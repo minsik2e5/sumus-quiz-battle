@@ -1,0 +1,12 @@
+{
+  "name": "sumus-quiz-battle-v0.8-public-server",
+  "version": "0.8.0",
+  "private": true,
+  "description": "SUMUS QUIZ BATTLE public internet realtime classroom server",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
