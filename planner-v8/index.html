@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#05080d" />
   <title>SUMUS Productivity</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="beauty.css" />
 </head>
 <body>
 <div id="app" class="app-shell">
@@ -20,6 +21,7 @@
       <button data-scroll="tasksSection">TASKS</button>
       <button data-scroll="scheduleSection">SCHEDULE</button>
       <button data-scroll="calendarSection">CALENDAR</button>
+      <button data-scroll="beautySection">BEAUTY</button>
     </nav>
     <div class="sync-wrap">
       <button class="status-pill" id="syncStatus" title="자동저장 상태"><span class="status-dot"></span><span id="syncText">기기에 저장됨</span></button>
@@ -97,6 +99,25 @@
       <div class="panel-head responsive-head"><div><div class="eyebrow">MONTH</div><h2>월간 캘린더</h2></div><div class="month-nav"><button id="monthPrev">‹</button><strong id="monthLabel"></strong><button id="monthNext">›</button><button id="monthToday" class="text-button">오늘</button></div></div>
       <div id="monthGrid" class="month-grid"></div>
     </section>
+
+    <section id="beautySection" class="panel section-gap beauty-panel">
+      <div class="panel-head responsive-head">
+        <div class="beauty-title"><span class="beauty-icon">💉</span><div><h2>시술 내역</h2><p>뷰티 시술 기록 전용 DB</p></div></div>
+        <div class="beauty-head-actions"><div id="beautyTotal" class="beauty-total">누적 0원</div><button id="addBeautyBtn" class="primary-button">+ 시술 기록 추가</button></div>
+      </div>
+      <div class="beauty-tabs">
+        <button class="beauty-tab active" data-beauty-view="default">▦ Default view</button>
+        <button class="beauty-tab" data-beauty-view="all">▤ 전체 내역</button>
+        <button class="beauty-tab" data-beauty-view="calendar">▣ 시술 캘린더</button>
+      </div>
+      <div id="beautyTableView" class="beauty-view">
+        <div class="table-scroll"><table class="data-table beauty-table"><thead><tr><th>시술명</th><th>금액</th><th>병원</th><th>분류</th><th>시술일</th><th>용량·부위</th><th>이벤트·비고</th><th></th></tr></thead><tbody id="beautyTableBody"></tbody></table></div>
+      </div>
+      <div id="beautyCalendarView" class="beauty-view hidden">
+        <div class="beauty-cal-head"><button id="beautyMonthPrev">‹</button><strong id="beautyMonthLabel"></strong><button id="beautyMonthNext">›</button><button id="beautyMonthToday" class="text-button">오늘</button></div>
+        <div id="beautyCalendarGrid" class="beauty-cal-grid"></div>
+      </div>
+    </section>
   </main>
 </div>
 
@@ -109,6 +130,7 @@
 <script src="app3b.js"></script>
 <script src="app4.js"></script>
 <script src="app5.js"></script>
+<script src="app7.js"></script>
 <script src="app6.js"></script>
 </body>
 </html>
