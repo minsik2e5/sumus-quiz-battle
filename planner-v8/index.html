@@ -1,17 +1,108 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>SUMUS Planner</title><link rel="stylesheet" href="style.css"></head><body>
-<div class="app"><div class="toptools"><button id="full">⛶ Full Screen</button><button id="backup">Backup</button></div><main class="dash">
-<div class="hero"><svg viewBox="0 0 1600 220" preserveAspectRatio="none"><rect width="1600" height="220" fill="#061820"/><g fill="#0c2d31"><rect x="240" width="300" height="220"/><rect x="560" width="290" height="220"/><rect x="875" width="290" height="220"/><rect x="1190" width="250" height="220"/></g><g stroke="#46aa87" stroke-width="5" opacity=".55"><path d="M310 0v220M470 0v220M640 0v220M800 0v220M955 0v220M1110 0v220M1270 0v220"/></g><g fill="#42b085" opacity=".8"><rect x="255" y="72" width="40" height="9"/><rect x="310" y="53" width="42" height="9"/><rect x="365" y="82" width="40" height="9"/><rect x="610" y="83" width="42" height="9"/><rect x="670" y="62" width="40" height="9"/><rect x="900" y="75" width="42" height="9"/><rect x="955" y="54" width="40" height="9"/><rect x="1210" y="78" width="40" height="9"/><rect x="1270" y="55" width="42" height="9"/></g></svg></div>
-<div class="brand">🌿 올인원 생산성 관리 시스템</div>
-<section class="g3"><div><div class="k">Live Clock</div><div class="clock"><div class="flip" id="hh">00</div><div class="colon">:</div><div class="flip" id="mm">00</div><div class="colon">:</div><div class="flip" id="ss">00</div></div><div class="date" id="date"></div></div><div><div class="weatherhead"><div class="k">South Korea Weather</div><div class="now" id="now">--°C</div></div><div class="weather" id="weather"></div></div><div class="memo">걱정하지마.<br>잘하고 있어.</div></section>
-<section class="g3 row"><div><h3>빠른 추가</h3><ul class="list"><li id="addTask" class="action-link">⊞ 새 작업</li><li id="addGoal" class="action-link">◎ 최우선</li><li id="addSession" class="action-link">◉ 새 세션 생성</li></ul></div><div><h3>오늘 할 일</h3><ul class="list" id="today"></ul></div><div><h3>최우선 목표</h3><ul class="list" id="goals"></ul></div></section>
-<section class="section routine" id="routineSection"><div class="routine-top"><div class="rhead">☑️ 일일 루틴</div><div class="pct"><span id="pct">0.0%</span><div class="bar"><span id="bar"></span></div></div><div class="routine-nav"><button class="small-btn" id="rPrev">‹</button><div class="routine-date" id="rDate"></div><button class="small-btn" id="rNext">›</button><button class="small-btn" id="rToday">오늘</button></div></div><div class="routine-grid" id="routines"></div><span class="history-link" id="routineHistoryLink">지난 루틴 기록 보기 →</span></section>
-<section class="section"><div class="section-head"><h3>작업 현황</h3><button class="small-btn" id="addTask2">+ 작업 추가</button></div><div class="table"><table class="tasktable"><thead><tr><th>완료</th><th>작업 이름</th><th>마감일</th><th>우선순위</th><th>상태</th></tr></thead><tbody id="tasks"></tbody></table></div></section>
-<section class="section"><div class="section-head"><div><h3>시간 기록 · DAILY TIME LOG</h3><div class="subtle">예: 03:00 ~ 04:00 수업자료 제작</div></div><div class="routine-nav"><button class="small-btn" id="logPrev">‹</button><div class="routine-date" id="logDate"></div><button class="small-btn" id="logNext">›</button><button class="small-btn" id="logToday">오늘</button></div></div><div class="timebox"><div class="time-controls"><div class="field-inline"><label>시작</label><input id="logStart" type="time"></div><div class="field-inline"><label>종료</label><input id="logEnd" type="time"></div><div class="field-inline activity"><label>무엇을 했는지</label><input id="logActivity" placeholder="예: 영어 수업자료 제작"></div><button class="btn primary" id="addLog">기록 추가</button></div><div class="time-list" id="timeList"></div></div></section>
-<div class="counters"><div class="counter blue"><div class="ico">📖</div><div class="cm"><div class="num" id="focus">0/4</div><div class="cl">Focus Sessions</div></div><div class="acts"><button class="sq" id="fm">−</button><button class="sq" id="fp">＋</button></div></div><div class="counter green"><div class="ico">💪</div><div class="cm"><div class="num" id="wins">0/50</div><div class="cl">Weekly Wins</div></div><div class="acts"><button class="sq" id="wm">−</button><button class="sq" id="wp">＋</button></div></div></div>
-<div class="timer"><div class="ico">🍩</div><div class="tc"><div class="modes"><button class="mode active" data-sec="1500">Pomodoro</button><button class="mode" data-sec="300">Short Break</button><button class="mode" data-sec="900">Long Break</button></div><div class="tm" id="timer">25:00</div><div class="cl">Focus Timer</div></div><button class="play" id="play">▶</button></div>
-<section class="calendar"><div class="calhead"><h3>MONTH CALENDAR</h3><div class="nav"><button id="prev">‹</button><div class="month" id="month"></div><button id="next">›</button><button id="todayMonth">●</button></div></div><div class="calgrid" id="cal"></div></section>
-</main></div>
-<div class="modalback" id="mb"><div class="modal"><h2 id="mt">새 작업</h2><div class="field"><label>작업 이름</label><input id="name"></div><div class="field"><label>마감일</label><input id="due" type="date"></div><div class="field"><label>우선순위</label><select id="priority"><option>Low</option><option selected>Medium</option><option>High</option><option>Urgent</option></select></div><div class="field"><label>상태</label><select id="status"><option>Not started</option><option>In progress</option><option>Done</option></select></div><div class="modalactions"><button class="btn danger" id="del">삭제</button><button class="btn" id="cancel">취소</button><button class="btn primary" id="save">저장</button></div></div></div>
-<div class="modalback" id="historyMb"><div class="modal history-modal"><div class="history-head"><div><h2>지난 루틴 기록</h2><div class="subtle">날짜별 체크 상태를 바로 보고, 여기서 직접 수정할 수 있어.</div></div><button class="small-btn" id="historyJumpToday">오늘 루틴</button></div><div id="historyList" style="margin-top:12px"></div><div class="modalactions"><button class="btn" id="historyClose">닫기</button></div></div></div>
-<div class="toast" id="toast"></div>
-<script src="app.js"></script></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#05080d" />
+  <title>SUMUS Productivity</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div id="app" class="app-shell">
+  <header class="topbar">
+    <div class="brand-lockup">
+      <div class="brand-mark">S</div>
+      <div><div class="brand-name">SUMUS</div><div class="brand-sub">Personal Productivity OS</div></div>
+    </div>
+    <nav class="topnav" id="topnav">
+      <button data-scroll="todaySection">TODAY</button>
+      <button data-scroll="routineSection">ROUTINE</button>
+      <button data-scroll="tasksSection">TASKS</button>
+      <button data-scroll="scheduleSection">SCHEDULE</button>
+      <button data-scroll="calendarSection">CALENDAR</button>
+    </nav>
+    <div class="sync-wrap">
+      <button class="status-pill" id="syncStatus" title="자동저장 상태"><span class="status-dot"></span><span id="syncText">기기에 저장됨</span></button>
+      <button class="icon-button" id="accountBtn" title="계정/동기화">☁</button>
+    </div>
+  </header>
+
+  <main class="main-wrap">
+    <section class="hero-card">
+      <div class="hero-visual" aria-hidden="true"><div class="moon"></div><div class="mount m1"></div><div class="mount m2"></div><div class="trees"></div></div>
+      <div class="hero-content">
+        <div class="hero-clock"><div class="eyebrow">LIVE CLOCK</div><div id="clock" class="clock">00:00:00</div><div id="dateLine" class="muted"></div></div>
+        <div class="hero-weather"><div class="eyebrow">SEOUL WEATHER</div><div class="weather-main"><span id="weatherTemp">--°</span><span id="weatherIcon">☁</span></div><div id="weatherDesc" class="muted">날씨 확인 중</div></div>
+        <div class="hero-note" contenteditable="true" id="heroNote" spellcheck="false">걱정하지마.<br>잘하고 있어.</div>
+      </div>
+    </section>
+
+    <section id="todaySection" class="section-grid section-gap">
+      <article class="panel quick-panel">
+        <div class="panel-head"><div><div class="eyebrow">QUICK ADD</div><h2>빠른 추가</h2></div></div>
+        <div class="quick-actions">
+          <button id="quickTask" class="quick-action"><span>＋</span><div><b>새 작업</b><small>할 일 바로 추가</small></div></button>
+          <button id="quickTimeLog" class="quick-action"><span>◷</span><div><b>시간 기록</b><small>지금 한 일 기록</small></div></button>
+          <button id="quickSchedule" class="quick-action"><span>▦</span><div><b>시간표</b><small>주간 일정 추가</small></div></button>
+        </div>
+      </article>
+
+      <article class="panel today-panel">
+        <div class="panel-head"><div><div class="eyebrow">TODAY</div><h2>오늘 할 일</h2></div><button class="text-button" id="addTaskTop">+ 추가</button></div>
+        <div id="todayTasks" class="task-list compact-list"></div>
+      </article>
+
+      <article class="panel focus-goals-panel">
+        <div class="panel-head"><div><div class="eyebrow">PRIORITY</div><h2>오늘의 최우선</h2></div><button class="text-button" id="addGoalBtn">+ 목표</button></div>
+        <div id="goalList" class="goal-list"></div>
+      </article>
+    </section>
+
+    <section id="routineSection" class="panel section-gap routine-panel">
+      <div class="panel-head responsive-head">
+        <div><div class="eyebrow">DAILY ROUTINE</div><h2>일일 루틴</h2></div>
+        <div class="date-nav"><button id="routinePrev">‹</button><button id="routineToday" class="date-label"></button><button id="routineNext">›</button></div>
+      </div>
+      <div class="routine-summary"><div><strong id="routinePercent">0%</strong><span id="routineCount" class="muted">0 / 0 완료</span></div><div class="progress-track"><span id="routineProgress"></span></div></div>
+      <div id="routineGrid" class="routine-grid"></div>
+      <div class="routine-footer"><button class="text-button" id="editRoutinesBtn">루틴 항목 편집</button><button class="text-button" id="routineHistoryBtn">지난 루틴 기록 보기 →</button></div>
+      <div id="routineHistory" class="history-drawer hidden"></div>
+    </section>
+
+    <section id="tasksSection" class="panel section-gap">
+      <div class="panel-head responsive-head"><div><div class="eyebrow">TASK CONTROL</div><h2>작업 현황</h2></div><div class="head-actions"><select id="taskFilter" class="select"><option value="active">진행 중</option><option value="all">전체</option><option value="done">완료</option></select><button id="addTaskBtn" class="primary-button">+ 작업 추가</button></div></div>
+      <div class="table-scroll"><table class="data-table"><thead><tr><th>완료</th><th>작업 이름</th><th>마감</th><th>우선순위</th><th>상태</th><th></th></tr></thead><tbody id="taskTableBody"></tbody></table></div>
+    </section>
+
+    <section class="two-col section-gap">
+      <article class="panel">
+        <div class="panel-head responsive-head"><div><div class="eyebrow">DAILY TIME LOG</div><h2>실제 시간 기록</h2></div><div class="date-nav"><button id="logPrev">‹</button><button id="logToday" class="date-label"></button><button id="logNext">›</button></div></div>
+        <div class="time-log-form"><input id="logStart" type="time"><span>~</span><input id="logEnd" type="time"><input id="logActivity" placeholder="무엇을 했는지 입력"><button id="addLogBtn" class="primary-button">추가</button></div>
+        <div id="timeLogList" class="time-log-list"></div>
+      </article>
+      <article class="panel focus-panel">
+        <div class="panel-head"><div><div class="eyebrow">FOCUS</div><h2>집중 세션</h2></div></div>
+        <div class="focus-stats"><div class="stat-card blue"><span>📖</span><div><strong id="focusCount">0</strong><small>Focus Sessions</small></div><div class="stepper"><button id="focusMinus">−</button><button id="focusPlus">＋</button></div></div><div class="stat-card green"><span>💪</span><div><strong id="winsCount">0</strong><small>Weekly Wins</small></div><div class="stepper"><button id="winsMinus">−</button><button id="winsPlus">＋</button></div></div></div>
+        <div class="timer-box"><div class="timer-tabs"><button data-min="25" class="active">Pomodoro</button><button data-min="5">Short</button><button data-min="15">Long</button></div><div id="timerDisplay" class="timer-display">25:00</div><button id="timerToggle" class="timer-main-button">▶ 시작</button></div>
+      </article>
+    </section>
+
+    <section id="scheduleSection" class="panel section-gap schedule-panel">
+      <div class="panel-head responsive-head"><div><div class="eyebrow">WEEKLY SCHEDULE</div><h2>주간 시간표</h2></div><div class="head-actions"><button id="scheduleTodayBtn" class="text-button">이번 주</button><button id="addScheduleBtn" class="primary-button">+ 일정 추가</button></div></div>
+      <div class="week-nav"><button id="weekPrev">‹</button><strong id="weekLabel"></strong><button id="weekNext">›</button></div>
+      <div class="week-scroll"><div id="weekGrid" class="week-grid"></div></div>
+    </section>
+
+    <section id="calendarSection" class="panel section-gap">
+      <div class="panel-head responsive-head"><div><div class="eyebrow">MONTH</div><h2>월간 캘린더</h2></div><div class="month-nav"><button id="monthPrev">‹</button><strong id="monthLabel"></strong><button id="monthNext">›</button><button id="monthToday" class="text-button">오늘</button></div></div>
+      <div id="monthGrid" class="month-grid"></div>
+    </section>
+  </main>
+</div>
+
+<div class="modal-backdrop hidden" id="modalBackdrop"><div class="modal" id="modal"></div></div>
+<div class="toast hidden" id="toast"></div>
+<script>window.SUMUS_CLOUD={supabaseUrl:'https://mrlrrzpppmdkivbozato.supabase.co',anonKey:'sb_publishable_grJ4unrcsYIKwOUV7cBzUA_NWMHzK3n'};</script>
+<script src="app.js"></script>
+</body>
+</html>
