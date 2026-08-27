@@ -25,7 +25,7 @@ try {
     throw new Error(`Client bundle integrity check failed (${Buffer.byteLength(htmlText)} bytes)`);
   }
 
-  const hotfix = ['hotfix_v081_part1.js', 'hotfix_v081_part2.js', 'hotfix_v082_public_access.js']
+  const hotfix = ['hotfix_v081_part1.js', 'hotfix_v081_part2.js', 'hotfix_v082_public_access.js', 'hotfix_v083_range_select.js']
     .map(name => fs.readFileSync(path.join(__dirname, name), 'utf8'))
     .join('\n');
   const marker = '    init();\n  })();';
@@ -35,7 +35,7 @@ try {
   const html = Buffer.from(htmlText, 'utf8');
   const gzip = zlib.gzipSync(html, { level: 9 });
   fs.writeFileSync(outputPath, gzip.toString('base64'));
-  console.log(`[SUMUS] Client bundle ready: ${parts.length} parts -> ${html.length} bytes · V0.8.2 PUBLIC ACCESS`);
+  console.log(`[SUMUS] Client bundle ready: ${parts.length} parts -> ${html.length} bytes · V0.8.3 RANGE FIX`);
 } catch (err) {
   console.error('[SUMUS] Failed to prepare client bundle:', err);
   process.exit(1);
