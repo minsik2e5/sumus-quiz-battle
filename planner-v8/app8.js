@@ -16,6 +16,7 @@ const defs=[
   {id:'focus',label:'집중 세션',sel:'.two-col > article:nth-child(2)',w:4,h:6},
   {id:'schedule',label:'주간 시간표',sel:'#scheduleSection',w:12,h:12},
   {id:'calendar',label:'월간 캘린더',sel:'#calendarSection',w:12,h:10},
+  {id:'saved',label:'저장된 기록',sel:'#savedSection',w:12,h:9},
   {id:'beauty',label:'시술 내역',sel:'#beautySection',w:12,h:10}
 ];
 
