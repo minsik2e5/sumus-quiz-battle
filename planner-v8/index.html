@@ -4,9 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="theme-color" content="#05080d" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <title>SUMUS Productivity</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/minsik2e5/sumus-quiz-battle@c1b4ccd08f665c4331dac895d9b15ed0c10c1bd0/planner-v8/style.css" />
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/minsik2e5/sumus-quiz-battle@c1b4ccd08f665c4331dac895d9b15ed0c10c1bd0/planner-v8/beauty.css" />
+  <link rel="manifest" href="./manifest.webmanifest?v=20260827" />
+  <link rel="icon" href="./sumus-icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="./style.css?v=20260827" />
+  <link rel="stylesheet" href="./beauty.css?v=20260827" />
+  <link rel="stylesheet" href="./layout.css?v=20260827" />
 </head>
 <body>
 <div id="app" class="app-shell">
@@ -40,97 +45,28 @@
     </section>
 
     <section id="todaySection" class="section-grid section-gap">
-      <article class="panel quick-panel">
-        <div class="panel-head"><div><div class="eyebrow">QUICK ADD</div><h2>빠른 추가</h2></div></div>
-        <div class="quick-actions">
-          <button id="quickTask" class="quick-action"><span>＋</span><div><b>새 작업</b><small>할 일 바로 추가</small></div></button>
-          <button id="quickTimeLog" class="quick-action"><span>◷</span><div><b>시간 기록</b><small>지금 한 일 기록</small></div></button>
-          <button id="quickSchedule" class="quick-action"><span>▦</span><div><b>시간표</b><small>주간 일정 추가</small></div></button>
-        </div>
-      </article>
-
-      <article class="panel today-panel">
-        <div class="panel-head"><div><div class="eyebrow">TODAY</div><h2>오늘 할 일</h2></div><button class="text-button" id="addTaskTop">+ 추가</button></div>
-        <div id="todayTasks" class="task-list compact-list"></div>
-      </article>
-
-      <article class="panel focus-goals-panel">
-        <div class="panel-head"><div><div class="eyebrow">PRIORITY</div><h2>오늘의 최우선</h2></div><button class="text-button" id="addGoalBtn">+ 목표</button></div>
-        <div id="goalList" class="goal-list"></div>
-      </article>
+      <article class="panel quick-panel"><div class="panel-head"><div><div class="eyebrow">QUICK ADD</div><h2>빠른 추가</h2></div></div><div class="quick-actions"><button id="quickTask" class="quick-action"><span>＋</span><div><b>새 작업</b><small>할 일 바로 추가</small></div></button><button id="quickTimeLog" class="quick-action"><span>◷</span><div><b>시간 기록</b><small>지금 한 일 기록</small></div></button><button id="quickSchedule" class="quick-action"><span>▦</span><div><b>시간표</b><small>주간 일정 추가</small></div></button></div></article>
+      <article class="panel today-panel"><div class="panel-head"><div><div class="eyebrow">TODAY</div><h2>오늘 할 일</h2></div><button class="text-button" id="addTaskTop">+ 추가</button></div><div id="todayTasks" class="task-list compact-list"></div></article>
+      <article class="panel focus-goals-panel"><div class="panel-head"><div><div class="eyebrow">PRIORITY</div><h2>오늘의 최우선</h2></div><button class="text-button" id="addGoalBtn">+ 목표</button></div><div id="goalList" class="goal-list"></div></article>
     </section>
 
-    <section id="routineSection" class="panel section-gap routine-panel">
-      <div class="panel-head responsive-head">
-        <div><div class="eyebrow">DAILY ROUTINE</div><h2>일일 루틴</h2></div>
-        <div class="date-nav"><button id="routinePrev">‹</button><button id="routineToday" class="date-label"></button><button id="routineNext">›</button></div>
-      </div>
-      <div class="routine-summary"><div><strong id="routinePercent">0%</strong><span id="routineCount" class="muted">0 / 0 완료</span></div><div class="progress-track"><span id="routineProgress"></span></div></div>
-      <div id="routineGrid" class="routine-grid"></div>
-      <div class="routine-footer"><button class="text-button" id="editRoutinesBtn">루틴 항목 편집</button><button class="text-button" id="routineHistoryBtn">지난 루틴 기록 보기 →</button></div>
-      <div id="routineHistory" class="history-drawer hidden"></div>
-    </section>
+    <section id="routineSection" class="panel section-gap routine-panel"><div class="panel-head responsive-head"><div><div class="eyebrow">DAILY ROUTINE</div><h2>일일 루틴</h2></div><div class="date-nav"><button id="routinePrev">‹</button><button id="routineToday" class="date-label"></button><button id="routineNext">›</button></div></div><div class="routine-summary"><div><strong id="routinePercent">0%</strong><span id="routineCount" class="muted">0 / 0 완료</span></div><div class="progress-track"><span id="routineProgress"></span></div></div><div id="routineGrid" class="routine-grid"></div><div class="routine-footer"><button class="text-button" id="editRoutinesBtn">루틴 항목 편집</button><button class="text-button" id="routineHistoryBtn">지난 루틴 기록 보기 →</button></div><div id="routineHistory" class="history-drawer hidden"></div></section>
 
-    <section id="tasksSection" class="panel section-gap">
-      <div class="panel-head responsive-head"><div><div class="eyebrow">TASK CONTROL</div><h2>작업 현황</h2></div><div class="head-actions"><select id="taskFilter" class="select"><option value="active">진행 중</option><option value="all">전체</option><option value="done">완료</option></select><button id="addTaskBtn" class="primary-button">+ 작업 추가</button></div></div>
-      <div class="table-scroll"><table class="data-table"><thead><tr><th>완료</th><th>작업 이름</th><th>마감</th><th>우선순위</th><th>상태</th><th></th></tr></thead><tbody id="taskTableBody"></tbody></table></div>
-    </section>
+    <section id="tasksSection" class="panel section-gap"><div class="panel-head responsive-head"><div><div class="eyebrow">TASK CONTROL</div><h2>작업 현황</h2></div><div class="head-actions"><select id="taskFilter" class="select"><option value="active">진행 중</option><option value="all">전체</option><option value="done">완료</option></select><button id="addTaskBtn" class="primary-button">+ 작업 추가</button></div></div><div class="table-scroll"><table class="data-table"><thead><tr><th>완료</th><th>작업 이름</th><th>마감</th><th>우선순위</th><th>상태</th><th></th></tr></thead><tbody id="taskTableBody"></tbody></table></div></section>
 
-    <section class="two-col section-gap">
-      <article class="panel">
-        <div class="panel-head responsive-head"><div><div class="eyebrow">DAILY TIME LOG</div><h2>실제 시간 기록</h2></div><div class="date-nav"><button id="logPrev">‹</button><button id="logToday" class="date-label"></button><button id="logNext">›</button></div></div>
-        <div class="time-log-form"><input id="logStart" type="time"><span>~</span><input id="logEnd" type="time"><input id="logActivity" placeholder="무엇을 했는지 입력"><button id="addLogBtn" class="primary-button">추가</button></div>
-        <div id="timeLogList" class="time-log-list"></div>
-      </article>
-      <article class="panel focus-panel">
-        <div class="panel-head"><div><div class="eyebrow">FOCUS</div><h2>집중 세션</h2></div></div>
-        <div class="focus-stats"><div class="stat-card blue"><span>📖</span><div><strong id="focusCount">0</strong><small>Focus Sessions</small></div><div class="stepper"><button id="focusMinus">−</button><button id="focusPlus">＋</button></div></div><div class="stat-card green"><span>💪</span><div><strong id="winsCount">0</strong><small>Weekly Wins</small></div><div class="stepper"><button id="winsMinus">−</button><button id="winsPlus">＋</button></div></div></div>
-        <div class="timer-box"><div class="timer-tabs"><button data-min="25" class="active">Pomodoro</button><button data-min="5">Short</button><button data-min="15">Long</button></div><div id="timerDisplay" class="timer-display">25:00</div><button id="timerToggle" class="timer-main-button">▶ 시작</button></div>
-      </article>
-    </section>
+    <section class="two-col section-gap"><article class="panel"><div class="panel-head responsive-head"><div><div class="eyebrow">DAILY TIME LOG</div><h2>실제 시간 기록</h2></div><div class="date-nav"><button id="logPrev">‹</button><button id="logToday" class="date-label"></button><button id="logNext">›</button></div></div><div class="time-log-form"><input id="logStart" type="time"><span>~</span><input id="logEnd" type="time"><input id="logActivity" placeholder="무엇을 했는지 입력"><button id="addLogBtn" class="primary-button">추가</button></div><div id="timeLogList" class="time-log-list"></div></article><article class="panel focus-panel"><div class="panel-head"><div><div class="eyebrow">FOCUS</div><h2>집중 세션</h2></div></div><div class="focus-stats"><div class="stat-card blue"><span>📖</span><div><strong id="focusCount">0</strong><small>Focus Sessions</small></div><div class="stepper"><button id="focusMinus">−</button><button id="focusPlus">＋</button></div></div><div class="stat-card green"><span>💪</span><div><strong id="winsCount">0</strong><small>Weekly Wins</small></div><div class="stepper"><button id="winsMinus">−</button><button id="winsPlus">＋</button></div></div></div><div class="timer-box"><div class="timer-tabs"><button data-min="25" class="active">Pomodoro</button><button data-min="5">Short</button><button data-min="15">Long</button></div><div id="timerDisplay" class="timer-display">25:00</div><button id="timerToggle" class="timer-main-button">▶ 시작</button></div></article></section>
 
-    <section id="scheduleSection" class="panel section-gap schedule-panel">
-      <div class="panel-head responsive-head"><div><div class="eyebrow">WEEKLY SCHEDULE</div><h2>주간 시간표</h2></div><div class="head-actions"><button id="scheduleTodayBtn" class="text-button">이번 주</button><button id="addScheduleBtn" class="primary-button">+ 일정 추가</button></div></div>
-      <div class="week-nav"><button id="weekPrev">‹</button><strong id="weekLabel"></strong><button id="weekNext">›</button></div>
-      <div class="week-scroll"><div id="weekGrid" class="week-grid"></div></div>
-    </section>
+    <section id="scheduleSection" class="panel section-gap schedule-panel"><div class="panel-head responsive-head"><div><div class="eyebrow">WEEKLY SCHEDULE</div><h2>주간 시간표</h2></div><div class="head-actions"><button id="scheduleTodayBtn" class="text-button">이번 주</button><button id="addScheduleBtn" class="primary-button">+ 일정 추가</button></div></div><div class="week-nav"><button id="weekPrev">‹</button><strong id="weekLabel"></strong><button id="weekNext">›</button></div><div class="week-scroll"><div id="weekGrid" class="week-grid"></div></div></section>
 
-    <section id="calendarSection" class="panel section-gap">
-      <div class="panel-head responsive-head"><div><div class="eyebrow">MONTH</div><h2>월간 캘린더</h2></div><div class="month-nav"><button id="monthPrev">‹</button><strong id="monthLabel"></strong><button id="monthNext">›</button><button id="monthToday" class="text-button">오늘</button></div></div>
-      <div id="monthGrid" class="month-grid"></div>
-    </section>
+    <section id="calendarSection" class="panel section-gap"><div class="panel-head responsive-head"><div><div class="eyebrow">MONTH</div><h2>월간 캘린더</h2></div><div class="month-nav"><button id="monthPrev">‹</button><strong id="monthLabel"></strong><button id="monthNext">›</button><button id="monthToday" class="text-button">오늘</button></div></div><div id="monthGrid" class="month-grid"></div></section>
 
-    <section id="beautySection" class="panel section-gap beauty-panel">
-      <div class="panel-head responsive-head">
-        <div class="beauty-title"><span class="beauty-icon">💉</span><div><h2>시술 내역</h2><p>뷰티 시술 기록 전용 DB</p></div></div>
-        <div class="beauty-head-actions"><div id="beautyTotal" class="beauty-total">누적 0원</div><button id="addBeautyBtn" class="primary-button">+ 시술 기록 추가</button></div>
-      </div>
-      <div class="beauty-tabs">
-        <button class="beauty-tab active" data-beauty-view="default">▦ Default view</button>
-        <button class="beauty-tab" data-beauty-view="all">▤ 전체 내역</button>
-        <button class="beauty-tab" data-beauty-view="calendar">▣ 시술 캘린더</button>
-      </div>
-      <div id="beautyTableView" class="beauty-view">
-        <div class="table-scroll"><table class="data-table beauty-table"><thead><tr><th>시술명</th><th>금액</th><th>병원</th><th>분류</th><th>시술일</th><th>용량·부위</th><th>이벤트·비고</th><th></th></tr></thead><tbody id="beautyTableBody"></tbody></table></div>
-      </div>
-      <div id="beautyCalendarView" class="beauty-view hidden">
-        <div class="beauty-cal-head"><button id="beautyMonthPrev">‹</button><strong id="beautyMonthLabel"></strong><button id="beautyMonthNext">›</button><button id="beautyMonthToday" class="text-button">오늘</button></div>
-        <div id="beautyCalendarGrid" class="beauty-cal-grid"></div>
-      </div>
-    </section>
+    <section id="beautySection" class="panel section-gap beauty-panel"><div class="panel-head responsive-head"><div class="beauty-title"><span class="beauty-icon">💉</span><div><h2>시술 내역</h2><p>뷰티 시술 기록 전용 DB</p></div></div><div class="beauty-head-actions"><div id="beautyTotal" class="beauty-total">누적 0원</div><button id="addBeautyBtn" class="primary-button">+ 시술 기록 추가</button></div></div><div class="beauty-tabs"><button class="beauty-tab active" data-beauty-view="default">▦ Default view</button><button class="beauty-tab" data-beauty-view="all">▤ 전체 내역</button><button class="beauty-tab" data-beauty-view="calendar">▣ 시술 캘린더</button></div><div id="beautyTableView" class="beauty-view"><div class="table-scroll"><table class="data-table beauty-table"><thead><tr><th>시술명</th><th>금액</th><th>병원</th><th>분류</th><th>시술일</th><th>용량·부위</th><th>이벤트·비고</th><th></th></tr></thead><tbody id="beautyTableBody"></tbody></table></div></div><div id="beautyCalendarView" class="beauty-view hidden"><div class="beauty-cal-head"><button id="beautyMonthPrev">‹</button><strong id="beautyMonthLabel"></strong><button id="beautyMonthNext">›</button><button id="beautyMonthToday" class="text-button">오늘</button></div><div id="beautyCalendarGrid" class="beauty-cal-grid"></div></div></section>
   </main>
 </div>
 
 <div class="modal-backdrop hidden" id="modalBackdrop"><div class="modal" id="modal"></div></div>
 <div class="toast hidden" id="toast"></div>
 <script>window.SUMUS_CLOUD={supabaseUrl:'https://mrlrrzpppmdkivbozato.supabase.co',anonKey:'sb_publishable_grJ4unrcsYIKwOUV7cBzUA_NWMHzK3n'};</script>
-<script src="https://cdn.jsdelivr.net/gh/minsik2e5/sumus-quiz-battle@c1b4ccd08f665c4331dac895d9b15ed0c10c1bd0/planner-v8/app1.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/minsik2e5/sumus-quiz-battle@c1b4ccd08f665c4331dac895d9b15ed0c10c1bd0/planner-v8/app2.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/minsik2e5/sumus-quiz-battle@c1b4ccd08f665c4331dac895d9b15ed0c10c1bd0/planner-v8/app3a.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/minsik2e5/sumus-quiz-battle@c1b4ccd08f665c4331dac895d9b15ed0c10c1bd0/planner-v8/app3b.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/minsik2e5/sumus-quiz-battle@c1b4ccd08f665c4331dac895d9b15ed0c10c1bd0/planner-v8/app4.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/minsik2e5/sumus-quiz-battle@c1b4ccd08f665c4331dac895d9b15ed0c10c1bd0/planner-v8/app5.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/minsik2e5/sumus-quiz-battle@c1b4ccd08f665c4331dac895d9b15ed0c10c1bd0/planner-v8/app7.js"></script>
-<script src="https://cdn.jsdelivr.net/gh/minsik2e5/sumus-quiz-battle@c1b4ccd08f665c4331dac895d9b15ed0c10c1bd0/planner-v8/app6.js"></script>
+<script src="./app1.js?v=20260827"></script><script src="./app2.js?v=20260827"></script><script src="./app3a.js?v=20260827"></script><script src="./app3b.js?v=20260827"></script><script src="./app4.js?v=20260827"></script><script src="./app5.js?v=20260827"></script><script src="./app7.js?v=20260827"></script><script src="./app6.js?v=20260827"></script><script src="./app8.js?v=20260827"></script>
 </body>
 </html>
