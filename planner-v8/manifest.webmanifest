@@ -1,0 +1,12 @@
+{
+  "name":"SUMUS Productivity OS",
+  "short_name":"SUMUS",
+  "description":"SUMUS personal productivity dashboard with cloud sync and movable widgets",
+  "start_url":"./",
+  "scope":"./",
+  "display":"standalone",
+  "background_color":"#05080d",
+  "theme_color":"#05080d",
+  "orientation":"any",
+  "icons":[{"src":"./sumus-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
