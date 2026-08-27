@@ -30,12 +30,14 @@ try {
     .join('\n');
   const marker = '    init();\n  })();';
   if (!htmlText.includes(marker)) throw new Error('Client hotfix insertion marker not found');
-  htmlText = htmlText.replace(marker, `${hotfix}\n${marker}`);
+  // IMPORTANT: use a function replacer so $&, $`, $', and $$ inside hotfix source
+  // are preserved literally instead of being interpreted as String.replace tokens.
+  htmlText = htmlText.replace(marker, () => `${hotfix}\n${marker}`);
 
   const html = Buffer.from(htmlText, 'utf8');
   const gzip = zlib.gzipSync(html, { level: 9 });
   fs.writeFileSync(outputPath, gzip.toString('base64'));
-  console.log(`[SUMUS] Client bundle ready: ${parts.length} parts -> ${html.length} bytes · V0.8.3 RANGE FIX`);
+  console.log(`[SUMUS] Client bundle ready: ${parts.length} parts -> ${html.length} bytes · V0.8.3.1 MENU FIX`);
 } catch (err) {
   console.error('[SUMUS] Failed to prepare client bundle:', err);
   process.exit(1);
