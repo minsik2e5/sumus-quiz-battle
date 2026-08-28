@@ -1,0 +1,7 @@
+node_modules/
+index.html.gz.b64
+test-results/
+playwright-report/
+tmp/
+*.log
+*.tmp

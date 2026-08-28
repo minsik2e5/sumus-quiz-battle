@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "policy": "local-only-no-hotlink",
+  "groups": ["characters", "arenas", "fx", "ui", "audio"],
+  "fallbacks": {
+    "characters.runner": "characters/runner-fallback.svg",
+    "arenas.run": "css-canvas",
+    "fx.speed-trail": "css",
+    "ui.podium": "css",
+    "audio.race": "web-audio"
+  }
+}

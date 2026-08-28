@@ -1,43 +1,15 @@
 'use strict';
 
 const fs = require('fs');
-const path = require('path');
-const zlib = require('zlib');
+const { buildClient } = require('./lib/build-client');
 
-const bundleDir = path.join(__dirname, 'bundle');
-const outputPath = path.join(__dirname, 'index.html.gz.b64');
+const outputPath = require('path').join(__dirname, 'index.html.gz.b64');
 
 try {
-  const parts = fs.readdirSync(bundleDir)
-    .filter(name => /^part\d+\.txt$/.test(name))
-    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-
-  if (parts.length !== 22) {
-    throw new Error(`Expected 22 bundle parts, found ${parts.length}`);
-  }
-
-  const base64 = parts
-    .map(name => fs.readFileSync(path.join(bundleDir, name), 'utf8').trim())
-    .join('');
-
-  let htmlText = zlib.brotliDecompressSync(Buffer.from(base64, 'base64')).toString('utf8');
-  if (Buffer.byteLength(htmlText) < 800000 || !htmlText.slice(0, 100).includes('<!doctype html>')) {
-    throw new Error(`Client bundle integrity check failed (${Buffer.byteLength(htmlText)} bytes)`);
-  }
-
-  const hotfix = ['hotfix_v081_part1.js', 'hotfix_v081_part2.js', 'hotfix_v082_public_access.js', 'hotfix_v083_range_select.js']
-    .map(name => fs.readFileSync(path.join(__dirname, name), 'utf8'))
-    .join('\n');
-  const marker = '    init();\n  })();';
-  if (!htmlText.includes(marker)) throw new Error('Client hotfix insertion marker not found');
-  // IMPORTANT: use a function replacer so $&, $`, $', and $$ inside hotfix source
-  // are preserved literally instead of being interpreted as String.replace tokens.
-  htmlText = htmlText.replace(marker, () => `${hotfix}\n${marker}`);
-
-  const html = Buffer.from(htmlText, 'utf8');
-  const gzip = zlib.gzipSync(html, { level: 9 });
-  fs.writeFileSync(outputPath, gzip.toString('base64'));
-  console.log(`[SUMUS] Client bundle ready: ${parts.length} parts -> ${html.length} bytes · V0.8.3.1 MENU FIX`);
+  const commit = String(process.env.RENDER_GIT_COMMIT || process.env.SUMUS_COMMIT || 'local-build').slice(0, 7);
+  const built = buildClient(__dirname, commit);
+  fs.writeFileSync(outputPath, built.encoded);
+  console.log(`[SUMUS] Client bundle ready: ${built.partCount} parts -> ${built.byteLength} bytes · V0.9.1 RELEASE CANDIDATE (${built.commit})`);
 } catch (err) {
   console.error('[SUMUS] Failed to prepare client bundle:', err);
   process.exit(1);

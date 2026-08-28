@@ -25,6 +25,7 @@
     };
     const V082_copy=async text=>{try{await navigator.clipboard.writeText(text);return true}catch{}try{const t=document.createElement('textarea');t.value=text;t.style.position='fixed';t.style.opacity='0';document.body.append(t);t.select();const ok=document.execCommand('copy');t.remove();return!!ok}catch{return false}};
     const V082_installAccessUI=()=>{
+      if(typeof AppRole!=='undefined'&&AppRole!=='teacher')return;
       const label=document.querySelector('#studentUrlLabel');if(!label)return;
       const url=V082_publicStudentUrl();label.textContent=url;
       const host=label.parentElement||label;

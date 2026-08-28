@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Runner fallback">
+  <circle cx="68" cy="25" r="14" fill="#f1bd98"/>
+  <path d="M58 43 76 42 70 70 48 67Z" fill="#5de4e7" stroke="#10202c" stroke-width="4"/>
+  <path d="M53 66 31 99M67 68l28 25M57 49 34 67M72 48l25 16" fill="none" stroke="#d7ebef" stroke-width="10" stroke-linecap="round"/>
+  <path d="M27 101H13M94 94l17 4" stroke="#ffc857" stroke-width="8" stroke-linecap="round"/>
+</svg>

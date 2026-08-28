@@ -1,12 +1,19 @@
 {
-  "name": "sumus-quiz-battle-v0.8-public-server",
-  "version": "0.8.0",
+  "name": "sumus-quiz-battle-v0.9.1-release-candidate",
+  "version": "0.9.1",
   "private": true,
   "description": "SUMUS QUIZ BATTLE public internet realtime classroom server",
   "scripts": {
-    "start": "node bootstrap.js"
+    "start": "node bootstrap.js",
+    "build": "node scripts/build-only.js",
+    "test": "node --test test/build.test.js test/data.test.js test/protocol.test.js test/room-registry.test.js",
+    "test:e2e": "node --test test/e2e-classroom.test.js",
+    "test:load": "node scripts/run-load-test.js"
   },
   "engines": {
     "node": ">=20"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.62.1"
   }
 }
