@@ -15,7 +15,9 @@
       if (code) code.textContent = BattleSession.code;
       TeacherBridge.updateStudentUrl?.();
     };
+    const V091_battleKey = () => `${String(BattleSession.id || '')}|${String(BattleSession.code || '')}`;
     LocalTransport.socketGeneration = 0;
+    LocalTransport.registeredBattleKey = '';
     LocalTransport.connectWebSocket = function () {
       clearTimeout(this.retryTimer);
       this.manualClose = false;
@@ -29,6 +31,7 @@
         if (!active()) return;
         this.connected = true;
         this.retryCount = 0;
+        this.registeredBattleKey = '';
         this.emitLocal('TRANSPORT_STATUS', { status: 'live', mode: 'websocket' });
         if (AppRole === 'teacher') this.announceBattle();
       };
@@ -42,12 +45,14 @@
             this.emitLocal('TRANSPORT_STATUS', { status: 'live', mode: 'websocket', serverTime: payload.serverTime });
           }
           if (message?.type === 'SERVER_CODE_CONFLICT' && AppRole === 'teacher') {
+            this.registeredBattleKey = '';
             V091_newBattleIdentity();
             toast('배틀 코드 충돌을 감지해 새 코드로 교체했습니다.', 'warn');
             this.reconnect();
             return;
           }
           if (message?.type === 'SERVER_REGISTERED' && AppRole === 'teacher') {
+            this.registeredBattleKey = `${String(payload.battleId || '')}|${String(payload.battleCode || '')}`;
             setTimeout(() => { if (!V091_roomStateReceived) TeacherBridge.publish(); }, 100);
           }
           this.receive(message);
@@ -58,6 +63,7 @@
         if (!active()) return;
         this.connected = false;
         this.socket = null;
+        this.registeredBattleKey = '';
         if (!this.manualClose) {
           this.emitLocal('TRANSPORT_STATUS', { status: 'reconnecting', mode: 'websocket' });
           this.scheduleReconnect();
@@ -73,12 +79,20 @@
         commit: String(window.SUMUS_COMMIT || '').slice(0, 40)
       });
     };
+    LocalTransport.ensureBattleRegistration = function () {
+      if (AppRole !== 'teacher' || !this.connected) return false;
+      const key = V091_battleKey();
+      if (!BattleSession.id || !BattleSession.code) return false;
+      if (this.registeredBattleKey === key) return true;
+      return this.announceBattle();
+    };
     LocalTransport.reconnect = function () {
       this.manualClose = false;
       clearTimeout(this.retryTimer);
       const old = this.socket;
       this.socket = null;
       this.connected = false;
+      this.registeredBattleKey = '';
       ++this.socketGeneration;
       try { old?.close(); } catch (e) {}
       setTimeout(() => this.connectWebSocket(), 180);

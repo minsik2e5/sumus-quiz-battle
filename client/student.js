@@ -9,7 +9,8 @@
       }
       StudentSession.battleCode = code;
       StudentSession.screen = 'connecting';
-      StudentSession.error = '서버에 연결 중입니다… 첫 접속은 최대 45초 걸릴 수 있습니다.';
+      StudentSession.error = '배틀 서버와 연결하는 중입니다…';
+      this.lookupNotFoundCount = 0;
       this.render();
       clearTimeout(this.lookupTimer);
       const startedAt = Date.now();
@@ -26,7 +27,7 @@
           this.render();
           return;
         }
-        StudentSession.error = elapsed > 9000 ? '무료 서버를 깨우는 중입니다… 잠시 기다려 주세요.' : '배틀 서버와 연결하는 중입니다…';
+        StudentSession.error = elapsed > 9000 && !LocalTransport.connected ? '무료 서버를 깨우는 중입니다… 잠시 기다려 주세요.' : 'Battle Code를 확인하고 있습니다.';
         this.render();
         this.lookupTimer = setTimeout(probe, Math.min(5000, 900 + attempt * 550));
       };
@@ -34,11 +35,20 @@
     };
     const V091_studentHandle = StudentApp.handle;
     StudentApp.handle = function (message) {
-      if (message?.type === 'BATTLE_NOT_FOUND' && StudentSession.screen === 'connecting') return;
+      if (message?.type === 'BATTLE_NOT_FOUND' && StudentSession.screen === 'connecting') {
+        this.lookupNotFoundCount = (this.lookupNotFoundCount || 0) + 1;
+        if (!LocalTransport.connected || this.lookupNotFoundCount < 3) return;
+        clearTimeout(this.lookupTimer);
+        StudentSession.screen = 'enter';
+        StudentSession.error = '배틀을 찾지 못했습니다. Battle Code를 다시 확인해 주세요.';
+        this.render();
+        return;
+      }
       return V091_studentHandle.call(this, message);
     };
     const V091_acceptSnapshot = StudentApp.acceptSnapshot;
     StudentApp.acceptSnapshot = function (snapshot) {
+      this.lookupNotFoundCount = 0;
       StudentSession.error = '';
       return V091_acceptSnapshot.call(this, snapshot);
     };

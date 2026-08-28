@@ -23,9 +23,7 @@ function resolveChromePath() {
       ? ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Chromium.app/Contents/MacOS/Chromium']
       : ['/usr/bin/google-chrome', '/usr/bin/google-chrome-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser'];
   const found = candidates.find((candidate) => candidate && fs.existsSync(candidate));
-  if (!found) {
-    throw new Error('Chrome/Chromium executable not found. Set SUMUS_CHROME_PATH to the browser executable.');
-  }
+  if (!found) throw new Error('Chrome/Chromium executable not found. Set SUMUS_CHROME_PATH to the browser executable.');
   return found;
 }
 const chromePath = resolveChromePath();
@@ -82,6 +80,34 @@ test('Incheon authoritative ranges isolate the actual pools', () => {
   assert.equal(book.words.filter((word) => a.has(word.unit) && b.has(word.unit)).length, 0);
   assert.equal(book.words.filter((word) => a.has(word.unit)).length, 78);
   assert.equal(book.words.filter((word) => b.has(word.unit)).length, 100);
+});
+
+test('teacher re-registers a battle created after websocket connection', { timeout: 30000 }, async () => {
+  const teacherContext = await browser.newContext();
+  const teacher = await teacherContext.newPage();
+  const pageErrors = [];
+  teacher.on('pageerror', (error) => pageErrors.push(`teacher: ${error.message}`));
+  await teacher.goto(`${baseUrl}/?role=teacher`);
+  await teacher.waitForFunction(() => window.SUMUS_BUILD && document.querySelector('.v091-buildtag'));
+  await teacher.waitForTimeout(1200);
+  const initiallyRegistered = await teacher.evaluate(() => ({ id: BattleSession.id, code: BattleSession.code }));
+  await teacher.getByRole('button', { name: /CREATE BATTLE/ }).click();
+  await teacher.locator('[data-arena="run"]').click();
+  if (hasIncheon) await teacher.locator('[data-book-id="incheon-g1-sep-2025-selected"]').click();
+  await teacher.getByRole('button', { name: 'CREATE LOBBY →', exact: true }).click();
+  const code = (await teacher.locator('#battleCode').textContent()).trim();
+  const afterCreate = await teacher.evaluate(() => ({ id: BattleSession.id, code: BattleSession.code }));
+  assert.match(code, /^\d{5}$/);
+  assert.notDeepEqual(afterCreate, initiallyRegistered);
+
+  const studentContext = await browser.newContext();
+  const student = await studentContext.newPage();
+  student.on('pageerror', (error) => pageErrors.push(`student: ${error.message}`));
+  await student.goto(`${baseUrl}/?role=student&code=${code}`);
+  await student.getByRole('textbox').waitFor({ timeout: 8000 });
+  assert.deepEqual(pageErrors, []);
+  await studentContext.close();
+  await teacherContext.close();
 });
 
 test('HOME to results survives student reconnect and teacher refresh', { timeout: 60000 }, async () => {

@@ -99,6 +99,7 @@
     };
     const V091_previousPublish = TeacherBridge.publish.bind(TeacherBridge);
     TeacherBridge.publish = function (targetClientId = '') {
+      try { LocalTransport.ensureBattleRegistration?.(); } catch (e) {}
       const result = V091_previousPublish(targetClientId);
       if (!targetClientId) V091_saveTeacherState();
       return result;
