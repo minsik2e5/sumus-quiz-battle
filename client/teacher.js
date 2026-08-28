@@ -65,6 +65,13 @@
     const V091_restoreTeacherState = (saved) => {
       if (!saved || saved.battleId !== BattleSession.id || saved.battleCode !== BattleSession.code) return false;
       if (!BUILT_IN_BOOKS.some((book) => book.id === saved.bookId)) return false;
+      const savedPlayers = Array.isArray(saved.players) ? saved.players : [];
+      const savedRaceActive = !!saved.race?.running || !!saved.race?.paused;
+      // An empty setup screen is not a live classroom session. Restoring it on the
+      // next visit makes a deliberate new CREATE BATTLE look stuck in yesterday's
+      // setup. Keep recovery for real lobby/race sessions, but start clean from an
+      // abandoned pre-lobby setup.
+      if (saved.screen === 'setup' && savedPlayers.length === 0 && !savedRaceActive) return false;
       setBook(saved.bookId, { notify: false });
       state.arena = saved.arena || state.arena;
       state.rangeMode = saved.rangeMode || 'same';
@@ -72,7 +79,7 @@
       state.rangeOptions = (saved.rangeOptions || []).map((row) => ({ ...row, units: (row.units || []).filter((unit) => state.units.includes(unit)) }));
       state.rangeOptionBookId = saved.bookId;
       state.config = { ...state.config, ...(saved.config || {}), questionTypes: [...(saved.config?.questionTypes || state.config.questionTypes)] };
-      state.players = (saved.players || []).map((player) => ({ ...player, questions: (player.questions || []).map((question) => ({ ...question })) }));
+      state.players = savedPlayers.map((player) => ({ ...player, questions: (player.questions || []).map((question) => ({ ...question })) }));
       Object.assign(state.race, saved.race || {});
       state.screen = saved.screen || 'lobby';
       try { V083_save(); } catch (e) {}
