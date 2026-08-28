@@ -82,7 +82,7 @@ test('Incheon authoritative ranges isolate the actual pools', () => {
   assert.equal(book.words.filter((word) => b.has(word.unit)).length, 100);
 });
 
-test('teacher re-registers a battle created after websocket connection', { timeout: 30000 }, async () => {
+test('teacher re-registers a new battle and ignores stale empty setup recovery', { timeout: 30000 }, async () => {
   const teacherContext = await browser.newContext();
   const teacher = await teacherContext.newPage();
   const pageErrors = [];
@@ -90,13 +90,19 @@ test('teacher re-registers a battle created after websocket connection', { timeo
   await teacher.goto(`${baseUrl}/?role=teacher`);
   await teacher.waitForFunction(() => window.SUMUS_BUILD && document.querySelector('.v091-buildtag'));
   await teacher.waitForTimeout(1200);
-  const initiallyRegistered = await teacher.evaluate(() => ({ id: BattleSession.id, code: BattleSession.code }));
+  const initiallyRegistered = await teacher.evaluate(() => {
+    const snapshot = window.SUMUS_TEACHER_AUDIT.snapshot();
+    return { id: snapshot.battleId, code: snapshot.battleCode };
+  });
   await teacher.getByRole('button', { name: /CREATE BATTLE/ }).click();
   await teacher.locator('[data-arena="run"]').click();
   if (hasIncheon) await teacher.locator('[data-book-id="incheon-g1-sep-2025-selected"]').click();
   await teacher.getByRole('button', { name: 'CREATE LOBBY →', exact: true }).click();
   const code = (await teacher.locator('#battleCode').textContent()).trim();
-  const afterCreate = await teacher.evaluate(() => ({ id: BattleSession.id, code: BattleSession.code }));
+  const afterCreate = await teacher.evaluate(() => {
+    const snapshot = window.SUMUS_TEACHER_AUDIT.snapshot();
+    return { id: snapshot.battleId, code: snapshot.battleCode };
+  });
   assert.match(code, /^\d{5}$/);
   assert.notDeepEqual(afterCreate, initiallyRegistered);
 
@@ -107,6 +113,21 @@ test('teacher re-registers a battle created after websocket connection', { timeo
   await student.getByRole('textbox').waitFor({ timeout: 8000 });
   assert.deepEqual(pageErrors, []);
   await studentContext.close();
+
+  await teacher.getByRole('button', { name: '← SETTINGS', exact: true }).click();
+  await teacher.getByRole('button', { name: 'INDIVIDUAL', exact: true }).click();
+  await teacher.waitForFunction(() => {
+    const snapshot = window.SUMUS_TEACHER_AUDIT?.snapshot();
+    return snapshot?.screen === 'setup' && snapshot.players.length === 0 &&
+      snapshot.race.running === false && snapshot.race.paused === false;
+  });
+  await teacher.waitForTimeout(350);
+  await teacher.reload();
+  await teacher.waitForFunction(() => window.SUMUS_TEACHER_AUDIT);
+  await teacher.waitForTimeout(900);
+  assert.equal(await teacher.locator('#home').evaluate((node) => node.classList.contains('active')), true);
+  assert.equal(await teacher.evaluate(() => window.SUMUS_TEACHER_AUDIT.restoreApplied()), false);
+  assert.deepEqual(pageErrors, []);
   await teacherContext.close();
 });
 
@@ -168,12 +189,14 @@ test('HOME to results survives student reconnect and teacher refresh', { timeout
   await studentB.page.getByText(/Q 1 \/ 20/).waitFor({ timeout: 10000 });
   await studentA.page.locator('.student-answer').first().click();
   await studentA.page.getByText(/Q 2 \/ 20/).waitFor({ timeout: 5000 });
+  await studentB.page.locator('.student-pass').click();
+  await studentB.page.getByText(/Q 2 \/ 20/).waitFor({ timeout: 5000 });
 
   await teacher.getByRole('button', { name: 'PAUSE', exact: true }).click();
   await teacher.getByRole('button', { name: 'RESUME', exact: true }).click();
   const playersBeforeStudentReload = await teacher.evaluate(() => window.SUMUS_TEACHER_AUDIT.snapshot().players.map((player) => ({ id: player.id, name: player.name })));
   await studentB.page.reload();
-  await studentB.page.getByText(/Q 1 \/ 20|기다리고 있습니다/).waitFor({ timeout: 10000 });
+  await studentB.page.getByText(/Q 2 \/ 20|기다리고 있습니다/).waitFor({ timeout: 10000 });
   await teacher.waitForFunction((expected) => {
     const current = window.SUMUS_TEACHER_AUDIT.snapshot().players.map((player) => ({ id: player.id, name: player.name }));
     return JSON.stringify(current) === JSON.stringify(expected);
