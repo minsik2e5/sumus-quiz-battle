@@ -323,14 +323,31 @@ function handleAppMessage(socket, message) {
     const room = roomRegistry.byCode(code);
     const teacher = room?.teacherSocket || teachersByCode.get(code);
     meta.code = code;
-    if (!teacher) {
-      if (room?.snapshot) {
-        addStudentToBattle(socket, room.battleId);
-        sendJson(socket, { ...room.snapshot, payload: { ...(room.snapshot.payload || room.snapshot), targetClientId: meta.clientId, cached: true } });
-      } else sendJson(socket, systemMessage('BATTLE_NOT_FOUND', { code }, meta.clientId));
+
+    // Resolve the room immediately from the server's cached authoritative snapshot.
+    // This removes a fragile student -> server -> teacher -> server -> student round trip
+    // from the initial join path. If the teacher is live we still forward the lookup so
+    // a fresh snapshot can follow, but the student no longer waits on that response.
+    if (room?.snapshot) {
+      addStudentToBattle(socket, room.battleId);
+      const snapshotPayload = room.snapshot.payload || room.snapshot;
+      sendJson(socket, {
+        ...room.snapshot,
+        payload: { ...snapshotPayload, targetClientId: meta.clientId, cached: true }
+      });
+      log('BATTLE_LOOKUP cache-hit', meta.clientId, code, room.battleId, teacher ? 'teacher-live' : 'teacher-offline');
+      if (teacher) sendJson(teacher, message);
       return;
     }
-    sendJson(teacher, message);
+
+    if (teacher) {
+      log('BATTLE_LOOKUP teacher-forward', meta.clientId, code, room?.battleId || '-');
+      sendJson(teacher, message);
+      return;
+    }
+
+    log('BATTLE_LOOKUP miss', meta.clientId, code);
+    sendJson(socket, systemMessage('BATTLE_NOT_FOUND', { code }, meta.clientId));
     return;
   }
 
@@ -619,13 +636,4 @@ server.listen(PORT, HOST, () => {
   console.log('Teacher: open the public HTTPS URL with ?role=teacher.');
   console.log('Students: open the same public HTTPS URL from Wi-Fi or LTE/5G.');
   if (!TEACHER_KEY) console.warn('WARNING: SUMUS_TEACHER_KEY is not configured. Public deployment should set it.');
-});
-
-process.on('SIGINT', () => {
-  log('Shutting down...');
-  clearInterval(heartbeat);
-  for (const socket of metaBySocket.keys()) {
-    try { socket.end(frameControl(0x8)); } catch {}
-  }
-  server.close(() => process.exit(0));
 });
