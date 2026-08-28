@@ -8,7 +8,8 @@
     "build": "node scripts/build-only.js",
     "test": "node --test test/build.test.js test/data.test.js test/protocol.test.js test/room-registry.test.js",
     "test:e2e": "node --test test/e2e-classroom.test.js",
-    "test:load": "node scripts/run-load-test.js"
+    "test:load": "node scripts/run-load-test.js",
+    "test:visual": "node scripts/visual-qa.js"
   },
   "engines": {
     "node": ">=20"
