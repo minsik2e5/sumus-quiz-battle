@@ -1,0 +1,54 @@
+name: V0.9.2B QA
+
+on:
+  push:
+    branches:
+      - v0.9.2b-run-motion-upgrade
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUMUS_CHROME_PATH: /usr/bin/google-chrome
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Unit and regression tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Classroom E2E
+        run: npm run test:e2e
+
+      - name: 24-player load and reconnect
+        run: npm run test:load
+
+      - name: V0.9.2A plus V0.9.2B visual regression
+        run: npm run test:visual
+
+      - name: V0.9.2B motion sequence QA
+        run: npm run test:motion
+
+      - name: Upload browser QA artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v092b-browser-qa
+          path: qa/
+          if-no-files-found: warn
