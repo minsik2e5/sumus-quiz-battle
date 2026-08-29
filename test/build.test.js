@@ -17,8 +17,16 @@ test('production client builds, compiles, and contains audited data', () => {
   assert.match(html, /const \$=\(s,r=document\)=>r\.querySelector\(s\), \$\$=\(s,r=document\)=>\[\.\.\.r\.querySelectorAll\(s\)\]/);
   assert.match(html, /V091_restoreTeacherState/);
   assert.match(html, /V0\.9\.2A VISUAL CLEANUP/);
-  assert.equal(HOTFIX_FILES.at(-1), 'client/visual-cleanup.js');
+  assert.match(html, /V0\.9\.2B RUN MOTION UPGRADE/);
+  assert.match(html, /V0\.9\.2B\.1 PREMIUM DIRECTOR PASS/);
+  assert.deepEqual(HOTFIX_FILES.slice(-3), [
+    'client/visual-cleanup.js',
+    'client/run-motion.js',
+    'client/premium-director.js'
+  ]);
   assert.ok(html.indexOf('V0.9.2A VISUAL CLEANUP') > html.indexOf('Diagnostics, fatal surface'));
+  assert.ok(html.indexOf('V0.9.2B RUN MOTION UPGRADE') > html.indexOf('V0.9.2A VISUAL CLEANUP'));
+  assert.ok(html.indexOf('V0.9.2B.1 PREMIUM DIRECTOR PASS') > html.indexOf('V0.9.2B RUN MOTION UPGRADE'));
 });
 
 test('V0.9.2A presentation layer does not override frozen gameplay methods', () => {
@@ -32,4 +40,25 @@ test('V0.9.2A presentation layer does not override frozen gameplay methods', () 
   );
   assert.match(productionHideBlock, /#openStudentTest/);
   assert.doesNotMatch(productionHideBlock, /#(?:forceStartBattle|addDemoPlayers|clearPlayers|copyStudentUrl)|\.student-lobby-tools/);
+});
+
+test('V0.9.2B motion layer stays presentation-only', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'client', 'run-motion.js'), 'utf8');
+  assert.doesNotMatch(source, /RaceEngine\.(?:answer|frame|finish|rank|setup|updateHud)\s*=/);
+  assert.doesNotMatch(source, /(?:QuizEngine|ScoreEngine|TeacherBridge|StudentApp)\.[A-Za-z_$][\w$]*\s*=/);
+  assert.doesNotMatch(source, /\bplayer\.(?:distance|worldDistance|score|points|combo|questionIndex|finished|finishRank)\s*=/);
+  assert.doesNotMatch(source, /\bstate\.(?:players|config|arena|battleId)\s*=/);
+  assert.match(source, /leaderProgress\s*>=\s*\.8/);
+  assert.match(source, /window\.SUMUS_MOTION_AUDIT/);
+  assert.match(source, /V0\.9\.2B RUN MOTION UPGRADE/);
+});
+
+test('V0.9.2B.1 premium director stays presentation-only', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'client', 'premium-director.js'), 'utf8');
+  assert.doesNotMatch(source, /RaceEngine\.(?:answer|frame|finish|rank|setup|updateHud)\s*=/);
+  assert.doesNotMatch(source, /(?:QuizEngine|ScoreEngine|TeacherBridge|StudentApp)\.[A-Za-z_$][\w$]*\s*=/);
+  assert.doesNotMatch(source, /\bplayer\.(?:distance|worldDistance|score|points|combo|questionIndex|finished|finishRank)\s*=/);
+  assert.doesNotMatch(source, /\bstate\.(?:players|config|arena|battleId)\s*=/);
+  assert.match(source, /v092b1-stadium-depth/);
+  assert.match(source, /window\.SUMUS_PREMIUM_BUILD/);
 });
