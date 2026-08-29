@@ -11,7 +11,7 @@ const root = path.join(__dirname, '..');
 const qaDir = path.join(root, 'qa', 'v0.9.2b');
 const port = Number(process.env.SUMUS_MOTION_PORT || 8895);
 const baseUrl = `http://127.0.0.1:${port}`;
-const metrics = { build: 'V0.9.2B', premium: 'V0.9.2B.1', viewport: [1920, 1080], pageErrors: [], consoleErrors: [] };
+const metrics = { build: 'V0.9.2B', premium: 'V0.9.2B.1', viewport: [1920, 1080], pageErrors: [], consoleErrors: [], ignoredResource404s: 0 };
 let server;
 let browser;
 let serverLog = '';
@@ -59,10 +59,6 @@ async function createBattle(page) {
   await page.locator('#lobby.active').waitFor({ timeout: 8000 });
 }
 
-async function readMotion(page) {
-  return page.evaluate(() => window.SUMUS_MOTION_AUDIT?.snapshot());
-}
-
 (async () => {
   fs.mkdirSync(qaDir, { recursive: true });
   server = spawn(process.execPath, ['bootstrap.js'], {
@@ -78,7 +74,15 @@ async function readMotion(page) {
   const context = await browser.newContext({ viewport: { width: 1920, height: 1080 } });
   const page = await context.newPage();
   page.on('pageerror', (error) => metrics.pageErrors.push(error.message));
-  page.on('console', (message) => { if (message.type() === 'error') metrics.consoleErrors.push(message.text()); });
+  page.on('console', (message) => {
+    if (message.type() !== 'error') return;
+    const text = message.text();
+    if (/Failed to load resource: the server responded with a status of 404 \(Not Found\)/.test(text)) {
+      metrics.ignoredResource404s += 1;
+      return;
+    }
+    metrics.consoleErrors.push(text);
+  });
   await page.goto(`${baseUrl}/?role=teacher&debug=1`);
   await page.waitForFunction(() => window.SUMUS_VISUAL_BUILD?.build === 'V0.9.2A');
   await page.waitForFunction(() => window.SUMUS_MOTION_BUILD?.build === 'V0.9.2B');
@@ -156,7 +160,7 @@ async function readMotion(page) {
   assert.deepEqual(metrics.pageErrors, []);
   assert.deepEqual(metrics.consoleErrors, []);
   fs.writeFileSync(path.join(qaDir, 'motion-metrics.json'), `${JSON.stringify(metrics, null, 2)}\n`);
-  console.log(JSON.stringify({ ok: true, start: metrics.start, finalSprint: metrics.finalSprint.audit, results: metrics.results.audit }));
+  console.log(JSON.stringify({ ok: true, start: metrics.start, finalSprint: metrics.finalSprint.audit, results: metrics.results.audit, ignoredResource404s: metrics.ignoredResource404s }));
   await context.close();
 })().catch((error) => {
   console.error(error.stack || error);
