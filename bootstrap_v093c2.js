@@ -1,0 +1,10 @@
+'use strict';
+const fs=require('fs');
+const path=require('path');
+const dir=path.join(__dirname,'deploy','v093c2');
+const parts=fs.readdirSync(dir).filter(n=>/^index_\d+\.txt$/.test(n)).sort();
+if(!parts.length) throw new Error('V0.9.3C2 client parts missing');
+const encoded=parts.map(n=>fs.readFileSync(path.join(dir,n),'utf8').trim()).join('');
+fs.writeFileSync(path.join(__dirname,'index.html.gz.b64'),encoded);
+console.log('[SUMUS] V0.9.3C2 prebuilt RAID client assembled', parts.length, 'parts');
+require('./server.js');
