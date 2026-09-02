@@ -116,7 +116,8 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    let pathname = decodeURIComponent(url.pathname).replace(/\\/{2,}/g, '/');
+    let pathname = decodeURIComponent(url.pathname);
+    while (pathname.startsWith('//')) pathname = pathname.slice(1);
     if (pathname === '/' || pathname === '/index.html' || (!path.extname(pathname) && !pathname.startsWith('/assets/'))) {
       if (!EMBEDDED_INDEX) {
         res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' });
