@@ -8,7 +8,7 @@
 - Student: `/?role=student&code=12345`
 - Health: `/health`
 - Realtime: WebSocket `/ws`
-- Fixed public origin: `https://sumus-quiz-battle-public-v083.onrender.com`
+- Public student origin: current `window.location.origin` (or a server-provided canonical origin); file-only QA falls back to localhost.
 
 현재 live Render는 사용자 승인 전까지 V0.9.1로 배포하지 않습니다. 최종 배포 시 GitHub main commit, Render `/health` commit, ZIP build badge가 일치해야 합니다.
 

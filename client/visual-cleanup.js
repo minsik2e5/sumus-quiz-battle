@@ -238,11 +238,17 @@
     };
 
     let V092A_decorateQueued = false;
-    const V092A_queueDecorate = () => {
+    let V092A_observerCallbacks = 0;
+    let V092A_observerRecords = 0;
+    let V092A_decorateRuns = 0;
+    const V092A_queueDecorate = (records = []) => {
+      V092A_observerCallbacks += 1;
+      V092A_observerRecords += records.length || 0;
       if (V092A_decorateQueued) return;
       V092A_decorateQueued = true;
       requestAnimationFrame(() => {
         V092A_decorateQueued = false;
+        V092A_decorateRuns += 1;
         V092A_decorate();
       });
     };
@@ -250,3 +256,6 @@
     V092A_observer.observe(document.body, { childList: true, characterData: true, subtree: true });
     V092A_decorate();
     window.SUMUS_VISUAL_BUILD = V092A_VISUAL;
+    window.SUMUS_VISUAL_AUDIT = {
+      observer: () => ({ callbacks: V092A_observerCallbacks, records: V092A_observerRecords, decorateRuns: V092A_decorateRuns })
+    };

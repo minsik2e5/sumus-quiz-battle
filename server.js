@@ -268,6 +268,7 @@ function handleAppMessage(socket, message) {
   const checked = validateMessage(meta.role, message);
   if (!checked.ok) {
     meta.invalidMessages = (meta.invalidMessages || 0) + 1;
+    log('WS invalid message', meta.role, meta.clientId, message?.type || '-', checked.reason, meta.invalidMessages);
     if (meta.invalidMessages >= 5) try { socket.destroy(); } catch {}
     return;
   }

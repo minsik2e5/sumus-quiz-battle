@@ -6,10 +6,12 @@
   "scripts": {
     "start": "node bootstrap.js",
     "build": "node scripts/build-only.js",
-    "test": "node --test test/build.test.js test/data.test.js test/protocol.test.js test/room-registry.test.js",
+    "test": "node --test test/build.test.js test/data.test.js test/protocol.test.js test/room-registry.test.js test/raid-engine.test.js test/raid-presentation.test.js test/raid-results.test.js test/raid-assets.test.js test/raid-continuation.test.js",
+    "test:assets": "node --test test/raid-assets.test.js",
     "test:e2e": "node --test test/e2e-classroom.test.js",
     "test:load": "node scripts/run-load-test.js",
-    "test:visual": "node scripts/visual-qa.js"
+    "test:visual": "node scripts/visual-qa.js",
+    "test:motion": "node scripts/motion-qa.js"
   },
   "engines": {
     "node": ">=20"

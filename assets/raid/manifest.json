@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 2,
+  "version": "V0.9.3B.1",
+  "policy": "local-only-no-hotlink",
+  "loadBehavior": "high-quality WebP first, canonical PNG second, original SVG/CSS fallback last",
+  "canonicalAssetCount": 34,
+  "convertedWebPCount": 34,
+  "groups": {
+    "player": ["raid-player-main-idle", "raid-player-main-attack", "raid-player-main-critical", "raid-player-main-hit", "raid-player-main-shield", "raid-player-main-down", "raid-player-main-revive", "raid-player-main-special"],
+    "common": ["raid-common-idle", "raid-common-attack", "raid-common-hit", "raid-common-clear"],
+    "elite": ["raid-elite-idle", "raid-elite-attack", "raid-elite-hit", "raid-elite-guard", "raid-elite-clear"],
+    "boss": ["raid-boss-idle", "raid-boss-attack", "raid-boss-hit", "raid-boss-guard", "raid-boss-heavy-charge", "raid-boss-clear"],
+    "fx": ["raid-fx-hit-normal", "raid-fx-hit-weak", "raid-fx-hit-critical", "raid-fx-shield", "raid-fx-guard", "raid-fx-guard-break", "raid-fx-perfect-break", "raid-fx-player-hit", "raid-fx-heavy-hit", "raid-fx-heavy-charge", "raid-fx-heavy-cancel"]
+  },
+  "pathPattern": "{group}/{asset-id}.{webp|png}",
+  "pendingFallbackOnly": ["raid-fx-revive", "raid-fx-word-tamed", "raid-fx-special", "raid-fx-combo-aura"],
+  "provenance": {
+    "manifest": "source-manifest.json",
+    "map": "ASSET_MAP.csv",
+    "notes": "README_ASSET_MAP.md",
+    "pendingReviewCopiedToRuntime": false,
+    "referenceCopiedToRuntime": false
+  }
+}

@@ -7,6 +7,14 @@
     "arenas.run": "css-canvas",
     "fx.speed-trail": "css",
     "ui.podium": "css",
-    "audio.race": "web-audio"
+    "audio.race": "web-audio",
+    "characters.raid-player": "raid/player/*.webp -> canonical png -> original-svg-css",
+    "monsters.raid-common": "raid/common/*.webp -> canonical png -> original-svg-css",
+    "monsters.raid-elite": "raid/elite/*.webp -> canonical png -> original-svg-css",
+    "monsters.raid-boss": "raid/boss/*.webp -> canonical png -> original-svg-css",
+    "arenas.raid": "raid/arenas/*.webp -> css",
+    "fx.raid": "raid/fx/*.webp -> canonical png -> css",
+    "fx.raid-pending": "revive/word-tamed/special/combo-aura -> css",
+    "ui.raid": "raid/ui/*.webp -> css"
   }
 }

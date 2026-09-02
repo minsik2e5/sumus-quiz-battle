@@ -2,7 +2,7 @@
     const V091 = Object.freeze({
       build: 'V0.9.1',
       version: '0.9.1-release-candidate',
-      publicOrigin: 'https://sumus-quiz-battle-public-v083.onrender.com',
+      publicOrigin: (location.protocol === 'http:' || location.protocol === 'https:') ? location.origin : 'http://localhost:8720',
       coldStartWindowMs: 45000
     });
     const V091_BOOK_POLICY = Object.freeze({

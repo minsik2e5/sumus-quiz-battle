@@ -1,0 +1,14 @@
+{
+  "version": "V0.9.3C.3",
+  "student": {
+    "360x667": { "document": [360, 667], "verticalOverflow": 0, "passBottom": 660, "answerCount": 4, "answerBottom": 582, "runHeaderVisible": false },
+    "390x844": { "document": [390, 844], "verticalOverflow": 0, "passBottom": 844, "answerCount": 4, "runHeaderVisible": false },
+    "412x915": { "document": [412, 915], "verticalOverflow": 0, "passBottom": 914, "answerCount": 4, "runHeaderVisible": false },
+    "430x932": { "document": [430, 932], "verticalOverflow": 0, "passBottom": 931, "answerCount": 4, "runHeaderVisible": false }
+  },
+  "teacher": {
+    "1366x768": { "document": [1366, 768], "cards": 24, "visibleCards": 24, "grid": "4x6", "verticalOverflow": 0, "horizontalOverflow": 0, "runScreenActive": false, "answerExposure": false },
+    "1600x900": { "document": [1600, 900], "cards": 24, "visibleCards": 24, "grid": "4x6", "verticalOverflow": 0, "horizontalOverflow": 0, "runScreenActive": false, "answerExposure": false },
+    "1920x1080": { "document": [1920, 1080], "cards": 24, "visibleCards": 24, "grid": "4x6", "verticalOverflow": 0, "horizontalOverflow": 0, "runScreenActive": false, "answerExposure": false }
+  }
+}

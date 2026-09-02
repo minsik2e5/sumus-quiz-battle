@@ -9,7 +9,7 @@
       version: '0.9.1-release-candidate',
       build: 'V0.9.1',
       commit: (typeof window !== 'undefined' && window.SUMUS_COMMIT) ? String(window.SUMUS_COMMIT).slice(0, 7) : 'dev',
-      publicOrigin: 'https://sumus-quiz-battle-public-v083.onrender.com'
+      publicOrigin: ''
     };
     try { window.SUMUS_BUILD = { build: V084.build, commit: V084.commit, version: V084.version }; } catch (e) {}
 
@@ -26,15 +26,23 @@
         /^10\./.test(h) || /^192\.168\./.test(h) || /^169\.254\./.test(h) ||
         /^172\.(1[6-9]|2\d|3[01])\./.test(h);
     };
-    // Production policy: every displayed/shared student link uses this one audited
-    // origin. A proxy host, preview domain, LAN address, or local port must not leak.
-    const V084_publicOrigin = () => V084.publicOrigin;
+    // The teacher and students must resolve against the same authoritative room
+    // registry. Production therefore follows the current public origin; a file-only
+    // debug build may use the documented localhost fallback.
+    const V084_publicOrigin = () => {
+      const canonical = String(window.SUMUS_CANONICAL_PUBLIC_ORIGIN || '').trim();
+      if (/^https?:\/\//i.test(canonical)) return canonical.replace(/\/+$/, '');
+      if (location.protocol === 'http:' || location.protocol === 'https:') return location.origin;
+      return 'http://localhost:8720';
+    };
+    window.SUMUS_PUBLIC_ORIGIN = V084_publicOrigin;
     const V084_code = () => (typeof BattleSession !== 'undefined' && BattleSession.code) ? String(BattleSession.code) : '';
     const V084_studentUrl = () => {
       const u = new URL(V084_publicOrigin().replace(/\/+$/, '') + '/');
       u.searchParams.set('role', 'student');
       const c = V084_code();
       if (c) u.searchParams.set('code', c);
+      if (typeof state !== 'undefined' && state.arena === 'raid') u.searchParams.set('mode', 'raid');
       return u.toString();
     };
     const V084_teacherUrl = () => {

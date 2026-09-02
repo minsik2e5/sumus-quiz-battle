@@ -1,0 +1,230 @@
+{
+  "visualBuild": "V0.9.2A",
+  "teacherViewport": [
+    1920,
+    1080
+  ],
+  "lobbies": {
+    "1": {
+      "viewport": [
+        1920,
+        1080
+      ],
+      "productionControlsVisible": {
+        "forceStartBattle": true,
+        "addDemoPlayers": true,
+        "clearPlayers": true,
+        "copyStudentUrl": true
+      },
+      "qaControlsHidden": {
+        "autoRace": true,
+        "demoSpeed": true,
+        "openStudentTest": true,
+        "debugPanel": true,
+        "buildBadge": true
+      }
+    },
+    "8": {
+      "viewport": [
+        1920,
+        1080
+      ],
+      "productionControlsVisible": {
+        "forceStartBattle": true,
+        "addDemoPlayers": true,
+        "clearPlayers": true,
+        "copyStudentUrl": true
+      },
+      "qaControlsHidden": {
+        "autoRace": true,
+        "demoSpeed": true,
+        "openStudentTest": true,
+        "debugPanel": true,
+        "buildBadge": true
+      }
+    },
+    "20": {
+      "viewport": [
+        1920,
+        1080
+      ],
+      "productionControlsVisible": {
+        "forceStartBattle": true,
+        "addDemoPlayers": true,
+        "clearPlayers": true,
+        "copyStudentUrl": true
+      },
+      "qaControlsHidden": {
+        "autoRace": true,
+        "demoSpeed": true,
+        "openStudentTest": true,
+        "debugPanel": true,
+        "buildBadge": true
+      }
+    },
+    "24": {
+      "viewport": [
+        1920,
+        1080
+      ],
+      "productionControlsVisible": {
+        "forceStartBattle": true,
+        "addDemoPlayers": true,
+        "clearPlayers": true,
+        "copyStudentUrl": true
+      },
+      "qaControlsHidden": {
+        "autoRace": true,
+        "demoSpeed": true,
+        "openStudentTest": true,
+        "debugPanel": true,
+        "buildBadge": true
+      }
+    }
+  },
+  "runs": {
+    "1": {
+      "viewport": [
+        1920,
+        1080
+      ],
+      "runnerCount": 1,
+      "stage": {
+        "x": 5.8367919921875,
+        "y": 82.36163330078125,
+        "width": 1904.6400146484375,
+        "height": 932.47998046875,
+        "right": 1910.476806640625,
+        "bottom": 1014.8416137695312
+      },
+      "runnersOutsideStage": [],
+      "nameplatesOutsideStage": [],
+      "overlappingNameplatePairs": 0,
+      "maxNameplateOverlap": 0,
+      "productionControlsHidden": {
+        "buildTag": true,
+        "autoDemo": true,
+        "demoSpeed": true,
+        "debugPanel": true,
+        "studentLab": true,
+        "openStudentTest": true
+      },
+      "rankingRows": 1,
+      "visualBuild": "V0.9.2A"
+    },
+    "8": {
+      "viewport": [
+        1920,
+        1080
+      ],
+      "runnerCount": 8,
+      "stage": {
+        "x": 5.8367919921875,
+        "y": 82.36163330078125,
+        "width": 1904.6400146484375,
+        "height": 932.47998046875,
+        "right": 1910.476806640625,
+        "bottom": 1014.8416137695312
+      },
+      "runnersOutsideStage": [],
+      "nameplatesOutsideStage": [],
+      "overlappingNameplatePairs": 0,
+      "maxNameplateOverlap": 0,
+      "productionControlsHidden": {
+        "buildTag": true,
+        "autoDemo": true,
+        "demoSpeed": true,
+        "debugPanel": true,
+        "studentLab": true,
+        "openStudentTest": true
+      },
+      "rankingRows": 8,
+      "visualBuild": "V0.9.2A"
+    },
+    "20": {
+      "viewport": [
+        1920,
+        1080
+      ],
+      "runnerCount": 20,
+      "stage": {
+        "x": 5.8367919921875,
+        "y": 82.36163330078125,
+        "width": 1904.6400146484375,
+        "height": 932.47998046875,
+        "right": 1910.476806640625,
+        "bottom": 1014.8416137695312
+      },
+      "runnersOutsideStage": [],
+      "nameplatesOutsideStage": [],
+      "overlappingNameplatePairs": 0,
+      "maxNameplateOverlap": 0,
+      "productionControlsHidden": {
+        "buildTag": true,
+        "autoDemo": true,
+        "demoSpeed": true,
+        "debugPanel": true,
+        "studentLab": true,
+        "openStudentTest": true
+      },
+      "rankingRows": 20,
+      "visualBuild": "V0.9.2A"
+    },
+    "24": {
+      "viewport": [
+        1920,
+        1080
+      ],
+      "runnerCount": 24,
+      "stage": {
+        "x": 5.8367919921875,
+        "y": 82.36163330078125,
+        "width": 1904.6400146484375,
+        "height": 932.47998046875,
+        "right": 1910.476806640625,
+        "bottom": 1014.8416137695312
+      },
+      "runnersOutsideStage": [],
+      "nameplatesOutsideStage": [],
+      "overlappingNameplatePairs": 0,
+      "maxNameplateOverlap": 0,
+      "productionControlsHidden": {
+        "buildTag": true,
+        "autoDemo": true,
+        "demoSpeed": true,
+        "debugPanel": true,
+        "studentLab": true,
+        "openStudentTest": true
+      },
+      "rankingRows": 24,
+      "visualBuild": "V0.9.2A"
+    }
+  },
+  "students": {
+    "390x844": {
+      "viewport": [
+        390,
+        844
+      ],
+      "shellInsideViewport": true,
+      "answersInsideViewport": true,
+      "passInsideViewport": true,
+      "answers": 4,
+      "buildTagHidden": true,
+      "debugToolsHidden": true
+    },
+    "360x800": {
+      "viewport": [
+        360,
+        800
+      ],
+      "shellInsideViewport": true,
+      "answersInsideViewport": true,
+      "passInsideViewport": true,
+      "answers": 4,
+      "buildTagHidden": true,
+      "debugToolsHidden": true
+    }
+  },
+  "pageErrors": []
+}

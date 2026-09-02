@@ -1,0 +1,182 @@
+{
+  "package": "SUMUS RAID ASSETS FOR CODEX",
+  "purpose": "V0.9.3B.1 final asset drop / visual integration",
+  "rules": {
+    "canonical_paths": true,
+    "keep_existing_fallback": true,
+    "convert_to_webp_if_desired": true,
+    "do_not_modify_gameplay_logic": true
+  },
+  "assets": {
+    "assets/raid/player/raid-player-main-idle.png": {
+      "source_file": "별빛_꼬리를_가진_마법_여우_마스코트.png",
+      "status": "included",
+      "note": "confirmed master"
+    },
+    "assets/raid/player/raid-player-main-attack.png": {
+      "source_file": "별빛_돌진_여우_마스코트.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/player/raid-player-main-critical.png": {
+      "source_file": "a_vibrant_high_energy_anime_chibi_fantasy_illustr.png",
+      "status": "included",
+      "note": "confirmed critical-generation output"
+    },
+    "assets/raid/player/raid-player-main-hit.png": {
+      "source_file": "a_vibrant_high_quality_anime_chibi_digital_illust.png",
+      "status": "included",
+      "note": "confirmed hit-generation output"
+    },
+    "assets/raid/player/raid-player-main-shield.png": {
+      "source_file": "a_bright_ultra_cute_high_detail_chibi_anime_gam.png",
+      "status": "included",
+      "note": "confirmed shield-generation output"
+    },
+    "assets/raid/player/raid-player-main-down.png": {
+      "source_file": "쓰러진_별여우_마스코트.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/player/raid-player-main-revive.png": {
+      "source_file": "별빛_에너지의_황금_여우_비상.png",
+      "status": "included",
+      "note": "revive-state visual selected from approved 3-output batch"
+    },
+    "assets/raid/player/raid-player-main-special.png": {
+      "source_file": "별빛_질주하는_여우_마스코트.png",
+      "status": "included",
+      "note": "special/action visual selected from approved set"
+    },
+    "assets/raid/common/raid-common-idle.png": {
+      "source_file": "민트_잎사귀_숲속_정령_몬스터.png",
+      "status": "included",
+      "note": "confirmed master"
+    },
+    "assets/raid/common/raid-common-attack.png": {
+      "source_file": "민트_물잎_정령의_깜짝_반격_자세.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/common/raid-common-hit.png": {
+      "source_file": "민트빛_잎사귀_여우_정령.png",
+      "status": "included",
+      "note": "approved COMMON state output"
+    },
+    "assets/raid/common/raid-common-clear.png": {
+      "source_file": "민트_잎정령의_해피_클리어_포즈.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/elite/raid-elite-idle.png": {
+      "source_file": "평온한_숲의_여우사슴_수호자.png",
+      "status": "included",
+      "note": "confirmed master"
+    },
+    "assets/raid/elite/raid-elite-attack.png": {
+      "source_file": "숲의_여우령_질풍의_돌진.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/elite/raid-elite-hit.png": {
+      "source_file": "타격에_휘말린_숲의_엘프_여우.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/elite/raid-elite-guard.png": {
+      "source_file": "수호의_잎빛_방벽_furry.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/elite/raid-elite-clear.png": {
+      "source_file": "민트빛_잎사귀_수호령_여우사슴.png",
+      "status": "included",
+      "note": "selected clear/rest variant from approved ELITE family"
+    },
+    "assets/raid/boss/raid-boss-idle.png": {
+      "source_file": "보이드_크림슨_드래곤_보스.png",
+      "status": "included",
+      "note": "confirmed final boss family"
+    },
+    "assets/raid/boss/raid-boss-attack.png": {
+      "source_file": "보랏빛_마룡_보스의_공중_강습.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/boss/raid-boss-hit.png": {
+      "source_file": "보랏빛_충격에_휘청이는_용왕.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/boss/raid-boss-guard.png": {
+      "source_file": "a_dynamic_high_quality_anime_game_style_illustrat.png",
+      "status": "included",
+      "note": "confirmed guard individual"
+    },
+    "assets/raid/boss/raid-boss-heavy-charge.png": {
+      "source_file": "epic_fantasy_game_style_digital_illustration_a_dr.png",
+      "status": "included",
+      "note": "confirmed heavy-charge family"
+    },
+    "assets/raid/boss/raid-boss-clear.png": {
+      "source_file": "a_clean_high_resolution_anime_style_game_asset_s.png",
+      "status": "included",
+      "note": "best available clear/defeat source; review crop/selection before final WebP"
+    },
+    "assets/raid/fx/raid-fx-hit-normal.png": {
+      "source_file": "푸른_황금_마법_충격파.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/fx/raid-fx-hit-weak.png": {
+      "source_file": "약한_타격의_청금빛_마법_임팩트.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/fx/raid-fx-hit-critical.png": {
+      "source_file": "푸른빛_황금_크리티컬_히트_폭발.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/fx/raid-fx-shield.png": {
+      "source_file": "황금_별_문장의_마법_방어막.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/fx/raid-fx-guard.png": {
+      "source_file": "청금빛_수호_방패_폭발_효과.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/fx/raid-fx-guard-break.png": {
+      "source_file": "산산조각_난_별빛_방벽.png",
+      "status": "included",
+      "note": "confirmed"
+    },
+    "assets/raid/fx/raid-fx-perfect-break.png": {
+      "source_file": "a_clean_high_resolution_game_style_special_effect.png",
+      "status": "included",
+      "note": "confirmed generated perfect-break style"
+    },
+    "assets/raid/fx/raid-fx-player-hit.png": {
+      "source_file": "a_crisp_high_resolution_game_art_style_fantasy_e.png",
+      "status": "included",
+      "note": "confirmed generated player-hit style"
+    },
+    "assets/raid/fx/raid-fx-heavy-hit.png": {
+      "source_file": "푸른빛과_황금빛의_마법_폭발_효과.png",
+      "status": "included",
+      "note": "confirmed heavy-impact family"
+    },
+    "assets/raid/fx/raid-fx-heavy-charge.png": {
+      "source_file": "a_dramatic_high_energy_fantasy_magical_effect_ill.png",
+      "status": "included",
+      "note": "confirmed charge-family output"
+    },
+    "assets/raid/fx/raid-fx-heavy-cancel.png": {
+      "source_file": "a_high_resolution_digital_fantasy_sci_fi_energy_ef.png",
+      "status": "included",
+      "note": "confirmed cancel-family output"
+    }
+  }
+}

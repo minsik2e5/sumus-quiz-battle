@@ -1,0 +1,438 @@
+{
+  "generatedAt": "2026-09-01T18:15:28.600Z",
+  "rulesChanged": false,
+  "reason": "All measured sizes clear with the existing adaptive stage planner; no balance change justified.",
+  "counts": {
+    "5": {
+      "plan": {
+        "questionCount": 5,
+        "totalWaves": 2,
+        "totalMonsterHp": 425,
+        "waves": [
+          {
+            "index": 0,
+            "number": 1,
+            "type": "COMMON",
+            "hp": 149,
+            "maxHp": 149,
+            "weight": 0.35
+          },
+          {
+            "index": 1,
+            "number": 2,
+            "type": "BOSS",
+            "hp": 276,
+            "maxHp": 276,
+            "weight": 0.65
+          }
+        ]
+      },
+      "profiles": {
+        "fast": {
+          "profile": "fast",
+          "cleared": true,
+          "waves": 2,
+          "attempts": 5,
+          "estimatedSeconds": 13,
+          "bossAttacks": 0,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 0,
+          "reviveObserved": false,
+          "reviveProbability": 0,
+          "maxCombo": 5,
+          "totalDamage": 647,
+          "finalHp": 100
+        },
+        "average": {
+          "profile": "average",
+          "cleared": true,
+          "waves": 2,
+          "attempts": 8,
+          "estimatedSeconds": 43,
+          "bossAttacks": 1,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 0,
+          "reviveObserved": false,
+          "reviveProbability": 0,
+          "maxCombo": 3,
+          "totalDamage": 498,
+          "finalHp": 92
+        },
+        "slow": {
+          "profile": "slow",
+          "cleared": true,
+          "waves": 2,
+          "attempts": 15,
+          "estimatedSeconds": 112,
+          "bossAttacks": 5,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 0,
+          "reviveObserved": false,
+          "reviveProbability": 0,
+          "maxCombo": 2,
+          "totalDamage": 540,
+          "finalHp": 38
+        }
+      }
+    },
+    "10": {
+      "plan": {
+        "questionCount": 10,
+        "totalWaves": 2,
+        "totalMonsterHp": 850,
+        "waves": [
+          {
+            "index": 0,
+            "number": 1,
+            "type": "COMMON",
+            "hp": 298,
+            "maxHp": 298,
+            "weight": 0.35
+          },
+          {
+            "index": 1,
+            "number": 2,
+            "type": "BOSS",
+            "hp": 552,
+            "maxHp": 552,
+            "weight": 0.65
+          }
+        ]
+      },
+      "profiles": {
+        "fast": {
+          "profile": "fast",
+          "cleared": true,
+          "waves": 2,
+          "attempts": 8,
+          "estimatedSeconds": 21,
+          "bossAttacks": 0,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 0,
+          "reviveObserved": false,
+          "reviveProbability": 0,
+          "maxCombo": 8,
+          "totalDamage": 1116,
+          "finalHp": 100
+        },
+        "average": {
+          "profile": "average",
+          "cleared": true,
+          "waves": 2,
+          "attempts": 15,
+          "estimatedSeconds": 82,
+          "bossAttacks": 3,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 0,
+          "reviveObserved": false,
+          "reviveProbability": 0,
+          "maxCombo": 3,
+          "totalDamage": 961,
+          "finalHp": 74
+        },
+        "slow": {
+          "profile": "slow",
+          "cleared": true,
+          "waves": 2,
+          "attempts": 21,
+          "estimatedSeconds": 162,
+          "bossAttacks": 5,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 0,
+          "reviveObserved": false,
+          "reviveProbability": 0,
+          "maxCombo": 4,
+          "totalDamage": 905,
+          "finalHp": 38
+        }
+      }
+    },
+    "20": {
+      "plan": {
+        "questionCount": 20,
+        "totalWaves": 3,
+        "totalMonsterHp": 1700,
+        "waves": [
+          {
+            "index": 0,
+            "number": 1,
+            "type": "COMMON",
+            "hp": 340,
+            "maxHp": 340,
+            "weight": 0.2
+          },
+          {
+            "index": 1,
+            "number": 2,
+            "type": "ELITE",
+            "hp": 425,
+            "maxHp": 425,
+            "weight": 0.25
+          },
+          {
+            "index": 2,
+            "number": 3,
+            "type": "BOSS",
+            "hp": 935,
+            "maxHp": 935,
+            "weight": 0.55
+          }
+        ]
+      },
+      "profiles": {
+        "fast": {
+          "profile": "fast",
+          "cleared": true,
+          "waves": 3,
+          "attempts": 12,
+          "estimatedSeconds": 31,
+          "bossAttacks": 0,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 0,
+          "reviveObserved": false,
+          "reviveProbability": 0,
+          "maxCombo": 12,
+          "totalDamage": 2002,
+          "finalHp": 100
+        },
+        "average": {
+          "profile": "average",
+          "cleared": true,
+          "waves": 3,
+          "attempts": 25,
+          "estimatedSeconds": 138,
+          "bossAttacks": 4,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 0,
+          "reviveObserved": false,
+          "reviveProbability": 0,
+          "maxCombo": 5,
+          "totalDamage": 1789,
+          "finalHp": 74
+        },
+        "slow": {
+          "profile": "slow",
+          "cleared": true,
+          "waves": 3,
+          "attempts": 39,
+          "estimatedSeconds": 296,
+          "bossAttacks": 8,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 0,
+          "reviveObserved": false,
+          "reviveProbability": 0,
+          "maxCombo": 5,
+          "totalDamage": 1778,
+          "finalHp": 22
+        }
+      }
+    },
+    "40": {
+      "plan": {
+        "questionCount": 40,
+        "totalWaves": 4,
+        "totalMonsterHp": 3400,
+        "waves": [
+          {
+            "index": 0,
+            "number": 1,
+            "type": "COMMON",
+            "hp": 544,
+            "maxHp": 544,
+            "weight": 0.16
+          },
+          {
+            "index": 1,
+            "number": 2,
+            "type": "ELITE",
+            "hp": 680,
+            "maxHp": 680,
+            "weight": 0.2
+          },
+          {
+            "index": 2,
+            "number": 3,
+            "type": "ENHANCED",
+            "hp": 850,
+            "maxHp": 850,
+            "weight": 0.25
+          },
+          {
+            "index": 3,
+            "number": 4,
+            "type": "BOSS",
+            "hp": 1326,
+            "maxHp": 1326,
+            "weight": 0.39
+          }
+        ]
+      },
+      "profiles": {
+        "fast": {
+          "profile": "fast",
+          "cleared": true,
+          "waves": 4,
+          "attempts": 22,
+          "estimatedSeconds": 57,
+          "bossAttacks": 0,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 0,
+          "reviveObserved": false,
+          "reviveProbability": 0,
+          "maxCombo": 22,
+          "totalDamage": 3774,
+          "finalHp": 100
+        },
+        "average": {
+          "profile": "average",
+          "cleared": true,
+          "waves": 4,
+          "attempts": 48,
+          "estimatedSeconds": 276,
+          "bossAttacks": 7,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 0,
+          "reviveObserved": false,
+          "reviveProbability": 0,
+          "maxCombo": 6,
+          "totalDamage": 3566,
+          "finalHp": 64
+        },
+        "slow": {
+          "profile": "slow",
+          "cleared": true,
+          "waves": 4,
+          "attempts": 75,
+          "estimatedSeconds": 583,
+          "bossAttacks": 16,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 2,
+          "reviveObserved": true,
+          "reviveProbability": 1,
+          "maxCombo": 5,
+          "totalDamage": 3553,
+          "finalHp": 30
+        }
+      }
+    },
+    "68": {
+      "plan": {
+        "questionCount": 68,
+        "totalWaves": 6,
+        "totalMonsterHp": 5780,
+        "waves": [
+          {
+            "index": 0,
+            "number": 1,
+            "type": "COMMON",
+            "hp": 578,
+            "maxHp": 578,
+            "weight": 0.1
+          },
+          {
+            "index": 1,
+            "number": 2,
+            "type": "ELITE",
+            "hp": 751,
+            "maxHp": 751,
+            "weight": 0.13
+          },
+          {
+            "index": 2,
+            "number": 3,
+            "type": "ENHANCED",
+            "hp": 867,
+            "maxHp": 867,
+            "weight": 0.15
+          },
+          {
+            "index": 3,
+            "number": 4,
+            "type": "ELITE+",
+            "hp": 983,
+            "maxHp": 983,
+            "weight": 0.17
+          },
+          {
+            "index": 4,
+            "number": 5,
+            "type": "MID BOSS",
+            "hp": 1156,
+            "maxHp": 1156,
+            "weight": 0.2
+          },
+          {
+            "index": 5,
+            "number": 6,
+            "type": "FINAL BOSS",
+            "hp": 1445,
+            "maxHp": 1445,
+            "weight": 0.25
+          }
+        ]
+      },
+      "profiles": {
+        "fast": {
+          "profile": "fast",
+          "cleared": true,
+          "waves": 6,
+          "attempts": 38,
+          "estimatedSeconds": 98,
+          "bossAttacks": 0,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 0,
+          "reviveObserved": false,
+          "reviveProbability": 0,
+          "maxCombo": 38,
+          "totalDamage": 6439,
+          "finalHp": 100
+        },
+        "average": {
+          "profile": "average",
+          "cleared": true,
+          "waves": 6,
+          "attempts": 81,
+          "estimatedSeconds": 461,
+          "bossAttacks": 11,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 0,
+          "reviveObserved": false,
+          "reviveProbability": 0,
+          "maxCombo": 8,
+          "totalDamage": 6166,
+          "finalHp": 54
+        },
+        "slow": {
+          "profile": "slow",
+          "cleared": true,
+          "waves": 6,
+          "attempts": 124,
+          "estimatedSeconds": 971,
+          "bossAttacks": 26,
+          "guard": 1,
+          "heavy": 1,
+          "revives": 4,
+          "reviveObserved": true,
+          "reviveProbability": 1,
+          "maxCombo": 6,
+          "totalDamage": 6020,
+          "finalHp": 20
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "version": "V0.9.3C",
+  "date": "2026-09-01",
+  "branch": "v0.9.3c-raid-premium-ui-rebuild",
+  "baselineSnapshotCommit": "ac6b796",
+  "productionMainObserved": "5c3b02f2275571fc73b05c8ac3d55e8504de4b90",
+  "approvedRunBaseline": "6a8a0526ade28b0d464df1bd3ef13d0258405c2c",
+  "buildBytes": 1313887,
+  "assets": {
+    "canonical": 34,
+    "webp": 34,
+    "brokenInBrowser": 0,
+    "pendingFallbackOnly": 4
+  },
+  "student": {
+    "390x844": {
+      "horizontalOverflow": false,
+      "stageHeight": 370,
+      "stageViewportRatio": 0.4384,
+      "questionHeight": 474,
+      "questionScrollHeight": 472,
+      "questionClientHeight": 472,
+      "answerMinHeight": 50,
+      "answerMaxHeight": 64.84375,
+      "passVisible": true,
+      "passBottom": 780.734375
+    },
+    "360x800": {
+      "horizontalOverflow": false,
+      "stageHeight": 346,
+      "stageViewportRatio": 0.4325,
+      "questionHeight": 454,
+      "questionScrollHeight": 452,
+      "questionClientHeight": 452,
+      "answerMinHeight": 47,
+      "answerMaxHeight": 53.5,
+      "passVisible": true,
+      "passBottom": 719.09375
+    }
+  },
+  "teacher": {
+    "viewports": ["1280x720", "1440x900", "1920x1080"],
+    "horizontalOverflow": false,
+    "connected": 24,
+    "totalCards": 24,
+    "visibleCardsPerPage": 12,
+    "spotlightWidthAt1280": 800.1875,
+    "rosterWidthAt1280": 455.796875,
+    "answerExposure": false,
+    "pageNavigation": true,
+    "autoManualRoundTrip": true,
+    "pauseResumeRoundTrip": true
+  },
+  "regression": {
+    "unitEnginePresentationAsset": "35/35 PASS",
+    "e2e": "3/3 PASS",
+    "load24": {
+      "ready": 24,
+      "answers": 24,
+      "reconnects": 5,
+      "collisionRejected": true,
+      "lookupAverageMs": 16,
+      "lookupP95Ms": 22,
+      "answerBatchMs": 28,
+      "pauseResumeBroadcastMs": 3,
+      "memoryRssMb": 59.3
+    },
+    "runVisualCounts": [1, 8, 20, 24],
+    "runMaxNameplateOverlap": 0,
+    "runPageErrors": 0,
+    "motion": "PASS",
+    "ignoredOptionalResource404s": 2,
+    "frozenModuleDiff": 0
+  }
+}

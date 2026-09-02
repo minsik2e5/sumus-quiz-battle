@@ -8,6 +8,7 @@ test('role-specific message types are enforced', () => {
   assert.equal(validateMessage('student', { type: 'ANSWER_SUBMIT', payload: {} }).ok, true);
   assert.equal(validateMessage('student', { type: 'GAME_START', payload: {} }).ok, false);
   assert.equal(validateMessage('teacher', { type: 'GAME_START', payload: {} }).ok, true);
+  assert.equal(validateMessage('teacher', { type: 'PLAYER_READY', payload: {} }).ok, true);
   assert.equal(validateMessage('teacher', { type: 'ANSWER_SUBMIT', payload: {} }).ok, false);
 });
 

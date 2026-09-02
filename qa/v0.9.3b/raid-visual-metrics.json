@@ -1,0 +1,64 @@
+{
+  "version": "V0.9.3B",
+  "baselineCommit": "beb522501e2d514c8a64522e5b488a1c19b831f9",
+  "branch": "v0.9.3b-raid-visual-asset-pass",
+  "student": {
+    "390x844": {
+      "statesCaptured": ["normal", "critical", "shield", "guard", "heavy", "player-hit", "down", "revive", "boss", "boss-clear"],
+      "horizontalOverflow": false,
+      "questionReadable": true,
+      "choiceCount": 4,
+      "passReachable": true,
+      "fallbackSlots": 2
+    },
+    "360x800": {
+      "statesCaptured": ["normal", "boss"],
+      "horizontalOverflow": false,
+      "questionReadable": true,
+      "choiceCount": 4,
+      "passReachable": true,
+      "fallbackSlots": 2
+    }
+  },
+  "teacher": {
+    "1280x720": {
+      "students": 24,
+      "cardOverlaps": 0,
+      "nameOverflows": 0,
+      "horizontalOverflow": false,
+      "answerExposure": false
+    },
+    "1440x900": {
+      "students": 24,
+      "cardOverlaps": 0,
+      "nameOverflows": 0,
+      "horizontalOverflow": false,
+      "answerExposure": false,
+      "spotlightWidthPx": 1002.5
+    },
+    "controls": {
+      "autoToManual": true,
+      "manualToAuto": true,
+      "pauseToResume": true,
+      "resumeToPause": true
+    }
+  },
+  "visualEndurance": {
+    "questions": 68,
+    "tiersVisited": ["common", "elite", "boss"],
+    "serializableProjection": true,
+    "sourceStateMutations": 0,
+    "effectNodeCap": 6,
+    "previewDomNodeRange": [877, 882],
+    "unboundedDomAccumulation": false,
+    "effectCleanupMs": 950
+  },
+  "assets": {
+    "externalHotlinks": 0,
+    "fallbackVerified": true,
+    "replaceableSlots": true
+  },
+  "reducedMotion": true,
+  "pageErrors": [],
+  "screenshots": 15
+}
