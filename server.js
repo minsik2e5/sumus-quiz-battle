@@ -116,8 +116,8 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-    let pathname = decodeURIComponent(url.pathname);
-    if (pathname === '/' || pathname === '/index.html') {
+    let pathname = decodeURIComponent(url.pathname).replace(/\\/{2,}/g, '/');
+    if (pathname === '/' || pathname === '/index.html' || (!path.extname(pathname) && !pathname.startsWith('/assets/'))) {
       if (!EMBEDDED_INDEX) {
         res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' });
         res.end('App bundle unavailable');
