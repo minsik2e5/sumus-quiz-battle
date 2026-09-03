@@ -50,6 +50,23 @@ test('Incheon authoritative 214 rows and source fields remain exact', () => {
   });
 });
 
+test('READING body vocabulary workbook is available as one selectable range', () => {
+  const reading = book('reading-body-vocabulary');
+  assert.ok(reading, 'Missing READING body vocabulary source');
+  assert.equal(reading.name, 'READING 본문 단어 정리');
+  assert.equal(reading.words.length, 84);
+  assert.deepEqual(countUnits(reading), { '본문 전체': 84 });
+  assert.deepEqual([reading.words[0].word, reading.words[0].meaning], ['speedy', '빠른, 신속한']);
+  assert.deepEqual([reading.words.at(-1).word, reading.words.at(-1).meaning], ['automation', '자동화']);
+  reading.words.forEach((row) => {
+    ['word', 'meaning', 'rawWord', 'rawMeaning', 'partOfSpeech', 'unit', 'section'].forEach((field) => assert.ok(Object.hasOwn(row, field), `missing ${field}`));
+    assert.equal(row.unit, '본문 전체');
+    assert.equal(row.section, '본문 전체');
+    assert.notEqual(row.word.trim(), '');
+    assert.notEqual(row.meaning.trim(), '');
+  });
+});
+
 test('all production authoritative keys are unique and meanings are non-empty', () => {
   for (const source of dataset.books) {
     const keys = source.words.map((row) => `${source.id}\0${row.unit}\0${row.word}`);
