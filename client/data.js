@@ -8,7 +8,8 @@
     const V091_BOOK_POLICY = Object.freeze({
       'common-english2-ybm-park-2022': { forceSection: 'READING' },
       'common-english2-ybm-kim-2022': { forceSection: 'READING' },
-      'incheon-g1-sep-2025-selected': { preserveSection: true }
+      'incheon-g1-sep-2025-selected': { preserveSection: true },
+      'reading-body-vocabulary': { preserveSection: true }
     });
     const V091_cloneBook = (sourceBook) => {
       const policy = V091_BOOK_POLICY[sourceBook.id] || { preserveSection: true };
