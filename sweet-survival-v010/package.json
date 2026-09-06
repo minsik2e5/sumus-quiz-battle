@@ -1,0 +1,9 @@
+{
+  "name": "sweet-survival-v010",
+  "version": "0.10.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "test:20": "node test/load20.js"
+  }
+}
