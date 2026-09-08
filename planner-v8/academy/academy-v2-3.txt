@@ -1,0 +1,82 @@
+ payload=legacyToServer(serverState);
+      const d=await api('/data',{method:'PUT',body:JSON.stringify({data:payload,baseVersion:serverVersion,action:'autosave-v2'})});
+      if(d.data){applyServerToLegacy(d.data);serverVersion=Number(d.data.version||serverVersion+1);}
+      pendingLocal=false;lastSaveError='';setSync('ok');
+    }catch(e){
+      if(e.status===409&&retry){
+        try{const latest=await api('/data');if(latest.data){serverState=clone(latest.data);serverVersion=Number(latest.data.version||serverVersion);await saveServerNow(false);return;}}catch{}
+      }
+      pendingLocal=false;lastSaveError=e.message;setSync('err','저장 오류');
+      setTimeout(()=>{if(authToken)saveServerNow(false)},7000);
+    }
+  }
+  function queueServerSave(){if(!authToken||applyingServer)return;pendingLocal=true;setSync('busy');clearTimeout(saveTimerV2);saveTimerV2=setTimeout(()=>saveServerNow(),SAVE_DELAY);}
+
+  function refreshCurrentUI(){
+    try{
+      if(S.curRole==='english'){initEng();}
+      else if(S.curRole==='reading'){initRr();}
+      else if(S.curRole==='admin'){initAdmin();}
+    }catch(e){console.warn('refresh',e);}
+    stampUserUI();
+  }
+
+  // 기존 로컬 저장 함수를 온라인 저장으로 교체
+  originalFns.loadS=window.loadS;originalFns.saveS=window.saveS;originalFns.forceSync=window.forceSync;
+  window.loadS=function(){try{const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');if(c?.state)applyServerToLegacy(c.state);}catch{};};
+  window.saveS=function(){S._ts=Date.now();localStorage.setItem(SK,JSON.stringify(S));queueServerSave();};
+  window.forceSync=async function(){showToast('최신 데이터 확인 중...');if(pendingLocal)await saveServerNow();await loadServerState();showToast(lastSaveError?'동기화 오류':'✓ 동기화 완료');};
+  window.saveToAppScript=async function(){return saveServerNow();};
+  window.loadFromAppScript=async function(){return loadServerState();};
+  window.postToSheet=async function(){return;};
+  window.saveUrl=function(){showToast('서버 연결은 자동으로 관리됩니다');};
+
+  // 로그인 UI
+  function renderAccountCards(users){
+    const grid=document.querySelector('#loginPage .role-grid');if(!grid)return;
+    const order=['이서현 선생님','김민식 선생님','원장선생님','부원장선생님'];
+    users=[...users].sort((a,b)=>order.indexOf(a.name)-order.indexOf(b.name));
+    grid.innerHTML=users.map(u=>{
+      const admin=u.role==='admin';
+      return `<button class="role-btn" onclick="selectSumusUser('${u.id}')"><div class="role-icon">${admin?'👑':'✦'}</div><div><div class="role-title">${u.name}</div><div class="role-desc">${admin?'전체 현황 · 운영 관리 · 백업':'출결 · 교재 · 테스트 · 독서실'}</div></div><span class="role-arrow">›</span></button>`;
+    }).join('');
+    if(!document.querySelector('.v2-login-note')){const note=document.createElement('div');note.className='v2-login-note';note.textContent='모든 변경사항은 공용 서버에 자동 저장됩니다 · 여러 PC 동시 사용 가능';grid.after(note);}
+  }
+  async function loadUsers(){
+    try{const d=await api('/auth/users');window.__sumusUsers=d.users||[];renderAccountCards(window.__sumusUsers);}
+    catch{renderAccountCards([{id:'',name:'서버 연결 확인 필요',role:'teacher'}]);}
+  }
+  window.selectSumusUser=function(id){
+    selectedUser=(window.__sumusUsers||[]).find(u=>u.id===id);if(!selectedUser){showToast('사용자 정보를 불러오지 못했습니다');return;}
+    pinBuf='';document.getElementById('pinRoleLabel').textContent=selectedUser.name;document.getElementById('loginPage').style.display='none';document.getElementById('pinPage').style.display='block';updDots();
+  };
+  window.showPin=function(){showToast('계정을 선택해주세요');};
+  window.checkPin=async function(){
+    if(!selectedUser)return backToLogin();
+    setSync('busy','로그인 중');
+    try{
+      const d=await api('/auth/login',{method:'POST',body:JSON.stringify({userId:selectedUser.id,pin:pinBuf})});
+      authToken=d.token;sessionStorage.setItem(TOKEN_KEY,authToken);currentUser=d.user;selectedUser=null;pinBuf='';
+      await loadServerState({render:false});
+      document.getElementById('pinPage').style.display='none';
+      const role=appRoleForUser(currentUser);startApp(role);stampUserUI();startPolling();setSync('ok');
+    }catch(e){document.querySelectorAll('.pin-dot').forEach(d=>{d.classList.add('error');d.classList.remove('filled');});setTimeout(()=>{pinBuf='';updDots();},600);setSync('err','PIN 확인');}
+  };
+  window.doLogout=async function(){
+    try{if(authToken)await api('/auth/logout',{method:'POST',body:'{}'});}catch{}
+    authToken='';currentUser=null;sessionStorage.removeItem(TOKEN_KEY);clearInterval(pollTimerV2);
+    S.curRole='';['englishApp','readingApp','adminApp'].forEach(id=>document.getElementById(id)?.classList.remove('active'));document.getElementById('pinPage').style.display='none';document.getElementById('loginPage').style.display='block';loadUsers();
+  };
+  async function resumeSession(){
+    if(!authToken){loadUsers();return;}
+    try{const d=await api('/me');currentUser=d.user;await loadServerState({render:false});startApp(appRoleForUser(currentUser));stampUserUI();startPolling();setSync('ok');}
+    catch{authToken='';sessionStorage.removeItem(TOKEN_KEY);loadUsers();}
+  }
+  function startPolling(){clearInterval(pollTimerV2);pollTimerV2=setInterval(async()=>{if(document.hidden||pendingLocal||!authToken)return;try{const d=await api('/data');if(Number(d.data?.version||0)>serverVersion){applyServerToLegacy(d.data);refreshCurrentUI();showToast('다른 PC의 변경사항을 반영했습니다');}}catch{}},POLL_MS);}
+
+  // 역할과 별개로 업무 화면 전환
+  window.openWorkspaceSwitcher=function(){document.getElementById('v2Workspace')?.classList.add('open');};
+  window.closeWorkspaceSwitcher=function(){document.getElementById('v2Workspace')?.classList.remove('open');};
+  window.switchWorkspace=function(role){if(role==='admin'&&currentUser?.role!=='admin'){showToast('관리자만 사용할 수 있습니다');return;}closeWorkspaceSwitcher();startApp(role);stampUserUI();};
+  function installWorkspaceModal(){
+    if(document.getElementById('v2Workspace'))return;const el=document.createElement('div');el.id='v2Workspace';el.className='v2-workspace';el.onclick=e=>{if(e.target===el)closeWorkspaceSwitcher()};
