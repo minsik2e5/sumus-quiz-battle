@@ -1,1 +1,135 @@
-<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sweet Survival · Teacher</title><link rel="stylesheet" href="/styles.css"></head><body><main class="page"><div class="row between"><div><div class="title">🍭 SWEET SURVIVAL · CONTROL CENTER</div><div class="small muted">V0.10 · 실제 20인 SSE 서버</div></div><span class="pill" id="serverStatus">서버 연결 중…</span></div><div class="teacher-layout" style="margin-top:14px"><section class="card"><div class="row between"><div><div class="small muted">ROOM CODE</div><div class="code" id="code">------</div></div><div><canvas id="qr" class="qr hidden" width="220" height="220" aria-label="학생 입장 QR"></canvas></div></div><div class="small muted" id="joinUrl" style="word-break:break-all;margin-top:8px"></div><div class="row" style="margin:14px 0"><button class="btn primary" id="start" disabled>START</button><button class="btn" id="pause" disabled>PAUSE</button><button class="btn" id="restart" disabled>NEW ROUND</button></div><div class="row"><span class="pill" id="connected">0 / 20 CONNECTED</span><span class="pill" id="readyCount">0 READY</span><span class="pill" id="alive">— ALIVE</span><span class="pill" id="roundTime">0.00 s</span></div><div id="players" class="grid players" style="margin-top:14px"></div></section><aside class="card"><div class="title" style="font-size:17px">LIVE RANKING</div><div id="ranking" style="margin-top:8px"></div></aside></div><section class="projector" style="margin-top:14px"><div><div class="small" style="letter-spacing:.25em;opacity:.7" id="projKick">WAITING ROOM</div><div class="big" id="projMain">0 / 20</div><div style="opacity:.72" id="projSub">학생들이 QR로 입장합니다.</div></div></section></main><div id="toast" class="toast hidden"></div><script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script><script src="/teacher.js"></script></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sweet Survival · Control Center</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body class="teacher-body">
+  <main class="teacher-page">
+    <header class="teacher-hero">
+      <div class="brand-lockup">
+        <div class="brand-orb" aria-hidden="true"><span></span></div>
+        <div>
+          <div class="eyebrow">SUMUS CLASS GAME</div>
+          <h1>SWEET SURVIVAL</h1>
+          <div class="hero-sub">20인 실시간 서바이벌 · Teacher Control Center</div>
+        </div>
+      </div>
+      <div class="server-badge" id="serverStatus"><i></i><span>서버 연결 중…</span></div>
+    </header>
+
+    <section class="teacher-dashboard">
+      <div class="teacher-main-column">
+        <section class="premium-card room-command-card">
+          <div class="room-command-top">
+            <div class="room-copy-block">
+              <div class="section-kicker">LIVE CLASSROOM</div>
+              <div class="room-code-row">
+                <div>
+                  <div class="room-label">ROOM CODE</div>
+                  <button class="room-code-button" id="code" title="방 코드 복사">------</button>
+                </div>
+                <div class="room-live-chip"><i></i> LIVE</div>
+              </div>
+
+              <div class="join-box">
+                <div class="join-copy">
+                  <span class="join-label">학생 입장 링크</span>
+                  <span id="joinUrl" class="join-url">생성 중…</span>
+                </div>
+                <button id="copyJoin" class="icon-action" type="button" title="학생 링크 복사">복사</button>
+              </div>
+
+              <div class="command-actions">
+                <button class="btn primary start-btn" id="start" disabled><span class="btn-icon">▶</span> START ROUND</button>
+                <button class="btn ghost" id="pause" disabled>Ⅱ PAUSE</button>
+                <button class="btn ghost" id="restart" disabled>↻ NEW ROUND</button>
+              </div>
+            </div>
+
+            <div class="qr-panel">
+              <div class="qr-head">
+                <span>SCAN TO JOIN</span>
+                <span class="qr-spark">✦</span>
+              </div>
+              <div class="qr-frame">
+                <div id="qr" class="qr-code" aria-label="학생 입장 QR"></div>
+              </div>
+              <div class="qr-caption">학생은 QR 스캔 → 이름 입력 → READY</div>
+            </div>
+          </div>
+
+          <div class="metric-grid">
+            <div class="metric-card">
+              <div class="metric-icon people">●</div>
+              <div><div class="metric-label">CONNECTED</div><div class="metric-value" id="connected">0 / 20</div></div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-icon ready">✓</div>
+              <div><div class="metric-label">READY</div><div class="metric-value" id="readyCount">0</div></div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-icon alive">♥</div>
+              <div><div class="metric-label">ALIVE</div><div class="metric-value" id="alive">—</div></div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-icon time">◷</div>
+              <div><div class="metric-label">ROUND TIME</div><div class="metric-value" id="roundTime">0.00 s</div></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="premium-card lobby-card">
+          <div class="section-head">
+            <div>
+              <div class="section-kicker">PLAYER LOBBY</div>
+              <h2>학생 접속 현황</h2>
+            </div>
+            <div class="legend-row"><span><i class="dot wait"></i>대기</span><span><i class="dot ready"></i>준비</span><span><i class="dot out"></i>탈락</span></div>
+          </div>
+          <div id="players" class="player-grid"></div>
+        </section>
+      </div>
+
+      <aside class="teacher-side-column">
+        <section class="premium-card ranking-card">
+          <div class="section-head compact">
+            <div>
+              <div class="section-kicker">LIVE BOARD</div>
+              <h2>실시간 순위</h2>
+            </div>
+            <div class="ranking-crown">♛</div>
+          </div>
+          <div id="ranking" class="ranking-list"></div>
+        </section>
+
+        <section class="mini-guide-card">
+          <div class="guide-icon">✦</div>
+          <div>
+            <strong>수업 진행 팁</strong>
+            <p>전원 READY가 되면 START가 활성화됩니다. 게임 중 연결이 끊겨도 다시 입장할 수 있습니다.</p>
+          </div>
+        </section>
+      </aside>
+    </section>
+
+    <section class="projector premium-projector">
+      <div class="projector-glow one"></div>
+      <div class="projector-glow two"></div>
+      <div class="projector-content">
+        <div class="projector-kicker" id="projKick">WAITING ROOM</div>
+        <div class="big" id="projMain">0 / 20</div>
+        <div class="projector-sub" id="projSub">학생들이 QR로 입장합니다.</div>
+      </div>
+      <div class="projector-candy left">✦</div>
+      <div class="projector-candy right">✦</div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="/teacher.js"></script>
+</body>
+</html>
