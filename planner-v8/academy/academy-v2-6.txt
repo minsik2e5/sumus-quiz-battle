@@ -1,0 +1,39 @@
+/div><div class="card-body"><div class="v2-section-grid" style="padding:0"><div class="v2-mini-card"><div class="v2-mini-kicker">재원</div><div class="v2-mini-value">${x.students}</div></div><div class="v2-mini-card"><div class="v2-mini-kicker">출석 / 결석</div><div class="v2-mini-value">${x.present} / ${x.absent}</div></div></div><div class="v2-divider"></div><div style="font-size:12px;line-height:1.9;color:var(--g5)">${x.missingReason?`⚠ 결석 사유 미입력 <b>${x.missingReason}</b>건<br>`:''}${x.noBook?`⚠ 현재 교재 미지정 <b>${x.noBook}</b>명<br>`:''}${x.noNext?`⚠ 다음 교재 미지정 <b>${x.noNext}</b>명<br>`:''}${!issues?'✓ 주요 누락 없음':''}</div></div></div>`;}).join('');
+  };
+  window.copyMonthCloseReport=function(){const classes=closeCls==='all'?S.classes:[closeCls];let t=`[썸어스학원 월말 마감] ${closeMonth}\n`;classes.forEach(c=>{const x=monthStats(c);t+=`\n${c} (${x.students}명)\n- 출석 ${x.present} / 결석 ${x.absent}\n- 결석 사유 미입력 ${x.missingReason}\n- 현재 교재 미지정 ${x.noBook}\n- 다음 교재 미지정 ${x.noNext}\n`;});navigator.clipboard?.writeText(t).then(()=>showToast('월말 마감 내용 복사됨'));};
+
+  // 상담용 학생 요약 복사
+  window.copyCounselSummary=function(name,cls){
+    try{
+      const st=(S.students[cls]||[]).find(x=>x.name===name)||{};
+      const att=typeof getProfileAttendance==='function'?getProfileAttendance(cls,name):{p:0,a:0,rate:null};
+      const cur=typeof tbCurrentForStudent==='function'?tbCurrentForStudent(tbStudentKey(cls,name)):null;
+      const hist=typeof tbHistoryForStudent==='function'?tbHistoryForStudent(tbStudentKey(cls,name)):[];
+      const memos=typeof getProfileMemos==='function'?getProfileMemos(cls,name,5):[];
+      const opt=typeof getStudentOptions==='function'?getStudentOptions('english',cls,name):{};
+      const lines=[`[썸어스학원 학생 상담 요약]`,`학생: ${name}${st.grade?' / '+st.grade:''} / ${cls}`,`출결: 출석 ${att.p||0}회 · 결석 ${att.a||0}회${att.rate!=null?' · 출석률 '+att.rate+'%':''}`,`현재 교재: ${opt.textbook===false?'관리 안 함':cur?.title||'미지정'}`,`다음 교재: ${cur?.nextTitle||'미지정'}`,`완료 교재: ${hist.length?hist.slice(0,4).map(x=>x.title).join(', '):'없음'}`];
+      if(memos.length)lines.push(`최근 메모: ${memos.slice(0,3).map(x=>x.memo||x.text||'').filter(Boolean).join(' / ')}`);
+      navigator.clipboard?.writeText(lines.join('\n')).then(()=>showToast('상담 요약을 복사했습니다'));
+    }catch(e){showToast('상담 요약 생성 실패');}
+  };
+
+  // 백업/복원/초기화는 서버 기준
+  window.exportData=async function(){
+    if(currentUser?.role!=='admin'){showToast('관리자만 백업할 수 있습니다');return;}
+    try{const r=await fetch(API+'/backup',{headers:{Authorization:'Bearer '+authToken}});if(!r.ok)throw new Error();const blob=await r.blob();const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`sumus-backup-${today()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);}catch{showToast('백업 실패');}
+  };
+  window.importData=function(e){const f=e.target.files?.[0];if(!f)return;if(currentUser?.role!=='admin'){showToast('관리자만 복원할 수 있습니다');e.target.value='';return;}const rd=new FileReader();rd.onload=async ev=>{try{const d=JSON.parse(ev.target.result);if(!confirm('서버 데이터를 이 백업으로 복원할까요?'))return;const r=await api('/restore',{method:'POST',body:JSON.stringify({data:d})});applyServerToLegacy(r.data);refreshCurrentUI();showToast('복원 완료');}catch(err){showToast(err.message||'복원 실패');}finally{e.target.value='';}};rd.readAsText(f);};
+  window.resetAllData=async function(){if(currentUser?.role!=='admin'){showToast('관리자만 초기화할 수 있습니다');return;}const v=prompt('전체 초기화는 백업 후 진행됩니다.\n계속하려면 SUMUS RESET 을 입력하세요');if(v!=='SUMUS RESET')return;try{const d=await api('/reset',{method:'POST',body:JSON.stringify({confirmText:v})});applyServerToLegacy(d.data);refreshCurrentUI();showToast('전체 초기화 완료');}catch(e){showToast(e.message||'초기화 실패');}};
+
+  // 설정의 Apps Script 입력은 숨기고 온라인 상태 카드로 변경
+  function cleanSettings(){
+    document.querySelectorAll('.card-label').forEach(lbl=>{if(lbl.textContent.includes('구글 시트 URL')){const card=lbl.closest('.card');if(card){card.querySelector('.card-label').textContent='온라인 자동저장';const body=card.querySelector('.card-body');if(body)body.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div><div style="font-size:13px;font-weight:800">공용 서버 연결</div><div style="font-size:11px;color:var(--g4);margin-top:3px">여러 PC의 데이터를 자동으로 동기화합니다.</div></div><button class="btn btn-dg btn-sm" onclick="forceSync()">지금 동기화</button></div><div class="sync-badge" style="margin-top:8px"></div>';}}});
+  }
+
+  // 기존 UI 함수 호출 후 공통 정리
+  ['initEng','initRr','initAdmin'].forEach(n=>{const f=window[n];if(typeof f==='function'){window[n]=function(){const r=f.apply(this,arguments);setTimeout(()=>{stampUserUI();cleanSettings();},0);return r;};}});
+
+  // 부팅: 기존 역할 로그인 화면을 서버 사용자 목록으로 덮어씀
+  document.getElementById('loginPage').style.display='block';document.getElementById('pinPage').style.display='none';['englishApp','readingApp','adminApp'].forEach(id=>document.getElementById(id)?.classList.remove('active'));
+  installWorkspaceModal();resumeSession();
+})();
