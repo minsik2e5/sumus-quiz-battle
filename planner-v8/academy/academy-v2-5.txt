@@ -1,0 +1,42 @@
+odal('globalSearchModal');const i=document.getElementById('globalSearchInput');if(i){i.value='';setTimeout(()=>i.focus(),80);}renderGlobalSearch();};
+  window.renderGlobalSearch=function(){
+    const q=text(document.getElementById('globalSearchInput')?.value||'').toLowerCase();const out=[];
+    S.classes.forEach(cls=>(S.students[cls]||[]).forEach(st=>{const hay=`${st.name} ${st.grade||''} ${cls}`.toLowerCase();if(q&&hay.includes(q))out.push({tag:'학생',title:st.name,sub:`${cls}${st.grade?' · '+st.grade:''}`,action:`closeModal('globalSearchModal');openProfile('${st.name}','english','${cls}')`});}));
+    (S.rrStudents||[]).forEach(st=>{if(q&&`${st.name} ${st.school||''}`.toLowerCase().includes(q))out.push({tag:'독서실',title:st.name,sub:st.school||'',action:`closeModal('globalSearchModal');openProfile('${st.name}','reading')`});});
+    (S.tbBooks||[]).forEach(b=>{if(q&&`${b.title} ${b.studentName}`.toLowerCase().includes(q))out.push({tag:'교재',title:b.title,sub:`${b.studentName} · ${b.status||''}`,action:`closeModal('globalSearchModal');switchWorkspace('english');setTimeout(()=>engPage('textbook',6),0)`});});
+    Object.entries(S.memos||{}).forEach(([k,m])=>{const [d,c,n]=k.split('||');if(q&&`${m} ${n} ${c}`.toLowerCase().includes(q))out.push({tag:'메모',title:n,sub:`${d} · ${m}`,action:`closeModal('globalSearchModal');openProfile('${n}','english','${c}')`});});
+    const el=document.getElementById('globalSearchResults');if(!el)return;el.innerHTML=!q?'<div class="v2-empty-inline">학생명, 교재명, 메모를 입력하세요.</div>':out.length?out.slice(0,60).map(x=>`<div class="search-result" onclick="${x.action}"><span class="search-tag">${x.tag}</span><div><div class="v2-result-title">${x.title}</div><div class="v2-result-sub">${x.sub}</div></div></div>`).join(''):'<div class="v2-empty-inline">검색 결과가 없습니다.</div>';
+  };
+
+  // 교재 일괄 처리 기능 복구
+  let bulkTargets=[];
+  window.openBulkActionModal=function(){const cls=document.getElementById('bulkClass');if(cls)cls.innerHTML=S.classes.map(c=>`<option value="${c}">${c}</option>`).join('');openModal('bulkActionModal');renderBulkHelper();};
+  window.renderBulkHelper=function(){
+    const cls=document.getElementById('bulkClass')?.value||S.classes[0],action=document.getElementById('bulkAction')?.value||'setCurrentNoBook',cur=text(document.getElementById('bulkCurrentTitle')?.value||'');const students=(S.students[cls]||[]).map(st=>({...st,key:tbStudentKey(cls,st.name)}));
+    if(action==='setCurrentNoBook')bulkTargets=students.filter(st=>!tbCurrentForStudent(st.key));else bulkTargets=students.filter(st=>{const b=tbCurrentForStudent(st.key);return b&&(!cur||b.title===cur);});
+    const p=document.getElementById('bulkPreview');if(p)p.innerHTML=bulkTargets.length?bulkTargets.map(st=>`<div style="padding:7px 3px;border-bottom:1px solid var(--g0)">${st.name} <span style="color:var(--g4)">${st.grade||''}</span></div>`).join(''):'대상 학생이 없습니다.';
+  };
+  ['bulkClass','bulkCurrentTitle'].forEach(id=>document.addEventListener('change',e=>{if(e.target?.id===id)renderBulkHelper();}));
+  window.runBulkAction=function(){
+    renderBulkHelper();if(!bulkTargets.length){showToast('대상 학생 없음');return;}const action=document.getElementById('bulkAction').value,newTitle=text(document.getElementById('bulkNewTitle').value),cur=text(document.getElementById('bulkCurrentTitle').value);
+    if((action==='setCurrentNoBook'||action==='setNextByCurrent')&&!newTitle){showToast('지정할 교재명을 입력하세요');return;}
+    if(action!=='setCurrentNoBook'&&!cur){showToast('기준 현재 교재명을 입력하세요');return;}
+    if(!confirm(`${bulkTargets.length}명에게 일괄 처리할까요?`))return;
+    bulkTargets.forEach(st=>{const b=tbCurrentForStudent(st.key);if(action==='setCurrentNoBook'){S.tbBooks.push({id:uid('tb'),studentKey:st.key,studentName:st.name,cls:document.getElementById('bulkClass').value,title:newTitle,startDate:today(),status:'진행중',nextTitle:'',memo:'',completedDate:'',createdAt:Date.now(),updatedAt:Date.now()});}else if(action==='setNextByCurrent'&&b){b.nextTitle=newTitle;b.updatedAt=Date.now();}else if(action==='completeByCurrent'&&b){b.status='완료';b.completedDate=today();b.updatedAt=Date.now();}});
+    saveS();closeModal('bulkActionModal');renderTextbook();renderEngHome();showToast(`${bulkTargets.length}명 처리 완료`);
+  };
+
+  // 월말 마감 기능 복구
+  let closeMonth=monthKey(),closeCls='all';
+  window.openMonthCloseModal=function(){closeMonth=monthKey();closeCls='all';openModal('monthCloseModal');renderMonthClose();};
+  window.setMonthCloseCls=function(c){closeCls=c;renderMonthClose();};
+  function monthStats(cls){
+    let present=0,absent=0,missingReason=0,noBook=0,noNext=0;const students=S.students[cls]||[];
+    students.forEach(st=>{Object.entries(S.attendance||{}).forEach(([k,v])=>{if(k.endsWith('_t')||!k.startsWith(closeMonth)||!k.includes(`||${cls}||${st.name}`))return;if(v==='present')present++;if(v==='absent'){absent++;if(!(S.absentReasons||{})[k])missingReason++;}});const b=tbCurrentForStudent(tbStudentKey(cls,st.name));if(!b)noBook++;else if(!b.nextTitle)noNext++;});
+    return{students:students.length,present,absent,missingReason,noBook,noNext};
+  }
+  window.renderMonthClose=function(){
+    const chip=document.getElementById('monthCloseChips'),cont=document.getElementById('monthCloseContent'),sub=document.getElementById('monthCloseSub');if(!chip||!cont)return;
+    if(sub)sub.textContent=`${closeMonth.replace('-','년 ')}월 · 출결/교재 누락을 한 번에 확인합니다.`;
+    chip.innerHTML=`<div class="chip ${closeCls==='all'?'active':''}" onclick="setMonthCloseCls('all')">전체</div>`+S.classes.map(c=>`<div class="chip ${closeCls===c?'active':''}" onclick="setMonthCloseCls('${c}')">${c}</div>`).join('');
+    const classes=closeCls==='all'?S.classes:[closeCls];cont.innerHTML=classes.map(c=>{const x=monthStats(c);const issues=x.missingReason+x.noBook+x.noNext;return `<div class="card" style="margin:0 0 10px"><div class="card-head"><span style="font-weight:800">${c}</span><span style="font-size:11px;color:${issues?'var(--red)':'var(--green)'}">${issues?`확인 ${issues}건`:'마감 가능'}</span><
