@@ -1,0 +1,68 @@
+|[]);
+      S._serverVersion=Number(state.version||1);S._serverUpdatedAt=state.updatedAt||'';
+      serverState=clone(state);serverVersion=Number(state.version||1);
+      localStorage.setItem(CACHE_KEY,JSON.stringify({state,at:Date.now()}));
+      localStorage.setItem(SK,JSON.stringify(S));
+    }finally{applyingServer=false;}
+  }
+
+  function idForStudent(cls,name){
+    S._studentIds=S._studentIds||{};const k=`${cls}||${name}`;
+    if(!S._studentIds[k])S._studentIds[k]=uid('stu');return S._studentIds[k];
+  }
+  function legacyToServer(base){
+    const next=clone(base||serverState||{});const cm=classMaps(next);
+    next.schemaVersion=next.schemaVersion||1;
+    next.classes=Array.isArray(next.classes)?next.classes:[];
+    S.classes.forEach(name=>{if(!cm.byName[name]){const id=uid('class');next.classes.push({id,name,active:true});cm.byName[name]=id;cm.byId[id]=name;}else{const c=next.classes.find(x=>x.id===cm.byName[name]);if(c)c.active=true;}});
+
+    const oldById={};(next.students||[]).forEach(st=>oldById[st.id]=st);const touched=new Set();
+    S.classes.forEach(cls=>(S.students[cls]||[]).forEach(st=>{
+      const id=st._id||idForStudent(cls,st.name);S._studentIds[`${cls}||${st.name}`]=id;touched.add(id);
+      const opt=(S.studentOptions||{})[`english||${cls}||${st.name}`]||{attendance:true,textbook:true,vocab:true,reading:false};
+      const prev=oldById[id]||{};oldById[id]={...prev,id,name:st.name,grade:st.grade||'',classId:cm.byName[cls],active:true,englishEnabled:true,attendanceEnabled:opt.attendance!==false,textbookEnabled:opt.textbook!==false,vocabEnabled:opt.vocab!==false,readingRoomEnabled:!!opt.reading,school:prev.school||'',note:(S._studentNotes||{})[id]??prev.note??'',updatedAt:new Date().toISOString()};
+    }));
+    (S.rrStudents||[]).forEach(st=>{
+      let id=st._id||Object.values(oldById).find(x=>x.name===st.name)?.id||uid('stu');touched.add(id);const prev=oldById[id]||{};
+      oldById[id]={...prev,id,name:st.name,grade:prev.grade||'',school:st.school||prev.school||'',classId:prev.classId||cm.byName['미분류']||next.classes[0]?.id,active:true,readingRoomEnabled:true,englishEnabled:prev.englishEnabled!==false,attendanceEnabled:prev.attendanceEnabled!==false,textbookEnabled:prev.textbookEnabled!==false,vocabEnabled:prev.vocabEnabled!==false,updatedAt:new Date().toISOString()};
+    });
+    Object.keys(S._deactivatedIds||{}).forEach(id=>{if(oldById[id])oldById[id]={...oldById[id],active:false,legacyStatus:'퇴원',updatedAt:new Date().toISOString()};});
+    next.students=Object.values(oldById);
+
+    const sm=studentMaps({...next,classes:next.classes,students:next.students});
+    const existingAtt=new Map();(next.attendance||[]).forEach(a=>{const st=sm.byId[a.studentId];if(!st)return;const cls=cm.byId[a.classId||st.classId]||cm.byId[st.classId]||'미분류';existingAtt.set(aKey(a.date,cls,st.name),a);});
+    // 기존 레코드는 화면 상태와 맞춰 present/absent/unchecked를 갱신
+    for(const [k,a] of existingAtt){
+      const st=S.attendance[k]||'';a.status=st||'unchecked';a.checkInTime=S.attendance[k+'_t']||null;a.absentReason=(S.absentReasons||{})[k]||'';a.updatedAt=new Date().toISOString();
+    }
+    Object.keys(S.attendance||{}).filter(k=>!k.endsWith('_t')).forEach(k=>{
+      if(existingAtt.has(k))return;const [date,cls,name]=k.split('||');const sid=idForStudent(cls,name);const rec={id:uid('att'),date,classId:cm.byName[cls],studentId:sid,status:S.attendance[k]||'unchecked',checkInTime:S.attendance[k+'_t']||null,absentReason:(S.absentReasons||{})[k]||'',memo:'',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()};existingAtt.set(k,rec);
+    });
+    next.attendance=[...existingAtt.values()];
+
+    const memoByKey=new Map();(next.memos||[]).forEach(m=>{const st=sm.byId[m.studentId];if(!st)return;const cls=cm.byId[m.classId||st.classId]||'미분류';memoByKey.set(aKey(m.date||'',cls,st.name),m);});
+    Object.entries(S.memos||{}).forEach(([k,v])=>{if(!v)return;const [date,cls,name]=k.split('||');const sid=idForStudent(cls,name);const prev=memoByKey.get(k)||{};memoByKey.set(k,{...prev,id:prev.id||uid('memo'),date,classId:cm.byName[cls],studentId:sid,content:v,updatedAt:new Date().toISOString()});});
+    next.memos=[...memoByKey.values()];
+
+    next.textbookLibrary=(S.tbOptions||[]).map((title,i)=>({id:(next.textbookLibrary||[])[i]?.id||uid('book'),title,active:true}));
+    next.textbookRecords=(S.tbBooks||[]).map(b=>{const {cls,name}=parseTbStudentKey(b.studentKey);return{id:b.id||uid('tb'),studentId:idForStudent(cls,name),title:b.title||'',startDate:b.startDate||'',status:b.status||'진행중',nextTitle:b.nextTitle||'',memo:b.memo||'',completedDate:b.completedDate||'',createdAt:b.createdAt?new Date(b.createdAt).toISOString():new Date().toISOString(),updatedAt:new Date().toISOString()};});
+    next.tests=Object.entries(S.vocabTests||{}).map(([id,t])=>({...clone(t),id:t.id||id}));
+    next.readingSessions=(S.rrSessions||[]).map(r=>{const rr=(S.rrStudents||[]).find(x=>x.name===r.name);const id=rr? (rr._id||Object.values(oldById).find(x=>x.name===r.name)?.id):Object.values(oldById).find(x=>x.name===r.name)?.id;return{id:r.id||uid('rr'),studentId:id||uid('stu'),name:r.name,date:r.date,in:r.in||'',out:r.out||null,inFull:r.inFull||null,outFull:r.outFull||null,duration:r.duration??null};});
+    next.exams=clone(S.rrExams||[]);next.tasks=clone(S.rrTasks||[]);next.notices=clone(S.notices||[]);
+    next.updatedAt=new Date().toISOString();next.updatedBy=currentUser?.id||'client';
+    return next;
+  }
+
+  async function loadServerState({render=true}={}){
+    if(!authToken)return false;
+    try{
+      const d=await api('/data');
+      if(d.data && Number(d.data.version||0)>=serverVersion){applyServerToLegacy(d.data);if(render)refreshCurrentUI();}
+      setSync('ok');return true;
+    }catch(e){setSync('err','오프라인');lastSaveError=e.message;return false;}
+  }
+  async function saveServerNow(retry=true){
+    if(!authToken||applyingServer)return;
+    clearTimeout(saveTimerV2);pendingLocal=true;setSync('busy');
+    try{
+      let 
