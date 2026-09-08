@@ -5,44 +5,33 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#21163c">
   <title>Sweet Survival · Student</title>
-  <link rel="stylesheet" href="/styles.css?v=11">
-  <link rel="stylesheet" href="/student-v011.css?v=11">
+  <link rel="stylesheet" href="/styles.css?v=12">
+  <link rel="stylesheet" href="/student-v011.css?v=12">
+  <link rel="stylesheet" href="/student-v012.css?v=12">
 </head>
 <body class="student-body">
   <main id="joinPage" class="student-flow student-join-page">
     <div class="student-deco deco-a"></div><div class="student-deco deco-b"></div><div class="student-deco deco-c"></div>
     <section class="student-entry-card">
-      <div class="student-brand">
-        <div class="student-logo"><span></span></div>
-        <div><div class="eyebrow">SUMUS PARTY GAME</div><h1>SWEET SURVIVAL</h1></div>
-      </div>
-      <div class="student-entry-copy">
-        <span class="entry-chip">20 PLAYER LIVE</span>
-        <h2>끝까지 살아남아!</h2>
-        <p>방 코드와 이름을 입력하면 바로 대기실로 들어가요.</p>
-      </div>
+      <div class="student-brand"><div class="student-logo"><span></span></div><div><div class="eyebrow">SUMUS PARTY GAME</div><h1>SWEET SURVIVAL</h1></div></div>
+      <div class="student-entry-copy"><div style="display:flex;gap:7px;flex-wrap:wrap"><span class="entry-chip">20 PLAYER LIVE</span><span class="entry-chip hazard-count-chip">10 HAZARDS</span></div><h2>끝까지 살아남아!</h2><p>수업에서는 방 코드로 입장하고, 혼자 연습 모드에서는 바로 플레이할 수 있어요.</p></div>
       <div class="student-form">
-        <label>ROOM CODE</label>
-        <input id="roomInput" class="room-code-input" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="000000">
-        <label>PLAYER NAME</label>
-        <input id="nameInput" maxlength="16" autocomplete="off" placeholder="이름 입력">
-        <button id="joinBtn" class="student-main-btn">입장하기 <span>→</span></button>
+        <label>ROOM CODE</label><input id="roomInput" class="room-code-input" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="000000">
+        <label>PLAYER NAME</label><input id="nameInput" maxlength="16" autocomplete="off" placeholder="이름 입력">
+        <button id="joinBtn" class="student-main-btn">수업 방 입장 <span>→</span></button>
+        <div class="student-mode-divider">OR</div>
+        <button id="soloBtn" class="student-solo-btn"><span>★</span> 사람 없이 혼자 연습하기</button>
         <div id="joinError" class="student-error"></div>
       </div>
-      <div class="student-entry-foot"><span>⚡ 실시간 서버</span><span>📱 모바일 최적화</span><span>🎮 3D 서바이벌</span></div>
+      <div class="student-entry-foot"><span>⚡ 실시간 서버</span><span>📱 모바일 최적화</span><span>🎮 3D 서바이벌</span><span>🧪 SOLO TEST</span></div>
     </section>
   </main>
 
   <main id="lobbyPage" class="student-flow student-lobby-page hidden">
     <section class="student-lobby-card">
       <div class="lobby-topline"><div><div class="eyebrow">WAITING ROOM</div><div class="lobby-code" id="studentCode">------</div></div><div class="student-live-pill" id="studentConn"><i></i> CONNECTED</div></div>
-      <div class="lobby-mascot-wrap">
-        <div class="mascot-halo"></div>
-        <div class="mascot-face">⭐</div>
-      </div>
-      <div class="lobby-player-name" id="studentName">PLAYER</div>
-      <div class="lobby-summary" id="lobbySummary">교사의 시작을 기다립니다.</div>
-      <div class="lobby-progress"><span></span></div>
+      <div class="lobby-mascot-wrap"><div class="mascot-halo"></div><div class="mascot-face">⭐</div></div>
+      <div class="lobby-player-name" id="studentName">PLAYER</div><div class="lobby-summary" id="lobbySummary">교사의 시작을 기다립니다.</div><div class="lobby-progress"><span></span></div>
       <button id="readyBtn" class="student-ready-btn"><span class="ready-dot"></span><b>READY</b><small>준비되면 눌러주세요</small></button>
       <div class="lobby-tip">TIP · 장애물은 경고 표시 후 등장해요. 타이밍을 보고 점프!</div>
     </section>
@@ -50,27 +39,18 @@
 
   <main id="gamePage" class="student-game-page hidden">
     <div class="game-shell premium-game-shell" id="gameShell">
-      <div id="view" class="game-view"></div>
-      <div class="game-vignette"></div>
-      <div class="game-topbar">
-        <div class="player-chip"><span class="player-avatar">★</span><div><b id="gameName">학생</b><small id="gameRoom"></small></div></div>
-        <div class="game-center-hud"><div class="hud-time" id="time">0.00</div><div class="hud-stage" id="stage">STAGE 1</div></div>
-        <div class="alive-chip"><small>ALIVE</small><b id="aliveHud">0 / 0</b></div>
-      </div>
-      <div class="net-pill" id="gameNet"><i></i> LIVE</div>
-      <button class="audio-btn" id="audioBtn" aria-label="sound">🔊</button>
+      <div id="view" class="game-view"></div><div class="game-vignette"></div>
+      <div class="game-topbar"><div class="player-chip"><span class="player-avatar">★</span><div><b id="gameName">학생</b><small id="gameRoom"></small></div></div><div class="game-center-hud"><div class="hud-time" id="time">0.00</div><div class="hud-stage" id="stage">STAGE 1</div></div><div class="alive-chip"><small>ALIVE</small><b id="aliveHud">0 / 0</b></div></div>
+      <div class="net-pill" id="gameNet"><i></i> LIVE</div><button class="audio-btn" id="audioBtn" aria-label="sound">🔊</button>
       <div class="stage-banner hidden" id="stageBanner"><small>NEXT LEVEL</small><b id="stageBannerText">STAGE 2</b></div>
       <div id="countdown" class="game-overlay countdown-overlay hidden"><div class="count-card"><small>GET READY</small><div id="countText">3</div><p>살아남을 준비!</p></div></div>
       <div id="warning" class="hazard-warning hidden"><div class="hazard-icon">!</div><div><small>WATCH OUT</small><b id="warningName">CANDY SWEEP</b><span>경고 후 공격 시작</span></div></div>
-      <div id="dead" class="game-overlay result-overlay hidden"><div class="result-card"><div class="result-burst">✦</div><div class="result-icon">💫</div><small>ROUND RESULT</small><h2>BONK!</h2><div id="deadResult" class="result-time"></div><p>다른 친구들의 경기가 끝날 때까지 기다려요.</p></div></div>
+      <div id="dead" class="game-overlay result-overlay hidden"><div class="result-card"><div class="result-burst">✦</div><div class="result-icon">💫</div><small>ROUND RESULT</small><h2>BONK!</h2><div id="deadResult" class="result-time"></div><p id="resultCopy">다른 친구들의 경기가 끝날 때까지 기다려요.</p><button id="retrySoloBtn" class="student-retry-btn hidden">↻ 다시 도전</button></div></div>
       <div id="paused" class="game-overlay pause-overlay hidden"><div><small>TEACHER CONTROL</small><b>PAUSED</b><p>잠시만 기다려 주세요</p></div></div>
-      <div class="touch-controls">
-        <div class="control-side move-side"><div class="control-label">MOVE</div><div id="joy" class="premium-joy"><div class="joy-arrows">⌃</div><div id="knob" class="premium-knob"><span></span></div></div></div>
-        <div class="control-side jump-side"><div class="control-label">JUMP</div><button id="jump" class="premium-jump"><span>↑</span><b>JUMP</b></button></div>
-      </div>
+      <div class="touch-controls"><div class="control-side move-side"><div class="control-label">MOVE</div><div id="joy" class="premium-joy"><div class="joy-arrows">⌃</div><div id="knob" class="premium-knob"><span></span></div></div></div><div class="control-side jump-side"><div class="control-label">JUMP</div><button id="jump" class="premium-jump"><span>↑</span><b>JUMP</b></button></div></div>
       <div class="bottom-tip">MOVE · DRAG &nbsp; / &nbsp; JUMP · TAP</div>
     </div>
   </main>
-  <script type="module" src="/student.js?v=11"></script>
+  <script type="module" src="/student-v012.js?v=12"></script>
 </body>
 </html>
