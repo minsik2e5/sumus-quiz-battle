@@ -1,0 +1,99 @@
+/* =========================================================
+   SUMUS ACADEMY V2 ONLINE + UX PATCH
+   - 4계정 서버 로그인
+   - Supabase API 공용 자동저장/다중 PC 동기화
+   - student_id 유지 / 퇴원 처리
+   - 검색/일괄처리/월말마감 기능 복구
+   - 출석시간 수정 / 입력값 안전화
+   ========================================================= */
+(() => {
+  'use strict';
+  const API='https://mrlrrzpppmdkivbozato.supabase.co/functions/v1/sumus-academy/api';
+  const TOKEN_KEY='sumus_academy_session_v2';
+  const CACHE_KEY='sumus_academy_online_cache_v2';
+  const SAVE_DELAY=900;
+  const POLL_MS=12000;
+  let authToken=sessionStorage.getItem(TOKEN_KEY)||'';
+  let currentUser=null;
+  let selectedUser=null;
+  let serverState=null;
+  let serverVersion=0;
+  let saveTimerV2=null;
+  let pollTimerV2=null;
+  let pendingLocal=false;
+  let applyingServer=false;
+  let lastSaveError='';
+  let originalFns={};
+
+  function clone(v){return JSON.parse(JSON.stringify(v));}
+  function uid(prefix='id'){return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2,8)}`;}
+  function text(v){return String(v??'').replace(/[<>]/g,c=>c==='<'?'＜':'＞').replace(/'/g,'’').replace(/"/g,'”').trim();}
+  function apiHeaders(json=true){const h={};if(json)h['Content-Type']='application/json';if(authToken)h.Authorization='Bearer '+authToken;return h;}
+  async function api(path,opt={}){
+    const r=await fetch(API+path,{...opt,headers:{...apiHeaders(opt.body!==undefined),...(opt.headers||{})}});
+    let d={};try{d=await r.json();}catch{}
+    if(!r.ok){const e=new Error(d.error||`HTTP ${r.status}`);e.status=r.status;e.payload=d;throw e;}
+    return d;
+  }
+  function setSync(mode,msg=''){
+    const dot=mode==='ok'?'ok':mode==='busy'?'busy':mode==='err'?'err':'';
+    const label=msg||(mode==='ok'?'저장됨':mode==='busy'?'저장 중':mode==='err'?'저장 오류':'온라인');
+    document.querySelectorAll('.sync-badge').forEach(el=>el.innerHTML=`<span class="v2-save-indicator"><i class="v2-dot ${dot}"></i>${label}</span>`);
+  }
+  function appRoleForUser(user){return user?.role==='admin'?'admin':'english';}
+  function classMaps(state){
+    const byId={},byName={};(state?.classes||[]).forEach(c=>{byId[c.id]=c.name;byName[c.name]=c.id;});return{byId,byName};
+  }
+  function studentMaps(state){
+    const byId={},byKey={};const cm=classMaps(state);
+    (state?.students||[]).forEach(st=>{byId[st.id]=st;const cls=cm.byId[st.classId]||'미분류';byKey[`${cls}||${st.name}`]=st.id;});
+    return{byId,byKey};
+  }
+
+  function applyServerToLegacy(state){
+    if(!state)return;
+    applyingServer=true;
+    try{
+      const cm=classMaps(state), sm=studentMaps(state);
+      const activeClasses=(state.classes||[]).filter(c=>c.active!==false).map(c=>c.name);
+      S.classes=activeClasses.length?activeClasses:['미분류'];
+      S.students={};S.classes.forEach(c=>S.students[c]=[]);
+      S._studentIds={};S._studentNotes={};S._deactivatedIds=S._deactivatedIds||{};
+      S.studentOptions={};
+      (state.students||[]).forEach(st=>{
+        const cls=cm.byId[st.classId]||'미분류';
+        if(st.active!==false && st.englishEnabled!==false){
+          if(!S.students[cls]){S.students[cls]=[];if(!S.classes.includes(cls))S.classes.push(cls);}
+          S.students[cls].push({name:st.name,grade:st.grade||'',_id:st.id});
+          S._studentIds[`${cls}||${st.name}`]=st.id;
+          S._studentNotes[st.id]=st.note||'';
+          S.studentOptions[`english||${cls}||${st.name}`]={attendance:st.attendanceEnabled!==false,textbook:st.textbookEnabled!==false,vocab:st.vocabEnabled!==false,reading:!!st.readingRoomEnabled};
+        }
+      });
+      S.rrStudents=(state.students||[]).filter(st=>st.active!==false&&st.readingRoomEnabled).map(st=>({name:st.name,school:st.school||st.grade||'',_id:st.id}));
+      S.rrStudents.forEach(st=>{S.studentOptions[`reading||||${st.name}`]={attendance:false,textbook:false,vocab:false,reading:true};});
+
+      S.attendance={};S.absentReasons={};S.legacyDirectorCheck={};
+      (state.attendance||[]).forEach(a=>{
+        const st=sm.byId[a.studentId];if(!st)return;const cls=cm.byId[a.classId||st.classId]||cm.byId[st.classId]||'미분류';
+        const k=aKey(a.date,cls,st.name);
+        if(a.status==='present'||a.status==='absent')S.attendance[k]=a.status;
+        if(a.checkInTime)S.attendance[k+'_t']=String(a.checkInTime).slice(0,5);
+        if(a.absentReason)S.absentReasons[k]=a.absentReason;
+        if(a.legacyDirectorCheckTime)S.legacyDirectorCheck[k]=a.legacyDirectorCheckTime;
+      });
+
+      S.memos={};
+      (state.memos||[]).forEach(m=>{const st=sm.byId[m.studentId];if(!st)return;const cls=cm.byId[m.classId||st.classId]||'미분류';const k=aKey(m.date||today(),cls,st.name);S.memos[k]=m.content||m.memo||m.text||'';});
+      // 학생 기본 메모도 기록 탭에서 확인 가능하도록 현재일 메모로 중복 생성하지 않고 별도 보존
+
+      S.tbOptions=(state.textbookLibrary||[]).filter(x=>x.active!==false).map(x=>typeof x==='string'?x:(x.title||x.name)).filter(Boolean);
+      if(!S.tbOptions.length && Array.isArray(DEFAULT_TB_OPTIONS))S.tbOptions=[...DEFAULT_TB_OPTIONS];
+      S.tbBooks=(state.textbookRecords||[]).map(b=>{
+        const st=sm.byId[b.studentId];if(!st)return null;const cls=cm.byId[st.classId]||'미분류';
+        return {id:b.id||uid('tb'),studentKey:`${cls}||${st.name}`,studentName:st.name,cls,title:b.title||'',startDate:b.startDate||'',status:b.status||'진행중',nextTitle:b.nextTitle||'',memo:b.memo||'',completedDate:b.completedDate||'',createdAt:b.createdAt?Date.parse(b.createdAt):Date.now(),updatedAt:b.updatedAt?Date.parse(b.updatedAt):Date.now()};
+      }).filter(Boolean);
+
+      S.vocabTests={};(state.tests||[]).forEach(t=>{S.vocabTests[t.id||uid('test')]=clone(t);});
+      S.rrSessions=(state.readingSessions||[]).map(r=>({name:(sm.byId[r.studentId]?.name)||r.name||'',date:r.date||today(),in:r.in||r.checkInTime||'',out:r.out||r.checkOutTime||null,inFull:r.inFull||r.checkInAt||null,outFull:r.outFull||r.checkOutAt||null,duration:r.duration??r.durationMinutes??null}));
+      S.rrExams=clone(state.exams||[]);S.rrTasks=clone(state.tasks||[]);S.notices=clone(state.notices|
