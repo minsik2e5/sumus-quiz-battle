@@ -1,0 +1,65 @@
+    el.innerHTML=`<div class="v2-workspace-card"><div class="m-title">업무 화면</div><div class="m-sub">원하는 관리 화면으로 이동합니다.</div><button class="v2-ws-item" onclick="switchWorkspace('english')"><span class="v2-ws-icon">📚</span><span><div class="v2-ws-title">수업 관리</div><div class="v2-ws-sub">출결 · 등원 · 마감 · 리포트 · 교재 · 테스트</div></span></button><button class="v2-ws-item" onclick="switchWorkspace('reading')"><span class="v2-ws-icon">📖</span><span><div class="v2-ws-title">독서실 관리</div><div class="v2-ws-sub">입퇴실 · 달력 · 메모 · 시험 · 순위</div></span></button><button id="v2AdminWs" class="v2-ws-item" onclick="switchWorkspace('admin')"><span class="v2-ws-icon">👑</span><span><div class="v2-ws-title">운영 관리</div><div class="v2-ws-sub">전체 현황 · 공지 · 학생 · 백업</div></span></button><button class="m-cancel" style="width:100%;margin-top:12px" onclick="closeWorkspaceSwitcher()">닫기</button></div>`;document.body.appendChild(el);
+  }
+  function stampUserUI(){
+    installWorkspaceModal();document.getElementById('v2AdminWs')?.style.setProperty('display',currentUser?.role==='admin'?'flex':'none');
+    document.querySelectorAll('.tb-role').forEach(el=>{el.textContent=currentUser?currentUser.name:'사용자';});
+    document.querySelectorAll('.topbar .tb-right').forEach(r=>{
+      if(!r.querySelector('.v2-work-btn')){const b=document.createElement('button');b.className='v2-top-tool v2-work-btn';b.textContent='업무 전환';b.onclick=openWorkspaceSwitcher;r.prepend(b);}
+    });
+  }
+
+  // 서버 PIN 변경으로 교체
+  window.changePw=async function(role){
+    if(!currentUser){showToast('로그인이 필요합니다');return;}
+    const newId=role==='english'?'newPwEng':role==='reading'?'newPwRr':'newPwAdmin';const el=document.getElementById(newId);const np=el?.value.trim()||'';
+    if(!/^\d{4,8}$/.test(np)){showToast('새 PIN은 숫자 4~8자리');return;}
+    const cp=prompt('현재 PIN을 입력하세요');if(cp===null)return;
+    try{await api('/auth/change-pin',{method:'POST',body:JSON.stringify({currentPin:cp,newPin:np})});if(el)el.value='';showToast('PIN 변경 완료');}catch(e){showToast(e.message||'PIN 변경 실패');}
+  };
+
+  // 출석 입력 UI 개선 + 시간 수정
+  window.renderAttStudents=function(){
+    const date=document.getElementById('attDate')?.value||today();const students=S.students[S.curAttCls]||[];const list=document.getElementById('attList');if(!list)return;
+    list.innerHTML=students.length?students.map(({name,grade})=>{
+      const k=aKey(date,S.curAttCls,name),s=S.attendance[k]||'',ts=S.attendance[k+'_t']||'',hm=!!S.memos[k],legacy=(S.legacyDirectorCheck||{})[k]||'';
+      const timeHtml=s==='present'?`<button class="v2-att-time" onclick="editAttTime('${k}','${name}')">${ts||'시간 입력'}</button>`:(legacy?`<span class="v2-att-time" style="cursor:default">기존확인 ${legacy}</span>`:'');
+      return `<div class="student-item"><div class="s-avatar">${name.slice(0,1)}</div><div class="s-info"><div class="s-name">${name}</div><div class="s-sub">${grade||S.curAttCls} ${timeHtml}</div></div><div class="att-toggle"><button class="att-btn ${s==='present'?'p-on':''}" onclick="setAtt('${k}','present','${name}')">출석</button><button class="att-btn ${s==='absent'?'a-on':''}" onclick="setAtt('${k}','absent','${name}')">결석</button>${s?`<button class="att-btn" onclick="cancelAtt('${k}')" style="color:var(--g4);font-size:11px;">취소</button>`:''}</div><div class="memo-btn ${hm?'has-m':''}" onclick="openMemo('${k}','${name}')">📝</div></div>`;
+    }).join(''):`<div class="empty"><div class="empty-text">학생이 없어요</div></div>`;
+  };
+  window.editAttTime=function(k,name){const cur=S.attendance[k+'_t']||nowTime();const v=prompt(`${name} 등원시간 (HH:MM)`,cur);if(v===null)return;if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(v)){showToast('예: 16:30 형식으로 입력');return;}S.attendance[k]='present';S.attendance[k+'_t']=v;saveS();renderAttStudents();renderPresent();renderEngHome();};
+
+  // 학생 삭제 -> 퇴원/비활성 처리
+  window.deleteStudentConfirm=function(){
+    if(!profName||!profType)return;const label=`${profName} 학생을 퇴원 처리할까요?\n과거 출석·교재·메모 기록은 보존됩니다.`;if(!confirm(label))return;
+    S._deactivatedIds=S._deactivatedIds||{};
+    if(profType==='english'){
+      const key=`${profCls}||${profName}`;const id=(S._studentIds||{})[key];if(id)S._deactivatedIds[id]=true;
+      if(profCls&&S.students[profCls])S.students[profCls]=S.students[profCls].filter(s=>s.name!==profName);else S.classes.forEach(c=>S.students[c]=(S.students[c]||[]).filter(s=>s.name!==profName));
+    }else{
+      const st=(S.rrStudents||[]).find(s=>s.name===profName);if(st?._id)S._deactivatedIds[st._id]=true;S.rrStudents=(S.rrStudents||[]).filter(s=>s.name!==profName);
+    }
+    saveS();closeModal('profileModal');showToast('퇴원 처리되었습니다');refreshCurrentUI();
+  };
+
+  // 학생 추가/수정 시 고정 ID 유지
+  if(typeof window.addStudent==='function'){
+    originalFns.addStudent=window.addStudent;
+    window.addStudent=function(){
+      const before=editStudentInfo?{...editStudentInfo}:null;const newName=text(document.getElementById('newStName')?.value||'');const newCls=document.getElementById('newStClass')?.value||'';
+      if(document.getElementById('newStName'))document.getElementById('newStName').value=newName;
+      originalFns.addStudent();
+      S._studentIds=S._studentIds||{};
+      if(before?.type==='english'){
+        const ok=`${before.cls}||${before.name}`,nk=`${newCls}||${newName}`,id=S._studentIds[ok]||uid('stu');delete S._studentIds[ok];S._studentIds[nk]=id;const st=(S.students[newCls]||[]).find(x=>x.name===newName);if(st)st._id=id;
+      }else if(!before&&addFor==='english'){
+        const nk=`${newCls}||${newName}`,id=S._studentIds[nk]||uid('stu');S._studentIds[nk]=id;const st=(S.students[newCls]||[]).find(x=>x.name===newName);if(st)st._id=id;
+      }
+      queueServerSave();
+    };
+  }
+
+  // 입력값을 HTML이 아닌 일반 텍스트로 정규화
+  document.addEventListener('change',e=>{const el=e.target;if(!(el instanceof HTMLInputElement||el instanceof HTMLTextAreaElement))return;if(['date','time','number','password','file'].includes(el.type))return;el.value=text(el.value);},true);
+
+  // 빠른 검색 기능 복구
+  window.openGlobalSearch=function(){openM
