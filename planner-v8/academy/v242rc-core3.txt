@@ -1,0 +1,12 @@
+ta:rebased,baseVersion:latestVersion,action:'autosave-v242-rebase'})});
+      }
+      if(d?.data){applyServerToLegacy(d.data);serverVersion=Number(d.data.version||serverVersion+1);}
+      pendingLocal=false;lastSaveError='';setSync('ok');
+    }catch(e){
+      pendingLocal=false;lastSaveError=e.message;setSync('err','저장 오류');
+      setTimeout(()=>{if(authToken)saveServerNow(false)},7000);
+    }finally{
+      savingNow=false;
+      if(resaveAfter){resaveAfter=false;setTimeout(()=>saveServerNow(),50);}
+    }
+  }
