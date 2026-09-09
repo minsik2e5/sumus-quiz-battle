@@ -1,0 +1,13 @@
+f=window.addStudent;window.addStudent=function(){
+  const e=(typeof editStudentInfo!=='undefined'&&editStudentInfo)?{...editStudentInfo}:null;
+  const newName=document.getElementById('newStName')?.value.trim()||'';const newCls=document.getElementById('newStClass')?.value||'';
+  let oldId='',oldOpt=null;
+  if(e?.type==='english'){const oldSt=(S.students?.[e.cls]||[]).find(x=>x.name===e.name);oldId=oldSt?._id||(S._studentIds||{})[`${e.cls}||${e.name}`]||'';try{oldOpt=getStudentOptions('english',e.cls,e.name)}catch{}}
+  const r=f.apply(this,arguments);
+  if(e?.type==='english'&&newName&&newCls&&(e.name!==newName||e.cls!==newCls)){
+    const oldFrag=`||${e.cls}||${e.name}`,newFrag=`||${newCls}||${newName}`;
+    ['absentReasons','_attendanceFlags','legacyDirectorCheck'].forEach(prop=>{const obj=S[prop]||{};Object.keys(obj).forEach(k=>{if(k.includes(oldFrag)){obj[k.replace(oldFrag,newFrag)]=obj[k];delete obj[k]}});S[prop]=obj});
+    const oldKey=`${e.cls}||${e.name}`,newKey=`${newCls}||${newName}`;S._studentIds=S._studentIds||{};if(oldId){S._studentIds[newKey]=oldId;delete S._studentIds[oldKey];const st=(S.students?.[newCls]||[]).find(x=>x.name===newName);if(st)st._id=oldId}
+    S.studentOptions=S.studentOptions||{};const ok=`english||${e.cls}||${e.name}`,nk=`english||${newCls}||${newName}`;if(oldOpt)S.studentOptions[nk]={...oldOpt};else if(S.studentOptions[ok])S.studentOptions[nk]=S.studentOptions[ok];delete S.studentOptions[ok];
+    Object.values(S.vocabTests||{}).forEach(t=>{if(t.records&&Object.prototype.hasOwnProperty.call(t.records,e.name)){if(!Object.prototype.hasOwnProperty.call(t.records,newName))t.records[newName]=t.records[e.name];delete t.records[e.name]}});
+    sav
