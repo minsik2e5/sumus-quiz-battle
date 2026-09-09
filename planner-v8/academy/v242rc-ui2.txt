@@ -1,0 +1,18 @@
+r-color:#f1d2d6!important}.vocab-status.taken{background:#edf8f3!important;color:#0b7f63!important;border-color:#cfe8dc!important}
+.v242-launch-note{margin:10px 12px 0;padding:10px 12px;border:1px solid #e5e9e7;border-radius:12px;background:#fafcfb;font-size:10.5px;color:#6e7a73;line-height:1.5}
+body.pc .v24-pipe-list{max-height:470px}
+body.pc .v24-pipe-col{min-height:250px}
+@media(min-width:901px){#eng-home>.card{margin-top:12px!important}.v23-ops{padding-bottom:6px!important}}
+</style>
+<script id="sumus-v242-script">
+(()=>{
+'use strict';
+const classes=()=>window.getEngClasses?.()||['초등 저학년','초등 고학년','중1'];
+const esc242=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function withAllowedClasses(fn){if(typeof fn!=='function')return fn;return function(){const old=S.classes;S.classes=classes();try{return fn.apply(this,arguments)}finally{S.classes=old}}}
+// Settings: 온라인 카드로 교체된 뒤 사라진 legacy URL input을 다시 참조하지 않도록 안전화
+if(typeof window.renderEngSet==='function'){const f=window.renderEngSet;window.renderEngSet=function(){const fakeNeeded=!document.getElementById('scriptUrl');let fake;if(fakeNeeded){fake=document.createElement('input');fake.id='scriptUrl';fake.type='hidden';fake.value=S.scriptUrl||'';document.body.appendChild(fake)}try{return withAllowedClasses(f).apply(this,arguments)}finally{if(fake)fake.remove()}}}
+// 영어 영역은 실제 운영 범위 3개 반만 노출
+['openAddStudent','openEditStudent','openBulkActionModal','renderMonthClose','copyMonthCloseReport'].forEach(n=>{if(typeof window[n]==='function')window[n]=withAllowedClasses(window[n])});
+// 학생 수정 시 stable id 및 과거 연동 데이터가 이름/반 변경 후에도 유지되도록 보강
+if(typeof window.addStudent==='function'){const 
