@@ -1,0 +1,23 @@
+ds={}}
+    return t||{date:m.date,cls:m.cls,type:m.type,title:m.title,maxScore:m.maxScore,records:{},_preview:true};
+  }
+  window.getOrCreateVocabTest=()=>vocabView(true);
+  window.setVocabMeta=function(){normalizeEnglishSelection();renderVocabList();renderVocabRecent()};
+  window.renderVocab=function(){
+    ensureVocab();normalizeEnglishSelection();const cs=classes();
+    const dateEl=document.getElementById('vocabDate');if(dateEl&&!dateEl.value)dateEl.value=today();
+    const clsEl=document.getElementById('vocabCls');if(clsEl){clsEl.innerHTML=cs.map(c=>`<option value="${esc(c)}" ${c===vocabCls?'selected':''}>${esc(c)}</option>`).join('');clsEl.value=vocabCls}
+    const chips=document.getElementById('vocabTypeChips');if(chips)chips.innerHTML=`<div class="chip ${vocabType==='vocab'?'active':''}" onclick="setVocabType('vocab')">단어</div><div class="chip ${vocabType==='test'?'active':''}" onclick="setVocabType('test')">테스트</div>`;
+    const test=vocabView(false),titleEl=document.getElementById('vocabTitle');if(titleEl&&!titleEl.value.trim())titleEl.value=test.title==='단어'||test.title==='테스트'?'':test.title;
+    const maxEl=document.getElementById('vocabMax');if(maxEl){maxEl.style.display=vocabType==='test'?'block':'none';maxEl.placeholder=vocabType==='test'?'만점':'';if(vocabType==='test'&&!maxEl.value)maxEl.value=test.maxScore||100}
+    const sub=document.querySelector('#eng-vocab .sec-sub');if(sub)sub.textContent='단어는 전체 단어 수·틀린 단어 수, 테스트는 점수·만점으로 자동 환산';
+    renderVocabList();renderVocabRecent();
+  };
+  function scoreText(rec,score){if(rec.status==='미응시')return '미응시';if(score!==null)return score+'점';if((rec.totalWords!==''&&rec.totalWords!=null)&&(rec.wrongWords!==''&&rec.wrongWords!=null)&&Number(rec.wrongWords)>Number(rec.totalWords))return '입력 확인';return '-'}
+  window.renderVocabList=function(){
+    const test=vocabView(false),students=S.students[test.cls]||[];
+    const head=vocabType==='vocab'?`<div class="vocab-row vocab-head"><div></div><div>학생</div><div>전체 단어 수</div><div>틀린 단어 수</div><div>환산점수</div><div>상태</div></div>`:`<div class="vocab-row vocab-head"><div></div><div>학생</div><div>점수</div><div>만점</div><div>환산점수</div><div>상태</div></div>`;
+    const rows=students.map(({name,grade})=>{const opt=getStudentOptions('english',test.cls,name);if(!opt.vocab)return `<div class="vocab-row na"><div class="s-avatar">${esc(name.slice(0,1))}</div><div><div class="s-name">${esc(name)}</div><div class="s-sub">${esc(grade||'')}</div></div><div class="mobile-hide"></div><div class="mobile-hide"></div><div class="vocab-score">-</div><div><span class="badge neutral">해당없음</span></div></div>`;
+      const rec=test.records?.[name]||{status:'응시'};
+      if(vocabType==='vocab'){const score=rec.status==='미응시'?null:vocabScoreFromWords(rec.totalWords,rec.wrongWords);return `<div class="vocab-row"><div class="s-avatar">${esc(name.slice(0,1))}</div><div><div class="s-name">${esc(name)}</div><div class="s-sub">${esc(grade||'')}</div></div><input class="vocab-input" type="number" min="0" value="${rec.totalWords??''}" oninput="saveVocabRecord('${name}','totalWords',this.value,this)"><input class="vocab-input" type="number" min="0" value="${rec.wrongWords??''}" oninput="saveVocabRecord('${name}','wrongWords',this.value,this)"><div class="vocab-score">${scoreText(rec,score)}</div><button class="btn btn-outline btn-sm vocab-status" onclick="toggleVocabAbsent('${name}')">${rec.status==='미응시'?'미응시':'응시 ✓'}</button></div>`}
+      const max=rec.maxScore||test.maxScore||100,score=rec.status==='미응시'?null:vocabScoreFromTest(rec.rawScore,max);return `<div class="vocab-row"><div class="s-avatar">${esc(name.slice(0,1))}</div><div><div class="s-name">${esc(name)}</div><div class="s-sub">${esc(grade||'')}</div></div><input class="vocab-input" type="number" min="0" value="${rec.rawScore??''}" oninput="saveVocabRecord('${name}','rawScore',this.value,this)"><input class="vocab-input" type="number" min="1" value="${max}" oninput="saveVocabRecord('${name}','maxScore',this.va
