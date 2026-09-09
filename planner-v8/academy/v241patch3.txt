@@ -1,0 +1,19 @@
+lue,this)"><div class="vocab-score">${rec.status==='미응시'?'미응시':score!==null?score+'점':'-'}</div><button class="btn btn-outline btn-sm vocab-status" onclick="toggleVocabAbsent('${name}')">${rec.status==='미응시'?'미응시':'응시 ✓'}</button></div>`}).join('');
+    const el=document.getElementById('vocabList');if(el)el.innerHTML=head+rows+`<div class="card-body"><button class="btn btn-dg" onclick="saveVocabAll()">저장</button></div>`;
+  };
+  window.saveVocabRecord=function(name,field,value,inputEl){const test=vocabView(true);if(!test.records[name])test.records[name]={status:'응시'};const rec=test.records[name];rec.status='응시';rec[field]=value===''?'':Number(value);rec.score=test.type==='vocab'?vocabScoreFromWords(rec.totalWords,rec.wrongWords):vocabScoreFromTest(rec.rawScore,rec.maxScore||test.maxScore);rec.updatedAt=Date.now();const row=inputEl?.closest?.('.vocab-row');if(row){const s=row.querySelector('.vocab-score');if(s)s.textContent=test.type==='vocab'?scoreText(rec,rec.score):(rec.score!==null?rec.score+'점':'-');const b=row.querySelector('.vocab-status');if(b)b.textContent='응시 ✓'}saveS();renderVocabRecent()};
+  window.toggleVocabAbsent=function(name){const test=vocabView(true);if(!test.records[name])test.records[name]={status:'응시'};const rec=test.records[name];rec.status=rec.status==='미응시'?'응시':'미응시';if(rec.status==='미응시')rec.score=null;saveS();renderVocabList();renderVocabRecent()};
+  window.saveVocabAll=function(){vocabView(true);saveS();renderVocabList();renderVocabRecent();showToast('단어/테스트 기록 저장 완료!')};
+  window.copyVocabSummary=function(){const test=vocabView(false);let txt=`${test.date} ${test.cls} ${test.type==='vocab'?'단어':'테스트'} 기록\n${test.title}\n`;for(const {name} of (S.students[test.cls]||[])){const opt=getStudentOptions('english',test.cls,name);if(!opt.vocab){txt+=`${name}: 해당없음\n`;continue}const r=test.records?.[name];if(!r){txt+=`${name}: 미입력\n`;continue}if(r.status==='미응시'){txt+=`${name}: 미응시\n`;continue}txt+=test.type==='vocab'?`${name}: 전체 ${r.totalWords||0}개 / 틀림 ${r.wrongWords||0}개 → ${r.score??'-'}점\n`:`${name}: ${r.rawScore??'-'}/${r.maxScore||test.maxScore} → ${r.score??'-'}점\n`}navigator.clipboard?.writeText(txt).then(()=>showToast('단어/테스트 요약 복사됨!')).catch(()=>alert(txt))};
+
+  // 일반 출석으로 다시 처리/취소할 때 지각·보강 플래그가 남지 않도록 정리
+  if(typeof window.setAtt==='function'){const f=window.setAtt;window.setAtt=function(k,status,name){if(S._attendanceFlags)delete S._attendanceFlags[k];return f.apply(this,arguments)}}
+  if(typeof window.cancelAtt==='function'){const f=window.cancelAtt;window.cancelAtt=function(k){if(S._attendanceFlags)delete S._attendanceFlags[k];return f.apply(this,arguments)}}
+
+  // PC 출결의 '선택 해제'가 출결 기록 삭제를 실행하던 위험 동작 수정
+  window.v241ClearSelection=function(){document.querySelectorAll('.v24-row-check:checked').forEach(cb=>{cb.checked=false;cb.dispatchEvent(new Event('change',{bubbles:true}))});const all=document.getElementById('v24CheckAll');if(all)all.checked=false;showToast('학생 선택을 해제했습니다')};
+  const attRender=window.renderAttStudents;if(typeof attRender==='function')window.renderAttStudents=function(){const r=attRender.apply(this,arguments);setTimeout(()=>{document.querySelectorAll("button[onclick=\"v24BulkAtt('clear')\"]").forEach(b=>{b.textContent='선택만 해제';b.setAttribute('onclick','v241ClearSelection()')})},0);return r};
+
+  normalizeEnglishSelection();
+  try{if(S.curRole==='english'){renderEngHome();renderAtt();if(document.getElementById('eng-vocab')?.classList.contains('active'))renderVocab()}else if(S.curRole==='admin')renderAdOverview()}catch(e){console.warn('V2.4.1 refresh',e)}
+})();
