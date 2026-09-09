@@ -1,0 +1,18 @@
+<style id="sumus-v242-style">
+/* SUMUS Academy V2.4.2 RELEASE CANDIDATE — launch readability & workflow polish */
+#eng-home>.stats-row,#eng-home>.v2-home-actions,#eng-home>#engHomeAlerts{display:none!important}
+#eng-home>#engWeekTrend{margin-top:12px!important}
+@media(max-width:900px){
+  .bottom-nav .nav-item .ni,.bottom-nav .nav-item .nl{color:rgba(255,255,255,.62)!important}
+  .bottom-nav .nav-item.active .ni,.bottom-nav .nav-item.active .nl{color:var(--gold)!important}
+  .att-toggle .att-btn{border:1px solid transparent!important}
+  .att-toggle .att-btn:first-child{background:#edf8f3!important;color:#0b7f63!important;border-color:#d7ece2!important}
+  .att-toggle .att-btn:nth-child(2){background:#fff2f3!important;color:#c94753!important;border-color:#f2d9dc!important}
+  .att-toggle .att-btn.p-on{background:#0f8d68!important;color:white!important;border-color:#0f8d68!important}
+  .att-toggle .att-btn.a-on{background:#d94c59!important;color:white!important;border-color:#d94c59!important}
+  .att-toggle .att-btn:nth-child(n+3){background:#f4f6f5!important;color:#6f7b74!important;border-color:#e4e9e6!important}
+  #eng-vocab{padding-bottom:84px!important}
+  #eng-att{padding-bottom:76px!important}
+}
+.v242-offline{position:fixed;left:50%;top:12px;z-index:100000;transform:translateX(-50%);display:none;align-items:center;gap:8px;padding:9px 13px;border-radius:999px;background:#8d3d42;color:white;box-shadow:0 8px 24px rgba(78,22,26,.2);font-size:11px;font-weight:750}.v242-offline.show{display:flex}
+.vocab-status.missing{background:#f4f6f5!important;color:#78847d!important;border-color:#dfe5e1!important}.vocab-status.absent{background:#fff2f3!important;color:#c94753!important;borde
