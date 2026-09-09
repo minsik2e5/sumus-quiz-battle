@@ -1,0 +1,8 @@
+row"><div class="s-avatar">${esc242(name.slice(0,1))}</div><div><div class="s-name">${esc242(name)}</div><div class="s-sub">${esc242(grade||'')}</div></div><input class="vocab-input" type="number" min="0" value="${rec?.rawScore??''}" oninput="saveVocabRecord('${name}','rawScore',this.value,this)"><input class="vocab-input" type="number" min="1" value="${max}" oninput="saveVocabRecord('${name}','maxScore',this.value,this)"><div class="vocab-score">${rec?.status==='미응시'?'미응시':score!==null?score+'점':'-'}</div><button class="btn btn-outline btn-sm vocab-status ${cl}" onclick="toggleVocabAbsent('${name}')">${lab}</button></div>`}).join('');
+  const el=document.getElementById('vocabList');if(el)el.innerHTML=head+rows+`<div class="card-body"><button class="btn btn-dg" onclick="saveVocabAll()">저장</button></div>`;
+}}
+if(typeof window.toggleVocabAbsent==='function'){window.toggleVocabAbsent=function(name){
+  const date=document.getElementById('vocabDate')?.value||today(),cls=document.getElementById('vocabCls')?.value||classes()[0],type=(typeof vocabType!=='undefined'?vocabType:'vocab'),title=document.getElementById('vocabTitle')?.value.trim()||(type==='vocab'?'단어':'테스트'),key=vocabKey(date,cls,type,title);ensureVocab();const t=S.vocabTests[key]||(S.vocabTests[key]={date,cls,type,title,maxScore:Number(document.getElementById('vocabMax')?.value||100)||100,records:{}});let r=t.records[name];if(!r)r=t.records[name]={status:'미입력'};if(r.status==='미응시')r.status=hasVocabInput(r,type)?'응시':'미입력';else{r.status='미응시';r.score=null}r.updatedAt=Date.now();saveS();renderVocabList();renderVocabRecent();
+}}
+// renderVocabRecord 입력 후 상태 클래스도 즉시 갱신
+if(typeof window.saveVocabRecord==='function'){const 
