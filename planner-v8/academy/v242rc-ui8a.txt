@@ -1,0 +1,5 @@
+name,clsHint=''){const r=f.apply(this,arguments);setTimeout(()=>{const first=document.querySelector('#profIntegratedBody .v23-profile-brief .v23-prof-metric:first-child');if(first){let count=0;try{count=getProfileMemos(clsHint,name,20).length}catch{};first.querySelector('.v23-prof-k').textContent='최근 메모';const v=first.querySelector('.v23-prof-v');v.textContent=count?count+'건':'없음';v.className='v23-prof-v'}} ,0);return r}}
+function relabelProfile(){document.querySelectorAll('#profileModal button[onclick="deleteStudentConfirm()" ]').forEach(b=>{b.textContent='퇴원 처리';b.title='과거 기록은 보존됩니다'})}
+const oldOpen=window.openProfile;if(typeof oldOpen==='function')window.openProfile=function(){const r=oldOpen.apply(this,arguments);setTimeout(relabelProfile,0);return r};relabelProfile();
+let net=document.getElementById('v242NetBanner');if(!net){net=document.createElement('div');net.id='v242NetBanner';net.className='v242-offline';net.innerHTML='● 인터넷 연결이 끊겼습니다 · 입력 내용은 이 PC에 임시 보관됩니다';document.body.appendChild(net)}
+function netState(){net.classList.toggle('show',!navigator.onLine)}
