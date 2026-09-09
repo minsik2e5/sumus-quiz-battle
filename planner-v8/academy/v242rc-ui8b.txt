@@ -1,0 +1,2 @@
+window.addEventListener('online',()=>{netState();showToast('인터넷 연결이 복구되었습니다 · 동기화 확인 중');setTimeout(()=>window.forceSync?.(),300)});window.addEventListener('offline',netState);netState();
+document.addEventListener('keydown',e=>{if(!document.getElementById('englishApp')?.classList.contains('active'))return;if(e.altKey&&!e.ctrlKey&&!e.metaKey){if(e.key==='1'){e.preventDefault();engPage('home',0)}if(e.key==='2'){e.preventDefault();engPage('att',1)}if(e.key==='3'){e.preventDefault();engPage('
