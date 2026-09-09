@@ -1,0 +1,6 @@
+lesson',3)}}});
+function launchNote(){const root=document.getElementById('eng-settings');if(!root||root.querySelector('.v242-launch-note'))return;const n=document.createElement('div');n.className='v242-launch-note';n.innerHTML='<b>운영 범위</b> · 초등 저학년 / 초등 고학년 / 중1만 영어 관리 화면에 표시됩니다. 기존 다른 반 데이터는 삭제하지 않고 서버에 보존합니다.';root.querySelector('.sec-head')?.insertAdjacentElement('afterend',n)}
+const iE=window.initEng;if(typeof iE==='function')window.initEng=function(){const r=iE.apply(this,arguments);setTimeout(()=>{launchNote();try{renderEngHome();renderEngSet()}catch{}},0);return r};
+setTimeout(()=>{launchNote();try{if(document.getElementById('englishApp')?.classList.contains('active')){renderEngHome();if(document.getElementById('eng-vocab')?.classList.contains('active'))renderVocab()}}catch(e){console.warn('V2.4.2 init',e)}},250);
+})();
+</script>
