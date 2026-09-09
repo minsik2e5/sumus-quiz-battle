@@ -1,0 +1,33 @@
+e}
+      if(l!==undefined&&stableString(l)!==stableString(b)){rm.set(k,clone(l))}
+    }
+    return [...rm.values()];
+  }
+  function rebaseLocalOntoLatest(base,local,latest){
+    const out=clone(latest||{}), sections=['classes','students','attendance','memos','textbookLibrary','textbookRecords','tests','readingSessions','exams','tasks','notices','activityFeed'];
+    sections.forEach(s=>{out[s]=mergeChangedArray(s,base?.[s],local?.[s],latest?.[s]);});
+    // 기타 scalar/object 필드는 로컬에서 실제 변경된 경우에만 최신본 위에 적용
+    Object.keys(local||{}).forEach(k=>{
+      if(sections.includes(k)||['version','updatedAt','updatedBy'].includes(k))return;
+      if(stableString(local[k])!==stableString(base?.[k]))out[k]=clone(local[k]);
+    });
+    out.version=Number(latest?.version||0);out.updatedAt=new Date().toISOString();out.updatedBy=currentUser?.id||'client';
+    return out;
+  }
+  async function saveServerNow(retry=true){
+    if(!authToken||applyingServer)return;
+    if(savingNow){resaveAfter=true;return;}
+    savingNow=true;clearTimeout(saveTimerV2);pendingLocal=true;setSync('busy');
+    try{
+      const baseBefore=clone(serverState||{});
+      const localPayload=legacyToServer(baseBefore);
+      let d;
+      try{
+        d=await api('/data',{method:'PUT',body:JSON.stringify({data:localPayload,baseVersion:serverVersion,action:'autosave-v242'})});
+      }catch(e){
+        if(e.status!==409||!retry)throw e;
+        const latest=await api('/data');
+        if(!latest.data)throw e;
+        const latestVersion=Number(latest.data.version||serverVersion);
+        const rebased=rebaseLocalOntoLatest(baseBefore,localPayload,latest.data);
+        d=await api('/data',{method:'PUT',body:JSON.stringify({da
