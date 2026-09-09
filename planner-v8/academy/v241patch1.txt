@@ -1,0 +1,50 @@
+/* SUMUS Academy V2.4.1 audit fixes */
+(() => {
+  'use strict';
+  const ALLOWED=['초등 저학년','초등 고학년','중1'];
+  if(!document.getElementById('sumus-v241-style')){const st=document.createElement('style');st.id='sumus-v241-style';st.textContent=`.vocab-status{min-width:64px}.vocab-score{font-variant-numeric:tabular-nums}.vocab-score.is-error{color:var(--red)}@media(max-width:720px){.vocab-head{display:none}.vocab-row:not(.vocab-head){grid-template-columns:34px minmax(90px,1fr) 74px 74px;grid-template-areas:'av who score status' 'av in1 in2 status';row-gap:7px}.vocab-row:not(.vocab-head)>:nth-child(1){grid-area:av}.vocab-row:not(.vocab-head)>:nth-child(2){grid-area:who}.vocab-row:not(.vocab-head)>:nth-child(3){grid-area:in1}.vocab-row:not(.vocab-head)>:nth-child(4){grid-area:in2}.vocab-row:not(.vocab-head)>:nth-child(5){grid-area:score;text-align:right}.vocab-row:not(.vocab-head)>:nth-child(6){grid-area:status}}`;document.head.appendChild(st)}
+  const esc=v=>String(v??'').replace(/[&<>\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;'}[c]));
+  window.getEngClasses=()=>{
+    const current=Array.isArray(S.classes)?S.classes:[];
+    const list=ALLOWED.filter(c=>current.includes(c)||S.students?.[c]);
+    return list.length?list:[...ALLOWED];
+  };
+  const classes=()=>window.getEngClasses();
+  const firstStudent=()=>{for(const c of classes()){const st=S.students?.[c]?.[0];if(st)return {cls:c,...st}}return null};
+  function normalizeEnglishSelection(){
+    const cs=classes(); if(!cs.length)return;
+    if(!cs.includes(S.curAttCls))S.curAttCls=cs[0];
+    if(!cs.includes(S.curAdAttCls))S.curAdAttCls=cs[0];
+    if(!cs.includes(S.curAdStCls))S.curAdStCls=cs[0];
+    if(!cs.includes(S.curEngSetCls))S.curEngSetCls=cs[0];
+    try{if(typeof lessonCls!=='undefined'&&!cs.includes(lessonCls))lessonCls=cs[0]}catch{}
+    try{if(typeof vocabCls!=='undefined'&&!cs.includes(vocabCls))vocabCls=cs[0]}catch{}
+    try{if(typeof reportCls!=='undefined'&&reportCls!=='all'&&!cs.includes(reportCls))reportCls='all'}catch{}
+    try{if(typeof memoFilterCls!=='undefined'&&memoFilterCls!=='all'&&!cs.includes(memoFilterCls))memoFilterCls='all'}catch{}
+    try{if(typeof tbCls!=='undefined'&&tbCls!=='all'&&!cs.includes(tbCls))tbCls='all'}catch{}
+    const f=firstStudent();
+    if(f){let found=false;for(const c of cs)if((S.students?.[c]||[]).some(x=>x.name===S.calStudent))found=true;if(!found)S.calStudent=f.name}
+  }
+  function withEnglishClasses(fn){
+    if(typeof fn!=='function')return fn;
+    return function(){normalizeEnglishSelection();const original=S.classes;S.classes=classes();try{return fn.apply(this,arguments)}finally{S.classes=original}};
+  }
+  ['renderEngHome','getWeeklyTrend','renderAtt','renderPresent','renderCal','renderLesson','renderReport','renderEngSet','renderMemoHistory','renderTextbook','renderAdOverview','renderAdEng','renderAdStudents'].forEach(n=>{if(typeof window[n]==='function')window[n]=withEnglishClasses(window[n])});
+
+  // 단어/TEST: 렌더링만으로 빈 시험 레코드를 만들지 않도록 분리
+  function vocabMeta(){
+    const cs=classes();
+    const date=document.getElementById('vocabDate')?.value||today();
+    let cls=document.getElementById('vocabCls')?.value||((typeof vocabCls!=='undefined'&&vocabCls)||cs[0]||'');
+    if(!cs.includes(cls))cls=cs[0]||'';
+    try{vocabCls=cls}catch{}
+    const titleInput=document.getElementById('vocabTitle')?.value.trim();
+    const type=(typeof vocabType!=='undefined'?vocabType:'vocab');
+    const title=titleInput||(type==='vocab'?'단어':'테스트');
+    const maxScore=Number(document.getElementById('vocabMax')?.value||100)||100;
+    return {date,cls,type,title,maxScore,key:vocabKey(date,cls,type,title)};
+  }
+  function vocabView(create=false){
+    ensureVocab();const m=vocabMeta();let t=S.vocabTests[m.key];
+    if(!t&&create)t=S.vocabTests[m.key]={date:m.date,cls:m.cls,type:m.type,title:m.title,maxScore:m.maxScore,records:{}};
+    if(t&&create){t.date=m.date;t.cls=m.cls;t.type=m.type;t.title=m.title;t.maxScore=m.maxScore;if(!t.records)t.recor
