@@ -1,0 +1,13 @@
+eS();
+  }
+  return r;
+}}
+// 단어/TEST 상태: 데이터가 없으면 '미입력'이 기본값
+function hasVocabInput(rec,type){if(!rec)return false;return type==='vocab'?rec.totalWords!==''&&rec.totalWords!=null&&rec.wrongWords!==''&&rec.wrongWords!=null:rec.rawScore!==''&&rec.rawScore!=null}
+function statusLabel(rec,type){if(!rec||rec.status==='미입력'||(!hasVocabInput(rec,type)&&rec.status!=='미응시'))return ['미입력','missing'];if(rec.status==='미응시')return ['미응시','absent'];return ['응시 ✓','taken']}
+if(typeof window.renderVocabList==='function'){window.renderVocabList=function(){
+  const test=(typeof getOrCreateVocabTest==='function'?null:null);
+  const date=document.getElementById('vocabDate')?.value||today(),cls=document.getElementById('vocabCls')?.value||classes()[0],type=(typeof vocabType!=='undefined'?vocabType:'vocab'),title=document.getElementById('vocabTitle')?.value.trim()||(type==='vocab'?'단어':'테스트'),key=vocabKey(date,cls,type,title);
+  ensureVocab();const view=S.vocabTests[key]||{date,cls,type,title,maxScore:Number(document.getElementById('vocabMax')?.value||100)||100,records:{}};const students=S.students[cls]||[];
+  const head=type==='vocab'?`<div class="vocab-row vocab-head"><div></div><div>학생</div><div>전체 단어 수</div><div>틀린 단어 수</div><div>환산점수</div><div>상태</div></div>`:`<div class="vocab-row vocab-head"><div></div><div>학생</div><div>점수</div><div>만점</div><div>환산점수</div><div>상태</div></div>`;
+  const rows=students.map(({name,grade})=>{const opt=getStudentOptions('english',cls,name);if(!opt.vocab)return `<div class="vocab-row na"><div class="s-avatar">${esc242(name.slice(0,1))}</div><div><div class="s-name">${esc242(name)}</div><div class="s-sub">${esc242(grade||'')}</div></div><div class="mobile-hide"></
