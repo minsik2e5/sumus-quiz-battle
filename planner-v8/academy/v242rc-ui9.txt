@@ -4,3 +4,4 @@ const iE=window.initEng;if(typeof iE==='function')window.initEng=function(){cons
 setTimeout(()=>{launchNote();try{if(document.getElementById('englishApp')?.classList.contains('active')){renderEngHome();if(document.getElementById('eng-vocab')?.classList.contains('active'))renderVocab()}}catch(e){console.warn('V2.4.2 init',e)}},250);
 })();
 </script>
+<link rel="stylesheet" href="./v243readability.css?v=20260910-v243">
