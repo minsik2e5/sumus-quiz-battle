@@ -1,0 +1,24 @@
+  function stableString(v){try{return JSON.stringify(v)}catch{return String(v)}}
+  function entityKey(section,x,i){
+    if(!x||typeof x!=='object')return String(i);
+    if(x.id)return String(x.id);
+    if(section==='classes')return String(x.name||i);
+    if(section==='students')return String(x.id||`${x.classId||''}||${x.name||''}`);
+    if(section==='attendance')return `${x.date||''}||${x.classId||''}||${x.studentId||''}`;
+    if(section==='memos')return `${x.date||''}||${x.classId||''}||${x.studentId||''}`;
+    if(section==='textbookLibrary')return String(x.title||x.name||i);
+    if(section==='textbookRecords')return `${x.studentId||''}||${x.title||''}||${x.startDate||''}`;
+    if(section==='tests')return String(x.id||`${x.date||''}||${x.cls||''}||${x.type||''}||${x.title||''}`);
+    if(section==='readingSessions')return String(x.id||`${x.studentId||x.name||''}||${x.date||''}||${x.in||x.checkInTime||''}`);
+    if(section==='exams'||section==='tasks'||section==='notices'||section==='activityFeed')return String(x.id||`${x.date||''}||${x.title||x.name||''}||${i}`);
+    return String(i);
+  }
+  function mergeChangedArray(section,baseArr,localArr,latestArr){
+    baseArr=Array.isArray(baseArr)?baseArr:[];localArr=Array.isArray(localArr)?localArr:[];latestArr=Array.isArray(latestArr)?latestArr:[];
+    const bm=new Map(baseArr.map((x,i)=>[entityKey(section,x,i),x]));
+    const lm=new Map(localArr.map((x,i)=>[entityKey(section,x,i),x]));
+    const rm=new Map(latestArr.map((x,i)=>[entityKey(section,x,i),x]));
+    const keys=new Set([...bm.keys(),...lm.keys()]);
+    for(const k of keys){
+      const b=bm.get(k),l=lm.get(k);
+      if(b!==undefined&&l===undefined){rm.delete(k);continu
