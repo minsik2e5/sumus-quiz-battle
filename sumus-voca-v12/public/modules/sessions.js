@@ -1,0 +1,176 @@
+import { api, $, $$, icon, esc, time, date, scope, toast, modal, buttonBusy } from './ui.js';
+import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, levelInfo } from './core.js';
+import { avatar } from './character.js';
+let A, redraw, refresh, examState = null, practiceState = null, timer, saving = Promise.resolve(), inputVersion = 0, dirty = false, syncError = '', debounce, audio;
+export function configureSessions(state, render, reload) { A = state; redraw = render; refresh = reload; }
+const mount = html => { $('#app').innerHTML = html; window.scrollTo(0, 0); };
+const draftKey = () => `sumus:v12:exam:${A.data.profile.id}:${examState.attempt.id}`;
+function localSave() {
+  if (!examState || examState.attempt.status !== 'active') return;
+  try { localStorage.setItem(draftKey(), JSON.stringify({ answers: examState.attempt.answers, index: examState.index, revision: examState.attempt.revision, dirty })); }
+  catch { syncError = '이 기기에 임시 저장하지 못했어요. 서버 저장 상태를 확인해주세요.'; }
+}
+export function leaveSession() { clearInterval(timer); clearTimeout(debounce); timer = null; A.screen = null; }
+export async function openExam(eid) {
+  const e = A.data.exams.find(e => e.id === eid); if (!e) return;
+  const close = modal(`<span class="pill">실전시험</span><h2>${esc(e.title)}</h2><p>${e.school} · ${esc(scope(e))}</p><div class="detail-grid"><div><b>${EXAM_TYPES[e.exam_type].label}</b><small>한 가지 유형으로 출제</small></div><div><b>${e.question_count}문제</b><small>제한시간 ${Math.round(e.duration_sec / 60)}분</small></div><div><b>${e.max_attempts}회</b><small>응시 가능 횟수</small></div><div><b>${e.passing_score}점</b><small>통과 기준</small></div></div><div class="exam-info">${icon('clock')}<p>시작하면 시간이 흐릅니다.<br>시간이 끝나면 저장된 답안이 자동 제출돼요.</p></div><button class="btn ink full" id="begin-exam">${A.data.attempts.some(a => a.exam_id === eid && a.status === 'active') ? '이어서 응시하기' : '시험 시작하기'}</button>`, '실전시험 시작');
+  $('#begin-exam').onclick = async e => {
+    buttonBusy(e.currentTarget);
+    try { const data = await api('/exams/start', { exam_id: eid }); close(); await beginExam(data); }
+    catch (err) { toast(err.message); buttonBusy($('#begin-exam'), false); }
+  };
+}
+async function beginExam(data) {
+  leaveSession(); A.screen = 'exam'; examState = { ...data, index: 0, review: false, offset: data.server_time - Date.now() };
+  inputVersion = 0; dirty = false; syncError = ''; saving = Promise.resolve();
+  try {
+    const local = JSON.parse(localStorage.getItem(draftKey()) || 'null');
+    if (local) { examState.index = Math.min(Math.max(0, local.index || 0), data.attempt.total - 1); if (local.dirty && local.revision === data.attempt.revision) { Object.assign(examState.attempt.answers, local.answers); dirty = true; } }
+  } catch {}
+  localSave(); renderExam();
+  timer = setInterval(examTick, 500);
+  if (dirty) flushDraft();
+  examTick();
+}
+function examTick() {
+  if (!examState || A.screen !== 'exam') return;
+  const left = Math.ceil((examState.attempt.deadline - Date.now() - examState.offset) / 1000), el = $('#timer-value');
+  if (el) el.textContent = time(left);
+  $('#exam-timer')?.classList.toggle('urgent', left <= 60);
+  if (left <= 0) submitExam(true);
+}
+function saveLabel() {
+  const node = $('#save-state'); if (!node) return;
+  node.classList.toggle('error', !!syncError);
+  node.innerHTML = syncError ? `${esc(syncError)} <button class="text-button" id="retry-sync">다시 저장</button>` : `${icon(dirty ? 'clock' : 'check')}${dirty ? '답안 저장 중…' : '답안 저장됨'}`;
+  $('#retry-sync')?.addEventListener('click', () => flushDraft());
+}
+function captureAnswer(value) {
+  const x = examState; if (!x || x.submitting || x.attempt.status !== 'active') return;
+  x.attempt.answers[x.index] = value; dirty = true; inputVersion++; localSave(); saveLabel();
+  const count = Object.values(x.attempt.answers).filter(v => v?.trim()).length;
+  if ($('#answered-count')) $('#answered-count').textContent = `${count} / ${x.attempt.total} 답변`;
+  clearTimeout(debounce); debounce = setTimeout(flushDraft, 220);
+}
+async function flushDraft() {
+  clearTimeout(debounce);
+  const x = examState;
+  saving = saving.then(async () => {
+    if (!x || x !== examState || !dirty || x.attempt.status !== 'active' || x.submitting) return;
+    const version = inputVersion, answers = { ...x.attempt.answers };
+    try {
+      const data = await api(`/attempts/${x.attempt.id}/draft`, { lease: x.attempt.lease, revision: x.attempt.revision, answers });
+      x.attempt.revision = data.attempt.revision; syncError = '';
+      if (data.attempt.status === 'submitted') { showExamResult(data); return; }
+      if (inputVersion === version) dirty = false;
+      localSave(); saveLabel();
+    } catch (err) {
+      syncError = err.status === 409 ? err.message : '연결이 끊겼어요. 답안은 이 기기에 보관 중이에요.';
+      if (err.status === 409) {
+        try {
+          const remote = await api(`/attempts/${x.attempt.id}`);
+          if (remote.attempt.status === 'submitted') { showExamResult(remote); return; }
+          if (remote.attempt.lease === x.attempt.lease && Object.entries(answers).every(([k, v]) => remote.attempt.answers[k] === v)) {
+            x.attempt.revision = remote.attempt.revision; dirty = inputVersion !== version; syncError = '';
+          }
+        } catch {}
+      }
+      localSave(); saveLabel();
+    }
+  });
+  await saving;
+}
+function renderExam() {
+  const x = examState, a = x.attempt, answered = Object.values(a.answers).filter(v => v?.trim()).length;
+  const header = `<header class="session-header"><div class="row between"><h1>${x.review ? '최종 답안 확인' : '실전시험'}</h1><span class="exam-timer" id="exam-timer">${icon('clock')}<span id="timer-value">${time(Math.ceil((a.deadline - Date.now() - x.offset) / 1000))}</span></span></div><div class="question-count row between"><span>${esc(x.exam.title)}</span><span id="answered-count">${answered} / ${a.total} 답변</span></div><div class="progress"><i style="width:${answered / a.total * 100}%"></i></div></header>`;
+  if (x.review) {
+    mount(`<div class="session-app">${header}<main class="question-area"><div class="review-head"><span class="pill">제출 전 확인</span><h2>${answered === a.total ? '모든 문제에 답했어요.' : `${a.total - answered}문제가 남아 있어요.`}</h2><p>번호를 누르면 해당 답안을 수정할 수 있어요.</p></div><div class="answer-grid">${a.questions.map((q, i) => `<button data-question="${i}" class="${a.answers[i]?.trim() ? 'answered' : ''}" aria-label="${i + 1}번 ${a.answers[i]?.trim() ? '답변 완료' : '미응답'}">${i + 1}</button>`).join('')}</div><div>${a.questions.map((q, i) => `<button class="review-item" data-question="${i}"><span>${String(i + 1).padStart(2, '0')}</span><div class="grow"><p>${esc(q.prompt)}</p><small>${esc(a.answers[i] || '미응답')}</small></div>${icon('chevron')}</button>`).join('')}</div><div id="save-state" class="save-state"></div><button class="btn ink full" id="final-submit">최종 제출하기</button><button class="text-button" id="review-back" style="width:100%">문제로 돌아가기</button><div id="submit-error" role="alert"></div></main></div>`);
+    $$('[data-question]').forEach(b => b.onclick = () => { x.index = Number(b.dataset.question); x.review = false; renderExam(); });
+    $('#review-back').onclick = () => { x.review = false; renderExam(); };
+    $('#final-submit').onclick = () => {
+      const missing = a.total - Object.values(a.answers).filter(v => v?.trim()).length;
+      const close = modal(`<h2>답안을 제출할까요?</h2><p>${missing ? `미응답 ${missing}문제가 있어요. ` : ''}제출 후에는 답안을 수정할 수 없어요.</p><button class="btn ink full" id="confirm-submit">제출하기</button>`, '최종 제출 확인');
+      $('#confirm-submit').onclick = () => { close(); submitExam(); };
+    };
+  } else {
+    const q = a.questions[x.index], value = a.answers[x.index] || '', writing = EXAM_TYPES[q.type].input;
+    mount(`<div class="session-app">${header}<main class="question-area"><div class="row between"><span class="question-type">${EXAM_TYPES[q.type].label}</span><span class="pill">${x.index + 1} / ${a.total}</span></div><h2 class="question-prompt ${['write_en', 'mean2eng_mc'].includes(q.type) ? 'korean' : ''}">${esc(q.prompt)}</h2>${writing ? `<label><span class="hidden">${q.type === 'write_en' ? '영어 답안' : '뜻 답안'}</span><textarea rows="2" class="answer-input" id="exam-answer" aria-label="${q.type === 'write_en' ? '영어 답안' : '뜻 답안'}" placeholder="${q.type === 'write_en' ? '영어 단어를 입력하세요' : '한국어 뜻을 입력하세요'}" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="500" lang="${q.type === 'write_en' ? 'en' : 'ko'}">${esc(value)}</textarea></label><p class="input-caption">${q.type === 'write_meaning' ? '뜻이 여러 개라면, 그중 하나를 정확히 적어주세요.' : '대소문자는 구분하지 않아요.'}</p>` : `<div class="options">${q.options.map((o, i) => `<button class="option ${value === o ? 'selected' : ''}" data-choice="${i}" aria-pressed="${value === o}"><span class="letter">${i + 1}</span><span>${esc(o)}</span></button>`).join('')}</div>`}<div class="answer-controls"><button class="btn" id="exam-prev" ${x.index === 0 ? 'disabled' : ''}>${icon('back')} 이전</button><button class="btn ink" id="exam-next">${x.index === a.total - 1 ? '답안 검토' : '다음'} ${icon('arrow')}</button></div><div id="save-state" class="save-state"></div><button class="text-button" id="all-answers" style="width:100%">전체 답안 보기</button><div id="submit-error" role="alert"></div></main></div>`);
+    $('#exam-answer')?.addEventListener('input', e => captureAnswer(e.target.value));
+    $$('[data-choice]').forEach(b => b.onclick = () => { captureAnswer(q.options[Number(b.dataset.choice)]); $$('[data-choice]').forEach(v => { const selected = v === b; v.classList.toggle('selected', selected); v.setAttribute('aria-pressed', String(selected)); }); flushDraft(); });
+    $('#exam-prev').onclick = () => { flushDraft(); x.index--; localSave(); renderExam(); };
+    $('#exam-next').onclick = () => { flushDraft(); if (x.index === a.total - 1) x.review = true; else x.index++; localSave(); renderExam(); };
+    $('#all-answers').onclick = () => { flushDraft(); x.review = true; renderExam(); };
+  }
+  saveLabel();
+}
+async function submitExam(auto = false) {
+  const x = examState; if (!x || x.submitting || A.screen !== 'exam') return;
+  if (!auto) { await flushDraft(); if (dirty && syncError) { toast('답안 저장 후 제출할 수 있어요. 연결을 확인해주세요.'); return; } }
+  x.submitting = true; clearTimeout(debounce);
+  $$('button,textarea', $('#app')).forEach(b => b.disabled = true);
+  try {
+    const result = await api(`/attempts/${x.attempt.id}/submit`, { answers: x.attempt.answers, revision: x.attempt.revision, lease: x.attempt.lease });
+    showExamResult(result);
+  } catch (err) {
+    x.submitting = false;
+    const node = $('#submit-error'); if (node) node.innerHTML = `<div class="error-box">${auto ? '시간이 종료됐어요. 서버 제출 결과를 확인 중이에요.' : esc(err.message)}<button id="retry-submit">다시 확인</button></div>`;
+    $('#retry-submit')?.addEventListener('click', () => submitExam(auto));
+    if (!auto) renderExam();
+  }
+}
+export async function openResult(id) { const data = await api(`/attempts/${id}`); if (A.data.profile.role === 'teacher') {
+  modal(`<span class="pill">학생 답안</span><h2>${esc(data.exam.title)}</h2><p>${data.attempt.correct} / ${data.attempt.total} 정답 · ${data.attempt.score}점</p>${data.attempt.details.map(d => `<div class="wrong-word"><span class="pill ${d.correct ? 'green' : 'red'}">${d.number}번 ${d.correct ? '정답' : '오답'}</span><p><b>${esc(d.word)}</b></p><p>${esc(d.meaning)}</p><small>학생 답안: ${esc(d.answer || '미응답')}</small></div>`).join('')}`, '시험 답안');
+  } else showExamResult(data);
+}
+function showExamResult(data) {
+  leaveSession(); if (examState) { try { localStorage.removeItem(draftKey()); } catch {} }
+  A.screen = 'result'; const a = data.attempt, e = data.exam, reveal = a.score !== undefined;
+  mount(`<div class="session-app"><main class="result-page"><span class="pill">${a.auto_submitted ? '시간 종료 · 자동 제출' : '제출 완료'}</span><h1>${reveal ? '실전시험을 마쳤어요.' : '답안을 제출했어요.'}</h1><p>${esc(e.title)}</p>${reveal ? `<div class="result-number">${a.score}<small>점</small></div><span class="pill ${a.score >= e.passing_score ? 'green' : ''}">${a.score >= e.passing_score ? '통과했어요' : '조금 더 연습해봐요'}</span><div class="record-stats"><div><strong>${a.correct}</strong><span>정답</span></div><div><strong>${a.total - a.correct}</strong><span>오답 · 미응답</span></div><div><strong>${a.total}</strong><span>전체 문제</span></div></div>` : `${icon('lock', 'result-lock')}<p>선생님이 결과를 공개하면<br>시험 기록에서 확인할 수 있어요.</p>`}<button class="btn ink full" id="result-home">시험 목록으로</button>${reveal ? '<button class="btn full" id="result-answers">답안 확인하기</button>' : ''}<p class="quiet-note">시험 점수는 성장 포인트와 별도로 기록돼요.</p><section id="result-details"></section></main></div>`);
+  $('#result-home').onclick = async () => { leaveSession(); A.tab = 'exam'; await refresh(); redraw(); };
+  $('#result-answers')?.addEventListener('click', () => { $('#result-details').innerHTML = a.details.map(d => `<div class="wrong-word"><span class="pill ${d.correct ? 'green' : 'red'}">${d.number}번 ${d.correct ? '정답' : '오답'}</span><p><b>${esc(d.word)}</b></p><p>${esc(d.meaning)}</p><small>내 답안: ${esc(d.answer || '미응답')}</small></div>`).join(''); });
+}
+export async function startPractice() {
+  const old = A.data.active_practice;
+  const data = old ? await api(`/practice/${old}`) : await api('/practice/start', { school: A.school, range_codes: A.ranges[A.school], mode: A.mode, target: A.target, assignment_id: A.assignmentId });
+  leaveSession(); practiceState = data; A.screen = 'practice'; renderPractice();
+}
+function renderPractice() {
+  const x = practiceState; if (x.finished) return finishPracticeView();
+  const q = x.question, feedback = x.feedback, input = !q.options.length, answer = feedback ? ['mean2eng', 'spell', 'scramble', 'initial', 'vowelblank'].includes(q.type) ? feedback.word : feedback.meaning : '';
+  mount(`<div class="session-app"><header class="session-header"><div class="row between"><button class="icon-button" id="practice-exit" aria-label="연습 종료">${icon('close')}</button><h1>${x.school} · 연습</h1><button class="icon-button" id="practice-sound" aria-label="효과음 ${A.sound ? '끄기' : '켜기'}">${icon(A.sound ? 'sound' : 'mute')}</button></div><div class="question-count row between"><span>${Math.min(x.total + (feedback ? 0 : 1), x.target)} / ${x.target}${x.total >= x.target && x.retry_count ? ' · 오답 복습' : ''}</span><div class="practice-score"><span>${x.combo ? x.combo + '연속' : '차근차근'}</span><b>+${x.xp}P</b></div></div><div class="progress"><i style="width:${Math.min(100, x.total / x.target * 100)}%"></i></div></header><main class="question-area"><div class="row between"><span class="question-type">${PRACTICE_TYPES[q.type]}</span><span class="pill blue">연습</span></div>${q.type === 'listen' ? `<button class="listen-button" id="listen-word" aria-label="발음 듣기">${icon('sound')}</button><p class="input-caption" style="text-align:center">발음을 듣고 뜻을 골라주세요.</p>` : `<h2 class="question-prompt ${q.type !== 'eng2mean' ? 'korean' : ''}">${esc(q.prompt)}</h2>`}${q.hint ? `<p class="question-hint">${esc(q.hint)}</p>` : ''}${input ? `<input id="practice-answer" class="answer-input" aria-label="영어 답안" placeholder="영어 단어를 입력하세요" autocomplete="off" autocapitalize="off" spellcheck="false" ${feedback ? 'disabled' : ''}><button class="btn primary full" id="practice-confirm" style="margin-top:13px" ${feedback ? 'disabled' : ''}>정답 확인</button>` : `<div class="options">${q.options.map((o, i) => `<button class="option ${feedback && o === answer ? 'correct' : ''}" data-practice-choice="${i}" ${feedback ? 'disabled' : ''}><span class="letter">${i + 1}</span><span>${esc(o)}</span></button>`).join('')}</div>`}<div id="practice-feedback">${feedback ? feedbackHtml(feedback) : ''}</div>${feedback ? `<button class="btn primary full" id="practice-next" style="margin-top:18px">${x.total >= x.target && !x.retry_count ? '연습 마치기' : '다음 단어'} ${icon('arrow')}</button>` : ''}<div id="practice-error" role="alert"></div></main></div>`);
+  $('#practice-exit').onclick = () => { const close = modal(`<h2>여기까지 기록할까요?</h2><p>지금까지 푼 ${x.total}문제와 포인트를 저장해요.</p><button class="btn primary full" id="practice-finish">저장하고 마치기</button>`, '연습 종료'); $('#practice-finish').onclick = async () => { try { practiceState = await api(`/practice/${x.id}/finish`, {}); close(); finishPracticeView(); } catch (e) { toast(e.message); } }; };
+  $('#practice-sound').onclick = () => { A.sound = !A.sound; try { localStorage.setItem('sumus:sound', String(A.sound)); } catch {} renderPractice(); };
+  $('#listen-word')?.addEventListener('click', () => {
+    if (!('speechSynthesis' in window)) return toast('이 기기에서는 듣기를 지원하지 않아요. 다른 연습 방식을 이용해주세요.');
+    speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(q.audio); u.lang = 'en-US'; u.rate = .85; u.onerror = () => toast('소리를 재생하지 못했어요. 다시 눌러주세요.'); speechSynthesis.speak(u);
+  });
+  $$('[data-practice-choice]').forEach(b => b.onclick = () => answerPractice(q.options[Number(b.dataset.practiceChoice)], b));
+  $('#practice-confirm')?.addEventListener('click', () => { const value = $('#practice-answer').value; if (!value.trim()) return toast('답을 입력해주세요.'); answerPractice(value); });
+  $('#practice-answer')?.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) $('#practice-confirm')?.click(); });
+  $('#practice-next')?.addEventListener('click', async e => { buttonBusy(e.currentTarget); try { practiceState = await api(`/practice/${x.id}/next`, {}); renderPractice(); } catch (err) { toast(err.message); buttonBusy($('#practice-next'), false); } });
+}
+function feedbackHtml(f) { return `<div class="feedback ${f.ok ? '' : 'wrong shake'}" role="status"><span class="gain">${f.ok ? '+' + f.gain + 'P' : ''}</span><b>${f.ok ? '정답이에요' : '기억해두면, 다시 맞힐 수 있어요'}</b><p>${f.ok ? `숙련도 ${f.mastery}%` : `${esc(f.word)} · ${esc(f.meaning)}<br>잠시 뒤 다시 나와요.`}</p><div class="progress"><i style="width:${f.mastery}%"></i></div></div>${f.milestone ? `<div class="milestone-toast">${f.combo}연속 정답. 좋은 흐름이에요.</div>` : ''}`; }
+let answering = false;
+async function answerPractice(answer, button) {
+  if (answering || practiceState.feedback) return;
+  answering = true; const x = practiceState;
+  $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = true);
+  try { const result = await api(`/practice/${x.id}/answer`, { question_id: x.question_id, answer }); practiceState = result; renderPractice();
+    if (!result.feedback.ok && button) { const index = button.dataset.practiceChoice; $(`[data-practice-choice="${index}"]`)?.classList.add('wrong'); }
+    if (result.feedback.ok) navigator.vibrate?.(12); else navigator.vibrate?.([12, 25, 12]);
+    if (A.sound) sound(result.feedback.ok, result.feedback.milestone);
+  } catch (e) { $('#practice-error').innerHTML = `<div class="error-box">${esc(e.message)} 답안은 다시 눌러 전송할 수 있어요.</div>`; $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = false); }
+  finally { answering = false; }
+}
+function sound(ok, milestone) {
+  try { audio ??= new (window.AudioContext || window.webkitAudioContext)(); audio.resume().catch(() => {}); const t = audio.currentTime; const notes = ok ? milestone ? [523, 659, 784] : [660, 880] : [220]; notes.forEach((f, i) => { const o = audio.createOscillator(), g = audio.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(.0001, t + i * .065); g.gain.exponentialRampToValueAtTime(.035, t + i * .065 + .01); g.gain.exponentialRampToValueAtTime(.0001, t + i * .065 + .15); o.connect(g); g.connect(audio.destination); o.start(t + i * .065); o.stop(t + i * .065 + .16); }); } catch {}
+}
+function finishPracticeView() {
+  const x = practiceState; A.screen = 'result'; const before = A.data.stats.level, after = x.stats.level;
+  mount(`<div class="session-app"><main class="result-page"><span class="pill blue">연습 기록 저장 완료</span>${avatar(A.data.profile.avatar_key, { stage: x.stats.stage, accessory: A.data.profile.avatar_accessory })}<h1>${after > before ? `Lv.${after}, 한 단계 성장했어요.` : x.total ? '오늘의 연습이 쌓였어요.' : '다음에 다시 만나요.'}</h1><p>${x.total}문제만큼, 더 익숙해졌어요.</p><div class="result-number">+${x.xp}<small>P</small></div><div class="record-stats"><div><strong>${x.total ? Math.round(x.correct / x.total * 100) : 0}%</strong><span>정답률</span></div><div><strong>${x.best}</strong><span>최고 연속</span></div><div><strong>Lv.${after}</strong><span>현재 성장</span></div></div>${after > before ? '<div class="result-note">캐릭터 화면에서 새로 열린 보상을 확인해보세요.</div>' : ''}<button class="btn primary full" id="practice-home">홈으로 돌아가기</button><button class="btn full" id="practice-records">연습 기록 보기</button></main></div>`);
+  const go = async tab => { leaveSession(); A.tab = tab; await refresh(); redraw(); };
+  $('#practice-home').onclick = () => go('home'); $('#practice-records').onclick = () => go('records');
+}
+window.addEventListener('online', () => { if (A?.screen === 'exam') flushDraft(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && A?.screen === 'exam') { examTick(); flushDraft(); } });
+window.addEventListener('pagehide', () => { if (A?.screen === 'exam') localSave(); });
