@@ -37,6 +37,11 @@ function rateLimit(bucket, max, windowMs, message) {
   if (list.length >= max) throw Object.assign(Error(message), { status: 429 });
   list.push(Date.now()); rates.set(bucket, list);
 }
+async function readJson(req, max = 100000) {
+  let text = '';
+  for await (const chunk of req) { text += chunk; if (text.length > max) throw Object.assign(Error('요청이 너무 큽니다.'), { status: 413 }); }
+  try { return text ? JSON.parse(text) : {}; } catch { throw Object.assign(Error('요청 형식을 확인해주세요.'), { status: 400 }); }
+}
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -44,6 +49,26 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; media-src 'self' blob:; font-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'");
   if (process.env.NODE_ENV === 'production') res.setHeader('Strict-Transport-Security', 'max-age=31536000');
   try {
+    if (url.pathname.startsWith('/internal/state/')) {
+      res.setHeader('Cache-Control', 'no-store');
+      if (req.method !== 'POST') throw Object.assign(Error('지원하지 않는 요청입니다.'), { status: 405 });
+      const expected = String(process.env.STATE_BRIDGE_SECRET || '');
+      const supplied = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+      if (!expected || supplied !== expected) throw Object.assign(Error('허용되지 않은 요청입니다.'), { status: 403 });
+      if (url.pathname === '/internal/state/read') {
+        const snapshot = await serial(() => repo.read());
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(snapshot)); return;
+      }
+      if (url.pathname === '/internal/state/commit') {
+        const body = await readJson(req, 5000000);
+        if (!Number.isInteger(Number(body.revision)) || !body.state || typeof body.state !== 'object') throw Object.assign(Error('저장 요청을 확인해주세요.'), { status: 400 });
+        await serial(() => repo.commit(body.state, Number(body.revision)));
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ ok: true })); return;
+      }
+      throw Object.assign(Error('요청한 기능을 찾을 수 없습니다.'), { status: 404 });
+    }
     if (url.pathname.startsWith('/api/')) {
       res.setHeader('Cache-Control', 'no-store');
       if (!['GET', 'POST', 'PATCH'].includes(req.method)) throw Object.assign(Error('지원하지 않는 요청입니다.'), { status: 405 });
@@ -52,9 +77,7 @@ const server = http.createServer(async (req, res) => {
         if (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) throw Object.assign(Error('허용되지 않은 요청입니다.'), { status: 403 });
         if (!String(req.headers['content-type']).startsWith('application/json')) throw Object.assign(Error('요청 형식을 확인해주세요.'), { status: 415 });
       }
-      let text = '';
-      for await (const chunk of req) { text += chunk; if (text.length > 100000) throw Object.assign(Error('요청이 너무 큽니다.'), { status: 413 }); }
-      let body = {}; try { body = text ? JSON.parse(text) : {}; } catch { throw Object.assign(Error('요청 형식을 확인해주세요.'), { status: 400 }); }
+      const body = await readJson(req);
       const address = req.socket.remoteAddress || 'unknown';
       if (url.pathname === '/api/login') {
         const key = address + ':' + String(body.username || '').trim().toLowerCase();
@@ -95,7 +118,8 @@ const server = http.createServer(async (req, res) => {
     res.setHeader('Cache-Control', 'no-cache');
     res.end(req.method === 'HEAD' ? undefined : await readFile(path));
   } catch (e) {
-    const status = e.status || (url.pathname.startsWith('/api/') ? 500 : 404);
+    const internal = url.pathname.startsWith('/internal/');
+    const status = e.status || (url.pathname.startsWith('/api/') || internal ? 500 : 404);
     if (status === 500) console.error('[request]', e.message);
     res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ error: status === 500 ? '저장 서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.' : e.message }));
