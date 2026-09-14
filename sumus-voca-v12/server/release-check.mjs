@@ -19,7 +19,7 @@ const expectStatus = async (status, fn, label) => {
   throw new Error(`[release-check] FAIL · ${label}`);
 };
 const answerFor = (type, word) => {
-  if (['mean2eng_mc', 'write_en', 'spell', 'scramble', 'vowelblank', 'initial'].includes(type)) return displayEnglish(word.word);
+  if (['mean2eng_mc', 'mean2eng', 'write_en', 'spell', 'scramble', 'vowelblank', 'initial'].includes(type)) return displayEnglish(word.word);
   return word.meaning;
 };
 
