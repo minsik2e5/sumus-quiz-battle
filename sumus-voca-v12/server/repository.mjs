@@ -6,6 +6,48 @@ export function emptyState() {
   return { profiles: [], tokens: [], sessions: [], mastery: {}, assignments: [], exams: [], examAttempts: [], practices: [], extraBooks: [] };
 }
 
+async function remoteBridgeRepository() {
+  const base = process.env.STATE_BRIDGE_URL.replace(/\/$/, '');
+  const secret = process.env.STATE_BRIDGE_SECRET;
+
+  async function request(path, body = {}) {
+    const response = await fetch(base + path, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${secret}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000)
+    });
+    const text = await response.text();
+    let payload = null;
+    try { payload = text ? JSON.parse(text) : null; } catch {}
+    if (!response.ok) {
+      const message = payload?.error || '영구 저장 서버에 연결하지 못했습니다.';
+      throw Object.assign(new Error(message), { status: response.status === 409 ? 409 : 503 });
+    }
+    return payload;
+  }
+
+  const initial = await request('/internal/state/read');
+  if (!initial || initial.revision === undefined || !initial.state) {
+    throw Object.assign(new Error('영구 저장 데이터를 불러오지 못했습니다.'), { status: 503 });
+  }
+  console.log(`[storage] Remote state bridge connected · revision ${initial.revision}`);
+
+  return {
+    async read() {
+      const payload = await request('/internal/state/read');
+      return { revision: Number(payload.revision), state: payload.state };
+    },
+    async commit(state, revision) {
+      await request('/internal/state/commit', { revision: Number(revision), state });
+    },
+    close() {}
+  };
+}
+
 async function protectedSupabaseRepository() {
   const base = process.env.SUPABASE_URL.replace(/\/$/, '') + '/rest/v1/rpc/';
   const apiKey = process.env.SUPABASE_ANON_KEY;
@@ -66,6 +108,10 @@ async function protectedSupabaseRepository() {
 }
 
 export async function repository(path) {
+  if (process.env.STATE_BRIDGE_URL && process.env.STATE_BRIDGE_SECRET) {
+    return remoteBridgeRepository();
+  }
+
   if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY && process.env.VOCA_STATE_SECRET) {
     return protectedSupabaseRepository();
   }
