@@ -7,6 +7,7 @@ import { repository } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
 import { service, sweep } from './service.mjs';
 import { selfSignup } from './signup.mjs';
+import { examAdmin } from './exam-admin.mjs';
 const root = resolve(fileURLToPath(new URL('../public/', import.meta.url)));
 const dbPath = process.env.DATA_PATH || fileURLToPath(new URL('../var/sumus.sqlite', import.meta.url));
 const repo = await repository(dbPath);
@@ -71,9 +72,13 @@ const server = http.createServer(async (req, res) => {
         const snapshot = await repo.read(), state = snapshot.state;
         let revision = snapshot.revision;
         if (sweep(state)) { await repo.commit(state, revision); revision++; }
-        const output = url.pathname === '/api/signup' && req.method === 'POST'
-          ? await selfSignup(state, body)
-          : await service(state, req.method, url.pathname.slice(4), body, token);
+        const path = url.pathname.slice(4);
+        const adminOutput = await examAdmin(state, req.method, path, body, token);
+        const output = adminOutput !== undefined
+          ? adminOutput
+          : url.pathname === '/api/signup' && req.method === 'POST'
+            ? await selfSignup(state, body)
+            : await service(state, req.method, path, body, token);
         if (req.method !== 'GET') await repo.commit(state, revision);
         return output;
       });
