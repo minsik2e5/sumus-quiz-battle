@@ -12,10 +12,18 @@ const dbPath = process.env.DATA_PATH || fileURLToPath(new URL('../var/sumus.sqli
 const repo = await repository(dbPath);
 if (process.env.ADMIN_PASSWORD) {
   const { state, revision } = await repo.read();
-  if (!state.profiles.some(p => p.role === 'teacher')) {
-    if (process.env.ADMIN_PASSWORD.length < 12) throw Error('ADMIN_PASSWORD must contain at least 12 characters');
-    state.profiles.push({ id: randomUUID(), username: process.env.ADMIN_USERNAME || 'teacher', display_name: 'SUMUS 선생님', class_name: '고1A', role: 'teacher', active: true, password_hash: await passwordHash(process.env.ADMIN_PASSWORD) });
+  const adminUsername = process.env.ADMIN_USERNAME || 'teacher';
+  const teacher = state.profiles.find(p => p.role === 'teacher' && p.username === adminUsername);
+  if (!teacher) {
+    if (process.env.ADMIN_PASSWORD.length < 6) throw Error('ADMIN_PASSWORD must contain at least 6 characters');
+    state.profiles.push({ id: randomUUID(), username: adminUsername, display_name: 'SUMUS 선생님', class_name: '고1A', role: 'teacher', active: true, password_hash: await passwordHash(process.env.ADMIN_PASSWORD) });
     await repo.commit(state, revision);
+  } else if (process.env.FORCE_ADMIN_PASSWORD === 'true') {
+    if (process.env.ADMIN_PASSWORD.length < 6) throw Error('ADMIN_PASSWORD must contain at least 6 characters');
+    teacher.password_hash = await passwordHash(process.env.ADMIN_PASSWORD);
+    state.tokens = state.tokens.filter(t => t.user_id !== teacher.id);
+    await repo.commit(state, revision);
+    console.log('[auth] Teacher password reset completed');
   }
 }
 let tail = Promise.resolve();
