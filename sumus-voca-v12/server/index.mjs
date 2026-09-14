@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { repository } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
 import { service, sweep } from './service.mjs';
+import { selfSignup } from './signup.mjs';
 const root = resolve(fileURLToPath(new URL('../public/', import.meta.url)));
 const dbPath = process.env.DATA_PATH || fileURLToPath(new URL('../var/sumus.sqlite', import.meta.url));
 const repo = await repository(dbPath);
@@ -21,6 +22,11 @@ let tail = Promise.resolve();
 const serial = fn => { const next = tail.then(fn, fn); tail = next.catch(() => {}); return next; };
 const rates = new Map();
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
+function rateLimit(bucket, max, windowMs, message) {
+  const list = (rates.get(bucket) || []).filter(t => t > Date.now() - windowMs);
+  if (list.length >= max) throw Object.assign(Error(message), { status: 429 });
+  list.push(Date.now()); rates.set(bucket, list);
+}
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -39,22 +45,26 @@ const server = http.createServer(async (req, res) => {
       let text = '';
       for await (const chunk of req) { text += chunk; if (text.length > 100000) throw Object.assign(Error('요청이 너무 큽니다.'), { status: 413 }); }
       let body = {}; try { body = text ? JSON.parse(text) : {}; } catch { throw Object.assign(Error('요청 형식을 확인해주세요.'), { status: 400 }); }
+      const address = req.socket.remoteAddress || 'unknown';
       if (url.pathname === '/api/login') {
-        const address = req.socket.remoteAddress;
         const key = address + ':' + String(body.username || '').trim().toLowerCase();
-        for (const [bucket, max] of [[key, 10], [address + ':all', 500]]) {
-          const list = (rates.get(bucket) || []).filter(t => t > Date.now() - 15 * 60000);
-          if (list.length >= max) throw Object.assign(Error('로그인 시도가 많습니다. 15분 후 다시 시도해주세요.'), { status: 429 });
-          list.push(Date.now()); rates.set(bucket, list);
-        }
-        if (rates.size > 10000) for (const [k, values] of rates) if (values.at(-1) < Date.now() - 15 * 60000) rates.delete(k);
+        rateLimit(key, 10, 15 * 60000, '로그인 시도가 많습니다. 15분 후 다시 시도해주세요.');
+        rateLimit(address + ':all', 500, 15 * 60000, '요청이 많습니다. 잠시 후 다시 시도해주세요.');
       }
+      if (url.pathname === '/api/signup') {
+        const username = String(body.username || '').trim().toLowerCase();
+        rateLimit(address + ':signup', 12, 30 * 60000, '회원가입 시도가 많습니다. 잠시 후 다시 시도해주세요.');
+        rateLimit(address + ':signup:' + username, 4, 30 * 60000, '같은 아이디로 가입 시도가 많습니다. 잠시 후 다시 시도해주세요.');
+      }
+      if (rates.size > 10000) for (const [k, values] of rates) if (values.at(-1) < Date.now() - 30 * 60000) rates.delete(k);
       const token = (req.headers.cookie || '').split(';').map(s => s.trim()).find(s => s.startsWith('sumus_session='))?.slice(14) || '';
       const result = await serial(async () => {
         const snapshot = await repo.read(), state = snapshot.state;
         let revision = snapshot.revision;
         if (sweep(state)) { await repo.commit(state, revision); revision++; }
-        const output = await service(state, req.method, url.pathname.slice(4), body, token);
+        const output = url.pathname === '/api/signup' && req.method === 'POST'
+          ? await selfSignup(state, body)
+          : await service(state, req.method, url.pathname.slice(4), body, token);
         if (req.method !== 'GET') await repo.commit(state, revision);
         return output;
       });
