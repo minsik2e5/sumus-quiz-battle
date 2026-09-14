@@ -9,7 +9,7 @@ function injectStyles() {
     .signup-entry button{border:0;background:transparent;color:#4f46e5;font:inherit;font-weight:700;cursor:pointer;padding:4px 6px}
     .signup-back{border:0;background:transparent;color:#667085;font:inherit;font-weight:650;cursor:pointer;padding:8px 0;margin-bottom:8px}
     .signup-terms{font-size:12px;line-height:1.55;color:#98a2b3;margin:12px 0 0}
-    .signup-success{padding:12px 14px;border-radius:14px;background:#ecfdf3;color:#027a48;font-size:14px;font-weight:650;margin-bottom:14px}
+    .signup-code-note{margin-top:7px;font-size:12px;line-height:1.5;color:#98a2b3}
     .signup-form .form-columns{align-items:end}
     @media(max-width:560px){.signup-form .form-columns{grid-template-columns:1fr}}
   `;
@@ -38,7 +38,7 @@ function showSignup() {
   app.innerHTML = `<div class="auth">
     <section class="auth-visual">
       <div class="brand"><img src="/icon.svg" alt=""><div>SUMUS <span>VOCA</span></div></div>
-      <div><h1>내 계정으로<br>바로 시작해요.</h1><p>회원가입 후 바로 연습할 수 있어요.<br>학교와 반을 정확히 선택해주세요.</p></div>
+      <div><h1>내 계정으로<br>바로 시작해요.</h1><p>회원가입 후 바로 연습할 수 있어요.<br>선생님에게 받은 가입코드로 반이 자동 배정됩니다.</p></div>
       <footer>SUMUS ENGLISH ACADEMY</footer>
     </section>
     <form class="auth-form signup-form" id="signup-form">
@@ -47,10 +47,8 @@ function showSignup() {
       <h2>학생 회원가입</h2>
       <p>내가 사용할 아이디와 비밀번호를 직접 만들어요.</p>
       <label class="field"><span>이름</span><input name="display_name" autocomplete="name" required maxlength="40" placeholder="학생 이름"></label>
-      <div class="form-columns">
-        <label class="field"><span>학교</span><select name="school" required><option value="">선택</option><option>단원고</option><option>선부고</option></select></label>
-        <label class="field"><span>반</span><select name="class_name" required><option value="">선택</option><option value="고1A">고1A</option><option value="고1B">고1B</option></select></label>
-      </div>
+      <label class="field"><span>학교</span><select name="school" required><option value="">학교 선택</option><option>단원고</option><option>선부고</option></select></label>
+      <label class="field"><span>가입코드</span><input name="signup_code" autocomplete="off" autocapitalize="characters" spellcheck="false" required maxlength="40" placeholder="선생님에게 받은 가입코드"><small class="signup-code-note">가입코드에 따라 고1A / 고1B가 자동으로 배정돼요.</small></label>
       <label class="field"><span>아이디</span><input name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required minlength="3" maxlength="40" pattern="[a-z0-9_.-]{3,40}" placeholder="영문 소문자·숫자 3자 이상"></label>
       <label class="field"><span>비밀번호</span><input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="128" placeholder="8자 이상"></label>
       <label class="field"><span>비밀번호 확인</span><input name="password_confirm" type="password" autocomplete="new-password" required minlength="8" maxlength="128" placeholder="한 번 더 입력"></label>
