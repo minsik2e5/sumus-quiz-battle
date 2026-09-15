@@ -203,7 +203,8 @@ export async function service(state, method, path, body, token) {
     const school = schoolByRef(state, body.school_id || body.school);
     const words = scopedWords(state, school?.id, body.range_codes);
     if (!PRACTICE_TYPES[body.mode]) fail('연습 방식을 선택해주세요.');
-    const x = { id: id(), student_id: p.id, school_id: school.id, school: school.name, range_codes: body.range_codes, mode: body.mode, assignment_id: null, target: integer(body.target || 10, 5, 40, '학습량'), total: 0, correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: Date.now(), finished: false, responses: {}, words: words.map(w => w.id) };
+    const coverAll = body.cover_all === true;
+    const x = { id: id(), student_id: p.id, school_id: school.id, school: school.name, range_codes: body.range_codes, mode: body.mode, assignment_id: null, target: coverAll ? words.length : integer(body.target || 10, 5, 500, '학습량'), cover_all: coverAll, seen: [], total: 0, correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: Date.now(), finished: false, responses: {}, words: words.map(w => w.id) };
     if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
@@ -223,7 +224,10 @@ export async function service(state, method, path, body, token) {
       x.feedback = { ok, gain, mastery: m.mastery, word: displayEnglish(word.word), meaning: word.meaning, combo: x.combo, retry: !ok, milestone: ok && [5, 10].includes(x.combo) };
       const result = practiceView(x, state); x.responses[body.question_id] = structuredClone(result); return result;
     }
-    if (path.endsWith('/next') && !x.finished && x.feedback) { if (x.total >= x.target && (!x.retry.length || x.total >= x.target + 12)) finishPractice(x, state); else nextPractice(x, state); }
+    if (path.endsWith('/next') && !x.finished && x.feedback) {
+      const covered = !x.cover_all || (x.seen?.length || 0) >= x.words.length;
+      if (covered && x.total >= x.target && (!x.retry.length || x.total >= x.target + 12)) finishPractice(x, state); else nextPractice(x, state);
+    }
     if (path.endsWith('/finish') && !x.finished) finishPractice(x, state);
     return practiceView(x, state);
   }
@@ -231,7 +235,17 @@ export async function service(state, method, path, body, token) {
 }
 function nextPractice(x, state) {
   const words = allBooks(state).flatMap(b => b.words).filter(w => x.words.includes(w.id));
-  const word = choosePracticeWord(words, state.mastery[x.student_id] || {}, x);
+  x.seen ??= [];
+  const unseen = x.cover_all ? words.filter(w => !x.seen.includes(w.id)) : [];
+  const due = x.retry.findIndex(r => r.at <= x.total);
+  let word;
+  if (unseen.length) {
+    word = choosePracticeWord(unseen, state.mastery[x.student_id] || {}, { ...x, retry: [] });
+  } else if (due >= 0) {
+    const retry = x.retry.splice(due, 1)[0];
+    word = words.find(w => w.id === retry.id);
+  } else word = choosePracticeWord(words, state.mastery[x.student_id] || {}, x);
+  if (!x.seen.includes(word.id)) x.seen.push(word.id);
   const mode = x.mode === 'mixed' ? shuffle(Object.keys(PRACTICE_TYPES).filter(k => k !== 'mixed'))[0] : x.mode;
   x.question = buildQuestion(word, mode, words); x.question_id = id(); x.feedback = null;
 }
@@ -242,5 +256,5 @@ function finishPractice(x, state) {
   if (!state.sessions.some(s => s.id === rec.id)) state.sessions.push(rec);
 }
 function practiceView(x, state) {
-  return { id: x.id, school: x.school, mode: x.mode, target: x.target, total: x.total, correct: x.correct, xp: x.xp, combo: x.combo, best: x.best, question: x.question, question_id: x.question_id, feedback: x.feedback, finished: x.finished, retry_count: x.retry.length, stats: growthFor(mySessions(state, x.student_id)) };
+  return { id: x.id, school: x.school, mode: x.mode, target: x.target, cover_all: !!x.cover_all, covered: x.seen?.length || 0, total: x.total, correct: x.correct, xp: x.xp, combo: x.combo, best: x.best, question: x.question, question_id: x.question_id, feedback: x.feedback, finished: x.finished, retry_count: x.retry.length, stats: growthFor(mySessions(state, x.student_id)) };
 }

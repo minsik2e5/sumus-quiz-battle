@@ -5,7 +5,7 @@ export const EXAM_TYPES = {
   write_meaning: { label: '뜻쓰기', help: '영어를 보고 뜻 직접 쓰기', input: true }
 };
 export const PRACTICE_TYPES = {
-  mixed: '골고루 연습', eng2mean: '영어 → 뜻', mean2eng: '뜻 → 영어',
+  write_meaning: '뜻 직접 쓰기', mixed: '골고루 연습', eng2mean: '영어 → 뜻', mean2eng: '뜻 → 영어',
   spell: '영어 철자 입력', listen: '듣기', scramble: '철자 배열', vowelblank: '모음 빈칸', initial: '첫 글자 힌트'
 };
 export const CHARACTERS = {

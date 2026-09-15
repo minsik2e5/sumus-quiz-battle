@@ -35,8 +35,8 @@ export async function runReleaseCheck() {
     assert(bySchool('강서고').length === 52, '강서고 vocabulary = 52');
     assert(new Set(allWords.map(word => word.id)).size === allWords.length, 'vocabulary ids are unique');
     assert(Object.keys(EXAM_TYPES).join(',') === 'eng2mean_mc,mean2eng_mc,write_en,write_meaning', 'exactly four exam types');
-    const practiceTypes = ['eng2mean', 'mean2eng', 'spell', 'listen', 'scramble', 'vowelblank', 'initial'];
-    assert(practiceTypes.every(type => PRACTICE_TYPES[type]), 'all seven practice types exist');
+    const practiceTypes = ['write_meaning', 'eng2mean', 'mean2eng', 'spell', 'listen', 'scramble', 'vowelblank', 'initial'];
+    assert(practiceTypes.every(type => PRACTICE_TYPES[type]), 'all eight practice types exist');
 
     assert(grade('write_en', 'PROSTHETIC', { word: '*prosthetic', meaning: '의족의' }), 'English writing ignores case and source marker');
     assert(grade('write_en', 'phenomena', { word: 'phenomenon(pl.phenomena)', meaning: '현상' }), 'plural annotation accepted');
@@ -144,7 +144,7 @@ export async function runReleaseCheck() {
       const finished = await service(state, 'POST', `/practice/${started.id}/finish`, {}, studentToken);
       assert(finished.finished === true, `${practiceType} practice can finish and save`);
     }
-    assert(state.sessions.length === 7, 'all seven practice sessions are recorded');
+    assert(state.sessions.length === 8, 'all eight practice sessions are recorded');
 
     const wrongPractice = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'spell', target: 5
@@ -154,6 +154,21 @@ export async function runReleaseCheck() {
     }, studentToken);
     assert(wrongResult.feedback?.ok === false && wrongResult.retry_count === 1, 'wrong practice answer enters retry queue');
     await service(state, 'POST', `/practice/${wrongPractice.id}/finish`, {}, studentToken);
+
+    const coverAll = await service(state, 'POST', '/practice/start', {
+      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', cover_all: true
+    }, studentToken);
+    const coveredIds = new Set();
+    let coverView = coverAll;
+    for (let guard = 0; !coverView.finished && guard < coverAll.target + 20; guard++) {
+      coveredIds.add(coverView.question.word_id);
+      const word = allWords.find(item => item.id === coverView.question.word_id);
+      coverView = await service(state, 'POST', `/practice/${coverAll.id}/answer`, {
+        question_id: coverView.question_id, answer: word.meaning
+      }, studentToken);
+      coverView = await service(state, 'POST', `/practice/${coverAll.id}/next`, {}, studentToken);
+    }
+    assert(coverView.finished && coveredIds.size === coverAll.target, 'cover-all practice shows every scoped word once before finishing');
 
     const serialized = JSON.stringify(state);
     const restored = JSON.parse(serialized);

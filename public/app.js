@@ -4,10 +4,10 @@ import { avatar } from './modules/character.js';
 import { studentPage, getRanges, updateRangeSummary } from './modules/student.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, startPractice, leaveSession } from './modules/sessions.js';
-const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'mixed', target: 10, sound: false, role: 'student' };
+const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', target: 30, sound: false, role: 'student' };
 let poll, rendering = false;
 function preferences() {
-  try { const v = JSON.parse(localStorage.getItem('sumus:v13:prefs:' + A.data.profile.id) || localStorage.getItem('sumus:v12:prefs:' + A.data.profile.id) || '{}'); A.ranges = v.ranges || {}; A.school = A.data.profile.role === 'teacher' ? A.data.profile.active_school : v.school || A.data.profile.school || A.data.schools[0]?.name || '단원고'; A.mode = v.mode || 'mixed'; A.target = v.target || 10; A.sound = localStorage.getItem('sumus:sound') === 'true'; } catch {}
+  try { const v = JSON.parse(localStorage.getItem('sumus:v13:prefs:' + A.data.profile.id) || localStorage.getItem('sumus:v12:prefs:' + A.data.profile.id) || '{}'); A.ranges = v.ranges || {}; A.school = A.data.profile.role === 'teacher' ? A.data.profile.active_school : v.school || A.data.profile.school || A.data.schools[0]?.name || '단원고'; A.mode = v.mode || 'write_meaning'; A.target = v.target || 30; A.sound = localStorage.getItem('sumus:sound') === 'true'; } catch {}
 }
 function savePreferences() { try { localStorage.setItem('sumus:v13:prefs:' + A.data.profile.id, JSON.stringify({ ranges: A.ranges, school: A.school, mode: A.mode, target: A.target })); } catch {} }
 async function refresh() { A.data = await api('/bootstrap'); if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; }
@@ -78,7 +78,7 @@ $('#app').addEventListener('change', event => {
   if (input.dataset.range) {
     const values = new Set(getRanges(A).selected); if (input.checked) values.add(input.dataset.range); else values.delete(input.dataset.range); A.ranges[A.school] = [...values]; A.assignmentId = null; updateRangeSummary(A); updateExamSummary(A); savePreferences();
   }
-  if (input.id === 'practice-count') { A.target = Number(input.value); savePreferences(); }
+  if (input.id === 'practice-count') { A.target = input.value === 'all' ? 'all' : Number(input.value); savePreferences(); }
   if (input.id === 'class-filter') { A.classFilter = input.value; $('#student-table').innerHTML = studentFiltered(A); }
 });
 function bindPageForms() {
