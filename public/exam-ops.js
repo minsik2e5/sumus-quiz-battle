@@ -10,11 +10,11 @@ function injectStyles() {
   style.textContent = `
     .exam-ops-mini{display:flex;flex-wrap:wrap;gap:5px;min-width:145px}
     .exam-ops-mini span{font-size:11px;font-weight:750;padding:4px 7px;border-radius:999px;background:#f2f4f7;color:#475467}
-    .exam-ops-mini .done{background:#ecfdf3;color:#027a48}.exam-ops-mini .live{background:#eff8ff;color:#175cd3}.exam-ops-mini .wait{background:#fff7ed;color:#b54708}
+    .exam-ops-mini .done{background:#ecfdf3;color:#027a48}.exam-ops-mini .live{background:#eff8ff;color:#175cd3}.exam-ops-mini .wait{background:#fff7ed;color:#b54708}.exam-ops-mini .review{background:#fff4e5;color:#b54708}
     .exam-ops-open{margin-left:6px}
     .exam-ops-hero{padding:2px 0 14px;border-bottom:1px solid #eaecf0}
     .exam-ops-hero h2{margin:0 0 5px;font-size:21px}.exam-ops-hero p{margin:0;color:#667085;font-size:13px;line-height:1.5}
-    .exam-ops-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0}
+    .exam-ops-metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:16px 0}
     .exam-ops-metrics div{padding:12px;border:1px solid #eaecf0;border-radius:14px;background:#fff}
     .exam-ops-metrics span{display:block;font-size:11px;color:#98a2b3;margin-bottom:5px}.exam-ops-metrics b{font-size:20px}
     .exam-ops-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 14px}
@@ -26,10 +26,13 @@ function injectStyles() {
     .exam-ops-status{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;padding:5px 8px;font-size:11px;font-weight:800;background:#f2f4f7;color:#475467;white-space:nowrap}
     .exam-ops-status.submitted{background:#ecfdf3;color:#027a48}.exam-ops-status.active{background:#eff8ff;color:#175cd3}.exam-ops-status.not_started{background:#fff7ed;color:#b54708}
     .exam-ops-expired{color:#b42318;font-weight:700}.exam-ops-opened{color:#027a48;font-weight:700}
+    .exam-review-note{display:inline-flex;align-items:center;gap:5px;margin-top:4px;padding:4px 7px;border-radius:999px;background:#fff4e5;color:#b54708;font-size:10px;font-weight:800}
     .exam-answer-list{display:grid;gap:8px;max-height:58vh;overflow:auto;margin-top:14px}
-    .exam-answer-item{padding:11px 12px;border:1px solid #eaecf0;border-radius:12px}.exam-answer-item.ok{border-color:#abefc6;background:#f6fef9}.exam-answer-item.wrong{border-color:#fecdca;background:#fffafa}
+    .exam-answer-item{padding:11px 12px;border:1px solid #eaecf0;border-radius:12px}.exam-answer-item.ok{border-color:#abefc6;background:#f6fef9}.exam-answer-item.wrong{border-color:#fecdca;background:#fffafa}.exam-answer-item.review{border-color:#fedf89;background:#fffcf5}
     .exam-answer-item b{display:block;margin-bottom:5px;font-size:13px}.exam-answer-item p{margin:2px 0;font-size:12px;color:#475467}.exam-answer-item small{color:#98a2b3}
-    @media(max-width:760px){.exam-ops-row{grid-template-columns:1fr auto}.exam-ops-meta{grid-column:1/-1}.exam-ops-actions{grid-column:1/-1;justify-content:flex-start}.exam-ops-metrics{grid-template-columns:repeat(2,1fr)}.exam-ops-tools select{margin-left:0;width:100%}}
+    .exam-review-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}.exam-review-actions .btn{min-height:34px;padding:7px 10px;font-size:11px}
+    @media(max-width:900px){.exam-ops-metrics{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:760px){.exam-ops-row{grid-template-columns:1fr auto}.exam-ops-meta{grid-column:1/-1}.exam-ops-actions{grid-column:1/-1;justify-content:flex-start}.exam-ops-tools select{margin-left:0;width:100%}}
   `;
   document.head.appendChild(style);
 }
@@ -50,7 +53,7 @@ function renderMini(row, data) {
   const cells = row.querySelectorAll('td');
   const cell = cells[4];
   if (!cell) return;
-  cell.innerHTML = `<div class="exam-ops-mini"><span class="done">완료 ${data.counts.submitted}</span><span class="live">응시 ${data.counts.active}</span><span class="wait">미응시 ${data.counts.not_started}</span></div>`;
+  cell.innerHTML = `<div class="exam-ops-mini"><span class="done">완료 ${data.counts.submitted}</span><span class="live">응시 ${data.counts.active}</span><span class="wait">미응시 ${data.counts.not_started}</span>${data.counts.review_pending ? `<span class="review">검토 ${data.counts.review_pending}</span>` : ''}</div>`;
 }
 
 async function enhanceExamRows() {
@@ -83,8 +86,9 @@ function studentRows(data, filter = '') {
     const a = s.attempt;
     let meta = '아직 시험을 시작하지 않았어요.';
     if (s.status === 'active') meta = `시작 ${date(a.started_at)}<small>제한시간 종료 ${date(a.deadline)}</small>`;
-    if (s.status === 'submitted') meta = `<b>${a.score}점 · ${a.correct}/${a.total}</b><small>${date(a.submitted_at)}${a.auto_submitted ? ' · 자동 제출' : ''}${s.previous.length ? ` · 이전 기록 ${s.previous.length}회 보관` : ''}</small>`;
-    const actions = s.status === 'submitted' ? `<button class="btn small" data-exam-answer="${a.id}" data-exam-id="${data.exam.id}">답안 보기</button><button class="btn small" data-exam-retry="${s.id}" data-exam-id="${data.exam.id}">재응시 허용</button>` : '';
+    if (s.status === 'submitted') meta = `<b>${a.score}점 · ${a.correct}/${a.total}</b><small>${date(a.submitted_at)}${a.auto_submitted ? ' · 자동 제출' : ''}${s.previous.length ? ` · 이전 기록 ${s.previous.length}회 보관` : ''}</small>${a.review_pending ? `<span class="exam-review-note">유사 답안 ${a.review_pending}개 확인 필요</span>` : ''}`;
+    const answerLabel = a?.review_pending ? `답안 보기 · 검토 ${a.review_pending}` : '답안 보기';
+    const actions = s.status === 'submitted' ? `<button class="btn small" data-exam-answer="${a.id}" data-exam-id="${data.exam.id}">${answerLabel}</button><button class="btn small" data-exam-retry="${s.id}" data-exam-id="${data.exam.id}">재응시 허용</button>` : '';
     return `<div class="exam-ops-row"><div class="exam-ops-student"><strong>${esc(s.display_name)}</strong><small>${esc(s.username)} · ${s.active ? '활성' : '일시 중지'}</small></div><div><span class="exam-ops-status ${s.status}">${statusLabel(s.status)}</span></div><div class="exam-ops-meta">${meta}</div><div class="exam-ops-actions">${actions}</div></div>`;
   }).join('');
 }
@@ -95,12 +99,12 @@ async function openExamOps(examId) {
   const expired = data.exam.due_at <= Date.now();
   const close = modal(`
     <div class="exam-ops-hero"><h2>${esc(data.exam.title)}</h2><p>${esc(data.exam.class_name)} · ${esc(data.exam.school)} · ${data.exam.question_count}문제 · ${Math.round(data.exam.duration_sec / 60)}분<br>마감 ${date(data.exam.due_at)} · <span class="${expired ? 'exam-ops-expired' : 'exam-ops-opened'}">${expired ? '마감됨' : '응시 가능'}</span></p></div>
-    <div class="exam-ops-metrics"><div><span>대상 학생</span><b>${data.counts.total}</b></div><div><span>미응시</span><b>${data.counts.not_started}</b></div><div><span>응시 중</span><b>${data.counts.active}</b></div><div><span>제출 완료</span><b>${data.counts.submitted}</b></div></div>
+    <div class="exam-ops-metrics"><div><span>대상 학생</span><b>${data.counts.total}</b></div><div><span>미응시</span><b>${data.counts.not_started}</b></div><div><span>응시 중</span><b>${data.counts.active}</b></div><div><span>제출 완료</span><b>${data.counts.submitted}</b></div><div><span>교사 검토</span><b>${data.counts.review_pending || 0}</b></div></div>
     <div class="exam-ops-tools"><button class="btn small" data-exam-extend="30" data-exam-id="${examId}">마감 +30분</button><button class="btn small" data-exam-extend="1440" data-exam-id="${examId}">마감 +1일</button><select id="exam-ops-filter"><option value="">전체 학생</option><option value="not_started">미응시</option><option value="active">응시 중</option><option value="submitted">제출 완료</option></select></div>
     <div class="exam-ops-list" id="exam-ops-list">${studentRows(data)}</div>`, '실전시험 운영');
 
   const filter = document.querySelector('#exam-ops-filter');
-  filter.onchange = () => { document.querySelector('#exam-ops-list').innerHTML = studentRows(data, filter.value); };
+  filter.onchange = () => { document.querySelector('#exam-ops-list').innerHTML = studentRows(data, filter.value); bindRosterActions(examId, close); };
 
   document.querySelectorAll('[data-exam-extend]').forEach(button => {
     button.onclick = async () => {
@@ -137,20 +141,40 @@ function bindRosterActions(examId, close) {
   });
 
   document.querySelectorAll('[data-exam-answer]').forEach(button => {
-    button.onclick = () => openAnswer(examId, button.dataset.examAnswer).catch(err => toast(err.message));
+    button.onclick = () => { close(); openAnswer(examId, button.dataset.examAnswer).catch(err => toast(err.message)); };
   });
 }
 
+function answerItem(exam, detail, attemptId) {
+  const stateClass = detail.correct ? 'ok' : detail.review_needed ? 'review' : 'wrong';
+  const status = detail.teacher_reviewed ? (detail.correct ? '교사 확인 · 정답 인정' : '교사 확인 · 오답 유지') : detail.review_needed ? '유사 답안 · 교사 확인 필요' : detail.correct ? '정답' : '오답';
+  const canReview = exam.exam_type === 'write_meaning' && (!detail.correct || detail.teacher_reviewed);
+  return `<div class="exam-answer-item ${stateClass}"><b>${detail.number}. ${esc(detail.word)}</b><p>정답 뜻: ${esc(detail.meaning)}</p><p>학생 답: ${esc(detail.answer || '(미응답)')}</p><small>${status}</small>${canReview ? `<div class="exam-review-actions"><button class="btn small ${detail.correct ? 'primary' : ''}" data-regrade="${detail.number}" data-attempt="${attemptId}" data-correct="true">정답 인정</button><button class="btn small ${!detail.correct && detail.teacher_reviewed ? 'danger' : ''}" data-regrade="${detail.number}" data-attempt="${attemptId}" data-correct="false">오답 유지</button></div>` : ''}</div>`;
+}
+
 async function openAnswer(examId, attemptId) {
-  const result = await api(`/attempts/${attemptId}`);
+  const result = await api(`/admin/exams/${examId}/attempt/${attemptId}`);
   const a = result.attempt;
   const details = a.details || [];
-  modal(`
+  const close = modal(`
     <button class="text-button" id="answer-back">← 시험 현황으로</button>
     <h2 style="margin:10px 0 4px">${esc(result.exam?.title || '실전시험')} 답안</h2>
-    <p class="tiny muted">${a.score}점 · ${a.correct}/${a.total} · ${date(a.submitted_at)}${a.auto_submitted ? ' · 자동 제출' : ''}</p>
-    <div class="exam-answer-list">${details.map(d => `<div class="exam-answer-item ${d.correct ? 'ok' : 'wrong'}"><b>${d.number}. ${esc(d.word)}</b><p>뜻: ${esc(d.meaning)}</p><p>학생 답: ${esc(d.answer || '(미응답)')}</p><small>${d.correct ? '정답' : '오답'}</small></div>`).join('')}</div>`, '학생 답안');
-  document.querySelector('#answer-back').onclick = () => openExamOps(examId).catch(err => toast(err.message));
+    <p class="tiny muted">현재 ${a.score}점 · ${a.correct}/${a.total} · ${date(a.submitted_at)}${a.auto_submitted ? ' · 자동 제출' : ''}${a.review_pending ? ` · 유사 답안 ${a.review_pending}개 검토 필요` : ''}</p>
+    ${a.review_pending ? '<div class="exam-info" style="margin:12px 0"><p>뜻쓰기에서 정답과 표현이 비슷한 답안만 표시했어요. 선생님이 정답 인정 또는 오답 유지를 선택하면 점수가 즉시 다시 계산됩니다.</p></div>' : ''}
+    <div class="exam-answer-list">${details.map(d => answerItem(result.exam, d, a.id)).join('')}</div>`, '학생 답안');
+  document.querySelector('#answer-back').onclick = () => { close(); openExamOps(examId).catch(err => toast(err.message)); };
+  document.querySelectorAll('[data-regrade]').forEach(button => {
+    button.onclick = async () => {
+      buttonBusy(button);
+      try {
+        await api(`/admin/exams/${examId}/regrade`, { attempt_id: attemptId, number: Number(button.dataset.regrade), correct: button.dataset.correct === 'true' });
+        cache.delete(examId);
+        toast(button.dataset.correct === 'true' ? '정답으로 인정했어요. 점수를 다시 계산했습니다.' : '오답으로 유지했어요.');
+        close();
+        await openAnswer(examId, attemptId);
+      } catch (err) { toast(err.message); buttonBusy(button, false); }
+    };
+  });
 }
 
 document.addEventListener('click', event => {
