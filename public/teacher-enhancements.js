@@ -69,7 +69,7 @@ async function enhanceStudentsPage() {
     school.id = 'school-filter';
     school.className = 'sumus-extra-filter';
     school.setAttribute('aria-label', '학교 필터');
-    school.innerHTML = '<option value="">전체 학교</option><option value="단원고">단원고</option><option value="선부고">선부고</option>';
+    school.innerHTML = '<option value="">현재 학교 전체</option><option value="단원고">단원고</option><option value="선부고">선부고</option><option value="강서고">강서고</option>';
     toolbar.appendChild(school);
 
     const status = document.createElement('select');

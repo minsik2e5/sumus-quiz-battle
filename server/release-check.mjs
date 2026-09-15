@@ -29,9 +29,10 @@ export async function runReleaseCheck() {
   try {
     const allWords = builtinBooks.flatMap(book => book.words || []);
     const bySchool = school => builtinBooks.filter(book => book.school === school).flatMap(book => book.words || []);
-    assert(allWords.length === 692, 'vocabulary total = 692');
+    assert(allWords.length === 744, 'vocabulary total = 744');
     assert(bySchool('단원고').length === 362, '단원고 vocabulary = 362');
     assert(bySchool('선부고').length === 330, '선부고 vocabulary = 330');
+    assert(bySchool('강서고').length === 52, '강서고 vocabulary = 52');
     assert(new Set(allWords.map(word => word.id)).size === allWords.length, 'vocabulary ids are unique');
     assert(Object.keys(EXAM_TYPES).join(',') === 'eng2mean_mc,mean2eng_mc,write_en,write_meaning', 'exactly four exam types');
     const practiceTypes = ['eng2mean', 'mean2eng', 'spell', 'listen', 'scramble', 'vowelblank', 'initial'];

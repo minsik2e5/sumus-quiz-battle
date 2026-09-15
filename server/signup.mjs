@@ -10,14 +10,14 @@ export async function selfSignup(state, body) {
   const displayName = str(body.display_name, 40);
   const username = str(body.username, 40).toLowerCase();
   const password = String(body.password || '');
-  const school = str(body.school, 20);
+  const school = state.schools.find(item => item.active !== false && (item.id === body.school_id || item.name === str(body.school, 20)));
   const className = str(body.class_name, 30);
 
   if (!displayName || displayName.length < 2) fail('이름을 2자 이상 입력해주세요.');
   if (!/^[a-z0-9_.-]{3,40}$/.test(username)) fail('아이디는 영문 소문자·숫자 3~40자로 입력해주세요.');
   if (state.profiles.some(profile => profile.username === username)) fail('이미 사용 중인 아이디예요.', 409);
   if (password.length < 8 || password.length > 128) fail('비밀번호는 8~128자로 입력해주세요.');
-  if (!['단원고', '선부고'].includes(school)) fail('학교를 선택해주세요.');
+  if (!school) fail('학교를 선택해주세요.');
   if (!['고1A', '고1B'].includes(className)) fail('반을 선택해주세요.');
 
   const student = {
@@ -27,7 +27,8 @@ export async function selfSignup(state, body) {
     password_hash: await passwordHash(password),
     display_name: displayName,
     class_name: className,
-    school,
+    school_id: school.id,
+    school: school.name,
     active: true,
     created_at: Date.now()
   };

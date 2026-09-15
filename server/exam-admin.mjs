@@ -11,9 +11,14 @@ function teacherFromToken(state, token) {
   return profile;
 }
 
-function examForTeacher(state, id) {
+const schoolByRef = (state, value) => state.schools.find(school => school.active !== false && (school.id === value || school.name === value));
+const sameSchool = (record, school) => !!school && (record.school_id === school.id || record.school === school.name);
+
+function examForTeacher(state, id, teacher) {
   const exam = state.exams.find(e => e.id === id);
   if (!exam) fail('시험을 찾을 수 없습니다.', 404);
+  const school = schoolByRef(state, teacher.active_school_id);
+  if (!school || !teacher.school_ids?.includes(school.id) || !sameSchool(exam, school)) fail('현재 관리 중인 학교의 시험이 아닙니다.', 403);
   return exam;
 }
 
@@ -60,7 +65,8 @@ function attemptForExam(state, exam, attemptId) {
 
 function roster(state, exam) {
   const archived = Array.isArray(state.examAttemptArchive) ? state.examAttemptArchive : [];
-  const candidates = state.profiles.filter(p => p.role === 'student' && p.class_name === exam.class_name && p.school === exam.school && (p.active || state.examAttempts.some(a => a.exam_id === exam.id && a.student_id === p.id)));
+  const school = schoolByRef(state, exam.school_id || exam.school);
+  const candidates = state.profiles.filter(p => p.role === 'student' && p.class_name === exam.class_name && sameSchool(p, school) && (p.active || state.examAttempts.some(a => a.exam_id === exam.id && a.student_id === p.id)));
   const students = candidates.map(student => {
     const attempts = state.examAttempts.filter(a => a.exam_id === exam.id && a.student_id === student.id).sort((a, b) => (b.submitted_at || b.started_at || 0) - (a.submitted_at || a.started_at || 0));
     const active = attempts.find(a => a.status === 'active');
@@ -114,7 +120,7 @@ export async function examAdmin(state, method, path, body, token) {
   const parts = path.split('/').filter(Boolean);
   const examId = parts[2];
   const action = parts[3] || '';
-  const exam = examForTeacher(state, examId);
+  const exam = examForTeacher(state, examId, teacher);
 
   if (method === 'GET' && action === 'roster') return roster(state, exam);
 
@@ -142,7 +148,8 @@ export async function examAdmin(state, method, path, body, token) {
 
   if (method === 'POST' && action === 'retry') {
     const studentId = String(body.student_id || '');
-    const student = state.profiles.find(p => p.id === studentId && p.role === 'student');
+    const school = schoolByRef(state, exam.school_id || exam.school);
+    const student = state.profiles.find(p => p.id === studentId && p.role === 'student' && p.class_name === exam.class_name && sameSchool(p, school));
     if (!student) fail('학생을 찾을 수 없습니다.', 404);
     const related = state.examAttempts.filter(a => a.exam_id === exam.id && a.student_id === studentId);
     if (related.some(a => a.status === 'active')) fail('현재 응시 중인 학생은 재응시로 변경할 수 없습니다.', 409);

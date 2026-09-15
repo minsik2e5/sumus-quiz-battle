@@ -3,7 +3,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
-import { repository } from './repository.mjs';
+import { migrateState, repository } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
 import { service, sweep } from './service.mjs';
 import { selfSignup } from './signup.mjs';
@@ -11,6 +11,10 @@ import { examAdmin } from './exam-admin.mjs';
 const root = resolve(fileURLToPath(new URL('../public/', import.meta.url)));
 const dbPath = process.env.DATA_PATH || fileURLToPath(new URL('../var/sumus.sqlite', import.meta.url));
 const repo = await repository(dbPath);
+{
+  const { state, revision } = await repo.read();
+  if (migrateState(state)) await repo.commit(state, revision);
+}
 {
   const { state, revision } = await repo.read();
   const adminUsername = process.env.ADMIN_USERNAME || 'teacher';
@@ -24,7 +28,7 @@ const repo = await repository(dbPath);
     console.log('[auth] Teacher password reset completed');
   } else if (!teacher && process.env.ADMIN_PASSWORD) {
     if (process.env.ADMIN_PASSWORD.length < 12) throw Error('ADMIN_PASSWORD must contain at least 12 characters');
-    state.profiles.push({ id: randomUUID(), username: adminUsername, display_name: 'SUMUS 선생님', class_name: '고1A', role: 'teacher', active: true, password_hash: await passwordHash(process.env.ADMIN_PASSWORD) });
+    state.profiles.push({ id: randomUUID(), username: adminUsername, display_name: 'SUMUS 선생님', class_name: '고1A', role: 'teacher', active: true, password_hash: await passwordHash(process.env.ADMIN_PASSWORD), school_ids: state.schools.filter(school => school.active !== false).map(school => school.id), active_school_id: state.schools[0].id });
     await repo.commit(state, revision);
   }
 }

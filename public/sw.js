@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v12-pwa-1';
+const VERSION = 'sumus-voca-v13-pwa-1';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -8,7 +8,7 @@ const SHELL = [
   '/signup-ui.js',
   '/teacher-enhancements.js',
   '/exam-ops.js',
-  '/teacher-dashboard.js',
+  '/dashboard-ops.js',
   '/student-enhancements.js',
   '/practice-enhancements.js',
   '/pwa.js',

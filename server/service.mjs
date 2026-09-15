@@ -8,10 +8,16 @@ const requireRole = (p, role) => { if (p.role !== role) fail('이 기능을 사�
 const integer = (n, min, max, label) => { if (!Number.isInteger(Number(n)) || Number(n) < min || Number(n) > max) fail(`${label}을 확인해주세요.`); return Number(n); };
 const str = (s, max = 120) => typeof s === 'string' ? s.trim().slice(0, max) : '';
 const id = () => randomUUID();
+const schoolByRef = (state, value) => state.schools.find(s => s.active !== false && (s.id === value || s.name === value));
+const schoolForProfile = (state, profile) => state.schools.find(s => s.id === profile.school_id) || schoolByRef(state, profile.school);
+const teacherSchools = (state, profile) => state.schools.filter(s => s.active !== false && profile.school_ids?.includes(s.id));
+const activeTeacherSchool = (state, profile) => teacherSchools(state, profile).find(s => s.id === profile.active_school_id) || teacherSchools(state, profile)[0];
+const sameSchool = (record, school) => !!record && !!school && (record.school_id === school.id || record.school === school.name);
 export function allBooks(state) { return [...builtinBooks, ...state.extraBooks]; }
-export function scopedWords(state, school, ranges) {
-  if (!['단원고', '선부고'].includes(school) || !Array.isArray(ranges) || !ranges.length) fail('학교와 범위를 선택해주세요.');
-  const words = allBooks(state).filter(b => b.school === school).flatMap(b => b.words);
+export function scopedWords(state, schoolRef, ranges) {
+  const school = schoolByRef(state, schoolRef);
+  if (!school || !Array.isArray(ranges) || !ranges.length) fail('학교와 범위를 선택해주세요.');
+  const words = allBooks(state).filter(b => sameSchool(b, school)).flatMap(b => b.words);
   if (!ranges.every(r => words.some(w => w.range_code === String(r)))) fail('선택한 범위를 찾을 수 없습니다.');
   return words.filter(w => ranges.map(String).includes(w.range_code));
 }
@@ -44,7 +50,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '12.0.0', ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.0.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -57,6 +63,10 @@ export async function service(state, method, path, body, token) {
       p = state.profiles.find(p => p.username === str(body.username).toLowerCase() && p.active);
       if (!(await verifyPassword(String(body.password || ''), p?.password_hash))) fail('아이디 또는 비밀번호를 확인해주세요.', 401);
     }
+    if (p.role === 'teacher') {
+      if (!Array.isArray(p.school_ids) || !p.school_ids.length) p.school_ids = state.schools.filter(s => s.active !== false).map(s => s.id);
+      if (!activeTeacherSchool(state, p)) p.active_school_id = teacherSchools(state, p)[0]?.id;
+    }
     if (p.role !== body.role) fail('학생 / 교사 선택을 확인해주세요.', 403);
     const raw = randomBytes(32).toString('base64url');
     state.tokens.push({ hash: hashToken(raw), user_id: p.id, expires_at: Date.now() + (supabaseAccessToken ? 3500000 : 7 * 86400000), ...(supabaseAccessToken ? { supabase_access_token: supabaseAccessToken } : {}) });
@@ -68,20 +78,35 @@ export async function service(state, method, path, body, token) {
   if (path === '/logout') { state.tokens = state.tokens.filter(t => t !== auth); return { ok: true, _clearCookie: true }; }
   const teacher = p.role === 'teacher';
   if (path === '/bootstrap') {
-    const exams = state.exams.filter(e => teacher || (e.class_name === p.class_name && (!p.school || e.school === p.school) && e.active));
-    const attempts = state.examAttempts.filter(a => teacher || a.student_id === p.id);
-    const studentProfiles = state.profiles.filter(x => x.role === 'student');
-    return { profile: publicProfile(p), books: allBooks(state), stats: stats(state, p), mastery: state.mastery[p.id] || {},
+    const studentSchool = schoolForProfile(state, p);
+    const selectedSchool = teacher ? activeTeacherSchool(state, p) : studentSchool;
+    const visibleExams = state.exams.filter(e => teacher ? sameSchool(e, selectedSchool) : (e.class_name === p.class_name && sameSchool(e, studentSchool) && e.active));
+    const visibleExamIds = new Set(visibleExams.map(e => e.id));
+    const studentProfiles = state.profiles.filter(x => x.role === 'student' && (!teacher || sameSchool(x, selectedSchool)));
+    const studentIds = new Set(studentProfiles.map(s => s.id));
+    const sessions = state.sessions.filter(s => teacher ? studentIds.has(s.student_id) : s.student_id === p.id).sort((a, b) => b.created_at - a.created_at);
+    const attempts = state.examAttempts.filter(a => teacher ? visibleExamIds.has(a.exam_id) : a.student_id === p.id);
+    const books = allBooks(state).filter(b => !teacher || sameSchool(b, selectedSchool));
+    const schools = (teacher ? teacherSchools(state, p) : state.schools.filter(s => s.active !== false)).map(s => ({ id: s.id, name: s.name, full_name: s.full_name }));
+    const profile = { ...publicProfile(p), ...(teacher && selectedSchool ? { active_school_id: selectedSchool.id, active_school: selectedSchool.name } : {}) };
+    return { profile, schools, books, stats: stats(state, p), mastery: state.mastery[p.id] || {},
       profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s) })) : [],
-      sessions: state.sessions.filter(s => teacher || s.student_id === p.id).sort((a, b) => b.created_at - a.created_at), exams,
-      assignments: state.assignments.filter(a => teacher || (a.class_name === p.class_name && (!p.school || a.school === p.school) && a.active)),
+      sessions, exams: visibleExams,
+      assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
       attempts: attempts.map(a => attemptView(a, state, p)), server_time: Date.now(),
       active_practice: state.practices.find(x => x.student_id === p.id && !x.finished)?.id || null,
-      ranking: studentProfiles.filter(x => x.active && x.class_name === p.class_name).map(s => {
+      ranking: studentProfiles.filter(x => x.active && x.class_name === p.class_name && (!studentSchool || sameSchool(x, studentSchool))).map(s => {
         const records = mySessions(state, s.id), weekly = records.filter(r => r.created_at >= Date.now() - 7 * 86400000);
         const g = growthFor(records); return { id: s.id, display_name: s.display_name, avatar_key: s.avatar_key || 'lumi', level: g.level, streak: g.streak, xp: weekly.reduce((n, r) => n + r.xp, 0), total: weekly.reduce((n, r) => n + r.total, 0) };
       })
     };
+  }
+  if (path === '/teacher/school' && method === 'PATCH') {
+    requireRole(p, 'teacher');
+    const school = schoolByRef(state, body.school_id || body.school);
+    if (!school || !p.school_ids?.includes(school.id)) fail('담당 학교를 확인해주세요.', 403);
+    p.active_school_id = school.id;
+    return { active_school_id: school.id, active_school: school.name };
   }
   if (path === '/profile/style' && method === 'POST') {
     const growth = stats(state, p);
@@ -91,8 +116,10 @@ export async function service(state, method, path, body, token) {
   }
   if (path === '/students' && method === 'POST') {
     requireRole(p, 'teacher');
+    const school = schoolByRef(state, body.school_id || body.school);
+    if (!school || !p.school_ids?.includes(school.id)) fail('담당 학교를 확인해주세요.', 403);
     if (process.env.AUTH_PROVIDER === 'supabase') {
-      const response = await fetch(process.env.SUPABASE_URL + '/functions/v1/create-student', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: process.env.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + auth.supabase_access_token }, body: JSON.stringify({ username: body.username, password: body.password, display_name: body.display_name, class_name: body.class_name, school: body.school }), signal: AbortSignal.timeout(12000) });
+      const response = await fetch(process.env.SUPABASE_URL + '/functions/v1/create-student', { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: process.env.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + auth.supabase_access_token }, body: JSON.stringify({ username: body.username, password: body.password, display_name: body.display_name, class_name: body.class_name, school: school.name, school_id: school.id }), signal: AbortSignal.timeout(12000) });
       const result = await response.json(); if (!response.ok || result.error) fail(result.error || '기존 계정 생성 함수 연결을 확인해주세요.');
       const profiles = await fetch(process.env.SUPABASE_URL + '/rest/v1/profiles?username=eq.' + encodeURIComponent(str(body.username).toLowerCase()) + '&select=*', { headers: { apikey: process.env.SUPABASE_ANON_KEY, Authorization: 'Bearer ' + auth.supabase_access_token }, signal: AbortSignal.timeout(10000) });
       if (!profiles.ok) fail('계정은 생성됐지만 학생 목록을 불러오지 못했어요. 연결을 확인해주세요.');
@@ -103,8 +130,8 @@ export async function service(state, method, path, body, token) {
     if (!/^[a-z0-9_.-]{3,40}$/.test(username)) fail('아이디는 영문·숫자 3~40자로 입력해주세요.');
     if (state.profiles.some(p => p.username === username)) fail('이미 사용 중인 아이디입니다.');
     if (String(body.password || '').length < 8 || String(body.password).length > 128) fail('비밀번호는 8~128자로 입력해주세요.');
-    if (!str(body.display_name) || !str(body.class_name) || !['단원고', '선부고'].includes(body.school)) fail('이름, 반, 학교를 확인해주세요.');
-    const student = { id: id(), role: 'student', username, password_hash: await passwordHash(body.password), display_name: str(body.display_name, 40), class_name: str(body.class_name, 30), school: body.school, active: true, created_at: Date.now() };
+    if (!str(body.display_name) || !str(body.class_name)) fail('이름, 반, 학교를 확인해주세요.');
+    const student = { id: id(), role: 'student', username, password_hash: await passwordHash(body.password), display_name: str(body.display_name, 40), class_name: str(body.class_name, 30), school_id: school.id, school: school.name, active: true, created_at: Date.now() };
     state.profiles.push(student); return publicProfile(student);
   }
   if (/^\/students\/[^/]+$/.test(path) && method === 'PATCH') {
@@ -112,15 +139,18 @@ export async function service(state, method, path, body, token) {
     if (!student) fail('학생을 찾을 수 없습니다.', 404);
     if (typeof body.active === 'boolean') student.active = body.active;
     if (str(body.class_name)) student.class_name = str(body.class_name, 30);
+    if (body.school_id || body.school) { const school = schoolByRef(state, body.school_id || body.school); if (!school || !p.school_ids?.includes(school.id)) fail('담당 학교를 확인해주세요.', 403); student.school_id = school.id; student.school = school.name; }
     if (body.password) { if (process.env.AUTH_PROVIDER === 'supabase') fail('기존 Supabase 계정 관리에서 변경해주세요.'); if (body.password.length < 8) fail('비밀번호는 8자 이상 입력해주세요.'); student.password_hash = await passwordHash(body.password); state.tokens = state.tokens.filter(t => t.user_id !== student.id); }
     return publicProfile(student);
   }
   if ((path === '/exams' || path === '/assignments') && method === 'POST') {
     requireRole(p, 'teacher');
-    const words = scopedWords(state, body.school, body.range_codes);
+    const school = schoolByRef(state, body.school_id || body.school);
+    if (!school || !p.school_ids?.includes(school.id)) fail('담당 학교를 확인해주세요.', 403);
+    const words = scopedWords(state, school.id, body.range_codes);
     if (!str(body.title) || !str(body.class_name)) fail('제목과 반을 입력해주세요.');
     const due = Number(body.due_at); if (!Number.isFinite(due) || due <= Date.now()) fail('마감 시간을 확인해주세요.');
-    const common = { id: id(), teacher_id: p.id, title: str(body.title), class_name: str(body.class_name, 30), school: body.school, range_codes: [...new Set(body.range_codes.map(String))], book_id: words[0].book_id, active: true, created_at: Date.now(), due_at: due };
+    const common = { id: id(), teacher_id: p.id, title: str(body.title), class_name: str(body.class_name, 30), school_id: school.id, school: school.name, range_codes: [...new Set(body.range_codes.map(String))], book_id: words[0].book_id, active: true, created_at: Date.now(), due_at: due };
     if (path === '/assignments') { const a = { ...common, target_questions: integer(body.target_questions, 5, 500, '목표 학습량') }; state.assignments.unshift(a); return a; }
     if (!EXAM_TYPES[body.exam_type]) fail('시험 유형을 선택해주세요.');
     const available = Number(body.available_at); if (!Number.isFinite(available) || available >= due) fail('시작 시간은 마감 시간보다 빨라야 합니다.');
@@ -129,13 +159,15 @@ export async function service(state, method, path, body, token) {
   }
   if (/^\/exams\/[^/]+$/.test(path) && method === 'PATCH') {
     requireRole(p, 'teacher'); const e = state.exams.find(e => e.id === path.split('/')[2]); if (!e) fail('시험을 찾을 수 없습니다.', 404);
+    if (!sameSchool(e, activeTeacherSchool(state, p))) fail('현재 관리 중인 학교의 시험이 아닙니다.', 403);
     if (typeof body.active === 'boolean') e.active = body.active;
     if (typeof body.release_result === 'boolean') e.release_result = body.release_result;
     return e;
   }
   if (path === '/exams/start' && method === 'POST') {
     requireRole(p, 'student');
-    const e = state.exams.find(e => e.id === body.exam_id && e.class_name === p.class_name && (!p.school || e.school === p.school) && e.active);
+    const studentSchool = schoolForProfile(state, p);
+    const e = state.exams.find(e => e.id === body.exam_id && e.class_name === p.class_name && sameSchool(e, studentSchool) && e.active);
     if (!e) fail('배정된 시험이 아닙니다.', 403);
     const existing = state.examAttempts.find(a => a.exam_id === e.id && a.student_id === p.id && a.status === 'active');
     if (existing) { existing.lease = id(); return { attempt: attemptView(existing, state, p), exam: e, server_time: Date.now() }; }
@@ -147,6 +179,7 @@ export async function service(state, method, path, body, token) {
   }
   if (/^\/attempts\/[^/]+(?:\/(?:draft|submit))?$/.test(path)) {
     const a = state.examAttempts.find(a => a.id === path.split('/')[2] && (teacher || a.student_id === p.id)); if (!a) fail('응시 기록을 찾을 수 없습니다.', 404);
+    if (teacher && !sameSchool(state.exams.find(e => e.id === a.exam_id), activeTeacherSchool(state, p))) fail('현재 관리 중인 학교의 응시 기록이 아닙니다.', 403);
     if (a.status === 'active' && method !== 'GET') {
       requireRole(p, 'student');
       if (body.lease !== a.lease) fail('다른 탭이나 기기에서 시험을 열었습니다. 시험 목록에서 다시 이어주세요.', 409);
@@ -167,10 +200,11 @@ export async function service(state, method, path, body, token) {
     requireRole(p, 'student');
     const active = state.practices.find(x => x.student_id === p.id && !x.finished);
     if (active) return practiceView(active, state);
-    const words = scopedWords(state, body.school, body.range_codes);
+    const school = schoolByRef(state, body.school_id || body.school);
+    const words = scopedWords(state, school?.id, body.range_codes);
     if (!PRACTICE_TYPES[body.mode]) fail('연습 방식을 선택해주세요.');
-    const x = { id: id(), student_id: p.id, school: body.school, range_codes: body.range_codes, mode: body.mode, assignment_id: null, target: integer(body.target || 10, 5, 40, '학습량'), total: 0, correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: Date.now(), finished: false, responses: {}, words: words.map(w => w.id) };
-    if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && a.school === x.school && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
+    const x = { id: id(), student_id: p.id, school_id: school.id, school: school.name, range_codes: body.range_codes, mode: body.mode, assignment_id: null, target: integer(body.target || 10, 5, 40, '학습량'), total: 0, correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: Date.now(), finished: false, responses: {}, words: words.map(w => w.id) };
+    if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
   if (/^\/practice\/[^/]+(?:\/(?:answer|next|finish))?$/.test(path)) {
@@ -204,7 +238,7 @@ function nextPractice(x, state) {
 function finishPractice(x, state) {
   x.finished = true;
   if (!x.total) return;
-  const rec = { id: x.id, student_id: x.student_id, assignment_id: x.assignment_id, school: x.school, range_codes: x.range_codes, mode: x.mode, correct: x.correct, total: x.total, xp: x.xp, best_combo: x.best, duration_sec: Math.round((Date.now() - x.started_at) / 1000), created_at: Date.now() };
+  const rec = { id: x.id, student_id: x.student_id, assignment_id: x.assignment_id, school_id: x.school_id, school: x.school, range_codes: x.range_codes, mode: x.mode, correct: x.correct, total: x.total, xp: x.xp, best_combo: x.best, duration_sec: Math.round((Date.now() - x.started_at) / 1000), created_at: Date.now() };
   if (!state.sessions.some(s => s.id === rec.id)) state.sessions.push(rec);
 }
 function practiceView(x, state) {
