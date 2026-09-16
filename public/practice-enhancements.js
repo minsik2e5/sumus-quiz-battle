@@ -10,6 +10,14 @@ function injectStyles() {
     .sumus-practice-live .question-area{padding-bottom:max(28px,env(safe-area-inset-bottom))}
     .mode-option:first-child{flex-wrap:wrap}
     .mode-option .mode-help{flex-basis:100%;padding-left:25px;margin-top:-4px;font-size:10px;font-weight:500;color:#7b89aa}
+    .practice-amount{margin-top:22px}
+    .practice-target-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-top:10px}
+    .practice-target-grid button{min-height:54px;border:1px solid #dfe4ec;border-radius:14px;background:#fff;color:#344054;font-size:17px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:4px;transition:.16s ease}
+    .practice-target-grid button small{font-size:10px;font-weight:550;color:#98a2b3}
+    .practice-target-grid button.all{grid-column:1/-1;min-height:62px;flex-direction:column;gap:3px}
+    .practice-target-grid button.all b{font-size:14px}
+    .practice-target-grid button.selected{border:2px solid #6f91ed;background:#eef3ff;color:#315ac7;box-shadow:0 7px 18px rgba(49,90,199,.12)}
+    .practice-target-grid button.selected small{color:#5875bd}
     .sumus-practice-live .question-prompt{letter-spacing:-.025em}
     .sumus-practice-live .option{transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease,background .14s ease}
     .sumus-practice-live .option:not(:disabled):active{transform:scale(.985)}
