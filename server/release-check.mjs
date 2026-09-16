@@ -82,6 +82,14 @@ export async function runReleaseCheck() {
     }
     assert(state.exams.length === 4, 'teacher can create all four exam types');
 
+    const allWordsExam = await service(state, 'POST', '/exams', {
+      title: 'QA 중3 전체 단어', class_name: '중3', school: '단원고', range_codes: [rangeCode], exam_type: 'eng2mean_mc',
+      question_count: 'all', duration_sec: 300, passing_score: 70, max_attempts: 1,
+      available_at: now - 1000, due_at: now + 3600000, release_result: true
+    }, teacherToken);
+    const scopedRangeCount = danwonWords.filter(word => String(word.range_code) === rangeCode).length;
+    assert(allWordsExam.class_name === '중3' && allWordsExam.question_count === scopedRangeCount, 'exam supports selectable class and all scoped words');
+
     const bootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
     assert(bootstrap.exams.length === 4 && bootstrap.assignments.length === 1, 'student receives assigned exam and practice task');
 

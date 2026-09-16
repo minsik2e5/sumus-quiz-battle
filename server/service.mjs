@@ -154,7 +154,14 @@ export async function service(state, method, path, body, token) {
     if (path === '/assignments') { const a = { ...common, target_questions: integer(body.target_questions, 5, 500, '목표 학습량') }; state.assignments.unshift(a); return a; }
     if (!EXAM_TYPES[body.exam_type]) fail('시험 유형을 선택해주세요.');
     const available = Number(body.available_at); if (!Number.isFinite(available) || available >= due) fail('시작 시간은 마감 시간보다 빨라야 합니다.');
-    const e = { ...common, exam_type: body.exam_type, question_count: integer(body.question_count, 1, Math.min(100, words.length), '문제 수'), duration_sec: integer(body.duration_sec, 5, 10800, '제한시간'), available_at: available, passing_score: integer(body.passing_score, 0, 100, '통과 점수'), max_attempts: integer(body.max_attempts, 1, 10, '응시 횟수'), release_result: body.release_result === true };
+    // The UI offers 10/20/30 or all words. Resolve "all" against the
+    // selected school/ranges so the stored exam remains a concrete question
+    // count for students and grading, while keeping numeric API callers
+    // backwards-compatible.
+    const questionCount = body.question_count === 'all'
+      ? words.length
+      : integer(body.question_count, 1, Math.min(500, words.length), '문제 수');
+    const e = { ...common, exam_type: body.exam_type, question_count: questionCount, duration_sec: integer(body.duration_sec, 5, 10800, '제한시간'), available_at: available, passing_score: integer(body.passing_score, 0, 100, '통과 점수'), max_attempts: integer(body.max_attempts, 1, 10, '응시 횟수'), release_result: body.release_result === true };
     state.exams.unshift(e); return e;
   }
   if (/^\/exams\/[^/]+$/.test(path) && method === 'PATCH') {

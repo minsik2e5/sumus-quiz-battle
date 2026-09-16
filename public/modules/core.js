@@ -4,6 +4,9 @@ export const EXAM_TYPES = {
   write_en: { label: '영어쓰기', help: '뜻을 보고 영어 직접 쓰기', input: true },
   write_meaning: { label: '뜻쓰기', help: '영어를 보고 뜻 직접 쓰기', input: true }
 };
+// Shared class roster used by teacher assignment forms. Keep values stable so
+// student visibility (school + class match) remains deterministic.
+export const CLASS_OPTIONS = ['고1A', '고1B', '중3', '중2'];
 export const PRACTICE_TYPES = {
   write_meaning: '뜻 직접 쓰기', mixed: '골고루 연습', eng2mean: '영어 → 뜻', mean2eng: '뜻 → 영어',
   spell: '영어 철자 입력', listen: '듣기', scramble: '철자 배열', vowelblank: '모음 빈칸', initial: '첫 글자 힌트'
