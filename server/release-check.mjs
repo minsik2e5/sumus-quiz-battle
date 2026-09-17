@@ -146,9 +146,10 @@ export async function runReleaseCheck() {
       assert(started.question.type === practiceType, `${practiceType} practice starts correctly`);
       const word = allWords.find(item => item.id === started.question.word_id);
       const result = await service(state, 'POST', `/practice/${started.id}/answer`, {
-        question_id: started.question_id, answer: answerFor(practiceType, word)
+        question_id: started.question_id, answer: answerFor(practiceType, word), prefetch_next: true
       }, studentToken);
       assert(result.feedback?.ok === true, `${practiceType} accepts correct answer`);
+      assert(result.prefetched_next?.question_id !== started.question_id, `${practiceType} prepares the next question in one request`);
       const repeated = await service(state, 'POST', `/practice/${started.id}/answer`, {
         question_id: started.question_id, answer: answerFor(practiceType, word)
       }, studentToken);

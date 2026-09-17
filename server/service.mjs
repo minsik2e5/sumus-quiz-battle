@@ -242,16 +242,28 @@ export async function service(state, method, path, body, token) {
       else { x.combo = 0; m.wrong++; m.streak = 0; m.mastery = clamp(m.mastery - 8, 0, 100); if (!x.retry.some(r => r.id === word.id)) x.retry.push({ id: word.id, at: x.total + 2 }); }
       m.last_seen = Date.now(); m.next_review_at = Date.now() + (ok ? 3600000 + m.mastery * 864000 : 120000);
       x.feedback = { ok, gain, mastery: m.mastery, word: displayEnglish(word.word), meaning: word.meaning, combo: x.combo, retry: !ok, milestone: ok && [5, 10].includes(x.combo) };
-      const result = practiceView(x, state); x.responses[body.question_id] = structuredClone(result); return result;
+      const result = practiceView(x, state);
+      // Prepare the following question in the same persisted mutation. The
+      // client can still show this answer's feedback, then switch instantly
+      // without a second database round trip.
+      if (body.prefetch_next === true) {
+        advancePractice(x, state);
+        result.prefetched_next = practiceView(x, state);
+      }
+      x.responses[body.question_id] = structuredClone(result); return result;
     }
     if (path.endsWith('/next') && !x.finished && x.feedback) {
-      const covered = !x.cover_all || (x.seen?.length || 0) >= x.words.length;
-      if (covered && x.total >= x.target && (!x.retry.length || x.total >= x.target + 12)) finishPractice(x, state); else nextPractice(x, state);
+      advancePractice(x, state);
     }
     if (path.endsWith('/finish') && !x.finished) finishPractice(x, state);
     return practiceView(x, state);
   }
   fail('요청한 기능을 찾을 수 없습니다.', 404);
+}
+function advancePractice(x, state) {
+  const covered = !x.cover_all || (x.seen?.length || 0) >= x.words.length;
+  if (covered && x.total >= x.target && (!x.retry.length || x.total >= x.target + 12)) finishPractice(x, state);
+  else nextPractice(x, state);
 }
 function nextPractice(x, state) {
   const words = allBooks(state).flatMap(b => b.words).filter(w => x.words.includes(w.id));

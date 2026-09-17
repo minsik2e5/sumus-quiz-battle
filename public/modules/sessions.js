@@ -1,7 +1,7 @@
 import { api, $, $$, icon, esc, time, date, scope, toast, modal, buttonBusy } from './ui.js';
 import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, levelInfo } from './core.js';
 import { avatar } from './character.js';
-let A, redraw, refresh, examState = null, practiceState = null, timer, saving = Promise.resolve(), inputVersion = 0, dirty = false, syncError = '', debounce, audio;
+let A, redraw, refresh, examState = null, practiceState = null, prefetchedPractice = null, practiceAdvanceTimer = null, timer, saving = Promise.resolve(), inputVersion = 0, dirty = false, syncError = '', debounce, audio;
 export function configureSessions(state, render, reload) { A = state; redraw = render; refresh = reload; }
 const mount = html => { $('#app').innerHTML = html; window.scrollTo(0, 0); };
 const draftKey = () => `sumus:v12:exam:${A.data.profile.id}:${examState.attempt.id}`;
@@ -10,7 +10,7 @@ function localSave() {
   try { localStorage.setItem(draftKey(), JSON.stringify({ answers: examState.attempt.answers, index: examState.index, revision: examState.attempt.revision, dirty })); }
   catch { syncError = '이 기기에 임시 저장하지 못했어요. 서버 저장 상태를 확인해주세요.'; }
 }
-export function leaveSession() { clearInterval(timer); clearTimeout(debounce); timer = null; A.screen = null; }
+export function leaveSession() { clearInterval(timer); clearTimeout(debounce); clearTimeout(practiceAdvanceTimer); timer = null; practiceAdvanceTimer = null; prefetchedPractice = null; A.screen = null; }
 export async function openExam(eid) {
   const e = A.data.exams.find(e => e.id === eid); if (!e) return;
   const close = modal(`<span class="pill">실전시험</span><h2>${esc(e.title)}</h2><p>${e.school} · ${esc(scope(e))}</p><div class="detail-grid"><div><b>${EXAM_TYPES[e.exam_type].label}</b><small>한 가지 유형으로 출제</small></div><div><b>${e.question_count}문제</b><small>제한시간 ${Math.round(e.duration_sec / 60)}분</small></div><div><b>${e.max_attempts}회</b><small>응시 가능 횟수</small></div><div><b>${e.passing_score}점</b><small>통과 기준</small></div></div><div class="exam-info">${icon('clock')}<p>시작하면 시간이 흐릅니다.<br>시간이 끝나면 저장된 답안이 자동 제출돼요.</p></div><button class="btn ink full" id="begin-exam">${A.data.attempts.some(a => a.exam_id === eid && a.status === 'active') ? '이어서 응시하기' : '시험 시작하기'}</button>`, '실전시험 시작');
@@ -132,7 +132,7 @@ function showExamResult(data) {
 export async function startPractice() {
   const old = A.data.active_practice;
   const data = old ? await api(`/practice/${old}`) : await api('/practice/start', { school: A.school, range_codes: A.ranges[A.school], mode: A.mode, target: A.target === 'all' ? undefined : A.target, cover_all: A.target === 'all', assignment_id: A.assignmentId });
-  leaveSession(); practiceState = data; A.screen = 'practice'; renderPractice();
+  leaveSession(); practiceState = data; prefetchedPractice = null; A.screen = 'practice'; renderPractice();
 }
 function renderPractice() {
   const x = practiceState; if (x.finished) return finishPracticeView();
@@ -148,18 +148,35 @@ function renderPractice() {
   $$('[data-practice-choice]').forEach(b => b.onclick = () => answerPractice(q.options[Number(b.dataset.practiceChoice)], b));
   $('#practice-confirm')?.addEventListener('click', () => { const value = $('#practice-answer').value; if (!value.trim()) return toast('답을 입력해주세요.'); answerPractice(value); });
   $('#practice-answer')?.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) $('#practice-confirm')?.click(); });
-  $('#practice-next')?.addEventListener('click', async e => { buttonBusy(e.currentTarget); try { practiceState = await api(`/practice/${x.id}/next`, {}); renderPractice(); } catch (err) { toast(err.message); buttonBusy($('#practice-next'), false); } });
+  $('#practice-next')?.addEventListener('click', e => advancePracticeScreen(e.currentTarget, x));
 }
 function feedbackHtml(f) { return `<div class="feedback ${f.ok ? '' : 'wrong shake'}" role="status"><span class="gain">${f.ok ? '+' + f.gain + 'P' : ''}</span><b>${f.ok ? `정답! ${f.combo > 1 ? f.combo + '연속 성공' : '제대로 맞혔어요'}` : '기억해두면, 다시 맞힐 수 있어요'}</b><p>${f.ok ? `숙련도 ${f.mastery}% 상승` : `${esc(f.word)} · ${esc(f.meaning)}<br>잠시 뒤 다시 나와요.`}</p><div class="progress"><i style="width:${f.mastery}%"></i></div></div>${f.milestone ? `<div class="milestone-toast">${f.combo}연속 정답. 좋은 흐름이에요.</div>` : ''}`; }
 let answering = false;
+async function advancePracticeScreen(button, answeredState) {
+  if (practiceState !== answeredState) return;
+  clearTimeout(practiceAdvanceTimer); practiceAdvanceTimer = null;
+  if (prefetchedPractice) {
+    practiceState = prefetchedPractice; prefetchedPractice = null; renderPractice(); return;
+  }
+  buttonBusy(button);
+  try { practiceState = await api(`/practice/${answeredState.id}/next`, {}); renderPractice(); }
+  catch (err) { toast(err.message); buttonBusy($('#practice-next'), false); }
+}
 async function answerPractice(answer, button) {
   if (answering || practiceState.feedback) return;
   answering = true; const x = practiceState;
   $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = true);
-  try { const result = await api(`/practice/${x.id}/answer`, { question_id: x.question_id, answer }); practiceState = result; renderPractice();
+  try { const result = await api(`/practice/${x.id}/answer`, { question_id: x.question_id, answer, prefetch_next: true });
+    prefetchedPractice = result.prefetched_next || null; delete result.prefetched_next; practiceState = result; renderPractice();
     if (!result.feedback.ok && button) { const index = button.dataset.practiceChoice; $(`[data-practice-choice="${index}"]`)?.classList.add('wrong'); }
     if (result.feedback.ok) navigator.vibrate?.([24, 34, 42]); else navigator.vibrate?.([12, 25, 12]);
     if (A.sound) sound(result.feedback.ok, result.feedback.milestone);
+    // Correct answers keep a short impact beat, then move on without another
+    // tap or network wait. Wrong answers stay visible for review.
+    if (result.feedback.ok && prefetchedPractice) {
+      clearTimeout(practiceAdvanceTimer);
+      practiceAdvanceTimer = setTimeout(() => advancePracticeScreen($('#practice-next'), result), 650);
+    }
   } catch (e) { $('#practice-error').innerHTML = `<div class="error-box">${esc(e.message)} 답안은 다시 눌러 전송할 수 있어요.</div>`; $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = false); }
   finally { answering = false; }
 }
