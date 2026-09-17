@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13-pwa-3';
+const VERSION = 'sumus-voca-v13-stability-1';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -65,14 +65,18 @@ self.addEventListener('fetch', event => {
 
   event.respondWith((async () => {
     const cached = await caches.match(req);
-    const network = fetch(req, { cache: 'no-store' }).then(async response => {
+    const network = fetch(req).then(async response => {
       if (response.ok) {
         const cache = await caches.open(STATIC_CACHE);
         cache.put(req, response.clone());
       }
       return response;
     }).catch(() => null);
-    return (await network) || cached || Response.error();
+    if (cached) {
+      event.waitUntil(network);
+      return cached;
+    }
+    return (await network) || Response.error();
   })());
 });
 

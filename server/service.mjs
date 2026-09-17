@@ -22,8 +22,8 @@ export function scopedWords(state, schoolRef, ranges) {
   return words.filter(w => ranges.map(String).includes(w.range_code));
 }
 function mySessions(state, student) { return state.sessions.filter(s => s.student_id === student); }
-function stats(state, p) {
-  const sessions = mySessions(state, p.id), today = sessions.filter(s => dayKey(s.created_at) === dayKey(Date.now()));
+function stats(state, p, sessions = mySessions(state, p.id)) {
+  const today = sessions.filter(s => dayKey(s.created_at) === dayKey(Date.now()));
   const recent = [...sessions].sort((a, b) => b.created_at - a.created_at).slice(0, 20);
   const total = recent.reduce((n, s) => n + s.total, 0), correct = recent.reduce((n, s) => n + s.correct, 0);
   return { ...growthFor(sessions), today_total: today.reduce((n, s) => n + s.total, 0), today_xp: today.reduce((n, s) => n + s.xp, 0), practice_count: sessions.length, accuracy: total ? Math.round(correct / total * 100) : 0, weak: Object.values(state.mastery[p.id] || {}).filter(m => m.wrong > 0 && m.mastery < 80).length };
@@ -34,6 +34,12 @@ function attemptView(a, state, profile) {
   return { id: a.id, exam_id: a.exam_id, student_id: a.student_id, status: a.status, started_at: a.started_at, deadline: a.deadline, submitted_at: a.submitted_at, auto_submitted: a.auto_submitted, total: a.questions.length,
     ...(a.status === 'active' ? { questions: a.questions, answers: a.answers, revision: a.revision, lease: a.lease } : {}),
     ...(reveal ? { score: a.score, correct: a.correct, details: a.details } : {}) };
+}
+function attemptSummary(a, state, profile) {
+  const view = attemptView(a, state, profile);
+  if (a.status === 'active' && profile.role === 'student') return view;
+  const { questions, answers, details, lease, revision, ...summary } = view;
+  return summary;
 }
 function finishExam(a, state, auto = false) {
   if (a.status === 'submitted') return;
@@ -85,19 +91,26 @@ export async function service(state, method, path, body, token) {
     const studentProfiles = state.profiles.filter(x => x.role === 'student' && (!teacher || sameSchool(x, selectedSchool)));
     const studentIds = new Set(studentProfiles.map(s => s.id));
     const sessions = state.sessions.filter(s => teacher ? studentIds.has(s.student_id) : s.student_id === p.id).sort((a, b) => b.created_at - a.created_at);
+    const sessionsByStudent = new Map();
+    if (teacher) for (const session of sessions) {
+      if (!sessionsByStudent.has(session.student_id)) sessionsByStudent.set(session.student_id, []);
+      sessionsByStudent.get(session.student_id).push(session);
+    }
     const attempts = state.examAttempts.filter(a => teacher ? visibleExamIds.has(a.exam_id) : a.student_id === p.id);
-    const books = allBooks(state).filter(b => !teacher || sameSchool(b, selectedSchool));
+    const books = allBooks(state).filter(b => sameSchool(b, selectedSchool));
     const schools = (teacher ? teacherSchools(state, p) : state.schools.filter(s => s.active !== false)).map(s => ({ id: s.id, name: s.name, full_name: s.full_name }));
     const profile = { ...publicProfile(p), ...(teacher && selectedSchool ? { active_school_id: selectedSchool.id, active_school: selectedSchool.name } : {}) };
     return { profile, schools, books, stats: stats(state, p), mastery: state.mastery[p.id] || {},
-      profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s) })) : [],
+      profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
       sessions, exams: visibleExams,
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
-      attempts: attempts.map(a => attemptView(a, state, p)), server_time: Date.now(),
+      attempts: attempts.map(a => attemptSummary(a, state, p)), server_time: Date.now(),
       active_practice: state.practices.find(x => x.student_id === p.id && !x.finished)?.id || null,
-      ranking: studentProfiles.filter(x => x.active && x.class_name === p.class_name && (!studentSchool || sameSchool(x, studentSchool))).map(s => {
+      ranking: teacher ? [] : state.profiles.filter(x => x.active && x.role === 'student').map(s => {
         const records = mySessions(state, s.id), weekly = records.filter(r => r.created_at >= Date.now() - 7 * 86400000);
-        const g = growthFor(records); return { id: s.id, display_name: s.display_name, avatar_key: s.avatar_key || 'lumi', level: g.level, streak: g.streak, xp: weekly.reduce((n, r) => n + r.xp, 0), total: weekly.reduce((n, r) => n + r.total, 0) };
+        const g = growthFor(records), isMe = s.id === p.id;
+        const hidden = !isMe && (s.ranking_public === false || s.share_profile === false);
+        return { id: hidden ? null : s.id, is_me: isMe, private: hidden, display_name: hidden ? '비공개 학생' : s.display_name, avatar_key: hidden ? 'lumi' : (s.avatar_key || 'lumi'), level: hidden ? 1 : g.level, streak: g.streak, xp: weekly.reduce((n, r) => n + r.xp, 0), total: weekly.reduce((n, r) => n + r.total, 0) };
       })
     };
   }

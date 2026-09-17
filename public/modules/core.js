@@ -87,7 +87,8 @@ export function choosePracticeWord(words, mastery, state, random = Math.random) 
   let roll = random() * weighted.reduce((n, v) => n + v.weight, 0);
   return (weighted.find(v => (roll -= v.weight) <= 0) || weighted.at(-1)).w;
 }
-export const dayKey = ts => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' }).format(new Date(ts));
+const dayFormatter = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' });
+export const dayKey = ts => dayFormatter.format(new Date(ts));
 export function growthFor(sessions) {
   const points = sessions.reduce((n, s) => n + (s.xp || 0), 0);
   const days = new Set(sessions.filter(s => s.total > 0).map(s => dayKey(s.created_at)));

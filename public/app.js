@@ -10,7 +10,7 @@ function preferences() {
   try { const v = JSON.parse(localStorage.getItem('sumus:v13:prefs:' + A.data.profile.id) || localStorage.getItem('sumus:v12:prefs:' + A.data.profile.id) || '{}'); A.ranges = v.ranges || {}; A.school = A.data.profile.role === 'teacher' ? A.data.profile.active_school : v.school || A.data.profile.school || A.data.schools[0]?.name || '단원고'; A.mode = v.mode || 'write_meaning'; A.target = v.target || 30; A.sound = localStorage.getItem('sumus:sound') === 'true'; } catch {}
 }
 function savePreferences() { try { localStorage.setItem('sumus:v13:prefs:' + A.data.profile.id, JSON.stringify({ ranges: A.ranges, school: A.school, mode: A.mode, target: A.target })); } catch {} }
-async function refresh() { A.data = await api('/bootstrap'); if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; }
+async function refresh() { A.data = await api('/bootstrap'); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; }
 function render() {
   if (!A.data || A.screen) return;
   $('#app').innerHTML = A.data.profile.role === 'teacher' ? teacherPage(A) : studentPage(A);
@@ -37,7 +37,7 @@ function startPolling() {
     if (!A.data || A.screen || document.visibilityState !== 'visible' || A.tab === 'exam-create' || $('#modal-root').children.length) return;
     try { await refresh(); if (['home', 'exam', 'ranking', 'dashboard', 'exams', 'results'].includes(A.tab)) render(); }
     catch (err) { if (err.status === 401) { clearInterval(poll); A.data = null; loginView(); } }
-  }, 15000);
+  }, 60000);
 }
 $('#app').addEventListener('click', async event => {
   const b = event.target.closest('button'); if (!b || b.disabled || !A.data || A.screen) return;

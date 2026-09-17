@@ -32,8 +32,23 @@ const repo = await repository(dbPath);
     await repo.commit(state, revision);
   }
 }
+let snapshotCache = await repo.read();
 let tail = Promise.resolve();
 const serial = fn => { const next = tail.then(fn, fn); tail = next.catch(() => {}); return next; };
+const commitMutation = fn => serial(async () => {
+  const state = structuredClone(snapshotCache.state);
+  const revision = snapshotCache.revision;
+  const output = await fn(state);
+  try {
+    await repo.commit(state, revision);
+  } catch (error) {
+    snapshotCache = await repo.read();
+    if (!error.status) error.status = 409;
+    throw error;
+  }
+  snapshotCache = { state, revision: revision + 1 };
+  return output;
+});
 const rates = new Map();
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
 function rateLimit(bucket, max, windowMs, message) {
@@ -60,14 +75,17 @@ const server = http.createServer(async (req, res) => {
       const supplied = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
       if (!expected || supplied !== expected) throw Object.assign(Error('허용되지 않은 요청입니다.'), { status: 403 });
       if (url.pathname === '/internal/state/read') {
-        const snapshot = await serial(() => repo.read());
+        const snapshot = { state: structuredClone(snapshotCache.state), revision: snapshotCache.revision };
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify(snapshot)); return;
       }
       if (url.pathname === '/internal/state/commit') {
         const body = await readJson(req, 5000000);
         if (!Number.isInteger(Number(body.revision)) || !body.state || typeof body.state !== 'object') throw Object.assign(Error('저장 요청을 확인해주세요.'), { status: 400 });
-        await serial(() => repo.commit(body.state, Number(body.revision)));
+        await serial(async () => {
+          await repo.commit(body.state, Number(body.revision));
+          snapshotCache = { state: structuredClone(body.state), revision: Number(body.revision) + 1 };
+        });
         res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
         res.end(JSON.stringify({ ok: true })); return;
       }
@@ -95,20 +113,18 @@ const server = http.createServer(async (req, res) => {
       }
       if (rates.size > 10000) for (const [k, values] of rates) if (values.at(-1) < Date.now() - 30 * 60000) rates.delete(k);
       const token = (req.headers.cookie || '').split(';').map(s => s.trim()).find(s => s.startsWith('sumus_session='))?.slice(14) || '';
-      const result = await serial(async () => {
-        const snapshot = await repo.read(), state = snapshot.state;
-        let revision = snapshot.revision;
-        if (sweep(state)) { await repo.commit(state, revision); revision++; }
+      const execute = async state => {
         const path = url.pathname.slice(4);
         const adminOutput = await examAdmin(state, req.method, path, body, token);
-        const output = adminOutput !== undefined
+        return adminOutput !== undefined
           ? adminOutput
           : url.pathname === '/api/signup' && req.method === 'POST'
             ? await selfSignup(state, body)
             : await service(state, req.method, path, body, token);
-        if (req.method !== 'GET') await repo.commit(state, revision);
-        return output;
-      });
+      };
+      const result = req.method === 'GET'
+        ? await execute(snapshotCache.state)
+        : await commitMutation(execute);
       const secure = process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production';
       if (result._cookie) { res.setHeader('Set-Cookie', `sumus_session=${result._cookie}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800${secure ? '; Secure' : ''}`); delete result._cookie; }
       if (result._clearCookie) { res.setHeader('Set-Cookie', 'sumus_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'); delete result._clearCookie; }
@@ -119,7 +135,10 @@ const server = http.createServer(async (req, res) => {
     if (!path.startsWith(root + sep) && path !== root) { res.writeHead(403); res.end(); return; }
     const s = await stat(path); if (!s.isFile()) throw Error('not found');
     res.setHeader('Content-Type', mime[extname(path)] || 'application/octet-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    const extension = extname(path);
+    res.setHeader('Cache-Control', extension === '.html' || url.pathname === '/sw.js'
+      ? 'no-cache'
+      : 'public, max-age=3600, stale-while-revalidate=86400');
     res.end(req.method === 'HEAD' ? undefined : await readFile(path));
   } catch (e) {
     const internal = url.pathname.startsWith('/internal/');
@@ -129,9 +148,18 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({ error: status === 500 ? '저장 서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.' : e.message }));
   }
 });
-const timer = setInterval(() => serial(async () => { const { state, revision } = await repo.read(); if (sweep(state)) await repo.commit(state, revision); }).catch(e => console.error('[deadline]', e.message)), 1000);
+const timer = setInterval(() => serial(async () => {
+  const state = structuredClone(snapshotCache.state);
+  if (!sweep(state)) return;
+  const revision = snapshotCache.revision;
+  await repo.commit(state, revision);
+  snapshotCache = { state, revision: revision + 1 };
+}).catch(async e => {
+  console.error('[deadline]', e.message);
+  snapshotCache = await repo.read().catch(() => snapshotCache);
+}), 5000);
 timer.unref();
 const port = Number(process.env.PORT || 3000);
-server.listen(port, process.env.HOST || '0.0.0.0', () => console.log(`SUMUS VOCA http://localhost:${port}`));
+server.listen(port, process.env.HOST || '0.0.0.0', () => console.log(`SUMUS VOCA http://localhost:${server.address().port}`));
 async function shutdown() { clearInterval(timer); server.close(); await tail; repo.close(); process.exit(0); }
 process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown);

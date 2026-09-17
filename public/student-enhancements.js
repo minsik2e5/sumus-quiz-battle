@@ -38,6 +38,7 @@ function injectStyles() {
 }
 
 async function bootstrap(force = false) {
+  if (!force && globalThis.__SUMUS_BOOTSTRAP__) return globalThis.__SUMUS_BOOTSTRAP__;
   if (!force && cache && Date.now() - cacheAt < 12000) return cache;
   cache = await api('/bootstrap');
   cacheAt = Date.now();
@@ -75,7 +76,7 @@ async function enhanceHome() {
   if (!document.querySelector('.student-app') || !document.querySelector('.home-title')) return;
   if (document.querySelector('#sumus-student-insights')) return;
   injectStyles();
-  const data = await bootstrap(true);
+  const data = await bootstrap();
   if (!document.querySelector('.home-title') || document.querySelector('#sumus-student-insights')) return;
 
   const week = weekStats(data);

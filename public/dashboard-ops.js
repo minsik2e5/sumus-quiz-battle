@@ -59,6 +59,7 @@ function injectStyles() {
 }
 
 async function bootstrap(force = false) {
+  if (!force && globalThis.__SUMUS_BOOTSTRAP__) return globalThis.__SUMUS_BOOTSTRAP__;
   if (!force && cache && Date.now() - cacheAt < 10000) return cache;
   cache = await api('/bootstrap');
   cacheAt = Date.now();
@@ -173,7 +174,7 @@ async function enhanceDashboard() {
   const metrics = document.querySelector('.teacher-main .teacher-metrics');
   if (!metrics || document.querySelector('#ops-dashboard')) return;
   injectStyles();
-  const data = await bootstrap(true);
+  const data = await bootstrap();
   if (!document.querySelector('button[data-go="dashboard"].active') || document.querySelector('#ops-dashboard')) return;
   const calc = calculate(data);
   const top = calc.weekly[0];

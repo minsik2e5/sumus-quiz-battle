@@ -29,10 +29,13 @@ export async function runReleaseCheck() {
   try {
     const allWords = builtinBooks.flatMap(book => book.words || []);
     const bySchool = school => builtinBooks.filter(book => book.school === school).flatMap(book => book.words || []);
-    assert(allWords.length === 744, 'vocabulary total = 744');
+    assert(allWords.length === 1046, 'vocabulary total = 1046');
     assert(bySchool('단원고').length === 362, '단원고 vocabulary = 362');
     assert(bySchool('선부고').length === 330, '선부고 vocabulary = 330');
-    assert(bySchool('강서고').length === 52, '강서고 vocabulary = 52');
+    const gangseoWords = bySchool('강서고');
+    assert(gangseoWords.length === 354, '강서고 vocabulary = 354');
+    const expectedGangseoRanges = { 21: 31, 23: 21, 29: 41, 30: 31, 31: 32, 32: 26, 33: 22, 34: 27, 36: 32, 37: 22, 38: 25, 39: 25, 40: 19 };
+    assert(Object.entries(expectedGangseoRanges).every(([range, count]) => gangseoWords.filter(word => String(word.range_code) === range).length === count), '강서고 range counts match source');
     assert(new Set(allWords.map(word => word.id)).size === allWords.length, 'vocabulary ids are unique');
     assert(Object.keys(EXAM_TYPES).join(',') === 'eng2mean_mc,mean2eng_mc,write_en,write_meaning', 'exactly four exam types');
     const practiceTypes = ['write_meaning', 'eng2mean', 'mean2eng', 'spell', 'listen', 'scramble', 'vowelblank', 'initial'];
@@ -92,6 +95,7 @@ export async function runReleaseCheck() {
 
     const bootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
     assert(bootstrap.exams.length === 4 && bootstrap.assignments.length === 1, 'student receives assigned exam and practice task');
+    assert(bootstrap.books.length > 0 && bootstrap.books.every(book => book.school === '단원고'), 'student bootstrap only includes own-school vocabulary');
 
     for (const examId of examIds) {
       const exam = state.exams.find(item => item.id === examId);

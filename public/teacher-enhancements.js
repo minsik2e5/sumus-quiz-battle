@@ -33,6 +33,7 @@ function injectStyles() {
 }
 
 async function bootstrap(force = false) {
+  if (!force && globalThis.__SUMUS_BOOTSTRAP__) return globalThis.__SUMUS_BOOTSTRAP__;
   if (!force && cache && Date.now() - cacheAt < 10000) return cache;
   cache = await api('/bootstrap');
   cacheAt = Date.now();
