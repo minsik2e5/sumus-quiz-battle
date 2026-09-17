@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { emptyState } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
 import { builtinBooks, service, sweep } from './service.mjs';
+import { createMutationCoordinator } from './mutation-coordinator.mjs';
 import { EXAM_TYPES, PRACTICE_TYPES, grade, displayEnglish } from '../public/modules/core.js';
 
 const checks = [];
@@ -192,6 +193,37 @@ export async function runReleaseCheck() {
     const sw = readFileSync(publicRoot + 'sw.js', 'utf8');
     assert(manifest.display === 'standalone' && manifest.start_url === '/', 'PWA manifest is installable');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
+
+    let storedCounter = 0;
+    let storageRevision = 0;
+    let storageWrites = 0;
+    const delayedRepository = {
+      async read() { return { state: { counter: storedCounter }, revision: storageRevision }; },
+      async commit(nextState, revision) {
+        await new Promise(resolve => setTimeout(resolve, 120));
+        if (revision !== storageRevision) throw Object.assign(Error('revision conflict'), { status: 409 });
+        storedCounter = nextState.counter;
+        storageRevision += 1;
+        storageWrites += 1;
+      }
+    };
+    const coordinator = createMutationCoordinator(delayedRepository, {
+      state: { counter: 0 }, revision: 0
+    }, { flushDelay: 500 });
+    const fastStartedAt = Date.now();
+    const fastResults = await Promise.all(Array.from({ length: 200 }, () => coordinator.fast(nextState => {
+      nextState.counter += 1;
+      return nextState.counter;
+    })));
+    const fastElapsed = Date.now() - fastStartedAt;
+    assert(fastResults.at(-1) === 200, 'concurrent practice mutations are applied in order');
+    assert(fastElapsed < 200, 'practice response does not wait for remote persistence');
+    await coordinator.flush();
+    assert(storedCounter === 200 && storageWrites === 1, 'concurrent practice mutations persist in one checkpoint');
+    const durableStartedAt = Date.now();
+    await coordinator.durable(nextState => { nextState.counter += 1; return nextState.counter; });
+    assert(Date.now() - durableStartedAt >= 100 && storedCounter === 201, 'durable mutations wait for persistence');
+    await coordinator.close();
 
     console.log(`[release-check] PASS ${checks.length}/${checks.length}`);
     return { ok: true, count: checks.length };
