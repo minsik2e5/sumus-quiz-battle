@@ -1,5 +1,6 @@
 import { api, modal, $, $$, esc, date, toast, buttonBusy, icon } from './modules/ui.js';
 import { avatar } from './modules/character.js';
+import { CLASS_OPTIONS } from './modules/core.js';
 
 const app = document.querySelector('#app');
 let cache = null;
@@ -148,6 +149,8 @@ async function openStudentDetail(id) {
   if (!p) return toast('학생 정보를 찾을 수 없어요.');
   const attempts = data.attempts.filter(a => a.student_id === id && a.status === 'submitted');
   const recent = shortActivity(lastActivity(data, id));
+  const schoolOptions = data.schools.map(s => `<option value="${esc(s.id)}" ${(s.id === p.school_id || (!p.school_id && s.name === p.school)) ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
+  const classOptions = [...new Set([...CLASS_OPTIONS, p.class_name].filter(Boolean))].map(c => `<option value="${esc(c)}" ${c === p.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('');
   const close = modal(`
     <div class="sumus-student-hero">
       ${avatar(p.avatar_key || 'lumi', { size: 'mini' })}
@@ -165,14 +168,14 @@ async function openStudentDetail(id) {
       <h3>계정 관리</h3>
       <form id="student-enhanced-update">
         <div class="form-columns">
-          <label class="field"><span>반</span><select name="class_name"><option value="고1A" ${p.class_name === '고1A' ? 'selected' : ''}>고1A</option><option value="고1B" ${p.class_name === '고1B' ? 'selected' : ''}>고1B</option></select></label>
-          <label class="field"><span>학교</span><input value="${esc(p.school)}" disabled></label>
+          <label class="field"><span>반</span><select name="class_name" required>${classOptions}</select></label>
+          <label class="field"><span>학교 변경</span><select name="school_id" required>${schoolOptions}</select></label>
         </div>
         <label class="field"><span>새 비밀번호</span><input name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="변경할 때만 입력 · 8자 이상"></label>
         <label class="checkbox-line"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}>계정 활성화</label>
         <div class="form-error" id="student-enhanced-error" role="alert"></div>
         <button class="btn primary full" type="submit">학생 정보 저장</button>
-        <p class="sumus-account-note">계정을 일시 중지하면 학생은 로그인할 수 없고, 기존 학습·시험 기록은 그대로 보존됩니다.</p>
+        <p class="sumus-account-note">학교를 변경하면 다음 로그인부터 새 학교의 단어·과제·시험만 표시됩니다. 기존 학습·시험 기록은 그대로 보존됩니다.</p>
       </form>
     </div>`, '학생 관리');
 
@@ -184,7 +187,7 @@ async function openStudentDetail(id) {
     error.textContent = '';
     buttonBusy(button);
     const values = Object.fromEntries(new FormData(form));
-    const payload = { class_name: values.class_name, active: values.active === 'on' };
+    const payload = { class_name: values.class_name, school_id: values.school_id, active: values.active === 'on' };
     if (values.password) payload.password = values.password;
     try {
       await api('/students/' + id, payload, 'PATCH');

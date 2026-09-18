@@ -150,6 +150,8 @@ export async function service(state, method, path, body, token) {
   if (/^\/students\/[^/]+$/.test(path) && method === 'PATCH') {
     requireRole(p, 'teacher'); const student = state.profiles.find(s => s.id === path.split('/')[2] && s.role === 'student');
     if (!student) fail('학생을 찾을 수 없습니다.', 404);
+    const currentSchool = schoolForProfile(state, student);
+    if (!currentSchool || !p.school_ids?.includes(currentSchool.id)) fail('담당 학교의 학생만 변경할 수 있습니다.', 403);
     if (typeof body.active === 'boolean') student.active = body.active;
     if (str(body.class_name)) student.class_name = str(body.class_name, 30);
     if (body.school_id || body.school) { const school = schoolByRef(state, body.school_id || body.school); if (!school || !p.school_ids?.includes(school.id)) fail('담당 학교를 확인해주세요.', 403); student.school_id = school.id; student.school = school.name; }

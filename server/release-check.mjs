@@ -184,6 +184,16 @@ export async function runReleaseCheck() {
     }
     assert(coverView.finished && coveredIds.size === coverAll.target, 'cover-all practice shows every scoped word once before finishing');
 
+    const movedStudent = await service(state, 'PATCH', `/students/${student.id}`, {
+      school_id: 'gangseo-high', class_name: '중3', active: true
+    }, teacherToken);
+    assert(movedStudent.school_id === 'gangseo-high' && movedStudent.school === '강서고' && movedStudent.class_name === '중3', 'teacher can change student school and class');
+    const danwonAfterMove = await service(state, 'GET', '/bootstrap', {}, teacherToken);
+    assert(!danwonAfterMove.profiles.some(profile => profile.id === student.id), 'moved student leaves the previous school roster');
+    await service(state, 'PATCH', '/teacher/school', { school_id: 'gangseo-high' }, teacherToken);
+    const gangseoAfterMove = await service(state, 'GET', '/bootstrap', {}, teacherToken);
+    assert(gangseoAfterMove.profiles.some(profile => profile.id === student.id), 'moved student appears in the new school roster');
+
     const serialized = JSON.stringify(state);
     const restored = JSON.parse(serialized);
     assert(restored.profiles.length === state.profiles.length && restored.examAttempts.length === state.examAttempts.length, 'state survives JSON persistence round-trip');
@@ -191,8 +201,10 @@ export async function runReleaseCheck() {
     const publicRoot = fileURLToPath(new URL('../public/', import.meta.url));
     const manifest = JSON.parse(readFileSync(publicRoot + 'manifest.webmanifest', 'utf8'));
     const sw = readFileSync(publicRoot + 'sw.js', 'utf8');
+    const teacherEnhancements = readFileSync(publicRoot + 'teacher-enhancements.js', 'utf8');
     assert(manifest.display === 'standalone' && manifest.start_url === '/', 'PWA manifest is installable');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
+    assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
 
     let storedCounter = 0;
     let storageRevision = 0;
