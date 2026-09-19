@@ -1,0 +1,50 @@
+name: Build BUNJANG MULTI MANAGER 1.0
+
+on:
+  push:
+    branches:
+      - bunjang-manager-v1
+    paths:
+      - 'bunjang-build/**'
+      - '.github/workflows/build-bunjang-manager.yml'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Rebuild source ZIP
+        shell: powershell
+        run: |
+          $parts = Get-ChildItem "bunjang-build/source.part*.b64" | Sort-Object Name
+          $b64 = ($parts | ForEach-Object { (Get-Content $_.FullName -Raw).Trim() }) -join ''
+          [IO.File]::WriteAllBytes("bunjang-source.zip", [Convert]::FromBase64String($b64))
+          Expand-Archive -Path "bunjang-source.zip" -DestinationPath "bunjang-src" -Force
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        working-directory: bunjang-src/bunjang-multi-manager-1.0
+        run: npm install
+
+      - name: Build Windows installer and portable EXE
+        working-directory: bunjang-src/bunjang-multi-manager-1.0
+        run: npm run dist
+
+      - name: Upload Windows build
+        uses: actions/upload-artifact@v4
+        with:
+          name: BUNJANG-MULTI-MANAGER-1.0-WINDOWS
+          path: |
+            bunjang-src/bunjang-multi-manager-1.0/dist/*.exe
+          if-no-files-found: error
+          retention-days: 30
