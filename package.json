@@ -8,6 +8,15 @@
   },
   "scripts": {
     "start": "node server/boot.mjs",
-    "setup": "node server/setup.mjs"
+    "setup": "node server/setup.mjs",
+    "build:assets": "node server/build-assets.mjs",
+    "check": "node -e \"import('./server/release-check.mjs').then(m => m.runReleaseCheck())\"",
+    "check:cloudflare": "node server/cloudflare-check.mjs",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "npm run build:assets && wrangler deploy",
+    "cf:types": "wrangler types"
+  },
+  "devDependencies": {
+    "wrangler": "4.135.0"
   }
 }
