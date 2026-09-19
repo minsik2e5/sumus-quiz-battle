@@ -11,6 +11,7 @@ function preferences() {
 }
 function savePreferences() { try { localStorage.setItem('sumus:v13:prefs:' + A.data.profile.id, JSON.stringify({ ranges: A.ranges, school: A.school, mode: A.mode, target: A.target })); } catch {} }
 async function refresh() { A.data = await api('/bootstrap'); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; }
+globalThis.__SUMUS_APPLY_BOOTSTRAP__ = data => { A.data = data; globalThis.__SUMUS_BOOTSTRAP__ = data; if (data?.profile?.role === 'teacher') A.school = data.profile.active_school; if (!A.screen) render(); };
 function render() {
   if (!A.data || A.screen) return;
   $('#app').innerHTML = A.data.profile.role === 'teacher' ? teacherPage(A) : studentPage(A);
@@ -35,7 +36,9 @@ function loginView(role = A.role) {
 function startPolling() {
   clearInterval(poll); poll = setInterval(async () => {
     if (!A.data || A.screen || document.visibilityState !== 'visible' || A.tab === 'exam-create' || $('#modal-root').children.length) return;
-    try { await refresh(); if (['home', 'exam', 'ranking', 'dashboard', 'exams', 'results'].includes(A.tab)) render(); }
+    const liveTabs = ['home', 'exam', 'ranking', 'dashboard', 'exams', 'results'];
+    if (!liveTabs.includes(A.tab)) return;
+    try { await refresh(); render(); }
     catch (err) { if (err.status === 401) { clearInterval(poll); A.data = null; loginView(); } }
   }, 60000);
 }
@@ -111,8 +114,10 @@ function studentModal(id) {
   const p = A.data.profiles.find(p => p.id === id), attempts = A.data.attempts.filter(a => a.student_id === id && a.status === 'submitted');
   const schoolOptions = A.data.schools.map(s => `<option value="${esc(s.id)}" ${s.id === p.school_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   const classOptions = [...new Set([...CLASS_OPTIONS, p.class_name].filter(Boolean))].map(c => `<option value="${esc(c)}" ${c === p.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('');
-  const close = modal(`<h2>${esc(p.display_name)}</h2><p>${esc(p.class_name)} · ${p.school} · ${esc(p.username)}</p><div class="detail-grid"><div><b>${p.stats.today_total}문제</b><small>오늘 학습량</small></div><div><b>${p.stats.accuracy}%</b><small>연습 정답률</small></div><div><b>${p.stats.weak}개</b><small>취약 단어</small></div><div><b>${attempts.length}회</b><small>실전시험 응시</small></div></div><form id="student-update"><label class="field"><span>학교 변경</span><select name="school_id">${schoolOptions}</select></label><label class="field"><span>반 변경</span><select name="class_name" required>${classOptions}</select></label><label class="field"><span>새 비밀번호 (변경할 때만)</span><input name="password" type="password" minlength="8" autocomplete="new-password" placeholder="8자 이상"></label><label class="checkbox-line"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}>계정 활성화</label><div class="form-error" id="update-error" role="alert"></div><button class="btn primary full" type="submit">변경 저장</button></form>`, '학생 정보');
+  const close = modal(`<h2>${esc(p.display_name)}</h2><p>${esc(p.class_name)} · ${p.school} · ${esc(p.username)}</p><div class="detail-grid"><div><b>${p.stats.today_total}문제</b><small>오늘 학습량</small></div><div><b>${p.stats.accuracy}%</b><small>연습 정답률</small></div><div><b>${p.stats.weak}개</b><small>취약 단어</small></div><div><b>${attempts.length}회</b><small>실전시험 응시</small></div></div><form id="student-update"><label class="field"><span>학교 변경</span><select name="school_id">${schoolOptions}</select></label><label class="field"><span>반 변경</span><select name="class_name" required>${classOptions}</select></label><label class="field"><span>새 비밀번호 (변경할 때만)</span><input name="password" type="password" minlength="8" autocomplete="new-password" placeholder="8자 이상"></label><label class="checkbox-line"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}>계정 활성화</label><div class="form-error" id="update-error" role="alert"></div><button class="btn primary full" type="submit">변경 저장</button><div class="sumus-account-actions"><button class="btn" type="button" id="student-quick-reset">비밀번호 12345678로 재설정</button><button class="btn sumus-danger" type="button" id="student-quick-delete">학생 계정 삭제</button></div></form>`, '학생 정보');
   $('#student-update').onsubmit = async e => { e.preventDefault(); const v = Object.fromEntries(new FormData(e.currentTarget)); try { await api('/students/' + id, { ...v, active: v.active === 'on' }, 'PATCH'); close(); await refresh(); render(); toast('학생 정보를 저장했어요.'); } catch (err) { $('#update-error').textContent = err.message; } };
+  $('#student-quick-reset').onclick = async e => { if (!confirm(p.display_name + ' 학생의 비밀번호를 12345678로 재설정할까요?')) return; buttonBusy(e.currentTarget); try { await api('/students/' + id, { password: '12345678' }, 'PATCH'); toast('비밀번호를 12345678로 재설정했어요.'); } catch (err) { toast(err.message); } finally { buttonBusy(e.currentTarget, false); } };
+  $('#student-quick-delete').onclick = async e => { if (!confirm(p.display_name + ' 학생 계정을 삭제할까요?\n연습 기록과 시험 기록도 함께 삭제됩니다.')) return; buttonBusy(e.currentTarget); try { await api('/students/' + id, {}, 'DELETE'); close(); await refresh(); render(); toast('학생 계정을 삭제했어요.'); } catch (err) { toast(err.message); buttonBusy(e.currentTarget, false); } };
 }
 function addAssignment() {
   const codes = getRanges(A).codes, selected = codes.slice(0, 2);
