@@ -106,7 +106,7 @@ export class VocaStateObject {
     const url = new URL(request.url);
     try {
       if (!url.pathname.startsWith('/api/')) return json({ error: '요청한 기능을 찾을 수 없습니다.' }, 404);
-      if (!['GET', 'POST', 'PATCH'].includes(request.method)) throw Object.assign(Error('지원하지 않는 요청입니다.'), { status: 405 });
+      if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(request.method)) throw Object.assign(Error('지원하지 않는 요청입니다.'), { status: 405 });
       if (request.method !== 'GET') {
         if (request.headers.get('sec-fetch-site') === 'cross-site') throw Object.assign(Error('허용되지 않은 요청입니다.'), { status: 403 });
         const origin = request.headers.get('origin');
@@ -114,7 +114,7 @@ export class VocaStateObject {
         if (!String(request.headers.get('content-type')).startsWith('application/json')) throw Object.assign(Error('요청 형식을 확인해주세요.'), { status: 415 });
       }
 
-      const body = request.method === 'GET' ? {} : await readJson(request);
+      const body = request.method === 'GET' ? Object.fromEntries(url.searchParams) : await readJson(request);
       const address = request.headers.get('CF-Connecting-IP') || 'unknown';
       if (url.pathname === '/api/login') {
         const key = `${address}:${String(body.username || '').trim().toLowerCase()}`;
@@ -146,14 +146,16 @@ export class VocaStateObject {
             : await service(state, request.method, path, body, token);
       };
 
-      const fastPracticeAnswer = request.method === 'POST' && /^\/api\/practice\/[^/]+\/answer$/.test(url.pathname);
+      const fastMutation =
+        (request.method === 'POST' && (url.pathname === '/api/practice/start' || /^\/api\/practice\/[^/]+\/(?:answer|finish)$/.test(url.pathname))) ||
+        (request.method === 'PATCH' && url.pathname === '/api/teacher/school');
       const result = request.method === 'GET'
         ? await execute(this.mutations.current().state)
-        : fastPracticeAnswer
+        : fastMutation
           ? await this.mutations.fast(execute)
           : await this.mutations.durable(execute);
 
-      if (fastPracticeAnswer) this.ctx.waitUntil(this.mutations.flush());
+      if (fastMutation) this.ctx.waitUntil(this.mutations.flush());
       const responseHeaders = {};
       if (result._cookie) {
         responseHeaders['Set-Cookie'] = `sumus_session=${result._cookie}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800; Secure`;
