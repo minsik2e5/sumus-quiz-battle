@@ -231,6 +231,66 @@ function sentenceChoices(sentence) {
   return sentence.parts.map((part, partIndex) => ({ part, partIndex })).filter(item => item.part[0] === 'c');
 }
 
+function analysisHelp(sentence, partIndex) {
+  const part = sentence.parts[partIndex];
+  if (!part || part[0] !== 'c') return '';
+  const options = part[1].map(v => String(v).toLowerCase());
+  const answer = String(part[2]);
+  const answerLower = answer.toLowerCase();
+  const before = sentence.parts.slice(0, partIndex).map(p => p[0] === 't' ? p[1] : p[2]).join('').trim();
+  const after = sentence.parts.slice(partIndex + 1).map(p => p[0] === 't' ? p[1] : p[2]).join('').trim();
+
+  if (options.includes('what') && options.includes('that')) {
+    if (answerLower === 'what') return '뒤 절에서 필요한 성분이 비어 있어 “~하는 것”의 what이 맞아요.';
+    if (/(argue|claim|find|feel|remarks?)\s*$/i.test(before)) return '동사의 목적어로 완전한 절을 이끄는 접속사 that이 맞아요.';
+    if (/(evidence|impression)\s*$/i.test(before)) return '앞 명사의 내용을 설명하는 동격의 that이 맞아요.';
+    return '선행사를 꾸미는 관계절에서 빠진 성분을 채우는 that이 맞아요.';
+  }
+  if (options.includes('which') && options.includes('that')) {
+    if (answerLower === 'which' && /,\s*$/.test(before)) return '쉼표 뒤 계속적 용법의 관계절이므로 which가 맞아요.';
+    if (answerLower === 'that' && /(evidence|impression)\s*$/i.test(before)) return '앞 명사의 내용을 설명하는 동격의 that이 맞아요.';
+    return part[4];
+  }
+  if (options.includes('during') && options.includes('while')) {
+    return answerLower === 'while' ? '뒤에 주어+동사가 있는 절이 이어져 While이 맞아요.' : '뒤에 명사구가 이어져 during이 맞아요.';
+  }
+  if (options.includes('because') && options.includes('because of')) {
+    return answerLower === 'because' ? '뒤에 완전한 절이 이어져 because가 맞아요.' : '뒤에 명사구가 이어져 because of가 맞아요.';
+  }
+  if (options.includes('is') && options.includes('does') && answerLower === 'does' && /so\s*$/i.test(before)) {
+    return '앞의 동사를 대신하는 대동사 does가 쓰이고, so가 앞에 와 도치돼요.';
+  }
+  if (options.includes('are') && options.includes('do') && answerLower === 'are' && /^\.?$/.test(after)) {
+    return '앞 문맥의 be happy가 생략된 형태라 they are가 맞아요.';
+  }
+  if (options.includes('harder') && options.includes('hard')) return 'the 비교급, the 비교급 구조이므로 harder가 맞아요.';
+  if (options.includes('faster') && options.includes('fastest')) return 'the 비교급, the 비교급 구조이므로 faster가 맞아요.';
+  if (options.includes('enough smart') && options.includes('smart enough')) return 'enough는 형용사 뒤에 오므로 smart enough가 맞아요.';
+  if (options.includes('approached to') && options.includes('approached')) return 'approach는 타동사라 전치사 to 없이 approached가 맞아요.';
+  if (options.includes('approaching to') && options.includes('approaching')) return 'approach는 타동사라 전치사 to 없이 approaching이 맞아요.';
+  if (options.includes('feel') && options.includes('to feel') && /makes customers\s*$/i.test(before)) return 'make+목적어+동사원형 구조라 feel이 맞아요.';
+  if (options.includes('keep') && options.includes('keeps') && /should.*$/i.test(before)) return '조동사 should 뒤에는 동사원형이 이어져 keep이 맞아요.';
+  if (options.includes('does') && options.includes('do') && /really\s*$/i.test(before)) return '일반동사 want를 강조하는 do이며 주어 customers와 수일치해 do가 맞아요.';
+  if (options.includes('implies') && options.includes('imply')) return '주어의 핵심어 meaning이 단수이므로 implies가 맞아요.';
+  if (options.includes('pressured') && options.includes('pressuring')) return 'customers가 압박을 받는 대상이므로 과거분사 pressured가 맞아요.';
+  if (options.includes('visualizing') && options.includes('visualized')) return '주절 주어 we가 직접 망치를 떠올리는 능동 관계라 visualizing이 맞아요.';
+  if (options.includes('seen') && options.includes('seeing') && /as\s*$/i.test(before)) return 'hammer가 보이는 대상이므로 과거분사 seen이 맞아요.';
+  if (options.includes('allowing') && options.includes('allowed')) return '앞 문장의 결과를 능동적으로 이어 설명하므로 allowing이 맞아요.';
+  if (options.includes('reabsorbing') && options.includes('to reabsorb')) return 'allow+목적어+to부정사 구조라 to reabsorb가 맞아요.';
+  if (options.includes('supplying') && options.includes('supplied')) return 'stay 뒤에서 “공급된 상태”를 나타내므로 supplied가 맞아요.';
+  if (options.includes('digging') && options.includes('to dig') && /by eating plants and\s*$/i.test(before)) return 'by 뒤의 eating과 병렬이므로 digging이 맞아요.';
+  if (options.includes('to mention') && options.includes('mentioning')) return 'be worth 뒤에는 동명사가 와서 mentioning이 맞아요.';
+  if (options.includes('having') && options.includes('being') && /judged/i.test(after)) return '판단을 받는 수동 의미라 being judged가 맞아요.';
+  if (options.includes('moral') && options.includes('morally')) return '형용사 good을 꾸미는 부사가 필요해 morally가 맞아요.';
+  if (options.includes('that') && options.includes('it') && /may be said/i.test(after)) return '뒤 that절을 받는 가주어 it이 필요해 it이 맞아요.';
+  if (options.includes('actually') && options.includes('actual')) return '명사 consequences를 꾸미는 형용사 actual이 맞아요.';
+  if (options.includes('mostly') && options.includes('most') && /of us/i.test(after)) return 'most of us가 “우리 대부분”이라는 표현이에요.';
+  if (options.includes('nearly') && options.includes('near')) return '숫자 30 feet를 꾸미는 부사 nearly가 맞아요.';
+  if (options.includes('relative') && options.includes('relatively')) return '형용사 precise를 꾸미는 부사 relatively가 맞아요.';
+  if (options.includes('take') && options.includes('taking') && /^\s*,\s*for example/i.test(after)) return '예를 들어 보라는 명령문이므로 동사원형 Take가 맞아요.';
+  return part[4];
+}
+
 function allChoiceRefs() {
   const refs = [];
   PASSAGE.sentences.forEach((sentence, sentenceIndex) => {
@@ -398,7 +458,7 @@ export function openGrammarChoiceSample(A, redraw, passageId = DANWONGO_PASSAGES
       const ok = chosen === part[2];
       return ok
         ? `<div class="gcv3-feedback ok compact"><i>✓</i><div><b>${groupIndex + 1}. 정답 · ${esc(part[2])}</b></div></div>`
-        : `<div class="gcv3-feedback"><i>!</i><div><b>${groupIndex + 1}. 정답은 ${esc(part[2])}</b><p>${esc(part[4])}</p></div></div>`;
+        : `<div class="gcv3-feedback"><i>!</i><div><b>${groupIndex + 1}. 정답은 ${esc(part[2])}</b><p>${esc(analysisHelp(sentence, partIndex))}</p></div></div>`;
     }).join('') : '';
 
     const body = `
@@ -462,6 +522,7 @@ export function openGrammarChoiceSample(A, redraw, passageId = DANWONGO_PASSAGES
       return `<button class="${cls}" data-recall-value="${esc(option)}" ${recallAnswered ? 'disabled' : ''}>${esc(option)}</button>`;
     }).join('');
 
+    const recallHelp = analysisHelp(sentence, item.partIndex);
     const body = `
       <div class="gcv3-recall-banner"><div>↻</div><div><strong>2차 · 오답 리콜</strong><span>1차에서 틀린 선택지만 다시 확인해요.</span></div></div>
       <div class="gcv3-stagebar"><div class="gcv3-stage"><span class="gcv3-chip">${esc(item.type)}</span><small>오답 ${recallIndex + 1} / ${recallQueue.length}</small></div><span></span></div>
@@ -473,7 +534,7 @@ export function openGrammarChoiceSample(A, redraw, passageId = DANWONGO_PASSAGES
         <div class="gcv3-segment">${options}</div>
         ${recallAnswered ? (recallPick === item.answer
           ? `<div class="gcv3-feedbacks"><div class="gcv3-feedback ok compact"><i>✓</i><div><b>정답 · ${esc(item.answer)}</b></div></div></div>`
-          : `<div class="gcv3-feedbacks"><div class="gcv3-feedback"><i>!</i><div><b>정답은 ${esc(item.answer)}</b><p>${esc(item.help)}</p></div></div></div>`) : ''}
+          : `<div class="gcv3-feedbacks"><div class="gcv3-feedback"><i>!</i><div><b>정답은 ${esc(item.answer)}</b><p>${esc(recallHelp)}</p></div></div></div>`) : ''}
       </section>`;
 
     const bottom = recallAnswered
