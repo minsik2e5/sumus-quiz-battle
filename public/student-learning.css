@@ -93,6 +93,9 @@
   flex:none;display:inline-flex;align-items:center;height:25px;padding:0 8px;border-radius:999px;
   background:#f2f4f7;color:#667085;font-size:10.5px;font-weight:850
 }
+.grammar-state.master{background:#ecfdf3;color:#067647}
+.grammar-set-card.premium.mastered{border-color:#b7ebcd}
+.grammar-set-card.premium.mastered .grammar-number{background:#ecfdf3;color:#067647}
 .grammar-set-card.premium .grammar-set-meta{margin-top:13px;gap:6px}
 .grammar-set-card.premium .grammar-set-meta span{padding:5px 8px;font-size:10.5px}
 .grammar-set-card.premium .grammar-set-cta{margin-top:12px;padding-top:11px}
