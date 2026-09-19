@@ -14,6 +14,13 @@ export function migrateState(state) {
     if (!Array.isArray(state[key])) { state[key] = []; changed = true; }
   }
   if (!state.mastery || typeof state.mastery !== 'object' || Array.isArray(state.mastery)) { state.mastery = {}; changed = true; }
+  // Completed practice payloads can be very large (questions, retries and idempotency responses).
+  // Their durable summary already lives in sessions, so keep only active/unreconciled practice state.
+  const sessionIds = new Set(state.sessions.map(item => item.id));
+  const compactPractices = state.practices.filter(item => !item?.finished || (Number(item?.total || 0) > 0 && !sessionIds.has(item.id)));
+  if (compactPractices.length !== state.practices.length) { state.practices = compactPractices; changed = true; }
+  const liveTokens = state.tokens.filter(item => Number(item?.expires_at || 0) > Date.now());
+  if (liveTokens.length !== state.tokens.length) { state.tokens = liveTokens; changed = true; }
   if (!Array.isArray(state.schools)) { state.schools = []; changed = true; }
   for (const school of DEFAULT_SCHOOLS) {
     if (!state.schools.some(item => item.id === school.id || item.name === school.name)) { state.schools.push(structuredClone(school)); changed = true; }
