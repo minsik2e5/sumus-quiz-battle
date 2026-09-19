@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.2.3-grammar-polish';
+const VERSION = 'sumus-voca-v13.3.0-danwongo-grammar';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -13,6 +13,7 @@ const SHELL = [
   '/student-enhancements.js',
   '/practice-enhancements.js',
   '/grammar-choice-sample.js',
+  '/danwongo-grammar-data.js',
   '/pwa.js',
   '/icon.svg',
   '/manifest.webmanifest',
