@@ -302,7 +302,7 @@ function nextPractice(x, state) {
   x.question = buildQuestion(word, mode, words); x.question_id = id(); x.feedback = null;
 }
 function finishPractice(x, state) {
-  x.finished = true;
+  x.finished = true; x.finished_at = Date.now();
   if (!x.total) return;
   const rec = { id: x.id, student_id: x.student_id, assignment_id: x.assignment_id, school_id: x.school_id, school: x.school, range_codes: x.range_codes, mode: x.mode, correct: x.correct, total: x.total, xp: x.xp, best_combo: x.best, duration_sec: Math.round((Date.now() - x.started_at) / 1000), created_at: Date.now() };
   if (!state.sessions.some(s => s.id === rec.id)) state.sessions.push(rec);
