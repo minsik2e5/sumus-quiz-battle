@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.2-learning-hub';
+const VERSION = 'sumus-voca-v13.2.1-grammar-ui';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
