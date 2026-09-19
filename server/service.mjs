@@ -1,8 +1,8 @@
 import { randomUUID, randomBytes } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
 import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, ACCESSORIES, FRAMES, TITLES, unlocked, growthFor, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish } from '../public/modules/core.js';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
-export const builtinBooks = JSON.parse(readFileSync(new URL('../data/vocabulary.json', import.meta.url), 'utf8'));
+export const builtinBooks = builtinBooksData;
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const requireRole = (p, role) => { if (p.role !== role) fail('이 기능을 사용할 권한이 없습니다.', 403); };
 const integer = (n, min, max, label) => { if (!Number.isInteger(Number(n)) || Number(n) < min || Number(n) > max) fail(`${label}을 확인해주세요.`); return Number(n); };
