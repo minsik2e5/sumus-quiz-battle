@@ -1,7 +1,7 @@
 import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, unlocked, levelInfo, dayKey } from './core.js';
 import { icon, esc, num, date, rangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar } from './character.js';
-export const studentTabs = [['home', '홈', 'home'], ['practice', '연습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
+export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
 export function shell(A, content) {
   const p = A.data.profile;
   return `<div class="student-app"><main class="student-main"><header class="app-header"><div class="brand"><img src="/icon.svg" alt=""><div>SUMUS <span>VOCA</span></div></div><button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${A.tab === id ? 'active' : ''}" ${A.tab === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
@@ -34,9 +34,48 @@ function home(A) {
   <div class="section-title"><h2>새 학습 샘플</h2><span class="pill blue">NEW</span></div><button class="exam-row" data-action="grammar-choice-sample"><span class="square-icon">${icon("records")}</span><div class="grow"><h3>어법·어휘 고르기</h3><p>2026년 3월 서울교육청 · 18번 샘플</p></div>${icon("chevron")}</button>\n  ${task ? `<div class="section-title"><h2>선생님이 남긴 연습</h2></div><button class="exam-row" data-assignment="${task.id}"><span class="square-icon">${icon('practice')}</span><div class="grow"><h3>${esc(task.title)}</h3><p>${task.target_questions}문제 · ${date(task.due_at)}까지</p></div>${icon('chevron')}</button>` : ''}
   <div class="section-title"><h2>배정된 실전시험</h2><button class="text-button" data-go="exam">모두 보기 ${icon('chevron')}</button></div>${available.length ? available.map(e => `<button class="exam-row" data-exam="${e.id}"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(e.title)}</h3><p>${EXAM_TYPES[e.exam_type].label} · ${e.question_count}문제</p></div>${icon('chevron')}</button>`).join('') : `<p class="quiet-note">지금은 배정된 시험이 없어요.</p>`}`;
 }
-function practice(A) {
+function studyHub(A) {
+  const school = A.data.profile.school || A.school || '학교 미설정';
+  return `<div class="page-heading"><h1>무엇을 공부할까요?</h1><p>오늘 필요한 학습을 골라 바로 시작하세요.</p></div>
+  <section class="study-school-card"><div><span class="tiny muted">현재 학교</span><strong>${esc(school)}</strong></div><button class="text-button" data-action="account">학교 변경</button></section>
+  <div class="study-hub-grid">
+    <button class="study-hub-card vocab" data-study="vocab">
+      <span class="study-hub-icon">${icon('practice')}</span>
+      <div><span class="pill blue">VOCAB</span><h2>단어 학습</h2><p>영어↔뜻, 철자, 듣기, 스크램블까지<br>약한 단어를 반복해서 익혀요.</p></div>
+      <span class="study-hub-arrow">${icon('arrow')}</span>
+    </button>
+    <button class="study-hub-card grammar" data-study="grammar">
+      <span class="study-hub-icon">${icon('records')}</span>
+      <div><span class="pill">GRAMMAR</span><h2>어법·어휘</h2><p>모의고사 지문을 문장 단위로 풀고<br>틀린 선택지만 다시 복습해요.</p></div>
+      <span class="study-hub-arrow">${icon('arrow')}</span>
+    </button>
+  </div>
+  <section class="study-tip"><span class="square-icon">${icon('sparkle')}</span><div><b>추천 학습 흐름</b><p>단어로 기본기를 익힌 뒤, 어법·어휘에서 실제 문장 속 쓰임을 확인해보세요.</p></div></section>`;
+}
+
+function grammarStudy(A) {
+  return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">SAMPLE</span></div>
+  <div class="page-heading"><h1>어법·어휘</h1><p>지문을 문장별로 풀고, 틀린 것만 다시 익혀요.</p></div>
+  <section class="study-school-card"><div><span class="tiny muted">현재 학교</span><strong>${esc(A.data.profile.school || A.school || '')}</strong></div><button class="text-button" data-action="account">학교 변경</button></section>
+  <div class="grammar-set-list">
+    <button class="grammar-set-card" data-action="grammar-choice-sample">
+      <div class="grammar-set-top"><span class="grammar-number">18</span><div class="grow"><b>2026년 3월 서울교육청</b><small>Connexa Point Table Tennis Center</small></div><span class="pill blue">연습 가능</span></div>
+      <div class="grammar-set-meta"><span>8문장</span><span>17개 선택</span><span>문장 학습 + 오답 리콜</span></div>
+      <div class="grammar-set-cta">18번 시작하기 ${icon('arrow')}</div>
+    </button>
+  </div>
+  <p class="quiet-note">지금은 18번 한 지문만 샘플로 열려 있어요. 학습 방식 확정 후 시험범위를 이어서 추가합니다.</p>`;
+}
+
+function vocabPractice(A) {
   const count = selectedCount(A);
-  return `<div class="page-heading"><h1>내 속도로, 연습</h1><p>범위를 고르면, 약한 단어부터 익혀요.</p></div><div class="step-label"><span>01</span>학교 선택</div>${schoolSwitch(A)}<div class="step-label"><span>02</span>연습할 범위</div>${rangePicker(A)}<div class="step-label"><span>03</span>연습 방식</div><div class="mode-grid">${Object.entries(PRACTICE_TYPES).map(([k, name]) => `<button class="mode-option ${A.mode === k ? 'selected' : ''}" data-mode="${k}" aria-pressed="${A.mode === k}">${icon(k === 'listen' ? 'sound' : k === 'mixed' ? 'sparkle' : ['write_meaning', 'spell', 'scramble', 'initial', 'vowelblank'].includes(k) ? 'records' : 'practice')}${name}${k === 'write_meaning' ? '<span class="grow"></span><span class="pill blue">추천</span><small class="mode-help">영어를 보고 뜻을 직접 입력</small>' : ''}</button>`).join('')}</div><div class="practice-amount"><span class="tiny muted">한 번에 학습할 양</span><div class="practice-target-grid" role="group" aria-label="학습량 선택">${[10, 20, 30].map(n => `<button data-practice-target="${n}" class="${A.target === n ? 'selected' : ''}" aria-pressed="${A.target === n}">${n}<small>문제</small></button>`).join('')}<button data-practice-target="all" class="all ${A.target === 'all' ? 'selected' : ''}" aria-pressed="${A.target === 'all'}"><b>선택 범위 전체</b><small data-all-count>${count}개 단어 모두 보기</small></button></div></div><div class="practice-launch"><button class="btn primary full" data-action="start-practice" ${!count ? 'disabled' : ''}>${A.data.active_practice ? '하던 연습 이어가기' : '연습 시작하기'} ${icon('arrow')}</button><p>${A.target === 'all' ? '선택한 단어를 중복 없이 모두 본 뒤, 틀린 단어를 복습해요.' : '틀린 단어는 잠시 뒤 다시 나와요.'}</p></div>`;
+  return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">VOCAB</span></div><div class="page-heading"><h1>단어 학습</h1><p>범위를 고르면, 약한 단어부터 익혀요.</p></div><div class="step-label"><span>01</span>학교 선택</div>${schoolSwitch(A)}<div class="step-label"><span>02</span>연습할 범위</div>${rangePicker(A)}<div class="step-label"><span>03</span>연습 방식</div><div class="mode-grid">${Object.entries(PRACTICE_TYPES).map(([k, name]) => `<button class="mode-option ${A.mode === k ? 'selected' : ''}" data-mode="${k}" aria-pressed="${A.mode === k}">${icon(k === 'listen' ? 'sound' : k === 'mixed' ? 'sparkle' : ['write_meaning', 'spell', 'scramble', 'initial', 'vowelblank'].includes(k) ? 'records' : 'practice')}${name}${k === 'write_meaning' ? '<span class="grow"></span><span class="pill blue">추천</span><small class="mode-help">영어를 보고 뜻을 직접 입력</small>' : ''}</button>`).join('')}</div><div class="practice-amount"><span class="tiny muted">한 번에 학습할 양</span><div class="practice-target-grid" role="group" aria-label="학습량 선택">${[10, 20, 30].map(n => `<button data-practice-target="${n}" class="${A.target === n ? 'selected' : ''}" aria-pressed="${A.target === n}">${n}<small>문제</small></button>`).join('')}<button data-practice-target="all" class="all ${A.target === 'all' ? 'selected' : ''}" aria-pressed="${A.target === 'all'}"><b>선택 범위 전체</b><small data-all-count>${count}개 단어 모두 보기</small></button></div></div><div class="practice-launch"><button class="btn primary full" data-action="start-practice" ${!count ? 'disabled' : ''}>${A.data.active_practice ? '하던 연습 이어가기' : '연습 시작하기'} ${icon('arrow')}</button><p>${A.target === 'all' ? '선택한 단어를 중복 없이 모두 본 뒤, 틀린 단어를 복습해요.' : '틀린 단어는 잠시 뒤 다시 나와요.'}</p></div>`;
+}
+
+function practice(A) {
+  if (A.studyView === 'vocab') return vocabPractice(A);
+  if (A.studyView === 'grammar') return grammarStudy(A);
+  return studyHub(A);
 }
 export function examStatus(A, e) {
   const attempts = A.data.attempts.filter(a => a.exam_id === e.id);
