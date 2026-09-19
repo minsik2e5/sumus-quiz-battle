@@ -153,14 +153,16 @@ function addStyles() {
       font-size:clamp(21px,3.2vw,25px);line-height:1.64;letter-spacing:-.35px;font-weight:760;
       color:#121a2c;word-break:keep-all;overflow-wrap:normal
     }
+    .gcv3-en.medium{font-size:clamp(20px,2.9vw,23px);line-height:1.62}
+    .gcv3-en.long{font-size:clamp(18.5px,2.6vw,21.5px);line-height:1.6}
     .gcv3-inline{
       display:inline-flex;align-items:center;justify-content:center;min-width:54px;min-height:36px;
       padding:2px 10px;margin:2px 2px;border-radius:10px;background:#f0f3f8;color:#8e99aa;
       font-size:.8em;font-weight:850;vertical-align:.03em;line-height:1.25
     }
     .gcv3-inline.filled{background:#edf3ff;color:#2457c6}
-    .gcv3-inline.correct{background:#eafaf1;color:#087443}
-    .gcv3-inline.wrong{background:#fff0ef;color:#b42318}
+    .gcv3-inline.correct{background:#e7f8ef;color:#027a48;box-shadow:inset 0 0 0 1px #6ce9a6}
+    .gcv3-inline.wrong{background:#fff0ef;color:#b42318;box-shadow:inset 0 0 0 1px #fda29b}
     .gcv3-divider{height:1px;background:#edf0f4;margin:24px 0 18px}
     .gcv3-question-title{font-size:14px;font-weight:850;color:#344054;margin-bottom:13px}
 
@@ -182,8 +184,8 @@ function addStyles() {
       border-color:#3f6df3;background:#edf3ff;color:#2457c6;
       box-shadow:0 0 0 2px rgba(63,109,243,.09)
     }
-    .gcv3-option.correct{border-color:#32c986;background:#eafaf1;color:#087443;box-shadow:none}
-    .gcv3-option.wrong{border-color:#f27a70;background:#fff0ef;color:#b42318;box-shadow:none}
+    .gcv3-option.correct{border-color:#12b76a;background:#ecfdf3;color:#027a48;box-shadow:0 0 0 1px rgba(18,183,106,.08)}
+    .gcv3-option.wrong{border-color:#f04438;background:#fff1f0;color:#b42318;box-shadow:0 0 0 1px rgba(240,68,56,.06)}
 
     .gcv3-feedbacks{display:grid;gap:9px;margin-top:17px}
     .gcv3-feedback{
@@ -191,6 +193,8 @@ function addStyles() {
       background:#fff7ed;color:#9a4b12
     }
     .gcv3-feedback.ok{background:#ecfdf3;color:#05603a}
+    .gcv3-feedback.compact{padding:9px 12px;align-items:center}
+    .gcv3-feedback.compact b{margin:0;font-size:12.5px}
     .gcv3-feedback i{
       width:23px;height:23px;border-radius:999px;background:rgba(255,255,255,.7);display:grid;
       place-items:center;font-style:normal;font-size:12px;font-weight:900;flex:none
@@ -234,20 +238,22 @@ function addStyles() {
     .gcv3-statgrid b{display:block;font-size:19px}.gcv3-statgrid span{font-size:11px;color:#98a2b3}
     .gcv3-mastery{margin-top:15px;padding:13px;border-radius:15px;background:#ecfdf3;color:#067647;font-size:13px;font-weight:800}
     .gcv3-history{
-      display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin:0 2px 12px
+      display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:2px;margin:0 2px 12px;
+      min-height:40px;padding:3px;background:#fff;border:1px solid #e5e9f0;border-radius:13px;
+      box-shadow:0 1px 3px rgba(16,24,40,.025)
     }
     .gcv3-history button{
-      min-height:38px;border:1px solid #e1e6ef;border-radius:12px;background:#fff;color:#475467;
-      padding:7px 11px;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:5px
+      min-height:34px;border:0;border-radius:10px;background:transparent;color:#526075;
+      padding:6px 9px;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:4px
     }
-    .gcv3-history button:last-child{justify-self:stretch}
-    .gcv3-history button:disabled{opacity:.35;background:#f8fafc}
-    .gcv3-history .icon{width:15px;height:15px}
+    .gcv3-history button:not(:disabled):active{background:#f3f6fb}
+    .gcv3-history button:disabled{opacity:.25}
+    .gcv3-history .icon{width:14px;height:14px}
     .gcv3-history-status{
-      min-width:88px;text-align:center;font-size:11.5px;font-weight:850;color:#667085;
-      background:#f2f4f7;border-radius:999px;padding:7px 10px;white-space:nowrap
+      min-width:75px;text-align:center;font-size:10.5px;font-weight:850;color:#7b8798;
+      background:#f4f6f9;border-radius:999px;padding:6px 9px;white-space:nowrap
     }
-    .gcv3-history-status.review{background:#fff7e8;color:#a15c08}
+    .gcv3-history-status.review{background:#fff7e8;color:#9a5b09}
     .gcv3-readonly-note{
       display:flex;align-items:center;gap:7px;margin:0 0 13px;padding:10px 12px;border-radius:12px;
       background:#fff9ec;color:#8b5b13;font-size:12px;font-weight:750
@@ -267,6 +273,11 @@ function addStyles() {
       .gcv3-card{padding:20px 16px 19px;border-radius:21px}
       .gcv3-sentence-label{margin-bottom:16px}
       .gcv3-en{font-size:21px;line-height:1.62;letter-spacing:-.25px}
+      .gcv3-en.medium{font-size:19.5px;line-height:1.6}
+      .gcv3-en.long{font-size:18px;line-height:1.58}
+      .gcv3-history{min-height:40px;margin-bottom:10px}
+      .gcv3-history button{min-height:34px;padding:5px 6px;font-size:11.5px}
+      .gcv3-history-status{min-width:68px;padding:6px 7px;font-size:10px}
       .gcv3-inline{min-height:34px;padding:2px 8px;border-radius:9px}
       .gcv3-divider{margin:21px 0 17px}
       .gcv3-question-title{font-size:13.5px;margin-bottom:12px}
@@ -284,11 +295,23 @@ function addStyles() {
       .gcv3-main{padding-left:10px;padding-right:10px}
       .gcv3-card{padding-left:14px;padding-right:14px}
       .gcv3-en{font-size:19.5px}
+      .gcv3-en.medium{font-size:18.5px}
+      .gcv3-en.long{font-size:17.2px}
       .gcv3-option{font-size:14.5px}
       .gcv3-meta strong{font-size:14.5px}
     }
   `;
   document.head.appendChild(style);
+}
+
+function sentenceSizeClass(sentence) {
+  const length = sentence.parts.reduce((sum, part) => {
+    if (part[0] === 't') return sum + String(part[1] || '').length;
+    return sum + Math.max(...part[1].map(option => String(option).length));
+  }, 0);
+  if (length >= 145) return ' long';
+  if (length >= 100) return ' medium';
+  return '';
 }
 
 function sentenceChoices(sentence) {
@@ -459,7 +482,9 @@ export function openGrammarChoiceSample(A, redraw) {
     const feedbacks = (sentenceGraded || isReview) ? choices.map(({ part, partIndex }, groupIndex) => {
       const chosen = answers.get(choiceKey(sentenceIndex, partIndex));
       const ok = chosen === part[2];
-      return `<div class="gcv3-feedback ${ok ? 'ok' : ''}"><i>${ok ? '✓' : '!'}</i><div><b>${groupIndex + 1}. ${ok ? '정답' : '정답은 ' + esc(part[2])}</b><p>${esc(part[4])}</p></div></div>`;
+      return ok
+        ? `<div class="gcv3-feedback ok compact"><i>✓</i><div><b>${groupIndex + 1}. 정답 · ${esc(part[2])}</b></div></div>`
+        : `<div class="gcv3-feedback"><i>!</i><div><b>${groupIndex + 1}. 정답은 ${esc(part[2])}</b><p>${esc(part[4])}</p></div></div>`;
     }).join('') : '';
 
     const body = `
@@ -473,7 +498,7 @@ export function openGrammarChoiceSample(A, redraw) {
       <section class="gcv3-card">
         <div class="gcv3-sentence-label"><b>SENTENCE ${String(sentenceIndex + 1).padStart(2, '0')}</b><span>${isReview ? '채점 완료 · 읽기 전용' : '선택 ' + chosenCount + ' / ' + choices.length}</span></div>
         ${showKo ? `<p class="gcv3-ko">${esc(sentence.ko)}</p>` : ''}
-        <div class="gcv3-en">${renderEnglish(sentence)}</div>
+        <div class="gcv3-en${sentenceSizeClass(sentence)}">${renderEnglish(sentence)}</div>
         <div class="gcv3-divider"></div>
         <div class="gcv3-question-title">${isReview ? '내가 선택한 답과 정답을 다시 확인하세요.' : '알맞은 표현을 하나씩 선택하세요.'}</div>
         <div class="gcv3-groups">${groups}</div>
@@ -528,11 +553,13 @@ export function openGrammarChoiceSample(A, redraw) {
       <div class="gcv3-stagebar"><div class="gcv3-stage"><span class="gcv3-chip">${esc(item.type)}</span><small>오답 ${recallIndex + 1} / ${recallQueue.length}</small></div><span></span></div>
       <section class="gcv3-card">
         <div class="gcv3-sentence-label"><b>RECALL</b><span>해석 없이 다시 도전</span></div>
-        <div class="gcv3-en">${renderEnglish(sentence, item.partIndex, true)}</div>
+        <div class="gcv3-en${sentenceSizeClass(sentence)}">${renderEnglish(sentence, item.partIndex, true)}</div>
         <div class="gcv3-divider"></div>
         <div class="gcv3-question-title">이번에는 힌트 없이 다시 골라보세요.</div>
         <div class="gcv3-segment">${options}</div>
-        ${recallAnswered ? `<div class="gcv3-feedbacks"><div class="gcv3-feedback ${recallPick === item.answer ? 'ok' : ''}"><i>${recallPick === item.answer ? '✓' : '!'}</i><div><b>${recallPick === item.answer ? '이번에는 맞았어요' : '한 번 더 기억해둘 포인트'}</b><p>${esc(item.help)}</p></div></div></div>` : ''}
+        ${recallAnswered ? (recallPick === item.answer
+          ? `<div class="gcv3-feedbacks"><div class="gcv3-feedback ok compact"><i>✓</i><div><b>정답 · ${esc(item.answer)}</b></div></div></div>`
+          : `<div class="gcv3-feedbacks"><div class="gcv3-feedback"><i>!</i><div><b>정답은 ${esc(item.answer)}</b><p>${esc(item.help)}</p></div></div></div>`) : ''}
       </section>`;
 
     const bottom = recallAnswered
