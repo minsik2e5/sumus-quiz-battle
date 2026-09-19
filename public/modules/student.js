@@ -1,6 +1,7 @@
 import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, unlocked, levelInfo, dayKey } from './core.js';
 import { icon, esc, num, date, rangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar } from './character.js';
+import { DANWONGO_PASSAGES } from '../danwongo-grammar-data.js?v=1';
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
 export function shell(A, content) {
   const p = A.data.profile;
@@ -54,17 +55,32 @@ function studyHub(A) {
 }
 
 function grammarStudy(A) {
-  return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">SAMPLE</span></div>
-  <div class="page-heading"><h1>어법·어휘</h1><p>지문을 문장별로 풀고, 틀린 것만 다시 익혀요.</p></div>
-  <section class="study-school-card"><div><span class="tiny muted">현재 학교</span><strong>${esc(A.data.profile.school || A.school || '')}</strong></div><button class="text-button" data-action="account">학교 변경</button></section>
-  <div class="grammar-set-list">
-    <button class="grammar-set-card" data-action="grammar-choice-sample">
-      <div class="grammar-set-top"><span class="grammar-number">18</span><div class="grow"><b>2026년 3월 서울교육청</b><small>Connexa Point Table Tennis Center</small></div><span class="pill blue">연습 가능</span></div>
-      <div class="grammar-set-meta"><span>8문장</span><span>17개 선택</span><span>문장 학습 + 오답 리콜</span></div>
-      <div class="grammar-set-cta">18번 시작하기 ${icon('arrow')}</div>
-    </button>
-  </div>
-  <p class="quiet-note">지금은 18번 한 지문만 샘플로 열려 있어요. 학습 방식 확정 후 시험범위를 이어서 추가합니다.</p>`;
+  const school = A.data.profile.school || A.school || '';
+  const isDanwon = school === '단원고';
+  const passageCards = DANWONGO_PASSAGES.map(p => {
+    const sentenceCount = p.sentences.length;
+    const choiceCount = p.sentences.reduce((sum, sentence) => sum + sentence.parts.filter(part => part[0] === 'c').length, 0);
+    return `<button class="grammar-set-card premium" data-action="grammar-choice" data-grammar-id="${esc(p.id)}">
+      <div class="grammar-set-top">
+        <span class="grammar-number">${esc(p.number)}</span>
+        <div class="grow"><b>${esc(p.subtitle)}</b><small>2025년 9월 인천교육청</small></div>
+        <span class="grammar-state">미학습</span>
+      </div>
+      <div class="grammar-set-meta"><span>${sentenceCount}문장</span><span>${choiceCount}개 선택</span><span>오답 리콜</span></div>
+      <div class="grammar-set-cta">학습 시작 ${icon('arrow')}</div>
+    </button>`;
+  }).join('');
+
+  return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">GRAMMAR</span></div>
+  <div class="page-heading grammar-heading"><h1>어법·어휘</h1><p>문장으로 이해하고, 틀린 선택지만 다시 익혀요.</p></div>
+  <section class="study-school-card"><div><span class="tiny muted">현재 학교</span><strong>${esc(school)}</strong></div><button class="text-button" data-action="account">학교 변경</button></section>
+  ${isDanwon ? `
+    <section class="grammar-range-head"><div><span class="eyebrow">단원고 시험범위</span><h2>2025년 9월 인천교육청</h2><p>분석본 수업 흐름과 같은 기준으로 채점 해설을 정리했어요.</p></div><span class="grammar-range-count">${DANWONGO_PASSAGES.length}지문</span></section>
+    <div class="grammar-set-list">${passageCards}</div>
+    <p class="quiet-note">범위: 24 · 29 · 31 · 32 · 33 · 34 · 36 · 39 · 40 · 41~42</p>
+  ` : `
+    <section class="grammar-empty-school"><span class="square-icon">${icon('records')}</span><div><b>현재는 단원고 시험범위부터 제작 중이에요.</b><p>학교를 단원고로 변경하면 전체 10개 지문을 연습할 수 있어요.</p></div></section>
+  `}`;
 }
 
 function vocabPractice(A) {
