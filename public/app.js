@@ -8,7 +8,7 @@ import { openGrammarChoiceSample } from './grammar-choice-sample.js?v=13.1.3';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', target: 30, sound: false, role: 'student', studyView: 'hub' };
 let poll, rendering = false;
 function preferences() {
-  try { const v = JSON.parse(localStorage.getItem('sumus:v13:prefs:' + A.data.profile.id) || localStorage.getItem('sumus:v12:prefs:' + A.data.profile.id) || '{}'); A.ranges = v.ranges || {}; A.school = A.data.profile.role === 'teacher' ? A.data.profile.active_school : v.school || A.data.profile.school || A.data.schools[0]?.name || '단원고'; A.mode = v.mode || 'write_meaning'; A.target = v.target || 30; A.sound = localStorage.getItem('sumus:sound') === 'true'; } catch {}
+  try { const v = JSON.parse(localStorage.getItem('sumus:v13:prefs:' + A.data.profile.id) || localStorage.getItem('sumus:v12:prefs:' + A.data.profile.id) || '{}'); A.ranges = v.ranges || {}; A.school = A.data.profile.role === 'teacher' ? A.data.profile.active_school : A.data.profile.school || v.school || A.data.schools[0]?.name || '단원고'; A.mode = v.mode || 'write_meaning'; A.target = v.target || 30; A.sound = localStorage.getItem('sumus:sound') === 'true'; } catch {}
 }
 function savePreferences() { try { localStorage.setItem('sumus:v13:prefs:' + A.data.profile.id, JSON.stringify({ ranges: A.ranges, school: A.school, mode: A.mode, target: A.target })); } catch {} }
 async function refresh() { A.data = await api('/bootstrap'); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; }
