@@ -4,6 +4,7 @@ import { avatar } from './modules/character.js';
 import { studentPage, getRanges, updateRangeSummary } from './modules/student.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, startPractice, leaveSession } from './modules/sessions.js';
+import { openGrammarChoiceSample } from './grammar-choice-sample.js';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', target: 30, sound: false, role: 'student' };
 let poll, rendering = false;
 function preferences() {
@@ -63,6 +64,7 @@ $('#app').addEventListener('click', async event => {
     if (d.examActive) { const e = A.data.exams.find(e => e.id === d.examActive); await api('/exams/' + e.id, { active: !e.active }, 'PATCH'); await refresh(); render(); return; }
     if (d.action === 'refresh') { buttonBusy(b); await refresh(); render(); toast('최신 기록으로 업데이트했어요.'); }
     if (d.action === 'start-practice') { buttonBusy(b); await startPractice(); }
+    if (d.action === 'grammar-choice-sample') { openGrammarChoiceSample(A, render); return; }
     if (d.action === 'save-style') { buttonBusy(b); await api('/profile/style', A.style); await refresh(); A.style = null; A.tab = 'home'; render(); toast('내 캐릭터를 저장했어요.'); }
     if (d.action === 'account') accountModal();
     if (d.action === 'logout') await logout();
