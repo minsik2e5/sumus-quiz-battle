@@ -116,8 +116,8 @@ export function openGrammarChoiceSample(A, redraw) {
       <main class="gcv2-main"><section class="gcv2-result"><div class="gcv2-result-mark">${rate===100?'✓':'★'}</div><h1>${rate===100?'18번 MASTER!':'한 번 더 다듬어 볼까요?'}</h1><p>문장 전체를 읽으며 선택한 결과예요.</p><div class="gcv2-score">${rate}<small style="font-size:22px">%</small></div><div class="gcv2-statgrid"><div><b>${correct}</b><span>정답</span></div><div><b>${wrong}</b><span>오답</span></div><div><b>${steps.length}</b><span>전체</span></div></div></section></main>
       <div class="gcv2-bottom"><div class="gcv2-bottomin"><button class="btn" id="gcv2-retry">처음부터 다시</button><button class="btn primary" id="gcv2-home">홈으로</button></div></div>
     </div>`;
-    $('#gcv2-back').onclick = exit;
-    $('#gcv2-home').onclick = exit;
+    $('#gcv2-back').onclick = cleanupExit;
+    $('#gcv2-home').onclick = cleanupExit;
     $('#gcv2-retry').onclick = () => { answers.clear(); index = 0; reveal = false; result = false; mount(); };
   }
 
@@ -157,7 +157,7 @@ export function openGrammarChoiceSample(A, redraw) {
       <div class="gcv2-bottom"><div class="gcv2-bottomin">${reveal?'<button class="btn primary" id="gcv2-next">'+(index===steps.length-1?'결과 보기':'다음 문제')+' '+icon('arrow')+'</button>':'<button class="btn" disabled>답을 선택하면 바로 채점돼요</button>'}</div></div>
     </div>`;
 
-    $('#gcv2-back').onclick = exit;
+    $('#gcv2-back').onclick = cleanupExit;
     $$('[data-answer]').forEach(button => button.onclick = () => {
       answers.set(keyOf(step), button.dataset.answer);
       reveal = true;
@@ -177,10 +177,9 @@ export function openGrammarChoiceSample(A, redraw) {
   };
   document.addEventListener('keydown', keyboard, { once: false });
 
-  const originalExit = exit;
   function cleanupExit() {
     document.removeEventListener('keydown', keyboard);
-    originalExit();
+    exit();
   }
 
   mount();
