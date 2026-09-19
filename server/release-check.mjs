@@ -194,6 +194,14 @@ export async function runReleaseCheck() {
     const gangseoAfterMove = await service(state, 'GET', '/bootstrap', {}, teacherToken);
     assert(gangseoAfterMove.profiles.some(profile => profile.id === student.id), 'moved student appears in the new school roster');
 
+    await service(state, 'PATCH', `/students/${student.id}`, { password: '12345678' }, teacherToken);
+    const resetLogin = await service(state, 'POST', '/login', { username: 'qa_student', password: '12345678', role: 'student' }, null);
+    assert(Boolean(resetLogin._cookie), 'teacher can reset a student password to the default');
+    await service(state, 'DELETE', `/students/${student.id}`, {}, teacherToken);
+    assert(!state.profiles.some(profile => profile.id === student.id), 'teacher can delete a student account');
+    assert(!state.sessions.some(session => session.student_id === student.id), 'student deletion removes practice history');
+    assert(!state.examAttempts.some(attempt => attempt.student_id === student.id), 'student deletion removes exam history');
+
     const serialized = JSON.stringify(state);
     const restored = JSON.parse(serialized);
     assert(restored.profiles.length === state.profiles.length && restored.examAttempts.length === state.examAttempts.length, 'state survives JSON persistence round-trip');
@@ -205,6 +213,8 @@ export async function runReleaseCheck() {
     assert(manifest.display === 'standalone' && manifest.start_url === '/', 'PWA manifest is installable');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
+    assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
+    assert(teacherEnhancements.includes('student-delete-account') && teacherEnhancements.includes("'DELETE'"), 'teacher can delete a student account from the modal');
 
     let storedCounter = 0;
     let storageRevision = 0;
