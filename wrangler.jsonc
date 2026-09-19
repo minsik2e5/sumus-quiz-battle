@@ -3,13 +3,17 @@
   "name": "sumus-voca",
   "main": "./cloudflare/worker.mjs",
   "compatibility_date": "2026-09-19",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
   "workers_dev": true,
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": [
+      "/api/*"
+    ]
   },
   "durable_objects": {
     "bindings": [
@@ -22,10 +26,16 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_sqlite_classes": ["VocaStateObject"]
+      "new_sqlite_classes": [
+        "VocaStateObject"
+      ]
     }
   ],
   "observability": {
     "enabled": true
+  },
+  "vars": {
+    "SUPABASE_URL": "https://mrlrrzpppmdkivbozato.supabase.co",
+    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ybHJyenBwcG1ka2l2Ym96YXRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3Mjc1NjksImV4cCI6MjEwMzMwMzU2OX0.1QQtLUvNOTo5n4NRXLUV_4CxsTMqB6LCuPP60D4a2d8"
   }
 }
