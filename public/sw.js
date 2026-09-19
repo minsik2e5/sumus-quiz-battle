@@ -1,9 +1,10 @@
-const VERSION = 'sumus-voca-v13.1.3-grammar-sample';
+const VERSION = 'sumus-voca-v13.2-learning-hub';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
   '/index.html',
   '/styles.css',
+  '/student-learning.css',
   '/app.js',
   '/signup-ui.js',
   '/teacher-enhancements.js',
