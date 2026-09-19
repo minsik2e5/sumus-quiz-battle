@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.0.1-speed-admin';
+const VERSION = 'sumus-voca-v13.1-grammar-sample';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -11,6 +11,7 @@ const SHELL = [
   '/dashboard-ops.js',
   '/student-enhancements.js',
   '/practice-enhancements.js',
+  '/grammar-choice-sample.js',
   '/pwa.js',
   '/icon.svg',
   '/manifest.webmanifest',
