@@ -1,0 +1,10 @@
+node_modules/
+.wrangler/
+.wrangler-dry-run*/
+var/
+data/vocabulary.json
+public/styles.css
+.dev.vars
+.env
+.env.*
+!.env.example
