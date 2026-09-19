@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.1-grammar-sample';
+const VERSION = 'sumus-voca-v13.1.1-grammar-sample';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -47,6 +47,22 @@ self.addEventListener('fetch', event => {
 
   // Never cache authenticated API data, exam drafts, scores, or student records.
   if (url.pathname.startsWith('/api/')) return;
+
+  if (/\.(?:js|css)$/.test(url.pathname)) {
+    event.respondWith((async () => {
+      try {
+        const fresh = await fetch(req, { cache: 'no-store' });
+        if (fresh.ok) {
+          const cache = await caches.open(STATIC_CACHE);
+          cache.put(req, fresh.clone());
+        }
+        return fresh;
+      } catch {
+        return (await caches.match(req)) || Response.error();
+      }
+    })());
+    return;
+  }
 
   if (req.mode === 'navigate') {
     event.respondWith((async () => {
