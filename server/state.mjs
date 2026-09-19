@@ -17,7 +17,7 @@ export function migrateState(state) {
   // Completed practice payloads can be very large (questions, retries and idempotency responses).
   // Their durable summary already lives in sessions, so keep only active/unreconciled practice state.
   const sessionIds = new Set(state.sessions.map(item => item.id));
-  const compactPractices = state.practices.filter(item => !item?.finished || (Number(item?.total || 0) > 0 && !sessionIds.has(item.id)));
+  const compactPractices = state.practices.filter(item => !item?.finished || (Number(item?.total || 0) > 0 && !sessionIds.has(item.id)) || Number(item?.finished_at || 0) > Date.now() - 10 * 60000);
   if (compactPractices.length !== state.practices.length) { state.practices = compactPractices; changed = true; }
   const liveTokens = state.tokens.filter(item => Number(item?.expires_at || 0) > Date.now());
   if (liveTokens.length !== state.tokens.length) { state.tokens = liveTokens; changed = true; }
