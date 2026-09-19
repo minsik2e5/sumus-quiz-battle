@@ -121,6 +121,17 @@ export async function service(state, method, path, body, token) {
     p.active_school_id = school.id;
     return { active_school_id: school.id, active_school: school.name };
   }
+  if (path === '/profile/school' && method === 'PATCH') {
+    requireRole(p, 'student');
+    const school = schoolByRef(state, body.school_id || body.school);
+    if (!school) fail('학교를 확인해주세요.', 404);
+    const current = schoolForProfile(state, p);
+    if (current?.id === school.id) return publicProfile(p);
+    for (const practice of state.practices.filter(item => item.student_id === p.id && !item.finished)) finishPractice(practice, state);
+    p.school_id = school.id;
+    p.school = school.name;
+    return publicProfile(p);
+  }
   if (path === '/profile/style' && method === 'POST') {
     const growth = stats(state, p);
     if (!CHARACTERS[body.avatar_key] || !unlocked(ACCESSORIES[body.avatar_accessory], growth) || !unlocked(FRAMES[body.avatar_frame], growth) || !unlocked(TITLES[body.avatar_title], growth)) fail('아직 열리지 않은 보상입니다.');
