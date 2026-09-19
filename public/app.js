@@ -1,11 +1,11 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, CLASS_OPTIONS } from './modules/core.js';
 import { avatar } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.1.1';
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.2.0';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, startPractice, leaveSession } from './modules/sessions.js';
 import { openGrammarChoiceSample } from './grammar-choice-sample.js?v=13.1.3';
-const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', target: 30, sound: false, role: 'student' };
+const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', target: 30, sound: false, role: 'student', studyView: 'hub' };
 let poll, rendering = false;
 function preferences() {
   try { const v = JSON.parse(localStorage.getItem('sumus:v13:prefs:' + A.data.profile.id) || localStorage.getItem('sumus:v12:prefs:' + A.data.profile.id) || '{}'); A.ranges = v.ranges || {}; A.school = A.data.profile.role === 'teacher' ? A.data.profile.active_school : v.school || A.data.profile.school || A.data.schools[0]?.name || '단원고'; A.mode = v.mode || 'write_meaning'; A.target = v.target || 30; A.sound = localStorage.getItem('sumus:sound') === 'true'; } catch {}
@@ -20,7 +20,7 @@ function render() {
 }
 configureSessions(A, render, refresh);
 function navigate(tab) {
-  collectExamForm(A); A.tab = tab; A.search = ''; A.classFilter = ''; A.style = null; render(); window.scrollTo(0, 0);
+  collectExamForm(A); A.tab = tab; if (tab === 'practice') A.studyView = 'hub'; A.search = ''; A.classFilter = ''; A.style = null; render(); window.scrollTo(0, 0);
 }
 function loginView(role = A.role) {
   A.role = role;
@@ -48,6 +48,7 @@ $('#app').addEventListener('click', async event => {
   const d = b.dataset; if (!Object.keys(d).length) return; event.preventDefault();
   try {
     if (d.go) return navigate(d.go);
+    if (d.study) { A.studyView = d.study; A.tab = 'practice'; render(); window.scrollTo(0, 0); return; }
     if (d.school) { collectExamForm(A); A.school = d.school; A.vocabRange = ''; A.assignmentId = null; savePreferences(); render(); return; }
     if (d.rangeAll) { const { codes } = getRanges(A); A.ranges[A.school] = d.rangeAll === 'true' ? [...codes] : []; $$('[data-range]').forEach(i => i.checked = d.rangeAll === 'true'); updateRangeSummary(A); updateExamSummary(A); savePreferences(); return; }
     if (d.mode) { A.mode = d.mode; $$('[data-mode]').forEach(e => { e.classList.toggle('selected', e === b); e.setAttribute('aria-pressed', String(e === b)); }); savePreferences(); return; }
@@ -59,7 +60,7 @@ $('#app').addEventListener('click', async event => {
     if (d.exam) return await openExam(d.exam);
     if (d.result) return await openResult(d.result);
     if (d.student) return studentModal(d.student);
-    if (d.assignment) { const task = A.data.assignments.find(a => a.id === d.assignment); A.school = task.school; A.ranges[task.school] = [...task.range_codes]; A.assignmentId = task.id; navigate('practice'); return; }
+    if (d.assignment) { const task = A.data.assignments.find(a => a.id === d.assignment); A.school = task.school; A.ranges[task.school] = [...task.range_codes]; A.assignmentId = task.id; A.studyView = 'vocab'; A.tab = 'practice'; render(); window.scrollTo(0, 0); return; }
     if (d.release) { const e = A.data.exams.find(e => e.id === d.release); await api('/exams/' + e.id, { release_result: !e.release_result }, 'PATCH'); await refresh(); render(); toast(e.release_result ? '결과를 비공개로 바꿨어요.' : '학생에게 결과가 공개됐어요.'); return; }
     if (d.examActive) { const e = A.data.exams.find(e => e.id === d.examActive); await api('/exams/' + e.id, { active: !e.active }, 'PATCH'); await refresh(); render(); return; }
     if (d.action === 'refresh') { buttonBusy(b); await refresh(); render(); toast('최신 기록으로 업데이트했어요.'); }
@@ -104,8 +105,30 @@ function bindPageForms() {
 async function logout() { await api('/logout', {}); clearInterval(poll); leaveSession(); A.data = null; A.ranges = {}; A.style = null; A.examForm = null; $('#modal-root').innerHTML = ''; loginView(); }
 function accountModal() {
   const p = A.data.profile;
-  modal(`<h2>${esc(p.display_name)}</h2><p>${esc(p.class_name)} · ${esc(p.school || 'SUMUS')}<br>${esc(p.username)}</p><button class="btn full" id="account-logout">로그아웃</button>`, '내 계정');
+  const schoolOptions = (A.data.schools || []).map(s => `<option value="${esc(s.id)}" ${s.id === p.school_id || (!p.school_id && s.name === p.school) ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
+  modal(`<h2>${esc(p.display_name)}</h2><p>${esc(p.class_name)} · ${esc(p.school || 'SUMUS')}<br>${esc(p.username)}</p>
+    ${p.role === 'student' ? `<div class="sumus-detail-section"><h3>학교 설정</h3><label class="field"><span>내 학교</span><select id="account-school">${schoolOptions}</select></label><p class="sumus-account-note">학교를 바꾸면 해당 학교의 단어·과제·시험이 바로 표시돼요. 기존 학습 기록은 유지됩니다.</p><button class="btn primary full" id="account-school-save">학교 변경 저장</button></div>` : ''}
+    <button class="btn full" id="account-logout" style="margin-top:10px">로그아웃</button>`, '내 계정');
   $('#account-logout').onclick = logout;
+  $('#account-school-save')?.addEventListener('click', async event => {
+    const schoolId = $('#account-school')?.value;
+    if (!schoolId || schoolId === p.school_id) return toast('현재 학교와 같아요.');
+    buttonBusy(event.currentTarget);
+    try {
+      await api('/profile/school', { school_id: schoolId }, 'PATCH');
+      await refresh();
+      A.school = A.data.profile.school;
+      A.ranges = {};
+      A.assignmentId = null;
+      savePreferences();
+      $('#modal-root').innerHTML = '';
+      render();
+      toast(`${A.data.profile.school}로 학교를 변경했어요.`);
+    } catch (err) {
+      toast(err.message);
+      buttonBusy(event.currentTarget, false);
+    }
+  });
 }
 function addStudent() {
   const classOptions = CLASS_OPTIONS.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
