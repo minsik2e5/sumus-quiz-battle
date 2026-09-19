@@ -1,5 +1,5 @@
 import { $, $$, esc, icon, toast } from './modules/ui.js';
-import { DANWONGO_PASSAGES, getDanwongoPassage } from './danwongo-grammar-data.js?v=1';
+import { DANWONGO_PASSAGES, getDanwongoPassage } from './danwongo-grammar-data.js?v=2';
 
 let PASSAGE = DANWONGO_PASSAGES[0];
 
@@ -512,7 +512,7 @@ export function openGrammarChoiceSample(A, redraw, passageId = DANWONGO_PASSAGES
     const body = `
       <section class="gcv3-result">
         <div class="gcv3-resultmark">${mastered ? '✓' : '★'}</div>
-        <h1>${mastered ? '${PASSAGE.number}번 MASTER!' : '한 번 더 다듬어 볼까요?'}</h1>
+        <h1>${mastered ? esc(PASSAGE.number) + '번 MASTER!' : '한 번 더 다듬어 볼까요?'}</h1>
         <p>문장 단위 학습과 오답 리콜을 마쳤어요.</p>
         <div class="gcv3-score">${firstRate}<small>% · 1차</small></div>
         <div class="gcv3-statgrid"><div><b>${firstCorrect}</b><span>1차 정답</span></div><div><b>${firstRoundWrong.length}</b><span>1차 오답</span></div><div><b>${recallAttempts}</b><span>오답 리콜</span></div></div>
