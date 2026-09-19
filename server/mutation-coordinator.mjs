@@ -1,5 +1,15 @@
 export const NO_MUTATION = Symbol('no-mutation');
 
+function compactState(state) {
+  if (!state || typeof state !== 'object') return state;
+  if (Array.isArray(state.practices)) {
+    const sessionIds = new Set(Array.isArray(state.sessions) ? state.sessions.map(item => item?.id) : []);
+    state.practices = state.practices.filter(item => !item?.finished || (Number(item?.total || 0) > 0 && !sessionIds.has(item.id)));
+  }
+  if (Array.isArray(state.tokens)) state.tokens = state.tokens.filter(item => Number(item?.expires_at || 0) > Date.now());
+  return state;
+}
+
 export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   const flushDelay = Math.max(50, Number(options.flushDelay || 500));
   const retryDelay = Math.max(1000, Number(options.retryDelay || 2000));
@@ -27,6 +37,7 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
     return queueApply(async () => {
       const nextState = structuredClone(snapshot.state);
       const output = await fn(nextState);
+      compactState(nextState);
       if (output === NO_MUTATION) {
         return { output: undefined, version: stateVersion, changed: false };
       }
