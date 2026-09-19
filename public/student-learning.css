@@ -62,3 +62,53 @@
   .study-school-card{padding:14px 15px}
   .grammar-set-top{align-items:flex-start}.grammar-set-top .pill{margin-left:auto}
 }
+
+
+/* Danwongo grammar library */
+.grammar-heading{margin-bottom:16px}
+.grammar-range-head{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:18px;
+  margin:4px 0 14px;padding:19px 20px;border-radius:20px;
+  background:linear-gradient(135deg,#18223a 0%,#2d3c60 100%);color:#fff;
+  box-shadow:0 10px 26px rgba(24,34,58,.12)
+}
+.grammar-range-head .eyebrow{display:block;color:#b9c9ff;font-size:11px;font-weight:900;letter-spacing:.08em}
+.grammar-range-head h2{margin:6px 0 5px;font-size:20px;letter-spacing:-.35px}
+.grammar-range-head p{margin:0;color:#d9e0ef;font-size:12px;line-height:1.55}
+.grammar-range-count{
+  flex:none;display:inline-flex;align-items:center;justify-content:center;min-width:58px;height:32px;
+  border-radius:999px;background:rgba(255,255,255,.12);font-size:12px;font-weight:850;color:#fff
+}
+.grammar-set-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.grammar-set-card.premium{padding:16px 16px 14px;border-radius:20px;min-height:168px}
+.grammar-set-card.premium .grammar-set-top{align-items:flex-start}
+.grammar-set-card.premium .grammar-number{
+  width:46px;height:46px;border-radius:14px;font-size:17px;background:#eef4ff;color:#315dd7
+}
+.grammar-set-card.premium .grammar-set-top b{
+  font-size:14px;line-height:1.35;color:#172033;letter-spacing:-.15px
+}
+.grammar-set-card.premium .grammar-set-top small{font-size:11px;color:#98a2b3}
+.grammar-state{
+  flex:none;display:inline-flex;align-items:center;height:25px;padding:0 8px;border-radius:999px;
+  background:#f2f4f7;color:#667085;font-size:10.5px;font-weight:850
+}
+.grammar-set-card.premium .grammar-set-meta{margin-top:13px;gap:6px}
+.grammar-set-card.premium .grammar-set-meta span{padding:5px 8px;font-size:10.5px}
+.grammar-set-card.premium .grammar-set-cta{margin-top:12px;padding-top:11px}
+.grammar-empty-school{
+  display:flex;align-items:flex-start;gap:12px;padding:18px;border:1px solid #e4e7ec;background:#fff;
+  border-radius:20px
+}
+.grammar-empty-school b{display:block;font-size:14px;margin-bottom:4px}
+.grammar-empty-school p{margin:0;color:#667085;font-size:12px;line-height:1.55}
+
+@media(max-width:680px){
+  .grammar-range-head{padding:17px 16px;border-radius:18px}
+  .grammar-range-head h2{font-size:18px}
+  .grammar-range-head p{font-size:11.5px}
+  .grammar-set-list{grid-template-columns:1fr;gap:10px}
+  .grammar-set-card.premium{min-height:0;padding:15px;border-radius:18px}
+  .grammar-set-card.premium .grammar-number{width:44px;height:44px}
+  .grammar-set-card.premium .grammar-set-cta{justify-content:space-between}
+}
