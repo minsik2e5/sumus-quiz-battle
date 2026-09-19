@@ -113,6 +113,8 @@ function accountModal() {
   $('#account-school-save')?.addEventListener('click', async event => {
     const schoolId = $('#account-school')?.value;
     if (!schoolId || schoolId === p.school_id) return toast('현재 학교와 같아요.');
+    const schoolName = A.data.schools.find(s => s.id === schoolId)?.name || '선택한 학교';
+    if (!confirm(schoolName + '로 학교를 변경할까요?')) return;
     buttonBusy(event.currentTarget);
     try {
       await api('/profile/school', { school_id: schoolId }, 'PATCH');
