@@ -233,6 +233,25 @@ function addStyles() {
     .gcv3-statgrid div{background:#f8fafc;border-radius:15px;padding:13px}
     .gcv3-statgrid b{display:block;font-size:19px}.gcv3-statgrid span{font-size:11px;color:#98a2b3}
     .gcv3-mastery{margin-top:15px;padding:13px;border-radius:15px;background:#ecfdf3;color:#067647;font-size:13px;font-weight:800}
+    .gcv3-history{
+      display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;margin:0 2px 12px
+    }
+    .gcv3-history button{
+      min-height:38px;border:1px solid #e1e6ef;border-radius:12px;background:#fff;color:#475467;
+      padding:7px 11px;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:5px
+    }
+    .gcv3-history button:last-child{justify-self:stretch}
+    .gcv3-history button:disabled{opacity:.35;background:#f8fafc}
+    .gcv3-history .icon{width:15px;height:15px}
+    .gcv3-history-status{
+      min-width:88px;text-align:center;font-size:11.5px;font-weight:850;color:#667085;
+      background:#f2f4f7;border-radius:999px;padding:7px 10px;white-space:nowrap
+    }
+    .gcv3-history-status.review{background:#fff7e8;color:#a15c08}
+    .gcv3-readonly-note{
+      display:flex;align-items:center;gap:7px;margin:0 0 13px;padding:10px 12px;border-radius:12px;
+      background:#fff9ec;color:#8b5b13;font-size:12px;font-weight:750
+    }
 
     @media(max-width:680px){
       .gcv3{padding-bottom:112px}
@@ -306,6 +325,8 @@ export function openGrammarChoiceSample(A, redraw) {
   let recallIndex = 0;
   let recallAnswered = false;
   let recallPick = null;
+  let activeSentenceIndex = 0;
+  const gradedSentences = new Set();
 
   const choiceKey = (s, p) => s + ':' + p;
   const currentSentence = () => PASSAGE.sentences[sentenceIndex];
@@ -344,6 +365,7 @@ export function openGrammarChoiceSample(A, redraw) {
     if (missing) return toast('아직 ' + missing + '개 선택이 남았어요.');
 
     sentenceGraded = true;
+    gradedSentences.add(sentenceIndex);
     for (const { part, partIndex } of choices) {
       const ref = { sentenceIndex, partIndex, options: part[1], answer: part[2], type: part[3], help: part[4] };
       const key = choiceKey(sentenceIndex, partIndex);
@@ -353,7 +375,31 @@ export function openGrammarChoiceSample(A, redraw) {
     mountPractice();
   }
 
+  function previousSentence() {
+    if (stage !== 'practice' || sentenceIndex <= 0) return;
+    sentenceIndex--;
+    sentenceGraded = gradedSentences.has(sentenceIndex);
+    showKo = false;
+    mountPractice();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function forwardSentence() {
+    if (stage !== 'practice' || sentenceIndex >= activeSentenceIndex) return;
+    sentenceIndex++;
+    sentenceGraded = gradedSentences.has(sentenceIndex);
+    showKo = false;
+    mountPractice();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   function nextSentence() {
+    // While reviewing a completed sentence, move forward through history
+    // without changing any saved answers.
+    if (sentenceIndex < activeSentenceIndex) {
+      return forwardSentence();
+    }
+
     if (sentenceIndex >= PASSAGE.sentences.length - 1) {
       if (firstRoundWrong.length) {
         stage = 'recall';
@@ -368,8 +414,10 @@ export function openGrammarChoiceSample(A, redraw) {
       }
       return;
     }
+
+    activeSentenceIndex = Math.max(activeSentenceIndex, sentenceIndex + 1);
     sentenceIndex++;
-    sentenceGraded = false;
+    sentenceGraded = gradedSentences.has(sentenceIndex);
     showKo = false;
     mountPractice();
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -391,50 +439,63 @@ export function openGrammarChoiceSample(A, redraw) {
     const sentence = currentSentence();
     const choices = sentenceChoices(sentence);
     const chosenCount = choices.filter(({ partIndex }) => answers.has(choiceKey(sentenceIndex, partIndex))).length;
-    const progress = Math.round(((sentenceIndex + 1) / PASSAGE.sentences.length) * 100);
+    const isReview = sentenceIndex < activeSentenceIndex;
+    const progress = Math.round(((activeSentenceIndex + 1) / PASSAGE.sentences.length) * 100);
 
     const groups = choices.map(({ part, partIndex }, groupIndex) => {
       const key = choiceKey(sentenceIndex, partIndex);
       const chosen = answers.get(key);
       const buttons = part[1].map(option => {
         let cls = 'gcv3-option' + (chosen === option ? ' selected' : '');
-        if (sentenceGraded) {
+        if (sentenceGraded || isReview) {
           if (option === part[2]) cls += ' correct';
           else if (chosen === option) cls += ' wrong';
         }
-        return `<button class="${cls}" data-choice-key="${key}" data-choice-value="${esc(option)}" ${sentenceGraded ? 'disabled' : ''}>${esc(option)}</button>`;
+        return `<button class="${cls}" data-choice-key="${key}" data-choice-value="${esc(option)}" ${sentenceGraded || isReview ? 'disabled' : ''}>${esc(option)}</button>`;
       }).join('');
       return `<div class="gcv3-group"><div class="gcv3-number">${groupIndex + 1}</div><div class="gcv3-segment">${buttons}</div></div>`;
     }).join('');
 
-    const feedbacks = sentenceGraded ? choices.map(({ part, partIndex }, groupIndex) => {
+    const feedbacks = (sentenceGraded || isReview) ? choices.map(({ part, partIndex }, groupIndex) => {
       const chosen = answers.get(choiceKey(sentenceIndex, partIndex));
       const ok = chosen === part[2];
       return `<div class="gcv3-feedback ${ok ? 'ok' : ''}"><i>${ok ? '✓' : '!'}</i><div><b>${groupIndex + 1}. ${ok ? '정답' : '정답은 ' + esc(part[2])}</b><p>${esc(part[4])}</p></div></div>`;
     }).join('') : '';
 
     const body = `
-      <div class="gcv3-stagebar"><div class="gcv3-stage"><span class="gcv3-chip">1차 · 문장 학습</span><small>문장 ${sentenceIndex + 1} / ${PASSAGE.sentences.length}</small></div><button class="gcv3-translate" id="gcv3-translate">${showKo ? '해석 숨기기' : '해석 보기'}</button></div>
+      <div class="gcv3-stagebar"><div class="gcv3-stage"><span class="gcv3-chip">${isReview ? '복습 보기' : '1차 · 문장 학습'}</span><small>문장 ${sentenceIndex + 1} / ${PASSAGE.sentences.length}</small></div><button class="gcv3-translate" id="gcv3-translate">${showKo ? '해석 숨기기' : '해석 보기'}</button></div>
+      <div class="gcv3-history">
+        <button id="gcv3-prev" ${sentenceIndex <= 0 ? 'disabled' : ''}>${icon('back')} 이전 문장</button>
+        <span class="gcv3-history-status ${isReview ? 'review' : ''}">${isReview ? '완료 문장' : '현재 문장'}</span>
+        <button id="gcv3-forward" ${sentenceIndex >= activeSentenceIndex ? 'disabled' : ''}>다음 문장 ${icon('arrow')}</button>
+      </div>
+      ${isReview ? '<div class="gcv3-readonly-note">✓ 이미 채점한 문장입니다. 답은 확인만 가능하고 수정할 수 없어요.</div>' : ''}
       <section class="gcv3-card">
-        <div class="gcv3-sentence-label"><b>SENTENCE ${String(sentenceIndex + 1).padStart(2, '0')}</b><span>선택 ${chosenCount} / ${choices.length}</span></div>
+        <div class="gcv3-sentence-label"><b>SENTENCE ${String(sentenceIndex + 1).padStart(2, '0')}</b><span>${isReview ? '채점 완료 · 읽기 전용' : '선택 ' + chosenCount + ' / ' + choices.length}</span></div>
         ${showKo ? `<p class="gcv3-ko">${esc(sentence.ko)}</p>` : ''}
         <div class="gcv3-en">${renderEnglish(sentence)}</div>
         <div class="gcv3-divider"></div>
-        <div class="gcv3-question-title">알맞은 표현을 하나씩 선택하세요.</div>
+        <div class="gcv3-question-title">${isReview ? '내가 선택한 답과 정답을 다시 확인하세요.' : '알맞은 표현을 하나씩 선택하세요.'}</div>
         <div class="gcv3-groups">${groups}</div>
-        ${sentenceGraded ? `<div class="gcv3-feedbacks">${feedbacks}</div>` : ''}
-        <div class="gcv3-tip"><span>한 문장 안에서 모든 괄호를 해결해요.</span><span>1·2 키로 현재 선택지를 바꿀 수 있어요.</span></div>
+        ${(sentenceGraded || isReview) ? `<div class="gcv3-feedbacks">${feedbacks}</div>` : ''}
+        <div class="gcv3-tip"><span>${isReview ? '완료된 문장은 답을 바꿀 수 없어요.' : '한 문장 안에서 모든 괄호를 해결해요.'}</span><span>${isReview ? '다음 문장으로 돌아가 학습을 이어가세요.' : '1·2 키로 현재 선택지를 바꿀 수 있어요.'}</span></div>
       </section>`;
 
+
     const allChosen = chosenCount === choices.length;
-    const bottom = sentenceGraded
-      ? `<button class="btn primary" id="gcv3-next">${sentenceIndex === PASSAGE.sentences.length - 1 ? (firstRoundWrong.length ? '오답 복습 시작' : '결과 보기') : '다음 문장'} ${icon('arrow')}</button>`
-      : `<button class="btn primary" id="gcv3-grade" ${allChosen ? '' : 'disabled'}>문장 채점</button>`;
+    const bottom = isReview
+      ? `<button class="btn primary" id="gcv3-next">다음 문장으로 ${icon('arrow')}</button>`
+      : sentenceGraded
+        ? `<button class="btn primary" id="gcv3-next">${sentenceIndex === PASSAGE.sentences.length - 1 ? (firstRoundWrong.length ? '오답 복습 시작' : '결과 보기') : '다음 문장'} ${icon('arrow')}</button>`
+        : `<button class="btn primary" id="gcv3-grade" ${allChosen ? '' : 'disabled'}>문장 채점</button>`;
 
     mountShell(PASSAGE.source, { label: (sentenceIndex + 1) + ' / ' + PASSAGE.sentences.length, percent: progress }, body, bottom);
 
     $('#gcv3-translate').onclick = () => { showKo = !showKo; mountPractice(); };
-    $$('[data-choice-key]').forEach(button => button.onclick = () => {
+    $('#gcv3-prev')?.addEventListener('click', previousSentence);
+    $('#gcv3-forward')?.addEventListener('click', forwardSentence);
+    $('[data-choice-key]').forEach(button => button.onclick = () => {
+      if (isReview || sentenceGraded) return;
       answers.set(button.dataset.choiceKey, button.dataset.choiceValue);
       mountPractice();
     });
@@ -524,6 +585,8 @@ export function openGrammarChoiceSample(A, redraw) {
       firstRoundWrong.length = 0;
       firstRoundCorrect.clear();
       sentenceIndex = 0;
+      activeSentenceIndex = 0;
+      gradedSentences.clear();
       sentenceGraded = false;
       showKo = false;
       stage = 'practice';
