@@ -570,6 +570,17 @@ export function openGrammarChoiceSample(A, redraw, passageId = DANWONGO_PASSAGES
     const firstRate = Math.round((firstCorrect / total) * 100);
     const recallAttempts = recallQueue.reduce((n, item) => n + (item.attempts || 0), 0);
     const mastered = firstRoundWrong.length === 0 || recallQueue.every(item => item.attempts > 0);
+    if (mastered) {
+      try {
+        localStorage.setItem('sumus:grammar-master:' + A.data.profile.id + ':' + PASSAGE.id, JSON.stringify({
+          mastered: true,
+          firstRate,
+          firstWrong: firstRoundWrong.length,
+          recallAttempts,
+          updatedAt: Date.now()
+        }));
+      } catch {}
+    }
     const body = `
       <section class="gcv3-result">
         <div class="gcv3-resultmark">${mastered ? '✓' : '★'}</div>
