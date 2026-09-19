@@ -60,14 +60,17 @@ function grammarStudy(A) {
   const passageCards = DANWONGO_PASSAGES.map(p => {
     const sentenceCount = p.sentences.length;
     const choiceCount = p.sentences.reduce((sum, sentence) => sum + sentence.parts.filter(part => part[0] === 'c').length, 0);
-    return `<button class="grammar-set-card premium" data-action="grammar-choice" data-grammar-id="${esc(p.id)}">
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem('sumus:grammar-master:' + A.data.profile.id + ':' + p.id) || 'null'); } catch {}
+    const mastered = Boolean(saved?.mastered);
+    return `<button class="grammar-set-card premium ${mastered ? 'mastered' : ''}" data-action="grammar-choice" data-grammar-id="${esc(p.id)}">
       <div class="grammar-set-top">
         <span class="grammar-number">${esc(p.number)}</span>
         <div class="grow"><b>${esc(p.subtitle)}</b><small>2025년 9월 인천교육청</small></div>
-        <span class="grammar-state">미학습</span>
+        <span class="grammar-state ${mastered ? 'master' : ''}">${mastered ? 'MASTER' : '미학습'}</span>
       </div>
-      <div class="grammar-set-meta"><span>${sentenceCount}문장</span><span>${choiceCount}개 선택</span><span>오답 리콜</span></div>
-      <div class="grammar-set-cta">학습 시작 ${icon('arrow')}</div>
+      <div class="grammar-set-meta"><span>${sentenceCount}문장</span><span>${choiceCount}개 선택</span><span>${mastered ? '1차 ' + Number(saved.firstRate || 0) + '%' : '오답 리콜'}</span></div>
+      <div class="grammar-set-cta">${mastered ? '다시 학습' : '학습 시작'} ${icon('arrow')}</div>
     </button>`;
   }).join('');
 
