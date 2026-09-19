@@ -28,6 +28,8 @@ function injectStyles() {
     .sumus-score{margin-left:auto;font-weight:800;font-size:13px;white-space:nowrap}
     .sumus-last-activity{white-space:nowrap;color:#667085;font-size:12px}
     .sumus-account-note{margin-top:10px;font-size:12px;line-height:1.5;color:#98a2b3}
+    .sumus-account-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+    .sumus-danger{color:#b42318!important;border-color:#fecdca!important;background:#fff!important}
     @media(max-width:760px){.sumus-extra-filter{min-width:0}.toolbar{flex-wrap:wrap}.sumus-detail-section .form-columns{grid-template-columns:1fr}}
   `;
   document.head.appendChild(style);
@@ -144,7 +146,7 @@ function examRows(data, id) {
 }
 
 async function openStudentDetail(id) {
-  const data = await bootstrap(true);
+  const data = await bootstrap();
   const p = data.profiles.find(x => x.id === id);
   if (!p) return toast('학생 정보를 찾을 수 없어요.');
   const attempts = data.attempts.filter(a => a.student_id === id && a.status === 'submitted');
@@ -174,8 +176,8 @@ async function openStudentDetail(id) {
         <label class="field"><span>새 비밀번호</span><input name="password" type="password" minlength="8" maxlength="128" autocomplete="new-password" placeholder="변경할 때만 입력 · 8자 이상"></label>
         <label class="checkbox-line"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}>계정 활성화</label>
         <div class="form-error" id="student-enhanced-error" role="alert"></div>
-        <button class="btn primary full" type="submit">학생 정보 저장</button>
-        <p class="sumus-account-note">학교를 변경하면 다음 로그인부터 새 학교의 단어·과제·시험만 표시됩니다. 기존 학습·시험 기록은 그대로 보존됩니다.</p>
+        <button class="btn primary full" type="submit">학생 정보 저장</button><div class="sumus-account-actions"><button class="btn" type="button" id="student-reset-password">비밀번호 12345678로 재설정</button><button class="btn sumus-danger" type="button" id="student-delete-account">학생 계정 삭제</button></div>
+        <p class="sumus-account-note">학교를 변경하면 다음 로그인부터 새 학교의 단어·과제·시험만 표시됩니다. 비밀번호 재설정 시 기존 로그인은 모두 해제됩니다. 계정 삭제는 해당 학생의 연습·시험 기록도 함께 삭제합니다.</p>
       </form>
     </div>`, '학생 관리');
 
@@ -191,14 +193,38 @@ async function openStudentDetail(id) {
     if (values.password) payload.password = values.password;
     try {
       await api('/students/' + id, payload, 'PATCH');
-      cache = null;
+      const fresh = await api('/bootstrap');
+      cache = fresh; cacheAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = fresh;
       close();
+      globalThis.__SUMUS_APPLY_BOOTSTRAP__?.(fresh);
       toast('학생 정보를 저장했어요.');
-      setTimeout(() => location.reload(), 350);
     } catch (err) {
       error.textContent = err.message;
       buttonBusy(button, false);
     }
+  };
+
+  $('#student-reset-password').onclick = async event => {
+    if (!confirm(p.display_name + ' 학생의 비밀번호를 12345678로 재설정할까요?')) return;
+    buttonBusy(event.currentTarget);
+    try {
+      await api('/students/' + id, { password: '12345678' }, 'PATCH');
+      toast('비밀번호를 12345678로 재설정했어요.');
+    } catch (err) { toast(err.message); }
+    finally { buttonBusy(event.currentTarget, false); }
+  };
+
+  $('#student-delete-account').onclick = async event => {
+    if (!confirm(p.display_name + ' 학생 계정을 삭제할까요?\n연습 기록과 시험 기록도 함께 삭제됩니다.')) return;
+    buttonBusy(event.currentTarget);
+    try {
+      await api('/students/' + id, {}, 'DELETE');
+      const fresh = await api('/bootstrap');
+      cache = fresh; cacheAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = fresh;
+      close();
+      globalThis.__SUMUS_APPLY_BOOTSTRAP__?.(fresh);
+      toast('학생 계정을 삭제했어요.');
+    } catch (err) { toast(err.message); buttonBusy(event.currentTarget, false); }
   };
 }
 
@@ -210,9 +236,15 @@ document.addEventListener('click', event => {
   openStudentDetail(button.dataset.student).catch(err => toast(err.message));
 }, true);
 
-const observer = new MutationObserver(() => {
-  enhanceStudentsPage().catch(() => {});
-});
+let enhanceFrame = 0;
+function scheduleEnhance() {
+  if (enhanceFrame) return;
+  enhanceFrame = requestAnimationFrame(() => {
+    enhanceFrame = 0;
+    enhanceStudentsPage().catch(() => {});
+  });
+}
+const observer = new MutationObserver(scheduleEnhance);
 observer.observe(app, { childList: true, subtree: true });
 injectStyles();
-enhanceStudentsPage().catch(() => {});
+scheduleEnhance();
