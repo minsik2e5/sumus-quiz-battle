@@ -36,15 +36,22 @@ jobs:
         working-directory: bunjang-src/bunjang-multi-manager-1.0
         run: npm install
 
-      - name: Build Windows installer and portable EXE
+      - name: Build Windows installer
         working-directory: bunjang-src/bunjang-multi-manager-1.0
-        run: npm run dist
+        shell: powershell
+        run: npx electron-builder --win nsis --x64 '--config.artifactName=BUNJANG_MULTI_MANAGER_Setup_${version}_${arch}.${ext}'
+
+      - name: Build Windows portable EXE
+        working-directory: bunjang-src/bunjang-multi-manager-1.0
+        shell: powershell
+        run: npx electron-builder --win portable --x64 '--config.artifactName=BUNJANG_MULTI_MANAGER_Portable_${version}_${arch}.${ext}'
 
       - name: Upload Windows build
         uses: actions/upload-artifact@v4
         with:
           name: BUNJANG-MULTI-MANAGER-1.0-WINDOWS
           path: |
-            bunjang-src/bunjang-multi-manager-1.0/dist/*.exe
+            bunjang-src/bunjang-multi-manager-1.0/dist/BUNJANG_MULTI_MANAGER_Setup_*.exe
+            bunjang-src/bunjang-multi-manager-1.0/dist/BUNJANG_MULTI_MANAGER_Portable_*.exe
           if-no-files-found: error
           retention-days: 30
