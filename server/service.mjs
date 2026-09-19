@@ -56,7 +56,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.0.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.0.1', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -158,6 +158,21 @@ export async function service(state, method, path, body, token) {
     if (body.password) { if (process.env.AUTH_PROVIDER === 'supabase') fail('기존 Supabase 계정 관리에서 변경해주세요.'); if (body.password.length < 8) fail('비밀번호는 8자 이상 입력해주세요.'); student.password_hash = await passwordHash(body.password); state.tokens = state.tokens.filter(t => t.user_id !== student.id); }
     return publicProfile(student);
   }
+  if (/^\/students\/[^/]+$/.test(path) && method === 'DELETE') {
+    requireRole(p, 'teacher');
+    const studentId = path.split('/')[2];
+    const student = state.profiles.find(s => s.id === studentId && s.role === 'student');
+    if (!student) fail('학생을 찾을 수 없습니다.', 404);
+    const currentSchool = schoolForProfile(state, student);
+    if (!currentSchool || !p.school_ids?.includes(currentSchool.id)) fail('담당 학교의 학생만 삭제할 수 있습니다.', 403);
+    state.profiles = state.profiles.filter(item => item.id !== studentId);
+    state.tokens = state.tokens.filter(item => item.user_id !== studentId);
+    state.sessions = state.sessions.filter(item => item.student_id !== studentId);
+    state.practices = state.practices.filter(item => item.student_id !== studentId);
+    state.examAttempts = state.examAttempts.filter(item => item.student_id !== studentId);
+    delete state.mastery[studentId];
+    return { ok: true, id: studentId };
+  }
   if ((path === '/exams' || path === '/assignments') && method === 'POST') {
     requireRole(p, 'teacher');
     const school = schoolByRef(state, body.school_id || body.school);
@@ -252,7 +267,10 @@ export async function service(state, method, path, body, token) {
         advancePractice(x, state);
         result.prefetched_next = practiceView(x, state);
       }
-      x.responses[body.question_id] = structuredClone(result); return result;
+      x.responses[body.question_id] = structuredClone(result);
+      const responseKeys = Object.keys(x.responses);
+      while (responseKeys.length > 3) delete x.responses[responseKeys.shift()];
+      return result;
     }
     if (path.endsWith('/next') && !x.finished && x.feedback) {
       advancePractice(x, state);
