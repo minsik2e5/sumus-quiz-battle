@@ -1,94 +1,7 @@
 import { $, $$, esc, icon, toast } from './modules/ui.js';
+import { DANWONGO_PASSAGES, getDanwongoPassage } from './danwongo-grammar-data.js?v=1';
 
-const PASSAGE = {
-  id: '2026-03-seoul-18',
-  title: '2026년 3월 서울교육청 · 18번',
-  subtitle: 'Connexa Point Table Tennis Center',
-  source: 'WORKBOOK 6 · 어법·어휘 고르기',
-  sentences: [
-    {
-      ko: 'Connexa Point 탁구 센터 회원님께, 저는 Connexa Point 탁구 센터의 관리자입니다.',
-      parts: [
-        ['t', 'Dear Connexa Point Table Tennis Center '],
-        ['c', ['members', 'owners'], 'members', '어휘', '편지의 수신자는 센터의 회원들이므로 members가 자연스러워요.'],
-        ['t', ', I am the manager of the Connexa Point Table Tennis Center.']
-      ]
-    },
-    {
-      ko: '센터의 다가오는 재개장에 관심을 가져 주셔서 감사합니다.',
-      parts: [
-        ['t', 'Thank you for your '],
-        ['c', ['interest', 'disinterest'], 'interest', '어휘', 'Thank you for your interest in ~는 “~에 관심을 가져 주셔서 감사합니다”라는 표현이에요.'],
-        ['t', ' in the upcoming '],
-        ['c', ['reopening', 'reopen'], 'reopening', '품사', 'upcoming 뒤에는 명사 역할을 하는 reopening이 와요.'],
-        ['t', ' of the center.']
-      ]
-    },
-    {
-      ko: '안타깝게도, 보수 과정에서 예상치 못한 전기 문제가 발견되었고, 작업이 저희가 계획했던 것보다 더 오래 걸리게 되었습니다.',
-      parts: [
-        ['c', ['Unfortunately', 'Fortunately'], 'Unfortunately', '문맥', '예상치 못한 문제가 발견된 부정적인 상황이므로 Unfortunately가 맞아요.'],
-        ['t', ', '],
-        ['c', ['while', 'during'], 'during', '어법', '뒤에 명사구 the repair process가 오므로 전치사 during이 맞아요.'],
-        ['t', ' the repair process, '],
-        ['c', ['expected', 'unexpected'], 'unexpected', '문맥', '계획에 없던 전기 문제이므로 unexpected가 맞아요.'],
-        ['t', ' electrical issues '],
-        ['c', ['were discovered', 'discovered'], 'were discovered', '수동태', '전기 문제가 “발견된” 것이므로 수동태 were discovered가 맞아요.'],
-        ['t', ', '],
-        ['c', ['causing', 'caused'], 'causing', '분사', '앞 문장의 결과를 이어 설명하므로 causing이 자연스러워요.'],
-        ['t', ' the work to take '],
-        ['c', ['shorter', 'longer'], 'longer', '문맥', '문제로 인해 작업 시간이 계획보다 더 길어졌으므로 longer가 맞아요.'],
-        ['t', ' than we planned.']
-      ]
-    },
-    {
-      ko: '저희가 센터 재개장을 연기해야 함을 알려 드리게 되어 유감입니다.',
-      parts: [
-        ['t', 'We regret '],
-        ['c', ['to inform', 'informing'], 'to inform', '어법', 'regret to inform은 “유감스럽게도 알려 드리다”라는 정형 표현이에요.'],
-        ['t', ' you '],
-        ['c', ['who', 'that'], 'that', '접속사', '뒤에 완전한 문장이 이어져 내용을 소개하므로 that이 맞아요.'],
-        ['t', ' the center’s reopening must '],
-        ['c', ['be delayed', 'delay'], 'be delayed', '수동태', '재개장은 “연기되는” 것이므로 must be delayed가 맞아요.'],
-        ['t', '.']
-      ]
-    },
-    {
-      ko: '센터는 원래 4월 1일에 재개장할 예정이었습니다.',
-      parts: [
-        ['t', 'The center was '],
-        ['c', ['original', 'originally'], 'originally', '품사', 'scheduled를 꾸며 주는 부사가 필요하므로 originally가 맞아요.'],
-        ['t', ' scheduled to reopen on April 1st.']
-      ]
-    },
-    {
-      ko: '하지만, 이제는 모든 방문객의 안전을 보장하기 위해 5월 1일에 재개장할 것입니다.',
-      parts: [
-        ['t', 'However, '],
-        ['c', ['they', 'it'], 'it', '대명사', '앞의 단수 명사 the center를 받으므로 it이 맞아요.'],
-        ['t', ' will now reopen on May 1st to '],
-        ['c', ['ensure', 'be ensured'], 'ensure', '태', '센터가 안전을 “보장하는” 목적이므로 능동형 ensure가 맞아요.'],
-        ['t', ' the safety of all members.']
-      ]
-    },
-    {
-      ko: '저희는 코트에서 여러분을 곧 다시 뵐 수 있기를 기대합니다.',
-      parts: [
-        ['t', 'We look forward to '],
-        ['c', ['seeing', 'see'], 'seeing', '어법', 'look forward to에서 to는 전치사이므로 뒤에 동명사 seeing이 와요.'],
-        ['t', ' you back on the court soon.']
-      ]
-    },
-    {
-      ko: '여러분의 인내와 이해에 감사드립니다.',
-      parts: [
-        ['t', 'Thank you for your '],
-        ['c', ['impatience', 'patience'], 'patience', '어휘', '지연을 이해하고 기다려 준 것에 감사하는 문맥이므로 patience가 맞아요.'],
-        ['t', ' and understanding.']
-      ]
-    }
-  ]
-};
+let PASSAGE = DANWONGO_PASSAGES[0];
 
 function addStyles() {
   if (document.querySelector('#gc-v4-style')) return;
@@ -333,7 +246,8 @@ function allChoiceRefs() {
   return refs;
 }
 
-export function openGrammarChoiceSample(A, redraw) {
+export function openGrammarChoiceSample(A, redraw, passageId = DANWONGO_PASSAGES[0]?.id) {
+  PASSAGE = getDanwongoPassage(passageId);
   addStyles();
   A.screen = 'grammar-choice';
 
@@ -598,7 +512,7 @@ export function openGrammarChoiceSample(A, redraw) {
     const body = `
       <section class="gcv3-result">
         <div class="gcv3-resultmark">${mastered ? '✓' : '★'}</div>
-        <h1>${mastered ? '18번 MASTER!' : '한 번 더 다듬어 볼까요?'}</h1>
+        <h1>${mastered ? '${PASSAGE.number}번 MASTER!' : '한 번 더 다듬어 볼까요?'}</h1>
         <p>문장 단위 학습과 오답 리콜을 마쳤어요.</p>
         <div class="gcv3-score">${firstRate}<small>% · 1차</small></div>
         <div class="gcv3-statgrid"><div><b>${firstCorrect}</b><span>1차 정답</span></div><div><b>${firstRoundWrong.length}</b><span>1차 오답</span></div><div><b>${recallAttempts}</b><span>오답 리콜</span></div></div>
