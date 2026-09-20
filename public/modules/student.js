@@ -3,6 +3,7 @@ import { icon, esc, num, date, rangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar } from './character.js';
 import { DANWONGO_PASSAGES } from '../danwongo-grammar-data.js?v=2';
 import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from '../seonbu-grammar-data.js?v=2';
+import { GANGSEO_PASSAGES } from '../gangseo-grammar-data.js?v=1';
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
 export function shell(A, content) {
   const p = A.data.profile;
@@ -58,7 +59,7 @@ function studyHub(A) {
 function grammarCards(A, passages) {
   return passages.map(p => {
     const sentenceCount = p.sentences.length;
-    const examLabel = p.id.startsWith('2026-03-seoul') ? '2026년 3월 서울교육청' : '2025년 9월 인천교육청';
+    const examLabel = p.id.startsWith('2026-06-busan') ? '2026년 6월 부산교육청' : p.id.startsWith('2026-03-seoul') ? '2026년 3월 서울교육청' : '2025년 9월 인천교육청';
     const choiceCount = p.sentences.reduce((sum, sentence) => sum + sentence.parts.filter(part => part[0] === 'c').length, 0);
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem('sumus:grammar-master:' + A.data.profile.id + ':' + p.id) || 'null'); } catch {}
@@ -79,7 +80,8 @@ function grammarStudy(A) {
   const school = A.data.profile.school || A.school || '';
   const isDanwon = school === '단원고';
   const isSeonbu = school === '선부고';
-  const passages = isDanwon ? DANWONGO_PASSAGES : [];
+  const isGangseo = school === '강서고';
+  const passages = isDanwon ? DANWONGO_PASSAGES : isGangseo ? GANGSEO_PASSAGES : [];
 
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">GRAMMAR</span></div>
   <div class="page-heading grammar-heading"><h1>어법·어휘</h1><p>WORKBOOK 6 선택지만 그대로 풀고, 분석본 기준으로 오답을 정리해요.</p></div>
@@ -88,6 +90,10 @@ function grammarStudy(A) {
     <section class="grammar-range-head"><div><span class="eyebrow">단원고 시험범위</span><h2>2025년 9월 인천교육청</h2><p>WORKBOOK 6 원문 선택지 · 분석본 기준 채점 해설</p></div><span class="grammar-range-count">${passages.length}지문</span></section>
     <div class="grammar-set-list">${grammarCards(A, passages)}</div>
     <p class="quiet-note">범위: 24 · 29 · 31 · 32 · 33 · 34 · 36 · 39 · 40 · 41~42</p>
+  ` : isGangseo ? `
+    <section class="grammar-range-head gangseo"><div><span class="eyebrow">강서고 시험범위 · 2026</span><h2>2026년 6월 부산교육청</h2><p>WORKBOOK 6 원문 선택지 · 지문분석 기준 채점 해설</p></div><span class="grammar-range-count">${GANGSEO_PASSAGES.length}지문</span></section>
+    <div class="grammar-set-list">${grammarCards(A, GANGSEO_PASSAGES)}</div>
+    <p class="quiet-note">범위: 21 · 23 · 29 · 30 · 31 · 32 · 33 · 34 · 36 · 37 · 38 · 39 · 40</p>
   ` : isSeonbu ? `
     <section class="grammar-range-head seonbu current"><div><span class="eyebrow">선부고 시험범위 · 2026</span><h2>2026년 3월 서울교육청</h2><p>WORKBOOK 6 원문 선택지 · 분석본 기준 채점 해설</p></div><span class="grammar-range-count">${SEONBU_2026_PASSAGES.length}지문</span></section>
     <div class="grammar-set-list">${grammarCards(A, SEONBU_2026_PASSAGES)}</div>
