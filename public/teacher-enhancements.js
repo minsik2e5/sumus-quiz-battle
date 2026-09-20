@@ -49,6 +49,7 @@ function lastActivity(data, studentId) {
   if (profile?.created_at) stamps.push(profile.created_at);
   for (const s of data.sessions) if (s.student_id === studentId && s.created_at) stamps.push(s.created_at);
   for (const a of data.attempts) if (a.student_id === studentId) stamps.push(a.submitted_at || a.started_at || 0);
+  for (const item of Object.values(data.grammar_progress?.[studentId] || {})) if (item.updated_at) stamps.push(item.updated_at);
   return Math.max(0, ...stamps);
 }
 
@@ -150,6 +151,9 @@ async function openStudentDetail(id) {
   const p = data.profiles.find(x => x.id === id);
   if (!p) return toast('학생 정보를 찾을 수 없어요.');
   const attempts = data.attempts.filter(a => a.student_id === id && a.status === 'submitted');
+  const grammarItems = Object.values(data.grammar_progress?.[id] || {}).filter(item => !item.school_id || item.school_id === p.school_id);
+  const grammarMastered = grammarItems.filter(item => item.mastered).length;
+  const grammarRecent = [...grammarItems].sort((a, b) => Number(b.updated_at || 0) - Number(a.updated_at || 0))[0];
   const recent = shortActivity(lastActivity(data, id));
   const schoolOptions = data.schools.map(s => `<option value="${esc(s.id)}" ${(s.id === p.school_id || (!p.school_id && s.name === p.school)) ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   const classOptions = [...new Set([...CLASS_OPTIONS, p.class_name].filter(Boolean))].map(c => `<option value="${esc(c)}" ${c === p.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('');
@@ -164,6 +168,7 @@ async function openStudentDetail(id) {
       <div><b>${p.stats.practice_count}회</b><small>누적 연습</small></div>
       <div><b>${attempts.length}회</b><small>실전시험 제출</small></div>
     </div>
+    <div class="sumus-detail-section"><h3>어법·어휘 진도</h3><div class="detail-grid"><div><b>${grammarMastered}지문</b><small>MASTER</small></div><div><b>${grammarItems.length}지문</b><small>학습 기록</small></div></div><p class="sumus-account-note">${grammarRecent ? '최근 어법 학습 ' + esc(shortActivity(grammarRecent.updated_at)) : '아직 어법·어휘 학습 기록이 없어요.'}</p></div>
     <div class="sumus-detail-section"><h3>최근 연습 기록</h3><div class="sumus-activity-list">${activityRows(data, id)}</div></div>
     <div class="sumus-detail-section"><h3>최근 시험 결과</h3><div class="sumus-activity-list">${examRows(data, id)}</div></div>
     <div class="sumus-detail-section">
