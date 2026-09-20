@@ -82,7 +82,9 @@ export class VocaStateObject {
     this.ready = ctx.blockConcurrencyWhile(async () => {
       this.repo = createSupabaseRepository(env);
       const initial = await this.repo.read();
-      if (migrateState(initial.state)) {
+      const migrated = migrateState(initial.state);
+      const swept = sweep(initial.state);
+      if (migrated || swept) {
         await this.repo.commit(initial.state, initial.revision);
         initial.revision += 1;
       }
