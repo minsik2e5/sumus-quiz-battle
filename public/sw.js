@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.6.0-teacher-dashboard';
+const VERSION = 'sumus-voca-v13.6.1-startup-fix';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
