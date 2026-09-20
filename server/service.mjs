@@ -169,7 +169,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.8.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.9.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -241,11 +241,12 @@ export async function service(state, method, path, body, token) {
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
       attempts: attempts.map(a => attemptSummary(a, state, p)), server_time: Date.now(),
       active_practice: state.practices.find(x => x.student_id === p.id && !x.finished)?.id || null,
-      ranking: teacher ? [] : state.profiles.filter(x => x.active && x.role === 'student' && x.division === selectedDivision).map(s => {
+      ranking: teacher ? [] : state.profiles.filter(x => x.active && x.role === 'student').map(s => {
         const records = mySessions(state, s.id), weekly = records.filter(r => r.created_at >= Date.now() - 7 * 86400000);
         const g = growthFor(records), isMe = s.id === p.id;
         const hidden = !isMe && (s.ranking_public === false || s.share_profile === false);
-        return { id: hidden ? null : s.id, is_me: isMe, private: hidden, display_name: hidden ? '비공개 학생' : s.display_name, avatar_key: hidden ? 'lumi' : (s.avatar_key || 'lumi'), level: hidden ? 1 : g.level, streak: g.streak, xp: weekly.reduce((n, r) => n + r.xp, 0), total: weekly.reduce((n, r) => n + r.total, 0) };
+        const grade = /^중2/.test(s.class_name || '') ? '중2' : /^중3/.test(s.class_name || '') ? '중3' : /^고1/.test(s.class_name || '') ? '고1' : (s.division === 'middle' ? '중등' : '고등');
+        return { id: hidden ? null : s.id, is_me: isMe, private: hidden, grade, division: s.division || (grade.startsWith('중') ? 'middle' : 'high'), display_name: hidden ? '비공개 학생' : s.display_name, avatar_key: hidden ? 'lumi' : (s.avatar_key || 'lumi'), level: hidden ? 1 : g.level, streak: g.streak, xp: weekly.reduce((n, r) => n + r.xp, 0), total: weekly.reduce((n, r) => n + r.total, 0) };
       })
     };
   }
