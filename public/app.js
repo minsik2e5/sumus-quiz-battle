@@ -4,7 +4,6 @@ import { avatar } from './modules/character.js';
 import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.5.0';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.6.1';
 import { configureSessions, openExam, openResult, startPractice, leaveSession } from './modules/sessions.js';
-import { openGrammarChoiceSample } from './grammar-choice-sample.js?v=13.6.1';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', target: 30, sound: false, role: 'student', studyView: 'hub' };
 let poll, rendering = false;
 function preferences() {
@@ -65,7 +64,11 @@ $('#app').addEventListener('click', async event => {
     if (d.examActive) { const e = A.data.exams.find(e => e.id === d.examActive); await api('/exams/' + e.id, { active: !e.active }, 'PATCH'); await refresh(); render(); return; }
     if (d.action === 'refresh') { buttonBusy(b); await refresh(); render(); toast('최신 기록으로 업데이트했어요.'); }
     if (d.action === 'start-practice') { buttonBusy(b); await startPractice(); }
-    if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') { openGrammarChoiceSample(A, render, d.grammarId); return; }
+    if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.6.2');
+      openGrammarChoiceSample(A, render, d.grammarId);
+      return;
+    }
     if (d.action === 'save-style') { buttonBusy(b); await api('/profile/style', A.style); await refresh(); A.style = null; A.tab = 'home'; render(); toast('내 캐릭터를 저장했어요.'); }
     if (d.action === 'account') accountModal();
     if (d.action === 'logout') await logout();
@@ -180,6 +183,18 @@ function exportResults() {
   A.data.attempts.filter(a => a.status === 'submitted').forEach(a => { const p = A.data.profiles.find(p => p.id === a.student_id), e = A.data.exams.find(e => e.id === a.exam_id); rows.push([p?.display_name, p?.class_name, e?.title, EXAM_TYPES[e?.exam_type]?.label, a.score, a.correct, a.total, date(a.submitted_at)]); });
   const url = URL.createObjectURL(new Blob(['\uFEFF' + rows.map(r => r.map(safe).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' })); const link = document.createElement('a'); link.href = url; link.download = 'SUMUS_시험결과.csv'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
-try { const health = await api('/health'); if (!health.ready) { loginView(); $('#login-error').textContent = '교사 계정을 먼저 설정해주세요. 실행 폴더의 시작 안내를 확인하세요.'; } else {
-  try { const session = await api('/session'); if (!session.authenticated) loginView(); else { await refresh(); preferences(); A.tab = A.data.profile.role === 'teacher' ? 'dashboard' : A.data.profile.avatar_key ? 'home' : 'studio'; render(); startPolling(); } } catch (e) { if (e.status === 401) loginView(); else throw e; }
-} } catch (e) { loginView(); $('#login-error').textContent = '서버 연결을 확인해주세요. 실행 폴더에서 서버를 시작해야 합니다.'; }
+loginView();
+try {
+  const session = await api('/session');
+  if (session.authenticated) {
+    await refresh();
+    preferences();
+    A.tab = A.data.profile.role === 'teacher' ? 'dashboard' : A.data.profile.avatar_key ? 'home' : 'studio';
+    render();
+    startPolling();
+  }
+} catch (e) {
+  if (e.status !== 401) {
+    $('#login-error').textContent = '서버 응답이 느립니다. 잠시 후 다시 로그인해주세요.';
+  }
+}
