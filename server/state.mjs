@@ -5,7 +5,7 @@ export const DEFAULT_SCHOOLS = [
 ];
 
 export function emptyState() {
-  return { schema_version: 13, schools: structuredClone(DEFAULT_SCHOOLS), profiles: [], tokens: [], sessions: [], mastery: {}, assignments: [], exams: [], examAttempts: [], practices: [], extraBooks: [] };
+  return { schema_version: 14, schools: structuredClone(DEFAULT_SCHOOLS), profiles: [], tokens: [], sessions: [], mastery: {}, grammarProgress: {}, assignments: [], exams: [], examAttempts: [], practices: [], extraBooks: [] };
 }
 
 export function migrateState(state) {
@@ -14,6 +14,7 @@ export function migrateState(state) {
     if (!Array.isArray(state[key])) { state[key] = []; changed = true; }
   }
   if (!state.mastery || typeof state.mastery !== 'object' || Array.isArray(state.mastery)) { state.mastery = {}; changed = true; }
+  if (!state.grammarProgress || typeof state.grammarProgress !== 'object' || Array.isArray(state.grammarProgress)) { state.grammarProgress = {}; changed = true; }
   // Completed practice payloads can be very large (questions, retries and idempotency responses).
   // Their durable summary already lives in sessions, so keep only active/unreconciled practice state.
   const sessionIds = new Set(state.sessions.map(item => item.id));
@@ -40,6 +41,6 @@ export function migrateState(state) {
   for (const key of ['assignments', 'exams', 'sessions', 'practices']) {
     for (const record of state[key]) if (!record.school_id && byName(record.school)) { record.school_id = byName(record.school).id; changed = true; }
   }
-  if (state.schema_version !== 13) { state.schema_version = 13; changed = true; }
+  if (state.schema_version !== 14) { state.schema_version = 14; changed = true; }
   return changed;
 }
