@@ -120,7 +120,18 @@ $('#app').addEventListener('change', event => {
     return;
   }
   if (input.dataset.range) {
-    const values = new Set(getRanges(A).selected); if (input.checked) values.add(input.dataset.range); else values.delete(input.dataset.range); A.ranges[A.school] = [...values]; A.assignmentId = null; updateRangeSummary(A); updateExamSummary(A); savePreferences();
+    const grade = input.dataset.rangeGrade || null;
+    const info = getRanges(A, A.school, grade);
+    const values = new Set(info.selected);
+    if (input.checked) values.add(input.dataset.range); else values.delete(input.dataset.range);
+    A.ranges[info.key] = [...values];
+    A.assignmentId = null;
+    if (grade) {
+      const count = selectedCount(A, grade);
+      if ($('#scope-count')) $('#scope-count').textContent = `${values.size}개 범위 · ${count}개 단어`;
+      updateExamSummary(A);
+    } else updateRangeSummary(A);
+    savePreferences();
   }
   if (input.id === 'vocab-grade') { A.vocabGrade = input.value; $('#vocab-table').innerHTML = vocabTable(A); return; }
   if (input.id === 'class-filter') { A.classFilter = input.value; $('#student-table').innerHTML = studentFiltered(A); }
@@ -130,11 +141,16 @@ function bindPageForms() {
   $('#vocab-search')?.addEventListener('input', e => { A.vocabSearch = e.target.value; $('#vocab-table').innerHTML = vocabTable(A); });
   const form = $('#exam-form');
   if (form) {
-    form.oninput = () => updateExamSummary(A); form.onchange = () => updateExamSummary(A);
+    form.oninput = () => updateExamSummary(A);
+    form.onchange = event => {
+      collectExamForm(A);
+      if (event.target?.name === 'class_name') { getRanges(A, A.school, A.examForm.class_name); render(); return; }
+      updateExamSummary(A);
+    };
     form.onsubmit = async e => {
       e.preventDefault(); collectExamForm(A); const v = A.examForm, b = $('[type="submit"]', form); buttonBusy(b); $('#exam-create-error').textContent = '';
       try {
-        await api('/exams', { title: v.title, school: A.school, range_codes: getRanges(A).selected, class_name: v.class_name, exam_type: v.exam_type, question_count: v.question_count === 'all' ? 'all' : Number(v.question_count), duration_sec: Number(v.minutes) * 60, passing_score: Number(v.passing_score), max_attempts: Number(v.max_attempts), available_at: new Date(v.available).getTime(), due_at: new Date(v.due).getTime(), release_result: v.release_result });
+        await api('/exams', { title: v.title, school: A.school, range_codes: getRanges(A, A.school, v.class_name).selected, class_name: v.class_name, exam_type: v.exam_type, question_count: v.question_count === 'all' ? 'all' : Number(v.question_count), duration_sec: Number(v.minutes) * 60, passing_score: Number(v.passing_score), max_attempts: Number(v.max_attempts), available_at: new Date(v.available).getTime(), due_at: new Date(v.due).getTime(), release_result: v.release_result });
         A.examForm = null; await refresh(); A.tab = 'exams'; render(); toast('시험이 학생에게 배정됐어요.');
       } catch (err) { $('#exam-create-error').textContent = err.message; buttonBusy(b, false); }
     };
@@ -235,7 +251,7 @@ function examEditModal(id) {
   const exam = A.data.exams.find(item => item.id === id);
   if (!exam) return toast('시험을 찾을 수 없어요.');
   const locked = A.data.attempts.some(a => a.exam_id === id);
-  const { codes, words } = getRanges(A);
+  const { codes, words } = getRanges(A, A.school, exam.class_name);
   const rangeChecks = codes.map(code => `<label class="range-option"><input type="checkbox" name="range_code" value="${esc(code)}" ${exam.range_codes.includes(code) ? 'checked' : ''} ${locked ? 'disabled' : ''}><span>${esc(code)}<small>${words.filter(w => w.range_code === code).length}개 단어</small></span></label>`).join('');
   const typeOptions = Object.entries(EXAM_TYPES).map(([key, type]) => `<option value="${key}" ${exam.exam_type === key ? 'selected' : ''}>${esc(type.label)}</option>`).join('');
   const classOptions = [...new Set([...activeClassOptions(), exam.class_name])].map(name => `<option value="${esc(name)}" ${name === exam.class_name ? 'selected' : ''}>${esc(name)}</option>`).join('');
@@ -418,10 +434,25 @@ function studentModal(id) {
   $('#student-quick-delete').onclick = async e => { if (!confirm(p.display_name + ' 학생 계정을 삭제할까요?\n연습 기록과 시험 기록도 함께 삭제됩니다.')) return; buttonBusy(e.currentTarget); try { await api('/students/' + id, {}, 'DELETE'); close(); await refresh(); render(); toast('학생 계정을 삭제했어요.'); } catch (err) { toast(err.message); buttonBusy(e.currentTarget, false); } };
 }
 function addAssignment() {
-  const codes = getRanges(A).codes, selected = codes.slice(0, 2);
-  const classOptions = activeClassOptions().map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
-  const close = modal(`<h2>연습 과제 만들기</h2><p>${esc(A.school)}의 여러 범위를 선택해 배정하세요.</p><form id="assignment-form"><input type="hidden" name="school_id" value="${esc(A.data.profile.active_school_id)}"><label class="field"><span>과제명</span><input name="title" required placeholder="예: 중간고사 단어 복습"></label><div class="form-columns"><label class="field"><span>반</span><select name="class_name" required>${classOptions}</select></label><label class="field"><span>목표 문제 수</span><input name="target_questions" type="number" min="5" max="500" value="40" required></label></div><div class="locked-school">${icon('shield')}<div><b>${esc(A.school)}</b><small>현재 관리 중인 학교</small></div></div><div class="range-grid" id="assignment-ranges">${codes.map(c => `<label class="range-option"><input type="checkbox" value="${esc(c)}" ${selected.includes(c) ? 'checked' : ''}><span>${esc(c)}<small>번 / 외부지문</small></span></label>`).join('')}</div><label class="field" style="margin-top:18px"><span>마감일</span><input name="due" type="date" required></label><div class="form-error" id="assignment-error" role="alert"></div><button class="btn primary full" type="submit">과제 배정하기</button></form>`, '연습 과제 배정');
-  $('#assignment-form').onsubmit = async e => { e.preventDefault(); const v = Object.fromEntries(new FormData(e.currentTarget)), range_codes = $$('input:checked', $('#assignment-ranges')).map(i => i.value); try { await api('/assignments', { ...v, range_codes, target_questions: Number(v.target_questions), due_at: new Date(v.due + 'T23:59:59').getTime() }); close(); await refresh(); render(); toast('연습 과제를 배정했어요.'); } catch (err) { $('#assignment-error').textContent = err.message; } };
+  const classes = activeClassOptions();
+  const defaultClass = classes[0];
+  const classOptions = classes.map(name => `<option value="${esc(name)}">${esc(name)}</option>`).join('');
+  const rangeHtml = className => {
+    const info = getRanges(A, A.school, className);
+    return info.codes.map((code, index) => `<label class="range-option"><input type="checkbox" value="${esc(code)}" ${index < 2 ? 'checked' : ''}><span>${esc(code)}<small>${info.words.filter(word => word.range_code === code).length}개 단어</small></span></label>`).join('');
+  };
+  const close = modal(`<h2>연습 과제 만들기</h2><p>${esc(A.school)}의 학년별 단어 범위를 선택해 배정하세요.</p><form id="assignment-form"><input type="hidden" name="school_id" value="${esc(A.data.profile.active_school_id)}"><label class="field"><span>과제명</span><input name="title" required placeholder="예: 중간고사 단어 복습"></label><div class="form-columns"><label class="field"><span>반</span><select id="assignment-class" name="class_name" required>${classOptions}</select></label><label class="field"><span>목표 문제 수</span><input name="target_questions" type="number" min="5" max="500" value="40" required></label></div><div class="locked-school">${icon('shield')}<div><b>${esc(A.school)}</b><small>현재 관리 중인 학교</small></div></div><div class="range-grid" id="assignment-ranges">${rangeHtml(defaultClass)}</div><label class="field" style="margin-top:18px"><span>마감일</span><input name="due" type="date" required></label><div class="form-error" id="assignment-error" role="alert"></div><button class="btn primary full" type="submit">과제 배정하기</button></form>`, '연습 과제 배정');
+  $('#assignment-class').addEventListener('change', event => { $('#assignment-ranges').innerHTML = rangeHtml(event.target.value); });
+  $('#assignment-form').onsubmit = async e => {
+    e.preventDefault();
+    const v = Object.fromEntries(new FormData(e.currentTarget));
+    const range_codes = $$('input:checked', $('#assignment-ranges')).map(input => input.value);
+    if (!range_codes.length) return $('#assignment-error').textContent = '과제 범위를 하나 이상 선택해주세요.';
+    try {
+      await api('/assignments', { ...v, range_codes, target_questions: Number(v.target_questions), due_at: new Date(v.due + 'T23:59:59').getTime() });
+      close(); await refresh(); render(); toast('연습 과제를 배정했어요.');
+    } catch (err) { $('#assignment-error').textContent = err.message; }
+  };
 }
 function exportResults() {
   const safe = value => '"' + String(value ?? '').replace(/^[=+@-]/, "'$&").replaceAll('"', '""') + '"';
