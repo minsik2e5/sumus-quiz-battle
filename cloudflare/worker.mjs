@@ -148,7 +148,7 @@ export class VocaStateObject {
 
       const fastMutation =
         (request.method === 'POST' && (url.pathname === '/api/practice/start' || /^\/api\/practice\/[^/]+\/(?:answer|finish)$/.test(url.pathname))) ||
-        (request.method === 'PATCH' && url.pathname === '/api/teacher/school');
+        (request.method === 'PATCH' && (url.pathname === '/api/teacher/school' || /^\/api\/grammar-progress\/[^/]+$/.test(url.pathname)));
       const result = request.method === 'GET'
         ? await execute(this.mutations.current().state)
         : fastMutation
