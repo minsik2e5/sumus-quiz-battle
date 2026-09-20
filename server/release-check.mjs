@@ -416,6 +416,7 @@ export async function runReleaseCheck() {
     const v139Css = readFileSync(publicRoot + 'v139.css', 'utf8');
     const v1310Css = readFileSync(publicRoot + 'v1310.css', 'utf8');
     const v1311Css = readFileSync(publicRoot + 'v1311.css', 'utf8');
+    const v1313Css = readFileSync(publicRoot + 'v1313.css', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
     const appJs = readFileSync(publicRoot + 'app.js', 'utf8');
@@ -441,8 +442,13 @@ export async function runReleaseCheck() {
     assert(appJs.includes('d.quickPractice') && appJs.includes("A.mode = 'write_meaning'") && appJs.includes('A.target = 20'), 'V13.10 home starts a 20-question meaning-writing quest directly');
     assert(studentModule.includes('오늘의 단어 퀘스트') && studentModule.includes('data-quick-practice') && !studentModule.includes('<h2>오늘의 한 걸음</h2>'), 'V13.10 simplified home remains active');
     assert(indexHtml.includes('v1311.css') && v1311Css.includes('.meaning-alias.auto'), 'V13.11 valid-answer teacher styles are loaded');
-    assert(teacherModule.includes('같은 품사의 기본 유효답 + 선생님 허용 뜻') && teacherModule.includes('approved_auto'), 'teacher UI shows part-of-speech safe valid-answer workflow');
-    assert(indexHtml.includes('/app.js?v=13.12.0') && sw.includes('sumus-voca-v13.12.0-strict-pos'), 'V13.12 strict POS cache versions are active');
+    assert(teacherModule.includes('기본 유효답과 승인된 허용 뜻의 출처') && teacherModule.includes('approved_auto'), 'teacher UI keeps part-of-speech safe valid-answer workflow');
+    assert(indexHtml.includes('v1313.css') && v1313Css.includes('.meaning-alias-row') && v1313Css.includes('.vocab-import-preview'), 'V13.13 vocabulary management styles are loaded');
+    assert(studentModule.includes('최근 성취') && studentModule.includes('daily_quest') && studentModule.includes('오답 ${mix.wrong'), 'V13.13 student UI exposes recent mastery and adaptive daily mix');
+    assert(sessionsModule.includes('daily_quest: true') && sessionsModule.includes('오늘의 퀘스트'), 'V13.13 daily quest starts through the practice session flow');
+    assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
+    assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
+    assert(indexHtml.includes('/app.js?v=13.13.0') && sw.includes('sumus-voca-v13.13.0-mastery-daily-import'), 'V13.13 cache versions are active');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
