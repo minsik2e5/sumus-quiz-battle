@@ -51,18 +51,17 @@ $('#app').addEventListener('click', async event => {
     if (d.go) return navigate(d.go);
     if (d.study) { A.studyView = d.study; A.tab = 'practice'; render(); window.scrollTo(0, 0); return; }
     if (d.quickPractice) {
-      if (!A.data.active_practice && !d.quickRange) {
+      if (!A.data.active_practice && !(A.data.daily_quest?.target > 0)) {
         A.studyView = 'vocab'; A.tab = 'practice'; render(); window.scrollTo(0, 0); return;
       }
       if (!A.data.active_practice) {
         A.mode = 'write_meaning';
         A.target = 20;
         A.assignmentId = null;
-        A.ranges[A.school] = [d.quickRange];
         savePreferences();
       }
       buttonBusy(b);
-      await startPractice();
+      await startPractice({ dailyQuest: !A.data.active_practice });
       return;
     }
     if (d.school && A.data.profile.role === 'teacher') { collectExamForm(A); A.school = d.school; A.vocabRange = ''; A.assignmentId = null; savePreferences(); render(); return; }
