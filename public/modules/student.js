@@ -1,7 +1,8 @@
 import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, unlocked, levelInfo, dayKey } from './core.js';
 import { icon, esc, num, date, rangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar } from './character.js';
-import { DANWONGO_PASSAGES } from '../danwongo-grammar-data.js?v=1';
+import { DANWONGO_PASSAGES } from '../danwongo-grammar-data.js?v=2';
+import { SEONBU_2025_PASSAGES } from '../seonbu-grammar-data.js?v=1';
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
 export function shell(A, content) {
   const p = A.data.profile;
@@ -54,10 +55,8 @@ function studyHub(A) {
   <section class="study-tip"><span class="square-icon">${icon('sparkle')}</span><div><b>추천 학습 흐름</b><p>단어로 기본기를 익힌 뒤, 어법·어휘에서 실제 문장 속 쓰임을 확인해보세요.</p></div></section>`;
 }
 
-function grammarStudy(A) {
-  const school = A.data.profile.school || A.school || '';
-  const isDanwon = school === '단원고';
-  const passageCards = DANWONGO_PASSAGES.map(p => {
+function grammarCards(A, passages) {
+  return passages.map(p => {
     const sentenceCount = p.sentences.length;
     const choiceCount = p.sentences.reduce((sum, sentence) => sum + sentence.parts.filter(part => part[0] === 'c').length, 0);
     let saved = null;
@@ -73,16 +72,27 @@ function grammarStudy(A) {
       <div class="grammar-set-cta">${mastered ? '다시 학습' : '학습 시작'} ${icon('arrow')}</div>
     </button>`;
   }).join('');
+}
+
+function grammarStudy(A) {
+  const school = A.data.profile.school || A.school || '';
+  const isDanwon = school === '단원고';
+  const isSeonbu = school === '선부고';
+  const passages = isDanwon ? DANWONGO_PASSAGES : isSeonbu ? SEONBU_2025_PASSAGES : [];
 
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">GRAMMAR</span></div>
-  <div class="page-heading grammar-heading"><h1>어법·어휘</h1><p>문장으로 이해하고, 틀린 선택지만 다시 익혀요.</p></div>
+  <div class="page-heading grammar-heading"><h1>어법·어휘</h1><p>WORKBOOK 6 선택지만 그대로 풀고, 분석본 기준으로 오답을 정리해요.</p></div>
   <section class="study-school-card"><div><span class="tiny muted">현재 학교</span><strong>${esc(school)}</strong></div><button class="text-button" data-action="account">학교 변경</button></section>
   ${isDanwon ? `
-    <section class="grammar-range-head"><div><span class="eyebrow">단원고 시험범위</span><h2>2025년 9월 인천교육청</h2><p>분석본 수업 흐름과 같은 기준으로 채점 해설을 정리했어요.</p></div><span class="grammar-range-count">${DANWONGO_PASSAGES.length}지문</span></section>
-    <div class="grammar-set-list">${passageCards}</div>
+    <section class="grammar-range-head"><div><span class="eyebrow">단원고 시험범위</span><h2>2025년 9월 인천교육청</h2><p>WORKBOOK 6 원문 선택지 · 분석본 기준 채점 해설</p></div><span class="grammar-range-count">${passages.length}지문</span></section>
+    <div class="grammar-set-list">${grammarCards(A, passages)}</div>
     <p class="quiet-note">범위: 24 · 29 · 31 · 32 · 33 · 34 · 36 · 39 · 40 · 41~42</p>
+  ` : isSeonbu ? `
+    <section class="grammar-range-head seonbu"><div><span class="eyebrow">선부고 시험범위 · 2025</span><h2>2025년 9월 인천교육청</h2><p>WORKBOOK 6 원문 선택지 · 분석본 기준 채점 해설</p></div><span class="grammar-range-count">${passages.length}지문</span></section>
+    <div class="grammar-set-list">${grammarCards(A, passages)}</div>
+    <p class="quiet-note">범위: 31 · 34 · 36 · 38 · 40 · 43~45</p>
   ` : `
-    <section class="grammar-empty-school"><span class="square-icon">${icon('records')}</span><div><b>현재는 단원고 시험범위부터 제작 중이에요.</b><p>학교를 단원고로 변경하면 전체 10개 지문을 연습할 수 있어요.</p></div></section>
+    <section class="grammar-empty-school"><span class="square-icon">${icon('records')}</span><div><b>현재 학교의 어법·어휘 범위를 준비 중이에요.</b><p>단원고와 선부고 시험범위부터 순서대로 추가하고 있어요.</p></div></section>
   `}`;
 }
 
