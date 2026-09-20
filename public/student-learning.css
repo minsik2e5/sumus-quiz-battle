@@ -123,3 +123,13 @@
 .grammar-year-divider:before,.grammar-year-divider:after{content:"";height:1px;background:#e6eaf0;flex:1}
 .grammar-range-head.seonbu.current{background:linear-gradient(135deg,#0f4b3f 0%,#287563 100%)}
 .grammar-range-head.seonbu.old{background:linear-gradient(135deg,#213a36 0%,#48635e 100%);box-shadow:0 8px 20px rgba(24,34,58,.08)}
+
+/* Gangseo premium range */
+.grammar-range-head.gangseo{
+  background:linear-gradient(135deg,#f5f0e5 0%,#ede4d2 100%);
+  color:#173f35;border:1px solid #ded3bf;box-shadow:0 10px 24px rgba(44,65,57,.08)
+}
+.grammar-range-head.gangseo .eyebrow{color:#2f6a59}
+.grammar-range-head.gangseo h2{color:#173f35}
+.grammar-range-head.gangseo p{color:#5d6f69}
+.grammar-range-head.gangseo .grammar-range-count{background:#173f35;color:#fff}
