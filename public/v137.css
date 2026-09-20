@@ -1,0 +1,52 @@
+/* SUMUS VOCA V13.7 · school isolation, teacher proportions, word mastery */
+.teacher-main{max-width:none!important;padding-left:42px!important;padding-right:42px!important}
+.teacher-main>.teacher-top,.teacher-main>.panel,.teacher-main>.teacher-grid,.teacher-main>.teacher-metrics,
+.teacher-main>.v136-command,.teacher-main>.v136-dashboard-grid,.teacher-main>.toolbar,.teacher-main>.teacher-form{
+  width:min(100%,1580px);margin-left:auto;margin-right:auto
+}
+.teacher-top{padding-top:34px!important;padding-bottom:28px!important;gap:28px}
+.teacher-top h1{font-size:30px!important;letter-spacing:-.7px}.teacher-top p{font-size:14px!important;margin-top:7px!important}
+.teacher-actions{gap:12px!important}.teacher-actions .btn{min-height:48px!important;padding-left:20px!important;padding-right:20px!important;font-size:14px!important}
+.teacher-school{min-height:46px!important}.teacher-school select{min-width:122px;font-size:14px!important}
+.panel{border-radius:20px!important}.panel-head{min-height:64px!important;padding:18px 22px!important}.panel-head h2{font-size:16px!important}
+.teacher-main table{font-size:13.5px}.teacher-main th{font-size:11.5px!important;padding:13px 16px!important;white-space:nowrap}
+.teacher-main td{padding:16px!important;vertical-align:middle}.teacher-main td>small{display:block;margin-top:4px;line-height:1.35}
+.exam-ops-table{min-width:1120px;table-layout:fixed}
+.exam-ops-table th:nth-child(1){width:28%}.exam-ops-table th:nth-child(2){width:14%}.exam-ops-table th:nth-child(3){width:10%}
+.exam-ops-table th:nth-child(4){width:10%}.exam-ops-table th:nth-child(5){width:18%}.exam-ops-table th:nth-child(6){width:8%}.exam-ops-table th:nth-child(7){width:18%}
+.exam-submit-state{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+.exam-submit-state span{display:inline-flex;align-items:center;height:25px;padding:0 8px;border-radius:999px;font-size:10.5px;font-weight:850;white-space:nowrap}
+.exam-submit-state .done{background:#eaf8f0;color:#087448}.exam-submit-state .doing{background:#eef4ff;color:#315fc5}.exam-submit-state .wait{background:#fff3e8;color:#ad5b11}
+.exam-op-actions{display:flex;align-items:center;gap:6px;white-space:nowrap}.exam-op-actions .btn{min-height:36px;padding:0 12px;border-radius:10px}
+.exam-more{width:36px!important;height:36px!important;font-size:20px!important;line-height:1!important}
+.exam-status-list{display:grid;gap:7px}.exam-status-student{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1px solid #eaecf0;border-radius:12px}
+.exam-status-student .table-name{padding:0}.exam-menu-actions{display:grid;gap:8px;margin-top:18px}
+.edit-lock-note{margin:12px 0 18px;padding:12px 14px;border-radius:12px;background:#fff7e8;color:#8b5b13;font-size:12px;line-height:1.5}
+.meaning-alias{display:inline-flex;margin:2px 4px 2px 0;padding:4px 7px;border-radius:8px;background:#eef6f2;color:#17674f;font-size:11px;font-weight:800}
+.meaning-alias-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}.meaning-alias-list>span{padding:6px 9px;border-radius:9px;background:#eef6f2;color:#17674f;font-size:12px;font-weight:800}
+.student-ops-table{min-width:980px}.student-ops-table td:nth-child(5) strong{color:#1c6b53}.student-ops-table td:nth-child(5) small{color:#89939f}
+
+/* fixed school ownership */
+.study-school-card.locked,.study-school-card.compact.locked{border-color:#e4e8ec!important;background:#fbfcfc!important}
+.school-fixed{display:inline-flex;align-items:center;gap:6px;color:#7d8793;font-size:12px;font-weight:800;white-space:nowrap}.school-fixed .icon{width:15px;height:15px}
+
+/* WORD QUEST */
+.word-conquest-card{display:block;width:100%;padding:19px;border:1px solid #dfe7e3;border-radius:20px;background:linear-gradient(145deg,#fff 0%,#f5faf7 100%);text-align:left;box-shadow:0 6px 20px rgba(28,81,64,.055)}
+.word-conquest-head{display:flex;align-items:center;justify-content:space-between;gap:16px}.word-conquest-head strong{display:block;margin-top:4px;font-size:18px;color:#173f35}
+.word-conquest-score{font-size:27px;font-weight:900;color:#226c55}.word-conquest-bar{height:8px;margin-top:14px;background:#e5ece8;border-radius:999px;overflow:hidden}.word-conquest-bar i{display:block;height:100%;background:#318064;border-radius:999px}
+.word-quest-mini{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:13px}.word-quest-mini>span{min-width:0;padding:8px 9px;border-radius:11px;background:#f5f7f8}
+.word-quest-mini b{display:block;font-size:12px;color:#303942}.word-quest-mini small{display:block;margin-top:2px;font-size:9.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#7d8791}
+.word-quest-mini .master,.word-quest-mini .perfect{background:#eaf8f0}.word-quest-mini .master small,.word-quest-mini .perfect small{color:#087448}
+.word-quest-mini .needs-work{background:#fff3e8}.word-quest-mini .needs-work small{color:#a6560d}.word-quest-mini .quest{background:#f2f4f7}.word-quest-mini .quest small{color:#667085}
+.word-conquest-cta{display:flex;align-items:center;justify-content:flex-end;gap:5px;margin-top:13px;color:#226c55;font-size:12px;font-weight:850}.word-conquest-cta .icon{width:15px;height:15px}
+.range-option.quest-range>span{position:relative;padding-bottom:28px!important}.quest-status{position:absolute;left:10px;bottom:7px;font-style:normal;font-size:9.5px;font-weight:900;padding:3px 6px;border-radius:7px;background:#f2f4f7;color:#667085}
+.quest-status.master,.quest-status.perfect{background:#e5f7ed;color:#087448}.quest-status.needs-work{background:#fff1e5;color:#a6560d}.quest-status.progressing{background:#edf3ff;color:#315fc5}
+
+@media(max-width:1200px){
+  .teacher-main{padding-left:26px!important;padding-right:26px!important}
+  .teacher-top{align-items:flex-start!important}.teacher-actions{flex-wrap:wrap;justify-content:flex-end}
+}
+@media(max-width:760px){
+  .teacher-main{padding-left:14px!important;padding-right:14px!important}.teacher-top h1{font-size:25px!important}
+  .word-quest-mini{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
