@@ -86,53 +86,48 @@ const SAFE_MEANING_LOOKUP = (() => {
   return lookup;
 })();
 
-function addPredicateFamily(set, raw, includeBare = false) {
+function addPredicateFamily(set, raw) {
   const value = normalizeMeaning(raw);
   if (!value) return;
   set.add(value);
   const add = (...values) => values.filter(Boolean).forEach(item => set.add(item));
 
+  // 하다 계열: 서술어 활용만 인정. 명사형(어간 단독/하기/함/한 것)은 제외.
   if (value.endsWith('하다') && value.length > 2) {
     const stem = value.slice(0, -2);
-    add(stem + '하다', stem + '한', stem + '하는', stem + '하기', stem + '함', stem + '하여', stem + '해서');
-    if (includeBare) add(stem);
+    add(stem + '하다', stem + '한', stem + '하는', stem + '하여', stem + '해서');
     return;
   }
   if (value.endsWith('하는') && value.length > 2) {
     const stem = value.slice(0, -2);
-    add(stem + '하다', stem + '한', stem + '하는', stem + '하기', stem + '함');
-    return;
-  }
-  if (value.endsWith('한것') && value.length > 2) {
-    const stem = value.slice(0, -2);
-    add(stem + '하다', stem + '한', stem + '하는');
+    add(stem + '하다', stem + '한', stem + '하는', stem + '하여', stem + '해서');
     return;
   }
   if (value.endsWith('한') && value.length > 1) {
     const stem = value.slice(0, -1);
-    add(stem + '하다', stem + '한', stem + '하는');
+    add(stem + '하다', stem + '한', stem + '하는', stem + '하여', stem + '해서');
     return;
   }
   if ((value.endsWith('하여') || value.endsWith('해서')) && value.length > 2) {
     const stem = value.slice(0, -2);
-    add(stem + '하다', stem + '한', stem + '하는');
+    add(stem + '하다', stem + '한', stem + '하는', stem + '하여', stem + '해서');
     return;
   }
 
+  // 되다 계열: 동사 활용만 인정. '형성' 같은 명사 어간은 제외.
   if (value.endsWith('되다') && value.length > 2) {
     const stem = value.slice(0, -2);
     add(stem + '되다', stem + '된', stem + '되는', stem + '되어', stem + '돼');
-    if (includeBare) add(stem);
     return;
   }
   if (value.endsWith('되는') && value.length > 2) {
     const stem = value.slice(0, -2);
-    add(stem + '되다', stem + '된', stem + '되는');
+    add(stem + '되다', stem + '된', stem + '되는', stem + '되어', stem + '돼');
     return;
   }
   if (value.endsWith('된') && value.length > 1) {
     const stem = value.slice(0, -1);
-    add(stem + '되다', stem + '된', stem + '되는');
+    add(stem + '되다', stem + '된', stem + '되는', stem + '되어', stem + '돼');
     return;
   }
 
@@ -173,16 +168,18 @@ function addPredicateFamily(set, raw, includeBare = false) {
     return;
   }
 
+  // -적이다 계열: '효과적이다 ↔ 효과적인'만 인정. '효과적' 단독은 제외.
   if (value.endsWith('적이다') && value.length > 3) {
     const stem = value.slice(0, -2);
-    add(stem, stem + '이다', stem + '인');
+    add(stem + '이다', stem + '인');
     return;
   }
   if (value.endsWith('적인') && value.length > 2) {
     const stem = value.slice(0, -1);
-    add(stem, stem + '이다', stem + '인');
+    add(stem + '이다', stem + '인');
     return;
   }
+
   if (value.endsWith('스럽다') && value.length > 3) {
     const stem = value.slice(0, -3);
     add(stem + '스럽다', stem + '스러운');
@@ -205,16 +202,16 @@ export function automaticMeaningAccepted(raw) {
   const accepted = new Set();
   for (const part of meaningParts(raw)) {
     const normalized = normalizeMeaning(part);
-    addPredicateFamily(accepted, normalized, normalized.endsWith('하다') || normalized.endsWith('되다'));
+    addPredicateFamily(accepted, normalized);
     const group = SAFE_MEANING_LOOKUP.get(normalized);
-    if (group) for (const alias of group) addPredicateFamily(accepted, alias, alias.endsWith('하다') || alias.endsWith('되다'));
+    if (group) for (const alias of group) addPredicateFamily(accepted, alias);
   }
   return [...accepted];
 }
 export function meaningAccepted(raw, aliases = []) {
   const accepted = new Set(automaticMeaningAccepted(raw));
   for (const alias of Array.isArray(aliases) ? aliases : []) {
-    addPredicateFamily(accepted, alias, true);
+    addPredicateFamily(accepted, alias);
   }
   return [...accepted];
 }
@@ -225,9 +222,9 @@ export function grade(type, answer, word) {
     const accepted = new Set(meaningAccepted(word.meaning, word.accepted_meanings));
     const input = normalizeMeaning(answer);
     const candidates = new Set();
-    addPredicateFamily(candidates, input, false);
+    addPredicateFamily(candidates, input);
     const withoutParticle = stripMeaningParticle(input);
-    if (withoutParticle !== input) addPredicateFamily(candidates, withoutParticle, false);
+    if (withoutParticle !== input) addPredicateFamily(candidates, withoutParticle);
     return [...candidates].some(value => accepted.has(value));
   }
   return answer === (type === 'mean2eng_mc' || type === 'mean2eng' ? displayEnglish(word.word) : word.meaning);
