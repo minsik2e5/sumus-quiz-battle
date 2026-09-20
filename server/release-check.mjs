@@ -49,11 +49,11 @@ export async function runReleaseCheck() {
     assert(grade('write_en', 'phenomena', { word: 'phenomenon(pl.phenomena)', meaning: '현상' }), 'plural annotation accepted');
     assert(grade('write_en', 'contribute to', { word: 'contribute to ~', meaning: '기여하다' }), 'source tilde ignored');
     assert(grade('write_meaning', '필요로 하다', { word: 'require', meaning: '요구하다, 필요로 하다' }), 'one listed Korean meaning accepted');
-    assert(grade('write_meaning', '감소', { word: 'decline', meaning: '감소하다' }), 'safe Korean noun/verb variation accepted');
+    assert(!grade('write_meaning', '감소', { word: 'decline', meaning: '감소하다' }), 'noun/verb part-of-speech change is rejected');
     assert(grade('write_meaning', '인식하다', { word: 'recognize', meaning: '알아보다', accepted_meanings: ['인식하다'] }), 'teacher-approved Korean meaning alias accepted');
     assert(grade('write_meaning', '만족하는', { word: 'satisfied', meaning: '만족한' }), 'Korean adjective form 만족한/만족하는 accepted');
     assert(grade('write_meaning', '만족하다', { word: 'satisfied', meaning: '만족한' }), 'Korean adjective dictionary form accepted');
-    assert(grade('write_meaning', '만족한 것', { word: 'satisfied', meaning: '만족한' }), 'Korean descriptive 것-form accepted');
+    assert(!grade('write_meaning', '만족한 것', { word: 'satisfied', meaning: '만족한' }), 'nominalized 것-form is rejected under strict part-of-speech grading');
     assert(grade('write_meaning', '필요하다', { word: 'necessary', meaning: '필요한' }), 'Korean 하다 adjective form accepted');
     assert(grade('write_meaning', '형성되다', { word: 'formed', meaning: '형성된' }), 'Korean 되다 predicate form accepted');
     assert(grade('write_meaning', '효과적이다', { word: 'effective', meaning: '효과적인' }), 'Korean 적이다 adjective form accepted');
@@ -61,6 +61,11 @@ export async function runReleaseCheck() {
     assert(grade('write_meaning', '줄어들다', { word: 'decline', meaning: '감소하다' }), 'conservative decrease synonym accepted');
     assert(!grade('write_meaning', '즐거운', { word: 'satisfied', meaning: '만족한' }), 'different Korean meaning is rejected');
     assert(!grade('write_meaning', '가능한', { word: 'necessary', meaning: '필요한' }), 'related but different Korean adjective is rejected');
+    assert(!grade('write_meaning', '만족', { word: 'satisfied', meaning: '만족한' }), 'adjective-to-noun shortening is rejected');
+    assert(!grade('write_meaning', '감소하다', { word: 'decrease', meaning: '감소' }), 'noun-to-verb expansion is rejected');
+    assert(!grade('write_meaning', '형성', { word: 'formed', meaning: '형성된' }), 'verb-participle-to-noun shortening is rejected');
+    assert(!grade('write_meaning', '효과적', { word: 'effective', meaning: '효과적인' }), 'adjective-to-bare nominal form is rejected');
+    assert(grade('write_meaning', '감소', { word: 'decline', meaning: '감소하다', accepted_meanings: ['감소'] }), 'teacher-approved cross-part-of-speech exception remains valid');
 
     const state = emptyState();
     state.profiles.push({
