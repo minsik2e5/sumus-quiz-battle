@@ -106,10 +106,29 @@ async function logout() { await api('/logout', {}); clearInterval(poll); leaveSe
 function accountModal() {
   const p = A.data.profile;
   const schoolOptions = (A.data.schools || []).map(s => `<option value="${esc(s.id)}" ${s.id === p.school_id || (!p.school_id && s.name === p.school) ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
-  modal(`<h2>${esc(p.display_name)}</h2><p>${esc(p.class_name)} · ${esc(p.school || 'SUMUS')}<br>${esc(p.username)}</p>
-    ${p.role === 'student' ? `<div class="sumus-detail-section"><h3>학교 설정</h3><label class="field"><span>내 학교</span><select id="account-school">${schoolOptions}</select></label><p class="sumus-account-note">학교를 바꾸면 해당 학교의 단어·과제·시험이 바로 표시돼요. 기존 학습 기록은 유지됩니다.</p><button class="btn primary full" id="account-school-save">학교 변경 저장</button></div>` : ''}
+  modal(`<h2>${esc(p.display_name)}</h2><p>${esc(p.class_name)} · ${esc(p.role === 'teacher' ? (p.active_school || 'SUMUS') : (p.school || 'SUMUS'))}<br>${esc(p.username)}</p>
+    ${p.role === 'student' ? `<div class="sumus-detail-section"><h3>학교 설정</h3><label class="field"><span>내 학교</span><select id="account-school">${schoolOptions}</select></label><p class="sumus-account-note">학교를 바꾸면 해당 학교의 단어·과제·시험이 바로 표시돼요. 기존 학습 기록은 유지됩니다.</p><button class="btn primary full" id="account-school-save">학교 변경 저장</button></div>` : `<div class="sumus-detail-section"><h3>비밀번호 변경</h3><form id="teacher-password-form"><label class="field"><span>현재 비밀번호</span><input name="current_password" type="password" autocomplete="current-password" required></label><label class="field"><span>새 비밀번호</span><input name="new_password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="8자 이상" required></label><label class="field"><span>새 비밀번호 확인</span><input name="confirm_password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label><div id="teacher-password-error" class="form-error" role="alert"></div><button class="btn primary full" type="submit">비밀번호 변경</button></form><p class="sumus-account-note">변경 후 현재 기기를 제외한 기존 로그인 세션은 종료됩니다.</p></div>`}
     <button class="btn full" id="account-logout" style="margin-top:10px">로그아웃</button>`, '내 계정');
   $('#account-logout').onclick = logout;
+  $('#teacher-password-form')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = Object.fromEntries(new FormData(form));
+    const error = $('#teacher-password-error');
+    error.textContent = '';
+    if (values.new_password !== values.confirm_password) return error.textContent = '새 비밀번호 확인이 일치하지 않습니다.';
+    const button = $('[type="submit"]', form);
+    buttonBusy(button);
+    try {
+      await api('/profile/password', { current_password: values.current_password, new_password: values.new_password }, 'PATCH');
+      form.reset();
+      toast('선생님 비밀번호를 변경했어요.');
+    } catch (err) {
+      error.textContent = err.message;
+    } finally {
+      buttonBusy(button, false);
+    }
+  });
   $('#account-school-save')?.addEventListener('click', async event => {
     const schoolId = $('#account-school')?.value;
     if (!schoolId || schoolId === p.school_id) return toast('현재 학교와 같아요.');
