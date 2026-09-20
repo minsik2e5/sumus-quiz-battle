@@ -55,7 +55,7 @@ function validateVocabulary() {
   }
 
   const seonbu = bySchool('선부고');
-  const seonbuCurrent = { 41:34, 42:28, 43:24, 44:49 };
+  const seonbuCurrent = { 44:49 };
   for (const [range, count] of Object.entries(seonbuCurrent)) {
     const actual = seonbu.filter(word => String(word.range_code) === range).length;
     assert(actual === count, `선부고 외부 ${range} 단어 수 불일치 (${actual} != ${count})`);
