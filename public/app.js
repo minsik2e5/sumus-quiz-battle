@@ -2,7 +2,7 @@ import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules
 import { CHARACTERS, EXAM_TYPES, CLASS_OPTIONS } from './modules/core.js';
 import { avatar } from './modules/character.js';
 import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.5.0';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.6.0';
 import { configureSessions, openExam, openResult, startPractice, leaveSession } from './modules/sessions.js';
 import { openGrammarChoiceSample } from './grammar-choice-sample.js?v=13.5.0';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', target: 30, sound: false, role: 'student', studyView: 'hub' };
