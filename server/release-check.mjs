@@ -6,6 +6,7 @@ import { allBooks, service, sweep } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
 import { EXAM_TYPES, PRACTICE_TYPES, grade, displayEnglish } from '../public/modules/core.js';
 import { runContentValidation } from './content-validation.mjs';
+import { openGrammarChoiceSample } from '../public/grammar-choice-sample.js';
 
 const checks = [];
 const assert = (condition, label) => {
@@ -31,6 +32,7 @@ export async function runReleaseCheck() {
   try {
     runContentValidation();
     checks.push('school content validation passes');
+    assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
     const bySchool = school => runtimeBooks.filter(book => book.school === school).flatMap(book => book.words || []);
