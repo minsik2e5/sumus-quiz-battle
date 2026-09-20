@@ -48,7 +48,7 @@ $('#app').addEventListener('click', async event => {
   try {
     if (d.go) return navigate(d.go);
     if (d.study) { A.studyView = d.study; A.tab = 'practice'; render(); window.scrollTo(0, 0); return; }
-    if (d.school) { collectExamForm(A); A.school = d.school; A.vocabRange = ''; A.assignmentId = null; savePreferences(); render(); return; }
+    if (d.school && A.data.profile.role === 'teacher') { collectExamForm(A); A.school = d.school; A.vocabRange = ''; A.assignmentId = null; savePreferences(); render(); return; }
     if (d.rangeAll) { const { codes } = getRanges(A); A.ranges[A.school] = d.rangeAll === 'true' ? [...codes] : []; $$('[data-range]').forEach(i => i.checked = d.rangeAll === 'true'); updateRangeSummary(A); updateExamSummary(A); savePreferences(); return; }
     if (d.mode) { A.mode = d.mode; $$('[data-mode]').forEach(e => { e.classList.toggle('selected', e === b); e.setAttribute('aria-pressed', String(e === b)); }); savePreferences(); return; }
     if (d.practiceTarget) { A.target = d.practiceTarget === 'all' ? 'all' : Number(d.practiceTarget); $$('[data-practice-target]').forEach(e => { const selected = e === b; e.classList.toggle('selected', selected); e.setAttribute('aria-pressed', String(selected)); }); savePreferences(); render(); return; }
@@ -62,6 +62,10 @@ $('#app').addEventListener('click', async event => {
     if (d.assignment) { const task = A.data.assignments.find(a => a.id === d.assignment); A.school = task.school; A.ranges[task.school] = [...task.range_codes]; A.assignmentId = task.id; A.studyView = 'vocab'; A.tab = 'practice'; render(); window.scrollTo(0, 0); return; }
     if (d.release) { const e = A.data.exams.find(e => e.id === d.release); await api('/exams/' + e.id, { release_result: !e.release_result }, 'PATCH'); await refresh(); render(); toast(e.release_result ? '결과를 비공개로 바꿨어요.' : '학생에게 결과가 공개됐어요.'); return; }
     if (d.examActive) { const e = A.data.exams.find(e => e.id === d.examActive); await api('/exams/' + e.id, { active: !e.active }, 'PATCH'); await refresh(); render(); return; }
+    if (d.examEdit) { examEditModal(d.examEdit); return; }
+    if (d.examStatus) { examStatusModal(d.examStatus); return; }
+    if (d.examMenu) { examMenuModal(d.examMenu); return; }
+    if (d.meaningAlias) { meaningAliasModal(d.meaningAlias); return; }
     if (d.action === 'refresh') { buttonBusy(b); await refresh(); render(); toast('최신 기록으로 업데이트했어요.'); }
     if (d.action === 'start-practice') { buttonBusy(b); await startPractice(); }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
@@ -108,9 +112,10 @@ function bindPageForms() {
 async function logout() { await api('/logout', {}); clearInterval(poll); leaveSession(); A.data = null; A.ranges = {}; A.style = null; A.examForm = null; $('#modal-root').innerHTML = ''; loginView(); }
 function accountModal() {
   const p = A.data.profile;
-  const schoolOptions = (A.data.schools || []).map(s => `<option value="${esc(s.id)}" ${s.id === p.school_id || (!p.school_id && s.name === p.school) ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   modal(`<h2>${esc(p.display_name)}</h2><p>${esc(p.class_name)} · ${esc(p.role === 'teacher' ? (p.active_school || 'SUMUS') : (p.school || 'SUMUS'))}<br>${esc(p.username)}</p>
-    ${p.role === 'student' ? `<div class="sumus-detail-section"><h3>학교 설정</h3><label class="field"><span>내 학교</span><select id="account-school">${schoolOptions}</select></label><p class="sumus-account-note">학교를 바꾸면 해당 학교의 단어·과제·시험이 바로 표시돼요. 기존 학습 기록은 유지됩니다.</p><button class="btn primary full" id="account-school-save">학교 변경 저장</button></div>` : `<div class="sumus-detail-section"><h3>비밀번호 변경</h3><form id="teacher-password-form"><label class="field"><span>현재 비밀번호</span><input name="current_password" type="password" autocomplete="current-password" required></label><label class="field"><span>새 비밀번호</span><input name="new_password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="8자 이상" required></label><label class="field"><span>새 비밀번호 확인</span><input name="confirm_password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label><div id="teacher-password-error" class="form-error" role="alert"></div><button class="btn primary full" type="submit">비밀번호 변경</button></form><p class="sumus-account-note">변경 후 현재 기기를 제외한 기존 로그인 세션은 종료됩니다.</p></div>`}
+    ${p.role === 'student'
+      ? `<div class="sumus-detail-section"><h3>학교 소속</h3><div class="locked-school">${icon('shield')}<div><b>${esc(p.school || '학교 미설정')}</b><small>학교 변경은 선생님이 관리합니다.</small></div></div><p class="sumus-account-note">다른 학교 시험이나 학습 범위가 섞이지 않도록 학교 소속은 학생이 직접 변경할 수 없어요.</p></div>`
+      : `<div class="sumus-detail-section"><h3>비밀번호 변경</h3><form id="teacher-password-form"><label class="field"><span>현재 비밀번호</span><input name="current_password" type="password" autocomplete="current-password" required></label><label class="field"><span>새 비밀번호</span><input name="new_password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="8자 이상" required></label><label class="field"><span>새 비밀번호 확인</span><input name="confirm_password" type="password" autocomplete="new-password" minlength="8" maxlength="128" required></label><div id="teacher-password-error" class="form-error" role="alert"></div><button class="btn primary full" type="submit">비밀번호 변경</button></form><p class="sumus-account-note">변경 후 현재 기기를 제외한 기존 로그인 세션은 종료됩니다.</p></div>`}
     <button class="btn full" id="account-logout" style="margin-top:10px">로그아웃</button>`, '내 계정');
   $('#account-logout').onclick = logout;
   $('#teacher-password-form')?.addEventListener('submit', async event => {
@@ -132,26 +137,126 @@ function accountModal() {
       buttonBusy(button, false);
     }
   });
-  $('#account-school-save')?.addEventListener('click', async event => {
-    const schoolId = $('#account-school')?.value;
-    if (!schoolId || schoolId === p.school_id) return toast('현재 학교와 같아요.');
-    const schoolName = A.data.schools.find(s => s.id === schoolId)?.name || '선택한 학교';
-    if (!confirm(schoolName + '로 학교를 변경할까요?')) return;
+}
+function localDateTime(value) {
+  const d = new Date(value);
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+function examStatusModal(id) {
+  const exam = A.data.exams.find(item => item.id === id);
+  if (!exam) return toast('시험을 찾을 수 없어요.');
+  const students = A.data.profiles.filter(p => p.active && p.class_name === exam.class_name);
+  const rows = students.map(student => {
+    const attempts = A.data.attempts.filter(a => a.exam_id === id && a.student_id === student.id);
+    const submitted = attempts.filter(a => a.status === 'submitted');
+    const active = attempts.some(a => a.status === 'active');
+    const label = submitted.length ? `완료 ${submitted.length}회` : active ? '응시 중' : '미응시';
+    const cls = submitted.length ? 'green' : active ? 'blue' : '';
+    return `<div class="exam-status-student"><button class="table-name" data-student="${student.id}"><strong>${esc(student.display_name)}</strong><small>${esc(student.class_name)} · ${esc(student.school)}</small></button><span class="pill ${cls}">${label}</span></div>`;
+  }).join('');
+  modal(`<h2>${esc(exam.title)}</h2><p>${esc(exam.school)} · ${esc(exam.class_name)} · ${exam.question_count}문제</p><div class="sumus-detail-section"><h3>응시 현황</h3><div class="exam-status-list">${rows || '<p class="tiny muted">대상 학생이 없어요.</p>'}</div></div>`, '시험 현황');
+}
+function examMenuModal(id) {
+  const exam = A.data.exams.find(item => item.id === id);
+  if (!exam) return toast('시험을 찾을 수 없어요.');
+  const hasAttempts = A.data.attempts.some(a => a.exam_id === id);
+  const close = modal(`<h2>시험 운영</h2><p><b>${esc(exam.title)}</b><br>${esc(exam.school)} · ${esc(exam.class_name)}</p>
+    <div class="exam-menu-actions">
+      <button class="btn full" id="exam-menu-toggle">${exam.active ? '배정 중지' : '다시 배정'}</button>
+      <button class="btn full" id="exam-menu-clone">수정본으로 복제</button>
+      <button class="btn full sumus-danger" id="exam-menu-delete" ${hasAttempts ? 'disabled' : ''}>시험 삭제</button>
+    </div>
+    ${hasAttempts ? '<p class="sumus-account-note">응시 기록이 있는 시험은 삭제할 수 없어요. 문제 구성을 바꾸려면 수정본으로 복제하세요.</p>' : ''}`, '시험 운영');
+  $('#exam-menu-toggle').onclick = async event => {
+    buttonBusy(event.currentTarget);
+    try { await api('/exams/' + id, { active: !exam.active }, 'PATCH'); close(); await refresh(); render(); toast(exam.active ? '시험 배정을 중지했어요.' : '시험을 다시 배정했어요.'); }
+    catch (err) { toast(err.message); buttonBusy(event.currentTarget, false); }
+  };
+  $('#exam-menu-clone').onclick = async event => {
     buttonBusy(event.currentTarget);
     try {
-      await api('/profile/school', { school_id: schoolId }, 'PATCH');
-      await refresh();
-      A.school = A.data.profile.school;
-      A.ranges = {};
-      A.assignmentId = null;
-      savePreferences();
-      $('#modal-root').innerHTML = '';
-      render();
-      toast(`${A.data.profile.school}로 학교를 변경했어요.`);
-    } catch (err) {
-      toast(err.message);
-      buttonBusy(event.currentTarget, false);
-    }
+      const copy = await api('/exams/' + id + '/clone', {}, 'POST');
+      close(); await refresh(); render(); toast('수정본을 만들었어요. 내용을 확인해 저장해주세요.'); examEditModal(copy.id);
+    } catch (err) { toast(err.message); buttonBusy(event.currentTarget, false); }
+  };
+  $('#exam-menu-delete').onclick = async event => {
+    if (!confirm('이 시험을 삭제할까요?')) return;
+    buttonBusy(event.currentTarget);
+    try { await api('/exams/' + id, {}, 'DELETE'); close(); await refresh(); render(); toast('시험을 삭제했어요.'); }
+    catch (err) { toast(err.message); buttonBusy(event.currentTarget, false); }
+  };
+}
+function examEditModal(id) {
+  const exam = A.data.exams.find(item => item.id === id);
+  if (!exam) return toast('시험을 찾을 수 없어요.');
+  const locked = A.data.attempts.some(a => a.exam_id === id);
+  const { codes, words } = getRanges(A);
+  const rangeChecks = codes.map(code => `<label class="range-option"><input type="checkbox" name="range_code" value="${esc(code)}" ${exam.range_codes.includes(code) ? 'checked' : ''} ${locked ? 'disabled' : ''}><span>${esc(code)}<small>${words.filter(w => w.range_code === code).length}개 단어</small></span></label>`).join('');
+  const typeOptions = Object.entries(EXAM_TYPES).map(([key, type]) => `<option value="${key}" ${exam.exam_type === key ? 'selected' : ''}>${esc(type.label)}</option>`).join('');
+  const classOptions = [...new Set([...CLASS_OPTIONS, exam.class_name])].map(name => `<option value="${esc(name)}" ${name === exam.class_name ? 'selected' : ''}>${esc(name)}</option>`).join('');
+  const close = modal(`<h2>시험 수정</h2><p>${esc(exam.school)} · ${locked ? '응시 기록 있음' : '아직 응시 기록 없음'}</p>
+    ${locked ? '<div class="edit-lock-note">학생 응시 기록이 있어 <b>시험명 · 마감시간 · 결과공개 · 배정상태</b>만 수정할 수 있어요. 범위나 문제 구성을 바꾸려면 수정본으로 복제하세요.</div>' : ''}
+    <form id="exam-edit-form">
+      <label class="field"><span>시험 이름</span><input name="title" value="${esc(exam.title)}" required maxlength="120"></label>
+      <div class="form-columns">
+        <label class="field"><span>대상 반</span><select name="class_name" ${locked ? 'disabled' : ''}>${classOptions}</select></label>
+        <label class="field"><span>시험 유형</span><select name="exam_type" ${locked ? 'disabled' : ''}>${typeOptions}</select></label>
+        <label class="field"><span>문제 수</span><input name="question_count" type="number" min="1" max="${words.length}" value="${exam.question_count}" ${locked ? 'disabled' : ''}></label>
+        <label class="field"><span>제한시간 (분)</span><input name="minutes" type="number" min="1" max="180" value="${Math.round(exam.duration_sec / 60)}" ${locked ? 'disabled' : ''}></label>
+        <label class="field"><span>시작 시간</span><input name="available" type="datetime-local" value="${localDateTime(exam.available_at)}" ${locked ? 'disabled' : ''}></label>
+        <label class="field"><span>마감 시간</span><input name="due" type="datetime-local" value="${localDateTime(exam.due_at)}" required></label>
+        <label class="field"><span>통과 점수</span><input name="passing_score" type="number" min="0" max="100" value="${exam.passing_score}" ${locked ? 'disabled' : ''}></label>
+        <label class="field"><span>응시 가능 횟수</span><input name="max_attempts" type="number" min="1" max="10" value="${exam.max_attempts}" ${locked ? 'disabled' : ''}></label>
+      </div>
+      <div class="step-label">시험 범위</div><div class="teacher-range">${rangeChecks}</div>
+      <label class="checkbox-line"><input type="checkbox" name="release_result" ${exam.release_result ? 'checked' : ''}><span>제출 후 결과 공개</span></label>
+      <label class="checkbox-line"><input type="checkbox" name="active" ${exam.active ? 'checked' : ''}><span>학생에게 배정</span></label>
+      <div id="exam-edit-error" class="form-error" role="alert"></div>
+      <button class="btn primary full" type="submit">수정 저장</button>
+    </form>`, '시험 수정');
+  $('#exam-edit-form').onsubmit = async event => {
+    event.preventDefault();
+    const form = event.currentTarget, button = $('[type="submit"]', form);
+    const values = Object.fromEntries(new FormData(form));
+    const payload = {
+      title: values.title,
+      due_at: new Date(values.due).getTime(),
+      release_result: values.release_result === 'on',
+      active: values.active === 'on'
+    };
+    if (!locked) Object.assign(payload, {
+      class_name: values.class_name,
+      exam_type: values.exam_type,
+      question_count: Number(values.question_count),
+      duration_sec: Number(values.minutes) * 60,
+      available_at: new Date(values.available).getTime(),
+      passing_score: Number(values.passing_score),
+      max_attempts: Number(values.max_attempts),
+      range_codes: $$('input[name="range_code"]:checked', form).map(input => input.value)
+    });
+    buttonBusy(button); $('#exam-edit-error').textContent = '';
+    try { await api('/exams/' + id, payload, 'PATCH'); close(); await refresh(); render(); toast('시험을 수정했어요.'); }
+    catch (err) { $('#exam-edit-error').textContent = err.message; buttonBusy(button, false); }
+  };
+}
+function meaningAliasModal(wordId) {
+  const word = A.data.books.flatMap(book => book.words || []).find(item => item.id === wordId);
+  if (!word) return toast('단어를 찾을 수 없어요.');
+  const aliases = A.data.meaning_aliases?.[wordId] || [];
+  const close = modal(`<h2>${esc(word.word)}</h2><p>기본 뜻: <b>${esc(word.meaning)}</b></p>
+    <div class="sumus-detail-section"><h3>추가 허용 뜻</h3><div class="meaning-alias-list">${aliases.length ? aliases.map(alias => `<span>${esc(alias)}</span>`).join('') : '<p class="tiny muted">아직 선생님이 추가한 허용 뜻이 없어요.</p>'}</div></div>
+    <form id="meaning-alias-form"><label class="field"><span>새로 인정할 뜻</span><input name="alias" maxlength="80" placeholder="예: 인식하다" required></label><div id="meaning-alias-error" class="form-error"></div><button class="btn primary full" type="submit">이 답도 정답으로 인정</button></form>
+    ${aliases.length ? '<button class="text-button full" id="meaning-alias-clear" style="width:100%;margin-top:10px">추가 허용 뜻 전체 초기화</button>' : ''}`, '허용 뜻 관리');
+  $('#meaning-alias-form').onsubmit = async event => {
+    event.preventDefault(); const button = $('[type="submit"]', event.currentTarget); buttonBusy(button);
+    try { await api('/meaning-aliases/' + encodeURIComponent(wordId), { alias: new FormData(event.currentTarget).get('alias') }, 'POST'); close(); await refresh(); render(); toast('이 표현도 정답으로 인정해요.'); }
+    catch (err) { $('#meaning-alias-error').textContent = err.message; buttonBusy(button, false); }
+  };
+  $('#meaning-alias-clear')?.addEventListener('click', async event => {
+    if (!confirm('추가로 등록한 허용 뜻을 모두 지울까요?')) return;
+    buttonBusy(event.currentTarget);
+    try { await api('/meaning-aliases/' + encodeURIComponent(wordId), {}, 'DELETE'); close(); await refresh(); render(); toast('추가 허용 뜻을 초기화했어요.'); }
+    catch (err) { toast(err.message); buttonBusy(event.currentTarget, false); }
   });
 }
 function addStudent() {
@@ -164,9 +269,10 @@ function studentModal(id) {
   const grammarItems = Object.values(A.data.grammar_progress?.[id] || {}).filter(item => !item.school_id || item.school_id === p.school_id);
   const grammarMastered = grammarItems.filter(item => item.mastered).length;
   const grammarRecent = [...grammarItems].sort((a, b) => Number(b.updated_at || 0) - Number(a.updated_at || 0))[0];
+  const wordMastery = A.data.word_mastery?.[id] || {};
   const schoolOptions = A.data.schools.map(s => `<option value="${esc(s.id)}" ${s.id === p.school_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   const classOptions = [...new Set([...CLASS_OPTIONS, p.class_name].filter(Boolean))].map(c => `<option value="${esc(c)}" ${c === p.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('');
-  const close = modal(`<h2>${esc(p.display_name)}</h2><p>${esc(p.class_name)} · ${p.school} · ${esc(p.username)}</p><div class="detail-grid"><div><b>${p.stats.today_total}문제</b><small>오늘 학습량</small></div><div><b>${p.stats.accuracy}%</b><small>연습 정답률</small></div><div><b>${p.stats.weak}개</b><small>취약 단어</small></div><div><b>${attempts.length}회</b><small>실전시험 응시</small></div></div><div class="sumus-detail-section"><h3>어법·어휘 진도</h3><p>${grammarItems.length ? `MASTER <b>${grammarMastered}</b>지문 · 학습 기록 ${grammarItems.length}지문${grammarRecent ? ` · 최근 ${date(grammarRecent.updated_at)}` : ''}` : '아직 어법·어휘 학습 기록이 없어요.'}</p></div><form id="student-update"><label class="field"><span>학교 변경</span><select name="school_id">${schoolOptions}</select></label><label class="field"><span>반 변경</span><select name="class_name" required>${classOptions}</select></label><label class="field"><span>새 비밀번호 (변경할 때만)</span><input name="password" type="password" minlength="8" autocomplete="new-password" placeholder="8자 이상"></label><label class="checkbox-line"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}>계정 활성화</label><div class="form-error" id="update-error" role="alert"></div><button class="btn primary full" type="submit">변경 저장</button><div class="sumus-account-actions"><button class="btn" type="button" id="student-quick-reset">비밀번호 12345678로 재설정</button><button class="btn sumus-danger" type="button" id="student-quick-delete">학생 계정 삭제</button></div></form>`, '학생 정보');
+  const close = modal(`<h2>${esc(p.display_name)}</h2><p>${esc(p.class_name)} · ${p.school} · ${esc(p.username)}</p><div class="detail-grid"><div><b>${p.stats.today_total}문제</b><small>오늘 학습량</small></div><div><b>${p.stats.accuracy}%</b><small>연습 정답률</small></div><div><b>${p.stats.weak}개</b><small>취약 단어</small></div><div><b>${attempts.length}회</b><small>실전시험 응시</small></div></div><div class="sumus-detail-section"><h3>시험범위 정복</h3><div class="detail-grid"><div><b>${wordMastery.mastered || 0}/${wordMastery.total_ranges || 0}</b><small>단어 MASTER</small></div><div><b>${wordMastery.conquest || 0}%</b><small>단어 정복도</small></div><div><b>${grammarMastered}</b><small>어법 MASTER</small></div><div><b>${grammarItems.length}</b><small>어법 학습 지문</small></div></div><p class="sumus-account-note">${grammarRecent ? `최근 어법 학습 ${date(grammarRecent.updated_at)}` : '어법·어휘 학습 기록 없음'}</p></div><form id="student-update"><label class="field"><span>학교 변경</span><select name="school_id">${schoolOptions}</select></label><label class="field"><span>반 변경</span><select name="class_name" required>${classOptions}</select></label><label class="field"><span>새 비밀번호 (변경할 때만)</span><input name="password" type="password" minlength="8" autocomplete="new-password" placeholder="8자 이상"></label><label class="checkbox-line"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}>계정 활성화</label><div class="form-error" id="update-error" role="alert"></div><button class="btn primary full" type="submit">변경 저장</button><div class="sumus-account-actions"><button class="btn" type="button" id="student-quick-reset">비밀번호 12345678로 재설정</button><button class="btn sumus-danger" type="button" id="student-quick-delete">학생 계정 삭제</button></div></form>`, '학생 정보');
   $('#student-update').onsubmit = async e => { e.preventDefault(); const v = Object.fromEntries(new FormData(e.currentTarget)); try { await api('/students/' + id, { ...v, active: v.active === 'on' }, 'PATCH'); close(); await refresh(); render(); toast('학생 정보를 저장했어요.'); } catch (err) { $('#update-error').textContent = err.message; } };
   $('#student-quick-reset').onclick = async e => { if (!confirm(p.display_name + ' 학생의 비밀번호를 12345678로 재설정할까요?')) return; buttonBusy(e.currentTarget); try { await api('/students/' + id, { password: '12345678' }, 'PATCH'); toast('비밀번호를 12345678로 재설정했어요.'); } catch (err) { toast(err.message); } finally { buttonBusy(e.currentTarget, false); } };
   $('#student-quick-delete').onclick = async e => { if (!confirm(p.display_name + ' 학생 계정을 삭제할까요?\n연습 기록과 시험 기록도 함께 삭제됩니다.')) return; buttonBusy(e.currentTarget); try { await api('/students/' + id, {}, 'DELETE'); close(); await refresh(); render(); toast('학생 계정을 삭제했어요.'); } catch (err) { toast(err.message); buttonBusy(e.currentTarget, false); } };
