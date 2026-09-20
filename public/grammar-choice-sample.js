@@ -493,7 +493,7 @@ export function openGrammarChoiceSample(A, redraw, passageId = DANWONGO_PASSAGES
     $('#gcv3-translate').onclick = () => { showKo = !showKo; mountPractice(); };
     $('#gcv3-prev')?.addEventListener('click', previousSentence);
     $('#gcv3-forward')?.addEventListener('click', forwardSentence);
-    $('[data-choice-key]').forEach(button => button.onclick = () => {
+    $$('[data-choice-key]').forEach(button => button.onclick = () => {
       if (isReview || sentenceGraded) return;
       answers.set(button.dataset.choiceKey, button.dataset.choiceValue);
       mountPractice();
