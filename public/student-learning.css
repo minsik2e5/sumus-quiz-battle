@@ -115,3 +115,6 @@
   .grammar-set-card.premium .grammar-number{width:44px;height:44px}
   .grammar-set-card.premium .grammar-set-cta{justify-content:space-between}
 }
+
+.grammar-range-head.seonbu{background:linear-gradient(135deg,#14352f 0%,#24594e 100%)}
+.grammar-range-head.seonbu .eyebrow{color:#b9f0df}
