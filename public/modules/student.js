@@ -34,17 +34,43 @@ function wordQuestMeta(state) {
   if (state.status === 'quest') return { label: '깨야 할 퀘스트', cls: 'quest', detail: '아직 미도전' };
   return { label: '정복 진행 중', cls: 'progressing', detail: `${state.attempted}/${state.total} 단어 · ${state.accuracy}%` };
 }
-function wordMasteryHome(A) {
+function todayWordQuest(A, goal = 20) {
   const wm = A.data.word_mastery;
-  if (!wm?.total_ranges) return '';
-  const entries = Object.values(wm.ranges || {}).slice(0, 6);
-  return `<div class="section-title"><h2>단어 시험범위 정복</h2><span class="tiny muted">MASTER ${wm.mastered} / ${wm.total_ranges}</span></div>
-    <button class="word-conquest-card" data-study="vocab">
-      <div class="word-conquest-head"><div><span class="eyebrow">WORD QUEST</span><strong>${esc(A.data.profile.school)} 정복도 ${wm.conquest}%</strong></div><span class="word-conquest-score">${wm.conquest}%</span></div>
-      <div class="word-conquest-bar"><i style="width:${wm.conquest}%"></i></div>
-      <div class="word-quest-mini">${entries.map(state => { const meta = wordQuestMeta(state); return `<span class="${meta.cls}"><b>${esc(state.range_code)}</b><small>${meta.label}</small></span>`; }).join('')}</div>
-      <div class="word-conquest-cta">시험범위 퀘스트 보기 ${icon('arrow')}</div>
-    </button>`;
+  const g = A.data.stats;
+  const school = A.data.profile.school || A.school || '';
+  const states = Object.values(wm?.ranges || {});
+  const priority = state => state.status === 'needs_work' ? 0
+    : ['conquering','in_progress'].includes(state.status) ? 1
+    : state.status === 'quest' ? 2
+    : state.status === 'master' ? 3
+    : state.status === 'perfect' ? 4 : 2;
+  const next = [...states].sort((a,b) => priority(a) - priority(b) || Number(a.range_code) - Number(b.range_code))[0] || null;
+  const meta = next ? wordQuestMeta(next) : { label: '시험범위 선택', cls: 'quest', detail: '학습에서 범위를 확인하세요' };
+  const done = Math.min(Number(g.today_total || 0), goal);
+  const mastered = wm?.mastered || 0;
+  const totalRanges = wm?.total_ranges || states.length;
+  const conquest = wm?.conquest || 0;
+  const active = Boolean(A.data.active_practice);
+  const nextText = active ? '진행 중인 연습 이어가기'
+    : next ? `${next.range_code}번 · ${meta.label}`
+    : '시험범위에서 시작하기';
+
+  return `<div class="section-title compact-home-title"><h2>오늘의 단어 퀘스트</h2><span class="tiny muted">오늘 ${done} / ${goal}</span></div>
+    <section class="today-word-quest">
+      <div class="today-word-top">
+        <div><span class="eyebrow">WORD QUEST</span><h2>${esc(school)} 시험범위 정복</h2></div>
+        <strong class="today-word-percent">${conquest}%</strong>
+      </div>
+      <div class="today-word-progress"><i style="width:${conquest}%"></i></div>
+      <div class="today-word-stats">
+        <span><b>${mastered} / ${totalRanges}</b><small>MASTER</small></span>
+        <span><b>${num(g.today_total || 0)}</b><small>오늘 학습</small></span>
+        <span><b>+${num(g.today_xp || 0)}P</b><small>오늘 포인트</small></span>
+      </div>
+      <div class="today-word-next"><span>다음 퀘스트</span><strong>${esc(nextText)}</strong></div>
+      <button class="btn primary full today-word-start" data-quick-practice="true" ${next?.range_code ? `data-quick-range="${esc(next.range_code)}"` : ''}><span>${active ? '하던 연습 이어가기' : '오늘 학습 시작하기'}</span>${icon('arrow')}</button>
+      <button class="today-word-detail" data-study="vocab">시험범위 전체 보기 ${icon('chevron')}</button>
+    </section>`;
 }
 export function rangePicker(A, teacher = false) {
   const { words, codes, selected } = getRanges(A);
@@ -94,11 +120,10 @@ function grammarHomeCard(A) {
 function home(A) {
   const { profile: p, stats: g, exams, assignments } = A.data, c = CHARACTERS[p.avatar_key] || CHARACTERS.lumi;
   const available = exams.filter(e => e.due_at > Date.now()).slice(0, 2);
-  const task = assignments.find(a => a.due_at > Date.now()), goal = 20, done = Math.min(g.today_total, goal);
+  const task = assignments.find(a => a.due_at > Date.now()), goal = 20;
   return `<div class="row between"><div><p class="hello">${esc(p.display_name)}님, 반가워요</p><h1 class="home-title">오늘도, 한 걸음 더.</h1></div>${g.streak ? `<span class="streak-badge">${icon('flame')}${g.streak}일째</span>` : ''}</div>
   <section class="character-hero" aria-label="내 캐릭터 성장"><div class="hero-top"><div><b class="eyebrow">${c.name}</b><small>${c.type}</small></div><span class="pill">${esc(TITLES[p.avatar_title || 'rookie']?.name || '첫걸음')}</span></div><div class="character-stage">${avatar(p.avatar_key, { stage: g.stage, accessory: p.avatar_accessory, frame: p.avatar_frame })}</div><div class="hero-growth"><div class="row between"><strong>Lv.${String(g.level).padStart(2, '0')}<span>${c.ko}</span></strong><button class="text-button" data-go="studio">내 캐릭터 ${icon('chevron')}</button></div><div class="progress" role="progressbar" aria-label="캐릭터 성장" aria-valuenow="${Math.round(g.percent)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${g.percent}%"></i></div><div class="growth-caption"><span>${g.level === 50 ? '최고 레벨에 도달했어요' : `다음 레벨까지 ${num(g.remaining)}P`}</span><span>${num(g.current)} / ${num(g.need)}P</span></div></div></section>
-  <div class="section-title"><h2>오늘의 한 걸음</h2><span class="tiny muted">${done} / ${goal}문제</span></div><section class="mission"><div class="mission-label">${icon(done >= goal ? 'check' : 'leaf')}${done >= goal ? '오늘 목표를 달성했어요' : '매일 조금씩, 꾸준하게'}</div><h2 class="mission-title">${done >= goal ? '좋은 흐름, 이어가 볼까요?' : '단어 20개와 친해지기'}</h2><button class="btn primary full" data-go="practice"><span>${A.data.active_practice ? '하던 연습 이어가기' : '학습 시작하기'}</span>${icon('arrow')}</button><div class="today-strip"><span>오늘 학습<strong>${num(g.today_total)}개</strong></span><span>획득 포인트<strong>+${num(g.today_xp)}P</strong></span></div></section>
-  ${wordMasteryHome(A)}
+  ${todayWordQuest(A, goal)}
   ${grammarHomeCard(A)}
   ${task ? `<div class="section-title"><h2>선생님이 남긴 연습</h2></div><button class="exam-row" data-assignment="${task.id}"><span class="square-icon">${icon('practice')}</span><div class="grow"><h3>${esc(task.title)}</h3><p>${task.target_questions}문제 · ${date(task.due_at)}까지</p></div>${icon('chevron')}</button>` : ''}
   <div class="section-title"><h2>배정된 실전시험</h2><button class="text-button" data-go="exam">모두 보기 ${icon('chevron')}</button></div>${available.length ? available.map(e => `<button class="exam-row" data-exam="${e.id}"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(e.title)}</h3><p>${EXAM_TYPES[e.exam_type].label} · ${e.question_count}문제</p></div>${icon('chevron')}</button>`).join('') : `<p class="quiet-note">지금은 배정된 시험이 없어요.</p>`}`;
