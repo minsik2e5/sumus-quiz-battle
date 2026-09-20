@@ -42,13 +42,31 @@ const sameSchool = (record, school) => !!record && !!school && record.school_id 
 const wordForGrade = (state, word) => ({ ...word, accepted_meanings: state.meaningAliases?.[word.id] || [] });
 const normalizeDisputeAnswer = value => String(value ?? '').normalize('NFKC').toLowerCase().replace(/[~～·•・.,;:!?()[\]{}"'‘’“”]/g, '').replace(/\s+/g, '').trim();
 const findWord = (state, wordId) => allBooks(state).flatMap(book => book.words || []).find(word => word.id === wordId);
-const addMeaningAlias = (state, wordId, alias) => {
+const addMeaningAlias = (state, wordId, alias, { source = 'teacher', created_by = null } = {}) => {
   const value = str(alias, 80);
   if (!value) fail('허용할 뜻을 입력해주세요.');
   state.meaningAliases ??= {};
+  state.meaningAliasMeta ??= {};
   state.meaningAliases[wordId] ??= [];
-  if (!state.meaningAliases[wordId].some(item => normalizeDisputeAnswer(item) === normalizeDisputeAnswer(value))) state.meaningAliases[wordId].push(value);
+  state.meaningAliasMeta[wordId] ??= [];
+  const normalized = normalizeDisputeAnswer(value);
+  const existingValue = state.meaningAliases[wordId].find(item => normalizeDisputeAnswer(item) === normalized);
+  if (!existingValue) state.meaningAliases[wordId].push(value);
+  const storedValue = existingValue || value;
+  const meta = state.meaningAliasMeta[wordId].find(item => normalizeDisputeAnswer(item?.value) === normalized);
+  if (!meta) state.meaningAliasMeta[wordId].push({ value: storedValue, source, created_at: Date.now(), created_by });
+  else if (meta.source === 'legacy' && source !== 'legacy') Object.assign(meta, { source, created_at: Date.now(), created_by });
   return state.meaningAliases[wordId];
+};
+const removeMeaningAlias = (state, wordId, alias) => {
+  const normalized = normalizeDisputeAnswer(alias);
+  state.meaningAliases ??= {};
+  state.meaningAliasMeta ??= {};
+  state.meaningAliases[wordId] = (state.meaningAliases[wordId] || []).filter(item => normalizeDisputeAnswer(item) !== normalized);
+  state.meaningAliasMeta[wordId] = (state.meaningAliasMeta[wordId] || []).filter(item => normalizeDisputeAnswer(item?.value) !== normalized);
+  if (!state.meaningAliases[wordId].length) delete state.meaningAliases[wordId];
+  if (!state.meaningAliasMeta[wordId].length) delete state.meaningAliasMeta[wordId];
+  return state.meaningAliases[wordId] || [];
 };
 function regradeMeaningDispute(state, dispute) {
   if (!dispute || dispute.regraded_at) return;
@@ -103,9 +121,26 @@ function autoResolveMeaningDisputes(state) {
   }
   return resolved;
 }
-function wordRangeMastery(state, studentId, school) {
+function booksForSchoolGrade(state, school, grade = null) {
+  if (!school) return [];
+  return allBooks(state).filter(book => book.school_id === school.id && (!book.grade || !grade || book.grade === grade));
+}
+function wordsForSchoolGrade(state, school, grade = null) {
+  const map = new Map();
+  for (const book of booksForSchoolGrade(state, school, grade)) {
+    for (const word of book.words || []) map.set(word.id, word);
+  }
+  return [...map.values()];
+}
+function recentRangeResults(list, mastery, limit = 30) {
+  return list.flatMap(word => (mastery[word.id]?.recent_results || []).map(item => ({ ...item, word_id: word.id })))
+    .filter(item => Number.isFinite(Number(item.at)))
+    .sort((a, b) => Number(b.at) - Number(a.at))
+    .slice(0, limit);
+}
+function wordRangeMastery(state, studentId, school, grade = null) {
   if (!school) return { ranges: {}, mastered: 0, perfect: 0, total_ranges: 0, conquest: 0 };
-  const words = allBooks(state).filter(book => book.school_id === school.id).flatMap(book => book.words || []);
+  const words = wordsForSchoolGrade(state, school, grade);
   const grouped = new Map();
   for (const word of words) {
     const code = String(word.range_code || '');
@@ -128,25 +163,81 @@ function wordRangeMastery(state, studentId, school) {
     }
     const accuracy = totalAnswers ? Math.round(correct / totalAnswers * 100) : 0;
     const coverage = list.length ? Math.round(attempted / list.length * 100) : 0;
+    const recent = recentRangeResults(list, mastery, 30);
+    const recentAccuracy = recent.length ? Math.round(recent.filter(item => item.ok).length / recent.length * 100) : accuracy;
+    const recentMinimum = Math.min(20, list.length);
+    const recentReady = recent.length >= recentMinimum;
+    const achievementAccuracy = recentReady ? recentAccuracy : accuracy;
     let status = 'quest';
-    if (attempted > 0 && accuracy <= 70) status = 'needs_work';
+    if (attempted > 0 && achievementAccuracy <= 70) status = 'needs_work';
     else if (attempted < list.length) status = attempted ? 'in_progress' : 'quest';
-    else if (accuracy === 100) status = 'perfect';
-    else if (accuracy >= 95) status = 'master';
+    else if (achievementAccuracy === 100) status = 'perfect';
+    else if (achievementAccuracy >= 95) status = 'master';
     else status = 'conquering';
     if (status === 'master' || status === 'perfect') mastered++;
     if (status === 'perfect') perfect++;
-    const conquest = Math.round(accuracy * (coverage / 100));
+    const conquest = Math.round(achievementAccuracy * (coverage / 100));
     conquestTotal += conquest;
-    ranges[code] = { range_code: code, total: list.length, attempted, accuracy, coverage, conquest, status };
+    ranges[code] = {
+      range_code: code, total: list.length, attempted, accuracy, coverage, conquest, status,
+      recent_accuracy: recentAccuracy, recent_samples: recent.length, recent_required: recentMinimum,
+      achievement_accuracy: achievementAccuracy, achievement_source: recentReady ? 'recent30' : 'cumulative'
+    };
   }
   return { ranges, mastered, perfect, total_ranges: grouped.size, conquest: grouped.size ? Math.round(conquestTotal / grouped.size) : 0 };
 }
+function composeDailyQuest(state, studentId, school, grade, target = 20) {
+  const words = wordsForSchoolGrade(state, school, grade);
+  const mastery = state.mastery?.[studentId] || {};
+  const limit = Math.min(Math.max(1, Number(target) || 20), 20, words.length);
+  const byLastSeen = (a, b) => Number(mastery[a.id]?.last_seen || 0) - Number(mastery[b.id]?.last_seen || 0);
+  const wrongPool = words.filter(word => {
+    const m = mastery[word.id];
+    if (!m) return false;
+    const recent = m.recent_results || [];
+    return Number(m.wrong || 0) > 0 && (recent.at(-1)?.ok === false || Number(m.mastery || 0) < 80);
+  }).sort((a, b) =>
+    Number(mastery[b.id]?.last_wrong_at || 0) - Number(mastery[a.id]?.last_wrong_at || 0) ||
+    Number(mastery[a.id]?.mastery || 0) - Number(mastery[b.id]?.mastery || 0)
+  );
+  const newPool = words.filter(word => {
+    const m = mastery[word.id];
+    return !m || Number(m.correct || 0) + Number(m.wrong || 0) === 0;
+  });
+  const selected = new Map();
+  const mix = { wrong: 0, review: 0, new: 0 };
+  const take = (pool, count, key) => {
+    for (const word of pool) {
+      if (selected.size >= limit || mix[key] >= count) break;
+      if (selected.has(word.id)) continue;
+      selected.set(word.id, word); mix[key]++;
+    }
+  };
+  take(wrongPool, 8, 'wrong');
+  const stalePool = words.filter(word => !selected.has(word.id) && !newPool.some(item => item.id === word.id) && mastery[word.id]?.last_seen).sort(byLastSeen);
+  take(stalePool, 6, 'review');
+  take(shuffle(newPool), 6, 'new');
+  const fillPools = [
+    ['wrong', wrongPool],
+    ['review', stalePool],
+    ['new', shuffle(newPool)],
+    ['review', words.filter(word => !selected.has(word.id)).sort(byLastSeen)]
+  ];
+  for (const [key, pool] of fillPools) {
+    for (const word of pool) {
+      if (selected.size >= limit) break;
+      if (selected.has(word.id)) continue;
+      selected.set(word.id, word); mix[key]++;
+    }
+  }
+  const chosen = [...selected.values()];
+  return { words: chosen, mix, target: chosen.length, range_codes: [...new Set(chosen.map(word => String(word.range_code)))].filter(Boolean) };
+}
 export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, ...state.extraBooks]; }
-export function scopedWords(state, schoolRef, ranges) {
+export function scopedWords(state, schoolRef, ranges, grade = null) {
   const school = schoolByRef(state, schoolRef);
   if (!school || !Array.isArray(ranges) || !ranges.length) fail('학교와 범위를 선택해주세요.');
-  const words = allBooks(state).filter(b => sameSchool(b, school)).flatMap(b => b.words);
+  const words = wordsForSchoolGrade(state, school, grade);
   if (!ranges.every(r => words.some(w => w.range_code === String(r)))) fail('선택한 범위를 찾을 수 없습니다.');
   return words.filter(w => ranges.map(String).includes(w.range_code));
 }
