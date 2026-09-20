@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.3.0-danwongo-grammar';
+const VERSION = 'sumus-voca-v13.3.1-grammar-multiselect';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
