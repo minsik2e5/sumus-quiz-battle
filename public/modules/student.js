@@ -28,11 +28,14 @@ function wordQuestState(A, code) {
 }
 function wordQuestMeta(state) {
   if (!state) return { label: '깨야 할 퀘스트', cls: 'quest', detail: '아직 미도전' };
-  if (state.status === 'perfect') return { label: 'PERFECT MASTER', cls: 'perfect', detail: '정답률 100%' };
-  if (state.status === 'master') return { label: 'WORD MASTER', cls: 'master', detail: `정답률 ${state.accuracy}%` };
-  if (state.status === 'needs_work') return { label: '수련 필요', cls: 'needs-work', detail: `정답률 ${state.accuracy}%` };
+  const achievement = Number(state.achievement_accuracy ?? state.accuracy ?? 0);
+  const recentReady = state.achievement_source === 'recent30';
+  const scoreLabel = recentReady ? `최근 성취 ${achievement}%` : `정답률 ${achievement}%`;
+  if (state.status === 'perfect') return { label: 'PERFECT MASTER', cls: 'perfect', detail: scoreLabel };
+  if (state.status === 'master') return { label: 'WORD MASTER', cls: 'master', detail: scoreLabel };
+  if (state.status === 'needs_work') return { label: '수련 필요', cls: 'needs-work', detail: scoreLabel };
   if (state.status === 'quest') return { label: '깨야 할 퀘스트', cls: 'quest', detail: '아직 미도전' };
-  return { label: '정복 진행 중', cls: 'progressing', detail: `${state.attempted}/${state.total} 단어 · ${state.accuracy}%` };
+  return { label: '정복 진행 중', cls: 'progressing', detail: `${state.attempted}/${state.total} 단어 · ${scoreLabel}` };
 }
 function todayWordQuest(A, goal = 20) {
   const wm = A.data.word_mastery;
@@ -51,7 +54,10 @@ function todayWordQuest(A, goal = 20) {
   const totalRanges = wm?.total_ranges || states.length;
   const conquest = wm?.conquest || 0;
   const active = Boolean(A.data.active_practice);
+  const daily = A.data.daily_quest || { target: 0, mix: { wrong: 0, review: 0, new: 0 } };
+  const mix = daily.mix || { wrong: 0, review: 0, new: 0 };
   const nextText = active ? '진행 중인 연습 이어가기'
+    : daily.target > 0 ? `오답 ${mix.wrong || 0} · 복습 ${mix.review || 0} · 새 단어 ${mix.new || 0}`
     : next ? `${next.range_code}번 · ${meta.label}`
     : '시험범위에서 시작하기';
 
@@ -68,7 +74,7 @@ function todayWordQuest(A, goal = 20) {
         <span><b>+${num(g.today_xp || 0)}P</b><small>오늘 포인트</small></span>
       </div>
       <div class="today-word-next"><span>다음 퀘스트</span><strong>${esc(nextText)}</strong></div>
-      <button class="btn primary full today-word-start" data-quick-practice="true" ${next?.range_code ? `data-quick-range="${esc(next.range_code)}"` : ''}><span>${active ? '하던 연습 이어가기' : '오늘 학습 시작하기'}</span>${icon('arrow')}</button>
+      <button class="btn primary full today-word-start" data-quick-practice="true"><span>${active ? '하던 연습 이어가기' : daily.target > 0 ? `오늘 ${daily.target}개 시작하기` : '시험범위 확인하기'}</span>${icon('arrow')}</button>
       <button class="today-word-detail" data-study="vocab">시험범위 전체 보기 ${icon('chevron')}</button>
     </section>`;
 }
