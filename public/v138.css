@@ -1,0 +1,21 @@
+/* SUMUS VOCA V13.8 · middle/high divisions + meaning disputes */
+.division-segment{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:5px;margin-bottom:10px;border:1px solid #e4e7ec;border-radius:14px;background:#f7f8fa}
+.division-segment button{min-height:42px;border:0;border-radius:10px;background:transparent;color:#667085;font-size:13px;font-weight:850}
+.division-segment button.selected{background:#173f35;color:#fff;box-shadow:0 4px 12px rgba(23,63,53,.15)}
+.auth-division-badge{display:inline-flex;align-items:center;padding:6px 9px;margin-bottom:10px;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;font-size:11px;font-weight:900;letter-spacing:.04em}
+.teacher-division select{min-width:102px!important}
+.sidebar nav button{position:relative}.nav-count{margin-left:auto;display:inline-grid;place-items:center;min-width:21px;height:21px;padding:0 6px;border-radius:999px;background:#e5484d;color:#fff;font-size:10px;font-style:normal;font-weight:900}
+.meaning-dispute-button{display:block;width:100%;margin-top:10px;padding:10px 12px;border:1px solid #cfd8d4;border-radius:12px;background:#fff;color:#245e4e;font-size:12px;font-weight:850}
+.meaning-dispute-button:hover{background:#f4f9f6}.meaning-dispute-button:disabled{opacity:.68}
+.dispute-summary{display:grid;grid-template-columns:170px 1fr;gap:18px;align-items:center;width:min(100%,1580px);margin:0 auto 16px;padding:18px 20px;border:1px solid #dce7e2;border-radius:18px;background:linear-gradient(135deg,#f7fbf9,#fff)}
+.dispute-summary>div span{display:block;color:#667085;font-size:11px;font-weight:800}.dispute-summary>div strong{display:block;margin-top:4px;font-size:30px;color:#1b5d49}.dispute-summary>div strong small{font-size:12px;margin-left:4px}.dispute-summary p{margin:0;color:#667085;font-size:12.5px;line-height:1.55}
+.dispute-list{display:grid;gap:10px;padding:4px 16px 18px}.dispute-card{border:1px solid #e5e8eb;border-radius:16px;background:#fff;overflow:hidden}
+.dispute-main{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:16px}.dispute-main h3{margin:8px 0 2px;font-size:20px}.dispute-main p{margin:3px 0;color:#667085;font-size:12px}.dispute-main small{display:block;margin-top:8px;color:#98a2b3;font-size:11px}
+.dispute-answer{margin-top:10px;padding:9px 11px;border-radius:10px;background:#f7f9f8;color:#667085;font-size:12px}.dispute-answer strong{margin-left:8px;color:#173f35;font-size:14px}
+.dispute-actions{display:flex;gap:7px;flex:none}.dispute-actions .btn{min-height:40px}
+.dispute-students{border-top:1px solid #f0f1f3;background:#fbfcfc}.dispute-students>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;border-bottom:1px solid #f0f1f3}.dispute-students>div:last-child{border-bottom:0}
+.dispute-students b{display:block;font-size:12px}.dispute-students small{display:block;margin-top:2px;color:#98a2b3;font-size:10.5px}
+@media(max-width:760px){
+  .dispute-summary{grid-template-columns:1fr}.dispute-main{align-items:flex-start;flex-direction:column}.dispute-actions{width:100%;display:grid;grid-template-columns:1fr 1fr}
+  .teacher-division select{min-width:90px!important}
+}
