@@ -1,0 +1,20 @@
+/* SUMUS VOCA V13.10 · simplified student home */
+.compact-home-title{margin-bottom:10px!important}
+.today-word-quest{padding:18px;border:1px solid #dde7e2;border-radius:20px;background:linear-gradient(145deg,#fff 0%,#f7fbf9 100%);box-shadow:0 6px 20px rgba(28,81,64,.045)}
+.today-word-top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.today-word-top h2{margin:4px 0 0;font-size:18px;letter-spacing:-.03em;color:#173f35}
+.today-word-percent{font-size:28px;line-height:1;color:#226c55}
+.today-word-progress{height:8px;margin:14px 0 15px;border-radius:999px;background:#e5ece8;overflow:hidden}
+.today-word-progress i{display:block;height:100%;border-radius:999px;background:#318064}
+.today-word-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:12px}
+.today-word-stats span{padding:10px 8px;border-radius:12px;background:#f4f7f5;text-align:center}
+.today-word-stats b{display:block;font-size:13px;color:#27352f}.today-word-stats small{display:block;margin-top:2px;font-size:9.5px;color:#8a9590}
+.today-word-next{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 1px 13px;color:#667085;font-size:11px}
+.today-word-next strong{max-width:65%;color:#34423d;font-size:12px;text-align:right}
+.today-word-start{min-height:54px!important;border-radius:15px!important}
+.today-word-detail{display:flex;width:100%;align-items:center;justify-content:center;gap:4px;margin-top:7px;padding:9px;border:0;background:transparent;color:#567267;font-size:11.5px;font-weight:800}
+.today-word-detail .icon{width:15px;height:15px}
+@media(max-width:520px){
+  .today-word-quest{padding:16px}.today-word-top h2{font-size:17px}.today-word-percent{font-size:26px}
+  .today-word-stats{gap:5px}.today-word-stats span{padding:9px 5px}.today-word-next strong{max-width:62%}
+}
