@@ -69,14 +69,8 @@ async function enhanceStudentsPage() {
   const toolbar = document.querySelector('.teacher-main .toolbar');
   if (!toolbar) return;
 
-  if (!toolbar.querySelector('#school-filter')) {
-    const school = document.createElement('select');
-    school.id = 'school-filter';
-    school.className = 'sumus-extra-filter';
-    school.setAttribute('aria-label', '학교 필터');
-    school.innerHTML = '<option value="">현재 학교 전체</option><option value="단원고">단원고</option><option value="선부고">선부고</option><option value="강서고">강서고</option>';
-    toolbar.appendChild(school);
-
+  if (!toolbar.querySelector('#status-filter')) {
+    toolbar.querySelector('#school-filter')?.remove();
     const status = document.createElement('select');
     status.id = 'status-filter';
     status.className = 'sumus-extra-filter';
@@ -89,7 +83,6 @@ async function enhanceStudentsPage() {
     count.className = 'sumus-filter-count';
     toolbar.appendChild(count);
 
-    school.addEventListener('change', applyFilters);
     status.addEventListener('change', applyFilters);
   }
 
@@ -118,13 +111,12 @@ async function applyFilters() {
   const table = document.querySelector('#student-table table');
   if (!table) return;
   const data = await bootstrap();
-  const school = document.querySelector('#school-filter')?.value || '';
   const status = document.querySelector('#status-filter')?.value || '';
   let visible = 0;
   for (const row of table.querySelectorAll('tbody tr')) {
     const id = row.querySelector('[data-student]')?.dataset.student;
     const p = data.profiles.find(x => x.id === id);
-    const show = !!p && (!school || p.school === school) && (!status || (status === 'active' ? p.active : !p.active));
+    const show = !!p && (!status || (status === 'active' ? p.active : !p.active));
     row.hidden = !show;
     if (show) visible++;
   }
@@ -153,6 +145,7 @@ async function openStudentDetail(id) {
   const attempts = data.attempts.filter(a => a.student_id === id && a.status === 'submitted');
   const grammarItems = Object.values(data.grammar_progress?.[id] || {}).filter(item => !item.school_id || item.school_id === p.school_id);
   const grammarMastered = grammarItems.filter(item => item.mastered).length;
+  const wordMastery = data.word_mastery?.[id] || {};
   const grammarRecent = [...grammarItems].sort((a, b) => Number(b.updated_at || 0) - Number(a.updated_at || 0))[0];
   const recent = shortActivity(lastActivity(data, id));
   const schoolOptions = data.schools.map(s => `<option value="${esc(s.id)}" ${(s.id === p.school_id || (!p.school_id && s.name === p.school)) ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
@@ -168,7 +161,7 @@ async function openStudentDetail(id) {
       <div><b>${p.stats.practice_count}회</b><small>누적 연습</small></div>
       <div><b>${attempts.length}회</b><small>실전시험 제출</small></div>
     </div>
-    <div class="sumus-detail-section"><h3>어법·어휘 진도</h3><div class="detail-grid"><div><b>${grammarMastered}지문</b><small>MASTER</small></div><div><b>${grammarItems.length}지문</b><small>학습 기록</small></div></div><p class="sumus-account-note">${grammarRecent ? '최근 어법 학습 ' + esc(shortActivity(grammarRecent.updated_at)) : '아직 어법·어휘 학습 기록이 없어요.'}</p></div>
+    <div class="sumus-detail-section"><h3>시험범위 정복</h3><div class="detail-grid"><div><b>${wordMastery.mastered || 0}/${wordMastery.total_ranges || 0}</b><small>단어 MASTER</small></div><div><b>${wordMastery.conquest || 0}%</b><small>단어 정복도</small></div><div><b>${grammarMastered}지문</b><small>어법 MASTER</small></div><div><b>${grammarItems.length}지문</b><small>어법 학습</small></div></div><p class="sumus-account-note">${grammarRecent ? '최근 어법 학습 ' + esc(shortActivity(grammarRecent.updated_at)) : '아직 어법·어휘 학습 기록이 없어요.'}</p></div>
     <div class="sumus-detail-section"><h3>최근 연습 기록</h3><div class="sumus-activity-list">${activityRows(data, id)}</div></div>
     <div class="sumus-detail-section"><h3>최근 시험 결과</h3><div class="sumus-activity-list">${examRows(data, id)}</div></div>
     <div class="sumus-detail-section">
