@@ -49,6 +49,8 @@ export async function runReleaseCheck() {
     assert(grade('write_en', 'phenomena', { word: 'phenomenon(pl.phenomena)', meaning: '현상' }), 'plural annotation accepted');
     assert(grade('write_en', 'contribute to', { word: 'contribute to ~', meaning: '기여하다' }), 'source tilde ignored');
     assert(grade('write_meaning', '필요로 하다', { word: 'require', meaning: '요구하다, 필요로 하다' }), 'one listed Korean meaning accepted');
+    assert(grade('write_meaning', '감소', { word: 'decline', meaning: '감소하다' }), 'safe Korean noun/verb variation accepted');
+    assert(grade('write_meaning', '인식하다', { word: 'recognize', meaning: '알아보다', accepted_meanings: ['인식하다'] }), 'teacher-approved Korean meaning alias accepted');
 
     const state = emptyState();
     state.profiles.push({
@@ -88,6 +90,13 @@ export async function runReleaseCheck() {
       examIds.push(exam.id);
     }
     assert(state.exams.length === 4, 'teacher can create all four exam types');
+    const editableExam = state.exams.find(item => item.id === examIds[0]);
+    const editedExam = await service(state, 'PATCH', '/exams/' + editableExam.id, {
+      title: 'QA edited exam', class_name: '고1A', range_codes: [rangeCode], exam_type: editableExam.exam_type,
+      question_count: 4, duration_sec: 360, passing_score: 75, max_attempts: 2,
+      available_at: now - 500, due_at: now + 7200000, release_result: false, active: true
+    }, teacherToken);
+    assert(editedExam.title === 'QA edited exam' && editedExam.duration_sec === 360, 'unattempted exam can be fully edited');
 
     const allWordsExam = await service(state, 'POST', '/exams', {
       title: 'QA 중3 전체 단어', class_name: '중3', school: '단원고', range_codes: [rangeCode], exam_type: 'eng2mean_mc',
@@ -100,6 +109,14 @@ export async function runReleaseCheck() {
     const bootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
     assert(bootstrap.exams.length === 4 && bootstrap.assignments.length === 1, 'student receives assigned exam and practice task');
     assert(bootstrap.books.length > 0 && bootstrap.books.every(book => book.school === '단원고'), 'student bootstrap only includes own-school vocabulary');
+    assert(bootstrap.schools.length === 1 && bootstrap.schools[0].id === 'danwon-high', 'student bootstrap exposes only assigned school');
+    await expectStatus(403, () => service(state, 'PATCH', '/profile/school', { school_id: 'seonbu-high' }, studentToken), 'student cannot change own school');
+
+    const aliasWord = danwonWords[0];
+    const aliasResult = await service(state, 'POST', '/meaning-aliases/' + encodeURIComponent(aliasWord.id), { alias: '교사용 허용 뜻' }, teacherToken);
+    assert(aliasResult.aliases.includes('교사용 허용 뜻'), 'teacher can add accepted meaning alias');
+    const aliasBootstrap = await service(state, 'GET', '/bootstrap', {}, teacherToken);
+    assert(aliasBootstrap.meaning_aliases[aliasWord.id]?.includes('교사용 허용 뜻'), 'teacher bootstrap exposes accepted meaning aliases');
 
     const grammarProgress = await service(state, 'PATCH', '/grammar-progress/qa-passage-21', {
       sentence_count: 6, choice_count: 16, completed_sentences: 2, active_sentence_index: 2,
@@ -122,6 +139,11 @@ export async function runReleaseCheck() {
       }, studentToken);
       assert(submitted.attempt.status === 'submitted' && submitted.attempt.score === 100, `${exam.exam_type} grades correct answers at 100`);
     }
+    await expectStatus(409, () => service(state, 'PATCH', '/exams/' + examIds[0], {
+      question_count: 2
+    }, teacherToken), 'attempted exam blocks structural edits');
+    const clonedExam = await service(state, 'POST', '/exams/' + examIds[0] + '/clone', {}, teacherToken);
+    assert(clonedExam.id !== examIds[0] && clonedExam.active === false && clonedExam.title.includes('수정본'), 'attempted exam can be cloned as editable revision');
 
     const leaseExam = await service(state, 'POST', '/exams', {
       title: 'QA reconnect', class_name: '고1A', school: '단원고', range_codes: [rangeCode], exam_type: 'eng2mean_mc',
@@ -195,6 +217,9 @@ export async function runReleaseCheck() {
       coverView = await service(state, 'POST', `/practice/${coverAll.id}/next`, {}, studentToken);
     }
     assert(coverView.finished && coveredIds.size === coverAll.target, 'cover-all practice shows every scoped word once before finishing');
+    const masteryBootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    assert(masteryBootstrap.word_mastery?.ranges?.[rangeCode]?.attempted === scopedRangeCount, 'word mastery tracks full-range coverage');
+    assert(['master','perfect','conquering','needs_work'].includes(masteryBootstrap.word_mastery.ranges[rangeCode].status), 'word mastery returns a quest status');
 
     const movedStudent = await service(state, 'PATCH', `/students/${student.id}`, {
       school_id: 'gangseo-high', class_name: '중3', active: true
@@ -205,6 +230,8 @@ export async function runReleaseCheck() {
     await service(state, 'PATCH', '/teacher/school', { school_id: 'gangseo-high' }, teacherToken);
     const gangseoAfterMove = await service(state, 'GET', '/bootstrap', {}, teacherToken);
     assert(gangseoAfterMove.profiles.some(profile => profile.id === student.id), 'moved student appears in the new school roster');
+    assert(gangseoAfterMove.sessions.every(session => session.school_id === 'gangseo-high'), 'historical sessions from other schools never leak into active school view');
+    assert(state.sessions.some(session => session.student_id === student.id && session.school_id === 'danwon-high'), 'historical school records remain preserved after school move');
 
     await service(state, 'PATCH', `/students/${student.id}`, { password: '12345678' }, teacherToken);
     const resetLogin = await service(state, 'POST', '/login', { username: 'qa_student', password: '12345678', role: 'student' }, null);
@@ -230,11 +257,19 @@ export async function runReleaseCheck() {
     const teacherModule = readFileSync(publicRoot + 'modules/teacher.js', 'utf8');
     const indexHtml = readFileSync(publicRoot + 'index.html', 'utf8');
     const dashboardCss = readFileSync(publicRoot + 'teacher-dashboard-v136.css', 'utf8');
+    const v137Css = readFileSync(publicRoot + 'v137.css', 'utf8');
+    const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
+    const appJs = readFileSync(publicRoot + 'app.js', 'utf8');
     assert(manifest.display === 'standalone' && manifest.start_url === '/', 'PWA manifest is installable');
     assert(teacherModule.includes('TODAY CONTROL') && teacherModule.includes('오늘 확인 필요') && teacherModule.includes('많이 틀린 어법 포인트'), 'V13.6 teacher operations dashboard is present');
     assert(teacherModule.includes('grammar_progress') && teacherModule.includes('시험 미제출'), 'teacher dashboard reads grammar and exam attention data');
     assert(indexHtml.includes('teacher-dashboard-v136.css') && !indexHtml.includes('teacher-dashboard.js'), 'dashboard stylesheet is loaded and stale missing module is removed');
     assert(dashboardCss.includes('.v136-dashboard-grid') && dashboardCss.includes('@media(max-width:760px)'), 'teacher dashboard has responsive styles');
+    assert(indexHtml.includes('v137.css') && v137Css.includes('.exam-ops-table') && v137Css.includes('.word-conquest-card'), 'V13.7 teacher proportions and word quest styles are loaded');
+    assert(teacherModule.includes('data-exam-edit') && teacherModule.includes('data-exam-status') && teacherModule.includes('data-exam-menu'), 'teacher exam list exposes edit status and operations');
+    assert(teacherModule.includes('data-meaning-alias') && appJs.includes('meaningAliasModal'), 'teacher can manage accepted meaning aliases');
+    assert(studentModule.includes('깨야 할 퀘스트') && studentModule.includes('WORD MASTER') && studentModule.includes('PERFECT MASTER'), 'student word mastery quest labels are present');
+    assert(!appJs.includes("id=\"account-school\"") && studentModule.includes('선생님 관리'), 'student self-service school change is removed');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
