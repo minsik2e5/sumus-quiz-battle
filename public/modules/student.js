@@ -13,7 +13,7 @@ export function studentPage(A) {
   return shell(A, ({ home, practice, exam, ranking, records, studio }[A.tab] || home)(A));
 }
 export function getRanges(A, school = A.school) {
-  const words = A.data.books.filter(b => b.school === school).flatMap(b => b.words);
+  const words = A.data.books.flatMap(b => b.words || []);
   const codes = [...new Set(words.map(w => w.range_code))];
   A.ranges[school] ??= codes.slice(0, 2);
   return { words, codes, selected: A.ranges[school] };
