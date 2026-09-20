@@ -1,9 +1,18 @@
-import { allBooks } from './service.mjs';
+import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
+import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { DANWONGO_PASSAGES } from '../public/danwongo-grammar-data.js';
 import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from '../public/seonbu-grammar-data.js';
 import { GANGSEO_PASSAGES } from '../public/gangseo-grammar-data.js';
 
 const fail = message => { throw new Error('[content-validation] ' + message); };
+const runtimeBooks = () => {
+  const books = builtinBooksData.map(book => {
+    const isSeonbu = book.school_id === 'seonbu-high' || book.school === '선부고';
+    if (!isSeonbu || !Array.isArray(book.words)) return book;
+    return { ...book, words: book.words.filter(word => String(word.range_code) !== '44') };
+  });
+  return [...books, seonbu44Correction];
+};
 const assert = (condition, message) => { if (!condition) fail(message); };
 
 function choiceCount(passages) {
@@ -32,7 +41,7 @@ function validateGrammarSet(name, passages, expectedNumbers, expectedChoices) {
 }
 
 function validateVocabulary() {
-  const books = allBooks({ extraBooks: [] });
+  const books = runtimeBooks();
   const words = books.flatMap(book => book.words || []);
   assert(new Set(words.map(word => word.id)).size === words.length, '단어 id 중복');
   const bySchool = school => books.filter(book => book.school === school).flatMap(book => book.words || []);
