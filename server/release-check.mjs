@@ -225,7 +225,14 @@ export async function runReleaseCheck() {
     const manifest = JSON.parse(readFileSync(publicRoot + 'manifest.webmanifest', 'utf8'));
     const sw = readFileSync(publicRoot + 'sw.js', 'utf8');
     const teacherEnhancements = readFileSync(publicRoot + 'teacher-enhancements.js', 'utf8');
+    const teacherModule = readFileSync(publicRoot + 'modules/teacher.js', 'utf8');
+    const indexHtml = readFileSync(publicRoot + 'index.html', 'utf8');
+    const dashboardCss = readFileSync(publicRoot + 'teacher-dashboard-v136.css', 'utf8');
     assert(manifest.display === 'standalone' && manifest.start_url === '/', 'PWA manifest is installable');
+    assert(teacherModule.includes('TODAY CONTROL') && teacherModule.includes('오늘 확인 필요') && teacherModule.includes('많이 틀린 어법 포인트'), 'V13.6 teacher operations dashboard is present');
+    assert(teacherModule.includes('grammar_progress') && teacherModule.includes('시험 미제출'), 'teacher dashboard reads grammar and exam attention data');
+    assert(indexHtml.includes('teacher-dashboard-v136.css') && !indexHtml.includes('teacher-dashboard.js'), 'dashboard stylesheet is loaded and stale missing module is removed');
+    assert(dashboardCss.includes('.v136-dashboard-grid') && dashboardCss.includes('@media(max-width:760px)'), 'teacher dashboard has responsive styles');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
