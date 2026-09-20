@@ -1,10 +1,11 @@
-const VERSION = 'sumus-voca-v13.5.0-ops-stability';
+const VERSION = 'sumus-voca-v13.6.0-teacher-dashboard';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
   '/index.html',
   '/styles.css',
   '/student-learning.css',
+  '/teacher-dashboard-v136.css',
   '/app.js',
   '/signup-ui.js',
   '/teacher-enhancements.js',
