@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.4.0-gangseo-range';
+const VERSION = 'sumus-voca-v13.5.0-ops-stability';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
