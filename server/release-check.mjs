@@ -58,18 +58,37 @@ export async function runReleaseCheck() {
       display_name: 'QA 선생님', class_name: '고1A', school: '단원고', active: true, created_at: Date.now()
     });
 
-    const teacherLogin = await service(state, 'POST', '/login', { username: 'qa_teacher', password: 'QaTeacher123!', role: 'teacher' }, null);
+    const teacherLogin = await service(state, 'POST', '/login', { username: 'qa_teacher', password: 'QaTeacher123!', role: 'teacher', division: 'high' }, null);
     const teacherToken = teacherLogin._cookie;
     assert(Boolean(teacherToken), 'teacher login succeeds');
+    let teacherBootstrap = await service(state, 'GET', '/bootstrap', {}, teacherToken);
+    assert(teacherBootstrap.profile.active_division === 'high' && teacherBootstrap.schools.every(school => school.division === 'high'), 'teacher starts in isolated high-school division');
+
+    await service(state, 'PATCH', '/teacher/division', { division: 'middle' }, teacherToken);
+    const middleTeacherBootstrap = await service(state, 'GET', '/bootstrap', {}, teacherToken);
+    assert(middleTeacherBootstrap.profile.active_division === 'middle' && middleTeacherBootstrap.profile.active_school_id === 'wonil-middle', 'teacher can switch to middle-school division');
+    assert(middleTeacherBootstrap.schools.length === 1 && middleTeacherBootstrap.schools[0].id === 'wonil-middle', 'middle division exposes only middle schools');
+    const middleStudent = await service(state, 'POST', '/students', {
+      username: 'qa_middle', password: 'QaMiddle123!', display_name: 'QA 중학생', class_name: '중3', school_id: 'wonil-middle'
+    }, teacherToken);
+    assert(middleStudent.division === 'middle' && middleStudent.class_name === '중3', 'teacher can create middle-school student');
+    const middleLogin = await service(state, 'POST', '/login', { username: 'qa_middle', password: 'QaMiddle123!', role: 'student', division: 'middle' }, null);
+    assert(Boolean(middleLogin._cookie), 'middle student logs into middle division');
+    await expectStatus(403, () => service(state, 'POST', '/login', { username: 'qa_middle', password: 'QaMiddle123!', role: 'student', division: 'high' }, null), 'middle account is rejected by high-school login');
+    await service(state, 'DELETE', '/students/' + middleStudent.id, {}, teacherToken);
+    await service(state, 'PATCH', '/teacher/division', { division: 'high' }, teacherToken);
+    teacherBootstrap = await service(state, 'GET', '/bootstrap', {}, teacherToken);
+    assert(teacherBootstrap.profile.active_division === 'high' && teacherBootstrap.profile.active_school_id === 'danwon-high', 'teacher returns to high-school division');
 
     const student = await service(state, 'POST', '/students', {
       username: 'qa_student', password: 'QaStudent123!', display_name: 'QA 학생', class_name: '고1A', school: '단원고'
     }, teacherToken);
     assert(student.role === 'student' && student.class_name === '고1A', 'teacher can create student');
 
-    const studentLogin = await service(state, 'POST', '/login', { username: 'qa_student', password: 'QaStudent123!', role: 'student' }, null);
+    const studentLogin = await service(state, 'POST', '/login', { username: 'qa_student', password: 'QaStudent123!', role: 'student', division: 'high' }, null);
     const studentToken = studentLogin._cookie;
     assert(Boolean(studentToken), 'student login succeeds');
+    await expectStatus(403, () => service(state, 'POST', '/login', { username: 'qa_student', password: 'QaStudent123!', role: 'student', division: 'middle' }, null), 'high-school account is rejected by middle login');
     await expectStatus(403, () => service(state, 'POST', '/login', { username: 'qa_student', password: 'QaStudent123!', role: 'teacher' }, null), 'role mismatch is rejected');
 
     const danwonWords = bySchool('단원고');
@@ -99,17 +118,18 @@ export async function runReleaseCheck() {
     assert(editedExam.title === 'QA edited exam' && editedExam.duration_sec === 360, 'unattempted exam can be fully edited');
 
     const allWordsExam = await service(state, 'POST', '/exams', {
-      title: 'QA 중3 전체 단어', class_name: '중3', school: '단원고', range_codes: [rangeCode], exam_type: 'eng2mean_mc',
+      title: 'QA 전체 단어', class_name: '고1A', school: '단원고', range_codes: [rangeCode], exam_type: 'eng2mean_mc',
       question_count: 'all', duration_sec: 300, passing_score: 70, max_attempts: 1,
       available_at: now - 1000, due_at: now + 3600000, release_result: true
     }, teacherToken);
     const scopedRangeCount = danwonWords.filter(word => String(word.range_code) === rangeCode).length;
-    assert(allWordsExam.class_name === '중3' && allWordsExam.question_count === scopedRangeCount, 'exam supports selectable class and all scoped words');
+    assert(allWordsExam.class_name === '고1A' && allWordsExam.question_count === scopedRangeCount, 'exam supports selectable class and all scoped words');
 
     const bootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
     assert(bootstrap.exams.length === 4 && bootstrap.assignments.length === 1, 'student receives assigned exam and practice task');
     assert(bootstrap.books.length > 0 && bootstrap.books.every(book => book.school === '단원고'), 'student bootstrap only includes own-school vocabulary');
     assert(bootstrap.schools.length === 1 && bootstrap.schools[0].id === 'danwon-high', 'student bootstrap exposes only assigned school');
+    assert(bootstrap.profile.division === 'high' && bootstrap.divisions.length === 1 && bootstrap.divisions[0] === 'high', 'student bootstrap is locked to assigned division');
     await expectStatus(403, () => service(state, 'PATCH', '/profile/school', { school_id: 'seonbu-high' }, studentToken), 'student cannot change own school');
 
     const aliasWord = danwonWords[0];
@@ -222,9 +242,9 @@ export async function runReleaseCheck() {
     assert(['master','perfect','conquering','needs_work'].includes(masteryBootstrap.word_mastery.ranges[rangeCode].status), 'word mastery returns a quest status');
 
     const movedStudent = await service(state, 'PATCH', `/students/${student.id}`, {
-      school_id: 'gangseo-high', class_name: '중3', active: true
+      school_id: 'gangseo-high', class_name: '고1B', active: true
     }, teacherToken);
-    assert(movedStudent.school_id === 'gangseo-high' && movedStudent.school === '강서고' && movedStudent.class_name === '중3', 'teacher can change student school and class');
+    assert(movedStudent.school_id === 'gangseo-high' && movedStudent.school === '강서고' && movedStudent.class_name === '고1B' && movedStudent.division === 'high', 'teacher can change student school and class');
     const danwonAfterMove = await service(state, 'GET', '/bootstrap', {}, teacherToken);
     assert(!danwonAfterMove.profiles.some(profile => profile.id === student.id), 'moved student leaves the previous school roster');
     await service(state, 'PATCH', '/teacher/school', { school_id: 'gangseo-high' }, teacherToken);
@@ -234,10 +254,10 @@ export async function runReleaseCheck() {
     assert(state.sessions.some(session => session.student_id === student.id && session.school_id === 'danwon-high'), 'historical school records remain preserved after school move');
 
     await service(state, 'PATCH', `/students/${student.id}`, { password: '12345678' }, teacherToken);
-    const resetLogin = await service(state, 'POST', '/login', { username: 'qa_student', password: '12345678', role: 'student' }, null);
+    const resetLogin = await service(state, 'POST', '/login', { username: 'qa_student', password: '12345678', role: 'student', division: 'high' }, null);
     assert(Boolean(resetLogin._cookie), 'teacher can reset a student password to the default');
     await service(state, 'PATCH', '/profile/password', { current_password: 'QaTeacher123!', new_password: 'QaTeacher456!' }, teacherToken);
-    const changedTeacherLogin = await service(state, 'POST', '/login', { username: 'qa_teacher', password: 'QaTeacher456!', role: 'teacher' }, null);
+    const changedTeacherLogin = await service(state, 'POST', '/login', { username: 'qa_teacher', password: 'QaTeacher456!', role: 'teacher', division: 'high' }, null);
     assert(Boolean(changedTeacherLogin._cookie), 'teacher can change own password');
 
     await service(state, 'DELETE', `/students/${student.id}`, {}, teacherToken);
