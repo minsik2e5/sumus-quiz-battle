@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.3.2-seonbu-2025';
+const VERSION = 'sumus-voca-v13.3.3-seonbu-2026';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
