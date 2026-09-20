@@ -1,4 +1,4 @@
-import { $, $$, esc, icon, toast } from './modules/ui.js';
+import { $, $, esc, icon, toast, api } from './modules/ui.js';
 import { DANWONGO_PASSAGES } from './danwongo-grammar-data.js?v=2';
 import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from './seonbu-grammar-data.js?v=2';
 import { GANGSEO_PASSAGES } from './gangseo-grammar-data.js?v=1';
@@ -329,6 +329,48 @@ export function openGrammarChoiceSample(A, redraw, passageId = DANWONGO_PASSAGES
 
   const choiceKey = (s, p) => s + ':' + p;
   const currentSentence = () => PASSAGE.sentences[sentenceIndex];
+  const passageChoiceCount = () => allChoiceRefs().length;
+  const progressPayload = overrides => {
+    const prior = A.data.grammar_progress?.[PASSAGE.id] || {};
+    return {
+      sentence_count: PASSAGE.sentences.length,
+      choice_count: passageChoiceCount(),
+      completed_sentences: gradedSentences.size,
+      active_sentence_index: Math.min(activeSentenceIndex, PASSAGE.sentences.length - 1),
+      graded_sentences: [...gradedSentences].sort((a, b) => a - b),
+      answers: Object.fromEntries(answers),
+      wrong_keys: firstRoundWrong.map(item => choiceKey(item.sentenceIndex, item.partIndex)),
+      first_wrong: firstRoundWrong.length,
+      first_rate: overrides?.first_rate ?? prior.first_rate ?? null,
+      recall_attempts: overrides?.recall_attempts ?? prior.recall_attempts ?? 0,
+      mastered: overrides?.mastered === true
+    };
+  };
+  async function syncProgress(overrides = {}) {
+    const payload = progressPayload(overrides);
+    A.data.grammar_progress ??= {};
+    A.data.grammar_progress[PASSAGE.id] = { ...(A.data.grammar_progress[PASSAGE.id] || {}), ...payload, passage_id: PASSAGE.id, school: A.data.profile.school, updated_at: Date.now() };
+    return await api('/grammar-progress/' + encodeURIComponent(PASSAGE.id), payload, 'PATCH');
+  }
+  function restoreProgress() {
+    const saved = A.data.grammar_progress?.[PASSAGE.id];
+    if (!saved || saved.mastered || Number(saved.sentence_count) !== PASSAGE.sentences.length || Number(saved.choice_count) !== passageChoiceCount()) return;
+    const refMap = new Map(allChoiceRefs().map(ref => [choiceKey(ref.sentenceIndex, ref.partIndex), ref]));
+    for (const [key, value] of Object.entries(saved.answers || {})) {
+      const ref = refMap.get(key);
+      if (ref?.options?.includes(value)) answers.set(key, value);
+    }
+    for (const index of saved.graded_sentences || []) if (Number.isInteger(index) && index >= 0 && index < PASSAGE.sentences.length) gradedSentences.add(index);
+    const wrongKeys = new Set(saved.wrong_keys || []);
+    for (const [key, ref] of refMap) {
+      if (wrongKeys.has(key)) firstRoundWrong.push(ref);
+      else if (gradedSentences.has(ref.sentenceIndex) && answers.get(key) === ref.answer) firstRoundCorrect.add(key);
+    }
+    activeSentenceIndex = Math.max(0, Math.min(Number(saved.active_sentence_index || 0), PASSAGE.sentences.length - 1));
+    sentenceIndex = activeSentenceIndex;
+    sentenceGraded = gradedSentences.has(sentenceIndex);
+  }
+  restoreProgress();
 
   function cleanupExit() {
     document.removeEventListener('keydown', keyboard);
@@ -372,6 +414,7 @@ export function openGrammarChoiceSample(A, redraw, passageId = DANWONGO_PASSAGES
       else if (!firstRoundWrong.some(x => x.sentenceIndex === sentenceIndex && x.partIndex === partIndex)) firstRoundWrong.push(ref);
     }
     mountPractice();
+    void syncProgress().catch(() => {});
   }
 
   function previousSentence() {
@@ -418,6 +461,7 @@ export function openGrammarChoiceSample(A, redraw, passageId = DANWONGO_PASSAGES
     sentenceIndex++;
     sentenceGraded = gradedSentences.has(sentenceIndex);
     showKo = false;
+    void syncProgress().catch(() => {});
     mountPractice();
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -572,6 +616,7 @@ export function openGrammarChoiceSample(A, redraw, passageId = DANWONGO_PASSAGES
     const firstRate = Math.round((firstCorrect / total) * 100);
     const recallAttempts = recallQueue.reduce((n, item) => n + (item.attempts || 0), 0);
     const mastered = firstRoundWrong.length === 0 || recallQueue.every(item => item.attempts > 0);
+    void syncProgress({ first_rate: firstRate, recall_attempts: recallAttempts, mastered }).catch(() => {});
     if (mastered) {
       try {
         localStorage.setItem('sumus:grammar-master:' + A.data.profile.id + ':' + PASSAGE.id, JSON.stringify({
@@ -596,6 +641,8 @@ export function openGrammarChoiceSample(A, redraw, passageId = DANWONGO_PASSAGES
     mountShell('학습 완료', { label: '완료', percent: 100 }, body, bottom);
     $('#gcv3-home').onclick = cleanupExit;
     $('#gcv3-restart').onclick = () => {
+      if (A.data.grammar_progress) delete A.data.grammar_progress[PASSAGE.id];
+      void api('/grammar-progress/' + encodeURIComponent(PASSAGE.id), { reset: true }, 'PATCH').catch(() => {});
       answers.clear();
       firstRoundWrong.length = 0;
       firstRoundCorrect.clear();
