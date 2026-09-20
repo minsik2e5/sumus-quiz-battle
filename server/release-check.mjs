@@ -324,7 +324,9 @@ export async function runReleaseCheck() {
     const indexHtml = readFileSync(publicRoot + 'index.html', 'utf8');
     const dashboardCss = readFileSync(publicRoot + 'teacher-dashboard-v136.css', 'utf8');
     const v137Css = readFileSync(publicRoot + 'v137.css', 'utf8');
+    const v138Css = readFileSync(publicRoot + 'v138.css', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
+    const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
     const appJs = readFileSync(publicRoot + 'app.js', 'utf8');
     assert(manifest.display === 'standalone' && manifest.start_url === '/', 'PWA manifest is installable');
     assert(teacherModule.includes('TODAY CONTROL') && teacherModule.includes('오늘 확인 필요') && teacherModule.includes('많이 틀린 어법 포인트'), 'V13.6 teacher operations dashboard is present');
@@ -336,6 +338,11 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('data-meaning-alias') && appJs.includes('meaningAliasModal'), 'teacher can manage accepted meaning aliases');
     assert(studentModule.includes('깨야 할 퀘스트') && studentModule.includes('WORD MASTER') && studentModule.includes('PERFECT MASTER'), 'student word mastery quest labels are present');
     assert(!appJs.includes("id=\"account-school\"") && studentModule.includes('선생님 관리'), 'student self-service school change is removed');
+    assert(indexHtml.includes('v138.css') && v138Css.includes('.division-segment') && v138Css.includes('.dispute-card'), 'V13.8 division and dispute styles are loaded');
+    assert(appJs.includes('data-division="middle"') && appJs.includes('/teacher/division'), 'login and teacher controls separate middle and high divisions');
+    assert(teacherModule.includes('뜻 이의제기') && teacherModule.includes('data-dispute-global') && teacherModule.includes('data-dispute-once'), 'teacher meaning-dispute inbox is present');
+    assert(sessionsModule.includes('이 답도 맞는 것 같아요') && sessionsModule.includes('/meaning-disputes'), 'meaning-writing student dispute buttons are present');
+    assert(indexHtml.includes('/app.js?v=13.8.0') && sw.includes('sumus-voca-v13.8.0-divisions-disputes'), 'V13.8 cache versions are active');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
