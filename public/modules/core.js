@@ -222,11 +222,13 @@ export function grade(type, answer, word) {
   if (typeof answer !== 'string' || !answer.trim()) return false;
   if (type === 'write_en' || ['spell', 'scramble', 'vowelblank', 'initial'].includes(type)) return englishAccepted(word.word).includes(normalizeEnglish(answer));
   if (type === 'write_meaning') {
-    const accepted = meaningAccepted(word.meaning, word.accepted_meanings);
+    const accepted = new Set(meaningAccepted(word.meaning, word.accepted_meanings));
     const input = normalizeMeaning(answer);
-    if (accepted.includes(input)) return true;
+    const candidates = new Set();
+    addPredicateFamily(candidates, input, false);
     const withoutParticle = stripMeaningParticle(input);
-    return withoutParticle !== input && accepted.includes(withoutParticle);
+    if (withoutParticle !== input) addPredicateFamily(candidates, withoutParticle, false);
+    return [...candidates].some(value => accepted.has(value));
   }
   return answer === (type === 'mean2eng_mc' || type === 'mean2eng' ? displayEnglish(word.word) : word.meaning);
 }
