@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.10.0-simplified-home';
+const VERSION = 'sumus-voca-v13.11.0-valid-meanings';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -10,6 +10,7 @@ const SHELL = [
   '/v138.css',
   '/v139.css',
   '/v1310.css',
+  '/v1311.css',
   '/app.js',
   '/signup-ui.js',
   '/teacher-enhancements.js',
