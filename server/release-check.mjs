@@ -384,8 +384,8 @@ export async function runReleaseCheck() {
     assert(appJs.includes('d.quickPractice') && appJs.includes("A.mode = 'write_meaning'") && appJs.includes('A.target = 20'), 'V13.10 home starts a 20-question meaning-writing quest directly');
     assert(studentModule.includes('오늘의 단어 퀘스트') && studentModule.includes('data-quick-practice') && !studentModule.includes('<h2>오늘의 한 걸음</h2>'), 'V13.10 simplified home remains active');
     assert(indexHtml.includes('v1311.css') && v1311Css.includes('.meaning-alias.auto'), 'V13.11 valid-answer teacher styles are loaded');
-    assert(teacherModule.includes('기본 유효답 + 선생님 허용 뜻') && teacherModule.includes('approved_auto'), 'teacher UI shows automatic valid-answer workflow');
-    assert(indexHtml.includes('/app.js?v=13.11.0') && sw.includes('sumus-voca-v13.11.0-valid-meanings'), 'V13.11 cache versions are active');
+    assert(teacherModule.includes('같은 품사의 기본 유효답 + 선생님 허용 뜻') && teacherModule.includes('approved_auto'), 'teacher UI shows part-of-speech safe valid-answer workflow');
+    assert(indexHtml.includes('/app.js?v=13.12.0') && sw.includes('sumus-voca-v13.12.0-strict-pos'), 'V13.12 strict POS cache versions are active');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
