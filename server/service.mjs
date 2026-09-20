@@ -188,7 +188,9 @@ export async function service(state, method, path, body, token) {
       const requestedDivision = DIVISIONS.includes(body.division) ? body.division : activeTeacherDivision(p);
       if (!p.division_ids.includes(requestedDivision)) fail('담당 부서를 확인해주세요.', 403);
       p.active_division = requestedDivision;
-      if (!activeTeacherSchool(state, p)) p.active_school_id = teacherSchools(state, p)[0]?.id;
+      const selectedTeacherSchool = activeTeacherSchool(state, p);
+      if (!selectedTeacherSchool) fail('이 부서에 등록된 학교가 없습니다.', 409);
+      p.active_school_id = selectedTeacherSchool.id;
     }
     if (p.role !== body.role) fail('학생 / 교사 선택을 확인해주세요.', 403);
     if (p.role === 'student') {
