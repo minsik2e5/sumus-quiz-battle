@@ -13,6 +13,22 @@ const fail = (message, status = 400) => { throw Object.assign(new Error(message)
 const requireRole = (p, role) => { if (p.role !== role) fail('이 기능을 사용할 권한이 없습니다.', 403); };
 const integer = (n, min, max, label) => { if (!Number.isInteger(Number(n)) || Number(n) < min || Number(n) > max) fail(`${label}을 확인해주세요.`); return Number(n); };
 const str = (s, max = 120) => typeof s === 'string' ? s.trim().slice(0, max) : '';
+const safeGrammarAnswers = value => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+  const entries = Object.entries(value).slice(0, 400);
+  const safe = {};
+  for (const [key, answer] of entries) {
+    if (!/^\d+:\d+$/.test(key) || typeof answer !== 'string' || answer.length > 160) continue;
+    safe[key] = answer;
+  }
+  return safe;
+};
+const safeGrammarIndexes = (value, max = 120) => Array.isArray(value)
+  ? [...new Set(value.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n < max))].slice(0, max)
+  : [];
+const safeGrammarKeys = value => Array.isArray(value)
+  ? [...new Set(value.map(String).filter(key => /^\d+:\d+$/.test(key)))].slice(0, 400)
+  : [];
 const id = () => randomUUID();
 const schoolByRef = (state, value) => state.schools.find(s => s.active !== false && (s.id === value || s.name === value));
 const schoolForProfile = (state, profile) => state.schools.find(s => s.id === profile.school_id) || schoolByRef(state, profile.school);
@@ -62,7 +78,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.0.1', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.5.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -106,7 +122,10 @@ export async function service(state, method, path, body, token) {
     const books = allBooks(state).filter(b => sameSchool(b, selectedSchool));
     const schools = (teacher ? teacherSchools(state, p) : state.schools.filter(s => s.active !== false)).map(s => ({ id: s.id, name: s.name, full_name: s.full_name }));
     const profile = { ...publicProfile(p), ...(teacher && selectedSchool ? { active_school_id: selectedSchool.id, active_school: selectedSchool.name } : {}) };
-    return { profile, schools, books, stats: stats(state, p), mastery: state.mastery[p.id] || {},
+    const grammarProgress = teacher
+      ? Object.fromEntries([...studentIds].map(studentId => [studentId, state.grammarProgress?.[studentId] || {}]))
+      : (state.grammarProgress?.[p.id] || {});
+    return { profile, schools, books, stats: stats(state, p), mastery: state.mastery[p.id] || {}, grammar_progress: grammarProgress,
       profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
       sessions, exams: visibleExams,
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
@@ -126,6 +145,53 @@ export async function service(state, method, path, body, token) {
     if (!school || !p.school_ids?.includes(school.id)) fail('담당 학교를 확인해주세요.', 403);
     p.active_school_id = school.id;
     return { active_school_id: school.id, active_school: school.name };
+  }
+  if (path === '/profile/password' && method === 'PATCH') {
+    if (process.env.AUTH_PROVIDER === 'supabase') fail('현재 로그인 방식에서는 계정 관리 화면에서 비밀번호를 변경해주세요.', 409);
+    const currentPassword = String(body.current_password || '');
+    const nextPassword = String(body.new_password || '');
+    if (!(await verifyPassword(currentPassword, p.password_hash))) fail('현재 비밀번호가 맞지 않습니다.', 401);
+    if (nextPassword.length < 8 || nextPassword.length > 128) fail('새 비밀번호는 8~128자로 입력해주세요.');
+    if (await verifyPassword(nextPassword, p.password_hash)) fail('현재 비밀번호와 다른 새 비밀번호를 입력해주세요.');
+    p.password_hash = await passwordHash(nextPassword);
+    state.tokens = state.tokens.filter(item => item === auth);
+    return { ok: true };
+  }
+  if (/^\/grammar-progress\/[^/]+$/.test(path) && method === 'PATCH') {
+    requireRole(p, 'student');
+    state.grammarProgress ??= {};
+    state.grammarProgress[p.id] ??= {};
+    const passageId = decodeURIComponent(path.split('/')[2] || '');
+    if (!/^[a-z0-9~._-]{3,80}$/i.test(passageId)) fail('지문 정보를 확인해주세요.');
+    if (body.reset === true) {
+      delete state.grammarProgress[p.id][passageId];
+      return { ok: true, passage_id: passageId, reset: true };
+    }
+    const school = schoolForProfile(state, p);
+    const sentenceCount = integer(body.sentence_count, 1, 120, '문장 수');
+    const choiceCount = integer(body.choice_count, 1, 500, '선택지 수');
+    const completedSentences = integer(body.completed_sentences ?? 0, 0, sentenceCount, '완료 문장 수');
+    const activeSentenceIndex = integer(body.active_sentence_index ?? 0, 0, Math.max(0, sentenceCount - 1), '현재 문장');
+    const firstRate = body.first_rate == null ? null : integer(body.first_rate, 0, 100, '1차 정답률');
+    const progress = {
+      passage_id: passageId,
+      school_id: school?.id || p.school_id || null,
+      school: school?.name || p.school || null,
+      sentence_count: sentenceCount,
+      choice_count: choiceCount,
+      completed_sentences: completedSentences,
+      active_sentence_index: activeSentenceIndex,
+      graded_sentences: safeGrammarIndexes(body.graded_sentences, sentenceCount),
+      answers: safeGrammarAnswers(body.answers),
+      wrong_keys: safeGrammarKeys(body.wrong_keys),
+      first_rate: firstRate,
+      first_wrong: integer(body.first_wrong ?? 0, 0, choiceCount, '1차 오답 수'),
+      recall_attempts: integer(body.recall_attempts ?? 0, 0, 5000, '오답 리콜 횟수'),
+      mastered: body.mastered === true,
+      updated_at: Date.now()
+    };
+    state.grammarProgress[p.id][passageId] = progress;
+    return progress;
   }
   if (path === '/profile/school' && method === 'PATCH') {
     requireRole(p, 'student');
@@ -188,6 +254,7 @@ export async function service(state, method, path, body, token) {
     state.practices = state.practices.filter(item => item.student_id !== studentId);
     state.examAttempts = state.examAttempts.filter(item => item.student_id !== studentId);
     delete state.mastery[studentId];
+    if (state.grammarProgress) delete state.grammarProgress[studentId];
     return { ok: true, id: studentId };
   }
   if ((path === '/exams' || path === '/assignments') && method === 'POST') {
