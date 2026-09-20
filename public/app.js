@@ -1,9 +1,9 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, CLASS_OPTIONS } from './modules/core.js';
 import { avatar } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.9.0';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.9.0';
-import { configureSessions, openExam, openResult, startPractice, leaveSession } from './modules/sessions.js?v=13.9.0';
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.10.0';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.10.0';
+import { configureSessions, openExam, openResult, startPractice, leaveSession } from './modules/sessions.js?v=13.10.0';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub' };
 let poll, rendering = false;
 function preferences() {
@@ -50,6 +50,21 @@ $('#app').addEventListener('click', async event => {
   try {
     if (d.go) return navigate(d.go);
     if (d.study) { A.studyView = d.study; A.tab = 'practice'; render(); window.scrollTo(0, 0); return; }
+    if (d.quickPractice) {
+      if (!A.data.active_practice && !d.quickRange) {
+        A.studyView = 'vocab'; A.tab = 'practice'; render(); window.scrollTo(0, 0); return;
+      }
+      if (!A.data.active_practice) {
+        A.mode = 'write_meaning';
+        A.target = 20;
+        A.assignmentId = null;
+        A.ranges[A.school] = [d.quickRange];
+        savePreferences();
+      }
+      buttonBusy(b);
+      await startPractice();
+      return;
+    }
     if (d.school && A.data.profile.role === 'teacher') { collectExamForm(A); A.school = d.school; A.vocabRange = ''; A.assignmentId = null; savePreferences(); render(); return; }
     if (d.rangeAll) { const { codes } = getRanges(A); A.ranges[A.school] = d.rangeAll === 'true' ? [...codes] : []; $$('[data-range]').forEach(i => i.checked = d.rangeAll === 'true'); updateRangeSummary(A); updateExamSummary(A); savePreferences(); return; }
     if (d.mode) { A.mode = d.mode; $$('[data-mode]').forEach(e => { e.classList.toggle('selected', e === b); e.setAttribute('aria-pressed', String(e === b)); }); savePreferences(); return; }
@@ -75,7 +90,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'refresh') { buttonBusy(b); await refresh(); render(); toast('최신 기록으로 업데이트했어요.'); }
     if (d.action === 'start-practice') { buttonBusy(b); await startPractice(); }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
-      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.9.0');
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.10.0');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
