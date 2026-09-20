@@ -142,9 +142,9 @@ function dashboard(A) {
       </section>
 
       <section class="panel">
-        <div class="panel-head"><div><h2>많이 틀린 어법 포인트</h2><span>현재 저장된 1차 오답 기준</span></div><span class="v136-count warn">${weak.choices.reduce((n, item) => n + item.count, 0)}</span></div>
+        <div class="panel-head"><div><h2>많이 틀린 어법 포인트</h2><span>현재 저장된 1차 오답 기준</span></div><span class="v136-count warn">${weak.choices.reduce((n, item) => n + item.count, 0)}건</span></div>
         <div class="v136-weak-list">${weak.choices.length ? weak.choices.slice(0, 5).map((item, index) => `
-          <div><span class="v136-rank">${index + 1}</span><div class="grow"><b>${esc(item.passage.number)}번 · 정답 ${esc(item.answer)}</b><small>${esc(item.type)} · ${esc(item.passage.subtitle || item.passage.title)}</small></div><strong>${item.count}회</strong></div>
+          <div><span class="v136-rank">${index + 1}</span><div class="grow"><b>${esc(item.passage.number)}번 · 정답 ${esc(item.answer)}</b><small>${esc(item.type)} · ${esc(item.passage.subtitle || item.passage.title)}</small></div><strong>${item.count}명</strong></div>
         `).join('') : '<div class="v136-empty-line">아직 누적된 어법·어휘 오답이 없어요.</div>'}</div>
       </section>
     </div>
@@ -152,7 +152,7 @@ function dashboard(A) {
     <section class="panel">
       <div class="panel-head"><div><h2>취약 지문 TOP</h2><span>학생들의 1차 오답이 많이 쌓인 지문</span></div><button class="text-button" data-go="students">학생별 확인 ${icon('chevron')}</button></div>
       <div class="v136-passage-grid">${weak.passages.length ? weak.passages.slice(0, 6).map((item, index) => `
-        <div><span>${index + 1}</span><strong>${esc(item.passage.number)}번</strong><small>${esc(item.passage.subtitle || item.passage.title)}</small><b>${item.count}회 오답</b></div>
+        <div><span>${index + 1}</span><strong>${esc(item.passage.number)}번</strong><small>${esc(item.passage.subtitle || item.passage.title)}</small><b>${item.count}건 오답</b></div>
       `).join('') : '<div class="v136-empty-line">어법·어휘 학습 데이터가 쌓이면 지문별 취약도가 표시됩니다.</div>'}</div>
     </section>
 
