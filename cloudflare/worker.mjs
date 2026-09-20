@@ -116,7 +116,7 @@ export class VocaStateObject {
         if (!String(request.headers.get('content-type')).startsWith('application/json')) throw Object.assign(Error('요청 형식을 확인해주세요.'), { status: 415 });
       }
 
-      const body = request.method === 'GET' ? Object.fromEntries(url.searchParams) : await readJson(request);
+      const body = request.method === 'GET' ? Object.fromEntries(url.searchParams) : await readJson(request, url.pathname.startsWith('/api/vocab-import/') ? 1000000 : 100000);
       const address = request.headers.get('CF-Connecting-IP') || 'unknown';
       if (url.pathname === '/api/login') {
         const key = `${address}:${String(body.username || '').trim().toLowerCase()}`;
