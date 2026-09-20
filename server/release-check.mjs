@@ -51,6 +51,16 @@ export async function runReleaseCheck() {
     assert(grade('write_meaning', '필요로 하다', { word: 'require', meaning: '요구하다, 필요로 하다' }), 'one listed Korean meaning accepted');
     assert(grade('write_meaning', '감소', { word: 'decline', meaning: '감소하다' }), 'safe Korean noun/verb variation accepted');
     assert(grade('write_meaning', '인식하다', { word: 'recognize', meaning: '알아보다', accepted_meanings: ['인식하다'] }), 'teacher-approved Korean meaning alias accepted');
+    assert(grade('write_meaning', '만족하는', { word: 'satisfied', meaning: '만족한' }), 'Korean adjective form 만족한/만족하는 accepted');
+    assert(grade('write_meaning', '만족하다', { word: 'satisfied', meaning: '만족한' }), 'Korean adjective dictionary form accepted');
+    assert(grade('write_meaning', '만족한 것', { word: 'satisfied', meaning: '만족한' }), 'Korean descriptive 것-form accepted');
+    assert(grade('write_meaning', '필요하다', { word: 'necessary', meaning: '필요한' }), 'Korean 하다 adjective form accepted');
+    assert(grade('write_meaning', '형성되다', { word: 'formed', meaning: '형성된' }), 'Korean 되다 predicate form accepted');
+    assert(grade('write_meaning', '효과적이다', { word: 'effective', meaning: '효과적인' }), 'Korean 적이다 adjective form accepted');
+    assert(grade('write_meaning', '인식하다', { word: 'recognize', meaning: '알아보다' }), 'conservative built-in synonym accepted');
+    assert(grade('write_meaning', '줄어들다', { word: 'decline', meaning: '감소하다' }), 'conservative decrease synonym accepted');
+    assert(!grade('write_meaning', '즐거운', { word: 'satisfied', meaning: '만족한' }), 'different Korean meaning is rejected');
+    assert(!grade('write_meaning', '가능한', { word: 'necessary', meaning: '필요한' }), 'related but different Korean adjective is rejected');
 
     const state = emptyState();
     state.profiles.push({
@@ -140,6 +150,15 @@ export async function runReleaseCheck() {
     assert(aliasResult.aliases.includes('교사용 허용 뜻'), 'teacher can add accepted meaning alias');
     const aliasBootstrap = await service(state, 'GET', '/bootstrap', {}, teacherToken);
     assert(aliasBootstrap.meaning_aliases[aliasWord.id]?.includes('교사용 허용 뜻'), 'teacher bootstrap exposes accepted meaning aliases');
+    const autoDispute = {
+      id: 'qa-auto-valid', student_id: student.id, division: 'high', school_id: 'danwon-high', school: '단원고',
+      class_name: '고1A', source_type: 'legacy', source_id: 'legacy-answer', source_key: '0',
+      word_id: aliasWord.id, word: displayEnglish(aliasWord.word), meaning: aliasWord.meaning, answer: aliasWord.meaning,
+      answer_normalized: aliasWord.meaning, status: 'pending', created_at: Date.now()
+    };
+    state.meaningDisputes.push(autoDispute);
+    sweep(state);
+    assert(autoDispute.status === 'approved_auto' && autoDispute.resolved_by === 'system', 'new valid-answer rules auto-resolve old pending disputes');
 
     const grammarProgress = await service(state, 'PATCH', '/grammar-progress/qa-passage-21', {
       sentence_count: 6, choice_count: 16, completed_sentences: 2, active_sentence_index: 2,
@@ -334,6 +353,7 @@ export async function runReleaseCheck() {
     const v138Css = readFileSync(publicRoot + 'v138.css', 'utf8');
     const v139Css = readFileSync(publicRoot + 'v139.css', 'utf8');
     const v1310Css = readFileSync(publicRoot + 'v1310.css', 'utf8');
+    const v1311Css = readFileSync(publicRoot + 'v1311.css', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
     const appJs = readFileSync(publicRoot + 'app.js', 'utf8');
@@ -357,7 +377,10 @@ export async function runReleaseCheck() {
     assert(indexHtml.includes('v1310.css') && v1310Css.includes('.today-word-quest') && v1310Css.includes('.today-word-start'), 'V13.10 simplified home styles are loaded');
     assert(studentModule.includes('오늘의 단어 퀘스트') && studentModule.includes('data-quick-practice') && !studentModule.includes('<h2>오늘의 한 걸음</h2>'), 'V13.10 merges duplicate vocabulary home cards');
     assert(appJs.includes('d.quickPractice') && appJs.includes("A.mode = 'write_meaning'") && appJs.includes('A.target = 20'), 'V13.10 home starts a 20-question meaning-writing quest directly');
-    assert(indexHtml.includes('/app.js?v=13.10.0') && sw.includes('sumus-voca-v13.10.0-simplified-home'), 'V13.10 cache versions are active');
+    assert(studentModule.includes('오늘의 단어 퀘스트') && studentModule.includes('data-quick-practice') && !studentModule.includes('<h2>오늘의 한 걸음</h2>'), 'V13.10 simplified home remains active');
+    assert(indexHtml.includes('v1311.css') && v1311Css.includes('.meaning-alias.auto'), 'V13.11 valid-answer teacher styles are loaded');
+    assert(teacherModule.includes('기본 유효답 + 선생님 허용 뜻') && teacherModule.includes('approved_auto'), 'teacher UI shows automatic valid-answer workflow');
+    assert(indexHtml.includes('/app.js?v=13.11.0') && sw.includes('sumus-voca-v13.11.0-valid-meanings'), 'V13.11 cache versions are active');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
