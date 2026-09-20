@@ -550,6 +550,50 @@ export async function service(state, method, path, body, token) {
     };
   }
 
+  if (path === '/vocab-import/commit' && method === 'POST') {
+    requireRole(p, 'teacher');
+    const school = activeTeacherSchool(state, p);
+    if (!school || school.division !== 'middle' || activeTeacherDivision(p) !== 'middle') fail('중등부 학교에서 사용할 수 있어요.', 403);
+    const grade = str(body.grade, 10);
+    if (!MIDDLE_IMPORT_GRADES.includes(grade)) fail('중2 또는 중3을 선택해주세요.');
+    const normalized = normalizeImportRows(body.rows);
+    if (!normalized.rows.length) fail('등록할 수 있는 단어가 없습니다.');
+    const bookId = `import:${school.id}:${grade}`;
+    const words = normalized.rows.map(row => ({
+      id: importedWordId(school.id, grade, row.range_code, row.word),
+      book_id: bookId,
+      school_id: school.id,
+      school: school.name,
+      division: school.division,
+      grade,
+      range_code: row.range_code,
+      word: row.word,
+      meaning: row.meaning
+    }));
+    const book = {
+      id: bookId,
+      school_id: school.id,
+      school: school.name,
+      division: school.division,
+      grade,
+      title: `${school.name} ${grade} 단어`,
+      source: 'teacher_import',
+      imported_at: Date.now(),
+      words
+    };
+    state.extraBooks = state.extraBooks.filter(item => item.id !== bookId);
+    state.extraBooks.push(book);
+    return {
+      ok: true,
+      book_id: bookId,
+      grade,
+      school: school.name,
+      count: words.length,
+      ranges: [...new Set(words.map(word => word.range_code))],
+      skipped: normalized.issues.length
+    };
+  }
+
   if (/^\/meaning-aliases\/[^/]+$/.test(path) && method === 'POST') {
     requireRole(p, 'teacher');
     const wordId = decodeURIComponent(path.split('/')[2] || '');
