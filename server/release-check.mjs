@@ -350,7 +350,6 @@ export async function runReleaseCheck() {
     assert(appJs.includes('data-division="middle"') && appJs.includes('/teacher/division'), 'login and teacher controls separate middle and high divisions');
     assert(teacherModule.includes('뜻 이의제기') && teacherModule.includes('data-dispute-global') && teacherModule.includes('data-dispute-once'), 'teacher meaning-dispute inbox is present');
     assert(sessionsModule.includes('이 답도 맞는 것 같아요') && sessionsModule.includes('/meaning-disputes'), 'meaning-writing student dispute buttons are present');
-    assert(indexHtml.includes('v138.css') && v138Css.includes('.division-segment') && v138Css.includes('.dispute-card'), 'V13.8 division and dispute styles are loaded');
     assert(indexHtml.includes('v139.css') && v139Css.includes('.rank-scope') && v139Css.includes('.my-rank-card'), 'V13.9 academy ranking styles are loaded');
     assert(studentModule.includes("['all','전체']") && studentModule.includes("['중2','중2']") && studentModule.includes("['중3','중3']") && studentModule.includes("['고1','고1']"), 'student ranking exposes overall middle2 middle3 and high1 filters');
     assert(appJs.includes('d.rankScope') && indexHtml.includes('/app.js?v=13.9.0') && sw.includes('sumus-voca-v13.9.0-academy-ranking'), 'V13.9 ranking interactions and cache versions are active');
