@@ -2,7 +2,7 @@ import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, un
 import { icon, esc, num, date, rangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar } from './character.js';
 import { DANWONGO_PASSAGES } from '../danwongo-grammar-data.js?v=2';
-import { SEONBU_2025_PASSAGES } from '../seonbu-grammar-data.js?v=1';
+import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from '../seonbu-grammar-data.js?v=2';
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
 export function shell(A, content) {
   const p = A.data.profile;
@@ -78,7 +78,7 @@ function grammarStudy(A) {
   const school = A.data.profile.school || A.school || '';
   const isDanwon = school === '단원고';
   const isSeonbu = school === '선부고';
-  const passages = isDanwon ? DANWONGO_PASSAGES : isSeonbu ? SEONBU_2025_PASSAGES : [];
+  const passages = isDanwon ? DANWONGO_PASSAGES : [];
 
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">GRAMMAR</span></div>
   <div class="page-heading grammar-heading"><h1>어법·어휘</h1><p>WORKBOOK 6 선택지만 그대로 풀고, 분석본 기준으로 오답을 정리해요.</p></div>
@@ -88,8 +88,13 @@ function grammarStudy(A) {
     <div class="grammar-set-list">${grammarCards(A, passages)}</div>
     <p class="quiet-note">범위: 24 · 29 · 31 · 32 · 33 · 34 · 36 · 39 · 40 · 41~42</p>
   ` : isSeonbu ? `
-    <section class="grammar-range-head seonbu"><div><span class="eyebrow">선부고 시험범위 · 2025</span><h2>2025년 9월 인천교육청</h2><p>WORKBOOK 6 원문 선택지 · 분석본 기준 채점 해설</p></div><span class="grammar-range-count">${passages.length}지문</span></section>
-    <div class="grammar-set-list">${grammarCards(A, passages)}</div>
+    <section class="grammar-range-head seonbu current"><div><span class="eyebrow">선부고 시험범위 · 2026</span><h2>2026년 3월 서울교육청</h2><p>WORKBOOK 6 원문 선택지 · 분석본 기준 채점 해설</p></div><span class="grammar-range-count">${SEONBU_2026_PASSAGES.length}지문</span></section>
+    <div class="grammar-set-list">${grammarCards(A, SEONBU_2026_PASSAGES)}</div>
+    <p class="quiet-note">범위: 20 · 23 · 24 · 32</p>
+
+    <div class="grammar-year-divider"><span>2025년 범위</span></div>
+    <section class="grammar-range-head seonbu old"><div><span class="eyebrow">선부고 시험범위 · 2025</span><h2>2025년 9월 인천교육청</h2><p>WORKBOOK 6 원문 선택지 · 분석본 기준 채점 해설</p></div><span class="grammar-range-count">${SEONBU_2025_PASSAGES.length}지문</span></section>
+    <div class="grammar-set-list">${grammarCards(A, SEONBU_2025_PASSAGES)}</div>
     <p class="quiet-note">범위: 31 · 34 · 36 · 38 · 40 · 43~45</p>
   ` : `
     <section class="grammar-empty-school"><span class="square-icon">${icon('records')}</span><div><b>현재 학교의 어법·어휘 범위를 준비 중이에요.</b><p>단원고와 선부고 시험범위부터 순서대로 추가하고 있어요.</p></div></section>
