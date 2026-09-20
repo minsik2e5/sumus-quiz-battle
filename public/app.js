@@ -1,9 +1,9 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, CLASS_OPTIONS } from './modules/core.js';
 import { avatar } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.8.0';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.8.0';
-import { configureSessions, openExam, openResult, startPractice, leaveSession } from './modules/sessions.js?v=13.8.0';
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.9.0';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.9.0';
+import { configureSessions, openExam, openResult, startPractice, leaveSession } from './modules/sessions.js?v=13.9.0';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub' };
 let poll, rendering = false;
 function preferences() {
@@ -55,6 +55,7 @@ $('#app').addEventListener('click', async event => {
     if (d.mode) { A.mode = d.mode; $$('[data-mode]').forEach(e => { e.classList.toggle('selected', e === b); e.setAttribute('aria-pressed', String(e === b)); }); savePreferences(); return; }
     if (d.practiceTarget) { A.target = d.practiceTarget === 'all' ? 'all' : Number(d.practiceTarget); $$('[data-practice-target]').forEach(e => { const selected = e === b; e.classList.toggle('selected', selected); e.setAttribute('aria-pressed', String(selected)); }); savePreferences(); render(); return; }
     if (d.rankMode) { A.rankMode = d.rankMode; render(); return; }
+    if (d.rankScope) { A.rankScope = d.rankScope; render(); return; }
     if (d.recordTab) { A.recordTab = d.recordTab; render(); return; }
     if (d.studioTab) { A.studioTab = d.studioTab; render(); return; }
     if (d.style) { A.style[d.style] = d.value; render(); return; }
@@ -74,7 +75,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'refresh') { buttonBusy(b); await refresh(); render(); toast('최신 기록으로 업데이트했어요.'); }
     if (d.action === 'start-practice') { buttonBusy(b); await startPractice(); }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
-      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.8.0');
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.9.0');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
