@@ -1,6 +1,6 @@
 {
   "name": "sumus-voca",
-  "version": "13.0.1",
+  "version": "13.5.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -13,7 +13,7 @@
     "check": "node -e \"import('./server/release-check.mjs').then(m => m.runReleaseCheck())\"",
     "check:cloudflare": "node server/cloudflare-check.mjs",
     "cf:dev": "wrangler dev",
-    "cf:deploy": "npm run build:assets && wrangler deploy",
+    "cf:deploy": "npm run build:assets && npm run check && wrangler deploy",
     "cf:types": "wrangler types"
   },
   "devDependencies": {
