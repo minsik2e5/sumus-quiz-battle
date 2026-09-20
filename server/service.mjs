@@ -526,6 +526,30 @@ export async function service(state, method, path, body, token) {
     state.meaningDisputes = state.meaningDisputes.filter(item => item.student_id !== studentId);
     return { ok: true, id: studentId };
   }
+  if (path === '/vocab-import/preview' && method === 'POST') {
+    requireRole(p, 'teacher');
+    const school = activeTeacherSchool(state, p);
+    if (!school || school.division !== 'middle' || activeTeacherDivision(p) !== 'middle') fail('중등부 학교에서 사용할 수 있어요.', 403);
+    const grade = str(body.grade, 10);
+    if (!MIDDLE_IMPORT_GRADES.includes(grade)) fail('중2 또는 중3을 선택해주세요.');
+    const normalized = normalizeImportRows(body.rows);
+    if (!normalized.rows.length) fail('등록할 수 있는 단어가 없습니다.');
+    const rangeCodes = [...new Set(normalized.rows.map(row => row.range_code))];
+    return {
+      grade,
+      school_id: school.id,
+      school: school.name,
+      valid: normalized.rows.length,
+      skipped: normalized.issues.length,
+      ranges: rangeCodes.map(range_code => ({
+        range_code,
+        count: normalized.rows.filter(row => row.range_code === range_code).length
+      })),
+      sample: normalized.rows.slice(0, 12),
+      issues: normalized.issues.slice(0, 30)
+    };
+  }
+
   if (/^\/meaning-aliases\/[^/]+$/.test(path) && method === 'POST') {
     requireRole(p, 'teacher');
     const wordId = decodeURIComponent(path.split('/')[2] || '');
