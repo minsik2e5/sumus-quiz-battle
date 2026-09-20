@@ -58,6 +58,7 @@ function studyHub(A) {
 function grammarCards(A, passages) {
   return passages.map(p => {
     const sentenceCount = p.sentences.length;
+    const examLabel = p.id.startsWith('2026-03-seoul') ? '2026년 3월 서울교육청' : '2025년 9월 인천교육청';
     const choiceCount = p.sentences.reduce((sum, sentence) => sum + sentence.parts.filter(part => part[0] === 'c').length, 0);
     let saved = null;
     try { saved = JSON.parse(localStorage.getItem('sumus:grammar-master:' + A.data.profile.id + ':' + p.id) || 'null'); } catch {}
@@ -65,7 +66,7 @@ function grammarCards(A, passages) {
     return `<button class="grammar-set-card premium ${mastered ? 'mastered' : ''}" data-action="grammar-choice" data-grammar-id="${esc(p.id)}">
       <div class="grammar-set-top">
         <span class="grammar-number">${esc(p.number)}</span>
-        <div class="grow"><b>${esc(p.subtitle)}</b><small>2025년 9월 인천교육청</small></div>
+        <div class="grow"><b>${esc(p.subtitle)}</b><small>${examLabel}</small></div>
         <span class="grammar-state ${mastered ? 'master' : ''}">${mastered ? 'MASTER' : '미학습'}</span>
       </div>
       <div class="grammar-set-meta"><span>${sentenceCount}문장</span><span>${choiceCount}개 선택</span><span>${mastered ? '1차 ' + Number(saved.firstRate || 0) + '%' : '오답 리콜'}</span></div>
