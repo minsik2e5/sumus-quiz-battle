@@ -88,6 +88,7 @@ function dashboard(A) {
   const d = A.data;
   const activeStudents = d.profiles.filter(student => student.active);
   const learnedToday = todayStudentIds(d);
+  const learnedActiveCount = activeStudents.filter(student => learnedToday.has(student.id)).length;
   const inactiveToday = activeStudents.filter(student => !learnedToday.has(student.id));
   const grammar = grammarSummary(d, A.school);
   const weak = grammarWeakness(d, A.school);
@@ -103,10 +104,10 @@ function dashboard(A) {
   return `
     <div class="v136-command">
       <div class="v136-command-copy"><span class="v136-kicker">TODAY CONTROL</span><h2>오늘 관리할 학생부터 보여드려요.</h2><p>단어 연습 · 어법/어휘 · 실전시험 기록을 한 번에 합산한 운영 현황입니다.</p></div>
-      <div class="v136-command-score"><strong>${learnedToday.size}<small>/ ${activeStudents.length}명</small></strong><span>오늘 학습 확인</span></div>
+      <div class="v136-command-score"><strong>${learnedActiveCount}<small>/ ${activeStudents.length}명</small></strong><span>오늘 학습 확인</span></div>
     </div>
     ${metrics([
-      ['오늘 학습 확인', learnedToday.size, '명'],
+      ['오늘 학습 확인', learnedActiveCount, '명'],
       ['오늘 미학습', inactiveToday.length, '명'],
       ['어법 MASTER', grammar.mastered, '지문'],
       ['시험 미제출', totalMissing, '건']
