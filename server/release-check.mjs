@@ -165,6 +165,30 @@ export async function runReleaseCheck() {
     const clonedExam = await service(state, 'POST', '/exams/' + examIds[0] + '/clone', {}, teacherToken);
     assert(clonedExam.id !== examIds[0] && clonedExam.active === false && clonedExam.title.includes('수정본'), 'attempted exam can be cloned as editable revision');
 
+    const disputeExam = await service(state, 'POST', '/exams', {
+      title: 'QA meaning dispute', class_name: '고1A', school: '단원고', range_codes: [rangeCode], exam_type: 'write_meaning',
+      question_count: 2, duration_sec: 300, passing_score: 70, max_attempts: 1,
+      available_at: now - 1000, due_at: now + 3600000, release_result: true
+    }, teacherToken);
+    const disputeExamStarted = await service(state, 'POST', '/exams/start', { exam_id: disputeExam.id }, studentToken);
+    const disputeAttempt = state.examAttempts.find(item => item.id === disputeExamStarted.attempt.id);
+    const disputeExamAnswers = {
+      0: '이번만인정표현',
+      1: disputeAttempt.keys[1].meaning
+    };
+    const disputeExamSubmitted = await service(state, 'POST', '/attempts/' + disputeAttempt.id + '/submit', {
+      lease: disputeAttempt.lease, revision: disputeAttempt.revision, answers: disputeExamAnswers
+    }, studentToken);
+    assert(disputeExamSubmitted.attempt.score === 50, 'wrong meaning-writing exam answer is initially graded wrong');
+    const examDispute = await service(state, 'POST', '/meaning-disputes', {
+      source_type: 'exam', source_id: disputeAttempt.id, question_index: 0
+    }, studentToken);
+    assert(examDispute.status === 'pending' && examDispute.answer === '이번만인정표현', 'student can dispute only a wrong meaning-writing exam answer');
+    const onceResolution = await service(state, 'PATCH', '/meaning-disputes/' + examDispute.id + '/resolve', { action: 'approve_once' }, teacherToken);
+    const regradedAttempt = state.examAttempts.find(item => item.id === disputeAttempt.id);
+    assert(onceResolution.regraded === 1 && regradedAttempt.score === 100, 'approve-once automatically regrades the student exam score');
+    assert(!(state.meaningAliases[disputeAttempt.keys[0].id] || []).includes('이번만인정표현'), 'approve-once does not change the global accepted-meaning DB');
+
     const leaseExam = await service(state, 'POST', '/exams', {
       title: 'QA reconnect', class_name: '고1A', school: '단원고', range_codes: [rangeCode], exam_type: 'eng2mean_mc',
       question_count: 2, duration_sec: 300, passing_score: 70, max_attempts: 1,
@@ -222,6 +246,28 @@ export async function runReleaseCheck() {
     }, studentToken);
     assert(wrongResult.feedback?.ok === false && wrongResult.retry_count === 1, 'wrong practice answer enters retry queue');
     await service(state, 'POST', `/practice/${wrongPractice.id}/finish`, {}, studentToken);
+
+    const meaningPractice = await service(state, 'POST', '/practice/start', {
+      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5
+    }, studentToken);
+    const disputedPracticeWord = allWords.find(item => item.id === meaningPractice.question.word_id);
+    const meaningQuestionId = meaningPractice.question_id;
+    const meaningWrong = await service(state, 'POST', `/practice/${meaningPractice.id}/answer`, {
+      question_id: meaningQuestionId, answer: '새로운허용뜻'
+    }, studentToken);
+    assert(meaningWrong.feedback?.ok === false && meaningWrong.feedback?.can_dispute === true, 'only wrong meaning-writing practice answers expose dispute eligibility');
+    await service(state, 'POST', `/practice/${meaningPractice.id}/finish`, {}, studentToken);
+    const practiceDispute = await service(state, 'POST', '/meaning-disputes', {
+      source_type: 'practice', source_id: meaningPractice.id, question_id: meaningQuestionId
+    }, studentToken);
+    assert(practiceDispute.status === 'pending' && practiceDispute.word_id === disputedPracticeWord.id, 'student can submit a meaning-writing practice dispute');
+    const pendingBootstrap = await service(state, 'GET', '/bootstrap', {}, teacherToken);
+    assert(pendingBootstrap.meaning_disputes.some(item => item.id === practiceDispute.id && item.status === 'pending'), 'teacher sees pending meaning disputes in current school');
+    const globalResolution = await service(state, 'PATCH', '/meaning-disputes/' + practiceDispute.id + '/resolve', { action: 'approve_global' }, teacherToken);
+    const regradedSession = state.sessions.find(item => item.id === meaningPractice.id);
+    assert(globalResolution.regraded === 1 && globalResolution.aliases.includes('새로운허용뜻'), 'global approval saves the alternate meaning and regrades matching disputes');
+    assert(regradedSession?.correct === 1, 'approved practice dispute automatically corrects the saved practice result');
+    assert((state.meaningAliases[disputedPracticeWord.id] || []).includes('새로운허용뜻'), 'approved alternate meaning persists separately from source vocabulary');
 
     const coverAll = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', cover_all: true
