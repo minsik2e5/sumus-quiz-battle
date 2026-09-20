@@ -12,13 +12,16 @@ export function shell(A, content) {
 export function studentPage(A) {
   return shell(A, ({ home, practice, exam, ranking, records, studio }[A.tab] || home)(A));
 }
-export function getRanges(A, school = A.school) {
-  const words = A.data.books.flatMap(b => b.words || []);
+export function getRanges(A, school = A.school, grade = null) {
+  const books = A.data.books.filter(book => !grade || !book.grade || book.grade === grade);
+  const words = books.flatMap(book => book.words || []);
   const codes = [...new Set(words.map(w => w.range_code))];
-  A.ranges[school] ??= codes.slice(0, 2);
-  return { words, codes, selected: A.ranges[school] };
+  const key = grade ? school + '::' + grade : school;
+  A.ranges[key] ??= codes.slice(0, 2);
+  A.ranges[key] = A.ranges[key].filter(code => codes.includes(code));
+  return { words, codes, selected: A.ranges[key], key };
 }
-export function selectedCount(A) { const { words, selected } = getRanges(A); return words.filter(w => selected.includes(w.range_code)).length; }
+export function selectedCount(A, grade = null) { const { words, selected } = getRanges(A, A.school, grade); return words.filter(w => selected.includes(w.range_code)).length; }
 export function schoolSwitch(A) {
   const school = A.data.profile.school || A.school || '학교 미설정';
   return `<section class="study-school-card compact locked"><div><span class="tiny muted">내 학교</span><strong>${esc(school)}</strong></div><span class="school-fixed">${icon('shield')} 선생님 관리</span></section>`;
@@ -78,13 +81,13 @@ function todayWordQuest(A, goal = 20) {
       <button class="today-word-detail" data-study="vocab">시험범위 전체 보기 ${icon('chevron')}</button>
     </section>`;
 }
-export function rangePicker(A, teacher = false) {
-  const { words, codes, selected } = getRanges(A);
+export function rangePicker(A, teacher = false, grade = null) {
+  const { words, codes, selected } = getRanges(A, A.school, grade);
   return `<div class="${teacher ? 'teacher-range' : 'range-grid'}">${codes.map(c => {
     const state = !teacher ? wordQuestState(A, c) : null;
     const meta = !teacher ? wordQuestMeta(state) : null;
-    return `<label class="range-option ${meta ? 'quest-range ' + meta.cls : ''}"><input type="checkbox" data-range="${c}" ${selected.includes(c) ? 'checked' : ''} aria-label="${esc(rangeLabel(A.school, c))}"><span>${esc(rangeLabel(A.school, c))}<small>${words.filter(w => w.range_code === c).length}개 단어${meta ? ' · ' + meta.detail : ''}</small>${meta ? `<em class="quest-status ${meta.cls}">${meta.label}</em>` : ''}</span></label>`;
-  }).join('')}</div><div class="scope-tools"><span id="scope-count">${selected.length}개 범위 · ${selectedCount(A)}개 단어</span><div><button data-range-all="true">전체 선택</button><button data-range-all="false">해제</button></div></div>`;
+    return `<label class="range-option ${meta ? 'quest-range ' + meta.cls : ''}"><input type="checkbox" data-range="${c}" ${grade ? `data-range-grade="${esc(grade)}"` : ''} ${selected.includes(c) ? 'checked' : ''} aria-label="${esc(rangeLabel(A.school, c))}"><span>${esc(rangeLabel(A.school, c))}<small>${words.filter(w => w.range_code === c).length}개 단어${meta ? ' · ' + meta.detail : ''}</small>${meta ? `<em class="quest-status ${meta.cls}">${meta.label}</em>` : ''}</span></label>`;
+  }).join('')}</div><div class="scope-tools"><span id="scope-count">${selected.length}개 범위 · ${selectedCount(A, grade)}개 단어</span><div><button data-range-all="true">전체 선택</button><button data-range-all="false">해제</button></div></div>`;
 }
 function grammarPassagesForSchool(school) {
   if (school === '단원고') return DANWONGO_PASSAGES;
