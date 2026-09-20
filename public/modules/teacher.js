@@ -174,12 +174,34 @@ export function studentFiltered(A) {
 function students(A) {
   return `<div class="toolbar"><div class="search">${icon('search')}<input id="student-search" aria-label="학생 검색" placeholder="이름 또는 아이디 검색" value="${esc(A.search || '')}"></div><select id="class-filter" aria-label="반 필터"><option value="">전체 반</option>${[...new Set(A.data.profiles.map(p => p.class_name))].map(c => `<option ${c === A.classFilter ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select><span class="tiny muted">총 ${A.data.profiles.length}명</span></div><section class="panel" id="student-table">${studentFiltered(A)}</section>`;
 }
+const aliasSourceLabel = source => source === 'appeal' ? '학생 이의제기' : source === 'teacher' ? '선생님 추가' : '기존 허용답';
 export function vocabTable(A) {
   const q = (A.vocabSearch || '').toLowerCase(), { words } = getRanges(A);
-  const list = words.filter(w => `${w.word} ${w.meaning}`.toLowerCase().includes(q) && (!A.vocabRange || w.range_code === A.vocabRange));
-  return `<div class="panel-head"><div><h2>${A.school} 단어장</h2><span>원본 뜻은 유지하고, 같은 품사의 기본 유효답 + 선생님 허용 뜻을 함께 인정합니다.</span></div><span>${list.length}개 단어</span></div><div class="table-scroll"><table class="vocab-table"><thead><tr><th>범위</th><th>영어</th><th>기본 뜻</th><th>허용 뜻</th><th>관리</th></tr></thead><tbody>${list.slice(0, 400).map(w => { const aliases = A.data.meaning_aliases?.[w.id] || []; return `<tr><td>${esc(w.range_code)}</td><td><strong>${esc(w.word)}</strong></td><td>${esc(w.meaning)}</td><td><span class="meaning-alias auto">기본 유효답</span>${aliases.length ? aliases.map(alias => `<span class="meaning-alias">${esc(alias)}</span>`).join('') : ''}</td><td><button class="text-button" data-meaning-alias="${esc(w.id)}">허용 뜻 관리</button></td></tr>`; }).join('')}</tbody></table></div>`;
+  const middle = A.data.profile.active_division === 'middle';
+  const list = words.filter(w => {
+    const searchMatch = `${w.word} ${w.meaning}`.toLowerCase().includes(q);
+    const rangeMatch = !A.vocabRange || w.range_code === A.vocabRange;
+    const gradeMatch = !middle || !A.vocabGrade || w.grade === A.vocabGrade;
+    return searchMatch && rangeMatch && gradeMatch;
+  });
+  const gradeHead = middle ? '<th>학년</th>' : '';
+  return `<div class="panel-head"><div><h2>${A.school} 단어장</h2><span>원본 뜻은 유지하고, 기본 유효답과 승인된 허용 뜻의 출처를 따로 관리합니다.</span></div><span>${list.length}개 단어</span></div><div class="table-scroll"><table class="vocab-table"><thead><tr>${gradeHead}<th>범위</th><th>영어</th><th>기본 뜻</th><th>허용 뜻</th><th>관리</th></tr></thead><tbody>${list.slice(0, 400).map(w => {
+    const aliases = A.data.meaning_aliases?.[w.id] || [];
+    const meta = A.data.meaning_alias_meta?.[w.id] || [];
+    const aliasHtml = aliases.map(alias => {
+      const item = meta.find(entry => String(entry.value) === String(alias));
+      const source = item?.source || 'legacy';
+      return `<span class="meaning-alias source-${source}" title="${esc(aliasSourceLabel(source))}">${esc(alias)}<small>${esc(aliasSourceLabel(source))}</small></span>`;
+    }).join('');
+    return `<tr>${middle ? `<td><span class="pill">${esc(w.grade || '-')}</span></td>` : ''}<td>${esc(w.range_code)}</td><td><strong>${esc(w.word)}</strong></td><td>${esc(w.meaning)}</td><td><span class="meaning-alias auto">기본 유효답<small>자동</small></span>${aliasHtml}</td><td><button class="text-button" data-meaning-alias="${esc(w.id)}">허용 뜻 관리</button></td></tr>`;
+  }).join('')}</tbody></table></div>`;
 }
-function books(A) { return `<div class="toolbar"><span class="school-chip">${esc(A.school)}</span><div class="search">${icon('search')}<input id="vocab-search" aria-label="단어 검색" placeholder="영어 또는 뜻 검색" value="${esc(A.vocabSearch || '')}"></div></div><section class="panel" id="vocab-table">${vocabTable(A)}</section>`; }
+function books(A) {
+  const middle = A.data.profile.active_division === 'middle';
+  const gradeSelect = middle ? `<label class="teacher-school"><span>학년</span><select id="vocab-grade"><option value="">전체</option><option value="중2" ${A.vocabGrade === '중2' ? 'selected' : ''}>중2</option><option value="중3" ${A.vocabGrade === '중3' ? 'selected' : ''}>중3</option></select></label>` : '';
+  const importButton = middle ? `<button class="btn primary" data-action="vocab-import">${icon('plus')} 단어 파일 등록</button>` : '';
+  return `<div class="toolbar"><span class="school-chip">${esc(A.school)}</span>${gradeSelect}<div class="search">${icon('search')}<input id="vocab-search" aria-label="단어 검색" placeholder="영어 또는 뜻 검색" value="${esc(A.vocabSearch || '')}"></div>${importButton}</div><section class="panel" id="vocab-table">${vocabTable(A)}</section>`;
+}
 function disputes(A) {
   const all = A.data.meaning_disputes || [];
   const pending = all.filter(item => item.status === 'pending');
