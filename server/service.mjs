@@ -32,6 +32,7 @@ const safeGrammarKeys = value => Array.isArray(value)
 const id = () => randomUUID();
 const DIVISIONS = ['middle', 'high'];
 const divisionLabel = division => division === 'middle' ? '중등부' : '고등부';
+const divisionClassAllowed = (division, className) => division === 'middle' ? ['중2','중3'].includes(className) : ['고1A','고1B'].includes(className);
 const schoolByRef = (state, value) => state.schools.find(s => s.active !== false && (s.id === value || s.name === value));
 const schoolForProfile = (state, profile) => state.schools.find(s => s.id === profile.school_id);
 const activeTeacherDivision = profile => DIVISIONS.includes(profile.active_division) ? profile.active_division : 'high';
@@ -338,6 +339,7 @@ export async function service(state, method, path, body, token) {
     if (state.profiles.some(p => p.username === username)) fail('이미 사용 중인 아이디입니다.');
     if (String(body.password || '').length < 8 || String(body.password).length > 128) fail('비밀번호는 8~128자로 입력해주세요.');
     if (!str(body.display_name) || !str(body.class_name)) fail('이름, 반, 학교를 확인해주세요.');
+    if (!divisionClassAllowed(school.division, str(body.class_name, 30))) fail(`${divisionLabel(school.division)} 반을 선택해주세요.`);
     const student = { id: id(), role: 'student', username, password_hash: await passwordHash(body.password), display_name: str(body.display_name, 40), class_name: str(body.class_name, 30), division: school.division, school_id: school.id, school: school.name, active: true, created_at: Date.now() };
     state.profiles.push(student); return publicProfile(student);
   }
@@ -345,19 +347,19 @@ export async function service(state, method, path, body, token) {
     requireRole(p, 'teacher'); const student = state.profiles.find(s => s.id === path.split('/')[2] && s.role === 'student');
     if (!student) fail('학생을 찾을 수 없습니다.', 404);
     const currentSchool = schoolForProfile(state, student);
-    if (!currentSchool || !p.school_ids?.includes(currentSchool.id)) fail('담당 학교의 학생만 변경할 수 있습니다.', 403);
+    if (!currentSchool || !p.school_ids?.includes(currentSchool.id) || currentSchool.division !== activeTeacherDivision(p)) fail('현재 부서의 담당 학생만 변경할 수 있습니다.', 403);
+    const nextSchool = body.school_id || body.school ? schoolByRef(state, body.school_id || body.school) : currentSchool;
+    if (!nextSchool || !p.school_ids?.includes(nextSchool.id) || nextSchool.division !== activeTeacherDivision(p)) fail('현재 부서의 담당 학교를 확인해주세요.', 403);
+    const nextClass = str(body.class_name, 30) || student.class_name;
+    if (!divisionClassAllowed(nextSchool.division, nextClass)) fail(`${divisionLabel(nextSchool.division)} 반을 선택해주세요.`);
     if (typeof body.active === 'boolean') student.active = body.active;
-    if (str(body.class_name)) student.class_name = str(body.class_name, 30);
-    if (body.school_id || body.school) {
-      const school = schoolByRef(state, body.school_id || body.school);
-      if (!school || !p.school_ids?.includes(school.id)) fail('담당 학교를 확인해주세요.', 403);
-      if (student.school_id !== school.id) {
-        for (const practice of state.practices.filter(item => item.student_id === student.id && !item.finished)) finishPractice(practice, state);
-        student.division = school.division;
-        student.school_id = school.id;
-        student.school = school.name;
-        state.tokens = state.tokens.filter(tokenItem => tokenItem.user_id !== student.id);
-      }
+    student.class_name = nextClass;
+    if (student.school_id !== nextSchool.id) {
+      for (const practice of state.practices.filter(item => item.student_id === student.id && !item.finished)) finishPractice(practice, state);
+      student.division = nextSchool.division;
+      student.school_id = nextSchool.id;
+      student.school = nextSchool.name;
+      state.tokens = state.tokens.filter(tokenItem => tokenItem.user_id !== student.id);
     }
     if (body.password) { if (process.env.AUTH_PROVIDER === 'supabase') fail('기존 Supabase 계정 관리에서 변경해주세요.'); if (body.password.length < 8) fail('비밀번호는 8자 이상 입력해주세요.'); student.password_hash = await passwordHash(body.password); state.tokens = state.tokens.filter(t => t.user_id !== student.id); }
     return publicProfile(student);
@@ -368,7 +370,7 @@ export async function service(state, method, path, body, token) {
     const student = state.profiles.find(s => s.id === studentId && s.role === 'student');
     if (!student) fail('학생을 찾을 수 없습니다.', 404);
     const currentSchool = schoolForProfile(state, student);
-    if (!currentSchool || !p.school_ids?.includes(currentSchool.id)) fail('담당 학교의 학생만 삭제할 수 있습니다.', 403);
+    if (!currentSchool || !p.school_ids?.includes(currentSchool.id) || currentSchool.division !== activeTeacherDivision(p)) fail('현재 부서의 담당 학생만 삭제할 수 있습니다.', 403);
     state.profiles = state.profiles.filter(item => item.id !== studentId);
     state.tokens = state.tokens.filter(item => item.user_id !== studentId);
     state.sessions = state.sessions.filter(item => item.student_id !== studentId);
@@ -477,6 +479,7 @@ export async function service(state, method, path, body, token) {
     if (!school || !p.school_ids?.includes(school.id) || school.division !== activeTeacherDivision(p)) fail('현재 부서의 담당 학교를 확인해주세요.', 403);
     const words = scopedWords(state, school.id, body.range_codes);
     if (!str(body.title) || !str(body.class_name)) fail('제목과 반을 입력해주세요.');
+    if (!divisionClassAllowed(school.division, str(body.class_name, 30))) fail(`${divisionLabel(school.division)} 반을 선택해주세요.`);
     const due = Number(body.due_at); if (!Number.isFinite(due) || due <= Date.now()) fail('마감 시간을 확인해주세요.');
     const common = { id: id(), teacher_id: p.id, title: str(body.title), class_name: str(body.class_name, 30), division: school.division, school_id: school.id, school: school.name, range_codes: [...new Set(body.range_codes.map(String))], book_id: words[0].book_id, active: true, created_at: Date.now(), due_at: due };
     if (path === '/assignments') { const a = { ...common, target_questions: integer(body.target_questions, 5, 500, '목표 학습량') }; state.assignments.unshift(a); return a; }
@@ -513,7 +516,11 @@ export async function service(state, method, path, body, token) {
     if (!locked) {
       const ranges = body.range_codes !== undefined ? [...new Set((body.range_codes || []).map(String))] : e.range_codes;
       const words = scopedWords(state, school.id, ranges);
-      if (body.class_name !== undefined) e.class_name = str(body.class_name, 30);
+      if (body.class_name !== undefined) {
+        const nextClass = str(body.class_name, 30);
+        if (!divisionClassAllowed(school.division, nextClass)) fail(`${divisionLabel(school.division)} 반을 선택해주세요.`);
+        e.class_name = nextClass;
+      }
       if (body.range_codes !== undefined) { e.range_codes = ranges; e.book_id = words[0].book_id; }
       if (body.exam_type !== undefined) { if (!EXAM_TYPES[body.exam_type]) fail('시험 유형을 선택해주세요.'); e.exam_type = body.exam_type; }
       if (body.question_count !== undefined) e.question_count = body.question_count === 'all' ? words.length : integer(body.question_count, 1, Math.min(500, words.length), '문제 수');
