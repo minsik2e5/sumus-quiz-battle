@@ -333,6 +333,7 @@ export async function runReleaseCheck() {
     const v137Css = readFileSync(publicRoot + 'v137.css', 'utf8');
     const v138Css = readFileSync(publicRoot + 'v138.css', 'utf8');
     const v139Css = readFileSync(publicRoot + 'v139.css', 'utf8');
+    const v1310Css = readFileSync(publicRoot + 'v1310.css', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
     const appJs = readFileSync(publicRoot + 'app.js', 'utf8');
@@ -352,7 +353,11 @@ export async function runReleaseCheck() {
     assert(sessionsModule.includes('이 답도 맞는 것 같아요') && sessionsModule.includes('/meaning-disputes'), 'meaning-writing student dispute buttons are present');
     assert(indexHtml.includes('v139.css') && v139Css.includes('.rank-scope') && v139Css.includes('.my-rank-card'), 'V13.9 academy ranking styles are loaded');
     assert(studentModule.includes("['all','전체']") && studentModule.includes("['중2','중2']") && studentModule.includes("['중3','중3']") && studentModule.includes("['고1','고1']"), 'student ranking exposes overall middle2 middle3 and high1 filters');
-    assert(appJs.includes('d.rankScope') && indexHtml.includes('/app.js?v=13.9.0') && sw.includes('sumus-voca-v13.9.0-academy-ranking'), 'V13.9 ranking interactions and cache versions are active');
+    assert(appJs.includes('d.rankScope') && studentModule.includes('SUMUS 랭킹'), 'V13.9 ranking interactions remain active');
+    assert(indexHtml.includes('v1310.css') && v1310Css.includes('.today-word-quest') && v1310Css.includes('.today-word-start'), 'V13.10 simplified home styles are loaded');
+    assert(studentModule.includes('오늘의 단어 퀘스트') && studentModule.includes('data-quick-practice') && !studentModule.includes('<h2>오늘의 한 걸음</h2>'), 'V13.10 merges duplicate vocabulary home cards');
+    assert(appJs.includes('d.quickPractice') && appJs.includes("A.mode = 'write_meaning'") && appJs.includes('A.target = 20'), 'V13.10 home starts a 20-question meaning-writing quest directly');
+    assert(indexHtml.includes('/app.js?v=13.10.0') && sw.includes('sumus-voca-v13.10.0-simplified-home'), 'V13.10 cache versions are active');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
