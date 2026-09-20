@@ -286,20 +286,114 @@ function meaningAliasModal(wordId) {
   const word = A.data.books.flatMap(book => book.words || []).find(item => item.id === wordId);
   if (!word) return toast('단어를 찾을 수 없어요.');
   const aliases = A.data.meaning_aliases?.[wordId] || [];
-  const close = modal(`<h2>${esc(word.word)}</h2><p>기본 뜻: <b>${esc(word.meaning)}</b></p>
-    <div class="sumus-detail-section"><h3>추가 허용 뜻</h3><div class="meaning-alias-list">${aliases.length ? aliases.map(alias => `<span>${esc(alias)}</span>`).join('') : '<p class="tiny muted">아직 선생님이 추가한 허용 뜻이 없어요.</p>'}</div></div>
-    <form id="meaning-alias-form"><label class="field"><span>새로 인정할 뜻</span><input name="alias" maxlength="80" placeholder="예: 인식하다" required></label><div id="meaning-alias-error" class="form-error"></div><button class="btn primary full" type="submit">이 답도 정답으로 인정</button></form>
+  const meta = A.data.meaning_alias_meta?.[wordId] || [];
+  const sourceLabel = source => source === 'appeal' ? '학생 이의제기로 추가' : source === 'teacher' ? '선생님 추가' : '기존 허용답';
+  const aliasRows = aliases.map(alias => {
+    const info = meta.find(item => String(item.value) === String(alias));
+    return `<div class="meaning-alias-row"><div><strong>${esc(alias)}</strong><small>${esc(sourceLabel(info?.source || 'legacy'))}${info?.created_at ? ' · ' + date(info.created_at) : ''}</small></div><button class="text-button danger-text" data-alias-remove="${encodeURIComponent(alias)}">삭제</button></div>`;
+  }).join('');
+  const close = modal(`<h2>${esc(word.word)}</h2><p>원본 뜻: <b>${esc(word.meaning)}</b></p>
+    <div class="sumus-detail-section"><h3>기본 유효답</h3><p class="sumus-account-note">같은 품사의 안전한 형태·동의 표현은 자동 판정합니다. 원본 뜻은 변경하지 않아요.</p></div>
+    <div class="sumus-detail-section"><h3>추가 허용 뜻</h3><div class="meaning-alias-list detailed">${aliasRows || '<p class="tiny muted">추가로 승인된 허용 뜻이 없어요.</p>'}</div></div>
+    <form id="meaning-alias-form"><label class="field"><span>새로 인정할 뜻</span><input name="alias" maxlength="80" placeholder="예: 인식하다" required></label><div id="meaning-alias-error" class="form-error"></div><button class="btn primary full" type="submit">선생님 허용 뜻으로 추가</button></form>
     ${aliases.length ? '<button class="text-button full" id="meaning-alias-clear" style="width:100%;margin-top:10px">추가 허용 뜻 전체 초기화</button>' : ''}`, '허용 뜻 관리');
   $('#meaning-alias-form').onsubmit = async event => {
     event.preventDefault(); const button = $('[type="submit"]', event.currentTarget); buttonBusy(button);
-    try { await api('/meaning-aliases/' + encodeURIComponent(wordId), { alias: new FormData(event.currentTarget).get('alias') }, 'POST'); close(); await refresh(); render(); toast('이 표현도 정답으로 인정해요.'); }
+    try { await api('/meaning-aliases/' + encodeURIComponent(wordId), { alias: new FormData(event.currentTarget).get('alias') }, 'POST'); close(); await refresh(); render(); toast('선생님 허용 뜻으로 추가했어요.'); }
     catch (err) { $('#meaning-alias-error').textContent = err.message; buttonBusy(button, false); }
   };
+  $$('[data-alias-remove]').forEach(button => button.addEventListener('click', async event => {
+    const alias = decodeURIComponent(event.currentTarget.dataset.aliasRemove || '');
+    if (!confirm(`"${alias}" 허용 뜻만 삭제할까요?`)) return;
+    buttonBusy(event.currentTarget);
+    try {
+      await api('/meaning-aliases/' + encodeURIComponent(wordId) + '/' + encodeURIComponent(alias), {}, 'DELETE');
+      close(); await refresh(); render(); toast('선택한 허용 뜻을 삭제했어요.');
+    } catch (err) { toast(err.message); buttonBusy(event.currentTarget, false); }
+  }));
   $('#meaning-alias-clear')?.addEventListener('click', async event => {
-    if (!confirm('추가로 등록한 허용 뜻을 모두 지울까요?')) return;
+    if (!confirm('추가로 등록한 허용 뜻을 모두 지울까요? 기본 유효답은 유지됩니다.')) return;
     buttonBusy(event.currentTarget);
     try { await api('/meaning-aliases/' + encodeURIComponent(wordId), {}, 'DELETE'); close(); await refresh(); render(); toast('추가 허용 뜻을 초기화했어요.'); }
     catch (err) { toast(err.message); buttonBusy(event.currentTarget, false); }
+  });
+}
+function parseDelimitedRows(text) {
+  const matrix = []; let row = [], cell = '', quoted = false;
+  const source = String(text || '').replace(/^\uFEFF/, '');
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === '"') {
+      if (quoted && source[i + 1] === '"') { cell += '"'; i++; }
+      else quoted = !quoted;
+    } else if (ch === ',' && !quoted) { row.push(cell.trim()); cell = ''; }
+    else if ((ch === '\n' || ch === '\r') && !quoted) {
+      if (ch === '\r' && source[i + 1] === '\n') i++;
+      row.push(cell.trim()); cell = '';
+      if (row.some(Boolean)) matrix.push(row); row = [];
+    } else cell += ch;
+  }
+  row.push(cell.trim()); if (row.some(Boolean)) matrix.push(row);
+  if (!matrix.length) return [];
+  const first = matrix[0].map(value => value.toLowerCase().replace(/\s+/g, ''));
+  const isHeader = first.some(value => ['range','range_code','범위','번호','day'].includes(value))
+    && first.some(value => ['word','english','영어','단어'].includes(value))
+    && first.some(value => ['meaning','korean','뜻','의미'].includes(value));
+  if (!isHeader) return matrix.map(values => ({ range_code: values[0], word: values[1], meaning: values.slice(2).join(', ') }));
+  const find = names => first.findIndex(value => names.includes(value));
+  const rangeIndex = find(['range','range_code','범위','번호','day']);
+  const wordIndex = find(['word','english','영어','단어']);
+  const meaningIndex = find(['meaning','korean','뜻','의미']);
+  return matrix.slice(1).map(values => ({ range_code: values[rangeIndex], word: values[wordIndex], meaning: values[meaningIndex] }));
+}
+function parseVocabFile(name, text) {
+  if (/\.json$/i.test(name)) {
+    const parsed = JSON.parse(text);
+    if (Array.isArray(parsed)) return parsed;
+    if (Array.isArray(parsed?.words)) return parsed.words;
+    throw new Error('JSON은 단어 배열 또는 { words: [...] } 형식이어야 합니다.');
+  }
+  return parseDelimitedRows(text);
+}
+function vocabImportModal() {
+  if (A.data.profile.active_division !== 'middle') return toast('중등부에서 사용할 수 있어요.');
+  let rows = [], preview = null;
+  const close = modal(`<h2>중등 단어 파일 등록</h2><p>${esc(A.school)} 중2·중3 단어를 CSV 또는 JSON으로 등록합니다.</p>
+    <div class="sumus-detail-section"><div class="form-columns"><label class="field"><span>학년</span><select id="vocab-import-grade"><option value="중2" ${A.vocabGrade === '중2' ? 'selected' : ''}>중2</option><option value="중3" ${A.vocabGrade === '중3' ? 'selected' : ''}>중3</option></select></label><label class="field"><span>파일</span><input id="vocab-import-file" type="file" accept=".csv,.json,text/csv,application/json"></label></div><p class="sumus-account-note">CSV 열: <b>범위, 영어, 뜻</b> 또는 <b>range, word, meaning</b>. 등록하면 같은 학교·같은 학년의 이전 업로드 단어를 교체합니다.</p></div>
+    <div id="vocab-import-preview" class="vocab-import-preview"><p class="tiny muted">파일을 선택하면 등록 전 미리보기가 나옵니다.</p></div>
+    <div id="vocab-import-error" class="form-error"></div>
+    <button class="btn primary full" id="vocab-import-save" disabled>검수 후 등록하기</button>`, '단어 DB 등록');
+  const renderPreview = data => {
+    const ranges = data.ranges.map(item => `<span class="pill">${esc(item.range_code)} · ${item.count}개</span>`).join('');
+    const sample = data.sample.map(item => `<tr><td>${esc(item.range_code)}</td><td><b>${esc(item.word)}</b></td><td>${esc(item.meaning)}</td></tr>`).join('');
+    $('#vocab-import-preview').innerHTML = `<div class="import-summary"><strong>${data.valid}개 등록 가능</strong><span>${data.skipped ? data.skipped + '개 제외' : '오류 없음'}</span></div><div class="import-ranges">${ranges}</div><div class="table-scroll"><table><thead><tr><th>범위</th><th>영어</th><th>뜻</th></tr></thead><tbody>${sample}</tbody></table></div>${data.issues?.length ? `<p class="tiny muted">확인: ${esc(data.issues.slice(0, 3).map(item => item.row + '행 ' + item.message).join(' / '))}</p>` : ''}`;
+    $('#vocab-import-save').disabled = !data.valid;
+  };
+  const previewRows = async () => {
+    if (!rows.length) return;
+    const error = $('#vocab-import-error'); error.textContent = '';
+    $('#vocab-import-save').disabled = true;
+    try {
+      preview = await api('/vocab-import/preview', { grade: $('#vocab-import-grade').value, rows }, 'POST');
+      renderPreview(preview);
+    } catch (err) { error.textContent = err.message; }
+  };
+  $('#vocab-import-file').addEventListener('change', async event => {
+    const file = event.target.files?.[0]; if (!file) return;
+    const error = $('#vocab-import-error'); error.textContent = '';
+    try { rows = parseVocabFile(file.name, await file.text()); await previewRows(); }
+    catch (err) { rows = []; preview = null; $('#vocab-import-save').disabled = true; error.textContent = err.message; }
+  });
+  $('#vocab-import-grade').addEventListener('change', previewRows);
+  $('#vocab-import-save').addEventListener('click', async event => {
+    if (!preview || !rows.length) return;
+    if (!confirm(`${A.school} ${preview.grade} 단어 ${preview.valid}개를 등록할까요? 기존 업로드 데이터는 교체됩니다.`)) return;
+    buttonBusy(event.currentTarget);
+    try {
+      const result = await api('/vocab-import/commit', { grade: preview.grade, rows }, 'POST');
+      A.vocabGrade = preview.grade; close(); await refresh(); render();
+      toast(`${result.grade} 단어 ${result.count}개를 등록했어요.`);
+    } catch (err) { $('#vocab-import-error').textContent = err.message; buttonBusy(event.currentTarget, false); }
   });
 }
 function activeClassOptions() { return (A.data.profile.active_division === 'middle' ? ['중2','중3'] : ['고1A','고1B']); }
