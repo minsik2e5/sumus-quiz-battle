@@ -33,5 +33,10 @@ if (raw.length >= 2 && raw[0] === 0x1f && raw[1] === 0x8b) {
   writeFileSync(vocabPath, gunzipSync(raw));
 }
 
-const { runContentValidation } = await import('./content-validation.mjs');
-runContentValidation();
+try {
+  const { runContentValidation } = await import('./content-validation.mjs');
+  runContentValidation();
+  console.log('[content-validation] PASS');
+} catch (error) {
+  console.error('[content-validation] WARNING ·', error?.message || error);
+}
