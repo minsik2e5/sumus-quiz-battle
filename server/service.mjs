@@ -31,10 +31,50 @@ const safeGrammarKeys = value => Array.isArray(value)
   : [];
 const id = () => randomUUID();
 const schoolByRef = (state, value) => state.schools.find(s => s.active !== false && (s.id === value || s.name === value));
-const schoolForProfile = (state, profile) => state.schools.find(s => s.id === profile.school_id) || schoolByRef(state, profile.school);
+const schoolForProfile = (state, profile) => state.schools.find(s => s.id === profile.school_id);
 const teacherSchools = (state, profile) => state.schools.filter(s => s.active !== false && profile.school_ids?.includes(s.id));
 const activeTeacherSchool = (state, profile) => teacherSchools(state, profile).find(s => s.id === profile.active_school_id) || teacherSchools(state, profile)[0];
-const sameSchool = (record, school) => !!record && !!school && (record.school_id === school.id || record.school === school.name);
+const sameSchool = (record, school) => !!record && !!school && record.school_id === school.id;
+const wordForGrade = (state, word) => ({ ...word, accepted_meanings: state.meaningAliases?.[word.id] || [] });
+function wordRangeMastery(state, studentId, school) {
+  if (!school) return { ranges: {}, mastered: 0, perfect: 0, total_ranges: 0, conquest: 0 };
+  const words = allBooks(state).filter(book => book.school_id === school.id).flatMap(book => book.words || []);
+  const grouped = new Map();
+  for (const word of words) {
+    const code = String(word.range_code || '');
+    if (!code) continue;
+    if (!grouped.has(code)) grouped.set(code, new Map());
+    grouped.get(code).set(word.id, word);
+  }
+  const mastery = state.mastery?.[studentId] || {};
+  const ranges = {};
+  let mastered = 0, perfect = 0, conquestTotal = 0;
+  for (const [code, map] of grouped) {
+    const list = [...map.values()];
+    let attempted = 0, correct = 0, totalAnswers = 0;
+    for (const word of list) {
+      const record = mastery[word.id];
+      const tries = Number(record?.correct || 0) + Number(record?.wrong || 0);
+      if (tries > 0) attempted++;
+      correct += Number(record?.correct || 0);
+      totalAnswers += tries;
+    }
+    const accuracy = totalAnswers ? Math.round(correct / totalAnswers * 100) : 0;
+    const coverage = list.length ? Math.round(attempted / list.length * 100) : 0;
+    let status = 'quest';
+    if (attempted > 0 && accuracy <= 70) status = 'needs_work';
+    else if (attempted < list.length) status = attempted ? 'in_progress' : 'quest';
+    else if (accuracy === 100) status = 'perfect';
+    else if (accuracy >= 95) status = 'master';
+    else status = 'conquering';
+    if (status === 'master' || status === 'perfect') mastered++;
+    if (status === 'perfect') perfect++;
+    const conquest = Math.round(accuracy * (coverage / 100));
+    conquestTotal += conquest;
+    ranges[code] = { range_code: code, total: list.length, attempted, accuracy, coverage, conquest, status };
+  }
+  return { ranges, mastered, perfect, total_ranges: grouped.size, conquest: grouped.size ? Math.round(conquestTotal / grouped.size) : 0 };
+}
 export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, ...state.extraBooks]; }
 export function scopedWords(state, schoolRef, ranges) {
   const school = schoolByRef(state, schoolRef);
@@ -66,7 +106,7 @@ function attemptSummary(a, state, profile) {
 function finishExam(a, state, auto = false) {
   if (a.status === 'submitted') return;
   let correct = 0;
-  a.details = a.questions.map((q, i) => { const w = a.keys[i], answer = a.answers[i] || '', ok = grade(q.type, answer, w); if (ok) correct++; return { number: i + 1, word: displayEnglish(w.word), meaning: w.meaning, answer, correct: ok }; });
+  a.details = a.questions.map((q, i) => { const w = a.keys[i], answer = a.answers[i] || '', ok = grade(q.type, answer, wordForGrade(state, w)); if (ok) correct++; return { number: i + 1, word: displayEnglish(w.word), meaning: w.meaning, answer, correct: ok }; });
   a.correct = correct; a.score = Math.round(correct / a.questions.length * 100); a.status = 'submitted';
   a.submitted_at = Date.now(); a.auto_submitted = auto; a.lease = null;
 }
@@ -78,7 +118,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.6.2', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.7.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -108,11 +148,12 @@ export async function service(state, method, path, body, token) {
   if (path === '/bootstrap') {
     const studentSchool = schoolForProfile(state, p);
     const selectedSchool = teacher ? activeTeacherSchool(state, p) : studentSchool;
+    if (!selectedSchool) fail('학교 설정을 확인해주세요.', 409);
     const visibleExams = state.exams.filter(e => teacher ? sameSchool(e, selectedSchool) : (e.class_name === p.class_name && sameSchool(e, studentSchool) && e.active));
     const visibleExamIds = new Set(visibleExams.map(e => e.id));
-    const studentProfiles = state.profiles.filter(x => x.role === 'student' && (!teacher || sameSchool(x, selectedSchool)));
+    const studentProfiles = state.profiles.filter(x => x.role === 'student' && (!teacher || x.school_id === selectedSchool.id));
     const studentIds = new Set(studentProfiles.map(s => s.id));
-    const sessions = state.sessions.filter(s => teacher ? studentIds.has(s.student_id) : s.student_id === p.id).sort((a, b) => b.created_at - a.created_at);
+    const sessions = state.sessions.filter(s => sameSchool(s, selectedSchool) && (teacher ? studentIds.has(s.student_id) : s.student_id === p.id)).sort((a, b) => b.created_at - a.created_at);
     const sessionsByStudent = new Map();
     if (teacher) for (const session of sessions) {
       if (!sessionsByStudent.has(session.student_id)) sessionsByStudent.set(session.student_id, []);
@@ -120,12 +161,15 @@ export async function service(state, method, path, body, token) {
     }
     const attempts = state.examAttempts.filter(a => teacher ? visibleExamIds.has(a.exam_id) : a.student_id === p.id);
     const books = allBooks(state).filter(b => sameSchool(b, selectedSchool));
-    const schools = (teacher ? teacherSchools(state, p) : state.schools.filter(s => s.active !== false)).map(s => ({ id: s.id, name: s.name, full_name: s.full_name }));
+    const schools = (teacher ? teacherSchools(state, p) : [selectedSchool]).filter(Boolean).map(s => ({ id: s.id, name: s.name, full_name: s.full_name }));
     const profile = { ...publicProfile(p), ...(teacher && selectedSchool ? { active_school_id: selectedSchool.id, active_school: selectedSchool.name } : {}) };
     const grammarProgress = teacher
       ? Object.fromEntries([...studentIds].map(studentId => [studentId, state.grammarProgress?.[studentId] || {}]))
       : (state.grammarProgress?.[p.id] || {});
-    return { profile, schools, books, stats: stats(state, p), mastery: state.mastery[p.id] || {}, grammar_progress: grammarProgress,
+    const wordMastery = teacher
+      ? Object.fromEntries([...studentIds].map(studentId => [studentId, wordRangeMastery(state, studentId, selectedSchool)]))
+      : wordRangeMastery(state, p.id, selectedSchool);
+    return { profile, schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {},
       profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
       sessions, exams: visibleExams,
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
@@ -195,14 +239,7 @@ export async function service(state, method, path, body, token) {
   }
   if (path === '/profile/school' && method === 'PATCH') {
     requireRole(p, 'student');
-    const school = schoolByRef(state, body.school_id || body.school);
-    if (!school) fail('학교를 확인해주세요.', 404);
-    const current = schoolForProfile(state, p);
-    if (current?.id === school.id) return publicProfile(p);
-    for (const practice of state.practices.filter(item => item.student_id === p.id && !item.finished)) finishPractice(practice, state);
-    p.school_id = school.id;
-    p.school = school.name;
-    return publicProfile(p);
+    fail('학교 변경은 선생님에게 요청해주세요.', 403);
   }
   if (path === '/profile/style' && method === 'POST') {
     const growth = stats(state, p);
@@ -237,7 +274,16 @@ export async function service(state, method, path, body, token) {
     if (!currentSchool || !p.school_ids?.includes(currentSchool.id)) fail('담당 학교의 학생만 변경할 수 있습니다.', 403);
     if (typeof body.active === 'boolean') student.active = body.active;
     if (str(body.class_name)) student.class_name = str(body.class_name, 30);
-    if (body.school_id || body.school) { const school = schoolByRef(state, body.school_id || body.school); if (!school || !p.school_ids?.includes(school.id)) fail('담당 학교를 확인해주세요.', 403); student.school_id = school.id; student.school = school.name; }
+    if (body.school_id || body.school) {
+      const school = schoolByRef(state, body.school_id || body.school);
+      if (!school || !p.school_ids?.includes(school.id)) fail('담당 학교를 확인해주세요.', 403);
+      if (student.school_id !== school.id) {
+        for (const practice of state.practices.filter(item => item.student_id === student.id && !item.finished)) finishPractice(practice, state);
+        student.school_id = school.id;
+        student.school = school.name;
+        state.tokens = state.tokens.filter(tokenItem => tokenItem.user_id !== student.id);
+      }
+    }
     if (body.password) { if (process.env.AUTH_PROVIDER === 'supabase') fail('기존 Supabase 계정 관리에서 변경해주세요.'); if (body.password.length < 8) fail('비밀번호는 8자 이상 입력해주세요.'); student.password_hash = await passwordHash(body.password); state.tokens = state.tokens.filter(t => t.user_id !== student.id); }
     return publicProfile(student);
   }
@@ -256,6 +302,26 @@ export async function service(state, method, path, body, token) {
     delete state.mastery[studentId];
     if (state.grammarProgress) delete state.grammarProgress[studentId];
     return { ok: true, id: studentId };
+  }
+  if (/^\/meaning-aliases\/[^/]+$/.test(path) && method === 'POST') {
+    requireRole(p, 'teacher');
+    const wordId = decodeURIComponent(path.split('/')[2] || '');
+    const school = activeTeacherSchool(state, p);
+    const word = allBooks(state).filter(book => sameSchool(book, school)).flatMap(book => book.words || []).find(item => item.id === wordId);
+    if (!word) fail('현재 학교의 단어를 찾을 수 없습니다.', 404);
+    const alias = str(body.alias, 80);
+    if (!alias) fail('허용할 뜻을 입력해주세요.');
+    state.meaningAliases ??= {};
+    state.meaningAliases[wordId] ??= [];
+    const normalized = normalizeAlias => String(normalizeAlias).normalize('NFKC').replace(/\s+/g, '').toLowerCase();
+    if (!state.meaningAliases[wordId].some(item => normalized(item) === normalized(alias))) state.meaningAliases[wordId].push(alias);
+    return { word_id: wordId, aliases: state.meaningAliases[wordId] };
+  }
+  if (/^\/meaning-aliases\/[^/]+$/.test(path) && method === 'DELETE') {
+    requireRole(p, 'teacher');
+    const wordId = decodeURIComponent(path.split('/')[2] || '');
+    if (state.meaningAliases) delete state.meaningAliases[wordId];
+    return { word_id: wordId, aliases: [] };
   }
   if ((path === '/exams' || path === '/assignments') && method === 'POST') {
     requireRole(p, 'teacher');
@@ -279,11 +345,62 @@ export async function service(state, method, path, body, token) {
     state.exams.unshift(e); return e;
   }
   if (/^\/exams\/[^/]+$/.test(path) && method === 'PATCH') {
-    requireRole(p, 'teacher'); const e = state.exams.find(e => e.id === path.split('/')[2]); if (!e) fail('시험을 찾을 수 없습니다.', 404);
-    if (!sameSchool(e, activeTeacherSchool(state, p))) fail('현재 관리 중인 학교의 시험이 아닙니다.', 403);
+    requireRole(p, 'teacher');
+    const e = state.exams.find(e => e.id === path.split('/')[2]);
+    if (!e) fail('시험을 찾을 수 없습니다.', 404);
+    const school = activeTeacherSchool(state, p);
+    if (!sameSchool(e, school)) fail('현재 관리 중인 학교의 시험이 아닙니다.', 403);
+    const attempts = state.examAttempts.filter(attempt => attempt.exam_id === e.id);
+    const locked = attempts.length > 0;
     if (typeof body.active === 'boolean') e.active = body.active;
     if (typeof body.release_result === 'boolean') e.release_result = body.release_result;
-    return e;
+    if (str(body.title)) e.title = str(body.title);
+    if (body.due_at !== undefined) {
+      const due = Number(body.due_at);
+      if (!Number.isFinite(due) || due <= Date.now()) fail('마감 시간을 확인해주세요.');
+      e.due_at = due;
+    }
+    const structuralKeys = ['class_name','range_codes','exam_type','question_count','duration_sec','available_at','passing_score','max_attempts'];
+    if (locked && structuralKeys.some(key => body[key] !== undefined)) fail('이미 응시 기록이 있어 문제 구성은 바꿀 수 없습니다. 수정본으로 복제해주세요.', 409);
+    if (!locked) {
+      const ranges = body.range_codes !== undefined ? [...new Set((body.range_codes || []).map(String))] : e.range_codes;
+      const words = scopedWords(state, school.id, ranges);
+      if (body.class_name !== undefined) e.class_name = str(body.class_name, 30);
+      if (body.range_codes !== undefined) { e.range_codes = ranges; e.book_id = words[0].book_id; }
+      if (body.exam_type !== undefined) { if (!EXAM_TYPES[body.exam_type]) fail('시험 유형을 선택해주세요.'); e.exam_type = body.exam_type; }
+      if (body.question_count !== undefined) e.question_count = body.question_count === 'all' ? words.length : integer(body.question_count, 1, Math.min(500, words.length), '문제 수');
+      if (body.duration_sec !== undefined) e.duration_sec = integer(body.duration_sec, 5, 10800, '제한시간');
+      if (body.available_at !== undefined) {
+        const available = Number(body.available_at);
+        if (!Number.isFinite(available) || available >= e.due_at) fail('시작 시간은 마감 시간보다 빨라야 합니다.');
+        e.available_at = available;
+      }
+      if (body.passing_score !== undefined) e.passing_score = integer(body.passing_score, 0, 100, '통과 점수');
+      if (body.max_attempts !== undefined) e.max_attempts = integer(body.max_attempts, 1, 10, '응시 횟수');
+    }
+    e.updated_at = Date.now();
+    return { ...e, edit_locked: locked };
+  }
+  if (/^\/exams\/[^/]+\/clone$/.test(path) && method === 'POST') {
+    requireRole(p, 'teacher');
+    const source = state.exams.find(e => e.id === path.split('/')[2]);
+    if (!source) fail('시험을 찾을 수 없습니다.', 404);
+    const school = activeTeacherSchool(state, p);
+    if (!sameSchool(source, school)) fail('현재 관리 중인 학교의 시험이 아닙니다.', 403);
+    const now = Date.now();
+    const copy = { ...source, id: id(), title: str(body.title || source.title + ' · 수정본'), active: false, release_result: false, created_at: now, updated_at: now, available_at: now, due_at: now + 3 * 86400000 };
+    state.exams.unshift(copy);
+    return copy;
+  }
+  if (/^\/exams\/[^/]+$/.test(path) && method === 'DELETE') {
+    requireRole(p, 'teacher');
+    const examId = path.split('/')[2];
+    const e = state.exams.find(item => item.id === examId);
+    if (!e) fail('시험을 찾을 수 없습니다.', 404);
+    if (!sameSchool(e, activeTeacherSchool(state, p))) fail('현재 관리 중인 학교의 시험이 아닙니다.', 403);
+    if (state.examAttempts.some(attempt => attempt.exam_id === examId)) fail('응시 기록이 있는 시험은 삭제할 수 없습니다. 배정을 중지해주세요.', 409);
+    state.exams = state.exams.filter(item => item.id !== examId);
+    return { ok: true, id: examId };
   }
   if (path === '/exams/start' && method === 'POST') {
     requireRole(p, 'student');
@@ -294,7 +411,7 @@ export async function service(state, method, path, body, token) {
     if (existing) { existing.lease = id(); return { attempt: attemptView(existing, state, p), exam: e, server_time: Date.now() }; }
     if (Date.now() < e.available_at || Date.now() >= e.due_at) fail('응시 가능한 시간이 아닙니다.');
     if (state.examAttempts.filter(a => a.exam_id === e.id && a.student_id === p.id).length >= e.max_attempts) fail('응시 횟수를 모두 사용했습니다.');
-    const words = scopedWords(state, e.school, e.range_codes), chosen = shuffle(words).slice(0, e.question_count);
+    const words = scopedWords(state, e.school_id, e.range_codes), chosen = shuffle(words).slice(0, e.question_count);
     const a = { id: id(), exam_id: e.id, student_id: p.id, status: 'active', started_at: Date.now(), deadline: Math.min(Date.now() + e.duration_sec * 1000, e.due_at), questions: chosen.map(w => buildQuestion(w, e.exam_type, words)), keys: chosen, answers: {}, revision: 0, lease: id() };
     state.examAttempts.push(a); return { attempt: attemptView(a, state, p), exam: e, server_time: Date.now() };
   }
@@ -321,8 +438,10 @@ export async function service(state, method, path, body, token) {
     requireRole(p, 'student');
     const active = state.practices.find(x => x.student_id === p.id && !x.finished);
     if (active) return practiceView(active, state);
-    const school = schoolByRef(state, body.school_id || body.school);
-    const words = scopedWords(state, school?.id, body.range_codes);
+    const school = schoolForProfile(state, p);
+    if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
+    if (body.school_id && body.school_id !== school.id) fail('현재 학교의 범위만 학습할 수 있어요.', 403);
+    const words = scopedWords(state, school.id, body.range_codes);
     if (!PRACTICE_TYPES[body.mode]) fail('연습 방식을 선택해주세요.');
     const coverAll = body.cover_all === true;
     const x = { id: id(), student_id: p.id, school_id: school.id, school: school.name, range_codes: body.range_codes, mode: body.mode, assignment_id: null, target: coverAll ? words.length : integer(body.target || 10, 5, 500, '학습량'), cover_all: coverAll, seen: [], total: 0, correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: Date.now(), finished: false, responses: {}, words: words.map(w => w.id) };
@@ -335,7 +454,7 @@ export async function service(state, method, path, body, token) {
       if (x.responses[body.question_id]) return x.responses[body.question_id];
       if (x.finished || x.feedback || body.question_id !== x.question_id) fail('현재 문제를 다시 확인해주세요.', 409);
       const word = allBooks(state).flatMap(b => b.words).find(w => w.id === x.question.word_id);
-      const ok = grade(x.question.type, body.answer, word);
+      const ok = grade(x.question.type, body.answer, wordForGrade(state, word));
       x.total++; x.last = word.id;
       state.mastery[p.id] ??= {}; const m = state.mastery[p.id][word.id] ??= { mastery: 0, correct: 0, wrong: 0, streak: 0 };
       let gain = 0;
