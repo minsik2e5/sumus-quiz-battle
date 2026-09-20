@@ -93,6 +93,24 @@ export async function runReleaseCheck() {
     const middleLogin = await service(state, 'POST', '/login', { username: 'qa_middle', password: 'QaMiddle123!', role: 'student', division: 'middle' }, null);
     assert(Boolean(middleLogin._cookie), 'middle student logs into middle division');
     await expectStatus(403, () => service(state, 'POST', '/login', { username: 'qa_middle', password: 'QaMiddle123!', role: 'student', division: 'high' }, null), 'middle account is rejected by high-school login');
+
+    const middle2Rows = Array.from({ length: 8 }, (_, index) => ({ range_code: index < 4 ? 'DAY1' : 'DAY2', word: 'm2word' + index, meaning: '중2뜻' + index }));
+    const middle3Rows = Array.from({ length: 8 }, (_, index) => ({ range_code: index < 4 ? 'DAY1' : 'DAY2', word: 'm3word' + index, meaning: '중3뜻' + index }));
+    const importPreview = await service(state, 'POST', '/vocab-import/preview', {
+      grade: '중2',
+      rows: [...middle2Rows, { ...middle2Rows[0] }, { range_code: '', word: 'invalid', meaning: '누락' }]
+    }, teacherToken);
+    assert(importPreview.valid === 8 && importPreview.skipped === 2 && importPreview.ranges.length === 2, 'middle vocab import preview validates rows and duplicates');
+    const middle2Import = await service(state, 'POST', '/vocab-import/commit', { grade: '중2', rows: middle2Rows }, teacherToken);
+    const middle3Import = await service(state, 'POST', '/vocab-import/commit', { grade: '중3', rows: middle3Rows }, teacherToken);
+    assert(middle2Import.count === 8 && middle3Import.count === 8 && state.extraBooks.filter(book => book.school_id === 'wonil-middle').length === 2, 'teacher can register separate middle2 and middle3 vocabulary');
+    const middle2Login = await service(state, 'POST', '/login', { username: 'qa_middle2', password: 'QaMiddle223!', role: 'student', division: 'middle' }, null);
+    const middle3Bootstrap = await service(state, 'GET', '/bootstrap', {}, middleLogin._cookie);
+    const middle2Bootstrap = await service(state, 'GET', '/bootstrap', {}, middle2Login._cookie);
+    assert(middle3Bootstrap.books.length === 1 && middle3Bootstrap.books[0].grade === '중3' && middle3Bootstrap.books[0].words.every(word => word.grade === '중3'), 'middle3 student receives only middle3 imported vocabulary');
+    assert(middle2Bootstrap.books.length === 1 && middle2Bootstrap.books[0].grade === '중2' && middle2Bootstrap.books[0].words.every(word => word.grade === '중2'), 'middle2 student receives only middle2 imported vocabulary');
+    assert(middle2Bootstrap.books[0].words[0].id.startsWith('import:wonil-middle:중2:'), 'middle import uses deterministic grade-scoped word ids');
+
     await service(state, 'PATCH', '/teacher/division', { division: 'high' }, teacherToken);
     teacherBootstrap = await service(state, 'GET', '/bootstrap', {}, teacherToken);
     assert(teacherBootstrap.profile.active_division === 'high' && teacherBootstrap.profile.active_school_id === 'danwon-high', 'teacher returns to high-school division');
@@ -153,8 +171,12 @@ export async function runReleaseCheck() {
     const aliasWord = danwonWords[0];
     const aliasResult = await service(state, 'POST', '/meaning-aliases/' + encodeURIComponent(aliasWord.id), { alias: '교사용 허용 뜻' }, teacherToken);
     assert(aliasResult.aliases.includes('교사용 허용 뜻'), 'teacher can add accepted meaning alias');
+    assert(aliasResult.meta.some(item => item.value === '교사용 허용 뜻' && item.source === 'teacher'), 'manual accepted meaning records teacher provenance');
+    await service(state, 'POST', '/meaning-aliases/' + encodeURIComponent(aliasWord.id), { alias: '두번째 허용 뜻' }, teacherToken);
+    const oneAliasDeleted = await service(state, 'DELETE', '/meaning-aliases/' + encodeURIComponent(aliasWord.id) + '/' + encodeURIComponent('교사용 허용 뜻'), {}, teacherToken);
+    assert(!oneAliasDeleted.aliases.includes('교사용 허용 뜻') && oneAliasDeleted.aliases.includes('두번째 허용 뜻'), 'teacher can delete one accepted meaning without clearing the others');
     const aliasBootstrap = await service(state, 'GET', '/bootstrap', {}, teacherToken);
-    assert(aliasBootstrap.meaning_aliases[aliasWord.id]?.includes('교사용 허용 뜻'), 'teacher bootstrap exposes accepted meaning aliases');
+    assert(aliasBootstrap.meaning_aliases[aliasWord.id]?.includes('두번째 허용 뜻') && aliasBootstrap.meaning_alias_meta[aliasWord.id]?.some(item => item.source === 'teacher'), 'teacher bootstrap exposes accepted meaning provenance');
     const autoDispute = {
       id: 'qa-auto-valid', student_id: student.id, division: 'high', school_id: 'danwon-high', school: '단원고',
       class_name: '고1A', source_type: 'legacy', source_id: 'legacy-answer', source_key: '0',
@@ -295,6 +317,7 @@ export async function runReleaseCheck() {
     assert(globalResolution.regraded === 1 && globalResolution.aliases.includes('새로운허용뜻'), 'global approval saves the alternate meaning and regrades matching disputes');
     assert(regradedSession?.correct === 1, 'approved practice dispute automatically corrects the saved practice result');
     assert((state.meaningAliases[disputedPracticeWord.id] || []).includes('새로운허용뜻'), 'approved alternate meaning persists separately from source vocabulary');
+    assert(state.meaningAliasMeta[disputedPracticeWord.id]?.some(item => item.value === '새로운허용뜻' && item.source === 'appeal'), 'appeal-approved meaning records student-appeal provenance');
 
     const coverAll = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', cover_all: true
@@ -313,6 +336,38 @@ export async function runReleaseCheck() {
     const masteryBootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
     assert(masteryBootstrap.word_mastery?.ranges?.[rangeCode]?.attempted === scopedRangeCount, 'word mastery tracks full-range coverage');
     assert(['master','perfect','conquering','needs_work'].includes(masteryBootstrap.word_mastery.ranges[rangeCode].status), 'word mastery returns a quest status');
+
+    const rangeWordsForRecent = danwonWords.filter(word => String(word.range_code) === rangeCode);
+    state.mastery[student.id] ??= {};
+    for (const word of rangeWordsForRecent) {
+      state.mastery[student.id][word.id] = {
+        mastery: 50, correct: 1, wrong: 9, streak: 0,
+        last_seen: now - 3600000, last_wrong_at: now - 7200000, recent_results: []
+      };
+    }
+    rangeWordsForRecent.slice(0, 20).forEach((word, index) => {
+      state.mastery[student.id][word.id].recent_results = [{ ok: index < 19, at: now + index }];
+    });
+    const recentMasteryBootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    const recentRange = recentMasteryBootstrap.word_mastery.ranges[rangeCode];
+    assert(recentRange.coverage === 100 && recentRange.accuracy === 10, 'word mastery keeps cumulative history for reporting');
+    assert(recentRange.recent_accuracy === 95 && recentRange.achievement_source === 'recent30' && recentRange.status === 'master', 'full coverage plus 95 percent recent achievement earns WORD MASTER despite early mistakes');
+
+    const reviewSeed = danwonWords.filter(word => String(word.range_code) !== rangeCode).slice(0, 6);
+    reviewSeed.forEach((word, index) => {
+      state.mastery[student.id][word.id] = {
+        mastery: 100, correct: 3, wrong: 0, streak: 3,
+        last_seen: now - (20 + index) * 86400000,
+        recent_results: [{ ok: true, at: now - (20 + index) * 86400000 }]
+      };
+    });
+    const dailyBootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    assert(dailyBootstrap.daily_quest.target === 20, 'daily quest automatically selects twenty words when enough vocabulary exists');
+    assert(dailyBootstrap.daily_quest.mix.wrong === 8 && dailyBootstrap.daily_quest.mix.review === 6 && dailyBootstrap.daily_quest.mix.new === 6, 'daily quest mixes eight wrong six stale and six new words');
+    const dailyPractice = await service(state, 'POST', '/practice/start', { mode: 'write_meaning', daily_quest: true }, studentToken);
+    const dailyInternal = state.practices.find(item => item.id === dailyPractice.id);
+    assert(dailyPractice.daily_quest === true && dailyPractice.target === 20 && new Set(dailyInternal.words).size === 20, 'daily quest starts as one twenty-word adaptive practice');
+    await service(state, 'POST', '/practice/' + dailyPractice.id + '/finish', {}, studentToken);
 
     const movedStudent = await service(state, 'PATCH', `/students/${student.id}`, {
       school_id: 'gangseo-high', class_name: '고1B', active: true
