@@ -184,7 +184,7 @@ function addPredicateFamily(set, raw, includeBare = false) {
     return;
   }
   if (value.endsWith('스럽다') && value.length > 3) {
-    const stem = value.slice(0, -2);
+    const stem = value.slice(0, -3);
     add(stem + '스럽다', stem + '스러운');
     return;
   }
