@@ -2,9 +2,10 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { emptyState } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
-import { builtinBooks, service, sweep } from './service.mjs';
+import { allBooks, service, sweep } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
 import { EXAM_TYPES, PRACTICE_TYPES, grade, displayEnglish } from '../public/modules/core.js';
+import { runContentValidation } from './content-validation.mjs';
 
 const checks = [];
 const assert = (condition, label) => {
@@ -28,15 +29,15 @@ export async function runReleaseCheck() {
   const priorAuthProvider = process.env.AUTH_PROVIDER;
   delete process.env.AUTH_PROVIDER;
   try {
-    const allWords = builtinBooks.flatMap(book => book.words || []);
-    const bySchool = school => builtinBooks.filter(book => book.school === school).flatMap(book => book.words || []);
-    assert(allWords.length === 1046, 'vocabulary total = 1046');
+    runContentValidation();
+    checks.push('school content validation passes');
+    const runtimeBooks = allBooks({ extraBooks: [] });
+    const allWords = runtimeBooks.flatMap(book => book.words || []);
+    const bySchool = school => runtimeBooks.filter(book => book.school === school).flatMap(book => book.words || []);
     assert(bySchool('단원고').length === 362, '단원고 vocabulary = 362');
-    assert(bySchool('선부고').length === 330, '선부고 vocabulary = 330');
     const gangseoWords = bySchool('강서고');
     assert(gangseoWords.length === 354, '강서고 vocabulary = 354');
-    const expectedGangseoRanges = { 21: 31, 23: 21, 29: 41, 30: 31, 31: 32, 32: 26, 33: 22, 34: 27, 36: 32, 37: 22, 38: 25, 39: 25, 40: 19 };
-    assert(Object.entries(expectedGangseoRanges).every(([range, count]) => gangseoWords.filter(word => String(word.range_code) === range).length === count), '강서고 range counts match source');
+    assert(bySchool('선부고').filter(word => String(word.range_code) === '44').length === 49, '선부고 외부 44 vocabulary = 49');
     assert(new Set(allWords.map(word => word.id)).size === allWords.length, 'vocabulary ids are unique');
     assert(Object.keys(EXAM_TYPES).join(',') === 'eng2mean_mc,mean2eng_mc,write_en,write_meaning', 'exactly four exam types');
     const practiceTypes = ['write_meaning', 'eng2mean', 'mean2eng', 'spell', 'listen', 'scramble', 'vowelblank', 'initial'];
@@ -97,6 +98,15 @@ export async function runReleaseCheck() {
     const bootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
     assert(bootstrap.exams.length === 4 && bootstrap.assignments.length === 1, 'student receives assigned exam and practice task');
     assert(bootstrap.books.length > 0 && bootstrap.books.every(book => book.school === '단원고'), 'student bootstrap only includes own-school vocabulary');
+
+    const grammarProgress = await service(state, 'PATCH', '/grammar-progress/qa-passage-21', {
+      sentence_count: 6, choice_count: 16, completed_sentences: 2, active_sentence_index: 2,
+      graded_sentences: [0, 1], answers: { '0:1': 'is', '1:2': 'them' }, wrong_keys: ['1:2'],
+      first_wrong: 1, first_rate: null, recall_attempts: 0, mastered: false
+    }, studentToken);
+    assert(grammarProgress.completed_sentences === 2 && state.grammarProgress[student.id]['qa-passage-21'], 'grammar progress persists on server');
+    const grammarBootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    assert(grammarBootstrap.grammar_progress['qa-passage-21']?.active_sentence_index === 2, 'student bootstrap restores grammar progress');
 
     for (const examId of examIds) {
       const exam = state.exams.find(item => item.id === examId);
@@ -197,10 +207,15 @@ export async function runReleaseCheck() {
     await service(state, 'PATCH', `/students/${student.id}`, { password: '12345678' }, teacherToken);
     const resetLogin = await service(state, 'POST', '/login', { username: 'qa_student', password: '12345678', role: 'student' }, null);
     assert(Boolean(resetLogin._cookie), 'teacher can reset a student password to the default');
+    await service(state, 'PATCH', '/profile/password', { current_password: 'QaTeacher123!', new_password: 'QaTeacher456!' }, teacherToken);
+    const changedTeacherLogin = await service(state, 'POST', '/login', { username: 'qa_teacher', password: 'QaTeacher456!', role: 'teacher' }, null);
+    assert(Boolean(changedTeacherLogin._cookie), 'teacher can change own password');
+
     await service(state, 'DELETE', `/students/${student.id}`, {}, teacherToken);
     assert(!state.profiles.some(profile => profile.id === student.id), 'teacher can delete a student account');
     assert(!state.sessions.some(session => session.student_id === student.id), 'student deletion removes practice history');
     assert(!state.examAttempts.some(attempt => attempt.student_id === student.id), 'student deletion removes exam history');
+    assert(!state.grammarProgress[student.id], 'student deletion removes grammar progress');
 
     const serialized = JSON.stringify(state);
     const restored = JSON.parse(serialized);
