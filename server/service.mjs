@@ -30,12 +30,62 @@ const safeGrammarKeys = value => Array.isArray(value)
   ? [...new Set(value.map(String).filter(key => /^\d+:\d+$/.test(key)))].slice(0, 400)
   : [];
 const id = () => randomUUID();
+const DIVISIONS = ['middle', 'high'];
+const divisionLabel = division => division === 'middle' ? '중등부' : '고등부';
 const schoolByRef = (state, value) => state.schools.find(s => s.active !== false && (s.id === value || s.name === value));
 const schoolForProfile = (state, profile) => state.schools.find(s => s.id === profile.school_id);
-const teacherSchools = (state, profile) => state.schools.filter(s => s.active !== false && profile.school_ids?.includes(s.id));
+const activeTeacherDivision = profile => DIVISIONS.includes(profile.active_division) ? profile.active_division : 'high';
+const teacherSchools = (state, profile, division = activeTeacherDivision(profile)) => state.schools.filter(s => s.active !== false && s.division === division && profile.school_ids?.includes(s.id));
 const activeTeacherSchool = (state, profile) => teacherSchools(state, profile).find(s => s.id === profile.active_school_id) || teacherSchools(state, profile)[0];
 const sameSchool = (record, school) => !!record && !!school && record.school_id === school.id;
 const wordForGrade = (state, word) => ({ ...word, accepted_meanings: state.meaningAliases?.[word.id] || [] });
+const normalizeDisputeAnswer = value => String(value ?? '').normalize('NFKC').toLowerCase().replace(/[~～·•・.,;:!?()[\]{}"'‘’“”]/g, '').replace(/\s+/g, '').trim();
+const findWord = (state, wordId) => allBooks(state).flatMap(book => book.words || []).find(word => word.id === wordId);
+const addMeaningAlias = (state, wordId, alias) => {
+  const value = str(alias, 80);
+  if (!value) fail('허용할 뜻을 입력해주세요.');
+  state.meaningAliases ??= {};
+  state.meaningAliases[wordId] ??= [];
+  if (!state.meaningAliases[wordId].some(item => normalizeDisputeAnswer(item) === normalizeDisputeAnswer(value))) state.meaningAliases[wordId].push(value);
+  return state.meaningAliases[wordId];
+};
+function regradeMeaningDispute(state, dispute) {
+  if (!dispute || dispute.regraded_at) return;
+  if (dispute.source_type === 'exam') {
+    const attempt = state.examAttempts.find(item => item.id === dispute.source_id && item.student_id === dispute.student_id);
+    const index = Number(dispute.question_index);
+    const detail = attempt?.details?.[index];
+    if (attempt?.status === 'submitted' && detail && detail.type === 'write_meaning' && !detail.correct) {
+      detail.correct = true;
+      detail.corrected_by_dispute = true;
+      attempt.correct = attempt.details.filter(item => item.correct).length;
+      attempt.score = Math.round(attempt.correct / Math.max(1, attempt.details.length) * 100);
+      attempt.regraded_at = Date.now();
+    }
+  } else if (dispute.source_type === 'practice') {
+    const mastery = state.mastery?.[dispute.student_id]?.[dispute.word_id];
+    if (mastery) {
+      mastery.wrong = Math.max(0, Number(mastery.wrong || 0) - 1);
+      mastery.correct = Number(mastery.correct || 0) + 1;
+      mastery.mastery = clamp(Number(mastery.mastery || 0) + 18, 0, 100);
+      mastery.last_seen = Date.now();
+    }
+    const practice = state.practices.find(item => item.id === dispute.source_id && item.student_id === dispute.student_id);
+    if (practice && !practice.finished) {
+      practice.correct = Math.min(practice.total, Number(practice.correct || 0) + 1);
+      practice.xp = Number(practice.xp || 0) + 20;
+      const retryIndex = practice.retry?.findIndex(item => item.id === dispute.word_id) ?? -1;
+      if (retryIndex >= 0) practice.retry.splice(retryIndex, 1);
+    }
+    const session = state.sessions.find(item => item.id === dispute.source_id && item.student_id === dispute.student_id);
+    if (session) {
+      session.correct = Math.min(session.total, Number(session.correct || 0) + 1);
+      session.xp = Number(session.xp || 0) + 20;
+      session.regraded_at = Date.now();
+    }
+  }
+  dispute.regraded_at = Date.now();
+}
 function wordRangeMastery(state, studentId, school) {
   if (!school) return { ranges: {}, mastered: 0, perfect: 0, total_ranges: 0, conquest: 0 };
   const words = allBooks(state).filter(book => book.school_id === school.id).flatMap(book => book.words || []);
@@ -106,7 +156,7 @@ function attemptSummary(a, state, profile) {
 function finishExam(a, state, auto = false) {
   if (a.status === 'submitted') return;
   let correct = 0;
-  a.details = a.questions.map((q, i) => { const w = a.keys[i], answer = a.answers[i] || '', ok = grade(q.type, answer, wordForGrade(state, w)); if (ok) correct++; return { number: i + 1, word: displayEnglish(w.word), meaning: w.meaning, answer, correct: ok }; });
+  a.details = a.questions.map((q, i) => { const w = a.keys[i], answer = a.answers[i] || '', ok = grade(q.type, answer, wordForGrade(state, w)); if (ok) correct++; return { number: i + 1, word_id: w.id, type: q.type, word: displayEnglish(w.word), meaning: w.meaning, answer, correct: ok }; });
   a.correct = correct; a.score = Math.round(correct / a.questions.length * 100); a.status = 'submitted';
   a.submitted_at = Date.now(); a.auto_submitted = auto; a.lease = null;
 }
