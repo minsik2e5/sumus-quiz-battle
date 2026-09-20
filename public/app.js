@@ -98,6 +98,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'logout') await logout();
     if (d.action === 'add-student') addStudent();
     if (d.action === 'add-assignment') addAssignment();
+    if (d.action === 'vocab-import') vocabImportModal();
     if (d.action === 'export-results') exportResults();
   } catch (err) { toast(err.message); buttonBusy(b, false); }
 });
@@ -121,6 +122,7 @@ $('#app').addEventListener('change', event => {
   if (input.dataset.range) {
     const values = new Set(getRanges(A).selected); if (input.checked) values.add(input.dataset.range); else values.delete(input.dataset.range); A.ranges[A.school] = [...values]; A.assignmentId = null; updateRangeSummary(A); updateExamSummary(A); savePreferences();
   }
+  if (input.id === 'vocab-grade') { A.vocabGrade = input.value; $('#vocab-table').innerHTML = vocabTable(A); return; }
   if (input.id === 'class-filter') { A.classFilter = input.value; $('#student-table').innerHTML = studentFiltered(A); }
 });
 function bindPageForms() {
