@@ -27,6 +27,43 @@ export function rangePicker(A, teacher = false) {
   const { words, codes, selected } = getRanges(A);
   return `<div class="${teacher ? 'teacher-range' : 'range-grid'}">${codes.map(c => `<label class="range-option"><input type="checkbox" data-range="${c}" ${selected.includes(c) ? 'checked' : ''} aria-label="${esc(rangeLabel(A.school, c))}"><span>${esc(rangeLabel(A.school, c))}<small>${words.filter(w => w.range_code === c).length}개 단어</small></span></label>`).join('')}</div><div class="scope-tools"><span id="scope-count">${selected.length}개 범위 · ${selectedCount(A)}개 단어</span><div><button data-range-all="true">전체 선택</button><button data-range-all="false">해제</button></div></div>`;
 }
+function grammarPassagesForSchool(school) {
+  if (school === '단원고') return DANWONGO_PASSAGES;
+  if (school === '선부고') return [...SEONBU_2026_PASSAGES, ...SEONBU_2025_PASSAGES];
+  if (school === '강서고') return GANGSEO_PASSAGES;
+  return [];
+}
+function grammarExamLabel(passage) {
+  return passage.id.startsWith('2026-06-busan') ? '2026년 6월 부산교육청'
+    : passage.id.startsWith('2026-03-seoul') ? '2026년 3월 서울교육청'
+    : '2025년 9월 인천교육청';
+}
+function savedGrammarProgress(A, passage) {
+  const server = A.data.grammar_progress?.[passage.id];
+  if (server) return server;
+  try { return JSON.parse(localStorage.getItem('sumus:grammar-master:' + A.data.profile.id + ':' + passage.id) || 'null'); }
+  catch { return null; }
+}
+function grammarHomeCard(A) {
+  const school = A.data.profile.school || A.school || '';
+  const passages = grammarPassagesForSchool(school);
+  if (!passages.length) return '';
+  const completed = passages.filter(p => savedGrammarProgress(A, p)?.mastered).length;
+  const target = passages.find(p => !savedGrammarProgress(A, p)?.mastered) || passages[0];
+  const progress = savedGrammarProgress(A, target);
+  const allMastered = completed === passages.length;
+  const detail = allMastered
+    ? '시험범위 전체 MASTER · 필요하면 다시 복습하세요.'
+    : progress?.completed_sentences
+      ? `${progress.completed_sentences} / ${target.sentences.length}문장 진행 중 · 이어서 학습`
+      : `${target.sentences.length}문장 · 지금 시작하기`;
+  return `<div class="section-title"><h2>오늘의 시험대비</h2><span class="tiny muted">${completed} / ${passages.length} MASTER</span></div>
+    <button class="exam-row exam-range-row" data-action="grammar-choice" data-grammar-id="${esc(target.id)}">
+      <span class="square-icon">${icon(allMastered ? 'check' : 'records')}</span>
+      <div class="grow"><h3>${esc(school)} · ${esc(target.number)}번</h3><p>${esc(grammarExamLabel(target))} · ${esc(detail)}</p></div>
+      ${icon('chevron')}
+    </button>`;
+}
 function home(A) {
   const { profile: p, stats: g, exams, assignments } = A.data, c = CHARACTERS[p.avatar_key] || CHARACTERS.lumi;
   const available = exams.filter(e => e.due_at > Date.now()).slice(0, 2);
@@ -34,7 +71,8 @@ function home(A) {
   return `<div class="row between"><div><p class="hello">${esc(p.display_name)}님, 반가워요</p><h1 class="home-title">오늘도, 한 걸음 더.</h1></div>${g.streak ? `<span class="streak-badge">${icon('flame')}${g.streak}일째</span>` : ''}</div>
   <section class="character-hero" aria-label="내 캐릭터 성장"><div class="hero-top"><div><b class="eyebrow">${c.name}</b><small>${c.type}</small></div><span class="pill">${esc(TITLES[p.avatar_title || 'rookie']?.name || '첫걸음')}</span></div><div class="character-stage">${avatar(p.avatar_key, { stage: g.stage, accessory: p.avatar_accessory, frame: p.avatar_frame })}</div><div class="hero-growth"><div class="row between"><strong>Lv.${String(g.level).padStart(2, '0')}<span>${c.ko}</span></strong><button class="text-button" data-go="studio">내 캐릭터 ${icon('chevron')}</button></div><div class="progress" role="progressbar" aria-label="캐릭터 성장" aria-valuenow="${Math.round(g.percent)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${g.percent}%"></i></div><div class="growth-caption"><span>${g.level === 50 ? '최고 레벨에 도달했어요' : `다음 레벨까지 ${num(g.remaining)}P`}</span><span>${num(g.current)} / ${num(g.need)}P</span></div></div></section>
   <div class="section-title"><h2>오늘의 한 걸음</h2><span class="tiny muted">${done} / ${goal}문제</span></div><section class="mission"><div class="mission-label">${icon(done >= goal ? 'check' : 'leaf')}${done >= goal ? '오늘 목표를 달성했어요' : '매일 조금씩, 꾸준하게'}</div><h2 class="mission-title">${done >= goal ? '좋은 흐름, 이어가 볼까요?' : '단어 20개와 친해지기'}</h2><button class="btn primary full" data-go="practice"><span>${A.data.active_practice ? '하던 연습 이어가기' : '학습 시작하기'}</span>${icon('arrow')}</button><div class="today-strip"><span>오늘 학습<strong>${num(g.today_total)}개</strong></span><span>획득 포인트<strong>+${num(g.today_xp)}P</strong></span></div></section>
-  <div class="section-title"><h2>새 학습 샘플</h2><span class="pill blue">NEW</span></div><button class="exam-row" data-action="grammar-choice-sample"><span class="square-icon">${icon("records")}</span><div class="grow"><h3>어법·어휘 고르기</h3><p>2026년 3월 서울교육청 · 18번 샘플</p></div>${icon("chevron")}</button>\n  ${task ? `<div class="section-title"><h2>선생님이 남긴 연습</h2></div><button class="exam-row" data-assignment="${task.id}"><span class="square-icon">${icon('practice')}</span><div class="grow"><h3>${esc(task.title)}</h3><p>${task.target_questions}문제 · ${date(task.due_at)}까지</p></div>${icon('chevron')}</button>` : ''}
+  ${grammarHomeCard(A)}
+  ${task ? `<div class="section-title"><h2>선생님이 남긴 연습</h2></div><button class="exam-row" data-assignment="${task.id}"><span class="square-icon">${icon('practice')}</span><div class="grow"><h3>${esc(task.title)}</h3><p>${task.target_questions}문제 · ${date(task.due_at)}까지</p></div>${icon('chevron')}</button>` : ''}
   <div class="section-title"><h2>배정된 실전시험</h2><button class="text-button" data-go="exam">모두 보기 ${icon('chevron')}</button></div>${available.length ? available.map(e => `<button class="exam-row" data-exam="${e.id}"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(e.title)}</h3><p>${EXAM_TYPES[e.exam_type].label} · ${e.question_count}문제</p></div>${icon('chevron')}</button>`).join('') : `<p class="quiet-note">지금은 배정된 시험이 없어요.</p>`}`;
 }
 function studyHub(A) {
@@ -59,10 +97,9 @@ function studyHub(A) {
 function grammarCards(A, passages) {
   return passages.map(p => {
     const sentenceCount = p.sentences.length;
-    const examLabel = p.id.startsWith('2026-06-busan') ? '2026년 6월 부산교육청' : p.id.startsWith('2026-03-seoul') ? '2026년 3월 서울교육청' : '2025년 9월 인천교육청';
+    const examLabel = grammarExamLabel(p);
     const choiceCount = p.sentences.reduce((sum, sentence) => sum + sentence.parts.filter(part => part[0] === 'c').length, 0);
-    let saved = null;
-    try { saved = JSON.parse(localStorage.getItem('sumus:grammar-master:' + A.data.profile.id + ':' + p.id) || 'null'); } catch {}
+    const saved = savedGrammarProgress(A, p);
     const mastered = Boolean(saved?.mastered);
     return `<button class="grammar-set-card premium ${mastered ? 'mastered' : ''}" data-action="grammar-choice" data-grammar-id="${esc(p.id)}">
       <div class="grammar-set-top">
