@@ -154,7 +154,7 @@ export async function service(state, method, path, body, token) {
     if (nextPassword.length < 8 || nextPassword.length > 128) fail('새 비밀번호는 8~128자로 입력해주세요.');
     if (await verifyPassword(nextPassword, p.password_hash)) fail('현재 비밀번호와 다른 새 비밀번호를 입력해주세요.');
     p.password_hash = await passwordHash(nextPassword);
-    state.tokens = state.tokens.filter(item => item === auth);
+    state.tokens = state.tokens.filter(item => item.user_id !== p.id || item === auth);
     return { ok: true };
   }
   if (/^\/grammar-progress\/[^/]+$/.test(path) && method === 'PATCH') {
