@@ -21,11 +21,38 @@ export function getRanges(A, school = A.school) {
 export function selectedCount(A) { const { words, selected } = getRanges(A); return words.filter(w => selected.includes(w.range_code)).length; }
 export function schoolSwitch(A) {
   const school = A.data.profile.school || A.school || '학교 미설정';
-  return `<section class="study-school-card compact"><div><span class="tiny muted">내 학교</span><strong>${esc(school)}</strong></div><button class="text-button" data-action="account">학교 변경</button></section>`;
+  return `<section class="study-school-card compact locked"><div><span class="tiny muted">내 학교</span><strong>${esc(school)}</strong></div><span class="school-fixed">${icon('shield')} 선생님 관리</span></section>`;
+}
+function wordQuestState(A, code) {
+  return A.data.word_mastery?.ranges?.[String(code)] || null;
+}
+function wordQuestMeta(state) {
+  if (!state) return { label: '깨야 할 퀘스트', cls: 'quest', detail: '아직 미도전' };
+  if (state.status === 'perfect') return { label: 'PERFECT MASTER', cls: 'perfect', detail: '정답률 100%' };
+  if (state.status === 'master') return { label: 'WORD MASTER', cls: 'master', detail: `정답률 ${state.accuracy}%` };
+  if (state.status === 'needs_work') return { label: '수련 필요', cls: 'needs-work', detail: `정답률 ${state.accuracy}%` };
+  if (state.status === 'quest') return { label: '깨야 할 퀘스트', cls: 'quest', detail: '아직 미도전' };
+  return { label: '정복 진행 중', cls: 'progressing', detail: `${state.attempted}/${state.total} 단어 · ${state.accuracy}%` };
+}
+function wordMasteryHome(A) {
+  const wm = A.data.word_mastery;
+  if (!wm?.total_ranges) return '';
+  const entries = Object.values(wm.ranges || {}).slice(0, 6);
+  return `<div class="section-title"><h2>단어 시험범위 정복</h2><span class="tiny muted">MASTER ${wm.mastered} / ${wm.total_ranges}</span></div>
+    <button class="word-conquest-card" data-study="vocab">
+      <div class="word-conquest-head"><div><span class="eyebrow">WORD QUEST</span><strong>${esc(A.data.profile.school)} 정복도 ${wm.conquest}%</strong></div><span class="word-conquest-score">${wm.conquest}%</span></div>
+      <div class="word-conquest-bar"><i style="width:${wm.conquest}%"></i></div>
+      <div class="word-quest-mini">${entries.map(state => { const meta = wordQuestMeta(state); return `<span class="${meta.cls}"><b>${esc(state.range_code)}</b><small>${meta.label}</small></span>`; }).join('')}</div>
+      <div class="word-conquest-cta">시험범위 퀘스트 보기 ${icon('arrow')}</div>
+    </button>`;
 }
 export function rangePicker(A, teacher = false) {
   const { words, codes, selected } = getRanges(A);
-  return `<div class="${teacher ? 'teacher-range' : 'range-grid'}">${codes.map(c => `<label class="range-option"><input type="checkbox" data-range="${c}" ${selected.includes(c) ? 'checked' : ''} aria-label="${esc(rangeLabel(A.school, c))}"><span>${esc(rangeLabel(A.school, c))}<small>${words.filter(w => w.range_code === c).length}개 단어</small></span></label>`).join('')}</div><div class="scope-tools"><span id="scope-count">${selected.length}개 범위 · ${selectedCount(A)}개 단어</span><div><button data-range-all="true">전체 선택</button><button data-range-all="false">해제</button></div></div>`;
+  return `<div class="${teacher ? 'teacher-range' : 'range-grid'}">${codes.map(c => {
+    const state = !teacher ? wordQuestState(A, c) : null;
+    const meta = !teacher ? wordQuestMeta(state) : null;
+    return `<label class="range-option ${meta ? 'quest-range ' + meta.cls : ''}"><input type="checkbox" data-range="${c}" ${selected.includes(c) ? 'checked' : ''} aria-label="${esc(rangeLabel(A.school, c))}"><span>${esc(rangeLabel(A.school, c))}<small>${words.filter(w => w.range_code === c).length}개 단어${meta ? ' · ' + meta.detail : ''}</small>${meta ? `<em class="quest-status ${meta.cls}">${meta.label}</em>` : ''}</span></label>`;
+  }).join('')}</div><div class="scope-tools"><span id="scope-count">${selected.length}개 범위 · ${selectedCount(A)}개 단어</span><div><button data-range-all="true">전체 선택</button><button data-range-all="false">해제</button></div></div>`;
 }
 function grammarPassagesForSchool(school) {
   if (school === '단원고') return DANWONGO_PASSAGES;
@@ -71,6 +98,7 @@ function home(A) {
   return `<div class="row between"><div><p class="hello">${esc(p.display_name)}님, 반가워요</p><h1 class="home-title">오늘도, 한 걸음 더.</h1></div>${g.streak ? `<span class="streak-badge">${icon('flame')}${g.streak}일째</span>` : ''}</div>
   <section class="character-hero" aria-label="내 캐릭터 성장"><div class="hero-top"><div><b class="eyebrow">${c.name}</b><small>${c.type}</small></div><span class="pill">${esc(TITLES[p.avatar_title || 'rookie']?.name || '첫걸음')}</span></div><div class="character-stage">${avatar(p.avatar_key, { stage: g.stage, accessory: p.avatar_accessory, frame: p.avatar_frame })}</div><div class="hero-growth"><div class="row between"><strong>Lv.${String(g.level).padStart(2, '0')}<span>${c.ko}</span></strong><button class="text-button" data-go="studio">내 캐릭터 ${icon('chevron')}</button></div><div class="progress" role="progressbar" aria-label="캐릭터 성장" aria-valuenow="${Math.round(g.percent)}" aria-valuemin="0" aria-valuemax="100"><i style="width:${g.percent}%"></i></div><div class="growth-caption"><span>${g.level === 50 ? '최고 레벨에 도달했어요' : `다음 레벨까지 ${num(g.remaining)}P`}</span><span>${num(g.current)} / ${num(g.need)}P</span></div></div></section>
   <div class="section-title"><h2>오늘의 한 걸음</h2><span class="tiny muted">${done} / ${goal}문제</span></div><section class="mission"><div class="mission-label">${icon(done >= goal ? 'check' : 'leaf')}${done >= goal ? '오늘 목표를 달성했어요' : '매일 조금씩, 꾸준하게'}</div><h2 class="mission-title">${done >= goal ? '좋은 흐름, 이어가 볼까요?' : '단어 20개와 친해지기'}</h2><button class="btn primary full" data-go="practice"><span>${A.data.active_practice ? '하던 연습 이어가기' : '학습 시작하기'}</span>${icon('arrow')}</button><div class="today-strip"><span>오늘 학습<strong>${num(g.today_total)}개</strong></span><span>획득 포인트<strong>+${num(g.today_xp)}P</strong></span></div></section>
+  ${wordMasteryHome(A)}
   ${grammarHomeCard(A)}
   ${task ? `<div class="section-title"><h2>선생님이 남긴 연습</h2></div><button class="exam-row" data-assignment="${task.id}"><span class="square-icon">${icon('practice')}</span><div class="grow"><h3>${esc(task.title)}</h3><p>${task.target_questions}문제 · ${date(task.due_at)}까지</p></div>${icon('chevron')}</button>` : ''}
   <div class="section-title"><h2>배정된 실전시험</h2><button class="text-button" data-go="exam">모두 보기 ${icon('chevron')}</button></div>${available.length ? available.map(e => `<button class="exam-row" data-exam="${e.id}"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(e.title)}</h3><p>${EXAM_TYPES[e.exam_type].label} · ${e.question_count}문제</p></div>${icon('chevron')}</button>`).join('') : `<p class="quiet-note">지금은 배정된 시험이 없어요.</p>`}`;
@@ -78,7 +106,7 @@ function home(A) {
 function studyHub(A) {
   const school = A.data.profile.school || A.school || '학교 미설정';
   return `<div class="page-heading"><h1>무엇을 공부할까요?</h1><p>오늘 필요한 학습을 골라 바로 시작하세요.</p></div>
-  <section class="study-school-card"><div><span class="tiny muted">현재 학교</span><strong>${esc(school)}</strong></div><button class="text-button" data-action="account">학교 변경</button></section>
+  <section class="study-school-card locked"><div><span class="tiny muted">현재 학교</span><strong>${esc(school)}</strong></div><span class="school-fixed">${icon('shield')} 선생님 관리</span></section>
   <div class="study-hub-grid">
     <button class="study-hub-card vocab" data-study="vocab">
       <span class="study-hub-icon">${icon('practice')}</span>
@@ -122,7 +150,7 @@ function grammarStudy(A) {
 
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">GRAMMAR</span></div>
   <div class="page-heading grammar-heading"><h1>어법·어휘</h1><p>WORKBOOK 6 선택지만 그대로 풀고, 분석본 기준으로 오답을 정리해요.</p></div>
-  <section class="study-school-card"><div><span class="tiny muted">현재 학교</span><strong>${esc(school)}</strong></div><button class="text-button" data-action="account">학교 변경</button></section>
+  <section class="study-school-card locked"><div><span class="tiny muted">현재 학교</span><strong>${esc(school)}</strong></div><span class="school-fixed">${icon('shield')} 선생님 관리</span></section>
   ${isDanwon ? `
     <section class="grammar-range-head"><div><span class="eyebrow">단원고 시험범위</span><h2>2025년 9월 인천교육청</h2><p>WORKBOOK 6 원문 선택지 · 분석본 기준 채점 해설</p></div><span class="grammar-range-count">${passages.length}지문</span></section>
     <div class="grammar-set-list">${grammarCards(A, passages)}</div>
