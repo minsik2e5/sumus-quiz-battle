@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.6.2-startup-stability';
+const VERSION = 'sumus-voca-v13.7.0-word-mastery';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -6,6 +6,7 @@ const SHELL = [
   '/styles.css',
   '/student-learning.css',
   '/teacher-dashboard-v136.css',
+  '/v137.css',
   '/app.js',
   '/signup-ui.js',
   '/teacher-enhancements.js',
