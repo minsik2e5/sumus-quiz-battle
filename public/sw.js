@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.3.3-seonbu-2026';
+const VERSION = 'sumus-voca-v13.4.0-gangseo-range';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -15,6 +15,7 @@ const SHELL = [
   '/grammar-choice-sample.js',
   '/danwongo-grammar-data.js',
   '/seonbu-grammar-data.js',
+  '/gangseo-grammar-data.js',
   '/pwa.js',
   '/icon.svg',
   '/manifest.webmanifest',
