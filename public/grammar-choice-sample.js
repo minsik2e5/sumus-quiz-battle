@@ -1,5 +1,6 @@
 import { $, $$, esc, icon, toast } from './modules/ui.js';
 import { DANWONGO_PASSAGES, getDanwongoPassage } from './danwongo-grammar-data.js?v=2';
+import { SEONBU_2025_PASSAGES, getSeonbu2025Passage } from './seonbu-grammar-data.js?v=1';
 
 let PASSAGE = DANWONGO_PASSAGES[0];
 
@@ -307,7 +308,7 @@ function allChoiceRefs() {
 }
 
 export function openGrammarChoiceSample(A, redraw, passageId = DANWONGO_PASSAGES[0]?.id) {
-  PASSAGE = getDanwongoPassage(passageId);
+  PASSAGE = getDanwongoPassage(passageId) || getSeonbu2025Passage(passageId) || DANWONGO_PASSAGES[0];
   addStyles();
   A.screen = 'grammar-choice';
 
