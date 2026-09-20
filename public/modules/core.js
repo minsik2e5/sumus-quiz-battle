@@ -45,18 +45,31 @@ export function englishAccepted(raw) {
   for (const m of String(raw).matchAll(/\((?:pl\.?|plural)\s*[:.]?\s*([^)]*)\)/gi)) values.push(...m[1].split(/[,;/]/).map(normalizeEnglish));
   return [...new Set(values.filter(Boolean))];
 }
-export function meaningAccepted(raw) {
-  const original = String(raw ?? '').normalize('NFKC');
-  const text = original.replace(/\([^)]*\)|\[[^\]]*\]/g, '');
-  return [...new Set([original, text, ...text.split(/[,;；，/\n]|또는/)].map(normalizeMeaning).filter(Boolean))];
-}
 export function normalizeMeaning(raw) {
   return String(raw ?? '').normalize('NFKC').toLowerCase().replace(/[~～·•・.,;:!?()[\]{}"'‘’“”]/g, '').replace(/\s+/g, '').trim();
+}
+function meaningStem(raw) {
+  let value = normalizeMeaning(raw);
+  value = value.replace(/(?:하는것|한것|하기|함|이다|임)$/u, '');
+  if (value.length >= 3) value = value.replace(/(?:하다|되다)$/u, '');
+  return value;
+}
+export function meaningAccepted(raw, aliases = []) {
+  const original = String(raw ?? '').normalize('NFKC');
+  const text = original.replace(/\([^)]*\)|\[[^\]]*\]/g, '');
+  const parts = [original, text, ...text.split(/[,;；，/\n]|또는/), ...(Array.isArray(aliases) ? aliases : [])];
+  return [...new Set(parts.map(normalizeMeaning).filter(Boolean))];
 }
 export function grade(type, answer, word) {
   if (typeof answer !== 'string' || !answer.trim()) return false;
   if (type === 'write_en' || ['spell', 'scramble', 'vowelblank', 'initial'].includes(type)) return englishAccepted(word.word).includes(normalizeEnglish(answer));
-  if (type === 'write_meaning') return meaningAccepted(word.meaning).includes(normalizeMeaning(answer));
+  if (type === 'write_meaning') {
+    const input = normalizeMeaning(answer);
+    const accepted = meaningAccepted(word.meaning, word.accepted_meanings);
+    if (accepted.includes(input)) return true;
+    const inputStem = meaningStem(input);
+    return inputStem.length >= 2 && accepted.some(value => meaningStem(value) === inputStem);
+  }
   return answer === (type === 'mean2eng_mc' || type === 'mean2eng' ? displayEnglish(word.word) : word.meaning);
 }
 export function shuffle(values, random = Math.random) {
