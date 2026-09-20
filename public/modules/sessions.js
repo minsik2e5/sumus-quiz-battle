@@ -127,7 +127,17 @@ function showExamResult(data) {
   A.screen = 'result'; const a = data.attempt, e = data.exam, reveal = a.score !== undefined;
   mount(`<div class="session-app"><main class="result-page"><span class="pill">${a.auto_submitted ? '시간 종료 · 자동 제출' : '제출 완료'}</span><h1>${reveal ? '실전시험을 마쳤어요.' : '답안을 제출했어요.'}</h1><p>${esc(e.title)}</p>${reveal ? `<div class="result-number">${a.score}<small>점</small></div><span class="pill ${a.score >= e.passing_score ? 'green' : ''}">${a.score >= e.passing_score ? '통과했어요' : '조금 더 연습해봐요'}</span><div class="record-stats"><div><strong>${a.correct}</strong><span>정답</span></div><div><strong>${a.total - a.correct}</strong><span>오답 · 미응답</span></div><div><strong>${a.total}</strong><span>전체 문제</span></div></div>` : `${icon('lock', 'result-lock')}<p>선생님이 결과를 공개하면<br>시험 기록에서 확인할 수 있어요.</p>`}<button class="btn ink full" id="result-home">시험 목록으로</button>${reveal ? '<button class="btn full" id="result-answers">답안 확인하기</button>' : ''}<p class="quiet-note">시험 점수는 성장 포인트와 별도로 기록돼요.</p><section id="result-details"></section></main></div>`);
   $('#result-home').onclick = async () => { leaveSession(); A.tab = 'exam'; await refresh(); redraw(); };
-  $('#result-answers')?.addEventListener('click', () => { $('#result-details').innerHTML = a.details.map(d => `<div class="wrong-word"><span class="pill ${d.correct ? 'green' : 'red'}">${d.number}번 ${d.correct ? '정답' : '오답'}</span><p><b>${esc(d.word)}</b></p><p>${esc(d.meaning)}</p><small>내 답안: ${esc(d.answer || '미응답')}</small></div>`).join(''); });
+  $('#result-answers')?.addEventListener('click', () => {
+    $('#result-details').innerHTML = a.details.map((d, index) => `<div class="wrong-word"><span class="pill ${d.correct ? 'green' : 'red'}">${d.number}번 ${d.correct ? '정답' : '오답'}</span><p><b>${esc(d.word)}</b></p><p>${esc(d.meaning)}</p><small>내 답안: ${esc(d.answer || '미응답')}</small>${!d.correct && d.type === 'write_meaning' && d.answer ? `<button class="meaning-dispute-button" data-exam-dispute="${index}">🙋 이 답도 맞는 것 같아요</button>` : ''}</div>`).join('');
+    $('[data-exam-dispute]').forEach(button => button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        await api('/meaning-disputes', { source_type: 'exam', source_id: a.id, question_index: Number(button.dataset.examDispute) }, 'POST');
+        button.textContent = '✓ 선생님께 검토 요청했어요';
+        toast('뜻 이의제기를 보냈어요.');
+      } catch (err) { button.disabled = false; toast(err.message); }
+    }));
+  });
 }
 export async function startPractice() {
   const old = A.data.active_practice;
@@ -149,8 +159,17 @@ function renderPractice() {
   $('#practice-confirm')?.addEventListener('click', () => { const value = $('#practice-answer').value; if (!value.trim()) return toast('답을 입력해주세요.'); answerPractice(value); });
   $('#practice-answer')?.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) $('#practice-confirm')?.click(); });
   $('#practice-next')?.addEventListener('click', e => advancePracticeScreen(e.currentTarget, x));
+  $('#practice-dispute')?.addEventListener('click', async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      await api('/meaning-disputes', { source_type: 'practice', source_id: x.id, question_id: feedback.question_id }, 'POST');
+      button.textContent = '✓ 선생님께 검토 요청했어요';
+      toast('뜻 이의제기를 보냈어요.');
+    } catch (err) { button.disabled = false; toast(err.message); }
+  });
 }
-function feedbackHtml(f) { return `<div class="feedback ${f.ok ? '' : 'wrong shake'}" role="status"><span class="gain">${f.ok ? '+' + f.gain + 'P' : ''}</span><b>${f.ok ? `정답! ${f.combo > 1 ? f.combo + '연속 성공' : '제대로 맞혔어요'}` : '기억해두면, 다시 맞힐 수 있어요'}</b><p>${f.ok ? `숙련도 ${f.mastery}% 상승` : `${esc(f.word)} · ${esc(f.meaning)}<br>잠시 뒤 다시 나와요.`}</p><div class="progress"><i style="width:${f.mastery}%"></i></div></div>${f.milestone ? `<div class="milestone-toast">${f.combo}연속 정답. 좋은 흐름이에요.</div>` : ''}`; }
+function feedbackHtml(f) { return `<div class="feedback ${f.ok ? '' : 'wrong shake'}" role="status"><span class="gain">${f.ok ? '+' + f.gain + 'P' : ''}</span><b>${f.ok ? `정답! ${f.combo > 1 ? f.combo + '연속 성공' : '제대로 맞혔어요'}` : '기억해두면, 다시 맞힐 수 있어요'}</b><p>${f.ok ? `숙련도 ${f.mastery}% 상승` : `${esc(f.word)} · ${esc(f.meaning)}<br>내 답: ${esc(f.answer || '')}<br>잠시 뒤 다시 나와요.`}</p><div class="progress"><i style="width:${f.mastery}%"></i></div></div>${f.can_dispute ? '<button class="meaning-dispute-button" id="practice-dispute">🙋 이 답도 맞는 것 같아요</button>' : ''}${f.milestone ? `<div class="milestone-toast">${f.combo}연속 정답. 좋은 흐름이에요.</div>` : ''}`; }
 let answering = false;
 async function advancePracticeScreen(button, answeredState) {
   if (practiceState !== answeredState) return;
