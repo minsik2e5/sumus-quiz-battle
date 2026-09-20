@@ -87,6 +87,22 @@ function regradeMeaningDispute(state, dispute) {
   }
   dispute.regraded_at = Date.now();
 }
+function autoResolveMeaningDisputes(state) {
+  let resolved = 0;
+  const now = Date.now();
+  for (const dispute of state.meaningDisputes || []) {
+    if (dispute.status !== 'pending') continue;
+    const word = findWord(state, dispute.word_id);
+    if (!word || !grade('write_meaning', dispute.answer, wordForGrade(state, word))) continue;
+    regradeMeaningDispute(state, dispute);
+    dispute.status = 'approved_auto';
+    dispute.resolved_at = now;
+    dispute.resolved_by = 'system';
+    dispute.resolution_note = '기본 유효답 자동 인정';
+    resolved++;
+  }
+  return resolved;
+}
 function wordRangeMastery(state, studentId, school) {
   if (!school) return { ranges: {}, mastered: 0, perfect: 0, total_ranges: 0, conquest: 0 };
   const words = allBooks(state).filter(book => book.school_id === school.id).flatMap(book => book.words || []);
@@ -164,12 +180,13 @@ function finishExam(a, state, auto = false) {
 export function sweep(state) {
   let changed = false;
   for (const a of state.examAttempts) if (a.status === 'active' && a.deadline <= Date.now()) { finishExam(a, state, true); changed = true; }
+  if (autoResolveMeaningDisputes(state) > 0) changed = true;
   const tokens = state.tokens.filter(t => t.expires_at > Date.now());
   if (tokens.length !== state.tokens.length) { state.tokens = tokens; changed = true; }
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.10.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.11.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -450,6 +467,13 @@ export async function service(state, method, path, body, token) {
       answer_normalized: normalizeDisputeAnswer(submittedAnswer), status: 'pending', created_at: Date.now()
     };
     state.meaningDisputes.push(dispute);
+    if (grade('write_meaning', dispute.answer, wordForGrade(state, word))) {
+      regradeMeaningDispute(state, dispute);
+      dispute.status = 'approved_auto';
+      dispute.resolved_at = Date.now();
+      dispute.resolved_by = 'system';
+      dispute.resolution_note = '기본 유효답 자동 인정';
+    }
     return dispute;
   }
   if (/^\/meaning-disputes\/[^/]+\/resolve$/.test(path) && method === 'PATCH') {
