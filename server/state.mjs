@@ -6,7 +6,7 @@ export const DEFAULT_SCHOOLS = [
 ];
 
 export function emptyState() {
-  return { schema_version: 16, schools: structuredClone(DEFAULT_SCHOOLS), profiles: [], tokens: [], sessions: [], mastery: {}, grammarProgress: {}, meaningAliases: {}, meaningDisputes: [], assignments: [], exams: [], examAttempts: [], practices: [], extraBooks: [] };
+  return { schema_version: 17, schools: structuredClone(DEFAULT_SCHOOLS), profiles: [], tokens: [], sessions: [], mastery: {}, grammarProgress: {}, meaningAliases: {}, meaningAliasMeta: {}, meaningDisputes: [], assignments: [], exams: [], examAttempts: [], practices: [], extraBooks: [] };
 }
 
 export function migrateState(state) {
@@ -17,6 +17,18 @@ export function migrateState(state) {
   if (!state.mastery || typeof state.mastery !== 'object' || Array.isArray(state.mastery)) { state.mastery = {}; changed = true; }
   if (!state.grammarProgress || typeof state.grammarProgress !== 'object' || Array.isArray(state.grammarProgress)) { state.grammarProgress = {}; changed = true; }
   if (!state.meaningAliases || typeof state.meaningAliases !== 'object' || Array.isArray(state.meaningAliases)) { state.meaningAliases = {}; changed = true; }
+  if (!state.meaningAliasMeta || typeof state.meaningAliasMeta !== 'object' || Array.isArray(state.meaningAliasMeta)) { state.meaningAliasMeta = {}; changed = true; }
+  for (const [wordId, aliases] of Object.entries(state.meaningAliases)) {
+    if (!Array.isArray(aliases)) { state.meaningAliases[wordId] = []; changed = true; continue; }
+    state.meaningAliasMeta[wordId] ??= [];
+    for (const alias of aliases) {
+      if (typeof alias !== 'string' || !alias.trim()) continue;
+      if (!state.meaningAliasMeta[wordId].some(item => item?.value === alias)) {
+        state.meaningAliasMeta[wordId].push({ value: alias, source: 'legacy', created_at: 0, created_by: null });
+        changed = true;
+      }
+    }
+  }
   // Completed practice payloads can be very large (questions, retries and idempotency responses).
   // Their durable summary already lives in sessions, so keep only active/unreconciled practice state.
   const sessionIds = new Set(state.sessions.map(item => item.id));
@@ -65,6 +77,6 @@ export function migrateState(state) {
     const school = state.schools.find(item => item.id === dispute.school_id);
     if (school && dispute.division !== school.division) { dispute.division = school.division; changed = true; }
   }
-  if (state.schema_version !== 16) { state.schema_version = 16; changed = true; }
+  if (state.schema_version !== 17) { state.schema_version = 17; changed = true; }
   return changed;
 }
