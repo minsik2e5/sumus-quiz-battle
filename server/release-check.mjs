@@ -69,13 +69,15 @@ export async function runReleaseCheck() {
     assert(middleTeacherBootstrap.profile.active_division === 'middle' && middleTeacherBootstrap.profile.active_school_id === 'wonil-middle', 'teacher can switch to middle-school division');
     assert(middleTeacherBootstrap.schools.length === 1 && middleTeacherBootstrap.schools[0].id === 'wonil-middle', 'middle division exposes only middle schools');
     const middleStudent = await service(state, 'POST', '/students', {
-      username: 'qa_middle', password: 'QaMiddle123!', display_name: 'QA 중학생', class_name: '중3', school_id: 'wonil-middle'
+      username: 'qa_middle', password: 'QaMiddle123!', display_name: 'QA 중3학생', class_name: '중3', school_id: 'wonil-middle'
     }, teacherToken);
-    assert(middleStudent.division === 'middle' && middleStudent.class_name === '중3', 'teacher can create middle-school student');
+    const middleStudent2 = await service(state, 'POST', '/students', {
+      username: 'qa_middle2', password: 'QaMiddle223!', display_name: 'QA 중2학생', class_name: '중2', school_id: 'wonil-middle'
+    }, teacherToken);
+    assert(middleStudent.division === 'middle' && middleStudent.class_name === '중3' && middleStudent2.class_name === '중2', 'teacher can create middle-school students by grade');
     const middleLogin = await service(state, 'POST', '/login', { username: 'qa_middle', password: 'QaMiddle123!', role: 'student', division: 'middle' }, null);
     assert(Boolean(middleLogin._cookie), 'middle student logs into middle division');
     await expectStatus(403, () => service(state, 'POST', '/login', { username: 'qa_middle', password: 'QaMiddle123!', role: 'student', division: 'high' }, null), 'middle account is rejected by high-school login');
-    await service(state, 'DELETE', '/students/' + middleStudent.id, {}, teacherToken);
     await service(state, 'PATCH', '/teacher/division', { division: 'high' }, teacherToken);
     teacherBootstrap = await service(state, 'GET', '/bootstrap', {}, teacherToken);
     assert(teacherBootstrap.profile.active_division === 'high' && teacherBootstrap.profile.active_school_id === 'danwon-high', 'teacher returns to high-school division');
@@ -130,6 +132,7 @@ export async function runReleaseCheck() {
     assert(bootstrap.books.length > 0 && bootstrap.books.every(book => book.school === '단원고'), 'student bootstrap only includes own-school vocabulary');
     assert(bootstrap.schools.length === 1 && bootstrap.schools[0].id === 'danwon-high', 'student bootstrap exposes only assigned school');
     assert(bootstrap.profile.division === 'high' && bootstrap.divisions.length === 1 && bootstrap.divisions[0] === 'high', 'student bootstrap is locked to assigned division');
+    assert(bootstrap.ranking.some(item => item.grade === '중2') && bootstrap.ranking.some(item => item.grade === '중3') && bootstrap.ranking.some(item => item.grade === '고1'), 'student ranking includes middle2 middle3 and high1 across division boundaries');
     await expectStatus(403, () => service(state, 'PATCH', '/profile/school', { school_id: 'seonbu-high' }, studentToken), 'student cannot change own school');
 
     const aliasWord = danwonWords[0];
@@ -311,6 +314,10 @@ export async function runReleaseCheck() {
     assert(!state.sessions.some(session => session.student_id === student.id), 'student deletion removes practice history');
     assert(!state.examAttempts.some(attempt => attempt.student_id === student.id), 'student deletion removes exam history');
     assert(!state.grammarProgress[student.id], 'student deletion removes grammar progress');
+    await service(state, 'PATCH', '/teacher/division', { division: 'middle' }, teacherToken);
+    await service(state, 'DELETE', '/students/' + middleStudent.id, {}, teacherToken);
+    await service(state, 'DELETE', '/students/' + middleStudent2.id, {}, teacherToken);
+    assert(!state.profiles.some(profile => profile.id === middleStudent.id || profile.id === middleStudent2.id), 'middle-school QA students can be cleaned up inside middle division');
 
     const serialized = JSON.stringify(state);
     const restored = JSON.parse(serialized);
@@ -325,6 +332,7 @@ export async function runReleaseCheck() {
     const dashboardCss = readFileSync(publicRoot + 'teacher-dashboard-v136.css', 'utf8');
     const v137Css = readFileSync(publicRoot + 'v137.css', 'utf8');
     const v138Css = readFileSync(publicRoot + 'v138.css', 'utf8');
+    const v139Css = readFileSync(publicRoot + 'v139.css', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
     const appJs = readFileSync(publicRoot + 'app.js', 'utf8');
@@ -342,7 +350,10 @@ export async function runReleaseCheck() {
     assert(appJs.includes('data-division="middle"') && appJs.includes('/teacher/division'), 'login and teacher controls separate middle and high divisions');
     assert(teacherModule.includes('뜻 이의제기') && teacherModule.includes('data-dispute-global') && teacherModule.includes('data-dispute-once'), 'teacher meaning-dispute inbox is present');
     assert(sessionsModule.includes('이 답도 맞는 것 같아요') && sessionsModule.includes('/meaning-disputes'), 'meaning-writing student dispute buttons are present');
-    assert(indexHtml.includes('/app.js?v=13.8.0') && sw.includes('sumus-voca-v13.8.0-divisions-disputes'), 'V13.8 cache versions are active');
+    assert(indexHtml.includes('v138.css') && v138Css.includes('.division-segment') && v138Css.includes('.dispute-card'), 'V13.8 division and dispute styles are loaded');
+    assert(indexHtml.includes('v139.css') && v139Css.includes('.rank-scope') && v139Css.includes('.my-rank-card'), 'V13.9 academy ranking styles are loaded');
+    assert(studentModule.includes("['all','전체']") && studentModule.includes("['중2','중2']") && studentModule.includes("['중3','중3']") && studentModule.includes("['고1','고1']"), 'student ranking exposes overall middle2 middle3 and high1 filters');
+    assert(appJs.includes('d.rankScope') && indexHtml.includes('/app.js?v=13.9.0') && sw.includes('sumus-voca-v13.9.0-academy-ranking'), 'V13.9 ranking interactions and cache versions are active');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
