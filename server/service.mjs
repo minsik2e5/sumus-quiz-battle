@@ -333,7 +333,7 @@ export async function service(state, method, path, body, token) {
       sessionsByStudent.get(session.student_id).push(session);
     }
     const attempts = state.examAttempts.filter(a => teacher ? visibleExamIds.has(a.exam_id) : a.student_id === p.id);
-    const books = allBooks(state).filter(b => sameSchool(b, selectedSchool));
+    const books = allBooks(state).filter(b => sameSchool(b, selectedSchool) && (teacher || !b.grade || b.grade === p.class_name));
     const schools = (teacher ? teacherSchools(state, p, selectedDivision) : [selectedSchool]).filter(Boolean).map(s => ({ id: s.id, name: s.name, full_name: s.full_name, division: s.division }));
     const profile = { ...publicProfile(p), division: selectedDivision, ...(teacher && selectedSchool ? { active_division: selectedDivision, active_school_id: selectedSchool.id, active_school: selectedSchool.name } : {}) };
     const meaningDisputes = state.meaningDisputes.filter(item => teacher ? (item.school_id === selectedSchool.id && item.division === selectedDivision) : item.student_id === p.id).sort((a, b) => b.created_at - a.created_at);
@@ -341,9 +341,10 @@ export async function service(state, method, path, body, token) {
       ? Object.fromEntries([...studentIds].map(studentId => [studentId, state.grammarProgress?.[studentId] || {}]))
       : (state.grammarProgress?.[p.id] || {});
     const wordMastery = teacher
-      ? Object.fromEntries([...studentIds].map(studentId => [studentId, wordRangeMastery(state, studentId, selectedSchool)]))
-      : wordRangeMastery(state, p.id, selectedSchool);
-    return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_disputes: meaningDisputes,
+      ? Object.fromEntries(studentProfiles.map(student => [student.id, wordRangeMastery(state, student.id, selectedSchool, student.class_name)]))
+      : wordRangeMastery(state, p.id, selectedSchool, p.class_name);
+    const dailyQuest = teacher ? null : composeDailyQuest(state, p.id, selectedSchool, p.class_name, 20);
+    return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes } : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
       profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
       sessions, exams: visibleExams,
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
@@ -499,7 +500,7 @@ export async function service(state, method, path, body, token) {
     const word = allBooks(state).filter(book => sameSchool(book, school)).flatMap(book => book.words || []).find(item => item.id === wordId);
     if (!word) fail('현재 학교의 단어를 찾을 수 없습니다.', 404);
     const alias = str(body.alias, 80);
-    const aliases = addMeaningAlias(state, wordId, alias);
+    const aliases = addMeaningAlias(state, wordId, alias, { source: 'teacher', created_by: p.id });
     const normalized = normalizeDisputeAnswer(alias);
     const now = Date.now();
     let regraded = 0;
@@ -510,13 +511,25 @@ export async function service(state, method, path, body, token) {
       dispute.resolved_by = p.id;
       regraded++;
     }
-    return { word_id: wordId, aliases, regraded };
+    return { word_id: wordId, aliases, meta: state.meaningAliasMeta?.[wordId] || [], regraded };
+  }
+  if (/^\/meaning-aliases\/[^/]+\/[^/]+$/.test(path) && method === 'DELETE') {
+    requireRole(p, 'teacher');
+    const [, , rawWordId, rawAlias] = path.split('/');
+    const wordId = decodeURIComponent(rawWordId || '');
+    const alias = decodeURIComponent(rawAlias || '');
+    const school = activeTeacherSchool(state, p);
+    const word = allBooks(state).filter(book => sameSchool(book, school)).flatMap(book => book.words || []).find(item => item.id === wordId);
+    if (!word) fail('현재 학교의 단어를 찾을 수 없습니다.', 404);
+    const aliases = removeMeaningAlias(state, wordId, alias);
+    return { word_id: wordId, aliases, meta: state.meaningAliasMeta?.[wordId] || [] };
   }
   if (/^\/meaning-aliases\/[^/]+$/.test(path) && method === 'DELETE') {
     requireRole(p, 'teacher');
     const wordId = decodeURIComponent(path.split('/')[2] || '');
     if (state.meaningAliases) delete state.meaningAliases[wordId];
-    return { word_id: wordId, aliases: [] };
+    if (state.meaningAliasMeta) delete state.meaningAliasMeta[wordId];
+    return { word_id: wordId, aliases: [], meta: [] };
   }
   if (path === '/meaning-disputes' && method === 'POST') {
     requireRole(p, 'student');
@@ -580,7 +593,7 @@ export async function service(state, method, path, body, token) {
     if (action === 'approve_global' || action === 'reject') {
       targets = state.meaningDisputes.filter(item => item.status === 'pending' && item.school_id === dispute.school_id && item.word_id === dispute.word_id && item.answer_normalized === dispute.answer_normalized);
     }
-    if (action === 'approve_global') addMeaningAlias(state, dispute.word_id, dispute.answer);
+    if (action === 'approve_global') addMeaningAlias(state, dispute.word_id, dispute.answer, { source: 'appeal', created_by: p.id });
     if (!['approve_global','approve_once','reject'].includes(action)) fail('처리 방식을 선택해주세요.');
     let regraded = 0;
     for (const item of targets) {
@@ -595,8 +608,8 @@ export async function service(state, method, path, body, token) {
     requireRole(p, 'teacher');
     const school = schoolByRef(state, body.school_id || body.school);
     if (!school || !p.school_ids?.includes(school.id) || school.division !== activeTeacherDivision(p)) fail('현재 부서의 담당 학교를 확인해주세요.', 403);
-    const words = scopedWords(state, school.id, body.range_codes);
     if (!str(body.title) || !str(body.class_name)) fail('제목과 반을 입력해주세요.');
+    const words = scopedWords(state, school.id, body.range_codes, str(body.class_name, 30));
     if (!divisionClassAllowed(school.division, str(body.class_name, 30))) fail(`${divisionLabel(school.division)} 반을 선택해주세요.`);
     const due = Number(body.due_at); if (!Number.isFinite(due) || due <= Date.now()) fail('마감 시간을 확인해주세요.');
     const common = { id: id(), teacher_id: p.id, title: str(body.title), class_name: str(body.class_name, 30), division: school.division, school_id: school.id, school: school.name, range_codes: [...new Set(body.range_codes.map(String))], book_id: words[0].book_id, active: true, created_at: Date.now(), due_at: due };
@@ -633,7 +646,8 @@ export async function service(state, method, path, body, token) {
     if (locked && structuralKeys.some(key => body[key] !== undefined)) fail('이미 응시 기록이 있어 문제 구성은 바꿀 수 없습니다. 수정본으로 복제해주세요.', 409);
     if (!locked) {
       const ranges = body.range_codes !== undefined ? [...new Set((body.range_codes || []).map(String))] : e.range_codes;
-      const words = scopedWords(state, school.id, ranges);
+      const targetClass = body.class_name !== undefined ? str(body.class_name, 30) : e.class_name;
+      const words = scopedWords(state, school.id, ranges, targetClass);
       if (body.class_name !== undefined) {
         const nextClass = str(body.class_name, 30);
         if (!divisionClassAllowed(school.division, nextClass)) fail(`${divisionLabel(school.division)} 반을 선택해주세요.`);
@@ -684,7 +698,7 @@ export async function service(state, method, path, body, token) {
     if (existing) { existing.lease = id(); return { attempt: attemptView(existing, state, p), exam: e, server_time: Date.now() }; }
     if (Date.now() < e.available_at || Date.now() >= e.due_at) fail('응시 가능한 시간이 아닙니다.');
     if (state.examAttempts.filter(a => a.exam_id === e.id && a.student_id === p.id).length >= e.max_attempts) fail('응시 횟수를 모두 사용했습니다.');
-    const words = scopedWords(state, e.school_id, e.range_codes), chosen = shuffle(words).slice(0, e.question_count);
+    const words = scopedWords(state, e.school_id, e.range_codes, e.class_name), chosen = shuffle(words).slice(0, e.question_count);
     const a = { id: id(), exam_id: e.id, student_id: p.id, status: 'active', started_at: Date.now(), deadline: Math.min(Date.now() + e.duration_sec * 1000, e.due_at), questions: chosen.map(w => buildQuestion(w, e.exam_type, words)), keys: chosen, answers: {}, revision: 0, lease: id() };
     state.examAttempts.push(a); return { attempt: attemptView(a, state, p), exam: e, server_time: Date.now() };
   }
@@ -714,10 +728,15 @@ export async function service(state, method, path, body, token) {
     const school = schoolForProfile(state, p);
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
     if (body.school_id && body.school_id !== school.id) fail('현재 학교의 범위만 학습할 수 있어요.', 403);
-    const words = scopedWords(state, school.id, body.range_codes);
     if (!PRACTICE_TYPES[body.mode]) fail('연습 방식을 선택해주세요.');
-    const coverAll = body.cover_all === true;
-    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, range_codes: body.range_codes, mode: body.mode, assignment_id: null, target: coverAll ? words.length : integer(body.target || 10, 5, 500, '학습량'), cover_all: coverAll, seen: [], total: 0, correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: Date.now(), finished: false, responses: {}, words: words.map(w => w.id) };
+    const isDailyQuest = body.daily_quest === true;
+    const daily = isDailyQuest ? composeDailyQuest(state, p.id, school, p.class_name, 20) : null;
+    const words = isDailyQuest ? daily.words : scopedWords(state, school.id, body.range_codes, p.class_name);
+    if (!words.length) fail('학습할 단어가 없습니다. 선생님에게 단어 범위를 확인해주세요.', 409);
+    const coverAll = isDailyQuest || body.cover_all === true;
+    const rangeCodes = isDailyQuest ? daily.range_codes : body.range_codes;
+    const target = isDailyQuest ? daily.target : coverAll ? words.length : integer(body.target || 10, 5, 500, '학습량');
+    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, assignment_id: null, target, cover_all: coverAll, daily_quest: isDailyQuest, quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: Date.now(), finished: false, responses: {}, words: words.map(w => w.id) };
     if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
@@ -729,10 +748,13 @@ export async function service(state, method, path, body, token) {
       const word = allBooks(state).flatMap(b => b.words).find(w => w.id === x.question.word_id);
       const ok = grade(x.question.type, body.answer, wordForGrade(state, word));
       x.total++; x.last = word.id;
-      state.mastery[p.id] ??= {}; const m = state.mastery[p.id][word.id] ??= { mastery: 0, correct: 0, wrong: 0, streak: 0 };
+      state.mastery[p.id] ??= {}; const m = state.mastery[p.id][word.id] ??= { mastery: 0, correct: 0, wrong: 0, streak: 0, recent_results: [] };
+      m.recent_results = Array.isArray(m.recent_results) ? m.recent_results : [];
       let gain = 0;
       if (ok) { x.correct++; x.combo++; x.best = Math.max(x.best, x.combo); gain = 20 + Math.min(x.combo, 10) * 3; x.xp += gain; m.correct++; m.streak++; m.mastery = clamp(m.mastery + (m.streak >= 3 ? 14 : 10), 0, 100); }
-      else { x.combo = 0; m.wrong++; m.streak = 0; m.mastery = clamp(m.mastery - 8, 0, 100); if (!x.retry.some(r => r.id === word.id)) x.retry.push({ id: word.id, at: x.total + 2 }); }
+      else { x.combo = 0; m.wrong++; m.streak = 0; m.mastery = clamp(m.mastery - 8, 0, 100); m.last_wrong_at = Date.now(); if (!x.retry.some(r => r.id === word.id)) x.retry.push({ id: word.id, at: x.total + 2 }); }
+      m.recent_results.push({ ok, at: Date.now() });
+      if (m.recent_results.length > 5) m.recent_results.splice(0, m.recent_results.length - 5);
       m.last_seen = Date.now(); m.next_review_at = Date.now() + (ok ? 3600000 + m.mastery * 864000 : 120000);
       x.feedback = { ok, gain, mastery: m.mastery, word_id: word.id, type: x.question.type, question_id: body.question_id, answer: str(body.answer, 160), word: displayEnglish(word.word), meaning: word.meaning, combo: x.combo, retry: !ok, can_dispute: !ok && x.question.type === 'write_meaning', milestone: ok && [5, 10].includes(x.combo) };
       const result = practiceView(x, state);
@@ -780,9 +802,9 @@ function nextPractice(x, state) {
 function finishPractice(x, state) {
   x.finished = true; x.finished_at = Date.now();
   if (!x.total) return;
-  const rec = { id: x.id, student_id: x.student_id, assignment_id: x.assignment_id, division: x.division, school_id: x.school_id, school: x.school, range_codes: x.range_codes, mode: x.mode, correct: x.correct, total: x.total, xp: x.xp, best_combo: x.best, duration_sec: Math.round((Date.now() - x.started_at) / 1000), created_at: Date.now() };
+  const rec = { id: x.id, student_id: x.student_id, assignment_id: x.assignment_id, division: x.division, school_id: x.school_id, school: x.school, grade: x.grade || null, daily_quest: !!x.daily_quest, range_codes: x.range_codes, mode: x.mode, correct: x.correct, total: x.total, xp: x.xp, best_combo: x.best, duration_sec: Math.round((Date.now() - x.started_at) / 1000), created_at: Date.now() };
   if (!state.sessions.some(s => s.id === rec.id)) state.sessions.push(rec);
 }
 function practiceView(x, state) {
-  return { id: x.id, school: x.school, mode: x.mode, target: x.target, cover_all: !!x.cover_all, covered: x.seen?.length || 0, total: x.total, correct: x.correct, xp: x.xp, combo: x.combo, best: x.best, question: x.question, question_id: x.question_id, feedback: x.feedback, finished: x.finished, retry_count: x.retry.length, stats: growthFor(mySessions(state, x.student_id)) };
+  return { id: x.id, school: x.school, mode: x.mode, target: x.target, cover_all: !!x.cover_all, daily_quest: !!x.daily_quest, quest_mix: x.quest_mix || null, covered: x.seen?.length || 0, total: x.total, correct: x.correct, xp: x.xp, combo: x.combo, best: x.best, question: x.question, question_id: x.question_id, feedback: x.feedback, finished: x.finished, retry_count: x.retry.length, stats: growthFor(mySessions(state, x.student_id)) };
 }
