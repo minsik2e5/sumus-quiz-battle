@@ -1,4 +1,4 @@
-import { $, $, esc, icon, toast, api } from './modules/ui.js';
+import { $, $$, esc, icon, toast, api } from './modules/ui.js';
 import { DANWONGO_PASSAGES } from './danwongo-grammar-data.js?v=2';
 import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from './seonbu-grammar-data.js?v=2';
 import { GANGSEO_PASSAGES } from './gangseo-grammar-data.js?v=1';
