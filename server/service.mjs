@@ -29,6 +29,36 @@ const safeGrammarIndexes = (value, max = 120) => Array.isArray(value)
 const safeGrammarKeys = value => Array.isArray(value)
   ? [...new Set(value.map(String).filter(key => /^\d+:\d+$/.test(key)))].slice(0, 400)
   : [];
+const MIDDLE_IMPORT_GRADES = ['중2', '중3'];
+const hashText = value => {
+  let hash = 2166136261;
+  for (const char of String(value)) { hash ^= char.codePointAt(0); hash = Math.imul(hash, 16777619); }
+  return (hash >>> 0).toString(36);
+};
+const importedWordId = (schoolId, grade, rangeCode, word) => `import:${schoolId}:${grade}:${rangeCode}:${hashText(String(word).normalize('NFKC').toLowerCase())}`;
+function normalizeImportRows(rawRows) {
+  if (!Array.isArray(rawRows)) fail('단어 파일 형식을 확인해주세요.');
+  if (rawRows.length > 3000) fail('한 번에 최대 3,000단어까지 등록할 수 있어요.');
+  const rows = [], issues = [], seen = new Set();
+  rawRows.forEach((raw, index) => {
+    const row = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    const rangeCode = str(row.range_code ?? row.range ?? row['범위'] ?? row['번호'] ?? row.day ?? row.DAY, 40);
+    const word = str(row.word ?? row.english ?? row['영어'] ?? row['단어'], 120);
+    const meaning = str(row.meaning ?? row.korean ?? row['뜻'] ?? row['의미'], 200);
+    if (!rangeCode || !word || !meaning) {
+      issues.push({ row: index + 1, message: '범위·영어·뜻 중 빠진 항목이 있어 제외했어요.' });
+      return;
+    }
+    const key = `${rangeCode}|${word.normalize('NFKC').toLowerCase()}`;
+    if (seen.has(key)) {
+      issues.push({ row: index + 1, message: '같은 범위의 중복 단어라 제외했어요.' });
+      return;
+    }
+    seen.add(key);
+    rows.push({ range_code: rangeCode, word, meaning });
+  });
+  return { rows, issues };
+}
 const id = () => randomUUID();
 const DIVISIONS = ['middle', 'high'];
 const divisionLabel = division => division === 'middle' ? '중등부' : '고등부';
@@ -87,6 +117,9 @@ function regradeMeaningDispute(state, dispute) {
       mastery.wrong = Math.max(0, Number(mastery.wrong || 0) - 1);
       mastery.correct = Number(mastery.correct || 0) + 1;
       mastery.mastery = clamp(Number(mastery.mastery || 0) + 18, 0, 100);
+      mastery.recent_results = Array.isArray(mastery.recent_results) ? mastery.recent_results : [];
+      const recentWrongIndex = [...mastery.recent_results].map((item, index) => ({ item, index })).reverse().find(entry => entry.item?.ok === false)?.index;
+      if (recentWrongIndex !== undefined) mastery.recent_results[recentWrongIndex] = { ...mastery.recent_results[recentWrongIndex], ok: true, regraded: true };
       mastery.last_seen = Date.now();
     }
     const practice = state.practices.find(item => item.id === dispute.source_id && item.student_id === dispute.student_id);
