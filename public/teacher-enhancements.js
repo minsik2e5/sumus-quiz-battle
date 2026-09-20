@@ -149,7 +149,8 @@ async function openStudentDetail(id) {
   const grammarRecent = [...grammarItems].sort((a, b) => Number(b.updated_at || 0) - Number(a.updated_at || 0))[0];
   const recent = shortActivity(lastActivity(data, id));
   const schoolOptions = data.schools.map(s => `<option value="${esc(s.id)}" ${(s.id === p.school_id || (!p.school_id && s.name === p.school)) ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
-  const classOptions = [...new Set([...CLASS_OPTIONS, p.class_name].filter(Boolean))].map(c => `<option value="${esc(c)}" ${c === p.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('');
+  const divisionClasses = data.profile.active_division === 'middle' ? ['중2','중3'] : ['고1A','고1B'];
+  const classOptions = [...new Set([...divisionClasses, p.class_name].filter(Boolean))].map(c => `<option value="${esc(c)}" ${c === p.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('');
   const close = modal(`
     <div class="sumus-student-hero">
       ${avatar(p.avatar_key || 'lumi', { size: 'mini' })}
