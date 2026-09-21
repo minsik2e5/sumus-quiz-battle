@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { passwordHash } from './auth.mjs';
+import { CLASS_OPTIONS } from '../public/modules/core.js';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const str = (value, max = 120) => typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -18,7 +19,7 @@ export async function selfSignup(state, body) {
   if (state.profiles.some(profile => profile.username === username)) fail('이미 사용 중인 아이디예요.', 409);
   if (password.length < 8 || password.length > 128) fail('비밀번호는 8~128자로 입력해주세요.');
   if (!school) fail('학교를 선택해주세요.');
-  if (!['고1A', '고1B'].includes(className)) fail('반을 선택해주세요.');
+  if (!CLASS_OPTIONS.includes(className)) fail('반을 선택해주세요.');
 
   const student = {
     id: randomUUID(),
