@@ -207,7 +207,37 @@ function grammarStudy(A) {
   `}`;
 }
 
+function middleLessonState(A) {
+  const words = A.data.books.flatMap(book => book.words || []);
+  const codes = [...new Set(words.map(word => String(word.range_code || '')).filter(Boolean))];
+  if (!codes.length) return { words, codes, code: '', lessonWords: [], selected: [] };
+  if (!codes.includes(String(A.middleRange || ''))) A.middleRange = codes[0];
+  const code = String(A.middleRange);
+  const lessonWords = words.filter(word => String(word.range_code) === code);
+  const valid = new Set(lessonWords.map(word => word.id));
+  A.middleWordIds = (A.middleWordIds || []).filter(id => valid.has(id));
+  return { words, codes, code, lessonWords, selected: A.middleWordIds };
+}
+function middleVocabPractice(A) {
+  const { codes, code, lessonWords, selected } = middleLessonState(A);
+  const selectedSet = new Set(selected);
+  const lessonTabs = codes.map(range => `<button data-middle-lesson="${esc(range)}" class="${String(range) === code ? 'selected' : ''}">${esc(range)}과</button>`).join('');
+  const rows = lessonWords.map((word, index) => `<label class="middle-word-row ${selectedSet.has(word.id) ? 'selected' : ''}"><input type="checkbox" data-middle-word="${esc(word.id)}" ${selectedSet.has(word.id) ? 'checked' : ''}><span class="middle-word-no">${index + 1}</span><span class="middle-word-en">${esc(word.word)}</span><span class="middle-word-ko">${esc(word.meaning)}</span></label>`).join('');
+  const preset = [15,20,30].filter(n => lessonWords.length >= n).map(n => `<button data-middle-preset="${n}">앞 ${n}개</button>`).join('');
+  return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">MIDDLE VOCAB</span></div>
+    <div class="page-heading"><h1>시험 볼 단어 고르기</h1><p>오늘 외운 만큼만 체크하면 돼요. 15개·20개·30개 모두 같은 방식으로 사용할 수 있어요.</p></div>
+    <div class="step-label"><span>01</span>과 선택</div>
+    <div class="middle-lesson-tabs">${lessonTabs || '<span class="tiny muted">등록된 단어가 없어요.</span>'}</div>
+    <div class="step-label"><span>02</span>단어 선택</div>
+    <div class="middle-word-tools"><div><button data-middle-preset="clear">선택 해제</button>${preset}<button data-middle-preset="all">전체</button></div><strong id="middle-selected-count">${selected.length}개 선택</strong></div>
+    <section class="middle-word-list">${rows || empty('practice','이 과에 등록된 단어가 없어요','선생님이 단어 DB를 등록하면 여기에 순서대로 표시돼요.')}</section>
+    <div class="step-label"><span>03</span>시험 방식</div>
+    <div class="mode-grid">${Object.entries(PRACTICE_TYPES).map(([k, name]) => `<button class="mode-option ${A.mode === k ? 'selected' : ''}" data-mode="${k}" aria-pressed="${A.mode === k}">${icon(k === 'listen' ? 'sound' : k === 'mixed' ? 'sparkle' : ['write_meaning', 'spell', 'scramble', 'initial', 'vowelblank'].includes(k) ? 'records' : 'practice')}${name}${k === 'write_meaning' ? '<span class="grow"></span><span class="pill blue">추천</span><small class="mode-help">영어를 보고 뜻을 직접 입력</small>' : ''}</button>`).join('')}</div>
+    <div class="practice-launch"><button class="btn primary full" data-action="start-practice" ${selected.length || A.data.active_practice ? '' : 'disabled'}>${A.data.active_practice ? '하던 연습 이어가기' : selected.length ? selected.length + '개 시험 시작하기' : '단어를 선택해주세요'} ${icon('arrow')}</button><p>체크한 단어만 원래 순서대로 한 번씩 나온 뒤, 틀린 단어를 다시 복습해요.</p></div>`;
+}
+
 function vocabPractice(A) {
+  if (A.data.profile.division === 'middle') return middleVocabPractice(A);
   const count = selectedCount(A);
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">VOCAB</span></div><div class="page-heading"><h1>단어 학습</h1><p>범위를 고르면, 약한 단어부터 익혀요.</p></div><div class="step-label"><span>01</span>내 학교</div>${schoolSwitch(A)}<div class="step-label"><span>02</span>연습할 범위</div>${rangePicker(A)}<div class="step-label"><span>03</span>연습 방식</div><div class="mode-grid">${Object.entries(PRACTICE_TYPES).map(([k, name]) => `<button class="mode-option ${A.mode === k ? 'selected' : ''}" data-mode="${k}" aria-pressed="${A.mode === k}">${icon(k === 'listen' ? 'sound' : k === 'mixed' ? 'sparkle' : ['write_meaning', 'spell', 'scramble', 'initial', 'vowelblank'].includes(k) ? 'records' : 'practice')}${name}${k === 'write_meaning' ? '<span class="grow"></span><span class="pill blue">추천</span><small class="mode-help">영어를 보고 뜻을 직접 입력</small>' : ''}</button>`).join('')}</div><div class="practice-amount"><span class="tiny muted">한 번에 학습할 양</span><div class="practice-target-grid" role="group" aria-label="학습량 선택">${[10, 20, 30].map(n => `<button data-practice-target="${n}" class="${A.target === n ? 'selected' : ''}" aria-pressed="${A.target === n}">${n}<small>문제</small></button>`).join('')}<button data-practice-target="all" class="all ${A.target === 'all' ? 'selected' : ''}" aria-pressed="${A.target === 'all'}"><b>선택 범위 전체</b><small data-all-count>${count}개 단어 모두 보기</small></button></div></div><div class="practice-launch"><button class="btn primary full" data-action="start-practice" ${!count ? 'disabled' : ''}>${A.data.active_practice ? '하던 연습 이어가기' : '연습 시작하기'} ${icon('arrow')}</button><p>${A.target === 'all' ? '선택한 단어를 중복 없이 모두 본 뒤, 틀린 단어를 복습해요.' : '틀린 단어는 잠시 뒤 다시 나와요.'}</p></div>`;
 }
