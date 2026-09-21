@@ -62,14 +62,31 @@ function normalizeImportRows(rawRows) {
 }
 const id = () => randomUUID();
 const DIVISIONS = ['middle', 'high'];
+const ALL_CLASSES = '__ALL__';
 const divisionLabel = division => division === 'middle' ? '중등부' : '고등부';
 const divisionClassAllowed = (division, className) => division === 'middle' ? ['중2','중3'].includes(className) : ['고1A','고1B'].includes(className);
-const schoolByRef = (state, value) => state.schools.find(s => s.active !== false && (s.id === value || s.name === value));
-const schoolForProfile = (state, profile) => state.schools.find(s => s.id === profile.school_id);
+const examClassAllowed = (division, className) => division === 'high' && className === ALL_CLASSES ? true : divisionClassAllowed(division, className);
+const examWordGrade = className => className === ALL_CLASSES ? null : className;
+const examTargetMatches = (exam, profile) => !!exam && !!profile && (exam.class_name === ALL_CLASSES || exam.class_name === profile.class_name);
+const normalizedSchoolRef = value => str(value, 80).replace(/\s+/g, '');
+const schoolByRef = (state, value) => {
+  const raw = str(value, 80);
+  const normalized = normalizedSchoolRef(raw);
+  return state.schools.find(s => s.active !== false && (
+    s.id === raw ||
+    normalizedSchoolRef(s.name) === normalized ||
+    normalizedSchoolRef(s.full_name) === normalized
+  ));
+};
+const schoolForProfile = (state, profile) => state.schools.find(s => s.id === profile.school_id) || schoolByRef(state, profile.school);
 const activeTeacherDivision = profile => DIVISIONS.includes(profile.active_division) ? profile.active_division : 'high';
 const teacherSchools = (state, profile, division = activeTeacherDivision(profile)) => state.schools.filter(s => s.active !== false && s.division === division && profile.school_ids?.includes(s.id));
 const activeTeacherSchool = (state, profile) => teacherSchools(state, profile).find(s => s.id === profile.active_school_id) || teacherSchools(state, profile)[0];
-const sameSchool = (record, school) => !!record && !!school && record.school_id === school.id;
+const sameSchool = (record, school) => !!record && !!school && (
+  record.school_id === school.id ||
+  normalizedSchoolRef(record.school) === normalizedSchoolRef(school.name) ||
+  normalizedSchoolRef(record.school) === normalizedSchoolRef(school.full_name)
+);
 const wordForGrade = (state, word) => ({ ...word, accepted_meanings: state.meaningAliases?.[word.id] || [] });
 const normalizeDisputeAnswer = value => String(value ?? '').normalize('NFKC').toLowerCase().replace(/[~～·•・.,;:!?()[\]{}"'‘’“”]/g, '').replace(/\s+/g, '').trim();
 const findWord = (state, wordId) => allBooks(state).flatMap(book => book.words || []).find(word => word.id === wordId);
@@ -276,6 +293,32 @@ export function scopedWords(state, schoolRef, ranges, grade = null) {
   return words.filter(w => ranges.map(String).includes(w.range_code));
 }
 function mySessions(state, student) { return state.sessions.filter(s => s.student_id === student); }
+const DAY_MS = 86400000;
+const KST_OFFSET_MS = 9 * 3600000;
+const KO_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+function shortKstDate(ts) {
+  const d = new Date(ts + KST_OFFSET_MS);
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${KO_WEEKDAYS[d.getUTCDay()]})`;
+}
+function rankingWeek(now = Date.now()) {
+  const local = new Date(now + KST_OFFSET_MS);
+  const daysSinceMonday = (local.getUTCDay() + 6) % 7;
+  const start = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - daysSinceMonday) - KST_OFFSET_MS;
+  const end = start + 7 * DAY_MS;
+  const thursday = new Date(start + KST_OFFSET_MS + 3 * DAY_MS);
+  const year = thursday.getUTCFullYear();
+  const monthIndex = thursday.getUTCMonth();
+  const month = monthIndex + 1;
+  const firstOfMonth = new Date(Date.UTC(year, monthIndex, 1));
+  const firstThursday = 1 + ((4 - firstOfMonth.getUTCDay() + 7) % 7);
+  const week = 1 + Math.floor((thursday.getUTCDate() - firstThursday) / 7);
+  return {
+    start, end, year, month, week,
+    key: `${year}-${String(month).padStart(2, '0')}-W${week}`,
+    label: `${year}년 ${month}월 ${week}주차`,
+    range: `${shortKstDate(start)} ~ ${shortKstDate(end - 1)}`
+  };
+}
 function stats(state, p, sessions = mySessions(state, p.id)) {
   const today = sessions.filter(s => dayKey(s.created_at) === dayKey(Date.now()));
   const recent = [...sessions].sort((a, b) => b.created_at - a.created_at).slice(0, 20);
@@ -311,7 +354,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.13.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.14.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -339,6 +382,7 @@ export async function service(state, method, path, body, token) {
       const school = schoolForProfile(state, p);
       const division = p.division || school?.division || (/^중/.test(p.class_name || '') ? 'middle' : 'high');
       p.division = division;
+      if (school) { p.school_id = school.id; p.school = school.name; }
       if (DIVISIONS.includes(body.division) && body.division !== division) fail(`${divisionLabel(division)} 계정입니다. ${divisionLabel(division)}로 로그인해주세요.`, 403);
     }
     const raw = randomBytes(32).toString('base64url');
@@ -356,9 +400,9 @@ export async function service(state, method, path, body, token) {
     const selectedSchool = teacher ? activeTeacherSchool(state, p) : studentSchool;
     if (!selectedSchool) fail('학교 설정을 확인해주세요.', 409);
     if (selectedSchool.division !== selectedDivision) fail('중등부/고등부 학교 설정을 확인해주세요.', 409);
-    const visibleExams = state.exams.filter(e => e.division === selectedDivision && (teacher ? sameSchool(e, selectedSchool) : (e.class_name === p.class_name && sameSchool(e, studentSchool) && e.active)));
+    const visibleExams = state.exams.filter(e => e.division === selectedDivision && (teacher ? sameSchool(e, selectedSchool) : (examTargetMatches(e, p) && sameSchool(e, studentSchool) && e.active)));
     const visibleExamIds = new Set(visibleExams.map(e => e.id));
-    const studentProfiles = state.profiles.filter(x => x.role === 'student' && x.division === selectedDivision && (!teacher || x.school_id === selectedSchool.id));
+    const studentProfiles = state.profiles.filter(x => x.role === 'student' && x.division === selectedDivision && (!teacher || sameSchool(x, selectedSchool)));
     const studentIds = new Set(studentProfiles.map(s => s.id));
     const sessions = state.sessions.filter(s => s.division === selectedDivision && sameSchool(s, selectedSchool) && (teacher ? studentIds.has(s.student_id) : s.student_id === p.id)).sort((a, b) => b.created_at - a.created_at);
     const sessionsByStudent = new Map();
@@ -384,12 +428,26 @@ export async function service(state, method, path, body, token) {
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
       attempts: attempts.map(a => attemptSummary(a, state, p)), server_time: Date.now(),
       active_practice: state.practices.find(x => x.student_id === p.id && !x.finished)?.id || null,
+      ranking_period: rankingWeek(Date.now()),
       ranking: teacher ? [] : state.profiles.filter(x => x.active && x.role === 'student').map(s => {
-        const records = mySessions(state, s.id), weekly = records.filter(r => r.created_at >= Date.now() - 7 * 86400000);
+        const records = mySessions(state, s.id);
+        const period = rankingWeek(Date.now());
+        const weekly = records.filter(r => r.created_at >= period.start && r.created_at < period.end);
         const g = growthFor(records), isMe = s.id === p.id;
         const hidden = !isMe && (s.ranking_public === false || s.share_profile === false);
         const grade = /^중2/.test(s.class_name || '') ? '중2' : /^중3/.test(s.class_name || '') ? '중3' : /^고1/.test(s.class_name || '') ? '고1' : (s.division === 'middle' ? '중등' : '고등');
-        return { id: hidden ? null : s.id, is_me: isMe, private: hidden, grade, division: s.division || (grade.startsWith('중') ? 'middle' : 'high'), display_name: hidden ? '비공개 학생' : s.display_name, avatar_key: hidden ? 'lumi' : (s.avatar_key || 'lumi'), level: hidden ? 1 : g.level, streak: g.streak, xp: weekly.reduce((n, r) => n + r.xp, 0), total: weekly.reduce((n, r) => n + r.total, 0) };
+        return {
+          id: hidden ? null : s.id, is_me: isMe, private: hidden, grade,
+          division: s.division || (grade.startsWith('중') ? 'middle' : 'high'),
+          display_name: hidden ? '비공개 학생' : s.display_name,
+          avatar_key: hidden ? 'lumi' : (s.avatar_key || 'lumi'),
+          level: hidden ? 1 : g.level, streak: g.streak,
+          xp: weekly.reduce((n, r) => n + Number(r.xp || 0), 0),
+          total: weekly.reduce((n, r) => n + Number(r.total || 0), 0),
+          all_xp: records.reduce((n, r) => n + Number(r.xp || 0), 0),
+          all_total: records.reduce((n, r) => n + Number(r.total || 0), 0),
+          all_streak: g.streak
+        };
       })
     };
   }
