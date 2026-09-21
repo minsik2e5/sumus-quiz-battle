@@ -768,11 +768,13 @@ export async function service(state, method, path, body, token) {
     requireRole(p, 'teacher');
     const school = schoolByRef(state, body.school_id || body.school);
     if (!school || !p.school_ids?.includes(school.id) || school.division !== activeTeacherDivision(p)) fail('현재 부서의 담당 학교를 확인해주세요.', 403);
-    if (!str(body.title) || !str(body.class_name)) fail('제목과 반을 입력해주세요.');
-    const words = scopedWords(state, school.id, body.range_codes, str(body.class_name, 30));
-    if (!divisionClassAllowed(school.division, str(body.class_name, 30))) fail(`${divisionLabel(school.division)} 반을 선택해주세요.`);
+    const targetClass = str(body.class_name, 30);
+    if (!str(body.title) || !targetClass) fail('제목과 대상을 입력해주세요.');
+    if (path === '/assignments' && !divisionClassAllowed(school.division, targetClass)) fail(`${divisionLabel(school.division)} 반을 선택해주세요.`);
+    if (path === '/exams' && !examClassAllowed(school.division, targetClass)) fail(school.division === 'high' ? '학교 전체 또는 고등부 반을 선택해주세요.' : '중등부 반을 선택해주세요.');
+    const words = scopedWords(state, school.id, body.range_codes, path === '/exams' ? examWordGrade(targetClass) : targetClass);
     const due = Number(body.due_at); if (!Number.isFinite(due) || due <= Date.now()) fail('마감 시간을 확인해주세요.');
-    const common = { id: id(), teacher_id: p.id, title: str(body.title), class_name: str(body.class_name, 30), division: school.division, school_id: school.id, school: school.name, range_codes: [...new Set(body.range_codes.map(String))], book_id: words[0].book_id, active: true, created_at: Date.now(), due_at: due };
+    const common = { id: id(), teacher_id: p.id, title: str(body.title), class_name: targetClass, division: school.division, school_id: school.id, school: school.name, range_codes: [...new Set(body.range_codes.map(String))], book_id: words[0].book_id, active: true, created_at: Date.now(), due_at: due };
     if (path === '/assignments') { const a = { ...common, target_questions: integer(body.target_questions, 5, 500, '목표 학습량') }; state.assignments.unshift(a); return a; }
     if (!EXAM_TYPES[body.exam_type]) fail('시험 유형을 선택해주세요.');
     const available = Number(body.available_at); if (!Number.isFinite(available) || available >= due) fail('시작 시간은 마감 시간보다 빨라야 합니다.');
@@ -807,12 +809,9 @@ export async function service(state, method, path, body, token) {
     if (!locked) {
       const ranges = body.range_codes !== undefined ? [...new Set((body.range_codes || []).map(String))] : e.range_codes;
       const targetClass = body.class_name !== undefined ? str(body.class_name, 30) : e.class_name;
-      const words = scopedWords(state, school.id, ranges, targetClass);
-      if (body.class_name !== undefined) {
-        const nextClass = str(body.class_name, 30);
-        if (!divisionClassAllowed(school.division, nextClass)) fail(`${divisionLabel(school.division)} 반을 선택해주세요.`);
-        e.class_name = nextClass;
-      }
+      if (!examClassAllowed(school.division, targetClass)) fail(school.division === 'high' ? '학교 전체 또는 고등부 반을 선택해주세요.' : '중등부 반을 선택해주세요.');
+      const words = scopedWords(state, school.id, ranges, examWordGrade(targetClass));
+      if (body.class_name !== undefined) e.class_name = targetClass;
       if (body.range_codes !== undefined) { e.range_codes = ranges; e.book_id = words[0].book_id; }
       if (body.exam_type !== undefined) { if (!EXAM_TYPES[body.exam_type]) fail('시험 유형을 선택해주세요.'); e.exam_type = body.exam_type; }
       if (body.question_count !== undefined) e.question_count = body.question_count === 'all' ? words.length : integer(body.question_count, 1, Math.min(500, words.length), '문제 수');
@@ -852,13 +851,13 @@ export async function service(state, method, path, body, token) {
   if (path === '/exams/start' && method === 'POST') {
     requireRole(p, 'student');
     const studentSchool = schoolForProfile(state, p);
-    const e = state.exams.find(e => e.id === body.exam_id && e.division === p.division && e.class_name === p.class_name && sameSchool(e, studentSchool) && e.active);
+    const e = state.exams.find(e => e.id === body.exam_id && e.division === p.division && examTargetMatches(e, p) && sameSchool(e, studentSchool) && e.active);
     if (!e) fail('배정된 시험이 아닙니다.', 403);
     const existing = state.examAttempts.find(a => a.exam_id === e.id && a.student_id === p.id && a.status === 'active');
     if (existing) { existing.lease = id(); return { attempt: attemptView(existing, state, p), exam: e, server_time: Date.now() }; }
     if (Date.now() < e.available_at || Date.now() >= e.due_at) fail('응시 가능한 시간이 아닙니다.');
     if (state.examAttempts.filter(a => a.exam_id === e.id && a.student_id === p.id).length >= e.max_attempts) fail('응시 횟수를 모두 사용했습니다.');
-    const words = scopedWords(state, e.school_id, e.range_codes, e.class_name), chosen = shuffle(words).slice(0, e.question_count);
+    const words = scopedWords(state, e.school_id, e.range_codes, examWordGrade(e.class_name)), chosen = shuffle(words).slice(0, e.question_count);
     const a = { id: id(), exam_id: e.id, student_id: p.id, status: 'active', started_at: Date.now(), deadline: Math.min(Date.now() + e.duration_sec * 1000, e.due_at), questions: chosen.map(w => buildQuestion(w, e.exam_type, words)), keys: chosen, answers: {}, revision: 0, lease: id() };
     state.examAttempts.push(a); return { attempt: attemptView(a, state, p), exam: e, server_time: Date.now() };
   }
