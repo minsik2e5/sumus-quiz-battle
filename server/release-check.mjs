@@ -196,11 +196,25 @@ export async function runReleaseCheck() {
     assert(allWordsExam.class_name === '고1A' && allWordsExam.question_count === scopedRangeCount, 'exam supports selectable class and all scoped words');
 
     const bootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
-    assert(bootstrap.exams.length === 4 && bootstrap.assignments.length === 1, 'student receives assigned exam and practice task');
+    assert(bootstrap.exams.length === 5 && bootstrap.assignments.length === 1, 'student receives assigned exams and practice task');
     assert(bootstrap.books.length > 0 && bootstrap.books.every(book => book.school === '단원고'), 'student bootstrap only includes own-school vocabulary');
     assert(bootstrap.schools.length === 1 && bootstrap.schools[0].id === 'danwon-high', 'student bootstrap exposes only assigned school');
     assert(bootstrap.profile.division === 'high' && bootstrap.divisions.length === 1 && bootstrap.divisions[0] === 'high', 'student bootstrap is locked to assigned division');
     assert(bootstrap.ranking.some(item => item.grade === '중2') && bootstrap.ranking.some(item => item.grade === '중3') && bootstrap.ranking.some(item => item.grade === '고1'), 'student ranking includes middle2 middle3 and high1 across division boundaries');
+    assert(bootstrap.ranking_period?.start < bootstrap.ranking_period?.end && bootstrap.ranking_period?.label && bootstrap.ranking_period?.range, 'ranking exposes Monday-Sunday calendar week metadata');
+
+    const highBStudent = await service(state, 'POST', '/students', {
+      username: 'qa_student_b', password: 'QaStudentB123!', display_name: 'QA B학생', class_name: '고1B', school: '단원고'
+    }, teacherToken);
+    const highBLogin = await service(state, 'POST', '/login', { username: 'qa_student_b', password: 'QaStudentB123!', role: 'student', division: 'high' }, null);
+    const schoolWideExam = await service(state, 'POST', '/exams', {
+      title: 'QA 학교 전체', class_name: '__ALL__', school: '단원고', range_codes: [rangeCode], exam_type: 'eng2mean_mc',
+      question_count: 4, duration_sec: 300, passing_score: 70, max_attempts: 1,
+      available_at: now - 1000, due_at: now + 3600000, release_result: true
+    }, teacherToken);
+    const highABootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    const highBBootstrap = await service(state, 'GET', '/bootstrap', {}, highBLogin._cookie);
+    assert(highBStudent.class_name === '고1B' && highABootstrap.exams.some(item => item.id === schoolWideExam.id) && highBBootstrap.exams.some(item => item.id === schoolWideExam.id), 'school-wide exam reaches both high-school classes');
     await expectStatus(403, () => service(state, 'PATCH', '/profile/school', { school_id: 'seonbu-high' }, studentToken), 'student cannot change own school');
 
     const aliasWord = danwonWords[0];
