@@ -376,7 +376,7 @@ export async function service(state, method, path, body, token) {
     const wordMastery = teacher
       ? Object.fromEntries(studentProfiles.map(student => [student.id, wordRangeMastery(state, student.id, selectedSchool, student.class_name)]))
       : wordRangeMastery(state, p.id, selectedSchool, p.class_name);
-    const dailyQuest = teacher ? null : composeDailyQuest(state, p.id, selectedSchool, p.class_name, 20);
+    const dailyQuest = teacher || selectedDivision === 'middle' ? null : composeDailyQuest(state, p.id, selectedSchool, p.class_name, 20);
     return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes } : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
       profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
       sessions, exams: visibleExams,
@@ -830,14 +830,22 @@ export async function service(state, method, path, body, token) {
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
     if (body.school_id && body.school_id !== school.id) fail('현재 학교의 범위만 학습할 수 있어요.', 403);
     if (!PRACTICE_TYPES[body.mode]) fail('연습 방식을 선택해주세요.');
-    const isDailyQuest = body.daily_quest === true;
+    const isDailyQuest = body.daily_quest === true && school.division !== 'middle';
+    const selectedWordIds = school.division === 'middle' && Array.isArray(body.word_ids)
+      ? [...new Set(body.word_ids.map(value => String(value)).filter(Boolean))].slice(0, 200)
+      : [];
+    const gradeWords = wordsForSchoolGrade(state, school, p.class_name);
+    const selectedWordSet = new Set(selectedWordIds);
+    const manualWords = selectedWordIds.length ? gradeWords.filter(word => selectedWordSet.has(word.id)) : [];
+    if (selectedWordIds.length && manualWords.length !== selectedWordIds.length) fail('선택한 단어를 다시 확인해주세요.', 409);
     const daily = isDailyQuest ? composeDailyQuest(state, p.id, school, p.class_name, 20) : null;
-    const words = isDailyQuest ? daily.words : scopedWords(state, school.id, body.range_codes, p.class_name);
+    const words = manualWords.length ? manualWords : isDailyQuest ? daily.words : scopedWords(state, school.id, body.range_codes, p.class_name);
     if (!words.length) fail('학습할 단어가 없습니다. 선생님에게 단어 범위를 확인해주세요.', 409);
-    const coverAll = isDailyQuest || body.cover_all === true;
-    const rangeCodes = isDailyQuest ? daily.range_codes : body.range_codes;
-    const target = isDailyQuest ? daily.target : coverAll ? words.length : integer(body.target || 10, 5, 500, '학습량');
-    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, assignment_id: null, target, cover_all: coverAll, daily_quest: isDailyQuest, quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: Date.now(), finished: false, responses: {}, words: words.map(w => w.id) };
+    const manualSelection = manualWords.length > 0;
+    const coverAll = manualSelection || isDailyQuest || body.cover_all === true;
+    const rangeCodes = manualSelection ? [...new Set(words.map(word => String(word.range_code)))] : isDailyQuest ? daily.range_codes : body.range_codes;
+    const target = manualSelection ? words.length : isDailyQuest ? daily.target : coverAll ? words.length : integer(body.target || 10, 5, 500, '학습량');
+    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, assignment_id: null, target, cover_all: coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection, quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: Date.now(), finished: false, responses: {}, words: words.map(w => w.id) };
     if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
@@ -891,7 +899,9 @@ function nextPractice(x, state) {
   const due = x.retry.findIndex(r => r.at <= x.total);
   let word;
   if (unseen.length) {
-    word = choosePracticeWord(unseen, state.mastery[x.student_id] || {}, { ...x, retry: [] });
+    word = x.preserve_order
+      ? unseen.sort((a, b) => x.words.indexOf(a.id) - x.words.indexOf(b.id))[0]
+      : choosePracticeWord(unseen, state.mastery[x.student_id] || {}, { ...x, retry: [] });
   } else if (due >= 0) {
     const retry = x.retry.splice(due, 1)[0];
     word = words.find(w => w.id === retry.id);
@@ -907,5 +917,5 @@ function finishPractice(x, state) {
   if (!state.sessions.some(s => s.id === rec.id)) state.sessions.push(rec);
 }
 function practiceView(x, state) {
-  return { id: x.id, school: x.school, mode: x.mode, target: x.target, cover_all: !!x.cover_all, daily_quest: !!x.daily_quest, quest_mix: x.quest_mix || null, covered: x.seen?.length || 0, total: x.total, correct: x.correct, xp: x.xp, combo: x.combo, best: x.best, question: x.question, question_id: x.question_id, feedback: x.feedback, finished: x.finished, retry_count: x.retry.length, stats: growthFor(mySessions(state, x.student_id)) };
+  return { id: x.id, school: x.school, mode: x.mode, target: x.target, cover_all: !!x.cover_all, daily_quest: !!x.daily_quest, manual_selection: !!x.manual_selection, quest_mix: x.quest_mix || null, covered: x.seen?.length || 0, total: x.total, correct: x.correct, xp: x.xp, combo: x.combo, best: x.best, question: x.question, question_id: x.question_id, feedback: x.feedback, finished: x.finished, retry_count: x.retry.length, stats: growthFor(mySessions(state, x.student_id)) };
 }
