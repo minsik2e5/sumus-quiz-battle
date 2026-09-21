@@ -475,7 +475,7 @@ export async function runReleaseCheck() {
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(studentModule.includes('middleVocabPractice') && studentModule.includes('data-middle-word') && studentModule.includes('data-middle-preset'), 'V13.13 middle student UI lists lesson words for exact checkbox selection');
     assert(sessionsModule.includes('word_ids: A.middleWordIds') && sessionsModule.includes('1500'), 'V13.13 sends exact middle word ids and keeps correct feedback readable before auto advance');
-    assert(indexHtml.includes('/app.js?v=13.13.0') && sw.includes('sumus-voca-v13.13.0-mastery-daily-import'), 'V13.13 cache versions are active');
+    assert(indexHtml.includes('/app.js?v=13.13.0') && indexHtml.includes('/practice-enhancements.js?v=13.13.0') && sw.includes('sumus-voca-v13.13.0-middle-word-pick'), 'V13.13 cache versions are active');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
