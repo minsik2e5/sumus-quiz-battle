@@ -48,7 +48,7 @@ function showSignup() {
       <label class="field"><span>이름</span><input name="display_name" autocomplete="name" required maxlength="40" placeholder="학생 이름"></label>
       <div class="form-columns">
         <label class="field"><span>학교</span><select name="school" required><option value="">학교 선택</option><option>단원고</option><option>선부고</option><option>강서고</option></select></label>
-        <label class="field"><span>반</span><select name="class_name" required><option value="">반 선택</option><option value="고1A">고1A</option><option value="고1B">고1B</option></select></label>
+        <label class="field"><span>반</span><select name="class_name" required><option value="">반 선택</option><option value="고1A">고1A</option><option value="고1B">고1B</option><option value="중3">중3</option><option value="중2">중2</option></select></label>
       </div>
       <label class="field"><span>아이디</span><input name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required minlength="3" maxlength="40" pattern="[a-z0-9_.-]{3,40}" placeholder="영문 소문자·숫자 3자 이상"></label>
       <label class="field"><span>비밀번호</span><input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="128" placeholder="8자 이상"></label>
