@@ -1,0 +1,42 @@
+name: Build SUMUS Class Timer
+on:
+  push:
+    branches: [sumus-class-timer-build-v15]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Extract source
+        shell: pwsh
+        run: Expand-Archive -Path "sumus-class-timer-build/source.zip" -DestinationPath "timer-src" -Force
+      - name: Publish Windows single EXE
+        shell: pwsh
+        run: |
+          dotnet publish "timer-src/SUMUS_Class_Timer/SUMUS_Class_Timer.csproj" -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -p:EnableCompressionInSingleFile=true -o "release"
+          if (!(Test-Path "release/SUMUS_Class_Timer.exe")) { throw "SUMUS_Class_Timer.exe was not produced." }
+      - name: Prepare simple package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path package -Force | Out-Null
+          Copy-Item "release/SUMUS_Class_Timer.exe" "package/SUMUS_Class_Timer.exe"
+          @"
+          SUMUS CLASS TIMER
+          
+          사용법:
+          SUMUS_Class_Timer.exe 를 더블클릭하면 바로 실행됩니다.
+          설치나 별도 프로그램은 필요하지 않습니다.
+          "@ | Set-Content -Path "package/README.txt" -Encoding UTF8
+          Compress-Archive -Path "package/*" -DestinationPath "SUMUS_Class_Timer_V1_Stable.zip" -Force
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SUMUS_Class_Timer_V1_Stable
+          path: |
+            package/SUMUS_Class_Timer.exe
+            package/README.txt
+            SUMUS_Class_Timer_V1_Stable.zip
+          if-no-files-found: error
