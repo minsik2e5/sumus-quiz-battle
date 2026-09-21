@@ -11,8 +11,23 @@ function teacherFromToken(state, token) {
   return profile;
 }
 
-const schoolByRef = (state, value) => state.schools.find(school => school.active !== false && (school.id === value || school.name === value));
-const sameSchool = (record, school) => !!school && (record.school_id === school.id || record.school === school.name);
+const normalizeSchool = value => String(value || '').trim().replace(/\s+/g, '');
+const schoolByRef = (state, value) => {
+  const raw = String(value || '').trim();
+  const normalized = normalizeSchool(raw);
+  return state.schools.find(school => school.active !== false && (
+    school.id === raw ||
+    normalizeSchool(school.name) === normalized ||
+    normalizeSchool(school.full_name) === normalized
+  ));
+};
+const sameSchool = (record, school) => !!record && !!school && (
+  record.school_id === school.id ||
+  normalizeSchool(record.school) === normalizeSchool(school.name) ||
+  normalizeSchool(record.school) === normalizeSchool(school.full_name)
+);
+const ALL_CLASSES = '__ALL__';
+const targetMatches = (exam, student) => exam.class_name === ALL_CLASSES || exam.class_name === student.class_name;
 
 function examForTeacher(state, id, teacher) {
   const exam = state.exams.find(e => e.id === id);
@@ -66,7 +81,7 @@ function attemptForExam(state, exam, attemptId) {
 function roster(state, exam) {
   const archived = Array.isArray(state.examAttemptArchive) ? state.examAttemptArchive : [];
   const school = schoolByRef(state, exam.school_id || exam.school);
-  const candidates = state.profiles.filter(p => p.role === 'student' && p.class_name === exam.class_name && sameSchool(p, school) && (p.active || state.examAttempts.some(a => a.exam_id === exam.id && a.student_id === p.id)));
+  const candidates = state.profiles.filter(p => p.role === 'student' && targetMatches(exam, p) && sameSchool(p, school) && (p.active || state.examAttempts.some(a => a.exam_id === exam.id && a.student_id === p.id)));
   const students = candidates.map(student => {
     const attempts = state.examAttempts.filter(a => a.exam_id === exam.id && a.student_id === student.id).sort((a, b) => (b.submitted_at || b.started_at || 0) - (a.submitted_at || a.started_at || 0));
     const active = attempts.find(a => a.status === 'active');
@@ -149,7 +164,7 @@ export async function examAdmin(state, method, path, body, token) {
   if (method === 'POST' && action === 'retry') {
     const studentId = String(body.student_id || '');
     const school = schoolByRef(state, exam.school_id || exam.school);
-    const student = state.profiles.find(p => p.id === studentId && p.role === 'student' && p.class_name === exam.class_name && sameSchool(p, school));
+    const student = state.profiles.find(p => p.id === studentId && p.role === 'student' && targetMatches(exam, p) && sameSchool(p, school));
     if (!student) fail('학생을 찾을 수 없습니다.', 404);
     const related = state.examAttempts.filter(a => a.exam_id === exam.id && a.student_id === studentId);
     if (related.some(a => a.status === 'active')) fail('현재 응시 중인 학생은 재응시로 변경할 수 없습니다.', 409);
