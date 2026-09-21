@@ -8,11 +8,26 @@ const requireRole = (p, role) => { if (p.role !== role) fail('이 기능을 사�
 const integer = (n, min, max, label) => { if (!Number.isInteger(Number(n)) || Number(n) < min || Number(n) > max) fail(`${label}을 확인해주세요.`); return Number(n); };
 const str = (s, max = 120) => typeof s === 'string' ? s.trim().slice(0, max) : '';
 const id = () => randomUUID();
-const schoolByRef = (state, value) => state.schools.find(s => s.active !== false && (s.id === value || s.name === value));
+const normalizedSchoolRef = value => str(value, 80).replace(/\s+/g, '');
+const schoolByRef = (state, value) => {
+  const raw = str(value, 80);
+  const normalized = normalizedSchoolRef(raw);
+  return state.schools.find(s => s.active !== false && (
+    s.id === raw ||
+    normalizedSchoolRef(s.name) === normalized ||
+    normalizedSchoolRef(s.full_name) === normalized
+  ));
+};
 const schoolForProfile = (state, profile) => state.schools.find(s => s.id === profile.school_id) || schoolByRef(state, profile.school);
 const teacherSchools = (state, profile) => state.schools.filter(s => s.active !== false && profile.school_ids?.includes(s.id));
 const activeTeacherSchool = (state, profile) => teacherSchools(state, profile).find(s => s.id === profile.active_school_id) || teacherSchools(state, profile)[0];
-const sameSchool = (record, school) => !!record && !!school && (record.school_id === school.id || record.school === school.name);
+const sameSchool = (record, school) => !!record && !!school && (
+  record.school_id === school.id ||
+  normalizedSchoolRef(record.school) === normalizedSchoolRef(school.name) ||
+  normalizedSchoolRef(record.school) === normalizedSchoolRef(school.full_name)
+);
+const ALL_CLASSES = '__ALL__';
+const targetMatches = (record, profile) => !!record && !!profile && (record.class_name === ALL_CLASSES || record.class_name === profile.class_name);
 export function allBooks(state) { return [...builtinBooks, ...state.extraBooks]; }
 export function scopedWords(state, schoolRef, ranges) {
   const school = schoolByRef(state, schoolRef);
@@ -104,6 +119,9 @@ export async function service(state, method, path, body, token) {
     if (p.role === 'teacher') {
       if (!Array.isArray(p.school_ids) || !p.school_ids.length) p.school_ids = state.schools.filter(s => s.active !== false).map(s => s.id);
       if (!activeTeacherSchool(state, p)) p.active_school_id = teacherSchools(state, p)[0]?.id;
+    } else if (p.role === 'student') {
+      const canonicalSchool = schoolForProfile(state, p);
+      if (canonicalSchool) { p.school_id = canonicalSchool.id; p.school = canonicalSchool.name; }
     }
     if (p.role !== body.role) fail('학생 / 교사 선택을 확인해주세요.', 403);
     const raw = randomBytes(32).toString('base64url');
@@ -118,7 +136,7 @@ export async function service(state, method, path, body, token) {
   if (path === '/bootstrap') {
     const studentSchool = schoolForProfile(state, p);
     const selectedSchool = teacher ? activeTeacherSchool(state, p) : studentSchool;
-    const visibleExams = state.exams.filter(e => teacher ? sameSchool(e, selectedSchool) : (e.class_name === p.class_name && sameSchool(e, studentSchool) && e.active));
+    const visibleExams = state.exams.filter(e => teacher ? sameSchool(e, selectedSchool) : (targetMatches(e, p) && sameSchool(e, studentSchool) && e.active));
     const visibleExamIds = new Set(visibleExams.map(e => e.id));
     const studentProfiles = state.profiles.filter(x => x.role === 'student' && (!teacher || sameSchool(x, selectedSchool)));
     const studentIds = new Set(studentProfiles.map(s => s.id));
@@ -136,7 +154,7 @@ export async function service(state, method, path, body, token) {
     return { profile, schools, books, stats: stats(state, p), mastery: state.mastery[p.id] || {},
       profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
       sessions, exams: visibleExams,
-      assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
+      assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (targetMatches(a, p) && sameSchool(a, studentSchool) && a.active)),
       attempts: attempts.map(a => attemptSummary(a, state, p)), server_time: Date.now(),
       active_practice: state.practices.find(x => x.student_id === p.id && !x.finished)?.id || null,
       ranking_period: rankingPeriod,
@@ -237,13 +255,13 @@ export async function service(state, method, path, body, token) {
   if (path === '/exams/start' && method === 'POST') {
     requireRole(p, 'student');
     const studentSchool = schoolForProfile(state, p);
-    const e = state.exams.find(e => e.id === body.exam_id && e.class_name === p.class_name && sameSchool(e, studentSchool) && e.active);
+    const e = state.exams.find(e => e.id === body.exam_id && targetMatches(e, p) && sameSchool(e, studentSchool) && e.active);
     if (!e) fail('배정된 시험이 아닙니다.', 403);
     const existing = state.examAttempts.find(a => a.exam_id === e.id && a.student_id === p.id && a.status === 'active');
     if (existing) { existing.lease = id(); return { attempt: attemptView(existing, state, p), exam: e, server_time: Date.now() }; }
     if (Date.now() < e.available_at || Date.now() >= e.due_at) fail('응시 가능한 시간이 아닙니다.');
     if (state.examAttempts.filter(a => a.exam_id === e.id && a.student_id === p.id).length >= e.max_attempts) fail('응시 횟수를 모두 사용했습니다.');
-    const words = scopedWords(state, e.school, e.range_codes), chosen = shuffle(words).slice(0, e.question_count);
+    const words = scopedWords(state, e.school_id || e.school, e.range_codes), chosen = shuffle(words).slice(0, e.question_count);
     const a = { id: id(), exam_id: e.id, student_id: p.id, status: 'active', started_at: Date.now(), deadline: Math.min(Date.now() + e.duration_sec * 1000, e.due_at), questions: chosen.map(w => buildQuestion(w, e.exam_type, words)), keys: chosen, answers: {}, revision: 0, lease: id() };
     state.examAttempts.push(a); return { attempt: attemptView(a, state, p), exam: e, server_time: Date.now() };
   }
@@ -275,7 +293,7 @@ export async function service(state, method, path, body, token) {
     if (!PRACTICE_TYPES[body.mode]) fail('연습 방식을 선택해주세요.');
     const coverAll = body.cover_all === true;
     const x = { id: id(), student_id: p.id, school_id: school.id, school: school.name, range_codes: body.range_codes, mode: body.mode, assignment_id: null, target: coverAll ? words.length : integer(body.target || 10, 5, 500, '학습량'), cover_all: coverAll, seen: [], total: 0, correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: Date.now(), finished: false, responses: {}, words: words.map(w => w.id) };
-    if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
+    if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && targetMatches(a, p) && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
   if (/^\/practice\/[^/]+(?:\/(?:answer|next|finish))?$/.test(path)) {
