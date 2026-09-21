@@ -223,7 +223,7 @@ function middleVocabPractice(A) {
   const selectedSet = new Set(selected);
   const lessonTabs = codes.map(range => `<button data-middle-lesson="${esc(range)}" class="${String(range) === code ? 'selected' : ''}">${esc(range)}과</button>`).join('');
   const rows = lessonWords.map((word, index) => `<label class="middle-word-row ${selectedSet.has(word.id) ? 'selected' : ''}"><input type="checkbox" data-middle-word="${esc(word.id)}" ${selectedSet.has(word.id) ? 'checked' : ''}><span class="middle-word-no">${index + 1}</span><span class="middle-word-en">${esc(word.word)}</span><span class="middle-word-ko">${esc(word.meaning)}</span></label>`).join('');
-  const preset = [15,20,30].filter(n => lessonWords.length >= n).map(n => `<button data-middle-preset="${n}">앞 ${n}개</button>`).join('');
+  const preset = [15,20,25,30].filter(n => lessonWords.length >= n).map(n => `<button data-middle-preset="${n}">앞 ${n}개</button>`).join('');
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">MIDDLE VOCAB</span></div>
     <div class="page-heading"><h1>시험 볼 단어 고르기</h1><p>오늘 외운 만큼만 체크하면 돼요. 15개·20개·30개 모두 같은 방식으로 사용할 수 있어요.</p></div>
     <div class="step-label"><span>01</span>과 선택</div>
