@@ -199,7 +199,7 @@ async function answerPractice(answer, button) {
     // Students can still tap the next button immediately; wrong answers stay visible for review.
     if (result.feedback.ok && prefetchedPractice) {
       clearTimeout(practiceAdvanceTimer);
-      practiceAdvanceTimer = setTimeout(() => advancePracticeScreen($('#practice-next'), result), 1500);
+      practiceAdvanceTimer = setTimeout(() => advancePracticeScreen($('#practice-next'), result), 3000);
     }
   } catch (e) { $('#practice-error').innerHTML = `<div class="error-box">${esc(e.message)} 답안은 다시 눌러 전송할 수 있어요.</div>`; $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = false); }
   finally { answering = false; }
