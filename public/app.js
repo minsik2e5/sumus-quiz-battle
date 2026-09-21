@@ -48,6 +48,7 @@ $('#app').addEventListener('click', async event => {
     if (d.rangeAll) { const { codes } = getRanges(A); A.ranges[A.school] = d.rangeAll === 'true' ? [...codes] : []; $$('[data-range]').forEach(i => i.checked = d.rangeAll === 'true'); updateRangeSummary(A); updateExamSummary(A); savePreferences(); return; }
     if (d.mode) { A.mode = d.mode; $$('[data-mode]').forEach(e => { e.classList.toggle('selected', e === b); e.setAttribute('aria-pressed', String(e === b)); }); savePreferences(); return; }
     if (d.practiceTarget) { A.target = d.practiceTarget === 'all' ? 'all' : Number(d.practiceTarget); $$('[data-practice-target]').forEach(e => { const selected = e === b; e.classList.toggle('selected', selected); e.setAttribute('aria-pressed', String(selected)); }); savePreferences(); render(); return; }
+    if (d.rankPeriod) { A.rankPeriod = d.rankPeriod; render(); return; }
     if (d.rankMode) { A.rankMode = d.rankMode; render(); return; }
     if (d.recordTab) { A.recordTab = d.recordTab; render(); return; }
     if (d.studioTab) { A.studioTab = d.studioTab; render(); return; }
