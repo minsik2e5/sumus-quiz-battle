@@ -107,12 +107,22 @@ export async function runReleaseCheck() {
     const middle2Login = await service(state, 'POST', '/login', { username: 'qa_middle2', password: 'QaMiddle223!', role: 'student', division: 'middle' }, null);
     const middle3Bootstrap = await service(state, 'GET', '/bootstrap', {}, middleLogin._cookie);
     const middle2Bootstrap = await service(state, 'GET', '/bootstrap', {}, middle2Login._cookie);
-    assert(middle3Bootstrap.books.length === 1 && middle3Bootstrap.books[0].grade === '중3' && middle3Bootstrap.books[0].words.every(word => word.grade === '중3'), 'middle3 student receives only middle3 imported vocabulary');
+    const middle3StaticBooks = middle3Bootstrap.books.filter(book => book.source === 'teacher_source_pages_1_2');
+    const middle3ImportedBook = middle3Bootstrap.books.find(book => book.source === 'teacher_import');
+    assert(middle3StaticBooks.length === 3 && middle3StaticBooks.every(book => book.grade === '중3' && book.words.every(word => word.grade === '중3')), 'middle3 student receives the built-in lesson 5 6 7 vocabulary only for middle3');
+    const lesson5Book = middle3StaticBooks.find(book => book.id.endsWith('lesson5'));
+    const lesson6Book = middle3StaticBooks.find(book => book.id.endsWith('lesson6'));
+    const lesson7Book = middle3StaticBooks.find(book => book.id.endsWith('lesson7'));
+    assert(lesson5Book?.words.length === 64 && lesson6Book?.words.length === 67 && lesson7Book?.words.length === 81, 'middle3 source lesson counts are 64 67 and 81');
+    assert(lesson5Book.words[0].word === 'once' && lesson5Book.words.at(-1).word === 'put up', 'middle3 lesson5 preserves source order');
+    assert(lesson6Book.words[0].word === 'elect' && lesson6Book.words.at(-1).word === 'come back', 'middle3 lesson6 preserves source order');
+    assert(lesson7Book.words[0].word === 'add' && lesson7Book.words.at(-1).word === 'play a role', 'middle3 lesson7 preserves source order across pages 1 and 2');
+    assert(middle3ImportedBook?.words.length === 8 && middle3ImportedBook.words.every(word => word.grade === '중3'), 'middle3 teacher import remains separate from built-in lessons');
     assert(middle2Bootstrap.books.length === 1 && middle2Bootstrap.books[0].grade === '중2' && middle2Bootstrap.books[0].words.every(word => word.grade === '중2'), 'middle2 student receives only middle2 imported vocabulary');
     assert(middle2Bootstrap.books[0].words[0].id.startsWith('import:wonil-middle:중2:'), 'middle import uses deterministic grade-scoped word ids');
     assert(middle3Bootstrap.daily_quest === null && middle2Bootstrap.daily_quest === null, 'middle students do not receive the high-school adaptive daily quest');
 
-    const middle3Words = middle3Bootstrap.books[0].words;
+    const middle3Words = lesson5Book.words;
     const pickedMiddle3Ids = [middle3Words[4].id, middle3Words[0].id, middle3Words[2].id];
     const middleManualPractice = await service(state, 'POST', '/practice/start', {
       mode: 'write_meaning', word_ids: pickedMiddle3Ids, cover_all: true
@@ -444,6 +454,7 @@ export async function runReleaseCheck() {
     const v1313Css = readFileSync(publicRoot + 'v1313.css', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
+    const practiceEnhancements = readFileSync(publicRoot + 'practice-enhancements.js', 'utf8');
     const appJs = readFileSync(publicRoot + 'app.js', 'utf8');
     assert(manifest.display === 'standalone' && manifest.start_url === '/', 'PWA manifest is installable');
     assert(teacherModule.includes('TODAY CONTROL') && teacherModule.includes('오늘 확인 필요') && teacherModule.includes('많이 틀린 어법 포인트'), 'V13.6 teacher operations dashboard is present');
@@ -474,7 +485,8 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(studentModule.includes('middleVocabPractice') && studentModule.includes('data-middle-word') && studentModule.includes('data-middle-preset'), 'V13.13 middle student UI lists lesson words for exact checkbox selection');
-    assert(sessionsModule.includes('word_ids: A.middleWordIds') && sessionsModule.includes('1500'), 'V13.13 sends exact middle word ids and keeps correct feedback readable before auto advance');
+    assert(sessionsModule.includes('word_ids: A.middleWordIds') && sessionsModule.includes('3000'), 'V13.13 sends exact middle word ids and keeps correct feedback visible for three seconds');
+    assert(practiceEnhancements.includes('sumusBurstFade 2.2s') && practiceEnhancements.includes('2300'), 'V13.13 correct-answer overlay stays visible long enough to read');
     assert(indexHtml.includes('/app.js?v=13.13.0') && indexHtml.includes('/practice-enhancements.js?v=13.13.0') && sw.includes('sumus-voca-v13.13.0-middle-word-pick'), 'V13.13 cache versions are active');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
