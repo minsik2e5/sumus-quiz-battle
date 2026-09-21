@@ -48,9 +48,9 @@ function injectStyles() {
     .sumus-result-ribbon span{font-size:12px;font-weight:800;padding:7px 10px;border-radius:999px;background:#f2f4f7;color:#344054}
     .sumus-result-ribbon span.primary{background:#eff8ff;color:#175cd3}
     .sumus-float-point{position:fixed;z-index:70;pointer-events:none;font-weight:900;font-size:18px;color:#1570ef;animation:sumusFloatPoint .85s ease-out forwards}
-    .sumus-correct-burst{position:fixed;inset:0;z-index:65;pointer-events:none;display:grid;place-items:center;overflow:hidden;background:radial-gradient(circle at center,rgba(18,183,106,.24),rgba(18,183,106,0) 52%);animation:sumusBurstFade .62s ease-out forwards}
-    .sumus-correct-burst strong{display:grid;place-items:center;width:126px;height:126px;border-radius:40px;background:linear-gradient(145deg,#12b76a,#027a48);color:#fff;font-size:29px;letter-spacing:-.04em;box-shadow:0 24px 70px rgba(2,122,72,.38),inset 0 1px 0 rgba(255,255,255,.45);animation:sumusBurstPop .56s cubic-bezier(.18,.9,.24,1.18)}
-    .sumus-correct-burst i{position:absolute;left:50%;top:50%;width:10px;height:20px;border-radius:99px;background:#32d583;transform:translate(-50%,-50%) rotate(var(--r)) translateY(-94px);animation:sumusSpark .78s ease-out forwards}
+    .sumus-correct-burst{position:fixed;inset:0;z-index:65;pointer-events:none;display:grid;place-items:center;overflow:hidden;background:radial-gradient(circle at center,rgba(18,183,106,.24),rgba(18,183,106,0) 52%);animation:sumusBurstFade 1.35s ease-out forwards}
+    .sumus-correct-burst strong{display:grid;place-items:center;width:126px;height:126px;border-radius:40px;background:linear-gradient(145deg,#12b76a,#027a48);color:#fff;font-size:29px;letter-spacing:-.04em;box-shadow:0 24px 70px rgba(2,122,72,.38),inset 0 1px 0 rgba(255,255,255,.45);animation:sumusBurstPop 1.15s cubic-bezier(.18,.9,.24,1.18)}
+    .sumus-correct-burst i{position:absolute;left:50%;top:50%;width:10px;height:20px;border-radius:99px;background:#32d583;transform:translate(-50%,-50%) rotate(var(--r)) translateY(-94px);animation:sumusSpark 1.2s ease-out forwards}
     .session-app.sumus-correct-hit .question-area{animation:sumusAreaHit .5s ease-out}
     @keyframes sumusSweep{0%,35%{transform:translateX(-100%)}70%,100%{transform:translateX(100%)}}
     @keyframes sumusComboPulse{0%{transform:scale(.92)}70%{transform:scale(1.08)}100%{transform:scale(1)}}
@@ -93,7 +93,7 @@ function celebrateCorrect(session, feedback) {
   burst.setAttribute('aria-hidden', 'true');
   burst.innerHTML = `<strong>✓ 정답!</strong>${Array.from({ length: 12 }, (_, i) => `<i style="--r:${i * 30}deg"></i>`).join('')}`;
   document.body.appendChild(burst);
-  setTimeout(() => { burst.remove(); session.classList.remove('sumus-correct-hit'); }, 650);
+  setTimeout(() => { burst.remove(); session.classList.remove('sumus-correct-hit'); }, 1400);
 }
 
 function enhancePractice() {
