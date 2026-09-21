@@ -193,11 +193,11 @@ async function answerPractice(answer, button) {
     if (!result.feedback.ok && button) { const index = button.dataset.practiceChoice; $(`[data-practice-choice="${index}"]`)?.classList.add('wrong'); }
     if (result.feedback.ok) navigator.vibrate?.([24, 34, 42]); else navigator.vibrate?.([12, 25, 12]);
     if (A.sound) sound(result.feedback.ok, result.feedback.milestone);
-    // Correct answers keep a short impact beat, then move on without another
-    // tap or network wait. Wrong answers stay visible for review.
+    // Correct answers stay visible long enough to read the feedback, then move on automatically.
+    // Students can still tap the next button immediately; wrong answers stay visible for review.
     if (result.feedback.ok && prefetchedPractice) {
       clearTimeout(practiceAdvanceTimer);
-      practiceAdvanceTimer = setTimeout(() => advancePracticeScreen($('#practice-next'), result), 420);
+      practiceAdvanceTimer = setTimeout(() => advancePracticeScreen($('#practice-next'), result), 1500);
     }
   } catch (e) { $('#practice-error').innerHTML = `<div class="error-box">${esc(e.message)} 답안은 다시 눌러 전송할 수 있어요.</div>`; $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = false); }
   finally { answering = false; }
