@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.13.0-mastery-daily-import';
+const VERSION = 'sumus-voca-v13.13.0-middle-word-pick';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
