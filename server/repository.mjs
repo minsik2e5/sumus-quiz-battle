@@ -23,19 +23,48 @@ export function migrateState(state) {
     if (!state.schools.some(item => item.id === school.id || item.name === school.name)) { state.schools.push(structuredClone(school)); changed = true; }
   }
   state.schools.sort((a, b) => (a.sort_order || 999) - (b.sort_order || 999));
-  const byName = name => state.schools.find(school => school.name === name);
+  const normalizeSchool = value => String(value || '').trim().replace(/\s+/g, '');
+  const byRef = value => {
+    const raw = String(value || '').trim();
+    const normalized = normalizeSchool(raw);
+    return state.schools.find(school =>
+      school.id === raw ||
+      normalizeSchool(school.name) === normalized ||
+      normalizeSchool(school.full_name) === normalized
+    );
+  };
   for (const profile of state.profiles) {
-    if (profile.role === 'student' && !profile.school_id && byName(profile.school)) { profile.school_id = byName(profile.school).id; changed = true; }
+    if (profile.role === 'student') {
+      const school = byRef(profile.school_id) || byRef(profile.school);
+      if (school && (profile.school_id !== school.id || profile.school !== school.name)) {
+        profile.school_id = school.id;
+        profile.school = school.name;
+        changed = true;
+      }
+    }
     if (profile.role === 'teacher') {
-      if (!Array.isArray(profile.school_ids) || !profile.school_ids.length) { profile.school_ids = state.schools.filter(school => school.active !== false).map(school => school.id); changed = true; }
-      if (!profile.active_school_id || !state.schools.some(school => school.id === profile.active_school_id && profile.school_ids.includes(school.id))) {
+      const normalizedIds = [...new Set((Array.isArray(profile.school_ids) ? profile.school_ids : []).map(value => byRef(value)?.id).filter(Boolean))];
+      const schoolIds = normalizedIds.length ? normalizedIds : state.schools.filter(school => school.active !== false).map(school => school.id);
+      if (JSON.stringify(profile.school_ids || []) !== JSON.stringify(schoolIds)) { profile.school_ids = schoolIds; changed = true; }
+      const active = byRef(profile.active_school_id);
+      if (!active || !profile.school_ids.includes(active.id)) {
         profile.active_school_id = profile.school_ids.find(schoolId => state.schools.some(school => school.id === schoolId && school.active !== false)) || state.schools[0]?.id;
+        changed = true;
+      } else if (profile.active_school_id !== active.id) {
+        profile.active_school_id = active.id;
         changed = true;
       }
     }
   }
   for (const key of ['assignments', 'exams', 'sessions', 'practices']) {
-    for (const record of state[key]) if (!record.school_id && byName(record.school)) { record.school_id = byName(record.school).id; changed = true; }
+    for (const record of state[key]) {
+      const school = byRef(record.school_id) || byRef(record.school);
+      if (school && (record.school_id !== school.id || record.school !== school.name)) {
+        record.school_id = school.id;
+        record.school = school.name;
+        changed = true;
+      }
+    }
   }
   if (state.schema_version !== 13) { state.schema_version = 13; changed = true; }
   return changed;
