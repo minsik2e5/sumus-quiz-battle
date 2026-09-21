@@ -51,8 +51,24 @@ function exam(A) {
   return `<div class="page-heading"><h1>실전시험</h1><p>연습한 실력, 차분하게 확인해요.</p></div><div class="exam-info">${icon('shield')}<p>선생님이 정한 범위로 응시해요.<br>시험 점수는 캐릭터 성장에 영향을 주지 않아요.</p></div><div class="exam-list">${list.length ? list.map(e => { const [status, cls, enabled] = examStatus(A, e); return `<article class="exam-card"><div class="row between"><span class="pill ${cls}">${status}</span><span class="tiny muted">${e.school}</span></div><h3>${esc(e.title)}</h3><p>${EXAM_TYPES[e.exam_type].label}</p><div class="exam-meta"><span>${e.question_count}문제</span><span>${Math.round(e.duration_sec / 60)}분</span><span>${e.passing_score}점 통과</span></div><p class="tiny">${e.available_at > Date.now() ? `${date(e.available_at)} 시작` : `${date(e.due_at)} 마감`}</p><button class="btn ${enabled ? 'primary' : ''} full" data-exam="${e.id}" style="margin-top:15px" ${enabled ? '' : 'disabled'}>${status === '이어서 응시' ? '이어서 응시하기' : enabled ? '시험 확인하기' : status}</button></article>`; }).join('') : empty('exam', '배정된 시험이 없어요', '새 시험이 열리면 여기에 표시돼요.')}</div>`;
 }
 function ranking(A) {
-  const mode = A.rankMode || 'xp', items = [...A.data.ranking].sort((a, b) => b[mode] - a[mode]), unit = mode === 'xp' ? 'P' : mode === 'streak' ? '일' : '문제';
-  return `<div class="page-heading"><h1>학원 전체순위</h1><p>학교와 반을 나누지 않은 SUMUS 전체 연습 기록</p></div><div class="rank-intro"><div class="eyebrow">SUMUS ACADEMY</div><h2>함께 자라는 우리.</h2><p>각자의 속도로 쌓아가는 기록이에요.</p></div><div class="segment">${[['xp', '주간 성장'], ['total', '연습량'], ['streak', '연속 학습']].map(([k, label]) => `<button data-rank-mode="${k}" class="${mode === k ? 'selected' : ''}">${label}</button>`).join('')}</div><div style="margin-top:15px">${items.length ? items.map(p => `<div class="rank-row ${p.is_me ? 'me' : ''}"><span class="rank-number">${p[mode] ? (items.findIndex(x => x[mode] === p[mode]) + 1) : '—'}</span>${avatar(p.avatar_key, { size: 'mini' })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill blue">나</span>' : ''}</strong><small>${p.private ? '프로필 비공개' : `Lv.${p.level} · ${CHARACTERS[p.avatar_key]?.ko || '루미'}`}</small></div><span class="rank-score">${num(p[mode])}${unit}</span></div>`).join('') : empty('ranking', '아직 연습 기록이 없어요')}</div><p class="quiet-note">모든 활성 학원생이 포함돼요. 비공개 학생은 익명으로 표시됩니다.<br>시험 성적은 랭킹에 포함하지 않아요.</p>`;
+  const period = A.rankPeriod || 'week';
+  const mode = A.rankMode || 'xp';
+  const metric = period === 'all' ? (mode === 'streak' ? 'all_streak' : `all_${mode}`) : mode;
+  const items = [...A.data.ranking].sort((a, b) => Number(b[metric] || 0) - Number(a[metric] || 0));
+  const unit = mode === 'xp' ? 'P' : mode === 'streak' ? '일' : '문제';
+  const info = A.data.ranking_period || {};
+  const periodTitle = period === 'week' ? (info.label || '이번 주') : '통합 누적';
+  const periodRange = period === 'week' ? (info.range || '월요일 ~ 일요일') : '첫 학습 기록부터 지금까지';
+  const note = period === 'week'
+    ? '주간 기록은 한국시간 기준 매주 월요일 00:00에 새로 시작해요. 이전 기록은 통합에 계속 남아요.'
+    : '통합은 기존 학습 기록을 모두 누적해서 보여줘요. 주간 리셋과 관계없이 기록은 삭제되지 않아요.';
+  return `<div class="page-heading"><h1>학원 전체순위</h1><p>학교와 반을 나누지 않은 SUMUS 전체 연습 기록</p></div>
+  <div class="rank-intro"><div class="eyebrow">SUMUS ACADEMY</div><h2>함께 자라는 우리.</h2><p>각자의 속도로 쌓아가는 기록이에요.</p></div>
+  <div class="segment" aria-label="랭킹 기간"><button data-rank-period="week" class="${period === 'week' ? 'selected' : ''}">주간</button><button data-rank-period="all" class="${period === 'all' ? 'selected' : ''}">통합</button></div>
+  <div style="margin:12px 0 14px;padding:13px 15px;border:1px solid #eaecf0;border-radius:15px;background:#f9fafb;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><strong style="font-size:14px">${esc(periodTitle)}</strong><span class="tiny muted">${esc(periodRange)}</span></div>
+  <div class="segment" aria-label="랭킹 기준">${[['xp', '성장 포인트'], ['total', '연습량'], ['streak', '연속 학습']].map(([k, label]) => `<button data-rank-mode="${k}" class="${mode === k ? 'selected' : ''}">${label}</button>`).join('')}</div>
+  <div style="margin-top:15px">${items.length ? items.map(p => `<div class="rank-row ${p.is_me ? 'me' : ''}"><span class="rank-number">${Number(p[metric] || 0) ? (items.findIndex(x => Number(x[metric] || 0) === Number(p[metric] || 0)) + 1) : '—'}</span>${avatar(p.avatar_key, { size: 'mini' })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill blue">나</span>' : ''}</strong><small>${p.private ? '프로필 비공개' : `Lv.${p.level} · ${CHARACTERS[p.avatar_key]?.ko || '루미'}`}</small></div><span class="rank-score">${num(p[metric] || 0)}${unit}</span></div>`).join('') : empty('ranking', '아직 연습 기록이 없어요')}</div>
+  <p class="quiet-note">${esc(note)}<br>시험 성적은 랭킹에 포함하지 않아요.</p>`;
 }
 function records(A) {
   const g = A.data.stats, tab = A.recordTab || 'practice';
