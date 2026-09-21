@@ -54,14 +54,29 @@ function nextReward(stats) {
   return candidates[0] || null;
 }
 
+function weekWindow(data) {
+  const period = data.ranking_period;
+  if (Number.isFinite(Number(period?.start)) && Number.isFinite(Number(period?.end))) {
+    return { start: Number(period.start), end: Number(period.end) };
+  }
+  const now = Date.now(), offset = 9 * 3600000, day = 86400000;
+  const local = new Date(now + offset);
+  const daysSinceMonday = (local.getUTCDay() + 6) % 7;
+  const start = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - daysSinceMonday) - offset;
+  return { start, end: start + 7 * day };
+}
 function weekStats(data) {
-  const cutoff = Date.now() - 7 * 86400000;
-  const sessions = data.sessions.filter(s => s.created_at >= cutoff);
-  const total = sessions.reduce((n,s) => n + (s.total || 0), 0);
-  const correct = sessions.reduce((n,s) => n + (s.correct || 0), 0);
-  const xp = sessions.reduce((n,s) => n + (s.xp || 0), 0);
+  const { start, end } = weekWindow(data);
+  const sessions = data.sessions.filter(s => s.created_at >= start && s.created_at < end);
+  const total = sessions.reduce((n,s) => n + Number(s.total || 0), 0);
+  const correct = sessions.reduce((n,s) => n + Number(s.correct || 0), 0);
+  const xp = sessions.reduce((n,s) => n + Number(s.xp || 0), 0);
   const days = new Set(sessions.filter(s => s.total > 0).map(s => new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Seoul'}).format(new Date(s.created_at)))).size;
   return { total, accuracy: total ? Math.round(correct / total * 100) : 0, xp, days };
+}
+function weekCaption(data) {
+  const period = data.ranking_period;
+  return period?.label && period?.range ? `${period.label} · ${period.range}` : '월요일 ~ 일요일';
 }
 
 function dueText(ts) {
@@ -94,7 +109,7 @@ async function enhanceHome() {
   node.id = 'sumus-student-insights';
   node.className = 'sumus-student-insights';
   node.innerHTML = `
-    <div class="section-title"><h2>이번 주 성장</h2><span class="tiny muted">최근 7일</span></div>
+    <div class="section-title"><h2>이번 주 성장</h2><span class="tiny muted">${esc(weekCaption(data))}</span></div>
     <div class="sumus-week-card">
       <div class="row between"><div><b>이번 주 ${num(week.total)}문제</b><p class="tiny muted" style="margin:4px 0 0">꾸준히 쌓인 만큼 실력이 남아요.</p></div><span class="pill blue">+${num(week.xp)}P</span></div>
       <div class="sumus-week-grid"><div><strong>${num(week.total)}</strong><span>푼 문제</span></div><div><strong>${week.accuracy}%</strong><span>정답률</span></div><div><strong>${week.days}일</strong><span>학습일</span></div></div>
