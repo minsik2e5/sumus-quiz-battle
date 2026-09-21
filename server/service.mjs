@@ -22,6 +22,38 @@ export function scopedWords(state, schoolRef, ranges) {
   return words.filter(w => ranges.map(String).includes(w.range_code));
 }
 function mySessions(state, student) { return state.sessions.filter(s => s.student_id === student); }
+const DAY_MS = 86400000;
+const KST_OFFSET_MS = 9 * 3600000;
+const KO_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
+function shortKstDate(ts) {
+  const d = new Date(ts + KST_OFFSET_MS);
+  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${KO_WEEKDAYS[d.getUTCDay()]})`;
+}
+function rankingWeek(now = Date.now()) {
+  const local = new Date(now + KST_OFFSET_MS);
+  const daysSinceMonday = (local.getUTCDay() + 6) % 7;
+  const start = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - daysSinceMonday) - KST_OFFSET_MS;
+  const end = start + 7 * DAY_MS;
+  // Assign cross-month weeks to the month containing Thursday. This keeps
+  // Monday-Sunday weeks intuitive (for example 9/28-10/4 becomes 10월 1주차).
+  const thursday = new Date(start + KST_OFFSET_MS + 3 * DAY_MS);
+  const year = thursday.getUTCFullYear();
+  const monthIndex = thursday.getUTCMonth();
+  const month = monthIndex + 1;
+  const firstOfMonth = new Date(Date.UTC(year, monthIndex, 1));
+  const firstThursday = 1 + ((4 - firstOfMonth.getUTCDay() + 7) % 7);
+  const week = 1 + Math.floor((thursday.getUTCDate() - firstThursday) / 7);
+  return {
+    start,
+    end,
+    year,
+    month,
+    week,
+    key: `${year}-${String(month).padStart(2, '0')}-W${week}`,
+    label: `${year}년 ${month}월 ${week}주차`,
+    range: `${shortKstDate(start)} ~ ${shortKstDate(end - 1)}`
+  };
+}
 function stats(state, p, sessions = mySessions(state, p.id)) {
   const today = sessions.filter(s => dayKey(s.created_at) === dayKey(Date.now()));
   const recent = [...sessions].sort((a, b) => b.created_at - a.created_at).slice(0, 20);
@@ -100,17 +132,33 @@ export async function service(state, method, path, body, token) {
     const books = allBooks(state).filter(b => sameSchool(b, selectedSchool));
     const schools = (teacher ? teacherSchools(state, p) : state.schools.filter(s => s.active !== false)).map(s => ({ id: s.id, name: s.name, full_name: s.full_name }));
     const profile = { ...publicProfile(p), ...(teacher && selectedSchool ? { active_school_id: selectedSchool.id, active_school: selectedSchool.name } : {}) };
+    const rankingPeriod = rankingWeek(Date.now());
     return { profile, schools, books, stats: stats(state, p), mastery: state.mastery[p.id] || {},
       profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
       sessions, exams: visibleExams,
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
       attempts: attempts.map(a => attemptSummary(a, state, p)), server_time: Date.now(),
       active_practice: state.practices.find(x => x.student_id === p.id && !x.finished)?.id || null,
+      ranking_period: rankingPeriod,
       ranking: teacher ? [] : state.profiles.filter(x => x.active && x.role === 'student').map(s => {
-        const records = mySessions(state, s.id), weekly = records.filter(r => r.created_at >= Date.now() - 7 * 86400000);
+        const records = mySessions(state, s.id);
+        const weekly = records.filter(r => r.created_at >= rankingPeriod.start && r.created_at < rankingPeriod.end);
         const g = growthFor(records), isMe = s.id === p.id;
         const hidden = !isMe && (s.ranking_public === false || s.share_profile === false);
-        return { id: hidden ? null : s.id, is_me: isMe, private: hidden, display_name: hidden ? '비공개 학생' : s.display_name, avatar_key: hidden ? 'lumi' : (s.avatar_key || 'lumi'), level: hidden ? 1 : g.level, streak: g.streak, xp: weekly.reduce((n, r) => n + r.xp, 0), total: weekly.reduce((n, r) => n + r.total, 0) };
+        return {
+          id: hidden ? null : s.id,
+          is_me: isMe,
+          private: hidden,
+          display_name: hidden ? '비공개 학생' : s.display_name,
+          avatar_key: hidden ? 'lumi' : (s.avatar_key || 'lumi'),
+          level: hidden ? 1 : g.level,
+          streak: g.streak,
+          xp: weekly.reduce((n, r) => n + Number(r.xp || 0), 0),
+          total: weekly.reduce((n, r) => n + Number(r.total || 0), 0),
+          all_xp: records.reduce((n, r) => n + Number(r.xp || 0), 0),
+          all_total: records.reduce((n, r) => n + Number(r.total || 0), 0),
+          all_streak: g.streak
+        };
       })
     };
   }
