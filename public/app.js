@@ -5,11 +5,16 @@ import { studentPage, getRanges, updateRangeSummary } from './modules/student.js
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.13.0';
 import { configureSessions, openExam, openResult, startPractice, leaveSession } from './modules/sessions.js?v=13.13.0';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub' };
+const ALL_CLASSES = '__ALL__';
+const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
+const examTargetMatches = (exam, profile) => exam?.class_name === ALL_CLASSES || exam?.class_name === profile?.class_name;
+const examRangeGrade = value => value === ALL_CLASSES ? null : value;
+const examTargetOptions = () => A.data.profile.active_division === 'middle' ? ['중2', '중3'] : [ALL_CLASSES, '고1A', '고1B'];
 let poll, rendering = false;
 function preferences() {
-  try { const v = JSON.parse(localStorage.getItem('sumus:v13:prefs:' + A.data.profile.id) || localStorage.getItem('sumus:v12:prefs:' + A.data.profile.id) || '{}'); A.ranges = v.ranges || {}; A.school = A.data.profile.role === 'teacher' ? A.data.profile.active_school : A.data.profile.school || v.school || A.data.schools[0]?.name || '단원고'; A.division = A.data.profile.active_division || A.data.profile.division || A.division || 'high'; A.mode = v.mode || 'write_meaning'; A.target = v.target || 30; A.middleRange = v.middleRange || A.middleRange || ''; A.middleWordIds = Array.isArray(v.middleWordIds) ? v.middleWordIds : (A.middleWordIds || []); A.rankMode = v.rankMode || A.rankMode || 'xp'; A.rankScope = v.rankScope || A.rankScope || 'all'; A.sound = localStorage.getItem('sumus:sound') === 'true'; } catch {}
+  try { const v = JSON.parse(localStorage.getItem('sumus:v13:prefs:' + A.data.profile.id) || localStorage.getItem('sumus:v12:prefs:' + A.data.profile.id) || '{}'); A.ranges = v.ranges || {}; A.school = A.data.profile.role === 'teacher' ? A.data.profile.active_school : A.data.profile.school || v.school || A.data.schools[0]?.name || '단원고'; A.division = A.data.profile.active_division || A.data.profile.division || A.division || 'high'; A.mode = v.mode || 'write_meaning'; A.target = v.target || 30; A.middleRange = v.middleRange || A.middleRange || ''; A.middleWordIds = Array.isArray(v.middleWordIds) ? v.middleWordIds : (A.middleWordIds || []); A.rankMode = v.rankMode || A.rankMode || 'xp'; A.rankScope = v.rankScope || A.rankScope || 'all'; A.rankPeriod = v.rankPeriod || A.rankPeriod || 'week'; A.sound = localStorage.getItem('sumus:sound') === 'true'; } catch {}
 }
-function savePreferences() { try { localStorage.setItem('sumus:v13:prefs:' + A.data.profile.id, JSON.stringify({ ranges: A.ranges, school: A.school, mode: A.mode, target: A.target, rankMode: A.rankMode, rankScope: A.rankScope, middleRange: A.middleRange, middleWordIds: A.middleWordIds || [] })); } catch {} }
+function savePreferences() { try { localStorage.setItem('sumus:v13:prefs:' + A.data.profile.id, JSON.stringify({ ranges: A.ranges, school: A.school, mode: A.mode, target: A.target, rankMode: A.rankMode, rankScope: A.rankScope, rankPeriod: A.rankPeriod, middleRange: A.middleRange, middleWordIds: A.middleWordIds || [] })); } catch {} }
 async function refresh() { A.data = await api('/bootstrap'); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; }
 globalThis.__SUMUS_APPLY_BOOTSTRAP__ = data => { A.data = data; globalThis.__SUMUS_BOOTSTRAP__ = data; if (data?.profile?.role === 'teacher') A.school = data.profile.active_school; if (!A.screen) render(); };
 function render() {
@@ -76,6 +81,7 @@ $('#app').addEventListener('click', async event => {
     }
     if (d.rankMode) { A.rankMode = d.rankMode; savePreferences(); render(); return; }
     if (d.rankScope) { A.rankScope = d.rankScope; savePreferences(); render(); return; }
+    if (d.rankPeriod) { A.rankPeriod = d.rankPeriod; savePreferences(); render(); return; }
     if (d.recordTab) { A.recordTab = d.recordTab; render(); return; }
     if (d.studioTab) { A.studioTab = d.studioTab; render(); return; }
     if (d.style) { A.style[d.style] = d.value; render(); return; }
@@ -160,13 +166,13 @@ function bindPageForms() {
     form.oninput = () => updateExamSummary(A);
     form.onchange = event => {
       collectExamForm(A);
-      if (event.target?.name === 'class_name') { getRanges(A, A.school, A.examForm.class_name); render(); return; }
+      if (event.target?.name === 'class_name') { getRanges(A, A.school, examRangeGrade(A.examForm.class_name)); render(); return; }
       updateExamSummary(A);
     };
     form.onsubmit = async e => {
       e.preventDefault(); collectExamForm(A); const v = A.examForm, b = $('[type="submit"]', form); buttonBusy(b); $('#exam-create-error').textContent = '';
       try {
-        await api('/exams', { title: v.title, school: A.school, range_codes: getRanges(A, A.school, v.class_name).selected, class_name: v.class_name, exam_type: v.exam_type, question_count: v.question_count === 'all' ? 'all' : Number(v.question_count), duration_sec: Number(v.minutes) * 60, passing_score: Number(v.passing_score), max_attempts: Number(v.max_attempts), available_at: new Date(v.available).getTime(), due_at: new Date(v.due).getTime(), release_result: v.release_result });
+        await api('/exams', { title: v.title, school: A.school, range_codes: getRanges(A, A.school, examRangeGrade(v.class_name)).selected, class_name: v.class_name, exam_type: v.exam_type, question_count: v.question_count === 'all' ? 'all' : Number(v.question_count), duration_sec: Number(v.minutes) * 60, passing_score: Number(v.passing_score), max_attempts: Number(v.max_attempts), available_at: new Date(v.available).getTime(), due_at: new Date(v.due).getTime(), release_result: v.release_result });
         A.examForm = null; await refresh(); A.tab = 'exams'; render(); toast('시험이 학생에게 배정됐어요.');
       } catch (err) { $('#exam-create-error').textContent = err.message; buttonBusy(b, false); }
     };
@@ -222,7 +228,7 @@ function localDateTime(value) {
 function examStatusModal(id) {
   const exam = A.data.exams.find(item => item.id === id);
   if (!exam) return toast('시험을 찾을 수 없어요.');
-  const students = A.data.profiles.filter(p => p.active && p.class_name === exam.class_name);
+  const students = A.data.profiles.filter(p => p.active && examTargetMatches(exam, p));
   const rows = students.map(student => {
     const attempts = A.data.attempts.filter(a => a.exam_id === id && a.student_id === student.id);
     const submitted = attempts.filter(a => a.status === 'submitted');
@@ -231,13 +237,13 @@ function examStatusModal(id) {
     const cls = submitted.length ? 'green' : active ? 'blue' : '';
     return `<div class="exam-status-student"><button class="table-name" data-student="${student.id}"><strong>${esc(student.display_name)}</strong><small>${esc(student.class_name)} · ${esc(student.school)}</small></button><span class="pill ${cls}">${label}</span></div>`;
   }).join('');
-  modal(`<h2>${esc(exam.title)}</h2><p>${esc(exam.school)} · ${esc(exam.class_name)} · ${exam.question_count}문제</p><div class="sumus-detail-section"><h3>응시 현황</h3><div class="exam-status-list">${rows || '<p class="tiny muted">대상 학생이 없어요.</p>'}</div></div>`, '시험 현황');
+  modal(`<h2>${esc(exam.title)}</h2><p>${esc(exam.school)} · ${esc(examTargetLabel(exam.class_name))} · ${exam.question_count}문제</p><div class="sumus-detail-section"><h3>응시 현황</h3><div class="exam-status-list">${rows || '<p class="tiny muted">대상 학생이 없어요.</p>'}</div></div>`, '시험 현황');
 }
 function examMenuModal(id) {
   const exam = A.data.exams.find(item => item.id === id);
   if (!exam) return toast('시험을 찾을 수 없어요.');
   const hasAttempts = A.data.attempts.some(a => a.exam_id === id);
-  const close = modal(`<h2>시험 운영</h2><p><b>${esc(exam.title)}</b><br>${esc(exam.school)} · ${esc(exam.class_name)}</p>
+  const close = modal(`<h2>시험 운영</h2><p><b>${esc(exam.title)}</b><br>${esc(exam.school)} · ${esc(examTargetLabel(exam.class_name))}</p>
     <div class="exam-menu-actions">
       <button class="btn full" id="exam-menu-toggle">${exam.active ? '배정 중지' : '다시 배정'}</button>
       <button class="btn full" id="exam-menu-clone">수정본으로 복제</button>
@@ -267,16 +273,16 @@ function examEditModal(id) {
   const exam = A.data.exams.find(item => item.id === id);
   if (!exam) return toast('시험을 찾을 수 없어요.');
   const locked = A.data.attempts.some(a => a.exam_id === id);
-  const { codes, words } = getRanges(A, A.school, exam.class_name);
+  const { codes, words } = getRanges(A, A.school, examRangeGrade(exam.class_name));
   const rangeChecks = codes.map(code => `<label class="range-option"><input type="checkbox" name="range_code" value="${esc(code)}" ${exam.range_codes.includes(code) ? 'checked' : ''} ${locked ? 'disabled' : ''}><span>${esc(code)}<small>${words.filter(w => w.range_code === code).length}개 단어</small></span></label>`).join('');
   const typeOptions = Object.entries(EXAM_TYPES).map(([key, type]) => `<option value="${key}" ${exam.exam_type === key ? 'selected' : ''}>${esc(type.label)}</option>`).join('');
-  const classOptions = [...new Set([...activeClassOptions(), exam.class_name])].map(name => `<option value="${esc(name)}" ${name === exam.class_name ? 'selected' : ''}>${esc(name)}</option>`).join('');
+  const classOptions = [...new Set([...examTargetOptions(), exam.class_name])].map(name => `<option value="${esc(name)}" ${name === exam.class_name ? 'selected' : ''}>${esc(examTargetLabel(name))}</option>`).join('');
   const close = modal(`<h2>시험 수정</h2><p>${esc(exam.school)} · ${locked ? '응시 기록 있음' : '아직 응시 기록 없음'}</p>
     ${locked ? '<div class="edit-lock-note">학생 응시 기록이 있어 <b>시험명 · 마감시간 · 결과공개 · 배정상태</b>만 수정할 수 있어요. 범위나 문제 구성을 바꾸려면 수정본으로 복제하세요.</div>' : ''}
     <form id="exam-edit-form">
       <label class="field"><span>시험 이름</span><input name="title" value="${esc(exam.title)}" required maxlength="120"></label>
       <div class="form-columns">
-        <label class="field"><span>대상 반</span><select name="class_name" ${locked ? 'disabled' : ''}>${classOptions}</select></label>
+        <label class="field"><span>대상</span><select name="class_name" ${locked ? 'disabled' : ''}>${classOptions}</select></label>
         <label class="field"><span>시험 유형</span><select name="exam_type" ${locked ? 'disabled' : ''}>${typeOptions}</select></label>
         <label class="field"><span>문제 수</span><input name="question_count" type="number" min="1" max="${words.length}" value="${exam.question_count}" ${locked ? 'disabled' : ''}></label>
         <label class="field"><span>제한시간 (분)</span><input name="minutes" type="number" min="1" max="180" value="${Math.round(exam.duration_sec / 60)}" ${locked ? 'disabled' : ''}></label>
