@@ -67,7 +67,7 @@ async function bootstrap(force = false) {
 }
 
 function eligibleStudents(data, item) {
-  return data.profiles.filter(p => p.active && p.class_name === item.class_name && (!item.school || p.school === item.school));
+  return data.profiles.filter(p => p.active && (item.class_name === '__ALL__' || p.class_name === item.class_name) && (!item.school || p.school === item.school));
 }
 
 function examState(data, exam, student) {
