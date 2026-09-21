@@ -143,7 +143,9 @@ export async function startPractice(options = {}) {
   const old = A.data.active_practice;
   const payload = options.dailyQuest
     ? { school: A.school, mode: 'write_meaning', target: 20, daily_quest: true }
-    : { school: A.school, range_codes: A.ranges[A.school], mode: A.mode, target: A.target === 'all' ? undefined : A.target, cover_all: A.target === 'all', assignment_id: A.assignmentId };
+    : A.data.profile.division === 'middle'
+      ? { school: A.school, mode: A.mode, word_ids: A.middleWordIds || [], cover_all: true }
+      : { school: A.school, range_codes: A.ranges[A.school], mode: A.mode, target: A.target === 'all' ? undefined : A.target, cover_all: A.target === 'all', assignment_id: A.assignmentId };
   const data = old ? await api(`/practice/${old}`) : await api('/practice/start', payload);
   leaveSession(); practiceState = data; prefetchedPractice = null; A.screen = 'practice'; renderPractice();
 }
