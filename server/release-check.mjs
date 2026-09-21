@@ -110,6 +110,31 @@ export async function runReleaseCheck() {
     assert(middle3Bootstrap.books.length === 1 && middle3Bootstrap.books[0].grade === '중3' && middle3Bootstrap.books[0].words.every(word => word.grade === '중3'), 'middle3 student receives only middle3 imported vocabulary');
     assert(middle2Bootstrap.books.length === 1 && middle2Bootstrap.books[0].grade === '중2' && middle2Bootstrap.books[0].words.every(word => word.grade === '중2'), 'middle2 student receives only middle2 imported vocabulary');
     assert(middle2Bootstrap.books[0].words[0].id.startsWith('import:wonil-middle:중2:'), 'middle import uses deterministic grade-scoped word ids');
+    assert(middle3Bootstrap.daily_quest === null && middle2Bootstrap.daily_quest === null, 'middle students do not receive the high-school adaptive daily quest');
+
+    const middle3Words = middle3Bootstrap.books[0].words;
+    const pickedMiddle3Ids = [middle3Words[4].id, middle3Words[0].id, middle3Words[2].id];
+    const middleManualPractice = await service(state, 'POST', '/practice/start', {
+      mode: 'write_meaning', word_ids: pickedMiddle3Ids, cover_all: true
+    }, middleLogin._cookie);
+    const middleManualInternal = state.practices.find(item => item.id === middleManualPractice.id);
+    assert(middleManualPractice.manual_selection === true && middleManualPractice.target === 3, 'middle student can start a test with any personally checked word count');
+    assert(JSON.stringify(middleManualInternal.words) === JSON.stringify([middle3Words[0].id, middle3Words[2].id, middle3Words[4].id]), 'checked middle words are normalized back to source lesson order');
+    assert(middleManualPractice.question.word_id === middle3Words[0].id, 'middle manual test begins with the first checked word in lesson order');
+    let middleManualView = middleManualPractice;
+    const middleSeen = [];
+    while (!middleManualView.finished && middleSeen.length < 8) {
+      middleSeen.push(middleManualView.question.word_id);
+      const current = middle3Words.find(word => word.id === middleManualView.question.word_id);
+      middleManualView = await service(state, 'POST', '/practice/' + middleManualPractice.id + '/answer', {
+        question_id: middleManualView.question_id, answer: current.meaning
+      }, middleLogin._cookie);
+      middleManualView = await service(state, 'POST', '/practice/' + middleManualPractice.id + '/next', {}, middleLogin._cookie);
+    }
+    assert(JSON.stringify(middleSeen.slice(0, 3)) === JSON.stringify([middle3Words[0].id, middle3Words[2].id, middle3Words[4].id]), 'middle manual test presents checked words sequentially');
+    await expectStatus(409, () => service(state, 'POST', '/practice/start', {
+      mode: 'write_meaning', word_ids: [middle2Bootstrap.books[0].words[0].id], cover_all: true
+    }, middleLogin._cookie), 'middle3 student cannot select middle2 vocabulary');
 
     await service(state, 'PATCH', '/teacher/division', { division: 'high' }, teacherToken);
     teacherBootstrap = await service(state, 'GET', '/bootstrap', {}, teacherToken);
@@ -448,6 +473,8 @@ export async function runReleaseCheck() {
     assert(sessionsModule.includes('daily_quest: true') && sessionsModule.includes('오늘의 퀘스트'), 'V13.13 daily quest starts through the practice session flow');
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
+    assert(studentModule.includes('middleVocabPractice') && studentModule.includes('data-middle-word') && studentModule.includes('data-middle-preset'), 'V13.13 middle student UI lists lesson words for exact checkbox selection');
+    assert(sessionsModule.includes('word_ids: A.middleWordIds') && sessionsModule.includes('1500'), 'V13.13 sends exact middle word ids and keeps correct feedback readable before auto advance');
     assert(indexHtml.includes('/app.js?v=13.13.0') && sw.includes('sumus-voca-v13.13.0-mastery-daily-import'), 'V13.13 cache versions are active');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
