@@ -216,6 +216,7 @@ function samePracticeRequest(data, payload) {
   if (!data || !payload) return false;
   if ((payload.mode || data.mode) !== data.mode) return false;
   if ((payload.run_mode || 'practice') !== (data.run_mode || 'practice')) return false;
+  if (Boolean(payload.exam_style) !== Boolean(data.exam_style)) return false;
   if (Boolean(payload.cover_all) !== Boolean(data.cover_all)) return false;
   if (Boolean(payload.daily_quest) !== Boolean(data.daily_quest)) return false;
   if ((payload.assignment_id || null) !== (data.assignment_id || null)) return false;
@@ -263,10 +264,10 @@ export async function startPractice(options = {}) {
   const payload = options.dailyQuest
     ? { school: A.school, mode: 'write_meaning', target: 20, daily_quest: true, run_mode: 'practice' }
     : Array.isArray(options.wordIds) && options.wordIds.length
-      ? { school: A.school, mode: options.mode || A.mode || 'write_meaning', word_ids: options.wordIds, target: options.target === 'all' ? undefined : options.target, cover_all: options.target === undefined || options.target === 'all', run_mode: options.runMode || 'practice' }
+      ? { school: A.school, mode: options.mode || A.mode || 'write_meaning', word_ids: options.wordIds, target: options.target === 'all' ? undefined : options.target, cover_all: options.target === undefined || options.target === 'all', run_mode: options.runMode || 'practice', exam_style: !!options.examStyle }
       : A.data.profile.division === 'middle'
         ? { school: A.school, mode: A.mode, word_ids: A.middleWordIds || [], cover_all: true, run_mode: options.runMode || A.practiceRunMode || 'practice' }
-        : { school: A.school, range_codes: A.ranges[A.school], mode: A.mode, target: A.target === 'all' ? undefined : A.target, cover_all: A.target === 'all', assignment_id: A.assignmentId, run_mode: options.runMode || A.practiceRunMode || 'practice' };
+        : { school: A.school, range_codes: A.ranges[A.school], mode: A.mode, target: A.target === 'all' ? undefined : A.target, cover_all: A.target === 'all', assignment_id: A.assignmentId, run_mode: options.runMode || A.practiceRunMode || 'practice', exam_style: !!options.examStyle };
   const old = A.data.active_practice;
   if (old) {
     const active = await api(`/practice/${old}`);
