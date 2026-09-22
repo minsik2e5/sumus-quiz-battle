@@ -64,6 +64,8 @@
 .result-next-copy{margin:0 0 14px;color:#344054;font-size:13px;font-weight:700}
 .answer-review-panel{margin:14px 0;text-align:left}
 .answer-review-panel[hidden]{display:none}
+.answer-review-panel .answer-correct{opacity:.82}
+.answer-review-panel .wrong-word{margin-bottom:10px}
 .result-secondary-actions{display:flex;justify-content:center;gap:18px;margin:14px 0 4px}
 .result-page-v1320>.btn{min-height:50px}
 .feedback{padding:14px 0;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0;background:transparent}
