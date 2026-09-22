@@ -362,7 +362,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.15.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.16.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -385,7 +385,6 @@ export async function service(state, method, path, body, token) {
       if (!selectedTeacherSchool) fail('이 부서에 등록된 학교가 없습니다.', 409);
       p.active_school_id = selectedTeacherSchool.id;
     }
-    if (p.role !== body.role) fail('학생 / 교사 선택을 확인해주세요.', 403);
     if (p.role === 'student') {
       const school = schoolForProfile(state, p);
       const division = p.division || school?.division || (/^중/.test(p.class_name || '') ? 'middle' : 'high');

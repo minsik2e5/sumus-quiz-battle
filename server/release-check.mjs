@@ -169,7 +169,8 @@ export async function runReleaseCheck() {
     const studentToken = studentLogin._cookie;
     assert(Boolean(studentToken), 'student login succeeds');
     await expectStatus(403, () => service(state, 'POST', '/login', { username: 'qa_student', password: 'QaStudent123!', role: 'student', division: 'middle' }, null), 'high-school account is rejected by middle login');
-    await expectStatus(403, () => service(state, 'POST', '/login', { username: 'qa_student', password: 'QaStudent123!', role: 'teacher' }, null), 'role mismatch is rejected');
+    const autoRoleLogin = await service(state, 'POST', '/login', { username: 'qa_student', password: 'QaStudent123!', role: 'teacher', division: 'high' }, null);
+    assert(autoRoleLogin.profile.role === 'student', 'login auto-detects the real account role even when the wrong role tab is selected');
 
     const danwonWords = bySchool('단원고');
     const rangeCode = String(danwonWords[0].range_code);
@@ -495,7 +496,7 @@ export async function runReleaseCheck() {
     assert(studentModule.includes('깨야 할 퀘스트') && studentModule.includes('WORD MASTER') && studentModule.includes('PERFECT MASTER'), 'student word mastery quest labels are present');
     assert(!appJs.includes("id=\"account-school\"") && studentModule.includes('선생님 관리'), 'student self-service school change is removed');
     assert(indexHtml.includes('v138.css') && v138Css.includes('.division-segment') && v138Css.includes('.dispute-card'), 'V13.8 division and dispute styles are loaded');
-    assert(appJs.includes('data-division="middle"') && appJs.includes('/teacher/division'), 'login and teacher controls separate middle and high divisions');
+    assert(appJs.includes('data-division="middle"') && appJs.includes('/teacher/division') && appJs.includes('login.profile?.role'), 'login auto-detects role while teacher controls separate middle and high divisions');
     assert(teacherModule.includes('뜻 이의제기') && teacherModule.includes('data-dispute-global') && teacherModule.includes('data-dispute-once'), 'teacher meaning-dispute inbox is present');
     assert(sessionsModule.includes('이 답도 맞는 것 같아요') && sessionsModule.includes('/meaning-disputes'), 'meaning-writing student dispute buttons are present');
     assert(indexHtml.includes('v139.css') && v139Css.includes('.rank-scope') && v139Css.includes('.my-rank-card'), 'V13.9 academy ranking styles are loaded');
@@ -515,7 +516,7 @@ export async function runReleaseCheck() {
     assert(studentModule.includes('middleVocabPractice') && studentModule.includes('data-middle-word') && studentModule.includes('data-middle-preset'), 'V13.13 middle student UI lists lesson words for exact checkbox selection');
     assert(sessionsModule.includes('word_ids: A.middleWordIds') && sessionsModule.includes('3000'), 'V13.13 sends exact middle word ids and keeps correct feedback visible for three seconds');
     assert(practiceEnhancements.includes('sumusBurstFade 2.2s') && practiceEnhancements.includes('2300'), 'V13.13 correct-answer overlay stays visible long enough to read');
-    assert(indexHtml.includes('/app.js?v=13.15.0') && indexHtml.includes('/practice-enhancements.js?v=13.15.0') && indexHtml.includes('/v1315.css?v=13.15.0') && sw.includes('sumus-voca-v13.15.0-scored-practice'), 'V13.15 cache versions are active');
+    assert(indexHtml.includes('/app.js?v=13.16.0') && indexHtml.includes('/practice-enhancements.js?v=13.16.0') && indexHtml.includes('/v1315.css?v=13.16.0') && sw.includes('sumus-voca-v13.16.0-auto-role-login'), 'V13.16 cache versions are active');
     assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'V13.15 puts meaning and English writing first and exposes student score history');
     assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && sessionsModule.includes('practice-timer-value'), 'V13.15 student home shows recent scores and timed practice countdown');
     assert(teacherModule.includes('학생별 연습 결과') && teacherModule.includes('data-practice-record') && appJs.includes('openPracticeRecord'), 'V13.15 teacher can inspect practice scores and wrong answers');
