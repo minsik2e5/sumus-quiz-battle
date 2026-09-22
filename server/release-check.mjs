@@ -372,6 +372,8 @@ export async function runReleaseCheck() {
     const testInternal = state.practices.find(item => item.id === testStarted.id);
     assert(new Set(testInternal.words).size === testStarted.target, 'test mode selects unique words without repeats');
     await expectStatus(409, () => service(state, 'POST', `/practice/${testStarted.id}/finish`, {}, studentToken), 'test mode blocks early manual finish');
+    const testWrongQuestionId = testStarted.question_id;
+    const testWrongWordId = testStarted.question.word_id;
     let testView = testStarted;
     let testAnswered = 0;
     while (!testView.finished && testAnswered < 8) {
@@ -383,7 +385,13 @@ export async function runReleaseCheck() {
     }
     const testSession = state.sessions.find(item => item.id === testStarted.id);
     assert(testView.finished === true && testView.score === 80 && testSession?.run_mode === 'test' && testSession?.score === 80, 'test mode grades all five answers together at the end');
-    assert(testSession?.wrong_details?.length === 1, 'test mode stores wrong-answer detail only after completion');
+    assert(testSession?.answer_records?.length === 5 && testSession?.wrong_count === 1 && testSession?.unanswered_count === 0 && testSession?.perfect === false, 'test mode stores durable first-pass answers and explicit wrong/unanswered counts');
+    assert(testSession?.wrong_details?.length === 1, 'test mode keeps backward-compatible wrong-answer detail');
+    const durableTestDispute = await service(state, 'POST', '/meaning-disputes', {
+      source_type: 'practice', source_id: testStarted.id, question_id: testWrongQuestionId
+    }, studentToken);
+    assert(durableTestDispute.word_id === testWrongWordId && durableTestDispute.status === 'pending', 'completed test-mode meaning answer can be disputed from durable first-pass record after response-cache churn');
+    await service(state, 'PATCH', '/meaning-disputes/' + durableTestDispute.id + '/resolve', { action: 'reject' }, teacherToken);
     const wrongPractice = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'spell', target: 5
     }, studentToken);
@@ -395,6 +403,26 @@ export async function runReleaseCheck() {
     const wrongSession = state.sessions.find(item => item.id === wrongPractice.id);
     assert(wrongFinished.score === 0 && wrongSession?.score === 0 && wrongSession?.wrong_details?.length === 1, 'practice finish stores a 100-point score and wrong-answer detail');
     assert(Number(wrongPractice.deadline) > Number(wrongPractice.started_at) && Number(wrongPractice.duration_sec) >= 60, 'practice starts with a server-backed countdown deadline');
+
+    const timeoutPractice = await service(state, 'POST', '/practice/start', {
+      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'test'
+    }, studentToken);
+    const timeoutInternal = state.practices.find(item => item.id === timeoutPractice.id);
+    timeoutInternal.started_at = Date.now() - 61000;
+    timeoutInternal.deadline = timeoutInternal.started_at + 60000;
+    const timeoutFinished = await service(state, 'POST', `/practice/${timeoutPractice.id}/finish`, {}, studentToken);
+    const timeoutSession = state.sessions.find(item => item.id === timeoutPractice.id);
+    assert(timeoutFinished.score === 0 && timeoutFinished.wrong_count === 0 && timeoutFinished.unanswered_count === 5 && timeoutFinished.perfect === false, 'timed-out practice records unanswered separately and never reports PERFECT');
+    assert(timeoutSession?.duration_sec === 60 && timeoutSession?.ended_at === timeoutInternal.deadline && timeoutSession?.finalized_at >= timeoutSession.ended_at, 'timeout duration uses authoritative deadline rather than delayed reconnect time');
+
+    const activeOriginal = await service(state, 'POST', '/practice/start', {
+      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5
+    }, studentToken);
+    const resumedDifferentRequest = await service(state, 'POST', '/practice/start', {
+      school: '단원고', range_codes: [rangeCode], mode: 'spell', target: 5
+    }, studentToken);
+    assert(resumedDifferentRequest.id === activeOriginal.id && resumedDifferentRequest.resumed_existing === true && resumedDifferentRequest.mode === 'write_meaning', 'server marks an existing active practice instead of pretending new settings started');
+    await service(state, 'POST', `/practice/${activeOriginal.id}/finish`, {}, studentToken);
 
     const meaningPractice = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5
@@ -555,7 +583,7 @@ export async function runReleaseCheck() {
     assert(studentModule.includes('middleVocabPractice') && studentModule.includes('data-middle-word') && studentModule.includes('data-middle-preset'), 'V13.13 middle student UI lists lesson words for exact checkbox selection');
     assert(sessionsModule.includes('word_ids: A.middleWordIds') && sessionsModule.includes('3000'), 'V13.13 sends exact middle word ids and keeps correct feedback visible for three seconds');
     assert(practiceEnhancements.includes('sumusBurstFade 2.2s') && practiceEnhancements.includes('2300'), 'V13.13 correct-answer overlay stays visible long enough to read');
-    assert(indexHtml.includes('/app.js?v=13.18.0') && indexHtml.includes('/practice-enhancements.js?v=13.18.0') && indexHtml.includes('/v1317.css?v=13.18.0') && sw.includes('sumus-voca-v13.18.0-p0-score-target-scope'), 'V13.18 cache versions are active');
+    assert(indexHtml.includes('/app.js?v=13.19.0') && indexHtml.includes('/practice-enhancements.js?v=13.19.0') && indexHtml.includes('/v1317.css?v=13.19.0') && sw.includes('sumus-voca-v13.19.0-p0-finish-dispute-session'), 'V13.19 cache versions are active');
     assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'V13.15 puts meaning and English writing first and exposes student score history');
     assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && sessionsModule.includes('practice-timer-value'), 'V13.15 student home shows recent scores and timed practice countdown');
     assert(teacherModule.includes('학생별 연습 결과') && teacherModule.includes('data-practice-record') && appJs.includes('openPracticeRecord'), 'V13.15 teacher can inspect practice scores and wrong answers');
@@ -565,6 +593,9 @@ export async function runReleaseCheck() {
     assert(studentModule.includes("result_visibility === 'visible'") && studentModule.includes("filter(Number.isFinite)") && studentModule.includes("'공개 대기'"), 'V13.18 P0 score visibility excludes withheld exams from averages and labels them explicitly');
     assert(teacherModule.includes('targetMatches(exam.class_name, p)') && teacherModule.includes('item.active.length'), 'V13.18 school-wide dashboard uses shared target matching and separates active attempts from missing');
     assert(uiModule.includes('recordRangeLabel') && studentModule.includes('recordRangeLabel(s, code)') && sessionsModule.includes('recordRangeLabel'), 'V13.18 uses shared middle/high range labels across records and results');
+    assert(sessionsModule.includes('미응답') && sessionsModule.includes('제출 상태를 확인하고 있어요') && sessionsModule.includes('data-finish-practice-dispute'), 'V13.19 result UI separates unanswered, keeps timeout confirmation visible, and supports durable completed-practice disputes');
+    assert(sessionsModule.includes('이미 진행 중인 학습이 있어요') && sessionsModule.includes('기존 연습 저장 후 새 설정 시작'), 'V13.19 warns before a mismatched active practice is reused');
+    assert(appJs.includes('examFormDirty') && appJs.includes('contextGeneration') && appJs.includes('작성 취소 후 전환'), 'V13.19 teacher context switch protects dirty exam forms and stale responses');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
