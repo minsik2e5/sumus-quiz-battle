@@ -926,7 +926,7 @@ export async function service(state, method, path, body, token) {
   if (path === '/practice/start' && method === 'POST') {
     requireRole(p, 'student');
     const active = state.practices.find(x => x.student_id === p.id && !x.finished);
-    if (active) return practiceView(active, state);
+    if (active) { const view = practiceView(active, state); view.resumed_existing = true; return view; }
     const school = schoolForProfile(state, p);
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
     if (body.school_id && body.school_id !== school.id) fail('현재 학교의 범위만 학습할 수 있어요.', 403);
@@ -1127,7 +1127,7 @@ function practiceView(x, state) {
   return {
     id: x.id, school: x.school, mode: x.mode, run_mode: x.run_mode || 'practice', target: x.target,
     range_codes: x.range_codes || [], cover_all: !!x.cover_all, daily_quest: !!x.daily_quest,
-    manual_selection: !!x.manual_selection, quest_mix: x.quest_mix || null,
+    manual_selection: !!x.manual_selection, quest_mix: x.quest_mix || null, word_ids: x.finished ? undefined : [...(x.words || [])],
     covered: x.seen?.length || 0, total: x.total, correct: hideTestScore ? null : x.correct, score_total: x.finished ? scoreTotal : (x.score_total || 0), score_correct: hideTestScore ? null : scoreCorrect, score: hideTestScore ? null : score,
     xp: hideTestScore ? null : x.xp, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
     started_at: x.started_at, finished_at: x.finished_at || null, ended_at: x.ended_at || null, finalized_at: x.finalized_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
