@@ -488,7 +488,7 @@ async function advancePracticeScreen(button, answeredState) {
 async function answerPractice(answer, button) {
   if (answering || practiceState.feedback) return;
   answering = true; const x = practiceState;
-  $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = true);
+  $$$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = true);
   clearInterval(timer); timer = null;
   try { const result = await api(`/practice/${x.id}/answer`, { question_id: x.question_id, answer, prefetch_next: false });
     practiceOffset = Number(result.server_time || Date.now()) - Date.now();
@@ -505,7 +505,7 @@ async function answerPractice(answer, button) {
     if (result.feedback.ok) navigator.vibrate?.([24, 34, 42]); else navigator.vibrate?.([12, 25, 12]);
     if (A.sound) sound(result.feedback.ok, result.feedback.milestone);
     // Feedback stays on screen until the student explicitly moves on.
-  } catch (e) { $('#practice-error').innerHTML = `<div class="error-box">${esc(e.message)} 답안은 다시 눌러 전송할 수 있어요.</div>`; $('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = false); if (!practiceState?.feedback) timer = setInterval(practiceTick, practiceState?.timer_mode === 'question' ? 100 : 500); }
+  } catch (e) { $('#practice-error').innerHTML = `<div class="error-box">${esc(e.message)} 답안은 다시 눌러 전송할 수 있어요.</div>`; $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = false); if (!practiceState?.feedback) timer = setInterval(practiceTick, practiceState?.timer_mode === 'question' ? 100 : 500); }
   finally { answering = false; }
 }
 function sound(ok, milestone) {
@@ -574,7 +574,7 @@ function finishPracticeView() {
       toast(error.message);
     }
   });
-  $('[data-finish-practice-dispute]').forEach(button => button.addEventListener('click', async () => {
+  $$('[data-finish-practice-dispute]').forEach(button => button.addEventListener('click', async () => {
     button.disabled = true;
     try {
       await api('/meaning-disputes', { source_type: 'practice', source_id: x.id, question_id: button.dataset.finishPracticeDispute }, 'POST');
