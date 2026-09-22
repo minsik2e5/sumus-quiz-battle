@@ -39,7 +39,7 @@ export async function runReleaseCheck() {
     assert(sessionUiSource.includes(String.fromCharCode(36, 36) + "('[data-practice-choice],#practice-confirm').forEach"), 'practice answer controls disable through the multi-node selector');
     assert(sessionUiSource.includes('practiceAdvanceTimer = setTimeout'), 'practice correct-answer auto advance is wired');
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
-    assert(indexSource.includes('/v1324.css?v=13.25.0') && indexSource.includes('/v1325.css?v=13.25.0'), 'V13.25 learning style layers are connected');
+    assert(indexSource.includes('/v1325.css?v=13.26.0') && indexSource.includes('/v1326.css?v=13.26.0'), 'V13.26 learning style layers are connected');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -360,20 +360,19 @@ export async function runReleaseCheck() {
         school: '단원고', range_codes: [rangeCode], mode: practiceType, target: 5
       }, studentToken);
       assert(started.question.type === practiceType, `${practiceType} practice starts correctly`);
-      assert(started.timer_mode === 'question' && started.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION[started.question.type] && started.question_deadline > started.server_time, `${practiceType} starts with a fresh per-question timer`);
+      assert(started.timer_mode === 'none' && started.question_duration_sec === 0 && !started.question_deadline && !started.deadline, `${practiceType} starts without a countdown timer`);
       const word = allWords.find(item => item.id === started.question.word_id);
-      const originalDeadline = started.question_deadline;
       const result = await service(state, 'POST', `/practice/${started.id}/answer`, {
         question_id: started.question_id, answer: answerFor(practiceType, word), prefetch_next: true
       }, studentToken);
       assert(result.feedback?.ok === true, `${practiceType} accepts correct answer`);
-      assert(!result.prefetched_next && result.question_deadline === originalDeadline, `${practiceType} does not start the next question timer while feedback is visible`);
+      assert(result.prefetched_next?.question_id && !result.prefetched_next.question_deadline, `${practiceType} can prefetch the next question without starting a timer`);
       const repeated = await service(state, 'POST', `/practice/${started.id}/answer`, {
         question_id: started.question_id, answer: answerFor(practiceType, word)
       }, studentToken);
       assert(repeated.total === result.total, `${practiceType} duplicate submission is idempotent`);
       const next = await service(state, 'POST', `/practice/${started.id}/next`, {}, studentToken);
-      assert(next.question_id !== started.question_id && next.question_deadline > next.server_time && next.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION[next.question.type] && next.question_started_at >= started.question_started_at, `${practiceType} resets the timer only when the next question begins`);
+      assert(next.question_id !== started.question_id && next.timer_mode === 'none' && !next.question_deadline, `${practiceType} advances without a countdown timer`);
       const finished = await service(state, 'POST', `/practice/${started.id}/finish`, {}, studentToken);
       assert(finished.finished === true, `${practiceType} practice can finish and save`);
     }
@@ -430,28 +429,26 @@ export async function runReleaseCheck() {
     const wrongFinished = await service(state, 'POST', `/practice/${wrongPractice.id}/finish`, {}, studentToken);
     const wrongSession = state.sessions.find(item => item.id === wrongPractice.id);
     assert(wrongFinished.score === 0 && wrongSession?.score === 0 && wrongSession?.wrong_details?.length === 1, 'practice finish stores a 100-point score and wrong-answer detail');
-    assert(wrongPractice.timer_mode === 'question' && wrongPractice.deadline === null && wrongPractice.question_deadline > wrongPractice.server_time && wrongPractice.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION.spell, 'practice uses a server-backed timer for each question instead of one total countdown');
+    assert(wrongPractice.timer_mode === 'none' && wrongPractice.deadline === null && !wrongPractice.question_deadline && wrongPractice.question_duration_sec === 0, 'practice keeps question timing disabled');
 
-    const timeoutPractice = await service(state, 'POST', '/practice/start', {
-      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'test', exam_style: true
+    const noTimerPractice = await service(state, 'POST', '/practice/start', {
+      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'practice', exam_style: true
     }, studentToken);
-    let timeoutView = timeoutPractice;
-    for (let index = 0; index < 5 && !timeoutView.finished; index++) {
-      const timeoutInternal = state.practices.find(item => item.id === timeoutPractice.id);
-      timeoutInternal.question_deadline = Date.now() - 1;
-      timeoutView = await service(state, 'POST', `/practice/${timeoutPractice.id}/answer`, {
-        question_id: timeoutView.question_id, answer: '', timed_out: true
-      }, studentToken);
-    }
-    const timeoutSession = state.sessions.find(item => item.id === timeoutPractice.id);
-    assert(timeoutView.finished === true && timeoutView.score === 0 && timeoutView.wrong_count === 0 && timeoutView.unanswered_count === 5 && timeoutView.perfect === false, 'five per-question timeouts finish as five unanswered without inflating wrong count');
-    assert(timeoutSession?.answer_records?.every(item => item.timed_out === true) && timeoutSession?.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION.write_meaning, 'timeout records preserve per-question timing evidence');
+    const noTimerInternal = state.practices.find(item => item.id === noTimerPractice.id);
+    assert(noTimerInternal.timer_mode === 'none' && noTimerInternal.question_deadline === null, 'exam-style practice has no per-question countdown');
+    const noTimerWrong = await service(state, 'POST', `/practice/${noTimerPractice.id}/answer`, {
+      question_id: noTimerPractice.question_id, answer: '__wrong__'
+    }, studentToken);
+    assert(noTimerWrong.feedback?.timed_out === false, 'slow or manual answers are never converted into timeout answers');
+    await service(state, 'POST', `/practice/${noTimerPractice.id}/finish`, {}, studentToken);
+    const noTimerSession = state.sessions.find(item => item.id === noTimerPractice.id);
+    assert(noTimerSession?.word_ids?.length === 5 && noTimerSession.unanswered_count === 4, 'early-finished practice stores the full word pool for complete review');
 
     const activeOriginal = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5
     }, studentToken);
     const activeSummaryBootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
-    assert(activeSummaryBootstrap.active_practice_summary?.id === activeOriginal.id && activeSummaryBootstrap.active_practice_summary?.mode === 'write_meaning' && activeSummaryBootstrap.active_practice_summary?.question_deadline && activeSummaryBootstrap.active_practice_summary?.timer_mode === 'question', 'bootstrap exposes the active question timer for action-first home');
+    assert(activeSummaryBootstrap.active_practice_summary?.id === activeOriginal.id && activeSummaryBootstrap.active_practice_summary?.mode === 'write_meaning' && activeSummaryBootstrap.active_practice_summary?.timer_mode === 'none', 'bootstrap exposes the active untimed practice for action-first home');
     const resumedDifferentRequest = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'spell', target: 5
     }, studentToken);
@@ -586,6 +583,7 @@ export async function runReleaseCheck() {
     const v1322Css = readFileSync(publicRoot + 'v1322.css', 'utf8');
     const v1323Css = readFileSync(publicRoot + 'v1323.css', 'utf8');
     const v1325Css = readFileSync(publicRoot + 'v1325.css', 'utf8');
+    const v1326Css = readFileSync(publicRoot + 'v1326.css', 'utf8');
     const uiModule = readFileSync(publicRoot + 'modules/ui.js', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
@@ -620,12 +618,16 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.25.0') && indexHtml.includes('/practice-enhancements.js?v=13.25.0') && indexHtml.includes('/v1324.css?v=13.25.0') && indexHtml.includes('/v1325.css?v=13.25.0') && sw.includes('sumus-voca-v13.25.0-premium-green-rewards'), 'V13.25 cache versions are active');
+    assert(indexHtml.includes('/app.js?v=13.26.0') && indexHtml.includes('/practice-enhancements.js?v=13.26.0') && indexHtml.includes('/v1325.css?v=13.26.0') && indexHtml.includes('/v1326.css?v=13.26.0') && sw.includes('sumus-voca-v13.26.0-focus-home-test-pwa'), 'V13.26 cache versions are active');
     assert(v1325Css.includes('--sumus-primary') && v1325Css.includes('grid-template-columns:repeat(5') && v1325Css.includes('memorize-flip-in'), 'V13.25 green design system, balanced bottom navigation, and memorization motion are loaded');
+    assert(v1326Css.includes('.home-focus-v1326') && v1326Css.includes('.rank-filter-bar') && v1326Css.includes('.pwa-install-hint'), 'V13.26 home, ranking, and PWA polish styles are loaded');
+    assert(studentModule.includes('오늘은 ${daily.target}개만 끝내요') && studentModule.includes('data-rank-scope-select') && !studentModule.includes('같이 올라가면 더 재밌다.'), 'V13.26 home is action-first and ranking filters are compact');
+    assert(appJs.includes('rankScopeSelect') && appJs.includes('missingCount') && appJs.includes('session.word_ids'), 'V13.26 compact rank filters and complete review flow are wired');
+
     assert(studentModule.includes('reward-wallet') && studentModule.includes('오늘 XP') && sessionsModule.includes('result-reward-card'), 'V13.25 separates XP, reward points, and achievements in the student UX');
     assert(appJs.includes('memorize-flip-out') && appJs.includes('memorize-flip-in'), 'V13.25 vocabulary tap uses a short flip and fade transition');
     assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'meaning and English writing remain first-class scored modes');
-    assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && sessionsModule.includes('practice-timer-value'), 'student home and record summaries remain available');
+    assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && !sessionsModule.includes('${timerHtml}'), 'student home and record summaries remain available while visible question timer is removed');
     assert(teacherModule.includes('학생별 연습 기록') && teacherModule.includes('학생이 보낸 실전 결과') && teacherModule.includes('data-practice-record') && appJs.includes('openPracticeRecord'), 'teacher can inspect practice history and student-shared real-test results');
     assert(studentModule.includes('첫 100점') && studentModule.includes('3회 연속 90점+') && studentModule.includes('영어쓰기 100점') && studentModule.includes('achievementSection'), 'student achievement badges remain present');
     assert(studentModule.includes("result_visibility === 'visible'") && studentModule.includes("filter(Number.isFinite)") && studentModule.includes("'공개 대기'"), 'legacy assigned-exam visibility remains safe in historical records');
@@ -643,10 +645,10 @@ export async function runReleaseCheck() {
     assert(memorizationSource.includes('data-memorize-word') && memorizationSource.includes('data-memorize-star') && memorizationSource.includes('data-memorize-speak') && memorizationSource.includes('front = show ? word.meaning : word.word'), 'V13.22 vocabulary rows swap English and meaning in place and expose pronunciation');
     assert(appJs.includes('SpeechSynthesisUtterance') && appJs.includes('d.memorizeSpeak'), 'V13.22 memorization has one-tap English pronunciation');
     assert(studentModule.includes("['exam', '시험'") && studentModule.includes('data-exam-kind="practice"') && studentModule.includes('data-exam-kind="test"') && studentModule.includes('연습시험') && studentModule.includes('실전시험'), 'V13.22 bottom Exam menu lets students choose practice or real exam');
-    assert(studentModule.includes('data-action="start-exam-run"') && studentModule.includes('한 문제당') && appJs.includes('examStyle: true'), 'V13.22 both exam modes share the same setup and exam-style word pool');
+    assert(studentModule.includes('data-action="start-exam-run"') && !studentModule.includes('다음 문제마다 시간이 다시 시작돼요') && appJs.includes('examStyle: true'), 'V13.26 both exam modes share the same untimed exam-style word pool');
     assert(!studentModule.includes('function middleVocabQuiz') && !studentModule.includes('function vocabQuiz') && !studentModule.includes('function practiceModePicker'), 'V13.22 removes the old duplicate vocabulary quiz path from Learning');
-    assert(sessionsModule.includes("const modeLabel = testMode ? '실전시험' : '연습시험'") && sessionsModule.includes('questionLeftMs') && sessionsModule.includes('question-timer') && sessionsModule.includes('setInterval(practiceTick, x.timer_mode === \'question\' ? 100 : 500)'), 'V13.22 practice and real exams share one question screen with a prominent per-question timer');
-    assert(sessionsModule.includes('TIME OUT') && sessionsModule.includes('timeoutPracticeQuestion') && sessionsModule.includes("timed_out: true"), 'V13.22 each question automatically records timeout at zero');
+    assert(sessionsModule.includes("const modeLabel = testMode ? '실전시험' : '연습시험'") && !sessionsModule.includes('${timerHtml}') && sessionsModule.includes('keyboard-focus'), 'V13.26 practice and real exams share one focused untimed question screen with keyboard handling');
+    assert(sessionsModule.includes('answer-impact-compact') && sessionsModule.includes('result-reward-top') && sessionsModule.includes('missingWordIds'), 'V13.26 keeps calm answer feedback and complete result review');
     assert(!teacherModule.match(/const tabs = .*assignments/) && !teacherModule.match(/const tabs = .*exams/), 'teacher navigation keeps assignment and teacher-created exam operations removed');
     assert(teacherModule.includes('학생이 보낸 실전 결과') && teacherModule.includes('shared_to_teacher_at'), 'teacher results focus on student-shared real exams');
     assert(sessionsModule.includes('/share') && sessionsModule.includes('선생님께 결과 보내기') && sessionsModule.includes('animateTestResult'), 'real exam result can be shared and keeps result impact');

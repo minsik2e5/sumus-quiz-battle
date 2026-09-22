@@ -6,7 +6,7 @@ function injectStyles() {
   style.id = 'practice-enhance-style';
   style.textContent = `
     .session-app.sumus-practice-live .session-header{position:relative;overflow:hidden}
-    .session-app.sumus-practice-live .session-header::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,transparent,rgba(37,99,235,.32),transparent);transform:translateX(-100%);animation:sumusSweep 2.6s ease-in-out infinite}
+    .session-app.sumus-practice-live .session-header::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(90deg,transparent,rgba(18,184,134,.28),transparent);transform:translateX(-100%);animation:sumusSweep 2.6s ease-in-out infinite}
     .sumus-practice-live .question-area{padding-bottom:max(28px,env(safe-area-inset-bottom))}
     .mode-option:first-child{flex-wrap:wrap}
     .mode-option .mode-help{flex-basis:100%;padding-left:25px;margin-top:-4px;font-size:10px;font-weight:500;color:#7b89aa}
@@ -16,13 +16,13 @@ function injectStyles() {
     .practice-target-grid button small{font-size:10px;font-weight:550;color:#98a2b3}
     .practice-target-grid button.all{grid-column:1/-1;min-height:62px;flex-direction:column;gap:3px}
     .practice-target-grid button.all b{font-size:14px}
-    .practice-target-grid button.selected{border:2px solid #6f91ed;background:#eef3ff;color:#315ac7;box-shadow:0 7px 18px rgba(49,90,199,.12)}
-    .practice-target-grid button.selected small{color:#5875bd}
+    .practice-target-grid button.selected{border:2px solid #7fd6b8;background:#eaf8f2;color:#07815f;box-shadow:0 7px 18px rgba(18,184,134,.10)}
+    .practice-target-grid button.selected small{color:#5d927f}
     .sumus-practice-live .question-prompt{letter-spacing:-.025em}
     .sumus-practice-live .option{transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease,background .14s ease}
     .sumus-practice-live .option:not(:disabled):active{transform:scale(.985)}
     .sumus-practice-live .answer-input{transition:border-color .16s ease,box-shadow .16s ease,background .16s ease}
-    .sumus-practice-live .answer-input:focus{box-shadow:0 0 0 4px rgba(37,99,235,.08)}
+    .sumus-practice-live .answer-input:focus{box-shadow:0 0 0 4px rgba(18,184,134,.09)}
     .sumus-practice-live .practice-score{display:flex;align-items:center}
     .sumus-practice-live .practice-score span{padding:0;background:transparent;color:#98a2b3;font-size:11px;font-weight:700}
     .sumus-practice-live .practice-score b{display:none}
@@ -39,8 +39,8 @@ function injectStyles() {
     .sumus-result-polish .result-number{animation:sumusScorePop .42s cubic-bezier(.2,.85,.25,1.15)}
     .sumus-result-ribbon{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:12px 0 20px}
     .sumus-result-ribbon span{font-size:12px;font-weight:800;padding:7px 10px;border-radius:999px;background:#f2f4f7;color:#344054}
-    .sumus-result-ribbon span.primary{background:#eff8ff;color:#175cd3}
-    .sumus-float-point{position:fixed;z-index:70;pointer-events:none;font-weight:900;font-size:18px;color:#1570ef;animation:sumusFloatPoint .85s ease-out forwards}
+    .sumus-result-ribbon span.primary{background:#eaf8f2;color:#07815f}
+    .sumus-float-point{position:fixed;z-index:70;pointer-events:none;font-weight:900;font-size:18px;color:#07815f;animation:sumusFloatPoint .85s ease-out forwards}
     .sumus-correct-burst{position:fixed;inset:0;z-index:65;pointer-events:none;display:grid;place-items:center;overflow:hidden;background:radial-gradient(circle at center,rgba(18,183,106,.24),rgba(18,183,106,0) 52%);animation:sumusBurstFade 2.2s ease-out forwards}
     .sumus-correct-burst strong{display:grid;place-items:center;width:126px;height:126px;border-radius:40px;background:linear-gradient(145deg,#12b76a,#027a48);color:#fff;font-size:29px;letter-spacing:-.04em;box-shadow:0 24px 70px rgba(2,122,72,.38),inset 0 1px 0 rgba(255,255,255,.45);animation:sumusBurstPop 2s cubic-bezier(.18,.9,.24,1.18)}
     .sumus-correct-burst i{position:absolute;left:50%;top:50%;width:10px;height:20px;border-radius:99px;background:#32d583;transform:translate(-50%,-50%) rotate(var(--r)) translateY(-94px);animation:sumusSpark 1.9s ease-out forwards}

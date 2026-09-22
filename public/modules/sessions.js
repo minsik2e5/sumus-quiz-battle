@@ -287,11 +287,10 @@ export async function startPractice(options = {}) {
       ? payload.word_ids.length
       : A.data.books.flatMap(book => book.words || []).filter(word => (payload.range_codes || []).map(String).includes(String(word.range_code))).length;
     const target = payload.cover_all ? scopedCount : Math.min(scopedCount, Number(payload.target || scopedCount));
-    const duration = practiceDurationSec(payload.mode, target);
     const ranges = Array.isArray(payload.word_ids) && payload.word_ids.length
       ? (A.data.profile.division === 'middle' ? String(A.middleRange || '') + '과' : '직접 선택')
       : (payload.range_codes || []).map(code => recordRangeLabel({ division: A.data.profile.division, school: A.school }, code)).join(' · ');
-    const close = modal(`<span class="pill green">실전 모드</span><h2>${esc(ranges || '선택 범위')}</h2><div class="detail-grid"><div><b>${esc(PRACTICE_TYPES[payload.mode] || '쓰기')}</b><small>시험 방식</small></div><div><b>${target}문제</b><small>문항 수</small></div><div><b>${payload.mode === 'spell' ? '12초' : '8초'}</b><small>문제당 제한시간</small></div><div><b>마지막 공개</b><small>채점 시점</small></div></div><div class="test-start-rules"><p>정답은 시험이 끝난 뒤 공개돼요.</p><p>이전 문항으로 돌아갈 수 없어요.</p><p>각 문제마다 제한시간이 새로 시작돼요.</p><p>0초가 되면 그 문제는 미응답 처리되고 다음 문제로 넘어가요.</p></div><button class="btn primary full" id="confirm-practice-test">실전 시작하기</button><button class="btn full" id="cancel-practice-test">설정으로 돌아가기</button>`, '실전 시작 확인');
+    const close = modal(`<span class="pill green">실전 모드</span><h2>${esc(ranges || '선택 범위')}</h2><div class="detail-grid"><div><b>${esc(PRACTICE_TYPES[payload.mode] || '쓰기')}</b><small>시험 방식</small></div><div><b>${target}문제</b><small>문항 수</small></div><div><b>마지막 공개</b><small>채점 시점</small></div></div><div class="test-start-rules"><p>정답은 시험이 끝난 뒤 공개돼요.</p><p>이전 문항으로 돌아갈 수 없어요.</p><p>시간에 쫓기지 않고 단어에 집중해서 풀어요.</p></div><button class="btn primary full" id="confirm-practice-test">실전 시작하기</button><button class="btn full" id="cancel-practice-test">설정으로 돌아가기</button>`, '실전 시작 확인');
     $('#cancel-practice-test').onclick = () => { close(); redraw(); };
     $('#confirm-practice-test').onclick = async event => {
       buttonBusy(event.currentTarget);
@@ -322,10 +321,6 @@ function renderPractice() {
   const testMode = x.run_mode === 'test';
   const modeLabel = testMode ? '실전시험' : '연습시험';
   const progressNo = Math.min(Number(x.score_total || 0) + (!feedback && !x.question_is_retry ? 1 : 0), Number(x.target || 0));
-  const leftMs = questionLeftMs(x);
-  const timerHtml = feedback
-    ? `<div class="question-timer feedback-timer-state"><strong>${feedback.timed_out ? 'TIME OUT' : feedback.ok ? '✓' : '✕'}</strong><small>${feedback.timed_out ? '시간 초과' : feedback.ok ? '정답' : '오답'}</small></div>`
-    : `<div class="question-timer ${leftMs <= 2000 ? 'danger' : leftMs <= 4000 ? 'warning' : ''}" id="practice-timer"><strong id="practice-timer-value">${(leftMs / 1000).toFixed(1)}</strong><small>초</small></div>`;
   mount(`<div class="session-app exam-run exam-run-${testMode ? 'test' : 'practice'}">
     <header class="session-header exam-run-header">
       <div class="row between"><button class="icon-button" id="practice-exit" aria-label="시험 화면 나가기">${icon('close')}</button><h1>${modeLabel}</h1><button class="icon-button" id="practice-sound" aria-label="효과음 ${A.sound ? '끄기' : '켜기'}">${icon(A.sound ? 'sound' : 'mute')}</button></div>
@@ -333,7 +328,6 @@ function renderPractice() {
       <div class="progress"><i style="width:${Math.min(100, Number(x.score_total || 0) / x.target * 100)}%"></i></div>
     </header>
     <main class="question-area exam-question-area">
-      ${timerHtml}
       <div class="exam-question-meta"><span class="question-type">${PRACTICE_TYPES[q.type]}</span></div>
       ${q.type === 'listen' ? `<button class="listen-button" id="listen-word" aria-label="발음 듣기">${icon('sound')}</button><p class="input-caption" style="text-align:center">발음을 듣고 뜻을 골라주세요.</p>` : `<h2 class="question-prompt ${!['eng2mean', 'write_meaning'].includes(q.type) ? 'korean' : ''}">${esc(q.prompt)}</h2>`}
       ${q.hint ? `<p class="question-hint">${esc(q.hint)}</p>` : ''}
@@ -343,10 +337,9 @@ function renderPractice() {
       <div id="practice-error" role="alert"></div>
     </main>
   </div>`);
-  if (!feedback && (x.timer_mode === 'question' ? x.question_deadline : x.deadline)) timer = setInterval(practiceTick, x.timer_mode === 'question' ? 100 : 500);
   $('#practice-exit').onclick = () => {
     if (testMode) {
-      const close = modal(`<h2>실전시험을 나갈까요?</h2><p>시험 기록은 그대로 남고 현재 문제의 시간은 계속 흘러요. 다시 들어오면 이어서 풀 수 있어요.</p><button class="btn primary full" id="practice-keep-going">계속 풀기</button><button class="btn full" id="practice-leave-test">시험 화면 나가기</button>`, '실전시험');
+      const close = modal(`<h2>실전시험을 나갈까요?</h2><p>진행 위치는 그대로 저장돼요. 다시 들어오면 이어서 풀 수 있어요.</p><button class="btn primary full" id="practice-keep-going">계속 풀기</button><button class="btn full" id="practice-leave-test">시험 화면 나가기</button>`, '실전시험');
       $('#practice-keep-going').onclick = close;
       $('#practice-leave-test').onclick = async () => { close(); leaveSession(); await refresh(); redraw(); };
     } else {
@@ -362,6 +355,11 @@ function renderPractice() {
   });
   $$('[data-practice-choice]').forEach(button => button.onclick = () => answerPractice(q.options[Number(button.dataset.practiceChoice)], button));
   $('#practice-confirm')?.addEventListener('click', () => { const value = $('#practice-answer').value; if (!value.trim()) return toast('답을 입력해주세요.'); answerPractice(value); });
+  $('#practice-answer')?.addEventListener('focus', event => {
+    $('.exam-run')?.classList.add('keyboard-focus');
+    setTimeout(() => event.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' }), 180);
+  });
+  $('#practice-answer')?.addEventListener('blur', () => $('.exam-run')?.classList.remove('keyboard-focus'));
   $('#practice-answer')?.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) $('#practice-confirm')?.click(); });
   $('#practice-next')?.addEventListener('click', e => advancePracticeScreen(e.currentTarget, x));
   $('#practice-dispute')?.addEventListener('click', async event => {
@@ -455,15 +453,15 @@ function answerImpact(feedback) {
     const area = $('.question-area');
     area?.classList.remove('answer-impact-wrong');
     requestAnimationFrame(() => area?.classList.add('answer-impact-wrong'));
-    setTimeout(() => area?.classList.remove('answer-impact-wrong'), 420);
+    setTimeout(() => area?.classList.remove('answer-impact-wrong'), 300);
     return;
   }
   const impact = document.createElement('div');
-  impact.className = `answer-impact ${feedback.milestone ? 'milestone' : ''}`;
-  impact.innerHTML = `<div class="answer-impact-ring"></div><div class="answer-impact-check">✓</div><strong>${feedback.milestone ? feedback.combo + '연속 정답' : '정답!'}</strong><div class="answer-impact-particles">${Array.from({length:8},(_,i)=>`<i style="--i:${i}"></i>`).join('')}</div>`;
+  impact.className = 'answer-impact answer-impact-compact';
+  impact.innerHTML = `<div class="answer-impact-check">✓</div>`;
   host.append(impact);
   requestAnimationFrame(() => impact.classList.add('show'));
-  setTimeout(() => impact.remove(), feedback.milestone ? 950 : 720);
+  setTimeout(() => impact.remove(), feedback.milestone ? 560 : 440);
 }
 function animateTestResult(score, perfect) {
   const node = $('#practice-result-score');
@@ -522,7 +520,7 @@ async function answerPractice(answer, button) {
       practiceAdvanceTimer = setTimeout(() => {
         const nextButton = $('#practice-next');
         if (nextButton && practiceState === answeredState) advancePracticeScreen(nextButton, answeredState);
-      }, result.feedback.milestone ? 900 : 650);
+      }, result.feedback.milestone ? 620 : 520);
     }
   } catch (e) { $('#practice-error').innerHTML = `<div class="error-box">${esc(e.message)} 답안은 다시 눌러 전송할 수 있어요.</div>`; $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = false); if (!practiceState?.feedback) timer = setInterval(practiceTick, practiceState?.timer_mode === 'question' ? 100 : 500); }
   finally { answering = false; }
@@ -543,13 +541,16 @@ function finishPracticeView() {
   const unanswered = Number.isFinite(Number(x.unanswered_count)) ? Number(x.unanswered_count) : timedOut.length + Math.max(0, Number(x.target || 0) - durable.length);
   const perfect = x.perfect === true || (score === 100 && wrongCount === 0 && unanswered === 0);
   const rangeText = (x.range_codes || []).map(code => esc(recordRangeLabel({ division: A.data.profile.division, school: x.school }, code))).join(' · ') || '선택 범위';
-  const missedWordIds = [...new Set(durable.filter(item => item.correct === false && !item.regraded).map(item => item.word_id).filter(Boolean))];
-  const reviewCount = wrongCount + unanswered;
+  const answeredWordIds = new Set(durable.map(item => item.word_id).filter(Boolean));
+  const wrongWordIds = durable.filter(item => item.correct === false && !item.regraded).map(item => item.word_id).filter(Boolean);
+  const timedOutStored = durable.filter(item => item.timed_out && !item.regraded).length;
+  const unrecordedMissing = Math.max(0, unanswered - timedOutStored);
+  const missingWordIds = (x.word_ids || []).filter(id => !answeredWordIds.has(id)).slice(0, unrecordedMissing);
+  const missedWordIds = [...new Set([...wrongWordIds, ...missingWordIds])];
+  const reviewCount = missedWordIds.length;
   const modeLabel = x.run_mode === 'test' ? '실전시험' : '연습시험';
   const statusText = perfect ? '모든 문항을 맞혔어요.' : reviewCount ? `다시 볼 단어가 ${reviewCount}개 있어요.` : '시험 기록을 저장했어요.';
   const answerRows = durable.length ? durable : wrong;
-  const timedOutStored = answerRows.filter(item => item.timed_out && !item.regraded).length;
-  const unrecordedMissing = Math.max(0, unanswered - timedOutStored);
   const detailHtml = `${answerRows.length ? answerRows.map(item => {
     const isTimeout = !!item.timed_out && !item.regraded;
     const isWrong = item.correct === false && !item.regraded && !isTimeout;
@@ -563,19 +564,19 @@ function finishPracticeView() {
       ? `<button class="btn primary full" id="practice-retry-wrong">틀린·미응답 ${missedWordIds.length}개 연습 ${icon('arrow')}</button>`
       : '<button class="btn primary full" id="practice-next-exam">다른 시험 선택</button>';
   mount(`<div class="session-app"><main class="result-page result-page-v1320">
-    <div class="result-identity"><span class="pill green">${modeLabel}</span><p>${rangeText} · ${esc(PRACTICE_TYPES[x.mode] || '쓰기')} · 문제당 ${Number(x.question_duration_sec || 0)}초</p></div>
+    <div class="result-identity"><span class="pill green">${modeLabel}</span><p>${rangeText} · ${esc(PRACTICE_TYPES[x.mode] || '쓰기')}</p></div>
     <h1>${modeLabel} 결과</h1>
     <div class="result-number"><span id="practice-result-score">${score}</span><small>점</small></div>
     <p class="result-score-basis">최초 풀이 기준 · ${Number(x.score_correct || 0)} / ${Number(x.target || x.score_total || 0)} 정답</p>
     <div class="result-stat-grid"><div><strong>${Number(x.score_correct || 0)}</strong><span>정답</span></div><div><strong>${wrongCount}</strong><span>오답</span></div><div><strong>${unanswered}</strong><span>미응답</span></div></div>
-    <div class="result-meta-line"><span>${icon('clock')} 전체 진행 ${time(elapsed)}</span><span>문제당 ${Number(x.question_duration_sec || 0)}초</span></div>
+    <div class="result-meta-line"><span>${icon('clock')} 전체 진행 ${time(elapsed)}</span></div>
+    <div class="result-reward-card result-reward-top"><div><span>학습 보상</span><strong>+${Number(x.reward_points || 0)}P</strong></div><div><span>성장 XP</span><strong>+${Number(x.xp || 0)} XP</strong></div></div>
     <p class="result-next-copy">${esc(statusText)}</p>
     ${primaryCta}
     ${x.run_mode === 'test' ? (x.shared_to_teacher_at ? '<button class="btn self-test-share-done full" disabled>✓ 선생님께 전송 완료</button>' : '<button class="btn self-test-share full" id="share-self-test">선생님께 결과 보내기</button>') : ''}
     ${answerRows.length || reviewCount ? '<button class="btn full" id="practice-answer-review">답안 보기</button>' : ''}
     <div id="practice-answer-details" class="answer-review-panel" hidden>${detailHtml}</div>
     <div class="result-secondary-actions"><button class="text-button" id="practice-records">내 기록</button><button class="text-button" id="practice-home">홈으로</button></div>
-    <div class="result-reward-card"><div><span>학습 보상</span><strong>+${Number(x.reward_points || 0)}P</strong></div><div><span>성장 XP</span><strong>+${Number(x.xp || 0)} XP</strong></div></div>
     <p class="quiet-note">보상 P는 학습 완료·만점·꾸준함으로 쌓여요. 점수는 오답 복습 재정답으로 올라가지 않고, 승인된 재채점만 반영돼요.</p>
   </main></div>`);
   if (x.run_mode === 'test') animateTestResult(score, perfect);

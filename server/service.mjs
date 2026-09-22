@@ -401,7 +401,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.25.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.26.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -956,7 +956,7 @@ export async function service(state, method, path, body, token) {
   if (path === '/practice/start' && method === 'POST') {
     requireRole(p, 'student');
     const active = state.practices.find(x => x.student_id === p.id && !x.finished);
-    if (active) { const view = practiceView(active, state); view.resumed_existing = true; return view; }
+    if (active) { removePracticeTimer(active); const view = practiceView(active, state); view.resumed_existing = true; return view; }
     const school = schoolForProfile(state, p);
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
     if (body.school_id && body.school_id !== school.id) fail('현재 학교의 범위만 학습할 수 있어요.', 403);
@@ -985,13 +985,12 @@ export async function service(state, method, path, body, token) {
     const practiceWords = runMode === 'test' || examStyle ? shuffle(words).slice(0, target) : words;
     const startedAt = Date.now();
     const durationSec = practiceDurationSec(body.mode, target);
-    const questionDurationSec = Number(PRACTICE_SECONDS_PER_QUESTION[body.mode] || 8);
-    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, run_mode: runMode, exam_style: examStyle, assignment_id: null, target, cover_all: runMode === 'test' || examStyle ? true : coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection && runMode !== 'test', quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, timer_mode: 'question', question_duration_sec: questionDurationSec, question_started_at: null, question_deadline: null, deadline: null, auto_submitted: false, wrong_details: [], answer_records: [], finished: false, responses: {}, words: practiceWords.map(w => w.id) };
+    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, run_mode: runMode, exam_style: examStyle, assignment_id: null, target, cover_all: runMode === 'test' || examStyle ? true : coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection && runMode !== 'test', quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, timer_mode: 'none', question_duration_sec: 0, question_started_at: null, question_deadline: null, deadline: null, auto_submitted: false, wrong_details: [], answer_records: [], finished: false, responses: {}, words: practiceWords.map(w => w.id) };
     if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
   if (/^\/practice\/[^/]+(?:\/(?:answer|next|finish|share))?$/.test(path)) {
-    requireRole(p, 'student'); const x = state.practices.find(x => x.id === path.split('/')[2] && x.student_id === p.id); if (!x) fail('연습을 찾을 수 없습니다.', 404);
+    requireRole(p, 'student'); const x = state.practices.find(x => x.id === path.split('/')[2] && x.student_id === p.id); if (!x) fail('연습을 찾을 수 없습니다.', 404); removePracticeTimer(x);
     if (path.endsWith('/share')) {
       if (method !== 'POST') fail('요청 방식을 확인해주세요.', 405);
       if (!x.finished || x.run_mode !== 'test') fail('완료한 실전모드 결과만 선생님께 보낼 수 있어요.', 409);
@@ -1124,6 +1123,16 @@ function nextPractice(x, state) {
     x.question_deadline = x.question_started_at + x.question_duration_sec * 1000;
   }
 }
+function removePracticeTimer(x) {
+  if (!x || x.finished) return x;
+  x.timer_mode = 'none';
+  x.deadline = null;
+  x.question_deadline = null;
+  x.question_duration_sec = 0;
+  x.question_started_at = null;
+  return x;
+}
+
 function practiceReward(x, state, endedAt, scoreTotal, perfect) {
   const previous = mySessions(state, x.student_id);
   const todayKey = dayKey(endedAt);
@@ -1204,6 +1213,7 @@ function finishPractice(x, state, autoSubmitted = false) {
     finalized_at: finalizedAt,
     shared_to_teacher_at: x.shared_to_teacher_at || null,
     answer_records: answerRecords,
+    word_ids: [...(x.words || [])],
     wrong_details: (x.wrong_details || []).map(item => ({ ...item })),
     created_at: endedAt
   };
