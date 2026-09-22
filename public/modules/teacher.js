@@ -259,7 +259,7 @@ function results(A) {
     <section class="panel"><div class="panel-head"><div><h2>학생별 실전시험 결과</h2><span>선생님이 배정한 시험 성적</span></div><span>${attempts.length}회</span></div>${examTable}</section>`;
 }
 const localDate = n => { const d = new Date(n); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
-export function examDefaults(A) { return A.examForm ??= { title: '', class_name: A.data.profile.active_division === 'middle' ? (A.data.profiles[0]?.class_name || '중3') : ALL_CLASSES, exam_type: 'eng2mean_mc', question_count: 20, minutes: 10, passing_score: 80, max_attempts: 1, available: localDate(Date.now()), due: localDate(Date.now() + 3 * 86400000), release_result: true }; }
+export function examDefaults(A) { return A.examForm ??= { title: '', class_name: A.data.profile.active_division === 'middle' ? (A.data.profiles[0]?.class_name || '중3') : ALL_CLASSES, exam_type: 'write_meaning', question_count: 20, minutes: 10, passing_score: 80, max_attempts: 1, available: localDate(Date.now()), due: localDate(Date.now() + 3 * 86400000), release_result: true }; }
 const field = (label, name, value, type = 'text', extra = '') => `<label class="field"><span>${label}</span><input name="${name}" value="${esc(value)}" type="${type}" required ${extra}></label>`;
 const divisionClasses = A => A.data.profile.active_division === 'middle' ? ['중2','중3'] : ['고1A','고1B'];
 const classSelect = (A, label, name, value) => {
