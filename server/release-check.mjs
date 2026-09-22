@@ -268,6 +268,24 @@ export async function runReleaseCheck() {
       }, studentToken);
       assert(submitted.attempt.status === 'submitted' && submitted.attempt.score === 100, `${exam.exam_type} grades correct answers at 100`);
     }
+    const hiddenExam = await service(state, 'POST', '/exams', {
+      title: 'QA hidden result', class_name: '고1A', school: '단원고', range_codes: [rangeCode], exam_type: 'write_meaning',
+      question_count: 2, duration_sec: 300, passing_score: 70, max_attempts: 1,
+      available_at: now - 1000, due_at: now + 3600000, release_result: false
+    }, teacherToken);
+    const hiddenStarted = await service(state, 'POST', '/exams/start', { exam_id: hiddenExam.id }, studentToken);
+    const hiddenInternal = state.examAttempts.find(item => item.id === hiddenStarted.attempt.id);
+    const hiddenAnswers = Object.fromEntries(hiddenInternal.keys.map((word, index) => [index, word.meaning]));
+    await service(state, 'POST', `/attempts/${hiddenInternal.id}/submit`, {
+      lease: hiddenInternal.lease, revision: hiddenInternal.revision, answers: hiddenAnswers
+    }, studentToken);
+    const hiddenStudentBootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    const hiddenStudentAttempt = hiddenStudentBootstrap.attempts.find(item => item.id === hiddenInternal.id);
+    assert(hiddenStudentAttempt.result_visibility === 'withheld' && hiddenStudentAttempt.grading_status === 'final' && hiddenStudentAttempt.score === undefined, 'withheld exam score is not exposed as zero to student');
+    const hiddenTeacherBootstrap = await service(state, 'GET', '/bootstrap', {}, teacherToken);
+    const hiddenTeacherAttempt = hiddenTeacherBootstrap.attempts.find(item => item.id === hiddenInternal.id);
+    assert(hiddenTeacherAttempt.result_visibility === 'visible' && hiddenTeacherAttempt.score === 100, 'teacher still sees withheld exam score for operations');
+
     await expectStatus(409, () => service(state, 'PATCH', '/exams/' + examIds[0], {
       question_count: 2
     }, teacherToken), 'attempted exam blocks structural edits');
@@ -501,6 +519,7 @@ export async function runReleaseCheck() {
     const v1313Css = readFileSync(publicRoot + 'v1313.css', 'utf8');
     const v1315Css = readFileSync(publicRoot + 'v1315.css', 'utf8');
     const v1317Css = readFileSync(publicRoot + 'v1317.css', 'utf8');
+    const uiModule = readFileSync(publicRoot + 'modules/ui.js', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
     const practiceEnhancements = readFileSync(publicRoot + 'practice-enhancements.js', 'utf8');
@@ -536,13 +555,16 @@ export async function runReleaseCheck() {
     assert(studentModule.includes('middleVocabPractice') && studentModule.includes('data-middle-word') && studentModule.includes('data-middle-preset'), 'V13.13 middle student UI lists lesson words for exact checkbox selection');
     assert(sessionsModule.includes('word_ids: A.middleWordIds') && sessionsModule.includes('3000'), 'V13.13 sends exact middle word ids and keeps correct feedback visible for three seconds');
     assert(practiceEnhancements.includes('sumusBurstFade 2.2s') && practiceEnhancements.includes('2300'), 'V13.13 correct-answer overlay stays visible long enough to read');
-    assert(indexHtml.includes('/app.js?v=13.17.0') && indexHtml.includes('/practice-enhancements.js?v=13.17.0') && indexHtml.includes('/v1317.css?v=13.17.0') && sw.includes('sumus-voca-v13.17.0-test-mode-badges'), 'V13.17 cache versions are active');
+    assert(indexHtml.includes('/app.js?v=13.18.0') && indexHtml.includes('/practice-enhancements.js?v=13.18.0') && indexHtml.includes('/v1317.css?v=13.18.0') && sw.includes('sumus-voca-v13.18.0-p0-score-target-scope'), 'V13.18 cache versions are active');
     assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'V13.15 puts meaning and English writing first and exposes student score history');
     assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && sessionsModule.includes('practice-timer-value'), 'V13.15 student home shows recent scores and timed practice countdown');
     assert(teacherModule.includes('학생별 연습 결과') && teacherModule.includes('data-practice-record') && appJs.includes('openPracticeRecord'), 'V13.15 teacher can inspect practice scores and wrong answers');
     assert(studentModule.includes('실전 모드') && studentModule.includes('data-practice-run-mode="test"') && sessionsModule.includes('실전 모드에서는 뒤로 갈 수 없어요'), 'V13.17 exposes locked no-feedback writing test mode');
     assert(studentModule.includes('첫 100점') && studentModule.includes('3회 연속 90점+') && studentModule.includes('영어쓰기 100점') && studentModule.includes('achievementSection'), 'V13.17 student achievement badges are present');
     assert(v1317Css.includes('.run-mode-grid') && v1317Css.includes('.achievement-grid'), 'V13.17 test mode and achievement styles are loaded');
+    assert(studentModule.includes("result_visibility === 'visible'") && studentModule.includes("filter(Number.isFinite)") && studentModule.includes("'공개 대기'"), 'V13.18 P0 score visibility excludes withheld exams from averages and labels them explicitly');
+    assert(teacherModule.includes('targetMatches(exam.class_name, p)') && teacherModule.includes('item.active.length'), 'V13.18 school-wide dashboard uses shared target matching and separates active attempts from missing');
+    assert(uiModule.includes('recordRangeLabel') && studentModule.includes('recordRangeLabel(s, code)') && sessionsModule.includes('recordRangeLabel'), 'V13.18 uses shared middle/high range labels across records and results');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
