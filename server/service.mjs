@@ -392,7 +392,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.20.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.21.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -974,8 +974,19 @@ export async function service(state, method, path, body, token) {
     if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
-  if (/^\/practice\/[^/]+(?:\/(?:answer|next|finish))?$/.test(path)) {
+  if (/^\/practice\/[^/]+(?:\/(?:answer|next|finish|share))?$/.test(path)) {
     requireRole(p, 'student'); const x = state.practices.find(x => x.id === path.split('/')[2] && x.student_id === p.id); if (!x) fail('연습을 찾을 수 없습니다.', 404);
+    if (path.endsWith('/share')) {
+      if (method !== 'POST') fail('요청 방식을 확인해주세요.', 405);
+      if (!x.finished || x.run_mode !== 'test') fail('완료한 실전모드 결과만 선생님께 보낼 수 있어요.', 409);
+      const sharedAt = x.shared_to_teacher_at || Date.now();
+      x.shared_to_teacher_at = sharedAt;
+      const session = state.sessions.find(item => item.id === x.id && item.student_id === p.id);
+      if (session) session.shared_to_teacher_at = sharedAt;
+      const view = practiceView(x, state);
+      view.shared_to_teacher_at = sharedAt;
+      return view;
+    }
     if (path.endsWith('/answer')) {
       if (x.responses[body.question_id]) return x.responses[body.question_id];
       if (!x.finished && Number(x.deadline || 0) && Date.now() >= x.deadline) {
@@ -1127,6 +1138,7 @@ function finishPractice(x, state, autoSubmitted = false) {
     auto_submitted: !!x.auto_submitted,
     ended_at: endedAt,
     finalized_at: finalizedAt,
+    shared_to_teacher_at: x.shared_to_teacher_at || null,
     answer_records: answerRecords,
     wrong_details: (x.wrong_details || []).map(item => ({ ...item })),
     created_at: endedAt
@@ -1150,6 +1162,7 @@ function practiceView(x, state) {
     xp: hideTestScore ? null : x.xp, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
     started_at: x.started_at, finished_at: x.finished_at || null, ended_at: x.ended_at || null, finalized_at: x.finalized_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
     auto_submitted: !!x.auto_submitted,
+    shared_to_teacher_at: x.shared_to_teacher_at || null,
     wrong_count: x.finished ? wrongCount : undefined,
     unanswered_count: x.finished ? unansweredCount : undefined,
     perfect: x.finished ? perfect : undefined,
