@@ -1,9 +1,9 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS } from './modules/core.js';
 import { avatar } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.25.0';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.25.0';
-import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.25.0';
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.26.0';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.26.0';
+import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.26.0';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [] };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -130,9 +130,15 @@ $('#app').addEventListener('click', async event => {
     if (d.reviewPractice) {
       const session = A.data.sessions.find(item => item.id === d.reviewPractice);
       if (!session) return toast('복습할 기록을 찾을 수 없어요.');
-      const hasAnswerRecords = Array.isArray(session.answer_records) && session.answer_records.length;
-      const source = hasAnswerRecords ? session.answer_records : (session.wrong_details || []);
-      const wordIds = [...new Set(source.filter(item => hasAnswerRecords ? item.correct === false && !item.regraded : !item.regraded).map(item => item.word_id).filter(Boolean))];
+      const records = Array.isArray(session.answer_records) ? session.answer_records : [];
+      const answered = new Set(records.map(item => item.word_id).filter(Boolean));
+      const wrongIds = records.length
+        ? records.filter(item => item.correct === false && !item.regraded).map(item => item.word_id).filter(Boolean)
+        : (session.wrong_details || []).filter(item => !item.regraded).map(item => item.word_id).filter(Boolean);
+      const timedOutCount = records.filter(item => item.timed_out && !item.regraded).length;
+      const missingCount = Math.max(0, Number(session.unanswered_count || 0) - timedOutCount);
+      const missingIds = (session.word_ids || []).filter(id => !answered.has(id)).slice(0, missingCount);
+      const wordIds = [...new Set([...wrongIds, ...missingIds])];
       if (!wordIds.length) return openPracticeRecord(session.id);
       A.mode = session.mode || 'write_meaning'; A.practiceRunMode = 'practice'; savePreferences();
       return await startPractice({ wordIds, mode: A.mode, runMode: 'practice' });
@@ -181,7 +187,7 @@ $('#app').addEventListener('click', async event => {
       return;
     }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
-      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.25.0');
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.26.0');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
@@ -194,6 +200,14 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'export-results') exportResults();
   } catch (err) { toast(err.message); buttonBusy(b, false); }
 });
+$('#app').addEventListener('change', event => {
+  const input = event.target;
+  if (!A.data || A.screen) return;
+  if (input.dataset.rankScopeSelect !== undefined) { A.rankScope = input.value; savePreferences(); render(); return; }
+  if (input.dataset.rankPeriodSelect !== undefined) { A.rankPeriod = input.value; savePreferences(); render(); return; }
+  if (input.dataset.rankModeSelect !== undefined) { A.rankMode = input.value; savePreferences(); render(); }
+});
+
 async function performTeacherContextSwitch(kind, value) {
   const generation = ++contextGeneration;
   const endpoint = kind === 'division' ? '/teacher/division' : '/teacher/school';
