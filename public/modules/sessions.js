@@ -255,9 +255,13 @@ export async function startPractice(options = {}) {
   const old = A.data.active_practice;
   if (old) {
     const active = await api(`/practice/${old}`);
-    if (options.resumeExisting || samePracticeRequest(active, payload)) return enterPracticeSession(active);
-    await resolveExistingPractice(active, payload);
-    return;
+    if (!active.finished) {
+      if (options.resumeExisting || samePracticeRequest(active, payload)) return enterPracticeSession(active);
+      await resolveExistingPractice(active, payload);
+      return;
+    }
+    A.data.active_practice = null;
+    A.data.active_practice_summary = null;
   }
   if (payload.run_mode === 'test' && !options.confirmed) {
     const scopedCount = Array.isArray(payload.word_ids) && payload.word_ids.length
