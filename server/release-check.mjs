@@ -638,7 +638,7 @@ export async function runReleaseCheck() {
     assert(sessionsModule.includes('미응답') && sessionsModule.includes('data-finish-practice-dispute'), 'saved exam results separate unanswered answers and keep meaning disputes');
     assert(sessionsModule.includes('이미 진행 중인 학습이 있어요') && sessionsModule.includes('기존 연습 저장 후 새 설정 시작'), 'active session mismatch still warns before reuse');
     assert(appJs.includes('examFormDirty') && appJs.includes('contextGeneration') && appJs.includes('작성 취소 후 전환'), 'teacher context switch still protects dirty forms and stale responses');
-    assert(studentModule.includes('homePrimaryAction') && studentModule.includes('home-focus-card') && studentModule.includes('오늘 학습'), 'student home keeps one action-first CTA');
+    assert(studentModule.includes('home-pet-hero') && studentModule.includes('home-metrics') && studentModule.includes('home-week-card'), 'student home centers pet, personal metrics, and weekly attendance');
     assert(v1320Css.includes('.home-focus-card') && v1320Css.includes('.setup-start-summary') && v1320Css.includes('.result-page-v1320'), 'base responsive student UX styles remain loaded');
 
     const studyHubSource = studentModule.slice(studentModule.indexOf('function studyHub'), studentModule.indexOf('function grammarCards'));
