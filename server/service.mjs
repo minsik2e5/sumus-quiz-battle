@@ -913,7 +913,7 @@ export async function service(state, method, path, body, token) {
     const target = manualSelection ? words.length : isDailyQuest ? daily.target : coverAll ? words.length : integer(body.target || 10, 5, 500, '학습량');
     const startedAt = Date.now();
     const durationSec = practiceDurationSec(body.mode, target);
-    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, assignment_id: null, target, cover_all: coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection, quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, deadline: startedAt + durationSec * 1000, auto_submitted: false, wrong_details: [], finished: false, responses: {}, words: words.map(w => w.id) };
+    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, assignment_id: null, target, cover_all: coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection, quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, deadline: startedAt + durationSec * 1000, auto_submitted: false, wrong_details: [], finished: false, responses: {}, words: words.map(w => w.id) };
     if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
@@ -929,6 +929,11 @@ export async function service(state, method, path, body, token) {
       const word = allBooks(state).flatMap(b => b.words).find(w => w.id === x.question.word_id);
       const ok = grade(x.question.type, body.answer, wordForGrade(state, word));
       x.total++; x.last = word.id;
+      const scoredAttempt = !x.question_is_retry && Number(x.score_total || 0) < Number(x.target || 0);
+      if (scoredAttempt) {
+        x.score_total = Number(x.score_total || 0) + 1;
+        if (ok) x.score_correct = Number(x.score_correct || 0) + 1;
+      }
       state.mastery[p.id] ??= {}; const m = state.mastery[p.id][word.id] ??= { mastery: 0, correct: 0, wrong: 0, streak: 0, recent_results: [] };
       m.recent_results = Array.isArray(m.recent_results) ? m.recent_results : [];
       let gain = 0;
@@ -937,8 +942,8 @@ export async function service(state, method, path, body, token) {
       m.recent_results.push({ ok, at: Date.now() });
       if (m.recent_results.length > 5) m.recent_results.splice(0, m.recent_results.length - 5);
       m.last_seen = Date.now(); m.next_review_at = Date.now() + (ok ? 3600000 + m.mastery * 864000 : 120000);
-      x.feedback = { ok, gain, mastery: m.mastery, word_id: word.id, type: x.question.type, question_id: body.question_id, answer: str(body.answer, 160), word: displayEnglish(word.word), meaning: word.meaning, combo: x.combo, retry: !ok, can_dispute: !ok && x.question.type === 'write_meaning', milestone: ok && [5, 10].includes(x.combo) };
-      if (!ok) {
+      x.feedback = { ok, gain, mastery: m.mastery, word_id: word.id, type: x.question.type, question_id: body.question_id, answer: str(body.answer, 160), word: displayEnglish(word.word), meaning: word.meaning, combo: x.combo, retry: !ok, can_dispute: !ok && scoredAttempt && x.question.type === 'write_meaning', scored: scoredAttempt, milestone: ok && [5, 10].includes(x.combo) };
+      if (!ok && scoredAttempt) {
         x.wrong_details ??= [];
         x.wrong_details.push({
           question_id: body.question_id,
@@ -984,7 +989,7 @@ function nextPractice(x, state) {
   x.seen ??= [];
   const unseen = x.cover_all ? words.filter(w => !x.seen.includes(w.id)) : [];
   const due = x.retry.findIndex(r => r.at <= x.total);
-  let word;
+  let word, isRetry = false;
   if (unseen.length) {
     word = x.preserve_order
       ? unseen.sort((a, b) => x.words.indexOf(a.id) - x.words.indexOf(b.id))[0]
@@ -992,15 +997,17 @@ function nextPractice(x, state) {
   } else if (due >= 0) {
     const retry = x.retry.splice(due, 1)[0];
     word = words.find(w => w.id === retry.id);
+    isRetry = true;
   } else word = choosePracticeWord(words, state.mastery[x.student_id] || {}, x);
   if (!x.seen.includes(word.id)) x.seen.push(word.id);
   const mode = x.mode === 'mixed' ? shuffle(Object.keys(PRACTICE_TYPES).filter(k => k !== 'mixed'))[0] : x.mode;
-  x.question = buildQuestion(word, mode, words); x.question_id = id(); x.feedback = null;
+  x.question = buildQuestion(word, mode, words); x.question_id = id(); x.question_is_retry = isRetry; x.feedback = null;
 }
 function finishPractice(x, state, autoSubmitted = false) {
   x.finished = true; x.finished_at = Date.now(); x.auto_submitted = !!autoSubmitted;
-  if (!x.total) return;
-  const score = Math.round(x.correct / x.total * 100);
+  const scoreTotal = Math.max(1, Number(x.target || 0));
+  const scoreCorrect = Math.min(scoreTotal, Number(x.score_correct || 0));
+  const score = Math.round(scoreCorrect / scoreTotal * 100);
   const rec = {
     id: x.id,
     student_id: x.student_id,
@@ -1012,8 +1019,9 @@ function finishPractice(x, state, autoSubmitted = false) {
     daily_quest: !!x.daily_quest,
     range_codes: x.range_codes,
     mode: x.mode,
-    correct: x.correct,
-    total: x.total,
+    correct: scoreCorrect,
+    total: scoreTotal,
+    attempts_total: x.total,
     score,
     xp: x.xp,
     best_combo: x.best,
@@ -1026,12 +1034,14 @@ function finishPractice(x, state, autoSubmitted = false) {
   if (!state.sessions.some(s => s.id === rec.id)) state.sessions.push(rec);
 }
 function practiceView(x, state) {
-  const score = x.total ? Math.round(x.correct / x.total * 100) : 0;
+  const scoreTotal = Math.max(1, Number(x.target || 0));
+  const scoreCorrect = Math.min(scoreTotal, Number(x.score_correct || 0));
+  const score = Math.round(scoreCorrect / scoreTotal * 100);
   return {
     id: x.id, school: x.school, mode: x.mode, target: x.target,
     range_codes: x.range_codes || [], cover_all: !!x.cover_all, daily_quest: !!x.daily_quest,
     manual_selection: !!x.manual_selection, quest_mix: x.quest_mix || null,
-    covered: x.seen?.length || 0, total: x.total, correct: x.correct, score,
+    covered: x.seen?.length || 0, total: x.total, correct: x.correct, score_total: scoreTotal, score_correct: scoreCorrect, score,
     xp: x.xp, combo: x.combo, best: x.best,
     started_at: x.started_at, finished_at: x.finished_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
     auto_submitted: !!x.auto_submitted,
