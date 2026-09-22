@@ -182,7 +182,7 @@ export function openPracticeRecord(sessionId) {
       : unanswered
         ? `<div class="result-note">미응답 ${unanswered}개 · 과거 기록은 미응답 단어 상세가 없을 수 있어요.</div>`
         : '<div class="result-note">오답 상세가 저장되지 않은 이전 기록이에요.</div>';
-  const close = modal(`<span class="pill">${esc(PRACTICE_TYPES[session.mode] || '연습')} · ${runLabel}</span><h2>${esc(session.school || '')} · ${rangeText}</h2><div class="result-number">${statusText}</div><div class="detail-grid"><div><b>${session.correct} / ${session.total}</b><small>정답</small></div><div><b>${wrongCount}</b><small>오답</small></div><div><b>${unanswered}</b><small>미응답</small></div><div><b>${time(session.duration_sec || 0)}</b><small>소요시간</small></div></div><section style="margin-top:18px"><div class="section-title"><h3>답안 확인</h3></div>${wrongHtml}</section>${wrong.length && A.data.profile.role === 'student' ? '<button class="btn primary full" id="retry-wrong-practice">틀린 단어만 다시 연습</button>' : ''}`, '내 연습 기록');
+  const close = modal(`<span class="pill">${esc(PRACTICE_TYPES[session.mode] || '연습')} · ${runLabel}</span><h2>${esc(session.school || '')} · ${rangeText}</h2><div class="result-number">${statusText}</div><div class="detail-grid"><div><b>${session.correct} / ${session.total}</b><small>정답</small></div><div><b>${wrongCount}</b><small>오답</small></div><div><b>${unanswered}</b><small>미응답</small></div><div><b>${time(session.duration_sec || 0)}</b><small>소요시간</small></div></div><section style="margin-top:18px"><div class="section-title"><h3>답안 확인</h3></div>${wrongHtml}</section>${session.run_mode === 'test' && A.data.profile.role === 'student' ? (session.shared_to_teacher_at ? '<button class="btn self-test-share-done full" disabled>✓ 선생님께 전송 완료</button>' : '<button class="btn self-test-share full" id="record-share-self-test">선생님께 결과 보내기</button>') : ''}${wrong.length && A.data.profile.role === 'student' ? '<button class="btn primary full" id="retry-wrong-practice">틀린 단어만 다시 연습</button>' : ''}`, '내 연습 기록');
   $$('[data-practice-dispute]').forEach(button => button.addEventListener('click', async () => {
     button.disabled = true;
     try {
@@ -220,7 +220,10 @@ function samePracticeRequest(data, payload) {
   if (Boolean(payload.daily_quest) !== Boolean(data.daily_quest)) return false;
   if ((payload.assignment_id || null) !== (data.assignment_id || null)) return false;
   if (Array.isArray(payload.word_ids) && payload.word_ids.length) {
-    if (JSON.stringify(sortedStrings(payload.word_ids)) !== JSON.stringify(sortedStrings(data.word_ids))) return false;
+    if (data.run_mode === 'test' && payload.target) {
+      const pool = new Set(payload.word_ids.map(String));
+      if (!(data.word_ids || []).every(id => pool.has(String(id)))) return false;
+    } else if (JSON.stringify(sortedStrings(payload.word_ids)) !== JSON.stringify(sortedStrings(data.word_ids))) return false;
   } else if (Array.isArray(payload.range_codes)) {
     if (JSON.stringify(sortedStrings(payload.range_codes)) !== JSON.stringify(sortedStrings(data.range_codes))) return false;
   }
