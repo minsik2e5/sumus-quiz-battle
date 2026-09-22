@@ -353,7 +353,7 @@ export async function runReleaseCheck() {
         school: '단원고', range_codes: [rangeCode], mode: practiceType, target: 5
       }, studentToken);
       assert(started.question.type === practiceType, `${practiceType} practice starts correctly`);
-      assert(started.timer_mode === 'question' && started.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION[practiceType] && started.question_deadline > started.server_time, `${practiceType} starts with a fresh per-question timer`);
+      assert(started.timer_mode === 'question' && started.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION[started.question.type] && started.question_deadline > started.server_time, `${practiceType} starts with a fresh per-question timer`);
       const word = allWords.find(item => item.id === started.question.word_id);
       const originalDeadline = started.question_deadline;
       const result = await service(state, 'POST', `/practice/${started.id}/answer`, {
@@ -366,7 +366,7 @@ export async function runReleaseCheck() {
       }, studentToken);
       assert(repeated.total === result.total, `${practiceType} duplicate submission is idempotent`);
       const next = await service(state, 'POST', `/practice/${started.id}/next`, {}, studentToken);
-      assert(next.question_id !== started.question_id && next.question_deadline > next.server_time && next.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION[practiceType] && next.question_started_at >= started.question_started_at, `${practiceType} resets the timer only when the next question begins`);
+      assert(next.question_id !== started.question_id && next.question_deadline > next.server_time && next.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION[next.question.type] && next.question_started_at >= started.question_started_at, `${practiceType} resets the timer only when the next question begins`);
       const finished = await service(state, 'POST', `/practice/${started.id}/finish`, {}, studentToken);
       assert(finished.finished === true, `${practiceType} practice can finish and save`);
     }
@@ -627,11 +627,12 @@ export async function runReleaseCheck() {
 
     const studyHubSource = studentModule.slice(studentModule.indexOf('function studyHub'), studentModule.indexOf('function grammarCards'));
     assert(studyHubSource.includes('단어 학습') && studyHubSource.includes('어법·어휘') && studyHubSource.includes('study-hub-simple') && !studyHubSource.includes('추천 학습 흐름') && !studyHubSource.includes('영어↔뜻, 철자'), 'V13.22 learning home contains only clean vocabulary and grammar choices');
-    const memorizationSource = studentModule.slice(studentModule.indexOf('function memorizationPanel'), studentModule.indexOf('function practiceSetupSummary'));
+    const memorizationSource = studentModule.slice(studentModule.indexOf('function memorizationPanel'), studentModule.indexOf('function durationText'));
     assert(memorizationSource.includes('data-memorize-word') && memorizationSource.includes('data-memorize-star') && memorizationSource.includes('data-memorize-speak') && memorizationSource.includes('front = show ? word.meaning : word.word'), 'V13.22 vocabulary rows swap English and meaning in place and expose pronunciation');
     assert(appJs.includes('SpeechSynthesisUtterance') && appJs.includes('d.memorizeSpeak'), 'V13.22 memorization has one-tap English pronunciation');
     assert(studentModule.includes("['exam', '시험'") && studentModule.includes('data-exam-kind="practice"') && studentModule.includes('data-exam-kind="test"') && studentModule.includes('연습시험') && studentModule.includes('실전시험'), 'V13.22 bottom Exam menu lets students choose practice or real exam');
     assert(studentModule.includes('data-action="start-exam-run"') && studentModule.includes('한 문제당') && appJs.includes('examStyle: true'), 'V13.22 both exam modes share the same setup and exam-style word pool');
+    assert(!studentModule.includes('function middleVocabQuiz') && !studentModule.includes('function vocabQuiz') && !studentModule.includes('function practiceModePicker'), 'V13.22 removes the old duplicate vocabulary quiz path from Learning');
     assert(sessionsModule.includes("const modeLabel = testMode ? '실전시험' : '연습시험'") && sessionsModule.includes('questionLeftMs') && sessionsModule.includes('question-timer') && sessionsModule.includes('setInterval(practiceTick, x.timer_mode === \'question\' ? 100 : 500)'), 'V13.22 practice and real exams share one question screen with a prominent per-question timer');
     assert(sessionsModule.includes('TIME OUT') && sessionsModule.includes('timeoutPracticeQuestion') && sessionsModule.includes("timed_out: true"), 'V13.22 each question automatically records timeout at zero');
     assert(!teacherModule.match(/const tabs = .*assignments/) && !teacherModule.match(/const tabs = .*exams/), 'teacher navigation keeps assignment and teacher-created exam operations removed');
