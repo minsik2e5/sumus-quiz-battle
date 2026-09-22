@@ -176,9 +176,9 @@ $('#app').addEventListener('click', async event => {
       if (A.data.profile.division === 'middle') {
         const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
         const target = A.target === 'all' ? 'all' : Math.min(words.length, Number(A.target || words.length));
-        await startPractice({ wordIds: words.map(word => word.id), target, mode: A.mode, runMode, confirmed: true });
+        await startPractice({ wordIds: words.map(word => word.id), target, mode: A.mode, runMode, examStyle: true, confirmed: true });
       } else {
-        await startPractice({ runMode, confirmed: true });
+        await startPractice({ runMode, examStyle: true, confirmed: true });
       }
       return;
     }
