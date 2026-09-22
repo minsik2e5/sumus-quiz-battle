@@ -1,5 +1,5 @@
 import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, practiceDurationSec, unlocked, levelInfo, dayKey } from './core.js';
-import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $ } from './ui.js';
+import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar } from './character.js';
 import { DANWONGO_PASSAGES } from '../danwongo-grammar-data.js?v=2';
 import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from '../seonbu-grammar-data.js?v=2';
