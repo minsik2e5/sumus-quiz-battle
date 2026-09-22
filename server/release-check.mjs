@@ -4,7 +4,7 @@ import { emptyState } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
 import { allBooks, service, sweep } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
-import { EXAM_TYPES, PRACTICE_TYPES, grade, displayEnglish } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
 import { runContentValidation } from './content-validation.mjs';
 import { openGrammarChoiceSample } from '../public/grammar-choice-sample.js';
 
@@ -23,6 +23,7 @@ const expectStatus = async (status, fn, label) => {
 };
 const answerFor = (type, word) => {
   if (['mean2eng_mc', 'mean2eng', 'write_en', 'spell', 'scramble', 'vowelblank', 'initial'].includes(type)) return displayEnglish(word.word);
+  if (type === 'write_meaning') return meaningAccepted(word.meaning, word.accepted_meanings)[0] || word.meaning;
   return word.meaning;
 };
 
