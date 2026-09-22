@@ -303,7 +303,7 @@ function home(A) {
     ${compactGrowth(A)}`;
 }
 function studyHub(A) {
-  return `<div class="page-heading study-simple-heading"><h1>학습</h1></div>
+  return `<div class="page-heading study-simple-heading premium-page-heading"><span class="premium-eyebrow">LEARNING</span><h1>학습</h1></div>
   <div class="study-hub-grid study-hub-simple">
     <button class="study-hub-card vocab" data-study="vocab">
       <span class="study-hub-icon">${icon('practice')}</span>
@@ -319,19 +319,15 @@ function studyHub(A) {
 }
 function grammarCards(A, passages) {
   return passages.map(p => {
-    const sentenceCount = p.sentences.length;
-    const examLabel = grammarExamLabel(p);
-    const choiceCount = p.sentences.reduce((sum, sentence) => sum + sentence.parts.filter(part => part[0] === 'c').length, 0);
     const saved = savedGrammarProgress(A, p);
     const mastered = Boolean(saved?.mastered);
     return `<button class="grammar-set-card premium ${mastered ? 'mastered' : ''}" data-action="grammar-choice" data-grammar-id="${esc(p.id)}">
       <div class="grammar-set-top">
         <span class="grammar-number">${esc(p.number)}</span>
-        <div class="grow"><b>${esc(p.subtitle)}</b><small>${examLabel}</small></div>
-        <span class="grammar-state ${mastered ? 'master' : ''}">${mastered ? 'MASTER' : '미학습'}</span>
+        <div class="grow"><b>${esc(p.subtitle)}</b><small>${mastered ? '학습 완료' : p.sentences.length + '문장'}</small></div>
+        <span class="grammar-state ${mastered ? 'master' : ''}">${mastered ? 'MASTER' : '학습'}</span>
       </div>
-      <div class="grammar-set-meta"><span>${sentenceCount}문장</span><span>${choiceCount}개 선택</span><span>${mastered ? '1차 ' + Number(saved.firstRate || 0) + '%' : '오답 리콜'}</span></div>
-      <div class="grammar-set-cta">${mastered ? '다시 학습' : '학습 시작'} ${icon('arrow')}</div>
+      <div class="grammar-set-cta">${mastered ? '다시 보기' : '시작하기'} ${icon('arrow')}</div>
     </button>`;
   }).join('');
 }
@@ -344,25 +340,21 @@ function grammarStudy(A) {
   const passages = isDanwon ? DANWONGO_PASSAGES : isGangseo ? GANGSEO_PASSAGES : [];
 
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">GRAMMAR</span></div>
-  <div class="page-heading grammar-heading"><h1>어법·어휘</h1><p>WORKBOOK 6 선택지만 그대로 풀고, 분석본 기준으로 오답을 정리해요.</p></div>
+  <div class="page-heading grammar-heading"><h1>어법·어휘</h1></div>
   <section class="study-school-card locked"><div><span class="tiny muted">현재 학교</span><strong>${esc(school)}</strong></div><span class="school-fixed">${icon('shield')} 선생님 관리</span></section>
   ${isDanwon ? `
-    <section class="grammar-range-head"><div><span class="eyebrow">단원고 시험범위</span><h2>2025년 9월 인천교육청</h2><p>WORKBOOK 6 원문 선택지 · 분석본 기준 채점 해설</p></div><span class="grammar-range-count">${passages.length}지문</span></section>
+    <section class="grammar-range-head"><div><span class="eyebrow">단원고 시험범위</span><h2>2025년 9월 인천교육청</h2></div><span class="grammar-range-count">${passages.length}지문</span></section>
     <div class="grammar-set-list">${grammarCards(A, passages)}</div>
-    <p class="quiet-note">범위: 24 · 29 · 31 · 32 · 33 · 34 · 36 · 39 · 40 · 41~42</p>
   ` : isGangseo ? `
-    <section class="grammar-range-head gangseo"><div><span class="eyebrow">강서고 시험범위 · 2026</span><h2>2026년 6월 부산교육청</h2><p>WORKBOOK 6 원문 선택지 · 지문분석 기준 채점 해설</p></div><span class="grammar-range-count">${GANGSEO_PASSAGES.length}지문</span></section>
+    <section class="grammar-range-head gangseo"><div><span class="eyebrow">강서고 시험범위 · 2026</span><h2>2026년 6월 부산교육청</h2></div><span class="grammar-range-count">${GANGSEO_PASSAGES.length}지문</span></section>
     <div class="grammar-set-list">${grammarCards(A, GANGSEO_PASSAGES)}</div>
-    <p class="quiet-note">범위: 21 · 23 · 29 · 30 · 31 · 32 · 33 · 34 · 36 · 37 · 38 · 39 · 40</p>
   ` : isSeonbu ? `
-    <section class="grammar-range-head seonbu current"><div><span class="eyebrow">선부고 시험범위 · 2026</span><h2>2026년 3월 서울교육청</h2><p>WORKBOOK 6 원문 선택지 · 분석본 기준 채점 해설</p></div><span class="grammar-range-count">${SEONBU_2026_PASSAGES.length}지문</span></section>
+    <section class="grammar-range-head seonbu current"><div><span class="eyebrow">선부고 시험범위 · 2026</span><h2>2026년 3월 서울교육청</h2></div><span class="grammar-range-count">${SEONBU_2026_PASSAGES.length}지문</span></section>
     <div class="grammar-set-list">${grammarCards(A, SEONBU_2026_PASSAGES)}</div>
-    <p class="quiet-note">범위: 20 · 23 · 24 · 32</p>
 
     <div class="grammar-year-divider"><span>2025년 범위</span></div>
-    <section class="grammar-range-head seonbu old"><div><span class="eyebrow">선부고 시험범위 · 2025</span><h2>2025년 9월 인천교육청</h2><p>WORKBOOK 6 원문 선택지 · 분석본 기준 채점 해설</p></div><span class="grammar-range-count">${SEONBU_2025_PASSAGES.length}지문</span></section>
+    <section class="grammar-range-head seonbu old"><div><span class="eyebrow">선부고 시험범위 · 2025</span><h2>2025년 9월 인천교육청</h2></div><span class="grammar-range-count">${SEONBU_2025_PASSAGES.length}지문</span></section>
     <div class="grammar-set-list">${grammarCards(A, SEONBU_2025_PASSAGES)}</div>
-    <p class="quiet-note">범위: 31 · 34 · 36 · 38 · 40 · 43~45</p>
   ` : `
     <section class="grammar-empty-school"><span class="square-icon">${icon('records')}</span><div><b>현재 학교의 어법·어휘 범위를 준비 중이에요.</b><p>단원고와 선부고 시험범위부터 순서대로 추가하고 있어요.</p></div></section>
   `}`;
@@ -400,7 +392,7 @@ function memorizationPanel(A) {
     : schoolSwitch(A) + rangePicker(A);
   const starredInScope = words.filter(word => stars.has(word.id));
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill green">VOCAB</span></div>
-    <div class="page-heading memorize-heading"><h1>단어 학습</h1></div>
+    <div class="page-heading memorize-heading premium-page-heading"><span class="premium-eyebrow">VOCABULARY</span><h1>단어 학습</h1></div>
     <section class="setup-section"><div class="step-label"><span>01</span>범위</div>${rangeUi}</section>
     <section class="memorize-shell">
       <div class="memorize-toolbar">
@@ -446,7 +438,7 @@ function examWritingPicker(A) {
 }
 function exam(A) {
   if (!A.examKind) {
-    return `<div class="page-heading exam-choice-heading"><h1>시험</h1></div>
+    return `<div class="page-heading exam-choice-heading premium-page-heading"><span class="premium-eyebrow">TEST</span><h1>시험</h1></div>
       <div class="exam-kind-grid">
         <button class="exam-kind-card practice" data-exam-kind="practice"><span class="square-icon">${icon('practice')}</span><div><span class="pill blue">PRACTICE</span><h2>연습시험</h2><p>문제마다 바로 채점</p></div>${icon('arrow')}</button>
         <button class="exam-kind-card test" data-exam-kind="test"><span class="square-icon">${icon('exam')}</span><div><span class="pill">TEST</span><h2>실전시험</h2><p>마지막에 한꺼번에 채점</p></div>${icon('arrow')}</button>
