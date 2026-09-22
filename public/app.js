@@ -10,7 +10,7 @@ const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value
 const examTargetMatches = (exam, profile) => exam?.class_name === ALL_CLASSES || exam?.class_name === profile?.class_name;
 const examRangeGrade = value => value === ALL_CLASSES ? null : value;
 const examTargetOptions = () => A.data.profile.active_division === 'middle' ? ['중2', '중3'] : [ALL_CLASSES, '고1A', '고1B'];
-let poll, rendering = false;
+let poll, rendering = false, contextGeneration = 0;
 function preferences() {
   try { const v = JSON.parse(localStorage.getItem('sumus:v13:prefs:' + A.data.profile.id) || localStorage.getItem('sumus:v12:prefs:' + A.data.profile.id) || '{}'); A.ranges = v.ranges || {}; A.school = A.data.profile.role === 'teacher' ? A.data.profile.active_school : A.data.profile.school || v.school || A.data.schools[0]?.name || '단원고'; A.division = A.data.profile.active_division || A.data.profile.division || A.division || 'high'; A.mode = v.mode || 'write_meaning'; A.practiceRunMode = ['practice','test'].includes(v.practiceRunMode) ? v.practiceRunMode : 'practice'; A.target = v.target || 30; A.middleRange = v.middleRange || A.middleRange || ''; A.middleWordIds = Array.isArray(v.middleWordIds) ? v.middleWordIds : (A.middleWordIds || []); A.rankMode = v.rankMode || A.rankMode || 'xp'; A.rankScope = v.rankScope || A.rankScope || 'all'; A.rankPeriod = v.rankPeriod || A.rankPeriod || 'week'; A.sound = localStorage.getItem('sumus:sound') === 'true'; } catch {}
 }
@@ -116,21 +116,49 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'export-results') exportResults();
   } catch (err) { toast(err.message); buttonBusy(b, false); }
 });
+async function performTeacherContextSwitch(kind, value) {
+  const generation = ++contextGeneration;
+  const endpoint = kind === 'division' ? '/teacher/division' : '/teacher/school';
+  const payload = kind === 'division' ? { division: value } : { school_id: value };
+  const selectors = $('#teacher-division,#teacher-school');
+  selectors.forEach(select => select.disabled = true);
+  try {
+    await api(endpoint, payload, 'PATCH');
+    if (generation !== contextGeneration) return;
+    A.examForm = null; A.examFormDirty = false; A.ranges = {}; A.search = ''; A.classFilter = '';
+    await refresh();
+    if (generation !== contextGeneration) return;
+    preferences();
+    render();
+    toast(kind === 'division'
+      ? `${A.data.profile.active_division === 'middle' ? '중등부' : '고등부'} 관리 화면으로 변경했어요.`
+      : `${A.data.profile.active_school} 관리 화면으로 변경했어요.`);
+  } catch (error) {
+    if (generation !== contextGeneration) return;
+    render();
+    toast(error.message);
+  }
+}
+function requestTeacherContextSwitch(kind, value, input) {
+  const currentValue = kind === 'division' ? A.data.profile.active_division : A.data.profile.active_school_id;
+  if (value === currentValue) return;
+  if (A.tab === 'exam-create' && A.examFormDirty) {
+    input.value = currentValue;
+    const close = modal(`<h2>작성 중인 시험 설정이 있어요.</h2><p>부서나 학교를 바꾸면 지금 작성한 시험 설정은 취소됩니다.</p><button class="btn primary full" id="discard-and-switch">작성 취소 후 전환</button><button class="btn full" id="keep-editing">계속 작성</button>`, '관리 화면 전환');
+    $('#keep-editing').onclick = close;
+    $('#discard-and-switch').onclick = () => { close(); performTeacherContextSwitch(kind, value); };
+    return;
+  }
+  performTeacherContextSwitch(kind, value);
+}
 $('#app').addEventListener('change', event => {
   const input = event.target;
   if (input.id === 'teacher-division') {
-    const previous = A.data.profile.active_division;
-    input.disabled = true;
-    api('/teacher/division', { division: input.value }, 'PATCH').then(async () => {
-      A.examForm = null; A.ranges = {}; A.search = ''; A.classFilter = ''; await refresh(); preferences(); render();
-      toast(`${A.data.profile.active_division === 'middle' ? '중등부' : '고등부'} 관리 화면으로 변경했어요.`);
-    }).catch(err => { input.value = previous; input.disabled = false; toast(err.message); });
+    requestTeacherContextSwitch('division', input.value, input);
     return;
   }
   if (input.id === 'teacher-school') {
-    const previous = A.data.profile.active_school_id;
-    input.disabled = true;
-    api('/teacher/school', { school_id: input.value }, 'PATCH').then(async () => { A.examForm = null; A.ranges = {}; await refresh(); render(); toast(`${A.data.profile.active_school} 관리 화면으로 변경했어요.`); }).catch(err => { input.value = previous; input.disabled = false; toast(err.message); });
+    requestTeacherContextSwitch('school', input.value, input);
     return;
   }
   if (input.dataset.middleWord) {
@@ -165,8 +193,9 @@ function bindPageForms() {
   $('#vocab-search')?.addEventListener('input', e => { A.vocabSearch = e.target.value; $('#vocab-table').innerHTML = vocabTable(A); });
   const form = $('#exam-form');
   if (form) {
-    form.oninput = () => updateExamSummary(A);
+    form.oninput = () => { A.examFormDirty = true; updateExamSummary(A); };
     form.onchange = event => {
+      A.examFormDirty = true;
       collectExamForm(A);
       if (event.target?.name === 'class_name') { getRanges(A, A.school, examRangeGrade(A.examForm.class_name)); render(); return; }
       updateExamSummary(A);
@@ -175,12 +204,12 @@ function bindPageForms() {
       e.preventDefault(); collectExamForm(A); const v = A.examForm, b = $('[type="submit"]', form); buttonBusy(b); $('#exam-create-error').textContent = '';
       try {
         await api('/exams', { title: v.title, school: A.school, range_codes: getRanges(A, A.school, examRangeGrade(v.class_name)).selected, class_name: v.class_name, exam_type: v.exam_type, question_count: v.question_count === 'all' ? 'all' : Number(v.question_count), duration_sec: Number(v.minutes) * 60, passing_score: Number(v.passing_score), max_attempts: Number(v.max_attempts), available_at: new Date(v.available).getTime(), due_at: new Date(v.due).getTime(), release_result: v.release_result });
-        A.examForm = null; await refresh(); A.tab = 'exams'; render(); toast('시험이 학생에게 배정됐어요.');
+        A.examForm = null; A.examFormDirty = false; await refresh(); A.tab = 'exams'; render(); toast('시험이 학생에게 배정됐어요.');
       } catch (err) { $('#exam-create-error').textContent = err.message; buttonBusy(b, false); }
     };
   }
 }
-async function logout() { await api('/logout', {}); clearInterval(poll); leaveSession(); A.data = null; A.ranges = {}; A.style = null; A.examForm = null; $('#modal-root').innerHTML = ''; loginView(); }
+async function logout() { await api('/logout', {}); clearInterval(poll); leaveSession(); A.data = null; A.ranges = {}; A.style = null; A.examForm = null; A.examFormDirty = false; $('#modal-root').innerHTML = ''; loginView(); }
 async function resolveDispute(id, action, button) {
   const messages = {
     approve_global: '이 표현을 모든 학생의 정답으로 인정할까요? 허용 뜻 DB에 저장되고 같은 이의제기가 자동 재채점됩니다.',
