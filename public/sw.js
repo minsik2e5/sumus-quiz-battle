@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.22.0-final-learning-exam-flow';
+const VERSION = 'sumus-voca-v13.23.0-premium-mobile-redesign';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -17,6 +17,7 @@ const SHELL = [
   '/v1320.css',
   '/v1321.css',
   '/v1322.css',
+  '/v1323.css',
   '/app.js',
   '/signup-ui.js',
   '/teacher-enhancements.js',
