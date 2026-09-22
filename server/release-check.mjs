@@ -347,6 +347,23 @@ export async function runReleaseCheck() {
     }
     assert(state.sessions.filter(session => session.student_id === student.id).length >= 8, 'all eight high-school practice modes are recorded for the student');
 
+    const testStarted = await service(state, 'POST', '/practice/start', {
+      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'test'
+    }, studentToken);
+    assert(testStarted.run_mode === 'test' && testStarted.feedback === null && testStarted.score === null, 'test mode hides correctness until final submit');
+    await expectStatus(409, () => service(state, 'POST', `/practice/${testStarted.id}/finish`, {}, studentToken), 'test mode blocks early manual finish');
+    let testView = testStarted;
+    let testAnswered = 0;
+    while (!testView.finished && testAnswered < 8) {
+      const currentWord = allWords.find(item => item.id === testView.question.word_id);
+      const answer = testAnswered === 0 ? '__wrong_test_answer__' : answerFor('write_meaning', currentWord);
+      testView = await service(state, 'POST', `/practice/${testStarted.id}/answer`, { question_id: testView.question_id, answer }, studentToken);
+      testAnswered += 1;
+      if (!testView.finished) assert(testView.feedback === null && testView.score === null, 'test mode advances without revealing grading');
+    }
+    const testSession = state.sessions.find(item => item.id === testStarted.id);
+    assert(testView.finished === true && testView.score === 80 && testSession?.run_mode === 'test' && testSession?.score === 80, 'test mode grades all five answers together at the end');
+    assert(testSession?.wrong_details?.length === 1, 'test mode stores wrong-answer detail only after completion');
     const wrongPractice = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'spell', target: 5
     }, studentToken);
@@ -481,6 +498,7 @@ export async function runReleaseCheck() {
     const v1311Css = readFileSync(publicRoot + 'v1311.css', 'utf8');
     const v1313Css = readFileSync(publicRoot + 'v1313.css', 'utf8');
     const v1315Css = readFileSync(publicRoot + 'v1315.css', 'utf8');
+    const v1317Css = readFileSync(publicRoot + 'v1317.css', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
     const practiceEnhancements = readFileSync(publicRoot + 'practice-enhancements.js', 'utf8');
@@ -516,10 +534,13 @@ export async function runReleaseCheck() {
     assert(studentModule.includes('middleVocabPractice') && studentModule.includes('data-middle-word') && studentModule.includes('data-middle-preset'), 'V13.13 middle student UI lists lesson words for exact checkbox selection');
     assert(sessionsModule.includes('word_ids: A.middleWordIds') && sessionsModule.includes('3000'), 'V13.13 sends exact middle word ids and keeps correct feedback visible for three seconds');
     assert(practiceEnhancements.includes('sumusBurstFade 2.2s') && practiceEnhancements.includes('2300'), 'V13.13 correct-answer overlay stays visible long enough to read');
-    assert(indexHtml.includes('/app.js?v=13.16.0') && indexHtml.includes('/practice-enhancements.js?v=13.16.0') && indexHtml.includes('/v1315.css?v=13.16.0') && sw.includes('sumus-voca-v13.16.0-auto-role-login'), 'V13.16 cache versions are active');
+    assert(indexHtml.includes('/app.js?v=13.17.0') && indexHtml.includes('/practice-enhancements.js?v=13.17.0') && indexHtml.includes('/v1317.css?v=13.17.0') && sw.includes('sumus-voca-v13.17.0-test-mode-badges'), 'V13.17 cache versions are active');
     assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'V13.15 puts meaning and English writing first and exposes student score history');
     assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && sessionsModule.includes('practice-timer-value'), 'V13.15 student home shows recent scores and timed practice countdown');
     assert(teacherModule.includes('학생별 연습 결과') && teacherModule.includes('data-practice-record') && appJs.includes('openPracticeRecord'), 'V13.15 teacher can inspect practice scores and wrong answers');
+    assert(studentModule.includes('실전 모드') && studentModule.includes('data-practice-run-mode="test"') && sessionsModule.includes('실전 모드에서는 뒤로 갈 수 없어요'), 'V13.17 exposes locked no-feedback writing test mode');
+    assert(studentModule.includes('첫 100점') && studentModule.includes('3회 연속 90점+') && studentModule.includes('영어쓰기 100점') && studentModule.includes('achievementSection'), 'V13.17 student achievement badges are present');
+    assert(v1317Css.includes('.run-mode-grid') && v1317Css.includes('.achievement-grid'), 'V13.17 test mode and achievement styles are loaded');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
