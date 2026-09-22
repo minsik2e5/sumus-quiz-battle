@@ -149,7 +149,14 @@ $('#app').addEventListener('click', async event => {
     if (d.disputeReject) { await resolveDispute(d.disputeReject, 'reject', b); return; }
     if (d.action === 'refresh') { buttonBusy(b); await refresh(); render(); toast('최신 기록으로 업데이트했어요.'); }
     if (d.action === 'start-practice') { A.practiceRunMode = 'practice'; savePreferences(); buttonBusy(b); await startPractice({ runMode: 'practice' }); }
-    if (d.action === 'start-self-test') { A.practiceRunMode = 'test'; savePreferences(); buttonBusy(b); await startPractice({ runMode: 'test' }); }
+    if (d.action === 'start-self-test') {
+      A.practiceRunMode = 'test'; savePreferences(); buttonBusy(b);
+      if (A.data.profile.division === 'middle') {
+        const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
+        const target = A.target === 'all' ? 'all' : Math.min(words.length, Number(A.target || words.length));
+        await startPractice({ wordIds: words.map(word => word.id), target, mode: A.mode, runMode: 'test' });
+      } else await startPractice({ runMode: 'test' });
+    }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
       const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.21.0');
       openGrammarChoiceSample(A, render, d.grammarId);
