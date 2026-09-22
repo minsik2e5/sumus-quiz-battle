@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.18.0-p0-score-target-scope';
+const VERSION = 'sumus-voca-v13.19.0-p0-finish-dispute-session';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
