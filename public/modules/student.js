@@ -294,7 +294,7 @@ function compactGrowth(A) {
     <div class="home-week-days">${week.map(day => `<div class="${day.active ? 'active' : ''} ${day.current ? 'today' : ''}"><span>${day.label}</span><b>${day.active ? '✓' : day.date}</b></div>`).join('')}</div>
   </section>`;
 }
-function homeSchedule(A) {function homeSchedule(A) {
+function homeSchedule(A) {
   const rows = [];
   const latestTests = [...(A.data.sessions || [])].filter(item => item.run_mode === 'test').sort((a,b) => b.created_at - a.created_at).slice(0,2);
   for (const item of latestTests) {
@@ -327,7 +327,7 @@ function home(A) {
     ${compactGrowth(A)}
     ${recentRecordCard(A)}`;
 }
-function studyHub(A) {function studyHub(A) {
+function studyHub(A) {
   return `<div class="page-heading study-simple-heading premium-page-heading"><span class="premium-eyebrow">LEARNING</span><h1>학습</h1></div>
   <div class="study-hub-grid study-hub-simple">
     <button class="study-hub-card vocab" data-study="vocab">
