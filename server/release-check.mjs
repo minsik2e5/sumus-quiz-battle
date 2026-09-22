@@ -4,7 +4,7 @@ import { emptyState } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
 import { allBooks, service, sweep } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
-import { EXAM_TYPES, PRACTICE_TYPES, grade, displayEnglish } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
 import { runContentValidation } from './content-validation.mjs';
 import { openGrammarChoiceSample } from '../public/grammar-choice-sample.js';
 
@@ -23,6 +23,7 @@ const expectStatus = async (status, fn, label) => {
 };
 const answerFor = (type, word) => {
   if (['mean2eng_mc', 'mean2eng', 'write_en', 'spell', 'scramble', 'vowelblank', 'initial'].includes(type)) return displayEnglish(word.word);
+  if (type === 'write_meaning') return meaningAccepted(word.meaning, word.accepted_meanings)[0] || word.meaning;
   return word.meaning;
 };
 
@@ -266,7 +267,9 @@ export async function runReleaseCheck() {
       const submitted = await service(state, 'POST', `/attempts/${internal.id}/submit`, {
         lease: internal.lease, revision: internal.revision, answers
       }, studentToken);
-      assert(submitted.attempt.status === 'submitted' && submitted.attempt.score === 100, `${exam.exam_type} grades correct answers at 100`);
+      const gradedInternal = state.examAttempts.find(item => item.id === internal.id);
+      assert(submitted.attempt.status === 'submitted' && gradedInternal?.score === 100, `${exam.exam_type} grades correct answers at 100`);
+      if (!exam.release_result) assert(submitted.attempt.result_visibility === 'withheld' && submitted.attempt.score === undefined, `${exam.exam_type} respects withheld student results after grading`);
     }
     const hiddenExam = await service(state, 'POST', '/exams', {
       title: 'QA hidden result', class_name: '고1A', school: '단원고', range_codes: [rangeCode], exam_type: 'write_meaning',
