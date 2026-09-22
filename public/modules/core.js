@@ -1,8 +1,8 @@
 export const EXAM_TYPES = {
-  eng2mean_mc: { label: '영어 → 뜻 객관식', help: '영어를 보고 뜻 고르기', input: false },
-  mean2eng_mc: { label: '뜻 → 영어 객관식', help: '뜻을 보고 영어 고르기', input: false },
+  write_meaning: { label: '뜻쓰기', help: '영어를 보고 뜻 직접 쓰기', input: true },
   write_en: { label: '영어쓰기', help: '뜻을 보고 영어 직접 쓰기', input: true },
-  write_meaning: { label: '뜻쓰기', help: '영어를 보고 뜻 직접 쓰기', input: true }
+  eng2mean_mc: { label: '영어 → 뜻 객관식', help: '영어를 보고 뜻 고르기', input: false },
+  mean2eng_mc: { label: '뜻 → 영어 객관식', help: '뜻을 보고 영어 고르기', input: false }
 };
 // Shared class roster used by teacher assignment forms. Keep values stable so
 // student visibility (school + class match) remains deterministic.
