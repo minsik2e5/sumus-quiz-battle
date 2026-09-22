@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.16.0-auto-role-login';
+const VERSION = 'sumus-voca-v13.17.0-test-mode-badges';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -13,6 +13,7 @@ const SHELL = [
   '/v1311.css',
   '/v1313.css',
   '/v1315.css',
+  '/v1317.css',
   '/app.js',
   '/signup-ui.js',
   '/teacher-enhancements.js',

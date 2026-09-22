@@ -1,0 +1,23 @@
+/* SUMUS VOCA V13.17 · writing test mode + achievement badges */
+.run-mode-panel{margin:12px 0 16px;padding:14px;border:1px solid #dfe5e2;border-radius:17px;background:#fafcfb}
+.run-mode-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.run-mode-head b{font-size:12px;color:#26332e}.run-mode-head span{font-size:10px;color:#98a2b3}
+.run-mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.run-mode-grid button{min-height:76px;padding:13px;border:1px solid #e1e6e3;border-radius:14px;background:#fff;text-align:left;transition:.16s ease}
+.run-mode-grid button strong{display:block;font-size:13px;color:#344054}
+.run-mode-grid button small{display:block;margin-top:5px;color:#84908b;font-size:10px;line-height:1.45}
+.run-mode-grid button.selected{border-color:#356ee8;background:#eef4ff;box-shadow:0 7px 18px rgba(53,110,232,.08)}
+.run-mode-grid button.selected strong{color:#2457c7}
+.test-lock-mark{display:grid;place-items:center;width:38px;height:38px;border:1px solid #e3e8e5;border-radius:12px;background:#f5f7f6;color:#667085}
+.achievement-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-bottom:18px}
+.achievement-badge{display:grid;grid-template-columns:38px 1fr;align-items:center;gap:10px;min-height:70px;padding:12px 13px;border:1px solid #e5e9e7;border-radius:15px;background:#fff}
+.achievement-badge>span{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:#f2f5f3;color:#7a8782}
+.achievement-badge b{display:block;font-size:12px;color:#344054}.achievement-badge small{display:block;margin-top:3px;color:#98a2b3;font-size:10px;line-height:1.35}
+.achievement-badge.earned{border-color:#c9dfd6;background:linear-gradient(135deg,#f5fbf8,#fff)}
+.achievement-badge.earned>span{background:#e8f5ef;color:#1f6b52}
+.achievement-badge.earned b{color:#174f40}
+.achievement-badge.locked{opacity:.62}
+@media(max-width:560px){
+  .run-mode-grid{grid-template-columns:1fr}
+  .achievement-grid{grid-template-columns:1fr}
+}
