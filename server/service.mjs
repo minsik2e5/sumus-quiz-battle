@@ -981,7 +981,8 @@ export async function service(state, method, path, body, token) {
 }
 function advancePractice(x, state) {
   const covered = !x.cover_all || (x.seen?.length || 0) >= x.words.length;
-  if (covered && x.total >= x.target && (!x.retry.length || x.total >= x.target + 12)) finishPractice(x, state);
+  const scoredDone = Number(x.score_total || 0) >= Number(x.target || 0);
+  if (covered && scoredDone && (!x.retry.length || x.total >= x.target + 12)) finishPractice(x, state);
   else nextPractice(x, state);
 }
 function nextPractice(x, state) {
@@ -1046,7 +1047,7 @@ function practiceView(x, state) {
     started_at: x.started_at, finished_at: x.finished_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
     auto_submitted: !!x.auto_submitted,
     wrong_details: x.finished ? (x.wrong_details || []) : undefined,
-    question: x.question, question_id: x.question_id, feedback: x.feedback,
+    question: x.question, question_id: x.question_id, question_is_retry: !!x.question_is_retry, feedback: x.feedback,
     finished: x.finished, retry_count: x.retry.length,
     stats: growthFor(mySessions(state, x.student_id)), server_time: Date.now()
   };
