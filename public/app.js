@@ -1,10 +1,10 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
-import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, practiceDurationSec } from './modules/core.js';
+import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS } from './modules/core.js';
 import { avatar } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.21.0';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.21.0';
-import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.21.0';
-const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', vocabPanel: 'memorize', memorizeFilter: 'all', memorizeShowAll: false, memStars: [], memRevealed: [] };
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.22.0';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.22.0';
+import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.22.0';
+const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memStars: [], memRevealed: [] };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
 const examTargetMatches = (exam, profile) => exam?.class_name === ALL_CLASSES || exam?.class_name === profile?.class_name;
@@ -12,9 +12,9 @@ const examRangeGrade = value => value === ALL_CLASSES ? null : value;
 const examTargetOptions = () => A.data.profile.active_division === 'middle' ? ['중2', '중3'] : [ALL_CLASSES, '고1A', '고1B'];
 let poll, rendering = false, contextGeneration = 0;
 function preferences() {
-  try { const v = JSON.parse(localStorage.getItem('sumus:v13:prefs:' + A.data.profile.id) || localStorage.getItem('sumus:v12:prefs:' + A.data.profile.id) || '{}'); A.ranges = v.ranges || {}; A.school = A.data.profile.role === 'teacher' ? A.data.profile.active_school : A.data.profile.school || v.school || A.data.schools[0]?.name || '단원고'; A.division = A.data.profile.active_division || A.data.profile.division || A.division || 'high'; A.mode = v.mode || 'write_meaning'; A.practiceRunMode = ['practice','test'].includes(v.practiceRunMode) ? v.practiceRunMode : 'practice'; A.target = v.target || 30; A.middleRange = v.middleRange || A.middleRange || ''; A.middleWordIds = Array.isArray(v.middleWordIds) ? v.middleWordIds : (A.middleWordIds || []); A.rankMode = v.rankMode || A.rankMode || 'xp'; A.rankScope = v.rankScope || A.rankScope || 'all'; A.rankPeriod = v.rankPeriod || A.rankPeriod || 'week'; A.vocabPanel = ['memorize','quiz'].includes(v.vocabPanel) ? v.vocabPanel : 'memorize'; A.memorizeFilter = v.memorizeFilter === 'starred' ? 'starred' : 'all'; A.memStars = Array.isArray(v.memStars) ? v.memStars : []; A.sound = localStorage.getItem('sumus:sound') === 'true'; } catch {}
+  try { const v = JSON.parse(localStorage.getItem('sumus:v13:prefs:' + A.data.profile.id) || localStorage.getItem('sumus:v12:prefs:' + A.data.profile.id) || '{}'); A.ranges = v.ranges || {}; A.school = A.data.profile.role === 'teacher' ? A.data.profile.active_school : A.data.profile.school || v.school || A.data.schools[0]?.name || '단원고'; A.division = A.data.profile.active_division || A.data.profile.division || A.division || 'high'; A.mode = v.mode || 'write_meaning'; A.practiceRunMode = ['practice','test'].includes(v.practiceRunMode) ? v.practiceRunMode : 'practice'; A.target = v.target || 30; A.middleRange = v.middleRange || A.middleRange || ''; A.middleWordIds = Array.isArray(v.middleWordIds) ? v.middleWordIds : (A.middleWordIds || []); A.rankMode = v.rankMode || A.rankMode || 'xp'; A.rankScope = v.rankScope || A.rankScope || 'all'; A.rankPeriod = v.rankPeriod || A.rankPeriod || 'week'; A.memorizeFilter = v.memorizeFilter === 'starred' ? 'starred' : 'all'; A.memStars = Array.isArray(v.memStars) ? v.memStars : []; A.sound = localStorage.getItem('sumus:sound') === 'true'; } catch {}
 }
-function savePreferences() { try { localStorage.setItem('sumus:v13:prefs:' + A.data.profile.id, JSON.stringify({ ranges: A.ranges, school: A.school, mode: A.mode, practiceRunMode: A.practiceRunMode, target: A.target, rankMode: A.rankMode, rankScope: A.rankScope, rankPeriod: A.rankPeriod, middleRange: A.middleRange, middleWordIds: A.middleWordIds || [], vocabPanel: A.vocabPanel || 'memorize', memorizeFilter: A.memorizeFilter || 'all', memStars: A.memStars || [] })); } catch {} }
+function savePreferences() { try { localStorage.setItem('sumus:v13:prefs:' + A.data.profile.id, JSON.stringify({ ranges: A.ranges, school: A.school, mode: A.mode, practiceRunMode: A.practiceRunMode, target: A.target, rankMode: A.rankMode, rankScope: A.rankScope, rankPeriod: A.rankPeriod, middleRange: A.middleRange, middleWordIds: A.middleWordIds || [], memorizeFilter: A.memorizeFilter || 'all', memStars: A.memStars || [] })); } catch {} }
 async function refresh() { A.data = await api('/bootstrap'); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; }
 globalThis.__SUMUS_APPLY_BOOTSTRAP__ = data => { A.data = data; globalThis.__SUMUS_BOOTSTRAP__ = data; if (data?.profile?.role === 'teacher') A.school = data.profile.active_school; if (!A.screen) render(); };
 function render() {
@@ -26,7 +26,7 @@ configureSessions(A, render, refresh);
 function navigate(tab) {
   collectExamForm(A); A.tab = tab;
   if (tab === 'practice') { A.studyView = 'hub'; A.practiceRunMode = 'practice'; }
-  if (tab === 'exam') { A.practiceRunMode = 'test'; if (!['write_meaning','spell'].includes(A.mode)) A.mode = 'write_meaning'; }
+  if (tab === 'exam') { A.examKind = null; A.practiceRunMode = 'practice'; if (!['write_meaning','spell'].includes(A.mode)) A.mode = 'write_meaning'; }
   A.search = ''; A.classFilter = ''; A.style = null; render(); window.scrollTo(0, 0);
 }
 function loginView(role = A.role, division = A.division) {
@@ -57,8 +57,7 @@ $('#app').addEventListener('click', async event => {
   const d = b.dataset; if (!Object.keys(d).length) return; event.preventDefault();
   try {
     if (d.go) return navigate(d.go);
-    if (d.study) { A.studyView = d.study; A.tab = 'practice'; if (d.study === 'vocab') { A.vocabPanel = 'memorize'; A.practiceRunMode = 'practice'; } render(); window.scrollTo(0, 0); return; }
-    if (d.vocabPanel) { A.vocabPanel = d.vocabPanel === 'quiz' ? 'quiz' : 'memorize'; A.practiceRunMode = 'practice'; savePreferences(); render(); window.scrollTo(0,0); return; }
+    if (d.study) { A.studyView = d.study; A.tab = 'practice'; A.practiceRunMode = 'practice'; render(); window.scrollTo(0, 0); return; }
     if (d.memorizeFilter) { A.memorizeFilter = d.memorizeFilter === 'starred' ? 'starred' : 'all'; savePreferences(); render(); return; }
     if (d.memorizeRevealAll) { A.memorizeShowAll = d.memorizeRevealAll === 'show'; render(); return; }
     if (d.memorizeWord) {
@@ -67,15 +66,22 @@ $('#app').addEventListener('click', async event => {
     if (d.memorizeStar) {
       const set = new Set(A.memStars || []); set.has(d.memorizeStar) ? set.delete(d.memorizeStar) : set.add(d.memorizeStar); A.memStars = [...set]; savePreferences(); render(); return;
     }
-    if (d.memorizePractice === 'starred') {
-      const stars = new Set(A.memStars || []);
-      const allWords = A.data.books.flatMap(book => book.words || []);
-      const scoped = A.data.profile.division === 'middle'
-        ? allWords.filter(word => String(word.range_code) === String(A.middleRange || ''))
-        : (() => { const selected = new Set(A.ranges[A.school] || []); return allWords.filter(word => selected.has(word.range_code)); })();
-      const ids = scoped.filter(word => stars.has(word.id)).map(word => word.id);
-      if (!ids.length) return toast('현재 범위에 별표 단어가 없어요.');
-      A.mode = 'write_meaning'; A.practiceRunMode = 'practice'; savePreferences(); buttonBusy(b); await startPractice({ wordIds: ids, mode: 'write_meaning', runMode: 'practice' }); return;
+    if (d.memorizeSpeak) {
+      const word = A.data.books.flatMap(book => book.words || []).find(item => item.id === d.memorizeSpeak);
+      if (!word) return toast('단어를 찾을 수 없어요.');
+      if (!('speechSynthesis' in window)) return toast('이 기기에서는 발음 재생을 지원하지 않아요.');
+      speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(String(word.word || '').replace(/\([^)]*\)|\[[^\]]*\]/g, '').trim());
+      utterance.lang = 'en-US'; utterance.rate = .82;
+      utterance.onerror = () => toast('발음을 재생하지 못했어요. 다시 눌러주세요.');
+      speechSynthesis.speak(utterance);
+      return;
+    }
+    if (d.examKind) {
+      A.examKind = d.examKind === 'test' ? 'test' : 'practice';
+      A.practiceRunMode = A.examKind === 'test' ? 'test' : 'practice';
+      if (!['write_meaning','spell'].includes(A.mode)) A.mode = 'write_meaning';
+      render(); window.scrollTo(0,0); return;
     }
     if (d.quickPractice) {
       if (!A.data.active_practice && !(A.data.daily_quest?.target > 0)) {
@@ -94,16 +100,8 @@ $('#app').addEventListener('click', async event => {
     if (d.school && A.data.profile.role === 'teacher') { collectExamForm(A); A.school = d.school; A.vocabRange = ''; A.assignmentId = null; savePreferences(); render(); return; }
     if (d.rangeAll) { const { codes } = getRanges(A); A.ranges[A.school] = d.rangeAll === 'true' ? [...codes] : []; $$('[data-range]').forEach(i => i.checked = d.rangeAll === 'true'); updateRangeSummary(A); updateExamSummary(A); savePreferences(); return; }
     if (d.mode) { A.mode = d.mode; if (!['write_meaning','spell'].includes(A.mode)) A.practiceRunMode = 'practice'; savePreferences(); render(); return; }
-    if (d.practiceRunMode) { A.practiceRunMode = d.practiceRunMode === 'test' ? 'test' : 'practice'; savePreferences(); render(); return; }
-    if (d.otherPractice) { A.otherPracticeOpen = !A.otherPracticeOpen; render(); return; }
-    if (d.middleWordsToggle) { A.middleWordsOpen = !A.middleWordsOpen; render(); return; }
     if (d.practiceTarget) { A.target = d.practiceTarget === 'all' ? 'all' : Number(d.practiceTarget); $$('[data-practice-target]').forEach(e => { const selected = e === b; e.classList.toggle('selected', selected); e.setAttribute('aria-pressed', String(selected)); }); savePreferences(); render(); return; }
     if (d.middleLesson) { A.middleRange = d.middleLesson; A.middleWordIds = []; savePreferences(); render(); return; }
-    if (d.middlePreset) {
-      const lessonWords = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
-      A.middleWordIds = d.middlePreset === 'clear' ? [] : d.middlePreset === 'all' ? lessonWords.map(word => word.id) : lessonWords.slice(0, Number(d.middlePreset)).map(word => word.id); A.middleSelectionTouched = true;
-      savePreferences(); render(); return;
-    }
     if (d.rankMode) { A.rankMode = d.rankMode; savePreferences(); render(); return; }
     if (d.rankScope) { A.rankScope = d.rankScope; savePreferences(); render(); return; }
     if (d.rankPeriod) { A.rankPeriod = d.rankPeriod; savePreferences(); render(); return; }
@@ -153,17 +151,20 @@ $('#app').addEventListener('click', async event => {
     if (d.disputeOnce) { await resolveDispute(d.disputeOnce, 'approve_once', b); return; }
     if (d.disputeReject) { await resolveDispute(d.disputeReject, 'reject', b); return; }
     if (d.action === 'refresh') { buttonBusy(b); await refresh(); render(); toast('최신 기록으로 업데이트했어요.'); }
-    if (d.action === 'start-practice') { A.practiceRunMode = 'practice'; savePreferences(); buttonBusy(b); await startPractice({ runMode: 'practice' }); }
-    if (d.action === 'start-self-test') {
-      A.practiceRunMode = 'test'; savePreferences(); buttonBusy(b);
+    if (d.action === 'start-exam-run') {
+      const runMode = A.examKind === 'test' ? 'test' : 'practice';
+      A.practiceRunMode = runMode; savePreferences(); buttonBusy(b);
       if (A.data.profile.division === 'middle') {
         const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
         const target = A.target === 'all' ? 'all' : Math.min(words.length, Number(A.target || words.length));
-        await startPractice({ wordIds: words.map(word => word.id), target, mode: A.mode, runMode: 'test' });
-      } else await startPractice({ runMode: 'test' });
+        await startPractice({ wordIds: words.map(word => word.id), target, mode: A.mode, runMode, examStyle: true, confirmed: true });
+      } else {
+        await startPractice({ runMode, examStyle: true, confirmed: true });
+      }
+      return;
     }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
-      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.21.0');
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.22.0');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
@@ -221,26 +222,7 @@ $('#app').addEventListener('change', event => {
     requestTeacherContextSwitch('school', input.value, input);
     return;
   }
-  if (input.dataset.middleWord) {
-    const values = new Set(A.middleWordIds || []);
-    if (input.checked) values.add(input.dataset.middleWord); else values.delete(input.dataset.middleWord);
-    A.middleWordIds = [...values]; A.middleSelectionTouched = true;
-    savePreferences();
-    const count = $('#middle-selected-count'); if (count) count.textContent = `${A.middleWordIds.length}개 선택`;
-    const directCount = $('.direct-word-toggle>strong'); if (directCount) directCount.textContent = `${A.middleWordIds.length}개 선택`;
-    const start = $('[data-action="start-practice"]'); if (start && !A.data.active_practice) start.disabled = !A.middleWordIds.length;
-    const summary = $('#setup-summary-text');
-    if (summary) {
-      const amount = A.middleWordIds.length;
-      const duration = amount ? practiceDurationSec(A.mode, amount) : 0;
-      const run = ['write_meaning','spell'].includes(A.mode) && A.practiceRunMode === 'test' ? '실전 모드' : '연습 모드';
-      const durationText = duration ? `${Math.floor(duration / 60)}분 ${String(duration % 60).padStart(2,'0')}초` : '';
-      summary.textContent = amount ? `${A.middleRange}과 · ${amount}단어 · ${PRACTICE_TYPES[A.mode] || '학습'} · ${run} · ${durationText}` : '학습할 단어를 선택해주세요.';
-    }
-    input.closest('.middle-word-row')?.classList.toggle('selected', input.checked);
-    return;
-  }
-    if (input.dataset.range) {
+  if (input.dataset.range) {
     const grade = input.dataset.rangeGrade || null;
     const info = getRanges(A, A.school, grade);
     const values = new Set(info.selected);

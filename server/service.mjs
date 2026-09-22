@@ -1,6 +1,6 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
-import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, ACCESSORIES, FRAMES, TITLES, unlocked, growthFor, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, ACCESSORIES, FRAMES, TITLES, unlocked, growthFor, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
 import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { middleGrade3Books } from './middle-vocab.mjs';
@@ -392,7 +392,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.21.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.22.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -471,6 +471,9 @@ export async function service(state, method, path, body, token) {
       score_total: Number(activePractice.score_total || 0),
       started_at: activePractice.started_at,
       deadline: activePractice.deadline,
+      question_deadline: activePractice.question_deadline || null,
+      question_duration_sec: activePractice.question_duration_sec || null,
+      timer_mode: activePractice.timer_mode || 'session',
       assignment_id: activePractice.assignment_id || null
     } : null;
     return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes } : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
@@ -951,6 +954,7 @@ export async function service(state, method, path, body, token) {
     if (!PRACTICE_TYPES[body.mode]) fail('연습 방식을 선택해주세요.');
     const requestedRunMode = body.run_mode === 'test' ? 'test' : 'practice';
     const runMode = requestedRunMode === 'test' && ['write_meaning','spell'].includes(body.mode) ? 'test' : 'practice';
+    const examStyle = body.exam_style === true && ['write_meaning','spell'].includes(body.mode);
     const isDailyQuest = body.daily_quest === true && school.division !== 'middle';
     const selectedWordIds = Array.isArray(body.word_ids)
       ? [...new Set(body.word_ids.map(value => String(value)).filter(Boolean))].slice(0, 200)
@@ -968,11 +972,12 @@ export async function service(state, method, path, body, token) {
     const requestedTarget = manualSelection
       ? (body.target === undefined ? words.length : integer(body.target, 5, Math.min(500, words.length), '학습량'))
       : isDailyQuest ? daily.target : coverAll ? words.length : integer(body.target || 10, 5, 500, '학습량');
-    const target = runMode === 'test' ? Math.min(requestedTarget, words.length) : requestedTarget;
-    const practiceWords = runMode === 'test' ? shuffle(words).slice(0, target) : words;
+    const target = runMode === 'test' || examStyle ? Math.min(requestedTarget, words.length) : requestedTarget;
+    const practiceWords = runMode === 'test' || examStyle ? shuffle(words).slice(0, target) : words;
     const startedAt = Date.now();
     const durationSec = practiceDurationSec(body.mode, target);
-    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, run_mode: runMode, assignment_id: null, target, cover_all: runMode === 'test' ? true : coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection && runMode !== 'test', quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, deadline: startedAt + durationSec * 1000, auto_submitted: false, wrong_details: [], answer_records: [], finished: false, responses: {}, words: practiceWords.map(w => w.id) };
+    const questionDurationSec = Number(PRACTICE_SECONDS_PER_QUESTION[body.mode] || 8);
+    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, run_mode: runMode, exam_style: examStyle, assignment_id: null, target, cover_all: runMode === 'test' || examStyle ? true : coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection && runMode !== 'test', quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, timer_mode: 'question', question_duration_sec: questionDurationSec, question_started_at: null, question_deadline: null, deadline: null, auto_submitted: false, wrong_details: [], answer_records: [], finished: false, responses: {}, words: practiceWords.map(w => w.id) };
     if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
@@ -991,13 +996,15 @@ export async function service(state, method, path, body, token) {
     }
     if (path.endsWith('/answer')) {
       if (x.responses[body.question_id]) return x.responses[body.question_id];
-      if (!x.finished && Number(x.deadline || 0) && Date.now() >= x.deadline) {
+      if (!x.finished && x.timer_mode !== 'question' && Number(x.deadline || 0) && Date.now() >= x.deadline) {
         finishPractice(x, state, true);
         return practiceView(x, state);
       }
       if (x.finished || x.feedback || body.question_id !== x.question_id) fail('현재 문제를 다시 확인해주세요.', 409);
+      const timedOut = x.timer_mode === 'question' && Number(x.question_deadline || 0) > 0 && (Date.now() >= Number(x.question_deadline) || (body.timed_out === true && Date.now() + 150 >= Number(x.question_deadline)));
+      const submittedAnswer = timedOut ? '' : body.answer;
       const word = allBooks(state).flatMap(b => b.words).find(w => w.id === x.question.word_id);
-      const ok = grade(x.question.type, body.answer, wordForGrade(state, word));
+      const ok = timedOut ? false : grade(x.question.type, submittedAnswer, wordForGrade(state, word));
       x.total++; x.last = word.id;
       const scoredAttempt = !x.question_is_retry && Number(x.score_total || 0) < Number(x.target || 0);
       if (scoredAttempt) {
@@ -1009,7 +1016,8 @@ export async function service(state, method, path, body, token) {
           word_id: word.id,
           word: displayEnglish(word.word),
           meaning: word.meaning,
-          answer: str(body.answer, 160),
+          answer: str(submittedAnswer, 160),
+          timed_out: !!timedOut,
           type: x.question.type,
           correct: !!ok,
           at: Date.now(),
@@ -1025,7 +1033,8 @@ export async function service(state, method, path, body, token) {
       m.recent_results.push({ ok, at: Date.now() });
       if (m.recent_results.length > 5) m.recent_results.splice(0, m.recent_results.length - 5);
       m.last_seen = Date.now(); m.next_review_at = Date.now() + (ok ? 3600000 + m.mastery * 864000 : 120000);
-      x.feedback = { ok, gain, mastery: m.mastery, word_id: word.id, type: x.question.type, question_id: body.question_id, answer: str(body.answer, 160), word: displayEnglish(word.word), meaning: word.meaning, combo: x.combo, retry: !ok, can_dispute: !ok && scoredAttempt && x.question.type === 'write_meaning', scored: scoredAttempt, milestone: ok && [5, 10].includes(x.combo) };
+      x.feedback = { ok, gain, mastery: m.mastery, word_id: word.id, type: x.question.type, question_id: body.question_id, answer: str(submittedAnswer, 160),
+          timed_out: !!timedOut, word: displayEnglish(word.word), meaning: word.meaning, combo: x.combo, retry: !ok, can_dispute: !ok && !timedOut && scoredAttempt && x.question.type === 'write_meaning', scored: scoredAttempt, milestone: ok && [5, 10].includes(x.combo) };
       if (!ok && scoredAttempt) {
         x.wrong_details ??= [];
         x.wrong_details.push({
@@ -1033,7 +1042,8 @@ export async function service(state, method, path, body, token) {
           word_id: word.id,
           word: displayEnglish(word.word),
           meaning: word.meaning,
-          answer: str(body.answer, 160),
+          answer: str(submittedAnswer, 160),
+          timed_out: !!timedOut,
           type: x.question.type,
           at: Date.now(),
           regraded: false
@@ -1053,7 +1063,7 @@ export async function service(state, method, path, body, token) {
       // Prepare the following question in the same persisted mutation. The
       // client can still show this answer's feedback, then switch instantly
       // without a second database round trip.
-      if (body.prefetch_next === true) {
+      if (body.prefetch_next === true && x.timer_mode !== 'question') {
         advancePractice(x, state);
         result.prefetched_next = practiceView(x, state);
       }
@@ -1063,12 +1073,12 @@ export async function service(state, method, path, body, token) {
       return result;
     }
     if (path.endsWith('/next') && !x.finished && x.feedback) {
-      if (Number(x.deadline || 0) && Date.now() >= x.deadline) finishPractice(x, state, true);
+      if (x.timer_mode !== 'question' && Number(x.deadline || 0) && Date.now() >= x.deadline) finishPractice(x, state, true);
       else advancePractice(x, state);
     }
     if (path.endsWith('/finish') && !x.finished) {
-      const expired = Number(x.deadline || 0) && Date.now() >= x.deadline;
-      if (x.run_mode === 'test' && !expired && Number(x.score_total || 0) < Number(x.target || 0)) fail('실전 모드는 중간 제출할 수 없어요.', 409);
+      const expired = x.timer_mode !== 'question' && Number(x.deadline || 0) && Date.now() >= x.deadline;
+      if (x.run_mode === 'test' && !expired && Number(x.score_total || 0) < Number(x.target || 0)) fail('실전 시험은 모든 문제를 완료해야 끝낼 수 있어요.', 409);
       finishPractice(x, state, expired);
     }
     return practiceView(x, state);
@@ -1099,6 +1109,11 @@ function nextPractice(x, state) {
   if (!x.seen.includes(word.id)) x.seen.push(word.id);
   const mode = x.mode === 'mixed' ? shuffle(Object.keys(PRACTICE_TYPES).filter(k => k !== 'mixed'))[0] : x.mode;
   x.question = buildQuestion(word, mode, words); x.question_id = id(); x.question_is_retry = isRetry; x.feedback = null;
+  if (x.timer_mode === 'question') {
+    x.question_duration_sec = Number(PRACTICE_SECONDS_PER_QUESTION[mode] || PRACTICE_SECONDS_PER_QUESTION[x.mode] || 8);
+    x.question_started_at = Date.now();
+    x.question_deadline = x.question_started_at + x.question_duration_sec * 1000;
+  }
 }
 function finishPractice(x, state, autoSubmitted = false) {
   const finalizedAt = Date.now();
@@ -1112,8 +1127,9 @@ function finishPractice(x, state, autoSubmitted = false) {
   const scoreCorrect = Math.min(scoreTotal, Number(x.score_correct || 0));
   const score = Math.round(scoreCorrect / scoreTotal * 100);
   const answerRecords = (x.answer_records || []).map(item => ({ ...item }));
-  const wrongCount = answerRecords.filter(item => item.correct === false && !item.regraded).length;
-  const unansweredCount = Math.max(0, scoreTotal - answerRecords.length);
+  const wrongCount = answerRecords.filter(item => item.correct === false && !item.regraded && !item.timed_out).length;
+  const timedOutCount = answerRecords.filter(item => item.timed_out && !item.regraded).length;
+  const unansweredCount = Math.max(0, scoreTotal - answerRecords.length) + timedOutCount;
   const rec = {
     id: x.id,
     student_id: x.student_id,
@@ -1126,6 +1142,7 @@ function finishPractice(x, state, autoSubmitted = false) {
     range_codes: x.range_codes,
     mode: x.mode,
     run_mode: x.run_mode || 'practice',
+    exam_style: !!x.exam_style,
     correct: scoreCorrect,
     total: scoreTotal,
     attempts_total: x.total,
@@ -1137,6 +1154,8 @@ function finishPractice(x, state, autoSubmitted = false) {
     best_combo: x.best,
     duration_sec: Math.max(0, Math.round((endedAt - x.started_at) / 1000)),
     limit_sec: Number(x.duration_sec || 0),
+    timer_mode: x.timer_mode || 'session',
+    question_duration_sec: Number(x.question_duration_sec || 0),
     auto_submitted: !!x.auto_submitted,
     ended_at: endedAt,
     finalized_at: finalizedAt,
@@ -1153,16 +1172,18 @@ function practiceView(x, state) {
   const score = Math.round(scoreCorrect / scoreTotal * 100);
   const hideTestScore = x.run_mode === 'test' && !x.finished;
   const answerRecords = x.answer_records || [];
-  const wrongCount = answerRecords.filter(item => item.correct === false && !item.regraded).length;
-  const unansweredCount = Math.max(0, scoreTotal - answerRecords.length);
+  const wrongCount = answerRecords.filter(item => item.correct === false && !item.regraded && !item.timed_out).length;
+  const timedOutCount = answerRecords.filter(item => item.timed_out && !item.regraded).length;
+  const unansweredCount = Math.max(0, scoreTotal - answerRecords.length) + timedOutCount;
   const perfect = x.finished && score === 100 && wrongCount === 0 && unansweredCount === 0;
   return {
     id: x.id, school: x.school, mode: x.mode, run_mode: x.run_mode || 'practice', target: x.target,
     range_codes: x.range_codes || [], cover_all: !!x.cover_all, daily_quest: !!x.daily_quest, assignment_id: x.assignment_id || null,
-    manual_selection: !!x.manual_selection, quest_mix: x.quest_mix || null, word_ids: [...(x.words || [])],
+    manual_selection: !!x.manual_selection, exam_style: !!x.exam_style, quest_mix: x.quest_mix || null, word_ids: [...(x.words || [])],
     covered: x.seen?.length || 0, total: x.total, correct: hideTestScore ? null : x.correct, score_total: x.finished ? scoreTotal : (x.score_total || 0), score_correct: hideTestScore ? null : scoreCorrect, score: hideTestScore ? null : score,
     xp: hideTestScore ? null : x.xp, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
     started_at: x.started_at, finished_at: x.finished_at || null, ended_at: x.ended_at || null, finalized_at: x.finalized_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
+    timer_mode: x.timer_mode || 'session', question_duration_sec: Number(x.question_duration_sec || 0), question_started_at: x.question_started_at || null, question_deadline: x.question_deadline || null,
     auto_submitted: !!x.auto_submitted,
     shared_to_teacher_at: x.shared_to_teacher_at || null,
     wrong_count: x.finished ? wrongCount : undefined,

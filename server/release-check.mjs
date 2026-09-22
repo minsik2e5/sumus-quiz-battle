@@ -4,7 +4,7 @@ import { emptyState } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
 import { allBooks, service, sweep } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
-import { EXAM_TYPES, PRACTICE_TYPES, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
 import { runContentValidation } from './content-validation.mjs';
 import { openGrammarChoiceSample } from '../public/grammar-choice-sample.js';
 
@@ -353,16 +353,20 @@ export async function runReleaseCheck() {
         school: '단원고', range_codes: [rangeCode], mode: practiceType, target: 5
       }, studentToken);
       assert(started.question.type === practiceType, `${practiceType} practice starts correctly`);
+      assert(started.timer_mode === 'question' && started.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION[started.question.type] && started.question_deadline > started.server_time, `${practiceType} starts with a fresh per-question timer`);
       const word = allWords.find(item => item.id === started.question.word_id);
+      const originalDeadline = started.question_deadline;
       const result = await service(state, 'POST', `/practice/${started.id}/answer`, {
         question_id: started.question_id, answer: answerFor(practiceType, word), prefetch_next: true
       }, studentToken);
       assert(result.feedback?.ok === true, `${practiceType} accepts correct answer`);
-      assert(result.prefetched_next?.question_id !== started.question_id, `${practiceType} prepares the next question in one request`);
+      assert(!result.prefetched_next && result.question_deadline === originalDeadline, `${practiceType} does not start the next question timer while feedback is visible`);
       const repeated = await service(state, 'POST', `/practice/${started.id}/answer`, {
         question_id: started.question_id, answer: answerFor(practiceType, word)
       }, studentToken);
       assert(repeated.total === result.total, `${practiceType} duplicate submission is idempotent`);
+      const next = await service(state, 'POST', `/practice/${started.id}/next`, {}, studentToken);
+      assert(next.question_id !== started.question_id && next.question_deadline > next.server_time && next.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION[next.question.type] && next.question_started_at >= started.question_started_at, `${practiceType} resets the timer only when the next question begins`);
       const finished = await service(state, 'POST', `/practice/${started.id}/finish`, {}, studentToken);
       assert(finished.finished === true, `${practiceType} practice can finish and save`);
     }
@@ -402,6 +406,13 @@ export async function runReleaseCheck() {
     const teacherAfterShare = await service(state, 'GET', '/bootstrap', {}, teacherToken);
     assert(teacherAfterShare.sessions.some(item => item.id === testStarted.id && item.shared_to_teacher_at), 'teacher bootstrap receives student-shared self-test results');
 
+    const practiceExam = await service(state, 'POST', '/practice/start', {
+      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'practice', exam_style: true
+    }, studentToken);
+    const practiceExamInternal = state.practices.find(item => item.id === practiceExam.id);
+    assert(practiceExam.exam_style === true && practiceExam.target === 5 && new Set(practiceExamInternal.words).size === 5, 'practice exam style selects a unique first-pass pool just like the real exam');
+    await service(state, 'POST', `/practice/${practiceExam.id}/finish`, {}, studentToken);
+
     const wrongPractice = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'spell', target: 5
     }, studentToken);
@@ -412,24 +423,28 @@ export async function runReleaseCheck() {
     const wrongFinished = await service(state, 'POST', `/practice/${wrongPractice.id}/finish`, {}, studentToken);
     const wrongSession = state.sessions.find(item => item.id === wrongPractice.id);
     assert(wrongFinished.score === 0 && wrongSession?.score === 0 && wrongSession?.wrong_details?.length === 1, 'practice finish stores a 100-point score and wrong-answer detail');
-    assert(Number(wrongPractice.deadline) > Number(wrongPractice.started_at) && Number(wrongPractice.duration_sec) >= 60, 'practice starts with a server-backed countdown deadline');
+    assert(wrongPractice.timer_mode === 'question' && wrongPractice.deadline === null && wrongPractice.question_deadline > wrongPractice.server_time && wrongPractice.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION.spell, 'practice uses a server-backed timer for each question instead of one total countdown');
 
     const timeoutPractice = await service(state, 'POST', '/practice/start', {
-      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'test'
+      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'test', exam_style: true
     }, studentToken);
-    const timeoutInternal = state.practices.find(item => item.id === timeoutPractice.id);
-    timeoutInternal.started_at = Date.now() - 61000;
-    timeoutInternal.deadline = timeoutInternal.started_at + 60000;
-    const timeoutFinished = await service(state, 'POST', `/practice/${timeoutPractice.id}/finish`, {}, studentToken);
+    let timeoutView = timeoutPractice;
+    for (let index = 0; index < 5 && !timeoutView.finished; index++) {
+      const timeoutInternal = state.practices.find(item => item.id === timeoutPractice.id);
+      timeoutInternal.question_deadline = Date.now() - 1;
+      timeoutView = await service(state, 'POST', `/practice/${timeoutPractice.id}/answer`, {
+        question_id: timeoutView.question_id, answer: '', timed_out: true
+      }, studentToken);
+    }
     const timeoutSession = state.sessions.find(item => item.id === timeoutPractice.id);
-    assert(timeoutFinished.score === 0 && timeoutFinished.wrong_count === 0 && timeoutFinished.unanswered_count === 5 && timeoutFinished.perfect === false, 'timed-out practice records unanswered separately and never reports PERFECT');
-    assert(timeoutSession?.duration_sec === 60 && timeoutSession?.ended_at === timeoutInternal.deadline && timeoutSession?.finalized_at >= timeoutSession.ended_at, 'timeout duration uses authoritative deadline rather than delayed reconnect time');
+    assert(timeoutView.finished === true && timeoutView.score === 0 && timeoutView.wrong_count === 0 && timeoutView.unanswered_count === 5 && timeoutView.perfect === false, 'five per-question timeouts finish as five unanswered without inflating wrong count');
+    assert(timeoutSession?.answer_records?.every(item => item.timed_out === true) && timeoutSession?.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION.write_meaning, 'timeout records preserve per-question timing evidence');
 
     const activeOriginal = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5
     }, studentToken);
     const activeSummaryBootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
-    assert(activeSummaryBootstrap.active_practice_summary?.id === activeOriginal.id && activeSummaryBootstrap.active_practice_summary?.mode === 'write_meaning' && activeSummaryBootstrap.active_practice_summary?.deadline, 'bootstrap exposes active practice summary for action-first home');
+    assert(activeSummaryBootstrap.active_practice_summary?.id === activeOriginal.id && activeSummaryBootstrap.active_practice_summary?.mode === 'write_meaning' && activeSummaryBootstrap.active_practice_summary?.question_deadline && activeSummaryBootstrap.active_practice_summary?.timer_mode === 'question', 'bootstrap exposes the active question timer for action-first home');
     const resumedDifferentRequest = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'spell', target: 5
     }, studentToken);
@@ -561,6 +576,7 @@ export async function runReleaseCheck() {
     const v1317Css = readFileSync(publicRoot + 'v1317.css', 'utf8');
     const v1320Css = readFileSync(publicRoot + 'v1320.css', 'utf8');
     const v1321Css = readFileSync(publicRoot + 'v1321.css', 'utf8');
+    const v1322Css = readFileSync(publicRoot + 'v1322.css', 'utf8');
     const uiModule = readFileSync(publicRoot + 'modules/ui.js', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
@@ -591,37 +607,39 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('기본 유효답과 승인된 허용 뜻의 출처') && teacherModule.includes('approved_auto'), 'teacher UI keeps part-of-speech safe valid-answer workflow');
     assert(indexHtml.includes('v1313.css') && v1313Css.includes('.meaning-alias-row') && v1313Css.includes('.vocab-import-preview'), 'V13.13 vocabulary management styles are loaded');
     assert(studentModule.includes('최근 성취') && studentModule.includes('daily_quest') && studentModule.includes('오답 ${mix.wrong'), 'V13.13 student UI exposes recent mastery and adaptive daily mix');
-    assert(sessionsModule.includes('daily_quest: true') && sessionsModule.includes('오늘의 퀘스트'), 'V13.13 daily quest starts through the practice session flow');
+    assert(sessionsModule.includes('daily_quest: true') && appJs.includes('d.quickPractice'), 'adaptive daily quest still starts through the practice session flow');
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
-    assert(studentModule.includes('middleVocabQuiz') && studentModule.includes('data-middle-word') && studentModule.includes('data-middle-preset'), 'middle student quiz setup still supports exact lesson-word selection');
-    assert(sessionsModule.includes('word_ids: A.middleWordIds') && !sessionsModule.includes('setTimeout(() => advancePracticeScreen'), 'V13.20 keeps practice feedback visible until the student moves on');
-    assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'V13.20 practice feedback no longer triggers the large correct-answer burst');
-    assert(indexHtml.includes('/app.js?v=13.21.0') && indexHtml.includes('/practice-enhancements.js?v=13.21.0') && indexHtml.includes('/v1321.css?v=13.21.0') && sw.includes('sumus-voca-v13.21.0-memorize-selftest-impact'), 'V13.21 cache versions are active');
-    assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'V13.15 puts meaning and English writing first and exposes student score history');
-    assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && sessionsModule.includes('practice-timer-value'), 'V13.15 student home shows recent scores and timed practice countdown');
-    assert(teacherModule.includes('학생별 연습 기록') && teacherModule.includes('학생이 보낸 실전 결과') && teacherModule.includes('data-practice-record') && appJs.includes('openPracticeRecord'), 'teacher can inspect practice history and student-shared self-test results');
-    assert(studentModule.includes('내가 직접 보는 실전') && studentModule.includes('data-action="start-self-test"') && sessionsModule.includes('실전 모드에서는 뒤로 갈 수 없어요'), 'student self-test keeps the locked no-feedback test behavior');
-    assert(studentModule.includes('첫 100점') && studentModule.includes('3회 연속 90점+') && studentModule.includes('영어쓰기 100점') && studentModule.includes('achievementSection'), 'V13.17 student achievement badges are present');
-    assert(v1317Css.includes('.run-mode-grid') && v1317Css.includes('.achievement-grid'), 'V13.17 test mode and achievement styles are loaded');
-    assert(studentModule.includes("result_visibility === 'visible'") && studentModule.includes("filter(Number.isFinite)") && studentModule.includes("'공개 대기'"), 'V13.18 P0 score visibility excludes withheld exams from averages and labels them explicitly');
-    assert(teacherModule.includes('sharedSelfTests') && teacherModule.includes('shared_to_teacher_at') && teacherModule.includes('학생이 보낸 실전 결과'), 'V13.21 teacher dashboard replaces assigned-exam missing state with student-shared self-test results');
-    assert(uiModule.includes('recordRangeLabel') && studentModule.includes('recordRangeLabel(s, code)') && sessionsModule.includes('recordRangeLabel'), 'V13.18 uses shared middle/high range labels across records and results');
-    assert(sessionsModule.includes('미응답') && sessionsModule.includes('제출 상태를 확인하고 있어요') && sessionsModule.includes('data-finish-practice-dispute'), 'V13.19 result UI separates unanswered, keeps timeout confirmation visible, and supports durable completed-practice disputes');
-    assert(sessionsModule.includes('이미 진행 중인 학습이 있어요') && sessionsModule.includes('기존 연습 저장 후 새 설정 시작'), 'V13.19 warns before a mismatched active practice is reused');
-    assert(appJs.includes('examFormDirty') && appJs.includes('contextGeneration') && appJs.includes('작성 취소 후 전환'), 'V13.19 teacher context switch protects dirty exam forms and stale responses');
-    assert(studentModule.includes('homePrimaryAction') && studentModule.includes('home-focus-card') && studentModule.includes('오늘 학습'), 'student home keeps one action-first CTA and no longer depends on teacher-assigned schedules');
-    assert(studentModule.includes('단어 학습 준비') && studentModule.includes('시작 요약') && studentModule.includes('기타 연습') && studentModule.includes('직접 선택'), 'V13.20 middle and high vocabulary setup uses one progressive preparation flow');
-    assert(sessionsModule.includes('실전 시작 확인') && sessionsModule.includes('정답은 시험이 끝난 뒤 공개돼요') && sessionsModule.includes('제출하고 결과 보기'), 'V13.20 autonomous test confirms policy before session creation and uses submit-next language');
-    assert(sessionsModule.includes('최초 풀이 기준') && sessionsModule.includes('같은 범위 다시 풀기') && sessionsModule.includes('답안 보기'), 'V13.20 practice result prioritizes score basis, review, and next action');
-    assert(v1320Css.includes('.home-focus-card') && v1320Css.includes('.setup-start-summary') && v1320Css.includes('.result-page-v1320'), 'V13.20 responsive student UX styles are loaded');
-    assert(studentModule.includes('단어 외우기') && studentModule.includes('data-memorize-word') && studentModule.includes('data-memorize-star') && studentModule.includes('뜻 모두 보기'), 'V13.21 video-style memorization supports inline reveal and difficult-word stars');
-    assert(studentModule.includes("['exam', '실전'") && studentModule.includes('선생님 배정 없이 범위와 유형을 직접 고르고'), 'V13.21 student navigation exposes self-selected self-test instead of assigned exam wording');
-    assert(!teacherModule.match(/const tabs = .*assignments/) && !teacherModule.match(/const tabs = .*exams/), 'V13.21 teacher navigation removes assignment and teacher-created exam operations');
-    assert(teacherModule.includes('학생이 보낸 실전 결과') && teacherModule.includes('shared_to_teacher_at'), 'V13.21 teacher results focus on student-shared self-tests');
-    assert(sessionsModule.includes('/share') && sessionsModule.includes('선생님께 결과 보내기') && sessionsModule.includes('animateTestResult'), 'V13.21 self-test result can be shared and has result impact');
-    assert(sessionsModule.includes('answerImpact') && v1321Css.includes('.answer-impact-check') && v1321Css.includes('.perfect-impact'), 'V13.21 correct answers and perfect self-tests have short premium impact effects');
-    assert(v1321Css.includes('.memorize-row') && v1321Css.includes('.memorize-meaning') && v1321Css.includes('.self-test-rule-strip'), 'V13.21 memorization and self-test responsive styles are loaded');
+    assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
+    assert(indexHtml.includes('/app.js?v=13.22.0') && indexHtml.includes('/practice-enhancements.js?v=13.22.0') && indexHtml.includes('/v1322.css?v=13.22.0') && sw.includes('sumus-voca-v13.22.0-final-learning-exam-flow'), 'V13.22 cache versions are active');
+    assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'meaning and English writing remain first-class scored modes');
+    assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && sessionsModule.includes('practice-timer-value'), 'student home and record summaries remain available');
+    assert(teacherModule.includes('학생별 연습 기록') && teacherModule.includes('학생이 보낸 실전 결과') && teacherModule.includes('data-practice-record') && appJs.includes('openPracticeRecord'), 'teacher can inspect practice history and student-shared real-test results');
+    assert(studentModule.includes('첫 100점') && studentModule.includes('3회 연속 90점+') && studentModule.includes('영어쓰기 100점') && studentModule.includes('achievementSection'), 'student achievement badges remain present');
+    assert(studentModule.includes("result_visibility === 'visible'") && studentModule.includes("filter(Number.isFinite)") && studentModule.includes("'공개 대기'"), 'legacy assigned-exam visibility remains safe in historical records');
+    assert(teacherModule.includes('sharedSelfTests') && teacherModule.includes('shared_to_teacher_at') && teacherModule.includes('학생이 보낸 실전 결과'), 'teacher dashboard is centered on student-shared real-test results');
+    assert(uiModule.includes('recordRangeLabel') && studentModule.includes('recordRangeLabel(s, code)') && sessionsModule.includes('recordRangeLabel'), 'middle and high range labels stay consistent');
+    assert(sessionsModule.includes('미응답') && sessionsModule.includes('data-finish-practice-dispute'), 'saved exam results separate unanswered answers and keep meaning disputes');
+    assert(sessionsModule.includes('이미 진행 중인 학습이 있어요') && sessionsModule.includes('기존 연습 저장 후 새 설정 시작'), 'active session mismatch still warns before reuse');
+    assert(appJs.includes('examFormDirty') && appJs.includes('contextGeneration') && appJs.includes('작성 취소 후 전환'), 'teacher context switch still protects dirty forms and stale responses');
+    assert(studentModule.includes('homePrimaryAction') && studentModule.includes('home-focus-card') && studentModule.includes('오늘 학습'), 'student home keeps one action-first CTA');
+    assert(v1320Css.includes('.home-focus-card') && v1320Css.includes('.setup-start-summary') && v1320Css.includes('.result-page-v1320'), 'base responsive student UX styles remain loaded');
+
+    const studyHubSource = studentModule.slice(studentModule.indexOf('function studyHub'), studentModule.indexOf('function grammarCards'));
+    assert(studyHubSource.includes('단어 학습') && studyHubSource.includes('어법·어휘') && studyHubSource.includes('study-hub-simple') && !studyHubSource.includes('추천 학습 흐름') && !studyHubSource.includes('영어↔뜻, 철자'), 'V13.22 learning home contains only clean vocabulary and grammar choices');
+    const memorizationSource = studentModule.slice(studentModule.indexOf('function memorizationPanel'), studentModule.indexOf('function durationText'));
+    assert(memorizationSource.includes('data-memorize-word') && memorizationSource.includes('data-memorize-star') && memorizationSource.includes('data-memorize-speak') && memorizationSource.includes('front = show ? word.meaning : word.word'), 'V13.22 vocabulary rows swap English and meaning in place and expose pronunciation');
+    assert(appJs.includes('SpeechSynthesisUtterance') && appJs.includes('d.memorizeSpeak'), 'V13.22 memorization has one-tap English pronunciation');
+    assert(studentModule.includes("['exam', '시험'") && studentModule.includes('data-exam-kind="practice"') && studentModule.includes('data-exam-kind="test"') && studentModule.includes('연습시험') && studentModule.includes('실전시험'), 'V13.22 bottom Exam menu lets students choose practice or real exam');
+    assert(studentModule.includes('data-action="start-exam-run"') && studentModule.includes('한 문제당') && appJs.includes('examStyle: true'), 'V13.22 both exam modes share the same setup and exam-style word pool');
+    assert(!studentModule.includes('function middleVocabQuiz') && !studentModule.includes('function vocabQuiz') && !studentModule.includes('function practiceModePicker'), 'V13.22 removes the old duplicate vocabulary quiz path from Learning');
+    assert(sessionsModule.includes("const modeLabel = testMode ? '실전시험' : '연습시험'") && sessionsModule.includes('questionLeftMs') && sessionsModule.includes('question-timer') && sessionsModule.includes('setInterval(practiceTick, x.timer_mode === \'question\' ? 100 : 500)'), 'V13.22 practice and real exams share one question screen with a prominent per-question timer');
+    assert(sessionsModule.includes('TIME OUT') && sessionsModule.includes('timeoutPracticeQuestion') && sessionsModule.includes("timed_out: true"), 'V13.22 each question automatically records timeout at zero');
+    assert(!teacherModule.match(/const tabs = .*assignments/) && !teacherModule.match(/const tabs = .*exams/), 'teacher navigation keeps assignment and teacher-created exam operations removed');
+    assert(teacherModule.includes('학생이 보낸 실전 결과') && teacherModule.includes('shared_to_teacher_at'), 'teacher results focus on student-shared real exams');
+    assert(sessionsModule.includes('/share') && sessionsModule.includes('선생님께 결과 보내기') && sessionsModule.includes('animateTestResult'), 'real exam result can be shared and keeps result impact');
+    assert(sessionsModule.includes('answerImpact') && v1321Css.includes('.answer-impact-check') && v1321Css.includes('.perfect-impact'), 'practice correct answers and perfect real exams keep short impact effects');
+    assert(v1322Css.includes('.study-hub-simple') && v1322Css.includes('.memorize-sound') && v1322Css.includes('.exam-kind-grid') && v1322Css.includes('.question-timer.danger'), 'V13.22 final learning, pronunciation, exam selector, and tension timer styles are loaded');
     assert(appJs.includes("$$('#teacher-division,#teacher-school')"), 'teacher context selectors use the multi-element helper');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
