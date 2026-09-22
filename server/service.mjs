@@ -1038,6 +1038,6 @@ function practiceView(x, state) {
     wrong_details: x.finished ? (x.wrong_details || []) : undefined,
     question: x.question, question_id: x.question_id, feedback: x.feedback,
     finished: x.finished, retry_count: x.retry.length,
-    stats: growthFor(mySessions(state, x.student_id))
+    stats: growthFor(mySessions(state, x.student_id)), server_time: Date.now()
   };
 }
