@@ -604,7 +604,7 @@ export async function runReleaseCheck() {
     assert(sessionsModule.includes('실전 시작 확인') && sessionsModule.includes('정답은 시험이 끝난 뒤 공개돼요') && sessionsModule.includes('제출하고 결과 보기'), 'V13.20 autonomous test confirms policy before session creation and uses submit-next language');
     assert(sessionsModule.includes('최초 풀이 기준') && sessionsModule.includes('같은 범위 다시 풀기') && sessionsModule.includes('답안 보기'), 'V13.20 practice result prioritizes score basis, review, and next action');
     assert(v1320Css.includes('.home-focus-card') && v1320Css.includes('.setup-start-summary') && v1320Css.includes('.result-page-v1320'), 'V13.20 responsive student UX styles are loaded');
-    assert(appJs.includes("$('#teacher-division,#teacher-school')"), 'teacher context selectors use the multi-element helper');
+    assert(appJs.includes("$$('#teacher-division,#teacher-school')"), 'teacher context selectors use the multi-element helper');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
