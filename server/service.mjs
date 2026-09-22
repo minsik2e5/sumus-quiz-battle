@@ -1145,7 +1145,7 @@ function practiceView(x, state) {
   return {
     id: x.id, school: x.school, mode: x.mode, run_mode: x.run_mode || 'practice', target: x.target,
     range_codes: x.range_codes || [], cover_all: !!x.cover_all, daily_quest: !!x.daily_quest, assignment_id: x.assignment_id || null,
-    manual_selection: !!x.manual_selection, quest_mix: x.quest_mix || null, word_ids: x.finished ? undefined : [...(x.words || [])],
+    manual_selection: !!x.manual_selection, quest_mix: x.quest_mix || null, word_ids: [...(x.words || [])],
     covered: x.seen?.length || 0, total: x.total, correct: hideTestScore ? null : x.correct, score_total: x.finished ? scoreTotal : (x.score_total || 0), score_correct: hideTestScore ? null : scoreCorrect, score: hideTestScore ? null : score,
     xp: hideTestScore ? null : x.xp, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
     started_at: x.started_at, finished_at: x.finished_at || null, ended_at: x.ended_at || null, finalized_at: x.finalized_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
