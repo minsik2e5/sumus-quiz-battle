@@ -954,6 +954,7 @@ export async function service(state, method, path, body, token) {
     if (!PRACTICE_TYPES[body.mode]) fail('연습 방식을 선택해주세요.');
     const requestedRunMode = body.run_mode === 'test' ? 'test' : 'practice';
     const runMode = requestedRunMode === 'test' && ['write_meaning','spell'].includes(body.mode) ? 'test' : 'practice';
+    const examStyle = body.exam_style === true && ['write_meaning','spell'].includes(body.mode);
     const isDailyQuest = body.daily_quest === true && school.division !== 'middle';
     const selectedWordIds = Array.isArray(body.word_ids)
       ? [...new Set(body.word_ids.map(value => String(value)).filter(Boolean))].slice(0, 200)
@@ -971,12 +972,12 @@ export async function service(state, method, path, body, token) {
     const requestedTarget = manualSelection
       ? (body.target === undefined ? words.length : integer(body.target, 5, Math.min(500, words.length), '학습량'))
       : isDailyQuest ? daily.target : coverAll ? words.length : integer(body.target || 10, 5, 500, '학습량');
-    const target = runMode === 'test' ? Math.min(requestedTarget, words.length) : requestedTarget;
-    const practiceWords = runMode === 'test' ? shuffle(words).slice(0, target) : words;
+    const target = runMode === 'test' || examStyle ? Math.min(requestedTarget, words.length) : requestedTarget;
+    const practiceWords = runMode === 'test' || examStyle ? shuffle(words).slice(0, target) : words;
     const startedAt = Date.now();
     const durationSec = practiceDurationSec(body.mode, target);
     const questionDurationSec = Number(PRACTICE_SECONDS_PER_QUESTION[body.mode] || 8);
-    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, run_mode: runMode, assignment_id: null, target, cover_all: runMode === 'test' ? true : coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection && runMode !== 'test', quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, timer_mode: 'question', question_duration_sec: questionDurationSec, question_started_at: null, question_deadline: null, deadline: null, auto_submitted: false, wrong_details: [], answer_records: [], finished: false, responses: {}, words: practiceWords.map(w => w.id) };
+    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, run_mode: runMode, exam_style: examStyle, assignment_id: null, target, cover_all: runMode === 'test' || examStyle ? true : coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection && runMode !== 'test', quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, timer_mode: 'question', question_duration_sec: questionDurationSec, question_started_at: null, question_deadline: null, deadline: null, auto_submitted: false, wrong_details: [], answer_records: [], finished: false, responses: {}, words: practiceWords.map(w => w.id) };
     if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
@@ -1000,7 +1001,7 @@ export async function service(state, method, path, body, token) {
         return practiceView(x, state);
       }
       if (x.finished || x.feedback || body.question_id !== x.question_id) fail('현재 문제를 다시 확인해주세요.', 409);
-      const timedOut = x.timer_mode === 'question' && Number(x.question_deadline || 0) > 0 && Date.now() >= Number(x.question_deadline);
+      const timedOut = x.timer_mode === 'question' && Number(x.question_deadline || 0) > 0 && (Date.now() >= Number(x.question_deadline) || (body.timed_out === true && Date.now() + 150 >= Number(x.question_deadline)));
       const submittedAnswer = timedOut ? '' : body.answer;
       const word = allBooks(state).flatMap(b => b.words).find(w => w.id === x.question.word_id);
       const ok = timedOut ? false : grade(x.question.type, submittedAnswer, wordForGrade(state, word));
@@ -1141,6 +1142,7 @@ function finishPractice(x, state, autoSubmitted = false) {
     range_codes: x.range_codes,
     mode: x.mode,
     run_mode: x.run_mode || 'practice',
+    exam_style: !!x.exam_style,
     correct: scoreCorrect,
     total: scoreTotal,
     attempts_total: x.total,
@@ -1177,7 +1179,7 @@ function practiceView(x, state) {
   return {
     id: x.id, school: x.school, mode: x.mode, run_mode: x.run_mode || 'practice', target: x.target,
     range_codes: x.range_codes || [], cover_all: !!x.cover_all, daily_quest: !!x.daily_quest, assignment_id: x.assignment_id || null,
-    manual_selection: !!x.manual_selection, quest_mix: x.quest_mix || null, word_ids: [...(x.words || [])],
+    manual_selection: !!x.manual_selection, exam_style: !!x.exam_style, quest_mix: x.quest_mix || null, word_ids: [...(x.words || [])],
     covered: x.seen?.length || 0, total: x.total, correct: hideTestScore ? null : x.correct, score_total: x.finished ? scoreTotal : (x.score_total || 0), score_correct: hideTestScore ? null : scoreCorrect, score: hideTestScore ? null : score,
     xp: hideTestScore ? null : x.xp, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
     started_at: x.started_at, finished_at: x.finished_at || null, ended_at: x.ended_at || null, finalized_at: x.finalized_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
