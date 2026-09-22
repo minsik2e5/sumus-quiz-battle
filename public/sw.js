@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.15.0-scored-practice';
+const VERSION = 'sumus-voca-v13.16.0-auto-role-login';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
