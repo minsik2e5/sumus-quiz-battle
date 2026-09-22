@@ -585,7 +585,7 @@ export async function runReleaseCheck() {
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(studentModule.includes('middleVocabPractice') && studentModule.includes('data-middle-word') && studentModule.includes('data-middle-preset'), 'V13.13 middle student UI lists lesson words for exact checkbox selection');
     assert(sessionsModule.includes('word_ids: A.middleWordIds') && !sessionsModule.includes('setTimeout(() => advancePracticeScreen'), 'V13.20 keeps practice feedback visible until the student moves on');
-    assert(practiceEnhancements.includes('sumusBurstFade 2.2s') && practiceEnhancements.includes('2300'), 'V13.13 correct-answer overlay stays visible long enough to read');
+    assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('celebrateCorrect(session, feedback)'), 'V13.20 practice feedback no longer triggers the large correct-answer burst');
     assert(indexHtml.includes('/app.js?v=13.20.0') && indexHtml.includes('/practice-enhancements.js?v=13.20.0') && indexHtml.includes('/v1320.css?v=13.20.0') && sw.includes('sumus-voca-v13.20.0-student-ux'), 'V13.20 cache versions are active');
     assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'V13.15 puts meaning and English writing first and exposes student score history');
     assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && sessionsModule.includes('practice-timer-value'), 'V13.15 student home shows recent scores and timed practice countdown');
