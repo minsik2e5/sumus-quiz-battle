@@ -172,7 +172,7 @@ function achievementSection(A, full = false) {
 function recentRecordCard(A) {
   const sessions = (A.data.sessions || []).map(item => ({ kind: 'practice', at: item.created_at, item }));
   const attempts = (A.data.attempts || []).filter(item => item.status === 'submitted').map(item => ({ kind: 'exam', at: item.submitted_at, item }));
-  const rows = [...sessions, ...attempts].sort((a,b) => b.at - a.at).slice(0,3);
+  const rows = [...sessions, ...attempts].sort((a,b) => b.at - a.at).slice(0,1);
   if (!rows.length) return '';
   const line = row => {
     if (row.kind === 'practice') {
@@ -183,7 +183,7 @@ function recentRecordCard(A) {
     const a = row.item, e = A.data.exams.find(exam => exam.id === a.exam_id);
     return `<button class="exam-row" data-result="${a.id}"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(e?.title || '실전시험')}</h3><p>${EXAM_TYPES[e?.exam_type]?.label || ''} · ${date(a.submitted_at)}</p></div><strong>${a.result_visibility === 'visible' && a.score !== undefined ? a.score + '점' : '공개 대기'}</strong></button>`;
   };
-  return `<div class="section-title"><h2>최근 기록</h2><button class="text-button" data-go="records">전체 기록 보기 ${icon('chevron')}</button></div>${rows.map(line).join('')}`;
+  return `<div class="section-title home-recent-head"><h2>최근 학습</h2><button class="text-button" data-go="records">전체 보기 ${icon('chevron')}</button></div><div class="home-recent-one">${rows.map(line).join('')}</div>`;
 }
 function homePrimaryAction(A) {
   const activePractice = A.data.active_practice_summary || null;
@@ -193,39 +193,37 @@ function homePrimaryAction(A) {
       kicker: activePractice.run_mode === 'test' ? '진행 중인 실전' : '진행 중인 연습',
       title: '이어서 마무리해요',
       detail: `${esc(ranges)} · ${esc(PRACTICE_TYPES[activePractice.mode] || '단어 학습')} · ${Number(activePractice.score_total || 0)}/${activePractice.target}`,
-      meta: activePractice.deadline ? `${date(activePractice.deadline)}까지` : '진행 중',
+      meta: '진행 위치가 저장되어 있어요.',
       cta: '이어서 풀기',
       attrs: 'data-quick-practice="true"'
     };
   }
 
-  const unsentTest = [...(A.data.sessions || [])]
-    .filter(item => item.run_mode === 'test' && !item.shared_to_teacher_at)
-    .sort((a,b) => b.created_at - a.created_at)[0];
-  if (unsentTest) {
-    const ranges = (unsentTest.range_codes || []).map(code => recordRangeLabel(unsentTest, code)).join(' · ') || '최근 범위';
+  const daily = A.data.daily_quest || null;
+  if (daily?.target > 0) {
+    const mix = daily.mix || {};
     return {
-      kicker: '실전 결과 미전송',
-      title: `${unsentTest.score ?? 0}점 결과를 확인해요`,
-      detail: `${esc(ranges)} · ${esc(PRACTICE_TYPES[unsentTest.mode] || '쓰기')}`,
-      meta: '원하면 선생님께 결과를 보낼 수 있어요.',
-      cta: '결과 확인하기',
-      attrs: `data-practice-record="${unsentTest.id}"`
+      kicker: '오늘의 추천 학습',
+      title: `오늘은 ${daily.target}개만 끝내요`,
+      detail: `오답 ${mix.wrong || 0} · 복습 ${mix.review || 0} · 새 단어 ${mix.new || 0}`,
+      meta: '지금 필요한 단어만 자동으로 섞어 보여줘요.',
+      cta: '오늘 학습 시작',
+      attrs: 'data-quick-practice="true"'
     };
   }
 
   const recentReview = [...(A.data.sessions || [])]
     .sort((a,b) => b.created_at - a.created_at)
-    .find(item => Number(item.wrong_count ?? (item.wrong_details || []).filter(detail => !detail.regraded).length) > 0);
+    .find(item => Number(item.wrong_count || 0) + Number(item.unanswered_count || 0) > 0);
   if (recentReview) {
-    const wrong = Number(recentReview.wrong_count ?? (recentReview.wrong_details || []).filter(detail => !detail.regraded).length);
+    const review = Number(recentReview.wrong_count || 0) + Number(recentReview.unanswered_count || 0);
     const ranges = (recentReview.range_codes || []).map(code => recordRangeLabel(recentReview, code)).join(' · ') || '최근 범위';
     return {
-      kicker: '최근 오답 복습',
-      title: `${ranges} 오답을 정리해요`,
-      detail: `${esc(PRACTICE_TYPES[recentReview.mode] || '단어 학습')} · 지난 기록 ${recentReview.score ?? 0}점 · 오답 ${wrong}개`,
+      kicker: '최근 복습',
+      title: `${ranges} 다시 잡아볼까요?`,
+      detail: `다시 볼 단어 ${review}개 · 지난 기록 ${recentReview.score ?? 0}점`,
       meta: date(recentReview.created_at),
-      cta: `오답 ${wrong}개 복습`,
+      cta: `${review}개 복습하기`,
       attrs: `data-review-practice="${recentReview.id}"`
     };
   }
@@ -234,10 +232,10 @@ function homePrimaryAction(A) {
   if (recent) {
     const ranges = (recent.range_codes || []).map(code => recordRangeLabel(recent, code)).join(' · ') || '최근 범위';
     return {
-      kicker: '최근 학습',
+      kicker: '오늘의 학습',
       title: `${ranges}를 다시 외워볼까요?`,
-      detail: `${esc(PRACTICE_TYPES[recent.mode] || '단어 학습')} · ${recent.score ?? 0}점`,
-      meta: date(recent.created_at),
+      detail: `${esc(PRACTICE_TYPES[recent.mode] || '단어 학습')} · 최근 ${recent.score ?? 0}점`,
+      meta: '외운 뒤 시험에서 바로 확인할 수 있어요.',
       cta: '단어 외우기',
       attrs: 'data-study="vocab"'
     };
@@ -246,8 +244,8 @@ function homePrimaryAction(A) {
   return {
     kicker: '오늘의 시작',
     title: '먼저 단어를 외워봐요',
-    detail: '뜻을 가린 목록으로 외운 뒤, 문제 연습과 실전으로 확인할 수 있어요.',
-    meta: '실전 결과는 원하는 것만 선생님께 보냅니다.',
+    detail: '시험 범위에서 오늘 외울 단어를 골라 시작해요.',
+    meta: '짧게 외우고 바로 확인하는 흐름으로 구성했어요.',
     cta: '단어 외우기 시작',
     attrs: 'data-study="vocab"'
   };
@@ -294,18 +292,15 @@ function home(A) {
   const p = A.data.profile;
   const action = homePrimaryAction(A);
   return `<div class="home-context"><div><span>SUMUS VOCA</span><b>${esc(p.school || A.school || '학교 미설정')} · ${esc(p.class_name || '')}</b></div>${A.data.stats.streak ? `<span class="streak-badge">${icon('flame')}${A.data.stats.streak}일째</span>` : ''}</div>
-    <section class="home-focus-card">
+    <section class="home-focus-card home-focus-v1326">
       <span class="home-focus-kicker">${action.kicker}</span>
       <h1>${action.title}</h1>
       <p>${action.detail}</p>
       <small>${action.meta}</small>
       <button class="btn primary full home-focus-cta" ${action.attrs}>${action.cta} ${icon('arrow')}</button>
     </section>
-    <div class="section-title home-section-head"><h2>오늘 학습</h2><button class="text-button" data-go="exam">내 실전 ${icon('chevron')}</button></div>
-    <div class="home-schedule-list">${homeSchedule(A, action)}</div>
-    ${recentRecordCard(A)}
-    ${homeRecommendations(A)}
-    ${compactGrowth(A)}`;
+    ${compactGrowth(A)}
+    ${recentRecordCard(A)}`;
 }
 function studyHub(A) {
   return `<div class="page-heading study-simple-heading premium-page-heading"><span class="premium-eyebrow">LEARNING</span><h1>학습</h1></div>
@@ -458,7 +453,7 @@ function examWritingPicker(A) {
     ['write_meaning','뜻 직접 쓰기','영어를 보고 뜻을 직접 입력'],
     ['spell','영어 직접 쓰기','뜻을 보고 영어 단어를 직접 입력']
   ];
-  return `<div class="primary-mode-grid">${items.map(([key,label,help]) => `<button class="primary-mode-card ${A.mode === key ? 'selected' : ''}" data-mode="${key}"><span class="primary-mode-icon">${icon('records')}</span><div><b>${label}</b><small>${help}</small><em>${PRACTICE_SECONDS_PER_QUESTION[key] || 8}초 / 문제</em></div></button>`).join('')}</div>`;
+  return `<div class="primary-mode-grid">${items.map(([key,label,help]) => `<button class="primary-mode-card ${A.mode === key ? 'selected' : ''}" data-mode="${key}"><span class="primary-mode-icon">${icon('records')}</span><div><b>${label}</b><small>${help}</small></div></button>`).join('')}</div>`;
 }
 function exam(A) {
   if (!A.examKind) {
@@ -485,13 +480,12 @@ function exam(A) {
     scopeUi = schoolSwitch(A) + rangePicker(A);
   }
   const target = A.target === 'all' ? count : Math.min(count, Number(A.target || 20));
-  const seconds = PRACTICE_SECONDS_PER_QUESTION[A.mode] || 8;
   return `<div class="exam-mode-switch segment"><button data-exam-kind="practice" class="${!testMode ? 'selected' : ''}">연습시험</button><button data-exam-kind="test" class="${testMode ? 'selected' : ''}">실전시험</button></div>
     <div class="page-heading exam-shared-heading"><h1>${testMode ? '실전시험' : '연습시험'}</h1></div>
     <section class="setup-section"><div class="step-label"><span>01</span>시험 범위</div>${scopeUi}</section>
     <section class="setup-section"><div class="step-label"><span>02</span>문항 수</div>${examTargetGrid(A, count)}</section>
     <section class="setup-section"><div class="step-label"><span>03</span>시험 방식</div>${examWritingPicker(A)}</section>
-    <aside class="setup-start-summary exam-start-summary"><div><span>시작 요약</span><strong>${esc(scopeLabel)} · ${target || 0}문제 · ${esc(PRACTICE_TYPES[A.mode] || '뜻쓰기')}</strong><small>한 문제당 ${seconds}초 · 다음 문제마다 시간이 다시 시작돼요.${testMode ? ' 정답은 시험 종료 후 공개돼요.' : ' 정답은 문제마다 바로 확인해요.'}</small></div><button class="btn primary full" data-action="start-exam-run" ${count ? '' : 'disabled'}>${testMode ? '실전시험 시작' : '연습시험 시작'} ${icon('arrow')}</button></aside>`;
+    <aside class="setup-start-summary exam-start-summary"><div><span>시작 요약</span><strong>${esc(scopeLabel)} · ${target || 0}문제 · ${esc(PRACTICE_TYPES[A.mode] || '뜻쓰기')}</strong><small>${testMode ? '정답은 시험이 끝난 뒤 한꺼번에 확인해요.' : '정답은 문제마다 바로 확인해요.'}</small></div><button class="btn primary full" data-action="start-exam-run" ${count ? '' : 'disabled'}>${testMode ? '실전시험 시작' : '연습시험 시작'} ${icon('arrow')}</button></aside>`;
 }
 
 function ranking(A) {
@@ -502,27 +496,26 @@ function ranking(A) {
   const all = [...A.data.ranking];
   const filtered = scope === 'all' ? all : all.filter(p => p.grade === scope);
   const items = filtered.sort((a, b) => Number(b[metric] || 0) - Number(a[metric] || 0) || Number(b.xp || 0) - Number(a.xp || 0));
-  const unit = mode === 'xp' ? 'P' : mode === 'streak' ? '일' : '문제';
+  const unit = mode === 'xp' ? ' XP' : mode === 'streak' ? '일' : '문제';
   const myIndex = items.findIndex(p => p.is_me);
   const scopeLabel = scope === 'all' ? '전체' : scope;
   const info = A.data.ranking_period || {};
   const periodTitle = period === 'week' ? (info.label || '이번 주') : '통합 누적';
-  const periodRange = period === 'week' ? (info.range || '월요일 ~ 일요일') : '첫 학습 기록부터 지금까지';
+  const periodRange = period === 'week' ? (info.range || '월요일 ~ 일요일') : '전체 학습 기록';
   const rankNo = item => Number(item[metric] || 0) > 0 ? items.findIndex(x => Number(x[metric] || 0) === Number(item[metric] || 0)) + 1 : '—';
-  const note = period === 'week'
-    ? '주간 기록은 한국시간 기준 매주 월요일 00:00에 새로 시작하며, 이전 기록은 통합에 계속 남아요.'
-    : '통합은 기존 학습 기록 전체를 누적해서 보여줘요. 주간 리셋으로 삭제되는 기록은 없어요.';
-  return `<div class="page-heading"><h1>SUMUS 랭킹</h1><p>중2 · 중3 · 고1이 함께 보는 학원 성장 순위</p></div>
-    <div class="rank-intro"><div class="eyebrow">SUMUS ACADEMY · ${scopeLabel}</div><h2>같이 올라가면 더 재밌다.</h2><p>시험 점수가 아니라 실제로 쌓은 학습 기록으로 경쟁해요.</p></div>
-    <div class="rank-scope" aria-label="학년별 랭킹">
-      ${[['all','전체'],['중2','중2'],['중3','중3'],['고1','고1']].map(([k,label]) => `<button data-rank-scope="${k}" class="${scope === k ? 'selected' : ''}">${label}</button>`).join('')}
+  const scopeOptions = [['all','전체'],['중2','중2'],['중3','중3'],['고1','고1']];
+  const periodOptions = [['week','이번 주'],['all','통합']];
+  const modeOptions = [['xp','성장 XP'],['total','연습량'],['streak','연속 학습']];
+  return `<div class="page-heading rank-heading-v1326"><h1>SUMUS 랭킹</h1><p>시험 점수가 아닌 실제 학습 기록으로 올라가요.</p></div>
+    <div class="rank-filter-bar" aria-label="랭킹 필터">
+      <label><span>학년</span><select data-rank-scope-select>${scopeOptions.map(([k,label]) => `<option value="${k}" ${scope === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+      <label><span>기간</span><select data-rank-period-select>${periodOptions.map(([k,label]) => `<option value="${k}" ${period === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+      <label><span>기준</span><select data-rank-mode-select>${modeOptions.map(([k,label]) => `<option value="${k}" ${mode === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
     </div>
-    <div class="segment" aria-label="랭킹 기간"><button data-rank-period="week" class="${period === 'week' ? 'selected' : ''}">주간</button><button data-rank-period="all" class="${period === 'all' ? 'selected' : ''}">통합</button></div>
-    <div style="margin:12px 0 14px;padding:13px 15px;border:1px solid #eaecf0;border-radius:15px;background:#f9fafb;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><strong style="font-size:14px">${esc(periodTitle)}</strong><span class="tiny muted">${esc(periodRange)}</span></div>
-    <div class="segment rank-metric">${[['xp', '성장 포인트'], ['total', '연습량'], ['streak', '연속 학습']].map(([k, label]) => `<button data-rank-mode="${k}" class="${mode === k ? 'selected' : ''}">${label}</button>`).join('')}</div>
+    <p class="rank-period-caption">${esc(periodTitle)} · ${esc(periodRange)}</p>
     ${myIndex >= 0 ? `<div class="my-rank-card"><span>내 ${scopeLabel} 순위</span><strong>${rankNo(items[myIndex])}<small>위</small></strong><p>${num(items[myIndex][metric] || 0)}${unit} · ${esc(periodTitle)}</p></div>` : ''}
     <div class="rank-list">${items.length ? items.map((p, index) => `<div class="rank-row ${p.is_me ? 'me' : ''} ${index < 3 && Number(p[metric] || 0) ? 'top-rank top-' + (index + 1) : ''}"><span class="rank-number">${rankNo(p)}</span>${avatar(p.avatar_key, { size: 'mini' })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill green">나</span>' : ''}</strong><small><span class="rank-grade">${esc(p.grade || '')}</span> · ${p.private ? '프로필 비공개' : `Lv.${p.level} · ${CHARACTERS[p.avatar_key]?.ko || '루미'}`}</small></div><span class="rank-score">${num(p[metric] || 0)}${unit}</span></div>`).join('') : empty('ranking', `${scopeLabel}에 아직 연습 기록이 없어요`, '학습을 시작하면 순위가 바로 생겨요.')}</div>
-    <p class="quiet-note">${esc(note)}<br>전체 랭킹에는 중2·중3·고1 모든 활성 학생이 함께 포함돼요. 시험 성적은 랭킹에 포함하지 않아요.</p>`;
+    <p class="quiet-note">주간 기록은 매주 월요일 새로 시작하고 통합 기록은 계속 누적돼요. 시험 성적은 랭킹에 포함하지 않아요.</p>`;
 }
 function records(A) {
   const tab = A.recordTab || 'all';
