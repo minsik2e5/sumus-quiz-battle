@@ -4,7 +4,7 @@ import { avatar } from './modules/character.js';
 import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.23.0';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.23.0';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.23.0';
-const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memStars: [], memRevealed: [] };
+const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [] };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
 const examTargetMatches = (exam, profile) => exam?.class_name === ALL_CLASSES || exam?.class_name === profile?.class_name;
@@ -12,9 +12,9 @@ const examRangeGrade = value => value === ALL_CLASSES ? null : value;
 const examTargetOptions = () => A.data.profile.active_division === 'middle' ? ['중2', '중3'] : [ALL_CLASSES, '고1A', '고1B'];
 let poll, rendering = false, contextGeneration = 0;
 function preferences() {
-  try { const v = JSON.parse(localStorage.getItem('sumus:v13:prefs:' + A.data.profile.id) || localStorage.getItem('sumus:v12:prefs:' + A.data.profile.id) || '{}'); A.ranges = v.ranges || {}; A.school = A.data.profile.role === 'teacher' ? A.data.profile.active_school : A.data.profile.school || v.school || A.data.schools[0]?.name || '단원고'; A.division = A.data.profile.active_division || A.data.profile.division || A.division || 'high'; A.mode = v.mode || 'write_meaning'; A.practiceRunMode = ['practice','test'].includes(v.practiceRunMode) ? v.practiceRunMode : 'practice'; A.target = v.target || 30; A.middleRange = v.middleRange || A.middleRange || ''; A.middleWordIds = Array.isArray(v.middleWordIds) ? v.middleWordIds : (A.middleWordIds || []); A.rankMode = v.rankMode || A.rankMode || 'xp'; A.rankScope = v.rankScope || A.rankScope || 'all'; A.rankPeriod = v.rankPeriod || A.rankPeriod || 'week'; A.memorizeFilter = v.memorizeFilter === 'starred' ? 'starred' : 'all'; A.memStars = Array.isArray(v.memStars) ? v.memStars : []; A.sound = localStorage.getItem('sumus:sound') === 'true'; } catch {}
+  try { const v = JSON.parse(localStorage.getItem('sumus:v13:prefs:' + A.data.profile.id) || localStorage.getItem('sumus:v12:prefs:' + A.data.profile.id) || '{}'); A.ranges = v.ranges || {}; A.school = A.data.profile.role === 'teacher' ? A.data.profile.active_school : A.data.profile.school || v.school || A.data.schools[0]?.name || '단원고'; A.division = A.data.profile.active_division || A.data.profile.division || A.division || 'high'; A.mode = v.mode || 'write_meaning'; A.practiceRunMode = ['practice','test'].includes(v.practiceRunMode) ? v.practiceRunMode : 'practice'; A.target = v.target || 30; A.middleRange = v.middleRange || A.middleRange || ''; A.middleWordIds = Array.isArray(v.middleWordIds) ? v.middleWordIds : (A.middleWordIds || []); A.rankMode = v.rankMode || A.rankMode || 'xp'; A.rankScope = v.rankScope || A.rankScope || 'all'; A.rankPeriod = v.rankPeriod || A.rankPeriod || 'week'; A.memorizeFilter = v.memorizeFilter === 'starred' ? 'starred' : 'all'; A.memorizeRange = v.memorizeRange || A.memorizeRange || ''; A.memStars = Array.isArray(v.memStars) ? v.memStars : []; A.sound = localStorage.getItem('sumus:sound') === 'true'; } catch {}
 }
-function savePreferences() { try { localStorage.setItem('sumus:v13:prefs:' + A.data.profile.id, JSON.stringify({ ranges: A.ranges, school: A.school, mode: A.mode, practiceRunMode: A.practiceRunMode, target: A.target, rankMode: A.rankMode, rankScope: A.rankScope, rankPeriod: A.rankPeriod, middleRange: A.middleRange, middleWordIds: A.middleWordIds || [], memorizeFilter: A.memorizeFilter || 'all', memStars: A.memStars || [] })); } catch {} }
+function savePreferences() { try { localStorage.setItem('sumus:v13:prefs:' + A.data.profile.id, JSON.stringify({ ranges: A.ranges, school: A.school, mode: A.mode, practiceRunMode: A.practiceRunMode, target: A.target, rankMode: A.rankMode, rankScope: A.rankScope, rankPeriod: A.rankPeriod, middleRange: A.middleRange, middleWordIds: A.middleWordIds || [], memorizeFilter: A.memorizeFilter || 'all', memorizeRange: A.memorizeRange || '', memStars: A.memStars || [] })); } catch {} }
 async function refresh() { A.data = await api('/bootstrap'); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; }
 globalThis.__SUMUS_APPLY_BOOTSTRAP__ = data => { A.data = data; globalThis.__SUMUS_BOOTSTRAP__ = data; if (data?.profile?.role === 'teacher') A.school = data.profile.active_school; if (!A.screen) render(); };
 function render() {
@@ -58,6 +58,7 @@ $('#app').addEventListener('click', async event => {
   try {
     if (d.go) return navigate(d.go);
     if (d.study) { A.studyView = d.study; A.tab = 'practice'; A.practiceRunMode = 'practice'; render(); window.scrollTo(0, 0); return; }
+    if (d.memorizeRange) { A.memorizeRange = d.memorizeRange; A.memRevealed = []; A.memorizeFilter = 'all'; savePreferences(); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (d.memorizeFilter) { A.memorizeFilter = d.memorizeFilter === 'starred' ? 'starred' : 'all'; savePreferences(); render(); return; }
     if (d.memorizeRevealAll) { A.memorizeShowAll = d.memorizeRevealAll === 'show'; render(); return; }
     if (d.memorizeWord) {
@@ -135,12 +136,13 @@ $('#app').addEventListener('click', async event => {
         A.middleWordsOpen = false;
       } else {
         A.ranges[A.school] = [...(session.range_codes || [])];
+        A.memorizeRange = String(session.range_codes?.[0] || A.memorizeRange || '');
         A.target = [10,20,30].includes(Number(session.total)) ? Number(session.total) : 'all';
       }
       A.studyView = 'vocab'; A.tab = 'practice'; savePreferences(); render(); window.scrollTo(0,0); return;
     }
     if (d.student) return studentModal(d.student);
-    if (d.assignment) { const task = A.data.assignments.find(a => a.id === d.assignment); A.school = task.school; A.ranges[task.school] = [...task.range_codes]; A.assignmentId = task.id; A.studyView = 'vocab'; A.tab = 'practice'; render(); window.scrollTo(0, 0); return; }
+    if (d.assignment) { const task = A.data.assignments.find(a => a.id === d.assignment); A.school = task.school; A.ranges[task.school] = [...task.range_codes]; A.memorizeRange = String(task.range_codes?.[0] || A.memorizeRange || ''); A.assignmentId = task.id; A.studyView = 'vocab'; A.tab = 'practice'; render(); window.scrollTo(0, 0); return; }
     if (d.release) { const e = A.data.exams.find(e => e.id === d.release); await api('/exams/' + e.id, { release_result: !e.release_result }, 'PATCH'); await refresh(); render(); toast(e.release_result ? '결과를 비공개로 바꿨어요.' : '학생에게 결과가 공개됐어요.'); return; }
     if (d.examActive) { const e = A.data.exams.find(e => e.id === d.examActive); await api('/exams/' + e.id, { active: !e.active }, 'PATCH'); await refresh(); render(); return; }
     if (d.examEdit) { examEditModal(d.examEdit); return; }
@@ -164,7 +166,7 @@ $('#app').addEventListener('click', async event => {
       return;
     }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
-      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.23.0');
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.24.0');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
