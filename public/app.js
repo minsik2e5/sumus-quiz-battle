@@ -1,9 +1,9 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS } from './modules/core.js';
 import { avatar } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.24.0';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.24.0';
-import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.24.0';
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.25.0';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.25.0';
+import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.25.0';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [] };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -62,7 +62,22 @@ $('#app').addEventListener('click', async event => {
     if (d.memorizeFilter) { A.memorizeFilter = d.memorizeFilter === 'starred' ? 'starred' : 'all'; savePreferences(); render(); return; }
     if (d.memorizeRevealAll) { A.memorizeShowAll = d.memorizeRevealAll === 'show'; render(); return; }
     if (d.memorizeWord) {
-      const set = new Set(A.memRevealed || []); set.has(d.memorizeWord) ? set.delete(d.memorizeWord) : set.add(d.memorizeWord); A.memRevealed = [...set]; render(); return;
+      const wordId = d.memorizeWord;
+      const row = b.closest('.memorize-row');
+      row?.classList.add('memorize-flip-out');
+      await new Promise(resolve => setTimeout(resolve, 115));
+      const set = new Set(A.memRevealed || []);
+      set.has(wordId) ? set.delete(wordId) : set.add(wordId);
+      A.memRevealed = [...set];
+      render();
+      requestAnimationFrame(() => {
+        const nextButton = $('[data-memorize-word]').find(item => item.dataset.memorizeWord === wordId);
+        const nextRow = nextButton?.closest('.memorize-row');
+        if (!nextRow) return;
+        nextRow.classList.add('memorize-flip-in');
+        setTimeout(() => nextRow.classList.remove('memorize-flip-in'), 320);
+      });
+      return;
     }
     if (d.memorizeStar) {
       const set = new Set(A.memStars || []); set.has(d.memorizeStar) ? set.delete(d.memorizeStar) : set.add(d.memorizeStar); A.memStars = [...set]; savePreferences(); render(); return;
@@ -166,7 +181,7 @@ $('#app').addEventListener('click', async event => {
       return;
     }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
-      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.24.0');
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.25.0');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
