@@ -577,6 +577,7 @@ export async function runReleaseCheck() {
     const v1320Css = readFileSync(publicRoot + 'v1320.css', 'utf8');
     const v1321Css = readFileSync(publicRoot + 'v1321.css', 'utf8');
     const v1322Css = readFileSync(publicRoot + 'v1322.css', 'utf8');
+    const v1323Css = readFileSync(publicRoot + 'v1323.css', 'utf8');
     const uiModule = readFileSync(publicRoot + 'modules/ui.js', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
@@ -611,7 +612,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.22.0') && indexHtml.includes('/practice-enhancements.js?v=13.22.0') && indexHtml.includes('/v1322.css?v=13.22.0') && sw.includes('sumus-voca-v13.22.0-final-learning-exam-flow'), 'V13.22 cache versions are active');
+    assert(indexHtml.includes('/app.js?v=13.23.0') && indexHtml.includes('/practice-enhancements.js?v=13.23.0') && indexHtml.includes('/v1323.css?v=13.23.0') && sw.includes('sumus-voca-v13.23.0-premium-mobile-redesign'), 'V13.23 cache versions are active');
     assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'meaning and English writing remain first-class scored modes');
     assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && sessionsModule.includes('practice-timer-value'), 'student home and record summaries remain available');
     assert(teacherModule.includes('학생별 연습 기록') && teacherModule.includes('학생이 보낸 실전 결과') && teacherModule.includes('data-practice-record') && appJs.includes('openPracticeRecord'), 'teacher can inspect practice history and student-shared real-test results');
@@ -640,6 +641,9 @@ export async function runReleaseCheck() {
     assert(sessionsModule.includes('/share') && sessionsModule.includes('선생님께 결과 보내기') && sessionsModule.includes('animateTestResult'), 'real exam result can be shared and keeps result impact');
     assert(sessionsModule.includes('answerImpact') && v1321Css.includes('.answer-impact-check') && v1321Css.includes('.perfect-impact'), 'practice correct answers and perfect real exams keep short impact effects');
     assert(v1322Css.includes('.study-hub-simple') && v1322Css.includes('.memorize-sound') && v1322Css.includes('.exam-kind-grid') && v1322Css.includes('.question-timer.danger'), 'V13.22 final learning, pronunciation, exam selector, and tension timer styles are loaded');
+    assert(v1323Css.includes('.study-hub-simple .study-hub-card') && v1323Css.includes('.memorize-list') && v1323Css.includes('.exam-kind-card') && v1323Css.includes('.exam-question-area') && v1323Css.includes('.result-page-v1320'), 'V13.23 premium mobile visual system covers learning, memorization, exam, and result screens');
+    assert(v1323Css.includes('grid-template-columns:1fr!important') && v1323Css.includes('min-height:184px') && v1323Css.includes('border-radius:34px 34px 0 0'), 'V13.23 uses large vertical entry cards and rounded exam sheets');
+    assert(studentModule.includes('premium-page-heading') && !studentModule.includes('grammar-set-meta"><span>'), 'V13.23 reduces secondary text and strengthens screen hierarchy');
     assert(appJs.includes("$$('#teacher-division,#teacher-school')"), 'teacher context selectors use the multi-element helper');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
