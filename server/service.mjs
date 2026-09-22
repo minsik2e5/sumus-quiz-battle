@@ -159,6 +159,9 @@ function regradeMeaningDispute(state, dispute) {
     const session = state.sessions.find(item => item.id === dispute.source_id && item.student_id === dispute.student_id);
     if (session) {
       const answerRecord = (session.answer_records || []).find(item => item.question_id === dispute.question_id || (item.word_id === dispute.word_id && !item.regraded && item.correct === false));
+      const currentWrongCount = Number.isFinite(Number(session.wrong_count))
+        ? Number(session.wrong_count)
+        : (session.wrong_details || []).filter(item => !item.regraded).length;
       if (answerRecord && !answerRecord.correct) {
         answerRecord.correct = true;
         answerRecord.regraded = true;
@@ -167,7 +170,7 @@ function regradeMeaningDispute(state, dispute) {
       }
       session.correct = Math.min(session.total, Number(session.correct || 0) + 1);
       session.score = session.total ? Math.round(session.correct / session.total * 100) : 0;
-      session.wrong_count = Math.max(0, Number(session.wrong_count ?? (session.total - session.correct)) - 1);
+      session.wrong_count = Math.max(0, currentWrongCount - 1);
       session.unanswered_count = Math.max(0, Number(session.unanswered_count || 0));
       session.perfect = session.score === 100 && session.wrong_count === 0 && session.unanswered_count === 0;
       session.xp = Number(session.xp || 0) + 20;
