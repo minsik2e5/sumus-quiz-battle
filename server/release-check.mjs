@@ -585,6 +585,7 @@ export async function runReleaseCheck() {
     const v1321Css = readFileSync(publicRoot + 'v1321.css', 'utf8');
     const v1322Css = readFileSync(publicRoot + 'v1322.css', 'utf8');
     const v1323Css = readFileSync(publicRoot + 'v1323.css', 'utf8');
+    const v1325Css = readFileSync(publicRoot + 'v1325.css', 'utf8');
     const uiModule = readFileSync(publicRoot + 'modules/ui.js', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
@@ -619,7 +620,10 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.24.0') && indexHtml.includes('/practice-enhancements.js?v=13.24.0') && indexHtml.includes('/v1323.css?v=13.24.0') && indexHtml.includes('/v1324.css?v=13.24.0') && sw.includes('sumus-voca-v13.24.0-learning-flow'), 'V13.24 cache versions are active');
+    assert(indexHtml.includes('/app.js?v=13.25.0') && indexHtml.includes('/practice-enhancements.js?v=13.25.0') && indexHtml.includes('/v1324.css?v=13.25.0') && indexHtml.includes('/v1325.css?v=13.25.0') && sw.includes('sumus-voca-v13.25.0-premium-green-rewards'), 'V13.25 cache versions are active');
+    assert(v1325Css.includes('--sumus-primary') && v1325Css.includes('grid-template-columns:repeat(5') && v1325Css.includes('memorize-flip-in'), 'V13.25 green design system, balanced bottom navigation, and memorization motion are loaded');
+    assert(studentModule.includes('reward-wallet') && studentModule.includes('오늘 XP') && sessionsModule.includes('result-reward-card'), 'V13.25 separates XP, reward points, and achievements in the student UX');
+    assert(appJs.includes('memorize-flip-out') && appJs.includes('memorize-flip-in'), 'V13.25 vocabulary tap uses a short flip and fade transition');
     assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'meaning and English writing remain first-class scored modes');
     assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && sessionsModule.includes('practice-timer-value'), 'student home and record summaries remain available');
     assert(teacherModule.includes('학생별 연습 기록') && teacherModule.includes('학생이 보낸 실전 결과') && teacherModule.includes('data-practice-record') && appJs.includes('openPracticeRecord'), 'teacher can inspect practice history and student-shared real-test results');
