@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.17.0-test-mode-badges';
+const VERSION = 'sumus-voca-v13.18.0-p0-score-target-scope';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
