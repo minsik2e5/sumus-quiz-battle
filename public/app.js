@@ -150,7 +150,7 @@ async function performTeacherContextSwitch(kind, value) {
   const generation = ++contextGeneration;
   const endpoint = kind === 'division' ? '/teacher/division' : '/teacher/school';
   const payload = kind === 'division' ? { division: value } : { school_id: value };
-  const selectors = $('#teacher-division,#teacher-school');
+  const selectors = $$('#teacher-division,#teacher-school');
   selectors.forEach(select => select.disabled = true);
   try {
     await api(endpoint, payload, 'PATCH');
