@@ -205,6 +205,9 @@ function samePracticeRequest(data, payload) {
   if (!data || !payload) return false;
   if ((payload.mode || data.mode) !== data.mode) return false;
   if ((payload.run_mode || 'practice') !== (data.run_mode || 'practice')) return false;
+  if (Boolean(payload.cover_all) !== Boolean(data.cover_all)) return false;
+  if (Boolean(payload.daily_quest) !== Boolean(data.daily_quest)) return false;
+  if ((payload.assignment_id || null) !== (data.assignment_id || null)) return false;
   if (Array.isArray(payload.word_ids) && payload.word_ids.length) {
     if (JSON.stringify(sortedStrings(payload.word_ids)) !== JSON.stringify(sortedStrings(data.word_ids))) return false;
   } else if (Array.isArray(payload.range_codes)) {
