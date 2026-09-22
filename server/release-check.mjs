@@ -41,7 +41,7 @@ export async function runReleaseCheck() {
     assert(gangseoWords.length === 354, '강서고 vocabulary = 354');
     assert(bySchool('선부고').filter(word => String(word.range_code) === '44').length === 49, '선부고 외부 44 vocabulary = 49');
     assert(new Set(allWords.map(word => word.id)).size === allWords.length, 'vocabulary ids are unique');
-    assert(Object.keys(EXAM_TYPES).join(',') === 'eng2mean_mc,mean2eng_mc,write_en,write_meaning', 'exactly four exam types');
+    assert(Object.keys(EXAM_TYPES).join(',') === 'write_meaning,write_en,eng2mean_mc,mean2eng_mc', 'exactly four exam types with writing modes first');
     const practiceTypes = ['write_meaning', 'eng2mean', 'mean2eng', 'spell', 'listen', 'scramble', 'vowelblank', 'initial'];
     assert(practiceTypes.every(type => PRACTICE_TYPES[type]), 'all eight practice types exist');
 
@@ -517,6 +517,7 @@ export async function runReleaseCheck() {
     assert(practiceEnhancements.includes('sumusBurstFade 2.2s') && practiceEnhancements.includes('2300'), 'V13.13 correct-answer overlay stays visible long enough to read');
     assert(indexHtml.includes('/app.js?v=13.15.0') && indexHtml.includes('/practice-enhancements.js?v=13.15.0') && indexHtml.includes('/v1315.css?v=13.15.0') && sw.includes('sumus-voca-v13.15.0-scored-practice'), 'V13.15 cache versions are active');
     assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'V13.15 puts meaning and English writing first and exposes student score history');
+    assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && sessionsModule.includes('practice-timer-value'), 'V13.15 student home shows recent scores and timed practice countdown');
     assert(teacherModule.includes('학생별 연습 결과') && teacherModule.includes('data-practice-record') && appJs.includes('openPracticeRecord'), 'V13.15 teacher can inspect practice scores and wrong answers');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
