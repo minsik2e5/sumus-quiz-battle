@@ -4,7 +4,7 @@ import { avatar } from './character.js';
 import { DANWONGO_PASSAGES } from '../danwongo-grammar-data.js?v=2';
 import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from '../seonbu-grammar-data.js?v=2';
 import { GANGSEO_PASSAGES } from '../gangseo-grammar-data.js?v=1';
-export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
+export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '실전', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
 export function shell(A, content) {
   const p = A.data.profile;
   return `<div class="student-app"><main class="student-main"><header class="app-header"><div class="brand"><img src="/icon.svg" alt=""><div>SUMUS <span>VOCA</span></div></div><button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${A.tab === id ? 'active' : ''}" ${A.tab === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
@@ -428,20 +428,61 @@ function middleLessonState(A) {
   A.middleWordIds = (A.middleWordIds || []).filter(id => valid.has(id));
   return { words, codes, code, lessonWords, selected: A.middleWordIds };
 }
-function practiceModePicker(A) {
+function practiceModePicker(A, { selfTest = false } = {}) {
   const primary = [
     ['write_meaning', '뜻 직접 쓰기', '영어를 보고 한국어 뜻을 직접 입력', '약 8초 / 문제'],
     ['spell', '영어 직접 쓰기', '뜻을 보고 영어 단어를 직접 입력', '약 12초 / 문제']
   ];
-  const writingSelected = ['write_meaning','spell'].includes(A.mode);
-  const runMode = writingSelected ? (A.practiceRunMode || 'practice') : 'practice';
   const secondary = Object.entries(PRACTICE_TYPES).filter(([key]) => !['write_meaning', 'spell'].includes(key));
-  const otherSelected = !writingSelected;
+  const otherSelected = !['write_meaning','spell'].includes(A.mode);
   return `<div class="primary-mode-grid">${primary.map(([key,label,help,timeText]) => `<button class="primary-mode-card ${A.mode === key ? 'selected' : ''}" data-mode="${key}" aria-pressed="${A.mode === key}"><span class="primary-mode-icon">${icon('records')}</span><div><b>${label}</b><small>${help}</small><em>${timeText}</em></div>${key === 'write_meaning' ? '<span class="pill blue">추천</span>' : ''}</button>`).join('')}</div>
-  ${writingSelected ? `<div class="step-label compact-step"><span>04</span>진행 방식</div><section class="run-mode-panel"><div class="run-mode-grid"><button data-practice-run-mode="practice" class="${runMode === 'practice' ? 'selected' : ''}" aria-pressed="${runMode === 'practice'}"><strong>연습 모드</strong><small>바로 정답 확인 · 오답 다시 출제</small></button><button data-practice-run-mode="test" class="${runMode === 'test' ? 'selected' : ''}" aria-pressed="${runMode === 'test'}"><strong>실전 모드</strong><small>정답 공개 없음 · 전체 타이머 · 마지막에 채점</small></button></div></section>` : `<div class="setup-inline-note">${icon('practice')} 이 방식은 연습 모드로 진행해요.</div>`}
-  <button class="other-practice-toggle" data-other-practice="toggle" aria-expanded="${A.otherPracticeOpen || otherSelected ? 'true' : 'false'}"><span>기타 연습</span><small>${otherSelected ? esc(PRACTICE_TYPES[A.mode]) + ' 선택됨' : '객관식 · 듣기 · 철자 보조'}</small>${icon('chevron')}</button>
-  ${A.otherPracticeOpen || otherSelected ? `<div class="mode-grid secondary-mode-grid">${secondary.map(([key,name]) => `<button class="mode-option ${A.mode === key ? 'selected' : ''}" data-mode="${key}" aria-pressed="${A.mode === key}">${icon(key === 'listen' ? 'sound' : key === 'mixed' ? 'sparkle' : ['scramble','initial','vowelblank'].includes(key) ? 'records' : 'practice')}${name}</button>`).join('')}</div>` : ''}`;
+  ${selfTest ? '<div class="setup-inline-note">' + icon('shield') + ' 실전은 뜻쓰기·영어쓰기만 사용하고, 정답은 끝난 뒤 한꺼번에 공개해요.</div>' : `<button class="other-practice-toggle" data-other-practice="toggle" aria-expanded="${A.otherPracticeOpen || otherSelected ? 'true' : 'false'}"><span>기타 연습</span><small>${otherSelected ? esc(PRACTICE_TYPES[A.mode]) + ' 선택됨' : '객관식 · 듣기 · 철자 보조'}</small>${icon('chevron')}</button>
+  ${A.otherPracticeOpen || otherSelected ? `<div class="mode-grid secondary-mode-grid">${secondary.map(([key,name]) => `<button class="mode-option ${A.mode === key ? 'selected' : ''}" data-mode="${key}" aria-pressed="${A.mode === key}">${icon(key === 'listen' ? 'sound' : key === 'mixed' ? 'sparkle' : ['scramble','initial','vowelblank'].includes(key) ? 'records' : 'practice')}${name}</button>`).join('')}</div>` : ''}`}`;
 }
+function memorizationWords(A) {
+  if (A.data.profile.division === 'middle') return middleLessonState(A).lessonWords;
+  const { words, selected } = getRanges(A);
+  return words.filter(word => selected.includes(word.range_code));
+}
+function memorizationPanel(A) {
+  const middle = A.data.profile.division === 'middle';
+  const words = memorizationWords(A);
+  const stars = new Set(A.memStars || []);
+  const revealed = new Set(A.memRevealed || []);
+  const starredOnly = A.memorizeFilter === 'starred';
+  const visible = starredOnly ? words.filter(word => stars.has(word.id)) : words;
+  const allShown = A.memorizeShowAll === true;
+  const rangeUi = middle
+    ? (() => {
+        const state = middleLessonState(A);
+        return `<div class="middle-lesson-tabs setup-choice-row">${state.codes.map(range => { const count = state.words.filter(word => String(word.range_code) === String(range)).length; return `<button data-middle-lesson="${esc(range)}" class="${String(range) === state.code ? 'selected' : ''}">${esc(range)}과 <small>${count}개</small></button>`; }).join('')}</div>`;
+      })()
+    : schoolSwitch(A) + rangePicker(A);
+  const starredInScope = words.filter(word => stars.has(word.id));
+  return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill green">MEMORIZE</span></div>
+    <div class="page-heading memorize-heading"><h1>단어 외우기</h1><p>뜻을 가린 채 단어를 보고, 기억이 안 나면 그 자리에서 눌러 확인해요.</p></div>
+    <section class="setup-section"><div class="step-label"><span>01</span>외울 범위</div>${rangeUi}</section>
+    <section class="memorize-shell">
+      <div class="memorize-toolbar">
+        <div class="segment compact"><button data-memorize-filter="all" class="${!starredOnly ? 'selected' : ''}">전체 ${words.length}</button><button data-memorize-filter="starred" class="${starredOnly ? 'selected' : ''}">★ 어려운 단어 ${starredInScope.length}</button></div>
+        <button class="text-button" data-memorize-reveal-all="${allShown ? 'hide' : 'show'}">${allShown ? '뜻 모두 가리기' : '뜻 모두 보기'}</button>
+      </div>
+      <div class="memorize-list">${visible.length ? visible.map((word,index) => {
+        const show = allShown || revealed.has(word.id);
+        const star = stars.has(word.id);
+        return `<div class="memorize-row ${show ? 'revealed' : ''} ${star ? 'starred' : ''}">
+          <button class="memorize-star" data-memorize-star="${esc(word.id)}" aria-label="${star ? '어려운 단어 해제' : '어려운 단어 표시'}">${star ? '★' : '☆'}</button>
+          <button class="memorize-word" data-memorize-word="${esc(word.id)}"><span class="memorize-no">${index + 1}</span><strong>${esc(word.word)}</strong><small>${show ? '뜻 다시 가리기' : '눌러서 뜻 확인'}</small></button>
+          ${show ? `<div class="memorize-meaning"><span>뜻</span><b>${esc(word.meaning)}</b></div>` : ''}
+        </div>`;
+      }).join('') : '<div class="memorize-empty">표시할 단어가 없어요. 별표 필터를 해제하거나 범위를 선택해주세요.</div>'}</div>
+      <div class="memorize-actions">
+        ${starredInScope.length ? `<button class="btn full" data-memorize-practice="starred">★ 어려운 단어 ${starredInScope.length}개 쓰기 연습</button>` : ''}
+        <button class="btn primary full" data-vocab-panel="quiz">문제로 확인하기 ${icon('arrow')}</button>
+      </div>
+    </section>`;
+}
+
 function practiceSetupSummary(A, availableCount) {
   const count = Math.max(0, Number(availableCount || 0));
   const target = A.data.profile.division === 'middle'
@@ -457,7 +498,7 @@ function durationText(seconds) {
   const min = Math.floor(sec / 60), rest = sec % 60;
   return min ? `${min}분 ${String(rest).padStart(2,'0')}초` : `${rest}초`;
 }
-function middleVocabPractice(A) {
+function middleVocabQuiz(A) {
   const { words, codes, code, lessonWords, selected } = middleLessonState(A);
   const selectedSet = new Set(selected);
   const lessonTabs = codes.map(range => { const count = words.filter(word => String(word.range_code) === String(range)).length; return `<button data-middle-lesson="${esc(range)}" class="${String(range) === code ? 'selected' : ''}">${esc(range)}과 <small>${count}개</small></button>`; }).join('');
@@ -485,8 +526,8 @@ function middleVocabPractice(A) {
       <button class="btn primary full" data-action="start-practice" ${selected.length || A.data.active_practice ? '' : 'disabled'}>${A.data.active_practice ? '진행 중인 학습 확인' : A.practiceRunMode === 'test' && ['write_meaning','spell'].includes(A.mode) ? '실전 모드 확인' : '연습 시작하기'} ${icon('arrow')}</button>
     </aside>`;
 }
-function vocabPractice(A) {
-  if (A.data.profile.division === 'middle') return middleVocabPractice(A);
+function vocabQuiz(A) {
+  if (A.data.profile.division === 'middle') return middleVocabQuiz(A);
   const count = selectedCount(A);
   const summary = practiceSetupSummary(A, count);
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">VOCAB</span></div>
@@ -496,23 +537,48 @@ function vocabPractice(A) {
     <section class="setup-section"><div class="step-label"><span>03</span>쓰기 방식</div>${practiceModePicker(A)}</section>
     <aside class="setup-start-summary"><div><span>시작 요약</span><strong id="setup-summary-text">${esc(summary.text)}</strong><small>${A.practiceRunMode === 'test' && ['write_meaning','spell'].includes(A.mode) ? '정답은 종료 후 공개되고 시간 종료 시 자동 제출돼요.' : '연습에서는 정답 확인 후 틀린 단어를 다시 볼 수 있어요.'}</small></div><button class="btn primary full" data-action="start-practice" ${!count && !A.data.active_practice ? 'disabled' : ''}>${A.data.active_practice ? '진행 중인 학습 확인' : A.practiceRunMode === 'test' && ['write_meaning','spell'].includes(A.mode) ? '실전 모드 확인' : '연습 시작하기'} ${icon('arrow')}</button></aside>`;
 }
+function vocabPractice(A) {
+  const panel = A.vocabPanel || 'memorize';
+  if (panel === 'memorize') return memorizationPanel(A);
+  A.practiceRunMode = 'practice';
+  return `<div class="vocab-panel-switch segment"><button data-vocab-panel="memorize">암기하기</button><button data-vocab-panel="quiz" class="selected">문제 연습</button></div>${vocabQuiz(A)}`;
+}
+
 function practice(A) {
   if (A.studyView === 'vocab') return vocabPractice(A);
   if (A.studyView === 'grammar') return grammarStudy(A);
   return studyHub(A);
 }
-export function examStatus(A, e) {
-  const attempts = A.data.attempts.filter(a => a.exam_id === e.id);
-  if (attempts.some(a => a.status === 'active')) return ['이어서 응시', 'blue', true];
-  if (e.available_at > Date.now()) return ['시작 예정', '', false];
-  if (e.due_at <= Date.now()) return ['마감', '', false];
-  if (attempts.length >= e.max_attempts) return ['응시 완료', 'green', false];
-  return ['응시 가능', 'blue', true];
+function selfTestTargetGrid(A, count) {
+  return `<div class="practice-target-grid" role="group" aria-label="실전 문항 수 선택">${[10,20,30].filter(n => count >= n).map(n => `<button data-practice-target="${n}" class="${A.target === n ? 'selected' : ''}">${n}<small>문제</small></button>`).join('')}<button data-practice-target="all" class="all ${A.target === 'all' ? 'selected' : ''}"><b>선택 범위 전체</b><small>${count}개 단어</small></button></div>`;
 }
 function exam(A) {
-  const list = [...A.data.exams].sort((a, b) => a.due_at - b.due_at);
-  return `<div class="page-heading"><h1>실전시험</h1><p>연습한 실력, 차분하게 확인해요.</p></div><div class="exam-info">${icon('shield')}<p>선생님이 정한 범위로 응시해요.<br>시험 점수는 캐릭터 성장에 영향을 주지 않아요.</p></div><div class="exam-list">${list.length ? list.map(e => { const [status, cls, enabled] = examStatus(A, e); return `<article class="exam-card"><div class="row between"><span class="pill ${cls}">${status}</span><span class="tiny muted">${e.school}</span></div><h3>${esc(e.title)}</h3><p>${EXAM_TYPES[e.exam_type].label}</p><div class="exam-meta"><span>${e.question_count}문제</span><span>${Math.round(e.duration_sec / 60)}분</span><span>${e.passing_score}점 통과</span></div><p class="tiny">${e.available_at > Date.now() ? `${date(e.available_at)} 시작` : `${date(e.due_at)} 마감`}</p><button class="btn ${enabled ? 'primary' : ''} full" data-exam="${e.id}" style="margin-top:15px" ${enabled ? '' : 'disabled'}>${status === '이어서 응시' ? '이어서 응시하기' : enabled ? '시험 확인하기' : status}</button></article>`; }).join('') : empty('exam', '배정된 시험이 없어요', '새 시험이 열리면 여기에 표시돼요.')}</div>`;
+  A.practiceRunMode = 'test';
+  if (!['write_meaning','spell'].includes(A.mode)) A.mode = 'write_meaning';
+  const middle = A.data.profile.division === 'middle';
+  let scopeUi = '', count = 0, scopeLabel = '';
+  if (middle) {
+    const state = middleLessonState(A);
+    count = state.lessonWords.length;
+    scopeLabel = state.code ? state.code + '과' : '범위 미선택';
+    scopeUi = `<div class="middle-lesson-tabs setup-choice-row">${state.codes.map(range => { const n = state.words.filter(word => String(word.range_code) === String(range)).length; return `<button data-middle-lesson="${esc(range)}" class="${String(range) === state.code ? 'selected' : ''}">${esc(range)}과 <small>${n}개</small></button>`; }).join('')}</div>`;
+  } else {
+    const state = getRanges(A);
+    count = state.words.filter(word => state.selected.includes(word.range_code)).length;
+    scopeLabel = state.selected.map(code => recordRangeLabel({ division: 'high', school: A.school }, code)).join(' · ') || '범위 미선택';
+    scopeUi = schoolSwitch(A) + rangePicker(A);
+  }
+  const target = A.target === 'all' ? count : Math.min(count, Number(A.target || 20));
+  const duration = target ? practiceDurationSec(A.mode, target) : 0;
+  const sentCount = (A.data.sessions || []).filter(item => item.run_mode === 'test' && item.shared_to_teacher_at).length;
+  return `<div class="page-heading self-test-heading"><span class="eyebrow">SELF TEST</span><h1>내가 직접 보는 실전</h1><p>선생님 배정 없이 범위와 유형을 직접 고르고, 끝난 결과만 선생님께 보낼 수 있어요.</p></div>
+    <div class="self-test-rule-strip"><span>${icon('shield')} 중간 정답 공개 없음</span><span>${icon('clock')} 전체 제한시간</span><span>${icon('records')} 결과 전송 선택</span></div>
+    <section class="setup-section"><div class="step-label"><span>01</span>시험 범위</div>${scopeUi}</section>
+    <section class="setup-section"><div class="step-label"><span>02</span>문항 수</div>${selfTestTargetGrid(A, count)}</section>
+    <section class="setup-section"><div class="step-label"><span>03</span>시험 방식</div>${practiceModePicker(A, { selfTest: true })}</section>
+    <aside class="setup-start-summary self-test-summary"><div><span>실전 시작 전 확인</span><strong>${esc(scopeLabel)} · ${target || 0}문제 · ${esc(PRACTICE_TYPES[A.mode] || '뜻쓰기')}</strong><small>전체 제한시간 ${durationText(duration)} · 완료 후 점수 확인 · 지금까지 선생님께 보낸 실전 ${sentCount}회</small></div><button class="btn primary full" data-action="start-self-test" ${count ? '' : 'disabled'}>실전 시작하기 ${icon('arrow')}</button></aside>`;
 }
+
 function ranking(A) {
   const mode = A.rankMode || 'xp';
   const scope = A.rankScope || 'all';
@@ -551,7 +617,7 @@ function records(A) {
     ...sessions.map(item => ({ kind: 'practice', at: item.created_at, item })),
     ...attempts.map(item => ({ kind: 'exam', at: item.submitted_at, item }))
   ].sort((a,b) => b.at - a.at);
-  const visible = tab === 'all' ? combined : combined.filter(row => row.kind === tab);
+  const visible = tab === 'all' ? combined : tab === 'selftest' ? combined.filter(row => row.kind === 'practice' && row.item.run_mode === 'test') : tab === 'practice' ? combined.filter(row => row.kind === 'practice' && row.item.run_mode !== 'test') : combined.filter(row => row.kind === tab);
   const weekStart = A.data.ranking_period?.start || 0;
   const numericScore = row => {
     if (row.kind === 'practice') return Number(row.item.score ?? (row.item.total ? Math.round(row.item.correct / row.item.total * 100) : 0));
@@ -572,7 +638,7 @@ function records(A) {
     if (row.kind === 'practice') {
       const s = row.item, score = s.score ?? (s.total ? Math.round(s.correct / s.total * 100) : 0);
       const ranges = (s.range_codes || []).map(code => esc(recordRangeLabel(s, code))).join(' · ') || '선택 범위';
-      return `<button class="record-row full" style="width:100%;text-align:left" data-practice-record="${s.id}"><span class="square-icon">${icon('practice')}</span><div class="grow"><strong>${esc(ranges)} · ${esc(PRACTICE_TYPES[s.mode] || '연습')} · ${s.run_mode === 'test' ? '실전' : '연습'}</strong><p>${s.correct}/${s.total} 정답 · ${durationText(s.duration_sec)}${s.auto_submitted ? ' · 시간 종료' : ''}</p><p>${date(s.created_at)}</p></div><div class="result">${score}점<small>${disputeState(s.id).replace(/^ · /,'') || '연습 기록'}</small></div></button>`;
+      return `<button class="record-row full" style="width:100%;text-align:left" data-practice-record="${s.id}"><span class="square-icon">${icon('practice')}</span><div class="grow"><strong>${esc(ranges)} · ${esc(PRACTICE_TYPES[s.mode] || '연습')} · ${s.run_mode === 'test' ? '실전' : '연습'}</strong><p>${s.correct}/${s.total} 정답 · ${durationText(s.duration_sec)}${s.auto_submitted ? ' · 시간 종료' : ''}</p><p>${date(s.created_at)}</p></div><div class="result">${score}점<small>${disputeState(s.id).replace(/^ · /,'') || (s.run_mode === 'test' ? (s.shared_to_teacher_at ? '선생님 전송 완료' : '실전 · 미전송') : '연습 기록')}</small></div></button>`;
     }
     const a = row.item, e = A.data.exams.find(exam => exam.id === a.exam_id);
     return `<button class="record-row full" style="width:100%;text-align:left" data-result="${a.id}"><span class="square-icon">${icon('exam')}</span><div class="grow"><strong>${esc(e?.title || '실전시험')}</strong><p>${EXAM_TYPES[e?.exam_type]?.label || ''}${a.result_visibility === 'visible' && a.correct !== undefined ? ' · ' + a.correct + '/' + a.total + ' 정답' : ' · 제출 완료'}</p><p>${date(a.submitted_at)}</p></div><div class="result">${a.result_visibility === 'visible' && a.score !== undefined ? a.score + '점' : '공개 대기'}<small>${a.result_visibility === 'visible' ? (disputeState(a.id).replace(/^ · /,'') || (a.grading_status === 'provisional' ? '임시 점수' : '시험 기록')) : '선생님 공개 대기'}</small></div></button>`;
@@ -580,7 +646,7 @@ function records(A) {
   return `<div class="page-heading"><h1>내 기록</h1><p>언제, 어떤 범위를 봤고 몇 점이었는지 모두 남아요.</p></div>
     <div class="record-stats"><div><strong>${weeklyAvg === null ? '—' : weeklyAvg + '점'}</strong><span>이번 주 평균 · 공개 ${weeklyScores.length}회</span></div><div><strong>${combined.length}회</strong><span>총 기록</span></div><div><strong>${best === null ? '—' : best + '점'}</strong><span>최고 공개 점수</span></div><div><strong>${num(totalQuestions)}</strong><span>누적 문제</span></div></div>
     ${achievementSection(A, true)}
-    <div class="segment"><button data-record-tab="all" class="${tab === 'all' ? 'selected' : ''}">전체</button><button data-record-tab="exam" class="${tab === 'exam' ? 'selected' : ''}">시험</button><button data-record-tab="practice" class="${tab === 'practice' ? 'selected' : ''}">연습</button></div>
+    <div class="segment"><button data-record-tab="all" class="${tab === 'all' ? 'selected' : ''}">전체</button><button data-record-tab="selftest" class="${tab === 'selftest' ? 'selected' : ''}">실전</button><button data-record-tab="practice" class="${tab === 'practice' ? 'selected' : ''}">연습</button></div>
     <div style="margin-top:18px">${visible.length ? visible.map(rowHtml).join('') : empty('records','아직 기록이 없어요','뜻쓰기나 영어쓰기를 마치면 점수와 시간이 여기에 저장돼요.')}</div>`;
 }
 function studio(A) {
