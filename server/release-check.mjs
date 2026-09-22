@@ -39,7 +39,7 @@ export async function runReleaseCheck() {
     assert(sessionUiSource.includes(String.fromCharCode(36, 36) + "('[data-practice-choice],#practice-confirm').forEach"), 'practice answer controls disable through the multi-node selector');
     assert(sessionUiSource.includes('practiceAdvanceTimer = setTimeout'), 'practice correct-answer auto advance is wired');
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
-    assert(indexSource.includes('/v1324.css?v=13.24.0'), 'V13.24 learning style layer is connected');
+    assert(indexSource.includes('/v1324.css?v=13.25.0') && indexSource.includes('/v1325.css?v=13.25.0'), 'V13.25 learning style layers are connected');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
