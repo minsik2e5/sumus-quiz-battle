@@ -329,12 +329,12 @@ function renderPractice() {
   mount(`<div class="session-app exam-run exam-run-${testMode ? 'test' : 'practice'}">
     <header class="session-header exam-run-header">
       <div class="row between"><button class="icon-button" id="practice-exit" aria-label="시험 화면 나가기">${icon('close')}</button><h1>${modeLabel}</h1><button class="icon-button" id="practice-sound" aria-label="효과음 ${A.sound ? '끄기' : '켜기'}">${icon(A.sound ? 'sound' : 'mute')}</button></div>
-      <div class="question-count row between"><span>${x.question_is_retry ? '오답 다시 풀기' : `${progressNo} / ${x.target}`}</span><span class="pill ${testMode ? '' : 'blue'}">${modeLabel}</span></div>
+      <div class="question-count"><span>${x.question_is_retry ? '오답 다시 풀기' : `${progressNo} / ${x.target}`}</span></div>
       <div class="progress"><i style="width:${Math.min(100, Number(x.score_total || 0) / x.target * 100)}%"></i></div>
     </header>
     <main class="question-area exam-question-area">
       ${timerHtml}
-      <div class="exam-question-meta"><span class="question-type">${PRACTICE_TYPES[q.type]}</span><span>${testMode ? '정답은 마지막에 공개' : feedback ? '정답 확인' : '문제마다 바로 채점'}</span></div>
+      <div class="exam-question-meta"><span class="question-type">${PRACTICE_TYPES[q.type]}</span></div>
       ${q.type === 'listen' ? `<button class="listen-button" id="listen-word" aria-label="발음 듣기">${icon('sound')}</button><p class="input-caption" style="text-align:center">발음을 듣고 뜻을 골라주세요.</p>` : `<h2 class="question-prompt ${!['eng2mean', 'write_meaning'].includes(q.type) ? 'korean' : ''}">${esc(q.prompt)}</h2>`}
       ${q.hint ? `<p class="question-hint">${esc(q.hint)}</p>` : ''}
       ${input ? `<input id="practice-answer" class="answer-input" aria-label="${meaningInput ? '한국어 뜻 답안' : '영어 답안'}" placeholder="${meaningInput ? '뜻을 직접 입력하세요' : '영어 단어를 입력하세요'}" autocomplete="off" autocapitalize="off" spellcheck="false" ${feedback ? 'disabled' : ''}><button class="btn primary full" id="practice-confirm" style="margin-top:13px" ${feedback ? 'disabled' : ''}>${testMode ? (Number(x.score_total || 0) + 1 >= Number(x.target || 0) ? '제출하고 결과 보기' : '답안 제출 · 다음') : '정답 확인'}</button>` : `<div class="options">${q.options.map((o, i) => `<button class="option ${feedback && o === answer ? 'correct' : ''}" data-practice-choice="${i}" ${feedback ? 'disabled' : ''}><span class="letter">${i + 1}</span><span>${esc(o)}</span></button>`).join('')}</div>`}
@@ -407,6 +407,11 @@ async function timeoutPracticeQuestion() {
       answerImpact(result.feedback);
       navigator.vibrate?.([18, 28, 18]);
       if (A.sound) sound(false, false);
+      const answeredState = practiceState;
+      practiceAdvanceTimer = setTimeout(() => {
+        const nextButton = $('#practice-next');
+        if (nextButton && practiceState === answeredState) advancePracticeScreen(nextButton, answeredState);
+      }, 1200);
     }
   } catch (error) {
     practiceQuestionTimingOut = false;
@@ -434,7 +439,15 @@ function practiceTick() {
   $('#practice-timer')?.classList.toggle('danger', left <= 60);
   if (left <= 0) finishPracticeByTimer();
 }
-function feedbackHtml(f) { const title = f.timed_out ? 'TIME OUT' : f.ok ? '정답!' : '오답'; const answerLine = f.timed_out ? '시간 안에 답하지 못했어요.' : f.ok ? `${esc(f.word)} · ${esc(f.meaning)}` : `${esc(f.word)} · ${esc(f.meaning)}<br>내 답: ${esc(f.answer || '')}`; return `<div class="feedback ${f.ok ? '' : 'wrong'} ${f.timed_out ? 'timed-out' : ''}" role="status"><b>${title}</b><p>${answerLine}</p>${f.ok ? '<small>좋아요. 다음 문제에서도 이어가세요.</small>' : `<small>정답: ${esc(f.word)} · ${esc(f.meaning)} · 몇 문제 뒤 다시 나와요.</small>`}</div>${f.can_dispute ? '<button class="meaning-dispute-button" id="practice-dispute">뜻 검토 요청</button>' : ''}`; }
+function feedbackHtml(f) {
+  const title = f.timed_out ? 'TIME OUT' : f.ok ? '정답' : '오답';
+  const answerLine = f.timed_out
+    ? '시간이 끝났어요. 다음 문제로 이동합니다.'
+    : f.ok
+      ? `${esc(f.word)} · ${esc(f.meaning)}`
+      : `정답 ${esc(f.word)} · ${esc(f.meaning)}<br>내 답 ${esc(f.answer || '미응답')}`;
+  return `<div class="feedback ${f.ok ? '' : 'wrong'} ${f.timed_out ? 'timed-out' : ''}" role="status"><b>${title}</b><p>${answerLine}</p></div>${f.can_dispute ? '<button class="meaning-dispute-button" id="practice-dispute">뜻 검토 요청</button>' : ''}`;
+}
 function answerImpact(feedback) {
   const host = $('.session-app');
   if (!host || !feedback) return;
@@ -488,7 +501,7 @@ async function advancePracticeScreen(button, answeredState) {
 async function answerPractice(answer, button) {
   if (answering || practiceState.feedback) return;
   answering = true; const x = practiceState;
-  $('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = true);
+  $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = true);
   clearInterval(timer); timer = null;
   try { const result = await api(`/practice/${x.id}/answer`, { question_id: x.question_id, answer, prefetch_next: false });
     practiceOffset = Number(result.server_time || Date.now()) - Date.now();
@@ -504,7 +517,13 @@ async function answerPractice(answer, button) {
     if (!result.feedback.ok && button) { const index = button.dataset.practiceChoice; $(`[data-practice-choice="${index}"]`)?.classList.add('wrong'); }
     if (result.feedback.ok) navigator.vibrate?.([24, 34, 42]); else navigator.vibrate?.([12, 25, 12]);
     if (A.sound) sound(result.feedback.ok, result.feedback.milestone);
-    // Feedback stays on screen until the student explicitly moves on.
+    if (result.feedback.ok) {
+      const answeredState = practiceState;
+      practiceAdvanceTimer = setTimeout(() => {
+        const nextButton = $('#practice-next');
+        if (nextButton && practiceState === answeredState) advancePracticeScreen(nextButton, answeredState);
+      }, result.feedback.milestone ? 900 : 650);
+    }
   } catch (e) { $('#practice-error').innerHTML = `<div class="error-box">${esc(e.message)} 답안은 다시 눌러 전송할 수 있어요.</div>`; $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = false); if (!practiceState?.feedback) timer = setInterval(practiceTick, practiceState?.timer_mode === 'question' ? 100 : 500); }
   finally { answering = false; }
 }
