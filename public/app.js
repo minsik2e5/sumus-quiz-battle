@@ -115,7 +115,7 @@ $('#app').addEventListener('click', async event => {
         A.middleWordsOpen = false;
       } else {
         A.ranges[A.school] = [...(session.range_codes || [])];
-        A.target = Number(session.total || 20);
+        A.target = [10,20,30].includes(Number(session.total)) ? Number(session.total) : 'all';
       }
       A.studyView = 'vocab'; A.tab = 'practice'; savePreferences(); render(); window.scrollTo(0,0); return;
     }
