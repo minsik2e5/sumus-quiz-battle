@@ -144,14 +144,32 @@ function regradeMeaningDispute(state, dispute) {
     const practice = state.practices.find(item => item.id === dispute.source_id && item.student_id === dispute.student_id);
     if (practice && !practice.finished) {
       practice.correct = Math.min(practice.total, Number(practice.correct || 0) + 1);
+      practice.score_correct = Math.min(practice.target, Number(practice.score_correct || 0) + 1);
       practice.xp = Number(practice.xp || 0) + 20;
+      const answerRecord = (practice.answer_records || []).find(item => item.question_id === dispute.question_id || (item.word_id === dispute.word_id && !item.regraded && item.correct === false));
+      if (answerRecord && !answerRecord.correct) {
+        answerRecord.correct = true;
+        answerRecord.regraded = true;
+        answerRecord.dispute_status = 'approved';
+        answerRecord.corrected_at = Date.now();
+      }
       const retryIndex = practice.retry?.findIndex(item => item.id === dispute.word_id) ?? -1;
       if (retryIndex >= 0) practice.retry.splice(retryIndex, 1);
     }
     const session = state.sessions.find(item => item.id === dispute.source_id && item.student_id === dispute.student_id);
     if (session) {
+      const answerRecord = (session.answer_records || []).find(item => item.question_id === dispute.question_id || (item.word_id === dispute.word_id && !item.regraded && item.correct === false));
+      if (answerRecord && !answerRecord.correct) {
+        answerRecord.correct = true;
+        answerRecord.regraded = true;
+        answerRecord.dispute_status = 'approved';
+        answerRecord.corrected_at = Date.now();
+      }
       session.correct = Math.min(session.total, Number(session.correct || 0) + 1);
       session.score = session.total ? Math.round(session.correct / session.total * 100) : 0;
+      session.wrong_count = Math.max(0, Number(session.wrong_count ?? (session.total - session.correct)) - 1);
+      session.unanswered_count = Math.max(0, Number(session.unanswered_count || 0));
+      session.perfect = session.score === 100 && session.wrong_count === 0 && session.unanswered_count === 0;
       session.xp = Number(session.xp || 0) + 20;
       session.regraded_at = Date.now();
       const detail = (session.wrong_details || []).find(item => item.question_id === dispute.question_id || (item.word_id === dispute.word_id && !item.regraded));
@@ -371,7 +389,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.18.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.19.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -727,13 +745,22 @@ export async function service(state, method, path, body, token) {
       sourceKey = String(questionIndex);
     } else if (sourceType === 'practice') {
       const practice = state.practices.find(item => item.id === sourceId && item.student_id === p.id);
-      if (!practice || practice.school_id !== school.id) fail('연습 답안을 찾을 수 없습니다.', 404);
+      const session = state.sessions.find(item => item.id === sourceId && item.student_id === p.id);
+      const source = session || practice;
+      if (!source || source.school_id !== school.id) fail('연습 답안을 찾을 수 없습니다.', 404);
       questionId = str(body.question_id, 100);
-      const response = practice.responses?.[questionId];
-      const feedback = response?.feedback;
-      if (!feedback || feedback.ok || feedback.type !== 'write_meaning' || !feedback.word_id || !feedback.answer) fail('오답으로 채점된 뜻쓰기 답안만 이의제기할 수 있어요.', 409);
-      word = findWord(state, feedback.word_id);
-      submittedAnswer = feedback.answer;
+      const durable = (source.answer_records || []).find(item => item.question_id === questionId);
+      if (durable) {
+        if (durable.correct || durable.type !== 'write_meaning' || !durable.word_id || !durable.answer) fail('오답으로 채점된 뜻쓰기 답안만 이의제기할 수 있어요.', 409);
+        word = findWord(state, durable.word_id);
+        submittedAnswer = durable.answer;
+      } else {
+        const response = practice?.responses?.[questionId];
+        const feedback = response?.feedback;
+        if (!feedback || feedback.ok || feedback.type !== 'write_meaning' || !feedback.word_id || !feedback.answer) fail('오답으로 채점된 뜻쓰기 답안만 이의제기할 수 있어요.', 409);
+        word = findWord(state, feedback.word_id);
+        submittedAnswer = feedback.answer;
+      }
       sourceKey = questionId;
     } else fail('뜻쓰기 답안 정보를 확인해주세요.');
     if (!word || !submittedAnswer) fail('이의제기할 답안을 확인해주세요.');
@@ -925,7 +952,7 @@ export async function service(state, method, path, body, token) {
     const practiceWords = runMode === 'test' && !manualSelection ? shuffle(words).slice(0, target) : words;
     const startedAt = Date.now();
     const durationSec = practiceDurationSec(body.mode, target);
-    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, run_mode: runMode, assignment_id: null, target, cover_all: runMode === 'test' ? true : coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection, quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, deadline: startedAt + durationSec * 1000, auto_submitted: false, wrong_details: [], finished: false, responses: {}, words: practiceWords.map(w => w.id) };
+    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, run_mode: runMode, assignment_id: null, target, cover_all: runMode === 'test' ? true : coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection, quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, deadline: startedAt + durationSec * 1000, auto_submitted: false, wrong_details: [], answer_records: [], finished: false, responses: {}, words: practiceWords.map(w => w.id) };
     if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
@@ -945,6 +972,19 @@ export async function service(state, method, path, body, token) {
       if (scoredAttempt) {
         x.score_total = Number(x.score_total || 0) + 1;
         if (ok) x.score_correct = Number(x.score_correct || 0) + 1;
+        x.answer_records ??= [];
+        x.answer_records.push({
+          question_id: body.question_id,
+          word_id: word.id,
+          word: displayEnglish(word.word),
+          meaning: word.meaning,
+          answer: str(body.answer, 160),
+          type: x.question.type,
+          correct: !!ok,
+          at: Date.now(),
+          regraded: false
+        });
+        if (x.answer_records.length > 500) x.answer_records.splice(0, x.answer_records.length - 500);
       }
       state.mastery[p.id] ??= {}; const m = state.mastery[p.id][word.id] ??= { mastery: 0, correct: 0, wrong: 0, streak: 0, recent_results: [] };
       m.recent_results = Array.isArray(m.recent_results) ? m.recent_results : [];
@@ -1030,10 +1070,19 @@ function nextPractice(x, state) {
   x.question = buildQuestion(word, mode, words); x.question_id = id(); x.question_is_retry = isRetry; x.feedback = null;
 }
 function finishPractice(x, state, autoSubmitted = false) {
-  x.finished = true; x.finished_at = Date.now(); x.auto_submitted = !!autoSubmitted;
+  const finalizedAt = Date.now();
+  const endedAt = autoSubmitted && Number(x.deadline || 0) ? Math.min(finalizedAt, Number(x.deadline)) : finalizedAt;
+  x.finished = true;
+  x.ended_at = endedAt;
+  x.finalized_at = finalizedAt;
+  x.finished_at = endedAt;
+  x.auto_submitted = !!autoSubmitted;
   const scoreTotal = Math.max(1, Number(x.target || 0));
   const scoreCorrect = Math.min(scoreTotal, Number(x.score_correct || 0));
   const score = Math.round(scoreCorrect / scoreTotal * 100);
+  const answerRecords = (x.answer_records || []).map(item => ({ ...item }));
+  const wrongCount = answerRecords.filter(item => item.correct === false && !item.regraded).length;
+  const unansweredCount = Math.max(0, scoreTotal - answerRecords.length);
   const rec = {
     id: x.id,
     student_id: x.student_id,
@@ -1050,13 +1099,19 @@ function finishPractice(x, state, autoSubmitted = false) {
     total: scoreTotal,
     attempts_total: x.total,
     score,
+    wrong_count: wrongCount,
+    unanswered_count: unansweredCount,
+    perfect: score === 100 && wrongCount === 0 && unansweredCount === 0,
     xp: x.xp,
     best_combo: x.best,
-    duration_sec: Math.round((x.finished_at - x.started_at) / 1000),
+    duration_sec: Math.max(0, Math.round((endedAt - x.started_at) / 1000)),
     limit_sec: Number(x.duration_sec || 0),
     auto_submitted: !!x.auto_submitted,
+    ended_at: endedAt,
+    finalized_at: finalizedAt,
+    answer_records: answerRecords,
     wrong_details: (x.wrong_details || []).map(item => ({ ...item })),
-    created_at: x.finished_at
+    created_at: endedAt
   };
   if (!state.sessions.some(s => s.id === rec.id)) state.sessions.push(rec);
 }
@@ -1065,14 +1120,22 @@ function practiceView(x, state) {
   const scoreCorrect = Math.min(scoreTotal, Number(x.score_correct || 0));
   const score = Math.round(scoreCorrect / scoreTotal * 100);
   const hideTestScore = x.run_mode === 'test' && !x.finished;
+  const answerRecords = x.answer_records || [];
+  const wrongCount = answerRecords.filter(item => item.correct === false && !item.regraded).length;
+  const unansweredCount = Math.max(0, scoreTotal - answerRecords.length);
+  const perfect = x.finished && score === 100 && wrongCount === 0 && unansweredCount === 0;
   return {
     id: x.id, school: x.school, mode: x.mode, run_mode: x.run_mode || 'practice', target: x.target,
     range_codes: x.range_codes || [], cover_all: !!x.cover_all, daily_quest: !!x.daily_quest,
     manual_selection: !!x.manual_selection, quest_mix: x.quest_mix || null,
     covered: x.seen?.length || 0, total: x.total, correct: hideTestScore ? null : x.correct, score_total: x.finished ? scoreTotal : (x.score_total || 0), score_correct: hideTestScore ? null : scoreCorrect, score: hideTestScore ? null : score,
     xp: hideTestScore ? null : x.xp, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
-    started_at: x.started_at, finished_at: x.finished_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
+    started_at: x.started_at, finished_at: x.finished_at || null, ended_at: x.ended_at || null, finalized_at: x.finalized_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
     auto_submitted: !!x.auto_submitted,
+    wrong_count: x.finished ? wrongCount : undefined,
+    unanswered_count: x.finished ? unansweredCount : undefined,
+    perfect: x.finished ? perfect : undefined,
+    answer_records: x.finished ? answerRecords : undefined,
     wrong_details: x.finished ? (x.wrong_details || []) : undefined,
     question: x.question, question_id: x.question_id, question_is_retry: !!x.question_is_retry, feedback: hideTestScore ? null : x.feedback,
     finished: x.finished, retry_count: x.retry.length,
