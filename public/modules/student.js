@@ -167,7 +167,7 @@ function recentRecordCard(A) {
   const line = row => {
     if (row.kind === 'practice') {
       const s = row.item, score = s.score ?? (s.total ? Math.round(s.correct / s.total * 100) : 0);
-      const ranges = (s.range_codes || []).map(code => `${esc(code)}과`).join(' · ') || '선택 범위';
+      const ranges = (s.range_codes || []).map(code => s.division === 'middle' ? `${esc(code)}과` : rangeLabel(s.school || A.school, code)).join(' · ') || '선택 범위';
       return `<button class="exam-row" data-practice-record="${s.id}"><span class="square-icon">${icon('practice')}</span><div class="grow"><h3>${esc(ranges)} · ${esc(PRACTICE_TYPES[s.mode] || '연습')} · ${s.run_mode === 'test' ? '실전' : '연습'}</h3><p>${s.correct}/${s.total} 정답 · ${durationText(s.duration_sec)} · ${date(s.created_at)}</p></div><strong>${score}점</strong></button>`;
     }
     const a = row.item, e = A.data.exams.find(exam => exam.id === a.exam_id);
