@@ -1062,7 +1062,7 @@ export async function service(state, method, path, body, token) {
       // Prepare the following question in the same persisted mutation. The
       // client can still show this answer's feedback, then switch instantly
       // without a second database round trip.
-      if (body.prefetch_next === true) {
+      if (body.prefetch_next === true && x.timer_mode !== 'question') {
         advancePractice(x, state);
         result.prefetched_next = practiceView(x, state);
       }
