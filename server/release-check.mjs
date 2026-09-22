@@ -267,8 +267,9 @@ export async function runReleaseCheck() {
       const submitted = await service(state, 'POST', `/attempts/${internal.id}/submit`, {
         lease: internal.lease, revision: internal.revision, answers
       }, studentToken);
-      if (submitted.attempt.score !== 100) console.error('[release-check][exam-debug]', exam.exam_type, JSON.stringify({ answers, details: submitted.attempt.details }, null, 2));
-      assert(submitted.attempt.status === 'submitted' && submitted.attempt.score === 100, `${exam.exam_type} grades correct answers at 100`);
+      const gradedInternal = state.examAttempts.find(item => item.id === internal.id);
+      assert(submitted.attempt.status === 'submitted' && gradedInternal?.score === 100, `${exam.exam_type} grades correct answers at 100`);
+      if (!exam.release_result) assert(submitted.attempt.result_visibility === 'withheld' && submitted.attempt.score === undefined, `${exam.exam_type} respects withheld student results after grading`);
     }
     const hiddenExam = await service(state, 'POST', '/exams', {
       title: 'QA hidden result', class_name: '고1A', school: '단원고', range_codes: [rangeCode], exam_type: 'write_meaning',
