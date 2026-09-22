@@ -159,30 +159,33 @@ export function openPracticeRecord(sessionId) {
   const session = A?.data?.sessions?.find(item => item.id === sessionId);
   if (!session) return toast('연습 기록을 찾을 수 없어요.');
   const disputes = (A.data.meaning_disputes || []).filter(item => item.source_type === 'practice' && item.source_id === session.id);
-  const runLabel = session.run_mode === 'test' ? '실전 모드' : '연습 모드';
+  const runLabel = session.run_mode === 'test' ? '실전시험' : '연습시험';
   const pending = disputes.filter(item => item.status === 'pending').length;
   const regraded = disputes.some(item => String(item.status || '').startsWith('approved')) || !!session.regraded_at;
   const score = session.score ?? (session.total ? Math.round(session.correct / session.total * 100) : 0);
   const durable = Array.isArray(session.answer_records) ? session.answer_records : [];
-  const wrong = durable.length ? durable.filter(item => item.correct === false && !item.regraded) : (session.wrong_details || []).filter(item => !item.regraded);
+  const wrong = durable.length ? durable.filter(item => item.correct === false && !item.regraded && !item.timed_out) : (session.wrong_details || []).filter(item => !item.regraded && !item.timed_out);
+  const timedOut = durable.filter(item => item.timed_out && !item.regraded);
   const wrongCount = Number.isFinite(Number(session.wrong_count)) ? Number(session.wrong_count) : wrong.length;
-  const unanswered = Number.isFinite(Number(session.unanswered_count)) ? Number(session.unanswered_count) : Math.max(0, Number(session.total || 0) - Number(session.correct || 0) - wrongCount);
+  const unanswered = Number.isFinite(Number(session.unanswered_count)) ? Number(session.unanswered_count) : timedOut.length + Math.max(0, Number(session.total || 0) - durable.length);
   const perfect = session.perfect === true || (score === 100 && wrongCount === 0 && unanswered === 0);
   const rangeText = (session.range_codes || []).map(code => esc(recordRangeLabel(session, code))).join(' · ') || '선택 범위';
   const statusText = pending ? `${score}점 (임시 · 이의제기 ${pending}건 심사중)` : regraded ? `${score}점 · 재채점 완료` : `${score}점`;
-  const wrongHtml = wrong.length
-    ? wrong.map(item => {
-        const dispute = disputes.find(d => d.question_id === item.question_id || (d.word_id === item.word_id && d.answer === item.answer));
+  const missed = [...wrong, ...timedOut];
+  const wrongHtml = missed.length
+    ? missed.map(item => {
+        const isTimeout = !!item.timed_out;
+        const dispute = isTimeout ? null : disputes.find(d => d.question_id === item.question_id || (d.word_id === item.word_id && d.answer === item.answer));
         const dStatus = dispute?.status === 'pending' ? ' · 이의제기 심사중' : String(dispute?.status || '').startsWith('approved') ? ' · 정답 인정' : dispute?.status === 'rejected' ? ' · 오답 유지' : '';
-        const canDispute = A.data.profile.role === 'student' && item.type === 'write_meaning' && item.answer && !dispute;
-        return `<div class="wrong-word"><p><b>${esc(item.word)}</b></p><p>${esc(item.meaning)}</p><small>내 답: ${esc(item.answer || '미응답')}${dStatus}</small>${canDispute ? `<button class="meaning-dispute-button" data-practice-dispute="${esc(item.question_id)}">🙋 이 답도 맞는 것 같아요</button>` : ''}</div>`;
+        const canDispute = !isTimeout && A.data.profile.role === 'student' && item.type === 'write_meaning' && item.answer && !dispute;
+        return `<div class="wrong-word"><span class="pill ${isTimeout ? 'red' : 'red'}">${isTimeout ? 'TIME OUT' : '오답'}</span><p><b>${esc(item.word)}</b></p><p>${esc(item.meaning)}</p><small>${isTimeout ? '시간 초과 · 미응답' : '내 답: ' + esc(item.answer || '미응답')}${dStatus}</small>${canDispute ? `<button class="meaning-dispute-button" data-practice-dispute="${esc(item.question_id)}">뜻 검토 요청</button>` : ''}</div>`;
       }).join('')
     : perfect
       ? '<div class="result-note">PERFECT · 모든 문항을 맞혔어요.</div>'
       : unanswered
-        ? `<div class="result-note">미응답 ${unanswered}개 · 과거 기록은 미응답 단어 상세가 없을 수 있어요.</div>`
+        ? `<div class="result-note">미응답 ${unanswered}개가 있어요.</div>`
         : '<div class="result-note">오답 상세가 저장되지 않은 이전 기록이에요.</div>';
-  const close = modal(`<span class="pill">${esc(PRACTICE_TYPES[session.mode] || '연습')} · ${runLabel}</span><h2>${esc(session.school || '')} · ${rangeText}</h2><div class="result-number">${statusText}</div><div class="detail-grid"><div><b>${session.correct} / ${session.total}</b><small>정답</small></div><div><b>${wrongCount}</b><small>오답</small></div><div><b>${unanswered}</b><small>미응답</small></div><div><b>${time(session.duration_sec || 0)}</b><small>소요시간</small></div></div><section style="margin-top:18px"><div class="section-title"><h3>답안 확인</h3></div>${wrongHtml}</section>${session.run_mode === 'test' && A.data.profile.role === 'student' ? (session.shared_to_teacher_at ? '<button class="btn self-test-share-done full" disabled>✓ 선생님께 전송 완료</button>' : '<button class="btn self-test-share full" id="record-share-self-test">선생님께 결과 보내기</button>') : ''}${wrong.length && A.data.profile.role === 'student' ? '<button class="btn primary full" id="retry-wrong-practice">틀린 단어만 다시 연습</button>' : ''}`, '내 연습 기록');
+  const close = modal(`<span class="pill">${esc(PRACTICE_TYPES[session.mode] || '연습')} · ${runLabel}</span><h2>${esc(session.school || '')} · ${rangeText}</h2><div class="result-number">${statusText}</div><div class="detail-grid"><div><b>${session.correct} / ${session.total}</b><small>정답</small></div><div><b>${wrongCount}</b><small>오답</small></div><div><b>${unanswered}</b><small>미응답</small></div><div><b>${time(session.duration_sec || 0)}</b><small>소요시간</small></div></div><section style="margin-top:18px"><div class="section-title"><h3>답안 확인</h3></div>${wrongHtml}</section>${session.run_mode === 'test' && A.data.profile.role === 'student' ? (session.shared_to_teacher_at ? '<button class="btn self-test-share-done full" disabled>✓ 선생님께 전송 완료</button>' : '<button class="btn self-test-share full" id="record-share-self-test">선생님께 결과 보내기</button>') : ''}${missed.length && A.data.profile.role === 'student' ? '<button class="btn primary full" id="retry-wrong-practice">틀린·미응답 단어 다시 연습</button>' : ''}`, '내 연습 기록');
   $$('[data-practice-dispute]').forEach(button => button.addEventListener('click', async () => {
     button.disabled = true;
     try {
@@ -207,7 +210,7 @@ export function openPracticeRecord(sessionId) {
     try {
       close();
       A.mode = session.mode || 'write_meaning';
-      await startPractice({ wordIds: [...new Set(wrong.map(item => item.word_id).filter(Boolean))], mode: session.mode, runMode: 'practice' });
+      await startPractice({ wordIds: [...new Set(missed.map(item => item.word_id).filter(Boolean))], mode: session.mode, runMode: 'practice', examStyle: true, confirmed: true });
     } catch (error) { toast(error.message); }
   });
 }
