@@ -458,9 +458,9 @@ function durationText(seconds) {
   return min ? `${min}분 ${String(rest).padStart(2,'0')}초` : `${rest}초`;
 }
 function middleVocabPractice(A) {
-  const { codes, code, lessonWords, selected } = middleLessonState(A);
+  const { words, codes, code, lessonWords, selected } = middleLessonState(A);
   const selectedSet = new Set(selected);
-  const lessonTabs = codes.map(range => `<button data-middle-lesson="${esc(range)}" class="${String(range) === code ? 'selected' : ''}">${esc(range)}과 <small>${lessonWords.length && String(range) === code ? lessonWords.length + '개' : ''}</small></button>`).join('');
+  const lessonTabs = codes.map(range => { const count = words.filter(word => String(word.range_code) === String(range)).length; return `<button data-middle-lesson="${esc(range)}" class="${String(range) === code ? 'selected' : ''}">${esc(range)}과 <small>${count}개</small></button>`; }).join('');
   const rows = lessonWords.map((word, index) => `<label class="middle-word-row ${selectedSet.has(word.id) ? 'selected' : ''}"><input type="checkbox" data-middle-word="${esc(word.id)}" ${selectedSet.has(word.id) ? 'checked' : ''}><span class="middle-word-no">${index + 1}</span><span class="middle-word-en">${esc(word.word)}</span><span class="middle-word-ko">${esc(word.meaning)}</span></label>`).join('');
   const preset = [15,20,30].filter(n => lessonWords.length >= n).map(n => `<button data-middle-preset="${n}" class="${selected.length === n ? 'selected' : ''}">앞 ${n}개</button>`).join('');
   const summary = practiceSetupSummary(A, selected.length);
