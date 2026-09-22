@@ -371,10 +371,22 @@ function middleLessonState(A) {
   A.middleWordIds = (A.middleWordIds || []).filter(id => valid.has(id));
   return { words, codes, code, lessonWords, selected: A.middleWordIds };
 }
+function highSchoolMemorizeState(A) {
+  const { words, codes, selected } = getRanges(A);
+  const normalized = codes.map(code => String(code));
+  const selectedFirst = selected.map(code => String(code)).find(code => normalized.includes(code));
+  if (!normalized.includes(String(A.memorizeRange || ''))) A.memorizeRange = selectedFirst || normalized[0] || '';
+  const code = String(A.memorizeRange || '');
+  return {
+    words,
+    codes,
+    code,
+    lessonWords: words.filter(word => String(word.range_code) === code)
+  };
+}
 function memorizationWords(A) {
   if (A.data.profile.division === 'middle') return middleLessonState(A).lessonWords;
-  const { words, selected } = getRanges(A);
-  return words.filter(word => selected.includes(word.range_code));
+  return highSchoolMemorizeState(A).lessonWords;
 }
 function memorizationPanel(A) {
   const middle = A.data.profile.division === 'middle';
@@ -389,7 +401,15 @@ function memorizationPanel(A) {
         const state = middleLessonState(A);
         return `<div class="middle-lesson-tabs setup-choice-row">${state.codes.map(range => { const count = state.words.filter(word => String(word.range_code) === String(range)).length; return `<button data-middle-lesson="${esc(range)}" class="${String(range) === state.code ? 'selected' : ''}">${esc(range)}과 <small>${count}개</small></button>`; }).join('')}</div>`;
       })()
-    : schoolSwitch(A) + rangePicker(A);
+    : (() => {
+        const state = highSchoolMemorizeState(A);
+        return schoolSwitch(A) + `<div class="memorize-range-strip" role="tablist" aria-label="학습 범위">${state.codes.map(range => {
+          const code = String(range);
+          const count = state.words.filter(word => String(word.range_code) === code).length;
+          const selected = code === state.code;
+          return `<button role="tab" aria-selected="${selected}" data-memorize-range="${esc(code)}" class="${selected ? 'selected' : ''}"><strong>${esc(rangeLabel(A.school, range))}</strong><small>${count}개</small></button>`;
+        }).join('')}</div>`;
+      })();
   const starredInScope = words.filter(word => stars.has(word.id));
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill green">VOCAB</span></div>
     <div class="page-heading memorize-heading premium-page-heading"><span class="premium-eyebrow">VOCABULARY</span><h1>단어 학습</h1></div>
@@ -403,10 +423,9 @@ function memorizationPanel(A) {
         const show = allShown || revealed.has(word.id);
         const star = stars.has(word.id);
         const front = show ? word.meaning : word.word;
-        const hint = show ? '눌러서 영어 보기' : '눌러서 뜻 보기';
         return `<div class="memorize-row ${show ? 'revealed' : ''} ${star ? 'starred' : ''}">
           <button class="memorize-star" data-memorize-star="${esc(word.id)}" aria-label="${star ? '어려운 단어 해제' : '어려운 단어 표시'}">${star ? '★' : '☆'}</button>
-          <button class="memorize-word" data-memorize-word="${esc(word.id)}"><span class="memorize-no">${index + 1}</span><strong>${esc(front)}</strong><small>${hint}</small></button>
+          <button class="memorize-word" data-memorize-word="${esc(word.id)}" aria-label="${esc(word.word)} ${show ? '영어 보기' : '뜻 보기'}"><span class="memorize-no">${index + 1}</span><strong>${esc(front)}</strong></button>
           <button class="memorize-sound" data-memorize-speak="${esc(word.id)}" aria-label="${esc(word.word)} 발음 듣기">${icon('sound')}</button>
         </div>`;
       }).join('') : '<div class="memorize-empty">표시할 단어가 없어요. 별표 필터를 해제하거나 범위를 선택해주세요.</div>'}</div>
