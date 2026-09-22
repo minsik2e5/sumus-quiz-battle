@@ -1,9 +1,9 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, CLASS_OPTIONS } from './modules/core.js';
 import { avatar } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.15.0';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.15.0';
-import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.15.0';
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.16.0';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.16.0';
+import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.16.0';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub' };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -29,14 +29,14 @@ function navigate(tab) {
 function loginView(role = A.role, division = A.division) {
   A.role = role; A.division = division;
   const divisionName = division === 'middle' ? '중등부' : '고등부';
-  $('#app').innerHTML = `<div class="auth"><section class="auth-visual"><div class="brand"><img src="/icon.svg" alt=""><div>SUMUS <span>VOCA</span></div></div><div><span class="auth-division-badge">${divisionName}</span><h1>단어를 넘어,<br>나만의 성장으로.</h1><p>매일 조금씩 쌓이는 실력.<br>오늘의 작은 연습부터 시작해요.</p>${avatar('lumi')}</div><footer>SUMUS ENGLISH ACADEMY</footer></section><form class="auth-form" id="login-form"><div class="brand"><img src="/icon.svg" alt=""><div>SUMUS <span>VOCA</span></div></div><div class="division-segment"><button type="button" data-division="middle" class="${division === 'middle' ? 'selected' : ''}">중등부</button><button type="button" data-division="high" class="${division === 'high' ? 'selected' : ''}">고등부</button></div><div class="segment"><button type="button" data-role="student" class="${role === 'student' ? 'selected' : ''}">학생</button><button type="button" data-role="teacher" class="${role === 'teacher' ? 'selected' : ''}">선생님</button></div><h2>${role === 'student' ? divisionName + ' 학생 로그인' : '선생님, 안녕하세요.'}</h2><p>${role === 'student' ? divisionName + ' 계정으로 로그인해주세요.' : divisionName + ' 관리 화면으로 시작합니다.'}</p><label class="field"><span>아이디</span><input name="username" autocomplete="username" placeholder="아이디를 입력하세요" required maxlength="80" autocapitalize="off"></label><label class="field"><span>비밀번호</span><div class="password-wrap"><input name="password" type="password" autocomplete="current-password" placeholder="비밀번호를 입력하세요" required maxlength="128"><button type="button" id="toggle-password" aria-label="비밀번호 보기">보기</button></div></label><div class="form-error" id="login-error" role="alert"></div><button class="btn primary full" type="submit">${divisionName} 로그인 ${icon('arrow')}</button><p class="auth-note">계정 문의는 담당 선생님에게 알려주세요.</p></form></div>`;
+  $('#app').innerHTML = `<div class="auth"><section class="auth-visual"><div class="brand"><img src="/icon.svg" alt=""><div>SUMUS <span>VOCA</span></div></div><div><span class="auth-division-badge">${divisionName}</span><h1>단어를 넘어,<br>나만의 성장으로.</h1><p>매일 조금씩 쌓이는 실력.<br>오늘의 작은 연습부터 시작해요.</p>${avatar('lumi')}</div><footer>SUMUS ENGLISH ACADEMY</footer></section><form class="auth-form" id="login-form"><div class="brand"><img src="/icon.svg" alt=""><div>SUMUS <span>VOCA</span></div></div><div class="division-segment"><button type="button" data-division="middle" class="${division === 'middle' ? 'selected' : ''}">중등부</button><button type="button" data-division="high" class="${division === 'high' ? 'selected' : ''}">고등부</button></div><div class="segment"><button type="button" data-role="student" class="${role === 'student' ? 'selected' : ''}">학생</button><button type="button" data-role="teacher" class="${role === 'teacher' ? 'selected' : ''}">선생님</button></div><p class="auth-role-note">계정 종류는 로그인할 때 자동으로 확인돼요.</p><h2>${role === 'student' ? divisionName + ' 학생 로그인' : '선생님, 안녕하세요.'}</h2><p>${role === 'student' ? divisionName + ' 계정으로 로그인해주세요.' : divisionName + ' 관리 화면으로 시작합니다.'}</p><label class="field"><span>아이디</span><input name="username" autocomplete="username" placeholder="아이디를 입력하세요" required maxlength="80" autocapitalize="off"></label><label class="field"><span>비밀번호</span><div class="password-wrap"><input name="password" type="password" autocomplete="current-password" placeholder="비밀번호를 입력하세요" required maxlength="128"><button type="button" id="toggle-password" aria-label="비밀번호 보기">보기</button></div></label><div class="form-error" id="login-error" role="alert"></div><button class="btn primary full" type="submit">${divisionName} 로그인 ${icon('arrow')}</button><p class="auth-note">계정 문의는 담당 선생님에게 알려주세요.</p></form></div>`;
   $$('[data-division]').forEach(b => b.onclick = () => loginView(A.role, b.dataset.division));
   $$('[data-role]').forEach(b => b.onclick = () => loginView(b.dataset.role, A.division));
   $('#toggle-password').onclick = e => { const input = $('[name="password"]'); input.type = input.type === 'password' ? 'text' : 'password'; e.currentTarget.textContent = input.type === 'password' ? '보기' : '숨기기'; };
   $('#login-form').onsubmit = async e => {
     e.preventDefault(); const b = $('[type="submit"]', e.currentTarget); buttonBusy(b); $('#login-error').textContent = '';
     try {
-      const values = Object.fromEntries(new FormData(e.currentTarget)); await api('/login', { ...values, role: A.role, division: A.division }); await refresh(); preferences(); A.tab = A.data.profile.role === 'teacher' ? 'dashboard' : A.data.profile.avatar_key ? 'home' : 'studio'; render(); startPolling();
+      const values = Object.fromEntries(new FormData(e.currentTarget)); const login = await api('/login', { ...values, role: A.role, division: A.division }); A.role = login.profile?.role || A.role; await refresh(); preferences(); A.tab = A.data.profile.role === 'teacher' ? 'dashboard' : A.data.profile.avatar_key ? 'home' : 'studio'; render(); startPolling();
     } catch (err) { $('#login-error').textContent = err.message; buttonBusy(b, false); }
   };
 }
@@ -102,7 +102,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'refresh') { buttonBusy(b); await refresh(); render(); toast('최신 기록으로 업데이트했어요.'); }
     if (d.action === 'start-practice') { buttonBusy(b); await startPractice(); }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
-      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.15.0');
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.16.0');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
