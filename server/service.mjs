@@ -352,7 +352,16 @@ function stats(state, p, sessions = mySessions(state, p.id)) {
   const today = sessions.filter(s => dayKey(s.created_at) === dayKey(Date.now()));
   const recent = [...sessions].sort((a, b) => b.created_at - a.created_at).slice(0, 20);
   const total = recent.reduce((n, s) => n + s.total, 0), correct = recent.reduce((n, s) => n + s.correct, 0);
-  return { ...growthFor(sessions), today_total: today.reduce((n, s) => n + s.total, 0), today_xp: today.reduce((n, s) => n + s.xp, 0), practice_count: sessions.length, accuracy: total ? Math.round(correct / total * 100) : 0, weak: Object.values(state.mastery[p.id] || {}).filter(m => m.wrong > 0 && m.mastery < 80).length };
+  return {
+    ...growthFor(sessions),
+    today_total: today.reduce((n, s) => n + s.total, 0),
+    today_xp: today.reduce((n, s) => n + (s.xp || 0), 0),
+    reward_points: sessions.reduce((n, s) => n + Number(s.reward_points || 0), 0),
+    today_reward_points: today.reduce((n, s) => n + Number(s.reward_points || 0), 0),
+    practice_count: sessions.length,
+    accuracy: total ? Math.round(correct / total * 100) : 0,
+    weak: Object.values(state.mastery[p.id] || {}).filter(m => m.wrong > 0 && m.mastery < 80).length
+  };
 }
 function attemptView(a, state, profile) {
   const exam = state.exams.find(e => e.id === a.exam_id);
@@ -392,7 +401,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.23.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.25.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -1115,6 +1124,34 @@ function nextPractice(x, state) {
     x.question_deadline = x.question_started_at + x.question_duration_sec * 1000;
   }
 }
+function practiceReward(x, state, endedAt, scoreTotal, perfect) {
+  const previous = mySessions(state, x.student_id);
+  const todayKey = dayKey(endedAt);
+  const todaySessions = previous.filter(session => dayKey(session.created_at) === todayKey);
+  const firstToday = todaySessions.length === 0;
+  const breakdown = [];
+  const add = (label, points) => { if (points > 0) breakdown.push({ label, points }); };
+
+  const completion = scoreTotal >= 30 ? 18 : scoreTotal >= 20 ? 12 : scoreTotal >= 10 ? 5 : Math.max(1, Math.ceil(scoreTotal / 3));
+  add('학습 완료', completion);
+  if (perfect && scoreTotal >= 10) add('100점', 10);
+  if (x.daily_quest) add('오늘 추천 학습', 5);
+  if (firstToday) add('오늘 첫 학습', 5);
+
+  if (firstToday) {
+    const projected = growthFor([...previous, { created_at: endedAt, total: scoreTotal, xp: 0, best_combo: 0 }]).streak;
+    if (projected === 3) add('3일 연속 학습', 8);
+    if (projected === 7) add('7일 연속 학습', 20);
+  }
+
+  const raw = breakdown.reduce((sum, item) => sum + item.points, 0);
+  const earnedToday = todaySessions.reduce((sum, session) => sum + Number(session.reward_points || 0), 0);
+  const available = Math.max(0, 80 - earnedToday);
+  const points = Math.min(raw, available);
+  if (points < raw) breakdown.push({ label: '일일 보상 한도 적용', points: points - raw });
+  return { points, breakdown };
+}
+
 function finishPractice(x, state, autoSubmitted = false) {
   const finalizedAt = Date.now();
   const endedAt = autoSubmitted && Number(x.deadline || 0) ? Math.min(finalizedAt, Number(x.deadline)) : finalizedAt;
@@ -1130,6 +1167,10 @@ function finishPractice(x, state, autoSubmitted = false) {
   const wrongCount = answerRecords.filter(item => item.correct === false && !item.regraded && !item.timed_out).length;
   const timedOutCount = answerRecords.filter(item => item.timed_out && !item.regraded).length;
   const unansweredCount = Math.max(0, scoreTotal - answerRecords.length) + timedOutCount;
+  const perfect = score === 100 && wrongCount === 0 && unansweredCount === 0;
+  const reward = practiceReward(x, state, endedAt, scoreTotal, perfect);
+  x.reward_points = reward.points;
+  x.reward_breakdown = reward.breakdown;
   const rec = {
     id: x.id,
     student_id: x.student_id,
@@ -1149,8 +1190,10 @@ function finishPractice(x, state, autoSubmitted = false) {
     score,
     wrong_count: wrongCount,
     unanswered_count: unansweredCount,
-    perfect: score === 100 && wrongCount === 0 && unansweredCount === 0,
+    perfect,
     xp: x.xp,
+    reward_points: reward.points,
+    reward_breakdown: reward.breakdown,
     best_combo: x.best,
     duration_sec: Math.max(0, Math.round((endedAt - x.started_at) / 1000)),
     limit_sec: Number(x.duration_sec || 0),
@@ -1181,7 +1224,7 @@ function practiceView(x, state) {
     range_codes: x.range_codes || [], cover_all: !!x.cover_all, daily_quest: !!x.daily_quest, assignment_id: x.assignment_id || null,
     manual_selection: !!x.manual_selection, exam_style: !!x.exam_style, quest_mix: x.quest_mix || null, word_ids: [...(x.words || [])],
     covered: x.seen?.length || 0, total: x.total, correct: hideTestScore ? null : x.correct, score_total: x.finished ? scoreTotal : (x.score_total || 0), score_correct: hideTestScore ? null : scoreCorrect, score: hideTestScore ? null : score,
-    xp: hideTestScore ? null : x.xp, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
+    xp: hideTestScore ? null : x.xp, reward_points: x.finished ? Number(x.reward_points || 0) : undefined, reward_breakdown: x.finished ? (x.reward_breakdown || []) : undefined, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
     started_at: x.started_at, finished_at: x.finished_at || null, ended_at: x.ended_at || null, finalized_at: x.finalized_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
     timer_mode: x.timer_mode || 'session', question_duration_sec: Number(x.question_duration_sec || 0), question_started_at: x.question_started_at || null, question_deadline: x.question_deadline || null,
     auto_submitted: !!x.auto_submitted,
