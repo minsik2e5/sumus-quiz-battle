@@ -1,7 +1,7 @@
 import { api, $, $$, icon, esc, time, date, recordRangeLabel, scope, toast, modal, buttonBusy } from './ui.js';
 import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo } from './core.js';
 import { avatar } from './character.js';
-let A, redraw, refresh, examState = null, practiceState = null, prefetchedPractice = null, practiceAdvanceTimer = null, practiceOffset = 0, practiceAutoFinishing = false, practiceGuardId = null, timer, saving = Promise.resolve(), inputVersion = 0, dirty = false, syncError = '', debounce, audio;
+let A, redraw, refresh, examState = null, practiceState = null, prefetchedPractice = null, practiceAdvanceTimer = null, practiceOffset = 0, practiceAutoFinishing = false, practiceQuestionTimingOut = false, practiceGuardId = null, timer, saving = Promise.resolve(), inputVersion = 0, dirty = false, syncError = '', debounce, audio;
 export function configureSessions(state, render, reload) { A = state; redraw = render; refresh = reload; }
 const mount = html => { $('#app').innerHTML = html; window.scrollTo(0, 0); };
 const draftKey = () => `sumus:v12:exam:${A.data.profile.id}:${examState.attempt.id}`;
@@ -26,7 +26,7 @@ function disarmTestGuard() {
   window.removeEventListener('popstate', testBackGuard);
   practiceGuardId = null;
 }
-export function leaveSession() { clearInterval(timer); clearTimeout(debounce); clearTimeout(practiceAdvanceTimer); timer = null; practiceAdvanceTimer = null; prefetchedPractice = null; practiceOffset = 0; practiceAutoFinishing = false; disarmTestGuard(); A.screen = null; }
+export function leaveSession() { clearInterval(timer); clearTimeout(debounce); clearTimeout(practiceAdvanceTimer); timer = null; practiceAdvanceTimer = null; prefetchedPractice = null; practiceOffset = 0; practiceAutoFinishing = false; practiceQuestionTimingOut = false; disarmTestGuard(); A.screen = null; }
 export async function openExam(eid) {
   const e = A.data.exams.find(e => e.id === eid); if (!e) return;
   const close = modal(`<span class="pill">실전시험</span><h2>${esc(e.title)}</h2><p>${e.school} · ${esc(scope(e))}</p><div class="detail-grid"><div><b>${EXAM_TYPES[e.exam_type].label}</b><small>한 가지 유형으로 출제</small></div><div><b>${e.question_count}문제</b><small>제한시간 ${Math.round(e.duration_sec / 60)}분</small></div><div><b>${e.max_attempts}회</b><small>응시 가능 횟수</small></div><div><b>${e.passing_score}점</b><small>통과 기준</small></div></div><div class="exam-info">${icon('clock')}<p>시작하면 시간이 흐릅니다.<br>시간이 끝나면 저장된 답안이 자동 제출돼요.</p></div><button class="btn ink full" id="begin-exam">${A.data.attempts.some(a => a.exam_id === eid && a.status === 'active') ? '이어서 응시하기' : '시험 시작하기'}</button>`, '실전시험 시작');
@@ -240,9 +240,10 @@ function enterPracticeSession(data) {
   renderPractice();
 }
 async function resolveExistingPractice(data, payload) {
-  const left = data.deadline ? Math.max(0, Math.ceil((data.deadline - Date.now() - (Number(data.server_time || Date.now()) - Date.now())) / 1000)) : 0;
+  const activeDeadline = data.timer_mode === 'question' ? data.question_deadline : data.deadline;
+  const left = activeDeadline ? Math.max(0, Math.ceil((activeDeadline - Date.now() - (Number(data.server_time || Date.now()) - Date.now())) / 1000)) : 0;
   const rangeText = (data.range_codes || []).map(code => esc(recordRangeLabel({ division: A.data.profile.division, school: data.school }, code))).join(' · ') || '선택 범위';
-  const close = modal(`<span class="pill">${data.run_mode === 'test' ? '실전 모드 진행 중' : '연습 진행 중'}</span><h2>이미 진행 중인 학습이 있어요.</h2><p>${esc(rangeText)} · ${esc(PRACTICE_TYPES[data.mode] || data.mode)} · ${data.target}문제</p><div class="detail-grid"><div><b>${Math.min(Number(data.score_total || 0), Number(data.target || 0))} / ${data.target}</b><small>진행</small></div><div><b>${time(left)}</b><small>남은 시간</small></div></div><p class="quiet-note">새로 고른 범위로 시작한 것처럼 바꾸지 않고, 먼저 기존 학습을 어떻게 할지 확인해요.</p><button class="btn primary full" id="resume-existing-practice">기존 학습 이어가기</button>${data.run_mode !== 'test' ? '<button class="btn full" id="finish-existing-practice">기존 연습 저장 후 새 설정 시작</button>' : ''}`, '진행 중인 학습');
+  const close = modal(`<span class="pill">${data.run_mode === 'test' ? '실전 모드 진행 중' : '연습 진행 중'}</span><h2>이미 진행 중인 학습이 있어요.</h2><p>${esc(rangeText)} · ${esc(PRACTICE_TYPES[data.mode] || data.mode)} · ${data.target}문제</p><div class="detail-grid"><div><b>${Math.min(Number(data.score_total || 0), Number(data.target || 0))} / ${data.target}</b><small>진행</small></div><div><b>${data.timer_mode === 'question' ? left + '초' : time(left)}</b><small>${data.timer_mode === 'question' ? '현재 문제' : '남은 시간'}</small></div></div><p class="quiet-note">새로 고른 범위로 시작한 것처럼 바꾸지 않고, 먼저 기존 학습을 어떻게 할지 확인해요.</p><button class="btn primary full" id="resume-existing-practice">기존 학습 이어가기</button>${data.run_mode !== 'test' ? '<button class="btn full" id="finish-existing-practice">기존 연습 저장 후 새 설정 시작</button>' : ''}`, '진행 중인 학습');
   $('#resume-existing-practice').onclick = () => { close(); enterPracticeSession(data); };
   $('#finish-existing-practice')?.addEventListener('click', async event => {
     buttonBusy(event.currentTarget);
@@ -302,32 +303,68 @@ export async function startPractice(options = {}) {
   }
   enterPracticeSession(data);
 }
+function questionLeftMs(x = practiceState) {
+  if (!x) return 0;
+  const deadline = x.timer_mode === 'question' ? Number(x.question_deadline || 0) : Number(x.deadline || 0);
+  if (!deadline) return 0;
+  return Math.max(0, deadline - Date.now() - practiceOffset);
+}
 function renderPractice() {
   const x = practiceState; if (x.finished) return finishPracticeView();
-  clearInterval(timer);
-  timer = x.deadline ? setInterval(practiceTick, 500) : null;
-  const q = x.question, feedback = x.feedback, input = !q.options.length, answer = feedback ? ['mean2eng', 'spell', 'scramble', 'initial', 'vowelblank'].includes(q.type) ? feedback.word : feedback.meaning : '';
+  clearInterval(timer); timer = null; practiceQuestionTimingOut = false;
+  const q = x.question, feedback = x.feedback, input = !q.options.length;
+  const answer = feedback ? ['mean2eng', 'spell', 'scramble', 'initial', 'vowelblank'].includes(q.type) ? feedback.word : feedback.meaning : '';
   const meaningInput = q.type === 'write_meaning';
   const testMode = x.run_mode === 'test';
-  const left = x.deadline ? Math.max(0, Math.ceil((x.deadline - Date.now() - practiceOffset) / 1000)) : 0;
-  mount(`<div class="session-app"><header class="session-header"><div class="row between">${testMode ? '<span class="test-lock-mark" aria-label="실전 모드 잠금">' + icon('lock') + '</span>' : '<button class="icon-button" id="practice-exit" aria-label="연습 종료">' + icon('close') + '</button>'}<h1>${x.school} · ${testMode ? '실전 테스트' : ['write_meaning','spell'].includes(x.mode) ? '단어 테스트' : '연습'}</h1><div class="row" style="gap:8px"><span class="exam-timer ${left <= 60 ? 'urgent' : ''}" id="practice-timer">${icon('clock')}<span id="practice-timer-value">${time(left)}</span></span><button class="icon-button" id="practice-sound" aria-label="효과음 ${A.sound ? '끄기' : '켜기'}">${icon(A.sound ? 'sound' : 'mute')}</button></div></div><div class="question-count row between"><span>${testMode ? `${Math.min(Number(x.score_total || 0) + 1, x.target)} / ${x.target}` : x.question_is_retry || (Number(x.score_total || 0) >= x.target && x.retry_count) ? '오답 복습' : `최초 풀이 ${Math.min(Number(x.score_total || 0) + (!feedback ? 1 : 0), x.target)} / ${x.target}`}</span><div class="practice-score"><span>${testMode ? '정답은 종료 후 공개' : feedback ? '정답을 확인했어요' : '답을 입력하세요'}</span></div></div><div class="progress"><i style="width:${Math.min(100, Number(x.score_total || 0) / x.target * 100)}%"></i></div></header><main class="question-area"><div class="row between"><span class="question-type">${PRACTICE_TYPES[q.type]}</span><span class="pill blue">${testMode ? '실전 모드' : x.daily_quest ? '오늘의 퀘스트' : x.cover_all ? '범위 전체' : '연습 모드'}</span></div>${q.type === 'listen' ? `<button class="listen-button" id="listen-word" aria-label="발음 듣기">${icon('sound')}</button><p class="input-caption" style="text-align:center">발음을 듣고 뜻을 골라주세요.</p>` : `<h2 class="question-prompt ${!['eng2mean', 'write_meaning'].includes(q.type) ? 'korean' : ''}">${esc(q.prompt)}</h2>`}${q.hint ? `<p class="question-hint">${esc(q.hint)}</p>` : ''}${input ? `<input id="practice-answer" class="answer-input" aria-label="${meaningInput ? '한국어 뜻 답안' : '영어 답안'}" placeholder="${meaningInput ? '뜻을 직접 입력하세요' : '영어 단어를 입력하세요'}" autocomplete="off" autocapitalize="off" spellcheck="false" ${feedback ? 'disabled' : ''}><button class="btn primary full" id="practice-confirm" style="margin-top:13px" ${feedback ? 'disabled' : ''}>${testMode ? (Number(x.score_total || 0) + 1 >= Number(x.target || 0) ? '제출하고 결과 보기' : '답안 제출 · 다음') : '정답 확인'}</button>` : `<div class="options">${q.options.map((o, i) => `<button class="option ${feedback && o === answer ? 'correct' : ''}" data-practice-choice="${i}" ${feedback ? 'disabled' : ''}><span class="letter">${i + 1}</span><span>${esc(o)}</span></button>`).join('')}</div>`}<div id="practice-feedback">${feedback ? feedbackHtml(feedback) : ''}</div>${feedback ? `<button class="btn primary full" id="practice-next" style="margin-top:18px">${x.total >= x.target && !x.retry_count ? '연습 마치기' : '다음 단어'} ${icon('arrow')}</button>` : ''}<div id="practice-error" role="alert"></div></main></div>`);
-  if ($('#practice-exit')) $('#practice-exit').onclick = () => { const close = modal(`<h2>여기까지 기록할까요?</h2><p>지금까지 푼 ${x.total}문제와 포인트를 저장해요.</p><button class="btn primary full" id="practice-finish">저장하고 마치기</button>`, '연습 종료'); $('#practice-finish').onclick = async () => { try { practiceState = await api(`/practice/${x.id}/finish`, {}); close(); finishPracticeView(); } catch (e) { toast(e.message); } }; };
+  const modeLabel = testMode ? '실전시험' : '연습시험';
+  const progressNo = Math.min(Number(x.score_total || 0) + (!feedback && !x.question_is_retry ? 1 : 0), Number(x.target || 0));
+  const leftMs = questionLeftMs(x);
+  const timerHtml = feedback
+    ? `<div class="question-timer feedback-timer-state"><strong>${feedback.timed_out ? 'TIME OUT' : feedback.ok ? '✓' : '✕'}</strong><small>${feedback.timed_out ? '시간 초과' : feedback.ok ? '정답' : '오답'}</small></div>`
+    : `<div class="question-timer ${leftMs <= 2000 ? 'danger' : leftMs <= 4000 ? 'warning' : ''}" id="practice-timer"><strong id="practice-timer-value">${(leftMs / 1000).toFixed(1)}</strong><small>초</small></div>`;
+  mount(`<div class="session-app exam-run exam-run-${testMode ? 'test' : 'practice'}">
+    <header class="session-header exam-run-header">
+      <div class="row between"><button class="icon-button" id="practice-exit" aria-label="시험 화면 나가기">${icon('close')}</button><h1>${modeLabel}</h1><button class="icon-button" id="practice-sound" aria-label="효과음 ${A.sound ? '끄기' : '켜기'}">${icon(A.sound ? 'sound' : 'mute')}</button></div>
+      <div class="question-count row between"><span>${x.question_is_retry ? '오답 다시 풀기' : `${progressNo} / ${x.target}`}</span><span class="pill ${testMode ? '' : 'blue'}">${modeLabel}</span></div>
+      <div class="progress"><i style="width:${Math.min(100, Number(x.score_total || 0) / x.target * 100)}%"></i></div>
+    </header>
+    <main class="question-area exam-question-area">
+      ${timerHtml}
+      <div class="exam-question-meta"><span class="question-type">${PRACTICE_TYPES[q.type]}</span><span>${testMode ? '정답은 마지막에 공개' : feedback ? '정답 확인' : '문제마다 바로 채점'}</span></div>
+      ${q.type === 'listen' ? `<button class="listen-button" id="listen-word" aria-label="발음 듣기">${icon('sound')}</button><p class="input-caption" style="text-align:center">발음을 듣고 뜻을 골라주세요.</p>` : `<h2 class="question-prompt ${!['eng2mean', 'write_meaning'].includes(q.type) ? 'korean' : ''}">${esc(q.prompt)}</h2>`}
+      ${q.hint ? `<p class="question-hint">${esc(q.hint)}</p>` : ''}
+      ${input ? `<input id="practice-answer" class="answer-input" aria-label="${meaningInput ? '한국어 뜻 답안' : '영어 답안'}" placeholder="${meaningInput ? '뜻을 직접 입력하세요' : '영어 단어를 입력하세요'}" autocomplete="off" autocapitalize="off" spellcheck="false" ${feedback ? 'disabled' : ''}><button class="btn primary full" id="practice-confirm" style="margin-top:13px" ${feedback ? 'disabled' : ''}>${testMode ? (Number(x.score_total || 0) + 1 >= Number(x.target || 0) ? '제출하고 결과 보기' : '답안 제출 · 다음') : '정답 확인'}</button>` : `<div class="options">${q.options.map((o, i) => `<button class="option ${feedback && o === answer ? 'correct' : ''}" data-practice-choice="${i}" ${feedback ? 'disabled' : ''}><span class="letter">${i + 1}</span><span>${esc(o)}</span></button>`).join('')}</div>`}
+      <div id="practice-feedback">${feedback ? feedbackHtml(feedback) : ''}</div>
+      ${feedback ? `<button class="btn primary full" id="practice-next" style="margin-top:18px">${x.total >= x.target && !x.retry_count ? '연습시험 결과 보기' : '다음 문제'} ${icon('arrow')}</button>` : ''}
+      <div id="practice-error" role="alert"></div>
+    </main>
+  </div>`);
+  if (!feedback && (x.timer_mode === 'question' ? x.question_deadline : x.deadline)) timer = setInterval(practiceTick, x.timer_mode === 'question' ? 100 : 500);
+  $('#practice-exit').onclick = () => {
+    if (testMode) {
+      const close = modal(`<h2>실전시험을 나갈까요?</h2><p>시험 기록은 그대로 남고 현재 문제의 시간은 계속 흘러요. 다시 들어오면 이어서 풀 수 있어요.</p><button class="btn primary full" id="practice-keep-going">계속 풀기</button><button class="btn full" id="practice-leave-test">시험 화면 나가기</button>`, '실전시험');
+      $('#practice-keep-going').onclick = close;
+      $('#practice-leave-test').onclick = async () => { close(); leaveSession(); await refresh(); redraw(); };
+    } else {
+      const close = modal(`<h2>연습시험을 마칠까요?</h2><p>지금까지의 최초 풀이 기록을 저장해요.</p><button class="btn primary full" id="practice-finish">저장하고 마치기</button><button class="btn full" id="practice-keep-practice">계속 풀기</button>`, '연습시험');
+      $('#practice-keep-practice').onclick = close;
+      $('#practice-finish').onclick = async () => { try { practiceState = await api(`/practice/${x.id}/finish`, {}); close(); finishPracticeView(); } catch (e) { toast(e.message); } };
+    }
+  };
   $('#practice-sound').onclick = () => { A.sound = !A.sound; try { localStorage.setItem('sumus:sound', String(A.sound)); } catch {} renderPractice(); };
   $('#listen-word')?.addEventListener('click', () => {
-    if (!('speechSynthesis' in window)) return toast('이 기기에서는 듣기를 지원하지 않아요. 다른 연습 방식을 이용해주세요.');
+    if (!('speechSynthesis' in window)) return toast('이 기기에서는 듣기를 지원하지 않아요.');
     speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(q.audio); u.lang = 'en-US'; u.rate = .85; u.onerror = () => toast('소리를 재생하지 못했어요. 다시 눌러주세요.'); speechSynthesis.speak(u);
   });
-  $$('[data-practice-choice]').forEach(b => b.onclick = () => answerPractice(q.options[Number(b.dataset.practiceChoice)], b));
+  $$('[data-practice-choice]').forEach(button => button.onclick = () => answerPractice(q.options[Number(button.dataset.practiceChoice)], button));
   $('#practice-confirm')?.addEventListener('click', () => { const value = $('#practice-answer').value; if (!value.trim()) return toast('답을 입력해주세요.'); answerPractice(value); });
   $('#practice-answer')?.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) $('#practice-confirm')?.click(); });
   $('#practice-next')?.addEventListener('click', e => advancePracticeScreen(e.currentTarget, x));
   $('#practice-dispute')?.addEventListener('click', async event => {
-    const button = event.currentTarget;
-    button.disabled = true;
+    const button = event.currentTarget; button.disabled = true;
     try {
       await api('/meaning-disputes', { source_type: 'practice', source_id: x.id, question_id: feedback.question_id }, 'POST');
-      button.textContent = '✓ 선생님께 검토 요청했어요';
-      toast('뜻 이의제기를 보냈어요.');
+      button.textContent = '✓ 선생님께 검토 요청했어요'; toast('뜻 이의제기를 보냈어요.');
     } catch (err) { button.disabled = false; toast(err.message); }
   });
 }
@@ -351,16 +388,49 @@ async function finishPracticeByTimer() {
     renderPracticeFinishPending(error.message || '제출 상태를 확인하지 못했어요. 네트워크를 확인한 뒤 다시 시도해주세요.');
   }
 }
+async function timeoutPracticeQuestion() {
+  if (practiceQuestionTimingOut || answering || !practiceState || practiceState.finished || practiceState.feedback) return;
+  practiceQuestionTimingOut = true;
+  clearInterval(timer); timer = null;
+  const x = practiceState;
+  try {
+    const result = await api(`/practice/${x.id}/answer`, { question_id: x.question_id, answer: '', timed_out: true, prefetch_next: false });
+    practiceOffset = Number(result.server_time || Date.now()) - Date.now();
+    if (result.finished) { practiceState = result; finishPracticeView(); return; }
+    practiceState = result;
+    renderPractice();
+    if (result.run_mode !== 'test' && result.feedback) {
+      answerImpact(result.feedback);
+      navigator.vibrate?.([18, 28, 18]);
+      if (A.sound) sound(false, false);
+    }
+  } catch (error) {
+    practiceQuestionTimingOut = false;
+    toast(error.message || '시간 종료 처리를 다시 확인해주세요.');
+    try { practiceState = await api(`/practice/${x.id}`); practiceOffset = Number(practiceState.server_time || Date.now()) - Date.now(); renderPractice(); } catch {}
+  }
+}
 function practiceTick() {
   const x = practiceState;
-  if (!x || x.finished || !x.deadline) return;
+  if (!x || x.finished || x.feedback) return;
+  if (x.timer_mode === 'question') {
+    const leftMs = questionLeftMs(x);
+    const value = $('#practice-timer-value');
+    if (value) value.textContent = (leftMs / 1000).toFixed(1);
+    const box = $('#practice-timer');
+    box?.classList.toggle('warning', leftMs > 2000 && leftMs <= 4000);
+    box?.classList.toggle('danger', leftMs <= 2000);
+    if (leftMs <= 0) timeoutPracticeQuestion();
+    return;
+  }
+  if (!x.deadline) return;
   const left = Math.max(0, Math.ceil((x.deadline - Date.now() - practiceOffset) / 1000));
   const value = $('#practice-timer-value');
   if (value) value.textContent = time(left);
-  $('#practice-timer')?.classList.toggle('urgent', left <= 60);
+  $('#practice-timer')?.classList.toggle('danger', left <= 60);
   if (left <= 0) finishPracticeByTimer();
 }
-function feedbackHtml(f) { return `<div class="feedback ${f.ok ? '' : 'wrong'}" role="status"><b>${f.ok ? '정답' : '다시 기억할 단어'}</b><p>${f.ok ? `${esc(f.word)} · ${esc(f.meaning)}` : `${esc(f.word)} · ${esc(f.meaning)}<br>내 답: ${esc(f.answer || '')}`}</p>${f.ok ? '<small>이 문항은 최초 풀이 정답으로 기록됐어요.</small>' : '<small>연습 모드에서는 잠시 뒤 다시 나와요.</small>'}</div>${f.can_dispute ? '<button class="meaning-dispute-button" id="practice-dispute">뜻 검토 요청</button>' : ''}`; }
+function feedbackHtml(f) { const title = f.timed_out ? 'TIME OUT' : f.ok ? '정답!' : '오답'; const answerLine = f.timed_out ? '시간 안에 답하지 못했어요.' : f.ok ? `${esc(f.word)} · ${esc(f.meaning)}` : `${esc(f.word)} · ${esc(f.meaning)}<br>내 답: ${esc(f.answer || '')}`; return `<div class="feedback ${f.ok ? '' : 'wrong'} ${f.timed_out ? 'timed-out' : ''}" role="status"><b>${title}</b><p>${answerLine}</p>${f.ok ? '<small>좋아요. 다음 문제에서도 이어가세요.</small>' : `<small>정답: ${esc(f.word)} · ${esc(f.meaning)} · 몇 문제 뒤 다시 나와요.</small>`}</div>${f.can_dispute ? '<button class="meaning-dispute-button" id="practice-dispute">뜻 검토 요청</button>' : ''}`; }
 function answerImpact(feedback) {
   const host = $('.session-app');
   if (!host || !feedback) return;
@@ -415,7 +485,8 @@ async function answerPractice(answer, button) {
   if (answering || practiceState.feedback) return;
   answering = true; const x = practiceState;
   $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = true);
-  try { const result = await api(`/practice/${x.id}/answer`, { question_id: x.question_id, answer, prefetch_next: true });
+  clearInterval(timer); timer = null;
+  try { const result = await api(`/practice/${x.id}/answer`, { question_id: x.question_id, answer, prefetch_next: false });
     practiceOffset = Number(result.server_time || Date.now()) - Date.now();
     if (result.finished) { prefetchedPractice = null; practiceState = result; finishPracticeView(); return; }
     if (result.run_mode === 'test') {
@@ -430,7 +501,7 @@ async function answerPractice(answer, button) {
     if (result.feedback.ok) navigator.vibrate?.([24, 34, 42]); else navigator.vibrate?.([12, 25, 12]);
     if (A.sound) sound(result.feedback.ok, result.feedback.milestone);
     // Feedback stays on screen until the student explicitly moves on.
-  } catch (e) { $('#practice-error').innerHTML = `<div class="error-box">${esc(e.message)} 답안은 다시 눌러 전송할 수 있어요.</div>`; $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = false); }
+  } catch (e) { $('#practice-error').innerHTML = `<div class="error-box">${esc(e.message)} 답안은 다시 눌러 전송할 수 있어요.</div>`; $('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = false); if (!practiceState?.feedback) timer = setInterval(practiceTick, practiceState?.timer_mode === 'question' ? 100 : 500); }
   finally { answering = false; }
 }
 function sound(ok, milestone) {
@@ -537,6 +608,6 @@ function finishPracticeView() {
   const go = async tab => { leaveSession(); A.tab = tab; await refresh(); redraw(); };
   $('#practice-home').onclick = () => go('home'); $('#practice-records').onclick = () => go('records');
 }
-window.addEventListener('online', () => { if (A?.screen === 'exam') flushDraft(); if (A?.screen === 'practice' && practiceState && !practiceState.finished && Number(practiceState.deadline || 0) <= Date.now() + practiceOffset) finishPracticeByTimer(); });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; if (A?.screen === 'exam') { examTick(); flushDraft(); } if (A?.screen === 'practice' && practiceState && !practiceState.finished && Number(practiceState.deadline || 0) <= Date.now() + practiceOffset) finishPracticeByTimer(); });
+window.addEventListener('online', () => { if (A?.screen === 'exam') flushDraft(); if (A?.screen === 'practice' && practiceState && !practiceState.finished) { if (practiceState.timer_mode === 'question' && questionLeftMs(practiceState) <= 0) timeoutPracticeQuestion(); else if (practiceState.timer_mode !== 'question' && Number(practiceState.deadline || 0) <= Date.now() + practiceOffset) finishPracticeByTimer(); } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; if (A?.screen === 'exam') { examTick(); flushDraft(); } if (A?.screen === 'practice' && practiceState && !practiceState.finished) { if (practiceState.timer_mode === 'question' && questionLeftMs(practiceState) <= 0) timeoutPracticeQuestion(); else if (practiceState.timer_mode !== 'question' && Number(practiceState.deadline || 0) <= Date.now() + practiceOffset) finishPracticeByTimer(); } });
 window.addEventListener('pagehide', () => { if (A?.screen === 'exam') localSave(); });
