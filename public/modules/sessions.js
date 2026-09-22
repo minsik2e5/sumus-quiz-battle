@@ -1,4 +1,4 @@
-import { api, $, $, icon, esc, time, date, recordRangeLabel, scope, toast, modal, buttonBusy } from './ui.js';
+import { api, $, $$, icon, esc, time, date, recordRangeLabel, scope, toast, modal, buttonBusy } from './ui.js';
 import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo } from './core.js';
 import { avatar } from './character.js';
 let A, redraw, refresh, examState = null, practiceState = null, prefetchedPractice = null, practiceAdvanceTimer = null, practiceOffset = 0, practiceAutoFinishing = false, practiceGuardId = null, timer, saving = Promise.resolve(), inputVersion = 0, dirty = false, syncError = '', debounce, audio;
