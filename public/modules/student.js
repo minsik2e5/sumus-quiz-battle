@@ -1,4 +1,4 @@
-import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, unlocked, levelInfo, dayKey } from './core.js';
+import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, practiceDurationSec, unlocked, levelInfo, dayKey } from './core.js';
 import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar } from './character.js';
 import { DANWONGO_PASSAGES } from '../danwongo-grammar-data.js?v=2';
