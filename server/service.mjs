@@ -335,10 +335,19 @@ function stats(state, p, sessions = mySessions(state, p.id)) {
 }
 function attemptView(a, state, profile) {
   const exam = state.exams.find(e => e.id === a.exam_id);
-  const reveal = a.status === 'submitted' && (profile.role === 'teacher' || exam?.release_result);
-  return { id: a.id, exam_id: a.exam_id, student_id: a.student_id, status: a.status, started_at: a.started_at, deadline: a.deadline, submitted_at: a.submitted_at, auto_submitted: a.auto_submitted, total: a.questions.length,
+  const submitted = a.status === 'submitted';
+  const resultVisible = submitted && (profile.role === 'teacher' || exam?.release_result);
+  const hasPendingDispute = submitted && (state.meaningDisputes || []).some(item => item.source_type === 'exam' && item.source_id === a.id && item.status === 'pending');
+  const gradingStatus = submitted ? (hasPendingDispute ? 'provisional' : 'final') : 'pending';
+  return {
+    id: a.id, exam_id: a.exam_id, student_id: a.student_id, status: a.status,
+    started_at: a.started_at, deadline: a.deadline, submitted_at: a.submitted_at,
+    auto_submitted: a.auto_submitted, total: a.questions.length,
+    result_visibility: resultVisible ? 'visible' : 'withheld',
+    grading_status: gradingStatus,
     ...(a.status === 'active' ? { questions: a.questions, answers: a.answers, revision: a.revision, lease: a.lease } : {}),
-    ...(reveal ? { score: a.score, correct: a.correct, details: a.details } : {}) };
+    ...(resultVisible ? { score: a.score, correct: a.correct, details: a.details } : {})
+  };
 }
 function attemptSummary(a, state, profile) {
   const view = attemptView(a, state, profile);
@@ -362,7 +371,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.17.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.18.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
