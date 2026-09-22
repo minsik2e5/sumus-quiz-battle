@@ -897,7 +897,7 @@ export async function service(state, method, path, body, token) {
     if (body.school_id && body.school_id !== school.id) fail('현재 학교의 범위만 학습할 수 있어요.', 403);
     if (!PRACTICE_TYPES[body.mode]) fail('연습 방식을 선택해주세요.');
     const isDailyQuest = body.daily_quest === true && school.division !== 'middle';
-    const selectedWordIds = school.division === 'middle' && Array.isArray(body.word_ids)
+    const selectedWordIds = Array.isArray(body.word_ids)
       ? [...new Set(body.word_ids.map(value => String(value)).filter(Boolean))].slice(0, 200)
       : [];
     const gradeWords = wordsForSchoolGrade(state, school, p.class_name);
@@ -1033,7 +1033,7 @@ function practiceView(x, state) {
     manual_selection: !!x.manual_selection, quest_mix: x.quest_mix || null,
     covered: x.seen?.length || 0, total: x.total, correct: x.correct, score,
     xp: x.xp, combo: x.combo, best: x.best,
-    started_at: x.started_at, duration_sec: x.duration_sec, deadline: x.deadline,
+    started_at: x.started_at, finished_at: x.finished_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
     auto_submitted: !!x.auto_submitted,
     wrong_details: x.finished ? (x.wrong_details || []) : undefined,
     question: x.question, question_id: x.question_id, feedback: x.feedback,
