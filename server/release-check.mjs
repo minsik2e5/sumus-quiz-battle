@@ -607,7 +607,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('기본 유효답과 승인된 허용 뜻의 출처') && teacherModule.includes('approved_auto'), 'teacher UI keeps part-of-speech safe valid-answer workflow');
     assert(indexHtml.includes('v1313.css') && v1313Css.includes('.meaning-alias-row') && v1313Css.includes('.vocab-import-preview'), 'V13.13 vocabulary management styles are loaded');
     assert(studentModule.includes('최근 성취') && studentModule.includes('daily_quest') && studentModule.includes('오답 ${mix.wrong'), 'V13.13 student UI exposes recent mastery and adaptive daily mix');
-    assert(sessionsModule.includes('daily_quest: true') && sessionsModule.includes('오늘의 퀘스트'), 'V13.13 daily quest starts through the practice session flow');
+    assert(sessionsModule.includes('daily_quest: true') && appJs.includes('d.quickPractice'), 'adaptive daily quest still starts through the practice session flow');
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
