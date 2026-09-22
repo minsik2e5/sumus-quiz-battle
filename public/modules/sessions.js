@@ -200,8 +200,48 @@ export function openPracticeRecord(sessionId) {
     } catch (error) { toast(error.message); }
   });
 }
+const sortedStrings = list => [...(list || [])].map(String).sort();
+function samePracticeRequest(data, payload) {
+  if (!data || !payload) return false;
+  if ((payload.mode || data.mode) !== data.mode) return false;
+  if ((payload.run_mode || 'practice') !== (data.run_mode || 'practice')) return false;
+  if (Array.isArray(payload.word_ids) && payload.word_ids.length) {
+    if (JSON.stringify(sortedStrings(payload.word_ids)) !== JSON.stringify(sortedStrings(data.word_ids))) return false;
+  } else if (Array.isArray(payload.range_codes)) {
+    if (JSON.stringify(sortedStrings(payload.range_codes)) !== JSON.stringify(sortedStrings(data.range_codes))) return false;
+  }
+  if (payload.target && Number(payload.target) !== Number(data.target)) return false;
+  return true;
+}
+function enterPracticeSession(data) {
+  leaveSession();
+  practiceState = data;
+  practiceOffset = Number(data.server_time || Date.now()) - Date.now();
+  prefetchedPractice = null;
+  A.screen = 'practice';
+  if (data.run_mode === 'test') armTestGuard(data.id);
+  renderPractice();
+}
+async function resolveExistingPractice(data, payload) {
+  const left = data.deadline ? Math.max(0, Math.ceil((data.deadline - Date.now() - (Number(data.server_time || Date.now()) - Date.now())) / 1000)) : 0;
+  const rangeText = (data.range_codes || []).map(code => esc(recordRangeLabel({ division: A.data.profile.division, school: data.school }, code))).join(' · ') || '선택 범위';
+  const close = modal(`<span class="pill">${data.run_mode === 'test' ? '실전 모드 진행 중' : '연습 진행 중'}</span><h2>이미 진행 중인 학습이 있어요.</h2><p>${esc(rangeText)} · ${esc(PRACTICE_TYPES[data.mode] || data.mode)} · ${data.target}문제</p><div class="detail-grid"><div><b>${Math.min(Number(data.score_total || 0), Number(data.target || 0))} / ${data.target}</b><small>진행</small></div><div><b>${time(left)}</b><small>남은 시간</small></div></div><p class="quiet-note">새로 고른 범위로 시작한 것처럼 바꾸지 않고, 먼저 기존 학습을 어떻게 할지 확인해요.</p><button class="btn primary full" id="resume-existing-practice">기존 학습 이어가기</button>${data.run_mode !== 'test' ? '<button class="btn full" id="finish-existing-practice">기존 연습 저장 후 새 설정 시작</button>' : ''}`, '진행 중인 학습');
+  $('#resume-existing-practice').onclick = () => { close(); enterPracticeSession(data); };
+  $('#finish-existing-practice')?.addEventListener('click', async event => {
+    buttonBusy(event.currentTarget);
+    try {
+      await api(`/practice/${data.id}/finish`, {});
+      await refresh();
+      const next = await api('/practice/start', payload);
+      close();
+      enterPracticeSession(next);
+    } catch (error) {
+      buttonBusy(event.currentTarget, false);
+      toast(error.message);
+    }
+  });
+}
 export async function startPractice(options = {}) {
-  const old = A.data.active_practice;
   const payload = options.dailyQuest
     ? { school: A.school, mode: 'write_meaning', target: 20, daily_quest: true, run_mode: 'practice' }
     : Array.isArray(options.wordIds) && options.wordIds.length
@@ -209,8 +249,19 @@ export async function startPractice(options = {}) {
       : A.data.profile.division === 'middle'
         ? { school: A.school, mode: A.mode, word_ids: A.middleWordIds || [], cover_all: true, run_mode: options.runMode || A.practiceRunMode || 'practice' }
         : { school: A.school, range_codes: A.ranges[A.school], mode: A.mode, target: A.target === 'all' ? undefined : A.target, cover_all: A.target === 'all', assignment_id: A.assignmentId, run_mode: options.runMode || A.practiceRunMode || 'practice' };
-  const data = old ? await api(`/practice/${old}`) : await api('/practice/start', payload);
-  leaveSession(); practiceState = data; practiceOffset = Number(data.server_time || Date.now()) - Date.now(); prefetchedPractice = null; A.screen = 'practice'; if (data.run_mode === 'test') armTestGuard(data.id); renderPractice();
+  const old = A.data.active_practice;
+  if (old) {
+    const active = await api(`/practice/${old}`);
+    if (options.resumeExisting || samePracticeRequest(active, payload)) return enterPracticeSession(active);
+    await resolveExistingPractice(active, payload);
+    return;
+  }
+  const data = await api('/practice/start', payload);
+  if (data.resumed_existing && !samePracticeRequest(data, payload)) {
+    await resolveExistingPractice(data, payload);
+    return;
+  }
+  enterPracticeSession(data);
 }
 function renderPractice() {
   const x = practiceState; if (x.finished) return finishPracticeView();
