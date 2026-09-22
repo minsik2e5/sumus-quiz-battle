@@ -1,5 +1,5 @@
 import { api, $, $, icon, esc, time, date, recordRangeLabel, scope, toast, modal, buttonBusy } from './ui.js';
-import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, levelInfo } from './core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo } from './core.js';
 import { avatar } from './character.js';
 let A, redraw, refresh, examState = null, practiceState = null, prefetchedPractice = null, practiceAdvanceTimer = null, practiceOffset = 0, practiceAutoFinishing = false, practiceGuardId = null, timer, saving = Promise.resolve(), inputVersion = 0, dirty = false, syncError = '', debounce, audio;
 export function configureSessions(state, render, reload) { A = state; redraw = render; refresh = reload; }
@@ -257,6 +257,24 @@ export async function startPractice(options = {}) {
     const active = await api(`/practice/${old}`);
     if (options.resumeExisting || samePracticeRequest(active, payload)) return enterPracticeSession(active);
     await resolveExistingPractice(active, payload);
+    return;
+  }
+  if (payload.run_mode === 'test' && !options.confirmed) {
+    const scopedCount = Array.isArray(payload.word_ids) && payload.word_ids.length
+      ? payload.word_ids.length
+      : A.data.books.flatMap(book => book.words || []).filter(word => (payload.range_codes || []).map(String).includes(String(word.range_code))).length;
+    const target = payload.cover_all ? scopedCount : Math.min(scopedCount, Number(payload.target || scopedCount));
+    const duration = practiceDurationSec(payload.mode, target);
+    const ranges = Array.isArray(payload.word_ids) && payload.word_ids.length
+      ? (A.data.profile.division === 'middle' ? String(A.middleRange || '') + '과' : '직접 선택')
+      : (payload.range_codes || []).map(code => recordRangeLabel({ division: A.data.profile.division, school: A.school }, code)).join(' · ');
+    const close = modal(`<span class="pill blue">실전 모드</span><h2>${esc(ranges || '선택 범위')}</h2><div class="detail-grid"><div><b>${esc(PRACTICE_TYPES[payload.mode] || '쓰기')}</b><small>시험 방식</small></div><div><b>${target}문제</b><small>문항 수</small></div><div><b>${time(duration)}</b><small>전체 제한시간</small></div><div><b>마지막 공개</b><small>채점 시점</small></div></div><div class="test-start-rules"><p>정답은 시험이 끝난 뒤 공개돼요.</p><p>이전 문항으로 돌아갈 수 없어요.</p><p>시작 후에는 시간이 계속 흘러요.</p><p>시간이 끝나면 자동으로 제출돼요.</p></div><button class="btn primary full" id="confirm-practice-test">실전 시작하기</button><button class="btn full" id="cancel-practice-test">설정으로 돌아가기</button>`, '실전 시작 확인');
+    $('#cancel-practice-test').onclick = () => { close(); redraw(); };
+    $('#confirm-practice-test').onclick = async event => {
+      buttonBusy(event.currentTarget);
+      try { close(); await startPractice({ ...options, confirmed: true }); }
+      catch (error) { toast(error.message); redraw(); }
+    };
     return;
   }
   const data = await api('/practice/start', payload);
