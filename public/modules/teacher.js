@@ -82,10 +82,14 @@ function grammarWeakness(d, school) {
 function activeExamStatus(d) {
   const now = Date.now();
   return d.exams.filter(e => e.active && e.available_at <= now && e.due_at > now).map(exam => {
-    const targets = d.profiles.filter(p => p.active && p.class_name === exam.class_name);
-    const submittedIds = new Set(d.attempts.filter(a => a.exam_id === exam.id && a.status === 'submitted').map(a => a.student_id));
-    const missing = targets.filter(student => !submittedIds.has(student.id));
-    return { exam, targets, submitted: targets.length - missing.length, missing };
+    const targets = d.profiles.filter(p => p.active && targetMatches(exam.class_name, p));
+    const examAttempts = d.attempts.filter(a => a.exam_id === exam.id);
+    const submittedIds = new Set(examAttempts.filter(a => a.status === 'submitted').map(a => a.student_id));
+    const activeIds = new Set(examAttempts.filter(a => a.status === 'active').map(a => a.student_id));
+    const submitted = targets.filter(student => submittedIds.has(student.id));
+    const active = targets.filter(student => !submittedIds.has(student.id) && activeIds.has(student.id));
+    const missing = targets.filter(student => !submittedIds.has(student.id) && !activeIds.has(student.id));
+    return { exam, targets, submitted, active, missing };
   });
 }
 function attentionStudentButton(student, sub, tone = '') {
@@ -143,8 +147,8 @@ function dashboard(A) {
         <div class="panel-head"><div><h2>실전시험 미제출</h2><span>현재 응시 가능한 시험 기준</span></div><button class="text-button" data-go="exams">시험 관리</button></div>
         <div class="v136-exam-list">${examStatus.length ? examStatus.map(item => `
           <div class="v136-exam-item">
-            <div class="v136-exam-top"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(item.exam.title)}</h3><p>${esc(item.exam.class_name)} · ${date(item.exam.due_at)} 마감</p></div><span class="pill ${item.missing.length ? '' : 'green'}">${item.submitted}/${item.targets.length} 제출</span></div>
-            <div class="v136-missing-names">${item.missing.length ? item.missing.slice(0, 8).map(student => `<button data-student="${student.id}">${esc(student.display_name)}</button>`).join('') : '<span>전원 제출 완료</span>'}${item.missing.length > 8 ? `<em>+${item.missing.length - 8}명</em>` : ''}</div>
+            <div class="v136-exam-top"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(item.exam.title)}</h3><p>${esc(targetLabel(item.exam.class_name))} · ${date(item.exam.due_at)} 마감</p></div><span class="pill ${item.missing.length ? '' : 'green'}">${item.submitted.length}/${item.targets.length} 제출</span></div>
+            <div class="v136-missing-names">${item.active.length ? `<span class="tiny muted">응시 중 ${item.active.length}명</span>` : ''}${item.missing.length ? item.missing.slice(0, 8).map(student => `<button data-student="${student.id}">${esc(student.display_name)}</button>`).join('') : '<span>미응시 없음</span>'}${item.missing.length > 8 ? `<em>+${item.missing.length - 8}명</em>` : ''}</div>
           </div>`).join('') : '<div class="v136-empty-line">현재 진행 중인 실전시험이 없어요.</div>'}</div>
       </section>
 
