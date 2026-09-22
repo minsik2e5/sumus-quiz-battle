@@ -481,7 +481,7 @@ function middleVocabPractice(A) {
       ${practiceModePicker(A)}
     </section>
     <aside class="setup-start-summary">
-      <div><span>시작 요약</span><strong>${esc(code ? code + '과 · ' + summary.text : summary.text)}</strong><small>${A.practiceRunMode === 'test' && ['write_meaning','spell'].includes(A.mode) ? '정답은 종료 후 공개되고 시간 종료 시 자동 제출돼요.' : '연습에서는 정답 확인 후 틀린 단어를 다시 볼 수 있어요.'}</small></div>
+      <div><span>시작 요약</span><strong id="setup-summary-text">${esc(code ? code + '과 · ' + summary.text : summary.text)}</strong><small>${A.practiceRunMode === 'test' && ['write_meaning','spell'].includes(A.mode) ? '정답은 종료 후 공개되고 시간 종료 시 자동 제출돼요.' : '연습에서는 정답 확인 후 틀린 단어를 다시 볼 수 있어요.'}</small></div>
       <button class="btn primary full" data-action="start-practice" ${selected.length || A.data.active_practice ? '' : 'disabled'}>${A.data.active_practice ? '진행 중인 학습 확인' : A.practiceRunMode === 'test' && ['write_meaning','spell'].includes(A.mode) ? '실전 모드 확인' : '연습 시작하기'} ${icon('arrow')}</button>
     </aside>`;
 }
@@ -494,7 +494,7 @@ function vocabPractice(A) {
     <section class="setup-section"><div class="step-label"><span>01</span>범위</div>${schoolSwitch(A)}${rangePicker(A)}</section>
     <section class="setup-section"><div class="step-label"><span>02</span>학습량</div><div class="practice-target-grid" role="group" aria-label="학습량 선택">${[10,20,30].map(n => `<button data-practice-target="${n}" class="${A.target === n ? 'selected' : ''}" aria-pressed="${A.target === n}">${n}<small>문제</small></button>`).join('')}<button data-practice-target="all" class="all ${A.target === 'all' ? 'selected' : ''}" aria-pressed="${A.target === 'all'}"><b>선택 범위 전체</b><small>${count}개 단어</small></button></div></section>
     <section class="setup-section"><div class="step-label"><span>03</span>쓰기 방식</div>${practiceModePicker(A)}</section>
-    <aside class="setup-start-summary"><div><span>시작 요약</span><strong>${esc(summary.text)}</strong><small>${A.practiceRunMode === 'test' && ['write_meaning','spell'].includes(A.mode) ? '정답은 종료 후 공개되고 시간 종료 시 자동 제출돼요.' : '연습에서는 정답 확인 후 틀린 단어를 다시 볼 수 있어요.'}</small></div><button class="btn primary full" data-action="start-practice" ${!count && !A.data.active_practice ? 'disabled' : ''}>${A.data.active_practice ? '진행 중인 학습 확인' : A.practiceRunMode === 'test' && ['write_meaning','spell'].includes(A.mode) ? '실전 모드 확인' : '연습 시작하기'} ${icon('arrow')}</button></aside>`;
+    <aside class="setup-start-summary"><div><span>시작 요약</span><strong id="setup-summary-text">${esc(summary.text)}</strong><small>${A.practiceRunMode === 'test' && ['write_meaning','spell'].includes(A.mode) ? '정답은 종료 후 공개되고 시간 종료 시 자동 제출돼요.' : '연습에서는 정답 확인 후 틀린 단어를 다시 볼 수 있어요.'}</small></div><button class="btn primary full" data-action="start-practice" ${!count && !A.data.active_practice ? 'disabled' : ''}>${A.data.active_practice ? '진행 중인 학습 확인' : A.practiceRunMode === 'test' && ['write_meaning','spell'].includes(A.mode) ? '실전 모드 확인' : '연습 시작하기'} ${icon('arrow')}</button></aside>`;
 }
 function practice(A) {
   if (A.studyView === 'vocab') return vocabPractice(A);
