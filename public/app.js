@@ -94,8 +94,9 @@ $('#app').addEventListener('click', async event => {
     if (d.reviewPractice) {
       const session = A.data.sessions.find(item => item.id === d.reviewPractice);
       if (!session) return toast('복습할 기록을 찾을 수 없어요.');
-      const source = Array.isArray(session.answer_records) && session.answer_records.length ? session.answer_records : (session.wrong_details || []);
-      const wordIds = [...new Set(source.filter(item => item.correct === false ? !item.regraded : !item.regraded).map(item => item.word_id).filter(Boolean))];
+      const hasAnswerRecords = Array.isArray(session.answer_records) && session.answer_records.length;
+      const source = hasAnswerRecords ? session.answer_records : (session.wrong_details || []);
+      const wordIds = [...new Set(source.filter(item => hasAnswerRecords ? item.correct === false && !item.regraded : !item.regraded).map(item => item.word_id).filter(Boolean))];
       if (!wordIds.length) return openPracticeRecord(session.id);
       A.mode = session.mode || 'write_meaning'; A.practiceRunMode = 'practice'; savePreferences();
       return await startPractice({ wordIds, mode: A.mode, runMode: 'practice' });
