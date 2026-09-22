@@ -1033,7 +1033,7 @@ export async function service(state, method, path, body, token) {
       if (m.recent_results.length > 5) m.recent_results.splice(0, m.recent_results.length - 5);
       m.last_seen = Date.now(); m.next_review_at = Date.now() + (ok ? 3600000 + m.mastery * 864000 : 120000);
       x.feedback = { ok, gain, mastery: m.mastery, word_id: word.id, type: x.question.type, question_id: body.question_id, answer: str(submittedAnswer, 160),
-          timed_out: !!timedOut, word: displayEnglish(word.word), meaning: word.meaning, combo: x.combo, retry: !ok, can_dispute: !ok && scoredAttempt && x.question.type === 'write_meaning', scored: scoredAttempt, milestone: ok && [5, 10].includes(x.combo) };
+          timed_out: !!timedOut, word: displayEnglish(word.word), meaning: word.meaning, combo: x.combo, retry: !ok, can_dispute: !ok && !timedOut && scoredAttempt && x.question.type === 'write_meaning', scored: scoredAttempt, milestone: ok && [5, 10].includes(x.combo) };
       if (!ok && scoredAttempt) {
         x.wrong_details ??= [];
         x.wrong_details.push({
@@ -1170,8 +1170,9 @@ function practiceView(x, state) {
   const score = Math.round(scoreCorrect / scoreTotal * 100);
   const hideTestScore = x.run_mode === 'test' && !x.finished;
   const answerRecords = x.answer_records || [];
-  const wrongCount = answerRecords.filter(item => item.correct === false && !item.regraded).length;
-  const unansweredCount = Math.max(0, scoreTotal - answerRecords.length);
+  const wrongCount = answerRecords.filter(item => item.correct === false && !item.regraded && !item.timed_out).length;
+  const timedOutCount = answerRecords.filter(item => item.timed_out && !item.regraded).length;
+  const unansweredCount = Math.max(0, scoreTotal - answerRecords.length) + timedOutCount;
   const perfect = x.finished && score === 100 && wrongCount === 0 && unansweredCount === 0;
   return {
     id: x.id, school: x.school, mode: x.mode, run_mode: x.run_mode || 'practice', target: x.target,
