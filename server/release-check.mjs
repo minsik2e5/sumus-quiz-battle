@@ -4,7 +4,7 @@ import { emptyState } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
 import { allBooks, service, sweep } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
-import { EXAM_TYPES, PRACTICE_TYPES, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
 import { runContentValidation } from './content-validation.mjs';
 import { openGrammarChoiceSample } from '../public/grammar-choice-sample.js';
 
@@ -353,16 +353,20 @@ export async function runReleaseCheck() {
         school: '단원고', range_codes: [rangeCode], mode: practiceType, target: 5
       }, studentToken);
       assert(started.question.type === practiceType, `${practiceType} practice starts correctly`);
+      assert(started.timer_mode === 'question' && started.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION[practiceType] && started.question_deadline > started.server_time, `${practiceType} starts with a fresh per-question timer`);
       const word = allWords.find(item => item.id === started.question.word_id);
+      const originalDeadline = started.question_deadline;
       const result = await service(state, 'POST', `/practice/${started.id}/answer`, {
         question_id: started.question_id, answer: answerFor(practiceType, word), prefetch_next: true
       }, studentToken);
       assert(result.feedback?.ok === true, `${practiceType} accepts correct answer`);
-      assert(result.prefetched_next?.question_id !== started.question_id, `${practiceType} prepares the next question in one request`);
+      assert(!result.prefetched_next && result.question_deadline === originalDeadline, `${practiceType} does not start the next question timer while feedback is visible`);
       const repeated = await service(state, 'POST', `/practice/${started.id}/answer`, {
         question_id: started.question_id, answer: answerFor(practiceType, word)
       }, studentToken);
       assert(repeated.total === result.total, `${practiceType} duplicate submission is idempotent`);
+      const next = await service(state, 'POST', `/practice/${started.id}/next`, {}, studentToken);
+      assert(next.question_id !== started.question_id && next.question_deadline > originalDeadline, `${practiceType} resets the timer only when the next question begins`);
       const finished = await service(state, 'POST', `/practice/${started.id}/finish`, {}, studentToken);
       assert(finished.finished === true, `${practiceType} practice can finish and save`);
     }
@@ -402,6 +406,13 @@ export async function runReleaseCheck() {
     const teacherAfterShare = await service(state, 'GET', '/bootstrap', {}, teacherToken);
     assert(teacherAfterShare.sessions.some(item => item.id === testStarted.id && item.shared_to_teacher_at), 'teacher bootstrap receives student-shared self-test results');
 
+    const practiceExam = await service(state, 'POST', '/practice/start', {
+      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'practice', exam_style: true
+    }, studentToken);
+    const practiceExamInternal = state.practices.find(item => item.id === practiceExam.id);
+    assert(practiceExam.exam_style === true && practiceExam.target === 5 && new Set(practiceExamInternal.words).size === 5, 'practice exam style selects a unique first-pass pool just like the real exam');
+    await service(state, 'POST', `/practice/${practiceExam.id}/finish`, {}, studentToken);
+
     const wrongPractice = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'spell', target: 5
     }, studentToken);
@@ -412,24 +423,28 @@ export async function runReleaseCheck() {
     const wrongFinished = await service(state, 'POST', `/practice/${wrongPractice.id}/finish`, {}, studentToken);
     const wrongSession = state.sessions.find(item => item.id === wrongPractice.id);
     assert(wrongFinished.score === 0 && wrongSession?.score === 0 && wrongSession?.wrong_details?.length === 1, 'practice finish stores a 100-point score and wrong-answer detail');
-    assert(Number(wrongPractice.deadline) > Number(wrongPractice.started_at) && Number(wrongPractice.duration_sec) >= 60, 'practice starts with a server-backed countdown deadline');
+    assert(wrongPractice.timer_mode === 'question' && wrongPractice.deadline === null && wrongPractice.question_deadline > wrongPractice.server_time && wrongPractice.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION.spell, 'practice uses a server-backed timer for each question instead of one total countdown');
 
     const timeoutPractice = await service(state, 'POST', '/practice/start', {
-      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'test'
+      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'test', exam_style: true
     }, studentToken);
-    const timeoutInternal = state.practices.find(item => item.id === timeoutPractice.id);
-    timeoutInternal.started_at = Date.now() - 61000;
-    timeoutInternal.deadline = timeoutInternal.started_at + 60000;
-    const timeoutFinished = await service(state, 'POST', `/practice/${timeoutPractice.id}/finish`, {}, studentToken);
+    let timeoutView = timeoutPractice;
+    for (let index = 0; index < 5 && !timeoutView.finished; index++) {
+      const timeoutInternal = state.practices.find(item => item.id === timeoutPractice.id);
+      timeoutInternal.question_deadline = Date.now() - 1;
+      timeoutView = await service(state, 'POST', `/practice/${timeoutPractice.id}/answer`, {
+        question_id: timeoutView.question_id, answer: '', timed_out: true
+      }, studentToken);
+    }
     const timeoutSession = state.sessions.find(item => item.id === timeoutPractice.id);
-    assert(timeoutFinished.score === 0 && timeoutFinished.wrong_count === 0 && timeoutFinished.unanswered_count === 5 && timeoutFinished.perfect === false, 'timed-out practice records unanswered separately and never reports PERFECT');
-    assert(timeoutSession?.duration_sec === 60 && timeoutSession?.ended_at === timeoutInternal.deadline && timeoutSession?.finalized_at >= timeoutSession.ended_at, 'timeout duration uses authoritative deadline rather than delayed reconnect time');
+    assert(timeoutView.finished === true && timeoutView.score === 0 && timeoutView.wrong_count === 0 && timeoutView.unanswered_count === 5 && timeoutView.perfect === false, 'five per-question timeouts finish as five unanswered without inflating wrong count');
+    assert(timeoutSession?.answer_records?.every(item => item.timed_out === true) && timeoutSession?.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION.write_meaning, 'timeout records preserve per-question timing evidence');
 
     const activeOriginal = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5
     }, studentToken);
     const activeSummaryBootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
-    assert(activeSummaryBootstrap.active_practice_summary?.id === activeOriginal.id && activeSummaryBootstrap.active_practice_summary?.mode === 'write_meaning' && activeSummaryBootstrap.active_practice_summary?.deadline, 'bootstrap exposes active practice summary for action-first home');
+    assert(activeSummaryBootstrap.active_practice_summary?.id === activeOriginal.id && activeSummaryBootstrap.active_practice_summary?.mode === 'write_meaning' && activeSummaryBootstrap.active_practice_summary?.question_deadline && activeSummaryBootstrap.active_practice_summary?.timer_mode === 'question', 'bootstrap exposes the active question timer for action-first home');
     const resumedDifferentRequest = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'spell', target: 5
     }, studentToken);
