@@ -1,8 +1,8 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, CLASS_OPTIONS } from './modules/core.js';
 import { avatar } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.14.0';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.14.0';
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.15.0';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.15.0';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.15.0';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub' };
 const ALL_CLASSES = '__ALL__';
@@ -102,7 +102,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'refresh') { buttonBusy(b); await refresh(); render(); toast('최신 기록으로 업데이트했어요.'); }
     if (d.action === 'start-practice') { buttonBusy(b); await startPractice(); }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
-      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.14.0');
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.15.0');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
