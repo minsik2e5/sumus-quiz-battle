@@ -379,17 +379,6 @@ function middleLessonState(A) {
   A.middleWordIds = (A.middleWordIds || []).filter(id => valid.has(id));
   return { words, codes, code, lessonWords, selected: A.middleWordIds };
 }
-function practiceModePicker(A, { selfTest = false } = {}) {
-  const primary = [
-    ['write_meaning', '뜻 직접 쓰기', '영어를 보고 한국어 뜻을 직접 입력', '약 8초 / 문제'],
-    ['spell', '영어 직접 쓰기', '뜻을 보고 영어 단어를 직접 입력', '약 12초 / 문제']
-  ];
-  const secondary = Object.entries(PRACTICE_TYPES).filter(([key]) => !['write_meaning', 'spell'].includes(key));
-  const otherSelected = !['write_meaning','spell'].includes(A.mode);
-  return `<div class="primary-mode-grid">${primary.map(([key,label,help,timeText]) => `<button class="primary-mode-card ${A.mode === key ? 'selected' : ''}" data-mode="${key}" aria-pressed="${A.mode === key}"><span class="primary-mode-icon">${icon('records')}</span><div><b>${label}</b><small>${help}</small><em>${timeText}</em></div>${key === 'write_meaning' ? '<span class="pill blue">추천</span>' : ''}</button>`).join('')}</div>
-  ${selfTest ? '<div class="setup-inline-note">' + icon('shield') + ' 실전은 뜻쓰기·영어쓰기만 사용하고, 정답은 끝난 뒤 한꺼번에 공개해요.</div>' : `<button class="other-practice-toggle" data-other-practice="toggle" aria-expanded="${A.otherPracticeOpen || otherSelected ? 'true' : 'false'}"><span>기타 연습</span><small>${otherSelected ? esc(PRACTICE_TYPES[A.mode]) + ' 선택됨' : '객관식 · 듣기 · 철자 보조'}</small>${icon('chevron')}</button>
-  ${A.otherPracticeOpen || otherSelected ? `<div class="mode-grid secondary-mode-grid">${secondary.map(([key,name]) => `<button class="mode-option ${A.mode === key ? 'selected' : ''}" data-mode="${key}" aria-pressed="${A.mode === key}">${icon(key === 'listen' ? 'sound' : key === 'mixed' ? 'sparkle' : ['scramble','initial','vowelblank'].includes(key) ? 'records' : 'practice')}${name}</button>`).join('')}</div>` : ''}`}`;
-}
 function memorizationWords(A) {
   if (A.data.profile.division === 'middle') return middleLessonState(A).lessonWords;
   const { words, selected } = getRanges(A);
@@ -431,59 +420,10 @@ function memorizationPanel(A) {
       }).join('') : '<div class="memorize-empty">표시할 단어가 없어요. 별표 필터를 해제하거나 범위를 선택해주세요.</div>'}</div>
     </section>`;
 }
-function practiceSetupSummary(A, availableCount) {
-  const count = Math.max(0, Number(availableCount || 0));
-  const target = A.data.profile.division === 'middle'
-    ? count
-    : A.target === 'all' ? count : Math.min(count, Number(A.target || 0));
-  const duration = target ? practiceDurationSec(A.mode, target) : 0;
-  const mode = PRACTICE_TYPES[A.mode] || '학습';
-  const runMode = ['write_meaning','spell'].includes(A.mode) && A.practiceRunMode === 'test' ? '실전 모드' : '연습 모드';
-  return { target, duration, mode, runMode, text: target ? `${target}단어 · ${mode} · ${runMode} · ${durationText(duration)}` : '학습할 단어를 선택해주세요.' };
-}
 function durationText(seconds) {
   const sec = Math.max(0, Number(seconds || 0));
   const min = Math.floor(sec / 60), rest = sec % 60;
   return min ? `${min}분 ${String(rest).padStart(2,'0')}초` : `${rest}초`;
-}
-function middleVocabQuiz(A) {
-  const { words, codes, code, lessonWords, selected } = middleLessonState(A);
-  const selectedSet = new Set(selected);
-  const lessonTabs = codes.map(range => { const count = words.filter(word => String(word.range_code) === String(range)).length; return `<button data-middle-lesson="${esc(range)}" class="${String(range) === code ? 'selected' : ''}">${esc(range)}과 <small>${count}개</small></button>`; }).join('');
-  const rows = lessonWords.map((word, index) => `<label class="middle-word-row ${selectedSet.has(word.id) ? 'selected' : ''}"><input type="checkbox" data-middle-word="${esc(word.id)}" ${selectedSet.has(word.id) ? 'checked' : ''}><span class="middle-word-no">${index + 1}</span><span class="middle-word-en">${esc(word.word)}</span><span class="middle-word-ko">${esc(word.meaning)}</span></label>`).join('');
-  const preset = [15,20,30].filter(n => lessonWords.length >= n).map(n => `<button data-middle-preset="${n}" class="${selected.length === n ? 'selected' : ''}">앞 ${n}개</button>`).join('');
-  const summary = practiceSetupSummary(A, selected.length);
-  return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">VOCAB</span></div>
-    <div class="page-heading setup-heading"><h1>단어 학습 준비</h1><p>${esc(A.data.profile.school || A.school)} · ${esc(A.data.profile.class_name)} · YBM(박준언)</p></div>
-    <section class="setup-section">
-      <div class="step-label"><span>01</span>범위</div>
-      <div class="middle-lesson-tabs setup-choice-row">${lessonTabs || '<span class="tiny muted">등록된 단어가 없어요.</span>'}</div>
-    </section>
-    <section class="setup-section">
-      <div class="step-label"><span>02</span>학습량</div>
-      <div class="middle-preset-grid"><button data-middle-preset="clear" class="${!selected.length ? 'selected' : ''}">선택 안 함</button>${preset}<button data-middle-preset="all" class="${selected.length === lessonWords.length && lessonWords.length ? 'selected' : ''}">전체 ${lessonWords.length}개</button></div>
-      <button class="direct-word-toggle" data-middle-words-toggle="true" aria-expanded="${A.middleWordsOpen ? 'true' : 'false'}"><span><b>직접 선택</b><small>원본 순서에서 필요한 단어만 고르기</small></span><strong>${selected.length}개 선택</strong>${icon('chevron')}</button>
-      ${A.middleWordsOpen ? `<div class="middle-word-tools"><div><button data-middle-preset="clear">선택 해제</button><button data-middle-preset="all">전체</button></div><strong id="middle-selected-count">${selected.length}개 선택</strong></div><section class="middle-word-list">${rows || empty('practice','이 과에 등록된 단어가 없어요','선생님이 단어 DB를 등록하면 여기에 표시돼요.')}</section>` : ''}
-    </section>
-    <section class="setup-section">
-      <div class="step-label"><span>03</span>쓰기 방식</div>
-      ${practiceModePicker(A)}
-    </section>
-    <aside class="setup-start-summary">
-      <div><span>시작 요약</span><strong id="setup-summary-text">${esc(code ? code + '과 · ' + summary.text : summary.text)}</strong><small>${A.practiceRunMode === 'test' && ['write_meaning','spell'].includes(A.mode) ? '정답은 종료 후 공개되고 시간 종료 시 자동 제출돼요.' : '연습에서는 정답 확인 후 틀린 단어를 다시 볼 수 있어요.'}</small></div>
-      <button class="btn primary full" data-action="start-practice" ${selected.length || A.data.active_practice ? '' : 'disabled'}>${A.data.active_practice ? '진행 중인 학습 확인' : A.practiceRunMode === 'test' && ['write_meaning','spell'].includes(A.mode) ? '실전 모드 확인' : '연습 시작하기'} ${icon('arrow')}</button>
-    </aside>`;
-}
-function vocabQuiz(A) {
-  if (A.data.profile.division === 'middle') return middleVocabQuiz(A);
-  const count = selectedCount(A);
-  const summary = practiceSetupSummary(A, count);
-  return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">VOCAB</span></div>
-    <div class="page-heading setup-heading"><h1>단어 학습 준비</h1><p>${esc(A.data.profile.school || A.school)} · ${esc(A.data.profile.class_name)} · 시험범위 단어</p></div>
-    <section class="setup-section"><div class="step-label"><span>01</span>범위</div>${schoolSwitch(A)}${rangePicker(A)}</section>
-    <section class="setup-section"><div class="step-label"><span>02</span>학습량</div><div class="practice-target-grid" role="group" aria-label="학습량 선택">${[10,20,30].map(n => `<button data-practice-target="${n}" class="${A.target === n ? 'selected' : ''}" aria-pressed="${A.target === n}">${n}<small>문제</small></button>`).join('')}<button data-practice-target="all" class="all ${A.target === 'all' ? 'selected' : ''}" aria-pressed="${A.target === 'all'}"><b>선택 범위 전체</b><small>${count}개 단어</small></button></div></section>
-    <section class="setup-section"><div class="step-label"><span>03</span>쓰기 방식</div>${practiceModePicker(A)}</section>
-    <aside class="setup-start-summary"><div><span>시작 요약</span><strong id="setup-summary-text">${esc(summary.text)}</strong><small>${A.practiceRunMode === 'test' && ['write_meaning','spell'].includes(A.mode) ? '정답은 종료 후 공개되고 시간 종료 시 자동 제출돼요.' : '연습에서는 정답 확인 후 틀린 단어를 다시 볼 수 있어요.'}</small></div><button class="btn primary full" data-action="start-practice" ${!count && !A.data.active_practice ? 'disabled' : ''}>${A.data.active_practice ? '진행 중인 학습 확인' : A.practiceRunMode === 'test' && ['write_meaning','spell'].includes(A.mode) ? '실전 모드 확인' : '연습 시작하기'} ${icon('arrow')}</button></aside>`;
 }
 function vocabPractice(A) {
   return memorizationPanel(A);
@@ -508,8 +448,8 @@ function exam(A) {
   if (!A.examKind) {
     return `<div class="page-heading exam-choice-heading"><h1>시험</h1></div>
       <div class="exam-kind-grid">
-        <button class="exam-kind-card practice" data-exam-kind="practice"><span class="square-icon">${icon('practice')}</span><div><span class="pill blue">PRACTICE</span><h2>연습시험</h2><p>문제마다 바로 정답을 확인하고 틀린 단어는 다시 나와요.</p></div>${icon('arrow')}</button>
-        <button class="exam-kind-card test" data-exam-kind="test"><span class="square-icon">${icon('exam')}</span><div><span class="pill">TEST</span><h2>실전시험</h2><p>끝까지 정답을 숨기고 마지막에 한꺼번에 채점해요.</p></div>${icon('arrow')}</button>
+        <button class="exam-kind-card practice" data-exam-kind="practice"><span class="square-icon">${icon('practice')}</span><div><span class="pill blue">PRACTICE</span><h2>연습시험</h2><p>문제마다 바로 채점</p></div>${icon('arrow')}</button>
+        <button class="exam-kind-card test" data-exam-kind="test"><span class="square-icon">${icon('exam')}</span><div><span class="pill">TEST</span><h2>실전시험</h2><p>마지막에 한꺼번에 채점</p></div>${icon('arrow')}</button>
       </div>`;
   }
   if (!['write_meaning','spell'].includes(A.mode)) A.mode = 'write_meaning';
@@ -531,7 +471,7 @@ function exam(A) {
   const target = A.target === 'all' ? count : Math.min(count, Number(A.target || 20));
   const seconds = PRACTICE_SECONDS_PER_QUESTION[A.mode] || 8;
   return `<div class="exam-mode-switch segment"><button data-exam-kind="practice" class="${!testMode ? 'selected' : ''}">연습시험</button><button data-exam-kind="test" class="${testMode ? 'selected' : ''}">실전시험</button></div>
-    <div class="page-heading exam-shared-heading"><h1>${testMode ? '실전시험' : '연습시험'}</h1><p>${testMode ? '문제 화면은 연습시험과 같고, 정답만 마지막에 공개해요.' : '시험처럼 시간을 재면서 문제마다 바로 정답을 확인해요.'}</p></div>
+    <div class="page-heading exam-shared-heading"><h1>${testMode ? '실전시험' : '연습시험'}</h1></div>
     <section class="setup-section"><div class="step-label"><span>01</span>시험 범위</div>${scopeUi}</section>
     <section class="setup-section"><div class="step-label"><span>02</span>문항 수</div>${examTargetGrid(A, count)}</section>
     <section class="setup-section"><div class="step-label"><span>03</span>시험 방식</div>${examWritingPicker(A)}</section>
