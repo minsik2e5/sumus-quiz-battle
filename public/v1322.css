@@ -1,0 +1,102 @@
+/* SUMUS VOCA V13.22 · final learning / exam structure */
+
+.study-simple-heading{margin-bottom:18px}
+.study-simple-heading h1{margin-bottom:0}
+.study-hub-simple{gap:12px}
+.study-hub-simple .study-hub-card{min-height:132px;padding:20px;align-items:center}
+.study-hub-simple .study-hub-card>div h2{margin:8px 0 0;font-size:21px}
+.study-hub-simple .study-hub-card>div p{display:none}
+.study-hub-simple .study-hub-icon{width:52px;height:52px;border-radius:16px}
+.study-hub-simple+.study-tip,.study-hub-simple~.study-tip{display:none!important}
+
+/* Memorization is now the only vocabulary-learning screen. */
+.memorize-heading{margin-bottom:4px}
+.memorize-heading h1{margin-bottom:0}
+.memorize-heading p{display:none}
+.memorize-shell{padding-bottom:88px}
+.memorize-row{grid-template-columns:42px minmax(0,1fr) 48px;align-items:center;min-height:64px}
+.memorize-row.revealed{background:#f6fbf8}
+.memorize-row.revealed .memorize-word strong{color:#216a47}
+.memorize-word{grid-template-columns:34px minmax(0,1fr);min-height:64px;padding:9px 4px 9px 0}
+.memorize-word strong{font-size:15px;line-height:1.42;word-break:keep-all}
+.memorize-word small{grid-column:2;color:#98a2b3}
+.memorize-sound{width:40px;height:40px;border:0;border-radius:13px;background:#f2f4f7;color:#475467;display:grid;place-items:center}
+.memorize-sound:active{transform:scale(.94);background:#e8eefb;color:#2457c7}
+.memorize-meaning,.memorize-actions{display:none!important}
+.memorize-toolbar{top:0}
+.memorize-toolbar .text-button{font-weight:800}
+
+/* Exam landing + one common setup. */
+.exam-choice-heading{margin-bottom:18px}
+.exam-kind-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.exam-kind-card{display:grid;grid-template-columns:52px 1fr 24px;align-items:center;gap:14px;padding:20px;border:1px solid #e4e7ec;border-radius:20px;background:#fff;text-align:left;box-shadow:0 6px 18px rgba(16,24,40,.04)}
+.exam-kind-card:hover{border-color:#c7d7fe;box-shadow:0 10px 24px rgba(16,24,40,.07)}
+.exam-kind-card .square-icon{width:52px;height:52px;border-radius:16px}
+.exam-kind-card h2{margin:7px 0 4px;color:#101828;font-size:20px;letter-spacing:-.03em}
+.exam-kind-card p{margin:0;color:#667085;font-size:11.5px;line-height:1.48}
+.exam-kind-card.test .square-icon{background:#f4f3ff;color:#6941c6}
+.exam-kind-card.practice .square-icon{background:#eef4ff;color:#2457c7}
+.exam-mode-switch{margin:0 0 18px}
+.exam-shared-heading{margin-bottom:6px}
+.exam-shared-heading p{max-width:560px}
+.exam-start-summary{border-color:#d6ddff}
+.exam-start-summary>div>small{font-size:11px}
+.exam-start-summary .btn{font-size:14px}
+
+/* Practice and real test intentionally share exactly the same question shell. */
+.exam-run{min-height:100dvh;background:#fff}
+.exam-run-header{border-bottom:0}
+.exam-run-header h1{font-size:15px}
+.exam-question-area{max-width:600px;margin:0 auto;padding-top:16px}
+.exam-question-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 12px;color:#98a2b3;font-size:10.5px}
+.exam-question-meta .question-type{color:#475467;font-weight:850}
+.exam-run .question-prompt{margin:18px 0 22px}
+.exam-run .answer-input{min-height:58px;font-size:18px}
+.exam-run .btn.primary{min-height:54px}
+.exam-run-test,.exam-run-practice{background:#fff}
+
+/* Per-question tension timer. */
+.question-timer{width:148px;height:102px;margin:2px auto 18px;border:1px solid #d0d5dd;border-radius:24px;background:#fff;display:flex;align-items:baseline;justify-content:center;gap:5px;box-shadow:0 10px 28px rgba(16,24,40,.06);transition:border-color .16s ease,box-shadow .16s ease,transform .16s ease,background .16s ease}
+.question-timer strong{font-variant-numeric:tabular-nums;letter-spacing:-.055em;color:#101828;font-size:52px;line-height:1;font-weight:900}
+.question-timer small{color:#98a2b3;font-size:13px;font-weight:800}
+.question-timer.warning{border-color:#fec84b;background:#fffcf5;box-shadow:0 12px 30px rgba(247,144,9,.12)}
+.question-timer.warning strong{color:#b54708}
+.question-timer.danger{border-color:#f97066;background:#fff5f4;box-shadow:0 14px 34px rgba(217,45,32,.16);animation:sumusQuestionTimerPulse .55s ease-in-out infinite alternate}
+.question-timer.danger strong{color:#d92d20}
+.question-timer.feedback-timer-state{height:86px;border-color:#e4e7ec;box-shadow:none;background:#f9fafb;animation:none}
+.question-timer.feedback-timer-state strong{font-size:25px;letter-spacing:0}
+.question-timer.feedback-timer-state small{font-size:11px}
+.feedback.timed-out{border-color:#fecdca}
+.feedback.timed-out b{color:#d92d20}
+
+@keyframes sumusQuestionTimerPulse{
+  from{transform:scale(1);box-shadow:0 12px 28px rgba(217,45,32,.12)}
+  to{transform:scale(1.045);box-shadow:0 18px 40px rgba(217,45,32,.24)}
+}
+
+@media(max-width:640px){
+  .study-hub-simple{grid-template-columns:1fr 1fr}
+  .study-hub-simple .study-hub-card{min-height:122px;padding:15px;grid-template-columns:1fr}
+  .study-hub-simple .study-hub-icon{width:46px;height:46px}
+  .study-hub-simple .study-hub-arrow{position:absolute;right:14px;top:14px}
+  .study-hub-simple .study-hub-card{position:relative}
+  .study-hub-simple .study-hub-card>div h2{font-size:18px}
+  .exam-kind-grid{grid-template-columns:1fr}
+  .exam-kind-card{min-height:118px}
+  .memorize-row{grid-template-columns:38px minmax(0,1fr) 44px}
+  .memorize-star{min-height:60px}
+  .memorize-word{grid-template-columns:26px minmax(0,1fr);min-height:60px}
+  .memorize-sound{width:38px;height:38px}
+  .question-timer{width:138px;height:96px;margin-bottom:15px;border-radius:22px}
+  .question-timer strong{font-size:49px}
+  .exam-question-area{padding-top:10px}
+}
+@media(max-width:360px){
+  .study-hub-simple{grid-template-columns:1fr}
+  .exam-kind-card{grid-template-columns:46px 1fr 20px;padding:16px}
+  .question-timer{width:128px;height:90px}
+  .question-timer strong{font-size:45px}
+}
+@media(prefers-reduced-motion:reduce){
+  .question-timer.danger{animation:none!important}
+}
