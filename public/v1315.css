@@ -1,0 +1,25 @@
+/* SUMUS VOCA V13.15 · scored practice, main writing modes, record history */
+.primary-mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.primary-mode-card{position:relative;display:grid;grid-template-columns:42px 1fr auto;align-items:center;gap:12px;min-height:104px;padding:16px;border:1px solid #dfe5e2;border-radius:18px;background:#fff;text-align:left;transition:.16s ease}
+.primary-mode-card:hover{transform:translateY(-1px);border-color:#b8cfc6}
+.primary-mode-card.selected{border:2px solid #376ee8;background:linear-gradient(135deg,#f7faff,#eef4ff);box-shadow:0 8px 22px rgba(55,110,232,.10)}
+.primary-mode-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#f1f4f8;color:#637083}
+.primary-mode-card.selected .primary-mode-icon{background:#e6efff;color:#376ee8}
+.primary-mode-card b{display:block;font-size:15px;color:#1f2937}
+.primary-mode-card small{display:block;margin-top:4px;color:#7b8794;font-size:11px;line-height:1.45}
+.primary-mode-card em{display:inline-block;margin-top:7px;color:#47627a;font-size:10px;font-style:normal;font-weight:850}
+.primary-mode-card>.pill{align-self:start}
+.other-mode-label{margin:14px 0 7px;color:#98a2b3;font-size:10px;font-weight:900;letter-spacing:.06em}
+.secondary-mode-grid{margin-bottom:4px}
+.record-stats{grid-template-columns:repeat(4,minmax(0,1fr))}
+.record-row .result{min-width:78px}
+.result-number{letter-spacing:-.04em}
+#practice-timer{flex:none}
+#practice-timer.urgent{animation:practiceTimerPulse .8s ease-in-out infinite alternate}
+@keyframes practiceTimerPulse{from{transform:scale(1)}to{transform:scale(1.04)}}
+.teacher-division select{min-width:92px}
+@media(max-width:640px){
+  .primary-mode-grid{grid-template-columns:1fr}
+  .primary-mode-card{min-height:92px}
+  .record-stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
