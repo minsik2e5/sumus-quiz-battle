@@ -242,7 +242,7 @@ function homePrimaryAction(A) {
   }
 
   const task = (A.data.assignments || [])
-    .filter(item => item.active !== false && item.due_at > now && dayKey(item.due_at) === dayKey(now))
+    .filter(item => item.active !== false && item.due_at > now && dayKey(item.due_at) === dayKey(now) && !(A.data.sessions || []).some(session => session.assignment_id === item.id))
     .sort((a,b) => a.due_at - b.due_at)[0];
   if (task) {
     return {
@@ -297,7 +297,7 @@ function compactGrowth(A) {
   const p = A.data.profile, g = A.data.stats, badges = achievementBadges(A);
   const earned = badges.filter(item => item.earned);
   const latest = earned[0];
-  return `<section class="home-growth-compact"><div class="home-growth-avatar">${avatar(p.avatar_key || 'lumi', { size: 'mini', accessory: p.avatar_accessory, frame: p.avatar_frame })}</div><div class="grow"><span class="tiny muted">내 성장</span><b>Lv.${g.level} · ${num(g.current)}P</b><small>${latest ? '최근 성취 · ' + esc(latest.label) : '첫 성취를 준비 중이에요.'}</small></div><button class="text-button" data-go="records">성취 ${earned.length}개 ${icon('chevron')}</button></section>`;
+  return `<section class="home-growth-compact"><div class="home-growth-avatar">${avatar(p.avatar_key || 'lumi', { size: 'mini', accessory: p.avatar_accessory, frame: p.avatar_frame })}</div><div class="grow"><span class="tiny muted">내 성장</span><b>Lv.${g.level} · ${num(g.current)}P</b><small>${latest ? '대표 성취 · ' + esc(latest.label) : '첫 성취를 준비 중이에요.'}</small></div><button class="text-button" data-go="records">성취 ${earned.length}개 ${icon('chevron')}</button></section>`;
 }
 function homeSchedule(A, primary) {
   const now = Date.now();
@@ -311,7 +311,7 @@ function homeSchedule(A, primary) {
     if (attempts.some(item => item.status === 'submitted') && attempts.length >= exam.max_attempts) continue;
     rows.push(`<button class="home-schedule-row" data-exam="${exam.id}"><span class="home-schedule-icon">${icon('exam')}</span><div class="grow"><b>${esc(exam.title)}</b><small>${EXAM_TYPES[exam.exam_type]?.label || '실전시험'} · ${date(exam.due_at)} 마감</small></div><span class="home-schedule-state">${attempts.some(item => item.status === 'active') ? '응시 중' : '시험'}</span>${icon('chevron')}</button>`);
   }
-  const task = (A.data.assignments || []).filter(item => item.active !== false && item.due_at > now).sort((a,b) => a.due_at - b.due_at)[0];
+  const task = (A.data.assignments || []).filter(item => item.active !== false && item.due_at > now && !(A.data.sessions || []).some(session => session.assignment_id === item.id)).sort((a,b) => a.due_at - b.due_at)[0];
   if (task) rows.push(`<button class="home-schedule-row" data-assignment="${task.id}"><span class="home-schedule-icon">${icon('practice')}</span><div class="grow"><b>${esc(task.title)}</b><small>${task.target_questions}문제 · ${date(task.due_at)} 마감</small></div><span class="home-schedule-state">과제</span>${icon('chevron')}</button>`);
   if (!rows.length) return '<p class="home-empty-line">지금 마감이 가까운 시험이나 과제가 없어요.</p>';
   return rows.slice(0, 3).join('');
