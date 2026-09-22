@@ -1,5 +1,5 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
-import { CHARACTERS, EXAM_TYPES, CLASS_OPTIONS } from './modules/core.js';
+import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, practiceDurationSec } from './modules/core.js';
 import { avatar } from './modules/character.js';
 import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.20.0';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.20.0';
@@ -197,7 +197,16 @@ $('#app').addEventListener('change', event => {
     A.middleWordIds = [...values]; A.middleSelectionTouched = true;
     savePreferences();
     const count = $('#middle-selected-count'); if (count) count.textContent = `${A.middleWordIds.length}개 선택`;
-    const start = $('[data-action="start-practice"]'); if (start && !A.data.active_practice) { start.disabled = !A.middleWordIds.length; start.innerHTML = A.middleWordIds.length ? `${A.middleWordIds.length}개 시험 시작하기 ${icon('arrow')}` : `단어를 선택해주세요 ${icon('arrow')}`; }
+    const directCount = $('.direct-word-toggle>strong'); if (directCount) directCount.textContent = `${A.middleWordIds.length}개 선택`;
+    const start = $('[data-action="start-practice"]'); if (start && !A.data.active_practice) start.disabled = !A.middleWordIds.length;
+    const summary = $('#setup-summary-text');
+    if (summary) {
+      const amount = A.middleWordIds.length;
+      const duration = amount ? practiceDurationSec(A.mode, amount) : 0;
+      const run = ['write_meaning','spell'].includes(A.mode) && A.practiceRunMode === 'test' ? '실전 모드' : '연습 모드';
+      const durationText = duration ? `${Math.floor(duration / 60)}분 ${String(duration % 60).padStart(2,'0')}초` : '';
+      summary.textContent = amount ? `${A.middleRange}과 · ${amount}단어 · ${PRACTICE_TYPES[A.mode] || '학습'} · ${run} · ${durationText}` : '학습할 단어를 선택해주세요.';
+    }
     input.closest('.middle-word-row')?.classList.toggle('selected', input.checked);
     return;
   }
