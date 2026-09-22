@@ -191,6 +191,17 @@ export function openPracticeRecord(sessionId) {
       toast('뜻 이의제기를 보냈어요.');
     } catch (error) { button.disabled = false; toast(error.message); }
   }));
+  $('#record-share-self-test')?.addEventListener('click', async event => {
+    buttonBusy(event.currentTarget);
+    try {
+      const shared = await api(`/practice/${session.id}/share`, {}, 'POST');
+      session.shared_to_teacher_at = shared.shared_to_teacher_at;
+      event.currentTarget.className = 'btn self-test-share-done full';
+      event.currentTarget.disabled = true;
+      event.currentTarget.textContent = '✓ 선생님께 전송 완료';
+      toast('실전 결과를 선생님께 보냈어요.');
+    } catch (error) { buttonBusy(event.currentTarget, false); toast(error.message); }
+  });
   $('#retry-wrong-practice')?.addEventListener('click', async event => {
     buttonBusy(event.currentTarget);
     try {
@@ -248,7 +259,7 @@ export async function startPractice(options = {}) {
   const payload = options.dailyQuest
     ? { school: A.school, mode: 'write_meaning', target: 20, daily_quest: true, run_mode: 'practice' }
     : Array.isArray(options.wordIds) && options.wordIds.length
-      ? { school: A.school, mode: options.mode || A.mode || 'write_meaning', word_ids: options.wordIds, cover_all: true, run_mode: options.runMode || 'practice' }
+      ? { school: A.school, mode: options.mode || A.mode || 'write_meaning', word_ids: options.wordIds, target: options.target === 'all' ? undefined : options.target, cover_all: options.target === undefined || options.target === 'all', run_mode: options.runMode || 'practice' }
       : A.data.profile.division === 'middle'
         ? { school: A.school, mode: A.mode, word_ids: A.middleWordIds || [], cover_all: true, run_mode: options.runMode || A.practiceRunMode || 'practice' }
         : { school: A.school, range_codes: A.ranges[A.school], mode: A.mode, target: A.target === 'all' ? undefined : A.target, cover_all: A.target === 'all', assignment_id: A.assignmentId, run_mode: options.runMode || A.practiceRunMode || 'practice' };
@@ -347,6 +358,45 @@ function practiceTick() {
   if (left <= 0) finishPracticeByTimer();
 }
 function feedbackHtml(f) { return `<div class="feedback ${f.ok ? '' : 'wrong'}" role="status"><b>${f.ok ? '정답' : '다시 기억할 단어'}</b><p>${f.ok ? `${esc(f.word)} · ${esc(f.meaning)}` : `${esc(f.word)} · ${esc(f.meaning)}<br>내 답: ${esc(f.answer || '')}`}</p>${f.ok ? '<small>이 문항은 최초 풀이 정답으로 기록됐어요.</small>' : '<small>연습 모드에서는 잠시 뒤 다시 나와요.</small>'}</div>${f.can_dispute ? '<button class="meaning-dispute-button" id="practice-dispute">뜻 검토 요청</button>' : ''}`; }
+function answerImpact(feedback) {
+  const host = $('.session-app');
+  if (!host || !feedback) return;
+  if (!feedback.ok) {
+    const area = $('.question-area');
+    area?.classList.remove('answer-impact-wrong');
+    requestAnimationFrame(() => area?.classList.add('answer-impact-wrong'));
+    setTimeout(() => area?.classList.remove('answer-impact-wrong'), 420);
+    return;
+  }
+  const impact = document.createElement('div');
+  impact.className = `answer-impact ${feedback.milestone ? 'milestone' : ''}`;
+  impact.innerHTML = `<div class="answer-impact-ring"></div><div class="answer-impact-check">✓</div><strong>${feedback.milestone ? feedback.combo + '연속 정답' : '정답!'}</strong><div class="answer-impact-particles">${Array.from({length:8},(_,i)=>`<i style="--i:${i}"></i>`).join('')}</div>`;
+  host.append(impact);
+  requestAnimationFrame(() => impact.classList.add('show'));
+  setTimeout(() => impact.remove(), feedback.milestone ? 950 : 720);
+}
+function animateTestResult(score, perfect) {
+  const node = $('#practice-result-score');
+  if (node) {
+    const start = performance.now(), duration = 620;
+    const tick = now => {
+      const p = Math.min(1, (now - start) / duration);
+      node.textContent = String(Math.round(score * (1 - Math.pow(1 - p, 3))));
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    node.textContent = '0';
+    requestAnimationFrame(tick);
+  }
+  if (!perfect) return;
+  const host = $('.session-app');
+  if (!host) return;
+  const burst = document.createElement('div');
+  burst.className = 'perfect-impact';
+  burst.innerHTML = `<div class="perfect-impact-core">PERFECT<small>100</small></div><div class="perfect-impact-stars">${Array.from({length:12},(_,i)=>`<i style="--i:${i}">✦</i>`).join('')}</div>`;
+  host.append(burst);
+  requestAnimationFrame(() => burst.classList.add('show'));
+  setTimeout(() => burst.remove(), 1500);
+}
 let answering = false;
 async function advancePracticeScreen(button, answeredState) {
   if (practiceState !== answeredState) return;
@@ -372,6 +422,7 @@ async function answerPractice(answer, button) {
       return;
     }
     prefetchedPractice = result.prefetched_next || null; delete result.prefetched_next; practiceState = result; renderPractice();
+    answerImpact(result.feedback);
     if (!result.feedback.ok && button) { const index = button.dataset.practiceChoice; $(`[data-practice-choice="${index}"]`)?.classList.add('wrong'); }
     if (result.feedback.ok) navigator.vibrate?.([24, 34, 42]); else navigator.vibrate?.([12, 25, 12]);
     if (A.sound) sound(result.feedback.ok, result.feedback.milestone);
@@ -413,18 +464,35 @@ function finishPracticeView() {
   mount(`<div class="session-app"><main class="result-page result-page-v1320">
     <div class="result-identity"><span class="pill blue">${esc(resultState)}</span><p>${rangeText} · ${esc(PRACTICE_TYPES[x.mode] || '연습')} · ${x.run_mode === 'test' ? '자율학습 실전' : '연습 모드'}</p></div>
     <h1>학습 결과</h1>
-    <div class="result-number">${score}<small>점</small></div>
+    <div class="result-number"><span id="practice-result-score">${score}</span><small>점</small></div>
     <p class="result-score-basis">최초 풀이 기준 · ${Number(x.score_correct || 0)} / ${Number(x.target || x.score_total || 0)} 정답</p>
     <div class="result-stat-grid"><div><strong>${Number(x.score_correct || 0)}</strong><span>정답</span></div><div><strong>${wrongCount}</strong><span>오답</span></div><div><strong>${unanswered}</strong><span>미응답</span></div></div>
     <div class="result-meta-line"><span>${icon('clock')} ${time(elapsed)}</span><span>${x.auto_submitted ? '시간 종료' : '정상 완료'}</span></div>
     <p class="result-next-copy">${esc(statusText)}</p>
     ${primaryCta}
+    ${x.run_mode === 'test' ? (x.shared_to_teacher_at ? '<button class="btn self-test-share-done full" disabled>✓ 선생님께 전송 완료</button>' : '<button class="btn self-test-share full" id="share-self-test">선생님께 결과 보내기</button>') : ''}
     ${answerRows.length || reviewCount ? '<button class="btn full" id="practice-answer-review">답안 보기</button>' : ''}
     <div id="practice-answer-details" class="answer-review-panel" hidden>${detailHtml}</div>
     <div class="result-secondary-actions"><button class="text-button" id="practice-records">내 기록</button><button class="text-button" id="practice-home">홈으로</button></div>
     <p class="quiet-note">성장 포인트 +${x.xp}P · 점수는 오답 복습 재정답으로 올라가지 않고, 승인된 재채점만 반영돼요.</p>
   </main></div>`);
-  $$('[data-finish-practice-dispute]').forEach(button => button.addEventListener('click', async () => {
+  if (x.run_mode === 'test') animateTestResult(score, perfect);
+  $('#share-self-test')?.addEventListener('click', async event => {
+    buttonBusy(event.currentTarget);
+    try {
+      const shared = await api(`/practice/${x.id}/share`, {}, 'POST');
+      x.shared_to_teacher_at = shared.shared_to_teacher_at;
+      event.currentTarget.className = 'btn self-test-share-done full';
+      event.currentTarget.disabled = true;
+      event.currentTarget.textContent = '✓ 선생님께 전송 완료';
+      await refresh();
+      toast('실전 결과를 선생님께 보냈어요.');
+    } catch (error) {
+      buttonBusy(event.currentTarget, false);
+      toast(error.message);
+    }
+  });
+  $('[data-finish-practice-dispute]').forEach(button => button.addEventListener('click', async () => {
     button.disabled = true;
     try {
       await api('/meaning-disputes', { source_type: 'practice', source_id: x.id, question_id: button.dataset.finishPracticeDispute }, 'POST');
