@@ -36,7 +36,7 @@ export async function runReleaseCheck() {
     const sessionUiSource = readFileSync(fileURLToPath(new URL('../public/modules/sessions.js', import.meta.url)), 'utf8');
     const studentUiSource = readFileSync(fileURLToPath(new URL('../public/modules/student.js', import.meta.url)), 'utf8');
     const indexSource = readFileSync(fileURLToPath(new URL('../public/index.html', import.meta.url)), 'utf8');
-    assert(sessionUiSource.includes("$('[data-practice-choice],#practice-confirm').forEach"), 'practice answer controls disable through the multi-node selector');
+    assert(sessionUiSource.includes("$" + "('[data-practice-choice],#practice-confirm').forEach"), 'practice answer controls disable through the multi-node selector');
     assert(sessionUiSource.includes('practiceAdvanceTimer = setTimeout'), 'practice correct-answer auto advance is wired');
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(indexSource.includes('/v1324.css?v=13.24.0'), 'V13.24 learning style layer is connected');
