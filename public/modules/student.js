@@ -74,7 +74,7 @@ function todayWordQuest(A, goal = 20) {
       <div class="today-word-stats">
         <span><b>${mastered} / ${totalRanges}</b><small>MASTER</small></span>
         <span><b>${num(g.today_total || 0)}</b><small>오늘 학습</small></span>
-        <span><b>+${num(g.today_xp || 0)}P</b><small>오늘 포인트</small></span>
+        <span><b>+${num(g.today_xp || 0)} XP</b><small>오늘 XP</small></span>
       </div>
       <div class="today-word-next"><span>다음 퀘스트</span><strong>${esc(nextText)}</strong></div>
       <button class="btn primary full today-word-start" data-quick-practice="true"><span>${active ? '하던 연습 이어가기' : daily.target > 0 ? `오늘 ${daily.target}개 시작하기` : '시험범위 확인하기'}</span>${icon('arrow')}</button>
@@ -256,7 +256,12 @@ function compactGrowth(A) {
   const p = A.data.profile, g = A.data.stats, badges = achievementBadges(A);
   const earned = badges.filter(item => item.earned);
   const latest = earned[0];
-  return `<section class="home-growth-compact"><div class="home-growth-avatar">${avatar(p.avatar_key || 'lumi', { size: 'mini', accessory: p.avatar_accessory, frame: p.avatar_frame })}</div><div class="grow"><span class="tiny muted">내 성장</span><b>Lv.${g.level} · ${num(g.current)}P</b><small>${latest ? '대표 성취 · ' + esc(latest.label) : '첫 성취를 준비 중이에요.'}</small></div><button class="text-button" data-go="records">성취 ${earned.length}개 ${icon('chevron')}</button></section>`;
+  const rewardPoints = Number(g.reward_points || 0);
+  return `<section class="home-growth-compact">
+    <div class="home-growth-avatar">${avatar(p.avatar_key || 'lumi', { size: 'mini', accessory: p.avatar_accessory, frame: p.avatar_frame })}</div>
+    <div class="grow"><span class="tiny muted">내 성장</span><b>Lv.${g.level}</b><small>XP ${num(g.points || 0)} · ${latest ? '대표 성취 ' + esc(latest.label) : '첫 성취 도전 중'}</small></div>
+    <div class="home-growth-reward"><span class="reward-wallet"><b>${num(rewardPoints)}P</b><small>보상</small></span><button class="text-button" data-go="records">성취 ${earned.length} ${icon('chevron')}</button></div>
+  </section>`;
 }
 function homeSchedule(A) {
   const rows = [];
@@ -307,7 +312,7 @@ function studyHub(A) {
   <div class="study-hub-grid study-hub-simple">
     <button class="study-hub-card vocab" data-study="vocab">
       <span class="study-hub-icon">${icon('practice')}</span>
-      <div><span class="pill blue">VOCAB</span><h2>단어 학습</h2></div>
+      <div><span class="pill green">VOCAB</span><h2>단어 학습</h2></div>
       <span class="study-hub-arrow">${icon('arrow')}</span>
     </button>
     <button class="study-hub-card grammar" data-study="grammar">
@@ -339,7 +344,7 @@ function grammarStudy(A) {
   const isGangseo = school === '강서고';
   const passages = isDanwon ? DANWONGO_PASSAGES : isGangseo ? GANGSEO_PASSAGES : [];
 
-  return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill blue">GRAMMAR</span></div>
+  return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill green">GRAMMAR</span></div>
   <div class="page-heading grammar-heading"><h1>어법·어휘</h1></div>
   <section class="study-school-card locked"><div><span class="tiny muted">현재 학교</span><strong>${esc(school)}</strong></div><span class="school-fixed">${icon('shield')} 선생님 관리</span></section>
   ${isDanwon ? `
@@ -459,7 +464,7 @@ function exam(A) {
   if (!A.examKind) {
     return `<div class="page-heading exam-choice-heading premium-page-heading"><span class="premium-eyebrow">TEST</span><h1>시험</h1></div>
       <div class="exam-kind-grid">
-        <button class="exam-kind-card practice" data-exam-kind="practice"><span class="square-icon">${icon('practice')}</span><div><span class="pill blue">PRACTICE</span><h2>연습시험</h2><p>문제마다 바로 채점</p></div>${icon('arrow')}</button>
+        <button class="exam-kind-card practice" data-exam-kind="practice"><span class="square-icon">${icon('practice')}</span><div><span class="pill green">PRACTICE</span><h2>연습시험</h2><p>문제마다 바로 채점</p></div>${icon('arrow')}</button>
         <button class="exam-kind-card test" data-exam-kind="test"><span class="square-icon">${icon('exam')}</span><div><span class="pill">TEST</span><h2>실전시험</h2><p>마지막에 한꺼번에 채점</p></div>${icon('arrow')}</button>
       </div>`;
   }
@@ -516,7 +521,7 @@ function ranking(A) {
     <div style="margin:12px 0 14px;padding:13px 15px;border:1px solid #eaecf0;border-radius:15px;background:#f9fafb;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><strong style="font-size:14px">${esc(periodTitle)}</strong><span class="tiny muted">${esc(periodRange)}</span></div>
     <div class="segment rank-metric">${[['xp', '성장 포인트'], ['total', '연습량'], ['streak', '연속 학습']].map(([k, label]) => `<button data-rank-mode="${k}" class="${mode === k ? 'selected' : ''}">${label}</button>`).join('')}</div>
     ${myIndex >= 0 ? `<div class="my-rank-card"><span>내 ${scopeLabel} 순위</span><strong>${rankNo(items[myIndex])}<small>위</small></strong><p>${num(items[myIndex][metric] || 0)}${unit} · ${esc(periodTitle)}</p></div>` : ''}
-    <div class="rank-list">${items.length ? items.map((p, index) => `<div class="rank-row ${p.is_me ? 'me' : ''} ${index < 3 && Number(p[metric] || 0) ? 'top-rank top-' + (index + 1) : ''}"><span class="rank-number">${rankNo(p)}</span>${avatar(p.avatar_key, { size: 'mini' })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill blue">나</span>' : ''}</strong><small><span class="rank-grade">${esc(p.grade || '')}</span> · ${p.private ? '프로필 비공개' : `Lv.${p.level} · ${CHARACTERS[p.avatar_key]?.ko || '루미'}`}</small></div><span class="rank-score">${num(p[metric] || 0)}${unit}</span></div>`).join('') : empty('ranking', `${scopeLabel}에 아직 연습 기록이 없어요`, '학습을 시작하면 순위가 바로 생겨요.')}</div>
+    <div class="rank-list">${items.length ? items.map((p, index) => `<div class="rank-row ${p.is_me ? 'me' : ''} ${index < 3 && Number(p[metric] || 0) ? 'top-rank top-' + (index + 1) : ''}"><span class="rank-number">${rankNo(p)}</span>${avatar(p.avatar_key, { size: 'mini' })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill green">나</span>' : ''}</strong><small><span class="rank-grade">${esc(p.grade || '')}</span> · ${p.private ? '프로필 비공개' : `Lv.${p.level} · ${CHARACTERS[p.avatar_key]?.ko || '루미'}`}</small></div><span class="rank-score">${num(p[metric] || 0)}${unit}</span></div>`).join('') : empty('ranking', `${scopeLabel}에 아직 연습 기록이 없어요`, '학습을 시작하면 순위가 바로 생겨요.')}</div>
     <p class="quiet-note">${esc(note)}<br>전체 랭킹에는 중2·중3·고1 모든 활성 학생이 함께 포함돼요. 시험 성적은 랭킹에 포함하지 않아요.</p>`;
 }
 function records(A) {
