@@ -418,6 +418,8 @@ export async function runReleaseCheck() {
     const activeOriginal = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5
     }, studentToken);
+    const activeSummaryBootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    assert(activeSummaryBootstrap.active_practice_summary?.id === activeOriginal.id && activeSummaryBootstrap.active_practice_summary?.mode === 'write_meaning' && activeSummaryBootstrap.active_practice_summary?.deadline, 'bootstrap exposes active practice summary for action-first home');
     const resumedDifferentRequest = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'spell', target: 5
     }, studentToken);
@@ -547,6 +549,7 @@ export async function runReleaseCheck() {
     const v1313Css = readFileSync(publicRoot + 'v1313.css', 'utf8');
     const v1315Css = readFileSync(publicRoot + 'v1315.css', 'utf8');
     const v1317Css = readFileSync(publicRoot + 'v1317.css', 'utf8');
+    const v1320Css = readFileSync(publicRoot + 'v1320.css', 'utf8');
     const uiModule = readFileSync(publicRoot + 'modules/ui.js', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
@@ -581,9 +584,9 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(studentModule.includes('middleVocabPractice') && studentModule.includes('data-middle-word') && studentModule.includes('data-middle-preset'), 'V13.13 middle student UI lists lesson words for exact checkbox selection');
-    assert(sessionsModule.includes('word_ids: A.middleWordIds') && sessionsModule.includes('3000'), 'V13.13 sends exact middle word ids and keeps correct feedback visible for three seconds');
+    assert(sessionsModule.includes('word_ids: A.middleWordIds') && !sessionsModule.includes('setTimeout(() => advancePracticeScreen'), 'V13.20 keeps practice feedback visible until the student moves on');
     assert(practiceEnhancements.includes('sumusBurstFade 2.2s') && practiceEnhancements.includes('2300'), 'V13.13 correct-answer overlay stays visible long enough to read');
-    assert(indexHtml.includes('/app.js?v=13.19.0') && indexHtml.includes('/practice-enhancements.js?v=13.19.0') && indexHtml.includes('/v1317.css?v=13.19.0') && sw.includes('sumus-voca-v13.19.0-p0-finish-dispute-session'), 'V13.19 cache versions are active');
+    assert(indexHtml.includes('/app.js?v=13.20.0') && indexHtml.includes('/practice-enhancements.js?v=13.20.0') && indexHtml.includes('/v1320.css?v=13.20.0') && sw.includes('sumus-voca-v13.20.0-student-ux'), 'V13.20 cache versions are active');
     assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'V13.15 puts meaning and English writing first and exposes student score history');
     assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && sessionsModule.includes('practice-timer-value'), 'V13.15 student home shows recent scores and timed practice countdown');
     assert(teacherModule.includes('학생별 연습 결과') && teacherModule.includes('data-practice-record') && appJs.includes('openPracticeRecord'), 'V13.15 teacher can inspect practice scores and wrong answers');
@@ -596,6 +599,12 @@ export async function runReleaseCheck() {
     assert(sessionsModule.includes('미응답') && sessionsModule.includes('제출 상태를 확인하고 있어요') && sessionsModule.includes('data-finish-practice-dispute'), 'V13.19 result UI separates unanswered, keeps timeout confirmation visible, and supports durable completed-practice disputes');
     assert(sessionsModule.includes('이미 진행 중인 학습이 있어요') && sessionsModule.includes('기존 연습 저장 후 새 설정 시작'), 'V13.19 warns before a mismatched active practice is reused');
     assert(appJs.includes('examFormDirty') && appJs.includes('contextGeneration') && appJs.includes('작성 취소 후 전환'), 'V13.19 teacher context switch protects dirty exam forms and stale responses');
+    assert(studentModule.includes('homePrimaryAction') && studentModule.includes('home-focus-card') && studentModule.includes('오늘 일정'), 'V13.20 student home has one action-first CTA before supporting information');
+    assert(studentModule.includes('단어 학습 준비') && studentModule.includes('시작 요약') && studentModule.includes('기타 연습') && studentModule.includes('직접 선택'), 'V13.20 middle and high vocabulary setup uses one progressive preparation flow');
+    assert(sessionsModule.includes('실전 시작 확인') && sessionsModule.includes('정답은 시험이 끝난 뒤 공개돼요') && sessionsModule.includes('제출하고 결과 보기'), 'V13.20 autonomous test confirms policy before session creation and uses submit-next language');
+    assert(sessionsModule.includes('최초 풀이 기준') && sessionsModule.includes('같은 범위 다시 풀기') && sessionsModule.includes('답안 보기'), 'V13.20 practice result prioritizes score basis, review, and next action');
+    assert(v1320Css.includes('.home-focus-card') && v1320Css.includes('.setup-start-summary') && v1320Css.includes('.result-page-v1320'), 'V13.20 responsive student UX styles are loaded');
+    assert(appJs.includes("$('#teacher-division,#teacher-school')"), 'teacher context selectors use the multi-element helper');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
