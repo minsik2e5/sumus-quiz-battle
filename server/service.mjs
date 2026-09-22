@@ -1059,7 +1059,7 @@ function practiceView(x, state) {
     range_codes: x.range_codes || [], cover_all: !!x.cover_all, daily_quest: !!x.daily_quest,
     manual_selection: !!x.manual_selection, quest_mix: x.quest_mix || null,
     covered: x.seen?.length || 0, total: x.total, correct: hideTestScore ? null : x.correct, score_total: x.finished ? scoreTotal : (x.score_total || 0), score_correct: hideTestScore ? null : scoreCorrect, score: hideTestScore ? null : score,
-    xp: x.xp, combo: x.combo, best: x.best,
+    xp: hideTestScore ? null : x.xp, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
     started_at: x.started_at, finished_at: x.finished_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
     auto_submitted: !!x.auto_submitted,
     wrong_details: x.finished ? (x.wrong_details || []) : undefined,
