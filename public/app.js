@@ -1,10 +1,10 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, practiceDurationSec } from './modules/core.js';
 import { avatar } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.21.0';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.21.0';
-import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.21.0';
-const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', vocabPanel: 'memorize', memorizeFilter: 'all', memorizeShowAll: false, memStars: [], memRevealed: [] };
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.22.0';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.22.0';
+import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.22.0';
+const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memStars: [], memRevealed: [] };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
 const examTargetMatches = (exam, profile) => exam?.class_name === ALL_CLASSES || exam?.class_name === profile?.class_name;
@@ -26,7 +26,7 @@ configureSessions(A, render, refresh);
 function navigate(tab) {
   collectExamForm(A); A.tab = tab;
   if (tab === 'practice') { A.studyView = 'hub'; A.practiceRunMode = 'practice'; }
-  if (tab === 'exam') { A.practiceRunMode = 'test'; if (!['write_meaning','spell'].includes(A.mode)) A.mode = 'write_meaning'; }
+  if (tab === 'exam') { A.examKind = null; A.practiceRunMode = 'practice'; if (!['write_meaning','spell'].includes(A.mode)) A.mode = 'write_meaning'; }
   A.search = ''; A.classFilter = ''; A.style = null; render(); window.scrollTo(0, 0);
 }
 function loginView(role = A.role, division = A.division) {
@@ -57,7 +57,7 @@ $('#app').addEventListener('click', async event => {
   const d = b.dataset; if (!Object.keys(d).length) return; event.preventDefault();
   try {
     if (d.go) return navigate(d.go);
-    if (d.study) { A.studyView = d.study; A.tab = 'practice'; if (d.study === 'vocab') { A.vocabPanel = 'memorize'; A.practiceRunMode = 'practice'; } render(); window.scrollTo(0, 0); return; }
+    if (d.study) { A.studyView = d.study; A.tab = 'practice'; A.practiceRunMode = 'practice'; render(); window.scrollTo(0, 0); return; }
     if (d.vocabPanel) { A.vocabPanel = d.vocabPanel === 'quiz' ? 'quiz' : 'memorize'; A.practiceRunMode = 'practice'; savePreferences(); render(); window.scrollTo(0,0); return; }
     if (d.memorizeFilter) { A.memorizeFilter = d.memorizeFilter === 'starred' ? 'starred' : 'all'; savePreferences(); render(); return; }
     if (d.memorizeRevealAll) { A.memorizeShowAll = d.memorizeRevealAll === 'show'; render(); return; }
@@ -66,6 +66,23 @@ $('#app').addEventListener('click', async event => {
     }
     if (d.memorizeStar) {
       const set = new Set(A.memStars || []); set.has(d.memorizeStar) ? set.delete(d.memorizeStar) : set.add(d.memorizeStar); A.memStars = [...set]; savePreferences(); render(); return;
+    }
+    if (d.memorizeSpeak) {
+      const word = A.data.books.flatMap(book => book.words || []).find(item => item.id === d.memorizeSpeak);
+      if (!word) return toast('단어를 찾을 수 없어요.');
+      if (!('speechSynthesis' in window)) return toast('이 기기에서는 발음 재생을 지원하지 않아요.');
+      speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(String(word.word || '').replace(/\([^)]*\)|\[[^\]]*\]/g, '').trim());
+      utterance.lang = 'en-US'; utterance.rate = .82;
+      utterance.onerror = () => toast('발음을 재생하지 못했어요. 다시 눌러주세요.');
+      speechSynthesis.speak(utterance);
+      return;
+    }
+    if (d.examKind) {
+      A.examKind = d.examKind === 'test' ? 'test' : 'practice';
+      A.practiceRunMode = A.examKind === 'test' ? 'test' : 'practice';
+      if (!['write_meaning','spell'].includes(A.mode)) A.mode = 'write_meaning';
+      render(); window.scrollTo(0,0); return;
     }
     if (d.memorizePractice === 'starred') {
       const stars = new Set(A.memStars || []);
@@ -153,7 +170,19 @@ $('#app').addEventListener('click', async event => {
     if (d.disputeOnce) { await resolveDispute(d.disputeOnce, 'approve_once', b); return; }
     if (d.disputeReject) { await resolveDispute(d.disputeReject, 'reject', b); return; }
     if (d.action === 'refresh') { buttonBusy(b); await refresh(); render(); toast('최신 기록으로 업데이트했어요.'); }
-    if (d.action === 'start-practice') { A.practiceRunMode = 'practice'; savePreferences(); buttonBusy(b); await startPractice({ runMode: 'practice' }); }
+    if (d.action === 'start-exam-run') {
+      const runMode = A.examKind === 'test' ? 'test' : 'practice';
+      A.practiceRunMode = runMode; savePreferences(); buttonBusy(b);
+      if (A.data.profile.division === 'middle') {
+        const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
+        const target = A.target === 'all' ? 'all' : Math.min(words.length, Number(A.target || words.length));
+        await startPractice({ wordIds: words.map(word => word.id), target, mode: A.mode, runMode, confirmed: true });
+      } else {
+        await startPractice({ runMode, confirmed: true });
+      }
+      return;
+    }
+    if (d.action === 'start-practice') { A.practiceRunMode = 'practice'; savePreferences(); buttonBusy(b); await startPractice({ runMode: 'practice', confirmed: true }); }
     if (d.action === 'start-self-test') {
       A.practiceRunMode = 'test'; savePreferences(); buttonBusy(b);
       if (A.data.profile.division === 'middle') {
@@ -163,7 +192,7 @@ $('#app').addEventListener('click', async event => {
       } else await startPractice({ runMode: 'test' });
     }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
-      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.21.0');
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.22.0');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
