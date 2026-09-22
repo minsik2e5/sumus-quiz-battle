@@ -291,7 +291,7 @@ export async function startPractice(options = {}) {
     const ranges = Array.isArray(payload.word_ids) && payload.word_ids.length
       ? (A.data.profile.division === 'middle' ? String(A.middleRange || '') + '과' : '직접 선택')
       : (payload.range_codes || []).map(code => recordRangeLabel({ division: A.data.profile.division, school: A.school }, code)).join(' · ');
-    const close = modal(`<span class="pill blue">실전 모드</span><h2>${esc(ranges || '선택 범위')}</h2><div class="detail-grid"><div><b>${esc(PRACTICE_TYPES[payload.mode] || '쓰기')}</b><small>시험 방식</small></div><div><b>${target}문제</b><small>문항 수</small></div><div><b>${payload.mode === 'spell' ? '12초' : '8초'}</b><small>문제당 제한시간</small></div><div><b>마지막 공개</b><small>채점 시점</small></div></div><div class="test-start-rules"><p>정답은 시험이 끝난 뒤 공개돼요.</p><p>이전 문항으로 돌아갈 수 없어요.</p><p>각 문제마다 제한시간이 새로 시작돼요.</p><p>0초가 되면 그 문제는 미응답 처리되고 다음 문제로 넘어가요.</p></div><button class="btn primary full" id="confirm-practice-test">실전 시작하기</button><button class="btn full" id="cancel-practice-test">설정으로 돌아가기</button>`, '실전 시작 확인');
+    const close = modal(`<span class="pill green">실전 모드</span><h2>${esc(ranges || '선택 범위')}</h2><div class="detail-grid"><div><b>${esc(PRACTICE_TYPES[payload.mode] || '쓰기')}</b><small>시험 방식</small></div><div><b>${target}문제</b><small>문항 수</small></div><div><b>${payload.mode === 'spell' ? '12초' : '8초'}</b><small>문제당 제한시간</small></div><div><b>마지막 공개</b><small>채점 시점</small></div></div><div class="test-start-rules"><p>정답은 시험이 끝난 뒤 공개돼요.</p><p>이전 문항으로 돌아갈 수 없어요.</p><p>각 문제마다 제한시간이 새로 시작돼요.</p><p>0초가 되면 그 문제는 미응답 처리되고 다음 문제로 넘어가요.</p></div><button class="btn primary full" id="confirm-practice-test">실전 시작하기</button><button class="btn full" id="cancel-practice-test">설정으로 돌아가기</button>`, '실전 시작 확인');
     $('#cancel-practice-test').onclick = () => { close(); redraw(); };
     $('#confirm-practice-test').onclick = async event => {
       buttonBusy(event.currentTarget);
@@ -563,7 +563,7 @@ function finishPracticeView() {
       ? `<button class="btn primary full" id="practice-retry-wrong">틀린·미응답 ${missedWordIds.length}개 연습 ${icon('arrow')}</button>`
       : '<button class="btn primary full" id="practice-next-exam">다른 시험 선택</button>';
   mount(`<div class="session-app"><main class="result-page result-page-v1320">
-    <div class="result-identity"><span class="pill blue">${modeLabel}</span><p>${rangeText} · ${esc(PRACTICE_TYPES[x.mode] || '쓰기')} · 문제당 ${Number(x.question_duration_sec || 0)}초</p></div>
+    <div class="result-identity"><span class="pill green">${modeLabel}</span><p>${rangeText} · ${esc(PRACTICE_TYPES[x.mode] || '쓰기')} · 문제당 ${Number(x.question_duration_sec || 0)}초</p></div>
     <h1>${modeLabel} 결과</h1>
     <div class="result-number"><span id="practice-result-score">${score}</span><small>점</small></div>
     <p class="result-score-basis">최초 풀이 기준 · ${Number(x.score_correct || 0)} / ${Number(x.target || x.score_total || 0)} 정답</p>
@@ -575,7 +575,8 @@ function finishPracticeView() {
     ${answerRows.length || reviewCount ? '<button class="btn full" id="practice-answer-review">답안 보기</button>' : ''}
     <div id="practice-answer-details" class="answer-review-panel" hidden>${detailHtml}</div>
     <div class="result-secondary-actions"><button class="text-button" id="practice-records">내 기록</button><button class="text-button" id="practice-home">홈으로</button></div>
-    <p class="quiet-note">성장 포인트 +${x.xp}P · 점수는 오답 복습 재정답으로 올라가지 않고, 승인된 재채점만 반영돼요.</p>
+    <div class="result-reward-card"><div><span>학습 보상</span><strong>+${Number(x.reward_points || 0)}P</strong></div><div><span>성장 XP</span><strong>+${Number(x.xp || 0)} XP</strong></div></div>
+    <p class="quiet-note">보상 P는 학습 완료·만점·꾸준함으로 쌓여요. 점수는 오답 복습 재정답으로 올라가지 않고, 승인된 재채점만 반영돼요.</p>
   </main></div>`);
   if (x.run_mode === 'test') animateTestResult(score, perfect);
   $('#share-self-test')?.addEventListener('click', async event => {
