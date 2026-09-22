@@ -1,0 +1,236 @@
+/* SUMUS VOCA V13.24 · learning flow refinement
+   Focus: tap-to-switch ranges, cleaner study rows, readable question rhythm,
+   and a reliable answer-to-next transition without redesigning V13.23. */
+
+.memorize-range-strip{
+  display:flex;
+  gap:10px;
+  overflow-x:auto;
+  padding:3px 1px 12px;
+  margin:2px 0 2px;
+  scroll-snap-type:x proximity;
+  scrollbar-width:none
+}
+.memorize-range-strip::-webkit-scrollbar{display:none}
+.memorize-range-strip button{
+  flex:0 0 96px;
+  min-height:70px;
+  padding:12px 10px;
+  border:1px solid #e1e6ec;
+  border-radius:20px;
+  background:#fff;
+  color:#5c697b;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  scroll-snap-align:start;
+  box-shadow:0 5px 15px rgba(27,39,61,.035);
+  transition:transform .14s ease,border-color .14s ease,background .14s ease,box-shadow .14s ease
+}
+.memorize-range-strip button strong{
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:15px;
+  line-height:1.1;
+  font-weight:900;
+  letter-spacing:-.03em
+}
+.memorize-range-strip button small{
+  font-size:10px;
+  font-weight:750;
+  color:#9aa4b2
+}
+.memorize-range-strip button.selected{
+  border-color:#85d4b8;
+  background:#effbf6;
+  color:#087a56;
+  box-shadow:0 8px 20px rgba(18,185,129,.10)
+}
+.memorize-range-strip button.selected small{color:#55947e}
+.memorize-range-strip button:active{transform:scale(.97)}
+
+.memorize-shell{padding-bottom:42px!important}
+.memorize-row{min-height:82px!important}
+.memorize-word{min-height:82px!important;padding:13px 0!important}
+.memorize-word strong{
+  font-size:18px!important;
+  line-height:1.36!important;
+  letter-spacing:-.025em!important
+}
+.memorize-word small{display:none!important}
+.memorize-no{align-self:center}
+.memorize-star{min-height:82px!important}
+.memorize-toolbar{margin-bottom:12px!important}
+
+/* Question screen: one clear hierarchy — progress, timer, type, question, answer. */
+.exam-run-header{padding-bottom:12px!important}
+.exam-run-header .question-count{
+  display:flex!important;
+  justify-content:center!important;
+  margin-top:8px!important;
+  color:#758195!important;
+  font-size:12px!important;
+  font-variant-numeric:tabular-nums
+}
+.exam-question-area{
+  min-height:calc(100dvh - 118px)!important;
+  padding-top:25px!important;
+  display:flex;
+  flex-direction:column
+}
+.exam-question-meta{
+  justify-content:center!important;
+  margin:0 0 18px!important
+}
+.exam-question-meta .question-type{
+  display:inline-flex;
+  align-items:center;
+  min-height:30px;
+  padding:0 11px;
+  border-radius:999px;
+  background:#f2f4f7;
+  color:#667085!important;
+  font-size:10.5px!important;
+  font-weight:900!important
+}
+.exam-run .input-caption{display:none!important}
+
+.question-timer{
+  width:132px!important;
+  height:132px!important;
+  flex:none;
+  margin:0 auto 18px!important;
+  border-radius:50%!important;
+  background:#fff!important;
+  box-shadow:0 12px 34px rgba(27,39,61,.08)!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:4px!important
+}
+.question-timer:before{
+  inset:-7px!important;
+  border:6px solid #e8ecf1!important;
+  border-radius:50%!important;
+  opacity:1!important
+}
+.question-timer strong{
+  font-size:52px!important;
+  line-height:1!important;
+  letter-spacing:-.065em!important
+}
+.question-timer small{
+  position:relative;
+  top:11px;
+  font-size:11px!important
+}
+.question-timer.warning{
+  background:#fffaf2!important;
+  box-shadow:0 14px 38px rgba(244,163,0,.13)!important
+}
+.question-timer.warning:before{border-color:#ffd079!important}
+.question-timer.danger{
+  background:#fff5f5!important;
+  box-shadow:0 16px 42px rgba(229,72,77,.16)!important
+}
+.question-timer.danger:before{border-color:#ef8589!important}
+.question-timer.feedback-timer-state{
+  width:104px!important;
+  height:104px!important;
+  margin-bottom:14px!important
+}
+.question-timer.feedback-timer-state strong{
+  font-size:28px!important;
+  letter-spacing:-.02em!important
+}
+.question-timer.feedback-timer-state small{
+  top:7px;
+  font-size:9.5px!important
+}
+
+.exam-run .question-prompt{
+  margin:20px auto 28px!important;
+  width:100%;
+  max-width:470px;
+  font-size:36px!important;
+  line-height:1.2!important
+}
+.exam-run .question-prompt.korean{
+  font-size:30px!important;
+  line-height:1.3!important
+}
+.exam-run .answer-input{
+  min-height:70px!important;
+  font-size:20px!important;
+  text-align:center
+}
+.exam-run #practice-confirm{
+  min-height:62px!important;
+  font-size:16px!important
+}
+.exam-run #practice-feedback{
+  margin-top:18px!important
+}
+.exam-run .feedback{
+  margin-top:0!important;
+  padding:16px 18px!important;
+  border-radius:20px!important
+}
+.exam-run .feedback b{
+  display:block;
+  margin-bottom:5px;
+  font-size:15px!important
+}
+.exam-run .feedback p{
+  margin:0;
+  font-size:13px!important;
+  line-height:1.55!important
+}
+.exam-run #practice-next{
+  min-height:58px!important;
+  margin-top:12px!important;
+  font-size:15px!important
+}
+.feedback.timed-out:before{display:none!important}
+.feedback.timed-out>b{display:block!important}
+.feedback.timed-out p{color:#7c4750}
+
+/* The V13.23 enhancement layer used a large full-screen success burst.
+   V13.24 keeps the hit feeling but prevents it from blocking the next question. */
+.sumus-correct-burst{
+  background:radial-gradient(circle at center,rgba(18,183,106,.16),rgba(18,183,106,0) 46%)!important;
+  animation-duration:.72s!important
+}
+.sumus-correct-burst strong{
+  width:98px!important;
+  height:98px!important;
+  border-radius:32px!important;
+  font-size:22px!important;
+  animation-duration:.68s!important
+}
+.sumus-correct-burst i{animation-duration:.66s!important}
+
+@media(max-width:640px){
+  .memorize-range-strip button{flex-basis:88px;min-height:66px;border-radius:18px}
+  .memorize-range-strip button strong{font-size:14px}
+  .exam-question-area{min-height:calc(100dvh - 112px)!important;padding:22px 20px calc(32px + env(safe-area-inset-bottom))!important}
+  .question-timer{width:122px!important;height:122px!important;margin-bottom:15px!important}
+  .question-timer strong{font-size:48px!important}
+  .exam-run .question-prompt{font-size:32px!important;margin:17px auto 24px!important}
+  .exam-run .question-prompt.korean{font-size:27px!important}
+  .exam-run .answer-input{min-height:66px!important;font-size:19px!important}
+}
+@media(max-width:380px){
+  .memorize-range-strip button{flex-basis:82px;min-height:62px}
+  .question-timer{width:112px!important;height:112px!important}
+  .question-timer strong{font-size:43px!important}
+  .exam-run .question-prompt{font-size:29px!important}
+  .exam-run .question-prompt.korean{font-size:25px!important}
+}
+@media(prefers-reduced-motion:reduce){
+  .memorize-range-strip button,.sumus-correct-burst,.sumus-correct-burst *{transition:none!important;animation:none!important}
+}
