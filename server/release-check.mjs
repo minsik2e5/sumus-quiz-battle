@@ -118,8 +118,16 @@ export async function runReleaseCheck() {
     assert(lesson6Book.words[0].word === 'elect' && lesson6Book.words.at(-1).word === 'come back', 'middle3 lesson6 preserves source order');
     assert(lesson7Book.words[0].word === 'add' && lesson7Book.words.at(-1).word === 'play a role', 'middle3 lesson7 preserves source order across pages 1 and 2');
     assert(middle3ImportedBook?.words.length === 8 && middle3ImportedBook.words.every(word => word.grade === '중3'), 'middle3 teacher import remains separate from built-in lessons');
-    assert(middle2Bootstrap.books.length === 1 && middle2Bootstrap.books[0].grade === '중2' && middle2Bootstrap.books[0].words.every(word => word.grade === '중2'), 'middle2 student receives only middle2 imported vocabulary');
-    assert(middle2Bootstrap.books[0].words[0].id.startsWith('import:wonil-middle:중2:'), 'middle import uses deterministic grade-scoped word ids');
+    const middle2StaticBook = middle2Bootstrap.books.find(book => book.id === 'middle:ybm-park:grade2:lesson6');
+    const middle2ImportedBook = middle2Bootstrap.books.find(book => book.source === 'teacher_import');
+    assert(middle2StaticBook?.words.length === 66 && middle2StaticBook.grade === '중2', 'middle2 student receives YBM Park lesson6 66-word source list');
+    assert(middle2StaticBook.words[0].word === 'throw' && middle2StaticBook.words.at(-1).word === 'take time', 'middle2 YBM lesson6 preserves source order');
+    assert(middle2ImportedBook?.words.length === 8 && middle2ImportedBook.words.every(word => word.grade === '중2'), 'middle2 teacher import remains separate from built-in lesson6');
+    assert(middle2ImportedBook.words[0].id.startsWith('import:wonil-middle:중2:'), 'middle import uses deterministic grade-scoped word ids');
+    const binWord = middle2StaticBook.words.find(word => word.word === 'bin');
+    const careWord = middle2StaticBook.words.find(word => word.word === 'take care of ~');
+    assert(grade('write_meaning', '휴지통', binWord), 'middle2 built-in accepted meaning allows safe synonym 휴지통');
+    assert(grade('write_meaning', '돌보다', careWord), 'middle2 built-in accepted meaning allows safe synonym 돌보다');
     assert(middle3Bootstrap.daily_quest === null && middle2Bootstrap.daily_quest === null, 'middle students do not receive the high-school adaptive daily quest');
 
     const middle3Words = lesson5Book.words;
