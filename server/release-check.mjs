@@ -267,6 +267,7 @@ export async function runReleaseCheck() {
       const submitted = await service(state, 'POST', `/attempts/${internal.id}/submit`, {
         lease: internal.lease, revision: internal.revision, answers
       }, studentToken);
+      if (submitted.attempt.score !== 100) console.error('[release-check][exam-debug]', exam.exam_type, JSON.stringify({ answers, details: submitted.attempt.details }, null, 2));
       assert(submitted.attempt.status === 'submitted' && submitted.attempt.score === 100, `${exam.exam_type} grades correct answers at 100`);
     }
     const hiddenExam = await service(state, 'POST', '/exams', {
