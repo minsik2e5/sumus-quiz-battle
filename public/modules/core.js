@@ -9,8 +9,20 @@ export const EXAM_TYPES = {
 export const CLASS_OPTIONS = ['고1A', '고1B', '중3', '중2'];
 export const PRACTICE_TYPES = {
   write_meaning: '뜻 직접 쓰기', mixed: '골고루 연습', eng2mean: '영어 → 뜻', mean2eng: '뜻 → 영어',
-  spell: '영어 철자 입력', listen: '듣기', scramble: '철자 배열', vowelblank: '모음 빈칸', initial: '첫 글자 힌트'
+  spell: '영어 직접 쓰기', listen: '듣기', scramble: '철자 배열', vowelblank: '모음 빈칸', initial: '첫 글자 힌트'
 };
+export const PRACTICE_SECONDS_PER_QUESTION = {
+  write_meaning: 8,
+  spell: 12,
+  mixed: 9,
+  eng2mean: 6,
+  mean2eng: 7,
+  listen: 7,
+  scramble: 10,
+  vowelblank: 10,
+  initial: 10
+};
+export const practiceDurationSec = (mode, total) => Math.max(60, Math.ceil(Math.max(1, Number(total) || 1) * (PRACTICE_SECONDS_PER_QUESTION[mode] || 8)));
 export const CHARACTERS = {
   lumi: { name: 'LUMI', ko: '루미', type: '별빛 여우', color: '#BD792E', light: '#F4CA87', soft: '#F7EEE0' },
   nox: { name: 'NOX', ko: '녹스', type: '나이트 캣', color: '#716297', light: '#C4B5DD', soft: '#F0EBF6' },
