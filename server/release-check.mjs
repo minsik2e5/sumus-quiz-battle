@@ -351,6 +351,8 @@ export async function runReleaseCheck() {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'test'
     }, studentToken);
     assert(testStarted.run_mode === 'test' && testStarted.feedback === null && testStarted.score === null, 'test mode hides correctness until final submit');
+    const testInternal = state.practices.find(item => item.id === testStarted.id);
+    assert(new Set(testInternal.words).size === testStarted.target, 'test mode selects unique words without repeats');
     await expectStatus(409, () => service(state, 'POST', `/practice/${testStarted.id}/finish`, {}, studentToken), 'test mode blocks early manual finish');
     let testView = testStarted;
     let testAnswered = 0;
