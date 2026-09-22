@@ -488,7 +488,7 @@ async function advancePracticeScreen(button, answeredState) {
 async function answerPractice(answer, button) {
   if (answering || practiceState.feedback) return;
   answering = true; const x = practiceState;
-  $$$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = true);
+  $('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = true);
   clearInterval(timer); timer = null;
   try { const result = await api(`/practice/${x.id}/answer`, { question_id: x.question_id, answer, prefetch_next: false });
     practiceOffset = Number(result.server_time || Date.now()) - Date.now();
