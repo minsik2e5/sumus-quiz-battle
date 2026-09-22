@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.13.0-middle-word-pick';
+const VERSION = 'sumus-voca-v13.15.0-scored-practice';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -12,6 +12,7 @@ const SHELL = [
   '/v1310.css',
   '/v1311.css',
   '/v1313.css',
+  '/v1315.css',
   '/app.js',
   '/signup-ui.js',
   '/teacher-enhancements.js',

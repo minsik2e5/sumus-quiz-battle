@@ -1,6 +1,6 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
-import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, ACCESSORIES, FRAMES, TITLES, unlocked, growthFor, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, ACCESSORIES, FRAMES, TITLES, unlocked, growthFor, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
 import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { middleGrade3Books } from './middle-vocab.mjs';
@@ -151,8 +151,15 @@ function regradeMeaningDispute(state, dispute) {
     const session = state.sessions.find(item => item.id === dispute.source_id && item.student_id === dispute.student_id);
     if (session) {
       session.correct = Math.min(session.total, Number(session.correct || 0) + 1);
+      session.score = session.total ? Math.round(session.correct / session.total * 100) : 0;
       session.xp = Number(session.xp || 0) + 20;
       session.regraded_at = Date.now();
+      const detail = (session.wrong_details || []).find(item => item.question_id === dispute.question_id || (item.word_id === dispute.word_id && !item.regraded));
+      if (detail) {
+        detail.regraded = true;
+        detail.dispute_status = 'approved';
+        detail.corrected_at = Date.now();
+      }
     }
   }
   dispute.regraded_at = Date.now();
@@ -355,7 +362,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.14.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.15.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -890,7 +897,7 @@ export async function service(state, method, path, body, token) {
     if (body.school_id && body.school_id !== school.id) fail('현재 학교의 범위만 학습할 수 있어요.', 403);
     if (!PRACTICE_TYPES[body.mode]) fail('연습 방식을 선택해주세요.');
     const isDailyQuest = body.daily_quest === true && school.division !== 'middle';
-    const selectedWordIds = school.division === 'middle' && Array.isArray(body.word_ids)
+    const selectedWordIds = Array.isArray(body.word_ids)
       ? [...new Set(body.word_ids.map(value => String(value)).filter(Boolean))].slice(0, 200)
       : [];
     const gradeWords = wordsForSchoolGrade(state, school, p.class_name);
@@ -904,7 +911,9 @@ export async function service(state, method, path, body, token) {
     const coverAll = manualSelection || isDailyQuest || body.cover_all === true;
     const rangeCodes = manualSelection ? [...new Set(words.map(word => String(word.range_code)))] : isDailyQuest ? daily.range_codes : body.range_codes;
     const target = manualSelection ? words.length : isDailyQuest ? daily.target : coverAll ? words.length : integer(body.target || 10, 5, 500, '학습량');
-    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, assignment_id: null, target, cover_all: coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection, quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: Date.now(), finished: false, responses: {}, words: words.map(w => w.id) };
+    const startedAt = Date.now();
+    const durationSec = practiceDurationSec(body.mode, target);
+    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, assignment_id: null, target, cover_all: coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection, quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, deadline: startedAt + durationSec * 1000, auto_submitted: false, wrong_details: [], finished: false, responses: {}, words: words.map(w => w.id) };
     if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
@@ -912,10 +921,19 @@ export async function service(state, method, path, body, token) {
     requireRole(p, 'student'); const x = state.practices.find(x => x.id === path.split('/')[2] && x.student_id === p.id); if (!x) fail('연습을 찾을 수 없습니다.', 404);
     if (path.endsWith('/answer')) {
       if (x.responses[body.question_id]) return x.responses[body.question_id];
+      if (!x.finished && Number(x.deadline || 0) && Date.now() >= x.deadline) {
+        finishPractice(x, state, true);
+        return practiceView(x, state);
+      }
       if (x.finished || x.feedback || body.question_id !== x.question_id) fail('현재 문제를 다시 확인해주세요.', 409);
       const word = allBooks(state).flatMap(b => b.words).find(w => w.id === x.question.word_id);
       const ok = grade(x.question.type, body.answer, wordForGrade(state, word));
       x.total++; x.last = word.id;
+      const scoredAttempt = !x.question_is_retry && Number(x.score_total || 0) < Number(x.target || 0);
+      if (scoredAttempt) {
+        x.score_total = Number(x.score_total || 0) + 1;
+        if (ok) x.score_correct = Number(x.score_correct || 0) + 1;
+      }
       state.mastery[p.id] ??= {}; const m = state.mastery[p.id][word.id] ??= { mastery: 0, correct: 0, wrong: 0, streak: 0, recent_results: [] };
       m.recent_results = Array.isArray(m.recent_results) ? m.recent_results : [];
       let gain = 0;
@@ -924,7 +942,21 @@ export async function service(state, method, path, body, token) {
       m.recent_results.push({ ok, at: Date.now() });
       if (m.recent_results.length > 5) m.recent_results.splice(0, m.recent_results.length - 5);
       m.last_seen = Date.now(); m.next_review_at = Date.now() + (ok ? 3600000 + m.mastery * 864000 : 120000);
-      x.feedback = { ok, gain, mastery: m.mastery, word_id: word.id, type: x.question.type, question_id: body.question_id, answer: str(body.answer, 160), word: displayEnglish(word.word), meaning: word.meaning, combo: x.combo, retry: !ok, can_dispute: !ok && x.question.type === 'write_meaning', milestone: ok && [5, 10].includes(x.combo) };
+      x.feedback = { ok, gain, mastery: m.mastery, word_id: word.id, type: x.question.type, question_id: body.question_id, answer: str(body.answer, 160), word: displayEnglish(word.word), meaning: word.meaning, combo: x.combo, retry: !ok, can_dispute: !ok && scoredAttempt && x.question.type === 'write_meaning', scored: scoredAttempt, milestone: ok && [5, 10].includes(x.combo) };
+      if (!ok && scoredAttempt) {
+        x.wrong_details ??= [];
+        x.wrong_details.push({
+          question_id: body.question_id,
+          word_id: word.id,
+          word: displayEnglish(word.word),
+          meaning: word.meaning,
+          answer: str(body.answer, 160),
+          type: x.question.type,
+          at: Date.now(),
+          regraded: false
+        });
+        if (x.wrong_details.length > 200) x.wrong_details.splice(0, x.wrong_details.length - 200);
+      }
       const result = practiceView(x, state);
       // Prepare the following question in the same persisted mutation. The
       // client can still show this answer's feedback, then switch instantly
@@ -939,16 +971,18 @@ export async function service(state, method, path, body, token) {
       return result;
     }
     if (path.endsWith('/next') && !x.finished && x.feedback) {
-      advancePractice(x, state);
+      if (Number(x.deadline || 0) && Date.now() >= x.deadline) finishPractice(x, state, true);
+      else advancePractice(x, state);
     }
-    if (path.endsWith('/finish') && !x.finished) finishPractice(x, state);
+    if (path.endsWith('/finish') && !x.finished) finishPractice(x, state, Number(x.deadline || 0) && Date.now() >= x.deadline);
     return practiceView(x, state);
   }
   fail('요청한 기능을 찾을 수 없습니다.', 404);
 }
 function advancePractice(x, state) {
   const covered = !x.cover_all || (x.seen?.length || 0) >= x.words.length;
-  if (covered && x.total >= x.target && (!x.retry.length || x.total >= x.target + 12)) finishPractice(x, state);
+  const scoredDone = Number(x.score_total || 0) >= Number(x.target || 0);
+  if (covered && scoredDone && (!x.retry.length || x.total >= x.target + 12)) finishPractice(x, state);
   else nextPractice(x, state);
 }
 function nextPractice(x, state) {
@@ -956,7 +990,7 @@ function nextPractice(x, state) {
   x.seen ??= [];
   const unseen = x.cover_all ? words.filter(w => !x.seen.includes(w.id)) : [];
   const due = x.retry.findIndex(r => r.at <= x.total);
-  let word;
+  let word, isRetry = false;
   if (unseen.length) {
     word = x.preserve_order
       ? unseen.sort((a, b) => x.words.indexOf(a.id) - x.words.indexOf(b.id))[0]
@@ -964,17 +998,57 @@ function nextPractice(x, state) {
   } else if (due >= 0) {
     const retry = x.retry.splice(due, 1)[0];
     word = words.find(w => w.id === retry.id);
+    isRetry = true;
   } else word = choosePracticeWord(words, state.mastery[x.student_id] || {}, x);
   if (!x.seen.includes(word.id)) x.seen.push(word.id);
   const mode = x.mode === 'mixed' ? shuffle(Object.keys(PRACTICE_TYPES).filter(k => k !== 'mixed'))[0] : x.mode;
-  x.question = buildQuestion(word, mode, words); x.question_id = id(); x.feedback = null;
+  x.question = buildQuestion(word, mode, words); x.question_id = id(); x.question_is_retry = isRetry; x.feedback = null;
 }
-function finishPractice(x, state) {
-  x.finished = true; x.finished_at = Date.now();
-  if (!x.total) return;
-  const rec = { id: x.id, student_id: x.student_id, assignment_id: x.assignment_id, division: x.division, school_id: x.school_id, school: x.school, grade: x.grade || null, daily_quest: !!x.daily_quest, range_codes: x.range_codes, mode: x.mode, correct: x.correct, total: x.total, xp: x.xp, best_combo: x.best, duration_sec: Math.round((Date.now() - x.started_at) / 1000), created_at: Date.now() };
+function finishPractice(x, state, autoSubmitted = false) {
+  x.finished = true; x.finished_at = Date.now(); x.auto_submitted = !!autoSubmitted;
+  const scoreTotal = Math.max(1, Number(x.target || 0));
+  const scoreCorrect = Math.min(scoreTotal, Number(x.score_correct || 0));
+  const score = Math.round(scoreCorrect / scoreTotal * 100);
+  const rec = {
+    id: x.id,
+    student_id: x.student_id,
+    assignment_id: x.assignment_id,
+    division: x.division,
+    school_id: x.school_id,
+    school: x.school,
+    grade: x.grade || null,
+    daily_quest: !!x.daily_quest,
+    range_codes: x.range_codes,
+    mode: x.mode,
+    correct: scoreCorrect,
+    total: scoreTotal,
+    attempts_total: x.total,
+    score,
+    xp: x.xp,
+    best_combo: x.best,
+    duration_sec: Math.round((x.finished_at - x.started_at) / 1000),
+    limit_sec: Number(x.duration_sec || 0),
+    auto_submitted: !!x.auto_submitted,
+    wrong_details: (x.wrong_details || []).map(item => ({ ...item })),
+    created_at: x.finished_at
+  };
   if (!state.sessions.some(s => s.id === rec.id)) state.sessions.push(rec);
 }
 function practiceView(x, state) {
-  return { id: x.id, school: x.school, mode: x.mode, target: x.target, cover_all: !!x.cover_all, daily_quest: !!x.daily_quest, manual_selection: !!x.manual_selection, quest_mix: x.quest_mix || null, covered: x.seen?.length || 0, total: x.total, correct: x.correct, xp: x.xp, combo: x.combo, best: x.best, question: x.question, question_id: x.question_id, feedback: x.feedback, finished: x.finished, retry_count: x.retry.length, stats: growthFor(mySessions(state, x.student_id)) };
+  const scoreTotal = Math.max(1, Number(x.target || 0));
+  const scoreCorrect = Math.min(scoreTotal, Number(x.score_correct || 0));
+  const score = Math.round(scoreCorrect / scoreTotal * 100);
+  return {
+    id: x.id, school: x.school, mode: x.mode, target: x.target,
+    range_codes: x.range_codes || [], cover_all: !!x.cover_all, daily_quest: !!x.daily_quest,
+    manual_selection: !!x.manual_selection, quest_mix: x.quest_mix || null,
+    covered: x.seen?.length || 0, total: x.total, correct: x.correct, score_total: scoreTotal, score_correct: scoreCorrect, score,
+    xp: x.xp, combo: x.combo, best: x.best,
+    started_at: x.started_at, finished_at: x.finished_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
+    auto_submitted: !!x.auto_submitted,
+    wrong_details: x.finished ? (x.wrong_details || []) : undefined,
+    question: x.question, question_id: x.question_id, question_is_retry: !!x.question_is_retry, feedback: x.feedback,
+    finished: x.finished, retry_count: x.retry.length,
+    stats: growthFor(mySessions(state, x.student_id)), server_time: Date.now()
+  };
 }

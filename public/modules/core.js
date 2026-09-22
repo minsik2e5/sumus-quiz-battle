@@ -1,16 +1,28 @@
 export const EXAM_TYPES = {
-  eng2mean_mc: { label: '영어 → 뜻 객관식', help: '영어를 보고 뜻 고르기', input: false },
-  mean2eng_mc: { label: '뜻 → 영어 객관식', help: '뜻을 보고 영어 고르기', input: false },
+  write_meaning: { label: '뜻쓰기', help: '영어를 보고 뜻 직접 쓰기', input: true },
   write_en: { label: '영어쓰기', help: '뜻을 보고 영어 직접 쓰기', input: true },
-  write_meaning: { label: '뜻쓰기', help: '영어를 보고 뜻 직접 쓰기', input: true }
+  eng2mean_mc: { label: '영어 → 뜻 객관식', help: '영어를 보고 뜻 고르기', input: false },
+  mean2eng_mc: { label: '뜻 → 영어 객관식', help: '뜻을 보고 영어 고르기', input: false }
 };
 // Shared class roster used by teacher assignment forms. Keep values stable so
 // student visibility (school + class match) remains deterministic.
 export const CLASS_OPTIONS = ['고1A', '고1B', '중3', '중2'];
 export const PRACTICE_TYPES = {
   write_meaning: '뜻 직접 쓰기', mixed: '골고루 연습', eng2mean: '영어 → 뜻', mean2eng: '뜻 → 영어',
-  spell: '영어 철자 입력', listen: '듣기', scramble: '철자 배열', vowelblank: '모음 빈칸', initial: '첫 글자 힌트'
+  spell: '영어 직접 쓰기', listen: '듣기', scramble: '철자 배열', vowelblank: '모음 빈칸', initial: '첫 글자 힌트'
 };
+export const PRACTICE_SECONDS_PER_QUESTION = {
+  write_meaning: 8,
+  spell: 12,
+  mixed: 9,
+  eng2mean: 6,
+  mean2eng: 7,
+  listen: 7,
+  scramble: 10,
+  vowelblank: 10,
+  initial: 10
+};
+export const practiceDurationSec = (mode, total) => Math.max(60, Math.ceil(Math.max(1, Number(total) || 1) * (PRACTICE_SECONDS_PER_QUESTION[mode] || 8)));
 export const CHARACTERS = {
   lumi: { name: 'LUMI', ko: '루미', type: '별빛 여우', color: '#BD792E', light: '#F4CA87', soft: '#F7EEE0' },
   nox: { name: 'NOX', ko: '녹스', type: '나이트 캣', color: '#716297', light: '#C4B5DD', soft: '#F0EBF6' },
