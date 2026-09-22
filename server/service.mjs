@@ -392,7 +392,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.19.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.20.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -459,12 +459,27 @@ export async function service(state, method, path, body, token) {
       ? Object.fromEntries(studentProfiles.map(student => [student.id, wordRangeMastery(state, student.id, selectedSchool, student.class_name)]))
       : wordRangeMastery(state, p.id, selectedSchool, p.class_name);
     const dailyQuest = teacher || selectedDivision === 'middle' ? null : composeDailyQuest(state, p.id, selectedSchool, p.class_name, 20);
+    const activePractice = teacher ? null : state.practices.find(x => x.student_id === p.id && !x.finished);
+    const activePracticeSummary = activePractice ? {
+      id: activePractice.id,
+      division: activePractice.division,
+      school: activePractice.school,
+      range_codes: activePractice.range_codes || [],
+      mode: activePractice.mode,
+      run_mode: activePractice.run_mode || 'practice',
+      target: activePractice.target,
+      score_total: Number(activePractice.score_total || 0),
+      started_at: activePractice.started_at,
+      deadline: activePractice.deadline,
+      assignment_id: activePractice.assignment_id || null
+    } : null;
     return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes } : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
       profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
       sessions, exams: visibleExams,
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
       attempts: attempts.map(a => attemptSummary(a, state, p)), server_time: Date.now(),
-      active_practice: state.practices.find(x => x.student_id === p.id && !x.finished)?.id || null,
+      active_practice: activePractice?.id || null,
+      active_practice_summary: activePracticeSummary,
       ranking_period: rankingWeek(Date.now()),
       ranking: teacher ? [] : state.profiles.filter(x => x.active && x.role === 'student').map(s => {
         const records = mySessions(state, s.id);
