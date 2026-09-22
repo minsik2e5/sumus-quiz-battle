@@ -1,5 +1,5 @@
 import { EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, dayKey } from './core.js';
-import { icon, esc, num, date, recordRangeLabel, scope, empty, $, $ } from './ui.js';
+import { icon, esc, num, date, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar } from './character.js';
 import { rangePicker, selectedCount, getRanges } from './student.js';
 import { DANWONGO_PASSAGES } from '../danwongo-grammar-data.js?v=2';
