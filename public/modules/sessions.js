@@ -220,11 +220,11 @@ function samePracticeRequest(data, payload) {
   if ((payload.mode || data.mode) !== data.mode) return false;
   if ((payload.run_mode || 'practice') !== (data.run_mode || 'practice')) return false;
   if (Boolean(payload.exam_style) !== Boolean(data.exam_style)) return false;
-  if (Boolean(payload.cover_all) !== Boolean(data.cover_all)) return false;
+  if (!data.exam_style && Boolean(payload.cover_all) !== Boolean(data.cover_all)) return false;
   if (Boolean(payload.daily_quest) !== Boolean(data.daily_quest)) return false;
   if ((payload.assignment_id || null) !== (data.assignment_id || null)) return false;
   if (Array.isArray(payload.word_ids) && payload.word_ids.length) {
-    if (data.run_mode === 'test' && payload.target) {
+    if ((data.run_mode === 'test' || data.exam_style) && payload.target) {
       const pool = new Set(payload.word_ids.map(String));
       if (!(data.word_ids || []).every(id => pool.has(String(id)))) return false;
     } else if (JSON.stringify(sortedStrings(payload.word_ids)) !== JSON.stringify(sortedStrings(data.word_ids))) return false;
@@ -291,7 +291,7 @@ export async function startPractice(options = {}) {
     const ranges = Array.isArray(payload.word_ids) && payload.word_ids.length
       ? (A.data.profile.division === 'middle' ? String(A.middleRange || '') + '과' : '직접 선택')
       : (payload.range_codes || []).map(code => recordRangeLabel({ division: A.data.profile.division, school: A.school }, code)).join(' · ');
-    const close = modal(`<span class="pill blue">실전 모드</span><h2>${esc(ranges || '선택 범위')}</h2><div class="detail-grid"><div><b>${esc(PRACTICE_TYPES[payload.mode] || '쓰기')}</b><small>시험 방식</small></div><div><b>${target}문제</b><small>문항 수</small></div><div><b>${time(duration)}</b><small>전체 제한시간</small></div><div><b>마지막 공개</b><small>채점 시점</small></div></div><div class="test-start-rules"><p>정답은 시험이 끝난 뒤 공개돼요.</p><p>이전 문항으로 돌아갈 수 없어요.</p><p>시작 후에는 시간이 계속 흘러요.</p><p>시간이 끝나면 자동으로 제출돼요.</p></div><button class="btn primary full" id="confirm-practice-test">실전 시작하기</button><button class="btn full" id="cancel-practice-test">설정으로 돌아가기</button>`, '실전 시작 확인');
+    const close = modal(`<span class="pill blue">실전 모드</span><h2>${esc(ranges || '선택 범위')}</h2><div class="detail-grid"><div><b>${esc(PRACTICE_TYPES[payload.mode] || '쓰기')}</b><small>시험 방식</small></div><div><b>${target}문제</b><small>문항 수</small></div><div><b>${payload.mode === 'spell' ? '12초' : '8초'}</b><small>문제당 제한시간</small></div><div><b>마지막 공개</b><small>채점 시점</small></div></div><div class="test-start-rules"><p>정답은 시험이 끝난 뒤 공개돼요.</p><p>이전 문항으로 돌아갈 수 없어요.</p><p>각 문제마다 제한시간이 새로 시작돼요.</p><p>0초가 되면 그 문제는 미응답 처리되고 다음 문제로 넘어가요.</p></div><button class="btn primary full" id="confirm-practice-test">실전 시작하기</button><button class="btn full" id="cancel-practice-test">설정으로 돌아가기</button>`, '실전 시작 확인');
     $('#cancel-practice-test').onclick = () => { close(); redraw(); };
     $('#confirm-practice-test').onclick = async event => {
       buttonBusy(event.currentTarget);
@@ -374,7 +374,7 @@ function renderPractice() {
 }
 function renderPracticeFinishPending(error = '') {
   if (!practiceState) return;
-  const expired = Number(practiceState.deadline || 0) > 0;
+  const expired = practiceState.timer_mode !== 'question' && Number(practiceState.deadline || 0) > 0;
   mount(`<div class="session-app"><main class="result-page"><span class="pill">시간 종료</span><h1>제출 상태를 확인하고 있어요.</h1><p>${expired ? '제한시간은 이미 종료됐어요. 답안을 더 수정할 수 없습니다.' : '학습 종료 상태를 확인하고 있어요.'}</p>${error ? `<div class="error-box">${esc(error)}</div><button class="btn primary full" id="practice-finish-retry">제출 상태 다시 확인</button>` : '<div class="result-note">잠시만 기다려주세요.</div>'}</main></div>`);
   $('#practice-finish-retry')?.addEventListener('click', () => finishPracticeByTimer());
 }
