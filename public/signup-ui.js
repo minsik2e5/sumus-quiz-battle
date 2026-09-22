@@ -1,4 +1,23 @@
 const app = document.querySelector('#app');
+const SIGNUP_CATALOG = {
+  middle: { label: '중등부', schools: ['원일중'], classes: ['중2', '중3'] },
+  high: { label: '고등부', schools: ['단원고', '선부고', '강서고'], classes: ['고1A', '고1B'] }
+};
+
+function selectedLoginDivision() {
+  return app?.querySelector('[data-division].selected')?.dataset.division === 'middle' ? 'middle' : 'high';
+}
+
+function signupSelectOptions(division) {
+  const item = SIGNUP_CATALOG[division] || SIGNUP_CATALOG.high;
+  const school = document.querySelector('#signup-school');
+  const className = document.querySelector('#signup-class');
+  if (!school || !className) return;
+  school.innerHTML = '<option value="">학교 선택</option>' + item.schools.map(value => `<option value="${value}">${value}</option>`).join('');
+  className.innerHTML = '<option value="">반 선택</option>' + item.classes.map(value => `<option value="${value}">${value}</option>`).join('');
+  document.querySelector('#signup-division-value').value = division;
+  document.querySelectorAll('[data-signup-division]').forEach(button => button.classList.toggle('selected', button.dataset.signupDivision === division));
+}
 
 function injectStyles() {
   if (document.querySelector('#signup-style')) return;
@@ -34,6 +53,7 @@ function enhanceLogin() {
 
 function showSignup() {
   injectStyles();
+  const initialDivision = selectedLoginDivision();
   app.innerHTML = `<div class="auth">
     <section class="auth-visual">
       <div class="brand"><img src="/icon.svg" alt=""><div>SUMUS <span>VOCA</span></div></div>
@@ -45,10 +65,15 @@ function showSignup() {
       <button class="signup-back" type="button" id="signup-back">← 로그인으로 돌아가기</button>
       <h2>학생 회원가입</h2>
       <p>내가 사용할 아이디와 비밀번호를 직접 만들어요.</p>
+      <input type="hidden" name="division" id="signup-division-value" value="${initialDivision}">
+      <div class="segment" aria-label="가입 부서">
+        <button type="button" data-signup-division="middle" class="${initialDivision === 'middle' ? 'selected' : ''}">중등부</button>
+        <button type="button" data-signup-division="high" class="${initialDivision === 'high' ? 'selected' : ''}">고등부</button>
+      </div>
       <label class="field"><span>이름</span><input name="display_name" autocomplete="name" required maxlength="40" placeholder="학생 이름"></label>
       <div class="form-columns">
-        <label class="field"><span>학교</span><select name="school" required><option value="">학교 선택</option><option>단원고</option><option>선부고</option><option>강서고</option></select></label>
-        <label class="field"><span>반</span><select name="class_name" required><option value="">반 선택</option><option value="고1A">고1A</option><option value="고1B">고1B</option></select></label>
+        <label class="field"><span>학교</span><select id="signup-school" name="school" required></select></label>
+        <label class="field"><span>반</span><select id="signup-class" name="class_name" required></select></label>
       </div>
       <label class="field"><span>아이디</span><input name="username" autocomplete="username" autocapitalize="off" spellcheck="false" required minlength="3" maxlength="40" pattern="[a-z0-9_.-]{3,40}" placeholder="영문 소문자·숫자 3자 이상"></label>
       <label class="field"><span>비밀번호</span><input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="128" placeholder="8자 이상"></label>
@@ -60,6 +85,10 @@ function showSignup() {
   </div>`;
 
   document.querySelector('#signup-back').onclick = () => location.reload();
+  document.querySelectorAll('[data-signup-division]').forEach(button => {
+    button.onclick = () => signupSelectOptions(button.dataset.signupDivision);
+  });
+  signupSelectOptions(initialDivision);
   document.querySelector('#signup-form').onsubmit = submitSignup;
   window.scrollTo(0, 0);
 }
@@ -93,7 +122,7 @@ async function submitSignup(event) {
   try {
     await request('/signup', values);
     button.textContent = '로그인 중…';
-    await request('/login', { username: values.username, password: values.password, role: 'student' });
+    await request('/login', { username: values.username, password: values.password, role: 'student', division: values.division });
     location.reload();
   } catch (err) {
     error.textContent = err.message;

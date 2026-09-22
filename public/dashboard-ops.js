@@ -67,7 +67,7 @@ async function bootstrap(force = false) {
 }
 
 function eligibleStudents(data, item) {
-  return data.profiles.filter(p => p.active && p.class_name === item.class_name && (!item.school || p.school === item.school));
+  return data.profiles.filter(p => p.active && (item.class_name === '__ALL__' || p.class_name === item.class_name) && (!item.school || p.school === item.school));
 }
 
 function examState(data, exam, student) {
@@ -83,9 +83,20 @@ function assignmentProgress(data, assignment, studentId) {
     .reduce((sum, s) => sum + Number(s.total || 0), 0);
 }
 
+function dashboardWeek(data, now = Date.now()) {
+  const period = data.ranking_period;
+  if (Number.isFinite(Number(period?.start)) && Number.isFinite(Number(period?.end))) {
+    return { start: Number(period.start), end: Number(period.end), label: period.label || '이번 주', range: period.range || '월요일 ~ 일요일' };
+  }
+  const offset = 9 * 3600000, day = 86400000;
+  const local = new Date(now + offset);
+  const daysSinceMonday = (local.getUTCDay() + 6) % 7;
+  const start = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - daysSinceMonday) - offset;
+  return { start, end: start + 7 * day, label: '이번 주', range: '월요일 ~ 일요일' };
+}
 function calculate(data) {
   const now = Date.now();
-  const weekAgo = now - 7 * 86400000;
+  const week = dashboardWeek(data, now);
   const twoWeeksAgo = now - 14 * 86400000;
   const activeStudents = data.profiles.filter(p => p.active);
   const openExams = data.exams.filter(e => e.active && e.available_at <= now && e.due_at > now);
@@ -119,7 +130,7 @@ function calculate(data) {
   });
 
   const weekly = activeStudents.map(student => {
-    const sessions = data.sessions.filter(s => s.student_id === student.id && s.created_at >= weekAgo);
+    const sessions = data.sessions.filter(s => s.student_id === student.id && s.created_at >= week.start && s.created_at < week.end);
     return {
       student,
       total: sessions.reduce((n, s) => n + Number(s.total || 0), 0),
@@ -130,7 +141,7 @@ function calculate(data) {
 
   const studiedThisWeek = weekly.filter(x => x.total > 0).length;
   const totalQuestions = weekly.reduce((n, x) => n + x.total, 0);
-  return { activeStudents, openExams, missingExams, activeExamStudents, incompleteAssignments, recentSubmitted, recentAvg, lowScores, weekly, studiedThisWeek, totalQuestions };
+  return { activeStudents, openExams, missingExams, activeExamStudents, incompleteAssignments, recentSubmitted, recentAvg, lowScores, weekly, studiedThisWeek, totalQuestions, week };
 }
 
 function priorityCard({ label, value, sub, iconName, kind = '', go }) {
@@ -193,7 +204,7 @@ async function enhanceDashboard() {
         <div class="ops-list">${missingExamRows(calc)}</div>
       </div>
       <div class="ops-card">
-        <div class="ops-card-head"><div><h2>주간 학습량</h2><p>최근 7일 학생별 연습 문제 수</p></div><button data-go="students">학생 관리</button></div>
+        <div class="ops-card-head"><div><h2>주간 학습량</h2><p>${esc(calc.week.label)} · ${esc(calc.week.range)}</p></div><button data-go="students">학생 관리</button></div>
         <div class="ops-weekly">${weeklyBars(calc)}</div>
         <div class="ops-summary-strip"><div><span>학습 학생</span><b>${calc.studiedThisWeek}/${calc.activeStudents.length}명</b></div><div><span>총 학습량</span><b>${calc.totalQuestions}문제</b></div><div><span>최다 학습</span><b>${esc(top?.student.display_name || '-')}</b></div></div>
       </div>

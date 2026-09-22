@@ -2,6 +2,7 @@ import { api, modal, esc, date, toast, buttonBusy, icon } from './modules/ui.js'
 
 const app = document.querySelector('#app');
 const cache = new Map();
+const targetLabel = value => value === '__ALL__' ? '학교 전체' : value;
 
 function injectStyles() {
   if (document.querySelector('#exam-ops-style')) return;
@@ -98,7 +99,7 @@ async function openExamOps(examId) {
   const data = await roster(examId, true);
   const expired = data.exam.due_at <= Date.now();
   const close = modal(`
-    <div class="exam-ops-hero"><h2>${esc(data.exam.title)}</h2><p>${esc(data.exam.class_name)} · ${esc(data.exam.school)} · ${data.exam.question_count}문제 · ${Math.round(data.exam.duration_sec / 60)}분<br>마감 ${date(data.exam.due_at)} · <span class="${expired ? 'exam-ops-expired' : 'exam-ops-opened'}">${expired ? '마감됨' : '응시 가능'}</span></p></div>
+    <div class="exam-ops-hero"><h2>${esc(data.exam.title)}</h2><p>${esc(targetLabel(data.exam.class_name))} · ${esc(data.exam.school)} · ${data.exam.question_count}문제 · ${Math.round(data.exam.duration_sec / 60)}분<br>마감 ${date(data.exam.due_at)} · <span class="${expired ? 'exam-ops-expired' : 'exam-ops-opened'}">${expired ? '마감됨' : '응시 가능'}</span></p></div>
     <div class="exam-ops-metrics"><div><span>대상 학생</span><b>${data.counts.total}</b></div><div><span>미응시</span><b>${data.counts.not_started}</b></div><div><span>응시 중</span><b>${data.counts.active}</b></div><div><span>제출 완료</span><b>${data.counts.submitted}</b></div><div><span>교사 검토</span><b>${data.counts.review_pending || 0}</b></div></div>
     <div class="exam-ops-tools"><button class="btn small" data-exam-extend="30" data-exam-id="${examId}">마감 +30분</button><button class="btn small" data-exam-extend="1440" data-exam-id="${examId}">마감 +1일</button><select id="exam-ops-filter"><option value="">전체 학생</option><option value="not_started">미응시</option><option value="active">응시 중</option><option value="submitted">제출 완료</option></select></div>
     <div class="exam-ops-list" id="exam-ops-list">${studentRows(data)}</div>`, '실전시험 운영');

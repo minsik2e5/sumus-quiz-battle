@@ -262,22 +262,32 @@ function exam(A) {
 function ranking(A) {
   const mode = A.rankMode || 'xp';
   const scope = A.rankScope || 'all';
+  const period = A.rankPeriod || 'week';
+  const metric = period === 'all' ? (mode === 'streak' ? 'all_streak' : `all_${mode}`) : mode;
   const all = [...A.data.ranking];
   const filtered = scope === 'all' ? all : all.filter(p => p.grade === scope);
-  const items = filtered.sort((a, b) => b[mode] - a[mode] || b.xp - a.xp || b.total - a.total);
+  const items = filtered.sort((a, b) => Number(b[metric] || 0) - Number(a[metric] || 0) || Number(b.xp || 0) - Number(a.xp || 0));
   const unit = mode === 'xp' ? 'P' : mode === 'streak' ? '일' : '문제';
   const myIndex = items.findIndex(p => p.is_me);
   const scopeLabel = scope === 'all' ? '전체' : scope;
-  const rankNo = (item, index) => item[mode] > 0 ? items.findIndex(x => x[mode] === item[mode]) + 1 : '—';
+  const info = A.data.ranking_period || {};
+  const periodTitle = period === 'week' ? (info.label || '이번 주') : '통합 누적';
+  const periodRange = period === 'week' ? (info.range || '월요일 ~ 일요일') : '첫 학습 기록부터 지금까지';
+  const rankNo = item => Number(item[metric] || 0) > 0 ? items.findIndex(x => Number(x[metric] || 0) === Number(item[metric] || 0)) + 1 : '—';
+  const note = period === 'week'
+    ? '주간 기록은 한국시간 기준 매주 월요일 00:00에 새로 시작하며, 이전 기록은 통합에 계속 남아요.'
+    : '통합은 기존 학습 기록 전체를 누적해서 보여줘요. 주간 리셋으로 삭제되는 기록은 없어요.';
   return `<div class="page-heading"><h1>SUMUS 랭킹</h1><p>중2 · 중3 · 고1이 함께 보는 학원 성장 순위</p></div>
-    <div class="rank-intro"><div class="eyebrow">SUMUS ACADEMY · ${scopeLabel}</div><h2>같이 올라가면 더 재밌다.</h2><p>시험 점수가 아니라, 최근 7일 동안 실제로 쌓은 학습 기록으로 경쟁해요.</p></div>
+    <div class="rank-intro"><div class="eyebrow">SUMUS ACADEMY · ${scopeLabel}</div><h2>같이 올라가면 더 재밌다.</h2><p>시험 점수가 아니라 실제로 쌓은 학습 기록으로 경쟁해요.</p></div>
     <div class="rank-scope" aria-label="학년별 랭킹">
       ${[['all','전체'],['중2','중2'],['중3','중3'],['고1','고1']].map(([k,label]) => `<button data-rank-scope="${k}" class="${scope === k ? 'selected' : ''}">${label}</button>`).join('')}
     </div>
-    <div class="segment rank-metric">${[['xp', '주간 성장'], ['total', '연습량'], ['streak', '연속 학습']].map(([k, label]) => `<button data-rank-mode="${k}" class="${mode === k ? 'selected' : ''}">${label}</button>`).join('')}</div>
-    ${myIndex >= 0 ? `<div class="my-rank-card"><span>내 ${scopeLabel} 순위</span><strong>${rankNo(items[myIndex], myIndex)}<small>위</small></strong><p>${num(items[myIndex][mode])}${unit} · 이번 주 기록</p></div>` : ''}
-    <div class="rank-list">${items.length ? items.map((p, index) => `<div class="rank-row ${p.is_me ? 'me' : ''} ${index < 3 && p[mode] ? 'top-rank top-' + (index + 1) : ''}"><span class="rank-number">${rankNo(p, index)}</span>${avatar(p.avatar_key, { size: 'mini' })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill blue">나</span>' : ''}</strong><small><span class="rank-grade">${esc(p.grade || '')}</span> · ${p.private ? '프로필 비공개' : `Lv.${p.level} · ${CHARACTERS[p.avatar_key]?.ko || '루미'}`}</small></div><span class="rank-score">${num(p[mode])}${unit}</span></div>`).join('') : empty('ranking', `${scopeLabel}에 아직 연습 기록이 없어요`, '학습을 시작하면 순위가 바로 생겨요.')}</div>
-    <p class="quiet-note">전체 랭킹에는 중2·중3·고1 모든 활성 학생이 함께 포함돼요. 비공개 학생은 익명으로 표시됩니다.<br>시험 성적은 랭킹에 포함하지 않아요.</p>`;
+    <div class="segment" aria-label="랭킹 기간"><button data-rank-period="week" class="${period === 'week' ? 'selected' : ''}">주간</button><button data-rank-period="all" class="${period === 'all' ? 'selected' : ''}">통합</button></div>
+    <div style="margin:12px 0 14px;padding:13px 15px;border:1px solid #eaecf0;border-radius:15px;background:#f9fafb;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap"><strong style="font-size:14px">${esc(periodTitle)}</strong><span class="tiny muted">${esc(periodRange)}</span></div>
+    <div class="segment rank-metric">${[['xp', '성장 포인트'], ['total', '연습량'], ['streak', '연속 학습']].map(([k, label]) => `<button data-rank-mode="${k}" class="${mode === k ? 'selected' : ''}">${label}</button>`).join('')}</div>
+    ${myIndex >= 0 ? `<div class="my-rank-card"><span>내 ${scopeLabel} 순위</span><strong>${rankNo(items[myIndex])}<small>위</small></strong><p>${num(items[myIndex][metric] || 0)}${unit} · ${esc(periodTitle)}</p></div>` : ''}
+    <div class="rank-list">${items.length ? items.map((p, index) => `<div class="rank-row ${p.is_me ? 'me' : ''} ${index < 3 && Number(p[metric] || 0) ? 'top-rank top-' + (index + 1) : ''}"><span class="rank-number">${rankNo(p)}</span>${avatar(p.avatar_key, { size: 'mini' })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill blue">나</span>' : ''}</strong><small><span class="rank-grade">${esc(p.grade || '')}</span> · ${p.private ? '프로필 비공개' : `Lv.${p.level} · ${CHARACTERS[p.avatar_key]?.ko || '루미'}`}</small></div><span class="rank-score">${num(p[metric] || 0)}${unit}</span></div>`).join('') : empty('ranking', `${scopeLabel}에 아직 연습 기록이 없어요`, '학습을 시작하면 순위가 바로 생겨요.')}</div>
+    <p class="quiet-note">${esc(note)}<br>전체 랭킹에는 중2·중3·고1 모든 활성 학생이 함께 포함돼요. 시험 성적은 랭킹에 포함하지 않아요.</p>`;
 }
 function records(A) {
   const g = A.data.stats, tab = A.recordTab || 'practice';
