@@ -86,7 +86,7 @@ function celebrateCorrect(session, feedback) {
   burst.setAttribute('aria-hidden', 'true');
   burst.innerHTML = `<strong>✓ 정답!</strong>${Array.from({ length: 12 }, (_, i) => `<i style="--r:${i * 30}deg"></i>`).join('')}`;
   document.body.appendChild(burst);
-  setTimeout(() => { burst.remove(); session.classList.remove('sumus-correct-hit'); }, 2300);
+  setTimeout(() => { burst.remove(); session.classList.remove('sumus-correct-hit'); }, 850);
 }
 
 function enhancePractice() {
