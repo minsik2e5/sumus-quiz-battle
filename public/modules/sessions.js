@@ -380,7 +380,7 @@ function sound(ok, milestone) {
 }
 function finishPracticeView() {
   clearInterval(timer); timer = null; disarmTestGuard(); practiceAutoFinishing = false;
-  const x = practiceState; A.screen = 'result'; const before = A.data.stats.level, after = x.stats.level;
+  const x = practiceState; A.screen = 'result';
   const score = Number(x.score || 0);
   const endedAt = Number(x.ended_at || x.finished_at || Date.now());
   const elapsed = Math.max(0, Math.round((endedAt - Number(x.started_at || endedAt)) / 1000));
@@ -389,23 +389,67 @@ function finishPracticeView() {
   const wrongCount = Number.isFinite(Number(x.wrong_count)) ? Number(x.wrong_count) : wrong.length;
   const unanswered = Number.isFinite(Number(x.unanswered_count)) ? Number(x.unanswered_count) : Math.max(0, Number(x.target || 0) - Number(x.score_total || 0));
   const perfect = x.perfect === true || (score === 100 && wrongCount === 0 && unanswered === 0);
-  const wrongHtml = wrong.length ? `<section style="margin-top:18px;text-align:left"><div class="section-title"><h2>틀린 단어 ${wrongCount}개</h2></div>${wrong.slice(0,30).map(item => `<div class="wrong-word"><p><b>${esc(item.word)}</b> · ${esc(item.meaning)}</p><small>내 답: ${esc(item.answer || '미응답')}</small>${item.type === 'write_meaning' && item.answer ? `<button class="meaning-dispute-button" data-finish-practice-dispute="${esc(item.question_id)}">🙋 이 답도 맞는 것 같아요</button>` : ''}</div>`).join('')}</section>` : '';
-  const statusNote = perfect
-    ? '<div class="result-note">PERFECT · 모든 문항을 맞혔어요.</div>'
+  const rangeText = (x.range_codes || []).map(code => esc(recordRangeLabel({ division: A.data.profile.division, school: x.school }, code))).join(' · ') || '선택 범위';
+  const wrongWordIds = [...new Set(wrong.map(item => item.word_id).filter(Boolean))];
+  const reviewCount = wrongCount + unanswered;
+  const resultState = x.auto_submitted ? '시간 종료 · 자동 제출' : '완료';
+  const statusText = perfect ? '모든 문항을 맞혔어요.' : unanswered ? `미응답 ${unanswered}개가 점수에 포함됐어요.` : wrongCount ? `오답 ${wrongCount}개를 바로 복습할 수 있어요.` : '학습 기록을 저장했어요.';
+  const detailHtml = `${wrong.length ? wrong.map(item => `<div class="wrong-word"><div class="row between"><span class="pill red">오답</span><small>원답은 수정되지 않아요.</small></div><p><b>${esc(item.word)}</b></p><p>${esc(item.meaning)}</p><small>내 답: ${esc(item.answer || '미응답')}</small>${item.type === 'write_meaning' && item.answer ? `<button class="meaning-dispute-button" data-finish-practice-dispute="${esc(item.question_id)}">뜻 검토 요청</button>` : ''}</div>`).join('') : ''}${unanswered ? `<div class="result-note">미응답 ${unanswered}개 · 미응답 단어 상세는 현재 기록에 별도로 보관되지 않아요.</div>` : ''}`;
+  const primaryCta = perfect
+    ? '<button class="btn primary full" id="practice-next-study">다음 학습 선택</button>'
     : unanswered
-      ? `<div class="result-note">미응답 ${unanswered}개가 점수 분모에 포함됐어요.</div>`
-      : wrongCount
-        ? ''
-        : '<div class="result-note">답안 상세를 확인할 수 없는 이전 기록이에요.</div>';
-  mount(`<div class="session-app"><main class="result-page"><span class="pill blue">${x.auto_submitted ? '시간 종료 · 자동 제출' : '기록 저장 완료'}</span><h1>${x.run_mode === 'test' ? '실전 테스트 결과' : ['write_meaning','spell'].includes(x.mode) ? '단어 테스트 결과' : '연습 결과'}</h1><p>${esc(PRACTICE_TYPES[x.mode] || '연습')} · ${x.run_mode === 'test' ? '실전 모드 · ' : '연습 모드 · '} ${(x.range_codes || []).map(code => esc(recordRangeLabel({ division: A.data.profile.division, school: x.school }, code))).join(' · ')}</p><div class="result-number">${score}<small>점</small></div><div class="record-stats"><div><strong>${Number(x.score_correct || 0)}</strong><span>정답</span></div><div><strong>${wrongCount}</strong><span>오답</span></div><div><strong>${unanswered}</strong><span>미응답</span></div><div><strong>${time(elapsed)}</strong><span>소요시간</span></div></div><div class="result-note">성장 포인트 +${x.xp}P · 최고 ${x.best}연속${x.auto_submitted ? ' · 제한시간 종료' : ''}</div>${wrongHtml}${statusNote}<button class="btn primary full" id="practice-records">내 기록 보기</button><button class="btn full" id="practice-home">홈으로 돌아가기</button></main></div>`);
+      ? `<button class="btn primary full" id="practice-repeat-range">같은 범위 다시 풀기 ${icon('arrow')}</button>`
+      : wrongWordIds.length
+        ? `<button class="btn primary full" id="practice-retry-wrong">오답 ${wrongCount}개 복습 ${icon('arrow')}</button>`
+        : '<button class="btn primary full" id="practice-next-study">다음 학습 선택</button>';
+  mount(`<div class="session-app"><main class="result-page result-page-v1320">
+    <div class="result-identity"><span class="pill blue">${esc(resultState)}</span><p>${rangeText} · ${esc(PRACTICE_TYPES[x.mode] || '연습')} · ${x.run_mode === 'test' ? '자율학습 실전' : '연습 모드'}</p></div>
+    <h1>학습 결과</h1>
+    <div class="result-number">${score}<small>점</small></div>
+    <p class="result-score-basis">최초 풀이 기준 · ${Number(x.score_correct || 0)} / ${Number(x.target || x.score_total || 0)} 정답</p>
+    <div class="result-stat-grid"><div><strong>${Number(x.score_correct || 0)}</strong><span>정답</span></div><div><strong>${wrongCount}</strong><span>오답</span></div><div><strong>${unanswered}</strong><span>미응답</span></div></div>
+    <div class="result-meta-line"><span>${icon('clock')} ${time(elapsed)}</span><span>${x.auto_submitted ? '시간 종료' : '정상 완료'}</span></div>
+    <p class="result-next-copy">${esc(statusText)}</p>
+    ${primaryCta}
+    ${reviewCount ? '<button class="btn full" id="practice-answer-review">답안 보기</button>' : ''}
+    <div id="practice-answer-details" class="answer-review-panel" hidden>${detailHtml}</div>
+    <div class="result-secondary-actions"><button class="text-button" id="practice-records">내 기록</button><button class="text-button" id="practice-home">홈으로</button></div>
+    <p class="quiet-note">성장 포인트 +${x.xp}P · 점수는 오답 복습 재정답으로 올라가지 않고, 승인된 재채점만 반영돼요.</p>
+  </main></div>`);
   $$('[data-finish-practice-dispute]').forEach(button => button.addEventListener('click', async () => {
     button.disabled = true;
     try {
       await api('/meaning-disputes', { source_type: 'practice', source_id: x.id, question_id: button.dataset.finishPracticeDispute }, 'POST');
-      button.textContent = '✓ 선생님께 검토 요청했어요';
+      button.textContent = '✓ 검토 요청됨';
       toast('뜻 이의제기를 보냈어요.');
     } catch (error) { button.disabled = false; toast(error.message); }
   }));
+  $('#practice-answer-review')?.addEventListener('click', event => {
+    const panel = $('#practice-answer-details');
+    panel.hidden = !panel.hidden;
+    event.currentTarget.textContent = panel.hidden ? '답안 보기' : '답안 접기';
+  });
+  $('#practice-retry-wrong')?.addEventListener('click', async event => {
+    buttonBusy(event.currentTarget);
+    try { await startPractice({ wordIds: wrongWordIds, mode: x.mode, runMode: 'practice' }); }
+    catch (error) { buttonBusy(event.currentTarget, false); toast(error.message); }
+  });
+  $('#practice-repeat-range')?.addEventListener('click', async event => {
+    buttonBusy(event.currentTarget);
+    const wordIds = [...new Set((x.word_ids || []).filter(Boolean))];
+    try {
+      if (wordIds.length) await startPractice({ wordIds, mode: x.mode, runMode: 'practice' });
+      else {
+        leaveSession(); A.studyView = 'vocab'; A.tab = 'practice'; A.mode = x.mode || 'write_meaning'; A.practiceRunMode = 'practice';
+        if (A.data.profile.division === 'middle') A.middleRange = String(x.range_codes?.[0] || A.middleRange || '');
+        else A.ranges[x.school || A.school] = [...(x.range_codes || [])];
+        redraw();
+      }
+    } catch (error) { buttonBusy(event.currentTarget, false); toast(error.message); }
+  });
+  $('#practice-next-study')?.addEventListener('click', async () => {
+    leaveSession(); A.studyView = 'vocab'; A.tab = 'practice'; await refresh(); redraw();
+  });
   const go = async tab => { leaveSession(); A.tab = tab; await refresh(); redraw(); };
   $('#practice-home').onclick = () => go('home'); $('#practice-records').onclick = () => go('records');
 }
