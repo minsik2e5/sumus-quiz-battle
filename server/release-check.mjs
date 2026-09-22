@@ -377,7 +377,7 @@ export async function runReleaseCheck() {
     const globalResolution = await service(state, 'PATCH', '/meaning-disputes/' + practiceDispute.id + '/resolve', { action: 'approve_global' }, teacherToken);
     const regradedSession = state.sessions.find(item => item.id === meaningPractice.id);
     assert(globalResolution.regraded === 1 && globalResolution.aliases.includes('새로운허용뜻'), 'global approval saves the alternate meaning and regrades matching disputes');
-    assert(regradedSession?.correct === 1 && regradedSession?.score === 100 && regradedSession?.wrong_details?.some(item => item.regraded), 'approved practice dispute automatically corrects the saved practice score and detail');
+    assert(regradedSession?.correct === 1 && regradedSession?.score === 20 && regradedSession?.wrong_details?.some(item => item.regraded), 'approved practice dispute automatically corrects the saved first-pass practice score and detail');
     assert((state.meaningAliases[disputedPracticeWord.id] || []).includes('새로운허용뜻'), 'approved alternate meaning persists separately from source vocabulary');
     assert(state.meaningAliasMeta[disputedPracticeWord.id]?.some(item => item.value === '새로운허용뜻' && item.source === 'appeal'), 'appeal-approved meaning records student-appeal provenance');
 
