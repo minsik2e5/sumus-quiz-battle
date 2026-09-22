@@ -118,16 +118,18 @@ export async function runReleaseCheck() {
     assert(lesson6Book.words[0].word === 'elect' && lesson6Book.words.at(-1).word === 'come back', 'middle3 lesson6 preserves source order');
     assert(lesson7Book.words[0].word === 'add' && lesson7Book.words.at(-1).word === 'play a role', 'middle3 lesson7 preserves source order across pages 1 and 2');
     assert(middle3ImportedBook?.words.length === 8 && middle3ImportedBook.words.every(word => word.grade === '중3'), 'middle3 teacher import remains separate from built-in lessons');
-    const middle2StaticBook = middle2Bootstrap.books.find(book => book.id === 'middle:ybm-park:grade2:lesson6');
+    const middle2Lesson5 = middle2Bootstrap.books.find(book => book.id === 'middle:ybm-park:grade2:lesson5');
+    const middle2Lesson6 = middle2Bootstrap.books.find(book => book.id === 'middle:ybm-park:grade2:lesson6');
     const middle2ImportedBook = middle2Bootstrap.books.find(book => book.source === 'teacher_import');
-    assert(middle2StaticBook?.words.length === 66 && middle2StaticBook.grade === '중2', 'middle2 student receives YBM Park lesson6 66-word source list');
-    assert(middle2StaticBook.words[0].word === 'throw' && middle2StaticBook.words.at(-1).word === 'take time', 'middle2 YBM lesson6 preserves source order');
-    assert(middle2ImportedBook?.words.length === 8 && middle2ImportedBook.words.every(word => word.grade === '중2'), 'middle2 teacher import remains separate from built-in lesson6');
+    assert(middle2Lesson5?.words.length === 69 && middle2Lesson6?.words.length === 66, 'middle2 YBM Park lesson5 and lesson6 source counts are 69 and 66');
+    assert(middle2Lesson5.words[0].word === 'be interested in ~' && middle2Lesson5.words.at(-1).word === 'explore', 'middle2 YBM lesson5 preserves source order');
+    assert(middle2Lesson6.words[0].word === 'throw' && middle2Lesson6.words.at(-1).word === 'take time', 'middle2 YBM lesson6 preserves source order');
+    assert(middle2ImportedBook?.words.length === 8 && middle2ImportedBook.words.every(word => word.grade === '중2'), 'middle2 teacher import remains separate from built-in lessons');
     assert(middle2ImportedBook.words[0].id.startsWith('import:wonil-middle:중2:'), 'middle import uses deterministic grade-scoped word ids');
-    const binWord = middle2StaticBook.words.find(word => word.word === 'bin');
-    const careWord = middle2StaticBook.words.find(word => word.word === 'take care of ~');
+    const binWord = middle2Lesson6.words.find(word => word.word === 'bin');
+    const careWord = middle2Lesson5.words.find(word => word.word === 'take care of ~');
     assert(grade('write_meaning', '휴지통', binWord), 'middle2 built-in accepted meaning allows safe synonym 휴지통');
-    assert(grade('write_meaning', '돌보다', careWord), 'middle2 built-in accepted meaning allows safe synonym 돌보다');
+    assert(grade('write_meaning', '돌보다', careWord), 'middle2 lesson5 accepted meaning allows safe synonym 돌보다');
     assert(middle3Bootstrap.daily_quest === null && middle2Bootstrap.daily_quest === null, 'middle students do not receive the high-school adaptive daily quest');
 
     const middle3Words = lesson5Book.words;
@@ -342,7 +344,7 @@ export async function runReleaseCheck() {
       const finished = await service(state, 'POST', `/practice/${started.id}/finish`, {}, studentToken);
       assert(finished.finished === true, `${practiceType} practice can finish and save`);
     }
-    assert(state.sessions.length === 8, 'all eight practice sessions are recorded');
+    assert(state.sessions.filter(session => session.student_id === student.id).length >= 8, 'all eight high-school practice modes are recorded for the student');
 
     const wrongPractice = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'spell', target: 5
@@ -351,7 +353,10 @@ export async function runReleaseCheck() {
       question_id: wrongPractice.question_id, answer: '__definitely_wrong__'
     }, studentToken);
     assert(wrongResult.feedback?.ok === false && wrongResult.retry_count === 1, 'wrong practice answer enters retry queue');
-    await service(state, 'POST', `/practice/${wrongPractice.id}/finish`, {}, studentToken);
+    const wrongFinished = await service(state, 'POST', `/practice/${wrongPractice.id}/finish`, {}, studentToken);
+    const wrongSession = state.sessions.find(item => item.id === wrongPractice.id);
+    assert(wrongFinished.score === 0 && wrongSession?.score === 0 && wrongSession?.wrong_details?.length === 1, 'practice finish stores a 100-point score and wrong-answer detail');
+    assert(Number(wrongPractice.deadline) > Number(wrongPractice.started_at) && Number(wrongPractice.duration_sec) >= 60, 'practice starts with a server-backed countdown deadline');
 
     const meaningPractice = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5
@@ -372,7 +377,7 @@ export async function runReleaseCheck() {
     const globalResolution = await service(state, 'PATCH', '/meaning-disputes/' + practiceDispute.id + '/resolve', { action: 'approve_global' }, teacherToken);
     const regradedSession = state.sessions.find(item => item.id === meaningPractice.id);
     assert(globalResolution.regraded === 1 && globalResolution.aliases.includes('새로운허용뜻'), 'global approval saves the alternate meaning and regrades matching disputes');
-    assert(regradedSession?.correct === 1, 'approved practice dispute automatically corrects the saved practice result');
+    assert(regradedSession?.correct === 1 && regradedSession?.score === 100 && regradedSession?.wrong_details?.some(item => item.regraded), 'approved practice dispute automatically corrects the saved practice score and detail');
     assert((state.meaningAliases[disputedPracticeWord.id] || []).includes('새로운허용뜻'), 'approved alternate meaning persists separately from source vocabulary');
     assert(state.meaningAliasMeta[disputedPracticeWord.id]?.some(item => item.value === '새로운허용뜻' && item.source === 'appeal'), 'appeal-approved meaning records student-appeal provenance');
 
@@ -474,6 +479,7 @@ export async function runReleaseCheck() {
     const v1310Css = readFileSync(publicRoot + 'v1310.css', 'utf8');
     const v1311Css = readFileSync(publicRoot + 'v1311.css', 'utf8');
     const v1313Css = readFileSync(publicRoot + 'v1313.css', 'utf8');
+    const v1315Css = readFileSync(publicRoot + 'v1315.css', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
     const practiceEnhancements = readFileSync(publicRoot + 'practice-enhancements.js', 'utf8');
@@ -509,7 +515,9 @@ export async function runReleaseCheck() {
     assert(studentModule.includes('middleVocabPractice') && studentModule.includes('data-middle-word') && studentModule.includes('data-middle-preset'), 'V13.13 middle student UI lists lesson words for exact checkbox selection');
     assert(sessionsModule.includes('word_ids: A.middleWordIds') && sessionsModule.includes('3000'), 'V13.13 sends exact middle word ids and keeps correct feedback visible for three seconds');
     assert(practiceEnhancements.includes('sumusBurstFade 2.2s') && practiceEnhancements.includes('2300'), 'V13.13 correct-answer overlay stays visible long enough to read');
-    assert(indexHtml.includes('/app.js?v=13.13.0') && indexHtml.includes('/practice-enhancements.js?v=13.13.0') && sw.includes('sumus-voca-v13.13.0-middle-word-pick'), 'V13.13 cache versions are active');
+    assert(indexHtml.includes('/app.js?v=13.15.0') && indexHtml.includes('/practice-enhancements.js?v=13.15.0') && indexHtml.includes('/v1315.css?v=13.15.0') && sw.includes('sumus-voca-v13.15.0-scored-practice'), 'V13.15 cache versions are active');
+    assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'V13.15 puts meaning and English writing first and exposes student score history');
+    assert(teacherModule.includes('학생별 연습 결과') && teacherModule.includes('data-practice-record') && appJs.includes('openPracticeRecord'), 'V13.15 teacher can inspect practice scores and wrong answers');
     assert(sw.includes("url.pathname.startsWith('/api/')"), 'service worker never caches API data');
     assert(teacherEnhancements.includes('name="school_id"') && teacherEnhancements.includes('school_id: values.school_id'), 'teacher student modal submits school changes');
     assert(teacherEnhancements.includes('student-reset-password') && teacherEnhancements.includes('12345678'), 'teacher can reset student password from the modal');
