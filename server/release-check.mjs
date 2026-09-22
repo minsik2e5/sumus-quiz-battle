@@ -366,7 +366,7 @@ export async function runReleaseCheck() {
       }, studentToken);
       assert(repeated.total === result.total, `${practiceType} duplicate submission is idempotent`);
       const next = await service(state, 'POST', `/practice/${started.id}/next`, {}, studentToken);
-      assert(next.question_id !== started.question_id && next.question_deadline > originalDeadline, `${practiceType} resets the timer only when the next question begins`);
+      assert(next.question_id !== started.question_id && next.question_deadline > next.server_time && next.question_duration_sec === PRACTICE_SECONDS_PER_QUESTION[practiceType] && next.question_started_at >= started.question_started_at, `${practiceType} resets the timer only when the next question begins`);
       const finished = await service(state, 'POST', `/practice/${started.id}/finish`, {}, studentToken);
       assert(finished.finished === true, `${practiceType} practice can finish and save`);
     }
