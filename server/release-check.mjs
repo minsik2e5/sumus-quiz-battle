@@ -39,7 +39,7 @@ export async function runReleaseCheck() {
     assert(sessionUiSource.includes(String.fromCharCode(36, 36) + "('[data-practice-choice],#practice-confirm').forEach"), 'practice answer controls disable through the multi-node selector');
     assert(sessionUiSource.includes('practiceAdvanceTimer = setTimeout'), 'practice correct-answer auto advance is wired');
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
-    assert(indexSource.includes('/v1325.css?v=13.26.0') && indexSource.includes('/v1326.css?v=13.26.0'), 'V13.26 learning style layers are connected');
+    assert(indexSource.includes('/v1325.css?v=13.27.0') && indexSource.includes('/v1326.css?v=13.27.0'), 'V13.27 learning style layers are connected');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -584,6 +584,7 @@ export async function runReleaseCheck() {
     const v1323Css = readFileSync(publicRoot + 'v1323.css', 'utf8');
     const v1325Css = readFileSync(publicRoot + 'v1325.css', 'utf8');
     const v1326Css = readFileSync(publicRoot + 'v1326.css', 'utf8');
+    const v1327Css = readFileSync(publicRoot + 'v1327.css', 'utf8');
     const uiModule = readFileSync(publicRoot + 'modules/ui.js', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
@@ -618,13 +619,14 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.26.0') && indexHtml.includes('/practice-enhancements.js?v=13.26.0') && indexHtml.includes('/v1325.css?v=13.26.0') && indexHtml.includes('/v1326.css?v=13.26.0') && sw.includes('sumus-voca-v13.26.0-focus-home-test-pwa'), 'V13.26 cache versions are active');
+    assert(indexHtml.includes('/app.js?v=13.27.0') && indexHtml.includes('/practice-enhancements.js?v=13.27.0') && indexHtml.includes('/v1325.css?v=13.27.0') && indexHtml.includes('/v1326.css?v=13.27.0') && indexHtml.includes('/v1327.css?v=13.27.0') && sw.includes('sumus-voca-v13.27.0-student-ux-finish'), 'V13.27 cache versions are active');
     assert(v1325Css.includes('--sumus-primary') && v1325Css.includes('grid-template-columns:repeat(5') && v1325Css.includes('memorize-flip-in'), 'V13.25 green design system, balanced bottom navigation, and memorization motion are loaded');
-    assert(v1326Css.includes('.home-focus-v1326') && v1326Css.includes('.rank-filter-bar') && v1326Css.includes('.pwa-install-hint'), 'V13.26 home, ranking, and PWA polish styles are loaded');
-    assert(studentModule.includes('오늘은 ${daily.target}개만 끝내요') && studentModule.includes('data-rank-scope-select') && !studentModule.includes('같이 올라가면 더 재밌다.'), 'V13.26 home is action-first and ranking filters are compact');
-    assert(appJs.includes('rankScopeSelect') && appJs.includes('missingCount') && appJs.includes('session.word_ids'), 'V13.26 compact rank filters and complete review flow are wired');
+    assert(v1326Css.includes('.home-focus-v1326') && v1326Css.includes('.rank-filter-bar') && v1326Css.includes('.pwa-install-hint'), 'V13.27 home, ranking, and PWA polish styles are loaded');
+    assert(v1327Css.includes('.home-pet-hero') && v1327Css.includes('.record-summary-v1327') && v1327Css.includes('.auth-card-v1327'), 'V13.27 student home, records, and login polish styles are loaded');
+    assert(studentModule.includes('home-pet-hero') && studentModule.includes('home-week-days') && studentModule.includes('data-rank-scope-select') && !studentModule.includes('같이 올라가면 더 재밌다.'), 'V13.27 home is pet-and-growth focused and ranking filters are compact');
+    assert(appJs.includes('rankScopeSelect') && appJs.includes('missingCount') && appJs.includes('session.word_ids'), 'V13.27 compact rank filters and complete review flow are wired');
 
-    assert(studentModule.includes('reward-wallet') && studentModule.includes('오늘 XP') && sessionsModule.includes('result-reward-card'), 'V13.25 separates XP, reward points, and achievements in the student UX');
+    assert(studentModule.includes('home-metrics') && studentModule.includes('포인트') && studentModule.includes('XP ') && sessionsModule.includes('result-reward-card'), 'V13.27 separates XP, reward points, and achievements in the student UX');
     assert(appJs.includes('memorize-flip-out') && appJs.includes('memorize-flip-in'), 'V13.25 vocabulary tap uses a short flip and fade transition');
     assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'meaning and English writing remain first-class scored modes');
     assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && !sessionsModule.includes('${timerHtml}'), 'student home and record summaries remain available while visible question timer is removed');
@@ -636,7 +638,7 @@ export async function runReleaseCheck() {
     assert(sessionsModule.includes('미응답') && sessionsModule.includes('data-finish-practice-dispute'), 'saved exam results separate unanswered answers and keep meaning disputes');
     assert(sessionsModule.includes('이미 진행 중인 학습이 있어요') && sessionsModule.includes('기존 연습 저장 후 새 설정 시작'), 'active session mismatch still warns before reuse');
     assert(appJs.includes('examFormDirty') && appJs.includes('contextGeneration') && appJs.includes('작성 취소 후 전환'), 'teacher context switch still protects dirty forms and stale responses');
-    assert(studentModule.includes('homePrimaryAction') && studentModule.includes('home-focus-card') && studentModule.includes('오늘 학습'), 'student home keeps one action-first CTA');
+    assert(studentModule.includes('home-pet-hero') && studentModule.includes('home-metrics') && studentModule.includes('home-week-card'), 'student home centers pet, personal metrics, and weekly attendance');
     assert(v1320Css.includes('.home-focus-card') && v1320Css.includes('.setup-start-summary') && v1320Css.includes('.result-page-v1320'), 'base responsive student UX styles remain loaded');
 
     const studyHubSource = studentModule.slice(studentModule.indexOf('function studyHub'), studentModule.indexOf('function grammarCards'));
@@ -645,10 +647,10 @@ export async function runReleaseCheck() {
     assert(memorizationSource.includes('data-memorize-word') && memorizationSource.includes('data-memorize-star') && memorizationSource.includes('data-memorize-speak') && memorizationSource.includes('front = show ? word.meaning : word.word'), 'V13.22 vocabulary rows swap English and meaning in place and expose pronunciation');
     assert(appJs.includes('SpeechSynthesisUtterance') && appJs.includes('d.memorizeSpeak'), 'V13.22 memorization has one-tap English pronunciation');
     assert(studentModule.includes("['exam', '시험'") && studentModule.includes('data-exam-kind="practice"') && studentModule.includes('data-exam-kind="test"') && studentModule.includes('연습시험') && studentModule.includes('실전시험'), 'V13.22 bottom Exam menu lets students choose practice or real exam');
-    assert(studentModule.includes('data-action="start-exam-run"') && !studentModule.includes('다음 문제마다 시간이 다시 시작돼요') && appJs.includes('examStyle: true'), 'V13.26 both exam modes share the same untimed exam-style word pool');
+    assert(studentModule.includes('data-action="start-exam-run"') && !studentModule.includes('다음 문제마다 시간이 다시 시작돼요') && appJs.includes('examStyle: true'), 'V13.27 both exam modes share the same untimed exam-style word pool');
     assert(!studentModule.includes('function middleVocabQuiz') && !studentModule.includes('function vocabQuiz') && !studentModule.includes('function practiceModePicker'), 'V13.22 removes the old duplicate vocabulary quiz path from Learning');
-    assert(sessionsModule.includes("const modeLabel = testMode ? '실전시험' : '연습시험'") && !sessionsModule.includes('${timerHtml}') && sessionsModule.includes('keyboard-focus'), 'V13.26 practice and real exams share one focused untimed question screen with keyboard handling');
-    assert(sessionsModule.includes('answer-impact-compact') && sessionsModule.includes('result-reward-top') && sessionsModule.includes('missingWordIds'), 'V13.26 keeps calm answer feedback and complete result review');
+    assert(sessionsModule.includes("const modeLabel = testMode ? '실전시험' : '연습시험'") && !sessionsModule.includes('${timerHtml}') && sessionsModule.includes('keyboard-focus'), 'V13.27 practice and real exams share one focused untimed question screen with keyboard handling');
+    assert(sessionsModule.includes('answer-impact-compact') && sessionsModule.includes('result-reward-top') && sessionsModule.includes('missingWordIds'), 'V13.27 keeps calm answer feedback and complete result review');
     assert(!teacherModule.match(/const tabs = .*assignments/) && !teacherModule.match(/const tabs = .*exams/), 'teacher navigation keeps assignment and teacher-created exam operations removed');
     assert(teacherModule.includes('학생이 보낸 실전 결과') && teacherModule.includes('shared_to_teacher_at'), 'teacher results focus on student-shared real exams');
     assert(sessionsModule.includes('/share') && sessionsModule.includes('선생님께 결과 보내기') && sessionsModule.includes('animateTestResult'), 'real exam result can be shared and keeps result impact');

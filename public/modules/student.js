@@ -250,15 +250,48 @@ function homePrimaryAction(A) {
     attrs: 'data-study="vocab"'
   };
 }
+function homeWeek(A) {
+  const today = new Date();
+  const kst = new Date(today.getTime() + 9 * 3600000);
+  const dow = kst.getUTCDay();
+  const mondayOffset = (dow + 6) % 7;
+  const start = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate() - mondayOffset) - 9 * 3600000;
+  const activeDays = new Set((A.data.sessions || []).filter(s => Number(s.total || 0) > 0).map(s => {
+    const d = new Date(Number(s.created_at || 0) + 9 * 3600000);
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+  }));
+  const labels = ['월','화','수','목','금','토','일'];
+  return labels.map((label,index) => {
+    const ts = start + index * 86400000;
+    const d = new Date(ts + 9 * 3600000);
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;
+    const current = key === (() => { const x = new Date(Date.now()+9*3600000); return `${x.getUTCFullYear()}-${String(x.getUTCMonth()+1).padStart(2,'0')}-${String(x.getUTCDate()).padStart(2,'0')}`; })();
+    return { label, date: d.getUTCDate(), active: activeDays.has(key), current };
+  });
+}
+function homeRank(A) {
+  const rows = [...(A.data.ranking || [])].sort((a,b) => Number(b.xp || 0)-Number(a.xp || 0) || Number(b.total || 0)-Number(a.total || 0));
+  const me = rows.find(item => item.is_me);
+  if (!me || Number(me.xp || 0) <= 0) return '—';
+  return rows.findIndex(item => item.is_me) + 1;
+}
 function compactGrowth(A) {
-  const p = A.data.profile, g = A.data.stats, badges = achievementBadges(A);
-  const earned = badges.filter(item => item.earned);
-  const latest = earned[0];
+  const p = A.data.profile, g = A.data.stats;
   const rewardPoints = Number(g.reward_points || 0);
-  return `<section class="home-growth-compact">
-    <div class="home-growth-avatar">${avatar(p.avatar_key || 'lumi', { size: 'mini', accessory: p.avatar_accessory, frame: p.avatar_frame })}</div>
-    <div class="grow"><span class="tiny muted">내 성장</span><b>Lv.${g.level}</b><small>XP ${num(g.points || 0)} · ${latest ? '대표 성취 ' + esc(latest.label) : '첫 성취 도전 중'}</small></div>
-    <div class="home-growth-reward"><span class="reward-wallet"><b>${num(rewardPoints)}P</b><small>보상</small></span><button class="text-button" data-go="records">성취 ${earned.length} ${icon('chevron')}</button></div>
+  const rank = homeRank(A);
+  const week = homeWeek(A);
+  return `<section class="home-pet-hero">
+    <div class="home-pet-art">${avatar(p.avatar_key || 'lumi', { accessory: p.avatar_accessory, frame: p.avatar_frame })}</div>
+    <div class="home-pet-copy"><span>MY PARTNER</span><h1>${CHARACTERS[p.avatar_key || 'lumi']?.ko || '루미'} <small>Lv.${g.level}</small></h1><p>XP ${num(g.points || 0)} · 다음 성장까지 ${num(g.remaining || 0)} XP</p><div class="home-xp-track"><i style="width:${Math.max(3,Number(g.percent || 0))}%"></i></div></div>
+  </section>
+  <section class="home-metrics">
+    <button data-go="ranking"><span>내 순위</span><strong>${rank === '—' ? '—' : rank + '위'}</strong><small>이번 주 XP</small></button>
+    <button data-go="records"><span>내 기록</span><strong>${num(g.practice_count || 0)}회</strong><small>누적 학습</small></button>
+    <div><span>포인트</span><strong>${num(rewardPoints)}P</strong><small>보유 보상</small></div>
+  </section>
+  <section class="home-week-card">
+    <div class="home-week-head"><div><span>이번 주 출석</span><strong>${Number(g.streak || 0)}일 연속 학습</strong></div><span class="streak-badge">${icon('flame')}${Number(g.streak || 0)} DAYS</span></div>
+    <div class="home-week-days">${week.map(day => `<div class="${day.active ? 'active' : ''} ${day.current ? 'today' : ''}"><span>${day.label}</span><b>${day.active ? '✓' : day.date}</b></div>`).join('')}</div>
   </section>`;
 }
 function homeSchedule(A) {
@@ -290,15 +323,7 @@ function homeRecommendations(A) {
 }
 function home(A) {
   const p = A.data.profile;
-  const action = homePrimaryAction(A);
-  return `<div class="home-context"><div><span>SUMUS VOCA</span><b>${esc(p.school || A.school || '학교 미설정')} · ${esc(p.class_name || '')}</b></div>${A.data.stats.streak ? `<span class="streak-badge">${icon('flame')}${A.data.stats.streak}일째</span>` : ''}</div>
-    <section class="home-focus-card home-focus-v1326">
-      <span class="home-focus-kicker">${action.kicker}</span>
-      <h1>${action.title}</h1>
-      <p>${action.detail}</p>
-      <small>${action.meta}</small>
-      <button class="btn primary full home-focus-cta" ${action.attrs}>${action.cta} ${icon('arrow')}</button>
-    </section>
+  return `<div class="home-context home-context-v1327"><div><span>SUMUS VOCA</span><b>${esc(p.school || A.school || '학교 미설정')} · ${esc(p.class_name || '')}</b></div></div>
     ${compactGrowth(A)}
     ${recentRecordCard(A)}`;
 }
@@ -448,12 +473,13 @@ function practice(A) {
 function examTargetGrid(A, count) {
   return `<div class="practice-target-grid" role="group" aria-label="문항 수 선택">${[10,20,30].filter(n => count >= n).map(n => `<button data-practice-target="${n}" class="${A.target === n ? 'selected' : ''}">${n}<small>문제</small></button>`).join('')}<button data-practice-target="all" class="all ${A.target === 'all' ? 'selected' : ''}"><b>선택 범위 전체</b><small>${count}개 단어</small></button></div>`;
 }
-function examWritingPicker(A) {
+function examWritingPicker(A, testMode = false) {
   const items = [
     ['write_meaning','뜻 직접 쓰기','영어를 보고 뜻을 직접 입력'],
-    ['spell','영어 직접 쓰기','뜻을 보고 영어 단어를 직접 입력']
+    ['spell','영어 직접 쓰기','뜻을 보고 영어 단어를 직접 입력'],
+    ...(!testMode ? [['eng2mean','객관식','영어를 보고 뜻 4개 중 선택']] : [])
   ];
-  return `<div class="primary-mode-grid">${items.map(([key,label,help]) => `<button class="primary-mode-card ${A.mode === key ? 'selected' : ''}" data-mode="${key}"><span class="primary-mode-icon">${icon('records')}</span><div><b>${label}</b><small>${help}</small></div></button>`).join('')}</div>`;
+  return `<div class="primary-mode-grid ${testMode ? '' : 'practice-mode-grid'}">${items.map(([key,label,help]) => `<button class="primary-mode-card ${key === 'eng2mean' ? 'compact-mc' : ''} ${A.mode === key ? 'selected' : ''}" data-mode="${key}"><span class="primary-mode-icon">${icon(key === 'eng2mean' ? 'practice' : 'records')}</span><div><b>${label}</b><small>${help}</small></div></button>`).join('')}</div>`;
 }
 function exam(A) {
   if (!A.examKind) {
@@ -463,7 +489,7 @@ function exam(A) {
         <button class="exam-kind-card test" data-exam-kind="test"><span class="square-icon">${icon('exam')}</span><div><span class="pill">TEST</span><h2>실전시험</h2><p>마지막에 한꺼번에 채점</p></div>${icon('arrow')}</button>
       </div>`;
   }
-  if (!['write_meaning','spell'].includes(A.mode)) A.mode = 'write_meaning';
+  if (!['write_meaning','spell','eng2mean'].includes(A.mode)) A.mode = 'write_meaning';
   const testMode = A.examKind === 'test';
   A.practiceRunMode = testMode ? 'test' : 'practice';
   const middle = A.data.profile.division === 'middle';
@@ -484,8 +510,8 @@ function exam(A) {
     <div class="page-heading exam-shared-heading"><h1>${testMode ? '실전시험' : '연습시험'}</h1></div>
     <section class="setup-section"><div class="step-label"><span>01</span>시험 범위</div>${scopeUi}</section>
     <section class="setup-section"><div class="step-label"><span>02</span>문항 수</div>${examTargetGrid(A, count)}</section>
-    <section class="setup-section"><div class="step-label"><span>03</span>시험 방식</div>${examWritingPicker(A)}</section>
-    <aside class="setup-start-summary exam-start-summary"><div><span>시작 요약</span><strong>${esc(scopeLabel)} · ${target || 0}문제 · ${esc(PRACTICE_TYPES[A.mode] || '뜻쓰기')}</strong><small>${testMode ? '정답은 시험이 끝난 뒤 한꺼번에 확인해요.' : '정답은 문제마다 바로 확인해요.'}</small></div><button class="btn primary full" data-action="start-exam-run" ${count ? '' : 'disabled'}>${testMode ? '실전시험 시작' : '연습시험 시작'} ${icon('arrow')}</button></aside>`;
+    <section class="setup-section"><div class="step-label"><span>03</span>시험 방식</div>${examWritingPicker(A, testMode)}</section>
+    <div class="exam-start-inline"><p>${esc(scopeLabel)} · ${target || 0}문제 · ${esc(PRACTICE_TYPES[A.mode] || '뜻쓰기')}</p><button class="btn primary full" data-action="start-exam-run" ${count ? '' : 'disabled'}>${testMode ? '실전시험 시작' : '연습시험 시작'} ${icon('arrow')}</button></div>`;
 }
 
 function ranking(A) {
@@ -551,11 +577,11 @@ function records(A) {
     const a = row.item, e = A.data.exams.find(exam => exam.id === a.exam_id);
     return `<button class="record-row full" style="width:100%;text-align:left" data-result="${a.id}"><span class="square-icon">${icon('exam')}</span><div class="grow"><strong>${esc(e?.title || '실전시험')}</strong><p>${EXAM_TYPES[e?.exam_type]?.label || ''}${a.result_visibility === 'visible' && a.correct !== undefined ? ' · ' + a.correct + '/' + a.total + ' 정답' : ' · 제출 완료'}</p><p>${date(a.submitted_at)}</p></div><div class="result">${a.result_visibility === 'visible' && a.score !== undefined ? a.score + '점' : '공개 대기'}<small>${a.result_visibility === 'visible' ? (disputeState(a.id).replace(/^ · /,'') || (a.grading_status === 'provisional' ? '임시 점수' : '시험 기록')) : '선생님 공개 대기'}</small></div></button>`;
   };
-  return `<div class="page-heading"><h1>내 기록</h1><p>언제, 어떤 범위를 봤고 몇 점이었는지 모두 남아요.</p></div>
-    <div class="record-stats"><div><strong>${weeklyAvg === null ? '—' : weeklyAvg + '점'}</strong><span>이번 주 평균 · 공개 ${weeklyScores.length}회</span></div><div><strong>${combined.length}회</strong><span>총 기록</span></div><div><strong>${best === null ? '—' : best + '점'}</strong><span>최고 공개 점수</span></div><div><strong>${num(totalQuestions)}</strong><span>누적 문제</span></div></div>
-    ${achievementSection(A, true)}
-    <div class="segment"><button data-record-tab="all" class="${tab === 'all' ? 'selected' : ''}">전체</button><button data-record-tab="selftest" class="${tab === 'selftest' ? 'selected' : ''}">실전시험</button><button data-record-tab="practice" class="${tab === 'practice' ? 'selected' : ''}">연습시험</button></div>
-    <div style="margin-top:18px">${visible.length ? visible.map(rowHtml).join('') : empty('records','아직 기록이 없어요','뜻쓰기나 영어쓰기를 마치면 점수와 시간이 여기에 저장돼요.')}</div>`;
+  return `<div class="page-heading records-heading-v1327"><span class="premium-eyebrow">MY RECORD</span><h1>내 기록</h1><p>점수보다 중요한 건 꾸준히 쌓인 학습이에요.</p></div>
+    <section class="record-summary-v1327"><div class="record-summary-main"><span>이번 주 평균</span><strong>${weeklyAvg === null ? '—' : weeklyAvg}<small>${weeklyAvg === null ? '' : '점'}</small></strong><p>${weeklyScores.length}회 학습 기록</p></div><div class="record-summary-side"><div><span>최고 점수</span><b>${best === null ? '—' : best + '점'}</b></div><div><span>누적 학습</span><b>${combined.length}회</b></div><div><span>누적 문제</span><b>${num(totalQuestions)}</b></div></div></section>
+    <section class="record-achievements-v1327">${achievementSection(A, true)}</section>
+    <div class="segment record-filter-v1327"><button data-record-tab="all" class="${tab === 'all' ? 'selected' : ''}">전체</button><button data-record-tab="selftest" class="${tab === 'selftest' ? 'selected' : ''}">실전</button><button data-record-tab="practice" class="${tab === 'practice' ? 'selected' : ''}">연습</button></div>
+    <div class="record-timeline-v1327">${visible.length ? visible.map(rowHtml).join('') : empty('records','아직 기록이 없어요','첫 학습을 마치면 여기에 기록이 쌓여요.')}</div>`;
 }
 function studio(A) {
   A.style ??= { avatar_key: A.data.profile.avatar_key || 'lumi', avatar_accessory: A.data.profile.avatar_accessory || 'none', avatar_frame: A.data.profile.avatar_frame || 'basic', avatar_title: A.data.profile.avatar_title || 'rookie' };
