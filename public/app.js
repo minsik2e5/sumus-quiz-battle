@@ -68,8 +68,13 @@ $('#app').addEventListener('click', async event => {
       const set = new Set(A.memStars || []); set.has(d.memorizeStar) ? set.delete(d.memorizeStar) : set.add(d.memorizeStar); A.memStars = [...set]; savePreferences(); render(); return;
     }
     if (d.memorizePractice === 'starred') {
-      const ids = [...new Set((A.memStars || []).filter(id => A.data.books.some(book => (book.words || []).some(word => word.id === id))))];
-      if (!ids.length) return toast('별표 단어가 없어요.');
+      const stars = new Set(A.memStars || []);
+      const allWords = A.data.books.flatMap(book => book.words || []);
+      const scoped = A.data.profile.division === 'middle'
+        ? allWords.filter(word => String(word.range_code) === String(A.middleRange || ''))
+        : (() => { const selected = new Set(A.ranges[A.school] || []); return allWords.filter(word => selected.has(word.range_code)); })();
+      const ids = scoped.filter(word => stars.has(word.id)).map(word => word.id);
+      if (!ids.length) return toast('현재 범위에 별표 단어가 없어요.');
       A.mode = 'write_meaning'; A.practiceRunMode = 'practice'; savePreferences(); buttonBusy(b); await startPractice({ wordIds: ids, mode: 'write_meaning', runMode: 'practice' }); return;
     }
     if (d.quickPractice) {
