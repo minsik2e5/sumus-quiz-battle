@@ -398,7 +398,11 @@ function finishPracticeView() {
   const reviewCount = wrongCount + unanswered;
   const resultState = x.auto_submitted ? '시간 종료 · 자동 제출' : '완료';
   const statusText = perfect ? '모든 문항을 맞혔어요.' : unanswered ? `미응답 ${unanswered}개가 점수에 포함됐어요.` : wrongCount ? `오답 ${wrongCount}개를 바로 복습할 수 있어요.` : '학습 기록을 저장했어요.';
-  const detailHtml = `${wrong.length ? wrong.map(item => `<div class="wrong-word"><div class="row between"><span class="pill red">오답</span><small>원답은 수정되지 않아요.</small></div><p><b>${esc(item.word)}</b></p><p>${esc(item.meaning)}</p><small>내 답: ${esc(item.answer || '미응답')}</small>${item.type === 'write_meaning' && item.answer ? `<button class="meaning-dispute-button" data-finish-practice-dispute="${esc(item.question_id)}">뜻 검토 요청</button>` : ''}</div>`).join('') : ''}${unanswered ? `<div class="result-note">미응답 ${unanswered}개 · 미응답 단어 상세는 현재 기록에 별도로 보관되지 않아요.</div>` : ''}`;
+  const answerRows = durable.length ? durable : wrong;
+  const detailHtml = `${answerRows.length ? answerRows.map(item => {
+    const isWrong = item.correct === false && !item.regraded;
+    return `<div class="wrong-word ${isWrong ? '' : 'answer-correct'}"><div class="row between"><span class="pill ${isWrong ? 'red' : 'green'}">${isWrong ? '오답' : '정답'}</span><small>최초 제출 답안</small></div><p><b>${esc(item.word)}</b></p><p>${esc(item.meaning)}</p><small>내 답: ${esc(item.answer || '미응답')}</small>${isWrong && item.type === 'write_meaning' && item.answer ? `<button class="meaning-dispute-button" data-finish-practice-dispute="${esc(item.question_id)}">뜻 검토 요청</button>` : ''}</div>`;
+  }).join('') : ''}${unanswered ? `<div class="result-note">미응답 ${unanswered}개 · 미응답 단어 상세는 현재 기록에 별도로 보관되지 않아요.</div>` : ''}`;
   const primaryCta = perfect
     ? '<button class="btn primary full" id="practice-next-study">다음 학습 선택</button>'
     : unanswered
@@ -415,7 +419,7 @@ function finishPracticeView() {
     <div class="result-meta-line"><span>${icon('clock')} ${time(elapsed)}</span><span>${x.auto_submitted ? '시간 종료' : '정상 완료'}</span></div>
     <p class="result-next-copy">${esc(statusText)}</p>
     ${primaryCta}
-    ${reviewCount ? '<button class="btn full" id="practice-answer-review">답안 보기</button>' : ''}
+    ${answerRows.length || reviewCount ? '<button class="btn full" id="practice-answer-review">답안 보기</button>' : ''}
     <div id="practice-answer-details" class="answer-review-panel" hidden>${detailHtml}</div>
     <div class="result-secondary-actions"><button class="text-button" id="practice-records">내 기록</button><button class="text-button" id="practice-home">홈으로</button></div>
     <p class="quiet-note">성장 포인트 +${x.xp}P · 점수는 오답 복습 재정답으로 올라가지 않고, 승인된 재채점만 반영돼요.</p>
@@ -440,15 +444,20 @@ function finishPracticeView() {
   });
   $('#practice-repeat-range')?.addEventListener('click', async event => {
     buttonBusy(event.currentTarget);
-    const wordIds = [...new Set((x.word_ids || []).filter(Boolean))];
     try {
-      if (wordIds.length) await startPractice({ wordIds, mode: x.mode, runMode: 'practice' });
-      else {
-        leaveSession(); A.studyView = 'vocab'; A.tab = 'practice'; A.mode = x.mode || 'write_meaning'; A.practiceRunMode = 'practice';
-        if (A.data.profile.division === 'middle') A.middleRange = String(x.range_codes?.[0] || A.middleRange || '');
-        else A.ranges[x.school || A.school] = [...(x.range_codes || [])];
-        redraw();
+      leaveSession();
+      A.studyView = 'vocab'; A.tab = 'practice'; A.mode = x.mode || 'write_meaning'; A.practiceRunMode = 'practice';
+      if (A.data.profile.division === 'middle') {
+        A.middleRange = String(x.range_codes?.[0] || A.middleRange || '');
+        A.middleWordIds = [...new Set((x.word_ids || []).filter(Boolean))];
+        A.middleWordsOpen = false;
+      } else {
+        A.school = x.school || A.school;
+        A.ranges[A.school] = [...(x.range_codes || [])];
+        A.target = [10,20,30].includes(Number(x.target)) ? Number(x.target) : 'all';
       }
+      await refresh();
+      redraw();
     } catch (error) { buttonBusy(event.currentTarget, false); toast(error.message); }
   });
   $('#practice-next-study')?.addEventListener('click', async () => {
