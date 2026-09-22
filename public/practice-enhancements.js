@@ -23,25 +23,18 @@ function injectStyles() {
     .sumus-practice-live .option:not(:disabled):active{transform:scale(.985)}
     .sumus-practice-live .answer-input{transition:border-color .16s ease,box-shadow .16s ease,background .16s ease}
     .sumus-practice-live .answer-input:focus{box-shadow:0 0 0 4px rgba(37,99,235,.08)}
-    .sumus-practice-live .practice-score{display:flex;gap:8px;align-items:center}
-    .sumus-practice-live .practice-score span{padding:5px 9px;border-radius:999px;background:#f2f4f7;color:#475467;font-weight:700}
-    .sumus-practice-live .practice-score span.sumus-combo-hot{background:#fff7ed;color:#c2410c;animation:sumusComboPulse .42s ease}
-    .sumus-practice-live .practice-score b{min-width:58px;text-align:right}
+    .sumus-practice-live .practice-score{display:flex;align-items:center}
+    .sumus-practice-live .practice-score span{padding:0;background:transparent;color:#98a2b3;font-size:11px;font-weight:700}
+    .sumus-practice-live .practice-score b{display:none}
     .sumus-practice-live #practice-feedback{margin-top:18px}
-    .sumus-practice-live .feedback{position:relative;overflow:hidden;border-radius:22px;padding:22px 20px 18px;box-shadow:0 12px 32px rgba(16,24,40,.09);animation:sumusFeedbackIn .3s cubic-bezier(.2,.9,.25,1.15)}
-    .sumus-practice-live .feedback:not(.wrong){border:2px solid #6ce9a6;background:linear-gradient(145deg,#ecfdf3,#fff 72%);box-shadow:0 16px 38px rgba(18,183,106,.18)}
-    .sumus-practice-live .feedback.wrong{border:1px solid #fee4e2;background:linear-gradient(180deg,#fff8f7,#fff)}
-    .sumus-feedback-badge{width:58px;height:58px;border-radius:19px;display:grid;place-items:center;font-size:30px;font-weight:900;margin-bottom:14px}
-    .sumus-feedback-badge.ok{background:linear-gradient(135deg,#12b76a,#039855);color:#fff;box-shadow:0 9px 20px rgba(18,183,106,.28)}
-    .sumus-feedback-badge.no{background:#fee4e2;color:#d92d20}
-    .sumus-feedback-kicker{display:block;margin:-5px 0 6px;font-size:11px;font-weight:900;letter-spacing:.08em;color:#079455}
-    .sumus-practice-live .feedback>b{font-size:19px;letter-spacing:-.02em}
-    .sumus-practice-live .feedback .gain{position:absolute;top:20px;right:19px;font-size:21px;font-weight:950;color:#1570ef}
-    .sumus-practice-live .feedback .progress{height:7px;margin-top:14px}
-    .sumus-practice-live #practice-next{min-height:54px;border-radius:15px;font-weight:800;box-shadow:0 8px 22px rgba(37,99,235,.16)}
-    .sumus-practice-live .milestone-toast{position:relative;border:0;background:linear-gradient(135deg,#101828,#344054);color:#fff;border-radius:16px;padding:14px 16px;margin-top:10px;font-weight:800;box-shadow:0 10px 28px rgba(16,24,40,.16);animation:sumusMilestone .38s cubic-bezier(.2,.8,.2,1)}
-    .sumus-practice-live .milestone-toast::before{content:"COMBO";display:block;font-size:10px;letter-spacing:.14em;opacity:.62;margin-bottom:4px}
-    .sumus-practice-live .progress.sumus-progress-hit i{animation:sumusProgressHit .42s ease}
+    .sumus-practice-live .feedback{position:relative;border-radius:0;padding:14px 0;box-shadow:none;animation:none;background:transparent;border-left:0;border-right:0;border-top:1px solid #eaecf0;border-bottom:1px solid #eaecf0}
+    .sumus-practice-live .feedback:not(.wrong){background:transparent;border-color:#d1fadf}
+    .sumus-practice-live .feedback.wrong{background:transparent;border-color:#fee4e2}
+    .sumus-feedback-badge,.sumus-feedback-kicker,.sumus-practice-live .feedback .gain,.sumus-practice-live .feedback .progress{display:none!important}
+    .sumus-practice-live .feedback>b{font-size:13px;letter-spacing:0}
+    .sumus-practice-live #practice-next{min-height:52px;border-radius:14px;font-weight:800;box-shadow:none}
+    .sumus-practice-live .milestone-toast{display:none}
+    .sumus-practice-live .progress.sumus-progress-hit i{animation:none}
     .sumus-result-polish{position:relative;overflow:hidden}
     .sumus-result-polish .result-number{animation:sumusScorePop .42s cubic-bezier(.2,.85,.25,1.15)}
     .sumus-result-ribbon{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:12px 0 20px}
@@ -103,25 +96,10 @@ function enhancePractice() {
   if (!exit) return;
   session.classList.add('sumus-practice-live');
 
-  const combo = session.querySelector('.practice-score span');
-  if (combo) {
-    const n = Number((combo.textContent.match(/\d+/) || [0])[0]);
-    if (n >= 5) combo.classList.add('sumus-combo-hot');
-  }
-
   const feedback = session.querySelector('.feedback');
-  if (feedback && !feedback.querySelector('.sumus-feedback-badge')) {
-    const ok = !feedback.classList.contains('wrong');
-    const badge = document.createElement('div');
-    badge.className = `sumus-feedback-badge ${ok ? 'ok' : 'no'}`;
-    badge.textContent = ok ? '✓' : '↺';
-    feedback.prepend(badge);
-    const kicker = document.createElement('span');
-    kicker.className = 'sumus-feedback-kicker';
-    kicker.textContent = ok ? '숙련도 상승' : '오답 복습 예약';
-    badge.after(kicker);
-    session.querySelector('.session-header .progress')?.classList.add('sumus-progress-hit');
-    if (ok) { floatGain(feedback); celebrateCorrect(session, feedback); }
+  if (feedback && !feedback.dataset.sumusCalmFeedback) {
+    feedback.dataset.sumusCalmFeedback = '1';
+    feedback.setAttribute('aria-live', 'polite');
   }
 
   const next = session.querySelector('#practice-next');
