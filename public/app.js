@@ -1,9 +1,9 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, CLASS_OPTIONS } from './modules/core.js';
 import { avatar } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.19.0';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.19.0';
-import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.19.0';
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.20.0';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.20.0';
+import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.20.0';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub' };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -73,11 +73,13 @@ $('#app').addEventListener('click', async event => {
     if (d.rangeAll) { const { codes } = getRanges(A); A.ranges[A.school] = d.rangeAll === 'true' ? [...codes] : []; $$('[data-range]').forEach(i => i.checked = d.rangeAll === 'true'); updateRangeSummary(A); updateExamSummary(A); savePreferences(); return; }
     if (d.mode) { A.mode = d.mode; if (!['write_meaning','spell'].includes(A.mode)) A.practiceRunMode = 'practice'; savePreferences(); render(); return; }
     if (d.practiceRunMode) { A.practiceRunMode = d.practiceRunMode === 'test' ? 'test' : 'practice'; savePreferences(); render(); return; }
+    if (d.otherPractice) { A.otherPracticeOpen = !A.otherPracticeOpen; render(); return; }
+    if (d.middleWordsToggle) { A.middleWordsOpen = !A.middleWordsOpen; render(); return; }
     if (d.practiceTarget) { A.target = d.practiceTarget === 'all' ? 'all' : Number(d.practiceTarget); $$('[data-practice-target]').forEach(e => { const selected = e === b; e.classList.toggle('selected', selected); e.setAttribute('aria-pressed', String(selected)); }); savePreferences(); render(); return; }
     if (d.middleLesson) { A.middleRange = d.middleLesson; A.middleWordIds = []; savePreferences(); render(); return; }
     if (d.middlePreset) {
       const lessonWords = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
-      A.middleWordIds = d.middlePreset === 'clear' ? [] : d.middlePreset === 'all' ? lessonWords.map(word => word.id) : lessonWords.slice(0, Number(d.middlePreset)).map(word => word.id);
+      A.middleWordIds = d.middlePreset === 'clear' ? [] : d.middlePreset === 'all' ? lessonWords.map(word => word.id) : lessonWords.slice(0, Number(d.middlePreset)).map(word => word.id); A.middleSelectionTouched = true;
       savePreferences(); render(); return;
     }
     if (d.rankMode) { A.rankMode = d.rankMode; savePreferences(); render(); return; }
@@ -89,6 +91,33 @@ $('#app').addEventListener('click', async event => {
     if (d.exam) return await openExam(d.exam);
     if (d.result) return await openResult(d.result);
     if (d.practiceRecord) return openPracticeRecord(d.practiceRecord);
+    if (d.reviewPractice) {
+      const session = A.data.sessions.find(item => item.id === d.reviewPractice);
+      if (!session) return toast('복습할 기록을 찾을 수 없어요.');
+      const source = Array.isArray(session.answer_records) && session.answer_records.length ? session.answer_records : (session.wrong_details || []);
+      const wordIds = [...new Set(source.filter(item => item.correct === false ? !item.regraded : !item.regraded).map(item => item.word_id).filter(Boolean))];
+      if (!wordIds.length) return openPracticeRecord(session.id);
+      A.mode = session.mode || 'write_meaning'; A.practiceRunMode = 'practice'; savePreferences();
+      return await startPractice({ wordIds, mode: A.mode, runMode: 'practice' });
+    }
+    if (d.repeatPractice) {
+      const session = A.data.sessions.find(item => item.id === d.repeatPractice);
+      if (!session) return toast('이전 학습 기록을 찾을 수 없어요.');
+      A.school = session.school || A.school;
+      A.mode = session.mode || 'write_meaning';
+      A.practiceRunMode = session.run_mode === 'test' && ['write_meaning','spell'].includes(A.mode) ? 'test' : 'practice';
+      A.assignmentId = null;
+      if (A.data.profile.division === 'middle') {
+        A.middleRange = String(session.range_codes?.[0] || A.middleRange || '');
+        const recordedIds = [...new Set((session.answer_records || []).map(item => item.word_id).filter(Boolean))];
+        A.middleWordIds = recordedIds;
+        A.middleWordsOpen = false;
+      } else {
+        A.ranges[A.school] = [...(session.range_codes || [])];
+        A.target = Number(session.total || 20);
+      }
+      A.studyView = 'vocab'; A.tab = 'practice'; savePreferences(); render(); window.scrollTo(0,0); return;
+    }
     if (d.student) return studentModal(d.student);
     if (d.assignment) { const task = A.data.assignments.find(a => a.id === d.assignment); A.school = task.school; A.ranges[task.school] = [...task.range_codes]; A.assignmentId = task.id; A.studyView = 'vocab'; A.tab = 'practice'; render(); window.scrollTo(0, 0); return; }
     if (d.release) { const e = A.data.exams.find(e => e.id === d.release); await api('/exams/' + e.id, { release_result: !e.release_result }, 'PATCH'); await refresh(); render(); toast(e.release_result ? '결과를 비공개로 바꿨어요.' : '학생에게 결과가 공개됐어요.'); return; }
@@ -103,7 +132,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'refresh') { buttonBusy(b); await refresh(); render(); toast('최신 기록으로 업데이트했어요.'); }
     if (d.action === 'start-practice') { buttonBusy(b); await startPractice(); }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
-      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.19.0');
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.20.0');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
@@ -164,7 +193,7 @@ $('#app').addEventListener('change', event => {
   if (input.dataset.middleWord) {
     const values = new Set(A.middleWordIds || []);
     if (input.checked) values.add(input.dataset.middleWord); else values.delete(input.dataset.middleWord);
-    A.middleWordIds = [...values];
+    A.middleWordIds = [...values]; A.middleSelectionTouched = true;
     savePreferences();
     const count = $('#middle-selected-count'); if (count) count.textContent = `${A.middleWordIds.length}개 선택`;
     const start = $('[data-action="start-practice"]'); if (start && !A.data.active_practice) { start.disabled = !A.middleWordIds.length; start.innerHTML = A.middleWordIds.length ? `${A.middleWordIds.length}개 시험 시작하기 ${icon('arrow')}` : `단어를 선택해주세요 ${icon('arrow')}`; }
