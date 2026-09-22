@@ -1,0 +1,75 @@
+/* SUMUS VOCA V13.21 · memorization + self-test + answer impact */
+
+.vocab-panel-switch{margin:4px 0 18px}
+.memorize-heading p{max-width:520px}
+.memorize-shell{margin-top:18px;padding-bottom:120px}
+.memorize-toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:5;padding:10px 0;background:rgba(255,255,255,.96);backdrop-filter:blur(10px);border-bottom:1px solid #f0f2f5}
+.segment.compact{width:auto;margin:0}
+.segment.compact button{min-width:92px;padding:8px 12px;font-size:11px}
+.memorize-list{border-top:1px solid #eef1f4}
+.memorize-row{display:grid;grid-template-columns:42px 1fr;align-items:stretch;border-bottom:1px solid #eef1f4;background:#fff;transition:.18s ease}
+.memorize-row.revealed{background:#fbfefc}
+.memorize-row.starred .memorize-star{color:#e6a700}
+.memorize-star{border:0;background:transparent;font-size:22px;color:#c8ced8;display:grid;place-items:center;min-height:58px}
+.memorize-word{border:0;background:transparent;text-align:left;display:grid;grid-template-columns:34px 1fr auto;align-items:center;gap:8px;min-height:58px;padding:10px 4px 10px 0}
+.memorize-no{font-size:10px;color:#a0a8b5;text-align:right}
+.memorize-word strong{font-size:14px;color:#1d2939;letter-spacing:-.01em}
+.memorize-word small{font-size:9.5px;color:#98a2b3}
+.memorize-meaning{grid-column:1/-1;display:grid;grid-template-columns:42px 1fr;gap:0;min-height:46px;background:linear-gradient(90deg,#e9f8ee,#f6fcf8);border-top:1px solid #d8f0e1}
+.memorize-meaning span{display:grid;place-items:center;font-size:9px;font-weight:900;color:#478064;background:rgba(63,150,103,.06)}
+.memorize-meaning b{display:flex;align-items:center;padding:9px 12px;color:#256244;font-size:13px;line-height:1.45}
+.memorize-empty{padding:38px 18px;text-align:center;color:#98a2b3;font-size:12px}
+.memorize-actions{position:sticky;bottom:72px;display:grid;gap:8px;margin-top:18px;padding:12px;border:1px solid #e4e7ec;border-radius:18px;background:rgba(255,255,255,.97);box-shadow:0 -8px 26px rgba(16,24,40,.06);backdrop-filter:blur(12px)}
+
+.self-test-heading .eyebrow{color:#7a5af8}
+.self-test-rule-strip{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px}
+.self-test-rule-strip span{display:inline-flex;align-items:center;gap:5px;padding:7px 10px;border-radius:999px;background:#f6f3ff;color:#6941c6;font-size:10px;font-weight:800}
+.self-test-summary{border-color:#d9d6fe;box-shadow:0 -8px 28px rgba(105,65,198,.09)}
+.self-test-share{margin-top:9px;border-color:#bdb4fe!important;background:#f7f5ff!important;color:#5925dc!important;font-weight:850}
+.self-test-share-done{margin-top:9px;border-color:#d1fadf!important;background:#ecfdf3!important;color:#027a48!important;font-weight:850;opacity:1!important}
+.legacy-results{margin-top:18px;padding:12px 0;border-top:1px solid #eaecf0}
+.legacy-results summary{cursor:pointer;color:#667085;font-size:12px;font-weight:800}
+
+/* Correct-answer impact: strong for under a second, then out of the way. */
+.answer-impact{position:fixed;inset:0;z-index:120;pointer-events:none;display:grid;place-items:center;opacity:0;transition:opacity .12s ease;background:radial-gradient(circle at center,rgba(30,190,105,.12),rgba(30,190,105,0) 48%)}
+.answer-impact.show{opacity:1}
+.answer-impact-check{position:absolute;width:88px;height:88px;border-radius:50%;display:grid;place-items:center;background:#12b76a;color:#fff;font-size:48px;font-weight:950;box-shadow:0 18px 52px rgba(18,183,106,.35);transform:scale(.58);animation:sumusCheckPop .62s cubic-bezier(.18,.9,.23,1.18) forwards}
+.answer-impact-ring{position:absolute;width:88px;height:88px;border:3px solid rgba(18,183,106,.55);border-radius:50%;animation:sumusRing .7s ease-out forwards}
+.answer-impact>strong{position:absolute;margin-top:140px;padding:7px 13px;border-radius:999px;background:rgba(16,24,40,.92);color:#fff;font-size:13px;letter-spacing:-.01em;transform:translateY(8px);animation:sumusImpactText .62s ease forwards}
+.answer-impact-particles{position:absolute;width:150px;height:150px}
+.answer-impact-particles i{--angle:calc(var(--i) * 45deg);position:absolute;left:72px;top:72px;width:7px;height:7px;border-radius:50%;background:#32d583;animation:sumusParticle .62s ease-out forwards;transform:rotate(var(--angle)) translateY(0)}
+.answer-impact.milestone{background:radial-gradient(circle at center,rgba(247,180,0,.16),rgba(247,180,0,0) 52%)}
+.answer-impact.milestone .answer-impact-check{background:linear-gradient(135deg,#fdb022,#f79009);box-shadow:0 18px 52px rgba(247,144,9,.38)}
+.answer-impact.milestone .answer-impact-ring{border-color:rgba(247,144,9,.65)}
+.answer-impact.milestone .answer-impact-particles i{background:#fdb022}
+.answer-impact-wrong{animation:sumusWrongNudge .34s ease}
+
+/* Self-test result impact */
+.perfect-impact{position:fixed;inset:0;z-index:130;pointer-events:none;display:grid;place-items:center;opacity:0;background:radial-gradient(circle at center,rgba(253,176,34,.18),rgba(253,176,34,0) 52%);transition:opacity .15s ease}
+.perfect-impact.show{opacity:1}
+.perfect-impact-core{width:164px;height:164px;border-radius:50%;display:grid;place-items:center;align-content:center;background:linear-gradient(145deg,#fff7d6,#fdb022);border:6px solid #fff;color:#7a2e0e;font-size:22px;font-weight:950;letter-spacing:.04em;box-shadow:0 24px 64px rgba(247,144,9,.35);animation:sumusPerfectPop 1.1s cubic-bezier(.18,.9,.23,1.12)}
+.perfect-impact-core small{display:block;margin-top:4px;font-size:42px;line-height:1}
+.perfect-impact-stars{position:absolute;width:260px;height:260px}
+.perfect-impact-stars i{--angle:calc(var(--i) * 30deg);position:absolute;left:122px;top:122px;color:#fdb022;font-style:normal;font-size:18px;animation:sumusPerfectStar 1.15s ease-out forwards;transform:rotate(var(--angle)) translateY(0) rotate(calc(var(--angle) * -1))}
+
+@keyframes sumusCheckPop{0%{transform:scale(.58);opacity:0}45%{transform:scale(1.14);opacity:1}70%{transform:scale(.96)}100%{transform:scale(1)}}
+@keyframes sumusRing{0%{transform:scale(.6);opacity:.8}100%{transform:scale(2.2);opacity:0}}
+@keyframes sumusImpactText{0%{opacity:0;transform:translateY(12px)}35%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-4px)}}
+@keyframes sumusParticle{0%{opacity:0;transform:rotate(var(--angle)) translateY(0) scale(.4)}28%{opacity:1}100%{opacity:0;transform:rotate(var(--angle)) translateY(-74px) scale(1)}}
+@keyframes sumusWrongNudge{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}55%{transform:translateX(5px)}78%{transform:translateX(-3px)}}
+@keyframes sumusPerfectPop{0%{transform:scale(.55) rotate(-5deg);opacity:0}35%{transform:scale(1.08) rotate(1deg);opacity:1}65%{transform:scale(.98)}100%{transform:scale(1)}}
+@keyframes sumusPerfectStar{0%{opacity:0;transform:rotate(var(--angle)) translateY(0) scale(.3)}28%{opacity:1}100%{opacity:0;transform:rotate(var(--angle)) translateY(-122px) scale(1.15)}}
+
+@media(max-width:640px){
+  .memorize-toolbar{align-items:flex-start}
+  .memorize-toolbar .segment.compact{display:grid;grid-template-columns:1fr 1fr;flex:1}
+  .memorize-toolbar>.text-button{padding-top:8px;white-space:nowrap}
+  .memorize-word{grid-template-columns:28px 1fr;gap:7px}
+  .memorize-word small{grid-column:2}
+  .memorize-actions{bottom:70px}
+  .answer-impact-check{width:78px;height:78px;font-size:42px}
+  .answer-impact-ring{width:78px;height:78px}
+}
+@media(prefers-reduced-motion:reduce){
+  .answer-impact,.answer-impact *,.perfect-impact,.perfect-impact *,.answer-impact-wrong{animation:none!important;transition:none!important}
+}

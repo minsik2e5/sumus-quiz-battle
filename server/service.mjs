@@ -392,7 +392,7 @@ export function sweep(state) {
   return changed;
 }
 export async function service(state, method, path, body, token) {
-  if (path === '/health') return { ok: true, version: '13.20.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: '13.21.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -963,19 +963,32 @@ export async function service(state, method, path, body, token) {
     const words = manualWords.length ? manualWords : isDailyQuest ? daily.words : scopedWords(state, school.id, body.range_codes, p.class_name);
     if (!words.length) fail('학습할 단어가 없습니다. 선생님에게 단어 범위를 확인해주세요.', 409);
     const manualSelection = manualWords.length > 0;
-    const coverAll = manualSelection || isDailyQuest || body.cover_all === true;
+    const coverAll = manualSelection ? body.cover_all === true || body.target === undefined : isDailyQuest || body.cover_all === true;
     const rangeCodes = manualSelection ? [...new Set(words.map(word => String(word.range_code)))] : isDailyQuest ? daily.range_codes : body.range_codes;
-    const requestedTarget = manualSelection ? words.length : isDailyQuest ? daily.target : coverAll ? words.length : integer(body.target || 10, 5, 500, '학습량');
+    const requestedTarget = manualSelection
+      ? (body.target === undefined ? words.length : integer(body.target, 5, Math.min(500, words.length), '학습량'))
+      : isDailyQuest ? daily.target : coverAll ? words.length : integer(body.target || 10, 5, 500, '학습량');
     const target = runMode === 'test' ? Math.min(requestedTarget, words.length) : requestedTarget;
-    const practiceWords = runMode === 'test' && !manualSelection ? shuffle(words).slice(0, target) : words;
+    const practiceWords = runMode === 'test' ? shuffle(words).slice(0, target) : words;
     const startedAt = Date.now();
     const durationSec = practiceDurationSec(body.mode, target);
-    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, run_mode: runMode, assignment_id: null, target, cover_all: runMode === 'test' ? true : coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection, quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, deadline: startedAt + durationSec * 1000, auto_submitted: false, wrong_details: [], answer_records: [], finished: false, responses: {}, words: practiceWords.map(w => w.id) };
+    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, run_mode: runMode, assignment_id: null, target, cover_all: runMode === 'test' ? true : coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection && runMode !== 'test', quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, deadline: startedAt + durationSec * 1000, auto_submitted: false, wrong_details: [], answer_records: [], finished: false, responses: {}, words: practiceWords.map(w => w.id) };
     if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
-  if (/^\/practice\/[^/]+(?:\/(?:answer|next|finish))?$/.test(path)) {
+  if (/^\/practice\/[^/]+(?:\/(?:answer|next|finish|share))?$/.test(path)) {
     requireRole(p, 'student'); const x = state.practices.find(x => x.id === path.split('/')[2] && x.student_id === p.id); if (!x) fail('연습을 찾을 수 없습니다.', 404);
+    if (path.endsWith('/share')) {
+      if (method !== 'POST') fail('요청 방식을 확인해주세요.', 405);
+      if (!x.finished || x.run_mode !== 'test') fail('완료한 실전모드 결과만 선생님께 보낼 수 있어요.', 409);
+      const sharedAt = x.shared_to_teacher_at || Date.now();
+      x.shared_to_teacher_at = sharedAt;
+      const session = state.sessions.find(item => item.id === x.id && item.student_id === p.id);
+      if (session) session.shared_to_teacher_at = sharedAt;
+      const view = practiceView(x, state);
+      view.shared_to_teacher_at = sharedAt;
+      return view;
+    }
     if (path.endsWith('/answer')) {
       if (x.responses[body.question_id]) return x.responses[body.question_id];
       if (!x.finished && Number(x.deadline || 0) && Date.now() >= x.deadline) {
@@ -1127,6 +1140,7 @@ function finishPractice(x, state, autoSubmitted = false) {
     auto_submitted: !!x.auto_submitted,
     ended_at: endedAt,
     finalized_at: finalizedAt,
+    shared_to_teacher_at: x.shared_to_teacher_at || null,
     answer_records: answerRecords,
     wrong_details: (x.wrong_details || []).map(item => ({ ...item })),
     created_at: endedAt
@@ -1150,6 +1164,7 @@ function practiceView(x, state) {
     xp: hideTestScore ? null : x.xp, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
     started_at: x.started_at, finished_at: x.finished_at || null, ended_at: x.ended_at || null, finalized_at: x.finalized_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
     auto_submitted: !!x.auto_submitted,
+    shared_to_teacher_at: x.shared_to_teacher_at || null,
     wrong_count: x.finished ? wrongCount : undefined,
     unanswered_count: x.finished ? unansweredCount : undefined,
     perfect: x.finished ? perfect : undefined,
