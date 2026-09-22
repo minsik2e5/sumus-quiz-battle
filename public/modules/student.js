@@ -1,5 +1,5 @@
 import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, unlocked, levelInfo, dayKey } from './core.js';
-import { icon, esc, num, date, rangeLabel, scope, empty, $, $$ } from './ui.js';
+import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $ } from './ui.js';
 import { avatar } from './character.js';
 import { DANWONGO_PASSAGES } from '../danwongo-grammar-data.js?v=2';
 import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from '../seonbu-grammar-data.js?v=2';
@@ -130,20 +130,30 @@ function scoredHistory(A) {
   const practices = (A.data.sessions || []).map(item => ({
     at: Number(item.created_at || 0),
     score: Number(item.score ?? (item.total ? Math.round(item.correct / item.total * 100) : 0)),
+    visible: true,
+    final: !(A.data.meaning_disputes || []).some(d => d.source_type === 'practice' && d.source_id === item.id && d.status === 'pending'),
     kind: 'practice', mode: item.mode, run_mode: item.run_mode || 'practice'
   }));
   const exams = (A.data.attempts || []).filter(item => item.status === 'submitted').map(item => {
     const exam = A.data.exams.find(e => e.id === item.exam_id);
-    return { at: Number(item.submitted_at || 0), score: Number(item.score || 0), kind: 'exam', mode: exam?.exam_type || '' };
+    const visible = item.result_visibility === 'visible' && Number.isFinite(Number(item.score));
+    return {
+      at: Number(item.submitted_at || 0),
+      score: visible ? Number(item.score) : null,
+      visible,
+      final: item.grading_status !== 'provisional',
+      kind: 'exam',
+      mode: exam?.exam_type || ''
+    };
   });
   return [...practices, ...exams].sort((a,b) => a.at - b.at);
 }
 function achievementBadges(A) {
   const history = scoredHistory(A);
-  const first100 = history.some(item => item.score === 100);
+  const first100 = history.some(item => item.visible && item.final && item.score === 100);
   let streak90 = false, streak = 0;
-  for (const item of history) { streak = item.score >= 90 ? streak + 1 : 0; if (streak >= 3) { streak90 = true; break; } }
-  const english100 = history.some(item => item.score === 100 && (item.mode === 'spell' || item.mode === 'write_en'));
+  for (const item of history) { if (!item.visible || !item.final || item.score === null) { streak = 0; continue; } streak = item.score >= 90 ? streak + 1 : 0; if (streak >= 3) { streak90 = true; break; } }
+  const english100 = history.some(item => item.visible && item.final && item.score === 100 && (item.mode === 'spell' || item.mode === 'write_en'));
   const badges = [
     { key: 'first100', label: '첫 100점', detail: '처음으로 100점을 달성했어요', earned: first100, icon: 'sparkle' },
     { key: 'streak90', label: '3회 연속 90점+', detail: '세 번 연속 90점 이상', earned: streak90, icon: 'flame' },
@@ -167,11 +177,11 @@ function recentRecordCard(A) {
   const line = row => {
     if (row.kind === 'practice') {
       const s = row.item, score = s.score ?? (s.total ? Math.round(s.correct / s.total * 100) : 0);
-      const ranges = (s.range_codes || []).map(code => s.division === 'middle' ? `${esc(code)}과` : rangeLabel(s.school || A.school, code)).join(' · ') || '선택 범위';
+      const ranges = (s.range_codes || []).map(code => esc(recordRangeLabel(s, code))).join(' · ') || '선택 범위';
       return `<button class="exam-row" data-practice-record="${s.id}"><span class="square-icon">${icon('practice')}</span><div class="grow"><h3>${esc(ranges)} · ${esc(PRACTICE_TYPES[s.mode] || '연습')} · ${s.run_mode === 'test' ? '실전' : '연습'}</h3><p>${s.correct}/${s.total} 정답 · ${durationText(s.duration_sec)} · ${date(s.created_at)}</p></div><strong>${score}점</strong></button>`;
     }
     const a = row.item, e = A.data.exams.find(exam => exam.id === a.exam_id);
-    return `<button class="exam-row" data-result="${a.id}"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(e?.title || '실전시험')}</h3><p>${EXAM_TYPES[e?.exam_type]?.label || ''} · ${date(a.submitted_at)}</p></div><strong>${a.score === undefined ? '제출' : a.score + '점'}</strong></button>`;
+    return `<button class="exam-row" data-result="${a.id}"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(e?.title || '실전시험')}</h3><p>${EXAM_TYPES[e?.exam_type]?.label || ''} · ${date(a.submitted_at)}</p></div><strong>${a.result_visibility === 'visible' && a.score !== undefined ? a.score + '점' : '공개 대기'}</strong></button>`;
   };
   return `<div class="section-title"><h2>최근 기록</h2><button class="text-button" data-go="records">전체 기록 보기 ${icon('chevron')}</button></div>${rows.map(line).join('')}`;
 }
@@ -368,14 +378,14 @@ function records(A) {
   ].sort((a,b) => b.at - a.at);
   const visible = tab === 'all' ? combined : combined.filter(row => row.kind === tab);
   const weekStart = A.data.ranking_period?.start || 0;
-  const weeklyScores = combined.filter(row => row.at >= weekStart).map(row => row.kind === 'practice'
-    ? (row.item.score ?? (row.item.total ? Math.round(row.item.correct / row.item.total * 100) : 0))
-    : Number(row.item.score || 0));
-  const allScores = combined.map(row => row.kind === 'practice'
-    ? (row.item.score ?? (row.item.total ? Math.round(row.item.correct / row.item.total * 100) : 0))
-    : Number(row.item.score || 0));
-  const weeklyAvg = weeklyScores.length ? Math.round(weeklyScores.reduce((n,v)=>n+v,0)/weeklyScores.length) : 0;
-  const best = allScores.length ? Math.max(...allScores) : 0;
+  const numericScore = row => {
+    if (row.kind === 'practice') return Number(row.item.score ?? (row.item.total ? Math.round(row.item.correct / row.item.total * 100) : 0));
+    return row.item.result_visibility === 'visible' && Number.isFinite(Number(row.item.score)) ? Number(row.item.score) : null;
+  };
+  const weeklyScores = combined.filter(row => row.at >= weekStart).map(numericScore).filter(Number.isFinite);
+  const allScores = combined.map(numericScore).filter(Number.isFinite);
+  const weeklyAvg = weeklyScores.length ? Math.round(weeklyScores.reduce((n,v)=>n+v,0)/weeklyScores.length) : null;
+  const best = allScores.length ? Math.max(...allScores) : null;
   const totalQuestions = sessions.reduce((n,s)=>n+Number(s.total||0),0) + attempts.reduce((n,a)=>n+Number(a.total||0),0);
   const disputeState = sourceId => {
     const rows = (A.data.meaning_disputes || []).filter(item => item.source_id === sourceId);
@@ -386,14 +396,14 @@ function records(A) {
   const rowHtml = row => {
     if (row.kind === 'practice') {
       const s = row.item, score = s.score ?? (s.total ? Math.round(s.correct / s.total * 100) : 0);
-      const ranges = (s.range_codes || []).map(code => `${esc(code)}과`).join(' · ') || '선택 범위';
+      const ranges = (s.range_codes || []).map(code => esc(recordRangeLabel(s, code))).join(' · ') || '선택 범위';
       return `<button class="record-row full" style="width:100%;text-align:left" data-practice-record="${s.id}"><span class="square-icon">${icon('practice')}</span><div class="grow"><strong>${esc(ranges)} · ${esc(PRACTICE_TYPES[s.mode] || '연습')} · ${s.run_mode === 'test' ? '실전' : '연습'}</strong><p>${s.correct}/${s.total} 정답 · ${durationText(s.duration_sec)}${s.auto_submitted ? ' · 시간 종료' : ''}</p><p>${date(s.created_at)}</p></div><div class="result">${score}점<small>${disputeState(s.id).replace(/^ · /,'') || '연습 기록'}</small></div></button>`;
     }
     const a = row.item, e = A.data.exams.find(exam => exam.id === a.exam_id);
-    return `<button class="record-row full" style="width:100%;text-align:left" data-result="${a.id}"><span class="square-icon">${icon('exam')}</span><div class="grow"><strong>${esc(e?.title || '실전시험')}</strong><p>${EXAM_TYPES[e?.exam_type]?.label || ''} · ${a.correct}/${a.total} 정답</p><p>${date(a.submitted_at)}</p></div><div class="result">${a.score === undefined ? '제출' : a.score + '점'}<small>${a.score === undefined ? '결과 비공개' : (disputeState(a.id).replace(/^ · /,'') || '시험 기록')}</small></div></button>`;
+    return `<button class="record-row full" style="width:100%;text-align:left" data-result="${a.id}"><span class="square-icon">${icon('exam')}</span><div class="grow"><strong>${esc(e?.title || '실전시험')}</strong><p>${EXAM_TYPES[e?.exam_type]?.label || ''}${a.result_visibility === 'visible' && a.correct !== undefined ? ' · ' + a.correct + '/' + a.total + ' 정답' : ' · 제출 완료'}</p><p>${date(a.submitted_at)}</p></div><div class="result">${a.result_visibility === 'visible' && a.score !== undefined ? a.score + '점' : '공개 대기'}<small>${a.result_visibility === 'visible' ? (disputeState(a.id).replace(/^ · /,'') || (a.grading_status === 'provisional' ? '임시 점수' : '시험 기록')) : '선생님 공개 대기'}</small></div></button>`;
   };
   return `<div class="page-heading"><h1>내 기록</h1><p>언제, 어떤 범위를 봤고 몇 점이었는지 모두 남아요.</p></div>
-    <div class="record-stats"><div><strong>${weeklyAvg}점</strong><span>이번 주 평균</span></div><div><strong>${combined.length}회</strong><span>총 기록</span></div><div><strong>${best}점</strong><span>최고 점수</span></div><div><strong>${num(totalQuestions)}</strong><span>누적 문제</span></div></div>
+    <div class="record-stats"><div><strong>${weeklyAvg === null ? '—' : weeklyAvg + '점'}</strong><span>이번 주 평균 · 공개 ${weeklyScores.length}회</span></div><div><strong>${combined.length}회</strong><span>총 기록</span></div><div><strong>${best === null ? '—' : best + '점'}</strong><span>최고 공개 점수</span></div><div><strong>${num(totalQuestions)}</strong><span>누적 문제</span></div></div>
     ${achievementSection(A, true)}
     <div class="segment"><button data-record-tab="all" class="${tab === 'all' ? 'selected' : ''}">전체</button><button data-record-tab="exam" class="${tab === 'exam' ? 'selected' : ''}">시험</button><button data-record-tab="practice" class="${tab === 'practice' ? 'selected' : ''}">연습</button></div>
     <div style="margin-top:18px">${visible.length ? visible.map(rowHtml).join('') : empty('records','아직 기록이 없어요','뜻쓰기나 영어쓰기를 마치면 점수와 시간이 여기에 저장돼요.')}</div>`;

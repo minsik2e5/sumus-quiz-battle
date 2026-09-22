@@ -1,5 +1,5 @@
 import { EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, dayKey } from './core.js';
-import { icon, esc, num, date, scope, empty, $, $$ } from './ui.js';
+import { icon, esc, num, date, recordRangeLabel, scope, empty, $, $ } from './ui.js';
 import { avatar } from './character.js';
 import { rangePicker, selectedCount, getRanges } from './student.js';
 import { DANWONGO_PASSAGES } from '../danwongo-grammar-data.js?v=2';
@@ -82,10 +82,14 @@ function grammarWeakness(d, school) {
 function activeExamStatus(d) {
   const now = Date.now();
   return d.exams.filter(e => e.active && e.available_at <= now && e.due_at > now).map(exam => {
-    const targets = d.profiles.filter(p => p.active && p.class_name === exam.class_name);
-    const submittedIds = new Set(d.attempts.filter(a => a.exam_id === exam.id && a.status === 'submitted').map(a => a.student_id));
-    const missing = targets.filter(student => !submittedIds.has(student.id));
-    return { exam, targets, submitted: targets.length - missing.length, missing };
+    const targets = d.profiles.filter(p => p.active && targetMatches(exam.class_name, p));
+    const examAttempts = d.attempts.filter(a => a.exam_id === exam.id);
+    const submittedIds = new Set(examAttempts.filter(a => a.status === 'submitted').map(a => a.student_id));
+    const activeIds = new Set(examAttempts.filter(a => a.status === 'active').map(a => a.student_id));
+    const submitted = targets.filter(student => submittedIds.has(student.id));
+    const active = targets.filter(student => !submittedIds.has(student.id) && activeIds.has(student.id));
+    const missing = targets.filter(student => !submittedIds.has(student.id) && !activeIds.has(student.id));
+    return { exam, targets, submitted, active, missing };
   });
 }
 function attentionStudentButton(student, sub, tone = '') {
@@ -143,8 +147,8 @@ function dashboard(A) {
         <div class="panel-head"><div><h2>실전시험 미제출</h2><span>현재 응시 가능한 시험 기준</span></div><button class="text-button" data-go="exams">시험 관리</button></div>
         <div class="v136-exam-list">${examStatus.length ? examStatus.map(item => `
           <div class="v136-exam-item">
-            <div class="v136-exam-top"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(item.exam.title)}</h3><p>${esc(item.exam.class_name)} · ${date(item.exam.due_at)} 마감</p></div><span class="pill ${item.missing.length ? '' : 'green'}">${item.submitted}/${item.targets.length} 제출</span></div>
-            <div class="v136-missing-names">${item.missing.length ? item.missing.slice(0, 8).map(student => `<button data-student="${student.id}">${esc(student.display_name)}</button>`).join('') : '<span>전원 제출 완료</span>'}${item.missing.length > 8 ? `<em>+${item.missing.length - 8}명</em>` : ''}</div>
+            <div class="v136-exam-top"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(item.exam.title)}</h3><p>${esc(targetLabel(item.exam.class_name))} · ${date(item.exam.due_at)} 마감</p></div><span class="pill ${item.missing.length ? '' : 'green'}">${item.submitted.length}/${item.targets.length} 제출</span></div>
+            <div class="v136-missing-names">${item.active.length ? `<span class="tiny muted">응시 중 ${item.active.length}명</span>` : ''}${item.missing.length ? item.missing.slice(0, 8).map(student => `<button data-student="${student.id}">${esc(student.display_name)}</button>`).join('') : '<span>미응시 없음</span>'}${item.missing.length > 8 ? `<em>+${item.missing.length - 8}명</em>` : ''}</div>
           </div>`).join('') : '<div class="v136-empty-line">현재 진행 중인 실전시험이 없어요.</div>'}</div>
       </section>
 
@@ -251,7 +255,7 @@ function results(A) {
   const totalQuestions = sessions.reduce((n,s)=>n+Number(s.total||0),0) + attempts.reduce((n,a)=>n+Number(a.total||0),0);
   const pending = (A.data.meaning_disputes || []).filter(item => item.status === 'pending').length;
   const sec = value => { const n = Math.max(0, Number(value || 0)), m = Math.floor(n/60), s = n%60; return `${m}:${String(s).padStart(2,'0')}`; };
-  const practiceTable = visibleSessions.length ? `<div class="table-scroll"><table><thead><tr><th>학생</th><th>범위</th><th>방식</th><th>점수</th><th>정답</th><th>시간</th><th>일시</th><th>상세</th></tr></thead><tbody>${visibleSessions.map(s => { const p = A.data.profiles.find(p => p.id === s.student_id); const score = s.score ?? (s.total ? Math.round(s.correct / s.total * 100) : 0); const disputes = (A.data.meaning_disputes || []).filter(d => d.source_type === 'practice' && d.source_id === s.id); const pendingCount = disputes.filter(d => d.status === 'pending').length; const regraded = disputes.some(d => String(d.status || '').startsWith('approved')) || s.regraded_at; return `<tr><td><strong>${esc(p?.display_name || '학생')}</strong><small>${esc(p?.class_name || s.grade || '')}</small></td><td>${(s.range_codes || []).map(code => esc(code) + (s.division === 'middle' ? '과' : '번')).join(' · ') || '선택 범위'}</td><td>${esc(PRACTICE_TYPES[s.mode] || '연습')}<small>${s.run_mode === 'test' ? '실전 모드' : '연습 모드'}</small></td><td><strong>${score}점</strong>${pendingCount ? '<small>임시 · 이의제기 심사중</small>' : regraded ? '<small>재채점 완료</small>' : ''}</td><td>${s.correct} / ${s.total}</td><td>${sec(s.duration_sec)}</td><td>${date(s.created_at)}${s.auto_submitted ? '<small>시간 종료 자동 제출</small>' : ''}</td><td><button class="text-button" data-practice-record="${s.id}">오답 보기</button></td></tr>`; }).join('')}</tbody></table></div>` : empty('records','완료된 연습 기록이 아직 없어요');
+  const practiceTable = visibleSessions.length ? `<div class="table-scroll"><table><thead><tr><th>학생</th><th>범위</th><th>방식</th><th>점수</th><th>정답</th><th>시간</th><th>일시</th><th>상세</th></tr></thead><tbody>${visibleSessions.map(s => { const p = A.data.profiles.find(p => p.id === s.student_id); const score = s.score ?? (s.total ? Math.round(s.correct / s.total * 100) : 0); const disputes = (A.data.meaning_disputes || []).filter(d => d.source_type === 'practice' && d.source_id === s.id); const pendingCount = disputes.filter(d => d.status === 'pending').length; const regraded = disputes.some(d => String(d.status || '').startsWith('approved')) || s.regraded_at; return `<tr><td><strong>${esc(p?.display_name || '학생')}</strong><small>${esc(p?.class_name || s.grade || '')}</small></td><td>${(s.range_codes || []).map(code => esc(recordRangeLabel(s, code))).join(' · ') || '선택 범위'}</td><td>${esc(PRACTICE_TYPES[s.mode] || '연습')}<small>${s.run_mode === 'test' ? '실전 모드' : '연습 모드'}</small></td><td><strong>${score}점</strong>${pendingCount ? '<small>임시 · 이의제기 심사중</small>' : regraded ? '<small>재채점 완료</small>' : ''}</td><td>${s.correct} / ${s.total}</td><td>${sec(s.duration_sec)}</td><td>${date(s.created_at)}${s.auto_submitted ? '<small>시간 종료 자동 제출</small>' : ''}</td><td><button class="text-button" data-practice-record="${s.id}">오답 보기</button></td></tr>`; }).join('')}</tbody></table></div>` : empty('records','완료된 연습 기록이 아직 없어요');
   const examTable = visibleAttempts.length ? `<div class="table-scroll"><table><thead><tr><th>학생</th><th>시험</th><th>유형</th><th>점수</th><th>정답</th><th>제출 시간</th><th>상세</th></tr></thead><tbody>${visibleAttempts.map(a => { const e = A.data.exams.find(e => e.id === a.exam_id), s = A.data.profiles.find(p => p.id === a.student_id); const disputes = (A.data.meaning_disputes || []).filter(d => d.source_type === 'exam' && d.source_id === a.id); const pendingCount = disputes.filter(d => d.status === 'pending').length; const regraded = disputes.some(d => String(d.status || '').startsWith('approved')) || a.regraded_at; return `<tr><td><strong>${esc(s?.display_name || '학생')}</strong><small>${esc(s?.class_name || '')}</small></td><td>${esc(e?.title || '시험')}</td><td>${EXAM_TYPES[e?.exam_type]?.label || ''}</td><td><strong>${a.score}점</strong>${pendingCount ? '<small>임시 · 이의제기 심사중</small>' : regraded ? '<small>재채점 완료</small>' : ''}</td><td>${a.correct} / ${a.total}</td><td>${date(a.submitted_at)}${a.auto_submitted ? '<small>시간 종료 자동 제출</small>' : ''}</td><td><button class="text-button" data-result="${a.id}">답안 보기</button></td></tr>`; }).join('')}</tbody></table></div>` : empty('exam','제출된 시험이 아직 없어요');
   return `${metrics([['연습 기록', sessions.length, '회'], ['연습 평균', practiceAvg, '점'], ['시험 평균', examAvg, '점'], ['누적 문제', totalQuestions, '문제']])}
     ${pending ? `<div class="dispute-summary"><div><span>이의제기 검토 대기</span><strong>${pending}<small>건</small></strong></div><p>승인하면 해당 연습 또는 시험 점수가 자동 재계산됩니다.</p></div>` : ''}
