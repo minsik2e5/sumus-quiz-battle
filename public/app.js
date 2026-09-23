@@ -29,6 +29,43 @@ function navigate(tab) {
   if (tab === 'exam') { A.examKind = null; A.practiceRunMode = 'practice'; if (!['write_meaning','spell','eng2mean'].includes(A.mode)) A.mode = 'write_meaning'; }
   A.search = ''; A.classFilter = ''; A.style = null; render(); window.scrollTo(0, 0);
 }
+function signupView(division = A.division) {
+  A.role = 'student'; A.division = division;
+  const divisionName = division === 'middle' ? '중등부' : '고등부';
+  const schools = division === 'middle'
+    ? [{ id:'wonil-middle', name:'원일중' }]
+    : [{ id:'danwon-high', name:'단원고' }, { id:'seonbu-high', name:'선부고' }, { id:'gangseo-high', name:'강서고' }];
+  const classes = division === 'middle' ? ['중2','중3'] : ['고1A','고1B'];
+  $('#app').innerHTML = `<div class="auth auth-v1327"><form class="auth-form auth-card-v1327 signup-card-v1332" id="signup-form">
+    <div class="auth-hero-v1330"><img src="/sumus-logo-green.svg" alt="SUMUS VOCA"><h1>SUMUS <em>VOCA</em></h1><p>나만의 학습 계정을 만들어요</p></div>
+    <button type="button" class="auth-back-student" data-back-login>← 로그인으로</button>
+    <div class="division-segment auth-division-v1327"><button type="button" data-signup-division="middle" class="${division === 'middle' ? 'selected' : ''}">중등부</button><button type="button" data-signup-division="high" class="${division === 'high' ? 'selected' : ''}">고등부</button></div>
+    <div class="auth-title-v1327"><span>JOIN SUMUS</span><h1>학생 회원가입</h1><p>${divisionName} 학교와 반을 선택해 주세요.</p></div>
+    <div class="signup-grid-v1332">
+      <label class="field"><span>학교</span><select name="school_id" required>${schools.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select></label>
+      <label class="field"><span>학년 / 반</span><select name="class_name" required>${classes.map(x=>`<option value="${x}">${x}</option>`).join('')}</select></label>
+    </div>
+    <div class="auth-fields-v1327">
+      <label class="field"><span>이름</span><input name="display_name" placeholder="학생 이름" required maxlength="40"></label>
+      <label class="field"><span>아이디</span><input name="username" autocomplete="username" placeholder="영문 소문자·숫자 3자 이상" required maxlength="40" autocapitalize="off"></label>
+      <label class="field"><span>비밀번호</span><div class="password-wrap"><input name="password" type="password" autocomplete="new-password" placeholder="8자 이상" required maxlength="128"><button type="button" id="toggle-signup-password">보기</button></div></label>
+    </div>
+    <div class="form-error" id="signup-error" role="alert"></div>
+    <button class="btn primary full auth-submit-v1327" type="submit">회원가입하고 시작하기 ${icon('arrow')}</button>
+  </form></div>`;
+  $('[data-signup-division]').forEach(b => b.onclick = () => signupView(b.dataset.signupDivision));
+  $('[data-back-login]').onclick = () => loginView('student', division);
+  $('#toggle-signup-password').onclick = e => { const input = $('[name="password"]'); input.type = input.type === 'password' ? 'text' : 'password'; e.currentTarget.textContent = input.type === 'password' ? '보기' : '숨기기'; };
+  $('#signup-form').onsubmit = async e => {
+    e.preventDefault(); const b = $('[type="submit"]', e.currentTarget); buttonBusy(b); $('#signup-error').textContent = '';
+    try {
+      const values = Object.fromEntries(new FormData(e.currentTarget));
+      await api('/signup', { ...values, division });
+      const login = await api('/login', { username: values.username, password: values.password, role:'student', division });
+      A.role = login.profile?.role || 'student'; A.division = division; await refresh(); preferences(); A.tab = A.data.profile.avatar_key ? 'home' : 'studio'; render(); startPolling();
+    } catch (err) { $('#signup-error').textContent = err.message; buttonBusy(b, false); }
+  };
+}
 function loginView(role = A.role, division = A.division) {
   A.role = role; A.division = division;
   const teacher = role === 'teacher';
@@ -39,10 +76,11 @@ function loginView(role = A.role, division = A.division) {
     <div class="auth-fields-v1327"><label class="field"><span>아이디</span><input name="username" autocomplete="username" placeholder="아이디" required maxlength="80" autocapitalize="off"></label><label class="field"><span>비밀번호</span><div class="password-wrap"><input name="password" type="password" autocomplete="current-password" placeholder="비밀번호" required maxlength="128"><button type="button" id="toggle-password" aria-label="비밀번호 보기">보기</button></div></label></div>
     <div class="form-error" id="login-error" role="alert"></div>
     <button class="btn primary full auth-submit-v1327" type="submit">${teacher ? '선생님 로그인' : divisionName + ' 로그인'} ${icon('arrow')}</button>
-    ${teacher ? '' : '<button type="button" class="teacher-login-link" data-login-teacher>선생님 로그인 →</button>'}
+    ${teacher ? '' : '<button type="button" class="signup-link-v1332" data-signup>처음이신가요? <b>회원가입</b></button><button type="button" class="teacher-login-link" data-login-teacher>선생님 로그인 →</button>'}
   </form></div>`;
   $$('[data-division]').forEach(b => b.onclick = () => loginView('student', b.dataset.division));
   $('[data-login-teacher]')?.addEventListener('click', () => loginView('teacher', A.division));
+  $('[data-signup]')?.addEventListener('click', () => signupView(A.division));
   $('[data-login-student]')?.addEventListener('click', () => loginView('student', A.division));
   $('#toggle-password').onclick = e => { const input = $('[name="password"]'); input.type = input.type === 'password' ? 'text' : 'password'; e.currentTarget.textContent = input.type === 'password' ? '보기' : '숨기기'; };
   $('#login-form').onsubmit = async e => {
