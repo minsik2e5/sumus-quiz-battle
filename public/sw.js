@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.28.0-mobile-ratio-teacher-context';
+const VERSION = 'sumus-voca-v13.29.0-green-login-logo';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -23,6 +23,7 @@ const SHELL = [
   '/v1326.css',
   '/v1327.css',
   '/v1328.css',
+  '/v1329.css',
   '/app.js',
   '/signup-ui.js',
   '/teacher-enhancements.js',
@@ -36,6 +37,7 @@ const SHELL = [
   '/gangseo-grammar-data.js',
   '/pwa.js',
   '/icon.svg',
+  '/sumus-logo-green.svg',
   '/manifest.webmanifest',
   '/modules/ui.js',
   '/modules/core.js',
