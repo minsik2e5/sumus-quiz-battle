@@ -338,15 +338,19 @@ function renderPractice() {
     </main>
   </div>`);
   $('#practice-exit').onclick = () => {
-    if (testMode) {
-      const close = modal(`<h2>실전시험을 나갈까요?</h2><p>진행 위치는 그대로 저장돼요. 다시 들어오면 이어서 풀 수 있어요.</p><button class="btn primary full" id="practice-keep-going">계속 풀기</button><button class="btn full" id="practice-leave-test">시험 화면 나가기</button>`, '실전시험');
-      $('#practice-keep-going').onclick = close;
-      $('#practice-leave-test').onclick = async () => { close(); leaveSession(); await refresh(); redraw(); };
-    } else {
-      const close = modal(`<h2>연습시험을 마칠까요?</h2><p>지금까지의 최초 풀이 기록을 저장해요.</p><button class="btn primary full" id="practice-finish">저장하고 마치기</button><button class="btn full" id="practice-keep-practice">계속 풀기</button>`, '연습시험');
-      $('#practice-keep-practice').onclick = close;
-      $('#practice-finish').onclick = async () => { try { practiceState = await api(`/practice/${x.id}/finish`, {}); close(); finishPracticeView(); } catch (e) { toast(e.message); } };
-    }
+    const progress = Math.min(Number(x.score_total || 0), Number(x.target || 0));
+    const close = modal(`<h2>시험을 나갈까요?</h2><p>현재 <b>${progress} / ${x.target}</b>까지 진행했어요. 나가도 진행 위치가 저장되어 나중에 이어서 풀 수 있어요.</p><button class="btn primary full" id="practice-keep-going">계속 풀기</button><button class="btn full" id="practice-save-leave">저장하고 나가기</button><button class="text-button full" id="practice-finish-exit">시험 종료하기</button>`, testMode ? '실전시험' : '연습시험');
+    $('#practice-keep-going').onclick = close;
+    $('#practice-save-leave').onclick = async () => { close(); leaveSession(); await refresh(); redraw(); };
+    $('#practice-finish-exit').onclick = async event => {
+      if (!confirm('현재까지 푼 내용으로 시험을 종료할까요? 종료하면 이어서 풀 수 없어요.')) return;
+      buttonBusy(event.currentTarget);
+      try {
+        practiceState = await api(`/practice/${x.id}/finish`, {});
+        close();
+        finishPracticeView();
+      } catch (e) { buttonBusy(event.currentTarget, false); toast(e.message); }
+    };
   };
   $('#practice-sound').onclick = () => { A.sound = !A.sound; try { localStorage.setItem('sumus:sound', String(A.sound)); } catch {} renderPractice(); };
   $('#listen-word')?.addEventListener('click', () => {
