@@ -35,7 +35,12 @@ export const icon = (name, cls = '') => `<svg class="icon ${cls}" viewBox="0 0 2
 export const empty = (name, title, sub = '') => `<div class="empty-state">${icon(name)}<h3>${title}</h3>${sub ? `<p>${sub}</p>` : ''}</div>`;
 export function toast(message) { const t = $('#toast'); t.textContent = message; t.classList.add('visible'); clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('visible'), 3200); }
 export async function api(path, body, method) {
-  const r = await fetch('/api' + path, { method: method || (body === undefined ? 'GET' : 'POST'), headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(12000) });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  let r;
+  try {
+    r = await fetch('/api' + path, { method: method || (body === undefined ? 'GET' : 'POST'), headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal });
+  } finally { clearTimeout(timer); }
   const data = await r.json();
   if (!r.ok) throw Object.assign(new Error(data.error || '연결을 확인해주세요.'), { status: r.status });
   return data;
