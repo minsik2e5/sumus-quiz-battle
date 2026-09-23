@@ -1,0 +1,12 @@
+/* SUMUS VOCA V13.41 · pet evolution */
+.home-pet-evolution-v1341{background:radial-gradient(circle at 22% 38%,rgba(255,239,184,.34),transparent 31%),linear-gradient(145deg,#f3fbf7 0%,#fff 54%,#eef9f5 100%)}
+.home-pet-evolution-v1341 .home-pet-stage-v1337:before{width:168px;height:168px;background:radial-gradient(circle,rgba(248,211,111,.18),rgba(28,183,137,.07) 53%,transparent 72%)}
+.avatar-egg{position:relative}.avatar-egg .avatar-stage-name{position:absolute;left:50%;bottom:-4px;transform:translateX(-50%);padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.94);box-shadow:0 5px 15px rgba(32,66,55,.08);font-size:9px;font-weight:900;color:#8b7133;white-space:nowrap}
+.avatar-stage-2 svg{transform:scale(.92)}
+.avatar-stage-3 svg{transform:scale(.98)}
+.avatar-stage-4 svg{transform:scale(1.04)}
+.avatar-stage-5 svg{transform:scale(1.08);filter:drop-shadow(0 0 12px rgba(240,190,70,.22))}
+.home-pet-evolution-v1341.stage-4,.home-pet-evolution-v1341.stage-5{background:radial-gradient(circle at 20% 35%,rgba(255,215,107,.23),transparent 34%),linear-gradient(145deg,#f4fbf7,#fff 48%,#f7f2dc)}
+.home-evolution-line-v1341{display:flex;align-items:center;justify-content:space-between;margin:-7px 0 10px;padding:6px 8px;border-radius:10px;background:rgba(10,142,104,.055)}
+.home-evolution-line-v1341 span{font-size:8.5px;font-weight:800;color:#6e817a}.home-evolution-line-v1341 b{font-size:9px;color:#078864}
+@media(max-width:390px){.home-pet-evolution-v1341 .home-pet-stage-v1337:before{width:145px;height:145px}.home-evolution-line-v1341{margin-top:-5px}.home-evolution-line-v1341 span{font-size:7.8px}}
