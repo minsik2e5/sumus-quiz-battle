@@ -590,6 +590,7 @@ export async function runReleaseCheck() {
     const v1330Css = readFileSync(publicRoot + 'v1330.css', 'utf8');
     const uiModule = readFileSync(publicRoot + 'modules/ui.js', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
+    const coreModule = readFileSync(publicRoot + 'modules/core.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
     const practiceEnhancements = readFileSync(publicRoot + 'practice-enhancements.js', 'utf8');
     const appJs = readFileSync(publicRoot + 'app.js', 'utf8');
@@ -629,7 +630,7 @@ export async function runReleaseCheck() {
     assert(v1328Css.includes('.home-pet-art .avatar') && v1328Css.includes('.exam-question-area') && v1328Css.includes('.teacher-division-switch'), 'V13.30 mobile ratio and teacher division switch styles are loaded');
     assert(v1329Css.includes('.auth-v1327') && v1329Css.includes('box-sizing:border-box') && indexSource.includes('/sumus-logo-green.svg'), 'V13.30 green login shell and logo are loaded');
     assert(v1330Css.includes('.pet-choice-grid') && v1330Css.includes('.auth-hero-v1330'), 'V13.30 cute pet onboarding styles are loaded');
-    assert(coreSource.includes("dog:") && coreSource.includes("pig:") && coreSource.includes("cat:") && coreSource.includes("dragon:") && coreSource.includes("panda:") && coreSource.includes("snake:"), 'V13.30 six pet partners are registered');
+    assert(coreModule.includes("dog:") && coreModule.includes("pig:") && coreModule.includes("cat:") && coreModule.includes("dragon:") && coreModule.includes("panda:") && coreModule.includes("snake:"), 'V13.30 six pet partners are registered');
     assert(studentModule.includes('home-pet-hero') && studentModule.includes('home-week-days') && studentModule.includes('data-rank-scope-select') && !studentModule.includes('같이 올라가면 더 재밌다.'), 'V13.30 home is pet-and-growth focused and ranking filters are compact');
     assert(appJs.includes('rankScopeSelect') && appJs.includes('missingCount') && appJs.includes('session.word_ids'), 'V13.30 compact rank filters and complete review flow are wired');
 
