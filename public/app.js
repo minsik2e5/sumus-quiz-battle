@@ -1,7 +1,7 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS } from './modules/core.js';
-import { avatar } from './modules/character.js?v=13.30.0';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.36.0';
+import { avatar } from './modules/character.js?v=13.37.0';
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.37.0';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.30.0';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.30.0';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [] };
