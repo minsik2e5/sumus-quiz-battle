@@ -496,9 +496,15 @@ function exam(A) {
   let scopeUi = '', count = 0, scopeLabel = '';
   if (middle) {
     const state = middleLessonState(A);
-    count = state.lessonWords.length;
-    scopeLabel = state.code ? state.code + '과' : '범위 미선택';
-    scopeUi = `<div class="middle-lesson-tabs setup-choice-row">${state.codes.map(range => { const n = state.words.filter(word => String(word.range_code) === String(range)).length; return `<button data-middle-lesson="${esc(range)}" class="${String(range) === state.code ? 'selected' : ''}">${esc(range)}과 <small>${n}개</small></button>`; }).join('')}</div>`;
+    const selectedIds = new Set(state.selected);
+    count = state.selected.length;
+    scopeLabel = state.code ? `${state.code}과 · ${count}개 선택` : '범위 미선택';
+    scopeUi = `<div class="middle-lesson-tabs setup-choice-row">${state.codes.map(range => { const n = state.words.filter(word => String(word.range_code) === String(range)).length; return `<button data-middle-lesson="${esc(range)}" class="${String(range) === state.code ? 'selected' : ''}">${esc(range)}과 <small>${n}개</small></button>`; }).join('')}</div>
+      <div class="middle-word-scope-v1334">
+        <div class="middle-word-scope-head"><div><strong>오늘 외운 단어 선택</strong><small>보통 20~30개 · 연습/실전 공통</small></div><b>${count}개 선택</b></div>
+        <div class="middle-word-scope-actions"><button data-middle-word-preset="20">앞 20개</button><button data-middle-word-preset="30">앞 30개</button><button data-middle-word-preset="all">전체</button><button data-middle-word-preset="clear">초기화</button></div>
+        <div class="middle-word-checklist">${state.lessonWords.map((word,index) => `<label class="${selectedIds.has(word.id) ? 'selected' : ''}"><input type="checkbox" data-middle-word="${esc(word.id)}" ${selectedIds.has(word.id) ? 'checked' : ''}><span class="middle-word-no">${index+1}</span><span><b>${esc(word.word)}</b><small>${esc(word.meaning)}</small></span></label>`).join('')}</div>
+      </div>`;
   } else {
     const state = getRanges(A);
     count = state.words.filter(word => state.selected.includes(word.range_code)).length;
