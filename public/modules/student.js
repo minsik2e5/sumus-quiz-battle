@@ -289,15 +289,19 @@ function compactGrowth(A) {
   const stage = Number(g.stage || 1);
   const percent = Math.max(3, Number(g.percent || 0));
   const pet = CHARACTERS[p.avatar_key || 'dog'] || CHARACTERS.dog;
-  return `<section class="home-profile-hero-v1337">
+  const petStageNames = ['알', '유년체', '성장체', '성숙체', '최종체'];
+  const petStageName = petStageNames[Math.max(1, Math.min(5, stage)) - 1];
+  const nextStageLevel = [5, 10, 15, 20, null][Math.max(1, Math.min(5, stage)) - 1];
+  return `<section class="home-profile-hero-v1337 home-pet-evolution-v1341 stage-${stage}">
     <div class="home-pet-stage-v1337">
       <span class="home-level-badge-v1337"><small>LEVEL</small><b>${level}</b></span>
       <div class="home-pet-art-v1337">${avatar(p.avatar_key || 'dog', { accessory: p.avatar_accessory, frame: p.avatar_frame, stage, size: 'home-featured' })}</div>
-      <span class="home-pet-status-v1337">MY PARTNER</span>
+      <span class="home-pet-status-v1337">${petStageName}</span>
     </div>
     <div class="home-profile-copy-v1337">
-      <span class="home-profile-kicker-v1337">나의 성장 파트너</span>
-      <h1>${esc(pet.ko)} <small>${esc(pet.type)}</small></h1>
+      <span class="home-profile-kicker-v1337">나의 성장 파트너 · ${petStageName}</span>
+      <h1>${stage === 1 ? '???' : esc(pet.ko)} <small>${stage === 1 ? '부화를 기다리는 중' : esc(pet.type)}</small></h1>
+      <div class="home-evolution-line-v1341"><span>${stage === 5 ? '최종 진화 완료' : `다음 진화 · Lv.${nextStageLevel}`}</span><b>${stage}/5</b></div>
       <div class="home-level-line-v1337"><b>Lv.${level}</b><span>다음 레벨까지 ${num(g.remaining || 0)} XP</span></div>
       <div class="home-xp-track-v1337" aria-label="레벨 진행률"><i style="width:${percent}%"></i></div>
       <div class="home-xp-meta-v1337"><span>누적 XP ${num(g.points || 0)}</span><strong>${Math.round(Number(g.percent || 0))}%</strong></div>
