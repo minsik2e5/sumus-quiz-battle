@@ -405,14 +405,23 @@ export async function service(state, method, path, body, token) {
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
-    if (process.env.AUTH_PROVIDER === 'supabase') {
-      const result = await supabaseLogin(str(body.username), String(body.password || '')); p = result.profile; supabaseAccessToken = result.accessToken;
+    const username = str(body.username).toLowerCase();
+    const password = String(body.password || '');
+    // Self-signup students are stored in the durable VOCA state with a local
+    // password_hash. Authenticate those accounts locally even when Supabase
+    // auth is enabled, so signup and subsequent login use the same credential.
+    const localProfile = state.profiles.find(profile => profile.username === username && profile.active);
+    if (localProfile?.password_hash) {
+      p = localProfile;
+      if (!(await verifyPassword(password, p.password_hash))) fail('아이디 또는 비밀번호를 확인해주세요.', 401);
+    } else if (process.env.AUTH_PROVIDER === 'supabase') {
+      const result = await supabaseLogin(username, password); p = result.profile; supabaseAccessToken = result.accessToken;
       const old = state.profiles.find(x => x.id === p.id);
       if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
       else state.profiles.push(p);
     } else {
-      p = state.profiles.find(p => p.username === str(body.username).toLowerCase() && p.active);
-      if (!(await verifyPassword(String(body.password || ''), p?.password_hash))) fail('아이디 또는 비밀번호를 확인해주세요.', 401);
+      p = localProfile;
+      if (!(await verifyPassword(password, p?.password_hash))) fail('아이디 또는 비밀번호를 확인해주세요.', 401);
     }
     if (p.role === 'teacher') {
       if (!Array.isArray(p.school_ids) || !p.school_ids.length) p.school_ids = state.schools.filter(s => s.active !== false).map(s => s.id);
