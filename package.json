@@ -9,7 +9,8 @@
     "test": "node --test test/build.test.js test/data.test.js test/protocol.test.js test/room-registry.test.js",
     "test:e2e": "node --test test/e2e-classroom.test.js",
     "test:load": "node scripts/run-load-test.js",
-    "test:visual": "node scripts/visual-qa.js"
+    "test:visual": "node scripts/visual-qa.js",
+    "test:motion": "node scripts/motion-qa.js"
   },
   "engines": {
     "node": ">=20"
