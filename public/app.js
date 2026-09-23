@@ -1,10 +1,10 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS } from './modules/core.js';
-import { avatar } from './modules/character.js?v=13.38.0';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.38.0';
+import { avatar } from './modules/character.js?v=13.39.0';
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.39.0';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.30.0';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.30.0';
-const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [] };
+const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
 const examTargetMatches = (exam, profile) => exam?.class_name === ALL_CLASSES || exam?.class_name === profile?.class_name;
@@ -165,10 +165,13 @@ $('#app').addEventListener('click', async event => {
     if (d.rangeAll) { const { codes } = getRanges(A); A.ranges[A.school] = d.rangeAll === 'true' ? [...codes] : []; $$('[data-range]').forEach(i => i.checked = d.rangeAll === 'true'); updateRangeSummary(A); updateExamSummary(A); savePreferences(); return; }
     if (d.mode) { A.mode = d.mode; if (!['write_meaning','spell'].includes(A.mode)) A.practiceRunMode = 'practice'; savePreferences(); render(); return; }
     if (d.practiceTarget) { A.target = d.practiceTarget === 'all' ? 'all' : Number(d.practiceTarget); $$('[data-practice-target]').forEach(e => { const selected = e === b; e.classList.toggle('selected', selected); e.setAttribute('aria-pressed', String(selected)); }); savePreferences(); render(); return; }
-    if (d.middleLesson) { A.middleRange = d.middleLesson; A.middleWordIds = []; A.target = 'all'; savePreferences(); render(); return; }
+    if (d.middleLesson) { A.middleRange = d.middleLesson; A.middleWordIds = []; A.middleWordsOpen = false; A.target = 'all'; savePreferences(); render(); return; }
+    if (d.middleWordsToggle) { A.middleWordsOpen = !A.middleWordsOpen; render(); return; }
+    if (d.middleGrammarLesson) { A.middleGrammarLesson = Number(d.middleGrammarLesson); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (d.middleWordPreset) {
       const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
       A.middleWordIds = d.middleWordPreset === 'clear' ? [] : d.middleWordPreset === 'all' ? words.map(word => word.id) : words.slice(0, Number(d.middleWordPreset)).map(word => word.id);
+      if (d.middleWordPreset !== 'clear') A.middleWordsOpen = false;
       A.target = 'all'; savePreferences(); render(); return;
     }
     if (d.rankMode) { A.rankMode = d.rankMode; savePreferences(); render(); return; }
@@ -243,7 +246,7 @@ $('#app').addEventListener('click', async event => {
       return;
     }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
-      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.36.0');
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.39.0');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
