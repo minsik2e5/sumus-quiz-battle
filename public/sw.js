@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.29.0-green-login-logo';
+const VERSION = 'sumus-voca-v13.30.0-cute-pets-onboarding';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -24,6 +24,7 @@ const SHELL = [
   '/v1327.css',
   '/v1328.css',
   '/v1329.css',
+  '/v1330.css',
   '/app.js',
   '/signup-ui.js',
   '/teacher-enhancements.js',
