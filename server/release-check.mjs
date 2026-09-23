@@ -584,7 +584,8 @@ export async function runReleaseCheck() {
     const v1323Css = readFileSync(publicRoot + 'v1323.css', 'utf8');
     const v1325Css = readFileSync(publicRoot + 'v1325.css', 'utf8');
     const v1326Css = readFileSync(publicRoot + 'v1326.css', 'utf8');
-    const v1327Css = readFileSync(publicRoot + 'v1327.css', 'utf8');\n    const v1328Css = readFileSync(publicRoot + 'v1328.css', 'utf8');
+    const v1327Css = readFileSync(publicRoot + 'v1327.css', 'utf8');
+    const v1328Css = readFileSync(publicRoot + 'v1328.css', 'utf8');
     const uiModule = readFileSync(publicRoot + 'modules/ui.js', 'utf8');
     const studentModule = readFileSync(publicRoot + 'modules/student.js', 'utf8');
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
@@ -622,7 +623,8 @@ export async function runReleaseCheck() {
     assert(indexHtml.includes('/app.js?v=13.28.0') && indexHtml.includes('/practice-enhancements.js?v=13.28.0') && indexHtml.includes('/v1325.css?v=13.28.0') && indexHtml.includes('/v1326.css?v=13.28.0') && indexHtml.includes('/v1327.css?v=13.28.0') && indexHtml.includes('/v1328.css?v=13.28.0') && sw.includes('sumus-voca-v13.28.0-mobile-ratio-teacher-context'), 'V13.28 cache versions are active');
     assert(v1325Css.includes('--sumus-primary') && v1325Css.includes('grid-template-columns:repeat(5') && v1325Css.includes('memorize-flip-in'), 'V13.25 green design system, balanced bottom navigation, and memorization motion are loaded');
     assert(v1326Css.includes('.home-focus-v1326') && v1326Css.includes('.rank-filter-bar') && v1326Css.includes('.pwa-install-hint'), 'V13.28 home, ranking, and PWA polish styles are loaded');
-    assert(v1327Css.includes('.home-pet-hero') && v1327Css.includes('.record-summary-v1327') && v1327Css.includes('.auth-card-v1327'), 'V13.28 student home, records, and login polish styles are loaded');\n    assert(v1328Css.includes('.home-pet-art .avatar') && v1328Css.includes('.exam-question-area') && v1328Css.includes('.teacher-division-switch'), 'V13.28 mobile ratio and teacher division switch styles are loaded');
+    assert(v1327Css.includes('.home-pet-hero') && v1327Css.includes('.record-summary-v1327') && v1327Css.includes('.auth-card-v1327'), 'V13.28 student home, records, and login polish styles are loaded');
+    assert(v1328Css.includes('.home-pet-art .avatar') && v1328Css.includes('.exam-question-area') && v1328Css.includes('.teacher-division-switch'), 'V13.28 mobile ratio and teacher division switch styles are loaded');
     assert(studentModule.includes('home-pet-hero') && studentModule.includes('home-week-days') && studentModule.includes('data-rank-scope-select') && !studentModule.includes('같이 올라가면 더 재밌다.'), 'V13.28 home is pet-and-growth focused and ranking filters are compact');
     assert(appJs.includes('rankScopeSelect') && appJs.includes('missingCount') && appJs.includes('session.word_ids'), 'V13.28 compact rank filters and complete review flow are wired');
 
