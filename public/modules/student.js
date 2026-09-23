@@ -4,6 +4,7 @@ import { avatar } from './character.js';
 import { DANWONGO_PASSAGES } from '../danwongo-grammar-data.js?v=2';
 import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from '../seonbu-grammar-data.js?v=2';
 import { GANGSEO_PASSAGES } from '../gangseo-grammar-data.js?v=1';
+import { MIDDLE_DONGA_YOON_PASSAGES, MIDDLE_DONGA_YOON_BY_LESSON } from '../middle-donga-yoon-grammar-data.js?v=1';
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
 export function shell(A, content) {
   const p = A.data.profile;
@@ -89,14 +90,16 @@ export function rangePicker(A, teacher = false, grade = null) {
     return `<label class="range-option ${meta ? 'quest-range ' + meta.cls : ''}"><input type="checkbox" data-range="${c}" ${grade ? `data-range-grade="${esc(grade)}"` : ''} ${selected.includes(c) ? 'checked' : ''} aria-label="${esc(rangeLabel(A.school, c))}"><span>${esc(rangeLabel(A.school, c))}<small>${words.filter(w => w.range_code === c).length}개 단어${meta ? ' · ' + meta.detail : ''}</small>${meta ? `<em class="quest-status ${meta.cls}">${meta.label}</em>` : ''}</span></label>`;
   }).join('')}</div><div class="scope-tools"><span id="scope-count">${selected.length}개 범위 · ${selectedCount(A, grade)}개 단어</span><div><button data-range-all="true">전체 선택</button><button data-range-all="false">해제</button></div></div>`;
 }
-function grammarPassagesForSchool(school) {
+function grammarPassagesForSchool(school, division = 'high') {
+  if (division === 'middle') return MIDDLE_DONGA_YOON_PASSAGES;
   if (school === '단원고') return DANWONGO_PASSAGES;
   if (school === '선부고') return [...SEONBU_2026_PASSAGES, ...SEONBU_2025_PASSAGES];
   if (school === '강서고') return GANGSEO_PASSAGES;
   return [];
 }
 function grammarExamLabel(passage) {
-  return passage.id.startsWith('2026-06-busan') ? '2026년 6월 부산교육청'
+  return passage.id.startsWith('middle-dong-a-yoon') ? '중3 동아(윤정미) · 본문 Part 4'
+    : passage.id.startsWith('2026-06-busan') ? '2026년 6월 부산교육청'
     : passage.id.startsWith('2026-03-seoul') ? '2026년 3월 서울교육청'
     : '2025년 9월 인천교육청';
 }
@@ -108,7 +111,7 @@ function savedGrammarProgress(A, passage) {
 }
 function grammarHomeCard(A) {
   const school = A.data.profile.school || A.school || '';
-  const passages = grammarPassagesForSchool(school);
+  const passages = grammarPassagesForSchool(school, A.data.profile.division);
   if (!passages.length) return '';
   const completed = passages.filter(p => savedGrammarProgress(A, p)?.mastered).length;
   const target = passages.find(p => !savedGrammarProgress(A, p)?.mastered) || passages[0];
@@ -314,7 +317,7 @@ function homeRecommendations(A) {
     rows.push(`<button class="home-recommend-row" data-quick-practice="true"><span>${icon('practice')}</span><div class="grow"><b>추천 복습 ${A.data.daily_quest.target}개</b><small>오답 ${mix.wrong || 0} · 복습 ${mix.review || 0} · 새 단어 ${mix.new || 0}</small></div>${icon('chevron')}</button>`);
   }
   const school = A.data.profile.school || A.school || '';
-  const passages = grammarPassagesForSchool(school);
+  const passages = grammarPassagesForSchool(school, A.data.profile.division);
   if (passages.length) {
     const target = passages.find(p => !savedGrammarProgress(A, p)?.mastered) || passages[0];
     rows.push(`<button class="home-recommend-row" data-action="grammar-choice" data-grammar-id="${esc(target.id)}"><span>${icon('records')}</span><div class="grow"><b>어법·어휘 ${esc(target.number)}번</b><small>${esc(grammarExamLabel(target))} · ${target.sentences.length}문장</small></div>${icon('chevron')}</button>`);
@@ -359,6 +362,7 @@ function grammarCards(A, passages) {
 
 function grammarStudy(A) {
   const school = A.data.profile.school || A.school || '';
+  const middle = A.data.profile.division === 'middle';
   const isDanwon = school === '단원고';
   const isSeonbu = school === '선부고';
   const isGangseo = school === '강서고';
@@ -367,7 +371,13 @@ function grammarStudy(A) {
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill green">GRAMMAR</span></div>
   <div class="page-heading grammar-heading"><h1>어법·어휘</h1></div>
   <section class="study-school-card locked"><div><span class="tiny muted">현재 학교</span><strong>${esc(school)}</strong></div><span class="school-fixed">${icon('shield')} 선생님 관리</span></section>
-  ${isDanwon ? `
+  ${middle ? `
+    <section class="grammar-range-head middle"><div><span class="eyebrow">중3 · 동아(윤정미)</span><h2>교과서 본문 어법 선택형</h2><p>이그잼포유 본문 7단계 WORKBOOK Part 4 기준</p></div><span class="grammar-range-count">6·7과</span></section>
+    <div class="grammar-year-divider"><span>6과</span></div>
+    <div class="grammar-set-list">${grammarCards(A, MIDDLE_DONGA_YOON_BY_LESSON[6])}</div>
+    <div class="grammar-year-divider"><span>7과</span></div>
+    <div class="grammar-set-list">${grammarCards(A, MIDDLE_DONGA_YOON_BY_LESSON[7])}</div>
+  ` : isDanwon ? `
     <section class="grammar-range-head"><div><span class="eyebrow">단원고 시험범위</span><h2>2025년 9월 인천교육청</h2></div><span class="grammar-range-count">${passages.length}지문</span></section>
     <div class="grammar-set-list">${grammarCards(A, passages)}</div>
   ` : isGangseo ? `
@@ -381,7 +391,7 @@ function grammarStudy(A) {
     <section class="grammar-range-head seonbu old"><div><span class="eyebrow">선부고 시험범위 · 2025</span><h2>2025년 9월 인천교육청</h2></div><span class="grammar-range-count">${SEONBU_2025_PASSAGES.length}지문</span></section>
     <div class="grammar-set-list">${grammarCards(A, SEONBU_2025_PASSAGES)}</div>
   ` : `
-    <section class="grammar-empty-school"><span class="square-icon">${icon('records')}</span><div><b>현재 학교의 어법·어휘 범위를 준비 중이에요.</b><p>단원고와 선부고 시험범위부터 순서대로 추가하고 있어요.</p></div></section>
+    <section class="grammar-empty-school"><span class="square-icon">${icon('records')}</span><div><b>현재 학교의 어법·어휘 범위를 준비 중이에요.</b><p>시험범위를 순서대로 추가하고 있어요.</p></div></section>
   `}`;
 }
 
