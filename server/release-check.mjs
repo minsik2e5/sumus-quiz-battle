@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { emptyState } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
+import { selfSignup } from './signup.mjs';
 import { allBooks, service, sweep } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
 import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
@@ -39,7 +40,7 @@ export async function runReleaseCheck() {
     assert(sessionUiSource.includes(String.fromCharCode(36, 36) + "('[data-practice-choice],#practice-confirm').forEach"), 'practice answer controls disable through the multi-node selector');
     assert(sessionUiSource.includes('practiceAdvanceTimer = setTimeout'), 'practice correct-answer auto advance is wired');
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
-    assert(indexSource.includes('/v1325.css?v=13.34.0') && indexSource.includes('/v1326.css?v=13.34.0'), 'V13.30 learning style layers are connected');
+    assert(indexSource.includes('/v1325.css?v=13.38.0') && indexSource.includes('/v1326.css?v=13.38.0'), 'V13.30 learning style layers are connected');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -76,6 +77,21 @@ export async function runReleaseCheck() {
     assert(grade('write_meaning', '감소', { word: 'decline', meaning: '감소하다', accepted_meanings: ['감소'] }), 'teacher-approved cross-part-of-speech exception remains valid');
 
     const state = emptyState();
+    const selfSigned = await selfSignup(state, {
+      username: 'qa_signup', password: 'QaSignup123!', display_name: '가입테스트', class_name: '중3',
+      school_id: 'wonil-middle', division: 'middle'
+    });
+    assert(selfSigned.ok === true && selfSigned.division === 'middle' && selfSigned.class_name === '중3', 'student self-signup creates a middle-school account');
+    const selfSignupLogin = await service(state, 'POST', '/login', {
+      username: 'qa_signup', password: 'QaSignup123!', role: 'student', division: 'middle'
+    }, null);
+    assert(Boolean(selfSignupLogin._cookie) && selfSignupLogin.profile.username === 'qa_signup', 'self-signup student can immediately log in with the same password');
+    const selfSignupBootstrap = await service(state, 'GET', '/bootstrap', {}, selfSignupLogin._cookie);
+    assert(selfSignupBootstrap.profile.school_id === 'wonil-middle' && selfSignupBootstrap.profile.class_name === '중3', 'self-signup account keeps the selected school and class');
+    await expectStatus(409, () => selfSignup(state, {
+      username: 'qa_signup', password: 'QaSignup123!', display_name: '중복가입', class_name: '중3',
+      school_id: 'wonil-middle', division: 'middle'
+    }), 'duplicate self-signup username is rejected');
     state.profiles.push({
       id: 'qa-teacher', role: 'teacher', username: 'qa_teacher', password_hash: await passwordHash('QaTeacher123!'),
       display_name: 'QA 선생님', class_name: '고1A', school: '단원고', active: true, created_at: Date.now()
@@ -606,6 +622,7 @@ export async function runReleaseCheck() {
     assert(!appJs.includes("id=\"account-school\"") && studentModule.includes('선생님 관리'), 'student self-service school change is removed');
     assert(indexHtml.includes('v138.css') && v138Css.includes('.division-segment') && v138Css.includes('.dispute-card'), 'V13.8 division and dispute styles are loaded');
     assert(appJs.includes('data-division="middle"') && appJs.includes('/teacher/division') && appJs.includes('login.profile?.role'), 'login auto-detects role while teacher controls separate middle and high divisions');
+    assert(appJs.includes("$('[data-signup-division]').forEach"), 'signup division buttons use the multi-node helper so the signup form remains interactive');
     assert(teacherModule.includes('뜻 이의제기') && teacherModule.includes('data-dispute-global') && teacherModule.includes('data-dispute-once'), 'teacher meaning-dispute inbox is present');
     assert(sessionsModule.includes('이 답도 맞는 것 같아요') && sessionsModule.includes('/meaning-disputes'), 'meaning-writing student dispute buttons are present');
     assert(indexHtml.includes('v139.css') && v139Css.includes('.rank-scope') && v139Css.includes('.my-rank-card'), 'V13.9 academy ranking styles are loaded');
@@ -623,7 +640,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.34.0') && indexHtml.includes('/practice-enhancements.js?v=13.34.0') && indexHtml.includes('/v1325.css?v=13.34.0') && indexHtml.includes('/v1326.css?v=13.34.0') && indexHtml.includes('/v1327.css?v=13.34.0') && indexHtml.includes('/v1328.css?v=13.34.0') && indexHtml.includes('/v1329.css?v=13.34.0') && indexHtml.includes('/v1330.css?v=13.34.0') && sw.includes('sumus-voca-v13.34.0-ios-boot-fix'), 'V13.31 cache versions are active');
+    assert(indexHtml.includes('/app.js?v=13.38.0') && indexHtml.includes('/practice-enhancements.js?v=13.38.0') && indexHtml.includes('/v1325.css?v=13.38.0') && indexHtml.includes('/v1326.css?v=13.38.0') && indexHtml.includes('/v1327.css?v=13.38.0') && indexHtml.includes('/v1328.css?v=13.38.0') && indexHtml.includes('/v1329.css?v=13.38.0') && indexHtml.includes('/v1330.css?v=13.38.0') && sw.includes('sumus-voca-v13.38.0-ios-boot-fix'), 'V13.31 cache versions are active');
     assert(v1325Css.includes('--sumus-primary') && v1325Css.includes('grid-template-columns:repeat(5') && v1325Css.includes('memorize-flip-in'), 'V13.25 green design system, balanced bottom navigation, and memorization motion are loaded');
     assert(v1326Css.includes('.home-focus-v1326') && v1326Css.includes('.rank-filter-bar') && v1326Css.includes('.pwa-install-hint'), 'V13.30 home, ranking, and PWA polish styles are loaded');
     assert(v1327Css.includes('.home-pet-hero') && v1327Css.includes('.record-summary-v1327') && v1327Css.includes('.auth-card-v1327'), 'V13.30 student home, records, and login polish styles are loaded');
@@ -631,10 +648,10 @@ export async function runReleaseCheck() {
     assert(v1329Css.includes('.auth-v1327') && v1329Css.includes('box-sizing:border-box') && indexSource.includes('/sumus-logo-green.svg'), 'V13.30 green login shell and logo are loaded');
     assert(v1330Css.includes('.pet-choice-grid') && v1330Css.includes('.auth-hero-v1330'), 'V13.30 cute pet onboarding styles are loaded');
     assert(coreModule.includes("dog:") && coreModule.includes("pig:") && coreModule.includes("cat:") && coreModule.includes("dragon:") && coreModule.includes("panda:") && coreModule.includes("snake:"), 'V13.30 six pet partners are registered');
-    assert(studentModule.includes('home-pet-hero') && studentModule.includes('home-week-days') && studentModule.includes('data-rank-scope-select') && !studentModule.includes('같이 올라가면 더 재밌다.'), 'V13.30 home is pet-and-growth focused and ranking filters are compact');
+    assert(studentModule.includes('home-profile-hero-v1337') && studentModule.includes('home-week-days') && studentModule.includes('data-rank-scope-select') && !studentModule.includes('같이 올라가면 더 재밌다.'), 'V13.30 home is pet-and-growth focused and ranking filters are compact');
     assert(appJs.includes('rankScopeSelect') && appJs.includes('missingCount') && appJs.includes('session.word_ids'), 'V13.30 compact rank filters and complete review flow are wired');
 
-    assert(studentModule.includes('home-metrics') && studentModule.includes('포인트') && studentModule.includes('XP ') && sessionsModule.includes('result-reward-card'), 'V13.30 separates XP, reward points, and achievements in the student UX');
+    assert(studentModule.includes('home-main-metrics-v1337') && studentModule.includes('포인트') && studentModule.includes('XP ') && sessionsModule.includes('result-reward-card'), 'V13.30 separates XP, reward points, and achievements in the student UX');
     assert(appJs.includes('memorize-flip-out') && appJs.includes('memorize-flip-in'), 'V13.25 vocabulary tap uses a short flip and fade transition');
     assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'meaning and English writing remain first-class scored modes');
     assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && !sessionsModule.includes('${timerHtml}'), 'student home and record summaries remain available while visible question timer is removed');
@@ -646,7 +663,7 @@ export async function runReleaseCheck() {
     assert(sessionsModule.includes('미응답') && sessionsModule.includes('data-finish-practice-dispute'), 'saved exam results separate unanswered answers and keep meaning disputes');
     assert(sessionsModule.includes('이미 진행 중인 학습이 있어요') && sessionsModule.includes('기존 연습 저장 후 새 설정 시작'), 'active session mismatch still warns before reuse');
     assert(appJs.includes('examFormDirty') && appJs.includes('contextGeneration') && appJs.includes('작성 취소 후 전환'), 'teacher context switch still protects dirty forms and stale responses');
-    assert(studentModule.includes('home-pet-hero') && studentModule.includes('home-metrics') && studentModule.includes('home-week-card'), 'student home centers pet, personal metrics, and weekly attendance');
+    assert(studentModule.includes('home-profile-hero-v1337') && studentModule.includes('home-main-metrics-v1337') && studentModule.includes('home-week-card'), 'student home centers pet, personal metrics, and weekly attendance');
     assert(v1320Css.includes('.home-focus-card') && v1320Css.includes('.setup-start-summary') && v1320Css.includes('.result-page-v1320'), 'base responsive student UX styles remain loaded');
 
     const studyHubSource = studentModule.slice(studentModule.indexOf('function studyHub'), studentModule.indexOf('function grammarCards'));
