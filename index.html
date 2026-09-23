@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="theme-color" content="#f2f4f6">
+<title>SUMUS 한국사 모바일 빈칸노트</title>
+<style>
+:root{
+  --bg:#f2f4f6;--card:#fff;--text:#191f28;--sub:#6b7684;--line:#e5e8eb;
+  --blue:#3182f6;--blue2:#1b64da;--blueSoft:#eaf3ff;--green:#00a67d;--red:#f04452;
+  --shadow:0 8px 26px rgba(0,0,0,.05);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);
+font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans KR",sans-serif}
+body{min-height:100vh;padding-bottom:calc(90px + env(safe-area-inset-bottom))}
+button,input{font:inherit}
+button{cursor:pointer}
+
+.app{width:100%;max-width:760px;margin:0 auto;padding:12px 12px 24px}
+.header{padding:8px 4px 12px}
+.brand{display:flex;align-items:center;gap:10px}
+.logo{width:40px;height:40px;border-radius:13px;background:linear-gradient(145deg,#3182f6,#69a8ff);color:white;
+display:grid;place-items:center;font-weight:900;box-shadow:0 7px 18px rgba(49,130,246,.22)}
+.brand h1{font-size:17px;margin:0;font-weight:900;letter-spacing:-.5px}
+.brand p{font-size:11px;color:var(--sub);margin:3px 0 0}
+
+.sticky{position:sticky;top:0;z-index:20;background:rgba(242,244,246,.94);backdrop-filter:blur(12px);padding:7px 0 10px}
+.mode-card{background:#fff;border-radius:19px;padding:10px;box-shadow:var(--shadow)}
+.mode-title{font-size:11px;color:#8b95a1;font-weight:800;margin:0 0 7px 2px}
+.segment{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;background:#f2f4f6;border-radius:14px;padding:4px}
+.ver{border:0;background:transparent;border-radius:11px;padding:9px 4px;color:#6b7684;font-weight:850;font-size:12px}
+.ver small{display:block;font-size:9px;margin-top:2px;color:#9aa3ad;font-weight:700}
+.ver.active{background:white;color:var(--blue);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.ver.active small{color:#73a0df}
+
+.chapter-scroll{display:flex;gap:7px;overflow:auto;scrollbar-width:none;padding:10px 1px 2px}
+.chapter-scroll::-webkit-scrollbar{display:none}
+.chapter{border:0;background:#fff;color:#6b7684;border-radius:999px;padding:9px 12px;white-space:nowrap;font-size:11px;font-weight:850;
+box-shadow:0 3px 10px rgba(0,0,0,.035)}
+.chapter.active{background:#191f28;color:#fff}
+
+.hero{background:#fff;border-radius:24px;padding:22px 18px 18px;margin-top:8px;box-shadow:var(--shadow)}
+.hero .eyebrow{font-size:11px;color:var(--blue);font-weight:900;margin-bottom:6px}
+.hero h2{font-size:24px;line-height:1.24;letter-spacing:-.8px;margin:0 0 7px}
+.hero p{font-size:13px;color:var(--sub);line-height:1.55;margin:0}
+.meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:13px}
+.badge{font-size:10px;background:#f7f8fa;color:#6b7684;font-weight:800;padding:7px 9px;border-radius:999px}
+
+.note{margin-top:12px;display:flex;flex-direction:column;gap:10px}
+.row{background:#fff;border-radius:20px;padding:15px 14px 14px;box-shadow:var(--shadow)}
+.keyword{color:#3567a8;font-weight:900;font-size:12px;margin-bottom:8px}
+.body{font-size:15px;line-height:1.9;font-weight:650;letter-spacing:-.22px;word-break:keep-all}
+.blank{display:inline-flex;align-items:center;vertical-align:middle;min-width:78px;max-width:100%;margin:0 3px;border-bottom:2px solid #9bc4ff}
+.blank input{width:100%;min-width:68px;max-width:170px;border:0;outline:0;background:transparent;text-align:center;padding:1px 3px 2px;
+font-size:15px;font-weight:900;color:#1b64da}
+.blank input::placeholder{color:#b0c9e8;font-weight:750}
+.blank input.ok{color:var(--green)}
+.blank input.no{color:var(--red)}
+.answer-show{color:#e14c58;font-weight:900}
+
+.progress-card{background:#fff;border-radius:18px;padding:13px 14px;margin-top:12px;box-shadow:var(--shadow)}
+.progress-top{display:flex;justify-content:space-between;font-size:11px;color:#6b7684;font-weight:800;margin-bottom:8px}
+.track{height:8px;background:#edf0f2;border-radius:999px;overflow:hidden}
+.bar{height:100%;width:0;background:linear-gradient(90deg,#3182f6,#65a8ff);border-radius:999px;transition:.25s}
+
+.bottom{position:fixed;left:0;right:0;bottom:0;z-index:30;background:rgba(255,255,255,.95);backdrop-filter:blur(14px);
+border-top:1px solid #eceff1;padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+.bottom-inner{max-width:760px;margin:0 auto;display:grid;grid-template-columns:1fr 1fr 1.25fr;gap:8px}
+.btn{border:0;border-radius:14px;padding:13px 8px;font-size:12px;font-weight:900}
+.btn.soft{background:#f2f4f6;color:#4e5968}
+.btn.primary{background:var(--blue);color:white}
+.btn.dark{background:#191f28;color:white}
+
+.toast{position:fixed;left:50%;bottom:94px;transform:translateX(-50%) translateY(15px);background:#191f28;color:white;
+padding:11px 14px;border-radius:13px;font-size:12px;font-weight:800;opacity:0;pointer-events:none;transition:.2s;z-index:40;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(min-width:680px){
+  .app{padding-top:18px}
+  .row{display:grid;grid-template-columns:145px 1fr;align-items:start}
+  .keyword{margin:3px 14px 0 0;font-size:13px}
+  .body{border-left:1px solid #edf0f2;padding-left:18px}
+  .hero{padding:26px 24px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="header">
+    <div class="brand">
+      <div class="logo">S</div>
+      <div>
+        <h1>SUMUS HISTORY</h1>
+        <p>핸드폰용 필기형 빈칸 복습</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="sticky">
+    <div class="mode-card">
+      <div class="mode-title">빈칸 버전</div>
+      <div class="segment">
+        <button class="ver active" data-v="1">VERSION 1<small>핵심어</small></button>
+        <button class="ver" data-v="2">VERSION 2<small>세부사항</small></button>
+        <button class="ver" data-v="3">VERSION 3<small>종합</small></button>
+      </div>
+    </div>
+    <div class="chapter-scroll" id="chapters"></div>
+  </div>
+
+  <section class="hero">
+    <div class="eyebrow" id="eyebrow">VERSION 1 · 핵심어</div>
+    <h2 id="title"></h2>
+    <p id="desc">필기 내용을 읽으면서 비어 있는 핵심 내용을 직접 채워보세요.</p>
+    <div class="meta">
+      <span class="badge" id="blankCount">빈칸 0개</span>
+      <span class="badge">자동 저장</span>
+      <span class="badge">장별 채점</span>
+    </div>
+  </section>
+
+  <section class="note" id="note"></section>
+
+  <section class="progress-card">
+    <div class="progress-top"><span id="status">0개 작성</span><span id="score">채점 전</span></div>
+    <div class="track"><div class="bar" id="bar"></div></div>
+  </section>
+</div>
+
+<div class="bottom">
+  <div class="bottom-inner">
+    <button class="btn soft" id="answerBtn">정답 보기</button>
+    <button class="btn soft" id="resetBtn">다시 쓰기</button>
+    <button class="btn primary" id="checkBtn">채점하기</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const DATA=[{"title":"1910~1920년대 일제의 식민 통치","short":"식민 통치","rows":[["1910",[["국권 피탈 → ",null,[]],["조선총독부","조선총독부",[1,3]],[", 총독은 주로 ",null,[]],["군인","군인",[2,3]],[" 출신으로 임명",null,[]]]],["1910년대 무단통치",[["헌병경찰제","헌병경찰제",[1,3]],[" 실시 → 정식 재판 없이 ",null,[]],["즉결처분","즉결처분",[2,3]],[" 가능",null,[]]]],["조선태형령",[["조선태형령","조선태형령",[1,2,3]],[" → 한국인에게만 ",null,[]],["태형","태형",[2,3]],[" 적용",null,[]]]],["토지조사사업",[["토지조사사업","토지조사사업",[1,3]],[" 실시 → ",null,[]],["신고제","신고제",[2,3]],[" 적용, ",null,[]],["지주의 권한 강화","지주의 권한 강화",[2,3]],[" → 토지세 안정적 확보",null,[]]]],["회사령",[["회사 설립은 조선 총독의 ",null,[]],["허가","허가",[1,2,3]],[" 필요 → 조선 경제권을 일본에 종속",null,[]]]],["1920년대 문화통치",[["3·1운동","3·1운동",[2,3]],[" 이후 ",null,[]],["문화통치","문화통치",[1,3]],["로 전환, 문관 출신 총독 임명 가능 규정",null,[]]]],["경찰",[["헌병경찰제 → ",null,[]],["보통경찰제","보통경찰제",[1,3]],[", 이후 ",null,[]],["치안유지법","치안유지법",[2,3]],[" 제정",null,[]]]],["정치참여",[["도평의회·부면협의회","도평의회·부면협의회",[2,3]],[" 설치 → 실제로는 ",null,[]],["자문기관","자문기관",[2,3]],["에 가까움",null,[]]]],["언론",[["한국인 신문 창간 허용 → ",null,[]],["검열·삭제·정간·폐간","검열·삭제·정간·폐간",[2,3]],[" 지속",null,[]]]],["산미증식계획",[["산미증식계획","산미증식계획",[1,3]],[" → 일본으로 쌀 반출 증가 / 국내 소비량 감소 / ",null,[]],["소작농 증가","소작농 증가",[2,3]]]],["회사 설립",[["허가제 → ",null,[]],["신고제","신고제",[1,2,3]],[", 일본 기업의 한국 진출 확대",null,[]]]]]},{"title":"국외 독립운동 기지","short":"국외 기지","rows":[["서간도",[["신민회 계열 인사들이 이주 → ",null,[]],["신흥강습소","신흥강습소",[2,3]],["·",null,[]],["신흥무관학교","신흥무관학교",[1,3]],[" 운영, 독립군 양성",null,[]]]],["북간도",[["한인 사회와 ",null,[]],["학교","학교",[2,3]],["를 중심으로 독립운동 기반 형성",null,[]]]],["연해주",[["신한촌","신한촌",[1,2,3]],[" 건설, ",null,[]],["대한광복군정부","대한광복군정부",[1,3]],[" 수립 → ",null,[]],["이상설·이동휘","이상설·이동휘",[2,3]]]],["미주",[["안창호","안창호",[2,3]],[" 등이 ",null,[]],["대한인국민회","대한인국민회",[1,3]],[" 조직, 박용만 → ",null,[]],["대조선국민군단","대조선국민군단",[2,3]],[" 결성",null,[]]]]]},{"title":"3·1운동 (1919)","short":"3·1운동","rows":[["민족자결주의",[["미국 대통령 ",null,[]],["윌슨","윌슨",[2,3]],["의 ",null,[]],["민족자결주의","민족자결주의",[1,3]],[" 발표 → 약소민족 독립 희망 고조",null,[]]]],["신한청년당",[["상하이의 ",null,[]],["신한청년당","신한청년당",[1,3]],[" → ",null,[]],["김규식","김규식",[2,3]],["을 ",null,[]],["파리강화회의","파리강화회의",[2,3]],["에 파견",null,[]]]],["2·8독립선언",[["일본 유학생들이 도쿄에서 ",null,[]],["2·8독립선언","2·8독립선언",[1,2,3]],[" 발표",null,[]]]],["1919.3.1",[["민족대표는 ",null,[]],["태화관","태화관",[1,3]],["에서 독립선언, 학생·시민은 ",null,[]],["탑골공원","탑골공원",[2,3]],["에서 만세시위 전개",null,[]]]],["일제 탄압",[["경기도 화성의 ",null,[]],["제암리","제암리",[1,2,3]],[" 사건 등 무력 탄압",null,[]]]],["의의",[["대한민국 임시정부","대한민국 임시정부",[1,3]],[" 수립의 계기, 중국 ",null,[]],["5·4운동","5·4운동",[2,3]],[" 등 세계 약소민족 운동에도 영향",null,[]]]],["통치 변화",[["무단통치 → ",null,[]],["문화통치","문화통치",[1,2,3]]]] ]},{"title":"대한민국 임시정부","short":"임시정부","rows":[["통합",[["3·1운동 이후 여러 임시정부가 수립 → ",null,[]],["대한민국 임시정부","대한민국 임시정부",[1,3]],["로 통합",null,[]]]],["위치·체제",[["중국 ",null,[]],["상하이","상하이",[1,2,3]],["에 자리, ",null,[]],["민주공화제","민주공화제",[1,3]],[" 채택",null,[]]]],["연통제",[["연통제","연통제",[1,3]],[" → 국내 비밀 행정 조직, 명령 전달·자금 모집",null,[]]]],["교통국",[["교통국","교통국",[1,3]],[" → 국내외 연락·정보 전달을 담당한 비밀 통신 조직",null,[]]]],["재정",[["독립운동 자금 확보를 위해 독립 ",null,[]],["공채","공채",[1,2,3]],[" 발행",null,[]]]],["외교",[["미국에 ",null,[]],["구미위원부","구미위원부",[2,3]],[" 설치 → 국제사회에 독립의 정당성 알림",null,[]]]],["국민대표회의",[["국민대표회의","국민대표회의",[1,3]],[" 개최 → ",null,[]],["창조파·개조파","창조파·개조파",[2,3]],[" 대립으로 결렬",null,[]]]]]},{"title":"무장 독립전쟁과 의열투쟁","short":"무장·의열","rows":[["봉오동전투",[["봉오동전투","봉오동전투",[1,3]],[" → ",null,[]],["홍범도","홍범도",[2,3]],["의 대한독립군 등이 일본군 격파",null,[]]]],["청산리대첩",[["청산리대첩","청산리대첩",[1,3]],[" → ",null,[]],["김좌진","김좌진",[2,3]],["의 북로군정서군 등 승리",null,[]]]],["간도참변",[["간도참변","간도참변",[1,3]],[" → 독립군에게 패한 일본군이 간도 한인 사회 공격",null,[]]]],["자유시참변",[["자유시참변","자유시참변",[1,3]],[" → 러시아로 이동한 독립군 세력이 큰 피해",null,[]]]],["3부",[["만주에 ",null,[]],["참의부","참의부",[1,3]],["·",null,[]],["정의부","정의부",[2,3]],["·",null,[]],["신민부","신민부",[2,3]],[" 조직",null,[]]]],["의열단",[["의열단","의열단",[1,3]],[" → ",null,[]],["김원봉","김원봉",[2,3]],[" 중심, 일제 주요 기관·인물 공격",null,[]]]],["조선혁명선언",[["신채호","신채호",[2,3]],["가 ",null,[]],["조선혁명선언","조선혁명선언",[1,3]],[" 작성 → 의열단 투쟁 이념 정리",null,[]]]],["한인애국단",[["김구","김구",[2,3]],["가 ",null,[]],["한인애국단","한인애국단",[1,3]],[" 조직 → 이봉창·",null,[]],["윤봉길","윤봉길",[2,3]],[" 의거",null,[]]]]]},{"title":"실력양성운동","short":"실력양성","rows":[["물산장려운동",[["물산장려운동","물산장려운동",[1,3]],[" → ",null,[]],["평양","평양",[2,3]],["에서 ",null,[]],["조만식","조만식",[2,3]],[" 등이 주도, 국산품 애용",null,[]]]],["한계",[["상품 가격 상승, ",null,[]],["자본가의 이익","자본가의 이익",[2,3]],["을 위한 운동이라는 비판",null,[]]]],["민립대학설립",[["민립대학설립운동","민립대학설립운동",[1,3]],[" → ",null,[]],["조선민립대학기성회","조선민립대학기성회",[2,3]],[" 조직",null,[]]]],["일제 대응",[["1924년 ",null,[]],["경성제국대학","경성제국대학",[1,2,3]],[" 설립",null,[]]]],["문맹퇴치",[["조선일보의 ",null,[]],["문자보급운동","문자보급운동",[1,3]],[", 동아일보의 ",null,[]],["브나로드운동","브나로드운동",[2,3]],[" → 일제가 1930년대 중반 금지",null,[]]]]]},{"title":"민족유일당운동 · 신간회","short":"신간회","rows":[["배경",[["민족주의","민족주의",[2,3]],[" 세력과 ",null,[]],["사회주의","사회주의",[2,3]],[" 세력의 협력 필요성 증가",null,[]]]],["정우회선언",[["1926년 ",null,[]],["정우회선언","정우회선언",[1,2,3]],[" → 민족주의 세력과의 협동 주장",null,[]]]],["신간회",[["1927년","1927년",[2,3]],[" 비타협적 민족주의 + 사회주의 세력 → ",null,[]],["신간회","신간회",[1,3]],[" 창립",null,[]]]],["활동",[["전국 지회 설치, ",null,[]],["노동·농민 운동","노동·농민 운동",[2,3]],[" 지원, 민족운동 전개",null,[]]]],["광주학생항일운동",[["1929년","1929년",[2,3]],[" ",null,[]],["광주학생항일운동","광주학생항일운동",[1,3]],[" 지원",null,[]]]],["근우회",[["근우회","근우회",[1,2,3]],[" → 신간회의 자매단체 성격을 가진 여성 민족운동 단체",null,[]]]],["해소",[["내부 노선 갈등과 정세 변화 속에서 ",null,[]],["1931년","1931년",[2,3]],[" 해소",null,[]]]]]}];
+let version=1, section=0, showAnswers=false;
+let saved={};
+try{saved=JSON.parse(localStorage.getItem("sumus_history_mobile_v4")||"{}")}catch(e){}
+
+const $=id=>document.getElementById(id);
+function k(s,v,r,p){return `s${s}v${v}r${r}p${p}`}
+function norm(s){return String(s||"").replace(/\s+/g,"").replace(/[·.,/\-]/g,"").toLowerCase()}
+function right(a,v){
+  if(norm(a)===norm(v))return true;
+  const aliases={
+    "대한민국 임시정부":["대한민국임시정부","임시정부"],
+    "민족자결주의":["민족자결"],
+    "2·8독립선언":["28독립선언","2.8독립선언"],
+    "도평의회·부면협의회":["도평의회부면협의회"],
+    "검열·삭제·정간·폐간":["검열삭제정간폐간"],
+    "이상설·이동휘":["이상설이동휘"],
+    "민립대학설립운동":["민립대학운동"],
+    "노동·농민 운동":["노동농민운동"]
+  };
+  return (aliases[a]||[]).some(x=>norm(x)===norm(v));
+}
+function save(){localStorage.setItem("sumus_history_mobile_v4",JSON.stringify(saved))}
+function buildChapters(){
+  const wrap=$("chapters");wrap.innerHTML="";
+  DATA.forEach((s,i)=>{
+    const b=document.createElement("button");
+    b.className="chapter"+(i===section?" active":"");
+    b.textContent=`${i+1}. ${s.short}`;
+    b.onclick=()=>{section=i;showAnswers=false;render();window.scrollTo({top:0,behavior:"smooth"})};
+    wrap.appendChild(b);
+  });
+}
+function render(){
+  buildChapters();
+  document.querySelectorAll(".ver").forEach(b=>b.classList.toggle("active",+b.dataset.v===version));
+  const s=DATA[section];
+  $("title").textContent=s.title;
+  $("eyebrow").textContent=version===1?"VERSION 1 · 핵심 개념":
+                              version===2?"VERSION 2 · 인물·장소·세부":
+                              "VERSION 3 · 종합 고난도";
+  const note=$("note");note.innerHTML="";
+  let total=0,filled=0,correct=0,checked=0;
+
+  s.rows.forEach((row,ri)=>{
+    const card=document.createElement("article");card.className="row";
+    const kw=document.createElement("div");kw.className="keyword";kw.textContent=row[0];
+    const body=document.createElement("div");body.className="body";
+
+    row[1].forEach((part,pi)=>{
+      const [txt,ans,vers]=part;
+      if(ans && vers.includes(version)){
+        total++;
+        if(showAnswers){
+          const span=document.createElement("span");span.className="answer-show";span.textContent=ans;body.appendChild(span);
+        }else{
+          const span=document.createElement("span");span.className="blank";
+          const inp=document.createElement("input");
+          const id=k(section,version,ri,pi);
+          inp.dataset.answer=ans;inp.dataset.key=id;inp.placeholder="입력";
+          inp.value=saved[id]?.value||"";
+          if(inp.value.trim())filled++;
+          if(saved[id]?.checked){
+            checked++;
+            if(saved[id].correct)correct++;
+            inp.classList.add(saved[id].correct?"ok":"no");
+          }
+          const width=Math.min(170,Math.max(74,ans.length*18+22));
+          inp.style.width=width+"px";
+          inp.addEventListener("input",()=>{
+            inp.classList.remove("ok","no");
+            saved[id]={value:inp.value,checked:false,correct:false};
+            save();updateLive();
+          });
+          span.appendChild(inp);body.appendChild(span);
+        }
+      } else {
+        body.appendChild(document.createTextNode(txt));
+      }
+    });
+    card.appendChild(kw);card.appendChild(body);note.appendChild(card);
+  });
+
+  $("blankCount").textContent=`빈칸 ${total}개`;
+  $("status").textContent=showAnswers?"정답 확인 중":`${filled} / ${total} 작성`;
+  $("score").textContent=checked?`${correct} / ${checked} 정답`:"채점 전";
+  $("bar").style.width=(total?Math.round(filled/total*100):0)+"%";
+  $("answerBtn").textContent=showAnswers?"문제로 돌아가기":"정답 보기";
+}
+function updateLive(){
+  const inputs=[...document.querySelectorAll("#note input")];
+  const total=inputs.length;
+  const filled=inputs.filter(x=>x.value.trim()).length;
+  $("status").textContent=`${filled} / ${total} 작성`;
+  $("bar").style.width=(total?Math.round(filled/total*100):0)+"%";
+}
+function check(){
+  if(showAnswers){showAnswers=false;render();return}
+  const inputs=[...document.querySelectorAll("#note input")];
+  let c=0;
+  inputs.forEach(inp=>{
+    const ok=right(inp.dataset.answer,inp.value);
+    inp.classList.remove("ok","no");inp.classList.add(ok?"ok":"no");
+    saved[inp.dataset.key]={value:inp.value,checked:true,correct:ok};
+    if(ok)c++;
+  });
+  save();
+  $("score").textContent=`${c} / ${inputs.length} 정답`;
+  toast(c===inputs.length?"전부 맞았어요.":`${inputs.length-c}개 다시 확인해보세요.`);
+}
+function reset(){
+  [...document.querySelectorAll("#note input")].forEach(inp=>{
+    delete saved[inp.dataset.key];inp.value="";inp.classList.remove("ok","no");
+  });
+  save();render();toast("이 페이지를 비웠어요.");
+}
+function toast(msg){
+  const t=$("toast");t.textContent=msg;t.classList.add("show");
+  clearTimeout(window.__t);window.__t=setTimeout(()=>t.classList.remove("show"),1500);
+}
+document.querySelectorAll(".ver").forEach(b=>b.onclick=()=>{
+  version=+b.dataset.v;showAnswers=false;render();toast(`VERSION ${version}`);
+});
+$("answerBtn").onclick=()=>{showAnswers=!showAnswers;render()};
+$("resetBtn").onclick=reset;
+$("checkBtn").onclick=check;
+render();
+</script>
+</body>
+</html>
