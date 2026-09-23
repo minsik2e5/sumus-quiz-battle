@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.34.0-ios-boot-fix';
+const VERSION = 'sumus-voca-v13.36.0-middle-grammar';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -38,6 +38,7 @@ const SHELL = [
   '/danwongo-grammar-data.js',
   '/seonbu-grammar-data.js',
   '/gangseo-grammar-data.js',
+  '/middle-donga-yoon-grammar-data.js',
   '/pwa.js',
   '/icon.svg',
   '/sumus-logo-green.svg',
