@@ -178,7 +178,7 @@ function activeAnswersForSection(){
 }
 function containsAnswer(text, answers){
   const n=norm(text);
-  return answers.some(a=>n.includes(norm(a)) || norm(a).includes(n) && n.length>=3);
+  return answers.some(a=>n.includes(norm(a)) || (norm(a).includes(n) && n.length>=2));
 }
 function appendMaskedText(parent,text,answers){
   let segments=[{text:String(text),masked:false}];
