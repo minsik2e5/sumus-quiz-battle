@@ -392,13 +392,24 @@ function grammarStudy(A) {
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill green">GRAMMAR</span></div>
   <div class="page-heading grammar-heading"><h1>어법·어휘</h1></div>
   <section class="study-school-card locked"><div><span class="tiny muted">현재 학교</span><strong>${esc(school)}</strong></div><span class="school-fixed">${icon('shield')} 선생님 관리</span></section>
-  ${middle ? `
-    <section class="grammar-range-head middle"><div><span class="eyebrow">중3 · 동아(윤정미)</span><h2>교과서 본문 어법 선택형</h2><p>이그잼포유 본문 7단계 WORKBOOK Part 4 기준</p></div><span class="grammar-range-count">6·7과</span></section>
-    <div class="grammar-year-divider"><span>6과</span></div>
-    <div class="grammar-set-list">${grammarCards(A, MIDDLE_DONGA_YOON_BY_LESSON[6])}</div>
-    <div class="grammar-year-divider"><span>7과</span></div>
-    <div class="grammar-set-list">${grammarCards(A, MIDDLE_DONGA_YOON_BY_LESSON[7])}</div>
-  ` : isDanwon ? `
+  ${middle ? (() => {
+    const lesson = Number(A.middleGrammarLesson || 6);
+    const selectedLesson = [6,7].includes(lesson) ? lesson : 6;
+    const lessonPassages = MIDDLE_DONGA_YOON_BY_LESSON[selectedLesson] || [];
+    const completed = lessonPassages.filter(p => savedGrammarProgress(A, p)?.mastered).length;
+    return `
+      <section class="grammar-range-head middle compact-v1339"><div><span class="eyebrow">중3 · 동아(윤정미)</span><h2>교과서 본문 어법 선택형</h2><p>문장을 읽고 알맞은 어법을 선택해요.</p></div></section>
+      <div class="middle-grammar-tabs-v1339">
+        ${[6,7].map(n => {
+          const ps = MIDDLE_DONGA_YOON_BY_LESSON[n] || [];
+          const done = ps.filter(p => savedGrammarProgress(A,p)?.mastered).length;
+          return `<button data-middle-grammar-lesson="${n}" class="${selectedLesson === n ? 'selected' : ''}"><b>${n}과</b><small>${done}/${ps.length} 완료</small></button>`;
+        }).join('')}
+      </div>
+      <div class="middle-grammar-summary-v1339"><b>${selectedLesson}과</b><span>${lessonPassages.length}개 본문 · ${completed}개 완료</span></div>
+      <div class="grammar-set-list compact-v1339">${grammarCards(A, lessonPassages)}</div>
+    `;
+  })() : isDanwon ? `
     <section class="grammar-range-head"><div><span class="eyebrow">단원고 시험범위</span><h2>2025년 9월 인천교육청</h2></div><span class="grammar-range-count">${passages.length}지문</span></section>
     <div class="grammar-set-list">${grammarCards(A, passages)}</div>
   ` : isGangseo ? `
@@ -530,10 +541,15 @@ function exam(A) {
     count = state.selected.length;
     scopeLabel = state.code ? `${state.code}과 · ${count}개 선택` : '범위 미선택';
     scopeUi = `<div class="middle-lesson-tabs setup-choice-row">${state.codes.map(range => { const n = state.words.filter(word => String(word.range_code) === String(range)).length; return `<button data-middle-lesson="${esc(range)}" class="${String(range) === state.code ? 'selected' : ''}">${esc(range)}과 <small>${n}개</small></button>`; }).join('')}</div>
-      <div class="middle-word-scope-v1334">
-        <div class="middle-word-scope-head"><div><strong>오늘 외운 단어 선택</strong><small>보통 20~30개 · 연습/실전 공통</small></div><b>${count}개 선택</b></div>
-        <div class="middle-word-scope-actions"><button data-middle-word-preset="20">20개 선택</button><button data-middle-word-preset="30">30개 선택</button><button data-middle-word-preset="all">전체 선택</button><button data-middle-word-preset="clear">선택 해제</button></div>
-        <div class="middle-word-checklist">${state.lessonWords.map(word => `<label class="${selectedIds.has(word.id) ? 'selected' : ''}"><input type="checkbox" data-middle-word="${esc(word.id)}" ${selectedIds.has(word.id) ? 'checked' : ''}><span class="middle-word-copy"><b>${esc(word.word)}</b><small>${esc(word.meaning)}</small></span></label>`).join('')}</div>
+      <div class="middle-word-scope-v1339">
+        <div class="middle-word-scope-head"><div><strong>오늘 외운 단어</strong><small>시험 볼 범위만 빠르게 골라요</small></div><b>${count}개</b></div>
+        <div class="middle-word-quick-v1339">
+          <button data-middle-word-preset="20" class="${count === Math.min(20, state.lessonWords.length) && !A.middleWordsOpen ? 'selected' : ''}"><b>20개</b><small>기본</small></button>
+          <button data-middle-word-preset="30" class="${count === Math.min(30, state.lessonWords.length) && !A.middleWordsOpen ? 'selected' : ''}"><b>30개</b><small>추천</small></button>
+          <button data-middle-word-preset="all" class="${count === state.lessonWords.length && state.lessonWords.length && !A.middleWordsOpen ? 'selected' : ''}"><b>전체</b><small>${state.lessonWords.length}개</small></button>
+          <button data-middle-words-toggle="1" class="${A.middleWordsOpen ? 'selected' : ''}"><b>직접 선택</b><small>${A.middleWordsOpen ? '접기' : '원하는 단어'}</small></button>
+        </div>
+        ${A.middleWordsOpen ? `<div class="middle-direct-head-v1339"><span>직접 선택</span><button data-middle-word-preset="clear">선택 해제</button></div><div class="middle-word-checklist compact-v1339">${state.lessonWords.map(word => `<label class="${selectedIds.has(word.id) ? 'selected' : ''}"><input type="checkbox" data-middle-word="${esc(word.id)}" ${selectedIds.has(word.id) ? 'checked' : ''}><span class="middle-word-copy"><b>${esc(word.word)}</b><small>${esc(word.meaning)}</small></span></label>`).join('')}</div>` : '' }
       </div>`;
   } else {
     const state = getRanges(A);
