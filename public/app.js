@@ -165,7 +165,12 @@ $('#app').addEventListener('click', async event => {
     if (d.rangeAll) { const { codes } = getRanges(A); A.ranges[A.school] = d.rangeAll === 'true' ? [...codes] : []; $$('[data-range]').forEach(i => i.checked = d.rangeAll === 'true'); updateRangeSummary(A); updateExamSummary(A); savePreferences(); return; }
     if (d.mode) { A.mode = d.mode; if (!['write_meaning','spell'].includes(A.mode)) A.practiceRunMode = 'practice'; savePreferences(); render(); return; }
     if (d.practiceTarget) { A.target = d.practiceTarget === 'all' ? 'all' : Number(d.practiceTarget); $$('[data-practice-target]').forEach(e => { const selected = e === b; e.classList.toggle('selected', selected); e.setAttribute('aria-pressed', String(selected)); }); savePreferences(); render(); return; }
-    if (d.middleLesson) { A.middleRange = d.middleLesson; A.middleWordIds = []; savePreferences(); render(); return; }
+    if (d.middleLesson) { A.middleRange = d.middleLesson; A.middleWordIds = []; A.target = 'all'; savePreferences(); render(); return; }
+    if (d.middleWordPreset) {
+      const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
+      A.middleWordIds = d.middleWordPreset === 'clear' ? [] : d.middleWordPreset === 'all' ? words.map(word => word.id) : words.slice(0, Number(d.middleWordPreset)).map(word => word.id);
+      A.target = 'all'; savePreferences(); render(); return;
+    }
     if (d.rankMode) { A.rankMode = d.rankMode; savePreferences(); render(); return; }
     if (d.rankScope) { A.rankScope = d.rankScope; savePreferences(); render(); return; }
     if (d.rankPeriod) { A.rankPeriod = d.rankPeriod; savePreferences(); render(); return; }
@@ -226,7 +231,10 @@ $('#app').addEventListener('click', async event => {
       const runMode = A.examKind === 'test' ? 'test' : 'practice';
       A.practiceRunMode = runMode; savePreferences(); buttonBusy(b);
       if (A.data.profile.division === 'middle') {
-        const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
+        const lessonWords = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
+        const selected = new Set(A.middleWordIds || []);
+        const words = lessonWords.filter(word => selected.has(word.id));
+        if (!words.length) { buttonBusy(b, false); return toast('시험 볼 단어를 먼저 선택해주세요.'); }
         const target = A.target === 'all' ? 'all' : Math.min(words.length, Number(A.target || words.length));
         await startPractice({ wordIds: words.map(word => word.id), target, mode: A.mode, runMode, examStyle: true, confirmed: true });
       } else {
@@ -251,7 +259,12 @@ $('#app').addEventListener('click', async event => {
 $('#app').addEventListener('change', event => {
   const input = event.target;
   if (!A.data || A.screen) return;
-  if (input.dataset.rankScopeSelect !== undefined) { A.rankScope = input.value; savePreferences(); render(); return; }
+  if (input.dataset.middleWord !== undefined) {
+    const set = new Set(A.middleWordIds || []);
+    input.checked ? set.add(input.dataset.middleWord) : set.delete(input.dataset.middleWord);
+    A.middleWordIds = [...set]; A.target = 'all'; savePreferences(); render(); return;
+  }
+    if (input.dataset.rankScopeSelect !== undefined) { A.rankScope = input.value; savePreferences(); render(); return; }
   if (input.dataset.rankPeriodSelect !== undefined) { A.rankPeriod = input.value; savePreferences(); render(); return; }
   if (input.dataset.rankModeSelect !== undefined) { A.rankMode = input.value; savePreferences(); render(); }
 });
