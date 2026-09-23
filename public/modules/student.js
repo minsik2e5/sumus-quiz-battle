@@ -283,16 +283,37 @@ function compactGrowth(A) {
   const rewardPoints = Number(g.reward_points || 0);
   const rank = homeRank(A);
   const week = homeWeek(A);
-  return `<section class="home-pet-hero">
-    <div class="home-pet-art">${avatar(p.avatar_key || 'dog', { accessory: p.avatar_accessory, frame: p.avatar_frame })}</div>
-    <div class="home-pet-copy"><span>MY PARTNER</span><h1>${CHARACTERS[p.avatar_key || 'dog']?.ko || '루미'} <small>Lv.${g.level}</small></h1><p>XP ${num(g.points || 0)} · 다음 성장까지 ${num(g.remaining || 0)} XP</p><div class="home-xp-track"><i style="width:${Math.max(3,Number(g.percent || 0))}%"></i></div></div>
+  const accuracy = Number(g.accuracy || 0);
+  const practiceCount = Number(g.practice_count || 0);
+  const level = Number(g.level || 1);
+  const stage = Number(g.stage || 1);
+  const percent = Math.max(3, Number(g.percent || 0));
+  const pet = CHARACTERS[p.avatar_key || 'dog'] || CHARACTERS.dog;
+  return `<section class="home-profile-hero-v1337">
+    <div class="home-pet-stage-v1337">
+      <span class="home-level-badge-v1337"><small>LEVEL</small><b>${level}</b></span>
+      <div class="home-pet-art-v1337">${avatar(p.avatar_key || 'dog', { accessory: p.avatar_accessory, frame: p.avatar_frame, stage, size: 'home-featured' })}</div>
+      <span class="home-pet-status-v1337">MY PARTNER</span>
+    </div>
+    <div class="home-profile-copy-v1337">
+      <span class="home-profile-kicker-v1337">나의 성장 파트너</span>
+      <h1>${esc(pet.ko)} <small>${esc(pet.type)}</small></h1>
+      <div class="home-level-line-v1337"><b>Lv.${level}</b><span>다음 레벨까지 ${num(g.remaining || 0)} XP</span></div>
+      <div class="home-xp-track-v1337" aria-label="레벨 진행률"><i style="width:${percent}%"></i></div>
+      <div class="home-xp-meta-v1337"><span>누적 XP ${num(g.points || 0)}</span><strong>${Math.round(Number(g.percent || 0))}%</strong></div>
+    </div>
   </section>
-  <section class="home-metrics">
-    <button data-go="ranking"><span>내 순위</span><strong>${rank === '—' ? '—' : rank + '위'}</strong><small>이번 주 XP</small></button>
-    <button data-go="records"><span>내 기록</span><strong>${num(g.practice_count || 0)}회</strong><small>누적 학습</small></button>
-    <div><span>포인트</span><strong>${num(rewardPoints)}P</strong><small>보유 보상</small></div>
+  <section class="home-main-metrics-v1337">
+    <button class="rank" data-go="ranking"><span>내 순위</span><strong>${rank === '—' ? '—' : rank + '위'}</strong><small>이번 주 랭킹 보기</small></button>
+    <button class="accuracy" data-go="records"><span>내 기록</span><strong>${accuracy}%</strong><small>최근 학습 정답률</small></button>
+    <button class="sessions" data-go="records"><span>학습 횟수</span><strong>${num(practiceCount)}회</strong><small>누적 학습 기록</small></button>
   </section>
-  <section class="home-week-card">
+  <section class="home-mini-stats-v1337">
+    <div><span>연속 학습</span><b>${Number(g.streak || 0)}일</b></div>
+    <div><span>오늘 XP</span><b>+${num(g.today_xp || 0)}</b></div>
+    <div><span>보유 포인트</span><b>${num(rewardPoints)}P</b></div>
+  </section>
+  <section class="home-week-card home-week-card-v1337">
     <div class="home-week-head"><div><span>이번 주 출석</span><strong>${Number(g.streak || 0)}일 연속 학습</strong></div><span class="streak-badge">${icon('flame')}${Number(g.streak || 0)} DAYS</span></div>
     <div class="home-week-days">${week.map(day => `<div class="${day.active ? 'active' : ''} ${day.current ? 'today' : ''}"><span>${day.label}</span><b>${day.active ? '✓' : day.date}</b></div>`).join('')}</div>
   </section>`;
