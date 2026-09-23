@@ -1,9 +1,9 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS } from './modules/core.js';
 import { avatar } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.28.0';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.28.0';
-import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.28.0';
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.29.0';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.29.0';
+import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, leaveSession } from './modules/sessions.js?v=13.29.0';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [] };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -34,7 +34,7 @@ function loginView(role = A.role, division = A.division) {
   const teacher = role === 'teacher';
   const divisionName = division === 'middle' ? '중등부' : '고등부';
   $('#app').innerHTML = `<div class="auth auth-v1327"><form class="auth-form auth-card-v1327" id="login-form">
-    <div class="auth-brand-v1327"><img src="/icon.svg" alt=""><div><b>SUMUS VOCA</b><span>매일 쌓이는 나의 영어 성장</span></div></div>
+    <div class="auth-brand-v1327"><img src="/sumus-logo-green.svg" alt="SUMUS VOCA"><div><b>SUMUS VOCA</b><span>매일 쌓이는 나의 영어 성장</span></div></div>
     ${teacher ? `<button type="button" class="auth-back-student" data-login-student>← 학생 로그인</button><div class="auth-title-v1327"><span>TEACHER</span><h1>선생님 로그인</h1><p>학생 학습과 시험을 관리하는 전용 화면입니다.</p></div>` : `<div class="division-segment auth-division-v1327"><button type="button" data-division="middle" class="${division === 'middle' ? 'selected' : ''}">중등부</button><button type="button" data-division="high" class="${division === 'high' ? 'selected' : ''}">고등부</button></div><div class="auth-title-v1327"><span>STUDENT</span><h1>로그인</h1><p>${divisionName} 계정으로 시작하세요.</p></div>`}
     <div class="auth-fields-v1327"><label class="field"><span>아이디</span><input name="username" autocomplete="username" placeholder="아이디" required maxlength="80" autocapitalize="off"></label><label class="field"><span>비밀번호</span><div class="password-wrap"><input name="password" type="password" autocomplete="current-password" placeholder="비밀번호" required maxlength="128"><button type="button" id="toggle-password" aria-label="비밀번호 보기">보기</button></div></label></div>
     <div class="form-error" id="login-error" role="alert"></div>
@@ -197,7 +197,7 @@ $('#app').addEventListener('click', async event => {
       return;
     }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
-      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.28.0');
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.29.0');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
