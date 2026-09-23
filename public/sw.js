@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.30.0-cute-pets-onboarding';
+const VERSION = 'sumus-voca-v13.31.0-ios-boot-fix';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
