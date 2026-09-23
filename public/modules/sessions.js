@@ -331,9 +331,9 @@ function renderPractice() {
       <div class="exam-question-meta"><span class="question-type">${PRACTICE_TYPES[q.type]}</span></div>
       ${q.type === 'listen' ? `<button class="listen-button" id="listen-word" aria-label="발음 듣기">${icon('sound')}</button><p class="input-caption" style="text-align:center">발음을 듣고 뜻을 골라주세요.</p>` : `<h2 class="question-prompt ${!['eng2mean', 'write_meaning'].includes(q.type) ? 'korean' : ''}">${esc(q.prompt)}</h2>`}
       ${q.hint ? `<p class="question-hint">${esc(q.hint)}</p>` : ''}
-      ${input ? `<input id="practice-answer" class="answer-input" aria-label="${meaningInput ? '한국어 뜻 답안' : '영어 답안'}" placeholder="${meaningInput ? '뜻을 직접 입력하세요' : '영어 단어를 입력하세요'}" autocomplete="off" autocapitalize="off" spellcheck="false" ${feedback ? 'disabled' : ''}><button class="btn primary full" id="practice-confirm" style="margin-top:13px" ${feedback ? 'disabled' : ''}>${testMode ? (Number(x.score_total || 0) + 1 >= Number(x.target || 0) ? '제출하고 결과 보기' : '답안 제출 · 다음') : '정답 확인'}</button>` : `<div class="options">${q.options.map((o, i) => `<button class="option ${feedback && o === answer ? 'correct' : ''}" data-practice-choice="${i}" ${feedback ? 'disabled' : ''}><span class="letter">${i + 1}</span><span>${esc(o)}</span></button>`).join('')}</div>`}
+      ${input ? `<input id="practice-answer" class="answer-input ${feedback ? (feedback.ok ? 'answer-correct-v1340' : 'answer-wrong-v1340') : ''}" aria-label="${meaningInput ? '한국어 뜻 답안' : '영어 답안'}" placeholder="${meaningInput ? '뜻을 직접 입력하세요' : '영어 단어를 입력하세요'}" autocomplete="off" autocapitalize="off" spellcheck="false" ${feedback ? 'disabled' : ''}>` : `<div class="options">${q.options.map((o, i) => `<button class="option ${feedback && o === answer ? 'correct' : ''}" data-practice-choice="${i}" ${feedback ? 'disabled' : ''}><span class="letter">${i + 1}</span><span>${esc(o)}</span></button>`).join('')}</div>`}
       <div id="practice-feedback">${feedback ? feedbackHtml(feedback) : ''}</div>
-      ${feedback ? `<button class="btn primary full" id="practice-next" style="margin-top:18px">${x.total >= x.target && !x.retry_count ? '연습시험 결과 보기' : '다음 문제'} ${icon('arrow')}</button>` : ''}
+      <div class="practice-action-slot-v1340">${feedback ? `<button class="btn primary full" id="practice-next">${x.total >= x.target && !x.retry_count ? '결과 보기' : '다음 문제'} ${icon('arrow')}</button>` : input ? `<button class="btn primary full" id="practice-confirm">${testMode ? (Number(x.score_total || 0) + 1 >= Number(x.target || 0) ? '제출하고 결과 보기' : '답안 제출 · 다음') : '정답 확인'}</button>` : ''}</div>
       <div id="practice-error" role="alert"></div>
     </main>
   </div>`);
@@ -544,6 +544,10 @@ function finishPracticeView() {
   const wrongCount = Number.isFinite(Number(x.wrong_count)) ? Number(x.wrong_count) : wrong.length;
   const unanswered = Number.isFinite(Number(x.unanswered_count)) ? Number(x.unanswered_count) : timedOut.length + Math.max(0, Number(x.target || 0) - durable.length);
   const perfect = x.perfect === true || (score === 100 && wrongCount === 0 && unanswered === 0);
+  const targetCount = Number(x.target || x.score_total || 0);
+  const answeredCount = Math.min(targetCount, durable.length || Number(x.score_total || 0));
+  const interrupted = unanswered > 0 && answeredCount < targetCount;
+  const resultHeadline = interrupted ? '시험을 중도 종료했어요' : modeLabel + ' 결과';
   const rangeText = (x.range_codes || []).map(code => esc(recordRangeLabel({ division: A.data.profile.division, school: x.school }, code))).join(' · ') || '선택 범위';
   const answeredWordIds = new Set(durable.map(item => item.word_id).filter(Boolean));
   const wrongWordIds = durable.filter(item => item.correct === false && !item.regraded).map(item => item.word_id).filter(Boolean);
@@ -569,9 +573,9 @@ function finishPracticeView() {
       : '<button class="btn primary full" id="practice-next-exam">다른 시험 선택</button>';
   mount(`<div class="session-app"><main class="result-page result-page-v1320">
     <div class="result-identity"><span class="pill green">${modeLabel}</span><p>${rangeText} · ${esc(PRACTICE_TYPES[x.mode] || '쓰기')}</p></div>
-    <h1>${modeLabel} 결과</h1>
-    <div class="result-number"><span id="practice-result-score">${score}</span><small>점</small></div>
-    <p class="result-score-basis">최초 풀이 기준 · ${Number(x.score_correct || 0)} / ${Number(x.target || x.score_total || 0)} 정답</p>
+    <h1 class="${interrupted ? 'interrupted-title-v1340' : ''}">${resultHeadline}</h1>
+    ${interrupted ? `<div class="interrupted-progress-v1340"><strong>${answeredCount}<small>/ ${targetCount}문제</small></strong><span>여기까지 풀었어요</span></div><div class="result-score-secondary-v1340">현재 점수 <b>${score}점</b></div>` : `<div class="result-number"><span id="practice-result-score">${score}</span><small>점</small></div>`}
+    <p class="result-score-basis">최초 풀이 기준 · ${Number(x.score_correct || 0)} / ${targetCount} 정답</p>
     <div class="result-stat-grid"><div><strong>${Number(x.score_correct || 0)}</strong><span>정답</span></div><div><strong>${wrongCount}</strong><span>오답</span></div><div><strong>${unanswered}</strong><span>미응답</span></div></div>
     <div class="result-meta-line"><span>${icon('clock')} 전체 진행 ${time(elapsed)}</span></div>
     <div class="result-reward-card result-reward-top"><div><span>학습 보상</span><strong>+${Number(x.reward_points || 0)}P</strong></div><div><span>성장 XP</span><strong>+${Number(x.xp || 0)} XP</strong></div></div>
@@ -583,7 +587,7 @@ function finishPracticeView() {
     <div class="result-secondary-actions"><button class="text-button" id="practice-records">내 기록</button><button class="text-button" id="practice-home">홈으로</button></div>
     <p class="quiet-note">보상 P는 학습 완료·만점·꾸준함으로 쌓여요. 점수는 오답 복습 재정답으로 올라가지 않고, 승인된 재채점만 반영돼요.</p>
   </main></div>`);
-  if (x.run_mode === 'test') animateTestResult(score, perfect);
+  if (x.run_mode === 'test' && !interrupted) animateTestResult(score, perfect);
   $('#share-self-test')?.addEventListener('click', async event => {
     buttonBusy(event.currentTarget);
     try {
