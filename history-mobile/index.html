@@ -61,6 +61,7 @@ font-size:15px;font-weight:850;color:#1b64da}
 .blank input.ok{color:var(--green)}
 .blank input.no{color:var(--red)}
 .answer-show{color:#e14c58;font-weight:900}
+.masked-clue{display:inline-block;min-width:44px;height:1.05em;margin:0 2px;vertical-align:-.04em;border-bottom:2px solid #d8dee8;color:transparent;user-select:none}
 
 .progress-card{background:#fff;border-radius:18px;padding:13px 14px;margin-top:12px;box-shadow:var(--shadow)}
 .progress-top{display:flex;justify-content:space-between;font-size:11px;color:#6b7684;font-weight:800;margin-bottom:8px}
@@ -147,6 +148,16 @@ body.typing .progress-card{display:none}
 <div class="toast" id="toast"></div>
 
 <script>
+const SAFE_TITLES=[
+  "1910~1920년대 일제의 식민 통치",
+  "국외 독립운동 기지",
+  "3·1운동의 배경과 전개",
+  "3·1운동 이후 정부 수립과 활동",
+  "무장 독립전쟁과 의열투쟁",
+  "실력양성운동",
+  "민족유일당운동과 민족 협동 전선"
+];
+const SAFE_SHORTS=["식민 통치","국외 기지","3·1운동","정부 활동","무장·의열","실력양성","민족협동"];
 const DATA=[{"title":"1910~1920년대 일제의 식민 통치","short":"식민 통치","rows":[["1910",[["국권 피탈 → ",null,[]],["조선총독부","조선총독부",[1,3]],[", 총독은 주로 ",null,[]],["군인","군인",[2,3]],[" 출신으로 임명",null,[]]]],["1910년대 무단통치",[["헌병경찰제","헌병경찰제",[1,3]],[" 실시 → 정식 재판 없이 ",null,[]],["즉결처분","즉결처분",[2,3]],[" 가능",null,[]]]],["조선태형령",[["조선태형령","조선태형령",[1,2,3]],[" → 한국인에게만 ",null,[]],["태형","태형",[2,3]],[" 적용",null,[]]]],["토지조사사업",[["토지조사사업","토지조사사업",[1,3]],[" 실시 → ",null,[]],["신고제","신고제",[2,3]],[" 적용, ",null,[]],["지주의 권한 강화","지주의 권한 강화",[2,3]],[" → 토지세 안정적 확보",null,[]]]],["회사령",[["회사 설립은 조선 총독의 ",null,[]],["허가","허가",[1,2,3]],[" 필요 → 조선 경제권을 일본에 종속",null,[]]]],["1920년대 문화통치",[["3·1운동","3·1운동",[2,3]],[" 이후 ",null,[]],["문화통치","문화통치",[1,3]],["로 전환, 문관 출신 총독 임명 가능 규정",null,[]]]],["경찰",[["헌병경찰제 → ",null,[]],["보통경찰제","보통경찰제",[1,3]],[", 이후 ",null,[]],["치안유지법","치안유지법",[2,3]],[" 제정",null,[]]]],["정치참여",[["도평의회·부면협의회","도평의회·부면협의회",[2,3]],[" 설치 → 실제로는 ",null,[]],["자문기관","자문기관",[2,3]],["에 가까움",null,[]]]],["언론",[["한국인 신문 창간 허용 → ",null,[]],["검열·삭제·정간·폐간","검열·삭제·정간·폐간",[2,3]],[" 지속",null,[]]]],["산미증식계획",[["산미증식계획","산미증식계획",[1,3]],[" → 일본으로 쌀 반출 증가 / 국내 소비량 감소 / ",null,[]],["소작농 증가","소작농 증가",[2,3]]]],["회사 설립",[["허가제 → ",null,[]],["신고제","신고제",[1,2,3]],[", 일본 기업의 한국 진출 확대",null,[]]]]]},{"title":"국외 독립운동 기지","short":"국외 기지","rows":[["서간도",[["신민회 계열 인사들이 이주 → ",null,[]],["신흥강습소","신흥강습소",[2,3]],["·",null,[]],["신흥무관학교","신흥무관학교",[1,3]],[" 운영, 독립군 양성",null,[]]]],["북간도",[["한인 사회와 ",null,[]],["학교","학교",[2,3]],["를 중심으로 독립운동 기반 형성",null,[]]]],["연해주",[["신한촌","신한촌",[1,2,3]],[" 건설, ",null,[]],["대한광복군정부","대한광복군정부",[1,3]],[" 수립 → ",null,[]],["이상설·이동휘","이상설·이동휘",[2,3]]]],["미주",[["안창호","안창호",[2,3]],[" 등이 ",null,[]],["대한인국민회","대한인국민회",[1,3]],[" 조직, 박용만 → ",null,[]],["대조선국민군단","대조선국민군단",[2,3]],[" 결성",null,[]]]]]},{"title":"3·1운동 (1919)","short":"3·1운동","rows":[["민족자결주의",[["미국 대통령 ",null,[]],["윌슨","윌슨",[2,3]],["의 ",null,[]],["민족자결주의","민족자결주의",[1,3]],[" 발표 → 약소민족 독립 희망 고조",null,[]]]],["신한청년당",[["상하이의 ",null,[]],["신한청년당","신한청년당",[1,3]],[" → ",null,[]],["김규식","김규식",[2,3]],["을 ",null,[]],["파리강화회의","파리강화회의",[2,3]],["에 파견",null,[]]]],["2·8독립선언",[["일본 유학생들이 도쿄에서 ",null,[]],["2·8독립선언","2·8독립선언",[1,2,3]],[" 발표",null,[]]]],["1919.3.1",[["민족대표는 ",null,[]],["태화관","태화관",[1,3]],["에서 독립선언, 학생·시민은 ",null,[]],["탑골공원","탑골공원",[2,3]],["에서 만세시위 전개",null,[]]]],["일제 탄압",[["경기도 화성의 ",null,[]],["제암리","제암리",[1,2,3]],[" 사건 등 무력 탄압",null,[]]]],["의의",[["대한민국 임시정부","대한민국 임시정부",[1,3]],[" 수립의 계기, 중국 ",null,[]],["5·4운동","5·4운동",[2,3]],[" 등 세계 약소민족 운동에도 영향",null,[]]]],["통치 변화",[["무단통치 → ",null,[]],["문화통치","문화통치",[1,2,3]]]] ]},{"title":"대한민국 임시정부","short":"임시정부","rows":[["통합",[["3·1운동 이후 여러 임시정부가 수립 → ",null,[]],["대한민국 임시정부","대한민국 임시정부",[1,3]],["로 통합",null,[]]]],["위치·체제",[["중국 ",null,[]],["상하이","상하이",[1,2,3]],["에 자리, ",null,[]],["민주공화제","민주공화제",[1,3]],[" 채택",null,[]]]],["연통제",[["연통제","연통제",[1,3]],[" → 국내 비밀 행정 조직, 명령 전달·자금 모집",null,[]]]],["교통국",[["교통국","교통국",[1,3]],[" → 국내외 연락·정보 전달을 담당한 비밀 통신 조직",null,[]]]],["재정",[["독립운동 자금 확보를 위해 독립 ",null,[]],["공채","공채",[1,2,3]],[" 발행",null,[]]]],["외교",[["미국에 ",null,[]],["구미위원부","구미위원부",[2,3]],[" 설치 → 국제사회에 독립의 정당성 알림",null,[]]]],["국민대표회의",[["국민대표회의","국민대표회의",[1,3]],[" 개최 → ",null,[]],["창조파·개조파","창조파·개조파",[2,3]],[" 대립으로 결렬",null,[]]]]]},{"title":"무장 독립전쟁과 의열투쟁","short":"무장·의열","rows":[["봉오동전투",[["봉오동전투","봉오동전투",[1,3]],[" → ",null,[]],["홍범도","홍범도",[2,3]],["의 대한독립군 등이 일본군 격파",null,[]]]],["청산리대첩",[["청산리대첩","청산리대첩",[1,3]],[" → ",null,[]],["김좌진","김좌진",[2,3]],["의 북로군정서군 등 승리",null,[]]]],["간도참변",[["간도참변","간도참변",[1,3]],[" → 독립군에게 패한 일본군이 간도 한인 사회 공격",null,[]]]],["자유시참변",[["자유시참변","자유시참변",[1,3]],[" → 러시아로 이동한 독립군 세력이 큰 피해",null,[]]]],["3부",[["만주에 ",null,[]],["참의부","참의부",[1,3]],["·",null,[]],["정의부","정의부",[2,3]],["·",null,[]],["신민부","신민부",[2,3]],[" 조직",null,[]]]],["의열단",[["의열단","의열단",[1,3]],[" → ",null,[]],["김원봉","김원봉",[2,3]],[" 중심, 일제 주요 기관·인물 공격",null,[]]]],["조선혁명선언",[["신채호","신채호",[2,3]],["가 ",null,[]],["조선혁명선언","조선혁명선언",[1,3]],[" 작성 → 의열단 투쟁 이념 정리",null,[]]]],["한인애국단",[["김구","김구",[2,3]],["가 ",null,[]],["한인애국단","한인애국단",[1,3]],[" 조직 → 이봉창·",null,[]],["윤봉길","윤봉길",[2,3]],[" 의거",null,[]]]]]},{"title":"실력양성운동","short":"실력양성","rows":[["물산장려운동",[["물산장려운동","물산장려운동",[1,3]],[" → ",null,[]],["평양","평양",[2,3]],["에서 ",null,[]],["조만식","조만식",[2,3]],[" 등이 주도, 국산품 애용",null,[]]]],["한계",[["상품 가격 상승, ",null,[]],["자본가의 이익","자본가의 이익",[2,3]],["을 위한 운동이라는 비판",null,[]]]],["민립대학설립",[["민립대학설립운동","민립대학설립운동",[1,3]],[" → ",null,[]],["조선민립대학기성회","조선민립대학기성회",[2,3]],[" 조직",null,[]]]],["일제 대응",[["1924년 ",null,[]],["경성제국대학","경성제국대학",[1,2,3]],[" 설립",null,[]]]],["문맹퇴치",[["조선일보의 ",null,[]],["문자보급운동","문자보급운동",[1,3]],[", 동아일보의 ",null,[]],["브나로드운동","브나로드운동",[2,3]],[" → 일제가 1930년대 중반 금지",null,[]]]]]},{"title":"민족유일당운동 · 신간회","short":"신간회","rows":[["배경",[["민족주의","민족주의",[2,3]],[" 세력과 ",null,[]],["사회주의","사회주의",[2,3]],[" 세력의 협력 필요성 증가",null,[]]]],["정우회선언",[["1926년 ",null,[]],["정우회선언","정우회선언",[1,2,3]],[" → 민족주의 세력과의 협동 주장",null,[]]]],["신간회",[["1927년","1927년",[2,3]],[" 비타협적 민족주의 + 사회주의 세력 → ",null,[]],["신간회","신간회",[1,3]],[" 창립",null,[]]]],["활동",[["전국 지회 설치, ",null,[]],["노동·농민 운동","노동·농민 운동",[2,3]],[" 지원, 민족운동 전개",null,[]]]],["광주학생항일운동",[["1929년","1929년",[2,3]],[" ",null,[]],["광주학생항일운동","광주학생항일운동",[1,3]],[" 지원",null,[]]]],["근우회",[["근우회","근우회",[1,2,3]],[" → 신간회의 자매단체 성격을 가진 여성 민족운동 단체",null,[]]]],["해소",[["내부 노선 갈등과 정세 변화 속에서 ",null,[]],["1931년","1931년",[2,3]],[" 해소",null,[]]]]]}];
 let version=1, section=0, showAnswers=false;
 let saved={};
@@ -157,6 +168,48 @@ try{saved=JSON.parse(localStorage.getItem("sumus_history_mobile_v4")||"{}")}catc
 const $=id=>document.getElementById(id);
 function k(s,v,r,p){return `s${s}v${v}r${r}p${p}`}
 function norm(s){return String(s||"").replace(/\s+/g,"").replace(/[·.,/\-]/g,"").toLowerCase()}
+function activeAnswersForSection(){
+  const answers=[];
+  DATA[section].rows.forEach(row=>row[1].forEach(part=>{
+    const ans=part[1], vers=part[2];
+    if(ans && vers.includes(version)) answers.push(ans);
+  }));
+  return [...new Set(answers)].sort((a,b)=>b.length-a.length);
+}
+function containsAnswer(text, answers){
+  const n=norm(text);
+  return answers.some(a=>n.includes(norm(a)) || norm(a).includes(n) && n.length>=3);
+}
+function appendMaskedText(parent,text,answers){
+  let segments=[{text:String(text),masked:false}];
+  answers.forEach(ans=>{
+    const next=[];
+    segments.forEach(seg=>{
+      if(seg.masked){next.push(seg);return}
+      let remaining=seg.text;
+      let idx=remaining.indexOf(ans);
+      if(idx<0){next.push(seg);return}
+      while(idx>=0){
+        if(idx>0) next.push({text:remaining.slice(0,idx),masked:false});
+        next.push({text:ans,masked:true});
+        remaining=remaining.slice(idx+ans.length);
+        idx=remaining.indexOf(ans);
+      }
+      if(remaining) next.push({text:remaining,masked:false});
+    });
+    segments=next;
+  });
+  segments.forEach(seg=>{
+    if(seg.masked){
+      const m=document.createElement("span");
+      m.className="masked-clue";
+      m.textContent=seg.text;
+      parent.appendChild(m);
+    }else{
+      parent.appendChild(document.createTextNode(seg.text));
+    }
+  });
+}
 function right(a,v){
   if(norm(a)===norm(v))return true;
   const aliases={
@@ -177,7 +230,7 @@ function buildChapters(){
   DATA.forEach((s,i)=>{
     const b=document.createElement("button");
     b.className="chapter"+(i===section?" active":"");
-    b.textContent=`${i+1}. ${s.short}`;
+    b.textContent=`${i+1}. ${SAFE_SHORTS[i]}`;
     b.onclick=()=>{section=i;showAnswers=false;render();window.scrollTo({top:0,behavior:"smooth"})};
     wrap.appendChild(b);
   });
@@ -190,7 +243,8 @@ function render(){
   buildChapters();
   document.querySelectorAll(".ver").forEach(b=>b.classList.toggle("active",+b.dataset.v===version));
   const s=DATA[section];
-  $("title").textContent=s.title;
+  const pageAnswers=activeAnswersForSection();
+  $("title").textContent=SAFE_TITLES[section];
   $("eyebrow").textContent=version===1?"VERSION 1 · 핵심 개념":
                               version===2?"VERSION 2 · 인물·장소·세부":
                               "VERSION 3 · 종합 고난도";
@@ -199,7 +253,8 @@ function render(){
 
   s.rows.forEach((row,ri)=>{
     const card=document.createElement("article");card.className="row";
-    const kw=document.createElement("div");kw.className="keyword";kw.textContent=row[0];
+    const kw=document.createElement("div");kw.className="keyword";
+    kw.textContent=containsAnswer(row[0],pageAnswers)?"핵심 내용":row[0];
     const body=document.createElement("div");body.className="body";
 
     row[1].forEach((part,pi)=>{
@@ -254,7 +309,7 @@ function render(){
           span.appendChild(inp);body.appendChild(span);
         }
       } else {
-        body.appendChild(document.createTextNode(txt));
+        appendMaskedText(body,txt,pageAnswers);
       }
     });
     card.appendChild(kw);card.appendChild(body);note.appendChild(card);
