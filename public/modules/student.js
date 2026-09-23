@@ -473,13 +473,12 @@ function practice(A) {
 function examTargetGrid(A, count) {
   return `<div class="practice-target-grid" role="group" aria-label="문항 수 선택">${[10,20,30].filter(n => count >= n).map(n => `<button data-practice-target="${n}" class="${A.target === n ? 'selected' : ''}">${n}<small>문제</small></button>`).join('')}<button data-practice-target="all" class="all ${A.target === 'all' ? 'selected' : ''}"><b>선택 범위 전체</b><small>${count}개 단어</small></button></div>`;
 }
-function examWritingPicker(A, testMode = false) {
+function examWritingPicker(A) {
   const items = [
     ['write_meaning','뜻 직접 쓰기','영어를 보고 뜻을 직접 입력'],
-    ['spell','영어 직접 쓰기','뜻을 보고 영어 단어를 직접 입력'],
-    ...(!testMode ? [['eng2mean','객관식','영어를 보고 뜻 4개 중 선택']] : [])
+    ['spell','영어 직접 쓰기','뜻을 보고 영어 단어를 직접 입력']
   ];
-  return `<div class="primary-mode-grid ${testMode ? '' : 'practice-mode-grid'}">${items.map(([key,label,help]) => `<button class="primary-mode-card ${key === 'eng2mean' ? 'compact-mc' : ''} ${A.mode === key ? 'selected' : ''}" data-mode="${key}"><span class="primary-mode-icon">${icon(key === 'eng2mean' ? 'practice' : 'records')}</span><div><b>${label}</b><small>${help}</small></div></button>`).join('')}</div>`;
+  return `<div class="primary-mode-grid writing-only-grid">${items.map(([key,label,help]) => `<button class="primary-mode-card ${A.mode === key ? 'selected' : ''}" data-mode="${key}"><span class="primary-mode-icon">${icon('records')}</span><div><b>${label}</b><small>${help}</small></div></button>`).join('')}</div>`;
 }
 function exam(A) {
   if (!A.examKind) {
@@ -489,7 +488,7 @@ function exam(A) {
         <button class="exam-kind-card test" data-exam-kind="test"><span class="square-icon">${icon('exam')}</span><div><span class="pill">TEST</span><h2>실전시험</h2><p>마지막에 한꺼번에 채점</p></div>${icon('arrow')}</button>
       </div>`;
   }
-  if (!['write_meaning','spell','eng2mean'].includes(A.mode)) A.mode = 'write_meaning';
+  if (!['write_meaning','spell'].includes(A.mode)) A.mode = 'write_meaning';
   const testMode = A.examKind === 'test';
   A.practiceRunMode = testMode ? 'test' : 'practice';
   const middle = A.data.profile.division === 'middle';
@@ -502,8 +501,8 @@ function exam(A) {
     scopeUi = `<div class="middle-lesson-tabs setup-choice-row">${state.codes.map(range => { const n = state.words.filter(word => String(word.range_code) === String(range)).length; return `<button data-middle-lesson="${esc(range)}" class="${String(range) === state.code ? 'selected' : ''}">${esc(range)}과 <small>${n}개</small></button>`; }).join('')}</div>
       <div class="middle-word-scope-v1334">
         <div class="middle-word-scope-head"><div><strong>오늘 외운 단어 선택</strong><small>보통 20~30개 · 연습/실전 공통</small></div><b>${count}개 선택</b></div>
-        <div class="middle-word-scope-actions"><button data-middle-word-preset="20">앞 20개</button><button data-middle-word-preset="30">앞 30개</button><button data-middle-word-preset="all">전체</button><button data-middle-word-preset="clear">초기화</button></div>
-        <div class="middle-word-checklist">${state.lessonWords.map((word,index) => `<label class="${selectedIds.has(word.id) ? 'selected' : ''}"><input type="checkbox" data-middle-word="${esc(word.id)}" ${selectedIds.has(word.id) ? 'checked' : ''}><span class="middle-word-no">${index+1}</span><span><b>${esc(word.word)}</b><small>${esc(word.meaning)}</small></span></label>`).join('')}</div>
+        <div class="middle-word-scope-actions"><button data-middle-word-preset="20">20개 선택</button><button data-middle-word-preset="30">30개 선택</button><button data-middle-word-preset="all">전체 선택</button><button data-middle-word-preset="clear">선택 해제</button></div>
+        <div class="middle-word-checklist">${state.lessonWords.map(word => `<label class="${selectedIds.has(word.id) ? 'selected' : ''}"><input type="checkbox" data-middle-word="${esc(word.id)}" ${selectedIds.has(word.id) ? 'checked' : ''}><span class="middle-word-copy"><b>${esc(word.word)}</b><small>${esc(word.meaning)}</small></span></label>`).join('')}</div>
       </div>`;
   } else {
     const state = getRanges(A);
