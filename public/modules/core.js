@@ -24,12 +24,12 @@ export const PRACTICE_SECONDS_PER_QUESTION = {
 };
 export const practiceDurationSec = (mode, total) => Math.max(60, Math.ceil(Math.max(1, Number(total) || 1) * (PRACTICE_SECONDS_PER_QUESTION[mode] || 8)));
 export const CHARACTERS = {
-  lumi: { name: 'LUMI', ko: '루미', type: '별빛 여우', color: '#BD792E', light: '#F4CA87', soft: '#F7EEE0' },
-  nox: { name: 'NOX', ko: '녹스', type: '나이트 캣', color: '#716297', light: '#C4B5DD', soft: '#F0EBF6' },
-  blaze: { name: 'BLAZE', ko: '블레이즈', type: '플레임 울프', color: '#B96853', light: '#EEB197', soft: '#F9ECE6' },
-  tide: { name: 'TIDE', ko: '타이드', type: '아쿠아 링크스', color: '#4C8499', light: '#A5D1DE', soft: '#E9F3F5' },
-  zeph: { name: 'ZEPH', ko: '제프', type: '스카이 팔콘', color: '#5D8C84', light: '#B5D9CF', soft: '#ECF3EF' },
-  terra: { name: 'TERRA', ko: '테라', type: '아이언 베어', color: '#7A825B', light: '#C5CDA3', soft: '#F1F1E5' }
+  dog: { name: 'MONG', ko: '몽이', type: '강아지', color: '#D79B54', light: '#F3C985', soft: '#FFF5E8' },
+  pig: { name: 'PINKY', ko: '핑키', type: '돼지', color: '#F3A7A8', light: '#FFD0C8', soft: '#FFF1F0' },
+  cat: { name: 'NABI', ko: '나비', type: '고양이', color: '#8B8582', light: '#C8C1BC', soft: '#F4F2F1' },
+  dragon: { name: 'YONG', ko: '용이', type: '용', color: '#59B982', light: '#A8DE9E', soft: '#ECF8ED' },
+  panda: { name: 'BAMBOO', ko: '밤부', type: '팬더', color: '#3F4442', light: '#F2F0E8', soft: '#F5F7F4' },
+  snake: { name: 'CHORONG', ko: '초롱', type: '뱀', color: '#71C96E', light: '#BDEB8F', soft: '#F0F9E8' }
 };
 export const ACCESSORIES = {
   none: { name: '기본', level: 1 }, headset: { name: '헤드셋', level: 3 }, glasses: { name: '포커스 글래스', level: 6 },
