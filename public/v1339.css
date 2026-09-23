@@ -1,0 +1,55 @@
+/* SUMUS VOCA V13.39 · mobile density and middle-school UX */
+@media(max-width:640px){
+  .student-main{padding-top:12px}
+  .app-header{margin-bottom:18px}
+  .exam-mode-switch{margin-top:4px}
+  .exam-shared-heading{margin:20px 0 28px!important}
+  .exam-shared-heading h1{font-size:34px!important}
+  .setup-section{margin-bottom:28px}
+  .setup-section .step-label{margin-bottom:16px}
+  .middle-word-scope-v1339{margin-top:18px;border:1px solid #dce9e4;border-radius:24px;background:#fff;overflow:hidden}
+  .middle-word-scope-v1339 .middle-word-scope-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 18px 14px;background:#f6fbf9}
+  .middle-word-scope-v1339 .middle-word-scope-head strong{display:block;font-size:17px;letter-spacing:-.035em;color:#172a24}
+  .middle-word-scope-v1339 .middle-word-scope-head small{display:block;margin-top:3px;font-size:11px;color:#8a9b95}
+  .middle-word-scope-v1339 .middle-word-scope-head>b{font-size:17px;color:#078c68;white-space:nowrap}
+  .middle-word-quick-v1339{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;padding:12px}
+  .middle-word-quick-v1339 button{min-width:0;min-height:66px;padding:9px 3px;border:1px solid #dfe8e4;border-radius:17px;background:#fff;color:#31463e;font:inherit}
+  .middle-word-quick-v1339 button b{display:block;font-size:14px;white-space:nowrap}
+  .middle-word-quick-v1339 button small{display:block;margin-top:3px;font-size:9px;color:#97a49f;white-space:nowrap}
+  .middle-word-quick-v1339 button.selected{border-color:#5bd4ae;background:#ebfaf5;color:#087e60;box-shadow:0 5px 14px rgba(21,165,120,.08)}
+  .middle-word-quick-v1339 button.selected small{color:#4b9c82}
+  .middle-direct-head-v1339{display:flex;align-items:center;justify-content:space-between;padding:12px 17px;border-top:1px solid #edf2f0}
+  .middle-direct-head-v1339 span{font-size:12px;font-weight:850;color:#50625c}
+  .middle-direct-head-v1339 button{border:0;background:transparent;color:#8c9995;font-size:11px;font-weight:750}
+  .middle-word-checklist.compact-v1339{max-height:42vh;overflow:auto;padding:0 14px 14px;-webkit-overflow-scrolling:touch}
+  .middle-word-checklist.compact-v1339 label{min-height:62px}
+  .exam-start-inline{position:sticky;bottom:calc(78px + env(safe-area-inset-bottom));z-index:12;padding:10px 12px 12px!important;border-radius:20px!important;background:rgba(255,255,255,.94)!important;box-shadow:0 10px 34px rgba(20,52,43,.13)!important;backdrop-filter:blur(14px)}
+  .exam-start-inline p{margin:0 0 7px!important;font-size:10px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .exam-start-inline .btn{min-height:50px!important}
+  .grammar-heading{margin-bottom:18px!important}
+  .grammar-range-head.middle.compact-v1339{margin:10px 0 14px;padding:20px!important;border-radius:23px!important}
+  .grammar-range-head.middle.compact-v1339 h2{font-size:22px!important;line-height:1.2!important}
+  .grammar-range-head.middle.compact-v1339 p{margin-top:5px!important;font-size:11px!important}
+  .middle-grammar-tabs-v1339{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 13px;padding:5px;border-radius:18px;background:#edf2f1}
+  .middle-grammar-tabs-v1339 button{min-height:58px;border:0;border-radius:14px;background:transparent;color:#7c8b86;font:inherit}
+  .middle-grammar-tabs-v1339 button b{display:block;font-size:16px}
+  .middle-grammar-tabs-v1339 button small{display:block;margin-top:2px;font-size:9px}
+  .middle-grammar-tabs-v1339 button.selected{background:#fff;color:#087f61;box-shadow:0 3px 12px rgba(30,65,53,.07)}
+  .middle-grammar-summary-v1339{display:flex;align-items:center;justify-content:space-between;margin:10px 3px 9px}
+  .middle-grammar-summary-v1339 b{font-size:16px;color:#182d26}.middle-grammar-summary-v1339 span{font-size:10px;color:#92a09b}
+  .grammar-set-list.compact-v1339{display:grid;gap:8px}
+  .grammar-set-list.compact-v1339 .grammar-set-card{min-height:0!important;padding:15px 16px!important;border-radius:20px!important}
+  .grammar-set-list.compact-v1339 .grammar-set-top{gap:11px!important}
+  .grammar-set-list.compact-v1339 .grammar-number{min-width:58px!important;width:58px!important;padding:9px 5px!important;border-radius:14px!important;font-size:14px!important;line-height:1.25!important}
+  .grammar-set-list.compact-v1339 .grammar-set-top .grow b{font-size:15px!important;line-height:1.25!important}
+  .grammar-set-list.compact-v1339 .grammar-set-top .grow small{font-size:10px!important;margin-top:3px!important}
+  .grammar-set-list.compact-v1339 .grammar-state{font-size:9px!important;padding:7px 9px!important}
+  .grammar-set-list.compact-v1339 .grammar-set-cta{margin-top:11px!important;padding-top:10px!important;font-size:12px!important}
+  .home-profile-hero-v1337{grid-template-columns:minmax(155px,46%) 1fr;min-height:218px;padding-top:12px;padding-bottom:12px}
+  .home-pet-art-v1337,.home-pet-art-v1337 .avatar-art{width:184px}
+  .home-pet-art-v1337 .avatar-art{height:170px}
+  .home-level-badge-v1337{width:50px;height:50px;border-radius:16px}
+  .home-level-badge-v1337 b{font-size:18px}
+  .home-main-metrics-v1337 button{min-height:90px;padding-top:12px;padding-bottom:11px}
+  .home-main-metrics-v1337 strong{font-size:23px;margin-top:6px}
+}
