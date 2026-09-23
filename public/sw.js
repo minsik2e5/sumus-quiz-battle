@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.31.0-ios-boot-fix';
+const VERSION = 'sumus-voca-v13.32.0-ios-boot-fix';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -24,7 +24,7 @@ const SHELL = [
   '/v1327.css',
   '/v1328.css',
   '/v1329.css',
-  '/v1330.css',
+  '/v1330.css',\n  '/v1332.css',
   '/app.js',
   '/signup-ui.js',
   '/teacher-enhancements.js',
