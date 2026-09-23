@@ -149,7 +149,7 @@ function showExamResult(data) {
       button.disabled = true;
       try {
         await api('/meaning-disputes', { source_type: 'exam', source_id: a.id, question_index: Number(button.dataset.examDispute) }, 'POST');
-        button.textContent = '✓ 선생님께 검토 요청했어요';
+        button.textContent = '✓ 이의제기 접수 완료';
         toast('뜻 이의제기를 보냈어요.');
       } catch (err) { button.disabled = false; toast(err.message); }
     }));
@@ -178,7 +178,7 @@ export function openPracticeRecord(sessionId) {
         const dispute = isTimeout ? null : disputes.find(d => d.question_id === item.question_id || (d.word_id === item.word_id && d.answer === item.answer));
         const dStatus = dispute?.status === 'pending' ? ' · 이의제기 심사중' : String(dispute?.status || '').startsWith('approved') ? ' · 정답 인정' : dispute?.status === 'rejected' ? ' · 오답 유지' : '';
         const canDispute = !isTimeout && A.data.profile.role === 'student' && item.type === 'write_meaning' && item.answer && !dispute;
-        return `<div class="wrong-word"><span class="pill ${isTimeout ? 'red' : 'red'}">${isTimeout ? 'TIME OUT' : '오답'}</span><p><b>${esc(item.word)}</b></p><p>${esc(item.meaning)}</p><small>${isTimeout ? '시간 초과 · 미응답' : '내 답: ' + esc(item.answer || '미응답')}${dStatus}</small>${canDispute ? `<button class="meaning-dispute-button" data-practice-dispute="${esc(item.question_id)}">뜻 검토 요청</button>` : ''}</div>`;
+        return `<div class="wrong-word"><span class="pill ${isTimeout ? 'red' : 'red'}">${isTimeout ? 'TIME OUT' : '오답'}</span><p><b>${esc(item.word)}</b></p><p>${esc(item.meaning)}</p><small>${isTimeout ? '시간 초과 · 미응답' : '내 답: ' + esc(item.answer || '미응답')}${dStatus}</small>${canDispute ? `<button class="meaning-dispute-button" data-practice-dispute="${esc(item.question_id)}">이의제기</button>` : ''}</div>`;
       }).join('')
     : perfect
       ? '<div class="result-note">PERFECT · 모든 문항을 맞혔어요.</div>'
@@ -190,7 +190,7 @@ export function openPracticeRecord(sessionId) {
     button.disabled = true;
     try {
       await api('/meaning-disputes', { source_type: 'practice', source_id: session.id, question_id: button.dataset.practiceDispute }, 'POST');
-      button.textContent = '✓ 선생님께 검토 요청했어요';
+      button.textContent = '✓ 이의제기 접수 완료';
       toast('뜻 이의제기를 보냈어요.');
     } catch (error) { button.disabled = false; toast(error.message); }
   }));
@@ -366,7 +366,7 @@ function renderPractice() {
     const button = event.currentTarget; button.disabled = true;
     try {
       await api('/meaning-disputes', { source_type: 'practice', source_id: x.id, question_id: feedback.question_id }, 'POST');
-      button.textContent = '✓ 선생님께 검토 요청했어요'; toast('뜻 이의제기를 보냈어요.');
+      button.textContent = '✓ 이의제기 접수 완료'; toast('뜻 이의제기를 보냈어요.');
     } catch (err) { button.disabled = false; toast(err.message); }
   });
 }
@@ -444,7 +444,7 @@ function feedbackHtml(f) {
     : f.ok
       ? `${esc(f.word)} · ${esc(f.meaning)}`
       : `정답 ${esc(f.word)} · ${esc(f.meaning)}<br>내 답 ${esc(f.answer || '미응답')}`;
-  return `<div class="feedback ${f.ok ? '' : 'wrong'} ${f.timed_out ? 'timed-out' : ''}" role="status"><b>${title}</b><p>${answerLine}</p></div>${f.can_dispute ? '<button class="meaning-dispute-button" id="practice-dispute">뜻 검토 요청</button>' : ''}`;
+  return `<div class="feedback ${f.ok ? '' : 'wrong'} ${f.timed_out ? 'timed-out' : ''}" role="status"><b>${title}</b><p>${answerLine}</p></div>${f.can_dispute ? '<button class="meaning-dispute-button" id="practice-dispute">이의제기</button>' : ''}`;
 }
 function answerImpact(feedback) {
   const host = $('.session-app');
@@ -556,7 +556,7 @@ function finishPracticeView() {
     const isWrong = item.correct === false && !item.regraded && !isTimeout;
     const stateClass = isTimeout ? 'red' : isWrong ? 'red' : 'green';
     const stateLabel = isTimeout ? 'TIME OUT' : isWrong ? '오답' : '정답';
-    return `<div class="wrong-word ${isWrong || isTimeout ? '' : 'answer-correct'}"><div class="row between"><span class="pill ${stateClass}">${stateLabel}</span><small>최초 제출 답안</small></div><p><b>${esc(item.word)}</b></p><p>${esc(item.meaning)}</p><small>${isTimeout ? '시간 초과 · 미응답' : '내 답: ' + esc(item.answer || '미응답')}</small>${isWrong && item.type === 'write_meaning' && item.answer ? `<button class="meaning-dispute-button" data-finish-practice-dispute="${esc(item.question_id)}">뜻 검토 요청</button>` : ''}</div>`;
+    return `<div class="wrong-word ${isWrong || isTimeout ? '' : 'answer-correct'}"><div class="row between"><span class="pill ${stateClass}">${stateLabel}</span><small>최초 제출 답안</small></div><p><b>${esc(item.word)}</b></p><p>${esc(item.meaning)}</p><small>${isTimeout ? '시간 초과 · 미응답' : '내 답: ' + esc(item.answer || '미응답')}</small>${isWrong && item.type === 'write_meaning' && item.answer ? `<button class="meaning-dispute-button" data-finish-practice-dispute="${esc(item.question_id)}">이의제기</button>` : ''}</div>`;
   }).join('') : ''}${unrecordedMissing ? `<div class="result-note">중간 종료로 답하지 않은 문항 ${unrecordedMissing}개가 있어요.</div>` : ''}`;
   const primaryCta = perfect
     ? '<button class="btn primary full" id="practice-next-exam">다른 시험 선택</button>'
