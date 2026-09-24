@@ -546,29 +546,41 @@ function exam(A) {
     const selectedIds = new Set(state.selected);
     count = state.selected.length;
     scopeLabel = state.code ? `${state.code}과 · ${count}개 선택` : '범위 미선택';
+    const chunkSize = [20,25,30].includes(Number(A.middleChunkSize)) ? Number(A.middleChunkSize) : 20;
+    const chunks = [];
+    for (let i = 0; i < state.lessonWords.length; i += chunkSize) chunks.push({ start: i, end: Math.min(i + chunkSize, state.lessonWords.length), words: state.lessonWords.slice(i, i + chunkSize) });
+    const selectedChunk = chunks.findIndex(chunk => chunk.words.length === state.selected.length && chunk.words.every(word => selectedIds.has(word.id)));
     scopeUi = `<div class="middle-lesson-tabs setup-choice-row">${state.codes.map(range => { const n = state.words.filter(word => String(word.range_code) === String(range)).length; return `<button data-middle-lesson="${esc(range)}" class="${String(range) === state.code ? 'selected' : ''}">${esc(range)}과 <small>${n}개</small></button>`; }).join('')}</div>
       <div class="middle-word-scope-v1339">
-        <div class="middle-word-scope-head"><div><strong>오늘 외운 단어</strong><small>시험 볼 범위만 빠르게 골라요</small></div><b>${count}개</b></div>
+        <div class="middle-word-scope-head"><div><strong>외운 범위 선택</strong><small>외운 단어 구간을 고르면 그 범위가 그대로 출제돼요</small></div><b>${count}개</b></div>
+        <div class="segment compact"><button data-middle-chunk-size="20" class="${chunkSize === 20 ? 'selected' : ''}">20개씩</button><button data-middle-chunk-size="25" class="${chunkSize === 25 ? 'selected' : ''}">25개씩</button><button data-middle-chunk-size="30" class="${chunkSize === 30 ? 'selected' : ''}">30개씩</button></div>
         <div class="middle-word-quick-v1339">
-          <button data-middle-word-preset="20" class="${count === Math.min(20, state.lessonWords.length) && !A.middleWordsOpen ? 'selected' : ''}"><b>20개</b><small>기본</small></button>
-          <button data-middle-word-preset="30" class="${count === Math.min(30, state.lessonWords.length) && !A.middleWordsOpen ? 'selected' : ''}"><b>30개</b><small>추천</small></button>
+          ${chunks.map((chunk,index) => `<button data-middle-word-chunk="${index}" class="${selectedChunk === index && !A.middleWordsOpen ? 'selected' : ''}"><b>${chunk.start + 1}~${chunk.end}</b><small>${chunk.words.length}개</small></button>`).join('')}
           <button data-middle-word-preset="all" class="${count === state.lessonWords.length && state.lessonWords.length && !A.middleWordsOpen ? 'selected' : ''}"><b>전체</b><small>${state.lessonWords.length}개</small></button>
           <button data-middle-words-toggle="1" class="${A.middleWordsOpen ? 'selected' : ''}"><b>직접 선택</b><small>${A.middleWordsOpen ? '접기' : '원하는 단어'}</small></button>
         </div>
         ${A.middleWordsOpen ? `<div class="middle-direct-head-v1339"><span>직접 선택</span><button data-middle-word-preset="clear">선택 해제</button></div><div class="middle-word-checklist compact-v1339">${state.lessonWords.map(word => `<label class="${selectedIds.has(word.id) ? 'selected' : ''}"><input type="checkbox" data-middle-word="${esc(word.id)}" ${selectedIds.has(word.id) ? 'checked' : ''}><span class="middle-word-copy"><b>${esc(word.word)}</b><small>${esc(word.meaning)}</small></span></label>`).join('')}</div>` : '' }
       </div>`;
-  } else {
+  } else {else {
     const state = getRanges(A);
-    count = state.words.filter(word => state.selected.includes(word.range_code)).length;
-    scopeLabel = state.selected.map(code => recordRangeLabel({ division: 'high', school: A.school }, code)).join(' · ') || '범위 미선택';
-    scopeUi = schoolSwitch(A) + rangePicker(A);
+    const textbookCodes = state.codes.filter(code => /^L\d+$/i.test(String(code)));
+    const mockCodes = state.codes.filter(code => !/^L\d+$/i.test(String(code)));
+    const availableTypes = [['mock','모의고사',mockCodes],['textbook','교과서',textbookCodes]].filter(([, , codes]) => codes.length);
+    if (!availableTypes.some(([key]) => key === A.highRangeType)) A.highRangeType = availableTypes[0]?.[0] || 'mock';
+    const visibleCodes = A.highRangeType === 'textbook' ? textbookCodes : mockCodes;
+    const visibleSelected = state.selected.filter(code => visibleCodes.includes(code));
+    count = state.words.filter(word => visibleSelected.includes(word.range_code)).length;
+    scopeLabel = visibleSelected.map(code => recordRangeLabel({ division: 'high', school: A.school }, code)).join(' · ') || '범위 미선택';
+    const typeTabs = availableTypes.length > 1 ? `<div class="segment exam-source-tabs">${availableTypes.map(([key,label]) => `<button data-high-range-type="${key}" class="${A.highRangeType === key ? 'selected' : ''}">${label}</button>`).join('')}</div>` : '';
+    const picker = `<div class="range-grid">${visibleCodes.map(c => `<label class="range-option"><input type="checkbox" data-range="${esc(c)}" ${visibleSelected.includes(c) ? 'checked' : ''}><span>${esc(rangeLabel(A.school, c))}<small>${state.words.filter(w => w.range_code === c).length}개 단어</small></span></label>`).join('')}</div><div class="scope-tools"><span id="scope-count">${visibleSelected.length}개 범위 · ${count}개 단어</span><div><button data-high-range-all="true">전체 선택</button><button data-high-range-all="false">해제</button></div></div>`;
+    scopeUi = schoolSwitch(A) + typeTabs + picker;
   }
-  const target = A.target === 'all' ? count : Math.min(count, Number(A.target || 20));
+  const target = middle ? count : (A.target === 'all' ? count : Math.min(count, Number(A.target || 20)));
   return `<div class="exam-mode-switch segment"><button data-exam-kind="practice" class="${!testMode ? 'selected' : ''}">연습시험</button><button data-exam-kind="test" class="${testMode ? 'selected' : ''}">실전시험</button></div>
     <div class="page-heading exam-shared-heading"><h1>${testMode ? '실전시험' : '연습시험'}</h1></div>
     <section class="setup-section"><div class="step-label"><span>01</span>시험 범위</div>${scopeUi}</section>
-    <section class="setup-section"><div class="step-label"><span>02</span>문항 수</div>${examTargetGrid(A, count)}</section>
-    <section class="setup-section"><div class="step-label"><span>03</span>시험 방식</div>${examWritingPicker(A, testMode)}</section>
+    ${middle ? '' : `<section class="setup-section"><div class="step-label"><span>02</span>문항 수</div>${examTargetGrid(A, count)}</section>`}
+    <section class="setup-section"><div class="step-label"><span>${middle ? '02' : '03'}</span>시험 방식</div>${examWritingPicker(A, testMode)}</section>
     <div class="exam-start-inline"><p>${esc(scopeLabel)} · ${target || 0}문제 · ${esc(PRACTICE_TYPES[A.mode] || '뜻쓰기')}</p><button class="btn primary full" data-action="start-exam-run" ${count ? '' : 'disabled'}>${testMode ? '실전시험 시작' : '연습시험 시작'} ${icon('arrow')}</button></div>`;
 }
 
