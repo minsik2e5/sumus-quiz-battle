@@ -5,6 +5,7 @@ import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin }
 import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { middleGrade3Books } from './middle-vocab.mjs';
 import { middleGrade2Books } from './middle-vocab-grade2.mjs';
+import { ybmKimHighBooks } from './high-vocab-ybm-kim.mjs';
 export const builtinBooks = builtinBooksData;
 const withoutLegacySeonbu44 = book => {
   const isSeonbu = book.school_id === 'seonbu-high' || book.school === '선부고';
@@ -313,7 +314,7 @@ function composeDailyQuest(state, studentId, school, grade, target = 20) {
   const chosen = [...selected.values()];
   return { words: chosen, mix, target: chosen.length, range_codes: [...new Set(chosen.map(word => String(word.range_code)))].filter(Boolean) };
 }
-export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, ...middleGrade2Books, ...middleGrade3Books, ...state.extraBooks]; }
+export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, ...middleGrade2Books, ...middleGrade3Books, ...ybmKimHighBooks, ...state.extraBooks]; }
 export function scopedWords(state, schoolRef, ranges, grade = null) {
   const school = schoolByRef(state, schoolRef);
   if (!school || !Array.isArray(ranges) || !ranges.length) fail('학교와 범위를 선택해주세요.');
