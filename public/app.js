@@ -182,15 +182,29 @@ $('#app').addEventListener('click', async event => {
       visibleCodes.forEach(code => d.highRangeAll === 'true' ? current.add(code) : current.delete(code));
       A.ranges[info.key] = [...current]; savePreferences(); render(); return;
     }
-    if (d.middleChunkSize) { A.middleChunkSize = Number(d.middleChunkSize); A.middleWordIds = []; A.middleWordsOpen = false; A.target = 'all'; savePreferences(); render(); return; }
-    if (d.middleWordChunk !== undefined) {
+    if (d.middleChunkSize) {
+      A.middleChunkSize = Number(d.middleChunkSize);
+      const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
+      const start = Math.max(0, Math.min(Number(A.middleStartIndex || 0), Math.max(0, words.length - 1)));
+      A.middleWordIds = words.slice(start, start + A.middleChunkSize).map(word => word.id);
+      A.target = 'all'; savePreferences(); render(); return;
+    }
+    if (d.middleStartIndex !== undefined) {
       const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
       const size = [20,25,30].includes(Number(A.middleChunkSize)) ? Number(A.middleChunkSize) : 20;
-      const start = Number(d.middleWordChunk) * size;
-      A.middleWordIds = words.slice(start, start + size).map(word => word.id);
-      A.middleWordsOpen = false; A.target = 'all'; savePreferences(); render(); return;
+      A.middleStartIndex = Math.max(0, Math.min(Number(d.middleStartIndex), Math.max(0, words.length - 1)));
+      A.middleWordIds = words.slice(A.middleStartIndex, A.middleStartIndex + size).map(word => word.id);
+      A.target = 'all'; savePreferences(); render(); return;
     }
-    if (d.middleLesson) { A.middleRange = d.middleLesson; A.middleWordIds = []; A.middleWordsOpen = false; A.target = 'all'; savePreferences(); render(); return; }
+    if (d.middleRangeMove) {
+      const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
+      const size = [20,25,30].includes(Number(A.middleChunkSize)) ? Number(A.middleChunkSize) : 20;
+      const current = Math.max(0, Number(A.middleStartIndex || 0));
+      A.middleStartIndex = d.middleRangeMove === 'next' ? Math.min(current + size, Math.max(0, words.length - 1)) : Math.max(0, current - size);
+      A.middleWordIds = words.slice(A.middleStartIndex, A.middleStartIndex + size).map(word => word.id);
+      A.target = 'all'; savePreferences(); render(); return;
+    }
+    if (d.middleLesson) { A.middleRange = d.middleLesson; A.middleStartIndex = 0; A.middleWordIds = []; A.middleWordsOpen = false; A.target = 'all'; savePreferences(); render(); return; }
     if (d.middleWordsToggle) { A.middleWordsOpen = !A.middleWordsOpen; render(); return; }
     if (d.middleGrammarLesson) { A.middleGrammarLesson = Number(d.middleGrammarLesson); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (d.middleWordPreset) {
