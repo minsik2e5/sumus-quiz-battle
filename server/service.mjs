@@ -525,6 +525,40 @@ export async function service(state, method, path, body, token) {
       })
     };
   }
+  if (path === '/teacher/student-preview' && method === 'POST') {
+    requireRole(p, 'teacher');
+    const school = schoolByRef(state, body.school_id || body.school || p.active_school_id);
+    if (!school || !p.school_ids?.includes(school.id)) fail('미리보기 학교를 확인해주세요.', 403);
+    const grade = str(body.grade, 20);
+    if (!divisionClassAllowed(school.division, grade)) fail('미리보기 학년/반을 확인해주세요.', 400);
+    const previewId = `teacher-preview:${p.id}:${school.id}:${grade}`;
+    let preview = state.profiles.find(item => item.id === previewId);
+    if (!preview) {
+      preview = {
+        id: previewId, role: 'student', username: previewId, display_name: `미리보기 · ${school.name}`,
+        class_name: grade, division: school.division, school_id: school.id, school: school.name,
+        active: true, preview_owner_id: p.id, avatar_key: 'dog', avatar_accessory: 'none',
+        avatar_frame: 'basic', avatar_title: 'rookie', ranking_public: false, share_profile: false,
+        created_at: Date.now()
+      };
+      state.profiles.push(preview);
+    } else {
+      Object.assign(preview, { class_name: grade, division: school.division, school_id: school.id, school: school.name, active: true, preview_owner_id: p.id });
+    }
+    const raw = randomBytes(32).toString('base64url');
+    state.tokens.push({ hash: hashToken(raw), user_id: preview.id, expires_at: Date.now() + 2 * 3600000, preview_owner_id: p.id });
+    return { ok: true, profile: publicProfile(preview), _cookie: raw };
+  }
+  if (path === '/student-preview/exit' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!p.preview_owner_id) fail('미리보기 계정이 아닙니다.', 403);
+    const owner = state.profiles.find(item => item.id === p.preview_owner_id && item.role === 'teacher' && item.active);
+    if (!owner) fail('교사 계정을 찾을 수 없습니다.', 404);
+    const raw = randomBytes(32).toString('base64url');
+    state.tokens.push({ hash: hashToken(raw), user_id: owner.id, expires_at: Date.now() + 7 * 86400000 });
+    state.tokens = state.tokens.filter(item => item !== auth);
+    return { ok: true, profile: publicProfile(owner), _cookie: raw };
+  }
   if (path === '/teacher/division' && method === 'PATCH') {
     requireRole(p, 'teacher');
     const division = str(body.division, 12);
