@@ -174,6 +174,22 @@ $('#app').addEventListener('click', async event => {
     if (d.rangeAll) { const { codes } = getRanges(A); A.ranges[A.school] = d.rangeAll === 'true' ? [...codes] : []; $$('[data-range]').forEach(i => i.checked = d.rangeAll === 'true'); updateRangeSummary(A); updateExamSummary(A); savePreferences(); return; }
     if (d.mode) { A.mode = d.mode; if (!['write_meaning','spell'].includes(A.mode)) A.practiceRunMode = 'practice'; savePreferences(); render(); return; }
     if (d.practiceTarget) { A.target = d.practiceTarget === 'all' ? 'all' : Number(d.practiceTarget); $$('[data-practice-target]').forEach(e => { const selected = e === b; e.classList.toggle('selected', selected); e.setAttribute('aria-pressed', String(selected)); }); savePreferences(); render(); return; }
+    if (d.highRangeType) { A.highRangeType = d.highRangeType; A.target = 20; savePreferences(); render(); return; }
+    if (d.highRangeAll) {
+      const info = getRanges(A);
+      const visibleCodes = info.codes.filter(code => d.highRangeType === 'textbook' ? /^L\\d+$/i.test(String(code)) : !/^L\\d+$/i.test(String(code)));
+      const current = new Set(info.selected);
+      visibleCodes.forEach(code => d.highRangeAll === 'true' ? current.add(code) : current.delete(code));
+      A.ranges[info.key] = [...current]; savePreferences(); render(); return;
+    }
+    if (d.middleChunkSize) { A.middleChunkSize = Number(d.middleChunkSize); A.middleWordIds = []; A.middleWordsOpen = false; A.target = 'all'; savePreferences(); render(); return; }
+    if (d.middleWordChunk !== undefined) {
+      const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
+      const size = [20,25,30].includes(Number(A.middleChunkSize)) ? Number(A.middleChunkSize) : 20;
+      const start = Number(d.middleWordChunk) * size;
+      A.middleWordIds = words.slice(start, start + size).map(word => word.id);
+      A.middleWordsOpen = false; A.target = 'all'; savePreferences(); render(); return;
+    }
     if (d.middleLesson) { A.middleRange = d.middleLesson; A.middleWordIds = []; A.middleWordsOpen = false; A.target = 'all'; savePreferences(); render(); return; }
     if (d.middleWordsToggle) { A.middleWordsOpen = !A.middleWordsOpen; render(); return; }
     if (d.middleGrammarLesson) { A.middleGrammarLesson = Number(d.middleGrammarLesson); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
