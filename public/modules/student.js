@@ -561,7 +561,7 @@ function exam(A) {
         </div>
         ${A.middleWordsOpen ? `<div class="middle-direct-head-v1339"><span>직접 선택</span><button data-middle-word-preset="clear">선택 해제</button></div><div class="middle-word-checklist compact-v1339">${state.lessonWords.map(word => `<label class="${selectedIds.has(word.id) ? 'selected' : ''}"><input type="checkbox" data-middle-word="${esc(word.id)}" ${selectedIds.has(word.id) ? 'checked' : ''}><span class="middle-word-copy"><b>${esc(word.word)}</b><small>${esc(word.meaning)}</small></span></label>`).join('')}</div>` : '' }
       </div>`;
-  } else {else {
+  } else {
     const state = getRanges(A);
     const textbookCodes = state.codes.filter(code => /^L\d+$/i.test(String(code)));
     const mockCodes = state.codes.filter(code => !/^L\d+$/i.test(String(code)));
