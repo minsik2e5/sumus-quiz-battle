@@ -544,22 +544,25 @@ function exam(A) {
   if (middle) {
     const state = middleLessonState(A);
     const selectedIds = new Set(state.selected);
-    count = state.selected.length;
-    scopeLabel = state.code ? `${state.code}과 · ${count}개 선택` : '범위 미선택';
-    const chunkSize = [20,25,30].includes(Number(A.middleChunkSize)) ? Number(A.middleChunkSize) : 20;
-    const chunks = [];
-    for (let i = 0; i < state.lessonWords.length; i += chunkSize) chunks.push({ start: i, end: Math.min(i + chunkSize, state.lessonWords.length), words: state.lessonWords.slice(i, i + chunkSize) });
-    const selectedChunk = chunks.findIndex(chunk => chunk.words.length === state.selected.length && chunk.words.every(word => selectedIds.has(word.id)));
+    const size = [20,25,30].includes(Number(A.middleChunkSize)) ? Number(A.middleChunkSize) : 20;
+    const startIndex = Math.max(0, Math.min(Number.isInteger(Number(A.middleStartIndex)) ? Number(A.middleStartIndex) : 0, Math.max(0, state.lessonWords.length - 1)));
+    const selectedWords = state.lessonWords.slice(startIndex, startIndex + size);
+    const effectiveWords = state.selected.length ? state.selected : selectedWords.map(word => word.id);
+    if (!state.selected.length && state.lessonWords.length) A.middleWordIds = [...effectiveWords];
+    count = effectiveWords.length;
+    const firstWord = state.lessonWords[startIndex];
+    const lastWord = state.lessonWords[Math.min(startIndex + count - 1, state.lessonWords.length - 1)];
+    scopeLabel = firstWord ? `${state.code}과 · ${firstWord.word} ~ ${lastWord?.word || firstWord.word} · ${count}개` : '범위 미선택';
     scopeUi = `<div class="middle-lesson-tabs setup-choice-row">${state.codes.map(range => { const n = state.words.filter(word => String(word.range_code) === String(range)).length; return `<button data-middle-lesson="${esc(range)}" class="${String(range) === state.code ? 'selected' : ''}">${esc(range)}과 <small>${n}개</small></button>`; }).join('')}</div>
       <div class="middle-word-scope-v1339">
-        <div class="middle-word-scope-head"><div><strong>외운 범위 선택</strong><small>외운 단어 구간을 고르면 그 범위가 그대로 출제돼요</small></div><b>${count}개</b></div>
-        <div class="segment compact"><button data-middle-chunk-size="20" class="${chunkSize === 20 ? 'selected' : ''}">20개씩</button><button data-middle-chunk-size="25" class="${chunkSize === 25 ? 'selected' : ''}">25개씩</button><button data-middle-chunk-size="30" class="${chunkSize === 30 ? 'selected' : ''}">30개씩</button></div>
-        <div class="middle-word-quick-v1339">
-          ${chunks.map((chunk,index) => `<button data-middle-word-chunk="${index}" class="${selectedChunk === index && !A.middleWordsOpen ? 'selected' : ''}"><b>${chunk.start + 1}~${chunk.end}</b><small>${chunk.words.length}개</small></button>`).join('')}
-          <button data-middle-word-preset="all" class="${count === state.lessonWords.length && state.lessonWords.length && !A.middleWordsOpen ? 'selected' : ''}"><b>전체</b><small>${state.lessonWords.length}개</small></button>
-          <button data-middle-words-toggle="1" class="${A.middleWordsOpen ? 'selected' : ''}"><b>직접 선택</b><small>${A.middleWordsOpen ? '접기' : '원하는 단어'}</small></button>
+        <div class="middle-word-scope-head"><div><strong>시작 단어 선택</strong><small>오늘 외우기 시작한 첫 단어를 눌러주세요</small></div><b>${count}개</b></div>
+        <div class="middle-word-checklist compact-v1339 start-word-list">${state.lessonWords.map((word,index) => `<button type="button" data-middle-start-index="${index}" class="${index === startIndex ? 'selected' : ''}"><span class="word-number">${index + 1}</span><span class="middle-word-copy"><b>${esc(word.word)}</b><small>${esc(word.meaning)}</small></span>${index === startIndex ? '<span class="start-mark">시작</span>' : ''}</button>`).join('')}</div>
+        <div class="middle-range-controls">
+          <div class="middle-word-scope-head"><div><strong>몇 개 외웠나요?</strong><small>시작 단어부터 자동으로 범위를 잡아요</small></div></div>
+          <div class="segment compact"><button data-middle-chunk-size="20" class="${size === 20 ? 'selected' : ''}">20개</button><button data-middle-chunk-size="25" class="${size === 25 ? 'selected' : ''}">25개</button><button data-middle-chunk-size="30" class="${size === 30 ? 'selected' : ''}">30개</button></div>
+          <div class="selected-range-card"><small>선택 범위</small><strong>${firstWord ? `${esc(firstWord.word)} ~ ${esc(lastWord?.word || firstWord.word)}` : '단어를 선택해주세요'}</strong><span>${count}개 · ${startIndex + 1}번 ~ ${Math.min(startIndex + count, state.lessonWords.length)}번</span></div>
+          <div class="range-nav"><button data-middle-range-move="prev" ${startIndex <= 0 ? 'disabled' : ''}>← 이전</button><button data-middle-range-move="next" ${startIndex + size >= state.lessonWords.length ? 'disabled' : ''}>다음 →</button></div>
         </div>
-        ${A.middleWordsOpen ? `<div class="middle-direct-head-v1339"><span>직접 선택</span><button data-middle-word-preset="clear">선택 해제</button></div><div class="middle-word-checklist compact-v1339">${state.lessonWords.map(word => `<label class="${selectedIds.has(word.id) ? 'selected' : ''}"><input type="checkbox" data-middle-word="${esc(word.id)}" ${selectedIds.has(word.id) ? 'checked' : ''}><span class="middle-word-copy"><b>${esc(word.word)}</b><small>${esc(word.meaning)}</small></span></label>`).join('')}</div>` : '' }
       </div>`;
   } else {
     const state = getRanges(A);
