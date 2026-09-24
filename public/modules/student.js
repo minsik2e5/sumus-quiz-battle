@@ -474,10 +474,18 @@ function memorizationPanel(A) {
       })()
     : (() => {
         const state = highSchoolMemorizeState(A);
-        return schoolSwitch(A) + `<div class="memorize-range-strip" role="tablist" aria-label="학습 범위">${state.codes.map(range => {
+        const textbookCodes = state.codes.filter(code => /^L\\d+$/i.test(String(code)));
+        const mockCodes = state.codes.filter(code => !/^L\\d+$/i.test(String(code)));
+        const availableTypes = [['mock','모의고사',mockCodes],['textbook','교과서',textbookCodes]].filter(([, , codes]) => codes.length);
+        if (!availableTypes.some(([key]) => key === A.memorizeRangeType)) A.memorizeRangeType = textbookCodes.includes(state.code) ? 'textbook' : (availableTypes[0]?.[0] || 'mock');
+        const visibleCodes = A.memorizeRangeType === 'textbook' ? textbookCodes : mockCodes;
+        if (visibleCodes.length && !visibleCodes.includes(state.code)) A.memorizeRange = String(visibleCodes[0]);
+        const activeCode = String(A.memorizeRange || visibleCodes[0] || '');
+        const tabs = availableTypes.length > 1 ? `<div class="segment exam-source-tabs memorize-source-tabs">${availableTypes.map(([key,label]) => `<button data-memorize-range-type="${key}" class="${A.memorizeRangeType === key ? 'selected' : ''}">${label}</button>`).join('')}</div>` : '';
+        return schoolSwitch(A) + tabs + `<div class="memorize-range-strip" role="tablist" aria-label="학습 범위">${visibleCodes.map(range => {
           const code = String(range);
           const count = state.words.filter(word => String(word.range_code) === code).length;
-          const selected = code === state.code;
+          const selected = code === activeCode;
           return `<button role="tab" aria-selected="${selected}" data-memorize-range="${esc(code)}" class="${selected ? 'selected' : ''}"><strong>${esc(rangeLabel(A.school, range))}</strong><small>${count}개</small></button>`;
         }).join('')}</div>`;
       })();
