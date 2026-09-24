@@ -45,7 +45,7 @@ export async function runReleaseCheck() {
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
     const bySchool = school => runtimeBooks.filter(book => book.school === school).flatMap(book => book.words || []);
-    assert(bySchool('단원고').length === 362, '단원고 vocabulary = 362');
+    assert(bySchool('단원고').length === 444, '단원고 vocabulary = 444 (existing 362 + YBM Kim 82)');
     const gangseoWords = bySchool('강서고');
     assert(gangseoWords.length === 354, '강서고 vocabulary = 354');
     assert(bySchool('단원고').some(word => word.id.startsWith('high:ybm-kim:common2:lesson1:')), 'YBM Kim lesson 1 vocabulary is loaded');
