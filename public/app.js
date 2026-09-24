@@ -104,6 +104,15 @@ $('#app').addEventListener('click', async event => {
   const d = b.dataset; if (!Object.keys(d).length) return; event.preventDefault();
   try {
     if (d.go) return navigate(d.go);
+    if (d.action === 'student-preview' && A.data.profile.role === 'teacher') {
+      const grade = $('#preview-grade')?.value || (A.data.profile.active_division === 'middle' ? '중3' : '고1A');
+      await api('/teacher/student-preview', { school_id: A.data.profile.active_school_id, grade });
+      await refresh(); A.role = 'student'; A.tab = A.data.profile.avatar_key ? 'home' : 'studio'; render(); window.scrollTo(0, 0); return;
+    }
+    if (d.action === 'exit-student-preview' && A.data.profile.preview_owner_id) {
+      await api('/student-preview/exit', {});
+      await refresh(); A.role = 'teacher'; A.tab = 'dashboard'; render(); window.scrollTo(0, 0); return;
+    }
     if (d.teacherDivision && A.data.profile.role === 'teacher') { await performTeacherContextSwitch('division', d.teacherDivision); return; }
     if (d.study) { A.studyView = d.study; A.tab = 'practice'; A.practiceRunMode = 'practice'; render(); window.scrollTo(0, 0); return; }
     if (d.memorizeRange) { A.memorizeRange = d.memorizeRange; A.memRevealed = []; A.memorizeFilter = 'all'; savePreferences(); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
