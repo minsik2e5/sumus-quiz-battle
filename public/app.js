@@ -115,6 +115,13 @@ $('#app').addEventListener('click', async event => {
     }
     if (d.teacherDivision && A.data.profile.role === 'teacher') { await performTeacherContextSwitch('division', d.teacherDivision); return; }
     if (d.study) { A.studyView = d.study; A.tab = 'practice'; A.practiceRunMode = 'practice'; render(); window.scrollTo(0, 0); return; }
+    if (d.memorizeRangeType) {
+      A.memorizeRangeType = d.memorizeRangeType;
+      const info = getRanges(A);
+      const codes = info.codes.filter(code => d.memorizeRangeType === 'textbook' ? /^L\\d+$/i.test(String(code)) : !/^L\\d+$/i.test(String(code)));
+      A.memorizeRange = String(codes[0] || '');
+      A.memRevealed = []; A.memorizeFilter = 'all'; savePreferences(); render(); return;
+    }
     if (d.memorizeRange) { A.memorizeRange = d.memorizeRange; A.memRevealed = []; A.memorizeFilter = 'all'; savePreferences(); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (d.memorizeFilter) { A.memorizeFilter = d.memorizeFilter === 'starred' ? 'starred' : 'all'; savePreferences(); render(); return; }
     if (d.memorizeRevealAll) { A.memorizeShowAll = d.memorizeRevealAll === 'show'; render(); return; }
