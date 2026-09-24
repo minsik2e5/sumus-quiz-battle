@@ -8,7 +8,7 @@ import { MIDDLE_DONGA_YOON_PASSAGES, MIDDLE_DONGA_YOON_BY_LESSON } from '../midd
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
 export function shell(A, content) {
   const p = A.data.profile;
-  return `<div class="student-app"><main class="student-main"><header class="app-header"><div class="brand"><img src="/icon.svg" alt=""><div>SUMUS <span>VOCA</span></div></div><button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${A.tab === id ? 'active' : ''}" ${A.tab === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
+  return `<div class="student-app">${p.preview_owner_id ? '<button class="btn secondary" data-action="exit-student-preview" style="position:fixed;top:12px;right:12px;z-index:1000">← 교사 화면으로</button>' : ''}<main class="student-main"><header class="app-header"><div class="brand"><img src="/icon.svg" alt=""><div>SUMUS <span>VOCA</span></div></div><button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${A.tab === id ? 'active' : ''}" ${A.tab === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
 }
 export function studentPage(A) {
   return shell(A, ({ home, practice, exam, ranking, records, studio }[A.tab] || home)(A));
