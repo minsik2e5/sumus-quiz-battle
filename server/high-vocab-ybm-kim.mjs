@@ -3,11 +3,11 @@
 const makeBook = (lesson, entries) => {
   const bookId = `high:ybm-kim:common2:lesson${lesson}`;
   return {
-    id: bookId, school_id: 'danwon-high', school: '단원고', division: 'high', grade: '고1',
+    id: bookId, school_id: 'danwon-high', school: '단원고', division: 'high', grade: '고1A',
     title: `공통영어2 YBM(김은형) ${lesson}과 본문`, source: 'teacher_source_textbook_pages_1_2',
     words: entries.map(([word, meaning, accepted_meanings = []], index) => ({
       id: `${bookId}:${String(index + 1).padStart(3, '0')}`, book_id: bookId,
-      school_id: 'danwon-high', school: '단원고', division: 'high', grade: '고1',
+      school_id: 'danwon-high', school: '단원고', division: 'high', grade: '고1A',
       range_code: `L${lesson}`, order: index + 1, word, meaning,
       ...(accepted_meanings.length ? { accepted_meanings } : {})
     }))
