@@ -10,3 +10,24 @@
 .home-evolution-line-v1341{display:flex;align-items:center;justify-content:space-between;margin:-7px 0 10px;padding:6px 8px;border-radius:10px;background:rgba(10,142,104,.055)}
 .home-evolution-line-v1341 span{font-size:8.5px;font-weight:800;color:#6e817a}.home-evolution-line-v1341 b{font-size:9px;color:#078864}
 @media(max-width:390px){.home-pet-evolution-v1341 .home-pet-stage-v1337:before{width:145px;height:145px}.home-evolution-line-v1341{margin-top:-5px}.home-evolution-line-v1341 span{font-size:7.8px}}
+
+
+/* V13.42 exam setup layout repair */
+.exam-source-tabs{margin:14px 0 12px;width:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:6px;border-radius:18px;background:#eef2f8}
+.exam-source-tabs button{min-height:50px;border:0;border-radius:14px;background:transparent;font-weight:800;color:#8b95a5}
+.exam-source-tabs button.selected{background:#e9faf4;color:#078e6c;box-shadow:0 2px 8px rgba(16,185,129,.08)}
+.range-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important;margin-top:8px}
+.range-option{min-width:0!important;margin:0!important}
+.range-option>span{min-height:94px!important;padding:18px 16px!important;border:1px solid #dfe6ee!important;border-radius:18px!important;background:#fff!important;display:flex!important;flex-direction:column!important;justify-content:center!important;gap:7px!important}
+.range-option input:checked+span{border-color:#55d2b1!important;background:#effbf7!important;color:#078e6c!important}
+.range-option span small{display:block!important;font-size:13px!important;color:#8b98aa!important}
+.scope-tools{margin-top:12px!important;display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;flex-wrap:wrap}
+.scope-tools>div{display:flex;gap:14px}
+.scope-tools button{border:0;background:transparent;color:#078e6c;font-weight:800;padding:8px 0}
+.memorize-source-tabs{margin-top:14px}
+@media(max-width:430px){
+  .setup-section{margin-top:24px!important}
+  .study-school-card.compact{margin-bottom:12px!important}
+  .range-grid{gap:8px!important}
+  .range-option>span{min-height:86px!important;padding:15px 14px!important}
+}
