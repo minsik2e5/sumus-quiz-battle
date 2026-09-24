@@ -521,6 +521,8 @@ function examTargetGrid(A, count) {
 }
 function examWritingPicker(A) {
   const items = [
+    ['eng2mean','뜻 4지선다','영어를 보고 알맞은 뜻 선택'],
+    ['mean2eng','영어 4지선다','뜻을 보고 알맞은 영어 선택'],
     ['write_meaning','뜻 직접 쓰기','영어를 보고 뜻을 직접 입력'],
     ['spell','영어 직접 쓰기','뜻을 보고 영어 단어를 직접 입력']
   ];
@@ -534,7 +536,7 @@ function exam(A) {
         <button class="exam-kind-card test" data-exam-kind="test"><span class="square-icon">${icon('exam')}</span><div><span class="pill">TEST</span><h2>실전시험</h2><p>마지막에 한꺼번에 채점</p></div>${icon('arrow')}</button>
       </div>`;
   }
-  if (!['write_meaning','spell'].includes(A.mode)) A.mode = 'write_meaning';
+  if (!['write_meaning','spell','eng2mean','mean2eng'].includes(A.mode)) A.mode = 'eng2mean';
   const testMode = A.examKind === 'test';
   A.practiceRunMode = testMode ? 'test' : 'practice';
   const middle = A.data.profile.division === 'middle';
