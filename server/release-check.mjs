@@ -41,6 +41,8 @@ export async function runReleaseCheck() {
     assert(sessionUiSource.includes(String.fromCharCode(36, 36) + "('[data-practice-choice],#practice-confirm').forEach"), 'practice answer controls disable through the multi-node selector');
     assert(sessionUiSource.includes('practiceAdvanceTimer = setTimeout'), 'practice correct-answer auto advance is wired');
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
+    assert(studentUiSource.includes('data-middle-start-picker="true"') && !studentUiSource.includes('data-middle-start-index='), 'middle-school test setup uses the compact on-demand start-word picker');
+    assert(studentUiSource.includes('effectiveWords.length !== state.selected.length'), 'middle-school test range is rebuilt from start word and chunk size');
     assert(indexSource.includes('/app.bundle.css?v=13.43.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326'), 'V13.43 production CSS bundle contains learning style layers');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
@@ -645,6 +647,7 @@ export async function runReleaseCheck() {
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
     const practiceEnhancements = readFileSync(publicRoot + 'practice-enhancements.js', 'utf8');
     const appJs = readFileSync(publicRoot + 'app.js', 'utf8');
+    assert(appJs.includes('data-middle-start-select') && appJs.includes('middle-start-search') && !appJs.includes('if (d.middleStartIndex !== undefined)'), 'middle-school start words open in a searchable modal without the legacy inline handler');
     const bootSource = readFileSync(fileURLToPath(new URL('./boot.mjs', import.meta.url)), 'utf8');
     const buildAssetsSource = readFileSync(fileURLToPath(new URL('./build-assets.mjs', import.meta.url)), 'utf8');
     const serverIndexSource = readFileSync(fileURLToPath(new URL('./index.mjs', import.meta.url)), 'utf8');
