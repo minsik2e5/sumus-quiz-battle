@@ -433,6 +433,21 @@ export async function runReleaseCheck() {
     const teacherAfterShare = await service(state, 'GET', '/bootstrap', {}, teacherToken);
     assert(teacherAfterShare.sessions.some(item => item.id === testStarted.id && item.shared_to_teacher_at), 'teacher bootstrap receives student-shared self-test results');
 
+    const choiceTest = await service(state, 'POST', '/practice/start', {
+      school: '단원고', range_codes: [rangeCode], mode: 'eng2mean', target: 4, run_mode: 'test'
+    }, studentToken);
+    assert(choiceTest.run_mode === 'test' && choiceTest.mode === 'eng2mean' && choiceTest.feedback === null, 'four-choice can start in real test mode');
+    let choiceTestView = choiceTest;
+    let choiceAnswered = 0;
+    while (!choiceTestView.finished && choiceAnswered < 6) {
+      const currentWord = allWords.find(item => item.id === choiceTestView.question.word_id);
+      choiceTestView = await service(state, 'POST', `/practice/${choiceTest.id}/answer`, {
+        question_id: choiceTestView.question_id, answer: answerFor('eng2mean', currentWord)
+      }, studentToken);
+      choiceAnswered += 1;
+    }
+    assert(choiceTestView.finished === true && choiceAnswered === 4 && choiceTestView.score === 100, 'four-choice real test finishes at the requested question count');
+
     const practiceExam = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'practice', exam_style: true
     }, studentToken);
@@ -665,6 +680,9 @@ export async function runReleaseCheck() {
     assert(!studentModule.includes('danwongo-grammar-data.js') && !studentModule.includes('seonbu-grammar-data.js') && appJs.includes('ensureGrammarData'), 'large grammar datasets are lazy-loaded only when grammar is opened');
     assert(!sw.includes("'/danwongo-grammar-data.js'") && !sw.includes("'/teacher-enhancements.js'") && !sw.includes("'/student-enhancements.js'"), 'service worker critical shell excludes optional role and grammar modules');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
+    assert(sessionsModule.includes('selectedHighRanges') && sessionsModule.includes("A.highRangeType === 'textbook'"), 'high-school self-tests isolate mock-exam and textbook ranges');
+    assert(appJs.includes("const liveTabs = A.data.profile.role === 'teacher'") && !appJs.includes("['home', 'exam', 'ranking', 'dashboard', 'exams', 'results']"), 'background polling no longer rerenders the student exam setup');
+    assert(!appJs.includes("if (!['write_meaning','spell'].includes(A.mode)) A.practiceRunMode = 'practice'"), 'four-choice selection no longer downgrades real test mode');
     assert(v1325Css.includes('--sumus-primary') && v1325Css.includes('grid-template-columns:repeat(5') && v1325Css.includes('memorize-flip-in'), 'V13.25 green design system, balanced bottom navigation, and memorization motion are loaded');
     assert(v1326Css.includes('.home-focus-v1326') && v1326Css.includes('.rank-filter-bar') && v1326Css.includes('.pwa-install-hint'), 'V13.30 home, ranking, and PWA polish styles are loaded');
     assert(v1327Css.includes('.home-pet-hero') && v1327Css.includes('.record-summary-v1327') && v1327Css.includes('.auth-card-v1327'), 'V13.30 student home, records, and login polish styles are loaded');
