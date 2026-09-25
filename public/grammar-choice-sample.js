@@ -1,10 +1,5 @@
 import { $, $$, esc, icon, toast, api } from './modules/ui.js';
-import { DANWONGO_PASSAGES } from './danwongo-grammar-data.js?v=2';
-import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from './seonbu-grammar-data.js?v=2';
-import { GANGSEO_PASSAGES } from './gangseo-grammar-data.js?v=1';
-import { MIDDLE_DONGA_YOON_PASSAGES } from './middle-donga-yoon-grammar-data.js?v=1';
-
-let PASSAGE = DANWONGO_PASSAGES[0];
+let PASSAGE = null;
 
 function addStyles() {
   if (document.querySelector('#gc-v4-style')) return;
@@ -309,8 +304,10 @@ function allChoiceRefs() {
   return refs;
 }
 
-export function openGrammarChoiceSample(A, redraw, passageId = DANWONGO_PASSAGES[0]?.id) {
-  PASSAGE = MIDDLE_DONGA_YOON_PASSAGES.find(p => p.id === passageId) || DANWONGO_PASSAGES.find(p => p.id === passageId) || SEONBU_2026_PASSAGES.find(p => p.id === passageId) || SEONBU_2025_PASSAGES.find(p => p.id === passageId) || GANGSEO_PASSAGES.find(p => p.id === passageId) || DANWONGO_PASSAGES[0];
+export function openGrammarChoiceSample(A, redraw, passageId = null) {
+  const passages = Array.isArray(A.grammarData?.passages) ? A.grammarData.passages : [];
+  PASSAGE = passages.find(p => p.id === passageId) || passages[0] || null;
+  if (!PASSAGE) { toast('어법 자료를 불러오지 못했어요. 다시 시도해주세요.'); redraw(); return; }
   addStyles();
   A.screen = 'grammar-choice';
 
