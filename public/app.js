@@ -137,13 +137,18 @@ function loginView(role = A.role, division = A.division) {
   };
 }
 function startPolling() {
-  clearInterval(poll); poll = setInterval(async () => {
-    if (!A.data || A.screen || document.visibilityState !== 'visible' || A.tab === 'exam-create' || $('#modal-root').children.length) return;
-    const liveTabs = ['home', 'exam', 'ranking', 'dashboard', 'exams', 'results'];
+  clearInterval(poll);
+  const interval = A.data?.profile?.role === 'teacher' ? 60000 : 120000;
+  poll = setInterval(async () => {
+    if (!A.data || A.screen || document.visibilityState !== 'visible' || $('#modal-root').children.length) return;
+    if (document.activeElement && ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
+    const liveTabs = A.data.profile.role === 'teacher'
+      ? ['dashboard', 'exams', 'results']
+      : ['home', 'ranking'];
     if (!liveTabs.includes(A.tab)) return;
-    try { await refresh(); render(); }
+    try { await refresh(); renderKeepScroll(); }
     catch (err) { if (err.status === 401) { clearInterval(poll); A.data = null; loginView(); } }
-  }, 60000);
+  }, interval);
 }
 $('#app').addEventListener('click', async event => {
   const b = event.target.closest('button'); if (!b || b.disabled || !A.data || A.screen) return;
@@ -228,7 +233,7 @@ $('#app').addEventListener('click', async event => {
     }
     if (d.school && A.data.profile.role === 'teacher') { collectExamForm(A); A.school = d.school; A.vocabRange = ''; A.assignmentId = null; savePreferences(); render(); return; }
     if (d.rangeAll) { const { codes } = getRanges(A); A.ranges[A.school] = d.rangeAll === 'true' ? [...codes] : []; $$('[data-range]').forEach(i => i.checked = d.rangeAll === 'true'); updateRangeSummary(A); updateExamSummary(A); savePreferences(); return; }
-    if (d.mode) { A.mode = d.mode; if (!['write_meaning','spell'].includes(A.mode)) A.practiceRunMode = 'practice'; savePreferences(); render(); return; }
+    if (d.mode) { A.mode = d.mode; savePreferences(); renderKeepScroll(); return; }
     if (d.practiceTarget) { A.target = d.practiceTarget === 'all' ? 'all' : Number(d.practiceTarget); $$('[data-practice-target]').forEach(e => { const selected = e === b; e.classList.toggle('selected', selected); e.setAttribute('aria-pressed', String(selected)); }); savePreferences(); render(); return; }
     if (d.highRangeType) { A.highRangeType = d.highRangeType; A.target = 20; savePreferences(); renderKeepScroll(); return; }
     if (d.highRangeAll) {
@@ -261,14 +266,7 @@ $('#app').addEventListener('click', async event => {
       A.target = 'all'; savePreferences(); renderKeepScroll(); return;
     }
     if (d.middleLesson) { A.middleRange = d.middleLesson; A.middleStartIndex = 0; A.middleWordIds = []; A.middleWordsOpen = false; A.target = 'all'; savePreferences(); renderKeepScroll(); return; }
-    if (d.middleWordsToggle) { A.middleWordsOpen = !A.middleWordsOpen; render(); return; }
     if (d.middleGrammarLesson) { A.middleGrammarLesson = Number(d.middleGrammarLesson); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
-    if (d.middleWordPreset) {
-      const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
-      A.middleWordIds = d.middleWordPreset === 'clear' ? [] : d.middleWordPreset === 'all' ? words.map(word => word.id) : words.slice(0, Number(d.middleWordPreset)).map(word => word.id);
-      if (d.middleWordPreset !== 'clear') A.middleWordsOpen = false;
-      A.target = 'all'; savePreferences(); renderKeepScroll(); return;
-    }
     if (d.rankMode) { A.rankMode = d.rankMode; savePreferences(); render(); return; }
     if (d.rankScope) { A.rankScope = d.rankScope; savePreferences(); render(); return; }
     if (d.rankPeriod) { A.rankPeriod = d.rankPeriod; savePreferences(); render(); return; }
