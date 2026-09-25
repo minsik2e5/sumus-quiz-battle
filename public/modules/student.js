@@ -1,10 +1,6 @@
 import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, unlocked, levelInfo, dayKey } from './core.js';
 import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar } from './character.js';
-import { DANWONGO_PASSAGES } from '../danwongo-grammar-data.js?v=2';
-import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from '../seonbu-grammar-data.js?v=2';
-import { GANGSEO_PASSAGES } from '../gangseo-grammar-data.js?v=1';
-import { MIDDLE_DONGA_YOON_PASSAGES, MIDDLE_DONGA_YOON_BY_LESSON } from '../middle-donga-yoon-grammar-data.js?v=1';
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
 export function shell(A, content) {
   const p = A.data.profile;
@@ -90,12 +86,8 @@ export function rangePicker(A, teacher = false, grade = null) {
     return `<label class="range-option ${meta ? 'quest-range ' + meta.cls : ''}"><input type="checkbox" data-range="${c}" ${grade ? `data-range-grade="${esc(grade)}"` : ''} ${selected.includes(c) ? 'checked' : ''} aria-label="${esc(rangeLabel(A.school, c))}"><span>${esc(rangeLabel(A.school, c))}<small>${words.filter(w => w.range_code === c).length}개 단어${meta ? ' · ' + meta.detail : ''}</small>${meta ? `<em class="quest-status ${meta.cls}">${meta.label}</em>` : ''}</span></label>`;
   }).join('')}</div><div class="scope-tools"><span id="scope-count">${selected.length}개 범위 · ${selectedCount(A, grade)}개 단어</span><div><button data-range-all="true">전체 선택</button><button data-range-all="false">해제</button></div></div>`;
 }
-function grammarPassagesForSchool(school, division = 'high') {
-  if (division === 'middle') return MIDDLE_DONGA_YOON_PASSAGES;
-  if (school === '단원고') return DANWONGO_PASSAGES;
-  if (school === '선부고') return [...SEONBU_2026_PASSAGES, ...SEONBU_2025_PASSAGES];
-  if (school === '강서고') return GANGSEO_PASSAGES;
-  return [];
+function grammarPassagesForSchool(A) {
+  return Array.isArray(A.grammarData?.passages) ? A.grammarData.passages : [];
 }
 function grammarExamLabel(passage) {
   return passage.id.startsWith('middle-dong-a-yoon') ? '중3 동아(윤정미) · 본문 Part 4'
@@ -111,8 +103,18 @@ function savedGrammarProgress(A, passage) {
 }
 function grammarHomeCard(A) {
   const school = A.data.profile.school || A.school || '';
-  const passages = grammarPassagesForSchool(school, A.data.profile.division);
-  if (!passages.length) return '';
+  const supported = A.data.profile.division === 'middle' || ['단원고','선부고','강서고'].includes(school);
+  if (!supported) return '';
+  const passages = grammarPassagesForSchool(A);
+  if (!passages.length) {
+    const completed = Object.values(A.data.grammar_progress || {}).filter(item => item?.mastered).length;
+    return `<div class="section-title"><h2>오늘의 시험대비</h2><span class="tiny muted">${completed ? completed + ' MASTER' : '어법·어휘'}</span></div>
+      <button class="exam-row exam-range-row" data-study="grammar">
+        <span class="square-icon">${icon('records')}</span>
+        <div class="grow"><h3>${esc(school)} · 어법·어휘</h3><p>필요할 때만 자료를 불러와 빠르게 학습해요.</p></div>
+        ${icon('chevron')}
+      </button>`;
+  }
   const completed = passages.filter(p => savedGrammarProgress(A, p)?.mastered).length;
   const target = passages.find(p => !savedGrammarProgress(A, p)?.mastered) || passages[0];
   const progress = savedGrammarProgress(A, target);
@@ -388,10 +390,15 @@ function grammarCards(A, passages) {
 function grammarStudy(A) {
   const school = A.data.profile.school || A.school || '';
   const middle = A.data.profile.division === 'middle';
+  const data = A.grammarData;
+  if (!data) return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill green">GRAMMAR</span></div><section class="grammar-empty-school"><div><b>어법 자료를 불러오고 있어요.</b><p>잠시만 기다려주세요.</p></div></section>`;
   const isDanwon = school === '단원고';
   const isSeonbu = school === '선부고';
   const isGangseo = school === '강서고';
-  const passages = isDanwon ? DANWONGO_PASSAGES : isGangseo ? GANGSEO_PASSAGES : [];
+  const passages = data.passages || [];
+  const current = data.current || [];
+  const old = data.old || [];
+  const byLesson = data.byLesson || {};
 
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill green">GRAMMAR</span></div>
   <div class="page-heading grammar-heading"><h1>어법·어휘</h1></div>
@@ -399,13 +406,13 @@ function grammarStudy(A) {
   ${middle ? (() => {
     const lesson = Number(A.middleGrammarLesson || 6);
     const selectedLesson = [6,7].includes(lesson) ? lesson : 6;
-    const lessonPassages = MIDDLE_DONGA_YOON_BY_LESSON[selectedLesson] || [];
+    const lessonPassages = byLesson[selectedLesson] || [];
     const completed = lessonPassages.filter(p => savedGrammarProgress(A, p)?.mastered).length;
     return `
       <section class="grammar-range-head middle compact-v1339"><div><span class="eyebrow">중3 · 동아(윤정미)</span><h2>교과서 본문 어법 선택형</h2><p>문장을 읽고 알맞은 어법을 선택해요.</p></div></section>
       <div class="middle-grammar-tabs-v1339">
         ${[6,7].map(n => {
-          const ps = MIDDLE_DONGA_YOON_BY_LESSON[n] || [];
+          const ps = byLesson[n] || [];
           const done = ps.filter(p => savedGrammarProgress(A,p)?.mastered).length;
           return `<button data-middle-grammar-lesson="${n}" class="${selectedLesson === n ? 'selected' : ''}"><b>${n}과</b><small>${done}/${ps.length} 완료</small></button>`;
         }).join('')}
@@ -417,15 +424,14 @@ function grammarStudy(A) {
     <section class="grammar-range-head"><div><span class="eyebrow">단원고 시험범위</span><h2>2025년 9월 인천교육청</h2></div><span class="grammar-range-count">${passages.length}지문</span></section>
     <div class="grammar-set-list">${grammarCards(A, passages)}</div>
   ` : isGangseo ? `
-    <section class="grammar-range-head gangseo"><div><span class="eyebrow">강서고 시험범위 · 2026</span><h2>2026년 6월 부산교육청</h2></div><span class="grammar-range-count">${GANGSEO_PASSAGES.length}지문</span></section>
-    <div class="grammar-set-list">${grammarCards(A, GANGSEO_PASSAGES)}</div>
+    <section class="grammar-range-head gangseo"><div><span class="eyebrow">강서고 시험범위 · 2026</span><h2>2026년 6월 부산교육청</h2></div><span class="grammar-range-count">${passages.length}지문</span></section>
+    <div class="grammar-set-list">${grammarCards(A, passages)}</div>
   ` : isSeonbu ? `
-    <section class="grammar-range-head seonbu current"><div><span class="eyebrow">선부고 시험범위 · 2026</span><h2>2026년 3월 서울교육청</h2></div><span class="grammar-range-count">${SEONBU_2026_PASSAGES.length}지문</span></section>
-    <div class="grammar-set-list">${grammarCards(A, SEONBU_2026_PASSAGES)}</div>
-
+    <section class="grammar-range-head seonbu current"><div><span class="eyebrow">선부고 시험범위 · 2026</span><h2>2026년 3월 서울교육청</h2></div><span class="grammar-range-count">${current.length}지문</span></section>
+    <div class="grammar-set-list">${grammarCards(A, current)}</div>
     <div class="grammar-year-divider"><span>2025년 범위</span></div>
-    <section class="grammar-range-head seonbu old"><div><span class="eyebrow">선부고 시험범위 · 2025</span><h2>2025년 9월 인천교육청</h2></div><span class="grammar-range-count">${SEONBU_2025_PASSAGES.length}지문</span></section>
-    <div class="grammar-set-list">${grammarCards(A, SEONBU_2025_PASSAGES)}</div>
+    <section class="grammar-range-head seonbu old"><div><span class="eyebrow">선부고 시험범위 · 2025</span><h2>2025년 9월 인천교육청</h2></div><span class="grammar-range-count">${old.length}지문</span></section>
+    <div class="grammar-set-list">${grammarCards(A, old)}</div>
   ` : `
     <section class="grammar-empty-school"><span class="square-icon">${icon('records')}</span><div><b>현재 학교의 어법·어휘 범위를 준비 중이에요.</b><p>시험범위를 순서대로 추가하고 있어요.</p></div></section>
   `}`;
