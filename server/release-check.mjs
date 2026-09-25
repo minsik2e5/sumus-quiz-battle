@@ -645,6 +645,9 @@ export async function runReleaseCheck() {
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
     const practiceEnhancements = readFileSync(publicRoot + 'practice-enhancements.js', 'utf8');
     const appJs = readFileSync(publicRoot + 'app.js', 'utf8');
+    const bootSource = readFileSync(fileURLToPath(new URL('./boot.mjs', import.meta.url)), 'utf8');
+    const buildAssetsSource = readFileSync(fileURLToPath(new URL('./build-assets.mjs', import.meta.url)), 'utf8');
+    const serverIndexSource = readFileSync(fileURLToPath(new URL('./index.mjs', import.meta.url)), 'utf8');
     assert(manifest.display === 'standalone' && manifest.start_url === '/', 'PWA manifest is installable');
     assert(teacherModule.includes('TODAY CONTROL') && teacherModule.includes('오늘 확인 필요') && teacherModule.includes('많이 틀린 어법 포인트'), 'V13.6 teacher operations dashboard is present');
     assert(teacherModule.includes('grammar_progress') && teacherModule.includes('학생이 보낸 실전 결과'), 'teacher dashboard combines grammar progress with student-shared self-test results');
@@ -685,6 +688,9 @@ export async function runReleaseCheck() {
     assert(sw.includes("'/app.bundle.css'") && !sw.includes("'/v1341.css'"), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
+    assert(bootSource.includes("RUN_RELEASE_CHECK_ON_BOOT === 'true'") && !bootSource.includes('await runReleaseCheck();\nawait import'), 'normal server startup does not execute the full release suite');
+    assert(buildAssetsSource.includes("process.env.NODE_ENV !== 'production'") && buildAssetsSource.includes('production runtime validation skipped'), 'production cold start skips redundant syntax validation while still building assets');
+    assert(serverIndexSource.includes('hasExpiredExam') && serverIndexSource.includes('maintenanceTimer') && serverIndexSource.includes('60000'), 'background sweep avoids full-state cloning every five seconds when idle');
     assert(sessionsModule.includes('selectedHighRanges') && sessionsModule.includes("A.highRangeType === 'textbook'"), 'high-school self-tests isolate mock-exam and textbook ranges');
     assert(appJs.includes("const liveTabs = A.data.profile.role === 'teacher'") && !appJs.includes("['home', 'exam', 'ranking', 'dashboard', 'exams', 'results']"), 'background polling no longer rerenders the student exam setup');
     assert(!appJs.includes("if (!['write_meaning','spell'].includes(A.mode)) A.practiceRunMode = 'practice'"), 'four-choice selection no longer downgrades real test mode');
@@ -767,6 +773,30 @@ export async function runReleaseCheck() {
     await coordinator.durable(nextState => { nextState.counter += 1; return nextState.counter; });
     assert(Date.now() - durableStartedAt >= 100 && storedCounter === 201, 'durable mutations wait for persistence');
     await coordinator.close();
+
+    let loadRevision = 0;
+    let loadWrites = 0;
+    let loadState = structuredClone(state);
+    const loadRepository = {
+      async read() { return { state: structuredClone(loadState), revision: loadRevision }; },
+      async commit(nextState, revision) {
+        if (revision !== loadRevision) throw Object.assign(Error('revision conflict'), { status: 409 });
+        loadState = structuredClone(nextState);
+        loadRevision += 1;
+        loadWrites += 1;
+      }
+    };
+    const loadCoordinator = createMutationCoordinator(loadRepository, { state: structuredClone(state), revision: 0 }, { flushDelay: 500 });
+    const loadResults = await Promise.all(Array.from({ length: 20 }, (_, index) => loadCoordinator.fast(nextState => {
+      nextState.mastery ??= {};
+      nextState.mastery['qa-load-' + index] = { marker: index, recent_results: [{ ok: true, at: Date.now() }] };
+      return index;
+    })));
+    assert(loadResults.length === 20 && loadResults.every((value, index) => value === index), '20 concurrent student-like mutations complete without dropped responses');
+    await loadCoordinator.flush();
+    assert(Array.from({ length: 20 }, (_, index) => loadState.mastery?.['qa-load-' + index]?.marker).every((value, index) => value === index), '20 concurrent student-like mutations are preserved in durable state');
+    assert(loadWrites === 1, '20 concurrent student-like mutations batch into one persistence checkpoint');
+    await loadCoordinator.close();
 
     console.log(`[release-check] PASS ${checks.length}/${checks.length}`);
     return { ok: true, count: checks.length };
