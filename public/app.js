@@ -136,6 +136,16 @@ function loginView(role = A.role, division = A.division) {
     } catch (err) { $('#login-error').textContent = err.message; buttonBusy(b, false); }
   };
 }
+window.addEventListener('offline', () => toast('인터넷 연결이 끊겼어요. 현재 화면은 유지할게요.'));
+window.addEventListener('online', async () => {
+  toast('연결이 복구됐어요.');
+  if (!A.data || A.screen) return;
+  try { await refresh(); renderKeepScroll(); } catch {}
+});
+window.addEventListener('pageshow', async event => {
+  if (!event.persisted || !A.data || A.screen) return;
+  try { await refresh(); renderKeepScroll(); } catch {}
+});
 function startPolling() {
   clearInterval(poll);
   const interval = A.data?.profile?.role === 'teacher' ? 60000 : 120000;
