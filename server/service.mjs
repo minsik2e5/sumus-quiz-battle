@@ -1006,8 +1006,9 @@ export async function service(state, method, path, body, token) {
     if (body.school_id && body.school_id !== school.id) fail('현재 학교의 범위만 학습할 수 있어요.', 403);
     if (!PRACTICE_TYPES[body.mode]) fail('연습 방식을 선택해주세요.');
     const requestedRunMode = body.run_mode === 'test' ? 'test' : 'practice';
-    const runMode = requestedRunMode === 'test' && ['write_meaning','spell'].includes(body.mode) ? 'test' : 'practice';
-    const examStyle = body.exam_style === true && ['write_meaning','spell'].includes(body.mode);
+    const selfTestModes = ['write_meaning','spell','eng2mean','mean2eng'];
+    const runMode = requestedRunMode === 'test' && selfTestModes.includes(body.mode) ? 'test' : 'practice';
+    const examStyle = body.exam_style === true && selfTestModes.includes(body.mode);
     const isDailyQuest = body.daily_quest === true && school.division !== 'middle';
     const selectedWordIds = Array.isArray(body.word_ids)
       ? [...new Set(body.word_ids.map(value => String(value)).filter(Boolean))].slice(0, 200)
