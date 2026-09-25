@@ -31,3 +31,22 @@
   .range-grid{gap:8px!important}
   .range-option>span{min-height:86px!important;padding:15px 14px!important}
 }
+
+
+/* V13.43 stabilization: reduce layout/paint work on long mobile lists */
+.memorize-row,
+.grammar-set-card,
+.wrong-word,
+.start-word-list>button{
+  content-visibility:auto;
+  contain-intrinsic-size:72px;
+}
+.start-word-list>button,
+.range-option,
+.primary-mode-card,
+.bottom-nav button{
+  touch-action:manipulation;
+}
+@media (prefers-reduced-motion: reduce){
+  .memorize-row,.grammar-set-card,.primary-mode-card,.option,.btn{transition:none!important;animation:none!important}
+}
