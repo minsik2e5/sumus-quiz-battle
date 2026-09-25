@@ -510,7 +510,15 @@ async function answerPractice(answer, button) {
   answering = true; const x = practiceState;
   $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = true);
   clearInterval(timer); timer = null;
-  try { const result = await api(`/practice/${x.id}/answer`, { question_id: x.question_id, answer, prefetch_next: x.run_mode !== 'test' });
+  try {
+    let result;
+    const payload = { question_id: x.question_id, answer, prefetch_next: x.run_mode !== 'test' };
+    try { result = await api(`/practice/${x.id}/answer`, payload); }
+    catch (firstError) {
+      if (!firstError?.transient) throw firstError;
+      await new Promise(resolve => setTimeout(resolve, 260));
+      result = await api(`/practice/${x.id}/answer`, payload);
+    }
     practiceOffset = Number(result.server_time || Date.now()) - Date.now();
     if (result.finished) { prefetchedPractice = null; practiceState = result; finishPracticeView(); return; }
     if (result.run_mode === 'test') {
