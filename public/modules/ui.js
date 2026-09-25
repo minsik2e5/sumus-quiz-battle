@@ -35,15 +35,30 @@ export const icon = (name, cls = '') => `<svg class="icon ${cls}" viewBox="0 0 2
 export const empty = (name, title, sub = '') => `<div class="empty-state">${icon(name)}<h3>${title}</h3>${sub ? `<p>${sub}</p>` : ''}</div>`;
 export function toast(message) { const t = $('#toast'); t.textContent = message; t.classList.add('visible'); clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('visible'), 3200); }
 export async function api(path, body, method) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 12000);
-  let r;
-  try {
-    r = await fetch('/api' + path, { method: method || (body === undefined ? 'GET' : 'POST'), headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal });
-  } finally { clearTimeout(timer); }
-  const data = await r.json();
-  if (!r.ok) throw Object.assign(new Error(data.error || '연결을 확인해주세요.'), { status: r.status });
-  return data;
+  const requestMethod = method || (body === undefined ? 'GET' : 'POST');
+  const attempts = requestMethod === 'GET' ? 2 : 1;
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 12000);
+    try {
+      const r = await fetch('/api' + path, { method: requestMethod, headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal });
+      let data = {};
+      try { data = await r.json(); } catch {}
+      if (!r.ok) {
+        const error = Object.assign(new Error(data.error || '연결을 확인해주세요.'), { status: r.status, transient: r.status >= 500 });
+        if (requestMethod === 'GET' && error.transient && attempt + 1 < attempts) { lastError = error; await new Promise(resolve => setTimeout(resolve, 220)); continue; }
+        throw error;
+      }
+      return data;
+    } catch (error) {
+      const transient = error?.name === 'AbortError' || error instanceof TypeError || error?.status >= 500;
+      lastError = Object.assign(error instanceof Error ? error : new Error('연결을 확인해주세요.'), { status: Number(error?.status || 0), transient });
+      if (requestMethod === 'GET' && transient && attempt + 1 < attempts) { await new Promise(resolve => setTimeout(resolve, 220)); continue; }
+      throw lastError;
+    } finally { clearTimeout(timer); }
+  }
+  throw lastError || Object.assign(new Error('연결을 확인해주세요.'), { status: 0, transient: true });
 }
 export function buttonBusy(button, busy = true) { if (!button) return; button.disabled = busy; button.classList.toggle('busy', busy); }
 export function modal(content, title = '안내') {
