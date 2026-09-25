@@ -263,6 +263,44 @@ async function resolveExistingPractice(data, payload) {
     }
   });
 }
+export async function resumeActivePractice() {
+  const activeId = A?.data?.profile?.role === 'student' ? A.data.active_practice : null;
+  if (!activeId) return false;
+  try {
+    const active = await api(`/practice/${activeId}`);
+    if (active?.finished) {
+      A.data.active_practice = null;
+      A.data.active_practice_summary = null;
+      return false;
+    }
+    enterPracticeSession(active);
+    return true;
+  } catch (error) {
+    if (error?.status === 404) {
+      A.data.active_practice = null;
+      A.data.active_practice_summary = null;
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function syncPracticeState() {
+  const current = practiceState;
+  if (A?.screen !== 'practice' || !current?.id || current.finished || answering) return;
+  try {
+    const latest = await api(`/practice/${current.id}`);
+    if (!latest || practiceState?.id !== current.id) return;
+    practiceOffset = Number(latest.server_time || Date.now()) - Date.now();
+    prefetchedPractice = null;
+    practiceState = latest;
+    if (latest.finished) finishPracticeView();
+    else renderPractice();
+  } catch (error) {
+    if (!error?.transient) toast(error.message);
+  }
+}
+
 export async function startPractice(options = {}) {
   const selectedHighRanges = (A.ranges[A.school] || []).filter(code => {
     if (A.highRangeType === 'textbook') return /^L\d+$/i.test(String(code));
@@ -658,6 +696,23 @@ function finishPracticeView() {
   const go = async tab => { leaveSession(); A.tab = tab; await refresh(); redraw(); };
   $('#practice-home').onclick = () => go('home'); $('#practice-records').onclick = () => go('records');
 }
-window.addEventListener('online', () => { if (A?.screen === 'exam') flushDraft(); if (A?.screen === 'practice' && practiceState && !practiceState.finished) { if (practiceState.timer_mode === 'question' && questionLeftMs(practiceState) <= 0) timeoutPracticeQuestion(); else if (practiceState.timer_mode !== 'question' && Number(practiceState.deadline || 0) <= Date.now() + practiceOffset) finishPracticeByTimer(); } });
-document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') return; if (A?.screen === 'exam') { examTick(); flushDraft(); } if (A?.screen === 'practice' && practiceState && !practiceState.finished) { if (practiceState.timer_mode === 'question' && questionLeftMs(practiceState) <= 0) timeoutPracticeQuestion(); else if (practiceState.timer_mode !== 'question' && Number(practiceState.deadline || 0) <= Date.now() + practiceOffset) finishPracticeByTimer(); } });
+let practiceHiddenAt = 0;
+window.addEventListener('online', () => {
+  if (A?.screen === 'exam') flushDraft();
+  if (A?.screen === 'practice' && practiceState && !practiceState.finished) syncPracticeState();
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') {
+    if (A?.screen === 'practice') practiceHiddenAt = Date.now();
+    return;
+  }
+  if (A?.screen === 'exam') { examTick(); flushDraft(); }
+  if (A?.screen === 'practice' && practiceState && !practiceState.finished) {
+    const hiddenFor = practiceHiddenAt ? Date.now() - practiceHiddenAt : 0;
+    practiceHiddenAt = 0;
+    if (hiddenFor >= 1500 && navigator.onLine !== false) syncPracticeState();
+    else if (practiceState.timer_mode === 'question' && questionLeftMs(practiceState) <= 0) timeoutPracticeQuestion();
+    else if (practiceState.timer_mode !== 'question' && Number(practiceState.deadline || 0) <= Date.now() + practiceOffset) finishPracticeByTimer();
+  }
+});
 window.addEventListener('pagehide', () => { if (A?.screen === 'exam') localSave(); });
