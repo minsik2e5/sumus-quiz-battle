@@ -1081,7 +1081,7 @@ export async function service(state, method, path, body, token) {
       m.recent_results = Array.isArray(m.recent_results) ? m.recent_results : [];
       let gain = 0;
       if (ok) { x.correct++; x.combo++; x.best = Math.max(x.best, x.combo); gain = 20 + Math.min(x.combo, 10) * 3; x.xp += gain; m.correct++; m.streak++; m.mastery = clamp(m.mastery + (m.streak >= 3 ? 14 : 10), 0, 100); }
-      else { x.combo = 0; m.wrong++; m.streak = 0; m.mastery = clamp(m.mastery - 8, 0, 100); m.last_wrong_at = Date.now(); if (x.run_mode !== 'test' && !x.retry.some(r => r.id === word.id)) x.retry.push({ id: word.id, at: x.total + 2 }); }
+      else { x.combo = 0; m.wrong++; m.streak = 0; m.mastery = clamp(m.mastery - 8, 0, 100); m.last_wrong_at = Date.now(); if (x.run_mode !== 'test' && !x.exam_style && !x.retry.some(r => r.id === word.id)) x.retry.push({ id: word.id, at: x.total + 2 }); }
       m.recent_results.push({ ok, at: Date.now() });
       if (m.recent_results.length > 5) m.recent_results.splice(0, m.recent_results.length - 5);
       m.last_seen = Date.now(); m.next_review_at = Date.now() + (ok ? 3600000 + m.mastery * 864000 : 120000);
@@ -1140,7 +1140,7 @@ export async function service(state, method, path, body, token) {
 function advancePractice(x, state) {
   const covered = !x.cover_all || (x.seen?.length || 0) >= x.words.length;
   const scoredDone = Number(x.score_total || 0) >= Number(x.target || 0);
-  if (covered && scoredDone && (!x.retry.length || x.total >= x.target + 12)) finishPractice(x, state);
+  if (covered && scoredDone && (x.exam_style || !x.retry.length || x.total >= x.target + 12)) finishPractice(x, state);
   else nextPractice(x, state);
 }
 function nextPractice(x, state) {
