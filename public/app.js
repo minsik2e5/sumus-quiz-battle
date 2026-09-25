@@ -285,18 +285,47 @@ $('#app').addEventListener('click', async event => {
       visibleCodes.forEach(code => d.highRangeAll === 'true' ? current.add(code) : current.delete(code));
       A.ranges[info.key] = [...current]; savePreferences(); render(); return;
     }
+    if (d.middleStartPicker) {
+      const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
+      if (!words.length) return toast('선택할 단어가 없어요.');
+      const current = Math.max(0, Math.min(Number(A.middleStartIndex || 0), words.length - 1));
+      const close = modal(`<div class="middle-start-modal-v1343">
+        <span class="pill green">${esc(A.middleRange || '')}과</span>
+        <h2>시작 단어 선택</h2>
+        <p>오늘 외우기 시작한 첫 단어를 골라주세요.</p>
+        <label class="middle-start-search-v1343"><span>검색</span><input id="middle-start-search" type="search" autocomplete="off" placeholder="번호 · 영어 · 뜻 검색"></label>
+        <div class="middle-start-list-v1343" id="middle-start-list">
+          ${words.map((word,index) => `<button type="button" data-middle-start-select="${index}" data-middle-start-search="${esc((String(index + 1) + ' ' + word.word + ' ' + word.meaning).toLowerCase())}" class="${index === current ? 'selected' : ''}"><span class="word-number">${index + 1}</span><span><b>${esc(word.word)}</b><small>${esc(word.meaning)}</small></span>${index === current ? '<em>현재</em>' : ''}</button>`).join('')}
+        </div>
+      </div>`, '시작 단어 선택');
+      const root = $('#modal-root');
+      const input = $('#middle-start-search', root);
+      const list = $('#middle-start-list', root);
+      input?.addEventListener('input', () => {
+        const query = input.value.trim().toLowerCase();
+        $('[data-middle-start-select]', list).forEach(button => {
+          button.hidden = Boolean(query && !String(button.dataset.middleStartSearch || '').includes(query));
+        });
+      });
+      $('[data-middle-start-select]', list).forEach(button => {
+        button.onclick = () => {
+          const size = [20,25,30].includes(Number(A.middleChunkSize)) ? Number(A.middleChunkSize) : 20;
+          A.middleStartIndex = Math.max(0, Math.min(Number(button.dataset.middleStartSelect), words.length - 1));
+          A.middleWordIds = words.slice(A.middleStartIndex, A.middleStartIndex + size).map(word => word.id);
+          A.target = 'all';
+          savePreferences();
+          close();
+          renderKeepScroll();
+        };
+      });
+      requestAnimationFrame(() => list?.querySelector('.selected')?.scrollIntoView({ block: 'center' }));
+      return;
+    }
     if (d.middleChunkSize) {
       A.middleChunkSize = Number(d.middleChunkSize);
       const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
       const start = Math.max(0, Math.min(Number(A.middleStartIndex || 0), Math.max(0, words.length - 1)));
       A.middleWordIds = words.slice(start, start + A.middleChunkSize).map(word => word.id);
-      A.target = 'all'; savePreferences(); renderKeepScroll(); return;
-    }
-    if (d.middleStartIndex !== undefined) {
-      const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
-      const size = [20,25,30].includes(Number(A.middleChunkSize)) ? Number(A.middleChunkSize) : 20;
-      A.middleStartIndex = Math.max(0, Math.min(Number(d.middleStartIndex), Math.max(0, words.length - 1)));
-      A.middleWordIds = words.slice(A.middleStartIndex, A.middleStartIndex + size).map(word => word.id);
       A.target = 'all'; savePreferences(); renderKeepScroll(); return;
     }
     if (d.middleRangeMove) {
