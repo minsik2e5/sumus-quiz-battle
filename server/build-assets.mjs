@@ -71,25 +71,29 @@ const cssBundle = cssSources
   .join('\n');
 writeFileSync(cssBundlePath, cssBundle);
 
-const { runContentValidation } = await import('./content-validation.mjs');
-runContentValidation();
-console.log('[content-validation] PASS');
+const validateBuild = process.env.NODE_ENV !== 'production' || process.env.RUN_BUILD_VALIDATION === 'true';
+if (validateBuild) {
+  const { runContentValidation } = await import('./content-validation.mjs');
+  runContentValidation();
+  console.log('[content-validation] PASS');
 
-
-function publicJavaScriptFiles(dir) {
-  return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
-    const full = resolve(dir, entry.name);
-    if (entry.isDirectory()) return publicJavaScriptFiles(full);
-    return entry.isFile() && entry.name.endsWith('.js') ? [full] : [];
-  });
-}
-
-for (const file of publicJavaScriptFiles(resolve(root, 'public'))) {
-  try {
-    execFileSync(process.execPath, ['--check', file], { stdio: 'pipe' });
-  } catch (error) {
-    const detail = String(error?.stderr || error?.stdout || error?.message || error);
-    throw new Error('Browser JavaScript syntax check failed: ' + file.replace(root, '') + '\n' + detail);
+  function publicJavaScriptFiles(dir) {
+    return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {
+      const full = resolve(dir, entry.name);
+      if (entry.isDirectory()) return publicJavaScriptFiles(full);
+      return entry.isFile() && entry.name.endsWith('.js') ? [full] : [];
+    });
   }
+
+  for (const file of publicJavaScriptFiles(resolve(root, 'public'))) {
+    try {
+      execFileSync(process.execPath, ['--check', file], { stdio: 'pipe' });
+    } catch (error) {
+      const detail = String(error?.stderr || error?.stdout || error?.message || error);
+      throw new Error('Browser JavaScript syntax check failed: ' + file.replace(root, '') + '\n' + detail);
+    }
+  }
+  console.log('[browser-syntax] PASS');
+} else {
+  console.log('[build-assets] production runtime validation skipped; CI already validates release assets');
 }
-console.log('[browser-syntax] PASS');
