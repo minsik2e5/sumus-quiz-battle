@@ -17,10 +17,56 @@ function preferences() {
 function savePreferences() { try { localStorage.setItem('sumus:v13:prefs:' + A.data.profile.id, JSON.stringify({ ranges: A.ranges, school: A.school, mode: A.mode, practiceRunMode: A.practiceRunMode, target: A.target, rankMode: A.rankMode, rankScope: A.rankScope, rankPeriod: A.rankPeriod, middleRange: A.middleRange, middleWordIds: A.middleWordIds || [], memorizeFilter: A.memorizeFilter || 'all', memorizeRange: A.memorizeRange || '', memStars: A.memStars || [] })); } catch {} }
 async function refresh() { A.data = await api('/bootstrap'); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; }
 globalThis.__SUMUS_APPLY_BOOTSTRAP__ = data => { A.data = data; globalThis.__SUMUS_BOOTSTRAP__ = data; if (data?.profile?.role === 'teacher') A.school = data.profile.active_school; if (!A.screen) render(); };
+let roleModules = { teacher: null, student: null };
+function ensureRoleEnhancements() {
+  const role = A.data?.profile?.role;
+  if (role === 'teacher' && !roleModules.teacher) {
+    roleModules.teacher = Promise.all([
+      import('./teacher-enhancements.js?v=13.43.0'),
+      import('./exam-ops.js?v=13.43.0')
+    ]).catch(() => null);
+  }
+  if (role === 'student' && !roleModules.student) {
+    roleModules.student = Promise.all([
+      import('./student-enhancements.js?v=13.43.0'),
+      import('./practice-enhancements.js?v=13.43.0')
+    ]).catch(() => null);
+  }
+}
+async function ensureGrammarData() {
+  if (!A.data?.profile) return;
+  const division = A.data.profile.division;
+  const school = A.data.profile.school || A.school || '';
+  const key = division + ':' + school;
+  if (A.grammarDataKey === key && A.grammarData) return;
+  let data = { passages: [] };
+  if (division === 'middle') {
+    const mod = await import('./middle-donga-yoon-grammar-data.js?v=1');
+    data = { passages: mod.MIDDLE_DONGA_YOON_PASSAGES || [], byLesson: mod.MIDDLE_DONGA_YOON_BY_LESSON || {} };
+  } else if (school === '단원고') {
+    const mod = await import('./danwongo-grammar-data.js?v=2');
+    data = { passages: mod.DANWONGO_PASSAGES || [] };
+  } else if (school === '선부고') {
+    const mod = await import('./seonbu-grammar-data.js?v=2');
+    const current = mod.SEONBU_2026_PASSAGES || [], old = mod.SEONBU_2025_PASSAGES || [];
+    data = { passages: [...current, ...old], current, old };
+  } else if (school === '강서고') {
+    const mod = await import('./gangseo-grammar-data.js?v=1');
+    data = { passages: mod.GANGSEO_PASSAGES || [] };
+  }
+  A.grammarDataKey = key;
+  A.grammarData = data;
+}
+function renderKeepScroll() {
+  const y = window.scrollY;
+  render();
+  requestAnimationFrame(() => window.scrollTo(0, y));
+}
 function render() {
   if (!A.data || A.screen) return;
   $('#app').innerHTML = A.data.profile.role === 'teacher' ? teacherPage(A) : studentPage(A);
   bindPageForms();
+  queueMicrotask(ensureRoleEnhancements);
 }
 configureSessions(A, render, refresh);
 function navigate(tab) {
@@ -114,15 +160,18 @@ $('#app').addEventListener('click', async event => {
       await refresh(); A.role = 'teacher'; A.tab = 'dashboard'; render(); window.scrollTo(0, 0); return;
     }
     if (d.teacherDivision && A.data.profile.role === 'teacher') { await performTeacherContextSwitch('division', d.teacherDivision); return; }
-    if (d.study) { A.studyView = d.study; A.tab = 'practice'; A.practiceRunMode = 'practice'; render(); window.scrollTo(0, 0); return; }
+    if (d.study) {
+      if (d.study === 'grammar') { buttonBusy(b); await ensureGrammarData(); }
+      A.studyView = d.study; A.tab = 'practice'; A.practiceRunMode = 'practice'; render(); window.scrollTo(0, 0); return;
+    }
     if (d.memorizeRangeType) {
       A.memorizeRangeType = d.memorizeRangeType;
       const info = getRanges(A);
       const codes = info.codes.filter(code => d.memorizeRangeType === 'textbook' ? /^L\\d+$/i.test(String(code)) : !/^L\\d+$/i.test(String(code)));
       A.memorizeRange = String(codes[0] || '');
-      A.memRevealed = []; A.memorizeFilter = 'all'; savePreferences(); render(); return;
+      A.memRevealed = []; A.memorizeFilter = 'all'; savePreferences(); renderKeepScroll(); return;
     }
-    if (d.memorizeRange) { A.memorizeRange = d.memorizeRange; A.memRevealed = []; A.memorizeFilter = 'all'; savePreferences(); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    if (d.memorizeRange) { A.memorizeRange = d.memorizeRange; A.memRevealed = []; A.memorizeFilter = 'all'; savePreferences(); renderKeepScroll(); return; }
     if (d.memorizeFilter) { A.memorizeFilter = d.memorizeFilter === 'starred' ? 'starred' : 'all'; savePreferences(); render(); return; }
     if (d.memorizeRevealAll) { A.memorizeShowAll = d.memorizeRevealAll === 'show'; render(); return; }
     if (d.memorizeWord) {
@@ -181,7 +230,7 @@ $('#app').addEventListener('click', async event => {
     if (d.rangeAll) { const { codes } = getRanges(A); A.ranges[A.school] = d.rangeAll === 'true' ? [...codes] : []; $$('[data-range]').forEach(i => i.checked = d.rangeAll === 'true'); updateRangeSummary(A); updateExamSummary(A); savePreferences(); return; }
     if (d.mode) { A.mode = d.mode; if (!['write_meaning','spell'].includes(A.mode)) A.practiceRunMode = 'practice'; savePreferences(); render(); return; }
     if (d.practiceTarget) { A.target = d.practiceTarget === 'all' ? 'all' : Number(d.practiceTarget); $$('[data-practice-target]').forEach(e => { const selected = e === b; e.classList.toggle('selected', selected); e.setAttribute('aria-pressed', String(selected)); }); savePreferences(); render(); return; }
-    if (d.highRangeType) { A.highRangeType = d.highRangeType; A.target = 20; savePreferences(); render(); return; }
+    if (d.highRangeType) { A.highRangeType = d.highRangeType; A.target = 20; savePreferences(); renderKeepScroll(); return; }
     if (d.highRangeAll) {
       const info = getRanges(A);
       const visibleCodes = info.codes.filter(code => d.highRangeType === 'textbook' ? /^L\\d+$/i.test(String(code)) : !/^L\\d+$/i.test(String(code)));
@@ -194,14 +243,14 @@ $('#app').addEventListener('click', async event => {
       const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
       const start = Math.max(0, Math.min(Number(A.middleStartIndex || 0), Math.max(0, words.length - 1)));
       A.middleWordIds = words.slice(start, start + A.middleChunkSize).map(word => word.id);
-      A.target = 'all'; savePreferences(); render(); return;
+      A.target = 'all'; savePreferences(); renderKeepScroll(); return;
     }
     if (d.middleStartIndex !== undefined) {
       const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
       const size = [20,25,30].includes(Number(A.middleChunkSize)) ? Number(A.middleChunkSize) : 20;
       A.middleStartIndex = Math.max(0, Math.min(Number(d.middleStartIndex), Math.max(0, words.length - 1)));
       A.middleWordIds = words.slice(A.middleStartIndex, A.middleStartIndex + size).map(word => word.id);
-      A.target = 'all'; savePreferences(); render(); return;
+      A.target = 'all'; savePreferences(); renderKeepScroll(); return;
     }
     if (d.middleRangeMove) {
       const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
@@ -209,16 +258,16 @@ $('#app').addEventListener('click', async event => {
       const current = Math.max(0, Number(A.middleStartIndex || 0));
       A.middleStartIndex = d.middleRangeMove === 'next' ? Math.min(current + size, Math.max(0, words.length - 1)) : Math.max(0, current - size);
       A.middleWordIds = words.slice(A.middleStartIndex, A.middleStartIndex + size).map(word => word.id);
-      A.target = 'all'; savePreferences(); render(); return;
+      A.target = 'all'; savePreferences(); renderKeepScroll(); return;
     }
-    if (d.middleLesson) { A.middleRange = d.middleLesson; A.middleStartIndex = 0; A.middleWordIds = []; A.middleWordsOpen = false; A.target = 'all'; savePreferences(); render(); return; }
+    if (d.middleLesson) { A.middleRange = d.middleLesson; A.middleStartIndex = 0; A.middleWordIds = []; A.middleWordsOpen = false; A.target = 'all'; savePreferences(); renderKeepScroll(); return; }
     if (d.middleWordsToggle) { A.middleWordsOpen = !A.middleWordsOpen; render(); return; }
     if (d.middleGrammarLesson) { A.middleGrammarLesson = Number(d.middleGrammarLesson); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (d.middleWordPreset) {
       const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
       A.middleWordIds = d.middleWordPreset === 'clear' ? [] : d.middleWordPreset === 'all' ? words.map(word => word.id) : words.slice(0, Number(d.middleWordPreset)).map(word => word.id);
       if (d.middleWordPreset !== 'clear') A.middleWordsOpen = false;
-      A.target = 'all'; savePreferences(); render(); return;
+      A.target = 'all'; savePreferences(); renderKeepScroll(); return;
     }
     if (d.rankMode) { A.rankMode = d.rankMode; savePreferences(); render(); return; }
     if (d.rankScope) { A.rankScope = d.rankScope; savePreferences(); render(); return; }
@@ -292,6 +341,8 @@ $('#app').addEventListener('click', async event => {
       return;
     }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
+      buttonBusy(b);
+      await ensureGrammarData();
       const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.43.0');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
@@ -311,7 +362,7 @@ $('#app').addEventListener('change', event => {
   if (input.dataset.middleWord !== undefined) {
     const set = new Set(A.middleWordIds || []);
     input.checked ? set.add(input.dataset.middleWord) : set.delete(input.dataset.middleWord);
-    A.middleWordIds = [...set]; A.target = 'all'; savePreferences(); render(); return;
+    A.middleWordIds = [...set]; A.target = 'all'; savePreferences(); renderKeepScroll(); return;
   }
     if (input.dataset.rankScopeSelect !== undefined) { A.rankScope = input.value; savePreferences(); render(); return; }
   if (input.dataset.rankPeriodSelect !== undefined) { A.rankPeriod = input.value; savePreferences(); render(); return; }
