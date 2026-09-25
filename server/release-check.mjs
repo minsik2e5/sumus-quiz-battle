@@ -434,7 +434,7 @@ export async function runReleaseCheck() {
     assert(teacherAfterShare.sessions.some(item => item.id === testStarted.id && item.shared_to_teacher_at), 'teacher bootstrap receives student-shared self-test results');
 
     const choiceTest = await service(state, 'POST', '/practice/start', {
-      school: '단원고', range_codes: [rangeCode], mode: 'eng2mean', target: 4, run_mode: 'test'
+      school: '단원고', range_codes: [rangeCode], mode: 'eng2mean', target: 5, run_mode: 'test'
     }, studentToken);
     assert(choiceTest.run_mode === 'test' && choiceTest.mode === 'eng2mean' && choiceTest.feedback === null, 'four-choice can start in real test mode');
     let choiceTestView = choiceTest;
@@ -446,7 +446,7 @@ export async function runReleaseCheck() {
       }, studentToken);
       choiceAnswered += 1;
     }
-    assert(choiceTestView.finished === true && choiceAnswered === 4 && choiceTestView.score === 100, 'four-choice real test finishes at the requested question count');
+    assert(choiceTestView.finished === true && choiceAnswered === 5 && choiceTestView.score === 100, 'four-choice real test finishes at the requested question count');
 
     const practiceExam = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'practice', exam_style: true
