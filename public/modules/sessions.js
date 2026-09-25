@@ -264,13 +264,18 @@ async function resolveExistingPractice(data, payload) {
   });
 }
 export async function startPractice(options = {}) {
+  const selectedHighRanges = (A.ranges[A.school] || []).filter(code => {
+    if (A.highRangeType === 'textbook') return /^L\d+$/i.test(String(code));
+    if (A.highRangeType === 'mock') return !/^L\d+$/i.test(String(code));
+    return true;
+  });
   const payload = options.dailyQuest
     ? { school: A.school, mode: 'write_meaning', target: 20, daily_quest: true, run_mode: 'practice' }
     : Array.isArray(options.wordIds) && options.wordIds.length
       ? { school: A.school, mode: options.mode || A.mode || 'write_meaning', word_ids: options.wordIds, target: options.target === 'all' ? undefined : options.target, cover_all: options.target === undefined || options.target === 'all', run_mode: options.runMode || 'practice', exam_style: !!options.examStyle }
       : A.data.profile.division === 'middle'
         ? { school: A.school, mode: A.mode, word_ids: A.middleWordIds || [], cover_all: true, run_mode: options.runMode || A.practiceRunMode || 'practice' }
-        : { school: A.school, range_codes: A.ranges[A.school], mode: A.mode, target: A.target === 'all' ? undefined : A.target, cover_all: A.target === 'all', assignment_id: A.assignmentId, run_mode: options.runMode || A.practiceRunMode || 'practice', exam_style: !!options.examStyle };
+        : { school: A.school, range_codes: selectedHighRanges, mode: A.mode, target: A.target === 'all' ? undefined : A.target, cover_all: A.target === 'all', assignment_id: A.assignmentId, run_mode: options.runMode || A.practiceRunMode || 'practice', exam_style: !!options.examStyle };
   const old = A.data.active_practice;
   if (old) {
     const active = await api(`/practice/${old}`);
