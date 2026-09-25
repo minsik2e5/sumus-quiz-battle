@@ -50,3 +50,46 @@
 @media (prefers-reduced-motion: reduce){
   .memorize-row,.grammar-set-card,.primary-mode-card,.option,.btn{transition:none!important;animation:none!important}
 }
+
+
+/* V13.43 middle-school exam range picker */
+.middle-scope-compact-v1343{margin-top:14px;padding:14px;border:1px solid #e1e9e6;border-radius:22px;background:#fff;box-shadow:0 8px 24px rgba(28,58,49,.055)}
+.middle-start-picker-v1343{width:100%;min-height:82px;padding:15px 16px;border:1px solid #dfe8e4;border-radius:18px;background:#f8fcfa;display:flex;align-items:center;justify-content:space-between;gap:14px;text-align:left;color:#172a24;font:inherit;touch-action:manipulation}
+.middle-start-picker-v1343:active{transform:scale(.995)}
+.middle-start-copy-v1343{min-width:0;display:flex;flex-direction:column;gap:3px}
+.middle-start-copy-v1343 small{font-size:11px;font-weight:800;color:#7d8e88}
+.middle-start-copy-v1343 strong{font-size:19px;line-height:1.25;letter-spacing:-.035em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.middle-start-copy-v1343 em{font-size:12px;font-style:normal;color:#84938e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.middle-start-change-v1343{flex:0 0 auto;display:flex;align-items:center;gap:2px;font-size:12px;font-weight:850;color:#078e6c}
+.middle-start-change-v1343 svg{width:16px;height:16px}
+.middle-chunk-row-v1343{margin-top:16px;display:flex;align-items:end;justify-content:space-between;gap:12px}
+.middle-chunk-row-v1343>div:first-child strong{display:block;font-size:15px;color:#22352f}
+.middle-chunk-row-v1343>div:first-child small{display:block;margin-top:3px;font-size:10px;color:#8a9994}
+.middle-chunk-segment-v1343{width:min(230px,60%);flex:0 0 auto}
+.middle-selected-range-v1343{margin-top:14px!important;padding:15px 16px!important;border-radius:17px!important;background:#f4faf7!important;border:1px solid #d8eee6!important}
+.middle-selected-range-v1343 small{font-size:10px!important;color:#82938d!important}
+.middle-selected-range-v1343 strong{display:block;margin-top:4px;font-size:17px!important;line-height:1.3;color:#17664f;white-space:normal!important;overflow-wrap:anywhere}
+.middle-selected-range-v1343 span{display:block;margin-top:5px;font-size:11px!important;color:#70837c}
+.middle-range-nav-v1343{display:grid!important;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.middle-range-nav-v1343 button{min-height:44px;border:1px solid #e0e8e5;border-radius:14px;background:#fff;font-weight:800;color:#52645e}
+.middle-range-nav-v1343 button:disabled{opacity:.35}
+.middle-start-modal-v1343>p{margin:7px 0 16px;color:#7e8d88;font-size:13px}
+.middle-start-search-v1343{display:block;margin-bottom:10px}
+.middle-start-search-v1343>span{display:block;margin-bottom:6px;font-size:11px;font-weight:800;color:#768780}
+.middle-start-search-v1343 input{width:100%;height:48px;padding:0 14px;border:1px solid #dce6e2;border-radius:14px;background:#f8faf9;font:inherit;outline:none}
+.middle-start-search-v1343 input:focus{border-color:#55d2b1;box-shadow:0 0 0 3px rgba(85,210,177,.12)}
+.middle-start-list-v1343{max-height:min(52vh,460px);overflow:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;gap:7px;padding:2px}
+.middle-start-list-v1343 button{min-height:60px;padding:9px 11px;border:1px solid #e3e9e7;border-radius:15px;background:#fff;display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;text-align:left;font:inherit;color:#273a34}
+.middle-start-list-v1343 button .word-number{width:30px;height:30px;border-radius:10px;background:#f1f5f3;display:grid;place-items:center;font-size:11px;font-weight:850;color:#7c8a85}
+.middle-start-list-v1343 button b{display:block;font-size:15px;line-height:1.2}
+.middle-start-list-v1343 button small{display:block;margin-top:3px;font-size:11px;color:#8b9894;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.middle-start-list-v1343 button em{font-size:10px;font-style:normal;font-weight:900;color:#078e6c}
+.middle-start-list-v1343 button.selected{border-color:#61d3b3;background:#effbf7}
+.middle-start-list-v1343 button.selected .word-number{background:#dff6ee;color:#078e6c}
+@media(max-width:430px){
+  .middle-scope-compact-v1343{padding:12px;border-radius:20px}
+  .middle-start-picker-v1343{min-height:76px;padding:13px 14px}
+  .middle-start-copy-v1343 strong{font-size:18px}
+  .middle-chunk-row-v1343{display:block}
+  .middle-chunk-segment-v1343{width:100%;margin-top:10px}
+}
