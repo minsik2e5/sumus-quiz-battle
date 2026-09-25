@@ -524,7 +524,7 @@ async function answerPractice(answer, button) {
       practiceAdvanceTimer = setTimeout(() => {
         const nextButton = $('#practice-next');
         if (nextButton && practiceState === answeredState) advancePracticeScreen(nextButton, answeredState);
-      }, result.feedback.milestone ? 620 : 520);
+      }, result.feedback.milestone ? 420 : 300);
     }
   } catch (e) { $('#practice-error').innerHTML = `<div class="error-box">${esc(e.message)} 답안은 다시 눌러 전송할 수 있어요.</div>`; $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = false); if (!practiceState?.feedback) timer = setInterval(practiceTick, practiceState?.timer_mode === 'question' ? 100 : 500); }
   finally { answering = false; }
