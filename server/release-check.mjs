@@ -37,6 +37,7 @@ export async function runReleaseCheck() {
     const sessionUiSource = readFileSync(fileURLToPath(new URL('../public/modules/sessions.js', import.meta.url)), 'utf8');
     const studentUiSource = readFileSync(fileURLToPath(new URL('../public/modules/student.js', import.meta.url)), 'utf8');
     const indexSource = readFileSync(fileURLToPath(new URL('../public/index.html', import.meta.url)), 'utf8');
+    const bundleCss = readFileSync(fileURLToPath(new URL('../public/app.bundle.css', import.meta.url)), 'utf8');
     assert(sessionUiSource.includes(String.fromCharCode(36, 36) + "('[data-practice-choice],#practice-confirm').forEach"), 'practice answer controls disable through the multi-node selector');
     assert(sessionUiSource.includes('practiceAdvanceTimer = setTimeout'), 'practice correct-answer auto advance is wired');
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
@@ -619,7 +620,6 @@ export async function runReleaseCheck() {
     const teacherEnhancements = readFileSync(publicRoot + 'teacher-enhancements.js', 'utf8');
     const teacherModule = readFileSync(publicRoot + 'modules/teacher.js', 'utf8');
     const indexHtml = readFileSync(publicRoot + 'index.html', 'utf8');
-    const bundleCss = readFileSync(publicRoot + 'app.bundle.css', 'utf8');
     const dashboardCss = readFileSync(publicRoot + 'teacher-dashboard-v136.css', 'utf8');
     const v137Css = readFileSync(publicRoot + 'v137.css', 'utf8');
     const v138Css = readFileSync(publicRoot + 'v138.css', 'utf8');
