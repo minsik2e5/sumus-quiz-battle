@@ -8,6 +8,38 @@ const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const partsDir = resolve(root, 'build_parts');
 const stylesPath = resolve(root, 'public/styles.css');
 const vocabPath = resolve(root, 'data/vocabulary.json');
+const cssSources = [
+  "styles.css",
+  "student-learning.css",
+  "teacher-dashboard-v136.css",
+  "v137.css",
+  "v138.css",
+  "v139.css",
+  "v1310.css",
+  "v1311.css",
+  "v1313.css",
+  "v1315.css",
+  "v1317.css",
+  "v1320.css",
+  "v1321.css",
+  "v1322.css",
+  "v1323.css",
+  "v1324.css",
+  "v1325.css",
+  "v1326.css",
+  "v1327.css",
+  "v1328.css",
+  "v1329.css",
+  "v1330.css",
+  "v1332.css",
+  "v1334.css",
+  "v1337.css",
+  "v1339.css",
+  "v1340.css",
+  "v1341.css"
+];
+const cssBundlePath = resolve(root, 'public/app.bundle.css');
+
 
 if (!existsSync(stylesPath)) {
   const styles = ['styles.00', 'styles.01']
@@ -33,6 +65,11 @@ const raw = readFileSync(vocabPath);
 if (raw.length >= 2 && raw[0] === 0x1f && raw[1] === 0x8b) {
   writeFileSync(vocabPath, gunzipSync(raw));
 }
+
+const cssBundle = cssSources
+  .map(name => readFileSync(resolve(root, 'public', name), 'utf8'))
+  .join('\n');
+writeFileSync(cssBundlePath, cssBundle);
 
 const { runContentValidation } = await import('./content-validation.mjs');
 runContentValidation();
