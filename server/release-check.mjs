@@ -179,6 +179,8 @@ export async function runReleaseCheck() {
       middleManualView = await service(state, 'POST', '/practice/' + middleManualPractice.id + '/next', {}, middleLogin._cookie);
     }
     assert(JSON.stringify(middleSeen.slice(0, 3)) === JSON.stringify([middle3Words[0].id, middle3Words[2].id, middle3Words[4].id]), 'middle manual test presents checked words sequentially');
+    assert(middleManualView.finished === true && middleManualView.score_total === 3 && middleManualView.answer_records?.length === 3, 'middle manual test finishes exactly at the selected word count');
+    assert(state.sessions.some(session => session.id === middleManualPractice.id && session.total === 3), 'middle manual completion is durably recorded');
     await expectStatus(409, () => service(state, 'POST', '/practice/start', {
       mode: 'write_meaning', word_ids: [middle2Bootstrap.books[0].words[0].id], cover_all: true
     }, middleLogin._cookie), 'middle3 student cannot select middle2 vocabulary');
@@ -436,7 +438,21 @@ export async function runReleaseCheck() {
     }, studentToken);
     const practiceExamInternal = state.practices.find(item => item.id === practiceExam.id);
     assert(practiceExam.exam_style === true && practiceExam.target === 5 && new Set(practiceExamInternal.words).size === 5, 'practice exam style selects a unique first-pass pool just like the real exam');
-    await service(state, 'POST', `/practice/${practiceExam.id}/finish`, {}, studentToken);
+    let practiceExamView = practiceExam;
+    let practiceExamAnswered = 0;
+    while (!practiceExamView.finished && practiceExamAnswered < 7) {
+      const currentWord = allWords.find(item => item.id === practiceExamView.question.word_id);
+      practiceExamView = await service(state, 'POST', `/practice/${practiceExam.id}/answer`, {
+        question_id: practiceExamView.question_id,
+        answer: practiceExamAnswered === 0 ? '__wrong_exam_style__' : answerFor('write_meaning', currentWord),
+        prefetch_next: false
+      }, studentToken);
+      practiceExamAnswered += 1;
+      if (!practiceExamView.finished) practiceExamView = await service(state, 'POST', `/practice/${practiceExam.id}/next`, {}, studentToken);
+    }
+    const practiceExamSession = state.sessions.find(item => item.id === practiceExam.id);
+    assert(practiceExamView.finished === true && practiceExamAnswered === 5, 'exam-style practice finishes exactly at the selected question count even with a wrong answer');
+    assert(practiceExamSession?.answer_records?.length === 5 && practiceExamSession?.unanswered_count === 0, 'exam-style practice completion saves all first-pass answers without hidden retry questions');
 
     const wrongPractice = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'spell', target: 5
