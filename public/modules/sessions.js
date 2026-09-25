@@ -547,6 +547,7 @@ function finishPracticeView() {
   const targetCount = Number(x.target || x.score_total || 0);
   const answeredCount = Math.min(targetCount, durable.length || Number(x.score_total || 0));
   const interrupted = unanswered > 0 && answeredCount < targetCount;
+  const modeLabel = x.run_mode === 'test' ? '실전시험' : '연습시험';
   const resultHeadline = interrupted ? '시험을 중도 종료했어요' : modeLabel + ' 결과';
   const rangeText = (x.range_codes || []).map(code => esc(recordRangeLabel({ division: A.data.profile.division, school: x.school }, code))).join(' · ') || '선택 범위';
   const answeredWordIds = new Set(durable.map(item => item.word_id).filter(Boolean));
@@ -556,7 +557,6 @@ function finishPracticeView() {
   const missingWordIds = (x.word_ids || []).filter(id => !answeredWordIds.has(id)).slice(0, unrecordedMissing);
   const missedWordIds = [...new Set([...wrongWordIds, ...missingWordIds])];
   const reviewCount = missedWordIds.length;
-  const modeLabel = x.run_mode === 'test' ? '실전시험' : '연습시험';
   const statusText = perfect ? '모든 문항을 맞혔어요.' : reviewCount ? `다시 볼 단어가 ${reviewCount}개 있어요.` : '시험 기록을 저장했어요.';
   const answerRows = durable.length ? durable : wrong;
   const detailHtml = `${answerRows.length ? answerRows.map(item => {
