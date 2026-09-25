@@ -141,11 +141,21 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({ error: status === 500 ? '저장 서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.' : e.message }));
   }
 });
-const timer = setInterval(() => mutations.durable(state => sweep(state) ? true : NO_MUTATION).catch(e => {
-  console.error('[deadline]', e.message);
-}), 5000);
-timer.unref();
+const deadlineTimer = setInterval(() => {
+  const current = mutations.current().state;
+  const now = Date.now();
+  const hasExpiredExam = (current.examAttempts || []).some(attempt => attempt.status === 'active' && Number(attempt.deadline || 0) <= now);
+  if (!hasExpiredExam) return;
+  mutations.durable(state => sweep(state) ? true : NO_MUTATION).catch(e => console.error('[deadline]', e.message));
+}, 5000);
+deadlineTimer.unref();
+
+const maintenanceTimer = setInterval(() => {
+  mutations.durable(state => sweep(state) ? true : NO_MUTATION).catch(e => console.error('[maintenance]', e.message));
+}, 60000);
+maintenanceTimer.unref();
+
 const port = Number(process.env.PORT || 3000);
 server.listen(port, process.env.HOST || '0.0.0.0', () => console.log(`SUMUS VOCA http://localhost:${server.address().port}`));
-async function shutdown() { clearInterval(timer); server.close(); await mutations.close(); repo.close(); process.exit(0); }
+async function shutdown() { clearInterval(deadlineTimer); clearInterval(maintenanceTimer); server.close(); await mutations.close(); repo.close(); process.exit(0); }
 process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown);
