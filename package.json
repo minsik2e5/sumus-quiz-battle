@@ -14,7 +14,8 @@
     "check:cloudflare": "node server/cloudflare-check.mjs",
     "cf:dev": "wrangler dev",
     "cf:deploy": "npm run build:assets && npm run check && wrangler deploy",
-    "cf:types": "wrangler types"
+    "cf:types": "wrangler types",
+    "check:load": "node server/stress-check.mjs"
   },
   "devDependencies": {
     "wrangler": "4.135.0"
