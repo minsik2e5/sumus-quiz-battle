@@ -148,16 +148,9 @@ export class VocaStateObject {
             : await service(state, request.method, path, body, token);
       };
 
-      const fastMutation =
-        (request.method === 'POST' && (url.pathname === '/api/practice/start' || /^\/api\/practice\/[^/]+\/(?:answer|finish)$/.test(url.pathname))) ||
-        (request.method === 'PATCH' && (url.pathname === '/api/teacher/school' || /^\/api\/grammar-progress\/[^/]+$/.test(url.pathname)));
       const result = request.method === 'GET'
         ? await execute(this.mutations.current().state)
-        : fastMutation
-          ? await this.mutations.fast(execute)
-          : await this.mutations.durable(execute);
-
-      if (fastMutation) this.ctx.waitUntil(this.mutations.flush());
+        : await this.mutations.durable(execute);
       const responseHeaders = {};
       if (result._cookie) {
         responseHeaders['Set-Cookie'] = `sumus_session=${result._cookie}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800; Secure`;

@@ -28,6 +28,8 @@ export async function runCloudflareCheck() {
   let persisted = deepCopy(state);
   let revision = 41;
   let commits = 0;
+  let holdNextCommit = null;
+  let failNextCommit = false;
   const nativeFetch = globalThis.fetch;
   globalThis.fetch = async (url, options = {}) => {
     const name = String(url).split('/').at(-1);
@@ -38,6 +40,16 @@ export async function runCloudflareCheck() {
     }
     if (name === 'voca_v12_state_commit') {
       assert.equal(body.p_secret, 'test-state-secret');
+      if (failNextCommit) {
+        failNextCommit = false;
+        return Response.json({ message: 'temporary storage failure' }, { status: 503 });
+      }
+      if (holdNextCommit) {
+        const hold = holdNextCommit;
+        holdNextCommit = null;
+        hold.started();
+        await hold.release;
+      }
       if (Number(body.p_revision) !== revision) {
         return Response.json({ code: '40001', message: 'revision_conflict' }, { status: 409 });
       }
@@ -92,10 +104,22 @@ export async function runCloudflareCheck() {
       method: 'POST', cookie,
       body: { school: '단원고', range_codes: [book.words[0].range_code], mode: 'eng2mean', target: 10 }
     });
-    const answer = await call(`/api/practice/${practice.payload.id}/answer`, {
+    let commitStarted;
+    let releaseCommit;
+    const started = new Promise(resolve => { commitStarted = resolve; });
+    const release = new Promise(resolve => { releaseCommit = resolve; });
+    holdNextCommit = { started: commitStarted, release };
+    const answerRequest = call(`/api/practice/${practice.payload.id}/answer`, {
       method: 'POST', cookie,
       body: { question_id: practice.payload.question_id, answer: '__cloudflare_check__', prefetch_next: true }
     });
+    await started;
+    let answeredBeforeCommit = false;
+    answerRequest.then(() => { answeredBeforeCommit = true; }, () => { answeredBeforeCommit = true; });
+    await Promise.resolve();
+    assert.equal(answeredBeforeCommit, false, '답안 저장 전에는 성공 응답을 보내지 않아야 합니다.');
+    releaseCommit();
+    const answer = await answerRequest;
     assert.equal(typeof answer.payload.feedback.ok, 'boolean');
     await Promise.all(waits);
 
@@ -106,6 +130,14 @@ export async function runCloudflareCheck() {
 
     const concurrent = await Promise.all(Array.from({ length: 200 }, () => call('/api/health')));
     assert(concurrent.every(item => item.payload.ok), '동시 API 200건이 모두 성공해야 합니다.');
+    failNextCommit = true;
+    const beforeFailure = commits;
+    await call('/api/practice/start', {
+      method: 'POST', cookie,
+      body: { school: '단원고', range_codes: [book.words[0].range_code], mode: 'eng2mean', target: 10 },
+      status: 503
+    });
+    assert.equal(commits, beforeFailure, '저장 실패를 성공으로 처리하지 않아야 합니다.');
     console.log(`[cloudflare-check] PASS credentials/records + ${concurrent.length} concurrent reads (${commits} commits)`);
   } finally {
     globalThis.fetch = nativeFetch;

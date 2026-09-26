@@ -109,7 +109,7 @@ export async function runStressCheck() {
     const responses = await Promise.all(views.map((view, index) => {
       assert(view && !view.finished && view.question_id, `${round + 1}번째 라운드 질문 상태 유효`);
       const answer = Array.isArray(view.question?.options) && view.question.options.length ? view.question.options[0] : '__load_answer__';
-      return coordinator.fast(nextState => service(nextState, 'POST', `/practice/${view.id}/answer`, {
+      return coordinator.durable(nextState => service(nextState, 'POST', `/practice/${view.id}/answer`, {
         question_id: view.question_id,
         answer,
         prefetch_next: true
