@@ -30,12 +30,18 @@ export async function runCloudflareCheck() {
   let commits = 0;
   let holdNextCommit = null;
   let failNextCommit = false;
+  let failAfterCommit = false;
+  let failReads = 0;
   const nativeFetch = globalThis.fetch;
   globalThis.fetch = async (url, options = {}) => {
     const name = String(url).split('/').at(-1);
     const body = JSON.parse(options.body || '{}');
     if (name === 'voca_v12_state_read') {
       assert.equal(body.p_secret, 'test-state-secret');
+      if (failReads > 0) {
+        failReads -= 1;
+        return Response.json({ message: 'temporary storage failure' }, { status: 503 });
+      }
       return Response.json([{ revision, data: deepCopy(persisted) }]);
     }
     if (name === 'voca_v12_state_commit') {
@@ -56,6 +62,10 @@ export async function runCloudflareCheck() {
       persisted = deepCopy(body.p_data);
       revision += 1;
       commits += 1;
+      if (failAfterCommit) {
+        failAfterCommit = false;
+        return Response.json({ message: 'response lost after commit' }, { status: 503 });
+      }
       return Response.json(revision);
     }
     throw new Error(`unexpected RPC: ${name}`);
@@ -121,6 +131,14 @@ export async function runCloudflareCheck() {
     releaseCommit();
     const answer = await answerRequest;
     assert.equal(typeof answer.payload.feedback.ok, 'boolean');
+    const nextQuestion = answer.payload.prefetched_next;
+    assert(nextQuestion?.question_id, '저장 응답을 잃은 경우 재시도할 다음 문제가 있어야 합니다.');
+    const nextAnswerPath = `/api/practice/${practice.payload.id}/answer`;
+    const nextAnswerBody = { question_id: nextQuestion.question_id, answer: '__cloudflare_retry__', prefetch_next: true };
+    failAfterCommit = true;
+    await call(nextAnswerPath, { method: 'POST', cookie, body: nextAnswerBody, status: 503 });
+    await call(nextAnswerPath, { method: 'POST', cookie, body: nextAnswerBody });
+    assert.equal(persisted.practices.find(item => item.id === practice.payload.id).answer_records.length, 2, '저장 성공 후 응답 유실을 재시도해도 답안이 중복되지 않아야 합니다.');
     await Promise.all(waits);
 
     assert.equal(persisted.profiles[0].password_hash, originalHash, '비밀번호 해시는 재생성하지 않고 그대로 보존해야 합니다.');
@@ -131,13 +149,24 @@ export async function runCloudflareCheck() {
     const concurrent = await Promise.all(Array.from({ length: 200 }, () => call('/api/health')));
     assert(concurrent.every(item => item.payload.ok), '동시 API 200건이 모두 성공해야 합니다.');
     failNextCommit = true;
+    failReads = 3;
     const beforeFailure = commits;
+    const beforeFailureState = deepCopy(persisted);
     await call('/api/practice/start', {
       method: 'POST', cookie,
       body: { school: '단원고', range_codes: [book.words[0].range_code], mode: 'eng2mean', target: 10 },
       status: 503
     });
     assert.equal(commits, beforeFailure, '저장 실패를 성공으로 처리하지 않아야 합니다.');
+    await call('/api/health', { status: 503 });
+    assert.deepEqual(persisted, beforeFailureState, '저장 장애 중에는 실패한 시험 시작이 영구 저장되지 않아야 합니다.');
+    await call('/api/health');
+    const retried = await call('/api/practice/start', {
+      method: 'POST', cookie,
+      body: { school: '단원고', range_codes: [book.words[0].range_code], mode: 'eng2mean', target: 10 }
+    });
+    assert(persisted.practices.some(item => item.id === retried.payload.id), '복구 후 재시도한 시험만 저장되어야 합니다.');
+    assert.deepEqual(persisted.practices.map(item => item.id), [retried.payload.id], '실패한 시험이 재시도와 함께 중복 저장되지 않아야 합니다.');
     console.log(`[cloudflare-check] PASS credentials/records + ${concurrent.length} concurrent reads (${commits} commits)`);
   } finally {
     globalThis.fetch = nativeFetch;
