@@ -38,8 +38,7 @@ jobs:
         shell: bash
         run: |
           actual="$(printf '%s' "$VOCA_STATE_SECRET" | sha256sum | awk '{print $1}')"
-          expected="0495468fce23052b6cf526800a0322d786e9a105524a44e514edf29b2cf54f0f"
-          echo "VOCA state secret SHA-256: $actual"
+          expected="81336e5a06fcd1381eb4e828715636773142660f792073648a5fb2e81f410e53"
           if [ "$actual" != "$expected" ]; then
             echo "VOCA_STATE_SECRET does not match the Supabase state secret."
             exit 1
