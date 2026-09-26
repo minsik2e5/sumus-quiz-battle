@@ -62,6 +62,10 @@ function createSupabaseRepository(env) {
       if (!cache) cache = await load();
       return { revision: cache.revision, state: structuredClone(cache.state) };
     },
+    async refresh() {
+      cache = await load();
+      return { revision: cache.revision, state: structuredClone(cache.state) };
+    },
     async commit(state, revision) {
       try {
         const next = await rpc('voca_v12_state_commit', { p_secret: secret, p_revision: Number(revision), p_data: state });
@@ -91,6 +95,7 @@ export class VocaStateObject {
       this.mutations = createMutationCoordinator(this.repo, initial, {
         flushDelay: 500,
         retryDelay: 2000,
+        rollbackOnFailure: true,
         onError: error => console.error('[checkpoint]', error.message)
       });
     });
@@ -107,6 +112,7 @@ export class VocaStateObject {
     await this.ready;
     const url = new URL(request.url);
     try {
+      await this.mutations.recover();
       if (!url.pathname.startsWith('/api/')) return json({ error: '요청한 기능을 찾을 수 없습니다.' }, 404);
       if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(request.method)) throw Object.assign(Error('지원하지 않는 요청입니다.'), { status: 405 });
       if (request.method !== 'GET') {
@@ -163,7 +169,7 @@ export class VocaStateObject {
       return json(result, 200, responseHeaders);
     } catch (error) {
       const status = errorStatus(error);
-      if (status === 500) console.error('[request]', error?.message);
+      if (status === 500 || status === 503) console.error('[request]', status, error?.message);
       return json({ error: safeError(error, status) }, status);
     }
   }
