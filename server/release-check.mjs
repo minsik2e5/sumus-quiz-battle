@@ -802,6 +802,31 @@ export async function runReleaseCheck() {
     assert(loadWrites === 1, '20 concurrent student-like mutations batch into one persistence checkpoint');
     await loadCoordinator.close();
 
+    let recoveryState = { counter: 0 };
+    let recoveryRevision = 0;
+    let rejectCheckpoint = true;
+    const recoveryRepository = {
+      async read() { return { state: structuredClone(recoveryState), revision: recoveryRevision }; },
+      async refresh() { return this.read(); },
+      async commit(nextState, revision) {
+        await new Promise(resolve => setTimeout(resolve, 20));
+        if (rejectCheckpoint) {
+          rejectCheckpoint = false;
+          throw Object.assign(Error('temporary save failure'), { status: 503 });
+        }
+        assert(revision === recoveryRevision, 'recovered checkpoint uses the current revision');
+        recoveryState = structuredClone(nextState);
+        recoveryRevision += 1;
+      }
+    };
+    const recovering = createMutationCoordinator(recoveryRepository, { state: { counter: 0 }, revision: 0 }, { rollbackOnFailure: true });
+    const failedBatch = await Promise.allSettled(Array.from({ length: 20 }, () => recovering.durable(nextState => ++nextState.counter)));
+    assert(failedBatch.every(item => item.status === 'rejected'), 'failed checkpoint rejects every concurrent save response');
+    assert(recovering.current().state.counter === 0 && recoveryState.counter === 0, 'failed concurrent mutations roll back from memory and storage');
+    const recoveredBatch = await Promise.all(Array.from({ length: 20 }, () => recovering.durable(nextState => ++nextState.counter)));
+    assert(recoveredBatch.at(-1) === 20 && recovering.current().state.counter === 20 && recoveryState.counter === 20, '20 concurrent retries persist once after recovery');
+    await recovering.close();
+
     console.log(`[release-check] PASS ${checks.length}/${checks.length}`);
     return { ok: true, count: checks.length };
   } finally {

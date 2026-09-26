@@ -14,6 +14,7 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   const flushDelay = Math.max(50, Number(options.flushDelay || 500));
   const retryDelay = Math.max(1000, Number(options.retryDelay || 2000));
   const onError = options.onError || (error => console.error('[checkpoint]', error.message));
+  const rollbackOnFailure = Boolean(options.rollbackOnFailure);
 
   let snapshot = {
     state: initialSnapshot.state,
@@ -26,6 +27,12 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   let persistTail = Promise.resolve();
   let flushTimer = null;
   let closed = false;
+  let generation = 0;
+  let needsRecovery = false;
+  let recoveryPromise = null;
+  let lastFailure = null;
+
+  const unavailable = () => lastFailure || Object.assign(Error('저장 서버에 연결하지 못했습니다.'), { status: 503 });
 
   const queueApply = task => {
     const run = applyTail.then(task, task);
@@ -35,16 +42,35 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
 
   async function applyMutation(fn) {
     return queueApply(async () => {
+      if (needsRecovery) throw unavailable();
       const nextState = structuredClone(snapshot.state);
       const output = await fn(nextState);
       compactState(nextState);
       if (output === NO_MUTATION) {
-        return { output: undefined, version: stateVersion, changed: false };
+        return { output: undefined, version: stateVersion, generation, changed: false };
       }
       snapshot = { state: nextState, revision: persistedRevision };
       stateVersion += 1;
-      return { output, version: stateVersion, changed: true };
+      return { output, version: stateVersion, generation, changed: true };
     });
+  }
+
+  async function recover() {
+    if (!needsRecovery) return;
+    if (!recoveryPromise) {
+      recoveryPromise = (async () => {
+        const current = await (repo.refresh ? repo.refresh() : repo.read());
+        await queueApply(() => {
+          snapshot = { state: current.state, revision: Number(current.revision) };
+          persistedRevision = Number(current.revision);
+          stateVersion = 0;
+          persistedVersion = 0;
+          generation += 1;
+          needsRecovery = false;
+        });
+      })().finally(() => { recoveryPromise = null; });
+    }
+    return recoveryPromise;
   }
 
   function persistOnce() {
@@ -52,13 +78,22 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
       const checkpoint = await queueApply(() => ({
         state: structuredClone(snapshot.state),
         version: stateVersion,
-        revision: persistedRevision
+        revision: persistedRevision,
+        generation
       }));
+      if (needsRecovery) throw unavailable();
+      if (checkpoint.generation !== generation) return;
       if (checkpoint.version <= persistedVersion) return;
 
       try {
         await repo.commit(checkpoint.state, checkpoint.revision);
       } catch (error) {
+        if (rollbackOnFailure) {
+          lastFailure = error;
+          needsRecovery = true;
+          try { await recover(); } catch {}
+          throw error;
+        }
         try {
           const current = await repo.read();
           persistedRevision = Number(current.revision);
@@ -75,8 +110,12 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
     return run;
   }
 
-  async function persistThrough(targetVersion) {
-    while (persistedVersion < targetVersion) await persistOnce();
+  async function persistThrough(targetVersion, expectedGeneration = generation) {
+    while (persistedVersion < targetVersion) {
+      if (generation !== expectedGeneration || needsRecovery) throw unavailable();
+      await persistOnce();
+    }
+    if (generation !== expectedGeneration || needsRecovery) throw unavailable();
   }
 
   function scheduleFlush(delay = flushDelay) {
@@ -103,7 +142,7 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
 
   async function durable(fn) {
     const result = await applyMutation(fn);
-    await persistThrough(result.version);
+    await persistThrough(result.version, result.generation);
     return result.output;
   }
 
@@ -136,6 +175,10 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
     flush,
     replace,
     close,
-    current: () => snapshot
+    recover,
+    current: () => {
+      if (needsRecovery) throw unavailable();
+      return snapshot;
+    }
   };
 }
