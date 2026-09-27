@@ -38,10 +38,11 @@ export class BattleRoom {
     if (times.length) await this.ctx.storage.setAlarm(Math.max(Date.now() + 10, Math.min(...times)));
   }
 
-  send(ws, message) { try { ws.send(JSON.stringify(message)); } catch {} }
-  broadcast(events) {
+  // Every message carries the room's clock so phones can correct their own for timers.
+  send(ws, message) { try { ws.send(JSON.stringify({ ...message, now: Date.now() })); } catch {} }
+  broadcast(events, except = null) {
     if (!events.length) return;
-    for (const ws of this.ctx.getWebSockets()) this.send(ws, { type: 'events', events });
+    for (const ws of this.ctx.getWebSockets()) if (ws !== except) this.send(ws, { type: 'events', events });
   }
 
   async fetch(request) {
@@ -91,8 +92,9 @@ export class BattleRoom {
     if (r.battle) {
       const events = connect(r.battle, pid, Date.now());
       await this.save();
+      // The new socket gets the whole view; the other player gets the events.
       this.send(server, { type: 'view', view: battleView(r.battle, pid) });
-      this.broadcast(events.filter(e => e.type !== 'presence' || e.player !== pid));
+      this.broadcast(events, server);
       await this.schedule();
     } else {
       this.send(server, { type: 'lobby', expires_at: r.expires_at, stake: r.stake });
@@ -111,7 +113,7 @@ export class BattleRoom {
     else if (msg.type === 'skill') events = useSkill(r.battle, pid, String(msg.skill), now);
     else if (msg.type === 'leave') events = forfeit(r.battle, pid, now);
     else if (msg.type === 'sync') return this.send(ws, { type: 'view', view: battleView(r.battle, pid) });
-    else if (msg.type === 'ping') return this.send(ws, { type: 'pong', now });
+    else if (msg.type === 'ping') return this.send(ws, { type: 'pong' });
     // Timers may have passed while the room slept; apply them first.
     events = [...tick(r.battle, now), ...events];
     if (!events.length) return;
