@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { emptyState } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
@@ -51,7 +51,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.49.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.50.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -750,7 +750,14 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.49.0') && indexHtml.includes('/app.bundle.css?v=13.49.0') && sw.includes("'/app.bundle.css'") && sw.includes('sumus-voca-v13.49.0-stable'), 'V13.49 cache versions and CSS bundle are active');
+    assert(indexHtml.includes('/app.js?v=13.50.0') && indexHtml.includes('/app.bundle.css?v=13.50.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    {
+      const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
+      const staticModules = ['/index.html', '/app.js', '/pwa.js', '/boot-guard.js', '/app.bundle.css', ...readdirSync(publicRoot + 'modules').filter(name => name.endsWith('.js')).map(name => '/modules/' + name)];
+      assert(staticModules.every(url => precache.includes(url)), 'service worker precaches every file needed to open the app: ' + staticModules.filter(url => !precache.includes(url)).join(', '));
+      assert(!/self\.skipWaiting\(\);\s*\}\)\(\)\)/.test(sw) && sw.includes("event.data?.type === 'SKIP_WAITING'"), 'a new service worker waits until the page decides it is safe to switch');
+    }
+    assert(!appJs.includes("await api('/session')"), 'app start fetches bootstrap directly instead of a separate /session round trip');
     assert(!indexHtml.includes('/teacher-enhancements.js') && !indexHtml.includes('/exam-ops.js') && !indexHtml.includes('/student-enhancements.js') && !indexHtml.includes('/practice-enhancements.js') && !indexHtml.includes('/signup-ui.js'), 'noncritical role modules are removed from eager boot');
     assert(!/<script(?![^>]*\bsrc=)[^>]*>/.test(indexHtml) && !/\son[a-z]+=/.test(indexHtml) && indexHtml.includes('/boot-guard.js'), 'index.html has no inline scripts or handlers (CSP script-src self would block them)');
     assert(appJs.includes("import('./teacher-enhancements.js')") && appJs.includes("import('./student-enhancements.js')") && appJs.includes("ensureRoleEnhancements"), 'teacher and student enhancements load only for the active role');
@@ -761,10 +768,10 @@ export async function runReleaseCheck() {
       const versioned = walk(publicRoot).filter(file => /(?:from\s*|import\()\s*['"]\.{1,2}\/[^'"]+\?v=/.test(readFileSync(file, 'utf8')));
       assert(versioned.length === 0, 'internal module imports have one URL each (no ?v= query that loads a module twice): ' + versioned.join(', '));
     }
-    assert(!sw.includes("'/danwongo-grammar-data.js'") && !sw.includes("'/teacher-enhancements.js'") && !sw.includes("'/student-enhancements.js'"), 'service worker critical shell excludes optional role and grammar modules');
+    assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.49.0'), 'browser loads one production stylesheet instead of layered CSS requests');
-    assert(sw.includes("'/app.bundle.css'") && !sw.includes("'/v1341.css'"), 'service worker precaches the CSS bundle instead of legacy style layers');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.50.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
     assert(bootSource.includes("RUN_RELEASE_CHECK_ON_BOOT === 'true'") && !bootSource.includes('await runReleaseCheck();\nawait import'), 'normal server startup does not execute the full release suite');
