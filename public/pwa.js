@@ -88,7 +88,10 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!hadController || reloading) return;
     reloading = true;
-    location.reload();
+    // A worker can also take over on its own (e.g. replacing a broken one);
+    // still never reload in the middle of an exam or practice.
+    const reloadWhenSafe = () => updateIsSafe() ? location.reload() : setTimeout(reloadWhenSafe, 3000);
+    reloadWhenSafe();
   });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
