@@ -2,9 +2,16 @@ import { EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, dayKey } from './core.js';
 import { icon, esc, num, date, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar } from './character.js';
 import { rangePicker, selectedCount, getRanges } from './student.js';
-import { DANWONGO_PASSAGES } from '../danwongo-grammar-data.js?v=2';
-import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from '../seonbu-grammar-data.js?v=2';
-import { GANGSEO_PASSAGES } from '../gangseo-grammar-data.js?v=1';
+// Grammar datasets are ~170KB; load only the active school's file, on demand,
+// so students (who also import this module) never download them up front.
+const GRAMMAR_LOADERS = {
+  '단원고': () => import('../danwongo-grammar-data.js').then(mod => mod.DANWONGO_PASSAGES || []),
+  '선부고': () => import('../seonbu-grammar-data.js').then(mod => [...(mod.SEONBU_2026_PASSAGES || []), ...(mod.SEONBU_2025_PASSAGES || [])]),
+  '강서고': () => import('../gangseo-grammar-data.js').then(mod => mod.GANGSEO_PASSAGES || [])
+};
+const grammarCache = new Map();
+let grammarLoaded = null;
+export function onTeacherGrammarLoaded(callback) { grammarLoaded = callback; }
 const tabs = [['dashboard', '대시보드', 'home'], ['students', '학생 관리', 'user'], ['books', '단어 데이터', 'practice'], ['disputes', '뜻 이의제기', 'records'], ['results', '결과 분석', 'ranking']];
 const ALL_CLASSES = '__ALL__';
 const targetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -22,9 +29,13 @@ export function teacherPage(A) {
 }
 function metrics(items) { return `<div class="teacher-metrics">${items.map(([name, value, unit]) => `<div><span>${name}</span><strong>${num(value)}<small>${unit || ''}</small></strong></div>`).join('')}</div>`; }
 function grammarPassagesForSchool(school) {
-  if (school === '단원고') return DANWONGO_PASSAGES;
-  if (school === '선부고') return [...SEONBU_2026_PASSAGES, ...SEONBU_2025_PASSAGES];
-  if (school === '강서고') return GANGSEO_PASSAGES;
+  if (grammarCache.has(school)) return grammarCache.get(school);
+  const load = GRAMMAR_LOADERS[school];
+  if (!load) return [];
+  grammarCache.set(school, []);
+  load()
+    .then(passages => { grammarCache.set(school, passages); grammarLoaded?.(); })
+    .catch(() => grammarCache.delete(school));
   return [];
 }
 function grammarPassageMap(school) {

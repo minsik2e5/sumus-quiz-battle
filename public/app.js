@@ -1,9 +1,9 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS } from './modules/core.js';
-import { avatar } from './modules/character.js?v=13.44.0';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.44.0';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.30.0';
-import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js?v=13.46.0';
+import { avatar } from './modules/character.js';
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, onTeacherGrammarLoaded } from './modules/teacher.js';
+import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -54,14 +54,14 @@ function ensureRoleEnhancements() {
   const role = A.data?.profile?.role;
   if (role === 'teacher' && !roleModules.teacher) {
     roleModules.teacher = Promise.all([
-      import('./teacher-enhancements.js?v=13.44.0'),
-      import('./exam-ops.js?v=13.44.0')
+      import('./teacher-enhancements.js'),
+      import('./exam-ops.js')
     ]).catch(() => null);
   }
   if (role === 'student' && !roleModules.student) {
     roleModules.student = Promise.all([
-      import('./student-enhancements.js?v=13.44.0'),
-      import('./practice-enhancements.js?v=13.44.0')
+      import('./student-enhancements.js'),
+      import('./practice-enhancements.js')
     ]).catch(() => null);
   }
 }
@@ -73,17 +73,17 @@ async function ensureGrammarData() {
   if (A.grammarDataKey === key && A.grammarData) return;
   let data = { passages: [] };
   if (division === 'middle') {
-    const mod = await import('./middle-donga-yoon-grammar-data.js?v=1');
+    const mod = await import('./middle-donga-yoon-grammar-data.js');
     data = { passages: mod.MIDDLE_DONGA_YOON_PASSAGES || [], byLesson: mod.MIDDLE_DONGA_YOON_BY_LESSON || {} };
   } else if (school === '단원고') {
-    const mod = await import('./danwongo-grammar-data.js?v=2');
+    const mod = await import('./danwongo-grammar-data.js');
     data = { passages: mod.DANWONGO_PASSAGES || [] };
   } else if (school === '선부고') {
-    const mod = await import('./seonbu-grammar-data.js?v=2');
+    const mod = await import('./seonbu-grammar-data.js');
     const current = mod.SEONBU_2026_PASSAGES || [], old = mod.SEONBU_2025_PASSAGES || [];
     data = { passages: [...current, ...old], current, old };
   } else if (school === '강서고') {
-    const mod = await import('./gangseo-grammar-data.js?v=1');
+    const mod = await import('./gangseo-grammar-data.js');
     data = { passages: mod.GANGSEO_PASSAGES || [] };
   }
   A.grammarDataKey = key;
@@ -94,6 +94,8 @@ function renderKeepScroll() {
   render();
   requestAnimationFrame(() => window.scrollTo(0, y));
 }
+// Teacher grammar summaries fill in once the school's dataset arrives.
+onTeacherGrammarLoaded(() => { if (A.data?.profile?.role === 'teacher' && !A.screen && !document.querySelector('#modal-root .modal') && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) renderKeepScroll(); });
 function render() {
   if (!A.data || A.screen) return;
   $('#app').innerHTML = A.data.profile.role === 'teacher' ? teacherPage(A) : studentPage(A);
@@ -369,7 +371,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
       buttonBusy(b);
       await ensureGrammarData();
-      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.44.0');
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }

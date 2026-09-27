@@ -2,7 +2,7 @@ name: Release check
 
 on:
   pull_request:
-    branches: [cloudflare-voca]
+    branches: [cloudflare-voca, sumus-voca-prod-deploy]
   push:
     branches: [cloudflare-voca]
 

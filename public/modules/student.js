@@ -347,8 +347,7 @@ function homeRecommendations(A) {
     const mix = A.data.daily_quest.mix || {};
     rows.push(`<button class="home-recommend-row" data-quick-practice="true"><span>${icon('practice')}</span><div class="grow"><b>추천 복습 ${A.data.daily_quest.target}개</b><small>오답 ${mix.wrong || 0} · 복습 ${mix.review || 0} · 새 단어 ${mix.new || 0}</small></div>${icon('chevron')}</button>`);
   }
-  const school = A.data.profile.school || A.school || '';
-  const passages = grammarPassagesForSchool(school, A.data.profile.division);
+  const passages = grammarPassagesForSchool(A);
   if (passages.length) {
     const target = passages.find(p => !savedGrammarProgress(A, p)?.mastered) || passages[0];
     rows.push(`<button class="home-recommend-row" data-action="grammar-choice" data-grammar-id="${esc(target.id)}"><span>${icon('records')}</span><div class="grow"><b>어법·어휘 ${esc(target.number)}번</b><small>${esc(grammarExamLabel(target))} · ${target.sentences.length}문장</small></div>${icon('chevron')}</button>`);

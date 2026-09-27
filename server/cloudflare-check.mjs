@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { pathToFileURL } from 'node:url';
 import { passwordHash } from './auth.mjs';
 import { emptyState } from './state.mjs';
 import { builtinBooks } from './service.mjs';
@@ -104,6 +105,10 @@ export async function runCloudflareCheck() {
     });
     const cookie = login.response.headers.get('set-cookie').split(';')[0];
     assert.equal(login.payload.profile.id, 'student-preserved');
+    assert.match(login.response.headers.get('server-timing') || '', /app;dur=\d+, commit;dur=\d+/, '저장 요청은 Server-Timing으로 처리·커밋 시간을 알려야 합니다.');
+    await call('/api/login', {
+      method: 'POST', status: 401, body: { username: 'student_preserved', password: 'wrong-password', role: 'student' }
+    });
 
     const bootstrap = await call('/api/bootstrap', { cookie });
     assert.equal(bootstrap.payload.stats.points, 900, '기존 XP가 그대로 노출되어야 합니다.');
@@ -173,7 +178,8 @@ export async function runCloudflareCheck() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// pathToFileURL: a hand-built `file://${path}` never matches on Windows, which made this check exit 0 without running.
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   runCloudflareCheck().catch(error => {
     console.error('[cloudflare-check] FAIL', error);
     process.exitCode = 1;

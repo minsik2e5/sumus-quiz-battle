@@ -1,4 +1,4 @@
-const VERSION = 'sumus-voca-v13.46.0-stable';
+const VERSION = 'sumus-voca-v13.47.0-stable';
 const STATIC_CACHE = `${VERSION}-static`;
 const SHELL = [
   '/',
@@ -6,6 +6,7 @@ const SHELL = [
   '/app.bundle.css',
   '/app.js',
   '/pwa.js',
+  '/boot-guard.js',
   '/icon.svg',
   '/sumus-logo-green.svg',
   '/manifest.webmanifest',
@@ -45,14 +46,18 @@ self.addEventListener('fetch', event => {
   if (/\.(?:js|css)$/.test(url.pathname)) {
     event.respondWith((async () => {
       try {
-        const fresh = await fetch(req, { cache: 'no-store' });
+        // Default cache mode lets the browser revalidate (ETag -> 304) instead
+        // of re-downloading every module on each launch; _headers sets no-cache
+        // so the answer is always current and modules never mix versions.
+        const fresh = await fetch(req);
         if (fresh.ok) {
           const cache = await caches.open(STATIC_CACHE);
           cache.put(req, fresh.clone());
         }
         return fresh;
       } catch {
-        return (await caches.match(req)) || Response.error();
+        // ignoreSearch: the page asks for /app.js?v=..., the shell precache stores /app.js.
+        return (await caches.match(req)) || (await caches.match(req, { ignoreSearch: true })) || Response.error();
       }
     })());
     return;
