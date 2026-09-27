@@ -51,7 +51,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.47.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.49.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -429,6 +429,32 @@ export async function runReleaseCheck() {
     }
     assert(state.sessions.filter(session => session.student_id === student.id).length >= 8, 'all eight high-school practice modes are recorded for the student');
 
+    // Instant practice: prepared next question + on-device grading data.
+    const instant = await service(state, 'POST', '/practice/start', {
+      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 12
+    }, studentToken);
+    assert(instant.local_check?.meaning && instant.next_preview?.question_id && instant.next_preview.local_check?.meaning, 'practice mode sends on-device grading data and a prepared next question');
+    assert(!('word_id' in instant.next_preview.question), 'prepared next question does not expose its word id');
+    let instantView = instant;
+    let sawRetryPreview = false;
+    for (let step = 0; step < 8 && !instantView.finished; step++) {
+      const internal = state.practices.find(item => item.id === instant.id);
+      const word = allWords.find(item => item.id === internal.question.word_id);
+      const wrong = step === 0;
+      const answer = wrong ? '__instant_wrong__' : answerFor(instantView.question.type, word);
+      assert(grade(instantView.question.type, answer, instantView.local_check) === !wrong, 'on-device grading with local_check matches the server key');
+      const expectedNext = instantView.next_preview?.question_id;
+      if (instantView.next_preview?.is_retry) sawRetryPreview = true;
+      const result = await service(state, 'POST', `/practice/${instant.id}/answer`, { question_id: instantView.question_id, answer, prefetch_next: true }, studentToken);
+      assert(result.feedback.ok === !wrong, 'server grading agrees with on-device grading');
+      if (expectedNext && !result.prefetched_next.finished) assert(result.prefetched_next.question_id === expectedNext, 'server advances to exactly the prepared next question');
+      instantView = result.prefetched_next;
+    }
+    assert(sawRetryPreview, 'a wrong practice answer comes back as a prepared retry question');
+    const instantInternal = state.practices.find(item => item.id === instant.id);
+    assert(!instantInternal.retry.some(item => item.id === instantInternal.question.word_id && instantInternal.question_is_retry), 'a retry shown from the prepared question is removed from the retry queue');
+    await service(state, 'POST', `/practice/${instant.id}/finish`, {}, studentToken);
+
     const emptyPractice = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 30
     }, studentToken);
@@ -444,6 +470,7 @@ export async function runReleaseCheck() {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'test'
     }, studentToken);
     assert(testStarted.run_mode === 'test' && testStarted.feedback === null && testStarted.score === null, 'test mode hides correctness until final submit');
+    assert(testStarted.local_check === undefined && !testStarted.next_preview?.local_check, 'test mode never sends grading data to the device');
     assert(testStarted.next_preview?.question_id && wordIdOf(state, testStarted.next_preview, testStarted.id) !== wordIdOf(state, testStarted), 'test mode prepares a distinct next question before saving the current answer');
     const testInternal = state.practices.find(item => item.id === testStarted.id);
     assert(new Set(testInternal.words).size === testStarted.target, 'test mode selects unique words without repeats');
@@ -723,7 +750,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.47.0') && indexHtml.includes('/app.bundle.css?v=13.47.0') && sw.includes("'/app.bundle.css'") && sw.includes('sumus-voca-v13.47.0-stable'), 'V13.47 cache versions and CSS bundle are active');
+    assert(indexHtml.includes('/app.js?v=13.49.0') && indexHtml.includes('/app.bundle.css?v=13.49.0') && sw.includes("'/app.bundle.css'") && sw.includes('sumus-voca-v13.49.0-stable'), 'V13.49 cache versions and CSS bundle are active');
     assert(!indexHtml.includes('/teacher-enhancements.js') && !indexHtml.includes('/exam-ops.js') && !indexHtml.includes('/student-enhancements.js') && !indexHtml.includes('/practice-enhancements.js') && !indexHtml.includes('/signup-ui.js'), 'noncritical role modules are removed from eager boot');
     assert(!/<script(?![^>]*\bsrc=)[^>]*>/.test(indexHtml) && !/\son[a-z]+=/.test(indexHtml) && indexHtml.includes('/boot-guard.js'), 'index.html has no inline scripts or handlers (CSP script-src self would block them)');
     assert(appJs.includes("import('./teacher-enhancements.js')") && appJs.includes("import('./student-enhancements.js')") && appJs.includes("ensureRoleEnhancements"), 'teacher and student enhancements load only for the active role');
@@ -736,7 +763,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes("'/danwongo-grammar-data.js'") && !sw.includes("'/teacher-enhancements.js'") && !sw.includes("'/student-enhancements.js'"), 'service worker critical shell excludes optional role and grammar modules');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.47.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.49.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes("'/app.bundle.css'") && !sw.includes("'/v1341.css'"), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
