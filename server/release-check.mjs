@@ -56,7 +56,19 @@ export async function runReleaseCheck() {
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
     const bySchool = school => runtimeBooks.filter(book => book.school === school).flatMap(book => book.words || []);
-    assert(bySchool('단원고').length === 444, '단원고 vocabulary = 444 (existing 362 + YBM Kim 82)');
+    assert(bySchool('단원고').length === 542, '단원고 vocabulary = 542 (existing 362 + YBM Kim READING DB 68 + 112)');
+    {
+      const ybm = bySchool('단원고').filter(word => word.id.startsWith('high:ybm-kim:common2:'));
+      const byId = id => ybm.find(word => word.id === id);
+      assert(ybm.filter(word => word.range_code === 'L1').length === 68 && ybm.filter(word => word.range_code === 'L2').length === 112, 'YBM Kim lessons match the READING DB (68 + 112)');
+      // Ids are what student mastery and answer records point at: existing words keep theirs.
+      assert(byId('high:ybm-kim:common2:lesson1:001')?.word === 'accountable' && byId('high:ybm-kim:common2:lesson2:001')?.word === 'deliver', 'existing YBM Kim word ids keep pointing at the same words');
+      assert(grade('write_meaning', '책임이 있는', byId('high:ybm-kim:common2:lesson1:001')) && grade('write_meaning', '책임감 있는', byId('high:ybm-kim:common2:lesson1:001')), 'reworded meanings accept both the READING DB meaning and the previous one');
+      assert(byId('high:ybm-kim:common2:lesson1:r001')?.word === 'shape', 'words new in the READING DB get r-prefixed ids that cannot collide with existing ones');
+      assert(new Set(ybm.map(word => word.id)).size === ybm.length, 'YBM Kim word ids are unique');
+      const charged = ybm.find(word => word.word.startsWith('be charged with'));
+      assert(displayEnglish(charged.word) === 'be charged with' && grade('write_en', 'be charged with', charged), 'grammar note (+동명사) is not part of the expected English answer');
+    }
     const gangseoWords = bySchool('강서고');
     assert(gangseoWords.length === 354, '강서고 vocabulary = 354');
     assert(bySchool('단원고').some(word => word.id.startsWith('high:ybm-kim:common2:lesson1:')), 'YBM Kim lesson 1 vocabulary is loaded');
@@ -454,6 +466,17 @@ export async function runReleaseCheck() {
     const instantInternal = state.practices.find(item => item.id === instant.id);
     assert(!instantInternal.retry.some(item => item.id === instantInternal.question.word_id && instantInternal.question_is_retry), 'a retry shown from the prepared question is removed from the retry queue');
     await service(state, 'POST', `/practice/${instant.id}/finish`, {}, studentToken);
+
+    {
+      // A word removed from its book while a practice is showing it must still grade.
+      const { ybmKimRetiredWords } = await import('./high-vocab-ybm-kim.mjs');
+      const retiredPractice = await service(state, 'POST', '/practice/start', { school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5 }, studentToken);
+      const retiredInternal = state.practices.find(item => item.id === retiredPractice.id);
+      retiredInternal.question = { ...retiredInternal.question, word_id: ybmKimRetiredWords[0].id };
+      const retiredAnswer = await service(state, 'POST', `/practice/${retiredPractice.id}/answer`, { question_id: retiredPractice.question_id, answer: ybmKimRetiredWords[0].meaning }, studentToken);
+      assert(retiredAnswer.feedback?.ok === true, 'a practice question whose word was retired from the book can still be answered and graded');
+      await service(state, 'POST', `/practice/${retiredPractice.id}/finish`, {}, studentToken);
+    }
 
     const emptyPractice = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 30

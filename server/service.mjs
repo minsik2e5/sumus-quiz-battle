@@ -5,7 +5,7 @@ import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin }
 import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { middleGrade3Books } from './middle-vocab.mjs';
 import { middleGrade2Books } from './middle-vocab-grade2.mjs';
-import { ybmKimHighBooks } from './high-vocab-ybm-kim.mjs';
+import { ybmKimHighBooks, ybmKimRetiredWords } from './high-vocab-ybm-kim.mjs';
 export const builtinBooks = builtinBooksData;
 const withoutLegacySeonbu44 = book => {
   const isSeonbu = book.school_id === 'seonbu-high' || book.school === '선부고';
@@ -101,7 +101,10 @@ const sameSchool = (record, school) => !!record && !!school && (
 );
 const wordForGrade = (state, word) => ({ ...word, accepted_meanings: [...new Set([...(word.accepted_meanings || []), ...(state.meaningAliases?.[word.id] || [])])] });
 const normalizeDisputeAnswer = value => String(value ?? '').normalize('NFKC').toLowerCase().replace(/[~～·•・.,;:!?()[\]{}"'‘’“”]/g, '').replace(/\s+/g, '').trim();
-const findWord = (state, wordId) => allBooks(state).flatMap(book => book.words || []).find(word => word.id === wordId);
+// Retired words are no longer offered, but in-progress practices, disputes and
+// records may still point at them.
+const findWord = (state, wordId) => allBooks(state).flatMap(book => book.words || []).find(word => word.id === wordId)
+  || ybmKimRetiredWords.find(word => word.id === wordId);
 const addMeaningAlias = (state, wordId, alias, { source = 'teacher', created_by = null } = {}) => {
   const value = str(alias, 80);
   if (!value) fail('허용할 뜻을 입력해주세요.');
@@ -1099,7 +1102,7 @@ export async function service(state, method, path, body, token, options = {}) {
       if (x.finished || x.feedback || body.question_id !== x.question_id) fail('현재 문제를 다시 확인해주세요.', 409);
       const timedOut = x.timer_mode === 'question' && Number(x.question_deadline || 0) > 0 && (Date.now() >= Number(x.question_deadline) || (body.timed_out === true && Date.now() + 150 >= Number(x.question_deadline)));
       const submittedAnswer = timedOut ? '' : body.answer;
-      const word = allBooks(state).flatMap(b => b.words).find(w => w.id === x.question.word_id);
+      const word = findWord(state, x.question.word_id);
       const ok = timedOut ? false : grade(x.question.type, submittedAnswer, wordForGrade(state, word));
       x.total++; x.last = word.id;
       const scoredAttempt = !x.question_is_retry && Number(x.score_total || 0) < Number(x.target || 0);
@@ -1205,6 +1208,8 @@ function nextPractice(x, state, preparePreview = true) {
     return;
   }
   const words = allBooks(state).flatMap(b => b.words).filter(w => x.words.includes(w.id));
+  // Every word of this practice was retired from its book: nothing left to ask.
+  if (!words.length) { x.next_preview = null; finishPractice(x, state); return; }
   x.seen ??= [];
   const unseen = x.cover_all ? words.filter(w => !x.seen.includes(w.id)) : [];
   const due = x.retry.findIndex(r => r.at <= x.total);
