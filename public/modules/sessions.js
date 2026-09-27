@@ -1,7 +1,7 @@
 import { api, $, $$, icon, esc, time, date, recordRangeLabel, scope, toast, modal, buttonBusy } from './ui.js';
 import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo } from './core.js';
 import { avatar } from './character.js';
-let A, redraw, refresh, examState = null, practiceState = null, prefetchedPractice = null, practiceAdvanceTimer = null, practiceOffset = 0, practiceAutoFinishing = false, practiceQuestionTimingOut = false, practiceGuardId = null, timer, saving = Promise.resolve(), inputVersion = 0, dirty = false, syncError = '', debounce, audio;
+let A, redraw, refresh, examState = null, practiceState = null, prefetchedPractice = null, practiceAdvanceTimer = null, practiceOffset = 0, practiceAutoFinishing = false, practiceQuestionTimingOut = false, practiceGuardId = null, pendingPracticeSave = false, timer, saving = Promise.resolve(), inputVersion = 0, dirty = false, syncError = '', debounce, audio;
 export function configureSessions(state, render, reload) { A = state; redraw = render; refresh = reload; }
 const mount = html => { $('#app').innerHTML = html; window.scrollTo(0, 0); };
 const draftKey = () => `sumus:v12:exam:${A.data.profile.id}:${examState.attempt.id}`;
@@ -26,7 +26,7 @@ function disarmTestGuard() {
   window.removeEventListener('popstate', testBackGuard);
   practiceGuardId = null;
 }
-export function leaveSession() { clearInterval(timer); clearTimeout(debounce); clearTimeout(practiceAdvanceTimer); timer = null; practiceAdvanceTimer = null; prefetchedPractice = null; practiceOffset = 0; practiceAutoFinishing = false; practiceQuestionTimingOut = false; disarmTestGuard(); A.screen = null; }
+export function leaveSession() { clearInterval(timer); clearTimeout(debounce); clearTimeout(practiceAdvanceTimer); timer = null; practiceAdvanceTimer = null; prefetchedPractice = null; practiceOffset = 0; practiceAutoFinishing = false; practiceQuestionTimingOut = false; pendingPracticeSave = false; disarmTestGuard(); A.screen = null; }
 export async function openExam(eid) {
   const e = A.data.exams.find(e => e.id === eid); if (!e) return;
   const close = modal(`<span class="pill">실전시험</span><h2>${esc(e.title)}</h2><p>${e.school} · ${esc(scope(e))}</p><div class="detail-grid"><div><b>${EXAM_TYPES[e.exam_type].label}</b><small>한 가지 유형으로 출제</small></div><div><b>${e.question_count}문제</b><small>제한시간 ${Math.round(e.duration_sec / 60)}분</small></div><div><b>${e.max_attempts}회</b><small>응시 가능 횟수</small></div><div><b>${e.passing_score}점</b><small>통과 기준</small></div></div><div class="exam-info">${icon('clock')}<p>시작하면 시간이 흐릅니다.<br>시간이 끝나면 저장된 답안이 자동 제출돼요.</p></div><button class="btn ink full" id="begin-exam">${A.data.attempts.some(a => a.exam_id === eid && a.status === 'active') ? '이어서 응시하기' : '시험 시작하기'}</button>`, '실전시험 시작');
@@ -375,11 +375,12 @@ function renderPractice() {
       ${q.type === 'listen' ? `<button class="listen-button" id="listen-word" aria-label="발음 듣기">${icon('sound')}</button><p class="input-caption" style="text-align:center">발음을 듣고 뜻을 골라주세요.</p>` : `<h2 class="question-prompt ${!['eng2mean', 'write_meaning'].includes(q.type) ? 'korean' : ''}">${esc(q.prompt)}</h2>`}
       ${q.hint ? `<p class="question-hint">${esc(q.hint)}</p>` : ''}
       ${input ? `<input id="practice-answer" class="answer-input ${feedback ? (feedback.ok ? 'answer-correct-v1340' : 'answer-wrong-v1340') : ''}" aria-label="${meaningInput ? '한국어 뜻 답안' : '영어 답안'}" placeholder="${meaningInput ? '뜻을 직접 입력하세요' : '영어 단어를 입력하세요'}" autocomplete="off" autocapitalize="off" spellcheck="false" ${feedback ? 'disabled' : ''}>` : `<div class="options">${q.options.map((o, i) => `<button class="option ${feedback && o === answer ? 'correct' : ''}" data-practice-choice="${i}" ${feedback ? 'disabled' : ''}><span class="letter">${i + 1}</span><span>${esc(o)}</span></button>`).join('')}</div>`}
-      <div id="practice-feedback">${feedback ? feedbackHtml(feedback) : ''}</div>
-      <div class="practice-action-slot-v1340">${feedback ? `<button class="btn primary full" id="practice-next">${x.total >= x.target && !x.retry_count ? '결과 보기' : '다음 문제'} ${icon('arrow')}</button>` : input ? `<button class="btn primary full" id="practice-confirm">${testMode ? (Number(x.score_total || 0) + 1 >= Number(x.target || 0) ? '제출하고 결과 보기' : '답안 제출 · 다음') : '정답 확인'}</button>` : ''}</div>
+      <div id="practice-feedback">${pendingPracticeSave ? '<div class="practice-saving-v1345" role="status">이전 답안을 저장하고 있어요.</div>' : feedback ? feedbackHtml(feedback) : ''}</div>
+      <div class="practice-action-slot-v1340">${feedback ? `<button class="btn primary full" id="practice-next">${x.total >= x.target && !x.retry_count ? '결과 보기' : '다음 문제'} ${icon('arrow')}</button>` : input ? `<button class="btn primary full" id="practice-confirm" ${pendingPracticeSave ? 'disabled' : ''}>${pendingPracticeSave ? '이전 답안 저장 중…' : testMode ? (Number(x.score_total || 0) + 1 >= Number(x.target || 0) ? '제출하고 결과 보기' : '답안 제출 · 다음') : '정답 확인'}</button>` : ''}</div>
       <div id="practice-error" role="alert"></div>
     </main>
   </div>`);
+  if (pendingPracticeSave) $$('[data-practice-choice]').forEach(button => { button.disabled = true; });
   $('#practice-exit').onclick = () => {
     const progress = Math.min(Number(x.score_total || 0), Number(x.target || 0));
     const close = modal(`<h2>시험을 나갈까요?</h2><p>현재 <b>${progress} / ${x.target}</b>까지 진행했어요. 나가도 진행 위치가 저장되어 나중에 이어서 풀 수 있어요.</p><button class="btn primary full" id="practice-keep-going">계속 풀기</button><button class="btn full" id="practice-save-leave">저장하고 나가기</button><button class="text-button full" id="practice-finish-exit">시험 종료하기</button>`, testMode ? '실전시험' : '연습시험');
@@ -559,6 +560,12 @@ async function answerPractice(answer, button) {
   if (confirmButton) confirmButton.textContent = '답안 저장 중…';
   const feedbackArea = $('#practice-feedback');
   if (feedbackArea) feedbackArea.innerHTML = '<div class="practice-saving-v1345" role="status">답안을 안전하게 저장하고 있어요.</div>';
+  const preview = x.run_mode === 'test' && x.next_preview;
+  if (preview) {
+    pendingPracticeSave = true;
+    practiceState = { ...x, question: preview.question, question_id: preview.question_id, next_preview: null, total: x.total + 1, score_total: Number(x.score_total || 0) + 1, feedback: null };
+    renderPractice();
+  }
   try {
     let result;
     const payload = { question_id: x.question_id, answer, prefetch_next: x.run_mode !== 'test' };
@@ -568,12 +575,16 @@ async function answerPractice(answer, button) {
       await new Promise(resolve => setTimeout(resolve, 260));
       result = await api(`/practice/${x.id}/answer`, payload);
     }
+    if (A.screen !== 'practice' || practiceState?.id !== x.id) return;
     practiceOffset = Number(result.server_time || Date.now()) - Date.now();
+    const typedAhead = preview && result.question_id === practiceState.question_id ? $('#practice-answer')?.value : null;
+    pendingPracticeSave = false;
     if (result.finished) { prefetchedPractice = null; practiceState = result; finishPracticeView(); return; }
     if (result.run_mode === 'test') {
       prefetchedPractice = null;
       practiceState = result;
       renderPractice();
+      if (typedAhead !== null && $('#practice-answer')) $('#practice-answer').value = typedAhead;
       return;
     }
     prefetchedPractice = result.prefetched_next || null; delete result.prefetched_next; practiceState = result; renderPractice();
@@ -589,6 +600,12 @@ async function answerPractice(answer, button) {
       }, result.feedback.milestone ? 420 : 300);
     }
   } catch (e) {
+    if (A.screen !== 'practice' || practiceState?.id !== x.id) return;
+    if (preview) {
+      pendingPracticeSave = false;
+      practiceState = x;
+      renderPractice();
+    }
     if (e?.status === 409 && e.message?.includes('현재 문제')) {
       try {
         const latest = await api(`/practice/${x.id}`);
@@ -601,7 +618,8 @@ async function answerPractice(answer, button) {
         }
       } catch {}
     }
-    if (feedbackArea?.isConnected) feedbackArea.innerHTML = '';
+    if (preview) $('#practice-feedback').innerHTML = '';
+    else if (feedbackArea?.isConnected) feedbackArea.innerHTML = '';
     if (confirmButton?.isConnected) confirmButton.textContent = confirmLabel;
     if (button?.isConnected) { button.classList.remove('submitting'); button.setAttribute('aria-pressed', 'false'); }
     $('#practice-error').innerHTML = `<div class="error-box">${esc(e.message)} 답안은 다시 눌러 전송할 수 있어요.</div>`;

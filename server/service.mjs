@@ -1144,7 +1144,19 @@ function advancePractice(x, state) {
   if (covered && scoredDone && (x.exam_style || !x.retry.length || x.total >= x.target + 12)) finishPractice(x, state);
   else nextPractice(x, state);
 }
-function nextPractice(x, state) {
+function nextPractice(x, state, preparePreview = true) {
+  if (x.run_mode === 'test' && x.next_preview) {
+    const preview = x.next_preview;
+    x.question = preview.question;
+    x.question_id = preview.question_id;
+    x.question_is_retry = false;
+    x.feedback = null;
+    x.seen ??= [];
+    if (!x.seen.includes(preview.question.word_id)) x.seen.push(preview.question.word_id);
+    x.next_preview = null;
+    if (preparePreview) prepareTestPreview(x, state);
+    return;
+  }
   const words = allBooks(state).flatMap(b => b.words).filter(w => x.words.includes(w.id));
   x.seen ??= [];
   const unseen = x.cover_all ? words.filter(w => !x.seen.includes(w.id)) : [];
@@ -1167,6 +1179,13 @@ function nextPractice(x, state) {
     x.question_started_at = Date.now();
     x.question_deadline = x.question_started_at + x.question_duration_sec * 1000;
   }
+  if (preparePreview) prepareTestPreview(x, state);
+}
+function prepareTestPreview(x, state) {
+  if (x.run_mode !== 'test' || Number(x.score_total || 0) + 1 >= Number(x.target || 0)) return;
+  const preview = { ...x, seen: [...x.seen], retry: [], next_preview: null, total: x.total + 1 };
+  nextPractice(preview, state, false);
+  x.next_preview = { question: preview.question, question_id: preview.question_id };
 }
 function removePracticeTimer(x) {
   if (!x || x.finished) return x;
@@ -1289,7 +1308,7 @@ function practiceView(x, state) {
     perfect: x.finished ? perfect : undefined,
     answer_records: x.finished ? answerRecords : undefined,
     wrong_details: x.finished ? (x.wrong_details || []) : undefined,
-    question: x.question, question_id: x.question_id, question_is_retry: !!x.question_is_retry, feedback: hideTestScore ? null : x.feedback,
+    question: x.question, question_id: x.question_id, question_is_retry: !!x.question_is_retry, next_preview: hideTestScore && !x.finished ? x.next_preview || null : undefined, feedback: hideTestScore ? null : x.feedback,
     finished: x.finished, retry_count: x.retry.length,
     stats: growthFor(mySessions(state, x.student_id)), server_time: Date.now()
   };
