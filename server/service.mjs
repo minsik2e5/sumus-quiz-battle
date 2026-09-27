@@ -1,6 +1,6 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
-import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, ACCESSORIES, FRAMES, TITLES, unlocked, growthFor, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, ACCESSORIES, FRAMES, TITLES, EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
 import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { middleGrade3Books } from './middle-vocab.mjs';
@@ -362,6 +362,17 @@ function rankingWeek(now = Date.now()) {
     range: `${shortKstDate(start)} ~ ${shortKstDate(end - 1)}`
   };
 }
+// Reward points are earned per finished practice and spent in the shop; pets grow separately.
+function pointsAndPets(p, sessions) {
+  const earned = sessions.reduce((n, s) => n + Number(s.reward_points || 0), 0);
+  const spent = Number(p.points_spent || 0);
+  const pets = petProgress(p.pets, sessions, p.avatar_key);
+  return { reward_points: earned, points_spent: spent, points_balance: Math.max(0, earned - spent), pets, pet: pets.find(x => x.active) || null, needs_pet_pick: p.role === 'student' && !pets.length };
+}
+function activePetKey(state, studentId) {
+  const p = state.profiles.find(x => x.id === studentId);
+  return p?.pets?.some(x => x.key === p.avatar_key) ? p.avatar_key : undefined;
+}
 function stats(state, p, sessions = mySessions(state, p.id)) {
   const today = sessions.filter(s => dayKey(s.created_at) === dayKey(Date.now()));
   const recent = [...sessions].sort((a, b) => b.created_at - a.created_at).slice(0, 20);
@@ -370,7 +381,7 @@ function stats(state, p, sessions = mySessions(state, p.id)) {
     ...growthFor(sessions),
     today_total: today.reduce((n, s) => n + s.total, 0),
     today_xp: today.reduce((n, s) => n + (s.xp || 0), 0),
-    reward_points: sessions.reduce((n, s) => n + Number(s.reward_points || 0), 0),
+    ...pointsAndPets(p, sessions),
     today_reward_points: today.reduce((n, s) => n + Number(s.reward_points || 0), 0),
     practice_count: sessions.length,
     accuracy: total ? Math.round(correct / total * 100) : 0,
@@ -448,7 +459,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } else if (process.env.AUTH_PROVIDER === 'supabase') {
       const result = await supabaseLogin(username, password); p = result.profile; supabaseAccessToken = result.accessToken;
       const old = state.profiles.find(x => x.id === p.id);
-      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
+      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'pets', 'points_spent', 'purchases'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
       else state.profiles.push(p);
     } else {
       p = localProfile;
@@ -557,6 +568,7 @@ export async function service(state, method, path, body, token, options = {}) {
           division: s.division || (grade.startsWith('중') ? 'middle' : 'high'),
           display_name: hidden ? '비공개 학생' : s.display_name,
           avatar_key: hidden ? 'lumi' : (s.avatar_key || 'lumi'),
+          ...(() => { const pet = hidden ? null : petProgress(s.pets, records, s.avatar_key).find(x => x.active); return { pet_name: pet?.name || '', pet_form: pet ? pet.form : 1 }; })(),
           level: hidden ? 1 : g.level, streak: g.streak,
           xp: weekly.reduce((n, r) => n + Number(r.xp || 0), 0),
           total: weekly.reduce((n, r) => n + Number(r.total || 0), 0),
@@ -579,7 +591,7 @@ export async function service(state, method, path, body, token, options = {}) {
       preview = {
         id: previewId, role: 'student', username: previewId, display_name: `미리보기 · ${school.name}`,
         class_name: grade, division: school.division, school_id: school.id, school: school.name,
-        active: true, preview_owner_id: p.id, avatar_key: 'dog', avatar_accessory: 'none',
+        active: true, preview_owner_id: p.id, avatar_key: 'dog', pets: [{ key: 'dog', first: true, acquired_at: Date.now() }], avatar_accessory: 'none',
         avatar_frame: 'basic', avatar_title: 'rookie', ranking_public: false, share_profile: false,
         created_at: Date.now()
       };
@@ -674,7 +686,47 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/profile/style' && method === 'POST') {
     const growth = stats(state, p);
     if (!CHARACTERS[body.avatar_key] || !unlocked(ACCESSORIES[body.avatar_accessory], growth) || !unlocked(FRAMES[body.avatar_frame], growth) || !unlocked(TITLES[body.avatar_title], growth)) fail('아직 열리지 않은 보상입니다.');
+    if (p.pets?.length && !p.pets.some(x => x.key === body.avatar_key)) fail('아직 만나지 못한 펫이에요.', 403);
     Object.assign(p, { avatar_key: body.avatar_key, avatar_accessory: body.avatar_accessory, avatar_frame: body.avatar_frame, avatar_title: body.avatar_title });
+    return publicProfile(p);
+  }
+  // Pets: the first one is chosen once for free; others come from random eggs in the shop.
+  if (path === '/pets/choose' && method === 'POST') {
+    requireRole(p, 'student');
+    if (p.pets?.length) fail('첫 펫은 이미 골랐어요. 새 친구는 상점의 알에서 만날 수 있어요.', 409);
+    if (!CHARACTERS[body.key]) fail('펫을 확인해주세요.');
+    p.pets = [{ key: body.key, first: true, acquired_at: Date.now() }];
+    p.avatar_key = body.key;
+    return publicProfile(p);
+  }
+  if (path === '/pets/active' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!p.pets?.some(x => x.key === body.key)) fail('아직 만나지 못한 펫이에요.', 403);
+    p.avatar_key = body.key;
+    return publicProfile(p);
+  }
+  if (path === '/shop/egg' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
+    const missing = Object.keys(CHARACTERS).filter(key => !p.pets.some(x => x.key === key));
+    if (!missing.length) fail('모든 펫을 모았어요!', 409);
+    const balance = pointsAndPets(p, mySessions(state, p.id)).points_balance;
+    if (balance < EGG_PRICE) fail(`포인트가 ${EGG_PRICE - balance}P 부족해요.`);
+    const key = missing[randomBytes(4).readUInt32BE(0) % missing.length];
+    const now = Date.now();
+    p.pets.push({ key, acquired_at: now });
+    p.points_spent = Number(p.points_spent || 0) + EGG_PRICE;
+    (p.purchases ||= []).push({ item: 'egg', key, price: EGG_PRICE, at: now });
+    p.avatar_key = key;
+    return { key, profile: publicProfile(p) };
+  }
+  if (path === '/profile/pet-name' && method === 'POST') {
+    requireRole(p, 'student');
+    const pet = p.pets?.find(x => x.key === p.avatar_key);
+    if (!pet) fail('먼저 펫을 골라주세요.', 409);
+    const { name, error } = cleanPetName(body.pet_name);
+    if (error) fail(error);
+    if (name) pet.name = name; else delete pet.name;
     return publicProfile(p);
   }
   if (path === '/students' && method === 'POST') {
@@ -1348,6 +1400,7 @@ function finishPractice(x, state, autoSubmitted = false) {
     unanswered_count: unansweredCount,
     perfect,
     xp: x.xp,
+    pet_key: activePetKey(state, x.student_id),
     reward_points: reward.points,
     reward_breakdown: reward.breakdown,
     best_combo: x.best,

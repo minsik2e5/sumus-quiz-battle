@@ -1,9 +1,10 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
-import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS } from './modules/core.js';
+import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm } from './modules/core.js';
 import { avatar } from './modules/character.js';
 import { studentPage, getRanges, updateRangeSummary } from './modules/student.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, onTeacherGrammarLoaded } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
+import { maybePetMoment, openPetNameModal, openEggShop, petJosa } from './modules/pet-moments.js';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -100,9 +101,23 @@ function renderKeepScroll() {
 onTeacherGrammarLoaded(() => { if (A.data?.profile?.role === 'teacher' && !A.screen && !document.querySelector('#modal-root .modal') && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) renderKeepScroll(); });
 function render() {
   if (!A.data || A.screen) return;
+  // Every student picks a first pet (once) before using the app.
+  if (A.data.profile.role === 'student' && A.data.stats?.needs_pet_pick) A.tab = 'studio';
   $('#app').innerHTML = A.data.profile.role === 'teacher' ? teacherPage(A) : studentPage(A);
   bindPageForms();
   queueMicrotask(ensureRoleEnhancements);
+  if (A.data.profile.role === 'student') queueMicrotask(() => maybePetMoment(A, petChanged));
+}
+async function petChanged() { try { await refresh(); A.style = null; renderKeepScroll(); } catch (err) { toast(err.message); } }
+function confirmFirstPet(key) {
+  const c = CHARACTERS[key]; if (!c) return;
+  const close = modal(`<div class="pet-confirm">${avatar(key, { form: Math.max(1, petForm(A.data.stats.level)) })}<h2>${esc(petJosa(c.ko, '과', '와'))} 함께할까요?</h2><p>첫 펫은 <b>다시 바꿀 수 없어요.</b><br>지금까지 쌓은 XP로 바로 자라요.</p><button class="btn primary full" id="confirm-first-pet">${esc(petJosa(c.ko, '으로', '로'))} 정할게요</button><button class="btn full" id="cancel-first-pet">다시 고를래요</button></div>`, '첫 펫 확인');
+  $('#cancel-first-pet').onclick = close;
+  $('#confirm-first-pet').onclick = async event => {
+    const b = event.currentTarget; buttonBusy(b);
+    try { await api('/pets/choose', { key }); close(); await refresh(); A.style = null; A.tab = 'home'; render(); window.scrollTo(0, 0); toast(`이제 ${petJosa(c.ko, '과', '와')} 함께 공부해요!`); }
+    catch (err) { toast(err.message); buttonBusy(b, false); }
+  };
 }
 configureSessions(A, render, refresh);
 function navigate(tab) {
@@ -377,6 +392,9 @@ $('#app').addEventListener('click', async event => {
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
+    if (d.action === 'pet-name') return openPetNameModal(A, petChanged);
+    if (d.action === 'choose-pet') return confirmFirstPet(d.key);
+    if (d.action === 'egg-shop') return openEggShop(A, petChanged);
     if (d.action === 'save-style') { buttonBusy(b); await api('/profile/style', A.style); await refresh(); A.style = null; A.tab = 'home'; render(); toast('내 캐릭터를 저장했어요.'); }
     if (d.action === 'account') accountModal();
     if (d.action === 'logout') await logout();

@@ -29,8 +29,25 @@ export const CHARACTERS = {
   cat: { name: 'NABI', ko: '나비', type: '고양이', color: '#8B8582', light: '#C8C1BC', soft: '#F4F2F1' },
   dragon: { name: 'YONG', ko: '용이', type: '용', color: '#59B982', light: '#A8DE9E', soft: '#ECF8ED' },
   panda: { name: 'BAMBOO', ko: '밤부', type: '팬더', color: '#3F4442', light: '#F2F0E8', soft: '#F5F7F4' },
-  snake: { name: 'CHORONG', ko: '초롱', type: '뱀', color: '#71C96E', light: '#BDEB8F', soft: '#F0F9E8' }
+  snake: { name: 'CHORONG', ko: '초롱', type: '뱀', color: '#71C96E', light: '#BDEB8F', soft: '#F0F9E8' },
+  rabbit: { name: 'TORI', ko: '토리', type: '토끼', color: '#F09AAE', light: '#FFD3DC', soft: '#FFF1F4' },
+  fox: { name: 'HOYA', ko: '호야', type: '여우', color: '#E8893A', light: '#F8C27D', soft: '#FFF4E8' }
 };
+// Pet growth: an egg, then three evolution forms. `form` is 0 (egg) .. 3 (final).
+export const PET_FORMS = ['알', '아기', '성장', '최종'];
+export const PET_FORM_LEVELS = [1, 3, 10, 20];
+export const petForm = (level = 1) => PET_FORM_LEVELS.reduce((form, min, i) => (Number(level) >= min ? i : form), 0);
+export const PET_NAME_MAX = 8;
+export const EGG_PRICE = 800;
+// Student-chosen pet name, checked the same way on the device and on the server.
+// An empty name is allowed and means "use the pet's default name".
+export function cleanPetName(value) {
+  const name = String(value ?? '').normalize('NFC').replace(/\s+/g, ' ').trim();
+  if (!name) return { name: '', error: '' };
+  if (Array.from(name).length > PET_NAME_MAX) return { name, error: `이름은 ${PET_NAME_MAX}자까지 지을 수 있어요.` };
+  if (!/^[\p{Script=Hangul}A-Za-z0-9 ·._~!-]+$/u.test(name)) return { name, error: '한글, 영어, 숫자로 지어주세요.' };
+  return { name, error: '' };
+}
 export const ACCESSORIES = {
   none: { name: '기본', level: 1 }, headset: { name: '헤드셋', level: 3 }, glasses: { name: '포커스 글래스', level: 6 },
   starpin: { name: '스타 핀', level: 9 }, visor: { name: '바이저', level: 13 }, crown: { name: '크라운', level: 18 }
@@ -43,7 +60,17 @@ export function levelInfo(points = 0) {
   points = Math.max(0, Number(points) || 0);
   while (level < 50 && points >= base + need) { base += need; level++; need = 180 + (level - 1) * 70; }
   const current = level === 50 ? need : points - base;
-  return { level, current, need, percent: clamp(current / need * 100, 0, 100), remaining: Math.max(0, need - current), stage: level >= 20 ? 5 : level >= 15 ? 4 : level >= 10 ? 3 : level >= 5 ? 2 : 1 };
+  // `stage` (1..5) is kept for app versions still installed on phones; new screens use `form`.
+  return { level, current, need, percent: clamp(current / need * 100, 0, 100), remaining: Math.max(0, need - current), stage: level >= 20 ? 5 : level >= 15 ? 4 : level >= 10 ? 3 : level >= 5 ? 2 : 1, form: petForm(level) };
+}
+// Each owned pet grows with the XP of practice finished while it was the partner.
+// Records from before pets were collectible (no pet_key) belong to the first pet.
+export function petProgress(pets = [], sessions = [], activeKey) {
+  return pets.map(pet => {
+    const xp = sessions.reduce((n, s) => n + ((s.pet_key ? s.pet_key === pet.key : pet.first) ? Number(s.xp || 0) : 0), 0);
+    const info = levelInfo(xp);
+    return { key: pet.key, name: pet.name || '', first: !!pet.first, acquired_at: pet.acquired_at || 0, xp, level: info.level, form: info.form, percent: info.percent, remaining: info.remaining, active: pet.key === activeKey };
+  });
 }
 export const unlocked = (item, growth) => !!item && (!item.level || growth.level >= item.level) && (!item.combo || growth.best_combo >= item.combo) && (!item.streak || growth.streak >= item.streak);
 export function displayEnglish(raw) {

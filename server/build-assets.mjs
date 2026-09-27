@@ -39,7 +39,8 @@ const cssSources = [
   "v1340.css",
   "v1341.css",
   "v1344.css",
-  "v1345.css"
+  "v1345.css",
+  "v1353.css"
 ];
 const cssBundlePath = resolve(root, 'public/app.bundle.css');
 
@@ -87,12 +88,13 @@ writeFileSync(cssBundlePath, cssBundle);
   const legacyCss = new Set(cssSources.map(name => '/' + name));
   const served = walk(publicDir)
     .map(full => ({ full, url: urlOf(full) }))
-    .filter(({ url }) => /\.(?:js|css|html|svg|webmanifest)$/.test(url) && url !== '/sw.js' && !legacyCss.has(url))
+    .filter(({ url }) => /\.(?:js|css|html|svg|webp|webmanifest)$/.test(url) && url !== '/sw.js' && !legacyCss.has(url))
     .sort((a, b) => a.url.localeCompare(b.url));
   const hash = createHash('sha256');
   for (const { full, url } of served) hash.update(url).update('\0').update(readFileSync(full)).update('\0');
-  // Loaded on every start; teacher tools and grammar data are cached on first use.
-  const onDemand = /^\/(?:teacher-enhancements|exam-ops|grammar-choice-sample|[a-z-]+-grammar-data)\.js$/;
+  // Loaded on every start; teacher tools, grammar data and pet images are cached on first
+  // use. Images still count toward ASSET_HASH, so a redrawn pet reaches installed apps.
+  const onDemand = /^\/(?:(?:teacher-enhancements|exam-ops|grammar-choice-sample|[a-z-]+-grammar-data)\.js|assets\/.+\.webp)$/;
   // The page is cached as "/": Cloudflare answers /index.html with a 307 to /,
   // and a redirected response cannot be used to answer a navigation.
   const precache = served.map(({ url }) => url === '/index.html' ? '/' : url).filter(url => !onDemand.test(url));
