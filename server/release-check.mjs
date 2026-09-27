@@ -43,7 +43,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.45.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.45 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.46.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -406,6 +406,7 @@ export async function runReleaseCheck() {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'test'
     }, studentToken);
     assert(testStarted.run_mode === 'test' && testStarted.feedback === null && testStarted.score === null, 'test mode hides correctness until final submit');
+    assert(testStarted.next_preview?.question_id && testStarted.next_preview.question.word_id !== testStarted.question.word_id, 'test mode prepares a distinct next question before saving the current answer');
     const testInternal = state.practices.find(item => item.id === testStarted.id);
     assert(new Set(testInternal.words).size === testStarted.target, 'test mode selects unique words without repeats');
     await expectStatus(409, () => service(state, 'POST', `/practice/${testStarted.id}/finish`, {}, studentToken), 'test mode blocks early manual finish');
@@ -416,8 +417,10 @@ export async function runReleaseCheck() {
     while (!testView.finished && testAnswered < 8) {
       const currentWord = allWords.find(item => item.id === testView.question.word_id);
       const answer = testAnswered === 0 ? '__wrong_test_answer__' : answerFor('write_meaning', currentWord);
+      const preparedQuestionId = testView.next_preview?.question_id;
       testView = await service(state, 'POST', `/practice/${testStarted.id}/answer`, { question_id: testView.question_id, answer }, studentToken);
       testAnswered += 1;
+      if (!testView.finished) assert(testView.question_id === preparedQuestionId, 'test mode returns the exact question shown while the previous answer was saving');
       if (!testView.finished) assert(testView.feedback === null && testView.score === null, 'test mode advances without revealing grading');
     }
     const testSession = state.sessions.find(item => item.id === testStarted.id);
@@ -682,13 +685,13 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.45.0') && indexHtml.includes('/app.bundle.css?v=13.45.0') && sw.includes("'/app.bundle.css'") && sw.includes('sumus-voca-v13.45.0-stable'), 'V13.45 cache versions and CSS bundle are active');
+    assert(indexHtml.includes('/app.js?v=13.46.0') && indexHtml.includes('/app.bundle.css?v=13.46.0') && sw.includes("'/app.bundle.css'") && sw.includes('sumus-voca-v13.46.0-stable'), 'V13.46 cache versions and CSS bundle are active');
     assert(!indexHtml.includes('/teacher-enhancements.js') && !indexHtml.includes('/exam-ops.js') && !indexHtml.includes('/student-enhancements.js') && !indexHtml.includes('/practice-enhancements.js') && !indexHtml.includes('/signup-ui.js'), 'noncritical role modules are removed from eager boot');
     assert(appJs.includes("import('./teacher-enhancements.js?v=13.44.0')") && appJs.includes("import('./student-enhancements.js?v=13.44.0')") && appJs.includes("ensureRoleEnhancements"), 'teacher and student enhancements load only for the active role');
     assert(!studentModule.includes('danwongo-grammar-data.js') && !studentModule.includes('seonbu-grammar-data.js') && appJs.includes('ensureGrammarData'), 'large grammar datasets are lazy-loaded only when grammar is opened');
     assert(!sw.includes("'/danwongo-grammar-data.js'") && !sw.includes("'/teacher-enhancements.js'") && !sw.includes("'/student-enhancements.js'"), 'service worker critical shell excludes optional role and grammar modules');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.45.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.46.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes("'/app.bundle.css'") && !sw.includes("'/v1341.css'"), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
