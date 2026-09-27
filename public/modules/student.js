@@ -4,7 +4,7 @@ import { avatar } from './character.js';
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
 export function shell(A, content) {
   const p = A.data.profile;
-  return `<div class="student-app">${p.preview_owner_id ? '<button class="btn secondary" data-action="exit-student-preview" style="position:fixed;top:12px;right:12px;z-index:1000">← 교사 화면으로</button>' : ''}<main class="student-main"><header class="app-header"><div class="brand"><img src="/icon.svg" alt=""><div>SUMUS <span>VOCA</span></div></div><button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${A.tab === id ? 'active' : ''}" ${A.tab === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
+  return `<div class="student-app">${p.preview_owner_id ? '<button class="btn secondary" data-action="exit-student-preview" style="position:fixed;top:12px;right:12px;z-index:1000">← 교사 화면으로</button>' : ''}<main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div><button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${A.tab === id ? 'active' : ''}" ${A.tab === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
 }
 export function studentPage(A) {
   return shell(A, ({ home, practice, exam, ranking, records, studio }[A.tab] || home)(A));
@@ -309,6 +309,10 @@ function compactGrowth(A) {
       <div class="home-xp-meta-v1337"><span>누적 XP ${num(g.points || 0)}</span><strong>${Math.round(Number(g.percent || 0))}%</strong></div>
     </div>
   </section>
+  <div class="home-quick-actions-v1344" aria-label="바로 시작">
+    <button class="home-quick-primary-v1344" data-study="vocab">${icon('practice')}<span><strong>단어 학습</strong><small>선택한 범위 바로 보기</small></span>${icon('arrow')}</button>
+    <button class="home-quick-secondary-v1344" data-go="exam">${icon('exam')}<span>시험 보기</span>${icon('arrow')}</button>
+  </div>
   <section class="home-main-metrics-v1337">
     <button class="rank" data-go="ranking"><span>내 순위</span><strong>${rank === '—' ? '—' : rank + '위'}</strong><small>이번 주 랭킹 보기</small></button>
     <button class="accuracy" data-go="records"><span>내 기록</span><strong>${accuracy}%</strong><small>최근 학습 정답률</small></button>

@@ -1,0 +1,46 @@
+/* V13.44: clearer student navigation, readable secondary text, one green accent. */
+.student-app .app-header .brand img{width:30px;height:30px;border-radius:9px}
+.student-app .app-header .profile-dot{background:#fff;border:1px solid #e1e9e5;color:#28443a;box-shadow:0 4px 14px rgba(25,60,46,.06)}
+.student-app .premium-page-heading .premium-eyebrow{font-size:11px!important;letter-spacing:.1em}
+.student-app .page-heading>p{color:#52645c!important}
+.student-app .home-main-metrics-v1337 .accuracy strong{color:#087e5f}
+.student-app .home-main-metrics-v1337 span{font-size:11px;color:#52675d}
+.student-app .home-main-metrics-v1337 small{font-size:10px;color:#61736a}
+.student-app .home-profile-kicker-v1337,.student-app .home-level-line-v1337 span,.student-app .home-xp-meta-v1337 span{font-size:11px;color:#52675d}
+.student-app .home-pet-status-v1337{font-size:10px;letter-spacing:.04em}
+.student-app .home-mini-stats-v1337 span,.student-app .home-week-head span,.student-app .home-week-days span{font-size:10px;color:#586d62}
+.student-app .home-week-days b{font-size:12px}
+.home-quick-actions-v1344{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);gap:9px;margin:12px 0 15px}
+.home-quick-actions-v1344 button{min-width:0;min-height:62px;border-radius:18px;display:flex;align-items:center;gap:9px;padding:10px 12px;font:inherit;text-align:left;touch-action:manipulation}
+.home-quick-actions-v1344 button>.icon:first-child{width:21px;height:21px;flex:none}
+.home-quick-actions-v1344 button>.icon:last-child{width:15px;height:15px;flex:none;margin-left:auto}
+.home-quick-primary-v1344{border:1px solid #078f6b;background:#078f6b;color:#fff;box-shadow:0 8px 20px rgba(8,143,107,.17)}
+.home-quick-primary-v1344 span{min-width:0}.home-quick-primary-v1344 strong{display:block;font-size:15px;white-space:nowrap}.home-quick-primary-v1344 small{display:block;margin-top:2px;font-size:10px;color:#e2fff2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.home-quick-secondary-v1344{border:1px solid #d9e8e0;background:#fff;color:#087e5f;font-weight:800}
+.home-quick-secondary-v1344 span{font-size:14px;white-space:nowrap}.home-quick-secondary-v1344>.icon:last-child{display:none}
+.home-quick-actions-v1344 button:active{transform:scale(.98)}
+.student-app .study-hub-simple .study-hub-card,.student-app .exam-kind-card{min-height:150px!important;padding:20px!important;border-radius:25px!important;box-shadow:0 10px 30px rgba(24,67,48,.055)!important}
+.student-app .study-hub-simple .study-hub-card>div h2,.student-app .exam-kind-card h2{color:#172a23}
+.student-app .exam-kind-card p{font-size:13px!important;color:#53665b!important}
+.student-app .study-hub-simple .study-hub-card.grammar:before,.student-app .exam-kind-card.test:before{background:#f0faf5!important}
+.student-app .record-summary-main span,.student-app .record-summary-main p,.student-app .record-summary-side span{font-size:11px;color:#53665b}
+.student-app .record-achievements-v1327 .achievement-badge small{color:#62766c;font-size:10px}
+.student-app .record-timeline-v1327 .record-row .result{color:#087e5f!important}
+.student-app .record-timeline-v1327 .record-row p{color:#586b61}
+.student-app .home-recent-one .result{color:#087e5f!important}
+.student-app .memorize-range-strip{background:linear-gradient(90deg,transparent 94%,rgba(8,143,107,.12));border-radius:18px}
+.student-app .memorize-range-strip button small{font-size:11px;color:#64776d}
+.student-app .study-school-card small,.student-app .scope-tools{color:#52675d}
+.student-app .range-option span small{color:#62756b!important}
+.bottom-nav button:not(.active){color:#65776e!important}
+.bottom-nav button span{font-size:11px!important}
+.student-app button:focus-visible,.student-app input:focus-visible,.bottom-nav button:focus-visible{outline:3px solid #51cda1!important;outline-offset:2px}
+@media(max-width:390px){
+  .home-quick-actions-v1344{gap:7px}
+  .home-quick-actions-v1344 button{padding:9px;gap:6px}
+  .home-quick-primary-v1344 small{font-size:9px}
+  .home-quick-secondary-v1344 span{font-size:12px}
+  .student-app .study-hub-simple .study-hub-card,.student-app .exam-kind-card{min-height:135px!important}
+  .student-app .home-main-metrics-v1337 small{font-size:9px}
+}
+@media(prefers-reduced-motion:reduce){.home-quick-actions-v1344 button{transition:none!important}}

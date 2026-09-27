@@ -1,9 +1,9 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS } from './modules/core.js';
-import { avatar } from './modules/character.js?v=13.43.0';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.43.0';
+import { avatar } from './modules/character.js?v=13.44.0';
+import { studentPage, getRanges, updateRangeSummary } from './modules/student.js?v=13.44.0';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable } from './modules/teacher.js?v=13.30.0';
-import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js?v=13.43.0';
+import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js?v=13.44.0';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -54,14 +54,14 @@ function ensureRoleEnhancements() {
   const role = A.data?.profile?.role;
   if (role === 'teacher' && !roleModules.teacher) {
     roleModules.teacher = Promise.all([
-      import('./teacher-enhancements.js?v=13.43.0'),
-      import('./exam-ops.js?v=13.43.0')
+      import('./teacher-enhancements.js?v=13.44.0'),
+      import('./exam-ops.js?v=13.44.0')
     ]).catch(() => null);
   }
   if (role === 'student' && !roleModules.student) {
     roleModules.student = Promise.all([
-      import('./student-enhancements.js?v=13.43.0'),
-      import('./practice-enhancements.js?v=13.43.0')
+      import('./student-enhancements.js?v=13.44.0'),
+      import('./practice-enhancements.js?v=13.44.0')
     ]).catch(() => null);
   }
 }
@@ -369,7 +369,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
       buttonBusy(b);
       await ensureGrammarData();
-      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.43.0');
+      const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js?v=13.44.0');
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
