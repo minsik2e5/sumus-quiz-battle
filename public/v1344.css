@@ -22,13 +22,15 @@
 .student-app .study-hub-simple .study-hub-card,.student-app .exam-kind-card{min-height:150px!important;padding:20px!important;border-radius:25px!important;box-shadow:0 10px 30px rgba(24,67,48,.055)!important}
 .student-app .study-hub-simple .study-hub-card>div h2,.student-app .exam-kind-card h2{color:#172a23}
 .student-app .exam-kind-card p{font-size:13px!important;color:#53665b!important}
-.student-app .study-hub-simple .study-hub-card.grammar:before,.student-app .exam-kind-card.test:before{background:#f0faf5!important}
+.student-app .study-hub-simple .study-hub-card.grammar:before,.student-app .exam-kind-card.practice:before,.student-app .exam-kind-card.test:before{background:#f0faf5!important}
 .student-app .record-summary-main span,.student-app .record-summary-main p,.student-app .record-summary-side span{font-size:11px;color:#53665b}
 .student-app .record-achievements-v1327 .achievement-badge small{color:#62766c;font-size:10px}
 .student-app .record-timeline-v1327 .record-row .result{color:#087e5f!important}
 .student-app .record-timeline-v1327 .record-row p{color:#586b61}
 .student-app .home-recent-one .result{color:#087e5f!important}
 .student-app .memorize-range-strip{background:linear-gradient(90deg,transparent 94%,rgba(8,143,107,.12));border-radius:18px}
+.student-app .memorize-heading{margin-bottom:4px!important}
+.student-app .memorize-heading+.setup-section .step-label{margin-top:10px}
 .student-app .memorize-range-strip button small{font-size:11px;color:#64776d}
 .student-app .study-school-card small,.student-app .scope-tools{color:#52675d}
 .student-app .range-option span small{color:#62756b!important}
