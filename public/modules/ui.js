@@ -60,7 +60,7 @@ export async function api(path, body, method) {
   }
   throw lastError || Object.assign(new Error('연결을 확인해주세요.'), { status: 0, transient: true });
 }
-export function buttonBusy(button, busy = true) { if (!button) return; button.disabled = busy; button.classList.toggle('busy', busy); }
+export function buttonBusy(button, busy = true) { if (!button) return; button.disabled = busy; button.classList.toggle('busy', busy); if (busy) button.setAttribute('aria-busy', 'true'); else button.removeAttribute('aria-busy'); }
 export function modal(content, title = '안내') {
   const prior = document.activeElement;
   $('#modal-root').innerHTML = `<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}"><button class="icon-button modal-close" data-close aria-label="닫기">${icon('close')}</button>${content}</section></div>`;
