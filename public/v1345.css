@@ -1,0 +1,8 @@
+/* Show an immediate, truthful acknowledgement while durable answer writes finish. */
+.session-app .practice-saving-v1345{display:flex;align-items:center;gap:9px;min-height:36px;margin:12px 0 0;padding:9px 12px;border-radius:12px;background:#f1f7f4;color:#36584a;font-size:12px;font-weight:750}
+.session-app .practice-saving-v1345:before,.btn.busy:after{content:"";display:inline-block;width:15px;height:15px;flex:none;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sumusSavingSpin .8s linear infinite}
+.btn.busy:after{vertical-align:-3px;margin-left:8px}
+.session-app .option.submitting{border-color:#98c3ae;background:#f2f8f4;color:#244a37}
+.session-app .option.submitting .letter{background:#dae9df;color:#295b42}
+@keyframes sumusSavingSpin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.session-app .practice-saving-v1345:before,.btn.busy:after{animation:none;border-right-color:currentColor}}
