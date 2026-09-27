@@ -7,6 +7,7 @@ import { allBooks, service, sweep } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
 import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, PET_FORM_LEVELS, petForm, levelInfo, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
 import { runContentValidation } from './content-validation.mjs';
+import { runBattleChecks } from './battle-check.mjs';
 import { openGrammarChoiceSample } from '../public/grammar-choice-sample.js';
 
 const checks = [];
@@ -985,6 +986,8 @@ export async function runReleaseCheck() {
     const recoveredBatch = await Promise.all(Array.from({ length: 20 }, () => recovering.durable(nextState => ++nextState.counter)));
     assert(recoveredBatch.at(-1) === 20 && recovering.current().state.counter === 20 && recoveryState.counter === 20, '20 concurrent retries persist once after recovery');
     await recovering.close();
+
+    runBattleChecks(assert);
 
     console.log(`[release-check] PASS ${checks.length}/${checks.length}`);
     return { ok: true, count: checks.length };
