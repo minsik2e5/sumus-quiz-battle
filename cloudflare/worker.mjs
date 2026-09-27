@@ -3,6 +3,7 @@ import { selfSignup } from '../server/signup.mjs';
 import { examAdmin } from '../server/exam-admin.mjs';
 import { migrateState } from '../server/state.mjs';
 import { createMutationCoordinator, NO_MUTATION } from '../server/mutation-coordinator.mjs';
+import { createLocalRepository, createSupabaseSync } from './local-first.mjs';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' };
 
@@ -56,31 +57,14 @@ function createSupabaseRepository(env) {
     return { revision: Number(row.revision), state: row.data };
   }
 
-  let cache;
-  const metrics = { commitMs: 0, commitBytes: 0 };
   return {
-    metrics,
-    async read() {
-      if (!cache) cache = await load();
-      return { revision: cache.revision, state: structuredClone(cache.state) };
-    },
-    async refresh() {
-      cache = await load();
-      return { revision: cache.revision, state: structuredClone(cache.state) };
-    },
-    async commit(state, revision) {
-      try {
-        const started = Date.now();
-        const payload = JSON.stringify({ p_secret: secret, p_revision: Number(revision), p_data: state });
-        const next = await rpc('voca_v12_state_commit', payload);
-        metrics.commitMs = Date.now() - started;
-        metrics.commitBytes = payload.length;
-        // The coordinator hands us a private checkpoint copy, so no extra clone is needed.
-        cache = { revision: Number(next), state };
-      } catch (error) {
-        try { cache = await load(); } catch {}
-        throw error;
-      }
+    read: load,
+    async readRevision() { return (await load()).revision; },
+    // `json` is the already-serialized state from the local snapshot, so the
+    // background upload does not stringify the whole state a second time.
+    async commitSerialized(json, revision) {
+      const payload = `{"p_secret":${JSON.stringify(secret)},"p_revision":${Number(revision)},"p_data":${json}}`;
+      return Number(await rpc('voca_v12_state_commit', payload));
     }
   };
 }
@@ -91,21 +75,56 @@ export class VocaStateObject {
     this.env = env;
     this.rates = new Map();
     this.ready = ctx.blockConcurrencyWhile(async () => {
-      this.repo = createSupabaseRepository(env);
-      const initial = await this.repo.read();
+      this.supabase = createSupabaseRepository(env);
+      this.local = createLocalRepository(ctx.storage);
+      this.sync = createSupabaseSync({ local: this.local, supabase: this.supabase, storage: ctx.storage });
+      const initial = await this.loadInitialState();
       const migrated = migrateState(initial.state);
       const swept = sweep(initial.state);
       if (migrated || swept) {
-        await this.repo.commit(initial.state, initial.revision);
+        await this.local.commit(initial.state, initial.revision);
         initial.revision += 1;
       }
-      this.mutations = createMutationCoordinator(this.repo, initial, {
+      this.local.onCommit = () => this.sync.schedule();
+      this.mutations = createMutationCoordinator(this.local, initial, {
         flushDelay: 500,
         retryDelay: 2000,
         rollbackOnFailure: true,
         onError: error => console.error('[checkpoint]', error.message)
       });
+      if (this.sync.pending()) this.sync.schedule(0);
     });
+  }
+
+  // Chooses the starting state:
+  // - local snapshot with changes Supabase has not received yet -> local wins
+  //   (those are student answers that must not be lost);
+  // - otherwise Supabase is read; if its revision differs from the one the
+  //   local snapshot was synced to (first start, or restored from a backup),
+  //   Supabase wins and replaces the local snapshot;
+  // - if Supabase is unreachable but a synced local snapshot exists, start from it.
+  async loadInitialState() {
+    const hasLocal = this.local.hasSnapshot();
+    const status = this.local.status();
+    if (hasLocal && status.syncedVersion < status.version) return this.local.read();
+    let remote;
+    try {
+      remote = await this.supabase.read();
+    } catch (error) {
+      if (!hasLocal) throw error;
+      console.error('[boot] Supabase unavailable; starting from the local snapshot', error.message);
+      return this.local.read();
+    }
+    if (!hasLocal || remote.revision !== status.supabaseRevision) {
+      if (hasLocal) console.warn('[boot] Supabase revision changed outside this object; adopting it', { local: status.supabaseRevision, remote: remote.revision });
+      this.local.adoptRemote(remote.state, remote.revision);
+    }
+    return this.local.read();
+  }
+
+  async alarm() {
+    await this.ready;
+    try { await this.sync.run(); } catch {}
   }
 
   rateLimit(bucket, max, windowMs, message) {
@@ -171,13 +190,17 @@ export class VocaStateObject {
         ? await execute(this.mutations.current().state)
         : await this.mutations.durable(execute);
       const elapsed = Date.now() - startedAt;
-      const { commitMs, commitBytes } = this.repo.metrics;
+      const { commitMs, commitBytes } = this.local.metrics;
+      const sync = this.sync.status();
       if (request.method !== 'GET' && elapsed > 1500) console.warn('[slow-mutation]', url.pathname.replace(/\/[0-9a-f-]{36}/g, '/:id'), { elapsed, commitMs, commitBytes });
+      // Public health output shows whether the Supabase backup is keeping up.
+      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures };
       const responseHeaders = {
         // Visible in DevTools > Network > Timing, so slow saves can be measured on a real phone.
+        // commit = local durable write; supabase = last background upload.
         'Server-Timing': request.method === 'GET'
           ? `app;dur=${elapsed}`
-          : `app;dur=${elapsed}, commit;dur=${commitMs};desc="last commit ${commitBytes} bytes"`
+          : `app;dur=${elapsed}, commit;dur=${commitMs};desc="local ${commitBytes} bytes", supabase;dur=${sync.last_sync_ms}`
       };
       if (result._cookie) {
         responseHeaders['Set-Cookie'] = `sumus_session=${result._cookie}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800; Secure`;

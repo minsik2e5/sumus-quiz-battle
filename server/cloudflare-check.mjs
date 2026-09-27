@@ -1,11 +1,41 @@
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
+import { DatabaseSync } from 'node:sqlite';
 import { passwordHash } from './auth.mjs';
 import { emptyState } from './state.mjs';
 import { builtinBooks } from './service.mjs';
 import { VocaStateObject } from '../cloudflare/worker.mjs';
+import { createLocalRepository } from '../cloudflare/local-first.mjs';
 
 const deepCopy = value => structuredClone(value);
+
+// Minimal stand-in for a SQLite-backed Durable Object's ctx.storage, backed by
+// node:sqlite so the real SQL statements run.
+function createStorageMock() {
+  const db = new DatabaseSync(':memory:');
+  let failWrites = 0;
+  return {
+    alarm: null,
+    failNextWrite() { failWrites += 1; },
+    sql: {
+      exec(query, ...bindings) {
+        if (failWrites > 0 && /^\s*(INSERT|DELETE)/i.test(query)) {
+          failWrites -= 1;
+          throw new Error('simulated disk failure');
+        }
+        const statement = db.prepare(query);
+        const rows = /^\s*SELECT/i.test(query) ? statement.all(...bindings) : (statement.run(...bindings), []);
+        return { toArray: () => rows, one: () => rows[0] };
+      }
+    },
+    transactionSync(callback) {
+      db.exec('BEGIN');
+      try { const result = callback(); db.exec('COMMIT'); return result; }
+      catch (error) { db.exec('ROLLBACK'); throw error; }
+    },
+    setAlarm(time) { this.alarm = time; }
+  };
+}
 
 export async function runCloudflareCheck() {
   const book = builtinBooks.find(item => item.school === '단원고');
@@ -72,40 +102,41 @@ export async function runCloudflareCheck() {
     throw new Error(`unexpected RPC: ${name}`);
   };
 
-  const waits = [];
-  const ctx = {
-    blockConcurrencyWhile: callback => callback(),
-    waitUntil: promise => waits.push(Promise.resolve(promise))
-  };
+  const storage = createStorageMock();
   const env = {
     SUPABASE_URL: 'https://example.supabase.co',
     SUPABASE_ANON_KEY: 'test-anon-key',
     VOCA_STATE_SECRET: 'test-state-secret'
   };
+  // A new object on the same storage is what a Durable Object restart looks like.
+  const boot = () => new VocaStateObject({ storage, blockConcurrencyWhile: callback => callback(), waitUntil: () => {} }, env);
+  const client = object => async (path, options = {}) => {
+    const response = await object.fetch(new Request(`https://sumus-voca.example${path}`, {
+      method: options.method || 'GET',
+      headers: {
+        ...(options.body === undefined ? {} : { 'content-type': 'application/json' }),
+        ...(options.cookie ? { cookie: options.cookie } : {}),
+        origin: 'https://sumus-voca.example'
+      },
+      body: options.body === undefined ? undefined : JSON.stringify(options.body)
+    }));
+    const payload = await response.json();
+    assert.equal(response.status, options.status || 200, JSON.stringify(payload));
+    return { response, payload };
+  };
+  const practiceBody = { school: '단원고', range_codes: [book.words[0].range_code], mode: 'eng2mean', target: 10 };
 
   try {
-    const object = new VocaStateObject(ctx, env);
-    const call = async (path, options = {}) => {
-      const response = await object.fetch(new Request(`https://sumus-voca.example${path}`, {
-        method: options.method || 'GET',
-        headers: {
-          ...(options.body === undefined ? {} : { 'content-type': 'application/json' }),
-          ...(options.cookie ? { cookie: options.cookie } : {}),
-          origin: 'https://sumus-voca.example'
-        },
-        body: options.body === undefined ? undefined : JSON.stringify(options.body)
-      }));
-      const payload = await response.json();
-      assert.equal(response.status, options.status || 200, JSON.stringify(payload));
-      return { response, payload };
-    };
+    let object = boot();
+    let call = client(object);
+    const syncNow = async () => { await object.ready; await object.sync.run(); };
 
     const login = await call('/api/login', {
       method: 'POST', body: { username: 'student_preserved', password: 'Student123!', role: 'student' }
     });
     const cookie = login.response.headers.get('set-cookie').split(';')[0];
     assert.equal(login.payload.profile.id, 'student-preserved');
-    assert.match(login.response.headers.get('server-timing') || '', /app;dur=\d+, commit;dur=\d+/, '저장 요청은 Server-Timing으로 처리·커밋 시간을 알려야 합니다.');
+    assert.match(login.response.headers.get('server-timing') || '', /app;dur=\d+, commit;dur=\d+;desc="local \d+ bytes", supabase;dur=\d+/, '저장 요청은 Server-Timing으로 로컬 저장·Supabase 업로드 시간을 알려야 합니다.');
     await call('/api/login', {
       method: 'POST', status: 401, body: { username: 'student_preserved', password: 'wrong-password', role: 'student' }
     });
@@ -115,64 +146,90 @@ export async function runCloudflareCheck() {
     assert.equal(bootstrap.payload.stats.practice_count, 1, '기존 학습 기록이 보존되어야 합니다.');
     assert.equal(bootstrap.payload.profile.avatar_key, 'terra', '기존 캐릭터가 보존되어야 합니다.');
 
-    const practice = await call('/api/practice/start', {
-      method: 'POST', cookie,
-      body: { school: '단원고', range_codes: [book.words[0].range_code], mode: 'eng2mean', target: 10 }
-    });
+    // 1. Answers no longer wait for Supabase.
+    const practice = await call('/api/practice/start', { method: 'POST', cookie, body: practiceBody });
+    await syncNow();
     let commitStarted;
     let releaseCommit;
     const started = new Promise(resolve => { commitStarted = resolve; });
     const release = new Promise(resolve => { releaseCommit = resolve; });
     holdNextCommit = { started: commitStarted, release };
-    const answerRequest = call(`/api/practice/${practice.payload.id}/answer`, {
+    const answer = await call(`/api/practice/${practice.payload.id}/answer`, {
       method: 'POST', cookie,
       body: { question_id: practice.payload.question_id, answer: '__cloudflare_check__', prefetch_next: true }
     });
+    assert.equal(typeof answer.payload.feedback.ok, 'boolean', 'Supabase 업로드가 멈춰 있어도 답안은 바로 응답해야 합니다.');
+    const pendingSync = object.sync.run();
     await started;
-    let answeredBeforeCommit = false;
-    answerRequest.then(() => { answeredBeforeCommit = true; }, () => { answeredBeforeCommit = true; });
-    await Promise.resolve();
-    assert.equal(answeredBeforeCommit, false, '답안 저장 전에는 성공 응답을 보내지 않아야 합니다.');
-    releaseCommit();
-    const answer = await answerRequest;
-    assert.equal(typeof answer.payload.feedback.ok, 'boolean');
-    const nextQuestion = answer.payload.prefetched_next;
-    assert(nextQuestion?.question_id, '저장 응답을 잃은 경우 재시도할 다음 문제가 있어야 합니다.');
-    const nextAnswerPath = `/api/practice/${practice.payload.id}/answer`;
-    const nextAnswerBody = { question_id: nextQuestion.question_id, answer: '__cloudflare_retry__', prefetch_next: true };
-    failAfterCommit = true;
-    await call(nextAnswerPath, { method: 'POST', cookie, body: nextAnswerBody, status: 503 });
-    await call(nextAnswerPath, { method: 'POST', cookie, body: nextAnswerBody });
-    assert.equal(persisted.practices.find(item => item.id === practice.payload.id).answer_records.length, 2, '저장 성공 후 응답 유실을 재시도해도 답안이 중복되지 않아야 합니다.');
-    await Promise.all(waits);
+    assert.equal(persisted.practices.find(item => item.id === practice.payload.id)?.answer_records?.length || 0, 0, '업로드가 끝나기 전에는 Supabase에 반영되지 않아야 합니다.');
 
-    assert.equal(persisted.profiles[0].password_hash, originalHash, '비밀번호 해시는 재생성하지 않고 그대로 보존해야 합니다.');
-    assert(persisted.sessions.some(item => item.id === 'session-preserved'), '기존 학습 기록이 영구 저장에 남아야 합니다.');
-    assert(persisted.mastery['student-preserved'], '신규 정답 데이터가 영구 저장되어야 합니다.');
-    assert(commits >= 3, '로그인·연습 생성·정답이 순서대로 저장되어야 합니다.');
+    // 2. The answer is already durable on the object's own disk.
+    const onDisk = await createLocalRepository(storage).read();
+    assert.equal(onDisk.state.practices.find(item => item.id === practice.payload.id).total, 1, '응답 전에 답안이 로컬 디스크에 저장되어 있어야 합니다.');
+    releaseCommit();
+    await pendingSync;
+    assert.equal(persisted.practices.find(item => item.id === practice.payload.id).answer_records.length, 1, '백그라운드 업로드 후 Supabase에 답안이 반영되어야 합니다.');
+
+    // 3. Supabase stored the upload but the response was lost -> no duplicate, retry succeeds.
+    const nextQuestion = answer.payload.prefetched_next;
+    assert(nextQuestion?.question_id, '다음 문제를 미리 받아야 합니다.');
+    await call(`/api/practice/${practice.payload.id}/answer`, {
+      method: 'POST', cookie, body: { question_id: nextQuestion.question_id, answer: '__cloudflare_retry__', prefetch_next: true }
+    });
+    failAfterCommit = true;
+    await assert.rejects(syncNow(), '응답 유실은 동기화 실패로 보고되어야 합니다.');
+    await syncNow();
+    assert.equal(persisted.practices.find(item => item.id === practice.payload.id).answer_records.length, 2, '업로드 응답이 유실돼도 답안이 중복되지 않아야 합니다.');
+    assert.equal(object.sync.status().pending, false, '재시도 후 동기화 대기가 없어야 합니다.');
+
+    await call(`/api/practice/${practice.payload.id}/finish`, { method: 'POST', cookie, body: {} });
+    await syncNow();
+
+    // 4. Supabase outage: students keep working, backup catches up later.
+    failNextCommit = true;
+    const duringOutage = await call('/api/practice/start', { method: 'POST', cookie, body: practiceBody });
+    await assert.rejects(syncNow());
+    assert(!persisted.practices.some(item => item.id === duringOutage.payload.id), '장애 중에는 Supabase에 아직 없어야 합니다.');
+    const health = await call('/api/health');
+    assert.equal(health.payload.storage.mode, 'local-first');
+    assert.equal(health.payload.storage.supabase_pending, true, '상태 점검에서 백업 대기를 보여야 합니다.');
+
+    // 5. Restart with changes Supabase has not received: local wins, then uploads.
+    object.sync.close();
+    failReads = 1;
+    object = boot();
+    call = client(object);
+    await object.ready;
+    assert.equal(failReads, 1, '미동기화 변경이 있으면 Supabase를 읽지 않고 로컬로 시작해야 합니다.');
+    failReads = 0;
+    assert(object.mutations.current().state.practices.some(item => item.id === duringOutage.payload.id), '미동기화 로컬 변경이 재시작 후에도 유지되어야 합니다.');
+    await syncNow();
+    assert(persisted.practices.some(item => item.id === duringOutage.payload.id), '복구 후 Supabase가 따라잡아야 합니다.');
+
+    // 6. Local disk failure -> request fails and nothing half-applied remains.
+    storage.failNextWrite();
+    const beforeFailure = deepCopy(object.mutations.current().state);
+    await call(`/api/practice/${duringOutage.payload.id}/finish`, { method: 'POST', cookie, body: {}, status: 503 });
+    await call('/api/health');
+    assert.deepEqual(object.mutations.current().state.practices, beforeFailure.practices, '로컬 저장 실패는 적용되지 않아야 합니다.');
+
+    // 7. Supabase restored from a backup while the local copy is fully synced -> adopt it.
+    await syncNow();
+    persisted = deepCopy(persisted);
+    persisted.profiles[0].display_name = '백업복원';
+    revision += 5;
+    object.sync.close();
+    object = boot();
+    call = client(object);
+    const restored = await call('/api/bootstrap', { cookie });
+    assert.equal(restored.payload.profile.display_name, '백업복원', '외부에서 복원된 Supabase 데이터를 받아들여야 합니다.');
 
     const concurrent = await Promise.all(Array.from({ length: 200 }, () => call('/api/health')));
     assert(concurrent.every(item => item.payload.ok), '동시 API 200건이 모두 성공해야 합니다.');
-    failNextCommit = true;
-    failReads = 3;
-    const beforeFailure = commits;
-    const beforeFailureState = deepCopy(persisted);
-    await call('/api/practice/start', {
-      method: 'POST', cookie,
-      body: { school: '단원고', range_codes: [book.words[0].range_code], mode: 'eng2mean', target: 10 },
-      status: 503
-    });
-    assert.equal(commits, beforeFailure, '저장 실패를 성공으로 처리하지 않아야 합니다.');
-    await call('/api/health', { status: 503 });
-    assert.deepEqual(persisted, beforeFailureState, '저장 장애 중에는 실패한 시험 시작이 영구 저장되지 않아야 합니다.');
-    await call('/api/health');
-    const retried = await call('/api/practice/start', {
-      method: 'POST', cookie,
-      body: { school: '단원고', range_codes: [book.words[0].range_code], mode: 'eng2mean', target: 10 }
-    });
-    assert(persisted.practices.some(item => item.id === retried.payload.id), '복구 후 재시도한 시험만 저장되어야 합니다.');
-    assert.deepEqual(persisted.practices.map(item => item.id), [retried.payload.id], '실패한 시험이 재시도와 함께 중복 저장되지 않아야 합니다.');
-    console.log(`[cloudflare-check] PASS credentials/records + ${concurrent.length} concurrent reads (${commits} commits)`);
+    assert.equal(persisted.profiles[0].password_hash, originalHash, '비밀번호 해시는 재생성하지 않고 그대로 보존해야 합니다.');
+    assert(persisted.sessions.some(item => item.id === 'session-preserved'), '기존 학습 기록이 영구 저장에 남아야 합니다.');
+    assert(persisted.mastery['student-preserved'], '신규 정답 데이터가 영구 저장되어야 합니다.');
+    console.log(`[cloudflare-check] PASS local-first storage + ${concurrent.length} concurrent reads (${commits} Supabase commits)`);
   } finally {
     globalThis.fetch = nativeFetch;
   }
