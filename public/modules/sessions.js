@@ -384,7 +384,11 @@ function renderPractice() {
     const progress = Math.min(Number(x.score_total || 0), Number(x.target || 0));
     const close = modal(`<h2>시험을 나갈까요?</h2><p>현재 <b>${progress} / ${x.target}</b>까지 진행했어요. 나가도 진행 위치가 저장되어 나중에 이어서 풀 수 있어요.</p><button class="btn primary full" id="practice-keep-going">계속 풀기</button><button class="btn full" id="practice-save-leave">저장하고 나가기</button><button class="text-button full" id="practice-finish-exit">시험 종료하기</button>`, testMode ? '실전시험' : '연습시험');
     $('#practice-keep-going').onclick = close;
-    $('#practice-save-leave').onclick = async () => { close(); leaveSession(); await refresh(); redraw(); };
+    $('#practice-save-leave').onclick = async () => {
+      close(); leaveSession(); redraw();
+      try { await refresh(); redraw(); }
+      catch (error) { toast(error.message || '최신 기록을 불러오지 못했어요.'); }
+    };
     $('#practice-finish-exit').onclick = async event => {
       if (!confirm('현재까지 푼 내용으로 시험을 종료할까요? 종료하면 이어서 풀 수 없어요.')) return;
       buttonBusy(event.currentTarget);
@@ -404,7 +408,8 @@ function renderPractice() {
   $('#practice-confirm')?.addEventListener('click', () => { const value = $('#practice-answer').value; if (!value.trim()) return toast('답을 입력해주세요.'); answerPractice(value); });
   $('#practice-answer')?.addEventListener('focus', event => {
     $('.exam-run')?.classList.add('keyboard-focus');
-    setTimeout(() => event.currentTarget.scrollIntoView({ block: 'center', behavior: 'smooth' }), 180);
+    const input = event.currentTarget;
+    setTimeout(() => { if (input.isConnected) input.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 180);
   });
   $('#practice-answer')?.addEventListener('blur', () => $('.exam-run')?.classList.remove('keyboard-focus'));
   $('#practice-answer')?.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) $('#practice-confirm')?.click(); });
@@ -474,7 +479,7 @@ function practiceTick() {
     const box = $('#practice-timer');
     box?.classList.toggle('warning', leftMs > 2000 && leftMs <= 4000);
     box?.classList.toggle('danger', leftMs <= 2000);
-    if (leftMs <= 0) timeoutPracticeQuestion();
+    if (leftMs <= 0 && !answering) timeoutPracticeQuestion();
     return;
   }
   if (!x.deadline) return;
@@ -482,7 +487,7 @@ function practiceTick() {
   const value = $('#practice-timer-value');
   if (value) value.textContent = time(left);
   $('#practice-timer')?.classList.toggle('danger', left <= 60);
-  if (left <= 0) finishPracticeByTimer();
+  if (left <= 0 && !answering) finishPracticeByTimer();
 }
 function feedbackHtml(f) {
   const title = f.timed_out ? 'TIME OUT' : f.ok ? '정답' : '오답';
@@ -540,14 +545,20 @@ async function advancePracticeScreen(button, answeredState) {
     practiceState = prefetchedPractice; prefetchedPractice = null; renderPractice(); return;
   }
   buttonBusy(button);
+  button.textContent = '다음 문제를 준비하고 있어요';
   try { practiceState = await api(`/practice/${answeredState.id}/next`, {}); renderPractice(); }
-  catch (err) { toast(err.message); buttonBusy($('#practice-next'), false); }
+  catch (err) { toast(err.message); button.textContent = '다음 문제 다시 시도'; buttonBusy($('#practice-next'), false); }
 }
 async function answerPractice(answer, button) {
   if (answering || practiceState.feedback) return;
   answering = true; const x = practiceState;
+  if (button) { button.classList.add('submitting'); button.setAttribute('aria-pressed', 'true'); }
   $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = true);
-  clearInterval(timer); timer = null;
+  const confirmButton = $('#practice-confirm');
+  const confirmLabel = confirmButton?.textContent;
+  if (confirmButton) confirmButton.textContent = '답안 저장 중…';
+  const feedbackArea = $('#practice-feedback');
+  if (feedbackArea) feedbackArea.innerHTML = '<div class="practice-saving-v1345" role="status">답안을 안전하게 저장하고 있어요.</div>';
   try {
     let result;
     const payload = { question_id: x.question_id, answer, prefetch_next: x.run_mode !== 'test' };
@@ -577,7 +588,26 @@ async function answerPractice(answer, button) {
         if (nextButton && practiceState === answeredState) advancePracticeScreen(nextButton, answeredState);
       }, result.feedback.milestone ? 420 : 300);
     }
-  } catch (e) { $('#practice-error').innerHTML = `<div class="error-box">${esc(e.message)} 답안은 다시 눌러 전송할 수 있어요.</div>`; $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = false); if (!practiceState?.feedback) timer = setInterval(practiceTick, practiceState?.timer_mode === 'question' ? 100 : 500); }
+  } catch (e) {
+    if (e?.status === 409 && e.message?.includes('현재 문제')) {
+      try {
+        const latest = await api(`/practice/${x.id}`);
+        if (practiceState === x) {
+          practiceOffset = Number(latest.server_time || Date.now()) - Date.now();
+          prefetchedPractice = null; practiceState = latest;
+          if (latest.finished) finishPracticeView(); else renderPractice();
+          toast('다른 화면에서 진행된 최신 문제를 불러왔어요.');
+          return;
+        }
+      } catch {}
+    }
+    if (feedbackArea?.isConnected) feedbackArea.innerHTML = '';
+    if (confirmButton?.isConnected) confirmButton.textContent = confirmLabel;
+    if (button?.isConnected) { button.classList.remove('submitting'); button.setAttribute('aria-pressed', 'false'); }
+    $('#practice-error').innerHTML = `<div class="error-box">${esc(e.message)} 답안은 다시 눌러 전송할 수 있어요.</div>`;
+    $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = false);
+    if (!practiceState?.feedback && !timer) timer = setInterval(practiceTick, practiceState?.timer_mode === 'question' ? 100 : 500);
+  }
   finally { answering = false; }
 }
 function sound(ok, milestone) {
