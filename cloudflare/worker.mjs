@@ -1,4 +1,4 @@
-import { service, sweep } from '../server/service.mjs';
+import { service, sweep, preauthenticateLogin } from '../server/service.mjs';
 import { selfSignup } from '../server/signup.mjs';
 import { examAdmin } from '../server/exam-admin.mjs';
 import { migrateState } from '../server/state.mjs';
@@ -36,7 +36,7 @@ function createSupabaseRepository(env) {
 
   async function rpc(name, body) {
     const response = await fetch(base + name, {
-      method: 'POST', headers, body: JSON.stringify(body), signal: AbortSignal.timeout(12000)
+      method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body), signal: AbortSignal.timeout(12000)
     });
     const text = await response.text();
     let payload = null;
@@ -57,7 +57,9 @@ function createSupabaseRepository(env) {
   }
 
   let cache;
+  const metrics = { commitMs: 0, commitBytes: 0 };
   return {
+    metrics,
     async read() {
       if (!cache) cache = await load();
       return { revision: cache.revision, state: structuredClone(cache.state) };
@@ -68,8 +70,13 @@ function createSupabaseRepository(env) {
     },
     async commit(state, revision) {
       try {
-        const next = await rpc('voca_v12_state_commit', { p_secret: secret, p_revision: Number(revision), p_data: state });
-        cache = { revision: Number(next), state: structuredClone(state) };
+        const started = Date.now();
+        const payload = JSON.stringify({ p_secret: secret, p_revision: Number(revision), p_data: state });
+        const next = await rpc('voca_v12_state_commit', payload);
+        metrics.commitMs = Date.now() - started;
+        metrics.commitBytes = payload.length;
+        // The coordinator hands us a private checkpoint copy, so no extra clone is needed.
+        cache = { revision: Number(next), state };
       } catch (error) {
         try { cache = await load(); } catch {}
         throw error;
@@ -144,6 +151,11 @@ export class VocaStateObject {
 
       const cookie = request.headers.get('cookie') || '';
       const token = cookie.split(';').map(value => value.trim()).find(value => value.startsWith('sumus_session='))?.slice(14) || '';
+      // scrypt takes tens of ms; doing it inside durable() would stall every
+      // other student's save while one login is checked.
+      const preauthenticatedUserId = url.pathname === '/api/login' && request.method === 'POST'
+        ? await preauthenticateLogin(this.mutations.current().state, body)
+        : null;
       const execute = async state => {
         const path = url.pathname.slice(4);
         const adminOutput = await examAdmin(state, request.method, path, body, token);
@@ -151,13 +163,22 @@ export class VocaStateObject {
           ? adminOutput
           : url.pathname === '/api/signup' && request.method === 'POST'
             ? await selfSignup(state, body)
-            : await service(state, request.method, path, body, token);
+            : await service(state, request.method, path, body, token, { preauthenticatedUserId });
       };
 
+      const startedAt = Date.now();
       const result = request.method === 'GET'
         ? await execute(this.mutations.current().state)
         : await this.mutations.durable(execute);
-      const responseHeaders = {};
+      const elapsed = Date.now() - startedAt;
+      const { commitMs, commitBytes } = this.repo.metrics;
+      if (request.method !== 'GET' && elapsed > 1500) console.warn('[slow-mutation]', url.pathname.replace(/\/[0-9a-f-]{36}/g, '/:id'), { elapsed, commitMs, commitBytes });
+      const responseHeaders = {
+        // Visible in DevTools > Network > Timing, so slow saves can be measured on a real phone.
+        'Server-Timing': request.method === 'GET'
+          ? `app;dur=${elapsed}`
+          : `app;dur=${elapsed}, commit;dur=${commitMs};desc="last commit ${commitBytes} bytes"`
+      };
       if (result._cookie) {
         responseHeaders['Set-Cookie'] = `sumus_session=${result._cookie}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800; Secure`;
         delete result._cookie;

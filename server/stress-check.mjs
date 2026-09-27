@@ -1,4 +1,5 @@
 import { performance } from 'node:perf_hooks';
+import { pathToFileURL } from 'node:url';
 import { emptyState } from './state.mjs';
 import { passwordHash } from './auth.mjs';
 import { allBooks, service } from './service.mjs';
@@ -139,7 +140,7 @@ export async function runStressCheck() {
   return { ok: true, students: STUDENTS, questions: QUESTIONS, answers, loginMs, startMs, answerMs, totalMs, answersPerSecond, writes };
 }
 
-if (import.meta.url === new URL(process.argv[1], 'file:').href) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   runStressCheck().catch(error => {
     console.error(error);
     process.exitCode = 1;

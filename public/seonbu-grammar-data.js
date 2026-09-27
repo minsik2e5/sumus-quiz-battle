@@ -1,4 +1,4 @@
-import { DANWONGO_PASSAGES } from './danwongo-grammar-data.js?v=2';
+import { DANWONGO_PASSAGES } from './danwongo-grammar-data.js';
 
 const EXTRA_2025 = [
   {

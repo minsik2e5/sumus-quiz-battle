@@ -22,6 +22,14 @@ const expectStatus = async (status, fn, label) => {
   }
   throw new Error(`[release-check] FAIL · ${label}`);
 };
+// Views no longer expose question.word_id to students; tests read it from server state.
+const wordIdOf = (state, view, practiceId = view?.id) => {
+  const practice = state.practices.find(item => item.id === practiceId);
+  if (!practice || !view) return undefined;
+  if (practice.question_id === view.question_id) return practice.question?.word_id;
+  if (practice.next_preview?.question_id === view.question_id) return practice.next_preview.question?.word_id;
+  return undefined;
+};
 const answerFor = (type, word) => {
   if (['mean2eng_mc', 'mean2eng', 'write_en', 'spell', 'scramble', 'vowelblank', 'initial'].includes(type)) return displayEnglish(word.word);
   if (type === 'write_meaning') return meaningAccepted(word.meaning, word.accepted_meanings)[0] || word.meaning;
@@ -43,7 +51,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.46.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.47.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -170,12 +178,12 @@ export async function runReleaseCheck() {
     const middleManualInternal = state.practices.find(item => item.id === middleManualPractice.id);
     assert(middleManualPractice.manual_selection === true && middleManualPractice.target === 3, 'middle student can start a test with any personally checked word count');
     assert(JSON.stringify(middleManualInternal.words) === JSON.stringify([middle3Words[0].id, middle3Words[2].id, middle3Words[4].id]), 'checked middle words are normalized back to source lesson order');
-    assert(middleManualPractice.question.word_id === middle3Words[0].id, 'middle manual test begins with the first checked word in lesson order');
+    assert(wordIdOf(state, middleManualPractice) === middle3Words[0].id, 'middle manual test begins with the first checked word in lesson order');
     let middleManualView = middleManualPractice;
     const middleSeen = [];
     while (!middleManualView.finished && middleSeen.length < 8) {
-      middleSeen.push(middleManualView.question.word_id);
-      const current = middle3Words.find(word => word.id === middleManualView.question.word_id);
+      middleSeen.push(wordIdOf(state, middleManualView));
+      const current = middle3Words.find(word => word.id === wordIdOf(state, middleManualView));
       middleManualView = await service(state, 'POST', '/practice/' + middleManualPractice.id + '/answer', {
         question_id: middleManualView.question_id, answer: current.meaning
       }, middleLogin._cookie);
@@ -319,6 +327,25 @@ export async function runReleaseCheck() {
     const hiddenTeacherBootstrap = await service(state, 'GET', '/bootstrap', {}, teacherToken);
     const hiddenTeacherAttempt = hiddenTeacherBootstrap.attempts.find(item => item.id === hiddenInternal.id);
     assert(hiddenTeacherAttempt.result_visibility === 'visible' && hiddenTeacherAttempt.score === 100, 'teacher still sees withheld exam score for operations');
+    await expectStatus(403, () => service(state, 'POST', '/meaning-disputes', {
+      source_type: 'exam', source_id: hiddenInternal.id, question_index: 0
+    }, studentToken), 'withheld exam cannot be disputed (would reveal grading and the correct meaning)');
+
+    const leakExam = await service(state, 'POST', '/exams', {
+      title: 'QA answer leak', class_name: '고1A', school: '단원고', range_codes: [rangeCode], exam_type: 'write_meaning',
+      question_count: 2, duration_sec: 300, passing_score: 70, max_attempts: 1,
+      available_at: now - 1000, due_at: now + 3600000, release_result: true
+    }, teacherToken);
+    const leakStarted = await service(state, 'POST', '/exams/start', { exam_id: leakExam.id }, studentToken);
+    assert(leakStarted.attempt.questions.every(question => !('word_id' in question)), 'active exam questions do not expose word ids to students');
+    const leakInternal = state.examAttempts.find(item => item.id === leakStarted.attempt.id);
+    await expectStatus(400, () => service(state, 'POST', `/attempts/${leakInternal.id}/draft`, {
+      lease: leakInternal.lease, revision: leakInternal.revision, answers: { '01': 'x' }
+    }, studentToken), 'exam draft rejects non-canonical answer keys');
+    assert(Object.keys(leakInternal.answers).every(key => String(Number(key)) === key), 'exam answers are stored under canonical keys only');
+    await service(state, 'POST', `/attempts/${leakInternal.id}/submit`, {
+      lease: leakInternal.lease, revision: leakInternal.revision, answers: {}
+    }, studentToken);
 
     await expectStatus(409, () => service(state, 'PATCH', '/exams/' + examIds[0], {
       question_count: 2
@@ -385,7 +412,7 @@ export async function runReleaseCheck() {
       }, studentToken);
       assert(started.question.type === practiceType, `${practiceType} practice starts correctly`);
       assert(started.timer_mode === 'none' && started.question_duration_sec === 0 && !started.question_deadline && !started.deadline, `${practiceType} starts without a countdown timer`);
-      const word = allWords.find(item => item.id === started.question.word_id);
+      const word = allWords.find(item => item.id === wordIdOf(state, started));
       const result = await service(state, 'POST', `/practice/${started.id}/answer`, {
         question_id: started.question_id, answer: answerFor(practiceType, word), prefetch_next: true
       }, studentToken);
@@ -402,20 +429,31 @@ export async function runReleaseCheck() {
     }
     assert(state.sessions.filter(session => session.student_id === student.id).length >= 8, 'all eight high-school practice modes are recorded for the student');
 
+    const emptyPractice = await service(state, 'POST', '/practice/start', {
+      school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 30
+    }, studentToken);
+    assert(!('word_id' in emptyPractice.question), 'practice question does not expose its word id');
+    await expectStatus(405, () => service(state, 'GET', `/practice/${emptyPractice.id}/answer`, { question_id: emptyPractice.question_id, answer: 'x' }, studentToken), 'GET cannot submit a practice answer outside the durable queue');
+    await expectStatus(405, () => service(state, 'GET', `/practice/${emptyPractice.id}/finish`, {}, studentToken), 'GET cannot finish a practice outside the durable queue');
+    await expectStatus(405, () => service(state, 'GET', '/logout', {}, studentToken), 'GET cannot log out (token removal must be persisted)');
+    const emptyFinished = await service(state, 'POST', `/practice/${emptyPractice.id}/finish`, {}, studentToken);
+    const emptySession = state.sessions.find(item => item.id === emptyPractice.id);
+    assert(emptyFinished.reward_points === 0 && emptySession?.answered_count === 0, 'finishing a practice without answering earns no reward points');
+
     const testStarted = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5, run_mode: 'test'
     }, studentToken);
     assert(testStarted.run_mode === 'test' && testStarted.feedback === null && testStarted.score === null, 'test mode hides correctness until final submit');
-    assert(testStarted.next_preview?.question_id && testStarted.next_preview.question.word_id !== testStarted.question.word_id, 'test mode prepares a distinct next question before saving the current answer');
+    assert(testStarted.next_preview?.question_id && wordIdOf(state, testStarted.next_preview, testStarted.id) !== wordIdOf(state, testStarted), 'test mode prepares a distinct next question before saving the current answer');
     const testInternal = state.practices.find(item => item.id === testStarted.id);
     assert(new Set(testInternal.words).size === testStarted.target, 'test mode selects unique words without repeats');
     await expectStatus(409, () => service(state, 'POST', `/practice/${testStarted.id}/finish`, {}, studentToken), 'test mode blocks early manual finish');
     const testWrongQuestionId = testStarted.question_id;
-    const testWrongWordId = testStarted.question.word_id;
+    const testWrongWordId = wordIdOf(state, testStarted);
     let testView = testStarted;
     let testAnswered = 0;
     while (!testView.finished && testAnswered < 8) {
-      const currentWord = allWords.find(item => item.id === testView.question.word_id);
+      const currentWord = allWords.find(item => item.id === wordIdOf(state, testView));
       const answer = testAnswered === 0 ? '__wrong_test_answer__' : answerFor('write_meaning', currentWord);
       const preparedQuestionId = testView.next_preview?.question_id;
       testView = await service(state, 'POST', `/practice/${testStarted.id}/answer`, { question_id: testView.question_id, answer }, studentToken);
@@ -446,7 +484,7 @@ export async function runReleaseCheck() {
     let choiceTestView = choiceTest;
     let choiceAnswered = 0;
     while (!choiceTestView.finished && choiceAnswered < 6) {
-      const currentWord = allWords.find(item => item.id === choiceTestView.question.word_id);
+      const currentWord = allWords.find(item => item.id === wordIdOf(state, choiceTestView));
       choiceTestView = await service(state, 'POST', `/practice/${choiceTest.id}/answer`, {
         question_id: choiceTestView.question_id, answer: answerFor('eng2mean', currentWord)
       }, studentToken);
@@ -462,7 +500,7 @@ export async function runReleaseCheck() {
     let practiceExamView = practiceExam;
     let practiceExamAnswered = 0;
     while (!practiceExamView.finished && practiceExamAnswered < 7) {
-      const currentWord = allWords.find(item => item.id === practiceExamView.question.word_id);
+      const currentWord = allWords.find(item => item.id === wordIdOf(state, practiceExamView));
       practiceExamView = await service(state, 'POST', `/practice/${practiceExam.id}/answer`, {
         question_id: practiceExamView.question_id,
         answer: practiceExamAnswered === 0 ? '__wrong_exam_style__' : answerFor('write_meaning', currentWord),
@@ -514,7 +552,7 @@ export async function runReleaseCheck() {
     const meaningPractice = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5
     }, studentToken);
-    const disputedPracticeWord = allWords.find(item => item.id === meaningPractice.question.word_id);
+    const disputedPracticeWord = allWords.find(item => item.id === wordIdOf(state, meaningPractice));
     const meaningQuestionId = meaningPractice.question_id;
     const meaningWrong = await service(state, 'POST', `/practice/${meaningPractice.id}/answer`, {
       question_id: meaningQuestionId, answer: '새로운허용뜻'
@@ -540,8 +578,8 @@ export async function runReleaseCheck() {
     const coveredIds = new Set();
     let coverView = coverAll;
     for (let guard = 0; !coverView.finished && guard < coverAll.target + 20; guard++) {
-      coveredIds.add(coverView.question.word_id);
-      const word = allWords.find(item => item.id === coverView.question.word_id);
+      coveredIds.add(wordIdOf(state, coverView));
+      const word = allWords.find(item => item.id === wordIdOf(state, coverView));
       coverView = await service(state, 'POST', `/practice/${coverAll.id}/answer`, {
         question_id: coverView.question_id, answer: word.meaning
       }, studentToken);
@@ -685,13 +723,20 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.46.0') && indexHtml.includes('/app.bundle.css?v=13.46.0') && sw.includes("'/app.bundle.css'") && sw.includes('sumus-voca-v13.46.0-stable'), 'V13.46 cache versions and CSS bundle are active');
+    assert(indexHtml.includes('/app.js?v=13.47.0') && indexHtml.includes('/app.bundle.css?v=13.47.0') && sw.includes("'/app.bundle.css'") && sw.includes('sumus-voca-v13.47.0-stable'), 'V13.47 cache versions and CSS bundle are active');
     assert(!indexHtml.includes('/teacher-enhancements.js') && !indexHtml.includes('/exam-ops.js') && !indexHtml.includes('/student-enhancements.js') && !indexHtml.includes('/practice-enhancements.js') && !indexHtml.includes('/signup-ui.js'), 'noncritical role modules are removed from eager boot');
-    assert(appJs.includes("import('./teacher-enhancements.js?v=13.44.0')") && appJs.includes("import('./student-enhancements.js?v=13.44.0')") && appJs.includes("ensureRoleEnhancements"), 'teacher and student enhancements load only for the active role');
-    assert(!studentModule.includes('danwongo-grammar-data.js') && !studentModule.includes('seonbu-grammar-data.js') && appJs.includes('ensureGrammarData'), 'large grammar datasets are lazy-loaded only when grammar is opened');
+    assert(!/<script(?![^>]*\bsrc=)[^>]*>/.test(indexHtml) && !/\son[a-z]+=/.test(indexHtml) && indexHtml.includes('/boot-guard.js'), 'index.html has no inline scripts or handlers (CSP script-src self would block them)');
+    assert(appJs.includes("import('./teacher-enhancements.js')") && appJs.includes("import('./student-enhancements.js')") && appJs.includes("ensureRoleEnhancements"), 'teacher and student enhancements load only for the active role');
+    assert(!studentModule.includes('danwongo-grammar-data.js') && !studentModule.includes('seonbu-grammar-data.js') && appJs.includes('ensureGrammarData') && !/^import [^;]*grammar-data\.js/m.test(teacherModule), 'large grammar datasets are lazy-loaded (no static import in student or teacher modules)');
+    {
+      const { readdirSync } = await import('node:fs');
+      const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? walk(dir + entry.name + '/') : entry.name.endsWith('.js') ? [dir + entry.name] : []);
+      const versioned = walk(publicRoot).filter(file => /(?:from\s*|import\()\s*['"]\.{1,2}\/[^'"]+\?v=/.test(readFileSync(file, 'utf8')));
+      assert(versioned.length === 0, 'internal module imports have one URL each (no ?v= query that loads a module twice): ' + versioned.join(', '));
+    }
     assert(!sw.includes("'/danwongo-grammar-data.js'") && !sw.includes("'/teacher-enhancements.js'") && !sw.includes("'/student-enhancements.js'"), 'service worker critical shell excludes optional role and grammar modules');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.46.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.47.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes("'/app.bundle.css'") && !sw.includes("'/v1341.css'"), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');

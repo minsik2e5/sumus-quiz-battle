@@ -8,7 +8,9 @@ on:
 
 concurrency:
   group: sumus-voca-cloudflare-production
-  cancel-in-progress: true
+  # Queue instead of cancelling: killing a run mid-deploy can leave the
+  # Worker updated but the secret sync / smoke test skipped.
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -28,6 +30,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build:assets
+      # Never ship without the full release suite, even on a direct push.
+      - run: npm run check
       - run: npm run check:cloudflare
       - name: Check Cloudflare credentials
         run: |

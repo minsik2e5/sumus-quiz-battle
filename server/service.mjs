@@ -26,6 +26,16 @@ const safeGrammarAnswers = value => {
   }
   return safe;
 };
+const GRAMMAR_PASSAGES_PER_STUDENT = 400;
+const MAX_TOKENS_PER_USER = 10;
+const RESERVED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+// Questions sent to a student must not carry the word id: bootstrap ships the
+// student's word books, so an id maps straight to the correct answer.
+const publicQuestion = question => {
+  if (!question || typeof question !== 'object') return question;
+  const { word_id, ...rest } = question;
+  return rest;
+};
 const safeGrammarIndexes = (value, max = 120) => Array.isArray(value)
   ? [...new Set(value.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n < max))].slice(0, max)
   : [];
@@ -376,7 +386,7 @@ function attemptView(a, state, profile) {
     auto_submitted: a.auto_submitted, total: a.questions.length,
     result_visibility: resultVisible ? 'visible' : 'withheld',
     grading_status: gradingStatus,
-    ...(a.status === 'active' ? { questions: a.questions, answers: a.answers, revision: a.revision, lease: a.lease } : {}),
+    ...(a.status === 'active' ? { questions: a.questions.map(publicQuestion), answers: a.answers, revision: a.revision, lease: a.lease } : {}),
     ...(resultVisible ? { score: a.score, correct: a.correct, details: a.details } : {})
   };
 }
@@ -401,7 +411,23 @@ export function sweep(state) {
   if (tokens.length !== state.tokens.length) { state.tokens = tokens; changed = true; }
   return changed;
 }
-export async function service(state, method, path, body, token) {
+// Checks a local password against a read-only state snapshot so the costly
+// scrypt work can run before the request enters the serialized mutation queue.
+// Returns the verified profile id, or null when the caller must fall back to
+// the in-queue path (Supabase auth, unknown user).
+export async function preauthenticateLogin(state, body) {
+  const username = str(body?.username).toLowerCase();
+  const password = String(body?.password || '');
+  const localProfile = state.profiles.find(profile => profile.username === username && profile.active);
+  if (!localProfile?.password_hash) return null;
+  if (!(await verifyPassword(password, localProfile.password_hash))) fail('아이디 또는 비밀번호를 확인해주세요.', 401);
+  return localProfile.id;
+}
+// Routes that change state. GET requests run against the live snapshot outside
+// the durable queue, so they must never reach these handlers.
+const MUTATING_WITHOUT_METHOD_CHECK = /^\/(?:logout|practice\/[^/]+\/(?:answer|next|finish))$/;
+export async function service(state, method, path, body, token, options = {}) {
+  if (method === 'GET' && MUTATING_WITHOUT_METHOD_CHECK.test(path)) fail('요청 방식을 확인해주세요.', 405);
   if (path === '/health') return { ok: true, version: '13.43.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
@@ -414,7 +440,8 @@ export async function service(state, method, path, body, token) {
     const localProfile = state.profiles.find(profile => profile.username === username && profile.active);
     if (localProfile?.password_hash) {
       p = localProfile;
-      if (!(await verifyPassword(password, p.password_hash))) fail('아이디 또는 비밀번호를 확인해주세요.', 401);
+      const preauthenticated = options.preauthenticatedUserId && options.preauthenticatedUserId === p.id;
+      if (!preauthenticated && !(await verifyPassword(password, p.password_hash))) fail('아이디 또는 비밀번호를 확인해주세요.', 401);
     } else if (process.env.AUTH_PROVIDER === 'supabase') {
       const result = await supabaseLogin(username, password); p = result.profile; supabaseAccessToken = result.accessToken;
       const old = state.profiles.find(x => x.id === p.id);
@@ -442,6 +469,11 @@ export async function service(state, method, path, body, token) {
       if (DIVISIONS.includes(body.division) && body.division !== division) fail(`${divisionLabel(division)} 계정입니다. ${divisionLabel(division)}로 로그인해주세요.`, 403);
     }
     const raw = randomBytes(32).toString('base64url');
+    const userTokens = state.tokens.filter(t => t.user_id === p.id).sort((a, b) => a.expires_at - b.expires_at);
+    if (userTokens.length >= MAX_TOKENS_PER_USER) {
+      const drop = new Set(userTokens.slice(0, userTokens.length - MAX_TOKENS_PER_USER + 1));
+      state.tokens = state.tokens.filter(t => !drop.has(t));
+    }
     state.tokens.push({ hash: hashToken(raw), user_id: p.id, expires_at: Date.now() + (supabaseAccessToken ? 3500000 : 7 * 86400000), ...(supabaseAccessToken ? { supabase_access_token: supabaseAccessToken } : {}) });
     return { profile: publicProfile(p), _cookie: raw };
   }
@@ -503,8 +535,15 @@ export async function service(state, method, path, body, token) {
       active_practice: activePractice?.id || null,
       active_practice_summary: activePracticeSummary,
       ranking_period: rankingWeek(Date.now()),
-      ranking: teacher ? [] : state.profiles.filter(x => x.active && x.role === 'student').map(s => {
-        const records = mySessions(state, s.id);
+      ranking: teacher ? [] : (() => {
+        // Group once instead of scanning every session per student (O(students × sessions)).
+        const byStudent = new Map();
+        for (const session of state.sessions) {
+          if (!byStudent.has(session.student_id)) byStudent.set(session.student_id, []);
+          byStudent.get(session.student_id).push(session);
+        }
+        return state.profiles.filter(x => x.active && x.role === 'student').map(s => ({ s, records: byStudent.get(s.id) || [] }));
+      })().map(({ s, records }) => {
         const period = rankingWeek(Date.now());
         const weekly = records.filter(r => r.created_at >= period.start && r.created_at < period.end);
         const g = growthFor(records), isMe = s.id === p.id;
@@ -592,11 +631,12 @@ export async function service(state, method, path, body, token) {
     state.grammarProgress ??= {};
     state.grammarProgress[p.id] ??= {};
     const passageId = decodeURIComponent(path.split('/')[2] || '');
-    if (!/^[a-z0-9~._-]{3,80}$/i.test(passageId)) fail('지문 정보를 확인해주세요.');
+    if (!/^[a-z0-9~._-]{3,80}$/i.test(passageId) || RESERVED_KEYS.has(passageId)) fail('지문 정보를 확인해주세요.');
     if (body.reset === true) {
       delete state.grammarProgress[p.id][passageId];
       return { ok: true, passage_id: passageId, reset: true };
     }
+    if (!Object.hasOwn(state.grammarProgress[p.id], passageId) && Object.keys(state.grammarProgress[p.id]).length >= GRAMMAR_PASSAGES_PER_STUDENT) fail('저장할 수 있는 지문 수를 넘었어요. 선생님께 문의해주세요.', 409);
     const school = schoolForProfile(state, p);
     const sentenceCount = integer(body.sentence_count, 1, 120, '문장 수');
     const choiceCount = integer(body.choice_count, 1, 500, '선택지 수');
@@ -673,7 +713,7 @@ export async function service(state, method, path, body, token) {
       student.school = nextSchool.name;
       state.tokens = state.tokens.filter(tokenItem => tokenItem.user_id !== student.id);
     }
-    if (body.password) { if (process.env.AUTH_PROVIDER === 'supabase') fail('기존 Supabase 계정 관리에서 변경해주세요.'); if (body.password.length < 8) fail('비밀번호는 8자 이상 입력해주세요.'); student.password_hash = await passwordHash(body.password); state.tokens = state.tokens.filter(t => t.user_id !== student.id); }
+    if (body.password) { if (process.env.AUTH_PROVIDER === 'supabase') fail('기존 Supabase 계정 관리에서 변경해주세요.'); if (typeof body.password !== 'string' || body.password.length < 8 || body.password.length > 128) fail('비밀번호는 8~128자로 입력해주세요.'); student.password_hash = await passwordHash(body.password); state.tokens = state.tokens.filter(t => t.user_id !== student.id); }
     return publicProfile(student);
   }
   if (/^\/students\/[^/]+$/.test(path) && method === 'DELETE') {
@@ -811,6 +851,8 @@ export async function service(state, method, path, body, token) {
       if (!attempt) fail('시험 답안을 찾을 수 없습니다.', 404);
       const exam = state.exams.find(item => item.id === attempt.exam_id);
       if (!exam || !sameSchool(exam, school) || exam.exam_type !== 'write_meaning') fail('뜻쓰기 시험에서만 이의제기할 수 있어요.', 403);
+      // A dispute reveals whether the answer was right and the correct meaning.
+      if (!exam.release_result) fail('결과가 공개된 뒤에 이의제기할 수 있어요.', 403);
       questionIndex = integer(body.question_index, 0, Math.max(0, attempt.questions.length - 1), '문항 번호');
       const detail = attempt.details?.[questionIndex];
       word = attempt.keys?.[questionIndex] || findWord(state, detail?.word_id);
@@ -987,8 +1029,9 @@ export async function service(state, method, path, body, token) {
       if (body.revision !== a.revision) fail('최신 답안을 다시 확인해주세요.', 409);
       if (body.answers && typeof body.answers === 'object') {
         for (const [key, value] of Object.entries(body.answers)) {
-          const i = Number(key); if (!Number.isInteger(i) || i < 0 || i >= a.questions.length || typeof value !== 'string' || value.length > 500) fail('답안을 확인해주세요.');
+          const i = Number(key); if (String(i) !== key || !Number.isInteger(i) || i < 0 || i >= a.questions.length || typeof value !== 'string' || value.length > 500) fail('답안을 확인해주세요.');
           const q = a.questions[i]; if (q.options.length && value && !q.options.includes(value)) fail('유효하지 않은 선택지입니다.');
+          // Only canonical keys ("1", not "01"/"001") so one question has one entry.
           a.answers[key] = value;
         }
         a.revision++;
@@ -1197,8 +1240,12 @@ function removePracticeTimer(x) {
   return x;
 }
 
-function practiceReward(x, state, endedAt, scoreTotal, perfect) {
-  const previous = mySessions(state, x.student_id);
+function practiceReward(x, state, endedAt, answeredCount, perfect) {
+  // Rewards follow answers actually given, not the requested target: finishing
+  // an empty practice must not earn points or keep a streak alive.
+  if (answeredCount <= 0) return { points: 0, breakdown: [] };
+  const scoreTotal = answeredCount;
+  const previous = mySessions(state, x.student_id).filter(session => session.answered_count !== 0);
   const todayKey = dayKey(endedAt);
   const todaySessions = previous.filter(session => dayKey(session.created_at) === todayKey);
   const firstToday = todaySessions.length === 0;
@@ -1241,7 +1288,7 @@ function finishPractice(x, state, autoSubmitted = false) {
   const timedOutCount = answerRecords.filter(item => item.timed_out && !item.regraded).length;
   const unansweredCount = Math.max(0, scoreTotal - answerRecords.length) + timedOutCount;
   const perfect = score === 100 && wrongCount === 0 && unansweredCount === 0;
-  const reward = practiceReward(x, state, endedAt, scoreTotal, perfect);
+  const reward = practiceReward(x, state, endedAt, answerRecords.length, perfect);
   x.reward_points = reward.points;
   x.reward_breakdown = reward.breakdown;
   const rec = {
@@ -1260,6 +1307,7 @@ function finishPractice(x, state, autoSubmitted = false) {
     correct: scoreCorrect,
     total: scoreTotal,
     attempts_total: x.total,
+    answered_count: answerRecords.length,
     score,
     wrong_count: wrongCount,
     unanswered_count: unansweredCount,
@@ -1308,7 +1356,7 @@ function practiceView(x, state) {
     perfect: x.finished ? perfect : undefined,
     answer_records: x.finished ? answerRecords : undefined,
     wrong_details: x.finished ? (x.wrong_details || []) : undefined,
-    question: x.question, question_id: x.question_id, question_is_retry: !!x.question_is_retry, next_preview: hideTestScore && !x.finished ? x.next_preview || null : undefined, feedback: hideTestScore ? null : x.feedback,
+    question: publicQuestion(x.question), question_id: x.question_id, question_is_retry: !!x.question_is_retry, next_preview: hideTestScore && !x.finished ? (x.next_preview ? { ...x.next_preview, question: publicQuestion(x.next_preview.question) } : null) : undefined, feedback: hideTestScore ? null : x.feedback,
     finished: x.finished, retry_count: x.retry.length,
     stats: growthFor(mySessions(state, x.student_id)), server_time: Date.now()
   };

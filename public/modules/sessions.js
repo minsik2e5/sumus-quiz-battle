@@ -53,8 +53,10 @@ function examTick() {
   const left = Math.ceil((examState.attempt.deadline - Date.now() - examState.offset) / 1000), el = $('#timer-value');
   if (el) el.textContent = time(left);
   $('#exam-timer')?.classList.toggle('urgent', left <= 60);
-  if (left <= 0) submitExam(true);
+  // After a failed auto-submit, back off instead of retrying on every 500ms tick.
+  if (left <= 0 && Date.now() >= (examState.autoRetryAt || 0)) submitExam(true);
 }
+window.addEventListener('online', () => { if (examState?.autoRetryAt) { examState.autoRetryAt = 0; examTick(); } });
 function saveLabel() {
   const node = $('#save-state'); if (!node) return;
   node.classList.toggle('error', !!syncError);
@@ -129,7 +131,12 @@ async function submitExam(auto = false) {
     showExamResult(result);
   } catch (err) {
     x.submitting = false;
-    const node = $('#submit-error'); if (node) node.innerHTML = `<div class="error-box">${auto ? '시간이 종료됐어요. 서버 제출 결과를 확인 중이에요.' : esc(err.message)}<button id="retry-submit">다시 확인</button></div>`;
+    if (auto) {
+      x.autoFailures = (x.autoFailures || 0) + 1;
+      x.autoRetryAt = Date.now() + Math.min(30000, 2000 * 2 ** (x.autoFailures - 1));
+    }
+    const offline = navigator.onLine === false;
+    const node = $('#submit-error'); if (node) node.innerHTML = `<div class="error-box">${auto ? (offline ? '시간이 종료됐어요. 인터넷이 연결되면 자동으로 제출 결과를 확인해요.' : '시간이 종료됐어요. 서버 제출 결과를 확인 중이에요.') : esc(err.message)}<button id="retry-submit">다시 확인</button></div>`;
     $('#retry-submit')?.addEventListener('click', () => submitExam(auto));
     if (!auto) renderExam();
   }
