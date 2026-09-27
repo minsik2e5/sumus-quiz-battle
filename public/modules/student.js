@@ -89,8 +89,11 @@ export function rangePicker(A, teacher = false, grade = null) {
 function grammarPassagesForSchool(A) {
   return Array.isArray(A.grammarData?.passages) ? A.grammarData.passages : [];
 }
+// Mock-exam passages are numbered ("24" -> "24번"); textbook ones already read "1과 · 본문 1".
+const passageNumberLabel = passage => /과/.test(String(passage.number)) ? String(passage.number) : `${passage.number}번`;
 function grammarExamLabel(passage) {
-  return passage.id.startsWith('middle-dong-a-yoon') ? '중3 동아(윤정미) · 본문 Part 4'
+  return passage.id.startsWith('danwon-ybm2') ? `공통영어2 YBM(김은형) · ${passage.lesson}과`
+    : passage.id.startsWith('middle-dong-a-yoon') ? '중3 동아(윤정미) · 본문 Part 4'
     : passage.id.startsWith('2026-06-busan') ? '2026년 6월 부산교육청'
     : passage.id.startsWith('2026-03-seoul') ? '2026년 3월 서울교육청'
     : '2025년 9월 인천교육청';
@@ -127,7 +130,7 @@ function grammarHomeCard(A) {
   return `<div class="section-title"><h2>오늘의 시험대비</h2><span class="tiny muted">${completed} / ${passages.length} MASTER</span></div>
     <button class="exam-row exam-range-row" data-action="grammar-choice" data-grammar-id="${esc(target.id)}">
       <span class="square-icon">${icon(allMastered ? 'check' : 'records')}</span>
-      <div class="grow"><h3>${esc(school)} · ${esc(target.number)}번</h3><p>${esc(grammarExamLabel(target))} · ${esc(detail)}</p></div>
+      <div class="grow"><h3>${esc(school)} · ${esc(passageNumberLabel(target))}</h3><p>${esc(grammarExamLabel(target))} · ${esc(detail)}</p></div>
       ${icon('chevron')}
     </button>`;
 }
@@ -350,7 +353,7 @@ function homeRecommendations(A) {
   const passages = grammarPassagesForSchool(A);
   if (passages.length) {
     const target = passages.find(p => !savedGrammarProgress(A, p)?.mastered) || passages[0];
-    rows.push(`<button class="home-recommend-row" data-action="grammar-choice" data-grammar-id="${esc(target.id)}"><span>${icon('records')}</span><div class="grow"><b>어법·어휘 ${esc(target.number)}번</b><small>${esc(grammarExamLabel(target))} · ${target.sentences.length}문장</small></div>${icon('chevron')}</button>`);
+    rows.push(`<button class="home-recommend-row" data-action="grammar-choice" data-grammar-id="${esc(target.id)}"><span>${icon('records')}</span><div class="grow"><b>어법·어휘 ${esc(passageNumberLabel(target))}</b><small>${esc(grammarExamLabel(target))} · ${target.sentences.length}문장</small></div>${icon('chevron')}</button>`);
   }
   return rows.length ? `<div class="section-title"><h2>추천 학습</h2></div><div class="home-recommend-list">${rows.join('')}</div>` : '';
 }
@@ -424,8 +427,13 @@ function grammarStudy(A) {
       <div class="grammar-set-list compact-v1339">${grammarCards(A, lessonPassages)}</div>
     `;
   })() : isDanwon ? `
-    <section class="grammar-range-head"><div><span class="eyebrow">단원고 시험범위</span><h2>2025년 9월 인천교육청</h2></div><span class="grammar-range-count">${passages.length}지문</span></section>
-    <div class="grammar-set-list">${grammarCards(A, passages)}</div>
+    ${[1, 2].filter(n => (byLesson[n] || []).length).map(n => `
+      <section class="grammar-range-head"><div><span class="eyebrow">단원고 시험범위 · 교과서</span><h2>공통영어2 YBM(김은형) ${n}과</h2></div><span class="grammar-range-count">${byLesson[n].length}지문</span></section>
+      <div class="grammar-set-list">${grammarCards(A, byLesson[n])}</div>
+    `).join('')}
+    ${(data.mock || passages).length && (data.textbook || []).length ? '<div class="grammar-year-divider"><span>모의고사 범위</span></div>' : ''}
+    <section class="grammar-range-head"><div><span class="eyebrow">단원고 시험범위</span><h2>2025년 9월 인천교육청</h2></div><span class="grammar-range-count">${(data.mock || passages).length}지문</span></section>
+    <div class="grammar-set-list">${grammarCards(A, data.mock || passages)}</div>
   ` : isGangseo ? `
     <section class="grammar-range-head gangseo"><div><span class="eyebrow">강서고 시험범위 · 2026</span><h2>2026년 6월 부산교육청</h2></div><span class="grammar-range-count">${passages.length}지문</span></section>
     <div class="grammar-set-list">${grammarCards(A, passages)}</div>

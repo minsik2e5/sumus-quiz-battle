@@ -5,10 +5,13 @@ import { rangePicker, selectedCount, getRanges } from './student.js';
 // Grammar datasets are ~170KB; load only the active school's file, on demand,
 // so students (who also import this module) never download them up front.
 const GRAMMAR_LOADERS = {
-  '단원고': () => import('../danwongo-grammar-data.js').then(mod => mod.DANWONGO_PASSAGES || []),
+  '단원고': () => Promise.all([import('../danwongo-textbook-grammar-data.js'), import('../danwongo-grammar-data.js')])
+    .then(([textbook, mock]) => [...(textbook.DANWONGO_TEXTBOOK_PASSAGES || []), ...(mock.DANWONGO_PASSAGES || [])]),
   '선부고': () => import('../seonbu-grammar-data.js').then(mod => [...(mod.SEONBU_2026_PASSAGES || []), ...(mod.SEONBU_2025_PASSAGES || [])]),
   '강서고': () => import('../gangseo-grammar-data.js').then(mod => mod.GANGSEO_PASSAGES || [])
 };
+// Mock-exam passages are numbered ("24" -> "24번"); textbook ones already read "1과 · 본문 1".
+const passageNumberLabel = passage => /과/.test(String(passage.number)) ? String(passage.number) : `${passage.number}번`;
 const grammarCache = new Map();
 let grammarLoaded = null;
 export function onTeacherGrammarLoaded(callback) { grammarLoaded = callback; }
@@ -162,7 +165,7 @@ function dashboard(A) {
       <section class="panel">
         <div class="panel-head"><div><h2>많이 틀린 어법 포인트</h2><span>현재 저장된 1차 오답 기준</span></div><span class="v136-count warn">${weak.choices.reduce((n, item) => n + item.count, 0)}건</span></div>
         <div class="v136-weak-list">${weak.choices.length ? weak.choices.slice(0, 5).map((item, index) => `
-          <div><span class="v136-rank">${index + 1}</span><div class="grow"><b>${esc(item.passage.number)}번 · 정답 ${esc(item.answer)}</b><small>${esc(item.type)} · ${esc(item.passage.subtitle || item.passage.title)}</small></div><strong>${item.count}명</strong></div>
+          <div><span class="v136-rank">${index + 1}</span><div class="grow"><b>${esc(passageNumberLabel(item.passage))} · 정답 ${esc(item.answer)}</b><small>${esc(item.type)} · ${esc(item.passage.subtitle || item.passage.title)}</small></div><strong>${item.count}명</strong></div>
         `).join('') : '<div class="v136-empty-line">아직 누적된 어법·어휘 오답이 없어요.</div>'}</div>
       </section>
     </div>
@@ -170,7 +173,7 @@ function dashboard(A) {
     <section class="panel">
       <div class="panel-head"><div><h2>취약 지문 TOP</h2><span>학생들의 1차 오답이 많이 쌓인 지문</span></div><button class="text-button" data-go="students">학생별 확인 ${icon('chevron')}</button></div>
       <div class="v136-passage-grid">${weak.passages.length ? weak.passages.slice(0, 6).map((item, index) => `
-        <div><span>${index + 1}</span><strong>${esc(item.passage.number)}번</strong><small>${esc(item.passage.subtitle || item.passage.title)}</small><b>${item.count}건 오답</b></div>
+        <div><span>${index + 1}</span><strong>${esc(passageNumberLabel(item.passage))}</strong><small>${esc(item.passage.subtitle || item.passage.title)}</small><b>${item.count}건 오답</b></div>
       `).join('') : '<div class="v136-empty-line">어법·어휘 학습 데이터가 쌓이면 지문별 취약도가 표시됩니다.</div>'}</div>
     </section>
 
