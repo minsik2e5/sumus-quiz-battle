@@ -4,6 +4,7 @@ import { avatar } from './modules/character.js';
 import { studentPage, getRanges, updateRangeSummary } from './modules/student.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, onTeacherGrammarLoaded } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
+import { maybePetMoment, openPetNameModal } from './modules/pet-moments.js';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -103,7 +104,9 @@ function render() {
   $('#app').innerHTML = A.data.profile.role === 'teacher' ? teacherPage(A) : studentPage(A);
   bindPageForms();
   queueMicrotask(ensureRoleEnhancements);
+  if (A.data.profile.role === 'student') queueMicrotask(() => maybePetMoment(A, petChanged));
 }
+async function petChanged() { try { await refresh(); renderKeepScroll(); } catch (err) { toast(err.message); } }
 configureSessions(A, render, refresh);
 function navigate(tab) {
   collectExamForm(A); A.tab = tab;
@@ -377,6 +380,7 @@ $('#app').addEventListener('click', async event => {
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
+    if (d.action === 'pet-name') return openPetNameModal(A, petChanged);
     if (d.action === 'save-style') { buttonBusy(b); await api('/profile/style', A.style); await refresh(); A.style = null; A.tab = 'home'; render(); toast('내 캐릭터를 저장했어요.'); }
     if (d.action === 'account') accountModal();
     if (d.action === 'logout') await logout();

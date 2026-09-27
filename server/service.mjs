@@ -1,6 +1,6 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
-import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, ACCESSORIES, FRAMES, TITLES, unlocked, growthFor, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, ACCESSORIES, FRAMES, TITLES, unlocked, growthFor, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
 import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { middleGrade3Books } from './middle-vocab.mjs';
@@ -448,7 +448,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } else if (process.env.AUTH_PROVIDER === 'supabase') {
       const result = await supabaseLogin(username, password); p = result.profile; supabaseAccessToken = result.accessToken;
       const old = state.profiles.find(x => x.id === p.id);
-      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
+      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'pet_name'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
       else state.profiles.push(p);
     } else {
       p = localProfile;
@@ -557,6 +557,7 @@ export async function service(state, method, path, body, token, options = {}) {
           division: s.division || (grade.startsWith('중') ? 'middle' : 'high'),
           display_name: hidden ? '비공개 학생' : s.display_name,
           avatar_key: hidden ? 'lumi' : (s.avatar_key || 'lumi'),
+          pet_name: hidden ? '' : (s.pet_name || ''),
           level: hidden ? 1 : g.level, streak: g.streak,
           xp: weekly.reduce((n, r) => n + Number(r.xp || 0), 0),
           total: weekly.reduce((n, r) => n + Number(r.total || 0), 0),
@@ -675,6 +676,13 @@ export async function service(state, method, path, body, token, options = {}) {
     const growth = stats(state, p);
     if (!CHARACTERS[body.avatar_key] || !unlocked(ACCESSORIES[body.avatar_accessory], growth) || !unlocked(FRAMES[body.avatar_frame], growth) || !unlocked(TITLES[body.avatar_title], growth)) fail('아직 열리지 않은 보상입니다.');
     Object.assign(p, { avatar_key: body.avatar_key, avatar_accessory: body.avatar_accessory, avatar_frame: body.avatar_frame, avatar_title: body.avatar_title });
+    return publicProfile(p);
+  }
+  if (path === '/profile/pet-name' && method === 'POST') {
+    requireRole(p, 'student');
+    const { name, error } = cleanPetName(body.pet_name);
+    if (error) fail(error);
+    if (name) p.pet_name = name; else delete p.pet_name;
     return publicProfile(p);
   }
   if (path === '/students' && method === 'POST') {

@@ -1,11 +1,11 @@
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { emptyState } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
 import { selfSignup } from './signup.mjs';
 import { allBooks, service, sweep } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
-import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, PET_FORM_LEVELS, petForm, levelInfo, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
 import { runContentValidation } from './content-validation.mjs';
 import { openGrammarChoiceSample } from '../public/grammar-choice-sample.js';
 
@@ -51,7 +51,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.52.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.53.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -279,6 +279,16 @@ export async function runReleaseCheck() {
     const highBBootstrap = await service(state, 'GET', '/bootstrap', {}, highBLogin._cookie);
     assert(highBStudent.class_name === '고1B' && highABootstrap.exams.some(item => item.id === schoolWideExam.id) && highBBootstrap.exams.some(item => item.id === schoolWideExam.id), 'school-wide exam reaches both high-school classes');
     await expectStatus(403, () => service(state, 'PATCH', '/profile/school', { school_id: 'seonbu-high' }, studentToken), 'student cannot change own school');
+
+    const namedPet = await service(state, 'POST', '/profile/pet-name', { pet_name: '  콩  이  ' }, studentToken);
+    assert(namedPet.pet_name === '콩 이', 'V13.53 student names their pet (spaces tidied)');
+    await expectStatus(400, () => service(state, 'POST', '/profile/pet-name', { pet_name: '가나다라마바사아자' }, studentToken), 'V13.53 pet names longer than 8 characters are rejected');
+    await expectStatus(400, () => service(state, 'POST', '/profile/pet-name', { pet_name: '<b>콩</b>' }, studentToken), 'V13.53 pet names with markup characters are rejected');
+    await expectStatus(403, () => service(state, 'POST', '/profile/pet-name', { pet_name: '콩이' }, teacherToken), 'V13.53 teachers cannot name a student pet');
+    const namedBootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    assert(namedBootstrap.profile.pet_name === '콩 이' && Number.isInteger(namedBootstrap.stats.form) && namedBootstrap.stats.form === petForm(namedBootstrap.stats.level), 'V13.53 bootstrap returns the pet name and the pet form for the level');
+    const clearedPet = await service(state, 'POST', '/profile/pet-name', { pet_name: '' }, studentToken);
+    assert(!('pet_name' in clearedPet), 'V13.53 an empty pet name returns to the default name');
 
     const aliasWord = danwonWords[0];
     const aliasResult = await service(state, 'POST', '/meaning-aliases/' + encodeURIComponent(aliasWord.id), { alias: '교사용 허용 뜻' }, teacherToken);
@@ -782,7 +792,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.52.0') && indexHtml.includes('/app.bundle.css?v=13.52.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.53.0') && indexHtml.includes('/app.bundle.css?v=13.53.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -803,7 +813,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.52.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.53.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -820,6 +830,11 @@ export async function runReleaseCheck() {
     assert(v1329Css.includes('.auth-v1327') && v1329Css.includes('box-sizing:border-box') && indexSource.includes('/sumus-logo-green.svg'), 'V13.30 green login shell and logo are loaded');
     assert(v1330Css.includes('.pet-choice-grid') && v1330Css.includes('.auth-hero-v1330'), 'V13.30 cute pet onboarding styles are loaded');
     assert(coreModule.includes("dog:") && coreModule.includes("pig:") && coreModule.includes("cat:") && coreModule.includes("dragon:") && coreModule.includes("panda:") && coreModule.includes("snake:"), 'V13.30 six pet partners are registered');
+    const petFile = name => existsSync(fileURLToPath(new URL('../public/assets/pets/' + name, import.meta.url)));
+    const missingPetArt = Object.keys(CHARACTERS).flatMap(key => [0, 1, 2, 3].flatMap(form => [`${key}-${form}.webp`, `${key}-${form}-s.webp`])).filter(name => !petFile(name));
+    assert(!missingPetArt.length, `V13.53 every pet has egg and three evolution sprites plus small copies${missingPetArt.length ? ' (missing: ' + missingPetArt.join(', ') + ')' : ''}`);
+    assert(PET_FORM_LEVELS.join() === '1,3,10,20' && levelInfo(0).form === 0 && petForm(3) === 1 && petForm(10) === 2 && petForm(20) === 3 && levelInfo(0).stage === 1, 'V13.53 pet hatches at Lv.3, grows at Lv.10 and reaches its final form at Lv.20 (legacy stage kept)');
+    assert(!sw.includes('/assets/pets/') && sw.includes('"/modules/pet-moments.js"'), 'V13.53 pet images are cached on first use, not precached, and the moments module is precached');
     assert(studentModule.includes('home-profile-hero-v1337') && studentModule.includes('home-week-days') && studentModule.includes('data-rank-scope-select') && !studentModule.includes('같이 올라가면 더 재밌다.'), 'V13.30 home is pet-and-growth focused and ranking filters are compact');
     assert(appJs.includes('rankScopeSelect') && appJs.includes('missingCount') && appJs.includes('session.word_ids'), 'V13.30 compact rank filters and complete review flow are wired');
 

@@ -1,6 +1,7 @@
-import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, unlocked, levelInfo, dayKey } from './core.js';
+import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, petForm, unlocked, levelInfo, dayKey } from './core.js';
 import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
-import { avatar } from './character.js';
+import { avatar, petKey } from './character.js';
+import { petDisplayName } from './pet-moments.js';
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
 export function shell(A, content) {
   const p = A.data.profile;
@@ -291,22 +292,21 @@ function compactGrowth(A) {
   const accuracy = Number(g.accuracy || 0);
   const practiceCount = Number(g.practice_count || 0);
   const level = Number(g.level || 1);
-  const stage = Number(g.stage || 1);
+  const form = Math.max(0, Math.min(3, Number(g.form ?? petForm(level))));
   const percent = Math.max(3, Number(g.percent || 0));
-  const pet = CHARACTERS[p.avatar_key || 'dog'] || CHARACTERS.dog;
-  const petStageNames = ['알', '유년체', '성장체', '성숙체', '최종체'];
-  const petStageName = petStageNames[Math.max(1, Math.min(5, stage)) - 1];
-  const nextStageLevel = [5, 10, 15, 20, null][Math.max(1, Math.min(5, stage)) - 1];
-  return `<section class="home-profile-hero-v1337 home-pet-evolution-v1341 stage-${stage}">
+  const pet = CHARACTERS[petKey(p.avatar_key)];
+  const formName = form ? `${form}단계 · ${PET_FORMS[form]}` : PET_FORMS[0];
+  const nextLine = form === 3 ? '최종 진화 완료' : form === 0 ? `Lv.${PET_FORM_LEVELS[1]}에 태어나요` : `다음 진화 · Lv.${PET_FORM_LEVELS[form + 1]}`;
+  return `<section class="home-profile-hero-v1337 home-pet-evolution-v1341 form-${form}">
     <div class="home-pet-stage-v1337">
       <span class="home-level-badge-v1337"><small>LEVEL</small><b>${level}</b></span>
-      <div class="home-pet-art-v1337">${avatar(p.avatar_key || 'dog', { accessory: p.avatar_accessory, frame: p.avatar_frame, stage, size: 'home-featured' })}</div>
-      <span class="home-pet-status-v1337">${petStageName}</span>
+      <div class="home-pet-art-v1337">${avatar(p.avatar_key, { accessory: p.avatar_accessory, frame: p.avatar_frame, form, size: 'home-featured' })}</div>
+      <span class="home-pet-status-v1337">${formName}</span>
     </div>
     <div class="home-profile-copy-v1337">
-      <span class="home-profile-kicker-v1337">나의 성장 파트너 · ${petStageName}</span>
-      <h1>${stage === 1 ? '???' : esc(pet.ko)} <small>${stage === 1 ? '부화를 기다리는 중' : esc(pet.type)}</small></h1>
-      <div class="home-evolution-line-v1341"><span>${stage === 5 ? '최종 진화 완료' : `다음 진화 · Lv.${nextStageLevel}`}</span><b>${stage}/5</b></div>
+      <span class="home-profile-kicker-v1337">나의 성장 파트너 · ${formName}</span>
+      <h1>${form === 0 ? '???' : esc(petDisplayName(p))} <small>${form === 0 ? '부화를 기다리는 중' : esc(pet.type)}</small>${form > 0 ? `<button type="button" class="pet-name-edit" data-action="pet-name">${p.pet_name ? '이름 바꾸기' : '이름 짓기'}</button>` : ''}</h1>
+      <div class="home-evolution-line-v1341"><span>${nextLine}</span><b>${form}/3</b></div>
       <div class="home-level-line-v1337"><b>Lv.${level}</b><span>다음 레벨까지 ${num(g.remaining || 0)} XP</span></div>
       <div class="home-xp-track-v1337" aria-label="레벨 진행률"><i style="width:${percent}%"></i></div>
       <div class="home-xp-meta-v1337"><span>누적 XP ${num(g.points || 0)}</span><strong>${Math.round(Number(g.percent || 0))}%</strong></div>
@@ -642,7 +642,7 @@ function ranking(A) {
     </div>
     <p class="rank-period-caption">${esc(periodTitle)} · ${esc(periodRange)}</p>
     ${myIndex >= 0 ? `<div class="my-rank-card"><span>내 ${scopeLabel} 순위</span><strong>${rankNo(items[myIndex])}<small>위</small></strong><p>${num(items[myIndex][metric] || 0)}${unit} · ${esc(periodTitle)}</p></div>` : ''}
-    <div class="rank-list">${items.length ? items.map((p, index) => `<div class="rank-row ${p.is_me ? 'me' : ''} ${index < 3 && Number(p[metric] || 0) ? 'top-rank top-' + (index + 1) : ''}"><span class="rank-number">${rankNo(p)}</span>${avatar(p.avatar_key, { size: 'mini' })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill green">나</span>' : ''}</strong><small><span class="rank-grade">${esc(p.grade || '')}</span> · ${p.private ? '프로필 비공개' : `Lv.${p.level} · ${CHARACTERS[p.avatar_key]?.ko || '루미'}`}</small></div><span class="rank-score">${num(p[metric] || 0)}${unit}</span></div>`).join('') : empty('ranking', `${scopeLabel}에 아직 연습 기록이 없어요`, '학습을 시작하면 순위가 바로 생겨요.')}</div>
+    <div class="rank-list">${items.length ? items.map((p, index) => `<div class="rank-row ${p.is_me ? 'me' : ''} ${index < 3 && Number(p[metric] || 0) ? 'top-rank top-' + (index + 1) : ''}"><span class="rank-number">${rankNo(p)}</span>${avatar(p.avatar_key, { size: 'mini', form: p.private ? 1 : Math.max(1, petForm(p.level)) })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill green">나</span>' : ''}</strong><small><span class="rank-grade">${esc(p.grade || '')}</span> · ${p.private ? '프로필 비공개' : `Lv.${p.level} · ${esc(p.pet_name || CHARACTERS[petKey(p.avatar_key)].ko)}`}</small></div><span class="rank-score">${num(p[metric] || 0)}${unit}</span></div>`).join('') : empty('ranking', `${scopeLabel}에 아직 연습 기록이 없어요`, '학습을 시작하면 순위가 바로 생겨요.')}</div>
     <p class="quiet-note">주간 기록은 매주 월요일 새로 시작하고 통합 기록은 계속 누적돼요. 시험 성적은 랭킹에 포함하지 않아요.</p>`;
 }
 function records(A) {
@@ -691,7 +691,9 @@ function studio(A) {
   const s = A.style, g = A.data.stats, tab = A.studioTab || 'character', c = CHARACTERS[s.avatar_key];
   const groups = { accessory: ACCESSORIES, frame: FRAMES, title: TITLES };
   let body = tab === 'character' ? `<div class="pet-choice-head"><span>MY PARTNER</span><h2>나의 학습 파트너를 선택해 주세요!</h2><p>어떤 친구와 함께 공부할까요?</p></div><div class="character-grid pet-choice-grid">${Object.entries(CHARACTERS).map(([key, c]) => `<button data-style="avatar_key" data-value="${key}" class="character-option ${s.avatar_key === key ? 'selected' : ''}" aria-pressed="${s.avatar_key === key}">${avatar(key)}<b>${c.ko}</b><small>${c.type}</small></button>`).join('')}</div><p class="quiet-note">능력은 모두 같아요. 마음이 가는 친구를 골라요.</p>` : `<div class="reward-grid">${Object.entries(groups[tab]).map(([key, item]) => { const open = unlocked(item, g); return `<button data-style="avatar_${tab}" data-value="${key}" class="reward-item ${s['avatar_' + tab] === key ? 'selected' : ''}" ${open ? '' : 'disabled'}>${icon(open ? tab === 'title' ? 'records' : 'sparkle' : 'lock')}<b>${item.name}</b><small>${open ? '사용 가능' : item.level ? `Lv.${item.level}에 열려요` : item.combo ? '10연속 정답 달성' : '7일 연속 학습'}</small></button>`; }).join('')}</div>`;
-  return `<div class="page-heading studio-page-heading"><h1>${A.data.profile.avatar_key ? '내 학습 파트너' : '함께 성장할 친구'}</h1><p>${A.data.profile.avatar_key ? '언제든 마음에 드는 친구로 바꿀 수 있어요.' : '처음의 선택. 언제든 바꿀 수 있어요.'}</p></div><div class="studio-preview">${avatar(s.avatar_key, { stage: g.stage, accessory: s.avatar_accessory, frame: s.avatar_frame })}<h2>${c.ko} <span class="tiny muted">Lv.${g.level}</span></h2><p>${TITLES[s.avatar_title].name}</p></div><div class="segment">${[['character', '캐릭터'], ['accessory', '장식'], ['frame', '프레임'], ['title', '칭호']].map(([k, label]) => `<button data-studio-tab="${k}" class="${tab === k ? 'selected' : ''}">${label}</button>`).join('')}</div>${body}<button class="btn primary full" data-action="save-style">${A.data.profile.avatar_key ? '이 모습으로 저장' : '함께 시작하기'}</button><div class="section-title"><h2>다음 성장의 선물</h2></div><div class="roadmap">${[[3, '헤드셋'], [5, '실버 프레임'], [6, '글래스'], [9, '스타 핀'], [10, '블루 라인'], [15, '오로라'], [18, '크라운'], [20, '골드']].map(([lv, name]) => `<div><div class="milestone ${g.level >= lv ? 'done' : ''}">${icon(g.level >= lv ? 'check' : 'lock')}</div><b>${name}</b><small>Lv.${lv}</small></div>`).join('')}</div>`;
+  const previewForm = Math.max(1, Number(g.form ?? petForm(g.level)));
+  const hasPet = !!A.data.profile.avatar_key;
+  return `<div class="page-heading studio-page-heading"><h1>${hasPet ? '내 학습 파트너' : '함께 성장할 친구'}</h1><p>${hasPet ? '언제든 마음에 드는 친구로 바꿀 수 있어요.' : '처음의 선택. 언제든 바꿀 수 있어요.'}</p></div><div class="studio-preview">${avatar(s.avatar_key, { form: previewForm, accessory: s.avatar_accessory, frame: s.avatar_frame })}<h2>${esc(A.data.profile.pet_name || c.ko)} <span class="tiny muted">Lv.${g.level}</span>${hasPet ? `<button type="button" class="pet-name-edit" data-action="pet-name">${A.data.profile.pet_name ? '이름 바꾸기' : '이름 짓기'}</button>` : ''}</h2><p>${TITLES[s.avatar_title].name}</p></div><div class="segment">${[['character', '캐릭터'], ['accessory', '장식'], ['frame', '프레임'], ['title', '칭호']].map(([k, label]) => `<button data-studio-tab="${k}" class="${tab === k ? 'selected' : ''}">${label}</button>`).join('')}</div>${body}<button class="btn primary full" data-action="save-style">${A.data.profile.avatar_key ? '이 모습으로 저장' : '함께 시작하기'}</button><div class="section-title"><h2>다음 성장의 선물</h2></div><div class="roadmap">${[[3, '헤드셋'], [5, '실버 프레임'], [6, '글래스'], [9, '스타 핀'], [10, '블루 라인'], [15, '오로라'], [18, '크라운'], [20, '골드']].map(([lv, name]) => `<div><div class="milestone ${g.level >= lv ? 'done' : ''}">${icon(g.level >= lv ? 'check' : 'lock')}</div><b>${name}</b><small>Lv.${lv}</small></div>`).join('')}</div>`;
 }
 export function updateRangeSummary(A) {
   const { selected } = getRanges(A);

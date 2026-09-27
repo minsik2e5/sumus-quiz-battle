@@ -39,7 +39,7 @@ const mutations = createMutationCoordinator(repo, await repo.read(), {
   onError: error => console.error('[checkpoint]', error.message)
 });
 const rates = new Map();
-const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
+const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.json': 'application/json', '.webmanifest': 'application/manifest+json' };
 function rateLimit(bucket, max, windowMs, message) {
   const list = (rates.get(bucket) || []).filter(t => t > Date.now() - windowMs);
   if (list.length >= max) throw Object.assign(Error(message), { status: 429 });

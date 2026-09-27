@@ -1,31 +1,32 @@
-import { CHARACTERS } from './core.js';
-let sequence = 0;
-// Asset boundary: replace the SVG inside this renderer with a WebP without changing screens.
+import { CHARACTERS, PET_FORMS } from './core.js';
+// Illustrated pets: /assets/pets/<pet>-<form>.webp (512px, transparent, feet on a shared
+// baseline) plus a 160px `-s` copy for small avatars. `form` is 0 (egg) .. 3 (final).
+const LEGACY = { lumi:'dog', nox:'cat', blaze:'dog', tide:'cat', zeph:'dragon', terra:'panda' };
+const EXPRESSIONS = { dog: { 2: ['happy'] }, pig: { 2: ['happy'] } };
+// Sprites are fitted one by one, so growth is added back gently (feet stay anchored).
+const GROW = [.86, .86, .93, 1];
+const SMALL = new Set(['mini']);
+// Accessories are earned rewards; on illustrated pets they show as a badge, not on the head.
+const ACCESSORY_ICONS = {
+  headset: '<path d="M5 14v-2a7 7 0 0 1 14 0v2"/><rect x="3.5" y="13" width="4" height="6" rx="1.6"/><rect x="16.5" y="13" width="4" height="6" rx="1.6"/>',
+  glasses: '<circle cx="7.5" cy="13" r="3.5"/><circle cx="16.5" cy="13" r="3.5"/><path d="M11 12.5h2"/>',
+  starpin: '<path d="m12 4 2.3 5 5.2.6-3.9 3.6 1.1 5.3L12 15.8 7.3 18.5l1.1-5.3-3.9-3.6 5.2-.6z"/>',
+  visor: '<path d="M4 11q8-5 16 0l-1.5 4.5q-6.5-3-13 0z"/>',
+  crown: '<path d="m4 17 1.5-9 4 3.5L12 6l2.5 5.5 4-3.5 1.5 9z"/><path d="M5 19.5h14"/>'
+};
+
+export function petKey(key) { return CHARACTERS[key] ? key : (LEGACY[key] || 'dog'); }
+
 export function avatar(key = 'dog', options = {}) {
-  const legacy = { lumi:'dog', nox:'cat', blaze:'dog', tide:'cat', zeph:'dragon', terra:'panda' };
-  key = CHARACTERS[key] ? key : (legacy[key] || 'dog');
-  const c = CHARACTERS[key] || CHARACTERS.dog, n = `av${++sequence}`;
-  const { size = '', stage = 1, accessory = 'none', frame = 'basic' } = options;
-  const s = Math.max(1, Math.min(5, Number(stage) || 1));
-  const stageNames = ['알', '유년체', '성장체', '성숙체', '최종체'];
-  if (s === 1 && size === 'home-featured') {
-    return `<div class="avatar-art avatar-premium avatar-egg ${size}" style="--avatar:${c.color};--avatar-soft:${c.soft}"><svg viewBox="0 0 216 200" role="img" aria-label="${c.ko}의 알"><defs><radialGradient id="${n}eggAura"><stop stop-color="${c.light}" stop-opacity=".4"/><stop offset="1" stop-color="${c.soft}" stop-opacity="0"/></radialGradient><linearGradient id="${n}egg" x1=".2" y1=".05" x2=".8" y2=".95"><stop stop-color="#fff"/><stop offset=".48" stop-color="${c.soft}"/><stop offset="1" stop-color="${c.light}"/></linearGradient><filter id="${n}eggShadow" x="-40%" y="-40%" width="180%" height="200%"><feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#17382e" flood-opacity=".16"/></filter></defs><circle cx="108" cy="94" r="88" fill="url(#${n}eggAura)"/><ellipse cx="108" cy="174" rx="52" ry="9" fill="#18352c" opacity=".11"/><g filter="url(#${n}eggShadow)"><path d="M108 32c-31 0-55 50-55 91 0 34 22 54 55 54s55-20 55-54c0-41-24-91-55-91Z" fill="url(#${n}egg)" stroke="#fff" stroke-width="4"/><path d="m108 61 8 17 19 3-14 13 4 19-17-9-17 9 4-19-14-13 19-3Z" fill="${c.color}" opacity=".9"/><circle cx="78" cy="120" r="7" fill="${c.color}" opacity=".36"/><circle cx="139" cy="133" r="5" fill="${c.color}" opacity=".3"/><path d="M77 66q31-22 57-5" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" opacity=".68"/></g><g fill="${c.light}"><circle cx="48" cy="76" r="2"/><circle cx="169" cy="67" r="2.5"/><path d="m168 103 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z"/></g></svg><span class="avatar-stage-name">${stageNames[s-1]}</span></div>`;
-  }
-  const eye = (x, y, r = 7) => `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${r + 1}" fill="#171D2A"/><ellipse cx="${x - 1}" cy="${y + 2}" rx="${Math.max(2,r-3)}" ry="${Math.max(2,r-2)}" fill="#2D3748" opacity=".78"/><circle cx="${x - 2.4}" cy="${y - 3.2}" r="2.4" fill="#fff"/><circle cx="${x + 2}" cy="${y + 2.6}" r="1.15" fill="${c.light}"/><circle cx="${x - 4.2}" cy="${y - .4}" r=".8" fill="#fff" opacity=".8"/>`;
-  const shapes = {
-    dog: `<g filter="url(#${n}shadow)"><path d="M72 72 61 43q24-4 35 14 12-5 24 0 13-18 36-13l-11 31q8 13 4 30-7 31-41 37-35-5-42-37-4-18 6-33Z" fill="url(#${n}g)"/><path d="M62 47q-8 35 9 45l17-31q-9-15-26-14Zm94 0q8 35-9 45l-17-31q9-15 26-14Z" fill="#B8733E"/><ellipse cx="108" cy="112" rx="30" ry="25" fill="#FFF3DD"/>${eye(91,88)}${eye(125,88)}<path d="m101 107q7-5 14 0l-7 8Z" fill="#2A3030"/><path d="M98 121q10 10 20 0" fill="none" stroke="#9A6046" stroke-width="3" stroke-linecap="round"/><path d="M143 129q31-6 25-31 19 28-13 45" fill="none" stroke="${c.color}" stroke-width="13" stroke-linecap="round"/></g>`,
-    pig: `<g filter="url(#${n}shadow)"><path d="M74 71Q62 45 82 38l14 19q12-5 24 0l15-19q19 7 7 34 13 13 9 35-6 31-43 36-37-5-43-36-4-22 9-36Z" fill="url(#${n}g)"/>${eye(91,88)}${eye(125,88)}<ellipse cx="108" cy="112" rx="25" ry="18" fill="#F58F96"/><ellipse cx="99" cy="112" rx="3.5" ry="5" fill="#A95D65"/><ellipse cx="117" cy="112" rx="3.5" ry="5" fill="#A95D65"/><path d="M98 129q10 7 20 0" fill="none" stroke="#B86570" stroke-width="3" stroke-linecap="round"/><path d="M151 139q26 8 18-12 13 7 3 19-10 11-25 2" fill="none" stroke="${c.color}" stroke-width="7" stroke-linecap="round"/></g>`,
-    cat: `<g filter="url(#${n}shadow)"><path d="M70 77 67 34l31 22q10-4 20 0l30-22-3 43q11 14 6 34-8 28-43 33-35-5-43-33-5-20 5-34Z" fill="url(#${n}g)"/><path d="m75 46 5 24 14-11Zm66 0-5 24-14-11Z" fill="#F4B6AD"/><ellipse cx="108" cy="113" rx="28" ry="23" fill="#F7F2EA"/>${eye(91,88)}${eye(125,88)}<path d="m101 106 14 0-7 8Z" fill="#343839"/><path d="M100 121q8 8 16 0" fill="none" stroke="#77706E" stroke-width="3" stroke-linecap="round"/><path d="M79 108 52 102m28 15-28 5m84-14 28-6m-28 15 28 5" stroke="#6F6B69" stroke-width="2" stroke-linecap="round"/><path d="M145 142q32 4 25-30" fill="none" stroke="${c.color}" stroke-width="12" stroke-linecap="round"/></g>`,
-    dragon: `<g filter="url(#${n}shadow)"><path d="M78 75q-2-28 16-37l6 20q8-3 16 0l8-22q18 10 14 39 17 13 13 35-6 29-43 35-37-6-43-35-4-22 13-35Z" fill="url(#${n}g)"/><path d="m89 48-2-23 13 17m17 2 11-18 1 24" stroke="#E9C45D" stroke-width="8" stroke-linecap="round"/><path d="M66 104 39 88q-3 28 25 37m88-21 27-16q3 28-25 37" fill="#9EDFAE" stroke="#459B6C" stroke-width="4"/><ellipse cx="108" cy="115" rx="28" ry="23" fill="#E8F3C8"/>${eye(91,90)}${eye(125,90)}<path d="M101 113h14" stroke="#4B795C" stroke-width="3" stroke-linecap="round"/><path d="M99 127q9 7 18 0" fill="none" stroke="#4B795C" stroke-width="3" stroke-linecap="round"/></g>`,
-    panda: `<g filter="url(#${n}shadow)"><circle cx="78" cy="57" r="20" fill="#343837"/><circle cx="138" cy="57" r="20" fill="#343837"/><path d="M67 80q5-39 41-39t41 39q9 17 2 36-10 27-43 31-33-4-43-31-7-19 2-36Z" fill="#F7F5EE"/><ellipse cx="89" cy="90" rx="16" ry="20" fill="#343837" transform="rotate(24 89 90)"/><ellipse cx="127" cy="90" rx="16" ry="20" fill="#343837" transform="rotate(-24 127 90)"/>${eye(91,88,5)}${eye(125,88,5)}<ellipse cx="108" cy="116" rx="24" ry="18" fill="#FFF"/><path d="m101 109q7-5 14 0l-7 8Z" fill="#252928"/><path d="M99 124q9 7 18 0" fill="none" stroke="#555" stroke-width="3" stroke-linecap="round"/><path d="M146 133q17-22 27-18-7 23-25 30" fill="#69A862"/><path d="M151 128q14-9 23-7" stroke="#3D7D47" stroke-width="3"/></g>`,
-    snake: `<g filter="url(#${n}shadow)"><path d="M108 45q31 0 31 29 0 22-20 31 30 7 31 31 1 30-42 34-42-4-42-30 0-23 28-31-22-10-22-34 0-30 36-30Z" fill="url(#${n}g)"/><ellipse cx="108" cy="82" rx="36" ry="34" fill="url(#${n}g)"/><ellipse cx="108" cy="100" rx="25" ry="16" fill="#E9F4B8"/>${eye(94,80,6)}${eye(122,80,6)}<path d="M102 99h12" stroke="#3C704C" stroke-width="3" stroke-linecap="round"/><path d="M108 106v8m0 0-7 6m7-6 7 6" stroke="#D85C62" stroke-width="3" stroke-linecap="round"/><path d="M91 139q18 13 36 0" fill="none" stroke="#B8E985" stroke-width="8" stroke-linecap="round"/></g>`
-  };
-  const accessorySvg = {
-    headset: '<path d="M62 84q0-46 45-46t45 46" fill="none" stroke="#414758" stroke-width="7"/><rect x="58" y="77" width="11" height="27" rx="5" fill="#515969"/><rect x="145" y="77" width="11" height="27" rx="5" fill="#515969"/>',
-    glasses: '<g fill="none" stroke="#3c4353" stroke-width="3"><rect x="77" y="74" width="25" height="19" rx="7"/><rect x="113" y="74" width="25" height="19" rx="7"/><path d="M102 81h11"/></g>',
-    starpin: '<path d="m141 55 3 7 8 3-8 3-3 8-3-8-8-3 8-3Z" fill="#faf1bf"/>',
-    visor: '<path d="M75 74h65l-5 23H80Z" fill="#708d99" fill-opacity=".6" stroke="#e9f3f6" stroke-width="2"/>',
-    crown: '<path d="m83 48-4-24 16 13 12-18 12 18 15-13-4 24Z" fill="#eed59a" stroke="#b78b3f" stroke-width="2"/>'
-  }[accessory] || '';
-  return `<div class="avatar-art avatar-premium avatar-stage-${s} frame-${frame} ${size}" style="--avatar:${c.color};--avatar-soft:${c.soft}"><svg viewBox="0 0 216 200" role="img" aria-label="${c.ko}, ${c.type}"><defs><linearGradient id="${n}g" x1=".15" y1="0" x2=".85" y2="1"><stop stop-color="${c.light}"/><stop offset=".52" stop-color="${c.color}"/><stop offset="1" stop-color="${c.color}"/></linearGradient><linearGradient id="${n}tail" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${c.color}"/><stop offset="1" stop-color="${c.light}"/></linearGradient><radialGradient id="${n}aura"><stop stop-color="${c.light}" stop-opacity=".36"/><stop offset="1" stop-color="${c.soft}" stop-opacity="0"/></radialGradient><filter id="${n}shadow" x="-35%" y="-35%" width="170%" height="190%"><feDropShadow dx="0" dy="9" stdDeviation="7" flood-color="#12211b" flood-opacity=".16"/><feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#ffffff" flood-opacity=".18"/></filter></defs><circle cx="108" cy="96" r="90" fill="url(#${n}aura)"/><ellipse cx="109" cy="179" rx="55" ry="9" fill="#1d2939" opacity=".12"/>${stage > 1 ? `<circle cx="108" cy="101" r="83" fill="none" stroke="${c.color}" opacity=".28" stroke-width="${stage > 3 ? 3 : 1}" ${stage >= 3 ? 'stroke-dasharray="3 8"' : ''}/>` : ''}<g filter="url(#${n}shadow)"><path d="M88 117c-8 12-12 29-10 54h24l5-27 8 27h24c1-24-4-42-15-54Z" fill="url(#${n}g)"/><path d="M99 127q9 23 18 0" fill="${c.light}" opacity=".66"/><path d="M84 143q-10 9-13 20M132 142q10 8 13 19" fill="none" stroke="${c.color}" stroke-width="8" stroke-linecap="round"/></g>${shapes[key] || shapes.dog}<path d="M82 66q26-18 52-2" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".13"/><ellipse cx="91" cy="133" rx="9" ry="4" fill="#fff" opacity=".12"/><ellipse cx="125" cy="133" rx="9" ry="4" fill="#fff" opacity=".08"/>${accessorySvg}${stage >= 2 ? `<g fill="${c.light}" opacity=".72"><circle cx="48" cy="78" r="2.2"/><circle cx="164" cy="61" r="1.8"/><circle cx="174" cy="116" r="2.5"/></g>` : ``}${stage >= 3 ? `<path d="m168 40 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="${c.light}" opacity=".85"/>` : ``}${stage >= 4 ? `<path d="m38 45 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z" fill="${c.light}"/>` : ''}</svg></div>`;
+  key = petKey(key);
+  const c = CHARACTERS[key];
+  const { size = '', form: rawForm = 1, accessory = 'none', frame = 'basic', expression = 'normal' } = options;
+  const form = Math.max(0, Math.min(3, Math.round(Number(rawForm)) || 0));
+  const small = SMALL.has(size);
+  const expr = expression === 'win' ? 'happy' : expression;
+  const hasExpr = !small && expr !== 'normal' && (EXPRESSIONS[key]?.[form] || []).includes(expr);
+  const src = `/assets/pets/${key}-${form}${hasExpr ? '-' + expr : ''}${small ? '-s' : ''}.webp`;
+  const label = `${c.ko}, ${PET_FORMS[form]}`;
+  const badge = !small && ACCESSORY_ICONS[accessory] ? `<span class="pet-acc-badge" aria-hidden="true"><svg viewBox="0 0 24 24">${ACCESSORY_ICONS[accessory]}</svg></span>` : '';
+  return `<div class="avatar-art avatar-premium avatar-img avatar-form-${form} frame-${frame} expr-${expression} ${size}" style="--avatar:${c.color};--avatar-soft:${c.soft};--pet-grow:${GROW[form]}"><img src="${src}" alt="${label}" width="${small ? 160 : 512}" height="${small ? 160 : 512}" decoding="async"${small ? ' loading="lazy"' : ''} draggable="false">${badge}</div>`;
 }
