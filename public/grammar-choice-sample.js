@@ -232,6 +232,9 @@ function sentenceChoices(sentence) {
 function analysisHelp(sentence, partIndex) {
   const part = sentence.parts[partIndex];
   if (!part || part[0] !== 'c') return '';
+  // Passages whose explanations were written per choice keep them; the
+  // pattern rules below only improve the generic explanations of older sets.
+  if (PASSAGE?.help === 'curated') return part[4];
   const options = part[1].map(v => String(v).toLowerCase());
   const answer = String(part[2]);
   const answerLower = answer.toLowerCase();
@@ -629,7 +632,7 @@ export function openGrammarChoiceSample(A, redraw, passageId = null) {
     const body = `
       <section class="gcv3-result">
         <div class="gcv3-resultmark">${mastered ? '✓' : '★'}</div>
-        <h1>${mastered ? esc(PASSAGE.number) + (PASSAGE.id.startsWith('middle-') ? ' MASTER!' : '번 MASTER!') : '한 번 더 다듬어 볼까요?'}</h1>
+        <h1>${mastered ? esc(PASSAGE.number) + (PASSAGE.id.startsWith('middle-') || /과/.test(String(PASSAGE.number)) ? ' MASTER!' : '번 MASTER!') : '한 번 더 다듬어 볼까요?'}</h1>
         <p>문장 단위 학습과 오답 리콜을 마쳤어요.</p>
         <div class="gcv3-score">${firstRate}<small>% · 1차</small></div>
         <div class="gcv3-statgrid"><div><b>${firstCorrect}</b><span>1차 정답</span></div><div><b>${firstRoundWrong.length}</b><span>1차 오답</span></div><div><b>${recallAttempts}</b><span>오답 리콜</span></div></div>

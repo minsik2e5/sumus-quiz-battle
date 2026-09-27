@@ -76,8 +76,10 @@ async function ensureGrammarData() {
     const mod = await import('./middle-donga-yoon-grammar-data.js');
     data = { passages: mod.MIDDLE_DONGA_YOON_PASSAGES || [], byLesson: mod.MIDDLE_DONGA_YOON_BY_LESSON || {} };
   } else if (school === '단원고') {
-    const mod = await import('./danwongo-grammar-data.js');
-    data = { passages: mod.DANWONGO_PASSAGES || [] };
+    const [mock, textbook] = await Promise.all([import('./danwongo-grammar-data.js'), import('./danwongo-textbook-grammar-data.js')]);
+    const textbookPassages = textbook.DANWONGO_TEXTBOOK_PASSAGES || [];
+    const mockPassages = mock.DANWONGO_PASSAGES || [];
+    data = { passages: [...textbookPassages, ...mockPassages], textbook: textbookPassages, byLesson: textbook.DANWONGO_TEXTBOOK_BY_LESSON || {}, mock: mockPassages };
   } else if (school === '선부고') {
     const mod = await import('./seonbu-grammar-data.js');
     const current = mod.SEONBU_2026_PASSAGES || [], old = mod.SEONBU_2025_PASSAGES || [];
