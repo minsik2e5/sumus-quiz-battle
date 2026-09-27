@@ -1188,16 +1188,20 @@ function advancePractice(x, state) {
   else nextPractice(x, state);
 }
 function nextPractice(x, state, preparePreview = true) {
-  if (x.run_mode === 'test' && x.next_preview) {
+  if (x.next_preview) {
     const preview = x.next_preview;
     x.question = preview.question;
     x.question_id = preview.question_id;
-    x.question_is_retry = false;
+    x.question_is_retry = !!preview.is_retry;
+    if (preview.is_retry) {
+      const index = x.retry.findIndex(item => item.id === preview.question.word_id);
+      if (index >= 0) x.retry.splice(index, 1);
+    }
     x.feedback = null;
     x.seen ??= [];
     if (!x.seen.includes(preview.question.word_id)) x.seen.push(preview.question.word_id);
     x.next_preview = null;
-    if (preparePreview) prepareTestPreview(x, state);
+    if (preparePreview) prepareNextPreview(x, state);
     return;
   }
   const words = allBooks(state).flatMap(b => b.words).filter(w => x.words.includes(w.id));
@@ -1222,13 +1226,39 @@ function nextPractice(x, state, preparePreview = true) {
     x.question_started_at = Date.now();
     x.question_deadline = x.question_started_at + x.question_duration_sec * 1000;
   }
-  if (preparePreview) prepareTestPreview(x, state);
+  if (preparePreview) prepareNextPreview(x, state);
 }
-function prepareTestPreview(x, state) {
-  if (x.run_mode !== 'test' || Number(x.score_total || 0) + 1 >= Number(x.target || 0)) return;
-  const preview = { ...x, seen: [...x.seen], retry: [], next_preview: null, total: x.total + 1 };
+// Picks the following question before the current one is answered, so the
+// client can show it without waiting for the save. The choice does not depend
+// on the answer: a wrong answer is retried at total + 2, never immediately,
+// and the answered word is excluded as `last`.
+// Test mode: only while the next advance cannot end the test.
+// Practice mode: always; the next advance may still finish the session
+// (e.g. last retry answered correctly), in which case the preview is unused
+// and the client, which predicts that case, waits for the server instead.
+function prepareNextPreview(x, state) {
+  x.next_preview = null;
+  const test = x.run_mode === 'test';
+  if (x.timer_mode === 'question' || (test && Number(x.score_total || 0) + 1 >= Number(x.target || 0))) return;
+  const preview = {
+    ...x,
+    seen: [...(x.seen || [])],
+    retry: test ? [] : x.retry.map(item => ({ ...item })),
+    next_preview: null,
+    total: x.total + 1,
+    last: test ? x.last : x.question?.word_id
+  };
   nextPractice(preview, state, false);
-  x.next_preview = { question: preview.question, question_id: preview.question_id };
+  x.next_preview = { question: preview.question, question_id: preview.question_id, is_retry: !!preview.question_is_retry };
+}
+// Grading data for on-device feedback in practice (not test) mode. The same
+// word + accepted meanings the server grades with; practice already reveals the
+// answer in its feedback, so this only moves that moment earlier.
+function localCheck(state, wordId) {
+  const word = findWord(state, wordId);
+  if (!word) return null;
+  const graded = wordForGrade(state, word);
+  return { word: graded.word, meaning: graded.meaning, accepted_meanings: graded.accepted_meanings || [] };
 }
 function removePracticeTimer(x) {
   if (!x || x.finished) return x;
@@ -1336,6 +1366,7 @@ function practiceView(x, state) {
   const scoreCorrect = Math.min(scoreTotal, Number(x.score_correct || 0));
   const score = Math.round(scoreCorrect / scoreTotal * 100);
   const hideTestScore = x.run_mode === 'test' && !x.finished;
+  const practiceKeys = x.run_mode !== 'test' && x.timer_mode !== 'question';
   const answerRecords = x.answer_records || [];
   const wrongCount = answerRecords.filter(item => item.correct === false && !item.regraded && !item.timed_out).length;
   const timedOutCount = answerRecords.filter(item => item.timed_out && !item.regraded).length;
@@ -1356,7 +1387,12 @@ function practiceView(x, state) {
     perfect: x.finished ? perfect : undefined,
     answer_records: x.finished ? answerRecords : undefined,
     wrong_details: x.finished ? (x.wrong_details || []) : undefined,
-    question: publicQuestion(x.question), question_id: x.question_id, question_is_retry: !!x.question_is_retry, next_preview: hideTestScore && !x.finished ? (x.next_preview ? { ...x.next_preview, question: publicQuestion(x.next_preview.question) } : null) : undefined, feedback: hideTestScore ? null : x.feedback,
+    question: publicQuestion(x.question), question_id: x.question_id, question_is_retry: !!x.question_is_retry,
+    local_check: practiceKeys && !x.finished && !x.feedback && x.question ? localCheck(state, x.question.word_id) : undefined,
+    next_preview: (hideTestScore || practiceKeys) && !x.finished
+      ? (x.next_preview ? { question: publicQuestion(x.next_preview.question), question_id: x.next_preview.question_id, is_retry: !!x.next_preview.is_retry, ...(practiceKeys ? { local_check: localCheck(state, x.next_preview.question.word_id) } : {}) } : null)
+      : undefined,
+    feedback: hideTestScore ? null : x.feedback,
     finished: x.finished, retry_count: x.retry.length,
     stats: growthFor(mySessions(state, x.student_id)), server_time: Date.now()
   };

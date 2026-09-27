@@ -1,5 +1,5 @@
 import { api, $, $$, icon, esc, time, date, recordRangeLabel, scope, toast, modal, buttonBusy } from './ui.js';
-import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo } from './core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo, grade, displayEnglish } from './core.js';
 import { avatar } from './character.js';
 let A, redraw, refresh, examState = null, practiceState = null, prefetchedPractice = null, practiceAdvanceTimer = null, practiceOffset = 0, practiceAutoFinishing = false, practiceQuestionTimingOut = false, practiceGuardId = null, pendingPracticeSave = false, timer, saving = Promise.resolve(), inputVersion = 0, dirty = false, syncError = '', debounce, audio;
 export function configureSessions(state, render, reload) { A = state; redraw = render; refresh = reload; }
@@ -26,7 +26,7 @@ function disarmTestGuard() {
   window.removeEventListener('popstate', testBackGuard);
   practiceGuardId = null;
 }
-export function leaveSession() { clearInterval(timer); clearTimeout(debounce); clearTimeout(practiceAdvanceTimer); timer = null; practiceAdvanceTimer = null; prefetchedPractice = null; practiceOffset = 0; practiceAutoFinishing = false; practiceQuestionTimingOut = false; pendingPracticeSave = false; disarmTestGuard(); A.screen = null; }
+export function leaveSession() { clearInterval(timer); clearTimeout(debounce); clearTimeout(practiceAdvanceTimer); timer = null; practiceAdvanceTimer = null; prefetchedPractice = null; practiceOffset = 0; practiceAutoFinishing = false; practiceQuestionTimingOut = false; pendingPracticeSave = false; serverNext.clear(); lastServerAnswer = null; disarmTestGuard(); A.screen = null; }
 export async function openExam(eid) {
   const e = A.data.exams.find(e => e.id === eid); if (!e) return;
   const close = modal(`<span class="pill">실전시험</span><h2>${esc(e.title)}</h2><p>${e.school} · ${esc(scope(e))}</p><div class="detail-grid"><div><b>${EXAM_TYPES[e.exam_type].label}</b><small>한 가지 유형으로 출제</small></div><div><b>${e.question_count}문제</b><small>제한시간 ${Math.round(e.duration_sec / 60)}분</small></div><div><b>${e.max_attempts}회</b><small>응시 가능 횟수</small></div><div><b>${e.passing_score}점</b><small>통과 기준</small></div></div><div class="exam-info">${icon('clock')}<p>시작하면 시간이 흐릅니다.<br>시간이 끝나면 저장된 답안이 자동 제출돼요.</p></div><button class="btn ink full" id="begin-exam">${A.data.attempts.some(a => a.exam_id === eid && a.status === 'active') ? '이어서 응시하기' : '시험 시작하기'}</button>`, '실전시험 시작');
@@ -294,7 +294,9 @@ export async function resumeActivePractice() {
 
 async function syncPracticeState() {
   const current = practiceState;
-  if (A?.screen !== 'practice' || !current?.id || current.finished || answering) return;
+  // While answers are still being saved the server is behind the screen; the
+  // save queue reconciles on its own.
+  if (A?.screen !== 'practice' || !current?.id || current.finished || answering || pendingAnswers > 0) return;
   try {
     const latest = await api(`/practice/${current.id}`);
     if (!latest || practiceState?.id !== current.id) return;
@@ -392,7 +394,9 @@ function renderPractice() {
     const progress = Math.min(Number(x.score_total || 0), Number(x.target || 0));
     const close = modal(`<h2>시험을 나갈까요?</h2><p>현재 <b>${progress} / ${x.target}</b>까지 진행했어요. 나가도 진행 위치가 저장되어 나중에 이어서 풀 수 있어요.</p><button class="btn primary full" id="practice-keep-going">계속 풀기</button><button class="btn full" id="practice-save-leave">저장하고 나가기</button><button class="text-button full" id="practice-finish-exit">시험 종료하기</button>`, testMode ? '실전시험' : '연습시험');
     $('#practice-keep-going').onclick = close;
-    $('#practice-save-leave').onclick = async () => {
+    $('#practice-save-leave').onclick = async event => {
+      buttonBusy(event.currentTarget);
+      await drainPracticeAnswers();
       close(); leaveSession(); redraw();
       try { await refresh(); redraw(); }
       catch (error) { toast(error.message || '최신 기록을 불러오지 못했어요.'); }
@@ -401,6 +405,7 @@ function renderPractice() {
       if (!confirm('현재까지 푼 내용으로 시험을 종료할까요? 종료하면 이어서 풀 수 없어요.')) return;
       buttonBusy(event.currentTarget);
       try {
+        await drainPracticeAnswers();
         practiceState = await api(`/practice/${x.id}/finish`, {});
         close();
         finishPracticeView();
@@ -546,9 +551,151 @@ function animateTestResult(score, perfect) {
   setTimeout(() => burst.remove(), 1500);
 }
 let answering = false;
+
+// Instant practice (not test mode): the server sends `local_check` (the word
+// and accepted meanings it grades with) and the already-chosen next question
+// (`next_preview`). The device grades, shows feedback and moves on at once;
+// answers go to the server strictly in order in the background, and the
+// server's grading wins if it ever differs.
+let answerChain = Promise.resolve(), pendingAnswers = 0, brokenSession = null, lastServerAnswer = null;
+const serverNext = new Map();
+const canAnswerInstantly = x => x && x.run_mode !== 'test' && x.timer_mode !== 'question' && !!x.local_check && !x.feedback;
+function showSaveIssue(message) {
+  const node = $('#practice-error');
+  if (node) node.innerHTML = message ? `<div class="practice-saving-v1345" role="status">${esc(message)}</div>` : '';
+}
+function answerPracticeInstant(answer, button) {
+  const x = practiceState;
+  clearTimeout(practiceAdvanceTimer); practiceAdvanceTimer = null;
+  const local = x.local_check;
+  const ok = grade(x.question.type, answer, local);
+  const combo = ok ? Number(x.combo || 0) + 1 : 0;
+  const feedback = { ok, local: true, word: displayEnglish(local.word), meaning: local.meaning, answer, type: x.question.type, question_id: x.question_id, retry: !ok, can_dispute: false, combo, milestone: ok && [5, 10].includes(combo) };
+  const scored = !x.question_is_retry && Number(x.score_total || 0) < Number(x.target || 0);
+  const retryAdded = !ok && !x.exam_style ? 1 : 0;
+  practiceState = { ...x, instant: true, feedback, local_check: null, total: Number(x.total || 0) + 1, score_total: Number(x.score_total || 0) + (scored ? 1 : 0), combo, retry_count: Number(x.retry_count || 0) + retryAdded };
+  renderPractice();
+  answerImpact(feedback);
+  if (!ok && button) $(`[data-practice-choice="${button.dataset.practiceChoice}"]`)?.classList.add('wrong');
+  navigator.vibrate?.(ok ? [24, 34, 42] : [12, 25, 12]);
+  if (A.sound) sound(ok, feedback.milestone);
+  queuePracticeAnswer(x.id, x.question_id, answer, ok);
+  if (ok) {
+    const answeredState = practiceState;
+    practiceAdvanceTimer = setTimeout(() => {
+      const nextButton = $('#practice-next');
+      if (nextButton && practiceState === answeredState) advancePracticeScreen(nextButton, answeredState);
+    }, feedback.milestone ? 420 : 300);
+  }
+}
+function queuePracticeAnswer(sessionId, questionId, answer, localOk) {
+  pendingAnswers += 1;
+  answerChain = answerChain.then(async () => {
+    if (brokenSession === sessionId) return;
+    let result;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        result = await api(`/practice/${sessionId}/answer`, { question_id: questionId, answer, prefetch_next: true });
+        break;
+      } catch (error) {
+        // The server answers a repeated question_id from its response cache, so retrying is safe.
+        if (!error?.transient || attempt >= 8) throw error;
+        if (practiceState?.id === sessionId) showSaveIssue('인터넷 연결을 확인하고 있어요. 답안은 순서대로 저장돼요.');
+        await new Promise(resolve => setTimeout(resolve, Math.min(8000, 800 * 2 ** attempt)));
+      }
+    }
+    if (practiceState?.id === sessionId) showSaveIssue('');
+    applyServerAnswer(sessionId, questionId, localOk, result);
+  }).catch(error => practiceChainFailed(sessionId, error))
+    .finally(() => { pendingAnswers -= 1; });
+}
+function applyServerAnswer(sessionId, questionId, localOk, result) {
+  const next = result.prefetched_next || null;
+  delete result.prefetched_next;
+  lastServerAnswer = { sessionId, questionId, next };
+  if (next) serverNext.set(next.question_id, next);
+  if (A.screen !== 'practice' || practiceState?.id !== sessionId) return;
+  practiceOffset = Number(result.server_time || Date.now()) - Date.now();
+  const current = practiceState;
+  const serverFeedback = result.feedback;
+  if (current.question_id === questionId && current.feedback) {
+    // Still on this answer's feedback: show the server's grading (dispute
+    // button, corrected result). Same object, so pending auto-advance stays valid.
+    if (serverFeedback && (serverFeedback.ok !== current.feedback.ok || serverFeedback.can_dispute)) {
+      current.feedback = serverFeedback;
+      renderPractice();
+    }
+  } else if (serverFeedback && serverFeedback.ok !== localOk) {
+    toast(serverFeedback.ok ? '서버 채점에서 정답으로 인정됐어요.' : '서버 채점에서 오답으로 처리됐어요.');
+  }
+  if (next?.finished && !current.feedback && current.question_id !== questionId) {
+    // The server ended the session although a prepared question was shown.
+    practiceState = next;
+    finishPracticeView();
+    return;
+  }
+  if (next && current.question_id === next.question_id) {
+    if (!current.feedback) {
+      // Same question already on screen: take the server's copy without
+      // re-rendering, so typing and the keyboard are not interrupted.
+      practiceState = next;
+    } else {
+      current.next_preview = next.next_preview || null;
+    }
+  }
+}
+function practiceChainFailed(sessionId, error) {
+  brokenSession = sessionId;
+  if (A.screen !== 'practice' || practiceState?.id !== sessionId) { toast(error?.message || '답안을 저장하지 못했어요.'); return; }
+  toast(error?.status === 409 ? '다른 화면에서 진행된 최신 문제를 불러왔어요.' : (error?.message || '답안을 저장하지 못했어요.') + ' 최신 상태를 다시 불러와요.');
+  api(`/practice/${sessionId}`).then(latest => {
+    if (practiceState?.id !== sessionId) return;
+    brokenSession = null;
+    serverNext.clear();
+    practiceState = latest;
+    showSaveIssue('');
+    if (latest.finished) finishPracticeView(); else renderPractice();
+  }).catch(() => showSaveIssue('답안 저장에 실패했어요. 화면을 나갔다가 다시 이어서 풀어주세요.'));
+}
+async function drainPracticeAnswers() {
+  if (pendingAnswers > 0) toast('답안을 저장하고 있어요.');
+  await answerChain;
+}
+// Mirrors the server's finish rule (advancePractice) after this answer.
+function practiceMayFinish(s) {
+  const covered = !s.cover_all || Number(s.covered || 0) >= (s.word_ids || []).length;
+  const scoredDone = Number(s.score_total || 0) >= Number(s.target || 0);
+  return covered && scoredDone && (s.exam_style || Number(s.retry_count || 0) === 0 || Number(s.total || 0) >= Number(s.target || 0) + 12);
+}
+async function advanceInstant(button, answeredState) {
+  const known = lastServerAnswer?.sessionId === answeredState.id && lastServerAnswer.questionId === answeredState.question_id ? lastServerAnswer.next : null;
+  if (known?.finished) { practiceState = known; renderPractice(); return; }
+  const preview = practiceMayFinish(answeredState) ? null : answeredState.next_preview;
+  const next = preview && (serverNext.get(preview.question_id) || {
+    ...answeredState,
+    question: preview.question, question_id: preview.question_id, question_is_retry: !!preview.is_retry,
+    local_check: preview.local_check || null, next_preview: null, feedback: null,
+    retry_count: Math.max(0, Number(answeredState.retry_count || 0) - (preview.is_retry ? 1 : 0))
+  });
+  if (next) { practiceState = next; renderPractice(); return; }
+  // No prepared question (last question, or the server has not answered yet):
+  // wait for the saves, then continue from the server's state.
+  buttonBusy(button);
+  button.textContent = '저장하고 있어요';
+  await answerChain;
+  if (practiceState !== answeredState) return;
+  if (lastServerAnswer?.sessionId === answeredState.id && lastServerAnswer.questionId === answeredState.question_id && lastServerAnswer.next) {
+    practiceState = lastServerAnswer.next;
+    renderPractice();
+    return;
+  }
+  try { practiceState = await api(`/practice/${answeredState.id}`); renderPractice(); }
+  catch (err) { toast(err.message); button.textContent = '다음 문제 다시 시도'; buttonBusy($('#practice-next'), false); }
+}
 async function advancePracticeScreen(button, answeredState) {
   if (practiceState !== answeredState) return;
   clearTimeout(practiceAdvanceTimer); practiceAdvanceTimer = null;
+  if (answeredState.instant) return advanceInstant(button, answeredState);
   if (prefetchedPractice) {
     practiceState = prefetchedPractice; prefetchedPractice = null; renderPractice(); return;
   }
@@ -559,6 +706,7 @@ async function advancePracticeScreen(button, answeredState) {
 }
 async function answerPractice(answer, button) {
   if (answering || practiceState.feedback) return;
+  if (canAnswerInstantly(practiceState)) return answerPracticeInstant(answer, button);
   answering = true; const x = practiceState;
   if (button) { button.classList.add('submitting'); button.setAttribute('aria-pressed', 'true'); }
   $$('[data-practice-choice],#practice-confirm').forEach(b => b.disabled = true);
