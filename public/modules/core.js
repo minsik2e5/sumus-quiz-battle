@@ -38,6 +38,7 @@ export const PET_FORMS = ['알', '아기', '성장', '최종'];
 export const PET_FORM_LEVELS = [1, 3, 10, 20];
 export const petForm = (level = 1) => PET_FORM_LEVELS.reduce((form, min, i) => (Number(level) >= min ? i : form), 0);
 export const PET_NAME_MAX = 8;
+export const EGG_PRICE = 800;
 // Student-chosen pet name, checked the same way on the device and on the server.
 // An empty name is allowed and means "use the pet's default name".
 export function cleanPetName(value) {
@@ -61,6 +62,15 @@ export function levelInfo(points = 0) {
   const current = level === 50 ? need : points - base;
   // `stage` (1..5) is kept for app versions still installed on phones; new screens use `form`.
   return { level, current, need, percent: clamp(current / need * 100, 0, 100), remaining: Math.max(0, need - current), stage: level >= 20 ? 5 : level >= 15 ? 4 : level >= 10 ? 3 : level >= 5 ? 2 : 1, form: petForm(level) };
+}
+// Each owned pet grows with the XP of practice finished while it was the partner.
+// Records from before pets were collectible (no pet_key) belong to the first pet.
+export function petProgress(pets = [], sessions = [], activeKey) {
+  return pets.map(pet => {
+    const xp = sessions.reduce((n, s) => n + ((s.pet_key ? s.pet_key === pet.key : pet.first) ? Number(s.xp || 0) : 0), 0);
+    const info = levelInfo(xp);
+    return { key: pet.key, name: pet.name || '', first: !!pet.first, acquired_at: pet.acquired_at || 0, xp, level: info.level, form: info.form, percent: info.percent, remaining: info.remaining, active: pet.key === activeKey };
+  });
 }
 export const unlocked = (item, growth) => !!item && (!item.level || growth.level >= item.level) && (!item.combo || growth.best_combo >= item.combo) && (!item.streak || growth.streak >= item.streak);
 export function displayEnglish(raw) {

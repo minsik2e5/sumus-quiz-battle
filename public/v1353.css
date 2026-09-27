@@ -12,6 +12,41 @@
 .pet-name-edit{margin-left:6px;vertical-align:middle;border:0;border-radius:999px;padding:3px 9px;background:rgba(10,142,104,.08);color:#078864;font-size:11px;font-weight:800;letter-spacing:0;cursor:pointer;touch-action:manipulation}
 .pet-name-edit:focus-visible{outline:2px solid #0b6e50;outline-offset:2px}
 
+/* Home: the pet opens "my pets"; points open the egg shop */
+.home-pet-open{appearance:none;border:0;padding:0;background:transparent;cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+.home-pet-open:focus-visible{outline:3px solid #0b6e50;outline-offset:4px;border-radius:24px}
+.home-mini-stats-v1337 .home-points-shop{appearance:none;border:0;background:transparent;padding:0;font:inherit;text-align:center;cursor:pointer;touch-action:manipulation}
+.home-mini-stats-v1337 .home-points-shop small{display:inline-block;margin-top:3px;padding:1px 7px;border-radius:999px;background:#fff4d9;color:#8a5a00;font-size:9px;font-weight:800}
+.home-mini-stats-v1337 .home-points-shop:focus-visible{outline:2px solid #0b6e50;outline-offset:2px;border-radius:10px}
+
+/* First pet pick and "my pets" */
+.pet-pick-heading p b{color:#07815f}
+.pet-pick-rules{margin:12px 0 4px;padding:12px 14px 12px 30px;border-radius:16px;background:#fff8e8;border:1px solid #f4e2b8;font-size:12.5px;line-height:1.65;color:#5b4a26}
+.pet-pick-rules b{color:#3d2f10}
+.pet-locked{cursor:default;opacity:.8;background:#f4f6f5!important;border-style:dashed!important}
+.pet-locked-art{display:grid;place-items:center;width:100%;aspect-ratio:1.05;font-size:28px;font-weight:900;color:#c3ccc8}
+.pet-shop-banner{display:flex;align-items:center;gap:12px;width:100%;margin:14px 0 4px;padding:12px 14px;border:1px solid #f1d9a0;border-radius:18px;background:linear-gradient(135deg,#fff8e6,#fff);text-align:left;cursor:pointer;font:inherit;color:#3d2f10;box-shadow:0 3px 0 #efdcae}
+.pet-shop-banner:active{transform:translateY(2px);box-shadow:0 1px 0 #efdcae}
+.pet-shop-banner:focus-visible{outline:3px solid #0b6e50;outline-offset:2px}
+.pet-shop-banner>span:nth-child(2){flex:1;min-width:0}
+.pet-shop-banner strong{display:block;font-size:15px}
+.pet-shop-banner small{display:block;margin-top:2px;font-size:11.5px;color:#8a6d2c}
+.pet-shop-banner>b{font-size:15px;color:#8a5a00;white-space:nowrap}
+.pet-shop-banner-egg{flex:none;width:40px;height:48px;border-radius:50% 50% 48% 48%/58% 58% 42% 42%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#fff,#ffe7a8 70%);border:2px solid #e9c46a;font-weight:900;color:#b98a2f}
+.pet-confirm{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+.pet-confirm .avatar-art{width:150px;height:150px}
+.pet-confirm h2{margin:4px 0 0}
+.pet-confirm p{margin:0 0 6px;color:#5d6d68;line-height:1.55}
+
+/* Egg shop dialog */
+.pet-shop{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%}
+.pet-shop-egg{width:110px;height:132px;margin-top:4px;border-radius:50% 50% 48% 48%/58% 58% 42% 42%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#fff,#ffe7a8 72%);border:3px solid #e9c46a;box-shadow:0 12px 28px -14px rgba(160,110,20,.6);font-size:44px;font-weight:900;color:#c99a3a;animation:petIdle 2.4s ease-in-out infinite;transform-origin:50% 90%}
+.pet-shop-copy{margin:0;font-size:13px;line-height:1.6;color:#5d6d68}
+.pet-shop-price{display:grid;grid-template-columns:auto auto auto auto;gap:4px 10px;align-items:baseline;padding:10px 16px;border-radius:14px;background:#f6f8f7;font-size:12px;color:#6c7c77}
+.pet-shop-price b{font-size:16px;color:#17242f}
+.pet-shop-reveal{width:170px;height:170px;animation:petPop .8s cubic-bezier(.2,1.6,.4,1)}
+.pet-shop-reveal .avatar-art{width:100%;height:100%}
+
 /* Moment dialog (hatch, evolution, naming) */
 .modal.pet-moment{max-width:380px;padding:18px 16px 18px;text-align:center;overflow:hidden}
 .pet-moment-body{display:flex;flex-direction:column;align-items:center;gap:12px}

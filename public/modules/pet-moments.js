@@ -1,21 +1,22 @@
-import { $, api, esc, toast } from './ui.js';
-import { CHARACTERS, PET_FORMS, PET_NAME_MAX, cleanPetName } from './core.js';
+import { $, api, esc, num, toast } from './ui.js';
+import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, cleanPetName } from './core.js';
 import { avatar, petKey } from './character.js';
 
 // Pet moments: the hatch (egg -> baby) and evolution scenes shown on the home screen the
 // first time a student's pet reaches a new form, plus the pet-name form.
 // The last form a student has seen is kept per device, so each moment plays once.
 
-const SEEN_KEY = id => `sumus:v13:pet-form:${id}`;
-const readSeen = id => { try { const v = localStorage.getItem(SEEN_KEY(id)); return v === null ? null : Number(v); } catch { return null; } };
-const writeSeen = (id, form) => { try { localStorage.setItem(SEEN_KEY(id), String(form)); } catch {} };
+const SEEN_KEY = (id, key) => `sumus:v13:pet-form:${id}:${key}`;
+const readSeen = (id, key) => { try { const v = localStorage.getItem(SEEN_KEY(id, key)); return v === null ? null : Number(v); } catch { return null; } };
+const writeSeen = (id, key, form) => { try { localStorage.setItem(SEEN_KEY(id, key), String(form)); } catch {} };
 const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export const petJosa = (word, withBatchim, without) => {
   const code = word.charCodeAt(word.length - 1) - 0xac00;
   return word + (code >= 0 && code <= 11171 && code % 28 ? withBatchim : without);
 };
-export const petDisplayName = profile => profile.pet_name || CHARACTERS[petKey(profile.avatar_key)].ko;
+// pet is an entry of stats.pets (the active one is stats.pet).
+export const petDisplayName = pet => pet?.name || CHARACTERS[petKey(pet?.key)].ko;
 
 // Where the egg sits inside each egg sprite (percent of the canvas): centre and width.
 const EGG_BOX = { dog: { x: 50, y: 50, w: 58 }, pig: { x: 50, y: 50, w: 58 }, default: { x: 50, y: 52, w: 40 } };
@@ -36,18 +37,18 @@ function burst(container, count, shards) {
   }).join('');
 }
 
-function nameFormHtml(profile) {
-  const fallback = CHARACTERS[petKey(profile.avatar_key)].ko;
+function nameFormHtml(pet) {
+  const fallback = CHARACTERS[petKey(pet.key)].ko;
   return `<form class="pet-name-form" novalidate>
     <label for="pet-name-input">우리 펫의 이름을 지어주세요</label>
-    <input id="pet-name-input" name="pet_name" autocomplete="off" enterkeyhint="done" maxlength="24" placeholder="${esc(fallback)}" value="${esc(profile.pet_name || '')}">
+    <input id="pet-name-input" name="pet_name" autocomplete="off" enterkeyhint="done" maxlength="24" placeholder="${esc(fallback)}" value="${esc(pet.name || '')}">
     <p class="pet-name-hint">한글·영어·숫자 ${PET_NAME_MAX}자까지 · 비워 두면 '${esc(fallback)}'(으)로 불러요</p>
     <p class="pet-name-error" role="alert"></p>
     <div class="pet-moment-actions"><button type="button" class="btn" data-pet-later>나중에</button><button type="submit" class="btn primary">이 이름으로 할게요</button></div>
   </form>`;
 }
 
-function bindNameForm(root, profile, done) {
+function bindNameForm(root, pet, done) {
   const form = root.querySelector('.pet-name-form'), input = form.querySelector('input'), error = form.querySelector('.pet-name-error');
   form.querySelector('[data-pet-later]').onclick = () => done(false);
   form.onsubmit = async event => {
@@ -57,7 +58,7 @@ function bindNameForm(root, profile, done) {
     const submit = form.querySelector('[type="submit"]'); submit.disabled = true; error.textContent = '';
     try {
       await api('/profile/pet-name', { pet_name: name });
-      profile.pet_name = name || undefined;
+      pet.name = name;
       toast(name ? `이제 ${petJosa(name, '이', '')}라고 불러요!` : '기본 이름으로 불러요.');
       done(true);
     } catch (err) { error.textContent = err.message; submit.disabled = false; }
@@ -164,29 +165,30 @@ function closeOverlay(changed, onChanged) {
 
 // Call after each student render; plays a moment when the pet has reached a new form.
 export function maybePetMoment(A, onChanged) {
-  const p = A.data?.profile;
-  if (momentOpen || A.screen || A.tab !== 'home' || p?.role !== 'student' || !p.avatar_key || $('#modal-root').children.length) return;
-  const form = Number(A.data.stats?.form ?? 0), level = Number(A.data.stats?.level || 1);
-  let seen = readSeen(p.id);
+  const p = A.data?.profile, pet = A.data?.stats?.pet;
+  if (momentOpen || A.screen || A.tab !== 'home' || p?.role !== 'student' || !pet || $('#modal-root').children.length) return;
+  const form = Number(pet.form || 0);
+  let seen = readSeen(p.id, pet.key);
   if (seen === null) {
-    // First run of this version: pets that were still eggs under the old Lv.5 rule get their hatch.
-    seen = form >= 1 && level < 5 ? 0 : form;
-    writeSeen(p.id, seen);
+    // First look at this pet on this device. A first pet that was still an egg under the
+    // old Lv.5 rule gets its hatch; any other pet starts from what it is now.
+    seen = pet.first && form >= 1 && pet.level < 5 ? 0 : form;
+    writeSeen(p.id, pet.key, seen);
   }
-  if (form <= seen) { if (form < seen) writeSeen(p.id, form); return; }
+  if (form <= seen) { if (form < seen) writeSeen(p.id, pet.key, form); return; }
   momentOpen = true;
-  const key = petKey(p.avatar_key);
+  const key = petKey(pet.key);
   const body = openOverlay(seen === 0 ? '부화' : '진화');
   let named = false;
-  $('[data-pet-close]').onclick = () => { writeSeen(p.id, form); closeOverlay(named, onChanged); };
+  $('[data-pet-close]').onclick = () => { writeSeen(p.id, pet.key, form); closeOverlay(named, onChanged); };
   const finished = () => {
-    writeSeen(p.id, form);
+    writeSeen(p.id, pet.key, form);
     const next = document.createElement('div');
     next.className = 'pet-moment-next';
-    if (seen === 0 && !p.pet_name) {
-      next.innerHTML = nameFormHtml(p);
+    if (seen === 0 && !pet.name) {
+      next.innerHTML = nameFormHtml(pet);
       body.appendChild(next);
-      bindNameForm(next, p, saved => { named = saved; closeOverlay(saved, onChanged); });
+      bindNameForm(next, pet, saved => { named = saved; closeOverlay(saved, onChanged); });
     } else {
       next.innerHTML = '<div class="pet-moment-actions"><button type="button" class="btn primary" data-pet-done>좋아요!</button></div>';
       body.appendChild(next);
@@ -194,17 +196,56 @@ export function maybePetMoment(A, onChanged) {
       next.querySelector('[data-pet-done]').focus({ preventScroll: true });
     }
   };
-  if (seen === 0) hatchScene(body, key, petDisplayName(p), finished);
-  else evolveScene(body, key, petDisplayName(p), Math.max(1, seen), form, finished);
+  if (seen === 0) hatchScene(body, key, petDisplayName(pet), finished);
+  else evolveScene(body, key, petDisplayName(pet), Math.max(1, seen), form, finished);
 }
 
-// Rename from the home or studio screen.
+// Rename the active pet from the home or pet screen.
 export function openPetNameModal(A, onChanged) {
-  const p = A.data.profile;
-  if (momentOpen || !p.avatar_key) return;
+  const pet = A.data.stats?.pet;
+  if (momentOpen || !pet) return;
   momentOpen = true;
   const body = openOverlay('펫 이름 짓기');
-  body.innerHTML = `<div class="pet-name-solo"><div class="pet-name-avatar">${avatar(p.avatar_key, { form: Math.max(1, Number(A.data.stats?.form ?? 1)), expression: 'happy' })}</div>${nameFormHtml(p)}</div>`;
+  body.innerHTML = `<div class="pet-name-solo"><div class="pet-name-avatar">${avatar(pet.key, { form: Math.max(1, pet.form), expression: 'happy' })}</div>${nameFormHtml(pet)}</div>`;
   $('[data-pet-close]').onclick = () => closeOverlay(false, onChanged);
-  bindNameForm(body, p, saved => closeOverlay(saved, onChanged));
+  bindNameForm(body, pet, saved => closeOverlay(saved, onChanged));
+}
+
+// Shop: buy a random egg, then reveal which pet's egg it was.
+export function openEggShop(A, onChanged) {
+  const g = A.data.stats;
+  if (momentOpen || !g?.pet) return;
+  const missing = Object.keys(CHARACTERS).filter(key => !g.pets.some(x => x.key === key));
+  const short = Math.max(0, EGG_PRICE - Number(g.points_balance || 0));
+  momentOpen = true;
+  const body = openOverlay('랜덤 알 상점');
+  body.innerHTML = `<div class="pet-shop">
+    <div class="pet-shop-egg" aria-hidden="true"><span>?</span></div>
+    <p class="pet-moment-msg">어떤 친구가 들어 있을까요?</p>
+    <p class="pet-shop-copy">아직 만나지 못한 ${missing.length}마리 중 한 마리의 알이 나와요.<br>새 알은 바로 파트너가 되고, 함께 공부하면 Lv.3에 태어나요.</p>
+    <div class="pet-shop-price"><span>가격</span><b>${num(EGG_PRICE)}P</b><span>보유</span><b>${num(g.points_balance || 0)}P</b></div>
+    <p class="pet-name-error" role="alert">${!missing.length ? '모든 펫을 모았어요!' : short ? `${num(short)}P가 더 필요해요. 공부하면 포인트가 쌓여요.` : ''}</p>
+    <div class="pet-moment-actions"><button type="button" class="btn" data-pet-later>닫기</button><button type="button" class="btn primary" data-pet-buy ${!missing.length || short ? 'disabled' : ''}>${num(EGG_PRICE)}P로 알 사기</button></div>
+  </div>`;
+  const close = changed => closeOverlay(changed, onChanged);
+  $('[data-pet-close]').onclick = () => close(false);
+  body.querySelector('[data-pet-later]').onclick = () => close(false);
+  body.querySelector('[data-pet-buy]').onclick = async event => {
+    const button = event.currentTarget; button.disabled = true;
+    try {
+      const { key } = await api('/shop/egg', {});
+      const name = CHARACTERS[key].ko;
+      body.innerHTML = `<div class="pet-shop">
+        <div class="pet-shop-reveal">${avatar(key, { form: 0 })}</div>
+        <p class="pet-moment-msg"><b>${esc(petJosa(name, '이', ''))}</b>의 알이에요!</p>
+        <p class="pet-shop-copy">지금부터 ${esc(petJosa(name, '과', '와'))} 함께 공부해요.<br>Lv.3이 되면 알이 깨져요.</p>
+        <div class="pet-moment-actions"><button type="button" class="btn primary" data-pet-done>좋아요!</button></div>
+      </div>`;
+      body.querySelector('[data-pet-done]').onclick = () => close(true);
+      $('[data-pet-close]').onclick = () => close(true);
+    } catch (err) {
+      body.querySelector('.pet-name-error').textContent = err.message;
+      button.disabled = false;
+    }
+  };
 }

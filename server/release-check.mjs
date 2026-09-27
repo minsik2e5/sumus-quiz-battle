@@ -280,15 +280,44 @@ export async function runReleaseCheck() {
     assert(highBStudent.class_name === '고1B' && highABootstrap.exams.some(item => item.id === schoolWideExam.id) && highBBootstrap.exams.some(item => item.id === schoolWideExam.id), 'school-wide exam reaches both high-school classes');
     await expectStatus(403, () => service(state, 'PATCH', '/profile/school', { school_id: 'seonbu-high' }, studentToken), 'student cannot change own school');
 
+    // Pets: first pick once, names per pet, random eggs from the shop, separate growth.
+    const petStudent = state.profiles.find(x => x.username === 'qa_student');
+    const beforePick = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    assert(beforePick.stats.needs_pet_pick === true && !beforePick.stats.pets.length, 'V13.53 existing students are asked to pick their first pet');
+    await expectStatus(409, () => service(state, 'POST', '/profile/pet-name', { pet_name: '콩이' }, studentToken), 'V13.53 naming waits for the first pet');
+    await expectStatus(409, () => service(state, 'POST', '/shop/egg', {}, studentToken), 'V13.53 the egg shop waits for the first pet');
+    await service(state, 'POST', '/pets/choose', { key: 'fox' }, studentToken);
+    await expectStatus(409, () => service(state, 'POST', '/pets/choose', { key: 'cat' }, studentToken), 'V13.53 the first pet cannot be chosen again');
+    await expectStatus(403, () => service(state, 'POST', '/pets/choose', { key: 'cat' }, teacherToken), 'V13.53 teachers cannot pick a student pet');
+    await expectStatus(403, () => service(state, 'POST', '/profile/style', { avatar_key: 'cat', avatar_accessory: 'none', avatar_frame: 'basic', avatar_title: 'rookie' }, studentToken), 'V13.53 students cannot switch to a pet they do not own');
+    await expectStatus(403, () => service(state, 'POST', '/pets/active', { key: 'cat' }, studentToken), 'V13.53 an unowned pet cannot become the partner');
     const namedPet = await service(state, 'POST', '/profile/pet-name', { pet_name: '  콩  이  ' }, studentToken);
-    assert(namedPet.pet_name === '콩 이', 'V13.53 student names their pet (spaces tidied)');
+    assert(namedPet.pets[0].name === '콩 이', 'V13.53 student names the partner pet (spaces tidied)');
     await expectStatus(400, () => service(state, 'POST', '/profile/pet-name', { pet_name: '가나다라마바사아자' }, studentToken), 'V13.53 pet names longer than 8 characters are rejected');
     await expectStatus(400, () => service(state, 'POST', '/profile/pet-name', { pet_name: '<b>콩</b>' }, studentToken), 'V13.53 pet names with markup characters are rejected');
     await expectStatus(403, () => service(state, 'POST', '/profile/pet-name', { pet_name: '콩이' }, teacherToken), 'V13.53 teachers cannot name a student pet');
-    const namedBootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
-    assert(namedBootstrap.profile.pet_name === '콩 이' && Number.isInteger(namedBootstrap.stats.form) && namedBootstrap.stats.form === petForm(namedBootstrap.stats.level), 'V13.53 bootstrap returns the pet name and the pet form for the level');
+    const legacyXp = state.sessions.filter(s => s.student_id === petStudent.id).reduce((n, s) => n + Number(s.xp || 0), 0);
+    const picked = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    assert(!picked.stats.needs_pet_pick && picked.stats.pet.key === 'fox' && picked.stats.pet.name === '콩 이' && picked.stats.pet.xp === legacyXp && picked.stats.pet.form === petForm(picked.stats.pet.level), 'V13.53 the first pet starts with the XP the student already earned');
+    const shortBalance = picked.stats.points_balance;
+    if (shortBalance < 800) await expectStatus(400, () => service(state, 'POST', '/shop/egg', {}, studentToken), 'V13.53 an egg needs 800 points');
+    const shopRecord = { id: 'qa-shop-points', student_id: petStudent.id, division: petStudent.division, school_id: petStudent.school_id, school: petStudent.school, total: 1, correct: 1, xp: 0, reward_points: 800 * 8, created_at: Date.now() - 60000 };
+    state.sessions.push(shopRecord);
+    const egg = await service(state, 'POST', '/shop/egg', {}, studentToken);
+    const afterEgg = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    assert(egg.key !== 'fox' && afterEgg.stats.pets.length === 2 && afterEgg.stats.pet.key === egg.key && afterEgg.stats.pet.xp === 0 && afterEgg.stats.pet.form === 0 && afterEgg.stats.points_spent === 800 && afterEgg.stats.points_balance === afterEgg.stats.reward_points - 800, 'V13.53 a random egg brings a new pet as an egg partner and spends 800 points');
+    const grownRecord = { id: 'qa-egg-growth', student_id: petStudent.id, division: petStudent.division, school_id: petStudent.school_id, school: petStudent.school, total: 1, correct: 1, xp: 500, pet_key: egg.key, reward_points: 0, created_at: Date.now() - 30000 };
+    state.sessions.push(grownRecord);
+    const grown = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    assert(grown.stats.pet.xp === 500 && grown.stats.pet.form === 1 && grown.stats.pets.find(x => x.key === 'fox').xp === legacyXp, 'V13.53 each pet grows only with the XP earned while it is the partner');
+    await service(state, 'POST', '/pets/active', { key: 'fox' }, studentToken);
+    for (let i = 2; i < Object.keys(CHARACTERS).length; i++) await service(state, 'POST', '/shop/egg', {}, studentToken);
+    const collected = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    assert(new Set(collected.stats.pets.map(x => x.key)).size === Object.keys(CHARACTERS).length, 'V13.53 eggs only bring pets the student does not have yet');
+    await expectStatus(409, () => service(state, 'POST', '/shop/egg', {}, studentToken), 'V13.53 the shop stops once every pet is collected');
+    state.sessions = state.sessions.filter(s => s !== shopRecord && s !== grownRecord);
     const clearedPet = await service(state, 'POST', '/profile/pet-name', { pet_name: '' }, studentToken);
-    assert(!('pet_name' in clearedPet), 'V13.53 an empty pet name returns to the default name');
+    assert(!('name' in clearedPet.pets.find(x => x.key === clearedPet.avatar_key)), 'V13.53 an empty pet name returns to the default name');
 
     const aliasWord = danwonWords[0];
     const aliasResult = await service(state, 'POST', '/meaning-aliases/' + encodeURIComponent(aliasWord.id), { alias: '교사용 허용 뜻' }, teacherToken);
