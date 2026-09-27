@@ -36,16 +36,23 @@ function createSupabaseRepository(env) {
   const headers = { apikey: apiKey, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
 
   async function rpc(name, body) {
-    const response = await fetch(base + name, {
-      method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body), signal: AbortSignal.timeout(12000)
-    });
-    const text = await response.text();
+    const text = typeof body === 'string' ? body : JSON.stringify(body);
+    let response;
+    try {
+      response = await fetch(base + name, { method: 'POST', headers, body: text, signal: AbortSignal.timeout(12000) });
+    } catch (error) {
+      // Timeouts and network failures: keep the cause for /api/health and the logs.
+      throw Object.assign(Error('영구 저장 서버에 연결하지 못했습니다.'), { status: 503, detail: `${name}: ${error?.name || 'Error'} ${error?.message || ''} (${Math.round(text.length / 1024)} KB)`.trim() });
+    }
+    const responseText = await response.text();
     let payload = null;
-    try { payload = text ? JSON.parse(text) : null; } catch {}
+    try { payload = responseText ? JSON.parse(responseText) : null; } catch {}
     if (!response.ok) {
       const message = payload?.message || payload?.error || 'Supabase 저장 연결을 확인해주세요.';
       const status = payload?.code === '40001' || message.includes('revision_conflict') ? 409 : 503;
-      throw Object.assign(Error(status === 409 ? '다른 기기의 변경이 있습니다. 다시 시도해주세요.' : '영구 저장 서버에 연결하지 못했습니다.'), { status });
+      // Supabase's own reason (never the request body or secret), for diagnosing failed backups.
+      const detail = `${name}: HTTP ${response.status}${payload?.code ? ' ' + payload.code : ''} ${String(message).slice(0, 160)} (${Math.round(text.length / 1024)} KB)`;
+      throw Object.assign(Error(status === 409 ? '다른 기기의 변경이 있습니다. 다시 시도해주세요.' : '영구 저장 서버에 연결하지 못했습니다.'), { status, detail });
     }
     return payload;
   }
@@ -194,7 +201,7 @@ export class VocaStateObject {
       const sync = this.sync.status();
       if (request.method !== 'GET' && elapsed > 1500) console.warn('[slow-mutation]', url.pathname.replace(/\/[0-9a-f-]{36}/g, '/:id'), { elapsed, commitMs, commitBytes });
       // Public health output shows whether the Supabase backup is keeping up.
-      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures };
+      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, state_kb: Math.round((this.local.latest()?.json.length || 0) / 1024) };
       const responseHeaders = {
         // Visible in DevTools > Network > Timing, so slow saves can be measured on a real phone.
         // commit = local durable write; supabase = last background upload.
