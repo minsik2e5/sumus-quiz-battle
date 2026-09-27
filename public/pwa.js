@@ -67,9 +67,36 @@ window.addEventListener('appinstalled', () => {
   try { localStorage.setItem('sumus:pwa-hint:v1326', 'dismissed'); } catch {}
 });
 
+// A new version installs in the background (sw.js). Switch to it only when
+// the switch cannot interrupt anything: no exam/practice screen, no open
+// dialog, nobody typing. The switch reloads the page from the new cache.
+function updateIsSafe() {
+  return !document.querySelector('.session-app') && !document.querySelector('#modal-root .modal') &&
+    !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName);
+}
+function applyWaitingUpdate(registration) {
+  if (!registration.waiting || !navigator.serviceWorker.controller) return;
+  if (updateIsSafe()) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+  else setTimeout(() => applyWaitingUpdate(registration), 5000);
+}
+
 if ('serviceWorker' in navigator) {
+  // On a first visit the worker takes control without a page swap; only a
+  // version change should reload.
+  const hadController = !!navigator.serviceWorker.controller;
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    reloading = true;
+    location.reload();
+  });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js', { scope: '/' }).then(registration => {
+      applyWaitingUpdate(registration);
+      registration.addEventListener('updatefound', () => {
+        const worker = registration.installing;
+        worker?.addEventListener('statechange', () => { if (worker.state === 'installed') applyWaitingUpdate(registration); });
+      });
       registration.update().catch(() => {});
     }).catch(() => {});
     setTimeout(showInstallHint, 1400);

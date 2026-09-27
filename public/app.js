@@ -797,15 +797,14 @@ function exportResults() {
 }
 loginView();
 try {
-  const session = await api('/session');
-  if (session.authenticated) {
-    await refresh();
-    preferences();
-    A.tab = A.data.profile.role === 'teacher' ? 'dashboard' : A.data.profile.avatar_key ? 'home' : 'studio';
-    render();
-    startPolling();
-    if (A.data.profile.role === 'student' && A.data.active_practice) await resumeActivePractice();
-  }
+  // Ask for the data directly: a 401 means "not logged in", so a separate
+  // /session round trip (~0.7 s from Korea) is not needed first.
+  await refresh();
+  preferences();
+  A.tab = A.data.profile.role === 'teacher' ? 'dashboard' : A.data.profile.avatar_key ? 'home' : 'studio';
+  render();
+  startPolling();
+  if (A.data.profile.role === 'student' && A.data.active_practice) await resumeActivePractice();
 } catch (e) {
   if (e.status !== 401) {
     $('#login-error').textContent = '서버 응답이 느립니다. 잠시 후 다시 로그인해주세요.';
