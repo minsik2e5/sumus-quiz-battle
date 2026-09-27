@@ -21,6 +21,10 @@
       {
         "name": "VOCA_STATE",
         "class_name": "VocaStateObject"
+      },
+      {
+        "name": "BATTLE_ROOM",
+        "class_name": "BattleRoom"
       }
     ]
   },
@@ -29,6 +33,12 @@
       "tag": "v1",
       "new_sqlite_classes": [
         "VocaStateObject"
+      ]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": [
+        "BattleRoom"
       ]
     }
   ],
