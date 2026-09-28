@@ -59,7 +59,7 @@ function todayWordQuest(A, goal = 20) {
   const mix = daily.mix || { wrong: 0, review: 0, new: 0 };
   const nextText = active ? '진행 중인 연습 이어가기'
     : daily.target > 0 ? `오답 ${mix.wrong || 0} · 복습 ${mix.review || 0} · 새 단어 ${mix.new || 0}`
-    : next ? `${next.range_code}번 · ${meta.label}`
+    : next ? `${rangeLabel(A.school, next.range_code)} · ${meta.label}`
     : '시험범위에서 시작하기';
 
   return `<div class="section-title compact-home-title"><h2>오늘의 단어 퀘스트</h2><span class="tiny muted">오늘 ${done} / ${goal}</span></div>
