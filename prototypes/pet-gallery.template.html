@@ -1,0 +1,184 @@
+<title>SUMUS 펫 도감</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Fredoka:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<style>
+  /* Single light look, matching the student app's green system. */
+  :root{
+    color-scheme: light;
+    --primary:#12b886; --primary-deep:#07815f; --primary-soft:#eaf8f2;
+    --ink:#17242f; --muted:#6c7c77; --line:#dde6e2; --ground:#f1f5f3; --panel:#ffffff; --tint:#f7faf8;
+    --display:"Jua","Noto Sans KR",system-ui,sans-serif;
+    --body:"Noto Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    --latin:"Fredoka","Noto Sans KR",system-ui,sans-serif;
+  }
+  [hidden]{display:none!important}
+  body{background:var(--ground);color:var(--ink);font-family:var(--body);padding-inline:16px}
+  .page{max-width:980px;margin:0 auto;padding-block:22px 40px;display:flex;flex-direction:column;gap:26px}
+  header{display:flex;flex-direction:column;gap:6px}
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--primary-deep);text-transform:uppercase}
+  h1{font-family:var(--display);font-weight:400;font-size:clamp(30px,6vw,40px);margin:0;line-height:1.1;text-wrap:balance}
+  .lead{margin:0;color:var(--muted);font-size:14px;line-height:1.6;max-width:62ch}
+  .tabs{display:flex;flex-wrap:wrap;gap:8px}
+  .tab{appearance:none;border:0;cursor:pointer;background:var(--panel);border-radius:999px;padding:5px 14px 5px 6px;display:flex;align-items:center;gap:6px;font-family:var(--body);font-weight:700;font-size:14px;color:var(--ink);box-shadow:0 0 0 1.5px var(--line) inset}
+  .tab .mini{width:34px;height:34px}
+  .tab[aria-selected="true"]{background:var(--primary-soft);box-shadow:0 0 0 2px var(--primary) inset}
+  .tab:focus-visible{outline:3px solid #0b6e50;outline-offset:2px}
+  section{display:flex;flex-direction:column;gap:12px}
+  h2{font-family:var(--display);font-weight:400;font-size:22px;margin:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  h2 small{font-family:var(--body);font-size:12.5px;color:var(--muted);font-weight:500}
+  .grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .grid.five{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+  @media (max-width:720px){ .grid.five,.grid.four{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  .card{background:var(--panel);border-radius:16px;padding:10px 10px 12px;display:flex;flex-direction:column;align-items:center;gap:4px;box-shadow:0 0 0 1px var(--line) inset}
+  .card .pic{width:100%;max-width:170px;aspect-ratio:1}
+  .card b{font-family:var(--display);font-weight:400;font-size:17px}
+  .card span{font-size:12px;color:var(--muted);text-align:center;line-height:1.4}
+  .card .lv{font-family:var(--latin);font-weight:600;font-size:11px;color:var(--primary-deep);background:var(--primary-soft);border-radius:999px;padding:1px 8px}
+  .avatar-art svg{width:100%;height:auto;display:block;overflow:visible}
+  .avatar-stage-name{display:none}
+  .avatar-img img{width:100%;max-width:100%;height:auto;display:block;filter:drop-shadow(0 2px 5px rgba(20,40,30,.14))}
+  .card,.card .pic,.lineup .cell,.tab .mini{min-width:0}
+  .avatar-img{animation:bob 2.6s ease-in-out infinite}
+  .sizes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .size-row{border-radius:16px;padding:14px;display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;box-shadow:0 0 0 1px var(--line) inset}
+  .size-row.white{background:#fff} .size-row.green{background:#eaf8f2}
+  .size-row figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--muted);font-weight:700}
+  .size-row .s40{width:40px} .size-row .s64{width:64px} .size-row .s96{width:96px}
+  .size-row .avatar-img{animation:none}
+  @media (max-width:560px){ .sizes{grid-template-columns:1fr} }
+  .pet-body{animation:bob 2.6s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .compare .card{padding-block:14px}
+  .compare .tag{font-size:11px;font-weight:700;letter-spacing:.08em;border-radius:6px;padding:2px 8px}
+  .tag.old{background:#f0eeea;color:#7a6f63} .tag.new{background:var(--primary-soft);color:var(--primary-deep)}
+  .lineup{display:grid;grid-template-columns:auto repeat(4,minmax(0,1fr));gap:6px;align-items:center;background:var(--panel);border-radius:16px;padding:10px;box-shadow:0 0 0 1px var(--line) inset;overflow-x:auto}
+  .lineup .h{font-size:11.5px;font-weight:700;color:var(--muted);text-align:center}
+  .lineup .name{font-family:var(--display);font-size:15px;padding-right:6px;white-space:nowrap}
+  .lineup .cell{max-width:120px;justify-self:center;width:100%}
+  .evo-pick{display:flex;gap:8px;flex-wrap:wrap}
+  .evo-pick button{appearance:none;border:0;cursor:pointer;background:var(--panel);border-radius:999px;padding:7px 14px;font-family:var(--body);font-weight:700;font-size:13px;color:var(--ink);box-shadow:0 0 0 1.5px var(--line) inset}
+  .evo-pick button[aria-pressed="true"]{background:var(--primary-soft);box-shadow:0 0 0 2px var(--primary) inset}
+  .evo-pick button:focus-visible{outline:3px solid #0b6e50;outline-offset:2px}
+  .hatch-card{background:radial-gradient(120% 90% at 50% 0%,#fffaf0,#ffffff 60%);border-radius:20px;padding:18px 16px 20px;box-shadow:0 0 0 1px var(--line) inset}
+  .note{background:var(--tint);border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.65;color:#33443e;box-shadow:0 0 0 1px var(--line) inset}
+  .note b{color:var(--ink)}
+  @media (prefers-reduced-motion:reduce){ .pet-body{animation:none} }
+</style>
+
+<div class="page">
+  <header>
+    <span class="eyebrow">SUMUS VOCA · 캐릭터 시안 v2</span>
+    <h1>SUMUS 펫 도감</h1>
+    <p class="lead">새로 그린 펫 8마리예요. 레벨이 오르면 모습이 바뀌고, 야차전에서는 상황에 따라 표정이 바뀌어요.</p>
+  </header>
+
+  <div class="tabs" id="tabs" role="tablist" aria-label="펫 고르기"></div>
+
+  <section>
+    <h2>부화 <small>Lv.3이 되면 알이 깨져요 · 알을 세 번 두드려 보세요</small></h2>
+    <div class="hatch-card" id="hatch"></div>
+  </section>
+
+  <section>
+    <h2>진화 <small>Lv.10에 성장, Lv.20에 최종 모습이 돼요</small></h2>
+    <div class="evo-pick" id="evoPick" role="group" aria-label="진화 고르기">
+      <button type="button" data-from="1" aria-pressed="true">아기 → 성장</button>
+      <button type="button" data-from="2" aria-pressed="false">성장 → 최종</button>
+    </div>
+    <div id="evolve"></div>
+  </section>
+
+  <section>
+    <h2 id="evoTitle">진화 단계 <small>레벨이 오르면 자동으로 진화해요</small></h2>
+    <div class="grid four" id="evo"></div>
+  </section>
+
+  <section>
+    <h2>표정 <small>야차전과 홈 화면에서 상황에 맞게 바뀌어요</small></h2>
+    <div class="grid five" id="faces"></div>
+  </section>
+
+  <section>
+    <h2>지금 그림과 비교 <small>같은 성장체 단계</small></h2>
+    <div class="compare" id="compare"></div>
+  </section>
+
+  <section>
+    <h2>작은 크기 테스트 <small>펫 고르기 버튼, 랭킹 목록처럼 작게 보일 때</small></h2>
+    <div class="sizes" id="sizes"></div>
+  </section>
+
+  <section>
+    <h2>장신구 <small id="accNote">지금 앱의 장신구 5종을 새 그림에 맞췄어요</small></h2>
+    <div class="grid five" id="acc"></div>
+  </section>
+
+  <section>
+    <h2>전체 진화 한눈에</h2>
+    <div class="lineup" id="lineup"></div>
+  </section>
+
+  <p class="note"><b>시안 안내</b> · 모든 펫이 새 일러스트(GPT로 만든 진화 모음을 잘라서 사용)예요. 토리(토끼)와 호야(여우)는 새로 추가한 펫이고 이름은 임시예요. 장신구는 아직 일러스트에 맞춰지지 않아서 일러스트 펫에는 표시되지 않아요.</p>
+</div>
+
+<script>window.PET_IMAGE_BASE = 'pets/';</script>
+<script>
+/*__AVATAR__*/
+/*__AVATAR_OLD__*/
+/*__HATCH__*/
+/*__EVOLVE__*/
+
+const STAGES = PET_FORMS.map((name, i) => [i ? `${i}단계 · ${name}` : name, `Lv.${PET_FORM_LEVELS[i]}`]);
+const FACES = [['normal','기본','평소'],['happy','기쁨','정답을 맞혔을 때'],['angry','공격','공격할 때'],['hurt','아픔','공격을 받았을 때'],['win','승리','대결에서 이겼을 때']];
+const ACC = [['headset','헤드셋','Lv.3'],['glasses','포커스 글래스','Lv.6'],['starpin','스타 핀','Lv.9'],['visor','바이저','Lv.13'],['crown','크라운','Lv.18']];
+const $ = id => document.getElementById(id);
+let current = 'dog';
+try { current = localStorage.getItem('gallery.pet') || 'dog'; } catch {}
+if (!CHARACTERS[current]) current = 'dog';
+
+function card(pic, title, sub, lv){
+  return `<div class="card"><div class="pic">${pic}</div>${lv ? `<span class="lv">${lv}</span>` : ''}<b>${title}</b>${sub ? `<span>${sub}</span>` : ''}</div>`;
+}
+function render(){
+  $('tabs').innerHTML = Object.entries(CHARACTERS).map(([k,c]) =>
+    `<button class="tab" role="tab" type="button" data-k="${k}" aria-selected="${k===current}"><span class="mini">${avatar(k,{stage:1})}</span>${c.ko}</button>`).join('');
+  const c = CHARACTERS[current];
+  hatchScene($('hatch'), current);
+  evolveScene($('evolve'), current, evoFrom, evoFrom + 1);
+  $('evoTitle').innerHTML = `${c.ko}의 진화 <small>알에서 태어나 3단계로 자라요</small>`;
+  $('evo').innerHTML = STAGES.map(([name,lv],i) => card(avatar(current,{stage:i}), name, '', lv)).join('');
+  const illustrated = !!PET_IMAGES[current];
+  $('faces').innerHTML = FACES.map(([e,name,sub]) => {
+    const ready = !illustrated || e === 'normal' || (petImage(current, 2, e)?.src || '').includes('-' + (e === 'win' ? 'happy' : e));
+    return card(avatar(current,{stage:2, expression:e}), name, ready ? sub : '그림 준비 중 · 지금은 기본 표정');
+  }).join('');
+  const sizes = s => `<figure><div class="s40">${avatar(current,{stage:s})}</div>40px</figure><figure><div class="s64">${avatar(current,{stage:s})}</div>64px</figure><figure><div class="s96">${avatar(current,{stage:s})}</div>96px</figure>`;
+  $('sizes').innerHTML = `<div class="size-row white">${sizes(2)}</div><div class="size-row green">${sizes(3)}</div>`;
+  $('compare').innerHTML =
+    `<div class="card"><span class="tag old">지금</span><div class="pic">${avatarOld(current,{stage:3})}</div><b>${c.ko}</b></div>` +
+    `<div class="card"><span class="tag new">새 그림</span><div class="pic">${avatar(current,{stage:2})}</div><b>${c.ko}</b></div>`;
+  $('accNote').textContent = illustrated ? '일러스트용 장신구는 아직 준비 중이라 기본 모습으로 보여요' : '지금 앱의 장신구 5종을 새 그림에 맞췄어요';
+  $('acc').innerHTML = ACC.map(([a,name,lv]) => card(avatar(current,{stage:2, accessory:a}), name, '', lv)).join('');
+}
+function renderLineup(){
+  const head = `<span></span>${STAGES.map(([n]) => `<span class="h">${n}</span>`).join('')}`;
+  $('lineup').innerHTML = head + Object.entries(CHARACTERS).map(([k,c]) =>
+    `<span class="name">${c.ko}</span>${[0,1,2,3].map(s => `<div class="cell">${avatar(k,{stage:s})}</div>`).join('')}`).join('');
+}
+let evoFrom = 1;
+$('evoPick').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  evoFrom = Number(b.dataset.from);
+  $('evoPick').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  evolveScene($('evolve'), current, evoFrom, evoFrom + 1);
+});
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('.tab'); if (!b) return;
+  current = b.dataset.k; try { localStorage.setItem('gallery.pet', current); } catch {}
+  render();
+});
+render(); renderLineup();
+</script>

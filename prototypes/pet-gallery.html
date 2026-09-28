@@ -1,0 +1,722 @@
+<title>SUMUS 펫 도감</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Fredoka:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<style>
+  /* Single light look, matching the student app's green system. */
+  :root{
+    color-scheme: light;
+    --primary:#12b886; --primary-deep:#07815f; --primary-soft:#eaf8f2;
+    --ink:#17242f; --muted:#6c7c77; --line:#dde6e2; --ground:#f1f5f3; --panel:#ffffff; --tint:#f7faf8;
+    --display:"Jua","Noto Sans KR",system-ui,sans-serif;
+    --body:"Noto Sans KR",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    --latin:"Fredoka","Noto Sans KR",system-ui,sans-serif;
+  }
+  [hidden]{display:none!important}
+  body{background:var(--ground);color:var(--ink);font-family:var(--body);padding-inline:16px}
+  .page{max-width:980px;margin:0 auto;padding-block:22px 40px;display:flex;flex-direction:column;gap:26px}
+  header{display:flex;flex-direction:column;gap:6px}
+  .eyebrow{font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--primary-deep);text-transform:uppercase}
+  h1{font-family:var(--display);font-weight:400;font-size:clamp(30px,6vw,40px);margin:0;line-height:1.1;text-wrap:balance}
+  .lead{margin:0;color:var(--muted);font-size:14px;line-height:1.6;max-width:62ch}
+  .tabs{display:flex;flex-wrap:wrap;gap:8px}
+  .tab{appearance:none;border:0;cursor:pointer;background:var(--panel);border-radius:999px;padding:5px 14px 5px 6px;display:flex;align-items:center;gap:6px;font-family:var(--body);font-weight:700;font-size:14px;color:var(--ink);box-shadow:0 0 0 1.5px var(--line) inset}
+  .tab .mini{width:34px;height:34px}
+  .tab[aria-selected="true"]{background:var(--primary-soft);box-shadow:0 0 0 2px var(--primary) inset}
+  .tab:focus-visible{outline:3px solid #0b6e50;outline-offset:2px}
+  section{display:flex;flex-direction:column;gap:12px}
+  h2{font-family:var(--display);font-weight:400;font-size:22px;margin:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  h2 small{font-family:var(--body);font-size:12.5px;color:var(--muted);font-weight:500}
+  .grid{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+  .grid.five{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+  @media (max-width:720px){ .grid.five,.grid.four{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  .card{background:var(--panel);border-radius:16px;padding:10px 10px 12px;display:flex;flex-direction:column;align-items:center;gap:4px;box-shadow:0 0 0 1px var(--line) inset}
+  .card .pic{width:100%;max-width:170px;aspect-ratio:1}
+  .card b{font-family:var(--display);font-weight:400;font-size:17px}
+  .card span{font-size:12px;color:var(--muted);text-align:center;line-height:1.4}
+  .card .lv{font-family:var(--latin);font-weight:600;font-size:11px;color:var(--primary-deep);background:var(--primary-soft);border-radius:999px;padding:1px 8px}
+  .avatar-art svg{width:100%;height:auto;display:block;overflow:visible}
+  .avatar-stage-name{display:none}
+  .avatar-img img{width:100%;max-width:100%;height:auto;display:block;filter:drop-shadow(0 2px 5px rgba(20,40,30,.14))}
+  .card,.card .pic,.lineup .cell,.tab .mini{min-width:0}
+  .avatar-img{animation:bob 2.6s ease-in-out infinite}
+  .sizes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .size-row{border-radius:16px;padding:14px;display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;box-shadow:0 0 0 1px var(--line) inset}
+  .size-row.white{background:#fff} .size-row.green{background:#eaf8f2}
+  .size-row figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--muted);font-weight:700}
+  .size-row .s40{width:40px} .size-row .s64{width:64px} .size-row .s96{width:96px}
+  .size-row .avatar-img{animation:none}
+  @media (max-width:560px){ .sizes{grid-template-columns:1fr} }
+  .pet-body{animation:bob 2.6s ease-in-out infinite;transform-box:fill-box;transform-origin:50% 100%}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .compare .card{padding-block:14px}
+  .compare .tag{font-size:11px;font-weight:700;letter-spacing:.08em;border-radius:6px;padding:2px 8px}
+  .tag.old{background:#f0eeea;color:#7a6f63} .tag.new{background:var(--primary-soft);color:var(--primary-deep)}
+  .lineup{display:grid;grid-template-columns:auto repeat(4,minmax(0,1fr));gap:6px;align-items:center;background:var(--panel);border-radius:16px;padding:10px;box-shadow:0 0 0 1px var(--line) inset;overflow-x:auto}
+  .lineup .h{font-size:11.5px;font-weight:700;color:var(--muted);text-align:center}
+  .lineup .name{font-family:var(--display);font-size:15px;padding-right:6px;white-space:nowrap}
+  .lineup .cell{max-width:120px;justify-self:center;width:100%}
+  .evo-pick{display:flex;gap:8px;flex-wrap:wrap}
+  .evo-pick button{appearance:none;border:0;cursor:pointer;background:var(--panel);border-radius:999px;padding:7px 14px;font-family:var(--body);font-weight:700;font-size:13px;color:var(--ink);box-shadow:0 0 0 1.5px var(--line) inset}
+  .evo-pick button[aria-pressed="true"]{background:var(--primary-soft);box-shadow:0 0 0 2px var(--primary) inset}
+  .evo-pick button:focus-visible{outline:3px solid #0b6e50;outline-offset:2px}
+  .hatch-card{background:radial-gradient(120% 90% at 50% 0%,#fffaf0,#ffffff 60%);border-radius:20px;padding:18px 16px 20px;box-shadow:0 0 0 1px var(--line) inset}
+  .note{background:var(--tint);border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.65;color:#33443e;box-shadow:0 0 0 1px var(--line) inset}
+  .note b{color:var(--ink)}
+  @media (prefers-reduced-motion:reduce){ .pet-body{animation:none} }
+</style>
+
+<div class="page">
+  <header>
+    <span class="eyebrow">SUMUS VOCA · 캐릭터 시안 v2</span>
+    <h1>SUMUS 펫 도감</h1>
+    <p class="lead">새로 그린 펫 8마리예요. 레벨이 오르면 모습이 바뀌고, 야차전에서는 상황에 따라 표정이 바뀌어요.</p>
+  </header>
+
+  <div class="tabs" id="tabs" role="tablist" aria-label="펫 고르기"></div>
+
+  <section>
+    <h2>부화 <small>Lv.3이 되면 알이 깨져요 · 알을 세 번 두드려 보세요</small></h2>
+    <div class="hatch-card" id="hatch"></div>
+  </section>
+
+  <section>
+    <h2>진화 <small>Lv.10에 성장, Lv.20에 최종 모습이 돼요</small></h2>
+    <div class="evo-pick" id="evoPick" role="group" aria-label="진화 고르기">
+      <button type="button" data-from="1" aria-pressed="true">아기 → 성장</button>
+      <button type="button" data-from="2" aria-pressed="false">성장 → 최종</button>
+    </div>
+    <div id="evolve"></div>
+  </section>
+
+  <section>
+    <h2 id="evoTitle">진화 단계 <small>레벨이 오르면 자동으로 진화해요</small></h2>
+    <div class="grid four" id="evo"></div>
+  </section>
+
+  <section>
+    <h2>표정 <small>야차전과 홈 화면에서 상황에 맞게 바뀌어요</small></h2>
+    <div class="grid five" id="faces"></div>
+  </section>
+
+  <section>
+    <h2>지금 그림과 비교 <small>같은 성장체 단계</small></h2>
+    <div class="compare" id="compare"></div>
+  </section>
+
+  <section>
+    <h2>작은 크기 테스트 <small>펫 고르기 버튼, 랭킹 목록처럼 작게 보일 때</small></h2>
+    <div class="sizes" id="sizes"></div>
+  </section>
+
+  <section>
+    <h2>장신구 <small id="accNote">지금 앱의 장신구 5종을 새 그림에 맞췄어요</small></h2>
+    <div class="grid five" id="acc"></div>
+  </section>
+
+  <section>
+    <h2>전체 진화 한눈에</h2>
+    <div class="lineup" id="lineup"></div>
+  </section>
+
+  <p class="note"><b>시안 안내</b> · 모든 펫이 새 일러스트(GPT로 만든 진화 모음을 잘라서 사용)예요. 토리(토끼)와 호야(여우)는 새로 추가한 펫이고 이름은 임시예요. 장신구는 아직 일러스트에 맞춰지지 않아서 일러스트 펫에는 표시되지 않아요.</p>
+</div>
+
+<script>window.PET_IMAGE_BASE = 'pets/';</script>
+<script>
+const CHARACTERS = {
+  dog: { name: 'MONG', ko: '몽이', type: '강아지', color: '#D79B54', light: '#F3C985', soft: '#FFF5E8' },
+  pig: { name: 'PINKY', ko: '핑키', type: '돼지', color: '#F3A7A8', light: '#FFD0C8', soft: '#FFF1F0' },
+  cat: { name: 'NABI', ko: '나비', type: '고양이', color: '#8B8582', light: '#C8C1BC', soft: '#F4F2F1' },
+  dragon: { name: 'YONG', ko: '용이', type: '용', color: '#59B982', light: '#A8DE9E', soft: '#ECF8ED' },
+  panda: { name: 'BAMBOO', ko: '밤부', type: '팬더', color: '#3F4442', light: '#F2F0E8', soft: '#F5F7F4' },
+  snake: { name: 'CHORONG', ko: '초롱', type: '뱀', color: '#71C96E', light: '#BDEB8F', soft: '#F0F9E8' }
+};
+// New pets for the prototype. When they ship, move these entries into CHARACTERS in
+// public/modules/core.js (names are placeholders until confirmed).
+Object.assign(CHARACTERS, {
+  rabbit: { name: 'TORI', ko: '토리', type: '토끼', color: '#F09AAE', light: '#FFD3DC', soft: '#FFF1F4' },
+  fox: { name: 'HOYA', ko: '호야', type: '여우', color: '#E8893A', light: '#F8C27D', soft: '#FFF4E8' }
+});
+
+// SUMUS VOCA pet art v2 — drop-in replacement for avatar() in public/modules/character.js.
+// Same signature and wrapper markup; adds real evolution forms and `expression`
+// ('normal' | 'happy' | 'angry' | 'hurt' | 'win').
+const PET_PALETTE = {
+  dog:    { base:'#E9A961', shade:'#C98540', light:'#F8D39C', belly:'#FFF3DF', line:'#6E4424', ear:'#B06C34', accent:'#3D8BDB' },
+  pig:    { base:'#F8B4B8', shade:'#E78D96', light:'#FFD7D8', belly:'#FFE9E9', line:'#A04E5C', ear:'#F09AA3', accent:'#7C5CE0' },
+  cat:    { base:'#A3AAB5', shade:'#7F8795', light:'#D3D8DF', belly:'#F7F4EF', line:'#4A5262', ear:'#F5B7C3', accent:'#E0567A' },
+  dragon: { base:'#6DC98F', shade:'#46A66D', light:'#A9E5BC', belly:'#F4E8B2', line:'#2E6B47', ear:'#F2C94C', accent:'#E3683C' },
+  panda:  { base:'#FBFAF5', shade:'#DCDAD1', light:'#FFFFFF', belly:'#FFFFFF', line:'#2B2E31', ear:'#34383B', accent:'#2FAE6E' },
+  snake:  { base:'#8DD46C', shade:'#63B04B', light:'#C4EFA0', belly:'#F5F1BA', line:'#2F6A2B', ear:'#5DA244', accent:'#F0A43A' }
+};
+const PET_LEGACY = { lumi:'dog', nox:'cat', blaze:'dog', tide:'cat', zeph:'dragon', terra:'panda' };
+const PET_EYE = '#2A2230';
+let petSeq = 0;
+
+// Growth: an egg, then three evolution stages. `stage` in avatar() is 0..3.
+const PET_FORMS = ['알', '아기', '성장', '최종'];
+const PET_FORM_LEVELS = [1, 3, 10, 20]; // level at which each form starts
+const petForm = (level = 1) => PET_FORM_LEVELS.reduce((f, lv, i) => (level >= lv ? i : f), 0);
+// Korean particle after a pet name: petJosa('초롱', '이', '가') -> '초롱이'.
+const petJosa = (word, withBatchim, without) => {
+  const code = word.charCodeAt(word.length - 1) - 0xac00;
+  return word + (code >= 0 && code <= 11171 && code % 28 ? withBatchim : without);
+};
+
+// Illustrated sprites (transparent WebP, 512x512, feet on a shared baseline), named
+// `<pet>-<form>.webp` and `<pet>-<form>-<expression>.webp`.
+// A pet listed here renders as images; anything missing falls back to the SVG below.
+// Expressions without their own sprite reuse the form's normal sprite.
+const PET_IMAGE_BASE = (typeof window !== 'undefined' && window.PET_IMAGE_BASE) || '/assets/pets/';
+const PET_IMAGES = {
+  dog: { forms: [0, 1, 2, 3], expressions: { 2: ['happy'] }, facing: 'right' },
+  pig: { forms: [0, 1, 2, 3], expressions: { 2: ['happy'] }, facing: 'right' },
+  cat: { forms: [0, 1, 2, 3], expressions: {}, facing: 'right' },
+  dragon: { forms: [0, 1, 2, 3], expressions: {}, facing: 'right' },
+  panda: { forms: [0, 1, 2, 3], expressions: {}, facing: 'right' },
+  snake: { forms: [0, 1, 2, 3], expressions: {}, facing: 'right' },
+  rabbit: { forms: [0, 1, 2, 3], expressions: {}, facing: 'right' },
+  fox: { forms: [0, 1, 2, 3], expressions: {}, facing: 'right' }
+};
+function petImage(key, form, expression) {
+  const set = PET_IMAGES[key];
+  if (!set || !set.forms.includes(form)) return null;
+  const expr = expression === 'win' ? 'happy' : expression;
+  const hasExpr = expr !== 'normal' && (set.expressions[form] || []).includes(expr);
+  return { src: `${PET_IMAGE_BASE}${key}-${form}${hasExpr ? '-' + expr : ''}.webp`, facing: set.facing };
+}
+
+function petDarken(hex, amt) {
+  const v = parseInt(hex.slice(1), 16), f = x => Math.max(0, Math.min(255, Math.round(x * (1 + amt))));
+  return '#' + [(v >> 16) & 255, (v >> 8) & 255, v & 255].map(f).map(x => x.toString(16).padStart(2, '0')).join('');
+}
+const petStar = (x, y, r, fill, op = 1) =>
+  `<path d="M${x} ${y - r}Q${x + r * .18} ${y - r * .18} ${x + r} ${y}Q${x + r * .18} ${y + r * .18} ${x} ${y + r}Q${x - r * .18} ${y + r * .18} ${x - r} ${y}Q${x - r * .18} ${y - r * .18} ${x} ${y - r}Z" fill="${fill}" opacity="${op}"/>`;
+const petMirror = svg => `<g transform="matrix(-1 0 0 1 200 0)">${svg}</g>`;
+
+function petEyes(expr, panda) {
+  const ink = panda ? '#FFFFFF' : PET_EYE;
+  const one = (x, y, side) => {
+    if (expr === 'happy' || expr === 'win')
+      return `<path d="M${x - 8} ${y + 3}Q${x} ${y - 9} ${x + 8} ${y + 3}" fill="none" stroke="${ink}" stroke-width="4.2" stroke-linecap="round"/>`;
+    if (expr === 'hurt') {
+      const d = side < 0 ? `M${x - 7} ${y - 6}L${x + 5} ${y}L${x - 7} ${y + 6}` : `M${x + 7} ${y - 6}L${x - 5} ${y}L${x + 7} ${y + 6}`;
+      return `<path d="${d}" fill="none" stroke="${ink}" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    }
+    const ry = expr === 'angry' ? 8.5 : 10.5;
+    return (panda ? `<circle cx="${x}" cy="${y}" r="9.5" fill="#fff"/>` : '') +
+      `<ellipse cx="${x}" cy="${y}" rx="${panda ? 6.4 : 8}" ry="${panda ? 7.2 : ry}" fill="${PET_EYE}"/>` +
+      `<circle cx="${x - 2.6}" cy="${y - 3.4}" r="${panda ? 2.4 : 3.3}" fill="#fff"/>` +
+      `<circle cx="${x + 2.6}" cy="${y + 3.4}" r="1.5" fill="#fff" opacity=".85"/>`;
+  };
+  let brows = '';
+  if (expr === 'angry') brows = `<path d="M67 80L89 88M133 80L111 88" stroke="${ink}" stroke-width="4.2" stroke-linecap="round"/>`;
+  if (expr === 'hurt') brows = `<path d="M70 83L88 79M130 83L112 79" stroke="${ink}" stroke-width="3.4" stroke-linecap="round"/>`;
+  return one(80, 96, -1) + one(120, 96, 1) + brows;
+}
+
+function petMouth(expr, y, cat) {
+  const st = `fill="none" stroke="${PET_EYE}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"`;
+  if (expr === 'happy' || expr === 'win')
+    return `<path d="M91 ${y - 2}Q100 ${y + 12} 109 ${y - 2}Z" fill="#8A2F3E" stroke="${PET_EYE}" stroke-width="2.6" stroke-linejoin="round"/><ellipse cx="100" cy="${y + 5}" rx="4.6" ry="2.6" fill="#FF8C9E"/>`;
+  if (expr === 'angry') return `<path d="M92 ${y + 1}Q100 ${y - 4} 108 ${y + 1}" ${st}/>`;
+  if (expr === 'hurt') return `<path d="M90 ${y + 1}q5-5 10 0t10 0" ${st}/>`;
+  if (cat) return `<path d="M91 ${y - 2}q4.5 5 9 0q4.5 5 9 0" ${st}/>`;
+  return `<path d="M93 ${y - 2}Q100 ${y + 5} 107 ${y - 2}" ${st}/>`;
+}
+
+function avatar(key = 'dog', options = {}) {
+  key = CHARACTERS[key] ? key : (PET_LEGACY[key] || 'dog');
+  // Pets added after the SVG set have no palette; their fallback borrows the dog's.
+  const c = CHARACTERS[key] || CHARACTERS.dog, p = PET_PALETTE[key] || PET_PALETTE.dog, n = `pa${++petSeq}`;
+  const { size = '', stage = 0, accessory = 'none', frame = 'basic', expression = 'normal' } = options;
+  const form = Math.max(0, Math.min(3, Math.round(Number(stage)) || 0));
+  const label = `${c.ko}, ${PET_FORMS[form]}`;
+  const eggTag = form === 0 && size === 'home-featured' ? '<span class="avatar-stage-name">알</span>' : '';
+  const img = petImage(key, form, expression);
+  if (img) {
+    // Sprites are fitted one by one, so growth is added back gently here (feet anchored).
+    const grow = [.86, .86, .93, 1][form];
+    return `<div class="avatar-art avatar-premium avatar-img faces-${img.facing} avatar-form-${form} frame-${frame} expr-${expression} ${size}" style="--avatar:${c.color};--avatar-soft:${c.soft}"><img src="${img.src}" alt="${label}" width="512" height="512" decoding="async" draggable="false" style="transform:scale(${grow});transform-origin:50% 96%">${eggTag}</div>`;
+  }
+  // SVG fallback draws five detail levels; map the three forms onto them.
+  const s = [1, 2, 3, 5][form];
+  const showEgg = form === 0;
+  const L = `stroke="${p.line}" stroke-width="3.2" stroke-linejoin="round" stroke-linecap="round"`;
+  const wrap = inner => `<div class="avatar-art avatar-premium avatar-v2 avatar-form-${form} frame-${frame} expr-${expression} ${size}" style="--avatar:${c.color};--avatar-soft:${c.soft}"><svg viewBox="0 0 200 200" role="img" aria-label="${label}">${inner}</svg>${eggTag}</div>`;
+  const defs = `<defs>
+<radialGradient id="${n}h" cx=".38" cy=".3" r=".85"><stop offset="0" stop-color="${p.light}"/><stop offset=".55" stop-color="${p.base}"/><stop offset="1" stop-color="${p.shade}"/></radialGradient>
+<radialGradient id="${n}b" cx=".42" cy=".22" r=".95"><stop offset="0" stop-color="${p.light}"/><stop offset=".5" stop-color="${p.base}"/><stop offset="1" stop-color="${p.shade}"/></radialGradient>
+<radialGradient id="${n}aura" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="${p.light}" stop-opacity=".8"/><stop offset=".6" stop-color="${p.light}" stop-opacity=".25"/><stop offset="1" stop-color="${p.light}" stop-opacity="0"/></radialGradient>
+<linearGradient id="${n}gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFE58A"/><stop offset="1" stop-color="#E9A93A"/></linearGradient>
+<linearGradient id="${n}cape" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${p.accent}"/><stop offset="1" stop-color="${petDarken(p.accent, -.28)}"/></linearGradient>
+<clipPath id="${n}eggc"><path d="M100 30c-34 0-58 56-58 98 0 34 24 54 58 54s58-20 58-54c0-42-24-98-58-98Z"/></clipPath>
+</defs>`;
+
+  if (showEgg) {
+    return wrap(defs + `<circle cx="100" cy="104" r="88" fill="url(#${n}aura)" opacity=".7"/><ellipse cx="100" cy="185" rx="44" ry="7" fill="#1d2939" opacity=".13"/>
+<g class="pet-body"><path d="M100 30c-34 0-58 56-58 98 0 34 24 54 58 54s58-20 58-54c0-42-24-98-58-98Z" fill="#FFFDF8"/>
+<g clip-path="url(#${n}eggc)"><path d="M36 122l16-11 16 11 16-11 16 11 16-11 16 11 16-11 16 11 16-11" fill="none" stroke="${p.base}" stroke-width="10" stroke-linejoin="round"/>
+<circle cx="76" cy="80" r="10" fill="${p.base}" opacity=".85"/><circle cx="120" cy="60" r="6" fill="${p.base}" opacity=".7"/><circle cx="128" cy="156" r="11" fill="${p.base}" opacity=".75"/><circle cx="74" cy="158" r="6" fill="${p.base}" opacity=".6"/>
+<ellipse cx="138" cy="120" rx="30" ry="60" fill="${p.shade}" opacity=".12"/></g>
+<path d="M100 30c-34 0-58 56-58 98 0 34 24 54 58 54s58-20 58-54c0-42-24-98-58-98Z" fill="none" ${L}/>
+<path d="M74 58q14-18 32-16" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" opacity=".95"/></g>
+${petStar(160, 58, 7, p.light)}${petStar(40, 92, 5, p.light, .8)}`);
+  }
+
+  const snake = key === 'snake', panda = key === 'panda', dragon = key === 'dragon';
+  const k = [1, .8, .9, .97, 1][s - 1];
+  const skin = `url(#${n}b)`, limb = panda ? p.ear : skin;
+  const parts = [];
+
+  // --- behind the body: aura, wings, cape, tail
+  if (s >= 4) parts.push(`<circle cx="100" cy="112" r="92" fill="url(#${n}aura)" opacity="${s === 5 ? 1 : .55}"/>`);
+  const inner = [];
+  if (dragon && s >= 2) {
+    const ws = s >= 4 ? 1.12 : .78;
+    const wing = `<g transform="translate(72 132) scale(${ws}) translate(-72 -132)"><path d="M72 132q-30-36-54-32q9 12 3 21q13-4 15 9q12-6 15 7q10-8 21-5Z" fill="${s === 5 ? `url(#${n}gold)` : p.light}" ${L}/><path d="M68 128q-18-12-38-16M64 132q-12-4-24-4" fill="none" stroke="${p.line}" stroke-width="2" opacity=".5"/></g>`;
+    inner.push(wing, petMirror(wing));
+  } else if (s === 5) {
+    const wing = `<path d="M76 130C62 98 40 78 12 72C18 82 18 90 14 96C27 96 31 102 27 110C39 108 43 115 39 124C51 122 55 130 53 139C62 137 69 140 74 146Z" fill="#FFFFFF" ${L}/><path d="M66 118C52 104 38 94 22 88M62 128C50 120 40 114 30 110M62 138C56 132 50 128 42 126" fill="none" stroke="${p.accent}" stroke-width="2.2" stroke-linecap="round" opacity=".5"/>`;
+    inner.push(wing, petMirror(wing));
+  }
+  if (s >= 4) inner.push(`<path d="M68 126q-18 30-22 56q54 12 108 0q-4-26-22-56Z" fill="url(#${n}cape)" ${L}/><path d="M78 140q-6 18-8 38M122 140q6 18 8 38" fill="none" stroke="#fff" stroke-width="2.4" opacity=".22"/>`);
+  const tails = {
+    dog: `<path d="M132 156q26-4 24-34q-2-9-9-4q2 18-18 26Z" fill="${skin}" ${L}/>`,
+    cat: `<path d="M134 166q36 4 30-38q-1-10-9-8q-4 2-2 10q2 26-22 24Z" fill="${skin}" ${L}/><path d="M156 128q-2-8 5-8q6 2 3 10" fill="${p.shade}"/>`,
+    pig: `<path d="M134 158q15-2 13-13q-2-8-9-4q-4 4 2 7" fill="none" stroke="${p.line}" stroke-width="8" stroke-linecap="round"/><path d="M134 158q15-2 13-13q-2-8-9-4q-4 4 2 7" fill="none" stroke="${p.base}" stroke-width="3.6" stroke-linecap="round"/>`,
+    dragon: `<path d="M130 166q34 6 44-22l6-14-16 6q-8 18-34 14Z" fill="${skin}" ${L}/><path d="M174 144l6-14-16 6Z" fill="url(#${n}gold)" ${L}/>`,
+    panda: `<circle cx="134" cy="170" r="8" fill="${p.ear}" ${L}/>`,
+    snake: `<path d="M142 174q26 2 28-16q1-7-5-6q-2 11-23 10Z" fill="${skin}" ${L}/>`
+  };
+  inner.push(tails[key]);
+
+  // --- body
+  if (snake) {
+    inner.push(`<ellipse cx="100" cy="171" rx="48" ry="15" fill="${skin}" ${L}/><ellipse cx="100" cy="153" rx="40" ry="14" fill="${skin}" ${L}/><ellipse cx="100" cy="137" rx="31" ry="12" fill="${skin}" ${L}/>
+<ellipse cx="100" cy="176" rx="30" ry="6" fill="${p.belly}" opacity=".9"/><ellipse cx="100" cy="158" rx="24" ry="5" fill="${p.belly}" opacity=".9"/>
+<g fill="${p.ear}"><ellipse cx="68" cy="168" rx="6" ry="3.5"/><ellipse cx="134" cy="167" rx="6" ry="3.5"/><ellipse cx="76" cy="149" rx="5" ry="3"/><ellipse cx="126" cy="149" rx="5" ry="3"/></g>`);
+  } else {
+    inner.push(`<ellipse cx="84" cy="177" rx="14" ry="8.5" fill="${limb}" ${L}/><ellipse cx="116" cy="177" rx="14" ry="8.5" fill="${limb}" ${L}/>
+<ellipse cx="100" cy="150" rx="37" ry="31" fill="${skin}" ${L}/><ellipse cx="100" cy="156" rx="22" ry="18" fill="${p.belly}"/>`);
+    if (dragon) inner.push(`<path d="M86 150h28M84 158h32M88 166h24" stroke="${p.shade}" stroke-width="2.2" stroke-linecap="round" opacity=".55"/>`);
+    inner.push(`<ellipse cx="66" cy="146" rx="9.5" ry="14" transform="rotate(28 66 146)" fill="${limb}" ${L}/><ellipse cx="134" cy="146" rx="9.5" ry="14" transform="rotate(-28 134 146)" fill="${limb}" ${L}/>`);
+  }
+  if (s >= 4) inner.push(`<path d="m100 ${snake ? 145 : 147} 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z" fill="url(#${n}gold)" stroke="#B7832F" stroke-width="1.4"/>`);
+  if (s === 3) inner.push(`<path d="M64 132q36 16 72 0l2 10q-38 18-76 0Z" fill="${p.accent}" ${L}/><path d="M120 142l16 26-13 3-11-24Z" fill="${petDarken(p.accent, -.15)}" ${L}/>`);
+
+  // --- ears / horns behind the head
+  const backEars = {
+    cat: `<path d="M58 74l4-46q2-7 9-2l31 27Z" fill="url(#${n}h)" ${L}/><path d="M67 64l2-27 18 16Z" fill="${p.ear}"/>`,
+    pig: `<path d="M62 64l-7-32q0-7 7-4l29 19Z" fill="${p.base}" ${L}/><path d="M64 56l-4-19 17 11Z" fill="${p.ear}"/>`,
+    panda: `<circle cx="60" cy="56" r="17" fill="${p.ear}" ${L}/>`,
+    dragon: `<path d="M76 58q-9-22-3-36q9 11 17 31Z" fill="url(#${n}gold)" ${L}/>`
+  };
+  if (backEars[key]) inner.push(backEars[key], petMirror(backEars[key]));
+
+  // --- head
+  inner.push(`<ellipse cx="100" cy="92" rx="54" ry="48" fill="url(#${n}h)" ${L}/><ellipse cx="78" cy="62" rx="17" ry="8" transform="rotate(-22 78 62)" fill="#fff" opacity=".38"/>`);
+  if (s === 2) inner.push(`<path d="M97 46q-3-15 9-17q-7 8 0 17Z" fill="url(#${n}h)" ${L}/>`);
+
+  // --- markings and muzzle
+  const face = {
+    dog: `<ellipse cx="122" cy="90" rx="15" ry="14" fill="${p.shade}" opacity=".45"/><ellipse cx="100" cy="113" rx="19" ry="13" fill="${p.belly}"/><path d="M93 106q7-4 14 0q-2 6-7 7q-5-1-7-7Z" fill="#3A2A22"/><ellipse cx="98" cy="106.5" rx="2" ry="1.1" fill="#fff" opacity=".7"/>`,
+    cat: `${s < 5 ? `<path d="M100 50v11M88 52l3 10M112 52l-3 10" stroke="${p.shade}" stroke-width="4" stroke-linecap="round"/>` : ''}<ellipse cx="100" cy="112" rx="18" ry="11" fill="${p.belly}"/><path d="M96 106h8l-4 5Z" fill="#E88A9B"/><path d="M62 108l-17-3M62 114l-17 2M138 108l17-3M138 114l17 2" stroke="${p.line}" stroke-width="2" stroke-linecap="round" opacity=".55"/>`,
+    pig: `<ellipse cx="100" cy="112" rx="15" ry="10.5" fill="${p.ear}" ${L}/><ellipse cx="94.5" cy="112" rx="2.6" ry="4" fill="${p.line}"/><ellipse cx="105.5" cy="112" rx="2.6" ry="4" fill="${p.line}"/>`,
+    dragon: `<ellipse cx="100" cy="112" rx="18" ry="11" fill="${p.light}"/><circle cx="95" cy="109" r="2.1" fill="${p.line}"/><circle cx="105" cy="109" r="2.1" fill="${p.line}"/><path d="M48 90l-12-5 5 11-8 5 13 3Z" fill="${p.ear}" ${L}/>` ,
+    panda: `<ellipse cx="80" cy="97" rx="14" ry="17" transform="rotate(22 80 97)" fill="${p.ear}"/><ellipse cx="120" cy="97" rx="14" ry="17" transform="rotate(-22 120 97)" fill="${p.ear}"/><ellipse cx="100" cy="109" rx="6.2" ry="4.4" fill="${p.ear}"/>`,
+    snake: `<ellipse cx="100" cy="56" rx="11" ry="6" fill="${p.ear}"/><circle cx="80" cy="62" r="4.2" fill="${p.ear}"/><circle cx="120" cy="62" r="4.2" fill="${p.ear}"/>`
+  };
+  inner.push(face[key]);
+  if (dragon) inner.push(petMirror(`<path d="M48 90l-12-5 5 11-8 5 13 3Z" fill="${p.ear}" ${L}/>`));
+  inner.push(petEyes(expression, panda));
+  inner.push(`<ellipse cx="65" cy="113" rx="9" ry="5.5" fill="#FF8FA3" opacity="${panda ? .6 : .5}"/><ellipse cx="135" cy="113" rx="9" ry="5.5" fill="#FF8FA3" opacity="${panda ? .6 : .5}"/>`);
+  const mouthY = { dog: 121, cat: 117, pig: 128, dragon: 122, panda: 116, snake: 114 }[key];
+  inner.push(petMouth(expression, mouthY, key === 'cat'));
+  if (snake && (expression === 'angry' || expression === 'win'))
+    inner.push(`<path d="M100 ${mouthY + 4}v9l-4 5M100 ${mouthY + 13}l4 5" stroke="#E5484D" stroke-width="2.6" fill="none" stroke-linecap="round"/>`);
+
+  // --- ears in front of the head
+  if (key === 'dog') {
+    const ear = `<path d="M62 58q-24 4-21 42q2 19 15 16q10-2 12-25q2-20-6-33Z" fill="${p.ear}" ${L}/>`;
+    inner.push(ear, petMirror(ear));
+  }
+  if (s >= 4) inner.push(`<circle cx="68" cy="134" r="5" fill="url(#${n}gold)" stroke="#B7832F" stroke-width="1.6"/><circle cx="132" cy="134" r="5" fill="url(#${n}gold)" stroke="#B7832F" stroke-width="1.6"/>`);
+  if (s === 5) inner.push(`<path d="M100 48l7 8-7 9-7-9Z" fill="url(#${n}gold)" stroke="#B7832F" stroke-width="2"/>`);
+
+  // --- accessories (same keys as ACCESSORIES in core.js)
+  const acc = {
+    headset: `<path d="M48 94Q48 38 100 38T152 94" fill="none" stroke="#414758" stroke-width="7"/><rect x="41" y="84" width="13" height="26" rx="6" fill="#515969"/><rect x="146" y="84" width="13" height="26" rx="6" fill="#515969"/>`,
+    glasses: `<g fill="none" stroke="#3c4353" stroke-width="3.4"><rect x="66" y="84" width="28" height="24" rx="9"/><rect x="106" y="84" width="28" height="24" rx="9"/><path d="M94 94h12"/></g>`,
+    starpin: petStar(138, 58, 9, '#FFE27A') + `<circle cx="138" cy="58" r="2.4" fill="#fff"/>`,
+    visor: `<path d="M60 82h80l-7 24H67Z" fill="#708d99" fill-opacity=".55" stroke="#e9f3f6" stroke-width="2.4" stroke-linejoin="round"/>`,
+    crown: `<path d="M78 52l-4-27 15 12 11-19 11 19 15-12-4 27Z" fill="url(#${n}gold)" stroke="#B7832F" stroke-width="2.4" stroke-linejoin="round"/><circle cx="100" cy="40" r="3" fill="#fff"/>`
+  }[accessory] || '';
+  inner.push(acc);
+
+  parts.push(`<ellipse cx="100" cy="186" rx="${Math.round(44 * k)}" ry="7" fill="#1d2939" opacity=".14"/>`);
+  parts.push(`<g transform="translate(100 186) scale(${k}) translate(-100 -186)"><g class="pet-body">${inner.join('')}</g></g>`);
+  if (s >= 4) parts.push(petStar(170, 44, 8, s === 5 ? '#FFD85A' : p.light), petStar(30, 70, 6, p.light, .85));
+  if (s === 5) parts.push(petStar(176, 118, 5, '#FFD85A', .9), petStar(26, 140, 4.5, '#FFD85A', .8));
+  if (expression === 'win') parts.push(petStar(150, 30, 7, '#FFD85A'), petStar(50, 34, 5, '#FFD85A'));
+  return wrap(defs + parts.join(''));
+}
+
+let oldSequence = 0;
+// Asset boundary: replace the SVG inside this renderer with a WebP without changing screens.
+function avatarOld(key = 'dog', options = {}) {
+  const legacy = { lumi:'dog', nox:'cat', blaze:'dog', tide:'cat', zeph:'dragon', terra:'panda' };
+  key = CHARACTERS[key] ? key : (legacy[key] || 'dog');
+  const c = CHARACTERS[key] || CHARACTERS.dog, n = `av${++oldSequence}`;
+  const { size = '', stage = 1, accessory = 'none', frame = 'basic' } = options;
+  const s = Math.max(1, Math.min(5, Number(stage) || 1));
+  const stageNames = ['알', '유년체', '성장체', '성숙체', '최종체'];
+  if (s === 1 && size === 'home-featured') {
+    return `<div class="avatar-art avatar-premium avatar-egg ${size}" style="--avatar:${c.color};--avatar-soft:${c.soft}"><svg viewBox="0 0 216 200" role="img" aria-label="${c.ko}의 알"><defs><radialGradient id="${n}eggAura"><stop stop-color="${c.light}" stop-opacity=".4"/><stop offset="1" stop-color="${c.soft}" stop-opacity="0"/></radialGradient><linearGradient id="${n}egg" x1=".2" y1=".05" x2=".8" y2=".95"><stop stop-color="#fff"/><stop offset=".48" stop-color="${c.soft}"/><stop offset="1" stop-color="${c.light}"/></linearGradient><filter id="${n}eggShadow" x="-40%" y="-40%" width="180%" height="200%"><feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#17382e" flood-opacity=".16"/></filter></defs><circle cx="108" cy="94" r="88" fill="url(#${n}eggAura)"/><ellipse cx="108" cy="174" rx="52" ry="9" fill="#18352c" opacity=".11"/><g filter="url(#${n}eggShadow)"><path d="M108 32c-31 0-55 50-55 91 0 34 22 54 55 54s55-20 55-54c0-41-24-91-55-91Z" fill="url(#${n}egg)" stroke="#fff" stroke-width="4"/><path d="m108 61 8 17 19 3-14 13 4 19-17-9-17 9 4-19-14-13 19-3Z" fill="${c.color}" opacity=".9"/><circle cx="78" cy="120" r="7" fill="${c.color}" opacity=".36"/><circle cx="139" cy="133" r="5" fill="${c.color}" opacity=".3"/><path d="M77 66q31-22 57-5" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" opacity=".68"/></g><g fill="${c.light}"><circle cx="48" cy="76" r="2"/><circle cx="169" cy="67" r="2.5"/><path d="m168 103 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z"/></g></svg><span class="avatar-stage-name">${stageNames[s-1]}</span></div>`;
+  }
+  const eye = (x, y, r = 7) => `<ellipse cx="${x}" cy="${y}" rx="${r}" ry="${r + 1}" fill="#171D2A"/><ellipse cx="${x - 1}" cy="${y + 2}" rx="${Math.max(2,r-3)}" ry="${Math.max(2,r-2)}" fill="#2D3748" opacity=".78"/><circle cx="${x - 2.4}" cy="${y - 3.2}" r="2.4" fill="#fff"/><circle cx="${x + 2}" cy="${y + 2.6}" r="1.15" fill="${c.light}"/><circle cx="${x - 4.2}" cy="${y - .4}" r=".8" fill="#fff" opacity=".8"/>`;
+  const shapes = {
+    dog: `<g filter="url(#${n}shadow)"><path d="M72 72 61 43q24-4 35 14 12-5 24 0 13-18 36-13l-11 31q8 13 4 30-7 31-41 37-35-5-42-37-4-18 6-33Z" fill="url(#${n}g)"/><path d="M62 47q-8 35 9 45l17-31q-9-15-26-14Zm94 0q8 35-9 45l-17-31q9-15 26-14Z" fill="#B8733E"/><ellipse cx="108" cy="112" rx="30" ry="25" fill="#FFF3DD"/>${eye(91,88)}${eye(125,88)}<path d="m101 107q7-5 14 0l-7 8Z" fill="#2A3030"/><path d="M98 121q10 10 20 0" fill="none" stroke="#9A6046" stroke-width="3" stroke-linecap="round"/><path d="M143 129q31-6 25-31 19 28-13 45" fill="none" stroke="${c.color}" stroke-width="13" stroke-linecap="round"/></g>`,
+    pig: `<g filter="url(#${n}shadow)"><path d="M74 71Q62 45 82 38l14 19q12-5 24 0l15-19q19 7 7 34 13 13 9 35-6 31-43 36-37-5-43-36-4-22 9-36Z" fill="url(#${n}g)"/>${eye(91,88)}${eye(125,88)}<ellipse cx="108" cy="112" rx="25" ry="18" fill="#F58F96"/><ellipse cx="99" cy="112" rx="3.5" ry="5" fill="#A95D65"/><ellipse cx="117" cy="112" rx="3.5" ry="5" fill="#A95D65"/><path d="M98 129q10 7 20 0" fill="none" stroke="#B86570" stroke-width="3" stroke-linecap="round"/><path d="M151 139q26 8 18-12 13 7 3 19-10 11-25 2" fill="none" stroke="${c.color}" stroke-width="7" stroke-linecap="round"/></g>`,
+    cat: `<g filter="url(#${n}shadow)"><path d="M70 77 67 34l31 22q10-4 20 0l30-22-3 43q11 14 6 34-8 28-43 33-35-5-43-33-5-20 5-34Z" fill="url(#${n}g)"/><path d="m75 46 5 24 14-11Zm66 0-5 24-14-11Z" fill="#F4B6AD"/><ellipse cx="108" cy="113" rx="28" ry="23" fill="#F7F2EA"/>${eye(91,88)}${eye(125,88)}<path d="m101 106 14 0-7 8Z" fill="#343839"/><path d="M100 121q8 8 16 0" fill="none" stroke="#77706E" stroke-width="3" stroke-linecap="round"/><path d="M79 108 52 102m28 15-28 5m84-14 28-6m-28 15 28 5" stroke="#6F6B69" stroke-width="2" stroke-linecap="round"/><path d="M145 142q32 4 25-30" fill="none" stroke="${c.color}" stroke-width="12" stroke-linecap="round"/></g>`,
+    dragon: `<g filter="url(#${n}shadow)"><path d="M78 75q-2-28 16-37l6 20q8-3 16 0l8-22q18 10 14 39 17 13 13 35-6 29-43 35-37-6-43-35-4-22 13-35Z" fill="url(#${n}g)"/><path d="m89 48-2-23 13 17m17 2 11-18 1 24" stroke="#E9C45D" stroke-width="8" stroke-linecap="round"/><path d="M66 104 39 88q-3 28 25 37m88-21 27-16q3 28-25 37" fill="#9EDFAE" stroke="#459B6C" stroke-width="4"/><ellipse cx="108" cy="115" rx="28" ry="23" fill="#E8F3C8"/>${eye(91,90)}${eye(125,90)}<path d="M101 113h14" stroke="#4B795C" stroke-width="3" stroke-linecap="round"/><path d="M99 127q9 7 18 0" fill="none" stroke="#4B795C" stroke-width="3" stroke-linecap="round"/></g>`,
+    panda: `<g filter="url(#${n}shadow)"><circle cx="78" cy="57" r="20" fill="#343837"/><circle cx="138" cy="57" r="20" fill="#343837"/><path d="M67 80q5-39 41-39t41 39q9 17 2 36-10 27-43 31-33-4-43-31-7-19 2-36Z" fill="#F7F5EE"/><ellipse cx="89" cy="90" rx="16" ry="20" fill="#343837" transform="rotate(24 89 90)"/><ellipse cx="127" cy="90" rx="16" ry="20" fill="#343837" transform="rotate(-24 127 90)"/>${eye(91,88,5)}${eye(125,88,5)}<ellipse cx="108" cy="116" rx="24" ry="18" fill="#FFF"/><path d="m101 109q7-5 14 0l-7 8Z" fill="#252928"/><path d="M99 124q9 7 18 0" fill="none" stroke="#555" stroke-width="3" stroke-linecap="round"/><path d="M146 133q17-22 27-18-7 23-25 30" fill="#69A862"/><path d="M151 128q14-9 23-7" stroke="#3D7D47" stroke-width="3"/></g>`,
+    snake: `<g filter="url(#${n}shadow)"><path d="M108 45q31 0 31 29 0 22-20 31 30 7 31 31 1 30-42 34-42-4-42-30 0-23 28-31-22-10-22-34 0-30 36-30Z" fill="url(#${n}g)"/><ellipse cx="108" cy="82" rx="36" ry="34" fill="url(#${n}g)"/><ellipse cx="108" cy="100" rx="25" ry="16" fill="#E9F4B8"/>${eye(94,80,6)}${eye(122,80,6)}<path d="M102 99h12" stroke="#3C704C" stroke-width="3" stroke-linecap="round"/><path d="M108 106v8m0 0-7 6m7-6 7 6" stroke="#D85C62" stroke-width="3" stroke-linecap="round"/><path d="M91 139q18 13 36 0" fill="none" stroke="#B8E985" stroke-width="8" stroke-linecap="round"/></g>`
+  };
+  const accessorySvg = {
+    headset: '<path d="M62 84q0-46 45-46t45 46" fill="none" stroke="#414758" stroke-width="7"/><rect x="58" y="77" width="11" height="27" rx="5" fill="#515969"/><rect x="145" y="77" width="11" height="27" rx="5" fill="#515969"/>',
+    glasses: '<g fill="none" stroke="#3c4353" stroke-width="3"><rect x="77" y="74" width="25" height="19" rx="7"/><rect x="113" y="74" width="25" height="19" rx="7"/><path d="M102 81h11"/></g>',
+    starpin: '<path d="m141 55 3 7 8 3-8 3-3 8-3-8-8-3 8-3Z" fill="#faf1bf"/>',
+    visor: '<path d="M75 74h65l-5 23H80Z" fill="#708d99" fill-opacity=".6" stroke="#e9f3f6" stroke-width="2"/>',
+    crown: '<path d="m83 48-4-24 16 13 12-18 12 18 15-13-4 24Z" fill="#eed59a" stroke="#b78b3f" stroke-width="2"/>'
+  }[accessory] || '';
+  return `<div class="avatar-art avatar-premium avatar-stage-${s} frame-${frame} ${size}" style="--avatar:${c.color};--avatar-soft:${c.soft}"><svg viewBox="0 0 216 200" role="img" aria-label="${c.ko}, ${c.type}"><defs><linearGradient id="${n}g" x1=".15" y1="0" x2=".85" y2="1"><stop stop-color="${c.light}"/><stop offset=".52" stop-color="${c.color}"/><stop offset="1" stop-color="${c.color}"/></linearGradient><linearGradient id="${n}tail" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${c.color}"/><stop offset="1" stop-color="${c.light}"/></linearGradient><radialGradient id="${n}aura"><stop stop-color="${c.light}" stop-opacity=".36"/><stop offset="1" stop-color="${c.soft}" stop-opacity="0"/></radialGradient><filter id="${n}shadow" x="-35%" y="-35%" width="170%" height="190%"><feDropShadow dx="0" dy="9" stdDeviation="7" flood-color="#12211b" flood-opacity=".16"/><feDropShadow dx="0" dy="2" stdDeviation="1.5" flood-color="#ffffff" flood-opacity=".18"/></filter></defs><circle cx="108" cy="96" r="90" fill="url(#${n}aura)"/><ellipse cx="109" cy="179" rx="55" ry="9" fill="#1d2939" opacity=".12"/>${stage > 1 ? `<circle cx="108" cy="101" r="83" fill="none" stroke="${c.color}" opacity=".28" stroke-width="${stage > 3 ? 3 : 1}" ${stage >= 3 ? 'stroke-dasharray="3 8"' : ''}/>` : ''}<g filter="url(#${n}shadow)"><path d="M88 117c-8 12-12 29-10 54h24l5-27 8 27h24c1-24-4-42-15-54Z" fill="url(#${n}g)"/><path d="M99 127q9 23 18 0" fill="${c.light}" opacity=".66"/><path d="M84 143q-10 9-13 20M132 142q10 8 13 19" fill="none" stroke="${c.color}" stroke-width="8" stroke-linecap="round"/></g>${shapes[key] || shapes.dog}<path d="M82 66q26-18 52-2" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity=".13"/><ellipse cx="91" cy="133" rx="9" ry="4" fill="#fff" opacity=".12"/><ellipse cx="125" cy="133" rx="9" ry="4" fill="#fff" opacity=".08"/>${accessorySvg}${stage >= 2 ? `<g fill="${c.light}" opacity=".72"><circle cx="48" cy="78" r="2.2"/><circle cx="164" cy="61" r="1.8"/><circle cx="174" cy="116" r="2.5"/></g>` : ``}${stage >= 3 ? `<path d="m168 40 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="${c.light}" opacity=".85"/>` : ``}${stage >= 4 ? `<path d="m38 45 3 8 8 3-8 3-3 8-3-8-8-3 8-3Z" fill="${c.light}"/>` : ''}</svg></div>`;
+}
+
+// Hatching scene: the egg wobbles, cracks with each tap, bursts, and the baby pops out.
+// hatchScene(root, key, { onHatched }) renders into `root` and returns { tap, auto, reset }.
+// Depends on avatar(), petJosa() and CHARACTERS (pet art module).
+
+// Where the egg sits inside each egg sprite (percent of the 512 canvas): centre and width.
+const HATCH_EGG_BOX = { dog: { x: 50, y: 50, w: 58 }, pig: { x: 50, y: 50, w: 58 }, default: { x: 50, y: 52, w: 40 } };
+const HATCH_TAPS = 3;
+
+function hatchStyles() {
+  if (document.getElementById('hatch-styles')) return;
+  const css = `
+.hatch{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;user-select:none}
+.hatch-stage{position:relative;width:min(260px,70vw);aspect-ratio:1;touch-action:manipulation}
+.hatch-stage .avatar-art img,.hatch-stage .avatar-art svg{width:100%;height:auto;display:block}
+.hatch-stage .avatar-stage-name{display:none}
+.hatch-egg,.hatch-baby,.hatch-glow,.hatch-flash,.hatch-bits{position:absolute;inset:0}
+.hatch-egg{cursor:pointer;transform-origin:50% 88%;transition:transform .5s,opacity .25s,filter .3s;-webkit-tap-highlight-color:transparent}
+.hatch-egg:focus-visible{outline:3px solid #0b6e50;outline-offset:4px;border-radius:24px}
+.hatch[data-state="idle"] .hatch-egg{animation:hatch-idle 2.4s ease-in-out infinite}
+.hatch-egg.wobble{animation:hatch-wobble .55s ease-in-out}
+.hatch-egg.wobble.big{animation:hatch-wobble-big .6s ease-in-out}
+.hatch[data-state="charging"] .hatch-egg{animation:hatch-shake .09s linear infinite;filter:brightness(1.12) drop-shadow(0 0 18px rgba(255,214,90,.9))}
+.hatch[data-state="hatched"] .hatch-egg{opacity:0;transform:scale(1.25);pointer-events:none}
+.hatch-cracks{position:absolute;pointer-events:none;overflow:visible}
+.hatch-cracks path{fill:none;stroke:#7a5a33;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:120;stroke-dashoffset:120;transition:stroke-dashoffset .35s ease-out}
+.hatch-cracks path.on{stroke-dashoffset:0}
+.hatch-glow{border-radius:50%;background:radial-gradient(circle,rgba(255,226,120,.75),rgba(255,226,120,0) 62%);opacity:0;transform:scale(.6);transition:opacity .9s,transform .9s;pointer-events:none}
+.hatch[data-state="charging"] .hatch-glow{opacity:1;transform:scale(1.15)}
+.hatch[data-state="hatched"] .hatch-glow{opacity:.55;transform:scale(1.05);animation:hatch-pulse 2.2s ease-in-out infinite}
+.hatch-flash{background:radial-gradient(circle,#fff 0 30%,rgba(255,255,255,0) 70%);opacity:0;pointer-events:none;transform:scale(.4)}
+.hatch-flash.on{animation:hatch-flash .7s ease-out}
+.hatch-baby{opacity:0;transform:scale(.2) translateY(20%);pointer-events:none}
+.hatch[data-state="hatched"] .hatch-baby{animation:hatch-pop .8s cubic-bezier(.2,1.6,.4,1) forwards}
+.hatch[data-state="hatched"] .hatch-baby .avatar-art{animation:hatch-bounce 2.4s ease-in-out .9s infinite}
+.hatch-bits{pointer-events:none}
+.hatch-bit{position:absolute;left:50%;top:48%;width:var(--s);height:calc(var(--s)*.8);background:#fff7e6;border:2px solid #d9b98a;clip-path:polygon(50% 0,100% 70%,70% 100%,0 80%);animation:hatch-fly .9s cubic-bezier(.2,.7,.3,1) forwards}
+.hatch-star{position:absolute;left:50%;top:48%;width:var(--s);height:var(--s);background:var(--c);clip-path:polygon(50% 0,61% 38%,100% 50%,61% 62%,50% 100%,39% 62%,0 50%,39% 38%);animation:hatch-fly 1.2s cubic-bezier(.2,.7,.3,1) forwards}
+.hatch-msg{margin:0;font-family:var(--display,"Jua",system-ui,sans-serif);font-size:20px;color:var(--ink,#17242f);min-height:1.4em;text-wrap:balance}
+.hatch-msg b{color:var(--primary-deep,#07815f);font-weight:400}
+.hatch-dots{display:flex;gap:6px}
+.hatch-dots span{width:10px;height:10px;border-radius:50%;background:#e2e8e5;transition:background .2s,transform .2s}
+.hatch-dots span.on{background:#f2a60c;transform:scale(1.15)}
+.hatch-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.hatch-btn{appearance:none;border:0;border-radius:12px;padding:10px 16px;font-family:var(--display,"Jua",system-ui,sans-serif);font-size:16px;cursor:pointer;background:var(--primary,#12b886);color:#fff;box-shadow:0 3px 0 var(--primary-deep,#07815f)}
+.hatch-btn.ghost{background:#eef3f0;color:var(--ink,#17242f);box-shadow:0 3px 0 #cdd8d3}
+.hatch-btn:active{transform:translateY(2px)}
+.hatch-btn:focus-visible{outline:3px solid #0b6e50;outline-offset:2px}
+@keyframes hatch-idle{0%,100%{transform:rotate(0)}8%{transform:rotate(-4deg)}16%{transform:rotate(4deg)}24%{transform:rotate(0)}}
+@keyframes hatch-wobble{0%,100%{transform:rotate(0)}20%{transform:rotate(-9deg)}45%{transform:rotate(8deg)}70%{transform:rotate(-5deg)}}
+@keyframes hatch-wobble-big{0%,100%{transform:rotate(0) scale(1)}15%{transform:rotate(-14deg) scale(1.04)}40%{transform:rotate(12deg) scale(1.06)}65%{transform:rotate(-8deg)}85%{transform:rotate(4deg)}}
+@keyframes hatch-shake{0%{transform:translate(-2px,0) rotate(-2deg)}50%{transform:translate(2px,-1px) rotate(2deg)}100%{transform:translate(-2px,0) rotate(-2deg)}}
+@keyframes hatch-flash{0%{opacity:0;transform:scale(.4)}30%{opacity:1;transform:scale(1.3)}100%{opacity:0;transform:scale(1.6)}}
+@keyframes hatch-pop{0%{opacity:0;transform:scale(.2) translateY(20%)}60%{opacity:1}100%{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes hatch-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4%)}}
+@keyframes hatch-pulse{50%{opacity:.3}}
+@keyframes hatch-fly{0%{opacity:1;transform:translate(-50%,-50%) rotate(0)}100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) rotate(var(--r))}}
+@media (prefers-reduced-motion:reduce){.hatch-egg,.hatch-egg.wobble,.hatch[data-state] .hatch-egg,.hatch[data-state="hatched"] .hatch-baby .avatar-art{animation:none!important}.hatch[data-state="hatched"] .hatch-baby{animation:none;opacity:1;transform:none}.hatch-bit,.hatch-star{display:none}}`;
+  const tag = document.createElement('style');
+  tag.id = 'hatch-styles'; tag.textContent = css;
+  document.head.appendChild(tag);
+}
+
+function hatchScene(root, key, { onHatched } = {}) {
+  hatchStyles();
+  const name = (CHARACTERS[key] || CHARACTERS.dog).ko;
+  const box = HATCH_EGG_BOX[key] || HATCH_EGG_BOX.default;
+  const cracks = [
+    'M18 46 L30 40 L38 50 L48 42',
+    'M48 42 L58 52 L68 44 L82 50',
+    'M26 62 L36 56 L46 64 L56 57 L66 65 L76 58'
+  ];
+  root.innerHTML = `
+<div class="hatch" data-state="idle">
+  <div class="hatch-stage">
+    <div class="hatch-glow"></div>
+    <div class="hatch-baby">${avatar(key, { stage: 1, expression: 'happy' })}</div>
+    <div class="hatch-egg" role="button" tabindex="0" aria-label="알 두드리기">
+      ${avatar(key, { stage: 0 })}
+      <svg class="hatch-cracks" viewBox="0 0 100 100" style="left:${box.x - box.w / 2}%;top:${box.y - box.w / 2}%;width:${box.w}%;height:${box.w}%">${cracks.map(d => `<path d="${d}"/>`).join('')}</svg>
+    </div>
+    <div class="hatch-flash"></div>
+    <div class="hatch-bits"></div>
+  </div>
+  <p class="hatch-msg" aria-live="polite">알이 꿈틀거려요! 톡톡 두드려 보세요</p>
+  <div class="hatch-dots">${'<span></span>'.repeat(HATCH_TAPS)}</div>
+  <div class="hatch-actions"><button class="hatch-btn ghost" type="button" data-act="auto">자동으로 보기</button></div>
+</div>`;
+  const $ = sel => root.querySelector(sel);
+  const scene = $('.hatch'), egg = $('.hatch-egg'), msg = $('.hatch-msg');
+  let taps = 0, busy = false, autoTimer = 0;
+
+  function burst() {
+    const bits = $('.hatch-bits'); bits.innerHTML = '';
+    const colors = ['#ffd85a', '#12b886', '#ff9fb2', '#8fd3ff'];
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + Math.random() * .4, d = 70 + Math.random() * 60;
+      bits.insertAdjacentHTML('beforeend', `<i class="hatch-bit" style="--s:${10 + Math.random() * 12}px;--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 20}px;--r:${Math.random() * 540 - 270}deg"></i>`);
+    }
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2, d = 90 + Math.random() * 70;
+      bits.insertAdjacentHTML('beforeend', `<i class="hatch-star" style="--s:${8 + Math.random() * 10}px;--c:${colors[i % colors.length]};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 30}px;--r:${Math.random() * 360}deg"></i>`);
+    }
+  }
+
+  function tap() {
+    if (busy || scene.dataset.state === 'hatched') return;
+    taps++;
+    scene.dataset.state = 'tapping';
+    root.querySelectorAll('.hatch-dots span').forEach((s, i) => s.classList.toggle('on', i < taps));
+    root.querySelectorAll('.hatch-cracks path').forEach((p, i) => p.classList.toggle('on', i < taps));
+    egg.classList.remove('wobble', 'big'); void egg.offsetWidth;
+    egg.classList.add('wobble'); if (taps > 1) egg.classList.add('big');
+    if (taps < HATCH_TAPS) { msg.textContent = taps === 1 ? '앗, 금이 갔어요!' : '조금만 더! 한 번만 더 두드려요'; return; }
+    busy = true;
+    msg.textContent = '알이 빛나기 시작했어요…';
+    scene.dataset.state = 'charging';
+    setTimeout(() => {
+      const flash = $('.hatch-flash'); flash.classList.remove('on'); void flash.offsetWidth; flash.classList.add('on');
+      burst();
+      scene.dataset.state = 'hatched';
+      msg.innerHTML = `<b>${petJosa(name, '이', '가')}</b> 태어났어요!`;
+      $('.hatch-actions').innerHTML = '<button class="hatch-btn" type="button" data-act="reset">다시 보기</button>';
+      busy = false;
+      onHatched?.(key);
+    }, 1100);
+  }
+  function auto() {
+    clearTimeout(autoTimer);
+    const step = () => { tap(); if (taps < HATCH_TAPS) autoTimer = setTimeout(step, 700); };
+    step();
+  }
+  function reset() { clearTimeout(autoTimer); hatchScene(root, key, { onHatched }); }
+
+  egg.addEventListener('click', tap);
+  egg.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); tap(); } });
+  root.querySelector('.hatch-actions').addEventListener('click', e => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'auto') auto();
+    if (act === 'reset') reset();
+  });
+  return { tap, auto, reset };
+}
+
+// Evolution scene: light gathers, the pet turns into a glowing silhouette that flickers
+// between its old and new forms faster and faster, then bursts into the new form.
+// evolveScene(root, key, from, to, { onEvolved }) renders into `root` and returns { start, reset }.
+// Depends on avatar(), petJosa(), PET_FORMS and CHARACTERS (pet art module).
+
+// Gaps (ms) between old/new silhouette swaps: slow at first, then a rapid shimmer.
+const EVO_FLICKER = [460, 400, 340, 280, 230, 190, 150, 120, 95, 75, 60, 50, 45, 40, 40, 40];
+const EVO_CHARGE_MS = 1300;
+
+function evolveStyles() {
+  if (document.getElementById('evolve-styles')) return;
+  const css = `
+.evo{position:relative;isolation:isolate;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;border-radius:20px;padding:18px 16px 20px;background:radial-gradient(120% 90% at 50% 0%,#f3fbf7,#ffffff 60%);box-shadow:0 0 0 1px var(--line,#dde6e2) inset;overflow:hidden;user-select:none}
+.evo::before{content:"";position:absolute;inset:0;z-index:-1;background:radial-gradient(circle at 50% 40%,#2f5e4f,#12241d 72%);opacity:0;transition:opacity .7s}
+.evo[data-state="charging"]::before,.evo[data-state="flicker"]::before{opacity:1}
+.evo-stage{position:relative;width:min(260px,70vw);aspect-ratio:1}
+.evo-stage .avatar-art img,.evo-stage .avatar-art svg{width:100%;height:auto;display:block}
+.evo-stage .avatar-stage-name{display:none}
+.evo-form,.evo-glow,.evo-flash,.evo-bits{position:absolute;inset:0;pointer-events:none}
+.evo-form .avatar-art{transition:filter .5s}
+.evo-to{opacity:0}
+.evo[data-state="ready"] .evo-from .avatar-art{animation:evo-bob 2.6s ease-in-out infinite}
+.evo[data-state="charging"] .evo-from .avatar-art{animation:evo-tremble .12s linear infinite;filter:brightness(1.25) drop-shadow(0 0 14px rgba(255,226,120,.9))}
+.evo[data-state="flicker"] .evo-form .avatar-art{filter:brightness(0) invert(1) drop-shadow(0 0 12px rgba(255,226,120,.95))}
+.evo[data-state="flicker"] .evo-stage.show-to .evo-from{opacity:0}
+.evo[data-state="flicker"] .evo-stage.show-to .evo-to{opacity:1}
+.evo[data-state="done"] .evo-from{opacity:0}
+.evo[data-state="done"] .evo-to{opacity:1;animation:evo-reveal .9s cubic-bezier(.2,1.5,.4,1)}
+.evo[data-state="done"] .evo-to .avatar-art{animation:evo-bob 2.4s ease-in-out 1s infinite}
+.evo-rays{position:absolute;inset:-18%;border-radius:50%;pointer-events:none;opacity:0;transition:opacity .8s;will-change:transform;
+  background:repeating-conic-gradient(from 0deg,rgba(255,222,120,.5) 0 7deg,rgba(255,222,120,0) 7deg 20deg);
+  -webkit-mask:radial-gradient(circle,#000 18%,transparent 68%);mask:radial-gradient(circle,#000 18%,transparent 68%)}
+.evo[data-state="charging"] .evo-rays,.evo[data-state="flicker"] .evo-rays{opacity:1;animation:evo-spin 7s linear infinite}
+.evo[data-state="done"] .evo-rays{opacity:0;transition:opacity 2.5s}
+.evo-glow{border-radius:50%;background:radial-gradient(circle,rgba(255,236,160,.8),rgba(255,236,160,0) 60%);opacity:0;transform:scale(.6);transition:opacity .8s,transform .8s}
+.evo[data-state="charging"] .evo-glow,.evo[data-state="flicker"] .evo-glow{opacity:1;transform:scale(1.1)}
+.evo[data-state="done"] .evo-glow{opacity:.5;transform:scale(1)}
+.evo-ring{position:absolute;left:50%;top:55%;width:42%;aspect-ratio:1;border-radius:50%;border:3px solid rgba(255,214,90,.95);transform:translate(-50%,-50%) scale(.3);opacity:0;pointer-events:none}
+.evo[data-state="done"] .evo-ring{animation:evo-ring .9s ease-out forwards}
+.evo[data-state="done"] .evo-ring.r2{animation-delay:.18s;border-color:rgba(18,184,134,.8)}
+.evo-flash{background:radial-gradient(circle,#fff 0 35%,rgba(255,255,255,0) 72%);opacity:0;transform:scale(.4)}
+.evo-flash.on{animation:evo-flash .75s ease-out}
+.evo-star{position:absolute;left:50%;top:50%;width:var(--s);height:var(--s);background:var(--c);clip-path:polygon(50% 0,61% 38%,100% 50%,61% 62%,50% 100%,39% 62%,0 50%,39% 38%);animation:evo-fly 1.3s cubic-bezier(.2,.7,.3,1) forwards}
+.evo-msg{margin:0;font-family:var(--display,"Jua",system-ui,sans-serif);font-size:20px;color:var(--ink,#17242f);min-height:1.4em;text-wrap:balance;transition:color .5s}
+.evo[data-state="charging"] .evo-msg,.evo[data-state="flicker"] .evo-msg{color:#fff}
+.evo-msg b{color:var(--primary-deep,#07815f);font-weight:400}
+.evo-chip{font-size:12px;font-weight:700;color:var(--muted,#6c7c77);transition:color .5s}
+.evo[data-state="charging"] .evo-chip,.evo[data-state="flicker"] .evo-chip{color:#b9d4c8}
+.evo-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;min-height:42px}
+.evo-btn{appearance:none;border:0;border-radius:12px;padding:10px 18px;font-family:var(--display,"Jua",system-ui,sans-serif);font-size:16px;cursor:pointer;background:var(--primary,#12b886);color:#fff;box-shadow:0 3px 0 var(--primary-deep,#07815f)}
+.evo-btn.ghost{background:#eef3f0;color:var(--ink,#17242f);box-shadow:0 3px 0 #cdd8d3}
+.evo-btn:active{transform:translateY(2px)}
+.evo-btn:focus-visible{outline:3px solid #0b6e50;outline-offset:2px}
+@keyframes evo-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3%)}}
+@keyframes evo-tremble{0%{transform:translate(-1.5px,0)}50%{transform:translate(1.5px,-1px)}100%{transform:translate(-1.5px,0)}}
+@keyframes evo-spin{to{transform:rotate(360deg)}}
+@keyframes evo-reveal{0%{transform:scale(1.18)}100%{transform:scale(1)}}
+@keyframes evo-ring{0%{opacity:1;transform:translate(-50%,-50%) scale(.3)}100%{opacity:0;transform:translate(-50%,-50%) scale(2.4)}}
+@keyframes evo-flash{0%{opacity:0;transform:scale(.4)}30%{opacity:1;transform:scale(1.4)}100%{opacity:0;transform:scale(1.8)}}
+@keyframes evo-fly{0%{opacity:1;transform:translate(-50%,-50%) rotate(0)}100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) rotate(var(--r))}}
+@media (prefers-reduced-motion:reduce){.evo *{animation:none!important}.evo-star{display:none}}`;
+  const tag = document.createElement('style');
+  tag.id = 'evolve-styles'; tag.textContent = css;
+  document.head.appendChild(tag);
+}
+
+function evolveScene(root, key, from, to, { onEvolved } = {}) {
+  evolveStyles();
+  const name = (CHARACTERS[key] || CHARACTERS.dog).ko;
+  const formLabel = f => `${f}단계 · ${PET_FORMS[f]}`;
+  root.innerHTML = `
+<div class="evo" data-state="ready">
+  <span class="evo-chip">${formLabel(from)} → ${formLabel(to)}</span>
+  <div class="evo-stage">
+    <div class="evo-rays"></div>
+    <div class="evo-glow"></div>
+    <div class="evo-form evo-from">${avatar(key, { stage: from })}</div>
+    <div class="evo-form evo-to">${avatar(key, { stage: to, expression: 'happy' })}</div>
+    <div class="evo-ring"></div><div class="evo-ring r2"></div>
+    <div class="evo-flash"></div>
+    <div class="evo-bits"></div>
+  </div>
+  <p class="evo-msg" aria-live="polite">${petJosa(name, '이', '가')} 진화할 준비가 됐어요!</p>
+  <div class="evo-actions"><button class="evo-btn" type="button" data-act="start">진화 시작</button></div>
+</div>`;
+  const q = sel => root.querySelector(sel);
+  const scene = q('.evo'), stage = q('.evo-stage'), msg = q('.evo-msg'), actions = q('.evo-actions');
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let timers = [];
+  const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+
+  function finish() {
+    stage.classList.add('show-to');
+    const flash = q('.evo-flash'); flash.classList.remove('on'); void flash.offsetWidth; flash.classList.add('on');
+    const bits = q('.evo-bits'), colors = ['#ffd85a', '#12b886', '#ff9fb2', '#8fd3ff', '#ffffff'];
+    bits.innerHTML = Array.from({ length: 18 }, (_, i) => {
+      const a = Math.random() * Math.PI * 2, d = 90 + Math.random() * 80;
+      return `<i class="evo-star" style="--s:${8 + Math.random() * 12}px;--c:${colors[i % colors.length]};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d - 20}px;--r:${Math.random() * 360}deg"></i>`;
+    }).join('');
+    scene.dataset.state = 'done';
+    msg.innerHTML = `<b>${petJosa(name, '이', '가')}</b> ${PET_FORMS[to]} 모습으로 진화했어요!`;
+    actions.innerHTML = '<button class="evo-btn ghost" type="button" data-act="reset">다시 보기</button>';
+    onEvolved?.(key, to);
+  }
+
+  function start() {
+    if (scene.dataset.state !== 'ready') return;
+    actions.innerHTML = '';
+    if (reduced) return finish();
+    scene.dataset.state = 'charging';
+    msg.textContent = `어? ${name}의 모습이…!`;
+    later(() => {
+      scene.dataset.state = 'flicker';
+      msg.textContent = `${petJosa(name, '이', '가')} 진화하고 있어요!`;
+      let t = 0;
+      EVO_FLICKER.forEach((gap, i) => { t += gap; later(() => stage.classList.toggle('show-to', i % 2 === 0), t); });
+      later(finish, t + 350);
+    }, EVO_CHARGE_MS);
+  }
+  function reset() { timers.forEach(clearTimeout); timers = []; evolveScene(root, key, from, to, { onEvolved }); }
+
+  actions.addEventListener('click', e => {
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (act === 'start') start();
+    if (act === 'reset') reset();
+  });
+  return { start, reset };
+}
+
+
+const STAGES = PET_FORMS.map((name, i) => [i ? `${i}단계 · ${name}` : name, `Lv.${PET_FORM_LEVELS[i]}`]);
+const FACES = [['normal','기본','평소'],['happy','기쁨','정답을 맞혔을 때'],['angry','공격','공격할 때'],['hurt','아픔','공격을 받았을 때'],['win','승리','대결에서 이겼을 때']];
+const ACC = [['headset','헤드셋','Lv.3'],['glasses','포커스 글래스','Lv.6'],['starpin','스타 핀','Lv.9'],['visor','바이저','Lv.13'],['crown','크라운','Lv.18']];
+const $ = id => document.getElementById(id);
+let current = 'dog';
+try { current = localStorage.getItem('gallery.pet') || 'dog'; } catch {}
+if (!CHARACTERS[current]) current = 'dog';
+
+function card(pic, title, sub, lv){
+  return `<div class="card"><div class="pic">${pic}</div>${lv ? `<span class="lv">${lv}</span>` : ''}<b>${title}</b>${sub ? `<span>${sub}</span>` : ''}</div>`;
+}
+function render(){
+  $('tabs').innerHTML = Object.entries(CHARACTERS).map(([k,c]) =>
+    `<button class="tab" role="tab" type="button" data-k="${k}" aria-selected="${k===current}"><span class="mini">${avatar(k,{stage:1})}</span>${c.ko}</button>`).join('');
+  const c = CHARACTERS[current];
+  hatchScene($('hatch'), current);
+  evolveScene($('evolve'), current, evoFrom, evoFrom + 1);
+  $('evoTitle').innerHTML = `${c.ko}의 진화 <small>알에서 태어나 3단계로 자라요</small>`;
+  $('evo').innerHTML = STAGES.map(([name,lv],i) => card(avatar(current,{stage:i}), name, '', lv)).join('');
+  const illustrated = !!PET_IMAGES[current];
+  $('faces').innerHTML = FACES.map(([e,name,sub]) => {
+    const ready = !illustrated || e === 'normal' || (petImage(current, 2, e)?.src || '').includes('-' + (e === 'win' ? 'happy' : e));
+    return card(avatar(current,{stage:2, expression:e}), name, ready ? sub : '그림 준비 중 · 지금은 기본 표정');
+  }).join('');
+  const sizes = s => `<figure><div class="s40">${avatar(current,{stage:s})}</div>40px</figure><figure><div class="s64">${avatar(current,{stage:s})}</div>64px</figure><figure><div class="s96">${avatar(current,{stage:s})}</div>96px</figure>`;
+  $('sizes').innerHTML = `<div class="size-row white">${sizes(2)}</div><div class="size-row green">${sizes(3)}</div>`;
+  $('compare').innerHTML =
+    `<div class="card"><span class="tag old">지금</span><div class="pic">${avatarOld(current,{stage:3})}</div><b>${c.ko}</b></div>` +
+    `<div class="card"><span class="tag new">새 그림</span><div class="pic">${avatar(current,{stage:2})}</div><b>${c.ko}</b></div>`;
+  $('accNote').textContent = illustrated ? '일러스트용 장신구는 아직 준비 중이라 기본 모습으로 보여요' : '지금 앱의 장신구 5종을 새 그림에 맞췄어요';
+  $('acc').innerHTML = ACC.map(([a,name,lv]) => card(avatar(current,{stage:2, accessory:a}), name, '', lv)).join('');
+}
+function renderLineup(){
+  const head = `<span></span>${STAGES.map(([n]) => `<span class="h">${n}</span>`).join('')}`;
+  $('lineup').innerHTML = head + Object.entries(CHARACTERS).map(([k,c]) =>
+    `<span class="name">${c.ko}</span>${[0,1,2,3].map(s => `<div class="cell">${avatar(k,{stage:s})}</div>`).join('')}`).join('');
+}
+let evoFrom = 1;
+$('evoPick').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  evoFrom = Number(b.dataset.from);
+  $('evoPick').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  evolveScene($('evolve'), current, evoFrom, evoFrom + 1);
+});
+$('tabs').addEventListener('click', e => {
+  const b = e.target.closest('.tab'); if (!b) return;
+  current = b.dataset.k; try { localStorage.setItem('gallery.pet', current); } catch {}
+  render();
+});
+render(); renderLineup();
+</script>
