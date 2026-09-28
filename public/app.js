@@ -201,9 +201,34 @@ window.addEventListener('pageshow', async event => {
   if (!event.persisted || !A.data || A.screen) return;
   try { await refresh(); renderKeepScroll(); } catch {}
 });
+// V13.63: pets with a run cycle run three laps when tapped; the rest hop. The sheet is loaded
+// on the first tap (the pet hops meanwhile) and runs from the next tap on.
+const RUN_MS = 1800;
+function runPet(art) {
+  const box = art.querySelector('.avatar-art[data-run]');
+  if (!box || matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+  const url = box.dataset.run;
+  const pre = art.querySelector('.pet-run-preload');
+  if (pre?.complete && pre.naturalWidth > 0) (runPet.ready ||= new Set()).add(url);
+  if (!runPet.ready?.has(url)) {
+    runPet.ready ||= new Set();
+    const img = new Image(); img.src = url;
+    img.decode().then(() => runPet.ready.add(url)).catch(() => {});
+    return false;
+  }
+  let sprite = box.querySelector('.pet-run');
+  if (!sprite) { sprite = document.createElement('i'); sprite.className = 'pet-run'; sprite.setAttribute('aria-hidden', 'true'); sprite.style.setProperty('--run', `url("${url}")`); sprite.appendChild(document.createElement('b')); box.appendChild(sprite); }
+  // Same square the still sprite occupies (object-fit: contain), so the switch does not jump.
+  sprite.style.setProperty('--side', `${Math.min(box.clientWidth, box.clientHeight)}px`);
+  art.classList.remove('running'); void art.offsetWidth; art.classList.add('running');
+  clearTimeout(art._run); art._run = setTimeout(() => art.classList.remove('running'), RUN_MS);
+  return true;
+}
 function pokePet(art) {
-  art.classList.remove('poke'); void art.offsetWidth; art.classList.add('poke');
-  clearTimeout(art._poke); art._poke = setTimeout(() => art.classList.remove('poke'), 720);
+  if (!art.classList.contains('running') && !runPet(art)) {
+    art.classList.remove('poke'); void art.offsetWidth; art.classList.add('poke');
+    clearTimeout(art._poke); art._poke = setTimeout(() => art.classList.remove('poke'), 720);
+  }
   navigator.vibrate?.(12);
   for (let i = 0; i < 3; i++) {
     const heart = document.createElement('i');

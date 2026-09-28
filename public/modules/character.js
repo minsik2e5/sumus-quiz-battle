@@ -6,6 +6,9 @@ const EXPRESSIONS = { dog: { 2: ['happy'] }, pig: { 2: ['happy'] } };
 // Sprites are fitted one by one, so growth is added back gently (feet stay anchored).
 const GROW = [.86, .86, .93, 1];
 const SMALL = new Set(['mini']);
+// V13.63: run cycles (/assets/pets/<pet>-<form>-run.webp, six 512px frames side by side, fitted
+// to the still sprite). Pets listed here run when tapped on the home card; the rest hop.
+export const RUN_SHEETS = new Set(['dog-1']);
 // Accessories are earned rewards; on illustrated pets they show as a badge, not on the head.
 const ACCESSORY_ICONS = {
   headset: '<path d="M5 14v-2a7 7 0 0 1 14 0v2"/><rect x="3.5" y="13" width="4" height="6" rx="1.6"/><rect x="16.5" y="13" width="4" height="6" rx="1.6"/>',
@@ -28,5 +31,6 @@ export function avatar(key = 'dog', options = {}) {
   const src = `/assets/pets/${key}-${form}${hasExpr ? '-' + expr : ''}${small ? '-s' : ''}.webp`;
   const label = `${c.ko}, ${PET_FORMS[form]}`;
   const badge = !small && ACCESSORY_ICONS[accessory] ? `<span class="pet-acc-badge" aria-hidden="true"><svg viewBox="0 0 24 24">${ACCESSORY_ICONS[accessory]}</svg></span>` : '';
-  return `<div class="avatar-art avatar-premium avatar-img avatar-form-${form} frame-${frame} expr-${expression} ${size}" style="--avatar:${c.color};--avatar-soft:${c.soft};--pet-grow:${GROW[form]}"><img src="${src}" alt="${label}" width="${small ? 160 : 512}" height="${small ? 160 : 512}" decoding="async"${small ? ' loading="lazy"' : ''} draggable="false">${badge}</div>`;
+  const run = !small && RUN_SHEETS.has(`${key}-${form}`) ? ` data-run="/assets/pets/${key}-${form}-run.webp"` : '';
+  return `<div class="avatar-art avatar-premium avatar-img avatar-form-${form} frame-${frame} expr-${expression} ${size}"${run} style="--avatar:${c.color};--avatar-soft:${c.soft};--pet-grow:${GROW[form]}"><img src="${src}" alt="${label}" width="${small ? 160 : 512}" height="${small ? 160 : 512}" decoding="async"${small ? ' loading="lazy"' : ''} draggable="false">${badge}</div>`;
 }

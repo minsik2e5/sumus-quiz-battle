@@ -1155,6 +1155,14 @@ export async function runReleaseCheck() {
         const wk = weekCorrect([{ correct: 10, created_at: monStart + 30 * 60000 }, { correct: 5, created_at: monStart - 30 * 60000 }, { correct: 7, created_at: wed }, { correct: 9, created_at: wed + 7 * 86400000 }], wed);
         assert(wk === 17 && weekCorrect([], wed) === 0, 'V13.63 the card counts words answered correctly this week (from Monday 00:00 KST), not last Sunday or next week');
         assert(studentModule.includes('이번 주 맞힌 단어') && studentModule.includes('g.week_correct') && !studentModule.includes('최근 학습 정답률'), 'V13.63 the partner card shows words correct this week instead of recent accuracy');
+        {
+          const { RUN_SHEETS, avatar: petAvatar } = await import('../public/modules/character.js');
+          const { statSync } = await import('node:fs');
+          const sheets = [...RUN_SHEETS].map(name => fileURLToPath(new URL(`../public/assets/pets/${name}-run.webp`, import.meta.url)));
+          assert(RUN_SHEETS.has('dog-1') && sheets.every(file => existsSync(file) && statSync(file).size < 250 * 1024), 'V13.63 every pet listed with a run cycle ships its sprite sheet (under 250 KB)');
+          assert(petAvatar('dog', { form: 1 }).includes('data-run="/assets/pets/dog-1-run.webp"') && !petAvatar('dog', { form: 1, size: 'mini' }).includes('data-run') && !petAvatar('cat', { form: 1 }).includes('data-run'), 'V13.63 only pets with a run sheet (and not mini avatars) are marked to run');
+          assert(appUi.includes('function runPet(') && appUi.includes("'(prefers-reduced-motion: reduce)'") && appUi.includes('.pet-run-preload') && studentModule.includes('pet-run-preload') && css1363.includes('steps(6) 3') && css1363.includes('.partner-art.running .avatar-art img{opacity:0'), 'V13.63 tapping a pet with a run sheet plays three laps (preloaded, off with reduced motion); others still hop');
+        }
       }
       assert(cardCss.includes('prefers-reduced-motion') && appSource.includes("matchMedia('(prefers-reduced-motion: reduce)')"), 'V13.58 the card does not tilt when reduced motion is on');
       {

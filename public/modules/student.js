@@ -1,6 +1,6 @@
 import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, petForm, unlocked, levelInfo, dayKey } from './core.js';
 import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
-import { avatar, petKey } from './character.js';
+import { avatar, petKey, RUN_SHEETS } from './character.js';
 import { petDisplayName, petJosa } from './pet-moments.js';
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
 export function shell(A, content) {
@@ -309,7 +309,7 @@ function partnerCard(A) {
         <span class="partner-face partner-front">
           <span class="partner-inner">
             <span class="partner-head"><span class="partner-stage">${PET_FORMS[form]}</span><span class="partner-name">${hatched ? esc(petDisplayName(partner)) : '???'}</span><span class="partner-lv"><small>Lv.</small><b>${level}</b></span></span>
-            <span class="partner-art">${avatar(partner.key, { accessory: p.avatar_accessory, frame: p.avatar_frame, form, size: 'home-featured' })}</span>
+            <span class="partner-art">${avatar(partner.key, { accessory: p.avatar_accessory, frame: p.avatar_frame, form, size: 'home-featured' })}${RUN_SHEETS.has(`${key}-${form}`) ? `<img class="pet-run-preload" src="/assets/pets/${key}-${form}-run.webp" alt="" aria-hidden="true" decoding="async">` : ''}</span>
             <span class="partner-type">${hatched ? esc(pet.type) : '알'} · 파트너 · ${esc(p.school || A.school || '')} ${esc(p.class_name || '')}</span>
             <span class="partner-skills">
               <span class="partner-skill"><i>단</i><span>단어 공격<small>이번 주 맞힌 단어</small></span><b>${num(g.week_correct || 0)}개</b></span>
