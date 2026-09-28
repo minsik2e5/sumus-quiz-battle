@@ -4,7 +4,7 @@ export const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;'
 export const num = n => Number(n || 0).toLocaleString('ko-KR');
 export const date = n => new Date(n).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' });
 export const time = n => `${Math.floor(Math.max(0, n) / 60)}:${String(Math.floor(Math.max(0, n) % 60)).padStart(2, '0')}`;
-export const rangeLabel = (school, code) => school === '선부고' ? `외부 ${code}` : `${code}번`;
+export const rangeLabel = (school, code) => /^L\d+$/.test(String(code)) ? `${String(code).slice(1)}과` : school === '선부고' ? `외부 ${code}` : `${code}번`;
 export const recordRangeLabel = (context, code) => context?.division === 'middle' ? `${code}과` : rangeLabel(context?.school, code);
 export const scope = e => (e.range_codes || []).map(c => recordRangeLabel(e, c)).join(' · ');
 const paths = {
