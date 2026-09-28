@@ -8,6 +8,7 @@ import { createMutationCoordinator } from './mutation-coordinator.mjs';
 import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, PET_FORM_LEVELS, petForm, levelInfo, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
 import { runContentValidation } from './content-validation.mjs';
 import { runBattleChecks } from './battle-check.mjs';
+import { compactSession, migrateState, stateSizeReport } from './state.mjs';
 import { openGrammarChoiceSample } from '../public/grammar-choice-sample.js';
 
 const checks = [];
@@ -37,6 +38,18 @@ const answerFor = (type, word) => {
   return word.meaning;
 };
 
+// Same review list as the record screen's "다시 풀기" (public/app.js, reviewPractice).
+function reviewWordIds(session) {
+  const records = Array.isArray(session.answer_records) ? session.answer_records : [];
+  const answered = new Set(records.map(item => item.word_id).filter(Boolean));
+  const wrongIds = records.length
+    ? records.filter(item => item.correct === false && !item.regraded).map(item => item.word_id).filter(Boolean)
+    : (session.wrong_details || []).filter(item => !item.regraded).map(item => item.word_id).filter(Boolean);
+  const timedOutCount = records.filter(item => item.timed_out && !item.regraded).length;
+  const missingCount = Math.max(0, Number(session.unanswered_count || 0) - timedOutCount);
+  const missingIds = (session.word_ids || []).filter(id => !answered.has(id)).slice(0, missingCount);
+  return [...new Set([...wrongIds, ...missingIds])];
+}
 export async function runReleaseCheck() {
   const priorAuthProvider = process.env.AUTH_PROVIDER;
   delete process.env.AUTH_PROVIDER;
@@ -52,7 +65,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.54.1') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.54.2') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -689,7 +702,30 @@ export async function runReleaseCheck() {
     assert(noTimerWrong.feedback?.timed_out === false, 'slow or manual answers are never converted into timeout answers');
     await service(state, 'POST', `/practice/${noTimerPractice.id}/finish`, {}, studentToken);
     const noTimerSession = state.sessions.find(item => item.id === noTimerPractice.id);
-    assert(noTimerSession?.word_ids?.length === 5 && noTimerSession.unanswered_count === 4, 'early-finished practice stores the full word pool for complete review');
+    const noTimerPool = state.practices.find(item => item.id === noTimerPractice.id).words;
+    const noTimerReview = reviewWordIds(noTimerSession);
+    assert(noTimerSession?.unanswered_count === 4 && noTimerSession.word_ids.length === 4 && noTimerReview.length === 5 && noTimerPool.every(id => noTimerReview.includes(id)), 'early-finished practice keeps every unanswered word so review still covers the whole pool');
+    {
+      // Records saved before v13.54.2 carry the whole range in word_ids. Trimming them must not
+      // change anything a student or teacher sees.
+      const range = danwonWords.filter(word => String(word.range_code) === rangeCode).map(word => word.id);
+      const answered = range.slice(0, 3);
+      const records = answered.map((wordId, index) => ({ question_id: 'q' + index, word_id: wordId, word: 'w', meaning: 'm', answer: index ? 'm' : 'x', timed_out: false, type: 'write_meaning', correct: index > 0, at: 1, regraded: false }));
+      const legacy = { id: 'legacy-session', student_id: 'legacy-student', score: 20, total: 10, correct: 2, xp: 55, reward_points: 12, pet_key: 'fox', wrong_count: 1, unanswered_count: 7, answer_records: records, wrong_details: [{ ...records[0] }], word_ids: [...range] };
+      const before = structuredClone(legacy);
+      assert(range.length > 10 && compactSession(legacy) === true && legacy.word_ids.length === 7, 'old session word_ids shrink to the unanswered words only');
+      assert(JSON.stringify(reviewWordIds(legacy)) === JSON.stringify(reviewWordIds(before)), 'trimmed word_ids give the same review list');
+      for (const key of ['score', 'total', 'correct', 'xp', 'reward_points', 'pet_key', 'wrong_count', 'unanswered_count', 'answer_records', 'wrong_details']) assert(JSON.stringify(legacy[key]) === JSON.stringify(before[key]), `session compaction keeps ${key}`);
+      assert(compactSession(legacy) === false, 'session compaction is idempotent');
+      const noRecords = { id: 'older', unanswered_count: 0, word_ids: [...range] };
+      const noCount = { id: 'older2', answer_records: [], word_ids: [...range] };
+      assert(compactSession(noRecords) === false && compactSession(noCount) === false && noRecords.word_ids.length === range.length && noCount.word_ids.length === range.length, 'sessions without answer_records or counts are left as they are');
+      const booted = { ...emptyState(), sessions: [structuredClone(before)] };
+      assert(migrateState(booted) === true && booted.sessions[0].word_ids.length === 7, 'boot migration trims existing session word_ids');
+      const report = stateSizeReport(state);
+      assert(report.keys_kb.sessions > 0 && report.sessions.count === state.sessions.length && report.sessions.word_ids_kb >= 0 && Number.isInteger(report.practices.active), 'health size report lists sizes per state key');
+      assert(!JSON.stringify(report).includes(state.profiles.find(item => item.role === 'student').username), 'health size report contains sizes and counts only, never content');
+    }
 
     const activeOriginal = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5
@@ -876,7 +912,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.54.1') && indexHtml.includes('/app.bundle.css?v=13.54.1') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.54.2') && indexHtml.includes('/app.bundle.css?v=13.54.2') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -897,7 +933,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.54.1'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.54.2'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');

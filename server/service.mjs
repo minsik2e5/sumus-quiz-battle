@@ -6,6 +6,7 @@ import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { middleGrade3Books } from './middle-vocab.mjs';
 import { middleGrade2Books } from './middle-vocab-grade2.mjs';
 import { ybmKimHighBooks, ybmKimRetiredWords } from './high-vocab-ybm-kim.mjs';
+import { compactSession } from './state.mjs';
 export const builtinBooks = builtinBooksData;
 const withoutLegacySeonbu44 = book => {
   const isSeonbu = book.school_id === 'seonbu-high' || book.school === '선부고';
@@ -1561,6 +1562,7 @@ function finishPractice(x, state, autoSubmitted = false) {
     wrong_details: (x.wrong_details || []).map(item => ({ ...item })),
     created_at: endedAt
   };
+  compactSession(rec);
   if (!state.sessions.some(s => s.id === rec.id)) state.sessions.push(rec);
 }
 function practiceView(x, state) {

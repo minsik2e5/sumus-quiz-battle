@@ -3,7 +3,7 @@ import { BattleRoom, battleReportKey } from './battle-room.mjs';
 export { BattleRoom };
 import { selfSignup } from '../server/signup.mjs';
 import { examAdmin } from '../server/exam-admin.mjs';
-import { migrateState } from '../server/state.mjs';
+import { migrateState, stateSizeReport } from '../server/state.mjs';
 import { createMutationCoordinator, NO_MUTATION } from '../server/mutation-coordinator.mjs';
 import { createLocalRepository, createSupabaseSync } from './local-first.mjs';
 
@@ -140,6 +140,14 @@ export class VocaStateObject {
     try { await this.sync.run(); } catch {}
   }
 
+  // Which parts of the state are large (sizes and counts only). Measuring stringifies the
+  // whole state, so the public health check reuses the last result for a minute.
+  sizeReport() {
+    const now = Date.now();
+    if (!this.sizeCache || now - this.sizeCache.at > 60000) this.sizeCache = { at: now, report: stateSizeReport(this.mutations.current().state) };
+    return this.sizeCache.report;
+  }
+
   rateLimit(bucket, max, windowMs, message) {
     const list = (this.rates.get(bucket) || []).filter(time => time > Date.now() - windowMs);
     if (list.length >= max) throw Object.assign(Error(message), { status: 429 });
@@ -227,7 +235,7 @@ export class VocaStateObject {
       const sync = this.sync.status();
       if (request.method !== 'GET' && elapsed > 1500) console.warn('[slow-mutation]', url.pathname.replace(/\/[0-9a-f-]{36}/g, '/:id'), { elapsed, commitMs, commitBytes });
       // Public health output shows whether the Supabase backup is keeping up.
-      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, state_kb: Math.round((this.local.latest()?.json.length || 0) / 1024) };
+      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, state_kb: Math.round((this.local.latest()?.json.length || 0) / 1024), state_breakdown: this.sizeReport() };
       const responseHeaders = {
         // Visible in DevTools > Network > Timing, so slow saves can be measured on a real phone.
         // commit = local durable write; supabase = last background upload.
