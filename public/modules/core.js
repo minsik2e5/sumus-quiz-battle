@@ -53,7 +53,7 @@ export const ACCESSORIES = {
   starpin: { name: '스타 핀', level: 9 }, visor: { name: '바이저', level: 13 }, crown: { name: '크라운', level: 18 }
 };
 export const FRAMES = { basic: { name: '기본', level: 1 }, silver: { name: '실버', level: 5 }, neon: { name: '블루 라인', level: 10 }, aurora: { name: '오로라', level: 15 }, legend: { name: '골드', level: 20 } };
-export const TITLES = { rookie: { name: '첫걸음', level: 1 }, focus: { name: '집중의 힘', level: 5 }, combo: { name: '10연속의 주인공', combo: 10 }, streak: { name: '7일의 기록', streak: 7 }, master: { name: '단어 마스터', level: 15 }, legend: { name: '한계를 넘어서', level: 20 } };
+export const TITLES = { rookie: { name: '첫걸음', level: 1 }, focus: { name: '집중의 힘', level: 5 }, combo: { name: '10연속의 주인공', combo: 10 }, streak: { name: '7일의 기록', streak: 7 }, master: { name: '단어 마스터', level: 15 }, legend: { name: '한계를 넘어서', level: 20 }, yacha3: { name: '야차 3연승', battle_streak: 3 }, yachaking: { name: '야차왕', battle_streak: 5 } };
 export const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 export function levelInfo(points = 0) {
   let level = 1, base = 0, need = 180;
@@ -72,7 +72,7 @@ export function petProgress(pets = [], sessions = [], activeKey) {
     return { key: pet.key, name: pet.name || '', first: !!pet.first, acquired_at: pet.acquired_at || 0, xp, level: info.level, form: info.form, percent: info.percent, remaining: info.remaining, active: pet.key === activeKey };
   });
 }
-export const unlocked = (item, growth) => !!item && (!item.level || growth.level >= item.level) && (!item.combo || growth.best_combo >= item.combo) && (!item.streak || growth.streak >= item.streak);
+export const unlocked = (item, growth) => !!item && (!item.level || growth.level >= item.level) && (!item.combo || growth.best_combo >= item.combo) && (!item.streak || growth.streak >= item.streak) && (!item.battle_streak || Number(growth.battle?.best_streak || 0) >= item.battle_streak);
 export function displayEnglish(raw) {
   return String(raw ?? '').normalize('NFKC').replace(/\([^)]*\)|\[[^\]]*\]/g, '').replace(/[*~～]/g, '').replace(/\s+/g, ' ').trim();
 }

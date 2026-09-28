@@ -7,6 +7,8 @@ import { middleGrade3Books } from './middle-vocab.mjs';
 import { middleGrade2Books } from './middle-vocab-grade2.mjs';
 import { ybmKimHighBooks, ybmKimRetiredWords } from './high-vocab-ybm-kim.mjs';
 import { compactSession } from './state.mjs';
+import packageInfo from '../package.json' with { type: 'json' };
+export const APP_VERSION = packageInfo.version;
 export const builtinBooks = builtinBooksData;
 const withoutLegacySeonbu44 = book => {
   const isSeonbu = book.school_id === 'seonbu-high' || book.school === '선부고';
@@ -385,14 +387,29 @@ const BATTLE_STALE_MS = 20 * 60000;  // after this a match that has not reported
 const BATTLE_ABANDON_MS = 2 * 3600000; // a match that never reported by then is called off
 const BATTLE_KEEP_CANCELLED_MS = 7 * 86400000;
 const BATTLE_QUESTIONS = 40;
+const BATTLE_REMATCH_WINDOW_MS = 2 * 60000; // a rematch can be asked for this long after a match
+const BATTLE_REMATCH_PER_PAIR_DAY = 2;       // so a loss does not turn into chasing it all day
 const gradeOf = className => String(className || '').match(/^(중[1-3]|고[1-3])/)?.[1] || String(className || '');
 const battleIsOpen = (b, now) => (b.status === 'waiting' && now - b.created_at < BATTLE_WAIT_MS) || (b.status === 'active' && now - (b.joined_at || b.created_at) < BATTLE_STALE_MS);
 const openBattleFor = (state, pid, now) => (state.battles || []).find(b => (b.host_id === pid || b.guest_id === pid) && battleIsOpen(b, now));
+// Win streak: consecutive wins until a loss or draw. Within one streak, wins over the same
+// friend on the same day count once, so two friends cannot trade wins to build titles.
+function battleStreaks(rows, pid) {
+  let current = 0, best = 0, counted = new Set();
+  for (const b of [...rows].sort((x, y) => x.finished_at - y.finished_at)) {
+    if (b.winner !== pid) { current = 0; counted = new Set(); continue; }
+    const key = `${b.host_id === pid ? b.guest_id : b.host_id}:${dayKey(b.finished_at)}`;
+    if (counted.has(key)) continue;
+    counted.add(key);
+    best = Math.max(best, ++current);
+  }
+  return { streak: current, best_streak: best };
+}
 function battleRecord(state, pid) {
   const rows = (state.battles || []).filter(b => b.status === 'finished' && (b.host_id === pid || b.guest_id === pid));
   const wins = rows.filter(b => b.winner === pid), losses = rows.filter(b => b.loser === pid);
   const held = (state.battles || []).filter(b => b.status === 'active' && (b.host_id === pid || b.guest_id === pid)).reduce((n, b) => n + b.stake, 0);
-  return { wins: wins.length, losses: losses.length, draws: rows.length - wins.length - losses.length, net: wins.reduce((n, b) => n + b.stake, 0) - losses.reduce((n, b) => n + b.stake, 0), held };
+  return { wins: wins.length, losses: losses.length, draws: rows.length - wins.length - losses.length, net: wins.reduce((n, b) => n + b.stake, 0) - losses.reduce((n, b) => n + b.stake, 0), held, ...battleStreaks(rows, pid) };
 }
 // Closes rooms nobody joined, calls off matches that never reported, drops tickets and
 // ranges once a battle is over, and forgets old cancelled rooms (the state is uploaded
@@ -403,7 +420,9 @@ export function tidyBattles(state, now = Date.now()) {
   for (const b of state.battles) {
     const expired = (b.status === 'waiting' && now - b.created_at >= BATTLE_WAIT_MS) || (b.status === 'active' && now - (b.joined_at || b.created_at) >= BATTLE_ABANDON_MS);
     if (expired) { Object.assign(b, { status: 'cancelled', reason: 'expired', finished_at: now }); changed = true; }
-    if (!['waiting', 'active'].includes(b.status) && (b.tickets || b.range_codes)) { delete b.tickets; delete b.range_codes; changed = true; }
+    // A finished match keeps its ranges while a rematch can still be asked for.
+    const rematchOpen = b.status === 'finished' && now - (b.finished_at || 0) < BATTLE_REMATCH_WINDOW_MS;
+    if (!['waiting', 'active'].includes(b.status) && (b.tickets || (b.range_codes && !rematchOpen))) { delete b.tickets; if (!rematchOpen) delete b.range_codes; changed = true; }
   }
   const kept = state.battles.filter(b => !(b.status === 'cancelled' && now - (b.finished_at || b.created_at) >= BATTLE_KEEP_CANCELLED_MS));
   if (kept.length !== state.battles.length) { state.battles = kept; changed = true; }
@@ -412,14 +431,15 @@ export function tidyBattles(state, now = Date.now()) {
 function findJoinableBattle(state, p, code, now) {
   const battle = (state.battles || []).find(b => b.code === code && b.status === 'waiting' && battleIsOpen(b, now));
   const school = schoolForProfile(state, p);
-  // Rooms of other schools or grades answer exactly like missing ones, so codes cannot be probed.
-  if (!battle || school?.id !== battle.school_id || gradeOf(p.class_name) !== battle.grade) fail('대결 방을 찾지 못했어요. 코드를 다시 확인해주세요. 같은 학교·학년 친구의 방만 들어갈 수 있어요.', 404);
+  // Rooms of other schools or grades, and rematch rooms for someone else, answer exactly
+  // like missing ones, so codes cannot be probed.
+  if (!battle || school?.id !== battle.school_id || gradeOf(p.class_name) !== battle.grade || (battle.invite_id && battle.invite_id !== p.id)) fail('대결 방을 찾지 못했어요. 코드를 다시 확인해주세요. 같은 학교·학년 친구의 방만 들어갈 수 있어요.', 404);
   return battle;
 }
 const battleLossToday = (state, pid, now) => (state.battles || []).filter(b => b.status === 'finished' && b.loser === pid && dayKey(b.finished_at) === dayKey(now)).reduce((n, b) => n + b.stake, 0);
 function battlePlayer(state, p) {
   const pet = pointsAndPets(state, p, mySessions(state, p.id)).pet;
-  return { id: p.id, name: p.display_name, pet: pet ? { key: pet.key, form: pet.form, name: pet.name || '' } : null };
+  return { id: p.id, name: p.display_name, pet: pet ? { key: pet.key, form: pet.form, name: pet.name || '' } : null, streak: battleRecord(state, p.id).streak };
 }
 function checkBattleEntry(state, p, stake, now) {
   if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
@@ -429,6 +449,24 @@ function checkBattleEntry(state, p, stake, now) {
   if (battleLossToday(state, p.id, now) + stake > BATTLE_DAILY_LOSS_CAP) fail(`대결로 하루에 잃을 수 있는 포인트는 ${BATTLE_DAILY_LOSS_CAP}P까지예요. 내일 다시 도전해요.`);
 }
 const battleTicket = () => randomBytes(18).toString('hex');
+// Builds the questions and opens a waiting room (a new one, or a rematch with `extra`).
+function openBattleRoom(state, p, school, stake, rangeCodes, now, extra = {}) {
+  if (!rangeCodes.length) fail('대결할 단어 범위를 골라주세요.');
+  const words = scopedWords(state, school.id, rangeCodes, p.class_name);
+  if (words.length < 8) fail('단어가 8개 이상인 범위를 골라주세요.', 409);
+  const questions = shuffle(words).slice(0, BATTLE_QUESTIONS)
+    .map(word => { const q = buildQuestion(word, 'eng2mean_mc', words); return { word_id: word.id, prompt: q.prompt, options: q.options, answer: q.options.indexOf(word.meaning) }; })
+    .filter(q => q.options.length === 4 && q.answer >= 0);
+  if (questions.length < 8) fail('뜻이 서로 다른 단어가 부족해요. 범위를 더 골라주세요.', 409);
+  state.battles ||= [];
+  const openCodes = new Set(state.battles.filter(b => battleIsOpen(b, now)).map(b => b.code));
+  let code;
+  do code = String(100000 + (randomBytes(4).readUInt32BE(0) % 900000)); while (openCodes.has(code));
+  const battle = { id: randomUUID(), code, status: 'waiting', school_id: school.id, division: school.division, grade: gradeOf(p.class_name), host_id: p.id, guest_id: null, stake, range_codes: rangeCodes, tickets: { [p.id]: battleTicket() }, created_at: now, ...extra };
+  state.battles.push(battle);
+  return { id: battle.id, code, stake, status: 'waiting', ticket: battle.tickets[p.id], expires_at: now + BATTLE_WAIT_MS,
+    _battle: { action: 'init', id: battle.id, stake, host: battlePlayer(state, p), questions, tickets: battle.tickets, expires_at: now + BATTLE_WAIT_MS } };
+}
 
 // Called by the battle room (never by a browser) when a match ends. Idempotent.
 export function settleBattle(state, result) {
@@ -488,9 +526,82 @@ function finishExam(a, state, auto = false) {
   a.correct = correct; a.score = Math.round(correct / a.questions.length * 100); a.status = 'submitted';
   a.submitted_at = Date.now(); a.auto_submitted = auto; a.lease = null;
 }
-export function sweep(state) {
+// Practices nobody touched for this long are closed: they were kept whole (question
+// cache, answer responses, word list) and were a large share of the backed-up state.
+export const STALE_PRACTICE_MS = 3 * DAY_MS;
+function closeStalePractices(state, now) {
+  let changed = false;
+  for (const x of state.practices) {
+    if (x.finished) continue;
+    const lastActivity = Math.max(Number(x.started_at || 0), ...(x.answer_records || []).map(item => Number(item?.at || 0)));
+    if (lastActivity > now - STALE_PRACTICE_MS) continue;
+    // Answers given: close it the way a finish does (the existing path used when a
+    // student changes school), so the answers become a record. No answers: nothing to keep.
+    if (Number(x.total || 0) > 0) finishPractice(x, state);
+    else x.discarded = true;
+    changed = true;
+  }
+  if (state.practices.some(x => x.discarded)) state.practices = state.practices.filter(x => !x.discarded);
+  return changed;
+}
+
+// Answer records of older sessions drop what can be rebuilt exactly: the English word and
+// meaning when they equal the built-in word list, and false flags. /bootstrap rebuilds them
+// (hydrateSession), so screens get the same records. Words from teacher-imported books are
+// kept as stored because an imported book can be removed.
+export const COMPACT_SESSION_AFTER_MS = 14 * DAY_MS;
+let builtinWordIndex = null;
+function builtinWords() {
+  if (!builtinWordIndex) {
+    builtinWordIndex = new Map();
+    for (const word of ybmKimRetiredWords) builtinWordIndex.set(word.id, word);
+    for (const book of allBooks({ extraBooks: [] })) for (const word of book.words || []) builtinWordIndex.set(word.id, word);
+  }
+  return builtinWordIndex;
+}
+function compactRecord(record, words) {
+  if (!record || typeof record !== 'object') return false;
+  let changed = false;
+  if (record.timed_out === false) { delete record.timed_out; changed = true; }
+  if (record.regraded === false) { delete record.regraded; changed = true; }
+  const word = words.get(record.word_id);
+  if (word && 'word' in record && 'meaning' in record && record.word === displayEnglish(word.word) && record.meaning === word.meaning) {
+    delete record.word; delete record.meaning; changed = true;
+  }
+  return changed;
+}
+function compactOldSessions(state, now) {
+  let changed = false, words = null;
+  for (const session of state.sessions) {
+    if (Number(session.created_at || 0) > now - COMPACT_SESSION_AFTER_MS) continue;
+    for (const list of [session.answer_records, session.wrong_details]) {
+      if (!Array.isArray(list)) continue;
+      for (const record of list) {
+        if (!record || (!('word' in record) && record.timed_out !== false && record.regraded !== false)) continue;
+        words ??= builtinWords();
+        if (compactRecord(record, words)) changed = true;
+      }
+    }
+  }
+  return changed;
+}
+function hydrateRecord(record, words) {
+  if ('word' in record && 'meaning' in record && 'timed_out' in record && 'regraded' in record) return record;
+  const word = words.get(record.word_id);
+  return { ...record, word: record.word ?? (word ? displayEnglish(word.word) : ''), meaning: record.meaning ?? word?.meaning ?? '', timed_out: !!record.timed_out, regraded: !!record.regraded };
+}
+export function hydrateSession(session) {
+  const lists = ['answer_records', 'wrong_details'].filter(key => Array.isArray(session[key]) && session[key].some(record => record && !('word' in record && 'meaning' in record && 'timed_out' in record && 'regraded' in record)));
+  if (!lists.length) return session;
+  const words = builtinWords();
+  return { ...session, ...Object.fromEntries(lists.map(key => [key, session[key].map(record => record ? hydrateRecord(record, words) : record)])) };
+}
+
+export function sweep(state, now = Date.now()) {
   let changed = false;
   for (const a of state.examAttempts) if (a.status === 'active' && a.deadline <= Date.now()) { finishExam(a, state, true); changed = true; }
+  if (closeStalePractices(state, now)) changed = true;
+  if (compactOldSessions(state, now)) changed = true;
   if (autoResolveMeaningDisputes(state) > 0) changed = true;
   if (tidyBattles(state)) changed = true;
   const tokens = state.tokens.filter(t => t.expires_at > Date.now());
@@ -514,7 +625,7 @@ export async function preauthenticateLogin(state, body) {
 const MUTATING_WITHOUT_METHOD_CHECK = /^\/(?:logout|practice\/[^/]+\/(?:answer|next|finish))$/;
 export async function service(state, method, path, body, token, options = {}) {
   if (method === 'GET' && MUTATING_WITHOUT_METHOD_CHECK.test(path)) fail('요청 방식을 확인해주세요.', 405);
-  if (path === '/health') return { ok: true, version: '13.43.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: APP_VERSION, schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -615,7 +726,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } : null;
     return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes } : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
       profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
-      sessions, exams: visibleExams,
+      sessions: sessions.map(hydrateSession), exams: visibleExams,
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
       attempts: attempts.map(a => attemptSummary(a, state, p)), server_time: Date.now(),
       active_practice: activePractice?.id || null,
@@ -814,21 +925,41 @@ export async function service(state, method, path, body, token, options = {}) {
     const school = schoolForProfile(state, p);
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
     const rangeCodes = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : [];
-    if (!rangeCodes.length) fail('대결할 단어 범위를 골라주세요.');
-    const words = scopedWords(state, school.id, rangeCodes, p.class_name);
-    if (words.length < 8) fail('단어가 8개 이상인 범위를 골라주세요.', 409);
-    const questions = shuffle(words).slice(0, BATTLE_QUESTIONS)
-      .map(word => { const q = buildQuestion(word, 'eng2mean_mc', words); return { word_id: word.id, prompt: q.prompt, options: q.options, answer: q.options.indexOf(word.meaning) }; })
-      .filter(q => q.options.length === 4 && q.answer >= 0);
-    if (questions.length < 8) fail('뜻이 서로 다른 단어가 부족해요. 범위를 더 골라주세요.', 409);
-    state.battles ||= [];
-    const openCodes = new Set(state.battles.filter(b => battleIsOpen(b, now)).map(b => b.code));
-    let code;
-    do code = String(100000 + (randomBytes(4).readUInt32BE(0) % 900000)); while (openCodes.has(code));
-    const battle = { id: randomUUID(), code, status: 'waiting', school_id: school.id, division: school.division, grade: gradeOf(p.class_name), host_id: p.id, guest_id: null, stake, range_codes: rangeCodes, tickets: { [p.id]: battleTicket() }, created_at: now };
-    state.battles.push(battle);
-    return { id: battle.id, code, stake, status: 'waiting', ticket: battle.tickets[p.id], expires_at: now + BATTLE_WAIT_MS,
-      _battle: { action: 'init', id: battle.id, stake, host: battlePlayer(state, p), questions, tickets: battle.tickets, expires_at: now + BATTLE_WAIT_MS } };
+    return openBattleRoom(state, p, school, stake, rangeCodes, now);
+  }
+  // Rematch: either player may ask within two minutes of the end; the room is only for the
+  // other player, who accepts it on the result screen (stake shown again before joining).
+  if (path === '/battle/rematch' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    tidyBattles(state, now);
+    const previous = (state.battles || []).find(b => b.id === str(body.battle_id, 64) && b.status === 'finished' && (b.host_id === p.id || b.guest_id === p.id));
+    if (!previous) fail('설욕전을 신청할 대결을 찾지 못했어요.', 404);
+    if (now - previous.finished_at > BATTLE_REMATCH_WINDOW_MS || !previous.range_codes?.length) fail('설욕전은 대결이 끝나고 2분 안에만 신청할 수 있어요.', 409);
+    const opponentId = previous.host_id === p.id ? previous.guest_id : previous.host_id;
+    const existing = (state.battles || []).find(b => b.rematch_of === previous.id && battleIsOpen(b, now));
+    if (existing?.host_id === p.id) return { id: existing.id, code: existing.code, stake: existing.stake, status: existing.status, ticket: existing.tickets[p.id], expires_at: existing.created_at + BATTLE_WAIT_MS, rematch: true };
+    if (existing) fail('상대가 먼저 설욕전을 신청했어요. 아래에서 수락해 주세요.', 409);
+    const pair = new Set([p.id, opponentId]);
+    const today = (state.battles || []).filter(b => b.rematch_of && b.status !== 'cancelled' && pair.has(b.host_id) && pair.has(b.invite_id) && dayKey(b.created_at) === dayKey(now)).length;
+    if (today >= BATTLE_REMATCH_PER_PAIR_DAY) fail(`같은 친구와의 설욕전은 하루 ${BATTLE_REMATCH_PER_PAIR_DAY}번까지예요. 내일 다시 붙어요!`, 409);
+    checkBattleEntry(state, p, previous.stake, now);
+    const school = schoolForProfile(state, p);
+    if (!school || school.id !== previous.school_id) fail('학생 학교 설정을 확인해주세요.', 409);
+    return { ...openBattleRoom(state, p, school, previous.stake, previous.range_codes, now, { invite_id: opponentId, rematch_of: previous.id }), rematch: true };
+  }
+  if (path === '/battle/rematch-offer' && method === 'GET') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    const offer = (state.battles || []).find(b => b.rematch_of === str(body.battle_id, 64) && b.invite_id === p.id && b.status === 'waiting' && battleIsOpen(b, now));
+    return { offer: offer ? { code: offer.code, stake: offer.stake, host: state.profiles.find(x => x.id === offer.host_id)?.display_name || '' } : null };
+  }
+  if (path === '/battle/rematch/decline' && method === 'POST') {
+    requireRole(p, 'student');
+    const offer = (state.battles || []).find(b => b.rematch_of === str(body.battle_id, 64) && b.invite_id === p.id && b.status === 'waiting');
+    if (!offer) return { ok: true };
+    Object.assign(offer, { status: 'cancelled', reason: 'declined', finished_at: Date.now() });
+    return { ok: true, _battle: { action: 'cancel', id: offer.id, reason: 'declined' } };
   }
   // Shows the stake and the host before a student commits to joining.
   if (path === '/battle/preview' && method === 'GET') {
@@ -864,7 +995,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const battle = openBattleFor(state, p.id, Date.now());
     if (!battle) return { battle: null };
     const opponentId = battle.host_id === p.id ? battle.guest_id : battle.host_id;
-    return { battle: { id: battle.id, code: battle.code, status: battle.status, stake: battle.stake, host: battle.host_id === p.id, ticket: battle.tickets[p.id], opponent: state.profiles.find(x => x.id === opponentId)?.display_name || null, expires_at: battle.status === 'waiting' ? battle.created_at + BATTLE_WAIT_MS : null } };
+    return { battle: { id: battle.id, code: battle.code, status: battle.status, stake: battle.stake, host: battle.host_id === p.id, rematch: !!battle.rematch_of, ticket: battle.tickets[p.id], opponent: state.profiles.find(x => x.id === opponentId)?.display_name || null, expires_at: battle.status === 'waiting' ? battle.created_at + BATTLE_WAIT_MS : null } };
   }
   if (path === '/battle/history' && method === 'GET') {
     requireRole(p, 'student');

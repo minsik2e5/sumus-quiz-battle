@@ -151,3 +151,31 @@
 @keyframes ybReady{50%{box-shadow:0 0 0 2px #f2a60c inset,0 3px 0 #e8cf92,0 0 12px rgba(242,166,12,.55)}}
 @media (max-width:360px){.yb-sk small{display:none}.yb-code{font-size:36px}}
 @media (prefers-reduced-motion:reduce){.battle-app *{animation:none!important;transition:none!important}}
+/* V13.56 · fever, streaks, emotes, sound switch, rematch, missed-word review */
+.yb-sound{appearance:none;border:0;margin-left:6px;padding:6px 10px;border-radius:999px;background:#fff;box-shadow:0 0 0 1px #dbe5e0 inset;font-size:11.5px;font-weight:800;color:#07815f;cursor:pointer}
+.yb-sound[aria-pressed="false"]{color:#8b9994}
+.yb-top-note:empty+.yb-sound{margin-left:auto}
+.yb-streak{display:inline-block;padding:1px 7px;border-radius:999px;background:#fff0e0;color:#c2410c;font-size:11px;font-weight:900}
+.yb-record small{margin-left:6px;font-size:11px;color:#6c7c77;font-weight:800}
+.yb-fever-tag{display:none;margin-left:8px;padding:1px 8px;border-radius:999px;background:#e5484d;color:#fff;font-size:11px;font-style:normal;font-weight:900}
+.yb-clock.fever .yb-fever-tag{display:inline-block;animation:ybFeverPulse .9s ease-in-out infinite}
+.yb-arena.fever{box-shadow:0 0 0 3px #e5484d inset,0 0 22px rgba(229,72,77,.35)}
+.yb-arena.fever::after{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 50%,transparent 55%,rgba(229,72,77,.18));pointer-events:none;z-index:1}
+.yb-fever-banner{position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);z-index:6;padding:10px 20px;border-radius:16px;background:#e5484d;color:#fff;font-size:24px;font-weight:900;text-align:center;box-shadow:0 8px 24px rgba(229,72,77,.4);animation:ybFeverIn .35s ease-out}
+.yb-fever-banner small{display:block;font-size:12px;font-weight:800;opacity:.9}
+@keyframes ybFeverPulse{50%{transform:scale(1.08)}}
+@keyframes ybFeverIn{from{transform:translate(-50%,-50%) scale(.6);opacity:0}}
+.yb-pop.emote{color:#1b2a24;-webkit-text-stroke:0;background:#fff;border-radius:14px;padding:4px 10px;font-size:clamp(15px,4.6vw,18px);box-shadow:0 4px 12px rgba(0,0,0,.15)}
+.yb-emotes{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.yb-emote{appearance:none;border:0;padding:7px 12px;border-radius:999px;background:#fff;box-shadow:0 0 0 1px #dbe5e0 inset;font-size:13px;font-weight:800;color:#17242f;cursor:pointer}
+.yb-emote:disabled{opacity:.45;cursor:default}
+.yb-emote-toggle{appearance:none;border:0;margin-left:auto;background:none;font-size:11.5px;font-weight:700;color:#6c7c77;text-decoration:underline;cursor:pointer}
+.yb-rematch small{margin-left:6px;font-weight:700;opacity:.85}
+.yb-offer{width:100%;box-sizing:border-box;padding:12px;border-radius:14px;background:#fff4d9;box-shadow:0 0 0 1.5px #f1d9a0 inset;text-align:left}
+.yb-offer p{margin:4px 0 10px;font-size:13px}
+.yb-offer .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.yb-review h2{margin:0;font-size:16px}.yb-review h2 small{font-size:12px;color:#6c7c77}
+.yb-review ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.yb-review li{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;border-radius:12px;background:#f6f8f7;font-size:14px}
+.yb-review li span{color:#5d6d68;text-align:right}
+@media (prefers-reduced-motion:reduce){.yb-clock.fever .yb-fever-tag,.yb-fever-banner{animation:none}}
