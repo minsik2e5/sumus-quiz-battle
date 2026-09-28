@@ -65,7 +65,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.59.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.60.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -1031,7 +1031,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.59.0') && indexHtml.includes('/app.bundle.css?v=13.59.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.60.0') && indexHtml.includes('/app.bundle.css?v=13.60.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1052,7 +1052,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.59.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.60.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -1100,16 +1100,17 @@ export async function runReleaseCheck() {
       {
         const growth = studentModule.slice(studentModule.indexOf('function compactGrowth('), studentModule.indexOf('function homeSchedule('));
         const tabs = studentModule.slice(studentModule.indexOf('export const studentTabs'), studentModule.indexOf('export function shell('));
-        const yacha = studentModule.slice(studentModule.indexOf('function battleTab('), studentModule.indexOf('function ranking('));
         assert(!growth.includes('home-trio-v1358') && !growth.includes('home-metrics-v1358') && !studentModule.includes('recentRecordCard') && growth.includes('home-next-v1358') && growth.includes('home-week-v1358') && growth.includes('today_xp'), 'V13.59 the home shows only the card, the next-step button and the week (no repeated shortcuts)');
-        assert(tabs.includes("['home', '홈', 'home'], ['practice', '학습', 'practice'], ['battle', '야차전', 'battle'], ['exam', '시험', 'exam'], ['records', '기록', 'records']"), 'V13.59 the bottom menu is home, study, yacha (center), exams, records');
-        assert(yacha.includes('data-action="battle"') && yacha.includes('${ranking(A)}') && studentModule.includes('battle: battleTab, ranking: battleTab') && studentModule.includes("tab === 'ranking' ? 'battle'"), 'V13.59 the yacha tab opens the battle and holds the ranking; old ranking links land there');
+        assert(tabs.includes("['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']") && !studentModule.includes('battleTab'), 'V13.60 the bottom menu is back to home, study, exams, ranking, records');
+        assert(growth.includes('${yachaBanner(A)}') && studentModule.includes('class="home-yacha-v1360" data-action="battle"') && growth.indexOf('home-next-v1358') < growth.indexOf('${yachaBanner(A)}'), 'V13.60 the home has a big yacha banner under the next-step button');
+        const css1360 = readFileSync(fileURLToPath(new URL('../public/v1360.css', import.meta.url)), 'utf8');
+        assert(growth.includes('home-stack-v1360') && css1360.includes('.home-stack-v1360{display:flex;flex-direction:column;gap:16px}') && css1360.includes('env(safe-area-inset-bottom'), 'V13.60 home sections are spaced and the last one clears the bottom menu and home bar');
       }
       assert(cardCss.includes('prefers-reduced-motion') && appSource.includes("matchMedia('(prefers-reduced-motion: reduce)')"), 'V13.58 the card does not tilt when reduced motion is on');
       {
         const { rangeLabel, scope } = await import('../public/modules/ui.js');
-        assert(rangeLabel('단원고', 'L1') === '1과' && rangeLabel('강서고', 'L12') === '12과' && rangeLabel('단원고', '5') === '5번' && rangeLabel('선부고', '3') === '외부 3' && scope({ school: '단원고', division: 'high', range_codes: ['L1', 'L2'] }) === '1과 · 2과', 'V13.59.0 textbook lesson ranges read "1과", not "L1번"');
-        assert(studentModule.includes('rangeLabel(A.school, next.range_code)') && !studentModule.includes('${next.range_code}번'), 'V13.59.0 the home word quest uses the same range label');
+        assert(rangeLabel('단원고', 'L1') === '1과' && rangeLabel('강서고', 'L12') === '12과' && rangeLabel('단원고', '5') === '5번' && rangeLabel('선부고', '3') === '외부 3' && scope({ school: '단원고', division: 'high', range_codes: ['L1', 'L2'] }) === '1과 · 2과', 'V13.60.0 textbook lesson ranges read "1과", not "L1번"');
+        assert(studentModule.includes('rangeLabel(A.school, next.range_code)') && !studentModule.includes('${next.range_code}번'), 'V13.60.0 the home word quest uses the same range label');
       }
     }
     assert(v1320Css.includes('.home-focus-card') && v1320Css.includes('.setup-start-summary') && v1320Css.includes('.result-page-v1320'), 'base responsive student UX styles remain loaded');

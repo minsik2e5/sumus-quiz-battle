@@ -2,15 +2,13 @@ import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, PR
 import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar, petKey } from './character.js';
 import { petDisplayName, petJosa } from './pet-moments.js';
-// V13.59: yacha is the center tab; the ranking lives inside it.
-export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['battle', '야차전', 'battle'], ['exam', '시험', 'exam'], ['records', '기록', 'records']];
-const tabOf = tab => tab === 'ranking' ? 'battle' : tab;
+export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
 export function shell(A, content) {
   const p = A.data.profile;
-  return `<div class="student-app">${p.preview_owner_id ? '<button class="preview-exit-v1359" data-action="exit-student-preview">← 교사 화면</button>' : ''}<main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div><button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${tabOf(A.tab) === id ? 'active' : ''}" ${tabOf(A.tab) === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
+  return `<div class="student-app"><main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div>${p.preview_owner_id ? '<button class="preview-exit-v1359" data-action="exit-student-preview">← 교사 화면</button>' : ''}<button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${A.tab === id ? 'active' : ''}" ${A.tab === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
 }
 export function studentPage(A) {
-  return shell(A, ({ home, practice, exam, battle: battleTab, ranking: battleTab, records, studio }[A.tab] || home)(A));
+  return shell(A, ({ home, practice, exam, ranking, records, studio }[A.tab] || home)(A));
 }
 export function getRanges(A, school = A.school, grade = null) {
   const books = A.data.books.filter(book => !grade || !book.grade || book.grade === grade);
@@ -318,18 +316,29 @@ function partnerCard(A) {
     </div>
   </section>`;
 }
-// V13.59 home: the card, one next-step button and the week. Word study, exams, the
-// ranking and records are one tap away in the bottom menu, so the home no longer repeats them.
+// V13.60 home: card, next-step button, a big yacha banner and the week, spaced as one
+// column. Word study, exams, the ranking and records stay in the bottom menu.
+function yachaBanner(A) {
+  const battle = A.data.stats.battle || {};
+  const played = Number(battle.wins || 0) + Number(battle.losses || 0) + Number(battle.draws || 0);
+  const record = played ? `${num(battle.wins || 0)}승 ${num(battle.losses || 0)}패${Number(battle.streak || 0) >= 2 ? ` · ${battle.streak}연승 중` : Number(battle.best_streak || 0) ? ` · 최고 ${battle.best_streak}연승` : ''}` : '첫 대결에 도전해요';
+  return `<button type="button" class="home-yacha-v1360" data-action="battle" aria-label="야차전 하러 가기">
+    <span class="hy-mark" aria-hidden="true">夜</span>
+    <span class="hy-text"><small>친구와 1:1 단어 대결</small><strong>야차전</strong><em>맞히면 누구나 공격! · ${esc(record)}</em></span>
+    <b class="hy-go">대결하기 ${icon('arrow')}</b>
+  </button>`;
+}
 function compactGrowth(A) {
   const g = A.data.stats;
   const week = homeWeek(A);
   const next = homePrimaryAction(A);
-  return `${partnerCard(A)}
+  return `<div class="home-stack-v1360">${partnerCard(A)}
   <button type="button" class="home-next-v1358" ${next.attrs}><span><small>${esc(next.kicker)}</small><strong>${esc(next.title)}</strong><em>${next.detail}</em></span><b>${esc(next.cta)} ${icon('arrow')}</b></button>
+  ${yachaBanner(A)}
   <section class="home-week-card home-week-v1358" aria-label="이번 주 출석">
     <span>이번 주 <b>${week.filter(day => day.active).length}일</b> · 오늘 <b>+${num(g.today_xp || 0)} XP</b></span>
     <div class="home-week-days">${week.map(day => `<i class="${day.active ? 'active' : ''} ${day.current ? 'today' : ''}" aria-label="${day.label}요일${day.active ? ' 학습함' : ''}">${day.label}</i>`).join('')}</div>
-  </section>`;
+  </section></div>`;
 }
 function homeSchedule(A) {
   const rows = [];
@@ -620,17 +629,6 @@ function exam(A) {
     <div class="exam-start-inline"><p>${esc(scopeLabel)} · ${target || 0}문제 · ${esc(PRACTICE_TYPES[A.mode] || '뜻쓰기')}</p><button class="btn primary full" data-action="start-exam-run" ${count ? '' : 'disabled'}>${testMode ? '실전시험 시작' : '연습시험 시작'} ${icon('arrow')}</button></div>`;
 }
 
-function battleTab(A) {
-  const g = A.data.stats, battle = g.battle || {};
-  const titles = Object.entries(TITLES).filter(([, item]) => item.battle_streak).map(([id, item]) => `<span class="${unlocked(item, g) ? '' : 'locked'}">${esc(item.name)}</span>`).join('');
-  return `<section class="yacha-hero-v1359" aria-label="야차전">
-    <div class="yacha-hero-top"><span class="yb-home-mark" aria-hidden="true">夜</span><div><h1>야차전</h1><p>친구와 1:1 단어 대결 · 맞히면 누구나 공격!</p></div></div>
-    <div class="yacha-hero-rec"><span><b>${num(battle.wins || 0)}</b>승</span><span><b>${num(battle.losses || 0)}</b>패</span><span><b>${num(battle.draws || 0)}</b>무</span><span><b>${Number(battle.best_streak || 0)}</b>최고 연승</span></div>
-    ${titles ? `<div class="yacha-hero-titles">${titles}</div>` : ''}
-    <button type="button" class="yacha-hero-go" data-action="battle">${icon('battle')} 대결하러 가기</button>
-  </section>
-  ${ranking(A)}`;
-}
 function ranking(A) {
   const mode = A.rankMode || 'xp';
   const scope = A.rankScope || 'all';
@@ -649,7 +647,7 @@ function ranking(A) {
   const scopeOptions = [['all','전체'],['중2','중2'],['중3','중3'],['고1','고1']];
   const periodOptions = [['week','이번 주'],['all','통합']];
   const modeOptions = [['xp','성장 XP'],['total','연습량'],['streak','연속 학습']];
-  return `<div class="section-title rank-heading-v1326 rank-heading-v1359"><h2>SUMUS 랭킹</h2><p>시험 점수가 아닌 실제 학습 기록으로 올라가요.</p></div>
+  return `<div class="page-heading rank-heading-v1326"><h1>SUMUS 랭킹</h1><p>시험 점수가 아닌 실제 학습 기록으로 올라가요.</p></div>
     <div class="rank-filter-bar" aria-label="랭킹 필터">
       <label><span>학년</span><select data-rank-scope-select>${scopeOptions.map(([k,label]) => `<option value="${k}" ${scope === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
       <label><span>기간</span><select data-rank-period-select>${periodOptions.map(([k,label]) => `<option value="${k}" ${period === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
