@@ -65,7 +65,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.60.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.61.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -438,6 +438,30 @@ export async function runReleaseCheck() {
       assert(asked._battle.host.streak === 0 && (await service(state, 'POST', '/profile/style', { ...style, avatar_title: 'rookie' }, studentToken)), 'V13.56 the room shows each player\'s current streak');
       const added = new Set([asked.id, again.id, ...pairRows.map(r => r.id), 'qa-win-x', 'qa-win-y', 'qa-loss-z']);
       state.battles = state.battles.filter(b => !added.has(b.id));
+
+      // V13.61 challenges: a room for one classmate, shown on their home screen.
+      const friendsOfHost = (await service(state, 'GET', '/battle/friends', {}, studentToken)).friends;
+      const middleStudent = state.profiles.find(x => x.role === 'student' && x.division === 'middle');
+      assert(friendsOfHost.some(f => f.id === guestStudent.id && !f.busy && f.pet?.key) && !friendsOfHost.some(f => f.id === petStudent.id || f.id === middleStudent?.id) && friendsOfHost.every(f => !('username' in f) && !('password_hash' in f)), 'V13.61 the friend list has only classmates of the same school and grade, without login details');
+      await expectStatus(404, () => service(state, 'POST', '/battle/challenge', { friend_id: middleStudent?.id || 'qa-nobody', stake: 10, range_codes: [battleRange] }, studentToken), 'V13.61 a challenge goes only to a classmate of the same school and grade');
+      const challenge = await service(state, 'POST', '/battle/challenge', { friend_id: guestStudent.id, stake: 10, range_codes: [battleRange] }, studentToken);
+      const challengeRow = state.battles.find(b => b.id === challenge.id);
+      assert(challenge.challenge && challenge.friend === guestStudent.display_name && challenge._battle?.action === 'init' && challengeRow.invite_id === guestStudent.id && challengeRow.challenge, 'V13.61 a challenge opens a room for that friend only');
+      const invite = (await service(state, 'GET', '/battle/invite', {}, guestToken)).invite;
+      const guestBoot = await service(state, 'GET', '/bootstrap', {}, guestToken);
+      assert(invite?.id === challenge.id && invite.code === challenge.code && invite.stake === 10 && invite.host === petStudent.display_name && guestBoot.battle_invite?.id === challenge.id, 'V13.61 the friend sees the challenge (poll and home data)');
+      assert((await service(state, 'GET', '/battle/invite', {}, studentToken)).invite === null && (await service(state, 'GET', '/battle/current', {}, studentToken)).battle?.friend === guestStudent.display_name, 'V13.61 the sender sees no invite of their own and finds the waiting room with the friend\'s name');
+      const refused = await service(state, 'POST', '/battle/invite/decline', { id: challenge.id }, guestToken);
+      assert(refused._battle?.action === 'cancel' && refused._battle.reason === 'declined' && challengeRow.status === 'cancelled' && (await service(state, 'GET', '/battle/invite', {}, guestToken)).invite === null, 'V13.61 declining closes the room and tells the sender');
+      const second = await service(state, 'POST', '/battle/challenge', { friend_id: guestStudent.id, stake: 10, range_codes: [battleRange] }, studentToken);
+      const took = await service(state, 'POST', '/battle/join', { code: second.code, stake: 10 }, guestToken);
+      assert(took.id === second.id && state.battles.find(b => b.id === second.id).status === 'active', 'V13.61 accepting a challenge is a normal join with the stake checked');
+      settleBattle(state, { id: second.id, reason: 'cancelled' });
+      const cappedRows = [0, 1, 2, 3].map(i => ({ id: 'qa-challenge-' + i, status: 'cancelled', challenge: true, host_id: petStudent.id, invite_id: guestStudent.id, guest_id: null, stake: 10, created_at: Date.now() - 1000, finished_at: Date.now() - 500 }));
+      state.battles.push(...cappedRows);
+      await expectStatus(409, () => service(state, 'POST', '/battle/challenge', { friend_id: guestStudent.id, stake: 10, range_codes: [battleRange] }, studentToken), 'V13.61 one student sends the same friend at most five challenges a day');
+      const challengeIds = new Set([challenge.id, second.id, ...cappedRows.map(r => r.id)]);
+      state.battles = state.battles.filter(b => !challengeIds.has(b.id));
       assert(state.battles.length === before, 'V13.56 rematch checks leave the battle list as they found it');
     }
     state.battles.push({ id: 'qa-loss-1', status: 'finished', host_id: guestStudent.id, guest_id: petStudent.id, winner: petStudent.id, loser: guestStudent.id, stake: 50, finished_at: Date.now() }, { id: 'qa-loss-2', status: 'finished', host_id: guestStudent.id, guest_id: petStudent.id, winner: petStudent.id, loser: guestStudent.id, stake: 50, finished_at: Date.now() });
@@ -1031,7 +1055,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.60.0') && indexHtml.includes('/app.bundle.css?v=13.60.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.61.0') && indexHtml.includes('/app.bundle.css?v=13.61.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1052,7 +1076,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.60.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.61.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -1105,12 +1129,16 @@ export async function runReleaseCheck() {
         assert(growth.includes('${yachaBanner(A)}') && studentModule.includes('class="home-yacha-v1360" data-action="battle"') && growth.indexOf('home-next-v1358') < growth.indexOf('${yachaBanner(A)}'), 'V13.60 the home has a big yacha banner under the next-step button');
         const css1360 = readFileSync(fileURLToPath(new URL('../public/v1360.css', import.meta.url)), 'utf8');
         assert(growth.includes('home-stack-v1360') && css1360.includes('.home-stack-v1360{display:flex;flex-direction:column;gap:16px}') && css1360.includes('env(safe-area-inset-bottom'), 'V13.60 home sections are spaced and the last one clears the bottom menu and home bar');
+        const battleUi = readFileSync(fileURLToPath(new URL('../public/modules/battle.js', import.meta.url)), 'utf8');
+        const appUi = readFileSync(fileURLToPath(new URL('../public/app.js', import.meta.url)), 'utf8');
+        assert(battleUi.includes('data-yb="challenge"') && battleUi.includes("api('/battle/challenge'") && battleUi.includes('function acceptChallenge(') && battleUi.includes('B.room.challenge'), 'V13.61 the yacha lobby sends a challenge to a picked friend and waits for them');
+        assert(studentModule.includes('data-action="battle-accept"') && studentModule.includes('data-action="battle-decline"') && appUi.includes("api('/battle/invite')") && appUi.includes('}, 20000);') && appUi.includes('openBattle(A, leaveBattle, { accept: invite })'), 'V13.61 a challenge shows on the home banner (checked every 20 seconds) and opens the stake check when accepted');
       }
       assert(cardCss.includes('prefers-reduced-motion') && appSource.includes("matchMedia('(prefers-reduced-motion: reduce)')"), 'V13.58 the card does not tilt when reduced motion is on');
       {
         const { rangeLabel, scope } = await import('../public/modules/ui.js');
-        assert(rangeLabel('단원고', 'L1') === '1과' && rangeLabel('강서고', 'L12') === '12과' && rangeLabel('단원고', '5') === '5번' && rangeLabel('선부고', '3') === '외부 3' && scope({ school: '단원고', division: 'high', range_codes: ['L1', 'L2'] }) === '1과 · 2과', 'V13.60.0 textbook lesson ranges read "1과", not "L1번"');
-        assert(studentModule.includes('rangeLabel(A.school, next.range_code)') && !studentModule.includes('${next.range_code}번'), 'V13.60.0 the home word quest uses the same range label');
+        assert(rangeLabel('단원고', 'L1') === '1과' && rangeLabel('강서고', 'L12') === '12과' && rangeLabel('단원고', '5') === '5번' && rangeLabel('선부고', '3') === '외부 3' && scope({ school: '단원고', division: 'high', range_codes: ['L1', 'L2'] }) === '1과 · 2과', 'V13.61.0 textbook lesson ranges read "1과", not "L1번"');
+        assert(studentModule.includes('rangeLabel(A.school, next.range_code)') && !studentModule.includes('${next.range_code}번'), 'V13.61.0 the home word quest uses the same range label');
       }
     }
     assert(v1320Css.includes('.home-focus-card') && v1320Css.includes('.setup-start-summary') && v1320Css.includes('.result-page-v1320'), 'base responsive student UX styles remain loaded');

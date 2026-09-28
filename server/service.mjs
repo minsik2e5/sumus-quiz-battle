@@ -389,6 +389,7 @@ const BATTLE_KEEP_CANCELLED_MS = 7 * 86400000;
 const BATTLE_QUESTIONS = 40;
 const BATTLE_REMATCH_WINDOW_MS = 2 * 60000; // a rematch can be asked for this long after a match
 const BATTLE_REMATCH_PER_PAIR_DAY = 2;       // so a loss does not turn into chasing it all day
+const BATTLE_CHALLENGE_PER_PAIR_DAY = 5;     // challenges one student may send the same friend per day
 const gradeOf = className => String(className || '').match(/^(중[1-3]|고[1-3])/)?.[1] || String(className || '');
 const battleIsOpen = (b, now) => (b.status === 'waiting' && now - b.created_at < BATTLE_WAIT_MS) || (b.status === 'active' && now - (b.joined_at || b.created_at) < BATTLE_STALE_MS);
 const openBattleFor = (state, pid, now) => (state.battles || []).find(b => (b.host_id === pid || b.guest_id === pid) && battleIsOpen(b, now));
@@ -466,6 +467,22 @@ function openBattleRoom(state, p, school, stake, rangeCodes, now, extra = {}) {
   state.battles.push(battle);
   return { id: battle.id, code, stake, status: 'waiting', ticket: battle.tickets[p.id], expires_at: now + BATTLE_WAIT_MS,
     _battle: { action: 'init', id: battle.id, stake, host: battlePlayer(state, p), questions, tickets: battle.tickets, expires_at: now + BATTLE_WAIT_MS } };
+}
+
+// V13.61 challenges: a room for one named friend of the same school and grade. The friend
+// sees it on the home screen (bootstrap + a light poll) and accepts or declines it there.
+function battleFriends(state, p, now) {
+  const school = schoolForProfile(state, p), grade = gradeOf(p.class_name);
+  return state.profiles
+    .filter(x => x.id !== p.id && x.role === 'student' && x.active !== false && x.pets?.length && schoolForProfile(state, x)?.id === school?.id && gradeOf(x.class_name) === grade)
+    .map(x => { const pet = pointsAndPets(state, x, mySessions(state, x.id)).pet; return { id: x.id, name: x.display_name, class_name: x.class_name || '', same_class: x.class_name === p.class_name, pet: pet ? { key: pet.key, form: pet.form } : null, busy: !!openBattleFor(state, x.id, now) }; })
+    .sort((a, b) => Number(b.same_class) - Number(a.same_class) || a.name.localeCompare(b.name, 'ko'));
+}
+function battleInviteFor(state, p, now) {
+  const b = (state.battles || []).filter(x => x.challenge && x.invite_id === p.id && x.status === 'waiting' && battleIsOpen(x, now)).sort((x, y) => y.created_at - x.created_at)[0];
+  if (!b) return null;
+  const host = state.profiles.find(x => x.id === b.host_id);
+  return { id: b.id, code: b.code, stake: b.stake, host: host?.display_name || '', expires_at: b.created_at + BATTLE_WAIT_MS };
 }
 
 // Called by the battle room (never by a browser) when a match ends. Idempotent.
@@ -724,7 +741,7 @@ export async function service(state, method, path, body, token, options = {}) {
       timer_mode: activePractice.timer_mode || 'session',
       assignment_id: activePractice.assignment_id || null
     } : null;
-    return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes } : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
+    return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
       profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
       sessions: sessions.map(hydrateSession), exams: visibleExams,
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
@@ -961,6 +978,38 @@ export async function service(state, method, path, body, token, options = {}) {
     Object.assign(offer, { status: 'cancelled', reason: 'declined', finished_at: Date.now() });
     return { ok: true, _battle: { action: 'cancel', id: offer.id, reason: 'declined' } };
   }
+  if (path === '/battle/friends' && method === 'GET') {
+    requireRole(p, 'student');
+    return { friends: battleFriends(state, p, Date.now()) };
+  }
+  if (path === '/battle/challenge' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    tidyBattles(state, now);
+    const stake = Number(body.stake);
+    if (!BATTLE_STAKES.includes(stake)) fail('판돈을 선택해주세요.');
+    checkBattleEntry(state, p, stake, now);
+    const friend = battleFriends(state, p, now).find(x => x.id === str(body.friend_id, 64));
+    if (!friend) fail('같은 학교·학년 친구에게만 도전장을 보낼 수 있어요.', 404);
+    if (friend.busy) fail(`${friend.name}이(가) 지금 다른 대결 중이에요. 조금 뒤에 다시 보내요.`, 409);
+    const sent = (state.battles || []).filter(b => b.challenge && b.host_id === p.id && b.invite_id === friend.id && dayKey(b.created_at) === dayKey(now)).length;
+    if (sent >= BATTLE_CHALLENGE_PER_PAIR_DAY) fail(`같은 친구에게는 하루 ${BATTLE_CHALLENGE_PER_PAIR_DAY}번까지 도전장을 보낼 수 있어요.`, 409);
+    const school = schoolForProfile(state, p);
+    if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
+    const rangeCodes = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : [];
+    return { ...openBattleRoom(state, p, school, stake, rangeCodes, now, { invite_id: friend.id, challenge: true }), challenge: true, friend: friend.name };
+  }
+  if (path === '/battle/invite' && method === 'GET') {
+    requireRole(p, 'student');
+    return { invite: battleInviteFor(state, p, Date.now()) };
+  }
+  if (path === '/battle/invite/decline' && method === 'POST') {
+    requireRole(p, 'student');
+    const invite = (state.battles || []).find(b => b.id === str(body.id, 64) && b.challenge && b.invite_id === p.id && b.status === 'waiting');
+    if (!invite) return { ok: true };
+    Object.assign(invite, { status: 'cancelled', reason: 'declined', finished_at: Date.now() });
+    return { ok: true, _battle: { action: 'cancel', id: invite.id, reason: 'declined' } };
+  }
   // Shows the stake and the host before a student commits to joining.
   if (path === '/battle/preview' && method === 'GET') {
     requireRole(p, 'student');
@@ -995,7 +1044,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const battle = openBattleFor(state, p.id, Date.now());
     if (!battle) return { battle: null };
     const opponentId = battle.host_id === p.id ? battle.guest_id : battle.host_id;
-    return { battle: { id: battle.id, code: battle.code, status: battle.status, stake: battle.stake, host: battle.host_id === p.id, rematch: !!battle.rematch_of, ticket: battle.tickets[p.id], opponent: state.profiles.find(x => x.id === opponentId)?.display_name || null, expires_at: battle.status === 'waiting' ? battle.created_at + BATTLE_WAIT_MS : null } };
+    return { battle: { id: battle.id, code: battle.code, status: battle.status, stake: battle.stake, host: battle.host_id === p.id, rematch: !!battle.rematch_of, challenge: !!battle.challenge, friend: battle.challenge ? state.profiles.find(x => x.id === battle.invite_id)?.display_name || '' : undefined, ticket: battle.tickets[p.id], opponent: state.profiles.find(x => x.id === opponentId)?.display_name || null, expires_at: battle.status === 'waiting' ? battle.created_at + BATTLE_WAIT_MS : null } };
   }
   if (path === '/battle/history' && method === 'GET') {
     requireRole(p, 'student');
