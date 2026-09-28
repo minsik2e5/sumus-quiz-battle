@@ -2,13 +2,15 @@ import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, PR
 import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar, petKey } from './character.js';
 import { petDisplayName, petJosa } from './pet-moments.js';
-export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
+// V13.59: yacha is the center tab; the ranking lives inside it.
+export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['battle', '야차전', 'battle'], ['exam', '시험', 'exam'], ['records', '기록', 'records']];
+const tabOf = tab => tab === 'ranking' ? 'battle' : tab;
 export function shell(A, content) {
   const p = A.data.profile;
-  return `<div class="student-app">${p.preview_owner_id ? '<button class="btn secondary" data-action="exit-student-preview" style="position:fixed;top:12px;right:12px;z-index:1000">← 교사 화면으로</button>' : ''}<main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div><button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${A.tab === id ? 'active' : ''}" ${A.tab === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
+  return `<div class="student-app">${p.preview_owner_id ? '<button class="preview-exit-v1359" data-action="exit-student-preview">← 교사 화면</button>' : ''}<main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div><button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${tabOf(A.tab) === id ? 'active' : ''}" ${tabOf(A.tab) === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
 }
 export function studentPage(A) {
-  return shell(A, ({ home, practice, exam, ranking, records, studio }[A.tab] || home)(A));
+  return shell(A, ({ home, practice, exam, battle: battleTab, ranking: battleTab, records, studio }[A.tab] || home)(A));
 }
 export function getRanges(A, school = A.school, grade = null) {
   const books = A.data.books.filter(book => !grade || !book.grade || book.grade === grade);
@@ -178,22 +180,6 @@ function achievementSection(A, full = false) {
   const earned = badges.filter(item => item.earned).length;
   return `<div class="section-title"><h2>성취 배지</h2>${full ? `<span class="tiny muted">${earned}개 달성</span>` : '<button class="text-button" data-go="records">전체 보기 ' + icon('chevron') + '</button>'}</div><div class="achievement-grid">${visible.map(item => `<div class="achievement-badge ${item.earned ? 'earned' : 'locked'}"><span>${icon(item.earned ? item.icon : 'lock')}</span><div><b>${esc(item.label)}</b><small>${esc(item.earned ? item.detail : '아직 도전 중')}</small></div></div>`).join('')}</div>`;
 }
-function recentRecordCard(A) {
-  const sessions = (A.data.sessions || []).map(item => ({ kind: 'practice', at: item.created_at, item }));
-  const attempts = (A.data.attempts || []).filter(item => item.status === 'submitted').map(item => ({ kind: 'exam', at: item.submitted_at, item }));
-  const rows = [...sessions, ...attempts].sort((a,b) => b.at - a.at).slice(0,1);
-  if (!rows.length) return '';
-  const line = row => {
-    if (row.kind === 'practice') {
-      const s = row.item, score = s.score ?? (s.total ? Math.round(s.correct / s.total * 100) : 0);
-      const ranges = (s.range_codes || []).map(code => esc(recordRangeLabel(s, code))).join(' · ') || '선택 범위';
-      return `<button class="exam-row" data-practice-record="${s.id}"><span class="square-icon">${icon('practice')}</span><div class="grow"><h3>${esc(ranges)} · ${esc(PRACTICE_TYPES[s.mode] || '연습')} · ${s.run_mode === 'test' ? '실전' : '연습'}</h3><p>${s.correct}/${s.total} 정답 · ${durationText(s.duration_sec)} · ${date(s.created_at)}</p></div><strong>${score}점</strong></button>`;
-    }
-    const a = row.item, e = A.data.exams.find(exam => exam.id === a.exam_id);
-    return `<button class="exam-row" data-result="${a.id}"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(e?.title || '실전시험')}</h3><p>${EXAM_TYPES[e?.exam_type]?.label || ''} · ${date(a.submitted_at)}</p></div><strong>${a.result_visibility === 'visible' && a.score !== undefined ? a.score + '점' : '공개 대기'}</strong></button>`;
-  };
-  return `<div class="section-title home-recent-head"><h2>최근 학습</h2><button class="text-button" data-go="records">전체 보기 ${icon('chevron')}</button></div><div class="home-recent-one">${rows.map(line).join('')}</div>`;
-}
 function homePrimaryAction(A) {
   const activePractice = A.data.active_practice_summary || null;
   if (activePractice) {
@@ -278,12 +264,6 @@ function homeWeek(A) {
     return { label, date: d.getUTCDate(), active: activeDays.has(key), current };
   });
 }
-function homeRank(A) {
-  const rows = [...(A.data.ranking || [])].sort((a,b) => Number(b.xp || 0)-Number(a.xp || 0) || Number(b.total || 0)-Number(a.total || 0));
-  const me = rows.find(item => item.is_me);
-  if (!me || Number(me.xp || 0) <= 0) return '—';
-  return rows.findIndex(item => item.is_me) + 1;
-}
 // Home hero: the partner pet as a trading card. The card's finish follows the pet's growth
 // (baby plain, growing silver, final holo); tapping flips it to the yacha record.
 const CARD_FINISH = ['plain', 'plain', 'silver', 'holo'];
@@ -334,29 +314,20 @@ function partnerCard(A) {
     <div class="partner-tools">
       <button type="button" data-go="studio">${icon('user')}내 펫 ${owned}/${total}</button>
       ${hatched ? `<button type="button" data-action="pet-name">${partner.name ? '이름 바꾸기' : '이름 짓기'}</button>` : ''}
-      <span>카드를 누르면 뒤집혀요</span>
+      <button type="button" class="partner-shop" data-action="egg-shop" aria-label="보유 포인트 ${num(g.points_balance ?? g.reward_points ?? 0)}P · 알 상점 열기">알 상점 <b>${num(g.points_balance ?? g.reward_points ?? 0)}P</b></button>
     </div>
   </section>`;
 }
+// V13.59 home: the card, one next-step button and the week. Word study, exams, the
+// ranking and records are one tap away in the bottom menu, so the home no longer repeats them.
 function compactGrowth(A) {
   const g = A.data.stats;
-  const rank = homeRank(A);
   const week = homeWeek(A);
   const next = homePrimaryAction(A);
   return `${partnerCard(A)}
   <button type="button" class="home-next-v1358" ${next.attrs}><span><small>${esc(next.kicker)}</small><strong>${esc(next.title)}</strong><em>${next.detail}</em></span><b>${esc(next.cta)} ${icon('arrow')}</b></button>
-  <div class="home-trio-v1358" aria-label="바로 가기">
-    <button type="button" data-study="vocab">${icon('practice')}<span><strong>단어 학습</strong><small>범위 골라 외우기</small></span></button>
-    <button type="button" data-go="exam">${icon('exam')}<span><strong>시험 보기</strong><small>선생님 시험</small></span></button>
-    <button type="button" class="yacha" data-action="battle"><span class="yb-home-mark" aria-hidden="true">夜</span><span><strong>야차전</strong><small>친구와 1:1</small></span></button>
-  </div>
-  <section class="home-metrics-v1358" aria-label="나의 기록">
-    <button type="button" data-go="ranking"><span>이번 주 순위</span><b>${rank === '—' ? '—' : rank + '위'}</b></button>
-    <button type="button" data-action="egg-shop"><span>보유 포인트</span><b>${num(g.points_balance ?? g.reward_points ?? 0)}P</b><small>알 상점</small></button>
-    <button type="button" data-go="records"><span>오늘 XP</span><b>+${num(g.today_xp || 0)}</b><small>학습 ${num(g.practice_count || 0)}회</small></button>
-  </section>
   <section class="home-week-card home-week-v1358" aria-label="이번 주 출석">
-    <span>이번 주 <b>${week.filter(day => day.active).length}일</b> 공부했어요</span>
+    <span>이번 주 <b>${week.filter(day => day.active).length}일</b> · 오늘 <b>+${num(g.today_xp || 0)} XP</b></span>
     <div class="home-week-days">${week.map(day => `<i class="${day.active ? 'active' : ''} ${day.current ? 'today' : ''}" aria-label="${day.label}요일${day.active ? ' 학습함' : ''}">${day.label}</i>`).join('')}</div>
   </section>`;
 }
@@ -389,8 +360,7 @@ function homeRecommendations(A) {
 function home(A) {
   const p = A.data.profile;
   return `<div class="home-context home-context-v1327"><div><span>SUMUS VOCA</span><b>${esc(p.school || A.school || '학교 미설정')} · ${esc(p.class_name || '')}</b></div></div>
-    ${compactGrowth(A)}
-    ${recentRecordCard(A)}`;
+    ${compactGrowth(A)}`;
 }
 function studyHub(A) {
   return `<div class="page-heading study-simple-heading premium-page-heading"><span class="premium-eyebrow">LEARNING</span><h1>학습</h1></div>
@@ -650,6 +620,17 @@ function exam(A) {
     <div class="exam-start-inline"><p>${esc(scopeLabel)} · ${target || 0}문제 · ${esc(PRACTICE_TYPES[A.mode] || '뜻쓰기')}</p><button class="btn primary full" data-action="start-exam-run" ${count ? '' : 'disabled'}>${testMode ? '실전시험 시작' : '연습시험 시작'} ${icon('arrow')}</button></div>`;
 }
 
+function battleTab(A) {
+  const g = A.data.stats, battle = g.battle || {};
+  const titles = Object.entries(TITLES).filter(([, item]) => item.battle_streak).map(([id, item]) => `<span class="${unlocked(item, g) ? '' : 'locked'}">${esc(item.name)}</span>`).join('');
+  return `<section class="yacha-hero-v1359" aria-label="야차전">
+    <div class="yacha-hero-top"><span class="yb-home-mark" aria-hidden="true">夜</span><div><h1>야차전</h1><p>친구와 1:1 단어 대결 · 맞히면 누구나 공격!</p></div></div>
+    <div class="yacha-hero-rec"><span><b>${num(battle.wins || 0)}</b>승</span><span><b>${num(battle.losses || 0)}</b>패</span><span><b>${num(battle.draws || 0)}</b>무</span><span><b>${Number(battle.best_streak || 0)}</b>최고 연승</span></div>
+    ${titles ? `<div class="yacha-hero-titles">${titles}</div>` : ''}
+    <button type="button" class="yacha-hero-go" data-action="battle">${icon('battle')} 대결하러 가기</button>
+  </section>
+  ${ranking(A)}`;
+}
 function ranking(A) {
   const mode = A.rankMode || 'xp';
   const scope = A.rankScope || 'all';
@@ -668,7 +649,7 @@ function ranking(A) {
   const scopeOptions = [['all','전체'],['중2','중2'],['중3','중3'],['고1','고1']];
   const periodOptions = [['week','이번 주'],['all','통합']];
   const modeOptions = [['xp','성장 XP'],['total','연습량'],['streak','연속 학습']];
-  return `<div class="page-heading rank-heading-v1326"><h1>SUMUS 랭킹</h1><p>시험 점수가 아닌 실제 학습 기록으로 올라가요.</p></div>
+  return `<div class="section-title rank-heading-v1326 rank-heading-v1359"><h2>SUMUS 랭킹</h2><p>시험 점수가 아닌 실제 학습 기록으로 올라가요.</p></div>
     <div class="rank-filter-bar" aria-label="랭킹 필터">
       <label><span>학년</span><select data-rank-scope-select>${scopeOptions.map(([k,label]) => `<option value="${k}" ${scope === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
       <label><span>기간</span><select data-rank-period-select>${periodOptions.map(([k,label]) => `<option value="${k}" ${period === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
