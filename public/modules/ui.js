@@ -12,6 +12,7 @@ const paths = {
   practice: '<path d="M4 4h6q2 0 2 2v15q-1-3-4-3H4zM20 4h-6q-2 0-2 2v15q1-3 4-3h4z"/>',
   exam: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h4"/>',
   ranking: '<path d="M4 20v-8h5v8M9 20V5h6v15M15 20v-11h5v11"/>',
+  battle: '<path d="M14.5 17.5 3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M14.5 6.5 18 3h3v3l-3.5 3.5M5 14l4 4M7 17l-3 3M3 19l2 2"/>',
   records: '<path d="M5 4h14v17H5zM9 9h6M9 13h6M9 17h3"/>',
   arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>', chevron: '<path d="m9 5 7 7-7 7"/>',
   back: '<path d="m14 5-7 7 7 7"/>', close: '<path d="m6 6 12 12M6 18 18 6"/>',

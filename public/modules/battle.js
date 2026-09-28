@@ -107,7 +107,7 @@ function bindRoot() {
     if (act === 'create') return createRoom(b);
     if (act === 'join') return joinRoom(b);
     if (act === 'cancel') return cancelRoom(b);
-    if (act === 'answer') return send({ type: 'answer', choice: Number(b.dataset.choice) }, b);
+    if (act === 'answer') { if (B.view?.question) B.view.question.picked = Number(b.dataset.choice); return send({ type: 'answer', choice: Number(b.dataset.choice) }, b); }
     if (act === 'skill') return send({ type: 'skill', skill: b.dataset.skill });
     if (act === 'leave') return confirmLeave();
     if (act === 'again') return openBattle(B.A, B.exit);
@@ -137,7 +137,7 @@ function lobby() {
     <section class="yb-hero">
       <div class="yb-hero-pet">${pet ? avatar(pet.key, { form: pet.form }) : ''}</div>
       <div><span class="yb-eyebrow">1 : 1 단어 배틀</span><h1>${pet ? esc(petJosa(petName(pet), '과', '와')) : ''} 함께 대결!</h1>
-      <p>같은 학교·학년 친구와 같은 단어로 겨뤄요. 먼저 맞히면 공격해요.</p>
+      <p>같은 학교·학년 친구와 같은 단어로 겨뤄요. 맞히면 누구나 공격해요. 빠르면 조금 더 세게!</p>
       <div class="yb-record"><b>${h.record.wins}</b>승 <b>${h.record.losses}</b>패 <b>${h.record.draws}</b>무${h.record.streak >= 2 ? ` · <span class="yb-streak">${h.record.streak}연승 중</span>` : ''}${h.record.best_streak ? ` <small>최고 ${h.record.best_streak}연승</small>` : ''}</div></div>
     </section>
     <section class="yb-card">
@@ -343,7 +343,7 @@ function drawQuestion() {
   document.getElementById('yb-q-n').textContent = `${q.n}번째 단어`;
   document.getElementById('yb-q-word').textContent = q.prompt;
   const frozen = (q.frozen_until?.[B.view.me] || 0) > serverNow();
-  document.getElementById('yb-answers').innerHTML = q.options.map((o, i) => `<button type="button" class="yb-answer ${q.answer === i ? 'right' : ''} ${q.answer !== undefined && q.answer !== i ? 'dim' : ''}" data-yb="answer" data-choice="${i}" ${q.locked || q.answer !== undefined || frozen ? 'disabled' : ''}><span class="yb-tag"><b>${i + 1}</b>공격</span><span class="yb-ko">${esc(o)}</span></button>`).join('');
+  document.getElementById('yb-answers').innerHTML = q.options.map((o, i) => `<button type="button" class="yb-answer ${q.answer === i ? 'right' : ''} ${q.answer !== undefined && q.answer !== i ? 'dim' : ''} ${q.picked === i ? 'picked' : ''} ${q.picked === i && q.hit ? 'hit' : ''}" data-yb="answer" data-choice="${i}" ${q.locked || q.answer !== undefined || frozen ? 'disabled' : ''}><span class="yb-tag"><b>${i + 1}</b>공격</span><span class="yb-ko">${esc(o)}</span></button>`).join('');
   document.getElementById('yb-answers').classList.toggle('frozen', frozen);
   document.getElementById('yb-pet-me')?.classList.toggle('frozen', frozen);
   if (frozen) {
@@ -436,26 +436,40 @@ function applyEvent(e) {
     } else setStatus('op', '상대가 틀렸어요!');
     refreshHud(); return;
   }
-  if (e.type === 'attack' || e.type === 'miss') {
+  // V13.59: a hit no longer ends the word; the answer arrives with 'reveal' (someone hit)
+  // or 'miss' (nobody did) once both players answered or the time ran out.
+  if (e.type === 'reveal' || e.type === 'miss') {
     v.phase = 'reveal'; v.question.answer = e.answer;
+    const line = `${v.question.prompt} = ${v.question.options[e.answer]}`;
     if (e.type === 'miss') {
       for (const id of v.order) P[id].ki = 0;
-      say(e.timeout ? '시간 초과!' : '둘 다 놓쳤어요!', `${v.question.prompt} = ${v.question.options[e.answer]}`);
+      say(e.timeout ? '시간 초과!' : '둘 다 놓쳤어요!', line);
     } else {
+      if (e.timeout && !v.question.locked) { P[v.me].ki = 0; setStatus('me', '시간 초과!'); }
+      say('정답 공개', line);
+    }
+    drawQuestion(); refreshHud(); return;
+  }
+  if (e.type === 'attack') {
+    {
       const atk = sideOf(e.attacker), def = sideOf(e.defender);
       Object.assign(P[e.attacker], { hp: e.hp[e.attacker], ki: e.ki[e.attacker] });
-      Object.assign(P[e.defender], { hp: e.hp[e.defender], ki: 0 });
+      Object.assign(P[e.defender], { hp: e.hp[e.defender], ki: e.ki?.[e.defender] ?? P[e.defender].ki });
+      if (atk === 'me') { v.question.locked = true; v.question.hit = true; }
       if (e.powered) P[e.attacker].power = false;
       if (e.shielded) P[e.defender].shield = false;
       setStatus(atk, `${(e.ms / 1000).toFixed(1)}초 정답!${atk === 'me' ? ` 기 +${e.fast ? 2 : 1}` : ''}`);
+      if (atk === 'op' && !v.question.locked) setStatus('me', '나도 맞히면 반격!');
       const label = e.powered ? '<em>필살기!</em>' : e.fast ? '<em>크리티컬</em> 공격!' : '공격!';
       if (atk === 'me') sfx(e.powered || e.fast || e.fever ? 'crit' : 'hit', e.powered || e.fever ? 30 : 0);
       else later(() => sfx('hurt', e.powered || e.fever ? [80, 40, 80] : 70), reduced() ? 0 : 230);
-      say(`${atk === 'op' ? '상대 ' : ''}${esc(petName(P[e.attacker].pet))}의 ${label}`, `${v.question.prompt} = ${v.question.options[e.answer]}${e.shielded ? ' · 방패가 피해를 절반 막았어요' : ''}`);
+      say(`${atk === 'op' ? '상대 ' : ''}${esc(petName(P[e.attacker].pet))}의 ${label}`, `${e.answer !== undefined ? `${v.question.prompt} = ${v.question.options[e.answer]}` : atk === 'me' ? '정답! 상대를 기다려요' : '상대가 맞혔어요'}${e.shielded ? ' · 방패가 피해를 절반 막았어요' : ''}`);
       lunge(atk);
       later(() => { if (e.powered || e.fast) flash(e.powered ? 'rgba(255,214,90,.9)' : 'rgba(255,236,160,.8)'); hit(def); pop(def, `-${e.dmg}${e.powered ? ' 필살!' : e.fast ? ' 크리티컬!' : e.fever ? ' 피버!' : ''}`, e.powered || e.fast || e.fever ? 'crit' : ''); refreshHud(); }, reduced() ? 0 : 230);
+      // Redraw only my own buttons: the other player's hit must not replace my question.
+      if (atk === 'me') drawQuestion();
     }
-    drawQuestion(); refreshHud(); return;
+    refreshHud(); return;
   }
   if (e.type === 'skill') {
     const p = P[e.player], side = sideOf(e.player), other = side === 'me' ? 'op' : 'me', rule = SKILLS.find(s => s.id === e.skill);

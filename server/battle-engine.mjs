@@ -12,6 +12,9 @@ export const BATTLE = {
   MAX_HP: 100,
   MAX_KI: 5,
   FAST_MS: 2000,       // answers faster than this are critical and give 2 ki
+  HIT: 12,             // damage of a correct answer
+  SPEED_BONUS: 0.5,    // extra damage per second left on the word
+  CRIT: 1.25,          // a fast answer multiplies the damage
   FREEZE_MS: 2000,
   HEAL: 20,
   FEVER_MS: 15000,     // the last 15 seconds of a match are fever time
@@ -59,7 +62,7 @@ function nextQuestion(state, now) {
   for (const id of state.order) {
     if (state.players[id].frozen_next) { frozen_until[id] = now + BATTLE.FREEZE_MS; state.players[id].frozen_next = false; }
   }
-  state.turn = { q: state.idx % state.questions.length, started_at: now, locked: {}, frozen_until, resolved: false };
+  state.turn = { q: state.idx % state.questions.length, started_at: now, locked: {}, hits: 0, frozen_until, resolved: false };
   state.phase = 'question';
   state.deadline = now + BATTLE.TURN_MS;
   return [questionEvent(state)];
@@ -94,32 +97,40 @@ function reveal(state, now) {
   state.deadline = now + BATTLE.REVEAL_MS;
 }
 
+// V13.59: every player who answers a word correctly attacks, not only the fastest.
+// Speed adds a little damage; accuracy decides the match. The word stays open until
+// both players have answered or its time runs out, and the answer is revealed only then.
 function attack(state, attackerId, ms, now) {
   const attacker = state.players[attackerId], defender = state.players[other(state, attackerId)];
   const fast = ms < BATTLE.FAST_MS;
   attacker.ki = Math.min(BATTLE.MAX_KI, attacker.ki + (fast ? 2 : 1));
-  defender.ki = 0; // losing the race breaks the streak
   attacker.correct++; attacker.answer_ms += ms;
-  let dmg = 12 + Math.round(Math.max(0, BATTLE.TURN_MS - ms) / 1000 * 1.2);
-  if (fast) dmg = Math.round(dmg * 1.4);
+  state.turn.locked[attackerId] = true;
+  state.turn.hits = (state.turn.hits || 0) + 1;
+  let dmg = BATTLE.HIT + Math.round(Math.max(0, BATTLE.TURN_MS - ms) / 1000 * BATTLE.SPEED_BONUS);
+  if (fast) dmg = Math.round(dmg * BATTLE.CRIT);
   const fever = inFever(state, now);
   if (fever) dmg = Math.round(dmg * BATTLE.FEVER_MULT);
   const powered = attacker.power, shielded = defender.shield;
   if (powered) { dmg *= 2; attacker.power = false; }
   if (shielded) { dmg = Math.round(dmg / 2); defender.shield = false; }
   defender.hp = Math.max(0, defender.hp - dmg);
-  reveal(state, now);
-  return [event(state, 'attack', { attacker: attacker.id, defender: defender.id, dmg, fast, fever, powered, shielded, ms, answer: state.questions[state.turn.q].answer, hp: { [attacker.id]: attacker.hp, [defender.id]: defender.hp }, ki: { [attacker.id]: attacker.ki, [defender.id]: 0 } })];
+  const events = [event(state, 'attack', { attacker: attacker.id, defender: defender.id, dmg, fast, fever, powered, shielded, ms, hp: { [attacker.id]: attacker.hp, [defender.id]: defender.hp }, ki: { [attacker.id]: attacker.ki, [defender.id]: defender.ki } })];
+  if (state.order.every(id => state.turn.locked[id])) events.push(...settle(state, now, false));
+  return events;
 }
 
-function miss(state, now, timeout) {
+// Closes a word: everyone has answered or its time ran out. Players who did not
+// answer lose their ki; the answer is revealed to both.
+function settle(state, now, timeout) {
   for (const id of state.order) {
+    if (state.turn.locked[id]) continue;
     state.players[id].ki = 0;
-    // Wrong answers were already noted; a timeout counts for whoever did not answer.
-    if (timeout && !state.turn.locked[id]) markMissed(state, id);
+    if (timeout) markMissed(state, id);
   }
   reveal(state, now);
-  return [event(state, 'miss', { timeout, answer: state.questions[state.turn.q].answer })];
+  const answer = state.questions[state.turn.q].answer;
+  return [event(state, state.turn.hits ? 'reveal' : 'miss', { timeout, answer })];
 }
 
 export function connect(state, pid, now) {
@@ -163,7 +174,7 @@ export function answer(state, pid, choice, now) {
   p.ki = 0;
   markMissed(state, pid);
   const events = [event(state, 'wrong', { player: pid, ki: 0 })];
-  if (state.order.every(id => turn.locked[id])) events.push(...miss(state, now, false));
+  if (state.order.every(id => turn.locked[id])) events.push(...settle(state, now, false));
   return events;
 }
 
@@ -197,7 +208,7 @@ export function tick(state, now) {
       state.ends_at = now + BATTLE.MATCH_MS;
       events.push(event(state, 'start', { ends_at: state.ends_at }));
       events.push(...nextQuestion(state, now));
-    } else if (state.phase === 'question') events.push(...miss(state, now, true));
+    } else if (state.phase === 'question') events.push(...settle(state, now, true));
     else if (state.phase === 'reveal') events.push(...nextQuestion(state, now));
     else break;
   }

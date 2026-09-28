@@ -13,6 +13,8 @@ function started(t = 1000) {
 }
 const correct = s => s.questions[s.turn.q].answer;
 const wrong = s => (correct(s) + 1) % 4;
+// Damage of a correct answer with `left` whole seconds still on the word (not fast).
+const slowHit = left => BATTLE.HIT + Math.round(left * BATTLE.SPEED_BONUS);
 
 export function runBattleChecks(assert) {
   {
@@ -21,7 +23,7 @@ export function runBattleChecks(assert) {
     const late = s.ends_at - BATTLE.FEVER_MS + 100;
     s.turn.started_at = late - 3000; s.deadline = late + 5000;
     const hit = answer(s, 'host', correct(s), late).find(e => e.type === 'attack');
-    const normal = 12 + Math.round(5 * 1.2);
+    const normal = slowHit(5);
     assert(hit?.fever === true && hit.dmg === Math.round(normal * BATTLE.FEVER_MULT) && s.players.guest.hp === BATTLE.MAX_HP - hit.dmg, 'fever time hits deal 1.5x damage');
     const { s: early, t: te } = started();
     assert(answer(early, 'host', correct(early), te + 3000).find(e => e.type === 'attack')?.fever === false, 'hits before fever time deal normal damage');
@@ -61,10 +63,17 @@ export function runBattleChecks(assert) {
     const { s, t } = started();
     const events = answer(s, 'host', correct(s), t + 1000);
     const hit = events.find(e => e.type === 'attack');
-    const expected = Math.round((12 + Math.round(7 * 1.2)) * 1.4);
-    assert(hit && hit.fast && hit.dmg === expected && s.players.guest.hp === BATTLE.MAX_HP - expected && s.players.host.ki === 2 && s.phase === 'reveal', 'a fast correct answer attacks with a critical and gives 2 ki');
-    assert(!answer(s, 'guest', correct(s), t + 1100).length, 'a resolved word ignores later answers');
-    tick(s, t + 1000 + BATTLE.REVEAL_MS);
+    const expected = Math.round(slowHit(7) * BATTLE.CRIT);
+    assert(hit && hit.fast && hit.dmg === expected && s.players.guest.hp === BATTLE.MAX_HP - expected && s.players.host.ki === 2, 'a fast correct answer attacks with a critical and gives 2 ki');
+    assert(s.phase === 'question' && !('answer' in hit) && !events.some(e => e.type === 'reveal'), 'V13.59 the word stays open and hides its answer until the other player answers');
+    assert(!answer(s, 'host', correct(s), t + 1200).length, 'a player attacks at most once per word');
+    const counter = answer(s, 'guest', correct(s), t + 3000);
+    const guestHit = counter.find(e => e.type === 'attack'), shown = counter.find(e => e.type === 'reveal');
+    assert(guestHit && !guestHit.fast && guestHit.dmg === slowHit(5) && s.players.host.hp === BATTLE.MAX_HP - slowHit(5) && s.players.guest.ki === 1, 'V13.59 the slower player also attacks when correct');
+    assert(s.players.host.ki === 2 && shown && shown.answer === correct(s) && !shown.timeout && s.phase === 'reveal', 'V13.59 being slower does not break the other player\'s ki, and the answer is revealed once both answered');
+    assert(guestHit.dmg < hit.dmg, 'V13.59 speed still gives a small bonus');
+    assert(!answer(s, 'guest', correct(s), t + 3100).length, 'a resolved word ignores later answers');
+    tick(s, t + 3000 + BATTLE.REVEAL_MS);
     assert(s.phase === 'question' && s.idx === 1, 'the next word opens after the reveal pause');
   }
   {
@@ -72,7 +81,7 @@ export function runBattleChecks(assert) {
     answer(s, 'host', wrong(s), t + 500);
     assert(s.turn.locked.host && !answer(s, 'host', correct(s), t + 700).length, 'a wrong answer locks that player out of the word');
     const guestHit = answer(s, 'guest', correct(s), t + 3000).find(e => e.type === 'attack');
-    assert(guestHit && !guestHit.fast && s.players.host.hp === BATTLE.MAX_HP - (12 + Math.round(5 * 1.2)) && s.players.guest.ki === 1, 'the other player can still win the word slowly for 1 ki');
+    assert(guestHit && !guestHit.fast && s.players.host.hp === BATTLE.MAX_HP - slowHit(5) && s.players.guest.ki === 1 && s.phase === 'reveal', 'the other player can still win the word slowly for 1 ki');
   }
   {
     const { s, t } = started();
@@ -83,6 +92,11 @@ export function runBattleChecks(assert) {
     s2.players.host.ki = 3;
     const timeout = tick(s2, t2 + BATTLE.TURN_MS);
     assert(timeout.some(e => e.type === 'miss' && e.timeout) && s2.players.host.ki === 0, 'a word nobody answers times out and resets ki');
+    const { s: s3, t: t3 } = started();
+    answer(s3, 'host', correct(s3), t3 + 3000);
+    s3.players.guest.ki = 3;
+    const late = tick(s3, t3 + BATTLE.TURN_MS);
+    assert(late.some(e => e.type === 'reveal' && e.timeout) && s3.players.host.ki === 1 && s3.players.guest.ki === 0 && s3.players.guest.missed.length === 1 && !s3.players.host.missed.length, 'V13.59 when time runs out only the player who did not answer loses ki and gets the word to review');
   }
   {
     const { s, t } = started();
@@ -91,7 +105,7 @@ export function runBattleChecks(assert) {
     s.players.guest.ki = 2;
     useSkill(s, 'guest', 'shield', t + 10);
     const hit = answer(s, 'host', correct(s), t + 3000).find(e => e.type === 'attack');
-    const base = 12 + Math.round(5 * 1.2);
+    const base = slowHit(5);
     assert(hit.powered && hit.shielded && hit.dmg === Math.round(base * 2 / 2) && !s.players.host.power && !s.players.guest.shield, 'power doubles and shield halves one attack, then both are used up');
     assert(!useSkill(s, 'host', 'heal', t + 3100).length, 'skills need enough ki');
     s.players.guest.ki = 3;
@@ -103,7 +117,8 @@ export function runBattleChecks(assert) {
     s.players.host.ki = 4;
     useSkill(s, 'host', 'freeze', t);
     answer(s, 'host', correct(s), t + 1000);
-    tick(s, t + 1000 + BATTLE.REVEAL_MS);
+    answer(s, 'guest', wrong(s), t + 1100);
+    tick(s, t + 1100 + BATTLE.REVEAL_MS);
     const opened = s.turn.started_at;
     assert(s.turn.frozen_until.guest === opened + BATTLE.FREEZE_MS && !answer(s, 'guest', correct(s), opened + 1000).length, 'a frozen player cannot answer for the first 2 seconds of the next word');
     assert(answer(s, 'guest', correct(s), opened + 2500).some(e => e.type === 'attack'), 'a frozen player can answer once the freeze ends');
@@ -112,7 +127,8 @@ export function runBattleChecks(assert) {
     const { s, t } = started();
     s.players.guest.hp = 10;
     answer(s, 'host', correct(s), t + 1000);
-    const end = tick(s, t + 1000 + BATTLE.REVEAL_MS).find(e => e.type === 'end');
+    assert(s.players.guest.hp === 0 && s.phase === 'question' && answer(s, 'guest', correct(s), t + 2000).some(e => e.type === 'attack') && s.players.host.hp < BATTLE.MAX_HP, 'V13.59 a knocked-out pet still gets its answer on that word');
+    const end = tick(s, t + 2000 + BATTLE.REVEAL_MS).find(e => e.type === 'end');
     assert(end && end.result.winner === 'host' && end.result.loser === 'guest' && end.result.stake === 30 && s.phase === 'finished' && nextWake(s) === null, 'knocking the other pet to 0 HP wins the stake');
   }
   {
