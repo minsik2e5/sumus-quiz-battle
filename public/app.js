@@ -215,6 +215,26 @@ function startPolling() {
     catch (err) { if (err.status === 401) { clearInterval(poll); A.data = null; loginView(); } }
   }, interval);
 }
+// Partner card on the home screen: the foil follows the finger, and the card tilts a little
+// unless the phone asks for reduced motion.
+$('#app').addEventListener('pointermove', event => {
+  const card = event.target.closest?.('.partner-card-btn');
+  if (!card) return;
+  const r = card.getBoundingClientRect();
+  const x = Math.min(1, Math.max(0, (event.clientX - r.left) / r.width)), y = Math.min(1, Math.max(0, (event.clientY - r.top) / r.height));
+  card.style.setProperty('--mx', `${(x * 100).toFixed(1)}%`);
+  card.style.setProperty('--my', `${(y * 100).toFixed(1)}%`);
+  if (card.getAttribute('aria-pressed') !== 'true' && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    card.style.setProperty('--ry', `${((x - .5) * 12).toFixed(2)}deg`);
+    card.style.setProperty('--rx', `${((.5 - y) * 12).toFixed(2)}deg`);
+  }
+});
+$('#app').addEventListener('pointerout', event => {
+  const card = event.target.closest?.('.partner-card-btn');
+  if (!card || card.contains(event.relatedTarget)) return;
+  card.style.setProperty('--rx', '0deg');
+  card.style.setProperty('--ry', '0deg');
+});
 $('#app').addEventListener('click', async event => {
   const b = event.target.closest('button'); if (!b || b.disabled || !A.data || A.screen) return;
   const d = b.dataset; if (!Object.keys(d).length) return; event.preventDefault();
@@ -394,6 +414,13 @@ $('#app').addEventListener('click', async event => {
       await ensureGrammarData();
       const { openGrammarChoiceSample } = await import('./grammar-choice-sample.js');
       openGrammarChoiceSample(A, render, d.grammarId);
+      return;
+    }
+    if (d.action === 'partner-flip') {
+      const flipped = b.getAttribute('aria-pressed') !== 'true';
+      b.setAttribute('aria-pressed', String(flipped));
+      b.closest('.partner-card-v1358')?.classList.toggle('flipped', flipped);
+      b.style.setProperty('--rx', '0deg'); b.style.setProperty('--ry', '0deg');
       return;
     }
     if (d.action === 'pet-name') return openPetNameModal(A, petChanged);
