@@ -162,9 +162,18 @@ function showExamResult(data) {
     }));
   });
 }
-export function openPracticeRecord(sessionId) {
-  const session = A?.data?.sessions?.find(item => item.id === sessionId);
+export async function openPracticeRecord(sessionId) {
+  let session = A?.data?.sessions?.find(item => item.id === sessionId);
   if (!session) return toast('연습 기록을 찾을 수 없어요.');
+  // V13.64: the teacher list arrives without per-answer lists; load this one record's details.
+  if (session.details_omitted) {
+    try {
+      const full = await api(`/sessions/${encodeURIComponent(sessionId)}`);
+      const list = A.data.sessions; const index = list.findIndex(item => item.id === sessionId);
+      session = { ...full, details_omitted: false };
+      if (index >= 0) list[index] = session;
+    } catch (err) { return toast(err.message || '답안을 불러오지 못했어요.'); }
+  }
   const disputes = (A.data.meaning_disputes || []).filter(item => item.source_type === 'practice' && item.source_id === session.id);
   const runLabel = session.run_mode === 'test' ? '실전시험' : '연습시험';
   const pending = disputes.filter(item => item.status === 'pending').length;

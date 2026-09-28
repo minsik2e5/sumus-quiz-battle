@@ -625,6 +625,13 @@ function hydrateRecord(record, words) {
   const word = words.get(record.word_id);
   return { ...record, word: record.word ?? (word ? displayEnglish(word.word) : ''), meaning: record.meaning ?? word?.meaning ?? '', timed_out: !!record.timed_out, regraded: !!record.regraded };
 }
+// V13.64: the teacher list only needs each record's scores and counts. The per-answer lists were
+// ~85% of the teacher bootstrap, so they are left out here and loaded one record at a time
+// (GET /sessions/:id) when the teacher opens "답안 보기".
+export function sessionSummary(session) {
+  const { answer_records, wrong_details, word_ids, ...rest } = session;
+  return { ...rest, details_omitted: true };
+}
 export function hydrateSession(session) {
   const lists = ['answer_records', 'wrong_details'].filter(key => Array.isArray(session[key]) && session[key].some(record => record && !('word' in record && 'meaning' in record && 'timed_out' in record && 'regraded' in record)));
   if (!lists.length) return session;
@@ -762,7 +769,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } : null;
     return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes, ...dailyQuestProgress(sessions, activePractice, dailyQuest.target) } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
       profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
-      sessions: sessions.map(hydrateSession), exams: visibleExams,
+      sessions: sessions.map(teacher ? sessionSummary : hydrateSession), exams: visibleExams,
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
       attempts: attempts.map(a => attemptSummary(a, state, p)), server_time: Date.now(),
       active_practice: activePractice?.id || null,
@@ -1418,6 +1425,12 @@ export async function service(state, method, path, body, token, options = {}) {
     const words = scopedWords(state, e.school_id, e.range_codes, examWordGrade(e.class_name)), chosen = shuffle(words).slice(0, e.question_count);
     const a = { id: id(), exam_id: e.id, student_id: p.id, status: 'active', started_at: Date.now(), deadline: Math.min(Date.now() + e.duration_sec * 1000, e.due_at), questions: chosen.map(w => buildQuestion(w, e.exam_type, words)), keys: chosen, answers: {}, revision: 0, lease: id() };
     state.examAttempts.push(a); return { attempt: attemptView(a, state, p), exam: e, server_time: Date.now() };
+  }
+  if (/^\/sessions\/[^/]+$/.test(path) && method === 'GET') {
+    const session = state.sessions.find(s => s.id === path.split('/')[2]);
+    const allowed = session && (session.student_id === p.id || (teacher && teacherSchools(state, p, session.division).some(school => sameSchool(session, school))));
+    if (!allowed) fail('학습 기록을 찾을 수 없습니다.', 404);
+    return hydrateSession(session);
   }
   if (/^\/attempts\/[^/]+(?:\/(?:draft|submit))?$/.test(path)) {
     const a = state.examAttempts.find(a => a.id === path.split('/')[2] && (teacher || a.student_id === p.id)); if (!a) fail('응시 기록을 찾을 수 없습니다.', 404);
