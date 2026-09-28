@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { emptyState } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
 import { selfSignup } from './signup.mjs';
-import { allBooks, service, sweep, scopedWords, settleBattle, tidyBattles, dailyQuestProgress, APP_VERSION, STALE_PRACTICE_MS, COMPACT_SESSION_AFTER_MS } from './service.mjs';
+import { allBooks, service, sweep, scopedWords, settleBattle, tidyBattles, dailyQuestProgress, weekCorrect, APP_VERSION, STALE_PRACTICE_MS, COMPACT_SESSION_AFTER_MS } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
 import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, PET_FORM_LEVELS, petForm, levelInfo, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
 import { runContentValidation } from './content-validation.mjs';
@@ -956,6 +956,7 @@ export async function runReleaseCheck() {
     assert(dailyPractice.daily_quest === true && dailyPractice.target === 20 && new Set(dailyInternal.words).size === 20, 'daily quest starts as one twenty-word adaptive practice');
     dailyInternal.score_total = 8;
     const dailyMidBoot = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    assert(Number.isInteger(dailyMidBoot.stats.week_correct) && dailyMidBoot.stats.week_correct >= 0, 'V13.63 bootstrap stats include words correct this week');
     assert(dailyMidBoot.active_practice_summary?.daily_quest === true && dailyMidBoot.daily_quest.done_today === 8 && dailyMidBoot.daily_quest.goal_today === 20 && dailyMidBoot.daily_quest.completed_today === false, 'V13.63 bootstrap tells the home button how far today\'s recommended study has gone (8/20)');
     dailyInternal.score_total = 0;
     await service(state, 'POST', '/practice/' + dailyPractice.id + '/finish', {}, studentToken);
@@ -1149,6 +1150,11 @@ export async function runReleaseCheck() {
         const full = dailyQuestProgress([rec(20, noon - 60000), rec(7, noon)], null, 20, noon);
         const older = dailyQuestProgress([{ daily_quest: true, total: 20, created_at: noon }], null, 20, noon);
         assert(fresh.done_today === 0 && !fresh.completed_today && mid.done_today === 8 && mid.goal_today === 20 && !mid.completed_today && full.done_today === 20 && full.completed_today && older.done_today === 20, 'V13.63 today\'s progress counts only today\'s recommended study (finished + in progress, not yesterday or other practice), capped at the goal');
+        const wed = Date.UTC(2026, 8, 30, 3); // Wed 12:00 KST; the week began Mon 9/28 00:00 KST
+        const monStart = Date.UTC(2026, 8, 27, 15);
+        const wk = weekCorrect([{ correct: 10, created_at: monStart + 30 * 60000 }, { correct: 5, created_at: monStart - 30 * 60000 }, { correct: 7, created_at: wed }, { correct: 9, created_at: wed + 7 * 86400000 }], wed);
+        assert(wk === 17 && weekCorrect([], wed) === 0, 'V13.63 the card counts words answered correctly this week (from Monday 00:00 KST), not last Sunday or next week');
+        assert(studentModule.includes('이번 주 맞힌 단어') && studentModule.includes('g.week_correct') && !studentModule.includes('최근 학습 정답률'), 'V13.63 the partner card shows words correct this week instead of recent accuracy');
       }
       assert(cardCss.includes('prefers-reduced-motion') && appSource.includes("matchMedia('(prefers-reduced-motion: reduce)')"), 'V13.58 the card does not tilt when reduced motion is on');
       {

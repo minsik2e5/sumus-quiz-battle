@@ -312,7 +312,7 @@ function partnerCard(A) {
             <span class="partner-art">${avatar(partner.key, { accessory: p.avatar_accessory, frame: p.avatar_frame, form, size: 'home-featured' })}</span>
             <span class="partner-type">${hatched ? esc(pet.type) : '알'} · 파트너 · ${esc(p.school || A.school || '')} ${esc(p.class_name || '')}</span>
             <span class="partner-skills">
-              <span class="partner-skill"><i>단</i><span>단어 공격<small>최근 학습 정답률</small></span><b>${Number(g.accuracy || 0)}%</b></span>
+              <span class="partner-skill"><i>단</i><span>단어 공격<small>이번 주 맞힌 단어</small></span><b>${num(g.week_correct || 0)}개</b></span>
               <span class="partner-skill"><i>연</i><span>연속 학습<small>쉬지 않고 공부한 날</small></span><b>${Number(g.streak || 0)}일</b></span>
             </span>
             <span class="partner-evo"><span class="partner-evo-row"><span>${nextLine}</span><span>${form === 3 ? `XP ${num(partner.xp || 0)}` : `${num(partner.remaining || 0)} XP 남음`}</span></span><span class="partner-bar" aria-label="레벨 진행률 ${Math.round(Number(partner.percent || 0))}%"><i style="width:${percent}%"></i></span></span>

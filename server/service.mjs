@@ -511,12 +511,18 @@ function activePetKey(state, studentId) {
   const p = state.profiles.find(x => x.id === studentId);
   return p?.pets?.some(x => x.key === p.avatar_key) ? p.avatar_key : undefined;
 }
+// Words answered correctly this ranking week (Monday 00:00 KST onward); grows through the week.
+export function weekCorrect(sessions, now = Date.now()) {
+  const { start, end } = rankingWeek(now);
+  return (sessions || []).filter(s => s.created_at >= start && s.created_at < end).reduce((n, s) => n + Number(s.correct || 0), 0);
+}
 function stats(state, p, sessions = mySessions(state, p.id)) {
   const today = sessions.filter(s => dayKey(s.created_at) === dayKey(Date.now()));
   const recent = [...sessions].sort((a, b) => b.created_at - a.created_at).slice(0, 20);
   const total = recent.reduce((n, s) => n + s.total, 0), correct = recent.reduce((n, s) => n + s.correct, 0);
   return {
     ...growthFor(sessions),
+    week_correct: weekCorrect(sessions),
     today_total: today.reduce((n, s) => n + s.total, 0),
     today_xp: today.reduce((n, s) => n + (s.xp || 0), 0),
     ...pointsAndPets(state, p, sessions),
