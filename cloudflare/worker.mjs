@@ -35,11 +35,13 @@ function createSupabaseRepository(env) {
   if (!env.SUPABASE_URL || !apiKey || !secret) throw Error('Cloudflare Supabase secrets are not configured');
   const headers = { apikey: apiKey, Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
 
-  async function rpc(name, body) {
+  // The whole state (about 2.4 MB in Sept 2026) travels on every backup. Uploads run in the
+  // background, so they get a long timeout instead of being cut off mid-transfer.
+  async function rpc(name, body, timeoutMs) {
     const text = typeof body === 'string' ? body : JSON.stringify(body);
     let response;
     try {
-      response = await fetch(base + name, { method: 'POST', headers, body: text, signal: AbortSignal.timeout(12000) });
+      response = await fetch(base + name, { method: 'POST', headers, body: text, signal: AbortSignal.timeout(timeoutMs) });
     } catch (error) {
       // Timeouts and network failures: keep the cause for /api/health and the logs.
       throw Object.assign(Error('영구 저장 서버에 연결하지 못했습니다.'), { status: 503, detail: `${name}: ${error?.name || 'Error'} ${error?.message || ''} (${Math.round(text.length / 1024)} KB)`.trim() });
@@ -58,7 +60,9 @@ function createSupabaseRepository(env) {
   }
 
   async function load() {
-    const rows = await rpc('voca_v12_state_read', { p_secret: secret });
+    // Read at start-up blocks the first requests, so it keeps a short timeout (a synced
+    // local snapshot is used if Supabase is slow).
+    const rows = await rpc('voca_v12_state_read', { p_secret: secret }, 12000);
     const row = Array.isArray(rows) ? rows[0] : rows;
     if (!row || row.revision === undefined || !row.data) throw Object.assign(Error('영구 저장 데이터를 불러오지 못했습니다.'), { status: 503 });
     return { revision: Number(row.revision), state: row.data };
@@ -71,7 +75,7 @@ function createSupabaseRepository(env) {
     // background upload does not stringify the whole state a second time.
     async commitSerialized(json, revision) {
       const payload = `{"p_secret":${JSON.stringify(secret)},"p_revision":${Number(revision)},"p_data":${json}}`;
-      return Number(await rpc('voca_v12_state_commit', payload));
+      return Number(await rpc('voca_v12_state_commit', payload, 45000));
     }
   };
 }
