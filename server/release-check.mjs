@@ -65,7 +65,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.57.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.58.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -1031,7 +1031,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.57.0') && indexHtml.includes('/app.bundle.css?v=13.57.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.58.0') && indexHtml.includes('/app.bundle.css?v=13.58.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1052,7 +1052,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.57.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.58.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -1074,10 +1074,10 @@ export async function runReleaseCheck() {
     assert(!missingPetArt.length, `V13.53 every pet has egg and three evolution sprites plus small copies${missingPetArt.length ? ' (missing: ' + missingPetArt.join(', ') + ')' : ''}`);
     assert(PET_FORM_LEVELS.join() === '1,3,10,20' && levelInfo(0).form === 0 && petForm(3) === 1 && petForm(10) === 2 && petForm(20) === 3 && levelInfo(0).stage === 1, 'V13.53 pet hatches at Lv.3, grows at Lv.10 and reaches its final form at Lv.20 (legacy stage kept)');
     assert(!sw.includes('/assets/pets/') && sw.includes('"/modules/pet-moments.js"'), 'V13.53 pet images are cached on first use, not precached, and the moments module is precached');
-    assert(studentModule.includes('home-profile-hero-v1337') && studentModule.includes('home-week-days') && studentModule.includes('data-rank-scope-select') && !studentModule.includes('같이 올라가면 더 재밌다.'), 'V13.30 home is pet-and-growth focused and ranking filters are compact');
+    assert(studentModule.includes('partner-card-v1358') && studentModule.includes('home-week-days') && studentModule.includes('data-rank-scope-select') && !studentModule.includes('같이 올라가면 더 재밌다.'), 'V13.30 home is pet-and-growth focused and ranking filters are compact');
     assert(appJs.includes('rankScopeSelect') && appJs.includes('missingCount') && appJs.includes('session.word_ids'), 'V13.30 compact rank filters and complete review flow are wired');
 
-    assert(studentModule.includes('home-main-metrics-v1337') && studentModule.includes('포인트') && studentModule.includes('XP ') && sessionsModule.includes('result-reward-card'), 'V13.30 separates XP, reward points, and achievements in the student UX');
+    assert(studentModule.includes('home-metrics-v1358') && studentModule.includes('포인트') && studentModule.includes('XP ') && sessionsModule.includes('result-reward-card'), 'V13.30 separates XP, reward points, and achievements in the student UX');
     assert(appJs.includes('memorize-flip-out') && appJs.includes('memorize-flip-in'), 'V13.25 vocabulary tap uses a short flip and fade transition');
     assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'meaning and English writing remain first-class scored modes');
     assert(studentModule.includes('recentRecordCard') && studentModule.includes('이번 주 평균') && !sessionsModule.includes('${timerHtml}'), 'student home and record summaries remain available while visible question timer is removed');
@@ -1089,7 +1089,16 @@ export async function runReleaseCheck() {
     assert(sessionsModule.includes('미응답') && sessionsModule.includes('data-finish-practice-dispute'), 'saved exam results separate unanswered answers and keep meaning disputes');
     assert(sessionsModule.includes('이미 진행 중인 학습이 있어요') && sessionsModule.includes('기존 연습 저장 후 새 설정 시작'), 'active session mismatch still warns before reuse');
     assert(appJs.includes('examFormDirty') && appJs.includes('contextGeneration') && appJs.includes('작성 취소 후 전환'), 'teacher context switch still protects dirty forms and stale responses');
-    assert(studentModule.includes('home-profile-hero-v1337') && studentModule.includes('home-main-metrics-v1337') && studentModule.includes('home-week-card'), 'student home centers pet, personal metrics, and weekly attendance');
+    assert(studentModule.includes('partner-card-v1358') && studentModule.includes('home-metrics-v1358') && studentModule.includes('home-week-card'), 'student home centers pet, personal metrics, and weekly attendance');
+    {
+      const home = studentModule.slice(studentModule.indexOf('const CARD_FINISH'), studentModule.indexOf('function homeSchedule('));
+      const appSource = readFileSync(fileURLToPath(new URL('../public/app.js', import.meta.url)), 'utf8');
+      const cardCss = readFileSync(fileURLToPath(new URL('../public/v1358.css', import.meta.url)), 'utf8');
+      assert(home.includes("['plain', 'plain', 'silver', 'holo']") && cardCss.includes('.finish-silver .partner-sheen') && cardCss.includes('.finish-holo .partner-sheen'), 'V13.58 the partner card finish follows growth (plain, silver, holo)');
+      assert(home.includes('data-action="partner-flip"') && appSource.includes("d.action === 'partner-flip'") && home.includes('야차전 기록') && home.includes('best_streak'), 'V13.58 tapping the partner card flips it to the yacha record');
+      assert(['data-action="egg-shop"', 'data-go="studio"', 'data-action="battle"', 'data-go="exam"', 'data-study="vocab"', 'data-go="ranking"', 'data-action="pet-name"'].every(entry => home.includes(entry)), 'V13.58 the new home keeps every entry of the old one (egg shop, my pets, yacha, exams, words, ranking, pet name)');
+      assert(cardCss.includes('prefers-reduced-motion') && appSource.includes("matchMedia('(prefers-reduced-motion: reduce)')"), 'V13.58 the card does not tilt when reduced motion is on');
+    }
     assert(v1320Css.includes('.home-focus-card') && v1320Css.includes('.setup-start-summary') && v1320Css.includes('.result-page-v1320'), 'base responsive student UX styles remain loaded');
 
     const studyHubSource = studentModule.slice(studentModule.indexOf('function studyHub'), studentModule.indexOf('function grammarCards'));

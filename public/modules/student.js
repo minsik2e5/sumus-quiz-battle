@@ -284,53 +284,80 @@ function homeRank(A) {
   if (!me || Number(me.xp || 0) <= 0) return '—';
   return rows.findIndex(item => item.is_me) + 1;
 }
-function compactGrowth(A) {
+// Home hero: the partner pet as a trading card. The card's finish follows the pet's growth
+// (baby plain, growing silver, final holo); tapping flips it to the yacha record.
+const CARD_FINISH = ['plain', 'plain', 'silver', 'holo'];
+function partnerCard(A) {
   const p = A.data.profile, g = A.data.stats;
-  const rank = homeRank(A);
-  const week = homeWeek(A);
-  const accuracy = Number(g.accuracy || 0);
-  const practiceCount = Number(g.practice_count || 0);
-  // The hero shows the partner pet: its own level and XP (each pet grows separately).
   const partner = g.pet || { key: p.avatar_key, name: '', level: Number(g.level || 1), form: petForm(g.level), percent: g.percent, remaining: g.remaining, xp: g.points };
+  const key = petKey(partner.key);
+  const pet = CHARACTERS[key];
   const level = Number(partner.level || 1);
   const form = Math.max(0, Math.min(3, Number(partner.form || 0)));
-  const percent = Math.max(3, Number(partner.percent || 0));
-  const pet = CHARACTERS[petKey(partner.key)];
-  const formName = form ? `${form}단계 · ${PET_FORMS[form]}` : PET_FORMS[0];
-  const nextLine = form === 3 ? '최종 진화 완료' : form === 0 ? `Lv.${PET_FORM_LEVELS[1]}에 태어나요` : `다음 진화 · Lv.${PET_FORM_LEVELS[form + 1]}`;
-  return `<section class="home-profile-hero-v1337 home-pet-evolution-v1341 form-${form}">
-    <div class="home-pet-stage-v1337">
-      <span class="home-level-badge-v1337"><small>LEVEL</small><b>${level}</b></span>
-      <button type="button" class="home-pet-art-v1337 home-pet-open" data-go="studio" aria-label="내 펫 보기">${avatar(partner.key, { accessory: p.avatar_accessory, frame: p.avatar_frame, form, size: 'home-featured' })}</button>
-      <span class="home-pet-status-v1337">${formName}</span>
+  const percent = Math.max(3, Math.min(100, Number(partner.percent || 0)));
+  const hatched = form > 0;
+  const nextLine = form === 3 ? '최종 진화 완료' : form === 0 ? `Lv.${PET_FORM_LEVELS[1]}에 태어나요` : `다음 진화 Lv.${PET_FORM_LEVELS[form + 1]}`;
+  const owned = Math.max(1, (g.pets || []).length);
+  const total = Object.keys(CHARACTERS).length;
+  const number = String(Object.keys(CHARACTERS).indexOf(key) + 1).padStart(3, '0');
+  const battle = g.battle || {};
+  const titles = Object.entries(TITLES).filter(([, item]) => item.battle_streak).map(([id, item]) => `<span class="${unlocked(item, g) ? '' : 'locked'}">${esc(item.name)}</span>`).join('');
+  const finish = CARD_FINISH[form];
+  return `<section class="partner-card-v1358 finish-${finish}" style="--pet:${pet.color};--pet-light:${pet.light};--pet-soft:${pet.soft}" aria-label="나의 파트너 카드">
+    <button type="button" class="partner-card-btn" data-action="partner-flip" aria-pressed="false" aria-label="파트너 카드. 누르면 뒷면의 야차전 기록을 보여줘요">
+      <span class="partner-card">
+        <span class="partner-face partner-front">
+          <span class="partner-inner">
+            <span class="partner-head"><span class="partner-stage">${PET_FORMS[form]}</span><span class="partner-name">${hatched ? esc(petDisplayName(partner)) : '???'}</span><span class="partner-lv"><small>Lv.</small><b>${level}</b></span></span>
+            <span class="partner-art">${avatar(partner.key, { accessory: p.avatar_accessory, frame: p.avatar_frame, form, size: 'home-featured' })}</span>
+            <span class="partner-type">${hatched ? esc(pet.type) : '알'} · 파트너 · ${esc(p.school || A.school || '')} ${esc(p.class_name || '')}</span>
+            <span class="partner-skills">
+              <span class="partner-skill"><i>단</i><span>단어 공격<small>최근 학습 정답률</small></span><b>${Number(g.accuracy || 0)}%</b></span>
+              <span class="partner-skill"><i>연</i><span>연속 학습<small>쉬지 않고 공부한 날</small></span><b>${Number(g.streak || 0)}일</b></span>
+            </span>
+            <span class="partner-evo"><span class="partner-evo-row"><span>${nextLine}</span><span>${form === 3 ? `XP ${num(partner.xp || 0)}` : `${num(partner.remaining || 0)} XP 남음`}</span></span><span class="partner-bar" aria-label="레벨 진행률 ${Math.round(Number(partner.percent || 0))}%"><i style="width:${percent}%"></i></span></span>
+            <span class="partner-foot"><span class="partner-stars" aria-label="모은 펫 ${owned}/${total}">${'★'.repeat(owned)}${'☆'.repeat(Math.max(0, total - owned))}</span><span>No.${number} · SUMUS${finish === 'plain' ? '' : `<b class="partner-finish">${finish === 'holo' ? 'HOLO' : 'SILVER'}</b>`}</span></span>
+          </span>
+          <span class="partner-sheen" aria-hidden="true"></span>
+        </span>
+        <span class="partner-face partner-back">
+          <span class="partner-back-in">
+            <span class="partner-back-title">야차전 기록</span>
+            <span class="partner-rec"><span><b>${num(battle.wins || 0)}</b>승</span><span><b>${num(battle.losses || 0)}</b>패</span><span><b>${num(battle.draws || 0)}</b>무</span></span>
+            <span class="partner-streak"><span>${Number(battle.streak || 0) >= 1 ? `지금 ${battle.streak}연승 중` : '연승에 도전해요'}</span><b>최고 ${Number(battle.best_streak || 0)}연승</b></span>
+            <span class="partner-titles">${titles}</span>
+            <span class="partner-back-hint">다시 누르면 앞면으로</span>
+          </span>
+        </span>
+      </span>
+    </button>
+    <div class="partner-tools">
+      <button type="button" data-go="studio">${icon('user')}내 펫 ${owned}/${total}</button>
+      ${hatched ? `<button type="button" data-action="pet-name">${partner.name ? '이름 바꾸기' : '이름 짓기'}</button>` : ''}
+      <span>카드를 누르면 뒤집혀요</span>
     </div>
-    <div class="home-profile-copy-v1337">
-      <span class="home-profile-kicker-v1337">나의 성장 파트너 · ${formName}</span>
-      <h1>${form === 0 ? '???' : esc(petDisplayName(partner))} <small>${form === 0 ? '부화를 기다리는 중' : esc(pet.type)}</small>${form > 0 ? `<button type="button" class="pet-name-edit" data-action="pet-name">${partner.name ? '이름 바꾸기' : '이름 짓기'}</button>` : ''}</h1>
-      <div class="home-evolution-line-v1341"><span>${nextLine}</span><b>${form}/3</b></div>
-      <div class="home-level-line-v1337"><b>Lv.${level}</b><span>다음 레벨까지 ${num(partner.remaining || 0)} XP</span></div>
-      <div class="home-xp-track-v1337" aria-label="레벨 진행률"><i style="width:${percent}%"></i></div>
-      <div class="home-xp-meta-v1337"><span>함께 쌓은 XP ${num(partner.xp || 0)}</span><strong>${Math.round(Number(partner.percent || 0))}%</strong></div>
-    </div>
-  </section>
-  <div class="home-quick-actions-v1344" aria-label="바로 시작">
-    <button class="home-quick-primary-v1344" data-study="vocab">${icon('practice')}<span><strong>단어 학습</strong><small>선택한 범위 바로 보기</small></span>${icon('arrow')}</button>
-    <button class="home-quick-secondary-v1344" data-go="exam">${icon('exam')}<span>시험 보기</span>${icon('arrow')}</button>
+  </section>`;
+}
+function compactGrowth(A) {
+  const g = A.data.stats;
+  const rank = homeRank(A);
+  const week = homeWeek(A);
+  const next = homePrimaryAction(A);
+  return `${partnerCard(A)}
+  <button type="button" class="home-next-v1358" ${next.attrs}><span><small>${esc(next.kicker)}</small><strong>${esc(next.title)}</strong><em>${next.detail}</em></span><b>${esc(next.cta)} ${icon('arrow')}</b></button>
+  <div class="home-trio-v1358" aria-label="바로 가기">
+    <button type="button" data-study="vocab">${icon('practice')}<span><strong>단어 학습</strong><small>범위 골라 외우기</small></span></button>
+    <button type="button" data-go="exam">${icon('exam')}<span><strong>시험 보기</strong><small>선생님 시험</small></span></button>
+    <button type="button" class="yacha" data-action="battle"><span class="yb-home-mark" aria-hidden="true">夜</span><span><strong>야차전</strong><small>친구와 1:1</small></span></button>
   </div>
-  <button type="button" class="home-battle-v1354" data-action="battle"><span class="yb-home-mark" aria-hidden="true">夜</span><span><strong>야차전</strong><small>친구와 1:1 단어 대결 · 포인트를 걸고 겨뤄요</small></span>${icon('arrow')}</button>
-  <section class="home-main-metrics-v1337">
-    <button class="rank" data-go="ranking"><span>내 순위</span><strong>${rank === '—' ? '—' : rank + '위'}</strong><small>이번 주 랭킹 보기</small></button>
-    <button class="accuracy" data-go="records"><span>내 기록</span><strong>${accuracy}%</strong><small>최근 학습 정답률</small></button>
-    <button class="sessions" data-go="records"><span>학습 횟수</span><strong>${num(practiceCount)}회</strong><small>누적 학습 기록</small></button>
+  <section class="home-metrics-v1358" aria-label="나의 기록">
+    <button type="button" data-go="ranking"><span>이번 주 순위</span><b>${rank === '—' ? '—' : rank + '위'}</b></button>
+    <button type="button" data-action="egg-shop"><span>보유 포인트</span><b>${num(g.points_balance ?? g.reward_points ?? 0)}P</b><small>알 상점</small></button>
+    <button type="button" data-go="records"><span>오늘 XP</span><b>+${num(g.today_xp || 0)}</b><small>학습 ${num(g.practice_count || 0)}회</small></button>
   </section>
-  <section class="home-mini-stats-v1337">
-    <div><span>연속 학습</span><b>${Number(g.streak || 0)}일</b></div>
-    <div><span>오늘 XP</span><b>+${num(g.today_xp || 0)}</b></div>
-    <button type="button" class="home-points-shop" data-action="egg-shop"><span>보유 포인트</span><b>${num(g.points_balance ?? g.reward_points ?? 0)}P</b><small>알 상점</small></button>
-  </section>
-  <section class="home-week-card home-week-card-v1337">
-    <div class="home-week-head"><div><span>이번 주 출석</span><strong>${Number(g.streak || 0)}일 연속 학습</strong></div><span class="streak-badge">${icon('flame')}${Number(g.streak || 0)} DAYS</span></div>
-    <div class="home-week-days">${week.map(day => `<div class="${day.active ? 'active' : ''} ${day.current ? 'today' : ''}"><span>${day.label}</span><b>${day.active ? '✓' : day.date}</b></div>`).join('')}</div>
+  <section class="home-week-card home-week-v1358" aria-label="이번 주 출석">
+    <span>이번 주 <b>${week.filter(day => day.active).length}일</b> 공부했어요</span>
+    <div class="home-week-days">${week.map(day => `<i class="${day.active ? 'active' : ''} ${day.current ? 'today' : ''}" aria-label="${day.label}요일${day.active ? ' 학습함' : ''}">${day.label}</i>`).join('')}</div>
   </section>`;
 }
 function homeSchedule(A) {
