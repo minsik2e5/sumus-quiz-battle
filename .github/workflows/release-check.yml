@@ -21,3 +21,4 @@ jobs:
       - run: npm run check
       - run: npm run check:load
       - run: npm run check:cloudflare
+      - run: npm run check:sql

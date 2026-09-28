@@ -545,11 +545,11 @@ function closeStalePractices(state, now) {
   return changed;
 }
 
-// Answer records of older sessions drop what can be rebuilt exactly: the English word and
-// meaning when they equal the built-in word list, and false flags. /bootstrap rebuilds them
-// (hydrateSession), so screens get the same records. Words from teacher-imported books are
-// kept as stored because an imported book can be removed.
-export const COMPACT_SESSION_AFTER_MS = 14 * DAY_MS;
+// Answer records of sessions older than two days drop what can be rebuilt exactly: the
+// English word and meaning when they equal the built-in word list, and false flags.
+// /bootstrap rebuilds them (hydrateSession), so screens get the same records. Words from
+// teacher-imported books are kept as stored because an imported book can be removed.
+export const COMPACT_SESSION_AFTER_MS = 2 * DAY_MS;
 let builtinWordIndex = null;
 function builtinWords() {
   if (!builtinWordIndex) {

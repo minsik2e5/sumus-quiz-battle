@@ -6,6 +6,7 @@ import { examAdmin } from '../server/exam-admin.mjs';
 import { migrateState, stateSizeReport } from '../server/state.mjs';
 import { createMutationCoordinator, NO_MUTATION } from '../server/mutation-coordinator.mjs';
 import { createLocalRepository, createSupabaseSync } from './local-first.mjs';
+import { partitionState, assembleState, hashText } from './state-parts.mjs';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' };
 
@@ -53,7 +54,8 @@ function createSupabaseRepository(env) {
     try { payload = responseText ? JSON.parse(responseText) : null; } catch {}
     if (!response.ok) {
       const message = payload?.message || payload?.error || 'Supabase 저장 연결을 확인해주세요.';
-      const status = payload?.code === '40001' || message.includes('revision_conflict') ? 409 : 503;
+      // 404: the function does not exist (the parts SQL has not been run yet).
+      const status = payload?.code === '40001' || message.includes('revision_conflict') ? 409 : response.status === 404 ? 404 : 503;
       // Supabase's own reason (never the request body or secret), for diagnosing failed backups.
       const detail = `${name}: HTTP ${response.status}${payload?.code ? ' ' + payload.code : ''} ${String(message).slice(0, 160)} (${Math.round(text.length / 1024)} KB)`;
       throw Object.assign(Error(status === 409 ? '다른 기기의 변경이 있습니다. 다시 시도해주세요.' : '영구 저장 서버에 연결하지 못했습니다.'), { status, detail });
@@ -78,6 +80,19 @@ function createSupabaseRepository(env) {
     async commitSerialized(json, revision) {
       const payload = `{"p_secret":${JSON.stringify(secret)},"p_revision":${Number(revision)},"p_data":${json}}`;
       return Number(await rpc('voca_v12_state_commit', payload, 45000));
+    },
+    // Parts backup (supabase/voca_v13_parts.sql).
+    async partsRevision() { return Number(await rpc('voca_v13_state_revision', { p_secret: secret }, 12000)); },
+    async readParts() {
+      const rows = await rpc('voca_v13_state_read', { p_secret: secret }, 20000);
+      const row = Array.isArray(rows) ? rows[0] : rows;
+      return { revision: Number(row?.revision || 0), parts: row?.parts && typeof row.parts === 'object' ? row.parts : {} };
+    },
+    // entries: [[part key, JSON text]]; the texts are sent as they are, not re-serialized.
+    async patchParts(entries, removed, revision) {
+      const parts = entries.map(([key, text]) => `${JSON.stringify(key)}:${text}`).join(',');
+      const payload = `{"p_secret":${JSON.stringify(secret)},"p_revision":${Number(revision)},"p_parts":{${parts}},"p_removed":${JSON.stringify(removed)}}`;
+      return Number(await rpc('voca_v13_state_patch', payload, 45000));
     }
   };
 }
@@ -90,7 +105,7 @@ export class VocaStateObject {
     this.ready = ctx.blockConcurrencyWhile(async () => {
       this.supabase = createSupabaseRepository(env);
       this.local = createLocalRepository(ctx.storage);
-      this.sync = createSupabaseSync({ local: this.local, supabase: this.supabase, storage: ctx.storage, minIntervalMs: Number(env.SUPABASE_SYNC_MIN_INTERVAL_MS ?? 60000) });
+      this.sync = createSupabaseSync({ local: this.local, supabase: this.supabase, storage: ctx.storage, minIntervalMs: Number(env.SUPABASE_SYNC_MIN_INTERVAL_MS ?? 60000), forceFull: env.SUPABASE_BACKUP_MODE === 'full' });
       const initial = await this.loadInitialState();
       const migrated = migrateState(initial.state);
       const swept = sweep(initial.state);
@@ -121,6 +136,33 @@ export class VocaStateObject {
     const hasLocal = this.local.hasSnapshot();
     const status = this.local.status();
     if (hasLocal && status.syncedVersion < status.version) return this.local.read();
+    // Backed up as parts: only the parts copy is compared. The v12 copy is then just a
+    // periodic safety copy, hours older, and must never replace a synced local snapshot.
+    if (hasLocal && status.partsRevision !== null && this.env.SUPABASE_BACKUP_MODE !== 'full') {
+      let remoteRevision;
+      try {
+        remoteRevision = await this.supabase.partsRevision();
+      } catch (error) {
+        console.error('[boot] parts backup unavailable; starting from the local snapshot', error?.detail || error?.message);
+        return this.local.read();
+      }
+      if (remoteRevision !== status.partsRevision) {
+        const remoteParts = await this.readPartsBackup();
+        if (remoteParts) {
+          console.warn('[boot] parts backup changed outside this object; adopting it', { local: status.partsRevision, remote: remoteParts.revision });
+          this.local.adoptRemoteParts(remoteParts.state, remoteParts.revision, remoteParts.hashes);
+        }
+      }
+      return this.local.read();
+    }
+    // No local copy: the parts backup, when it is set up and filled, is the freshest copy.
+    if (!hasLocal && this.env.SUPABASE_BACKUP_MODE !== 'full') {
+      const remoteParts = await this.readPartsBackup();
+      if (remoteParts) {
+        this.local.adoptRemoteParts(remoteParts.state, remoteParts.revision, remoteParts.hashes);
+        return this.local.read();
+      }
+    }
     let remote;
     try {
       remote = await this.supabase.read();
@@ -134,6 +176,21 @@ export class VocaStateObject {
       this.local.adoptRemote(remote.state, remote.revision);
     }
     return this.local.read();
+  }
+
+  // The state from the parts backup, or null when it is missing, empty or unreachable
+  // (then the v12 copy is used as before).
+  async readPartsBackup() {
+    try {
+      const { revision, parts } = await this.supabase.readParts();
+      if (!revision || !parts['o:keys']) return null;
+      const state = assembleState(parts);
+      const hashes = await Promise.all([...partitionState(state)].map(async ([key, text]) => [key, await hashText(text)]));
+      return { state, revision, hashes };
+    } catch (error) {
+      if (error?.status !== 404) console.error('[boot] parts backup unavailable', error?.detail || error?.message);
+      return null;
+    }
   }
 
   async alarm() {
@@ -241,7 +298,7 @@ export class VocaStateObject {
       const sync = this.sync.status();
       if (request.method !== 'GET' && elapsed > 1500) console.warn('[slow-mutation]', url.pathname.replace(/\/[0-9a-f-]{36}/g, '/:id'), { elapsed, commitMs, commitBytes });
       // Public health output shows whether the Supabase backup is keeping up.
-      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, state_kb: Math.round((this.local.latest()?.json.length || 0) / 1024), state_breakdown: this.sizeReport() };
+      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.json.length || 0) / 1024), state_breakdown: this.sizeReport() };
       const responseHeaders = {
         // Visible in DevTools > Network > Timing, so slow saves can be measured on a real phone.
         // commit = local durable write; supabase = last background upload.

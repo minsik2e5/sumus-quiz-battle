@@ -1,6 +1,6 @@
 {
   "name": "sumus-voca",
-  "version": "13.56.1",
+  "version": "13.57.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -15,9 +15,11 @@
     "cf:dev": "wrangler dev",
     "cf:deploy": "npm run build:assets && npm run check && wrangler deploy",
     "cf:types": "wrangler types",
-    "check:load": "node server/stress-check.mjs"
+    "check:load": "node server/stress-check.mjs",
+    "check:sql": "node server/sql-check.mjs"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "wrangler": "4.135.0"
   }
 }
