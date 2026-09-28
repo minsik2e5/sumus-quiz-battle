@@ -5,7 +5,7 @@ import { passwordHash } from './auth.mjs';
 import { emptyState } from './state.mjs';
 import { builtinBooks } from './service.mjs';
 import { VocaStateObject } from '../cloudflare/worker.mjs';
-import { createLocalRepository } from '../cloudflare/local-first.mjs';
+import { createLocalRepository, createSupabaseSync } from '../cloudflare/local-first.mjs';
 
 const deepCopy = value => structuredClone(value);
 
@@ -230,6 +230,20 @@ export async function runCloudflareCheck() {
     assert.equal(persisted.profiles[0].password_hash, originalHash, '비밀번호 해시는 재생성하지 않고 그대로 보존해야 합니다.');
     assert(persisted.sessions.some(item => item.id === 'session-preserved'), '기존 학습 기록이 영구 저장에 남아야 합니다.');
     assert(persisted.mastery['student-preserved'], '신규 정답 데이터가 영구 저장되어야 합니다.');
+
+    // 8. Minimum upload interval: after a successful upload the next one waits, and a
+    //    newer snapshot is not uploaded back to back.
+    {
+      let version = 1, synced = 0, uploads = 0, alarmAt = null;
+      const fakeLocal = { status: () => ({ version, syncedVersion: synced, supabaseRevision: 1 }), latest: () => ({ version, json: '{}' }), markSynced(v) { synced = v; } };
+      const fakeRemote = { async commitSerialized() { uploads += 1; version += uploads === 1 ? 1 : 0; return 2; } };
+      const sync = createSupabaseSync({ local: fakeLocal, supabase: fakeRemote, storage: { setAlarm(at) { alarmAt = at; } }, minIntervalMs: 60000, log: { warn() {}, error() {} } });
+      await sync.run();
+      assert.equal(uploads, 1, '최소 간격이 있으면 새 스냅샷을 연달아 올리지 않아야 합니다.');
+      assert.equal(sync.pending(), true);
+      assert(alarmAt >= Date.now() + 60000, '다음 업로드는 최소 간격 뒤로 예약되어야 합니다.');
+      sync.close();
+    }
     console.log(`[cloudflare-check] PASS local-first storage + ${concurrent.length} concurrent reads (${commits} Supabase commits)`);
   } finally {
     globalThis.fetch = nativeFetch;

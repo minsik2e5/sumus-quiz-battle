@@ -7,6 +7,8 @@ import { middleGrade3Books } from './middle-vocab.mjs';
 import { middleGrade2Books } from './middle-vocab-grade2.mjs';
 import { ybmKimHighBooks, ybmKimRetiredWords } from './high-vocab-ybm-kim.mjs';
 import { compactSession } from './state.mjs';
+import packageInfo from '../package.json' with { type: 'json' };
+export const APP_VERSION = packageInfo.version;
 export const builtinBooks = builtinBooksData;
 const withoutLegacySeonbu44 = book => {
   const isSeonbu = book.school_id === 'seonbu-high' || book.school === '선부고';
@@ -488,9 +490,82 @@ function finishExam(a, state, auto = false) {
   a.correct = correct; a.score = Math.round(correct / a.questions.length * 100); a.status = 'submitted';
   a.submitted_at = Date.now(); a.auto_submitted = auto; a.lease = null;
 }
-export function sweep(state) {
+// Practices nobody touched for this long are closed: they were kept whole (question
+// cache, answer responses, word list) and were a large share of the backed-up state.
+export const STALE_PRACTICE_MS = 3 * DAY_MS;
+function closeStalePractices(state, now) {
+  let changed = false;
+  for (const x of state.practices) {
+    if (x.finished) continue;
+    const lastActivity = Math.max(Number(x.started_at || 0), ...(x.answer_records || []).map(item => Number(item?.at || 0)));
+    if (lastActivity > now - STALE_PRACTICE_MS) continue;
+    // Answers given: close it the way a finish does (the existing path used when a
+    // student changes school), so the answers become a record. No answers: nothing to keep.
+    if (Number(x.total || 0) > 0) finishPractice(x, state);
+    else x.discarded = true;
+    changed = true;
+  }
+  if (state.practices.some(x => x.discarded)) state.practices = state.practices.filter(x => !x.discarded);
+  return changed;
+}
+
+// Answer records of older sessions drop what can be rebuilt exactly: the English word and
+// meaning when they equal the built-in word list, and false flags. /bootstrap rebuilds them
+// (hydrateSession), so screens get the same records. Words from teacher-imported books are
+// kept as stored because an imported book can be removed.
+export const COMPACT_SESSION_AFTER_MS = 14 * DAY_MS;
+let builtinWordIndex = null;
+function builtinWords() {
+  if (!builtinWordIndex) {
+    builtinWordIndex = new Map();
+    for (const word of ybmKimRetiredWords) builtinWordIndex.set(word.id, word);
+    for (const book of allBooks({ extraBooks: [] })) for (const word of book.words || []) builtinWordIndex.set(word.id, word);
+  }
+  return builtinWordIndex;
+}
+function compactRecord(record, words) {
+  if (!record || typeof record !== 'object') return false;
+  let changed = false;
+  if (record.timed_out === false) { delete record.timed_out; changed = true; }
+  if (record.regraded === false) { delete record.regraded; changed = true; }
+  const word = words.get(record.word_id);
+  if (word && 'word' in record && 'meaning' in record && record.word === displayEnglish(word.word) && record.meaning === word.meaning) {
+    delete record.word; delete record.meaning; changed = true;
+  }
+  return changed;
+}
+function compactOldSessions(state, now) {
+  let changed = false, words = null;
+  for (const session of state.sessions) {
+    if (Number(session.created_at || 0) > now - COMPACT_SESSION_AFTER_MS) continue;
+    for (const list of [session.answer_records, session.wrong_details]) {
+      if (!Array.isArray(list)) continue;
+      for (const record of list) {
+        if (!record || (!('word' in record) && record.timed_out !== false && record.regraded !== false)) continue;
+        words ??= builtinWords();
+        if (compactRecord(record, words)) changed = true;
+      }
+    }
+  }
+  return changed;
+}
+function hydrateRecord(record, words) {
+  if ('word' in record && 'meaning' in record && 'timed_out' in record && 'regraded' in record) return record;
+  const word = words.get(record.word_id);
+  return { ...record, word: record.word ?? (word ? displayEnglish(word.word) : ''), meaning: record.meaning ?? word?.meaning ?? '', timed_out: !!record.timed_out, regraded: !!record.regraded };
+}
+export function hydrateSession(session) {
+  const lists = ['answer_records', 'wrong_details'].filter(key => Array.isArray(session[key]) && session[key].some(record => record && !('word' in record && 'meaning' in record && 'timed_out' in record && 'regraded' in record)));
+  if (!lists.length) return session;
+  const words = builtinWords();
+  return { ...session, ...Object.fromEntries(lists.map(key => [key, session[key].map(record => record ? hydrateRecord(record, words) : record)])) };
+}
+
+export function sweep(state, now = Date.now()) {
   let changed = false;
   for (const a of state.examAttempts) if (a.status === 'active' && a.deadline <= Date.now()) { finishExam(a, state, true); changed = true; }
+  if (closeStalePractices(state, now)) changed = true;
+  if (compactOldSessions(state, now)) changed = true;
   if (autoResolveMeaningDisputes(state) > 0) changed = true;
   if (tidyBattles(state)) changed = true;
   const tokens = state.tokens.filter(t => t.expires_at > Date.now());
@@ -514,7 +589,7 @@ export async function preauthenticateLogin(state, body) {
 const MUTATING_WITHOUT_METHOD_CHECK = /^\/(?:logout|practice\/[^/]+\/(?:answer|next|finish))$/;
 export async function service(state, method, path, body, token, options = {}) {
   if (method === 'GET' && MUTATING_WITHOUT_METHOD_CHECK.test(path)) fail('요청 방식을 확인해주세요.', 405);
-  if (path === '/health') return { ok: true, version: '13.43.0', schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  if (path === '/health') return { ok: true, version: APP_VERSION, schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
@@ -615,7 +690,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } : null;
     return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes } : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
       profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
-      sessions, exams: visibleExams,
+      sessions: sessions.map(hydrateSession), exams: visibleExams,
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
       attempts: attempts.map(a => attemptSummary(a, state, p)), server_time: Date.now(),
       active_practice: activePractice?.id || null,

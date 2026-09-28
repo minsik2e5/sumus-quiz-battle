@@ -90,10 +90,11 @@ export class VocaStateObject {
     this.ready = ctx.blockConcurrencyWhile(async () => {
       this.supabase = createSupabaseRepository(env);
       this.local = createLocalRepository(ctx.storage);
-      this.sync = createSupabaseSync({ local: this.local, supabase: this.supabase, storage: ctx.storage });
+      this.sync = createSupabaseSync({ local: this.local, supabase: this.supabase, storage: ctx.storage, minIntervalMs: Number(env.SUPABASE_SYNC_MIN_INTERVAL_MS ?? 60000) });
       const initial = await this.loadInitialState();
       const migrated = migrateState(initial.state);
       const swept = sweep(initial.state);
+      this.sweptAt = Date.now();
       if (migrated || swept) {
         await this.local.commit(initial.state, initial.revision);
         initial.revision += 1;
@@ -196,7 +197,12 @@ export class VocaStateObject {
 
       const currentState = this.mutations.current().state;
       const hasExpiredAttempt = currentState.examAttempts.some(attempt => attempt.status === 'active' && attempt.deadline <= Date.now());
-      if (hasExpiredAttempt) await this.mutations.durable(state => sweep(state) ? true : NO_MUTATION);
+      // Housekeeping (stale practices, old record compaction) also runs hourly, not only at start-up.
+      const sweepDue = Date.now() - this.sweptAt > 3600000;
+      if (hasExpiredAttempt || sweepDue) {
+        if (sweepDue) this.sweptAt = Date.now();
+        await this.mutations.durable(state => sweep(state) ? true : NO_MUTATION);
+      }
 
       const cookie = request.headers.get('cookie') || '';
       const token = cookie.split(';').map(value => value.trim()).find(value => value.startsWith('sumus_session='))?.slice(14) || '';

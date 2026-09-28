@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { emptyState } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
 import { selfSignup } from './signup.mjs';
-import { allBooks, service, sweep, scopedWords, settleBattle, tidyBattles } from './service.mjs';
+import { allBooks, service, sweep, scopedWords, settleBattle, tidyBattles, APP_VERSION, STALE_PRACTICE_MS, COMPACT_SESSION_AFTER_MS } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
 import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, PET_FORM_LEVELS, petForm, levelInfo, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
 import { runContentValidation } from './content-validation.mjs';
@@ -65,7 +65,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.54.2') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.55.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -726,6 +726,52 @@ export async function runReleaseCheck() {
       assert(report.keys_kb.sessions > 0 && report.sessions.count === state.sessions.length && report.sessions.word_ids_kb >= 0 && Number.isInteger(report.practices.active), 'health size report lists sizes per state key');
       assert(!JSON.stringify(report).includes(state.profiles.find(item => item.role === 'student').username), 'health size report contains sizes and counts only, never content');
     }
+    {
+      // v13.55.0 housekeeping runs on a copy so the rest of the check keeps its state.
+      const canonical = value => JSON.stringify(value, (key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(k => [k, item[k]])) : item);
+      const health = await service(state, 'GET', '/health', {}, null);
+      assert(health.version === APP_VERSION && APP_VERSION === JSON.parse(readFileSync(fileURLToPath(new URL('../package.json', import.meta.url)), 'utf8')).version, 'health reports the package version');
+
+      const old = structuredClone(state);
+      const now = Date.now();
+      const student = old.profiles.find(item => item.username === 'qa_student');
+      const mine = old.sessions.filter(item => item.student_id === student.id && Array.isArray(item.answer_records) && item.answer_records.length);
+      assert(mine.length > 0, 'the check has saved practice records to compact');
+      for (const session of mine) session.created_at = now - COMPACT_SESSION_AFTER_MS - 60000;
+      const before = structuredClone(await service(old, 'GET', '/bootstrap', {}, studentToken));
+      const sizeBefore = JSON.stringify(old.sessions).length;
+      assert(sweep(old, now) === true && JSON.stringify(old.sessions).length < sizeBefore, 'old session answer records are compacted');
+      assert(mine.every(session => session.answer_records.every(record => !('regraded' in record && record.regraded === false))), 'false flags are dropped from old records');
+      const compacted = JSON.stringify(old.sessions);
+      sweep(old, now);
+      assert(JSON.stringify(old.sessions) === compacted, 'record compaction is idempotent');
+      const after = await service(old, 'GET', '/bootstrap', {}, studentToken);
+      assert(canonical(after.sessions) === canonical(before.sessions), 'bootstrap returns the same records after compaction');
+      const recent = old.sessions.find(item => item.student_id === student.id && !mine.includes(item) && Array.isArray(item.answer_records) && item.answer_records.length);
+      assert(!recent || recent.answer_records.every(record => 'word' in record), 'recent records are left as stored');
+
+      const stale = structuredClone(state);
+      const staleStudent = stale.profiles.find(item => item.username === 'qa_student');
+      let active = stale.practices.find(item => item.student_id === staleStudent.id && !item.finished);
+      if (!active) {
+        const started = await service(stale, 'POST', '/practice/start', { school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5 }, studentToken);
+        active = stale.practices.find(item => item.id === started.id);
+      }
+      if (!active.total) await service(stale, 'POST', `/practice/${active.id}/answer`, { question_id: active.question_id, answer: '__stale__' }, studentToken);
+      active = stale.practices.find(item => item.id === active.id);
+      const long = now - STALE_PRACTICE_MS - 60000;
+      active.started_at = long;
+      for (const record of active.answer_records) record.at = long;
+      stale.practices.push({ ...structuredClone(active), id: 'qa-stale-empty', total: 0, answer_records: [], wrong_details: [], responses: {} });
+      const fresh = { ...structuredClone(active), id: 'qa-fresh-empty', total: 0, answer_records: [], started_at: now - 3600000 };
+      stale.practices.push(fresh);
+      const pointsBefore = (await service(stale, 'GET', '/battle/history', {}, studentToken)).points_balance;
+      assert(sweep(stale, now) === true, 'sweep closes practices untouched for three days');
+      assert(stale.practices.find(item => item.id === active.id)?.finished === true && stale.sessions.some(item => item.id === active.id), 'a stale practice with answers is finished into a record');
+      assert(!stale.practices.some(item => item.id === 'qa-stale-empty') && !stale.sessions.some(item => item.id === 'qa-stale-empty'), 'a stale practice with no answers is removed without a record');
+      assert(stale.practices.some(item => item.id === 'qa-fresh-empty' && !item.finished), 'a practice used within three days is kept');
+      assert(Number.isFinite(pointsBefore) && (await service(stale, 'GET', '/battle/history', {}, studentToken)).points_balance >= pointsBefore, 'closing a stale practice never takes points away');
+    }
 
     const activeOriginal = await service(state, 'POST', '/practice/start', {
       school: '단원고', range_codes: [rangeCode], mode: 'write_meaning', target: 5
@@ -912,7 +958,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.54.2') && indexHtml.includes('/app.bundle.css?v=13.54.2') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.55.0') && indexHtml.includes('/app.bundle.css?v=13.55.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -933,7 +979,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.54.2'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.55.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');

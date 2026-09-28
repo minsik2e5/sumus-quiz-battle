@@ -110,7 +110,11 @@ export function createLocalRepository(storage) {
   };
 }
 
-export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, log = console }) {
+// minIntervalMs: the least time between the end of one successful upload and the start
+// of the next. Every upload carries the whole state, so during a class uploading after each
+// answer kept Supabase busy with back-to-back multi-megabyte writes and uploads timed out.
+// The local snapshot is durable, so a later backup loses nothing.
+export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, minIntervalMs = 0, log = console }) {
   let timer = null;
   let running = null;
   let failures = 0;
@@ -128,6 +132,7 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, l
   function schedule(delay = delayMs) {
     if (!pendingSince && pending()) pendingSince = Date.now();
     if (timer || closed) return;
+    if (lastSyncAt && minIntervalMs > 0) delay = Math.max(delay, lastSyncAt + minIntervalMs - Date.now());
     timer = setTimeout(() => { timer = null; run().catch(() => {}); }, delay);
     timer?.unref?.();
     // Safety net: if the object is evicted before the timer fires, the alarm
@@ -162,7 +167,9 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, l
     if (running) return running;
     running = (async () => {
       try {
-        while (await pushOnce()) { /* keep going while newer snapshots exist */ }
+        // Without a minimum interval, keep going while newer snapshots exist; with one,
+        // a newer snapshot waits for the next scheduled upload.
+        while (await pushOnce() && minIntervalMs <= 0) { /* next snapshot */ }
         failures = 0;
         lastError = null;
         pendingSince = 0;
