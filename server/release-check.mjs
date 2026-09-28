@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { emptyState } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
 import { selfSignup } from './signup.mjs';
-import { allBooks, service, sweep, scopedWords, settleBattle, tidyBattles, APP_VERSION, STALE_PRACTICE_MS, COMPACT_SESSION_AFTER_MS } from './service.mjs';
+import { allBooks, service, sweep, scopedWords, settleBattle, tidyBattles, dailyQuestProgress, weekCorrect, APP_VERSION, STALE_PRACTICE_MS, COMPACT_SESSION_AFTER_MS } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
 import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, PET_FORM_LEVELS, petForm, levelInfo, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
 import { runContentValidation } from './content-validation.mjs';
@@ -65,7 +65,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.62.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.63.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -954,6 +954,11 @@ export async function runReleaseCheck() {
     const dailyPractice = await service(state, 'POST', '/practice/start', { mode: 'write_meaning', daily_quest: true }, studentToken);
     const dailyInternal = state.practices.find(item => item.id === dailyPractice.id);
     assert(dailyPractice.daily_quest === true && dailyPractice.target === 20 && new Set(dailyInternal.words).size === 20, 'daily quest starts as one twenty-word adaptive practice');
+    dailyInternal.score_total = 8;
+    const dailyMidBoot = await service(state, 'GET', '/bootstrap', {}, studentToken);
+    assert(Number.isInteger(dailyMidBoot.stats.week_correct) && dailyMidBoot.stats.week_correct >= 0, 'V13.63 bootstrap stats include words correct this week');
+    assert(dailyMidBoot.active_practice_summary?.daily_quest === true && dailyMidBoot.daily_quest.done_today === 8 && dailyMidBoot.daily_quest.goal_today === 20 && dailyMidBoot.daily_quest.completed_today === false, 'V13.63 bootstrap tells the home button how far today\'s recommended study has gone (8/20)');
+    dailyInternal.score_total = 0;
     await service(state, 'POST', '/practice/' + dailyPractice.id + '/finish', {}, studentToken);
 
     const movedStudent = await service(state, 'PATCH', `/students/${student.id}`, {
@@ -1055,7 +1060,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.62.0') && indexHtml.includes('/app.bundle.css?v=13.62.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.63.0') && indexHtml.includes('/app.bundle.css?v=13.63.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1076,7 +1081,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.62.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.63.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -1136,6 +1141,28 @@ export async function runReleaseCheck() {
         const css1362 = readFileSync(fileURLToPath(new URL('../public/v1362.css', import.meta.url)), 'utf8');
         assert(['.partner-art .avatar-art img', '.studio-preview .avatar-art img', '.yb-hero-pet .avatar-art img', '.yb-pet .avatar-art img'].every(sel => css1362.includes(sel)) && css1362.includes('@keyframes petBreath') && css1362.includes('@keyframes petHop') && !/@keyframes pet(Breath|Hop)\{[^@]*transform:/.test(css1362), 'V13.62 pets breathe and hop on the home card, My pets and yacha, using scale/translate so card and arena transforms still apply');
         assert(appUi.includes("event.target.closest('.partner-art')") && appUi.includes('function pokePet(') && css1362.includes('.partner-art.poke') && css1362.includes('prefers-reduced-motion'), 'V13.62 tapping the pet on the card makes it jump with hearts (off with reduced motion); the rest of the card still flips');
+        const css1363 = readFileSync(fileURLToPath(new URL('../public/v1363.css', import.meta.url)), 'utf8');
+        assert(studentModule.includes('function homeProgress(') && studentModule.includes('next.progress') && studentModule.includes('daily.completed_today') && studentModule.includes('role="progressbar"') && css1363.includes('.home-next-progress-v1363') && css1363.includes('prefers-reduced-motion'), 'V13.63 the home study button shows a progress bar (e.g. 8/20) and a finished state');
+        const noon = Date.UTC(2026, 8, 29, 3); // 12:00 KST
+        const rec = (answered, at, daily = true) => ({ daily_quest: daily, answered_count: answered, total: 20, created_at: at });
+        const fresh = dailyQuestProgress([], null, 20, noon);
+        const mid = dailyQuestProgress([rec(5, noon - 3600000), rec(20, noon - 86400000), rec(20, noon, false)], { daily_quest: true, finished: false, target: 20, score_total: 3 }, 20, noon);
+        const full = dailyQuestProgress([rec(20, noon - 60000), rec(7, noon)], null, 20, noon);
+        const older = dailyQuestProgress([{ daily_quest: true, total: 20, created_at: noon }], null, 20, noon);
+        assert(fresh.done_today === 0 && !fresh.completed_today && mid.done_today === 8 && mid.goal_today === 20 && !mid.completed_today && full.done_today === 20 && full.completed_today && older.done_today === 20, 'V13.63 today\'s progress counts only today\'s recommended study (finished + in progress, not yesterday or other practice), capped at the goal');
+        const wed = Date.UTC(2026, 8, 30, 3); // Wed 12:00 KST; the week began Mon 9/28 00:00 KST
+        const monStart = Date.UTC(2026, 8, 27, 15);
+        const wk = weekCorrect([{ correct: 10, created_at: monStart + 30 * 60000 }, { correct: 5, created_at: monStart - 30 * 60000 }, { correct: 7, created_at: wed }, { correct: 9, created_at: wed + 7 * 86400000 }], wed);
+        assert(wk === 17 && weekCorrect([], wed) === 0, 'V13.63 the card counts words answered correctly this week (from Monday 00:00 KST), not last Sunday or next week');
+        assert(studentModule.includes('이번 주 맞힌 단어') && studentModule.includes('g.week_correct') && !studentModule.includes('최근 학습 정답률'), 'V13.63 the partner card shows words correct this week instead of recent accuracy');
+        {
+          const { RUN_SHEETS, avatar: petAvatar } = await import('../public/modules/character.js');
+          const { statSync } = await import('node:fs');
+          const sheets = [...RUN_SHEETS].map(name => fileURLToPath(new URL(`../public/assets/pets/${name}-run.webp`, import.meta.url)));
+          assert(RUN_SHEETS.has('dog-1') && sheets.every(file => existsSync(file) && statSync(file).size < 250 * 1024), 'V13.63 every pet listed with a run cycle ships its sprite sheet (under 250 KB)');
+          assert(petAvatar('dog', { form: 1 }).includes('data-run="/assets/pets/dog-1-run.webp"') && !petAvatar('dog', { form: 1, size: 'mini' }).includes('data-run') && !petAvatar('cat', { form: 1 }).includes('data-run'), 'V13.63 only pets with a run sheet (and not mini avatars) are marked to run');
+          assert(appUi.includes('function runPet(') && appUi.includes("'(prefers-reduced-motion: reduce)'") && appUi.includes('.pet-run-preload') && studentModule.includes('pet-run-preload') && css1363.includes('steps(6) 3') && css1363.includes('.partner-art.running .avatar-art img{opacity:0'), 'V13.63 tapping a pet with a run sheet plays three laps (preloaded, off with reduced motion); others still hop');
+        }
       }
       assert(cardCss.includes('prefers-reduced-motion') && appSource.includes("matchMedia('(prefers-reduced-motion: reduce)')"), 'V13.58 the card does not tilt when reduced motion is on');
       {
