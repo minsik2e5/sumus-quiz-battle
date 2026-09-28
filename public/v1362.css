@@ -1,0 +1,21 @@
+/* SUMUS VOCA V13.62 · living pets: breathing, an occasional hop, and a reaction to a tap.
+   The motion is on the picture itself (individual scale/translate/rotate), so it adds to
+   whatever the card, arena or stage already does with transform. */
+.partner-art .avatar-art img,
+.studio-preview .avatar-art img,
+.yb-hero-pet .avatar-art img,
+.yb-pet .avatar-art img{transform-origin:50% 92%;animation:petBreath 3.4s ease-in-out infinite,petHop 11s ease-in-out 1.5s infinite}
+/* different rhythms so two pets on one screen do not move in step */
+.yb-pet.op .avatar-art img{animation-duration:3.9s,13s;animation-delay:0s,4s}
+.studio-preview .avatar-art img{animation-duration:3.7s,9s}
+@keyframes petBreath{0%,100%{scale:1 1}50%{scale:.985 1.03}}
+@keyframes petHop{0%,84%,100%{translate:0 0;rotate:0deg}87%{translate:0 2%;rotate:0deg}90%{translate:0 -10%;rotate:-4deg}93%{translate:0 0;rotate:3deg}95%{translate:0 1.5%;rotate:0deg}97%{translate:0 -2%}}
+/* tap on the home card's pet */
+.partner-art.poke .avatar-art img{animation:petPoke .7s cubic-bezier(.3,1.4,.5,1)}
+@keyframes petPoke{0%{translate:0 0;scale:1 1;rotate:0deg}18%{translate:0 4%;scale:1.08 .9}45%{translate:0 -16%;scale:.95 1.07;rotate:-6deg}70%{translate:0 0;scale:1.05 .95;rotate:4deg}100%{translate:0 0;scale:1 1;rotate:0deg}}
+.pet-heart{position:absolute;z-index:2;left:var(--x,50%);bottom:30%;font-style:normal;font-size:22px;line-height:1;color:#ff5f8a;text-shadow:0 2px 6px rgba(255,95,138,.35);pointer-events:none;animation:petHeart .95s ease-out forwards}
+@keyframes petHeart{0%{opacity:0;translate:-50% 0;scale:.6}20%{opacity:1;scale:1.1}100%{opacity:0;translate:calc(-50% + var(--dx,0px)) -90px;scale:.9}}
+@media (prefers-reduced-motion:reduce){
+  .partner-art .avatar-art img,.studio-preview .avatar-art img,.yb-hero-pet .avatar-art img,.yb-pet .avatar-art img,.partner-art.poke .avatar-art img{animation:none}
+  .pet-heart{animation-duration:.01s}
+}

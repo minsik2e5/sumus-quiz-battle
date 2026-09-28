@@ -282,7 +282,7 @@ function partnerCard(A) {
   const titles = Object.entries(TITLES).filter(([, item]) => item.battle_streak).map(([id, item]) => `<span class="${unlocked(item, g) ? '' : 'locked'}">${esc(item.name)}</span>`).join('');
   const finish = CARD_FINISH[form];
   return `<section class="partner-card-v1358 finish-${finish}" style="--pet:${pet.color};--pet-light:${pet.light};--pet-soft:${pet.soft}" aria-label="나의 파트너 카드">
-    <button type="button" class="partner-card-btn" data-action="partner-flip" aria-pressed="false" aria-label="파트너 카드. 누르면 뒷면의 야차전 기록을 보여줘요">
+    <button type="button" class="partner-card-btn" data-action="partner-flip" aria-pressed="false" aria-label="파트너 카드. 펫을 누르면 반응하고, 다른 곳을 누르면 뒷면의 야차전 기록을 보여줘요">
       <span class="partner-card">
         <span class="partner-face partner-front">
           <span class="partner-inner">
