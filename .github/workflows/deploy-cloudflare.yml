@@ -50,8 +50,15 @@ jobs:
 
       - name: Deploy Worker and static assets
         run: npx wrangler deploy
+      # Re-applies the same secret as a safety net (its value is verified by the fingerprint
+      # step above). Cloudflare refuses it while a Workers Builds preview version of another
+      # branch is the newest upload; that must not skip the smoke test, so warn instead.
       - name: Sync durable-state secret
-        run: printf '%s' "$VOCA_STATE_SECRET" | npx wrangler secret put VOCA_STATE_SECRET
+        shell: bash
+        run: |
+          if ! printf '%s' "$VOCA_STATE_SECRET" | npx wrangler secret put VOCA_STATE_SECRET; then
+            echo "::warning::VOCA_STATE_SECRET was not re-applied (a newer preview version exists). The deployed Worker keeps its current secret; the smoke test below checks it."
+          fi
 
       - name: Smoke test deployed API
         shell: bash

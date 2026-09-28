@@ -5,6 +5,7 @@ import { studentPage, getRanges, updateRangeSummary } from './modules/student.js
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, onTeacherGrammarLoaded } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
 import { maybePetMoment, openPetNameModal, openEggShop, petJosa } from './modules/pet-moments.js';
+import { openBattle } from './modules/battle.js';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -395,6 +396,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'pet-name') return openPetNameModal(A, petChanged);
     if (d.action === 'choose-pet') return confirmFirstPet(d.key);
     if (d.action === 'egg-shop') return openEggShop(A, petChanged);
+    if (d.action === 'battle') { A.screen = 'battle'; return openBattle(A, async () => { A.screen = null; await petChanged(); window.scrollTo(0, 0); }); }
     if (d.action === 'save-style') { buttonBusy(b); await api('/profile/style', A.style); await refresh(); A.style = null; A.tab = 'home'; render(); toast('내 캐릭터를 저장했어요.'); }
     if (d.action === 'account') accountModal();
     if (d.action === 'logout') await logout();

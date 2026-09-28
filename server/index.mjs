@@ -121,6 +121,8 @@ const server = http.createServer(async (req, res) => {
       const secure = process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production';
       if (result._cookie) { res.setHeader('Set-Cookie', `sumus_session=${result._cookie}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800${secure ? '; Secure' : ''}`); delete result._cookie; }
       if (result._clearCookie) { res.setHeader('Set-Cookie', 'sumus_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'); delete result._clearCookie; }
+      // Battle rooms (with the answers) exist only on Cloudflare; never send them to a browser.
+      delete result._battle;
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(result)); return;
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); res.end(); return; }

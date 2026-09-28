@@ -317,6 +317,7 @@ function compactGrowth(A) {
     <button class="home-quick-primary-v1344" data-study="vocab">${icon('practice')}<span><strong>단어 학습</strong><small>선택한 범위 바로 보기</small></span>${icon('arrow')}</button>
     <button class="home-quick-secondary-v1344" data-go="exam">${icon('exam')}<span>시험 보기</span>${icon('arrow')}</button>
   </div>
+  <button type="button" class="home-battle-v1354" data-action="battle"><span class="yb-home-mark" aria-hidden="true">夜</span><span><strong>야차전</strong><small>친구와 1:1 단어 대결 · 포인트를 걸고 겨뤄요</small></span>${icon('arrow')}</button>
   <section class="home-main-metrics-v1337">
     <button class="rank" data-go="ranking"><span>내 순위</span><strong>${rank === '—' ? '—' : rank + '위'}</strong><small>이번 주 랭킹 보기</small></button>
     <button class="accuracy" data-go="records"><span>내 기록</span><strong>${accuracy}%</strong><small>최근 학습 정답률</small></button>

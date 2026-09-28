@@ -1,4 +1,6 @@
-import { service, sweep, preauthenticateLogin } from '../server/service.mjs';
+import { service, sweep, preauthenticateLogin, settleBattle } from '../server/service.mjs';
+import { BattleRoom, battleReportKey } from './battle-room.mjs';
+export { BattleRoom };
 import { selfSignup } from '../server/signup.mjs';
 import { examAdmin } from '../server/exam-admin.mjs';
 import { migrateState } from '../server/state.mjs';
@@ -160,6 +162,12 @@ export class VocaStateObject {
       }
 
       const body = request.method === 'GET' ? Object.fromEntries(url.searchParams) : await readJson(request, url.pathname.startsWith('/api/vocab-import/') ? 1000000 : 100000);
+      // Battle rooms report finished matches here (the public worker blocks /api/internal/).
+      if (url.pathname === '/api/internal/battle-result') {
+        if (request.headers.get('X-Battle-Key') !== await battleReportKey(this.env)) throw Object.assign(Error('허용되지 않은 요청입니다.'), { status: 403 });
+        await this.mutations.durable(state => settleBattle(state, body) ? { ok: true } : NO_MUTATION);
+        return json({ ok: true });
+      }
       const address = request.headers.get('CF-Connecting-IP') || 'unknown';
       if (url.pathname === '/api/login') {
         const key = `${address}:${String(body.username || '').trim().toLowerCase()}`;
@@ -200,6 +208,17 @@ export class VocaStateObject {
       const result = request.method === 'GET'
         ? await execute(this.mutations.current().state)
         : await this.mutations.durable(execute);
+      // Room set-up for yacha battles: the questions (with answers) go to the room only.
+      if (result?._battle) {
+        const message = result._battle;
+        delete result._battle;
+        const room = this.env.BATTLE_ROOM.get(this.env.BATTLE_ROOM.idFromName(message.id));
+        const reply = await room.fetch('https://battle/admin', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(message) }).catch(() => null);
+        if (!reply?.ok && message.action !== 'cancel') {
+          await this.mutations.durable(state => settleBattle(state, { id: message.id, reason: 'cancelled' }) ? true : NO_MUTATION);
+          throw Object.assign(Error('대결 방을 준비하지 못했어요. 잠시 후 다시 시도해주세요.'), { status: 503 });
+        }
+      }
       const elapsed = Date.now() - startedAt;
       const { commitMs, commitBytes } = this.local.metrics;
       const sync = this.sync.status();
@@ -243,6 +262,15 @@ function securityHeaders(response, pathname) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith('/api/internal/')) return securityHeaders(json({ error: '요청한 기능을 찾을 수 없습니다.' }, 404), url.pathname);
+    // Battle sockets go straight to their room; a 101 response must not be re-wrapped.
+    const battleSocket = url.pathname.match(/^\/api\/battle\/ws\/([0-9a-f-]{36})$/);
+    if (battleSocket) {
+      if (request.headers.get('Upgrade') !== 'websocket') return securityHeaders(json({ error: 'WebSocket 연결이 필요해요.' }, 426), url.pathname);
+      const origin = request.headers.get('origin');
+      if (origin && new URL(origin).host !== url.host) return securityHeaders(json({ error: '허용되지 않은 요청입니다.' }, 403), url.pathname);
+      return env.BATTLE_ROOM.get(env.BATTLE_ROOM.idFromName(battleSocket[1])).fetch(request);
+    }
     if (url.pathname.startsWith('/api/')) {
       const id = env.VOCA_STATE.idFromName('main');
       return securityHeaders(await env.VOCA_STATE.get(id).fetch(request), url.pathname);
