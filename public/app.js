@@ -201,6 +201,18 @@ window.addEventListener('pageshow', async event => {
   if (!event.persisted || !A.data || A.screen) return;
   try { await refresh(); renderKeepScroll(); } catch {}
 });
+function pokePet(art) {
+  art.classList.remove('poke'); void art.offsetWidth; art.classList.add('poke');
+  clearTimeout(art._poke); art._poke = setTimeout(() => art.classList.remove('poke'), 720);
+  navigator.vibrate?.(12);
+  for (let i = 0; i < 3; i++) {
+    const heart = document.createElement('i');
+    heart.className = 'pet-heart'; heart.textContent = '♥'; heart.setAttribute('aria-hidden', 'true');
+    heart.style.setProperty('--x', `${38 + i * 12}%`); heart.style.setProperty('--dx', `${(i - 1) * 18}px`); heart.style.animationDelay = `${i * 90}ms`;
+    art.appendChild(heart);
+    setTimeout(() => heart.remove(), 1200);
+  }
+}
 async function leaveBattle() { A.screen = null; await petChanged(); window.scrollTo(0, 0); }
 // V13.61: a student on the home screen checks for a friend's challenge every 20 seconds
 // (a small request; the full refresh stays every 2 minutes).
@@ -437,6 +449,9 @@ $('#app').addEventListener('click', async event => {
       return;
     }
     if (d.action === 'partner-flip') {
+      // V13.62: tapping the pet on the front makes it jump with hearts; the rest of the card flips it.
+      const art = event.target.closest('.partner-art');
+      if (art && b.getAttribute('aria-pressed') !== 'true') { pokePet(art); return; }
       const flipped = b.getAttribute('aria-pressed') !== 'true';
       b.setAttribute('aria-pressed', String(flipped));
       b.closest('.partner-card-v1358')?.classList.toggle('flipped', flipped);
