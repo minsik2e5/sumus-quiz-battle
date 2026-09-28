@@ -1,0 +1,22 @@
+/* SUMUS VOCA V13.60 · home as one spaced column with a big yacha banner */
+.home-stack-v1360{display:flex;flex-direction:column;gap:16px}
+.home-stack-v1360 .partner-card-v1358{gap:10px;max-width:none}
+.home-stack-v1360 .partner-card-btn{max-width:290px;margin:0 auto}
+/* pet tools under the card: one centered row, even with four-digit points */
+.home-stack-v1360 .partner-tools{justify-content:center;flex-wrap:nowrap;gap:6px}
+.home-stack-v1360 .partner-tools button{padding:6px 11px;white-space:nowrap}
+/* week: the line on top, the seven days spread below */
+.home-stack-v1360 .home-week-v1358{flex-direction:column;align-items:stretch;gap:9px}
+.home-stack-v1360 .home-week-v1358 .home-week-days{justify-content:space-between}
+/* the last section clears the bottom menu and the phone's home bar */
+.student-main{padding-bottom:calc(112px + env(safe-area-inset-bottom,0px))!important}
+.home-yacha-v1360{position:relative;overflow:hidden;appearance:none;border:0;width:100%;min-height:118px;border-radius:22px;padding:18px 16px;background:linear-gradient(145deg,#1f4a3b,#11271e);color:#fff;font:inherit;text-align:left;display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;column-gap:14px;row-gap:12px;align-items:center;cursor:pointer;box-shadow:0 12px 26px rgba(17,39,30,.28)}
+.home-yacha-v1360::after{content:"夜";position:absolute;right:-6px;bottom:-34px;font-size:128px;font-weight:900;line-height:1;color:rgba(255,255,255,.06);pointer-events:none}
+.home-yacha-v1360 .hy-mark{grid-row:1;width:52px;height:52px;border-radius:15px;display:grid;place-items:center;background:#fbfaf6;color:#1f3b31;border:2px solid #9fd9c2;font-size:25px;font-weight:900}
+.home-yacha-v1360 .hy-text{grid-row:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.home-yacha-v1360 small{font-size:12px;font-weight:700;color:#9fd8c2}
+.home-yacha-v1360 strong{font-size:24px;font-weight:900;letter-spacing:-.02em;line-height:1.15}
+.home-yacha-v1360 em{font-style:normal;font-size:12.5px;color:#cfeee2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.home-yacha-v1360 .hy-go{grid-column:1 / -1;position:relative;z-index:1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:14px;padding:12px;background:linear-gradient(135deg,#9fe3c8,#51cda1);color:#12291f;font-size:16px;font-weight:900}
+.home-yacha-v1360 .hy-go .icon{width:18px;height:18px}
+.home-yacha-v1360:focus-visible{outline:3px solid #51cda1;outline-offset:3px}

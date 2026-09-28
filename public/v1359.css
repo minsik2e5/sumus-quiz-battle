@@ -1,28 +1,7 @@
-/* SUMUS VOCA V13.59 · tidy home, yacha as the center tab, open-word yacha hits */
+/* SUMUS VOCA V13.59 · tidy home, open-word yacha hits */
 .partner-tools .partner-shop b{color:#07815f;font-weight:900}
 .home-week-v1358>span b{color:#16241f}
-/* bottom menu: the yacha tab in the middle stands out */
-.bottom-nav button[data-go="battle"]{color:#fff!important;background:#15342a!important}
-.bottom-nav button[data-go="battle"].active{background:#07815f!important;box-shadow:0 6px 14px rgba(7,129,95,.3)}
-.bottom-nav button[data-go="battle"] .icon{stroke:#9fe3c8}
-.bottom-nav button[data-go="battle"].active .icon{stroke:#fff}
-/* yacha tab */
-.yacha-hero-v1359{display:flex;flex-direction:column;gap:14px;background:linear-gradient(150deg,#1d4739,#12291f);color:#e8f6f0;border-radius:22px;padding:18px 16px 16px;margin-bottom:18px;box-shadow:0 12px 26px rgba(18,41,31,.28)}
-.yacha-hero-top{display:flex;align-items:center;gap:12px}
-.yacha-hero-top .yb-home-mark{flex:none;display:grid;place-items:center;width:46px;height:46px;font-size:22px;font-weight:900;border-radius:14px;background:#fbfaf6;color:#1f3b31;border:2px solid #9fd9c2}
-.yacha-hero-top h1{margin:0;font-size:24px;font-weight:900;letter-spacing:-.02em;color:#fff}
-.yacha-hero-top p{margin:2px 0 0;font-size:12.5px;color:#a9d6c4}
-.yacha-hero-rec{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;text-align:center;font-size:11px;color:#a9d6c4}
-.yacha-hero-rec>span{background:rgba(255,255,255,.07);border-radius:12px;padding:9px 2px}
-.yacha-hero-rec b{display:block;font-size:22px;font-weight:900;color:#fff;font-variant-numeric:tabular-nums}
-.yacha-hero-titles{display:flex;flex-wrap:wrap;gap:6px}
-.yacha-hero-titles span{font-size:12px;border:1px solid #3f8a6f;border-radius:999px;padding:3px 10px}
-.yacha-hero-titles span.locked{opacity:.45;border-style:dashed}
-.yacha-hero-go{appearance:none;border:0;border-radius:16px;padding:15px;font:inherit;font-size:17px;font-weight:900;color:#12291f;background:linear-gradient(135deg,#9fe3c8,#51cda1);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
-.yacha-hero-go .icon{width:20px;height:20px}
-.rank-heading-v1359{flex-direction:column;align-items:flex-start;gap:2px}
-.rank-heading-v1359 p{margin:0;font-size:12px;color:#6c7c77}
 /* yacha match: my correct pick stays marked while the word is still open */
 .yb-answer.hit{background:#e6f8ef;box-shadow:0 0 0 2px #2fbf71 inset}
-/* teacher preview: a small pill in the header instead of a button over the content */
-.preview-exit-v1359{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:50%;transform:translateX(-50%);z-index:1000;appearance:none;border:1px solid #c9d8f5;background:#eef3ff;color:#2b4fb8;border-radius:999px;padding:6px 12px;font:inherit;font-size:12px;font-weight:800;cursor:pointer}
+/* teacher preview: a small pill in the header, next to the profile button */
+.preview-exit-v1359{margin-left:auto;margin-right:8px;appearance:none;border:1px solid #c9d8f5;background:#eef3ff;color:#2b4fb8;border-radius:999px;padding:6px 12px;font:inherit;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap}

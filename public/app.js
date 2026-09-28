@@ -209,7 +209,7 @@ function startPolling() {
     if (document.activeElement && ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
     const liveTabs = A.data.profile.role === 'teacher'
       ? ['dashboard', 'exams', 'results']
-      : ['home', 'battle', 'ranking'];
+      : ['home', 'ranking'];
     if (!liveTabs.includes(A.tab)) return;
     try { await refresh(); renderKeepScroll(); }
     catch (err) { if (err.status === 401) { clearInterval(poll); A.data = null; loginView(); } }
