@@ -13,7 +13,10 @@ export const BATTLE = {
   MAX_KI: 5,
   FAST_MS: 2000,       // answers faster than this are critical and give 2 ki
   FREEZE_MS: 2000,
-  HEAL: 20
+  HEAL: 20,
+  FEVER_MS: 15000,     // the last 15 seconds of a match are fever time
+  FEVER_MULT: 1.5,     // hits in fever time do 1.5x damage
+  REVIEW_MAX: 20       // words listed per player on the result screen
 };
 export const BATTLE_SKILLS = {
   shield: { cost: 2, name: '방패' },
@@ -32,9 +35,9 @@ export function createBattle({ id, players, questions, stake = 0, now }) {
     id, stake, created_at: now, phase: 'waiting', seq: 0,
     order: players.map(p => p.id),
     players: Object.fromEntries(players.map(p => [p.id, {
-      id: p.id, name: p.name, pet: p.pet || null,
+      id: p.id, name: p.name, pet: p.pet || null, streak: Number(p.streak || 0),
       hp: BATTLE.MAX_HP, ki: 0, shield: false, power: false, frozen_next: false,
-      connected: false, dropped_at: null, correct: 0, answer_ms: 0, skills_used: 0
+      connected: false, dropped_at: null, correct: 0, answer_ms: 0, skills_used: 0, missed: []
     }])),
     questions, idx: -1, turn: null,
     started_at: null, ends_at: null, deadline: null, result: null
@@ -62,6 +65,14 @@ function nextQuestion(state, now) {
   return [questionEvent(state)];
 }
 
+// Words a player got wrong or let run out, for review after the match.
+function markMissed(state, pid) {
+  const p = state.players[pid], wordId = state.questions[state.turn.q]?.word_id;
+  p.missed ||= [];
+  if (wordId && !p.missed.includes(wordId) && p.missed.length < BATTLE.REVIEW_MAX) p.missed.push(wordId);
+}
+export const inFever = (state, now) => !!state.ends_at && state.ends_at - now <= BATTLE.FEVER_MS;
+
 function finish(state, now, reason, loserId = null) {
   state.phase = 'finished';
   state.deadline = null;
@@ -69,7 +80,11 @@ function finish(state, now, reason, loserId = null) {
   let winner = null;
   if (loserId) winner = other(state, loserId);
   else if (a.hp !== b.hp) winner = a.hp > b.hp ? a.id : b.id;
-  state.result = { winner, loser: winner ? other(state, winner) : null, reason, stake: state.stake, finished_at: now, hp: { [a.id]: a.hp, [b.id]: b.hp } };
+  const review = Object.fromEntries(state.order.map(id => [id, (state.players[id].missed || []).map(wordId => {
+    const q = state.questions.find(item => item.word_id === wordId);
+    return q ? { word_id: wordId, word: q.prompt, meaning: q.options[q.answer] } : null;
+  }).filter(Boolean)]));
+  state.result = { winner, loser: winner ? other(state, winner) : null, reason, stake: state.stake, finished_at: now, hp: { [a.id]: a.hp, [b.id]: b.hp }, review };
   return [event(state, 'end', { result: state.result })];
 }
 
@@ -87,16 +102,22 @@ function attack(state, attackerId, ms, now) {
   attacker.correct++; attacker.answer_ms += ms;
   let dmg = 12 + Math.round(Math.max(0, BATTLE.TURN_MS - ms) / 1000 * 1.2);
   if (fast) dmg = Math.round(dmg * 1.4);
+  const fever = inFever(state, now);
+  if (fever) dmg = Math.round(dmg * BATTLE.FEVER_MULT);
   const powered = attacker.power, shielded = defender.shield;
   if (powered) { dmg *= 2; attacker.power = false; }
   if (shielded) { dmg = Math.round(dmg / 2); defender.shield = false; }
   defender.hp = Math.max(0, defender.hp - dmg);
   reveal(state, now);
-  return [event(state, 'attack', { attacker: attacker.id, defender: defender.id, dmg, fast, powered, shielded, ms, answer: state.questions[state.turn.q].answer, hp: { [attacker.id]: attacker.hp, [defender.id]: defender.hp }, ki: { [attacker.id]: attacker.ki, [defender.id]: 0 } })];
+  return [event(state, 'attack', { attacker: attacker.id, defender: defender.id, dmg, fast, fever, powered, shielded, ms, answer: state.questions[state.turn.q].answer, hp: { [attacker.id]: attacker.hp, [defender.id]: defender.hp }, ki: { [attacker.id]: attacker.ki, [defender.id]: 0 } })];
 }
 
 function miss(state, now, timeout) {
-  for (const id of state.order) state.players[id].ki = 0;
+  for (const id of state.order) {
+    state.players[id].ki = 0;
+    // Wrong answers were already noted; a timeout counts for whoever did not answer.
+    if (timeout && !state.turn.locked[id]) markMissed(state, id);
+  }
   reveal(state, now);
   return [event(state, 'miss', { timeout, answer: state.questions[state.turn.q].answer })];
 }
@@ -140,6 +161,7 @@ export function answer(state, pid, choice, now) {
   if (choice === q.answer) return attack(state, pid, now - turn.started_at, now);
   turn.locked[pid] = true;
   p.ki = 0;
+  markMissed(state, pid);
   const events = [event(state, 'wrong', { player: pid, ki: 0 })];
   if (state.order.every(id => turn.locked[id])) events.push(...miss(state, now, false));
   return events;
@@ -197,10 +219,10 @@ export function battleView(state, pid) {
   const turn = state.turn, q = turn ? state.questions[turn.q] : null;
   return {
     id: state.id, me: pid, phase: state.phase, seq: state.seq, stake: state.stake,
-    order: state.order, started_at: state.started_at, ends_at: state.ends_at, deadline: state.deadline,
+    order: state.order, started_at: state.started_at, ends_at: state.ends_at, deadline: state.deadline, fever_ms: BATTLE.FEVER_MS,
     players: Object.fromEntries(state.order.map(id => {
       const p = state.players[id];
-      return [id, { id, name: p.name, pet: p.pet, hp: p.hp, ki: p.ki, shield: p.shield, power: p.power, frozen_next: p.frozen_next, connected: p.connected }];
+      return [id, { id, name: p.name, pet: p.pet, streak: p.streak || 0, hp: p.hp, ki: p.ki, shield: p.shield, power: p.power, frozen_next: p.frozen_next, connected: p.connected }];
     })),
     question: q && ['question', 'reveal'].includes(state.phase) ? {
       n: state.idx + 1, prompt: q.prompt, options: q.options, started_at: turn.started_at,

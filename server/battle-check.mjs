@@ -16,6 +16,36 @@ const wrong = s => (correct(s) + 1) % 4;
 
 export function runBattleChecks(assert) {
   {
+    // V13.56 fever time: the last 15 seconds deal 1.5x damage.
+    const { s, t } = started();
+    const late = s.ends_at - BATTLE.FEVER_MS + 100;
+    s.turn.started_at = late - 3000; s.deadline = late + 5000;
+    const hit = answer(s, 'host', correct(s), late).find(e => e.type === 'attack');
+    const normal = 12 + Math.round(5 * 1.2);
+    assert(hit?.fever === true && hit.dmg === Math.round(normal * BATTLE.FEVER_MULT) && s.players.guest.hp === BATTLE.MAX_HP - hit.dmg, 'fever time hits deal 1.5x damage');
+    const { s: early, t: te } = started();
+    assert(answer(early, 'host', correct(early), te + 3000).find(e => e.type === 'attack')?.fever === false, 'hits before fever time deal normal damage');
+    assert(battleView(early, 'host').fever_ms === BATTLE.FEVER_MS, 'the view tells phones when fever time starts');
+  }
+  {
+    // V13.56 review: wrong answers and timeouts are listed per player after the match.
+    const { s, t } = started();
+    const first = s.questions[s.turn.q];
+    answer(s, 'host', wrong(s), t + 500);
+    answer(s, 'guest', correct(s), t + 900);
+    tick(s, t + 900 + BATTLE.REVEAL_MS);
+    const second = s.questions[s.turn.q];
+    tick(s, t + 900 + BATTLE.REVEAL_MS + BATTLE.TURN_MS);
+    const end = forfeit(s, 'guest', t + 20000).find(e => e.type === 'end');
+    const review = end.result.review;
+    assert(review.host.map(w => w.word_id).join() === [first.word_id, second.word_id].join() && review.host[0].meaning === first.options[first.answer] && review.host[0].word === first.prompt, 'the host sees the word answered wrong and the word that timed out');
+    assert(review.guest.map(w => w.word_id).join() === second.word_id, 'the guest sees only the word that timed out');
+    const legacy = fresh(); delete legacy.players.host.missed;
+    connect(legacy, 'host', 1000); connect(legacy, 'guest', 1000); tick(legacy, 1000 + BATTLE.COUNTDOWN_MS);
+    answer(legacy, 'host', wrong(legacy), 1000 + BATTLE.COUNTDOWN_MS + 100);
+    assert(legacy.players.host.missed.length === 1, 'a match saved before v13.56 starts its missed list on the first wrong answer');
+  }
+  {
     const s = fresh();
     connect(s, 'host', 1000);
     assert(s.phase === 'waiting' && nextWake(s) === null, 'battle waits until both players connect');

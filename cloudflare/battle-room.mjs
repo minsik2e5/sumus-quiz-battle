@@ -7,6 +7,9 @@ import { createBattle, connect, disconnect, forfeit, answer, useSkill, tick, nex
 const REPORT_RETRY_MS = 5000;
 const CONNECT_MS = 120000;    // after the guest joins, both phones must connect within this
 const CLOSE_AFTER_MS = 60000; // keep a finished room around briefly for late reconnects
+// Emotes: a fixed set only (no free text), one every 3 seconds, at most 20 per match.
+export const EMOTES = ['lol', 'come', 'gg', 'nice'];
+const EMOTE_GAP_MS = 3000, EMOTE_MAX = 20;
 
 // Shared by the room and the main object so only rooms can report results.
 export async function battleReportKey(env) {
@@ -70,7 +73,7 @@ export class BattleRoom {
       }
     } else if (msg.action === 'cancel' && this.room && !this.room.battle) {
       this.room.closed = true; this.room.closed_at = now; this.room.reported = true;
-      for (const ws of this.ctx.getWebSockets()) { this.send(ws, { type: 'cancelled' }); ws.close(1000, 'cancelled'); }
+      for (const ws of this.ctx.getWebSockets()) { this.send(ws, { type: 'cancelled', reason: msg.reason || null }); ws.close(1000, 'cancelled'); }
     } else {
       return Response.json({ ok: false }, { status: 409 });
     }
@@ -110,6 +113,7 @@ export class BattleRoom {
     const now = Date.now();
     if (msg.type === 'sync') return this.send(ws, { type: 'view', view: battleView(r.battle, pid) });
     if (msg.type === 'ping') return this.send(ws, { type: 'pong' });
+    if (msg.type === 'emote') return this.emote(pid, String(msg.emote), now);
     // Timers may have passed while the room slept: apply them before the player's action,
     // so a late answer cannot count and events keep their order.
     const events = tick(r.battle, now);
@@ -120,6 +124,18 @@ export class BattleRoom {
     await this.save();
     this.broadcast(events);
     await this.afterChange();
+  }
+
+  async emote(pid, emote, now) {
+    const r = this.room;
+    if (!EMOTES.includes(emote) || !['countdown', 'question', 'reveal'].includes(r.battle.phase)) return;
+    r.emotes ||= {};
+    const mine = r.emotes[pid] ||= { at: 0, count: 0 };
+    if (now - mine.at < EMOTE_GAP_MS || mine.count >= EMOTE_MAX) return;
+    Object.assign(mine, { at: now, count: mine.count + 1 });
+    await this.save();
+    // Not a match event: no sequence number, nothing to replay after a reconnect.
+    this.broadcast([{ type: 'emote', player: pid, emote }]);
   }
 
   async webSocketClose(ws) {

@@ -65,7 +65,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.55.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.56.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -372,6 +372,52 @@ export async function runReleaseCheck() {
     assert(afterHost.stats.points_balance === baseHost + 30 && afterGuest.stats.points_balance === baseGuest - 30 && afterHost.stats.battle.held === 0 && afterHost.stats.battle.wins === 1 && afterGuest.stats.battle.losses === 1, 'V13.54 the winner takes the stake from the loser');
     const history = await service(state, 'GET', '/battle/history', {}, guestToken);
     assert(history.battles[0]?.outcome === 'lose' && history.lost_today === 30 && history.record.losses === 1, 'V13.54 battle history shows the result and today\'s losses');
+    {
+      // V13.56 rematch: asked within two minutes, only for the other player, stake shown again.
+      const before = state.battles.length;
+      const asked = await service(state, 'POST', '/battle/rematch', { battle_id: room.id }, guestToken);
+      const rematchRow = state.battles.find(b => b.id === asked.id);
+      assert(asked.rematch && /^\d{6}$/.test(asked.code) && rematchRow.invite_id === petStudent.id && rematchRow.rematch_of === room.id && rematchRow.stake === 30 && asked._battle?.action === 'init', 'V13.56 the loser can ask for a rematch with the same stake and words');
+      assert((await service(state, 'POST', '/battle/rematch', { battle_id: room.id }, guestToken)).id === asked.id, 'V13.56 asking again returns the same rematch room');
+      await expectStatus(409, () => service(state, 'POST', '/battle/rematch', { battle_id: room.id }, studentToken), 'V13.56 the other player accepts the rematch already asked instead of opening a second one');
+      const offer = await service(state, 'GET', '/battle/rematch-offer', { battle_id: room.id }, studentToken);
+      assert(offer.offer?.code === asked.code && offer.offer.stake === 30 && offer.offer.host === guestStudent.display_name, 'V13.56 the invited player sees the rematch offer with its stake');
+      assert((await service(state, 'GET', '/battle/rematch-offer', { battle_id: room.id }, guestToken)).offer === null, 'V13.56 the player who asked sees no offer of their own');
+      rematchRow.invite_id = 'qa-someone-else';
+      await expectStatus(404, () => service(state, 'POST', '/battle/join', { code: asked.code, stake: 30 }, studentToken), 'V13.56 a rematch room is closed to everyone but the invited player');
+      rematchRow.invite_id = petStudent.id;
+      const declined = await service(state, 'POST', '/battle/rematch/decline', { battle_id: room.id }, studentToken);
+      assert(declined._battle?.action === 'cancel' && declined._battle.reason === 'declined' && rematchRow.status === 'cancelled' && (await service(state, 'GET', '/battle/rematch-offer', { battle_id: room.id }, studentToken)).offer === null, 'V13.56 declining closes the rematch room and tells the room why');
+      const again = await service(state, 'POST', '/battle/rematch', { battle_id: room.id }, guestToken);
+      const accepted = await service(state, 'POST', '/battle/join', { code: again.code, stake: 30 }, studentToken);
+      assert(accepted.id === again.id && state.battles.find(b => b.id === again.id).status === 'active', 'V13.56 the invited player joins the rematch through the normal join (stake checked)');
+      settleBattle(state, { id: again.id, winner: petStudent.id, loser: guestStudent.id, reason: 'end', hp: {} });
+      const pairRows = [0, 1].map(i => ({ id: 'qa-rematch-' + i, status: 'finished', rematch_of: room.id, host_id: guestStudent.id, invite_id: petStudent.id, guest_id: petStudent.id, winner: petStudent.id, loser: guestStudent.id, stake: 10, created_at: Date.now(), finished_at: Date.now() }));
+      state.battles.push(pairRows[0]);
+      await expectStatus(409, () => service(state, 'POST', '/battle/rematch', { battle_id: again.id }, guestToken), 'V13.56 the same two students get two rematches a day');
+      const expiredRow = state.battles.find(b => b.id === again.id);
+      expiredRow.finished_at = Date.now() - 3 * 60000;
+      await expectStatus(409, () => service(state, 'POST', '/battle/rematch', { battle_id: again.id }, studentToken), 'V13.56 a rematch can only be asked within two minutes of the end');
+
+      // V13.56 win streaks: wins over the same friend on the same day count once.
+      const streakBefore = (await service(state, 'GET', '/battle/history', {}, studentToken)).record;
+      assert(streakBefore.streak === 1 && streakBefore.best_streak === 1, 'V13.56 repeated wins over the same friend on one day are one streak win');
+      const win = (id, opponent, at) => ({ id, status: 'finished', host_id: petStudent.id, guest_id: opponent, winner: petStudent.id, loser: opponent, stake: 10, created_at: at, finished_at: at });
+      state.battles.push(win('qa-win-x', 'qa-opp-x', Date.now() + 1000), win('qa-win-y', 'qa-opp-y', Date.now() + 2000));
+      const streaked = await service(state, 'GET', '/battle/history', {}, studentToken);
+      assert(streaked.record.streak === 3 && streaked.record.best_streak === 3, 'V13.56 wins over different friends build the streak');
+      const styled = await service(state, 'GET', '/bootstrap', {}, studentToken);
+      const style = { avatar_key: styled.profile.avatar_key, avatar_accessory: 'none', avatar_frame: 'basic' };
+      assert((await service(state, 'POST', '/profile/style', { ...style, avatar_title: 'yacha3' }, studentToken)).avatar_title === 'yacha3', 'V13.56 three streak wins unlock the "야차 3연승" title');
+      await expectStatus(400, () => service(state, 'POST', '/profile/style', { ...style, avatar_title: 'yachaking' }, studentToken), 'V13.56 "야차왕" needs a five-win streak');
+      state.battles.push({ ...win('qa-loss-z', 'qa-opp-z', Date.now() + 3000), winner: 'qa-opp-z', loser: petStudent.id });
+      const broken = (await service(state, 'GET', '/battle/history', {}, studentToken)).record;
+      assert(broken.streak === 0 && broken.best_streak === 3, 'V13.56 a loss ends the streak but keeps the best');
+      assert(asked._battle.host.streak === 0 && (await service(state, 'POST', '/profile/style', { ...style, avatar_title: 'rookie' }, studentToken)), 'V13.56 the room shows each player\'s current streak');
+      const added = new Set([asked.id, again.id, ...pairRows.map(r => r.id), 'qa-win-x', 'qa-win-y', 'qa-loss-z']);
+      state.battles = state.battles.filter(b => !added.has(b.id));
+      assert(state.battles.length === before, 'V13.56 rematch checks leave the battle list as they found it');
+    }
     state.battles.push({ id: 'qa-loss-1', status: 'finished', host_id: guestStudent.id, guest_id: petStudent.id, winner: petStudent.id, loser: guestStudent.id, stake: 50, finished_at: Date.now() }, { id: 'qa-loss-2', status: 'finished', host_id: guestStudent.id, guest_id: petStudent.id, winner: petStudent.id, loser: guestStudent.id, stake: 50, finished_at: Date.now() });
     await expectStatus(400, () => service(state, 'POST', '/battle/rooms', { stake: 30, range_codes: [battleRange] }, guestToken), 'V13.54 battles stop once today\'s losses would pass 150 points');
     const cancelRoom = await service(state, 'POST', '/battle/rooms', { stake: 10, range_codes: [battleRange] }, studentToken);
@@ -383,7 +429,12 @@ export async function runReleaseCheck() {
       { id: 'qa-stale-wait', code: '000001', status: 'waiting', host_id: petStudent.id, guest_id: null, stake: 10, tickets: { x: 'y' }, range_codes: ['1'], created_at: tidyNow - 11 * 60000 },
       { id: 'qa-stale-active', code: '000002', status: 'active', host_id: petStudent.id, guest_id: guestStudent.id, stake: 10, tickets: { x: 'y' }, range_codes: ['1'], created_at: tidyNow - 3 * 3600000, joined_at: tidyNow - 3 * 3600000 },
       { id: 'qa-old-cancel', status: 'cancelled', host_id: petStudent.id, guest_id: null, stake: 10, created_at: tidyNow - 9 * 86400000, finished_at: tidyNow - 8 * 86400000 });
-    assert(tidyBattles(state, tidyNow) && state.battles.find(b => b.id === 'qa-stale-wait').status === 'cancelled' && state.battles.find(b => b.id === 'qa-stale-active').status === 'cancelled' && !state.battles.some(b => b.id === 'qa-old-cancel') && state.battles.every(b => ['waiting', 'active'].includes(b.status) || (!b.tickets && !b.range_codes)), 'V13.54.1 expired rooms close, abandoned matches are called off and finished rows drop tickets');
+    assert(tidyBattles(state, tidyNow) && state.battles.find(b => b.id === 'qa-stale-wait').status === 'cancelled' && state.battles.find(b => b.id === 'qa-stale-active').status === 'cancelled' && !state.battles.some(b => b.id === 'qa-old-cancel') && state.battles.every(b => ['waiting', 'active'].includes(b.status) || (!b.tickets && (!b.range_codes || (b.status === 'finished' && tidyNow - b.finished_at < 2 * 60000)))), 'V13.54.1 expired rooms close, abandoned matches are called off and finished rows drop tickets (V13.56: ranges stay for the 2-minute rematch window)');
+    {
+      const later = structuredClone(state.battles);
+      tidyBattles({ battles: later }, tidyNow + 3 * 60000);
+      assert(later.every(b => ['waiting', 'active'].includes(b.status) || !b.range_codes), 'V13.56 finished rows drop their ranges once the rematch window closes');
+    }
     state.battles = state.battles.filter(b => ![room.id, cancelRoom.id, 'qa-loss-1', 'qa-loss-2', 'qa-stale-wait', 'qa-stale-active'].includes(b.id));
     state.sessions = state.sessions.filter(s => !battlePointRecords.includes(s));
 
@@ -958,7 +1009,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.55.0') && indexHtml.includes('/app.bundle.css?v=13.55.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.56.0') && indexHtml.includes('/app.bundle.css?v=13.56.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -979,7 +1030,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.55.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.56.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
