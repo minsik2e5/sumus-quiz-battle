@@ -193,6 +193,7 @@ export async function runCloudflareCheck() {
     const health = await call('/api/health');
     assert.equal(health.payload.storage.mode, 'local-first');
     assert.equal(health.payload.storage.supabase_pending, true, '상태 점검에서 백업 대기를 보여야 합니다.');
+    assert(health.payload.storage.state_breakdown?.keys_kb?.sessions >= 0 && Number.isInteger(health.payload.storage.state_breakdown.practices.active), '상태 점검에서 항목별 크기를 보여야 합니다.');
 
     // 5. Restart with changes Supabase has not received: local wins, then uploads.
     object.sync.close();

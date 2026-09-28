@@ -5,6 +5,40 @@ export const DEFAULT_SCHOOLS = [
   { id: 'gangseo-high', name: '강서고', full_name: '강서고등학교', division: 'high', active: true, sort_order: 30 }
 ];
 
+// Finished-session records are kept forever, so they are the part of the state that keeps
+// growing. Their word_ids held the whole range (word ids are ~35 characters each), but the
+// record screens only use it to list unanswered words: the ids not in answer_records, cut to
+// the missing count, which is never above unanswered_count. Keeping exactly those ids gives
+// the same review list. Records without answer_records or counts (older formats) are left as
+// they are.
+export function compactSession(session) {
+  if (!session || typeof session !== 'object' || !Array.isArray(session.answer_records) || !Array.isArray(session.word_ids)) return false;
+  const unanswered = Number(session.unanswered_count);
+  if (!Number.isInteger(unanswered) || unanswered < 0) return false;
+  const answered = new Set(session.answer_records.map(item => item?.word_id).filter(Boolean));
+  const missing = session.word_ids.filter(id => !answered.has(id)).slice(0, unanswered);
+  if (missing.length === session.word_ids.length) return false;
+  session.word_ids = missing;
+  return true;
+}
+
+// Size of each part of the state, for /api/health. Only sizes and counts, never content.
+export function stateSizeReport(state) {
+  const kb = value => Math.round((JSON.stringify(value ?? null)?.length || 0) / 102.4) / 10;
+  const keys = Object.fromEntries(Object.keys(state || {}).map(key => [key, kb(state[key])]).sort((a, b) => b[1] - a[1]));
+  const sessions = Array.isArray(state?.sessions) ? state.sessions : [];
+  const practices = Array.isArray(state?.practices) ? state.practices : [];
+  const field = (list, name) => kb(list.map(item => item?.[name] ?? null));
+  const active = practices.filter(item => !item?.finished);
+  const finished = practices.filter(item => item?.finished);
+  return {
+    keys_kb: keys,
+    sessions: { count: sessions.length, answer_records_kb: field(sessions, 'answer_records'), wrong_details_kb: field(sessions, 'wrong_details'), word_ids_kb: field(sessions, 'word_ids'), reward_breakdown_kb: field(sessions, 'reward_breakdown') },
+    practices: { active: active.length, active_kb: kb(active), stale_active: active.filter(item => Number(item?.started_at || 0) < Date.now() - 86400000).length, finished: finished.length, finished_kb: kb(finished), responses_kb: field(practices, 'responses'), words_kb: field(practices, 'words') },
+    mastery_students: Object.keys(state?.mastery || {}).length
+  };
+}
+
 export function emptyState() {
   return { schema_version: 18, schools: structuredClone(DEFAULT_SCHOOLS), profiles: [], tokens: [], sessions: [], mastery: {}, grammarProgress: {}, meaningAliases: {}, meaningAliasMeta: {}, meaningDisputes: [], assignments: [], exams: [], examAttempts: [], practices: [], extraBooks: [], battles: [] };
 }
@@ -34,6 +68,7 @@ export function migrateState(state) {
   const sessionIds = new Set(state.sessions.map(item => item.id));
   const compactPractices = state.practices.filter(item => !item?.finished || (Number(item?.total || 0) > 0 && !sessionIds.has(item.id)) || Number(item?.finished_at || 0) > Date.now() - 10 * 60000);
   if (compactPractices.length !== state.practices.length) { state.practices = compactPractices; changed = true; }
+  for (const session of state.sessions) if (compactSession(session)) changed = true;
   const liveTokens = state.tokens.filter(item => Number(item?.expires_at || 0) > Date.now());
   if (liveTokens.length !== state.tokens.length) { state.tokens = liveTokens; changed = true; }
   if (!Array.isArray(state.schools)) { state.schools = []; changed = true; }
