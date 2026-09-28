@@ -16,13 +16,20 @@ const SKILLS = [
   { id: 'power', name: '필살기', cost: 5, desc: '다음 공격 2배' }
 ];
 const MAX_HP = 100, MAX_KI = 5;
-const REASONS = { end: '시간 종료', forfeit: '상대가 나갔어요', disconnect: '연결이 끊겼어요', cancelled: '대결이 취소됐어요' };
+// Why a match ended, from the point of view of the player reading the result.
+const REASONS = { end: () => '시간 종료', forfeit: mine => mine ? '대결을 포기했어요' : '상대가 대결을 포기했어요', disconnect: mine => mine ? '연결이 끊겨 패배했어요' : '상대의 연결이 끊겼어요', cancelled: () => '대결이 취소됐어요' };
 
 let B = null; // current screen state
 
 const root = () => document.getElementById('app');
 const serverNow = () => Date.now() + (B?.clockOffset || 0);
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Timers that draw on this screen; they do nothing once the screen (or a newer one) took over.
+function later(fn, ms) {
+  const cur = B;
+  const id = setTimeout(() => { if (B === cur && !cur.closing) fn(); }, ms);
+  cur.timers = [...(cur.timers || []), id];
+}
 const petName = pet => pet?.name || CHARACTERS[petKey(pet?.key)]?.ko || '';
 
 export async function openBattle(A, exit) {
@@ -74,13 +81,14 @@ function toggleRange(code) { B.ranges.has(code) ? B.ranges.delete(code) : B.rang
 function lobby() {
   const A = B.A, g = A.data.stats, h = B.history || { record: { wins: 0, losses: 0, draws: 0 }, battles: [], lost_today: 0, daily_loss_cap: 150 };
   const { codes, counts } = lobbyRanges();
-  const balance = Number(g.points_balance || 0), lossLeft = Math.max(0, h.daily_loss_cap - h.lost_today);
+  // History is fetched each time the lobby opens, so its balance is fresher than stats.
+  const balance = Number(h.points_balance ?? g.points_balance ?? 0), lossLeft = Math.max(0, h.daily_loss_cap - h.lost_today);
   const selectedWords = [...B.ranges].reduce((n, c) => n + (counts.get(c) || 0), 0);
   const canCreate = B.ranges.size && selectedWords >= 8 && balance >= B.stake && B.stake <= lossLeft;
   const pet = g.pet;
   main(`
     <section class="yb-hero">
-      <div class="yb-hero-pet">${pet ? avatar(pet.key, { form: Math.max(1, pet.form) }) : ''}</div>
+      <div class="yb-hero-pet">${pet ? avatar(pet.key, { form: pet.form }) : ''}</div>
       <div><span class="yb-eyebrow">1 : 1 단어 배틀</span><h1>${pet ? esc(petJosa(petName(pet), '과', '와')) : ''} 함께 대결!</h1>
       <p>같은 학교·학년 친구와 같은 단어로 겨뤄요. 먼저 맞히면 공격해요.</p>
       <div class="yb-record"><b>${h.record.wins}</b>승 <b>${h.record.losses}</b>패 <b>${h.record.draws}</b>무</div></div>
@@ -108,13 +116,31 @@ async function createRoom(button) {
     enterRoom({ ...room, host: true });
   } catch (err) { toast(err.message); button.disabled = false; }
 }
+// Joining shows the stake and the host first; the match can start as soon as we connect.
 async function joinRoom(button) {
   if (!/^\d{6}$/.test(B.joinCode)) return toast('6자리 코드를 입력해주세요.');
   button.disabled = true;
-  try {
-    const room = await api('/battle/join', { code: B.joinCode });
-    enterRoom({ ...room, host: false });
-  } catch (err) { toast(err.message); button.disabled = false; }
+  let room;
+  try { room = await api(`/battle/preview?code=${B.joinCode}`); }
+  catch (err) { toast(err.message); button.disabled = false; return; }
+  const cur = B;
+  confirmBox(`<h2>${esc(room.host)}의 방</h2><p>판돈 <b>${num(room.stake)}P</b>를 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(room.stake)}P를 잃어요.</p>`, '돌아가기', '참가하기', async yes => {
+    if (B !== cur) return;
+    if (!yes) { button.disabled = false; return; }
+    try {
+      const joined = await api('/battle/join', { code: room.code, stake: room.stake });
+      if (B === cur) enterRoom({ ...joined, host: false });
+    } catch (err) { toast(err.message); button.disabled = false; }
+  });
+}
+function confirmBox(html, noLabel, yesLabel, done, danger = false) {
+  const box = document.createElement('div');
+  box.className = 'yb-confirm';
+  box.innerHTML = `<div class="yb-confirm-card" role="dialog" aria-modal="true">${html}<div class="btn-row"><button type="button" class="btn" data-confirm="no">${noLabel}</button><button type="button" class="btn ${danger ? 'danger' : 'primary'}" data-confirm="yes">${yesLabel}</button></div></div>`;
+  box.onclick = e => { const c = e.target.closest('[data-confirm]')?.dataset.confirm; if (!c) return; box.remove(); done(c === 'yes'); };
+  box.onkeydown = e => { if (e.key === 'Escape') { box.remove(); done(false); } };
+  document.querySelector('.battle-app')?.appendChild(box);
+  box.querySelector('[data-confirm="no"]').focus();
 }
 async function cancelRoom(button) {
   button.disabled = true;
@@ -137,9 +163,11 @@ function openSocket() {
   const ws = new WebSocket(url);
   B.ws = ws;
   ws.onmessage = event => { let msg; try { msg = JSON.parse(event.data); } catch { return; } onMessage(msg); };
-  ws.onclose = () => {
+  ws.onclose = event => {
     if (B?.ws !== ws || B.closing) return;
     if (B.view?.phase === 'finished') return;
+    // Opened on another tab or phone: that one keeps the match; this one stops fighting it.
+    if (event.code === 4000) { setNote(''); main('<section class="yb-card yb-waiting"><h2>다른 화면에서 대결을 열었어요</h2><p>이 대결은 방금 연 화면에서 이어서 할 수 있어요.</p><button type="button" class="btn full" data-yb="exit">나가기</button></section>'); B.closing = true; return; }
     B.retries = (B.retries || 0) + 1;
     if (B.retries > 8) { toast('대결 방에 다시 연결하지 못했어요.'); return; }
     setNote('연결이 끊겨 다시 연결하는 중…');
@@ -151,7 +179,7 @@ function openSocket() {
 }
 function closeSocket(final = true) {
   if (!B) return;
-  if (final) { B.closing = true; clearInterval(B.pinger); cancelAnimationFrame(B.raf); clearInterval(B.waitTimer); }
+  if (final) { B.closing = true; clearInterval(B.pinger); cancelAnimationFrame(B.raf); clearInterval(B.waitTimer); (B.timers || []).forEach(clearTimeout); B.timers = []; }
   try { B.ws?.close(); } catch {}
   B.ws = null;
 }
@@ -199,8 +227,8 @@ function drawMatch() {
     <div class="yb-arena" id="yb-arena">
       <div class="yb-banner">夜叉</div><div class="yb-centerline"></div><div class="yb-ring"></div>
       ${hud(f, 'op')}
-      <div class="yb-pet op" id="yb-pet-op">${avatar(f.pet?.key, { form: Math.max(1, f.pet?.form || 1) })}</div>
-      <div class="yb-pet me" id="yb-pet-me">${avatar(m.pet?.key, { form: Math.max(1, m.pet?.form || 1) })}</div>
+      <div class="yb-pet op" id="yb-pet-op">${avatar(f.pet?.key, { form: f.pet?.form ?? 1 })}</div>
+      <div class="yb-pet me" id="yb-pet-me">${avatar(m.pet?.key, { form: m.pet?.form ?? 1 })}</div>
       ${hud(m, 'me')}
       <div class="yb-flash" id="yb-flash"></div>
       <div class="yb-countdown" id="yb-countdown" hidden></div>
@@ -219,7 +247,7 @@ function drawMatch() {
 
 function hud(p, side) {
   return `<div class="yb-hud ${side}" id="yb-hud-${side}">
-    <div class="yb-hud-row"><span class="yb-hud-name">${esc(petName(p.pet))}</span><span class="yb-hud-lv">${p.pet?.form ? PET_FORMS[p.pet.form] : ''}</span></div>
+    <div class="yb-hud-row"><span class="yb-hud-name">${esc(petName(p.pet))}</span><span class="yb-hud-lv">${PET_FORMS[p.pet?.form ?? 1] || ''}</span></div>
     <div class="yb-hud-who">${esc(p.name)}${side === 'me' ? ' · 나' : ''}</div>
     <div class="yb-hpbar"><i>HP</i><div class="yb-track"><div class="yb-fill" id="yb-hp-${side}"></div></div></div>
     <div class="yb-hud-foot"><div class="yb-ki" id="yb-ki-${side}"></div><div class="yb-fx" id="yb-fx-${side}"></div></div>
@@ -263,7 +291,7 @@ function drawQuestion() {
   document.getElementById('yb-pet-me')?.classList.toggle('frozen', frozen);
   if (frozen) {
     setStatus('me', '얼어붙었어요! 2초 뒤 풀려요');
-    setTimeout(() => { if (B?.view?.question === q && q.answer === undefined) drawQuestion(); }, Math.max(0, q.frozen_until[B.view.me] - serverNow()) + 30);
+    later(() => { if (B.view?.question === q && q.answer === undefined) { setStatus('me', ''); drawQuestion(); } }, Math.max(0, q.frozen_until[B.view.me] - serverNow()) + 30);
   }
   if (q.answer === undefined && !q.locked) say(`<em>${esc(q.prompt)}</em>의 뜻은?`, '정답 버튼이 곧 공격 버튼이에요.');
 }
@@ -291,7 +319,7 @@ function showCountdown(deadline) {
   const step = () => {
     const left = Math.ceil((deadline - serverNow()) / 1000);
     if (left <= 0 || B.view.phase !== 'countdown') { box.hidden = true; return; }
-    box.textContent = left; setTimeout(step, 150);
+    box.textContent = left; later(step, 150);
   };
   step();
   say('곧 시작해요!', '같은 단어가 두 사람에게 동시에 나와요.');
@@ -317,7 +345,7 @@ function applyEvent(e) {
   if (e.seq && e.seq <= v.seq) return; // already in the view
   v.seq = e.seq || v.seq;
   const P = v.players;
-  if (e.type === 'presence') { P[e.player].connected = e.connected; if (!e.connected && e.player !== v.me) setStatus('op', '상대 연결이 끊겼어요. 15초 기다려요'); refreshHud(); return; }
+  if (e.type === 'presence') { P[e.player].connected = e.connected; if (e.player !== v.me) setStatus('op', e.connected ? '' : '상대 연결이 끊겼어요. 15초 기다려요'); refreshHud(); return; }
   if (e.type === 'countdown') { v.phase = 'countdown'; v.deadline = e.deadline; if (!document.getElementById('yb-arena')) drawMatch(); showCountdown(e.deadline); return; }
   if (e.type === 'start') { v.ends_at = e.ends_at; return; }
   if (e.type === 'question') {
@@ -354,7 +382,7 @@ function applyEvent(e) {
       const label = e.powered ? '<em>필살기!</em>' : e.fast ? '<em>크리티컬</em> 공격!' : '공격!';
       say(`${atk === 'op' ? '상대 ' : ''}${esc(petName(P[e.attacker].pet))}의 ${label}`, `${v.question.prompt} = ${v.question.options[e.answer]}${e.shielded ? ' · 방패가 피해를 절반 막았어요' : ''}`);
       lunge(atk);
-      setTimeout(() => { if (e.powered || e.fast) flash(e.powered ? 'rgba(255,214,90,.9)' : 'rgba(255,236,160,.8)'); hit(def); pop(def, `-${e.dmg}${e.powered ? ' 필살!' : e.fast ? ' 크리티컬!' : ''}`, e.powered || e.fast ? 'crit' : ''); refreshHud(); }, reduced() ? 0 : 230);
+      later(() => { if (e.powered || e.fast) flash(e.powered ? 'rgba(255,214,90,.9)' : 'rgba(255,236,160,.8)'); hit(def); pop(def, `-${e.dmg}${e.powered ? ' 필살!' : e.fast ? ' 크리티컬!' : ''}`, e.powered || e.fast ? 'crit' : ''); refreshHud(); }, reduced() ? 0 : 230);
     }
     drawQuestion(); refreshHud(); return;
   }
@@ -373,7 +401,7 @@ function applyEvent(e) {
     const loser = e.result.loser ? sideOf(e.result.loser) : null;
     if (loser) document.getElementById('yb-pet-' + loser)?.classList.add('faint');
     cancelAnimationFrame(B.raf);
-    setTimeout(drawResult, reduced() ? 0 : 1100);
+    later(drawResult, reduced() ? 0 : 1100);
   }
 }
 
@@ -383,9 +411,9 @@ function drawResult() {
   const delta = outcome === 'win' ? `+${r.stake}P` : outcome === 'lose' ? `−${r.stake}P` : '±0P';
   closeSocket();
   main(`<section class="yb-card yb-result ${outcome}">
-    <div class="yb-result-pet">${avatar(m.pet?.key, { form: Math.max(1, m.pet?.form || 1), expression: outcome === 'win' ? 'win' : outcome === 'lose' ? 'hurt' : 'normal' })}</div>
+    <div class="yb-result-pet">${avatar(m.pet?.key, { form: m.pet?.form ?? 1, expression: outcome === 'win' ? 'win' : outcome === 'lose' ? 'hurt' : 'normal' })}</div>
     <div class="yb-result-badge">${{ win: '승리!', lose: '패배', draw: r.reason === 'cancelled' ? '취소' : '무승부' }[outcome]}</div>
-    <p class="yb-result-lead">${esc(REASONS[r.reason] || '')}${r.hp ? ` · 내 HP ${r.hp[v.me] ?? m.hp} · 상대 HP ${r.hp[foe().id] ?? foe().hp}` : ''}</p>
+    <p class="yb-result-lead">${esc(REASONS[r.reason]?.(r.loser === v.me) || '')}${r.hp ? ` · 내 HP ${r.hp[v.me] ?? m.hp} · 상대 HP ${r.hp[foe().id] ?? foe().hp}` : ''}</p>
     <div class="yb-result-points ${outcome}">${delta}</div>
     <div class="btn-row yb-result-actions"><button type="button" class="btn" data-yb="exit">홈으로</button><button type="button" class="btn primary" data-yb="again">다시 대결</button></div>
   </section>`);
@@ -393,20 +421,20 @@ function drawResult() {
 
 /* ---------- leaving ---------- */
 function confirmLeave() {
-  if (!B.view || B.view.phase === 'finished') return tryExit();
-  const box = document.createElement('div');
-  box.className = 'yb-confirm';
-  box.innerHTML = `<div class="yb-confirm-card" role="dialog" aria-modal="true" aria-label="대결 포기"><h2>대결을 포기할까요?</h2><p>지금 나가면 <b>패배</b>로 처리되고 판돈 ${B.view.stake}P를 잃어요.</p><div class="btn-row"><button type="button" class="btn" data-confirm="no">계속할게요</button><button type="button" class="btn danger" data-confirm="yes">포기하기</button></div></div>`;
-  box.onclick = e => {
-    const c = e.target.closest('[data-confirm]')?.dataset.confirm; if (!c) return;
-    box.remove();
-    if (c === 'yes') send({ type: 'leave' });
-  };
-  document.querySelector('.battle-app')?.appendChild(box);
-  box.querySelector('[data-confirm="no"]').focus();
+  if (!B.view || B.view.phase === 'finished') return leaveScreen();
+  const cur = B;
+  // Before the match starts, leaving calls it off without moving any points.
+  if (B.view.phase === 'waiting') {
+    return confirmBox('<h2>대결을 취소할까요?</h2><p>아직 시작 전이라 포인트는 그대로예요.</p>', '기다릴게요', '취소하기', yes => {
+      if (!yes || B !== cur) return;
+      send({ type: 'leave' });
+      later(leaveScreen, 200);
+    });
+  }
+  confirmBox(`<h2>대결을 포기할까요?</h2><p>지금 나가면 <b>패배</b>로 처리되고 판돈 ${num(B.view.stake)}P를 잃어요.</p>`, '계속할게요', '포기하기', yes => { if (yes && B === cur) send({ type: 'leave' }); }, true);
 }
 function tryExit() {
-  if (B?.view && !['finished', 'waiting'].includes(B.view.phase)) return confirmLeave();
+  if (B?.view && B.view.phase !== 'finished' && !B.closing) return confirmLeave();
   leaveScreen();
 }
 function leaveScreen() {

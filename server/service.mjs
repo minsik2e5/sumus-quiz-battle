@@ -369,7 +369,9 @@ function pointsAndPets(state, p, sessions) {
   const spent = Number(p.points_spent || 0);
   const battle = battleRecord(state, p.id);
   const pets = petProgress(p.pets, sessions, p.avatar_key);
-  return { reward_points: earned, points_spent: spent, points_balance: Math.max(0, earned - spent + battle.net), battle, pets, pet: pets.find(x => x.active) || null, needs_pet_pick: p.role === 'student' && !pets.length };
+  // Stakes of matches that have not been settled yet are held back, so a late result can
+  // never be absorbed by a balance that was spent in the meantime.
+  return { reward_points: earned, points_spent: spent, points_balance: Math.max(0, earned - spent + battle.net - battle.held), battle, pets, pet: pets.find(x => x.active) || null, needs_pet_pick: p.role === 'student' && !pets.length };
 }
 
 // Yacha battles: 1:1 word duels between students of the same school and grade. The
@@ -378,7 +380,9 @@ function pointsAndPets(state, p, sessions) {
 export const BATTLE_STAKES = [10, 30, 50];
 export const BATTLE_DAILY_LOSS_CAP = 150;
 const BATTLE_WAIT_MS = 10 * 60000;   // a room nobody joins closes
-const BATTLE_STALE_MS = 20 * 60000;  // a match that never reported back is treated as cancelled
+const BATTLE_STALE_MS = 20 * 60000;  // after this a match that has not reported stops blocking new ones
+const BATTLE_ABANDON_MS = 2 * 3600000; // a match that never reported by then is called off
+const BATTLE_KEEP_CANCELLED_MS = 7 * 86400000;
 const BATTLE_QUESTIONS = 40;
 const gradeOf = className => String(className || '').match(/^(중[1-3]|고[1-3])/)?.[1] || String(className || '');
 const battleIsOpen = (b, now) => (b.status === 'waiting' && now - b.created_at < BATTLE_WAIT_MS) || (b.status === 'active' && now - (b.joined_at || b.created_at) < BATTLE_STALE_MS);
@@ -386,7 +390,30 @@ const openBattleFor = (state, pid, now) => (state.battles || []).find(b => (b.ho
 function battleRecord(state, pid) {
   const rows = (state.battles || []).filter(b => b.status === 'finished' && (b.host_id === pid || b.guest_id === pid));
   const wins = rows.filter(b => b.winner === pid), losses = rows.filter(b => b.loser === pid);
-  return { wins: wins.length, losses: losses.length, draws: rows.length - wins.length - losses.length, net: wins.reduce((n, b) => n + b.stake, 0) - losses.reduce((n, b) => n + b.stake, 0) };
+  const held = (state.battles || []).filter(b => b.status === 'active' && (b.host_id === pid || b.guest_id === pid)).reduce((n, b) => n + b.stake, 0);
+  return { wins: wins.length, losses: losses.length, draws: rows.length - wins.length - losses.length, net: wins.reduce((n, b) => n + b.stake, 0) - losses.reduce((n, b) => n + b.stake, 0), held };
+}
+// Closes rooms nobody joined, calls off matches that never reported, drops tickets and
+// ranges once a battle is over, and forgets old cancelled rooms (the state is uploaded
+// whole on every backup, so it should not keep growing).
+export function tidyBattles(state, now = Date.now()) {
+  if (!Array.isArray(state.battles)) return false;
+  let changed = false;
+  for (const b of state.battles) {
+    const expired = (b.status === 'waiting' && now - b.created_at >= BATTLE_WAIT_MS) || (b.status === 'active' && now - (b.joined_at || b.created_at) >= BATTLE_ABANDON_MS);
+    if (expired) { Object.assign(b, { status: 'cancelled', reason: 'expired', finished_at: now }); changed = true; }
+    if (!['waiting', 'active'].includes(b.status) && (b.tickets || b.range_codes)) { delete b.tickets; delete b.range_codes; changed = true; }
+  }
+  const kept = state.battles.filter(b => !(b.status === 'cancelled' && now - (b.finished_at || b.created_at) >= BATTLE_KEEP_CANCELLED_MS));
+  if (kept.length !== state.battles.length) { state.battles = kept; changed = true; }
+  return changed;
+}
+function findJoinableBattle(state, p, code, now) {
+  const battle = (state.battles || []).find(b => b.code === code && b.status === 'waiting' && battleIsOpen(b, now));
+  const school = schoolForProfile(state, p);
+  // Rooms of other schools or grades answer exactly like missing ones, so codes cannot be probed.
+  if (!battle || school?.id !== battle.school_id || gradeOf(p.class_name) !== battle.grade) fail('대결 방을 찾지 못했어요. 코드를 다시 확인해주세요. 같은 학교·학년 친구의 방만 들어갈 수 있어요.', 404);
+  return battle;
 }
 const battleLossToday = (state, pid, now) => (state.battles || []).filter(b => b.status === 'finished' && b.loser === pid && dayKey(b.finished_at) === dayKey(now)).reduce((n, b) => n + b.stake, 0);
 function battlePlayer(state, p) {
@@ -464,6 +491,7 @@ export function sweep(state) {
   let changed = false;
   for (const a of state.examAttempts) if (a.status === 'active' && a.deadline <= Date.now()) { finishExam(a, state, true); changed = true; }
   if (autoResolveMeaningDisputes(state) > 0) changed = true;
+  if (tidyBattles(state)) changed = true;
   const tokens = state.tokens.filter(t => t.expires_at > Date.now());
   if (tokens.length !== state.tokens.length) { state.tokens = tokens; changed = true; }
   return changed;
@@ -778,6 +806,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/battle/rooms' && method === 'POST') {
     requireRole(p, 'student');
     const now = Date.now();
+    tidyBattles(state, now);
     const stake = Number(body.stake);
     if (!BATTLE_STAKES.includes(stake)) fail('판돈을 선택해주세요.');
     checkBattleEntry(state, p, stake, now);
@@ -800,15 +829,20 @@ export async function service(state, method, path, body, token, options = {}) {
     return { id: battle.id, code, stake, status: 'waiting', ticket: battle.tickets[p.id], expires_at: now + BATTLE_WAIT_MS,
       _battle: { action: 'init', id: battle.id, stake, host: battlePlayer(state, p), questions, tickets: battle.tickets, expires_at: now + BATTLE_WAIT_MS } };
   }
+  // Shows the stake and the host before a student commits to joining.
+  if (path === '/battle/preview' && method === 'GET') {
+    requireRole(p, 'student');
+    const battle = findJoinableBattle(state, p, str(body.code, 12).replace(/\D/g, ''), Date.now());
+    if (battle.host_id === p.id) fail('내가 만든 방이에요. 친구에게 코드를 알려주세요.', 409);
+    return { code: battle.code, stake: battle.stake, host: state.profiles.find(x => x.id === battle.host_id)?.display_name || '', expires_at: battle.created_at + BATTLE_WAIT_MS };
+  }
   if (path === '/battle/join' && method === 'POST') {
     requireRole(p, 'student');
     const now = Date.now();
-    const code = str(body.code, 12).replace(/\D/g, '');
-    const battle = (state.battles || []).find(b => b.code === code && b.status === 'waiting' && battleIsOpen(b, now));
-    if (!battle) fail('대결 방을 찾지 못했어요. 코드를 다시 확인해주세요.', 404);
+    tidyBattles(state, now);
+    const battle = findJoinableBattle(state, p, str(body.code, 12).replace(/\D/g, ''), now);
     if (battle.host_id === p.id) fail('내가 만든 방이에요. 친구에게 코드를 알려주세요.', 409);
-    const school = schoolForProfile(state, p);
-    if (school?.id !== battle.school_id || gradeOf(p.class_name) !== battle.grade) fail('같은 학교, 같은 학년 친구와만 대결할 수 있어요.', 403);
+    if (body.stake !== undefined && Number(body.stake) !== battle.stake) fail('방의 판돈이 바뀌었어요. 다시 확인해주세요.', 409);
     checkBattleEntry(state, p, battle.stake, now);
     const host = state.profiles.find(x => x.id === battle.host_id);
     if (!host) fail('대결 방을 찾지 못했어요.', 404);
@@ -834,7 +868,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/battle/history' && method === 'GET') {
     requireRole(p, 'student');
     const rows = (state.battles || []).filter(b => b.status === 'finished' && (b.host_id === p.id || b.guest_id === p.id)).sort((a, b) => b.finished_at - a.finished_at).slice(0, 20);
-    return { record: battleRecord(state, p.id), stakes: BATTLE_STAKES, daily_loss_cap: BATTLE_DAILY_LOSS_CAP, lost_today: battleLossToday(state, p.id, Date.now()), battles: rows.map(b => {
+    return { record: battleRecord(state, p.id), points_balance: pointsAndPets(state, p, mySessions(state, p.id)).points_balance, stakes: BATTLE_STAKES, daily_loss_cap: BATTLE_DAILY_LOSS_CAP, lost_today: battleLossToday(state, p.id, Date.now()), battles: rows.map(b => {
       const opponentId = b.host_id === p.id ? b.guest_id : b.host_id;
       return { id: b.id, finished_at: b.finished_at, stake: b.stake, outcome: b.winner === p.id ? 'win' : b.loser === p.id ? 'lose' : 'draw', reason: b.reason, opponent: state.profiles.find(x => x.id === opponentId)?.display_name || '' };
     }) };
