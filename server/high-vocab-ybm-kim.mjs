@@ -5,7 +5,9 @@
 // - words that already existed keep their original id (`...:lessonN:NNN`);
 // - words first added from the READING DB use `...:lessonN:rNNN` (DB order number).
 // Never renumber. When a meaning was reworded, the previous meaning stays accepted.
-const SCHOOL = { school_id: 'danwon-high', school: '단원고', division: 'high', grade: '고1A' };
+// No class (grade) tag: the textbook is the same for every Danwon class (고1A and 고1B),
+// like the textbook grammar sets. A '고1A' tag hid these words from 고1B students.
+const SCHOOL = { school_id: 'danwon-high', school: '단원고', division: 'high' };
 const makeBook = (lesson, entries) => {
   const bookId = `high:ybm-kim:common2:lesson${lesson}`;
   return {
