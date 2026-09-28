@@ -6,6 +6,7 @@ import { emptyState } from './state.mjs';
 import { builtinBooks } from './service.mjs';
 import { VocaStateObject } from '../cloudflare/worker.mjs';
 import { createLocalRepository, createSupabaseSync } from '../cloudflare/local-first.mjs';
+import { assembleState } from '../cloudflare/state-parts.mjs';
 
 const deepCopy = value => structuredClone(value);
 
@@ -63,6 +64,8 @@ export async function runCloudflareCheck() {
   let failNextCommit = false;
   let failAfterCommit = false;
   let failReads = 0;
+  // Parts backup (supabase/voca_v13_parts.sql): absent (404) until a test turns it on.
+  const partsStore = { enabled: false, revision: 0, parts: {}, patches: [], loseNextAnswer: false };
   const nativeFetch = globalThis.fetch;
   globalThis.fetch = async (url, options = {}) => {
     const name = String(url).split('/').at(-1);
@@ -98,6 +101,21 @@ export async function runCloudflareCheck() {
         return Response.json({ message: 'response lost after commit' }, { status: 503 });
       }
       return Response.json(revision);
+    }
+    if (name.startsWith('voca_v13_')) {
+      if (!partsStore.enabled) return Response.json({ code: 'PGRST202', message: `Could not find the function public.${name}` }, { status: 404 });
+      assert.equal(body.p_secret, 'test-state-secret');
+      if (name === 'voca_v13_state_revision') return Response.json(partsStore.revision);
+      if (name === 'voca_v13_state_read') return Response.json([{ revision: partsStore.revision, parts: deepCopy(partsStore.parts) }]);
+      if (name === 'voca_v13_state_patch') {
+        if (Number(body.p_revision) !== partsStore.revision) return Response.json({ code: '40001', message: 'revision_conflict' }, { status: 409 });
+        Object.assign(partsStore.parts, deepCopy(body.p_parts));
+        for (const key of body.p_removed || []) delete partsStore.parts[key];
+        partsStore.revision += 1;
+        partsStore.patches.push({ keys: Object.keys(body.p_parts), removed: body.p_removed || [], bytes: options.body.length });
+        if (partsStore.loseNextAnswer) { partsStore.loseNextAnswer = false; return Response.json({ message: 'response lost after commit' }, { status: 503 }); }
+        return Response.json(partsStore.revision);
+      }
     }
     throw new Error(`unexpected RPC: ${name}`);
   };
@@ -243,6 +261,68 @@ export async function runCloudflareCheck() {
       assert.equal(sync.pending(), true);
       assert(alarmAt >= Date.now() + 60000, '다음 업로드는 최소 간격 뒤로 예약되어야 합니다.');
       sync.close();
+    }
+
+    // 9. Parts backup (supabase/voca_v13_parts.sql): once the functions exist, only the
+    //    parts that changed are uploaded, a lost answer is retried safely, a periodic full
+    //    v12 copy is still stored, and an object without a local copy restores from parts.
+    {
+      object.sync.close();
+      partsStore.enabled = true;
+      object = boot();
+      call = client(object);
+      await object.ready;
+      const partsLogin = await call('/api/login', { method: 'POST', body: { username: 'student_preserved', password: 'Student123!', role: 'student' } });
+      const partsCookie = partsLogin.response.headers.get('set-cookie').split(';')[0];
+      const commitsBefore = commits;
+      await object.sync.run();
+      assert.equal(object.sync.status().mode, 'parts', '파트 함수가 있으면 파트 백업을 써야 합니다.');
+      assert(partsStore.revision >= 1 && partsStore.parts['o:keys'] && partsStore.parts['k:profiles'], '첫 파트 백업은 모든 파트를 올려야 합니다.');
+      assert.equal(commits, commitsBefore + 1, '파트 백업 중에도 전체 사본(v12)을 주기적으로 남겨야 합니다.');
+
+      const run = await call('/api/practice/start', { method: 'POST', cookie: partsCookie, body: practiceBody });
+      await object.sync.run();
+      partsStore.patches = [];
+      await call(`/api/practice/${run.payload.id}/answer`, { method: 'POST', cookie: partsCookie, body: { question_id: run.payload.question_id, answer: '__parts__' } });
+      await object.sync.run();
+      const sent = partsStore.patches.flatMap(patch => patch.keys);
+      assert(sent.length > 0 && sent.every(key => key.includes('student-preserved') || key.startsWith('o:')), `답 하나에는 그 학생의 파트만 올라가야 합니다: ${sent.join(', ')}`);
+      assert(!sent.includes('k:profiles') && !sent.some(key => key.startsWith('a:sessions:')), '바뀌지 않은 파트는 다시 올리지 않아야 합니다.');
+      assert.equal(commits, commitsBefore + 1, '전체 사본은 주기(6시간)마다만 올려야 합니다.');
+
+      partsStore.loseNextAnswer = true;
+      await call(`/api/practice/${run.payload.id}/next`, { method: 'POST', cookie: partsCookie, body: {} });
+      await assert.rejects(object.sync.run(), '응답이 유실되면 이번 동기화는 실패로 보고해야 합니다.');
+      await object.sync.run();
+      assert.equal(object.sync.status().pending, false, '응답 유실 뒤 재시도로 파트 백업이 따라잡아야 합니다.');
+
+      const canonical = value => JSON.stringify(value, (key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(k => [k, item[k]])) : item);
+      const live = object.mutations.current().state;
+      const restoredObject = new VocaStateObject({ storage: createStorageMock(), blockConcurrencyWhile: callback => callback(), waitUntil: () => {} }, env);
+      await restoredObject.ready;
+      assert.equal(canonical(restoredObject.mutations.current().state), canonical(live), '로컬 사본이 없으면 파트 백업에서 똑같이 복원해야 합니다.');
+      partsStore.patches = [];
+      assert.equal(restoredObject.sync.pending(), false, '파트에서 복원한 직후에는 다시 올릴 것이 없어야 합니다.');
+      restoredObject.sync.close();
+
+      const beforeReset = partsStore.revision;
+      partsStore.revision += 3; // changed elsewhere (e.g. a manual restore)
+      await call(`/api/practice/${run.payload.id}/finish`, { method: 'POST', cookie: partsCookie, body: {} });
+      await assert.rejects(object.sync.run(), '다른 곳에서 파트가 바뀌면 이번 동기화는 실패로 보고해야 합니다.');
+      await object.sync.run();
+      assert(partsStore.revision > beforeReset + 3 && partsStore.patches.some(patch => patch.keys.includes('k:profiles')), '다른 곳에서 바뀌었으면 모든 파트를 다시 올려야 합니다.');
+      assert.equal(canonical(assembleState(deepCopy(partsStore.parts))), canonical(object.mutations.current().state), 'Supabase 파트를 합치면 현재 상태와 같아야 합니다.');
+
+      // The periodic v12 copy is older than the parts backup: a restart must not adopt it,
+      // even when its revision moved (e.g. a full copy whose answer was lost).
+      const beforeRestart = canonical(object.mutations.current().state);
+      persisted = deepCopy(state);
+      revision += 7;
+      object.sync.close();
+      object = boot();
+      await object.ready;
+      assert.equal(canonical(object.mutations.current().state), beforeRestart, '파트 백업 중에는 오래된 v12 사본으로 되돌아가면 안 됩니다.');
+      object.sync.close();
     }
     console.log(`[cloudflare-check] PASS local-first storage + ${concurrent.length} concurrent reads (${commits} Supabase commits)`);
   } finally {
