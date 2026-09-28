@@ -330,6 +330,18 @@ function composeDailyQuest(state, studentId, school, grade, target = 20) {
   const chosen = [...selected.values()];
   return { words: chosen, mix, target: chosen.length, range_codes: [...new Set(chosen.map(word => String(word.range_code)))].filter(Boolean) };
 }
+// How far today's recommended study has gone: answers in daily-quest records finished today
+// plus the one in progress. The goal is the running quest's size, or today's composed size.
+export function dailyQuestProgress(sessions, activePractice, target, now = Date.now()) {
+  const today = dayKey(now);
+  const running = activePractice && activePractice.daily_quest && !activePractice.finished ? activePractice : null;
+  const goal = Math.max(1, Number(running ? running.target : target) || 20);
+  const finishedAnswers = (sessions || [])
+    .filter(s => s.daily_quest && dayKey(s.created_at) === today)
+    .reduce((n, s) => n + Number(s.answered_count ?? s.total ?? 0), 0);
+  const done = Math.min(goal, finishedAnswers + (running ? Number(running.score_total || 0) : 0));
+  return { done_today: done, goal_today: goal, completed_today: done >= goal };
+}
 export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, ...middleGrade2Books, ...middleGrade3Books, ...ybmKimHighBooks, ...state.extraBooks]; }
 export function scopedWords(state, schoolRef, ranges, grade = null) {
   const school = schoolByRef(state, schoolRef);
@@ -739,9 +751,10 @@ export async function service(state, method, path, body, token, options = {}) {
       question_deadline: activePractice.question_deadline || null,
       question_duration_sec: activePractice.question_duration_sec || null,
       timer_mode: activePractice.timer_mode || 'session',
-      assignment_id: activePractice.assignment_id || null
+      assignment_id: activePractice.assignment_id || null,
+      daily_quest: !!activePractice.daily_quest
     } : null;
-    return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
+    return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes, ...dailyQuestProgress(sessions, activePractice, dailyQuest.target) } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
       profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
       sessions: sessions.map(hydrateSession), exams: visibleExams,
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),

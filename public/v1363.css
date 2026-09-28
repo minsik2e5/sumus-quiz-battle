@@ -1,0 +1,7 @@
+/* V13.63: 오늘 학습 버튼의 진행 막대 (예: 8/20) */
+.home-next-progress-v1363{display:flex;align-items:center;gap:8px;margin-top:9px}
+.home-next-progress-v1363>i{flex:1;display:block;height:7px;border-radius:999px;background:rgba(255,255,255,.28);overflow:hidden}
+.home-next-progress-v1363>i>span{display:block;height:100%;border-radius:inherit;background:#fff;transition:width .45s ease}
+.home-next-progress-v1363>b{font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap;opacity:.95}
+.home-next-v1358.is-done-v1363{background:linear-gradient(135deg,#f59f00,#e8590c);box-shadow:0 8px 18px rgba(232,89,12,.25)}
+@media (prefers-reduced-motion:reduce){.home-next-progress-v1363>i>span{transition:none}}

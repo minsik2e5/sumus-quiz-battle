@@ -178,14 +178,21 @@ function achievementSection(A, full = false) {
   const earned = badges.filter(item => item.earned).length;
   return `<div class="section-title"><h2>성취 배지</h2>${full ? `<span class="tiny muted">${earned}개 달성</span>` : '<button class="text-button" data-go="records">전체 보기 ' + icon('chevron') + '</button>'}</div><div class="achievement-grid">${visible.map(item => `<div class="achievement-badge ${item.earned ? 'earned' : 'locked'}"><span>${icon(item.earned ? item.icon : 'lock')}</span><div><b>${esc(item.label)}</b><small>${esc(item.earned ? item.detail : '아직 도전 중')}</small></div></div>`).join('')}</div>`;
 }
+// Progress bar inside the home button, e.g. "8/20".
+function homeProgress(done, goal, label) {
+  const total = Math.max(1, Number(goal) || 1);
+  const value = Math.min(total, Math.max(0, Number(done) || 0));
+  return `<span class="home-next-progress-v1363" role="progressbar" aria-valuemin="0" aria-valuemax="${total}" aria-valuenow="${value}" aria-label="${esc(label)} ${value}/${total}"><i><span style="width:${Math.round(value / total * 100)}%"></span></i><b>${value}/${total}</b></span>`;
+}
 function homePrimaryAction(A) {
   const activePractice = A.data.active_practice_summary || null;
   if (activePractice) {
     const ranges = (activePractice.range_codes || []).map(code => recordRangeLabel({ division: activePractice.division, school: activePractice.school }, code)).join(' · ') || '선택 범위';
     return {
-      kicker: activePractice.run_mode === 'test' ? '진행 중인 실전' : '진행 중인 연습',
+      kicker: activePractice.daily_quest ? '오늘의 추천 학습' : activePractice.run_mode === 'test' ? '진행 중인 실전' : '진행 중인 연습',
       title: '이어서 마무리해요',
-      detail: `${esc(ranges)} · ${esc(PRACTICE_TYPES[activePractice.mode] || '단어 학습')} · ${Number(activePractice.score_total || 0)}/${activePractice.target}`,
+      detail: `${esc(ranges)} · ${esc(PRACTICE_TYPES[activePractice.mode] || '단어 학습')}`,
+      progress: homeProgress(activePractice.score_total, activePractice.target, '진행'),
       meta: '진행 위치가 저장되어 있어요.',
       cta: '이어서 풀기',
       attrs: 'data-quick-practice="true"'
@@ -195,12 +202,27 @@ function homePrimaryAction(A) {
   const daily = A.data.daily_quest || null;
   if (daily?.target > 0) {
     const mix = daily.mix || {};
+    const goal = Number(daily.goal_today || daily.target);
+    const done = Number(daily.done_today || 0);
+    if (daily.completed_today) {
+      return {
+        kicker: '오늘의 추천 학습',
+        title: '오늘 목표 달성!',
+        detail: '더 풀면 새로 필요한 단어를 골라줘요.',
+        progress: homeProgress(goal, goal, '오늘 학습'),
+        done: true,
+        meta: '',
+        cta: '한 번 더 하기',
+        attrs: 'data-quick-practice="true"'
+      };
+    }
     return {
       kicker: '오늘의 추천 학습',
-      title: `오늘은 ${daily.target}개만 끝내요`,
+      title: done > 0 ? `오늘 ${goal - done}개 남았어요` : `오늘은 ${daily.target}개만 끝내요`,
       detail: `오답 ${mix.wrong || 0} · 복습 ${mix.review || 0} · 새 단어 ${mix.new || 0}`,
+      progress: homeProgress(done, goal, '오늘 학습'),
       meta: '지금 필요한 단어만 자동으로 섞어 보여줘요.',
-      cta: '오늘 학습 시작',
+      cta: done > 0 ? '오늘 학습 계속' : '오늘 학습 시작',
       attrs: 'data-quick-practice="true"'
     };
   }
@@ -343,7 +365,7 @@ function compactGrowth(A) {
   const week = homeWeek(A);
   const next = homePrimaryAction(A);
   return `<div class="home-stack-v1360">${partnerCard(A)}
-  <button type="button" class="home-next-v1358" ${next.attrs}><span><small>${esc(next.kicker)}</small><strong>${esc(next.title)}</strong><em>${next.detail}</em></span><b>${esc(next.cta)} ${icon('arrow')}</b></button>
+  <button type="button" class="home-next-v1358${next.done ? ' is-done-v1363' : ''}" ${next.attrs}><span><small>${esc(next.kicker)}</small><strong>${esc(next.title)}</strong><em>${next.detail}</em>${next.progress || ''}</span><b>${esc(next.cta)} ${icon('arrow')}</b></button>
   ${yachaBanner(A)}
   <section class="home-week-card home-week-v1358" aria-label="이번 주 출석">
     <span>이번 주 <b>${week.filter(day => day.active).length}일</b> · 오늘 <b>+${num(g.today_xp || 0)} XP</b></span>
