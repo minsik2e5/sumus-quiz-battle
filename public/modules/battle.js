@@ -71,7 +71,8 @@ function later(fn, ms) {
 }
 const petName = pet => pet?.name || CHARACTERS[petKey(pet?.key)]?.ko || '';
 
-export async function openBattle(A, exit) {
+// opts.accept: a challenge from the home screen ({ code, stake, host }) to confirm right away.
+export async function openBattle(A, exit, opts = {}) {
   closeSocket();
   B = { A, exit, stake: 10, ranges: null, joinCode: '' };
   root().innerHTML = shell('<div class="yb-loading">야차전을 준비하고 있어요…</div>');
@@ -81,6 +82,7 @@ export async function openBattle(A, exit) {
     B.history = history;
     if (battle) return enterRoom(battle);
     lobby();
+    if (opts.accept) acceptChallenge(opts.accept);
   } catch (err) { toast(err.message); leaveScreen(); }
 }
 
@@ -105,6 +107,7 @@ function bindRoot() {
     if (act === 'range') { toggleRange(b.dataset.code); return; }
     if (act === 'stake') { B.stake = Number(b.dataset.stake); lobby(); return; }
     if (act === 'create') return createRoom(b);
+    if (act === 'challenge') return pickFriend(b);
     if (act === 'join') return joinRoom(b);
     if (act === 'cancel') return cancelRoom(b);
     if (act === 'answer') { if (B.view?.question) B.view.question.picked = Number(b.dataset.choice); return send({ type: 'answer', choice: Number(b.dataset.choice) }, b); }
@@ -141,13 +144,16 @@ function lobby() {
       <div class="yb-record"><b>${h.record.wins}</b>승 <b>${h.record.losses}</b>패 <b>${h.record.draws}</b>무${h.record.streak >= 2 ? ` · <span class="yb-streak">${h.record.streak}연승 중</span>` : ''}${h.record.best_streak ? ` <small>최고 ${h.record.best_streak}연승</small>` : ''}</div></div>
     </section>
     <section class="yb-card">
-      <h2>방 만들기</h2>
+      <h2>대결 준비</h2>
       <div class="yb-label">단어 범위 <small>${B.ranges.size ? `${B.ranges.size}개 범위 · ${selectedWords}단어` : '범위를 골라주세요'}</small></div>
       <div class="yb-ranges">${codes.map(c => `<button type="button" class="yb-chip ${B.ranges.has(c) ? 'on' : ''}" data-yb="range" data-code="${esc(c)}" aria-pressed="${B.ranges.has(c)}">${esc(rangeLabel(A.data.profile.school, c))}<small>${counts.get(c) || 0}</small></button>`).join('') || '<p class="yb-muted">학습할 단어 범위가 없어요.</p>'}</div>
       <div class="yb-label">판돈 <small>보유 ${num(balance)}P · 오늘 더 잃을 수 있는 포인트 ${num(lossLeft)}P</small></div>
       <div class="yb-stakes">${STAKES.map(s => `<button type="button" class="yb-stake ${B.stake === s ? 'on' : ''}" data-yb="stake" data-stake="${s}" aria-pressed="${B.stake === s}" ${balance < s || s > lossLeft ? 'disabled' : ''}>${s}P</button>`).join('')}</div>
       <p class="yb-note">이기면 판돈만큼 받고, 지면 판돈만큼 잃어요. 무승부면 그대로예요.</p>
-      <button type="button" class="btn primary full" data-yb="create" ${canCreate ? '' : 'disabled'}>방 만들기</button>
+      <div class="yb-start-v1361">
+        <button type="button" class="btn primary full" data-yb="challenge" ${canCreate ? '' : 'disabled'}>친구에게 도전장 보내기</button>
+        <button type="button" class="btn full" data-yb="create" ${canCreate ? '' : 'disabled'}>코드로 방 만들기</button>
+      </div>
     </section>
     <section class="yb-card">
       <h2>코드로 참가</h2>
@@ -162,6 +168,48 @@ async function createRoom(button) {
     const room = await api('/battle/rooms', { stake: B.stake, range_codes: [...B.ranges] });
     enterRoom({ ...room, host: true });
   } catch (err) { toast(err.message); button.disabled = false; }
+}
+// V13.61 challenge: pick a friend of the same school and grade; the room is only for them.
+async function pickFriend(button) {
+  button.disabled = true;
+  let friends;
+  try { ({ friends } = await api('/battle/friends')); }
+  catch (err) { toast(err.message); button.disabled = false; return; }
+  button.disabled = false;
+  const cur = B;
+  const box = document.createElement('div');
+  box.className = 'yb-confirm';
+  box.innerHTML = `<div class="yb-confirm-card yb-friends-v1361" role="dialog" aria-modal="true" aria-label="도전장 보낼 친구">
+    <h2>누구에게 도전할까요?</h2><p class="yb-note">판돈 ${num(B.stake)}P · 고른 범위로 대결해요. 친구 홈 화면에 도전장이 떠요.</p>
+    <div class="yb-friend-list">${friends.length ? friends.map(f => `<button type="button" class="yb-friend" data-friend="${esc(f.id)}" ${f.busy ? 'disabled' : ''}>
+      <span class="yb-friend-pet">${f.pet ? avatar(f.pet.key, { form: f.pet.form }) : ''}</span>
+      <span class="yb-friend-name"><b>${esc(f.name)}</b><small>${esc(f.class_name)}${f.busy ? ' · 대결 중' : ''}</small></span>
+    </button>`).join('') : '<p class="yb-muted">같은 학교·학년 친구가 아직 없어요.</p>'}</div>
+    <button type="button" class="btn full" data-friend-close>닫기</button></div>`;
+  box.onclick = async e => {
+    if (e.target === box || e.target.closest('[data-friend-close]')) { box.remove(); return; }
+    const pick = e.target.closest('[data-friend]'); if (!pick || pick.disabled) return;
+    pick.disabled = true;
+    try {
+      const room = await api('/battle/challenge', { friend_id: pick.dataset.friend, stake: B.stake, range_codes: [...B.ranges] });
+      box.remove();
+      if (B === cur) enterRoom({ ...room, host: true });
+    } catch (err) { toast(err.message); pick.disabled = false; }
+  };
+  box.onkeydown = e => { if (e.key === 'Escape') box.remove(); };
+  document.querySelector('.battle-app')?.appendChild(box);
+  box.querySelector('[data-friend-close]').focus();
+}
+// A challenge accepted on the home screen: show the stake once more, then join.
+function acceptChallenge(invite) {
+  const cur = B;
+  confirmBox(`<h2>${esc(invite.host)}의 도전장</h2><p>판돈 <b>${num(invite.stake)}P</b>를 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(invite.stake)}P를 잃어요.</p>`, '나중에', '도전 받기', async yes => {
+    if (B !== cur || !yes) return;
+    try {
+      const joined = await api('/battle/join', { code: invite.code, stake: invite.stake });
+      if (B === cur) enterRoom({ ...joined, host: false });
+    } catch (err) { toast(err.message); }
+  });
 }
 // Joining shows the stake and the host first; the match can start as soon as we connect.
 async function joinRoom(button) {
@@ -240,7 +288,7 @@ function setNote(text) { const n = document.getElementById('yb-top-note'); if (n
 function onMessage(msg) {
   if (typeof msg.now === 'number') B.clockOffset = msg.now - Date.now();
   if (msg.type === 'lobby') { if (B.room.host) waitingRoom(msg.expires_at); return; }
-  if (msg.type === 'cancelled' || msg.type === 'expired') { toast(msg.type === 'expired' ? '10분 동안 아무도 들어오지 않아 방이 닫혔어요.' : msg.reason === 'declined' ? '상대가 이번에는 설욕전을 거절했어요.' : '대결 방이 취소됐어요.'); closeSocket(); return openBattle(B.A, B.exit); }
+  if (msg.type === 'cancelled' || msg.type === 'expired') { toast(msg.type === 'expired' ? '10분 동안 아무도 들어오지 않아 방이 닫혔어요.' : msg.reason === 'declined' ? (B.room?.challenge ? '친구가 이번에는 도전을 거절했어요.' : '상대가 이번에는 설욕전을 거절했어요.') : '대결 방이 취소됐어요.'); closeSocket(); return openBattle(B.A, B.exit); }
   if (msg.type === 'view') { B.view = msg.view; return drawMatch(); }
   if (msg.type === 'events' && B.view) { for (const e of msg.events) applyEvent(e); }
 }
@@ -248,7 +296,14 @@ function onMessage(msg) {
 /* ---------- waiting room ---------- */
 function waitingRoom(expiresAt = B.room.expires_at) {
   const code = String(B.room.code || '');
-  if (B.room.rematch) main(`<section class="yb-card yb-waiting">
+  if (B.room.challenge) main(`<section class="yb-card yb-waiting">
+    <span class="yb-eyebrow">도전장 보냄</span>
+    <h2>${esc(B.room.friend || '친구')}의 답을 기다리는 중</h2>
+    <p>친구 홈 화면에 도전장이 떴어요.<br>받으면 바로 시작해요.</p>
+    <p class="yb-note">판돈 ${B.room.stake}P · <span id="yb-wait-left"></span></p>
+    <button type="button" class="btn full" data-yb="cancel">도전장 취소</button>
+  </section>`);
+  else if (B.room.rematch) main(`<section class="yb-card yb-waiting">
     <span class="yb-eyebrow">설욕전 신청 완료</span>
     <h2>상대의 답을 기다리는 중</h2>
     <p>상대 화면에 설욕전 신청이 떴어요.<br>수락하면 바로 시작해요.</p>

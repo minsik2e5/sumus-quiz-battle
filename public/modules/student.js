@@ -319,6 +319,16 @@ function partnerCard(A) {
 // V13.60 home: card, next-step button, a big yacha banner and the week, spaced as one
 // column. Word study, exams, the ranking and records stay in the bottom menu.
 function yachaBanner(A) {
+  const invite = A.data.battle_invite;
+  // V13.61: a challenge from a friend replaces the banner until it is answered or expires.
+  if (invite && invite.expires_at > Date.now()) {
+    const left = Math.max(1, Math.ceil((invite.expires_at - Date.now()) / 60000));
+    return `<section class="home-yacha-v1360 invite" aria-label="도전장">
+      <span class="hy-mark" aria-hidden="true">夜</span>
+      <span class="hy-text"><small>도전장이 왔어요!</small><strong>${esc(invite.host)}의 도전</strong><em>판돈 ${num(invite.stake)}P · ${left}분 안에 받아요</em></span>
+      <span class="hy-actions"><button type="button" class="hy-no" data-action="battle-decline" data-id="${esc(invite.id)}">거절</button><button type="button" class="hy-go" data-action="battle-accept">도전 받기 ${icon('arrow')}</button></span>
+    </section>`;
+  }
   const battle = A.data.stats.battle || {};
   const played = Number(battle.wins || 0) + Number(battle.losses || 0) + Number(battle.draws || 0);
   const record = played ? `${num(battle.wins || 0)}승 ${num(battle.losses || 0)}패${Number(battle.streak || 0) >= 2 ? ` · ${battle.streak}연승 중` : Number(battle.best_streak || 0) ? ` · 최고 ${battle.best_streak}연승` : ''}` : '첫 대결에 도전해요';

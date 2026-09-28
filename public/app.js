@@ -201,7 +201,27 @@ window.addEventListener('pageshow', async event => {
   if (!event.persisted || !A.data || A.screen) return;
   try { await refresh(); renderKeepScroll(); } catch {}
 });
+async function leaveBattle() { A.screen = null; await petChanged(); window.scrollTo(0, 0); }
+// V13.61: a student on the home screen checks for a friend's challenge every 20 seconds
+// (a small request; the full refresh stays every 2 minutes).
+let invitePoll;
+function startInvitePolling() {
+  clearInterval(invitePoll);
+  if (A.data?.profile?.role !== 'student') return;
+  invitePoll = setInterval(async () => {
+    if (!A.data || A.screen || A.tab !== 'home' || document.visibilityState !== 'visible' || $('#modal-root').children.length) return;
+    try {
+      const { invite } = await api('/battle/invite');
+      const before = A.data.battle_invite;
+      if ((invite?.id || null) === (before?.id || null) && !invite) return;
+      A.data.battle_invite = invite;
+      if (invite && invite.id !== before?.id) { toast(`${invite.host}의 도전장이 왔어요!`); navigator.vibrate?.(80); }
+      renderKeepScroll();
+    } catch {}
+  }, 20000);
+}
 function startPolling() {
+  startInvitePolling();
   clearInterval(poll);
   const interval = A.data?.profile?.role === 'teacher' ? 60000 : 120000;
   poll = setInterval(async () => {
@@ -426,7 +446,9 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'pet-name') return openPetNameModal(A, petChanged);
     if (d.action === 'choose-pet') return confirmFirstPet(d.key);
     if (d.action === 'egg-shop') return openEggShop(A, petChanged);
-    if (d.action === 'battle') { A.screen = 'battle'; return openBattle(A, async () => { A.screen = null; await petChanged(); window.scrollTo(0, 0); }); }
+    if (d.action === 'battle') { A.screen = 'battle'; return openBattle(A, leaveBattle); }
+    if (d.action === 'battle-accept' && A.data.battle_invite) { const invite = A.data.battle_invite; A.data.battle_invite = null; A.screen = 'battle'; return openBattle(A, leaveBattle, { accept: invite }); }
+    if (d.action === 'battle-decline') { buttonBusy(b); await api('/battle/invite/decline', { id: d.id }); A.data.battle_invite = null; renderKeepScroll(); toast('도전장을 거절했어요.'); return; }
     if (d.action === 'save-style') { buttonBusy(b); await api('/profile/style', A.style); await refresh(); A.style = null; A.tab = 'home'; render(); toast('내 캐릭터를 저장했어요.'); }
     if (d.action === 'account') accountModal();
     if (d.action === 'logout') await logout();
