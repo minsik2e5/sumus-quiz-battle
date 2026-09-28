@@ -168,7 +168,7 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, l
         pendingSince = 0;
       } catch (error) {
         failures += 1;
-        lastError = error?.message || String(error);
+        lastError = error?.detail || error?.message || String(error);
         log.error('[supabase-sync]', lastError);
         schedule(Math.min(60000, 2000 * 2 ** Math.min(failures - 1, 5)));
         throw error;
