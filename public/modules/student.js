@@ -437,8 +437,13 @@ function grammarStudy(A) {
     <section class="grammar-range-head"><div><span class="eyebrow">단원고 시험범위</span><h2>2025년 9월 인천교육청</h2></div><span class="grammar-range-count">${(data.mock || passages).length}지문</span></section>
     <div class="grammar-set-list">${grammarCards(A, data.mock || passages)}</div>
   ` : isGangseo ? `
-    <section class="grammar-range-head gangseo"><div><span class="eyebrow">강서고 시험범위 · 2026</span><h2>2026년 6월 부산교육청</h2></div><span class="grammar-range-count">${passages.length}지문</span></section>
-    <div class="grammar-set-list">${grammarCards(A, passages)}</div>
+    ${[1, 2].filter(n => (byLesson[n] || []).length).map(n => `
+      <section class="grammar-range-head"><div><span class="eyebrow">강서고 시험범위 · 교과서</span><h2>공통영어2 YBM(김은형) ${n}과</h2></div><span class="grammar-range-count">${byLesson[n].length}지문</span></section>
+      <div class="grammar-set-list">${grammarCards(A, byLesson[n])}</div>
+    `).join('')}
+    ${(data.textbook || []).length ? '<div class="grammar-year-divider"><span>모의고사 범위</span></div>' : ''}
+    <section class="grammar-range-head gangseo"><div><span class="eyebrow">강서고 시험범위 · 2026</span><h2>2026년 6월 부산교육청</h2></div><span class="grammar-range-count">${(data.mock || passages).length}지문</span></section>
+    <div class="grammar-set-list">${grammarCards(A, data.mock || passages)}</div>
   ` : isSeonbu ? `
     <section class="grammar-range-head seonbu current"><div><span class="eyebrow">선부고 시험범위 · 2026</span><h2>2026년 3월 서울교육청</h2></div><span class="grammar-range-count">${current.length}지문</span></section>
     <div class="grammar-set-list">${grammarCards(A, current)}</div>

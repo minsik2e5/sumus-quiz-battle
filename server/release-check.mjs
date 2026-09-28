@@ -65,7 +65,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.56.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.56.1') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -84,7 +84,19 @@ export async function runReleaseCheck() {
       assert(displayEnglish(charged.word) === 'be charged with' && grade('write_en', 'be charged with', charged), 'grammar note (+동명사) is not part of the expected English answer');
     }
     const gangseoWords = bySchool('강서고');
-    assert(gangseoWords.length === 354, '강서고 vocabulary = 354');
+    assert(gangseoWords.length === 354 + 180, '강서고 vocabulary = 354 mock-exam words + 180 YBM textbook words (same textbook as 단원고)');
+    {
+      const danwonYbm = bySchool('단원고').filter(word => word.id.startsWith('high:ybm-kim:common2:'));
+      const gangseoYbm = gangseoWords.filter(word => word.id.startsWith('high:ybm-kim:gangseo:common2:'));
+      assert(gangseoYbm.length === 180 && gangseoYbm.every((word, i) => word.word === danwonYbm[i].word && word.meaning === danwonYbm[i].meaning && word.range_code === danwonYbm[i].range_code && word.school_id === 'gangseo-high'), 'V13.56.1 강서고 gets the same textbook words as 단원고 (its own ids, 단원고 ids unchanged)');
+      assert(runtimeBooks.filter(book => book.id.startsWith('high:ybm-kim:')).every(book => !book.grade), 'V13.56.1 the textbook class split (고1A/고1B) is switched off for now');
+      const probe = { extraBooks: [], schools: [{ id: 'gangseo-high', name: '강서고', full_name: '강서고등학교', division: 'high' }] };
+      assert(scopedWords(probe, 'gangseo-high', ['L1'], '고1B').length === 68 && scopedWords(probe, 'gangseo-high', ['L2'], '고1A').length === 112, 'V13.56.1 강서고 고1A/고1B students can practice textbook lessons 1-2');
+      const appSource = readFileSync(fileURLToPath(new URL('../public/app.js', import.meta.url)), 'utf8');
+      const teacherSource = readFileSync(fileURLToPath(new URL('../public/modules/teacher.js', import.meta.url)), 'utf8');
+      const gangseoLoader = appSource.slice(appSource.indexOf("school === '강서고'"), appSource.indexOf("school === '강서고'") + 400);
+      assert(gangseoLoader.includes('danwongo-textbook-grammar-data.js') && teacherSource.slice(teacherSource.indexOf("'강서고':")).slice(0, 300).includes('danwongo-textbook-grammar-data.js'), 'V13.56.1 강서고 students and teachers load the textbook grammar sets');
+    }
     assert(bySchool('단원고').some(word => word.id.startsWith('high:ybm-kim:common2:lesson1:')), 'YBM Kim lesson 1 vocabulary is loaded');
     assert(bySchool('단원고').some(word => word.id.startsWith('high:ybm-kim:common2:lesson2:')), 'YBM Kim lesson 2 vocabulary is loaded');
     assert(studentUiSource.includes("['eng2mean','뜻 4지선다'") && studentUiSource.includes("['mean2eng','영어 4지선다'"), 'middle/high self-test exposes both four-choice modes');
@@ -292,6 +304,16 @@ export async function runReleaseCheck() {
     const highABootstrap = await service(state, 'GET', '/bootstrap', {}, studentToken);
     const highBBootstrap = await service(state, 'GET', '/bootstrap', {}, highBLogin._cookie);
     assert(highBStudent.class_name === '고1B' && highABootstrap.exams.some(item => item.id === schoolWideExam.id) && highBBootstrap.exams.some(item => item.id === schoolWideExam.id), 'school-wide exam reaches both high-school classes');
+    {
+      // V13.56.1: the YBM textbook words reach both Danwon classes, not only 고1A.
+      const bWords = highBBootstrap.books.flatMap(book => book.words || []);
+      const aWords = (await service(state, 'GET', '/bootstrap', {}, studentToken)).books.flatMap(book => book.words || []);
+      const ybmOf = list => list.filter(word => word.id.startsWith('high:ybm-kim:common2:')).length;
+      assert(ybmOf(bWords) === 180 && ybmOf(aWords) === 180, 'V13.56.1 고1A and 고1B students both see the 180 YBM textbook words');
+      const bPractice = await service(state, 'POST', '/practice/start', { school: '단원고', range_codes: ['L1'], mode: 'write_meaning', target: 5 }, highBLogin._cookie);
+      assert(bPractice.id && bPractice.word_ids.length === 68, 'V13.56.1 a 고1B student can practice textbook lesson 1');
+      await service(state, 'POST', `/practice/${bPractice.id}/finish`, {}, highBLogin._cookie);
+    }
     await expectStatus(403, () => service(state, 'PATCH', '/profile/school', { school_id: 'seonbu-high' }, studentToken), 'student cannot change own school');
 
     // Pets: first pick once, names per pet, random eggs from the shop, separate growth.
@@ -1009,7 +1031,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.56.0') && indexHtml.includes('/app.bundle.css?v=13.56.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.56.1') && indexHtml.includes('/app.bundle.css?v=13.56.1') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1030,7 +1052,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.56.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.56.1'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');

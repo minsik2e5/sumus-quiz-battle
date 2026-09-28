@@ -5,14 +5,26 @@
 // - words that already existed keep their original id (`...:lessonN:NNN`);
 // - words first added from the READING DB use `...:lessonN:rNNN` (DB order number).
 // Never renumber. When a meaning was reworded, the previous meaning stays accepted.
-const SCHOOL = { school_id: 'danwon-high', school: '단원고', division: 'high', grade: '고1A' };
-const makeBook = (lesson, entries) => {
-  const bookId = `high:ybm-kim:common2:lesson${lesson}`;
+// The same textbook is used at 단원고 and 강서고: each school gets the same lessons. Word ids
+// stay unique across all books, so 강서고's copy uses its own prefix (단원고 ids never change).
+const SCHOOLS = [
+  { school_id: 'danwon-high', school: '단원고', division: 'high', prefix: 'high:ybm-kim:common2' },
+  { school_id: 'gangseo-high', school: '강서고', division: 'high', prefix: 'high:ybm-kim:gangseo:common2' }
+];
+// Class split (고1A / 고1B): off for now, so every class sees the textbook. After the exams,
+// when the classes study different lessons again, set a lesson's class here, e.g. { 1: '고1A' }.
+// A book with a class is shown only to students of that class (the teacher sees every book).
+export const YBM_KIM_CLASS_BY_LESSON = {};
+const makeBook = (lesson, entries, place) => {
+  const { prefix, ...school } = place;
+  const bookId = `${prefix}:lesson${lesson}`;
+  const className = YBM_KIM_CLASS_BY_LESSON[lesson];
+  const tags = { ...school, ...(className ? { grade: className } : {}) };
   return {
-    id: bookId, ...SCHOOL,
+    id: bookId, ...tags,
     title: `공통영어2 YBM(김은형) ${lesson}과 본문`, source: 'teacher_reading_db_2026_09_27',
     words: entries.map(([key, word, meaning, part_of_speech, accepted_meanings = []], index) => ({
-      id: `${bookId}:${key}`, book_id: bookId, ...SCHOOL,
+      id: `${bookId}:${key}`, book_id: bookId, ...tags,
       range_code: `L${lesson}`, order: index + 1, word, meaning, part_of_speech,
       ...(accepted_meanings.length ? { accepted_meanings } : {})
     }))
@@ -205,7 +217,7 @@ const lesson2 = [
  ["r112","driving force","원동력, 추진력","n."]
 ];
 
-export const ybmKimHighBooks = [makeBook(1, lesson1), makeBook(2, lesson2)];
+export const ybmKimHighBooks = SCHOOLS.flatMap(place => [makeBook(1, lesson1, place), makeBook(2, lesson2, place)]);
 
 // Removed from the lists on 2026-09-27 (not in the READING DB). Kept only so
 // in-progress practices, old disputes and records can still resolve these ids.
