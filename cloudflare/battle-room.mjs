@@ -108,14 +108,14 @@ export class BattleRoom {
     if (!r?.battle || !pid) return;
     let msg; try { msg = JSON.parse(data); } catch { return; }
     const now = Date.now();
-    let events = [];
-    if (msg.type === 'answer') events = answer(r.battle, pid, Number(msg.choice), now);
-    else if (msg.type === 'skill') events = useSkill(r.battle, pid, String(msg.skill), now);
-    else if (msg.type === 'leave') events = forfeit(r.battle, pid, now);
-    else if (msg.type === 'sync') return this.send(ws, { type: 'view', view: battleView(r.battle, pid) });
-    else if (msg.type === 'ping') return this.send(ws, { type: 'pong' });
-    // Timers may have passed while the room slept; apply them first.
-    events = [...tick(r.battle, now), ...events];
+    if (msg.type === 'sync') return this.send(ws, { type: 'view', view: battleView(r.battle, pid) });
+    if (msg.type === 'ping') return this.send(ws, { type: 'pong' });
+    // Timers may have passed while the room slept: apply them before the player's action,
+    // so a late answer cannot count and events keep their order.
+    const events = tick(r.battle, now);
+    if (msg.type === 'answer') events.push(...answer(r.battle, pid, Number(msg.choice), now));
+    else if (msg.type === 'skill') events.push(...useSkill(r.battle, pid, String(msg.skill), now));
+    else if (msg.type === 'leave') events.push(...forfeit(r.battle, pid, now));
     if (!events.length) return;
     await this.save();
     this.broadcast(events);

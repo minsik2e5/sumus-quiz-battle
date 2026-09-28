@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { emptyState } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
 import { selfSignup } from './signup.mjs';
-import { allBooks, service, sweep, scopedWords, settleBattle } from './service.mjs';
+import { allBooks, service, sweep, scopedWords, settleBattle, tidyBattles } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
 import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, PET_FORM_LEVELS, petForm, levelInfo, grade, displayEnglish, meaningAccepted } from '../public/modules/core.js';
 import { runContentValidation } from './content-validation.mjs';
@@ -52,7 +52,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.54.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.54.1') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -329,6 +329,8 @@ export async function runReleaseCheck() {
     const battleSchool = state.schools.find(s => s.id === petStudent.school_id);
     const battleRange = [...new Set(danwonWords.map(w => String(w.range_code)))].find(code => { try { return scopedWords(state, battleSchool.id, [code], petStudent.class_name).length >= 8; } catch { return false; } });
     assert(battleRange, 'V13.54 release check found a danwon range with enough words for a battle');
+    const baseHost = (await service(state, 'GET', '/bootstrap', {}, studentToken)).stats.points_balance;
+    const baseGuest = (await service(state, 'GET', '/bootstrap', {}, guestToken)).stats.points_balance;
     await expectStatus(400, () => service(state, 'POST', '/battle/rooms', { stake: 20, range_codes: [battleRange] }, studentToken), 'V13.54 battle stakes are 10, 30 or 50 points');
     await expectStatus(400, () => service(state, 'POST', '/battle/rooms', { stake: 30, range_codes: [] }, studentToken), 'V13.54 a battle needs a word range');
     const room = await service(state, 'POST', '/battle/rooms', { stake: 30, range_codes: [battleRange] }, studentToken);
@@ -338,18 +340,23 @@ export async function runReleaseCheck() {
     await expectStatus(409, () => service(state, 'POST', '/battle/join', { code: room.code }, guestToken), 'V13.54 joining needs a first pet');
     await service(state, 'POST', '/pets/choose', { key: 'cat' }, guestToken);
     await expectStatus(404, () => service(state, 'POST', '/battle/join', { code: room.code === '999999' ? '999998' : '999999' }, guestToken), 'V13.54 a wrong room code is rejected');
-    await expectStatus(403, () => service(state, 'POST', '/battle/join', { code: room.code }, middleLogin._cookie), 'V13.54 only the same school and grade can join');
-    const joined = await service(state, 'POST', '/battle/join', { code: room.code }, guestToken);
+    await expectStatus(404, () => service(state, 'POST', '/battle/join', { code: room.code }, middleLogin._cookie), 'V13.54 only the same school and grade can join, and other rooms look missing');
+    await expectStatus(404, () => service(state, 'GET', '/battle/preview', { code: room.code }, middleLogin._cookie), 'V13.54.1 room previews are hidden from other schools and grades');
+    const preview = await service(state, 'GET', '/battle/preview', { code: room.code }, guestToken);
+    assert(preview.stake === 30 && preview.host === petStudent.display_name && !('ticket' in preview), 'V13.54.1 a classmate sees the stake and host before joining');
+    await expectStatus(409, () => service(state, 'POST', '/battle/join', { code: room.code, stake: 10 }, guestToken), 'V13.54.1 joining with a stake the room does not have is refused');
+    const joined = await service(state, 'POST', '/battle/join', { code: room.code, stake: 30 }, guestToken);
     assert(joined.id === room.id && joined.ticket && joined.ticket !== room.ticket && joined._battle?.action === 'join' && joined._battle.guest.id === guestStudent.id && joined._battle.guest.pet?.key === 'cat', 'V13.54 a classmate joins with the code and gets their own ticket');
     const current = await service(state, 'GET', '/battle/current', {}, studentToken);
     assert(current.battle?.id === room.id && current.battle.status === 'active' && current.battle.ticket === room.ticket, 'V13.54 a player can find the open battle again after reloading');
     await expectStatus(409, () => service(state, 'POST', '/shop/egg', {}, guestToken), 'V13.54 the egg shop waits until the battle ends');
-    const beforeHost = (await service(state, 'GET', '/bootstrap', {}, studentToken)).stats.points_balance;
-    const beforeGuest = (await service(state, 'GET', '/bootstrap', {}, guestToken)).stats.points_balance;
+    const heldHost = (await service(state, 'GET', '/bootstrap', {}, studentToken)).stats;
+    const heldGuest = (await service(state, 'GET', '/bootstrap', {}, guestToken)).stats;
+    assert(heldHost.points_balance === baseHost - 30 && heldGuest.points_balance === baseGuest - 30 && heldHost.battle.held === 30, 'V13.54.1 both stakes are held while the match is open');
     assert(settleBattle(state, { id: room.id, winner: petStudent.id, loser: guestStudent.id, reason: 'end', hp: {} }) && !settleBattle(state, { id: room.id, winner: guestStudent.id, reason: 'end' }), 'V13.54 a finished match is settled once');
     const afterHost = await service(state, 'GET', '/bootstrap', {}, studentToken);
     const afterGuest = await service(state, 'GET', '/bootstrap', {}, guestToken);
-    assert(afterHost.stats.points_balance === beforeHost + 30 && afterGuest.stats.points_balance === beforeGuest - 30 && afterHost.stats.battle.wins === 1 && afterGuest.stats.battle.losses === 1, 'V13.54 the winner takes the stake from the loser');
+    assert(afterHost.stats.points_balance === baseHost + 30 && afterGuest.stats.points_balance === baseGuest - 30 && afterHost.stats.battle.held === 0 && afterHost.stats.battle.wins === 1 && afterGuest.stats.battle.losses === 1, 'V13.54 the winner takes the stake from the loser');
     const history = await service(state, 'GET', '/battle/history', {}, guestToken);
     assert(history.battles[0]?.outcome === 'lose' && history.lost_today === 30 && history.record.losses === 1, 'V13.54 battle history shows the result and today\'s losses');
     state.battles.push({ id: 'qa-loss-1', status: 'finished', host_id: guestStudent.id, guest_id: petStudent.id, winner: petStudent.id, loser: guestStudent.id, stake: 50, finished_at: Date.now() }, { id: 'qa-loss-2', status: 'finished', host_id: guestStudent.id, guest_id: petStudent.id, winner: petStudent.id, loser: guestStudent.id, stake: 50, finished_at: Date.now() });
@@ -358,7 +365,13 @@ export async function runReleaseCheck() {
     const cancelled = await service(state, 'POST', `/battle/rooms/${cancelRoom.id}/cancel`, {}, studentToken);
     const afterCancel = await service(state, 'GET', '/battle/current', {}, studentToken);
     assert(cancelled._battle?.action === 'cancel' && afterCancel.battle === null, 'V13.54 a host can cancel a room nobody joined');
-    state.battles = state.battles.filter(b => ![room.id, cancelRoom.id, 'qa-loss-1', 'qa-loss-2'].includes(b.id));
+    const tidyNow = Date.now();
+    state.battles.push(
+      { id: 'qa-stale-wait', code: '000001', status: 'waiting', host_id: petStudent.id, guest_id: null, stake: 10, tickets: { x: 'y' }, range_codes: ['1'], created_at: tidyNow - 11 * 60000 },
+      { id: 'qa-stale-active', code: '000002', status: 'active', host_id: petStudent.id, guest_id: guestStudent.id, stake: 10, tickets: { x: 'y' }, range_codes: ['1'], created_at: tidyNow - 3 * 3600000, joined_at: tidyNow - 3 * 3600000 },
+      { id: 'qa-old-cancel', status: 'cancelled', host_id: petStudent.id, guest_id: null, stake: 10, created_at: tidyNow - 9 * 86400000, finished_at: tidyNow - 8 * 86400000 });
+    assert(tidyBattles(state, tidyNow) && state.battles.find(b => b.id === 'qa-stale-wait').status === 'cancelled' && state.battles.find(b => b.id === 'qa-stale-active').status === 'cancelled' && !state.battles.some(b => b.id === 'qa-old-cancel') && state.battles.every(b => ['waiting', 'active'].includes(b.status) || (!b.tickets && !b.range_codes)), 'V13.54.1 expired rooms close, abandoned matches are called off and finished rows drop tickets');
+    state.battles = state.battles.filter(b => ![room.id, cancelRoom.id, 'qa-loss-1', 'qa-loss-2', 'qa-stale-wait', 'qa-stale-active'].includes(b.id));
     state.sessions = state.sessions.filter(s => !battlePointRecords.includes(s));
 
     const aliasWord = danwonWords[0];
@@ -863,7 +876,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.54.0') && indexHtml.includes('/app.bundle.css?v=13.54.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.54.1') && indexHtml.includes('/app.bundle.css?v=13.54.1') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -884,7 +897,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.54.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.54.1'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');

@@ -116,7 +116,8 @@ export function connect(state, pid, now) {
 
 export function disconnect(state, pid, now) {
   const p = state.players[pid];
-  if (!p || state.phase === 'finished') return [];
+  // A socket can report both an error and a close; only the first starts the grace period.
+  if (!p || !p.connected || state.phase === 'finished') return [];
   p.connected = false; p.dropped_at = now;
   return [event(state, 'presence', { player: pid, connected: false, grace_until: now + BATTLE.RECONNECT_MS })];
 }
@@ -130,7 +131,8 @@ export function forfeit(state, pid, now) {
 
 export function answer(state, pid, choice, now) {
   const p = state.players[pid], turn = state.turn;
-  if (!p || state.phase !== 'question' || !turn || turn.resolved) return [];
+  // Answers after the deadline do not count, even if the room has not woken up yet.
+  if (!p || state.phase !== 'question' || !turn || turn.resolved || now >= state.deadline) return [];
   if (turn.locked[pid]) return [];
   if ((turn.frozen_until[pid] || 0) > now) return [];
   if (!Number.isInteger(choice) || choice < 0 || choice > 3) return [];
@@ -145,7 +147,7 @@ export function answer(state, pid, choice, now) {
 
 export function useSkill(state, pid, skill, now) {
   const p = state.players[pid], rule = BATTLE_SKILLS[skill];
-  if (!p || !rule || !['question', 'reveal'].includes(state.phase) || p.ki < rule.cost) return [];
+  if (!p || !rule || !['question', 'reveal'].includes(state.phase) || now >= state.deadline || p.ki < rule.cost) return [];
   const foe = state.players[other(state, pid)];
   if (skill === 'shield' && p.shield) return [];
   if (skill === 'power' && p.power) return [];
@@ -183,7 +185,9 @@ export function tick(state, now) {
 // When the room should wake up next (word deadline or a dropped player's grace end).
 export function nextWake(state) {
   if (state.phase === 'finished') return null;
-  const times = [state.deadline, ...state.order.map(id => state.players[id].dropped_at === null ? null : state.players[id].dropped_at + BATTLE.RECONNECT_MS)].filter(t => t !== null);
+  // Before the match starts a dropped player only matters to the room's connect deadline.
+  const graceEnds = state.phase === 'waiting' ? [] : state.order.map(id => state.players[id].dropped_at === null ? null : state.players[id].dropped_at + BATTLE.RECONNECT_MS);
+  const times = [state.deadline, ...graceEnds].filter(t => t !== null);
   return times.length ? Math.min(...times) : null;
 }
 

@@ -116,6 +116,21 @@ export function runBattleChecks(assert) {
     assert(cancelled && cancelled.result.winner === null && cancelled.result.reason === 'cancelled', 'leaving before the match starts cancels it without a winner');
   }
   {
+    const { s, t } = started();
+    assert(!answer(s, 'host', correct(s), t + BATTLE.TURN_MS + 300).length && s.players.guest.hp === BATTLE.MAX_HP, 'an answer after the word deadline does not count even before the room wakes up');
+    s.players.host.ki = 2;
+    assert(!useSkill(s, 'host', 'shield', t + BATTLE.TURN_MS + 300).length, 'a skill after the deadline waits for the timers to run first');
+  }
+  {
+    const s = fresh();
+    connect(s, 'host', 1000);
+    disconnect(s, 'host', 2000);
+    assert(nextWake(s) === null, 'a player who drops before the match starts does not keep waking the room');
+    const { s: d, t } = started();
+    disconnect(d, 'guest', t + 100);
+    assert(!disconnect(d, 'guest', t + 5000).length && d.players.guest.dropped_at === t + 100, 'a second disconnect report does not extend the grace period');
+  }
+  {
     const s = fresh();
     connect(s, 'host', 1000); connect(s, 'guest', 1000);
     const late = tick(s, 1000 + BATTLE.COUNTDOWN_MS + 60000);
