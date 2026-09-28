@@ -101,6 +101,7 @@ async function enhanceStudentsPage() {
     if (!button || row.querySelector('[data-extra-last]')) continue;
     const td = document.createElement('td');
     td.dataset.extraLast = '1';
+    td.dataset.label = '최근 활동';
     td.innerHTML = `<span class="sumus-last-activity">${esc(shortActivity(lastActivity(data, button.dataset.student)))}</span>`;
     row.appendChild(td);
   }

@@ -1,0 +1,202 @@
+/* ===================================================================
+   V13.64 — 교사 화면 리디자인 (PC · 태블릿 · 모바일)
+   - 학생 앱과 같은 초록 브랜드, 한 줄로 떨어지는 헤더, 맥락 바, 오늘 현황 카드
+   - 폰: 아래 탭 바, 표 → 카드, 가로로 밀리는 맥락 바
+   모든 규칙은 .teacher-app.tv2 안에서만 적용됩니다(학생 화면 영향 없음).
+   =================================================================== */
+.teacher-app.tv2{--t-bg:#f3f6f5;--t-line:#e3e9e6;--t-text:#16242f;--t-sub:#6f7f7a;--t-green:#12b886;--t-green-deep:#07815f;--t-green-soft:#e9f8f1;--t-card:0 1px 2px rgba(16,40,32,.04),0 8px 24px rgba(16,40,32,.05);background:var(--t-bg);color:var(--t-text)}
+
+/* ---------- sidebar ---------- */
+.teacher-app.tv2 .sidebar{background:#fff;border-right:1px solid var(--t-line);padding:26px 14px 20px}
+.teacher-app.tv2 .sidebar .brand{gap:10px;font-weight:800;letter-spacing:-.01em}
+.teacher-app.tv2 .sidebar .brand span{color:var(--t-green)}
+.teacher-app.tv2 .sidebar .workspace-label{padding-left:42px;margin-bottom:30px;color:#9aa8a3}
+.teacher-app.tv2 .sidebar nav{gap:4px}
+.teacher-app.tv2 .sidebar nav button{position:relative;padding:12px 14px;border-radius:12px;color:#5f6f6a;font-weight:650;font-size:14px;transition:background .15s,color .15s}
+.teacher-app.tv2 .sidebar nav button:hover{background:#f4f8f6;color:var(--t-text)}
+.teacher-app.tv2 .sidebar nav button.active{background:var(--t-green-soft);color:var(--t-green-deep)}
+.teacher-app.tv2 .sidebar nav button.active::before{content:"";position:absolute;left:-14px;top:10px;bottom:10px;width:4px;border-radius:0 4px 4px 0;background:var(--t-green)}
+.teacher-app.tv2 .sidebar footer b{font-size:13px}
+
+/* ---------- main + header ---------- */
+.teacher-app.tv2 .teacher-main{max-width:1360px!important;padding:28px 36px 56px!important;margin:0 auto}
+.teacher-app.tv2 .tv2-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
+.teacher-app.tv2 .tv2-title{min-width:0}
+.teacher-app.tv2 .tv2-title .eyebrow{font-size:12px;font-weight:700;color:var(--t-green-deep);letter-spacing:0;text-transform:none}
+.teacher-app.tv2 .tv2-title h1{margin:4px 0 0;font-size:28px;font-weight:800;letter-spacing:-.03em;line-height:1.2;white-space:nowrap}
+.teacher-app.tv2 .tv2-top-actions{display:flex;align-items:center;gap:8px;flex:none}
+.teacher-app.tv2 .tv2-top-actions .btn{white-space:nowrap}
+.teacher-app.tv2 .tv2-date{font-size:13px;color:var(--t-sub);white-space:nowrap;margin-right:4px}
+.teacher-app.tv2 .icon-button{width:40px;height:40px;border-radius:12px;border:1px solid var(--t-line);background:#fff;display:inline-grid;place-items:center;color:#4c5c57}
+.teacher-app.tv2 .icon-button:hover{border-color:#c9d8d1;background:#f7faf9}
+.teacher-app.tv2 .tv2-mobile-only{display:none}
+.teacher-app.tv2 .btn.primary{background:var(--t-green);border-color:var(--t-green);color:#fff}
+.teacher-app.tv2 .btn.primary:hover{background:var(--t-green-deep)}
+
+/* context bar: division · school · student preview — never wraps words */
+.teacher-app.tv2 .tv2-context{display:flex;align-items:center;gap:10px;padding:8px;margin:0 0 22px;background:#fff;border:1px solid var(--t-line);border-radius:16px;box-shadow:var(--t-card);overflow-x:auto;scrollbar-width:none}
+.teacher-app.tv2 .tv2-context::-webkit-scrollbar{display:none}
+.teacher-app.tv2 .tv2-context>*{flex:none;white-space:nowrap}
+.teacher-app.tv2 .tv2-context .teacher-division-switch{display:inline-flex;padding:3px;border-radius:11px;background:#f0f4f2;border:0;box-shadow:none}
+.teacher-app.tv2 .tv2-context .teacher-division-switch button{min-width:56px;padding:7px 14px;border-radius:9px;font-size:13px;font-weight:700;color:#6f7f7a;background:transparent;border:0}
+.teacher-app.tv2 .tv2-context .teacher-division-switch button.selected{background:#fff;color:var(--t-green-deep);box-shadow:0 1px 3px rgba(16,40,32,.12)}
+.teacher-app.tv2 .tv2-select{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 6px 0 12px;border-radius:11px;background:#f7faf9;border:1px solid transparent}
+.teacher-app.tv2 .tv2-select:focus-within{border-color:var(--t-green);background:#fff}
+.teacher-app.tv2 .tv2-select span{font-size:12px;font-weight:700;color:var(--t-sub)}
+.teacher-app.tv2 .tv2-select select{appearance:auto;border:0;background:transparent;font:inherit;font-size:14px;font-weight:700;color:var(--t-text);padding:6px 4px;min-width:84px;outline:none}
+.teacher-app.tv2 .tv2-context-gap{flex:1 1 auto!important;min-width:8px}
+.teacher-app.tv2 .tv2-preview{height:40px;display:inline-flex;align-items:center;gap:6px;padding:0 14px;border-radius:11px;background:var(--t-green-soft);color:var(--t-green-deep);border:0;font-weight:700}
+.teacher-app.tv2 .tv2-preview .icon{width:17px;height:17px}
+
+/* ---------- today card ---------- */
+.teacher-app.tv2 .tv2-today{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:26px;padding:22px 26px;margin-bottom:22px;border-radius:20px;background:linear-gradient(120deg,#ffffff 0%,#ffffff 55%,#effaf5 100%);border:1px solid var(--t-line);box-shadow:var(--t-card)}
+.teacher-app.tv2 .tv2-ring{--p:0;width:112px;height:112px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--t-green) calc(var(--p) * 1%),#e3eee9 0)}
+.teacher-app.tv2 .tv2-ring>div{width:86px;height:86px;border-radius:50%;background:#fff;display:grid;place-content:center;text-align:center}
+.teacher-app.tv2 .tv2-ring strong{font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.teacher-app.tv2 .tv2-ring strong small{font-size:14px;font-weight:700;color:var(--t-sub);margin-left:1px}
+.teacher-app.tv2 .tv2-ring span{font-size:11px;font-weight:700;color:var(--t-sub);margin-top:4px}
+.teacher-app.tv2 .tv2-kicker{display:inline-block;font-size:12px;font-weight:800;color:var(--t-green-deep);background:var(--t-green-soft);padding:4px 10px;border-radius:999px}
+.teacher-app.tv2 .tv2-today-copy h2{margin:10px 0 6px;font-size:21px;font-weight:800;letter-spacing:-.02em;line-height:1.35}
+.teacher-app.tv2 .tv2-today-copy p{margin:0;font-size:13px;color:var(--t-sub)}
+.teacher-app.tv2 .tv2-today-stats{display:grid;grid-template-columns:repeat(3,minmax(116px,auto));gap:10px}
+.teacher-app.tv2 .tv2-today-stats>div{padding:14px 16px;border-radius:14px;background:#f7faf9;border:1px solid #edf2f0}
+.teacher-app.tv2 .tv2-today-stats span{display:block;font-size:12px;font-weight:700;color:var(--t-sub)}
+.teacher-app.tv2 .tv2-today-stats strong{display:block;margin-top:6px;font-size:24px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.teacher-app.tv2 .tv2-today-stats small{font-size:12px;font-weight:700;color:var(--t-sub);margin-left:3px}
+
+/* ---------- panels & lists ---------- */
+.teacher-app.tv2 .panel{border-radius:18px;border:1px solid var(--t-line);box-shadow:var(--t-card);margin-bottom:18px}
+.teacher-app.tv2 .panel-head{padding:16px 20px;border-bottom:1px solid #edf2f0}
+.teacher-app.tv2 .panel-head h2{font-size:16px;font-weight:800;letter-spacing:-.02em}
+.teacher-app.tv2 .panel-head span{font-size:12px;color:var(--t-sub)}
+.teacher-app.tv2 .v136-dashboard-grid{gap:18px;margin-bottom:0}
+.teacher-app.tv2 .v136-dashboard-grid>.panel{margin-bottom:18px}
+.teacher-app.tv2 .v136-count{font-size:12px;font-weight:800}
+.teacher-app.tv2 .v136-student-chip{border-radius:12px;border:1px solid #e6eeea;background:#fff;transition:border-color .15s,background .15s}
+.teacher-app.tv2 .v136-student-chip:hover{border-color:#bfe3d3;background:#f6fbf9}
+.teacher-app.tv2 .v136-empty-line,.teacher-app.tv2 .v136-clear{margin:14px 20px;padding:14px 16px;border-radius:12px;border:1px dashed #d9e4df;background:#fbfdfc;color:var(--t-sub);font-size:13px}
+.teacher-app.tv2 .v136-passage-grid .v136-empty-line{margin:0}
+.teacher-app.tv2 .toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-bottom:14px}
+.teacher-app.tv2 .toolbar .search{flex:1 1 260px;min-width:0;height:44px;border-radius:12px;border:1px solid var(--t-line);background:#fff}
+.teacher-app.tv2 .toolbar select{height:44px;border-radius:12px;border:1px solid var(--t-line);background:#fff;padding:0 12px;font-weight:600}
+
+/* tables */
+.teacher-app.tv2 table thead th{font-size:12px;font-weight:700;color:var(--t-sub);background:#f9fbfa}
+.teacher-app.tv2 table tbody tr{transition:background .12s}
+.teacher-app.tv2 table tbody tr:hover{background:#f7fbf9}
+.teacher-app.tv2 .pill.green{background:var(--t-green-soft);color:var(--t-green-deep)}
+.teacher-app.tv2 .stat-bar .progress i{background:var(--t-green)}
+.teacher-app.tv2 .tv2-cell-range{max-width:320px;color:#4c5c57;font-size:12.5px;line-height:1.5}
+.teacher-app.tv2 .tv2-score{font-variant-numeric:tabular-nums}
+.teacher-app.tv2 .tv2-score.hi{color:var(--t-green-deep)}
+.teacher-app.tv2 .tv2-score.lo{color:#e0513d}
+.teacher-app.tv2 .tv2-more{display:block;width:calc(100% - 40px);margin:12px 20px 18px;height:44px;border-radius:12px;border:1px dashed #cfe0d8;background:#fbfdfc;color:var(--t-green-deep);font-weight:800;cursor:pointer}
+.teacher-app.tv2 .tv2-more:hover{background:var(--t-green-soft)}
+
+/* bottom tab bar — phones only */
+.teacher-app.tv2 .tv2-bottom-nav{display:none}
+
+/* ---------- tablet ---------- */
+@media (max-width:1180px){
+  .teacher-app.tv2 .teacher-main{padding:22px 24px 48px!important}
+  .teacher-app.tv2 .tv2-date{display:none}
+  .teacher-app.tv2 .tv2-today{grid-template-columns:auto minmax(0,1fr)}
+  .teacher-app.tv2 .tv2-today-stats{grid-column:1 / -1;grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+
+/* ---------- phones ---------- */
+@media (max-width:860px){
+  .teacher-app.tv2{display:block;padding-bottom:calc(76px + env(safe-area-inset-bottom))}
+  .teacher-app.tv2 .sidebar{display:none}
+  .teacher-app.tv2 .teacher-main{padding:16px 14px 24px!important;max-width:none!important}
+  .teacher-app.tv2 .tv2-top{margin-bottom:12px}
+  .teacher-app.tv2 .tv2-title h1{font-size:22px}
+  .teacher-app.tv2 .tv2-top-actions{gap:6px}
+  .teacher-app.tv2 .tv2-top-actions .btn{height:40px;padding:0 12px;font-size:13px}
+  .teacher-app.tv2 .tv2-mobile-only{display:inline-grid}
+  .teacher-app.tv2 .tv2-context{margin:0 -14px 16px;padding:8px 14px;border-radius:0;border-left:0;border-right:0;box-shadow:none;gap:8px}
+  .teacher-app.tv2 .tv2-context-gap{display:none}
+  .teacher-app.tv2 .tv2-select select{min-width:64px}
+  .teacher-app.tv2 .tv2-today{grid-template-columns:auto minmax(0,1fr);gap:16px;padding:18px}
+  .teacher-app.tv2 .tv2-ring{width:92px;height:92px}
+  .teacher-app.tv2 .tv2-ring>div{width:70px;height:70px}
+  .teacher-app.tv2 .tv2-ring strong{font-size:21px}
+  .teacher-app.tv2 .tv2-today-copy h2{font-size:17px;margin-top:8px}
+  .teacher-app.tv2 .tv2-today-stats{gap:8px}
+  .teacher-app.tv2 .tv2-today-stats>div{padding:11px 12px}
+  .teacher-app.tv2 .tv2-today-stats strong{font-size:19px}
+  .teacher-app.tv2 .v136-dashboard-grid{display:block}
+  .teacher-app.tv2 .panel-head{padding:14px 16px}
+  .teacher-app.tv2 .teacher-metrics{grid-template-columns:repeat(2,minmax(0,1fr));row-gap:16px}
+  .teacher-app.tv2 .teacher-metrics>div:nth-child(2){border-right:0}
+
+  /* tables become cards */
+  .teacher-app.tv2 .student-ops-table,.teacher-app.tv2 .tv2-results-table{display:block;min-width:0!important;width:100%}
+  .teacher-app.tv2 .student-ops-table thead,.teacher-app.tv2 .tv2-results-table thead{display:none}
+  .teacher-app.tv2 .student-ops-table tbody,.teacher-app.tv2 .tv2-results-table tbody{display:grid;gap:10px;padding:12px}
+  .teacher-app.tv2 .student-ops-table tr,.teacher-app.tv2 .tv2-results-table tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px;padding:14px;border:1px solid #e6eeea;border-radius:14px;background:#fff}
+  .teacher-app.tv2 .student-ops-table td,.teacher-app.tv2 .tv2-results-table td{display:block;padding:0!important;border:0!important;font-size:13px;min-width:0}
+  .teacher-app.tv2 .student-ops-table td[data-label]::before,.teacher-app.tv2 .tv2-results-table td[data-label]::before{content:attr(data-label);display:block;font-size:11px;font-weight:700;color:var(--t-sub);margin-bottom:2px}
+  .teacher-app.tv2 .tv2-cell-name{grid-column:1 / -1;padding-bottom:6px!important;border-bottom:1px solid #eef3f1!important}
+  .teacher-app.tv2 .tv2-cell-range{grid-column:1 / -1;max-width:none}
+  .teacher-app.tv2 .tv2-cell-action{grid-column:1 / -1}
+  .teacher-app.tv2 .tv2-cell-action .text-button{width:100%;height:40px;border-radius:10px;background:var(--t-green-soft);color:var(--t-green-deep);font-weight:800}
+  .teacher-app.tv2 .table-scroll{overflow:visible}
+
+  .teacher-app.tv2 .tv2-bottom-nav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:40;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-top:1px solid var(--t-line)}
+  .teacher-app.tv2 .tv2-tab{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 2px;border:0;background:transparent;border-radius:12px;color:#7d8c87;font-size:11px;font-weight:700;min-width:0}
+  .teacher-app.tv2 .tv2-tab span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .teacher-app.tv2 .tv2-tab .icon{width:22px;height:22px}
+  .teacher-app.tv2 .tv2-tab.active{color:var(--t-green-deep);background:var(--t-green-soft)}
+  .teacher-app.tv2 .tv2-tab .nav-count{position:absolute;top:2px;right:calc(50% - 22px);min-width:18px;height:18px;font-size:10px}
+}
+@media (max-width:380px){
+  .teacher-app.tv2 .tv2-top-actions .btn span,.teacher-app.tv2 .tv2-top-actions .btn:not(.icon-button){font-size:12px}
+  .teacher-app.tv2 .tv2-today-stats{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion:reduce){.teacher-app.tv2 *{transition:none!important}}
+
+/* brand colour everywhere in the teacher screen (links and secondary buttons were blue) */
+.teacher-app.tv2 .text-button{color:var(--t-green-deep);font-weight:700}
+.teacher-app.tv2 .text-button:hover{color:var(--t-green)}
+.teacher-app.tv2 .btn.secondary{background:var(--t-green-soft);color:var(--t-green-deep);border-color:transparent}
+.teacher-app.tv2 .sidebar .brand img{width:34px;height:34px;border-radius:10px}
+.teacher-app.tv2 .v136-passage-grid .v136-empty-line{grid-column:1 / -1}
+.teacher-app.tv2 .sidebar footer .text-button{color:#7d8c87;font-weight:600}
+
+/* ===================================================================
+   V13.64 — 로그인: PC는 브랜드 패널 + 로그인 카드 2단, 폰은 한 장의 카드
+   =================================================================== */
+.auth-show-v1364{display:none}
+@media (min-width:900px){
+  .auth-v1327.auth-v1364{display:grid!important;grid-template-columns:minmax(0,1.05fr) minmax(420px,.95fr)!important;align-items:stretch!important;justify-content:stretch!important;padding:0!important;min-height:100dvh!important;background:#f5f9f7!important}
+  .auth-v1364 .auth-show-v1364{display:flex;position:relative;overflow:hidden;align-items:center;justify-content:center;padding:56px 7%;background:radial-gradient(120% 90% at 10% 0%,#20c997 0%,#0ca678 45%,#087f5b 100%);color:#fff}
+  .auth-v1364 .auth-show-v1364::before,.auth-v1364 .auth-show-v1364::after{content:"";position:absolute;border-radius:50%;background:rgba(255,255,255,.08)}
+  .auth-v1364 .auth-show-v1364::before{width:520px;height:520px;right:-180px;top:-160px}
+  .auth-v1364 .auth-show-v1364::after{width:380px;height:380px;left:-140px;bottom:-140px}
+  .auth-v1364 .auth-show-in{position:relative;z-index:1;width:min(520px,100%)}
+  .auth-v1364 .auth-show-kicker{display:inline-block;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.16);font-size:12px;font-weight:800;letter-spacing:.04em}
+  .auth-v1364 .auth-show-v1364 h2{margin:18px 0 26px;font-size:40px;line-height:1.22;font-weight:850;letter-spacing:-.04em;color:#fff}
+  .auth-v1364 .auth-show-v1364 ul{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+  .auth-v1364 .auth-show-v1364 li{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:16px;background:rgba(255,255,255,.12);backdrop-filter:blur(4px)}
+  .auth-v1364 .auth-show-v1364 li>span{flex:none;width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:#fff;color:#0ca678}
+  .auth-v1364 .auth-show-v1364 li .icon{width:20px;height:20px}
+  .auth-v1364 .auth-show-v1364 li b{display:block;font-size:16px;font-weight:800}
+  .auth-v1364 .auth-show-v1364 li small{display:block;margin-top:2px;font-size:13px;opacity:.88}
+  .auth-v1364 .auth-show-pets{display:flex;align-items:flex-end;gap:4px;margin-top:30px}
+  .auth-v1364 .auth-show-pets img{width:30%;height:auto;filter:drop-shadow(0 12px 18px rgba(0,40,28,.28))}
+  .auth-v1364 .auth-show-pets img:nth-child(1){width:22%}
+  .auth-v1364 .auth-show-pets img:nth-child(2){width:28%}
+  .auth-v1364 .auth-show-pets img:nth-child(3){width:36%}
+  .auth-v1364 .auth-show-foot{margin:22px 0 0;font-size:13px;font-weight:700;opacity:.75;letter-spacing:.02em}
+  .auth-v1327.auth-v1364 .auth-card-v1327{align-self:center!important;justify-self:center!important;width:min(100% - 64px,440px)!important;margin:40px auto!important;box-shadow:0 24px 60px rgba(16,40,32,.10)!important}
+  .auth-v1364.is-teacher .auth-show-v1364{background:radial-gradient(120% 90% at 10% 0%,#2b3d38 0%,#1d2d28 55%,#13201c 100%)}
+  .auth-v1364.is-teacher .auth-show-v1364 li>span{color:#1d2d28}
+}
+@media (min-width:900px) and (max-width:1100px){
+  .auth-v1364 .auth-show-v1364 h2{font-size:32px}
+  .auth-v1364 .auth-show-v1364{padding:48px 5%}
+}
+@media (max-width:899px){
+  .auth-v1327.auth-v1364 .auth-card-v1327{box-shadow:0 18px 44px rgba(16,40,32,.08)!important}
+}

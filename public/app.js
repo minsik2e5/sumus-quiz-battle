@@ -171,7 +171,13 @@ function loginView(role = A.role, division = A.division) {
   A.role = role; A.division = division;
   const teacher = role === 'teacher';
   const divisionName = division === 'middle' ? '중등부' : '고등부';
-  $('#app').innerHTML = `<div class="auth auth-v1327"><form class="auth-form auth-card-v1327" id="login-form">
+  // V13.64: on wide screens the login sits next to a brand panel (what the app does + the pet
+  // growing up). Phones keep the single card; the panel's images are lazy so phones skip them.
+  const showcase = teacher
+    ? { kicker: 'SUMUS VOCA · 선생님', title: '학생들의 오늘을<br>한눈에 관리해요', items: [['home', '오늘 현황', '누가 학습했고 누가 아직인지 바로 확인'], ['user', '학생 관리', '반별 정답률·취약 단어·최근 활동'], ['ranking', '결과 분석', '연습·실전 기록과 뜻 이의제기 처리']] }
+    : { kicker: 'SUMUS VOCA', title: '매일 20개,<br>펫과 함께 쌓는 영어 실력', items: [['check', '오늘의 추천 학습', '틀린 단어·복습·새 단어를 알맞게 섞어 20개'], ['sparkle', '펫 키우기', '공부할수록 자라고, 진화하고, 컬렉션이 늘어요'], ['flame', '야차전', '친구와 1:1 실시간 단어 대결']] };
+  const showcaseHtml = `<aside class="auth-show-v1364" aria-hidden="true"><div class="auth-show-in"><span class="auth-show-kicker">${showcase.kicker}</span><h2>${showcase.title}</h2><ul>${showcase.items.map(([i, t, d]) => `<li><span>${icon(i)}</span><div><b>${t}</b><small>${d}</small></div></li>`).join('')}</ul><div class="auth-show-pets">${[1, 2, 3].map(f => `<img src="/assets/pets/dog-${f}.webp" alt="" loading="lazy" decoding="async" width="512" height="512">`).join('')}</div><p class="auth-show-foot">Better Words, A Brighter You</p></div></aside>`;
+  $('#app').innerHTML = `<div class="auth auth-v1327 auth-v1364${teacher ? ' is-teacher' : ''}">${showcaseHtml}<form class="auth-form auth-card-v1327" id="login-form">
     <div class="auth-hero-v1330"><span class="auth-motto">Better Words<br>A Brighter You</span><img src="/sumus-logo-green.svg" alt="SUMUS VOCA"><h1>SUMUS <em>VOCA</em></h1><p>매일 쌓이는 나의 영어 성장</p><div class="auth-pet-mini">${avatar("dog")}</div></div>
     ${teacher ? `<button type="button" class="auth-back-student" data-login-student>← 학생 로그인</button><div class="auth-title-v1327"><span>TEACHER</span><h1>선생님 로그인</h1><p>학생 학습과 시험을 관리하는 전용 화면입니다.</p></div>` : `<div class="division-segment auth-division-v1327"><button type="button" data-division="middle" class="${division === 'middle' ? 'selected' : ''}">중등부</button><button type="button" data-division="high" class="${division === 'high' ? 'selected' : ''}">고등부</button></div><div class="auth-title-v1327"><span>STUDENT</span><h1>로그인</h1><p>${divisionName} 계정으로 시작하세요.</p></div>`}
     <div class="auth-fields-v1327"><label class="field"><span>아이디</span><input name="username" autocomplete="username" placeholder="아이디" required maxlength="80" autocapitalize="off"></label><label class="field"><span>비밀번호</span><div class="password-wrap"><input name="password" type="password" autocomplete="current-password" placeholder="비밀번호" required maxlength="128"><button type="button" id="toggle-password" aria-label="비밀번호 보기">보기</button></div></label></div>
@@ -404,6 +410,7 @@ $('#app').addEventListener('click', async event => {
     if (d.exam) return await openExam(d.exam);
     if (d.result) return await openResult(d.result);
     if (d.practiceRecord) return openPracticeRecord(d.practiceRecord);
+    if (d.resultsMore !== undefined) { A.resultsLimit = (Number(A.resultsLimit) || 30) + 30; renderKeepScroll(); return; }
     if (d.reviewPractice) {
       const session = A.data.sessions.find(item => item.id === d.reviewPractice);
       if (!session) return toast('복습할 기록을 찾을 수 없어요.');
@@ -583,10 +590,19 @@ $('#app').addEventListener('change', event => {
   }
   if (input.id === 'vocab-grade') { A.vocabGrade = input.value; $('#vocab-table').innerHTML = vocabTable(A); return; }
   if (input.id === 'class-filter') { A.classFilter = input.value; $('#student-table').innerHTML = studentFiltered(A); }
+  if (input.id === 'results-class') { A.resultsClass = input.value; A.resultsLimit = 30; renderKeepScroll(); }
 });
 function bindPageForms() {
   $('#student-search')?.addEventListener('input', e => { A.search = e.target.value; $('#student-table').innerHTML = studentFiltered(A); });
   $('#vocab-search')?.addEventListener('input', e => { A.vocabSearch = e.target.value; $('#vocab-table').innerHTML = vocabTable(A); });
+  $('#results-search')?.addEventListener('input', e => {
+    A.resultsQuery = e.target.value; A.resultsLimit = 30;
+    clearTimeout(bindPageForms.resultsTimer);
+    bindPageForms.resultsTimer = setTimeout(() => {
+      renderKeepScroll();
+      const box = $('#results-search'); if (box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+    }, 180);
+  });
   const form = $('#exam-form');
   if (form) {
     form.oninput = () => { A.examFormDirty = true; updateExamSummary(A); };

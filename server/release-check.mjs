@@ -65,7 +65,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.63.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.64.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -960,6 +960,30 @@ export async function runReleaseCheck() {
     assert(dailyMidBoot.active_practice_summary?.daily_quest === true && dailyMidBoot.daily_quest.done_today === 8 && dailyMidBoot.daily_quest.goal_today === 20 && dailyMidBoot.daily_quest.completed_today === false, 'V13.63 bootstrap tells the home button how far today\'s recommended study has gone (8/20)');
     dailyInternal.score_total = 0;
     await service(state, 'POST', '/practice/' + dailyPractice.id + '/finish', {}, studentToken);
+    {
+      // V13.64: the teacher bootstrap leaves out per-answer lists; one record loads on demand.
+      const withAnswers = state.sessions.find(s => Array.isArray(s.answer_records) && s.answer_records.length && state.profiles.some(x => x.id === s.student_id && x.role === 'student'));
+      const owner = state.profiles.find(x => x.id === withAnswers.student_id);
+      const teacherProfile = state.profiles.find(x => x.id === 'qa-teacher');
+      const before = { division: teacherProfile.active_division, school: teacherProfile.active_school_id };
+      await service(state, 'PATCH', '/teacher/division', { division: owner.division }, teacherToken);
+      await service(state, 'PATCH', '/teacher/school', { school_id: owner.school_id }, teacherToken).catch(() => {});
+      const slimBoot = await service(state, 'GET', '/bootstrap', {}, teacherToken);
+      assert(slimBoot.sessions.length > 0 && slimBoot.sessions.every(s => s.details_omitted === true && !('answer_records' in s) && !('wrong_details' in s) && !('word_ids' in s) && Number.isFinite(Number(s.score))), 'V13.64 the teacher bootstrap sends record summaries without per-answer lists');
+      const detail = await service(state, 'GET', '/sessions/' + withAnswers.id, {}, teacherToken);
+      assert(detail.id === withAnswers.id && Array.isArray(detail.answer_records) && detail.answer_records.length === withAnswers.answer_records.length, 'V13.64 a teacher loads one record\'s answers on demand');
+      if (owner.id === student.id) {
+        const ownDetail = await service(state, 'GET', '/sessions/' + withAnswers.id, {}, studentToken);
+        assert(ownDetail.id === withAnswers.id, 'V13.64 a student can read their own record');
+      }
+      const fakeStudent = { id: 'qa-session-stranger', role: 'student', username: 'qa_session_stranger', display_name: '남의 기록', class_name: owner.class_name, school_id: owner.school_id, school: owner.school, division: owner.division, active: true, password_hash: await passwordHash('Stranger123!'), created_at: Date.now() };
+      state.profiles.push(fakeStudent);
+      const fakeLogin = await service(state, 'POST', '/login', { username: 'qa_session_stranger', password: 'Stranger123!', role: 'student', division: owner.division }, null);
+      await expectStatus(404, () => service(state, 'GET', '/sessions/' + withAnswers.id, {}, fakeLogin._cookie), 'V13.64 another student cannot read someone else\'s record');
+      state.profiles = state.profiles.filter(x => x.id !== fakeStudent.id);
+      state.tokens = state.tokens.filter(t => t.user_id !== fakeStudent.id);
+      teacherProfile.active_division = before.division; teacherProfile.active_school_id = before.school;
+    }
 
     const movedStudent = await service(state, 'PATCH', `/students/${student.id}`, {
       school_id: 'gangseo-high', class_name: '고1B', active: true
@@ -1031,7 +1055,16 @@ export async function runReleaseCheck() {
     const buildAssetsSource = readFileSync(fileURLToPath(new URL('./build-assets.mjs', import.meta.url)), 'utf8');
     const serverIndexSource = readFileSync(fileURLToPath(new URL('./index.mjs', import.meta.url)), 'utf8');
     assert(manifest.display === 'standalone' && manifest.start_url === '/', 'PWA manifest is installable');
-    assert(teacherModule.includes('TODAY CONTROL') && teacherModule.includes('오늘 확인 필요') && teacherModule.includes('많이 틀린 어법 포인트'), 'V13.6 teacher operations dashboard is present');
+    assert(teacherModule.includes('tv2-today') && teacherModule.includes('오늘 확인 필요') && teacherModule.includes('많이 틀린 어법 포인트'), 'V13.6 teacher operations dashboard is present');
+    {
+      const css1364 = readFileSync(publicRoot + 'v1364.css', 'utf8');
+      const appLogin = readFileSync(publicRoot + 'app.js', 'utf8');
+      assert(teacherModule.includes('class="tv2-top"') && teacherModule.includes('class="tv2-context"') && teacherModule.includes('id="teacher-school"') && teacherModule.includes('id="preview-grade"') && teacherModule.includes('data-teacher-division="middle"') && teacherModule.includes('data-action="student-preview"') && !teacherModule.includes('TODAY CONTROL'), 'V13.64 teacher header: one-line title and actions, a separate context bar keeping every control id');
+      assert(teacherModule.includes('tv2-bottom-nav') && css1364.includes('.teacher-app.tv2 .tv2-bottom-nav{display:grid') && css1364.includes('@media (max-width:860px)') && css1364.includes('content:attr(data-label)') && teacherModule.includes('data-label="정답률"'), 'V13.64 phones get a bottom tab bar and tables become labelled cards');
+      assert(teacherModule.includes('id="results-search"') && teacherModule.includes('id="results-class"') && teacherModule.includes('data-results-more') && appLogin.includes("input.id === 'results-class'") && appLogin.includes('d.resultsMore !== undefined'), 'V13.64 results can be filtered by name and class and load 30 rows at a time');
+      assert(appLogin.includes('auth-show-v1364') && appLogin.includes('loading="lazy"') && css1364.includes('.auth-show-v1364{display:none}') && css1364.includes('@media (min-width:900px)'), 'V13.64 wide screens show a brand panel next to the login card; phones skip its images');
+      assert(css1364.includes('--t-green:#12b886') && css1364.includes('.teacher-app.tv2 .text-button{color:var(--t-green-deep)'), 'V13.64 the teacher screen uses the green brand colour');
+    }
     assert(teacherModule.includes('grammar_progress') && teacherModule.includes('학생이 보낸 실전 결과'), 'teacher dashboard combines grammar progress with student-shared self-test results');
     assert(bundleCss.includes('.v136-dashboard-grid') && !indexHtml.includes('teacher-dashboard.js'), 'dashboard styles are bundled and stale missing module is removed');
     assert(dashboardCss.includes('.v136-dashboard-grid') && dashboardCss.includes('@media(max-width:760px)'), 'teacher dashboard has responsive styles');
@@ -1060,7 +1093,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.63.0') && indexHtml.includes('/app.bundle.css?v=13.63.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.64.0') && indexHtml.includes('/app.bundle.css?v=13.64.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1081,7 +1114,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.63.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.64.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
