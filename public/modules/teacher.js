@@ -8,7 +8,9 @@ const GRAMMAR_LOADERS = {
   '단원고': () => Promise.all([import('../danwongo-textbook-grammar-data.js'), import('../danwongo-grammar-data.js')])
     .then(([textbook, mock]) => [...(textbook.DANWONGO_TEXTBOOK_PASSAGES || []), ...(mock.DANWONGO_PASSAGES || [])]),
   '선부고': () => import('../seonbu-grammar-data.js').then(mod => [...(mod.SEONBU_2026_PASSAGES || []), ...(mod.SEONBU_2025_PASSAGES || [])]),
-  '강서고': () => import('../gangseo-grammar-data.js').then(mod => mod.GANGSEO_PASSAGES || [])
+  // 강서고 shares 단원고's textbook (YBM Kim), so its textbook passages come first.
+  '강서고': () => Promise.all([import('../danwongo-textbook-grammar-data.js'), import('../gangseo-grammar-data.js')])
+    .then(([textbook, mod]) => [...(textbook.DANWONGO_TEXTBOOK_PASSAGES || []), ...(mod.GANGSEO_PASSAGES || [])])
 };
 // Mock-exam passages are numbered ("24" -> "24번"); textbook ones already read "1과 · 본문 1".
 const passageNumberLabel = passage => /과/.test(String(passage.number)) ? String(passage.number) : `${passage.number}번`;

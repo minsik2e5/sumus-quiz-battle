@@ -84,7 +84,19 @@ export async function runReleaseCheck() {
       assert(displayEnglish(charged.word) === 'be charged with' && grade('write_en', 'be charged with', charged), 'grammar note (+동명사) is not part of the expected English answer');
     }
     const gangseoWords = bySchool('강서고');
-    assert(gangseoWords.length === 354, '강서고 vocabulary = 354');
+    assert(gangseoWords.length === 354 + 180, '강서고 vocabulary = 354 mock-exam words + 180 YBM textbook words (same textbook as 단원고)');
+    {
+      const danwonYbm = bySchool('단원고').filter(word => word.id.startsWith('high:ybm-kim:common2:'));
+      const gangseoYbm = gangseoWords.filter(word => word.id.startsWith('high:ybm-kim:gangseo:common2:'));
+      assert(gangseoYbm.length === 180 && gangseoYbm.every((word, i) => word.word === danwonYbm[i].word && word.meaning === danwonYbm[i].meaning && word.range_code === danwonYbm[i].range_code && word.school_id === 'gangseo-high'), 'V13.56.1 강서고 gets the same textbook words as 단원고 (its own ids, 단원고 ids unchanged)');
+      assert(runtimeBooks.filter(book => book.id.startsWith('high:ybm-kim:')).every(book => !book.grade), 'V13.56.1 the textbook class split (고1A/고1B) is switched off for now');
+      const probe = { extraBooks: [], schools: [{ id: 'gangseo-high', name: '강서고', full_name: '강서고등학교', division: 'high' }] };
+      assert(scopedWords(probe, 'gangseo-high', ['L1'], '고1B').length === 68 && scopedWords(probe, 'gangseo-high', ['L2'], '고1A').length === 112, 'V13.56.1 강서고 고1A/고1B students can practice textbook lessons 1-2');
+      const appSource = readFileSync(fileURLToPath(new URL('../public/app.js', import.meta.url)), 'utf8');
+      const teacherSource = readFileSync(fileURLToPath(new URL('../public/modules/teacher.js', import.meta.url)), 'utf8');
+      const gangseoLoader = appSource.slice(appSource.indexOf("school === '강서고'"), appSource.indexOf("school === '강서고'") + 400);
+      assert(gangseoLoader.includes('danwongo-textbook-grammar-data.js') && teacherSource.slice(teacherSource.indexOf("'강서고':")).slice(0, 300).includes('danwongo-textbook-grammar-data.js'), 'V13.56.1 강서고 students and teachers load the textbook grammar sets');
+    }
     assert(bySchool('단원고').some(word => word.id.startsWith('high:ybm-kim:common2:lesson1:')), 'YBM Kim lesson 1 vocabulary is loaded');
     assert(bySchool('단원고').some(word => word.id.startsWith('high:ybm-kim:common2:lesson2:')), 'YBM Kim lesson 2 vocabulary is loaded');
     assert(studentUiSource.includes("['eng2mean','뜻 4지선다'") && studentUiSource.includes("['mean2eng','영어 4지선다'"), 'middle/high self-test exposes both four-choice modes');

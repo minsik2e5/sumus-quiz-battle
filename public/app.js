@@ -87,8 +87,11 @@ async function ensureGrammarData() {
     const current = mod.SEONBU_2026_PASSAGES || [], old = mod.SEONBU_2025_PASSAGES || [];
     data = { passages: [...current, ...old], current, old };
   } else if (school === '강서고') {
-    const mod = await import('./gangseo-grammar-data.js');
-    data = { passages: mod.GANGSEO_PASSAGES || [] };
+    // 강서고 uses the same textbook as 단원고: textbook lessons first, then its own mock exam.
+    const [mod, textbook] = await Promise.all([import('./gangseo-grammar-data.js'), import('./danwongo-textbook-grammar-data.js')]);
+    const textbookPassages = textbook.DANWONGO_TEXTBOOK_PASSAGES || [];
+    const mockPassages = mod.GANGSEO_PASSAGES || [];
+    data = { passages: [...textbookPassages, ...mockPassages], textbook: textbookPassages, byLesson: textbook.DANWONGO_TEXTBOOK_BY_LESSON || {}, mock: mockPassages };
   }
   A.grammarDataKey = key;
   A.grammarData = data;
