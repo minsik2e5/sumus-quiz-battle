@@ -2,7 +2,7 @@ import { $, $$, api, esc, icon, toast, modal, buttonBusy, date, num, rangeLabel 
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm } from './modules/core.js';
 import { avatar } from './modules/character.js';
 import { studentPage, getRanges, updateRangeSummary } from './modules/student.js';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded } from './modules/teacher.js';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
 import { maybePetMoment, openPetNameModal, openEggShop, petJosa } from './modules/pet-moments.js';
 import { mountYacha } from './modules/battle.js';
@@ -287,10 +287,27 @@ function startTournamentPolling() {
   tournamentPoll = setInterval(async () => {
     if (!A.data || A.screen || A.tab !== 'tournaments' || document.visibilityState !== 'visible' || $('#modal-root').children.length) return;
     if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
-    if (!(A.data.tournaments || []).some(t => t.status === 'active')) return;
-    try { await refresh(); renderKeepScroll(); } catch {}
+    const active = (A.data.tournaments || []).filter(t => t.status === 'active');
+    if (!active.length) return;
+    // V13.71: fetch only the live tournaments and redraw only a bracket that changed (the whole
+    // teacher bootstrap and page were reloaded every 8 seconds before).
+    try {
+      let moved = false;
+      for (const t of active) {
+        const { tournament } = await api(`/teacher/tournaments/${encodeURIComponent(t.id)}`);
+        if (!tournament || JSON.stringify(tournament) === JSON.stringify(t)) continue;
+        const list = A.data.tournaments, i = list.findIndex(item => item.id === t.id);
+        if (i >= 0) list[i] = tournament;
+        if (tournament.status !== 'active') { moved = true; continue; }
+        const panel = document.getElementById(`tn-${t.id}`);
+        if (panel) panel.outerHTML = tournamentPanel(tournament); else moved = true;
+      }
+      if (moved) renderKeepScroll();
+    } catch {}
   }, 8000);
 }
+// V13.71: remember whether 지난 대회 is open, so a redraw does not snap it shut.
+document.addEventListener('toggle', event => { if (event.target?.classList?.contains('tn-past')) A.tnPastOpen = event.target.open; }, true);
 function startPolling() {
   startInvitePolling();
   startTournamentPolling();
@@ -333,7 +350,12 @@ $('#app').addEventListener('click', async event => {
   if (b.closest('#yacha-host')) return;
   const d = b.dataset; if (!Object.keys(d).length) return; event.preventDefault();
   try {
-    if (d.go) { if (d.go === 'ranking') A.rankFrom = d.from || 'home'; return navigate(d.go); }
+    if (d.go) {
+      if (d.go === 'ranking') A.rankFrom = d.from || 'home';
+      // V13.71: the 나 tile shows the grade's weekly rank, so open the ranking on that view.
+      if (d.go === 'ranking' && d.rankGrade) { A.rankScope = d.rankGrade; A.rankPeriod = 'week'; A.rankMode = 'xp'; savePreferences(); }
+      return navigate(d.go);
+    }
     if (d.action === 'student-preview' && A.data.profile.role === 'teacher') {
       const grade = $('#preview-grade')?.value || (A.data.profile.active_division === 'middle' ? '중3' : '고1A');
       await api('/teacher/student-preview', { school_id: A.data.profile.active_school_id, grade });
@@ -538,6 +560,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'tournament-bracket') return bracketModal(d.tournament);
     if (d.action === 'tournament-new') return tournamentCreateModal();
     if (d.action === 'tournament-tv') return openTournamentTv(d.id);
+    if (d.action === 'tournament-tv-link') return tournamentTvLink(d.id);
     if (d.action === 'tournament-cancel') return cancelTournament(d.id, b);
     if (d.tnDecide) return decideTournamentMatch(d.tnDecide, d.match, d.winner, d.name, b);
     if (d.action === 'battle-accept' && A.data.battle_invite) { const invite = A.data.battle_invite; A.data.battle_invite = null; A.yachaOpts = { accept: invite }; return navigate('yacha'); }
@@ -1013,6 +1036,20 @@ function bracketModal(id) {
   const t = (A.data.tournaments || []).find(item => item.id === id) || null;
   return openBracket(id, A.data.profile.id, t);
 }
+// V13.71 teacher: a link for the classroom TV that shows only this bracket, without logging the
+// TV in as the teacher (leaving it never lands on the teacher dashboard).
+async function tournamentTvLink(id) {
+  try {
+    const { token } = await api(`/teacher/tournaments/${encodeURIComponent(id)}/tv`, {});
+    const url = `${location.origin}/?tv=${encodeURIComponent(token)}`;
+    modal(`<h2>교실 TV 링크</h2><p>TV나 교실 컴퓨터의 브라우저에서 이 주소를 열면 <b>로그인 없이 이 대회 대진표만</b> 보여요.</p><ul class="tv-link-notes"><li>대회가 끝나고 하루 뒤 자동으로 만료돼요.</li><li>새 링크를 만들면 이전 링크는 바로 막혀요.</li></ul><div class="tv-link-box"><input id="tv-link" readonly value="${esc(url)}" aria-label="TV 링크"><button type="button" class="btn primary" id="tv-link-copy">복사</button></div>`, 'TV 링크');
+    $('#tv-link').onfocus = e => e.target.select();
+    $('#tv-link-copy').onclick = async () => {
+      try { await navigator.clipboard.writeText(url); toast('링크를 복사했어요. TV 브라우저 주소창에 붙여 넣으세요.'); }
+      catch { $('#tv-link').select(); toast('주소를 길게 눌러 복사해 주세요.'); }
+    };
+  } catch (err) { toast(err.message); }
+}
 // V13.69 teacher: the bracket on the classroom TV, full screen and refreshing by itself.
 function openTournamentTv(id) {
   A.screen = 'bracket-tv';
@@ -1093,6 +1130,12 @@ async function cancelTournament(id, button) {
   try { await api(`/teacher/tournaments/${encodeURIComponent(id)}/cancel`, {}); await refresh(); renderKeepScroll(); toast('대회를 취소했어요.'); }
   catch (err) { toast(err.message); buttonBusy(button, false); }
 }
+// V13.71: a classroom TV opened with a TV link shows only that bracket, with no login.
+const tvToken = new URLSearchParams(location.search).get('tv');
+if (tvToken) {
+  A.screen = 'bracket-tv';
+  openBracketTv(A, null, () => location.replace('/'), { token: tvToken });
+} else {
 loginView();
 try {
   // Ask for the data directly: a 401 means "not logged in", so a separate
@@ -1107,4 +1150,5 @@ try {
   if (e.status !== 401) {
     $('#login-error').textContent = '서버 응답이 느립니다. 잠시 후 다시 로그인해주세요.';
   }
+}
 }

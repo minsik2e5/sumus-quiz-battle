@@ -11,10 +11,11 @@ const POLL_MS = 5000;
 let TV = null;
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-export function openBracketTv(A, id, exit) {
+// V13.71: `token` opens the bracket from a TV link (no login on the classroom TV).
+export function openBracketTv(A, id, exit, { token = null } = {}) {
   closeTv();
   const root = document.getElementById('app');
-  TV = { A, id, exit, t: null, seen: null, timer: null, scale: 1, toastTimer: null };
+  TV = { A, id, exit, token, t: null, seen: null, timer: null, scale: 1, toastTimer: null };
   root.innerHTML = `<div class="btv" id="btv">
     <header class="btv-top">
       <div class="btv-title"><small>SUMUS 학원 야차 대회</small><h1 id="btv-name">대진표를 불러오고 있어요…</h1><p id="btv-meta"></p></div>
@@ -63,7 +64,7 @@ async function load() {
   const cur = TV;
   if (!cur || document.visibilityState === 'hidden' && cur.t) return;
   try {
-    const { tournament } = await api(`/teacher/tournaments/${encodeURIComponent(cur.id)}`);
+    const { tournament } = await api(cur.token ? `/tv/bracket?token=${encodeURIComponent(cur.token)}` : `/teacher/tournaments/${encodeURIComponent(cur.id)}`);
     if (TV !== cur) return;
     const before = cur.seen, now = new Map();
     for (const round of tournament.rounds) for (const m of round.matches) now.set(m.id, m.winner || null);
@@ -73,6 +74,8 @@ async function load() {
     draw(fresh.map(x => x.m.id));
     if (crowned) celebrate(tournament);
     else if (fresh.length) announce(fresh.at(-1), tournament);
+    // V13.71: a finished (or cancelled) tournament does not change any more; stop asking.
+    if (tournament.status !== 'active') { clearInterval(cur.timer); cur.timer = null; }
   } catch (err) {
     const name = document.getElementById('btv-name');
     if (name && !cur.t) name.textContent = err.message || '대진표를 불러오지 못했어요.';

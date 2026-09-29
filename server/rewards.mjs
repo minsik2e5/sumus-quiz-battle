@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { dayKey } from '../public/modules/core.js';
+import { dayKey, ACCESSORIES } from '../public/modules/core.js';
 import {
   ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, drawLucky,
   BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS
@@ -42,6 +42,48 @@ export function attendanceCoins(p, window = null) {
   return (a.log || []).filter(x => x.at >= window.start && x.at < window.end).reduce((n, x) => n + Number(x.coins || 0), 0);
 }
 
+/* ---------- V13.71 profile logs stay small (profiles are backed up as one part) ---------- */
+// Attendance coins count toward this week's and last week's rankings, so 15 days is enough;
+// the coin capsule shows its last six pulls. The old capsule and double-chance logs are unused.
+const ATTENDANCE_LOG_DAYS = 15;
+const LUCKY_LOG_KEEP = 6;
+function trimAttendanceLog(log, now) {
+  const cut = now - ATTENDANCE_LOG_DAYS * DAY_MS;
+  return log.filter(x => Number(x?.at || 0) >= cut);
+}
+export function tidyProfileLogs(state, now = Date.now()) {
+  let changed = false;
+  for (const p of state.profiles || []) {
+    const a = p.attendance;
+    if (Array.isArray(a?.log)) { const next = trimAttendanceLog(a.log, now); if (next.length !== a.log.length) { a.log = next; changed = true; } }
+    const l = p.lucky;
+    if (Array.isArray(l?.log) && l.log.length > LUCKY_LOG_KEEP) { l.log = l.log.slice(-LUCKY_LOG_KEEP); changed = true; }
+    if (p.gacha && 'log' in p.gacha) { delete p.gacha.log; changed = true; }
+    if (p.chance && 'log' in p.chance) { delete p.chance.log; changed = true; }
+    if (refundRemovedBadges(p)) changed = true;
+  }
+  return changed;
+}
+// V13.68 removed the capsule badges but kept them on students (worn ones broke saving a new
+// look) and never paid them back. Each badge kind a student owned is paid back once at the
+// capsule price (duplicates already paid their part back), and a worn badge goes back to
+// '기본'. The badge entries are removed, so this cannot pay twice.
+export const BADGE_REFUND = 60;
+export function refundRemovedBadges(p) {
+  let changed = false;
+  const g = p.gacha;
+  const badges = Object.keys(g?.items || {}).filter(key => key.startsWith('badge_') && Number(g.items[key]) > 0);
+  if (badges.length) {
+    const coins = BADGE_REFUND * badges.length;
+    g.refund = Number(g.refund || 0) + coins;
+    g.badge_refund = Number(g.badge_refund || 0) + coins;
+    for (const key of badges) delete g.items[key];
+    changed = true;
+  }
+  if (typeof p.avatar_accessory === 'string' && !ACCESSORIES[p.avatar_accessory]) { p.avatar_accessory = 'none'; changed = true; }
+  return changed;
+}
+
 /* ---------- attendance ---------- */
 export function attendanceView(p, now = Date.now()) {
   const a = p.attendance || {}, today = dayKey(now), done = a.last === today;
@@ -66,7 +108,7 @@ export function checkIn(p, now = Date.now()) {
   a.total = Number(a.total || 0) + 1;
   a.coins = Number(a.coins || 0) + coins;
   a.last = today;
-  a.log = [...(a.log || []), { at: now, coins }].slice(-40);
+  a.log = trimAttendanceLog([...(a.log || []), { at: now, coins }], now);
   let tickets = 0;
   if (stamp >= ATTENDANCE_REWARDS.length) {
     a.card = 0;
@@ -114,7 +156,7 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
   const odd = drawLucky(random);
   const paid = bet * odd.mult;
   l.paid = Number(l.paid || 0) + paid;
-  l.log = [...(l.log || []), { at: now, bet, mult: odd.mult, ticket }].slice(-20);
+  l.log = [...(l.log || []), { at: now, bet, mult: odd.mult, ticket }].slice(-LUCKY_LOG_KEEP);
   return { bet, mult: odd.mult, name: odd.name, paid, ticket, lucky: luckyView(p, now) };
 }
 

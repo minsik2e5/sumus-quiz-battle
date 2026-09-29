@@ -4,7 +4,7 @@ import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, 
 import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
 import { battleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
-import { rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, botStart, botFinish, botView, examReward } from './rewards.mjs';
+import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, botStart, botFinish, botView, examReward } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
@@ -543,7 +543,9 @@ function coinsCollected(state, ctx, pid, window = null) {
 }
 function rankingRows(state, ctx, p) {
   const period = ctx.week;
-  return state.profiles.filter(x => x.active && x.role === 'student').map(s => {
+  // V13.71: the same students the weekly titles are given to (teacher preview accounts are left
+  // out, so the 1st place shown is the one who gets 주간 챔피언); a preview still sees itself.
+  return state.profiles.filter(x => isRankedStudent(x) || x.id === p.id).map(s => {
     const records = ctx.sessionsOf(s.id);
     const weekly = records.filter(r => r.created_at >= period.start && r.created_at < period.end);
     const g = growthFor(records), isMe = s.id === p.id;
@@ -742,6 +744,7 @@ export function sweep(state, now = Date.now()) {
   if (compactOldSessions(state, now)) changed = true;
   if (autoResolveMeaningDisputes(state) > 0) changed = true;
   if (tidyBattles(state)) changed = true;
+  if (tidyProfileLogs(state, now)) changed = true;
   const tokens = state.tokens.filter(t => t.expires_at > Date.now());
   if (tokens.length !== state.tokens.length) { state.tokens = tokens; changed = true; }
   return changed;
@@ -765,6 +768,16 @@ export async function service(state, method, path, body, token, options = {}) {
   if (method === 'GET' && MUTATING_WITHOUT_METHOD_CHECK.test(path)) fail('요청 방식을 확인해주세요.', 405);
   if (path === '/health') return { ok: true, version: APP_VERSION, schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
+  // V13.71 교실 TV link: a bracket-only view for the classroom screen, opened with a random link
+  // the teacher makes (no teacher login on the shared TV). It lasts until a day after the
+  // tournament ends; making a new link ends the old one.
+  if (path === '/tv/bracket' && method === 'GET') {
+    const raw = str(body.token, 80);
+    const t = raw.length >= 24 ? (state.tournaments || []).find(x => x.tv_hash && x.tv_hash === hashToken(raw)) : null;
+    const now = Date.now();
+    if (!t || t.status === 'cancelled' || (t.status !== 'active' && now - Number(t.finished_at || 0) > DAY_MS)) fail('TV 링크가 만료됐어요. 선생님께 새 링크를 받아 주세요.', 404);
+    return { tournament: tournamentView(state, createCompetition(state), t, { role: 'tv', id: null }, now) };
+  }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
     const username = str(body.username).toLowerCase();
@@ -987,6 +1000,9 @@ export async function service(state, method, path, body, token, options = {}) {
   }
   if (path === '/profile/style' && method === 'POST') {
     const growth = stats(state, p);
+    // V13.71: an accessory that no longer exists (the removed capsule badges) falls back to '기본'
+    // instead of blocking every later change of look.
+    if (!ACCESSORIES[body.avatar_accessory]) body.avatar_accessory = 'none';
     const titleOk = TITLES[body.avatar_title] && titleUnlocked(body.avatar_title, createCompetition(state).titleStats(p));
     if (!CHARACTERS[body.avatar_key] || !unlocked(ACCESSORIES[body.avatar_accessory], growth) || !unlocked(FRAMES[body.avatar_frame], growth) || !titleOk) fail('아직 열리지 않은 보상입니다.');
     if (p.pets?.length && !p.pets.some(x => x.key === body.avatar_key)) fail('아직 만나지 못한 펫이에요.', 403);
@@ -1246,6 +1262,16 @@ export async function service(state, method, path, body, token, options = {}) {
     const t = (state.tournaments || []).find(x => x.id === tournamentOne[1] && p.school_ids?.includes(x.school_id));
     if (!t) fail('대회를 찾지 못했어요.', 404);
     return { tournament: tournamentView(state, createCompetition(state), t, p, Date.now()), server_time: Date.now() };
+  }
+  const tournamentTv = path.match(/^\/teacher\/tournaments\/([^/]+)\/tv$/);
+  if (tournamentTv && method === 'POST') {
+    requireRole(p, 'teacher');
+    const t = (state.tournaments || []).find(x => x.id === tournamentTv[1] && p.school_ids?.includes(x.school_id));
+    if (!t || t.status === 'cancelled') fail('대회를 찾지 못했어요.', 404);
+    const token = randomBytes(24).toString('base64url');
+    t.tv_hash = hashToken(token);
+    t.tv_at = Date.now();
+    return { token };
   }
   const tournamentRoute = path.match(/^\/teacher\/tournaments\/([^/]+)\/(winner|cancel)$/);
   if (tournamentRoute && method === 'POST') {

@@ -143,6 +143,17 @@ export async function runCompetitionChecks(assert, expectStatus) {
   assert(created.tournament?.id === t.id && t.status === 'active' && t.rounds.map(r => r.length).join() === '4,2,1' && created.tournament.rounds.map(r => r.label).join() === '8강,4강,결승' && t.players[0] === 'qa-cc-a', 'V13.66 a teacher opens a tournament; seeding by league points puts the league leader first');
   assert(t.rounds[0].filter(m => m.by === 'bye' && m.winner).length === 3 && t.rounds[1].every(m => m.a || m.b), 'V13.66 byes are decided at once and move the players on');
   await expectStatus(409, () => service(state, 'POST', '/teacher/tournaments', { class_name: '고1', student_ids: ['qa-cc-a', 'qa-cc-b'], range_codes: range }, teacher), 'V13.66 a student plays one tournament at a time');
+  {
+    // V13.71 교실 TV link: bracket only, no login; a new link ends the old one; teachers only.
+    await expectStatus(403, () => service(state, 'POST', `/teacher/tournaments/${t.id}/tv`, {}, tokens['qa-cc-a']), 'V13.71 only teachers make a TV link');
+    const { token: first } = await service(state, 'POST', `/teacher/tournaments/${t.id}/tv`, {}, teacher);
+    const tv = await service(state, 'GET', '/tv/bracket', { token: first }, null);
+    assert(tv.tournament?.id === t.id && tv.tournament.rounds.length === 3 && tv.tournament.me === null && !JSON.stringify(tv).includes('tv_hash') && !JSON.stringify(created).includes('tv_hash'), 'V13.71 a TV link shows the bracket without a login and without student-only fields');
+    const { token: second } = await service(state, 'POST', `/teacher/tournaments/${t.id}/tv`, {}, teacher);
+    await expectStatus(404, () => service(state, 'GET', '/tv/bracket', { token: first }, null), 'V13.71 making a new TV link ends the old one');
+    await expectStatus(404, () => service(state, 'GET', '/tv/bracket', { token: 'x'.repeat(32) }, null), 'V13.71 a made-up TV link shows nothing');
+    assert((await service(state, 'GET', '/tv/bracket', { token: second }, null)).tournament.id === t.id, 'V13.71 the newest TV link works');
+  }
   const played = t.rounds[0].find(m => m.a && m.b);
   const [p1, p2] = [played.a, played.b];
   const boot1Tn = await service(state, 'GET', '/bootstrap', {}, tokens[p1]);

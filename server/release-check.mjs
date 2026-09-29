@@ -67,7 +67,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.70.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.71.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -1109,7 +1109,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.70.0') && indexHtml.includes('/app.bundle.css?v=13.70.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.71.0') && indexHtml.includes('/app.bundle.css?v=13.71.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1130,7 +1130,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.70.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.71.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -1183,6 +1183,17 @@ export async function runReleaseCheck() {
         assert(!growth.includes('home-trio-v1358') && !growth.includes('home-metrics-v1358') && !studentModule.includes('recentRecordCard') && !growth.includes('home-next-v1358') && growth.includes('${resumeBar(A)}') && growth.includes('${rankingCard(A)}') && growth.includes('home-week-v1358') && growth.includes('today_xp'), 'V13.68 the home shows the card, what is waiting, attendance, the week\'s ranking and the week (no study recommendation)');
         assert(tabs.includes("['home', '홈', 'home'], ['practice', '학습', 'practice'], ['yacha', '야차전', 'battle'], ['arcade', '놀이터', 'arcade'], ['me', '나', 'user']") && tabs.includes("exam: 'practice', records: 'practice', ranking: 'home'") && studentModule.includes('function studyTabs(') && !studentModule.includes('battleTab'), 'V13.68 the bottom menu is home, study (with tests and records), yacha, arcade, me');
         assert(growth.includes('${yachaAlerts(A)}') && !growth.includes('yachaBanner') && studentModule.includes('function yachaPage(') && battleUiSource.includes('export function mountYacha(') && battleUiSource.includes('function goFull('), 'V13.68 yacha is a tab (the lobby inside the app, matches full screen); the home only shows challenges and tournament matches');
+        {
+          const css1371 = readFileSync(fileURLToPath(new URL('../public/v1371.css', import.meta.url)), 'utf8');
+          const teacherUi = readFileSync(fileURLToPath(new URL('../public/modules/teacher.js', import.meta.url)), 'utf8');
+          const tvUi = readFileSync(fileURLToPath(new URL('../public/modules/bracket-tv.js', import.meta.url)), 'utf8');
+          const study = studentModule.slice(studentModule.indexOf('function studyDailyCard('), studentModule.indexOf('// V13.68 야차전 tab'));
+          assert(study.includes('data-quick-practice="true"') && study.includes('daily.completed_today') && study.includes('homeProgress(done, goal') && /<h1>학습<\/h1><\/div>\s*\$\{studyDailyCard\(A\)\}/.test(studentModule) && css1371.includes('.study-daily-v1371'), 'V13.71 오늘의 추천 학습 can be started again from the top of 학습 (with its progress bar); the home stays without it');
+          assert(appSource.includes('/teacher/tournaments/${encodeURIComponent(t.id)}') && appSource.includes('panel.outerHTML = tournamentPanel(tournament)') && !/tournamentPoll = setInterval\([\s\S]{0,400}await refresh\(\)/.test(appSource) && teacherUi.includes('id="tn-${esc(t.id)}"') && teacherUi.includes("A.tnPastOpen ? 'open' : ''") && appSource.includes("classList?.contains('tn-past')"), 'V13.71 a live tournament refreshes only its bracket (not the whole teacher page) and 지난 대회 stays open');
+          assert(teacherUi.includes('data-action="tournament-tv-link"') && appSource.includes('function tournamentTvLink(') && appSource.includes("new URLSearchParams(location.search).get('tv')") && tvUi.includes('/tv/bracket?token=') && tvUi.includes("if (tournament.status !== 'active') { clearInterval(cur.timer)"), 'V13.71 the classroom TV opens a bracket-only link without the teacher login and stops refreshing once the tournament ends');
+          assert(battleUiSource.includes('data-yb-retry') && battleUiSource.includes('if (B?.embedded) {'), 'V13.71 a yacha tab that fails to load shows a retry button instead of reopening in a loop');
+          assert(studentModule.includes('data-rank-grade=') && appSource.includes("if (d.go === 'ranking' && d.rankGrade) { A.rankScope = d.rankGrade;"), 'V13.71 the 나 ranking tile says it is the grade rank and opens that view');
+        }
         const css1360 = readFileSync(fileURLToPath(new URL('../public/v1360.css', import.meta.url)), 'utf8');
         assert(growth.includes('home-stack-v1360') && css1360.includes('.home-stack-v1360{display:flex;flex-direction:column;gap:16px}') && css1360.includes('env(safe-area-inset-bottom'), 'V13.60 home sections are spaced and the last one clears the bottom menu and home bar');
         const battleUi = readFileSync(fileURLToPath(new URL('../public/modules/battle.js', import.meta.url)), 'utf8');
