@@ -1,6 +1,9 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
-import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, ACCESSORIES, FRAMES, TITLES, EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, ACCESSORIES, FRAMES, EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
+import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
+import { DAY_MS, rankingWeek, gradeOf, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
+import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
 import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { middleGrade3Books } from './middle-vocab.mjs';
@@ -351,42 +354,17 @@ export function scopedWords(state, schoolRef, ranges, grade = null) {
   return words.filter(w => ranges.map(String).includes(w.range_code));
 }
 function mySessions(state, student) { return state.sessions.filter(s => s.student_id === student); }
-const DAY_MS = 86400000;
-const KST_OFFSET_MS = 9 * 3600000;
-const KO_WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토'];
-function shortKstDate(ts) {
-  const d = new Date(ts + KST_OFFSET_MS);
-  return `${d.getUTCMonth() + 1}/${d.getUTCDate()}(${KO_WEEKDAYS[d.getUTCDay()]})`;
-}
-function rankingWeek(now = Date.now()) {
-  const local = new Date(now + KST_OFFSET_MS);
-  const daysSinceMonday = (local.getUTCDay() + 6) % 7;
-  const start = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() - daysSinceMonday) - KST_OFFSET_MS;
-  const end = start + 7 * DAY_MS;
-  const thursday = new Date(start + KST_OFFSET_MS + 3 * DAY_MS);
-  const year = thursday.getUTCFullYear();
-  const monthIndex = thursday.getUTCMonth();
-  const month = monthIndex + 1;
-  const firstOfMonth = new Date(Date.UTC(year, monthIndex, 1));
-  const firstThursday = 1 + ((4 - firstOfMonth.getUTCDay() + 7) % 7);
-  const week = 1 + Math.floor((thursday.getUTCDate() - firstThursday) / 7);
-  return {
-    start, end, year, month, week,
-    key: `${year}-${String(month).padStart(2, '0')}-W${week}`,
-    label: `${year}년 ${month}월 ${week}주차`,
-    range: `${shortKstDate(start)} ~ ${shortKstDate(end - 1)}`
-  };
-}
-// Reward points are earned per finished practice, spent in the shop, and won or lost in
-// yacha battles; pets grow separately.
+// Coins (코인, stored as reward points) are earned per finished practice and as tournament
+// prizes, spent in the shop, and won or lost in yacha battles; pets grow separately with 경험치.
 function pointsAndPets(state, p, sessions) {
   const earned = sessions.reduce((n, s) => n + Number(s.reward_points || 0), 0);
   const spent = Number(p.points_spent || 0);
   const battle = battleRecord(state, p.id);
+  const prizes = tournamentPrizes(state, p.id);
   const pets = petProgress(p.pets, sessions, p.avatar_key);
   // Stakes of matches that have not been settled yet are held back, so a late result can
   // never be absorbed by a balance that was spent in the meantime.
-  return { reward_points: earned, points_spent: spent, points_balance: Math.max(0, earned - spent + battle.net - battle.held), battle, pets, pet: pets.find(x => x.active) || null, needs_pet_pick: p.role === 'student' && !pets.length };
+  return { reward_points: earned, points_spent: spent, prize_points: prizes, points_balance: Math.max(0, earned + prizes - spent + battle.net - battle.held), battle, pets, pet: pets.find(x => x.active) || null, needs_pet_pick: p.role === 'student' && !pets.length };
 }
 
 // Yacha battles: 1:1 word duels between students of the same school and grade. The
@@ -402,27 +380,13 @@ const BATTLE_QUESTIONS = 40;
 const BATTLE_REMATCH_WINDOW_MS = 2 * 60000; // a rematch can be asked for this long after a match
 const BATTLE_REMATCH_PER_PAIR_DAY = 2;       // so a loss does not turn into chasing it all day
 const BATTLE_CHALLENGE_PER_PAIR_DAY = 5;     // challenges one student may send the same friend per day
-const gradeOf = className => String(className || '').match(/^(중[1-3]|고[1-3])/)?.[1] || String(className || '');
 const battleIsOpen = (b, now) => (b.status === 'waiting' && now - b.created_at < BATTLE_WAIT_MS) || (b.status === 'active' && now - (b.joined_at || b.created_at) < BATTLE_STALE_MS);
 const openBattleFor = (state, pid, now) => (state.battles || []).find(b => (b.host_id === pid || b.guest_id === pid) && battleIsOpen(b, now));
-// Win streak: consecutive wins until a loss or draw. Within one streak, wins over the same
-// friend on the same day count once, so two friends cannot trade wins to build titles.
-function battleStreaks(rows, pid) {
-  let current = 0, best = 0, counted = new Set();
-  for (const b of [...rows].sort((x, y) => x.finished_at - y.finished_at)) {
-    if (b.winner !== pid) { current = 0; counted = new Set(); continue; }
-    const key = `${b.host_id === pid ? b.guest_id : b.host_id}:${dayKey(b.finished_at)}`;
-    if (counted.has(key)) continue;
-    counted.add(key);
-    best = Math.max(best, ++current);
-  }
-  return { streak: current, best_streak: best };
-}
 function battleRecord(state, pid) {
   const rows = (state.battles || []).filter(b => b.status === 'finished' && (b.host_id === pid || b.guest_id === pid));
   const wins = rows.filter(b => b.winner === pid), losses = rows.filter(b => b.loser === pid);
   const held = (state.battles || []).filter(b => b.status === 'active' && (b.host_id === pid || b.guest_id === pid)).reduce((n, b) => n + b.stake, 0);
-  return { wins: wins.length, losses: losses.length, draws: rows.length - wins.length - losses.length, net: wins.reduce((n, b) => n + b.stake, 0) - losses.reduce((n, b) => n + b.stake, 0), held, ...battleStreaks(rows, pid) };
+  return { wins: wins.length, losses: losses.length, draws: rows.length - wins.length - losses.length, win_rate: rows.length ? Math.round(wins.length / rows.length * 100) : null, net: wins.reduce((n, b) => n + b.stake, 0) - losses.reduce((n, b) => n + b.stake, 0), held, ...battleStreaks(rows, pid) };
 }
 // Closes rooms nobody joined, calls off matches that never reported, drops tickets and
 // ranges once a battle is over, and forgets old cancelled rooms (the state is uploaded
@@ -450,16 +414,17 @@ function findJoinableBattle(state, p, code, now) {
   return battle;
 }
 const battleLossToday = (state, pid, now) => (state.battles || []).filter(b => b.status === 'finished' && b.loser === pid && dayKey(b.finished_at) === dayKey(now)).reduce((n, b) => n + b.stake, 0);
-function battlePlayer(state, p) {
+// What the room shows about a player: pet, win streak, and (V13.66) title and league tier.
+function battlePlayer(state, p, ctx = createCompetition(state)) {
   const pet = pointsAndPets(state, p, mySessions(state, p.id)).pet;
-  return { id: p.id, name: p.display_name, pet: pet ? { key: pet.key, form: pet.form, name: pet.name || '' } : null, streak: battleRecord(state, p.id).streak };
+  return { id: p.id, name: p.display_name, pet: pet ? { key: pet.key, form: pet.form, name: pet.name || '' } : null, streak: battleRecord(state, p.id).streak, title: ctx.displayTitle(p), tier: ctx.league(p.id).tier.key };
 }
 function checkBattleEntry(state, p, stake, now) {
   if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
   if (openBattleFor(state, p.id, now)) fail('이미 진행 중인 대결이 있어요.', 409);
   const balance = pointsAndPets(state, p, mySessions(state, p.id)).points_balance;
-  if (balance < stake) fail(`판돈 ${stake}P가 필요해요. 지금 ${balance}P가 있어요.`);
-  if (battleLossToday(state, p.id, now) + stake > BATTLE_DAILY_LOSS_CAP) fail(`대결로 하루에 잃을 수 있는 포인트는 ${BATTLE_DAILY_LOSS_CAP}P까지예요. 내일 다시 도전해요.`);
+  if (balance < stake) fail(`판돈 ${stake}코인이 필요해요. 지금 ${balance}코인이 있어요.`);
+  if (battleLossToday(state, p.id, now) + stake > BATTLE_DAILY_LOSS_CAP) fail(`대결로 하루에 잃을 수 있는 코인은 ${BATTLE_DAILY_LOSS_CAP}코인까지예요. 내일 다시 도전해요.`);
 }
 const battleTicket = () => randomBytes(18).toString('hex');
 // Builds the questions and opens a waiting room (a new one, or a rematch with `extra`).
@@ -478,23 +443,25 @@ function openBattleRoom(state, p, school, stake, rangeCodes, now, extra = {}) {
   const battle = { id: randomUUID(), code, status: 'waiting', school_id: school.id, division: school.division, grade: gradeOf(p.class_name), host_id: p.id, guest_id: null, stake, range_codes: rangeCodes, tickets: { [p.id]: battleTicket() }, created_at: now, ...extra };
   state.battles.push(battle);
   return { id: battle.id, code, stake, status: 'waiting', ticket: battle.tickets[p.id], expires_at: now + BATTLE_WAIT_MS,
-    _battle: { action: 'init', id: battle.id, stake, host: battlePlayer(state, p), questions, tickets: battle.tickets, expires_at: now + BATTLE_WAIT_MS } };
+    _battle: { action: 'init', id: battle.id, stake, label: extra.label || null, host: battlePlayer(state, p), questions, tickets: battle.tickets, expires_at: now + BATTLE_WAIT_MS } };
 }
 
 // V13.61 challenges: a room for one named friend of the same school and grade. The friend
 // sees it on the home screen (bootstrap + a light poll) and accepts or declines it there.
 function battleFriends(state, p, now) {
   const school = schoolForProfile(state, p), grade = gradeOf(p.class_name);
+  const ctx = createCompetition(state, now);
   return state.profiles
     .filter(x => x.id !== p.id && x.role === 'student' && x.active !== false && x.pets?.length && schoolForProfile(state, x)?.id === school?.id && gradeOf(x.class_name) === grade)
-    .map(x => { const pet = pointsAndPets(state, x, mySessions(state, x.id)).pet; return { id: x.id, name: x.display_name, class_name: x.class_name || '', same_class: x.class_name === p.class_name, pet: pet ? { key: pet.key, form: pet.form } : null, busy: !!openBattleFor(state, x.id, now) }; })
+    .map(x => { const pet = pointsAndPets(state, x, mySessions(state, x.id)).pet; return { id: x.id, name: x.display_name, class_name: x.class_name || '', same_class: x.class_name === p.class_name, pet: pet ? { key: pet.key, form: pet.form } : null, title: ctx.displayTitle(x), tier: ctx.league(x.id).tier.key, busy: !!openBattleFor(state, x.id, now) }; })
     .sort((a, b) => Number(b.same_class) - Number(a.same_class) || a.name.localeCompare(b.name, 'ko'));
 }
 function battleInviteFor(state, p, now) {
   const b = (state.battles || []).filter(x => x.challenge && x.invite_id === p.id && x.status === 'waiting' && battleIsOpen(x, now)).sort((x, y) => y.created_at - x.created_at)[0];
   if (!b) return null;
   const host = state.profiles.find(x => x.id === b.host_id);
-  return { id: b.id, code: b.code, stake: b.stake, host: host?.display_name || '', expires_at: b.created_at + BATTLE_WAIT_MS };
+  const t = b.tournament_id ? (state.tournaments || []).find(x => x.id === b.tournament_id) : null;
+  return { id: b.id, code: b.code, stake: b.stake, host: host?.display_name || '', expires_at: b.created_at + BATTLE_WAIT_MS, ...(t ? { tournament: { id: t.id, name: t.name, round: b.label || '' } } : {}) };
 }
 
 // Called by the battle room (never by a browser) when a match ends. Idempotent.
@@ -505,7 +472,16 @@ export function settleBattle(state, result) {
   if (result.reason === 'cancelled' || !b.guest_id) { b.status = 'cancelled'; b.finished_at = Date.now(); return true; }
   const winner = players.includes(result.winner) ? result.winner : null;
   Object.assign(b, { status: 'finished', winner, loser: winner ? players.find(id => id !== winner) : null, reason: String(result.reason || 'end').slice(0, 20), hp: result.hp || {}, finished_at: Date.now() });
+  if (b.tournament_id) settleTournamentMatch(state, b);
   return true;
+}
+// V13.66: a finished tournament room decides its match; a draw is played again.
+function settleTournamentMatch(state, b) {
+  const t = (state.tournaments || []).find(x => x.id === b.tournament_id);
+  const found = t?.status === 'active' ? findMatch(t, b.match_id) : null;
+  if (!found || found.match.winner) return;
+  if (b.winner && [found.match.a, found.match.b].includes(b.winner)) decideMatch(t, found.match.id, b.winner, 'match', b.finished_at);
+  else { found.match.draws = Number(found.match.draws || 0) + 1; delete found.match.battle_id; }
 }
 function activePetKey(state, studentId) {
   const p = state.profiles.find(x => x.id === studentId);
@@ -530,6 +506,91 @@ function stats(state, p, sessions = mySessions(state, p.id)) {
     practice_count: sessions.length,
     accuracy: total ? Math.round(correct / total * 100) : 0,
     weak: Object.values(state.mastery[p.id] || {}).filter(m => m.wrong > 0 && m.mastery < 80).length
+  };
+}
+
+// V13.66 coins collected in a period (study rewards + stakes won + tournament prizes). Spending
+// and lost stakes are not taken off, so buying an egg never drops a student in the ranking.
+function coinsCollected(state, ctx, pid, window = null) {
+  const inside = at => !window || (at >= window.start && at < window.end);
+  const study = ctx.sessionsOf(pid).filter(s => inside(s.created_at)).reduce((n, s) => n + Number(s.reward_points || 0), 0);
+  const won = ctx.battlesOf(pid).filter(b => b.winner === pid && inside(b.finished_at)).reduce((n, b) => n + Number(b.stake || 0), 0);
+  return study + won + tournamentPrizes(state, pid, window);
+}
+function rankingRows(state, ctx, p) {
+  const period = ctx.week;
+  return state.profiles.filter(x => x.active && x.role === 'student').map(s => {
+    const records = ctx.sessionsOf(s.id);
+    const weekly = records.filter(r => r.created_at >= period.start && r.created_at < period.end);
+    const g = growthFor(records), isMe = s.id === p.id;
+    const hidden = !isMe && isPrivate(s);
+    const grade = rankGrade(s);
+    const pet = hidden ? null : petProgress(s.pets, records, s.avatar_key).find(x => x.active);
+    return {
+      id: hidden ? null : s.id, is_me: isMe, private: hidden, grade,
+      division: s.division || (grade.startsWith('중') ? 'middle' : 'high'),
+      display_name: hidden ? '비공개 학생' : s.display_name,
+      avatar_key: hidden ? 'lumi' : (s.avatar_key || 'lumi'),
+      pet_name: pet?.name || '', pet_form: pet ? pet.form : 1,
+      title: hidden ? null : ctx.displayTitle(s),
+      level: hidden ? 1 : g.level, streak: g.streak,
+      xp: weekly.reduce((n, r) => n + Number(r.xp || 0), 0),
+      total: weekly.reduce((n, r) => n + Number(r.total || 0), 0),
+      coins: coinsCollected(state, ctx, s.id, period),
+      all_xp: records.reduce((n, r) => n + Number(r.xp || 0), 0),
+      all_total: records.reduce((n, r) => n + Number(r.total || 0), 0),
+      all_coins: coinsCollected(state, ctx, s.id),
+      all_streak: g.streak
+    };
+  });
+}
+// The title collection of the signed-in student. `fresh`: titles unlocked since the student
+// last looked (a limited title is new again each week it is won); `intro`: the student has not
+// seen the V13.66 collection yet, so the app shows one summary instead of a pop-up per title.
+const titleSeenKey = (ctx, key) => TITLES[key]?.tier === 'limited' ? `${key}@${ctx.lastWeek.key}` : key;
+function titleView(ctx, p) {
+  const stats = ctx.titleStats(p);
+  const unlocked = TITLE_KEYS.filter(key => titleUnlocked(key, stats));
+  const seen = Array.isArray(p.titles_seen) ? p.titles_seen : null;
+  return {
+    equipped: ctx.displayTitle(p), unlocked, stats,
+    fresh: seen ? unlocked.filter(key => key !== 'rookie' && !seen.includes(titleSeenKey(ctx, key))) : [],
+    intro: !seen,
+    week_end: ctx.week.end
+  };
+}
+function leagueView(ctx, p) {
+  const table = leagueStandings(ctx, p, 'week');
+  const mine = table.find(row => row.is_me);
+  const lg = ctx.league(p.id);
+  return { points: lg.points, wins: lg.wins, losses: lg.losses, draws: lg.draws, played: lg.played, win_rate: lg.win_rate, tier: lg.tier, rank: mine?.rank ?? null, size: table.length, week_end: ctx.week.end, week_label: ctx.week.label };
+}
+function petSummary(ctx, profile) {
+  if (!profile) return null;
+  const pet = petProgress(profile.pets || [], ctx.sessionsOf(profile.id), profile.avatar_key).find(x => x.active);
+  return pet ? { key: pet.key, form: pet.form } : null;
+}
+// V13.66 tournament as the app draws it: the bracket with names, which matches are being
+// played, and for a student their own next match.
+function tournamentView(state, ctx, t, viewer, now = Date.now()) {
+  const person = id => { const x = id ? ctx.profiles.get(id) : null; return x ? { id: x.id, name: x.display_name, class_name: x.class_name || '' } : (id ? { id, name: '(탈퇴한 학생)', class_name: '' } : null); };
+  const open = new Map((state.battles || []).filter(b => b.tournament_id === t.id && battleIsOpen(b, now)).map(b => [b.match_id, b]));
+  const mine = viewer.role === 'student' ? playerMatch(t, viewer.id) : null;
+  let match = null;
+  if (mine) {
+    const oppId = mine.match.a === viewer.id ? mine.match.b : mine.match.a;
+    const opp = oppId ? ctx.profiles.get(oppId) : null;
+    const room = open.get(mine.match.id);
+    match = { id: mine.match.id, round: mine.label, ready: mine.ready, draws: Number(mine.match.draws || 0),
+      opponent: opp ? { id: opp.id, name: opp.display_name, title: ctx.displayTitle(opp), pet: petSummary(ctx, opp) } : null,
+      room: room ? { host: room.host_id === viewer.id, status: room.status } : null };
+  }
+  return {
+    id: t.id, name: t.name, status: t.status, grade: t.grade, class_name: t.class_name || null, prize: Number(t.prize || 0),
+    created_at: t.created_at, finished_at: t.finished_at || null, players: t.players.length,
+    champion: person(t.champion), runner_up: person(t.runner_up),
+    rounds: t.rounds.map(round => ({ label: roundLabel(round.length), matches: round.map(m => ({ id: m.id, a: person(m.a), b: person(m.b), winner: m.winner || null, by: m.by || null, draws: Number(m.draws || 0), live: open.get(m.id)?.status || null })) })),
+    me: viewer.role === 'student' ? { match, out: eliminatedIn(t, viewer.id), champion: t.champion === viewer.id } : null
   };
 }
 function attemptView(a, state, profile) {
@@ -684,7 +745,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } else if (process.env.AUTH_PROVIDER === 'supabase') {
       const result = await supabaseLogin(username, password); p = result.profile; supabaseAccessToken = result.accessToken;
       const old = state.profiles.find(x => x.id === p.id);
-      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'pets', 'points_spent', 'purchases'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
+      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
       else state.profiles.push(p);
     } else {
       p = localProfile;
@@ -727,6 +788,8 @@ export async function service(state, method, path, body, token, options = {}) {
     const selectedSchool = teacher ? activeTeacherSchool(state, p) : studentSchool;
     if (!selectedSchool) fail('학교 설정을 확인해주세요.', 409);
     if (selectedSchool.division !== selectedDivision) fail('중등부/고등부 학교 설정을 확인해주세요.', 409);
+    const now = Date.now();
+    const competition = createCompetition(state, now);
     const visibleExams = state.exams.filter(e => e.division === selectedDivision && (teacher ? sameSchool(e, selectedSchool) : (examTargetMatches(e, p) && sameSchool(e, studentSchool) && e.active)));
     const visibleExamIds = new Set(visibleExams.map(e => e.id));
     const studentProfiles = state.profiles.filter(x => x.role === 'student' && x.division === selectedDivision && (!teacher || sameSchool(x, selectedSchool)));
@@ -775,34 +838,11 @@ export async function service(state, method, path, body, token, options = {}) {
       active_practice: activePractice?.id || null,
       active_practice_summary: activePracticeSummary,
       ranking_period: rankingWeek(Date.now()),
-      ranking: teacher ? [] : (() => {
-        // Group once instead of scanning every session per student (O(students × sessions)).
-        const byStudent = new Map();
-        for (const session of state.sessions) {
-          if (!byStudent.has(session.student_id)) byStudent.set(session.student_id, []);
-          byStudent.get(session.student_id).push(session);
-        }
-        return state.profiles.filter(x => x.active && x.role === 'student').map(s => ({ s, records: byStudent.get(s.id) || [] }));
-      })().map(({ s, records }) => {
-        const period = rankingWeek(Date.now());
-        const weekly = records.filter(r => r.created_at >= period.start && r.created_at < period.end);
-        const g = growthFor(records), isMe = s.id === p.id;
-        const hidden = !isMe && (s.ranking_public === false || s.share_profile === false);
-        const grade = /^중2/.test(s.class_name || '') ? '중2' : /^중3/.test(s.class_name || '') ? '중3' : /^고1/.test(s.class_name || '') ? '고1' : (s.division === 'middle' ? '중등' : '고등');
-        return {
-          id: hidden ? null : s.id, is_me: isMe, private: hidden, grade,
-          division: s.division || (grade.startsWith('중') ? 'middle' : 'high'),
-          display_name: hidden ? '비공개 학생' : s.display_name,
-          avatar_key: hidden ? 'lumi' : (s.avatar_key || 'lumi'),
-          ...(() => { const pet = hidden ? null : petProgress(s.pets, records, s.avatar_key).find(x => x.active); return { pet_name: pet?.name || '', pet_form: pet ? pet.form : 1 }; })(),
-          level: hidden ? 1 : g.level, streak: g.streak,
-          xp: weekly.reduce((n, r) => n + Number(r.xp || 0), 0),
-          total: weekly.reduce((n, r) => n + Number(r.total || 0), 0),
-          all_xp: records.reduce((n, r) => n + Number(r.xp || 0), 0),
-          all_total: records.reduce((n, r) => n + Number(r.total || 0), 0),
-          all_streak: g.streak
-        };
-      })
+      ranking: teacher ? [] : rankingRows(state, competition, p),
+      titles: teacher ? null : titleView(competition, p),
+      league: teacher ? null : leagueView(competition, p),
+      tournaments: (state.tournaments || []).filter(t => teacher ? t.school_id === selectedSchool?.id && (t.status !== 'cancelled' || now - (t.finished_at || t.created_at) < DAY_MS) : t.players.includes(p.id) && (t.status === 'active' || (t.status === 'finished' && now - (t.finished_at || 0) < 3 * DAY_MS)))
+        .sort((a, b) => b.created_at - a.created_at).slice(0, 12).map(t => tournamentView(state, competition, t, p, now))
     };
   }
   if (path === '/teacher/student-preview' && method === 'POST') {
@@ -911,10 +951,32 @@ export async function service(state, method, path, body, token, options = {}) {
   }
   if (path === '/profile/style' && method === 'POST') {
     const growth = stats(state, p);
-    if (!CHARACTERS[body.avatar_key] || !unlocked(ACCESSORIES[body.avatar_accessory], growth) || !unlocked(FRAMES[body.avatar_frame], growth) || !unlocked(TITLES[body.avatar_title], growth)) fail('아직 열리지 않은 보상입니다.');
+    const titleOk = TITLES[body.avatar_title] && titleUnlocked(body.avatar_title, createCompetition(state).titleStats(p));
+    if (!CHARACTERS[body.avatar_key] || !unlocked(ACCESSORIES[body.avatar_accessory], growth) || !unlocked(FRAMES[body.avatar_frame], growth) || !titleOk) fail('아직 열리지 않은 보상입니다.');
     if (p.pets?.length && !p.pets.some(x => x.key === body.avatar_key)) fail('아직 만나지 못한 펫이에요.', 403);
     Object.assign(p, { avatar_key: body.avatar_key, avatar_accessory: body.avatar_accessory, avatar_frame: body.avatar_frame, avatar_title: body.avatar_title });
     return publicProfile(p);
+  }
+  // V13.66 titles: equip one from the collection, and remember which new ones were shown.
+  if (path === '/profile/title' && method === 'POST') {
+    requireRole(p, 'student');
+    const key = str(body.key, 40);
+    if (!TITLES[key]) fail('칭호를 확인해주세요.');
+    if (!titleUnlocked(key, createCompetition(state).titleStats(p))) fail('아직 얻지 못한 칭호예요.', 403);
+    p.avatar_title = key;
+    return { equipped: key };
+  }
+  if (path === '/titles/seen' && method === 'POST') {
+    requireRole(p, 'student');
+    const ctx = createCompetition(state);
+    const stats = ctx.titleStats(p);
+    const keys = (Array.isArray(body.keys) ? body.keys : []).map(key => str(key, 40)).filter(key => TITLES[key] && titleUnlocked(key, stats));
+    // Every title held now counts as seen once the collection has been introduced. Limited
+    // titles are remembered per week; older weeks are dropped.
+    const all = body.all === true ? TITLE_KEYS.filter(key => titleUnlocked(key, stats)) : keys;
+    const kept = (Array.isArray(p.titles_seen) ? p.titles_seen : []).filter(entry => typeof entry === 'string' && (!entry.includes('@') || entry.endsWith('@' + ctx.lastWeek.key)));
+    p.titles_seen = [...new Set([...kept, ...all.map(key => titleSeenKey(ctx, key))])].slice(0, 120);
+    return { ok: true, seen: p.titles_seen.length };
   }
   // Pets: the first one is chosen once for free; others come from random eggs in the shop.
   if (path === '/pets/choose' && method === 'POST') {
@@ -938,7 +1000,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!missing.length) fail('모든 펫을 모았어요!', 409);
     if (openBattleFor(state, p.id, Date.now())) fail('대결이 끝난 뒤에 알을 살 수 있어요.', 409);
     const balance = pointsAndPets(state, p, mySessions(state, p.id)).points_balance;
-    if (balance < EGG_PRICE) fail(`포인트가 ${EGG_PRICE - balance}P 부족해요.`);
+    if (balance < EGG_PRICE) fail(`코인이 ${EGG_PRICE - balance}개 부족해요.`);
     const key = missing[randomBytes(4).readUInt32BE(0) % missing.length];
     const now = Date.now();
     p.pets.push({ key, acquired_at: now });
@@ -1018,7 +1080,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const friend = battleFriends(state, p, now).find(x => x.id === str(body.friend_id, 64));
     if (!friend) fail('같은 학교·학년 친구에게만 도전장을 보낼 수 있어요.', 404);
     if (friend.busy) fail(`${friend.name}이(가) 지금 다른 대결 중이에요. 조금 뒤에 다시 보내요.`, 409);
-    const sent = (state.battles || []).filter(b => b.challenge && b.host_id === p.id && b.invite_id === friend.id && dayKey(b.created_at) === dayKey(now)).length;
+    const sent = (state.battles || []).filter(b => b.challenge && !b.tournament_id && b.host_id === p.id && b.invite_id === friend.id && dayKey(b.created_at) === dayKey(now)).length;
     if (sent >= BATTLE_CHALLENGE_PER_PAIR_DAY) fail(`같은 친구에게는 하루 ${BATTLE_CHALLENGE_PER_PAIR_DAY}번까지 도전장을 보낼 수 있어요.`, 409);
     const school = schoolForProfile(state, p);
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
@@ -1070,15 +1132,109 @@ export async function service(state, method, path, body, token, options = {}) {
     const battle = openBattleFor(state, p.id, Date.now());
     if (!battle) return { battle: null };
     const opponentId = battle.host_id === p.id ? battle.guest_id : battle.host_id;
-    return { battle: { id: battle.id, code: battle.code, status: battle.status, stake: battle.stake, host: battle.host_id === p.id, rematch: !!battle.rematch_of, challenge: !!battle.challenge, friend: battle.challenge ? state.profiles.find(x => x.id === battle.invite_id)?.display_name || '' : undefined, ticket: battle.tickets[p.id], opponent: state.profiles.find(x => x.id === opponentId)?.display_name || null, expires_at: battle.status === 'waiting' ? battle.created_at + BATTLE_WAIT_MS : null } };
+    return { battle: { id: battle.id, code: battle.code, status: battle.status, stake: battle.stake, host: battle.host_id === p.id, rematch: !!battle.rematch_of, challenge: !!battle.challenge, tournament: battle.tournament_id ? battle.label || '대회' : undefined, friend: battle.challenge ? state.profiles.find(x => x.id === battle.invite_id)?.display_name || '' : undefined, ticket: battle.tickets[p.id], opponent: state.profiles.find(x => x.id === opponentId)?.display_name || null, expires_at: battle.status === 'waiting' ? battle.created_at + BATTLE_WAIT_MS : null } };
   }
   if (path === '/battle/history' && method === 'GET') {
     requireRole(p, 'student');
     const rows = (state.battles || []).filter(b => b.status === 'finished' && (b.host_id === p.id || b.guest_id === p.id)).sort((a, b) => b.finished_at - a.finished_at).slice(0, 20);
-    return { record: battleRecord(state, p.id), points_balance: pointsAndPets(state, p, mySessions(state, p.id)).points_balance, stakes: BATTLE_STAKES, daily_loss_cap: BATTLE_DAILY_LOSS_CAP, lost_today: battleLossToday(state, p.id, Date.now()), battles: rows.map(b => {
+    const ctx = createCompetition(state);
+    return { record: battleRecord(state, p.id), league: leagueView(ctx, p), points_balance: pointsAndPets(state, p, mySessions(state, p.id)).points_balance, stakes: BATTLE_STAKES, daily_loss_cap: BATTLE_DAILY_LOSS_CAP, lost_today: battleLossToday(state, p.id, Date.now()), battles: rows.map(b => {
       const opponentId = b.host_id === p.id ? b.guest_id : b.host_id;
-      return { id: b.id, finished_at: b.finished_at, stake: b.stake, outcome: b.winner === p.id ? 'win' : b.loser === p.id ? 'lose' : 'draw', reason: b.reason, opponent: state.profiles.find(x => x.id === opponentId)?.display_name || '' };
+      return { id: b.id, finished_at: b.finished_at, stake: b.stake, outcome: b.winner === p.id ? 'win' : b.loser === p.id ? 'lose' : 'draw', reason: b.reason, tournament: b.tournament_id ? b.label || '대회' : undefined, hp: Number.isFinite(Number(b.hp?.[p.id])) ? Number(b.hp[p.id]) : undefined, opponent: state.profiles.find(x => x.id === opponentId)?.display_name || '' };
     }) };
+  }
+  // V13.66 weekly yacha league (this week) or the all-time record of the student's school + grade.
+  if (path === '/battle/league' && method === 'GET') {
+    requireRole(p, 'student');
+    const period = body.period === 'all' ? 'all' : 'week';
+    const ctx = createCompetition(state);
+    return { period, week: { label: ctx.week.label, range: ctx.week.range, end: ctx.week.end }, rows: leagueStandings(ctx, p, period), me: leagueView(ctx, p) };
+  }
+  // V13.66 academy tournaments (학원 대회): the teacher opens a bracket for one grade.
+  if (path === '/teacher/tournaments' && method === 'POST') {
+    requireRole(p, 'teacher');
+    const school = activeTeacherSchool(state, p);
+    if (!school) fail('관리 학교를 확인해주세요.', 409);
+    const now = Date.now();
+    const className = str(body.class_name, 20);
+    const grade = gradeOf(className);
+    const grades = school.division === 'middle' ? ['중2', '중3'] : ['고1'];
+    if (!grades.includes(grade) || (className !== grade && !divisionClassAllowed(school.division, className))) fail('대회 학년·반을 확인해주세요.');
+    const ids = [...new Set((Array.isArray(body.student_ids) ? body.student_ids : []).map(value => str(value, 80)).filter(Boolean))];
+    if (ids.length < TOURNAMENT_MIN_PLAYERS || ids.length > TOURNAMENT_MAX_PLAYERS) fail(`참가 학생은 ${TOURNAMENT_MIN_PLAYERS}~${TOURNAMENT_MAX_PLAYERS}명으로 골라주세요.`);
+    const players = ids.map(pid => state.profiles.find(x => x.id === pid));
+    if (players.some(x => !x || !isRankedStudent(x) || schoolForProfile(state, x)?.id !== school.id || gradeOf(x.class_name) !== grade || (className !== grade && x.class_name !== className))) fail('같은 학교·학년(반)의 활성 학생만 참가할 수 있어요.');
+    const petless = players.filter(x => !x.pets?.length);
+    if (petless.length) fail(`${petless.map(x => x.display_name).join(', ')} 학생이 아직 첫 펫을 고르지 않았어요.`, 409);
+    const busy = (state.tournaments || []).find(t => t.status === 'active' && t.players.some(pid => ids.includes(pid)));
+    if (busy) fail(`'${busy.name}' 대회에 이미 참가 중인 학생이 있어요.`, 409);
+    const rangeCodes = [...new Set((Array.isArray(body.range_codes) ? body.range_codes : []).map(String))].slice(0, 60);
+    if (!rangeCodes.length) fail('대결할 단어 범위를 골라주세요.');
+    if (scopedWords(state, school.id, rangeCodes, players[0].class_name).length < 8) fail('단어가 8개 이상인 범위를 골라주세요.', 409);
+    const prize = Number(body.prize || 0);
+    if (!TOURNAMENT_PRIZES.includes(prize)) fail('상금을 확인해주세요.');
+    const ctx = createCompetition(state, now);
+    const seeded = body.seeding === 'league'
+      ? shuffle(players).sort((a, b) => ctx.league(b.id).points - ctx.league(a.id).points)
+      : shuffle(players);
+    state.tournaments ||= [];
+    const t = createTournament({ id: id(), name: str(body.name, 40) || `${school.name} ${className} 야차 대회`, teacher: p, school, grade, className: className === grade ? null : className, players: seeded.map(x => x.id), rangeCodes, prize, now });
+    state.tournaments.push(t);
+    return { tournament: tournamentView(state, createCompetition(state, now), t, p, now) };
+  }
+  const tournamentRoute = path.match(/^\/teacher\/tournaments\/([^/]+)\/(winner|cancel)$/);
+  if (tournamentRoute && method === 'POST') {
+    requireRole(p, 'teacher');
+    const t = (state.tournaments || []).find(x => x.id === tournamentRoute[1] && p.school_ids?.includes(x.school_id));
+    if (!t) fail('대회를 찾지 못했어요.', 404);
+    if (t.status !== 'active') fail('이미 끝난 대회예요.', 409);
+    const now = Date.now();
+    const waiting = (state.battles || []).filter(b => b.tournament_id === t.id && b.status === 'waiting');
+    const closeRooms = rooms => {
+      for (const b of rooms) Object.assign(b, { status: 'cancelled', reason: 'tournament', finished_at: now });
+      return rooms.map(b => ({ action: 'cancel', id: b.id, reason: 'tournament' }));
+    };
+    if (tournamentRoute[2] === 'cancel') {
+      Object.assign(t, { status: 'cancelled', finished_at: now });
+      return { ok: true, _battles: closeRooms(waiting) };
+    }
+    const found = findMatch(t, str(body.match_id, 20));
+    if (!found || found.match.winner) fail('이미 끝났거나 없는 경기예요.', 409);
+    const winner = str(body.winner_id, 80);
+    if (!found.match.a || !found.match.b || ![found.match.a, found.match.b].includes(winner)) fail('승자를 확인해주세요.');
+    decideMatch(t, found.match.id, winner, 'teacher', now);
+    const rooms = closeRooms(waiting.filter(b => b.match_id === found.match.id));
+    return { tournament: tournamentView(state, createCompetition(state, now), t, p, now), _battles: rooms };
+  }
+  // A student starts their tournament match: opens the room for the opponent, or joins the
+  // room the opponent already opened. There is no stake.
+  if (path === '/tournament/play' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    tidyBattles(state, now);
+    const t = (state.tournaments || []).find(x => x.id === str(body.tournament_id, 80) && x.status === 'active' && x.players.includes(p.id));
+    if (!t) fail('대회를 찾지 못했어요.', 404);
+    const mine = playerMatch(t, p.id);
+    if (!mine || mine.match.id !== str(body.match_id, 20)) fail('지금 할 대회 경기가 없어요.', 409);
+    if (!mine.ready) fail('상대가 정해지면 경기를 할 수 있어요.', 409);
+    const opponentId = mine.match.a === p.id ? mine.match.b : mine.match.a;
+    const opponent = state.profiles.find(x => x.id === opponentId);
+    const room = (state.battles || []).find(b => b.tournament_id === t.id && b.match_id === mine.match.id && battleIsOpen(b, now));
+    if (room && (room.host_id === p.id || room.guest_id === p.id)) {
+      return { id: room.id, code: room.code, stake: 0, status: room.status, ticket: room.tickets[p.id], host: room.host_id === p.id, challenge: true, tournament: room.label, friend: opponent?.display_name || '', expires_at: room.status === 'waiting' ? room.created_at + BATTLE_WAIT_MS : null };
+    }
+    checkBattleEntry(state, p, 0, now);
+    if (room && room.status === 'waiting' && room.invite_id === p.id) {
+      Object.assign(room, { guest_id: p.id, status: 'active', joined_at: now });
+      room.tickets[p.id] = battleTicket();
+      return { id: room.id, stake: 0, status: 'active', ticket: room.tickets[p.id], host: false, tournament: room.label, opponent: opponent?.display_name || '',
+        _battle: { action: 'join', id: room.id, guest: battlePlayer(state, p), tickets: room.tickets } };
+    }
+    const school = schoolForProfile(state, p);
+    if (!school || school.id !== t.school_id) fail('학생 학교 설정을 확인해주세요.', 409);
+    const label = `대회 ${mine.label}`;
+    const opened = openBattleRoom(state, p, school, 0, t.range_codes, now, { invite_id: opponentId, challenge: true, tournament_id: t.id, match_id: mine.match.id, label });
+    return { ...opened, host: true, challenge: true, tournament: label, friend: opponent?.display_name || '' };
   }
   if (path === '/students' && method === 'POST') {
     requireRole(p, 'teacher');

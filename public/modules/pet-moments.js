@@ -223,9 +223,9 @@ export function openEggShop(A, onChanged) {
     <div class="pet-shop-egg" aria-hidden="true"><span>?</span></div>
     <p class="pet-moment-msg">어떤 친구가 들어 있을까요?</p>
     <p class="pet-shop-copy">아직 만나지 못한 ${missing.length}마리 중 한 마리의 알이 나와요.<br>새 알은 바로 파트너가 되고, 함께 공부하면 Lv.3에 태어나요.</p>
-    <div class="pet-shop-price"><span>가격</span><b>${num(EGG_PRICE)}P</b><span>보유</span><b>${num(g.points_balance || 0)}P</b></div>
-    <p class="pet-name-error" role="alert">${!missing.length ? '모든 펫을 모았어요!' : short ? `${num(short)}P가 더 필요해요. 공부하면 포인트가 쌓여요.` : ''}</p>
-    <div class="pet-moment-actions"><button type="button" class="btn" data-pet-later>닫기</button><button type="button" class="btn primary" data-pet-buy ${!missing.length || short ? 'disabled' : ''}>${num(EGG_PRICE)}P로 알 사기</button></div>
+    <div class="pet-shop-price"><span>가격</span><b><i class="coin-ico" aria-hidden="true"></i>${num(EGG_PRICE)}</b><span>가진 코인</span><b><i class="coin-ico" aria-hidden="true"></i>${num(g.points_balance || 0)}</b></div>
+    <p class="pet-name-error" role="alert">${!missing.length ? '모든 펫을 모았어요!' : short ? `코인이 ${num(short)}개 더 필요해요. 공부하면 코인이 쌓여요.` : ''}</p>
+    <div class="pet-moment-actions"><button type="button" class="btn" data-pet-later>닫기</button><button type="button" class="btn primary" data-pet-buy ${!missing.length || short ? 'disabled' : ''}>${num(EGG_PRICE)}코인으로 알 사기</button></div>
   </div>`;
   const close = changed => closeOverlay(changed, onChanged);
   $('[data-pet-close]').onclick = () => close(false);
