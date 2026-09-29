@@ -22,6 +22,29 @@ export const BATTLE = {
   FEVER_MULT: 1.5,     // hits in fever time do 1.5x damage
   REVIEW_MAX: 20       // words listed per player on the result screen
 };
+// V13.67 modes. 스피드전 is the original match (four choices, speed hits harder). 실력전 mixes
+// in spelling words typed on an in-app keyboard: a spelled word hits hardest, speed adds only
+// a little and there are no critical hits, so knowing the word decides the match.
+export const BATTLE_MODES = {
+  speed: { name: '스피드전', desc: '4지선다 · 빠를수록 세게', match_ms: 90000 },
+  skill: { name: '실력전', desc: '철자 쓰기 섞임 · 정확도로 승부', match_ms: 120000 }
+};
+export const SKILL_RULES = {
+  CHOICE_TURN_MS: 9000,
+  SPELL_TURN_MS: 16000,
+  CHOICE_HIT: 10,
+  SPELL_HIT: 22,
+  SPEED_BONUS: 0.15    // extra damage per second left, much less than 스피드전
+};
+export const battleMode = mode => mode === 'skill' ? 'skill' : 'speed';
+// Typed answers are compared letter by letter after the same clean-up the question used.
+export const normalizeTyped = raw => String(raw ?? '').normalize('NFKC').toLowerCase().replace(/[‘’]/g, "'").replace(/[‐‑–—]/g, '-').replace(/\s+/g, ' ').trim();
+const turnMs = (state, q) => state.mode === 'skill' ? (q?.kind === 'spell' ? SKILL_RULES.SPELL_TURN_MS : SKILL_RULES.CHOICE_TURN_MS) : BATTLE.TURN_MS;
+// The word and its meaning of a question (the review list and the reveal line).
+export function questionWord(q) {
+  return q.kind === 'spell' ? { word: q.text, meaning: q.prompt } : { word: q.prompt, meaning: q.options[q.answer] };
+}
+
 export const BATTLE_SKILLS = {
   shield: { cost: 2, name: '방패' },
   heal: { cost: 3, name: '회복' },
@@ -32,13 +55,14 @@ export const BATTLE_SKILLS = {
 const other = (state, pid) => state.order.find(id => id !== pid);
 
 // players: [{ id, name, pet, streak, title, tier, bot }] (host first);
-// questions: [{ word_id, prompt, options[4], answer }]. `label` names a match that is not an
-// ordinary one ('대회 8강', '연습 경기').
-export function createBattle({ id, players, questions, stake = 0, label = null, now }) {
+// questions: [{ word_id, prompt, options[4], answer }] or, in 실력전, also spelling words
+// [{ word_id, kind: 'spell', prompt (meaning), hint, text, accept[] }]. `label` names a match
+// that is not an ordinary one ('대회 8강', '연습 경기').
+export function createBattle({ id, players, questions, stake = 0, label = null, mode = 'speed', now }) {
   if (players.length !== 2 || players[0].id === players[1].id) throw Error('battle needs two different players');
   if (!questions.length) throw Error('battle needs questions');
   return {
-    id, stake, label: label || null, created_at: now, phase: 'waiting', seq: 0,
+    id, stake, label: label || null, mode: battleMode(mode), created_at: now, phase: 'waiting', seq: 0,
     order: players.map(p => p.id),
     players: Object.fromEntries(players.map(p => [p.id, {
       id: p.id, name: p.name, pet: p.pet || null, streak: Number(p.streak || 0), title: p.title || null, tier: p.tier || null, bot: !!p.bot,
@@ -52,10 +76,15 @@ export function createBattle({ id, players, questions, stake = 0, label = null, 
 
 function event(state, type, data = {}) { state.seq++; return { type, seq: state.seq, ...data }; }
 
+// What a player sees of a question: never the answer.
+function questionPublic(q) {
+  return q.kind === 'spell' ? { kind: 'spell', prompt: q.prompt, hint: q.hint, options: [] } : { kind: 'choice', prompt: q.prompt, options: q.options };
+}
 function questionEvent(state) {
   const q = state.questions[state.turn.q];
-  return event(state, 'question', { n: state.idx + 1, prompt: q.prompt, options: q.options, started_at: state.turn.started_at, deadline: state.deadline, frozen_until: state.turn.frozen_until });
+  return event(state, 'question', { n: state.idx + 1, ...questionPublic(q), started_at: state.turn.started_at, deadline: state.deadline, frozen_until: state.turn.frozen_until });
 }
+const answerOf = q => q.kind === 'spell' ? q.text : q.answer;
 
 function nextQuestion(state, now) {
   const alive = state.order.every(id => state.players[id].hp > 0);
@@ -67,7 +96,7 @@ function nextQuestion(state, now) {
   }
   state.turn = { q: state.idx % state.questions.length, started_at: now, locked: {}, hits: 0, frozen_until, resolved: false };
   state.phase = 'question';
-  state.deadline = now + BATTLE.TURN_MS;
+  state.deadline = now + turnMs(state, state.questions[state.turn.q]);
   return [questionEvent(state)];
 }
 
@@ -88,7 +117,7 @@ function finish(state, now, reason, loserId = null) {
   else if (a.hp !== b.hp) winner = a.hp > b.hp ? a.id : b.id;
   const review = Object.fromEntries(state.order.map(id => [id, (state.players[id].missed || []).map(wordId => {
     const q = state.questions.find(item => item.word_id === wordId);
-    return q ? { word_id: wordId, word: q.prompt, meaning: q.options[q.answer] } : null;
+    return q ? { word_id: wordId, ...questionWord(q) } : null;
   }).filter(Boolean)]));
   state.result = { winner, loser: winner ? other(state, winner) : null, reason, stake: state.stake, finished_at: now, hp: { [a.id]: a.hp, [b.id]: b.hp }, review };
   return [event(state, 'end', { result: state.result })];
@@ -105,12 +134,17 @@ function reveal(state, now) {
 // both players have answered or its time runs out, and the answer is revealed only then.
 function attack(state, attackerId, ms, now) {
   const attacker = state.players[attackerId], defender = state.players[other(state, attackerId)];
-  const fast = ms < BATTLE.FAST_MS;
-  attacker.ki = Math.min(BATTLE.MAX_KI, attacker.ki + (fast ? 2 : 1));
+  const q = state.questions[state.turn.q], skill = state.mode === 'skill', spell = q.kind === 'spell';
+  // 실력전 has no critical hits: a spelled word gives the extra ki instead.
+  const fast = !skill && ms < BATTLE.FAST_MS;
+  attacker.ki = Math.min(BATTLE.MAX_KI, attacker.ki + (fast || spell ? 2 : 1));
   attacker.correct++; attacker.answer_ms += ms;
   state.turn.locked[attackerId] = true;
   state.turn.hits = (state.turn.hits || 0) + 1;
-  let dmg = BATTLE.HIT + Math.round(Math.max(0, BATTLE.TURN_MS - ms) / 1000 * BATTLE.SPEED_BONUS);
+  const left = Math.max(0, turnMs(state, q) - ms) / 1000;
+  let dmg = skill
+    ? (spell ? SKILL_RULES.SPELL_HIT : SKILL_RULES.CHOICE_HIT) + Math.round(left * SKILL_RULES.SPEED_BONUS)
+    : BATTLE.HIT + Math.round(left * BATTLE.SPEED_BONUS);
   if (fast) dmg = Math.round(dmg * BATTLE.CRIT);
   const fever = inFever(state, now);
   if (fever) dmg = Math.round(dmg * BATTLE.FEVER_MULT);
@@ -118,7 +152,7 @@ function attack(state, attackerId, ms, now) {
   if (powered) { dmg *= 2; attacker.power = false; }
   if (shielded) { dmg = Math.round(dmg / 2); defender.shield = false; }
   defender.hp = Math.max(0, defender.hp - dmg);
-  const events = [event(state, 'attack', { attacker: attacker.id, defender: defender.id, dmg, fast, fever, powered, shielded, ms, hp: { [attacker.id]: attacker.hp, [defender.id]: defender.hp }, ki: { [attacker.id]: attacker.ki, [defender.id]: defender.ki } })];
+  const events = [event(state, 'attack', { attacker: attacker.id, defender: defender.id, dmg, fast, spell, fever, powered, shielded, ms, hp: { [attacker.id]: attacker.hp, [defender.id]: defender.hp }, ki: { [attacker.id]: attacker.ki, [defender.id]: defender.ki } })];
   if (state.order.every(id => state.turn.locked[id])) events.push(...settle(state, now, false));
   return events;
 }
@@ -132,7 +166,7 @@ function settle(state, now, timeout) {
     if (timeout) markMissed(state, id);
   }
   reveal(state, now);
-  const answer = state.questions[state.turn.q].answer;
+  const answer = answerOf(state.questions[state.turn.q]);
   return [event(state, state.turn.hits ? 'reveal' : 'miss', { timeout, answer })];
 }
 
@@ -170,9 +204,16 @@ export function answer(state, pid, choice, now) {
   if (!p || state.phase !== 'question' || !turn || turn.resolved || now >= state.deadline) return [];
   if (turn.locked[pid]) return [];
   if ((turn.frozen_until[pid] || 0) > now) return [];
-  if (!Number.isInteger(choice) || choice < 0 || choice > 3) return [];
   const q = state.questions[turn.q];
-  if (choice === q.answer) return attack(state, pid, now - turn.started_at, now);
+  let right;
+  if (q.kind === 'spell') {
+    if (typeof choice !== 'string' || !choice.trim() || choice.length > 60) return [];
+    right = (q.accept || [q.text]).includes(normalizeTyped(choice));
+  } else {
+    if (!Number.isInteger(choice) || choice < 0 || choice > 3) return [];
+    right = choice === q.answer;
+  }
+  if (right) return attack(state, pid, now - turn.started_at, now);
   turn.locked[pid] = true;
   p.ki = 0;
   markMissed(state, pid);
@@ -208,7 +249,7 @@ export function tick(state, now) {
     // late, a word still gets its full time instead of expiring unseen.
     if (state.phase === 'countdown') {
       state.started_at = now;
-      state.ends_at = now + BATTLE.MATCH_MS;
+      state.ends_at = now + (BATTLE_MODES[state.mode]?.match_ms || BATTLE.MATCH_MS);
       events.push(event(state, 'start', { ends_at: state.ends_at }));
       events.push(...nextQuestion(state, now));
     } else if (state.phase === 'question') events.push(...settle(state, now, true));
@@ -232,15 +273,15 @@ export function nextWake(state) {
 export function battleView(state, pid) {
   const turn = state.turn, q = turn ? state.questions[turn.q] : null;
   return {
-    id: state.id, me: pid, phase: state.phase, seq: state.seq, stake: state.stake, label: state.label || null,
+    id: state.id, me: pid, phase: state.phase, seq: state.seq, stake: state.stake, label: state.label || null, mode: state.mode || 'speed',
     order: state.order, started_at: state.started_at, ends_at: state.ends_at, deadline: state.deadline, fever_ms: BATTLE.FEVER_MS,
     players: Object.fromEntries(state.order.map(id => {
       const p = state.players[id];
       return [id, { id, name: p.name, pet: p.pet, streak: p.streak || 0, title: p.title || null, tier: p.tier || null, bot: !!p.bot, hp: p.hp, ki: p.ki, shield: p.shield, power: p.power, frozen_next: p.frozen_next, connected: p.connected }];
     })),
     question: q && ['question', 'reveal'].includes(state.phase) ? {
-      n: state.idx + 1, prompt: q.prompt, options: q.options, started_at: turn.started_at,
-      frozen_until: turn.frozen_until, locked: !!turn.locked[pid], answer: state.phase === 'reveal' ? q.answer : undefined
+      n: state.idx + 1, ...questionPublic(q), started_at: turn.started_at,
+      frozen_until: turn.frozen_until, locked: !!turn.locked[pid], answer: state.phase === 'reveal' ? answerOf(q) : undefined
     } : null,
     result: state.result
   };

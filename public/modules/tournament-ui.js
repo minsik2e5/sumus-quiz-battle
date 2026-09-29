@@ -1,5 +1,5 @@
 import { api, esc, num, icon, modal, toast } from './ui.js';
-import { titleBadge, titleEmblem, coin } from './emblems.js';
+import { titleBadge, titleEmblem, coin, trophy } from './emblems.js';
 import { avatar } from './character.js';
 
 // V13.66 academy tournament (학원 대회) drawing: the bracket (teacher and students) and a
@@ -22,7 +22,7 @@ export function bracketHtml(t, { teacher = false, meId = null } = {}) {
       <small class="tn-state">${matchState(m)}${m.draws ? ` · 무승부 ${m.draws}번` : ''}</small>
       ${teacher && t.status === 'active' && !m.winner && m.a && m.b ? `<div class="tn-decide" role="group" aria-label="승자 지정"><button type="button" data-tn-decide="${esc(t.id)}" data-match="${esc(m.id)}" data-winner="${esc(m.a.id)}" data-name="${esc(m.a.name)}">${esc(m.a.name)} 승</button><button type="button" data-tn-decide="${esc(t.id)}" data-match="${esc(m.id)}" data-winner="${esc(m.b.id)}" data-name="${esc(m.b.name)}">${esc(m.b.name)} 승</button></div>` : ''}
     </div>`).join('')}</div></div>`).join('');
-  return `<div class="tn-scroll"><div class="tn-bracket">${rounds}<div class="tn-round tn-final"><h4>우승</h4><div class="tn-matches"><div class="tn-champ${t.champion ? ' on' : ''}">${titleEmblem('champion', { size: 'md', locked: !t.champion })}<b>${t.champion ? esc(t.champion.name) : '누가 될까요?'}</b>${t.runner_up ? `<small>준우승 ${esc(t.runner_up.name)}</small>` : ''}</div></div></div></div></div>`;
+  return `<div class="tn-scroll"><div class="tn-bracket">${rounds}<div class="tn-round tn-final"><h4>우승</h4><div class="tn-matches"><div class="tn-champ${t.champion ? ' on' : ''}">${trophy('lg')}<b>${t.champion ? esc(t.champion.name) : '누가 될까요?'}</b>${t.runner_up ? `<small>준우승 ${esc(t.runner_up.name)}</small>` : ''}</div></div></div></div></div>`;
 }
 const prizeLine = t => t.prize ? `${coin()} 우승 ${num(t.prize)} · 준우승 ${num(Math.floor(t.prize / 2))}` : '상금 없음';
 
@@ -42,10 +42,10 @@ export function tournamentCard(t, { compact = false } = {}) {
     action = `<button type="button" class="btn primary full tn-play" data-action="tournament-play" data-tournament="${esc(t.id)}" data-match="${esc(m.id)}">${m.room?.host ? '대기실로 가기' : waitingForMe ? '상대가 기다려요 · 입장하기' : '경기 시작'} ${icon('arrow')}</button>`;
   }
   return `<section class="tn-card${t.status === 'finished' ? ' finished' : ''}${compact ? ' compact' : ''}">
-    <div class="tn-card-head">${titleEmblem('champion', { size: 'sm' })}<div><small>학원 야차 대회 · ${esc(t.class_name || t.grade || '')}</small><strong>${esc(t.name)}</strong></div><button type="button" class="tn-bracket-open" data-action="tournament-bracket" data-tournament="${esc(t.id)}">대진표</button></div>
+    <div class="tn-card-head">${trophy('md')}<div><small>학원 야차 대회 · ${esc(t.class_name || t.grade || '')}</small><strong>${esc(t.name)}</strong></div><button type="button" class="tn-bracket-open" data-action="tournament-bracket" data-tournament="${esc(t.id)}">대진표</button></div>
     <div class="tn-line">${line}</div>
     ${action}
-    <p class="tn-foot">판돈 없는 대결 · ${prizeLine(t)}</p>
+    <p class="tn-foot">${t.mode === 'skill' ? '실력전' : '스피드전'} · 판돈 없는 대결 · ${prizeLine(t)}</p>
   </section>`;
 }
 

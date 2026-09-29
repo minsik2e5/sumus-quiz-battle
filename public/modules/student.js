@@ -3,10 +3,12 @@ import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$
 import { avatar, petKey, RUN_SHEETS } from './character.js';
 import { petDisplayName, petJosa } from './pet-moments.js';
 import { TITLES, TITLE_KEYS } from './titles.js';
-import { titleBadge, titleEmblem, tierEmblem, coin } from './emblems.js';
+import { titleBadge, titleEmblem, tierEmblem, coin, trophy } from './emblems.js';
 import { titlesPage, titleState, titleCount } from './titles-ui.js';
 import { tournamentCard } from './tournament-ui.js';
 import { shownTitle } from './league-ui.js';
+import { arcadePage, capsuleArt } from './arcade.js';
+import { ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, GACHA_ITEMS, GACHA_TIERS } from './rewards.js';
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
 // V13.66: coins (코인) sit in the header on every tab; tapping opens the wallet.
 function coinChip(A) {
@@ -18,7 +20,7 @@ export function shell(A, content) {
   return `<div class="student-app"><main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div>${p.preview_owner_id ? '<button class="preview-exit-v1359" data-action="exit-student-preview">← 교사 화면</button>' : ''}${A.data.stats?.needs_pet_pick ? '' : coinChip(A)}<button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${A.tab === id ? 'active' : ''}" ${A.tab === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
 }
 export function studentPage(A) {
-  return shell(A, ({ home, practice, exam, ranking, records, studio, titles: titlesPage }[A.tab] || home)(A));
+  return shell(A, ({ home, practice, exam, ranking, records, studio, titles: titlesPage, arcade: arcadePage }[A.tab] || home)(A));
 }
 export function getRanges(A, school = A.school, grade = null) {
   const books = A.data.books.filter(book => !grade || !book.grade || book.grade === grade);
@@ -362,7 +364,7 @@ function yachaBanner(A) {
     const left = Math.max(1, Math.ceil((invite.expires_at - Date.now()) / 60000));
     // V13.66: the opponent of a tournament match opened the room.
     if (invite.tournament) return `<section class="home-yacha-v1360 invite tourney-v1366" aria-label="대회 경기">
-      <span class="hy-mark hy-trophy" aria-hidden="true">${titleEmblem('champion', { size: 'sm' })}</span>
+      <span class="hy-mark hy-trophy" aria-hidden="true">${trophy('sm')}</span>
       <span class="hy-text"><small>${esc(invite.tournament.name)} · ${esc(invite.tournament.round)}</small><strong>${esc(invite.host)} 입장 완료!</strong><em>판돈 없는 대회 경기 · ${left}분 안에 들어가요</em></span>
       <span class="hy-actions"><button type="button" class="hy-no" data-action="battle-decline" data-id="${esc(invite.id)}">나중에</button><button type="button" class="hy-go" data-action="battle-accept">입장하기 ${icon('arrow')}</button></span>
     </section>`;
@@ -376,7 +378,7 @@ function yachaBanner(A) {
   const tourney = (A.data.tournaments || []).find(t => t.status === 'active' && t.me?.match?.ready);
   const m = tourney?.me.match;
   const tourneyBanner = tourney ? `<section class="home-yacha-v1360 tourney-v1366" aria-label="대회 경기">
-      <span class="hy-mark hy-trophy" aria-hidden="true">${titleEmblem('champion', { size: 'sm' })}</span>
+      <span class="hy-mark hy-trophy" aria-hidden="true">${trophy('sm')}</span>
       <span class="hy-text"><small>${esc(tourney.name)}</small><strong>${esc(m.round)} 경기 차례!</strong><em>vs ${esc(m.opponent?.name || '')} · 판돈 없는 대회 경기${m.draws ? ' · 재경기' : ''}</em></span>
       <span class="hy-actions one"><button type="button" class="hy-go" data-action="tournament-play" data-tournament="${esc(tourney.id)}" data-match="${esc(m.id)}">${m.room?.host ? '대기실로 가기' : '경기 시작'} ${icon('arrow')}</button></span>
     </section>` : '';
@@ -389,13 +391,50 @@ function yachaBanner(A) {
     <b class="hy-go">대결하기 ${icon('arrow')}</b>
   </button>`;
 }
+// V13.67 daily attendance: a card of seven stamps; the 7th gives the most coins and a capsule
+// ticket. Before today's stamp the card sits right under the pet card; after it, lower down.
+const STAMP_CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg>';
+const STAMP_GIFT = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M3 7.5h18v3H3zM12 7.5V20M12 7.5C10.5 4 7 4 7 6s3 1.5 5 1.5c2 0 5 .5 5-1.5s-3.5-2-5 1.5"/></svg>';
+function attendanceCard(A) {
+  const a = A.data.rewards?.attendance;
+  if (!a) return '';
+  const last = ATTENDANCE_REWARDS.length - 1;
+  const stamps = ATTENDANCE_REWARDS.map((coins, i) => {
+    const on = i < a.stamps, next = !a.done && i === a.stamps;
+    return `<li class="${on ? 'on' : ''}${next ? ' next' : ''}${i === last ? ' gift' : ''}"><span>${on ? STAMP_CHECK : i === last ? STAMP_GIFT : `<b>${i + 1}</b>`}</span><small>${coins}</small></li>`;
+  }).join('');
+  const lead = a.done
+    ? `<small>출석 완료</small><strong>내일 출석하면 ${coin()}${a.next}</strong>`
+    : `<small>출석 체크 · ${a.stamps + 1}번째 도장</small><strong>오늘 출석하고 ${coin()}${a.next} 받기</strong>`;
+  return `<section class="att-card${a.done ? ' done' : ''}" aria-label="출석 체크">
+    <div class="att-head"><div>${lead}</div>${a.done ? `<span class="att-streak">${a.streak >= 2 ? `${a.streak}일 연속` : '오늘 도장 쾅!'}</span>` : '<button type="button" class="btn primary att-btn" data-action="attend">출석하기</button>'}</div>
+    <ol class="att-stamps">${stamps}</ol>
+    ${a.done ? '' : `<p class="att-foot">7번째 도장은 <b>${coin()}${ATTENDANCE_REWARDS[last]}</b> + <b>뽑기권 ${ATTENDANCE_TICKETS}장</b>! 하루에 한 번 찍어요.</p>`}
+  </section>`;
+}
+// V13.67 coin arcade entry: the capsule machine and the word double chance.
+function arcadeBanner(A) {
+  const g = A.data.rewards?.gacha || {}, c = A.data.rewards?.chance || {};
+  const have = Object.values(g.items || {}).filter(n => n > 0).length;
+  const tickets = Number(g.tickets || 0);
+  return `<button type="button" class="arcade-banner" data-go="arcade">
+    <span class="ab-machine" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><b></b></span>
+    <span class="ab-copy"><small>COIN ARCADE</small><strong>코인 놀이터</strong><em>뽑기 도감 ${have}/${Object.keys(GACHA_ITEMS).length} · 더블 찬스 ${c.left ?? 3}번 남음</em></span>
+    ${tickets ? `<span class="ab-ticket">뽑기권 ${tickets}</span>` : ''}
+    <span class="ab-go">${icon('chevron')}</span>
+  </button>`;
+}
 function compactGrowth(A) {
   const g = A.data.stats;
   const week = homeWeek(A);
   const next = homePrimaryAction(A);
+  const attended = !!A.data.rewards?.attendance?.done;
   return `<div class="home-stack-v1360">${partnerCard(A)}
+  ${attended ? '' : attendanceCard(A)}
   <button type="button" class="home-next-v1358${next.done ? ' is-done-v1363' : ''}" ${next.attrs}><span><small>${esc(next.kicker)}</small><strong>${esc(next.title)}</strong><em>${next.detail}</em>${next.progress || ''}</span><b>${esc(next.cta)} ${icon('arrow')}</b></button>
   ${yachaBanner(A)}
+  ${arcadeBanner(A)}
+  ${attended ? attendanceCard(A) : ''}
   <section class="home-week-card home-week-v1358" aria-label="이번 주 출석">
     <span>이번 주 <b>${week.filter(day => day.active).length}일</b> · 오늘 <b>+${num(g.today_xp || 0)} 경험치</b> · <b class="home-week-coin">${coin()}+${num(g.today_reward_points || 0)}</b></span>
     <div class="home-week-days">${week.map(day => `<i class="${day.active ? 'active' : ''} ${day.current ? 'today' : ''}" aria-label="${day.label}요일${day.active ? ' 학습함' : ''}">${day.label}</i>`).join('')}</div>
@@ -812,7 +851,7 @@ function studio(A) {
     ? `${shop}<div class="pet-choice-head"><span>MY PETS · ${owned.length}/${Object.keys(CHARACTERS).length}</span><h2>누구와 함께 공부할까요?</h2><p>파트너로 함께 공부한 펫이 자라요.</p></div><div class="character-grid pet-choice-grid">${Object.keys(CHARACTERS).map(petCard).join('')}</div>`
     : tab === 'title'
     ? `<button type="button" class="tt-studio-link" data-go="titles">${titleEmblem(t.equipped, { size: 'md' })}<span class="tt-studio-copy"><small>지금 달고 있는 칭호</small>${titleBadge(t.equipped, { size: 'sm' })}<em>칭호 도감에서 ${titleCount(A)}개를 모았어요. 골라서 달아 보세요.</em></span>${icon('chevron')}</button>`
-    : `<div class="reward-grid">${Object.entries(groups[tab]).map(([key, item]) => { const open = unlocked(item, g); return `<button data-style="avatar_${tab}" data-value="${key}" class="reward-item ${s['avatar_' + tab] === key ? 'selected' : ''}" ${open ? '' : 'disabled'}>${icon(open ? 'sparkle' : 'lock')}<b>${item.name}</b><small>${open ? '사용 가능' : `Lv.${item.level}에 열려요`}</small></button>`; }).join('')}</div>`;
+    : `<div class="reward-grid">${Object.entries(groups[tab]).filter(([, item]) => !item.gacha || unlocked(item, g)).map(([key, item]) => { const open = unlocked(item, g); if (item.gacha) return `<button data-style="avatar_${tab}" data-value="${key}" class="reward-item gacha t-${item.tier} ${s['avatar_' + tab] === key ? 'selected' : ''}">${capsuleArt(A, item.gacha, 'xs')}<b>${esc(item.name)}</b><small>뽑기 · ${GACHA_TIERS[item.tier].name}</small></button>`; return `<button data-style="avatar_${tab}" data-value="${key}" class="reward-item ${s['avatar_' + tab] === key ? 'selected' : ''}" ${open ? '' : 'disabled'}>${icon(open ? 'sparkle' : 'lock')}<b>${item.name}</b><small>${open ? '사용 가능' : `Lv.${item.level}에 열려요`}</small></button>`; }).join('')}</div><button type="button" class="studio-arcade-link" data-go="arcade">${icon('sparkle')}<span><b>뽑기 전용 ${tab === 'frame' ? '오라' : '배지'}</b><small>코인 놀이터의 뽑기 머신에서 모아요</small></span>${icon('chevron')}</button>`;
   const isPartner = chosen.key === g.pet?.key;
   return `<div class="page-heading studio-page-heading"><h1>내 펫</h1><p>파트너를 바꾸거나 꾸밀 수 있어요.</p></div><div class="studio-preview">${avatar(chosen.key, { form: chosen.form, accessory: s.avatar_accessory, frame: s.avatar_frame })}<h2>${chosen.form ? esc(petDisplayName(chosen)) : '???'} <span class="tiny muted">Lv.${chosen.level}</span>${isPartner && chosen.form ? `<button type="button" class="pet-name-edit" data-action="pet-name">${chosen.name ? '이름 바꾸기' : '이름 짓기'}</button>` : ''}</h2><p>${esc(c.type)} · ${chosen.form ? PET_FORMS[chosen.form] : '부화를 기다리는 중'}</p>${titleBadge(t.equipped, { size: 'sm' })}</div><div class="segment">${[['character', '펫'], ['accessory', '장식'], ['frame', '프레임'], ['title', '칭호']].map(([k, label]) => `<button data-studio-tab="${k}" class="${tab === k ? 'selected' : ''}">${label}</button>`).join('')}</div>${body}<button class="btn primary full" data-action="save-style">${isPartner ? '이 모습으로 저장' : `${esc(petJosa(petDisplayName(chosen), '과', '와'))} 함께하기`}</button><div class="section-title"><h2>다음 성장의 선물</h2></div><div class="roadmap">${[[3, '헤드셋'], [5, '실버 프레임'], [6, '글래스'], [9, '스타 핀'], [10, '블루 라인'], [15, '오로라'], [18, '크라운'], [20, '골드']].map(([lv, name]) => `<div><div class="milestone ${g.level >= lv ? 'done' : ''}">${icon(g.level >= lv ? 'check' : 'lock')}</div><b>${name}</b><small>Lv.${lv}</small></div>`).join('')}</div>`;
 }

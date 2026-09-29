@@ -1,3 +1,4 @@
+import { GACHA_ITEMS } from './rewards.js';
 export const EXAM_TYPES = {
   write_meaning: { label: '뜻쓰기', help: '영어를 보고 뜻 직접 쓰기', input: true },
   write_en: { label: '영어쓰기', help: '뜻을 보고 영어 직접 쓰기', input: true },
@@ -48,11 +49,15 @@ export function cleanPetName(value) {
   if (!/^[\p{Script=Hangul}A-Za-z0-9 ·._~!-]+$/u.test(name)) return { name, error: '한글, 영어, 숫자로 지어주세요.' };
   return { name, error: '' };
 }
+// V13.67: capsule-machine decorations join as frames (auras) and accessories (badges); they are
+// worn only by students who pulled them (`gacha`: the capsule key, checked in `unlocked`).
+const gachaWear = kind => Object.fromEntries(Object.entries(GACHA_ITEMS).filter(([, item]) => item.kind === kind).map(([key, item]) => [item.wear, { name: item.name, gacha: key, tier: item.tier }]));
 export const ACCESSORIES = {
   none: { name: '기본', level: 1 }, headset: { name: '헤드셋', level: 3 }, glasses: { name: '포커스 글래스', level: 6 },
-  starpin: { name: '스타 핀', level: 9 }, visor: { name: '바이저', level: 13 }, crown: { name: '크라운', level: 18 }
+  starpin: { name: '스타 핀', level: 9 }, visor: { name: '바이저', level: 13 }, crown: { name: '크라운', level: 18 },
+  ...gachaWear('badge')
 };
-export const FRAMES = { basic: { name: '기본', level: 1 }, silver: { name: '실버', level: 5 }, neon: { name: '블루 라인', level: 10 }, aurora: { name: '오로라', level: 15 }, legend: { name: '골드', level: 20 } };
+export const FRAMES = { basic: { name: '기본', level: 1 }, silver: { name: '실버', level: 5 }, neon: { name: '블루 라인', level: 10 }, aurora: { name: '오로라', level: 15 }, legend: { name: '골드', level: 20 }, ...gachaWear('aura') };
 export const TITLES = { rookie: { name: '첫걸음', level: 1 }, focus: { name: '집중의 힘', level: 5 }, combo: { name: '10연속의 주인공', combo: 10 }, streak: { name: '7일의 기록', streak: 7 }, master: { name: '단어 마스터', level: 15 }, legend: { name: '한계를 넘어서', level: 20 }, yacha3: { name: '야차 3연승', battle_streak: 3 }, yachaking: { name: '야차왕', battle_streak: 5 } };
 export const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 export function levelInfo(points = 0) {
@@ -72,7 +77,7 @@ export function petProgress(pets = [], sessions = [], activeKey) {
     return { key: pet.key, name: pet.name || '', first: !!pet.first, acquired_at: pet.acquired_at || 0, xp, level: info.level, form: info.form, percent: info.percent, remaining: info.remaining, active: pet.key === activeKey };
   });
 }
-export const unlocked = (item, growth) => !!item && (!item.level || growth.level >= item.level) && (!item.combo || growth.best_combo >= item.combo) && (!item.streak || growth.streak >= item.streak) && (!item.battle_streak || Number(growth.battle?.best_streak || 0) >= item.battle_streak);
+export const unlocked = (item, growth) => !!item && (!item.gacha || Number(growth?.gacha?.[item.gacha] || 0) > 0) && (!item.level || growth.level >= item.level) && (!item.combo || growth.best_combo >= item.combo) && (!item.streak || growth.streak >= item.streak) && (!item.battle_streak || Number(growth.battle?.best_streak || 0) >= item.battle_streak);
 export function displayEnglish(raw) {
   return String(raw ?? '').normalize('NFKC').replace(/\([^)]*\)|\[[^\]]*\]/g, '').replace(/[*~～]/g, '').replace(/\s+/g, ' ').trim();
 }

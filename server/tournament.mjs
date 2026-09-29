@@ -66,10 +66,10 @@ export function resolveByes(t, now = Date.now()) {
     else if (!match.a && match.b) decideMatch(t, match.id, match.b, 'bye', now);
   }
 }
-export function createTournament({ id, name, teacher, school, grade, className, players, rangeCodes, prize, now = Date.now() }) {
+export function createTournament({ id, name, teacher, school, grade, className, players, rangeCodes, prize, mode = 'speed', now = Date.now() }) {
   const t = {
     id, name, teacher_id: teacher.id, school_id: school.id, school: school.name, division: school.division,
-    grade, class_name: className || null, range_codes: rangeCodes, prize, status: 'active', created_at: now,
+    grade, class_name: className || null, range_codes: rangeCodes, prize, mode: mode === 'skill' ? 'skill' : 'speed', status: 'active', created_at: now,
     players: [...players], rounds: buildBracket(players), champion: null, runner_up: null
   };
   resolveByes(t, now);

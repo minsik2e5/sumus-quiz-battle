@@ -2,6 +2,9 @@ import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
 import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, ACCESSORIES, FRAMES, EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
+import { battleQuestions } from '../public/modules/battle-questions.js';
+import { battleMode } from '../public/modules/battle-engine.js';
+import { rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, pullCapsule, chanceView, chanceStart, chanceAnswer, chanceDecide } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
@@ -354,6 +357,13 @@ export function scopedWords(state, schoolRef, ranges, grade = null) {
   return words.filter(w => ranges.map(String).includes(w.range_code));
 }
 function mySessions(state, student) { return state.sessions.filter(s => s.student_id === student); }
+const coinBalance = (state, p) => pointsAndPets(state, p, mySessions(state, p.id)).points_balance;
+// V13.67 double chance: the words of the student's school and grade they have already studied.
+function studiedWords(state, p) {
+  const school = schoolForProfile(state, p), seen = state.mastery[p.id] || {};
+  if (!school) return [];
+  return wordsForSchoolGrade(state, school, p.class_name).filter(word => seen[word.id] && word.meaning);
+}
 // Coins (코인, stored as reward points) are earned per finished practice and as tournament
 // prizes, spent in the shop, and won or lost in yacha battles; pets grow separately with 경험치.
 function pointsAndPets(state, p, sessions) {
@@ -364,7 +374,9 @@ function pointsAndPets(state, p, sessions) {
   const pets = petProgress(p.pets, sessions, p.avatar_key);
   // Stakes of matches that have not been settled yet are held back, so a late result can
   // never be absorbed by a balance that was spent in the meantime.
-  return { reward_points: earned, points_spent: spent, prize_points: prizes, points_balance: Math.max(0, earned + prizes - spent + battle.net - battle.held), battle, pets, pet: pets.find(x => x.active) || null, needs_pet_pick: p.role === 'student' && !pets.length };
+  // V13.67: attendance, capsule refunds and double-chance pay-outs (rewards.mjs).
+  const bonus = rewardIncome(p);
+  return { reward_points: earned, points_spent: spent, prize_points: prizes, bonus_points: bonus, points_balance: Math.max(0, earned + prizes + bonus - spent + battle.net - battle.held), battle, pets, pet: pets.find(x => x.active) || null, needs_pet_pick: p.role === 'student' && !pets.length };
 }
 
 // Yacha battles: 1:1 word duels between students of the same school and grade. The
@@ -438,9 +450,10 @@ function openBattleRoom(state, p, school, stake, rangeCodes, now, extra = {}) {
   if (!rangeCodes.length) fail('대결할 단어 범위를 골라주세요.');
   const words = scopedWords(state, school.id, rangeCodes, p.class_name);
   if (words.length < 8) fail('단어가 8개 이상인 범위를 골라주세요.', 409);
-  const questions = shuffle(words).slice(0, BATTLE_QUESTIONS)
-    .map(word => { const q = buildQuestion(word, 'eng2mean_mc', words); return { word_id: word.id, prompt: q.prompt, options: q.options, answer: q.options.indexOf(word.meaning) }; })
-    .filter(q => q.options.length === 4 && q.answer >= 0);
+  // V13.67: 스피드전 (four choices) or 실력전 (spelling words mixed in).
+  const mode = battleMode(extra.mode);
+  extra = { ...extra, mode };
+  const questions = battleQuestions(words, mode, BATTLE_QUESTIONS);
   if (questions.length < 8) fail('뜻이 서로 다른 단어가 부족해요. 범위를 더 골라주세요.', 409);
   state.battles ||= [];
   const openCodes = new Set(state.battles.filter(b => battleIsOpen(b, now)).map(b => b.code));
@@ -449,7 +462,7 @@ function openBattleRoom(state, p, school, stake, rangeCodes, now, extra = {}) {
   const battle = { id: randomUUID(), code, status: 'waiting', school_id: school.id, division: school.division, grade: gradeOf(p.class_name), host_id: p.id, guest_id: null, stake, range_codes: rangeCodes, tickets: { [p.id]: battleTicket() }, created_at: now, ...extra };
   state.battles.push(battle);
   return { id: battle.id, code, stake, status: 'waiting', ticket: battle.tickets[p.id], expires_at: now + BATTLE_WAIT_MS,
-    _battle: { action: 'init', id: battle.id, stake, label: extra.label || null, host: battlePlayer(state, p), questions, tickets: battle.tickets, expires_at: now + BATTLE_WAIT_MS } };
+    mode, _battle: { action: 'init', id: battle.id, stake, label: extra.label || null, mode, host: battlePlayer(state, p), questions, tickets: battle.tickets, expires_at: now + BATTLE_WAIT_MS } };
 }
 
 // V13.61 challenges: a room for one named friend of the same school and grade. The friend
@@ -467,7 +480,7 @@ function battleInviteFor(state, p, now) {
   if (!b) return null;
   const host = state.profiles.find(x => x.id === b.host_id);
   const t = b.tournament_id ? (state.tournaments || []).find(x => x.id === b.tournament_id) : null;
-  return { id: b.id, code: b.code, stake: b.stake, host: host?.display_name || '', expires_at: b.created_at + BATTLE_WAIT_MS, ...(t ? { tournament: { id: t.id, name: t.name, round: b.label || '' } } : {}) };
+  return { id: b.id, code: b.code, stake: b.stake, mode: battleMode(b.mode), host: host?.display_name || '', expires_at: b.created_at + BATTLE_WAIT_MS, ...(t ? { tournament: { id: t.id, name: t.name, round: b.label || '' } } : {}) };
 }
 
 // Called by the battle room (never by a browser) when a match ends. Idempotent.
@@ -511,6 +524,7 @@ function stats(state, p, sessions = mySessions(state, p.id)) {
     today_reward_points: today.reduce((n, s) => n + Number(s.reward_points || 0), 0),
     practice_count: sessions.length,
     accuracy: total ? Math.round(correct / total * 100) : 0,
+    gacha: p.gacha?.items || {},
     weak: Object.values(state.mastery[p.id] || {}).filter(m => m.wrong > 0 && m.mastery < 80).length
   };
 }
@@ -521,7 +535,7 @@ function coinsCollected(state, ctx, pid, window = null) {
   const inside = at => !window || (at >= window.start && at < window.end);
   const study = ctx.sessionsOf(pid).filter(s => inside(s.created_at)).reduce((n, s) => n + Number(s.reward_points || 0), 0);
   const won = ctx.battlesOf(pid).filter(b => b.winner === pid && inside(b.finished_at)).reduce((n, b) => n + Number(b.stake || 0), 0);
-  return study + won + tournamentPrizes(state, pid, window);
+  return study + won + tournamentPrizes(state, pid, window) + attendanceCoins(ctx.profiles.get(pid), window);
 }
 function rankingRows(state, ctx, p) {
   const period = ctx.week;
@@ -592,7 +606,7 @@ function tournamentView(state, ctx, t, viewer, now = Date.now()) {
       room: room ? { host: room.host_id === viewer.id, status: room.status } : null };
   }
   return {
-    id: t.id, name: t.name, status: t.status, grade: t.grade, class_name: t.class_name || null, prize: Number(t.prize || 0),
+    id: t.id, name: t.name, status: t.status, grade: t.grade, class_name: t.class_name || null, prize: Number(t.prize || 0), mode: battleMode(t.mode),
     created_at: t.created_at, finished_at: t.finished_at || null, players: t.players.length,
     champion: person(t.champion), runner_up: person(t.runner_up),
     rounds: t.rounds.map(round => ({ label: roundLabel(round.length), matches: round.map(m => ({ id: m.id, a: person(m.a), b: person(m.b), winner: m.winner || null, by: m.by || null, draws: Number(m.draws || 0), live: open.get(m.id)?.status || null })) })),
@@ -751,7 +765,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } else if (process.env.AUTH_PROVIDER === 'supabase') {
       const result = await supabaseLogin(username, password); p = result.profile; supabaseAccessToken = result.accessToken;
       const old = state.profiles.find(x => x.id === p.id);
-      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
+      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'chance', 'chance_live'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
       else state.profiles.push(p);
     } else {
       p = localProfile;
@@ -847,6 +861,7 @@ export async function service(state, method, path, body, token, options = {}) {
       ranking: teacher ? [] : rankingRows(state, competition, p),
       titles: teacher ? null : titleView(competition, p),
       league: teacher ? null : leagueView(competition, p),
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), chance: chanceView(p, now) },
       tournaments: (state.tournaments || []).filter(t => teacher ? t.school_id === selectedSchool?.id && (t.status !== 'cancelled' || now - (t.finished_at || t.created_at) < DAY_MS) : t.players.includes(p.id) && (t.status === 'active' || (t.status === 'finished' && now - (t.finished_at || 0) < 3 * DAY_MS)))
         .sort((a, b) => b.created_at - a.created_at).slice(0, 12).map(t => tournamentView(state, competition, t, p, now))
     };
@@ -999,6 +1014,36 @@ export async function service(state, method, path, body, token, options = {}) {
     p.avatar_key = body.key;
     return publicProfile(p);
   }
+  // V13.67 coin rewards and games: attendance, the capsule machine and the word double chance.
+  if (path === '/rewards' && method === 'GET') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    return { attendance: attendanceView(p, now), gacha: gachaView(p), chance: chanceView(p, now), points_balance: coinBalance(state, p) };
+  }
+  if (path === '/attendance/check' && method === 'POST') {
+    requireRole(p, 'student');
+    return { ...checkIn(p, Date.now()), points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
+  }
+  if (path === '/gacha/pull' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
+    const result = pullCapsule(p, coinBalance(state, p), { ticket: body.ticket === true });
+    return { ...result, points_balance: coinBalance(state, p) };
+  }
+  if (path === '/chance/start' && method === 'POST') {
+    requireRole(p, 'student');
+    const result = chanceStart(p, Number(body.bet), coinBalance(state, p), studiedWords(state, p));
+    return { ...result, points_balance: coinBalance(state, p) };
+  }
+  if (path === '/chance/answer' && method === 'POST') {
+    requireRole(p, 'student');
+    const answer = typeof body.answer === 'string' ? body.answer : Number(body.answer);
+    return { ...chanceAnswer(p, answer, Date.now()), points_balance: coinBalance(state, p) };
+  }
+  if (path === '/chance/decide' && method === 'POST') {
+    requireRole(p, 'student');
+    return { ...chanceDecide(p, body.go === true, studiedWords(state, p)), points_balance: coinBalance(state, p) };
+  }
   if (path === '/shop/egg' && method === 'POST') {
     requireRole(p, 'student');
     if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
@@ -1036,7 +1081,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const school = schoolForProfile(state, p);
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
     const rangeCodes = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : [];
-    return openBattleRoom(state, p, school, stake, rangeCodes, now);
+    return openBattleRoom(state, p, school, stake, rangeCodes, now, { mode: body.mode });
   }
   // Rematch: either player may ask within two minutes of the end; the room is only for the
   // other player, who accepts it on the result screen (stake shown again before joining).
@@ -1057,7 +1102,7 @@ export async function service(state, method, path, body, token, options = {}) {
     checkBattleEntry(state, p, previous.stake, now);
     const school = schoolForProfile(state, p);
     if (!school || school.id !== previous.school_id) fail('학생 학교 설정을 확인해주세요.', 409);
-    return { ...openBattleRoom(state, p, school, previous.stake, previous.range_codes, now, { invite_id: opponentId, rematch_of: previous.id }), rematch: true };
+    return { ...openBattleRoom(state, p, school, previous.stake, previous.range_codes, now, { invite_id: opponentId, rematch_of: previous.id, mode: previous.mode }), rematch: true };
   }
   if (path === '/battle/rematch-offer' && method === 'GET') {
     requireRole(p, 'student');
@@ -1091,7 +1136,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const school = schoolForProfile(state, p);
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
     const rangeCodes = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : [];
-    return { ...openBattleRoom(state, p, school, stake, rangeCodes, now, { invite_id: friend.id, challenge: true }), challenge: true, friend: friend.name };
+    return { ...openBattleRoom(state, p, school, stake, rangeCodes, now, { invite_id: friend.id, challenge: true, mode: body.mode }), challenge: true, friend: friend.name };
   }
   if (path === '/battle/invite' && method === 'GET') {
     requireRole(p, 'student');
@@ -1109,7 +1154,7 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const battle = findJoinableBattle(state, p, str(body.code, 12).replace(/\D/g, ''), Date.now());
     if (battle.host_id === p.id) fail('내가 만든 방이에요. 친구에게 코드를 알려주세요.', 409);
-    return { code: battle.code, stake: battle.stake, host: state.profiles.find(x => x.id === battle.host_id)?.display_name || '', expires_at: battle.created_at + BATTLE_WAIT_MS };
+    return { code: battle.code, stake: battle.stake, mode: battleMode(battle.mode), host: state.profiles.find(x => x.id === battle.host_id)?.display_name || '', expires_at: battle.created_at + BATTLE_WAIT_MS };
   }
   if (path === '/battle/join' && method === 'POST') {
     requireRole(p, 'student');
@@ -1138,7 +1183,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const battle = openBattleFor(state, p.id, Date.now());
     if (!battle) return { battle: null };
     const opponentId = battle.host_id === p.id ? battle.guest_id : battle.host_id;
-    return { battle: { id: battle.id, code: battle.code, status: battle.status, stake: battle.stake, host: battle.host_id === p.id, rematch: !!battle.rematch_of, challenge: !!battle.challenge, tournament: battle.tournament_id ? battle.label || '대회' : undefined, friend: battle.challenge ? state.profiles.find(x => x.id === battle.invite_id)?.display_name || '' : undefined, ticket: battle.tickets[p.id], opponent: state.profiles.find(x => x.id === opponentId)?.display_name || null, expires_at: battle.status === 'waiting' ? battle.created_at + BATTLE_WAIT_MS : null } };
+    return { battle: { id: battle.id, code: battle.code, status: battle.status, stake: battle.stake, mode: battleMode(battle.mode), host: battle.host_id === p.id, rematch: !!battle.rematch_of, challenge: !!battle.challenge, tournament: battle.tournament_id ? battle.label || '대회' : undefined, friend: battle.challenge ? state.profiles.find(x => x.id === battle.invite_id)?.display_name || '' : undefined, ticket: battle.tickets[p.id], opponent: state.profiles.find(x => x.id === opponentId)?.display_name || null, expires_at: battle.status === 'waiting' ? battle.created_at + BATTLE_WAIT_MS : null } };
   }
   if (path === '/battle/history' && method === 'GET') {
     requireRole(p, 'student');
@@ -1146,7 +1191,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const ctx = createCompetition(state);
     return { record: battleRecord(state, p.id), league: leagueView(ctx, p), points_balance: pointsAndPets(state, p, mySessions(state, p.id)).points_balance, stakes: BATTLE_STAKES, daily_loss_cap: BATTLE_DAILY_LOSS_CAP, lost_today: battleLossToday(state, p.id, Date.now()), battles: rows.map(b => {
       const opponentId = b.host_id === p.id ? b.guest_id : b.host_id;
-      return { id: b.id, finished_at: b.finished_at, stake: b.stake, outcome: b.winner === p.id ? 'win' : b.loser === p.id ? 'lose' : 'draw', reason: b.reason, tournament: b.tournament_id ? b.label || '대회' : undefined, hp: Number.isFinite(Number(b.hp?.[p.id])) ? Number(b.hp[p.id]) : undefined, opponent: state.profiles.find(x => x.id === opponentId)?.display_name || '' };
+      return { id: b.id, finished_at: b.finished_at, stake: b.stake, mode: battleMode(b.mode), outcome: b.winner === p.id ? 'win' : b.loser === p.id ? 'lose' : 'draw', reason: b.reason, tournament: b.tournament_id ? b.label || '대회' : undefined, hp: Number.isFinite(Number(b.hp?.[p.id])) ? Number(b.hp[p.id]) : undefined, opponent: state.profiles.find(x => x.id === opponentId)?.display_name || '' };
     }) };
   }
   // V13.66 weekly yacha league (this week) or the all-time record of the student's school + grade.
@@ -1184,7 +1229,7 @@ export async function service(state, method, path, body, token, options = {}) {
       ? shuffle(players).sort((a, b) => ctx.league(b.id).points - ctx.league(a.id).points)
       : shuffle(players);
     state.tournaments ||= [];
-    const t = createTournament({ id: id(), name: str(body.name, 40) || `${school.name} ${className} 야차 대회`, teacher: p, school, grade, className: className === grade ? null : className, players: seeded.map(x => x.id), rangeCodes, prize, now });
+    const t = createTournament({ id: id(), name: str(body.name, 40) || `${school.name} ${className} 야차 대회`, teacher: p, school, grade, className: className === grade ? null : className, players: seeded.map(x => x.id), rangeCodes, prize, mode: battleMode(body.mode), now });
     state.tournaments.push(t);
     return { tournament: tournamentView(state, createCompetition(state, now), t, p, now) };
   }
@@ -1246,7 +1291,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const school = schoolForProfile(state, p);
     if (!school || school.id !== t.school_id) fail('학생 학교 설정을 확인해주세요.', 409);
     const label = `대회 ${mine.label}`;
-    const opened = openBattleRoom(state, p, school, 0, t.range_codes, now, { invite_id: opponentId, challenge: true, tournament_id: t.id, match_id: mine.match.id, label });
+    const opened = openBattleRoom(state, p, school, 0, t.range_codes, now, { invite_id: opponentId, challenge: true, tournament_id: t.id, match_id: mine.match.id, label, mode: t.mode });
     return { ...opened, host: true, challenge: true, tournament: label, friend: opponent?.display_name || '' };
   }
   if (path === '/students' && method === 'POST') {

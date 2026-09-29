@@ -5,10 +5,11 @@ import { getRanges } from './student.js';
 import { petJosa } from './pet-moments.js';
 import { startPractice } from './sessions.js';
 import { TITLES, TITLE_KEYS, titleProgress } from './titles.js';
-import { titleBadge, titleEmblem, tierEmblem, coin } from './emblems.js';
+import { titleBadge, titleEmblem, tierEmblem, coin, trophy } from './emblems.js';
 import { titleState, openTitleDetail } from './titles-ui.js';
 import { mountLeagueBoard, clearLeagueCache, shownTitle } from './league-ui.js';
 import { createPracticeMatch, practiceQuestions, BOT_LEVELS } from './battle-bot.js';
+import { BATTLE_MODES } from './battle-engine.js';
 import { tournamentCard, openBracket } from './tournament-ui.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
@@ -28,6 +29,14 @@ const MAX_HP = 100, MAX_KI = 5;
 const REASONS = { end: () => '시간 종료', forfeit: mine => mine ? '대결을 포기했어요' : '상대가 대결을 포기했어요', disconnect: mine => mine ? '연결이 끊겨 패배했어요' : '상대의 연결이 끊겼어요', cancelled: () => '대결이 취소됐어요' };
 
 const EMOTES = { lol: 'ㅋㅋ', come: '덤벼!', gg: 'GG', nice: '좋았어!' };
+// V13.67 modes: 스피드전 (the original) and 실력전 (spelling words on an in-app keyboard).
+const MODE_ICONS = {
+  speed: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>',
+  skill: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 1-4L16 5l3 3L8 19zM14 7l3 3"/></svg>'
+};
+const modeName = mode => BATTLE_MODES[mode === 'skill' ? 'skill' : 'speed'].name;
+const modeTag = mode => `<span class="yb-mode-tag ${mode === 'skill' ? 'skill' : 'speed'}">${MODE_ICONS[mode === 'skill' ? 'skill' : 'speed']}${modeName(mode)}</span>`;
+const KEY_ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
 const REMATCH_MS = 2 * 60000;
 
 let B = null; // current screen state
@@ -82,7 +91,7 @@ const petName = pet => pet?.name || CHARACTERS[petKey(pet?.key)]?.ko || '';
 // opts.tournament: { tid, mid } a tournament match to start or join (V13.66).
 export async function openBattle(A, exit, opts = {}) {
   closeSocket();
-  B = { A, exit, stake: 10, ranges: null, joinCode: '', tab: opts.tab || 'play', botLevel: 'normal' };
+  B = { A, exit, stake: 10, ranges: null, joinCode: '', tab: opts.tab || 'play', botLevel: 'normal', mode: pref('sumus-yacha-mode', 'speed') === 'skill' ? 'skill' : 'speed' };
   root().innerHTML = shell('<div class="yb-loading">야차전을 준비하고 있어요…</div>');
   bindRoot();
   try {
@@ -121,6 +130,9 @@ function bindRoot() {
     if (act === 'stake') { B.stake = Number(b.dataset.stake); lobby(); return; }
     if (act === 'tab') { B.tab = b.dataset.tab; lobby(); window.scrollTo(0, 0); return; }
     if (act === 'bot-level') { B.botLevel = b.dataset.level; lobby(); return; }
+    if (act === 'mode') { B.mode = b.dataset.mode === 'skill' ? 'skill' : 'speed'; setPref('sumus-yacha-mode', B.mode); lobby(); return; }
+    if (act === 'key') return spellKey(b.dataset.key);
+    if (act === 'spell-go') return spellSubmit();
     if (act === 'bot') return startBotMatch(b);
     if (act === 'bot-again') return botAgain();
     if (act === 'title') return openTitleDetail(B.A, b.dataset.key);
@@ -175,6 +187,9 @@ function playTab(h) {
   return `${tourneys.map(t => tournamentCard(t)).join('')}
     <section class="yb-card">
       <h2>대결 준비</h2>
+      <div class="yb-label">대결 방식</div>
+      <div class="yb-modes" role="group" aria-label="대결 방식">${Object.entries(BATTLE_MODES).map(([key, m]) => `<button type="button" class="yb-mode ${key} ${B.mode === key ? 'on' : ''}" data-yb="mode" data-mode="${key}" aria-pressed="${B.mode === key}"><span class="yb-mode-ico">${MODE_ICONS[key]}</span><b>${m.name}</b><small>${m.desc}</small></button>`).join('')}</div>
+      <p class="yb-note yb-mode-note">${B.mode === 'skill' ? '두 문제에 한 번은 <b>뜻을 보고 철자를 써요</b>. 쓰기 정답은 두 배로 세고, 빠르기는 조금만 더해요. 2분 동안 겨뤄요.' : '뜻 고르기 4지선다예요. <b>빨리 맞힐수록</b> 세게 공격해요. 1분 30초 동안 겨뤄요.'}</p>
       <div class="yb-label">단어 범위 <small>${B.ranges.size ? `${B.ranges.size}개 범위 · ${selectedWords}단어` : '범위를 골라주세요'}</small></div>
       <div class="yb-ranges">${codes.map(c => `<button type="button" class="yb-chip ${B.ranges.has(c) ? 'on' : ''}" data-yb="range" data-code="${esc(c)}" aria-pressed="${B.ranges.has(c)}">${esc(rangeLabel(A.data.profile.school, c))}<small>${counts.get(c) || 0}</small></button>`).join('') || '<p class="yb-muted">학습할 단어 범위가 없어요.</p>'}</div>
       <div class="yb-label">판돈 <small>가진 코인 ${num(balance)} · 오늘 더 잃을 수 있는 코인 ${num(lossLeft)}</small></div>
@@ -186,7 +201,7 @@ function playTab(h) {
       </div>
     </section>
     <section class="yb-card yb-bot-v1366">
-      <div class="yb-bot-head"><span class="yb-bot-pet" aria-hidden="true">${avatar(B.botLevel === 'hard' ? 'dragon' : B.botLevel === 'easy' ? 'rabbit' : 'fox', { form: BOT_LEVELS[B.botLevel]?.form || 2 })}<i>AI</i></span><div><h2>연습 상대와 대결</h2><p class="yb-note">친구가 없을 때 AI 펫과 겨뤄요. 판돈 없이, 기록·리그에도 들어가지 않아요.</p></div></div>
+      <div class="yb-bot-head"><span class="yb-bot-pet" aria-hidden="true">${avatar('robot', { form: BOT_LEVELS[B.botLevel]?.form || 2 })}<i>AI</i></span><div><h2>로보와 연습 대결</h2><p class="yb-note">친구가 없을 때 AI 로보와 ${modeName(B.mode)}으로 겨뤄요. 판돈 없이, 기록·리그에도 들어가지 않아요.</p></div></div>
       <div class="yb-bot-levels" role="group" aria-label="연습 상대 난이도">${Object.entries(BOT_LEVELS).map(([key, lv]) => `<button type="button" class="yb-chip ${B.botLevel === key ? 'on' : ''}" data-yb="bot-level" data-level="${key}" aria-pressed="${B.botLevel === key}">${lv.name}</button>`).join('')}</div>
       <button type="button" class="btn full yb-bot-go" data-yb="bot" ${wordsOk ? '' : 'disabled'}>연습 대결 시작 ${icon('arrow')}</button>
     </section>
@@ -197,7 +212,7 @@ function playTab(h) {
 }
 function historyList(h) {
   if (!h.battles.length) return '<p class="yb-muted">아직 대결 기록이 없어요. 첫 대결에 도전해요!</p>';
-  return `<ul class="yb-history">${h.battles.slice(0, 12).map(b => `<li class="${b.outcome}"><b>${b.outcome === 'win' ? '승' : b.outcome === 'lose' ? '패' : '무'}</b><span>${esc(b.opponent || '친구')}${b.tournament ? ` <em class="yb-tn-tag">${esc(b.tournament)}</em>` : ''}</span><small>${b.tournament ? '대회' : `${b.outcome === 'win' ? '+' : b.outcome === 'lose' ? '−' : '±'}${b.outcome === 'draw' ? 0 : b.stake}코인`}</small></li>`).join('')}</ul>`;
+  return `<ul class="yb-history">${h.battles.slice(0, 12).map(b => `<li class="${b.outcome}"><b>${b.outcome === 'win' ? '승' : b.outcome === 'lose' ? '패' : '무'}</b><span>${esc(b.opponent || '친구')}${b.tournament ? ` <em class="yb-tn-tag">${esc(b.tournament)}</em>` : ''}${b.mode === 'skill' ? ' <em class="yb-mode-mini">실력전</em>' : ''}</span><small>${b.tournament ? '대회' : `${b.outcome === 'win' ? '+' : b.outcome === 'lose' ? '−' : '±'}${b.outcome === 'draw' ? 0 : b.stake}코인`}</small></li>`).join('')}</ul>`;
 }
 // My record: totals, win rate, special wins and the yacha titles with their progress.
 function myRecord(h) {
@@ -223,7 +238,7 @@ function myRecord(h) {
 async function createRoom(button) {
   button.disabled = true;
   try {
-    const room = await api('/battle/rooms', { stake: B.stake, range_codes: [...B.ranges] });
+    const room = await api('/battle/rooms', { stake: B.stake, range_codes: [...B.ranges], mode: B.mode });
     enterRoom({ ...room, host: true });
   } catch (err) { toast(err.message); button.disabled = false; }
 }
@@ -238,7 +253,7 @@ async function pickFriend(button) {
   const box = document.createElement('div');
   box.className = 'yb-confirm';
   box.innerHTML = `<div class="yb-confirm-card yb-friends-v1361" role="dialog" aria-modal="true" aria-label="도전장 보낼 친구">
-    <h2>누구에게 도전할까요?</h2><p class="yb-note">판돈 ${num(B.stake)}코인 · 고른 범위로 대결해요. 친구 홈 화면에 도전장이 떠요.</p>
+    <h2>누구에게 도전할까요?</h2><p class="yb-note">${modeName(B.mode)} · 판돈 ${num(B.stake)}코인 · 고른 범위로 대결해요. 친구 홈 화면에 도전장이 떠요.</p>
     <div class="yb-friend-list">${friends.length ? friends.map(f => `<button type="button" class="yb-friend" data-friend="${esc(f.id)}" ${f.busy ? 'disabled' : ''}>
       <span class="yb-friend-pet">${f.pet ? avatar(f.pet.key, { form: f.pet.form }) : ''}</span>
       <span class="yb-friend-name"><b>${esc(f.name)}</b><small>${esc(f.class_name)}${f.busy ? ' · 대결 중' : ''}</small>${shownTitle(f.title) ? titleBadge(f.title, { size: 'xs' }) : ''}</span>
@@ -250,7 +265,7 @@ async function pickFriend(button) {
     const pick = e.target.closest('[data-friend]'); if (!pick || pick.disabled) return;
     pick.disabled = true;
     try {
-      const room = await api('/battle/challenge', { friend_id: pick.dataset.friend, stake: B.stake, range_codes: [...B.ranges] });
+      const room = await api('/battle/challenge', { friend_id: pick.dataset.friend, stake: B.stake, range_codes: [...B.ranges], mode: B.mode });
       box.remove();
       if (B === cur) enterRoom({ ...room, host: true });
     } catch (err) { toast(err.message); pick.disabled = false; }
@@ -263,8 +278,8 @@ async function pickFriend(button) {
 function acceptChallenge(invite) {
   const cur = B;
   const text = invite.tournament
-    ? `<h2>${esc(invite.tournament.name)}</h2><p><b>${esc(invite.tournament.round)}</b> · ${esc(petJosa(invite.host, '과', '와'))} 겨뤄요.<br>판돈 없는 대회 경기예요. 들어가면 바로 시작해요.</p>`
-    : `<h2>${esc(invite.host)}의 도전장</h2><p>판돈 <b>${num(invite.stake)}코인</b>을 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(invite.stake)}코인을 잃어요.</p>`;
+    ? `<h2>${esc(invite.tournament.name)}</h2>${modeTag(invite.mode)}<p><b>${esc(invite.tournament.round)}</b> · ${esc(petJosa(invite.host, '과', '와'))} 겨뤄요.<br>판돈 없는 대회 경기예요. 들어가면 바로 시작해요.</p>`
+    : `<h2>${esc(invite.host)}의 도전장</h2>${modeTag(invite.mode)}<p>판돈 <b>${num(invite.stake)}코인</b>을 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(invite.stake)}코인을 잃어요.</p>`;
   if (invite.tournament) B.tournament = { tid: invite.tournament.id };
   confirmBox(text, '나중에', invite.tournament ? '입장하기' : '도전 받기', async yes => {
     if (B !== cur || !yes) return;
@@ -282,7 +297,7 @@ async function joinRoom(button) {
   try { room = await api(`/battle/preview?code=${B.joinCode}`); }
   catch (err) { toast(err.message); button.disabled = false; return; }
   const cur = B;
-  confirmBox(`<h2>${esc(room.host)}의 방</h2><p>판돈 <b>${num(room.stake)}코인</b>을 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(room.stake)}코인을 잃어요.</p>`, '돌아가기', '참가하기', async yes => {
+  confirmBox(`<h2>${esc(room.host)}의 방</h2>${modeTag(room.mode)}<p>판돈 <b>${num(room.stake)}코인</b>을 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(room.stake)}코인을 잃어요.</p>`, '돌아가기', '참가하기', async yes => {
     if (B !== cur) return;
     if (!yes) { button.disabled = false; return; }
     try {
@@ -314,21 +329,21 @@ function meAsPlayer() {
 function startBotMatch(button) {
   const A = B.A;
   const { words } = getRanges(A, A.school, A.data.profile.class_name);
-  const questions = practiceQuestions(words.filter(word => B.ranges.has(word.range_code)));
+  const questions = practiceQuestions(words.filter(word => B.ranges.has(word.range_code)), B.mode);
   if (questions.length < 8) return toast('뜻이 서로 다른 단어가 부족해요. 범위를 더 골라주세요.');
   if (button) button.disabled = true;
   closeSocket(false);
   B.room = { id: 'practice', practice: true, stake: 0 };
   B.view = null;
-  B.practiceSetup = { ranges: [...B.ranges], level: B.botLevel };
-  B.local = createPracticeMatch({ me: meAsPlayer(), questions, level: B.botLevel, onMessage });
-  main('<div class="yb-loading">연습 상대를 부르고 있어요…</div>');
+  B.practiceSetup = { ranges: [...B.ranges], level: B.botLevel, mode: B.mode };
+  B.local = createPracticeMatch({ me: meAsPlayer(), questions, level: B.botLevel, mode: B.mode, onMessage });
+  main('<div class="yb-loading">로보를 부르고 있어요…</div>');
   B.local.start();
 }
 function botAgain() {
   const setup = B.practiceSetup;
   nextScreen();
-  if (setup) { B.ranges = new Set(setup.ranges); B.botLevel = setup.level; }
+  if (setup) { B.ranges = new Set(setup.ranges); B.botLevel = setup.level; B.mode = setup.mode || 'speed'; }
   startBotMatch();
 }
 
@@ -406,7 +421,7 @@ function waitingRoom(expiresAt = B.room.expires_at) {
   const code = String(B.room.code || '');
   if (B.room.tournament) main(`<section class="yb-card yb-waiting yb-waiting-tn">
     <span class="yb-eyebrow">${esc(B.room.tournament)}</span>
-    ${titleEmblem('champion', { size: 'lg' })}
+    ${trophy('lg')}
     <h2>${esc(B.room.friend || '상대')}의 입장을 기다리는 중</h2>
     <p>상대 홈 화면에 대회 경기 알림이 떴어요.<br>들어오면 바로 시작해요.</p>
     <p class="yb-note">판돈 없는 대회 경기 · <span id="yb-wait-left"></span></p>
@@ -444,13 +459,14 @@ const foe = () => B.view.players[B.view.order.find(id => id !== B.view.me)];
 
 function drawMatch() {
   clearInterval(B.waitTimer);
+  hookKeys();
   const v = B.view;
   if (v.phase === 'finished') return drawResult();
   const m = me(), f = foe();
   // The lobby may have been scrolled; the arena starts at the top of the screen.
   if (!document.getElementById('yb-arena')) window.scrollTo(0, 0);
   main(`
-    <div class="yb-clock"><b>남은 시간</b><span id="yb-clock">1:30</span><em class="yb-fever-tag">피버 1.5배</em></div>
+    <div class="yb-clock"><b>남은 시간</b><span id="yb-clock">${v.mode === 'skill' ? '2:00' : '1:30'}</span>${modeTag(v.mode)}<em class="yb-fever-tag">피버 1.5배</em></div>
     <div class="yb-arena" id="yb-arena">
       <div class="yb-banner">夜叉</div><div class="yb-centerline"></div><div class="yb-ring"></div>
       ${hud(f, 'op')}
@@ -517,19 +533,88 @@ function drawSkills() {
   bar.innerHTML = SKILLS.map(s => { const ok = canUse(s); return `<button type="button" class="yb-sk ${ok ? 'ready' : ''}" data-yb="skill" data-skill="${s.id}" ${ok ? '' : 'disabled'} aria-label="${s.name}, 기 ${s.cost}칸, ${s.desc}"><b>${s.name}</b><span class="yb-cost">${'<span></span>'.repeat(s.cost)}</span><small>${s.desc}</small></button>`; }).join('');
 }
 
+// The line shown when a word is revealed: "word = meaning".
+function revealLine(q, answer) {
+  return q.kind === 'spell' ? `${answer} = ${q.prompt}` : `${q.prompt} = ${q.options[answer]}`;
+}
+
+/* ---------- V13.67 실력전 spelling words ---------- */
+// The hint shows the first letter of each word (already filled in); the player types the
+// rest on the in-app keyboard (phone keyboards would autocorrect the spelling).
+const blanks = q => [...q.hint].filter(ch => ch === '_').length;
+function spelled(q) {
+  let i = 0;
+  return [...q.hint].map(ch => ch === '_' ? (q.typed[i++] || '') : ch).join('');
+}
+function spellSlots(q) {
+  let i = 0;
+  const reveal = typeof q.answer === 'string' ? q.answer : null;
+  return [...q.hint].map((ch, k) => {
+    if (ch === ' ') return '<span class="yb-slot gap" aria-hidden="true"></span>';
+    const typed = ch === '_' ? q.typed[i++] : null;
+    const shown = reveal ? reveal[k] || '' : ch === '_' ? (typed || '') : ch;
+    const cls = ch !== '_' ? 'fixed' : typed ? 'typed' : i - 1 === q.typed.length ? 'next' : '';
+    return `<span class="yb-slot ${cls}">${esc(shown)}</span>`;
+  }).join('');
+}
+function drawSpell(q, frozen) {
+  const done = q.answer !== undefined, closed = q.locked || done || frozen;
+  const full = q.typed.length === blanks(q);
+  // Once the word is revealed the right spelling shows (in yellow), even after a wrong try.
+  const state = q.right ? 'right' : done ? 'reveal' : q.wrong ? 'wrong' : '';
+  const box = document.getElementById('yb-answers');
+  box.innerHTML = `<div class="yb-spell ${state}" id="yb-spell">
+      <div class="yb-spell-slots" id="yb-spell-slots" aria-label="입력한 철자 ${esc(spelled(q))}">${spellSlots(q)}</div>
+      <div class="yb-kb" role="group" aria-label="알파벳 자판">${KEY_ROWS.map((row, r) => `<div class="yb-kb-row">${r === 2 ? `<button type="button" class="yb-key wide" data-yb="key" data-key="back" aria-label="지우기" ${closed ? 'disabled' : ''}>⌫</button>` : ''}${[...row].map(k => `<button type="button" class="yb-key" data-yb="key" data-key="${k}" ${closed ? 'disabled' : ''}>${k}</button>`).join('')}${r === 2 ? `<button type="button" class="yb-key go" data-yb="spell-go" id="yb-spell-go" ${closed || !full ? 'disabled' : ''}>공격!</button>` : ''}</div>`).join('')}</div>
+    </div>`;
+}
+function spellKey(key) {
+  const q = B?.view?.question;
+  if (!q || q.kind !== 'spell' || q.locked || q.answer !== undefined || (q.frozen_until?.[B.view.me] || 0) > serverNow()) return;
+  if (key === 'back') q.typed.pop();
+  else if (/^[a-z]$/.test(key) && q.typed.length < blanks(q)) q.typed.push(key);
+  else return;
+  const slots = document.getElementById('yb-spell-slots');
+  if (slots) { slots.innerHTML = spellSlots(q); slots.setAttribute('aria-label', `입력한 철자 ${spelled(q)}`); }
+  const go = document.getElementById('yb-spell-go');
+  if (go) go.disabled = q.typed.length !== blanks(q);
+}
+function spellSubmit() {
+  const q = B?.view?.question;
+  if (!q || q.kind !== 'spell' || q.locked || q.answer !== undefined || q.typed.length !== blanks(q)) return;
+  q.locked = true;
+  document.querySelectorAll('#yb-spell button').forEach(b => { b.disabled = true; });
+  send({ type: 'answer', choice: spelled(q) });
+}
+// A hardware keyboard (tablets, computers) types too.
+let keysHooked = false;
+function hookKeys() {
+  if (keysHooked) return;
+  keysHooked = true;
+  window.addEventListener('keydown', event => {
+    if (!document.getElementById('yb-spell') || event.ctrlKey || event.metaKey || event.altKey) return;
+    const key = event.key === 'Backspace' ? 'back' : event.key === 'Enter' ? 'go' : event.key.toLowerCase();
+    if (key === 'go') { event.preventDefault(); return spellSubmit(); }
+    if (key === 'back' || /^[a-z]$/.test(key)) { event.preventDefault(); spellKey(key); }
+  });
+}
+
 function drawQuestion() {
   const q = B.view.question; if (!q) return;
-  document.getElementById('yb-q-n').textContent = `${q.n}번째 단어`;
+  document.getElementById('yb-q-n').textContent = `${q.n}번째 단어${q.kind === 'spell' ? ' · 철자 쓰기' : ''}`;
   document.getElementById('yb-q-word').textContent = q.prompt;
+  document.getElementById('yb-q-word').classList.toggle('meaning', q.kind === 'spell');
   const frozen = (q.frozen_until?.[B.view.me] || 0) > serverNow();
-  document.getElementById('yb-answers').innerHTML = q.options.map((o, i) => `<button type="button" class="yb-answer ${q.answer === i ? 'right' : ''} ${q.answer !== undefined && q.answer !== i ? 'dim' : ''} ${q.picked === i ? 'picked' : ''} ${q.picked === i && q.hit ? 'hit' : ''}" data-yb="answer" data-choice="${i}" ${q.locked || q.answer !== undefined || frozen ? 'disabled' : ''}><span class="yb-tag"><b>${i + 1}</b>공격</span><span class="yb-ko">${esc(o)}</span></button>`).join('');
+  document.querySelector('.battle-app')?.classList.toggle('yb-spelling', q.kind === 'spell');
+  if (q.kind === 'spell') drawSpell(q, frozen);
+  else document.getElementById('yb-answers').innerHTML = q.options.map((o, i) => `<button type="button" class="yb-answer ${q.answer === i ? 'right' : ''} ${q.answer !== undefined && q.answer !== i ? 'dim' : ''} ${q.picked === i ? 'picked' : ''} ${q.picked === i && q.hit ? 'hit' : ''}" data-yb="answer" data-choice="${i}" ${q.locked || q.answer !== undefined || frozen ? 'disabled' : ''}><span class="yb-tag"><b>${i + 1}</b>공격</span><span class="yb-ko">${esc(o)}</span></button>`).join('');
   document.getElementById('yb-answers').classList.toggle('frozen', frozen);
   document.getElementById('yb-pet-me')?.classList.toggle('frozen', frozen);
   if (frozen) {
     setStatus('me', '얼어붙었어요! 2초 뒤 풀려요');
     later(() => { if (B.view?.question === q && q.answer === undefined) { setStatus('me', ''); drawQuestion(); } }, Math.max(0, q.frozen_until[B.view.me] - serverNow()) + 30);
   }
-  if (q.answer === undefined && !q.locked) say(`<em>${esc(q.prompt)}</em>의 뜻은?`, '정답 버튼이 곧 공격 버튼이에요.');
+  if (q.answer === undefined && !q.locked) say(q.kind === 'spell' ? `<em>${esc(q.prompt)}</em>을(를) 영어로!` : `<em>${esc(q.prompt)}</em>의 뜻은?`, q.kind === 'spell' ? '철자를 다 쓰고 공격! 쓰기 정답은 두 배로 세요.' : '정답 버튼이 곧 공격 버튼이에요.');
 }
 
 function say(mainHtml, sub = '') {
@@ -597,7 +682,7 @@ function applyEvent(e) {
   if (e.type === 'start') { v.ends_at = e.ends_at; return; }
   if (e.type === 'question') {
     v.phase = 'question'; v.deadline = e.deadline;
-    v.question = { n: e.n, prompt: e.prompt, options: e.options, started_at: e.started_at, frozen_until: e.frozen_until || {}, locked: false, answer: undefined };
+    v.question = { n: e.n, kind: e.kind || 'choice', prompt: e.prompt, hint: e.hint || '', options: e.options || [], started_at: e.started_at, frozen_until: e.frozen_until || {}, locked: false, answer: undefined, typed: [] };
     for (const id of Object.keys(e.frozen_until || {})) P[id].frozen_next = false;
     if (!document.getElementById('yb-arena')) return drawMatch();
     setStatus('me', ''); setStatus('op', '');
@@ -614,6 +699,7 @@ function applyEvent(e) {
       v.question.locked = true;
       document.querySelector('.yb-answer.picked')?.classList.add('wrong');
       document.querySelectorAll('.yb-answer').forEach(b => { b.disabled = true; });
+      if (v.question.kind === 'spell') { v.question.wrong = true; drawQuestion(); }
       setStatus('me', '틀렸어요! 이번 단어는 공격 불가');
     } else setStatus('op', '상대가 틀렸어요!');
     refreshHud(); return;
@@ -622,7 +708,7 @@ function applyEvent(e) {
   // or 'miss' (nobody did) once both players answered or the time ran out.
   if (e.type === 'reveal' || e.type === 'miss') {
     v.phase = 'reveal'; v.question.answer = e.answer;
-    const line = `${v.question.prompt} = ${v.question.options[e.answer]}`;
+    const line = revealLine(v.question, e.answer);
     if (e.type === 'miss') {
       for (const id of v.order) P[id].ki = 0;
       say(e.timeout ? '시간 초과!' : '둘 다 놓쳤어요!', line);
@@ -640,14 +726,15 @@ function applyEvent(e) {
       if (atk === 'me') { v.question.locked = true; v.question.hit = true; }
       if (e.powered) P[e.attacker].power = false;
       if (e.shielded) P[e.defender].shield = false;
-      setStatus(atk, `${(e.ms / 1000).toFixed(1)}초 정답!${atk === 'me' ? ` 기 +${e.fast ? 2 : 1}` : ''}`);
+      if (e.spell && atk === 'me') v.question.right = true;
+      setStatus(atk, `${(e.ms / 1000).toFixed(1)}초 ${e.spell ? '철자 ' : ''}정답!${atk === 'me' ? ` 기 +${e.fast || e.spell ? 2 : 1}` : ''}`);
       if (atk === 'op' && !v.question.locked) setStatus('me', '나도 맞히면 반격!');
-      const label = e.powered ? '<em>필살기!</em>' : e.fast ? '<em>크리티컬</em> 공격!' : '공격!';
+      const label = e.powered ? '<em>필살기!</em>' : e.fast ? '<em>크리티컬</em> 공격!' : e.spell ? '<em>철자</em> 공격!' : '공격!';
       if (atk === 'me') sfx(e.powered || e.fast || e.fever ? 'crit' : 'hit', e.powered || e.fever ? 30 : 0);
       else later(() => sfx('hurt', e.powered || e.fever ? [80, 40, 80] : 70), reduced() ? 0 : 230);
-      say(`${atk === 'op' ? '상대 ' : ''}${esc(petName(P[e.attacker].pet))}의 ${label}`, `${e.answer !== undefined ? `${v.question.prompt} = ${v.question.options[e.answer]}` : atk === 'me' ? '정답! 상대를 기다려요' : '상대가 맞혔어요'}${e.shielded ? ' · 방패가 피해를 절반 막았어요' : ''}`);
+      say(`${atk === 'op' ? '상대 ' : ''}${esc(petName(P[e.attacker].pet))}의 ${label}`, `${atk === 'me' ? '정답! 상대를 기다려요' : '상대가 맞혔어요'}${e.shielded ? ' · 방패가 피해를 절반 막았어요' : ''}`);
       lunge(atk);
-      later(() => { if (e.powered || e.fast) flash(e.powered ? 'rgba(255,214,90,.9)' : 'rgba(255,236,160,.8)'); hit(def); pop(def, `-${e.dmg}${e.powered ? ' 필살!' : e.fast ? ' 크리티컬!' : e.fever ? ' 피버!' : ''}`, e.powered || e.fast || e.fever ? 'crit' : ''); refreshHud(); }, reduced() ? 0 : 230);
+      later(() => { if (e.powered || e.fast || e.spell) flash(e.powered ? 'rgba(255,214,90,.9)' : e.spell ? 'rgba(150,230,210,.75)' : 'rgba(255,236,160,.8)'); hit(def); pop(def, `-${e.dmg}${e.powered ? ' 필살!' : e.fast ? ' 크리티컬!' : e.spell ? ' 철자!' : e.fever ? ' 피버!' : ''}`, e.powered || e.fast || e.spell || e.fever ? 'crit' : ''); refreshHud(); }, reduced() ? 0 : 230);
       // Redraw only my own buttons: the other player's hit must not replace my question.
       if (atk === 'me') drawQuestion();
     }
@@ -688,7 +775,7 @@ function drawResult() {
   const canRematch = !practice && !tournament && r.reason !== 'cancelled' && serverNow() - finishedAt < REMATCH_MS;
   const hpMe = r.hp?.[v.me] ?? m.hp, special = !practice && outcome === 'win' && r.reason === 'end' ? (hpMe === 100 ? '퍼펙트 게임!' : hpMe > 0 && hpMe <= 20 ? '기적의 역전승!' : '') : '';
   main(`<section class="yb-card yb-result ${outcome}${practice ? ' practice' : ''}${tournament ? ' tournament' : ''}">
-    ${practice || tournament ? `<span class="yb-result-kind">${esc(v.label || '')}</span>` : ''}
+    <span class="yb-result-kind">${practice || tournament ? `${esc(v.label || '')} · ` : ''}${modeName(v.mode)}</span>
     <div class="yb-result-pet">${avatar(m.pet?.key, { form: m.pet?.form ?? 1, expression: outcome === 'win' ? 'win' : outcome === 'lose' ? 'hurt' : 'normal' })}</div>
     <div class="yb-result-badge">${{ win: '승리!', lose: '패배', draw: r.reason === 'cancelled' ? '취소' : '무승부' }[outcome]}</div>
     ${special ? `<div class="yb-result-special">${special}</div>` : ''}

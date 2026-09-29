@@ -1,5 +1,5 @@
-import { createBattle, connect, answer, useSkill, forfeit, tick, battleView, BATTLE, BATTLE_SKILLS } from './battle-engine.js';
-import { CHARACTERS, buildQuestion, shuffle } from './core.js';
+import { createBattle, connect, answer, useSkill, forfeit, tick, battleView, BATTLE, BATTLE_SKILLS, SKILL_RULES } from './battle-engine.js';
+import { battleQuestions } from './battle-questions.js';
 
 // V13.66 practice match (연습 상대): a yacha match against a computer pet, run entirely on the
 // phone with the same engine as the battle rooms. No stake, no records, no league points;
@@ -14,20 +14,16 @@ export const BOT_LEVELS = {
 export const BOT_ID = 'practice-bot';
 const EMOTE_REPLIES = { lol: 'lol', come: 'come', gg: 'gg', nice: 'nice' };
 
-// Four-choice questions from the student's own words (at most 40), like a room builds them.
-export function practiceQuestions(words) {
-  const pool = words.filter(word => word?.id && word.meaning);
-  return shuffle(pool).slice(0, 40)
-    .map(word => { const q = buildQuestion(word, 'eng2mean_mc', pool); return { word_id: word.id, prompt: q.prompt, options: q.options, answer: q.options.indexOf(word.meaning) }; })
-    .filter(q => q.options.length === 4 && q.answer >= 0);
+// The student's own words (at most 40), built like a room builds them (V13.67: by mode).
+export function practiceQuestions(words, mode = 'speed') {
+  return battleQuestions(words, mode, 40);
 }
 
-export function createPracticeMatch({ me, questions, level = 'normal', onMessage, random = Math.random }) {
+// V13.67: the practice partner is 로보, a robot pet that grows with the level.
+export function createPracticeMatch({ me, questions, level = 'normal', mode = 'speed', onMessage, random = Math.random }) {
   const lv = BOT_LEVELS[level] || BOT_LEVELS.normal;
-  const species = Object.keys(CHARACTERS).filter(key => key !== me.pet?.key);
-  const key = species[Math.floor(random() * species.length)] || 'cat';
-  const bot = { id: BOT_ID, name: `연습 상대 · ${lv.name}`, pet: { key, form: lv.form, name: `AI ${CHARACTERS[key].ko}` }, bot: true };
-  const state = createBattle({ id: `practice-${Date.now()}`, players: [me, bot], questions, stake: 0, label: '연습 경기', now: Date.now() });
+  const bot = { id: BOT_ID, name: `연습 상대 · ${lv.name}`, pet: { key: 'robot', form: lv.form, name: `AI 로보` }, bot: true };
+  const state = createBattle({ id: `practice-${Date.now()}`, players: [me, bot], questions, stake: 0, label: '연습 경기', mode, now: Date.now() });
   let closed = false, loop = null, botTimer = null, skillTimer = null, emoteTimer = null;
   const now = () => Date.now();
   const deliver = message => { if (!closed) onMessage({ ...message, now: now() }); };
@@ -44,13 +40,20 @@ export function createPracticeMatch({ me, questions, level = 'normal', onMessage
     clearTimeout(botTimer);
     const turn = state.turn;
     const frozenFor = Math.max(0, (e.frozen_until?.[BOT_ID] || 0) - now());
-    const delay = frozenFor + lv.min + random() * (lv.max - lv.min);
-    if (delay >= BATTLE.TURN_MS - 120) return; // too slow: the word times out for the bot
+    // A spelling word takes longer to type and is a little harder for the bot too.
+    const spell = e.kind === 'spell';
+    const delay = frozenFor + (spell ? 2600 + (lv.min + random() * (lv.max - lv.min)) * 1.35 : lv.min + random() * (lv.max - lv.min));
+    const limit = state.mode === 'skill' ? (spell ? SKILL_RULES.SPELL_TURN_MS : SKILL_RULES.CHOICE_TURN_MS) : BATTLE.TURN_MS;
+    if (delay >= limit - 120) return; // too slow: the word times out for the bot
     botTimer = setTimeout(() => {
       if (closed || state.phase !== 'question' || state.turn !== turn || turn.locked[BOT_ID]) return;
       const q = state.questions[turn.q];
-      const wrong = [0, 1, 2, 3].filter(i => i !== q.answer);
-      const choice = random() < lv.accuracy ? q.answer : wrong[Math.floor(random() * wrong.length)];
+      let choice;
+      if (q.kind === 'spell') choice = random() < lv.accuracy * .88 ? q.text : `${q.text.slice(0, -1)}${q.text.endsWith('e') ? 'a' : 'e'}`;
+      else {
+        const wrong = [0, 1, 2, 3].filter(i => i !== q.answer);
+        choice = random() < lv.accuracy ? q.answer : wrong[Math.floor(random() * wrong.length)];
+      }
       emit(answer(state, BOT_ID, choice, now()));
       planSkill();
     }, delay);
@@ -96,7 +99,7 @@ export function createPracticeMatch({ me, questions, level = 'normal', onMessage
       }
       if (message.type === 'ping' || message.type === 'sync') return;
       const events = tick(state, t);
-      if (message.type === 'answer') events.push(...answer(state, me.id, Number(message.choice), t));
+      if (message.type === 'answer') events.push(...answer(state, me.id, typeof message.choice === 'string' ? message.choice.slice(0, 60) : Number(message.choice), t));
       else if (message.type === 'skill') events.push(...useSkill(state, me.id, String(message.skill), t));
       else if (message.type === 'leave') events.push(...forfeit(state, me.id, t));
       emit(events);
