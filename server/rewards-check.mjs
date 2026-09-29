@@ -1,5 +1,6 @@
-// Release checks for V13.67: 실력전 (spelling words in yacha), daily attendance (출석 체크), the
-// capsule machine (뽑기) and the word double chance (더블 찬스).
+// Release checks for V13.67: 실력전 (spelling words in yacha), daily attendance (출석 체크) and the
+// capsule machine (뽑기); V13.70: 경험치 and coins from robot matches and teacher exams, and the
+// retired word double chance.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { emptyState } from './state.mjs';
@@ -11,7 +12,8 @@ import { TITLES, TITLE_KEYS, visibleTitleKeys } from '../public/modules/titles.j
 import { createBattle, connect, answer, tick, battleView, SKILL_RULES, BATTLE } from '../public/modules/battle-engine.js';
 import { battleQuestions, spellHint, spellable } from '../public/modules/battle-questions.js';
 import { createPracticeMatch } from '../public/modules/battle-bot.js';
-import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, drawLucky, CHANCE_DAILY, CHANCE_STEPS } from '../public/modules/rewards.js';
+import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS } from '../public/modules/rewards.js';
+import { addBonus, bonusRecords } from './rewards.mjs';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 // A small deterministic random source for the odds checks.
@@ -126,53 +128,76 @@ export async function runRewardsChecks(assert, expectStatus) {
   const bootC = await service(state, 'GET', '/bootstrap', {}, tokens['qa-rw-c']);
   assert(bootC.stats.gacha.aura_sakura === 1 && bootC.rewards.gacha.items.aura_sakura === 1 && bootC.rewards.lucky.left === 0, 'V13.68 the app gets the decorations owned and today\'s coin capsules');
 
-  /* ---------- word double chance ---------- */
+  /* ---------- V13.70 the word double chance is retired ---------- */
   const A = profile('qa-rw-a');
-  await expectStatus(409, () => service(state, 'POST', '/chance/start', { bet: 10 }, tokens['qa-rw-a']), 'V13.67 double chance opens after studying enough words');
-  state.mastery['qa-rw-a'] = Object.fromEntries(words.slice(0, 30).map(w => [w.id, { mastery: 40, wrong: 1 }]));
-  await expectStatus(400, () => service(state, 'POST', '/chance/start', { bet: 15 }, tokens['qa-rw-a']), 'V13.67 bets are 10 or 20 coins');
-  const cb0 = await balance('qa-rw-a');
-  const started = await service(state, 'POST', '/chance/start', { bet: 10 }, tokens['qa-rw-a']);
-  const live = A.chance_live, q1 = live.q;
-  const sent = JSON.stringify(started) + JSON.stringify(await service(state, 'GET', '/bootstrap', {}, tokens['qa-rw-a']));
-  assert(started.points_balance === cb0 - 10 && started.chance.live.question.options.length === 4 && started.chance.live.question.kind === 'choice' && started.chance.left === CHANCE_DAILY - 1 && !sent.includes('chance_live') && !sent.includes('"accept"') && !('chance_live' in publicProfile(A)), 'V13.67 the bet is taken at the start; the answer never leaves the server');
-  assert(words.slice(0, 30).some(w => w.id === q1.word_id), 'V13.67 double chance only asks words the student studied');
-  await expectStatus(409, () => service(state, 'POST', '/chance/start', { bet: 10 }, tokens['qa-rw-a']), 'V13.67 one double chance at a time');
-  const r1 = await service(state, 'POST', '/chance/answer', { answer: q1.answer }, tokens['qa-rw-a']);
-  assert(r1.right && r1.pot === 10 * CHANCE_STEPS[0].mult && r1.chance.live.status === 'decide' && r1.chance.live.next_pot === 10 * CHANCE_STEPS[1].mult, 'V13.67 a right answer doubles the pot; keep it or go on');
-  const r2q = (await service(state, 'POST', '/chance/decide', { go: true }, tokens['qa-rw-a'])).chance.live.question;
-  const q2 = A.chance_live.q;
-  const w2 = words.find(w => w.id === q2.word_id);
-  assert(r2q.kind === 'choice' && q2.word_id !== q1.word_id && r2q.prompt === w2.meaning && q2.options.length === 4 && q2.options[q2.answer].toLowerCase() === w2.word.toLowerCase().replace(/\([^)]*\)/g, '').trim(), 'V13.67 the second word asks the English word for a meaning');
-  await service(state, 'POST', '/chance/answer', { answer: q2.answer }, tokens['qa-rw-a']);
-  const r3q = (await service(state, 'POST', '/chance/decide', { go: true }, tokens['qa-rw-a'])).chance.live.question;
-  const q3 = A.chance_live.q;
-  const r3 = await service(state, 'POST', '/chance/answer', { answer: q3.text.toUpperCase() }, tokens['qa-rw-a']);
-  assert(r3q.kind === 'spell' && r3q.hint === q3.hint && r3.right && r3.done && r3.paid === 10 * CHANCE_STEPS[2].mult && r3.points_balance === cb0 - 10 + r3.paid && !A.chance_live && A.chance.best === 3, 'V13.67 three right answers in a row (the last one spelled) pay eight times the bet, and it stops there');
-  await service(state, 'POST', '/chance/start', { bet: 20 }, tokens['qa-rw-a']);
-  const lossQ = A.chance_live.q;
-  const lost = await service(state, 'POST', '/chance/answer', { answer: (lossQ.answer + 1) % 4 }, tokens['qa-rw-a']);
-  assert(!lost.right && lost.lost === 20 && lost.reveal.word === lossQ.options[lossQ.answer] && !A.chance_live && lost.points_balance === cb0 - 10 + r3.paid - 20, 'V13.67 a wrong answer loses the pot and shows the right one');
-  const keepStart = await service(state, 'POST', '/chance/start', { bet: 10 }, tokens['qa-rw-a']);
-  A.chance_live.deadline = Date.now() - 2000;
-  const late = await service(state, 'POST', '/chance/answer', { answer: A.chance_live.q.answer }, tokens['qa-rw-a']);
-  assert(keepStart.chance.left === 0 && !late.right && late.late, 'V13.67 an answer after the time is up does not count');
-  await expectStatus(409, () => service(state, 'POST', '/chance/start', { bet: 10 }, tokens['qa-rw-a']), 'V13.67 double chance is three times a day');
-  A.chance.day = dayKey(now - DAY_MS);
-  await service(state, 'POST', '/chance/start', { bet: 10 }, tokens['qa-rw-a']);
-  const keepQ = A.chance_live.q;
-  await service(state, 'POST', '/chance/answer', { answer: keepQ.answer }, tokens['qa-rw-a']);
-  const bk = await balance('qa-rw-a');
-  const kept = await service(state, 'POST', '/chance/decide', { go: false }, tokens['qa-rw-a']);
-  assert(kept.paid === 20 && kept.points_balance === bk + 20 && !A.chance_live, 'V13.67 keeping the pot after a right answer pays it at once');
-  await service(state, 'POST', '/chance/start', { bet: 10 }, tokens['qa-rw-a']);
-  A.chance_live.deadline = Date.now() - 10000;
-  const afterLeave = await service(state, 'GET', '/rewards', {}, tokens['qa-rw-a']);
-  assert(afterLeave.chance.live === null && A.chance_live, 'V13.67 a word left open past its time shows as over (a GET does not change the state)');
-  await service(state, 'POST', '/chance/start', { bet: 10 }, tokens['qa-rw-a']).catch(() => null);
-  assert(A.chance.losses >= 3, 'V13.67 the next double chance request records a word left open as lost');
+  await expectStatus(404, () => service(state, 'POST', '/chance/start', { bet: 10 }, tokens['qa-rw-a']), 'V13.70 the word double chance is gone');
+  const beforeRefund = await balance('qa-rw-a');
+  A.points_spent = Number(A.points_spent || 0) + 10;
+  A.chance_live = { id: 'qa-old', bet: 10, pot: 10, step: 0, status: 'question', used: [] };
+  const refundQuestion = await balance('qa-rw-a');
+  A.chance_live = { id: 'qa-old', bet: 10, pot: 20, step: 0, status: 'decide', used: [] };
+  const refundDecide = await balance('qa-rw-a');
+  const bootA = await service(state, 'GET', '/bootstrap', {}, tokens['qa-rw-a']);
+  assert(refundQuestion === beforeRefund && refundDecide === beforeRefund + 10 && !JSON.stringify(bootA).includes('chance_live') && !('chance' in bootA.rewards), 'V13.70 a double chance left open gives its bet back (or the pot a right answer reached)');
+
+  /* ---------- V13.70 robot practice matches ---------- */
+  const tB = tokens['qa-rw-b'], B = profile('qa-rw-b');
+  const statsOf = async id => (await service(state, 'GET', '/bootstrap', {}, tokens[id])).stats;
+  const s0 = await statsOf('qa-rw-b');
+  const quickStart = await service(state, 'POST', '/battle/practice/start', { level: 'hard', mode: 'speed' }, tB);
+  const tooQuick = await service(state, 'POST', '/battle/practice/finish', { id: quickStart.id, result: 'win', right: 9 }, tB);
+  await expectStatus(404, () => service(state, 'POST', '/battle/practice/finish', { id: quickStart.id, result: 'win', right: 9 }, tB), 'V13.70 a robot match pays once');
+  const play = async (level, result, right) => {
+    const start = await service(state, 'POST', '/battle/practice/start', { level, mode: 'skill' }, tB);
+    B.bonus.bot_live.at -= 60000;
+    return service(state, 'POST', '/battle/practice/finish', { id: start.id, result, right }, tB);
+  };
+  const few = await play('hard', 'win', 2);
+  const botWon = await play('hard', 'win', 8);
+  const s1 = await statsOf('qa-rw-b');
+  const petXp = st => (st.pets || []).find(x => x.active)?.xp || 0;
+  assert(quickStart.left === BOT_DAILY && !tooQuick.paid && tooQuick.reason === 'short' && !few.paid && few.reason === 'few', 'V13.70 a robot match pays only when it lasted and enough words were right');
+  assert(botWon.paid && botWon.coins === BOT_WIN_REWARDS.hard.coins && botWon.xp === BOT_WIN_REWARDS.hard.xp && botWon.left === BOT_DAILY - 1 && s1.points_balance === s0.points_balance + botWon.coins && s1.points === s0.points + botWon.xp && petXp(s1) === petXp(s0) + botWon.xp && s1.today_xp === s0.today_xp + botWon.xp, 'V13.70 a robot win pays coins and 경험치 by the robot level (level, partner pet and today)');
+  assert(s1.practice_count === s0.practice_count && s1.streak === s0.streak && s1.accuracy === s0.accuracy && !state.sessions.some(x => x.bonus), 'V13.70 robot matches are not practice records (count, study days and accuracy stay)');
+  const lostMatch = await play('easy', 'lose', 5);
+  assert(lostMatch.paid && lostMatch.coins === BOT_TRY_REWARD.coins && lostMatch.xp === BOT_TRY_REWARD.xp, 'V13.70 a lost robot match still pays a little');
+  const spoofed = await (async () => { const start = await service(state, 'POST', '/battle/practice/start', { level: 'easy', mode: 'speed' }, tB); B.bonus.bot_live.at -= 60000; return service(state, 'POST', '/battle/practice/finish', { id: start.id, result: 'win', right: 6, level: 'hard' }, tB); })();
+  assert(spoofed.paid && spoofed.coins === BOT_WIN_REWARDS.easy.coins, 'V13.70 the reward follows the level the match started with');
+  await play('normal', 'draw', 4);
+  await play('normal', 'win', 4);
+  const over = await play('normal', 'win', 9);
+  assert(over.paid === false && over.reason === 'daily' && over.left === 0 && B.bonus.bot.count === BOT_DAILY, `V13.70 robot matches pay ${BOT_DAILY} times a day`);
+  const bootB = await service(state, 'GET', '/bootstrap', {}, tB);
+  const rankB = bootB.ranking.find(r => r.is_me);
+  assert(!('bonus' in bootB.profile) && bootB.rewards.bot.left === 0 && rankB.xp >= botWon.xp + lostMatch.xp, 'V13.70 the bonus counts in the weekly ranking; the ledger itself is not sent');
+  // The ledger keeps one row per day and pet; old days fold together without changing totals.
+  const ledger = { id: 'qa-ledger', bonus: {} };
+  addBonus(ledger, { xp: 10, coins: 1, pet: 'dog', now: now - 60 * DAY_MS });
+  addBonus(ledger, { xp: 20, coins: 2, pet: 'dog', now: now - 50 * DAY_MS });
+  addBonus(ledger, { xp: 5, coins: 1, pet: 'dog', now });
+  addBonus(ledger, { xp: 5, coins: 1, pet: 'dog', now });
+  const rows = bonusRecords(ledger);
+  assert(rows.length === 2 && rows.reduce((n, r) => n + r.xp, 0) === 40 && rows.reduce((n, r) => n + r.reward_points, 0) === 5 && rows.every(r => r.bonus && r.answered_count === 0 && r.pet_key === 'dog'), 'V13.70 the bonus ledger folds old days and keeps the totals');
+
+  /* ---------- V13.70 teacher exams ---------- */
+  const tC = tokens['qa-rw-c'];
+  const exam = await service(state, 'POST', '/exams', { title: 'QA 보상 시험', class_name: '고1A', school: '단원고', range_codes: range, exam_type: 'write_meaning', question_count: 4, duration_sec: 300, passing_score: 70, max_attempts: 2, available_at: now - 1000, due_at: now + 3600000, release_result: false }, tokens.qa_rw_teacher);
+  const c0 = await statsOf('qa-rw-c');
+  const examFirst = await service(state, 'POST', '/exams/start', { exam_id: exam.id }, tC);
+  const firstAttempt = state.examAttempts.find(x => x.id === examFirst.attempt.id);
+  const firstDone = await service(state, 'POST', `/attempts/${firstAttempt.id}/submit`, { lease: firstAttempt.lease, revision: firstAttempt.revision, answers: { 0: '모름', 2: '모름' } }, tC);
+  const c1 = await statsOf('qa-rw-c');
+  assert(firstDone.attempt.reward?.xp === 2 * EXAM_XP_PER_ANSWER && firstDone.attempt.reward.coins === EXAM_COINS && firstDone.attempt.score === undefined && c1.points === c0.points + 2 * EXAM_XP_PER_ANSWER && c1.points_balance === c0.points_balance + EXAM_COINS && c1.practice_count === c0.practice_count, 'V13.70 an exam gives 경험치 per answered question and coins for half of it (the hidden score stays hidden)');
+  const again = await service(state, 'POST', '/exams/start', { exam_id: exam.id }, tC);
+  const againAttempt = state.examAttempts.find(x => x.id === again.attempt.id);
+  const againDone = await service(state, 'POST', `/attempts/${againAttempt.id}/submit`, { lease: againAttempt.lease, revision: againAttempt.revision, answers: { 0: 'a', 1: 'b', 2: 'c', 3: 'd' } }, tC);
+  const c2 = await statsOf('qa-rw-c');
+  assert(!againDone.attempt.reward && c2.points === c1.points && c2.points_balance === c1.points_balance, 'V13.70 only the first attempt of an exam pays');
   const homeUi = source('../public/modules/student.js'), arcade = source('../public/modules/arcade.js');
   const luckyUi = source('../public/modules/lucky.js');
   assert(luckyUi.includes('export function luckyShow(') && luckyUi.includes('function machineSpin(') && luckyUi.includes("const shakes = res.mult === 0 ? 1 : res.mult === 1 ? 2 : 3") && luckyUi.includes('data-lk="skip"') && luckyUi.includes('prefers-reduced-motion') && arcade.includes('luckyCard(luckyState(A)'), 'V13.68 the coin capsule has a machine and a show: coin in, dial, the capsule shakes more for better results, bursts open; it can be skipped and respects reduced motion');
-  assert(homeUi.includes('attendanceCard(') && arcade.includes('/lucky/pull') && arcade.includes('/chance/answer') && arcade.includes('확률'), 'V13.67 the home screen has the attendance card; the coin arcade has the capsule machine (with its odds) and double chance');
+  assert(homeUi.includes('attendanceCard(') && arcade.includes('/lucky/pull') && !arcade.includes('/chance/') && !arcade.includes('더블 찬스') && arcade.includes('확률'), 'V13.67 the home screen has the attendance card; the coin arcade has the capsule machine (with its odds); V13.70 no double chance');
+  const battleV70 = source('../public/modules/battle.js'), sessionsUi = source('../public/modules/sessions.js'), appUi = source('../public/app.js'), buildUi = source('./build-assets.mjs');
+  assert(battleV70.includes("api('/battle/practice/start'") && battleV70.includes("api('/battle/practice/finish'") && battleV70.includes('botRewardLine()') && sessionsUi.includes('a.reward ?') && homeUi.includes('data-go="ranking" data-from="me"') && homeUi.includes("A.rankFrom === 'me' ? backTo('me', '나')") && appUi.includes("A.rankFrom = d.from || 'home'") && !appUi.includes('wallet-chance') && buildUi.includes('"v1370.css"'), 'V13.70 robot and exam rewards show in the app; 나 opens the ranking; the wallet has no double chance');
+  assert(battleV70.indexOf('id="yb-answers"') < battleV70.indexOf('id="yb-skillbar"') && battleV70.includes('yb-strip-v1370') && battleV70.includes('yb-hpn-'), 'V13.70 the match shows the answers right under the word, the clock beside the message line and HP numbers');
 }

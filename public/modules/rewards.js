@@ -1,5 +1,6 @@
 // Coin rewards and games, shared by the server (which decides) and the app (which draws): daily
-// attendance (출석 체크), the coin capsule (코인 뽑기, V13.68) and the word double chance (더블 찬스).
+// attendance (출석 체크), the coin capsule (코인 뽑기, V13.68) and, since V13.70, the small rewards
+// for practice matches against the robot and for teacher exams (실전시험).
 
 // Attendance: one stamp a day (days in a row are not required). The 7th stamp of a card gives
 // the most coins and a free coin capsule (뽑기권), then a new card starts.
@@ -46,14 +47,20 @@ export const GACHA_ITEMS = {
 export const GACHA_KEYS = Object.keys(GACHA_ITEMS);
 export const ownedDecorations = items => GACHA_KEYS.filter(key => Number(items?.[key] || 0) > 0);
 
-// Word double chance: bet coins, answer a word, and each right answer doubles the pot. After
-// a right answer the student keeps the pot or goes on; three steps at most. A wrong answer or
-// running out of time loses the pot. Only words the student has already studied come up.
-export const CHANCE_BETS = [10, 20];
-export const CHANCE_DAILY = 3;
-export const CHANCE_STEPS = [
-  { kind: 'choice', dir: 'eng2mean', mult: 2, ms: 12000, name: '뜻 고르기' },
-  { kind: 'choice', dir: 'mean2eng', mult: 4, ms: 12000, name: '단어 고르기' },
-  { kind: 'spell', mult: 8, ms: 20000, name: '철자 쓰기' }
-];
-export const CHANCE_MIN_WORDS = 8;
+// V13.70 practice match against the robot (로보와 연습 대결): a few coins and 경험치 for the
+// partner pet. A win pays by the robot's level; a loss or draw still pays a little. The first
+// BOT_DAILY matches of a day pay, and only if the student answered BOT_MIN_RIGHT words right.
+export const BOT_WIN_REWARDS = { easy: { coins: 3, xp: 40 }, normal: { coins: 5, xp: 60 }, hard: { coins: 8, xp: 80 } };
+export const BOT_TRY_REWARD = { coins: 2, xp: 30 };
+export const BOT_DAILY = 5;
+export const BOT_MIN_RIGHT = 3;
+export const BOT_MIN_MS = 15000; // a match cannot be over faster than this
+export function botReward(level, result) {
+  return result === 'win' ? (BOT_WIN_REWARDS[level] || BOT_WIN_REWARDS.normal) : BOT_TRY_REWARD;
+}
+
+// V13.70 teacher exams (실전시험): 경험치 for every question answered (not for right answers, so a
+// result the teacher has not released stays hidden) and coins for finishing at least half of it.
+// Only the first submitted attempt of an exam pays.
+export const EXAM_XP_PER_ANSWER = 10;
+export const EXAM_COINS = 10;

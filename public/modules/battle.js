@@ -10,6 +10,7 @@ import { titleState, openTitleDetail } from './titles-ui.js';
 import { mountLeagueBoard, clearLeagueCache, shownTitle } from './league-ui.js';
 import { createPracticeMatch, practiceQuestions, BOT_LEVELS } from './battle-bot.js';
 import { BATTLE_MODES } from './battle-engine.js';
+import { BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, BOT_MIN_RIGHT } from './rewards.js';
 import { tournamentCard, openBracket } from './tournament-ui.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
@@ -225,6 +226,7 @@ function playTab(h) {
     </section>
     <section class="yb-card yb-bot-v1366">
       <div class="yb-bot-head"><span class="yb-bot-pet" aria-hidden="true">${avatar('robot', { form: BOT_LEVELS[B.botLevel]?.form || 2 })}<i>AI</i></span><div><h2>로보와 연습 대결</h2><p class="yb-note">친구가 없을 때 AI 로보와 ${modeName(B.mode)}으로 겨뤄요. 판돈 없이, 기록·리그에도 들어가지 않아요.</p></div></div>
+      ${botRewardLine()}
       <div class="yb-bot-levels" role="group" aria-label="연습 상대 난이도">${Object.entries(BOT_LEVELS).map(([key, lv]) => `<button type="button" class="yb-chip ${B.botLevel === key ? 'on' : ''}" data-yb="bot-level" data-level="${key}" aria-pressed="${B.botLevel === key}">${lv.name}</button>`).join('')}</div>
       <button type="button" class="btn full yb-bot-go" data-yb="bot" ${wordsOk ? '' : 'disabled'}>연습 대결 시작 ${icon('arrow')}</button>
     </section>
@@ -345,6 +347,11 @@ async function cancelRoom(button) {
 }
 
 /* ---------- V13.66 practice match against the app ---------- */
+// V13.70 what a robot match pays (coins and 경험치), by level; the first few matches a day.
+function botRewardLine() {
+  const win = BOT_WIN_REWARDS[B.botLevel] || BOT_WIN_REWARDS.normal, left = B.A.data.rewards?.bot?.left ?? BOT_DAILY;
+  return `<div class="yb-bot-reward-v1370"><span><b>이기면</b>${coin()}${win.coins} · 경험치 ${win.xp}</span><span><b>져도</b>${coin()}${BOT_TRY_REWARD.coins} · 경험치 ${BOT_TRY_REWARD.xp}</span><small>${left > 0 ? `오늘 보상 ${left}/${BOT_DAILY}판 남음 · 단어 ${BOT_MIN_RIGHT}개 이상 맞히면 받아요` : '오늘 보상은 다 받았어요. 연습은 계속할 수 있어요!'}</small></div>`;
+}
 function meAsPlayer() {
   const A = B.A, pet = A.data.stats.pet;
   return { id: A.data.profile.id, name: A.data.profile.display_name, pet: pet ? { key: pet.key, form: pet.form, name: pet.name || '' } : null, streak: 0, title: titleState(A).equipped, tier: A.data.league?.tier?.key || null };
@@ -360,7 +367,11 @@ function startBotMatch(button) {
   B.room = { id: 'practice', practice: true, stake: 0 };
   B.view = null;
   B.practiceSetup = { ranges: [...B.ranges], level: B.botLevel, mode: B.mode };
+  B.botReward = null;
+  // The server notes the start (and the level); a match it never heard of pays nothing.
+  const ticket = api('/battle/practice/start', { level: B.botLevel, mode: B.mode }).then(res => res.id).catch(() => null);
   B.local = createPracticeMatch({ me: meAsPlayer(), questions, level: B.botLevel, mode: B.mode, onMessage });
+  B.local.ticket = ticket;
   main('<div class="yb-loading">로보를 부르고 있어요…</div>');
   B.local.start();
 }
@@ -490,8 +501,9 @@ function drawMatch() {
   const m = me(), f = foe();
   // The lobby may have been scrolled; the arena starts at the top of the screen.
   if (!document.getElementById('yb-arena')) window.scrollTo(0, 0);
+  // V13.70 easier to read: a smaller arena, one line for what is happening next to the clock,
+  // and the answers right under the word (skills below them).
   main(`
-    <div class="yb-clock"><b>남은 시간</b><span id="yb-clock">${v.mode === 'skill' ? '2:00' : '1:30'}</span>${modeTag(v.mode)}<em class="yb-fever-tag">피버 1.5배</em></div>
     <div class="yb-arena" id="yb-arena">
       <div class="yb-banner">夜叉</div><div class="yb-centerline"></div><div class="yb-ring"></div>
       ${hud(f, 'op')}
@@ -503,10 +515,13 @@ function drawMatch() {
       <div class="yb-countdown" id="yb-countdown" hidden></div>
       <div class="yb-fever-banner" id="yb-fever" hidden>피버 타임!<small>공격력 1.5배</small></div>
     </div>
-    <div class="yb-msg" aria-live="polite"><div class="yb-msg-main" id="yb-msg-main"></div><div class="yb-msg-sub" id="yb-msg-sub"></div></div>
-    <div class="yb-question"><div class="yb-q-head"><span id="yb-q-n"></span><span>${v.label ? esc(v.label) : `판돈 ${num(v.stake)}코인`}</span></div><div class="yb-q-word" id="yb-q-word">…</div><div class="yb-turnbar"><i id="yb-turnbar"></i></div><div class="yb-status"><span id="yb-status-me"></span><span id="yb-status-op"></span></div></div>
-    <div class="yb-skillbar" id="yb-skillbar"></div>
+    <div class="yb-strip-v1370">
+      <div class="yb-msg" aria-live="polite"><div class="yb-msg-main" id="yb-msg-main"></div><div class="yb-msg-sub" id="yb-msg-sub"></div></div>
+      <div class="yb-clock"><b>남은 시간</b><span id="yb-clock">${v.mode === 'skill' ? '2:00' : '1:30'}</span><em class="yb-fever-tag">피버 1.5배</em></div>
+    </div>
+    <div class="yb-question"><div class="yb-q-head"><span id="yb-q-n"></span><span>${modeName(v.mode)} · ${v.label ? esc(v.label) : `판돈 ${num(v.stake)}코인`}</span></div><div class="yb-q-word" id="yb-q-word">…</div><div class="yb-turnbar"><i id="yb-turnbar"></i></div><div class="yb-status"><span id="yb-status-me"></span><span id="yb-status-op"></span></div></div>
     <div class="yb-answers" id="yb-answers"></div>
+    <div class="yb-skillbar" id="yb-skillbar"></div>
     <div class="yb-emotes" id="yb-emotes"></div>
     <button type="button" class="yb-leave" data-yb="leave">대결 포기하기</button>`);
   refreshHud();
@@ -526,7 +541,7 @@ function hud(p, side) {
     <div class="yb-hud-row"><span class="yb-hud-name">${esc(petName(p.pet))}</span><span class="yb-hud-lv">${PET_FORMS[p.pet?.form ?? 1] || ''}</span></div>
     <div class="yb-hud-who">${p.tier ? tierEmblem(p.tier, { size: 'xs' }) : ''}${esc(p.name)}${side === 'me' ? ' · 나' : ''}${p.bot ? ' <i class="yb-ai">AI</i>' : ''}${p.streak >= 2 ? ` <span class="yb-streak">${p.streak}연승</span>` : ''}</div>
     ${shownTitle(p.title) ? `<div class="yb-hud-title">${titleBadge(p.title, { size: 'xs' })}</div>` : ''}
-    <div class="yb-hpbar"><i>HP</i><div class="yb-track"><div class="yb-fill" id="yb-hp-${side}"></div></div></div>
+    <div class="yb-hpbar"><i>HP</i><div class="yb-track"><div class="yb-fill" id="yb-hp-${side}"></div></div><b class="yb-hp-num" id="yb-hpn-${side}">${Math.max(0, p.hp)}</b></div>
     <div class="yb-hud-foot"><div class="yb-ki" id="yb-ki-${side}"></div><div class="yb-fx" id="yb-fx-${side}"></div></div>
   </div>`;
 }
@@ -535,6 +550,8 @@ function refreshHud() {
   for (const [side, p] of [['me', me()], ['op', foe()]]) {
     const pct = Math.max(0, p.hp) / MAX_HP * 100, fill = document.getElementById('yb-hp-' + side);
     if (fill) { fill.style.width = pct + '%'; fill.style.backgroundColor = pct > 50 ? '#2fbf71' : pct > 20 ? '#f2b233' : '#e5484d'; }
+    const hpn = document.getElementById('yb-hpn-' + side);
+    if (hpn) hpn.textContent = Math.max(0, p.hp);
     const ki = document.getElementById('yb-ki-' + side);
     if (ki) ki.innerHTML = '<i>기</i>' + Array.from({ length: MAX_KI }, (_, i) => `<span class="${i < p.ki ? 'on' : ''}"></span>`).join('');
     const fx = document.getElementById('yb-fx-' + side);
@@ -626,20 +643,21 @@ function hookKeys() {
 
 function drawQuestion() {
   const q = B.view.question; if (!q) return;
-  document.getElementById('yb-q-n').textContent = `${q.n}번째 단어${q.kind === 'spell' ? ' · 철자 쓰기' : ''}`;
+  document.getElementById('yb-q-n').textContent = `${q.n}번째 단어 · ${q.kind === 'spell' ? '철자 쓰기' : '뜻 고르기'}`;
   document.getElementById('yb-q-word').textContent = q.prompt;
   document.getElementById('yb-q-word').classList.toggle('meaning', q.kind === 'spell');
   const frozen = (q.frozen_until?.[B.view.me] || 0) > serverNow();
   document.querySelector('.battle-app')?.classList.toggle('yb-spelling', q.kind === 'spell');
   if (q.kind === 'spell') drawSpell(q, frozen);
-  else document.getElementById('yb-answers').innerHTML = q.options.map((o, i) => `<button type="button" class="yb-answer ${q.answer === i ? 'right' : ''} ${q.answer !== undefined && q.answer !== i ? 'dim' : ''} ${q.picked === i ? 'picked' : ''} ${q.picked === i && q.hit ? 'hit' : ''}" data-yb="answer" data-choice="${i}" ${q.locked || q.answer !== undefined || frozen ? 'disabled' : ''}><span class="yb-tag"><b>${i + 1}</b>공격</span><span class="yb-ko">${esc(o)}</span></button>`).join('');
+  else document.getElementById('yb-answers').innerHTML = q.options.map((o, i) => `<button type="button" class="yb-answer ${q.answer === i ? 'right' : ''} ${q.answer !== undefined && q.answer !== i ? 'dim' : ''} ${q.picked === i ? 'picked' : ''} ${q.picked === i && q.hit ? 'hit' : ''}" data-yb="answer" data-choice="${i}" aria-label="${i + 1}번 ${esc(o)} 공격" ${q.locked || q.answer !== undefined || frozen ? 'disabled' : ''}><span class="yb-tag"><b>${i + 1}</b></span><span class="yb-ko">${esc(o)}</span></button>`).join('');
   document.getElementById('yb-answers').classList.toggle('frozen', frozen);
   document.getElementById('yb-pet-me')?.classList.toggle('frozen', frozen);
   if (frozen) {
     setStatus('me', '얼어붙었어요! 2초 뒤 풀려요');
     later(() => { if (B.view?.question === q && q.answer === undefined) { setStatus('me', ''); drawQuestion(); } }, Math.max(0, q.frozen_until[B.view.me] - serverNow()) + 30);
   }
-  if (q.answer === undefined && !q.locked) say(q.kind === 'spell' ? `<em>${esc(q.prompt)}</em>을(를) 영어로!` : `<em>${esc(q.prompt)}</em>의 뜻은?`, q.kind === 'spell' ? '철자를 다 쓰고 공격! 쓰기 정답은 두 배로 세요.' : '정답 버튼이 곧 공격 버튼이에요.');
+  // The word itself is in the question card; the line only says what to do.
+  if (q.answer === undefined && !q.locked) say(q.kind === 'spell' ? '뜻을 보고 <em>영어 철자</em>를 써요!' : '알맞은 <em>뜻</em>을 누르면 바로 공격!', q.kind === 'spell' ? '쓰기 정답은 두 배로 세요.' : '');
 }
 
 function say(mainHtml, sub = '') {
@@ -786,10 +804,10 @@ function applyEvent(e) {
 }
 
 function drawResult() {
-  const v = B.view, r = v.result || {}, m = me();
+  const v = B.view, r = v.result || {}, m = me(), local = B.local;
   const outcome = !r.winner ? 'draw' : r.winner === v.me ? 'win' : 'lose';
   const practice = !!B.room?.practice, tournament = !practice && /^대회/.test(v.label || '');
-  const delta = practice ? '연습 경기 · 코인 변화 없음'
+  const delta = practice ? `<span id="yb-bot-reward">${botRewardText()}</span>`
     : tournament ? (outcome === 'win' ? '다음 라운드 진출!' : outcome === 'lose' ? '여기까지! 멋진 경기였어요' : '무승부 · 다시 겨뤄요')
     : `${coin()}${outcome === 'win' ? `+${num(r.stake)}` : outcome === 'lose' ? `−${num(r.stake)}` : '±0'}`;
   closeSocket();
@@ -813,6 +831,33 @@ function drawResult() {
   </section>
   ${missed.length ? `<section class="yb-card yb-review"><h2>이번 대결에서 놓친 단어 <small>${missed.length}개</small></h2><ul>${missed.slice(0, 10).map(w => `<li><b>${esc(w.word)}</b><span>${esc(w.meaning)}</span></li>`).join('')}</ul>${missed.length > 10 ? `<p class="yb-note">외 ${missed.length - 10}개</p>` : ''}<button type="button" class="btn primary full" data-yb="review">놓친 단어 연습하기</button></section>` : ''}`);
   if (canRematch) watchOffers(v.id, finishedAt);
+  if (practice && r.reason === 'forfeit' && r.loser === v.me && !B.botReward) { B.botReward = { paid: false, reason: 'forfeit' }; document.getElementById('yb-bot-reward').innerHTML = botRewardText(); }
+  else if (practice) claimBotReward(outcome, local);
+}
+// V13.70 the robot match reward: asked once per match, shown on the result card.
+function botRewardText() {
+  const r = B.botReward;
+  if (!r) return '보상 확인 중…';
+  if (r.paid) return `${coin()}+${num(r.coins)} · 경험치 +${num(r.xp)}`;
+  return { few: `단어를 ${BOT_MIN_RIGHT}개 이상 맞히면 보상을 받아요`, daily: '오늘 연습 보상은 다 받았어요', forfeit: '포기한 경기는 보상이 없어요' }[r.reason] || '연습 경기 · 보상 없음';
+}
+async function claimBotReward(outcome, local) {
+  const cur = B;
+  if (!local || local.claimed) return;
+  local.claimed = true;
+  const id = await local.ticket;
+  let res = { paid: false, reason: 'error' };
+  if (id) {
+    try { res = await api('/battle/practice/finish', { id, result: outcome, right: local.myRight() }); }
+    catch { res = { paid: false, reason: 'error' }; }
+  }
+  if (B !== cur) return;
+  B.botReward = res;
+  if (res.left !== undefined && B.A.data.rewards) B.A.data.rewards.bot = { left: res.left, daily: res.daily };
+  if (res.paid && res.stats) Object.assign(B.A.data.stats, res.stats);
+  const el = document.getElementById('yb-bot-reward');
+  if (el) el.innerHTML = botRewardText();
+  if (res.paid) el?.closest('.yb-result-points')?.classList.add('paid');
 }
 
 /* ---------- rematch ---------- */

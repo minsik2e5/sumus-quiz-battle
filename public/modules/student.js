@@ -13,7 +13,8 @@ import { ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, GACHA_ITEMS, GACHA_TIERS } from
 // collect. Pages without their own button light up the one they belong to.
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['yacha', '야차전', 'battle'], ['arcade', '놀이터', 'arcade'], ['me', '나', 'user']];
 const NAV_OF = { exam: 'practice', records: 'practice', ranking: 'home', studio: 'me', titles: 'me', gachabook: 'me' };
-export const navOf = tab => NAV_OF[tab] || tab;
+// V13.70 the ranking also opens from 나 (A.rankFrom), and then belongs to 나.
+export const navOf = (tab, A = null) => tab === 'ranking' && A?.rankFrom === 'me' ? 'me' : NAV_OF[tab] || tab;
 // V13.66: coins (코인) sit in the header on every tab; tapping opens the wallet.
 function coinChip(A) {
   const balance = Number(A.data.stats?.points_balance ?? 0);
@@ -21,7 +22,7 @@ function coinChip(A) {
 }
 export function shell(A, content) {
   const p = A.data.profile;
-  return `<div class="student-app"><main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div>${p.preview_owner_id ? '<button class="preview-exit-v1359" data-action="exit-student-preview">← 교사 화면</button>' : ''}${A.data.stats?.needs_pet_pick ? '' : coinChip(A)}<button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${navOf(A.tab) === id ? 'active' : ''}" ${navOf(A.tab) === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
+  return `<div class="student-app"><main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div>${p.preview_owner_id ? '<button class="preview-exit-v1359" data-action="exit-student-preview">← 교사 화면</button>' : ''}${A.data.stats?.needs_pet_pick ? '' : coinChip(A)}<button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${navOf(A.tab, A) === id ? 'active' : ''}" ${navOf(A.tab, A) === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
 }
 export function studentPage(A) {
   return shell(A, ({ home, practice, exam, ranking, records, studio, titles: titlesPage, arcade: arcadePage, yacha: yachaPage, me: mePage, gachabook: gachaBookPage }[A.tab] || home)(A));
@@ -591,6 +592,13 @@ function yachaPage() {
 }
 // V13.68 나: what the student has collected, and the way to each collection.
 const backTo = (tab, label) => `<button type="button" class="page-back-v1368" data-go="${tab}">${icon('back')}${label}</button>`;
+// V13.70 my place this week in my grade (경험치), for the 나 ranking tile.
+function myRankLine(A) {
+  const rows = A.data.ranking || [], me = rows.find(r => r.is_me);
+  if (!me || !(Number(me.xp || 0) > 0)) return '이번 주 순위 보기';
+  const higher = rows.filter(r => r.grade === me.grade && Number(r.xp || 0) > Number(me.xp || 0)).length;
+  return `이번 주 ${higher + 1}위`;
+}
 function mePage(A) {
   const p = A.data.profile, g = A.data.stats, pet = g.pet, t = titleState(A);
   const items = A.data.rewards?.gacha?.items || {};
@@ -603,8 +611,9 @@ function mePage(A) {
       <span class="me-pet">${pet ? avatar(pet.key, { form: Math.max(1, pet.form), accessory: p.avatar_accessory, frame: p.avatar_frame }) : ''}</span>
       <div class="me-who"><strong>${esc(p.display_name)}</strong><small>${esc(p.school || '')} · ${esc(p.class_name || '')} · Lv.${num(g.level || 1)}</small>${titleBadge(t.equipped, { size: 'sm' })}</div>
     </section>
-    <div class="me-tiles-v1368${gachaHave ? '' : ' two'}">
-      <button type="button" class="me-tile pet" data-go="studio"><span class="me-ico">${icon('user')}</span><b>내 펫·꾸미기</b><small>펫 ${owned}/${Object.keys(CHARACTERS).length} · 장식·프레임</small></button>
+    <div class="me-tiles-v1368${gachaHave ? ' four' : ''}">
+      <button type="button" class="me-tile pet" data-go="studio"><span class="me-ico">${icon('user')}</span><b>내 펫·꾸미기</b><small>펫 ${owned}/${Object.keys(CHARACTERS).length}</small></button>
+      <button type="button" class="me-tile rank" data-go="ranking" data-from="me"><span class="me-ico">${icon('ranking')}</span><b>랭킹</b><small>${myRankLine(A)}</small></button>
       <button type="button" class="me-tile titles" data-go="titles"><span class="me-ico">${icon('star')}</span><b>칭호 도감</b><small>${titleCount(A)}${(t.fresh || []).length ? ' · <i class="me-new">NEW</i>' : ''}</small></button>
       ${gachaHave ? `<button type="button" class="me-tile gacha" data-go="gachabook"><span class="me-ico">${icon('arcade')}</span><b>모은 꾸미기</b><small>${gachaHave}개</small></button>` : ''}
     </div>
@@ -711,7 +720,7 @@ function podium(top, metric, mode, rankNo) {
 }
 function ranking(A) {
   const view = A.rankView === 'league' ? 'league' : 'study';
-  const head = `${backTo('home', '홈')}<div class="page-heading rank-heading-v1326"><h1>SUMUS 랭킹</h1><p>${view === 'league' ? '같은 학교·학년 친구들과 겨루는 주간 야차 리그예요.' : '시험 점수가 아닌 실제 학습 기록으로 올라가요.'}</p></div>
+  const head = `${A.rankFrom === 'me' ? backTo('me', '나') : backTo('home', '홈')}<div class="page-heading rank-heading-v1326"><h1>SUMUS 랭킹</h1><p>${view === 'league' ? '같은 학교·학년 친구들과 겨루는 주간 야차 리그예요.' : '시험 점수가 아닌 실제 학습 기록으로 올라가요.'}</p></div>
     <div class="segment rank-view-v1366" role="group" aria-label="랭킹 종류"><button type="button" data-rank-view="study" class="${view === 'study' ? 'selected' : ''}" aria-pressed="${view === 'study'}">학습 랭킹</button><button type="button" data-rank-view="league" class="${view === 'league' ? 'selected' : ''}" aria-pressed="${view === 'league'}">야차 리그</button></div>`;
   if (view === 'league') return `${head}<div class="lg-board" data-league-board data-period="${A.leaguePeriod === 'all' ? 'all' : 'week'}"></div>`;
   const mode = RANK_MODES.some(([key]) => key === A.rankMode) ? A.rankMode : 'xp';

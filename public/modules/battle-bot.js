@@ -80,6 +80,8 @@ export function createPracticeMatch({ me, questions, level = 'normal', mode = 's
   return {
     id: state.id,
     bot,
+    // V13.70 words the student answered right (the server pays the practice reward by it).
+    myRight: () => Number(state.players[me.id]?.correct || 0),
     start() {
       connect(state, BOT_ID, now());
       deliver({ type: 'view', view: battleView(state, me.id) });

@@ -4,6 +4,7 @@
 import { levelInfo, petProgress } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked, LEAGUE_POINTS, LEAGUE_PAIR_DAY_CAP, leagueTier, leagueTierIndex } from '../public/modules/titles.js';
 import { GACHA_ITEMS, GACHA_KEYS } from '../public/modules/rewards.js';
+import { bonusRecords } from './rewards.mjs';
 
 export const DAY_MS = 86400000;
 export const KST_OFFSET_MS = 9 * 3600000;
@@ -98,6 +99,8 @@ export function createCompetition(state, now = Date.now()) {
   for (const s of state.sessions || []) push(sessionsBy, s.student_id, s);
   for (const b of state.battles || []) if (isMatch(b)) { push(battlesBy, b.host_id, b); push(battlesBy, b.guest_id, b); }
   const profiles = new Map((state.profiles || []).map(p => [p.id, p]));
+  // V13.70 경험치 and coins from robot matches and exams count like practice (levels, pets, rankings).
+  for (const p of profiles.values()) for (const row of bonusRecords(p)) push(sessionsBy, p.id, row);
   const week = rankingWeek(now), lastWeek = rankingWeek(week.start - 1);
   const champions = new Map();
   for (const t of state.tournaments || []) if (t.status === 'finished' && t.champion) champions.set(t.champion, (champions.get(t.champion) || 0) + 1);
