@@ -1061,7 +1061,7 @@ async function tournamentTvLink(id) {
 // V13.73 teacher: coins as a gift to one student, a class or everyone, with a short note. The
 // student opens a gift box on the next visit to the home screen.
 function giftModal(preset = []) {
-  const students = A.data.profiles.filter(s => s.active !== false).sort((a, b) => String(a.class_name).localeCompare(String(b.class_name), 'ko') || a.display_name.localeCompare(b.display_name, 'ko'));
+  const students = A.data.profiles.filter(s => s.active !== false && !s.preview_owner_id).sort((a, b) => String(a.class_name).localeCompare(String(b.class_name), 'ko') || a.display_name.localeCompare(b.display_name, 'ko'));
   const classes = [...new Set(students.map(s => s.class_name).filter(Boolean))];
   const st = { target: preset.length ? 'pick' : 'class', cls: classes[0] || '', picked: new Set(preset), amount: GIFT_AMOUNTS[1], q: '' };
   const count = () => st.target === 'all' ? students.length : st.target === 'class' ? students.filter(s => s.class_name === st.cls).length : st.picked.size;
