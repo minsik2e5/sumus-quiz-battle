@@ -2,6 +2,8 @@ import { EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, dayKey } from './core.js';
 import { icon, esc, num, date, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar } from './character.js';
 import { rangePicker, selectedCount, getRanges } from './student.js';
+import { bracketHtml } from './tournament-ui.js';
+import { coin } from './emblems.js';
 // Grammar datasets are ~170KB; load only the active school's file, on demand,
 // so students (who also import this module) never download them up front.
 const GRAMMAR_LOADERS = {
@@ -17,7 +19,7 @@ const passageNumberLabel = passage => /과/.test(String(passage.number)) ? Strin
 const grammarCache = new Map();
 let grammarLoaded = null;
 export function onTeacherGrammarLoaded(callback) { grammarLoaded = callback; }
-const tabs = [['dashboard', '대시보드', 'home'], ['students', '학생 관리', 'user'], ['books', '단어 데이터', 'practice'], ['disputes', '뜻 이의제기', 'records'], ['results', '결과 분석', 'ranking']];
+const tabs = [['dashboard', '대시보드', 'home'], ['students', '학생 관리', 'user'], ['books', '단어 데이터', 'practice'], ['disputes', '뜻 이의제기', 'records'], ['results', '결과 분석', 'ranking'], ['tournaments', '야차 대회', 'battle']];
 const ALL_CLASSES = '__ALL__';
 const targetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
 const targetMatches = (target, profile) => target === ALL_CLASSES || profile.class_name === target;
@@ -26,8 +28,8 @@ const targetCount = (A, value) => A.data.profiles.filter(p => p.active && target
 export function teacherPage(A) {
   const title = tabs.find(t => t[0] === A.tab)?.[1] || '대시보드';
   const pendingDisputes = (A.data.meaning_disputes || []).filter(item => item.status === 'pending').length;
-  const actions = A.tab === 'students' ? `<button class="btn primary" data-action="add-student">${icon('plus')} 학생 등록</button>` : A.tab === 'results' ? `<button class="btn secondary" data-action="export-results">${icon('download')} 결과 내보내기</button>` : '';
-  const content = ({ dashboard, students, books, disputes, results }[A.tab] || dashboard)(A);
+  const actions = A.tab === 'students' ? `<button class="btn primary" data-action="add-student">${icon('plus')} 학생 등록</button>` : A.tab === 'results' ? `<button class="btn secondary" data-action="export-results">${icon('download')} 결과 내보내기</button>` : A.tab === 'tournaments' ? `<button class="btn primary" data-action="tournament-new">${icon('plus')} 대회 만들기</button>` : '';
+  const content = ({ dashboard, students, books, disputes, results, tournaments }[A.tab] || dashboard)(A);
   const divisionOptions = [['middle','중등부'],['high','고등부']].filter(([id]) => (A.data.divisions || []).includes(id)).map(([id,label]) => `<option value="${id}" ${id === A.data.profile.active_division ? 'selected' : ''}>${label}</option>`).join('');
   const schoolOptions = A.data.schools.map(s => `<option value="${esc(s.id)}" ${s.id === A.data.profile.active_school_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   const division = A.data.profile.active_division;
@@ -319,6 +321,30 @@ function results(A) {
     <section class="panel"><div class="panel-head"><div><h2>학생이 보낸 실전 결과</h2><span>학생이 직접 범위·유형을 선택하고 선생님께 전송한 성적</span></div><span>${selfTests.length}회</span></div>${table(selfTests, true)}</section>
     <section class="panel"><div class="panel-head"><div><h2>학생별 연습 기록</h2><span>암기 후 문제 연습 과정에서 저장된 기록</span></div><span>${practices.length}회</span></div>${table(practices, false)}</section>
     ${legacyTable}`;
+}
+// V13.66 academy yacha tournaments: open a bracket for a grade, watch it live, decide a match
+// when a student cannot play.
+function tournamentPanel(t) {
+  const decided = t.rounds.flatMap(round => round.matches).filter(m => m.winner && m.by !== 'bye').length;
+  const total = t.rounds.flatMap(round => round.matches).filter(m => m.by !== 'bye').length;
+  const live = t.rounds.flatMap(round => round.matches).filter(m => m.live).length;
+  const current = t.rounds.find(round => round.matches.some(m => !m.winner));
+  const status = t.status === 'finished' ? `<span class="pill green">우승 ${esc(t.champion?.name || '')}</span>` : t.status === 'cancelled' ? '<span class="pill">취소됨</span>' : `<span class="pill blue">${esc(current?.label || '')} 진행 중${live ? ` · 경기 ${live}개` : ''}</span>`;
+  return `<section class="panel tn-panel ${t.status}">
+    <div class="panel-head"><div><h2>${esc(t.name)}</h2><span>${esc(t.class_name || t.grade || '')} · ${num(t.players)}명 · 경기 ${decided}/${total} · ${t.prize ? `${coin()} 우승 ${num(t.prize)} · 준우승 ${num(Math.floor(t.prize / 2))}` : '상금 없음'} · ${date(t.created_at)}</span></div>${status}</div>
+    ${bracketHtml(t, { teacher: true })}
+    ${t.status === 'active' ? `<div class="tn-panel-foot"><p>학생이 오지 않았거나 경기를 할 수 없을 때는 경기 칸의 <b>승자 지정</b>으로 다음 라운드를 열 수 있어요. 무승부는 다시 겨뤄요.</p><button class="btn small" data-action="tournament-cancel" data-id="${esc(t.id)}">대회 취소</button></div>` : ''}
+  </section>`;
+}
+function tournaments(A) {
+  const list = A.data.tournaments || [];
+  const active = list.filter(t => t.status === 'active'), past = list.filter(t => t.status !== 'active');
+  return `<section class="panel tn-intro">
+      <div class="tn-intro-copy"><h2>학원 야차 대회</h2><p>같은 학년 학생들을 골라 토너먼트를 열어요. 판돈 없이 겨루고, 이기면 다음 라운드로 올라가요. 학생은 <b>홈 화면의 대회 알림</b>에서 경기를 시작하고, 우승하면 <b>SUMUS 챔피언</b> 칭호와 상금을 받아요.</p></div>
+      <button class="btn primary" data-action="tournament-new">${icon('plus')} 대회 만들기</button>
+    </section>
+    ${active.length ? active.map(tournamentPanel).join('') : empty('battle', '진행 중인 대회가 없어요', '대회 만들기로 첫 토너먼트를 열어 보세요.')}
+    ${past.length ? `<details class="tn-past"><summary>지난 대회 ${past.length}개</summary>${past.map(tournamentPanel).join('')}</details>` : ''}`;
 }
 const localDate = n => { const d = new Date(n); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
 export function examDefaults(A) { return A.examForm ??= { title: '', class_name: A.data.profile.active_division === 'middle' ? (A.data.profiles[0]?.class_name || '중3') : ALL_CLASSES, exam_type: 'write_meaning', question_count: 20, minutes: 10, passing_score: 80, max_attempts: 1, available: localDate(Date.now()), due: localDate(Date.now() + 3 * 86400000), release_result: true }; }

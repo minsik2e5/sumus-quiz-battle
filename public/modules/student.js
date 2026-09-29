@@ -1,14 +1,24 @@
-import { CHARACTERS, ACCESSORIES, FRAMES, TITLES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, petForm, unlocked, levelInfo, dayKey } from './core.js';
+import { CHARACTERS, ACCESSORIES, FRAMES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, petForm, unlocked, levelInfo, dayKey } from './core.js';
 import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar, petKey, RUN_SHEETS } from './character.js';
 import { petDisplayName, petJosa } from './pet-moments.js';
+import { TITLES, TITLE_KEYS } from './titles.js';
+import { titleBadge, titleEmblem, tierEmblem, coin } from './emblems.js';
+import { titlesPage, titleState, titleCount } from './titles-ui.js';
+import { tournamentCard } from './tournament-ui.js';
+import { shownTitle } from './league-ui.js';
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']];
+// V13.66: coins (코인) sit in the header on every tab; tapping opens the wallet.
+function coinChip(A) {
+  const balance = Number(A.data.stats?.points_balance ?? 0);
+  return `<button class="coin-chip-v1366" data-action="coins" aria-label="내 코인 ${num(balance)}개 · 코인 지갑 열기">${coin()}<b>${num(balance)}</b></button>`;
+}
 export function shell(A, content) {
   const p = A.data.profile;
-  return `<div class="student-app"><main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div>${p.preview_owner_id ? '<button class="preview-exit-v1359" data-action="exit-student-preview">← 교사 화면</button>' : ''}<button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${A.tab === id ? 'active' : ''}" ${A.tab === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
+  return `<div class="student-app"><main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div>${p.preview_owner_id ? '<button class="preview-exit-v1359" data-action="exit-student-preview">← 교사 화면</button>' : ''}${A.data.stats?.needs_pet_pick ? '' : coinChip(A)}<button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${A.tab === id ? 'active' : ''}" ${A.tab === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
 }
 export function studentPage(A) {
-  return shell(A, ({ home, practice, exam, ranking, records, studio }[A.tab] || home)(A));
+  return shell(A, ({ home, practice, exam, ranking, records, studio, titles: titlesPage }[A.tab] || home)(A));
 }
 export function getRanges(A, school = A.school, grade = null) {
   const books = A.data.books.filter(book => !grade || !book.grade || book.grade === grade);
@@ -72,7 +82,7 @@ function todayWordQuest(A, goal = 20) {
       <div class="today-word-stats">
         <span><b>${mastered} / ${totalRanges}</b><small>MASTER</small></span>
         <span><b>${num(g.today_total || 0)}</b><small>오늘 학습</small></span>
-        <span><b>+${num(g.today_xp || 0)} XP</b><small>오늘 XP</small></span>
+        <span><b>+${num(g.today_xp || 0)}</b><small>오늘 경험치</small></span>
       </div>
       <div class="today-word-next"><span>다음 퀘스트</span><strong>${esc(nextText)}</strong></div>
       <button class="btn primary full today-word-start" data-quick-practice="true"><span>${active ? '하던 연습 이어가기' : daily.target > 0 ? `오늘 ${daily.target}개 시작하기` : '시험범위 확인하기'}</span>${icon('arrow')}</button>
@@ -301,21 +311,25 @@ function partnerCard(A) {
   const total = Object.keys(CHARACTERS).length;
   const number = String(Object.keys(CHARACTERS).indexOf(key) + 1).padStart(3, '0');
   const battle = g.battle || {};
-  const titles = Object.entries(TITLES).filter(([, item]) => item.battle_streak).map(([id, item]) => `<span class="${unlocked(item, g) ? '' : 'locked'}">${esc(item.name)}</span>`).join('');
+  const t = titleState(A), have = new Set(t.unlocked);
+  // Back of the card: the yacha titles held (and the ones still to win).
+  const yachaTitles = TITLE_KEYS.filter(key => TITLES[key].group === 'yacha').filter(key => have.has(key)).slice(-4);
+  const titles = yachaTitles.length ? yachaTitles.map(key => titleBadge(key, { size: 'xs' })).join('') : '<span class="partner-titles-empty">야차전 칭호에 도전해요</span>';
+  const league = A.data.league;
   const finish = CARD_FINISH[form];
   return `<section class="partner-card-v1358 finish-${finish}" style="--pet:${pet.color};--pet-light:${pet.light};--pet-soft:${pet.soft}" aria-label="나의 파트너 카드">
     <button type="button" class="partner-card-btn" data-action="partner-flip" aria-pressed="false" aria-label="파트너 카드. 펫을 누르면 반응하고, 다른 곳을 누르면 뒷면의 야차전 기록을 보여줘요">
       <span class="partner-card">
         <span class="partner-face partner-front">
           <span class="partner-inner">
-            <span class="partner-head"><span class="partner-stage">${PET_FORMS[form]}</span><span class="partner-name">${hatched ? esc(petDisplayName(partner)) : '???'}</span><span class="partner-lv"><small>Lv.</small><b>${level}</b></span></span>
+            <span class="partner-head"><span class="partner-stage">${PET_FORMS[form]}</span><span class="partner-name">${hatched ? esc(petDisplayName(partner)) : '???'}</span>${hatched && !partner.name ? '<span class="partner-name-pen" data-action="pet-name" aria-hidden="true">✎ 이름</span>' : ''}<span class="partner-lv"><small>Lv.</small><b>${level}</b></span></span>
             <span class="partner-art">${avatar(partner.key, { accessory: p.avatar_accessory, frame: p.avatar_frame, form, size: 'home-featured' })}${RUN_SHEETS.has(`${key}-${form}`) ? `<img class="pet-run-preload" src="/assets/pets/${key}-${form}-run.webp" alt="" aria-hidden="true" decoding="async">` : ''}</span>
-            <span class="partner-type">${hatched ? esc(pet.type) : '알'} · 파트너 · ${esc(p.school || A.school || '')} ${esc(p.class_name || '')}</span>
+            <span class="partner-title-v1366">${titleBadge(t.equipped, { size: 'sm' })}</span>
             <span class="partner-skills">
               <span class="partner-skill"><i>단</i><span>단어 공격<small>이번 주 맞힌 단어</small></span><b>${num(g.week_correct || 0)}개</b></span>
               <span class="partner-skill"><i>연</i><span>연속 학습<small>쉬지 않고 공부한 날</small></span><b>${Number(g.streak || 0)}일</b></span>
             </span>
-            <span class="partner-evo"><span class="partner-evo-row"><span>${nextLine}</span><span>${form === 3 ? `XP ${num(partner.xp || 0)}` : `${num(partner.remaining || 0)} XP 남음`}</span></span><span class="partner-bar" aria-label="레벨 진행률 ${Math.round(Number(partner.percent || 0))}%"><i style="width:${percent}%"></i></span></span>
+            <span class="partner-evo"><span class="partner-evo-row"><span>${nextLine}</span><span>${form === 3 ? `경험치 ${num(partner.xp || 0)}` : `경험치 ${num(partner.remaining || 0)} 남음`}</span></span><span class="partner-bar" aria-label="레벨 진행률 ${Math.round(Number(partner.percent || 0))}%"><i style="width:${percent}%"></i></span></span>
             <span class="partner-foot"><span class="partner-stars" aria-label="모은 펫 ${owned}/${total}">${'★'.repeat(owned)}${'☆'.repeat(Math.max(0, total - owned))}</span><span>No.${number} · SUMUS${finish === 'plain' ? '' : `<b class="partner-finish">${finish === 'holo' ? 'HOLO' : 'SILVER'}</b>`}</span></span>
           </span>
           <span class="partner-sheen" aria-hidden="true"></span>
@@ -324,6 +338,7 @@ function partnerCard(A) {
           <span class="partner-back-in">
             <span class="partner-back-title">야차전 기록</span>
             <span class="partner-rec"><span><b>${num(battle.wins || 0)}</b>승</span><span><b>${num(battle.losses || 0)}</b>패</span><span><b>${num(battle.draws || 0)}</b>무</span></span>
+            ${league?.tier ? `<span class="partner-league-v1366">${tierEmblem(league.tier.key, { size: 'sm' })}<span><b>${esc(league.tier.name)}</b> · 이번 주 ${num(league.points)}점${league.rank ? ` · ${league.rank}위` : ''}</span></span>` : ''}
             <span class="partner-streak"><span>${Number(battle.streak || 0) >= 1 ? `지금 ${battle.streak}연승 중` : '연승에 도전해요'}</span><b>최고 ${Number(battle.best_streak || 0)}연승</b></span>
             <span class="partner-titles">${titles}</span>
             <span class="partner-back-hint">다시 누르면 앞면으로</span>
@@ -333,8 +348,8 @@ function partnerCard(A) {
     </button>
     <div class="partner-tools">
       <button type="button" data-go="studio">${icon('user')}내 펫 ${owned}/${total}</button>
-      ${hatched ? `<button type="button" data-action="pet-name">${partner.name ? '이름 바꾸기' : '이름 짓기'}</button>` : ''}
-      <button type="button" class="partner-shop" data-action="egg-shop" aria-label="보유 포인트 ${num(g.points_balance ?? g.reward_points ?? 0)}P · 알 상점 열기">알 상점 <b>${num(g.points_balance ?? g.reward_points ?? 0)}P</b></button>
+      <button type="button" class="partner-titles-btn" data-go="titles" aria-label="칭호 도감 ${titleCount(A)}">${icon('star')}칭호 ${titleCount(A)}${(t.fresh || []).length ? '<i class="partner-new" aria-label="새 칭호">N</i>' : ''}</button>
+      <button type="button" class="partner-shop" data-action="egg-shop" aria-label="알 상점 열기, 가진 코인 ${num(g.points_balance ?? 0)}개">알 상점</button>
     </div>
   </section>`;
 }
@@ -345,18 +360,32 @@ function yachaBanner(A) {
   // V13.61: a challenge from a friend replaces the banner until it is answered or expires.
   if (invite && invite.expires_at > Date.now()) {
     const left = Math.max(1, Math.ceil((invite.expires_at - Date.now()) / 60000));
+    // V13.66: the opponent of a tournament match opened the room.
+    if (invite.tournament) return `<section class="home-yacha-v1360 invite tourney-v1366" aria-label="대회 경기">
+      <span class="hy-mark hy-trophy" aria-hidden="true">${titleEmblem('champion', { size: 'sm' })}</span>
+      <span class="hy-text"><small>${esc(invite.tournament.name)} · ${esc(invite.tournament.round)}</small><strong>${esc(invite.host)} 입장 완료!</strong><em>판돈 없는 대회 경기 · ${left}분 안에 들어가요</em></span>
+      <span class="hy-actions"><button type="button" class="hy-no" data-action="battle-decline" data-id="${esc(invite.id)}">나중에</button><button type="button" class="hy-go" data-action="battle-accept">입장하기 ${icon('arrow')}</button></span>
+    </section>`;
     return `<section class="home-yacha-v1360 invite" aria-label="도전장">
       <span class="hy-mark" aria-hidden="true">夜</span>
-      <span class="hy-text"><small>도전장이 왔어요!</small><strong>${esc(invite.host)}의 도전</strong><em>판돈 ${num(invite.stake)}P · ${left}분 안에 받아요</em></span>
+      <span class="hy-text"><small>도전장이 왔어요!</small><strong>${esc(invite.host)}의 도전</strong><em>판돈 ${num(invite.stake)}코인 · ${left}분 안에 받아요</em></span>
       <span class="hy-actions"><button type="button" class="hy-no" data-action="battle-decline" data-id="${esc(invite.id)}">거절</button><button type="button" class="hy-go" data-action="battle-accept">도전 받기 ${icon('arrow')}</button></span>
     </section>`;
   }
-  const battle = A.data.stats.battle || {};
+  // V13.66: a tournament match waiting to be played sits on top of the everyday banner.
+  const tourney = (A.data.tournaments || []).find(t => t.status === 'active' && t.me?.match?.ready);
+  const m = tourney?.me.match;
+  const tourneyBanner = tourney ? `<section class="home-yacha-v1360 tourney-v1366" aria-label="대회 경기">
+      <span class="hy-mark hy-trophy" aria-hidden="true">${titleEmblem('champion', { size: 'sm' })}</span>
+      <span class="hy-text"><small>${esc(tourney.name)}</small><strong>${esc(m.round)} 경기 차례!</strong><em>vs ${esc(m.opponent?.name || '')} · 판돈 없는 대회 경기${m.draws ? ' · 재경기' : ''}</em></span>
+      <span class="hy-actions one"><button type="button" class="hy-go" data-action="tournament-play" data-tournament="${esc(tourney.id)}" data-match="${esc(m.id)}">${m.room?.host ? '대기실로 가기' : '경기 시작'} ${icon('arrow')}</button></span>
+    </section>` : '';
+  const battle = A.data.stats.battle || {}, league = A.data.league;
   const played = Number(battle.wins || 0) + Number(battle.losses || 0) + Number(battle.draws || 0);
   const record = played ? `${num(battle.wins || 0)}승 ${num(battle.losses || 0)}패${Number(battle.streak || 0) >= 2 ? ` · ${battle.streak}연승 중` : Number(battle.best_streak || 0) ? ` · 최고 ${battle.best_streak}연승` : ''}` : '첫 대결에 도전해요';
-  return `<button type="button" class="home-yacha-v1360" data-action="battle" aria-label="야차전 하러 가기">
+  return `${tourneyBanner}<button type="button" class="home-yacha-v1360" data-action="battle" aria-label="야차전 하러 가기">
     <span class="hy-mark" aria-hidden="true">夜</span>
-    <span class="hy-text"><small>친구와 1:1 단어 대결</small><strong>야차전</strong><em>맞히면 누구나 공격! · ${esc(record)}</em></span>
+    <span class="hy-text"><small>친구와 1:1 단어 대결</small><strong>야차전</strong><em>${league?.tier ? `<span class="hy-league">${tierEmblem(league.tier.key, { size: 'xs' })}${esc(league.tier.name)} ${num(league.points)}점</span> · ` : ''}${esc(record)}</em></span>
     <b class="hy-go">대결하기 ${icon('arrow')}</b>
   </button>`;
 }
@@ -368,7 +397,7 @@ function compactGrowth(A) {
   <button type="button" class="home-next-v1358${next.done ? ' is-done-v1363' : ''}" ${next.attrs}><span><small>${esc(next.kicker)}</small><strong>${esc(next.title)}</strong><em>${next.detail}</em>${next.progress || ''}</span><b>${esc(next.cta)} ${icon('arrow')}</b></button>
   ${yachaBanner(A)}
   <section class="home-week-card home-week-v1358" aria-label="이번 주 출석">
-    <span>이번 주 <b>${week.filter(day => day.active).length}일</b> · 오늘 <b>+${num(g.today_xp || 0)} XP</b></span>
+    <span>이번 주 <b>${week.filter(day => day.active).length}일</b> · 오늘 <b>+${num(g.today_xp || 0)} 경험치</b> · <b class="home-week-coin">${coin()}+${num(g.today_reward_points || 0)}</b></span>
     <div class="home-week-days">${week.map(day => `<i class="${day.active ? 'active' : ''} ${day.current ? 'today' : ''}" aria-label="${day.label}요일${day.active ? ' 학습함' : ''}">${day.label}</i>`).join('')}</div>
   </section></div>`;
 }
@@ -661,15 +690,37 @@ function exam(A) {
     <div class="exam-start-inline"><p>${esc(scopeLabel)} · ${target || 0}문제 · ${esc(PRACTICE_TYPES[A.mode] || '뜻쓰기')}</p><button class="btn primary full" data-action="start-exam-run" ${count ? '' : 'disabled'}>${testMode ? '실전시험 시작' : '연습시험 시작'} ${icon('arrow')}</button></div>`;
 }
 
+// V13.66 ranking: 학습 랭킹 (경험치 · 코인 · 연습량 · 연속 학습, with a top-3 podium and titles)
+// and 야차 리그 (the weekly league board, loaded when it opens).
+const RANK_MODES = [['xp', '경험치'], ['coins', '코인'], ['total', '연습량'], ['streak', '연속 학습']];
+function rankScore(value, mode) {
+  const n = num(value || 0);
+  return mode === 'coins' ? `${coin()}${n}` : mode === 'xp' ? `${n}<small>경험치</small>` : mode === 'streak' ? `${n}<small>일</small>` : `${n}<small>문제</small>`;
+}
+function podium(top, metric, mode, rankNo) {
+  return `<div class="rank-podium-v1366" aria-label="1~3위">${[1, 0, 2].map(i => {
+    const p = top[i];
+    return `<div class="pod pod-${i + 1}${p.is_me ? ' me' : ''}">
+      <div class="pod-pet">${avatar(p.avatar_key, { form: p.private ? 1 : Math.max(1, p.pet_form ?? petForm(p.level)) })}<i class="pod-medal" aria-hidden="true">${i + 1}</i></div>
+      <b class="pod-name">${esc(p.display_name)}</b>
+      ${shownTitle(p.title) ? titleBadge(p.title, { size: 'xs' }) : '<span class="pod-grade">' + esc(p.grade || '') + '</span>'}
+      <span class="pod-score">${rankScore(p[metric], mode)}</span>
+      <div class="pod-base" aria-label="${rankNo(p)}위"><span>${rankNo(p)}</span></div>
+    </div>`;
+  }).join('')}</div>`;
+}
 function ranking(A) {
-  const mode = A.rankMode || 'xp';
+  const view = A.rankView === 'league' ? 'league' : 'study';
+  const head = `<div class="page-heading rank-heading-v1326"><h1>SUMUS 랭킹</h1><p>${view === 'league' ? '같은 학교·학년 친구들과 겨루는 주간 야차 리그예요.' : '시험 점수가 아닌 실제 학습 기록으로 올라가요.'}</p></div>
+    <div class="segment rank-view-v1366" role="group" aria-label="랭킹 종류"><button type="button" data-rank-view="study" class="${view === 'study' ? 'selected' : ''}" aria-pressed="${view === 'study'}">학습 랭킹</button><button type="button" data-rank-view="league" class="${view === 'league' ? 'selected' : ''}" aria-pressed="${view === 'league'}">야차 리그</button></div>`;
+  if (view === 'league') return `${head}<div class="lg-board" data-league-board data-period="${A.leaguePeriod === 'all' ? 'all' : 'week'}"></div>`;
+  const mode = RANK_MODES.some(([key]) => key === A.rankMode) ? A.rankMode : 'xp';
   const scope = A.rankScope || 'all';
   const period = A.rankPeriod || 'week';
   const metric = period === 'all' ? (mode === 'streak' ? 'all_streak' : `all_${mode}`) : mode;
   const all = [...A.data.ranking];
   const filtered = scope === 'all' ? all : all.filter(p => p.grade === scope);
   const items = filtered.sort((a, b) => Number(b[metric] || 0) - Number(a[metric] || 0) || Number(b.xp || 0) - Number(a.xp || 0));
-  const unit = mode === 'xp' ? ' XP' : mode === 'streak' ? '일' : '문제';
   const myIndex = items.findIndex(p => p.is_me);
   const scopeLabel = scope === 'all' ? '전체' : scope;
   const info = A.data.ranking_period || {};
@@ -678,16 +729,21 @@ function ranking(A) {
   const rankNo = item => Number(item[metric] || 0) > 0 ? items.findIndex(x => Number(x[metric] || 0) === Number(item[metric] || 0)) + 1 : '—';
   const scopeOptions = [['all','전체'],['중2','중2'],['중3','중3'],['고1','고1']];
   const periodOptions = [['week','이번 주'],['all','통합']];
-  const modeOptions = [['xp','성장 XP'],['total','연습량'],['streak','연속 학습']];
-  return `<div class="page-heading rank-heading-v1326"><h1>SUMUS 랭킹</h1><p>시험 점수가 아닌 실제 학습 기록으로 올라가요.</p></div>
+  const showPodium = items.length >= 3 && Number(items[2][metric] || 0) > 0;
+  const rows = showPodium ? items.slice(3) : items;
+  const modeNote = mode === 'coins' ? '모은 코인: 학습 보상 + 야차전에서 딴 코인 + 대회 상금 (쓴 코인·잃은 코인은 빼지 않아요)' : '';
+  return `${head}
     <div class="rank-filter-bar" aria-label="랭킹 필터">
       <label><span>학년</span><select data-rank-scope-select>${scopeOptions.map(([k,label]) => `<option value="${k}" ${scope === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
       <label><span>기간</span><select data-rank-period-select>${periodOptions.map(([k,label]) => `<option value="${k}" ${period === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
-      <label><span>기준</span><select data-rank-mode-select>${modeOptions.map(([k,label]) => `<option value="${k}" ${mode === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+      <label><span>기준</span><select data-rank-mode-select>${RANK_MODES.map(([k,label]) => `<option value="${k}" ${mode === k ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
     </div>
     <p class="rank-period-caption">${esc(periodTitle)} · ${esc(periodRange)}</p>
-    ${myIndex >= 0 ? `<div class="my-rank-card"><span>내 ${scopeLabel} 순위</span><strong>${rankNo(items[myIndex])}<small>위</small></strong><p>${num(items[myIndex][metric] || 0)}${unit} · ${esc(periodTitle)}</p></div>` : ''}
-    <div class="rank-list">${items.length ? items.map((p, index) => `<div class="rank-row ${p.is_me ? 'me' : ''} ${index < 3 && Number(p[metric] || 0) ? 'top-rank top-' + (index + 1) : ''}"><span class="rank-number">${rankNo(p)}</span>${avatar(p.avatar_key, { size: 'mini', form: p.private ? 1 : Math.max(1, p.pet_form ?? petForm(p.level)) })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill green">나</span>' : ''}</strong><small><span class="rank-grade">${esc(p.grade || '')}</span> · ${p.private ? '프로필 비공개' : `Lv.${p.level} · ${esc(p.pet_name || CHARACTERS[petKey(p.avatar_key)].ko)}`}</small></div><span class="rank-score">${num(p[metric] || 0)}${unit}</span></div>`).join('') : empty('ranking', `${scopeLabel}에 아직 연습 기록이 없어요`, '학습을 시작하면 순위가 바로 생겨요.')}</div>
+    ${period === 'week' && mode === 'xp' ? `<div class="rank-award-v1366">${titleEmblem('weekly1', { size: 'sm' })}<span>이번 주 <b>학년별 경험치 1~3위</b>는 다음 주 내내 <b>한정 칭호</b>를 달아요!</span></div>` : ''}
+    ${modeNote ? `<p class="rank-mode-note-v1366">${coin()} ${esc(modeNote)}</p>` : ''}
+    ${myIndex >= 0 ? `<div class="my-rank-card"><span>내 ${scopeLabel} 순위</span><strong>${rankNo(items[myIndex])}<small>위</small></strong><p>${rankScore(items[myIndex][metric], mode)} · ${esc(periodTitle)}</p></div>` : ''}
+    ${showPodium ? podium(items.slice(0, 3), metric, mode, rankNo) : ''}
+    <div class="rank-list">${rows.length ? rows.map((p, index) => `<div class="rank-row ${p.is_me ? 'me' : ''} ${!showPodium && index < 3 && Number(p[metric] || 0) ? 'top-rank top-' + (index + 1) : ''}"><span class="rank-number">${rankNo(p)}</span>${avatar(p.avatar_key, { size: 'mini', form: p.private ? 1 : Math.max(1, p.pet_form ?? petForm(p.level)) })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill green">나</span>' : ''}</strong><small><span class="rank-grade">${esc(p.grade || '')}</span> · ${p.private ? '프로필 비공개' : `Lv.${p.level} · ${esc(p.pet_name || CHARACTERS[petKey(p.avatar_key)].ko)}`}</small>${shownTitle(p.title) ? `<span class="rank-title-v1366">${titleBadge(p.title, { size: 'xs' })}</span>` : ''}</div><span class="rank-score">${rankScore(p[metric], mode)}</span></div>`).join('') : showPodium ? '' : empty('ranking', `${scopeLabel}에 아직 연습 기록이 없어요`, '학습을 시작하면 순위가 바로 생겨요.')}</div>
     <p class="quiet-note">주간 기록은 매주 월요일 새로 시작하고 통합 기록은 계속 누적돼요. 시험 성적은 랭킹에 포함하지 않아요.</p>`;
 }
 function records(A) {
@@ -733,28 +789,32 @@ function records(A) {
 // First pet: chosen once. It starts with all the XP the student has already earned.
 function petPicker(A) {
   const g = A.data.stats, startForm = Math.max(1, petForm(g.level));
-  return `<div class="page-heading studio-page-heading pet-pick-heading"><span class="premium-eyebrow">NEW SUMUS PETS</span><h1>함께할 첫 친구를 골라주세요</h1><p>펫이 새로워졌어요! 지금까지 쌓은 <b>${num(g.points || 0)} XP</b>로 바로 자라요.</p></div>
-    <ul class="pet-pick-rules"><li><b>한 번 고르면 바꿀 수 없어요.</b> 신중하게 골라요.</li><li>다른 친구는 <b>상점의 랜덤 알(${num(EGG_PRICE)}P)</b>로 만날 수 있어요.</li><li>능력은 모두 같아요. 마음이 가는 친구를 골라요.</li></ul>
+  return `<div class="page-heading studio-page-heading pet-pick-heading"><span class="premium-eyebrow">NEW SUMUS PETS</span><h1>함께할 첫 친구를 골라주세요</h1><p>펫이 새로워졌어요! 지금까지 쌓은 <b>경험치 ${num(g.points || 0)}</b>로 바로 자라요.</p></div>
+    <ul class="pet-pick-rules"><li><b>한 번 고르면 바꿀 수 없어요.</b> 신중하게 골라요.</li><li>다른 친구는 <b>상점의 랜덤 알(${num(EGG_PRICE)}코인)</b>로 만날 수 있어요.</li><li>능력은 모두 같아요. 마음이 가는 친구를 골라요.</li></ul>
     <div class="character-grid pet-choice-grid">${Object.entries(CHARACTERS).map(([key, c]) => `<button data-action="choose-pet" data-key="${key}" class="character-option">${avatar(key, { form: startForm })}<b>${c.ko}</b><small>${c.type}</small></button>`).join('')}</div>`;
 }
 function studio(A) {
   const p = A.data.profile, g = A.data.stats, owned = g.pets || [], tab = A.studioTab || 'character';
   if (!owned.length) return petPicker(A);
-  A.style ??= { avatar_key: g.pet?.key || owned[0].key, avatar_accessory: p.avatar_accessory || 'none', avatar_frame: p.avatar_frame || 'basic', avatar_title: p.avatar_title || 'rookie' };
+  // The title is kept as it is (chosen in the 칭호 도감); an expired limited title saves as 첫걸음.
+  A.style ??= { avatar_key: g.pet?.key || owned[0].key, avatar_accessory: p.avatar_accessory || 'none', avatar_frame: p.avatar_frame || 'basic', avatar_title: titleState(A).equipped };
   const s = A.style, chosen = owned.find(x => x.key === s.avatar_key) || owned[0], c = CHARACTERS[chosen.key];
-  const groups = { accessory: ACCESSORIES, frame: FRAMES, title: TITLES };
+  const groups = { accessory: ACCESSORIES, frame: FRAMES };
   const missing = Object.keys(CHARACTERS).filter(key => !owned.some(x => x.key === key));
   const petCard = key => {
     const pet = owned.find(x => x.key === key);
     if (!pet) return `<div class="character-option pet-locked" aria-label="${CHARACTERS[key].type}, 아직 만나지 못했어요"><span class="pet-locked-art">?</span><b>???</b><small>상점의 알</small></div>`;
     return `<button data-style="avatar_key" data-value="${key}" class="character-option ${s.avatar_key === key ? 'selected' : ''}" aria-pressed="${s.avatar_key === key}">${avatar(key, { form: pet.form })}<b>${esc(petDisplayName(pet))}</b><small>${pet.form ? `Lv.${pet.level} · ${PET_FORMS[pet.form]}` : '알'}</small></button>`;
   };
-  const shop = `<button type="button" class="pet-shop-banner" data-action="egg-shop"><span class="pet-shop-banner-egg" aria-hidden="true">?</span><span><strong>랜덤 알 상점</strong><small>${missing.length ? `${num(EGG_PRICE)}P · 아직 못 만난 친구 ${missing.length}마리` : '모든 친구를 모았어요!'}</small></span><b>${num(g.points_balance || 0)}P</b></button>`;
+  const shop = `<button type="button" class="pet-shop-banner" data-action="egg-shop"><span class="pet-shop-banner-egg" aria-hidden="true">?</span><span><strong>랜덤 알 상점</strong><small>${missing.length ? `${num(EGG_PRICE)}코인 · 아직 못 만난 친구 ${missing.length}마리` : '모든 친구를 모았어요!'}</small></span><b>${coin()}${num(g.points_balance || 0)}</b></button>`;
+  const t = titleState(A);
   const body = tab === 'character'
     ? `${shop}<div class="pet-choice-head"><span>MY PETS · ${owned.length}/${Object.keys(CHARACTERS).length}</span><h2>누구와 함께 공부할까요?</h2><p>파트너로 함께 공부한 펫이 자라요.</p></div><div class="character-grid pet-choice-grid">${Object.keys(CHARACTERS).map(petCard).join('')}</div>`
-    : `<div class="reward-grid">${Object.entries(groups[tab]).map(([key, item]) => { const open = unlocked(item, g); return `<button data-style="avatar_${tab}" data-value="${key}" class="reward-item ${s['avatar_' + tab] === key ? 'selected' : ''}" ${open ? '' : 'disabled'}>${icon(open ? tab === 'title' ? 'records' : 'sparkle' : 'lock')}<b>${item.name}</b><small>${open ? '사용 가능' : item.level ? `Lv.${item.level}에 열려요` : item.battle_streak ? `야차전 ${item.battle_streak}연승` : item.combo ? '10연속 정답 달성' : '7일 연속 학습'}</small></button>`; }).join('')}</div>`;
+    : tab === 'title'
+    ? `<button type="button" class="tt-studio-link" data-go="titles">${titleEmblem(t.equipped, { size: 'md' })}<span class="tt-studio-copy"><small>지금 달고 있는 칭호</small>${titleBadge(t.equipped, { size: 'sm' })}<em>칭호 도감에서 ${titleCount(A)}개를 모았어요. 골라서 달아 보세요.</em></span>${icon('chevron')}</button>`
+    : `<div class="reward-grid">${Object.entries(groups[tab]).map(([key, item]) => { const open = unlocked(item, g); return `<button data-style="avatar_${tab}" data-value="${key}" class="reward-item ${s['avatar_' + tab] === key ? 'selected' : ''}" ${open ? '' : 'disabled'}>${icon(open ? 'sparkle' : 'lock')}<b>${item.name}</b><small>${open ? '사용 가능' : `Lv.${item.level}에 열려요`}</small></button>`; }).join('')}</div>`;
   const isPartner = chosen.key === g.pet?.key;
-  return `<div class="page-heading studio-page-heading"><h1>내 펫</h1><p>파트너를 바꾸거나 꾸밀 수 있어요.</p></div><div class="studio-preview">${avatar(chosen.key, { form: chosen.form, accessory: s.avatar_accessory, frame: s.avatar_frame })}<h2>${chosen.form ? esc(petDisplayName(chosen)) : '???'} <span class="tiny muted">Lv.${chosen.level}</span>${isPartner && chosen.form ? `<button type="button" class="pet-name-edit" data-action="pet-name">${chosen.name ? '이름 바꾸기' : '이름 짓기'}</button>` : ''}</h2><p>${esc(c.type)} · ${chosen.form ? PET_FORMS[chosen.form] : '부화를 기다리는 중'} · ${TITLES[s.avatar_title].name}</p></div><div class="segment">${[['character', '펫'], ['accessory', '장식'], ['frame', '프레임'], ['title', '칭호']].map(([k, label]) => `<button data-studio-tab="${k}" class="${tab === k ? 'selected' : ''}">${label}</button>`).join('')}</div>${body}<button class="btn primary full" data-action="save-style">${isPartner ? '이 모습으로 저장' : `${esc(petJosa(petDisplayName(chosen), '과', '와'))} 함께하기`}</button><div class="section-title"><h2>다음 성장의 선물</h2></div><div class="roadmap">${[[3, '헤드셋'], [5, '실버 프레임'], [6, '글래스'], [9, '스타 핀'], [10, '블루 라인'], [15, '오로라'], [18, '크라운'], [20, '골드']].map(([lv, name]) => `<div><div class="milestone ${g.level >= lv ? 'done' : ''}">${icon(g.level >= lv ? 'check' : 'lock')}</div><b>${name}</b><small>Lv.${lv}</small></div>`).join('')}</div>`;
+  return `<div class="page-heading studio-page-heading"><h1>내 펫</h1><p>파트너를 바꾸거나 꾸밀 수 있어요.</p></div><div class="studio-preview">${avatar(chosen.key, { form: chosen.form, accessory: s.avatar_accessory, frame: s.avatar_frame })}<h2>${chosen.form ? esc(petDisplayName(chosen)) : '???'} <span class="tiny muted">Lv.${chosen.level}</span>${isPartner && chosen.form ? `<button type="button" class="pet-name-edit" data-action="pet-name">${chosen.name ? '이름 바꾸기' : '이름 짓기'}</button>` : ''}</h2><p>${esc(c.type)} · ${chosen.form ? PET_FORMS[chosen.form] : '부화를 기다리는 중'}</p>${titleBadge(t.equipped, { size: 'sm' })}</div><div class="segment">${[['character', '펫'], ['accessory', '장식'], ['frame', '프레임'], ['title', '칭호']].map(([k, label]) => `<button data-studio-tab="${k}" class="${tab === k ? 'selected' : ''}">${label}</button>`).join('')}</div>${body}<button class="btn primary full" data-action="save-style">${isPartner ? '이 모습으로 저장' : `${esc(petJosa(petDisplayName(chosen), '과', '와'))} 함께하기`}</button><div class="section-title"><h2>다음 성장의 선물</h2></div><div class="roadmap">${[[3, '헤드셋'], [5, '실버 프레임'], [6, '글래스'], [9, '스타 핀'], [10, '블루 라인'], [15, '오로라'], [18, '크라운'], [20, '골드']].map(([lv, name]) => `<div><div class="milestone ${g.level >= lv ? 'done' : ''}">${icon(g.level >= lv ? 'check' : 'lock')}</div><b>${name}</b><small>Lv.${lv}</small></div>`).join('')}</div>`;
 }
 export function updateRangeSummary(A) {
   const { selected } = getRanges(A);

@@ -283,9 +283,10 @@ export class VocaStateObject {
         ? await execute(this.mutations.current().state)
         : await this.mutations.durable(execute);
       // Room set-up for yacha battles: the questions (with answers) go to the room only.
-      if (result?._battle) {
-        const message = result._battle;
-        delete result._battle;
+      // `_battles` (V13.66) carries several room messages, e.g. when a tournament is called off.
+      const roomMessages = [...(result?._battle ? [result._battle] : []), ...(Array.isArray(result?._battles) ? result._battles : [])];
+      if (result && typeof result === 'object') { delete result._battle; delete result._battles; }
+      for (const message of roomMessages) {
         const room = this.env.BATTLE_ROOM.get(this.env.BATTLE_ROOM.idFromName(message.id));
         const reply = await room.fetch('https://battle/admin', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(message) }).catch(() => null);
         if (!reply?.ok && message.action !== 'cancel') {

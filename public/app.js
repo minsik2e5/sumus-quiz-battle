@@ -1,4 +1,4 @@
-import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules/ui.js';
+import { $, $$, api, esc, icon, toast, modal, buttonBusy, date, num, rangeLabel } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm } from './modules/core.js';
 import { avatar } from './modules/character.js';
 import { studentPage, getRanges, updateRangeSummary } from './modules/student.js';
@@ -6,6 +6,11 @@ import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocab
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
 import { maybePetMoment, openPetNameModal, openEggShop, petJosa } from './modules/pet-moments.js';
 import { openBattle } from './modules/battle.js';
+import { maybeTitleMoment, openTitleDetail } from './modules/titles-ui.js';
+import { mountLeagueBoard } from './modules/league-ui.js';
+import { coin } from './modules/emblems.js';
+import { openBracket } from './modules/tournament-ui.js';
+import { EGG_PRICE } from './modules/core.js';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -31,6 +36,8 @@ function preferences() {
     A.rankMode = v.rankMode || A.rankMode || 'xp';
     A.rankScope = v.rankScope || A.rankScope || 'all';
     A.rankPeriod = v.rankPeriod || A.rankPeriod || 'week';
+    A.rankView = v.rankView === 'league' ? 'league' : 'study';
+    A.leaguePeriod = v.leaguePeriod === 'all' ? 'all' : 'week';
     A.memorizeFilter = v.memorizeFilter === 'starred' ? 'starred' : 'all';
     A.memorizeRange = v.memorizeRange || A.memorizeRange || '';
     A.memStars = Array.isArray(v.memStars) ? v.memStars : [];
@@ -42,7 +49,7 @@ function savePreferences() {
     localStorage.setItem('sumus:v13:prefs:' + A.data.profile.id, JSON.stringify({
       ranges: A.ranges, school: A.school, mode: A.mode, practiceRunMode: A.practiceRunMode, target: A.target,
       highRangeType: A.highRangeType || 'mock', memorizeRangeType: A.memorizeRangeType || 'mock',
-      rankMode: A.rankMode, rankScope: A.rankScope, rankPeriod: A.rankPeriod,
+      rankMode: A.rankMode, rankScope: A.rankScope, rankPeriod: A.rankPeriod, rankView: A.rankView, leaguePeriod: A.leaguePeriod,
       middleRange: A.middleRange, middleChunkSize: A.middleChunkSize || 20, middleStartIndex: A.middleStartIndex || 0,
       middleWordIds: A.middleWordIds || [], memorizeFilter: A.memorizeFilter || 'all',
       memorizeRange: A.memorizeRange || '', memStars: A.memStars || []
@@ -110,12 +117,16 @@ function render() {
   $('#app').innerHTML = A.data.profile.role === 'teacher' ? teacherPage(A) : studentPage(A);
   bindPageForms();
   queueMicrotask(ensureRoleEnhancements);
-  if (A.data.profile.role === 'student') queueMicrotask(() => maybePetMoment(A, petChanged));
+  if (A.data.profile.role === 'student') {
+    $$('[data-league-board]').forEach(el => mountLeagueBoard(el, period => { A.leaguePeriod = period; savePreferences(); }));
+    queueMicrotask(() => maybePetMoment(A, petChanged));
+    queueMicrotask(() => maybeTitleMoment(A, moved => { if (moved) { render(); window.scrollTo(0, 0); } else renderKeepScroll(); }));
+  }
 }
 async function petChanged() { try { await refresh(); A.style = null; renderKeepScroll(); } catch (err) { toast(err.message); } }
 function confirmFirstPet(key) {
   const c = CHARACTERS[key]; if (!c) return;
-  const close = modal(`<div class="pet-confirm">${avatar(key, { form: Math.max(1, petForm(A.data.stats.level)) })}<h2>${esc(petJosa(c.ko, '과', '와'))} 함께할까요?</h2><p>첫 펫은 <b>다시 바꿀 수 없어요.</b><br>지금까지 쌓은 XP로 바로 자라요.</p><button class="btn primary full" id="confirm-first-pet">${esc(petJosa(c.ko, '으로', '로'))} 정할게요</button><button class="btn full" id="cancel-first-pet">다시 고를래요</button></div>`, '첫 펫 확인');
+  const close = modal(`<div class="pet-confirm">${avatar(key, { form: Math.max(1, petForm(A.data.stats.level)) })}<h2>${esc(petJosa(c.ko, '과', '와'))} 함께할까요?</h2><p>첫 펫은 <b>다시 바꿀 수 없어요.</b><br>지금까지 쌓은 경험치로 바로 자라요.</p><button class="btn primary full" id="confirm-first-pet">${esc(petJosa(c.ko, '으로', '로'))} 정할게요</button><button class="btn full" id="cancel-first-pet">다시 고를래요</button></div>`, '첫 펫 확인');
   $('#cancel-first-pet').onclick = close;
   $('#confirm-first-pet').onclick = async event => {
     const b = event.currentTarget; buttonBusy(b);
@@ -263,15 +274,28 @@ function startInvitePolling() {
     } catch {}
   }, 20000);
 }
+// V13.66: while a teacher watches a tournament, the bracket refreshes every 8 seconds.
+let tournamentPoll;
+function startTournamentPolling() {
+  clearInterval(tournamentPoll);
+  if (A.data?.profile?.role !== 'teacher') return;
+  tournamentPoll = setInterval(async () => {
+    if (!A.data || A.screen || A.tab !== 'tournaments' || document.visibilityState !== 'visible' || $('#modal-root').children.length) return;
+    if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+    if (!(A.data.tournaments || []).some(t => t.status === 'active')) return;
+    try { await refresh(); renderKeepScroll(); } catch {}
+  }, 8000);
+}
 function startPolling() {
   startInvitePolling();
+  startTournamentPolling();
   clearInterval(poll);
   const interval = A.data?.profile?.role === 'teacher' ? 60000 : 120000;
   poll = setInterval(async () => {
     if (!A.data || A.screen || document.visibilityState !== 'visible' || $('#modal-root').children.length) return;
     if (document.activeElement && ['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)) return;
     const liveTabs = A.data.profile.role === 'teacher'
-      ? ['dashboard', 'exams', 'results']
+      ? ['dashboard', 'exams', 'results', 'tournaments']
       : ['home', 'ranking'];
     if (!liveTabs.includes(A.tab)) return;
     try { await refresh(); renderKeepScroll(); }
@@ -402,6 +426,10 @@ $('#app').addEventListener('click', async event => {
     if (d.middleLesson) { A.middleRange = d.middleLesson; A.middleStartIndex = 0; A.middleWordIds = []; A.middleWordsOpen = false; A.target = 'all'; savePreferences(); renderKeepScroll(); return; }
     if (d.middleGrammarLesson) { A.middleGrammarLesson = Number(d.middleGrammarLesson); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (d.rankMode) { A.rankMode = d.rankMode; savePreferences(); render(); return; }
+    if (d.rankView) { A.rankView = d.rankView === 'league' ? 'league' : 'study'; savePreferences(); render(); return; }
+    if (d.titleFilter) { A.titleFilter = d.titleFilter; renderKeepScroll(); return; }
+    if (d.titleOpen) { openTitleDetail(A, d.titleOpen, renderKeepScroll); return; }
+    if (d.leaguePeriod) return;
     if (d.rankScope) { A.rankScope = d.rankScope; savePreferences(); render(); return; }
     if (d.rankPeriod) { A.rankPeriod = d.rankPeriod; savePreferences(); render(); return; }
     if (d.recordTab) { A.recordTab = d.recordTab; render(); return; }
@@ -484,6 +512,8 @@ $('#app').addEventListener('click', async event => {
       // V13.62: tapping the pet on the front makes it jump with hearts; the rest of the card flips it.
       const art = event.target.closest('.partner-art');
       if (art && b.getAttribute('aria-pressed') !== 'true') { pokePet(art); return; }
+      // V13.66: an unnamed pet shows a small "✎ 이름" on the card that opens the name form.
+      if (event.target.closest('.partner-name-pen') && b.getAttribute('aria-pressed') !== 'true') return openPetNameModal(A, petChanged);
       const flipped = b.getAttribute('aria-pressed') !== 'true';
       b.setAttribute('aria-pressed', String(flipped));
       b.closest('.partner-card-v1358')?.classList.toggle('flipped', flipped);
@@ -495,6 +525,12 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'egg-shop') return openEggShop(A, petChanged);
     if (d.action === 'vocab-more') { moreVocab(A); $('#vocab-table').innerHTML = vocabTable(A); return; }
     if (d.action === 'battle') { A.screen = 'battle'; return openBattle(A, leaveBattle); }
+    if (d.action === 'coins') return walletModal();
+    if (d.action === 'tournament-play') { A.screen = 'battle'; return openBattle(A, leaveBattle, { tournament: { tid: d.tournament, mid: d.match } }); }
+    if (d.action === 'tournament-bracket') return bracketModal(d.tournament);
+    if (d.action === 'tournament-new') return tournamentCreateModal();
+    if (d.action === 'tournament-cancel') return cancelTournament(d.id, b);
+    if (d.tnDecide) return decideTournamentMatch(d.tnDecide, d.match, d.winner, d.name, b);
     if (d.action === 'battle-accept' && A.data.battle_invite) { const invite = A.data.battle_invite; A.data.battle_invite = null; A.screen = 'battle'; return openBattle(A, leaveBattle, { accept: invite }); }
     if (d.action === 'battle-decline') { buttonBusy(b); await api('/battle/invite/decline', { id: d.id }); A.data.battle_invite = null; renderKeepScroll(); toast('도전장을 거절했어요.'); return; }
     if (d.action === 'save-style') { buttonBusy(b); await api('/profile/style', A.style); await refresh(); A.style = null; A.tab = 'home'; render(); toast('내 캐릭터를 저장했어요.'); }
@@ -925,6 +961,104 @@ function exportResults() {
   const rows = [['학생', '반', '시험', '유형', '점수', '정답 수', '전체', '제출 시간']];
   A.data.attempts.filter(a => a.status === 'submitted').forEach(a => { const p = A.data.profiles.find(p => p.id === a.student_id), e = A.data.exams.find(e => e.id === a.exam_id); rows.push([p?.display_name, p?.class_name, e?.title, EXAM_TYPES[e?.exam_type]?.label, a.score, a.correct, a.total, date(a.submitted_at)]); });
   const url = URL.createObjectURL(new Blob(['\uFEFF' + rows.map(r => r.map(safe).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' })); const link = document.createElement('a'); link.href = url; link.download = 'SUMUS_시험결과.csv'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+// V13.66 coin wallet: balance, today's study coins (80 a day) and where coins come from and go.
+function walletModal() {
+  const g = A.data.stats, today = Number(g.today_reward_points || 0);
+  const close = modal(`<div class="wallet-v1366">
+    <div class="wallet-top">${coin()}<div><small>내 코인</small><strong>${num(g.points_balance || 0)}<span>코인</span></strong></div></div>
+    <p class="wallet-note"><b>경험치와 코인은 달라요.</b> 경험치는 맞힐수록 쌓여서 레벨·펫 성장·랭킹에 쓰이고, 코인은 모아서 쓰는 돈이에요.</p>
+    <div class="wallet-today"><div class="row"><span>오늘 공부로 모은 코인</span><b>${num(today)} / 80</b></div><div class="wallet-bar"><i style="width:${Math.min(100, Math.round(today / 80 * 100))}%"></i></div></div>
+    <h3>모으는 법</h3>
+    <ul class="wallet-list">
+      <li><span>학습 완료 (10·20·30문제)</span><b>+5·12·18</b></li>
+      <li><span>100점 (10문제 이상)</span><b>+10</b></li>
+      <li><span>추천 학습 · 오늘 첫 학습</span><b>+5·5</b></li>
+      <li><span>3일 · 7일 연속 학습</span><b>+8·20</b></li>
+      <li><span>야차전 승리 · 학원 대회 상금</span><b>판돈 · 상금</b></li>
+    </ul>
+    <h3>쓰는 곳</h3>
+    <div class="wallet-actions"><button type="button" class="btn" id="wallet-egg">랜덤 알 <small>${coin()}${num(EGG_PRICE)}</small></button><button type="button" class="btn" id="wallet-yacha">야차전 판돈 <small>${coin()}10·30·50</small></button></div>
+  </div>`, '코인 지갑');
+  $('#wallet-egg').onclick = () => { close(); openEggShop(A, petChanged); };
+  $('#wallet-yacha').onclick = () => { close(); A.screen = 'battle'; openBattle(A, leaveBattle); };
+}
+function bracketModal(id) {
+  const t = (A.data.tournaments || []).find(item => item.id === id) || null;
+  return openBracket(id, A.data.profile.id, t);
+}
+// V13.66 teacher: open an academy tournament for one grade (or class).
+const gradeOfClass = value => String(value || '').match(/^(중[1-3]|고[1-3])/)?.[1] || String(value || '');
+function tournamentCreateModal() {
+  const middle = A.data.profile.active_division === 'middle';
+  const targets = middle ? [['중2', '중2'], ['중3', '중3']] : [['고1', '고1 전체'], ['고1A', '고1A'], ['고1B', '고1B']];
+  const students = target => A.data.profiles.filter(p => p.active && !p.preview_owner_id && (target === gradeOfClass(target) && target.length === 2 ? gradeOfClass(p.class_name) === target : p.class_name === target)).sort((a, b) => a.display_name.localeCompare(b.display_name, 'ko'));
+  const roundName = n => { let size = 2; while (size < n) size *= 2; return size === 2 ? '결승' : `${size}강`; };
+  const MAX_PLAYERS = 32;
+  // Students already in a running tournament cannot join a second one.
+  const busy = new Set((A.data.tournaments || []).filter(t => t.status === 'active').flatMap(t => t.rounds[0].matches.flatMap(m => [m.a?.id, m.b?.id])).filter(Boolean));
+  const close = modal(`<h2>야차 대회 만들기</h2><p>${esc(A.school)} · 판돈 없는 1:1 토너먼트예요. 학생들은 홈 화면에서 자기 경기를 시작해요.</p>
+    <form id="tn-form" class="tn-form">
+      <label class="field"><span>대회 이름</span><input name="name" maxlength="40" placeholder="${esc(A.school)} 야차 대회"></label>
+      <div class="form-columns">
+        <label class="field"><span>대상</span><select name="class_name" id="tn-target">${targets.map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select></label>
+        <label class="field"><span>대진 방식</span><select name="seeding"><option value="random">랜덤 대진</option><option value="league">이번 주 리그 승점순</option></select></label>
+        <label class="field"><span>우승 상금 (준우승 절반)</span><select name="prize"><option value="0">없음</option><option value="50">50코인</option><option value="100" selected>100코인</option><option value="200">200코인</option></select></label>
+      </div>
+      <div class="step-label">참가 학생 <small id="tn-count"></small></div>
+      <div class="tn-pick-tools"><button type="button" class="text-button" data-tn-all="1">전체 선택</button><button type="button" class="text-button" data-tn-all="0">전체 해제</button></div>
+      <div class="tn-pick" id="tn-players"></div>
+      <div class="step-label">대결 단어 범위</div>
+      <div class="teacher-range" id="tn-ranges"></div>
+      <div id="tn-error" class="form-error" role="alert"></div>
+      <button class="btn primary full" type="submit">대회 시작하기</button>
+    </form>`, '야차 대회 만들기');
+  const form = $('#tn-form');
+  const count = () => {
+    const n = $$('input[name="student"]:checked', form).length;
+    $('#tn-count').textContent = n > MAX_PLAYERS ? `${n}명 · 한 대회는 ${MAX_PLAYERS}명까지예요` : n >= 2 ? `${n}명 · ${roundName(n)}부터` : `${n}명 · 2명 이상 골라주세요`;
+    $('#tn-count').classList.toggle('warn', n > MAX_PLAYERS || n < 2);
+  };
+  const fill = () => {
+    const target = $('#tn-target').value;
+    const list = students(target);
+    const open = p => Array.isArray(p.pets) && p.pets.length > 0 && !busy.has(p.id);
+    const tick = list.filter(open).length <= MAX_PLAYERS;
+    $('#tn-players').innerHTML = list.length ? list.map(p => { const ok = open(p); const why = busy.has(p.id) ? '다른 대회 참가 중' : !ok ? '아직 펫을 고르지 않았어요' : `Lv.${p.stats?.level || 1}`; return `<label class="tn-pick-item ${ok ? '' : 'off'}"><input type="checkbox" name="student" value="${esc(p.id)}" ${ok ? (tick ? 'checked' : '') : 'disabled'}><span><b>${esc(p.display_name)}</b><small>${esc(p.class_name)} · ${why}</small></span></label>`; }).join('') : '<p class="tiny muted">이 대상의 활성 학생이 없어요.</p>';
+    const info = getRanges(A, A.school, middle ? target : null);
+    $('#tn-ranges').innerHTML = info.codes.map((code, index) => `<label class="range-option"><input type="checkbox" name="range" value="${esc(code)}" ${index < 2 ? 'checked' : ''}><span>${esc(middle ? `${code}과` : rangeLabel(A.school, code))}<small>${info.words.filter(word => word.range_code === code).length}개 단어</small></span></label>`).join('') || '<p class="tiny muted">단어 범위가 없어요.</p>';
+    count();
+  };
+  $('#tn-target').onchange = fill;
+  form.addEventListener('change', event => { if (event.target.name === 'student') count(); });
+  $$('[data-tn-all]', form).forEach(button => button.onclick = () => { $$('input[name="student"]:not(:disabled)', form).forEach(input => { input.checked = button.dataset.tnAll === '1'; }); count(); });
+  fill();
+  form.onsubmit = async event => {
+    event.preventDefault();
+    const button = $('[type="submit"]', form), values = Object.fromEntries(new FormData(form));
+    const ids = $$('input[name="student"]:checked', form).map(input => input.value);
+    const ranges = $$('input[name="range"]:checked', form).map(input => input.value);
+    if (ids.length < 2) return $('#tn-error').textContent = '참가 학생을 2명 이상 골라주세요.';
+    if (ids.length > MAX_PLAYERS) return $('#tn-error').textContent = `한 대회에는 ${MAX_PLAYERS}명까지 참가할 수 있어요.`;
+    if (!ranges.length) return $('#tn-error').textContent = '단어 범위를 하나 이상 골라주세요.';
+    buttonBusy(button); $('#tn-error').textContent = '';
+    try {
+      await api('/teacher/tournaments', { name: values.name, class_name: values.class_name, seeding: values.seeding, prize: Number(values.prize), student_ids: ids, range_codes: ranges });
+      close(); await refresh(); A.tab = 'tournaments'; render(); toast('대회를 열었어요! 학생 홈 화면에 첫 경기가 떠요.');
+    } catch (err) { $('#tn-error').textContent = err.message; buttonBusy(button, false); }
+  };
+}
+async function decideTournamentMatch(tid, matchId, winnerId, name, button) {
+  if (!confirm(`${name} 학생을 이 경기의 승자로 정할까요?\n결석·기권처럼 경기를 할 수 없을 때 써요. 되돌릴 수 없어요.`)) return;
+  buttonBusy(button);
+  try { await api(`/teacher/tournaments/${encodeURIComponent(tid)}/winner`, { match_id: matchId, winner_id: winnerId }); await refresh(); renderKeepScroll(); toast(`${name} 학생이 다음 라운드로 올라갔어요.`); }
+  catch (err) { toast(err.message); buttonBusy(button, false); }
+}
+async function cancelTournament(id, button) {
+  if (!confirm('이 대회를 취소할까요? 진행 중인 기록은 남지만 더 이상 경기를 할 수 없어요.')) return;
+  buttonBusy(button);
+  try { await api(`/teacher/tournaments/${encodeURIComponent(id)}/cancel`, {}); await refresh(); renderKeepScroll(); toast('대회를 취소했어요.'); }
+  catch (err) { toast(err.message); buttonBusy(button, false); }
 }
 loginView();
 try {

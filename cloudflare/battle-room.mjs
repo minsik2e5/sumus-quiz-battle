@@ -60,11 +60,11 @@ export class BattleRoom {
   async admin(msg) {
     const now = Date.now();
     if (msg.action === 'init') {
-      this.room = { id: msg.id, stake: msg.stake, host: msg.host, guest: null, questions: msg.questions, tickets: msg.tickets, expires_at: msg.expires_at, battle: null, reported: false, closed: false };
+      this.room = { id: msg.id, stake: msg.stake, label: msg.label || null, host: msg.host, guest: null, questions: msg.questions, tickets: msg.tickets, expires_at: msg.expires_at, battle: null, reported: false, closed: false };
     } else if (msg.action === 'join' && this.room && !this.room.closed && !this.room.battle) {
       this.room.guest = msg.guest;
       this.room.tickets = msg.tickets;
-      this.room.battle = createBattle({ id: this.room.id, players: [this.room.host, msg.guest], questions: this.room.questions, stake: this.room.stake, now });
+      this.room.battle = createBattle({ id: this.room.id, players: [this.room.host, msg.guest], questions: this.room.questions, stake: this.room.stake, label: this.room.label, now });
       this.room.connect_deadline = now + CONNECT_MS;
       // The host may already be waiting on a socket.
       for (const ws of this.ctx.getWebSockets(this.room.host.id)) {

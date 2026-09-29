@@ -148,7 +148,7 @@ export async function openResult(id) { const data = await api(`/attempts/${id}`)
 function showExamResult(data) {
   leaveSession(); if (examState) { try { localStorage.removeItem(draftKey()); } catch {} }
   A.screen = 'result'; const a = data.attempt, e = data.exam, reveal = a.score !== undefined;
-  mount(`<div class="session-app"><main class="result-page"><span class="pill">${a.auto_submitted ? '시간 종료 · 자동 제출' : '제출 완료'}</span><h1>${reveal ? '실전시험을 마쳤어요.' : '답안을 제출했어요.'}</h1><p>${esc(e.title)}</p>${reveal ? `<div class="result-number">${a.score}<small>점</small></div><span class="pill ${a.score >= e.passing_score ? 'green' : ''}">${a.score >= e.passing_score ? '통과했어요' : '조금 더 연습해봐요'}</span><div class="record-stats"><div><strong>${a.correct}</strong><span>정답</span></div><div><strong>${a.total - a.correct}</strong><span>오답 · 미응답</span></div><div><strong>${a.total}</strong><span>전체 문제</span></div></div>` : `${icon('lock', 'result-lock')}<p>선생님이 결과를 공개하면<br>시험 기록에서 확인할 수 있어요.</p>`}<button class="btn ink full" id="result-home">시험 목록으로</button>${reveal ? '<button class="btn full" id="result-answers">답안 확인하기</button>' : ''}<p class="quiet-note">시험 점수는 성장 포인트와 별도로 기록돼요.</p><section id="result-details"></section></main></div>`);
+  mount(`<div class="session-app"><main class="result-page"><span class="pill">${a.auto_submitted ? '시간 종료 · 자동 제출' : '제출 완료'}</span><h1>${reveal ? '실전시험을 마쳤어요.' : '답안을 제출했어요.'}</h1><p>${esc(e.title)}</p>${reveal ? `<div class="result-number">${a.score}<small>점</small></div><span class="pill ${a.score >= e.passing_score ? 'green' : ''}">${a.score >= e.passing_score ? '통과했어요' : '조금 더 연습해봐요'}</span><div class="record-stats"><div><strong>${a.correct}</strong><span>정답</span></div><div><strong>${a.total - a.correct}</strong><span>오답 · 미응답</span></div><div><strong>${a.total}</strong><span>전체 문제</span></div></div>` : `${icon('lock', 'result-lock')}<p>선생님이 결과를 공개하면<br>시험 기록에서 확인할 수 있어요.</p>`}<button class="btn ink full" id="result-home">시험 목록으로</button>${reveal ? '<button class="btn full" id="result-answers">답안 확인하기</button>' : ''}<p class="quiet-note">시험 점수는 경험치·코인과 별도로 기록돼요.</p><section id="result-details"></section></main></div>`);
   $('#result-home').onclick = async () => { leaveSession(); A.tab = 'exam'; await refresh(); redraw(); };
   $('#result-answers')?.addEventListener('click', () => {
     $('#result-details').innerHTML = a.details.map((d, index) => `<div class="wrong-word"><span class="pill ${d.correct ? 'green' : 'red'}">${d.number}번 ${d.correct ? '정답' : '오답'}</span><p><b>${esc(d.word)}</b></p><p>${esc(d.meaning)}</p><small>내 답안: ${esc(d.answer || '미응답')}</small>${!d.correct && d.type === 'write_meaning' && d.answer ? `<button class="meaning-dispute-button" data-exam-dispute="${index}">🙋 이 답도 맞는 것 같아요</button>` : ''}</div>`).join('');
@@ -855,14 +855,14 @@ function finishPracticeView() {
     <p class="result-score-basis">최초 풀이 기준 · ${Number(x.score_correct || 0)} / ${targetCount} 정답</p>
     <div class="result-stat-grid"><div><strong>${Number(x.score_correct || 0)}</strong><span>정답</span></div><div><strong>${wrongCount}</strong><span>오답</span></div><div><strong>${unanswered}</strong><span>미응답</span></div></div>
     <div class="result-meta-line"><span>${icon('clock')} 전체 진행 ${time(elapsed)}</span></div>
-    <div class="result-reward-card result-reward-top"><div><span>학습 보상</span><strong>+${Number(x.reward_points || 0)}P</strong></div><div><span>성장 XP</span><strong>+${Number(x.xp || 0)} XP</strong></div></div>
+    <div class="result-reward-card result-reward-top"><div><span>코인</span><strong><i class="coin-ico" aria-hidden="true"></i>+${Number(x.reward_points || 0)}</strong></div><div><span>경험치</span><strong>+${Number(x.xp || 0)}</strong></div></div>
     <p class="result-next-copy">${esc(statusText)}</p>
     ${primaryCta}
     ${x.run_mode === 'test' ? (x.shared_to_teacher_at ? '<button class="btn self-test-share-done full" disabled>✓ 선생님께 전송 완료</button>' : '<button class="btn self-test-share full" id="share-self-test">선생님께 결과 보내기</button>') : ''}
     ${answerRows.length || reviewCount ? '<button class="btn full" id="practice-answer-review">답안 보기</button>' : ''}
     <div id="practice-answer-details" class="answer-review-panel" hidden>${detailHtml}</div>
     <div class="result-secondary-actions"><button class="text-button" id="practice-records">내 기록</button><button class="text-button" id="practice-home">홈으로</button></div>
-    <p class="quiet-note">보상 P는 학습 완료·만점·꾸준함으로 쌓여요. 점수는 오답 복습 재정답으로 올라가지 않고, 승인된 재채점만 반영돼요.</p>
+    <p class="quiet-note">코인은 학습 완료·만점·꾸준함으로 쌓이고(하루 80개까지), 경험치는 맞힌 만큼 쌓여요. 점수는 오답 복습 재정답으로 올라가지 않고, 승인된 재채점만 반영돼요.</p>
   </main></div>`);
   if (x.run_mode === 'test' && !interrupted) animateTestResult(score, perfect);
   $('#share-self-test')?.addEventListener('click', async event => {

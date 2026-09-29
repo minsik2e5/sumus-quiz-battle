@@ -40,12 +40,12 @@ export function stateSizeReport(state) {
 }
 
 export function emptyState() {
-  return { schema_version: 18, schools: structuredClone(DEFAULT_SCHOOLS), profiles: [], tokens: [], sessions: [], mastery: {}, grammarProgress: {}, meaningAliases: {}, meaningAliasMeta: {}, meaningDisputes: [], assignments: [], exams: [], examAttempts: [], practices: [], extraBooks: [], battles: [] };
+  return { schema_version: 18, schools: structuredClone(DEFAULT_SCHOOLS), profiles: [], tokens: [], sessions: [], mastery: {}, grammarProgress: {}, meaningAliases: {}, meaningAliasMeta: {}, meaningDisputes: [], assignments: [], exams: [], examAttempts: [], practices: [], extraBooks: [], battles: [], tournaments: [] };
 }
 
 export function migrateState(state) {
   let changed = false;
-  for (const key of ['profiles', 'tokens', 'sessions', 'assignments', 'exams', 'examAttempts', 'practices', 'extraBooks', 'meaningDisputes', 'battles']) {
+  for (const key of ['profiles', 'tokens', 'sessions', 'assignments', 'exams', 'examAttempts', 'practices', 'extraBooks', 'meaningDisputes', 'battles', 'tournaments']) {
     if (!Array.isArray(state[key])) { state[key] = []; changed = true; }
   }
   if (!state.mastery || typeof state.mastery !== 'object' || Array.isArray(state.mastery)) { state.mastery = {}; changed = true; }
