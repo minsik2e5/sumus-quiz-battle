@@ -9,8 +9,7 @@ import { titleBadge, titleEmblem, tierEmblem, coin } from './emblems.js';
 import { titleState, openTitleDetail } from './titles-ui.js';
 import { mountLeagueBoard, clearLeagueCache, shownTitle } from './league-ui.js';
 import { createPracticeMatch, practiceQuestions, BOT_LEVELS } from './battle-bot.js';
-import { tournamentCard, bracketHtml } from './tournament-ui.js';
-import { modal } from './ui.js';
+import { tournamentCard, openBracket } from './tournament-ui.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
 // the match, and the result. A match runs in a battle room on the server (or, for a practice
@@ -157,7 +156,7 @@ function lobby() {
       <div><span class="yb-eyebrow">1 : 1 단어 배틀</span><h1>${pet ? esc(petJosa(petName(pet), '과', '와')) : ''} 함께 대결!</h1>
       <p>같은 학교·학년 친구와 같은 단어로 겨뤄요. 맞히면 누구나 공격해요. 빠르면 조금 더 세게!</p>
       <div class="yb-record"><b>${h.record.wins}</b>승 <b>${h.record.losses}</b>패 <b>${h.record.draws}</b>무${h.record.streak >= 2 ? ` · <span class="yb-streak">${h.record.streak}연승 중</span>` : ''}${h.record.best_streak ? ` <small>최고 ${h.record.best_streak}연승</small>` : ''}</div>
-      ${league?.tier ? `<button type="button" class="yb-hero-league" data-yb="tab" data-tab="league">${tierEmblem(league.tier.key, { size: 'sm' })}<span><b>${esc(league.tier.name)}</b> · 이번 주 ${num(league.points)}점${league.rank ? ` · ${league.rank}위` : ''}</span>${icon('chevron')}</button>` : ''}</div>
+      ${league?.tier ? `<button type="button" class="yb-hero-league" data-yb="tab" data-tab="league" aria-label="이번 주 리그 ${esc(league.tier.name)} ${num(league.points)}점${league.rank ? ` ${league.rank}위` : ''}">${tierEmblem(league.tier.key, { size: 'sm' })}<span><b>${esc(league.tier.name)}</b> ${num(league.points)}점${league.rank ? ` · ${league.rank}위` : ''}</span>${icon('chevron')}</button>` : ''}</div>
     </section>
     <div class="segment yb-tabs-v1366" role="group" aria-label="야차전 메뉴">${[['play', '대결'], ['league', '리그 랭킹'], ['me', '내 전적']].map(([key, label]) => `<button type="button" data-yb="tab" data-tab="${key}" class="${tab === key ? 'selected' : ''}" aria-pressed="${tab === key}">${label}</button>`).join('')}</div>
     ${tab === 'league' ? `<div class="lg-board" data-league-board data-period="${B.leaguePeriod === 'all' ? 'all' : 'week'}" data-fresh="1"></div>` : tab === 'me' ? myRecord(h) : playTab(h)}`);
@@ -171,7 +170,8 @@ function playTab(h) {
   const selectedWords = [...B.ranges].reduce((n, c) => n + (counts.get(c) || 0), 0);
   const wordsOk = B.ranges.size && selectedWords >= 8;
   const canCreate = wordsOk && balance >= B.stake && B.stake <= lossLeft;
-  const tourneys = (A.data.tournaments || []).filter(t => t.status === 'active' || t.me?.champion);
+  // Running tournaments, and finished ones for three days (their results).
+  const tourneys = A.data.tournaments || [];
   return `${tourneys.map(t => tournamentCard(t)).join('')}
     <section class="yb-card">
       <h2>대결 준비</h2>
@@ -213,7 +213,7 @@ function myRecord(h) {
       <h2>야차전 칭호 <small>${keys.filter(key => t.unlocked.includes(key)).length}/${keys.length}</small></h2>
       <div class="yb-me-titles">${keys.map(key => {
         const on = t.unlocked.includes(key), prog = on ? null : titleProgress(key, stats);
-        return `<button type="button" class="yb-me-title${on ? ' on' : ''}" data-yb="title" data-key="${key}">${titleEmblem(key, { size: 'sm', locked: !on })}<span><b>${esc(TITLES[key].name)}</b><small>${esc(TITLES[key].how)}</small>${prog ? `<i class="tt-prog"><i style="width:${Math.round(prog[0] / prog[1] * 100)}%"></i></i>` : ''}</span></button>`;
+        return `<button type="button" class="yb-me-title${on ? ' on' : ''}" data-yb="title" data-key="${key}">${titleEmblem(key, { size: 'sm', locked: !on })}<span class="yb-me-copy"><b>${esc(TITLES[key].name)}</b><small>${esc(TITLES[key].how)}</small>${prog ? `<i class="tt-prog"><i style="width:${Math.round(prog[0] / prog[1] * 100)}%"></i></i>` : ''}</span></button>`;
       }).join('')}</div>
       <p class="yb-note">칭호와 리그의 승리는 같은 친구에게 하루 3번까지만 세어요.</p>
     </section>
@@ -265,6 +265,7 @@ function acceptChallenge(invite) {
   const text = invite.tournament
     ? `<h2>${esc(invite.tournament.name)}</h2><p><b>${esc(invite.tournament.round)}</b> · ${esc(petJosa(invite.host, '과', '와'))} 겨뤄요.<br>판돈 없는 대회 경기예요. 들어가면 바로 시작해요.</p>`
     : `<h2>${esc(invite.host)}의 도전장</h2><p>판돈 <b>${num(invite.stake)}코인</b>을 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(invite.stake)}코인을 잃어요.</p>`;
+  if (invite.tournament) B.tournament = { tid: invite.tournament.id };
   confirmBox(text, '나중에', invite.tournament ? '입장하기' : '도전 받기', async yes => {
     if (B !== cur || !yes) return;
     try {
@@ -343,9 +344,8 @@ async function playTournament(tid, mid, button) {
   } catch (err) { toast(err.message); if (button) button.disabled = false; }
 }
 function showBracket(tid) {
-  const t = (B?.A.data.tournaments || []).find(item => item.id === tid);
-  if (!t) return toast('대진표를 찾지 못했어요.');
-  modal(`<h2>${esc(t.name)}</h2><p>${esc(t.class_name || t.grade || '')} · ${num(t.players)}명 · 판돈 없는 대결</p>${bracketHtml(t, { meId: B.A.data.profile.id })}`, '대진표');
+  if (!B || !tid) return;
+  openBracket(tid, B.A.data.profile.id, (B.A.data.tournaments || []).find(item => item.id === tid) || null);
 }
 
 /* ---------- room connection ---------- */
@@ -396,7 +396,7 @@ function setNote(text) { const n = document.getElementById('yb-top-note'); if (n
 function onMessage(msg) {
   if (typeof msg.now === 'number') B.clockOffset = msg.now - Date.now();
   if (msg.type === 'lobby') { if (B.room.host) waitingRoom(msg.expires_at); return; }
-  if (msg.type === 'cancelled' || msg.type === 'expired') { toast(msg.type === 'expired' ? '10분 동안 아무도 들어오지 않아 방이 닫혔어요.' : msg.reason === 'declined' ? (B.room?.challenge ? '친구가 이번에는 도전을 거절했어요.' : '상대가 이번에는 설욕전을 거절했어요.') : '대결 방이 취소됐어요.'); closeSocket(); return openBattle(B.A, B.exit); }
+  if (msg.type === 'cancelled' || msg.type === 'expired') { toast(msg.type === 'expired' ? '10분 동안 아무도 들어오지 않아 방이 닫혔어요.' : msg.reason === 'tournament' ? '선생님이 이 대회 경기를 정리했어요.' : msg.reason === 'declined' ? (B.room?.tournament ? '상대가 대회 경기를 다음에 하기로 했어요.' : B.room?.challenge ? '친구가 이번에는 도전을 거절했어요.' : '상대가 이번에는 설욕전을 거절했어요.') : '대결 방이 취소됐어요.'); closeSocket(); return openBattle(B.A, B.exit); }
   if (msg.type === 'view') { B.view = msg.view; return drawMatch(); }
   if (msg.type === 'events' && B.view) { for (const e of msg.events) applyEvent(e); }
 }

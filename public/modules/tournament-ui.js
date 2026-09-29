@@ -1,4 +1,4 @@
-import { esc, num, icon } from './ui.js';
+import { api, esc, num, icon, modal, toast } from './ui.js';
 import { titleBadge, titleEmblem, coin } from './emblems.js';
 import { avatar } from './character.js';
 
@@ -47,4 +47,13 @@ export function tournamentCard(t, { compact = false } = {}) {
     ${action}
     <p class="tn-foot">판돈 없는 대결 · ${prizeLine(t)}</p>
   </section>`;
+}
+
+// The bracket in a pop-up, fetched fresh (a match may have just ended). `fallback` is the copy
+// the screen already has, used when the network is slow.
+export async function openBracket(id, meId, fallback = null) {
+  let t = fallback;
+  try { t = (await api(`/tournament/view?id=${encodeURIComponent(id)}`)).tournament; }
+  catch (err) { if (!t) return toast(err.message); }
+  modal(`<h2>${esc(t.name)}</h2><p>${esc(t.class_name || t.grade || '')} · ${num(t.players)}명 · 판돈 없는 대결</p>${bracketHtml(t, { meId })}`, '대진표');
 }

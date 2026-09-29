@@ -403,6 +403,12 @@ export function tidyBattles(state, now = Date.now()) {
   }
   const kept = state.battles.filter(b => !(b.status === 'cancelled' && now - (b.finished_at || b.created_at) >= BATTLE_KEEP_CANCELLED_MS));
   if (kept.length !== state.battles.length) { state.battles = kept; changed = true; }
+  // V13.66: a tournament called off is forgotten after a week (finished ones stay: they
+  // carry champions and prizes).
+  if (Array.isArray(state.tournaments)) {
+    const tournaments = state.tournaments.filter(t => !(t.status === 'cancelled' && now - (t.finished_at || t.created_at) >= BATTLE_KEEP_CANCELLED_MS));
+    if (tournaments.length !== state.tournaments.length) { state.tournaments = tournaments; changed = true; }
+  }
   return changed;
 }
 function findJoinableBattle(state, p, code, now) {
@@ -1205,6 +1211,13 @@ export async function service(state, method, path, body, token, options = {}) {
     decideMatch(t, found.match.id, winner, 'teacher', now);
     const rooms = closeRooms(waiting.filter(b => b.match_id === found.match.id));
     return { tournament: tournamentView(state, createCompetition(state, now), t, p, now), _battles: rooms };
+  }
+  // A player's fresh bracket (the result screen and cards open it without reloading everything).
+  if (path === '/tournament/view' && method === 'GET') {
+    requireRole(p, 'student');
+    const t = (state.tournaments || []).find(x => x.id === str(body.id, 80) && x.players.includes(p.id));
+    if (!t) fail('대회를 찾지 못했어요.', 404);
+    return { tournament: tournamentView(state, createCompetition(state), t, p, Date.now()) };
   }
   // A student starts their tournament match: opens the room for the opponent, or joins the
   // room the opponent already opened. There is no stake.

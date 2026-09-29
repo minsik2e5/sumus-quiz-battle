@@ -9,7 +9,7 @@ import { openBattle } from './modules/battle.js';
 import { maybeTitleMoment, openTitleDetail } from './modules/titles-ui.js';
 import { mountLeagueBoard } from './modules/league-ui.js';
 import { coin } from './modules/emblems.js';
-import { bracketHtml } from './modules/tournament-ui.js';
+import { openBracket } from './modules/tournament-ui.js';
 import { EGG_PRICE } from './modules/core.js';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
@@ -984,9 +984,8 @@ function walletModal() {
   $('#wallet-yacha').onclick = () => { close(); A.screen = 'battle'; openBattle(A, leaveBattle); };
 }
 function bracketModal(id) {
-  const t = (A.data.tournaments || []).find(item => item.id === id);
-  if (!t) return toast('대진표를 찾지 못했어요.');
-  modal(`<h2>${esc(t.name)}</h2><p>${esc(t.class_name || t.grade || '')} · ${num(t.players)}명 · 판돈 없는 대결</p>${bracketHtml(t, { meId: A.data.profile.role === 'student' ? A.data.profile.id : null })}`, '대진표');
+  const t = (A.data.tournaments || []).find(item => item.id === id) || null;
+  return openBracket(id, A.data.profile.id, t);
 }
 // V13.66 teacher: open an academy tournament for one grade (or class).
 const gradeOfClass = value => String(value || '').match(/^(중[1-3]|고[1-3])/)?.[1] || String(value || '');

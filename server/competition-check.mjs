@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { emptyState } from './state.mjs';
 import { passwordHash } from './auth.mjs';
-import { service, settleBattle, scopedWords } from './service.mjs';
+import { service, settleBattle, scopedWords, tidyBattles } from './service.mjs';
 import { createCompetition, rankingWeek, countedMatches, leagueSummary, DAY_MS } from './competition.mjs';
 import { buildBracket, seedOrder, roundLabel } from './tournament.mjs';
 import { TITLES, TITLE_KEYS, titleUnlocked, titleProgress, leagueTier, LEAGUE_TIERS } from '../public/modules/titles.js';
@@ -169,6 +169,9 @@ export async function runCompetitionChecks(assert, expectStatus) {
   const loserBoot = await service(state, 'GET', '/bootstrap', {}, tokens[p1]);
   assert(loserBoot.tournaments.find(x => x.id === t.id)?.me.out === '8강', 'V13.66 a player who lost sees where their run ended');
   await expectStatus(409, () => service(state, 'POST', '/tournament/play', { tournament_id: t.id, match_id: played.id }, tokens[p1]), 'V13.66 a decided match cannot be started again');
+  const viewed = await service(state, 'GET', '/tournament/view', { id: t.id }, tokens[p1]);
+  assert(viewed.tournament.id === t.id && viewed.tournament.rounds[0].matches.some(m => m.id === played.id && m.winner === p2), 'V13.66 a player opens the fresh bracket');
+  await expectStatus(404, () => service(state, 'GET', '/tournament/view', { id: t.id }, tokens['qa-cc-private']), 'V13.66 only the players open a tournament bracket');
   // The teacher decides the rest (e.g. a student is absent); a waiting room of that match closes.
   const semi = t.rounds[1].find(m => !m.winner && m.a && m.b);
   const semiRoom = await service(state, 'POST', '/tournament/play', { tournament_id: t.id, match_id: semi.id }, tokens[semi.a]);
@@ -186,6 +189,9 @@ export async function runCompetitionChecks(assert, expectStatus) {
   const openedSecond = await service(state, 'POST', '/tournament/play', { tournament_id: second.tournament.id, match_id: 'r0m0' }, tokens['qa-cc-a']);
   const cancelled = await service(state, 'POST', `/teacher/tournaments/${second.tournament.id}/cancel`, {}, teacher);
   assert(state.tournaments.find(x => x.id === second.tournament.id).status === 'cancelled' && cancelled._battles?.some(msg => msg.id === openedSecond.id), 'V13.66 a teacher can call a tournament off; its waiting rooms close');
+  const old = { ...state.tournaments.find(x => x.id === second.tournament.id) };
+  tidyBattles(state, now + 8 * DAY);
+  assert(!state.tournaments.some(x => x.id === old.id) && state.tournaments.some(x => x.id === t.id), 'V13.66 a cancelled tournament is forgotten after a week; finished ones stay');
   const workerSource = source('../cloudflare/worker.mjs');
   assert(workerSource.includes('result?._battles') && workerSource.includes('for (const message of roomMessages)'), 'V13.66 the worker forwards several room messages (a cancelled tournament)');
 

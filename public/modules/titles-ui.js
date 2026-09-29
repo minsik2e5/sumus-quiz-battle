@@ -42,7 +42,7 @@ export function titlesPage(A) {
     <div class="page-heading tt-page-head"><span class="premium-eyebrow">TITLE COLLECTION</span><h1>칭호 도감</h1><p>칭호를 달면 랭킹·야차전·도전장에서 친구들에게 보여요.</p></div>
     <section class="tt-hero tier-${eq.tier}">
       <button type="button" class="tt-hero-medal" data-title-open="${t.equipped}" aria-label="달고 있는 칭호 ${esc(eq.name)} 자세히 보기">${titleEmblem(t.equipped, { size: 'lg' })}</button>
-      <div class="tt-hero-copy"><small>지금 달고 있는 칭호</small>${titleBadge(t.equipped, { size: 'md' })}<span>${esc(eq.desc)}</span></div>
+      <div class="tt-hero-copy"><small>지금 달고 있는 칭호</small>${titleBadge(t.equipped, { size: 'md' })}<span class="tt-hero-desc">${esc(eq.desc)}</span></div>
       <div class="tt-hero-count" role="img" aria-label="칭호 ${have.size}개 모음, 전체 ${TITLE_KEYS.length}개" style="--p:${pct}"><b>${have.size}</b><span>/${TITLE_KEYS.length}</span></div>
     </section>
     <div class="tt-tier-row">${chips}</div>
