@@ -3,6 +3,7 @@
 // and battles by student once, so ranking lists stay O(sessions + battles).
 import { levelInfo, petProgress } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked, LEAGUE_POINTS, LEAGUE_PAIR_DAY_CAP, leagueTier, leagueTierIndex } from '../public/modules/titles.js';
+import { GACHA_ITEMS, GACHA_KEYS } from '../public/modules/rewards.js';
 
 export const DAY_MS = 86400000;
 export const KST_OFFSET_MS = 9 * 3600000;
@@ -125,7 +126,9 @@ export function createCompetition(state, now = Date.now()) {
     },
     championships: (p, pid) => champions.get(pid) || 0,
     weekly_rank: (p, pid) => ctx.awards().weeklyRank.get(pid) || 0,
-    league_king: (p, pid) => ctx.awards().leagueKings.has(pid) ? 1 : 0
+    league_king: (p, pid) => ctx.awards().leagueKings.has(pid) ? 1 : 0,
+    // V13.67 capsule-only titles: owned when the capsule was pulled.
+    ...Object.fromEntries(GACHA_KEYS.filter(key => GACHA_ITEMS[key].kind === 'title').map(key => [`item_${key}`, p => Number(p?.gacha?.items?.[key] || 0)]))
   };
 
   const ctx = {

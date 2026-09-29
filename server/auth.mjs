@@ -14,7 +14,8 @@ export async function verifyPassword(password, stored = '') {
   return key.length === target.length && timingSafeEqual(key, target);
 }
 export const publicProfile = p => {
-  const { password_hash, password, ...safe } = p;
+  // V13.67: chance_live holds the answer of an open double-chance word.
+  const { password_hash, password, chance_live, ...safe } = p;
   return safe;
 };
 // Optional existing Supabase Auth integration. A local password is never substituted

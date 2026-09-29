@@ -79,15 +79,15 @@ export function titleBadge(key, opts = {}) {
 export const tierName = key => TITLE_TIERS[key]?.name || '';
 
 // League tier shield: bronze one chevron, silver two, gold three and wings, diamond a gem.
+// V13.67: league tiers are drawn emblems (/assets/ui/league-<tier>.webp; 96px copy for small sizes).
 export function tierEmblem(key = 'bronze', opts = {}) {
   const tier = LEAGUE_TIERS.find(item => item.key === key) || LEAGUE_TIERS[0];
-  const fill = `url(#lg-${tier.key})`;
-  const chevrons = n => Array.from({ length: n }, (_, i) => `<path d="m22 ${24 + i * 8} 10 6 10-6" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/>`).join('');
-  const inner = tier.key === 'diamond'
-    ? '<path d="M23 25h18l6 7-15 16-15-16z" fill="#fff" fill-opacity=".9"/><path d="M17 32h30M27 25l5 7 5-7M32 32v16" fill="none" stroke="#6aa6ff" stroke-width="1.6" stroke-linejoin="round"/>'
-    : tier.key === 'gold' ? `${chevrons(3)}${star(32, 17, 3.4)}` : chevrons(tier.key === 'silver' ? 2 : 1);
-  const wings = ['gold', 'diamond'].includes(tier.key) ? `<path d="M9 22C3 24 1 31 3 38c3-3 6-4 9-4-2 3-2 6-1 9 2-3 4-5 7-6z" fill="${fill}"/><path d="M55 22c6 2 8 9 6 16-3-3-6-4-9-4 2 3 2 6 1 9-2-3-4-5-7-6z" fill="${fill}"/>` : '';
-  return `<span class="lg-emblem lg-emblem-${opts.size || 'md'} lg-${tier.key}" role="img" aria-label="${tier.name}"><svg viewBox="0 0 64 64">${wings}<path d="M32 4 54 11.5v18.2C54 45 44.5 55 32 60 19.5 55 10 45 10 29.7V11.5z" fill="${fill}"/><path d="M32 9 49.5 15v14.5C49.5 42 42 50.5 32 54.8 22 50.5 14.5 42 14.5 29.5V15z" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="1.4"/><path d="M16 17c5-4 10-6 16-6s11 2 16 6" fill="none" stroke="url(#tt-shine)" stroke-width="5" stroke-linecap="round" opacity=".6"/>${inner}</svg></span>`;
+  const size = opts.size || 'md';
+  return `<span class="lg-emblem lg-emblem-${size} lg-${tier.key}" role="img" aria-label="${tier.name}"><img src="/assets/ui/league-${tier.key}${size === 'lg' ? '' : '-s'}.webp" alt="" width="${size === 'lg' ? 256 : 96}" height="${size === 'lg' ? 256 : 96}" decoding="async" draggable="false"></span>`;
+}
+// The academy tournament trophy (drawn art).
+export function trophy(size = 'md') {
+  return `<span class="tn-trophy tn-trophy-${size}" aria-hidden="true"><img src="/assets/ui/trophy${size === 'lg' || size === 'xl' ? '' : '-s'}.webp" alt="" width="${size === 'lg' || size === 'xl' ? 256 : 96}" height="${size === 'lg' || size === 'xl' ? 256 : 96}" decoding="async" draggable="false"></span>`;
 }
 
 export const coin = (cls = '') => `<i class="coin-ico ${cls}" aria-hidden="true"></i>`;

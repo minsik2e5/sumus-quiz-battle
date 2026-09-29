@@ -60,11 +60,11 @@ export class BattleRoom {
   async admin(msg) {
     const now = Date.now();
     if (msg.action === 'init') {
-      this.room = { id: msg.id, stake: msg.stake, label: msg.label || null, host: msg.host, guest: null, questions: msg.questions, tickets: msg.tickets, expires_at: msg.expires_at, battle: null, reported: false, closed: false };
+      this.room = { id: msg.id, stake: msg.stake, label: msg.label || null, mode: msg.mode || 'speed', host: msg.host, guest: null, questions: msg.questions, tickets: msg.tickets, expires_at: msg.expires_at, battle: null, reported: false, closed: false };
     } else if (msg.action === 'join' && this.room && !this.room.closed && !this.room.battle) {
       this.room.guest = msg.guest;
       this.room.tickets = msg.tickets;
-      this.room.battle = createBattle({ id: this.room.id, players: [this.room.host, msg.guest], questions: this.room.questions, stake: this.room.stake, label: this.room.label, now });
+      this.room.battle = createBattle({ id: this.room.id, players: [this.room.host, msg.guest], questions: this.room.questions, stake: this.room.stake, label: this.room.label, mode: this.room.mode, now });
       this.room.connect_deadline = now + CONNECT_MS;
       // The host may already be waiting on a socket.
       for (const ws of this.ctx.getWebSockets(this.room.host.id)) {
@@ -117,7 +117,7 @@ export class BattleRoom {
     // Timers may have passed while the room slept: apply them before the player's action,
     // so a late answer cannot count and events keep their order.
     const events = tick(r.battle, now);
-    if (msg.type === 'answer') events.push(...answer(r.battle, pid, Number(msg.choice), now));
+    if (msg.type === 'answer') events.push(...answer(r.battle, pid, typeof msg.choice === 'string' ? msg.choice.slice(0, 60) : Number(msg.choice), now));
     else if (msg.type === 'skill') events.push(...useSkill(r.battle, pid, String(msg.skill), now));
     else if (msg.type === 'leave') events.push(...forfeit(r.battle, pid, now));
     if (!events.length) return;

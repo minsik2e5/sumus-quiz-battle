@@ -10,6 +10,8 @@ import { maybeTitleMoment, openTitleDetail } from './modules/titles-ui.js';
 import { mountLeagueBoard } from './modules/league-ui.js';
 import { coin } from './modules/emblems.js';
 import { openBracket } from './modules/tournament-ui.js';
+import { mountArcade, attendanceMoment } from './modules/arcade.js';
+import { GACHA_PRICE, CHANCE_BETS, ATTENDANCE_REWARDS } from './modules/rewards.js';
 import { EGG_PRICE } from './modules/core.js';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
@@ -56,8 +58,8 @@ function savePreferences() {
     }));
   } catch {}
 }
-async function refresh() { A.data = await api('/bootstrap'); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; }
-globalThis.__SUMUS_APPLY_BOOTSTRAP__ = data => { A.data = data; globalThis.__SUMUS_BOOTSTRAP__ = data; if (data?.profile?.role === 'teacher') A.school = data.profile.active_school; if (!A.screen) render(); };
+async function refresh() { A.data = await api('/bootstrap'); A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; }
+globalThis.__SUMUS_APPLY_BOOTSTRAP__ = data => { A.data = data; A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = data; if (data?.profile?.role === 'teacher') A.school = data.profile.active_school; if (!A.screen) render(); };
 let roleModules = { teacher: null, student: null };
 function ensureRoleEnhancements() {
   const role = A.data?.profile?.role;
@@ -119,6 +121,7 @@ function render() {
   queueMicrotask(ensureRoleEnhancements);
   if (A.data.profile.role === 'student') {
     $$('[data-league-board]').forEach(el => mountLeagueBoard(el, period => { A.leaguePeriod = period; savePreferences(); }));
+    $$('[data-arcade]').forEach(el => mountArcade(el, A));
     queueMicrotask(() => maybePetMoment(A, petChanged));
     queueMicrotask(() => maybeTitleMoment(A, moved => { if (moved) { render(); window.scrollTo(0, 0); } else renderKeepScroll(); }));
   }
@@ -526,6 +529,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'vocab-more') { moreVocab(A); $('#vocab-table').innerHTML = vocabTable(A); return; }
     if (d.action === 'battle') { A.screen = 'battle'; return openBattle(A, leaveBattle); }
     if (d.action === 'coins') return walletModal();
+    if (d.action === 'attend') return attend(b);
     if (d.action === 'tournament-play') { A.screen = 'battle'; return openBattle(A, leaveBattle, { tournament: { tid: d.tournament, mid: d.match } }); }
     if (d.action === 'tournament-bracket') return bracketModal(d.tournament);
     if (d.action === 'tournament-new') return tournamentCreateModal();
@@ -963,6 +967,19 @@ function exportResults() {
   const url = URL.createObjectURL(new Blob(['\uFEFF' + rows.map(r => r.map(safe).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' })); const link = document.createElement('a'); link.href = url; link.download = 'SUMUS_시험결과.csv'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 // V13.66 coin wallet: balance, today's study coins (80 a day) and where coins come from and go.
+// V13.67 today's attendance stamp.
+async function attend(button) {
+  if (button) button.disabled = true;
+  try {
+    const res = await api('/attendance/check', {});
+    A.data.rewards ||= {};
+    A.data.rewards.attendance = res.attendance;
+    if (A.data.rewards.gacha) A.data.rewards.gacha.tickets = res.tickets;
+    A.data.stats.points_balance = res.points_balance;
+    renderKeepScroll();
+    attendanceMoment(res, () => navigate('arcade'));
+  } catch (err) { toast(err.message); if (button) button.disabled = false; }
+}
 function walletModal() {
   const g = A.data.stats, today = Number(g.today_reward_points || 0);
   const close = modal(`<div class="wallet-v1366">
@@ -975,11 +992,14 @@ function walletModal() {
       <li><span>100점 (10문제 이상)</span><b>+10</b></li>
       <li><span>추천 학습 · 오늘 첫 학습</span><b>+5·5</b></li>
       <li><span>3일 · 7일 연속 학습</span><b>+8·20</b></li>
+      <li><span>매일 출석 체크 (7번째는 뽑기권도)</span><b>+${ATTENDANCE_REWARDS[0]}~${ATTENDANCE_REWARDS.at(-1)}</b></li>
       <li><span>야차전 승리 · 학원 대회 상금</span><b>판돈 · 상금</b></li>
     </ul>
     <h3>쓰는 곳</h3>
-    <div class="wallet-actions"><button type="button" class="btn" id="wallet-egg">랜덤 알 <small>${coin()}${num(EGG_PRICE)}</small></button><button type="button" class="btn" id="wallet-yacha">야차전 판돈 <small>${coin()}10·30·50</small></button></div>
+    <div class="wallet-actions"><button type="button" class="btn" id="wallet-egg">랜덤 알 <small>${coin()}${num(EGG_PRICE)}</small></button><button type="button" class="btn" id="wallet-yacha">야차전 판돈 <small>${coin()}10·30·50</small></button><button type="button" class="btn" id="wallet-gacha">뽑기 <small>${coin()}${GACHA_PRICE}</small></button><button type="button" class="btn" id="wallet-chance">더블 찬스 <small>${coin()}${CHANCE_BETS.join('·')}</small></button></div>
   </div>`, '코인 지갑');
+  $('#wallet-gacha').onclick = () => { close(); navigate('arcade'); };
+  $('#wallet-chance').onclick = () => { close(); navigate('arcade'); };
   $('#wallet-egg').onclick = () => { close(); openEggShop(A, petChanged); };
   $('#wallet-yacha').onclick = () => { close(); A.screen = 'battle'; openBattle(A, leaveBattle); };
 }
@@ -1002,6 +1022,7 @@ function tournamentCreateModal() {
       <label class="field"><span>대회 이름</span><input name="name" maxlength="40" placeholder="${esc(A.school)} 야차 대회"></label>
       <div class="form-columns">
         <label class="field"><span>대상</span><select name="class_name" id="tn-target">${targets.map(([value, label]) => `<option value="${value}">${label}</option>`).join('')}</select></label>
+        <label class="field"><span>대결 방식</span><select name="mode"><option value="speed">스피드전 (4지선다)</option><option value="skill">실력전 (철자 쓰기 섞임)</option></select></label>
         <label class="field"><span>대진 방식</span><select name="seeding"><option value="random">랜덤 대진</option><option value="league">이번 주 리그 승점순</option></select></label>
         <label class="field"><span>우승 상금 (준우승 절반)</span><select name="prize"><option value="0">없음</option><option value="50">50코인</option><option value="100" selected>100코인</option><option value="200">200코인</option></select></label>
       </div>
@@ -1043,7 +1064,7 @@ function tournamentCreateModal() {
     if (!ranges.length) return $('#tn-error').textContent = '단어 범위를 하나 이상 골라주세요.';
     buttonBusy(button); $('#tn-error').textContent = '';
     try {
-      await api('/teacher/tournaments', { name: values.name, class_name: values.class_name, seeding: values.seeding, prize: Number(values.prize), student_ids: ids, range_codes: ranges });
+      await api('/teacher/tournaments', { name: values.name, class_name: values.class_name, seeding: values.seeding, mode: values.mode, prize: Number(values.prize), student_ids: ids, range_codes: ranges });
       close(); await refresh(); A.tab = 'tournaments'; render(); toast('대회를 열었어요! 학생 홈 화면에 첫 경기가 떠요.');
     } catch (err) { $('#tn-error').textContent = err.message; buttonBusy(button, false); }
   };
