@@ -43,6 +43,8 @@ const GLYPHS = {
   heart: '<path d="M12 20s-7.2-4.4-7.2-10.1A4.1 4.1 0 0 1 12 7.6a4.1 4.1 0 0 1 7.2 2.3C19.2 15.6 12 20 12 20z" fill="#fff" fill-opacity=".3"/>',
   wing: '<path d="M12 18.5c-1.3-3.4-4.5-5.9-8.5-6.4 1.6-1.2 3.5-1.6 5.4-1.2C8 9.4 7.7 7.6 8.3 5.8c1.7 1.7 3 3.9 3.7 6.4.7-2.5 2-4.7 3.7-6.4.6 1.8.3 3.6-.6 5.1 1.9-.4 3.8 0 5.4 1.2-4 .5-7.2 3-8.5 6.4z" fill="#fff" fill-opacity=".3"/>',
   trophy: '<path d="M8 4h8v5.2a4 4 0 0 1-8 0z" fill="#fff" fill-opacity=".3"/><path d="M8 6H5.2a2.8 2.8 0 0 0 3 3.6M16 6h2.8a2.8 2.8 0 0 1-3 3.6M12 13.2V17M8.5 20.5h7M9.5 17h5"/>',
+  // V13.73: 출석 titles.
+  calendar: '<rect x="4" y="5.5" width="16" height="14.5" rx="2.4" fill="#fff" fill-opacity=".25"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/><path d="m9 15 2 2 4-4"/>',
   medal: '<path d="m8 3 4 6.2L16 3"/><circle cx="12" cy="15" r="5.6" fill="#fff" fill-opacity=".28"/><path d="m12 12.2.9 1.9 2 .2-1.5 1.4.4 2-1.8-1-1.8 1 .4-2-1.5-1.4 2-.2z" fill="#fff"/>'
 };
 const glyph = (name, x = 16, y = 16, size = 32) => `<g transform="translate(${x} ${y}) scale(${size / 24})" fill="none" stroke="#fff" stroke-width="${(2.1 * 24 / size).toFixed(2)}" stroke-linecap="round" stroke-linejoin="round">${GLYPHS[name] || GLYPHS.star}</g>`;

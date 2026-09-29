@@ -47,11 +47,21 @@ export const GACHA_ITEMS = {
 export const GACHA_KEYS = Object.keys(GACHA_ITEMS);
 export const ownedDecorations = items => GACHA_KEYS.filter(key => Number(items?.[key] || 0) > 0);
 
+// V13.73 teacher coin gifts: to one student, a class or the whole school, with a short note.
+export const GIFT_AMOUNTS = [10, 30, 50, 100];
+export const GIFT_NOTE_MAX = 40;
+export const GIFT_LOG_KEEP = 20;
+
+// V13.73 study coins (원장님과 정한 중간안). A practice pays only when it is finished and at least
+// 60% of its answers are right; `cap` is the daily limit of study coins.
+export const STUDY_COINS = { t30: 22, t20: 16, t10: 7, perfect: 12, daily: 5, first: 5, streak3: 8, streak7: 20, cap: 100, min_accuracy: 0.6 };
+
 // V13.70 practice match against the robot (로보와 연습 대결): a few coins and 경험치 for the
 // partner pet. A win pays by the robot's level; a loss or draw still pays a little. The first
 // BOT_DAILY matches of a day pay, and only if the student answered BOT_MIN_RIGHT words right.
-export const BOT_WIN_REWARDS = { easy: { coins: 3, xp: 40 }, normal: { coins: 5, xp: 60 }, hard: { coins: 8, xp: 80 } };
-export const BOT_TRY_REWARD = { coins: 2, xp: 30 };
+// V13.73 (중간안): more coins, same 경험치.
+export const BOT_WIN_REWARDS = { easy: { coins: 5, xp: 40 }, normal: { coins: 8, xp: 60 }, hard: { coins: 12, xp: 80 } };
+export const BOT_TRY_REWARD = { coins: 3, xp: 30 };
 export const BOT_DAILY = 5;
 export const BOT_MIN_RIGHT = 3;
 export const BOT_MIN_MS = 15000; // a match cannot be over faster than this

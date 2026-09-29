@@ -126,7 +126,8 @@ function finish(state, now, reason, loserId = null) {
     const q = state.questions.find(item => item.word_id === wordId);
     return q ? { word_id: wordId, ...questionWord(q) } : null;
   }).filter(Boolean)]));
-  state.result = { winner, loser: winner ? other(state, winner) : null, reason, stake: state.stake, finished_at: now, hp: { [a.id]: a.hp, [b.id]: b.hp }, review };
+  // V13.73: pet skills set off, per player (the 스킬 titles count them).
+  state.result = { winner, loser: winner ? other(state, winner) : null, reason, stake: state.stake, finished_at: now, hp: { [a.id]: a.hp, [b.id]: b.hp }, skills: { [a.id]: a.skills_used || 0, [b.id]: b.skills_used || 0 }, review };
   return [event(state, 'end', { result: state.result })];
 }
 

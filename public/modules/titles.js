@@ -16,6 +16,12 @@
 //   weekly_rank  last week's 경험치 rank in the student's grade (1..3, 0 = none)
 //   league_king  1 when the student topped last week's yacha league
 //   item_<key>   V13.67: how many of that capsule the student pulled (capsule-only titles)
+//   studies      V13.73: finished studies of 10 or more answers
+//   attendance   V13.73: days checked in (출석)
+//   bot_wins     V13.73: robot practice matches won (any level); bot_hard_wins: at 어려움
+//   skills       V13.73: pet skills set off in yacha matches (counted from v13.73 on)
+//   exams        V13.73: teacher exams submitted
+//   gifts        V13.73: coin gifts received from a teacher
 // Limited titles belong to one week: they are held only while last week's result stands.
 
 export const TITLE_TIERS = {
@@ -26,6 +32,10 @@ export const TITLE_TIERS = {
   limited: { name: '한정', order: 5 }
 };
 export const TITLE_GROUPS = { study: '학습', yacha: '야차전', collect: '수집', gacha: '뽑기', limited: '한정' };
+// V13.73: coins for a new title, by tier (paid once when the student first sees it; a limited
+// title pays again each week it is won). 첫걸음 and retired capsule titles pay nothing.
+export const TITLE_COINS = { common: 10, rare: 30, epic: 60, legendary: 120, limited: 60 };
+export const titleCoins = key => key === 'rookie' || !TITLES[key] || TITLES[key].retired ? 0 : TITLE_COINS[TITLES[key].tier] || 0;
 
 // Keys of the first eight titles are kept from V13.56 (students may have one equipped).
 export const TITLES = {
@@ -61,7 +71,26 @@ export const TITLES = {
   weekly1: { name: '주간 챔피언', tier: 'limited', group: 'limited', stat: 'weekly_rank', goal: 1, exact: true, icon: 'medal', how: '지난주 경험치 랭킹 1위 (우리 학년)', desc: '지난주 우리 학년에서 가장 열심히 공부했어요.' },
   weekly2: { name: '주간 은메달', tier: 'limited', group: 'limited', stat: 'weekly_rank', goal: 2, exact: true, icon: 'medal', how: '지난주 경험치 랭킹 2위 (우리 학년)', desc: '지난주 우리 학년 2위!' },
   weekly3: { name: '주간 동메달', tier: 'limited', group: 'limited', stat: 'weekly_rank', goal: 3, exact: true, icon: 'medal', how: '지난주 경험치 랭킹 3위 (우리 학년)', desc: '지난주 우리 학년 3위!' },
-  leagueking: { name: '주간 야차왕', tier: 'limited', group: 'limited', stat: 'league_king', goal: 1, icon: 'crown', how: '지난주 야차 리그 1위', desc: '지난주 야차 리그를 제패했어요.' }
+  leagueking: { name: '주간 야차왕', tier: 'limited', group: 'limited', stat: 'league_king', goal: 1, icon: 'crown', how: '지난주 야차 리그 1위', desc: '지난주 야차 리그를 제패했어요.' },
+  // V13.73: more titles (출석, 로보, 펫 스킬, 선생님 선물, 실전시험, and higher goals).
+  pets2: { name: '새 친구', tier: 'common', group: 'collect', stat: 'pets', goal: 2, icon: 'paw', how: '펫 2마리 만나기', desc: '두 번째 펫 친구가 생겼어요.' },
+  study10: { name: '공부 습관', tier: 'common', group: 'study', stat: 'studies', goal: 10, icon: 'book', how: '10문제 이상 학습 10번', desc: '공부가 조금씩 몸에 배고 있어요.' },
+  attend7: { name: '출석 도장', tier: 'common', group: 'study', stat: 'attendance', goal: 7, icon: 'calendar', how: '출석 체크 7번', desc: '도장 일곱 개, 꽉 찬 출석 카드!' },
+  bot1: { name: '로보 격파', tier: 'common', group: 'yacha', stat: 'bot_wins', goal: 1, icon: 'sword', how: '로보 연습 대결 1승', desc: '로보를 처음으로 이겼어요.' },
+  gift1: { name: '선생님의 칭찬', tier: 'common', group: 'collect', stat: 'gifts', goal: 1, icon: 'heart', how: '선생님께 코인 선물 받기', desc: '선생님이 알아봐 주셨어요!' },
+  level10: { name: '쑥쑥 성장', tier: 'rare', group: 'study', stat: 'level', goal: 10, icon: 'sprout', how: 'Lv.10 달성', desc: '어느새 이만큼 자랐어요.' },
+  study50: { name: '성실한 학생', tier: 'rare', group: 'study', stat: 'studies', goal: 50, icon: 'book', how: '10문제 이상 학습 50번', desc: '꾸준함이 최고의 재능이에요.' },
+  attend30: { name: '개근상', tier: 'rare', group: 'study', stat: 'attendance', goal: 30, icon: 'calendar', how: '출석 체크 30번', desc: '빠짐없이 출석하는 모범생.' },
+  bothunter: { name: '로보 사냥꾼', tier: 'rare', group: 'yacha', stat: 'bot_hard_wins', goal: 5, icon: 'target', how: '어려움 로보 5번 이기기', desc: '어려운 로보도 문제없어요.' },
+  skill10: { name: '스킬 달인', tier: 'rare', group: 'yacha', stat: 'skills', goal: 10, icon: 'bolt', how: '야차전에서 펫 스킬 10번 발동', desc: '연속 정답으로 펫의 힘을 깨웠어요.' },
+  exam3: { name: '실전 강자', tier: 'rare', group: 'study', stat: 'exams', goal: 3, icon: 'target', how: '선생님 실전시험 3번 응시', desc: '실전에서도 떨지 않아요.' },
+  words2000: { name: '단어 박사', tier: 'epic', group: 'study', stat: 'correct', goal: 2000, icon: 'gem', how: '맞힌 단어 2,000개', desc: '단어라면 물어보세요, 박사님!' },
+  study150: { name: '공부의 신', tier: 'epic', group: 'study', stat: 'studies', goal: 150, icon: 'crown', how: '10문제 이상 학습 150번', desc: '공부의 신이 강림했어요.' },
+  attend100: { name: '백일 출석', tier: 'epic', group: 'study', stat: 'attendance', goal: 100, icon: 'calendar', how: '출석 체크 100번', desc: '백 번의 출석, 백 번의 성장.' },
+  combo30: { name: '30연속 불꽃', tier: 'epic', group: 'study', stat: 'combo', goal: 30, icon: 'flame', how: '한 번에 30문제 연속 정답', desc: '꺼지지 않는 정답 불꽃!' },
+  skill50: { name: '펫과 한마음', tier: 'epic', group: 'yacha', stat: 'skills', goal: 50, icon: 'paw', how: '야차전에서 펫 스킬 50번 발동', desc: '펫과 호흡이 척척 맞아요.' },
+  perfect50: { name: '만점 전설', tier: 'legendary', group: 'study', stat: 'perfect', goal: 50, icon: 'star', how: '10문제 이상 100점 50번', desc: '100점이 곧 이름이 되었어요.' },
+  yacha10: { name: '무적의 야차', tier: 'legendary', group: 'yacha', stat: 'win_streak', goal: 10, icon: 'crown', how: '야차전 10연승', desc: '열 번 연속, 아무도 막지 못했어요.' }
 };
 // V13.67: titles that came out of the capsule machine. V13.68 retired the machine: they stay
 // with the students who have them and are not shown to anyone else (`retired`).

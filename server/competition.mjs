@@ -104,6 +104,8 @@ export function createCompetition(state, now = Date.now()) {
   const week = rankingWeek(now), lastWeek = rankingWeek(week.start - 1);
   const champions = new Map();
   for (const t of state.tournaments || []) if (t.status === 'finished' && t.champion) champions.set(t.champion, (champions.get(t.champion) || 0) + 1);
+  const exams = new Map();
+  for (const a of state.examAttempts || []) if (a.status === 'submitted') exams.set(a.student_id, (exams.get(a.student_id) || 0) + 1);
   const countedCache = new Map(), statCache = new Map();
   let awards = null;
   const inWindow = window => b => b.finished_at >= window.start && b.finished_at < window.end;
@@ -128,6 +130,14 @@ export function createCompetition(state, now = Date.now()) {
       return Math.max(0, ...[...weeks.values()].map(points => leagueTierIndex(points)));
     },
     championships: (p, pid) => champions.get(pid) || 0,
+    // V13.73 titles. Bonus rows (robot matches, exams) have no answers, so they are not studies.
+    studies: (p, pid) => ctx.sessionsOf(pid).filter(s => !s.bonus && Number(s.answered_count ?? s.total ?? 0) >= 10).length,
+    attendance: p => Number(p?.attendance?.total || 0),
+    bot_wins: p => Number(p?.bonus?.bot?.wins || 0),
+    bot_hard_wins: p => Number(p?.bonus?.bot?.hard_wins || 0),
+    skills: (p, pid) => ctx.battlesOf(pid).reduce((n, b) => n + Number(b.skills?.[pid] || 0), 0),
+    exams: (p, pid) => exams.get(pid) || 0,
+    gifts: p => Number(p?.gift_box?.count || 0),
     weekly_rank: (p, pid) => ctx.awards().weeklyRank.get(pid) || 0,
     league_king: (p, pid) => ctx.awards().leagueKings.has(pid) ? 1 : 0,
     // V13.67 capsule-only titles: owned when the capsule was pulled.

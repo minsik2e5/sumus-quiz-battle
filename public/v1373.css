@@ -1,0 +1,98 @@
+/* V13.73: 코인 보상 개편 · 칭호 코인과 연출 · 선생님 코인 선물 · 발음 듣기 */
+
+/* coins raining over a pop-up */
+.cel-coins{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:6}
+.cel-coins i{position:absolute;left:var(--x);top:-40px;width:var(--s);height:var(--s);border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff6c4 0 18%,#ffd84d 20% 55%,#e9a300 58% 100%);box-shadow:inset 0 0 0 2px rgba(160,100,0,.35),0 2px 6px rgba(160,100,0,.3);opacity:0;animation:celFall var(--t) cubic-bezier(.3,.1,.6,1) var(--d) forwards}
+.cel-coins i::after{content:"";position:absolute;inset:26%;border-radius:50%;border:2px solid rgba(170,110,0,.45)}
+@keyframes celFall{0%{opacity:0;transform:translateY(0) rotateY(0)}10%{opacity:1}85%{opacity:1}100%{opacity:0;transform:translateY(560px) rotateY(var(--r))}}
+
+/* "+60 코인" */
+.cel-reward{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;border-radius:999px;background:linear-gradient(135deg,#fff6d6,#ffe39a);box-shadow:0 0 0 1.5px #f2c14e inset,0 6px 18px rgba(233,163,0,.28);color:#7a4a00;transform:scale(.6);opacity:0;transition:transform .45s cubic-bezier(.2,1.6,.4,1),opacity .25s}
+.cel-reward.on{transform:scale(1);opacity:1}
+.cel-reward .coin-ico{width:26px;height:26px}
+.cel-reward b{font-size:26px;font-weight:900;letter-spacing:-.02em}
+.cel-reward small{font-size:12.5px;font-weight:800;opacity:.8}
+.tt-moment.tier-limited .cel-reward{background:linear-gradient(135deg,#fff3c4,#ffd36b)}
+@media (prefers-reduced-motion:reduce){.cel-reward{transform:none;opacity:1;transition:none}}
+
+/* title moments */
+.tt-moment{position:relative}
+.tt-moment.tier-legendary .tt-moment-stage::before,.tt-moment.tier-limited .tt-moment-stage::before{content:"";position:absolute;inset:-30px;border-radius:50%;background:conic-gradient(from 0deg,rgba(255,215,90,0),rgba(255,215,90,.55),rgba(255,215,90,0) 30%,rgba(255,215,90,.55) 60%,rgba(255,215,90,0) 80%);animation:ttSpin 5s linear infinite;filter:blur(6px)}
+.tt-unlock[data-state="shown"] .tt-moment-medal{animation:celPulse 2.4s ease-in-out .8s infinite}
+@keyframes celPulse{50%{transform:scale(1.05)}}
+.tt-card{position:relative}
+.tt-card-coins{position:absolute;top:8px;right:8px;display:inline-flex;align-items:center;gap:2px;padding:1px 6px 1px 3px;border-radius:999px;background:#fff6d6;color:#8a5a00;font-size:10.5px;font-weight:900}
+.tt-card-coins .coin-ico{width:13px;height:13px}
+.tt-detail-coins{display:flex;align-items:center;gap:6px;justify-content:center;margin:2px 0 6px;font-size:13px;color:#7a4a00}
+.tt-detail-coins .coin-ico{width:18px;height:18px}
+.tt-payday .tt-intro-grid small{white-space:nowrap}
+
+/* teacher gift box on the student's screen */
+.cel-gift-backdrop{background:radial-gradient(circle at 50% 38%,rgba(90,40,120,.55),rgba(8,12,20,.85))}
+.cel-gift{position:relative;overflow:hidden;text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px;background:linear-gradient(180deg,#fffdf5,#fff0f6)}
+.cel-gift-stage{position:relative;width:230px;height:210px;display:grid;place-items:center}
+.cel-gift-rays{position:absolute;inset:-20px;border-radius:50%;background:repeating-conic-gradient(from 0deg,rgba(255,190,90,.35) 0 10deg,transparent 10deg 30deg);-webkit-mask:radial-gradient(circle,#000 25%,transparent 70%);mask:radial-gradient(circle,#000 25%,transparent 70%);animation:ttSpin 14s linear infinite;opacity:.6}
+.cel-box{appearance:none;border:0;background:none;padding:0;position:relative;width:132px;height:128px;cursor:pointer;animation:celWobble 1.6s ease-in-out infinite;z-index:2}
+.cel-box-body{position:absolute;left:10px;right:10px;bottom:0;height:84px;border-radius:12px;background:linear-gradient(135deg,#ff6b9a,#e0457a);box-shadow:inset 0 -8px 0 rgba(0,0,0,.08),0 10px 24px rgba(224,69,122,.35)}
+.cel-box-lid{position:absolute;left:0;right:0;top:18px;height:34px;border-radius:10px;background:linear-gradient(135deg,#ff82ab,#ea5286);box-shadow:0 4px 0 rgba(0,0,0,.08);transition:transform .6s cubic-bezier(.2,1.4,.4,1),opacity .6s;z-index:2}
+.cel-box-body i,.cel-box-lid i{position:absolute;left:50%;top:0;bottom:0;width:18px;margin-left:-9px;background:linear-gradient(180deg,#ffe37a,#f2b233)}
+.cel-box-lid::before,.cel-box-lid::after{content:"";position:absolute;top:-22px;width:34px;height:26px;border:7px solid #f2b233;border-radius:50% 50% 8px 50%}
+.cel-box-lid::before{left:calc(50% - 38px);transform:rotate(-12deg)}
+.cel-box-lid::after{right:calc(50% - 38px);transform:scaleX(-1) rotate(-12deg)}
+.cel-gift-burst{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle,rgba(255,240,170,.95),rgba(255,240,170,0) 60%);opacity:0;transform:scale(.3);z-index:1}
+.cel-gift-stage[data-state="open"] .cel-box{animation:none}
+.cel-gift-stage[data-state="open"] .cel-box-lid{transform:translateY(-90px) rotate(-24deg);opacity:0}
+.cel-gift-stage[data-state="open"] .cel-gift-burst{animation:celBurst .9s ease-out forwards}
+@keyframes celWobble{0%,100%{transform:rotate(0)}10%{transform:rotate(-6deg) scale(1.03)}20%{transform:rotate(5deg)}30%{transform:rotate(-3deg)}40%{transform:rotate(0) scale(1)}}
+@keyframes celBurst{0%{opacity:0;transform:scale(.3)}30%{opacity:1}100%{opacity:0;transform:scale(1.6)}}
+.cel-kicker{font-size:12px;font-weight:900;letter-spacing:.08em;color:#c0306a}
+.cel-gift-title{margin:0;font-size:26px;letter-spacing:-.02em}
+.cel-notes{display:grid;gap:6px;width:100%}
+.cel-notes p{margin:0;padding:10px 14px;border-radius:14px;background:#fff;box-shadow:0 0 0 1px #f6d4e2 inset;font-size:14px;font-weight:700;color:#5b2a42}
+.cel-gift-reward{display:grid;justify-items:center;gap:4px}
+.cel-gift-count{font-size:12px;color:#8b6a78;font-weight:800}
+.cel-gift .pet-moment-actions{width:100%}
+@media (prefers-reduced-motion:reduce){.cel-box,.cel-gift-rays,.tt-moment-stage::before{animation:none!important}}
+
+/* study result + wallet */
+.result-reward-note-v1373{margin:8px 0 0;padding:9px 12px;border-radius:12px;background:#fff6e6;color:#8a5a00;font-size:13px;font-weight:700;text-align:center}
+.wallet-rule-v1373{display:block;margin-top:6px;font-size:11.5px;color:#7b8986}
+
+/* 발음 듣기 */
+.speak-row-v1373{display:flex;align-items:center;justify-content:center;gap:10px}
+.speak-row-v1373 .question-prompt{margin:0}
+.speak-btn-v1373{flex:none;appearance:none;border:0;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;background:#e8f6f0;color:#07815f;cursor:pointer;box-shadow:0 0 0 1px #cfe9de inset}
+.speak-btn-v1373 .icon{width:22px;height:22px}
+.speak-btn-v1373:active{transform:scale(.94)}
+
+/* teacher: gift button and modal */
+.tv2-gift-v1373{appearance:none;border:0;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:16px;background:linear-gradient(135deg,#fff0f6,#ffe3ee);color:#a3255c;cursor:pointer;box-shadow:0 0 0 1px #f8cfe0 inset;font:inherit;text-align:left}
+.tv2-gift-v1373 .icon{width:26px;height:26px}
+.tv2-gift-v1373 b{display:block;font-size:14px}
+.tv2-gift-v1373 small{display:block;font-size:11.5px;color:#b0587e}
+.gift-btn-v1373{margin-left:auto}
+.gift-modal-v1373 h2{display:flex;align-items:center;gap:8px}
+.gift-modal-v1373 h2 .icon{color:#e0457a}
+.gift-label{margin:14px 0 6px;font-size:12.5px;font-weight:900;color:#5d6d68}
+.gift-target{width:100%}
+.gift-target button{flex:1}
+#gift-target-box{margin-top:8px}
+.gift-classes{display:flex;flex-wrap:wrap;gap:6px}
+.gift-all-note{margin:4px 0;font-size:13px;color:#5d6d68}
+.gift-search{margin-bottom:6px}
+.gift-students{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px;max-height:220px;overflow:auto;padding:2px}
+.gift-student{display:flex;align-items:center;gap:6px;padding:7px 9px;border-radius:10px;background:#f6f8f7;box-shadow:0 0 0 1px #e3e9e6 inset;cursor:pointer;font-size:13px}
+.gift-student.on{background:#fff0f6;box-shadow:0 0 0 2px #e0457a inset}
+.gift-student small{margin-left:auto;color:#8b9994;font-size:11px}
+.gift-amounts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.gift-amount{appearance:none;border:0;display:flex;align-items:center;justify-content:center;gap:4px;height:46px;border-radius:12px;background:#fff;box-shadow:0 0 0 1.5px #e3e9e6 inset;font:inherit;font-size:16px;font-weight:900;color:#7a4a00;cursor:pointer}
+.gift-amount.on{background:#fff6d6;box-shadow:0 0 0 2px #f2b233 inset}
+.gift-note{margin-top:12px}
+#gift-send{margin-top:12px}
+#gift-send small{font-weight:700;opacity:.85}
+.gift-sent{margin-top:12px;font-size:13px}
+.gift-sent summary{cursor:pointer;color:#5d6d68;font-weight:800}
+.gift-sent ul{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}
+.gift-sent li{display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:10px;background:#f6f8f7}
+.gift-sent li small{display:block;color:#8b9994;font-size:11px}
+.gift-sent li span:last-child{text-align:right;white-space:nowrap}

@@ -1,7 +1,22 @@
 import { api, $, $$, icon, esc, time, date, recordRangeLabel, scope, toast, modal, buttonBusy } from './ui.js';
 import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo, grade, displayEnglish } from './core.js';
 import { avatar } from './character.js';
-import { EXAM_XP_PER_ANSWER, EXAM_COINS } from './rewards.js';
+import { EXAM_XP_PER_ANSWER, EXAM_COINS, STUDY_COINS } from './rewards.js';
+
+// V13.73: a 발음 듣기 button next to an English word shown as the question (never next to a
+// Korean meaning: there the English sound would give the answer away).
+function speakablePrompt(prompt, english, cls = '') {
+  const h2 = `<h2 class="question-prompt ${cls}">${esc(prompt)}</h2>`;
+  return english ? `<div class="speak-row-v1373">${h2}<button type="button" class="speak-btn-v1373" id="speak-prompt" aria-label="${esc(prompt)} 발음 듣기">${icon('sound')}</button></div>` : h2;
+}
+function speakEnglish(text) {
+  if (!('speechSynthesis' in window)) return toast('이 기기에서는 발음 듣기를 지원하지 않아요.');
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(String(text || '').replace(/\([^)]*\)|\[[^\]]*\]/g, '').trim());
+  u.lang = 'en-US'; u.rate = .82;
+  u.onerror = () => toast('발음을 재생하지 못했어요. 다시 눌러주세요.');
+  speechSynthesis.speak(u);
+}
 let A, redraw, refresh, examState = null, practiceState = null, prefetchedPractice = null, practiceAdvanceTimer = null, practiceOffset = 0, practiceAutoFinishing = false, practiceQuestionTimingOut = false, practiceGuardId = null, pendingPracticeSave = false, timer, saving = Promise.resolve(), inputVersion = 0, dirty = false, syncError = '', debounce, audio;
 export function configureSessions(state, render, reload) { A = state; redraw = render; refresh = reload; }
 const mount = html => { $('#app').innerHTML = html; window.scrollTo(0, 0); };
@@ -113,7 +128,8 @@ function renderExam() {
     };
   } else {
     const q = a.questions[x.index], value = a.answers[x.index] || '', writing = EXAM_TYPES[q.type].input;
-    mount(`<div class="session-app">${header}<main class="question-area"><div class="row between"><span class="question-type">${EXAM_TYPES[q.type].label}</span><span class="pill">${x.index + 1} / ${a.total}</span></div><h2 class="question-prompt ${['write_en', 'mean2eng_mc'].includes(q.type) ? 'korean' : ''}">${esc(q.prompt)}</h2>${writing ? `<label><span class="hidden">${q.type === 'write_en' ? '영어 답안' : '뜻 답안'}</span><textarea rows="2" class="answer-input" id="exam-answer" aria-label="${q.type === 'write_en' ? '영어 답안' : '뜻 답안'}" placeholder="${q.type === 'write_en' ? '영어 단어를 입력하세요' : '한국어 뜻을 입력하세요'}" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="500" lang="${q.type === 'write_en' ? 'en' : 'ko'}">${esc(value)}</textarea></label><p class="input-caption">${q.type === 'write_meaning' ? '뜻이 여러 개라면, 그중 하나를 정확히 적어주세요.' : '대소문자는 구분하지 않아요.'}</p>` : `<div class="options">${q.options.map((o, i) => `<button class="option ${value === o ? 'selected' : ''}" data-choice="${i}" aria-pressed="${value === o}"><span class="letter">${i + 1}</span><span>${esc(o)}</span></button>`).join('')}</div>`}<div class="answer-controls"><button class="btn" id="exam-prev" ${x.index === 0 ? 'disabled' : ''}>${icon('back')} 이전</button><button class="btn ink" id="exam-next">${x.index === a.total - 1 ? '답안 검토' : '다음'} ${icon('arrow')}</button></div><div id="save-state" class="save-state"></div><button class="text-button" id="all-answers" style="width:100%">전체 답안 보기</button><div id="submit-error" role="alert"></div></main></div>`);
+    mount(`<div class="session-app">${header}<main class="question-area"><div class="row between"><span class="question-type">${EXAM_TYPES[q.type].label}</span><span class="pill">${x.index + 1} / ${a.total}</span></div>${speakablePrompt(q.prompt, !['write_en', 'mean2eng_mc'].includes(q.type), ['write_en', 'mean2eng_mc'].includes(q.type) ? 'korean' : '')}${writing ? `<label><span class="hidden">${q.type === 'write_en' ? '영어 답안' : '뜻 답안'}</span><textarea rows="2" class="answer-input" id="exam-answer" aria-label="${q.type === 'write_en' ? '영어 답안' : '뜻 답안'}" placeholder="${q.type === 'write_en' ? '영어 단어를 입력하세요' : '한국어 뜻을 입력하세요'}" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="500" lang="${q.type === 'write_en' ? 'en' : 'ko'}">${esc(value)}</textarea></label><p class="input-caption">${q.type === 'write_meaning' ? '뜻이 여러 개라면, 그중 하나를 정확히 적어주세요.' : '대소문자는 구분하지 않아요.'}</p>` : `<div class="options">${q.options.map((o, i) => `<button class="option ${value === o ? 'selected' : ''}" data-choice="${i}" aria-pressed="${value === o}"><span class="letter">${i + 1}</span><span>${esc(o)}</span></button>`).join('')}</div>`}<div class="answer-controls"><button class="btn" id="exam-prev" ${x.index === 0 ? 'disabled' : ''}>${icon('back')} 이전</button><button class="btn ink" id="exam-next">${x.index === a.total - 1 ? '답안 검토' : '다음'} ${icon('arrow')}</button></div><div id="save-state" class="save-state"></div><button class="text-button" id="all-answers" style="width:100%">전체 답안 보기</button><div id="submit-error" role="alert"></div></main></div>`);
+    $('#speak-prompt')?.addEventListener('click', () => speakEnglish(q.prompt));
     $('#exam-answer')?.addEventListener('input', e => captureAnswer(e.target.value));
     $$('[data-choice]').forEach(b => b.onclick = () => { captureAnswer(q.options[Number(b.dataset.choice)]); $$('[data-choice]').forEach(v => { const selected = v === b; v.classList.toggle('selected', selected); v.setAttribute('aria-pressed', String(selected)); }); flushDraft(); });
     $('#exam-prev').onclick = () => { flushDraft(); x.index--; localSave(); renderExam(); };
@@ -391,7 +407,7 @@ function renderPractice() {
     </header>
     <main class="question-area exam-question-area">
       <div class="exam-question-meta"><span class="question-type">${PRACTICE_TYPES[q.type]}</span></div>
-      ${q.type === 'listen' ? `<button class="listen-button" id="listen-word" aria-label="발음 듣기">${icon('sound')}</button><p class="input-caption" style="text-align:center">발음을 듣고 뜻을 골라주세요.</p>` : `<h2 class="question-prompt ${!['eng2mean', 'write_meaning'].includes(q.type) ? 'korean' : ''}">${esc(q.prompt)}</h2>`}
+      ${q.type === 'listen' ? `<button class="listen-button" id="listen-word" aria-label="발음 듣기">${icon('sound')}</button><p class="input-caption" style="text-align:center">발음을 듣고 뜻을 골라주세요.</p>` : speakablePrompt(q.prompt, ['eng2mean', 'write_meaning', 'eng2mean_mc'].includes(q.type), !['eng2mean', 'write_meaning'].includes(q.type) ? 'korean' : '')}
       ${q.hint ? `<p class="question-hint">${esc(q.hint)}</p>` : ''}
       ${input ? `<input id="practice-answer" class="answer-input ${feedback ? (feedback.ok ? 'answer-correct-v1340' : 'answer-wrong-v1340') : ''}" aria-label="${meaningInput ? '한국어 뜻 답안' : '영어 답안'}" placeholder="${meaningInput ? '뜻을 직접 입력하세요' : '영어 단어를 입력하세요'}" autocomplete="off" autocapitalize="off" spellcheck="false" ${feedback ? 'disabled' : ''}>` : `<div class="options">${q.options.map((o, i) => `<button class="option ${feedback && o === answer ? 'correct' : ''}" data-practice-choice="${i}" ${feedback ? 'disabled' : ''}><span class="letter">${i + 1}</span><span>${esc(o)}</span></button>`).join('')}</div>`}
       <div id="practice-feedback">${pendingPracticeSave ? '<div class="practice-saving-v1345" role="status">이전 답안을 저장하고 있어요.</div>' : feedback ? feedbackHtml(feedback) : ''}</div>
@@ -412,7 +428,7 @@ function renderPractice() {
       catch (error) { toast(error.message || '최신 기록을 불러오지 못했어요.'); }
     };
     $('#practice-finish-exit').onclick = async event => {
-      if (!confirm('현재까지 푼 내용으로 시험을 종료할까요? 종료하면 이어서 풀 수 없어요.')) return;
+      if (!confirm('지금 끝내면 코인은 받지 못해요(경험치는 남아요). 코인은 끝까지 풀어야 받아요.\n그래도 종료할까요? 종료하면 이어서 풀 수 없어요.')) return;
       buttonBusy(event.currentTarget);
       try {
         await drainPracticeAnswers();
@@ -423,6 +439,7 @@ function renderPractice() {
     };
   };
   $('#practice-sound').onclick = () => { A.sound = !A.sound; try { localStorage.setItem('sumus:sound', String(A.sound)); } catch {} renderPractice(); };
+  $('#speak-prompt')?.addEventListener('click', () => speakEnglish(q.prompt));
   $('#listen-word')?.addEventListener('click', () => {
     if (!('speechSynthesis' in window)) return toast('이 기기에서는 듣기를 지원하지 않아요.');
     speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(q.audio); u.lang = 'en-US'; u.rate = .85; u.onerror = () => toast('소리를 재생하지 못했어요. 다시 눌러주세요.'); speechSynthesis.speak(u);
@@ -857,13 +874,14 @@ function finishPracticeView() {
     <div class="result-stat-grid"><div><strong>${Number(x.score_correct || 0)}</strong><span>정답</span></div><div><strong>${wrongCount}</strong><span>오답</span></div><div><strong>${unanswered}</strong><span>미응답</span></div></div>
     <div class="result-meta-line"><span>${icon('clock')} 전체 진행 ${time(elapsed)}</span></div>
     <div class="result-reward-card result-reward-top"><div><span>코인</span><strong><i class="coin-ico" aria-hidden="true"></i>+${Number(x.reward_points || 0)}</strong></div><div><span>경험치</span><strong>+${Number(x.xp || 0)}</strong></div></div>
+    ${x.reward_note ? `<p class="result-reward-note-v1373">${esc(x.reward_note)}</p>` : ''}
     <p class="result-next-copy">${esc(statusText)}</p>
     ${primaryCta}
     ${x.run_mode === 'test' ? (x.shared_to_teacher_at ? '<button class="btn self-test-share-done full" disabled>✓ 선생님께 전송 완료</button>' : '<button class="btn self-test-share full" id="share-self-test">선생님께 결과 보내기</button>') : ''}
     ${answerRows.length || reviewCount ? '<button class="btn full" id="practice-answer-review">답안 보기</button>' : ''}
     <div id="practice-answer-details" class="answer-review-panel" hidden>${detailHtml}</div>
     <div class="result-secondary-actions"><button class="text-button" id="practice-records">내 기록</button><button class="text-button" id="practice-home">홈으로</button></div>
-    <p class="quiet-note">코인은 학습 완료·만점·꾸준함으로 쌓이고(하루 80개까지), 경험치는 맞힌 만큼 쌓여요. 점수는 오답 복습 재정답으로 올라가지 않고, 승인된 재채점만 반영돼요.</p>
+    <p class="quiet-note">코인은 끝까지 풀고 정답률 ${Math.round(STUDY_COINS.min_accuracy * 100)}% 이상일 때 학습 완료·만점·꾸준함으로 쌓이고(하루 ${STUDY_COINS.cap}개까지), 경험치는 맞힌 만큼 쌓여요. 점수는 오답 복습 재정답으로 올라가지 않고, 승인된 재채점만 반영돼요.</p>
   </main></div>`);
   if (x.run_mode === 'test' && !interrupted) animateTestResult(score, perfect);
   $('#share-self-test')?.addEventListener('click', async event => {
