@@ -134,6 +134,28 @@ function activeExamStatus(d) {
 function attentionStudentButton(student, sub, tone = '') {
   return `<button class="v136-student-chip ${tone}" data-student="${student.id}"><span>${esc(student.display_name)}</span><small>${esc(sub)}</small>${icon('chevron')}</button>`;
 }
+// V13.74 반 대항전 (this week's 경험치 of each class) and 선생님 알림판 (who has not come in).
+function classLeaguePanel(league) {
+  if (!league) return '';
+  const max = Math.max(1, ...league.classes.map(c => c.xp));
+  return `<section class="panel cl-panel-v1374">
+    <div class="panel-head"><div><h2>반 대항전</h2><span>이번 주 반별 경험치 합계 · 일요일 밤 마감</span></div></div>
+    <div class="cl-bars">${league.classes.length ? league.classes.map((c, i) => `<div class="cl-bar ${i === 0 && c.xp ? 'lead' : ''}"><b>${i + 1}</b><span class="cl-name">${esc(c.name)}</span><span class="cl-track"><i style="width:${Math.max(3, Math.round(c.xp / max * 100))}%"></i></span><strong>${num(c.xp)}</strong><small>${num(c.active)}/${num(c.students)}명</small></div>`).join('') : '<div class="v136-empty-line">반에 배정된 학생이 없어요.</div>'}</div>
+    <div class="cl-actions"><button type="button" class="btn" data-action="class-tv">${icon('tv')} TV로 크게 보기</button><button type="button" class="btn" data-action="class-tv-link">TV 링크</button></div>
+  </section>`;
+}
+function idlePanel(rows) {
+  if (!rows) return '';
+  const week = rows.filter(r => r.week), longer = rows.filter(r => !r.week);
+  const sub = r => r.last ? (r.days >= 1 ? `${r.days}일째 기록 없음` : '오늘 기록 없음') : '아직 기록 없음';
+  return `<section class="panel idle-panel-v1374">
+    <div class="panel-head"><div><h2>선생님 알림판</h2><span>이번 주 공부·출석·대결 기록이 하나도 없는 학생</span></div><span class="v136-count ${week.length ? 'danger' : ''}">${week.length}명</span></div>
+    <div class="v136-chip-list">${week.length ? week.slice(0, 12).map(r => attentionStudentButton({ id: r.id, display_name: r.name }, `${r.class_name} · ${sub(r)}`, 'danger')).join('') : '<div class="v136-clear">✓ 이번 주 모든 학생이 한 번 이상 들어왔어요.</div>'}</div>
+    ${week.length > 12 ? `<button class="text-button v136-more" data-go="students">나머지 ${week.length - 12}명 학생 관리에서 보기 ${icon('chevron')}</button>` : ''}
+    ${longer.length ? `<p class="idle-note-v1374">이번 주엔 들어왔지만 <b>3일 이상</b> 기록이 없는 학생 ${longer.length}명: ${longer.slice(0, 6).map(r => esc(r.name)).join(', ')}${longer.length > 6 ? ' 외' : ''}</p>` : ''}
+    ${week.length ? `<button type="button" class="btn full idle-gift-v1374" data-action="gift-idle">${icon('gift')} 이 학생들에게 응원 코인 보내기</button>` : ''}
+  </section>`;
+}
 function dashboard(A) {
   const d = A.data;
   const activeStudents = d.profiles.filter(student => student.active);
@@ -164,6 +186,7 @@ function dashboard(A) {
         <div><span>실전 결과 제출</span><strong>${num(sharedToday.length)}<small>건</small></strong></div>
       </div>
     </section>
+    <div class="v136-dashboard-grid tv3-row-v1374">${classLeaguePanel(d.class_league)}${idlePanel(d.idle_students)}</div>
     <div class="v136-dashboard-grid">
       <section class="panel v136-attention">
         <div class="panel-head"><div><h2>오늘 확인 필요</h2><span>학습 기록이 아직 없는 학생</span></div><span class="v136-count danger">${inactiveToday.length}명</span></div>

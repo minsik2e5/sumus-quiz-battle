@@ -1,0 +1,42 @@
+/* V13.74: 반 대항전 (대시보드 · 교실 TV), 선생님 알림판 */
+.tv3-row-v1374{align-items:stretch}
+.cl-bars{display:grid;gap:8px;margin:4px 0 12px}
+.cl-bar{display:grid;grid-template-columns:22px 64px 1fr auto auto;align-items:center;gap:8px;font-size:13px}
+.cl-bar b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:#eef3f1;color:#5d6d68;font-size:12px}
+.cl-bar.lead b{background:#ffd66b;color:#6a4300}
+.cl-name{font-weight:800;color:#16242f}
+.cl-track{height:12px;border-radius:999px;background:#eef3f1;overflow:hidden}
+.cl-track i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#12b886,#0b8f69);transition:width .6s ease}
+.cl-bar.lead .cl-track i{background:linear-gradient(90deg,#f2b233,#e07b00)}
+.cl-bar strong{font-size:14px;color:#16242f;min-width:48px;text-align:right}
+.cl-bar small{color:#8b9994;font-size:11.5px;white-space:nowrap}
+.cl-actions{display:flex;gap:8px;flex-wrap:wrap}
+.cl-actions .btn{flex:1}
+.idle-note-v1374{margin:10px 0 0;font-size:12.5px;color:#5d6d68;line-height:1.5}
+.idle-gift-v1374{margin-top:12px}
+
+/* classroom TV */
+.ctv-stage{flex:1;display:flex;flex-direction:column;gap:clamp(10px,1.6vh,20px);padding:clamp(12px,2vh,28px) clamp(16px,3vw,56px);overflow:auto}
+.ctv-row{display:flex;align-items:center;gap:clamp(12px,2vw,28px);padding:clamp(12px,1.8vh,22px) clamp(14px,2vw,28px);border-radius:22px;background:rgba(255,255,255,.08);box-shadow:0 0 0 1px rgba(255,255,255,.1) inset;animation:ctvIn .5s ease both;animation-delay:calc(var(--i) * 90ms)}
+.ctv-row.rank-1{background:linear-gradient(90deg,rgba(255,214,107,.22),rgba(255,255,255,.06));box-shadow:0 0 0 2px rgba(255,214,107,.6) inset}
+.ctv-rank{flex:none;width:clamp(48px,5vw,76px);display:grid;place-items:center}
+.ctv-rank b{display:grid;place-items:center;width:clamp(40px,4vw,60px);height:clamp(40px,4vw,60px);border-radius:50%;background:rgba(255,255,255,.14);color:#fff;font-size:clamp(20px,2.4vw,32px);font-weight:900}
+.ctv-main{flex:1;min-width:0}
+.ctv-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.ctv-head h2{margin:0;color:#fff;font-size:clamp(22px,2.8vw,40px);font-weight:900;letter-spacing:-.02em}
+.ctv-head span{color:#cfe6dc;font-size:clamp(12px,1.2vw,17px);font-weight:700}
+.ctv-bar{position:relative;display:flex;align-items:center;height:clamp(26px,3.4vh,42px);margin:8px 0;border-radius:999px;background:rgba(255,255,255,.1);overflow:hidden}
+.ctv-bar i{position:absolute;inset:0 auto 0 0;width:var(--w);border-radius:inherit;background:linear-gradient(90deg,#12b886,#5fe3b0);animation:ctvGrow 1.1s cubic-bezier(.2,.9,.3,1) both;animation-delay:calc(var(--i) * 90ms + .2s)}
+.ctv-row.rank-1 .ctv-bar i{background:linear-gradient(90deg,#f2b233,#ffe08a)}
+.ctv-bar strong{position:relative;margin-left:auto;padding:0 16px;color:#fff;font-size:clamp(16px,2vw,28px);font-weight:900;text-shadow:0 1px 4px rgba(0,0,0,.35)}
+.ctv-bar small{margin-left:4px;font-size:.6em;opacity:.8}
+.ctv-top{display:flex;gap:10px;flex-wrap:wrap}
+.ctv-top span{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;background:rgba(255,255,255,.12);color:#fff;font-size:clamp(12px,1.3vw,18px);font-weight:800}
+.ctv-top em{font-style:normal;display:grid;place-items:center;width:1.4em;height:1.4em;border-radius:50%;background:#ffd66b;color:#6a4300;font-size:.8em}
+.ctv-top small{color:#cfe6dc;font-weight:700}
+.ctv-none{opacity:.75}
+.ctv-empty{color:#cfe6dc;font-size:20px;text-align:center;margin-top:10vh}
+@keyframes ctvIn{from{opacity:0;transform:translateY(12px)}}
+@keyframes ctvGrow{from{width:0}}
+@media (max-width:640px){.cl-bar{grid-template-columns:22px 56px 1fr auto}.cl-bar small{display:none}}
+@media (prefers-reduced-motion:reduce){.ctv-row,.ctv-bar i{animation:none}}
