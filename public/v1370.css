@@ -1,0 +1,80 @@
+/* V13.70 야차전 match, easier to read on a phone: a smaller arena, one line for what happens
+   next to the clock, the word and the answers together, skills under the answers. */
+.battle-app .yb-arena{aspect-ratio:16/10.4}
+.battle-app .yb-banner{display:none}
+.battle-app .yb-ring{top:66%}
+.battle-app .yb-pet.op{right:5%;top:5%;width:27%}
+.battle-app .yb-pet.me{left:4%;bottom:-2%;width:35%}
+.battle-app .yb-hud{width:52%;padding:7px 10px 8px;background:rgba(255,255,255,.97)}
+.battle-app .yb-hud.op{left:3%;top:5%}
+.battle-app .yb-hud.me{right:3%;bottom:5%}
+.battle-app .yb-hud-title{display:none}
+.battle-app .yb-hud-name{font-size:15px}
+.battle-app .yb-hud-who{font-size:11.5px;color:#55655f}
+.yb-hpbar .yb-hp-num{min-width:26px;text-align:right;font-size:13px;font-weight:900;color:#17242f;font-variant-numeric:tabular-nums}
+.battle-app .yb-track{height:10px}
+.battle-app .yb-ki span{width:10px;height:10px}
+
+.yb-strip-v1370{display:flex;gap:8px;align-items:stretch}
+.yb-strip-v1370 .yb-msg{flex:1;min-width:0;min-height:50px;padding:7px 12px;border-radius:12px}
+.yb-strip-v1370 .yb-msg-main{font-size:15px;line-height:1.3}
+.yb-strip-v1370 .yb-msg-sub{font-size:12px}
+.yb-strip-v1370 .yb-msg-sub:empty{display:none}
+.yb-strip-v1370 .yb-clock{align-self:stretch;flex:none;min-width:74px;flex-direction:column;justify-content:center;gap:0;border-radius:12px;padding:4px 10px}
+.yb-strip-v1370 .yb-clock>b{font-size:10.5px}
+.yb-strip-v1370 #yb-clock{font-size:21px;font-weight:900;line-height:1.1}
+.yb-strip-v1370 .yb-clock.fever .yb-fever-tag{margin:2px 0 0;font-size:10px}
+.yb-strip-v1370 .yb-clock.warn{background:#fff3f3}
+
+.battle-app .yb-question{padding:9px 14px 10px;border-width:1.5px}
+.battle-app .yb-q-head{font-size:12px;color:#55655f}
+.battle-app .yb-q-word{font-size:clamp(30px,9.4vw,40px);color:#101c17}
+.battle-app .yb-q-word.meaning{font-size:clamp(22px,6.6vw,28px)}
+.battle-app .yb-status{font-size:13px}
+
+.battle-app .yb-answers{gap:9px}
+.battle-app .yb-answer{flex-direction:row;align-items:center;gap:10px;min-height:66px;padding:10px 12px;box-shadow:0 0 0 1.5px #cfdcd6 inset,0 3px 0 #c3d1cb}
+.battle-app .yb-answer .yb-tag{flex:none}
+.battle-app .yb-answer .yb-tag b{width:26px;height:26px;border-radius:8px;font-size:14px;background:#e3f6ee;color:#067453}
+.battle-app .yb-answer .yb-ko{font-size:17px;font-weight:800;line-height:1.3;color:#101c17}
+.battle-app .yb-answer.dim{opacity:.4}
+.battle-app .yb-answer.right .yb-tag b{background:#2fbf71;color:#fff}
+
+.battle-app .yb-skillbar{margin-top:2px}
+.battle-app .yb-sk b{font-size:14.5px}
+.battle-app .yb-sk small{font-size:10.5px;opacity:1}
+.battle-app .yb-sk:disabled{background:#f3f5f4;color:#7a8782;box-shadow:0 0 0 1.5px #e0e6e3 inset,0 3px 0 #d8dfdc}
+
+/* Robot match rewards: on the card and on the result. */
+.yb-bot-reward-v1370{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:2px 0 10px;padding:9px 12px;border-radius:12px;background:#f4f1ff;color:#3b2a86;font-size:13px;font-weight:800}
+.yb-bot-reward-v1370 span{display:inline-flex;align-items:center;gap:4px}
+.yb-bot-reward-v1370 b{font-weight:900;color:#5b3fd4}
+.yb-bot-reward-v1370 small{flex-basis:100%;font-size:11.5px;font-weight:700;color:#6a5fa3}
+.yb-result.practice .yb-result-points{font-size:15px}
+.yb-result.practice .yb-result-points.paid{font-size:20px;color:#07815f}
+
+/* 실전시험 result: the reward under the score. */
+.exam-reward-v1370{margin:14px 0 4px}
+
+/* 나: the ranking tile. */
+.me-tile.rank .me-ico{background:#e7eeff;color:#3765e9}
+.me-tiles-v1368.four{grid-template-columns:repeat(2,1fr)}
+
+/* Narrow phones (iPhone SE and smaller): lighter name cards and a tighter column, so all four
+   answers stay on the screen. */
+@media (max-width:380px){
+  .battle-app .yb-hud-who{display:none}
+  .battle-app .yb-hud{padding:5px 8px 6px}
+  .battle-app .yb-hud-name{font-size:13.5px}
+  .battle-app .yb-hpbar{margin-top:3px}
+  .yb-strip-v1370 .yb-msg{min-height:42px;padding:6px 10px}
+  .yb-strip-v1370 .yb-msg-main{font-size:13.5px}
+  .yb-strip-v1370 .yb-clock{min-width:64px}
+  .yb-strip-v1370 #yb-clock{font-size:18px}
+  .battle-app .yb-question{padding:6px 12px 5px;gap:4px}
+  .battle-app .yb-q-word{font-size:clamp(26px,8.6vw,32px)}
+  .battle-app .yb-status{min-height:15px;font-size:12px}
+  .battle-app .yb-answers{gap:7px}
+  .battle-app .yb-answer{min-height:54px;padding:8px 10px;gap:8px}
+  .battle-app .yb-answer .yb-ko{font-size:15.5px}
+}

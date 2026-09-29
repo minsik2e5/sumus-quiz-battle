@@ -12,7 +12,7 @@ import { coin } from './modules/emblems.js';
 import { openBracket } from './modules/tournament-ui.js';
 import { openBracketTv } from './modules/bracket-tv.js';
 import { mountArcade, attendanceMoment } from './modules/arcade.js';
-import { LUCKY_BETS, CHANCE_BETS, ATTENDANCE_REWARDS } from './modules/rewards.js';
+import { LUCKY_BETS, ATTENDANCE_REWARDS, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_COINS } from './modules/rewards.js';
 import { EGG_PRICE } from './modules/core.js';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
@@ -333,7 +333,7 @@ $('#app').addEventListener('click', async event => {
   if (b.closest('#yacha-host')) return;
   const d = b.dataset; if (!Object.keys(d).length) return; event.preventDefault();
   try {
-    if (d.go) return navigate(d.go);
+    if (d.go) { if (d.go === 'ranking') A.rankFrom = d.from || 'home'; return navigate(d.go); }
     if (d.action === 'student-preview' && A.data.profile.role === 'teacher') {
       const grade = $('#preview-grade')?.value || (A.data.profile.active_division === 'middle' ? '중3' : '고1A');
       await api('/teacher/student-preview', { school_id: A.data.profile.active_school_id, grade });
@@ -998,13 +998,14 @@ function walletModal() {
       <li><span>추천 학습 · 오늘 첫 학습</span><b>+5·5</b></li>
       <li><span>3일 · 7일 연속 학습</span><b>+8·20</b></li>
       <li><span>매일 출석 체크 (7번째는 코인 뽑기권도)</span><b>+${ATTENDANCE_REWARDS[0]}~${ATTENDANCE_REWARDS.at(-1)}</b></li>
+      <li><span>선생님 실전시험 (절반 이상 풀기 · 처음 한 번)</span><b>+${EXAM_COINS}</b></li>
+      <li><span>로보 연습 대결 (하루 ${BOT_DAILY}판까지)</span><b>+${BOT_TRY_REWARD.coins}~${BOT_WIN_REWARDS.hard.coins}</b></li>
       <li><span>야차전 승리 · 학원 대회 상금</span><b>판돈 · 상금</b></li>
     </ul>
     <h3>쓰는 곳</h3>
-    <div class="wallet-actions"><button type="button" class="btn" id="wallet-egg">랜덤 알 <small>${coin()}${num(EGG_PRICE)}</small></button><button type="button" class="btn" id="wallet-yacha">야차전 판돈 <small>${coin()}10·30·50</small></button><button type="button" class="btn" id="wallet-gacha">코인 뽑기 <small>${coin()}${LUCKY_BETS.join('·')}</small></button><button type="button" class="btn" id="wallet-chance">더블 찬스 <small>${coin()}${CHANCE_BETS.join('·')}</small></button></div>
+    <div class="wallet-actions"><button type="button" class="btn" id="wallet-egg">랜덤 알 <small>${coin()}${num(EGG_PRICE)}</small></button><button type="button" class="btn" id="wallet-yacha">야차전 판돈 <small>${coin()}10·30·50</small></button><button type="button" class="btn" id="wallet-gacha">코인 뽑기 <small>${coin()}${LUCKY_BETS.join('·')}</small></button></div>
   </div>`, '코인 지갑');
   $('#wallet-gacha').onclick = () => { close(); navigate('arcade'); };
-  $('#wallet-chance').onclick = () => { close(); navigate('arcade'); };
   $('#wallet-egg').onclick = () => { close(); openEggShop(A, petChanged); };
   $('#wallet-yacha').onclick = () => { close(); navigate('yacha'); };
 }

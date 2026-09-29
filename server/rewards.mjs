@@ -1,10 +1,8 @@
-import { randomBytes, randomUUID } from 'node:crypto';
-import { buildQuestion, shuffle, dayKey, displayEnglish, englishAccepted, normalizeEnglish } from '../public/modules/core.js';
-import { normalizeTyped } from '../public/modules/battle-engine.js';
-import { spellable, spellHint } from '../public/modules/battle-questions.js';
+import { randomBytes } from 'node:crypto';
+import { dayKey } from '../public/modules/core.js';
 import {
   ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, drawLucky,
-  CHANCE_BETS, CHANCE_DAILY, CHANCE_STEPS, CHANCE_MIN_WORDS
+  BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS
 } from '../public/modules/rewards.js';
 
 // Coin rewards and games (rules and odds: public/modules/rewards.js). Everything lives on the
@@ -13,20 +11,28 @@ import {
 //   gacha        { items{key: count}, tickets, refund } decorations from the retired V13.67
 //                capsule machine (kept and worn) and free coin capsules (뽑기권)
 //   lucky        V13.68 coin capsule { day, plays, bets, paid, log[{at, bet, mult, ticket}] }
-//   chance       { day, plays, wins, losses, paid, bets, best, log[{at, bet, steps, paid}] }
-//   chance_live  the double chance being played, with its answer (never sent: see publicProfile)
+//   chance       the V13.67 word double chance (retired in V13.70): { paid } still counts
+//   chance_live  a double chance left open when it was retired: its bet (or the pot it had
+//                reached) comes back (never sent: see publicProfile)
+//   bonus        V13.70 { log[{d, k, xp, c, at}], bot{day, count}, bot_live{id, level, mode, at} }
+//                경험치 and coins from robot matches and teacher exams, one entry per day and pet
 // Coins received here (attendance, old capsule refunds, coin capsule and double chance pay-outs)
-// are added to the
-// balance in service.mjs pointsAndPets; coins paid (capsules, bets) go to points_spent.
+// are added to the balance in service.mjs pointsAndPets; coins paid (capsules, bets) go to
+// points_spent. Bonus 경험치 and coins join the student's records as bonus rows (bonusRecords).
 
 const DAY_MS = 86400000;
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 export const secureRandom = () => randomBytes(4).readUInt32BE(0) / 2 ** 32;
-const CHANCE_GRACE_MS = 1500;   // network delay allowed after a question's time
-const CHANCE_ABANDON_MS = 5000; // a question left open this long after its time is lost
 
 export function rewardIncome(p) {
-  return Number(p?.attendance?.coins || 0) + Number(p?.gacha?.refund || 0) + Number(p?.chance?.paid || 0) + Number(p?.lucky?.paid || 0);
+  return Number(p?.attendance?.coins || 0) + Number(p?.gacha?.refund || 0) + Number(p?.chance?.paid || 0) + Number(p?.lucky?.paid || 0) + chanceRefund(p);
+}
+// V13.70 the double chance is gone; one left open gives back its bet, or the pot a right answer
+// had already reached (the student could have kept it).
+function chanceRefund(p) {
+  const live = p?.chance_live;
+  if (!live) return 0;
+  return live.status === 'decide' ? Number(live.pot || live.bet || 0) : Number(live.bet || 0);
 }
 // Coins from attendance inside a period (the coin ranking counts them like study rewards).
 export function attendanceCoins(p, window = null) {
@@ -112,121 +118,70 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
   return { bet, mult: odd.mult, name: odd.name, paid, ticket, lucky: luckyView(p, now) };
 }
 
-/* ---------- word double chance ---------- */
-function chanceDay(p, now) {
-  const c = p.chance ||= {};
+/* ---------- V13.70 bonus 경험치 and coins (robot matches, teacher exams) ---------- */
+const BONUS_KEEP_DAYS = 40; // older days fold into one entry per pet (totals stay the same)
+export function addBonus(p, { xp = 0, coins = 0, pet = null, now = Date.now() }) {
+  if (!(xp > 0 || coins > 0)) return;
+  const b = p.bonus ||= {};
+  const log = b.log ||= [];
+  const d = dayKey(now), k = pet || null;
+  let row = log.find(x => x.d === d && x.k === k);
+  if (!row) { row = { d, k, xp: 0, c: 0, at: now }; log.push(row); }
+  row.xp += xp; row.c += coins;
+  const cut = now - BONUS_KEEP_DAYS * DAY_MS;
+  if (log.some(x => x.d !== 'old' && x.at < cut)) {
+    const keep = [], old = new Map();
+    for (const x of log) {
+      if (x.d !== 'old' && x.at >= cut) { keep.push(x); continue; }
+      const o = old.get(x.k) || { d: 'old', k: x.k, xp: 0, c: 0, at: x.at };
+      o.xp += x.xp; o.c += x.c; o.at = Math.min(o.at, x.at);
+      old.set(x.k, o);
+    }
+    b.log = [...old.values(), ...keep];
+  }
+}
+// The bonus as rows shaped like finished practices, so 경험치 (levels, pet growth, the weekly
+// ranking) and coins count them. They are not practices: no words, not a study day, no records.
+export function bonusRecords(p) {
+  return (p?.bonus?.log || []).map(x => ({
+    id: `bonus:${x.d}:${x.k || ''}`, student_id: p.id, bonus: true, created_at: x.at,
+    xp: Number(x.xp || 0), reward_points: Number(x.c || 0), pet_key: x.k || undefined,
+    total: 0, correct: 0, answered_count: 0, best_combo: 0
+  }));
+}
+
+// A robot match is announced when it starts (the server keeps the level) and pays when it ends.
+export function botStart(p, { level, mode, id, now = Date.now() }) {
+  const b = p.bonus ||= {};
+  b.bot_live = { id, level: ['easy', 'normal', 'hard'].includes(level) ? level : 'normal', mode: mode === 'skill' ? 'skill' : 'speed', at: now };
+  return { id, ...botView(p, now) };
+}
+export function botView(p, now = Date.now()) {
+  const bot = p.bonus?.bot || {};
+  const used = bot.day === dayKey(now) ? Number(bot.count || 0) : 0;
+  return { left: Math.max(0, BOT_DAILY - used), daily: BOT_DAILY };
+}
+export function botFinish(p, { id, result, right, pet, now = Date.now() }) {
+  const b = p.bonus ||= {};
+  const live = b.bot_live;
+  if (!live || live.id !== id) fail('연습 대결을 찾지 못했어요.', 404);
+  delete b.bot_live;
+  const outcome = ['win', 'lose', 'draw'].includes(result) ? result : 'lose';
+  const answered = Math.max(0, Math.min(200, Math.floor(Number(right) || 0)));
+  if (now - live.at < BOT_MIN_MS) return { paid: false, reason: 'short', ...botView(p, now) };
+  if (answered < BOT_MIN_RIGHT) return { paid: false, reason: 'few', ...botView(p, now) };
   const today = dayKey(now);
-  if (c.day !== today) { c.day = today; c.plays = 0; }
-  return c;
+  const bot = b.bot ||= {};
+  if (bot.day !== today) { bot.day = today; bot.count = 0; }
+  if (Number(bot.count || 0) >= BOT_DAILY) return { paid: false, reason: 'daily', ...botView(p, now) };
+  bot.count = Number(bot.count || 0) + 1;
+  const reward = botReward(live.level, outcome);
+  addBonus(p, { xp: reward.xp, coins: reward.coins, pet, now });
+  return { paid: true, coins: reward.coins, xp: reward.xp, result: outcome, level: live.level, ...botView(p, now) };
 }
-function chanceLog(p, live, paid, now) {
-  const c = p.chance ||= {};
-  if (paid) { c.paid = Number(c.paid || 0) + paid; c.wins = Number(c.wins || 0) + 1; }
-  else c.losses = Number(c.losses || 0) + 1;
-  c.best = Math.max(Number(c.best || 0), paid ? live.step + 1 : live.step);
-  c.log = [...(c.log || []), { at: now, bet: live.bet, steps: paid ? live.step + 1 : live.step, paid }].slice(-20);
-  delete p.chance_live;
-}
-// A question left open (the student closed the app) is lost once its time is well past.
-export function chanceTidy(p, now = Date.now()) {
-  const live = p.chance_live;
-  if (abandoned(live, now)) { chanceLog(p, live, 0, now); return true; }
-  return false;
-}
-function liveView(live, now) {
-  const q = live.q, step = CHANCE_STEPS[live.step];
-  return {
-    id: live.id, bet: live.bet, step: live.step, pot: live.pot, status: live.status,
-    next_pot: live.status === 'decide' && CHANCE_STEPS[live.step + 1] ? live.bet * CHANCE_STEPS[live.step + 1].mult : null,
-    question: live.status === 'question' && q ? { kind: q.kind, dir: step.dir || null, prompt: q.prompt, options: q.options || [], hint: q.hint || '', left: Math.max(0, live.deadline - now), ms: step.ms } : null
-  };
-}
-// Read-only (GET requests do not save): a question left open past its time shows as over; it is
-// recorded as lost by the next double-chance request (chanceTidy).
-const abandoned = (live, now) => live?.status === 'question' && now > live.deadline + CHANCE_ABANDON_MS;
-export function chanceView(p, now = Date.now()) {
-  const c = p.chance || {}, today = dayKey(now);
-  const plays = c.day === today ? Number(c.plays || 0) : 0;
-  return {
-    bets: CHANCE_BETS, daily: CHANCE_DAILY, left: Math.max(0, CHANCE_DAILY - plays),
-    steps: CHANCE_STEPS.map(s => ({ kind: s.kind, name: s.name, mult: s.mult, ms: s.ms })),
-    wins: Number(c.wins || 0), losses: Number(c.losses || 0), paid: Number(c.paid || 0), best: Number(c.best || 0),
-    live: p.chance_live && !abandoned(p.chance_live, now) ? liveView(p.chance_live, now) : null
-  };
-}
-// `words`: the words the student has studied (word objects); the question is one not asked yet
-// in this run. The last step is spelled, so it needs a word that can be typed.
-function askStep(live, words, now, random) {
-  const step = CHANCE_STEPS[live.step];
-  let pool = words.filter(w => !live.used.includes(w.id));
-  if (step.kind === 'spell') pool = pool.filter(spellable);
-  if (!pool.length) pool = step.kind === 'spell' ? words.filter(spellable) : words;
-  if (!pool.length) fail('철자를 쓸 수 있는 단어가 부족해요.', 409);
-  const word = pool[Math.floor(random() * pool.length)];
-  let q;
-  if (step.kind === 'spell') {
-    const text = normalizeEnglish(word.word);
-    q = { kind: 'spell', prompt: String(word.meaning).trim(), hint: spellHint(text), text, accept: englishAccepted(word.word) };
-  } else {
-    const built = buildQuestion(word, step.dir === 'mean2eng' ? 'mean2eng_mc' : 'eng2mean_mc', words);
-    const right = step.dir === 'mean2eng' ? displayEnglish(word.word) : word.meaning;
-    q = { kind: 'choice', prompt: built.prompt, options: built.options, answer: built.options.indexOf(right) };
-    if (q.options.length !== 4 || q.answer < 0) fail('뜻이 서로 다른 단어가 부족해요. 단어를 더 공부해요!', 409);
-  }
-  live.q = { word_id: word.id, ...q };
-  live.used.push(word.id);
-  live.status = 'question';
-  live.deadline = now + step.ms;
-}
-export function chanceStart(p, bet, balance, words, { now = Date.now(), random = secureRandom } = {}) {
-  chanceTidy(p, now);
-  if (!CHANCE_BETS.includes(bet)) fail('걸 코인을 골라주세요.');
-  if (p.chance_live) fail('진행 중인 더블 찬스가 있어요.', 409);
-  const c = chanceDay(p, now);
-  if (Number(c.plays || 0) >= CHANCE_DAILY) fail(`더블 찬스는 하루 ${CHANCE_DAILY}번까지예요. 내일 또 도전해요!`, 409);
-  if (words.length < CHANCE_MIN_WORDS) fail(`단어를 ${CHANCE_MIN_WORDS}개 이상 공부하면 도전할 수 있어요.`, 409);
-  if (balance < bet) fail(`코인이 ${bet - balance}개 부족해요.`);
-  const live = { id: randomUUID(), bet, step: 0, pot: bet, used: [], started_at: now };
-  askStep(live, shuffle(words), now, random);
-  p.points_spent = Number(p.points_spent || 0) + bet;
-  c.plays = Number(c.plays || 0) + 1;
-  c.bets = Number(c.bets || 0) + bet;
-  p.chance_live = live;
-  return { chance: chanceView(p, now) };
-}
-export function chanceAnswer(p, answer, now = Date.now()) {
-  const live = p.chance_live;
-  if (!live || live.status !== 'question') fail('지금은 답할 문제가 없어요.', 409);
-  const q = live.q, late = now > live.deadline + CHANCE_GRACE_MS;
-  const right = !late && (q.kind === 'spell'
-    ? typeof answer === 'string' && answer.length <= 60 && q.accept.includes(normalizeTyped(answer))
-    : Number.isInteger(answer) && answer === q.answer);
-  const reveal = q.kind === 'spell' ? { word: q.text, meaning: q.prompt } : { right_option: q.answer, word: q.options[q.answer] };
-  if (!right) {
-    const lost = live.pot;
-    chanceLog(p, live, 0, now);
-    return { right: false, late, reveal, lost, chance: chanceView(p, now) };
-  }
-  live.pot = live.bet * CHANCE_STEPS[live.step].mult;
-  live.q = null;
-  if (live.step === CHANCE_STEPS.length - 1) {
-    const paid = live.pot;
-    chanceLog(p, live, paid, now);
-    return { right: true, reveal, paid, done: true, chance: chanceView(p, now) };
-  }
-  live.status = 'decide';
-  return { right: true, reveal, pot: live.pot, chance: chanceView(p, now) };
-}
-// After a right answer: keep the pot (go = false) or answer the next, harder word.
-export function chanceDecide(p, go, words, { now = Date.now(), random = secureRandom } = {}) {
-  const live = p.chance_live;
-  if (!live || live.status !== 'decide') fail('지금은 고를 수 없어요.', 409);
-  if (!go) {
-    const paid = live.pot;
-    chanceLog(p, live, paid, now);
-    return { paid, chance: chanceView(p, now) };
-  }
-  live.step++;
-  askStep(live, shuffle(words), now, random);
-  return { chance: chanceView(p, now) };
+
+// A submitted teacher exam: 경험치 for every answered question, coins for answering half of it.
+export function examReward(answered, total) {
+  const n = Math.max(0, Math.floor(Number(answered) || 0));
+  return { xp: n * EXAM_XP_PER_ANSWER, coins: total > 0 && n * 2 >= total ? EXAM_COINS : 0 };
 }

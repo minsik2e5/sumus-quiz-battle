@@ -4,7 +4,7 @@ import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, 
 import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
 import { battleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
-import { rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, chanceView, chanceStart, chanceAnswer, chanceDecide } from './rewards.mjs';
+import { rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, botStart, botFinish, botView, examReward } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
@@ -357,13 +357,12 @@ export function scopedWords(state, schoolRef, ranges, grade = null) {
   return words.filter(w => ranges.map(String).includes(w.range_code));
 }
 function mySessions(state, student) { return state.sessions.filter(s => s.student_id === student); }
-const coinBalance = (state, p) => pointsAndPets(state, p, mySessions(state, p.id)).points_balance;
-// V13.67 double chance: the words of the student's school and grade they have already studied.
-function studiedWords(state, p) {
-  const school = schoolForProfile(state, p), seen = state.mastery[p.id] || {};
-  if (!school) return [];
-  return wordsForSchoolGrade(state, school, p.class_name).filter(word => seen[word.id] && word.meaning);
+// V13.70 practices plus the bonus rows (robot matches, teacher exams): what 경험치, levels, pets
+// and coins are counted from. Screens that list practices use mySessions.
+function xpSessions(state, student, profile = state.profiles.find(x => x.id === student)) {
+  return [...mySessions(state, student), ...bonusRecords(profile)];
 }
+const coinBalance = (state, p) => pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance;
 // Coins (코인, stored as reward points) are earned per finished practice and as tournament
 // prizes, spent in the shop, and won or lost in yacha battles; pets grow separately with 경험치.
 function pointsAndPets(state, p, sessions) {
@@ -375,6 +374,7 @@ function pointsAndPets(state, p, sessions) {
   // Stakes of matches that have not been settled yet are held back, so a late result can
   // never be absorbed by a balance that was spent in the meantime.
   // V13.67: attendance, capsule refunds, coin capsule and double-chance pay-outs (rewards.mjs).
+  // V13.70: robot-match and exam coins come in `sessions` as bonus rows (xpSessions).
   const bonus = rewardIncome(p);
   return { reward_points: earned, points_spent: spent, prize_points: prizes, bonus_points: bonus, points_balance: Math.max(0, earned + prizes + bonus - spent + battle.net - battle.held), battle, pets, pet: pets.find(x => x.active) || null, needs_pet_pick: p.role === 'student' && !pets.length };
 }
@@ -434,13 +434,13 @@ function findJoinableBattle(state, p, code, now) {
 const battleLossToday = (state, pid, now) => (state.battles || []).filter(b => b.status === 'finished' && b.loser === pid && dayKey(b.finished_at) === dayKey(now)).reduce((n, b) => n + b.stake, 0);
 // What the room shows about a player: pet, win streak, and (V13.66) title and league tier.
 function battlePlayer(state, p, ctx = createCompetition(state)) {
-  const pet = pointsAndPets(state, p, mySessions(state, p.id)).pet;
+  const pet = pointsAndPets(state, p, xpSessions(state, p.id, p)).pet;
   return { id: p.id, name: p.display_name, pet: pet ? { key: pet.key, form: pet.form, name: pet.name || '' } : null, streak: battleRecord(state, p.id).streak, title: ctx.displayTitle(p), tier: ctx.league(p.id).tier.key };
 }
 function checkBattleEntry(state, p, stake, now) {
   if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
   if (openBattleFor(state, p.id, now)) fail('이미 진행 중인 대결이 있어요.', 409);
-  const balance = pointsAndPets(state, p, mySessions(state, p.id)).points_balance;
+  const balance = pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance;
   if (balance < stake) fail(`판돈 ${stake}코인이 필요해요. 지금 ${balance}코인이 있어요.`);
   if (battleLossToday(state, p.id, now) + stake > BATTLE_DAILY_LOSS_CAP) fail(`대결로 하루에 잃을 수 있는 코인은 ${BATTLE_DAILY_LOSS_CAP}코인까지예요. 내일 다시 도전해요.`);
 }
@@ -472,7 +472,7 @@ function battleFriends(state, p, now) {
   const ctx = createCompetition(state, now);
   return state.profiles
     .filter(x => x.id !== p.id && x.role === 'student' && x.active !== false && x.pets?.length && schoolForProfile(state, x)?.id === school?.id && gradeOf(x.class_name) === grade)
-    .map(x => { const pet = pointsAndPets(state, x, mySessions(state, x.id)).pet; return { id: x.id, name: x.display_name, class_name: x.class_name || '', same_class: x.class_name === p.class_name, pet: pet ? { key: pet.key, form: pet.form } : null, title: ctx.displayTitle(x), tier: ctx.league(x.id).tier.key, busy: !!openBattleFor(state, x.id, now) }; })
+    .map(x => { const pet = pointsAndPets(state, x, xpSessions(state, x.id, x)).pet; return { id: x.id, name: x.display_name, class_name: x.class_name || '', same_class: x.class_name === p.class_name, pet: pet ? { key: pet.key, form: pet.form } : null, title: ctx.displayTitle(x), tier: ctx.league(x.id).tier.key, busy: !!openBattleFor(state, x.id, now) }; })
     .sort((a, b) => Number(b.same_class) - Number(a.same_class) || a.name.localeCompare(b.name, 'ko'));
 }
 function battleInviteFor(state, p, now) {
@@ -512,16 +512,20 @@ export function weekCorrect(sessions, now = Date.now()) {
   return (sessions || []).filter(s => s.created_at >= start && s.created_at < end).reduce((n, s) => n + Number(s.correct || 0), 0);
 }
 function stats(state, p, sessions = mySessions(state, p.id)) {
-  const today = sessions.filter(s => dayKey(s.created_at) === dayKey(Date.now()));
+  // V13.70: 경험치 and coins also come from robot matches and exams (bonus rows); counts of
+  // practices, words and accuracy stay with the practices.
+  const all = [...sessions, ...bonusRecords(p)];
+  const isToday = s => dayKey(s.created_at) === dayKey(Date.now());
+  const today = sessions.filter(isToday), todayAll = all.filter(isToday);
   const recent = [...sessions].sort((a, b) => b.created_at - a.created_at).slice(0, 20);
   const total = recent.reduce((n, s) => n + s.total, 0), correct = recent.reduce((n, s) => n + s.correct, 0);
   return {
-    ...growthFor(sessions),
+    ...growthFor(all),
     week_correct: weekCorrect(sessions),
     today_total: today.reduce((n, s) => n + s.total, 0),
-    today_xp: today.reduce((n, s) => n + (s.xp || 0), 0),
-    ...pointsAndPets(state, p, sessions),
-    today_reward_points: today.reduce((n, s) => n + Number(s.reward_points || 0), 0),
+    today_xp: todayAll.reduce((n, s) => n + (s.xp || 0), 0),
+    ...pointsAndPets(state, p, all),
+    today_reward_points: todayAll.reduce((n, s) => n + Number(s.reward_points || 0), 0),
     practice_count: sessions.length,
     accuracy: total ? Math.round(correct / total * 100) : 0,
     gacha: p.gacha?.items || {},
@@ -626,6 +630,8 @@ function attemptView(a, state, profile) {
     result_visibility: resultVisible ? 'visible' : 'withheld',
     grading_status: gradingStatus,
     ...(a.status === 'active' ? { questions: a.questions.map(publicQuestion), answers: a.answers, revision: a.revision, lease: a.lease } : {}),
+    // V13.70 the reward follows answered questions only, so it shows even before results are out.
+    ...(submitted && a.reward ? { reward: a.reward } : {}),
     ...(resultVisible ? { score: a.score, correct: a.correct, details: a.details } : {})
   };
 }
@@ -641,6 +647,15 @@ function finishExam(a, state, auto = false) {
   a.details = a.questions.map((q, i) => { const w = a.keys[i], answer = a.answers[i] || '', ok = grade(q.type, answer, wordForGrade(state, w)); if (ok) correct++; return { number: i + 1, word_id: w.id, type: q.type, word: displayEnglish(w.word), meaning: w.meaning, answer, correct: ok }; });
   a.correct = correct; a.score = Math.round(correct / a.questions.length * 100); a.status = 'submitted';
   a.submitted_at = Date.now(); a.auto_submitted = auto; a.lease = null;
+  // V13.70 the first submitted attempt of an exam gives 경험치 per answered question and coins.
+  const student = state.profiles.find(x => x.id === a.student_id);
+  const first = !state.examAttempts.some(x => x !== a && x.exam_id === a.exam_id && x.student_id === a.student_id && x.status === 'submitted');
+  if (student && first) {
+    const answered = a.questions.filter((q, i) => String(a.answers[i] ?? '').trim()).length;
+    const reward = examReward(answered, a.questions.length);
+    addBonus(student, { xp: reward.xp, coins: reward.coins, pet: activePetKey(state, student.id), now: a.submitted_at });
+    a.reward = reward;
+  }
 }
 // Practices nobody touched for this long are closed: they were kept whole (question
 // cache, answer responses, word list) and were a large share of the backed-up state.
@@ -765,7 +780,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } else if (process.env.AUTH_PROVIDER === 'supabase') {
       const result = await supabaseLogin(username, password); p = result.profile; supabaseAccessToken = result.accessToken;
       const old = state.profiles.find(x => x.id === p.id);
-      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
+      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live', 'bonus'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
       else state.profiles.push(p);
     } else {
       p = localProfile;
@@ -861,7 +876,7 @@ export async function service(state, method, path, body, token, options = {}) {
       ranking: teacher ? [] : rankingRows(state, competition, p),
       titles: teacher ? null : titleView(competition, p),
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), chance: chanceView(p, now) },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), bot: botView(p, now) },
       tournaments: (state.tournaments || []).filter(t => teacher ? t.school_id === selectedSchool?.id && (t.status !== 'cancelled' || now - (t.finished_at || t.created_at) < DAY_MS) : t.players.includes(p.id) && (t.status === 'active' || (t.status === 'finished' && now - (t.finished_at || 0) < 3 * DAY_MS)))
         .sort((a, b) => b.created_at - a.created_at).slice(0, 12).map(t => tournamentView(state, competition, t, p, now))
     };
@@ -1014,11 +1029,11 @@ export async function service(state, method, path, body, token, options = {}) {
     p.avatar_key = body.key;
     return publicProfile(p);
   }
-  // V13.67 coin rewards and games: attendance, the capsule machine and the word double chance.
+  // V13.67 coin rewards and games: attendance and the coin capsule (the double chance left in V13.70).
   if (path === '/rewards' && method === 'GET') {
     requireRole(p, 'student');
     const now = Date.now();
-    return { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), chance: chanceView(p, now), points_balance: coinBalance(state, p) };
+    return { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), bot: botView(p, now), points_balance: coinBalance(state, p) };
   }
   if (path === '/attendance/check' && method === 'POST') {
     requireRole(p, 'student');
@@ -1030,19 +1045,15 @@ export async function service(state, method, path, body, token, options = {}) {
     const result = pullLucky(p, Number(body.bet), coinBalance(state, p), { ticket: body.ticket === true });
     return { ...result, points_balance: coinBalance(state, p) };
   }
-  if (path === '/chance/start' && method === 'POST') {
+  // V13.70 robot practice match: announced at the start, paid (a few coins and 경험치) at the end.
+  if (path === '/battle/practice/start' && method === 'POST') {
     requireRole(p, 'student');
-    const result = chanceStart(p, Number(body.bet), coinBalance(state, p), studiedWords(state, p));
-    return { ...result, points_balance: coinBalance(state, p) };
+    return botStart(p, { level: str(body.level, 10), mode: battleMode(body.mode), id: id(), now: Date.now() });
   }
-  if (path === '/chance/answer' && method === 'POST') {
+  if (path === '/battle/practice/finish' && method === 'POST') {
     requireRole(p, 'student');
-    const answer = typeof body.answer === 'string' ? body.answer : Number(body.answer);
-    return { ...chanceAnswer(p, answer, Date.now()), points_balance: coinBalance(state, p) };
-  }
-  if (path === '/chance/decide' && method === 'POST') {
-    requireRole(p, 'student');
-    return { ...chanceDecide(p, body.go === true, studiedWords(state, p)), points_balance: coinBalance(state, p) };
+    const result = botFinish(p, { id: str(body.id, 80), result: str(body.result, 10), right: Number(body.right), pet: activePetKey(state, p.id), now: Date.now() });
+    return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
   if (path === '/shop/egg' && method === 'POST') {
     requireRole(p, 'student');
@@ -1050,7 +1061,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const missing = Object.keys(CHARACTERS).filter(key => !p.pets.some(x => x.key === key));
     if (!missing.length) fail('모든 펫을 모았어요!', 409);
     if (openBattleFor(state, p.id, Date.now())) fail('대결이 끝난 뒤에 알을 살 수 있어요.', 409);
-    const balance = pointsAndPets(state, p, mySessions(state, p.id)).points_balance;
+    const balance = pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance;
     if (balance < EGG_PRICE) fail(`코인이 ${EGG_PRICE - balance}개 부족해요.`);
     const key = missing[randomBytes(4).readUInt32BE(0) % missing.length];
     const now = Date.now();
@@ -1184,7 +1195,7 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const rows = (state.battles || []).filter(b => b.status === 'finished' && (b.host_id === p.id || b.guest_id === p.id)).sort((a, b) => b.finished_at - a.finished_at).slice(0, 20);
     const ctx = createCompetition(state);
-    return { record: battleRecord(state, p.id), league: leagueView(ctx, p), points_balance: pointsAndPets(state, p, mySessions(state, p.id)).points_balance, stakes: BATTLE_STAKES, daily_loss_cap: BATTLE_DAILY_LOSS_CAP, lost_today: battleLossToday(state, p.id, Date.now()), battles: rows.map(b => {
+    return { record: battleRecord(state, p.id), league: leagueView(ctx, p), points_balance: pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance, stakes: BATTLE_STAKES, daily_loss_cap: BATTLE_DAILY_LOSS_CAP, lost_today: battleLossToday(state, p.id, Date.now()), battles: rows.map(b => {
       const opponentId = b.host_id === p.id ? b.guest_id : b.host_id;
       return { id: b.id, finished_at: b.finished_at, stake: b.stake, mode: battleMode(b.mode), outcome: b.winner === p.id ? 'win' : b.loser === p.id ? 'lose' : 'draw', reason: b.reason, tournament: b.tournament_id ? b.label || '대회' : undefined, hp: Number.isFinite(Number(b.hp?.[p.id])) ? Number(b.hp[p.id]) : undefined, opponent: state.profiles.find(x => x.id === opponentId)?.display_name || '' };
     }) };
@@ -2026,6 +2037,6 @@ function practiceView(x, state) {
       : undefined,
     feedback: hideTestScore ? null : x.feedback,
     finished: x.finished, retry_count: x.retry.length,
-    stats: growthFor(mySessions(state, x.student_id)), server_time: Date.now()
+    stats: growthFor(xpSessions(state, x.student_id)), server_time: Date.now()
   };
 }
