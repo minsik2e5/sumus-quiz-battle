@@ -1,0 +1,9 @@
+{
+  "defaults": { "size": "1536x1024", "quality": "high", "background": "transparent", "n": 2 },
+  "jobs": [
+    { "name": "fox-1-run", "template": "run", "pet": "fox", "form": 1 },
+    { "name": "rabbit-1-run", "template": "run", "pet": "rabbit", "form": 1 },
+    { "name": "pig-2-redraw", "template": "redraw", "pet": "pig", "form": 2, "size": "1024x1024", "notes": "몸이 자라 보이게, 아기 단계보다 키가 크고 다리가 길게" },
+    { "name": "dog-evolution", "template": "evolution", "pet": "dog", "refs": ["public/assets/pets/dog-1.webp", "public/assets/pets/dog-3.webp"], "n": 1 }
+  ]
+}
