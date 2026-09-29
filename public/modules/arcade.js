@@ -4,6 +4,7 @@ import { GACHA_ITEMS, GACHA_KEYS, GACHA_TIERS, GACHA_TIER_KEYS, GACHA_PRICE, GAC
 import { titleEmblem, coin } from './emblems.js';
 import { TITLES } from './titles.js';
 import { titleState } from './titles-ui.js';
+import { CHARACTERS, EGG_PRICE } from './core.js';
 
 // V13.67 코인 놀이터: the capsule machine (뽑기), its collection and the word double chance
 // (더블 찬스). The server decides everything (server/rewards.mjs); this module draws the page in
@@ -39,9 +40,24 @@ const tierTag = tier => `<span class="ga-tier t-${tier}">${GACHA_TIERS[tier].nam
 
 /* ---------- page ---------- */
 export function arcadePage(A) {
-  return `<div class="page-heading arcade-head"><span class="premium-eyebrow">COIN ARCADE</span><h1>코인 놀이터</h1><p>모은 코인으로 뽑기와 더블 찬스에 도전해요.</p></div>
-    <div class="arcade-wallet"><span>${coin()}<b id="ga-balance">${num(A.data.stats?.points_balance || 0)}</b> 코인</span><small>공부·출석·야차전으로 모아요</small></div>
+  return `<div class="page-heading arcade-head"><span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>모은 코인으로 뽑기·더블 찬스·알 상점을 즐겨요.</p></div>
+    <button type="button" class="arcade-wallet" data-action="coins" aria-label="코인 지갑 열기"><span>${coin()}<b id="ga-balance">${num(A.data.stats?.points_balance || 0)}</b> 코인</span><small>코인 지갑 ${icon('chevron')}</small></button>
     <div data-arcade></div>`;
+}
+// V13.68: the capsule collection lives under 나.
+export function gachaBookPage() {
+  return `<button type="button" class="page-back-v1368" data-go="me">${icon('back')}나</button>
+    <div class="page-heading arcade-head"><span class="premium-eyebrow">CAPSULE BOOK</span><h1>뽑기 도감</h1><p>뽑기 머신에서만 나오는 오라·배지·칭호예요. 눌러서 착용해요.</p></div>
+    <div data-arcade data-arcade-view="book"></div>`;
+}
+// The pet egg shop and the way to the capsule book, below the games.
+function shopHtml(A) {
+  const g = A.data.stats || {}, owned = (g.pets || []).length, total = Object.keys(CHARACTERS).length;
+  const items = rewards(A).gacha.items || {}, have = GACHA_KEYS.filter(key => items[key] > 0).length;
+  return `<section class="ga-card ga-shop">
+    <button type="button" class="ga-shop-row" data-action="egg-shop"><span class="ga-egg" aria-hidden="true">?</span><span><b>랜덤 알 상점</b><small>${owned < total ? `아직 못 만난 친구 ${total - owned}마리` : '모든 친구를 모았어요!'}</small></span><em>${coin()}${num(EGG_PRICE)}</em></button>
+    <button type="button" class="ga-shop-row" data-go="gachabook"><span class="ga-book-ico" aria-hidden="true">${icon('arcade')}</span><span><b>뽑기 도감</b><small>모은 캡슐 ${have}/${GACHA_KEYS.length}</small></span>${icon('chevron')}</button>
+  </section>`;
 }
 function machineHtml(A) {
   const g = rewards(A).gacha, tickets = Number(g.tickets || 0), since = Number(g.since_rare || 0);
@@ -178,7 +194,7 @@ export function mountArcade(el, A) {
 }
 function draw() {
   if (!current?.el.isConnected) return;
-  current.el.innerHTML = `${machineHtml(current.A)}${chanceHtml(current.A)}${collectionHtml(current.A)}`;
+  current.el.innerHTML = current.el.dataset.arcadeView === 'book' ? collectionHtml(current.A) : `${machineHtml(current.A)}${chanceHtml(current.A)}${shopHtml(current.A)}`;
   runTimer();
 }
 function drawChance() {

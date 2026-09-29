@@ -1,0 +1,81 @@
+/* V13.68 menu: 홈 · 학습 · 야차전 · 놀이터 · 나 */
+
+/* back to the tab a page belongs to */
+.page-back-v1368{appearance:none;border:0;background:none;display:inline-flex;align-items:center;gap:2px;padding:4px 8px 4px 0;margin:0 0 4px;font:inherit;font-size:13px;font-weight:800;color:#51736a;cursor:pointer}
+.page-back-v1368 svg{width:18px;height:18px}
+
+/* 학습: word study / tests / records */
+.study-tabs-v1368{max-width:none!important;margin:0 0 14px;display:grid!important;grid-template-columns:repeat(3,1fr)}
+.study-tabs-v1368 button{min-height:40px;font-weight:900}
+
+/* 야차전 tab: the lobby inside the app */
+.yacha-host{margin:0 -4px}
+.battle-app.yb-embedded{min-height:0;padding:0;background:none}
+.yb-embedded .yb-top{position:static;padding:0 0 8px;background:none;max-width:none}
+.yb-top-tab strong{font-size:22px;font-weight:900;color:#17242f;flex:1}
+.yb-embedded .yb-main{max-width:none}
+
+/* home: a practice left open */
+.home-resume-v1368{appearance:none;border:0;width:100%;border-radius:18px;padding:14px 16px;background:linear-gradient(135deg,#12b886,#07815f);color:#fff;font:inherit;text-align:left;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;cursor:pointer;box-shadow:0 8px 18px rgba(7,129,95,.22)}
+.home-resume-v1368>span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.home-resume-v1368 small{font-size:11.5px;font-weight:800;opacity:.85}
+.home-resume-v1368 strong{font-size:17px;font-weight:900}
+.home-resume-v1368 em{font-style:normal;font-size:12px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.home-resume-v1368 b{display:inline-flex;align-items:center;gap:4px;font-size:13px;background:rgba(255,255,255,.18);border-radius:999px;padding:8px 12px;white-space:nowrap}
+.home-resume-v1368 b svg{width:15px;height:15px}
+
+/* home: this week's ranking */
+.home-rank-v1368{appearance:none;width:100%;border:1px solid #e3ebe7;background:#fff;border-radius:18px;padding:13px 14px 12px;font:inherit;text-align:left;display:flex;flex-direction:column;gap:10px;cursor:pointer;color:#1d2b27}
+.hr-head{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto;column-gap:8px;align-items:center}
+.hr-head small{font-size:11.5px;font-weight:800;color:#6c7c77}
+.hr-head strong{grid-row:2;font-size:15.5px;font-weight:900}
+.hr-head strong b{color:#0b8a67;font-size:18px}
+.hr-head svg{grid-row:1/3;grid-column:2;width:20px;height:20px;color:#9aa6a2}
+.hr-top{display:flex;flex-direction:column;gap:5px}
+.hr-row{display:grid;grid-template-columns:22px 30px minmax(0,1fr) auto;gap:8px;align-items:center;padding:4px 8px 4px 4px;border-radius:12px;background:#f7faf9}
+.hr-row.me{background:#e8f8f1;box-shadow:inset 0 0 0 1.5px #9fe0c5}
+.hr-row .avatar-art{width:30px!important;height:30px!important}
+.hr-row b{font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hr-row em{font-style:normal;font-size:12.5px;font-weight:900;color:#51736a;font-variant-numeric:tabular-nums}
+.hr-medal{font-style:normal;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11.5px;font-weight:900;color:#fff}
+.hr-medal.m1{background:linear-gradient(135deg,#ffd35a,#f0a400)}.hr-medal.m2{background:linear-gradient(135deg,#d9e1ea,#9aa8b8)}.hr-medal.m3{background:linear-gradient(135deg,#f3b58a,#c7773f)}
+
+/* 나 */
+.me-head-v1368{margin-bottom:10px}
+.me-profile-v1368{display:flex;align-items:center;gap:14px;background:linear-gradient(160deg,#effaf5,#fff);border:1px solid #dcefe6;border-radius:20px;padding:14px}
+.me-pet{flex:none;width:96px;height:96px;display:grid;place-items:center}
+.me-pet .avatar-art{width:96px!important;height:96px!important;animation:none}
+.me-who{display:flex;flex-direction:column;align-items:flex-start;gap:4px;min-width:0}
+.me-who strong{font-size:20px;font-weight:900}
+.me-who small{font-size:12px;color:#6c7c77}
+.me-tiles-v1368{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.me-tile{appearance:none;border:1px solid #e3ebe7;background:#fff;border-radius:18px;padding:14px 8px 12px;font:inherit;display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;color:#1d2b27;text-align:center}
+.me-tile b{font-size:13.5px;font-weight:900;word-break:keep-all}
+.me-tile small{font-size:11.5px;color:#6c7c77;font-weight:700;display:flex;align-items:center;gap:4px}
+.me-ico{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;margin-bottom:2px}
+.me-ico svg{width:24px;height:24px}
+.me-tile.pet .me-ico{background:#e3f8ee;color:#0b8a67}
+.me-tile.titles .me-ico{background:#fff4d6;color:#c47f00}
+.me-tile.gacha .me-ico{background:#efe9ff;color:#6d4bd8}
+.me-new{font-style:normal;font-size:9.5px;font-weight:900;color:#fff;background:#e5484d;border-radius:999px;padding:1px 6px}
+.me-stats-v1368{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:12px;background:#fff;border:1px solid #e3ebe7;border-radius:18px;padding:12px 6px}
+.me-stats-v1368 div{display:flex;flex-direction:column;align-items:center;gap:2px}
+.me-stats-v1368 b{font-size:19px;font-weight:900;font-variant-numeric:tabular-nums}
+.me-stats-v1368 b small{font-size:11px;margin-left:1px;color:#6c7c77}
+.me-stats-v1368 span{font-size:10.5px;color:#6c7c77;font-weight:700;text-align:center;word-break:keep-all}
+
+/* 놀이터: wallet button, egg shop and the way to the capsule book */
+button.arcade-wallet{appearance:none;width:100%;font:inherit;cursor:pointer;text-align:left}
+.arcade-wallet small{display:inline-flex;align-items:center;gap:2px}
+.arcade-wallet small svg{width:14px;height:14px}
+.ga-shop{padding:8px!important;gap:4px!important}
+.ga-shop-row{appearance:none;border:0;background:none;width:100%;display:grid;grid-template-columns:44px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 8px;border-radius:14px;font:inherit;text-align:left;cursor:pointer;color:#1d2b27}
+.ga-shop-row+.ga-shop-row{border-top:1px solid #eef2f1;border-radius:0 0 14px 14px}
+.ga-shop-row span:nth-child(2){display:flex;flex-direction:column}
+.ga-shop-row b{font-size:15px;font-weight:900}
+.ga-shop-row small{font-size:12px;color:#6c7c77}
+.ga-shop-row em{font-style:normal;display:inline-flex;align-items:center;gap:3px;font-weight:900;color:#b57500}
+.ga-shop-row>svg{width:20px;height:20px;color:#9aa6a2}
+.ga-egg{width:44px;height:44px;border-radius:50% 50% 46% 46%/58% 58% 42% 42%;background:linear-gradient(160deg,#fff7e0,#ffd88a);box-shadow:inset 0 -4px 0 rgba(200,140,0,.18);display:grid;place-items:center;font-weight:900;color:#c47f00;font-size:18px}
+.ga-book-ico{width:44px;height:44px;border-radius:14px;background:#efe9ff;color:#6d4bd8;display:grid;place-items:center}
+.ga-book-ico svg{width:24px;height:24px}

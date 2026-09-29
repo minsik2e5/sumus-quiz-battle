@@ -39,6 +39,7 @@ export function titlesPage(A) {
     return `<span class="tt-tier-chip tier-${tier}"><span><i aria-hidden="true"></i>${TITLE_TIERS[tier].name}</span><b>${all.filter(key => have.has(key)).length}/${all.length}</b></span>`;
   }).join('');
   return `<div class="study-subhead"><button class="study-back" data-go="home">${icon('back')} 홈</button><span class="pill green">TITLES</span></div>
+    <button type="button" class="page-back-v1368" data-go="me">${icon('back')}나</button>
     <div class="page-heading tt-page-head"><span class="premium-eyebrow">TITLE COLLECTION</span><h1>칭호 도감</h1><p>칭호를 달면 랭킹·야차전·도전장에서 친구들에게 보여요.</p></div>
     <section class="tt-hero tier-${eq.tier}">
       <button type="button" class="tt-hero-medal" data-title-open="${t.equipped}" aria-label="달고 있는 칭호 ${esc(eq.name)} 자세히 보기">${titleEmblem(t.equipped, { size: 'lg' })}</button>

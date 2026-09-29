@@ -67,7 +67,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.67.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.68.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -1106,7 +1106,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.67.0') && indexHtml.includes('/app.bundle.css?v=13.67.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.68.0') && indexHtml.includes('/app.bundle.css?v=13.68.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1127,7 +1127,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.67.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.68.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -1175,21 +1175,22 @@ export async function runReleaseCheck() {
       assert(['data-action="egg-shop"', 'data-go="studio"', 'data-action="pet-name"'].every(entry => home.includes(entry)), 'V13.58 the home keeps the egg shop, my pets and pet name entries');
       {
         const growth = studentModule.slice(studentModule.indexOf('function compactGrowth('), studentModule.indexOf('function homeSchedule('));
+        const battleUiSource = readFileSync(fileURLToPath(new URL('../public/modules/battle.js', import.meta.url)), 'utf8');
         const tabs = studentModule.slice(studentModule.indexOf('export const studentTabs'), studentModule.indexOf('export function shell('));
-        assert(!growth.includes('home-trio-v1358') && !growth.includes('home-metrics-v1358') && !studentModule.includes('recentRecordCard') && growth.includes('home-next-v1358') && growth.includes('home-week-v1358') && growth.includes('today_xp'), 'V13.59 the home shows only the card, the next-step button and the week (no repeated shortcuts)');
-        assert(tabs.includes("['home', '홈', 'home'], ['practice', '학습', 'practice'], ['exam', '시험', 'exam'], ['ranking', '랭킹', 'ranking'], ['records', '기록', 'records']") && !studentModule.includes('battleTab'), 'V13.60 the bottom menu is back to home, study, exams, ranking, records');
-        assert(growth.includes('${yachaBanner(A)}') && studentModule.includes('class="home-yacha-v1360" data-action="battle"') && growth.indexOf('home-next-v1358') < growth.indexOf('${yachaBanner(A)}'), 'V13.60 the home has a big yacha banner under the next-step button');
+        assert(!growth.includes('home-trio-v1358') && !growth.includes('home-metrics-v1358') && !studentModule.includes('recentRecordCard') && !growth.includes('home-next-v1358') && growth.includes('${resumeBar(A)}') && growth.includes('${rankingCard(A)}') && growth.includes('home-week-v1358') && growth.includes('today_xp'), 'V13.68 the home shows the card, what is waiting, attendance, the week\'s ranking and the week (no study recommendation)');
+        assert(tabs.includes("['home', '홈', 'home'], ['practice', '학습', 'practice'], ['yacha', '야차전', 'battle'], ['arcade', '놀이터', 'arcade'], ['me', '나', 'user']") && tabs.includes("exam: 'practice', records: 'practice', ranking: 'home'") && studentModule.includes('function studyTabs(') && !studentModule.includes('battleTab'), 'V13.68 the bottom menu is home, study (with tests and records), yacha, arcade, me');
+        assert(growth.includes('${yachaAlerts(A)}') && !growth.includes('yachaBanner') && studentModule.includes('function yachaPage(') && battleUiSource.includes('export function mountYacha(') && battleUiSource.includes('function goFull('), 'V13.68 yacha is a tab (the lobby inside the app, matches full screen); the home only shows challenges and tournament matches');
         const css1360 = readFileSync(fileURLToPath(new URL('../public/v1360.css', import.meta.url)), 'utf8');
         assert(growth.includes('home-stack-v1360') && css1360.includes('.home-stack-v1360{display:flex;flex-direction:column;gap:16px}') && css1360.includes('env(safe-area-inset-bottom'), 'V13.60 home sections are spaced and the last one clears the bottom menu and home bar');
         const battleUi = readFileSync(fileURLToPath(new URL('../public/modules/battle.js', import.meta.url)), 'utf8');
         const appUi = readFileSync(fileURLToPath(new URL('../public/app.js', import.meta.url)), 'utf8');
         assert(battleUi.includes('data-yb="challenge"') && battleUi.includes("api('/battle/challenge'") && battleUi.includes('function acceptChallenge(') && battleUi.includes('B.room.challenge'), 'V13.61 the yacha lobby sends a challenge to a picked friend and waits for them');
-        assert(studentModule.includes('data-action="battle-accept"') && studentModule.includes('data-action="battle-decline"') && appUi.includes("api('/battle/invite')") && appUi.includes('}, 20000);') && appUi.includes('openBattle(A, leaveBattle, { accept: invite })'), 'V13.61 a challenge shows on the home banner (checked every 20 seconds) and opens the stake check when accepted');
+        assert(studentModule.includes('data-action="battle-accept"') && studentModule.includes('data-action="battle-decline"') && appUi.includes("api('/battle/invite')") && appUi.includes('}, 20000);') && appUi.includes('A.yachaOpts = { accept: invite }'), 'V13.61 a challenge shows on the home banner (checked every 20 seconds) and opens the stake check when accepted');
         const css1362 = readFileSync(fileURLToPath(new URL('../public/v1362.css', import.meta.url)), 'utf8');
         assert(['.partner-art .avatar-art img', '.studio-preview .avatar-art img', '.yb-hero-pet .avatar-art img', '.yb-pet .avatar-art img'].every(sel => css1362.includes(sel)) && css1362.includes('@keyframes petBreath') && css1362.includes('@keyframes petHop') && !/@keyframes pet(Breath|Hop)\{[^@]*transform:/.test(css1362), 'V13.62 pets breathe and hop on the home card, My pets and yacha, using scale/translate so card and arena transforms still apply');
         assert(appUi.includes("event.target.closest('.partner-art')") && appUi.includes('function pokePet(') && css1362.includes('.partner-art.poke') && css1362.includes('prefers-reduced-motion'), 'V13.62 tapping the pet on the card makes it jump with hearts (off with reduced motion); the rest of the card still flips');
         const css1363 = readFileSync(fileURLToPath(new URL('../public/v1363.css', import.meta.url)), 'utf8');
-        assert(studentModule.includes('function homeProgress(') && studentModule.includes('next.progress') && studentModule.includes('daily.completed_today') && studentModule.includes('role="progressbar"') && css1363.includes('.home-next-progress-v1363') && css1363.includes('prefers-reduced-motion'), 'V13.63 the home study button shows a progress bar (e.g. 8/20) and a finished state');
+        assert(studentModule.includes('function homeProgress(') && studentModule.includes('function resumeBar(') && studentModule.includes('role="progressbar"') && css1363.includes('.home-next-progress-v1363') && css1363.includes('prefers-reduced-motion'), 'V13.63 a practice left open shows its progress bar (e.g. 8/20) on the home');
         const noon = Date.UTC(2026, 8, 29, 3); // 12:00 KST
         const rec = (answered, at, daily = true) => ({ daily_quest: daily, answered_count: answered, total: 20, created_at: at });
         const fresh = dailyQuestProgress([], null, 20, noon);
