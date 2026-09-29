@@ -115,4 +115,18 @@ export async function runCoinsChecks(assert, expectStatus) {
   assert(createCompetition(state).titleStats(profile('qa-co-a')).gifts === 2, 'V13.73 gifts received count for the 선생님의 칭찬 title');
   const teacherBoot = await service(state, 'GET', '/bootstrap', {}, tokens['qa_co_teacher']);
   assert(teacherBoot.gifts_sent.length === 2 && teacherBoot.gifts_sent[0].amount === 100, 'V13.73 the teacher sees recent gifts, newest first');
+
+  /* ---------- V13.74 반 대항전 and 선생님 알림판 ---------- */
+  const tb = await service(state, 'GET', '/bootstrap', {}, tokens['qa_co_teacher']);
+  const cl = tb.class_league;
+  assert(cl.classes[0].name === '고1A' && cl.classes[0].xp > 0 && cl.classes[0].students === 2 && cl.classes.some(c => c.name === '고1B') && !JSON.stringify(cl).includes('먼학교'), 'V13.74 반 대항전 adds up the 경험치 of each class this week');
+  const idle = tb.idle_students;
+  assert(Array.isArray(idle) && !idle.some(r => r.id === 'qa-co-a'), 'V13.74 the 알림판 leaves out students who studied this week');
+  await expectStatus(403, () => service(state, 'POST', '/teacher/class-league/tv', {}, tokens['qa-co-a']), 'V13.74 only teachers make a 반 대항전 TV link');
+  const first = (await service(state, 'POST', '/teacher/class-league/tv', {}, tokens['qa_co_teacher'])).token;
+  const tvView = await service(state, 'GET', '/tv/classes', { token: first }, null);
+  assert(tvView.league.classes.length === cl.classes.length && !JSON.stringify(tvView).includes('class_tv'), 'V13.74 the TV link shows 반 대항전 without logging in');
+  const second = (await service(state, 'POST', '/teacher/class-league/tv', {}, tokens['qa_co_teacher'])).token;
+  await expectStatus(404, () => service(state, 'GET', '/tv/classes', { token: first }, null), 'V13.74 a new TV link ends the old one');
+  assert((await service(state, 'GET', '/tv/classes', { token: second }, null)).league.school, 'V13.74 the newest TV link works');
 }

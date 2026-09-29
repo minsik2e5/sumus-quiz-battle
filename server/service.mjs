@@ -574,6 +574,40 @@ function rankingRows(state, ctx, p) {
     };
   });
 }
+// V13.74 반 대항전: this week's 경험치 of each class of a school (study, robot matches, exams),
+// for the teacher dashboard and the classroom TV. Ranked by the class total, as 원장님 asked.
+function classLeague(state, ctx, school, now = Date.now()) {
+  const week = rankingWeek(now);
+  const classes = new Map();
+  for (const x of state.profiles) {
+    if (!isRankedStudent(x) || !x.class_name || schoolForProfile(state, x)?.id !== school.id) continue;
+    const xp = ctx.sessionsOf(x.id).filter(s => s.created_at >= week.start && s.created_at < week.end).reduce((n, s) => n + Number(s.xp || 0), 0);
+    const c = classes.get(x.class_name) || { name: x.class_name, xp: 0, students: 0, active: 0, top: [] };
+    c.xp += xp; c.students++;
+    if (xp > 0) { c.active++; c.top.push({ name: x.display_name, xp }); }
+    classes.set(x.class_name, c);
+  }
+  const rows = [...classes.values()]
+    .map(c => ({ ...c, avg: c.students ? Math.round(c.xp / c.students) : 0, top: c.top.sort((a, b) => b.xp - a.xp).slice(0, 3) }))
+    .sort((a, b) => b.xp - a.xp || a.name.localeCompare(b.name, 'ko'));
+  return { school: school.name, week: { start: week.start, end: week.end }, classes: rows, updated_at: now };
+}
+// V13.74 선생님 알림판: students with no study, robot match, exam, attendance or yacha match
+// this week (and for 3 days or more). Derived from records: nothing is written on a visit.
+function idleStudents(state, ctx, school, now = Date.now()) {
+  const week = rankingWeek(now), rows = [];
+  for (const x of state.profiles) {
+    if (!isRankedStudent(x) || schoolForProfile(state, x)?.id !== school.id) continue;
+    const times = ctx.sessionsOf(x.id).map(s => Number(s.created_at || 0));
+    for (const b of ctx.battlesOf(x.id)) times.push(Number(b.finished_at || 0));
+    const day = x.attendance?.last;
+    if (day) times.push(Date.parse(`${day}T00:00:00+09:00`) || 0);
+    const last = Math.max(0, ...times);
+    rows.push({ id: x.id, name: x.display_name, class_name: x.class_name || '', last: last || null, week: last < week.start, days: last ? Math.floor((now - last) / DAY_MS) : null });
+  }
+  return rows.filter(r => r.week || r.days === null || r.days >= 3).sort((a, b) => (a.last || 0) - (b.last || 0) || a.name.localeCompare(b.name, 'ko'));
+}
+
 // The title collection of the signed-in student. `fresh`: titles unlocked since the student
 // last looked (a limited title is new again each week it is won); `intro`: the student has not
 // seen the V13.66 collection yet, so the app shows one summary instead of a pop-up per title.
@@ -785,6 +819,14 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!t || t.status === 'cancelled' || (t.status !== 'active' && now - Number(t.finished_at || 0) > DAY_MS)) fail('TV 링크가 만료됐어요. 선생님께 새 링크를 받아 주세요.', 404);
     return { tournament: tournamentView(state, createCompetition(state), t, { role: 'tv', id: null }, now) };
   }
+  // V13.74 반 대항전 on the classroom TV, opened with a link (no login), like the bracket.
+  if (path === '/tv/classes' && method === 'GET') {
+    const raw = str(body.token, 80);
+    const t = raw.length >= 24 ? state.profiles.find(x => x.role === 'teacher' && x.class_tv?.hash === hashToken(raw)) : null;
+    const school = t ? schoolByRef(state, t.class_tv.school_id) : null;
+    if (!school || Date.now() - Number(t.class_tv.at || 0) > 60 * DAY_MS) fail('TV 링크가 만료됐어요. 선생님께 새 링크를 받아 주세요.', 404);
+    return { league: classLeague(state, createCompetition(state), school) };
+  }
   if (path === '/login' && method === 'POST') {
     let p, supabaseAccessToken;
     const username = str(body.username).toLowerCase();
@@ -897,6 +939,8 @@ export async function service(state, method, path, body, token, options = {}) {
       titles: teacher ? null : titleView(competition, p),
       gifts: teacher ? null : giftsWaiting(p),
       gifts_sent: teacher ? (p.gifts_sent || []).slice(-10).reverse() : null,
+      class_league: teacher && selectedSchool ? classLeague(state, competition, selectedSchool, now) : null,
+      idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
       rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), bot: botView(p, now) },
       tournaments: (state.tournaments || []).filter(t => teacher ? t.school_id === selectedSchool?.id && (t.status !== 'cancelled' || now - (t.finished_at || t.created_at) < DAY_MS) : t.players.includes(p.id) && (t.status === 'active' || (t.status === 'finished' && now - (t.finished_at || 0) < 3 * DAY_MS)))
@@ -1069,6 +1113,21 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const gifts = openGifts(p, Date.now());
     return { gifts, coins: gifts.reduce((n, g) => n + g.amount, 0), points_balance: coinBalance(state, p) };
+  }
+  if (path === '/teacher/class-league' && method === 'GET') {
+    requireRole(p, 'teacher');
+    const school = activeTeacherSchool(state, p);
+    if (!school) fail('관리 학교를 확인해주세요.', 409);
+    return { league: classLeague(state, createCompetition(state), school) };
+  }
+  // A new link ends the old one; it lasts 60 days.
+  if (path === '/teacher/class-league/tv' && method === 'POST') {
+    requireRole(p, 'teacher');
+    const school = activeTeacherSchool(state, p);
+    if (!school) fail('관리 학교를 확인해주세요.', 409);
+    const token = randomBytes(24).toString('base64url');
+    p.class_tv = { hash: hashToken(token), school_id: school.id, at: Date.now() };
+    return { token };
   }
   if (path === '/teacher/gifts' && method === 'POST') {
     requireRole(p, 'teacher');

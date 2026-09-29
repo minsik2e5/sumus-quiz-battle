@@ -11,6 +11,7 @@ import { mountLeagueBoard } from './modules/league-ui.js';
 import { coin } from './modules/emblems.js';
 import { openBracket } from './modules/tournament-ui.js';
 import { openBracketTv } from './modules/bracket-tv.js';
+import { openClassTv } from './modules/class-tv.js';
 import { mountArcade, attendanceMoment } from './modules/arcade.js';
 import { LUCKY_BETS, ATTENDANCE_REWARDS, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_COINS, STUDY_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX } from './modules/rewards.js';
 import { TITLE_COINS } from './modules/titles.js';
@@ -563,6 +564,9 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'tournament-tv') return openTournamentTv(d.id);
     if (d.action === 'tournament-tv-link') return tournamentTvLink(d.id);
     if (d.action === 'gift') return giftModal(d.student ? [d.student] : []);
+    if (d.action === 'gift-idle') return giftModal((A.data.idle_students || []).filter(r => r.week).map(r => r.id));
+    if (d.action === 'class-tv') { A.screen = 'class-tv'; window.scrollTo(0, 0); return openClassTv(A, async () => { A.screen = null; try { await refresh(); } catch {} render(); }); }
+    if (d.action === 'class-tv-link') return classTvLink();
     if (d.action === 'tournament-cancel') return cancelTournament(d.id, b);
     if (d.tnDecide) return decideTournamentMatch(d.tnDecide, d.match, d.winner, d.name, b);
     if (d.action === 'battle-accept' && A.data.battle_invite) { const invite = A.data.battle_invite; A.data.battle_invite = null; A.yachaOpts = { accept: invite }; return navigate('yacha'); }
@@ -1127,6 +1131,19 @@ function giftModal(preset = []) {
   };
   drawTarget();
 }
+// V13.74 teacher: a link that shows 반 대항전 on the classroom TV without logging in.
+async function classTvLink() {
+  try {
+    const { token } = await api('/teacher/class-league/tv', {});
+    const url = `${location.origin}/?tvc=${encodeURIComponent(token)}`;
+    modal(`<h2>반 대항전 TV 링크</h2><p>TV나 교실 컴퓨터의 브라우저에서 이 주소를 열면 <b>로그인 없이 반 대항전 순위만</b> 보여요. 30초마다 저절로 새로고침돼요.</p><ul class="tv-link-notes"><li>60일 동안 쓸 수 있어요.</li><li>새 링크를 만들면 이전 링크는 바로 막혀요.</li></ul><div class="tv-link-box"><input id="tv-link" readonly value="${esc(url)}" aria-label="TV 링크"><button type="button" class="btn primary" id="tv-link-copy">복사</button></div>`, 'TV 링크');
+    $('#tv-link').onfocus = e => e.target.select();
+    $('#tv-link-copy').onclick = async () => {
+      try { await navigator.clipboard.writeText(url); toast('링크를 복사했어요.'); }
+      catch { $('#tv-link').select(); toast('주소를 길게 눌러 복사해 주세요.'); }
+    };
+  } catch (err) { toast(err.message); }
+}
 // V13.69 teacher: the bracket on the classroom TV, full screen and refreshing by itself.
 function openTournamentTv(id) {
   A.screen = 'bracket-tv';
@@ -1208,10 +1225,13 @@ async function cancelTournament(id, button) {
   catch (err) { toast(err.message); buttonBusy(button, false); }
 }
 // V13.71: a classroom TV opened with a TV link shows only that bracket, with no login.
-const tvToken = new URLSearchParams(location.search).get('tv');
+const tvToken = new URLSearchParams(location.search).get('tv'), classTvToken = new URLSearchParams(location.search).get('tvc');
 if (tvToken) {
   A.screen = 'bracket-tv';
   openBracketTv(A, null, () => location.replace('/'), { token: tvToken });
+} else if (classTvToken) {
+  A.screen = 'class-tv';
+  openClassTv(A, () => location.replace('/'), { token: classTvToken });
 } else {
 loginView();
 try {
