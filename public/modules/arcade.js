@@ -5,6 +5,7 @@ import { titleEmblem, coin } from './emblems.js';
 import { TITLES } from './titles.js';
 import { titleState } from './titles-ui.js';
 import { CHARACTERS, EGG_PRICE } from './core.js';
+import { luckyCard, luckyShow, machineSpin, machineDrop, unlockSound } from './lucky.js';
 
 // 놀이터: the coin capsule (코인 뽑기, V13.68) and the word double chance (더블 찬스), plus the
 // decorations kept from the retired V13.67 capsule machine (모은 꾸미기, under 나). The server
@@ -14,11 +15,9 @@ import { CHARACTERS, EGG_PRICE } from './core.js';
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const KEY_ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
 // Capsules piled in the dome (left, bottom in px).
-const BALL_SPOTS = [[6, 2], [30, 1], [54, 3], [78, 2], [16, 22], [42, 24], [66, 21], [28, 44], [54, 45]];
 const rewards = A => A.data.rewards ||= { attendance: null, gacha: { items: {}, tickets: 0 }, lucky: null, chance: null };
 const luckyState = A => rewards(A).lucky || { bets: LUCKY_BETS, daily: LUCKY_DAILY, left: LUCKY_DAILY, odds: LUCKY_ODDS, tickets: Number(rewards(A).gacha?.tickets || 0) };
-// Each result has the color of a tier: 꽝 grey, 본전 green, 2배 blue, 3배 gold.
-const MULT_CLASS = { 0: 't-miss', 1: 't-common', 2: 't-rare', 3: 't-legendary' };
+
 const byTier = keys => [...keys].sort((a, b) => GACHA_TIER_KEYS.indexOf(GACHA_ITEMS[b].tier) - GACHA_TIER_KEYS.indexOf(GACHA_ITEMS[a].tier) || GACHA_KEYS.indexOf(a) - GACHA_KEYS.indexOf(b));
 
 // The coin chip in the header follows every change here.
@@ -60,30 +59,10 @@ function shopHtml(A) {
     <button type="button" class="ga-shop-row" data-action="egg-shop"><span class="ga-egg" aria-hidden="true">?</span><span><b>랜덤 알 상점</b><small>${owned < total ? `아직 못 만난 친구 ${total - owned}마리` : '모든 친구를 모았어요!'}</small></span><em>${coin()}${num(EGG_PRICE)}</em></button>
   </section>`;
 }
-// V13.68 coin capsule: pick a bet, turn the knob; the capsule says how many times it comes back.
+// V13.68 coin capsule: the machine and its show live in lucky.js.
 let luckyBet = LUCKY_BETS[0];
 function machineHtml(A) {
-  const l = luckyState(A), tickets = Number(l.tickets || 0);
-  const balance = Number(A.data.stats?.points_balance || 0);
-  const balls = ['#ff8fb1', '#7cc7ff', '#ffd166', '#8ee6b8', '#b69cff', '#ff9f6b', '#6ee7d6', '#ffc1d9', '#9ad0ff'];
-  const can = l.left > 0 && balance >= luckyBet;
-  return `<section class="ga-card">
-    <div class="ga-top">
-      <div class="ga-machine" id="ga-machine" aria-hidden="true">
-        <div class="ga-dome">${balls.map((c, i) => `<i style="--c:${c};left:${BALL_SPOTS[i][0]}px;bottom:${BALL_SPOTS[i][1]}px;transform:rotate(${i * 37}deg)"></i>`).join('')}<span class="ga-shine"></span></div>
-        <div class="ga-body"><span class="ga-brand">SUMUS</span><span class="ga-knob"><i></i></span><span class="ga-slot"></span></div>
-      </div>
-      <div class="ga-side">
-        <h2>코인 뽑기</h2>
-        <p>코인을 걸고 캡슐을 뽑아요. <b>최대 3배</b>로 돌아와요!</p>
-        <div class="lk-bets" role="group" aria-label="걸 코인">${(l.bets || LUCKY_BETS).map(b => `<button type="button" class="lk-bet ${luckyBet === b ? 'on' : ''}" data-ga="bet" data-bet="${b}" aria-pressed="${luckyBet === b}">${coin()}${b}</button>`).join('')}</div>
-        <button type="button" class="btn primary full ga-pull" data-ga="pull" ${can ? '' : 'disabled'}>${l.left > 0 ? `뽑기 <span>${coin()}${luckyBet}</span>` : '오늘 뽑기 끝! 내일 또 만나요'}</button>
-        ${tickets ? `<button type="button" class="btn full ga-ticket" data-ga="ticket">뽑기권 쓰기 <span>${tickets}장 · ${coin()}${LUCKY_TICKET_BET} 공짜</span></button>` : ''}
-      </div>
-    </div>
-    <div class="lk-odds">${LUCKY_ODDS.map(o => `<span class="${MULT_CLASS[o.mult]}"><b>${o.mult ? `×${o.mult}` : '꽝'}</b>${o.rate}%</span>`).join('')}</div>
-    <p class="ga-note">오늘 남은 뽑기 <b>${l.left}/${l.daily || LUCKY_DAILY}</b> · 확률은 매번 같아요 <button type="button" class="lk-odds-more" data-ga="odds">자세히</button> · 뽑기권은 출석 7번째 도장에서 받아요.</p>
-  </section>`;
+  return luckyCard(luckyState(A), luckyBet, Number(A.data.stats?.points_balance || 0));
 }
 // Decorations the student pulled from the V13.67 machine (the page shows only those).
 function collectionHtml(A) {
@@ -215,43 +194,26 @@ function drawChance() {
 async function pull(A, ticket, button) {
   if (current?.busy) return;
   current.busy = true;
-  button.disabled = true;
-  const machine = document.getElementById('ga-machine');
-  machine?.classList.add('spinning');
-  const wait = new Promise(resolve => setTimeout(resolve, reduced() ? 0 : 1100));
+  if (button) button.disabled = true;
+  unlockSound();
+  const machine = document.getElementById('lk-machine');
   try {
-    const [res] = await Promise.all([api('/lucky/pull', ticket ? { ticket: true } : { bet: luckyBet }), wait]);
+    const [res] = await Promise.all([api('/lucky/pull', ticket ? { ticket: true } : { bet: luckyBet }), machineSpin(machine)]);
     rewards(A).lucky = res.lucky;
     if (rewards(A).gacha) rewards(A).gacha.tickets = res.lucky.tickets;
-    setBalance(A, res.points_balance);
-    machine?.classList.remove('spinning');
-    machine?.classList.add('drop');
-    await new Promise(resolve => setTimeout(resolve, reduced() ? 0 : 450));
-    reveal(res);
+    await machineDrop(machine);
+    const balance = Number(res.points_balance);
+    const canAgain = !ticket && res.lucky.left > 0 && balance >= luckyBet;
+    // The header coins change only after the show, so the result is not spoiled.
+    const again = await luckyShow(res, { again: canAgain, againLabel: `${coin()}${luckyBet}` });
+    setBalance(A, balance);
+    current.busy = false;
+    draw();
+    if (again) pull(A, false, null);
+    return;
   } catch (err) { toast(err.message); }
-  finally { current.busy = false; machine?.classList.remove('spinning', 'drop'); draw(); }
-}
-function reveal(res) {
-  const cls = MULT_CLASS[res.mult] || 't-miss';
-  const head = res.mult === 3 ? '대박! 3배!' : res.mult === 2 ? '2배 당첨!' : res.mult === 1 ? '본전!' : '아쉬워요!';
-  const line = res.mult ? `${coin()}${num(res.bet)} → <b>${coin()}${num(res.paid)}</b>` : `${coin()}${num(res.bet)}코인을 잃었어요. 다음엔 꼭!`;
-  const box = document.createElement('div');
-  box.className = `ga-reveal ${cls}${reduced() ? ' still' : ''}`;
-  box.innerHTML = `<div class="ga-reveal-card" role="dialog" aria-modal="true" aria-label="코인 뽑기 결과 ${esc(head)}">
-    <div class="ga-capsule" aria-hidden="true"><i class="top"></i><i class="bottom"></i></div>
-    <div class="ga-reveal-body">
-      <div class="ga-rays" aria-hidden="true"></div>
-      <span class="lk-mult ${cls}">${res.mult ? `×${res.mult}` : '꽝'}</span>
-      <h2>${head}</h2>
-      <p class="lk-line">${line}</p>
-      ${res.ticket ? '<p class="ga-new">뽑기권으로 공짜 뽑기!</p>' : `<p>오늘 남은 뽑기 ${res.lucky.left}번</p>`}
-      <div class="ga-reveal-actions"><button type="button" class="btn primary full" data-rv="close">확인</button></div>
-    </div>
-  </div>`;
-  box.onclick = e => { if (e.target.closest('[data-rv]') || e.target === box) box.remove(); };
-  document.body.appendChild(box);
-  requestAnimationFrame(() => box.classList.add('open'));
-  box.querySelector('[data-rv="close"]').focus({ preventScroll: true });
+  current.busy = false;
+  draw();
 }
 // Aura -> frame (saved with the rest of the pet style), title -> equipped.
 async function wear(A, key) {

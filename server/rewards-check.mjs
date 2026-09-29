@@ -172,5 +172,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   await service(state, 'POST', '/chance/start', { bet: 10 }, tokens['qa-rw-a']).catch(() => null);
   assert(A.chance.losses >= 3, 'V13.67 the next double chance request records a word left open as lost');
   const homeUi = source('../public/modules/student.js'), arcade = source('../public/modules/arcade.js');
+  const luckyUi = source('../public/modules/lucky.js');
+  assert(luckyUi.includes('export function luckyShow(') && luckyUi.includes('function machineSpin(') && luckyUi.includes("const shakes = res.mult === 0 ? 1 : res.mult === 1 ? 2 : 3") && luckyUi.includes('data-lk="skip"') && luckyUi.includes('prefers-reduced-motion') && arcade.includes('luckyCard(luckyState(A)'), 'V13.68 the coin capsule has a machine and a show: coin in, dial, the capsule shakes more for better results, bursts open; it can be skipped and respects reduced motion');
   assert(homeUi.includes('attendanceCard(') && arcade.includes('/lucky/pull') && arcade.includes('/chance/answer') && arcade.includes('확률'), 'V13.67 the home screen has the attendance card; the coin arcade has the capsule machine (with its odds) and double chance');
 }
