@@ -1,0 +1,8 @@
+/* V13.71: 학습 탭의 오늘의 추천 학습 카드, 교실 TV 링크, 야차전 다시 시도 */
+.study-daily-v1371{margin:4px 0 16px}
+.tv-link-notes{margin:10px 0 14px;padding-left:18px;color:#5d6d68;font-size:13px;line-height:1.6}
+.tv-link-box{display:flex;gap:8px;align-items:center}
+.tv-link-box input{flex:1;min-width:0;height:44px;padding:0 12px;border:1px solid #d9e4df;border-radius:12px;background:#f7faf9;font:inherit;font-size:13px;color:#16242f}
+.tv-link-box .btn{flex:none;height:44px}
+.yb-error-v1371{display:grid;gap:14px;justify-items:center;text-align:center;padding:36px 16px}
+.yb-error-v1371 small{display:block;margin-top:6px;color:#7b8986;font-size:12px}

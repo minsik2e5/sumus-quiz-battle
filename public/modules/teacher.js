@@ -324,14 +324,14 @@ function results(A) {
 }
 // V13.66 academy yacha tournaments: open a bracket for a grade, watch it live, decide a match
 // when a student cannot play.
-function tournamentPanel(t) {
+export function tournamentPanel(t) {
   const decided = t.rounds.flatMap(round => round.matches).filter(m => m.winner && m.by !== 'bye').length;
   const total = t.rounds.flatMap(round => round.matches).filter(m => m.by !== 'bye').length;
   const live = t.rounds.flatMap(round => round.matches).filter(m => m.live).length;
   const current = t.rounds.find(round => round.matches.some(m => !m.winner));
   const status = t.status === 'finished' ? `<span class="pill green">우승 ${esc(t.champion?.name || '')}</span>` : t.status === 'cancelled' ? '<span class="pill">취소됨</span>' : `<span class="pill blue">${esc(current?.label || '')} 진행 중${live ? ` · 경기 ${live}개` : ''}</span>`;
-  return `<section class="panel tn-panel ${t.status}">
-    <div class="panel-head"><div><h2>${esc(t.name)}</h2><span>${esc(t.class_name || t.grade || '')} · ${t.mode === 'skill' ? '실력전' : '스피드전'} · ${num(t.players)}명 · 경기 ${decided}/${total} · ${t.prize ? `${coin()} 우승 ${num(t.prize)} · 준우승 ${num(Math.floor(t.prize / 2))}` : '상금 없음'} · ${date(t.created_at)}</span></div><div class="tn-panel-actions">${status}${t.status !== 'cancelled' ? `<button type="button" class="btn small primary tn-tv-open" data-action="tournament-tv" data-id="${esc(t.id)}">${icon('tv')} TV로 크게 보기</button>` : ''}</div></div>
+  return `<section class="panel tn-panel ${t.status}" id="tn-${esc(t.id)}">
+    <div class="panel-head"><div><h2>${esc(t.name)}</h2><span>${esc(t.class_name || t.grade || '')} · ${t.mode === 'skill' ? '실력전' : '스피드전'} · ${num(t.players)}명 · 경기 ${decided}/${total} · ${t.prize ? `${coin()} 우승 ${num(t.prize)} · 준우승 ${num(Math.floor(t.prize / 2))}` : '상금 없음'} · ${date(t.created_at)}</span></div><div class="tn-panel-actions">${status}${t.status !== 'cancelled' ? `<button type="button" class="btn small primary tn-tv-open" data-action="tournament-tv" data-id="${esc(t.id)}">${icon('tv')} TV로 크게 보기</button><button type="button" class="btn small secondary tn-tv-link" data-action="tournament-tv-link" data-id="${esc(t.id)}">${icon('tv')} TV 링크</button>` : ''}</div></div>
     ${bracketHtml(t, { teacher: true })}
     ${t.status === 'active' ? `<div class="tn-panel-foot"><p>학생이 오지 않았거나 경기를 할 수 없을 때는 경기 칸의 <b>승자 지정</b>으로 다음 라운드를 열 수 있어요. 무승부는 다시 겨뤄요.</p><button class="btn small" data-action="tournament-cancel" data-id="${esc(t.id)}">대회 취소</button></div>` : ''}
   </section>`;
@@ -344,7 +344,7 @@ function tournaments(A) {
       <button class="btn primary" data-action="tournament-new">${icon('plus')} 대회 만들기</button>
     </section>
     ${active.length ? active.map(tournamentPanel).join('') : empty('battle', '진행 중인 대회가 없어요', '대회 만들기로 첫 토너먼트를 열어 보세요.')}
-    ${past.length ? `<details class="tn-past"><summary>지난 대회 ${past.length}개</summary>${past.map(tournamentPanel).join('')}</details>` : ''}`;
+    ${past.length ? `<details class="tn-past" ${A.tnPastOpen ? 'open' : ''}><summary>지난 대회 ${past.length}개</summary>${past.map(tournamentPanel).join('')}</details>` : ''}`;
 }
 const localDate = n => { const d = new Date(n); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
 export function examDefaults(A) { return A.examForm ??= { title: '', class_name: A.data.profile.active_division === 'middle' ? (A.data.profiles[0]?.class_name || '중3') : ALL_CLASSES, exam_type: 'write_meaning', question_count: 20, minutes: 10, passing_score: 80, max_attempts: 1, available: localDate(Date.now()), due: localDate(Date.now() + 3 * 86400000), release_result: true }; }

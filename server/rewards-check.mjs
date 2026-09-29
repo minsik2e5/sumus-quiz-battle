@@ -13,7 +13,7 @@ import { createBattle, connect, answer, tick, battleView, SKILL_RULES, BATTLE } 
 import { battleQuestions, spellHint, spellable } from '../public/modules/battle-questions.js';
 import { createPracticeMatch } from '../public/modules/battle-bot.js';
 import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS } from '../public/modules/rewards.js';
-import { addBonus, bonusRecords } from './rewards.mjs';
+import { addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND } from './rewards.mjs';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 // A small deterministic random source for the odds checks.
@@ -122,7 +122,25 @@ export async function runRewardsChecks(assert, expectStatus) {
   const styleBody = { avatar_key: 'dog', avatar_accessory: 'none', avatar_frame: 'g_sakura', avatar_title: 'rookie' };
   assert((await service(state, 'POST', '/profile/style', styleBody, tokens['qa-rw-c'])).avatar_frame === 'g_sakura', 'V13.68 a pulled aura can still be worn');
   await expectStatus(400, () => service(state, 'POST', '/profile/style', { ...styleBody, avatar_frame: 'g_galaxy' }, tokens['qa-rw-c']), 'V13.68 an aura not pulled cannot be worn');
-  await expectStatus(400, () => service(state, 'POST', '/profile/style', { ...styleBody, avatar_accessory: 'g_heart' }, tokens['qa-rw-c']), 'V13.68 a removed badge cannot be worn');
+  // V13.71: a removed badge is not worn (it falls back to 기본) instead of blocking the change.
+  assert((await service(state, 'POST', '/profile/style', { ...styleBody, avatar_accessory: 'g_heart' }, tokens['qa-rw-c'])).avatar_accessory === 'none', 'V13.71 a removed badge is saved as 기본, not worn');
+  {
+    // A student who still wore a badge from V13.67 can put on an aura again, gets the badges paid
+    // back once (60 coins per kind), and the profile logs stay small.
+    const now = Date.now();
+    poor.avatar_accessory = 'g_note';
+    poor.gacha = { items: { badge_heart: 2, badge_note: 1, aura_sakura: 1, title_lucky: 1 }, refund: 5, log: [{ at: now, key: 'badge_heart' }] };
+    poor.chance = { paid: 0, log: [{ at: now }] };
+    poor.attendance = { ...(poor.attendance || {}), log: [{ at: now - 30 * DAY_MS, coins: 3 }, { at: now - 20 * DAY_MS, coins: 3 }, { at: now - DAY_MS, coins: 5 }] };
+    poor.lucky = { ...(poor.lucky || {}), log: Array.from({ length: 12 }, (_, i) => ({ at: now - i * 1000, bet: 10, mult: 0 })) };
+    const before = (await service(state, 'GET', '/bootstrap', {}, tokens['qa-rw-c'])).stats.points_balance;
+    assert((await service(state, 'POST', '/profile/style', { ...styleBody, avatar_accessory: 'g_note' }, tokens['qa-rw-c'])).avatar_frame === 'g_sakura', 'V13.71 a student still wearing a removed badge can change the look again');
+    poor.avatar_accessory = 'g_note';
+    assert(tidyProfileLogs(state, now) === true && tidyProfileLogs(state, now) === false, 'V13.71 the profile tidy runs once and then has nothing left to do');
+    const after = (await service(state, 'GET', '/bootstrap', {}, tokens['qa-rw-c'])).stats.points_balance;
+    assert(after - before === BADGE_REFUND * 2 && poor.gacha.refund === 5 + BADGE_REFUND * 2 && poor.gacha.items.aura_sakura === 1 && !Object.keys(poor.gacha.items).some(key => key.startsWith('badge_')) && poor.avatar_accessory === 'none', 'V13.71 each removed badge kind is paid back once at the capsule price and a worn one goes back to 기본');
+    assert(!('log' in poor.gacha) && !('log' in poor.chance) && poor.attendance.log.length === 1 && poor.lucky.log.length === 6, 'V13.71 profile logs keep only what screens and rankings read');
+  }
   assert(TITLES.g_lucky.retired && !visibleTitleKeys(['rookie']).includes('g_lucky') && visibleTitleKeys(['rookie', 'g_lucky']).includes('g_lucky') && (await service(state, 'POST', '/profile/title', { key: 'g_lucky' }, tokens['qa-rw-c'])).equipped === 'g_lucky', 'V13.68 capsule titles stay with their owners and are hidden from everyone else');
   await expectStatus(403, () => service(state, 'POST', '/profile/title', { key: 'g_god' }, tokens['qa-rw-c']), 'V13.67 a capsule title not pulled cannot be equipped');
   const bootC = await service(state, 'GET', '/bootstrap', {}, tokens['qa-rw-c']);

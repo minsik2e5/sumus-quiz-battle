@@ -401,6 +401,7 @@ function home(A) {
 }
 function studyHub(A) {
   return `<div class="page-heading study-simple-heading premium-page-heading"><span class="premium-eyebrow">LEARNING</span><h1>학습</h1></div>
+  ${studyDailyCard(A)}
   <div class="study-hub-grid study-hub-simple">
     <button class="study-hub-card vocab" data-study="vocab">
       <span class="study-hub-icon">${icon('practice')}</span>
@@ -581,6 +582,20 @@ function vocabPractice(A) {
 function studyTabs(A) {
   return `<div class="segment study-tabs-v1368" role="group" aria-label="학습 메뉴">${[['practice', '단어·어법'], ['exam', '시험'], ['records', '기록']].map(([tab, label]) => `<button type="button" data-go="${tab}" class="${A.tab === tab ? 'selected' : ''}" aria-pressed="${A.tab === tab}">${label}</button>`).join('')}</div>`;
 }
+// V13.71: 오늘의 추천 학습 lives at the top of 학습 (v13.68 took it off the home, which left no
+// way to start it). Same button, progress bar (8/20) and finished state as v13.63.
+function studyDailyCard(A) {
+  const active = A.data.active_practice_summary || null;
+  if (active) {
+    const ranges = (active.range_codes || []).map(code => recordRangeLabel({ division: active.division, school: active.school }, code)).join(' · ') || '선택 범위';
+    return `<button type="button" class="home-next-v1358 study-daily-v1371" data-quick-practice="true"><span><small>${active.daily_quest ? '오늘의 추천 학습' : active.run_mode === 'test' ? '진행 중인 실전' : '진행 중인 연습'}</small><strong>이어서 마무리해요</strong><em>${esc(ranges)} · ${esc(PRACTICE_TYPES[active.mode] || '단어 학습')}</em>${homeProgress(active.score_total, active.target, '진행')}</span><b>이어서 풀기 ${icon('arrow')}</b></button>`;
+  }
+  const daily = A.data.daily_quest || null;
+  if (!(daily?.target > 0)) return '';
+  const goal = Number(daily.goal_today || daily.target), done = Number(daily.done_today || 0), mix = daily.mix || {};
+  if (daily.completed_today) return `<button type="button" class="home-next-v1358 is-done-v1363 study-daily-v1371" data-quick-practice="true"><span><small>오늘의 추천 학습</small><strong>오늘 목표 달성!</strong><em>더 풀면 새로 필요한 단어를 골라줘요.</em>${homeProgress(goal, goal, '오늘 학습')}</span><b>한 번 더 하기 ${icon('arrow')}</b></button>`;
+  return `<button type="button" class="home-next-v1358 study-daily-v1371" data-quick-practice="true"><span><small>오늘의 추천 학습</small><strong>${done > 0 ? `오늘 ${goal - done}개 남았어요` : `오늘은 ${daily.target}개만 끝내요`}</strong><em>오답 ${mix.wrong || 0} · 복습 ${mix.review || 0} · 새 단어 ${mix.new || 0}</em>${homeProgress(done, goal, '오늘 학습')}</span><b>${done > 0 ? '오늘 학습 계속' : '오늘 학습 시작'} ${icon('arrow')}</b></button>`;
+}
 function practice(A) {
   if (A.studyView === 'vocab') return vocabPractice(A);
   if (A.studyView === 'grammar') return grammarStudy(A);
@@ -597,7 +612,8 @@ function myRankLine(A) {
   const rows = A.data.ranking || [], me = rows.find(r => r.is_me);
   if (!me || !(Number(me.xp || 0) > 0)) return '이번 주 순위 보기';
   const higher = rows.filter(r => r.grade === me.grade && Number(r.xp || 0) > Number(me.xp || 0)).length;
-  return `이번 주 ${higher + 1}위`;
+  // V13.71: say it is the grade rank; the tile opens the ranking on the same grade and week.
+  return `${esc(me.grade || '우리 학년')} 이번 주 ${higher + 1}위`;
 }
 function mePage(A) {
   const p = A.data.profile, g = A.data.stats, pet = g.pet, t = titleState(A);
@@ -613,7 +629,7 @@ function mePage(A) {
     </section>
     <div class="me-tiles-v1368${gachaHave ? ' four' : ''}">
       <button type="button" class="me-tile pet" data-go="studio"><span class="me-ico">${icon('user')}</span><b>내 펫·꾸미기</b><small>펫 ${owned}/${Object.keys(CHARACTERS).length}</small></button>
-      <button type="button" class="me-tile rank" data-go="ranking" data-from="me"><span class="me-ico">${icon('ranking')}</span><b>랭킹</b><small>${myRankLine(A)}</small></button>
+      <button type="button" class="me-tile rank" data-go="ranking" data-from="me" data-rank-grade="${esc((A.data.ranking || []).find(r => r.is_me)?.grade || '')}"><span class="me-ico">${icon('ranking')}</span><b>랭킹</b><small>${myRankLine(A)}</small></button>
       <button type="button" class="me-tile titles" data-go="titles"><span class="me-ico">${icon('star')}</span><b>칭호 도감</b><small>${titleCount(A)}${(t.fresh || []).length ? ' · <i class="me-new">NEW</i>' : ''}</small></button>
       ${gachaHave ? `<button type="button" class="me-tile gacha" data-go="gachabook"><span class="me-ico">${icon('arcade')}</span><b>모은 꾸미기</b><small>${gachaHave}개</small></button>` : ''}
     </div>

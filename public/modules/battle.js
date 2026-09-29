@@ -106,7 +106,17 @@ export async function openBattle(A, exit, opts = {}) {
     lobby();
     if (opts.accept) acceptChallenge(opts.accept);
     if (opts.tournament) playTournament(opts.tournament.tid, opts.tournament.mid);
-  } catch (err) { toast(err.message); leaveScreen(); }
+  } catch (err) {
+    toast(err.message);
+    // V13.71: inside the 야차전 tab, leaving re-rendered the tab, which opened the lobby again and
+    // failed again in a loop. Show the error in the tab and let the student retry instead.
+    if (B?.embedded) {
+      root().innerHTML = shell(`<div class="yb-loading yb-error-v1371"><p>야차전을 불러오지 못했어요.<br><small>${esc(err.message || '잠시 후 다시 시도해 주세요.')}</small></p><button type="button" class="btn primary" data-yb-retry>다시 시도</button></div>`);
+      root().querySelector('[data-yb-retry]')?.addEventListener('click', () => openBattle(A, exit, opts));
+      return;
+    }
+    leaveScreen();
+  }
 }
 
 // The 야차전 tab: draws the lobby in `el` (a fresh element on every app render).
