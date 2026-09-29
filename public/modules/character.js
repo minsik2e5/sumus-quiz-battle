@@ -2,7 +2,9 @@ import { CHARACTERS, PET_FORMS } from './core.js';
 // Illustrated pets: /assets/pets/<pet>-<form>.webp (512px, transparent, feet on a shared
 // baseline) plus a 160px `-s` copy for small avatars. `form` is 0 (egg) .. 3 (final).
 const LEGACY = { lumi:'dog', nox:'cat', blaze:'dog', tide:'cat', zeph:'dragon', terra:'panda' };
-const EXPRESSIONS = { dog: { 2: ['happy'] }, pig: { 2: ['happy'] } };
+// V13.65: 몽이's growing and final art were redrawn (the body grows); its old happy face
+// belonged to the previous drawing, so it is left out until a matching one is drawn.
+const EXPRESSIONS = { pig: { 2: ['happy'] } };
 // Sprites are fitted one by one, so growth is added back gently (feet stay anchored).
 const GROW = [.86, .86, .93, 1];
 const SMALL = new Set(['mini']);

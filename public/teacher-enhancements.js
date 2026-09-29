@@ -118,11 +118,14 @@ async function applyFilters() {
     const id = row.querySelector('[data-student]')?.dataset.student;
     const p = data.profiles.find(x => x.id === id);
     const show = !!p && (!status || (status === 'active' ? p.active : !p.active));
-    row.hidden = !show;
+    // Write only on a change: every write is a DOM mutation, and the observer below
+    // re-runs this on mutations, so unconditional writes looped every frame (V13.65).
+    if (row.hidden !== !show) row.hidden = !show;
     if (show) visible++;
   }
   const count = document.querySelector('#visible-student-count');
-  if (count) count.textContent = `현재 ${visible}명 표시`;
+  const label = `현재 ${visible}명 표시`;
+  if (count && count.textContent !== label) count.textContent = label;
 }
 
 function activityRows(data, id) {
@@ -206,17 +209,19 @@ async function openStudentDetail(id) {
 
   $('#student-reset-password').onclick = async event => {
     if (!confirm(p.display_name + ' 학생의 비밀번호를 12345678로 재설정할까요?')) return;
-    buttonBusy(event.currentTarget);
+    const button = event.currentTarget; // null after the await below
+    buttonBusy(button);
     try {
       await api('/students/' + id, { password: '12345678' }, 'PATCH');
       toast('비밀번호를 12345678로 재설정했어요.');
     } catch (err) { toast(err.message); }
-    finally { buttonBusy(event.currentTarget, false); }
+    finally { buttonBusy(button, false); }
   };
 
   $('#student-delete-account').onclick = async event => {
     if (!confirm(p.display_name + ' 학생 계정을 삭제할까요?\n연습 기록과 시험 기록도 함께 삭제됩니다.')) return;
-    buttonBusy(event.currentTarget);
+    const button = event.currentTarget; // null after the awaits below
+    buttonBusy(button);
     try {
       await api('/students/' + id, {}, 'DELETE');
       const fresh = await api('/bootstrap');
@@ -224,7 +229,7 @@ async function openStudentDetail(id) {
       close();
       globalThis.__SUMUS_APPLY_BOOTSTRAP__?.(fresh);
       toast('학생 계정을 삭제했어요.');
-    } catch (err) { toast(err.message); buttonBusy(event.currentTarget, false); }
+    } catch (err) { toast(err.message); buttonBusy(button, false); }
   };
 }
 

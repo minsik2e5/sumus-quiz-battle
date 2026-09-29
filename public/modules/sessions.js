@@ -211,15 +211,15 @@ export async function openPracticeRecord(sessionId) {
     } catch (error) { button.disabled = false; toast(error.message); }
   }));
   $('#record-share-self-test')?.addEventListener('click', async event => {
-    buttonBusy(event.currentTarget);
+    // Keep the button: event.currentTarget is null once the request has awaited.
+    const button = event.currentTarget;
+    buttonBusy(button);
     try {
       const shared = await api(`/practice/${session.id}/share`, {}, 'POST');
       session.shared_to_teacher_at = shared.shared_to_teacher_at;
-      event.currentTarget.className = 'btn self-test-share-done full';
-      event.currentTarget.disabled = true;
-      event.currentTarget.textContent = '✓ 선생님께 전송 완료';
-      toast('실전 결과를 선생님께 보냈어요.');
-    } catch (error) { buttonBusy(event.currentTarget, false); toast(error.message); }
+      markShared(session.id, shared.shared_to_teacher_at);
+      shareDone(button);
+    } catch (error) { buttonBusy(button, false); toast(error.message); }
   });
   $('#retry-wrong-practice')?.addEventListener('click', async event => {
     buttonBusy(event.currentTarget);
@@ -537,6 +537,20 @@ function answerImpact(feedback) {
   requestAnimationFrame(() => impact.classList.add('show'));
   setTimeout(() => impact.remove(), feedback.milestone ? 560 : 440);
 }
+// V13.65: a shared result is marked in the data already on the phone instead of
+// reloading everything (that second round trip made "결과 보내기" feel stuck).
+function markShared(id, at) {
+  const data = globalThis.__SUMUS_BOOTSTRAP__;
+  const row = data?.sessions?.find(item => item.id === id);
+  if (row) row.shared_to_teacher_at = at;
+}
+function shareDone(button) {
+  buttonBusy(button, false);
+  button.className = 'btn self-test-share-done full';
+  button.disabled = true;
+  button.textContent = '✓ 선생님께 전송 완료';
+  toast('실전 결과를 선생님께 보냈어요.');
+}
 function animateTestResult(score, perfect) {
   const node = $('#practice-result-score');
   if (node) {
@@ -852,17 +866,16 @@ function finishPracticeView() {
   </main></div>`);
   if (x.run_mode === 'test' && !interrupted) animateTestResult(score, perfect);
   $('#share-self-test')?.addEventListener('click', async event => {
-    buttonBusy(event.currentTarget);
+    // Keep the button: event.currentTarget is null once the request has awaited.
+    const button = event.currentTarget;
+    buttonBusy(button);
     try {
       const shared = await api(`/practice/${x.id}/share`, {}, 'POST');
       x.shared_to_teacher_at = shared.shared_to_teacher_at;
-      event.currentTarget.className = 'btn self-test-share-done full';
-      event.currentTarget.disabled = true;
-      event.currentTarget.textContent = '✓ 선생님께 전송 완료';
-      await refresh();
-      toast('실전 결과를 선생님께 보냈어요.');
+      markShared(x.id, shared.shared_to_teacher_at);
+      shareDone(button);
     } catch (error) {
-      buttonBusy(event.currentTarget, false);
+      buttonBusy(button, false);
       toast(error.message);
     }
   });
