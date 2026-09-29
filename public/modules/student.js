@@ -595,6 +595,7 @@ function mePage(A) {
   const p = A.data.profile, g = A.data.stats, pet = g.pet, t = titleState(A);
   const items = A.data.rewards?.gacha?.items || {};
   const gachaHave = Object.keys(GACHA_ITEMS).filter(key => items[key] > 0).length;
+  // Decorations from the retired capsule machine: a tile only for students who have some.
   const att = A.data.rewards?.attendance || {}, battle = g.battle || {};
   const owned = (g.pets || []).length;
   return `<div class="page-heading me-head-v1368"><span class="premium-eyebrow">MY SUMUS</span><h1>나</h1></div>
@@ -602,10 +603,10 @@ function mePage(A) {
       <span class="me-pet">${pet ? avatar(pet.key, { form: Math.max(1, pet.form), accessory: p.avatar_accessory, frame: p.avatar_frame }) : ''}</span>
       <div class="me-who"><strong>${esc(p.display_name)}</strong><small>${esc(p.school || '')} · ${esc(p.class_name || '')} · Lv.${num(g.level || 1)}</small>${titleBadge(t.equipped, { size: 'sm' })}</div>
     </section>
-    <div class="me-tiles-v1368">
-      <button type="button" class="me-tile pet" data-go="studio"><span class="me-ico">${icon('user')}</span><b>내 펫·꾸미기</b><small>펫 ${owned}/${Object.keys(CHARACTERS).length} · 오라·배지</small></button>
+    <div class="me-tiles-v1368${gachaHave ? '' : ' two'}">
+      <button type="button" class="me-tile pet" data-go="studio"><span class="me-ico">${icon('user')}</span><b>내 펫·꾸미기</b><small>펫 ${owned}/${Object.keys(CHARACTERS).length} · 장식·프레임</small></button>
       <button type="button" class="me-tile titles" data-go="titles"><span class="me-ico">${icon('star')}</span><b>칭호 도감</b><small>${titleCount(A)}${(t.fresh || []).length ? ' · <i class="me-new">NEW</i>' : ''}</small></button>
-      <button type="button" class="me-tile gacha" data-go="gachabook"><span class="me-ico">${icon('arcade')}</span><b>뽑기 도감</b><small>${gachaHave}/${Object.keys(GACHA_ITEMS).length}</small></button>
+      ${gachaHave ? `<button type="button" class="me-tile gacha" data-go="gachabook"><span class="me-ico">${icon('arcade')}</span><b>모은 꾸미기</b><small>${gachaHave}개</small></button>` : ''}
     </div>
     <section class="me-stats-v1368" aria-label="내 기록">
       <div><b>${num(g.streak || 0)}<small>일</small></b><span>연속 학습</span></div>
@@ -796,7 +797,7 @@ function studio(A) {
   const p = A.data.profile, g = A.data.stats, owned = g.pets || [], tab = A.studioTab || 'character';
   if (!owned.length) return petPicker(A);
   // The title is kept as it is (chosen in the 칭호 도감); an expired limited title saves as 첫걸음.
-  A.style ??= { avatar_key: g.pet?.key || owned[0].key, avatar_accessory: p.avatar_accessory || 'none', avatar_frame: p.avatar_frame || 'basic', avatar_title: titleState(A).equipped };
+  A.style ??= { avatar_key: g.pet?.key || owned[0].key, avatar_accessory: ACCESSORIES[p.avatar_accessory] ? p.avatar_accessory : 'none', avatar_frame: p.avatar_frame || 'basic', avatar_title: titleState(A).equipped };
   const s = A.style, chosen = owned.find(x => x.key === s.avatar_key) || owned[0], c = CHARACTERS[chosen.key];
   const groups = { accessory: ACCESSORIES, frame: FRAMES };
   const missing = Object.keys(CHARACTERS).filter(key => !owned.some(x => x.key === key));
@@ -811,7 +812,7 @@ function studio(A) {
     ? `${shop}<div class="pet-choice-head"><span>MY PETS · ${owned.length}/${Object.keys(CHARACTERS).length}</span><h2>누구와 함께 공부할까요?</h2><p>파트너로 함께 공부한 펫이 자라요.</p></div><div class="character-grid pet-choice-grid">${Object.keys(CHARACTERS).map(petCard).join('')}</div>`
     : tab === 'title'
     ? `<button type="button" class="tt-studio-link" data-go="titles">${titleEmblem(t.equipped, { size: 'md' })}<span class="tt-studio-copy"><small>지금 달고 있는 칭호</small>${titleBadge(t.equipped, { size: 'sm' })}<em>칭호 도감에서 ${titleCount(A)}개를 모았어요. 골라서 달아 보세요.</em></span>${icon('chevron')}</button>`
-    : `<div class="reward-grid">${Object.entries(groups[tab]).filter(([, item]) => !item.gacha || unlocked(item, g)).map(([key, item]) => { const open = unlocked(item, g); if (item.gacha) return `<button data-style="avatar_${tab}" data-value="${key}" class="reward-item gacha t-${item.tier} ${s['avatar_' + tab] === key ? 'selected' : ''}">${capsuleArt(A, item.gacha, 'xs')}<b>${esc(item.name)}</b><small>뽑기 · ${GACHA_TIERS[item.tier].name}</small></button>`; return `<button data-style="avatar_${tab}" data-value="${key}" class="reward-item ${s['avatar_' + tab] === key ? 'selected' : ''}" ${open ? '' : 'disabled'}>${icon(open ? 'sparkle' : 'lock')}<b>${item.name}</b><small>${open ? '사용 가능' : `Lv.${item.level}에 열려요`}</small></button>`; }).join('')}</div><button type="button" class="studio-arcade-link" data-go="arcade">${icon('sparkle')}<span><b>뽑기 전용 ${tab === 'frame' ? '오라' : '배지'}</b><small>코인 놀이터의 뽑기 머신에서 모아요</small></span>${icon('chevron')}</button>`;
+    : `<div class="reward-grid">${Object.entries(groups[tab]).filter(([, item]) => !item.gacha || unlocked(item, g)).map(([key, item]) => { const open = unlocked(item, g); if (item.gacha) return `<button data-style="avatar_${tab}" data-value="${key}" class="reward-item gacha t-${item.tier} ${s['avatar_' + tab] === key ? 'selected' : ''}">${capsuleArt(A, item.gacha, 'xs')}<b>${esc(item.name)}</b><small>뽑기 · ${GACHA_TIERS[item.tier].name}</small></button>`; return `<button data-style="avatar_${tab}" data-value="${key}" class="reward-item ${s['avatar_' + tab] === key ? 'selected' : ''}" ${open ? '' : 'disabled'}>${icon(open ? 'sparkle' : 'lock')}<b>${item.name}</b><small>${open ? '사용 가능' : `Lv.${item.level}에 열려요`}</small></button>`; }).join('')}</div>`;
   const isPartner = chosen.key === g.pet?.key;
   return `${backTo('me', '나')}<div class="page-heading studio-page-heading"><h1>내 펫</h1><p>파트너를 바꾸거나 꾸밀 수 있어요.</p></div><div class="studio-preview">${avatar(chosen.key, { form: chosen.form, accessory: s.avatar_accessory, frame: s.avatar_frame })}<h2>${chosen.form ? esc(petDisplayName(chosen)) : '???'} <span class="tiny muted">Lv.${chosen.level}</span>${isPartner && chosen.form ? `<button type="button" class="pet-name-edit" data-action="pet-name">${chosen.name ? '이름 바꾸기' : '이름 짓기'}</button>` : ''}</h2><p>${esc(c.type)} · ${chosen.form ? PET_FORMS[chosen.form] : '부화를 기다리는 중'}</p>${titleBadge(t.equipped, { size: 'sm' })}</div><div class="segment">${[['character', '펫'], ['accessory', '장식'], ['frame', '프레임'], ['title', '칭호']].map(([k, label]) => `<button data-studio-tab="${k}" class="${tab === k ? 'selected' : ''}">${label}</button>`).join('')}</div>${body}<button class="btn primary full" data-action="save-style">${isPartner ? '이 모습으로 저장' : `${esc(petJosa(petDisplayName(chosen), '과', '와'))} 함께하기`}</button><div class="section-title"><h2>다음 성장의 선물</h2></div><div class="roadmap">${[[3, '헤드셋'], [5, '실버 프레임'], [6, '글래스'], [9, '스타 핀'], [10, '블루 라인'], [15, '오로라'], [18, '크라운'], [20, '골드']].map(([lv, name]) => `<div><div class="milestone ${g.level >= lv ? 'done' : ''}">${icon(g.level >= lv ? 'check' : 'lock')}</div><b>${name}</b><small>Lv.${lv}</small></div>`).join('')}</div>`;
 }

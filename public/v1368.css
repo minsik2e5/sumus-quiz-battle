@@ -79,3 +79,21 @@ button.arcade-wallet{appearance:none;width:100%;font:inherit;cursor:pointer;text
 .ga-egg{width:44px;height:44px;border-radius:50% 50% 46% 46%/58% 58% 42% 42%;background:linear-gradient(160deg,#fff7e0,#ffd88a);box-shadow:inset 0 -4px 0 rgba(200,140,0,.18);display:grid;place-items:center;font-weight:900;color:#c47f00;font-size:18px}
 .ga-book-ico{width:44px;height:44px;border-radius:14px;background:#efe9ff;color:#6d4bd8;display:grid;place-items:center}
 .ga-book-ico svg{width:24px;height:24px}
+.me-tiles-v1368.two{grid-template-columns:repeat(2,1fr)}
+
+/* V13.68 coin capsule (코인 뽑기) */
+.lk-bets{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.lk-bet{appearance:none;border:1.5px solid #e3ebe7;background:#fff;border-radius:12px;min-height:40px;font:inherit;font-size:15px;font-weight:900;display:flex;align-items:center;justify-content:center;gap:3px;cursor:pointer;color:#1d2b27}
+.lk-bet.on{border-color:#f0a400;background:#fff8e1;box-shadow:0 0 0 3px #ffefc2}
+.lk-odds{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.lk-odds span{display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 4px;border-radius:12px;font-size:11.5px;font-weight:800;color:#51615c;background:#f5f8f7}
+.lk-odds b{font-size:17px;font-weight:900}
+.lk-odds .t-miss b{color:#8a9893}.lk-odds .t-common b{color:#1f9d5a}.lk-odds .t-rare b{color:#2563eb}.lk-odds .t-legendary b{color:#d97706}
+.lk-odds .t-legendary{background:linear-gradient(180deg,#fff8e1,#fff1c7)}
+.lk-odds-more{border:0;background:none;padding:0;font:inherit;font-weight:900;color:#127a67;text-decoration:underline;cursor:pointer}
+.ga-reveal.t-miss{--cap:#b4c0bc;--ray:rgba(150,160,158,.12)}
+.lk-mult{font-size:64px;font-weight:900;line-height:1;letter-spacing:-.02em;margin-top:40px}
+.lk-mult.t-miss{color:#9aa6a2}.lk-mult.t-common{color:#1f9d5a}.lk-mult.t-rare{color:#2563eb}
+.lk-mult.t-legendary{background:linear-gradient(180deg,#ffd35a,#f08a00);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 3px 6px rgba(240,138,0,.3))}
+.lk-line{font-size:15px!important;color:#39504a!important;display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap}
+.lk-line b{display:inline-flex;align-items:center;gap:3px;font-size:18px;color:#b57500}

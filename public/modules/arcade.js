@@ -1,20 +1,24 @@
 import { api, esc, num, icon, toast, modal } from './ui.js';
-import { avatar, GACHA_BADGE_ICONS } from './character.js';
-import { GACHA_ITEMS, GACHA_KEYS, GACHA_TIERS, GACHA_TIER_KEYS, GACHA_PRICE, GACHA_PITY, GACHA_KINDS, CHANCE_BETS, CHANCE_STEPS, CHANCE_DAILY } from './rewards.js';
+import { avatar } from './character.js';
+import { GACHA_ITEMS, GACHA_KEYS, GACHA_TIERS, GACHA_TIER_KEYS, GACHA_KINDS, ownedDecorations, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET, CHANCE_BETS, CHANCE_STEPS, CHANCE_DAILY } from './rewards.js';
 import { titleEmblem, coin } from './emblems.js';
 import { TITLES } from './titles.js';
 import { titleState } from './titles-ui.js';
 import { CHARACTERS, EGG_PRICE } from './core.js';
 
-// V13.67 코인 놀이터: the capsule machine (뽑기), its collection and the word double chance
-// (더블 찬스). The server decides everything (server/rewards.mjs); this module draws the page in
-// `[data-arcade]` and keeps it up to date without redrawing the whole app.
+// 놀이터: the coin capsule (코인 뽑기, V13.68) and the word double chance (더블 찬스), plus the
+// decorations kept from the retired V13.67 capsule machine (모은 꾸미기, under 나). The server
+// decides everything (server/rewards.mjs); this module draws `[data-arcade]` and keeps it up to
+// date without redrawing the whole app.
 
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const KEY_ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
 // Capsules piled in the dome (left, bottom in px).
 const BALL_SPOTS = [[6, 2], [30, 1], [54, 3], [78, 2], [16, 22], [42, 24], [66, 21], [28, 44], [54, 45]];
-const rewards = A => A.data.rewards ||= { attendance: null, gacha: { items: {}, pulls: 0, tickets: 0, since_rare: 0 }, chance: null };
+const rewards = A => A.data.rewards ||= { attendance: null, gacha: { items: {}, tickets: 0 }, lucky: null, chance: null };
+const luckyState = A => rewards(A).lucky || { bets: LUCKY_BETS, daily: LUCKY_DAILY, left: LUCKY_DAILY, odds: LUCKY_ODDS, tickets: Number(rewards(A).gacha?.tickets || 0) };
+// Each result has the color of a tier: 꽝 grey, 본전 green, 2배 blue, 3배 gold.
+const MULT_CLASS = { 0: 't-miss', 1: 't-common', 2: 't-rare', 3: 't-legendary' };
 const byTier = keys => [...keys].sort((a, b) => GACHA_TIER_KEYS.indexOf(GACHA_ITEMS[b].tier) - GACHA_TIER_KEYS.indexOf(GACHA_ITEMS[a].tier) || GACHA_KEYS.indexOf(a) - GACHA_KEYS.indexOf(b));
 
 // The coin chip in the header follows every change here.
@@ -25,7 +29,7 @@ function setBalance(A, balance) {
   const wallet = document.getElementById('ga-balance'); if (wallet) wallet.textContent = num(balance);
 }
 
-// What a capsule looks like: an aura on the student's own pet, a badge, or the title's medal.
+// What a decoration looks like: an aura on the student's own pet, or the title's medal.
 export function capsuleArt(A, key, size = 'md') {
   const item = GACHA_ITEMS[key];
   if (!item) return '';
@@ -33,36 +37,36 @@ export function capsuleArt(A, key, size = 'md') {
     const pet = A.data.stats?.pet;
     return `<span class="ga-art aura ${size}">${avatar(pet?.key || 'dog', { form: Math.max(1, pet?.form ?? 1), frame: item.wear, size: size === 'sm' ? 'mini' : '' })}</span>`;
   }
-  if (item.kind === 'badge') return `<span class="ga-art badge ${size} gb-${item.wear}"><svg viewBox="0 0 24 24">${GACHA_BADGE_ICONS[item.wear] || ''}</svg></span>`;
   return `<span class="ga-art title ${size}">${titleEmblem(item.title, { size: size === 'lg' ? 'lg' : 'md' })}</span>`;
 }
 const tierTag = tier => `<span class="ga-tier t-${tier}">${GACHA_TIERS[tier].name}</span>`;
 
 /* ---------- page ---------- */
 export function arcadePage(A) {
-  return `<div class="page-heading arcade-head"><span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>모은 코인으로 뽑기·더블 찬스·알 상점을 즐겨요.</p></div>
+  return `<div class="page-heading arcade-head"><span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>모은 코인으로 코인 뽑기·더블 찬스·알 상점을 즐겨요.</p></div>
     <button type="button" class="arcade-wallet" data-action="coins" aria-label="코인 지갑 열기"><span>${coin()}<b id="ga-balance">${num(A.data.stats?.points_balance || 0)}</b> 코인</span><small>코인 지갑 ${icon('chevron')}</small></button>
     <div data-arcade></div>`;
 }
-// V13.68: the capsule collection lives under 나.
+// V13.68: decorations pulled from the retired capsule machine, under 나 (only for their owners).
 export function gachaBookPage() {
   return `<button type="button" class="page-back-v1368" data-go="me">${icon('back')}나</button>
-    <div class="page-heading arcade-head"><span class="premium-eyebrow">CAPSULE BOOK</span><h1>뽑기 도감</h1><p>뽑기 머신에서만 나오는 오라·배지·칭호예요. 눌러서 착용해요.</p></div>
+    <div class="page-heading arcade-head"><span class="premium-eyebrow">MY COLLECTION</span><h1>모은 꾸미기</h1><p>예전 뽑기 머신에서 모은 오라와 칭호예요. 눌러서 착용해요.</p></div>
     <div data-arcade data-arcade-view="book"></div>`;
 }
-// The pet egg shop and the way to the capsule book, below the games.
+// The pet egg shop, below the games.
 function shopHtml(A) {
   const g = A.data.stats || {}, owned = (g.pets || []).length, total = Object.keys(CHARACTERS).length;
-  const items = rewards(A).gacha.items || {}, have = GACHA_KEYS.filter(key => items[key] > 0).length;
   return `<section class="ga-card ga-shop">
     <button type="button" class="ga-shop-row" data-action="egg-shop"><span class="ga-egg" aria-hidden="true">?</span><span><b>랜덤 알 상점</b><small>${owned < total ? `아직 못 만난 친구 ${total - owned}마리` : '모든 친구를 모았어요!'}</small></span><em>${coin()}${num(EGG_PRICE)}</em></button>
-    <button type="button" class="ga-shop-row" data-go="gachabook"><span class="ga-book-ico" aria-hidden="true">${icon('arcade')}</span><span><b>뽑기 도감</b><small>모은 캡슐 ${have}/${GACHA_KEYS.length}</small></span>${icon('chevron')}</button>
   </section>`;
 }
+// V13.68 coin capsule: pick a bet, turn the knob; the capsule says how many times it comes back.
+let luckyBet = LUCKY_BETS[0];
 function machineHtml(A) {
-  const g = rewards(A).gacha, tickets = Number(g.tickets || 0), since = Number(g.since_rare || 0);
+  const l = luckyState(A), tickets = Number(l.tickets || 0);
   const balance = Number(A.data.stats?.points_balance || 0);
   const balls = ['#ff8fb1', '#7cc7ff', '#ffd166', '#8ee6b8', '#b69cff', '#ff9f6b', '#6ee7d6', '#ffc1d9', '#9ad0ff'];
+  const can = l.left > 0 && balance >= luckyBet;
   return `<section class="ga-card">
     <div class="ga-top">
       <div class="ga-machine" id="ga-machine" aria-hidden="true">
@@ -70,30 +74,32 @@ function machineHtml(A) {
         <div class="ga-body"><span class="ga-brand">SUMUS</span><span class="ga-knob"><i></i></span><span class="ga-slot"></span></div>
       </div>
       <div class="ga-side">
-        <h2>뽑기 머신</h2>
-        <p>뽑기에서만 나오는 <b>오라·배지·칭호</b>를 모아요.</p>
-        <button type="button" class="btn primary full ga-pull" data-ga="pull" ${balance < GACHA_PRICE ? 'disabled' : ''}>뽑기 1회 <span>${coin()}${GACHA_PRICE}</span></button>
-        <button type="button" class="btn full ga-ticket" data-ga="ticket" ${tickets ? '' : 'disabled'}>뽑기권 쓰기 <span>${tickets}장</span></button>
+        <h2>코인 뽑기</h2>
+        <p>코인을 걸고 캡슐을 뽑아요. <b>최대 3배</b>로 돌아와요!</p>
+        <div class="lk-bets" role="group" aria-label="걸 코인">${(l.bets || LUCKY_BETS).map(b => `<button type="button" class="lk-bet ${luckyBet === b ? 'on' : ''}" data-ga="bet" data-bet="${b}" aria-pressed="${luckyBet === b}">${coin()}${b}</button>`).join('')}</div>
+        <button type="button" class="btn primary full ga-pull" data-ga="pull" ${can ? '' : 'disabled'}>${l.left > 0 ? `뽑기 <span>${coin()}${luckyBet}</span>` : '오늘 뽑기 끝! 내일 또 만나요'}</button>
+        ${tickets ? `<button type="button" class="btn full ga-ticket" data-ga="ticket">뽑기권 쓰기 <span>${tickets}장 · ${coin()}${LUCKY_TICKET_BET} 공짜</span></button>` : ''}
       </div>
     </div>
-    <div class="ga-odds">${GACHA_TIER_KEYS.map(tier => `<span class="t-${tier}"><i></i>${GACHA_TIERS[tier].name} ${GACHA_TIERS[tier].rate}%</span>`).join('')}<button type="button" data-ga="odds">확률 자세히</button></div>
-    <div class="ga-pity"><span>희귀 이상 보장까지</span><span class="ga-pity-bar"><i style="width:${Math.round(Math.min(since, GACHA_PITY - 1) / (GACHA_PITY - 1) * 100)}%"></i></span><b>${Math.max(1, GACHA_PITY - since)}번</b></div>
-    <p class="ga-note">같은 걸 또 뽑으면 코인을 돌려받아요 (일반 ${GACHA_TIERS.common.refund} · 희귀 ${GACHA_TIERS.rare.refund} · 영웅 ${GACHA_TIERS.epic.refund} · 전설 ${GACHA_TIERS.legendary.refund}). 뽑기권은 출석 7번째 도장에서 받아요.</p>
+    <div class="lk-odds">${LUCKY_ODDS.map(o => `<span class="${MULT_CLASS[o.mult]}"><b>${o.mult ? `×${o.mult}` : '꽝'}</b>${o.rate}%</span>`).join('')}</div>
+    <p class="ga-note">오늘 남은 뽑기 <b>${l.left}/${l.daily || LUCKY_DAILY}</b> · 확률은 매번 같아요 <button type="button" class="lk-odds-more" data-ga="odds">자세히</button> · 뽑기권은 출석 7번째 도장에서 받아요.</p>
   </section>`;
 }
+// Decorations the student pulled from the V13.67 machine (the page shows only those).
 function collectionHtml(A) {
   const items = rewards(A).gacha.items || {};
-  const have = GACHA_KEYS.filter(key => items[key] > 0).length;
+  const have = ownedDecorations(items);
   const p = A.data.profile;
-  const worn = key => { const item = GACHA_ITEMS[key]; return item.kind === 'aura' ? p.avatar_frame === item.wear : item.kind === 'badge' ? p.avatar_accessory === item.wear : titleState(A).equipped === item.title; };
+  const worn = key => { const item = GACHA_ITEMS[key]; return item.kind === 'aura' ? p.avatar_frame === item.wear : titleState(A).equipped === item.title; };
+  if (!have.length) return '<section class="ga-card ga-book"><p class="ga-note">모은 꾸미기가 없어요.</p></section>';
   return `<section class="ga-card ga-book">
-    <div class="ga-book-head"><h2>뽑기 도감</h2><b>${have}<small>/${GACHA_KEYS.length}</small></b></div>
-    <div class="ga-grid">${byTier(GACHA_KEYS).map(key => {
-      const item = GACHA_ITEMS[key], on = items[key] > 0;
-      return `<button type="button" class="ga-item t-${item.tier}${on ? ' on' : ''}${on && worn(key) ? ' worn' : ''}" data-ga="item" data-key="${key}" aria-label="${esc(on ? item.name : '아직 못 뽑은 캡슐')} · ${GACHA_TIERS[item.tier].name} ${GACHA_KINDS[item.kind]}">
-        ${on ? capsuleArt(A, key, 'sm') : '<span class="ga-art locked sm">?</span>'}
-        <b>${on ? esc(item.name) : '???'}</b><small>${GACHA_TIERS[item.tier].name} ${GACHA_KINDS[item.kind]}${on && items[key] > 1 ? ` ×${items[key]}` : ''}</small>
-        ${on && worn(key) ? '<i class="ga-worn">착용 중</i>' : ''}
+    <div class="ga-book-head"><h2>모은 꾸미기</h2><b>${have.length}<small>개</small></b></div>
+    <div class="ga-grid">${byTier(have).map(key => {
+      const item = GACHA_ITEMS[key];
+      return `<button type="button" class="ga-item on t-${item.tier}${worn(key) ? ' worn' : ''}" data-ga="item" data-key="${key}" aria-label="${esc(item.name)} · ${GACHA_TIERS[item.tier].name} ${GACHA_KINDS[item.kind]}">
+        ${capsuleArt(A, key, 'sm')}
+        <b>${esc(item.name)}</b><small>${GACHA_TIERS[item.tier].name} ${GACHA_KINDS[item.kind]}</small>
+        ${worn(key) ? '<i class="ga-worn">착용 중</i>' : ''}
       </button>`;
     }).join('')}</div>
   </section>`;
@@ -166,7 +172,7 @@ export function mountArcade(el, A) {
   api('/rewards').then(res => {
     if (current?.el !== el || DC.busy || current.busy) return;
     const r = rewards(A);
-    r.attendance = res.attendance; r.gacha = res.gacha; r.chance = res.chance;
+    r.attendance = res.attendance; r.gacha = res.gacha; r.lucky = res.lucky; r.chance = res.chance;
     A.data.stats.gacha = res.gacha.items;
     DC.receivedAt = Date.now();
     setBalance(A, res.points_balance);
@@ -175,6 +181,7 @@ export function mountArcade(el, A) {
   el.addEventListener('click', event => {
     const g = event.target.closest('[data-ga]'), d = event.target.closest('[data-dc]');
     if (g && !g.disabled) {
+      if (g.dataset.ga === 'bet') { luckyBet = Number(g.dataset.bet); return draw(); }
       if (g.dataset.ga === 'pull') return pull(A, false, g);
       if (g.dataset.ga === 'ticket') return pull(A, true, g);
       if (g.dataset.ga === 'odds') return oddsModal();
@@ -204,7 +211,7 @@ function drawChance() {
   runTimer();
 }
 
-/* capsule machine */
+/* coin capsule */
 async function pull(A, ticket, button) {
   if (current?.busy) return;
   current.busy = true;
@@ -213,54 +220,40 @@ async function pull(A, ticket, button) {
   machine?.classList.add('spinning');
   const wait = new Promise(resolve => setTimeout(resolve, reduced() ? 0 : 1100));
   try {
-    const [res] = await Promise.all([api('/gacha/pull', { ticket }), wait]);
-    rewards(A).gacha = res.gacha;
-    A.data.stats.gacha = res.gacha.items;
+    const [res] = await Promise.all([api('/lucky/pull', ticket ? { ticket: true } : { bet: luckyBet }), wait]);
+    rewards(A).lucky = res.lucky;
+    if (rewards(A).gacha) rewards(A).gacha.tickets = res.lucky.tickets;
     setBalance(A, res.points_balance);
-    if (res.item.kind === 'title') {
-      const t = A.data.titles;
-      if (t && !t.unlocked.includes(res.item.title)) t.unlocked.push(res.item.title);
-      api('/titles/seen', { keys: [res.item.title] }).catch(() => {});
-    }
     machine?.classList.remove('spinning');
     machine?.classList.add('drop');
     await new Promise(resolve => setTimeout(resolve, reduced() ? 0 : 450));
-    reveal(A, res);
+    reveal(res);
   } catch (err) { toast(err.message); }
   finally { current.busy = false; machine?.classList.remove('spinning', 'drop'); draw(); }
 }
-function reveal(A, res) {
-  const item = res.item, tier = res.tier;
+function reveal(res) {
+  const cls = MULT_CLASS[res.mult] || 't-miss';
+  const head = res.mult === 3 ? '대박! 3배!' : res.mult === 2 ? '2배 당첨!' : res.mult === 1 ? '본전!' : '아쉬워요!';
+  const line = res.mult ? `${coin()}${num(res.bet)} → <b>${coin()}${num(res.paid)}</b>` : `${coin()}${num(res.bet)}코인을 잃었어요. 다음엔 꼭!`;
   const box = document.createElement('div');
-  box.className = `ga-reveal t-${tier}${reduced() ? ' still' : ''}`;
-  box.innerHTML = `<div class="ga-reveal-card" role="dialog" aria-modal="true" aria-label="${esc(item.name)} 뽑음">
+  box.className = `ga-reveal ${cls}${reduced() ? ' still' : ''}`;
+  box.innerHTML = `<div class="ga-reveal-card" role="dialog" aria-modal="true" aria-label="코인 뽑기 결과 ${esc(head)}">
     <div class="ga-capsule" aria-hidden="true"><i class="top"></i><i class="bottom"></i></div>
     <div class="ga-reveal-body">
       <div class="ga-rays" aria-hidden="true"></div>
-      ${capsuleArt(A, res.key, 'lg')}
-      ${tierTag(tier)}
-      <h2>${esc(item.name)}</h2>
-      <p>${esc(item.desc)}</p>
-      ${res.dup ? `<p class="ga-dup">이미 가진 캡슐이라 ${coin()}${num(res.refund)}을 돌려받았어요.</p>` : res.pity ? '<p class="ga-dup">10번째 보장! 희귀 이상이 나왔어요.</p>' : '<p class="ga-new">NEW! 뽑기 도감에 모였어요.</p>'}
-      <div class="ga-reveal-actions">
-        <button type="button" class="btn primary full" data-rv="wear">${item.kind === 'title' ? '칭호 달기' : '바로 착용'}</button>
-        <button type="button" class="btn full" data-rv="close">확인</button>
-      </div>
+      <span class="lk-mult ${cls}">${res.mult ? `×${res.mult}` : '꽝'}</span>
+      <h2>${head}</h2>
+      <p class="lk-line">${line}</p>
+      ${res.ticket ? '<p class="ga-new">뽑기권으로 공짜 뽑기!</p>' : `<p>오늘 남은 뽑기 ${res.lucky.left}번</p>`}
+      <div class="ga-reveal-actions"><button type="button" class="btn primary full" data-rv="close">확인</button></div>
     </div>
   </div>`;
-  const close = () => box.remove();
-  box.onclick = async e => {
-    const b = e.target.closest('[data-rv]'); if (!b) { if (e.target === box) close(); return; }
-    if (b.dataset.rv === 'close') return close();
-    b.disabled = true;
-    try { await wear(A, res.key); toast(`${item.name}을(를) ${item.kind === 'title' ? '달았어요' : '착용했어요'}!`); close(); draw(); }
-    catch (err) { toast(err.message); b.disabled = false; }
-  };
+  box.onclick = e => { if (e.target.closest('[data-rv]') || e.target === box) box.remove(); };
   document.body.appendChild(box);
   requestAnimationFrame(() => box.classList.add('open'));
   box.querySelector('[data-rv="close"]').focus({ preventScroll: true });
 }
-// Aura -> frame, badge -> accessory (saved with the rest of the pet style), title -> equipped.
+// Aura -> frame (saved with the rest of the pet style), title -> equipped.
 async function wear(A, key) {
   const item = GACHA_ITEMS[key], p = A.data.profile;
   if (item.kind === 'title') {
@@ -270,21 +263,20 @@ async function wear(A, key) {
     return;
   }
   const style = { avatar_key: p.avatar_key, avatar_accessory: p.avatar_accessory || 'none', avatar_frame: p.avatar_frame || 'basic', avatar_title: titleState(A).equipped };
-  if (item.kind === 'aura') style.avatar_frame = item.wear; else style.avatar_accessory = item.wear;
+  style.avatar_frame = item.wear;
   const saved = await api('/profile/style', style);
   Object.assign(p, { avatar_accessory: saved.avatar_accessory, avatar_frame: saved.avatar_frame });
 }
 function oddsModal() {
-  const rows = GACHA_TIER_KEYS.map(tier => {
-    const keys = GACHA_KEYS.filter(key => GACHA_ITEMS[key].tier === tier), each = GACHA_TIERS[tier].rate / keys.length;
-    return `<h3 class="ga-odds-h t-${tier}">${GACHA_TIERS[tier].name} ${GACHA_TIERS[tier].rate}%</h3><ul class="ga-odds-list">${keys.map(key => `<li><span>${esc(GACHA_ITEMS[key].name)} <small>${GACHA_KINDS[GACHA_ITEMS[key].kind]}</small></span><b>${each.toFixed(2)}%</b></li>`).join('')}</ul>`;
-  }).join('');
-  modal(`<h2>뽑기 확률</h2><p>캡슐 하나마다 아래 확률로 나와요. 같은 등급 안에서는 모두 똑같은 확률이에요. 희귀 이상이 ${GACHA_PITY - 1}번 연속 안 나오면 ${GACHA_PITY}번째는 희귀 이상이 나와요.</p>${rows}`, '뽑기 확률');
+  const avg = LUCKY_ODDS.reduce((n, o) => n + o.mult * o.rate, 0);
+  modal(`<h2>코인 뽑기 확률</h2><p>뽑을 때마다 아래 확률로 나와요. 앞에 뽑은 결과와 상관없이 매번 같아요.</p>
+    <ul class="ga-odds-list">${LUCKY_ODDS.map(o => `<li><span>${o.mult === 1 ? '본전 (1배)' : o.mult ? `${o.mult}배` : '꽝'} <small>${o.mult ? `건 코인의 ${o.mult}배를 받아요` : '건 코인을 잃어요'}</small></span><b>${o.rate}%</b></li>`).join('')}</ul>
+    <p class="ga-note">100코인을 걸면 평균 ${num(avg)}코인이 돌아와요. 코인은 공부로 모으는 게 가장 좋아요! 하루 ${LUCKY_DAILY}번까지 뽑을 수 있어요.</p>`, '코인 뽑기 확률');
 }
 function itemModal(A, key) {
   const item = GACHA_ITEMS[key], owned = Number(rewards(A).gacha.items?.[key] || 0);
-  if (!owned) return modal(`<div class="ga-item-modal"><span class="ga-art locked lg">?</span>${tierTag(item.tier)}<h2>아직 못 뽑은 캡슐</h2><p>${GACHA_TIERS[item.tier].name} ${GACHA_KINDS[item.kind]} · 뽑기 머신에서 나와요.</p></div>`, '뽑기 도감');
-  const close = modal(`<div class="ga-item-modal">${capsuleArt(A, key, 'lg')}${tierTag(item.tier)}<h2>${esc(item.name)}</h2><p>${esc(item.desc)}</p><small>${GACHA_KINDS[item.kind]} · ${owned}개 가지고 있어요</small><button type="button" class="btn primary full" id="ga-wear">${item.kind === 'title' ? '칭호 달기' : '착용하기'}</button></div>`, '뽑기 도감');
+  if (!owned) return;
+  const close = modal(`<div class="ga-item-modal">${capsuleArt(A, key, 'lg')}${tierTag(item.tier)}<h2>${esc(item.name)}</h2><p>${esc(item.desc)}</p><small>${GACHA_KINDS[item.kind]}</small><button type="button" class="btn primary full" id="ga-wear">${item.kind === 'title' ? '칭호 달기' : '착용하기'}</button></div>`, '모은 꾸미기');
   document.getElementById('ga-wear').onclick = async e => {
     e.currentTarget.disabled = true;
     try { await wear(A, key); close(); toast(`${item.name}을(를) ${item.kind === 'title' ? '달았어요' : '착용했어요'}!`); draw(); }

@@ -63,13 +63,16 @@ export const TITLES = {
   weekly3: { name: '주간 동메달', tier: 'limited', group: 'limited', stat: 'weekly_rank', goal: 3, exact: true, icon: 'medal', how: '지난주 경험치 랭킹 3위 (우리 학년)', desc: '지난주 우리 학년 3위!' },
   leagueking: { name: '주간 야차왕', tier: 'limited', group: 'limited', stat: 'league_king', goal: 1, icon: 'crown', how: '지난주 야차 리그 1위', desc: '지난주 야차 리그를 제패했어요.' }
 };
-// V13.67: titles that only come out of the capsule machine (public/modules/rewards.js).
+// V13.67: titles that came out of the capsule machine. V13.68 retired the machine: they stay
+// with the students who have them and are not shown to anyone else (`retired`).
 Object.assign(TITLES, {
-  g_lucky: { name: '행운의 주인공', tier: 'rare', group: 'gacha', stat: 'item_title_lucky', goal: 1, icon: 'heart', how: '뽑기에서만 나와요 (희귀)', desc: '오늘도 운이 좋은 하루!' },
-  g_golden: { name: '황금 손', tier: 'epic', group: 'gacha', stat: 'item_title_golden', goal: 1, icon: 'gem', how: '뽑기에서만 나와요 (영웅)', desc: '뽑기만 하면 대박!' },
-  g_god: { name: '뽑기의 신', tier: 'legendary', group: 'gacha', stat: 'item_title_god', goal: 1, icon: 'crown', how: '뽑기에서만 나와요 (전설)', desc: '전설을 뽑아낸 행운의 주인공.' }
+  g_lucky: { name: '행운의 주인공', tier: 'rare', group: 'gacha', stat: 'item_title_lucky', goal: 1, icon: 'heart', how: '예전 뽑기 머신에서 나온 칭호', desc: '오늘도 운이 좋은 하루!', retired: true },
+  g_golden: { name: '황금 손', tier: 'epic', group: 'gacha', stat: 'item_title_golden', goal: 1, icon: 'gem', how: '예전 뽑기 머신에서 나온 칭호', desc: '뽑기만 하면 대박!', retired: true },
+  g_god: { name: '뽑기의 신', tier: 'legendary', group: 'gacha', stat: 'item_title_god', goal: 1, icon: 'crown', how: '예전 뽑기 머신에서 나온 칭호', desc: '전설을 뽑아낸 행운의 주인공.', retired: true }
 });
 export const TITLE_KEYS = Object.keys(TITLES);
+// The titles a student sees in the collection: all but retired ones they do not have.
+export const visibleTitleKeys = unlocked => TITLE_KEYS.filter(key => !TITLES[key].retired || unlocked.includes(key));
 
 export function titleUnlocked(key, stats = {}) {
   const t = TITLES[key];

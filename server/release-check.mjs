@@ -418,7 +418,9 @@ export async function runReleaseCheck() {
       settleBattle(state, { id: again.id, winner: petStudent.id, loser: guestStudent.id, reason: 'end', hp: {} });
       const pairRows = [0, 1].map(i => ({ id: 'qa-rematch-' + i, status: 'finished', rematch_of: room.id, host_id: guestStudent.id, invite_id: petStudent.id, guest_id: petStudent.id, winner: petStudent.id, loser: guestStudent.id, stake: 10, created_at: Date.now(), finished_at: Date.now() }));
       state.battles.push(pairRows[0]);
-      await expectStatus(409, () => service(state, 'POST', '/battle/rematch', { battle_id: again.id }, guestToken), 'V13.56 the same two students get two rematches a day');
+      const third = await service(state, 'POST', '/battle/rematch', { battle_id: again.id }, guestToken);
+      assert(third.rematch && third.id, 'V13.68 rematches between the same two students have no daily limit');
+      state.battles = state.battles.filter(b => b.id !== third.id);
       const expiredRow = state.battles.find(b => b.id === again.id);
       expiredRow.finished_at = Date.now() - 3 * 60000;
       await expectStatus(409, () => service(state, 'POST', '/battle/rematch', { battle_id: again.id }, studentToken), 'V13.56 a rematch can only be asked within two minutes of the end');
@@ -461,8 +463,9 @@ export async function runReleaseCheck() {
       settleBattle(state, { id: second.id, reason: 'cancelled' });
       const cappedRows = [0, 1, 2, 3].map(i => ({ id: 'qa-challenge-' + i, status: 'cancelled', challenge: true, host_id: petStudent.id, invite_id: guestStudent.id, guest_id: null, stake: 10, created_at: Date.now() - 1000, finished_at: Date.now() - 500 }));
       state.battles.push(...cappedRows);
-      await expectStatus(409, () => service(state, 'POST', '/battle/challenge', { friend_id: guestStudent.id, stake: 10, range_codes: [battleRange] }, studentToken), 'V13.61 one student sends the same friend at most five challenges a day');
-      const challengeIds = new Set([challenge.id, second.id, ...cappedRows.map(r => r.id)]);
+      const sixth = await service(state, 'POST', '/battle/challenge', { friend_id: guestStudent.id, stake: 10, range_codes: [battleRange] }, studentToken);
+      assert(sixth.challenge, 'V13.68 challenges to the same friend have no daily limit');
+      const challengeIds = new Set([challenge.id, second.id, sixth.id, ...cappedRows.map(r => r.id)]);
       state.battles = state.battles.filter(b => !challengeIds.has(b.id));
       assert(state.battles.length === before, 'V13.56 rematch checks leave the battle list as they found it');
     }

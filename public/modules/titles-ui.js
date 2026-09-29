@@ -1,5 +1,5 @@
 import { $, api, esc, num, toast, icon, modal, buttonBusy } from './ui.js';
-import { TITLES, TITLE_TIERS, TITLE_GROUPS, TITLE_KEYS, LEAGUE_TIERS, titleProgress } from './titles.js';
+import { TITLES, TITLE_TIERS, TITLE_GROUPS, TITLE_KEYS, LEAGUE_TIERS, titleProgress, visibleTitleKeys } from './titles.js';
 import { titleEmblem, titleBadge } from './emblems.js';
 
 // V13.66 title collection (칭호 도감): the page, one title's card, and the moment a new title
@@ -9,7 +9,7 @@ const TIER_ORDER = ['common', 'rare', 'epic', 'legendary', 'limited'];
 const byTier = keys => [...keys].sort((a, b) => TITLE_TIERS[TITLES[a].tier].order - TITLE_TIERS[TITLES[b].tier].order || TITLE_KEYS.indexOf(a) - TITLE_KEYS.indexOf(b));
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 export const titleState = A => A.data?.titles || { equipped: 'rookie', unlocked: ['rookie'], stats: {}, fresh: [], intro: false };
-export const titleCount = A => `${titleState(A).unlocked.length}/${TITLE_KEYS.length}`;
+export const titleCount = A => { const u = titleState(A).unlocked; return `${u.length}/${visibleTitleKeys(u).length}`; };
 
 // "333 / 500", or for the league title the best tier so far.
 const progressText = (key, prog) => TITLES[key].stat === 'league_best' ? `최고 ${LEAGUE_TIERS[prog[0]]?.name || '브론즈'}` : `${num(prog[0])} / ${num(prog[1])}`;
@@ -30,24 +30,26 @@ function titleCard(key, t, have) {
 
 export function titlesPage(A) {
   const t = titleState(A), have = new Set(t.unlocked);
-  const filter = TITLE_GROUPS[A.titleFilter] ? A.titleFilter : 'all';
-  const keys = byTier(TITLE_KEYS).filter(key => filter === 'all' || TITLES[key].group === filter);
+  // V13.68: retired capsule titles show only for students who have them.
+  const visible = visibleTitleKeys(t.unlocked);
+  const groups = Object.entries(TITLE_GROUPS).filter(([key]) => visible.some(k => TITLES[k].group === key));
+  const filter = groups.some(([key]) => key === A.titleFilter) ? A.titleFilter : 'all';
+  const keys = byTier(visible).filter(key => filter === 'all' || TITLES[key].group === filter);
   const eq = TITLES[t.equipped] || TITLES.rookie;
-  const pct = Math.round(have.size / TITLE_KEYS.length * 100);
+  const pct = Math.round(have.size / visible.length * 100);
   const chips = TIER_ORDER.map(tier => {
-    const all = TITLE_KEYS.filter(key => TITLES[key].tier === tier);
+    const all = visible.filter(key => TITLES[key].tier === tier);
     return `<span class="tt-tier-chip tier-${tier}"><span><i aria-hidden="true"></i>${TITLE_TIERS[tier].name}</span><b>${all.filter(key => have.has(key)).length}/${all.length}</b></span>`;
   }).join('');
-  return `<div class="study-subhead"><button class="study-back" data-go="home">${icon('back')} 홈</button><span class="pill green">TITLES</span></div>
-    <button type="button" class="page-back-v1368" data-go="me">${icon('back')}나</button>
+  return `<button type="button" class="page-back-v1368" data-go="me">${icon('back')}나</button>
     <div class="page-heading tt-page-head"><span class="premium-eyebrow">TITLE COLLECTION</span><h1>칭호 도감</h1><p>칭호를 달면 랭킹·야차전·도전장에서 친구들에게 보여요.</p></div>
     <section class="tt-hero tier-${eq.tier}">
       <button type="button" class="tt-hero-medal" data-title-open="${t.equipped}" aria-label="달고 있는 칭호 ${esc(eq.name)} 자세히 보기">${titleEmblem(t.equipped, { size: 'lg' })}</button>
       <div class="tt-hero-copy"><small>지금 달고 있는 칭호</small>${titleBadge(t.equipped, { size: 'md' })}<span class="tt-hero-desc">${esc(eq.desc)}</span></div>
-      <div class="tt-hero-count" role="img" aria-label="칭호 ${have.size}개 모음, 전체 ${TITLE_KEYS.length}개" style="--p:${pct}"><b>${have.size}</b><span>/${TITLE_KEYS.length}</span></div>
+      <div class="tt-hero-count" role="img" aria-label="칭호 ${have.size}개 모음, 전체 ${visible.length}개" style="--p:${pct}"><b>${have.size}</b><span>/${visible.length}</span></div>
     </section>
     <div class="tt-tier-row">${chips}</div>
-    <div class="segment tt-filter" role="group" aria-label="칭호 종류">${[['all', '전체'], ...Object.entries(TITLE_GROUPS)].map(([key, label]) => `<button type="button" data-title-filter="${key}" class="${filter === key ? 'selected' : ''}" aria-pressed="${filter === key}">${label}</button>`).join('')}</div>
+    <div class="segment tt-filter" role="group" aria-label="칭호 종류">${[['all', '전체'], ...groups].map(([key, label]) => `<button type="button" data-title-filter="${key}" class="${filter === key ? 'selected' : ''}" aria-pressed="${filter === key}">${label}</button>`).join('')}</div>
     <div class="tt-grid">${keys.map(key => titleCard(key, t, have)).join('')}</div>
     <p class="quiet-note">야차전 승리는 같은 친구에게 하루 3번까지만 칭호·리그에 세어요. 한정 칭호는 지난주 기록으로 받아서 이번 주 일요일 밤까지만 달 수 있어요.</p>`;
 }
@@ -116,7 +118,7 @@ function introMoment(A, onChanged) {
     <h2>칭호 도감이 열렸어요!</h2>
     <p>지금까지의 기록으로 <b>${t.unlocked.length}개</b>의 칭호를 모았어요.</p>
     <div class="tt-intro-grid">${best.map((key, i) => `<span style="--i:${i}">${titleEmblem(key, { size: 'md' })}<small>${esc(TITLES[key].name)}</small></span>`).join('')}</div>
-    <p class="tt-intro-copy">모두 ${TITLE_KEYS.length}개! 칭호를 달면 랭킹·야차전·도전장에서 친구들에게 보여요.</p>
+    <p class="tt-intro-copy">모두 ${visibleTitleKeys(titleState(A).unlocked).length}개! 칭호를 달면 랭킹·야차전·도전장에서 친구들에게 보여요.</p>
     <div class="pet-moment-actions"><button type="button" class="btn" data-tt-done>좋아요</button><button type="button" class="btn primary" data-tt-open>칭호 도감 보기</button></div>
   </div>`;
   const done = open => { markSeen(A, { all: true }); closeOverlay(); if (open) { A.tab = 'titles'; onChanged?.(true); } };

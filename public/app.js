@@ -11,7 +11,7 @@ import { mountLeagueBoard } from './modules/league-ui.js';
 import { coin } from './modules/emblems.js';
 import { openBracket } from './modules/tournament-ui.js';
 import { mountArcade, attendanceMoment } from './modules/arcade.js';
-import { GACHA_PRICE, CHANCE_BETS, ATTENDANCE_REWARDS } from './modules/rewards.js';
+import { LUCKY_BETS, CHANCE_BETS, ATTENDANCE_REWARDS } from './modules/rewards.js';
 import { EGG_PRICE } from './modules/core.js';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
@@ -995,11 +995,11 @@ function walletModal() {
       <li><span>100점 (10문제 이상)</span><b>+10</b></li>
       <li><span>추천 학습 · 오늘 첫 학습</span><b>+5·5</b></li>
       <li><span>3일 · 7일 연속 학습</span><b>+8·20</b></li>
-      <li><span>매일 출석 체크 (7번째는 뽑기권도)</span><b>+${ATTENDANCE_REWARDS[0]}~${ATTENDANCE_REWARDS.at(-1)}</b></li>
+      <li><span>매일 출석 체크 (7번째는 코인 뽑기권도)</span><b>+${ATTENDANCE_REWARDS[0]}~${ATTENDANCE_REWARDS.at(-1)}</b></li>
       <li><span>야차전 승리 · 학원 대회 상금</span><b>판돈 · 상금</b></li>
     </ul>
     <h3>쓰는 곳</h3>
-    <div class="wallet-actions"><button type="button" class="btn" id="wallet-egg">랜덤 알 <small>${coin()}${num(EGG_PRICE)}</small></button><button type="button" class="btn" id="wallet-yacha">야차전 판돈 <small>${coin()}10·30·50</small></button><button type="button" class="btn" id="wallet-gacha">뽑기 <small>${coin()}${GACHA_PRICE}</small></button><button type="button" class="btn" id="wallet-chance">더블 찬스 <small>${coin()}${CHANCE_BETS.join('·')}</small></button></div>
+    <div class="wallet-actions"><button type="button" class="btn" id="wallet-egg">랜덤 알 <small>${coin()}${num(EGG_PRICE)}</small></button><button type="button" class="btn" id="wallet-yacha">야차전 판돈 <small>${coin()}10·30·50</small></button><button type="button" class="btn" id="wallet-gacha">코인 뽑기 <small>${coin()}${LUCKY_BETS.join('·')}</small></button><button type="button" class="btn" id="wallet-chance">더블 찬스 <small>${coin()}${CHANCE_BETS.join('·')}</small></button></div>
   </div>`, '코인 지갑');
   $('#wallet-gacha').onclick = () => { close(); navigate('arcade'); };
   $('#wallet-chance').onclick = () => { close(); navigate('arcade'); };

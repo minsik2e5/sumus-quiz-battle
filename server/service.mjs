@@ -4,7 +4,7 @@ import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, 
 import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
 import { battleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
-import { rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, pullCapsule, chanceView, chanceStart, chanceAnswer, chanceDecide } from './rewards.mjs';
+import { rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, chanceView, chanceStart, chanceAnswer, chanceDecide } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
@@ -374,7 +374,7 @@ function pointsAndPets(state, p, sessions) {
   const pets = petProgress(p.pets, sessions, p.avatar_key);
   // Stakes of matches that have not been settled yet are held back, so a late result can
   // never be absorbed by a balance that was spent in the meantime.
-  // V13.67: attendance, capsule refunds and double-chance pay-outs (rewards.mjs).
+  // V13.67: attendance, capsule refunds, coin capsule and double-chance pay-outs (rewards.mjs).
   const bonus = rewardIncome(p);
   return { reward_points: earned, points_spent: spent, prize_points: prizes, bonus_points: bonus, points_balance: Math.max(0, earned + prizes + bonus - spent + battle.net - battle.held), battle, pets, pet: pets.find(x => x.active) || null, needs_pet_pick: p.role === 'student' && !pets.length };
 }
@@ -390,8 +390,8 @@ const BATTLE_ABANDON_MS = 2 * 3600000; // a match that never reported by then is
 const BATTLE_KEEP_CANCELLED_MS = 7 * 86400000;
 const BATTLE_QUESTIONS = 40;
 const BATTLE_REMATCH_WINDOW_MS = 2 * 60000; // a rematch can be asked for this long after a match
-const BATTLE_REMATCH_PER_PAIR_DAY = 2;       // so a loss does not turn into chasing it all day
-const BATTLE_CHALLENGE_PER_PAIR_DAY = 5;     // challenges one student may send the same friend per day
+// V13.68: no daily limit on rematches or challenges; the daily coin-loss cap still applies, and
+// the league and titles still count only three matches a day with the same friend.
 const battleIsOpen = (b, now) => (b.status === 'waiting' && now - b.created_at < BATTLE_WAIT_MS) || (b.status === 'active' && now - (b.joined_at || b.created_at) < BATTLE_STALE_MS);
 const openBattleFor = (state, pid, now) => (state.battles || []).find(b => (b.host_id === pid || b.guest_id === pid) && battleIsOpen(b, now));
 function battleRecord(state, pid) {
@@ -765,7 +765,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } else if (process.env.AUTH_PROVIDER === 'supabase') {
       const result = await supabaseLogin(username, password); p = result.profile; supabaseAccessToken = result.accessToken;
       const old = state.profiles.find(x => x.id === p.id);
-      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'chance', 'chance_live'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
+      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
       else state.profiles.push(p);
     } else {
       p = localProfile;
@@ -861,7 +861,7 @@ export async function service(state, method, path, body, token, options = {}) {
       ranking: teacher ? [] : rankingRows(state, competition, p),
       titles: teacher ? null : titleView(competition, p),
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), chance: chanceView(p, now) },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), chance: chanceView(p, now) },
       tournaments: (state.tournaments || []).filter(t => teacher ? t.school_id === selectedSchool?.id && (t.status !== 'cancelled' || now - (t.finished_at || t.created_at) < DAY_MS) : t.players.includes(p.id) && (t.status === 'active' || (t.status === 'finished' && now - (t.finished_at || 0) < 3 * DAY_MS)))
         .sort((a, b) => b.created_at - a.created_at).slice(0, 12).map(t => tournamentView(state, competition, t, p, now))
     };
@@ -1018,16 +1018,16 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/rewards' && method === 'GET') {
     requireRole(p, 'student');
     const now = Date.now();
-    return { attendance: attendanceView(p, now), gacha: gachaView(p), chance: chanceView(p, now), points_balance: coinBalance(state, p) };
+    return { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), chance: chanceView(p, now), points_balance: coinBalance(state, p) };
   }
   if (path === '/attendance/check' && method === 'POST') {
     requireRole(p, 'student');
     return { ...checkIn(p, Date.now()), points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
   }
-  if (path === '/gacha/pull' && method === 'POST') {
+  // V13.68 coin capsule: bet 10·20·30 coins (or a free ticket); ×0·×1·×2·×3 comes back.
+  if (path === '/lucky/pull' && method === 'POST') {
     requireRole(p, 'student');
-    if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
-    const result = pullCapsule(p, coinBalance(state, p), { ticket: body.ticket === true });
+    const result = pullLucky(p, Number(body.bet), coinBalance(state, p), { ticket: body.ticket === true });
     return { ...result, points_balance: coinBalance(state, p) };
   }
   if (path === '/chance/start' && method === 'POST') {
@@ -1096,9 +1096,6 @@ export async function service(state, method, path, body, token, options = {}) {
     const existing = (state.battles || []).find(b => b.rematch_of === previous.id && battleIsOpen(b, now));
     if (existing?.host_id === p.id) return { id: existing.id, code: existing.code, stake: existing.stake, status: existing.status, ticket: existing.tickets[p.id], expires_at: existing.created_at + BATTLE_WAIT_MS, rematch: true };
     if (existing) fail('상대가 먼저 설욕전을 신청했어요. 아래에서 수락해 주세요.', 409);
-    const pair = new Set([p.id, opponentId]);
-    const today = (state.battles || []).filter(b => b.rematch_of && b.status !== 'cancelled' && pair.has(b.host_id) && pair.has(b.invite_id) && dayKey(b.created_at) === dayKey(now)).length;
-    if (today >= BATTLE_REMATCH_PER_PAIR_DAY) fail(`같은 친구와의 설욕전은 하루 ${BATTLE_REMATCH_PER_PAIR_DAY}번까지예요. 내일 다시 붙어요!`, 409);
     checkBattleEntry(state, p, previous.stake, now);
     const school = schoolForProfile(state, p);
     if (!school || school.id !== previous.school_id) fail('학생 학교 설정을 확인해주세요.', 409);
@@ -1131,8 +1128,6 @@ export async function service(state, method, path, body, token, options = {}) {
     const friend = battleFriends(state, p, now).find(x => x.id === str(body.friend_id, 64));
     if (!friend) fail('같은 학교·학년 친구에게만 도전장을 보낼 수 있어요.', 404);
     if (friend.busy) fail(`${friend.name}이(가) 지금 다른 대결 중이에요. 조금 뒤에 다시 보내요.`, 409);
-    const sent = (state.battles || []).filter(b => b.challenge && !b.tournament_id && b.host_id === p.id && b.invite_id === friend.id && dayKey(b.created_at) === dayKey(now)).length;
-    if (sent >= BATTLE_CHALLENGE_PER_PAIR_DAY) fail(`같은 친구에게는 하루 ${BATTLE_CHALLENGE_PER_PAIR_DAY}번까지 도전장을 보낼 수 있어요.`, 409);
     const school = schoolForProfile(state, p);
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
     const rangeCodes = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : [];
