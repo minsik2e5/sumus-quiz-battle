@@ -1,5 +1,5 @@
 // Release checks for the yacha battle rules (server/battle-engine.mjs).
-import { BATTLE, createBattle, connect, disconnect, forfeit, answer, useSkill, tick, nextWake, battleView } from './battle-engine.mjs';
+import { BATTLE, PET_SKILLS, PET_SKILL_NEED, petSkill, createBattle, connect, disconnect, forfeit, answer, tick, nextWake, battleView } from './battle-engine.mjs';
 
 const questions = Array.from({ length: 6 }, (_, i) => ({ word_id: 'w' + i, prompt: 'word' + i, options: ['a', 'b', 'c', 'd'], answer: i % 4 }));
 const players = [{ id: 'host', name: '호스트', pet: { key: 'fox', form: 2 } }, { id: 'guest', name: '게스트', pet: { key: 'cat', form: 1 } }];
@@ -15,6 +15,21 @@ const correct = s => s.questions[s.turn.q].answer;
 const wrong = s => (correct(s) + 1) % 4;
 // Damage of a correct answer with `left` whole seconds still on the word (not fast).
 const slowHit = left => BATTLE.HIT + Math.round(left * BATTLE.SPEED_BONUS);
+// V13.72: one word where each player answers right (true), wrong (false) or not at all
+// (missing), the host at 3 s and the guest at 3.5 s; runs the clock until the next word opens.
+function playWord(s, picks) {
+  const at = s.turn.started_at, events = [];
+  if (picks.host !== undefined) events.push(...answer(s, 'host', picks.host ? correct(s) : wrong(s), at + 3000));
+  if (picks.guest !== undefined) events.push(...answer(s, 'guest', picks.guest ? correct(s) : wrong(s), at + 3500));
+  while (s.phase !== 'finished' && (s.phase !== 'question' || s.turn.started_at === at)) events.push(...tick(s, s.deadline));
+  return events;
+}
+function startedWith(hostPet, guestPet, t = 1000) {
+  const s = createBattle({ id: 'b2', players: [{ ...players[0], pet: { key: hostPet, form: 1 } }, { ...players[1], pet: { key: guestPet, form: 1 } }], questions, stake: 30, now: t });
+  connect(s, 'host', t); connect(s, 'guest', t);
+  tick(s, t + BATTLE.COUNTDOWN_MS);
+  return s;
+}
 
 export function runBattleChecks(assert) {
   {
@@ -64,13 +79,13 @@ export function runBattleChecks(assert) {
     const events = answer(s, 'host', correct(s), t + 1000);
     const hit = events.find(e => e.type === 'attack');
     const expected = Math.round(slowHit(7) * BATTLE.CRIT);
-    assert(hit && hit.fast && hit.dmg === expected && s.players.guest.hp === BATTLE.MAX_HP - expected && s.players.host.ki === 2, 'a fast correct answer attacks with a critical and gives 2 ki');
+    assert(hit && hit.fast && hit.dmg === expected && s.players.guest.hp === BATTLE.MAX_HP - expected && s.players.host.gauge === 1, 'a fast correct answer attacks with a critical and fills one step of the pet gauge');
     assert(s.phase === 'question' && !('answer' in hit) && !events.some(e => e.type === 'reveal'), 'V13.59 the word stays open and hides its answer until the other player answers');
     assert(!answer(s, 'host', correct(s), t + 1200).length, 'a player attacks at most once per word');
     const counter = answer(s, 'guest', correct(s), t + 3000);
     const guestHit = counter.find(e => e.type === 'attack'), shown = counter.find(e => e.type === 'reveal');
-    assert(guestHit && !guestHit.fast && guestHit.dmg === slowHit(5) && s.players.host.hp === BATTLE.MAX_HP - slowHit(5) && s.players.guest.ki === 1, 'V13.59 the slower player also attacks when correct');
-    assert(s.players.host.ki === 2 && shown && shown.answer === correct(s) && !shown.timeout && s.phase === 'reveal', 'V13.59 being slower does not break the other player\'s ki, and the answer is revealed once both answered');
+    assert(guestHit && !guestHit.fast && guestHit.dmg === slowHit(5) && s.players.host.hp === BATTLE.MAX_HP - slowHit(5) && s.players.guest.gauge === 1, 'V13.59 the slower player also attacks when correct');
+    assert(s.players.host.gauge === 1 && shown && shown.answer === correct(s) && !shown.timeout && s.phase === 'reveal', 'V13.59 being slower does not empty the other player\'s gauge, and the answer is revealed once both answered');
     assert(guestHit.dmg < hit.dmg, 'V13.59 speed still gives a small bonus');
     assert(!answer(s, 'guest', correct(s), t + 3100).length, 'a resolved word ignores later answers');
     tick(s, t + 3000 + BATTLE.REVEAL_MS);
@@ -81,7 +96,7 @@ export function runBattleChecks(assert) {
     answer(s, 'host', wrong(s), t + 500);
     assert(s.turn.locked.host && !answer(s, 'host', correct(s), t + 700).length, 'a wrong answer locks that player out of the word');
     const guestHit = answer(s, 'guest', correct(s), t + 3000).find(e => e.type === 'attack');
-    assert(guestHit && !guestHit.fast && s.players.host.hp === BATTLE.MAX_HP - slowHit(5) && s.players.guest.ki === 1 && s.phase === 'reveal', 'the other player can still win the word slowly for 1 ki');
+    assert(guestHit && !guestHit.fast && s.players.host.hp === BATTLE.MAX_HP - slowHit(5) && s.players.guest.gauge === 1 && s.players.host.gauge === 0 && s.phase === 'reveal', 'the other player can still win the word slowly');
   }
   {
     const { s, t } = started();
@@ -89,39 +104,75 @@ export function runBattleChecks(assert) {
     const events = answer(s, 'guest', wrong(s), t + 600);
     assert(events.some(e => e.type === 'miss' && !e.timeout) && s.phase === 'reveal', 'two wrong answers end the word with no attack');
     const { s: s2, t: t2 } = started();
-    s2.players.host.ki = 3;
+    s2.players.host.gauge = 2;
     const timeout = tick(s2, t2 + BATTLE.TURN_MS);
-    assert(timeout.some(e => e.type === 'miss' && e.timeout) && s2.players.host.ki === 0, 'a word nobody answers times out and resets ki');
+    assert(timeout.some(e => e.type === 'miss' && e.timeout) && s2.players.host.gauge === 0, 'V13.72 a word nobody answers times out and empties the pet gauge');
     const { s: s3, t: t3 } = started();
     answer(s3, 'host', correct(s3), t3 + 3000);
-    s3.players.guest.ki = 3;
+    s3.players.guest.gauge = 2;
     const late = tick(s3, t3 + BATTLE.TURN_MS);
-    assert(late.some(e => e.type === 'reveal' && e.timeout) && s3.players.host.ki === 1 && s3.players.guest.ki === 0 && s3.players.guest.missed.length === 1 && !s3.players.host.missed.length, 'V13.59 when time runs out only the player who did not answer loses ki and gets the word to review');
+    assert(late.some(e => e.type === 'reveal' && e.timeout) && s3.players.host.gauge === 1 && s3.players.guest.gauge === 0 && s3.players.guest.missed.length === 1 && !s3.players.host.missed.length, 'V13.59 when time runs out only the player who did not answer loses the gauge and gets the word to review');
   }
   {
-    const { s, t } = started();
-    s.players.host.ki = 5;
-    assert(useSkill(s, 'host', 'power', t).length && s.players.host.power && s.players.host.ki === 0, 'the power skill costs 5 ki');
-    s.players.guest.ki = 2;
-    useSkill(s, 'guest', 'shield', t + 10);
-    const hit = answer(s, 'host', correct(s), t + 3000).find(e => e.type === 'attack');
-    const base = slowHit(5);
-    assert(hit.powered && hit.shielded && hit.dmg === Math.round(base * 2 / 2) && !s.players.host.power && !s.players.guest.shield, 'power doubles and shield halves one attack, then both are used up');
-    assert(!useSkill(s, 'host', 'heal', t + 3100).length, 'skills need enough ki');
-    s.players.guest.ki = 3;
-    useSkill(s, 'guest', 'heal', t + 3200);
-    assert(s.players.guest.hp === Math.min(BATTLE.MAX_HP, BATTLE.MAX_HP - hit.dmg + BATTLE.HEAL), 'heal restores 20 HP up to the maximum');
+    // V13.72 pet skills: 3 right answers in a row set off the pet's own skill, no buttons.
+    const { s } = started(); // host 호야 (fox), guest 나비 (cat)
+    playWord(s, { host: true, guest: false });
+    const second = playWord(s, { host: true, guest: false });
+    assert(s.players.host.gauge === 2 && s.players.guest.gauge === 0 && !second.some(e => e.type === 'petskill'), 'V13.72 the gauge fills one step per right answer and a wrong answer empties it');
+    const third = playWord(s, { host: true, guest: false });
+    const fired = third.find(e => e.type === 'petskill');
+    assert(fired?.player === 'host' && fired.skill === 'fox' && fired.name === PET_SKILLS.fox.name && s.players.host.gauge === 0 && s.players.host.boost.join() === '9,9' && s.players.host.skills_used === 1, 'V13.72 the third right answer in a row sets off 호야\'s skill (next 2 attacks +9) and the gauge starts again');
+    assert(third.findIndex(e => e.type === 'attack') < third.findIndex(e => e.type === 'petskill') && fired.effects.boost.length === 2, 'V13.72 the skill goes off right after the attack that filled the gauge');
+    const hp = s.players.guest.hp;
+    const boosted = playWord(s, { host: true, guest: true }).find(e => e.type === 'attack' && e.attacker === 'host');
+    assert(boosted.boost === 9 && boosted.dmg === slowHit(5) + 9 && s.players.guest.hp === hp - boosted.dmg && s.players.host.boost.length === 1, 'V13.72 a boost adds its number to one attack');
+    playWord(s, { host: false, guest: true });
+    const guard = playWord(s, { host: false, guest: true }).find(e => e.type === 'petskill');
+    assert(guard?.skill === 'cat' && s.players.guest.guard.join() === '16', 'V13.72 나비\'s skill guards the next attack it takes');
+    const guarded = playWord(s, { host: true }).find(e => e.type === 'attack');
+    assert(guarded.guard === 16 && guarded.boost === 9 && guarded.dmg === Math.max(0, slowHit(5) + 9 - 16) && !s.players.guest.guard.length && !s.players.host.boost.length, 'V13.72 a guard takes its number off one attack (after a boost), then both are used up');
   }
   {
-    const { s, t } = started();
-    s.players.host.ki = 4;
-    useSkill(s, 'host', 'freeze', t);
-    answer(s, 'host', correct(s), t + 1000);
-    answer(s, 'guest', wrong(s), t + 1100);
-    tick(s, t + 1100 + BATTLE.REVEAL_MS);
-    const opened = s.turn.started_at;
-    assert(s.turn.frozen_until.guest === opened + BATTLE.FREEZE_MS && !answer(s, 'guest', correct(s), opened + 1000).length, 'a frozen player cannot answer for the first 2 seconds of the next word');
-    assert(answer(s, 'guest', correct(s), opened + 2500).some(e => e.type === 'attack'), 'a frozen player can answer once the freeze ends');
+    // 토리 needs only 2 in a row and hits at once; 초롱 poisons 3 words; 밤부 heals up to 100.
+    const s = startedWith('rabbit', 'snake');
+    playWord(s, { host: true, guest: true });
+    const hop = playWord(s, { host: true, guest: true });
+    const rabbit = hop.find(e => e.type === 'petskill' && e.player === 'host');
+    assert(PET_SKILLS.rabbit.need === 2 && rabbit?.dmg === 7 && !hop.some(e => e.type === 'petskill' && e.player === 'guest'), 'V13.72 토리\'s skill goes off after 2 in a row and hits for 7 at once');
+    assert(s.players.guest.hp === BATTLE.MAX_HP - 2 * slowHit(5) - 7, 'V13.72 토리\'s hit comes on top of the attacks');
+    const bite = playWord(s, { host: false, guest: true });
+    const poison = bite.find(e => e.type === 'poison');
+    assert(bite.some(e => e.type === 'petskill' && e.skill === 'snake') && poison?.dmg === 5 && poison.left === 2 && poison.target === 'host' && bite.findIndex(e => e.type === 'reveal') < bite.findIndex(e => e.type === 'poison'), 'V13.72 초롱\'s poison bites as the word closes');
+    const hostHp = s.players.host.hp;
+    playWord(s, { host: false, guest: false });
+    playWord(s, { host: false, guest: false });
+    playWord(s, { host: false, guest: false });
+    assert(s.players.host.hp === hostHp - 10 && s.players.guest.poison === 0, 'V13.72 the poison bites 3 words in all, even words nobody answers');
+    const p = startedWith('panda', 'dragon');
+    p.players.host.hp = 95;
+    for (let i = 0; i < PET_SKILL_NEED; i++) playWord(p, { host: true, guest: false });
+    assert(p.players.host.hp === BATTLE.MAX_HP && p.players.host.skills_used === 1, 'V13.72 밤부 heals 13 but not above 100');
+    const d = startedWith('panda', 'dragon');
+    for (let i = 0; i < PET_SKILL_NEED; i++) playWord(d, { host: false, guest: true });
+    assert(d.players.host.hp === BATTLE.MAX_HP - 3 * slowHit(4.5) - 13, 'V13.72 용이 hits for 13 at once');
+    const ko = startedWith('dragon', 'dog');
+    ko.players.guest.hp = 50;
+    playWord(ko, { host: true }); playWord(ko, { host: true });
+    const last = playWord(ko, { host: true, guest: false }), end = last.find(e => e.type === 'end');
+    assert(last.find(e => e.type === 'attack').hp.guest === 5 && ko.phase === 'finished' && end?.result.winner === 'host' && ko.players.guest.hp === 0, 'V13.72 a skill can knock the other pet out');
+  }
+  {
+    // Every pet has one skill; the robot and a player without a pet use 몽이's.
+    assert(Object.keys(PET_SKILLS).length === 8 && Object.values(PET_SKILLS).every(x => x.name && x.desc), 'V13.72 all eight pets have a named skill');
+    assert(petSkill({ key: 'robot' }).key === 'dog' && petSkill(null).key === 'dog' && petSkill({ key: 'pig' }).need === PET_SKILL_NEED, 'V13.72 the practice robot and a player without a pet use 몽이\'s skill');
+    const r = startedWith('robot', 'fox');
+    const view = battleView(r, 'guest');
+    assert(view.players.host.skill.key === 'dog' && view.players.guest.skill.name === PET_SKILLS.fox.name && view.players.host.gauge === 0 && Array.isArray(view.players.guest.effects.boost) && !('ki' in view.players.host), 'V13.72 the view shows each pet\'s skill, gauge and waiting effects');
+    // A match saved by an older room (no gauge or effect lists) keeps working.
+    const old = startedWith('fox', 'cat');
+    for (const id of old.order) { const x = old.players[id]; delete x.gauge; delete x.boost; delete x.guard; delete x.poison; x.ki = 3; }
+    const hit = playWord(old, { host: true, guest: true }).find(e => e.type === 'attack');
+    assert(hit?.dmg === slowHit(5) && old.players.host.gauge === 1 && battleView(old, 'host').players.guest.gauge === 1, 'V13.72 a match started before the update keeps going');
   }
   {
     const { s, t } = started();
@@ -164,8 +215,6 @@ export function runBattleChecks(assert) {
   {
     const { s, t } = started();
     assert(!answer(s, 'host', correct(s), t + BATTLE.TURN_MS + 300).length && s.players.guest.hp === BATTLE.MAX_HP, 'an answer after the word deadline does not count even before the room wakes up');
-    s.players.host.ki = 2;
-    assert(!useSkill(s, 'host', 'shield', t + BATTLE.TURN_MS + 300).length, 'a skill after the deadline waits for the timers to run first');
   }
   {
     const s = fresh();

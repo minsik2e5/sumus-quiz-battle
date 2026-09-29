@@ -1,4 +1,4 @@
-import { createBattle, connect, answer, useSkill, forfeit, tick, battleView, BATTLE, BATTLE_SKILLS, SKILL_RULES } from './battle-engine.js';
+import { createBattle, connect, answer, forfeit, tick, battleView, BATTLE, SKILL_RULES } from './battle-engine.js';
 import { battleQuestions } from './battle-questions.js';
 
 // V13.66 practice match (연습 상대): a yacha match against a computer pet, run entirely on the
@@ -7,9 +7,9 @@ import { battleQuestions } from './battle-questions.js';
 // messages a room sends ('view', 'events'), so the screen draws it like any match.
 
 export const BOT_LEVELS = {
-  easy: { name: '쉬움', form: 1, accuracy: .58, min: 3000, max: 7000, skill: .25 },
-  normal: { name: '보통', form: 2, accuracy: .74, min: 2100, max: 5600, skill: .55 },
-  hard: { name: '어려움', form: 3, accuracy: .88, min: 1300, max: 4200, skill: .9 }
+  easy: { name: '쉬움', form: 1, accuracy: .58, min: 3000, max: 7000 },
+  normal: { name: '보통', form: 2, accuracy: .74, min: 2100, max: 5600 },
+  hard: { name: '어려움', form: 3, accuracy: .88, min: 1300, max: 4200 }
 };
 export const BOT_ID = 'practice-bot';
 const EMOTE_REPLIES = { lol: 'lol', come: 'come', gg: 'gg', nice: 'nice' };
@@ -24,7 +24,7 @@ export function createPracticeMatch({ me, questions, level = 'normal', mode = 's
   const lv = BOT_LEVELS[level] || BOT_LEVELS.normal;
   const bot = { id: BOT_ID, name: `연습 상대 · ${lv.name}`, pet: { key: 'robot', form: lv.form, name: `AI 로보` }, bot: true };
   const state = createBattle({ id: `practice-${Date.now()}`, players: [me, bot], questions, stake: 0, label: '연습 경기', mode, now: Date.now() });
-  let closed = false, loop = null, botTimer = null, skillTimer = null, emoteTimer = null;
+  let closed = false, loop = null, botTimer = null, emoteTimer = null;
   const now = () => Date.now();
   const deliver = message => { if (!closed) onMessage({ ...message, now: now() }); };
   const emit = events => {
@@ -33,16 +33,15 @@ export function createPracticeMatch({ me, questions, level = 'normal', mode = 's
     for (const e of events) react(e);
     if (state.phase === 'finished') stop();
   };
-  const stop = () => { clearInterval(loop); clearTimeout(botTimer); clearTimeout(skillTimer); loop = null; };
+  const stop = () => { clearInterval(loop); clearTimeout(botTimer); loop = null; };
 
   // The bot answers each word after a human-like pause, right or wrong by its level.
   function planAnswer(e) {
     clearTimeout(botTimer);
     const turn = state.turn;
-    const frozenFor = Math.max(0, (e.frozen_until?.[BOT_ID] || 0) - now());
     // A spelling word takes longer to type and is a little harder for the bot too.
     const spell = e.kind === 'spell';
-    const delay = frozenFor + (spell ? 2600 + (lv.min + random() * (lv.max - lv.min)) * 1.35 : lv.min + random() * (lv.max - lv.min));
+    const delay = spell ? 2600 + (lv.min + random() * (lv.max - lv.min)) * 1.35 : lv.min + random() * (lv.max - lv.min);
     const limit = state.mode === 'skill' ? (spell ? SKILL_RULES.SPELL_TURN_MS : SKILL_RULES.CHOICE_TURN_MS) : BATTLE.TURN_MS;
     if (delay >= limit - 120) return; // too slow: the word times out for the bot
     botTimer = setTimeout(() => {
@@ -55,26 +54,10 @@ export function createPracticeMatch({ me, questions, level = 'normal', mode = 's
         choice = random() < lv.accuracy ? q.answer : wrong[Math.floor(random() * wrong.length)];
       }
       emit(answer(state, BOT_ID, choice, now()));
-      planSkill();
     }, delay);
-  }
-  // Skills: heal when hurt, a power hit when full, now and then a shield or freeze.
-  function planSkill() {
-    clearTimeout(skillTimer);
-    skillTimer = setTimeout(() => {
-      if (closed || !['question', 'reveal'].includes(state.phase) || random() > lv.skill) return;
-      const b = state.players[BOT_ID], foe = state.players[me.id];
-      let pick = null;
-      if (b.ki >= BATTLE_SKILLS.heal.cost && b.hp <= 55) pick = 'heal';
-      else if (b.ki >= BATTLE_SKILLS.power.cost && !b.power) pick = 'power';
-      else if (b.ki >= BATTLE_SKILLS.freeze.cost && !foe.frozen_next && random() < .5) pick = 'freeze';
-      else if (b.ki >= BATTLE_SKILLS.shield.cost && !b.shield && foe.hp > b.hp && random() < .4) pick = 'shield';
-      if (pick) emit(useSkill(state, BOT_ID, pick, now()));
-    }, 350 + random() * 900);
   }
   function react(e) {
     if (e.type === 'question') planAnswer(e);
-    if (e.type === 'attack' && e.attacker === me.id) planSkill();
   }
 
   return {
@@ -102,7 +85,6 @@ export function createPracticeMatch({ me, questions, level = 'normal', mode = 's
       if (message.type === 'ping' || message.type === 'sync') return;
       const events = tick(state, t);
       if (message.type === 'answer') events.push(...answer(state, me.id, typeof message.choice === 'string' ? message.choice.slice(0, 60) : Number(message.choice), t));
-      else if (message.type === 'skill') events.push(...useSkill(state, me.id, String(message.skill), t));
       else if (message.type === 'leave') events.push(...forfeit(state, me.id, t));
       emit(events);
     },
