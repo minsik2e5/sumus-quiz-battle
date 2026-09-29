@@ -39,7 +39,7 @@ export const PET_FORMS = ['알', '아기', '성장', '최종'];
 export const PET_FORM_LEVELS = [1, 3, 10, 20];
 export const petForm = (level = 1) => PET_FORM_LEVELS.reduce((form, min, i) => (Number(level) >= min ? i : form), 0);
 export const PET_NAME_MAX = 8;
-export const EGG_PRICE = 800;
+export const EGG_PRICE = 400; // V13.73: 800 -> 400
 // Student-chosen pet name, checked the same way on the device and on the server.
 // An empty name is allowed and means "use the pet's default name".
 export function cleanPetName(value) {

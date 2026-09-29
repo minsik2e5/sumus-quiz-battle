@@ -4,7 +4,8 @@ import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, 
 import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
 import { battleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
-import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, botStart, botFinish, botView, examReward } from './rewards.mjs';
+import { STUDY_COINS, GIFT_AMOUNTS } from '../public/modules/rewards.js';
+import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, botStart, botFinish, botView, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
@@ -490,7 +491,8 @@ export function settleBattle(state, result) {
   const players = [b.host_id, b.guest_id];
   if (result.reason === 'cancelled' || !b.guest_id) { b.status = 'cancelled'; b.finished_at = Date.now(); return true; }
   const winner = players.includes(result.winner) ? result.winner : null;
-  Object.assign(b, { status: 'finished', winner, loser: winner ? players.find(id => id !== winner) : null, reason: String(result.reason || 'end').slice(0, 20), hp: result.hp || {}, finished_at: Date.now() });
+  const skills = Object.fromEntries(players.map(id => [id, Math.max(0, Math.min(99, Math.floor(Number(result.skills?.[id]) || 0)))]).filter(([, n]) => n > 0));
+  Object.assign(b, { status: 'finished', winner, loser: winner ? players.find(id => id !== winner) : null, reason: String(result.reason || 'end').slice(0, 20), hp: result.hp || {}, ...(Object.keys(skills).length ? { skills } : {}), finished_at: Date.now() });
   if (b.tournament_id) settleTournamentMatch(state, b);
   return true;
 }
@@ -526,6 +528,8 @@ function stats(state, p, sessions = mySessions(state, p.id)) {
     today_xp: todayAll.reduce((n, s) => n + (s.xp || 0), 0),
     ...pointsAndPets(state, p, all),
     today_reward_points: todayAll.reduce((n, s) => n + Number(s.reward_points || 0), 0),
+    // V13.73: the wallet's daily bar counts study coins only, like the daily cap does.
+    today_study_points: today.reduce((n, s) => n + Number(s.reward_points || 0), 0),
     practice_count: sessions.length,
     accuracy: total ? Math.round(correct / total * 100) : 0,
     gacha: p.gacha?.items || {},
@@ -574,6 +578,8 @@ function rankingRows(state, ctx, p) {
 // last looked (a limited title is new again each week it is won); `intro`: the student has not
 // seen the V13.66 collection yet, so the app shows one summary instead of a pop-up per title.
 const titleSeenKey = (ctx, key) => TITLES[key]?.tier === 'limited' ? `${key}@${ctx.lastWeek.key}` : key;
+// V13.73 `unpaid`: held titles whose coins are not paid yet (new ones, and titles won before
+// V13.73); they are paid when the app shows them (/titles/seen).
 function titleView(ctx, p) {
   const stats = ctx.titleStats(p);
   const unlocked = TITLE_KEYS.filter(key => titleUnlocked(key, stats));
@@ -582,6 +588,7 @@ function titleView(ctx, p) {
     equipped: ctx.displayTitle(p), unlocked, stats,
     fresh: seen ? unlocked.filter(key => key !== 'rookie' && !seen.includes(titleSeenKey(ctx, key))) : [],
     intro: !seen,
+    unpaid: unpaidTitles(p, unlocked, key => titleSeenKey(ctx, key)),
     week_end: ctx.week.end
   };
 }
@@ -888,6 +895,8 @@ export async function service(state, method, path, body, token, options = {}) {
       ranking_period: rankingWeek(Date.now()),
       ranking: teacher ? [] : rankingRows(state, competition, p),
       titles: teacher ? null : titleView(competition, p),
+      gifts: teacher ? null : giftsWaiting(p),
+      gifts_sent: teacher ? (p.gifts_sent || []).slice(-10).reverse() : null,
       league: teacher ? null : leagueView(competition, p),
       rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), bot: botView(p, now) },
       tournaments: (state.tournaments || []).filter(t => teacher ? t.school_id === selectedSchool?.id && (t.status !== 'cancelled' || now - (t.finished_at || t.created_at) < DAY_MS) : t.players.includes(p.id) && (t.status === 'active' || (t.status === 'finished' && now - (t.finished_at || 0) < 3 * DAY_MS)))
@@ -1027,8 +1036,12 @@ export async function service(state, method, path, body, token, options = {}) {
     // titles are remembered per week; older weeks are dropped.
     const all = body.all === true ? TITLE_KEYS.filter(key => titleUnlocked(key, stats)) : keys;
     const kept = (Array.isArray(p.titles_seen) ? p.titles_seen : []).filter(entry => typeof entry === 'string' && (!entry.includes('@') || entry.endsWith('@' + ctx.lastWeek.key)));
-    p.titles_seen = [...new Set([...kept, ...all.map(key => titleSeenKey(ctx, key))])].slice(0, 120);
-    return { ok: true, seen: p.titles_seen.length };
+    // V13.73: the titles just shown pay their coins, and so do held titles already seen before
+    // (titles won before coins were paid for them).
+    const seenBefore = TITLE_KEYS.filter(key => titleUnlocked(key, stats) && kept.includes(titleSeenKey(ctx, key)));
+    p.titles_seen = [...new Set([...kept, ...all.map(key => titleSeenKey(ctx, key))])].slice(0, 160);
+    const paid = payTitles(p, [...new Set([...all, ...seenBefore])], key => titleSeenKey(ctx, key), ctx.lastWeek.key);
+    return { ok: true, seen: p.titles_seen.length, paid, paid_coins: paid.reduce((n, x) => n + x.coins, 0), points_balance: coinBalance(state, p) };
   }
   // Pets: the first one is chosen once for free; others come from random eggs in the shop.
   if (path === '/pets/choose' && method === 'POST') {
@@ -1050,6 +1063,30 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const now = Date.now();
     return { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), bot: botView(p, now), points_balance: coinBalance(state, p) };
+  }
+  // V13.73 coin gifts from a teacher: the student opens the waiting gift boxes.
+  if (path === '/gifts/open' && method === 'POST') {
+    requireRole(p, 'student');
+    const gifts = openGifts(p, Date.now());
+    return { gifts, coins: gifts.reduce((n, g) => n + g.amount, 0), points_balance: coinBalance(state, p) };
+  }
+  if (path === '/teacher/gifts' && method === 'POST') {
+    requireRole(p, 'teacher');
+    const school = activeTeacherSchool(state, p);
+    if (!school) fail('관리 학교를 확인해주세요.', 409);
+    const amount = Number(body.amount);
+    if (!GIFT_AMOUNTS.includes(amount)) fail('선물할 코인을 골라주세요.');
+    const pool = state.profiles.filter(x => x.role === 'student' && x.active !== false && schoolForProfile(state, x)?.id === school.id);
+    const className = str(body.class_name, 20);
+    const ids = new Set((Array.isArray(body.student_ids) ? body.student_ids : []).map(value => str(value, 80)).filter(Boolean));
+    const targets = body.all === true ? pool : className ? pool.filter(x => x.class_name === className) : pool.filter(x => ids.has(x.id));
+    if (!targets.length) fail('선물 받을 학생을 골라주세요.');
+    if (targets.length > 300) fail('한 번에 300명까지 선물할 수 있어요.');
+    const now = Date.now(), note = str(body.note, 60);
+    for (const x of targets) giveGift(x, { id: randomUUID(), amount, note, from: p.id, fromName: p.display_name || '선생님', now });
+    const label = body.all === true ? `${school.name} 전체` : className ? className : targets.length === 1 ? targets[0].display_name : `${targets[0].display_name} 외 ${targets.length - 1}명`;
+    p.gifts_sent = [...(p.gifts_sent || []), { at: now, amount, count: targets.length, label, note: note.slice(0, 40), school_id: school.id }].slice(-30);
+    return { sent: targets.length, amount, total: targets.length * amount, gifts_sent: p.gifts_sent.slice(-10).reverse() };
   }
   if (path === '/attendance/check' && method === 'POST') {
     requireRole(p, 'student');
@@ -1849,7 +1886,7 @@ export async function service(state, method, path, body, token, options = {}) {
 function advancePractice(x, state) {
   const covered = !x.cover_all || (x.seen?.length || 0) >= x.words.length;
   const scoredDone = Number(x.score_total || 0) >= Number(x.target || 0);
-  if (covered && scoredDone && (x.exam_style || !x.retry.length || x.total >= x.target + 12)) finishPractice(x, state);
+  if (covered && scoredDone && (x.exam_style || !x.retry.length || x.total >= x.target + 12)) finishPractice(x, state, false, { natural: true });
   else nextPractice(x, state);
 }
 function nextPractice(x, state, preparePreview = true) {
@@ -1871,7 +1908,7 @@ function nextPractice(x, state, preparePreview = true) {
   }
   const words = allBooks(state).flatMap(b => b.words).filter(w => x.words.includes(w.id));
   // Every word of this practice was retired from its book: nothing left to ask.
-  if (!words.length) { x.next_preview = null; finishPractice(x, state); return; }
+  if (!words.length) { x.next_preview = null; finishPractice(x, state, false, { natural: true }); return; }
   x.seen ??= [];
   const unseen = x.cover_all ? words.filter(w => !x.seen.includes(w.id)) : [];
   const due = x.retry.findIndex(r => r.at <= x.total);
@@ -1937,39 +1974,51 @@ function removePracticeTimer(x) {
   return x;
 }
 
-function practiceReward(x, state, endedAt, answeredCount, perfect) {
+// V13.73: coins are paid only for a practice finished to its target (or ended by its own
+// timer) with at least 60% of the answers right (STUDY_COINS in public/modules/rewards.js):
+// quitting midway or tapping at random pays no coins. XP for right answers is kept either way.
+const hadBonus = (sessions, label) => sessions.some(session => (session.reward_breakdown || []).some(item => item.label === label));
+function practiceReward(x, state, endedAt, answeredCount, perfect, { complete = true, correct = answeredCount } = {}) {
   // Rewards follow answers actually given, not the requested target: finishing
   // an empty practice must not earn points or keep a streak alive.
   if (answeredCount <= 0) return { points: 0, breakdown: [] };
+  if (!complete) return { points: 0, breakdown: [], note: '끝까지 풀지 않아 코인은 없어요. 경험치는 그대로 받아요.' };
+  if (correct / answeredCount < STUDY_COINS.min_accuracy) return { points: 0, breakdown: [], note: `정답률 ${Math.round(STUDY_COINS.min_accuracy * 100)}% 이상이면 코인을 받아요. 경험치는 그대로 받아요.` };
   const scoreTotal = answeredCount;
   const previous = mySessions(state, x.student_id).filter(session => session.answered_count !== 0);
   const todayKey = dayKey(endedAt);
   const todaySessions = previous.filter(session => dayKey(session.created_at) === todayKey);
-  const firstToday = todaySessions.length === 0;
+  // "First" means the first practice today that paid its bonus: a practice left midway
+  // (no coins) does not use up the day's first-study or recommended-study bonus.
+  const firstToday = !hadBonus(todaySessions, '오늘 첫 학습');
   const breakdown = [];
   const add = (label, points) => { if (points > 0) breakdown.push({ label, points }); };
 
-  const completion = scoreTotal >= 30 ? 18 : scoreTotal >= 20 ? 12 : scoreTotal >= 10 ? 5 : Math.max(1, Math.ceil(scoreTotal / 3));
+  const C = STUDY_COINS;
+  const completion = scoreTotal >= 30 ? C.t30 : scoreTotal >= 20 ? C.t20 : scoreTotal >= 10 ? C.t10 : Math.max(1, Math.ceil(scoreTotal / 3));
   add('학습 완료', completion);
-  if (perfect && scoreTotal >= 10) add('100점', 10);
-  if (x.daily_quest) add('오늘 추천 학습', 5);
-  if (firstToday) add('오늘 첫 학습', 5);
+  if (perfect && scoreTotal >= 10) add('100점', C.perfect);
+  // Once a day: doing the recommended study again is welcome but pays no second bonus.
+  if (x.daily_quest && !hadBonus(todaySessions, '오늘 추천 학습')) add('오늘 추천 학습', C.daily);
+  if (firstToday) add('오늘 첫 학습', C.first);
 
   if (firstToday) {
     const projected = growthFor([...previous, { created_at: endedAt, total: scoreTotal, xp: 0, best_combo: 0 }]).streak;
-    if (projected === 3) add('3일 연속 학습', 8);
-    if (projected === 7) add('7일 연속 학습', 20);
+    if (projected === 3) add('3일 연속 학습', C.streak3);
+    if (projected === 7) add('7일 연속 학습', C.streak7);
   }
 
   const raw = breakdown.reduce((sum, item) => sum + item.points, 0);
   const earnedToday = todaySessions.reduce((sum, session) => sum + Number(session.reward_points || 0), 0);
-  const available = Math.max(0, 80 - earnedToday);
+  const available = Math.max(0, C.cap - earnedToday);
   const points = Math.min(raw, available);
   if (points < raw) breakdown.push({ label: '일일 보상 한도 적용', points: points - raw });
   return { points, breakdown };
 }
 
-function finishPractice(x, state, autoSubmitted = false) {
+// `natural`: the practice ended by itself (every word done). A practice closed by the
+// student midway, by the 3-day clean-up or by a school change pays no coins.
+function finishPractice(x, state, autoSubmitted = false, { natural = false } = {}) {
   const finalizedAt = Date.now();
   const endedAt = autoSubmitted && Number(x.deadline || 0) ? Math.min(finalizedAt, Number(x.deadline)) : finalizedAt;
   x.finished = true;
@@ -1985,9 +2034,11 @@ function finishPractice(x, state, autoSubmitted = false) {
   const timedOutCount = answerRecords.filter(item => item.timed_out && !item.regraded).length;
   const unansweredCount = Math.max(0, scoreTotal - answerRecords.length) + timedOutCount;
   const perfect = score === 100 && wrongCount === 0 && unansweredCount === 0;
-  const reward = practiceReward(x, state, endedAt, answerRecords.length, perfect);
+  const complete = natural || autoSubmitted || answerRecords.length >= scoreTotal;
+  const reward = practiceReward(x, state, endedAt, answerRecords.length, perfect, { complete, correct: scoreCorrect });
   x.reward_points = reward.points;
   x.reward_breakdown = reward.breakdown;
+  x.reward_note = reward.note || null;
   const rec = {
     id: x.id,
     student_id: x.student_id,
@@ -2013,6 +2064,7 @@ function finishPractice(x, state, autoSubmitted = false) {
     pet_key: activePetKey(state, x.student_id),
     reward_points: reward.points,
     reward_breakdown: reward.breakdown,
+    ...(reward.note ? { reward_note: reward.note } : {}),
     best_combo: x.best,
     duration_sec: Math.max(0, Math.round((endedAt - x.started_at) / 1000)),
     limit_sec: Number(x.duration_sec || 0),
@@ -2046,7 +2098,7 @@ function practiceView(x, state) {
     range_codes: x.range_codes || [], cover_all: !!x.cover_all, daily_quest: !!x.daily_quest, assignment_id: x.assignment_id || null,
     manual_selection: !!x.manual_selection, exam_style: !!x.exam_style, quest_mix: x.quest_mix || null, word_ids: [...(x.words || [])],
     covered: x.seen?.length || 0, total: x.total, correct: hideTestScore ? null : x.correct, score_total: x.finished ? scoreTotal : (x.score_total || 0), score_correct: hideTestScore ? null : scoreCorrect, score: hideTestScore ? null : score,
-    xp: hideTestScore ? null : x.xp, reward_points: x.finished ? Number(x.reward_points || 0) : undefined, reward_breakdown: x.finished ? (x.reward_breakdown || []) : undefined, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
+    xp: hideTestScore ? null : x.xp, reward_points: x.finished ? Number(x.reward_points || 0) : undefined, reward_breakdown: x.finished ? (x.reward_breakdown || []) : undefined, reward_note: x.finished ? (x.reward_note || null) : undefined, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
     started_at: x.started_at, finished_at: x.finished_at || null, ended_at: x.ended_at || null, finalized_at: x.finalized_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
     timer_mode: x.timer_mode || 'session', question_duration_sec: Number(x.question_duration_sec || 0), question_started_at: x.question_started_at || null, question_deadline: x.question_deadline || null,
     auto_submitted: !!x.auto_submitted,

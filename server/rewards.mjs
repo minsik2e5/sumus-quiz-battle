@@ -2,12 +2,15 @@ import { randomBytes } from 'node:crypto';
 import { dayKey, ACCESSORIES } from '../public/modules/core.js';
 import {
   ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, drawLucky,
-  BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS
+  BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX, GIFT_LOG_KEEP
 } from '../public/modules/rewards.js';
+import { titleCoins } from '../public/modules/titles.js';
 
 // Coin rewards and games (rules and odds: public/modules/rewards.js). Everything lives on the
 // student's profile:
 //   attendance   { last, card, streak, best, total, coins, log[{at, coins}] }
+//   title_reward { total, keys[] } V13.73 coins paid for titles (keys already paid)
+//   gift_box     { total, count, log[{id, amount, note, from, from_name, at, opened}] } V13.73
 //   gacha        { items{key: count}, tickets, refund } decorations from the retired V13.67
 //                capsule machine (kept and worn) and free coin capsules (뽑기권)
 //   lucky        V13.68 coin capsule { day, plays, bets, paid, log[{at, bet, mult, ticket}] }
@@ -25,7 +28,45 @@ const fail = (message, status = 400) => { throw Object.assign(new Error(message)
 export const secureRandom = () => randomBytes(4).readUInt32BE(0) / 2 ** 32;
 
 export function rewardIncome(p) {
-  return Number(p?.attendance?.coins || 0) + Number(p?.gacha?.refund || 0) + Number(p?.chance?.paid || 0) + Number(p?.lucky?.paid || 0) + chanceRefund(p);
+  return Number(p?.attendance?.coins || 0) + Number(p?.gacha?.refund || 0) + Number(p?.chance?.paid || 0) + Number(p?.lucky?.paid || 0) + chanceRefund(p)
+    + Number(p?.title_reward?.total || 0) + Number(p?.gift_box?.total || 0);
+}
+
+/* ---------- V13.73 title coins ---------- */
+// A title pays its coins once (TITLE_COINS by tier), when the student sees it; titles held
+// before V13.73 are paid the same way the first time the app shows them. `payKey` is the
+// title key, or key@week for a limited title (paid again each week it is won). Keys of older
+// weeks are dropped: those weeks cannot come back. The total is kept apart from the keys.
+export function unpaidTitles(p, keys, payKey) {
+  const paid = new Set(p?.title_reward?.keys || []);
+  return keys.filter(key => titleCoins(key) > 0 && !paid.has(payKey(key))).map(key => ({ key, coins: titleCoins(key) }));
+}
+export function payTitles(p, keys, payKey, weekKey) {
+  const r = p.title_reward ||= { total: 0, keys: [] };
+  r.keys = (r.keys || []).filter(k => !k.includes('@') || k.endsWith('@' + weekKey));
+  const paid = unpaidTitles(p, keys, payKey);
+  for (const x of paid) { r.keys.push(payKey(x.key)); r.total = Number(r.total || 0) + x.coins; }
+  return paid;
+}
+
+/* ---------- V13.73 teacher coin gifts ---------- */
+// The coins count as soon as a gift is sent (`total`); the box on the student's screen is only
+// the moment of opening it. The log keeps the last GIFT_LOG_KEEP gifts (all unopened ones).
+export function giveGift(p, { amount, note = '', from, fromName, now = Date.now(), id }) {
+  if (!GIFT_AMOUNTS.includes(amount)) fail('선물할 코인을 골라주세요.');
+  const box = p.gift_box ||= { total: 0, count: 0, log: [] };
+  box.total = Number(box.total || 0) + amount;
+  box.count = Number(box.count || 0) + 1;
+  const log = [...(box.log || []), { id, amount, note: String(note || '').trim().slice(0, GIFT_NOTE_MAX), from, from_name: fromName, at: now, opened: false }];
+  const opened = log.filter(g => g.opened), closed = log.filter(g => !g.opened);
+  box.log = [...opened.slice(-Math.max(0, GIFT_LOG_KEEP - closed.length)), ...closed].sort((a, b) => a.at - b.at);
+  return box;
+}
+export const giftsWaiting = p => (p?.gift_box?.log || []).filter(g => !g.opened).map(g => ({ id: g.id, amount: g.amount, note: g.note, from_name: g.from_name, at: g.at }));
+export function openGifts(p, now = Date.now()) {
+  const waiting = giftsWaiting(p);
+  for (const g of p?.gift_box?.log || []) if (!g.opened) { g.opened = true; g.opened_at = now; }
+  return waiting;
 }
 // V13.70 the double chance is gone; one left open gives back its bet, or the pot a right answer
 // had already reached (the student could have kept it).
@@ -217,6 +258,8 @@ export function botFinish(p, { id, result, right, pet, now = Date.now() }) {
   if (bot.day !== today) { bot.day = today; bot.count = 0; }
   if (Number(bot.count || 0) >= BOT_DAILY) return { paid: false, reason: 'daily', ...botView(p, now) };
   bot.count = Number(bot.count || 0) + 1;
+  // V13.73: lifetime wins for the 로보 titles (paid matches only).
+  if (outcome === 'win') { bot.wins = Number(bot.wins || 0) + 1; if (live.level === 'hard') bot.hard_wins = Number(bot.hard_wins || 0) + 1; }
   const reward = botReward(live.level, outcome);
   addBonus(p, { xp: reward.xp, coins: reward.coins, pet, now });
   return { paid: true, coins: reward.coins, xp: reward.xp, result: outcome, level: live.level, ...botView(p, now) };

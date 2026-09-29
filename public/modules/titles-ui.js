@@ -1,6 +1,7 @@
 import { $, api, esc, num, toast, icon, modal, buttonBusy } from './ui.js';
-import { TITLES, TITLE_TIERS, TITLE_GROUPS, TITLE_KEYS, LEAGUE_TIERS, titleProgress, visibleTitleKeys } from './titles.js';
-import { titleEmblem, titleBadge } from './emblems.js';
+import { TITLES, TITLE_TIERS, TITLE_GROUPS, TITLE_KEYS, LEAGUE_TIERS, titleProgress, visibleTitleKeys, titleCoins } from './titles.js';
+import { titleEmblem, titleBadge, coin } from './emblems.js';
+import { coinShower, coinReward, playReward, giftMoment } from './celebrate.js';
 
 // V13.66 title collection (칭호 도감): the page, one title's card, and the moment a new title
 // is won. The server decides what is unlocked (bootstrap `titles`); this module only draws it.
@@ -25,6 +26,7 @@ function titleCard(key, t, have) {
     <b>${esc(item.name)}</b>
     <small>${esc(item.how)}</small>
     ${foot}
+    ${!on && titleCoins(key) ? `<span class="tt-card-coins">${coin()}${titleCoins(key)}</span>` : ''}
   </button>`;
 }
 
@@ -72,6 +74,7 @@ export function openTitleDetail(A, key, onChanged) {
       <h2>${esc(item.name)}</h2>
       <p class="tt-detail-desc">${esc(item.desc)}</p>
       <div class="tt-detail-how ${on ? 'done' : ''}">${icon(on ? 'check' : 'lock')}<span>${esc(item.how)}</span></div>
+      ${titleCoins(key) ? `<div class="tt-detail-coins">${coin()}<span>얻으면 <b>${titleCoins(key)}코인</b>${item.tier === 'limited' ? ' (이긴 주마다)' : ''}</span></div>` : ''}
       ${prog ? `<div class="tt-detail-prog"><span class="tt-prog"><i style="width:${Math.round(prog[0] / prog[1] * 100)}%"></i></span><b>${progressText(key, prog)}</b></div>` : ''}
       ${item.tier === 'limited' ? `<p class="tt-detail-note">${on ? '이번 주 일요일 밤까지 달 수 있어요.' : '지난주 기록으로 주어지는 한정 칭호예요. 이번 주에 도전하면 다음 주에 받을 수 있어요.'}</p>` : ''}
       <div class="tt-detail-preview"><small>친구에게는 이렇게 보여요</small>${titleBadge(key, { size: 'md' })}</div>
@@ -87,6 +90,8 @@ export function openTitleDetail(A, key, onChanged) {
 
 /* ---------- the moment a title is won ---------- */
 let momentOpen = false, waiting = null;
+// V13.73: the higher the tier, the bigger the celebration.
+const TIER_FX = { common: { bits: 20, coins: 16, waves: 1 }, rare: { bits: 28, coins: 22, waves: 1 }, epic: { bits: 38, coins: 26, waves: 2 }, legendary: { bits: 52, coins: 30, waves: 3 }, limited: { bits: 44, coins: 28, waves: 2 } };
 function sparkles(box, count = 22) {
   const colors = ['#ffd85a', '#fff4b8', '#12b886', '#ff9fd0', '#8fd3ff', '#b98bff'];
   box.innerHTML = Array.from({ length: count }, (_, i) => {
@@ -99,14 +104,26 @@ function overlay(label, tier) {
   $('.tt-moment').onkeydown = event => { if (event.key === 'Escape') $('[data-tt-close]')?.click(); };
   return $('.tt-moment-body');
 }
-function closeOverlay() { $('#modal-root').innerHTML = ''; momentOpen = false; }
-function markSeen(A, body) {
-  api('/titles/seen', body).catch(() => {});
-  const t = A.data?.titles;
-  if (!t) return;
-  if (body.all) { t.intro = false; t.fresh = []; }
-  else t.fresh = (t.fresh || []).filter(key => !body.keys.includes(key));
+// Closes the pop-up but keeps other moments away until the server has answered (and paid).
+async function closeAfter(A, body) {
+  $('#modal-root').innerHTML = '';
+  try { return await markSeen(A, body); } finally { momentOpen = false; }
 }
+// V13.73: seeing titles also pays their coins (and coins of titles won before V13.73).
+async function markSeen(A, body) {
+  const t = A.data?.titles;
+  if (t) {
+    if (body.all) { t.intro = false; t.fresh = []; }
+    else t.fresh = (t.fresh || []).filter(key => !body.keys.includes(key));
+  }
+  try {
+    const res = await api('/titles/seen', body);
+    if (t) { const paid = new Set((res.paid || []).map(x => x.key)); t.unpaid = (t.unpaid || []).filter(x => !paid.has(x.key)); }
+    if (res.points_balance !== undefined && A.data?.stats) A.data.stats.points_balance = res.points_balance;
+    return res;
+  } catch { return null; }
+}
+const unpaidTotal = list => list.reduce((n, x) => n + Number(x.coins || 0), 0);
 
 // First look at the V13.66 collection: one summary of everything already won.
 function introMoment(A, onChanged) {
@@ -119,9 +136,11 @@ function introMoment(A, onChanged) {
     <p>지금까지의 기록으로 <b>${t.unlocked.length}개</b>의 칭호를 모았어요.</p>
     <div class="tt-intro-grid">${best.map((key, i) => `<span style="--i:${i}">${titleEmblem(key, { size: 'md' })}<small>${esc(TITLES[key].name)}</small></span>`).join('')}</div>
     <p class="tt-intro-copy">모두 ${visibleTitleKeys(titleState(A).unlocked).length}개! 칭호를 달면 랭킹·야차전·도전장에서 친구들에게 보여요.</p>
+    ${unpaidTotal(t.unpaid || []) ? coinReward(unpaidTotal(t.unpaid), '칭호 보상 코인') : ''}
     <div class="pet-moment-actions"><button type="button" class="btn" data-tt-done>좋아요</button><button type="button" class="btn primary" data-tt-open>칭호 도감 보기</button></div>
   </div>`;
-  const done = open => { markSeen(A, { all: true }); closeOverlay(); if (open) { A.tab = 'titles'; onChanged?.(true); } };
+  if (unpaidTotal(t.unpaid || [])) { coinShower($('.tt-moment'), 24, 2); playReward(body, 500); }
+  const done = async open => { await closeAfter(A, { all: true }); if (open) A.tab = 'titles'; onChanged?.(open); };
   $('[data-tt-close]').onclick = () => done(false);
   body.querySelector('[data-tt-done]').onclick = () => done(false);
   body.querySelector('[data-tt-open]').onclick = () => done(true);
@@ -129,8 +148,15 @@ function introMoment(A, onChanged) {
 }
 
 function unlockMoment(A, keys, onChanged) {
-  let index = 0, equippedNow = false;
-  const finish = () => { markSeen(A, { keys }); closeOverlay(); if (equippedNow) onChanged?.(false); };
+  let index = 0;
+  const shown = keys.reduce((n, key) => n + titleCoins(key), 0);
+  const finish = async () => {
+    const res = await closeAfter(A, { keys });
+    // Coins of titles won before V13.73 come with the first new title shown.
+    const extra = Number(res?.paid_coins || 0) - shown;
+    if (extra > 0) toast(`예전에 얻은 칭호 보상 ${extra}코인도 받았어요!`);
+    onChanged?.(false);
+  };
   const show = () => {
     const key = keys[index], item = TITLES[key], last = index === keys.length - 1;
     const body = overlay('새 칭호', item.tier);
@@ -141,14 +167,18 @@ function unlockMoment(A, keys, onChanged) {
       <span class="tt-ribbon tier-${item.tier}">${TITLE_TIERS[item.tier].name} 칭호</span>
       <h2>${esc(item.name)}</h2>
       <p>${esc(item.how)} 달성!</p>
+      ${titleCoins(key) ? coinReward(titleCoins(key)) : ''}
       ${keys.length > 1 ? `<span class="tt-moment-count">${index + 1} / ${keys.length}</span>` : ''}
       <div class="pet-moment-actions"><button type="button" class="btn" data-tt-next>${last ? '닫기' : '다음 칭호'}</button><button type="button" class="btn primary" data-tt-equip>바로 달기</button></div>
     </div>`;
     const scene = body.querySelector('.tt-unlock');
     if (!reduced()) {
-      requestAnimationFrame(() => requestAnimationFrame(() => { scene.dataset.state = 'shown'; sparkles(body.querySelector('.tt-bits')); }));
-      try { navigator.vibrate?.(item.tier === 'legendary' || item.tier === 'limited' ? [40, 60, 90] : 40); } catch {}
+      const fx = TIER_FX[item.tier] || TIER_FX.common;
+      requestAnimationFrame(() => requestAnimationFrame(() => { scene.dataset.state = 'shown'; sparkles(body.querySelector('.tt-bits'), fx.bits); }));
+      setTimeout(() => coinShower($('.tt-moment'), fx.coins, fx.waves), 380);
+      try { navigator.vibrate?.(item.tier === 'legendary' || item.tier === 'limited' ? [40, 60, 90, 60, 140] : item.tier === 'epic' ? [40, 60, 90] : 40); } catch {}
     }
+    playReward(body, 700);
     const next = () => { if (last) finish(); else { index++; show(); } };
     $('[data-tt-close]').onclick = finish;
     body.querySelector('[data-tt-next]').onclick = next;
@@ -156,7 +186,7 @@ function unlockMoment(A, keys, onChanged) {
     if (titleState(A).equipped === key) { equip.disabled = true; equip.textContent = '달고 있어요'; }
     equip.onclick = async () => {
       buttonBusy(equip);
-      try { await equipTitle(A, key); equippedNow = true; toast(`'${item.name}' 칭호를 달았어요!`); next(); }
+      try { await equipTitle(A, key); toast(`'${item.name}' 칭호를 달았어요!`); next(); }
       catch (err) { toast(err.message); buttonBusy(equip, false); }
     };
     equip.focus({ preventScroll: true });
@@ -164,13 +194,38 @@ function unlockMoment(A, keys, onChanged) {
   show();
 }
 
+// V13.73: coins for titles won before titles paid coins (shown once, as one reward).
+function paydayMoment(A, list, onChanged) {
+  const keys = byTier(list.map(x => x.key)).reverse();
+  const total = unpaidTotal(list);
+  const body = overlay('칭호 보상', 'legendary');
+  body.innerHTML = `<div class="tt-intro tt-payday">
+    <span class="tt-moment-kicker">NEW · 칭호 보상</span>
+    <h2>칭호 보상이 도착했어요!</h2>
+    <p>이제 칭호를 얻으면 코인을 받아요. 지금까지 모은 칭호 <b>${list.length}개</b>의 보상이에요.</p>
+    <div class="tt-intro-grid">${keys.slice(0, 8).map((key, i) => `<span style="--i:${i}">${titleEmblem(key, { size: 'md' })}<small>${esc(TITLES[key].name)} · ${titleCoins(key)}</small></span>`).join('')}</div>
+    ${coinReward(total)}
+    <p class="tt-intro-copy">일반 10 · 희귀 30 · 영웅 60 · 전설 120코인. 다음 칭호에 도전해 봐요!</p>
+    <div class="pet-moment-actions"><button type="button" class="btn primary full" data-tt-done>받기</button></div>
+  </div>`;
+  coinShower($('.tt-moment'), 26, 2);
+  playReward(body, 500);
+  // Wait for the server before drawing again, or the same reward would show twice.
+  const done = async () => { await closeAfter(A, { keys: [] }); onChanged?.(false); };
+  $('[data-tt-close]').onclick = done;
+  body.querySelector('[data-tt-done]').onclick = done;
+  body.querySelector('[data-tt-done]').focus({ preventScroll: true });
+}
+
 // Called after each student render on the home tab. When another pop-up is open (a pet
-// hatching, the wallet), it waits for it to close.
+// hatching, the wallet), it waits for it to close. V13.73: a teacher's gift comes first.
 export function maybeTitleMoment(A, onChanged) {
   const t = A.data?.titles;
   if (!t || momentOpen || A.screen || A.tab !== 'home' || A.data.profile?.role !== 'student' || A.data.stats?.needs_pet_pick) return;
   const fresh = byTier((t.fresh || []).filter(key => TITLES[key] && t.unlocked.includes(key)));
-  if (!t.intro && !fresh.length) return;
+  const retro = (t.unpaid || []).filter(x => TITLES[x.key] && !fresh.includes(x.key));
+  const gifts = A.data.gifts || [];
+  if (!t.intro && !fresh.length && !retro.length && !gifts.length) return;
   const root = $('#modal-root');
   if (root.children.length) {
     if (waiting) return;
@@ -183,6 +238,8 @@ export function maybeTitleMoment(A, onChanged) {
     return;
   }
   momentOpen = true;
-  if (t.intro) introMoment(A, onChanged);
-  else unlockMoment(A, fresh.slice(0, 5), onChanged);
+  if (gifts.length) giftMoment(A, gifts, () => { momentOpen = false; onChanged?.(false); setTimeout(() => maybeTitleMoment(A, onChanged), 400); });
+  else if (t.intro) introMoment(A, onChanged);
+  else if (fresh.length) unlockMoment(A, fresh.slice(0, 5), onChanged);
+  else paydayMoment(A, retro, onChanged);
 }

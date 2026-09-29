@@ -157,6 +157,7 @@ function dashboard(A) {
         <div><strong>${learnedActiveCount}<small>/${activeStudents.length}</small></strong><span>오늘 학습</span></div>
       </div>
       <div class="tv2-today-copy"><span class="tv2-kicker">오늘 현황</span><h2>${activeStudents.length ? (inactiveToday.length ? `${inactiveToday.length}명이 아직 오늘 학습 전이에요` : '모든 학생이 오늘 학습했어요') : '등록된 학생이 없어요'}</h2><p>${esc(A.school)} · 활성 학생 ${activeStudents.length}명 기준</p></div>
+      <button type="button" class="tv2-gift-v1373" data-action="gift" aria-label="학생에게 코인 선물하기">${icon('gift')}<span><b>코인 선물</b><small>칭찬할 학생에게</small></span></button>
       <div class="tv2-today-stats">
         <div><span>오늘 푼 문제</span><strong>${num(todayQuestions)}<small>문제</small></strong></div>
         <div><span>어법 MASTER</span><strong>${num(grammar.mastered)}<small>지문</small></strong></div>
@@ -221,7 +222,7 @@ export function studentFiltered(A) {
   return studentTable(A.data.profiles.filter(p => (!A.classFilter || p.class_name === A.classFilter) && `${p.display_name} ${p.username}`.toLowerCase().includes(q)), A.data.word_mastery || {});
 }
 function students(A) {
-  return `<div class="toolbar"><div class="search">${icon('search')}<input id="student-search" aria-label="학생 검색" placeholder="이름 또는 아이디 검색" value="${esc(A.search || '')}"></div><select id="class-filter" aria-label="반 필터"><option value="">전체 반</option>${[...new Set(A.data.profiles.map(p => p.class_name))].map(c => `<option ${c === A.classFilter ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select><span class="tiny muted">총 ${A.data.profiles.length}명</span></div><section class="panel" id="student-table">${studentFiltered(A)}</section>`;
+  return `<div class="toolbar"><div class="search">${icon('search')}<input id="student-search" aria-label="학생 검색" placeholder="이름 또는 아이디 검색" value="${esc(A.search || '')}"></div><select id="class-filter" aria-label="반 필터"><option value="">전체 반</option>${[...new Set(A.data.profiles.map(p => p.class_name))].map(c => `<option ${c === A.classFilter ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select><span class="tiny muted">총 ${A.data.profiles.length}명</span><button type="button" class="btn primary gift-btn-v1373" data-action="gift">${icon('gift')} 코인 선물</button></div><section class="panel" id="student-table">${studentFiltered(A)}</section>`;
 }
 const aliasSourceLabel = source => source === 'appeal' ? '학생 이의제기' : source === 'teacher' ? '선생님 추가' : '기존 허용답';
 export function vocabTable(A) {

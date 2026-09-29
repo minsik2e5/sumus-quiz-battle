@@ -12,7 +12,8 @@ import { coin } from './modules/emblems.js';
 import { openBracket } from './modules/tournament-ui.js';
 import { openBracketTv } from './modules/bracket-tv.js';
 import { mountArcade, attendanceMoment } from './modules/arcade.js';
-import { LUCKY_BETS, ATTENDANCE_REWARDS, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_COINS } from './modules/rewards.js';
+import { LUCKY_BETS, ATTENDANCE_REWARDS, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_COINS, STUDY_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX } from './modules/rewards.js';
+import { TITLE_COINS } from './modules/titles.js';
 import { EGG_PRICE } from './modules/core.js';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
@@ -561,6 +562,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'tournament-new') return tournamentCreateModal();
     if (d.action === 'tournament-tv') return openTournamentTv(d.id);
     if (d.action === 'tournament-tv-link') return tournamentTvLink(d.id);
+    if (d.action === 'gift') return giftModal(d.student ? [d.student] : []);
     if (d.action === 'tournament-cancel') return cancelTournament(d.id, b);
     if (d.tnDecide) return decideTournamentMatch(d.tnDecide, d.match, d.winner, d.name, b);
     if (d.action === 'battle-accept' && A.data.battle_invite) { const invite = A.data.battle_invite; A.data.battle_invite = null; A.yachaOpts = { accept: invite }; return navigate('yacha'); }
@@ -1009,17 +1011,19 @@ async function attend(button) {
   } catch (err) { toast(err.message); if (button) button.disabled = false; }
 }
 function walletModal() {
-  const g = A.data.stats, today = Number(g.today_reward_points || 0);
+  const g = A.data.stats, today = Number(g.today_study_points ?? g.today_reward_points ?? 0), C = STUDY_COINS;
   const close = modal(`<div class="wallet-v1366">
     <div class="wallet-top">${coin()}<div><small>내 코인</small><strong>${num(g.points_balance || 0)}<span>코인</span></strong></div></div>
     <p class="wallet-note"><b>경험치와 코인은 달라요.</b> 경험치는 맞힐수록 쌓여서 레벨·펫 성장·랭킹에 쓰이고, 코인은 모아서 쓰는 돈이에요.</p>
-    <div class="wallet-today"><div class="row"><span>오늘 공부로 모은 코인</span><b>${num(today)} / 80</b></div><div class="wallet-bar"><i style="width:${Math.min(100, Math.round(today / 80 * 100))}%"></i></div></div>
+    <div class="wallet-today"><div class="row"><span>오늘 공부로 모은 코인</span><b>${num(today)} / ${C.cap}</b></div><div class="wallet-bar"><i style="width:${Math.min(100, Math.round(today / C.cap * 100))}%"></i></div><small class="wallet-rule-v1373">끝까지 풀고, 정답률 ${Math.round(C.min_accuracy * 100)}% 이상일 때 받아요</small></div>
     <h3>모으는 법</h3>
     <ul class="wallet-list">
-      <li><span>학습 완료 (10·20·30문제)</span><b>+5·12·18</b></li>
-      <li><span>100점 (10문제 이상)</span><b>+10</b></li>
-      <li><span>추천 학습 · 오늘 첫 학습</span><b>+5·5</b></li>
-      <li><span>3일 · 7일 연속 학습</span><b>+8·20</b></li>
+      <li><span>학습 완료 (10·20·30문제)</span><b>+${C.t10}·${C.t20}·${C.t30}</b></li>
+      <li><span>100점 (10문제 이상)</span><b>+${C.perfect}</b></li>
+      <li><span>추천 학습 · 오늘 첫 학습 (하루 한 번)</span><b>+${C.daily}·${C.first}</b></li>
+      <li><span>3일 · 7일 연속 학습</span><b>+${C.streak3}·${C.streak7}</b></li>
+      <li><span>칭호 얻기 (등급별)</span><b>+${TITLE_COINS.common}~${TITLE_COINS.legendary}</b></li>
+      <li><span>선생님 선물</span><b>선물 상자</b></li>
       <li><span>매일 출석 체크 (7번째는 코인 뽑기권도)</span><b>+${ATTENDANCE_REWARDS[0]}~${ATTENDANCE_REWARDS.at(-1)}</b></li>
       <li><span>선생님 실전시험 (절반 이상 풀기 · 처음 한 번)</span><b>+${EXAM_COINS}</b></li>
       <li><span>로보 연습 대결 (하루 ${BOT_DAILY}판까지)</span><b>+${BOT_TRY_REWARD.coins}~${BOT_WIN_REWARDS.hard.coins}</b></li>
@@ -1049,6 +1053,79 @@ async function tournamentTvLink(id) {
       catch { $('#tv-link').select(); toast('주소를 길게 눌러 복사해 주세요.'); }
     };
   } catch (err) { toast(err.message); }
+}
+// V13.73 teacher: coins as a gift to one student, a class or everyone, with a short note. The
+// student opens a gift box on the next visit to the home screen.
+function giftModal(preset = []) {
+  const students = A.data.profiles.filter(s => s.active !== false).sort((a, b) => String(a.class_name).localeCompare(String(b.class_name), 'ko') || a.display_name.localeCompare(b.display_name, 'ko'));
+  const classes = [...new Set(students.map(s => s.class_name).filter(Boolean))];
+  const st = { target: preset.length ? 'pick' : 'class', cls: classes[0] || '', picked: new Set(preset), amount: GIFT_AMOUNTS[1], q: '' };
+  const count = () => st.target === 'all' ? students.length : st.target === 'class' ? students.filter(s => s.class_name === st.cls).length : st.picked.size;
+  const sent = A.data.gifts_sent || [];
+  const close = modal(`<div class="gift-modal-v1373">
+    <h2>${icon('gift')} 코인 선물</h2>
+    <p>학생이 다음에 앱을 열면 <b>선물 상자</b>가 나타나요. 상자를 열면 코인이 쏟아져요!</p>
+    <div class="gift-label">누구에게</div>
+    <div class="segment gift-target" role="group" aria-label="선물 받을 학생">${[['pick', '학생 고르기'], ['class', '반 전체'], ['all', `${esc(A.school)} 전체`]].map(([k, l]) => `<button type="button" data-gt="${k}">${l}</button>`).join('')}</div>
+    <div id="gift-target-box"></div>
+    <div class="gift-label">얼마나</div>
+    <div class="gift-amounts">${GIFT_AMOUNTS.map(n => `<button type="button" class="gift-amount" data-ga="${n}">${coin()}${n}</button>`).join('')}</div>
+    <label class="field gift-note"><span>한마디 (선택)</span><input id="gift-note" maxlength="${GIFT_NOTE_MAX}" placeholder="예: 이번 주 정말 열심히 했어요!" autocomplete="off"></label>
+    <button type="button" class="btn primary full" id="gift-send"></button>
+    ${sent.length ? `<details class="gift-sent"><summary>최근 보낸 선물 ${sent.length}건</summary><ul>${sent.map(g => `<li><span><b>${esc(g.label)}</b>${g.note ? `<small>“${esc(g.note)}”</small>` : ''}</span><span>${coin()}${num(g.amount)} × ${num(g.count)}명<small>${date(g.at)}</small></span></li>`).join('')}</ul></details>` : ''}
+  </div>`, '코인 선물');
+  const drawTarget = () => {
+    $$('[data-gt]').forEach(b => b.classList.toggle('selected', b.dataset.gt === st.target));
+    const box = $('#gift-target-box');
+    if (st.target === 'class') box.innerHTML = `<div class="gift-classes">${classes.map(c => `<button type="button" class="yb-chip ${c === st.cls ? 'on' : ''}" data-gc="${esc(c)}">${esc(c)} <small>${students.filter(s => s.class_name === c).length}명</small></button>`).join('')}</div>`;
+    else if (st.target === 'all') box.innerHTML = `<p class="gift-all-note">${esc(A.school)} 활성 학생 <b>${students.length}명</b> 모두에게 보내요.</p>`;
+    else {
+      const q = st.q.trim().toLowerCase();
+      const list = students.filter(s => !q || `${s.display_name} ${s.username || ''} ${s.class_name || ''}`.toLowerCase().includes(q));
+      box.innerHTML = `<div class="search gift-search">${icon('search')}<input id="gift-q" placeholder="이름 검색" value="${esc(st.q)}" autocomplete="off"></div>
+        <div class="gift-students">${list.map(s => `<label class="gift-student ${st.picked.has(s.id) ? 'on' : ''}"><input type="checkbox" data-gs="${esc(s.id)}" ${st.picked.has(s.id) ? 'checked' : ''}><b>${esc(s.display_name)}</b><small>${esc(s.class_name || '')}</small></label>`).join('') || '<p class="gift-all-note">검색된 학생이 없어요.</p>'}</div>`;
+      const input = $('#gift-q');
+      input.oninput = () => { st.q = input.value; const pos = input.selectionStart; drawTarget(); const again = $('#gift-q'); again.focus(); again.setSelectionRange(pos, pos); };
+    }
+    drawSend();
+  };
+  const drawSend = () => {
+    $$('[data-ga]').forEach(b => b.classList.toggle('on', Number(b.dataset.ga) === st.amount));
+    const n = count(), button = $('#gift-send');
+    button.disabled = !n;
+    button.innerHTML = n ? `${num(n)}명에게 ${num(st.amount)}코인씩 보내기 <small>(모두 ${num(n * st.amount)}코인)</small>` : '받을 학생을 골라주세요';
+  };
+  const root = $('.gift-modal-v1373');
+  root.onclick = event => {
+    const b = event.target.closest('button');
+    if (!b) return;
+    if (b.dataset.gt) { st.target = b.dataset.gt; drawTarget(); }
+    else if (b.dataset.gc) { st.cls = b.dataset.gc; drawTarget(); }
+    else if (b.dataset.ga) { st.amount = Number(b.dataset.ga); drawSend(); }
+  };
+  root.onchange = event => {
+    const id = event.target.dataset?.gs;
+    if (!id) return;
+    if (event.target.checked) st.picked.add(id); else st.picked.delete(id);
+    event.target.closest('.gift-student')?.classList.toggle('on', event.target.checked);
+    drawSend();
+  };
+  $('#gift-send').onclick = async event => {
+    const button = event.currentTarget, n = count();
+    if (!n || !confirm(`${num(n)}명에게 ${num(st.amount)}코인씩, 모두 ${num(n * st.amount)}코인을 선물할까요?`)) return;
+    buttonBusy(button);
+    const body = { amount: st.amount, note: $('#gift-note').value.trim() };
+    if (st.target === 'all') body.all = true;
+    else if (st.target === 'class') body.class_name = st.cls;
+    else body.student_ids = [...st.picked];
+    try {
+      const res = await api('/teacher/gifts', body);
+      A.data.gifts_sent = res.gifts_sent;
+      close();
+      toast(`${num(res.sent)}명에게 ${num(res.amount)}코인을 선물했어요! 학생이 앱을 열면 선물 상자가 나타나요.`);
+    } catch (err) { toast(err.message); buttonBusy(button, false); drawSend(); }
+  };
+  drawTarget();
 }
 // V13.69 teacher: the bracket on the classroom TV, full screen and refreshing by itself.
 function openTournamentTv(id) {
