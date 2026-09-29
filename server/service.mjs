@@ -593,7 +593,7 @@ function petSummary(ctx, profile) {
 // V13.66 tournament as the app draws it: the bracket with names, which matches are being
 // played, and for a student their own next match.
 function tournamentView(state, ctx, t, viewer, now = Date.now()) {
-  const person = id => { const x = id ? ctx.profiles.get(id) : null; return x ? { id: x.id, name: x.display_name, class_name: x.class_name || '' } : (id ? { id, name: '(탈퇴한 학생)', class_name: '' } : null); };
+  const person = id => { const x = id ? ctx.profiles.get(id) : null; return x ? { id: x.id, name: x.display_name, class_name: x.class_name || '', pet: petSummary(ctx, x) } : (id ? { id, name: '(탈퇴한 학생)', class_name: '' } : null); };
   const open = new Map((state.battles || []).filter(b => b.tournament_id === t.id && battleIsOpen(b, now)).map(b => [b.match_id, b]));
   const mine = viewer.role === 'student' ? playerMatch(t, viewer.id) : null;
   let match = null;
@@ -1227,6 +1227,14 @@ export async function service(state, method, path, body, token, options = {}) {
     const t = createTournament({ id: id(), name: str(body.name, 40) || `${school.name} ${className} 야차 대회`, teacher: p, school, grade, className: className === grade ? null : className, players: seeded.map(x => x.id), rangeCodes, prize, mode: battleMode(body.mode), now });
     state.tournaments.push(t);
     return { tournament: tournamentView(state, createCompetition(state, now), t, p, now) };
+  }
+  // V13.69 the classroom TV bracket polls one tournament.
+  const tournamentOne = path.match(/^\/teacher\/tournaments\/([^/]+)$/);
+  if (tournamentOne && method === 'GET') {
+    requireRole(p, 'teacher');
+    const t = (state.tournaments || []).find(x => x.id === tournamentOne[1] && p.school_ids?.includes(x.school_id));
+    if (!t) fail('대회를 찾지 못했어요.', 404);
+    return { tournament: tournamentView(state, createCompetition(state), t, p, Date.now()), server_time: Date.now() };
   }
   const tournamentRoute = path.match(/^\/teacher\/tournaments\/([^/]+)\/(winner|cancel)$/);
   if (tournamentRoute && method === 'POST') {

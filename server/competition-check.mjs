@@ -185,6 +185,16 @@ export async function runCompetitionChecks(assert, expectStatus) {
   const runnerBoot = await service(state, 'GET', '/bootstrap', {}, tokens[t.runner_up]);
   assert(champBoot.stats.prize_points === 100 && runnerBoot.stats.prize_points === 50 && champBoot.titles.unlocked.includes('champion') && champBoot.tournaments.find(x => x.id === t.id)?.me.champion, 'V13.66 the champion gets the prize and the SUMUS 챔피언 title; the runner-up half the prize');
   await expectStatus(409, () => service(state, 'POST', `/teacher/tournaments/${t.id}/cancel`, {}, teacher), 'V13.66 a finished tournament cannot be cancelled');
+  // V13.69 the classroom TV bracket: the teacher polls one tournament with the players' pets.
+  const tv = await service(state, 'GET', `/teacher/tournaments/${t.id}`, {}, teacher);
+  assert(tv.tournament?.id === t.id && tv.tournament.status === 'finished' && tv.tournament.champion?.id === t.champion && tv.tournament.champion.pet?.key === 'dog' && tv.tournament.rounds.every(r => r.matches.every(m => (!m.a || m.a.pet) && (!m.b || m.b.pet))) && Number.isFinite(tv.server_time), 'V13.69 the TV bracket gets the tournament with every player\'s pet');
+  await expectStatus(403, () => service(state, 'GET', `/teacher/tournaments/${t.id}`, {}, tokens['qa-cc-a']), 'V13.69 only teachers open the TV bracket');
+  await expectStatus(404, () => service(state, 'GET', '/teacher/tournaments/qa-no-such', {}, teacher), 'V13.69 an unknown tournament is not found');
+  state.profiles.push({ id: 'qa-cc-teacher2', username: 'qa_cc_teacher2', display_name: '다른 학교 선생님', role: 'teacher', active: true, password_hash: hash, school_ids: ['seonbu-high'], division_ids: ['high'], active_division: 'high', active_school_id: 'seonbu-high', created_at: now - 30 * DAY });
+  const otherTeacher = await login('qa_cc_teacher2');
+  await expectStatus(404, () => service(state, 'GET', `/teacher/tournaments/${t.id}`, {}, otherTeacher), 'V13.69 a teacher of another school cannot open the TV bracket');
+  const tvSource = source('../public/modules/bracket-tv.js'), appTvSource = source('../public/app.js'), teacherTvSource = source('../public/modules/teacher.js'), buildTvSource = source('./build-assets.mjs');
+  assert(tvSource.includes('export function openBracketTv(') && tvSource.includes('/teacher/tournaments/') && tvSource.includes('POLL_MS') && tvSource.includes('function celebrate(') && tvSource.includes('function announce(') && tvSource.includes('requestFullscreen') && appTvSource.includes("d.action === 'tournament-tv'") && appTvSource.includes("A.screen = 'bracket-tv'") && teacherTvSource.includes('data-action="tournament-tv"') && buildTvSource.includes('"v1369.css"'), 'V13.69 teachers open the live bracket on the classroom TV from the tournament panel');
   const second = await service(state, 'POST', '/teacher/tournaments', { class_name: '고1', student_ids: ['qa-cc-a', 'qa-cc-b'], range_codes: range }, teacher);
   const openedSecond = await service(state, 'POST', '/tournament/play', { tournament_id: second.tournament.id, match_id: 'r0m0' }, tokens['qa-cc-a']);
   const cancelled = await service(state, 'POST', `/teacher/tournaments/${second.tournament.id}/cancel`, {}, teacher);
