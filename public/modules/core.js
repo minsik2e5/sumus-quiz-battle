@@ -49,13 +49,12 @@ export function cleanPetName(value) {
   if (!/^[\p{Script=Hangul}A-Za-z0-9 ·._~!-]+$/u.test(name)) return { name, error: '한글, 영어, 숫자로 지어주세요.' };
   return { name, error: '' };
 }
-// V13.67: capsule-machine decorations join as frames (auras) and accessories (badges); they are
-// worn only by students who pulled them (`gacha`: the capsule key, checked in `unlocked`).
+// V13.67: capsule-machine auras join as frames; they are worn only by students who pulled them
+// (`gacha`: the capsule key, checked in `unlocked`). V13.68 dropped the capsule badges.
 const gachaWear = kind => Object.fromEntries(Object.entries(GACHA_ITEMS).filter(([, item]) => item.kind === kind).map(([key, item]) => [item.wear, { name: item.name, gacha: key, tier: item.tier }]));
 export const ACCESSORIES = {
   none: { name: '기본', level: 1 }, headset: { name: '헤드셋', level: 3 }, glasses: { name: '포커스 글래스', level: 6 },
-  starpin: { name: '스타 핀', level: 9 }, visor: { name: '바이저', level: 13 }, crown: { name: '크라운', level: 18 },
-  ...gachaWear('badge')
+  starpin: { name: '스타 핀', level: 9 }, visor: { name: '바이저', level: 13 }, crown: { name: '크라운', level: 18 }
 };
 export const FRAMES = { basic: { name: '기본', level: 1 }, silver: { name: '실버', level: 5 }, neon: { name: '블루 라인', level: 10 }, aurora: { name: '오로라', level: 15 }, legend: { name: '골드', level: 20 }, ...gachaWear('aura') };
 export const TITLES = { rookie: { name: '첫걸음', level: 1 }, focus: { name: '집중의 힘', level: 5 }, combo: { name: '10연속의 주인공', combo: 10 }, streak: { name: '7일의 기록', streak: 7 }, master: { name: '단어 마스터', level: 15 }, legend: { name: '한계를 넘어서', level: 20 }, yacha3: { name: '야차 3연승', battle_streak: 3 }, yachaking: { name: '야차왕', battle_streak: 5 } };

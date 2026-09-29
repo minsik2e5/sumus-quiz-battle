@@ -7,11 +7,11 @@ import { passwordHash, publicProfile } from './auth.mjs';
 import { service, scopedWords } from './service.mjs';
 import { DAY_MS, rankingWeek } from './competition.mjs';
 import { dayKey, unlocked, FRAMES, ACCESSORIES } from '../public/modules/core.js';
-import { TITLES, TITLE_KEYS } from '../public/modules/titles.js';
+import { TITLES, TITLE_KEYS, visibleTitleKeys } from '../public/modules/titles.js';
 import { createBattle, connect, answer, tick, battleView, SKILL_RULES, BATTLE } from '../public/modules/battle-engine.js';
 import { battleQuestions, spellHint, spellable } from '../public/modules/battle-questions.js';
 import { createPracticeMatch } from '../public/modules/battle-bot.js';
-import { ATTENDANCE_REWARDS, GACHA_PRICE, GACHA_ITEMS, GACHA_KEYS, GACHA_TIERS, GACHA_PITY, drawCapsule, CHANCE_DAILY, CHANCE_STEPS } from '../public/modules/rewards.js';
+import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, drawLucky, CHANCE_DAILY, CHANCE_STEPS } from '../public/modules/rewards.js';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 // A small deterministic random source for the odds checks.
@@ -88,37 +88,43 @@ export async function runRewardsChecks(assert, expectStatus) {
   const coinRow = (await service(state, 'GET', '/bootstrap', {}, tokens['qa-rw-b'])).ranking.find(r => r.is_me);
   assert(coinRow.all_coins === 400 + ATTENDANCE_REWARDS[0] + ATTENDANCE_REWARDS[6] && coinRow.coins === (now - DAY_MS >= week.start ? 400 : 0) + ATTENDANCE_REWARDS[0] + ATTENDANCE_REWARDS[6], 'V13.67 attendance coins count in the coin ranking');
 
-  /* ---------- capsule machine ---------- */
-  assert(Object.values(GACHA_TIERS).reduce((n, t) => n + t.rate, 0) === 100 && GACHA_KEYS.length >= 18 && ['aura', 'badge', 'title'].every(kind => GACHA_KEYS.some(key => GACHA_ITEMS[key].kind === kind)) && Object.keys(GACHA_TIERS).every(tier => GACHA_KEYS.some(key => GACHA_ITEMS[key].tier === tier)), 'V13.67 capsules: odds add up to 100%, every tier has items (auras, badges, titles)');
+  /* ---------- V13.68 coin capsule (코인 뽑기) ---------- */
+  const avg = LUCKY_ODDS.reduce((n, o) => n + o.mult * o.rate, 0);
+  assert(LUCKY_ODDS.reduce((n, o) => n + o.rate, 0) === 100 && LUCKY_ODDS.map(o => o.mult).join() === '0,1,2,3' && LUCKY_BETS.join() === '10,20,30' && LUCKY_DAILY === 3, 'V13.68 coin capsule: ×0·×1·×2·×3 for bets of 10·20·30 coins, three a day');
+  assert(avg >= 90 && avg < 100, 'V13.68 on average a little less comes back than is bet (study stays the way to earn coins)');
   const counts = {}, rnd = seeded(7);
-  for (let i = 0; i < 20000; i++) { const got = drawCapsule(rnd, 0); counts[got.tier] = (counts[got.tier] || 0) + 1; }
-  assert(Object.entries(GACHA_TIERS).every(([tier, t]) => Math.abs((counts[tier] || 0) / 200 - t.rate) < 1.2), 'V13.67 capsules come out at the odds shown on the machine');
-  const pity = drawCapsule(() => 0.3, GACHA_PITY - 1);
-  assert(pity.tier === 'rare' && pity.pity && drawCapsule(() => 0.3, GACHA_PITY - 2).tier === 'common' && drawCapsule(() => 0.995, GACHA_PITY - 1).tier === 'legendary', 'V13.67 no rare-or-better in nine pulls makes the tenth at least rare (a better capsule stays better)');
+  for (let i = 0; i < 20000; i++) { const got = drawLucky(rnd); counts[got.mult] = (counts[got.mult] || 0) + 1; }
+  assert(LUCKY_ODDS.every(o => Math.abs((counts[o.mult] || 0) / 200 - o.rate) < 1.2), 'V13.68 capsules come out at the odds shown on the machine');
   const poor = profile('qa-rw-c');
-  poor.points_spent = 350; // 400 earned (a waiting room holds no stake): 50 left
-  await expectStatus(400, () => service(state, 'POST', '/gacha/pull', {}, tokens['qa-rw-c']), 'V13.67 a capsule needs 60 coins');
+  poor.points_spent = 390; // 400 earned (a waiting room holds no stake): 10 left
+  await expectStatus(400, () => service(state, 'POST', '/lucky/pull', { bet: 20 }, tokens['qa-rw-c']), 'V13.68 a coin capsule needs the coins it bets');
+  await expectStatus(400, () => service(state, 'POST', '/lucky/pull', { bet: 15 }, tokens['qa-rw-c']), 'V13.68 bets are 10, 20 or 30 coins');
   poor.points_spent = 0;
   const b0 = await balance('qa-rw-c');
-  const pull = await service(state, 'POST', '/gacha/pull', {}, tokens['qa-rw-c']);
-  assert(pull.points_balance === b0 - GACHA_PRICE + pull.refund && GACHA_ITEMS[pull.key] && poor.gacha.items[pull.key] === 1 && !pull.dup && pull.gacha.pulls === 1, 'V13.67 a pull costs 60 coins and the capsule is kept');
-  await expectStatus(409, () => service(state, 'POST', '/gacha/pull', { ticket: true }, tokens['qa-rw-c']), 'V13.67 a free pull needs a ticket');
-  const withTicket = await service(state, 'POST', '/gacha/pull', { ticket: true }, tokens['qa-rw-b']);
-  assert(withTicket.ticket && withTicket.gacha.tickets === 0 && withTicket.points_balance === (await balance('qa-rw-b')), 'V13.67 the attendance ticket pulls a capsule for free');
-  poor.gacha.items = { aura_sakura: 1, badge_heart: 1, title_lucky: 1 };
-  poor.gacha.log = [];
-  const dupBefore = Number(poor.gacha.refund || 0);
-  const dup = await service(state, 'POST', '/gacha/pull', {}, tokens['qa-rw-c']);
-  assert(!dup.dup || dup.refund === GACHA_TIERS[dup.tier].refund && poor.gacha.refund === dupBefore + dup.refund, 'V13.67 a repeat capsule gives coins back by tier');
-  poor.gacha.items = { aura_sakura: 1, badge_heart: 1, title_lucky: 1 };
-  assert(FRAMES.g_sakura?.gacha === 'aura_sakura' && ACCESSORIES.g_heart?.gacha === 'badge_heart' && !unlocked(FRAMES.g_sakura, { level: 50 }) && unlocked(FRAMES.g_sakura, { level: 1, gacha: { aura_sakura: 1 } }), 'V13.67 capsule auras and badges are worn as the frame and accessory, only by their owners');
-  const styleBody = { avatar_key: 'dog', avatar_accessory: 'g_heart', avatar_frame: 'g_sakura', avatar_title: 'rookie' };
-  assert((await service(state, 'POST', '/profile/style', styleBody, tokens['qa-rw-c'])).avatar_frame === 'g_sakura', 'V13.67 a pulled aura and badge can be worn');
-  await expectStatus(400, () => service(state, 'POST', '/profile/style', { ...styleBody, avatar_frame: 'g_galaxy' }, tokens['qa-rw-c']), 'V13.67 an aura not pulled cannot be worn');
-  assert(TITLE_KEYS.includes('g_lucky') && TITLES.g_lucky.group === 'gacha' && (await service(state, 'POST', '/profile/title', { key: 'g_lucky' }, tokens['qa-rw-c'])).equipped === 'g_lucky', 'V13.67 capsule titles join the collection and can be equipped by their owners');
+  const plays = [];
+  for (let i = 0; i < 3; i++) plays.push(await service(state, 'POST', '/lucky/pull', { bet: 10 }, tokens['qa-rw-c']));
+  const won = plays.reduce((n, r) => n + r.paid, 0);
+  assert(plays.every(r => [0, 10, 20, 30].includes(r.paid) && r.paid === r.bet * r.mult) && plays[2].points_balance === b0 - 30 + won && plays[2].lucky.left === 0, 'V13.68 each capsule pays the bet times ×0·×1·×2·×3 into the balance');
+  await expectStatus(409, () => service(state, 'POST', '/lucky/pull', { bet: 10 }, tokens['qa-rw-c']), 'V13.68 coin capsules are three a day');
+  await expectStatus(409, () => service(state, 'POST', '/lucky/pull', { ticket: true }, tokens['qa-rw-c']), 'V13.68 a free capsule needs a ticket');
+  const bb = await balance('qa-rw-b');
+  const withTicket = await service(state, 'POST', '/lucky/pull', { ticket: true }, tokens['qa-rw-b']);
+  assert(withTicket.ticket && withTicket.bet === 10 && withTicket.lucky.tickets === 0 && withTicket.lucky.left === LUCKY_DAILY && withTicket.points_balance === bb + withTicket.paid, 'V13.68 the attendance ticket plays a 10-coin capsule for free, outside the three a day');
+  const rankC = (await service(state, 'GET', '/bootstrap', {}, tokens['qa-rw-c'])).ranking.find(r => r.is_me);
+  assert(rankC.all_coins === 400, 'V13.68 coin capsule winnings are not counted in the coin ranking');
+  await expectStatus(404, () => service(state, 'POST', '/gacha/pull', {}, tokens['qa-rw-c']), 'V13.68 the decoration capsule machine is gone');
+
+  /* ---------- decorations kept from the V13.67 machine ---------- */
+  poor.gacha = { items: { aura_sakura: 1, title_lucky: 1 } };
+  assert(!GACHA_KEYS.some(key => key.startsWith('badge_')) && !Object.keys(ACCESSORIES).some(key => key.startsWith('g_')) && FRAMES.g_sakura?.gacha === 'aura_sakura' && !unlocked(FRAMES.g_sakura, { level: 50 }) && unlocked(FRAMES.g_sakura, { level: 1, gacha: { aura_sakura: 1 } }), 'V13.68 badges are gone; auras pulled before stay wearable by their owners only');
+  const styleBody = { avatar_key: 'dog', avatar_accessory: 'none', avatar_frame: 'g_sakura', avatar_title: 'rookie' };
+  assert((await service(state, 'POST', '/profile/style', styleBody, tokens['qa-rw-c'])).avatar_frame === 'g_sakura', 'V13.68 a pulled aura can still be worn');
+  await expectStatus(400, () => service(state, 'POST', '/profile/style', { ...styleBody, avatar_frame: 'g_galaxy' }, tokens['qa-rw-c']), 'V13.68 an aura not pulled cannot be worn');
+  await expectStatus(400, () => service(state, 'POST', '/profile/style', { ...styleBody, avatar_accessory: 'g_heart' }, tokens['qa-rw-c']), 'V13.68 a removed badge cannot be worn');
+  assert(TITLES.g_lucky.retired && !visibleTitleKeys(['rookie']).includes('g_lucky') && visibleTitleKeys(['rookie', 'g_lucky']).includes('g_lucky') && (await service(state, 'POST', '/profile/title', { key: 'g_lucky' }, tokens['qa-rw-c'])).equipped === 'g_lucky', 'V13.68 capsule titles stay with their owners and are hidden from everyone else');
   await expectStatus(403, () => service(state, 'POST', '/profile/title', { key: 'g_god' }, tokens['qa-rw-c']), 'V13.67 a capsule title not pulled cannot be equipped');
   const bootC = await service(state, 'GET', '/bootstrap', {}, tokens['qa-rw-c']);
-  assert(bootC.stats.gacha.aura_sakura === 1 && bootC.rewards.gacha.items.aura_sakura === 1 && bootC.rewards.gacha.price === GACHA_PRICE, 'V13.67 the app gets the capsules owned');
+  assert(bootC.stats.gacha.aura_sakura === 1 && bootC.rewards.gacha.items.aura_sakura === 1 && bootC.rewards.lucky.left === 0, 'V13.68 the app gets the decorations owned and today\'s coin capsules');
 
   /* ---------- word double chance ---------- */
   const A = profile('qa-rw-a');
@@ -166,5 +172,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   await service(state, 'POST', '/chance/start', { bet: 10 }, tokens['qa-rw-a']).catch(() => null);
   assert(A.chance.losses >= 3, 'V13.67 the next double chance request records a word left open as lost');
   const homeUi = source('../public/modules/student.js'), arcade = source('../public/modules/arcade.js');
-  assert(homeUi.includes('attendanceCard(') && arcade.includes('/gacha/pull') && arcade.includes('/chance/answer') && arcade.includes('확률'), 'V13.67 the home screen has the attendance card; the coin arcade has the capsule machine (with its odds) and double chance');
+  const luckyUi = source('../public/modules/lucky.js');
+  assert(luckyUi.includes('export function luckyShow(') && luckyUi.includes('function machineSpin(') && luckyUi.includes("const shakes = res.mult === 0 ? 1 : res.mult === 1 ? 2 : 3") && luckyUi.includes('data-lk="skip"') && luckyUi.includes('prefers-reduced-motion') && arcade.includes('luckyCard(luckyState(A)'), 'V13.68 the coin capsule has a machine and a show: coin in, dial, the capsule shakes more for better results, bursts open; it can be skipped and respects reduced motion');
+  assert(homeUi.includes('attendanceCard(') && arcade.includes('/lucky/pull') && arcade.includes('/chance/answer') && arcade.includes('확률'), 'V13.67 the home screen has the attendance card; the coin arcade has the capsule machine (with its odds) and double chance');
 }

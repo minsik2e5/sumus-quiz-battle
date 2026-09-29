@@ -3,17 +3,20 @@ import { buildQuestion, shuffle, dayKey, displayEnglish, englishAccepted, normal
 import { normalizeTyped } from '../public/modules/battle-engine.js';
 import { spellable, spellHint } from '../public/modules/battle-questions.js';
 import {
-  ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, GACHA_PRICE, GACHA_PITY, GACHA_TIERS, GACHA_ITEMS, drawCapsule,
+  ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, drawLucky,
   CHANCE_BETS, CHANCE_DAILY, CHANCE_STEPS, CHANCE_MIN_WORDS
 } from '../public/modules/rewards.js';
 
-// V13.67 coin rewards and games (rules and odds: public/modules/rewards.js). Everything lives
-// on the student's profile:
+// Coin rewards and games (rules and odds: public/modules/rewards.js). Everything lives on the
+// student's profile:
 //   attendance   { last, card, streak, best, total, coins, log[{at, coins}] }
-//   gacha        { items{key: count}, pulls, since_rare, tickets, refund, log[{at, key, dup}] }
+//   gacha        { items{key: count}, tickets, refund } decorations from the retired V13.67
+//                capsule machine (kept and worn) and free coin capsules (뽑기권)
+//   lucky        V13.68 coin capsule { day, plays, bets, paid, log[{at, bet, mult, ticket}] }
 //   chance       { day, plays, wins, losses, paid, bets, best, log[{at, bet, steps, paid}] }
 //   chance_live  the double chance being played, with its answer (never sent: see publicProfile)
-// Coins received here (attendance, capsule refunds, double chance pay-outs) are added to the
+// Coins received here (attendance, old capsule refunds, coin capsule and double chance pay-outs)
+// are added to the
 // balance in service.mjs pointsAndPets; coins paid (capsules, bets) go to points_spent.
 
 const DAY_MS = 86400000;
@@ -23,7 +26,7 @@ const CHANCE_GRACE_MS = 1500;   // network delay allowed after a question's time
 const CHANCE_ABANDON_MS = 5000; // a question left open this long after its time is lost
 
 export function rewardIncome(p) {
-  return Number(p?.attendance?.coins || 0) + Number(p?.gacha?.refund || 0) + Number(p?.chance?.paid || 0);
+  return Number(p?.attendance?.coins || 0) + Number(p?.gacha?.refund || 0) + Number(p?.chance?.paid || 0) + Number(p?.lucky?.paid || 0);
 }
 // Coins from attendance inside a period (the coin ranking counts them like study rewards).
 export function attendanceCoins(p, window = null) {
@@ -68,34 +71,45 @@ export function checkIn(p, now = Date.now()) {
   return { stamp, coins, tickets, attendance: attendanceView(p, now) };
 }
 
-/* ---------- capsule machine ---------- */
+/* ---------- decorations kept from the V13.67 capsule machine ---------- */
 export function gachaView(p) {
   const g = p.gacha || {};
+  return { items: g.items || {}, tickets: Number(g.tickets || 0) };
+}
+
+/* ---------- V13.68 coin capsule (코인 뽑기) ---------- */
+export function luckyView(p, now = Date.now()) {
+  const l = p.lucky || {}, today = dayKey(now);
+  const plays = l.day === today ? Number(l.plays || 0) : 0;
   return {
-    price: GACHA_PRICE, pity: GACHA_PITY, tiers: GACHA_TIERS, items: g.items || {}, pulls: Number(g.pulls || 0),
-    tickets: Number(g.tickets || 0), since_rare: Number(g.since_rare || 0),
-    recent: (g.log || []).slice(-8).reverse()
+    bets: LUCKY_BETS, daily: LUCKY_DAILY, left: Math.max(0, LUCKY_DAILY - plays), odds: LUCKY_ODDS,
+    ticket_bet: LUCKY_TICKET_BET, tickets: Number(p.gacha?.tickets || 0),
+    recent: (l.log || []).slice(-6).reverse()
   };
 }
-export function pullCapsule(p, balance, { ticket = false, random = secureRandom, now = Date.now() } = {}) {
-  const g = p.gacha ||= {};
-  g.items ||= {};
+// A ticket plays a 10-coin capsule for free and does not count toward the three a day.
+export function pullLucky(p, bet, balance, { ticket = false, random = secureRandom, now = Date.now() } = {}) {
+  const l = p.lucky ||= {};
+  const today = dayKey(now);
+  if (l.day !== today) { l.day = today; l.plays = 0; }
   if (ticket) {
+    const g = p.gacha ||= {};
     if (!(Number(g.tickets || 0) > 0)) fail('뽑기권이 없어요. 출석 7번째 도장에서 받아요!', 409);
     g.tickets = Number(g.tickets) - 1;
+    bet = LUCKY_TICKET_BET;
   } else {
-    if (balance < GACHA_PRICE) fail(`코인이 ${GACHA_PRICE - balance}개 부족해요.`);
-    p.points_spent = Number(p.points_spent || 0) + GACHA_PRICE;
+    if (!LUCKY_BETS.includes(bet)) fail('걸 코인을 골라주세요.');
+    if (Number(l.plays || 0) >= LUCKY_DAILY) fail(`코인 뽑기는 하루 ${LUCKY_DAILY}번까지예요. 내일 또 만나요!`, 409);
+    if (balance < bet) fail(`코인이 ${bet - balance}개 부족해요.`);
+    p.points_spent = Number(p.points_spent || 0) + bet;
+    l.plays = Number(l.plays || 0) + 1;
+    l.bets = Number(l.bets || 0) + bet;
   }
-  const got = drawCapsule(random, Number(g.since_rare || 0));
-  const dup = Number(g.items[got.key] || 0) > 0;
-  g.items[got.key] = Number(g.items[got.key] || 0) + 1;
-  g.pulls = Number(g.pulls || 0) + 1;
-  g.since_rare = got.tier === 'common' ? Number(g.since_rare || 0) + 1 : 0;
-  const refund = dup ? GACHA_TIERS[got.tier].refund : 0;
-  g.refund = Number(g.refund || 0) + refund;
-  g.log = [...(g.log || []), { at: now, key: got.key, dup }].slice(-20);
-  return { key: got.key, tier: got.tier, item: GACHA_ITEMS[got.key], dup, refund, pity: got.pity, ticket, gacha: gachaView(p) };
+  const odd = drawLucky(random);
+  const paid = bet * odd.mult;
+  l.paid = Number(l.paid || 0) + paid;
+  l.log = [...(l.log || []), { at: now, bet, mult: odd.mult, ticket }].slice(-20);
+  return { bet, mult: odd.mult, name: odd.name, paid, ticket, lucky: luckyView(p, now) };
 }
 
 /* ---------- word double chance ---------- */

@@ -64,14 +64,6 @@
 @media (max-width:360px){.yb-key{height:42px;font-size:16px}.yb-slot{width:26px;height:36px;font-size:18px}}
 @media (prefers-reduced-motion:reduce){.yb-slot.typed,.yb-spell.wrong .yb-slot.typed{animation:none}}
 
-/* capsule badges (filled, own colors) */
-.pet-acc-badge.gacha svg{fill:currentColor;stroke:currentColor;stroke-width:.6;width:17px;height:17px}
-.pet-acc-badge.gacha{box-shadow:0 3px 10px rgba(20,60,45,.18),0 0 0 2px #fff inset}
-.gb-g_heart{color:#ff5a7a}.gb-g_note{color:#6c63ff}.gb-g_clover{color:#2fbf71}.gb-g_cloud{color:#7fb6ff}.gb-g_candy{color:#ff7ab8}
-.gb-g_rocket{color:#ff7a3d}.gb-g_gem{color:#23b5d3}
-.gb-g_rainbow{color:#ff6b6b;background:linear-gradient(135deg,#fff,#fff7fb)!important}
-.gb-g_rainbow svg path:first-child{fill:url(#tt-g-legendary)}
-
 /* capsule auras (worn as the frame): a glow behind the pet (::before) and, from rare up, a moving
    layer (::after). Pets are transparent images, so the aura shows around them. */
 .avatar-art[class*="frame-g_"]::before,.avatar-art[class*="frame-g_"]::after{content:'';position:absolute;pointer-events:none;z-index:-1}

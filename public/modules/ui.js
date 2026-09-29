@@ -9,6 +9,7 @@ export const recordRangeLabel = (context, code) => context?.division === 'middle
 export const scope = e => (e.range_codes || []).map(c => recordRangeLabel(e, c)).join(' · ');
 const paths = {
   home: '<path d="m3 10 9-7 9 7v10H4V10"/><path d="M9 20v-7h6v7"/>',
+  arcade: '<path d="M6 11a6 6 0 0 1 12 0v1H6z"/><rect x="5" y="12" width="14" height="9" rx="2"/><circle cx="12" cy="16.5" r="1.8"/><path d="M9 8.5h.01M13 7h.01M15 9.5h.01"/>',
   practice: '<path d="M4 4h6q2 0 2 2v15q-1-3-4-3H4zM20 4h-6q-2 0-2 2v15q1-3 4-3h4z"/>',
   exam: '<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9zM9 11h6M9 15h4"/>',
   ranking: '<path d="M4 20v-8h5v8M9 20V5h6v15M15 20v-11h5v11"/>',

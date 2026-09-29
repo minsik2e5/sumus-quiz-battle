@@ -76,7 +76,10 @@ function sfx(name, buzz = 0) {
   if (buzz) try { navigator.vibrate?.(buzz); } catch {}
 }
 
-const root = () => document.getElementById('app');
+// V13.68: the lobby is drawn inside the 야차전 tab (`host`, with the app's menu around it);
+// a room or a match takes the whole screen (#app).
+let host = null;
+const root = () => host || document.getElementById('app');
 const serverNow = () => Date.now() + (B?.clockOffset || 0);
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 // Timers that draw on this screen; they do nothing once the screen (or a newer one) took over.
@@ -91,7 +94,8 @@ const petName = pet => pet?.name || CHARACTERS[petKey(pet?.key)]?.ko || '';
 // opts.tournament: { tid, mid } a tournament match to start or join (V13.66).
 export async function openBattle(A, exit, opts = {}) {
   closeSocket();
-  B = { A, exit, stake: 10, ranges: null, joinCode: '', tab: opts.tab || 'play', botLevel: 'normal', mode: pref('sumus-yacha-mode', 'speed') === 'skill' ? 'skill' : 'speed' };
+  host = opts.embedded || null;
+  B = { A, exit, embedded: !!host, stake: 10, ranges: null, joinCode: '', tab: opts.tab || 'play', botLevel: 'normal', mode: pref('sumus-yacha-mode', 'speed') === 'skill' ? 'skill' : 'speed' };
   root().innerHTML = shell('<div class="yb-loading">야차전을 준비하고 있어요…</div>');
   bindRoot();
   try {
@@ -104,7 +108,25 @@ export async function openBattle(A, exit, opts = {}) {
   } catch (err) { toast(err.message); leaveScreen(); }
 }
 
+// The 야차전 tab: draws the lobby in `el` (a fresh element on every app render).
+export function mountYacha(el, A, exit, opts = {}) {
+  if (!el || el.dataset.mounted) return;
+  el.dataset.mounted = '1';
+  openBattle(A, exit, { ...(opts || {}), embedded: el });
+}
+// Leaves the tab for the full screen when a room opens or a match starts.
+function goFull() {
+  if (!B?.embedded) return;
+  if (host) { host.onclick = null; host.oninput = null; }
+  host = null;
+  B.embedded = false;
+  B.A.screen = 'battle';
+  root().innerHTML = shell('');
+  bindRoot();
+  window.scrollTo(0, 0);
+}
 function shell(content) {
+  if (B?.embedded) return `<div class="battle-app yb-embedded"><header class="yb-top yb-top-tab"><strong>야차전</strong><span class="yb-top-note" id="yb-top-note"></span><button type="button" class="yb-sound" data-yb="sound" aria-pressed="${soundOn()}" aria-label="효과음과 진동">${soundOn() ? '소리 켜짐' : '소리 꺼짐'}</button></header><main class="yb-main" id="yb-main">${content}</main></div>`;
   return `<div class="session-app battle-app"><header class="yb-top"><button type="button" class="yb-back" data-yb="exit" aria-label="나가기">${icon('back')}</button><strong>야차전</strong><span class="yb-top-note" id="yb-top-note"></span><button type="button" class="yb-sound" data-yb="sound" aria-pressed="${soundOn()}" aria-label="효과음과 진동">${soundOn() ? '소리 켜짐' : '소리 꺼짐'}</button></header><main class="yb-main" id="yb-main">${content}</main></div>`;
 }
 function main(html) { const m = document.getElementById('yb-main'); if (m) m.innerHTML = html; }
@@ -126,6 +148,7 @@ function bindRoot() {
     if (act === 'offer-no') return declineOffer(b);
     if (act === 'review') return reviewWords();
     if (act === 'exit') return tryExit();
+    if (act === 'home') { B.A.tab = 'home'; return leaveScreen(); }
     if (act === 'range') { toggleRange(b.dataset.code); return; }
     if (act === 'stake') { B.stake = Number(b.dataset.stake); lobby(); return; }
     if (act === 'tab') { B.tab = b.dataset.tab; lobby(); window.scrollTo(0, 0); return; }
@@ -143,7 +166,7 @@ function bindRoot() {
     if (act === 'answer') { if (B.view?.question) B.view.question.picked = Number(b.dataset.choice); return send({ type: 'answer', choice: Number(b.dataset.choice) }, b); }
     if (act === 'skill') return send({ type: 'skill', skill: b.dataset.skill });
     if (act === 'leave') return confirmLeave();
-    if (act === 'again') return openBattle(B.A, B.exit);
+    if (act === 'again') { B.A.tab = 'yacha'; return leaveScreen(); }
   };
   root().oninput = event => { if (event.target.id === 'yb-code') B.joinCode = event.target.value.replace(/\D/g, '').slice(0, 6); };
 }
@@ -332,6 +355,7 @@ function startBotMatch(button) {
   const questions = practiceQuestions(words.filter(word => B.ranges.has(word.range_code)), B.mode);
   if (questions.length < 8) return toast('뜻이 서로 다른 단어가 부족해요. 범위를 더 골라주세요.');
   if (button) button.disabled = true;
+  goFull();
   closeSocket(false);
   B.room = { id: 'practice', practice: true, stake: 0 };
   B.view = null;
@@ -365,6 +389,7 @@ function showBracket(tid) {
 
 /* ---------- room connection ---------- */
 function enterRoom(room) {
+  goFull();
   B.room = room;
   B.view = null;
   if (room.status === 'waiting' && room.host) waitingRoom();
@@ -784,7 +809,7 @@ function drawResult() {
     ${practice ? `<button type="button" class="btn primary full" data-yb="bot-again">한 판 더 <small>${esc(BOT_LEVELS[B.practiceSetup?.level]?.name || '')}</small></button>` : ''}
     ${canRematch ? `<button type="button" class="btn primary full yb-rematch" data-yb="rematch">${outcome === 'lose' ? '설욕전 신청' : '한 판 더'} <small>판돈 ${num(r.stake)}코인</small></button><div id="yb-offer"></div>` : ''}
     ${tournament && B.tournament ? `<button type="button" class="btn full" data-action="tournament-bracket" data-tournament="${esc(B.tournament.tid)}">대진표 보기</button>` : ''}
-    <div class="btn-row yb-result-actions"><button type="button" class="btn" data-yb="exit">홈으로</button><button type="button" class="btn" data-yb="again">로비로</button></div>
+    <div class="btn-row yb-result-actions"><button type="button" class="btn" data-yb="home">홈으로</button><button type="button" class="btn" data-yb="again">로비로</button></div>
   </section>
   ${missed.length ? `<section class="yb-card yb-review"><h2>이번 대결에서 놓친 단어 <small>${missed.length}개</small></h2><ul>${missed.slice(0, 10).map(w => `<li><b>${esc(w.word)}</b><span>${esc(w.meaning)}</span></li>`).join('')}</ul>${missed.length > 10 ? `<p class="yb-note">외 ${missed.length - 10}개</p>` : ''}<button type="button" class="btn primary full" data-yb="review">놓친 단어 연습하기</button></section>` : ''}`);
   if (canRematch) watchOffers(v.id, finishedAt);

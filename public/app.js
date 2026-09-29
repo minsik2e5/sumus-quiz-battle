@@ -5,13 +5,13 @@ import { studentPage, getRanges, updateRangeSummary } from './modules/student.js
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
 import { maybePetMoment, openPetNameModal, openEggShop, petJosa } from './modules/pet-moments.js';
-import { openBattle } from './modules/battle.js';
+import { mountYacha } from './modules/battle.js';
 import { maybeTitleMoment, openTitleDetail } from './modules/titles-ui.js';
 import { mountLeagueBoard } from './modules/league-ui.js';
 import { coin } from './modules/emblems.js';
 import { openBracket } from './modules/tournament-ui.js';
 import { mountArcade, attendanceMoment } from './modules/arcade.js';
-import { GACHA_PRICE, CHANCE_BETS, ATTENDANCE_REWARDS } from './modules/rewards.js';
+import { LUCKY_BETS, CHANCE_BETS, ATTENDANCE_REWARDS } from './modules/rewards.js';
 import { EGG_PRICE } from './modules/core.js';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
@@ -122,6 +122,7 @@ function render() {
   if (A.data.profile.role === 'student') {
     $$('[data-league-board]').forEach(el => mountLeagueBoard(el, period => { A.leaguePeriod = period; savePreferences(); }));
     $$('[data-arcade]').forEach(el => mountArcade(el, A));
+    $$('#yacha-host').forEach(el => { const opts = A.yachaOpts; A.yachaOpts = null; mountYacha(el, A, leaveBattle, opts); });
     queueMicrotask(() => maybePetMoment(A, petChanged));
     queueMicrotask(() => maybeTitleMoment(A, moved => { if (moved) { render(); window.scrollTo(0, 0); } else renderKeepScroll(); }));
   }
@@ -327,6 +328,8 @@ $('#app').addEventListener('pointerout', event => {
 });
 $('#app').addEventListener('click', async event => {
   const b = event.target.closest('button'); if (!b || b.disabled || !A.data || A.screen) return;
+  // V13.68: the yacha lobby inside its tab answers its own buttons (battle.js).
+  if (b.closest('#yacha-host')) return;
   const d = b.dataset; if (!Object.keys(d).length) return; event.preventDefault();
   try {
     if (d.go) return navigate(d.go);
@@ -527,15 +530,15 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'choose-pet') return confirmFirstPet(d.key);
     if (d.action === 'egg-shop') return openEggShop(A, petChanged);
     if (d.action === 'vocab-more') { moreVocab(A); $('#vocab-table').innerHTML = vocabTable(A); return; }
-    if (d.action === 'battle') { A.screen = 'battle'; return openBattle(A, leaveBattle); }
+    if (d.action === 'battle') return navigate('yacha');
     if (d.action === 'coins') return walletModal();
     if (d.action === 'attend') return attend(b);
-    if (d.action === 'tournament-play') { A.screen = 'battle'; return openBattle(A, leaveBattle, { tournament: { tid: d.tournament, mid: d.match } }); }
+    if (d.action === 'tournament-play') { A.yachaOpts = { tournament: { tid: d.tournament, mid: d.match } }; return navigate('yacha'); }
     if (d.action === 'tournament-bracket') return bracketModal(d.tournament);
     if (d.action === 'tournament-new') return tournamentCreateModal();
     if (d.action === 'tournament-cancel') return cancelTournament(d.id, b);
     if (d.tnDecide) return decideTournamentMatch(d.tnDecide, d.match, d.winner, d.name, b);
-    if (d.action === 'battle-accept' && A.data.battle_invite) { const invite = A.data.battle_invite; A.data.battle_invite = null; A.screen = 'battle'; return openBattle(A, leaveBattle, { accept: invite }); }
+    if (d.action === 'battle-accept' && A.data.battle_invite) { const invite = A.data.battle_invite; A.data.battle_invite = null; A.yachaOpts = { accept: invite }; return navigate('yacha'); }
     if (d.action === 'battle-decline') { buttonBusy(b); await api('/battle/invite/decline', { id: d.id }); A.data.battle_invite = null; renderKeepScroll(); toast('도전장을 거절했어요.'); return; }
     if (d.action === 'save-style') { buttonBusy(b); await api('/profile/style', A.style); await refresh(); A.style = null; A.tab = 'home'; render(); toast('내 캐릭터를 저장했어요.'); }
     if (d.action === 'account') accountModal();
@@ -992,16 +995,16 @@ function walletModal() {
       <li><span>100점 (10문제 이상)</span><b>+10</b></li>
       <li><span>추천 학습 · 오늘 첫 학습</span><b>+5·5</b></li>
       <li><span>3일 · 7일 연속 학습</span><b>+8·20</b></li>
-      <li><span>매일 출석 체크 (7번째는 뽑기권도)</span><b>+${ATTENDANCE_REWARDS[0]}~${ATTENDANCE_REWARDS.at(-1)}</b></li>
+      <li><span>매일 출석 체크 (7번째는 코인 뽑기권도)</span><b>+${ATTENDANCE_REWARDS[0]}~${ATTENDANCE_REWARDS.at(-1)}</b></li>
       <li><span>야차전 승리 · 학원 대회 상금</span><b>판돈 · 상금</b></li>
     </ul>
     <h3>쓰는 곳</h3>
-    <div class="wallet-actions"><button type="button" class="btn" id="wallet-egg">랜덤 알 <small>${coin()}${num(EGG_PRICE)}</small></button><button type="button" class="btn" id="wallet-yacha">야차전 판돈 <small>${coin()}10·30·50</small></button><button type="button" class="btn" id="wallet-gacha">뽑기 <small>${coin()}${GACHA_PRICE}</small></button><button type="button" class="btn" id="wallet-chance">더블 찬스 <small>${coin()}${CHANCE_BETS.join('·')}</small></button></div>
+    <div class="wallet-actions"><button type="button" class="btn" id="wallet-egg">랜덤 알 <small>${coin()}${num(EGG_PRICE)}</small></button><button type="button" class="btn" id="wallet-yacha">야차전 판돈 <small>${coin()}10·30·50</small></button><button type="button" class="btn" id="wallet-gacha">코인 뽑기 <small>${coin()}${LUCKY_BETS.join('·')}</small></button><button type="button" class="btn" id="wallet-chance">더블 찬스 <small>${coin()}${CHANCE_BETS.join('·')}</small></button></div>
   </div>`, '코인 지갑');
   $('#wallet-gacha').onclick = () => { close(); navigate('arcade'); };
   $('#wallet-chance').onclick = () => { close(); navigate('arcade'); };
   $('#wallet-egg').onclick = () => { close(); openEggShop(A, petChanged); };
-  $('#wallet-yacha').onclick = () => { close(); A.screen = 'battle'; openBattle(A, leaveBattle); };
+  $('#wallet-yacha').onclick = () => { close(); navigate('yacha'); };
 }
 function bracketModal(id) {
   const t = (A.data.tournaments || []).find(item => item.id === id) || null;
