@@ -10,6 +10,7 @@ import { maybeTitleMoment, openTitleDetail } from './modules/titles-ui.js';
 import { mountLeagueBoard } from './modules/league-ui.js';
 import { coin } from './modules/emblems.js';
 import { openBracket } from './modules/tournament-ui.js';
+import { openBracketTv } from './modules/bracket-tv.js';
 import { mountArcade, attendanceMoment } from './modules/arcade.js';
 import { LUCKY_BETS, CHANCE_BETS, ATTENDANCE_REWARDS } from './modules/rewards.js';
 import { EGG_PRICE } from './modules/core.js';
@@ -536,6 +537,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'tournament-play') { A.yachaOpts = { tournament: { tid: d.tournament, mid: d.match } }; return navigate('yacha'); }
     if (d.action === 'tournament-bracket') return bracketModal(d.tournament);
     if (d.action === 'tournament-new') return tournamentCreateModal();
+    if (d.action === 'tournament-tv') return openTournamentTv(d.id);
     if (d.action === 'tournament-cancel') return cancelTournament(d.id, b);
     if (d.tnDecide) return decideTournamentMatch(d.tnDecide, d.match, d.winner, d.name, b);
     if (d.action === 'battle-accept' && A.data.battle_invite) { const invite = A.data.battle_invite; A.data.battle_invite = null; A.yachaOpts = { accept: invite }; return navigate('yacha'); }
@@ -1009,6 +1011,12 @@ function walletModal() {
 function bracketModal(id) {
   const t = (A.data.tournaments || []).find(item => item.id === id) || null;
   return openBracket(id, A.data.profile.id, t);
+}
+// V13.69 teacher: the bracket on the classroom TV, full screen and refreshing by itself.
+function openTournamentTv(id) {
+  A.screen = 'bracket-tv';
+  window.scrollTo(0, 0);
+  openBracketTv(A, id, async () => { A.screen = null; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); });
 }
 // V13.66 teacher: open an academy tournament for one grade (or class).
 const gradeOfClass = value => String(value || '').match(/^(중[1-3]|고[1-3])/)?.[1] || String(value || '');
