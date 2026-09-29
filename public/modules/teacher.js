@@ -232,7 +232,7 @@ export function vocabTable(A) {
     return searchMatch && rangeMatch && gradeMatch;
   });
   const gradeHead = middle ? '<th>학년</th>' : '';
-  return `<div class="panel-head"><div><h2>${A.school} 단어장</h2><span>원본 뜻은 유지하고, 기본 유효답과 승인된 허용 뜻의 출처를 따로 관리합니다.</span></div><span>${list.length}개 단어</span></div><div class="table-scroll"><table class="vocab-table"><thead><tr>${gradeHead}<th>범위</th><th>영어</th><th>기본 뜻</th><th>허용 뜻</th><th>관리</th></tr></thead><tbody>${list.slice(0, 400).map(w => {
+  return `<div class="panel-head"><div><h2>${A.school} 단어장</h2><span>원본 뜻은 유지하고, 기본 유효답과 승인된 허용 뜻의 출처를 따로 관리합니다.</span></div><span>${list.length}개 단어</span></div><div class="table-scroll"><table class="vocab-table"><thead><tr>${gradeHead}<th>범위</th><th>영어</th><th>기본 뜻</th><th>허용 뜻</th><th>관리</th></tr></thead><tbody>${list.slice(0, vocabLimit(A)).map(w => {
     const aliases = A.data.meaning_aliases?.[w.id] || [];
     const meta = A.data.meaning_alias_meta?.[w.id] || [];
     const aliasHtml = aliases.map(alias => {
@@ -241,8 +241,13 @@ export function vocabTable(A) {
       return `<span class="meaning-alias source-${source}" title="${esc(aliasSourceLabel(source))}">${esc(alias)}<small>${esc(aliasSourceLabel(source))}</small></span>`;
     }).join('');
     return `<tr>${middle ? `<td><span class="pill">${esc(w.grade || '-')}</span></td>` : ''}<td>${esc(w.range_code)}</td><td><strong>${esc(w.word)}</strong></td><td>${esc(w.meaning)}</td><td><span class="meaning-alias auto">기본 유효답<small>자동</small></span>${aliasHtml}</td><td><button class="text-button" data-meaning-alias="${esc(w.id)}">허용 뜻 관리</button></td></tr>`;
-  }).join('')}</tbody></table></div>`;
+  }).join('')}</tbody></table></div>${list.length > vocabLimit(A) ? `<button class="btn full vocab-more-v1365" data-action="vocab-more">더 보기 (${list.length - vocabLimit(A)}개 남음)</button>` : ''}`;
 }
+// V13.65: 80 rows first (was 400 at once, which made this tab slow to open on phones);
+// "더 보기" adds 200, and search still looks through every word.
+const VOCAB_FIRST = 80, VOCAB_STEP = 200;
+const vocabLimit = A => A.vocabLimit || VOCAB_FIRST;
+export function moreVocab(A) { A.vocabLimit = vocabLimit(A) + VOCAB_STEP; }
 function books(A) {
   const middle = A.data.profile.active_division === 'middle';
   const gradeSelect = middle ? `<label class="teacher-school"><span>학년</span><select id="vocab-grade"><option value="">전체</option><option value="중2" ${A.vocabGrade === '중2' ? 'selected' : ''}>중2</option><option value="중3" ${A.vocabGrade === '중3' ? 'selected' : ''}>중3</option></select></label>` : '';

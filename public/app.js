@@ -2,7 +2,7 @@ import { $, $$, api, esc, icon, toast, modal, buttonBusy, date } from './modules
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm } from './modules/core.js';
 import { avatar } from './modules/character.js';
 import { studentPage, getRanges, updateRangeSummary } from './modules/student.js';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, onTeacherGrammarLoaded } from './modules/teacher.js';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
 import { maybePetMoment, openPetNameModal, openEggShop, petJosa } from './modules/pet-moments.js';
 import { openBattle } from './modules/battle.js';
@@ -128,7 +128,7 @@ function navigate(tab) {
   collectExamForm(A); A.tab = tab;
   if (tab === 'practice') { A.studyView = 'hub'; A.practiceRunMode = 'practice'; }
   if (tab === 'exam') { A.examKind = null; A.practiceRunMode = 'practice'; if (!['write_meaning','spell','eng2mean','mean2eng'].includes(A.mode)) A.mode = 'eng2mean'; }
-  A.search = ''; A.classFilter = ''; A.style = null; render(); window.scrollTo(0, 0);
+  A.search = ''; A.classFilter = ''; A.style = null; A.vocabLimit = 0; render(); window.scrollTo(0, 0);
 }
 function signupView(division = A.division) {
   A.role = 'student'; A.division = division;
@@ -493,6 +493,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'pet-name') return openPetNameModal(A, petChanged);
     if (d.action === 'choose-pet') return confirmFirstPet(d.key);
     if (d.action === 'egg-shop') return openEggShop(A, petChanged);
+    if (d.action === 'vocab-more') { moreVocab(A); $('#vocab-table').innerHTML = vocabTable(A); return; }
     if (d.action === 'battle') { A.screen = 'battle'; return openBattle(A, leaveBattle); }
     if (d.action === 'battle-accept' && A.data.battle_invite) { const invite = A.data.battle_invite; A.data.battle_invite = null; A.screen = 'battle'; return openBattle(A, leaveBattle, { accept: invite }); }
     if (d.action === 'battle-decline') { buttonBusy(b); await api('/battle/invite/decline', { id: d.id }); A.data.battle_invite = null; renderKeepScroll(); toast('도전장을 거절했어요.'); return; }
@@ -588,13 +589,13 @@ $('#app').addEventListener('change', event => {
     } else updateRangeSummary(A);
     savePreferences();
   }
-  if (input.id === 'vocab-grade') { A.vocabGrade = input.value; $('#vocab-table').innerHTML = vocabTable(A); return; }
+  if (input.id === 'vocab-grade') { A.vocabGrade = input.value; A.vocabLimit = 0; $('#vocab-table').innerHTML = vocabTable(A); return; }
   if (input.id === 'class-filter') { A.classFilter = input.value; $('#student-table').innerHTML = studentFiltered(A); }
   if (input.id === 'results-class') { A.resultsClass = input.value; A.resultsLimit = 30; renderKeepScroll(); }
 });
 function bindPageForms() {
   $('#student-search')?.addEventListener('input', e => { A.search = e.target.value; $('#student-table').innerHTML = studentFiltered(A); });
-  $('#vocab-search')?.addEventListener('input', e => { A.vocabSearch = e.target.value; $('#vocab-table').innerHTML = vocabTable(A); });
+  $('#vocab-search')?.addEventListener('input', e => { A.vocabSearch = e.target.value; A.vocabLimit = 0; $('#vocab-table').innerHTML = vocabTable(A); });
   $('#results-search')?.addEventListener('input', e => {
     A.resultsQuery = e.target.value; A.resultsLimit = 30;
     clearTimeout(bindPageForms.resultsTimer);

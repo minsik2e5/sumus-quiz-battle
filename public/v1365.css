@@ -1,0 +1,6 @@
+/* SUMUS VOCA V13.65 · lighter teacher screen on phones.
+   Row cards the teacher has not scrolled to yet skip layout until they come near the
+   screen (results went from ~0.7s to ~0.07s of layout per tap on a slow phone). On a
+   desktop table the rows are table rows, where this has no effect. */
+.teacher-app.tv2 tbody tr{content-visibility:auto;contain-intrinsic-size:auto 120px}
+.vocab-more-v1365{margin-top:12px}

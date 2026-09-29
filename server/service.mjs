@@ -1498,9 +1498,8 @@ export async function service(state, method, path, body, token, options = {}) {
       x.shared_to_teacher_at = sharedAt;
       const session = state.sessions.find(item => item.id === x.id && item.student_id === p.id);
       if (session) session.shared_to_teacher_at = sharedAt;
-      const view = practiceView(x, state);
-      view.shared_to_teacher_at = sharedAt;
-      return view;
+      // V13.65: the phone only needs the time; the whole result view made this slow.
+      return { id: x.id, shared_to_teacher_at: sharedAt };
     }
     if (path.endsWith('/answer')) {
       if (x.responses[body.question_id]) return x.responses[body.question_id];
