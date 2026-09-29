@@ -47,9 +47,11 @@ export async function runCompetitionChecks(assert, expectStatus) {
   const boot1 = await service(state, 'GET', '/bootstrap', {}, tokens['qa-cc-a']);
   assert(boot1.titles.intro === false && boot1.titles.fresh.length === 0, 'V13.66 after the introduction nothing is new');
   // Study: 9 days in a row, two sessions a day (one perfect), 37 words correct a day.
+  // Both sessions of a day stay on the same KST day, also when the check runs just after midnight.
+  const sinceMidnight = (now + 9 * 3600000) % DAY, [early, later] = [Math.min(3600000, sinceMidnight / 3), Math.min(7200000, sinceMidnight * 2 / 3)];
   for (let d = 0; d < 9; d++) {
-    state.sessions.push(session(`qa-cc-s${d}a`, 'qa-cc-a', now - d * DAY - 3600000));
-    state.sessions.push(session(`qa-cc-s${d}b`, 'qa-cc-a', now - d * DAY - 7200000, { correct: 17, score: 85, perfect: false, best_combo: 12 }));
+    state.sessions.push(session(`qa-cc-s${d}a`, 'qa-cc-a', now - d * DAY - early));
+    state.sessions.push(session(`qa-cc-s${d}b`, 'qa-cc-a', now - d * DAY - later, { correct: 17, score: 85, perfect: false, best_combo: 12 }));
   }
   const boot2 = await service(state, 'GET', '/bootstrap', {}, tokens['qa-cc-a']);
   const s2 = boot2.titles.stats;

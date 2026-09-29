@@ -9,23 +9,19 @@ import { titleBadge, titleEmblem, tierEmblem, coin, trophy } from './emblems.js'
 import { titleState, openTitleDetail } from './titles-ui.js';
 import { mountLeagueBoard, clearLeagueCache, shownTitle } from './league-ui.js';
 import { createPracticeMatch, practiceQuestions, BOT_LEVELS } from './battle-bot.js';
-import { BATTLE_MODES } from './battle-engine.js';
+import { BATTLE_MODES, PET_SKILLS, PET_SKILL_NEED, petSkill } from './battle-engine.js';
 import { BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, BOT_MIN_RIGHT } from './rewards.js';
 import { tournamentCard, openBracket } from './tournament-ui.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
 // the match, and the result. A match runs in a battle room on the server (or, for a practice
 // match, on the phone: battle-bot.js); this module only draws what the room says and sends
-// answers and skills. It owns #app while A.screen === 'battle'.
+// answers. Pet skills fire by themselves (V13.72). It owns #app while A.screen === 'battle'.
 
 const STAKES = [10, 30, 50];
-const SKILLS = [
-  { id: 'shield', name: '방패', cost: 2, desc: '받는 피해 절반' },
-  { id: 'heal', name: '회복', cost: 3, desc: 'HP 20 회복' },
-  { id: 'freeze', name: '얼리기', cost: 4, desc: '상대 2초 멈춤' },
-  { id: 'power', name: '필살기', cost: 5, desc: '다음 공격 2배' }
-];
-const MAX_HP = 100, MAX_KI = 5;
+const MAX_HP = 100;
+// V13.72 "3번 연속 맞히면" (토리: 2번).
+const skillWhen = s => `${s.need}번 연속 맞히면`;
 // Why a match ended, from the point of view of the player reading the result.
 const REASONS = { end: () => '시간 종료', forfeit: mine => mine ? '대결을 포기했어요' : '상대가 대결을 포기했어요', disconnect: mine => mine ? '연결이 끊겨 패배했어요' : '상대의 연결이 끊겼어요', cancelled: () => '대결이 취소됐어요' };
 
@@ -175,7 +171,6 @@ function bindRoot() {
     if (act === 'join') return joinRoom(b);
     if (act === 'cancel') return cancelRoom(b);
     if (act === 'answer') { if (B.view?.question) B.view.question.picked = Number(b.dataset.choice); return send({ type: 'answer', choice: Number(b.dataset.choice) }, b); }
-    if (act === 'skill') return send({ type: 'skill', skill: b.dataset.skill });
     if (act === 'leave') return confirmLeave();
     if (act === 'again') { B.A.tab = 'yacha'; return leaveScreen(); }
   };
@@ -204,9 +199,18 @@ function lobby() {
       <div class="yb-record"><b>${h.record.wins}</b>승 <b>${h.record.losses}</b>패 <b>${h.record.draws}</b>무${h.record.streak >= 2 ? ` · <span class="yb-streak">${h.record.streak}연승 중</span>` : ''}${h.record.best_streak ? ` <small>최고 ${h.record.best_streak}연승</small>` : ''}</div>
       ${league?.tier ? `<button type="button" class="yb-hero-league" data-yb="tab" data-tab="league" aria-label="이번 주 리그 ${esc(league.tier.name)} ${num(league.points)}점${league.rank ? ` ${league.rank}위` : ''}">${tierEmblem(league.tier.key, { size: 'sm' })}<span><b>${esc(league.tier.name)}</b> ${num(league.points)}점${league.rank ? ` · ${league.rank}위` : ''}</span>${icon('chevron')}</button>` : ''}</div>
     </section>
+    ${petSkillChip(pet)}
     <div class="segment yb-tabs-v1366" role="group" aria-label="야차전 메뉴">${[['play', '대결'], ['league', '리그 랭킹'], ['me', '내 전적']].map(([key, label]) => `<button type="button" data-yb="tab" data-tab="${key}" class="${tab === key ? 'selected' : ''}" aria-pressed="${tab === key}">${label}</button>`).join('')}</div>
     ${tab === 'league' ? `<div class="lg-board" data-league-board data-period="${B.leaguePeriod === 'all' ? 'all' : 'week'}" data-fresh="1"></div>` : tab === 'me' ? myRecord(h) : playTab(h)}`);
   if (tab === 'league') mountLeagueBoard(document.querySelector('#yb-main [data-league-board]'), period => { B.leaguePeriod = period; });
+}
+// V13.72: what my pet does in a match, and what every pet does (the other player's too).
+function petSkillChip(pet) {
+  const s = petSkill(pet);
+  return `<details class="yb-skill-chip-v1372"><summary><span class="yb-skill-ico" aria-hidden="true">✦</span><span><b>펫 스킬 · ${esc(s.name)}</b><small>${skillWhen(s)} 저절로: ${esc(s.desc)}</small></span>${icon('chevron')}</summary>
+    <p>버튼을 누르지 않아도 돼요. 틀리거나 시간이 지나면 게이지가 처음부터 다시 차요. 펫 레벨과 상관없이 세기는 같아요.</p>
+    <ul>${Object.entries(PET_SKILLS).map(([key, x]) => `<li class="${key === s.key ? 'mine' : ''}"><span class="yb-skill-pet">${avatar(key, { size: 'mini', form: 1 })}</span><span><b>${esc(CHARACTERS[key]?.ko || '')} · ${esc(x.name)}</b><small>${x.need || PET_SKILL_NEED}번 연속 · ${esc(x.desc)}</small></span></li>`).join('')}</ul>
+  </details>`;
 }
 function playTab(h) {
   const A = B.A, g = A.data.stats;
@@ -512,7 +516,7 @@ function drawMatch() {
   // The lobby may have been scrolled; the arena starts at the top of the screen.
   if (!document.getElementById('yb-arena')) window.scrollTo(0, 0);
   // V13.70 easier to read: a smaller arena, one line for what is happening next to the clock,
-  // and the answers right under the word (skills below them).
+  // and the answers right under the word (V13.72: my pet's skill below them, no buttons).
   main(`
     <div class="yb-arena" id="yb-arena">
       <div class="yb-banner">夜叉</div><div class="yb-centerline"></div><div class="yb-ring"></div>
@@ -524,6 +528,7 @@ function drawMatch() {
       <div class="yb-vs-v1366" id="yb-vs" hidden>${vsSide(f, 'op')}<b class="yb-vs-mark">VS</b>${vsSide(m, 'me')}</div>
       <div class="yb-countdown" id="yb-countdown" hidden></div>
       <div class="yb-fever-banner" id="yb-fever" hidden>피버 타임!<small>공격력 1.5배</small></div>
+      <div class="yb-skill-banner-v1372" id="yb-skill-banner" hidden></div>
     </div>
     <div class="yb-strip-v1370">
       <div class="yb-msg" aria-live="polite"><div class="yb-msg-main" id="yb-msg-main"></div><div class="yb-msg-sub" id="yb-msg-sub"></div></div>
@@ -531,7 +536,7 @@ function drawMatch() {
     </div>
     <div class="yb-question"><div class="yb-q-head"><span id="yb-q-n"></span><span>${modeName(v.mode)} · ${v.label ? esc(v.label) : `판돈 ${num(v.stake)}코인`}</span></div><div class="yb-q-word" id="yb-q-word">…</div><div class="yb-turnbar"><i id="yb-turnbar"></i></div><div class="yb-status"><span id="yb-status-me"></span><span id="yb-status-op"></span></div></div>
     <div class="yb-answers" id="yb-answers"></div>
-    <div class="yb-skillbar" id="yb-skillbar"></div>
+    <div class="yb-myskill-v1372" id="yb-myskill"></div>
     <div class="yb-emotes" id="yb-emotes"></div>
     <button type="button" class="yb-leave" data-yb="leave">대결 포기하기</button>`);
   refreshHud();
@@ -552,37 +557,49 @@ function hud(p, side) {
     <div class="yb-hud-who">${p.tier ? tierEmblem(p.tier, { size: 'xs' }) : ''}${esc(p.name)}${side === 'me' ? ' · 나' : ''}${p.bot ? ' <i class="yb-ai">AI</i>' : ''}${p.streak >= 2 ? ` <span class="yb-streak">${p.streak}연승</span>` : ''}</div>
     ${shownTitle(p.title) ? `<div class="yb-hud-title">${titleBadge(p.title, { size: 'xs' })}</div>` : ''}
     <div class="yb-hpbar"><i>HP</i><div class="yb-track"><div class="yb-fill" id="yb-hp-${side}"></div></div><b class="yb-hp-num" id="yb-hpn-${side}">${Math.max(0, p.hp)}</b></div>
-    <div class="yb-hud-foot"><div class="yb-ki" id="yb-ki-${side}"></div><div class="yb-fx" id="yb-fx-${side}"></div></div>
+    <div class="yb-hud-foot"><div class="yb-gauge-v1372" id="yb-gauge-${side}"></div><div class="yb-fx" id="yb-fx-${side}"></div></div>
   </div>`;
 }
 
+// Pet skill effects still waiting: a bonus on my next attacks, a guard, poison.
+function effectBadges(fx = {}) {
+  const list = (xs, sign) => xs.length > 1 && xs.every(x => x === xs[0]) ? `${sign}${xs[0]} ×${xs.length}` : xs.map(x => sign + x).join(' ');
+  return [fx.boost?.length && `<b class="boost">공격 ${list(fx.boost, '+')}</b>`, fx.guard?.length && `<b class="guard">방어 ${list(fx.guard, '−')}</b>`, fx.poison > 0 && `<b class="poison">독 ${fx.poison}번</b>`].filter(Boolean);
+}
 function refreshHud() {
   for (const [side, p] of [['me', me()], ['op', foe()]]) {
     const pct = Math.max(0, p.hp) / MAX_HP * 100, fill = document.getElementById('yb-hp-' + side);
     if (fill) { fill.style.width = pct + '%'; fill.style.backgroundColor = pct > 50 ? '#2fbf71' : pct > 20 ? '#f2b233' : '#e5484d'; }
     const hpn = document.getElementById('yb-hpn-' + side);
     if (hpn) hpn.textContent = Math.max(0, p.hp);
-    const ki = document.getElementById('yb-ki-' + side);
-    if (ki) ki.innerHTML = '<i>기</i>' + Array.from({ length: MAX_KI }, (_, i) => `<span class="${i < p.ki ? 'on' : ''}"></span>`).join('');
+    const skill = p.skill || petSkill(p.pet), gauge = Math.min(p.gauge || 0, skill.need);
+    const box = document.getElementById('yb-gauge-' + side);
+    if (box) {
+      box.innerHTML = '<i>스킬</i>' + Array.from({ length: skill.need }, (_, i) => `<span class="${i < gauge ? 'on' : ''}"></span>`).join('');
+      box.classList.toggle('near', gauge === skill.need - 1);
+      box.setAttribute('aria-label', `${skill.name} 게이지 ${gauge}/${skill.need}`);
+    }
     const fx = document.getElementById('yb-fx-' + side);
-    if (fx) fx.innerHTML = [p.shield && '<b class="shield">방패</b>', p.power && '<b class="power">필살 준비</b>', p.frozen_next && '<b class="freeze">다음 단어 얼음</b>', !p.connected && B.view.phase !== 'waiting' && '<b class="off">연결 끊김</b>'].filter(Boolean).join('');
-    document.getElementById('yb-pet-' + side)?.classList.toggle('buff', !!p.power);
+    if (fx) fx.innerHTML = [...effectBadges(p.effects), !p.connected && B.view.phase !== 'waiting' && '<b class="off">연결 끊김</b>'].filter(Boolean).join('');
+    document.getElementById('yb-pet-' + side)?.classList.toggle('buff', !!p.effects?.boost?.length);
+    document.getElementById('yb-pet-' + side)?.classList.toggle('guarded', !!p.effects?.guard?.length);
   }
-  drawSkills();
+  drawMySkill();
 }
-
-function canUse(skill) {
-  const v = B.view, m = me(), f = foe();
-  if (!['question', 'reveal'].includes(v.phase) || m.ki < skill.cost) return false;
-  if (skill.id === 'shield' && m.shield) return false;
-  if (skill.id === 'power' && m.power) return false;
-  if (skill.id === 'heal' && m.hp >= MAX_HP) return false;
-  if (skill.id === 'freeze' && f.frozen_next) return false;
-  return true;
+// Under the answers: my pet's skill and how close it is, so nobody has to look for a button.
+function drawMySkill() {
+  const box = document.getElementById('yb-myskill'); if (!box) return;
+  const p = me(), s = p.skill || petSkill(p.pet), gauge = Math.min(p.gauge || 0, s.need), left = s.need - gauge;
+  box.innerHTML = `<span class="yb-myskill-name"><span aria-hidden="true">✦</span> ${esc(s.name)}</span><span class="yb-myskill-desc">${esc(s.desc)}</span><span class="yb-myskill-left ${left === 1 ? 'near' : ''}">${left === 1 ? '한 번만 더!' : `${left}번 더 맞히면`}</span>`;
 }
-function drawSkills() {
-  const bar = document.getElementById('yb-skillbar'); if (!bar) return;
-  bar.innerHTML = SKILLS.map(s => { const ok = canUse(s); return `<button type="button" class="yb-sk ${ok ? 'ready' : ''}" data-yb="skill" data-skill="${s.id}" ${ok ? '' : 'disabled'} aria-label="${s.name}, 기 ${s.cost}칸, ${s.desc}"><b>${s.name}</b><span class="yb-cost">${'<span></span>'.repeat(s.cost)}</span><small>${s.desc}</small></button>`; }).join('');
+// A pet skill went off: a banner across the arena for a moment.
+function skillBanner(side, name, text) {
+  const box = document.getElementById('yb-skill-banner'); if (!box) return;
+  box.className = `yb-skill-banner-v1372 ${side}`;
+  box.innerHTML = `<b>${name}</b><small>${esc(text)}</small>`;
+  box.hidden = false;
+  clearTimeout(B.skillBannerTimer);
+  B.skillBannerTimer = setTimeout(() => { box.hidden = true; }, reduced() ? 1200 : 1500);
 }
 
 // The line shown when a word is revealed: "word = meaning".
@@ -609,8 +626,8 @@ function spellSlots(q) {
     return `<span class="yb-slot ${cls}">${esc(shown)}</span>`;
   }).join('');
 }
-function drawSpell(q, frozen) {
-  const done = q.answer !== undefined, closed = q.locked || done || frozen;
+function drawSpell(q) {
+  const done = q.answer !== undefined, closed = q.locked || done;
   const full = q.typed.length === blanks(q);
   // Once the word is revealed the right spelling shows (in yellow), even after a wrong try.
   const state = q.right ? 'right' : done ? 'reveal' : q.wrong ? 'wrong' : '';
@@ -622,7 +639,7 @@ function drawSpell(q, frozen) {
 }
 function spellKey(key) {
   const q = B?.view?.question;
-  if (!q || q.kind !== 'spell' || q.locked || q.answer !== undefined || (q.frozen_until?.[B.view.me] || 0) > serverNow()) return;
+  if (!q || q.kind !== 'spell' || q.locked || q.answer !== undefined) return;
   if (key === 'back') q.typed.pop();
   else if (/^[a-z]$/.test(key) && q.typed.length < blanks(q)) q.typed.push(key);
   else return;
@@ -656,16 +673,9 @@ function drawQuestion() {
   document.getElementById('yb-q-n').textContent = `${q.n}번째 단어 · ${q.kind === 'spell' ? '철자 쓰기' : '뜻 고르기'}`;
   document.getElementById('yb-q-word').textContent = q.prompt;
   document.getElementById('yb-q-word').classList.toggle('meaning', q.kind === 'spell');
-  const frozen = (q.frozen_until?.[B.view.me] || 0) > serverNow();
   document.querySelector('.battle-app')?.classList.toggle('yb-spelling', q.kind === 'spell');
-  if (q.kind === 'spell') drawSpell(q, frozen);
-  else document.getElementById('yb-answers').innerHTML = q.options.map((o, i) => `<button type="button" class="yb-answer ${q.answer === i ? 'right' : ''} ${q.answer !== undefined && q.answer !== i ? 'dim' : ''} ${q.picked === i ? 'picked' : ''} ${q.picked === i && q.hit ? 'hit' : ''}" data-yb="answer" data-choice="${i}" aria-label="${i + 1}번 ${esc(o)} 공격" ${q.locked || q.answer !== undefined || frozen ? 'disabled' : ''}><span class="yb-tag"><b>${i + 1}</b></span><span class="yb-ko">${esc(o)}</span></button>`).join('');
-  document.getElementById('yb-answers').classList.toggle('frozen', frozen);
-  document.getElementById('yb-pet-me')?.classList.toggle('frozen', frozen);
-  if (frozen) {
-    setStatus('me', '얼어붙었어요! 2초 뒤 풀려요');
-    later(() => { if (B.view?.question === q && q.answer === undefined) { setStatus('me', ''); drawQuestion(); } }, Math.max(0, q.frozen_until[B.view.me] - serverNow()) + 30);
-  }
+  if (q.kind === 'spell') drawSpell(q);
+  else document.getElementById('yb-answers').innerHTML = q.options.map((o, i) => `<button type="button" class="yb-answer ${q.answer === i ? 'right' : ''} ${q.answer !== undefined && q.answer !== i ? 'dim' : ''} ${q.picked === i ? 'picked' : ''} ${q.picked === i && q.hit ? 'hit' : ''}" data-yb="answer" data-choice="${i}" aria-label="${i + 1}번 ${esc(o)} 공격" ${q.locked || q.answer !== undefined ? 'disabled' : ''}><span class="yb-tag"><b>${i + 1}</b></span><span class="yb-ko">${esc(o)}</span></button>`).join('');
   // The word itself is in the question card; the line only says what to do.
   if (q.answer === undefined && !q.locked) say(q.kind === 'spell' ? '뜻을 보고 <em>영어 철자</em>를 써요!' : '알맞은 <em>뜻</em>을 누르면 바로 공격!', q.kind === 'spell' ? '쓰기 정답은 두 배로 세요.' : '');
 }
@@ -699,7 +709,7 @@ function showCountdown(deadline) {
     box.textContent = left; later(step, 150);
   };
   step();
-  say('곧 시작해요!', '같은 단어가 두 사람에게 동시에 나와요.');
+  say('곧 시작해요!', '연속으로 맞히면 펫 스킬이 저절로 나가요.');
 }
 
 // Clock and word timer, drawn from the room's deadlines.
@@ -735,18 +745,17 @@ function applyEvent(e) {
   if (e.type === 'start') { v.ends_at = e.ends_at; return; }
   if (e.type === 'question') {
     v.phase = 'question'; v.deadline = e.deadline;
-    v.question = { n: e.n, kind: e.kind || 'choice', prompt: e.prompt, hint: e.hint || '', options: e.options || [], started_at: e.started_at, frozen_until: e.frozen_until || {}, locked: false, answer: undefined, typed: [] };
-    for (const id of Object.keys(e.frozen_until || {})) P[id].frozen_next = false;
+    v.question = { n: e.n, kind: e.kind || 'choice', prompt: e.prompt, hint: e.hint || '', options: e.options || [], started_at: e.started_at, locked: false, opDone: false, answer: undefined, typed: [] };
     if (!document.getElementById('yb-arena')) return drawMatch();
     setStatus('me', ''); setStatus('op', '');
     const vs = document.getElementById('yb-vs'); if (vs) vs.hidden = true;
-    document.getElementById('yb-pet-op')?.classList.remove('frozen');
     if (e.n === 1) sfx('go');
     drawQuestion(); refreshHud(); drawEmotes(); return;
   }
   if (e.type === 'emote') return showEmote(e);
   if (e.type === 'wrong') {
-    P[e.player].ki = 0;
+    P[e.player].gauge = 0;
+    if (e.player !== v.me) v.question.opDone = true;
     if (e.player === v.me) {
       sfx('wrong', 40);
       v.question.locked = true;
@@ -762,11 +771,13 @@ function applyEvent(e) {
   if (e.type === 'reveal' || e.type === 'miss') {
     v.phase = 'reveal'; v.question.answer = e.answer;
     const line = revealLine(v.question, e.answer);
+    // A word left to run out empties the gauge, like a wrong answer.
     if (e.type === 'miss') {
-      for (const id of v.order) P[id].ki = 0;
+      for (const id of v.order) P[id].gauge = 0;
       say(e.timeout ? '시간 초과!' : '둘 다 놓쳤어요!', line);
     } else {
-      if (e.timeout && !v.question.locked) { P[v.me].ki = 0; setStatus('me', '시간 초과!'); }
+      if (e.timeout && !v.question.locked) { P[v.me].gauge = 0; setStatus('me', '시간 초과!'); }
+      if (e.timeout && !v.question.opDone) foe().gauge = 0;
       say('정답 공개', line);
     }
     drawQuestion(); refreshHud(); return;
@@ -774,34 +785,47 @@ function applyEvent(e) {
   if (e.type === 'attack') {
     {
       const atk = sideOf(e.attacker), def = sideOf(e.defender);
-      Object.assign(P[e.attacker], { hp: e.hp[e.attacker], ki: e.ki[e.attacker] });
-      Object.assign(P[e.defender], { hp: e.hp[e.defender], ki: e.ki?.[e.defender] ?? P[e.defender].ki });
-      if (atk === 'me') { v.question.locked = true; v.question.hit = true; }
-      if (e.powered) P[e.attacker].power = false;
-      if (e.shielded) P[e.defender].shield = false;
+      P[e.attacker].hp = e.hp[e.attacker]; P[e.defender].hp = e.hp[e.defender];
+      P[e.attacker].gauge = e.gauge ?? P[e.attacker].gauge;
+      if (e.effects) for (const id of Object.keys(e.effects)) P[id].effects = e.effects[id];
+      if (atk === 'me') { v.question.locked = true; v.question.hit = true; } else v.question.opDone = true;
       if (e.spell && atk === 'me') v.question.right = true;
-      setStatus(atk, `${(e.ms / 1000).toFixed(1)}초 ${e.spell ? '철자 ' : ''}정답!${atk === 'me' ? ` 기 +${e.fast || e.spell ? 2 : 1}` : ''}`);
+      const need = (P[e.attacker].skill || petSkill(P[e.attacker].pet)).need;
+      setStatus(atk, `${(e.ms / 1000).toFixed(1)}초 ${e.spell ? '철자 ' : ''}정답!${atk === 'me' && e.gauge ? ` 스킬 ${e.gauge}/${need}` : ''}`);
       if (atk === 'op' && !v.question.locked) setStatus('me', '나도 맞히면 반격!');
-      const label = e.powered ? '<em>필살기!</em>' : e.fast ? '<em>크리티컬</em> 공격!' : e.spell ? '<em>철자</em> 공격!' : '공격!';
-      if (atk === 'me') sfx(e.powered || e.fast || e.fever ? 'crit' : 'hit', e.powered || e.fever ? 30 : 0);
-      else later(() => sfx('hurt', e.powered || e.fever ? [80, 40, 80] : 70), reduced() ? 0 : 230);
-      say(`${atk === 'op' ? '상대 ' : ''}${esc(petName(P[e.attacker].pet))}의 ${label}`, `${atk === 'me' ? '정답! 상대를 기다려요' : '상대가 맞혔어요'}${e.shielded ? ' · 방패가 피해를 절반 막았어요' : ''}`);
+      const strong = e.boost || e.fast || e.fever;
+      const label = e.boost ? '<em>스킬</em> 공격!' : e.fast ? '<em>크리티컬</em> 공격!' : e.spell ? '<em>철자</em> 공격!' : '공격!';
+      if (atk === 'me') sfx(strong ? 'crit' : 'hit', e.boost || e.fever ? 30 : 0);
+      else later(() => sfx('hurt', e.boost || e.fever ? [80, 40, 80] : 70), reduced() ? 0 : 230);
+      say(`${atk === 'op' ? '상대 ' : ''}${esc(petName(P[e.attacker].pet))}의 ${label}`, `${atk === 'me' ? '정답! 상대를 기다려요' : '상대가 맞혔어요'}${e.guard ? ` · ${def === 'me' ? '내' : '상대'} 펫이 ${e.guard}만큼 막았어요` : ''}`);
       lunge(atk);
-      later(() => { if (e.powered || e.fast || e.spell) flash(e.powered ? 'rgba(255,214,90,.9)' : e.spell ? 'rgba(150,230,210,.75)' : 'rgba(255,236,160,.8)'); hit(def); pop(def, `-${e.dmg}${e.powered ? ' 필살!' : e.fast ? ' 크리티컬!' : e.spell ? ' 철자!' : e.fever ? ' 피버!' : ''}`, e.powered || e.fast || e.spell || e.fever ? 'crit' : ''); refreshHud(); }, reduced() ? 0 : 230);
+      later(() => { if (e.boost || e.fast || e.spell) flash(e.boost ? 'rgba(255,214,90,.9)' : e.spell ? 'rgba(150,230,210,.75)' : 'rgba(255,236,160,.8)'); if (e.dmg) { hit(def); pop(def, `-${e.dmg}${e.boost ? ' 스킬!' : e.fast ? ' 크리티컬!' : e.spell ? ' 철자!' : e.fever ? ' 피버!' : ''}`, strong || e.spell ? 'crit' : ''); } if (e.guard) pop(def, e.dmg ? `막기 ${e.guard}` : '다 막았다!', 'info'); refreshHud(); }, reduced() ? 0 : 230);
       // Redraw only my own buttons: the other player's hit must not replace my question.
       if (atk === 'me') drawQuestion();
     }
     refreshHud(); return;
   }
-  if (e.type === 'skill') {
-    const p = P[e.player], side = sideOf(e.player), other = side === 'me' ? 'op' : 'me', rule = SKILLS.find(s => s.id === e.skill);
-    p.ki = e.ki; p.hp = e.hp;
-    sfx('skill', side === 'op' && e.skill === 'freeze' ? 50 : 0);
-    if (e.skill === 'shield') { p.shield = true; flash('rgba(120,200,240,.7)'); pop(side, '방패!', 'info'); }
-    if (e.skill === 'power') { p.power = true; flash('rgba(255,214,90,.85)'); pop(side, '기 모으기!', 'crit'); }
-    if (e.skill === 'heal') { flash('rgba(120,235,170,.7)'); pop(side, '+20', 'heal'); }
-    if (e.skill === 'freeze') { P[v.order.find(id => id !== e.player)].frozen_next = true; flash('rgba(160,215,245,.8)'); pop(other, '얼음!', 'info'); }
-    say(`${side === 'op' ? '상대 ' : ''}${esc(petName(p.pet))}의 <em>${rule?.name || ''}</em>!`, e.skill === 'freeze' ? '다음 단어에서 2초 동안 멈춰요.' : rule?.desc || '');
+  // V13.72: a full gauge sets off the pet's own skill.
+  if (e.type === 'petskill') {
+    const p = P[e.player], side = sideOf(e.player), other = side === 'me' ? 'op' : 'me', foeId = v.order.find(id => id !== e.player);
+    p.gauge = 0; p.effects = e.effects;
+    P[e.player].hp = e.hp[e.player]; P[foeId].hp = e.hp[foeId];
+    later(() => {
+      sfx('skill', side === 'me' ? 30 : 50);
+      flash(side === 'me' ? 'rgba(255,214,90,.8)' : 'rgba(170,160,255,.65)');
+      skillBanner(side, `${side === 'op' ? '상대 ' : ''}${esc(petName(p.pet))}의 ${esc(e.name)}!`, e.desc);
+      if (e.dmg) { hit(other); pop(other, `-${e.dmg} 스킬!`, 'crit'); }
+      if (e.heal) pop(side, `+${e.heal}`, 'heal');
+      refreshHud();
+    }, reduced() ? 0 : 520);
+    refreshHud(); return;
+  }
+  // 초롱's poison bites as a word closes.
+  if (e.type === 'poison') {
+    const side = sideOf(e.target);
+    P[e.target].hp = e.hp;
+    P[e.player].effects = { ...(P[e.player].effects || {}), poison: e.left };
+    later(() => { hit(side); pop(side, `-${e.dmg} 독`, 'poison'); refreshHud(); }, reduced() ? 0 : 700);
     refreshHud(); return;
   }
   if (e.type === 'end') {

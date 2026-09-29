@@ -2,7 +2,7 @@
 // WebSocket; the room runs server/battle-engine.mjs, wakes itself with alarms for word
 // timeouts, and reports the result to the main state object when the match ends.
 // Uses the hibernation API, so every change is written to storage before replying.
-import { createBattle, connect, disconnect, forfeit, answer, useSkill, tick, nextWake, battleView } from '../server/battle-engine.mjs';
+import { createBattle, connect, disconnect, forfeit, answer, tick, nextWake, battleView } from '../server/battle-engine.mjs';
 
 const REPORT_RETRY_MS = 5000;
 const CONNECT_MS = 120000;    // after the guest joins, both phones must connect within this
@@ -117,8 +117,8 @@ export class BattleRoom {
     // Timers may have passed while the room slept: apply them before the player's action,
     // so a late answer cannot count and events keep their order.
     const events = tick(r.battle, now);
+    // V13.72: pet skills fire by themselves; a 'skill' message from an old screen is ignored.
     if (msg.type === 'answer') events.push(...answer(r.battle, pid, typeof msg.choice === 'string' ? msg.choice.slice(0, 60) : Number(msg.choice), now));
-    else if (msg.type === 'skill') events.push(...useSkill(r.battle, pid, String(msg.skill), now));
     else if (msg.type === 'leave') events.push(...forfeit(r.battle, pid, now));
     if (!events.length) return;
     await this.save();

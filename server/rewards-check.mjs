@@ -51,7 +51,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   const wrongSpell = answer(duel, 'y', 'zzzz', t1 + 1000);
   const typed = answer(duel, 'x', ` ${sq.text.toUpperCase()} `, t1 + 8000);
   const hitSpell = typed.find(e => e.type === 'attack'), reveal = typed.find(e => e.type === 'reveal');
-  assert(wrongSpell[0].type === 'wrong' && hitSpell?.spell === true && hitSpell.fast === false && hitSpell.dmg === SKILL_RULES.SPELL_HIT + Math.round(8 * SKILL_RULES.SPEED_BONUS) && duel.players.x.ki === 2 && reveal?.answer === sq.text, 'V13.67 a typed spelling is checked without case or spaces; it hits hardest (no speed crits in 실력전) and the word is revealed after');
+  assert(wrongSpell[0].type === 'wrong' && hitSpell?.spell === true && hitSpell.fast === false && hitSpell.dmg === SKILL_RULES.SPELL_HIT + Math.round(8 * SKILL_RULES.SPEED_BONUS) && duel.players.x.gauge === 1 && reveal?.answer === sq.text, 'V13.67 a typed spelling is checked without case or spaces; it hits hardest (no speed crits in 실력전) and the word is revealed after');
   tick(duel, t1 + 8000 + BATTLE.REVEAL_MS);
   const cq = duel.questions[duel.turn.q], t2 = t1 + 8000 + BATTLE.REVEAL_MS;
   const quick = answer(duel, 'x', cq.answer, t2 + 500).find(e => e.type === 'attack');
@@ -217,5 +217,5 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(homeUi.includes('attendanceCard(') && arcade.includes('/lucky/pull') && !arcade.includes('/chance/') && !arcade.includes('더블 찬스') && arcade.includes('확률'), 'V13.67 the home screen has the attendance card; the coin arcade has the capsule machine (with its odds); V13.70 no double chance');
   const battleV70 = source('../public/modules/battle.js'), sessionsUi = source('../public/modules/sessions.js'), appUi = source('../public/app.js'), buildUi = source('./build-assets.mjs');
   assert(battleV70.includes("api('/battle/practice/start'") && battleV70.includes("api('/battle/practice/finish'") && battleV70.includes('botRewardLine()') && sessionsUi.includes('a.reward ?') && homeUi.includes('data-go="ranking" data-from="me"') && homeUi.includes("A.rankFrom === 'me' ? backTo('me', '나')") && appUi.includes("A.rankFrom = d.from || 'home'") && !appUi.includes('wallet-chance') && buildUi.includes('"v1370.css"'), 'V13.70 robot and exam rewards show in the app; 나 opens the ranking; the wallet has no double chance');
-  assert(battleV70.indexOf('id="yb-answers"') < battleV70.indexOf('id="yb-skillbar"') && battleV70.includes('yb-strip-v1370') && battleV70.includes('yb-hpn-'), 'V13.70 the match shows the answers right under the word, the clock beside the message line and HP numbers');
+  assert(battleV70.indexOf('id="yb-answers"') < battleV70.indexOf('id="yb-myskill"') && battleV70.includes('yb-strip-v1370') && battleV70.includes('yb-hpn-'), 'V13.70 the match shows the answers right under the word, the clock beside the message line and HP numbers');
 }

@@ -11,13 +11,10 @@ export const BATTLE = {
   COUNTDOWN_MS: 3000,  // after both players are connected
   RECONNECT_MS: 15000, // a dropped player may come back within this
   MAX_HP: 100,
-  MAX_KI: 5,
-  FAST_MS: 2000,       // answers faster than this are critical and give 2 ki
+  FAST_MS: 2000,       // answers faster than this are critical hits
   HIT: 12,             // damage of a correct answer
   SPEED_BONUS: 0.5,    // extra damage per second left on the word
   CRIT: 1.25,          // a fast answer multiplies the damage
-  FREEZE_MS: 2000,
-  HEAL: 20,
   FEVER_MS: 15000,     // the last 15 seconds of a match are fever time
   FEVER_MULT: 1.5,     // hits in fever time do 1.5x damage
   REVIEW_MAX: 20       // words listed per player on the result screen
@@ -45,12 +42,26 @@ export function questionWord(q) {
   return q.kind === 'spell' ? { word: q.text, meaning: q.prompt } : { word: q.prompt, meaning: q.options[q.answer] };
 }
 
-export const BATTLE_SKILLS = {
-  shield: { cost: 2, name: '방패' },
-  heal: { cost: 3, name: '회복' },
-  freeze: { cost: 4, name: '얼리기' },
-  power: { cost: 5, name: '필살기' }
+// V13.72 pet skills fire by themselves: answering 3 words in a row right fills the gauge
+// (토리: 2 in a row, but weaker); a wrong answer or a word left to time out empties it.
+// There are no skill buttons: children focusing on the word kept missing them. Every pet is
+// as strong at any level, and the numbers come from a simulation of thousands of matches per
+// pair of pets (each pet wins 47–54% against the others in both modes at every skill level).
+// Bonuses and guards are flat numbers, added after the critical and fever multipliers.
+export const PET_SKILL_NEED = 3;
+export const PET_SKILLS = {
+  dog: { name: '용감한 돌진', desc: '다음 공격 +16', boost: [16] },
+  dragon: { name: '불꽃 숨결', desc: '바로 13 피해', burst: 13 },
+  fox: { name: '여우 연타', desc: '다음 공격 2번 +9씩', boost: [9, 9] },
+  snake: { name: '독 이빨', desc: '3문제 동안 5씩 피해', poison: 5, turns: 3 },
+  cat: { name: '사뿐 회피', desc: '다음에 받는 공격 −16', guard: [16] },
+  pig: { name: '말랑 방패', desc: '다음에 받는 공격 2번 −8씩', guard: [8, 8] },
+  panda: { name: '대나무 간식', desc: 'HP +13', heal: 13 },
+  rabbit: { name: '깡총 연타', desc: '2번 연속 맞히면 바로 7 피해', burst: 7, need: 2 }
 };
+// A pet without its own skill (the practice robot, or no pet) uses 몽이's.
+export const petSkillKey = pet => PET_SKILLS[pet?.key] ? pet.key : 'dog';
+export const petSkill = pet => ({ key: petSkillKey(pet), need: PET_SKILL_NEED, ...PET_SKILLS[petSkillKey(pet)] });
 
 const other = (state, pid) => state.order.find(id => id !== pid);
 
@@ -66,7 +77,7 @@ export function createBattle({ id, players, questions, stake = 0, label = null, 
     order: players.map(p => p.id),
     players: Object.fromEntries(players.map(p => [p.id, {
       id: p.id, name: p.name, pet: p.pet || null, streak: Number(p.streak || 0), title: p.title || null, tier: p.tier || null, bot: !!p.bot,
-      hp: BATTLE.MAX_HP, ki: 0, shield: false, power: false, frozen_next: false,
+      hp: BATTLE.MAX_HP, gauge: 0, boost: [], guard: [], poison: 0,
       connected: false, dropped_at: null, correct: 0, answer_ms: 0, skills_used: 0, missed: []
     }])),
     questions, idx: -1, turn: null,
@@ -82,7 +93,7 @@ function questionPublic(q) {
 }
 function questionEvent(state) {
   const q = state.questions[state.turn.q];
-  return event(state, 'question', { n: state.idx + 1, ...questionPublic(q), started_at: state.turn.started_at, deadline: state.deadline, frozen_until: state.turn.frozen_until });
+  return event(state, 'question', { n: state.idx + 1, ...questionPublic(q), started_at: state.turn.started_at, deadline: state.deadline });
 }
 const answerOf = q => q.kind === 'spell' ? q.text : q.answer;
 
@@ -90,11 +101,7 @@ function nextQuestion(state, now) {
   const alive = state.order.every(id => state.players[id].hp > 0);
   if (!alive || now >= state.ends_at) return finish(state, now, 'end');
   state.idx++;
-  const frozen_until = {};
-  for (const id of state.order) {
-    if (state.players[id].frozen_next) { frozen_until[id] = now + BATTLE.FREEZE_MS; state.players[id].frozen_next = false; }
-  }
-  state.turn = { q: state.idx % state.questions.length, started_at: now, locked: {}, hits: 0, frozen_until, resolved: false };
+  state.turn = { q: state.idx % state.questions.length, started_at: now, locked: {}, hits: 0, resolved: false };
   state.phase = 'question';
   state.deadline = now + turnMs(state, state.questions[state.turn.q]);
   return [questionEvent(state)];
@@ -135,9 +142,8 @@ function reveal(state, now) {
 function attack(state, attackerId, ms, now) {
   const attacker = state.players[attackerId], defender = state.players[other(state, attackerId)];
   const q = state.questions[state.turn.q], skill = state.mode === 'skill', spell = q.kind === 'spell';
-  // 실력전 has no critical hits: a spelled word gives the extra ki instead.
+  // 실력전 has no critical hits.
   const fast = !skill && ms < BATTLE.FAST_MS;
-  attacker.ki = Math.min(BATTLE.MAX_KI, attacker.ki + (fast || spell ? 2 : 1));
   attacker.correct++; attacker.answer_ms += ms;
   state.turn.locked[attackerId] = true;
   state.turn.hits = (state.turn.hits || 0) + 1;
@@ -148,26 +154,52 @@ function attack(state, attackerId, ms, now) {
   if (fast) dmg = Math.round(dmg * BATTLE.CRIT);
   const fever = inFever(state, now);
   if (fever) dmg = Math.round(dmg * BATTLE.FEVER_MULT);
-  const powered = attacker.power, shielded = defender.shield;
-  if (powered) { dmg *= 2; attacker.power = false; }
-  if (shielded) { dmg = Math.round(dmg / 2); defender.shield = false; }
+  // Pet skill effects waiting for this attack (a room started before V13.72 has no lists).
+  const boost = (attacker.boost ||= []).shift() || 0, guard = (defender.guard ||= []).shift() || 0;
+  dmg = Math.max(0, dmg + boost - guard);
   defender.hp = Math.max(0, defender.hp - dmg);
-  const events = [event(state, 'attack', { attacker: attacker.id, defender: defender.id, dmg, fast, spell, fever, powered, shielded, ms, hp: { [attacker.id]: attacker.hp, [defender.id]: defender.hp }, ki: { [attacker.id]: attacker.ki, [defender.id]: defender.ki } })];
+  attacker.gauge = (attacker.gauge || 0) + 1;
+  const events = [event(state, 'attack', { attacker: attacker.id, defender: defender.id, dmg, fast, spell, fever, boost, guard, ms, hp: { [attacker.id]: attacker.hp, [defender.id]: defender.hp }, gauge: attacker.gauge, effects: { [attacker.id]: effectsOf(attacker), [defender.id]: effectsOf(defender) } })];
+  if (attacker.gauge >= petSkill(attacker.pet).need) events.push(firePetSkill(state, attacker, defender));
   if (state.order.every(id => state.turn.locked[id])) events.push(...settle(state, now, false));
   return events;
 }
 
-// Closes a word: everyone has answered or its time ran out. Players who did not
-// answer lose their ki; the answer is revealed to both.
+// The gauge is full: the pet's skill goes off at once and the gauge starts again.
+function firePetSkill(state, p, foe) {
+  const s = petSkill(p.pet);
+  p.gauge = 0; p.skills_used++;
+  if (s.boost) p.boost = [...s.boost];
+  if (s.guard) p.guard = [...s.guard];
+  if (s.poison) p.poison = s.turns;
+  if (s.heal) p.hp = Math.min(BATTLE.MAX_HP, p.hp + s.heal);
+  if (s.burst) foe.hp = Math.max(0, foe.hp - s.burst);
+  return event(state, 'petskill', { player: p.id, skill: s.key, name: s.name, desc: s.desc, dmg: s.burst || 0, heal: s.heal || 0, hp: { [p.id]: p.hp, [foe.id]: foe.hp }, effects: effectsOf(p) });
+}
+// What is still waiting to happen for a player (drawn under the HP bar).
+const effectsOf = p => ({ boost: [...(p.boost || [])], guard: [...(p.guard || [])], poison: p.poison || 0 });
+
+// Closes a word: everyone has answered or its time ran out; the answer is revealed to both.
+// A word left to run out empties the pet gauge like a wrong answer. 초롱's poison bites
+// as each word closes.
 function settle(state, now, timeout) {
   for (const id of state.order) {
     if (state.turn.locked[id]) continue;
-    state.players[id].ki = 0;
+    state.players[id].gauge = 0;
     if (timeout) markMissed(state, id);
   }
   reveal(state, now);
   const answer = answerOf(state.questions[state.turn.q]);
-  return [event(state, state.turn.hits ? 'reveal' : 'miss', { timeout, answer })];
+  const events = [event(state, state.turn.hits ? 'reveal' : 'miss', { timeout, answer })];
+  for (const id of state.order) {
+    const p = state.players[id];
+    if (!(p.poison > 0)) continue;
+    const foe = state.players[other(state, id)], dmg = petSkill(p.pet).poison || 0;
+    p.poison--;
+    foe.hp = Math.max(0, foe.hp - dmg);
+    events.push(event(state, 'poison', { player: id, target: foe.id, dmg, left: p.poison, hp: foe.hp }));
+  }
+  return events;
 }
 
 export function connect(state, pid, now) {
@@ -203,7 +235,6 @@ export function answer(state, pid, choice, now) {
   // Answers after the deadline do not count, even if the room has not woken up yet.
   if (!p || state.phase !== 'question' || !turn || turn.resolved || now >= state.deadline) return [];
   if (turn.locked[pid]) return [];
-  if ((turn.frozen_until[pid] || 0) > now) return [];
   const q = state.questions[turn.q];
   let right;
   if (q.kind === 'spell') {
@@ -215,27 +246,11 @@ export function answer(state, pid, choice, now) {
   }
   if (right) return attack(state, pid, now - turn.started_at, now);
   turn.locked[pid] = true;
-  p.ki = 0;
+  p.gauge = 0;
   markMissed(state, pid);
-  const events = [event(state, 'wrong', { player: pid, ki: 0 })];
+  const events = [event(state, 'wrong', { player: pid, gauge: 0 })];
   if (state.order.every(id => turn.locked[id])) events.push(...settle(state, now, false));
   return events;
-}
-
-export function useSkill(state, pid, skill, now) {
-  const p = state.players[pid], rule = BATTLE_SKILLS[skill];
-  if (!p || !rule || !['question', 'reveal'].includes(state.phase) || now >= state.deadline || p.ki < rule.cost) return [];
-  const foe = state.players[other(state, pid)];
-  if (skill === 'shield' && p.shield) return [];
-  if (skill === 'power' && p.power) return [];
-  if (skill === 'heal' && p.hp >= BATTLE.MAX_HP) return [];
-  if (skill === 'freeze' && foe.frozen_next) return [];
-  p.ki -= rule.cost; p.skills_used++;
-  if (skill === 'shield') p.shield = true;
-  if (skill === 'power') p.power = true;
-  if (skill === 'heal') p.hp = Math.min(BATTLE.MAX_HP, p.hp + BATTLE.HEAL);
-  if (skill === 'freeze') foe.frozen_next = true;
-  return [event(state, 'skill', { player: pid, skill, ki: p.ki, hp: p.hp })];
 }
 
 // Advances timers: countdown, word timeout, reveal pause, and dropped players.
@@ -277,11 +292,12 @@ export function battleView(state, pid) {
     order: state.order, started_at: state.started_at, ends_at: state.ends_at, deadline: state.deadline, fever_ms: BATTLE.FEVER_MS,
     players: Object.fromEntries(state.order.map(id => {
       const p = state.players[id];
-      return [id, { id, name: p.name, pet: p.pet, streak: p.streak || 0, title: p.title || null, tier: p.tier || null, bot: !!p.bot, hp: p.hp, ki: p.ki, shield: p.shield, power: p.power, frozen_next: p.frozen_next, connected: p.connected }];
+      const s = petSkill(p.pet);
+      return [id, { id, name: p.name, pet: p.pet, streak: p.streak || 0, title: p.title || null, tier: p.tier || null, bot: !!p.bot, hp: p.hp, gauge: p.gauge || 0, skill: { key: s.key, name: s.name, desc: s.desc, need: s.need }, effects: effectsOf(p), connected: p.connected }];
     })),
     question: q && ['question', 'reveal'].includes(state.phase) ? {
       n: state.idx + 1, ...questionPublic(q), started_at: turn.started_at,
-      frozen_until: turn.frozen_until, locked: !!turn.locked[pid], answer: state.phase === 'reveal' ? answerOf(q) : undefined
+      locked: !!turn.locked[pid], answer: state.phase === 'reveal' ? answerOf(q) : undefined
     } : null,
     result: state.result
   };
