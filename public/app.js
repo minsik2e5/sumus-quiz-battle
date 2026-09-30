@@ -1,7 +1,7 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date, num, rangeLabel } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm } from './modules/core.js';
 import { avatar } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary } from './modules/student.js';
+import { studentPage, getRanges, updateRangeSummary, starredWords } from './modules/student.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel, careIds } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
 import { maybePetMoment, openPetNameModal, openEggShop, petJosa } from './modules/pet-moments.js';
@@ -48,6 +48,34 @@ function preferences() {
     A.memStars = Array.isArray(v.memStars) ? v.memStars : [];
     A.sound = localStorage.getItem('sumus:sound') === 'true';
   } catch {}
+  syncStars();
+}
+// V13.76 ⭐ 어려운 단어 are kept on the account (they used to stay on one phone). The stars this
+// phone had before are sent up once; after that the account's list is the one shown.
+function syncStars() {
+  const profile = A.data?.profile;
+  if (profile?.role !== 'student') return;
+  const server = Array.isArray(profile.stars) ? profile.stars : [];
+  const key = 'sumus:stars-synced:' + profile.id;
+  let synced = false;
+  try { synced = localStorage.getItem(key) === '1'; } catch {}
+  const local = A.memStars || [];
+  if (!synced && local.some(id => !server.includes(id))) {
+    A.memStars = [...new Set([...server, ...local])];
+    api('/stars', { word_ids: local }).then(r => { profile.stars = r.stars; A.memStars = r.stars; try { localStorage.setItem(key, '1'); } catch {} savePreferences(); }).catch(() => {});
+    return;
+  }
+  try { localStorage.setItem(key, '1'); } catch {}
+  A.memStars = [...server];
+}
+export function toggleStar(wordId) {
+  const set = new Set(A.memStars || []), on = !set.has(wordId);
+  on ? set.add(wordId) : set.delete(wordId);
+  A.memStars = [...set];
+  if (A.data?.profile) A.data.profile.stars = [...set];
+  savePreferences();
+  api('/stars', { word_id: wordId, on }).then(r => { if (A.data?.profile) A.data.profile.stars = r.stars; }).catch(() => toast('별표를 저장하지 못했어요. 인터넷 연결을 확인해 주세요.'));
+  return on;
 }
 function savePreferences() {
   try {
@@ -61,7 +89,7 @@ function savePreferences() {
     }));
   } catch {}
 }
-async function refresh() { A.data = await api('/bootstrap'); A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; }
+async function refresh() { A.data = await api('/bootstrap'); A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; else if (Array.isArray(A.data.profile.stars)) A.memStars = [...A.data.profile.stars]; }
 globalThis.__SUMUS_APPLY_BOOTSTRAP__ = data => { A.data = data; A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = data; if (data?.profile?.role === 'teacher') A.school = data.profile.active_school; if (!A.screen) render(); };
 let roleModules = { teacher: null, student: null };
 function ensureRoleEnhancements() {
@@ -127,6 +155,7 @@ function render() {
     $$('[data-arcade]').forEach(el => mountArcade(el, A));
     $$('#yacha-host').forEach(el => { const opts = A.yachaOpts; A.yachaOpts = null; mountYacha(el, A, leaveBattle, opts); });
     queueMicrotask(() => maybePetMoment(A, petChanged));
+    queueMicrotask(maybeMissedYou);
     queueMicrotask(() => maybeTitleMoment(A, moved => { if (moved) { render(); window.scrollTo(0, 0); } else renderKeepScroll(); }));
   }
 }
@@ -261,6 +290,60 @@ function pokePet(art) {
     art.appendChild(heart);
     setTimeout(() => heart.remove(), 1200);
   }
+}
+// V13.76 펫 교감: a speech bubble over the home pet.
+function petSay(text, ms = 3200) {
+  const art = document.querySelector('.partner-card-v1358:not(.flipped) .partner-art');
+  if (!art) return null;
+  art.querySelector('.pet-say')?.remove();
+  const bubble = document.createElement('span');
+  bubble.className = 'pet-say'; bubble.setAttribute('role', 'status'); bubble.textContent = text;
+  art.appendChild(bubble);
+  setTimeout(() => bubble.remove(), ms);
+  return art;
+}
+const CARE_LINES = { pet: ['헤헤, 간지러워!', '기분 좋아! 💕', '또 쓰다듬어 줘!'], feed: ['냠냠! 맛있어!', '배불러~ 고마워!', '힘이 난다! 💪'] };
+async function petCare(b, kind) {
+  if (b.getAttribute('aria-disabled') === 'true') return toast(kind === 'feed' ? '오늘은 이미 밥을 줬어요. 내일 또 주세요!' : '오늘은 이미 쓰다듬어 줬어요. 내일 또 만나요!');
+  buttonBusy(b);
+  try {
+    const r = await api('/pet/care', { kind });
+    A.data.care = r.care; if (r.stats) A.data.stats = r.stats;
+    renderKeepScroll();
+    requestAnimationFrame(() => {
+      const lines = CARE_LINES[kind] || CARE_LINES.pet;
+      const art = petSay(lines[Math.floor(Math.random() * lines.length)]);
+      if (art) {
+        pokePet(art);
+        const xp = document.createElement('i');
+        xp.className = 'pet-xp-float'; xp.textContent = `경험치 +${r.xp}`; xp.setAttribute('aria-hidden', 'true');
+        art.appendChild(xp); setTimeout(() => xp.remove(), 1400);
+      }
+    });
+  } catch (err) { toast(err.message); buttonBusy(b, false); }
+}
+// V13.76: practise the ★ words together, in the question type the student picks.
+function openStarPractice() {
+  const words = starredWords(A);
+  if (!words.length) return toast('☆를 눌러 헷갈리는 단어를 먼저 모아 주세요.');
+  const modes = ['eng2mean', 'mean2eng', 'write_meaning', 'spell'];
+  const close = modal(`<div class="star-mode-v1376"><p class="muted">★ 표시한 단어 <b>${words.length}개</b>를 한 번씩 모두 풀어요.</p><div class="star-mode-grid">${modes.map(m => `<button type="button" class="btn ${m === 'eng2mean' ? 'primary' : ''}" data-star-mode="${m}">${esc(PRACTICE_TYPES[m])}</button>`).join('')}</div></div>`, '어려운 단어 연습');
+  $$('[data-star-mode]').forEach(btn => btn.onclick = async () => {
+    buttonBusy(btn);
+    try { close(); await startPractice({ wordIds: words.map(w => w.id), mode: btn.dataset.starMode, runMode: 'practice' }); }
+    catch (err) { toast(err.message); }
+  });
+}
+// After a few days away the pet says it missed the student (once that day, on the home screen).
+function maybeMissedYou() {
+  const care = A.data?.care;
+  if (!care?.missed || A.tab !== 'home' || document.querySelector('#modal-root .modal')) return;
+  const key = 'sumus:missed:' + A.data.profile.id, today = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  try { if (localStorage.getItem(key) === today) return; localStorage.setItem(key, today); } catch { return; }
+  setTimeout(() => {
+    const art = petSay(`보고 싶었어! ${care.away_days}일 만이야 💕`, 4200);
+    if (art) { art.closest('.partner-card-v1358')?.classList.add('missed-v1376'); pokePet(art); }
+  }, 500);
 }
 async function leaveBattle() { A.screen = null; await petChanged(); window.scrollTo(0, 0); }
 // V13.61: a student on the home screen checks for a friend's challenge every 20 seconds
@@ -403,9 +486,7 @@ $('#app').addEventListener('click', async event => {
       });
       return;
     }
-    if (d.memorizeStar) {
-      const set = new Set(A.memStars || []); set.has(d.memorizeStar) ? set.delete(d.memorizeStar) : set.add(d.memorizeStar); A.memStars = [...set]; savePreferences(); render(); return;
-    }
+    if (d.memorizeStar) { toggleStar(d.memorizeStar); render(); return; }
     if (d.memorizeSpeak) {
       const word = A.data.books.flatMap(book => book.words || []).find(item => item.id === d.memorizeSpeak);
       if (!word) return toast('단어를 찾을 수 없어요.');
@@ -558,6 +639,8 @@ $('#app').addEventListener('click', async event => {
       openGrammarChoiceSample(A, render, d.grammarId);
       return;
     }
+    if (d.petCare) return petCare(b, d.petCare);
+    if (d.starPractice) return openStarPractice();
     if (d.action === 'partner-flip') {
       // V13.62: tapping the pet on the front makes it jump with hearts; the rest of the card flips it.
       const art = event.target.closest('.partner-art');

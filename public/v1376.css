@@ -1,0 +1,55 @@
+/* V13.76 펫 교감(쓰다듬기 · 밥 주기) · ⭐ 어려운 단어 모아서 연습 · 실전시험 문제별 시간과 화면 이탈 기록. */
+
+/* ---------- 펫 교감 ---------- */
+.pet-care-v1376{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0 8px}
+.pet-care-btn{appearance:none;display:grid;grid-template-columns:auto 1fr;grid-template-rows:auto auto;column-gap:8px;align-items:center;padding:9px 12px;border:1px solid #f4d4df;border-radius:16px;background:linear-gradient(180deg,#fff,#fff6f9);font:inherit;text-align:left;color:#16241f;cursor:pointer;transition:transform .12s,border-color .15s}
+.pet-care-btn:active{transform:scale(.97)}
+.pet-care-emoji{grid-row:1/3;font-size:24px;line-height:1}
+.pet-care-label{font-size:13.5px;font-weight:900;letter-spacing:-.02em}
+.pet-care-btn small{font-size:11.5px;font-weight:800;color:#d9467a}
+.pet-care-btn.done{border-color:#e3e9e6;background:#f6f8f7;color:#6c7c77}
+.pet-care-btn.done .pet-care-emoji{filter:grayscale(.6);opacity:.7}
+.pet-care-btn.done small{color:#07815f}
+.pet-say{position:absolute;z-index:4;left:50%;top:4%;transform:translateX(-50%);max-width:92%;padding:7px 12px;border-radius:14px;background:#fff;color:#16241f;font-size:13px;font-weight:900;letter-spacing:-.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 6px 18px rgba(20,40,34,.18);pointer-events:none;animation:petSay .28s cubic-bezier(.2,.9,.3,1.3)}
+.pet-say::after{content:"";position:absolute;left:50%;bottom:-6px;width:12px;height:12px;background:#fff;transform:translateX(-50%) rotate(45deg);border-radius:2px}
+.pet-xp-float{position:absolute;z-index:3;left:50%;bottom:22%;transform:translateX(-50%);font-style:normal;font-size:14px;font-weight:900;color:#07815f;text-shadow:0 1px 0 #fff,0 0 8px #fff;white-space:nowrap;pointer-events:none;animation:petXp 1.3s ease-out forwards}
+.missed-v1376 .partner-card{animation:petMissed .9s ease-in-out 2}
+@keyframes petSay{from{opacity:0;transform:translateX(-50%) translateY(6px) scale(.9)}to{opacity:1;transform:translateX(-50%)}}
+@keyframes petXp{0%{opacity:0;transform:translate(-50%,8px)}20%{opacity:1}100%{opacity:0;transform:translate(-50%,-38px)}}
+@keyframes petMissed{0%,100%{transform:none}30%{transform:rotate(-1.4deg) scale(1.01)}60%{transform:rotate(1.4deg) scale(1.01)}}
+@media (prefers-reduced-motion:reduce){.pet-say,.pet-xp-float,.missed-v1376 .partner-card{animation:none}}
+
+/* ---------- ⭐ 어려운 단어 모아서 연습 ---------- */
+.star-practice-v1376{appearance:none;display:flex;align-items:center;gap:12px;width:100%;padding:13px 16px;border:1px solid #f3dc9b;border-radius:18px;background:linear-gradient(180deg,#fffdf4,#fff7dc);font:inherit;text-align:left;color:#3d3212;cursor:pointer}
+.star-practice-v1376.in-hub{margin-top:12px}
+.star-practice-v1376.in-memorize{margin:0 0 12px}
+.star-practice-mark{flex:none;display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:#ffd84d;color:#8a5a00;font-size:20px}
+.star-practice-v1376>span:nth-child(2){display:flex;flex-direction:column;min-width:0;flex:1}
+.star-practice-v1376 small{font-size:11.5px;font-weight:800;color:#a07a14}
+.star-practice-v1376 strong{font-size:15px;font-weight:900;letter-spacing:-.02em}
+.star-practice-v1376 b .icon{width:18px;height:18px;color:#a07a14}
+.star-mode-v1376 p{margin:0 0 12px;font-size:13.5px}
+.star-mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.star-mode-grid .btn{margin:0}
+
+/* ---------- 실전시험: 문제별 시간 · 화면 이탈 ---------- */
+.exam-run-header .question-count{display:flex;align-items:center;gap:8px}
+.practice-timer-v1376{margin-left:auto;display:inline-flex;align-items:baseline;gap:3px;padding:4px 10px;border-radius:999px;background:#eef4f2;color:#16241f;font-variant-numeric:tabular-nums}
+.practice-timer-v1376 i{font-style:normal;font-size:12px}
+.practice-timer-v1376 b{font-size:17px;font-weight:900;letter-spacing:-.02em;min-width:2.6em;text-align:right}
+.practice-timer-v1376 small{font-size:11px;font-weight:800;color:#6c7c77}
+.practice-timer-v1376.warning{background:#fff4e0;color:#b45309}
+.practice-timer-v1376.danger{background:#ffe9e6;color:#c2410c;animation:timerPulse .5s ease-in-out infinite alternate}
+.test-leaves-v1376{padding:3px 8px;border-radius:999px;background:#fff1e6;color:#c2410c;font-size:11px;font-weight:900}
+.test-leave-rule-v1376{color:#c2410c}
+.test-leave-warn-v1376{text-align:center}
+.test-leave-warn-v1376 .test-leave-count{display:inline-flex;align-items:baseline;justify-content:center;width:84px;height:84px;margin:4px auto 8px;padding-top:18px;border-radius:50%;background:#fff1e6;color:#c2410c;font-size:34px;font-weight:900;font-variant-numeric:tabular-nums}
+.test-leave-warn-v1376 .test-leave-count small{font-size:15px;margin-left:2px}
+.test-leave-warn-v1376 h2{margin:6px 0 8px}
+.test-leave-warn-v1376 p{font-size:13.5px;line-height:1.6;color:#51625c;margin:0 0 14px}
+.test-leave-warn-v1376 p b{color:#c2410c}
+.result-leaves-v1376{margin-left:10px;color:#c2410c;font-weight:800}
+.test-left-out-v1376{background:#fff1e6!important;color:#9a3412!important}
+.leave-note-v1376{color:#c2410c!important;font-weight:800}
+@keyframes timerPulse{to{transform:scale(1.06)}}
+@media (prefers-reduced-motion:reduce){.practice-timer-v1376.danger{animation:none}}

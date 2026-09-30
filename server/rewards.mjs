@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { dayKey, ACCESSORIES } from '../public/modules/core.js';
+import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS } from '../public/modules/core.js';
 import {
   ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, drawLucky,
   BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX, GIFT_LOG_KEEP
@@ -269,4 +269,31 @@ export function botFinish(p, { id, result, right, pet, now = Date.now() }) {
 export function examReward(answered, total) {
   const n = Math.max(0, Math.floor(Number(answered) || 0));
   return { xp: n * EXAM_XP_PER_ANSWER, coins: total > 0 && n * 2 >= total ? EXAM_COINS : 0 };
+}
+
+/* ---------- V13.76 펫 교감 ---------- */
+//   care { day, pet, feed, last_at, total } — 쓰다듬기 and 밥 주기 once a day each (a little 경험치)
+// `lastActive`: the student's last activity before today (practice, battles, attendance, care);
+// away PET_MISS_DAYS days or more, the pet greets them (보고 싶었어).
+export function careView(p, lastActive, now = Date.now()) {
+  const c = p.care || {}, today = dayKey(now), done = c.day === today;
+  const away = lastActive ? Math.max(0, Math.round((Date.parse(today) - Date.parse(dayKey(lastActive))) / DAY_MS)) : 0;
+  return {
+    pet: done && !!c.pet, feed: done && !!c.feed, xp: { pet: PET_CARE.pet.xp, feed: PET_CARE.feed.xp },
+    away_days: away, missed: away >= PET_MISS_DAYS, total: Number(c.total || 0)
+  };
+}
+export function petCare(p, kind, { pet, now = Date.now() }) {
+  if (!PET_CARE[kind]) fail('할 수 있는 교감이 아니에요.');
+  if (!pet) fail('먼저 펫을 골라주세요.', 409);
+  const c = p.care ||= {};
+  const today = dayKey(now);
+  if (c.day !== today) { c.day = today; c.pet = false; c.feed = false; }
+  if (c[kind]) fail(kind === 'feed' ? '오늘은 이미 밥을 줬어요. 내일 또 주세요!' : '오늘은 이미 쓰다듬어 줬어요. 내일 또 만나요!', 409);
+  c[kind] = true;
+  c.last_at = now;
+  c.total = Number(c.total || 0) + 1;
+  const xp = PET_CARE[kind].xp;
+  addBonus(p, { xp, pet, now });
+  return { kind, xp };
 }

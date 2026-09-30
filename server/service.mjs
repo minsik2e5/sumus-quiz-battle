@@ -1,11 +1,11 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
-import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, CHARACTERS, ACCESSORIES, FRAMES, EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, ACCESSORIES, FRAMES, EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
 import { battleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
 import { STUDY_COINS, GIFT_AMOUNTS } from '../public/modules/rewards.js';
-import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, botStart, botFinish, botView, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts } from './rewards.mjs';
+import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
@@ -362,6 +362,14 @@ function mySessions(state, student) { return state.sessions.filter(s => s.studen
 // and coins are counted from. Screens that list practices use mySessions.
 function xpSessions(state, student, profile = state.profiles.find(x => x.id === student)) {
   return [...mySessions(state, student), ...bonusRecords(profile)];
+}
+// V13.76 the student's last activity before today (for the pet's 보고 싶었어).
+function lastActiveBefore(state, p, now = Date.now()) {
+  const today = dayKey(now), times = [Number(p.care?.last_at || 0)];
+  for (const s of state.sessions) if (s.student_id === p.id) times.push(Number(s.created_at || 0));
+  for (const b of state.battles || []) if (b.host_id === p.id || b.guest_id === p.id) times.push(Number(b.finished_at || b.created_at || 0));
+  for (const x of p.attendance?.log || []) times.push(Number(x.at || 0));
+  return Math.max(0, ...times.filter(t => t && dayKey(t) !== today));
 }
 const coinBalance = (state, p) => pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance;
 // Coins (코인, stored as reward points) are earned per finished practice and as tournament
@@ -804,7 +812,7 @@ export async function preauthenticateLogin(state, body) {
 }
 // Routes that change state. GET requests run against the live snapshot outside
 // the durable queue, so they must never reach these handlers.
-const MUTATING_WITHOUT_METHOD_CHECK = /^\/(?:logout|practice\/[^/]+\/(?:answer|next|finish))$/;
+const MUTATING_WITHOUT_METHOD_CHECK = /^\/(?:logout|practice\/[^/]+\/(?:answer|next|finish|leave))$/;
 export async function service(state, method, path, body, token, options = {}) {
   if (method === 'GET' && MUTATING_WITHOUT_METHOD_CHECK.test(path)) fail('요청 방식을 확인해주세요.', 405);
   if (path === '/health') return { ok: true, version: APP_VERSION, schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
@@ -928,7 +936,7 @@ export async function service(state, method, path, body, token, options = {}) {
       daily_quest: !!activePractice.daily_quest
     } : null;
     return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes, ...dailyQuestProgress(sessions, activePractice, dailyQuest.target) } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
-      profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
+      profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stars: undefined, care: undefined, stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
       sessions: sessions.map(teacher ? sessionSummary : hydrateSession), exams: visibleExams,
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
       attempts: attempts.map(a => attemptSummary(a, state, p)), server_time: Date.now(),
@@ -943,6 +951,7 @@ export async function service(state, method, path, body, token, options = {}) {
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
       rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), bot: botView(p, now) },
+      care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now),
       tournaments: (state.tournaments || []).filter(t => teacher ? t.school_id === selectedSchool?.id && (t.status !== 'cancelled' || now - (t.finished_at || t.created_at) < DAY_MS) : t.players.includes(p.id) && (t.status === 'active' || (t.status === 'finished' && now - (t.finished_at || 0) < 3 * DAY_MS)))
         .sort((a, b) => b.created_at - a.created_at).slice(0, 12).map(t => tournamentView(state, competition, t, p, now))
     };
@@ -1146,6 +1155,28 @@ export async function service(state, method, path, body, token, options = {}) {
     const label = body.all === true ? `${school.name} 전체` : className ? className : targets.length === 1 ? targets[0].display_name : `${targets[0].display_name} 외 ${targets.length - 1}명`;
     p.gifts_sent = [...(p.gifts_sent || []), { at: now, amount, count: targets.length, label, note: note.slice(0, 40), school_id: school.id }].slice(-30);
     return { sent: targets.length, amount, total: targets.length * amount, gifts_sent: p.gifts_sent.slice(-10).reverse() };
+  }
+  // V13.76 펫 교감 (once a day each) and starred words (어려운 단어 ⭐, kept on the account).
+  if (path === '/pet/care' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    const result = petCare(p, str(body.kind, 10), { pet: activePetKey(state, p.id), now });
+    return { ...result, care: careView(p, lastActiveBefore(state, p, now), now), stats: stats(state, p) };
+  }
+  if (path === '/stars' && method === 'POST') {
+    requireRole(p, 'student');
+    const school = schoolForProfile(state, p);
+    if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
+    const known = new Set(wordsForSchoolGrade(state, school, p.class_name).map(w => w.id));
+    let stars = Array.isArray(p.stars) ? p.stars : [];
+    if (Array.isArray(body.word_ids)) stars = [...new Set([...stars, ...body.word_ids.map(v => str(v, 120)).filter(v => known.has(v))])];
+    else {
+      const wordId = str(body.word_id, 120);
+      if (!known.has(wordId)) fail('단어를 찾을 수 없어요.', 404);
+      stars = body.on === false ? stars.filter(v => v !== wordId) : [...new Set([...stars, wordId])];
+    }
+    p.stars = stars.slice(-STARS_MAX);
+    return { stars: p.stars };
   }
   if (path === '/attendance/check' && method === 'POST') {
     requireRole(p, 'student');
@@ -1835,12 +1866,28 @@ export async function service(state, method, path, body, token, options = {}) {
     const practiceWords = runMode === 'test' || examStyle ? shuffle(words).slice(0, target) : words;
     const startedAt = Date.now();
     const durationSec = practiceDurationSec(body.mode, target);
-    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, run_mode: runMode, exam_style: examStyle, assignment_id: null, target, cover_all: runMode === 'test' || examStyle ? true : coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection && runMode !== 'test', quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, timer_mode: 'none', question_duration_sec: 0, question_started_at: null, question_deadline: null, deadline: null, auto_submitted: false, wrong_details: [], answer_records: [], finished: false, responses: {}, words: practiceWords.map(w => w.id) };
+    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, run_mode: runMode, exam_style: examStyle, assignment_id: null, target, cover_all: runMode === 'test' || examStyle ? true : coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection && runMode !== 'test', quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, timer_mode: runMode === 'test' ? 'question' : 'none', question_duration_sec: 0, question_started_at: null, question_deadline: null, deadline: null, auto_submitted: false, wrong_details: [], answer_records: [], finished: false, responses: {}, words: practiceWords.map(w => w.id) };
     if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
-  if (/^\/practice\/[^/]+(?:\/(?:answer|next|finish|share))?$/.test(path)) {
+  if (/^\/practice\/[^/]+(?:\/(?:answer|next|finish|share|leave))?$/.test(path)) {
     requireRole(p, 'student'); const x = state.practices.find(x => x.id === path.split('/')[2] && x.student_id === p.id); if (!x) fail('연습을 찾을 수 없습니다.', 404); removePracticeTimer(x);
+    // V13.76 실전시험: the phone reports leaving the app ('out') and coming back ('back' with
+    // how long). The third time out hands the test in with the answers given so far.
+    if (path.endsWith('/leave')) {
+      if (x.run_mode !== 'test' || x.finished) return { leaves: Number(x.leaves || 0), limit: TEST_LEAVE_LIMIT, finished: !!x.finished };
+      if (body.phase === 'back') {
+        x.leave_ms = Math.min(3600000, Number(x.leave_ms || 0) + Math.max(0, Math.min(3600000, Number(body.ms) || 0)));
+        return { leaves: Number(x.leaves || 0), limit: TEST_LEAVE_LIMIT, finished: false };
+      }
+      x.leaves = Number(x.leaves || 0) + 1;
+      if (x.leaves >= TEST_LEAVE_LIMIT) {
+        x.left_out = true;
+        finishPractice(x, state, true);
+        return { ...practiceView(x, state), leaves: x.leaves, limit: TEST_LEAVE_LIMIT };
+      }
+      return { leaves: x.leaves, limit: TEST_LEAVE_LIMIT, finished: false };
+    }
     if (path.endsWith('/share')) {
       if (method !== 'POST') fail('요청 방식을 확인해주세요.', 405);
       if (!x.finished || x.run_mode !== 'test') fail('완료한 실전모드 결과만 선생님께 보낼 수 있어요.', 409);
@@ -1858,7 +1905,7 @@ export async function service(state, method, path, body, token, options = {}) {
         return practiceView(x, state);
       }
       if (x.finished || x.feedback || body.question_id !== x.question_id) fail('현재 문제를 다시 확인해주세요.', 409);
-      const timedOut = x.timer_mode === 'question' && Number(x.question_deadline || 0) > 0 && (Date.now() >= Number(x.question_deadline) || (body.timed_out === true && Date.now() + 150 >= Number(x.question_deadline)));
+      const timedOut = x.timer_mode === 'question' && Number(x.question_deadline || 0) > 0 && (Date.now() >= Number(x.question_deadline) + (x.run_mode === 'test' ? TEST_ANSWER_GRACE_MS : 0) || (body.timed_out === true && Date.now() + 150 >= Number(x.question_deadline)));
       const submittedAnswer = timedOut ? '' : body.answer;
       const word = findWord(state, x.question.word_id);
       const ok = timedOut ? false : grade(x.question.type, submittedAnswer, wordForGrade(state, word));
@@ -1962,6 +2009,7 @@ function nextPractice(x, state, preparePreview = true) {
     x.seen ??= [];
     if (!x.seen.includes(preview.question.word_id)) x.seen.push(preview.question.word_id);
     x.next_preview = null;
+    startQuestionTimer(x, preview.question.type);
     if (preparePreview) prepareNextPreview(x, state);
     return;
   }
@@ -1984,12 +2032,16 @@ function nextPractice(x, state, preparePreview = true) {
   if (!x.seen.includes(word.id)) x.seen.push(word.id);
   const mode = x.mode === 'mixed' ? shuffle(Object.keys(PRACTICE_TYPES).filter(k => k !== 'mixed'))[0] : x.mode;
   x.question = buildQuestion(word, mode, words); x.question_id = id(); x.question_is_retry = isRetry; x.feedback = null;
-  if (x.timer_mode === 'question') {
-    x.question_duration_sec = Number(PRACTICE_SECONDS_PER_QUESTION[mode] || PRACTICE_SECONDS_PER_QUESTION[x.mode] || 8);
-    x.question_started_at = Date.now();
-    x.question_deadline = x.question_started_at + x.question_duration_sec * 1000;
-  }
+  startQuestionTimer(x, mode);
   if (preparePreview) prepareNextPreview(x, state);
+}
+function startQuestionTimer(x, mode) {
+  if (x.timer_mode !== 'question') return;
+  x.question_duration_sec = x.run_mode === 'test'
+    ? Number(TEST_SECONDS_PER_QUESTION[mode] || TEST_SECONDS_PER_QUESTION[x.mode] || 15)
+    : Number(PRACTICE_SECONDS_PER_QUESTION[mode] || PRACTICE_SECONDS_PER_QUESTION[x.mode] || 8);
+  x.question_started_at = Date.now();
+  x.question_deadline = x.question_started_at + x.question_duration_sec * 1000;
 }
 // Picks the following question before the current one is answered, so the
 // client can show it without waiting for the save. The choice does not depend
@@ -2002,7 +2054,9 @@ function nextPractice(x, state, preparePreview = true) {
 function prepareNextPreview(x, state) {
   x.next_preview = null;
   const test = x.run_mode === 'test';
-  if (x.timer_mode === 'question' || (test && Number(x.score_total || 0) + 1 >= Number(x.target || 0))) return;
+  // 실전시험 still shows the next word while the answer saves; its countdown starts when the
+  // server moves on (the client waits for that deadline).
+  if ((x.timer_mode === 'question' && !test) || (test && Number(x.score_total || 0) + 1 >= Number(x.target || 0))) return;
   const preview = {
     ...x,
     seen: [...(x.seen || [])],
@@ -2023,8 +2077,11 @@ function localCheck(state, wordId) {
   const graded = wordForGrade(state, word);
   return { word: graded.word, meaning: graded.meaning, accepted_meanings: graded.accepted_meanings || [] };
 }
+// 실전시험: an answer sent just before the countdown ended still counts while it travels.
+const TEST_ANSWER_GRACE_MS = 1500;
 function removePracticeTimer(x) {
-  if (!x || x.finished) return x;
+  // V13.76: 실전시험 keeps its countdown for every word (practice has none since V13.26).
+  if (!x || x.finished || x.run_mode === 'test') return x;
   x.timer_mode = 'none';
   x.deadline = null;
   x.question_deadline = null;
@@ -2131,6 +2188,8 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false } = {
     timer_mode: x.timer_mode || 'session',
     question_duration_sec: Number(x.question_duration_sec || 0),
     auto_submitted: !!x.auto_submitted,
+    // V13.76 실전시험: how often and how long the student left the app, and whether that ended it.
+    ...(x.run_mode === 'test' ? { leave_count: Number(x.leaves || 0), leave_ms: Number(x.leave_ms || 0), left_out: !!x.left_out } : {}),
     ended_at: endedAt,
     finalized_at: finalizedAt,
     shared_to_teacher_at: x.shared_to_teacher_at || null,
@@ -2162,6 +2221,7 @@ function practiceView(x, state) {
     started_at: x.started_at, finished_at: x.finished_at || null, ended_at: x.ended_at || null, finalized_at: x.finalized_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
     timer_mode: x.timer_mode || 'session', question_duration_sec: Number(x.question_duration_sec || 0), question_started_at: x.question_started_at || null, question_deadline: x.question_deadline || null,
     auto_submitted: !!x.auto_submitted,
+    leaves: Number(x.leaves || 0), leave_ms: Number(x.leave_ms || 0), left_out: !!x.left_out,
     shared_to_teacher_at: x.shared_to_teacher_at || null,
     wrong_count: x.finished ? wrongCount : undefined,
     unanswered_count: x.finished ? unansweredCount : undefined,
