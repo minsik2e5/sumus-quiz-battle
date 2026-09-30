@@ -8,11 +8,6 @@ function mobileLike() {
   return window.matchMedia?.('(max-width: 760px)').matches || /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
-function installGuideText() {
-  if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) return '공유 버튼을 누른 뒤 “홈 화면에 추가”를 선택하세요.';
-  return '브라우저 메뉴에서 “홈 화면에 추가” 또는 “앱 설치”를 선택하세요.';
-}
-
 function dismissInstallHint(node) {
   try { localStorage.setItem('sumus:pwa-hint:v1326', 'dismissed'); } catch {}
   node?.remove();
@@ -27,11 +22,8 @@ async function requestInstall(node) {
       if (choice?.outcome === 'accepted') return dismissInstallHint(node);
     } catch {}
   }
-  const detail = node?.querySelector('.pwa-install-detail');
-  if (detail) {
-    detail.hidden = false;
-    detail.textContent = installGuideText();
-  }
+  // V13.77: no one-tap install here (iPhone, or the browser has not offered it): the guide page.
+  location.href = '/install';
 }
 
 function showInstallHint() {
@@ -48,7 +40,6 @@ function showInstallHint() {
     <div class="pwa-install-copy">
       <strong>앱처럼 더 넓게 학습하세요</strong>
       <span>홈 화면에 추가하면 주소창 없이 SUMUS VOCA를 사용할 수 있어요.</span>
-      <small class="pwa-install-detail" hidden></small>
     </div>
     <button class="pwa-install-action" type="button">앱으로 사용</button>
   `;

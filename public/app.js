@@ -1,7 +1,7 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date, num, rangeLabel } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm } from './modules/core.js';
 import { avatar } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary, starredWords } from './modules/student.js';
+import { studentPage, getRanges, updateRangeSummary, starredWords, pushSupport } from './modules/student.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel, careIds } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
 import { maybePetMoment, openPetNameModal, openEggShop, petJosa } from './modules/pet-moments.js';
@@ -89,7 +89,7 @@ function savePreferences() {
     }));
   } catch {}
 }
-async function refresh() { A.data = await api('/bootstrap'); A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; else if (Array.isArray(A.data.profile.stars)) A.memStars = [...A.data.profile.stars]; }
+async function refresh() { A.data = await api('/bootstrap'); A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; else { if (Array.isArray(A.data.profile.stars)) A.memStars = [...A.data.profile.stars]; checkPushHere(); } }
 globalThis.__SUMUS_APPLY_BOOTSTRAP__ = data => { A.data = data; A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = data; if (data?.profile?.role === 'teacher') A.school = data.profile.active_school; if (!A.screen) render(); };
 let roleModules = { teacher: null, student: null };
 function ensureRoleEnhancements() {
@@ -334,6 +334,109 @@ function openStarPractice() {
     catch (err) { toast(err.message); }
   });
 }
+// V13.77 알림 (web push). The server holds the key; the phone asks the student once.
+const fromB64u = text => { const s = text.replace(/-/g, '+').replace(/_/g, '/'); return Uint8Array.from(atob(s + '='.repeat((4 - s.length % 4) % 4)), c => c.charCodeAt(0)); };
+const toB64u = buf => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const deviceLabel = () => /iPhone|iPad/i.test(navigator.userAgent) ? 'iPhone' : /Android/i.test(navigator.userAgent) ? 'Android' : 'PC';
+async function currentPushSubscription() {
+  if (!pushSupport().api) return null;
+  const reg = await navigator.serviceWorker.getRegistration('/');
+  return reg ? reg.pushManager.getSubscription() : null;
+}
+// Whether this phone receives the 알림 (the account may have it on another phone). A phone the
+// server forgot (removed after an error) is registered again without asking.
+async function checkPushHere() {
+  if (A.data?.profile?.role !== 'student') return;
+  try {
+    const sub = await currentPushSubscription();
+    const before = A.pushHere;
+    A.pushHere = !!sub && Notification.permission === 'granted';
+    if (A.pushHere && !A.data.push?.on) {
+      const r = await api('/push/subscribe', { subscription: sub.toJSON(), origin: location.origin, device: deviceLabel(), quiet: true });
+      A.data.push = r.push;
+    }
+    if (before !== A.pushHere && !A.screen) renderKeepScroll();
+  } catch { A.pushHere = false; }
+}
+async function enablePush(b) {
+  const s = pushSupport();
+  if (s.needsInstall) { location.href = '/install'; return; }
+  if (!s.api) return toast('이 브라우저에서는 알림을 켤 수 없어요. 크롬이나 사파리로 설치해 주세요.');
+  buttonBusy(b);
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      buttonBusy(b, false);
+      return toast(permission === 'denied' ? '알림이 차단돼 있어요. 휴대폰 설정 → 알림에서 허용해 주세요.' : '알림을 허용해야 받을 수 있어요.');
+    }
+    const { key } = await api('/push/key', {});
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (sub?.options?.applicationServerKey && toB64u(sub.options.applicationServerKey) !== key) { await sub.unsubscribe().catch(() => {}); sub = null; }
+    sub ||= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: fromB64u(key) });
+    const r = await api('/push/subscribe', { subscription: sub.toJSON(), origin: location.origin, device: deviceLabel() });
+    A.data.push = r.push; A.pushHere = true;
+    renderKeepScroll();
+    toast('알림을 켰어요! 확인 알림이 곧 도착해요.');
+  } catch (err) {
+    buttonBusy(b, false);
+    // Browser errors are English ("Registration failed - permission denied"); server ones are Korean.
+    toast(err?.status ? err.message : err?.name === 'NotAllowedError' ? '알림 권한이 막혀 있어요. 휴대폰 설정 → 알림에서 허용해 주세요.' : '이 브라우저에서는 알림을 켜지 못했어요. 홈 화면에 설치한 앱에서 다시 눌러 주세요.');
+  }
+}
+async function disablePush(b) {
+  buttonBusy(b);
+  try {
+    const sub = await currentPushSubscription();
+    const r = await api('/push/unsubscribe', { endpoint: sub?.endpoint || '' });
+    await sub?.unsubscribe().catch(() => {});
+    A.data.push = r.push; A.pushHere = false;
+    renderKeepScroll();
+    toast('이 휴대폰의 알림을 껐어요.');
+  } catch (err) { buttonBusy(b, false); toast(err.message); }
+}
+// 선생님 공지: saved for the students' home screen and sent to the phones with 알림 on.
+function noticeModal() {
+  const classes = [...new Set(A.data.profiles.filter(s => s.active !== false && !s.preview_owner_id).map(s => s.class_name).filter(Boolean))].sort((a, b) => String(a).localeCompare(String(b), 'ko'));
+  const sent = A.data.notices_sent || [];
+  const close = modal(`<div class="notice-modal-v1377">
+    <h2>📢 공지 보내기</h2>
+    <p>학생 홈 화면 맨 위에 3일 동안 보이고, <b>알림을 켠 학생 ${num(A.data.push_reach || 0)}명</b>에게는 휴대폰 알림으로도 가요.</p>
+    <label class="field"><span>받는 학생</span><select id="notice-class"><option value="">${esc(A.school || '')} 전체</option>${classes.map(c => `<option>${esc(c)}</option>`).join('')}</select></label>
+    <label class="field"><span>내용 (80자)</span><textarea id="notice-text" maxlength="80" rows="3" placeholder="예: 내일 단어 시험 24번까지! 오늘 20개만 연습해요 💪"></textarea></label>
+    <button type="button" class="btn primary full" id="notice-send">공지 보내기</button>
+    ${sent.length ? `<details class="gift-sent"><summary>최근 공지 ${sent.length}건</summary><ul>${sent.map(n => `<li><span><b>${esc(n.class_name || '전체')}</b><small>${esc(n.text)}</small></span><span><small>${date(n.at)}</small></span></li>`).join('')}</ul></details>` : ''}
+  </div>`, '공지 보내기');
+  $('#notice-send').onclick = async event => {
+    const button = event.currentTarget, text = $('#notice-text').value.trim();
+    if (!text) return toast('공지 내용을 적어 주세요.');
+    buttonBusy(button);
+    try {
+      const r = await api('/teacher/notice', { text, class_name: $('#notice-class').value });
+      close();
+      toast(`공지를 보냈어요. ${r.total}명 중 알림 ${r.reach}명`);
+      try { await refresh(); renderKeepScroll(); } catch {}
+    } catch (err) { buttonBusy(button, false); toast(err.message); }
+  };
+}
+// Notification links (/?go=yacha) and the app's shortcuts open that tab.
+const GO_TABS = new Set(['home', 'practice', 'exam', 'yacha', 'arcade', 'me', 'ranking', 'records', 'titles']);
+function openGo(go) {
+  if (!GO_TABS.has(go) || !A.data || A.data.profile.role !== 'student' || A.screen || A.data.stats?.needs_pet_pick) return false;
+  navigate(go);
+  if (go === 'home' || go === 'yacha') refresh().then(() => { if (!A.screen) renderKeepScroll(); }).catch(() => {});
+  return true;
+}
+document.addEventListener('change', async event => {
+  const daily = event.target.closest?.('[data-push-daily]');
+  if (!daily) return;
+  try { const r = await api('/push/settings', { daily: daily.checked }); A.data.push = r.push; toast(daily.checked ? '저녁 7시 공부 알림을 켰어요.' : '저녁 공부 알림을 껐어요.'); }
+  catch (err) { daily.checked = !daily.checked; toast(err.message); }
+});
+navigator.serviceWorker?.addEventListener('message', event => {
+  if (event.data?.type !== 'sumus-open') return;
+  try { openGo(new URL(event.data.url).searchParams.get('go') || 'home'); } catch {}
+});
 // After a few days away the pet says it missed the student (once that day, on the home screen).
 function maybeMissedYou() {
   const care = A.data?.care;
@@ -640,6 +743,12 @@ $('#app').addEventListener('click', async event => {
       return;
     }
     if (d.petCare) return petCare(b, d.petCare);
+    if (d.action === 'push-on') return enablePush(b);
+    if (d.action === 'push-off') return disablePush(b);
+    if (d.action === 'push-later') { try { localStorage.setItem('sumus:push-later', String(Date.now() + 7 * 86400000)); } catch {} return renderKeepScroll(); }
+    if (d.action === 'notice-close') { try { localStorage.setItem('sumus:notice-closed', d.id); } catch {} return renderKeepScroll(); }
+    if (d.action === 'notice') return noticeModal();
+    if (d.action === 'install-qr') { window.open('/install?qr=1', '_blank', 'noopener'); return; }
     if (d.starPractice) return openStarPractice();
     if (d.action === 'partner-flip') {
       // V13.62: tapping the pet on the front makes it jump with hearts; the rest of the card flips it.
@@ -1343,7 +1452,11 @@ try {
   A.tab = A.data.profile.role === 'teacher' ? 'dashboard' : A.data.profile.avatar_key ? 'home' : 'studio';
   render();
   startPolling();
+  // V13.77: /?go=yacha from a notification or an app shortcut.
+  const go = new URLSearchParams(location.search).get('go');
+  if (go || location.search) history.replaceState(null, '', '/');
   if (A.data.profile.role === 'student' && A.data.active_practice) await resumeActivePractice();
+  else if (go) openGo(go);
 } catch (e) {
   if (e.status !== 401) {
     $('#login-error').textContent = '서버 응답이 느립니다. 잠시 후 다시 로그인해주세요.';

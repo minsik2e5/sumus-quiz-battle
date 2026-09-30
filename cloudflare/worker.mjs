@@ -1,4 +1,6 @@
-import { service, sweep, preauthenticateLogin, settleBattle } from '../server/service.mjs';
+import { service, sweep, preauthenticateLogin, settleBattle, runEveningReminders } from '../server/service.mjs';
+import { sendPush } from '../server/push.mjs';
+import { dropEndpoints } from '../server/notify.mjs';
 import { BattleRoom, battleReportKey } from './battle-room.mjs';
 export { BattleRoom };
 import { selfSignup } from '../server/signup.mjs';
@@ -193,6 +195,36 @@ export class VocaStateObject {
     }
   }
 
+  // V13.77 알림: send after the change is saved; phones that are gone (404/410) are forgotten.
+  async deliverPush(messages, origin = '') {
+    const push = this.mutations.current().state.push;
+    if (!push?.vapid || !messages.length) return { sent: 0, failed: 0, gone: 0 };
+    const subject = push.subject || origin || 'mailto:sumus-voca@users.noreply.github.com';
+    const jobs = [];
+    for (const m of messages) {
+      const payload = { title: String(m.title || 'SUMUS VOCA').slice(0, 80), body: String(m.body || '').slice(0, 160), url: String(m.url || '/'), tag: m.tag || undefined, urgent: !!m.urgent };
+      for (const id of new Set(m.to || [])) for (const sub of push.subs?.[id] || []) jobs.push([sub, payload]);
+    }
+    const gone = [];
+    let sent = 0, failed = 0;
+    for (let i = 0; i < jobs.length; i += 8) {
+      const results = await Promise.all(jobs.slice(i, i + 8).map(([sub, payload]) => sendPush(sub, payload, push.vapid, { subject })));
+      results.forEach((r, k) => { if (r.ok) sent++; else { failed++; if (r.gone) gone.push(jobs[i + k][0].endpoint); } });
+    }
+    if (gone.length) await this.mutations.durable(state => dropEndpoints(state, gone) ? true : NO_MUTATION).catch(() => {});
+    if (failed) console.warn('[push]', { sent, failed, gone: gone.length });
+    return { sent, failed, gone: gone.length };
+  }
+
+  // Called by the daily cron (19:00 KST): students who have not studied today get one nudge.
+  async eveningPush() {
+    const messages = await this.mutations.durable(state => {
+      const list = runEveningReminders(state);
+      return list.length ? list : NO_MUTATION;
+    });
+    return Array.isArray(messages) ? this.deliverPush(messages) : { sent: 0 };
+  }
+
   async alarm() {
     await this.ready;
     try { await this.sync.run(); } catch {}
@@ -228,6 +260,10 @@ export class VocaStateObject {
       }
 
       const body = request.method === 'GET' ? Object.fromEntries(url.searchParams) : await readJson(request, url.pathname.startsWith('/api/vocab-import/') ? 1000000 : 100000);
+      if (url.pathname === '/api/internal/evening-push') {
+        if (request.headers.get('X-Push-Key') !== await eveningPushKey(this.env)) throw Object.assign(Error('허용되지 않은 요청입니다.'), { status: 403 });
+        return json(await this.eveningPush());
+      }
       // Battle rooms report finished matches here (the public worker blocks /api/internal/).
       if (url.pathname === '/api/internal/battle-result') {
         if (request.headers.get('X-Battle-Key') !== await battleReportKey(this.env)) throw Object.assign(Error('허용되지 않은 요청입니다.'), { status: 403 });
@@ -285,7 +321,9 @@ export class VocaStateObject {
       // Room set-up for yacha battles: the questions (with answers) go to the room only.
       // `_battles` (V13.66) carries several room messages, e.g. when a tournament is called off.
       const roomMessages = [...(result?._battle ? [result._battle] : []), ...(Array.isArray(result?._battles) ? result._battles : [])];
-      if (result && typeof result === 'object') { delete result._battle; delete result._battles; }
+      const pushMessages = Array.isArray(result?._push) ? result._push : [];
+      if (result && typeof result === 'object') { delete result._battle; delete result._battles; delete result._push; }
+      if (pushMessages.length) this.ctx.waitUntil(this.deliverPush(pushMessages, url.origin).catch(error => console.error('[push]', error?.message)));
       for (const message of roomMessages) {
         const room = this.env.BATTLE_ROOM.get(this.env.BATTLE_ROOM.idFromName(message.id));
         const reply = await room.fetch('https://battle/admin', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(message) }).catch(() => null);
@@ -334,7 +372,21 @@ function securityHeaders(response, pathname) {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
+// The cron's call into the state object (the public worker blocks /api/internal/).
+async function eveningPushKey(env) {
+  const bytes = new TextEncoder().encode(`${env.VOCA_STATE_SECRET}:evening-push`);
+  return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export default {
+  // wrangler.jsonc "triggers": 10:00 UTC = 19:00 in Korea.
+  async scheduled(controller, env, ctx) {
+    ctx.waitUntil((async () => {
+      const stub = env.VOCA_STATE.get(env.VOCA_STATE.idFromName('main'));
+      const res = await stub.fetch('https://voca.internal/api/internal/evening-push', { method: 'POST', headers: { ...JSON_HEADERS, 'X-Push-Key': await eveningPushKey(env) }, body: '{}' });
+      console.log('[push:evening]', res.status, await res.text());
+    })().catch(error => console.error('[push:evening]', error?.message)));
+  },
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/api/internal/')) return securityHeaders(json({ error: '요청한 기능을 찾을 수 없습니다.' }, 404), url.pathname);

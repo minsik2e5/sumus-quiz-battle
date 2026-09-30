@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f3f6f5">
+  <meta name="description" content="SUMUS VOCA를 홈 화면에 앱으로 설치하는 방법">
+  <title>SUMUS VOCA 앱 설치</title>
+  <link rel="icon" href="/sumus-logo-green.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <style>
+    :root{--ink:#16241f;--sub:#5d6f68;--line:#dfe9e5;--green:#10b981;--deep:#07815f;--soft:#eafaf3;--bg:#f3f6f5;--card:#fff;--warn:#c2410c}
+    *{box-sizing:border-box}
+    html{-webkit-text-size-adjust:100%}
+    body{margin:0;background:var(--bg);color:var(--ink);font-family:"Pretendard",system-ui,-apple-system,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;line-height:1.5;padding:env(safe-area-inset-top,0) 16px calc(28px + env(safe-area-inset-bottom,0))}
+    main{max-width:520px;margin:0 auto}
+    .top{display:flex;align-items:center;gap:12px;padding:22px 0 8px}
+    .top img{width:52px;height:52px;border-radius:15px;box-shadow:0 6px 16px rgba(7,129,95,.25)}
+    .top b{display:block;font-size:20px;letter-spacing:-.03em}
+    .top small{color:var(--sub);font-size:13px}
+    h1{font-size:26px;letter-spacing:-.04em;line-height:1.3;margin:18px 0 6px;text-wrap:balance}
+    .lead{margin:0 0 18px;color:var(--sub);font-size:15px}
+    .tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:16px;background:#e5eeea;margin-bottom:14px}
+    .tabs button{appearance:none;border:0;border-radius:12px;padding:11px;background:none;font:inherit;font-weight:800;color:var(--sub);cursor:pointer}
+    .tabs button[aria-selected="true"]{background:#fff;color:var(--ink);box-shadow:0 2px 8px rgba(20,40,34,.08)}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:18px;margin-bottom:14px}
+    .steps{list-style:none;margin:0;padding:0;display:grid;gap:14px;counter-reset:s}
+    .steps li{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;counter-increment:s}
+    .steps li::before{content:counter(s);display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--soft);color:var(--deep);font-weight:900}
+    .steps b{display:block;font-size:16px;letter-spacing:-.02em}
+    .steps span{color:var(--sub);font-size:14px}
+    .ico{display:inline-grid;place-items:center;width:26px;height:26px;margin:0 2px;border-radius:7px;background:#eef3f1;vertical-align:-7px}
+    .ico svg{width:17px;height:17px}
+    .big{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:16px;border:0;border-radius:18px;background:var(--green);color:#fff;font:inherit;font-size:17px;font-weight:900;cursor:pointer;text-decoration:none;box-shadow:0 10px 22px rgba(16,185,129,.28)}
+    .big.ghost{background:#fff;color:var(--deep);border:1px solid #bfe6d6;box-shadow:none}
+    .note{margin:12px 0 0;padding:11px 13px;border-radius:14px;background:#fff7ed;color:#9a3412;font-size:13.5px}
+    .note.ok{background:var(--soft);color:var(--deep)}
+    .after h2{font-size:17px;margin:0 0 8px}
+    .after p{margin:0;color:var(--sub);font-size:14px}
+    .qr{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center}
+    .qr-box{width:132px;height:132px;padding:8px;border-radius:16px;background:#fff;border:1px solid var(--line)}
+    .qr-box svg,.qr-box img{display:block;width:100%;height:100%}
+    .qr b{display:block;font-size:16px}
+    .qr span{color:var(--sub);font-size:13.5px;word-break:break-all}
+    .copy{margin-top:8px;padding:8px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;font:inherit;font-size:13px;font-weight:700;color:var(--deep);cursor:pointer}
+    [hidden]{display:none!important}
+    /* 교실 TV: ?qr=1 */
+    body.tv{display:grid;place-items:center;min-height:100vh}
+    body.tv main{max-width:none;text-align:center}
+    body.tv .tv-qr{width:min(62vh,80vw);height:min(62vh,80vw);margin:0 auto 18px;padding:18px;border-radius:28px;background:#fff}
+    body.tv .tv-qr svg{width:100%;height:100%}
+    body.tv h1{font-size:clamp(28px,4.4vw,56px);margin:0 0 6px}
+    body.tv p{font-size:clamp(16px,2vw,24px);color:var(--sub);margin:0}
+  </style>
+</head>
+<body>
+  <script src="/inapp.js"></script>
+  <main id="page">
+    <header class="top"><img src="/icons/icon-192.png" alt="" width="52" height="52"><div><b>SUMUS VOCA</b><small>스토어 없이, 홈 화면에 바로 설치</small></div></header>
+    <h1>1분이면 앱처럼 설치돼요</h1>
+    <p class="lead">설치하면 홈 화면 아이콘으로 바로 열리고, 주소창 없이 넓게 보여요. 선생님 공지와 공부 알림도 받을 수 있어요.</p>
+
+    <div id="installed" class="card" hidden>
+      <p class="note ok" style="margin:0 0 12px">이미 앱으로 열려 있어요! 🎉</p>
+      <a class="big" href="/">SUMUS VOCA 시작하기</a>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="휴대폰 종류">
+      <button role="tab" id="tab-ios" aria-selected="false" data-tab="ios">아이폰</button>
+      <button role="tab" id="tab-android" aria-selected="false" data-tab="android">안드로이드</button>
+    </div>
+
+    <section class="card" data-panel="ios" hidden>
+      <ol class="steps">
+        <li><div><b>Safari로 열기</b><span>이 페이지를 <b style="display:inline">Safari</b>에서 열어 주세요. (카카오톡 안이라면 오른쪽 아래 <span class="ico" aria-label="더보기">⋯</span> → Safari로 열기)</span></div></li>
+        <li><div><b>공유 버튼 누르기</b><span>화면 아래(또는 주소창 옆)의 <span class="ico" aria-label="공유"><svg viewBox="0 0 24 24" fill="none" stroke="#0a84ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4"/><path d="M6 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1"/></svg></span> 버튼을 눌러요.</span></div></li>
+        <li><div><b>"홈 화면에 추가"</b><span>목록을 아래로 내려 <span class="ico" aria-label="추가"><svg viewBox="0 0 24 24" fill="none" stroke="#16241f" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span> <b style="display:inline">홈 화면에 추가</b>를 누르고, 오른쪽 위 <b style="display:inline">추가</b>를 눌러요.</span></div></li>
+        <li><div><b>홈 화면의 SUMUS 아이콘으로 열기</b><span>이제부터는 아이콘으로 열어요. 알림은 앱 안의 <b style="display:inline">나 → 알림 켜기</b>에서 켤 수 있어요.</span></div></li>
+      </ol>
+      <p class="note" id="ios-not-safari" hidden>지금은 Safari가 아닌 것 같아요. 주소를 복사해서 Safari에 붙여 넣어 주세요.</p>
+    </section>
+
+    <section class="card" data-panel="android" hidden>
+      <button type="button" class="big" id="install-now" hidden>📲 앱 설치하기</button>
+      <ol class="steps" id="android-steps">
+        <li><div><b>크롬으로 열기</b><span>이 페이지를 <b style="display:inline">Chrome</b>(또는 삼성 인터넷)에서 열어 주세요.</span></div></li>
+        <li><div><b>메뉴 누르기</b><span>오른쪽 위 <span class="ico" aria-label="메뉴">⋮</span> 버튼을 눌러요. (삼성 인터넷은 아래 <span class="ico" aria-label="메뉴">≡</span>)</span></div></li>
+        <li><div><b>"앱 설치" 또는 "홈 화면에 추가"</b><span>눌러서 <b style="display:inline">설치</b>를 선택해요.</span></div></li>
+        <li><div><b>홈 화면의 SUMUS 아이콘으로 열기</b><span>알림은 앱 안의 <b style="display:inline">나 → 알림 켜기</b>에서 켤 수 있어요.</span></div></li>
+      </ol>
+      <p class="note ok" id="android-done" hidden>설치했어요! 홈 화면에서 SUMUS 아이콘을 찾아보세요.</p>
+    </section>
+
+    <section class="card qr">
+      <div class="qr-box" id="qr" aria-label="설치 안내 QR코드"></div>
+      <div><b>친구에게 보여 주기</b><span>카메라로 찍으면 이 설치 안내가 열려요.</span><br><span id="link"></span><br><button type="button" class="copy" id="copy-link">링크 복사</button></div>
+    </section>
+
+    <a class="big ghost" href="/">설치 안 하고 바로 시작하기</a>
+  </main>
+  <script type="module" src="/install.js"></script>
+</body>
+</html>

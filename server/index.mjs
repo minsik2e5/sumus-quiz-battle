@@ -123,6 +123,8 @@ const server = http.createServer(async (req, res) => {
       if (result._clearCookie) { res.setHeader('Set-Cookie', 'sumus_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'); delete result._clearCookie; }
       // Battle rooms (with the answers) exist only on Cloudflare; never send them to a browser.
       delete result._battle;
+      // Web push is sent by the Cloudflare wrapper only.
+      delete result._push;
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(result)); return;
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); res.end(); return; }
