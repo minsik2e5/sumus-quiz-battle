@@ -87,7 +87,7 @@ export function createStore({ normalize = d => d, onChange = () => {}, onStatus 
             continue;
           }
           dirty = true;
-          status('error', { message: err.status === 401 ? '로그인이 풀렸어요. 새로고침해 주세요.' : '저장하지 못했어요. 인터넷 연결을 확인해 주세요.' });
+          status('error', { message: err.status === 401 ? '로그인이 풀렸어요. 새로고침해 주세요.' : '저장하지 못했어요. 인터넷 연결을 확인해 주세요.', auth: err.status === 401 });
           clearTimeout(timer); timer = setTimeout(save, 8000);
           return;
         }
