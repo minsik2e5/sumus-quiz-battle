@@ -1,0 +1,51 @@
+/* V13.77 앱 설치 · 알림: 선생님 공지 띠, 알림 켜기 카드, 나 탭 알림 설정, 선생님 공지 창. */
+
+/* ---------- 학생 홈: 선생님 공지 ---------- */
+.notice-v1377{display:flex;align-items:flex-start;gap:10px;margin:0 0 12px;padding:12px 12px 12px 14px;border:1px solid #cfe9dd;border-radius:18px;background:linear-gradient(180deg,#f3fcf8,#e9f8f1)}
+.notice-v1377 .notice-mark{flex:none;font-size:22px;line-height:1.2}
+.notice-v1377>div{flex:1;min-width:0}
+.notice-v1377 small{display:block;font-size:11.5px;font-weight:800;color:#07815f}
+.notice-v1377 p{margin:2px 0 0;font-size:14.5px;font-weight:800;line-height:1.45;color:#16241f;overflow-wrap:anywhere}
+.notice-v1377 .notice-close{flex:none;appearance:none;width:30px;height:30px;border:0;border-radius:50%;background:rgba(255,255,255,.7);font-size:18px;line-height:1;color:#6c7c77;cursor:pointer}
+
+/* ---------- 학생 홈: 알림 켜기 ---------- */
+.push-prompt-v1377{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:10px 12px;border:1px solid #e4e0f7;border-radius:18px;background:#faf9ff}
+.push-prompt-v1377 .push-bell{flex:none;font-size:22px}
+.push-prompt-v1377>div{flex:1;min-width:0;display:flex;flex-direction:column}
+.push-prompt-v1377 b{font-size:14px;font-weight:900}
+.push-prompt-v1377 small{font-size:12px;color:#6c7c77}
+.push-prompt-v1377 .btn.small{margin:0;padding:8px 14px;white-space:nowrap}
+.push-prompt-v1377 .push-later{appearance:none;border:0;background:none;font:inherit;font-size:12px;color:#8a9893;cursor:pointer;white-space:nowrap}
+
+/* ---------- 나: 알림 ---------- */
+.me-notify-v1377{margin:14px 0 0;padding:16px;border:1px solid #e3e9e6;border-radius:20px;background:#fff}
+.me-notify-v1377 h2{margin:0 0 8px;font-size:16px}
+.me-notify-v1377 p{margin:0 0 12px;font-size:13.5px;line-height:1.55;color:#51625c}
+.me-notify-v1377 .push-on-line{color:#07815f;font-weight:800}
+.me-notify-v1377 .btn{margin:0}
+.me-notify-v1377 .text-button{margin-top:6px;font-size:13px;color:#8a9893}
+.push-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid #eef2f0;border-bottom:1px solid #eef2f0;cursor:pointer}
+.push-row span{display:flex;flex-direction:column}
+.push-row b{font-size:14px}
+.push-row small{font-size:12px;color:#8a9893}
+.push-row input{flex:none;appearance:none;position:relative;width:48px;height:28px;margin:0;border-radius:999px;background:#d7dfdc;cursor:pointer;transition:background .15s}
+.push-row input::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .15s}
+.push-row input:checked{background:#10b981}
+.push-row input:checked::after{transform:translateX(20px)}
+.push-row input:focus-visible{outline:2px solid #10b981;outline-offset:2px}
+.me-install-v1377{display:flex;align-items:center;gap:12px;margin:10px 0 0;padding:14px 16px;border:1px solid #cfe9dd;border-radius:18px;background:#f3fcf8;color:#16241f;text-decoration:none}
+.me-install-v1377>span:first-child{font-size:22px}
+.me-install-v1377>span:nth-child(2){flex:1;display:flex;flex-direction:column}
+.me-install-v1377 b{font-size:14.5px}
+.me-install-v1377 small{font-size:12px;color:#6c7c77}
+.me-install-v1377 .icon{width:18px;height:18px;color:#07815f}
+
+/* ---------- 선생님: 공지 보내기 ---------- */
+.notice-modal-v1377 h2{margin:0 0 6px}
+.notice-modal-v1377>p{margin:0 0 14px;font-size:13.5px;line-height:1.55;color:#51625c}
+.notice-modal-v1377 textarea{width:100%;resize:vertical;min-height:84px;font:inherit}
+.notice-modal-v1377 .btn{margin-top:4px}
+@media (max-width:760px){
+  .notice-top-v1377,.install-qr-v1377{padding-left:10px!important;padding-right:10px!important}
+  .install-qr-v1377{display:none!important}
+}

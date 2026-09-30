@@ -42,6 +42,10 @@
       ]
     }
   ],
+  // V13.77 저녁 공부 알림: 10:00 UTC = 19:00 KST.
+  "triggers": {
+    "crons": ["0 10 * * *"]
+  },
   "observability": {
     "enabled": true
   },

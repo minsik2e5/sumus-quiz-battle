@@ -9,6 +9,8 @@ import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn
 import { DAY_MS, rankingWeek, gradeOf, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
+import { createVapidKeys } from './push.mjs';
+import { pushState, pushView, addSubscription, removeSubscription, postNotice, noticeFor, eveningReminders } from './notify.mjs';
 import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { middleGrade3Books } from './middle-vocab.mjs';
 import { middleGrade2Books } from './middle-vocab-grade2.mjs';
@@ -362,6 +364,22 @@ function mySessions(state, student) { return state.sessions.filter(s => s.studen
 // and coins are counted from. Screens that list practices use mySessions.
 function xpSessions(state, student, profile = state.profiles.find(x => x.id === student)) {
   return [...mySessions(state, student), ...bonusRecords(profile)];
+}
+// V13.77 저녁 공부 알림 (run by the daily Cloudflare cron): who gets one, and the messages.
+export function runEveningReminders(state, now = Date.now()) {
+  const today = dayKey(now);
+  const studied = new Set();
+  for (const s of state.sessions) if (Number(s.created_at || 0) > now - 2 * DAY_MS && dayKey(Number(s.created_at)) === today) studied.add(s.student_id);
+  for (const x of state.practices) if (Number(x.started_at || 0) > now - 2 * DAY_MS && dayKey(Number(x.started_at)) === today && Number(x.total || 0) > 0) studied.add(x.student_id);
+  return eveningReminders(state, {
+    now,
+    studiedToday: p => studied.has(p.id),
+    extra: p => {
+      const g = stats(state, p);
+      const pet = g.pet?.name || CHARACTERS[g.pet?.key || p.avatar_key]?.ko || '';
+      return { streak: Number(g.streak || 0), pet };
+    }
+  });
 }
 // V13.76 the student's last activity before today (for the pet's 보고 싶었어).
 function lastActiveBefore(state, p, now = Date.now()) {
@@ -952,6 +970,10 @@ export async function service(state, method, path, body, token, options = {}) {
       league: teacher ? null : leagueView(competition, p),
       rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), bot: botView(p, now) },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now),
+      push: teacher ? null : pushView(state, p),
+      notice: teacher ? null : noticeFor(state, p, studentSchool, now),
+      push_reach: teacher && selectedSchool ? studentProfiles.filter(s => (state.push?.subs?.[s.id] || []).length).length : null,
+      notices_sent: teacher && selectedSchool ? (state.push?.notices || []).filter(n => n.school_id === selectedSchool.id).slice(-5).reverse() : null,
       tournaments: (state.tournaments || []).filter(t => teacher ? t.school_id === selectedSchool?.id && (t.status !== 'cancelled' || now - (t.finished_at || t.created_at) < DAY_MS) : t.players.includes(p.id) && (t.status === 'active' || (t.status === 'finished' && now - (t.finished_at || 0) < 3 * DAY_MS)))
         .sort((a, b) => b.created_at - a.created_at).slice(0, 12).map(t => tournamentView(state, competition, t, p, now))
     };
@@ -1154,7 +1176,8 @@ export async function service(state, method, path, body, token, options = {}) {
     for (const x of targets) giveGift(x, { id: randomUUID(), amount, note, from: p.id, fromName: p.display_name || '선생님', now });
     const label = body.all === true ? `${school.name} 전체` : className ? className : targets.length === 1 ? targets[0].display_name : `${targets[0].display_name} 외 ${targets.length - 1}명`;
     p.gifts_sent = [...(p.gifts_sent || []), { at: now, amount, count: targets.length, label, note: note.slice(0, 40), school_id: school.id }].slice(-30);
-    return { sent: targets.length, amount, total: targets.length * amount, gifts_sent: p.gifts_sent.slice(-10).reverse() };
+    return { sent: targets.length, amount, total: targets.length * amount, gifts_sent: p.gifts_sent.slice(-10).reverse(),
+      _push: [{ to: targets.map(x => x.id), title: `🎁 ${p.display_name || '선생님'}의 선물이 도착했어요`, body: `응원 코인 ${amount}개${note ? ` · ${note}` : ''}`, url: '/?go=home', tag: 'gift' }] };
   }
   // V13.76 펫 교감 (once a day each) and starred words (어려운 단어 ⭐, kept on the account).
   if (path === '/pet/care' && method === 'POST') {
@@ -1177,6 +1200,45 @@ export async function service(state, method, path, body, token, options = {}) {
     }
     p.stars = stars.slice(-STARS_MAX);
     return { stars: p.stars };
+  }
+  // V13.77 알림 (web push). The key pair is made on first use and kept in the state.
+  if (path === '/push/key' && method === 'POST') {
+    const push = pushState(state);
+    if (!push.vapid) push.vapid = await createVapidKeys();
+    return { key: push.vapid.public_key };
+  }
+  if (path === '/push/subscribe' && method === 'POST') {
+    requireRole(p, 'student');
+    const push = pushState(state);
+    if (!push.vapid) fail('알림 준비가 아직 안 됐어요. 다시 눌러 주세요.', 409);
+    const origin = str(body.origin, 200);
+    if (/^https:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(origin)) push.subject = origin;
+    addSubscription(state, p, body.subscription, { ua: str(body.device, 40) });
+    if (typeof body.daily === 'boolean') push.prefs[p.id] = { ...(push.prefs[p.id] || {}), daily: body.daily };
+    // quiet: the phone registered itself again (after an error), without the student asking.
+    if (body.quiet === true) return { push: pushView(state, p) };
+    return { push: pushView(state, p), _push: [{ to: [p.id], title: '🔔 알림이 켜졌어요', body: '선생님 공지, 도전장, 선물, 저녁 공부 알림을 여기로 보내 줄게요.', url: '/?go=me', tag: 'hello' }] };
+  }
+  if (path === '/push/unsubscribe' && method === 'POST') {
+    requireRole(p, 'student');
+    removeSubscription(state, p, str(body.endpoint, 1000));
+    return { push: pushView(state, p) };
+  }
+  if (path === '/push/settings' && method === 'POST') {
+    requireRole(p, 'student');
+    const push = pushState(state);
+    push.prefs[p.id] = { ...(push.prefs[p.id] || {}), daily: body.daily !== false };
+    return { push: pushView(state, p) };
+  }
+  if (path === '/teacher/notice' && method === 'POST') {
+    requireRole(p, 'teacher');
+    const school = activeTeacherSchool(state, p);
+    if (!school) fail('관리 학교를 확인해주세요.', 409);
+    const className = str(body.class_name, 20);
+    const students = state.profiles.filter(x => isRankedStudent(x) && schoolForProfile(state, x)?.id === school.id && (!className || x.class_name === className));
+    if (!students.length) fail('공지를 받을 학생이 없어요.');
+    const posted = postNotice(state, p, school, students, { text: body.text, className, id: randomUUID() });
+    return { notice: posted.notice, reach: posted.reach, total: posted.total, _push: [posted.message] };
   }
   if (path === '/attendance/check' && method === 'POST') {
     requireRole(p, 'student');
@@ -1285,7 +1347,8 @@ export async function service(state, method, path, body, token, options = {}) {
     const school = schoolForProfile(state, p);
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
     const rangeCodes = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : [];
-    return { ...openBattleRoom(state, p, school, stake, rangeCodes, now, { invite_id: friend.id, challenge: true, mode: body.mode }), challenge: true, friend: friend.name };
+    return { ...openBattleRoom(state, p, school, stake, rangeCodes, now, { invite_id: friend.id, challenge: true, mode: body.mode }), challenge: true, friend: friend.name,
+      _push: [{ to: [friend.id], title: `⚔️ ${p.display_name}의 도전장!`, body: `야차전 도전장이 왔어요${stake ? ` · 판돈 ${stake}코인` : ''}. 몇 분 안에 받아 주세요!`, url: '/?go=yacha', tag: 'challenge', urgent: true }] };
   }
   if (path === '/battle/invite' && method === 'GET') {
     requireRole(p, 'student');

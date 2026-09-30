@@ -408,7 +408,43 @@ function homeRecommendations(A) {
 function home(A) {
   const p = A.data.profile;
   return `<div class="home-context home-context-v1327"><div><span>SUMUS VOCA</span><b>${esc(p.school || A.school || '학교 미설정')} · ${esc(p.class_name || '')}</b></div></div>
+    ${noticeBanner(A)}${pushPrompt(A)}
     ${compactGrowth(A)}`;
+}
+// V13.77 선생님 공지 (shown for a few days, until the student closes it) and 알림.
+function noticeBanner(A) {
+  const n = A.data.notice;
+  if (!n) return '';
+  let closed = false;
+  try { closed = localStorage.getItem('sumus:notice-closed') === n.id; } catch {}
+  if (closed) return '';
+  return `<section class="notice-v1377" role="status"><span class="notice-mark" aria-hidden="true">📢</span><div><small>${esc(n.from_name)}${n.class_name ? ` · ${esc(n.class_name)}` : ''} · ${date(n.at)}</small><p>${esc(n.text)}</p></div><button type="button" class="notice-close" data-action="notice-close" data-id="${esc(n.id)}" aria-label="공지 닫기">×</button></section>`;
+}
+export const pushSupport = () => {
+  const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const installed = matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
+  const api = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  return { ios, installed, api, needsInstall: ios && !installed, blocked: api && Notification.permission === 'denied' };
+};
+function pushPrompt(A) {
+  const s = pushSupport();
+  if (A.pushHere !== false || !s.api || s.blocked || s.needsInstall) return '';
+  try { if (Number(localStorage.getItem('sumus:push-later') || 0) > Date.now()) return ''; } catch {}
+  return `<section class="push-prompt-v1377"><span class="push-bell" aria-hidden="true">🔔</span><div><b>알림 켜기</b><small>선생님 공지·도전장·선물을 바로 알려 줄게요</small></div><button type="button" class="btn primary small" data-action="push-on">켜기</button><button type="button" class="push-later" data-action="push-later" aria-label="나중에">나중에</button></section>`;
+}
+function meNotify(A) {
+  const s = pushSupport(), push = A.data.push || {};
+  const here = A.pushHere === true;
+  let body;
+  if (s.needsInstall) body = `<p>아이폰은 <b>홈 화면에 추가한 앱</b>에서만 알림을 받을 수 있어요.</p><a class="btn primary full" href="/install">📲 앱으로 설치하는 방법</a>`;
+  else if (!s.api) body = '<p>이 브라우저는 알림을 지원하지 않아요. 크롬(안드로이드)이나 사파리(아이폰)로 설치해 주세요.</p>';
+  else if (s.blocked) body = '<p>알림이 <b>차단</b>돼 있어요. 휴대폰 <b>설정 → 알림</b>에서 SUMUS(또는 브라우저)를 허용한 뒤 다시 눌러 주세요.</p><button type="button" class="btn full" data-action="push-on">다시 확인</button>';
+  else if (here) body = `<p class="push-on-line">🔔 이 휴대폰으로 알림을 받고 있어요.</p>
+    <label class="push-row"><span><b>저녁 7시 공부 알림</b><small>오늘 공부를 안 했으면 한 번 알려 줘요</small></span><input type="checkbox" class="switch" data-push-daily ${push.daily !== false ? 'checked' : ''}></label>
+    <button type="button" class="text-button" data-action="push-off">이 휴대폰 알림 끄기</button>`;
+  else body = `<p>선생님 공지, 친구의 도전장, 선물, 저녁 공부 알림을 받아요.</p><button type="button" class="btn primary full" data-action="push-on">🔔 알림 켜기</button>`;
+  const install = !s.installed ? `<a class="me-install-v1377" href="/install"><span aria-hidden="true">📲</span><span><b>앱으로 설치하기</b><small>홈 화면 아이콘으로 바로 열려요</small></span>${icon('chevron')}</a>` : '';
+  return `<section class="me-notify-v1377" aria-label="알림"><h2>알림</h2>${body}</section>${install}`;
 }
 // V13.76 ⭐ 어려운 단어: the starred words of this school and grade, practised together.
 export function starredWords(A) {
@@ -663,7 +699,8 @@ function mePage(A) {
       <div><b>${num(att.total || 0)}<small>번</small></b><span>출석</span></div>
       <div><b>${num(battle.wins || 0)}<small>승</small></b><span>야차전</span></div>
       <div><b>${num(g.best_combo || 0)}</b><span>최고 연속 정답</span></div>
-    </section>`;
+    </section>
+    ${meNotify(A)}`;
 }
 function examTargetGrid(A, count) {
   return `<div class="practice-target-grid" role="group" aria-label="문항 수 선택">${[10,20,30].filter(n => count >= n).map(n => `<button data-practice-target="${n}" class="${A.target === n ? 'selected' : ''}">${n}<small>문제</small></button>`).join('')}<button data-practice-target="all" class="all ${A.target === 'all' ? 'selected' : ''}"><b>선택 범위 전체</b><small>${count}개 단어</small></button></div>`;
