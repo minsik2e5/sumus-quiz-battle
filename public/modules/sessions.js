@@ -1,5 +1,5 @@
 import { api, $, $$, icon, esc, time, date, recordRangeLabel, scope, toast, modal, buttonBusy } from './ui.js';
-import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo, grade, displayEnglish } from './core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo, grade, displayEnglish, TEST_SECONDS_PER_QUESTION, TEST_LEAVE_LIMIT } from './core.js';
 import { avatar } from './character.js';
 import { EXAM_XP_PER_ANSWER, EXAM_COINS, STUDY_COINS } from './rewards.js';
 
@@ -368,7 +368,7 @@ export async function startPractice(options = {}) {
     const ranges = Array.isArray(payload.word_ids) && payload.word_ids.length
       ? (A.data.profile.division === 'middle' ? String(A.middleRange || '') + '과' : '직접 선택')
       : (payload.range_codes || []).map(code => recordRangeLabel({ division: A.data.profile.division, school: A.school }, code)).join(' · ');
-    const close = modal(`<span class="pill green">실전 모드</span><h2>${esc(ranges || '선택 범위')}</h2><div class="detail-grid"><div><b>${esc(PRACTICE_TYPES[payload.mode] || '쓰기')}</b><small>시험 방식</small></div><div><b>${target}문제</b><small>문항 수</small></div><div><b>마지막 공개</b><small>채점 시점</small></div></div><div class="test-start-rules"><p>정답은 시험이 끝난 뒤 공개돼요.</p><p>이전 문항으로 돌아갈 수 없어요.</p><p>시간에 쫓기지 않고 단어에 집중해서 풀어요.</p></div><button class="btn primary full" id="confirm-practice-test">실전 시작하기</button><button class="btn full" id="cancel-practice-test">설정으로 돌아가기</button>`, '실전 시작 확인');
+    const close = modal(`<span class="pill green">실전 모드</span><h2>${esc(ranges || '선택 범위')}</h2><div class="detail-grid"><div><b>${esc(PRACTICE_TYPES[payload.mode] || '쓰기')}</b><small>시험 방식</small></div><div><b>${target}문제</b><small>문항 수</small></div><div><b>마지막 공개</b><small>채점 시점</small></div></div><div class="test-start-rules"><p>정답은 시험이 끝난 뒤 공개돼요.</p><p>이전 문항으로 돌아갈 수 없어요.</p><p>⏱ 문제마다 제한시간이 있어요 (${TEST_SECONDS_PER_QUESTION[payload.mode] || 15}초). 시간이 지나면 미응답으로 넘어가요.</p><p class="test-leave-rule-v1376">📵 시험 중에 다른 앱·탭으로 나가면 기록돼요. <b>${TEST_LEAVE_LIMIT}번째로 나가면 자동 제출</b>돼요.</p></div><button class="btn primary full" id="confirm-practice-test">실전 시작하기</button><button class="btn full" id="cancel-practice-test">설정으로 돌아가기</button>`, '실전 시작 확인');
     $('#cancel-practice-test').onclick = () => { close(); redraw(); };
     $('#confirm-practice-test').onclick = async event => {
       buttonBusy(event.currentTarget);
@@ -399,10 +399,12 @@ function renderPractice() {
   const testMode = x.run_mode === 'test';
   const modeLabel = testMode ? '실전시험' : '연습시험';
   const progressNo = Math.min(Number(x.score_total || 0) + (!feedback && !x.question_is_retry ? 1 : 0), Number(x.target || 0));
+  // V13.76: 실전시험 counts down every word again (V13.26 took the timer out of practice).
+  const questionTimer = x.timer_mode === 'question' && !feedback && Number(x.question_deadline || 0) > 0;
   mount(`<div class="session-app exam-run exam-run-${testMode ? 'test' : 'practice'}">
     <header class="session-header exam-run-header">
       <div class="row between"><button class="icon-button" id="practice-exit" aria-label="시험 화면 나가기">${icon('close')}</button><h1>${modeLabel}</h1><button class="icon-button" id="practice-sound" aria-label="효과음 ${A.sound ? '끄기' : '켜기'}">${icon(A.sound ? 'sound' : 'mute')}</button></div>
-      <div class="question-count"><span>${x.question_is_retry ? '오답 다시 풀기' : `${progressNo} / ${x.target}`}</span></div>
+      <div class="question-count"><span>${x.question_is_retry ? '오답 다시 풀기' : `${progressNo} / ${x.target}`}</span>${testMode && Number(x.leaves || 0) ? `<span class="test-leaves-v1376" title="화면 이탈">📵 ${Number(x.leaves)}/${Number(x.leave_limit || TEST_LEAVE_LIMIT)}</span>` : ''}${questionTimer ? `<span class="practice-timer-v1376" id="practice-timer" role="timer" aria-label="남은 시간"><i aria-hidden="true">⏱</i><b id="practice-timer-value">${(questionLeftMs(x) / 1000).toFixed(1)}</b><small>초</small></span>` : ''}</div>
       <div class="progress"><i style="width:${Math.min(100, Number(x.score_total || 0) / x.target * 100)}%"></i></div>
     </header>
     <main class="question-area exam-question-area">
@@ -418,11 +420,16 @@ function renderPractice() {
   if (pendingPracticeSave) $$('[data-practice-choice]').forEach(button => { button.disabled = true; });
   $('#practice-exit').onclick = () => {
     const progress = Math.min(Number(x.score_total || 0), Number(x.target || 0));
-    const close = modal(`<h2>시험을 나갈까요?</h2><p>현재 <b>${progress} / ${x.target}</b>까지 진행했어요. 나가도 진행 위치가 저장되어 나중에 이어서 풀 수 있어요.</p><button class="btn primary full" id="practice-keep-going">계속 풀기</button><button class="btn full" id="practice-save-leave">저장하고 나가기</button><button class="text-button full" id="practice-finish-exit">시험 종료하기</button>`, testMode ? '실전시험' : '연습시험');
+    const leavesNow = Number(x.leaves || 0), leaveLimit = Number(x.leave_limit || TEST_LEAVE_LIMIT);
+    const leaveLine = testMode ? (leavesNow + 1 >= leaveLimit ? `<p class="test-leave-rule-v1376"><b>지금 나가면 ${leaveLimit}번째 이탈이라 바로 자동 제출돼요.</b></p>` : `<p class="test-leave-rule-v1376">📵 실전시험에서 나가면 화면 이탈 ${leavesNow + 1}/${leaveLimit}번으로 기록돼요.</p>`) : '';
+    const close = modal(`<h2>시험을 나갈까요?</h2><p>현재 <b>${progress} / ${x.target}</b>까지 진행했어요. 나가도 진행 위치가 저장되어 나중에 이어서 풀 수 있어요.</p>${leaveLine}<button class="btn primary full" id="practice-keep-going">계속 풀기</button><button class="btn full" id="practice-save-leave">저장하고 나가기</button><button class="text-button full" id="practice-finish-exit">시험 종료하기</button>`, testMode ? '실전시험' : '연습시험');
     $('#practice-keep-going').onclick = close;
     $('#practice-save-leave').onclick = async event => {
       buttonBusy(event.currentTarget);
       await drainPracticeAnswers();
+      // V13.76: leaving a 실전시험 from its own button counts like switching apps.
+      const out = testMode ? await reportTestLeave(x.id, { phase: 'out' }) : null;
+      if (out?.finished && practiceState?.id === x.id) { close(); practiceState = out; finishPracticeView(); return; }
       close(); leaveSession(); redraw();
       try { await refresh(); redraw(); }
       catch (error) { toast(error.message || '최신 기록을 불러오지 못했어요.'); }
@@ -454,6 +461,7 @@ function renderPractice() {
   $('#practice-answer')?.addEventListener('blur', () => $('.exam-run')?.classList.remove('keyboard-focus'));
   $('#practice-answer')?.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) $('#practice-confirm')?.click(); });
   $('#practice-next')?.addEventListener('click', e => advancePracticeScreen(e.currentTarget, x));
+  if (questionTimer && !pendingPracticeSave) timer = setInterval(practiceTick, 100);
   $('#practice-dispute')?.addEventListener('click', async event => {
     const button = event.currentTarget; button.disabled = true;
     try {
@@ -759,7 +767,7 @@ async function answerPractice(answer, button) {
   const preview = x.run_mode === 'test' && x.next_preview;
   if (preview) {
     pendingPracticeSave = true;
-    practiceState = { ...x, question: preview.question, question_id: preview.question_id, next_preview: null, total: x.total + 1, score_total: Number(x.score_total || 0) + 1, feedback: null };
+    practiceState = { ...x, question: preview.question, question_id: preview.question_id, next_preview: null, total: x.total + 1, score_total: Number(x.score_total || 0) + 1, feedback: null, question_deadline: null };
     renderPractice();
   }
   try {
@@ -872,7 +880,8 @@ function finishPracticeView() {
     ${interrupted ? `<div class="interrupted-progress-v1340"><strong>${answeredCount}<small>/ ${targetCount}문제</small></strong><span>여기까지 풀었어요</span></div><div class="result-score-secondary-v1340">현재 점수 <b>${score}점</b></div>` : `<div class="result-number"><span id="practice-result-score">${score}</span><small>점</small></div>`}
     <p class="result-score-basis">최초 풀이 기준 · ${Number(x.score_correct || 0)} / ${targetCount} 정답</p>
     <div class="result-stat-grid"><div><strong>${Number(x.score_correct || 0)}</strong><span>정답</span></div><div><strong>${wrongCount}</strong><span>오답</span></div><div><strong>${unanswered}</strong><span>미응답</span></div></div>
-    <div class="result-meta-line"><span>${icon('clock')} 전체 진행 ${time(elapsed)}</span></div>
+    <div class="result-meta-line"><span>${icon('clock')} 전체 진행 ${time(elapsed)}</span>${x.run_mode === 'test' && Number(x.leaves || 0) ? `<span class="result-leaves-v1376">📵 화면 이탈 ${Number(x.leaves)}번</span>` : ''}</div>
+    ${x.left_out ? `<div class="result-note test-left-out-v1376">시험 중에 화면을 ${Number(x.leaves || TEST_LEAVE_LIMIT)}번 나가서 지금까지 푼 답으로 자동 제출됐어요.</div>` : ''}
     <div class="result-reward-card result-reward-top"><div><span>코인</span><strong><i class="coin-ico" aria-hidden="true"></i>+${Number(x.reward_points || 0)}</strong></div><div><span>경험치</span><strong>+${Number(x.xp || 0)}</strong></div></div>
     ${x.reward_note ? `<p class="result-reward-note-v1373">${esc(x.reward_note)}</p>` : ''}
     <p class="result-next-copy">${esc(statusText)}</p>
@@ -945,12 +954,47 @@ window.addEventListener('online', () => {
   if (A?.screen === 'exam') flushDraft();
   if (A?.screen === 'practice' && practiceState && !practiceState.finished) syncPracticeState();
 });
+// V13.76 실전시험: leaving the app (to search a word, say) is reported to the server. The
+// student is warned on coming back, and the third time out hands the test in.
+let testLeave = null;
+function reportTestLeave(id, body) {
+  // keepalive lets the report go out while the phone is switching away.
+  return fetch(`/api/practice/${id}/leave`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: JSON.stringify(body), keepalive: true })
+    .then(r => r.ok ? r.json() : null).catch(() => null);
+}
+function testLeaveOut() {
+  const x = practiceState;
+  if (A?.screen !== 'practice' || !x || x.finished || x.run_mode !== 'test' || testLeave) return;
+  testLeave = { id: x.id, at: Date.now(), sent: reportTestLeave(x.id, { phase: 'out' }) };
+}
+async function testLeaveBack() {
+  const leave = testLeave; testLeave = null;
+  if (!leave) return false;
+  const out = await leave.sent;
+  reportTestLeave(leave.id, { phase: 'back', ms: Date.now() - leave.at });
+  if (A?.screen !== 'practice' || practiceState?.id !== leave.id) return true;
+  if (out?.finished) {
+    practiceState = out;
+    finishPracticeView();
+    return true;
+  }
+  const leaves = Number(out?.leaves || Number(practiceState.leaves || 0) + 1), limit = Number(out?.limit || TEST_LEAVE_LIMIT);
+  practiceState.leaves = leaves; practiceState.leave_limit = limit;
+  await syncPracticeState();
+  if (practiceState?.finished || A?.screen !== 'practice') return true;
+  const last = leaves >= limit - 1;
+  const close = modal(`<div class="test-leave-warn-v1376"><span class="test-leave-count">${leaves}<small>/${limit}</small></span><h2>시험 화면을 나갔어요</h2><p>나간 기록은 선생님께 보내는 결과에 남아요.${last ? '<br><b>한 번 더 나가면 지금까지 푼 답으로 자동 제출돼요.</b>' : `<br>${limit}번째로 나가면 자동 제출돼요.`}</p><button class="btn primary full" id="test-leave-ok">시험 계속 풀기</button></div>`, '실전시험');
+  $('#test-leave-ok').onclick = close;
+  navigator.vibrate?.([30, 40, 30]);
+  return true;
+}
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') {
-    if (A?.screen === 'practice') practiceHiddenAt = Date.now();
+    if (A?.screen === 'practice') { practiceHiddenAt = Date.now(); testLeaveOut(); }
     return;
   }
   if (A?.screen === 'exam') { examTick(); flushDraft(); }
+  if (testLeave) { practiceHiddenAt = 0; testLeaveBack(); return; }
   if (A?.screen === 'practice' && practiceState && !practiceState.finished) {
     const hiddenFor = practiceHiddenAt ? Date.now() - practiceHiddenAt : 0;
     practiceHiddenAt = 0;

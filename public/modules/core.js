@@ -23,6 +23,14 @@ export const PRACTICE_SECONDS_PER_QUESTION = {
   vowelblank: 10,
   initial: 10
 };
+// V13.76 실전시험: a countdown for every word (searching elsewhere does not fit in it), and the
+// test is handed in by itself the third time the student leaves the app while it runs.
+export const TEST_SECONDS_PER_QUESTION = { eng2mean: 10, mean2eng: 10, write_meaning: 15, spell: 20 };
+export const TEST_LEAVE_LIMIT = 3;
+// V13.76 펫 교감: 쓰다듬기 and 밥 주기, once a day each, a little 경험치 for the partner pet.
+export const PET_CARE = { pet: { name: '쓰다듬기', xp: 10 }, feed: { name: '밥 주기', xp: 10 } };
+export const PET_MISS_DAYS = 3; // away this long: the pet says it missed the student
+export const STARS_MAX = 500;
 export const practiceDurationSec = (mode, total) => Math.max(60, Math.ceil(Math.max(1, Number(total) || 1) * (PRACTICE_SECONDS_PER_QUESTION[mode] || 8)));
 export const CHARACTERS = {
   dog: { name: 'MONG', ko: '몽이', type: '강아지', color: '#D79B54', light: '#F3C985', soft: '#FFF5E8' },

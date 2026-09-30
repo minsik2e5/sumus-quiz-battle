@@ -4,6 +4,13 @@ import { avatar } from './character.js';
 import { rangePicker, selectedCount, getRanges } from './student.js';
 import { bracketHtml } from './tournament-ui.js';
 import { coin, trophy } from './emblems.js';
+// V13.76 실전시험: how often the student left the test screen (the third time hands it in).
+function leaveNote(s) {
+  const n = Number(s.leave_count || 0);
+  if (!n) return '';
+  const sec = Math.round(Number(s.leave_ms || 0) / 1000);
+  return `📵 화면 이탈 ${n}번${sec ? ` · ${sec >= 60 ? `${Math.floor(sec / 60)}분 ${sec % 60}초` : `${sec}초`}` : ''}${s.left_out ? ' · 자동 제출' : ''}`;
+}
 // Grammar datasets are ~170KB; load only the active school's file, on demand,
 // so students (who also import this module) never download them up front.
 const GRAMMAR_LOADERS = {
@@ -240,7 +247,7 @@ function dashboard(A) {
       <div class="v136-exam-list">${sharedSelfTests.slice(0,6).map(item => {
         const student = d.profiles.find(profile => profile.id === item.student_id);
         const ranges = (item.range_codes || []).map(code => recordRangeLabel(item, code)).join(' · ') || '선택 범위';
-        return `<div class="v136-exam-item"><div class="v136-exam-top"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(student?.display_name || '학생')} · ${item.score ?? 0}점</h3><p>${esc(student?.class_name || item.grade || '')} · ${esc(ranges)} · ${esc(PRACTICE_TYPES[item.mode] || '쓰기')}</p></div><button class="text-button" data-practice-record="${item.id}">답안 보기</button></div><div class="v136-missing-names"><span>전송 ${date(item.shared_to_teacher_at)}</span></div></div>`;
+        return `<div class="v136-exam-item"><div class="v136-exam-top"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(student?.display_name || '학생')} · ${item.score ?? 0}점</h3><p>${esc(student?.class_name || item.grade || '')} · ${esc(ranges)} · ${esc(PRACTICE_TYPES[item.mode] || '쓰기')}</p></div><button class="text-button" data-practice-record="${item.id}">답안 보기</button></div><div class="v136-missing-names"><span>전송 ${date(item.shared_to_teacher_at)}</span>${leaveNote(item) ? `<span class="leave-note-v1376">${leaveNote(item)}</span>` : ''}</div></div>`;
       }).join('')}</div>
     </section>` : ''}
     <details class="panel grammar-fold-v1375" ${A.grammarOpen ?? grammarUsed ? 'open' : ''}>
@@ -386,7 +393,7 @@ function results(A) {
     const disputes = (A.data.meaning_disputes || []).filter(d => d.source_type === 'practice' && d.source_id === s.id);
     const pendingCount = disputes.filter(d => d.status === 'pending').length;
     const regraded = disputes.some(d => String(d.status || '').startsWith('approved')) || s.regraded_at;
-    return `<tr><td class="tv2-cell-name"><strong>${esc(p?.display_name || '학생')}</strong><small>${esc(p?.class_name || s.grade || '')}</small></td><td data-label="범위" class="tv2-cell-range">${(s.range_codes || []).map(code => esc(recordRangeLabel(s, code))).join(' · ') || '선택 범위'}</td><td data-label="방식">${esc(PRACTICE_TYPES[s.mode] || '연습')}<small>${sent ? '학생 실전' : '연습 모드'}</small></td><td data-label="점수"><strong class="tv2-score ${score >= 90 ? 'hi' : score < 60 ? 'lo' : ''}">${score}점</strong>${pendingCount ? '<small>임시 · 이의제기 심사중</small>' : regraded ? '<small>재채점 완료</small>' : ''}</td><td data-label="정답">${s.correct} / ${s.total}</td><td data-label="시간">${sec(s.duration_sec)}</td><td data-label="${sent ? '전송' : '학습'}">${date(sent ? s.shared_to_teacher_at : s.created_at)}${s.auto_submitted ? '<small>시간 종료 자동 제출</small>' : ''}</td><td class="tv2-cell-action"><button class="text-button" data-practice-record="${s.id}">답안 보기</button></td></tr>`;
+    return `<tr><td class="tv2-cell-name"><strong>${esc(p?.display_name || '학생')}</strong><small>${esc(p?.class_name || s.grade || '')}</small></td><td data-label="범위" class="tv2-cell-range">${(s.range_codes || []).map(code => esc(recordRangeLabel(s, code))).join(' · ') || '선택 범위'}</td><td data-label="방식">${esc(PRACTICE_TYPES[s.mode] || '연습')}<small>${sent ? '학생 실전' : '연습 모드'}</small></td><td data-label="점수"><strong class="tv2-score ${score >= 90 ? 'hi' : score < 60 ? 'lo' : ''}">${score}점</strong>${pendingCount ? '<small>임시 · 이의제기 심사중</small>' : regraded ? '<small>재채점 완료</small>' : ''}</td><td data-label="정답">${s.correct} / ${s.total}</td><td data-label="시간">${sec(s.duration_sec)}</td><td data-label="${sent ? '전송' : '학습'}">${date(sent ? s.shared_to_teacher_at : s.created_at)}${s.left_out ? '' : s.auto_submitted ? '<small>시간 종료 자동 제출</small>' : ''}${leaveNote(s) ? `<small class="leave-note-v1376">${leaveNote(s)}</small>` : ''}</td><td class="tv2-cell-action"><button class="text-button" data-practice-record="${s.id}">답안 보기</button></td></tr>`;
   }).join('')}</tbody></table></div>${rows.length > limit ? `<button class="tv2-more" data-results-more>${rows.length - limit}개 더 보기</button>` : ''}` : empty('records', q || A.resultsClass ? '조건에 맞는 기록이 없어요' : sent ? '학생이 보낸 실전 결과가 아직 없어요' : '완료된 연습 기록이 아직 없어요'); };
   const classes = [...new Set(A.data.profiles.map(p => p.class_name).filter(Boolean))];
   const filterBar = `<div class="toolbar tv2-results-filter"><div class="search">${icon('search')}<input id="results-search" aria-label="학생 이름으로 기록 찾기" placeholder="학생 이름 또는 아이디" value="${esc(A.resultsQuery || '')}"></div><select id="results-class" aria-label="반으로 기록 거르기"><option value="">전체 반</option>${classes.map(c => `<option ${c === A.resultsClass ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>`;

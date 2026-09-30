@@ -279,12 +279,23 @@ function partnerCard(A) {
         </span>
       </span>
     </button>
+    ${petCareBar(A, hatched)}
     <div class="partner-tools">
       <button type="button" data-go="studio">${icon('user')}내 펫 ${owned}/${total}</button>
       <button type="button" class="partner-titles-btn" data-go="titles" aria-label="칭호 도감 ${titleCount(A)}">${icon('star')}칭호 ${titleCount(A)}${(t.fresh || []).length ? '<i class="partner-new" aria-label="새 칭호">N</i>' : ''}</button>
       <button type="button" class="partner-shop" data-action="egg-shop" aria-label="알 상점 열기, 가진 코인 ${num(g.points_balance ?? 0)}개">알 상점</button>
     </div>
   </section>`;
+}
+// V13.76 펫 교감: once a day each, 쓰다듬기 and 밥 주기 give a little 경험치 and the pet reacts.
+function petCareBar(A, hatched) {
+  const care = A.data.care;
+  if (!care) return '';
+  const item = (kind, label, emoji) => {
+    const done = !!care[kind];
+    return `<button type="button" class="pet-care-btn ${done ? 'done' : ''}" data-pet-care="${kind}" ${done ? 'aria-disabled="true"' : ''} aria-label="${label}${done ? ', 오늘 완료' : `, 경험치 ${care.xp?.[kind] || 10}`}"><span class="pet-care-emoji" aria-hidden="true">${emoji}</span><span class="pet-care-label">${label}</span><small>${done ? '오늘 완료 ✓' : `경험치 +${care.xp?.[kind] || 10}`}</small></button>`;
+  };
+  return `<div class="pet-care-v1376" role="group" aria-label="오늘의 펫 교감">${item('pet', hatched ? '쓰다듬기' : '알 쓰다듬기', '🤚')}${item('feed', hatched ? '밥 주기' : '알 데워주기', hatched ? '🍖' : '🔥')}</div>`;
 }
 // V13.60 home: card, next-step button, a big yacha banner and the week, spaced as one
 // column. Word study, exams, the ranking and records stay in the bottom menu.
@@ -399,6 +410,18 @@ function home(A) {
   return `<div class="home-context home-context-v1327"><div><span>SUMUS VOCA</span><b>${esc(p.school || A.school || '학교 미설정')} · ${esc(p.class_name || '')}</b></div></div>
     ${compactGrowth(A)}`;
 }
+// V13.76 ⭐ 어려운 단어: the starred words of this school and grade, practised together.
+export function starredWords(A) {
+  const stars = new Set(A.memStars || []);
+  if (!stars.size) return [];
+  const seen = new Set();
+  return (A.data.books || []).flatMap(book => book.words || []).filter(word => stars.has(word.id) && !seen.has(word.id) && seen.add(word.id));
+}
+function starPracticeButton(A, cls = '') {
+  const n = starredWords(A).length;
+  if (!n) return '';
+  return `<button type="button" class="star-practice-v1376 ${cls}" data-star-practice="true"><span class="star-practice-mark" aria-hidden="true">★</span><span><small>어려운 단어 모음</small><strong>★ ${n}개 모아서 연습</strong></span><b>${icon('arrow')}</b></button>`;
+}
 function studyHub(A) {
   return `<div class="page-heading study-simple-heading premium-page-heading"><span class="premium-eyebrow">LEARNING</span><h1>학습</h1></div>
   ${studyDailyCard(A)}
@@ -413,7 +436,8 @@ function studyHub(A) {
       <div><span class="pill">GRAMMAR</span><h2>어법·어휘</h2></div>
       <span class="study-hub-arrow">${icon('arrow')}</span>
     </button>
-  </div>`;
+  </div>
+  ${starPracticeButton(A, 'in-hub')}`;
 }
 function grammarCards(A, passages) {
   return passages.map(p => {
@@ -557,6 +581,7 @@ function memorizationPanel(A) {
         <div class="segment compact"><button data-memorize-filter="all" class="${!starredOnly ? 'selected' : ''}">전체 ${words.length}</button><button data-memorize-filter="starred" class="${starredOnly ? 'selected' : ''}">★ 어려운 단어 ${starredInScope.length}</button></div>
         <button class="text-button" data-memorize-reveal-all="${allShown ? 'hide' : 'show'}">${allShown ? '전체 영어 보기' : '전체 뜻 보기'}</button>
       </div>
+      ${starPracticeButton(A, 'in-memorize')}
       <div class="memorize-list">${visible.length ? visible.map((word,index) => {
         const show = allShown || revealed.has(word.id);
         const star = stars.has(word.id);
@@ -566,7 +591,7 @@ function memorizationPanel(A) {
           <button class="memorize-word" data-memorize-word="${esc(word.id)}" aria-label="${esc(word.word)} ${show ? '영어 보기' : '뜻 보기'}"><span class="memorize-no">${index + 1}</span><strong>${esc(front)}</strong></button>
           <button class="memorize-sound" data-memorize-speak="${esc(word.id)}" aria-label="${esc(word.word)} 발음 듣기">${icon('sound')}</button>
         </div>`;
-      }).join('') : '<div class="memorize-empty">표시할 단어가 없어요. 별표 필터를 해제하거나 범위를 선택해주세요.</div>'}</div>
+      }).join('') : `<div class="memorize-empty">${starredOnly ? '이 범위에 ★ 표시한 단어가 없어요. 헷갈리는 단어의 ☆를 눌러 모아 두세요.' : '표시할 단어가 없어요. 범위를 선택해주세요.'}</div>`}</div>
     </section>`;
 }
 function durationText(seconds) {

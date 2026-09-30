@@ -1,13 +1,14 @@
 // Release checks for V13.67: 실력전 (spelling words in yacha), daily attendance (출석 체크) and the
 // capsule machine (뽑기); V13.70: 경험치 and coins from robot matches and teacher exams, and the
-// retired word double chance.
+// retired word double chance; V13.76: 펫 교감, ⭐ 어려운 단어 on the account, and the 실전시험
+// countdown and leave record.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { emptyState } from './state.mjs';
 import { passwordHash, publicProfile } from './auth.mjs';
 import { service, scopedWords } from './service.mjs';
 import { DAY_MS, rankingWeek } from './competition.mjs';
-import { dayKey, unlocked, FRAMES, ACCESSORIES } from '../public/modules/core.js';
+import { dayKey, unlocked, FRAMES, ACCESSORIES, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, TEST_LEAVE_LIMIT, STARS_MAX } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, visibleTitleKeys } from '../public/modules/titles.js';
 import { createBattle, connect, answer, tick, battleView, SKILL_RULES, BATTLE } from '../public/modules/battle-engine.js';
 import { battleQuestions, spellHint, spellable } from '../public/modules/battle-questions.js';
@@ -218,4 +219,84 @@ export async function runRewardsChecks(assert, expectStatus) {
   const battleV70 = source('../public/modules/battle.js'), sessionsUi = source('../public/modules/sessions.js'), appUi = source('../public/app.js'), buildUi = source('./build-assets.mjs');
   assert(battleV70.includes("api('/battle/practice/start'") && battleV70.includes("api('/battle/practice/finish'") && battleV70.includes('botRewardLine()') && sessionsUi.includes('a.reward ?') && homeUi.includes('data-go="ranking" data-from="me"') && homeUi.includes("A.rankFrom === 'me' ? backTo('me', '나')") && appUi.includes("A.rankFrom = d.from || 'home'") && !appUi.includes('wallet-chance') && buildUi.includes('"v1370.css"'), 'V13.70 robot and exam rewards show in the app; 나 opens the ranking; the wallet has no double chance');
   assert(battleV70.indexOf('id="yb-answers"') < battleV70.indexOf('id="yb-myskill"') && battleV70.includes('yb-strip-v1370') && battleV70.includes('yb-hpn-'), 'V13.70 the match shows the answers right under the word, the clock beside the message line and HP numbers');
+
+  /* ---------- V13.76 펫 교감 ---------- */
+  state.profiles.push(student('qa-rw-d', '라온'), student('qa-rw-e', '마루'));
+  for (const id of ['qa-rw-d', 'qa-rw-e']) tokens[id] = await login(id);
+  const tD = tokens['qa-rw-d'], tE = tokens['qa-rw-e'];
+  const d0 = await service(state, 'GET', '/bootstrap', {}, tD);
+  assert(d0.care && d0.care.pet === false && d0.care.feed === false && d0.care.xp.pet === PET_CARE.pet.xp && d0.care.away_days === 0 && d0.care.missed === false, 'V13.76 a new student sees both 교감 buttons open and no "missed you"');
+  const petted = await service(state, 'POST', '/pet/care', { kind: 'pet' }, tD);
+  assert(petted.kind === 'pet' && petted.xp === PET_CARE.pet.xp && petted.care.pet === true && petted.care.feed === false && petted.stats.points === d0.stats.points + PET_CARE.pet.xp, 'V13.76 쓰다듬기 gives its 경험치 right away');
+  await expectStatus(409, () => service(state, 'POST', '/pet/care', { kind: 'pet' }, tD), 'V13.76 쓰다듬기 pays once a day');
+  const fed = await service(state, 'POST', '/pet/care', { kind: 'feed' }, tD);
+  assert(fed.care.pet && fed.care.feed && fed.stats.points === d0.stats.points + PET_CARE.pet.xp + PET_CARE.feed.xp && fed.care.total === 2, 'V13.76 밥 주기 is a second, separate daily 교감');
+  await expectStatus(400, () => service(state, 'POST', '/pet/care', { kind: 'hug' }, tD), 'V13.76 only 쓰다듬기 and 밥 주기 exist');
+  await expectStatus(403, () => service(state, 'POST', '/pet/care', { kind: 'pet' }, tokens.qa_rw_teacher), 'V13.76 teachers have no pet to care for');
+  profile('qa-rw-d').care.day = dayKey(now - DAY_MS);
+  const dNext = await service(state, 'GET', '/bootstrap', {}, tD);
+  assert(!dNext.care.pet && !dNext.care.feed, 'V13.76 the 교감 buttons open again the next day');
+  profile('qa-rw-d').care.last_at = now - (PET_MISS_DAYS + 2) * DAY_MS;
+  const dAway = await service(state, 'GET', '/bootstrap', {}, tD);
+  assert(dAway.care.missed === true && dAway.care.away_days === PET_MISS_DAYS + 2, 'V13.76 after a few days away the pet says it missed the student');
+  profile('qa-rw-d').care.last_at = now - DAY_MS;
+  assert((await service(state, 'GET', '/bootstrap', {}, tD)).care.missed === false, 'V13.76 yesterday counts as not away');
+  const teacherCare = (await service(state, 'GET', '/bootstrap', {}, tokens.qa_rw_teacher)).profiles.find(x => x.id === 'qa-rw-d');
+  assert(teacherCare && teacherCare.care === undefined, 'V13.76 the teacher list does not carry each student\'s 교감 record');
+
+  /* ---------- V13.76 ⭐ 어려운 단어 ---------- */
+  const [w1, w2, w3] = words;
+  const starOn = await service(state, 'POST', '/stars', { word_id: w1.id, on: true }, tD);
+  assert(starOn.stars.length === 1 && starOn.stars[0] === w1.id, 'V13.76 a ★ is saved on the account');
+  const merged = await service(state, 'POST', '/stars', { word_ids: [w1.id, w2.id, w3.id, 'not-a-word'] }, tD);
+  assert(merged.stars.join() === [w1.id, w2.id, w3.id].join(), 'V13.76 the stars kept on one phone are merged in once (unknown words dropped, no doubles)');
+  const starOff = await service(state, 'POST', '/stars', { word_id: w2.id, on: false }, tD);
+  assert(starOff.stars.join() === [w1.id, w3.id].join(), 'V13.76 ★ can be taken off');
+  await expectStatus(404, () => service(state, 'POST', '/stars', { word_id: 'not-a-word', on: true }, tD), 'V13.76 only words of the student\'s school and grade can be starred');
+  const dStars = await service(state, 'GET', '/bootstrap', {}, tD);
+  assert(dStars.profile.stars.join() === [w1.id, w3.id].join(), 'V13.76 the stars come back on any phone');
+  const teacherView = await service(state, 'GET', '/bootstrap', {}, tokens.qa_rw_teacher);
+  assert(teacherView.profiles.every(x => x.stars === undefined), 'V13.76 the teacher list does not carry the stars');
+  profile('qa-rw-e').stars = [];
+  await service(state, 'POST', '/stars', { word_ids: words.slice(0, Math.min(words.length, STARS_MAX + 5)).map(w => w.id) }, tE);
+  assert(profile('qa-rw-e').stars.length <= STARS_MAX, 'V13.76 the star list has a ceiling');
+  const starPractice = await service(state, 'POST', '/practice/start', { school: '단원고', mode: 'eng2mean', word_ids: [w1.id, w3.id], cover_all: true, run_mode: 'practice' }, tD);
+  assert(starPractice.target === 2 && starPractice.timer_mode === 'none' && !starPractice.question_deadline, 'V13.76 the ★ words start as one untimed practice');
+  await service(state, 'POST', `/practice/${starPractice.id}/finish`, {}, tD);
+
+  /* ---------- V13.76 실전시험: countdown and leaving the screen ---------- */
+  const test = await service(state, 'POST', '/practice/start', { school: '단원고', range_codes: range, mode: 'write_meaning', target: 5, run_mode: 'test' }, tE);
+  const testX = () => state.practices.find(x => x.id === test.id);
+  assert(test.timer_mode === 'question' && test.question_duration_sec === TEST_SECONDS_PER_QUESTION.write_meaning && test.question_deadline > now && test.leaves === 0, 'V13.76 실전시험 counts down every word');
+  const again0 = await service(state, 'GET', `/practice/${test.id}`, {}, tE);
+  assert(again0.timer_mode === 'question' && again0.question_deadline === test.question_deadline, 'V13.76 opening the test again keeps its countdown (practice drops it)');
+  const late = testX();
+  late.question_deadline = Date.now() - 500;
+  const inGrace = await service(state, 'POST', `/practice/${test.id}/answer`, { question_id: late.question_id, answer: 'x' }, tE);
+  const firstRecord = testX().answer_records?.[0];
+  assert(!firstRecord?.timed_out && inGrace.timer_mode === 'question' && inGrace.question_deadline > Date.now(), 'V13.76 an answer that left just before the end still counts, and the next word gets its own countdown');
+  const expired = testX();
+  expired.question_deadline = Date.now() - 5000;
+  await service(state, 'POST', `/practice/${test.id}/answer`, { question_id: expired.question_id, answer: 'x' }, tE);
+  assert(testX().answer_records?.[1]?.timed_out === true, 'V13.76 an answer after the countdown is 미응답');
+  const out1 = await service(state, 'POST', `/practice/${test.id}/leave`, { phase: 'out' }, tE);
+  const back1 = await service(state, 'POST', `/practice/${test.id}/leave`, { phase: 'back', ms: 4200 }, tE);
+  assert(out1.leaves === 1 && out1.limit === TEST_LEAVE_LIMIT && out1.finished === false && back1.leaves === 1 && testX().leave_ms === 4200, 'V13.76 leaving the test is counted, with how long');
+  await expectStatus(405, () => service(state, 'GET', `/practice/${test.id}/leave`, { phase: 'out' }, tE), 'V13.76 a leave is only recorded by POST (saved)');
+  const out2 = await service(state, 'POST', `/practice/${test.id}/leave`, { phase: 'out' }, tE);
+  assert(out2.leaves === 2 && !out2.finished, 'V13.76 the second leave is a warning');
+  const out3 = await service(state, 'POST', `/practice/${test.id}/leave`, { phase: 'out' }, tE);
+  const leftSession = state.sessions.find(x => x.id === test.id);
+  assert(out3.finished === true && out3.left_out === true && out3.leaves === TEST_LEAVE_LIMIT && leftSession?.leave_count === TEST_LEAVE_LIMIT && leftSession.left_out === true && leftSession.leave_ms === 4200, `V13.76 the ${TEST_LEAVE_LIMIT}rd leave hands the test in, and the record keeps the leaves`);
+  const afterDone = await service(state, 'POST', `/practice/${test.id}/leave`, { phase: 'back', ms: 9000 }, tE);
+  assert(afterDone.finished === true && (!testX() || testX().leave_ms === 4200) && leftSession.leave_ms === 4200, 'V13.76 a leave report after the end changes nothing');
+  const practiceRun = await service(state, 'POST', '/practice/start', { school: '단원고', range_codes: range, mode: 'write_meaning', target: 5 }, tE);
+  const practiceLeave = await service(state, 'POST', `/practice/${practiceRun.id}/leave`, { phase: 'out' }, tE);
+  assert(practiceRun.timer_mode === 'none' && practiceLeave.leaves === 0 && !state.practices.find(x => x.id === practiceRun.id).leaves, 'V13.76 practice keeps no countdown and no leave record');
+  await service(state, 'POST', `/practice/${practiceRun.id}/finish`, {}, tE);
+  const sessionsUi76 = source('../public/modules/sessions.js'), appUi76 = source('../public/app.js'), studentUi76 = source('../public/modules/student.js'), teacherUi76 = source('../public/modules/teacher.js'), build76 = source('./build-assets.mjs'), css76 = source('../public/v1376.css');
+  assert(sessionsUi76.includes("reportTestLeave(x.id, { phase: 'out' })") && sessionsUi76.includes('keepalive: true') && sessionsUi76.includes('function testLeaveBack()') && sessionsUi76.includes('id="practice-timer-value"') && sessionsUi76.includes('if (questionTimer && !pendingPracticeSave) timer = setInterval(practiceTick, 100)') && sessionsUi76.includes('test-leave-rule-v1376') && sessionsUi76.includes("const out = testMode ? await reportTestLeave(x.id, { phase: 'out' }) : null") && teacherUi76.includes('function leaveNote(s)'), 'V13.76 the test screen shows the countdown, reports leaving and warns; the teacher sees the leaves');
+  assert(studentUi76.includes('function petCareBar(A, hatched)') && studentUi76.includes('data-pet-care="${kind}"') && appUi76.includes("api('/pet/care', { kind })") && appUi76.includes('function maybeMissedYou()') && appUi76.includes('보고 싶었어!'), 'V13.76 the home card has 쓰다듬기 and 밥 주기, and the pet greets a student back');
+  assert(appUi76.includes('function syncStars()') && appUi76.includes("api('/stars', { word_id: wordId, on })") && studentUi76.includes('export function starredWords(A)') && studentUi76.includes('data-star-practice="true"') && appUi76.includes('function openStarPractice()'), 'V13.76 ★ words are kept on the account and practised together');
+  assert(build76.includes('"v1376.css"') && css76.includes('.pet-care-v1376') && css76.includes('.practice-timer-v1376') && css76.includes('.star-practice-v1376'), 'V13.76 styles are bundled');
 }
