@@ -28,7 +28,7 @@ const targetCount = (A, value) => A.data.profiles.filter(p => p.active && target
 export function teacherPage(A) {
   const title = tabs.find(t => t[0] === A.tab)?.[1] || '대시보드';
   const pendingDisputes = (A.data.meaning_disputes || []).filter(item => item.status === 'pending').length;
-  const actions = A.tab === 'students' ? `<button class="btn primary" data-action="add-student">${icon('plus')} 학생 등록</button>` : A.tab === 'results' ? `<button class="btn secondary" data-action="export-results">${icon('download')} 결과 내보내기</button>` : A.tab === 'tournaments' ? `<button class="btn primary" data-action="tournament-new">${icon('plus')} 대회 만들기</button>` : '';
+  const actions = A.tab === 'students' ? `<button class="btn primary" data-action="add-student">${icon('plus')} 학생 등록</button>` : A.tab === 'results' ? `<button class="btn secondary" data-action="export-results">${icon('download')} 결과 내보내기</button>` : A.tab === 'tournaments' ? `<button class="btn primary" data-action="tournament-new">${icon('plus')} 대회 만들기</button>` : A.tab === 'dashboard' || !A.tab ? `<button class="btn secondary tv2-gift-top-v1375" data-action="gift">${icon('gift')} 코인 선물</button>` : '';
   const content = ({ dashboard, students, books, disputes, results, tournaments }[A.tab] || dashboard)(A);
   const divisionOptions = [['middle','중등부'],['high','고등부']].filter(([id]) => (A.data.divisions || []).includes(id)).map(([id,label]) => `<option value="${id}" ${id === A.data.profile.active_division ? 'selected' : ''}>${label}</option>`).join('');
   const schoolOptions = A.data.schools.map(s => `<option value="${esc(s.id)}" ${s.id === A.data.profile.active_school_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
@@ -131,10 +131,8 @@ function activeExamStatus(d) {
     return { exam, targets, submitted, active, missing };
   });
 }
-function attentionStudentButton(student, sub, tone = '') {
-  return `<button class="v136-student-chip ${tone}" data-student="${student.id}"><span>${esc(student.display_name)}</span><small>${esc(sub)}</small>${icon('chevron')}</button>`;
-}
-// V13.74 반 대항전 (this week's 경험치 of each class) and 선생님 알림판 (who has not come in).
+// V13.74 반 대항전 (this week's 경험치 of each class). The V13.74 선생님 알림판 is part of
+// 챙겨야 할 학생 since V13.75.
 function classLeaguePanel(league) {
   if (!league) return '';
   const max = Math.max(1, ...league.classes.map(c => c.xp));
@@ -144,108 +142,158 @@ function classLeaguePanel(league) {
     <div class="cl-actions"><button type="button" class="btn" data-action="class-tv">${icon('tv')} TV로 크게 보기</button><button type="button" class="btn" data-action="class-tv-link">TV 링크</button></div>
   </section>`;
 }
-function idlePanel(rows) {
-  if (!rows) return '';
-  const week = rows.filter(r => r.week), longer = rows.filter(r => !r.week);
-  const sub = r => r.last ? (r.days >= 1 ? `${r.days}일째 기록 없음` : '오늘 기록 없음') : '아직 기록 없음';
-  return `<section class="panel idle-panel-v1374">
-    <div class="panel-head"><div><h2>선생님 알림판</h2><span>이번 주 공부·출석·대결 기록이 하나도 없는 학생</span></div><span class="v136-count ${week.length ? 'danger' : ''}">${week.length}명</span></div>
-    <div class="v136-chip-list">${week.length ? week.slice(0, 12).map(r => attentionStudentButton({ id: r.id, display_name: r.name }, `${r.class_name} · ${sub(r)}`, 'danger')).join('') : '<div class="v136-clear">✓ 이번 주 모든 학생이 한 번 이상 들어왔어요.</div>'}</div>
-    ${week.length > 12 ? `<button class="text-button v136-more" data-go="students">나머지 ${week.length - 12}명 학생 관리에서 보기 ${icon('chevron')}</button>` : ''}
-    ${longer.length ? `<p class="idle-note-v1374">이번 주엔 들어왔지만 <b>3일 이상</b> 기록이 없는 학생 ${longer.length}명: ${longer.slice(0, 6).map(r => esc(r.name)).join(', ')}${longer.length > 6 ? ' 외' : ''}</p>` : ''}
-    ${week.length ? `<button type="button" class="btn full idle-gift-v1374" data-action="gift-idle">${icon('gift')} 이 학생들에게 응원 코인 보내기</button>` : ''}
+// V13.75 teacher overview helpers: when each student last did anything, this week's work.
+const DAY = 86400000;
+function weekStart(now = Date.now()) {
+  const kst = new Date(now + 9 * 3600000), back = (kst.getUTCDay() + 6) % 7;
+  return Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate() - back) - 9 * 3600000;
+}
+function lastActivityMap(d) {
+  const last = new Map();
+  const put = (id, t) => { t = Number(t || 0); if (t > (last.get(id) || 0)) last.set(id, t); };
+  for (const s of d.sessions) put(s.student_id, s.created_at);
+  for (const a of d.attempts) put(a.student_id, a.submitted_at || a.started_at);
+  for (const [id, progress] of Object.entries(d.grammar_progress || {})) for (const item of Object.values(progress || {})) put(id, item.updated_at);
+  for (const r of d.idle_students || []) if (r.last) put(r.id, r.last);
+  return last;
+}
+export function agoLabel(t, now = Date.now()) {
+  if (!t) return '기록 없음';
+  const diff = now - t;
+  if (dayKey(t) === dayKey(now)) return diff < 3600000 ? `${Math.max(1, Math.floor(diff / 60000))}분 전` : `${Math.floor(diff / 3600000)}시간 전`;
+  const days = Math.max(1, Math.round((new Date(dayKey(now)) - new Date(dayKey(t))) / DAY));
+  return days < 14 ? `${days}일 전` : date(t);
+}
+function weekWork(d, now = Date.now()) {
+  const start = weekStart(now), prev = start - 7 * DAY, rows = new Map();
+  const row = id => rows.get(id) || rows.set(id, { count: 0, total: 0, scores: 0, prevTotal: 0 }).get(id);
+  for (const s of d.sessions) {
+    const t = Number(s.created_at || 0);
+    if (t >= start) { const r = row(s.student_id); r.count++; r.total += Number(s.total || 0); r.scores += Number(s.score ?? (s.total ? Math.round(s.correct / s.total * 100) : 0)); }
+    else if (t >= prev) row(s.student_id).prevTotal += Number(s.total || 0);
+  }
+  return rows;
+}
+// Students to look after: not studied today, not seen this week, quiet for 3+ days.
+function careGroups(d) {
+  const active = d.profiles.filter(p => p.active && !p.preview_owner_id);
+  const today = todayStudentIds(d), last = lastActivityMap(d), start = weekStart();
+  const byName = (a, b) => a.display_name.localeCompare(b.display_name, 'ko');
+  const idle = new Map((d.idle_students || []).map(r => [r.id, r]));
+  const todayMissing = active.filter(p => !today.has(p.id)).sort((a, b) => (last.get(b.id) || 0) - (last.get(a.id) || 0) || byName(a, b));
+  const week = active.filter(p => idle.get(p.id)?.week ?? (last.get(p.id) || 0) < start).sort((a, b) => (last.get(a.id) || 0) - (last.get(b.id) || 0) || byName(a, b));
+  const quiet = active.filter(p => { const t = last.get(p.id) || 0; return t >= start && Date.now() - t >= 3 * DAY; }).sort((a, b) => (last.get(a.id) || 0) - (last.get(b.id) || 0));
+  return { active, today, last, groups: { today: todayMissing, week, quiet } };
+}
+// The student ids of one 챙겨야 할 학생 tab (for the 응원 코인 button).
+export const careIds = (A, tab) => (careGroups(A.data).groups[tab] || []).map(p => p.id);
+const CARE_TABS = [['today', '오늘 안 함'], ['week', '이번 주 미접속'], ['quiet', '3일 이상 쉼']];
+function carePanel(A, care) {
+  const tab = CARE_TABS.some(([k]) => k === A.careTab) ? A.careTab : 'today';
+  const list = care.groups[tab], shown = A.careAll ? list : list.slice(0, 12);
+  const empty = { today: '✓ 활성 학생 모두 오늘 학습했어요.', week: '✓ 이번 주 모든 학생이 한 번 이상 들어왔어요.', quiet: '✓ 3일 넘게 쉰 학생이 없어요.' }[tab];
+  return `<section class="panel care-v1375" id="care-panel">
+    <div class="panel-head"><div><h2>챙겨야 할 학생</h2><span>오늘 확인 필요 · 이름을 누르면 학생 기록이 열려요</span></div>${list.length ? `<button type="button" class="btn small" data-action="gift-care" data-care="${tab}">${icon('gift')} ${list.length}명에게 응원 코인</button>` : ''}</div>
+    <div class="care-tabs" role="tablist">${CARE_TABS.map(([k, label]) => `<button type="button" role="tab" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}" data-care-tab="${k}">${label}<b>${care.groups[k].length}</b></button>`).join('')}</div>
+    <div class="care-list">${shown.length ? shown.map(p => `<div class="care-row"><button type="button" class="care-who" data-student="${p.id}">${avatar(p.avatar_key, { size: 'mini' })}<span><b>${esc(p.display_name)}</b><small>${esc(p.class_name || '')}</small></span></button><span class="care-when ${Date.now() - (care.last.get(p.id) || 0) >= 3 * DAY ? 'late' : ''}">${agoLabel(care.last.get(p.id))}</span><button type="button" class="care-gift" data-gift-to="${p.id}" aria-label="${esc(p.display_name)}에게 코인 선물">${icon('gift')}</button></div>`).join('') : `<div class="v136-clear">${empty}</div>`}</div>
+    ${list.length > 12 ? `<button type="button" class="text-button v136-more" data-care-all>${A.careAll ? '접기' : `${list.length - 12}명 더 보기`} ${icon('chevron')}</button>` : ''}
   </section>`;
+}
+function kpiCards(A, care) {
+  const d = A.data, active = care.active.length, done = active - care.groups.today.length;
+  const pct = active ? Math.round(done / active * 100) : 0;
+  const pending = (d.meaning_disputes || []).filter(item => item.status === 'pending').length;
+  const matches = (d.tournaments || []).filter(t => t.status === 'active').flatMap(t => t.rounds.flatMap(r => r.matches)).filter(m => !m.winner && m.a && m.b).length;
+  const todayKey = dayKey(Date.now());
+  const questions = d.sessions.filter(s => dayKey(s.created_at) === todayKey).reduce((n, s) => n + Number(s.total || 0), 0);
+  return `<section class="tv2-today kpi-v1375" aria-label="오늘 현황">
+    <button type="button" class="kpi" data-care-tab="today"><span class="kpi-ring" style="--p:${pct}"><b>${pct}%</b></span><span><small>오늘 학습</small><strong>${num(done)}<em>/${num(active)}명</em></strong><i>오늘 푼 문제 ${num(questions)}</i></span></button>
+    <button type="button" class="kpi ${care.groups.week.length ? 'warn' : 'ok'}" data-care-tab="week"><span class="kpi-ico">${icon('user')}</span><span><small>이번 주 미접속</small><strong>${num(care.groups.week.length)}<em>명</em></strong><i>${care.groups.quiet.length ? `3일 이상 쉼 ${care.groups.quiet.length}명` : '월요일부터 기준'}</i></span></button>
+    <button type="button" class="kpi ${pending ? 'warn' : 'ok'}" data-go="disputes"><span class="kpi-ico">${icon('records')}</span><span><small>뜻 이의제기</small><strong>${num(pending)}<em>건</em></strong><i>${pending ? '검토가 필요해요' : '대기 없음'}</i></span></button>
+    <button type="button" class="kpi" data-go="tournaments"><span class="kpi-ico">${icon('battle')}</span><span><small>야차 대회</small><strong>${num(matches)}<em>경기</em></strong><i>${matches ? '아직 안 한 경기' : '진행 중인 경기 없음'}</i></span></button>
+  </section>`;
+}
+function examPanel(d) {
+  const rows = activeExamStatus(d);
+  if (!rows.length) return '';
+  return `<section class="panel exam-now-v1375"><div class="panel-head"><div><h2>진행 중인 실전시험</h2><span>마감 전 시험의 제출 현황</span></div></div>${rows.slice(0, 4).map(r => `<div class="exam-now-row"><b>${esc(r.exam.title)}</b><span class="exam-submit-state"><span class="done">완료 ${r.submitted.length}</span><span class="doing">응시 ${r.active.length}</span><span class="wait">미응시 ${r.missing.length}</span></span><small>${date(r.exam.due_at)} 마감</small></div>`).join('')}</section>`;
 }
 function dashboard(A) {
   const d = A.data;
-  const activeStudents = d.profiles.filter(student => student.active);
-  const learnedToday = todayStudentIds(d);
-  const learnedActiveCount = activeStudents.filter(student => learnedToday.has(student.id)).length;
-  const inactiveToday = activeStudents.filter(student => !learnedToday.has(student.id));
+  const care = careGroups(d);
   const grammar = grammarSummary(d, A.school);
   const weak = grammarWeakness(d, A.school);
+  const activeStudents = care.active;
   const sharedSelfTests = d.sessions.filter(item => item.run_mode === 'test' && item.shared_to_teacher_at).sort((a,b) => Number(b.shared_to_teacher_at) - Number(a.shared_to_teacher_at));
-  const sharedToday = sharedSelfTests.filter(item => dayKey(item.shared_to_teacher_at) === dayKey(Date.now()));
-  const attention = [...inactiveToday].sort((a, b) => a.display_name.localeCompare(b.display_name, 'ko'));
   const grammarAttention = [...grammar.studentRows].sort((a, b) => a.masters - b.masters || a.touched - b.touched).slice(0, 6);
-
-  const todayKey = dayKey(Date.now());
-  const todayQuestions = d.sessions.filter(s => dayKey(s.created_at) === todayKey).reduce((n, s) => n + Number(s.total || 0), 0);
-  const learnedPercent = activeStudents.length ? Math.round(learnedActiveCount / activeStudents.length * 100) : 0;
-  // V13.64: one "today" card instead of a dark banner plus a metrics row repeating the same count.
+  const grammarUsed = grammar.touched > 0 || weak.choices.length > 0;
+  // V13.75: the four numbers that need the teacher, one list of students to look after, the
+  // class race, then what students sent. Grammar analysis folds away until there is data.
   return `
-    <section class="tv2-today" aria-label="오늘 현황">
-      <div class="tv2-ring" style="--p:${learnedPercent}" role="img" aria-label="오늘 학습한 학생 ${learnedActiveCount}명 / ${activeStudents.length}명">
-        <div><strong>${learnedActiveCount}<small>/${activeStudents.length}</small></strong><span>오늘 학습</span></div>
-      </div>
-      <div class="tv2-today-copy"><span class="tv2-kicker">오늘 현황</span><h2>${activeStudents.length ? (inactiveToday.length ? `${inactiveToday.length}명이 아직 오늘 학습 전이에요` : '모든 학생이 오늘 학습했어요') : '등록된 학생이 없어요'}</h2><p>${esc(A.school)} · 활성 학생 ${activeStudents.length}명 기준</p></div>
-      <button type="button" class="tv2-gift-v1373" data-action="gift" aria-label="학생에게 코인 선물하기">${icon('gift')}<span><b>코인 선물</b><small>칭찬할 학생에게</small></span></button>
-      <div class="tv2-today-stats">
-        <div><span>오늘 푼 문제</span><strong>${num(todayQuestions)}<small>문제</small></strong></div>
-        <div><span>어법 MASTER</span><strong>${num(grammar.mastered)}<small>지문</small></strong></div>
-        <div><span>실전 결과 제출</span><strong>${num(sharedToday.length)}<small>건</small></strong></div>
-      </div>
-    </section>
-    <div class="v136-dashboard-grid tv3-row-v1374">${classLeaguePanel(d.class_league)}${idlePanel(d.idle_students)}</div>
-    <div class="v136-dashboard-grid">
-      <section class="panel v136-attention">
-        <div class="panel-head"><div><h2>오늘 확인 필요</h2><span>학습 기록이 아직 없는 학생</span></div><span class="v136-count danger">${inactiveToday.length}명</span></div>
-        <div class="v136-chip-list">${attention.length
-          ? attention.slice(0, 10).map(student => attentionStudentButton(student, '오늘 학습 기록 없음')).join('')
-          : '<div class="v136-clear">✓ 현재 활성 학생 모두 오늘 학습 기록이 있어요.</div>'}</div>
-        ${attention.length > 10 ? `<button class="text-button v136-more" data-go="students">나머지 ${attention.length - 10}명 학생 관리에서 보기 ${icon('chevron')}</button>` : ''}
-      </section>
-
-      <section class="panel v136-grammar">
-        <div class="panel-head"><div><h2>어법·어휘 MASTER</h2><span>${esc(A.school)} 시험범위 · ${grammar.passages.length}지문 기준</span></div><span class="v136-count">${grammar.percent}%</span></div>
-        <div class="v136-master-bar"><i style="width:${grammar.percent}%"></i></div>
-        <div class="v136-master-summary"><b>${grammar.mastered}</b><span>/ ${activeStudents.length * grammar.passages.length} 학생·지문 MASTER</span></div>
-        <div class="v136-mini-list">${grammarAttention.length ? grammarAttention.map(row => `
-          <button data-student="${row.student.id}"><span><b>${esc(row.student.display_name)}</b><small>${esc(row.student.class_name)} · 학습 ${row.touched}/${row.total}</small></span><strong>${row.masters}/${row.total}</strong></button>
-        `).join('') : '<div class="v136-empty-line">등록된 활성 학생이 없어요.</div>'}</div>
-      </section>
+    ${kpiCards(A, care)}
+    <div class="dash-grid-v1375">
+      ${carePanel(A, care)}
+      <div class="dash-side-v1375">${classLeaguePanel(d.class_league)}${examPanel(d)}</div>
     </div>
-
-    <div class="v136-dashboard-grid">
-      <section class="panel">
-        <div class="panel-head"><div><h2>학생이 보낸 실전 결과</h2><span>학생이 직접 실전모드를 끝내고 전송한 기록</span></div><button class="text-button" data-go="results">전체 결과</button></div>
-        <div class="v136-exam-list">${sharedSelfTests.length ? sharedSelfTests.slice(0,6).map(item => {
-          const student = d.profiles.find(profile => profile.id === item.student_id);
-          const ranges = (item.range_codes || []).map(code => recordRangeLabel(item, code)).join(' · ') || '선택 범위';
-          return `<div class="v136-exam-item"><div class="v136-exam-top"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(student?.display_name || '학생')} · ${item.score ?? 0}점</h3><p>${esc(student?.class_name || item.grade || '')} · ${esc(ranges)} · ${esc(PRACTICE_TYPES[item.mode] || '쓰기')}</p></div><button class="text-button" data-practice-record="${item.id}">답안 보기</button></div><div class="v136-missing-names"><span>전송 ${date(item.shared_to_teacher_at)}</span></div></div>`;
-        }).join('') : '<div class="v136-empty-line">아직 학생이 보낸 실전 결과가 없어요.</div>'}</div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head"><div><h2>많이 틀린 어법 포인트</h2><span>현재 저장된 1차 오답 기준</span></div><span class="v136-count warn">${weak.choices.reduce((n, item) => n + item.count, 0)}건</span></div>
-        <div class="v136-weak-list">${weak.choices.length ? weak.choices.slice(0, 5).map((item, index) => `
-          <div><span class="v136-rank">${index + 1}</span><div class="grow"><b>${esc(passageNumberLabel(item.passage))} · 정답 ${esc(item.answer)}</b><small>${esc(item.type)} · ${esc(item.passage.subtitle || item.passage.title)}</small></div><strong>${item.count}명</strong></div>
-        `).join('') : '<div class="v136-empty-line">아직 누적된 어법·어휘 오답이 없어요.</div>'}</div>
-      </section>
-    </div>
-
-    <section class="panel">
-      <div class="panel-head"><div><h2>취약 지문 TOP</h2><span>학생들의 1차 오답이 많이 쌓인 지문</span></div><button class="text-button" data-go="students">학생별 확인 ${icon('chevron')}</button></div>
+    ${sharedSelfTests.length ? `<section class="panel">
+      <div class="panel-head"><div><h2>학생이 보낸 실전 결과</h2><span>학생이 직접 실전모드를 끝내고 전송한 기록</span></div><button class="text-button" data-go="results">전체 결과</button></div>
+      <div class="v136-exam-list">${sharedSelfTests.slice(0,6).map(item => {
+        const student = d.profiles.find(profile => profile.id === item.student_id);
+        const ranges = (item.range_codes || []).map(code => recordRangeLabel(item, code)).join(' · ') || '선택 범위';
+        return `<div class="v136-exam-item"><div class="v136-exam-top"><span class="square-icon">${icon('exam')}</span><div class="grow"><h3>${esc(student?.display_name || '학생')} · ${item.score ?? 0}점</h3><p>${esc(student?.class_name || item.grade || '')} · ${esc(ranges)} · ${esc(PRACTICE_TYPES[item.mode] || '쓰기')}</p></div><button class="text-button" data-practice-record="${item.id}">답안 보기</button></div><div class="v136-missing-names"><span>전송 ${date(item.shared_to_teacher_at)}</span></div></div>`;
+      }).join('')}</div>
+    </section>` : ''}
+    <details class="panel grammar-fold-v1375" ${A.grammarOpen ?? grammarUsed ? 'open' : ''}>
+      <summary><span><b>어법·어휘 분석</b><small>${grammarUsed ? `MASTER ${grammar.percent}% · 오답 ${weak.choices.reduce((n, item) => n + item.count, 0)}건` : '학생들이 어법·어휘를 공부하면 여기에 쌓여요'}</small></span>${icon('chevron')}</summary>
+      <div class="v136-dashboard-grid">
+        <section class="v136-grammar">
+          <div class="panel-head"><div><h2>어법·어휘 MASTER</h2><span>${esc(A.school)} 시험범위 · ${grammar.passages.length}지문 기준</span></div><span class="v136-count">${grammar.percent}%</span></div>
+          <div class="v136-master-bar"><i style="width:${grammar.percent}%"></i></div>
+          <div class="v136-master-summary"><b>${grammar.mastered}</b><span>/ ${activeStudents.length * grammar.passages.length} 학생·지문 MASTER</span></div>
+          <div class="v136-mini-list">${grammarAttention.length ? grammarAttention.map(row => `
+            <button data-student="${row.student.id}"><span><b>${esc(row.student.display_name)}</b><small>${esc(row.student.class_name)} · 학습 ${row.touched}/${row.total}</small></span><strong>${row.masters}/${row.total}</strong></button>
+          `).join('') : '<div class="v136-empty-line">등록된 활성 학생이 없어요.</div>'}</div>
+        </section>
+        <section>
+          <div class="panel-head"><div><h2>많이 틀린 어법 포인트</h2><span>현재 저장된 1차 오답 기준</span></div><span class="v136-count warn">${weak.choices.reduce((n, item) => n + item.count, 0)}건</span></div>
+          <div class="v136-weak-list">${weak.choices.length ? weak.choices.slice(0, 5).map((item, index) => `
+            <div><span class="v136-rank">${index + 1}</span><div class="grow"><b>${esc(passageNumberLabel(item.passage))} · 정답 ${esc(item.answer)}</b><small>${esc(item.type)} · ${esc(item.passage.subtitle || item.passage.title)}</small></div><strong>${item.count}명</strong></div>
+          `).join('') : '<div class="v136-empty-line">아직 누적된 어법·어휘 오답이 없어요.</div>'}</div>
+        </section>
+      </div>
+      <div class="panel-head"><div><h2>취약 지문 TOP</h2><span>학생들의 1차 오답이 많이 쌓인 지문</span></div></div>
       <div class="v136-passage-grid">${weak.passages.length ? weak.passages.slice(0, 6).map((item, index) => `
         <div><span>${index + 1}</span><strong>${esc(passageNumberLabel(item.passage))}</strong><small>${esc(item.passage.subtitle || item.passage.title)}</small><b>${item.count}건 오답</b></div>
       `).join('') : '<div class="v136-empty-line">어법·어휘 학습 데이터가 쌓이면 지문별 취약도가 표시됩니다.</div>'}</div>
-    </section>
-
-    <section class="panel">
-      <div class="panel-head"><h2>학생 학습 현황</h2><button class="text-button" data-go="students">전체 학생 ${icon('chevron')}</button></div>
-      ${studentTable(d.profiles.slice(0, 8), d.word_mastery || {})}
-    </section>
+    </details>
+    <button type="button" class="dash-students-link-v1375" data-go="students">${icon('user')} 전체 학생 ${num(d.profiles.length)}명 · 정렬과 필터는 학생 관리에서 ${icon('chevron')}</button>
   `;
 }
-function studentTable(list, wordMastery = {}) {
-  return list.length ? `<div class="table-scroll"><table class="student-ops-table"><thead><tr><th>학생</th><th>반 / 학교</th><th>오늘 학습량</th><th>정답률</th><th>단어 MASTER</th><th>취약 단어</th><th>상태</th></tr></thead><tbody>${list.map(p => { const wm = wordMastery[p.id] || {}; return `<tr><td class="tv2-cell-name"><button class="table-name" data-student="${p.id}">${avatar(p.avatar_key, { size: 'mini' })}<div><strong>${esc(p.display_name)}</strong><small>Lv.${p.stats.level} · ${esc(p.username)}</small></div></button></td><td data-label="반">${esc(p.class_name)}<small>${p.school}</small></td><td data-label="오늘"><strong>${num(p.stats.today_total)}</strong> 문제</td><td data-label="정답률"><div class="stat-bar"><div class="progress"><i style="width:${p.stats.accuracy}%"></i></div><span>${p.stats.accuracy}%</span></div></td><td data-label="단어 MASTER"><strong>${wm.mastered || 0}/${wm.total_ranges || 0}</strong><small>정복도 ${wm.conquest || 0}%</small></td><td data-label="취약 단어">${p.stats.weak}개</td><td data-label="상태"><span class="pill ${p.active ? 'green' : ''}">${p.active ? '활성' : '일시 중지'}</span></td></tr>`; }).join('')}</tbody></table></div>` : empty('user', '등록된 학생이 없어요', '학생 등록으로 첫 계정을 만들어주세요.');
-}
+// V13.75 학생 관리: quick filters, sortable columns, one compact row per student.
+const QUICK = [['', '전체'], ['today', '오늘 안 함'], ['week', '이번 주 미접속'], ['low', '정답률 60% 미만'], ['off', '일시 중지']];
+const SORTS = { name: '이름', recent: '최근 활동', today: '오늘', week: '이번 주', accuracy: '정답률', weak: '취약 단어' };
 export function studentFiltered(A) {
-  const q = (A.search || '').toLowerCase();
-  return studentTable(A.data.profiles.filter(p => (!A.classFilter || p.class_name === A.classFilter) && `${p.display_name} ${p.username}`.toLowerCase().includes(q)), A.data.word_mastery || {});
+  const d = A.data, q = (A.search || '').toLowerCase();
+  const care = careGroups(d), work = weekWork(d);
+  const sets = { today: new Set(care.groups.today.map(p => p.id)), week: new Set(care.groups.week.map(p => p.id)) };
+  const quick = QUICK.some(([k]) => k === A.studentQuick) ? A.studentQuick : '';
+  const pass = p => (!A.classFilter || p.class_name === A.classFilter) && `${p.display_name} ${p.username}`.toLowerCase().includes(q) && (
+    !quick ? true : quick === 'off' ? !p.active : quick === 'low' ? p.active && p.stats.practice_count > 0 && p.stats.accuracy < 60 : sets[quick].has(p.id));
+  const count = key => d.profiles.filter(p => (!A.classFilter || p.class_name === A.classFilter) && (key === 'off' ? !p.active : key === 'low' ? p.active && p.stats.practice_count > 0 && p.stats.accuracy < 60 : key ? sets[key].has(p.id) : true)).length;
+  const sort = SORTS[A.studentSort] ? A.studentSort : 'recent', dir = A.studentSortDir === 'asc' ? 1 : -1;
+  const value = p => ({ name: p.display_name, recent: care.last.get(p.id) || 0, today: p.stats.today_total || 0, week: work.get(p.id)?.total || 0, accuracy: p.stats.accuracy || 0, weak: p.stats.weak || 0 }[sort]);
+  const list = d.profiles.filter(pass).sort((a, b) => { const x = value(a), y = value(b); return (typeof x === 'string' ? x.localeCompare(y, 'ko') * -dir : (x - y) * dir) || a.display_name.localeCompare(b.display_name, 'ko'); });
+  const th = (key, label) => `<th${key === 'accuracy' ? ' class="num"' : ''}><button type="button" data-student-sort="${key}" class="${sort === key ? 'on' : ''}" aria-label="${label}로 정렬">${label}${sort === key ? (dir > 0 ? ' ↓' : ' ↑') : ''}</button></th>`;
+  const chips = `<div class="st-quick-v1375" role="group" aria-label="빠른 필터">${QUICK.map(([k, label]) => `<button type="button" data-student-quick="${k}" class="${quick === k ? 'on' : ''}">${label}<b>${count(k)}</b></button>`).join('')}</div>`;
+  if (!d.profiles.length) return chips + empty('user', '등록된 학생이 없어요', '학생 등록으로 첫 계정을 만들어주세요.');
+  if (!list.length) return chips + empty('user', '조건에 맞는 학생이 없어요', '다른 필터를 골라 보세요.');
+  return `${chips}<div class="table-scroll"><table class="student-ops-table st-table-v1375"><thead><tr>${th('name', '학생')}<th>반</th>${th('recent', '최근 활동')}${th('today', '오늘')}${th('week', '이번 주')}${th('accuracy', '정답률')}${th('weak', '취약 단어')}<th></th></tr></thead><tbody>${list.map(p => {
+    const w = work.get(p.id), t = care.last.get(p.id) || 0, late = p.active && Date.now() - t >= 3 * DAY;
+    return `<tr class="${p.active ? '' : 'off'}"><td class="tv2-cell-name"><button class="table-name" data-student="${p.id}">${avatar(p.avatar_key, { size: 'mini' })}<div><strong>${esc(p.display_name)}</strong><small>Lv.${p.stats.level} · ${esc(p.username)}${p.active ? '' : ' · 일시 중지'}</small></div></button></td><td data-label="반">${esc(p.class_name)}</td><td data-label="최근 활동"><span class="st-when ${late ? 'late' : ''}">${agoLabel(t)}</span></td><td data-label="오늘"><strong>${num(p.stats.today_total)}</strong><small>문제</small></td><td data-label="이번 주"><strong>${num(w?.total || 0)}</strong><small>문제 · ${num(w?.count || 0)}회</small></td><td data-label="정답률" class="num"><div class="stat-bar"><div class="progress"><i style="width:${p.stats.accuracy}%"></i></div><span class="${p.stats.practice_count && p.stats.accuracy < 60 ? 'lo' : ''}">${p.stats.practice_count ? `${p.stats.accuracy}%` : '-'}</span></div></td><td data-label="취약 단어">${num(p.stats.weak)}개</td><td class="st-act"><button type="button" class="icon-button st-gift" data-gift-to="${p.id}" aria-label="${esc(p.display_name)}에게 코인 선물" title="코인 선물">${icon('gift')}</button></td></tr>`;
+  }).join('')}</tbody></table></div><p class="st-count-v1375">${num(list.length)}명 표시 · 이름을 누르면 기록과 계정 관리가 열려요</p>`;
 }
 function students(A) {
-  return `<div class="toolbar"><div class="search">${icon('search')}<input id="student-search" aria-label="학생 검색" placeholder="이름 또는 아이디 검색" value="${esc(A.search || '')}"></div><select id="class-filter" aria-label="반 필터"><option value="">전체 반</option>${[...new Set(A.data.profiles.map(p => p.class_name))].map(c => `<option ${c === A.classFilter ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select><span class="tiny muted">총 ${A.data.profiles.length}명</span><button type="button" class="btn primary gift-btn-v1373" data-action="gift">${icon('gift')} 코인 선물</button></div><section class="panel" id="student-table">${studentFiltered(A)}</section>`;
+  return `<div class="toolbar st-toolbar-v1375"><div class="search">${icon('search')}<input id="student-search" aria-label="학생 검색" placeholder="이름 또는 아이디 검색" value="${esc(A.search || '')}"></div><select id="class-filter" aria-label="반 필터"><option value="">전체 반</option>${[...new Set(A.data.profiles.map(p => p.class_name))].map(c => `<option ${c === A.classFilter ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select><button type="button" class="btn secondary gift-btn-v1373" data-action="gift">${icon('gift')} 코인 선물</button></div><section class="panel st-panel-v1375" id="student-table">${studentFiltered(A)}</section>`;
 }
 const aliasSourceLabel = source => source === 'appeal' ? '학생 이의제기' : source === 'teacher' ? '선생님 추가' : '기존 허용답';
 export function vocabTable(A) {
@@ -258,7 +306,11 @@ export function vocabTable(A) {
     return searchMatch && rangeMatch && gradeMatch;
   });
   const gradeHead = middle ? '<th>학년</th>' : '';
-  return `<div class="panel-head"><div><h2>${A.school} 단어장</h2><span>원본 뜻은 유지하고, 기본 유효답과 승인된 허용 뜻의 출처를 따로 관리합니다.</span></div><span>${list.length}개 단어</span></div><div class="table-scroll"><table class="vocab-table"><thead><tr>${gradeHead}<th>범위</th><th>영어</th><th>기본 뜻</th><th>허용 뜻</th><th>관리</th></tr></thead><tbody>${list.slice(0, vocabLimit(A)).map(w => {
+  // V13.75 one chip per range (with its word count): pick a range instead of scrolling.
+  const counts = new Map();
+  for (const w of words) if (!middle || !A.vocabGrade || w.grade === A.vocabGrade) counts.set(w.range_code, (counts.get(w.range_code) || 0) + 1);
+  const chips = counts.size > 1 ? `<div class="vocab-ranges-v1375" role="group" aria-label="범위 고르기"><button type="button" data-vocab-range="" class="${A.vocabRange ? '' : 'on'}">전체<b>${num([...counts.values()].reduce((n, c) => n + c, 0))}</b></button>${[...counts].map(([code, n]) => `<button type="button" data-vocab-range="${esc(code)}" class="${A.vocabRange === code ? 'on' : ''}">${esc(recordRangeLabel({ division: middle ? 'middle' : 'high', school: A.school }, code))}<b>${num(n)}</b></button>`).join('')}</div>` : '';
+  return `${chips}<div class="panel-head"><div><h2>${A.school} 단어장</h2><span>원본 뜻은 유지하고, 기본 유효답과 승인된 허용 뜻의 출처를 따로 관리합니다.</span></div><span>${list.length}개 단어</span></div><div class="table-scroll"><table class="vocab-table"><thead><tr>${gradeHead}<th>범위</th><th>영어</th><th>기본 뜻</th><th>허용 뜻</th><th>관리</th></tr></thead><tbody>${list.slice(0, vocabLimit(A)).map(w => {
     const aliases = A.data.meaning_aliases?.[w.id] || [];
     const meta = A.data.meaning_alias_meta?.[w.id] || [];
     const aliasHtml = aliases.map(alias => {
@@ -278,7 +330,7 @@ function books(A) {
   const middle = A.data.profile.active_division === 'middle';
   const gradeSelect = middle ? `<label class="teacher-school"><span>학년</span><select id="vocab-grade"><option value="">전체</option><option value="중2" ${A.vocabGrade === '중2' ? 'selected' : ''}>중2</option><option value="중3" ${A.vocabGrade === '중3' ? 'selected' : ''}>중3</option></select></label>` : '';
   const importButton = middle ? `<button class="btn primary" data-action="vocab-import">${icon('plus')} 단어 파일 등록</button>` : '';
-  return `<div class="toolbar"><span class="school-chip">${esc(A.school)}</span>${gradeSelect}<div class="search">${icon('search')}<input id="vocab-search" aria-label="단어 검색" placeholder="영어 또는 뜻 검색" value="${esc(A.vocabSearch || '')}"></div>${importButton}</div><section class="panel" id="vocab-table">${vocabTable(A)}</section>`;
+  return `<div class="toolbar books-toolbar-v1375"><span class="school-chip">${esc(A.school)}</span>${gradeSelect}<div class="search">${icon('search')}<input id="vocab-search" aria-label="단어 검색" placeholder="영어 또는 뜻 검색" value="${esc(A.vocabSearch || '')}"></div>${importButton}</div><section class="panel" id="vocab-table">${vocabTable(A)}</section>`;
 }
 function disputes(A) {
   const all = A.data.meaning_disputes || [];
@@ -339,11 +391,28 @@ function results(A) {
   const classes = [...new Set(A.data.profiles.map(p => p.class_name).filter(Boolean))];
   const filterBar = `<div class="toolbar tv2-results-filter"><div class="search">${icon('search')}<input id="results-search" aria-label="학생 이름으로 기록 찾기" placeholder="학생 이름 또는 아이디" value="${esc(A.resultsQuery || '')}"></div><select id="results-class" aria-label="반으로 기록 거르기"><option value="">전체 반</option>${classes.map(c => `<option ${c === A.resultsClass ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>`;
   const legacyTable = legacyAttempts.length ? `<details class="legacy-results"><summary>이전 선생님 배정시험 기록 ${legacyAttempts.length}회</summary><div class="table-scroll"><table><thead><tr><th>학생</th><th>시험</th><th>점수</th><th>일시</th></tr></thead><tbody>${legacyAttempts.slice(0,100).map(a => { const e=A.data.exams.find(exam=>exam.id===a.exam_id), p=A.data.profiles.find(profile=>profile.id===a.student_id); return `<tr><td>${esc(p?.display_name || '학생')}</td><td>${esc(e?.title || '이전 시험')}</td><td>${a.score}점</td><td>${date(a.submitted_at)}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';
+  // V13.75: a weekly summary per student comes first; the full logs sit behind tabs.
+  const views = [['week', '이번 주 요약'], ['practice', `연습 기록 ${num(practices.length)}`], ...(selfTests.length ? [['sent', `학생이 보낸 실전 결과 ${num(selfTests.length)}`]] : [])];
+  const view = views.some(([k]) => k === A.resultsView) ? A.resultsView : 'week';
+  const tabsBar = `<div class="res-tabs-v1375" role="tablist">${views.map(([k, label]) => `<button type="button" role="tab" aria-selected="${k === view}" class="${k === view ? 'on' : ''}" data-results-view="${k}">${label}</button>`).join('')}</div>`;
+  let body;
+  if (view === 'week') {
+    const work = weekWork(A.data), last = lastActivityMap(A.data);
+    const rows = A.data.profiles.filter(p => p.active && (!A.resultsClass || p.class_name === A.resultsClass) && (!q || `${p.display_name} ${p.username}`.toLowerCase().includes(q)))
+      .map(p => ({ p, w: work.get(p.id) || { count: 0, total: 0, scores: 0, prevTotal: 0 }, t: last.get(p.id) || 0 }))
+      .sort((a, b) => b.w.total - a.w.total || b.t - a.t);
+    const trend = w => { const diff = w.total - w.prevTotal; return diff > 0 ? `<span class="up">▲ ${num(diff)}</span>` : diff < 0 ? `<span class="down">▼ ${num(-diff)}</span>` : '<span>-</span>'; };
+    body = `<section class="panel"><div class="panel-head"><div><h2>이번 주 학생별 요약</h2><span>월요일부터 오늘까지 · 푼 문제가 많은 순서</span></div><span>${num(rows.filter(r => r.w.count).length)}/${num(rows.length)}명 학습</span></div>${rows.length ? `<div class="table-scroll"><table class="tv2-results-table week-table-v1375"><thead><tr><th>학생</th><th>학습</th><th>푼 문제</th><th>평균 점수</th><th>지난주 대비</th><th>최근 활동</th></tr></thead><tbody>${rows.map(({ p, w, t }) => `<tr class="${w.count ? '' : 'none'}"><td class="tv2-cell-name"><button class="table-name" data-student="${p.id}"><div><strong>${esc(p.display_name)}</strong><small>${esc(p.class_name || '')}</small></div></button></td><td data-label="학습">${w.count ? `${num(w.count)}회` : '<b class="lo">없음</b>'}</td><td data-label="푼 문제"><strong>${num(w.total)}</strong></td><td data-label="평균 점수">${w.count ? `<strong class="tv2-score ${Math.round(w.scores / w.count) >= 90 ? 'hi' : Math.round(w.scores / w.count) < 60 ? 'lo' : ''}">${Math.round(w.scores / w.count)}점</strong>` : '-'}</td><td data-label="지난주 대비" class="trend-v1375">${trend(w)}</td><td data-label="최근 활동">${agoLabel(t)}</td></tr>`).join('')}</tbody></table></div>` : empty('records', '조건에 맞는 학생이 없어요')}</section>`;
+  } else if (view === 'sent') {
+    body = `<section class="panel"><div class="panel-head"><div><h2>학생이 보낸 실전 결과</h2><span>학생이 직접 범위·유형을 선택하고 선생님께 전송한 성적</span></div><span>${selfTests.length}회</span></div>${table(selfTests, true)}</section>`;
+  } else {
+    body = `<section class="panel"><div class="panel-head"><div><h2>학생별 연습 기록</h2><span>암기 후 문제 연습 과정에서 저장된 기록</span></div><span>${practices.length}회</span></div>${table(practices, false)}</section>`;
+  }
   return `${metrics([['학생 제출 실전', selfTests.length, '회'], ['실전 평균', avg(selfTests), '점'], ['연습 평균', avg(practices), '점'], ['누적 문제', totalQuestions, '문제']])}
     ${pending ? `<div class="dispute-summary"><div><span>이의제기 검토 대기</span><strong>${pending}<small>건</small></strong></div><p>승인하면 해당 기록 점수가 자동 재계산됩니다.</p></div>` : ''}
+    ${tabsBar}
     ${filterBar}
-    <section class="panel"><div class="panel-head"><div><h2>학생이 보낸 실전 결과</h2><span>학생이 직접 범위·유형을 선택하고 선생님께 전송한 성적</span></div><span>${selfTests.length}회</span></div>${table(selfTests, true)}</section>
-    <section class="panel"><div class="panel-head"><div><h2>학생별 연습 기록</h2><span>암기 후 문제 연습 과정에서 저장된 기록</span></div><span>${practices.length}회</span></div>${table(practices, false)}</section>
+    ${body}
     ${legacyTable}`;
 }
 // V13.66 academy yacha tournaments: open a bracket for a grade, watch it live, decide a match
@@ -365,7 +434,6 @@ function tournaments(A) {
   const active = list.filter(t => t.status === 'active'), past = list.filter(t => t.status !== 'active');
   return `<section class="panel tn-intro">
       ${trophy('xl')}<div class="tn-intro-copy"><h2>학원 야차 대회</h2><p>같은 학년 학생들을 골라 토너먼트를 열어요. 판돈 없이 겨루고, 이기면 다음 라운드로 올라가요. 학생은 <b>홈 화면의 대회 알림</b>에서 경기를 시작하고, 우승하면 <b>SUMUS 챔피언</b> 칭호와 상금을 받아요.</p></div>
-      <button class="btn primary" data-action="tournament-new">${icon('plus')} 대회 만들기</button>
     </section>
     ${active.length ? active.map(tournamentPanel).join('') : empty('battle', '진행 중인 대회가 없어요', '대회 만들기로 첫 토너먼트를 열어 보세요.')}
     ${past.length ? `<details class="tn-past" ${A.tnPastOpen ? 'open' : ''}><summary>지난 대회 ${past.length}개</summary>${past.map(tournamentPanel).join('')}</details>` : ''}`;

@@ -60,10 +60,12 @@
 .middle-direct-toolbar-v1343>b{flex:0 0 auto;padding:7px 10px;border-radius:999px;background:#e8f8f2;color:#078e6c;font-size:12px}
 .middle-direct-actions-v1343{display:flex;justify-content:flex-end;gap:14px;padding:9px 15px;border-top:1px solid #edf2f0;border-bottom:1px solid #edf2f0}
 .middle-direct-actions-v1343 button{border:0;background:transparent;padding:5px 0;color:#078e6c;font-size:11px;font-weight:850}
-.middle-direct-list-v1343{max-height:48vh;overflow:auto;-webkit-overflow-scrolling:touch;padding:8px 10px 12px}
-.middle-direct-word-v1343{min-height:58px;padding:9px 10px;display:grid;grid-template-columns:22px 30px minmax(0,1fr);align-items:center;gap:9px;border:1px solid transparent;border-radius:14px;cursor:pointer;touch-action:manipulation}
+.middle-direct-list-v1343{max-height:48vh;overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:8px 10px 12px}
+.middle-direct-word-v1343{position:relative;min-height:58px;padding:9px 10px;display:grid;grid-template-columns:22px 30px minmax(0,1fr);align-items:center;gap:9px;border:1px solid transparent;border-radius:14px;cursor:pointer;touch-action:manipulation}
 .middle-direct-word-v1343+.middle-direct-word-v1343{margin-top:3px}
-.middle-direct-word-v1343 input{position:absolute;opacity:0;pointer-events:none}
+/* V13.74.2: the hidden box sits inside its row (it stayed where the list first drew it, so a tap
+   after scrolling the list focused it off screen and the whole page jumped to it). */
+.middle-direct-word-v1343 input{position:absolute;top:50%;left:10px;width:1px;height:1px;margin:0;opacity:0;pointer-events:none}
 .middle-direct-check-v1343{width:21px;height:21px;border:1.5px solid #ccd7d3;border-radius:7px;background:#fff;display:grid;place-items:center}
 .middle-direct-word-v1343.selected{border-color:#bce9db;background:#f1fbf7}
 .middle-direct-word-v1343.selected .middle-direct-check-v1343{border-color:#13a77d;background:#13a77d}

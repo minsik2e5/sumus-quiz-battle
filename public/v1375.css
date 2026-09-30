@@ -1,0 +1,132 @@
+/* V13.75 선생님 화면: 대시보드(숫자 카드 4개 · 챙겨야 할 학생 · 반 대항전), 학생 관리(빠른 필터 ·
+   정렬 · 촘촘한 줄), 결과 분석(이번 주 요약), 단어 데이터(범위 칩). */
+
+/* ---------- dashboard ---------- */
+.teacher-app.tv2 .kpi-v1375{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;padding:0;margin:0 0 16px;background:none;border:0;box-shadow:none}
+.kpi-v1375 .kpi{display:flex;align-items:center;gap:14px;min-width:0;padding:16px 18px;border:1px solid var(--t-line);border-radius:18px;background:#fff;box-shadow:var(--t-card);text-align:left;font:inherit;color:var(--t-text);cursor:pointer;transition:border-color .15s,transform .15s}
+.kpi-v1375 .kpi:hover{border-color:#bfe6d6;transform:translateY(-1px)}
+.kpi-v1375 .kpi>span:last-child{display:flex;flex-direction:column;min-width:0}
+.kpi-v1375 .kpi small{font-size:12px;font-weight:800;color:var(--t-sub)}
+.kpi-v1375 .kpi strong{font-size:26px;font-weight:900;letter-spacing:-.03em;line-height:1.15;font-variant-numeric:tabular-nums}
+.kpi-v1375 .kpi strong em{font-style:normal;font-size:13px;font-weight:800;color:var(--t-sub);margin-left:2px}
+.kpi-v1375 .kpi i{font-style:normal;font-size:11.5px;color:var(--t-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-v1375 .kpi-ring{flex:none;width:54px;height:54px;border-radius:50%;display:grid;place-items:center;background:conic-gradient(var(--t-green) calc(var(--p) * 1%),#e5efeb 0)}
+.kpi-v1375 .kpi-ring b{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;background:#fff;font-size:12px;font-weight:900;color:var(--t-green-deep)}
+.kpi-v1375 .kpi-ico{flex:none;width:44px;height:44px;border-radius:14px;display:grid;place-items:center;background:#eef4f2;color:#5e726b}
+.kpi-v1375 .kpi-ico .icon{width:22px;height:22px}
+.kpi-v1375 .kpi.warn .kpi-ico{background:#fff1e6;color:#c2560c}
+.kpi-v1375 .kpi.warn strong{color:#c2410c}
+.kpi-v1375 .kpi.ok .kpi-ico{background:var(--t-green-soft);color:var(--t-green-deep)}
+
+.dash-grid-v1375{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(0,1fr);gap:16px;align-items:start;margin-bottom:16px}
+.dash-side-v1375{display:grid;gap:16px;min-width:0}
+.dash-side-v1375>.panel,.dash-grid-v1375>.panel{margin:0}
+
+.care-v1375 .panel-head .btn .icon{width:15px;height:15px}
+.care-tabs{display:flex;gap:6px;padding:0 18px 12px;flex-wrap:wrap}
+.care-tabs button{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--t-line);border-radius:999px;background:#fff;font:inherit;font-size:13px;font-weight:800;color:#51625c;cursor:pointer}
+.care-tabs button b{min-width:20px;padding:1px 6px;border-radius:999px;background:#eef3f1;font-size:11.5px;text-align:center}
+.care-tabs button.on{border-color:var(--t-green);background:var(--t-green-soft);color:var(--t-green-deep)}
+.care-tabs button.on b{background:var(--t-green);color:#fff}
+.care-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:0 18px 16px}
+.care-row{display:flex;align-items:center;gap:8px;min-width:0;padding:6px 6px 6px 8px;border:1px solid #edf2f0;border-radius:12px;background:#fbfdfc}
+.care-who{display:flex;align-items:center;gap:8px;flex:1;min-width:0;padding:0;border:0;background:none;font:inherit;text-align:left;cursor:pointer;color:var(--t-text)}
+.care-who .avatar-art.mini{width:30px;height:30px;border-radius:9px;flex:none}
+.care-who span{display:flex;flex-direction:column;min-width:0}
+.care-who b{font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.care-who small{font-size:11px;color:var(--t-sub)}
+.care-when{flex:none;font-size:11.5px;font-weight:700;color:var(--t-sub);white-space:nowrap}
+.care-when.late{color:#c2410c}
+.care-gift{flex:none;width:30px;height:30px;border:0;border-radius:9px;display:grid;place-items:center;background:#fdf0f5;color:#c0306b;cursor:pointer}
+.care-gift .icon{width:16px;height:16px}
+.care-v1375 .v136-clear{grid-column:1/-1}
+.care-v1375 .v136-more{margin:0 18px 14px}
+
+.exam-now-v1375 .exam-now-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:10px 18px;border-top:1px solid #eef3f1}
+.exam-now-v1375 .exam-now-row b{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exam-now-v1375 .exam-now-row small{grid-column:1/-1;font-size:11px;color:var(--t-sub)}
+
+.grammar-fold-v1375{padding:0;overflow:hidden}
+.grammar-fold-v1375>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;cursor:pointer;list-style:none}
+.grammar-fold-v1375>summary::-webkit-details-marker{display:none}
+.grammar-fold-v1375>summary span{display:flex;flex-direction:column;gap:2px}
+.grammar-fold-v1375>summary b{font-size:16px;font-weight:900}
+.grammar-fold-v1375>summary small{font-size:12px;color:var(--t-sub)}
+.grammar-fold-v1375>summary .icon{width:18px;height:18px;color:var(--t-sub);transition:transform .2s}
+.grammar-fold-v1375[open]>summary .icon{transform:rotate(90deg)}
+.grammar-fold-v1375[open]>summary{border-bottom:1px solid #eef3f1}
+.grammar-fold-v1375 .v136-dashboard-grid{margin:0;padding:6px 6px 0}
+.grammar-fold-v1375 .v136-passage-grid{padding:0 18px 18px}
+
+.dash-students-link-v1375{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:16px;padding:14px;border:1px dashed #cfe0d9;border-radius:16px;background:#fff;font:inherit;font-size:13.5px;font-weight:800;color:var(--t-green-deep);cursor:pointer}
+.dash-students-link-v1375 .icon{width:17px;height:17px}
+.tv2-gift-top-v1375 .icon{width:17px;height:17px}
+
+/* ---------- students ---------- */
+.st-quick-v1375{display:flex;gap:6px;flex-wrap:wrap;padding:14px 16px 10px}
+.st-quick-v1375 button{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--t-line);border-radius:999px;background:#fff;font:inherit;font-size:13px;font-weight:800;color:#51625c;cursor:pointer}
+.st-quick-v1375 button b{min-width:20px;padding:1px 6px;border-radius:999px;background:#eef3f1;font-size:11.5px;text-align:center}
+.st-quick-v1375 button.on{border-color:var(--t-green);background:var(--t-green-soft);color:var(--t-green-deep)}
+.st-quick-v1375 button.on b{background:var(--t-green);color:#fff}
+.st-table-v1375 th button{padding:0;border:0;background:none;font:inherit;font-weight:800;color:inherit;cursor:pointer;white-space:nowrap}
+.st-table-v1375 th button.on{color:var(--t-green-deep)}
+.teacher-app.tv2 .st-table-v1375 td{padding-top:9px;padding-bottom:9px}
+.st-table-v1375 td small{display:block;font-size:11px;color:var(--t-sub)}
+.st-table-v1375 .st-when{font-size:12.5px;font-weight:700;color:#51625c;white-space:nowrap}
+.st-table-v1375 .st-when.late{color:#c2410c}
+.st-table-v1375 .stat-bar .lo{color:#c2410c;font-weight:800}
+.st-table-v1375 tr.off td{opacity:.55}
+.st-table-v1375 .st-act{width:44px;text-align:right}
+.st-table-v1375 .st-gift{width:34px;height:34px;border-radius:10px;background:#fdf0f5;color:#c0306b;border:0}
+.st-table-v1375 .st-gift .icon{width:16px;height:16px}
+.teacher-app.tv2 .st-table-v1375 .table-name div,.teacher-app.tv2 .week-table-v1375 .table-name div{display:flex;flex-direction:column;align-items:flex-start;text-align:left}
+.st-count-v1375{margin:0;padding:10px 16px 14px;font-size:12px;color:var(--t-sub)}
+
+/* ---------- results ---------- */
+.res-tabs-v1375{display:flex;gap:4px;padding:4px;margin:0 0 14px;border-radius:14px;background:#e9efed;width:max-content;max-width:100%;overflow-x:auto}
+.res-tabs-v1375 button{padding:9px 16px;border:0;border-radius:11px;background:none;font:inherit;font-size:13.5px;font-weight:800;color:#5e716a;white-space:nowrap;cursor:pointer}
+.res-tabs-v1375 button.on{background:#fff;color:var(--t-green-deep);box-shadow:0 1px 3px rgba(16,40,32,.1)}
+.week-table-v1375 tr.none td{background:#fffaf5}
+.week-table-v1375 .lo{color:#c2410c}
+.trend-v1375 .up{color:var(--t-green-deep);font-weight:800}
+.trend-v1375 .down{color:#c2410c;font-weight:800}
+
+/* ---------- words ---------- */
+.teacher-app.tv2 .books-toolbar-v1375{position:sticky;top:0;z-index:4;padding-block:10px;margin-top:-10px;background:var(--t-bg)}
+.vocab-ranges-v1375{display:flex;gap:6px;flex-wrap:wrap;padding:14px 16px 4px}
+.vocab-ranges-v1375 button{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border:1px solid var(--t-line);border-radius:999px;background:#fff;font:inherit;font-size:13px;font-weight:800;color:#51625c;cursor:pointer}
+.vocab-ranges-v1375 button b{font-size:11.5px;color:var(--t-sub)}
+.vocab-ranges-v1375 button.on{border-color:var(--t-green);background:var(--t-green-soft);color:var(--t-green-deep)}
+
+/* ---------- narrow screens ---------- */
+@media (max-width:1100px){
+  .teacher-app.tv2 .kpi-v1375{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .dash-grid-v1375{grid-template-columns:1fr}
+}
+@media (max-width:860px){
+  .kpi-v1375 .kpi{padding:12px;gap:10px;border-radius:16px}
+  .kpi-v1375 .kpi strong{font-size:22px}
+  .kpi-v1375 .kpi-ring{width:44px;height:44px}
+  .kpi-v1375 .kpi-ring b{width:34px;height:34px;font-size:11px}
+  .kpi-v1375 .kpi-ico{width:36px;height:36px;border-radius:11px}
+  .care-list{grid-template-columns:1fr;padding:0 12px 12px}
+  .care-tabs{padding:0 12px 10px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .care-tabs button{flex:none}
+  .care-v1375 .panel-head{flex-direction:column;align-items:stretch;gap:10px}
+  .care-v1375 .panel-head .btn{width:100%;justify-content:center}
+  /* One short row per student instead of a tall card. */
+  .teacher-app.tv2 .st-table-v1375 tbody{gap:6px;padding:8px}
+  .teacher-app.tv2 .st-table-v1375 tr{grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 8px;padding:9px 10px;border-radius:12px}
+  .teacher-app.tv2 .st-table-v1375 .tv2-cell-name{grid-column:1 / 4;padding-bottom:4px!important;border-bottom:0!important}
+  .teacher-app.tv2 .st-table-v1375 .st-act{grid-column:4;grid-row:1;justify-self:end;width:auto}
+  .teacher-app.tv2 .st-table-v1375 td[data-label="반"],.teacher-app.tv2 .st-table-v1375 td[data-label="취약 단어"]{display:none}
+  .teacher-app.tv2 .st-table-v1375 td{font-size:12.5px}
+  .teacher-app.tv2 .st-table-v1375 td[data-label]::before{font-size:10.5px;margin-bottom:0}
+  .teacher-app.tv2 .st-table-v1375 td small{display:inline;margin-left:2px}
+  .teacher-app.tv2 .st-table-v1375 .stat-bar .progress{display:none}
+  .st-quick-v1375,.vocab-ranges-v1375{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:12px 12px 8px}
+  .st-quick-v1375 button,.vocab-ranges-v1375 button{flex:none}
+  .teacher-app.tv2 .week-table-v1375 tr{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .res-tabs-v1375{width:100%}
+  .teacher-app.tv2 .books-toolbar-v1375{margin-inline:-14px;padding-inline:14px}
+}

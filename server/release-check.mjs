@@ -68,7 +68,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.74.1') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.75.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -1062,6 +1062,18 @@ export async function runReleaseCheck() {
     const buildAssetsSource = readFileSync(fileURLToPath(new URL('./build-assets.mjs', import.meta.url)), 'utf8');
     const serverIndexSource = readFileSync(fileURLToPath(new URL('./index.mjs', import.meta.url)), 'utf8');
     assert(manifest.display === 'standalone' && manifest.start_url === '/', 'PWA manifest is installable');
+    {
+      const css1341 = readFileSync(publicRoot + 'v1341.css', 'utf8');
+      assert(/\.middle-direct-word-v1343\{position:relative;/.test(css1341) && /\.middle-direct-word-v1343 input\{position:absolute;top:50%;left:10px;width:1px;height:1px;/.test(css1341) && css1341.includes('overscroll-behavior:contain'), 'V13.74.2 the hidden word box stays in its row, so tapping a word after scrolling the middle-school list does not jump the page');
+    }
+    {
+      const css1375 = readFileSync(publicRoot + 'v1375.css', 'utf8'), app1375 = readFileSync(publicRoot + 'app.js', 'utf8'), build1375 = readFileSync(fileURLToPath(new URL('./build-assets.mjs', import.meta.url)), 'utf8');
+      const dash = teacherModule.slice(teacherModule.indexOf('function dashboard(A)'), teacherModule.indexOf('// V13.75 학생 관리'));
+      assert(dash.includes('${kpiCards(A, care)}') && dash.includes('${carePanel(A, care)}') && dash.includes('classLeaguePanel(d.class_league)') && dash.includes('grammar-fold-v1375') && !dash.includes('studentTable(') && teacherModule.includes("['today', '오늘 안 함'], ['week', '이번 주 미접속'], ['quiet', '3일 이상 쉼']") && teacherModule.includes('data-go="disputes"') && teacherModule.includes('data-go="tournaments"'), 'V13.75 the teacher dashboard: four numbers, one 챙겨야 할 학생 list with tabs, the class race, grammar folded away, no duplicate student table');
+      assert(teacherModule.includes('data-student-quick=') && teacherModule.includes('data-student-sort=') && teacherModule.includes('data-gift-to=') && teacherModule.includes('st-table-v1375') && app1375.includes('if (d.studentSort)') && app1375.includes('if (d.giftTo) return giftModal([d.giftTo])') && app1375.includes("d.action === 'gift-care'"), 'V13.75 학생 관리 filters (today, this week, low accuracy, paused), sorts by column and sends coins from each row');
+      assert(teacherModule.includes("['week', '이번 주 요약']") && teacherModule.includes('이번 주 학생별 요약') && teacherModule.includes('지난주 대비') && app1375.includes('if (d.resultsView)') && teacherModule.includes('data-vocab-range=') && app1375.includes('if (d.vocabRange !== undefined)') && build1375.includes('"v1375.css"') && css1375.includes('.st-table-v1375') && css1375.includes('.kpi-v1375'), 'V13.75 results open on a weekly summary per student; the word list picks one range at a time');
+      assert((teacherModule.match(/data-action="tournament-new"/g) || []).length === 1, 'V13.75 the tournament tab has one 대회 만들기 button');
+    }
     assert(teacherModule.includes('tv2-today') && teacherModule.includes('오늘 확인 필요') && teacherModule.includes('많이 틀린 어법 포인트'), 'V13.6 teacher operations dashboard is present');
     {
       const css1364 = readFileSync(publicRoot + 'v1364.css', 'utf8');
@@ -1074,8 +1086,9 @@ export async function runReleaseCheck() {
       {
         const rd = f => readFileSync(fileURLToPath(new URL(f, import.meta.url)), 'utf8');
         const teacherExtra = rd('../public/teacher-enhancements.js'), sessionsUi = rd('../public/modules/sessions.js'), teacherUi = rd('../public/modules/teacher.js'), appUi65 = rd('../public/app.js'), css1365 = rd('../public/v1365.css'), charUi = rd('../public/modules/character.js');
-        const filters = teacherExtra.slice(teacherExtra.indexOf('async function applyFilters'), teacherExtra.indexOf('function activityRows'));
-        assert(filters.includes('if (row.hidden !== !show)') && filters.includes('count.textContent !== label') && !/count\.textContent = `/.test(filters), 'V13.65 the teacher student list writes the filter count only on a change (no observer loop every frame)');
+        // V13.75: the student list filters and shows the last activity itself; the old observer that
+        // patched the table after every render (and could loop) is gone.
+        assert(!teacherExtra.includes('MutationObserver') && !teacherExtra.includes('enhanceStudentsPage') && teacherUi.includes("quick === 'off' ? !p.active") && teacherUi.includes('agoLabel(t)'), 'V13.75 the teacher student list filters by status and shows the last activity without a DOM observer');
         const shares = [...sessionsUi.matchAll(/share-self-test'\)\?\.addEventListener\('click', async event => \{([\s\S]*?)\n  \}\);/g)].map(m => m[1]);
         assert(shares.length === 2 && shares.every(body => body.includes('const button = event.currentTarget;') && !body.slice(body.indexOf('await api')).includes('event.currentTarget') && !body.includes('await refresh()') && body.includes('shareDone(button)')), 'V13.65 "결과 보내기" keeps its button across the request and does not reload everything afterwards');
         assert(teacherUi.includes('list.slice(0, vocabLimit(A))') && teacherUi.includes('data-action="vocab-more"') && appUi65.includes("d.action === 'vocab-more'") && css1365.includes('.teacher-app.tv2 tbody tr{content-visibility:auto'), 'V13.65 the teacher word list starts with 80 rows and long teacher lists skip offscreen layout');
@@ -1110,7 +1123,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.74.1') && indexHtml.includes('/app.bundle.css?v=13.74.1') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.75.0') && indexHtml.includes('/app.bundle.css?v=13.75.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1131,7 +1144,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.74.1'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.75.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');

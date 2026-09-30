@@ -2,7 +2,7 @@ import { $, $$, api, esc, icon, toast, modal, buttonBusy, date, num, rangeLabel 
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm } from './modules/core.js';
 import { avatar } from './modules/character.js';
 import { studentPage, getRanges, updateRangeSummary } from './modules/student.js';
-import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel } from './modules/teacher.js';
+import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel, careIds } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
 import { maybePetMoment, openPetNameModal, openEggShop, petJosa } from './modules/pet-moments.js';
 import { mountYacha } from './modules/battle.js';
@@ -309,7 +309,10 @@ function startTournamentPolling() {
   }, 8000);
 }
 // V13.71: remember whether 지난 대회 is open, so a redraw does not snap it shut.
-document.addEventListener('toggle', event => { if (event.target?.classList?.contains('tn-past')) A.tnPastOpen = event.target.open; }, true);
+document.addEventListener('toggle', event => {
+  if (event.target?.classList?.contains('tn-past')) A.tnPastOpen = event.target.open;
+  if (event.target?.classList?.contains('grammar-fold-v1375')) A.grammarOpen = event.target.open;
+}, true);
 function startPolling() {
   startInvitePolling();
   startTournamentPolling();
@@ -470,6 +473,22 @@ $('#app').addEventListener('click', async event => {
     if (d.result) return await openResult(d.result);
     if (d.practiceRecord) return openPracticeRecord(d.practiceRecord);
     if (d.resultsMore !== undefined) { A.resultsLimit = (Number(A.resultsLimit) || 30) + 30; renderKeepScroll(); return; }
+    // V13.75 teacher screens: 챙겨야 할 학생 tabs, student filters and sorting, result views, ranges.
+    if (d.careTab) {
+      A.careTab = d.careTab; A.careAll = false; renderKeepScroll();
+      if (b.classList.contains('kpi')) setTimeout(() => $('#care-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
+      return;
+    }
+    if (d.careAll !== undefined) { A.careAll = !A.careAll; renderKeepScroll(); return; }
+    if (d.giftTo) return giftModal([d.giftTo]);
+    if (d.action === 'gift-care') return giftModal(careIds(A, d.care));
+    if (d.studentQuick !== undefined) { A.studentQuick = d.studentQuick; $('#student-table').innerHTML = studentFiltered(A); return; }
+    if (d.studentSort) {
+      A.studentSortDir = A.studentSort === d.studentSort ? (A.studentSortDir === 'asc' ? 'desc' : 'asc') : (d.studentSort === 'name' ? 'asc' : 'desc');
+      A.studentSort = d.studentSort; $('#student-table').innerHTML = studentFiltered(A); return;
+    }
+    if (d.resultsView) { A.resultsView = d.resultsView; A.resultsLimit = 30; renderKeepScroll(); return; }
+    if (d.vocabRange !== undefined) { A.vocabRange = d.vocabRange; A.vocabLimit = 0; $('#vocab-table').innerHTML = vocabTable(A); return; }
     if (d.reviewPractice) {
       const session = A.data.sessions.find(item => item.id === d.reviewPractice);
       if (!session) return toast('복습할 기록을 찾을 수 없어요.');
@@ -564,7 +583,6 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'tournament-tv') return openTournamentTv(d.id);
     if (d.action === 'tournament-tv-link') return tournamentTvLink(d.id);
     if (d.action === 'gift') return giftModal(d.student ? [d.student] : []);
-    if (d.action === 'gift-idle') return giftModal((A.data.idle_students || []).filter(r => r.week).map(r => r.id));
     if (d.action === 'class-tv') { A.screen = 'class-tv'; window.scrollTo(0, 0); return openClassTv(A, async () => { A.screen = null; try { await refresh(); } catch {} render(); }); }
     if (d.action === 'class-tv-link') return classTvLink();
     if (d.action === 'tournament-cancel') return cancelTournament(d.id, b);
