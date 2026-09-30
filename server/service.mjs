@@ -822,9 +822,9 @@ export async function service(state, method, path, body, token, options = {}) {
   // V13.74 반 대항전 on the classroom TV, opened with a link (no login), like the bracket.
   if (path === '/tv/classes' && method === 'GET') {
     const raw = str(body.token, 80);
-    const t = raw.length >= 24 ? state.profiles.find(x => x.role === 'teacher' && x.class_tv?.hash === hashToken(raw)) : null;
+    const t = raw.length >= 24 ? state.profiles.find(x => x.role === 'teacher' && x.active !== false && x.class_tv?.hash === hashToken(raw)) : null;
     const school = t ? schoolByRef(state, t.class_tv.school_id) : null;
-    if (!school || Date.now() - Number(t.class_tv.at || 0) > 60 * DAY_MS) fail('TV 링크가 만료됐어요. 선생님께 새 링크를 받아 주세요.', 404);
+    if (!school || !t.school_ids?.includes(school.id) || Date.now() - Number(t.class_tv.at || 0) > 60 * DAY_MS) fail('TV 링크가 만료됐어요. 선생님께 새 링크를 받아 주세요.', 404);
     return { league: classLeague(state, createCompetition(state), school) };
   }
   if (path === '/login' && method === 'POST') {
@@ -1135,7 +1135,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!school) fail('관리 학교를 확인해주세요.', 409);
     const amount = Number(body.amount);
     if (!GIFT_AMOUNTS.includes(amount)) fail('선물할 코인을 골라주세요.');
-    const pool = state.profiles.filter(x => x.role === 'student' && x.active !== false && schoolForProfile(state, x)?.id === school.id);
+    const pool = state.profiles.filter(x => isRankedStudent(x) && schoolForProfile(state, x)?.id === school.id);
     const className = str(body.class_name, 20);
     const ids = new Set((Array.isArray(body.student_ids) ? body.student_ids : []).map(value => str(value, 80)).filter(Boolean));
     const targets = body.all === true ? pool : className ? pool.filter(x => x.class_name === className) : pool.filter(x => ids.has(x.id));
@@ -2093,7 +2093,8 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false } = {
   const timedOutCount = answerRecords.filter(item => item.timed_out && !item.regraded).length;
   const unansweredCount = Math.max(0, scoreTotal - answerRecords.length) + timedOutCount;
   const perfect = score === 100 && wrongCount === 0 && unansweredCount === 0;
-  const complete = natural || autoSubmitted || answerRecords.length >= scoreTotal;
+  // A timer that ran out counts as finished only with at least half of the words answered.
+  const complete = natural || answerRecords.length >= scoreTotal || (autoSubmitted && answerRecords.length * 2 >= scoreTotal);
   const reward = practiceReward(x, state, endedAt, answerRecords.length, perfect, { complete, correct: scoreCorrect });
   x.reward_points = reward.points;
   x.reward_breakdown = reward.breakdown;

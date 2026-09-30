@@ -121,7 +121,11 @@ async function markSeen(A, body) {
     if (t) { const paid = new Set((res.paid || []).map(x => x.key)); t.unpaid = (t.unpaid || []).filter(x => !paid.has(x.key)); }
     if (res.points_balance !== undefined && A.data?.stats) A.data.stats.points_balance = res.points_balance;
     return res;
-  } catch { return null; }
+  } catch {
+    // Offline: do not show the same reward again until the next load.
+    if (t) t.unpaid = [];
+    return null;
+  }
 }
 const unpaidTotal = list => list.reduce((n, x) => n + Number(x.coins || 0), 0);
 
