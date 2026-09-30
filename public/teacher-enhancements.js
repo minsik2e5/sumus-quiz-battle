@@ -63,75 +63,13 @@ function shortActivity(ts) {
   return date(ts);
 }
 
-async function enhanceStudentsPage() {
-  if (!document.querySelector('.teacher-app') || !document.querySelector('#student-table')) return;
-  injectStyles();
-  const toolbar = document.querySelector('.teacher-main .toolbar');
-  if (!toolbar) return;
-
-  if (!toolbar.querySelector('#status-filter')) {
-    toolbar.querySelector('#school-filter')?.remove();
-    const status = document.createElement('select');
-    status.id = 'status-filter';
-    status.className = 'sumus-extra-filter';
-    status.setAttribute('aria-label', '계정 상태 필터');
-    status.innerHTML = '<option value="">전체 상태</option><option value="active">활성</option><option value="inactive">일시 중지</option>';
-    toolbar.appendChild(status);
-
-    const count = document.createElement('span');
-    count.id = 'visible-student-count';
-    count.className = 'sumus-filter-count';
-    toolbar.appendChild(count);
-
-    status.addEventListener('change', applyFilters);
-  }
-
-  const data = await bootstrap();
-  const table = document.querySelector('#student-table table');
-  if (!table) return;
-  const headRow = table.querySelector('thead tr');
-  if (headRow && !headRow.querySelector('[data-extra-last]')) {
-    const th = document.createElement('th');
-    th.dataset.extraLast = '1';
-    th.textContent = '최근 활동';
-    headRow.appendChild(th);
-  }
-  for (const row of table.querySelectorAll('tbody tr')) {
-    const button = row.querySelector('[data-student]');
-    if (!button || row.querySelector('[data-extra-last]')) continue;
-    const td = document.createElement('td');
-    td.dataset.extraLast = '1';
-    td.dataset.label = '최근 활동';
-    td.innerHTML = `<span class="sumus-last-activity">${esc(shortActivity(lastActivity(data, button.dataset.student)))}</span>`;
-    row.appendChild(td);
-  }
-  applyFilters();
-}
-
-async function applyFilters() {
-  const table = document.querySelector('#student-table table');
-  if (!table) return;
-  const data = await bootstrap();
-  const status = document.querySelector('#status-filter')?.value || '';
-  let visible = 0;
-  for (const row of table.querySelectorAll('tbody tr')) {
-    const id = row.querySelector('[data-student]')?.dataset.student;
-    const p = data.profiles.find(x => x.id === id);
-    const show = !!p && (!status || (status === 'active' ? p.active : !p.active));
-    // Write only on a change: every write is a DOM mutation, and the observer below
-    // re-runs this on mutations, so unconditional writes looped every frame (V13.65).
-    if (row.hidden !== !show) row.hidden = !show;
-    if (show) visible++;
-  }
-  const count = document.querySelector('#visible-student-count');
-  const label = `현재 ${visible}명 표시`;
-  if (count && count.textContent !== label) count.textContent = label;
-}
+// V13.75: the student list itself shows the last activity and filters by status
+// (modules/teacher.js); this file keeps the student detail pop-up.
 
 function activityRows(data, id) {
   return data.sessions.filter(s => s.student_id === id).slice(0, 5).map(s => {
     const rate = s.total ? Math.round((s.correct || 0) / s.total * 100) : 0;
-    return `<div class="sumus-activity-item"><span class="square-icon">${icon('practice')}</span><div class="grow"><b>${s.total}문제 연습 · 정답률 ${rate}%</b><small>${date(s.created_at)} · +${s.xp || 0}P</small></div></div>`;
+    return `<div class="sumus-activity-item"><span class="square-icon">${icon('practice')}</span><div class="grow"><b>${s.total}문제 연습 · 정답률 ${rate}%</b><small>${date(s.created_at)} · 경험치 +${s.xp || 0}</small></div></div>`;
   }).join('') || '<p class="tiny muted">아직 연습 기록이 없어요.</p>';
 }
 
@@ -241,15 +179,4 @@ document.addEventListener('click', event => {
   openStudentDetail(button.dataset.student).catch(err => toast(err.message));
 }, true);
 
-let enhanceFrame = 0;
-function scheduleEnhance() {
-  if (enhanceFrame) return;
-  enhanceFrame = requestAnimationFrame(() => {
-    enhanceFrame = 0;
-    enhanceStudentsPage().catch(() => {});
-  });
-}
-const observer = new MutationObserver(scheduleEnhance);
-observer.observe(app, { childList: true, subtree: true });
 injectStyles();
-scheduleEnhance();
