@@ -8,3 +8,5 @@
 .pass-btn-v1380{width:100%;margin-top:10px;background:#fff;border:1px dashed #b9c4e8;color:#4457a6;font-weight:800}
 .pass-btn-v1380:active{background:#f4f6fd}
 .result-pass-v1380{margin-left:10px;color:#4457a6;font-weight:800}
+.test-rules-v1380{display:grid;gap:4px;margin:0 0 10px;padding:12px 14px;border:1px solid #dfe6f6;border-radius:16px;background:#f7f9fe;font-size:13px;color:#3d4b6b}
+.test-rules-v1380 b{color:#24345e}
