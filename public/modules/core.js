@@ -25,7 +25,11 @@ export const PRACTICE_SECONDS_PER_QUESTION = {
 };
 // V13.76 실전시험: a countdown for every word (searching elsewhere does not fit in it), and the
 // test is handed in by itself the third time the student leaves the app while it runs.
-export const TEST_SECONDS_PER_QUESTION = { eng2mean: 10, mean2eng: 10, write_meaning: 15, spell: 20 };
+export const TEST_SECONDS_PER_QUESTION = { eng2mean: 10, mean2eng: 10, write_meaning: 15, spell: 20 }; // V13.76 per-word countdown (tests started before V13.80)
+// V13.80 실전시험: one calm time limit for the whole test instead of a countdown per word
+// (students found the per-word seconds too stressful). Each word adds its share; at least 2 minutes.
+export const TEST_TIME_PER_QUESTION = { eng2mean: 15, mean2eng: 15, write_meaning: 24, spell: 24 };
+export const testDurationSec = (mode, target) => Math.max(120, Math.ceil(Math.max(1, Number(target) || 1) * (TEST_TIME_PER_QUESTION[mode] || 20)));
 export const TEST_LEAVE_LIMIT = 3;
 // V13.76 펫 교감: 쓰다듬기 and 밥 주기, once a day each, a little 경험치 for the partner pet.
 export const PET_CARE = { pet: { name: '쓰다듬기', xp: 10 }, feed: { name: '밥 주기', xp: 10 } };

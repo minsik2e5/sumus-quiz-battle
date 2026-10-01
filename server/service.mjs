@@ -1,6 +1,6 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
-import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, ACCESSORIES, FRAMES, EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, ACCESSORIES, FRAMES, EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
 import { battleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
@@ -833,7 +833,7 @@ export async function preauthenticateLogin(state, body) {
 }
 // Routes that change state. GET requests run against the live snapshot outside
 // the durable queue, so they must never reach these handlers.
-const MUTATING_WITHOUT_METHOD_CHECK = /^\/(?:logout|practice\/[^/]+\/(?:answer|next|finish|leave))$/;
+const MUTATING_WITHOUT_METHOD_CHECK = /^\/(?:logout|practice\/[^/]+\/(?:answer|next|finish|leave|pass))$/;
 export async function service(state, method, path, body, token, options = {}) {
   if (method === 'GET' && MUTATING_WITHOUT_METHOD_CHECK.test(path)) fail('요청 방식을 확인해주세요.', 405);
   if (path === '/health') return { ok: true, version: APP_VERSION, schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
@@ -1935,11 +1935,12 @@ export async function service(state, method, path, body, token, options = {}) {
     const practiceWords = runMode === 'test' || examStyle ? shuffle(words).slice(0, target) : words;
     const startedAt = Date.now();
     const durationSec = practiceDurationSec(body.mode, target);
-    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, run_mode: runMode, exam_style: examStyle, assignment_id: null, target, cover_all: runMode === 'test' || examStyle ? true : coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection && runMode !== 'test', quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: durationSec, timer_mode: runMode === 'test' ? 'question' : 'none', question_duration_sec: 0, question_started_at: null, question_deadline: null, deadline: null, auto_submitted: false, wrong_details: [], answer_records: [], finished: false, responses: {}, words: practiceWords.map(w => w.id) };
+    const testSec = testDurationSec(body.mode, target);
+    const x = { id: id(), student_id: p.id, division: p.division || school.division, school_id: school.id, school: school.name, grade: p.class_name, range_codes: rangeCodes, mode: body.mode, run_mode: runMode, exam_style: examStyle, assignment_id: null, target, cover_all: runMode === 'test' || examStyle ? true : coverAll, daily_quest: isDailyQuest, manual_selection: manualSelection, preserve_order: manualSelection && runMode !== 'test', quest_mix: daily?.mix || null, seen: [], total: 0, correct: 0, score_total: 0, score_correct: 0, xp: 0, combo: 0, best: 0, retry: [], last: null, started_at: startedAt, duration_sec: runMode === 'test' ? testSec : durationSec, timer_mode: runMode === 'test' ? 'session' : 'none', question_duration_sec: 0, question_started_at: null, question_deadline: null, deadline: runMode === 'test' ? startedAt + testSec * 1000 : null, auto_submitted: false, wrong_details: [], answer_records: [], finished: false, responses: {}, words: practiceWords.map(w => w.id) };
     if (body.assignment_id) { const a = state.assignments.find(a => a.id === body.assignment_id && a.class_name === p.class_name && a.active); if (a && sameSchool(a, school) && JSON.stringify([...a.range_codes].sort()) === JSON.stringify([...x.range_codes].sort())) x.assignment_id = a.id; }
     state.practices.push(x); nextPractice(x, state); return practiceView(x, state);
   }
-  if (/^\/practice\/[^/]+(?:\/(?:answer|next|finish|share|leave))?$/.test(path)) {
+  if (/^\/practice\/[^/]+(?:\/(?:answer|next|finish|share|leave|pass))?$/.test(path)) {
     requireRole(p, 'student'); const x = state.practices.find(x => x.id === path.split('/')[2] && x.student_id === p.id); if (!x) fail('연습을 찾을 수 없습니다.', 404); removePracticeTimer(x);
     // V13.76 실전시험: the phone reports leaving the app ('out') and coming back ('back' with
     // how long). The third time out hands the test in with the answers given so far.
@@ -1959,6 +1960,22 @@ export async function service(state, method, path, body, token, options = {}) {
       }
       return { leaves: x.leaves, limit: TEST_LEAVE_LIMIT, finished: false };
     }
+    // V13.80 PASS: a word the student can't recall goes to the end of the test, once.
+    if (path.endsWith('/pass')) {
+      if (method !== 'POST') fail('요청 방식을 확인해주세요.', 405);
+      if (x.run_mode !== 'test') fail('실전시험에서만 넘길 수 있어요.', 409);
+      if (x.finished) return practiceView(x, state);
+      if (Number(x.deadline || 0) && Date.now() >= x.deadline + TEST_ANSWER_GRACE_MS) { finishPractice(x, state, true); return practiceView(x, state); }
+      // A repeated tap (or a retry after the pass was saved) just gets the current question.
+      if (body.question_id !== x.question_id) return practiceView(x, state);
+      const wordId = x.question?.word_id;
+      x.passed ??= []; x.passed_once ??= [];
+      if (x.passed_once.includes(wordId)) fail('이 문제는 이미 한 번 넘겼어요. 이번엔 답을 골라 주세요.', 409);
+      if (Number(x.target || 0) - Number(x.score_total || 0) <= 1) fail('마지막 문제는 넘길 수 없어요.', 409);
+      x.passed.push(wordId); x.passed_once.push(wordId); x.pass_count = Number(x.pass_count || 0) + 1;
+      nextPractice(x, state);
+      return practiceView(x, state);
+    }
     if (path.endsWith('/share')) {
       if (method !== 'POST') fail('요청 방식을 확인해주세요.', 405);
       if (!x.finished || x.run_mode !== 'test') fail('완료한 실전모드 결과만 선생님께 보낼 수 있어요.', 409);
@@ -1971,7 +1988,7 @@ export async function service(state, method, path, body, token, options = {}) {
     }
     if (path.endsWith('/answer')) {
       if (x.responses[body.question_id]) return x.responses[body.question_id];
-      if (!x.finished && x.timer_mode !== 'question' && Number(x.deadline || 0) && Date.now() >= x.deadline) {
+      if (!x.finished && x.timer_mode !== 'question' && Number(x.deadline || 0) && Date.now() >= x.deadline + (x.run_mode === 'test' ? TEST_ANSWER_GRACE_MS : 0)) {
         finishPractice(x, state, true);
         return practiceView(x, state);
       }
@@ -2080,6 +2097,8 @@ function nextPractice(x, state, preparePreview = true) {
     x.seen ??= [];
     if (!x.seen.includes(preview.question.word_id)) x.seen.push(preview.question.word_id);
     x.next_preview = null;
+    const passedAt = (x.passed || []).indexOf(preview.question.word_id);
+    if (passedAt >= 0) x.passed.splice(passedAt, 1);
     startQuestionTimer(x, preview.question.type);
     if (preparePreview) prepareNextPreview(x, state);
     return;
@@ -2095,6 +2114,9 @@ function nextPractice(x, state, preparePreview = true) {
     word = x.preserve_order
       ? unseen.sort((a, b) => x.words.indexOf(a.id) - x.words.indexOf(b.id))[0]
       : choosePracticeWord(unseen, state.mastery[x.student_id] || {}, { ...x, retry: [] });
+  } else if (x.run_mode === 'test' && x.passed?.length && words.some(w => x.passed.includes(w.id))) {
+    // V13.80: the words passed earlier come back, in the order they were passed.
+    while (!word && x.passed.length) { const wid = x.passed.shift(); word = words.find(w => w.id === wid); }
   } else if (due >= 0) {
     const retry = x.retry.splice(due, 1)[0];
     word = words.find(w => w.id === retry.id);
@@ -2131,6 +2153,7 @@ function prepareNextPreview(x, state) {
   const preview = {
     ...x,
     seen: [...(x.seen || [])],
+    passed: [...(x.passed || [])],
     retry: test ? [] : x.retry.map(item => ({ ...item })),
     next_preview: null,
     total: x.total + 1,
@@ -2260,7 +2283,7 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false } = {
     question_duration_sec: Number(x.question_duration_sec || 0),
     auto_submitted: !!x.auto_submitted,
     // V13.76 실전시험: how often and how long the student left the app, and whether that ended it.
-    ...(x.run_mode === 'test' ? { leave_count: Number(x.leaves || 0), leave_ms: Number(x.leave_ms || 0), left_out: !!x.left_out } : {}),
+    ...(x.run_mode === 'test' ? { leave_count: Number(x.leaves || 0), leave_ms: Number(x.leave_ms || 0), left_out: !!x.left_out, pass_count: Number(x.pass_count || 0) } : {}),
     ended_at: endedAt,
     finalized_at: finalizedAt,
     shared_to_teacher_at: x.shared_to_teacher_at || null,
@@ -2293,6 +2316,9 @@ function practiceView(x, state) {
     timer_mode: x.timer_mode || 'session', question_duration_sec: Number(x.question_duration_sec || 0), question_started_at: x.question_started_at || null, question_deadline: x.question_deadline || null,
     auto_submitted: !!x.auto_submitted,
     leaves: Number(x.leaves || 0), leave_ms: Number(x.leave_ms || 0), left_out: !!x.left_out,
+    pass_count: Number(x.pass_count || 0), passed_left: (x.passed || []).length,
+    revisit: !!(x.run_mode === 'test' && x.question && (x.passed_once || []).includes(x.question.word_id)),
+    can_pass: !!(x.run_mode === 'test' && !x.finished && x.question && !(x.passed_once || []).includes(x.question.word_id) && Number(x.target || 0) - Number(x.score_total || 0) > 1),
     shared_to_teacher_at: x.shared_to_teacher_at || null,
     wrong_count: x.finished ? wrongCount : undefined,
     unanswered_count: x.finished ? unansweredCount : undefined,

@@ -1,4 +1,4 @@
-import { CHARACTERS, ACCESSORIES, FRAMES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, petForm, unlocked, levelInfo, dayKey, cardTier } from './core.js';
+import { CHARACTERS, ACCESSORIES, FRAMES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, petForm, unlocked, levelInfo, dayKey, cardTier, testDurationSec, TEST_LEAVE_LIMIT } from './core.js';
 import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar, petKey, RUN_SHEETS } from './character.js';
 import { petDisplayName, petJosa } from './pet-moments.js';
@@ -783,6 +783,7 @@ function exam(A) {
     <section class="setup-section"><div class="step-label"><span>01</span>시험 범위</div>${scopeUi}</section>
     ${middle ? '' : `<section class="setup-section"><div class="step-label"><span>02</span>문항 수</div>${examTargetGrid(A, count)}</section>`}
     <section class="setup-section"><div class="step-label"><span>${middle ? '02' : '03'}</span>시험 방식</div>${examWritingPicker(A, testMode)}</section>
+    ${testMode && count ? `<div class="test-rules-v1380"><span>⏳ 시험 전체 <b>${Math.round(testDurationSec(A.mode, target || count) / 60)}분</b> · 문제마다 재지 않아요</span><span>⏭ 헷갈리면 <b>PASS</b> → 마지막에 다시 나와요</span><span>📵 다른 앱으로 <b>${TEST_LEAVE_LIMIT}번</b> 나가면 자동 제출</span></div>` : ''}
     <div class="exam-start-inline"><p>${esc(scopeLabel)} · ${target || 0}문제 · ${esc(PRACTICE_TYPES[A.mode] || '뜻쓰기')}</p><button class="btn primary full" data-action="start-exam-run" ${count ? '' : 'disabled'}>${testMode ? '실전시험 시작' : '연습시험 시작'} ${icon('arrow')}</button></div>`;
 }
 

@@ -1,0 +1,12 @@
+/* V13.80 실전시험: 전체 시간 시계(분 단위, 천천히 줄어드는 바탕) · PASS · 다시 보는 문제. */
+.test-clock-v1380{margin-left:auto;display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:999px;font-size:12.5px;font-weight:800;color:#27443a;
+  background:linear-gradient(90deg,#d8f3e8 var(--p,100%),#eef2f1 var(--p,100%));border:1px solid #cfe9dd;transition:background .9s linear}
+.test-clock-v1380 i{font-style:normal;font-size:12px}
+.test-clock-v1380.last{color:#7a4a0c;background:linear-gradient(90deg,#fdebc8 var(--p,100%),#f6f1e8 var(--p,100%));border-color:#f3dcae}
+.pass-left-v1380{padding:3px 9px;border-radius:999px;background:#eef1fb;color:#4457a6;font-size:11px;font-weight:800}
+.revisit-pill-v1380{margin-left:8px;padding:2px 9px;border-radius:999px;background:#eef1fb;color:#4457a6;font-size:11.5px;font-weight:800}
+.pass-btn-v1380{width:100%;margin-top:10px;background:#fff;border:1px dashed #b9c4e8;color:#4457a6;font-weight:800}
+.pass-btn-v1380:active{background:#f4f6fd}
+.result-pass-v1380{margin-left:10px;color:#4457a6;font-weight:800}
+.test-rules-v1380{display:grid;gap:4px;margin:0 0 10px;padding:12px 14px;border:1px solid #dfe6f6;border-radius:16px;background:#f7f9fe;font-size:13px;color:#3d4b6b}
+.test-rules-v1380 b{color:#24345e}
