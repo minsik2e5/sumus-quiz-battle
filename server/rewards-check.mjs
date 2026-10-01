@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { emptyState } from './state.mjs';
 import { passwordHash, publicProfile } from './auth.mjs';
-import { service, scopedWords } from './service.mjs';
+import { service, scopedWords, sweep } from './service.mjs';
 import { DAY_MS, rankingWeek } from './competition.mjs';
 import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, visibleTitleKeys } from '../public/modules/titles.js';
@@ -296,6 +296,26 @@ export async function runRewardsChecks(assert, expectStatus) {
   timedX.deadline = Date.now() - 5000;
   const lateAnswer = await service(state, 'POST', `/practice/${timed.id}/answer`, { question_id: graceAnswer.question_id, answer: 'x' }, tD);
   assert(lateAnswer.finished === true && lateAnswer.auto_submitted === true, 'V13.80 when the time is up the test is handed in with the answers so far');
+  // An abandoned test is handed in by the hourly sweep once its time is up (not 3 days later).
+  const left = await service(state, 'POST', '/practice/start', { school: '단원고', range_codes: range, mode: 'eng2mean', target: 5, run_mode: 'test' }, tD);
+  const leftX = state.practices.find(x => x.id === left.id);
+  await service(state, 'POST', `/practice/${left.id}/answer`, { question_id: left.question_id, answer: left.question.options[0] }, tD);
+  leftX.deadline = Date.now() - 10000;
+  sweep(state);
+  const sweptSession = state.sessions.find(x => x.id === left.id);
+  assert(leftX.finished && sweptSession?.auto_submitted === true && sweptSession.answered_count === 1, 'V13.80 a test left open past its time is handed in by the sweep');
+  // Leaving after the time is up is a time-out, not a leave.
+  const late2 = await service(state, 'POST', '/practice/start', { school: '단원고', range_codes: range, mode: 'eng2mean', target: 5, run_mode: 'test' }, tD);
+  state.practices.find(x => x.id === late2.id).deadline = Date.now() - 10000;
+  const lateLeave = await service(state, 'POST', `/practice/${late2.id}/leave`, { phase: 'out' }, tD);
+  assert(lateLeave.finished === true && lateLeave.auto_submitted === true && !lateLeave.left_out && lateLeave.leaves === 0, 'V13.80 leaving after the time is up hands the test in as a time-out');
+  // Tests started before v13.80 (a countdown per word) have no PASS.
+  const old = await service(state, 'POST', '/practice/start', { school: '단원고', range_codes: range, mode: 'eng2mean', target: 5, run_mode: 'test' }, tD);
+  const oldX = state.practices.find(x => x.id === old.id);
+  Object.assign(oldX, { timer_mode: 'question', deadline: null, question_deadline: Date.now() + 9000 });
+  assert((await service(state, 'GET', `/practice/${old.id}`, {}, tD)).can_pass === false, 'V13.80 an older per-word-countdown test shows no PASS');
+  await expectStatus(409, () => service(state, 'POST', `/practice/${old.id}/pass`, { question_id: old.question_id }, tD), 'V13.80 and cannot PASS');
+  assert(source('../public/modules/sessions.js').includes("Number(practiceState.deadline || 0) > 0 && Number(practiceState.deadline) <= Date.now() + practiceOffset"), 'V13.80 coming back to a practice without a time limit never ends it');
   const out1 = await service(state, 'POST', `/practice/${test.id}/leave`, { phase: 'out' }, tE);
   const back1 = await service(state, 'POST', `/practice/${test.id}/leave`, { phase: 'back', ms: 4200 }, tE);
   assert(out1.leaves === 1 && out1.limit === TEST_LEAVE_LIMIT && out1.finished === false && back1.leaves === 1 && testX().leave_ms === 4200, 'V13.76 leaving the test is counted, with how long');

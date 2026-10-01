@@ -736,6 +736,12 @@ function closeStalePractices(state, now) {
   let changed = false;
   for (const x of state.practices) {
     if (x.finished) continue;
+    // V13.80: a 실전시험 left open past its time limit is handed in at that time.
+    if (x.run_mode === 'test' && x.timer_mode !== 'question' && Number(x.deadline || 0) && now >= Number(x.deadline) + TEST_ANSWER_GRACE_MS) {
+      if (Number(x.total || 0) > 0) finishPractice(x, state, true); else x.discarded = true;
+      changed = true;
+      continue;
+    }
     const lastActivity = Math.max(Number(x.started_at || 0), ...(x.answer_records || []).map(item => Number(item?.at || 0)));
     if (lastActivity > now - STALE_PRACTICE_MS) continue;
     // Answers given: close it the way a finish does (the existing path used when a
@@ -1952,6 +1958,8 @@ export async function service(state, method, path, body, token, options = {}) {
         x.leave_ms = Math.min(3600000, Number(x.leave_ms || 0) + Math.max(0, Math.min(3600000, Number(body.ms) || 0)));
         return { leaves: Number(x.leaves || 0), limit: TEST_LEAVE_LIMIT, finished: false };
       }
+      // Time already up: hand it in as a time-out, not as leaving.
+      if (x.timer_mode !== 'question' && Number(x.deadline || 0) && Date.now() >= Number(x.deadline) + TEST_ANSWER_GRACE_MS) { finishPractice(x, state, true); return { ...practiceView(x, state), leaves: Number(x.leaves || 0), limit: TEST_LEAVE_LIMIT }; }
       x.leaves = Number(x.leaves || 0) + 1;
       if (x.leaves >= TEST_LEAVE_LIMIT) {
         x.left_out = true;
@@ -1963,7 +1971,7 @@ export async function service(state, method, path, body, token, options = {}) {
     // V13.80 PASS: a word the student can't recall goes to the end of the test, once.
     if (path.endsWith('/pass')) {
       if (method !== 'POST') fail('요청 방식을 확인해주세요.', 405);
-      if (x.run_mode !== 'test') fail('실전시험에서만 넘길 수 있어요.', 409);
+      if (x.run_mode !== 'test' || x.timer_mode === 'question') fail('이 시험에서는 넘길 수 없어요.', 409);
       if (x.finished) return practiceView(x, state);
       if (Number(x.deadline || 0) && Date.now() >= x.deadline + TEST_ANSWER_GRACE_MS) { finishPractice(x, state, true); return practiceView(x, state); }
       // A repeated tap (or a retry after the pass was saved) just gets the current question.
@@ -2318,7 +2326,7 @@ function practiceView(x, state) {
     leaves: Number(x.leaves || 0), leave_ms: Number(x.leave_ms || 0), left_out: !!x.left_out,
     pass_count: Number(x.pass_count || 0), passed_left: (x.passed || []).length,
     revisit: !!(x.run_mode === 'test' && x.question && (x.passed_once || []).includes(x.question.word_id)),
-    can_pass: !!(x.run_mode === 'test' && !x.finished && x.question && !(x.passed_once || []).includes(x.question.word_id) && Number(x.target || 0) - Number(x.score_total || 0) > 1),
+    can_pass: !!(x.run_mode === 'test' && x.timer_mode !== 'question' && !x.finished && x.question && !(x.passed_once || []).includes(x.question.word_id) && Number(x.target || 0) - Number(x.score_total || 0) > 1),
     shared_to_teacher_at: x.shared_to_teacher_at || null,
     wrong_count: x.finished ? wrongCount : undefined,
     unanswered_count: x.finished ? unansweredCount : undefined,

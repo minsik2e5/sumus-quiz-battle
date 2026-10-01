@@ -368,7 +368,7 @@ export async function startPractice(options = {}) {
     const ranges = Array.isArray(payload.word_ids) && payload.word_ids.length
       ? (A.data.profile.division === 'middle' ? String(A.middleRange || '') + '과' : '직접 선택')
       : (payload.range_codes || []).map(code => recordRangeLabel({ division: A.data.profile.division, school: A.school }, code)).join(' · ');
-    const close = modal(`<span class="pill green">실전 모드</span><h2>${esc(ranges || '선택 범위')}</h2><div class="detail-grid"><div><b>${esc(PRACTICE_TYPES[payload.mode] || '쓰기')}</b><small>시험 방식</small></div><div><b>${target}문제</b><small>문항 수</small></div><div><b>마지막 공개</b><small>채점 시점</small></div></div><div class="test-start-rules"><p>정답은 시험이 끝난 뒤 공개돼요.</p><p>이전 문항으로 돌아갈 수 없어요.</p><p>⏳ 시험 전체 <b>${Math.round(testDurationSec(payload.mode, target) / 60)}분</b>이에요. 문제마다 재지 않으니 천천히 풀어요.</p><p>⏭ 헷갈리는 단어는 <b>PASS</b>로 넘기면 마지막에 다시 나와요(한 단어에 한 번).</p><p class="test-leave-rule-v1376">📵 시험 중에 다른 앱·탭으로 나가면 기록돼요. <b>${TEST_LEAVE_LIMIT}번째로 나가면 자동 제출</b>돼요.</p></div><button class="btn primary full" id="confirm-practice-test">실전 시작하기</button><button class="btn full" id="cancel-practice-test">설정으로 돌아가기</button>`, '실전 시작 확인');
+    const close = modal(`<span class="pill green">실전 모드</span><h2>${esc(ranges || '선택 범위')}</h2><div class="detail-grid"><div><b>${esc(PRACTICE_TYPES[payload.mode] || '쓰기')}</b><small>시험 방식</small></div><div><b>${target}문제</b><small>문항 수</small></div><div><b>마지막 공개</b><small>채점 시점</small></div></div><div class="test-start-rules"><p>정답은 시험이 끝난 뒤 공개돼요.</p><p>이전 문항으로 돌아갈 수 없어요.</p><p>⏳ 시험 전체 <b>${minSec(testDurationSec(payload.mode, target))}</b>이에요. 문제마다 재지 않으니 천천히 풀어요.</p><p>⏭ 헷갈리는 단어는 <b>PASS</b>로 넘기면 마지막에 다시 나와요(한 단어에 한 번).</p><p class="test-leave-rule-v1376">📵 시험 중에 다른 앱·탭으로 나가면 기록돼요. <b>${TEST_LEAVE_LIMIT}번째로 나가면 자동 제출</b>돼요.</p></div><button class="btn primary full" id="confirm-practice-test">실전 시작하기</button><button class="btn full" id="cancel-practice-test">설정으로 돌아가기</button>`, '실전 시작 확인');
     $('#cancel-practice-test').onclick = () => { close(); redraw(); };
     $('#confirm-practice-test').onclick = async event => {
       buttonBusy(event.currentTarget);
@@ -523,6 +523,7 @@ async function timeoutPracticeQuestion() {
   }
 }
 let lastMinuteSaid = null;
+const minSec = sec => sec % 60 ? `${Math.floor(sec / 60)}분 ${sec % 60}초` : `${sec / 60}분`;
 const testClockText = left => left > 60 ? `약 ${Math.ceil(left / 60)}분 남음` : '1분 안쪽';
 const testClockPercent = (x, left) => Math.max(0, Math.min(100, left / Math.max(1, Number(x.duration_sec || 0)) * 100));
 function testClockHtml(x) {
@@ -892,7 +893,9 @@ function finishPracticeView() {
   const answeredCount = Math.min(targetCount, durable.length || Number(x.score_total || 0));
   const interrupted = unanswered > 0 && answeredCount < targetCount;
   const modeLabel = x.run_mode === 'test' ? '실전시험' : '연습시험';
-  const resultHeadline = interrupted ? '시험을 중도 종료했어요' : modeLabel + ' 결과';
+  // V13.80: a 실전시험 whose time ran out (not left 3 times) is not a quit.
+  const timeUp = x.run_mode === 'test' && x.auto_submitted && !x.left_out;
+  const resultHeadline = timeUp && interrupted ? '시간이 끝났어요' : interrupted ? '시험을 중도 종료했어요' : modeLabel + ' 결과';
   const rangeText = (x.range_codes || []).map(code => esc(recordRangeLabel({ division: A.data.profile.division, school: x.school }, code))).join(' · ') || '선택 범위';
   const answeredWordIds = new Set(durable.map(item => item.word_id).filter(Boolean));
   const wrongWordIds = durable.filter(item => item.correct === false && !item.regraded).map(item => item.word_id).filter(Boolean);
@@ -909,7 +912,7 @@ function finishPracticeView() {
     const stateClass = isTimeout ? 'red' : isWrong ? 'red' : 'green';
     const stateLabel = isTimeout ? 'TIME OUT' : isWrong ? '오답' : '정답';
     return `<div class="wrong-word ${isWrong || isTimeout ? '' : 'answer-correct'}"><div class="row between"><span class="pill ${stateClass}">${stateLabel}</span><small>최초 제출 답안</small></div><p><b>${esc(item.word)}</b></p><p>${esc(item.meaning)}</p><small>${isTimeout ? '시간 초과 · 미응답' : '내 답: ' + esc(item.answer || '미응답')}</small>${isWrong && item.type === 'write_meaning' && item.answer ? `<button class="meaning-dispute-button" data-finish-practice-dispute="${esc(item.question_id)}">이의제기</button>` : ''}</div>`;
-  }).join('') : ''}${unrecordedMissing ? `<div class="result-note">중간 종료로 답하지 않은 문항 ${unrecordedMissing}개가 있어요.</div>` : ''}`;
+  }).join('') : ''}${unrecordedMissing ? `<div class="result-note">${timeUp ? '시간이 끝나 답하지 못한' : '중간 종료로 답하지 않은'} 문항 ${unrecordedMissing}개가 있어요.</div>` : ''}`;
   const primaryCta = perfect
     ? '<button class="btn primary full" id="practice-next-exam">다른 시험 선택</button>'
     : missedWordIds.length
@@ -1041,7 +1044,9 @@ document.addEventListener('visibilitychange', () => {
     practiceHiddenAt = 0;
     if (hiddenFor >= 1500 && navigator.onLine !== false) syncPracticeState();
     else if (practiceState.timer_mode === 'question' && questionLeftMs(practiceState) <= 0) timeoutPracticeQuestion();
-    else if (practiceState.timer_mode !== 'question' && Number(practiceState.deadline || 0) <= Date.now() + practiceOffset) finishPracticeByTimer();
+    // Only a practice that has a time limit can run out of time (ordinary practice has none:
+    // without this check a quick app switch used to end it early).
+    else if (practiceState.timer_mode !== 'question' && Number(practiceState.deadline || 0) > 0 && Number(practiceState.deadline) <= Date.now() + practiceOffset) finishPracticeByTimer();
   }
 });
 window.addEventListener('pagehide', () => { if (A?.screen === 'exam') localSave(); });
