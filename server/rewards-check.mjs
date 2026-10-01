@@ -8,7 +8,7 @@ import { emptyState } from './state.mjs';
 import { passwordHash, publicProfile } from './auth.mjs';
 import { service, scopedWords } from './service.mjs';
 import { DAY_MS, rankingWeek } from './competition.mjs';
-import { dayKey, unlocked, FRAMES, ACCESSORIES, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, TEST_LEAVE_LIMIT, STARS_MAX } from '../public/modules/core.js';
+import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, TEST_LEAVE_LIMIT, STARS_MAX } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, visibleTitleKeys } from '../public/modules/titles.js';
 import { createBattle, connect, answer, tick, battleView, SKILL_RULES, BATTLE } from '../public/modules/battle-engine.js';
 import { battleQuestions, spellHint, spellable } from '../public/modules/battle-questions.js';
@@ -299,4 +299,14 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(studentUi76.includes('function petCareBar(A, hatched)') && studentUi76.includes('data-pet-care="${kind}"') && appUi76.includes("api('/pet/care', { kind })") && appUi76.includes('function maybeMissedYou()') && appUi76.includes('보고 싶었어!'), 'V13.76 the home card has 쓰다듬기 and 밥 주기, and the pet greets a student back');
   assert(appUi76.includes('function syncStars()') && appUi76.includes("api('/stars', { word_id: wordId, on })") && studentUi76.includes('export function starredWords(A)') && studentUi76.includes('data-star-practice="true"') && appUi76.includes('function openStarPractice()'), 'V13.76 ★ words are kept on the account and practised together');
   assert(build76.includes('"v1376.css"') && css76.includes('.pet-care-v1376') && css76.includes('.practice-timer-v1376') && css76.includes('.star-practice-v1376'), 'V13.76 styles are bundled');
+
+  /* ---------- V13.78 card tiers by level, Lv.60 cap ---------- */
+  const top = levelInfo(10 ** 9);
+  assert(MAX_LEVEL === 60 && top.level === 60 && top.remaining === 0 && levelInfo(91140).level === 50 && levelInfo(91140 + 10000).level > 50, 'V13.78 the level cap is 60 (it was 50)');
+  assert(CARD_TIERS.map(t => `${t.label}:${t.min}`).join() === 'C:1,U:3,R:6,RR:10,RRR:15,SR:20,HR:25,UR:30,SSR:40,LGD:50', 'V13.78 ten card tiers by level');
+  assert(cardTier(1).key === 'c' && cardTier(2).key === 'c' && cardTier(9).key === 'r' && cardTier(10).key === 'rr' && cardTier(49).key === 'ssr' && cardTier(50).key === 'lgd' && cardTier(60).max && !cardTier(59).max && cardTier(15).next.key === 'sr' && cardTier(60).next === null, 'V13.78 each level maps to one tier; Lv.60 is MAX');
+  assert(['level30', 'level40', 'level50', 'level60'].every(k => TITLES[k]?.stat === 'level' && TITLES[k].tier === 'legendary') && TITLES.level60.goal === 60, 'V13.78 titles at Lv.30, 40, 50 and 60');
+  const card78 = source('../public/modules/card-levelup.js'), app78 = source('../public/app.js'), css78 = source('../public/v1378.css'), build78 = source('./build-assets.mjs'), home78 = source('../public/modules/student.js');
+  assert(card78.includes('export function maybeCardLevelUp(A)') && card78.includes('if (to.index > from.index) upgradeScene(') && card78.includes('setTimeout(() => bump(level), 900)') && card78.includes('waitForClear(root') && card78.includes("sumus:card-level:") && app78.includes('queueMicrotask(() => maybeCardLevelUp(A))'), 'V13.78 a level-up plays on the home card; a new tier plays the card-upgrade scene after any evolution moment');
+  assert(home78.includes('function cardFx(tier)') && build78.includes('"v1378.css"') && ['c', 'u', 'r', 'rr', 'rrr', 'sr', 'hr', 'ur', 'ssr', 'lgd'].every(k => k === 'c' || css78.includes(`.tier-${k} `)) && css78.includes('.card-up-v1378') && css78.includes('prefers-reduced-motion'), 'V13.78 every tier has its own finish (styles bundled, calmer with reduced motion)');
 }
