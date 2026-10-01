@@ -17,7 +17,9 @@ const BALL_SPOTS = [[8, 4], [36, 2], [64, 5], [92, 3], [120, 6], [20, 28], [50, 
 const soundOn = () => { try { return (localStorage.getItem('sumus-yacha-sound') ?? 'on') === 'on'; } catch { return true; } };
 let audio = null;
 export function unlockSound() {
-  if (audio || !soundOn()) return;
+  if (!soundOn()) return;
+  // iOS suspends the sound after the app was in the background or a call: wake it on the next tap.
+  if (audio) { if (audio.state !== 'running') audio.resume?.().catch(() => {}); return; }
   try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch { audio = null; }
 }
 function tone(freqs, { type = 'sine', len = .12, gap = .07, vol = .05, slide = 0 } = {}) {

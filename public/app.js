@@ -439,9 +439,19 @@ function noticeModal() {
   };
 }
 // Notification links (/?go=yacha) and the app's shortcuts open that tab.
-const GO_TABS = new Set(['home', 'practice', 'exam', 'yacha', 'arcade', 'me', 'ranking', 'records', 'titles']);
+const GO_TABS = new Set(['home', 'practice', 'exam', 'yacha', 'arcade', 'me', 'ranking', 'records', 'titles', 'challenge']);
 function openGo(go) {
   if (!GO_TABS.has(go) || !A.data || A.data.profile.role !== 'student' || A.screen || A.data.stats?.needs_pet_pick) return false;
+  // V13.81: a 도전장 notification opens the challenge itself (or home, if it is gone).
+  if (go === 'challenge') {
+    refresh().catch(() => {}).then(() => {
+      if (A.screen) return;
+      const invite = A.data.battle_invite;
+      if (invite) { A.data.battle_invite = null; A.yachaOpts = { accept: invite }; return navigate('yacha'); }
+      navigate('home');
+    });
+    return true;
+  }
   navigate(go);
   if (go === 'home' || go === 'yacha') refresh().then(() => { if (!A.screen) renderKeepScroll(); }).catch(() => {});
   return true;
@@ -583,7 +593,7 @@ $('#app').addEventListener('click', async event => {
     if (d.memorizeRangeType) {
       A.memorizeRangeType = d.memorizeRangeType;
       const info = getRanges(A);
-      const codes = info.codes.filter(code => d.memorizeRangeType === 'textbook' ? /^L\\d+$/i.test(String(code)) : !/^L\\d+$/i.test(String(code)));
+      const codes = info.codes.filter(code => d.memorizeRangeType === 'textbook' ? /^L\d+$/i.test(String(code)) : !/^L\d+$/i.test(String(code)));
       A.memorizeRange = String(codes[0] || '');
       A.memRevealed = []; A.memorizeFilter = 'all'; savePreferences(); renderKeepScroll(); return;
     }
@@ -647,7 +657,7 @@ $('#app').addEventListener('click', async event => {
     if (d.highRangeType) { A.highRangeType = d.highRangeType; A.target = 20; savePreferences(); renderKeepScroll(); return; }
     if (d.highRangeAll) {
       const info = getRanges(A);
-      const visibleCodes = info.codes.filter(code => d.highRangeType === 'textbook' ? /^L\\d+$/i.test(String(code)) : !/^L\\d+$/i.test(String(code)));
+      const visibleCodes = info.codes.filter(code => d.highRangeType === 'textbook' ? /^L\d+$/i.test(String(code)) : !/^L\d+$/i.test(String(code)));
       const current = new Set(info.selected);
       visibleCodes.forEach(code => d.highRangeAll === 'true' ? current.add(code) : current.delete(code));
       A.ranges[info.key] = [...current]; savePreferences(); render(); return;

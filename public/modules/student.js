@@ -602,8 +602,8 @@ function memorizationPanel(A) {
       })()
     : (() => {
         const state = highSchoolMemorizeState(A);
-        const textbookCodes = state.codes.filter(code => /^L\\d+$/i.test(String(code)));
-        const mockCodes = state.codes.filter(code => !/^L\\d+$/i.test(String(code)));
+        const textbookCodes = state.codes.filter(code => /^L\d+$/i.test(String(code)));
+        const mockCodes = state.codes.filter(code => !/^L\d+$/i.test(String(code)));
         const availableTypes = [['mock','모의고사',mockCodes],['textbook','교과서',textbookCodes]].filter(([, , codes]) => codes.length);
         if (!availableTypes.some(([key]) => key === A.memorizeRangeType)) A.memorizeRangeType = textbookCodes.includes(state.code) ? 'textbook' : (availableTypes[0]?.[0] || 'mock');
         const visibleCodes = A.memorizeRangeType === 'textbook' ? textbookCodes : mockCodes;

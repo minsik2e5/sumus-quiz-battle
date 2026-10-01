@@ -6,12 +6,22 @@ export { BattleRoom };
 import { selfSignup } from '../server/signup.mjs';
 import { examAdmin } from '../server/exam-admin.mjs';
 import { migrateState, stateSizeReport } from '../server/state.mjs';
+import { hashToken } from '../server/auth.mjs';
 import { createMutationCoordinator, NO_MUTATION } from '../server/mutation-coordinator.mjs';
 import { createLocalRepository, createSupabaseSync } from './local-first.mjs';
 import { partitionState, assembleState, hashText } from './state-parts.mjs';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' };
 
+// Changes allowed without a session. Everything else needs a live token of an active profile
+// (the same test service() makes, done once more outside the queue).
+const OPEN_POST_PATHS = new Set(['/api/login', '/api/signup']);
+function hasLiveSession(state, token) {
+  if (!token || token.length > 200) return false;
+  const hash = hashToken(token), now = Date.now();
+  const auth = state.tokens.find(t => t.hash === hash && t.expires_at > now);
+  return !!auth && state.profiles.some(p => p.id === auth.user_id && p.active);
+}
 function json(payload, status = 200, headers = {}) {
   return new Response(JSON.stringify(payload), { status, headers: { ...JSON_HEADERS, ...headers } });
 }
@@ -271,6 +281,13 @@ export class VocaStateObject {
         return json({ ok: true });
       }
       const address = request.headers.get('CF-Connecting-IP') || 'unknown';
+      const cookie = request.headers.get('cookie') || '';
+      const token = cookie.split(';').map(value => value.trim()).find(value => value.startsWith('sumus_session='))?.slice(14) || '';
+      // A change without a live session is turned away here, before it waits in the queue
+      // and copies the whole state (only login and signup work without one).
+      if (request.method !== 'GET' && !OPEN_POST_PATHS.has(url.pathname) && !hasLiveSession(this.mutations.current().state, token)) {
+        throw Object.assign(Error('다시 로그인해주세요.'), { status: 401 });
+      }
       if (url.pathname === '/api/login') {
         const key = `${address}:${String(body.username || '').trim().toLowerCase()}`;
         this.rateLimit(key, 10, 15 * 60000, '로그인 시도가 많습니다. 15분 후 다시 시도해주세요.');
@@ -281,6 +298,8 @@ export class VocaStateObject {
         this.rateLimit(`${address}:signup`, 12, 30 * 60000, '회원가입 시도가 많습니다. 잠시 후 다시 시도해주세요.');
         this.rateLimit(`${address}:signup:${username}`, 4, 30 * 60000, '같은 아이디로 가입 시도가 많습니다. 잠시 후 다시 시도해주세요.');
       }
+      // Each password check runs scrypt up to three times.
+      if (url.pathname === '/api/profile/password') this.rateLimit(`${address}:password:${hashToken(token).slice(0, 16)}`, 8, 15 * 60000, '비밀번호 변경 시도가 많습니다. 잠시 후 다시 시도해주세요.');
       if (url.pathname === '/api/battle/join' || url.pathname === '/api/battle/preview') {
         this.rateLimit(`${address}:battle-join`, 30, 10 * 60000, '대결 방 참가 시도가 많아요. 잠시 후 다시 시도해주세요.');
       }
@@ -297,8 +316,6 @@ export class VocaStateObject {
         await this.mutations.durable(state => sweep(state) ? true : NO_MUTATION);
       }
 
-      const cookie = request.headers.get('cookie') || '';
-      const token = cookie.split(';').map(value => value.trim()).find(value => value.startsWith('sumus_session='))?.slice(14) || '';
       // scrypt takes tens of ms; doing it inside durable() would stall every
       // other student's save while one login is checked.
       const preauthenticatedUserId = url.pathname === '/api/login' && request.method === 'POST'

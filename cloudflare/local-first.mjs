@@ -252,7 +252,17 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
     const hashes = new Map(await Promise.all([...parts].map(async ([key, text]) => [key, await hashText(text)])));
     const previous = local.partHashes();
     const changed = [...parts].filter(([key]) => previous.get(key) !== hashes.get(key));
-    const removed = [...previous.keys()].filter(key => !parts.has(key));
+    let removed = [...previous.keys()].filter(key => !parts.has(key));
+    // Sending everything again (no hashes kept): parts deleted here meanwhile are still in
+    // Supabase and would come back on a restore, so ask which keys it holds.
+    if (!previous.size && supabase.readParts) {
+      try {
+        const remote = await supabase.readParts();
+        removed = Object.keys(remote.parts || {}).filter(key => !parts.has(key));
+      } catch (error) {
+        log.warn('[supabase-sync] could not list remote parts; old parts kept', { error: error?.message || String(error) });
+      }
+    }
     const batches = batchParts(changed);
     if (!batches.length && removed.length) batches.push([]);
     let revision = status.partsRevision ?? await supabase.partsRevision();

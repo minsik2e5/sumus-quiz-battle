@@ -293,9 +293,9 @@ async function pickFriend(button) {
   box.className = 'yb-confirm';
   box.innerHTML = `<div class="yb-confirm-card yb-friends-v1361" role="dialog" aria-modal="true" aria-label="도전장 보낼 친구">
     <h2>누구에게 도전할까요?</h2><p class="yb-note">${modeName(B.mode)} · 판돈 ${num(B.stake)}코인 · 고른 범위로 대결해요. 친구 홈 화면에 도전장이 떠요.</p>
-    <div class="yb-friend-list">${friends.length ? friends.map(f => `<button type="button" class="yb-friend" data-friend="${esc(f.id)}" ${f.busy ? 'disabled' : ''}>
+    <div class="yb-friend-list">${friends.length ? friends.map(f => `<button type="button" class="yb-friend" data-friend="${esc(f.id)}" ${f.busy || f.invited ? 'disabled' : ''}>
       <span class="yb-friend-pet">${f.pet ? avatar(f.pet.key, { form: f.pet.form }) : ''}</span>
-      <span class="yb-friend-name"><b>${esc(f.name)}</b><small>${esc(f.class_name)}${f.busy ? ' · 대결 중' : ''}</small>${shownTitle(f.title) ? titleBadge(f.title, { size: 'xs' }) : ''}</span>
+      <span class="yb-friend-name"><b>${esc(f.name)}</b><small>${esc(f.class_name)}${f.busy ? ' · 대결 중' : f.invited ? ' · 도전장 받는 중' : ''}</small>${shownTitle(f.title) ? titleBadge(f.title, { size: 'xs' }) : ''}</span>
       ${f.tier ? `<span class="yb-friend-tier">${tierEmblem(f.tier, { size: 'sm' })}</span>` : ''}
     </button>`).join('') : '<p class="yb-muted">같은 학교·학년 친구가 아직 없어요. 아래 <b>연습 상대</b>와 먼저 겨뤄 봐요!</p>'}</div>
     <button type="button" class="btn full" data-friend-close>닫기</button></div>`;
@@ -462,7 +462,12 @@ function onMessage(msg) {
   if (typeof msg.now === 'number') B.clockOffset = msg.now - Date.now();
   if (msg.type === 'lobby') { if (B.room.host) waitingRoom(msg.expires_at); return; }
   if (msg.type === 'cancelled' || msg.type === 'expired') { toast(msg.type === 'expired' ? '10분 동안 아무도 들어오지 않아 방이 닫혔어요.' : msg.reason === 'tournament' ? '선생님이 이 대회 경기를 정리했어요.' : msg.reason === 'declined' ? (B.room?.tournament ? '상대가 대회 경기를 다음에 하기로 했어요.' : B.room?.challenge ? '친구가 이번에는 도전을 거절했어요.' : '상대가 이번에는 설욕전을 거절했어요.') : '대결 방이 취소됐어요.'); closeSocket(); return openBattle(B.A, B.exit); }
-  if (msg.type === 'view') { B.view = msg.view; return drawMatch(); }
+  if (msg.type === 'view') {
+    // A view after a reconnect or reload has the word but not what this phone typed for it.
+    const q = msg.view?.question;
+    if (q) Object.assign(q, { typed: [], hint: q.hint || '', options: q.options || [], opDone: !!q.opDone });
+    B.view = msg.view; return drawMatch();
+  }
   if (msg.type === 'events' && B.view) { for (const e of msg.events) applyEvent(e); }
 }
 
