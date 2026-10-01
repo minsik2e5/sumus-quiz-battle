@@ -92,7 +92,7 @@ export async function runPushChecks(assert, expectStatus) {
   const key1 = await service(state, 'POST', '/push/key', {}, t['qa-pu-a']);
   const key2 = await service(state, 'POST', '/push/key', {}, t['qa-pu-b']);
   assert(key1.key === key2.key && state.push.vapid.public_key === key1.key, 'V13.77 one key pair for the whole app, made once');
-  const subA = await service(state, 'POST', '/push/subscribe', { subscription: phone.subscription, origin: 'https://sumus.example', device: 'Android' }, t['qa-pu-a']);
+  const subA = await service(state, 'POST', '/push/subscribe', { subscription: phone.subscription, origin: 'https://evil.example', device: 'Android' }, t['qa-pu-a'], { origin: 'https://sumus.example' });
   assert(subA.push.on && subA._push?.[0]?.to?.[0] === 'qa-pu-a' && subA._push[0].title.includes('알림이 켜졌어요') && state.push.subject === 'https://sumus.example', 'V13.77 turning 알림 on stores the phone and sends a hello');
   await expectStatus(400, () => service(state, 'POST', '/push/subscribe', { subscription: { ...phone.subscription, endpoint: 'https://evil.example/x' } }, t['qa-pu-a']), 'V13.77 a made-up push address is refused');
   const quiet = await service(state, 'POST', '/push/subscribe', { subscription: phone.subscription, quiet: true }, t['qa-pu-a']);

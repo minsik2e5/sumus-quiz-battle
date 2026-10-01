@@ -9,9 +9,9 @@
 .card-fx{position:absolute;inset:0;z-index:3;pointer-events:none;border-radius:20px;overflow:hidden}
 .card-rarity{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:5px;font-size:9.5px;font-weight:900;letter-spacing:.06em;line-height:1.5;color:#51625c;background:#e9efec;border:1px solid rgba(0,0,0,.06)}
 .card-rarity.rarity-u{color:#5d6b72;background:linear-gradient(135deg,#eef2f4,#fff)}
-.card-rarity.rarity-r{color:#fff;background:linear-gradient(135deg,#8e9aa1,#dfe6e9 50%,#8e9aa1)}
+.card-rarity.rarity-r{color:#2f3a3f;background:linear-gradient(135deg,#8e9aa1,#dfe6e9 50%,#8e9aa1)}
 .card-rarity.rarity-rr,.card-rarity.rarity-rrr,.card-rarity.rarity-sr{color:#5a3b00;background:linear-gradient(135deg,#c8922c,#ffe7a3 50%,#c8922c)}
-.card-rarity.rarity-hr,.card-rarity.rarity-ssr{color:#fff;background:linear-gradient(135deg,#ff5fa2,#ffc94a 30%,#3fe0b0 60%,#6aa8ff 85%,#b07cff);text-shadow:0 1px 1px rgba(0,0,0,.25)}
+.card-rarity.rarity-hr,.card-rarity.rarity-ssr{color:#2a1840;background:linear-gradient(135deg,#ff5fa2,#ffc94a 30%,#3fe0b0 60%,#6aa8ff 85%,#b07cff);text-shadow:0 1px 0 rgba(255,255,255,.6)}
 .card-rarity.rarity-ur{color:#3b2500;background:linear-gradient(135deg,#a8741a,#fff1b8 45%,#e2b04a 70%,#a8741a)}
 .card-rarity.rarity-lgd{color:#ffe7a3;background:linear-gradient(135deg,#1b1238,#4b2d86 55%,#1b1238);border-color:#e8c469}
 
@@ -81,7 +81,7 @@
 .tier-lgd .partner-front::before{opacity:1;background:radial-gradient(circle,#fff 0 1px,transparent 1.5px),radial-gradient(circle,rgba(255,230,160,.9) 0 1px,transparent 1.6px);background-size:23px 19px,31px 27px;animation:cardGlitter 9s linear infinite}
 .tier-lgd .partner-inner::before{background:repeating-conic-gradient(rgba(255,215,120,.28) 0 5deg,transparent 5deg 14deg,rgba(190,150,255,.3) 14deg 19deg,transparent 19deg 28deg)}
 .tier-lgd .partner-inner{background:radial-gradient(circle at 50% 36%,#fffaf0 0 11%,transparent 12%),radial-gradient(circle at 50% 36%,#ffe9b0,#b78cff 55%,#3c2a86 115%)}
-.tier-lgd .partner-name{background:linear-gradient(180deg,#8a5a00,#d8a53a 55%,#7a4a00);-webkit-background-clip:text;background-clip:text;color:transparent}
+.tier-lgd .partner-name{background:linear-gradient(180deg,#5e3c00,#9a6a10 55%,#4f3200);-webkit-background-clip:text;background-clip:text;color:transparent}
 .card-gem{position:absolute;width:16px;height:16px;transform:rotate(45deg);border-radius:3px;background:linear-gradient(135deg,#fff 0%,#8fe3ff 30%,#4a7dff 60%,#b27cff 100%);box-shadow:0 0 8px rgba(160,200,255,.9),inset 0 0 0 1.5px #f3d27a}
 .card-gem.g1{left:5px;top:5px}.card-gem.g2{right:5px;top:5px}.card-gem.g3{left:5px;bottom:5px}.card-gem.g4{right:5px;bottom:5px}
 .card-crown{position:absolute;left:50%;top:2px;transform:translateX(-50%);padding:1px 10px 2px;border-radius:0 0 10px 10px;font-style:normal;font-size:10px;font-weight:900;letter-spacing:.14em;color:#3b2500;background:linear-gradient(135deg,#c8922c,#fff1b8 50%,#c8922c);box-shadow:0 2px 6px rgba(0,0,0,.25)}
@@ -109,7 +109,7 @@
 .card-up-v1378 .up-card .partner-tools,.card-up-v1378 .up-card .pet-care-v1376{display:none}
 .card-up-v1378 .up-card.flipping .partner-card{animation:upFlip .9s ease-in-out}
 .card-up-v1378 .up-stampbox{position:absolute;left:50%;top:50%;z-index:8;pointer-events:none}
-.card-up-v1378 .up-stamp{position:absolute;left:0;top:0;padding:8px 18px;border:4px solid currentColor;border-radius:14px;font-size:40px;font-weight:900;letter-spacing:.06em;color:#ffcf4a;background:rgba(20,14,40,.55);text-shadow:0 2px 10px rgba(0,0,0,.4);box-shadow:0 0 30px rgba(255,200,80,.5);animation:upStamp .5s cubic-bezier(.3,1.4,.4,1) forwards;white-space:nowrap}
+.card-up-v1378 .up-stamp{position:absolute;left:0;top:0;transform:translate(-50%,-50%) rotate(-8deg);padding:8px 18px;border:4px solid currentColor;border-radius:14px;font-size:40px;font-weight:900;letter-spacing:.06em;color:#ffcf4a;background:rgba(20,14,40,.55);text-shadow:0 2px 10px rgba(0,0,0,.4);box-shadow:0 0 30px rgba(255,200,80,.5);animation:upStamp .5s cubic-bezier(.3,1.4,.4,1) forwards;white-space:nowrap}
 .card-up-v1378 .up-burst{position:absolute;left:50%;top:45%;width:10px;height:10px;border-radius:50%;background:var(--c);animation:upBurst .9s ease-out forwards;pointer-events:none}
 .card-up-v1378 .up-text{text-align:center;color:#fff}
 .card-up-v1378 .up-text b{display:block;font-size:24px;letter-spacing:-.02em}
@@ -118,9 +118,12 @@
 .card-up-v1378 .up-next i{display:block;height:6px;margin-top:6px;border-radius:99px;background:rgba(255,255,255,.18);overflow:hidden;font-style:normal}
 .card-up-v1378 .up-next i::after{content:"";display:block;height:100%;width:var(--p);border-radius:inherit;background:linear-gradient(90deg,#ffe27a,#ffb13b)}
 .card-up-v1378 .up-ok{width:100%;padding:15px;border:0;border-radius:16px;font:inherit;font-size:17px;font-weight:900;color:#3b2500;background:linear-gradient(135deg,#ffd76a,#ffb13b);cursor:pointer;opacity:0;transition:opacity .3s}
+.card-up-v1378 .up-ok:not(.show){pointer-events:none}
 .card-up-v1378 .up-ok.show{opacity:1}
 
 @media (prefers-reduced-motion:reduce){
   .partner-card-v1358 .partner-front,.partner-card-v1358 .partner-front::before,.partner-card-v1358 .partner-inner::before,.card-star,.card-up-v1378 *,.card-up-v1378{animation:none!important}
   .card-star{opacity:.8}
 }
+.preview-wait-v1379 .question-prompt,.preview-wait-v1379 .options,.preview-wait-v1379 .answer-input{visibility:hidden}
+.preview-wait-v1379::after{content:"답안을 저장하고 있어요…";display:block;text-align:center;color:#6c7c77;font-weight:700;margin-top:-40px}

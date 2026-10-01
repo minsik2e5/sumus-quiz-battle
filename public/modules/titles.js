@@ -80,9 +80,9 @@ export const TITLES = {
   gift1: { name: '선생님의 칭찬', tier: 'common', group: 'collect', stat: 'gifts', goal: 1, icon: 'heart', how: '선생님께 코인 선물 받기', desc: '선생님이 알아봐 주셨어요!' },
   level10: { name: '쑥쑥 성장', tier: 'rare', group: 'study', stat: 'level', goal: 10, icon: 'sprout', how: 'Lv.10 달성', desc: '어느새 이만큼 자랐어요.' },
   // V13.78: the level cap is 60; a title at each new card tier from Lv.30.
-  level30: { name: '울트라 레어', tier: 'legendary', group: 'study', stat: 'level', goal: 30, icon: 'gem', how: 'Lv.30 달성', desc: '카드가 황금빛 UR로 빛나요.' },
-  level40: { name: '샤이니', tier: 'legendary', group: 'study', stat: 'level', goal: 40, icon: 'star', how: 'Lv.40 달성', desc: '무지갯빛으로 반짝이는 SSR 카드의 주인.' },
-  level50: { name: '살아있는 전설', tier: 'legendary', group: 'study', stat: 'level', goal: 50, icon: 'wing', how: 'Lv.50 달성', desc: '레전드 카드를 가진 사람은 많지 않아요.' },
+  level30: { name: '울트라 레어', tier: 'legendary', group: 'study', stat: 'level', goal: 30, icon: 'gem', how: 'Lv.30 달성', desc: '레벨 30, 이제 진짜 고수예요.' },
+  level40: { name: '샤이니', tier: 'legendary', group: 'study', stat: 'level', goal: 40, icon: 'star', how: 'Lv.40 달성', desc: '레벨 40, 무지갯빛으로 반짝이는 실력.' },
+  level50: { name: '살아있는 전설', tier: 'legendary', group: 'study', stat: 'level', goal: 50, icon: 'wing', how: 'Lv.50 달성', desc: '레벨 50에 오른 사람은 많지 않아요.' },
   level60: { name: 'MAX', tier: 'legendary', group: 'study', stat: 'level', goal: 60, icon: 'crown', how: 'Lv.60 달성(최고 레벨)', desc: '더 오를 곳이 없는 최고 레벨.' },
   study50: { name: '성실한 학생', tier: 'rare', group: 'study', stat: 'studies', goal: 50, icon: 'book', how: '10문제 이상 학습 50번', desc: '꾸준함이 최고의 재능이에요.' },
   attend30: { name: '개근상', tier: 'rare', group: 'study', stat: 'attendance', goal: 30, icon: 'calendar', how: '출석 체크 30번', desc: '빠짐없이 출석하는 모범생.' },

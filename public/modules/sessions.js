@@ -422,19 +422,19 @@ function renderPractice() {
     const progress = Math.min(Number(x.score_total || 0), Number(x.target || 0));
     const leavesNow = Number(x.leaves || 0), leaveLimit = Number(x.leave_limit || TEST_LEAVE_LIMIT);
     const leaveLine = testMode ? (leavesNow + 1 >= leaveLimit ? `<p class="test-leave-rule-v1376"><b>지금 나가면 ${leaveLimit}번째 이탈이라 바로 자동 제출돼요.</b></p>` : `<p class="test-leave-rule-v1376">📵 실전시험에서 나가면 화면 이탈 ${leavesNow + 1}/${leaveLimit}번으로 기록돼요.</p>`) : '';
-    const close = modal(`<h2>시험을 나갈까요?</h2><p>현재 <b>${progress} / ${x.target}</b>까지 진행했어요. 나가도 진행 위치가 저장되어 나중에 이어서 풀 수 있어요.</p>${leaveLine}<button class="btn primary full" id="practice-keep-going">계속 풀기</button><button class="btn full" id="practice-save-leave">저장하고 나가기</button><button class="text-button full" id="practice-finish-exit">시험 종료하기</button>`, testMode ? '실전시험' : '연습시험');
+    const close = modal(`<h2>시험을 나갈까요?</h2><p>현재 <b>${progress} / ${x.target}</b>까지 진행했어요. 나가도 진행 위치가 저장되어 나중에 이어서 풀 수 있어요.</p>${leaveLine}<button class="btn primary full" id="practice-keep-going">계속 풀기</button><button class="btn full" id="practice-save-leave">저장하고 나가기</button>${testMode ? '' : '<button class="text-button full" id="practice-finish-exit">시험 종료하기</button>'}`, testMode ? '실전시험' : '연습시험');
     $('#practice-keep-going').onclick = close;
     $('#practice-save-leave').onclick = async event => {
       buttonBusy(event.currentTarget);
       await drainPracticeAnswers();
       // V13.76: leaving a 실전시험 from its own button counts like switching apps.
       const out = testMode ? await reportTestLeave(x.id, { phase: 'out' }) : null;
-      if (out?.finished && practiceState?.id === x.id) { close(); practiceState = out; finishPracticeView(); return; }
+      if (out?.finished && out.id && practiceState?.id === x.id) { close(); practiceState = out; finishPracticeView(); return; }
       close(); leaveSession(); redraw();
       try { await refresh(); redraw(); }
       catch (error) { toast(error.message || '최신 기록을 불러오지 못했어요.'); }
     };
-    $('#practice-finish-exit').onclick = async event => {
+    if ($('#practice-finish-exit')) $('#practice-finish-exit').onclick = async event => {
       if (!confirm('지금 끝내면 코인은 받지 못해요(경험치는 남아요). 코인은 끝까지 풀어야 받아요.\n그래도 종료할까요? 종료하면 이어서 풀 수 없어요.')) return;
       buttonBusy(event.currentTarget);
       try {
@@ -512,7 +512,8 @@ async function timeoutPracticeQuestion() {
       }, 1200);
     }
   } catch (error) {
-    practiceQuestionTimingOut = false;
+    // Wait before the next try (the countdown would otherwise resend at once, again and again).
+    setTimeout(() => { practiceQuestionTimingOut = false; }, 4000);
     toast(error.message || '시간 종료 처리를 다시 확인해주세요.');
     try { practiceState = await api(`/practice/${x.id}`); practiceOffset = Number(practiceState.server_time || Date.now()) - Date.now(); renderPractice(); } catch {}
   }
@@ -606,6 +607,7 @@ let answering = false;
 // (`next_preview`). The device grades, shows feedback and moves on at once;
 // answers go to the server strictly in order in the background, and the
 // server's grading wins if it ever differs.
+let previewHide = null;
 let answerChain = Promise.resolve(), pendingAnswers = 0, brokenSession = null, lastServerAnswer = null;
 const serverNext = new Map();
 const canAnswerInstantly = x => x && x.run_mode !== 'test' && x.timer_mode !== 'question' && !!x.local_check && !x.feedback;
@@ -769,6 +771,9 @@ async function answerPractice(answer, button) {
     pendingPracticeSave = true;
     practiceState = { ...x, question: preview.question, question_id: preview.question_id, next_preview: null, total: x.total + 1, score_total: Number(x.score_total || 0) + 1, feedback: null, question_deadline: null };
     renderPractice();
+    // A slow save must not leave the next word on screen without its countdown.
+    clearTimeout(previewHide);
+    previewHide = setTimeout(() => { if (pendingPracticeSave && practiceState?.question_id === preview.question_id) $('.exam-question-area')?.classList.add('preview-wait-v1379'); }, 1500);
   }
   try {
     let result;
@@ -781,7 +786,8 @@ async function answerPractice(answer, button) {
     }
     if (A.screen !== 'practice' || practiceState?.id !== x.id) return;
     practiceOffset = Number(result.server_time || Date.now()) - Date.now();
-    const typedAhead = preview && result.question_id === practiceState.question_id ? $('#practice-answer')?.value : null;
+    clearTimeout(previewHide);
+    const typedAhead = null; // 실전시험: the next word's answer starts with its own countdown.
     pendingPracticeSave = false;
     if (result.finished) { prefetchedPractice = null; practiceState = result; finishPracticeView(); return; }
     if (result.run_mode === 'test') {
@@ -973,7 +979,7 @@ async function testLeaveBack() {
   const out = await leave.sent;
   reportTestLeave(leave.id, { phase: 'back', ms: Date.now() - leave.at });
   if (A?.screen !== 'practice' || practiceState?.id !== leave.id) return true;
-  if (out?.finished) {
+  if (out?.finished && out.id) {
     practiceState = out;
     finishPracticeView();
     return true;

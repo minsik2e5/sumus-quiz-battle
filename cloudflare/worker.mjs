@@ -311,7 +311,7 @@ export class VocaStateObject {
           ? adminOutput
           : url.pathname === '/api/signup' && request.method === 'POST'
             ? await selfSignup(state, body)
-            : await service(state, request.method, path, body, token, { preauthenticatedUserId });
+            : await service(state, request.method, path, body, token, { preauthenticatedUserId, origin: url.origin });
       };
 
       const startedAt = Date.now();
@@ -323,7 +323,6 @@ export class VocaStateObject {
       const roomMessages = [...(result?._battle ? [result._battle] : []), ...(Array.isArray(result?._battles) ? result._battles : [])];
       const pushMessages = Array.isArray(result?._push) ? result._push : [];
       if (result && typeof result === 'object') { delete result._battle; delete result._battles; delete result._push; }
-      if (pushMessages.length) this.ctx.waitUntil(this.deliverPush(pushMessages, url.origin).catch(error => console.error('[push]', error?.message)));
       for (const message of roomMessages) {
         const room = this.env.BATTLE_ROOM.get(this.env.BATTLE_ROOM.idFromName(message.id));
         const reply = await room.fetch('https://battle/admin', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(message) }).catch(() => null);
@@ -332,6 +331,8 @@ export class VocaStateObject {
           throw Object.assign(Error('대결 방을 준비하지 못했어요. 잠시 후 다시 시도해주세요.'), { status: 503 });
         }
       }
+      // After the rooms are ready: a 도전장 for a room that failed to open is never sent.
+      if (pushMessages.length) this.ctx.waitUntil(this.deliverPush(pushMessages, url.origin).catch(error => console.error('[push]', error?.message)));
       const elapsed = Date.now() - startedAt;
       const { commitMs, commitBytes } = this.local.metrics;
       const sync = this.sync.status();

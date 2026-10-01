@@ -62,20 +62,26 @@ function syncStars() {
   try { synced = localStorage.getItem(key) === '1'; } catch {}
   const local = A.memStars || [];
   if (!synced && local.some(id => !server.includes(id))) {
+    // Kept apart until the upload succeeds, so a refresh can never drop them.
+    try { localStorage.setItem('sumus:stars-pending:' + profile.id, JSON.stringify(local)); } catch {}
     A.memStars = [...new Set([...server, ...local])];
-    api('/stars', { word_ids: local }).then(r => { profile.stars = r.stars; A.memStars = r.stars; try { localStorage.setItem(key, '1'); } catch {} savePreferences(); }).catch(() => {});
+    api('/stars', { word_ids: local }).then(r => { profile.stars = r.stars; A.memStars = r.stars; try { localStorage.setItem(key, '1'); localStorage.removeItem('sumus:stars-pending:' + profile.id); } catch {} savePreferences(); }).catch(() => {});
     return;
   }
   try { localStorage.setItem(key, '1'); } catch {}
   A.memStars = [...server];
 }
+let starsSaving = 0;
 export function toggleStar(wordId) {
   const set = new Set(A.memStars || []), on = !set.has(wordId);
   on ? set.add(wordId) : set.delete(wordId);
   A.memStars = [...set];
   if (A.data?.profile) A.data.profile.stars = [...set];
   savePreferences();
-  api('/stars', { word_id: wordId, on }).then(r => { if (A.data?.profile) A.data.profile.stars = r.stars; }).catch(() => toast('별표를 저장하지 못했어요. 인터넷 연결을 확인해 주세요.'));
+  starsSaving++;
+  api('/stars', { word_id: wordId, on }).then(r => { if (A.data?.profile) A.data.profile.stars = r.stars; if (starsSaving === 1) A.memStars = [...r.stars]; })
+    .catch(err => toast(err?.status ? err.message : '별표를 저장하지 못했어요. 인터넷 연결을 확인해 주세요.'))
+    .finally(() => { starsSaving--; });
   return on;
 }
 function savePreferences() {
@@ -90,7 +96,7 @@ function savePreferences() {
     }));
   } catch {}
 }
-async function refresh() { A.data = await api('/bootstrap'); A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; else { if (Array.isArray(A.data.profile.stars)) A.memStars = [...A.data.profile.stars]; checkPushHere(); } }
+async function refresh() { A.data = await api('/bootstrap'); A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; else { if (Array.isArray(A.data.profile.stars) && !starsSaving) { let pending = []; try { pending = JSON.parse(localStorage.getItem('sumus:stars-pending:' + A.data.profile.id) || '[]'); } catch {} A.memStars = [...new Set([...A.data.profile.stars, ...pending])]; } checkPushHere(); } }
 globalThis.__SUMUS_APPLY_BOOTSTRAP__ = data => { A.data = data; A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = data; if (data?.profile?.role === 'teacher') A.school = data.profile.active_school; if (!A.screen) render(); };
 let roleModules = { teacher: null, student: null };
 function ensureRoleEnhancements() {
@@ -326,7 +332,7 @@ async function petCare(b, kind) {
 }
 // V13.76: practise the ★ words together, in the question type the student picks.
 function openStarPractice() {
-  const words = starredWords(A);
+  const words = starredWords(A).slice(0, 200);
   if (!words.length) return toast('☆를 눌러 헷갈리는 단어를 먼저 모아 주세요.');
   const modes = ['eng2mean', 'mean2eng', 'write_meaning', 'spell'];
   const close = modal(`<div class="star-mode-v1376"><p class="muted">★ 표시한 단어 <b>${words.length}개</b>를 한 번씩 모두 풀어요.</p><div class="star-mode-grid">${modes.map(m => `<button type="button" class="btn ${m === 'eng2mean' ? 'primary' : ''}" data-star-mode="${m}">${esc(PRACTICE_TYPES[m])}</button>`).join('')}</div></div>`, '어려운 단어 연습');
@@ -347,14 +353,25 @@ async function currentPushSubscription() {
 }
 // Whether this phone receives the 알림 (the account may have it on another phone). A phone the
 // server forgot (removed after an error) is registered again without asking.
+let pushChecked = false;
 async function checkPushHere() {
   if (A.data?.profile?.role !== 'student') return;
   try {
     const sub = await currentPushSubscription();
     const before = A.pushHere;
     A.pushHere = !!sub && Notification.permission === 'granted';
-    if (A.pushHere && !A.data.push?.on) {
-      const r = await api('/push/subscribe', { subscription: sub.toJSON(), origin: location.origin, device: deviceLabel(), quiet: true });
+    // Once per app start: make sure the server still has this phone, with the current key
+    // (the phone may have been moved to another login or dropped after an error).
+    if (A.pushHere && !pushChecked) {
+      pushChecked = true;
+      const { key } = await api('/push/key', {});
+      let current = sub;
+      if (sub.options?.applicationServerKey && toB64u(sub.options.applicationServerKey) !== key) {
+        await sub.unsubscribe().catch(() => {});
+        const reg = await navigator.serviceWorker.ready;
+        current = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: fromB64u(key) });
+      }
+      const r = await api('/push/subscribe', { subscription: current.toJSON(), device: deviceLabel(), quiet: true });
       A.data.push = r.push;
     }
     if (before !== A.pushHere && !A.screen) renderKeepScroll();
@@ -376,7 +393,7 @@ async function enablePush(b) {
     let sub = await reg.pushManager.getSubscription();
     if (sub?.options?.applicationServerKey && toB64u(sub.options.applicationServerKey) !== key) { await sub.unsubscribe().catch(() => {}); sub = null; }
     sub ||= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: fromB64u(key) });
-    const r = await api('/push/subscribe', { subscription: sub.toJSON(), origin: location.origin, device: deviceLabel() });
+    const r = await api('/push/subscribe', { subscription: sub.toJSON(), device: deviceLabel() });
     A.data.push = r.push; A.pushHere = true;
     renderKeepScroll();
     toast('알림을 켰어요! 확인 알림이 곧 도착해요.');

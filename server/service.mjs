@@ -387,6 +387,9 @@ function lastActiveBefore(state, p, now = Date.now()) {
   for (const s of state.sessions) if (s.student_id === p.id) times.push(Number(s.created_at || 0));
   for (const b of state.battles || []) if (b.host_id === p.id || b.guest_id === p.id) times.push(Number(b.finished_at || b.created_at || 0));
   for (const x of p.attendance?.log || []) times.push(Number(x.at || 0));
+  // Robot matches and teacher exams count too (they pay through the bonus ledger).
+  for (const r of bonusRecords(p)) times.push(Number(r.created_at || 0));
+  for (const a of state.examAttempts || []) if (a.student_id === p.id) times.push(Number(a.submitted_at || a.started_at || 0));
   return Math.max(0, ...times.filter(t => t && dayKey(t) !== today));
 }
 const coinBalance = (state, p) => pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance;
@@ -1195,7 +1198,8 @@ export async function service(state, method, path, body, token, options = {}) {
     if (Array.isArray(body.word_ids)) stars = [...new Set([...stars, ...body.word_ids.map(v => str(v, 120)).filter(v => known.has(v))])];
     else {
       const wordId = str(body.word_id, 120);
-      if (!known.has(wordId)) fail('단어를 찾을 수 없어요.', 404);
+      // A star can always be taken off, even when the word left the student's list.
+      if (body.on !== false && !known.has(wordId)) fail('단어를 찾을 수 없어요.', 404);
       stars = body.on === false ? stars.filter(v => v !== wordId) : [...new Set([...stars, wordId])];
     }
     p.stars = stars.slice(-STARS_MAX);
@@ -1211,7 +1215,8 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const push = pushState(state);
     if (!push.vapid) fail('알림 준비가 아직 안 됐어요. 다시 눌러 주세요.', 409);
-    const origin = str(body.origin, 200);
+    // The contact address the push services see: this app's own address, never one sent by a phone.
+    const origin = str(options.origin, 200);
     if (/^https:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(origin)) push.subject = origin;
     addSubscription(state, p, body.subscription, { ua: str(body.device, 40) });
     if (typeof body.daily === 'boolean') push.prefs[p.id] = { ...(push.prefs[p.id] || {}), daily: body.daily };
@@ -1581,6 +1586,7 @@ export async function service(state, method, path, body, token, options = {}) {
     delete state.mastery[studentId];
     if (state.grammarProgress) delete state.grammarProgress[studentId];
     state.meaningDisputes = state.meaningDisputes.filter(item => item.student_id !== studentId);
+    if (state.push) { delete state.push.subs?.[studentId]; delete state.push.prefs?.[studentId]; delete state.push.reminded?.[studentId]; }
     return { ok: true, id: studentId };
   }
   if (path === '/vocab-import/preview' && method === 'POST') {
@@ -1938,7 +1944,9 @@ export async function service(state, method, path, body, token, options = {}) {
     // V13.76 실전시험: the phone reports leaving the app ('out') and coming back ('back' with
     // how long). The third time out hands the test in with the answers given so far.
     if (path.endsWith('/leave')) {
-      if (x.run_mode !== 'test' || x.finished) return { leaves: Number(x.leaves || 0), limit: TEST_LEAVE_LIMIT, finished: !!x.finished };
+      // A test that already ended (e.g. the last answer arrived first) answers with its full result.
+      if (x.finished) return { ...practiceView(x, state), leaves: Number(x.leaves || 0), limit: TEST_LEAVE_LIMIT };
+      if (x.run_mode !== 'test') return { leaves: 0, limit: TEST_LEAVE_LIMIT, finished: false };
       if (body.phase === 'back') {
         x.leave_ms = Math.min(3600000, Number(x.leave_ms || 0) + Math.max(0, Math.min(3600000, Number(body.ms) || 0)));
         return { leaves: Number(x.leaves || 0), limit: TEST_LEAVE_LIMIT, finished: false };

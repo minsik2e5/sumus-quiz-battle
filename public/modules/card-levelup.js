@@ -3,12 +3,14 @@
 // - 등급이 바뀌면(예: R → RR): 화면이 어두워지고 카드가 뒤집히며 새 테두리로 바뀌고, 등급
 //   도장이 찍혀요. 다음 등급까지 몇 레벨 남았는지도 보여줘요.
 // 마지막으로 본 레벨은 이 기기에 펫마다 저장해요(처음 보는 기기는 연출 없이 지금 레벨부터).
-import { cardTier, MAX_LEVEL } from './core.js';
+import { cardTier, MAX_LEVEL, petForm, PET_FORMS } from './core.js';
 import { esc } from './ui.js';
 
 const key = (profileId, petKey) => `sumus:card-level:${profileId}:${petKey}`;
 const read = k => { try { return Number(localStorage.getItem(k)) || 0; } catch { return -1; } };
-const write = (k, v) => { try { localStorage.setItem(k, String(v)); } catch {} };
+// Also kept in memory, so a full storage never replays the same moment on every redraw.
+const shown = new Map();
+const write = (k, v) => { shown.set(k, v); try { localStorage.setItem(k, String(v)); } catch {} };
 let open = false, waiting = false;
 
 export function maybeCardLevelUp(A) {
@@ -19,7 +21,7 @@ export function maybeCardLevelUp(A) {
   // An evolution or another moment is on screen: try again when it closes.
   const root = document.querySelector('#modal-root');
   if (root?.children.length) { waitForClear(root, () => maybeCardLevelUp(A)); return; }
-  const level = Math.min(MAX_LEVEL, Number(pet.level || 1)), k = key(p.id, pet.key), seen = read(k);
+  const level = Math.min(MAX_LEVEL, Number(pet.level || 1)), k = key(p.id, pet.key), seen = Math.max(read(k), shown.get(k) || 0);
   if (seen < 0) return;
   if (!seen || level <= seen) { if (level !== seen) write(k, level); return; }
   write(k, level);
@@ -62,6 +64,15 @@ function cardAt(section, tier, level) {
   if (rarity) { rarity.className = `card-rarity rarity-${tier.key}`; rarity.textContent = tier.label; }
   const lv = clone.querySelector('.partner-lv b');
   if (lv) lv.textContent = level;
+  // At Lv.3, 10 and 20 the pet evolved too: the card before shows the earlier form.
+  const form = petForm(level), img = clone.querySelector('.partner-art .avatar-art img');
+  if (img && /-\d(?:-[a-z]+)?\.webp$/.test(img.getAttribute('src') || '')) {
+    img.setAttribute('src', img.getAttribute('src').replace(/-(\d)((?:-[a-z]+)?)\.webp$/, `-${form}.webp`));
+    const art = clone.querySelector('.partner-art .avatar-art');
+    art.className = art.className.replace(/avatar-form-\d/, `avatar-form-${form}`);
+    const stage = clone.querySelector('.partner-stage');
+    if (stage) stage.textContent = PET_FORMS[form];
+  }
   clone.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
   clone.querySelector('.partner-card-btn')?.setAttribute('tabindex', '-1');
   return clone;
@@ -79,7 +90,7 @@ function upgradeScene(fromLevel, level, from, to, pet) {
   const next = to.next, span = next ? next.min - to.min : 1, done = next ? level - to.min : span;
   const box = document.createElement('div');
   box.className = 'card-up-v1378';
-  box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', `카드 등급 업: ${to.label} ${to.name}`);
+  box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.tabIndex = -1; box.setAttribute('aria-label', `카드 등급 업: ${to.label} ${to.name}`);
   box.innerHTML = `<div class="up-rays" aria-hidden="true"></div>
     <div class="up-stage">
       <p class="up-title">✦ 카드 등급 업 ✦</p>
@@ -89,6 +100,7 @@ function upgradeScene(fromLevel, level, from, to, pet) {
       <button type="button" class="up-ok">좋아요!</button>
     </div>`;
   document.querySelector('#modal-root').appendChild(box);
+  box.focus({ preventScroll: true });
   const holder = box.querySelector('.up-card');
   holder.appendChild(oldCard);
   const close = () => { box.remove(); open = false; };
