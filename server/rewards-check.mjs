@@ -253,6 +253,8 @@ export async function runRewardsChecks(assert, expectStatus) {
   const starOff = await service(state, 'POST', '/stars', { word_id: w2.id, on: false }, tD);
   assert(starOff.stars.join() === [w1.id, w3.id].join(), 'V13.76 ★ can be taken off');
   await expectStatus(404, () => service(state, 'POST', '/stars', { word_id: 'not-a-word', on: true }, tD), 'V13.76 only words of the student\'s school and grade can be starred');
+  profile('qa-rw-d').stars.push('retired-word');
+  assert(!(await service(state, 'POST', '/stars', { word_id: 'retired-word', on: false }, tD)).stars.includes('retired-word'), 'V13.79 a star can be taken off a word that left the list');
   const dStars = await service(state, 'GET', '/bootstrap', {}, tD);
   assert(dStars.profile.stars.join() === [w1.id, w3.id].join(), 'V13.76 the stars come back on any phone');
   const teacherView = await service(state, 'GET', '/bootstrap', {}, tokens.qa_rw_teacher);
@@ -290,6 +292,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(out3.finished === true && out3.left_out === true && out3.leaves === TEST_LEAVE_LIMIT && leftSession?.leave_count === TEST_LEAVE_LIMIT && leftSession.left_out === true && leftSession.leave_ms === 4200, `V13.76 the ${TEST_LEAVE_LIMIT}rd leave hands the test in, and the record keeps the leaves`);
   const afterDone = await service(state, 'POST', `/practice/${test.id}/leave`, { phase: 'back', ms: 9000 }, tE);
   assert(afterDone.finished === true && (!testX() || testX().leave_ms === 4200) && leftSession.leave_ms === 4200, 'V13.76 a leave report after the end changes nothing');
+  assert(afterDone.id === test.id && afterDone.left_out === true && Number.isFinite(Number(afterDone.score)), 'V13.79 a leave report that arrives after the test ended gets the whole result (not an empty screen)');
   const practiceRun = await service(state, 'POST', '/practice/start', { school: '단원고', range_codes: range, mode: 'write_meaning', target: 5 }, tE);
   const practiceLeave = await service(state, 'POST', `/practice/${practiceRun.id}/leave`, { phase: 'out' }, tE);
   assert(practiceRun.timer_mode === 'none' && practiceLeave.leaves === 0 && !state.practices.find(x => x.id === practiceRun.id).leaves, 'V13.76 practice keeps no countdown and no leave record');

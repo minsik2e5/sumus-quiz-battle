@@ -125,3 +125,5 @@
   .partner-card-v1358 .partner-front,.partner-card-v1358 .partner-front::before,.partner-card-v1358 .partner-inner::before,.card-star,.card-up-v1378 *,.card-up-v1378{animation:none!important}
   .card-star{opacity:.8}
 }
+.preview-wait-v1379 .question-prompt,.preview-wait-v1379 .options,.preview-wait-v1379 .answer-input{visibility:hidden}
+.preview-wait-v1379::after{content:"답안을 저장하고 있어요…";display:block;text-align:center;color:#6c7c77;font-weight:700;margin-top:-40px}

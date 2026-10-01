@@ -462,7 +462,8 @@ export function starredWords(A) {
   return (A.data.books || []).flatMap(book => book.words || []).filter(word => stars.has(word.id) && !seen.has(word.id) && seen.add(word.id));
 }
 function starPracticeButton(A, cls = '') {
-  const n = starredWords(A).length;
+  // One practice takes up to 200 words (the server's limit).
+  const n = Math.min(200, starredWords(A).length);
   if (!n) return '';
   return `<button type="button" class="star-practice-v1376 ${cls}" data-star-practice="true"><span class="star-practice-mark" aria-hidden="true">★</span><span><small>어려운 단어 모음</small><strong>★ ${n}개 모아서 연습</strong></span><b>${icon('arrow')}</b></button>`;
 }
