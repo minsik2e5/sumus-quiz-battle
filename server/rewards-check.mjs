@@ -13,8 +13,10 @@ import { TITLES, TITLE_KEYS, visibleTitleKeys } from '../public/modules/titles.j
 import { createBattle, connect, answer, tick, battleView, SKILL_RULES, BATTLE } from '../public/modules/battle-engine.js';
 import { battleQuestions, spellHint, spellable } from '../public/modules/battle-questions.js';
 import { createPracticeMatch } from '../public/modules/battle-bot.js';
-import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS } from '../public/modules/rewards.js';
-import { addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND } from './rewards.mjs';
+import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
+import { addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, rpsPlay, rpsCash, rewardIncome } from './rewards.mjs';
+import { marketPrices } from './market.mjs';
+import { STOCKS, MARKET, tradeFee, newsText } from '../public/modules/market.js';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 // A small deterministic random source for the odds checks.
@@ -93,7 +95,7 @@ export async function runRewardsChecks(assert, expectStatus) {
 
   /* ---------- V13.68 coin capsule (코인 뽑기) ---------- */
   const avg = LUCKY_ODDS.reduce((n, o) => n + o.mult * o.rate, 0);
-  assert(LUCKY_ODDS.reduce((n, o) => n + o.rate, 0) === 100 && LUCKY_ODDS.map(o => o.mult).join() === '0,1,2,3' && LUCKY_BETS.join() === '10,20,30' && LUCKY_DAILY === 3, 'V13.68 coin capsule: ×0·×1·×2·×3 for bets of 10·20·30 coins, three a day');
+  assert(LUCKY_ODDS.reduce((n, o) => n + o.rate, 0) === 100 && LUCKY_ODDS.map(o => o.mult).join() === '0,1,2,3' && LUCKY_BETS.join() === '10,20,30' && LUCKY_DAILY === 5, 'V13.68 coin capsule (V13.82: five a day): ×0·×1·×2·×3 for bets of 10·20·30 coins, three a day');
   assert(avg >= 90 && avg < 100, 'V13.68 on average a little less comes back than is bet (study stays the way to earn coins)');
   const counts = {}, rnd = seeded(7);
   for (let i = 0; i < 20000; i++) { const got = drawLucky(rnd); counts[got.mult] = (counts[got.mult] || 0) + 1; }
@@ -113,10 +115,10 @@ export async function runRewardsChecks(assert, expectStatus) {
   poor.points_spent = 0;
   const b0 = await balance('qa-rw-c');
   const plays = [];
-  for (let i = 0; i < 3; i++) plays.push(await service(state, 'POST', '/lucky/pull', { bet: 10 }, tokens['qa-rw-c']));
+  for (let i = 0; i < LUCKY_DAILY; i++) plays.push(await service(state, 'POST', '/lucky/pull', { bet: 10 }, tokens['qa-rw-c']));
   const won = plays.reduce((n, r) => n + r.paid, 0);
-  assert(plays.every(r => [0, 10, 20, 30].includes(r.paid) && r.paid === r.bet * r.mult) && plays[2].points_balance === b0 - 30 + won && plays[2].lucky.left === 0, 'V13.68 each capsule pays the bet times ×0·×1·×2·×3 into the balance');
-  await expectStatus(409, () => service(state, 'POST', '/lucky/pull', { bet: 10 }, tokens['qa-rw-c']), 'V13.68 coin capsules are three a day');
+  assert(plays.every(r => [0, 10, 20, 30].includes(r.paid) && r.paid === r.bet * r.mult) && plays.at(-1).points_balance === b0 - 10 * LUCKY_DAILY + won && plays.at(-1).lucky.left === 0, 'V13.68 each capsule pays the bet times ×0·×1·×2·×3 into the balance');
+  await expectStatus(409, () => service(state, 'POST', '/lucky/pull', { bet: 10 }, tokens['qa-rw-c']), 'V13.82 coin capsules are five a day');
   await expectStatus(409, () => service(state, 'POST', '/lucky/pull', { ticket: true }, tokens['qa-rw-c']), 'V13.68 a free capsule needs a ticket');
   const bb = await balance('qa-rw-b');
   const withTicket = await service(state, 'POST', '/lucky/pull', { ticket: true }, tokens['qa-rw-b']);
@@ -407,4 +409,67 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(app81.includes("if (go === 'challenge')") && app81.includes('A.yachaOpts = { accept: invite }; return navigate(\'yacha\')'), 'V13.81 the 도전장 alert opens the challenge');
   assert(!student81.includes('/^L\\\\d+$/') && !app81.includes('/^L\\\\d+$/') && student81.includes('const textbookCodes = state.codes.filter(code => /^L\\d+$/i.test(String(code)));'), 'V13.81 the 교과서 tab finds textbook lessons (L1, L2)');
   assert(gift81.includes('if (Array.isArray(res?.gifts) && !res.gifts.length)') && lucky81.includes("if (audio) { if (audio.state !== 'running') audio.resume"), 'V13.81 a gift opened on another phone is not shown again; capsule sounds wake after iOS pauses them');
+
+  /* ---------- V13.82 가위바위보 · 문법 증권거래소 · more capsules and study coins ---------- */
+  const g82 = { id: 'qa-rw-g82', role: 'student' };
+  const fixed = v => () => v; // 0 → 로보 내는 손 rock, 0.4 → scissors, 0.7 → paper
+  assert(rpsOutcome('paper', 'rock') === 'win' && rpsOutcome('rock', 'paper') === 'lose' && rpsOutcome('scissors', 'scissors') === 'draw' && RPS_BETS.join() === '10,20,30' && RPS_DAILY === 5 && RPS_MAX_WINS === 3, 'V13.82 가위바위보 rules: 10·20·30 coins, five a day, up to three wins in a row');
+  const t82 = Date.now();
+  const rw1 = rpsPlay(g82, { bet: 10, pick: 'paper' }, 1000, { random: fixed(0), now: t82 });
+  assert(rw1.result === 'win' && rw1.robot === 'rock' && rw1.pot === 20 && !rw1.done && g82.points_spent === 10 && rw1.rps.live.await === 'choice', 'V13.82 a win doubles the pot and asks: take it or double');
+  await expectStatus(409, async () => rpsPlay(g82, { bet: 10, pick: 'rock' }, 1000, { random: fixed(0), now: t82 }), 'V13.82 after a win the student must take the pot or double it');
+  const rtie = rpsPlay(g82, { pick: 'rock', double: true }, 1000, { random: fixed(0), now: t82 });
+  assert(rtie.result === 'draw' && rtie.pot === 20 && rtie.rps.live.await === 'pick' && g82.points_spent === 10, 'V13.82 a tie is thrown again for free');
+  const rw2 = rpsPlay(g82, { pick: 'rock' }, 1000, { random: fixed(0.4), now: t82 });
+  const rcashed = rpsCash(g82, t82);
+  assert(rw2.result === 'win' && rw2.pot === 40 && rcashed.paid === 40 && g82.rps.paid === 40 && !g82.rps.live && rewardIncome(g82) >= 40, 'V13.82 taking the pot pays it as coins');
+  const rl1 = rpsPlay(g82, { bet: 20, pick: 'scissors' }, 1000, { random: fixed(0), now: t82 });
+  assert(rl1.result === 'lose' && rl1.done && g82.points_spent === 30 && g82.rps.paid === 40, 'V13.82 a loss loses the pot');
+  let rjack = rpsPlay(g82, { bet: 10, pick: 'paper' }, 1000, { random: fixed(0), now: t82 });
+  rjack = rpsPlay(g82, { pick: 'paper', double: true }, 1000, { random: fixed(0), now: t82 });
+  rjack = rpsPlay(g82, { pick: 'paper', double: true }, 1000, { random: fixed(0), now: t82 });
+  assert(rjack.done && rjack.wins === 3 && rjack.paid === 80 && g82.rps.paid === 120 && g82.rps.best === 3, 'V13.82 three wins in a row pay ×8 at once');
+  const rst = rpsPlay(g82, { bet: 10, pick: 'paper' }, 1000, { random: fixed(0), now: t82 });
+  const rlater = rpsPlay(g82, { bet: 10, pick: 'paper' }, 1000, { random: fixed(0.7), now: t82 + RPS_STALE_MS + 1 });
+  assert(rst.rps.live && g82.rps.paid === 140 && rlater.result === 'draw', 'V13.82 a won pot left open is paid before the next game');
+  rpsPlay(g82, { pick: 'paper' }, 1000, { random: fixed(0), now: t82 + RPS_STALE_MS + 2 }); rpsCash(g82, t82 + RPS_STALE_MS + 2);
+  await expectStatus(409, async () => rpsPlay(g82, { bet: 10, pick: 'rock' }, 1000, { random: fixed(0.4), now: t82 + RPS_STALE_MS + 3 }), 'V13.82 five games a day');
+  await expectStatus(400, async () => rpsPlay({}, { bet: 10, pick: 'constructor' }, 1000), 'V13.82 only 가위, 바위 or 보');
+  await expectStatus(400, async () => rpsPlay({}, { bet: 10, pick: 'rock' }, 5), 'V13.82 a game needs the coins it bets');
+  // Through the API, with real coins.
+  const tG = tokens['qa-rw-h'];
+  const g0 = await balance('qa-rw-h');
+  const viaApi = await service(state, 'POST', '/rps/play', { bet: 10, pick: 'rock' }, tG);
+  assert(['win', 'lose', 'draw'].includes(viaApi.result) && RPS_KEYS.includes(viaApi.robot) && viaApi.points_balance === g0 - 10 && (await service(state, 'GET', '/rewards', {}, tG)).rps.left === RPS_DAILY - 1, 'V13.82 /rps/play takes the bet and shows the throw');
+  // 문법 증권거래소
+  assert(!(await service(state, 'GET', '/market', {}, tG)).market.open || state.market?.seed, 'V13.82 the market needs its seed');
+  sweep(state);
+  const sseed = state.market.seed;
+  assert(typeof sseed === 'string' && sseed.length >= 32, 'V13.82 the hourly sweep gives the market a secret seed');
+  const before82 = JSON.stringify(state.market);
+  const smk = (await service(state, 'GET', '/market', {}, tG)).market;
+  assert(JSON.stringify(state.market) === before82 && smk.open && smk.stocks.length === STOCKS.length && smk.stocks.every(s => s.hist.length === MARKET.history && s.price > 0) && !JSON.stringify(smk).includes(sseed), 'V13.82 the market shows 10 shares with 48 hours of prices (never the seed), without saving anything');
+  const sprices = marketPrices(state, Date.now() + 3600000 * 500);
+  assert(STOCKS.every(s => sprices.hist[s.key].every(v => v >= Math.floor(s.base * MARKET.min_x) && v <= Math.ceil(s.base * MARKET.max_x))), 'V13.82 prices stay between 0.3× and 3× of their base');
+  const again82 = marketPrices({ market: { ...state.market } }, Date.now() + 3600000 * 500);
+  assert(STOCKS.every(s => again82.prices[s.key] === sprices.prices[s.key]), 'V13.82 the same seed always gives the same prices (nothing to store)');
+  const other82 = marketPrices({ market: { seed: 'another-seed-0123456789abcdef0000', start: state.market.start } }, Date.now());
+  assert(STOCKS.some(s => other82.prices[s.key] !== smk.stocks.find(x => x.key === s.key).price), 'V13.82 another seed gives other prices');
+  const srel = smk.stocks.find(s => s.key === 'REL');
+  const cash0 = await balance('qa-rw-h');
+  const sbuy = await service(state, 'POST', '/market/trade', { key: 'REL', side: 'buy', qty: 2, price: srel.price }, tG);
+  const sfee = tradeFee(srel.price * 2);
+  assert(sbuy.trade.total === srel.price * 2 + sfee && sbuy.points_balance === cash0 - srel.price * 2 - sfee && sbuy.market.me.holdings[0].q === 2, 'V13.82 buying pays price × shares + 1% fee');
+  await expectStatus(409, () => service(state, 'POST', '/market/trade', { key: 'REL', side: 'buy', qty: 1, price: srel.price + 1 }, tG), 'V13.82 an order at a price that is no longer the price is refused');
+  await expectStatus(409, () => service(state, 'POST', '/market/trade', { key: 'REL', side: 'sell', qty: 3, price: srel.price }, tG), 'V13.82 nobody sells shares they do not have');
+  await expectStatus(400, () => service(state, 'POST', '/market/trade', { key: 'constructor', side: 'buy', qty: 1, price: 1 }, tG), 'V13.82 only listed shares');
+  await expectStatus(400, () => service(state, 'POST', '/market/trade', { key: 'REL', side: 'buy', qty: 0.5, price: srel.price }, tG), 'V13.82 whole shares only');
+  const ssell = await service(state, 'POST', '/market/trade', { key: 'REL', side: 'sell', qty: 2, price: srel.price }, tG);
+  assert(ssell.trade.total === srel.price * 2 - sfee && ssell.points_balance === cash0 - 2 * sfee && !ssell.market.me.holdings.length && ssell.market.me.realized === -2 * sfee, 'V13.82 selling pays price × shares − fee; the fees are the only loss at the same price');
+  profile('qa-rw-h').stocks.h = { REL: { q: MARKET.max_hold, cost: 1 } };
+  await expectStatus(409, () => service(state, 'POST', '/market/trade', { key: 'REL', side: 'buy', qty: 1, price: srel.price }, tG), 'V13.82 at most 100 shares of one stock');
+  delete profile('qa-rw-h').stocks.h.REL;
+  assert(newsText({ key: 'SUBJ', up: true, pick: 1 }).includes('가정법은') && newsText({ key: 'PART', up: true, pick: 1 }).includes('분사는'), 'V13.82 news lines use 은/는 by the last letter');
+  const arcade82 = source('../public/modules/arcade.js'), css82 = source('../public/v1382.css'), build82 = source('./build-assets.mjs');
+  assert(arcade82.includes('rpsCard(rewards(current.A).rps') && arcade82.includes('${stocksCard()}') && arcade82.includes("openStock(k.dataset.key") && build82.includes('"v1382.css"') && css82.includes('.rps-show{') && css82.includes('.stk-card{'), 'V13.82 놀이터 shows 가위바위보 and 문법 증권거래소');
 }

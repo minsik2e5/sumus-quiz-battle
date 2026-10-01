@@ -5,6 +5,8 @@ import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
 import { battleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
 import { STUDY_COINS, GIFT_AMOUNTS } from '../public/modules/rewards.js';
+import { marketView, trade as stockTrade, rebaseMarket, newMarket } from './market.mjs';
+import { rpsView, rpsPlay, rpsCash } from './rewards.mjs';
 import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
@@ -836,6 +838,8 @@ export function sweep(state, now = Date.now()) {
   if (autoResolveMeaningDisputes(state) > 0) changed = true;
   if (tidyBattles(state)) changed = true;
   if (tidyProfileLogs(state, now)) changed = true;
+  // V13.82 문법 증권거래소: a seed for the prices on first start, and a shorter path now and then.
+  if (rebaseMarket(state, now)) changed = true;
   const tokens = state.tokens.filter(t => t.expires_at > Date.now());
   if (tokens.length !== state.tokens.length) { state.tokens = tokens; changed = true; }
   return changed;
@@ -992,7 +996,7 @@ export async function service(state, method, path, body, token, options = {}) {
       class_league: teacher && selectedSchool ? classLeague(state, competition, selectedSchool, now) : null,
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), bot: botView(p, now) },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsView(p, now), bot: botView(p, now) },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -1162,7 +1166,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/rewards' && method === 'GET') {
     requireRole(p, 'student');
     const now = Date.now();
-    return { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), bot: botView(p, now), points_balance: coinBalance(state, p) };
+    return { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsView(p, now), bot: botView(p, now), points_balance: coinBalance(state, p) };
   }
   // V13.73 coin gifts from a teacher: the student opens the waiting gift boxes.
   if (path === '/gifts/open' && method === 'POST') {
@@ -1278,6 +1282,33 @@ export async function service(state, method, path, body, token, options = {}) {
     if (body.ticket !== true && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 코인 뽑기를 할 수 있어요.', 409);
     const result = pullLucky(p, Number(body.bet), coinBalance(state, p), { ticket: body.ticket === true });
     return { ...result, points_balance: coinBalance(state, p) };
+  }
+  // V13.82 가위바위보 against 로보: a throw (a new game with `bet`, or the pot again after a win
+  // with `double`), and taking the pot after a win.
+  if (path === '/rps/play' && method === 'POST') {
+    requireRole(p, 'student');
+    const live = p.rps?.live;
+    if (!live && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 가위바위보를 할 수 있어요.', 409);
+    const result = rpsPlay(p, { bet: Number(body.bet), pick: str(body.pick, 12), double: body.double === true }, coinBalance(state, p));
+    return { ...result, points_balance: coinBalance(state, p) };
+  }
+  if (path === '/rps/cash' && method === 'POST') {
+    requireRole(p, 'student');
+    const result = rpsCash(p);
+    return { ...result, points_balance: coinBalance(state, p) };
+  }
+  // V13.82 문법 증권거래소: prices of this hour, and an order at that price.
+  if (path === '/market' && method === 'GET') {
+    requireRole(p, 'student');
+    return { market: marketView(state, p, coinBalance(state, p)) };
+  }
+  if (path === '/market/trade' && method === 'POST') {
+    requireRole(p, 'student');
+    state.market ||= newMarket();
+    if (body.side === 'buy' && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 주식을 살 수 있어요.', 409);
+    const done = stockTrade(state, p, { key: str(body.key, 12), side: str(body.side, 8), qty: body.qty, price: body.price }, coinBalance(state, p));
+    const balance = coinBalance(state, p);
+    return { trade: done, points_balance: balance, market: marketView(state, p, balance) };
   }
   // V13.70 robot practice match: announced at the start, paid (a few coins and 경험치) at the end.
   if (path === '/battle/practice/start' && method === 'POST') {

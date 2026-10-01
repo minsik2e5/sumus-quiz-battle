@@ -194,3 +194,6 @@ export function luckyShow(res, { again = false, againLabel = '' } = {}) {
     })();
   });
 }
+
+// V13.82: the same little synth and vibration for 가위바위보 (rps.js).
+export { tone as sfxTone, buzz as sfxBuzz };

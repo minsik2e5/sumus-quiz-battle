@@ -2,7 +2,8 @@ import { randomBytes } from 'node:crypto';
 import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS } from '../public/modules/core.js';
 import {
   ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, drawLucky,
-  BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX, GIFT_LOG_KEEP
+  BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX, GIFT_LOG_KEEP,
+  RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome
 } from '../public/modules/rewards.js';
 import { titleCoins } from '../public/modules/titles.js';
 
@@ -29,7 +30,9 @@ export const secureRandom = () => randomBytes(4).readUInt32BE(0) / 2 ** 32;
 
 export function rewardIncome(p) {
   return Number(p?.attendance?.coins || 0) + Number(p?.gacha?.refund || 0) + Number(p?.chance?.paid || 0) + Number(p?.lucky?.paid || 0) + chanceRefund(p)
-    + Number(p?.title_reward?.total || 0) + Number(p?.gift_box?.total || 0);
+    + Number(p?.title_reward?.total || 0) + Number(p?.gift_box?.total || 0)
+    // V13.82: 가위바위보 pay-outs and shares sold in 문법 증권거래소 (bets and buys are points_spent).
+    + Number(p?.rps?.paid || 0) + Number(p?.stocks?.paid || 0);
 }
 
 /* ---------- V13.73 title coins ---------- */
@@ -199,6 +202,70 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
   l.paid = Number(l.paid || 0) + paid;
   l.log = [...(l.log || []), { at: now, bet, mult: odd.mult, ticket }].slice(-LUCKY_LOG_KEEP);
   return { bet, mult: odd.mult, name: odd.name, paid, ticket, lucky: luckyView(p, now) };
+}
+
+/* ---------- V13.82 가위바위보 ---------- */
+//   rps { day, plays, bets, paid, wins_total, best, live: { id, bet, pot, wins, ties, await: 'pick'|'choice', at }, log[] }
+const RPS_LOG_KEEP = 12;
+export function rpsView(p, now = Date.now()) {
+  const r = p.rps || {}, today = dayKey(now);
+  const plays = r.day === today ? Number(r.plays || 0) : 0;
+  const live = r.live ? { bet: r.live.bet, pot: r.live.pot, wins: r.live.wins, await: r.live.await } : null;
+  return { bets: RPS_BETS, daily: RPS_DAILY, left: Math.max(0, RPS_DAILY - plays), max_wins: RPS_MAX_WINS, live, best: Number(r.best || 0), recent: (r.log || []).slice(-6).reverse() };
+}
+function rpsSettle(r, now, paid) {
+  const live = r.live;
+  r.paid = Number(r.paid || 0) + paid;
+  r.best = Math.max(Number(r.best || 0), live.wins);
+  r.log = [...(r.log || []), { at: now, bet: live.bet, wins: live.wins, paid }].slice(-RPS_LOG_KEEP);
+  r.live = null;
+  return paid;
+}
+// A game left open for a while is settled before anything else: a pot already won is paid, a
+// first round left on a tie gives the bet back (nothing was decided).
+function rpsSettleStale(r, now) {
+  if (!r.live || now - Number(r.live.at || 0) < RPS_STALE_MS) return 0;
+  return rpsSettle(r, now, r.live.wins > 0 ? r.live.pot : r.live.bet);
+}
+// One throw. A new game takes `bet`; after a win `double: true` plays the pot again.
+export function rpsPlay(p, { bet, pick, double = false }, balance, { random = secureRandom, now = Date.now() } = {}) {
+  if (!RPS_KEYS.includes(pick)) fail('가위·바위·보 중에 골라주세요.');
+  const r = p.rps ||= {};
+  const today = dayKey(now);
+  if (r.day !== today) { r.day = today; r.plays = 0; }
+  rpsSettleStale(r, now);
+  if (r.live?.await === 'choice' && !double) fail('받을지 더블 도전할지 먼저 골라주세요.', 409);
+  if (!r.live) {
+    if (!RPS_BETS.includes(bet)) fail('걸 코인을 골라주세요.');
+    if (Number(r.plays || 0) >= RPS_DAILY) fail(`가위바위보는 하루 ${RPS_DAILY}판까지예요. 내일 또 겨뤄요!`, 409);
+    if (balance < bet) fail(`코인이 ${bet - balance}개 부족해요.`);
+    p.points_spent = Number(p.points_spent || 0) + bet;
+    r.plays = Number(r.plays || 0) + 1;
+    r.bets = Number(r.bets || 0) + bet;
+    r.live = { id: randomBytes(6).toString('hex'), bet, pot: bet, wins: 0, ties: 0, await: 'pick', at: now };
+  }
+  const live = r.live;
+  live.at = now;
+  const robot = RPS_KEYS[Math.floor(random() * 3) % 3];
+  const result = rpsOutcome(pick, robot);
+  let paid = 0;
+  if (result === 'draw') { live.ties++; live.await = 'pick'; }
+  else if (result === 'lose') { live.lost = live.pot; rpsSettle(r, now, 0); }
+  else {
+    live.wins++; live.pot *= 2;
+    r.wins_total = Number(r.wins_total || 0) + 1;
+    if (live.wins >= RPS_MAX_WINS) paid = rpsSettle(r, now, live.pot);
+    else live.await = 'choice';
+  }
+  return { pick, robot, result, pot: live.pot, wins: live.wins, bet: live.bet, paid, done: !r.live, rps: rpsView(p, now) };
+}
+// Stop after a win and take the pot.
+export function rpsCash(p, now = Date.now()) {
+  const r = p.rps ||= {};
+  if (r.live?.await !== 'choice') fail('받을 코인이 없어요.', 409);
+  const pot = r.live.pot, wins = r.live.wins;
+  rpsSettle(r, now, pot);
+  return { paid: pot, wins, rps: rpsView(p, now) };
 }
 
 /* ---------- V13.70 bonus 경험치 and coins (robot matches, teacher exams) ---------- */

@@ -115,19 +115,34 @@ function markMissed(state, pid) {
 }
 export const inFever = (state, now) => !!state.ends_at && state.ends_at - now <= BATTLE.FEVER_MS;
 
+// V13.82: equal HP was a draw, and with both pets attacking on the same word that happened
+// a lot (both knocked out together, or the same HP when time ran out). Now a draw is rare:
+// 1. both knocked out on one word: the pet that knocked the other out first wins;
+// 2. otherwise more right answers wins, then the faster average answer;
+// 3. only a full tie (same answers, same speed) is still a draw.
+function breakTie(state, a, b) {
+  if (a.hp <= 0 && b.hp <= 0 && state.first_ko && state.players[state.first_ko]) return { winner: state.first_ko, tiebreak: 'ko_first' };
+  if ((a.correct || 0) !== (b.correct || 0)) return { winner: (a.correct || 0) > (b.correct || 0) ? a.id : b.id, tiebreak: 'correct' };
+  const avg = p => p.correct ? (p.answer_ms || 0) / p.correct : Infinity;
+  if (a.correct && Math.abs(avg(a) - avg(b)) >= 1) return { winner: avg(a) < avg(b) ? a.id : b.id, tiebreak: 'speed' };
+  return { winner: null, tiebreak: null };
+}
+const markKo = (state, attackerId, defender) => { if (defender.hp <= 0 && !state.first_ko) state.first_ko = attackerId; };
+
 function finish(state, now, reason, loserId = null) {
   state.phase = 'finished';
   state.deadline = null;
   const [a, b] = state.order.map(id => state.players[id]);
-  let winner = null;
+  let winner = null, tiebreak = null;
   if (loserId) winner = other(state, loserId);
   else if (a.hp !== b.hp) winner = a.hp > b.hp ? a.id : b.id;
+  else ({ winner, tiebreak } = breakTie(state, a, b));
   const review = Object.fromEntries(state.order.map(id => [id, (state.players[id].missed || []).map(wordId => {
     const q = state.questions.find(item => item.word_id === wordId);
     return q ? { word_id: wordId, ...questionWord(q) } : null;
   }).filter(Boolean)]));
   // V13.73: pet skills set off, per player (the 스킬 titles count them).
-  state.result = { winner, loser: winner ? other(state, winner) : null, reason, stake: state.stake, finished_at: now, hp: { [a.id]: a.hp, [b.id]: b.hp }, skills: { [a.id]: a.skills_used || 0, [b.id]: b.skills_used || 0 }, review };
+  state.result = { winner, loser: winner ? other(state, winner) : null, reason, ...(tiebreak ? { tiebreak } : {}), stake: state.stake, finished_at: now, hp: { [a.id]: a.hp, [b.id]: b.hp }, skills: { [a.id]: a.skills_used || 0, [b.id]: b.skills_used || 0 }, review };
   return [event(state, 'end', { result: state.result })];
 }
 
@@ -159,6 +174,7 @@ function attack(state, attackerId, ms, now) {
   const boost = (attacker.boost ||= []).shift() || 0, guard = (defender.guard ||= []).shift() || 0;
   dmg = Math.max(0, dmg + boost - guard);
   defender.hp = Math.max(0, defender.hp - dmg);
+  markKo(state, attacker.id, defender);
   attacker.gauge = (attacker.gauge || 0) + 1;
   const events = [event(state, 'attack', { attacker: attacker.id, defender: defender.id, dmg, fast, spell, fever, boost, guard, ms, hp: { [attacker.id]: attacker.hp, [defender.id]: defender.hp }, gauge: attacker.gauge, effects: { [attacker.id]: effectsOf(attacker), [defender.id]: effectsOf(defender) } })];
   if (attacker.gauge >= petSkill(attacker.pet).need) events.push(firePetSkill(state, attacker, defender));
@@ -175,6 +191,7 @@ function firePetSkill(state, p, foe) {
   if (s.poison) p.poison = s.turns;
   if (s.heal) p.hp = Math.min(BATTLE.MAX_HP, p.hp + s.heal);
   if (s.burst) foe.hp = Math.max(0, foe.hp - s.burst);
+  markKo(state, p.id, foe);
   return event(state, 'petskill', { player: p.id, skill: s.key, name: s.name, desc: s.desc, dmg: s.burst || 0, heal: s.heal || 0, hp: { [p.id]: p.hp, [foe.id]: foe.hp }, effects: effectsOf(p) });
 }
 // What is still waiting to happen for a player (drawn under the HP bar).
@@ -198,6 +215,7 @@ function settle(state, now, timeout) {
     const foe = state.players[other(state, id)], dmg = petSkill(p.pet).poison || 0;
     p.poison--;
     foe.hp = Math.max(0, foe.hp - dmg);
+    markKo(state, id, foe);
     events.push(event(state, 'poison', { player: id, target: foe.id, dmg, left: p.poison, hp: foe.hp }));
   }
   return events;

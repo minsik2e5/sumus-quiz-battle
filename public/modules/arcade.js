@@ -6,6 +6,9 @@ import { TITLES } from './titles.js';
 import { titleState } from './titles-ui.js';
 import { CHARACTERS, EGG_PRICE } from './core.js';
 import { luckyCard, luckyShow, machineSpin, machineDrop, unlockSound } from './lucky.js';
+import { rpsCard, rpsMatch } from './rps.js';
+import { stocksCard, loadMarket, openStock, startStockClock } from './stocks.js';
+import { RPS_BETS } from './rewards.js';
 
 // 놀이터: the coin capsule (코인 뽑기, V13.68) and the egg shop, plus the decorations kept from the retired V13.67 capsule machine (모은 꾸미기, under 나). The server
 // decides everything (server/rewards.mjs); this module draws `[data-arcade]` and keeps it up to
@@ -40,7 +43,7 @@ const tierTag = tier => `<span class="ga-tier t-${tier}">${GACHA_TIERS[tier].nam
 
 /* ---------- page ---------- */
 export function arcadePage(A) {
-  return `<div class="page-heading arcade-head"><span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>모은 코인으로 코인 뽑기와 알 상점을 즐겨요.</p></div>
+  return `<div class="page-heading arcade-head"><span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>모은 코인으로 코인 뽑기, 가위바위보, 문법 주식, 알 상점을 즐겨요.</p></div>
     <button type="button" class="arcade-wallet" data-action="coins" aria-label="코인 지갑 열기"><span>${coin()}<b id="ga-balance">${num(A.data.stats?.points_balance || 0)}</b> 코인</span><small>코인 지갑 ${icon('chevron')}</small></button>
     <div data-arcade></div>`;
 }
@@ -93,7 +96,7 @@ export function mountArcade(el, A) {
   api('/rewards').then(res => {
     if (current?.el !== el || current.busy) return;
     const r = rewards(A);
-    r.attendance = res.attendance; r.gacha = res.gacha; r.lucky = res.lucky; r.bot = res.bot;
+    r.attendance = res.attendance; r.gacha = res.gacha; r.lucky = res.lucky; r.rps = res.rps; r.bot = res.bot;
     A.data.stats.gacha = res.gacha.items;
     setBalance(A, res.points_balance);
     draw();
@@ -107,11 +110,30 @@ export function mountArcade(el, A) {
       if (g.dataset.ga === 'odds') return oddsModal();
       if (g.dataset.ga === 'item') return itemModal(A, g.dataset.key);
     }
+    // V13.82 가위바위보 and 문법 증권거래소.
+    const r = event.target.closest('[data-rps]');
+    if (r && !r.disabled && !current?.busy) {
+      if (r.dataset.rps === 'bet') { rpsBet = Number(r.dataset.bet); return draw(); }
+      return playRps(A, r.dataset.rps === 'resume');
+    }
+    const k = event.target.closest('[data-stk]');
+    if (k) return openStock(k.dataset.key, { onBalance: value => setBalance(A, value), onChange: draw });
   });
+  // A redraw waits while a capsule or a match is on screen (it would replace the machine).
+  const quietDraw = () => { if (!current?.busy) draw(); };
+  if (el.dataset.arcadeView !== 'book') loadMarket().then(() => { quietDraw(); startStockClock(quietDraw); }).catch(() => {});
+}
+let rpsBet = RPS_BETS[0];
+async function playRps(A, resume) {
+  current.busy = true;
+  const live = resume ? rewards(A).rps?.live : null;
+  await rpsMatch(A, { bet: rpsBet, live, onBalance: value => setBalance(A, value) });
+  current.busy = false;
+  draw();
 }
 function draw() {
   if (!current?.el.isConnected) return;
-  current.el.innerHTML = current.el.dataset.arcadeView === 'book' ? collectionHtml(current.A) : `${machineHtml(current.A)}${shopHtml(current.A)}`;
+  current.el.innerHTML = current.el.dataset.arcadeView === 'book' ? collectionHtml(current.A) : `${machineHtml(current.A)}${rpsCard(rewards(current.A).rps, rpsBet, Number(current.A.data.stats?.points_balance || 0))}${stocksCard()}${shopHtml(current.A)}`;
 }
 
 /* coin capsule */
