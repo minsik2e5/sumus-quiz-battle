@@ -57,13 +57,13 @@ export async function runCoinsChecks(assert, expectStatus) {
   const again = await study('qa-co-a', { target: 20, daily: true });
   const labels2 = (again.reward_breakdown || []).map(x => x.label);
   assert(again.reward_points === STUDY_COINS.t20 + STUDY_COINS.perfect && !labels2.includes('오늘 추천 학습') && !labels2.includes('오늘 첫 학습'), 'V13.73 the recommended-study and first-study bonuses are paid once a day; 100점 pays 12');
-  assert(STUDY_COINS.t30 === 22 && STUDY_COINS.t20 === 16 && STUDY_COINS.cap === 100 && EGG_PRICE === 400, 'V13.73 중간안 numbers: 30문제 22, 20문제 16, daily cap 100, egg 400');
-  // The cap counts study coins of the day: 90 already earned leaves 10.
-  state.sessions.push({ id: 'qa-co-rich', student_id: 'qa-co-b', division: 'high', school_id: 'danwon-high', school: '단원고', mode: 'eng2mean', run_mode: 'practice', total: 30, correct: 30, answered_count: 30, score: 100, xp: 0, reward_points: 90, reward_breakdown: [{ label: '오늘 첫 학습', points: 5 }], created_at: now - 1000 });
+  assert(STUDY_COINS.t30 === 22 && STUDY_COINS.t20 === 16 && STUDY_COINS.cap === 150 && EGG_PRICE === 400, 'V13.73 중간안 numbers: 30문제 22, 20문제 16, egg 400 (V13.82: daily cap 150)');
+  // The cap counts study coins of the day: cap − 10 already earned leaves 10.
+  state.sessions.push({ id: 'qa-co-rich', student_id: 'qa-co-b', division: 'high', school_id: 'danwon-high', school: '단원고', mode: 'eng2mean', run_mode: 'practice', total: 30, correct: 30, answered_count: 30, score: 100, xp: 0, reward_points: STUDY_COINS.cap - 10, reward_breakdown: [{ label: '오늘 첫 학습', points: 5 }], created_at: now - 1000 });
   const capped = await study('qa-co-b', { target: 10 });
-  assert(capped.reward_points === 10 && capped.reward_breakdown.some(x => x.label === '일일 보상 한도 적용'), 'V13.73 study coins stop at 100 a day');
+  assert(capped.reward_points === 10 && capped.reward_breakdown.some(x => x.label === '일일 보상 한도 적용'), 'V13.73 study coins stop at the daily cap (V13.82: 150)');
   const bootB = await service(state, 'GET', '/bootstrap', {}, tokens['qa-co-b']);
-  assert(bootB.stats.today_study_points === 100, 'V13.73 the wallet bar counts study coins of today');
+  assert(bootB.stats.today_study_points === STUDY_COINS.cap, 'V13.73 the wallet bar counts study coins of today');
 
   /* ---------- robot matches ---------- */
   assert(BOT_WIN_REWARDS.easy.coins === 5 && BOT_WIN_REWARDS.normal.coins === 8 && BOT_WIN_REWARDS.hard.coins === 12 && BOT_TRY_REWARD.coins === 3, 'V13.73 robot matches pay 5/8/12 for a win and 3 for trying');

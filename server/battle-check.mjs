@@ -194,6 +194,22 @@ export function runBattleChecks(assert) {
     answer(d, 'host', wrong(d), dt + 10); answer(d, 'guest', wrong(d), dt + 20);
     const draw = tick(d, dt + 20 + BATTLE.REVEAL_MS).find(e => e.type === 'end');
     assert(draw && draw.result.winner === null && draw.result.loser === null, 'equal HP at the end is a draw with no stake moved');
+    // V13.82 tie-breaks: equal HP is no longer a draw when the match can be told apart.
+    const { s: k, t: kt } = started();
+    k.players.host.hp = 10; k.players.guest.hp = 10;
+    answer(k, 'host', correct(k), kt + 1000); answer(k, 'guest', correct(k), kt + 2000);
+    const ko = tick(k, kt + 2000 + BATTLE.REVEAL_MS).find(e => e.type === 'end');
+    assert(k.players.host.hp === 0 && k.players.guest.hp === 0 && ko?.result.winner === 'host' && ko.result.tiebreak === 'ko_first', 'V13.82 both knocked out on one word: the pet that knocked the other out first wins');
+    const { s: c, t: ct } = started();
+    answer(c, 'host', correct(c), ct + 3000); answer(c, 'guest', wrong(c), ct + 3000);
+    c.players.host.hp = 50; c.players.guest.hp = 50; c.ends_at = ct + 3100;
+    const more = tick(c, ct + 3000 + BATTLE.REVEAL_MS).find(e => e.type === 'end');
+    assert(more?.result.winner === 'host' && more.result.tiebreak === 'correct', 'V13.82 same HP when time runs out: more right answers wins');
+    const { s: f, t: ft } = started();
+    answer(f, 'host', correct(f), ft + 3000); answer(f, 'guest', correct(f), ft + 1500);
+    f.players.host.hp = 40; f.players.guest.hp = 40; f.ends_at = ft + 3100;
+    const fast = tick(f, ft + 3000 + BATTLE.REVEAL_MS).find(e => e.type === 'end');
+    assert(fast?.result.winner === 'guest' && fast.result.tiebreak === 'speed', 'V13.82 then the faster average answer wins');
   }
   {
     const { s, t } = started();

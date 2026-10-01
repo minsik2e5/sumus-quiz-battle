@@ -25,6 +25,12 @@ const skillWhen = s => `${s.need}번 연속 맞히면`;
 // Why a match ended, from the point of view of the player reading the result.
 const REASONS = { end: () => '시간 종료', forfeit: mine => mine ? '대결을 포기했어요' : '상대가 대결을 포기했어요', disconnect: mine => mine ? '연결이 끊겨 패배했어요' : '상대의 연결이 끊겼어요', cancelled: () => '대결이 취소됐어요' };
 
+// V13.82: who won a match that ended on equal HP.
+const TIEBREAKS = {
+  ko_first: mine => mine ? '먼저 쓰러뜨려서 이겼어요' : '상대가 먼저 쓰러뜨렸어요',
+  correct: mine => mine ? '더 많이 맞혀서 이겼어요' : '상대가 더 많이 맞혔어요',
+  speed: mine => mine ? '정답 속도가 더 빨라서 이겼어요' : '상대의 정답 속도가 더 빨랐어요'
+};
 const EMOTES = { lol: 'ㅋㅋ', come: '덤벼!', gg: 'GG', nice: '좋았어!' };
 // V13.67 modes: 스피드전 (the original) and 실력전 (spelling words on an in-app keyboard).
 const MODE_ICONS = {
@@ -232,7 +238,7 @@ function playTab(h) {
       <div class="yb-ranges">${codes.map(c => `<button type="button" class="yb-chip ${B.ranges.has(c) ? 'on' : ''}" data-yb="range" data-code="${esc(c)}" aria-pressed="${B.ranges.has(c)}">${esc(rangeLabel(A.data.profile.school, c))}<small>${counts.get(c) || 0}</small></button>`).join('') || '<p class="yb-muted">학습할 단어 범위가 없어요.</p>'}</div>
       <div class="yb-label">판돈 <small>가진 코인 ${num(balance)} · 오늘 더 잃을 수 있는 코인 ${num(lossLeft)}</small></div>
       <div class="yb-stakes">${STAKES.map(s => `<button type="button" class="yb-stake ${B.stake === s ? 'on' : ''}" data-yb="stake" data-stake="${s}" aria-pressed="${B.stake === s}" aria-label="판돈 ${s}코인" ${balance < s || s > lossLeft ? 'disabled' : ''}>${coin()}${s}</button>`).join('')}</div>
-      <p class="yb-note">이기면 판돈만큼 코인을 받고, 지면 판돈만큼 잃어요. 무승부면 그대로예요.</p>
+      <p class="yb-note">이기면 판돈만큼 코인을 받고, 지면 판돈만큼 잃어요. HP가 같으면 먼저 쓰러뜨린 쪽, 그다음 더 많이 맞힌 쪽, 그다음 더 빨리 맞힌 쪽이 이겨요.</p>
       <div class="yb-start-v1361">
         <button type="button" class="btn primary full" data-yb="challenge" ${canCreate ? '' : 'disabled'}>친구에게 도전장 보내기</button>
         <button type="button" class="btn full" data-yb="create" ${canCreate ? '' : 'disabled'}>코드로 방 만들기</button>
@@ -862,6 +868,7 @@ function drawResult() {
     <div class="yb-result-badge">${{ win: '승리!', lose: '패배', draw: r.reason === 'cancelled' ? '취소' : '무승부' }[outcome]}</div>
     ${special ? `<div class="yb-result-special">${special}</div>` : ''}
     <p class="yb-result-lead">${esc(REASONS[r.reason]?.(r.loser === v.me) || '')}${r.hp ? ` · 내 HP ${hpMe} · 상대 HP ${r.hp[foe().id] ?? foe().hp}` : ''}</p>
+    ${TIEBREAKS[r.tiebreak] ? `<p class="yb-tiebreak-v1382">⚖️ HP 동점 · ${esc(TIEBREAKS[r.tiebreak](r.winner === v.me))}</p>` : ''}
     <div class="yb-result-points ${outcome}">${delta}</div>
     ${practice ? `<button type="button" class="btn primary full" data-yb="bot-again">한 판 더 <small>${esc(BOT_LEVELS[B.practiceSetup?.level]?.name || '')}</small></button>` : ''}
     ${canRematch ? `<button type="button" class="btn primary full yb-rematch" data-yb="rematch">${outcome === 'lose' ? '설욕전 신청' : '한 판 더'} <small>판돈 ${num(r.stake)}코인</small></button><div id="yb-offer"></div>` : ''}

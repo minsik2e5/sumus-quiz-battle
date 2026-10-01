@@ -11,7 +11,7 @@ export const ATTENDANCE_TICKETS = 1; // free coin capsules on the 7th stamp
 // are shown on the machine; on average a little less comes back than is bet, so study stays the
 // way to earn coins. A free capsule (뽑기권) plays a 10-coin bet without paying or counting.
 export const LUCKY_BETS = [10, 20, 30];
-export const LUCKY_DAILY = 3;
+export const LUCKY_DAILY = 5; // V13.82: 3 → 5 a day
 export const LUCKY_TICKET_BET = 10;
 export const LUCKY_ODDS = [
   { mult: 0, rate: 45, name: '꽝' },
@@ -54,7 +54,7 @@ export const GIFT_LOG_KEEP = 20;
 
 // V13.73 study coins (원장님과 정한 중간안). A practice pays only when it is finished and at least
 // 60% of its answers are right; `cap` is the daily limit of study coins.
-export const STUDY_COINS = { t30: 22, t20: 16, t10: 7, perfect: 12, daily: 5, first: 5, streak3: 8, streak7: 20, cap: 100, min_accuracy: 0.6 };
+export const STUDY_COINS = { t30: 22, t20: 16, t10: 7, perfect: 12, daily: 5, first: 5, streak3: 8, streak7: 20, cap: 150, min_accuracy: 0.6 };
 
 // V13.70 practice match against the robot (로보와 연습 대결): a few coins and 경험치 for the
 // partner pet. A win pays by the robot's level; a loss or draw still pays a little. The first
@@ -74,3 +74,20 @@ export function botReward(level, result) {
 // Only the first submitted attempt of an exam pays.
 export const EXAM_XP_PER_ANSWER = 10;
 export const EXAM_COINS = 10;
+
+// V13.82 가위바위보 against 로보 (after the coin capsule in 놀이터). The server picks 로보's hand
+// at random (each a third). A win doubles the pot, and the student may stop and take it or play
+// the pot again (더블 도전) up to RPS_MAX_WINS wins in a row (×2 → ×4 → ×8, taken at the last).
+// A tie is played again for free. A loss loses the pot. On average as much comes back as is bet.
+export const RPS_BETS = [10, 20, 30];
+export const RPS_DAILY = 5;
+export const RPS_MAX_WINS = 3;
+export const RPS_HANDS = { rock: { name: '바위', emoji: '✊', beats: 'scissors' }, scissors: { name: '가위', emoji: '✌️', beats: 'paper' }, paper: { name: '보', emoji: '✋', beats: 'rock' } };
+export const RPS_KEYS = Object.keys(RPS_HANDS);
+// A game left open (closed app) is settled on the next play: a pot already won is paid, a first
+// round left on a tie gives the bet back.
+export const RPS_STALE_MS = 10 * 60000;
+export function rpsOutcome(mine, robot) {
+  if (mine === robot) return 'draw';
+  return RPS_HANDS[mine]?.beats === robot ? 'win' : 'lose';
+}
