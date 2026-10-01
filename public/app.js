@@ -5,6 +5,7 @@ import { studentPage, getRanges, updateRangeSummary, starredWords, pushSupport }
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel, careIds } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
 import { maybePetMoment, openPetNameModal, openEggShop, petJosa } from './modules/pet-moments.js';
+import { maybeCardLevelUp } from './modules/card-levelup.js';
 import { mountYacha } from './modules/battle.js';
 import { maybeTitleMoment, openTitleDetail } from './modules/titles-ui.js';
 import { mountLeagueBoard } from './modules/league-ui.js';
@@ -156,6 +157,7 @@ function render() {
     $$('#yacha-host').forEach(el => { const opts = A.yachaOpts; A.yachaOpts = null; mountYacha(el, A, leaveBattle, opts); });
     queueMicrotask(() => maybePetMoment(A, petChanged));
     queueMicrotask(maybeMissedYou);
+    queueMicrotask(() => maybeCardLevelUp(A));
     queueMicrotask(() => maybeTitleMoment(A, moved => { if (moved) { render(); window.scrollTo(0, 0); } else renderKeepScroll(); }));
   }
 }
