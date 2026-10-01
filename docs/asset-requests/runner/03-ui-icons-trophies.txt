@@ -1,0 +1,35 @@
+Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
+Style: glossy 3D game UI icon, soft pastel palette with SUMUS mint green (#10B981) accents, chunky friendly shapes, clean edges readable at 48 pixels, one object per cell, slight top-down front view.
+TOP-LEFT cell: a round mint pet food bowl piled with kibble and a small bone-shaped cookie, a little steam
+TOP-RIGHT cell: one soft round open palm with two small pink hearts and curved petting motion lines
+BOTTOM-LEFT cell: a cream egg wrapped in a cozy mint blanket with a tiny warm sun glow
+BOTTOM-RIGHT cell: a mint megaphone with small sparkles
+---
+Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
+Style: glossy 3D game UI icon, soft pastel palette with SUMUS mint green (#10B981) accents, chunky friendly shapes, clean edges readable at 48 pixels, one object per cell, slight top-down front view.
+TOP-LEFT cell: a golden bell with a small paw print on it, two ringing lines
+TOP-RIGHT cell: a chubby golden star badge with a soft shine
+BOTTOM-LEFT cell: a mint stopwatch with motion lines on the hand
+BOTTOM-RIGHT cell: an orange smartphone with a small cute exclamation sign, friendly warning
+---
+Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
+Style: glossy 3D game UI icon, soft pastel palette with SUMUS mint green (#10B981) accents, chunky friendly shapes, clean edges readable at 48 pixels, one object per cell, slight top-down front view.
+TOP-LEFT cell: a shiny gold coin with a mint swirl engraved in the middle (no letters)
+TOP-RIGHT cell: a glowing mint crystal shard with sparkles
+BOTTOM-LEFT cell: a calendar page with a big mint check-mark stamp (no numbers)
+BOTTOM-RIGHT cell: a pastel gift box with a mint ribbon, lid slightly lifted with sparkles
+---
+Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
+Style: glossy 3D game UI icon, soft pastel palette with SUMUS mint green (#10B981) accents, chunky friendly shapes, clean edges readable at 48 pixels, one object per cell, slight top-down front view.
+TOP-LEFT cell: a small shop stand with three colorful eggs on a cushion
+TOP-RIGHT cell: a friendly orange flame with a tiny smile
+BOTTOM-LEFT cell: a smartphone with a mint app icon popping out and a small download arrow
+BOTTOM-RIGHT cell: a small mint arcade cabinet with a glowing screen and a joystick
+---
+Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
+Style: shiny 3D game trophy/badge, metallic with soft gem highlights, symmetric, readable at 64 pixels, one object per cell.
+Subject: season-end league trophies of the same cup shape: a chubby cup on a short stem and a round base, two small wings on the sides, a gem in the middle of the cup.
+TOP-LEFT cell: BRONZE finish trophy with a warm amber gem
+TOP-RIGHT cell: SILVER finish trophy with a pale blue gem
+BOTTOM-LEFT cell: GOLD finish trophy with a ruby gem and a few sparkles
+BOTTOM-RIGHT cell: DIAMOND trophy made of shimmering pale cyan crystal with rainbow glints and a large faceted gem
