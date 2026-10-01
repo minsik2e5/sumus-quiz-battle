@@ -28,17 +28,27 @@ const fail = (message, status = 400) => { throw Object.assign(new Error(message)
 const requireRole = (p, role) => { if (p.role !== role) fail('이 기능을 사용할 권한이 없습니다.', 403); };
 const integer = (n, min, max, label) => { if (!Number.isInteger(Number(n)) || Number(n) < min || Number(n) > max) fail(`${label}을 확인해주세요.`); return Number(n); };
 const str = (s, max = 120) => typeof s === 'string' ? s.trim().slice(0, max) : '';
-const safeGrammarAnswers = value => {
+// A table lookup by a key from the request: own keys only (never 'constructor' or '__proto__').
+const own = (table, key) => typeof key === 'string' && Object.hasOwn(table, key) ? table[key] : undefined;
+// Grammar keys are "sentence:part". Real passages have at most 14 sentences, 37 choices and
+// answers of a few words, so anything far past that is not a real save.
+const grammarKey = (key, sentences) => {
+  const m = /^(\d{1,3}):(\d{1,3})$/.exec(String(key));
+  return m && Number(m[1]) < sentences && Number(m[2]) < 200 ? `${Number(m[1])}:${Number(m[2])}` : null;
+};
+const safeGrammarAnswers = (value, sentences = 120, choices = 150) => {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
-  const entries = Object.entries(value).slice(0, 400);
   const safe = {};
-  for (const [key, answer] of entries) {
-    if (!/^\d+:\d+$/.test(key) || typeof answer !== 'string' || answer.length > 160) continue;
+  let count = 0;
+  for (const [raw, answer] of Object.entries(value).slice(0, 400)) {
+    const key = grammarKey(raw, sentences);
+    if (!key || typeof answer !== 'string' || answer.length > 40 || Object.hasOwn(safe, key)) continue;
     safe[key] = answer;
+    if (++count >= choices) break;
   }
   return safe;
 };
-const GRAMMAR_PASSAGES_PER_STUDENT = 400;
+const GRAMMAR_PASSAGES_PER_STUDENT = 80;
 const MAX_TOKENS_PER_USER = 10;
 const RESERVED_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 // Questions sent to a student must not carry the word id: bootstrap ships the
@@ -51,8 +61,8 @@ const publicQuestion = question => {
 const safeGrammarIndexes = (value, max = 120) => Array.isArray(value)
   ? [...new Set(value.map(Number).filter(n => Number.isInteger(n) && n >= 0 && n < max))].slice(0, max)
   : [];
-const safeGrammarKeys = value => Array.isArray(value)
-  ? [...new Set(value.map(String).filter(key => /^\d+:\d+$/.test(key)))].slice(0, 400)
+const safeGrammarKeys = (value, sentences = 120, choices = 150) => Array.isArray(value)
+  ? [...new Set(value.slice(0, 400).map(key => grammarKey(key, sentences)).filter(Boolean))].slice(0, choices)
   : [];
 const MIDDLE_IMPORT_GRADES = ['중2', '중3'];
 const hashText = value => {
@@ -476,8 +486,13 @@ function checkBattleEntry(state, p, stake, now) {
 }
 const battleTicket = () => randomBytes(18).toString('hex');
 // Builds the questions and opens a waiting room (a new one, or a rematch with `extra`).
+// Opening and cancelling rooms over and over would fill the battle list (and, for a
+// challenge, the friend's phone): a student opens at most this many rooms in 10 minutes.
+const BATTLE_ROOMS_PER_10_MIN = 12;
+const CHALLENGE_PUSH_GAP_MS = 3 * 60000;
 function openBattleRoom(state, p, school, stake, rangeCodes, now, extra = {}) {
   if (!rangeCodes.length) fail('대결할 단어 범위를 골라주세요.');
+  if (!extra.tournament_id && (state.battles || []).filter(b => b.host_id === p.id && !b.tournament_id && now - (b.created_at || 0) < 600000).length >= BATTLE_ROOMS_PER_10_MIN) fail('방을 너무 자주 만들었어요. 잠시 뒤에 다시 해 주세요.', 429);
   const words = scopedWords(state, school.id, rangeCodes, p.class_name);
   if (words.length < 8) fail('단어가 8개 이상인 범위를 골라주세요.', 409);
   // V13.67: 스피드전 (four choices) or 실력전 (spelling words mixed in).
@@ -501,8 +516,8 @@ function battleFriends(state, p, now) {
   const school = schoolForProfile(state, p), grade = gradeOf(p.class_name);
   const ctx = createCompetition(state, now);
   return state.profiles
-    .filter(x => x.id !== p.id && x.role === 'student' && x.active !== false && x.pets?.length && schoolForProfile(state, x)?.id === school?.id && gradeOf(x.class_name) === grade)
-    .map(x => { const pet = pointsAndPets(state, x, xpSessions(state, x.id, x)).pet; return { id: x.id, name: x.display_name, class_name: x.class_name || '', same_class: x.class_name === p.class_name, pet: pet ? { key: pet.key, form: pet.form } : null, title: ctx.displayTitle(x), tier: ctx.league(x.id).tier.key, busy: !!openBattleFor(state, x.id, now) }; })
+    .filter(x => x.id !== p.id && x.role === 'student' && x.active !== false && !x.preview_owner_id && x.pets?.length && schoolForProfile(state, x)?.id === school?.id && gradeOf(x.class_name) === grade)
+    .map(x => { const pet = pointsAndPets(state, x, xpSessions(state, x.id, x)).pet; return { id: x.id, name: x.display_name, class_name: x.class_name || '', same_class: x.class_name === p.class_name, pet: pet ? { key: pet.key, form: pet.form } : null, title: ctx.displayTitle(x), tier: ctx.league(x.id).tier.key, busy: !!openBattleFor(state, x.id, now), invited: !!battleInviteFor(state, x, now) }; })
     .sort((a, b) => Number(b.same_class) - Number(a.same_class) || a.name.localeCompare(b.name, 'ko'));
 }
 function battleInviteFor(state, p, now) {
@@ -736,6 +751,12 @@ function closeStalePractices(state, now) {
   let changed = false;
   for (const x of state.practices) {
     if (x.finished) continue;
+    // V13.80: a 실전시험 left open past its time limit is handed in at that time.
+    if (x.run_mode === 'test' && x.timer_mode !== 'question' && Number(x.deadline || 0) && now >= Number(x.deadline) + TEST_ANSWER_GRACE_MS) {
+      if (Number(x.total || 0) > 0) finishPractice(x, state, true); else x.discarded = true;
+      changed = true;
+      continue;
+    }
     const lastActivity = Math.max(Number(x.started_at || 0), ...(x.answer_records || []).map(item => Number(item?.at || 0)));
     if (lastActivity > now - STALE_PRACTICE_MS) continue;
     // Answers given: close it the way a finish does (the existing path used when a
@@ -1007,7 +1028,8 @@ export async function service(state, method, path, body, token, options = {}) {
   }
   if (path === '/student-preview/exit' && method === 'POST') {
     requireRole(p, 'student');
-    if (!p.preview_owner_id) fail('미리보기 계정이 아닙니다.', 403);
+    // Only the preview token the teacher was handed can go back to the teacher.
+    if (!p.preview_owner_id || auth?.preview_owner_id !== p.preview_owner_id) fail('미리보기 계정이 아닙니다.', 403);
     const owner = state.profiles.find(item => item.id === p.preview_owner_id && item.role === 'teacher' && item.active);
     if (!owner) fail('교사 계정을 찾을 수 없습니다.', 404);
     const raw = randomBytes(32).toString('base64url');
@@ -1056,7 +1078,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!Object.hasOwn(state.grammarProgress[p.id], passageId) && Object.keys(state.grammarProgress[p.id]).length >= GRAMMAR_PASSAGES_PER_STUDENT) fail('저장할 수 있는 지문 수를 넘었어요. 선생님께 문의해주세요.', 409);
     const school = schoolForProfile(state, p);
     const sentenceCount = integer(body.sentence_count, 1, 120, '문장 수');
-    const choiceCount = integer(body.choice_count, 1, 500, '선택지 수');
+    const choiceCount = integer(body.choice_count, 1, 150, '선택지 수');
     const completedSentences = integer(body.completed_sentences ?? 0, 0, sentenceCount, '완료 문장 수');
     const activeSentenceIndex = integer(body.active_sentence_index ?? 0, 0, Math.max(0, sentenceCount - 1), '현재 문장');
     const firstRate = body.first_rate == null ? null : integer(body.first_rate, 0, 100, '1차 정답률');
@@ -1070,8 +1092,8 @@ export async function service(state, method, path, body, token, options = {}) {
       completed_sentences: completedSentences,
       active_sentence_index: activeSentenceIndex,
       graded_sentences: safeGrammarIndexes(body.graded_sentences, sentenceCount),
-      answers: safeGrammarAnswers(body.answers),
-      wrong_keys: safeGrammarKeys(body.wrong_keys),
+      answers: safeGrammarAnswers(body.answers, sentenceCount, choiceCount),
+      wrong_keys: safeGrammarKeys(body.wrong_keys, sentenceCount, choiceCount),
       first_rate: firstRate,
       first_wrong: integer(body.first_wrong ?? 0, 0, choiceCount, '1차 오답 수'),
       recall_attempts: integer(body.recall_attempts ?? 0, 0, 5000, '오답 리콜 횟수'),
@@ -1089,9 +1111,9 @@ export async function service(state, method, path, body, token, options = {}) {
     const growth = stats(state, p);
     // V13.71: an accessory that no longer exists (the removed capsule badges) falls back to '기본'
     // instead of blocking every later change of look.
-    if (!ACCESSORIES[body.avatar_accessory]) body.avatar_accessory = 'none';
-    const titleOk = TITLES[body.avatar_title] && titleUnlocked(body.avatar_title, createCompetition(state).titleStats(p));
-    if (!CHARACTERS[body.avatar_key] || !unlocked(ACCESSORIES[body.avatar_accessory], growth) || !unlocked(FRAMES[body.avatar_frame], growth) || !titleOk) fail('아직 열리지 않은 보상입니다.');
+    if (!own(ACCESSORIES, body.avatar_accessory)) body.avatar_accessory = 'none';
+    const titleOk = own(TITLES, body.avatar_title) && titleUnlocked(body.avatar_title, createCompetition(state).titleStats(p));
+    if (!own(CHARACTERS, body.avatar_key) || !unlocked(own(ACCESSORIES, body.avatar_accessory), growth) || !unlocked(own(FRAMES, body.avatar_frame), growth) || !titleOk) fail('아직 열리지 않은 보상입니다.');
     if (p.pets?.length && !p.pets.some(x => x.key === body.avatar_key)) fail('아직 만나지 못한 펫이에요.', 403);
     Object.assign(p, { avatar_key: body.avatar_key, avatar_accessory: body.avatar_accessory, avatar_frame: body.avatar_frame, avatar_title: body.avatar_title });
     return publicProfile(p);
@@ -1100,7 +1122,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/profile/title' && method === 'POST') {
     requireRole(p, 'student');
     const key = str(body.key, 40);
-    if (!TITLES[key]) fail('칭호를 확인해주세요.');
+    if (!own(TITLES, key)) fail('칭호를 확인해주세요.');
     if (!titleUnlocked(key, createCompetition(state).titleStats(p))) fail('아직 얻지 못한 칭호예요.', 403);
     p.avatar_title = key;
     return { equipped: key };
@@ -1109,7 +1131,7 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const ctx = createCompetition(state);
     const stats = ctx.titleStats(p);
-    const keys = (Array.isArray(body.keys) ? body.keys : []).map(key => str(key, 40)).filter(key => TITLES[key] && titleUnlocked(key, stats));
+    const keys = (Array.isArray(body.keys) ? body.keys : []).map(key => str(key, 40)).filter(key => own(TITLES, key) && titleUnlocked(key, stats));
     // Every title held now counts as seen once the collection has been introduced. Limited
     // titles are remembered per week; older weeks are dropped.
     const all = body.all === true ? TITLE_KEYS.filter(key => titleUnlocked(key, stats)) : keys;
@@ -1125,7 +1147,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/pets/choose' && method === 'POST') {
     requireRole(p, 'student');
     if (p.pets?.length) fail('첫 펫은 이미 골랐어요. 새 친구는 상점의 알에서 만날 수 있어요.', 409);
-    if (!CHARACTERS[body.key]) fail('펫을 확인해주세요.');
+    if (!own(CHARACTERS, body.key)) fail('펫을 확인해주세요.');
     p.pets = [{ key: body.key, first: true, acquired_at: Date.now() }];
     p.avatar_key = body.key;
     return publicProfile(p);
@@ -1252,6 +1274,8 @@ export async function service(state, method, path, body, token, options = {}) {
   // V13.68 coin capsule: bet 10·20·30 coins (or a free ticket); ×0·×1·×2·×3 comes back.
   if (path === '/lucky/pull' && method === 'POST') {
     requireRole(p, 'student');
+    // Like eggs: a stake waiting in a yacha room is not spent elsewhere (a free ticket is fine).
+    if (body.ticket !== true && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 코인 뽑기를 할 수 있어요.', 409);
     const result = pullLucky(p, Number(body.bet), coinBalance(state, p), { ticket: body.ticket === true });
     return { ...result, points_balance: coinBalance(state, p) };
   }
@@ -1349,11 +1373,15 @@ export async function service(state, method, path, body, token, options = {}) {
     const friend = battleFriends(state, p, now).find(x => x.id === str(body.friend_id, 64));
     if (!friend) fail('같은 학교·학년 친구에게만 도전장을 보낼 수 있어요.', 404);
     if (friend.busy) fail(`${friend.name}이(가) 지금 다른 대결 중이에요. 조금 뒤에 다시 보내요.`, 409);
+    // The friend sees one challenge at a time, so a second one would wait unseen.
+    if (friend.invited) fail(`${friend.name}이(가) 다른 도전장을 먼저 받았어요. 조금 뒤에 다시 보내요.`, 409);
     const school = schoolForProfile(state, p);
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
     const rangeCodes = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : [];
+    // One phone alert per friend every few minutes, however often a challenge is re-sent.
+    const pushedLately = (state.battles || []).some(b => b.challenge && !b.tournament_id && b.host_id === p.id && b.invite_id === friend.id && now - (b.created_at || 0) < CHALLENGE_PUSH_GAP_MS);
     return { ...openBattleRoom(state, p, school, stake, rangeCodes, now, { invite_id: friend.id, challenge: true, mode: body.mode }), challenge: true, friend: friend.name,
-      _push: [{ to: [friend.id], title: `⚔️ ${p.display_name}의 도전장!`, body: `야차전 도전장이 왔어요${stake ? ` · 판돈 ${stake}코인` : ''}. 몇 분 안에 받아 주세요!`, url: '/?go=yacha', tag: 'challenge', urgent: true }] };
+      _push: pushedLately ? [] : [{ to: [friend.id], title: `⚔️ ${p.display_name}의 도전장!`, body: `야차전 도전장이 왔어요${stake ? ` · 판돈 ${stake}코인` : ''}. 몇 분 안에 받아 주세요!`, url: '/?go=challenge', tag: 'challenge', urgent: true }] };
   }
   if (path === '/battle/invite' && method === 'GET') {
     requireRole(p, 'student');
@@ -1383,6 +1411,9 @@ export async function service(state, method, path, body, token, options = {}) {
     checkBattleEntry(state, p, battle.stake, now);
     const host = state.profiles.find(x => x.id === battle.host_id);
     if (!host) fail('대결 방을 찾지 못했어요.', 404);
+    // The host's coins are only held once the match starts: coins spent while waiting
+    // (코인 뽑기) must not leave a stake the host can no longer pay.
+    if (battle.stake > 0 && coinBalance(state, host) < battle.stake) fail('방을 만든 친구의 코인이 판돈보다 적어졌어요. 다른 방에 들어가 주세요.', 409);
     Object.assign(battle, { guest_id: p.id, status: 'active', joined_at: now });
     battle.tickets[p.id] = battleTicket();
     return { id: battle.id, stake: battle.stake, status: 'active', ticket: battle.tickets[p.id], opponent: host.display_name,
@@ -1551,7 +1582,7 @@ export async function service(state, method, path, body, token, options = {}) {
     state.profiles.push(student); return publicProfile(student);
   }
   if (/^\/students\/[^/]+$/.test(path) && method === 'PATCH') {
-    requireRole(p, 'teacher'); const student = state.profiles.find(s => s.id === path.split('/')[2] && s.role === 'student');
+    requireRole(p, 'teacher'); const student = state.profiles.find(s => s.id === path.split('/')[2] && s.role === 'student' && !s.preview_owner_id);
     if (!student) fail('학생을 찾을 수 없습니다.', 404);
     const currentSchool = schoolForProfile(state, student);
     if (!currentSchool || !p.school_ids?.includes(currentSchool.id) || currentSchool.division !== activeTeacherDivision(p)) fail('현재 부서의 담당 학생만 변경할 수 있습니다.', 403);
@@ -1574,7 +1605,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (/^\/students\/[^/]+$/.test(path) && method === 'DELETE') {
     requireRole(p, 'teacher');
     const studentId = path.split('/')[2];
-    const student = state.profiles.find(s => s.id === studentId && s.role === 'student');
+    const student = state.profiles.find(s => s.id === studentId && s.role === 'student' && !s.preview_owner_id);
     if (!student) fail('학생을 찾을 수 없습니다.', 404);
     const currentSchool = schoolForProfile(state, student);
     if (!currentSchool || !p.school_ids?.includes(currentSchool.id) || currentSchool.division !== activeTeacherDivision(p)) fail('현재 부서의 담당 학생만 삭제할 수 있습니다.', 403);
@@ -1791,7 +1822,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const due = Number(body.due_at); if (!Number.isFinite(due) || due <= Date.now()) fail('마감 시간을 확인해주세요.');
     const common = { id: id(), teacher_id: p.id, title: str(body.title), class_name: targetClass, division: school.division, school_id: school.id, school: school.name, range_codes: [...new Set(body.range_codes.map(String))], book_id: words[0].book_id, active: true, created_at: Date.now(), due_at: due };
     if (path === '/assignments') { const a = { ...common, target_questions: integer(body.target_questions, 5, 500, '목표 학습량') }; state.assignments.unshift(a); return a; }
-    if (!EXAM_TYPES[body.exam_type]) fail('시험 유형을 선택해주세요.');
+    if (!own(EXAM_TYPES, body.exam_type)) fail('시험 유형을 선택해주세요.');
     const available = Number(body.available_at); if (!Number.isFinite(available) || available >= due) fail('시작 시간은 마감 시간보다 빨라야 합니다.');
     // The UI offers 10/20/30 or all words. Resolve "all" against the
     // selected school/ranges so the stored exam remains a concrete question
@@ -1828,7 +1859,7 @@ export async function service(state, method, path, body, token, options = {}) {
       const words = scopedWords(state, school.id, ranges, examWordGrade(targetClass));
       if (body.class_name !== undefined) e.class_name = targetClass;
       if (body.range_codes !== undefined) { e.range_codes = ranges; e.book_id = words[0].book_id; }
-      if (body.exam_type !== undefined) { if (!EXAM_TYPES[body.exam_type]) fail('시험 유형을 선택해주세요.'); e.exam_type = body.exam_type; }
+      if (body.exam_type !== undefined) { if (!own(EXAM_TYPES, body.exam_type)) fail('시험 유형을 선택해주세요.'); e.exam_type = body.exam_type; }
       if (body.question_count !== undefined) e.question_count = body.question_count === 'all' ? words.length : integer(body.question_count, 1, Math.min(500, words.length), '문제 수');
       if (body.duration_sec !== undefined) e.duration_sec = integer(body.duration_sec, 5, 10800, '제한시간');
       if (body.available_at !== undefined) {
@@ -1909,7 +1940,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const school = schoolForProfile(state, p);
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
     if (body.school_id && body.school_id !== school.id) fail('현재 학교의 범위만 학습할 수 있어요.', 403);
-    if (!PRACTICE_TYPES[body.mode]) fail('연습 방식을 선택해주세요.');
+    if (!own(PRACTICE_TYPES, body.mode)) fail('연습 방식을 선택해주세요.');
     const requestedRunMode = body.run_mode === 'test' ? 'test' : 'practice';
     const selfTestModes = ['write_meaning','spell','eng2mean','mean2eng'];
     const runMode = requestedRunMode === 'test' && selfTestModes.includes(body.mode) ? 'test' : 'practice';
@@ -1923,11 +1954,13 @@ export async function service(state, method, path, body, token, options = {}) {
     const manualWords = selectedWordIds.length ? gradeWords.filter(word => selectedWordSet.has(word.id)) : [];
     if (selectedWordIds.length && manualWords.length !== selectedWordIds.length) fail('선택한 단어를 다시 확인해주세요.', 409);
     const daily = isDailyQuest ? composeDailyQuest(state, p.id, school, p.class_name, 20) : null;
-    const words = manualWords.length ? manualWords : isDailyQuest ? daily.words : scopedWords(state, school.id, body.range_codes, p.class_name);
+    // Ranges are kept on the practice record: no duplicates, and no more than a grade could have.
+    const askedRanges = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(value => String(value).slice(0, 40)))].slice(0, 60) : [];
+    const words = manualWords.length ? manualWords : isDailyQuest ? daily.words : scopedWords(state, school.id, askedRanges, p.class_name);
     if (!words.length) fail('학습할 단어가 없습니다. 선생님에게 단어 범위를 확인해주세요.', 409);
     const manualSelection = manualWords.length > 0;
     const coverAll = manualSelection ? body.cover_all === true || body.target === undefined : isDailyQuest || body.cover_all === true;
-    const rangeCodes = manualSelection ? [...new Set(words.map(word => String(word.range_code)))] : isDailyQuest ? daily.range_codes : body.range_codes;
+    const rangeCodes = manualSelection ? [...new Set(words.map(word => String(word.range_code)))] : isDailyQuest ? daily.range_codes : askedRanges;
     const requestedTarget = manualSelection
       ? (body.target === undefined ? words.length : integer(body.target, 5, Math.min(500, words.length), '학습량'))
       : isDailyQuest ? daily.target : coverAll ? words.length : integer(body.target || 10, 5, 500, '학습량');
@@ -1952,6 +1985,8 @@ export async function service(state, method, path, body, token, options = {}) {
         x.leave_ms = Math.min(3600000, Number(x.leave_ms || 0) + Math.max(0, Math.min(3600000, Number(body.ms) || 0)));
         return { leaves: Number(x.leaves || 0), limit: TEST_LEAVE_LIMIT, finished: false };
       }
+      // Time already up: hand it in as a time-out, not as leaving.
+      if (x.timer_mode !== 'question' && Number(x.deadline || 0) && Date.now() >= Number(x.deadline) + TEST_ANSWER_GRACE_MS) { finishPractice(x, state, true); return { ...practiceView(x, state), leaves: Number(x.leaves || 0), limit: TEST_LEAVE_LIMIT }; }
       x.leaves = Number(x.leaves || 0) + 1;
       if (x.leaves >= TEST_LEAVE_LIMIT) {
         x.left_out = true;
@@ -1963,7 +1998,7 @@ export async function service(state, method, path, body, token, options = {}) {
     // V13.80 PASS: a word the student can't recall goes to the end of the test, once.
     if (path.endsWith('/pass')) {
       if (method !== 'POST') fail('요청 방식을 확인해주세요.', 405);
-      if (x.run_mode !== 'test') fail('실전시험에서만 넘길 수 있어요.', 409);
+      if (x.run_mode !== 'test' || x.timer_mode === 'question') fail('이 시험에서는 넘길 수 없어요.', 409);
       if (x.finished) return practiceView(x, state);
       if (Number(x.deadline || 0) && Date.now() >= x.deadline + TEST_ANSWER_GRACE_MS) { finishPractice(x, state, true); return practiceView(x, state); }
       // A repeated tap (or a retry after the pass was saved) just gets the current question.
@@ -2318,7 +2353,7 @@ function practiceView(x, state) {
     leaves: Number(x.leaves || 0), leave_ms: Number(x.leave_ms || 0), left_out: !!x.left_out,
     pass_count: Number(x.pass_count || 0), passed_left: (x.passed || []).length,
     revisit: !!(x.run_mode === 'test' && x.question && (x.passed_once || []).includes(x.question.word_id)),
-    can_pass: !!(x.run_mode === 'test' && !x.finished && x.question && !(x.passed_once || []).includes(x.question.word_id) && Number(x.target || 0) - Number(x.score_total || 0) > 1),
+    can_pass: !!(x.run_mode === 'test' && x.timer_mode !== 'question' && !x.finished && x.question && !(x.passed_once || []).includes(x.question.word_id) && Number(x.target || 0) - Number(x.score_total || 0) > 1),
     shared_to_teacher_at: x.shared_to_teacher_at || null,
     wrong_count: x.finished ? wrongCount : undefined,
     unanswered_count: x.finished ? unansweredCount : undefined,

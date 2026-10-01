@@ -5,8 +5,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { emptyState } from './state.mjs';
-import { passwordHash, publicProfile } from './auth.mjs';
-import { service, scopedWords } from './service.mjs';
+import { passwordHash, publicProfile, hashToken } from './auth.mjs';
+import { service, scopedWords, sweep } from './service.mjs';
 import { DAY_MS, rankingWeek } from './competition.mjs';
 import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, visibleTitleKeys } from '../public/modules/titles.js';
@@ -98,6 +98,14 @@ export async function runRewardsChecks(assert, expectStatus) {
   const counts = {}, rnd = seeded(7);
   for (let i = 0; i < 20000; i++) { const got = drawLucky(rnd); counts[got.mult] = (counts[got.mult] || 0) + 1; }
   assert(LUCKY_ODDS.every(o => Math.abs((counts[o.mult] || 0) / 200 - o.rate) < 1.2), 'V13.68 capsules come out at the odds shown on the machine');
+  // V13.81: a stake waiting in a room is not spent on capsules, and a host who can no longer
+  // pay the stake cannot be joined.
+  await expectStatus(409, () => service(state, 'POST', '/lucky/pull', { bet: 10 }, tokens['qa-rw-c']), 'V13.81 coins staked in a waiting room are not spent on capsules');
+  profile('qa-rw-c').points_spent = 395;
+  await expectStatus(409, () => service(state, 'POST', '/battle/join', { code: plain.code }, tokens['qa-rw-b']), 'V13.81 a room whose host has fewer coins than the stake cannot be joined');
+  profile('qa-rw-c').points_spent = 0;
+  assert(state.battles.find(b => b.id === plain.id).status === 'waiting', 'V13.81 the refused join leaves the room waiting');
+  await service(state, 'POST', `/battle/rooms/${plain.id}/cancel`, {}, tokens['qa-rw-c']);
   const poor = profile('qa-rw-c');
   poor.points_spent = 390; // 400 earned (a waiting room holds no stake): 10 left
   await expectStatus(400, () => service(state, 'POST', '/lucky/pull', { bet: 20 }, tokens['qa-rw-c']), 'V13.68 a coin capsule needs the coins it bets');
@@ -296,6 +304,26 @@ export async function runRewardsChecks(assert, expectStatus) {
   timedX.deadline = Date.now() - 5000;
   const lateAnswer = await service(state, 'POST', `/practice/${timed.id}/answer`, { question_id: graceAnswer.question_id, answer: 'x' }, tD);
   assert(lateAnswer.finished === true && lateAnswer.auto_submitted === true, 'V13.80 when the time is up the test is handed in with the answers so far');
+  // An abandoned test is handed in by the hourly sweep once its time is up (not 3 days later).
+  const left = await service(state, 'POST', '/practice/start', { school: '단원고', range_codes: range, mode: 'eng2mean', target: 5, run_mode: 'test' }, tD);
+  const leftX = state.practices.find(x => x.id === left.id);
+  await service(state, 'POST', `/practice/${left.id}/answer`, { question_id: left.question_id, answer: left.question.options[0] }, tD);
+  leftX.deadline = Date.now() - 10000;
+  sweep(state);
+  const sweptSession = state.sessions.find(x => x.id === left.id);
+  assert(leftX.finished && sweptSession?.auto_submitted === true && sweptSession.answered_count === 1, 'V13.80 a test left open past its time is handed in by the sweep');
+  // Leaving after the time is up is a time-out, not a leave.
+  const late2 = await service(state, 'POST', '/practice/start', { school: '단원고', range_codes: range, mode: 'eng2mean', target: 5, run_mode: 'test' }, tD);
+  state.practices.find(x => x.id === late2.id).deadline = Date.now() - 10000;
+  const lateLeave = await service(state, 'POST', `/practice/${late2.id}/leave`, { phase: 'out' }, tD);
+  assert(lateLeave.finished === true && lateLeave.auto_submitted === true && !lateLeave.left_out && lateLeave.leaves === 0, 'V13.80 leaving after the time is up hands the test in as a time-out');
+  // Tests started before v13.80 (a countdown per word) have no PASS.
+  const old = await service(state, 'POST', '/practice/start', { school: '단원고', range_codes: range, mode: 'eng2mean', target: 5, run_mode: 'test' }, tD);
+  const oldX = state.practices.find(x => x.id === old.id);
+  Object.assign(oldX, { timer_mode: 'question', deadline: null, question_deadline: Date.now() + 9000 });
+  assert((await service(state, 'GET', `/practice/${old.id}`, {}, tD)).can_pass === false, 'V13.80 an older per-word-countdown test shows no PASS');
+  await expectStatus(409, () => service(state, 'POST', `/practice/${old.id}/pass`, { question_id: old.question_id }, tD), 'V13.80 and cannot PASS');
+  assert(source('../public/modules/sessions.js').includes("Number(practiceState.deadline || 0) > 0 && Number(practiceState.deadline) <= Date.now() + practiceOffset"), 'V13.80 coming back to a practice without a time limit never ends it');
   const out1 = await service(state, 'POST', `/practice/${test.id}/leave`, { phase: 'out' }, tE);
   const back1 = await service(state, 'POST', `/practice/${test.id}/leave`, { phase: 'back', ms: 4200 }, tE);
   assert(out1.leaves === 1 && out1.limit === TEST_LEAVE_LIMIT && out1.finished === false && back1.leaves === 1 && testX().leave_ms === 4200, 'V13.76 leaving the test is counted, with how long');
@@ -327,4 +355,56 @@ export async function runRewardsChecks(assert, expectStatus) {
   const card78 = source('../public/modules/card-levelup.js'), app78 = source('../public/app.js'), css78 = source('../public/v1378.css'), build78 = source('./build-assets.mjs'), home78 = source('../public/modules/student.js');
   assert(card78.includes('export function maybeCardLevelUp(A)') && card78.includes('if (to.index > from.index) upgradeScene(') && card78.includes('setTimeout(() => bump(level), 900)') && card78.includes('waitForClear(root') && card78.includes("sumus:card-level:") && app78.includes('queueMicrotask(() => maybeCardLevelUp(A))'), 'V13.78 a level-up plays on the home card; a new tier plays the card-upgrade scene after any evolution moment');
   assert(home78.includes('function cardFx(tier)') && build78.includes('"v1378.css"') && ['c', 'u', 'r', 'rr', 'rrr', 'sr', 'hr', 'ur', 'ssr', 'lgd'].every(k => k === 'c' || css78.includes(`.tier-${k} `)) && css78.includes('.card-up-v1378') && css78.includes('prefers-reduced-motion'), 'V13.78 every tier has its own finish (styles bundled, calmer with reduced motion)');
+
+  /* ---------- V13.81 점검: limits on what one student can store or send ---------- */
+  state.profiles.push(student('qa-rw-f', '라온'), student('qa-rw-g', '마루'), student('qa-rw-h', '바다'));
+  for (const id of ['qa-rw-f', 'qa-rw-g', 'qa-rw-h']) tokens[id] = await login(id);
+  for (const id of ['qa-rw-f', 'qa-rw-g', 'qa-rw-h']) state.sessions.push({ id: `qa-rw-s81-${id}`, student_id: id, division: 'high', school_id: 'danwon-high', school: '단원고', mode: 'eng2mean', run_mode: 'practice', total: 20, correct: 18, answered_count: 20, score: 90, xp: 200, reward_points: 400, created_at: now - DAY_MS });
+  const tF = tokens['qa-rw-f'];
+  const grammar = await service(state, 'PATCH', '/grammar-progress/qa-g81', {
+    sentence_count: 3, choice_count: 4,
+    answers: { '0:0': 'that', '0:1': 'x'.repeat(41), '9:0': 'is', '00001:0': 'are', '1:0': 'was', '1:1': 'were', '2:0': 'a', '2:1': 'b', '2:2': 'c' },
+    wrong_keys: [...Array.from({ length: 500 }, (_, i) => `${i % 3}:${i}`), '7:0', '1:'.padEnd(5000, '9')]
+  }, tF);
+  const gKeys = Object.keys(grammar.answers);
+  assert(gKeys.length === 4 && !gKeys.includes('9:0') && !gKeys.includes('0:1') && grammar.answers['1:0'] === 'was' && gKeys.includes('1:1'), 'V13.81 grammar answers: real sentences only, short answers, no more than the passage has');
+  assert(grammar.wrong_keys.length === 4 && grammar.wrong_keys.every(k => /^[0-2]:\d{1,3}$/.test(k)), 'V13.81 grammar wrong words are capped the same way');
+  await expectStatus(400, () => service(state, 'PATCH', '/grammar-progress/qa-g81b', { sentence_count: 3, choice_count: 151 }, tF), 'V13.81 a passage cannot claim more choices than any real one');
+  const ranged = await service(state, 'POST', '/practice/start', { school: '단원고', range_codes: Array(5000).fill(range[0]), mode: 'eng2mean', target: 5 }, tF);
+  assert(state.practices.find(x => x.id === ranged.id).range_codes.length === 1, 'V13.81 a practice keeps each range once (a repeated list is not stored)');
+  await service(state, 'POST', `/practice/${ranged.id}/finish`, {}, tF);
+  await expectStatus(400, () => service(state, 'POST', '/profile/style', { avatar_key: 'constructor', avatar_accessory: 'toString', avatar_frame: 'constructor', avatar_title: 'rookie' }, tF), 'V13.81 a look named after a JavaScript built-in is refused');
+  await expectStatus(400, () => service(state, 'POST', '/practice/start', { school: '단원고', range_codes: range, mode: 'constructor' }, tF), 'V13.81 so is a practice mode named after one');
+  // Challenges: one at a time per friend, one phone alert per friend every few minutes, and a
+  // cap on rooms opened in 10 minutes.
+  const ch1 = await service(state, 'POST', '/battle/challenge', { stake: 10, friend_id: 'qa-rw-g', range_codes: range }, tF);
+  assert(ch1._push.length === 1 && ch1._push[0].url === '/?go=challenge', 'V13.81 the first 도전장 buzzes the friend, and opens the challenge itself');
+  const friendsH = (await service(state, 'GET', '/battle/friends', {}, tokens['qa-rw-h'])).friends;
+  assert(friendsH.find(f => f.id === 'qa-rw-g')?.invited === true, 'V13.81 a friend already holding a 도전장 shows as invited');
+  await expectStatus(409, () => service(state, 'POST', '/battle/challenge', { stake: 10, friend_id: 'qa-rw-g', range_codes: range }, tokens['qa-rw-h']), 'V13.81 a second 도전장 to the same friend waits (only one is shown)');
+  await service(state, 'POST', `/battle/rooms/${ch1.id}/cancel`, {}, tF);
+  const ch2 = await service(state, 'POST', '/battle/challenge', { stake: 10, friend_id: 'qa-rw-g', range_codes: range }, tF);
+  assert(Array.isArray(ch2._push) && ch2._push.length === 0, 'V13.81 sent again right away: no second alert');
+  await service(state, 'POST', `/battle/rooms/${ch2.id}/cancel`, {}, tF);
+  for (let i = 2; i < 12; i++) { const r = await service(state, 'POST', '/battle/rooms', { stake: 10, range_codes: range }, tF); await service(state, 'POST', `/battle/rooms/${r.id}/cancel`, {}, tF); }
+  await expectStatus(429, () => service(state, 'POST', '/battle/rooms', { stake: 10, range_codes: range }, tF), 'V13.81 at most 12 rooms in 10 minutes');
+  // Teacher preview accounts are not classmates: not in the 도전장 list, not editable as students,
+  // and only the preview token goes back to the teacher.
+  const tT = tokens['qa_rw_teacher'];
+  const previewLogin = await service(state, 'POST', '/teacher/student-preview', { school_id: 'danwon-high', grade: '고1A' }, tT);
+  const previewId = previewLogin.profile.id;
+  assert(!(await service(state, 'GET', '/battle/friends', {}, tF)).friends.some(f => f.id === previewId), 'V13.81 a preview account is not in the 도전장 list');
+  await expectStatus(404, () => service(state, 'PATCH', `/students/${encodeURIComponent(previewId)}`, { password: 'Changed1!' }, tT), 'V13.81 a preview account cannot be edited as a student');
+  const fakeToken = 'qa-preview-fake-token-81';
+  state.tokens.push({ hash: hashToken(fakeToken), user_id: previewId, expires_at: Date.now() + 60000 });
+  await expectStatus(403, () => service(state, 'POST', '/student-preview/exit', {}, fakeToken), 'V13.81 only the preview token handed to the teacher goes back to the teacher');
+  assert((await service(state, 'POST', '/student-preview/exit', {}, previewLogin._cookie)).profile.id === 'qa-rw-teacher', 'V13.81 the real preview token still goes back');
+  const worker81 = source('../cloudflare/worker.mjs'), sync81 = source('../cloudflare/local-first.mjs'), battle81 = source('../public/modules/battle.js'), app81 = source('../public/app.js');
+  const student81 = source('../public/modules/student.js'), gift81 = source('../public/modules/celebrate.js'), lucky81 = source('../public/modules/lucky.js');
+  assert(worker81.includes("!hasLiveSession(this.mutations.current().state, token)") && worker81.includes("OPEN_POST_PATHS = new Set(['/api/login', '/api/signup'])") && worker81.includes("url.pathname === '/api/profile/password'"), 'V13.81 changes without a session are turned away before the queue; password changes are rate-limited');
+  assert(sync81.includes('if (!previous.size && supabase.readParts)') && sync81.includes("removed = Object.keys(remote.parts || {}).filter(key => !parts.has(key))"), 'V13.81 sending every part again also removes parts deleted here');
+  assert(battle81.includes("Object.assign(q, { typed: [], hint: q.hint || ''") && battle81.includes("f.invited ? ' · 도전장 받는 중'"), 'V13.81 a 실력전 word after a reconnect can be typed; friends with a 도전장 show it');
+  assert(app81.includes("if (go === 'challenge')") && app81.includes('A.yachaOpts = { accept: invite }; return navigate(\'yacha\')'), 'V13.81 the 도전장 alert opens the challenge');
+  assert(!student81.includes('/^L\\\\d+$/') && !app81.includes('/^L\\\\d+$/') && student81.includes('const textbookCodes = state.codes.filter(code => /^L\\d+$/i.test(String(code)));'), 'V13.81 the 교과서 tab finds textbook lessons (L1, L2)');
+  assert(gift81.includes('if (Array.isArray(res?.gifts) && !res.gifts.length)') && lucky81.includes("if (audio) { if (audio.state !== 'running') audio.resume"), 'V13.81 a gift opened on another phone is not shown again; capsule sounds wake after iOS pauses them');
 }

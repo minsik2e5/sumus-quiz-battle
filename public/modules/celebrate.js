@@ -71,6 +71,16 @@ export function giftMoment(A, gifts, done) {
     catch (err) { toast(err.message); opened = false; button.disabled = false; return; }
     if (res?.points_balance !== undefined && A.data?.stats) A.data.stats.points_balance = res.points_balance;
     A.data.gifts = [];
+    // Already opened on another phone: nothing new to show (the coins were counted once).
+    if (Array.isArray(res?.gifts) && !res.gifts.length) { $('#modal-root').innerHTML = ''; toast('선물은 이미 받았어요.'); done?.(); return; }
+    // What the server just opened, not this phone's older list.
+    if (Number.isFinite(Number(res?.coins))) {
+      const reward = $('.cel-gift-reward [data-cel-count]');
+      if (reward) reward.dataset.celCount = String(Number(res.coins));
+      $('.cel-gift-reward .cel-reward')?.setAttribute('aria-label', `${num(res.coins)} 코인`);
+      const count = $('.cel-gift-count');
+      if (count && Array.isArray(res.gifts)) { count.textContent = `선물 ${res.gifts.length}개`; count.hidden = res.gifts.length < 2; }
+    }
     stage.dataset.state = 'open';
     buzz([30, 50, 30, 50, 120]);
     $('.cel-gift-title').textContent = '코인 선물 받았어요!';

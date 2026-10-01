@@ -121,7 +121,7 @@ export function refundRemovedBadges(p) {
     for (const key of badges) delete g.items[key];
     changed = true;
   }
-  if (typeof p.avatar_accessory === 'string' && !ACCESSORIES[p.avatar_accessory]) { p.avatar_accessory = 'none'; changed = true; }
+  if (typeof p.avatar_accessory === 'string' && !Object.hasOwn(ACCESSORIES, p.avatar_accessory)) { p.avatar_accessory = 'none'; changed = true; }
   return changed;
 }
 
@@ -284,7 +284,7 @@ export function careView(p, lastActive, now = Date.now()) {
   };
 }
 export function petCare(p, kind, { pet, now = Date.now() }) {
-  if (!PET_CARE[kind]) fail('할 수 있는 교감이 아니에요.');
+  if (typeof kind !== 'string' || !Object.hasOwn(PET_CARE, kind)) fail('할 수 있는 교감이 아니에요.');
   if (!pet) fail('먼저 펫을 골라주세요.', 409);
   const c = p.care ||= {};
   const today = dayKey(now);

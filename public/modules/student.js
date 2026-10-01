@@ -602,8 +602,8 @@ function memorizationPanel(A) {
       })()
     : (() => {
         const state = highSchoolMemorizeState(A);
-        const textbookCodes = state.codes.filter(code => /^L\\d+$/i.test(String(code)));
-        const mockCodes = state.codes.filter(code => !/^L\\d+$/i.test(String(code)));
+        const textbookCodes = state.codes.filter(code => /^L\d+$/i.test(String(code)));
+        const mockCodes = state.codes.filter(code => !/^L\d+$/i.test(String(code)));
         const availableTypes = [['mock','모의고사',mockCodes],['textbook','교과서',textbookCodes]].filter(([, , codes]) => codes.length);
         if (!availableTypes.some(([key]) => key === A.memorizeRangeType)) A.memorizeRangeType = textbookCodes.includes(state.code) ? 'textbook' : (availableTypes[0]?.[0] || 'mock');
         const visibleCodes = A.memorizeRangeType === 'textbook' ? textbookCodes : mockCodes;
@@ -783,7 +783,7 @@ function exam(A) {
     <section class="setup-section"><div class="step-label"><span>01</span>시험 범위</div>${scopeUi}</section>
     ${middle ? '' : `<section class="setup-section"><div class="step-label"><span>02</span>문항 수</div>${examTargetGrid(A, count)}</section>`}
     <section class="setup-section"><div class="step-label"><span>${middle ? '02' : '03'}</span>시험 방식</div>${examWritingPicker(A, testMode)}</section>
-    ${testMode && count ? `<div class="test-rules-v1380"><span>⏳ 시험 전체 <b>${Math.round(testDurationSec(A.mode, target || count) / 60)}분</b> · 문제마다 재지 않아요</span><span>⏭ 헷갈리면 <b>PASS</b> → 마지막에 다시 나와요</span><span>📵 다른 앱으로 <b>${TEST_LEAVE_LIMIT}번</b> 나가면 자동 제출</span></div>` : ''}
+    ${testMode && count ? `<div class="test-rules-v1380"><span>⏳ 시험 전체 <b>${(sec => sec % 60 ? `${Math.floor(sec / 60)}분 ${sec % 60}초` : `${sec / 60}분`)(testDurationSec(A.mode, target || count))}</b> · 문제마다 재지 않아요</span><span>⏭ 헷갈리면 <b>PASS</b> → 마지막에 다시 나와요</span><span>📵 다른 앱으로 <b>${TEST_LEAVE_LIMIT}번</b> 나가면 자동 제출</span></div>` : ''}
     <div class="exam-start-inline"><p>${esc(scopeLabel)} · ${target || 0}문제 · ${esc(PRACTICE_TYPES[A.mode] || '뜻쓰기')}</p><button class="btn primary full" data-action="start-exam-run" ${count ? '' : 'disabled'}>${testMode ? '실전시험 시작' : '연습시험 시작'} ${icon('arrow')}</button></div>`;
 }
 
