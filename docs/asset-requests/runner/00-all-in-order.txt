@@ -38,7 +38,7 @@ Subject: 몽이, a Shiba-like puppy with cream and soft golden-orange fur, white
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -47,7 +47,7 @@ Subject: 몽이, a Shiba-like puppy with cream and soft golden-orange fur, white
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -56,34 +56,34 @@ Subject: 몽이, a Shiba-like puppy with cream and soft golden-orange fur, white
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
 Style: premium cute chibi fantasy pet, soft 3D-painted anime illustration, fluffy fur drawn with fine strands, soft pastel colors, big glossy eyes with white highlights, light pink blush, a thin warm golden-white rim light along the outline, clean soft shading. Every cell shows exactly the same character design (same colors, markings, proportions and accessories); only the pose and expression change. Full body, 3/4 view facing the viewer's right, feet near the bottom of the cell.
-Subject: 핑키, a round pastel-pink piglet with soft pink skin, small floppy ears with pink insides, a round snout, big glossy brown eyes, a tiny curly tail. This is the baby stage: small, very round, no accessories.
+Subject: 핑키, a round pastel-pink piglet with soft pink skin, small floppy ears with pink insides, a big round pink pig snout with two nostrils (the snout must stay visible in every cell, also in the sad one — never a small dog nose), big glossy brown eyes, a tiny curly tail. This is the baby stage: small, very round, no accessories.
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
 Style: premium cute chibi fantasy pet, soft 3D-painted anime illustration, fluffy fur drawn with fine strands, soft pastel colors, big glossy eyes with white highlights, light pink blush, a thin warm golden-white rim light along the outline, clean soft shading. Every cell shows exactly the same character design (same colors, markings, proportions and accessories); only the pose and expression change. Full body, 3/4 view facing the viewer's right, feet near the bottom of the cell.
-Subject: 핑키, a round pastel-pink piglet with soft pink skin, small floppy ears with pink insides, a round snout, big glossy brown eyes, a tiny curly tail. This is the grown stage: a little bigger, wearing a green scarf with a small gold star charm.
+Subject: 핑키, a round pastel-pink piglet with soft pink skin, small floppy ears with pink insides, a big round pink pig snout with two nostrils (the snout must stay visible in every cell, also in the sad one — never a small dog nose), big glossy brown eyes, a tiny curly tail. This is the grown stage: a little bigger, wearing a green scarf with a small gold star charm.
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
 Style: premium cute chibi fantasy pet, soft 3D-painted anime illustration, fluffy fur drawn with fine strands, soft pastel colors, big glossy eyes with white highlights, light pink blush, a thin warm golden-white rim light along the outline, clean soft shading. Every cell shows exactly the same character design (same colors, markings, proportions and accessories); only the pose and expression change. Full body, 3/4 view facing the viewer's right, feet near the bottom of the cell.
-Subject: 핑키, a round pastel-pink piglet with soft pink skin, small floppy ears with pink insides, a round snout, big glossy brown eyes, a tiny curly tail. This is the final stage: wearing a green cape with a gold star clasp, small white feathered wings, a soft golden sparkle aura.
+Subject: 핑키, a round pastel-pink piglet with soft pink skin, small floppy ears with pink insides, a big round pink pig snout with two nostrils (the snout must stay visible in every cell, also in the sad one — never a small dog nose), big glossy brown eyes, a tiny curly tail. This is the final stage: wearing a green cape with a gold star clasp, small white feathered wings, a soft golden sparkle aura.
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -92,7 +92,7 @@ Subject: 나비, a silver-grey tabby kitten with darker grey stripes, white ches
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -101,7 +101,7 @@ Subject: 나비, a silver-grey tabby kitten with darker grey stripes, white ches
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -110,7 +110,7 @@ Subject: 나비, a silver-grey tabby kitten with darker grey stripes, white ches
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -119,7 +119,7 @@ Subject: 용이, a fluffy white baby dragon with pastel aqua-blue scales along t
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -128,7 +128,7 @@ Subject: 용이, a fluffy white baby dragon with pastel aqua-blue scales along t
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -137,7 +137,7 @@ Subject: 용이, a fluffy white baby dragon with pastel aqua-blue scales along t
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -146,7 +146,7 @@ Subject: 밤부, a round panda cub with very dark brown and white fur, dark eye 
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -155,7 +155,7 @@ Subject: 밤부, a round panda cub with very dark brown and white fur, dark eye 
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -164,7 +164,7 @@ Subject: 밤부, a round panda cub with very dark brown and white fur, dark eye 
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -173,7 +173,7 @@ Subject: 초롱, a cute little snake with a cream belly and green leaf-shaped sc
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -182,7 +182,7 @@ Subject: 초롱, a cute little snake with a cream belly and green leaf-shaped sc
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -191,7 +191,7 @@ Subject: 초롱, a cute little snake with a cream belly and green leaf-shaped sc
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -200,7 +200,7 @@ Subject: 토리, a white bunny with soft pastel-pink petal-like patches on the f
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -209,7 +209,7 @@ Subject: 토리, a white bunny with soft pastel-pink petal-like patches on the f
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -218,7 +218,7 @@ Subject: 토리, a white bunny with soft pastel-pink petal-like patches on the f
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -227,7 +227,7 @@ Subject: 호야, a bright orange fox with a white chest, white muzzle and white 
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -236,7 +236,7 @@ Subject: 호야, a bright orange fox with a white chest, white muzzle and white 
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
@@ -245,7 +245,7 @@ Subject: 호야, a bright orange fox with a white chest, white muzzle and white 
 If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.
 TOP-LEFT cell: HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head
 TOP-RIGHT cell: EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy
-BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)
+BOTTOM-LEFT cell: SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells
 BOTTOM-RIGHT cell: CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.

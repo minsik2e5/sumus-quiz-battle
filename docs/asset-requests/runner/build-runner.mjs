@@ -26,7 +26,7 @@ const PETS = {
     1: 'baby stage: small, very round and fluffy, big head, no accessories',
     2: 'grown stage: a little taller and slimmer, wearing a green bandana scarf with a small gold star charm',
     3: 'final stage: larger and proud, wearing a flowing green cape with gold trim fastened by a gold star clasp, small white feathered angel wings, a few golden sparkles around' } },
-  pig: { ko: '핑키', base: 'a round pastel-pink piglet with soft pink skin, small floppy ears with pink insides, a round snout, big glossy brown eyes, a tiny curly tail', f: {
+  pig: { ko: '핑키', base: 'a round pastel-pink piglet with soft pink skin, small floppy ears with pink insides, a big round pink pig snout with two nostrils (the snout must stay visible in every cell, also in the sad one — never a small dog nose), big glossy brown eyes, a tiny curly tail', f: {
     1: 'baby stage: small, very round, no accessories',
     2: 'grown stage: a little bigger, wearing a green scarf with a small gold star charm',
     3: 'final stage: wearing a green cape with a gold star clasp, small white feathered wings, a soft golden sparkle aura' } },
@@ -59,7 +59,7 @@ const FORM_KO = { 1: '아기', 2: '성장', 3: '최종' };
 const EXPRS = [
   ['happy', '기뻐함', 'HAPPY: eyes closed in a big happy smile, rosy cheeks, two or three small pink hearts floating above the head'],
   ['eat', '냠냠', 'EATING: happily eating from a small round mint food bowl held in front, cheeks puffed, a few crumbs, eyes curved in joy'],
-  ['sad', '시무룩', 'SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard)'],
+  ['sad', '시무룩', 'SAD: slightly sad pouty face with teary sparkling eyes, ears and head drooping a little, still cute (not crying hard); keep the same nose/snout, ears and markings as the other cells'],
   ['cheer', '응원', 'CHEERING: energetic pose with one front paw (or the tail tip for the snake) raised high, determined sparkling eyes, small motion sparkles']
 ];
 
