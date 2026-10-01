@@ -6,6 +6,9 @@ import { battleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
 import { STUDY_COINS, GIFT_AMOUNTS, RPS_MAX_WINS } from '../public/modules/rewards.js';
 import { marketView, trade as stockTrade, rebaseMarket, newMarket } from './market.mjs';
+import { MARKET_OPEN } from '../public/modules/market.js';
+// V13.82 문법 증권거래소 is on hold: closed unless switched on.
+const marketOpen = state => MARKET_OPEN || state.market?.open === true;
 import { rpsView, rpsPlay, rpsCash } from './rewards.mjs';
 import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
@@ -851,7 +854,7 @@ export function sweep(state, now = Date.now()) {
   if (tidyBattles(state)) changed = true;
   if (tidyProfileLogs(state, now)) changed = true;
   // V13.82 문법 증권거래소: a seed for the prices on first start, and a shorter path now and then.
-  if (rebaseMarket(state, now)) changed = true;
+  if (marketOpen(state) && rebaseMarket(state, now)) changed = true;
   const tokens = state.tokens.filter(t => t.expires_at > Date.now());
   if (tokens.length !== state.tokens.length) { state.tokens = tokens; changed = true; }
   return changed;
@@ -1008,7 +1011,7 @@ export async function service(state, method, path, body, token, options = {}) {
       class_league: teacher && selectedSchool ? classLeague(state, competition, selectedSchool, now) : null,
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), bot: botView(p, now) },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now) },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -1178,7 +1181,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/rewards' && method === 'GET') {
     requireRole(p, 'student');
     const now = Date.now();
-    return { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), bot: botView(p, now), points_balance: coinBalance(state, p) };
+    return { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), points_balance: coinBalance(state, p) };
   }
   // V13.73 coin gifts from a teacher: the student opens the waiting gift boxes.
   if (path === '/gifts/open' && method === 'POST') {
@@ -1312,11 +1315,13 @@ export async function service(state, method, path, body, token, options = {}) {
   // V13.82 문법 증권거래소: prices of this hour, and an order at that price.
   if (path === '/market' && method === 'GET') {
     requireRole(p, 'student');
+    if (!marketOpen(state)) fail('문법 증권거래소는 준비 중이에요.', 404);
     return { market: marketView(state, p, coinBalance(state, p)) };
   }
   if (path === '/market/trade' && method === 'POST') {
     requireRole(p, 'student');
-    state.market ||= newMarket();
+    if (!marketOpen(state)) fail('문법 증권거래소는 준비 중이에요.', 404);
+    if (!state.market?.seed) state.market = { ...newMarket(), ...(state.market || {}) };
     if (body.side === 'buy' && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 주식을 살 수 있어요.', 409);
     const done = stockTrade(state, p, { key: str(body.key, 12), side: str(body.side, 8), qty: body.qty, price: body.price }, coinBalance(state, p));
     const balance = coinBalance(state, p);

@@ -43,7 +43,7 @@ const tierTag = tier => `<span class="ga-tier t-${tier}">${GACHA_TIERS[tier].nam
 
 /* ---------- page ---------- */
 export function arcadePage(A) {
-  return `<div class="page-heading arcade-head"><span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>모은 코인으로 코인 뽑기, 가위바위보, 문법 주식, 알 상점을 즐겨요.</p></div>
+  return `<div class="page-heading arcade-head"><span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>모은 코인으로 코인 뽑기, 가위바위보, 알 상점을 즐겨요.</p></div>
     <button type="button" class="arcade-wallet" data-action="coins" aria-label="코인 지갑 열기"><span>${coin()}<b id="ga-balance">${num(A.data.stats?.points_balance || 0)}</b> 코인</span><small>코인 지갑 ${icon('chevron')}</small></button>
     <div data-arcade></div>`;
 }
@@ -96,7 +96,7 @@ export function mountArcade(el, A) {
   api('/rewards').then(res => {
     if (current?.el !== el || current.busy) return;
     const r = rewards(A);
-    r.attendance = res.attendance; r.gacha = res.gacha; r.lucky = res.lucky; r.rps = res.rps; r.bot = res.bot;
+    r.attendance = res.attendance; r.gacha = res.gacha; r.lucky = res.lucky; r.rps = res.rps; r.market_open = res.market_open; r.bot = res.bot;
     A.data.stats.gacha = res.gacha.items;
     setBalance(A, res.points_balance);
     draw();
@@ -121,7 +121,7 @@ export function mountArcade(el, A) {
   });
   // A redraw waits while a capsule or a match is on screen (it would replace the machine).
   const quietDraw = () => { if (!current?.busy) draw(); };
-  if (el.dataset.arcadeView !== 'book') loadMarket().then(() => { quietDraw(); startStockClock(quietDraw); }).catch(() => {});
+  if (el.dataset.arcadeView !== 'book' && rewards(A).market_open) loadMarket().then(() => { quietDraw(); startStockClock(quietDraw); }).catch(() => {});
 }
 let rpsBet = RPS_BETS[0];
 async function playRps(A, resume) {
@@ -133,7 +133,7 @@ async function playRps(A, resume) {
 }
 function draw() {
   if (!current?.el.isConnected) return;
-  current.el.innerHTML = current.el.dataset.arcadeView === 'book' ? collectionHtml(current.A) : `${machineHtml(current.A)}${rpsCard(rewards(current.A).rps, rpsBet, Number(current.A.data.stats?.points_balance || 0))}${stocksCard()}${shopHtml(current.A)}`;
+  current.el.innerHTML = current.el.dataset.arcadeView === 'book' ? collectionHtml(current.A) : `${machineHtml(current.A)}${rpsCard(rewards(current.A).rps, rpsBet, Number(current.A.data.stats?.points_balance || 0))}${rewards(current.A).market_open ? stocksCard() : ''}${shopHtml(current.A)}`;
 }
 
 /* coin capsule */

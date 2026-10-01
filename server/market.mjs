@@ -149,10 +149,12 @@ export function trade(state, p, { key, side, qty, price }, balance, now = Date.n
 const REBASE_AFTER_H = 14 * 24;
 export function rebaseMarket(state, now = Date.now()) {
   const market = state.market;
-  if (!market?.seed) { state.market = newMarket(now); return true; }
+  // `open` (switching the market on through the state) is kept.
+  const keep = market?.open === true ? { open: true } : {};
+  if (!market?.seed) { state.market = { ...newMarket(now), ...keep }; return true; }
   const hour = hourOf(now);
   if (hour - market.start < REBASE_AFTER_H) return false;
   const start = hour - MARKET.history - 24, c = pathTo(market, start);
-  state.market = { seed: market.seed, start, from: { ...c.raw } };
+  state.market = { seed: market.seed, start, from: { ...c.raw }, ...keep };
   return true;
 }

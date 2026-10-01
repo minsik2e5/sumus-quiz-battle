@@ -16,7 +16,7 @@ import { createPracticeMatch } from '../public/modules/battle-bot.js';
 import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
 import { addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, rpsPlay, rpsCash, rpsView, rewardIncome } from './rewards.mjs';
 import { marketPrices } from './market.mjs';
-import { STOCKS, MARKET, tradeFee, newsText } from '../public/modules/market.js';
+import { STOCKS, MARKET, MARKET_OPEN, tradeFee, newsText } from '../public/modules/market.js';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 // A small deterministic random source for the odds checks.
@@ -454,8 +454,13 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(tstats.rps_jackpots === 1 && titleUnlocked('rpsjack', tstats) && !titleUnlocked('rpsgod', tstats), 'V13.82 the ×8 title opens with the first ×8');
   const rps82 = source('../public/modules/rps.js');
   assert(rps82.includes('const TALK = {') && rps82.includes("box.classList.toggle('tense', tense)") && rps82.includes("stamp(res.done ? '×8!' : 'WIN!'") && rps82.includes('function skipIntro()') && rps82.includes('robotRow(g.robot)'), 'V13.82 the match: entrance, 로보\'s talk, clash stamp, tension, 로보\'s last hands');
-  // 문법 증권거래소
-  assert(!(await service(state, 'GET', '/market', {}, tG)).market.open || state.market?.seed, 'V13.82 the market needs its seed');
+  // 문법 증권거래소 (on hold: shipped switched off, checked here switched on through the state)
+  assert(MARKET_OPEN === false, 'V13.82 문법 증권거래소 is on hold');
+  await expectStatus(404, () => service(state, 'GET', '/market', {}, tG), 'V13.82 while on hold the market is closed');
+  await expectStatus(404, () => service(state, 'POST', '/market/trade', { key: 'REL', side: 'buy', qty: 1, price: 1 }, tG), 'V13.82 and takes no orders');
+  sweep(state);
+  assert(!state.market?.seed && (await service(state, 'GET', '/rewards', {}, tG)).market_open === false, 'V13.82 no market seed is made, and the app is told it is closed');
+  state.market = { open: true };
   sweep(state);
   const sseed = state.market.seed;
   assert(typeof sseed === 'string' && sseed.length >= 32, 'V13.82 the hourly sweep gives the market a secret seed');
@@ -484,5 +489,5 @@ export async function runRewardsChecks(assert, expectStatus) {
   delete profile('qa-rw-h').stocks.h.REL;
   assert(newsText({ key: 'SUBJ', up: true, pick: 1 }).includes('가정법은') && newsText({ key: 'PART', up: true, pick: 1 }).includes('분사는'), 'V13.82 news lines use 은/는 by the last letter');
   const arcade82 = source('../public/modules/arcade.js'), css82 = source('../public/v1382.css'), build82 = source('./build-assets.mjs');
-  assert(arcade82.includes('rpsCard(rewards(current.A).rps') && arcade82.includes('${stocksCard()}') && arcade82.includes("openStock(k.dataset.key") && build82.includes('"v1382.css"') && css82.includes('.rps-show{') && css82.includes('.stk-card{'), 'V13.82 놀이터 shows 가위바위보 and 문법 증권거래소');
+  assert(arcade82.includes('rpsCard(rewards(current.A).rps') && arcade82.includes("rewards(current.A).market_open ? stocksCard() : ''") && arcade82.includes("openStock(k.dataset.key") && build82.includes('"v1382.css"') && css82.includes('.rps-show{') && css82.includes('.stk-card{'), 'V13.82 놀이터 shows 가위바위보 and 문법 증권거래소');
 }

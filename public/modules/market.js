@@ -4,6 +4,9 @@
 //   base   the price the share keeps coming back to
 //   vol    how much it moves in an hour (0.03 = about 3%)
 //   tip    the grammar point behind the name, shown on the share's page
+// V13.82: on hold (원장님 확인 전). The code ships switched off: the 놀이터 card and the API stay
+// closed unless this is true (or the state has market.open set).
+export const MARKET_OPEN = false;
 export const STOCKS = [
   { key: 'POS8', name: '8품사홀딩스', short: '8품사', base: 150, vol: 0.025, color: '#2f6fed', tip: '명사·대명사·동사·형용사·부사·전치사·접속사·감탄사. 모든 문법의 기초 대장주!' },
   { key: 'REL', name: '관대전자', short: '관계대명사', base: 120, vol: 0.04, color: '#e8590c', tip: 'who·which·that·whose·whom. 앞의 명사를 꾸미는 절을 이끌어요. 뒤는 불완전한 문장!' },
