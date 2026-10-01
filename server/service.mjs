@@ -4,7 +4,7 @@ import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS
 import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
 import { battleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
-import { STUDY_COINS, GIFT_AMOUNTS } from '../public/modules/rewards.js';
+import { STUDY_COINS, GIFT_AMOUNTS, RPS_MAX_WINS } from '../public/modules/rewards.js';
 import { marketView, trade as stockTrade, rebaseMarket, newMarket } from './market.mjs';
 import { rpsView, rpsPlay, rpsCash } from './rewards.mjs';
 import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts } from './rewards.mjs';
@@ -830,6 +830,18 @@ export function hydrateSession(session) {
   return { ...session, ...Object.fromEntries(lists.map(key => [key, session[key].map(record => record ? hydrateRecord(record, words) : record)])) };
 }
 
+// V13.82 가위바위보 명예의 전당: students of the same school who won a ×8 pot this week.
+function rpsHall(state, p, now = Date.now()) {
+  const school = schoolForProfile(state, p)?.id, week = rankingWeek(now);
+  return state.profiles
+    .filter(x => (isRankedStudent(x) || x.id === p.id) && schoolForProfile(state, x)?.id === school)
+    .map(x => ({ x, n: (x.rps?.log || []).filter(e => e.wins >= RPS_MAX_WINS && e.at >= week.start && e.at < week.end).length, at: Math.max(0, ...(x.rps?.log || []).map(e => e.at)) }))
+    .filter(row => row.n > 0)
+    .sort((a, b) => b.n - a.n || b.at - a.at)
+    .slice(0, 5)
+    .map(row => ({ name: row.x.display_name, count: row.n, me: row.x.id === p.id }));
+}
+const rpsFor = (state, p, now = Date.now()) => ({ ...rpsView(p, now), hall: rpsHall(state, p, now) });
 export function sweep(state, now = Date.now()) {
   let changed = false;
   for (const a of state.examAttempts) if (a.status === 'active' && a.deadline <= Date.now()) { finishExam(a, state, true); changed = true; }
@@ -996,7 +1008,7 @@ export async function service(state, method, path, body, token, options = {}) {
       class_league: teacher && selectedSchool ? classLeague(state, competition, selectedSchool, now) : null,
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsView(p, now), bot: botView(p, now) },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), bot: botView(p, now) },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -1166,7 +1178,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/rewards' && method === 'GET') {
     requireRole(p, 'student');
     const now = Date.now();
-    return { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsView(p, now), bot: botView(p, now), points_balance: coinBalance(state, p) };
+    return { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), bot: botView(p, now), points_balance: coinBalance(state, p) };
   }
   // V13.73 coin gifts from a teacher: the student opens the waiting gift boxes.
   if (path === '/gifts/open' && method === 'POST') {
@@ -1290,12 +1302,12 @@ export async function service(state, method, path, body, token, options = {}) {
     const live = p.rps?.live;
     if (!live && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 가위바위보를 할 수 있어요.', 409);
     const result = rpsPlay(p, { bet: Number(body.bet), pick: str(body.pick, 12), double: body.double === true }, coinBalance(state, p));
-    return { ...result, points_balance: coinBalance(state, p) };
+    return { ...result, rps: rpsFor(state, p), points_balance: coinBalance(state, p) };
   }
   if (path === '/rps/cash' && method === 'POST') {
     requireRole(p, 'student');
     const result = rpsCash(p);
-    return { ...result, points_balance: coinBalance(state, p) };
+    return { ...result, rps: rpsFor(state, p), points_balance: coinBalance(state, p) };
   }
   // V13.82 문법 증권거래소: prices of this hour, and an order at that price.
   if (path === '/market' && method === 'GET') {

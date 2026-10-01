@@ -22,6 +22,7 @@
 //   skills       V13.73: pet skills set off in yacha matches (counted from v13.73 on)
 //   exams        V13.73: teacher exams submitted
 //   gifts        V13.73: coin gifts received from a teacher
+//   rps_wins     V13.82: 가위바위보 throws won; rps_jackpots: ×8 pots (three wins in a row)
 // Limited titles belong to one week: they are held only while last week's result stands.
 
 export const TITLE_TIERS = {
@@ -31,7 +32,7 @@ export const TITLE_TIERS = {
   legendary: { name: '전설', order: 4 },
   limited: { name: '한정', order: 5 }
 };
-export const TITLE_GROUPS = { study: '학습', yacha: '야차전', collect: '수집', gacha: '뽑기', limited: '한정' };
+export const TITLE_GROUPS = { study: '학습', yacha: '야차전', collect: '수집', gacha: '뽑기', arcade: '놀이터', limited: '한정' };
 // V13.73: coins for a new title, by tier (paid once when the student first sees it; a limited
 // title pays again each week it is won). 첫걸음 and retired capsule titles pay nothing.
 export const TITLE_COINS = { common: 10, rare: 30, epic: 60, legendary: 120, limited: 60 };
@@ -76,6 +77,10 @@ export const TITLES = {
   pets2: { name: '새 친구', tier: 'common', group: 'collect', stat: 'pets', goal: 2, icon: 'paw', how: '펫 2마리 만나기', desc: '두 번째 펫 친구가 생겼어요.' },
   study10: { name: '공부 습관', tier: 'common', group: 'study', stat: 'studies', goal: 10, icon: 'book', how: '10문제 이상 학습 10번', desc: '공부가 조금씩 몸에 배고 있어요.' },
   attend7: { name: '출석 도장', tier: 'common', group: 'study', stat: 'attendance', goal: 7, icon: 'calendar', how: '출석 체크 7번', desc: '도장 일곱 개, 꽉 찬 출석 카드!' },
+  // V13.82 가위바위보 (놀이터).
+  rps10: { name: '가위바위보 고수', tier: 'common', group: 'arcade', stat: 'rps_wins', goal: 10, icon: 'bolt', how: '가위바위보 10번 이기기', desc: '로보의 손이 보이기 시작했어요.' },
+  rpsjack: { name: '×8 대박', tier: 'epic', group: 'arcade', stat: 'rps_jackpots', goal: 1, icon: 'flame', how: '가위바위보 3연승(×8) 달성', desc: '로보를 세 번 연속 이겼어요!' },
+  rpsgod: { name: '가위바위보의 신', tier: 'legendary', group: 'arcade', stat: 'rps_jackpots', goal: 5, icon: 'crown', how: '가위바위보 ×8 대박 5번', desc: '운도 실력이라는 걸 보여 줬어요.' },
   bot1: { name: '로보 격파', tier: 'common', group: 'yacha', stat: 'bot_wins', goal: 1, icon: 'sword', how: '로보 연습 대결 1승', desc: '로보를 처음으로 이겼어요.' },
   gift1: { name: '선생님의 칭찬', tier: 'common', group: 'collect', stat: 'gifts', goal: 1, icon: 'heart', how: '선생님께 코인 선물 받기', desc: '선생님이 알아봐 주셨어요!' },
   level10: { name: '쑥쑥 성장', tier: 'rare', group: 'study', stat: 'level', goal: 10, icon: 'sprout', how: 'Lv.10 달성', desc: '어느새 이만큼 자랐어요.' },

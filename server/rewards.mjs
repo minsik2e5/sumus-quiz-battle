@@ -206,17 +206,27 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
 
 /* ---------- V13.82 가위바위보 ---------- */
 //   rps { day, plays, bets, paid, wins_total, best, live: { id, bet, pot, wins, ties, await: 'pick'|'choice', at }, log[] }
-const RPS_LOG_KEEP = 12;
+// A week of games (five a day), for the weekly ×8 명예의 전당.
+const RPS_LOG_KEEP = 36;
+const RPS_HANDS_KEEP = 8;
 export function rpsView(p, now = Date.now()) {
   const r = p.rps || {}, today = dayKey(now);
   const plays = r.day === today ? Number(r.plays || 0) : 0;
   const live = r.live ? { bet: r.live.bet, pot: r.live.pot, wins: r.live.wins, await: r.live.await } : null;
-  return { bets: RPS_BETS, daily: RPS_DAILY, left: Math.max(0, RPS_DAILY - plays), max_wins: RPS_MAX_WINS, live, best: Number(r.best || 0), recent: (r.log || []).slice(-6).reverse() };
+  return {
+    bets: RPS_BETS, daily: RPS_DAILY, left: Math.max(0, RPS_DAILY - plays), max_wins: RPS_MAX_WINS, live, best: Number(r.best || 0), recent: (r.log || []).slice(-6).reverse(),
+    // V13.82: 로보's last hands (it picks at random; students like to look for a pattern anyway)
+    // and the student's record.
+    robot_recent: (r.hands || []).slice(-RPS_HANDS_KEEP).reverse(),
+    stats: { wins: Number(r.wins_total || 0), ties: Number(r.ties_total || 0), losses: Number(r.losses_total || 0), jackpots: Number(r.jackpots || 0), biggest: Number(r.biggest || 0) }
+  };
 }
 function rpsSettle(r, now, paid) {
   const live = r.live;
   r.paid = Number(r.paid || 0) + paid;
   r.best = Math.max(Number(r.best || 0), live.wins);
+  r.biggest = Math.max(Number(r.biggest || 0), paid);
+  if (live.wins >= RPS_MAX_WINS) r.jackpots = Number(r.jackpots || 0) + 1;
   r.log = [...(r.log || []), { at: now, bet: live.bet, wins: live.wins, paid }].slice(-RPS_LOG_KEEP);
   r.live = null;
   return paid;
@@ -248,9 +258,10 @@ export function rpsPlay(p, { bet, pick, double = false }, balance, { random = se
   live.at = now;
   const robot = RPS_KEYS[Math.floor(random() * 3) % 3];
   const result = rpsOutcome(pick, robot);
+  r.hands = [...(r.hands || []), robot].slice(-RPS_HANDS_KEEP);
   let paid = 0;
-  if (result === 'draw') { live.ties++; live.await = 'pick'; }
-  else if (result === 'lose') { live.lost = live.pot; rpsSettle(r, now, 0); }
+  if (result === 'draw') { live.ties++; live.await = 'pick'; r.ties_total = Number(r.ties_total || 0) + 1; }
+  else if (result === 'lose') { live.lost = live.pot; r.losses_total = Number(r.losses_total || 0) + 1; rpsSettle(r, now, 0); }
   else {
     live.wins++; live.pot *= 2;
     r.wins_total = Number(r.wins_total || 0) + 1;

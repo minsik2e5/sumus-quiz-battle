@@ -135,6 +135,9 @@ export function createCompetition(state, now = Date.now()) {
     attendance: p => Number(p?.attendance?.total || 0),
     bot_wins: p => Number(p?.bonus?.bot?.wins || 0),
     bot_hard_wins: p => Number(p?.bonus?.bot?.hard_wins || 0),
+    // V13.82 가위바위보: throws won, and ×8 (three wins in a row) pots.
+    rps_wins: p => Number(p?.rps?.wins_total || 0),
+    rps_jackpots: p => Number(p?.rps?.jackpots || 0),
     skills: (p, pid) => ctx.battlesOf(pid).reduce((n, b) => n + Number(b.skills?.[pid] || 0), 0),
     exams: (p, pid) => exams.get(pid) || 0,
     gifts: p => Number(p?.gift_box?.count || 0),

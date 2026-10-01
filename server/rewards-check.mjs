@@ -7,14 +7,14 @@ import { fileURLToPath } from 'node:url';
 import { emptyState } from './state.mjs';
 import { passwordHash, publicProfile, hashToken } from './auth.mjs';
 import { service, scopedWords, sweep } from './service.mjs';
-import { DAY_MS, rankingWeek } from './competition.mjs';
+import { DAY_MS, rankingWeek, createCompetition } from './competition.mjs';
 import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX } from '../public/modules/core.js';
-import { TITLES, TITLE_KEYS, visibleTitleKeys } from '../public/modules/titles.js';
+import { TITLES, TITLE_KEYS, visibleTitleKeys, titleUnlocked } from '../public/modules/titles.js';
 import { createBattle, connect, answer, tick, battleView, SKILL_RULES, BATTLE } from '../public/modules/battle-engine.js';
 import { battleQuestions, spellHint, spellable } from '../public/modules/battle-questions.js';
 import { createPracticeMatch } from '../public/modules/battle-bot.js';
 import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
-import { addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, rpsPlay, rpsCash, rewardIncome } from './rewards.mjs';
+import { addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, rpsPlay, rpsCash, rpsView, rewardIncome } from './rewards.mjs';
 import { marketPrices } from './market.mjs';
 import { STOCKS, MARKET, tradeFee, newsText } from '../public/modules/market.js';
 
@@ -436,11 +436,24 @@ export async function runRewardsChecks(assert, expectStatus) {
   await expectStatus(409, async () => rpsPlay(g82, { bet: 10, pick: 'rock' }, 1000, { random: fixed(0.4), now: t82 + RPS_STALE_MS + 3 }), 'V13.82 five games a day');
   await expectStatus(400, async () => rpsPlay({}, { bet: 10, pick: 'constructor' }, 1000), 'V13.82 only 가위, 바위 or 보');
   await expectStatus(400, async () => rpsPlay({}, { bet: 10, pick: 'rock' }, 5), 'V13.82 a game needs the coins it bets');
+  // The upgrade: 로보's last hands, the student's record, ×8 count, titles and 명예의 전당.
+  const v82 = rpsView(g82, t82 + RPS_STALE_MS + 3);
+  assert(v82.robot_recent.length > 0 && v82.robot_recent.length <= 8 && v82.robot_recent.every(h => RPS_KEYS.includes(h)) && v82.robot_recent[0] === g82.rps.hands.at(-1), 'V13.82 the card shows 로보\'s last hands, newest first');
+  assert(v82.stats.wins === g82.rps.wins_total && v82.stats.jackpots === 1 && v82.stats.ties >= 2 && v82.stats.losses === 1 && v82.stats.biggest === 80, 'V13.82 the record: wins, ties, losses, ×8 count, biggest pay-out');
+  assert(TITLES.rps10?.stat === 'rps_wins' && TITLES.rpsjack?.stat === 'rps_jackpots' && TITLES.rpsjack.goal === 1 && TITLES.rpsgod?.goal === 5 && TITLES.rpsgod.tier === 'legendary', 'V13.82 three 가위바위보 titles');
   // Through the API, with real coins.
   const tG = tokens['qa-rw-h'];
   const g0 = await balance('qa-rw-h');
   const viaApi = await service(state, 'POST', '/rps/play', { bet: 10, pick: 'rock' }, tG);
   assert(['win', 'lose', 'draw'].includes(viaApi.result) && RPS_KEYS.includes(viaApi.robot) && viaApi.points_balance === g0 - 10 && (await service(state, 'GET', '/rewards', {}, tG)).rps.left === RPS_DAILY - 1, 'V13.82 /rps/play takes the bet and shows the throw');
+  profile('qa-rw-h').rps.log = [...(profile('qa-rw-h').rps.log || []), { at: Date.now(), bet: 10, wins: RPS_MAX_WINS, paid: 80 }];
+  profile('qa-rw-h').rps.jackpots = 1;
+  const hall82 = (await service(state, 'GET', '/rewards', {}, tokens['qa-rw-g'])).rps.hall;
+  assert(hall82.some(h => h.name === profile('qa-rw-h').display_name && h.count === 1 && !h.me), 'V13.82 a ×8 this week shows in the school\'s 명예의 전당');
+  const tstats = createCompetition(state).titleStats(profile('qa-rw-h'));
+  assert(tstats.rps_jackpots === 1 && titleUnlocked('rpsjack', tstats) && !titleUnlocked('rpsgod', tstats), 'V13.82 the ×8 title opens with the first ×8');
+  const rps82 = source('../public/modules/rps.js');
+  assert(rps82.includes('const TALK = {') && rps82.includes("box.classList.toggle('tense', tense)") && rps82.includes("stamp(res.done ? '×8!' : 'WIN!'") && rps82.includes('function skipIntro()') && rps82.includes('robotRow(g.robot)'), 'V13.82 the match: entrance, 로보\'s talk, clash stamp, tension, 로보\'s last hands');
   // 문법 증권거래소
   assert(!(await service(state, 'GET', '/market', {}, tG)).market.open || state.market?.seed, 'V13.82 the market needs its seed');
   sweep(state);
