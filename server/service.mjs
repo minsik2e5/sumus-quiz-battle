@@ -1211,7 +1211,8 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const push = pushState(state);
     if (!push.vapid) fail('알림 준비가 아직 안 됐어요. 다시 눌러 주세요.', 409);
-    const origin = str(body.origin, 200);
+    // The contact address the push services see: this app's own address, never one sent by a phone.
+    const origin = str(options.origin, 200);
     if (/^https:\/\/[a-z0-9.-]+(?::\d+)?$/i.test(origin)) push.subject = origin;
     addSubscription(state, p, body.subscription, { ua: str(body.device, 40) });
     if (typeof body.daily === 'boolean') push.prefs[p.id] = { ...(push.prefs[p.id] || {}), daily: body.daily };
@@ -1581,6 +1582,7 @@ export async function service(state, method, path, body, token, options = {}) {
     delete state.mastery[studentId];
     if (state.grammarProgress) delete state.grammarProgress[studentId];
     state.meaningDisputes = state.meaningDisputes.filter(item => item.student_id !== studentId);
+    if (state.push) { delete state.push.subs?.[studentId]; delete state.push.prefs?.[studentId]; delete state.push.reminded?.[studentId]; }
     return { ok: true, id: studentId };
   }
   if (path === '/vocab-import/preview' && method === 'POST') {

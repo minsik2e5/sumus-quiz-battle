@@ -347,14 +347,25 @@ async function currentPushSubscription() {
 }
 // Whether this phone receives the 알림 (the account may have it on another phone). A phone the
 // server forgot (removed after an error) is registered again without asking.
+let pushChecked = false;
 async function checkPushHere() {
   if (A.data?.profile?.role !== 'student') return;
   try {
     const sub = await currentPushSubscription();
     const before = A.pushHere;
     A.pushHere = !!sub && Notification.permission === 'granted';
-    if (A.pushHere && !A.data.push?.on) {
-      const r = await api('/push/subscribe', { subscription: sub.toJSON(), origin: location.origin, device: deviceLabel(), quiet: true });
+    // Once per app start: make sure the server still has this phone, with the current key
+    // (the phone may have been moved to another login or dropped after an error).
+    if (A.pushHere && !pushChecked) {
+      pushChecked = true;
+      const { key } = await api('/push/key', {});
+      let current = sub;
+      if (sub.options?.applicationServerKey && toB64u(sub.options.applicationServerKey) !== key) {
+        await sub.unsubscribe().catch(() => {});
+        const reg = await navigator.serviceWorker.ready;
+        current = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: fromB64u(key) });
+      }
+      const r = await api('/push/subscribe', { subscription: current.toJSON(), device: deviceLabel(), quiet: true });
       A.data.push = r.push;
     }
     if (before !== A.pushHere && !A.screen) renderKeepScroll();
@@ -376,7 +387,7 @@ async function enablePush(b) {
     let sub = await reg.pushManager.getSubscription();
     if (sub?.options?.applicationServerKey && toB64u(sub.options.applicationServerKey) !== key) { await sub.unsubscribe().catch(() => {}); sub = null; }
     sub ||= await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: fromB64u(key) });
-    const r = await api('/push/subscribe', { subscription: sub.toJSON(), origin: location.origin, device: deviceLabel() });
+    const r = await api('/push/subscribe', { subscription: sub.toJSON(), device: deviceLabel() });
     A.data.push = r.push; A.pushHere = true;
     renderKeepScroll();
     toast('알림을 켰어요! 확인 알림이 곧 도착해요.');

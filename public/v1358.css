@@ -32,11 +32,7 @@
 .partner-stars{letter-spacing:1px;color:color-mix(in srgb,var(--pet) 80%,#000)}
 /* Finish follows growth: baby plain, growing silver foil, final holo. */
 .partner-sheen{position:absolute;inset:0;border-radius:20px;pointer-events:none;opacity:0;mix-blend-mode:soft-light}
-.finish-silver .partner-sheen{opacity:.75;background:radial-gradient(circle at var(--mx) var(--my),rgba(255,255,255,.95),rgba(255,255,255,0) 45%),linear-gradient(115deg,transparent 30%,rgba(255,255,255,.55) 45%,transparent 60%)}
-.finish-holo .partner-sheen{opacity:.9;mix-blend-mode:color-dodge;background:radial-gradient(circle at var(--mx) var(--my),rgba(255,255,255,.8),transparent 40%),linear-gradient(115deg,rgba(255,0,132,.35),rgba(255,213,0,.35),rgba(0,255,170,.35),rgba(0,149,255,.35),rgba(170,0,255,.35));background-size:100% 100%,300% 300%;background-position:center,var(--mx) var(--my)}
-.finish-holo .partner-front{background:linear-gradient(160deg,#fff4c2,var(--pet-light) 30%,var(--pet) 60%,#b58a2a)}
 .partner-finish{font-size:9.5px;font-weight:800;letter-spacing:.08em;border-radius:4px;padding:1px 5px;margin-left:5px;color:#fff;background:linear-gradient(135deg,#9aa6a2,#dfe6e3 50%,#9aa6a2)}
-.finish-holo .partner-finish{background:linear-gradient(135deg,#ff5fa2,#ffd54a 35%,#3fe0b0 65%,#6aa8ff)}
 /* back: yacha record */
 .partner-back{transform:rotateY(180deg);background:#0f3b2d;color:#e8f6f0;padding:12px;box-shadow:0 12px 26px rgba(18,38,30,.25)}
 .partner-back-in{height:100%;border:2px solid #2d6b55;border-radius:13px;padding:18px 14px;display:flex;flex-direction:column;gap:14px;background:repeating-linear-gradient(45deg,rgba(255,255,255,.03) 0 10px,transparent 10px 20px)}

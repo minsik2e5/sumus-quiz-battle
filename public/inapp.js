@@ -7,12 +7,14 @@
   var inApp = kakao || /Instagram|FBAN|FBAV|FB_IAB|Line\/|NAVER\(inapp|DaumApps|everytimeApp|Whale\/.*inapp|; wv\)/i.test(ua);
   if (!inApp) return;
   var ios = /iPhone|iPad|iPod/i.test(ua), android = /Android/i.test(ua);
-  var here = location.href;
-  var tried = false;
-  try { tried = sessionStorage.getItem('sumus:inapp-escape') === '1'; sessionStorage.setItem('sumus:inapp-escape', '1'); } catch (e) {}
+  // #inapp-tried marks a page that was already handed off (sessionStorage can be unavailable).
+  var marked = location.hash === '#inapp-tried';
+  var here = location.href.replace(/#inapp-tried$/, '');
+  var tried = marked;
+  try { tried = tried || sessionStorage.getItem('sumus:inapp-escape') === '1'; sessionStorage.setItem('sumus:inapp-escape', '1'); } catch (e) {}
   if (!tried) {
     if (kakao) { location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(here); }
-    else if (android) { location.href = 'intent://' + here.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(here) + ';end'; }
+    else if (android) { location.href = 'intent://' + here.replace(/^https?:\/\//, '') + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(here.replace(/#.*$/, '') + '#inapp-tried') + ';end'; }
   }
   function guide() {
     if (document.getElementById('inapp-guide')) return;
