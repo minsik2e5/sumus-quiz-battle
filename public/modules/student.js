@@ -1,4 +1,4 @@
-import { CHARACTERS, ACCESSORIES, FRAMES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, petForm, unlocked, levelInfo, dayKey } from './core.js';
+import { CHARACTERS, ACCESSORIES, FRAMES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, petForm, unlocked, levelInfo, dayKey, cardTier } from './core.js';
 import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar, petKey, RUN_SHEETS } from './character.js';
 import { petDisplayName, petJosa } from './pet-moments.js';
@@ -227,9 +227,15 @@ function homeWeek(A) {
     return { label, date: d.getUTCDate(), active: activeDays.has(key), current };
   });
 }
+// Sparkles and corner gems for the higher tiers (drawn in CSS, v1378.css).
+function cardFx(tier) {
+  const stars = [0, 0, 0, 0, 5, 6, 8, 9, 12, 14][tier.index];
+  const gems = tier.key === 'lgd' ? '<i class="card-gem g1"></i><i class="card-gem g2"></i><i class="card-gem g3"></i><i class="card-gem g4"></i>' : '';
+  const crown = tier.max ? '<i class="card-crown">MAX</i>' : '';
+  return stars || gems ? `<span class="card-fx" aria-hidden="true">${Array.from({ length: stars }, (_, i) => `<i class="card-star" style="--x:${(i * 37 + 11) % 88 + 4}%;--y:${(i * 53 + 7) % 46 + 6}%;--d:${(i * 0.37 % 2.6).toFixed(2)}s;--s:${0.7 + (i * 29 % 7) / 10}"></i>`).join('')}${gems}${crown}</span>` : '';
+}
 // Home hero: the partner pet as a trading card. The card's finish follows the pet's growth
 // (baby plain, growing silver, final holo); tapping flips it to the yacha record.
-const CARD_FINISH = ['plain', 'plain', 'silver', 'holo'];
 function partnerCard(A) {
   const p = A.data.profile, g = A.data.stats;
   const partner = g.pet || { key: p.avatar_key, name: '', level: Number(g.level || 1), form: petForm(g.level), percent: g.percent, remaining: g.remaining, xp: g.points };
@@ -249,8 +255,9 @@ function partnerCard(A) {
   const yachaTitles = TITLE_KEYS.filter(key => TITLES[key].group === 'yacha').filter(key => have.has(key)).slice(-4);
   const titles = yachaTitles.length ? yachaTitles.map(key => titleBadge(key, { size: 'xs' })).join('') : '<span class="partner-titles-empty">야차전 칭호에 도전해요</span>';
   const league = A.data.league;
-  const finish = CARD_FINISH[form];
-  return `<section class="partner-card-v1358 finish-${finish}" style="--pet:${pet.color};--pet-light:${pet.light};--pet-soft:${pet.soft}" aria-label="나의 파트너 카드">
+  // V13.78: the card's rarity follows the pet's level (C .. LGD).
+  const tier = cardTier(level);
+  return `<section class="partner-card-v1358 tier-${tier.key}${tier.max ? ' tier-max' : ''}" data-card-tier="${tier.key}" style="--pet:${pet.color};--pet-light:${pet.light};--pet-soft:${pet.soft}" aria-label="나의 파트너 카드">
     <button type="button" class="partner-card-btn" data-action="partner-flip" aria-pressed="false" aria-label="파트너 카드. 펫을 누르면 반응하고, 다른 곳을 누르면 뒷면의 야차전 기록을 보여줘요">
       <span class="partner-card">
         <span class="partner-face partner-front">
@@ -263,9 +270,10 @@ function partnerCard(A) {
               <span class="partner-skill"><i>연</i><span>연속 학습<small>쉬지 않고 공부한 날</small></span><b>${Number(g.streak || 0)}일</b></span>
             </span>
             <span class="partner-evo"><span class="partner-evo-row"><span>${nextLine}</span><span>${form === 3 ? `경험치 ${num(partner.xp || 0)}` : `경험치 ${num(partner.remaining || 0)} 남음`}</span></span><span class="partner-bar" aria-label="레벨 진행률 ${Math.round(Number(partner.percent || 0))}%"><i style="width:${percent}%"></i></span></span>
-            <span class="partner-foot"><span class="partner-stars" aria-label="모은 펫 ${owned}/${total}">${'★'.repeat(owned)}${'☆'.repeat(Math.max(0, total - owned))}</span><span>No.${number} · SUMUS${finish === 'plain' ? '' : `<b class="partner-finish">${finish === 'holo' ? 'HOLO' : 'SILVER'}</b>`}</span></span>
+            <span class="partner-foot"><span class="partner-stars" aria-label="모은 펫 ${owned}/${total}">${'★'.repeat(owned)}${'☆'.repeat(Math.max(0, total - owned))}</span><span>No.${number} · SUMUS<b class="card-rarity rarity-${tier.key}" title="${tier.name}">${tier.label}</b></span></span>
           </span>
           <span class="partner-sheen" aria-hidden="true"></span>
+          ${cardFx(tier)}
         </span>
         <span class="partner-face partner-back">
           <span class="partner-back-in">

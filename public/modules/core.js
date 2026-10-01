@@ -67,13 +67,34 @@ export const ACCESSORIES = {
 export const FRAMES = { basic: { name: '기본', level: 1 }, silver: { name: '실버', level: 5 }, neon: { name: '블루 라인', level: 10 }, aurora: { name: '오로라', level: 15 }, legend: { name: '골드', level: 20 }, ...gachaWear('aura') };
 export const TITLES = { rookie: { name: '첫걸음', level: 1 }, focus: { name: '집중의 힘', level: 5 }, combo: { name: '10연속의 주인공', combo: 10 }, streak: { name: '7일의 기록', streak: 7 }, master: { name: '단어 마스터', level: 15 }, legend: { name: '한계를 넘어서', level: 20 }, yacha3: { name: '야차 3연승', battle_streak: 3 }, yachaking: { name: '야차왕', battle_streak: 5 } };
 export const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+// V13.78: the level cap went from 50 to 60.
+export const MAX_LEVEL = 60;
 export function levelInfo(points = 0) {
   let level = 1, base = 0, need = 180;
   points = Math.max(0, Number(points) || 0);
-  while (level < 50 && points >= base + need) { base += need; level++; need = 180 + (level - 1) * 70; }
-  const current = level === 50 ? need : points - base;
+  while (level < MAX_LEVEL && points >= base + need) { base += need; level++; need = 180 + (level - 1) * 70; }
+  const current = level === MAX_LEVEL ? need : points - base;
   // `stage` (1..5) is kept for app versions still installed on phones; new screens use `form`.
   return { level, current, need, percent: clamp(current / need * 100, 0, 100), remaining: Math.max(0, need - current), stage: level >= 20 ? 5 : level >= 15 ? 4 : level >= 10 ? 3 : level >= 5 ? 2 : 1, form: petForm(level) };
+}
+// V13.78 partner card rarity by level (trading-card style). Each tier changes the card's finish;
+// reaching a new tier plays the card-upgrade moment (modules/card-levelup.js).
+export const CARD_TIERS = [
+  { key: 'c', label: 'C', name: '커먼', min: 1 },
+  { key: 'u', label: 'U', name: '언커먼', min: 3 },
+  { key: 'r', label: 'R', name: '레어', min: 6 },
+  { key: 'rr', label: 'RR', name: '더블 레어', min: 10 },
+  { key: 'rrr', label: 'RRR', name: '트리플 레어', min: 15 },
+  { key: 'sr', label: 'SR', name: '슈퍼 레어', min: 20 },
+  { key: 'hr', label: 'HR', name: '하이퍼 레어', min: 25 },
+  { key: 'ur', label: 'UR', name: '울트라 레어', min: 30 },
+  { key: 'ssr', label: 'SSR', name: '샤이니 레어', min: 40 },
+  { key: 'lgd', label: 'LGD', name: '레전드', min: 50 }
+];
+export const cardTierIndex = (level = 1) => CARD_TIERS.reduce((index, tier, i) => (Number(level) >= tier.min ? i : index), 0);
+export function cardTier(level = 1) {
+  const index = cardTierIndex(level), next = CARD_TIERS[index + 1] || null;
+  return { ...CARD_TIERS[index], index, next, max: Number(level) >= MAX_LEVEL };
 }
 // Each owned pet grows with the XP of practice finished while it was the partner.
 // Records from before pets were collectible (no pet_key) belong to the first pet.
