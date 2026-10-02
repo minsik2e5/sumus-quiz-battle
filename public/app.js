@@ -1,6 +1,6 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date, num, rangeLabel } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm } from './modules/core.js';
-import { avatar } from './modules/character.js';
+import { avatar, showPose } from './modules/character.js';
 import { studentPage, getRanges, updateRangeSummary, starredWords, pushSupport } from './modules/student.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel, careIds } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
@@ -322,6 +322,8 @@ async function petCare(b, kind) {
       const lines = CARE_LINES[kind] || CARE_LINES.pet;
       const art = petSay(lines[Math.floor(Math.random() * lines.length)]);
       if (art) {
+        // V13.83: the pet eats or smiles for a moment (when that pose is drawn).
+        showPose(art, kind === 'feed' ? 'eat' : 'happy');
         pokePet(art);
         const xp = document.createElement('i');
         xp.className = 'pet-xp-float'; xp.textContent = `경험치 +${r.xp}`; xp.setAttribute('aria-hidden', 'true');
@@ -474,7 +476,7 @@ function maybeMissedYou() {
   try { if (localStorage.getItem(key) === today) return; localStorage.setItem(key, today); } catch { return; }
   setTimeout(() => {
     const art = petSay(`보고 싶었어! ${care.away_days}일 만이야 💕`, 4200);
-    if (art) { art.closest('.partner-card-v1358')?.classList.add('missed-v1376'); pokePet(art); }
+    if (art) { art.closest('.partner-card-v1358')?.classList.add('missed-v1376'); showPose(art, 'sad', 2200); setTimeout(() => showPose(art, 'happy', 2400), 2300); pokePet(art); }
   }, 500);
 }
 async function leaveBattle() { A.screen = null; await petChanged(); window.scrollTo(0, 0); }

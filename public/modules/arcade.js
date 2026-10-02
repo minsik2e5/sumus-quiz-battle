@@ -1,7 +1,7 @@
 import { api, esc, num, icon, toast, modal } from './ui.js';
 import { avatar } from './character.js';
 import { GACHA_ITEMS, GACHA_KEYS, GACHA_TIERS, GACHA_TIER_KEYS, GACHA_KINDS, ownedDecorations, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET } from './rewards.js';
-import { titleEmblem, coin } from './emblems.js';
+import { titleEmblem, coin, uiArt } from './emblems.js';
 import { TITLES } from './titles.js';
 import { titleState } from './titles-ui.js';
 import { CHARACTERS, EGG_PRICE } from './core.js';
@@ -43,7 +43,7 @@ const tierTag = tier => `<span class="ga-tier t-${tier}">${GACHA_TIERS[tier].nam
 
 /* ---------- page ---------- */
 export function arcadePage(A) {
-  return `<div class="page-heading arcade-head"><span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>모은 코인으로 코인 뽑기, 가위바위보, 알 상점을 즐겨요.</p></div>
+  return `<div class="page-heading arcade-head">${uiArt('arcade', 'arcade-head-art')}<span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>모은 코인으로 코인 뽑기, 가위바위보, 알 상점을 즐겨요.</p></div>
     <button type="button" class="arcade-wallet" data-action="coins" aria-label="코인 지갑 열기"><span>${coin()}<b id="ga-balance">${num(A.data.stats?.points_balance || 0)}</b> 코인</span><small>코인 지갑 ${icon('chevron')}</small></button>
     <div data-arcade></div>`;
 }
@@ -57,7 +57,7 @@ export function gachaBookPage() {
 function shopHtml(A) {
   const g = A.data.stats || {}, owned = (g.pets || []).length, total = Object.keys(CHARACTERS).length;
   return `<section class="ga-card ga-shop">
-    <button type="button" class="ga-shop-row" data-action="egg-shop"><span class="ga-egg" aria-hidden="true">?</span><span><b>랜덤 알 상점</b><small>${owned < total ? `아직 못 만난 친구 ${total - owned}마리` : '모든 친구를 모았어요!'}</small></span><em>${coin()}${num(EGG_PRICE)}</em></button>
+    <button type="button" class="ga-shop-row" data-action="egg-shop"><span class="ga-egg art" aria-hidden="true">${uiArt('egg-shop')}</span><span><b>랜덤 알 상점</b><small>${owned < total ? `아직 못 만난 친구 ${total - owned}마리` : '모든 친구를 모았어요!'}</small></span><em>${coin()}${num(EGG_PRICE)}</em></button>
   </section>`;
 }
 // V13.68 coin capsule: the machine and its show live in lucky.js.

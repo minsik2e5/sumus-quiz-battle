@@ -69,7 +69,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.82.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.86.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -1093,7 +1093,8 @@ export async function runReleaseCheck() {
         const shares = [...sessionsUi.matchAll(/share-self-test'\)\?\.addEventListener\('click', async event => \{([\s\S]*?)\n  \}\);/g)].map(m => m[1]);
         assert(shares.length === 2 && shares.every(body => body.includes('const button = event.currentTarget;') && !body.slice(body.indexOf('await api')).includes('event.currentTarget') && !body.includes('await refresh()') && body.includes('shareDone(button)')), 'V13.65 "결과 보내기" keeps its button across the request and does not reload everything afterwards');
         assert(teacherUi.includes('list.slice(0, vocabLimit(A))') && teacherUi.includes('data-action="vocab-more"') && appUi65.includes("d.action === 'vocab-more'") && css1365.includes('.teacher-app.tv2 tbody tr{content-visibility:auto'), 'V13.65 the teacher word list starts with 80 rows and long teacher lists skip offscreen layout');
-        assert(!/dog:\s*\{\s*2:\s*\['happy'\]/.test(charUi) && !existsSync(fileURLToPath(new URL('../public/assets/pets/dog-2-happy.webp', import.meta.url))) && existsSync(fileURLToPath(new URL('../public/assets/pets/dog-3-s.webp', import.meta.url))), 'V13.65 몽이 growing/final art redrawn; the old happy face is not used with it');
+        // V13.83: the redrawn 몽이 now has poses drawn from its new art (the old happy face is gone).
+        assert(charUi.includes('dog: { 1: ALL, 2: ALL, 3: ALL }') && existsSync(fileURLToPath(new URL('../public/assets/pets/dog-2-happy.webp', import.meta.url))) && existsSync(fileURLToPath(new URL('../public/assets/pets/dog-3-s.webp', import.meta.url))), 'V13.65 몽이 growing/final art redrawn; V13.83 its poses match the new art');
       }
     }
     assert(teacherModule.includes('grammar_progress') && teacherModule.includes('학생이 보낸 실전 결과'), 'teacher dashboard combines grammar progress with student-shared self-test results');
@@ -1124,7 +1125,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.82.0') && indexHtml.includes('/app.bundle.css?v=13.82.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.86.0') && indexHtml.includes('/app.bundle.css?v=13.86.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1145,7 +1146,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.82.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.86.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');

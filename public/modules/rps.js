@@ -8,6 +8,12 @@
 // - a win can be taken or played again for double (×2 → ×4 → ×8). From the second round the
 //   screen gets tense (heartbeat, red edges); the third is "운명의 한 판".
 // A tie is thrown again for free.
+// V13.85 drawn art (/assets/rps/): the three hand medals, the clash, and 로보's poses — it pumps
+// its fist, throws its hand, then reacts (gloats, gets dizzy, glitches at ×8, thinks on a tie).
+// V13.86 a comic panel: the screen splits along a lightning bolt (로보's half, my half) with a VS
+// burst in the middle, and two arms reach in from the screen edges, pump, and smash together.
+// Until the arm pictures are drawn (05-rps-arms.txt) the arms are drawn sleeves ending in the
+// hand medals; set ARM_ART once /assets/rps/arm-<robot|me>-<hand>.webp exist.
 import { api, esc, num, toast } from './ui.js';
 import { avatar } from './character.js';
 import { coin } from './emblems.js';
@@ -29,16 +35,26 @@ const SFX = {
   cash: () => tone([1568, 2093, 1760, 2349, 2637], { type: 'triangle', gap: .05, len: .1, vol: .035 }),
   jackpot: () => { tone([523, 659, 784, 1047, 1319, 1568, 2093], { type: 'square', gap: .085, len: .26, vol: .03 }); buzz([40, 50, 40, 50, 160]); }
 };
+const ART = '/assets/rps/';
+const ROBOT_STILL = '/assets/pets/robot-3.webp';
+const ROBOT_POSES = ['ready', 'rock', 'scissors', 'paper', 'win', 'lose', 'shock', 'think'];
+const ARM_ART = false;
+const handArt = (hand, px = 256) => `<img src="${ART}hand-${hand}.webp" alt="" width="${px}" height="${px}" decoding="async" draggable="false">`;
 const ladder = (wins, bet) => Array.from({ length: RPS_MAX_WINS }, (_, i) => `<span class="rps-step${wins > i ? ' on' : ''}${wins === i ? ' next' : ''}"><b>×${2 ** (i + 1)}</b><small>${num(bet * 2 ** (i + 1))}</small></span>`).join('');
-const medal = (hand, cls = '') => `<span class="rps-medal${hand ? ` h-${hand}` : ''}${cls ? ` ${cls}` : ''}">${hand ? RPS_HANDS[hand].emoji : '✊'}</span>`;
-const robotRow = hands => (hands || []).length ? `<span class="rps-robot-log" aria-label="로보가 최근에 낸 손"><small>로보 최근</small>${hands.slice(0, 8).map((h, i) => `<i class="h-${h}${i === 0 ? ' new' : ''}">${RPS_HANDS[h]?.emoji || ''}</i>`).join('')}</span>` : '';
+const medal = (hand, cls = '') => `<span class="rps-medal art${hand ? ` h-${hand}` : ' idle'}${cls ? ` ${cls}` : ''}">${handArt(hand || 'rock')}</span>`;
+// The hand at the end of an arm: the drawn arm, or (until it is drawn) the hand medal.
+const fist = (side, hand, cls = '') => ARM_ART
+  ? `<img class="rps-arm-art${hand ? ` h-${hand}` : ' idle'}${cls ? ` ${cls}` : ''}" src="${ART}arm-${side}-${hand || 'rock'}.webp" alt="" decoding="async" draggable="false">`
+  : medal(hand, cls);
+const mineRow = hands => hands.length ? `<span class="rps-robot-log">${hands.slice(0, 8).map((h, i) => `<i class="h-${h}${i === 0 ? ' new' : ''}">${handArt(h, 64)}</i>`).join('')}</span>` : '<span class="rps-bar-empty">아직 없어요</span>';
+const robotRow = hands => (hands || []).length ? `<span class="rps-robot-log" aria-label="로보가 최근에 낸 손"><small>로보 최근</small>${hands.slice(0, 8).map((h, i) => RPS_HANDS[h] ? `<i class="h-${h}${i === 0 ? ' new' : ''}">${handArt(h, 64)}</i>` : '').join('')}</span>` : '';
 
 // What 로보 says. The "tell" is only talk: the server has not picked yet and never asks 로보.
 const TALK = {
   start: ['가위바위보는 실력이지! 삐빅!', '내 손을 읽을 수 있을까?', '삐빅… 계산 중…', '오늘은 봐주지 않을 거야!', '준비됐어? 나는 됐어!'],
   streak: w => [`벌써 ${w}연승?! 이번엔 안 봐줘!`, `${w}연승이라고? 삐빅, 경고 모드!`, '이번 판은 진짜 이긴다!'],
   final: ['운명의 한 판… 삐…삐빅…', '이번에 지면 내 회로가 타버려!', '마지막이야. 각오해!'],
-  tell: h => [`이번엔 ${RPS_HANDS[h].emoji} 낼 거야~`, `${RPS_HANDS[h].name}! …라고 하면 믿을래?`, `힌트: ${RPS_HANDS[h].emoji}. 진짜일까?`],
+  tell: h => [`이번엔 ${RPS_HANDS[h].name} 낼 거야~`, `${RPS_HANDS[h].name}! …라고 하면 믿을래?`, `힌트: ${RPS_HANDS[h].name}. 진짜일까?`],
   lose: ['으악! 다시 해!', '삐…삐빅… 오류 발생!', '운이 좋았을 뿐이야!', '내 손이 왜 그랬지?!'],
   win: ['역시 나야! 삐빅!', '로보 승리! 히히', '한 판 더 할래?', '내 계산이 맞았어!'],
   tie: ['어? 똑같네!', '생각이 통했나 봐!', '다시! 다시!', '따라 하지 마~'],
@@ -59,7 +75,7 @@ export function rpsCard(state, bet, balance) {
     <div class="rps-card-stage" aria-hidden="true">
       <span class="rps-card-pet robot">${avatar('robot', { form: 3, size: 'mini' })}</span>
       <span class="rps-card-bubble">${esc(pickOne(TALK.start))}</span>
-      <span class="rps-card-hands">${RPS_KEYS.map((k, i) => `<i class="h-${k}" style="--i:${i}">${RPS_HANDS[k].emoji}</i>`).join('')}</span>
+      <span class="rps-card-hands">${RPS_KEYS.map((k, i) => `<i class="h-${k}" style="--i:${i}">${handArt(k, 96)}</i>`).join('')}</span>
     </div>
     ${hall.length ? `<div class="rps-hall"><b>🏆 이번 주 ×8 명예의 전당</b><span>${hall.map(h => `<em class="${h.me ? 'me' : ''}">${esc(h.name)}${h.count > 1 ? ` ×${h.count}` : ''}</em>`).join('')}</span></div>` : ''}
     <div class="rps-card-ladder">${ladder(-1, bet)}</div>
@@ -79,7 +95,7 @@ export function rpsMatch(A, { bet, live = null, onBalance }) {
     const pet = A.data.stats?.pet || { key: A.data.profile?.avatar_key || 'dog', form: 1 };
     const state = A.data.rewards?.rps || {};
     const g = { bet: live?.bet || bet, pot: live?.pot || bet, wins: live?.wins || 0, phase: live?.await === 'choice' ? 'choice' : 'pick', fresh: !live, busy: false, round: 1,
-      balance: Number(A.data.stats?.points_balance || 0), left: Number(state.left ?? RPS_DAILY), robot: state.robot_recent || [], heart: null };
+      balance: Number(A.data.stats?.points_balance || 0), left: Number(state.left ?? RPS_DAILY), robot: state.robot_recent || [], mine: [], heart: null };
     const box = document.createElement('div');
     box.className = 'rps-show';
     box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', '가위바위보');
@@ -89,21 +105,41 @@ export function rpsMatch(A, { bet, live = null, onBalance }) {
         <div class="rps-ladder" id="rps-ladder">${ladder(g.wins, g.bet)}</div>
         <button type="button" class="rps-x" data-r="close" aria-label="닫기">✕</button>
       </div>
-      <div class="rps-log" id="rps-log">${robotRow(g.robot)}</div>
-      <div class="rps-arena intro" id="rps-arena">
-        <div class="rps-side robot"><span class="rps-talk" id="rps-talk" aria-live="polite"></span><span class="rps-name">로보</span><span class="rps-avatar">${avatar('robot', { form: 3 })}</span><span class="rps-hand" id="rps-robot">${medal(null)}</span></div>
-        <div class="rps-mid"><span class="rps-vs">VS</span><span class="rps-stack" id="rps-stack" aria-hidden="true"></span></div>
-        <div class="rps-side me"><span class="rps-name">${esc(A.data.profile?.display_name || '나')}</span><span class="rps-avatar">${avatar(pet.key, { form: Math.max(1, pet.form ?? 1) })}</span><span class="rps-hand" id="rps-me">${medal(null)}</span></div>
+      <div class="rps-arena comic intro" id="rps-arena">
+        <div class="rps-comic" aria-hidden="true"><i class="half robot"></i><i class="half me"></i><i class="rays"></i><i class="bolt"></i></div>
+        <div class="rps-side robot"><span class="rps-avatar">${avatar('robot', { form: 3 })}</span><span class="rps-name">로보</span><span class="rps-talk" id="rps-talk" aria-live="polite"></span></div>
+        <div class="rps-side me"><span class="rps-avatar">${avatar(pet.key, { form: Math.max(1, pet.form ?? 1) })}</span><span class="rps-name">${esc(A.data.profile?.display_name || '나')}</span></div>
+        <div class="rps-vsburst" aria-hidden="true"><b>VS</b></div>
+        <span class="rps-stack" id="rps-stack" aria-hidden="true"></span>
+        <div class="rps-arm robot${ARM_ART ? ' drawn' : ''}"><i class="rps-sleeve" aria-hidden="true"></i><span class="rps-hand" id="rps-robot">${fist('robot', null)}</span></div>
+        <div class="rps-arm me${ARM_ART ? ' drawn' : ''}"><i class="rps-sleeve" aria-hidden="true"></i><span class="rps-hand" id="rps-me">${fist('me', null)}</span></div>
         <div class="rps-ring" id="rps-ring"></div>
         <div class="rps-flash" id="rps-flash"></div>
+        <img class="rps-clash-art" id="rps-clash" src="${ART}clash.webp" alt="" width="256" height="256" decoding="async" draggable="false">
         <div class="rps-burst" id="rps-burst"></div>
         <div class="rps-stamp" id="rps-stamp"></div>
+        <div class="rps-bars"><div class="rps-bar robot"><b>로보</b><span id="rps-log">${robotRow(g.robot)}</span></div><div class="rps-bar me"><b>나</b><span id="rps-mine">${mineRow(g.mine)}</span></div></div>
       </div>
       <div class="rps-banner" id="rps-banner" aria-live="assertive"></div>
       <div class="rps-controls" id="rps-controls"></div>`;
     document.body.appendChild(box);
     const $ = sel => box.querySelector(sel);
     requestAnimationFrame(() => box.classList.add('open'));
+    // 로보's poses are loaded and decoded now, and a swap waits for its picture, so 로보 never
+    // blinks out between poses.
+    const posePics = new Map([ROBOT_STILL, ...ROBOT_POSES.map(p => `${ART}robot-${p}.webp`)].map(src => {
+      const pic = new Image(); pic.src = src;
+      return [src, pic.decode().catch(() => {})];
+    }));
+    let wantPose = ROBOT_STILL;
+    const robotPose = pose => {
+      const src = pose ? `${ART}robot-${pose}.webp` : ROBOT_STILL;
+      wantPose = src;
+      (posePics.get(src) || Promise.resolve()).then(() => {
+        const img = $('.rps-side.robot .avatar-art img');
+        if (img && wantPose === src) { img.decoding = 'sync'; img.setAttribute('src', src); }
+      });
+    };
 
     const setBalance = value => { if (typeof value === 'number') { g.balance = value; onBalance?.(value); } };
     const banner = (text, cls = '') => { const b = $('#rps-banner'); b.className = `rps-banner ${cls}`; b.textContent = text; void b.offsetWidth; b.classList.add('pop'); };
@@ -138,7 +174,7 @@ export function rpsMatch(A, { bet, live = null, onBalance }) {
       tension();
       if (g.phase === 'pick') {
         const hot = g.wins > 0;
-        c.innerHTML = `<p class="rps-hint">${hot ? `${g.wins}연승 중! 이번 판에 <b>${num(g.pot * 2)}코인</b>이 걸렸어요` : '무엇을 낼까요?'}</p><div class="rps-picks">${RPS_KEYS.map(k => `<button type="button" class="rps-pick h-${k}${hot ? ' hot' : ''}" data-r="pick" data-hand="${k}"><span>${RPS_HANDS[k].emoji}</span><b>${RPS_HANDS[k].name}</b></button>`).join('')}</div>`;
+        c.innerHTML = `<p class="rps-hint">${hot ? `${g.wins}연승 중! 이번 판에 <b>${num(g.pot * 2)}코인</b>이 걸렸어요` : '무엇을 낼까요?'}</p><div class="rps-picks">${RPS_KEYS.map(k => `<button type="button" class="rps-pick h-${k}${hot ? ' hot' : ''}" data-r="pick" data-hand="${k}"><span>${handArt(k, 128)}</span><b>${RPS_HANDS[k].name}</b></button>`).join('')}</div>`;
       } else if (g.phase === 'choice') {
         const next = g.pot * 2;
         c.innerHTML = `<p class="rps-hint">${g.wins}연승! 여기서 받을까요, <b>${num(next)}코인</b>에 도전할까요?</p><div class="rps-choice"><button type="button" class="rps-cash" data-r="cash">받기<em>${coin()}${num(g.pot)}</em></button><button type="button" class="rps-double" data-r="double">${g.wins >= RPS_MAX_WINS - 1 ? '운명의 한 판!' : '더블 도전!'}<em>×${2 ** (g.wins + 1)} · ${coin()}${num(next)}</em></button></div>`;
@@ -160,13 +196,15 @@ export function rpsMatch(A, { bet, live = null, onBalance }) {
     };
     const preRoundTalk = () => {
       if (g.wins >= RPS_MAX_WINS - 1) return talk(pickOne(TALK.final), 0);
-      if (Math.random() < .35) return talk(pickOne(TALK.tell(pickOne(RPS_KEYS))), 0);
+      if (Math.random() < .35) { robotPose('think'); return talk(pickOne(TALK.tell(pickOne(RPS_KEYS))), 0); }
       talk(g.wins ? pickOne(TALK.streak(g.wins)) : pickOne(TALK.start), 0);
     };
     const resetHands = () => {
       $('#rps-arena').classList.remove('win', 'lose', 'tie', 'clash', 'fly');
-      $('#rps-robot').innerHTML = medal(null); $('#rps-me').innerHTML = medal(null);
+      $('#rps-robot').innerHTML = fist('robot', null); $('#rps-me').innerHTML = fist('me', null);
       $('#rps-stamp').className = 'rps-stamp';
+      $('#rps-clash').classList.remove('go');
+      robotPose(null);
     };
 
     async function throwHand(hand) {
@@ -176,6 +214,7 @@ export function rpsMatch(A, { bet, live = null, onBalance }) {
       $('#rps-controls').innerHTML = '';
       const arena = $('#rps-arena');
       resetHands();
+      robotPose('ready');
       const body = g.phase === 'choice' ? { pick: hand, double: true } : g.fresh ? { bet: g.bet, pick: hand } : { pick: hand };
       const request = api('/rps/play', body);
       // 가위! 바위! 보! — the hands pump in time, faster each beat (slower and heavier on the
@@ -192,42 +231,47 @@ export function rpsMatch(A, { bet, live = null, onBalance }) {
       }
       let res;
       try { res = await request; }
-      catch (err) { toast(err.message); g.busy = false; banner(''); controls(); return; }
+      catch (err) { toast(err.message); g.busy = false; banner(''); robotPose(null); controls(); return; }
       g.fresh = false;
       // Hands fly to the middle and clash.
-      $('#rps-robot').innerHTML = medal(res.robot, 'shown'); $('#rps-me').innerHTML = medal(res.pick, 'shown');
+      $('#rps-robot').innerHTML = fist('robot', res.robot, 'shown'); $('#rps-me').innerHTML = fist('me', res.pick, 'shown');
+      g.mine = [res.pick, ...g.mine].slice(0, 8);
+      robotPose(res.robot);
       arena.classList.remove('shake'); arena.classList.add('fly');
       if (!reduced()) { SFX.whoosh(); await wait(170); }
       arena.classList.add('clash');
       SFX.clash();
       $('#rps-ring').classList.remove('go'); void $('#rps-ring').offsetWidth; $('#rps-ring').classList.add('go');
       $('#rps-flash').classList.remove('go'); void $('#rps-flash').offsetWidth; $('#rps-flash').classList.add('go');
+      $('#rps-clash').classList.remove('go'); void $('#rps-clash').offsetWidth; $('#rps-clash').classList.add('go');
       g.left = Number(res.rps?.left ?? g.left);
       g.robot = res.rps?.robot_recent || g.robot;
       if (A.data.rewards) A.data.rewards.rps = res.rps;
       if (!reduced()) await wait(140); // hit-stop
-      $('#rps-log').innerHTML = robotRow(g.robot);
+      $('#rps-log').innerHTML = robotRow(g.robot); $('#rps-mine').innerHTML = mineRow(g.mine);
       await wait(reduced() ? 0 : 300);
       if (res.result === 'draw') {
-        arena.classList.add('tie'); stamp('DRAW', 'tie'); banner('비겼다! 한 번 더!', 'tie'); SFX.tie(); talk(pickOne(TALK.tie));
+        arena.classList.add('tie'); robotPose('think'); stamp('DRAW', 'tie'); banner('비겼다! 한 번 더!', 'tie'); SFX.tie(); talk(pickOne(TALK.tie));
         g.phase = 'pick';
         await wait(reduced() ? 0 : 750);
         resetHands();
         preRoundTalk();
       } else if (res.result === 'lose') {
-        arena.classList.add('lose'); stamp('LOSE', 'lose'); banner(g.wins ? `${g.wins}연승에서 멈췄어요…` : '로보 승리…', 'lose'); SFX.lose(); talk(pickOne(TALK.win));
+        arena.classList.add('lose'); robotPose('win'); stamp('LOSE', 'lose'); banner(g.wins ? `${g.wins}연승에서 멈췄어요…` : '로보 승리…', 'lose'); SFX.lose(); talk(pickOne(TALK.win));
         burst('puff', 14);
         potTo(0);
         g.wins = 0; g.phase = 'end';
         setBalance(res.points_balance);
       } else {
         arena.classList.add('win'); g.wins = res.wins;
+        robotPose(res.done ? 'shock' : 'lose');
         stamp(res.done ? '×8!' : 'WIN!', res.done ? 'jackpot' : 'win');
         $('#rps-ladder').innerHTML = ladder(g.wins, g.bet);
         potTo(res.pot);
         burst('coin', 10 + g.wins * 8);
         if (res.done) {
           banner(`${RPS_MAX_WINS}연승! ×${2 ** RPS_MAX_WINS} 대박!`, 'jackpot'); SFX.jackpot(); confetti(); talk(pickOne(TALK.jackpot), 0);
+          if (ARM_ART) setTimeout(() => { if (box.isConnected) $('#rps-robot').innerHTML = fist('robot', 'flag', 'shown'); }, 900);
           box.classList.add('gold');
           g.phase = 'end';
           setBalance(res.points_balance);
@@ -248,7 +292,8 @@ export function rpsMatch(A, { bet, live = null, onBalance }) {
         if (A.data.rewards) A.data.rewards.rps = res.rps;
         g.left = Number(res.rps?.left ?? g.left);
         setBalance(res.points_balance);
-        banner(`+${num(res.paid)}코인 획득!`, 'win'); SFX.cash(); talk(pickOne(TALK.cash));
+        banner(`+${num(res.paid)}코인 획득!`, 'win'); SFX.cash(); talk(pickOne(TALK.cash)); robotPose('think');
+        if (ARM_ART) $('#rps-me').innerHTML = fist('me', 'thumb', 'shown');
         burst('coin', 26);
         g.phase = 'end';
       } catch (err) { toast(err.message); }

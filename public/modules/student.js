@@ -3,7 +3,7 @@ import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$
 import { avatar, petKey, RUN_SHEETS } from './character.js';
 import { petDisplayName, petJosa } from './pet-moments.js';
 import { TITLES, TITLE_KEYS } from './titles.js';
-import { titleBadge, titleEmblem, tierEmblem, coin, trophy } from './emblems.js';
+import { titleBadge, titleEmblem, tierEmblem, coin, trophy, uiArt } from './emblems.js';
 import { titlesPage, titleState, titleCount } from './titles-ui.js';
 import { tournamentCard } from './tournament-ui.js';
 import { shownTitle } from './league-ui.js';
@@ -299,11 +299,11 @@ function partnerCard(A) {
 function petCareBar(A, hatched) {
   const care = A.data.care;
   if (!care) return '';
-  const item = (kind, label, emoji) => {
+  const item = (kind, label, art) => {
     const done = !!care[kind];
-    return `<button type="button" class="pet-care-btn ${done ? 'done' : ''}" data-pet-care="${kind}" ${done ? 'aria-disabled="true"' : ''} aria-label="${label}${done ? ', 오늘 완료' : `, 경험치 ${care.xp?.[kind] || 10}`}"><span class="pet-care-emoji" aria-hidden="true">${emoji}</span><span class="pet-care-label">${label}</span><small>${done ? '오늘 완료 ✓' : `경험치 +${care.xp?.[kind] || 10}`}</small></button>`;
+    return `<button type="button" class="pet-care-btn ${done ? 'done' : ''}" data-pet-care="${kind}" ${done ? 'aria-disabled="true"' : ''} aria-label="${label}${done ? ', 오늘 완료' : `, 경험치 ${care.xp?.[kind] || 10}`}"><span class="pet-care-emoji" aria-hidden="true">${uiArt(art)}</span><span class="pet-care-label">${label}</span><small>${done ? '오늘 완료 ✓' : `경험치 +${care.xp?.[kind] || 10}`}</small></button>`;
   };
-  return `<div class="pet-care-v1376" role="group" aria-label="오늘의 펫 교감">${item('pet', hatched ? '쓰다듬기' : '알 쓰다듬기', '🤚')}${item('feed', hatched ? '밥 주기' : '알 데워주기', hatched ? '🍖' : '🔥')}</div>`;
+  return `<div class="pet-care-v1376" role="group" aria-label="오늘의 펫 교감">${item('pet', hatched ? '쓰다듬기' : '알 쓰다듬기', 'care-pet')}${item('feed', hatched ? '밥 주기' : '알 데워주기', hatched ? 'care-feed' : 'care-warm')}</div>`;
 }
 // V13.60 home: card, next-step button, a big yacha banner and the week, spaced as one
 // column. Word study, exams, the ranking and records stay in the bottom menu.
@@ -338,20 +338,19 @@ function yachaAlerts(A) {
 // V13.67 daily attendance: a card of seven stamps; the 7th gives the most coins and a capsule
 // ticket.
 const STAMP_CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.2 4.2L19 7"/></svg>';
-const STAMP_GIFT = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="10" width="16" height="10" rx="2"/><path d="M3 7.5h18v3H3zM12 7.5V20M12 7.5C10.5 4 7 4 7 6s3 1.5 5 1.5c2 0 5 .5 5-1.5s-3.5-2-5 1.5"/></svg>';
 function attendanceCard(A) {
   const a = A.data.rewards?.attendance;
   if (!a) return '';
   const last = ATTENDANCE_REWARDS.length - 1;
   const stamps = ATTENDANCE_REWARDS.map((coins, i) => {
     const on = i < a.stamps, next = !a.done && i === a.stamps;
-    return `<li class="${on ? 'on' : ''}${next ? ' next' : ''}${i === last ? ' gift' : ''}"><span>${on ? STAMP_CHECK : i === last ? STAMP_GIFT : `<b>${i + 1}</b>`}</span><small>${coins}</small></li>`;
+    return `<li class="${on ? 'on' : ''}${next ? ' next' : ''}${i === last ? ' gift' : ''}"><span>${on ? STAMP_CHECK : i === last ? uiArt('gift', 'att-gift-art') : `<b>${i + 1}</b>`}</span><small>${coins}</small></li>`;
   }).join('');
   const lead = a.done
     ? `<small>출석 완료</small><strong>내일 출석하면 ${coin()}${a.next}</strong>`
     : `<small>출석 체크 · ${a.stamps + 1}번째 도장</small><strong>오늘 출석하고 ${coin()}${a.next} 받기</strong>`;
   return `<section class="att-card${a.done ? ' done' : ''}" aria-label="출석 체크">
-    <div class="att-head"><div>${lead}</div>${a.done ? `<span class="att-streak">${a.streak >= 2 ? `${a.streak}일 연속` : '오늘 도장 쾅!'}</span>` : '<button type="button" class="btn primary att-btn" data-action="attend">출석하기</button>'}</div>
+    <div class="att-head">${uiArt('attendance', 'att-art')}<div>${lead}</div>${a.done ? `<span class="att-streak">${a.streak >= 2 ? `${a.streak}일 연속` : '오늘 도장 쾅!'}</span>` : '<button type="button" class="btn primary att-btn" data-action="attend">출석하기</button>'}</div>
     <ol class="att-stamps">${stamps}</ol>
     ${a.done ? '' : `<p class="att-foot">7번째 도장은 <b>${coin()}${ATTENDANCE_REWARDS[last]}</b> + <b>뽑기권 ${ATTENDANCE_TICKETS}장</b>! 하루에 한 번 찍어요.</p>`}
   </section>`;
@@ -426,7 +425,7 @@ function noticeBanner(A) {
   let closed = false;
   try { closed = localStorage.getItem('sumus:notice-closed') === n.id; } catch {}
   if (closed) return '';
-  return `<section class="notice-v1377" role="status"><span class="notice-mark" aria-hidden="true">📢</span><div><small>${esc(n.from_name)}${n.class_name ? ` · ${esc(n.class_name)}` : ''} · ${date(n.at)}</small><p>${esc(n.text)}</p></div><button type="button" class="notice-close" data-action="notice-close" data-id="${esc(n.id)}" aria-label="공지 닫기">×</button></section>`;
+  return `<section class="notice-v1377" role="status"><span class="notice-mark" aria-hidden="true">${uiArt('notice')}</span><div><small>${esc(n.from_name)}${n.class_name ? ` · ${esc(n.class_name)}` : ''} · ${date(n.at)}</small><p>${esc(n.text)}</p></div><button type="button" class="notice-close" data-action="notice-close" data-id="${esc(n.id)}" aria-label="공지 닫기">×</button></section>`;
 }
 export const pushSupport = () => {
   const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -438,7 +437,7 @@ function pushPrompt(A) {
   const s = pushSupport();
   if (A.pushHere !== false || !s.api || s.blocked || s.needsInstall) return '';
   try { if (Number(localStorage.getItem('sumus:push-later') || 0) > Date.now()) return ''; } catch {}
-  return `<section class="push-prompt-v1377"><span class="push-bell" aria-hidden="true">🔔</span><div><b>알림 켜기</b><small>선생님 공지·도전장·선물을 바로 알려 줄게요</small></div><button type="button" class="btn primary small" data-action="push-on">켜기</button><button type="button" class="push-later" data-action="push-later" aria-label="나중에">나중에</button></section>`;
+  return `<section class="push-prompt-v1377"><span class="push-bell" aria-hidden="true">${uiArt('bell')}</span><div><b>알림 켜기</b><small>선생님 공지·도전장·선물을 바로 알려 줄게요</small></div><button type="button" class="btn primary small" data-action="push-on">켜기</button><button type="button" class="push-later" data-action="push-later" aria-label="나중에">나중에</button></section>`;
 }
 function meNotify(A) {
   const s = pushSupport(), push = A.data.push || {};
@@ -451,7 +450,7 @@ function meNotify(A) {
     <label class="push-row"><span><b>저녁 7시 공부 알림</b><small>오늘 공부를 안 했으면 한 번 알려 줘요</small></span><input type="checkbox" class="switch" data-push-daily ${push.daily !== false ? 'checked' : ''}></label>
     <button type="button" class="text-button" data-action="push-off">이 휴대폰 알림 끄기</button>`;
   else body = `<p>선생님 공지, 친구의 도전장, 선물, 저녁 공부 알림을 받아요.</p><button type="button" class="btn primary full" data-action="push-on">🔔 알림 켜기</button>`;
-  const install = !s.installed ? `<a class="me-install-v1377" href="/install"><span aria-hidden="true">📲</span><span><b>앱으로 설치하기</b><small>홈 화면 아이콘으로 바로 열려요</small></span>${icon('chevron')}</a>` : '';
+  const install = !s.installed ? `<a class="me-install-v1377" href="/install"><span class="me-install-art" aria-hidden="true">${uiArt('install')}</span><span><b>앱으로 설치하기</b><small>홈 화면 아이콘으로 바로 열려요</small></span>${icon('chevron')}</a>` : '';
   return `<section class="me-notify-v1377" aria-label="알림"><h2>알림</h2>${body}</section>${install}`;
 }
 // V13.76 ⭐ 어려운 단어: the starred words of this school and grade, practised together.
@@ -465,7 +464,7 @@ function starPracticeButton(A, cls = '') {
   // One practice takes up to 200 words (the server's limit).
   const n = Math.min(200, starredWords(A).length);
   if (!n) return '';
-  return `<button type="button" class="star-practice-v1376 ${cls}" data-star-practice="true"><span class="star-practice-mark" aria-hidden="true">★</span><span><small>어려운 단어 모음</small><strong>★ ${n}개 모아서 연습</strong></span><b>${icon('arrow')}</b></button>`;
+  return `<button type="button" class="star-practice-v1376 ${cls}" data-star-practice="true"><span class="star-practice-mark" aria-hidden="true">${uiArt('star-word')}</span><span><small>어려운 단어 모음</small><strong>★ ${n}개 모아서 연습</strong></span><b>${icon('arrow')}</b></button>`;
 }
 function studyHub(A) {
   return `<div class="page-heading study-simple-heading premium-page-heading"><span class="premium-eyebrow">LEARNING</span><h1>학습</h1></div>

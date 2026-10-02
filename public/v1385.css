@@ -1,0 +1,41 @@
+/* V13.85 drawn art: 가위바위보 hands, 로보's poses and the clash; UI icons. */
+.ui-art{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none;user-select:none}
+
+/* ---------- 가위바위보 ---------- */
+.rps-medal.art{background:none;border:0;box-shadow:none;border-radius:50%}
+.rps-medal.art img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 8px 14px rgba(0,0,0,.45));pointer-events:none}
+.rps-medal.art.idle img{filter:saturate(.15) brightness(1.15) drop-shadow(0 8px 14px rgba(0,0,0,.45));opacity:.85}
+.rps-medal.art.shown{background:none;box-shadow:none}
+.rps-medal.art.shown img{filter:drop-shadow(0 0 16px var(--h)) drop-shadow(0 8px 14px rgba(0,0,0,.45))}
+.rps-card-hands i{width:38px;height:38px}
+.rps-card-hands i img{width:100%;height:100%;object-fit:contain}
+.rps-pick span{width:54px;height:54px;display:block}
+.rps-pick span img{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 4px 6px rgba(0,0,0,.3))}
+.rps-robot-log i{display:inline-block;width:22px;height:22px}
+.rps-robot-log i img{width:100%;height:100%;object-fit:contain}
+.rps-side.robot .rps-avatar img{transition:none}
+.rps-clash-art{position:absolute;left:50%;top:62%;z-index:2;width:min(34vw,150px);height:auto;transform:translate(-50%,-50%) scale(0);opacity:0;pointer-events:none}
+.rps-clash-art.go{animation:rps-clash-art .7s cubic-bezier(.2,1.6,.4,1) forwards}
+@keyframes rps-clash-art{0%{opacity:1;transform:translate(-50%,-50%) scale(.3) rotate(-12deg)}35%{opacity:1;transform:translate(-50%,-50%) scale(1.15) rotate(4deg)}70%{opacity:1;transform:translate(-50%,-50%) scale(1) rotate(0)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.25)}}
+@media (prefers-reduced-motion:reduce){.rps-clash-art.go{animation:none;opacity:0}}
+
+/* ---------- UI icons ---------- */
+.pet-care-emoji{width:30px;height:30px;font-size:0}
+.notice-v1377 .notice-mark{width:34px;height:34px;font-size:0}
+.push-prompt-v1377 .push-bell{width:34px;height:34px;font-size:0}
+.me-install-v1377>span.me-install-art{flex:none;width:38px;height:38px;font-size:0}
+.att-head{justify-content:flex-start}
+.att-head>div{flex:1}
+.att-head .att-art{flex:none;width:42px;height:42px}
+.att-stamps li.gift span:has(.att-gift-art){border:0;background:none;overflow:visible}
+.att-stamps .att-gift-art{width:128%;height:128%;max-width:none}
+.ga-egg.art{background:none;box-shadow:none;border-radius:0;width:44px;height:44px}
+.star-practice-mark{background:none;font-size:0}
+.arcade-head{position:relative;padding-right:72px}
+.arcade-head .arcade-head-art{position:absolute;right:0;top:50%;width:64px;height:64px;transform:translateY(-50%) rotate(6deg)}
+.test-leave-warn-v1376 .test-leave-art{width:72px;height:72px;margin:0 auto 4px}
+.exam-timer .timer-art{display:inline-block;width:20px;height:20px;vertical-align:-4px;margin-right:2px}
+
+/* The coin: the drawn coin everywhere (the shape and size stay, the CSS star goes). */
+.coin-ico{background:url(/assets/ui/coin.webp) center/118% no-repeat;box-shadow:none;border-radius:0}
+.coin-ico::after{display:none}
