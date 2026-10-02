@@ -271,6 +271,65 @@ for (const [a, b] of [['haechi', 'phoenix'], ['whale', 'qilin']]) {
   ]);
 }
 
+/* 09 새 기본 펫 8종 (07 전설 펫과 같은 2단계: 09a 설정 시트 → 잘라서 참고 그림 → 09b 표정) */
+const F9A = '09a-new-pets-design.txt', F9B = '09b-new-pets-expressions.txt';
+const NEW_PETS = {
+  capybara: { ko: '유자', type: '카피바라', base: 'a chubby round capybara with warm caramel-brown fur, a blunt rounded snout, tiny round ears, small calm eyes with a sleepy happy look, pink blush, a little orange yuzu fruit with one green leaf resting on its head', egg: 'a warm caramel egg with darker brown spots and a small orange yuzu-fruit pattern, resting in a little nest of green leaves', f: {
+    1: 'baby stage: small and very round, sitting, a tiny yuzu on the head, no other accessories',
+    2: 'grown stage: bigger and longer, standing on four short legs, a green leaf scarf with a small gold star charm (NOT a round sitting baby)',
+    3: 'final stage: large, calm and proud, a fluffy mint towel worn like a cape fastened with a gold star clasp, a crown of three little yuzu fruits with leaves, soft steam swirls and golden sparkles around (NOT a small baby)' } },
+  penguin: { ko: '펭이', type: '펭귄', base: 'a chubby penguin with a navy-blue back and head, a white belly and face, a small orange beak and orange feet, big glossy dark eyes, pink blush, a soft sky-blue knitted scarf', egg: 'a pale ice-blue egg with white snowflake patterns, resting on a small block of ice', f: {
+    1: 'baby stage: a small fluffy blue-grey chick covered in soft down, tiny flippers, the sky-blue scarf a little too big',
+    2: 'grown stage: a taller, sleek young penguin standing upright, the sky-blue scarf with a small gold star charm (NOT a fluffy chick)',
+    3: 'final stage: a tall proud emperor-style penguin with a golden-yellow neck patch, a long flowing sky-blue scarf, a small ice crown, snowflake sparkles around (NOT a fluffy chick)' } },
+  owl: { ko: '올리', type: '부엉이', base: 'a round little owl with soft lavender-purple and cream feathers, big tufted ear feathers, a heart-shaped cream face, big glossy amber eyes behind small round golden glasses, a tiny beak, pink blush', egg: 'a lavender egg with cream crescent-moon and tiny closed-book patterns (no letters), resting in a small nest of twigs', f: {
+    1: 'baby stage: a small round fluffy owlet, the golden glasses slightly too big for its face',
+    2: 'grown stage: a bigger owl with neatly folded wings, a small mint scholar cap with a gold star tassel (NOT a round fluffy owlet)',
+    3: 'final stage: a majestic wise owl with wide spread wings edged in gold, the scholar cap, a small glowing open book with blank pages floating beside it, golden sparkles (NOT a round owlet)' } },
+  hamster: { ko: '쿠키', type: '햄스터', base: 'a tiny chubby hamster with golden-yellow and cream fur, a white belly, round pink ears, big glossy black eyes, very puffy cheeks, a tiny pink nose, pink blush', egg: 'a cream-yellow egg with small sunflower-seed patterns, resting in a nest of soft wood shavings', f: {
+    1: 'baby stage: a very small round fluff ball, no accessories',
+    2: 'grown stage: a bit bigger, standing on its hind legs holding a sunflower seed, a small green scarf with a gold star charm',
+    3: 'final stage: bigger and proud, a sunflower crown, a little golden cape with a gold star clasp, golden sparkles (NOT a tiny fluff ball)' } },
+  shark: { ko: '파도', type: '아기 상어', base: 'a cute shark with smooth sky-blue skin, a white belly, a rounded dorsal fin, a happy smile with tiny friendly rounded teeth (never scary), big glossy dark eyes, pink blush; it floats in the air as if swimming', egg: 'a sky-blue egg with white wave patterns, resting on a little cushion of sea foam next to a small shell', f: {
+    1: 'baby stage: a small round chubby baby shark floating, tiny fins',
+    2: 'grown stage: a longer, sleek young shark with a small mint scarf and a gold star charm, a few bubbles around (NOT a round baby)',
+    3: 'final stage: a big majestic friendly shark with a flowing aqua wave-shaped cape, a small coral crown, bubbles and golden sparkles (NOT a round baby, still friendly)' } },
+  alpaca: { ko: '몽글', type: '알파카', base: 'a fluffy alpaca with cloud-like white wool tinted soft lavender at the tips, a long neck, a cream face, small upright ears, big glossy dark eyes with long lashes, pink blush, a little rainbow pom-pom tassel by one ear', egg: 'a fluffy-looking white egg with lavender wool-swirl patterns, resting on a small pastel blanket', f: {
+    1: 'baby stage: a small round ball of wool with short legs, sitting',
+    2: 'grown stage: taller with a long neck, standing on four legs, a woven mint scarf with a gold star charm (NOT a round sitting baby)',
+    3: 'final stage: a grand alpaca with an enormous cloud-like fluffy mane, a colorful woven poncho with gold trim, little pom-pom flowers, golden sparkles (NOT a small baby)' } },
+  hedgehog: { ko: '도치', type: '고슴도치', base: 'a tiny round hedgehog with soft beige-brown spines (rounded and soft-looking, not sharp), a cream face and belly, small round ears, big glossy dark eyes, a little pink nose, pink blush, a small red apple stuck on its back spines', egg: 'a beige egg covered in soft rounded spike bumps, resting in a nest of autumn leaves', f: {
+    1: 'baby stage: a tiny round ball, the apple very small',
+    2: 'grown stage: bigger, standing on its hind legs, a small green scarf with a gold star charm, the red apple on its back',
+    3: 'final stage: bigger and proud, the spines tipped with gold, a crown of autumn leaves, a little golden cape, golden sparkles (NOT a tiny ball)' } },
+  otter: { ko: '달이', type: '수달', base: 'a sleek little otter with glossy chocolate-brown fur, a cream face and belly, small round ears, whiskers, big glossy dark eyes, pink blush, holding a small pink seashell', egg: 'a chocolate-brown egg with cream wave stripes and a small pink seashell motif, resting on smooth river stones', f: {
+    1: 'baby stage: a small round baby otter floating on its back, hugging the pink shell',
+    2: 'grown stage: a longer young otter standing on its hind legs, a mint scarf with a gold star charm, holding the shell (NOT a round baby)',
+    3: 'final stage: a grand otter with a flowing river-blue cape with gold trim, holding a shining pearl in an open shell, water-drop sparkles (NOT a round baby)' } }
+};
+for (const [key, pet] of Object.entries(NEW_PETS)) sheet(F9A, `${pet.ko} ${pet.type} 설정 시트`, 'pet', `${pet.ko}, ${pet.base}. Draw the same character at four growth steps; each cell must clearly be the same creature, getting bigger and grander.`, [
+  [`${key}-0`, `${pet.ko} 알`, `EGG: ${pet.egg}. Just the egg, no creature`, `public/assets/pets/${key}-0.webp`],
+  [`${key}-1`, `${pet.ko} 아기`, `BABY: the ${pet.f[1]}, happy calm face, front 3/4 view`, `public/assets/pets/${key}-1.webp`],
+  [`${key}-2`, `${pet.ko} 성장`, `GROWN: the ${pet.f[2]}, happy calm face, front 3/4 view`, `public/assets/pets/${key}-2.webp`],
+  [`${key}-3`, `${pet.ko} 최종`, `FINAL: the ${pet.f[3]}, happy calm face, front 3/4 view`, `public/assets/pets/${key}-3.webp`]
+]);
+// Wings, flippers and fins: the poses say so, and each pet keeps its own item.
+const EXPRS_N = EXPRS.map(([e, ko, text]) => [e, ko, e === 'sad' ? 'SAD: slightly sad pouty face with teary sparkling eyes, ears, feathers or fins drooping a little, still cute (not crying hard); keep the same face, markings and item (fruit, glasses, scarf, apple or shell) as the other cells'
+  : e === 'cheer' ? 'CHEERING: energetic pose with one front paw, wing, flipper or fin raised high, determined sparkling eyes, small motion sparkles'
+  : e === 'eat' ? 'EATING: happily eating from a small round mint food bowl in front of it, cheeks puffed, a few crumbs, eyes curved in joy' : text]);
+for (const [key, pet] of Object.entries(NEW_PETS)) for (const form of [1, 2, 3]) {
+  sheet(F9B, `${pet.ko} ${FORM_KO[form]} 표정`, 'pet', `${pet.ko}, ${pet.base}. This is the ${pet.f[form]}.`,
+    EXPRS_N.map(([expr, ko, text]) => [`${key}-${form}-${expr}`, `${pet.ko} ${FORM_KO[form]} ${ko}`, text, `public/assets/pets/${key}-${form}-${expr}.webp`]));
+}
+for (const [a, b] of [['capybara', 'penguin'], ['owl', 'hamster'], ['shark', 'alpaca'], ['hedgehog', 'otter']]) {
+  sheet(F9B, `${NEW_PETS[a].ko} · ${NEW_PETS[b].ko} 알 반응`, 'egg', `two pet eggs (the reference picture shows them side by side). The TOP row cells show ${NEW_PETS[a].ko}'s egg: ${NEW_PETS[a].egg}. The BOTTOM row cells show ${NEW_PETS[b].ko}'s egg: ${NEW_PETS[b].egg}.`, [
+    [`${a}-0-happy`, `${NEW_PETS[a].ko} 알 기뻐함`, EGG_HAPPY, `public/assets/pets/${a}-0-happy.webp`],
+    [`${a}-0-eat`, `${NEW_PETS[a].ko} 알 따뜻해짐`, EGG_WARM, `public/assets/pets/${a}-0-eat.webp`],
+    [`${b}-0-happy`, `${NEW_PETS[b].ko} 알 기뻐함`, EGG_HAPPY, `public/assets/pets/${b}-0-happy.webp`],
+    [`${b}-0-eat`, `${NEW_PETS[b].ko} 알 따뜻해짐`, EGG_WARM, `public/assets/pets/${b}-0-eat.webp`]
+  ]);
+}
+
 /* 08 메뉴 · 학습 화면 · 성취 배지 (선 아이콘과 이모지로 남아 있던 자리) */
 const F8 = '08-menu-learning.txt';
 const MENU = 'All icons in this set are one family (the same lighting, outline softness, color palette and level of detail), like the tab-bar icons of one premium mobile game. Keep every icon simple and bold so it stays clear at 28 pixels: big rounded shapes, at most three main colors, no thin lines, no tiny details. If a picture of earlier icons from this set was attached in this conversation, match its style exactly.';
@@ -338,9 +397,9 @@ for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.fil
 for (const [file, list] of byFile) writeFileSync(resolve(here, file), list.map(p => p.text).join('\n---\n') + '\n');
 writeFileSync(resolve(here, '00-all-in-order.txt'), prompts.map(p => p.text).join('\n---\n') + '\n');
 // Sheets that each need their own chat (their own reference picture) also go one per file in split/.
-const SPLIT = new Set([F5, F6, F7A, F7B, F8]);
+const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B]);
 mkdirSync(resolve(here, 'split'), { recursive: true });
-for (const [file, list] of byFile) if (SPLIT.has(file)) list.forEach((p, i) => writeFileSync(resolve(here, 'split', `${file.slice(0, file.startsWith('07') ? 3 : 2)}-${i + 1} ${p.title.replace(/[\\/:*?"<>|()]/g, '').replace(/\s+/g, ' ').trim()}.txt`), p.text + '\n'));
+for (const [file, list] of byFile) if (SPLIT.has(file)) list.forEach((p, i) => writeFileSync(resolve(here, 'split', `${file.slice(0, /^\d\d[ab]-/.test(file) ? 3 : 2)}-${i + 1} ${p.title.replace(/[\\/:*?"<>|()]/g, '').replace(/\s+/g, ' ').trim()}.txt`), p.text + '\n'));
 const csv = v => `"${String(v).replace(/"/g, '""')}"`;
 writeFileSync(resolve(here, 'slice-map.csv'), '﻿' + ['list,prompt_no,sheet,cell,key,name,app_file', ...slices.map(s => [s.file, String(s.no).padStart(3, '0'), s.title, s.cell, s.key, s.name, s.out].map(csv).join(','))].join('\n') + '\n');
 console.log([...byFile].map(([f, l]) => `${f}: ${l.length} prompts → ${l.length * 4} images`).join('\n'));
