@@ -271,13 +271,55 @@ for (const [a, b] of [['haechi', 'phoenix'], ['whale', 'qilin']]) {
   ]);
 }
 
+/* 08 메뉴 · 학습 화면 · 성취 배지 (선 아이콘과 이모지로 남아 있던 자리) */
+const F8 = '08-menu-learning.txt';
+const MENU = 'All icons in this set are one family (the same lighting, outline softness, color palette and level of detail), like the tab-bar icons of one premium mobile game. Keep every icon simple and bold so it stays clear at 28 pixels: big rounded shapes, at most three main colors, no thin lines, no tiny details. If a picture of earlier icons from this set was attached in this conversation, match its style exactly.';
+const menu = (title, cells) => sheet(F8, title, 'icon', MENU, cells.map(([key, ko, desc]) => [`ui-${key}`, ko, desc, `public/assets/ui/${key}.webp`]));
+menu('메뉴 아이콘 1 (하단 메뉴)', [
+  ['nav-home', '하단 메뉴 홈', 'a small cozy house with a rounded mint roof, a round cream door and one warm yellow window'],
+  ['nav-study', '하단 메뉴 학습', 'an open book with mint covers and a short yellow pencil lying across it'],
+  ['nav-yacha', '하단 메뉴 야차전', 'two chunky cartoon swords crossed in an X with mint blades and gold handles, a small yellow lightning spark where they cross'],
+  ['nav-arcade', '하단 메뉴 놀이터', 'a chunky handheld game controller in mint with one red round button and a yellow cross pad']
+]);
+menu('메뉴 아이콘 2 (나 · 나 화면 메뉴)', [
+  ['nav-me', '하단 메뉴 나', 'a round friendly head-and-shoulders avatar bust of a child in a mint hoodie, simple happy face, no hair details'],
+  ['me-pets', '내 펫·꾸미기', 'a big soft paw print in warm peach with a small pink bow ribbon on its top right'],
+  ['me-ranking', '랭킹', 'a three-step winners podium in mint with a small golden crown floating above the tallest middle step'],
+  ['me-titles', '칭호 도감', 'a chunky closed album book in lavender with a round gold medal and ribbon on its cover']
+]);
+menu('메뉴 아이콘 3 (나 화면 메뉴 · 야차전 방식)', [
+  ['me-records', '내 기록', 'a mint clipboard with a white sheet showing a rising zigzag line graph and a small check mark'],
+  ['me-settings', '계정·설정', 'a chunky rounded gear in soft gray-blue with a small mint circle in its center'],
+  ['mode-speed', '스피드전', 'a bold yellow lightning bolt with short orange speed streaks behind it'],
+  ['mode-skill', '실력전', 'a chunky mint pencil writing a short curved line next to a small red-and-white target']
+]);
+STYLE.scene = 'Style: premium cute 3D-painted mobile-game illustration, soft pastel colors with SUMUS mint green (#10B981) accents, gentle warm rim light, clean soft shading. One small object-group per cell (no characters, no scenery, no floor), slightly top-down front view, readable at 96 pixels, filling about 75% of its cell.';
+sheet(F8, '학습 · 시험 카드 그림', 'scene', null, [
+  ['ui-study-vocab', '단어 학습', 'a fan of three colorful word flash cards (blank, no letters) with a mint pencil and two small sparkles', 'public/assets/ui/study-vocab.webp'],
+  ['ui-study-grammar', '어법·어휘', 'an open notebook with a few soft colored highlighter stripes on its pages (no readable text) and a mint highlighter pen lying on it', 'public/assets/ui/study-grammar.webp'],
+  ['ui-exam-practice', '연습시험', 'a mint clipboard holding a sheet with three green check marks in a column and a short yellow pencil', 'public/assets/ui/exam-practice.webp'],
+  ['ui-exam-test', '실전시험', 'an answer sheet with rows of round bubbles (a few filled in dark gray), a pencil, and a small round gold medal with a red ribbon on its corner', 'public/assets/ui/exam-test.webp']
+]);
+sheet(F8, '추천 학습 · 카드 외우기', 'scene', null, [
+  ['ui-study-daily', '오늘의 추천 학습', 'a small stack of three books with a little mint flag planted on top and a warm small sun behind it', 'public/assets/ui/study-daily.webp'],
+  ['ui-flash-deck', '카드로 외우기', 'a neat fan of three flash cards: each card is white on the top half and mint green on the bottom half (like a cover over the bottom), no letters', 'public/assets/ui/flash-deck.webp'],
+  ['ui-flash-done', '다 외웠어요', 'the same white-and-mint flash cards tossed up joyfully with colorful confetti and a big round gold badge with a white check mark in front', 'public/assets/ui/flash-done.webp'],
+  ['ui-word-empty', '빈 단어 목록', 'an empty woven basket in soft cream with a single small golden star resting beside it, calm and friendly', 'public/assets/ui/word-empty.webp']
+]);
+sheet(F8, '성취 배지', 'emblem', 'round achievement medals of the same shape and size: a thick round medal with a soft beveled rim and a short ribbon at the top.', [
+  ['ui-badge-first100', '첫 100점', 'a GOLD medal with a big shining white star burst in the middle', 'public/assets/ui/badge-first100.webp'],
+  ['ui-badge-streak90', '3회 연속 90점+', 'a SILVER medal with three small orange flames in a row rising from left to right', 'public/assets/ui/badge-streak90.webp'],
+  ['ui-badge-english100', '영어쓰기 100점', 'a MINT-ENAMEL medal with a white fountain-pen nib in the middle and a few sparkles', 'public/assets/ui/badge-english100.webp'],
+  ['ui-badge-master', '범위 MASTER', 'a PURPLE-GEM medal with a small golden crown above a golden laurel wreath', 'public/assets/ui/badge-master.webp']
+]);
+
 /* 쓰기 */
 const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
 for (const [file, list] of byFile) writeFileSync(resolve(here, file), list.map(p => p.text).join('\n---\n') + '\n');
 writeFileSync(resolve(here, '00-all-in-order.txt'), prompts.map(p => p.text).join('\n---\n') + '\n');
 // Sheets that each need their own chat (their own reference picture) also go one per file in split/.
-const SPLIT = new Set([F5, F6, F7A, F7B]);
+const SPLIT = new Set([F5, F6, F7A, F7B, F8]);
 mkdirSync(resolve(here, 'split'), { recursive: true });
 for (const [file, list] of byFile) if (SPLIT.has(file)) list.forEach((p, i) => writeFileSync(resolve(here, 'split', `${file.slice(0, file.startsWith('07') ? 3 : 2)}-${i + 1} ${p.title.replace(/[\\/:*?"<>|()]/g, '').replace(/\s+/g, ' ').trim()}.txt`), p.text + '\n'));
 const csv = v => `"${String(v).replace(/"/g, '""')}"`;

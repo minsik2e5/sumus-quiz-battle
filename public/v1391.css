@@ -1,0 +1,34 @@
+/* V13.91 나 메뉴판: the three big tiles stay; everything else is one grid of app-style icons.
+   A drawn picture (asset list 08) replaces each line icon as it arrives (emblems.js ART_READY). */
+.me-ico img.ui-art{width:44px;height:44px;object-fit:contain}
+.me-tile .me-ico:has(img.ui-art){background:none!important}
+.me-menu-v1391{margin-top:14px;padding:14px 12px 10px;border:1px solid #e3ebe7;border-radius:22px;background:#fff}
+.me-menu-v1391 h2{margin:0 4px 10px;font-size:15px;font-weight:900;color:#1d2b27}
+.me-menu-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 4px}
+.me-menu-item{appearance:none;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0;padding:8px 2px 6px;border:0;border-radius:16px;background:none;font:inherit;color:#1d2b27;text-decoration:none;text-align:center;cursor:pointer}
+.me-menu-item:active{background:#f2f7f5}
+.me-menu-art{width:46px;height:46px;border-radius:15px;display:grid;place-items:center;background:#f2f7f5;color:#0b8a67}
+.me-menu-art img.ui-art{width:42px;height:42px;object-fit:contain}
+.me-menu-art:has(img.ui-art){background:none}
+.me-menu-art svg{width:24px;height:24px}
+.me-menu-item b{font-size:12.5px;font-weight:800;word-break:keep-all;line-height:1.25}
+.me-menu-item small{font-size:10.5px;font-weight:700;color:#6c7c77;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.me-menu-dot{font-style:normal;color:#e5484d}
+.me-notify-v1377.flash-v1391{animation:meFlash 1.2s ease-out}
+@keyframes meFlash{0%,40%{box-shadow:0 0 0 3px rgba(16,185,129,.55)}100%{box-shadow:0 0 0 0 rgba(16,185,129,0)}}
+@media (max-width:340px){.me-menu-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+/* the drawn pictures, where they replace a line icon (once they are in ART_READY) */
+.bottom-nav img.nav-art{width:28px;height:28px;object-fit:contain;transition:filter .15s,opacity .15s,transform .15s}
+.bottom-nav button:not(.active) img.nav-art{filter:grayscale(.85);opacity:.55}
+.bottom-nav button.active img.nav-art{transform:translateY(-1px) scale(1.06)}
+img.hub-art{width:100%;height:100%;object-fit:contain}
+.study-hub-icon:has(img.hub-art),.square-icon:has(img.hub-art){background:none!important;box-shadow:none!important}
+img.badge-art{width:100%;height:100%;object-fit:contain}
+.achievement-badge span:has(img.badge-art){background:none!important}
+img.mode-art{width:30px;height:30px;object-fit:contain}
+.yb-mode-ico:has(img.mode-art){background:none!important}
+img.empty-art{display:block;width:96px;height:96px;margin:0 auto 6px;object-fit:contain}
+img.daily-art{flex:none;width:56px;height:56px;object-fit:contain;align-self:center}
+.fc-deck-art img.ui-art{width:72px;height:72px;margin:-6px auto 0;display:block}
+.fc-entry-art img.ui-art{width:48px;height:48px;margin:-4px}
+.fc-end-burst img.ui-art{width:150px;height:150px}

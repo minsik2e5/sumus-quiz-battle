@@ -825,6 +825,9 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'battle') return navigate('yacha');
     if (d.action === 'coins') return walletModal();
     if (d.action === 'attend') return attend(b);
+    // V13.91 나 메뉴판: 어려운 단어 opens 단어 학습 on the ★ words; 알림 scrolls to its settings.
+    if (d.action === 'me-stars') { A.tab = 'practice'; A.studyView = 'vocab'; A.memorizeFilter = 'starred'; savePreferences(); render(); window.scrollTo(0, 0); return; }
+    if (d.action === 'me-notify') { const box = document.getElementById('me-notify'); box?.scrollIntoView({ behavior: 'smooth', block: 'center' }); box?.classList.add('flash-v1391'); setTimeout(() => box?.classList.remove('flash-v1391'), 1200); return; }
     if (d.action === 'tournament-play') { A.yachaOpts = { tournament: { tid: d.tournament, mid: d.match } }; return navigate('yacha'); }
     if (d.action === 'tournament-bracket') return bracketModal(d.tournament);
     if (d.action === 'tournament-new') return tournamentCreateModal();

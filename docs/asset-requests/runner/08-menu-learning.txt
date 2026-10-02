@@ -1,0 +1,45 @@
+Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
+Style: glossy 3D game UI icon, soft pastel palette with SUMUS mint green (#10B981) accents, chunky friendly shapes, clean edges readable at 48 pixels, one object per cell, slight top-down front view.
+Subject: All icons in this set are one family (the same lighting, outline softness, color palette and level of detail), like the tab-bar icons of one premium mobile game. Keep every icon simple and bold so it stays clear at 28 pixels: big rounded shapes, at most three main colors, no thin lines, no tiny details. If a picture of earlier icons from this set was attached in this conversation, match its style exactly.
+TOP-LEFT cell: a small cozy house with a rounded mint roof, a round cream door and one warm yellow window
+TOP-RIGHT cell: an open book with mint covers and a short yellow pencil lying across it
+BOTTOM-LEFT cell: two chunky cartoon swords crossed in an X with mint blades and gold handles, a small yellow lightning spark where they cross
+BOTTOM-RIGHT cell: a chunky handheld game controller in mint with one red round button and a yellow cross pad
+---
+Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
+Style: glossy 3D game UI icon, soft pastel palette with SUMUS mint green (#10B981) accents, chunky friendly shapes, clean edges readable at 48 pixels, one object per cell, slight top-down front view.
+Subject: All icons in this set are one family (the same lighting, outline softness, color palette and level of detail), like the tab-bar icons of one premium mobile game. Keep every icon simple and bold so it stays clear at 28 pixels: big rounded shapes, at most three main colors, no thin lines, no tiny details. If a picture of earlier icons from this set was attached in this conversation, match its style exactly.
+TOP-LEFT cell: a round friendly head-and-shoulders avatar bust of a child in a mint hoodie, simple happy face, no hair details
+TOP-RIGHT cell: a big soft paw print in warm peach with a small pink bow ribbon on its top right
+BOTTOM-LEFT cell: a three-step winners podium in mint with a small golden crown floating above the tallest middle step
+BOTTOM-RIGHT cell: a chunky closed album book in lavender with a round gold medal and ribbon on its cover
+---
+Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
+Style: glossy 3D game UI icon, soft pastel palette with SUMUS mint green (#10B981) accents, chunky friendly shapes, clean edges readable at 48 pixels, one object per cell, slight top-down front view.
+Subject: All icons in this set are one family (the same lighting, outline softness, color palette and level of detail), like the tab-bar icons of one premium mobile game. Keep every icon simple and bold so it stays clear at 28 pixels: big rounded shapes, at most three main colors, no thin lines, no tiny details. If a picture of earlier icons from this set was attached in this conversation, match its style exactly.
+TOP-LEFT cell: a mint clipboard with a white sheet showing a rising zigzag line graph and a small check mark
+TOP-RIGHT cell: a chunky rounded gear in soft gray-blue with a small mint circle in its center
+BOTTOM-LEFT cell: a bold yellow lightning bolt with short orange speed streaks behind it
+BOTTOM-RIGHT cell: a chunky mint pencil writing a short curved line next to a small red-and-white target
+---
+Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
+Style: premium cute 3D-painted mobile-game illustration, soft pastel colors with SUMUS mint green (#10B981) accents, gentle warm rim light, clean soft shading. One small object-group per cell (no characters, no scenery, no floor), slightly top-down front view, readable at 96 pixels, filling about 75% of its cell.
+TOP-LEFT cell: a fan of three colorful word flash cards (blank, no letters) with a mint pencil and two small sparkles
+TOP-RIGHT cell: an open notebook with a few soft colored highlighter stripes on its pages (no readable text) and a mint highlighter pen lying on it
+BOTTOM-LEFT cell: a mint clipboard holding a sheet with three green check marks in a column and a short yellow pencil
+BOTTOM-RIGHT cell: an answer sheet with rows of round bubbles (a few filled in dark gray), a pencil, and a small round gold medal with a red ribbon on its corner
+---
+Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
+Style: premium cute 3D-painted mobile-game illustration, soft pastel colors with SUMUS mint green (#10B981) accents, gentle warm rim light, clean soft shading. One small object-group per cell (no characters, no scenery, no floor), slightly top-down front view, readable at 96 pixels, filling about 75% of its cell.
+TOP-LEFT cell: a small stack of three books with a little mint flag planted on top and a warm small sun behind it
+TOP-RIGHT cell: a neat fan of three flash cards: each card is white on the top half and mint green on the bottom half (like a cover over the bottom), no letters
+BOTTOM-LEFT cell: the same white-and-mint flash cards tossed up joyfully with colorful confetti and a big round gold badge with a white check mark in front
+BOTTOM-RIGHT cell: an empty woven basket in soft cream with a single small golden star resting beside it, calm and friendly
+---
+Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
+Style: shiny 3D game trophy/badge, metallic with soft gem highlights, symmetric, readable at 64 pixels, one object per cell.
+Subject: round achievement medals of the same shape and size: a thick round medal with a soft beveled rim and a short ribbon at the top.
+TOP-LEFT cell: a GOLD medal with a big shining white star burst in the middle
+TOP-RIGHT cell: a SILVER medal with three small orange flames in a row rising from left to right
+BOTTOM-LEFT cell: a MINT-ENAMEL medal with a white fountain-pen nib in the middle and a few sparkles
+BOTTOM-RIGHT cell: a PURPLE-GEM medal with a small golden crown above a golden laurel wreath
