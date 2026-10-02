@@ -254,9 +254,13 @@ sheet(F7A, '전설 알 연출', 'icon', 'a LEGENDARY egg for a capsule-toy prize
   ['legend-egg-burst', '전설 알(깨짐)', 'BURST: the egg breaking open, the top shell flying up, beams of rainbow light and sparkles pouring out, no creature visible', 'public/assets/lucky/legend-egg-burst.webp'],
   ['legend-badge', '전설 배지', 'BADGE: a round legendary emblem in rainbow and gold with small wings on both sides and a star in the middle, no letters', 'public/assets/lucky/legend-badge.webp']
 ]);
+// The firebird has wings and the whale fins: the poses say paw, wing or fin.
+const EXPRS_L = EXPRS.map(([e, ko, text]) => [e, ko, e === 'sad' ? 'SAD: slightly sad pouty face with teary sparkling eyes, ears, crest or fins drooping a little, still cute (not crying hard); keep the same face, horn or crest and markings as the other cells'
+  : e === 'cheer' ? 'CHEERING: energetic pose with one front paw, wing or fin raised high, determined sparkling eyes, small motion sparkles'
+  : e === 'eat' ? 'EATING: happily eating from a small round mint food bowl in front of it, cheeks puffed, a few crumbs, eyes curved in joy' : text]);
 for (const [key, pet] of Object.entries(LEGENDS)) for (const form of [1, 2, 3]) {
   sheet(F7B, `${pet.ko} ${FORM_KO[form]} 표정`, 'pet', `${pet.ko}, ${pet.base}. This is the ${pet.f[form]}. A legendary pet: a soft golden rim light.`,
-    EXPRS.map(([expr, ko, text]) => [`${key}-${form}-${expr}`, `${pet.ko} ${FORM_KO[form]} ${ko}`, text, `public/assets/pets/${key}-${form}-${expr}.webp`]));
+    EXPRS_L.map(([expr, ko, text]) => [`${key}-${form}-${expr}`, `${pet.ko} ${FORM_KO[form]} ${ko}`, text, `public/assets/pets/${key}-${form}-${expr}.webp`]));
 }
 for (const [a, b] of [['haechi', 'phoenix'], ['whale', 'qilin']]) {
   sheet(F7B, `${LEGENDS[a].ko} · ${LEGENDS[b].ko} 알 반응`, 'egg', `two legendary pet eggs (the reference picture shows them side by side). The TOP row cells show ${LEGENDS[a].ko}'s egg: ${LEGENDS[a].egg}. The BOTTOM row cells show ${LEGENDS[b].ko}'s egg: ${LEGENDS[b].egg}.`, [
