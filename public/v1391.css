@@ -32,3 +32,8 @@ img.daily-art{flex:none;width:56px;height:56px;object-fit:contain;align-self:cen
 .fc-deck-art img.ui-art{width:72px;height:72px;margin:-6px auto 0;display:block}
 .fc-entry-art img.ui-art{width:48px;height:48px;margin:-4px}
 .fc-end-burst img.ui-art{width:150px;height:150px}
+img.locked-art{width:76%;height:76%;object-fit:contain}
+.empty-state img.empty-art{width:88px;height:88px}
+img.result-stamp{display:block;width:96px;height:96px;margin:4px auto -6px;object-fit:contain;animation:stampIn .45s cubic-bezier(.3,1.6,.5,1) .15s both}
+@keyframes stampIn{from{opacity:0;transform:scale(1.8) rotate(-12deg)}}
+@media (prefers-reduced-motion:reduce){img.result-stamp{animation:none}}

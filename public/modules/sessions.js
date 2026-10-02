@@ -1,7 +1,7 @@
 import { api, $, $$, icon, esc, time, date, recordRangeLabel, scope, toast, modal, buttonBusy } from './ui.js';
 import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo, grade, displayEnglish, TEST_SECONDS_PER_QUESTION, TEST_LEAVE_LIMIT, testDurationSec } from './core.js';
 import { avatar } from './character.js';
-import { uiArt } from './emblems.js';
+import { uiArt, artOr } from './emblems.js';
 import { EXAM_XP_PER_ANSWER, EXAM_COINS, STUDY_COINS } from './rewards.js';
 
 // V13.73: a 발음 듣기 button next to an English word shown as the question (never next to a
@@ -615,6 +615,8 @@ function shareDone(button) {
   button.textContent = '✓ 선생님께 전송 완료';
   toast('실전 결과를 선생님께 보냈어요.');
 }
+// V13.91 a reward stamp over the score (asset list 08-9), shown once the pictures are in ART_READY.
+const resultStamp = score => artOr(score >= 100 ? 'result-perfect' : score >= 80 ? 'result-great' : score >= 60 ? 'result-good' : 'result-retry', '', 'result-stamp');
 function animateTestResult(score, perfect) {
   const node = $('#practice-result-score');
   if (node) {
@@ -922,7 +924,7 @@ function finishPracticeView() {
   mount(`<div class="session-app"><main class="result-page result-page-v1320">
     <div class="result-identity"><span class="pill green">${modeLabel}</span><p>${rangeText} · ${esc(PRACTICE_TYPES[x.mode] || '쓰기')}</p></div>
     <h1 class="${interrupted ? 'interrupted-title-v1340' : ''}">${resultHeadline}</h1>
-    ${interrupted ? `<div class="interrupted-progress-v1340"><strong>${answeredCount}<small>/ ${targetCount}문제</small></strong><span>여기까지 풀었어요</span></div><div class="result-score-secondary-v1340">현재 점수 <b>${score}점</b></div>` : `<div class="result-number"><span id="practice-result-score">${score}</span><small>점</small></div>`}
+    ${interrupted ? `<div class="interrupted-progress-v1340"><strong>${answeredCount}<small>/ ${targetCount}문제</small></strong><span>여기까지 풀었어요</span></div><div class="result-score-secondary-v1340">현재 점수 <b>${score}점</b></div>` : `${resultStamp(score)}<div class="result-number"><span id="practice-result-score">${score}</span><small>점</small></div>`}
     <p class="result-score-basis">최초 풀이 기준 · ${Number(x.score_correct || 0)} / ${targetCount} 정답</p>
     <div class="result-stat-grid"><div><strong>${Number(x.score_correct || 0)}</strong><span>정답</span></div><div><strong>${wrongCount}</strong><span>오답</span></div><div><strong>${unanswered}</strong><span>미응답</span></div></div>
     <div class="result-meta-line"><span>${icon('clock')} 전체 진행 ${time(elapsed)}</span>${x.run_mode === 'test' && Number(x.leaves || 0) ? `<span class="result-leaves-v1376">📵 화면 이탈 ${Number(x.leaves)}번</span>` : ''}${x.run_mode === 'test' && Number(x.pass_count || 0) ? `<span class="result-pass-v1380">⏭ PASS ${Number(x.pass_count)}번</span>` : ''}</div>

@@ -293,6 +293,18 @@ menu('메뉴 아이콘 3 (나 화면 메뉴 · 야차전 방식)', [
   ['mode-speed', '스피드전', 'a bold yellow lightning bolt with short orange speed streaks behind it'],
   ['mode-skill', '실력전', 'a chunky mint pencil writing a short curved line next to a small red-and-white target']
 ]);
+menu('메뉴 아이콘 4 (나 화면 메뉴)', [
+  ['me-attendance', '출석 도장', 'a small mint calendar block with a big round red stamp mark pressed on it (no numbers)'],
+  ['me-stars', '어려운 단어', 'a small stack of two word cards with a chubby golden star sticker on the top card (no letters)'],
+  ['me-notify', '알림', 'a chunky golden bell with a mint bow on top and two short ringing curves'],
+  ['me-install', '앱 설치', 'a chunky rounded smartphone in mint with a big white downward arrow on its screen']
+]);
+menu('메뉴 아이콘 5 (꾸미기 · 펫 잠금 · 빈 기록)', [
+  ['me-gacha', '모은 꾸미기', 'a small round toy capsule half open with a pink ribbon and a tiny sparkle popping out'],
+  ['pet-locked', '아직 못 만난 펫 (상점의 알)', 'a plain cream egg partly covered by a soft lavender cloth, a tiny sparkle, mysterious but friendly (no face, no question mark)'],
+  ['pet-legend-locked', '아직 못 만난 전설 펫', 'a dark navy egg silhouette with a thin glowing golden outline and three tiny gold stars around it (no face, no question mark)'],
+  ['empty-records', '아직 기록 없음', 'an empty mint clipboard with a small green sprout growing from its top clip']
+]);
 STYLE.scene = 'Style: premium cute 3D-painted mobile-game illustration, soft pastel colors with SUMUS mint green (#10B981) accents, gentle warm rim light, clean soft shading. One small object-group per cell (no characters, no scenery, no floor), slightly top-down front view, readable at 96 pixels, filling about 75% of its cell.';
 sheet(F8, '학습 · 시험 카드 그림', 'scene', null, [
   ['ui-study-vocab', '단어 학습', 'a fan of three colorful word flash cards (blank, no letters) with a mint pencil and two small sparkles', 'public/assets/ui/study-vocab.webp'],
@@ -311,6 +323,13 @@ sheet(F8, '성취 배지', 'emblem', 'round achievement medals of the same shape
   ['ui-badge-streak90', '3회 연속 90점+', 'a SILVER medal with three small orange flames in a row rising from left to right', 'public/assets/ui/badge-streak90.webp'],
   ['ui-badge-english100', '영어쓰기 100점', 'a MINT-ENAMEL medal with a white fountain-pen nib in the middle and a few sparkles', 'public/assets/ui/badge-english100.webp'],
   ['ui-badge-master', '범위 MASTER', 'a PURPLE-GEM medal with a small golden crown above a golden laurel wreath', 'public/assets/ui/badge-master.webp']
+]);
+
+sheet(F8, '결과 도장', 'emblem', 'round result stamps of the same size, like a teacher\'s cute reward stamp: a thick round badge with a scalloped rim and a soft glossy finish (no letters, no numbers).', [
+  ['ui-result-perfect', '결과 PERFECT (100점)', 'a GOLD scalloped stamp with a big shining star and a small crown on top, a few sparkles', 'public/assets/ui/result-perfect.webp'],
+  ['ui-result-great', '결과 아주 잘했어요 (80점+)', 'a MINT scalloped stamp with a big white thumbs-up and two small stars', 'public/assets/ui/result-great.webp'],
+  ['ui-result-good', '결과 잘했어요 (60점+)', 'a SKY-BLUE scalloped stamp with a big white smiling check mark', 'public/assets/ui/result-good.webp'],
+  ['ui-result-retry', '결과 다시 도전 (60점 미만)', 'a soft PEACH scalloped stamp with a white curved arrow going around in a circle and a small heart', 'public/assets/ui/result-retry.webp']
 ]);
 
 /* 쓰기 */

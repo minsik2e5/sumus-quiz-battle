@@ -456,17 +456,19 @@ function pushPrompt(A) {
   try { if (Number(localStorage.getItem('sumus:push-later') || 0) > Date.now()) return ''; } catch {}
   return `<section class="push-prompt-v1377"><span class="push-bell" aria-hidden="true">${uiArt('bell')}</span><div><b>알림 켜기</b><small>선생님 공지·도전장·선물을 바로 알려 줄게요</small></div><button type="button" class="btn primary small" data-action="push-on">켜기</button><button type="button" class="push-later" data-action="push-later" aria-label="나중에">나중에</button></section>`;
 }
+// V13.91 an empty list with its drawn picture (asset list 08-8) once it is in ART_READY.
+const emptyArt = (art, name, title, sub = '') => `<div class="empty-state">${artOr(art, icon(name), 'empty-art')}<h3>${title}</h3>${sub ? `<p>${sub}</p>` : ''}</div>`;
 // V13.91 나 메뉴판: everything else the student can open, as one grid of app-style icons.
 function meMenu(A, { gachaHave, att }) {
   const s = pushSupport(), stars = (A.memStars || []).length;
   const item = (attrs, art, label, note = '') => `<button type="button" class="me-menu-item" ${attrs}><span class="me-menu-art">${art}</span><b>${label}</b>${note ? `<small>${note}</small>` : ''}</button>`;
   const items = [
     item('data-go="records"', artOr('me-records', icon('records')), '내 기록'),
-    att.done ? item('data-go="home"', uiArt('attendance'), '출석 도장', att.streak >= 2 ? `${att.streak}일 연속` : '오늘 완료') : item('data-action="attend"', uiArt('attendance'), '출석 도장', '<i class="me-menu-dot">오늘 아직</i>'),
-    item('data-action="me-stars"', uiArt('star-word'), '어려운 단어', stars ? `★ ${num(stars)}개` : ''),
-    item('data-action="me-notify"', uiArt('bell'), '알림', A.pushHere ? '켜짐' : '꺼짐'),
-    gachaHave ? item('data-go="gachabook"', icon('arcade'), '모은 꾸미기', `${gachaHave}개`) : '',
-    !s.installed ? `<a class="me-menu-item" href="/install"><span class="me-menu-art">${uiArt('install')}</span><b>앱 설치</b></a>` : '',
+    att.done ? item('data-go="home"', artOr('me-attendance', uiArt('attendance')), '출석 도장', att.streak >= 2 ? `${att.streak}일 연속` : '오늘 완료') : item('data-action="attend"', artOr('me-attendance', uiArt('attendance')), '출석 도장', '<i class="me-menu-dot">오늘 아직</i>'),
+    item('data-action="me-stars"', artOr('me-stars', uiArt('star-word')), '어려운 단어', stars ? `★ ${num(stars)}개` : ''),
+    item('data-action="me-notify"', artOr('me-notify', uiArt('bell')), '알림', A.pushHere ? '켜짐' : '꺼짐'),
+    gachaHave ? item('data-go="gachabook"', artOr('me-gacha', icon('arcade')), '모은 꾸미기', `${gachaHave}개`) : '',
+    !s.installed ? `<a class="me-menu-item" href="/install"><span class="me-menu-art">${artOr('me-install', uiArt('install'))}</span><b>앱 설치</b></a>` : '',
     item('data-action="account"', artOr('me-settings', icon('shield')), '계정·설정')
   ].filter(Boolean);
   return `<section class="me-menu-v1391" aria-label="메뉴"><h2>메뉴</h2><div class="me-menu-grid">${items.join('')}</div></section>`;
@@ -889,7 +891,7 @@ function ranking(A) {
     ${modeNote ? `<p class="rank-mode-note-v1366">${coin()} ${esc(modeNote)}</p>` : ''}
     ${myIndex >= 0 ? `<div class="my-rank-card"><span>내 ${scopeLabel} 순위</span><strong>${rankNo(items[myIndex])}<small>위</small></strong><p>${rankScore(items[myIndex][metric], mode)} · ${esc(periodTitle)}</p></div>` : ''}
     ${showPodium ? podium(items.slice(0, 3), metric, mode, rankNo) : ''}
-    <div class="rank-list">${rows.length ? rows.map((p, index) => `<div class="rank-row ${p.is_me ? 'me' : ''} ${!showPodium && index < 3 && Number(p[metric] || 0) ? 'top-rank top-' + (index + 1) : ''}"><span class="rank-number">${rankNo(p)}</span>${avatar(p.avatar_key, { size: 'mini', form: p.private ? 1 : Math.max(1, p.pet_form ?? petForm(p.level)) })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill green">나</span>' : ''}</strong><small><span class="rank-grade">${esc(p.grade || '')}</span> · ${p.private ? '프로필 비공개' : `Lv.${p.level} · ${esc(p.pet_name || CHARACTERS[petKey(p.avatar_key)].ko)}`}</small>${shownTitle(p.title) ? `<span class="rank-title-v1366">${titleBadge(p.title, { size: 'xs' })}</span>` : ''}</div><span class="rank-score">${rankScore(p[metric], mode)}</span></div>`).join('') : showPodium ? '' : empty('ranking', `${scopeLabel}에 아직 연습 기록이 없어요`, '학습을 시작하면 순위가 바로 생겨요.')}</div>
+    <div class="rank-list">${rows.length ? rows.map((p, index) => `<div class="rank-row ${p.is_me ? 'me' : ''} ${!showPodium && index < 3 && Number(p[metric] || 0) ? 'top-rank top-' + (index + 1) : ''}"><span class="rank-number">${rankNo(p)}</span>${avatar(p.avatar_key, { size: 'mini', form: p.private ? 1 : Math.max(1, p.pet_form ?? petForm(p.level)) })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill green">나</span>' : ''}</strong><small><span class="rank-grade">${esc(p.grade || '')}</span> · ${p.private ? '프로필 비공개' : `Lv.${p.level} · ${esc(p.pet_name || CHARACTERS[petKey(p.avatar_key)].ko)}`}</small>${shownTitle(p.title) ? `<span class="rank-title-v1366">${titleBadge(p.title, { size: 'xs' })}</span>` : ''}</div><span class="rank-score">${rankScore(p[metric], mode)}</span></div>`).join('') : showPodium ? '' : emptyArt('empty-records', 'ranking', `${scopeLabel}에 아직 연습 기록이 없어요`, '학습을 시작하면 순위가 바로 생겨요.')}</div>
     <p class="quiet-note">주간 기록은 매주 월요일 새로 시작하고 통합 기록은 계속 누적돼요. 시험 성적은 랭킹에 포함하지 않아요.</p>`;
 }
 function records(A) {
@@ -930,7 +932,7 @@ function records(A) {
     <section class="record-summary-v1327"><div class="record-summary-main"><span>이번 주 평균</span><strong>${weeklyAvg === null ? '—' : weeklyAvg}<small>${weeklyAvg === null ? '' : '점'}</small></strong><p>${weeklyScores.length}회 학습 기록</p></div><div class="record-summary-side"><div><span>최고 점수</span><b>${best === null ? '—' : best + '점'}</b></div><div><span>누적 학습</span><b>${combined.length}회</b></div><div><span>누적 문제</span><b>${num(totalQuestions)}</b></div></div></section>
     <section class="record-achievements-v1327">${achievementSection(A, true)}</section>
     <div class="segment record-filter-v1327"><button data-record-tab="all" class="${tab === 'all' ? 'selected' : ''}">전체</button><button data-record-tab="selftest" class="${tab === 'selftest' ? 'selected' : ''}">실전</button><button data-record-tab="practice" class="${tab === 'practice' ? 'selected' : ''}">연습</button></div>
-    <div class="record-timeline-v1327">${visible.length ? visible.map(rowHtml).join('') : empty('records','아직 기록이 없어요','첫 학습을 마치면 여기에 기록이 쌓여요.')}</div>`;
+    <div class="record-timeline-v1327">${visible.length ? visible.map(rowHtml).join('') : emptyArt('empty-records', 'records', '아직 기록이 없어요', '첫 학습을 마치면 여기에 기록이 쌓여요.')}</div>`;
 }
 // First pet: chosen once. It starts with all the XP the student has already earned.
 function petPicker(A) {
@@ -949,7 +951,7 @@ function studio(A) {
   const missing = STANDARD_PET_KEYS.filter(key => !owned.some(x => x.key === key));
   const petCard = key => {
     const pet = owned.find(x => x.key === key);
-    if (!pet) return `<div class="character-option pet-locked" aria-label="${CHARACTERS[key].type}, 아직 만나지 못했어요"><span class="pet-locked-art">?</span><b>???</b><small>${CHARACTERS[key].legendary ? '행운 뽑기 전용' : '상점의 알'}</small></div>`;
+    if (!pet) return `<div class="character-option pet-locked" aria-label="${CHARACTERS[key].type}, 아직 만나지 못했어요"><span class="pet-locked-art">${artOr(CHARACTERS[key].legendary ? 'pet-legend-locked' : 'pet-locked', '?', 'locked-art')}</span><b>???</b><small>${CHARACTERS[key].legendary ? '행운 뽑기 전용' : '상점의 알'}</small></div>`;
     return `<button data-style="avatar_key" data-value="${key}" class="character-option ${s.avatar_key === key ? 'selected' : ''}" aria-pressed="${s.avatar_key === key}">${avatar(key, { form: pet.form })}<b>${esc(petDisplayName(pet))}</b><small>${pet.form ? `Lv.${pet.level} · ${PET_FORMS[pet.form]}` : '알'}</small></button>`;
   };
   const shop = `<button type="button" class="pet-shop-banner" data-action="egg-shop"><span class="pet-shop-banner-egg" aria-hidden="true">?</span><span><strong>랜덤 알 상점</strong><small>${missing.length ? `${num(EGG_PRICE)}코인 · 상점에서 아직 못 만난 친구 ${missing.length}마리` : '상점 펫을 모두 모았어요!'}</small></span><b>${coin()}${num(g.points_balance || 0)}</b></button>`;
