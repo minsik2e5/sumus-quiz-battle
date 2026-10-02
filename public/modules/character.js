@@ -2,9 +2,24 @@ import { CHARACTERS, PET_FORMS } from './core.js';
 // Illustrated pets: /assets/pets/<pet>-<form>.webp (512px, transparent, feet on a shared
 // baseline) plus a 160px `-s` copy for small avatars. `form` is 0 (egg) .. 3 (final).
 const LEGACY = { lumi:'dog', nox:'cat', blaze:'dog', tide:'cat', zeph:'dragon', terra:'panda' };
-// V13.65: 몽이's growing and final art were redrawn (the body grows); its old happy face
-// belonged to the previous drawing, so it is left out until a matching one is drawn.
-const EXPRESSIONS = { pig: { 2: ['happy'] } };
+// V13.83 expressions (/assets/pets/<pet>-<form>-<expr>.webp, fitted to the still sprite):
+// happy (petting, wins), eat (feeding), sad (losses, a long absence), cheer (attacking, starting).
+// A pose not drawn yet (or redrawn because it did not match) falls back to the still sprite.
+const ALL = ['happy', 'eat', 'sad', 'cheer'], NO_SAD = ['happy', 'eat', 'cheer'];
+const EXPRESSIONS = {
+  dog: { 1: ALL, 2: ALL, 3: ALL },
+  pig: { 1: NO_SAD, 2: NO_SAD, 3: NO_SAD },
+  cat: { 1: ALL, 2: ALL },
+  dragon: { 1: ALL, 2: ALL },
+  panda: { 1: ALL, 2: ALL, 3: ALL },
+  snake: { 1: ALL, 2: ALL }
+};
+const EXPR_ALIAS = { win: 'happy', hurt: 'sad', lose: 'sad', feed: 'eat', pet: 'happy', attack: 'cheer' };
+// The art of a pet's pose, or null when that pose is not drawn (callers keep the still sprite).
+export function expressionSrc(key, form, expression) {
+  const k = petKey(key), f = Math.max(0, Math.min(3, Math.round(Number(form)) || 0)), e = EXPR_ALIAS[expression] || expression;
+  return (EXPRESSIONS[k]?.[f] || []).includes(e) ? `/assets/pets/${k}-${f}-${e}.webp` : null;
+}
 // Sprites are fitted one by one, so growth is added back gently (feet stay anchored).
 const GROW = [.86, .86, .93, 1];
 const SMALL = new Set(['mini']);
@@ -30,7 +45,7 @@ export function avatar(key = 'dog', options = {}) {
   const { size = '', form: rawForm = 1, accessory = 'none', frame = 'basic', expression = 'normal' } = options;
   const form = Math.max(0, Math.min(3, Math.round(Number(rawForm)) || 0));
   const small = SMALL.has(size);
-  const expr = expression === 'win' ? 'happy' : expression;
+  const expr = EXPR_ALIAS[expression] || expression;
   const hasExpr = !small && expr !== 'normal' && (EXPRESSIONS[key]?.[form] || []).includes(expr);
   const src = `/assets/pets/${key}-${form}${hasExpr ? '-' + expr : ''}${small ? '-s' : ''}.webp`;
   const label = `${c.ko}, ${PET_FORMS[form]}`;

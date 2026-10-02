@@ -490,4 +490,14 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(newsText({ key: 'SUBJ', up: true, pick: 1 }).includes('가정법은') && newsText({ key: 'PART', up: true, pick: 1 }).includes('분사는'), 'V13.82 news lines use 은/는 by the last letter');
   const arcade82 = source('../public/modules/arcade.js'), css82 = source('../public/v1382.css'), build82 = source('./build-assets.mjs');
   assert(arcade82.includes('rpsCard(rewards(current.A).rps') && arcade82.includes("rewards(current.A).market_open ? stocksCard() : ''") && arcade82.includes("openStock(k.dataset.key") && build82.includes('"v1382.css"') && css82.includes('.rps-show{') && css82.includes('.stk-card{'), 'V13.82 놀이터 shows 가위바위보 and 문법 증권거래소');
+
+  /* ---------- V13.83 pet expressions (art from SUMUS ASSET STUDIO) ---------- */
+  const { expressionSrc } = await import('../public/modules/character.js');
+  const { existsSync } = await import('node:fs');
+  const exprFiles = [];
+  for (const pet of ['dog', 'pig', 'cat', 'dragon', 'panda', 'snake', 'rabbit', 'fox']) for (const form of [1, 2, 3]) for (const e of ['happy', 'eat', 'sad', 'cheer']) { const src = expressionSrc(pet, form, e); if (src) exprFiles.push(src); }
+  assert(exprFiles.length === 57 && exprFiles.every(src => existsSync(fileURLToPath(new URL('../public' + src, import.meta.url)))), 'V13.83 every listed pet pose has its picture (57 drawn so far)');
+  assert(expressionSrc('dog', 3, 'feed') === '/assets/pets/dog-3-eat.webp' && expressionSrc('dog', 1, 'hurt') === '/assets/pets/dog-1-sad.webp' && expressionSrc('pig', 1, 'sad') === null && expressionSrc('fox', 2, 'happy') === null && expressionSrc('dog', 0, 'happy') === null, 'V13.83 poses map (feed→eat, hurt→sad); a pose not drawn keeps the still sprite');
+  const app83 = source('../public/app.js');
+  assert(app83.includes("showPose(art, kind === 'feed' ? 'eat' : 'happy')") && app83.includes("showPose(art, 'sad', 2200)"), 'V13.83 feeding and petting show the eating or happy pose; a long absence shows sad, then happy');
 }
