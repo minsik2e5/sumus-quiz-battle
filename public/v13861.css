@@ -1,0 +1,13 @@
+/* V13.86.1 home card: the pet shows a little bigger and whole, so 쓰다듬기 · 밥 주기 reactions read.
+   - The card is a little wider (290 → 312px), and the extra height all goes to the picture.
+   - The pet stands on the bottom of its frame (before, a square taller than the frame was centred
+     in it, so the feet and the food bowl were cut off).
+   - The speech bubble sits small in the top-right corner, and the 경험치 float rises at the bottom
+     right, so neither covers the pet's face. */
+.home-stack-v1360 .partner-card-btn{max-width:312px}
+.partner-art .avatar-art{position:absolute;left:50%;bottom:0;translate:-50% 0;width:auto;height:104%;max-height:none;aspect-ratio:1}
+.pet-say{left:auto;right:4%;top:5%;transform:none;max-width:62%;padding:5px 10px;font-size:12px;border-radius:12px;animation-name:petSayCorner}
+.pet-say::after{left:22%;bottom:-5px;width:10px;height:10px}
+@keyframes petSayCorner{from{opacity:0;transform:translateY(6px) scale(.9)}to{opacity:1;transform:none}}
+.pet-xp-float{left:auto;right:6%;bottom:8%;transform:none;animation-name:petXpCorner}
+@keyframes petXpCorner{0%{opacity:0;transform:translateY(8px)}20%{opacity:1}100%{opacity:0;transform:translateY(-34px)}}

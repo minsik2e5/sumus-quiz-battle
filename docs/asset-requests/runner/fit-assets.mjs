@@ -1,17 +1,20 @@
 // 2×2 시트 한 장(로보 · 가위바위보 · UI 아이콘 · 트로피)을 4칸으로 나눠 public/assets/ 아래에 넣어요.
-//   node docs/asset-requests/runner/fit-assets.mjs <sheet.png> <왼쪽위> <오른쪽위> <왼쪽아래> <오른쪽아래> [--base pets/robot-3] [--size 256] [--preview out.png]
+//   node docs/asset-requests/runner/fit-assets.mjs <sheet.png> <왼쪽위> <오른쪽위> <왼쪽아래> <오른쪽아래> [--base pets/robot-3] [--size 256] [--trim] [--preview out.png]
 //   예) node docs/asset-requests/runner/fit-assets.mjs out/043.png ui/care-feed ui/care-pet ui/care-warm ui/notice
 //       node docs/asset-requests/runner/fit-assets.mjs out/001.png rps/robot-rock rps/robot-scissors rps/robot-paper rps/robot-ready --base pets/robot-3
 // - 칸 이름은 public/assets/ 아래 경로(확장자 없이). "-"인 칸은 버려요.
 // - 펫 표정용 fit-sheets.mjs처럼, 붙어 있는 그림 덩어리의 중심이 어느 칸에 있는지로 나눠요.
 // - --base가 있으면 그 그림(public/assets/<base>.webp)과 키·가운데·발 위치를 맞춰요(같은 시트는 같은 배율).
 //   없으면 정사각형(--size, 기본 256px) 가운데에 여백을 두고 넣어요.
+// - --trim이면 정사각형에 넣지 않고 그림 테두리에 딱 맞게 잘라요(같은 시트는 같은 배율, 가장 넓은 칸이 --size px).
+//   예) 캡슐 위·아래 반쪽처럼 앱에서 위아래로 맞붙여 쓰는 그림.
 import sharp from 'sharp';
 import { fileURLToPath } from 'node:url';
 
 const ASSETS = fileURLToPath(new URL('../../../public/assets/', import.meta.url));
 const args = process.argv.slice(2);
 const opt = name => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : null; };
+const ti = args.indexOf('--trim'), trim = ti >= 0 && !!args.splice(ti, 1);
 const preview = opt('--preview'), baseName = opt('--base'), size = Number(opt('--size') || 256);
 const [sheet, ...names] = args;
 if (!sheet || names.length !== 4) {
@@ -72,6 +75,8 @@ if (base) {
   const ratio = cells.map(c => base.h / c.b.h).sort((a, b) => a - b)[Math.floor((cells.length - 1) / 2)];
   k = ratio;
   for (const c of cells) k = Math.min(k, (base.W - 12) / c.b.w, (base.y1 + 1 - 6) / c.b.h);
+} else if (trim) {
+  k = Math.min(...cells.map(c => size / Math.max(c.b.w, c.b.h)));
 } else {
   k = Math.min(...cells.map(c => size * .88 / Math.max(c.b.w, c.b.h)));
 }
@@ -81,7 +86,7 @@ for (const c of cells) {
   const crop = await sharp(c.buf, { raw: { width: W, height: H, channels: 4 } }).extract({ left: c.b.x0, top: c.b.y0, width: c.b.w, height: c.b.h }).png().toBuffer();
   const w = Math.round(c.b.w * k), h = Math.round(c.b.h * k);
   const img = await sharp(crop).resize(w, h).toBuffer();
-  const CW = base ? base.W : size, CH = base ? base.H : size;
+  const CW = base ? base.W : trim ? w : size, CH = base ? base.H : trim ? h : size;
   const left = base ? Math.max(6, Math.min(CW - w - 6, Math.round((base.x0 + base.x1) / 2 - w / 2))) : Math.round((CW - w) / 2);
   const top = base ? Math.max(0, base.y1 + 1 - h) : Math.round((CH - h) / 2);
   const out = await sharp({ create: { width: CW, height: CH, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
