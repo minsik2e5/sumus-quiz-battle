@@ -10,8 +10,6 @@ import { LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET } from './rewards
 export const MULT_CLASS = { 0: 't-miss', 1: 't-common', 2: 't-rare', 3: 't-legendary' };
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-const BALLS = ['#ff8fb1', '#7cc7ff', '#ffd166', '#8ee6b8', '#b69cff', '#ff9f6b', '#6ee7d6', '#ffc1d9', '#9ad0ff', '#ffe08a', '#a0e7b8', '#f7a8ff'];
-const BALL_SPOTS = [[8, 4], [36, 2], [64, 5], [92, 3], [120, 6], [20, 28], [50, 30], [80, 27], [108, 30], [34, 54], [66, 56], [96, 52]];
 
 /* ---------- sound and vibration (the yacha sound switch applies here too) ---------- */
 const soundOn = () => { try { return (localStorage.getItem('sumus-yacha-sound') ?? 'on') === 'on'; } catch { return true; } };
@@ -61,20 +59,16 @@ export function luckyCard(state, bet, balance) {
     <div class="lk-head"><div><small>COIN CAPSULE</small><h2>코인 뽑기</h2></div><span class="lk-left" aria-label="오늘 남은 뽑기 ${left}번">${Array.from({ length: l.daily || LUCKY_DAILY }, (_, i) => `<i class="${i < left ? 'on' : ''}"></i>`).join('')}<b>${left}/${l.daily || LUCKY_DAILY}</b></span></div>
     <div class="lk-stagebox">
       <div class="lk-machine" id="lk-machine" aria-hidden="true">
-        <span class="lk-bulbs">${Array.from({ length: 9 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</span>
-        <div class="lk-glass">${BALLS.map((c, i) => `<i style="--c:${c};--i:${i};left:${BALL_SPOTS[i][0]}px;bottom:${BALL_SPOTS[i][1]}px"></i>`).join('')}<span class="lk-glare"></span></div>
-        <div class="lk-base">
-          <span class="lk-marquee">×3 · ×2 · ×1</span>
-          <span class="lk-slot"><i class="lk-coin-in"></i></span>
-          <span class="lk-dial"><i></i></span>
-          <span class="lk-chute"><i class="lk-drop"></i></span>
-        </div>
+        <img class="lk-machine-art" src="/assets/lucky/machine.webp" alt="" draggable="false">
+        <img class="lk-machine-lit" src="/assets/lucky/machine-lit.webp" alt="" draggable="false">
+        <i class="lk-coin-in"></i>
+        <i class="lk-drop"></i>
       </div>
       <div class="lk-odds" aria-label="확률">${LUCKY_ODDS.slice().reverse().map(o => `<span class="${MULT_CLASS[o.mult]}"><b>${o.mult ? `×${o.mult}` : '꽝'}</b><em>${o.rate}%</em></span>`).join('')}</div>
     </div>
     <div class="lk-bets" role="group" aria-label="걸 코인">${(l.bets || LUCKY_BETS).map(b => `<button type="button" class="lk-bet ${bet === b ? 'on' : ''}" data-ga="bet" data-bet="${b}" aria-pressed="${bet === b}"><span class="lk-stack" aria-hidden="true">${'<i></i>'.repeat(b / 10)}</span><b>${b}</b></button>`).join('')}</div>
     <button type="button" class="lk-go" data-ga="pull" ${can ? '' : 'disabled'}>${left > 0 ? (balance >= bet ? `<span>뽑기!</span><em>${coin()}${bet}</em>` : '<span>코인이 부족해요</span>') : '<span>오늘 뽑기 끝! 내일 또 만나요</span>'}</button>
-    ${tickets ? `<button type="button" class="lk-ticket" data-ga="ticket"><b>🎟</b> 뽑기권 ${tickets}장 · ${coin()}${LUCKY_TICKET_BET} 공짜 뽑기</button>` : ''}
+    ${tickets ? `<button type="button" class="lk-ticket" data-ga="ticket"><img class="lk-ticket-art" src="/assets/lucky/ticket.webp" alt=""> 뽑기권 ${tickets}장 · ${coin()}${LUCKY_TICKET_BET} 공짜 뽑기</button>` : ''}
     ${recent.length ? `<div class="lk-recent"><span>최근</span>${recent.map(r => `<i class="${MULT_CLASS[r.mult]}">${r.mult ? `×${r.mult}` : '꽝'}</i>`).join('')}${todayNet ? `<em class="${todayNet > 0 ? 'up' : 'down'}">오늘 ${todayNet > 0 ? '+' : '−'}${num(Math.abs(todayNet))}</em>` : ''}</div>` : ''}
     <p class="lk-note">하루 ${l.daily || LUCKY_DAILY}번 · 확률은 매번 같아요 <button type="button" class="lk-odds-more" data-ga="odds">자세히</button> · 뽑기권은 출석 7번째 도장에서 받아요</p>
   </section>`;
@@ -123,10 +117,11 @@ export function luckyShow(res, { again = false, againLabel = '' } = {}) {
     box.setAttribute('aria-modal', 'true');
     box.setAttribute('aria-label', `코인 뽑기 결과: ${HEAD[res.mult]}`);
     box.innerHTML = `<div class="lk-spot"></div>
-      <div class="lk-cap" id="lk-cap"><i class="top"></i><i class="bot"></i><span class="lk-cap-band"></span><span class="lk-cap-shine"></span></div>
+      <div class="lk-cap" id="lk-cap"><img class="top" src="/assets/lucky/capsule-top.webp" alt=""><img class="bot" src="/assets/lucky/capsule-bottom.webp" alt=""></div>
       <div class="lk-burst" id="lk-burst"></div>
       <div class="lk-result" id="lk-result" hidden>
         ${res.mult === 3 ? '<div class="lk-ribbon">JACKPOT</div>' : ''}
+        ${res.mult === 0 ? '<img class="lk-result-art" src="/assets/lucky/miss.webp" alt="">' : res.mult === 3 ? '<img class="lk-result-art" src="/assets/lucky/jackpot.webp" alt="">' : ''}
         <span class="lk-big ${cls}">${res.mult ? `×${res.mult}` : '꽝'}</span>
         <h2>${HEAD[res.mult]}</h2>
         <p class="lk-pay">${res.mult ? `${coin('big')}<b id="lk-count">0</b><span>코인</span>` : `<span class="lk-lost">${coin()}${num(res.bet)}코인이 사라졌어요</span>`}</p>

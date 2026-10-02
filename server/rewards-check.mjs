@@ -497,7 +497,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   const exprFiles = [];
   for (const pet of ['dog', 'pig', 'cat', 'dragon', 'panda', 'snake', 'rabbit', 'fox']) for (const form of [1, 2, 3]) for (const e of ['happy', 'eat', 'sad', 'cheer']) { const src = expressionSrc(pet, form, e); if (src) exprFiles.push(src); }
   assert(exprFiles.length === 96 && exprFiles.every(src => existsSync(fileURLToPath(new URL('../public' + src, import.meta.url)))), 'V13.84 every listed pet pose has its picture (96 drawn)');
-  assert(expressionSrc('dog', 3, 'feed') === '/assets/pets/dog-3-eat.webp' && expressionSrc('dog', 1, 'hurt') === '/assets/pets/dog-1-sad.webp' && expressionSrc('pig', 1, 'sad') === '/assets/pets/pig-1-sad.webp' && expressionSrc('fox', 2, 'happy') === '/assets/pets/fox-2-happy.webp' && expressionSrc('cat', 2, 'happy') === '/assets/pets/cat-2-happy.webp' && expressionSrc('panda', 3, 'eat') === '/assets/pets/panda-3-eat.webp' && expressionSrc('dog', 0, 'happy') === null, 'V13.84 poses map (feed→eat, hurt→sad); a pose not drawn keeps the still sprite');
+  assert(expressionSrc('dog', 3, 'feed') === '/assets/pets/dog-3-eat.webp' && expressionSrc('dog', 1, 'hurt') === '/assets/pets/dog-1-sad.webp' && expressionSrc('pig', 1, 'sad') === '/assets/pets/pig-1-sad.webp' && expressionSrc('fox', 2, 'happy') === '/assets/pets/fox-2-happy.webp' && expressionSrc('cat', 2, 'happy') === '/assets/pets/cat-2-happy.webp' && expressionSrc('panda', 3, 'eat') === '/assets/pets/panda-3-eat.webp' && expressionSrc('dog', 0, 'happy') === '/assets/pets/dog-0-happy.webp' && expressionSrc('dog', 0, 'sad') === null, 'V13.84 poses map (feed→eat, hurt→sad); egg happy is drawn and an undrawn pose keeps the still sprite');
   const app83 = source('../public/app.js');
   assert(app83.includes("showPose(art, kind === 'feed' ? 'eat' : 'happy')") && app83.includes("showPose(art, 'sad', 2200)"), 'V13.83 feeding and petting show the eating or happy pose; a long absence shows sad, then happy');
 
@@ -507,7 +507,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     ...['care-feed', 'care-pet', 'care-warm', 'notice', 'bell', 'star-word', 'stopwatch', 'leave-warn', 'coin', 'xp', 'attendance', 'gift', 'egg-shop', 'streak', 'install', 'arcade',
       'season-bronze', 'season-silver', 'season-gold', 'season-diamond'].map(k => `ui/${k}`)];
   assert(art85.length === 36 && art85.every(a => existsSync(fileURLToPath(new URL(`../public/assets/${a}.webp`, import.meta.url)))), 'V13.85 the 36 drawn pictures (로보, 가위바위보, UI icons, season trophies) are in place');
-  assert(expressionSrc('robot', 3, 'attack') === '/assets/pets/robot-3-attack.webp' && expressionSrc('robot', 3, 'hurt') === '/assets/pets/robot-3-hurt.webp' && expressionSrc('robot', 3, 'win') === '/assets/pets/robot-3-happy.webp' && expressionSrc('robot', 2, 'attack') === null && expressionSrc('dog', 2, 'attack') === '/assets/pets/dog-2-cheer.webp' && expressionSrc('dog', 2, 'hurt') === '/assets/pets/dog-2-sad.webp', 'V13.85 로보 (final form) punches and flinches with its own art; other pets attack with cheer and are hurt with sad');
+  assert(expressionSrc('robot', 3, 'attack') === '/assets/pets/robot-3-attack.webp' && expressionSrc('robot', 3, 'hurt') === '/assets/pets/robot-3-hurt.webp' && expressionSrc('robot', 3, 'win') === '/assets/pets/robot-3-happy.webp' && expressionSrc('robot', 2, 'attack') === '/assets/pets/robot-2-attack.webp' && expressionSrc('dog', 2, 'attack') === '/assets/pets/dog-2-cheer.webp' && expressionSrc('dog', 2, 'hurt') === '/assets/pets/dog-2-sad.webp', 'V13.85 로보 punches and flinches with its own art; other pets attack with cheer and are hurt with sad');
   const rps85 = source('../public/modules/rps.js'), battle85 = source('../public/modules/battle.js'), css85 = source('../public/v1385.css'), build85 = source('./build-assets.mjs'), student85 = source('../public/modules/student.js');
   assert(rps85.includes('robotPose(res.robot)') && rps85.includes("robotPose(res.done ? 'shock' : 'lose')") && rps85.includes("robotPose('win')") && rps85.includes("robotPose('think')") && rps85.includes("robotPose('ready')") && !rps85.includes('.emoji') && rps85.includes('clash.webp'), 'V13.85 가위바위보 uses the drawn hands, the clash, and 로보 pumps, throws and reacts');
   const css86 = source('../public/v1386.css');
@@ -516,4 +516,15 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(rps85.includes('rps-arena comic') && rps85.includes('const ARM_ART = false') && rps85.includes("fist('me', res.pick, 'shown')") && rps85.includes('id="rps-mine"') && build85.includes('"v1386.css"') && css86.includes('.rps-vsburst{') && css86.includes('.rps-comic .bolt{') && css86.includes('.rps-arena.comic.win .rps-arm.me{'), 'V13.86 가위바위보 is a comic panel: a lightning split, a VS burst, arms from the edges, hand bars (arm art switches on with ARM_ART)');
   assert(battle85.includes("showPose(el, 'hurt', 900)") && battle85.includes("showPose(el, 'attack', 900)"), 'V13.85 yacha pets show their attack and hurt poses');
   assert(build85.includes('"v1385.css"') && css85.includes('.coin-ico{background:url(/assets/ui/coin.webp)') && student85.includes("hatched ? 'care-feed' : 'care-warm'") && student85.includes("uiArt('notice')") && student85.includes("uiArt('gift', 'att-gift-art')"), 'V13.85 UI icons: pet care, notice, bell, install, attendance, the drawn coin');
+
+  /* ---------- V13.88 로보 쉬움·보통 · 코인 뽑기 · 알 반응 ---------- */
+  const robot88 = [1, 2].flatMap(form => ['attack', 'hurt', 'happy', 'sad'].map(expression => expressionSrc('robot', form, expression)));
+  const eggs88 = ['dog', 'pig', 'cat', 'dragon', 'panda', 'snake', 'rabbit', 'fox'].flatMap(pet => ['happy', 'eat'].map(expression => expressionSrc(pet, 0, expression)));
+  const registered88 = [...robot88, ...eggs88];
+  assert(registered88.length === 24 && registered88.every(src => src && existsSync(fileURLToPath(new URL('../public' + src, import.meta.url)))), 'V13.88 로보 1·2단계 8장과 알 반응 16장이 등록되어 있고 파일이 있다');
+  const luckyArt88 = ['machine', 'machine-lit', 'ticket', 'jackpot', 'capsule', 'capsule-top', 'capsule-bottom', 'miss'];
+  assert(luckyArt88.every(name => existsSync(fileURLToPath(new URL(`../public/assets/lucky/${name}.webp`, import.meta.url)))), 'V13.88 코인 뽑기 그림 8장이 있다');
+  const lucky88 = source('../public/modules/lucky.js'), build88 = source('./build-assets.mjs');
+  assert(lucky88.includes('/assets/lucky/machine.webp') && lucky88.includes('/assets/lucky/capsule-top.webp') && lucky88.includes('/assets/lucky/ticket.webp') && !lucky88.includes('🎟'), 'V13.88 뽑기 화면은 새 머신·캡슐·뽑기권 그림을 쓴다');
+  assert(build88.includes('"v1388.css"'), 'V13.88 뽑기 그림 스타일이 빌드 목록에 있다');
 }
