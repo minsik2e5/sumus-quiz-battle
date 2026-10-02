@@ -3,7 +3,7 @@
 // 한 프롬프트 = 그림 4장(2×2 시트, 1024×1024). 받은 시트는 slice-map.csv대로 4칸으로 잘라 앱에 넣어요.
 // 급한 순서: 01 가위바위보·로보 → 02 펫 표정 → 03 UI 아이콘·트로피 → 04 다시 만들 것 → 05 가위바위보 팔(만화 연출)
 // → 06 로보 쉬움·보통 표정, 코인 뽑기 머신·캡슐, 알 반응 (Codex 작업: CODEX_PROMPT_06.md).
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -224,6 +224,10 @@ const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
 for (const [file, list] of byFile) writeFileSync(resolve(here, file), list.map(p => p.text).join('\n---\n') + '\n');
 writeFileSync(resolve(here, '00-all-in-order.txt'), prompts.map(p => p.text).join('\n---\n') + '\n');
+// Sheets that each need their own chat (their own reference picture) also go one per file in split/.
+const SPLIT = new Set([F5, F6]);
+mkdirSync(resolve(here, 'split'), { recursive: true });
+for (const [file, list] of byFile) if (SPLIT.has(file)) list.forEach((p, i) => writeFileSync(resolve(here, 'split', `${file.slice(0, 2)}-${i + 1} ${p.title.replace(/[\\/:*?"<>|()]/g, '').replace(/\s+/g, ' ').trim()}.txt`), p.text + '\n'));
 const csv = v => `"${String(v).replace(/"/g, '""')}"`;
 writeFileSync(resolve(here, 'slice-map.csv'), '﻿' + ['list,prompt_no,sheet,cell,key,name,app_file', ...slices.map(s => [s.file, String(s.no).padStart(3, '0'), s.title, s.cell, s.key, s.name, s.out].map(csv).join(','))].join('\n') + '\n');
 console.log([...byFile].map(([f, l]) => `${f}: ${l.length} prompts → ${l.length * 4} images`).join('\n'));
