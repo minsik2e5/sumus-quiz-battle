@@ -1,7 +1,7 @@
 // SUMUS Prompt Runner용 프롬프트 목록 만들기 (ChatGPT 웹, 프롬프트 사이는 ---).
 //   node docs/asset-requests/runner/build-runner.mjs
 // 한 프롬프트 = 그림 4장(2×2 시트, 1024×1024). 받은 시트는 slice-map.csv대로 4칸으로 잘라 앱에 넣어요.
-// 급한 순서: 01 가위바위보·로보 → 02 펫 표정 → 03 UI 아이콘·트로피.
+// 급한 순서: 01 가위바위보·로보 → 02 펫 표정 → 03 UI 아이콘·트로피 → 04 다시 만들 것 → 05 가위바위보 팔(만화 연출).
 import { writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,7 +15,8 @@ const STYLE = {
   pet: 'Style: premium cute chibi fantasy pet, soft 3D-painted anime illustration, fluffy fur drawn with fine strands, soft pastel colors, big glossy eyes with white highlights, light pink blush, a thin warm golden-white rim light along the outline, clean soft shading. Every cell shows exactly the same character design (same colors, markings, proportions and accessories); only the pose and expression change. Full body, 3/4 view facing the viewer\'s right, feet near the bottom of the cell.',
   robot: 'Style: premium cute chibi 3D toy robot mascot, glossy white plastic armor with mint/teal (#2CC4A8) accents, soft studio lighting, gentle rim light, clean shading. Every cell shows exactly the same robot design; only the pose and face-screen change.',
   icon: 'Style: glossy 3D game UI icon, soft pastel palette with SUMUS mint green (#10B981) accents, chunky friendly shapes, clean edges readable at 48 pixels, one object per cell, slight top-down front view.',
-  emblem: 'Style: shiny 3D game trophy/badge, metallic with soft gem highlights, symmetric, readable at 64 pixels, one object per cell.'
+  emblem: 'Style: shiny 3D game trophy/badge, metallic with soft gem highlights, symmetric, readable at 64 pixels, one object per cell.',
+  arm: 'Style: glossy 3D cartoon game art, chunky friendly shapes, bold clean outline, soft studio lighting with a gentle rim light, clean shading, the same look as cute 3D mobile-game hand icons. Side view. Every cell shows exactly the same arm (same length, thickness, colors and sleeve); only the hand changes. In every cell the arm lies HORIZONTALLY across the middle of the cell at the same height, about 80% of the cell width long, so the four arms can be swapped in place.'
 };
 
 const ROBO = 'The robot "로보": a chubby chibi robot about 2.3 heads tall. Round white helmet head with a large black glossy visor screen; the screen shows its face as glowing mint lines (default: happy ^ ^ eyes and a tiny pink tongue smile). A thin antenna on top ending in a glossy mint ball. Round mint ear-discs on both sides of the head. White rounded body with a glowing mint circular core on the chest, mint panel lines, chunky white arms with mint joints, chunky robot hands with five rounded fingers, short sturdy legs with mint knee pads. Faces the viewer.';
@@ -148,6 +149,23 @@ sheet(F3, '시즌 트로피', 'emblem', 'season-end league trophies of the same 
   ['season-silver', '시즌 트로피 실버', 'SILVER finish trophy with a pale blue gem', 'public/assets/ui/season-silver.webp'],
   ['season-gold', '시즌 트로피 골드', 'GOLD finish trophy with a ruby gem and a few sparkles', 'public/assets/ui/season-gold.webp'],
   ['season-diamond', '시즌 트로피 다이아', 'DIAMOND trophy made of shimmering pale cyan crystal with rainbow glints and a large faceted gem', 'public/assets/ui/season-diamond.webp']
+]);
+
+/* 05 가위바위보 팔 (만화 연출: 화면 양쪽 끝에서 팔이 들어와 가운데에서 맞부딪힘) */
+const F5 = '05-rps-arms.txt';
+const ROBO_ARM = 'the robot "로보"\'s right forearm and hand only (no body, no shoulder): glossy white plastic armor with mint/teal (#2CC4A8) panel lines, a round mint elbow joint at the LEFT end where the arm starts, a glowing mint ring around the wrist, a chunky white robot hand with five rounded fingers and mint finger joints. The arm comes from the LEFT and the hand points to the RIGHT (toward the opponent).';
+const KID_ARM = 'a child\'s forearm and hand only (no body, no shoulder): warm peach skin with soft pink knuckles, chubby friendly fingers, wearing a mint green (#10B981) sporty jacket sleeve with a white stripe and a white ribbed cuff; the sleeve ends cleanly at the RIGHT edge of the drawing where the arm starts. The arm comes from the RIGHT and the hand points to the LEFT (toward the opponent).';
+sheet(F5, '로보 팔 (왼쪽에서 들어옴)', 'arm', ROBO_ARM, [
+  ['arm-robot-rock', '로보 팔 바위', 'ROCK: a tight closed fist, knuckles facing right toward the opponent, small speed lines behind the fist', 'public/assets/rps/arm-robot-rock.webp'],
+  ['arm-robot-scissors', '로보 팔 가위', 'SCISSORS: index and middle fingers stretched straight forward to the right in a V shape, the other fingers folded', 'public/assets/rps/arm-robot-scissors.webp'],
+  ['arm-robot-paper', '로보 팔 보', 'PAPER: an open flat hand, all five fingers stretched straight forward to the right and slightly spread, palm facing down', 'public/assets/rps/arm-robot-paper.webp'],
+  ['arm-robot-flag', '로보 팔 항복', 'GIVE UP: the hand holds a small white flag on a short stick, the flag waving, a tiny sweat drop (used when 로보 loses big)', 'public/assets/rps/arm-robot-flag.webp']
+]);
+sheet(F5, '내 팔 (오른쪽에서 들어옴)', 'arm', KID_ARM, [
+  ['arm-me-rock', '내 팔 바위', 'ROCK: a tight closed fist, knuckles facing left toward the opponent, small speed lines behind the fist', 'public/assets/rps/arm-me-rock.webp'],
+  ['arm-me-scissors', '내 팔 가위', 'SCISSORS: index and middle fingers stretched straight forward to the left in a V shape, the other fingers folded', 'public/assets/rps/arm-me-scissors.webp'],
+  ['arm-me-paper', '내 팔 보', 'PAPER: an open flat hand, all five fingers stretched straight forward to the left and slightly spread, palm facing down', 'public/assets/rps/arm-me-paper.webp'],
+  ['arm-me-thumb', '내 팔 엄지척', 'THUMBS UP: a fist with the thumb pointing straight up, a few small sparkles (used when taking the coins)', 'public/assets/rps/arm-me-thumb.webp']
 ]);
 
 /* 쓰기 */

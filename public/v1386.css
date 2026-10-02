@@ -1,0 +1,100 @@
+/* V13.86 가위바위보 as a comic panel: the screen splits along a lightning bolt (로보 left, me
+   right), a VS burst sits in the middle and two arms reach in from the edges and smash together. */
+.rps-arena.comic{--hand:min(27vw,112px);--gap:50px;display:block;flex:1;min-height:340px;margin:10px -16px 0;width:calc(100% + 32px);max-width:560px;align-self:center;overflow:hidden;
+  border-block:4px solid #1b1030;box-shadow:0 8px 0 rgba(0,0,0,.25)}
+@media (min-width:592px){.rps-arena.comic{border-inline:4px solid #1b1030;border-radius:18px;margin-inline:auto}}
+
+/* the background: two halftone halves split by a zigzag, rays from the clash point */
+.rps-comic{position:absolute;inset:0;pointer-events:none}
+.rps-comic i{position:absolute;inset:0}
+.rps-comic .half{background-size:11px 11px,100% 100%;transition:filter .3s}
+.rps-comic .half.robot{clip-path:polygon(0 0,53% 0,47% 24%,54% 42%,46% 62%,53% 80%,48% 100%,0 100%);
+  background-image:radial-gradient(circle,rgba(255,255,255,.2) 26%,transparent 29%),linear-gradient(160deg,#5fe0c9 0%,#1aa58e 55%,#0b6f60 100%)}
+.rps-comic .half.me{clip-path:polygon(53% 0,100% 0,100% 100%,48% 100%,53% 80%,46% 62%,54% 42%,47% 24%);
+  background-image:radial-gradient(circle,rgba(255,255,255,.22) 26%,transparent 29%),linear-gradient(200deg,#ffe066 0%,#ffb703 50%,#f27d0c 100%)}
+.rps-comic .rays{background:repeating-conic-gradient(from 0deg at 50% 56%,rgba(255,255,255,.13) 0 6deg,transparent 6deg 15deg);mix-blend-mode:soft-light;animation:rps-rays 40s linear infinite}
+.rps-comic .bolt{background:#1b1030;clip-path:polygon(51.6% 0,54.4% 0,48.6% 24%,55.6% 42%,47.6% 62%,54.6% 80%,49.4% 100%,46.6% 100%,51.4% 80%,44.4% 62%,52.4% 42%,45.4% 24%)}
+.rps-comic .bolt::after{content:'';position:absolute;inset:0;background:#ffe14d;clip-path:polygon(52.6% 0,53.4% 0,47.6% 24%,54.6% 42%,46.6% 62%,53.6% 80%,48.4% 100%,47.6% 100%,52.4% 80%,45.4% 62%,53.4% 42%,46.4% 24%)}
+.rps-arena.comic.clash .rps-comic .bolt::after{animation:rps-bolt .4s steps(2) 2}
+@keyframes rps-bolt{50%{background:#fff}}
+.rps-show.tense .rps-comic .half.robot{filter:hue-rotate(-150deg) saturate(1.3)}
+.rps-show.final .rps-comic .half.me{filter:hue-rotate(-30deg) saturate(1.4)}
+.rps-show.gold .rps-comic .half{filter:sepia(.6) saturate(2.2) brightness(1.1)}
+
+/* the fighters: small, in the top corners, with their name tags */
+.rps-arena.comic .rps-side{position:absolute;top:10px;z-index:2;display:flex;flex-direction:column;align-items:center;gap:2px}
+.rps-arena.comic .rps-side.robot{left:12px}
+.rps-arena.comic .rps-side.me{right:12px}
+.rps-arena.comic .rps-avatar{width:min(25vw,104px);height:min(25vw,104px);filter:drop-shadow(0 6px 0 rgba(27,16,48,.35))}
+.rps-arena.comic .rps-name{font-size:12px;font-style:italic;letter-spacing:.04em;background:#1b1030;color:#fff;border:2px solid #fff;padding:2px 10px;transform:skew(-8deg)}
+.rps-arena.comic .rps-side.robot .rps-name{background:#0b6f60}
+.rps-arena.comic .rps-side.me .rps-name{background:#c75a00}
+.rps-arena.comic .rps-talk{left:calc(100% + 4px);top:6px;bottom:auto;border:2.5px solid #1b1030;box-shadow:3px 3px 0 #1b1030;max-width:min(52vw,220px);transform-origin:0 50%}
+.rps-arena.comic .rps-talk::after{left:-9px;top:14px;border:7px solid transparent;border-right-color:#1b1030;border-left:0}
+
+/* VS burst */
+.rps-vsburst{position:absolute;left:50%;top:56%;z-index:1;width:min(30vw,128px);aspect-ratio:1;transform:translate(-50%,-50%);display:grid;place-items:center;transition:transform .18s,opacity .18s;
+  background:radial-gradient(circle,#ffde3b 0 40%,#ff7b1a 41% 52%,#e0261d 53%);clip-path:polygon(50% 0,58% 20%,75% 5%,72% 26%,95% 22%,80% 40%,100% 50%,80% 60%,95% 78%,72% 74%,75% 95%,58% 80%,50% 100%,42% 80%,25% 95%,28% 74%,5% 78%,20% 60%,0 50%,20% 40%,5% 22%,28% 26%,25% 5%,42% 20%);
+  filter:drop-shadow(0 0 0 #1b1030);animation:rps-vsb 1.1s ease-in-out infinite alternate}
+.rps-vsburst b{font-size:min(10vw,42px);font-weight:900;font-style:italic;color:#ffe14d;letter-spacing:-.02em;-webkit-text-stroke:2.5px #1b1030;paint-order:stroke fill;text-shadow:3px 3px 0 #1b1030;transform:rotate(-8deg)}
+@keyframes rps-vsb{to{transform:translate(-50%,-50%) scale(1.08) rotate(4deg)}}
+.rps-arena.comic.fly .rps-vsburst{transform:translate(-50%,-50%) scale(.2);opacity:0;animation:none}
+.rps-arena.comic.intro .rps-vsburst{animation:rps-vs-in .45s cubic-bezier(.2,1.6,.4,1) .45s both}
+@keyframes rps-vs-in{from{transform:translate(-50%,-50%) scale(4) rotate(-30deg);opacity:0}}
+.rps-arena.comic .rps-stack{display:none}
+
+/* the arms: in from the edges at the clash height; the hand is at the inner end */
+.rps-arm{position:absolute;top:56%;z-index:2;width:calc(50% - var(--gap));height:var(--hand);display:flex;align-items:center;transform:translateY(-50%);transition:transform .17s cubic-bezier(.5,0,.8,.4),filter .3s}
+.rps-arm.robot{left:0;transform-origin:0 50%}
+.rps-arm.me{right:0;flex-direction:row-reverse;transform-origin:100% 50%}
+.rps-sleeve{flex:1;height:calc(var(--hand) * .46);border:3px solid #1b1030;box-shadow:0 5px 0 rgba(27,16,48,.3)}
+.rps-arm.robot .rps-sleeve{margin-right:-14px;border-left:0;border-radius:0 14px 14px 0;
+  background:repeating-linear-gradient(90deg,transparent 0 30px,#2cc4a8 30px 36px),linear-gradient(180deg,#fff 0 45%,#d7e6e2 100%)}
+.rps-arm.me .rps-sleeve{margin-left:-14px;border-right:0;border-radius:14px 0 0 14px;
+  background:linear-gradient(90deg,#fff 0 16px,#1b1030 16px 19px,transparent 19px),linear-gradient(180deg,transparent 0 38%,#fff 38% 52%,transparent 52%),linear-gradient(180deg,#34d399 0,#10b981 55%,#0a8a62 100%)}
+.rps-arm .rps-hand{flex:none;position:relative;z-index:1;width:var(--hand);height:var(--hand);display:grid;place-items:center;filter:none;transform:none}
+.rps-arm .rps-medal{width:100%;height:100%}
+.rps-arm.drawn .rps-sleeve{display:none}
+.rps-arm.drawn{width:calc(50% - var(--gap) + 20px)}
+.rps-arm.drawn .rps-hand{width:100%;height:auto}
+.rps-arm-art{width:100%;height:auto;filter:drop-shadow(0 6px 0 rgba(27,16,48,.3))}
+.rps-arm-art.idle{filter:saturate(.5) drop-shadow(0 6px 0 rgba(27,16,48,.3))}
+/* pump on "가위! 바위! 보!" (the arm swings from the screen edge) */
+.rps-arena.comic.shake .rps-arm.robot{animation:rps-arm-l .3s ease-in-out}
+.rps-arena.comic.shake .rps-arm.me{animation:rps-arm-r .3s ease-in-out}
+@keyframes rps-arm-l{45%{transform:translateY(-50%) rotate(-16deg)}}
+@keyframes rps-arm-r{45%{transform:translateY(-50%) rotate(16deg)}}
+/* fly in and smash */
+.rps-arena.comic.fly .rps-arm.robot{transform:translateY(-50%) translateX(calc(var(--gap) - 6px))}
+.rps-arena.comic.fly .rps-arm.me{transform:translateY(-50%) translateX(calc(6px - var(--gap)))}
+.rps-arena.comic.clash .rps-arm .rps-medal,.rps-arena.comic.clash .rps-arm-art{animation:rps-slam .38s cubic-bezier(.2,1.6,.4,1)}
+/* the winner pushes through, the loser is knocked back */
+.rps-arena.comic.win .rps-arm.me{transform:translateY(-50%) translateX(calc(10px - var(--gap) - 24px));transition-duration:.3s}
+.rps-arena.comic.win .rps-arm.robot{transform:translateY(-50%) translateX(-34px) rotate(-14deg);filter:grayscale(.7) brightness(.85);transition-duration:.3s}
+.rps-arena.comic.lose .rps-arm.robot{transform:translateY(-50%) translateX(calc(var(--gap) + 18px));transition-duration:.3s}
+.rps-arena.comic.lose .rps-arm.me{transform:translateY(-50%) translateX(34px) rotate(14deg);filter:grayscale(.7) brightness(.85);transition-duration:.3s}
+.rps-arena.comic.tie .rps-arm.robot{transform:translateY(-50%) translateX(calc(var(--gap) - 22px))}
+.rps-arena.comic.tie .rps-arm.me{transform:translateY(-50%) translateX(calc(22px - var(--gap)))}
+.rps-arena.comic .rps-ring,.rps-arena.comic .rps-clash-art{top:56%}
+.rps-arena.comic .rps-burst{top:56%}
+.rps-arena.comic .rps-stamp{top:34%;z-index:3;-webkit-text-stroke:2px #1b1030;paint-order:stroke fill;text-shadow:4px 4px 0 #1b1030;background:rgba(255,255,255,.12)}
+.rps-arena.comic.intro .rps-arm.robot{animation:rps-in-l .5s cubic-bezier(.2,1.25,.4,1) both}
+.rps-arena.comic.intro .rps-arm.me{animation:rps-in-r .5s cubic-bezier(.2,1.25,.4,1) .08s both}
+.rps-arena.comic.intro .rps-side.robot{animation:rps-drop .45s cubic-bezier(.2,1.4,.4,1) .2s both}
+.rps-arena.comic.intro .rps-side.me{animation:rps-drop .45s cubic-bezier(.2,1.4,.4,1) .28s both}
+@keyframes rps-drop{from{transform:translateY(-140%)}}
+
+/* the hand bars at the bottom of the panel */
+.rps-bars{position:absolute;left:8px;right:8px;bottom:8px;z-index:2;display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.rps-bar{display:flex;align-items:center;gap:6px;min-width:0;height:34px;padding:0 8px;background:rgba(27,16,48,.72);border:2px solid #ffe14d;border-radius:4px;transform:skew(-6deg)}
+.rps-bar>b{flex:none;font-size:12.5px;font-weight:900;font-style:italic;color:#b8ff5a;letter-spacing:.04em}
+.rps-bar.robot>b{color:#7ff0dc}
+.rps-bar.me{flex-direction:row-reverse}
+.rps-bar>span{display:flex;min-width:0;overflow:hidden}
+.rps-bar .rps-robot-log{background:none;padding:0;gap:2px}
+.rps-bar .rps-robot-log small{display:none}
+.rps-bar.me .rps-robot-log{flex-direction:row-reverse}
+.rps-bar-empty{font-size:11px;color:rgba(255,255,255,.6);font-weight:700}
+.rps-show:has(.rps-arena.comic) .rps-log{display:none}
+
+@media (prefers-reduced-motion:reduce){.rps-comic .rays,.rps-vsburst,.rps-arena.comic .rps-comic .bolt::after{animation:none!important}.rps-arm{transition:none}}
