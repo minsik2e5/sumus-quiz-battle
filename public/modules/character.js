@@ -9,9 +9,11 @@ const ALL = ['happy', 'eat', 'sad', 'cheer'], NO_SAD = ['happy', 'eat', 'cheer']
 const EXPRESSIONS = {
   dog: { 1: ALL, 2: ALL, 3: ALL },
   pig: { 1: NO_SAD, 2: NO_SAD, 3: NO_SAD },
-  cat: { 1: ALL, 2: ALL },
-  dragon: { 1: ALL, 2: ALL },
-  panda: { 1: ALL, 2: ALL, 3: ALL },
+  // 나비·용이·밤부: the grown and final sheets came out in the baby's body (no growth), so only
+  // the baby's poses are used until they are redrawn.
+  cat: { 1: ALL },
+  dragon: { 1: ALL },
+  panda: { 1: ALL },
   snake: { 1: ALL, 2: ALL }
 };
 const EXPR_ALIAS = { win: 'happy', hurt: 'sad', lose: 'sad', feed: 'eat', pet: 'happy', attack: 'cheer' };

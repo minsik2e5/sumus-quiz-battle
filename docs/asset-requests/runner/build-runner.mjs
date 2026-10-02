@@ -30,22 +30,22 @@ const PETS = {
     1: 'baby stage: small, very round, no accessories',
     2: 'grown stage: a little bigger, wearing a green scarf with a small gold star charm',
     3: 'final stage: wearing a green cape with a gold star clasp, small white feathered wings, a soft golden sparkle aura' } },
-  cat: { ko: '나비', base: 'a silver-grey tabby kitten with darker grey stripes, white chest, white paws and white muzzle, pink ear insides, big glossy amber eyes, a fluffy striped tail', f: {
+  cat: { ko: '나비', base: 'a silver-grey tabby cat with darker grey stripes, white chest, white paws and white muzzle, pink ear insides, big glossy amber eyes, a fluffy striped tail', f: {
     1: 'baby stage: small, round and fluffy, sitting-size proportions, no accessories',
-    2: 'grown stage: slimmer and longer, a small gold star charm on the chest',
-    3: 'final stage: a long elegant fluffy cat with flowing fur edged in a soft golden glow, a gold star charm, golden sparkles' } },
-  dragon: { ko: '용이', base: 'a fluffy white baby dragon with pastel aqua-blue scales along the spine, tail and paws, small curved golden horns, aqua ear fins, big glossy sky-blue eyes', f: {
+    2: 'grown stage: a slim young cat (NOT a round kitten) with a longer body, long legs, upright pointed ears and a long thin striped tail curling up, a small gold star charm on the chest',
+    3: 'final stage: a tall, slender, elegant adult cat with long legs and long flowing silky fur edged in a soft golden glow, a huge plume-like fluffy tail, a gold star charm, golden sparkles (NOT a round kitten)' } },
+  dragon: { ko: '용이', base: 'a fluffy white dragon with pastel aqua-blue scales along the spine, tail and paws, small curved golden horns, aqua ear fins, big glossy sky-blue eyes', f: {
     1: 'baby stage: small and round, tiny wing nubs, no accessories',
-    2: 'grown stage: translucent pastel-blue wings, longer scaled tail, a small gold star on the chest',
-    3: 'final stage: larger with wide translucent blue wings edged in gold, more aqua scales, a gold star on the chest, golden sparkles' } },
-  panda: { ko: '밤부', base: 'a round panda cub with very dark brown and white fur, dark eye patches, round dark ears, big glossy brown eyes, pink paw pads', f: {
+    2: 'grown stage: a young dragon with a longer body and neck, standing on four legs, LARGE translucent pastel-blue bat-like wings raised behind it, a long scaled tail, a small gold star on the chest (NOT a round baby)',
+    3: 'final stage: a majestic dragon with a long graceful body, VERY LARGE wide translucent blue wings edged in gold spread behind it, a golden crest, a long tail full of aqua scales, a gold star on the chest, golden sparkles (NOT a round baby)' } },
+  panda: { ko: '밤부', base: 'a panda with very dark brown and white fur, dark eye patches, round dark ears, big glossy brown eyes, pink paw pads', f: {
     1: 'baby stage: small and round, holding a few green bamboo leaves',
-    2: 'grown stage: bigger and sturdier, a garland of green bamboo leaves around the neck with a gold star',
-    3: 'final stage: a bamboo-leaf crown, glowing golden leaf patterns on the dark fur, a gold star, soft golden sparkles' } },
+    2: 'grown stage: a bigger, sturdier young panda with longer legs (NOT a round sitting cub), a garland of green bamboo leaves around the neck with a gold star',
+    3: 'final stage: a large proud panda with a strong body and long legs, a bamboo-leaf crown with a gold star, glowing golden leaf patterns painted on its dark legs, soft golden sparkles (NOT a round cub)' } },
   snake: { ko: '초롱', base: 'a cute little snake with a cream belly and green leaf-shaped scales, a crest of leafy green "hair" on the head, big glossy green eyes, coiled body', f: {
     1: 'baby stage: short, chubby coil, small leaf crest',
     2: 'grown stage: longer S-shaped coil, more leaves along the back',
-    3: 'final stage: a long elegant coil with glowing golden-green leaf scales and a fuller leafy crest, golden sparkles' } },
+    3: 'final stage: a long, slender, elegant serpent rising tall in several graceful coils, a longer face, glowing golden-green leaf scales and a fuller leafy crest, golden sparkles (NOT a short chubby coil)' } },
   rabbit: { ko: '토리', base: 'a white bunny with soft pastel-pink petal-like patches on the fur, very long ears with pink insides, big glossy dark ruby eyes, a fluffy round tail', f: {
     1: 'baby stage: small and round with floppy long ears, no accessories',
     2: 'grown stage: slimmer and taller, upright ears, pink petal patches on the legs and tail',
@@ -68,7 +68,8 @@ const slices = [];
 function sheet(file, title, styleKey, subject, cells) {
   const no = prompts.length + 1;
   const ref = styleKey === 'pet' || styleKey === 'robot' ? 'If a reference picture of this character was attached earlier in this conversation, match its face, colors and markings exactly.' : '';
-  const lines = [SHEET, STYLE[styleKey], subject && `Subject: ${subject}`, ref, ...cells.map((c, i) => `${CELLS[i]} cell: ${c[2]}`)].filter(Boolean);
+  const stage = styleKey === 'pet' && /stage/.test(subject || '') && !/baby stage/.test(subject || '') ? 'IMPORTANT: draw this exact growth stage in every cell, with its full body size, proportions and accessories. Do not draw the younger baby version, and do not make it rounder, shorter or chubbier when it sits, eats or is sad.' : '';
+  const lines = [SHEET, STYLE[styleKey], subject && `Subject: ${subject}`, ref, stage, ...cells.map((c, i) => `${CELLS[i]} cell: ${c[2]}`)].filter(Boolean);
   prompts.push({ file, no, title, text: lines.join('\n') });
   cells.forEach((c, i) => slices.push({ file, no, title, cell: CELL_KO[i], key: c[0], name: c[1], out: c[3] }));
 }
@@ -106,6 +107,17 @@ for (const [key, pet] of Object.entries(PETS)) for (const form of [1, 2, 3]) {
   sheet(F2, `${pet.ko} ${FORM_KO[form]} 표정`, 'pet', `${pet.ko}, ${pet.base}. This is the ${pet.f[form]}.`,
     EXPRS.map(([expr, ko, text]) => [`${key}-${form}-${expr}`, `${pet.ko} ${FORM_KO[form]} ${ko}`, text, `public/assets/pets/${key}-${form}-${expr}.webp`]));
 }
+
+/* 04 다시 만들 것 (v13.83 점검): 성장·최종이 아기 몸으로 나온 시트, 핑키 시무룩, 아직 없는 토리·호야 */
+const F4 = '04-redo-and-missing.txt';
+const pet4 = (key, form, exprs = EXPRS) => { const pet = PETS[key];
+  sheet(F4, `${pet.ko} ${FORM_KO[form]} 표정(다시)`, 'pet', `${pet.ko}, ${pet.base}. This is the ${pet.f[form]}.`,
+    exprs.map(([expr, ko, text]) => [`${key}-${form}-${expr}`, `${pet.ko} ${FORM_KO[form]} ${ko}`, text, `public/assets/pets/${key}-${form}-${expr}.webp`])); };
+for (const [key, form] of [['cat', 2], ['cat', 3], ['dragon', 2], ['dragon', 3], ['panda', 2], ['panda', 3], ['snake', 3]]) pet4(key, form);
+{ const sad = EXPRS.find(e => e[0] === 'sad'), pig = PETS.pig;
+  sheet(F4, '핑키 시무룩 3단계(다시)', 'pet', `${pig.ko}, ${pig.base}. Draw the SAD pose of its three growth stages, one per cell: TOP-LEFT the ${pig.f[1]}; TOP-RIGHT the ${pig.f[2]}; BOTTOM-LEFT the ${pig.f[3]}; leave the BOTTOM-RIGHT cell empty.`,
+    [1, 2, 3].map(form => [`pig-${form}-sad`, `핑키 ${FORM_KO[form]} 시무룩`, `${FORM_KO[form] === '아기' ? 'baby' : FORM_KO[form] === '성장' ? 'grown' : 'final'} stage: ${sad[2]}`, `public/assets/pets/pig-${form}-sad.webp`]).concat([['-', '(비움)', 'EMPTY: leave this cell completely empty and transparent', '']])); }
+for (const key of ['rabbit', 'fox']) for (const form of [1, 2, 3]) pet4(key, form);
 
 /* 03 UI 아이콘 · 시즌 트로피 (지금 이모지 자리) */
 const F3 = '03-ui-icons-trophies.txt';
