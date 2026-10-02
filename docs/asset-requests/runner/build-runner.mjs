@@ -1,7 +1,8 @@
 // SUMUS Prompt Runner용 프롬프트 목록 만들기 (ChatGPT 웹, 프롬프트 사이는 ---).
 //   node docs/asset-requests/runner/build-runner.mjs
 // 한 프롬프트 = 그림 4장(2×2 시트, 1024×1024). 받은 시트는 slice-map.csv대로 4칸으로 잘라 앱에 넣어요.
-// 급한 순서: 01 가위바위보·로보 → 02 펫 표정 → 03 UI 아이콘·트로피 → 04 다시 만들 것 → 05 가위바위보 팔(만화 연출).
+// 급한 순서: 01 가위바위보·로보 → 02 펫 표정 → 03 UI 아이콘·트로피 → 04 다시 만들 것 → 05 가위바위보 팔(만화 연출)
+// → 06 로보 쉬움·보통 표정, 코인 뽑기 머신·캡슐, 알 반응 (Codex 작업: CODEX_PROMPT_06.md).
 import { writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +17,7 @@ const STYLE = {
   robot: 'Style: premium cute chibi 3D toy robot mascot, glossy white plastic armor with mint/teal (#2CC4A8) accents, soft studio lighting, gentle rim light, clean shading. Every cell shows exactly the same robot design; only the pose and face-screen change.',
   icon: 'Style: glossy 3D game UI icon, soft pastel palette with SUMUS mint green (#10B981) accents, chunky friendly shapes, clean edges readable at 48 pixels, one object per cell, slight top-down front view.',
   emblem: 'Style: shiny 3D game trophy/badge, metallic with soft gem highlights, symmetric, readable at 64 pixels, one object per cell.',
+  egg: 'Style: premium cute 3D-painted game illustration, soft pastel colors, gentle warm rim light, clean soft shading. Each egg keeps exactly the shape, pattern, colors and nest (if it has one) of the reference picture; only its tilt and the effect around it change. Front view, the bottom of the egg (or its nest) near the bottom of the cell.',
   arm: 'Style: glossy 3D cartoon game art, chunky friendly shapes, bold clean outline, soft studio lighting with a gentle rim light, clean shading, the same look as cute 3D mobile-game hand icons. Side view. Every cell shows exactly the same arm (same length, thickness, colors and sleeve); only the hand changes. In every cell the arm lies HORIZONTALLY across the middle of the cell at the same height, about 80% of the cell width long, so the four arms can be swapped in place.'
 };
 
@@ -167,6 +169,55 @@ sheet(F5, '내 팔 (오른쪽에서 들어옴)', 'arm', KID_ARM, [
   ['arm-me-paper', '내 팔 보', 'PAPER: an open flat hand, all five fingers stretched straight forward to the left and slightly spread, palm facing down', 'public/assets/rps/arm-me-paper.webp'],
   ['arm-me-thumb', '내 팔 엄지척', 'THUMBS UP: a fist with the thumb pointing straight up, a few small sparkles (used when taking the coins)', 'public/assets/rps/arm-me-thumb.webp']
 ]);
+
+/* 06 로보 쉬움·보통 표정 · 코인 뽑기 머신과 캡슐 · 알 반응 (Codex: CODEX_PROMPT_06.md) */
+const F6 = '06-robot-lucky-eggs.txt';
+const ROBO_FORM = {
+  1: 'The robot "로보" in its smallest BABY form (yacha practice 쉬움): a tiny round chibi robot about 1.6 heads tall. A big round white helmet head with a large black glossy visor screen; the screen shows its face as glowing mint lines (default: happy ^ ^ eyes and a tiny pink tongue smile). A thin antenna with a glossy mint ball, round mint ear-discs, a small round white body with a glowing mint core on the chest, short stubby arms and legs with mint joints. NO shoulder spikes and NO armor plates (that is the final form). Faces the viewer.',
+  2: 'The robot "로보" in its MIDDLE form (yacha practice 보통): the same face, antenna and ear-discs as the baby form, about 1.8 heads tall, a slightly bigger rounded white body with more mint panel lines, chunkier arms and legs with mint knee pads. Still round and cute: NO shoulder spikes and NO big armor (that is the final form). Faces the viewer.'
+};
+const ROBO_POSES = [
+  ['attack', '공격', 'ATTACK: a dynamic forward punch with a glowing mint energy trail behind the fist, focused face screen'],
+  ['hurt', '맞음', 'HIT: flinching backward with one arm raised to block, face screen shows > < eyes, a few small white impact stars'],
+  ['happy', '기쁨', 'HAPPY: jumping with both arms up, face screen shows big happy ^ ^ eyes and a wide smile, small hearts'],
+  ['sad', '시무룩', 'SAD: sitting slumped, face screen shows teary droopy eyes, antenna ball drooping and dim']
+];
+for (const form of [1, 2]) sheet(F6, `로보 ${form === 1 ? '쉬움(아기)' : '보통(성장)'} 야차전 동작`, 'robot', ROBO_FORM[form],
+  ROBO_POSES.map(([key, ko, text]) => [`robot-${form}-${key}`, `로보 ${form === 1 ? '쉬움' : '보통'} ${ko}`, text, `public/assets/pets/robot-${form}-${key}.webp`]));
+const MACHINE = 'a cute capsule toy machine (gachapon) seen straight from the front, taller than wide (about 3:4): a big round clear glass dome on top filled with colorful two-tone capsules (pink, sky-blue, yellow, mint, lavender), a row of small round light bulbs along the bottom rim of the dome, a chunky pastel coral-pink base with rounded corners and mint trim, a small golden coin slot on the FRONT RIGHT of the base, a round white dial with an orange handle in the FRONT CENTER of the base, and a dark rounded capsule chute opening at the BOTTOM CENTER of the base';
+const CAPSULE = 'the same round toy capsule in every capsule cell: the top half is glossy with pastel rainbow stripes (pink, yellow, mint, sky-blue, lavender), the bottom half is glossy white, a thin lavender band where the halves meet';
+sheet(F6, '코인 뽑기 머신', 'icon', null, [
+  ['lucky-machine', '뽑기 머신', `MACHINE: ${MACHINE}; the bulbs are softly lit`, 'public/assets/lucky/machine.webp'],
+  ['lucky-machine-lit', '뽑기 머신(번쩍)', `MACHINE LIT UP: exactly the same machine, same size and position, but every bulb shines bright yellow, the dome glows with a soft golden light and a few sparkles pop around it`, 'public/assets/lucky/machine-lit.webp'],
+  ['lucky-ticket', '뽑기권', 'TICKET: a golden admission ticket with notched edges and a small capsule picture printed in the middle, slightly tilted, no letters', 'public/assets/lucky/ticket.webp'],
+  ['lucky-jackpot', '잭팟', 'JACKPOT: an opened toy capsule with a fountain of shiny gold coins bursting out of it, golden rays behind, sparkles, no letters', 'public/assets/lucky/jackpot.webp']
+]);
+sheet(F6, '코인 뽑기 캡슐', 'icon', `Every capsule cell shows ${CAPSULE}. Draw all capsule parts at the same size, as if cut from one capsule.`, [
+  ['lucky-capsule', '캡슐(닫힘)', 'CLOSED: the whole closed capsule, round, front view, a small white shine on the top half', 'public/assets/lucky/capsule.webp'],
+  ['lucky-capsule-top', '캡슐 위 뚜껑', 'TOP HALF ONLY: just the striped top half of the capsule (a dome), its open flat side facing DOWN, nothing else', 'public/assets/lucky/capsule-top.webp'],
+  ['lucky-capsule-bottom', '캡슐 아래', 'BOTTOM HALF ONLY: just the white bottom half of the capsule (a bowl), its open flat side facing UP, empty, nothing else', 'public/assets/lucky/capsule-bottom.webp'],
+  ['lucky-miss', '꽝', 'MISS: the capsule opened and EMPTY, both halves tilted apart, a small grey puff of smoke and one tiny sweat drop, comic but cute, no letters', 'public/assets/lucky/miss.webp']
+]);
+const EGG = {
+  dog: 'a cream egg with a yellow zigzag band around the middle, yellow dots, a small green leaf sprout and a gold star on top (no nest)',
+  pig: 'a cream egg with a pink zigzag band, pink dots, a pink pig snout on the lower half, a small green leaf sprout and a gold star on top (no nest)',
+  cat: 'a cream egg with grey paw prints and a small gold star, sitting in a woven straw nest with green leaves and white flowers',
+  dragon: 'a cream egg with pale blue scale-like leaf patterns and a gold star, sitting in a woven straw nest with green leaves and white flowers',
+  panda: 'a cream egg with dark brown paw prints and a gold star, sitting in a woven straw nest with green leaves and white flowers',
+  snake: 'a cream egg with a green vine swirl pattern and a gold star, sitting in a woven straw nest with green leaves and white flowers',
+  rabbit: 'a cream egg with pink bunny silhouettes and a gold star, sitting in a woven straw nest with green leaves and white flowers',
+  fox: 'a cream egg with orange flame-like leaf patterns and a gold star, sitting in a woven straw nest with green leaves and white flowers'
+};
+const EGG_HAPPY = 'PETTED (기뻐함): the egg tilts to one side as if wiggling happily, two short curved motion lines on each side, three small pink hearts floating above. Do NOT crack the egg and do NOT give it a face.';
+const EGG_WARM = 'WARMED (따뜻해짐): the egg glows with a soft warm orange-golden aura, three small wavy heat lines rising above it, a few tiny golden sparkles. Do NOT crack the egg, do NOT give it a face, no fire.';
+for (const [a, b] of [['dog', 'pig'], ['cat', 'dragon'], ['panda', 'snake'], ['rabbit', 'fox']]) {
+  sheet(F6, `${PETS[a].ko} · ${PETS[b].ko} 알 반응`, 'egg', `two pet eggs (the reference picture shows them side by side). The TOP row cells show ${PETS[a].ko}'s egg: ${EGG[a]}. The BOTTOM row cells show ${PETS[b].ko}'s egg: ${EGG[b]}.`, [
+    [`${a}-0-happy`, `${PETS[a].ko} 알 기뻐함`, EGG_HAPPY, `public/assets/pets/${a}-0-happy.webp`],
+    [`${a}-0-eat`, `${PETS[a].ko} 알 따뜻해짐`, EGG_WARM, `public/assets/pets/${a}-0-eat.webp`],
+    [`${b}-0-happy`, `${PETS[b].ko} 알 기뻐함`, EGG_HAPPY, `public/assets/pets/${b}-0-happy.webp`],
+    [`${b}-0-eat`, `${PETS[b].ko} 알 따뜻해짐`, EGG_WARM, `public/assets/pets/${b}-0-eat.webp`]
+  ]);
+}
 
 /* 쓰기 */
 const byFile = new Map();
