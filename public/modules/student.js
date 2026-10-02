@@ -1,6 +1,7 @@
 import { CHARACTERS, STANDARD_PET_KEYS, ACCESSORIES, FRAMES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, petForm, unlocked, levelInfo, dayKey, cardTier, testDurationSec, TEST_LEAVE_LIMIT } from './core.js';
 import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar, petKey, RUN_SHEETS } from './character.js';
+import { knownWords } from './flashcards.js';
 import { petDisplayName, petJosa } from './pet-moments.js';
 import { TITLES, TITLE_KEYS } from './titles.js';
 import { titleBadge, titleEmblem, tierEmblem, coin, trophy, uiArt } from './emblems.js';
@@ -296,14 +297,19 @@ function partnerCard(A) {
   </section>`;
 }
 // V13.76 펫 교감: once a day each, 쓰다듬기 and 밥 주기 give a little 경험치 and the pet reacts.
+// V13.90: for every pet — a student with several pets switches partner to care for the next one.
 function petCareBar(A, hatched) {
   const care = A.data.care;
   if (!care) return '';
+  const active = A.data.stats?.pet?.key, mine = care.done ? care.done[active] || {} : care;
+  const pets = A.data.stats?.pets || [];
+  const cared = pets.filter(x => care.done?.[x.key]?.pet && care.done[x.key].feed).length;
+  const more = pets.length > 1 ? `<button type="button" class="pet-care-more-v1390 ${cared >= pets.length ? 'all' : ''}" data-go="studio"><span>${cared >= pets.length ? `오늘 펫 ${pets.length}마리를 모두 돌봤어요 ✓` : `오늘 돌본 펫 <b>${cared}/${pets.length}</b> · 파트너를 바꾸면 다른 펫도 돌봐줄 수 있어요`}</span>${icon('arrow')}</button>` : '';
   const item = (kind, label, art) => {
-    const done = !!care[kind];
+    const done = !!mine[kind];
     return `<button type="button" class="pet-care-btn ${done ? 'done' : ''}" data-pet-care="${kind}" ${done ? 'aria-disabled="true"' : ''} aria-label="${label}${done ? ', 오늘 완료' : `, 경험치 ${care.xp?.[kind] || 10}`}"><span class="pet-care-emoji" aria-hidden="true">${uiArt(art)}</span><span class="pet-care-label">${label}</span><small>${done ? '오늘 완료 ✓' : `경험치 +${care.xp?.[kind] || 10}`}</small></button>`;
   };
-  return `<div class="pet-care-v1376" role="group" aria-label="오늘의 펫 교감">${item('pet', hatched ? '쓰다듬기' : '알 쓰다듬기', 'care-pet')}${item('feed', hatched ? '밥 주기' : '알 데워주기', hatched ? 'care-feed' : 'care-warm')}</div>`;
+  return `<div class="pet-care-v1376" role="group" aria-label="오늘의 펫 교감">${item('pet', hatched ? '쓰다듬기' : '알 쓰다듬기', 'care-pet')}${item('feed', hatched ? '밥 주기' : '알 데워주기', hatched ? 'care-feed' : 'care-warm')}</div>${more}`;
 }
 // V13.60 home: card, next-step button, a big yacha banner and the week, spaced as one
 // column. Word study, exams, the ranking and records stay in the bottom menu.
@@ -595,6 +601,23 @@ function memorizationWords(A) {
   if (A.data.profile.division === 'middle') return middleLessonState(A).lessonWords;
   return highSchoolMemorizeState(A).lessonWords;
 }
+// V13.90 the words the cover cards use: what the list shows (the range, or only ★ words).
+export function memorizeDeck(A) {
+  const middle = A.data.profile.division === 'middle';
+  const words = memorizationWords(A);
+  const stars = new Set(A.memStars || []);
+  const starredOnly = A.memorizeFilter === 'starred';
+  const code = middle ? middleLessonState(A).code : String(A.memorizeRange || '');
+  const range = middle ? `${code}과` : rangeLabel(A.school, code);
+  return { words: starredOnly ? words.filter(word => stars.has(word.id)) : words, title: starredOnly ? `${range} ★ 어려운 단어` : range };
+}
+// V13.90: a big button above the list opens 카드로 가리고 외우기 (flashcards.js).
+function flashcardEntry(A, visible) {
+  if (!visible.length) return '';
+  const known = knownWords(A.data.profile.id), done = visible.filter(word => known.has(word.id)).length;
+  const pct = Math.round(done / visible.length * 100);
+  return `<button type="button" class="fc-entry-v1390" data-flashcards="true"><span class="fc-entry-art" aria-hidden="true"><i></i><i></i><i></i></span><span class="fc-entry-text"><small>뜻을 가리고 한 장씩</small><strong>카드로 외우기</strong><em>${done ? `외운 단어 ${done}/${visible.length}` : `${visible.length}장 · 커버를 내려서 확인해요`}</em>${done ? `<span class="fc-entry-bar" aria-hidden="true"><i style="width:${pct}%"></i></span>` : ''}</span><b>${icon('arrow')}</b></button>`;
+}
 function memorizationPanel(A) {
   const middle = A.data.profile.division === 'middle';
   const words = memorizationWords(A);
@@ -602,6 +625,7 @@ function memorizationPanel(A) {
   const revealed = new Set(A.memRevealed || []);
   const starredOnly = A.memorizeFilter === 'starred';
   const visible = starredOnly ? words.filter(word => stars.has(word.id)) : words;
+  const known = knownWords(A.data.profile.id);
   const allShown = A.memorizeShowAll === true;
   const rangeUi = middle
     ? (() => {
@@ -634,12 +658,13 @@ function memorizationPanel(A) {
         <div class="segment compact"><button data-memorize-filter="all" class="${!starredOnly ? 'selected' : ''}">전체 ${words.length}</button><button data-memorize-filter="starred" class="${starredOnly ? 'selected' : ''}">★ 어려운 단어 ${starredInScope.length}</button></div>
         <button class="text-button" data-memorize-reveal-all="${allShown ? 'hide' : 'show'}">${allShown ? '전체 영어 보기' : '전체 뜻 보기'}</button>
       </div>
+      ${flashcardEntry(A, visible)}
       ${starPracticeButton(A, 'in-memorize')}
       <div class="memorize-list">${visible.length ? visible.map((word,index) => {
         const show = allShown || revealed.has(word.id);
         const star = stars.has(word.id);
         const front = show ? word.meaning : word.word;
-        return `<div class="memorize-row ${show ? 'revealed' : ''} ${star ? 'starred' : ''}">
+        return `<div class="memorize-row ${show ? 'revealed' : ''} ${star ? 'starred' : ''} ${known.has(word.id) ? 'known-v1390' : ''}">
           <button class="memorize-star" data-memorize-star="${esc(word.id)}" aria-label="${star ? '어려운 단어 해제' : '어려운 단어 표시'}">${star ? '★' : '☆'}</button>
           <button class="memorize-word" data-memorize-word="${esc(word.id)}" aria-label="${esc(word.word)} ${show ? '영어 보기' : '뜻 보기'}"><span class="memorize-no">${index + 1}</span><strong>${esc(front)}</strong></button>
           <button class="memorize-sound" data-memorize-speak="${esc(word.id)}" aria-label="${esc(word.word)} 발음 듣기">${icon('sound')}</button>

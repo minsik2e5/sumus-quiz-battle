@@ -367,14 +367,23 @@ export function examReward(answered, total) {
 }
 
 /* ---------- V13.76 펫 교감 ---------- */
-//   care { day, pet, feed, last_at, total } — 쓰다듬기 and 밥 주기 once a day each (a little 경험치)
+//   care { day, done: { [pet]: { pet, feed } }, last_at, total } — V13.90: 쓰다듬기 and 밥 주기
+// once a day each, for every pet the student owns (a little 경험치 to that pet).
 // `lastActive`: the student's last activity before today (practice, battles, attendance, care);
 // away PET_MISS_DAYS days or more, the pet greets them (보고 싶었어).
-export function careView(p, lastActive, now = Date.now()) {
-  const c = p.care || {}, today = dayKey(now), done = c.day === today;
+// Today's record per pet. A record from before V13.90 kept one pair a day (c.pet / c.feed):
+// it belonged to the partner of the time, so it counts for the partner now.
+function careToday(c, active, today) {
+  if (c.day !== today) return {};
+  const done = c.done && typeof c.done === 'object' ? { ...c.done } : {};
+  if ((c.pet || c.feed) && active && !done[active]) done[active] = { pet: !!c.pet, feed: !!c.feed };
+  return done;
+}
+export function careView(p, lastActive, now = Date.now(), active) {
+  const c = p.care || {}, today = dayKey(now), done = careToday(c, active, today), mine = done[active] || {};
   const away = lastActive ? Math.max(0, Math.round((Date.parse(today) - Date.parse(dayKey(lastActive))) / DAY_MS)) : 0;
   return {
-    pet: done && !!c.pet, feed: done && !!c.feed, xp: { pet: PET_CARE.pet.xp, feed: PET_CARE.feed.xp },
+    pet: !!mine.pet, feed: !!mine.feed, done, xp: { pet: PET_CARE.pet.xp, feed: PET_CARE.feed.xp },
     away_days: away, missed: away >= PET_MISS_DAYS, total: Number(c.total || 0)
   };
 }
@@ -383,9 +392,11 @@ export function petCare(p, kind, { pet, now = Date.now() }) {
   if (!pet) fail('먼저 펫을 골라주세요.', 409);
   const c = p.care ||= {};
   const today = dayKey(now);
-  if (c.day !== today) { c.day = today; c.pet = false; c.feed = false; }
-  if (c[kind]) fail(kind === 'feed' ? '오늘은 이미 밥을 줬어요. 내일 또 주세요!' : '오늘은 이미 쓰다듬어 줬어요. 내일 또 만나요!', 409);
-  c[kind] = true;
+  c.done = careToday(c, pet, today);
+  c.day = today; delete c.pet; delete c.feed;
+  const mine = c.done[pet] ||= { pet: false, feed: false };
+  if (mine[kind]) fail(kind === 'feed' ? '오늘은 이 펫에게 이미 밥을 줬어요. 내일 또 주세요!' : '오늘은 이 펫을 이미 쓰다듬어 줬어요. 내일 또 만나요!', 409);
+  mine[kind] = true;
   c.last_at = now;
   c.total = Number(c.total || 0) + 1;
   const xp = PET_CARE[kind].xp;

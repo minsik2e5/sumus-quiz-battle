@@ -248,6 +248,20 @@ export async function runRewardsChecks(assert, expectStatus) {
   const fed = await service(state, 'POST', '/pet/care', { kind: 'feed' }, tD);
   assert(fed.care.pet && fed.care.feed && fed.stats.points === d0.stats.points + PET_CARE.pet.xp + PET_CARE.feed.xp && fed.care.total === 2, 'V13.76 밥 주기 is a second, separate daily 교감');
   await expectStatus(400, () => service(state, 'POST', '/pet/care', { kind: 'hug' }, tD), 'V13.76 only 쓰다듬기 and 밥 주기 exist');
+  const careFirst = profile('qa-rw-d').avatar_key, careOther = ['dog', 'pig', 'cat'].find(k => k !== careFirst);
+  profile('qa-rw-d').pets.push({ key: careOther, acquired_at: now });
+  profile('qa-rw-d').avatar_key = careOther;
+  const other0 = await service(state, 'GET', '/bootstrap', {}, tD);
+  assert(!other0.care.pet && !other0.care.feed && other0.care.done[careFirst]?.pet && other0.care.done[careFirst]?.feed, 'V13.90 another pet has its own 쓰다듬기 and 밥 주기 today');
+  const otherFed = await service(state, 'POST', '/pet/care', { kind: 'feed' }, tD);
+  assert(otherFed.care.feed && !otherFed.care.pet && otherFed.stats.points === fed.stats.points + PET_CARE.feed.xp, 'V13.90 caring for the second pet pays its 경험치 too');
+  await expectStatus(409, () => service(state, 'POST', '/pet/care', { kind: 'feed' }, tD), 'V13.90 still once a day for that pet');
+  profile('qa-rw-d').avatar_key = careFirst;
+  await expectStatus(409, () => service(state, 'POST', '/pet/care', { kind: 'pet' }, tD), 'V13.90 switching back does not open the first pet again');
+  profile('qa-rw-d').care = { day: dayKey(now), pet: true, feed: false, total: 1 };
+  const legacyCare = await service(state, 'GET', '/bootstrap', {}, tD);
+  assert(legacyCare.care.pet === true && legacyCare.care.feed === false, 'V13.90 a care record from before counts for the partner');
+  await expectStatus(409, () => service(state, 'POST', '/pet/care', { kind: 'pet' }, tD), 'V13.90 an old record still blocks a second 쓰다듬기 the same day');
   await expectStatus(403, () => service(state, 'POST', '/pet/care', { kind: 'pet' }, tokens.qa_rw_teacher), 'V13.76 teachers have no pet to care for');
   profile('qa-rw-d').care.day = dayKey(now - DAY_MS);
   const dNext = await service(state, 'GET', '/bootstrap', {}, tD);
@@ -548,4 +562,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   const lucky89 = source('../public/modules/lucky.js'), arcade89 = source('../public/modules/arcade.js'), service89 = source('./service.mjs'), css89 = source('../public/v1389.css'), build89 = source('./build-assets.mjs');
   assert(lucky89.includes('legend-egg-glow.webp') && lucky89.includes('legend-egg-burst.webp') && lucky89.includes('legend-badge.webp') && lucky89.includes('function legendaryShow(') && css89.includes('.lk-legend-show{') && build89.includes('"v1389.css"'), 'V13.89 전설 알의 빛남·깨짐·배지 연출과 전설 결과 화면이 빌드에 들어간다');
   assert(arcade89.includes('LEGENDARY_RATE') && service89.includes('postNotice(state') && service89.includes('STANDARD_PET_KEYS.filter') && service89.includes('학생이 행운 뽑기에서 전설 펫'), 'V13.89 확률과 천장을 안내하고, 전설 획득은 학교에 알리며, 알 상점에서는 일반 펫만 나온다');
+  const fc90 = source('../public/modules/flashcards.js'), student90 = source('../public/modules/student.js'), app90 = source('../public/app.js'), css90 = source('../public/v1390.css');
+  assert(fc90.includes('export function openFlashcards(') && fc90.includes('KNOWN_AT') && fc90.includes("data-fc=\"next-round\"") && fc90.includes("data-fc=\"star-left\"") && fc90.includes("'eng2mean' : 'mean2eng'") && student90.includes('data-flashcards="true"') && student90.includes('export function memorizeDeck(') && app90.includes('if (d.flashcards) return openCards();') && app90.includes('openFlashcards({') && css90.includes('.fc-cover{') && build89.includes('"v1390.css"'), 'V13.90 단어 학습에서 카드로 가리고 외우기: 커버를 끝까지 내리면 아는 카드, 헷갈리는 카드만 다음 라운드, ★ 담기와 확인 테스트');
+  assert(css90.includes('.lk-machine{width:220px') && css90.includes('.lk-result-art{width:156px') && student90.includes('pet-care-more-v1390'), 'V13.90 코인 뽑기 기계·캡슐·결과 그림이 커지고, 펫이 여러 마리면 다른 펫도 돌볼 수 있다고 알려 준다');
 }

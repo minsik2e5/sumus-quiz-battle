@@ -1,7 +1,8 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date, num, rangeLabel } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm } from './modules/core.js';
 import { avatar, showPose } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary, starredWords, pushSupport } from './modules/student.js';
+import { studentPage, getRanges, updateRangeSummary, starredWords, pushSupport, memorizeDeck } from './modules/student.js';
+import { openFlashcards } from './modules/flashcards.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel, careIds } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
 import { maybePetMoment, openPetNameModal, openEggShop, petJosa } from './modules/pet-moments.js';
@@ -70,6 +71,38 @@ function syncStars() {
   }
   try { localStorage.setItem(key, '1'); } catch {}
   A.memStars = [...server];
+}
+// ★ several words at once (the cover cards' 헷갈리는 단어 담기).
+function starMany(ids) {
+  const add = ids.filter(id => !(A.memStars || []).includes(id));
+  if (!add.length) return;
+  A.memStars = [...new Set([...(A.memStars || []), ...add])];
+  if (A.data?.profile) A.data.profile.stars = [...A.memStars];
+  savePreferences();
+  starsSaving++;
+  api('/stars', { word_ids: add }).then(r => { if (A.data?.profile) A.data.profile.stars = r.stars; if (starsSaving === 1) A.memStars = [...r.stars]; })
+    .catch(err => toast(err?.status ? err.message : '별표를 저장하지 못했어요. 인터넷 연결을 확인해 주세요.'))
+    .finally(() => { starsSaving--; });
+}
+function speakWord(word) {
+  if (!word) return toast('단어를 찾을 수 없어요.');
+  if (!('speechSynthesis' in window)) return toast('이 기기에서는 발음 재생을 지원하지 않아요.');
+  speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(String(word.word || '').replace(/\([^)]*\)|\[[^\]]*\]/g, '').trim());
+  utterance.lang = 'en-US'; utterance.rate = .82;
+  utterance.onerror = () => toast('발음을 재생하지 못했어요. 다시 눌러주세요.');
+  speechSynthesis.speak(utterance);
+}
+// V13.90 카드로 가리고 외우기: the words the list shows, one card at a time.
+function openCards() {
+  const deck = memorizeDeck(A);
+  if (!deck.words.length) return toast('외울 단어가 없어요. 범위를 먼저 골라 주세요.');
+  openFlashcards({
+    ...deck, profileId: A.data.profile.id,
+    isStarred: id => (A.memStars || []).includes(id), toggleStar, starMany, speak: speakWord,
+    onQuiz: (ids, mode) => startPractice({ wordIds: ids, mode, runMode: 'practice' }).catch(err => toast(err.message)),
+    onClose: () => { if (A.tab === 'practice') renderKeepScroll(); }
+  });
 }
 let starsSaving = 0;
 export function toggleStar(wordId) {
@@ -312,7 +345,7 @@ function petSay(text, ms = 3200) {
 }
 const CARE_LINES = { pet: ['헤헤, 간지러워!', '기분 좋아! 💕', '또 쓰다듬어 줘!'], feed: ['냠냠! 맛있어!', '배불러~ 고마워!', '힘이 난다! 💪'] };
 async function petCare(b, kind) {
-  if (b.getAttribute('aria-disabled') === 'true') return toast(kind === 'feed' ? '오늘은 이미 밥을 줬어요. 내일 또 주세요!' : '오늘은 이미 쓰다듬어 줬어요. 내일 또 만나요!');
+  if (b.getAttribute('aria-disabled') === 'true') return toast(kind === 'feed' ? '오늘은 이 펫에게 이미 밥을 줬어요. 다른 펫도 챙겨 주세요!' : '오늘은 이 펫을 이미 쓰다듬어 줬어요. 다른 펫도 챙겨 주세요!');
   buttonBusy(b);
   try {
     const r = await api('/pet/care', { kind });
@@ -621,17 +654,8 @@ $('#app').addEventListener('click', async event => {
       return;
     }
     if (d.memorizeStar) { toggleStar(d.memorizeStar); render(); return; }
-    if (d.memorizeSpeak) {
-      const word = A.data.books.flatMap(book => book.words || []).find(item => item.id === d.memorizeSpeak);
-      if (!word) return toast('단어를 찾을 수 없어요.');
-      if (!('speechSynthesis' in window)) return toast('이 기기에서는 발음 재생을 지원하지 않아요.');
-      speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(String(word.word || '').replace(/\([^)]*\)|\[[^\]]*\]/g, '').trim());
-      utterance.lang = 'en-US'; utterance.rate = .82;
-      utterance.onerror = () => toast('발음을 재생하지 못했어요. 다시 눌러주세요.');
-      speechSynthesis.speak(utterance);
-      return;
-    }
+    if (d.memorizeSpeak) return speakWord(A.data.books.flatMap(book => book.words || []).find(item => item.id === d.memorizeSpeak));
+    if (d.flashcards) return openCards();
     if (d.examKind) {
       A.examKind = d.examKind === 'test' ? 'test' : 'practice';
       A.practiceRunMode = A.examKind === 'test' ? 'test' : 'practice';
