@@ -1,6 +1,7 @@
 import { esc, num } from './ui.js';
 import { coin } from './emblems.js';
-import { LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET } from './rewards.js';
+import { CHARACTERS } from './core.js';
+import { LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET, LEGENDARY_RATE, LEGENDARY_PITY } from './rewards.js';
 
 // V13.68 코인 뽑기: the machine on the 놀이터 page and the show when a capsule comes out.
 // The server has already decided the result (server/rewards.mjs pullLucky); this module only
@@ -52,6 +53,7 @@ const SFX = {
 /* ---------- the machine ---------- */
 export function luckyCard(state, bet, balance) {
   const l = state, tickets = Number(l.tickets || 0), left = Number(l.left ?? LUCKY_DAILY);
+  const legend = l.legend || { rate: LEGENDARY_RATE, pity: LEGENDARY_PITY, pulls: 0, remaining: LEGENDARY_PITY, owned: false, key: null };
   const can = left > 0 && balance >= bet;
   const recent = (l.recent || []).slice(0, 5);
   const todayNet = (l.recent || []).filter(r => sameDay(r.at)).reduce((n, r) => n + (r.ticket ? r.bet * r.mult : r.bet * r.mult - r.bet), 0);
@@ -67,6 +69,7 @@ export function luckyCard(state, bet, balance) {
       <div class="lk-odds" aria-label="확률">${LUCKY_ODDS.slice().reverse().map(o => `<span class="${MULT_CLASS[o.mult]}"><b>${o.mult ? `×${o.mult}` : '꽝'}</b><em>${o.rate}%</em></span>`).join('')}</div>
     </div>
     <div class="lk-bets" role="group" aria-label="걸 코인">${(l.bets || LUCKY_BETS).map(b => `<button type="button" class="lk-bet ${bet === b ? 'on' : ''}" data-ga="bet" data-bet="${b}" aria-pressed="${bet === b}"><span class="lk-stack" aria-hidden="true">${'<i></i>'.repeat(b / 10)}</span><b>${b}</b></button>`).join('')}</div>
+    <div class="lk-legend-status ${legend.owned ? 'owned' : ''}"><img src="/assets/lucky/legend-badge.webp" alt=""><span><b>${legend.owned ? `전설 펫 ${esc(CHARACTERS[legend.key]?.ko || '')}와 만났어요` : `전설 펫 ${legend.rate}%`}</b><small>${legend.owned ? '학생 한 명당 한 마리만 만날 수 있어요' : `행운 뽑기 전용 · ${num(legend.remaining)}회 안에 확정`}</small></span></div>
     <button type="button" class="lk-go" data-ga="pull" ${can ? '' : 'disabled'}>${left > 0 ? (balance >= bet ? `<span>뽑기!</span><em>${coin()}${bet}</em>` : '<span>코인이 부족해요</span>') : '<span>오늘 뽑기 끝! 내일 또 만나요</span>'}</button>
     ${tickets ? `<button type="button" class="lk-ticket" data-ga="ticket"><img class="lk-ticket-art" src="/assets/lucky/ticket.webp" alt=""> 뽑기권 ${tickets}장 · ${coin()}${LUCKY_TICKET_BET} 공짜 뽑기</button>` : ''}
     ${recent.length ? `<div class="lk-recent"><span>최근</span>${recent.map(r => `<i class="${MULT_CLASS[r.mult]}">${r.mult ? `×${r.mult}` : '꽝'}</i>`).join('')}${todayNet ? `<em class="${todayNet > 0 ? 'up' : 'down'}">오늘 ${todayNet > 0 ? '+' : '−'}${num(Math.abs(todayNet))}</em>` : ''}</div>` : ''}
@@ -107,8 +110,69 @@ function confetti() {
   const colors = ['#ffd35a', '#ff6b8a', '#5ac8fa', '#6ee7a8', '#a78bfa', '#ff9f43'];
   return Array.from({ length: 46 }, (_, i) => `<i class="lk-conf" style="left:${(i * 53) % 100}%;--c:${colors[i % colors.length]};--d:${(1.6 + (i % 7) * .22).toFixed(2)}s;--delay:${((i % 9) * .07).toFixed(2)}s;--r:${(i * 47) % 360}deg"></i>`).join('');
 }
+function legendaryShow(res, { again = false, againLabel = '' } = {}) {
+  return new Promise(resolve => {
+    const key = res.legendary.key, name = CHARACTERS[key]?.ko || '전설 펫';
+    const box = document.createElement('div');
+    box.className = 'lk-show lk-legend-show';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', `전설 펫 ${name} 획득`);
+    box.innerHTML = `<div class="lk-legend-sky" aria-hidden="true"></div>
+      <div class="lk-legend-stage" id="lk-legend-stage" aria-hidden="true">
+        <img class="lk-legend-glow" src="/assets/lucky/legend-egg-glow.webp" alt="">
+        <img class="lk-legend-egg" src="/assets/lucky/legend-egg.webp" alt="">
+        <img class="lk-legend-burst" src="/assets/lucky/legend-egg-burst.webp" alt="">
+      </div>
+      <div class="lk-legend-result" id="lk-legend-result" hidden>
+        <img class="lk-legend-badge" src="/assets/lucky/legend-badge.webp" alt="전설">
+        <img class="lk-legend-pet" src="/assets/pets/${key}-0.webp" alt="${esc(name)}의 알">
+        <span class="lk-legend-kicker">LEGENDARY PET</span><h2>전설 펫을 만났어요!</h2><h3>${esc(name)}의 알</h3>
+        <p>${res.legendary.guaranteed ? `${num(res.legendary.pull)}번째 뽑기 확정 보상이에요.` : '0.5%의 행운이 찾아왔어요!'} 학교 친구들에게도 소식이 전해져요.</p>
+        <small>코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}</small>
+        <div class="lk-actions">${again ? `<button type="button" class="lk-again" data-lk="again">한 번 더 <em>${againLabel}</em></button>` : ''}<button type="button" class="lk-ok" data-lk="ok">확인</button></div>
+      </div>
+      <button type="button" class="lk-skip" data-lk="skip">건너뛰기</button>`;
+    document.body.appendChild(box);
+    const stage = box.querySelector('#lk-legend-stage'), result = box.querySelector('#lk-legend-result');
+    let shown = false;
+    const close = go => { box.classList.add('bye'); setTimeout(() => box.remove(), 180); resolve(!!go); };
+    const showResult = () => {
+      if (shown) return;
+      shown = true;
+      box.classList.add('legend-opened');
+      box.querySelector('.lk-skip')?.remove();
+      stage.remove();
+      result.hidden = false;
+      box.insertAdjacentHTML('beforeend', `<div class="lk-confetti" aria-hidden="true">${confetti()}</div>`);
+      SFX.jackpot();
+      (box.querySelector('.lk-again') || box.querySelector('.lk-ok')).focus({ preventScroll: true });
+    };
+    box.addEventListener('click', e => {
+      const b = e.target.closest('[data-lk]');
+      if (!shown) return showResult();
+      if (b?.dataset.lk === 'again') return close(true);
+      if (b?.dataset.lk === 'ok') return close(false);
+    });
+    box.addEventListener('keydown', e => { if (e.key === 'Escape' && shown) close(false); });
+    requestAnimationFrame(() => box.classList.add('open'));
+    if (reduced()) return showResult();
+    (async () => {
+      await wait(250);
+      stage.classList.add('awaken');
+      SFX.wobble(2);
+      await wait(1100);
+      if (shown) return;
+      stage.classList.add('burst');
+      SFX.pop();
+      await wait(650);
+      showResult();
+    })();
+  });
+}
 // Resolves when the student closes it: true for "한 번 더" (offered when `again`).
 export function luckyShow(res, { again = false, againLabel = '' } = {}) {
+  if (res.legendary) return legendaryShow(res, { again, againLabel });
   return new Promise(resolve => {
     const cls = MULT_CLASS[res.mult] || 't-miss';
     const box = document.createElement('div');

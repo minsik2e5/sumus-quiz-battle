@@ -1,6 +1,6 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
-import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, ACCESSORIES, FRAMES, EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, STANDARD_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
 import { battleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
@@ -1166,7 +1166,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/pets/choose' && method === 'POST') {
     requireRole(p, 'student');
     if (p.pets?.length) fail('첫 펫은 이미 골랐어요. 새 친구는 상점의 알에서 만날 수 있어요.', 409);
-    if (!own(CHARACTERS, body.key)) fail('펫을 확인해주세요.');
+    if (!STANDARD_PET_KEYS.includes(body.key)) fail('첫 펫은 일반 펫 중에서 골라주세요.');
     p.pets = [{ key: body.key, first: true, acquired_at: Date.now() }];
     p.avatar_key = body.key;
     return publicProfile(p);
@@ -1296,7 +1296,16 @@ export async function service(state, method, path, body, token, options = {}) {
     // Like eggs: a stake waiting in a yacha room is not spent elsewhere (a free ticket is fine).
     if (body.ticket !== true && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 코인 뽑기를 할 수 있어요.', 409);
     const result = pullLucky(p, Number(body.bet), coinBalance(state, p), { ticket: body.ticket === true });
-    return { ...result, points_balance: coinBalance(state, p) };
+    if (!result.legendary) return { ...result, points_balance: coinBalance(state, p) };
+    const school = schoolForProfile(state, p);
+    let announcement = {};
+    if (school) {
+      const students = state.profiles.filter(x => isRankedStudent(x) && schoolForProfile(state, x)?.id === school.id);
+      const name = CHARACTERS[result.legendary.key]?.ko || '전설 펫';
+      const posted = postNotice(state, { display_name: '전설 소식' }, school, students, { text: `${p.display_name} 학생이 행운 뽑기에서 전설 펫 ${name}를 만났어요!`, id: randomUUID() });
+      announcement = { notice: posted.notice, _push: [posted.message] };
+    }
+    return { ...result, ...announcement, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
   }
   // V13.82 가위바위보 against 로보: a throw (a new game with `bet`, or the pot again after a win
   // with `double`), and taking the pot after a win.
@@ -1340,7 +1349,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/shop/egg' && method === 'POST') {
     requireRole(p, 'student');
     if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
-    const missing = Object.keys(CHARACTERS).filter(key => !p.pets.some(x => x.key === key));
+    const missing = STANDARD_PET_KEYS.filter(key => !p.pets.some(x => x.key === key));
     if (!missing.length) fail('모든 펫을 모았어요!', 409);
     if (openBattleFor(state, p.id, Date.now())) fail('대결이 끝난 뒤에 알을 살 수 있어요.', 409);
     const balance = pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance;

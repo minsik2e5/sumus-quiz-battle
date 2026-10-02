@@ -1,4 +1,4 @@
-import { CHARACTERS, ACCESSORIES, FRAMES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, petForm, unlocked, levelInfo, dayKey, cardTier, testDurationSec, TEST_LEAVE_LIMIT } from './core.js';
+import { CHARACTERS, STANDARD_PET_KEYS, ACCESSORIES, FRAMES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, petForm, unlocked, levelInfo, dayKey, cardTier, testDurationSec, TEST_LEAVE_LIMIT } from './core.js';
 import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar, petKey, RUN_SHEETS } from './character.js';
 import { petDisplayName, petJosa } from './pet-moments.js';
@@ -887,7 +887,7 @@ function petPicker(A) {
   const g = A.data.stats, startForm = Math.max(1, petForm(g.level));
   return `<div class="page-heading studio-page-heading pet-pick-heading"><span class="premium-eyebrow">NEW SUMUS PETS</span><h1>함께할 첫 친구를 골라주세요</h1><p>펫이 새로워졌어요! 지금까지 쌓은 <b>경험치 ${num(g.points || 0)}</b>로 바로 자라요.</p></div>
     <ul class="pet-pick-rules"><li><b>한 번 고르면 바꿀 수 없어요.</b> 신중하게 골라요.</li><li>다른 친구는 <b>상점의 랜덤 알(${num(EGG_PRICE)}코인)</b>로 만날 수 있어요.</li><li>능력은 모두 같아요. 마음이 가는 친구를 골라요.</li></ul>
-    <div class="character-grid pet-choice-grid">${Object.entries(CHARACTERS).map(([key, c]) => `<button data-action="choose-pet" data-key="${key}" class="character-option">${avatar(key, { form: startForm })}<b>${c.ko}</b><small>${c.type}</small></button>`).join('')}</div>`;
+    <div class="character-grid pet-choice-grid">${STANDARD_PET_KEYS.map(key => [key, CHARACTERS[key]]).map(([key, c]) => `<button data-action="choose-pet" data-key="${key}" class="character-option">${avatar(key, { form: startForm })}<b>${c.ko}</b><small>${c.type}</small></button>`).join('')}</div>`;
 }
 function studio(A) {
   const p = A.data.profile, g = A.data.stats, owned = g.pets || [], tab = A.studioTab || 'character';
@@ -896,13 +896,13 @@ function studio(A) {
   A.style ??= { avatar_key: g.pet?.key || owned[0].key, avatar_accessory: ACCESSORIES[p.avatar_accessory] ? p.avatar_accessory : 'none', avatar_frame: p.avatar_frame || 'basic', avatar_title: titleState(A).equipped };
   const s = A.style, chosen = owned.find(x => x.key === s.avatar_key) || owned[0], c = CHARACTERS[chosen.key];
   const groups = { accessory: ACCESSORIES, frame: FRAMES };
-  const missing = Object.keys(CHARACTERS).filter(key => !owned.some(x => x.key === key));
+  const missing = STANDARD_PET_KEYS.filter(key => !owned.some(x => x.key === key));
   const petCard = key => {
     const pet = owned.find(x => x.key === key);
-    if (!pet) return `<div class="character-option pet-locked" aria-label="${CHARACTERS[key].type}, 아직 만나지 못했어요"><span class="pet-locked-art">?</span><b>???</b><small>상점의 알</small></div>`;
+    if (!pet) return `<div class="character-option pet-locked" aria-label="${CHARACTERS[key].type}, 아직 만나지 못했어요"><span class="pet-locked-art">?</span><b>???</b><small>${CHARACTERS[key].legendary ? '행운 뽑기 전용' : '상점의 알'}</small></div>`;
     return `<button data-style="avatar_key" data-value="${key}" class="character-option ${s.avatar_key === key ? 'selected' : ''}" aria-pressed="${s.avatar_key === key}">${avatar(key, { form: pet.form })}<b>${esc(petDisplayName(pet))}</b><small>${pet.form ? `Lv.${pet.level} · ${PET_FORMS[pet.form]}` : '알'}</small></button>`;
   };
-  const shop = `<button type="button" class="pet-shop-banner" data-action="egg-shop"><span class="pet-shop-banner-egg" aria-hidden="true">?</span><span><strong>랜덤 알 상점</strong><small>${missing.length ? `${num(EGG_PRICE)}코인 · 아직 못 만난 친구 ${missing.length}마리` : '모든 친구를 모았어요!'}</small></span><b>${coin()}${num(g.points_balance || 0)}</b></button>`;
+  const shop = `<button type="button" class="pet-shop-banner" data-action="egg-shop"><span class="pet-shop-banner-egg" aria-hidden="true">?</span><span><strong>랜덤 알 상점</strong><small>${missing.length ? `${num(EGG_PRICE)}코인 · 상점에서 아직 못 만난 친구 ${missing.length}마리` : '상점 펫을 모두 모았어요!'}</small></span><b>${coin()}${num(g.points_balance || 0)}</b></button>`;
   const t = titleState(A);
   const body = tab === 'character'
     ? `${shop}<div class="pet-choice-head"><span>MY PETS · ${owned.length}/${Object.keys(CHARACTERS).length}</span><h2>누구와 함께 공부할까요?</h2><p>파트너로 함께 공부한 펫이 자라요.</p></div><div class="character-grid pet-choice-grid">${Object.keys(CHARACTERS).map(petCard).join('')}</div>`

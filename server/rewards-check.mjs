@@ -8,13 +8,13 @@ import { emptyState } from './state.mjs';
 import { passwordHash, publicProfile, hashToken } from './auth.mjs';
 import { service, scopedWords, sweep } from './service.mjs';
 import { DAY_MS, rankingWeek, createCompetition } from './competition.mjs';
-import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX } from '../public/modules/core.js';
+import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX, CHARACTERS, LEGENDARY_PET_KEYS, STANDARD_PET_KEYS } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, visibleTitleKeys, titleUnlocked } from '../public/modules/titles.js';
-import { createBattle, connect, answer, tick, battleView, SKILL_RULES, BATTLE } from '../public/modules/battle-engine.js';
+import { createBattle, connect, answer, tick, battleView, petSkill, SKILL_RULES, BATTLE } from '../public/modules/battle-engine.js';
 import { battleQuestions, spellHint, spellable } from '../public/modules/battle-questions.js';
 import { createPracticeMatch } from '../public/modules/battle-bot.js';
-import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
-import { addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, rpsPlay, rpsCash, rpsView, rewardIncome } from './rewards.mjs';
+import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
+import { addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome } from './rewards.mjs';
 import { marketPrices } from './market.mjs';
 import { STOCKS, MARKET, MARKET_OPEN, tradeFee, newsText } from '../public/modules/market.js';
 
@@ -123,6 +123,10 @@ export async function runRewardsChecks(assert, expectStatus) {
   const bb = await balance('qa-rw-b');
   const withTicket = await service(state, 'POST', '/lucky/pull', { ticket: true }, tokens['qa-rw-b']);
   assert(withTicket.ticket && withTicket.bet === 10 && withTicket.lucky.tickets === 0 && withTicket.lucky.left === LUCKY_DAILY && withTicket.points_balance === bb + withTicket.paid, 'V13.68 the attendance ticket plays a 10-coin capsule for free, outside the three a day');
+  profile('qa-rw-a').lucky = { legend_pulls: LEGENDARY_PITY - 1 };
+  (profile('qa-rw-a').gacha ||= {}).tickets = 1;
+  const schoolLegend = await service(state, 'POST', '/lucky/pull', { ticket: true }, tokens['qa-rw-a']);
+  assert(schoolLegend.legendary?.guaranteed && schoolLegend.profile.avatar_key === schoolLegend.legendary.key && schoolLegend.stats.pets.some(pet => pet.key === schoolLegend.legendary.key) && schoolLegend.notice?.text.includes('전설 펫') && schoolLegend._push?.[0]?.to.includes('qa-rw-b'), 'V13.89 a pity pull gives the legendary egg, makes it the partner and sends the news to the school');
   const rankC = (await service(state, 'GET', '/bootstrap', {}, tokens['qa-rw-c'])).ranking.find(r => r.is_me);
   assert(rankC.all_coins === 400, 'V13.68 coin capsule winnings are not counted in the coin ranking');
   await expectStatus(404, () => service(state, 'POST', '/gacha/pull', {}, tokens['qa-rw-c']), 'V13.68 the decoration capsule machine is gone');
@@ -527,4 +531,19 @@ export async function runRewardsChecks(assert, expectStatus) {
   const lucky88 = source('../public/modules/lucky.js'), build88 = source('./build-assets.mjs');
   assert(lucky88.includes('/assets/lucky/machine.webp') && lucky88.includes('/assets/lucky/capsule-top.webp') && lucky88.includes('/assets/lucky/ticket.webp') && !lucky88.includes('🎟'), 'V13.88 뽑기 화면은 새 머신·캡슐·뽑기권 그림을 쓴다');
   assert(build88.includes('"v1388.css"'), 'V13.88 뽑기 그림 스타일이 빌드 목록에 있다');
+
+  /* ---------- V13.89 전설 펫 ---------- */
+  assert(LEGENDARY_RATE === 0.5 && LEGENDARY_PITY === 150 && LEGENDARY_PET_KEYS.join() === 'haechi,phoenix,whale,qilin' && STANDARD_PET_KEYS.length === 8, 'V13.89 전설 펫은 네 마리, 0.5% 확률, 150회 확정이며 일반 펫과 분리된다');
+  const values = xs => () => xs.shift() ?? .99;
+  const legendProfile = { pets: [{ key: 'dog' }], avatar_key: 'dog', lucky: { legend_pulls: 148 }, points_spent: 0 };
+  const beforePity = pullLucky(legendProfile, 10, 100, { random: values([.5, .99]), now });
+  const atPity = pullLucky(legendProfile, 10, 100, { random: values([.5, .6]), now });
+  const afterPity = pullLucky(legendProfile, 10, 100, { random: values([.5, 0, 0]), now });
+  assert(!beforePity.legendary && beforePity.lucky.legend.remaining === 1 && atPity.legendary?.guaranteed && atPity.legendary.pull === 150 && LEGENDARY_PET_KEYS.includes(atPity.legendary.key) && afterPity.legendary === null && legendProfile.pets.filter(pet => LEGENDARY_PET_KEYS.includes(pet.key)).length === 1, 'V13.89 149번째까지 실패하면 150번째에 확정되고, 한 번 만난 뒤에는 전설 펫이 더 나오지 않는다');
+  const legendExpressions = LEGENDARY_PET_KEYS.flatMap(pet => [0, 1, 2, 3].flatMap(form => (form ? ['happy', 'eat', 'sad', 'cheer'] : ['happy', 'eat']).map(expression => expressionSrc(pet, form, expression))));
+  assert(legendExpressions.length === 56 && legendExpressions.every(src => src && existsSync(fileURLToPath(new URL('../public' + src, import.meta.url)))), 'V13.89 전설 펫 표정과 알 반응 56장이 등록되어 있고 파일이 있다');
+  assert(LEGENDARY_PET_KEYS.every(key => CHARACTERS[key].legendary && petSkill({ key }).key === 'none'), 'V13.89 전설 펫에는 야차전 펫 특기가 없다');
+  const lucky89 = source('../public/modules/lucky.js'), arcade89 = source('../public/modules/arcade.js'), service89 = source('./service.mjs'), css89 = source('../public/v1389.css'), build89 = source('./build-assets.mjs');
+  assert(lucky89.includes('legend-egg-glow.webp') && lucky89.includes('legend-egg-burst.webp') && lucky89.includes('legend-badge.webp') && lucky89.includes('function legendaryShow(') && css89.includes('.lk-legend-show{') && build89.includes('"v1389.css"'), 'V13.89 전설 알의 빛남·깨짐·배지 연출과 전설 결과 화면이 빌드에 들어간다');
+  assert(arcade89.includes('LEGENDARY_RATE') && service89.includes('postNotice(state') && service89.includes('STANDARD_PET_KEYS.filter') && service89.includes('학생이 행운 뽑기에서 전설 펫'), 'V13.89 확률과 천장을 안내하고, 전설 획득은 학교에 알리며, 알 상점에서는 일반 펫만 나온다');
 }

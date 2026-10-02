@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
-import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS } from '../public/modules/core.js';
+import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS } from '../public/modules/core.js';
 import {
-  ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, drawLucky,
+  ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, drawLucky,
   BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX, GIFT_LOG_KEEP,
   RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome
 } from '../public/modules/rewards.js';
@@ -173,10 +173,13 @@ export function gachaView(p) {
 export function luckyView(p, now = Date.now()) {
   const l = p.lucky || {}, today = dayKey(now);
   const plays = l.day === today ? Number(l.plays || 0) : 0;
+  const legendary = (p.pets || []).find(pet => LEGENDARY_PET_KEYS.includes(pet.key));
+  const legendPulls = Math.max(0, Number(l.legend_pulls || 0));
   return {
     bets: LUCKY_BETS, daily: LUCKY_DAILY, left: Math.max(0, LUCKY_DAILY - plays), odds: LUCKY_ODDS,
     ticket_bet: LUCKY_TICKET_BET, tickets: Number(p.gacha?.tickets || 0),
-    recent: (l.log || []).slice(-6).reverse()
+    recent: (l.log || []).slice(-6).reverse(),
+    legend: { rate: LEGENDARY_RATE, pity: LEGENDARY_PITY, pulls: legendPulls, remaining: legendary ? 0 : Math.max(0, LEGENDARY_PITY - legendPulls), owned: !!legendary, key: legendary?.key || null }
   };
 }
 // A ticket plays a 10-coin capsule for free and does not count toward the three a day.
@@ -199,9 +202,23 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
   }
   const odd = drawLucky(random);
   const paid = bet * odd.mult;
+  let legendary = null;
+  const hasLegend = (p.pets || []).some(pet => LEGENDARY_PET_KEYS.includes(pet.key));
+  if (!hasLegend) {
+    l.legend_pulls = Number(l.legend_pulls || 0) + 1;
+    const guaranteed = l.legend_pulls >= LEGENDARY_PITY;
+    if (guaranteed || random() * 100 < LEGENDARY_RATE) {
+      const key = LEGENDARY_PET_KEYS[Math.min(LEGENDARY_PET_KEYS.length - 1, Math.floor(random() * LEGENDARY_PET_KEYS.length))];
+      (p.pets ||= []).push({ key, acquired_at: now, legendary: true });
+      p.avatar_key = key;
+      l.legend_key = key;
+      l.legend_at = now;
+      legendary = { key, guaranteed, pull: l.legend_pulls };
+    }
+  }
   l.paid = Number(l.paid || 0) + paid;
-  l.log = [...(l.log || []), { at: now, bet, mult: odd.mult, ticket }].slice(-LUCKY_LOG_KEEP);
-  return { bet, mult: odd.mult, name: odd.name, paid, ticket, lucky: luckyView(p, now) };
+  l.log = [...(l.log || []), { at: now, bet, mult: odd.mult, ticket, ...(legendary ? { legendary: legendary.key } : {}) }].slice(-LUCKY_LOG_KEEP);
+  return { bet, mult: odd.mult, name: odd.name, paid, ticket, legendary, lucky: luckyView(p, now) };
 }
 
 /* ---------- V13.82 가위바위보 ---------- */

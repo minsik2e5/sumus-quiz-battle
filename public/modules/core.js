@@ -44,8 +44,14 @@ export const CHARACTERS = {
   panda: { name: 'BAMBOO', ko: '밤부', type: '팬더', color: '#3F4442', light: '#F2F0E8', soft: '#F5F7F4' },
   snake: { name: 'CHORONG', ko: '초롱', type: '뱀', color: '#71C96E', light: '#BDEB8F', soft: '#F0F9E8' },
   rabbit: { name: 'TORI', ko: '토리', type: '토끼', color: '#F09AAE', light: '#FFD3DC', soft: '#FFF1F4' },
-  fox: { name: 'HOYA', ko: '호야', type: '여우', color: '#E8893A', light: '#F8C27D', soft: '#FFF4E8' }
+  fox: { name: 'HOYA', ko: '호야', type: '여우', color: '#E8893A', light: '#F8C27D', soft: '#FFF4E8' },
+  haechi: { name: 'HAECHI', ko: '해치', type: '한국 수호수', color: '#63B89B', light: '#BFE8D7', soft: '#F0FBF6', legendary: true },
+  phoenix: { name: 'PHOENIX', ko: '불새', type: '봉황', color: '#E96A2E', light: '#FFD06A', soft: '#FFF3E8', legendary: true },
+  whale: { name: 'STAR WHALE', ko: '별고래', type: '별고래', color: '#4659B8', light: '#A9B7FF', soft: '#F0F1FF', legendary: true },
+  qilin: { name: 'QILIN', ko: '기린', type: '동양 신수', color: '#77C9B2', light: '#F2C9F0', soft: '#FFF7FC', legendary: true }
 };
+export const LEGENDARY_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].legendary);
+export const STANDARD_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].legendary);
 // Pet growth: an egg, then three evolution forms. `form` is 0 (egg) .. 3 (final).
 export const PET_FORMS = ['알', '아기', '성장', '최종'];
 export const PET_FORM_LEVELS = [1, 3, 10, 20];

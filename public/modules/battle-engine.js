@@ -59,9 +59,12 @@ export const PET_SKILLS = {
   panda: { name: '대나무 간식', desc: 'HP +13', heal: 13 },
   rabbit: { name: '깡총 연타', desc: '2번 연속 맞히면 바로 7 피해', burst: 7, need: 2 }
 };
-// A pet without its own skill (the practice robot, or no pet) uses 몽이's.
-export const petSkillKey = pet => PET_SKILLS[pet?.key] ? pet.key : 'dog';
-export const petSkill = pet => ({ key: petSkillKey(pet), need: PET_SKILL_NEED, ...PET_SKILLS[petSkillKey(pet)] });
+const NO_SKILL_PETS = new Set(['haechi', 'phoenix', 'whale', 'qilin']);
+// The practice robot (or no pet) uses 몽이's. Legendary pets deliberately have no battle skill.
+export const petSkillKey = pet => NO_SKILL_PETS.has(pet?.key) ? 'none' : PET_SKILLS[pet?.key] ? pet.key : 'dog';
+export const petSkill = pet => petSkillKey(pet) === 'none'
+  ? { key: 'none', name: '특기 없음', desc: '전설 펫은 펫 특기를 사용하지 않아요.', need: 0 }
+  : ({ key: petSkillKey(pet), need: PET_SKILL_NEED, ...PET_SKILLS[petSkillKey(pet)] });
 
 const other = (state, pid) => state.order.find(id => id !== pid);
 
@@ -175,9 +178,10 @@ function attack(state, attackerId, ms, now) {
   dmg = Math.max(0, dmg + boost - guard);
   defender.hp = Math.max(0, defender.hp - dmg);
   markKo(state, attacker.id, defender);
-  attacker.gauge = (attacker.gauge || 0) + 1;
+  const skillInfo = petSkill(attacker.pet);
+  attacker.gauge = skillInfo.need > 0 ? (attacker.gauge || 0) + 1 : 0;
   const events = [event(state, 'attack', { attacker: attacker.id, defender: defender.id, dmg, fast, spell, fever, boost, guard, ms, hp: { [attacker.id]: attacker.hp, [defender.id]: defender.hp }, gauge: attacker.gauge, effects: { [attacker.id]: effectsOf(attacker), [defender.id]: effectsOf(defender) } })];
-  if (attacker.gauge >= petSkill(attacker.pet).need) events.push(firePetSkill(state, attacker, defender));
+  if (skillInfo.need > 0 && attacker.gauge >= skillInfo.need) events.push(firePetSkill(state, attacker, defender));
   if (state.order.every(id => state.turn.locked[id])) events.push(...settle(state, now, false));
   return events;
 }
