@@ -19,6 +19,10 @@ const EXPRESSIONS = {
   snake: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   rabbit: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   fox: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  haechi: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  phoenix: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  whale: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  qilin: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   robot: { 1: ROBOT, 2: ROBOT, 3: ROBOT }
 };
 const EXPR_ALIAS = { win: 'happy', hurt: 'sad', lose: 'sad', feed: 'eat', pet: 'happy', attack: 'cheer' };

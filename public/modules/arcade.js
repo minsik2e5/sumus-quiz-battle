@@ -1,10 +1,10 @@
 import { api, esc, num, icon, toast, modal } from './ui.js';
 import { avatar } from './character.js';
-import { GACHA_ITEMS, GACHA_KEYS, GACHA_TIERS, GACHA_TIER_KEYS, GACHA_KINDS, ownedDecorations, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET } from './rewards.js';
+import { GACHA_ITEMS, GACHA_KEYS, GACHA_TIERS, GACHA_TIER_KEYS, GACHA_KINDS, ownedDecorations, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET, LEGENDARY_RATE, LEGENDARY_PITY } from './rewards.js';
 import { titleEmblem, coin, uiArt } from './emblems.js';
 import { TITLES } from './titles.js';
 import { titleState } from './titles-ui.js';
-import { CHARACTERS, EGG_PRICE } from './core.js';
+import { CHARACTERS, STANDARD_PET_KEYS, EGG_PRICE } from './core.js';
 import { luckyCard, luckyShow, machineSpin, machineDrop, unlockSound } from './lucky.js';
 import { rpsCard, rpsMatch } from './rps.js';
 import { stocksCard, loadMarket, openStock, startStockClock } from './stocks.js';
@@ -55,9 +55,9 @@ export function gachaBookPage() {
 }
 // The pet egg shop, below the games.
 function shopHtml(A) {
-  const g = A.data.stats || {}, owned = (g.pets || []).length, total = Object.keys(CHARACTERS).length;
+  const g = A.data.stats || {}, owned = (g.pets || []).filter(pet => STANDARD_PET_KEYS.includes(pet.key)).length, total = STANDARD_PET_KEYS.length;
   return `<section class="ga-card ga-shop">
-    <button type="button" class="ga-shop-row" data-action="egg-shop"><span class="ga-egg art" aria-hidden="true">${uiArt('egg-shop')}</span><span><b>랜덤 알 상점</b><small>${owned < total ? `아직 못 만난 친구 ${total - owned}마리` : '모든 친구를 모았어요!'}</small></span><em>${coin()}${num(EGG_PRICE)}</em></button>
+    <button type="button" class="ga-shop-row" data-action="egg-shop"><span class="ga-egg art" aria-hidden="true">${uiArt('egg-shop')}</span><span><b>랜덤 알 상점</b><small>${owned < total ? `상점에서 아직 못 만난 친구 ${total - owned}마리` : '상점 펫을 모두 모았어요!'}</small></span><em>${coin()}${num(EGG_PRICE)}</em></button>
   </section>`;
 }
 // V13.68 coin capsule: the machine and its show live in lucky.js.
@@ -149,6 +149,10 @@ async function pull(A, ticket, button) {
     if (rewards(A).gacha) rewards(A).gacha.tickets = res.lucky.tickets;
     await machineDrop(machine);
     const balance = Number(res.points_balance);
+    if (res.legendary) {
+      if (res.profile) Object.assign(A.data.profile, res.profile);
+      if (res.stats) Object.assign(A.data.stats, res.stats);
+    }
     const canAgain = !ticket && res.lucky.left > 0 && balance >= luckyBet;
     // The header coins change only after the show, so the result is not spoiled.
     const again = await luckyShow(res, { again: canAgain, againLabel: `${coin()}${luckyBet}` });
@@ -179,6 +183,7 @@ function oddsModal() {
   const avg = LUCKY_ODDS.reduce((n, o) => n + o.mult * o.rate, 0);
   modal(`<h2>코인 뽑기 확률</h2><p>뽑을 때마다 아래 확률로 나와요. 앞에 뽑은 결과와 상관없이 매번 같아요.</p>
     <ul class="ga-odds-list">${LUCKY_ODDS.map(o => `<li><span>${o.mult === 1 ? '본전 (1배)' : o.mult ? `${o.mult}배` : '꽝'} <small>${o.mult ? `건 코인의 ${o.mult}배를 받아요` : '건 코인을 잃어요'}</small></span><b>${o.rate}%</b></li>`).join('')}</ul>
+    <p class="ga-note"><b>전설 펫은 별도로 ${LEGENDARY_RATE}%</b> 확률로 나타나요. 아직 전설 펫이 없다면 ${LEGENDARY_PITY}번째 뽑기에는 반드시 만나며, 학생 한 명당 한 마리만 가질 수 있어요.</p>
     <p class="ga-note">100코인을 걸면 평균 ${num(avg)}코인이 돌아와요. 코인은 공부로 모으는 게 가장 좋아요! 하루 ${LUCKY_DAILY}번까지 뽑을 수 있어요.</p>`, '코인 뽑기 확률');
 }
 function itemModal(A, key) {

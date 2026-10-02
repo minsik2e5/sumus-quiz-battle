@@ -1,6 +1,6 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
-import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, ACCESSORIES, FRAMES, EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, STANDARD_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
 import { battleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
@@ -15,7 +15,7 @@ import { DAY_MS, rankingWeek, gradeOf, rankGrade, battleStreaks, createCompetiti
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
 import { createVapidKeys } from './push.mjs';
-import { pushState, pushView, addSubscription, removeSubscription, postNotice, noticeFor, eveningReminders } from './notify.mjs';
+import { pushState, pushView, addSubscription, removeSubscription, postNotice, noticeFor, postLegend, legendFor, eveningReminders } from './notify.mjs';
 import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { middleGrade3Books } from './middle-vocab.mjs';
 import { middleGrade2Books } from './middle-vocab-grade2.mjs';
@@ -29,6 +29,8 @@ const withoutLegacySeonbu44 = book => {
   if (!isSeonbu || !Array.isArray(book.words) || !book.words.some(word => String(word.range_code) === '44')) return book;
   return { ...book, words: book.words.filter(word => String(word.range_code) !== '44') };
 };
+// 기린을 / 해치를: the object particle that fits the name.
+const eulReul = name => { const c = String(name).charCodeAt(String(name).length - 1) - 0xAC00; return c >= 0 && c <= 11171 && c % 28 ? `${name}을` : `${name}를`; };
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const requireRole = (p, role) => { if (p.role !== role) fail('이 기능을 사용할 권한이 없습니다.', 403); };
 const integer = (n, min, max, label) => { if (!Number.isInteger(Number(n)) || Number(n) < min || Number(n) > max) fail(`${label}을 확인해주세요.`); return Number(n); };
@@ -1015,6 +1017,7 @@ export async function service(state, method, path, body, token, options = {}) {
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
+      legend_news: teacher ? null : legendFor(state, studentSchool, now),
       push_reach: teacher && selectedSchool ? studentProfiles.filter(s => (state.push?.subs?.[s.id] || []).length).length : null,
       notices_sent: teacher && selectedSchool ? (state.push?.notices || []).filter(n => n.school_id === selectedSchool.id).slice(-5).reverse() : null,
       tournaments: (state.tournaments || []).filter(t => teacher ? t.school_id === selectedSchool?.id && (t.status !== 'cancelled' || now - (t.finished_at || t.created_at) < DAY_MS) : t.players.includes(p.id) && (t.status === 'active' || (t.status === 'finished' && now - (t.finished_at || 0) < 3 * DAY_MS)))
@@ -1166,7 +1169,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/pets/choose' && method === 'POST') {
     requireRole(p, 'student');
     if (p.pets?.length) fail('첫 펫은 이미 골랐어요. 새 친구는 상점의 알에서 만날 수 있어요.', 409);
-    if (!own(CHARACTERS, body.key)) fail('펫을 확인해주세요.');
+    if (!STANDARD_PET_KEYS.includes(body.key)) fail('첫 펫은 일반 펫 중에서 골라주세요.');
     p.pets = [{ key: body.key, first: true, acquired_at: Date.now() }];
     p.avatar_key = body.key;
     return publicProfile(p);
@@ -1296,7 +1299,16 @@ export async function service(state, method, path, body, token, options = {}) {
     // Like eggs: a stake waiting in a yacha room is not spent elsewhere (a free ticket is fine).
     if (body.ticket !== true && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 코인 뽑기를 할 수 있어요.', 409);
     const result = pullLucky(p, Number(body.bet), coinBalance(state, p), { ticket: body.ticket === true });
-    return { ...result, points_balance: coinBalance(state, p) };
+    if (!result.legendary) return { ...result, points_balance: coinBalance(state, p) };
+    const school = schoolForProfile(state, p);
+    let announcement = {};
+    if (school) {
+      const students = state.profiles.filter(x => x.id !== p.id && isRankedStudent(x) && schoolForProfile(state, x)?.id === school.id);
+      const name = CHARACTERS[result.legendary.key]?.ko || '전설 펫';
+      const posted = postLegend(state, school, students, { text: `${p.display_name} 학생이 행운 뽑기에서 전설 펫 ${eulReul(name)} 만났어요!`, id: randomUUID() });
+      announcement = { legend_news: posted.news, _push: students.length ? [posted.message] : [] };
+    }
+    return { ...result, ...announcement, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
   }
   // V13.82 가위바위보 against 로보: a throw (a new game with `bet`, or the pot again after a win
   // with `double`), and taking the pot after a win.
@@ -1340,7 +1352,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/shop/egg' && method === 'POST') {
     requireRole(p, 'student');
     if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
-    const missing = Object.keys(CHARACTERS).filter(key => !p.pets.some(x => x.key === key));
+    const missing = STANDARD_PET_KEYS.filter(key => !p.pets.some(x => x.key === key));
     if (!missing.length) fail('모든 펫을 모았어요!', 409);
     if (openBattleFor(state, p.id, Date.now())) fail('대결이 끝난 뒤에 알을 살 수 있어요.', 409);
     const balance = pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance;

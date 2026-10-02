@@ -15,6 +15,7 @@ import { cleanSubscription } from './push.mjs';
 export const PUSH_MAX_PER_STUDENT = 4;
 export const NOTICE_MAX = 80;
 export const NOTICE_SHOW_DAYS = 3;
+export const LEGEND_SHOW_DAYS = 2;
 const DAY = 86400000;
 // 몽이가 / 루미가 / 용용이가: the subject particle that fits the name.
 const ga = name => { const c = String(name).charCodeAt(String(name).length - 1) - 0xAC00; return c >= 0 && c <= 11171 && c % 28 ? `${name}이` : `${name}가`; };
@@ -74,6 +75,18 @@ export function postNotice(state, teacher, school, students, { text, className =
   const to = students.map(s => s.id);
   const reach = to.filter(sid => (push.subs[sid] || []).length).length;
   return { notice, reach, total: to.length, message: { to, title: `📢 ${notice.from_name}`, body: clean, url: '/?go=home', tag: 'notice' } };
+}
+// V13.89 전설 소식: kept apart from 선생님 공지 — the home screen shows only the latest notice,
+// so a legendary pull must never hide (or, in the teacher's sent list, pose as) the teacher's own.
+export function postLegend(state, school, students, { text, now = Date.now(), id }) {
+  const push = pushState(state);
+  const news = { id, school_id: school.id, text, at: now };
+  push.legends = [...(Array.isArray(push.legends) ? push.legends : []), news].slice(-30);
+  return { news, message: { to: students.map(s => s.id), title: '🌟 전설 소식', body: text, url: '/?go=home', tag: 'legend' } };
+}
+export function legendFor(state, school, now = Date.now()) {
+  const n = (state.push?.legends || []).filter(x => x.school_id === school?.id && now - x.at < LEGEND_SHOW_DAYS * DAY).at(-1);
+  return n ? { id: n.id, text: n.text, at: n.at } : null;
 }
 export function noticeFor(state, p, school, now = Date.now()) {
   const list = (state.push?.notices || []).filter(n => n.school_id === school?.id && (!n.class_name || n.class_name === p.class_name) && now - n.at < NOTICE_SHOW_DAYS * DAY);

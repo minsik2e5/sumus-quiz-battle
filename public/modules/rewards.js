@@ -13,6 +13,10 @@ export const ATTENDANCE_TICKETS = 1; // free coin capsules on the 7th stamp
 export const LUCKY_BETS = [10, 20, 30];
 export const LUCKY_DAILY = 5; // V13.82: 3 → 5 a day
 export const LUCKY_TICKET_BET = 10;
+// V13.89 전설 펫: every coin capsule (including a ticket) has a 0.5% chance. A student who
+// has not met one gets one on the 150th pull at the latest, and can own only one legendary pet.
+export const LEGENDARY_RATE = 0.5;
+export const LEGENDARY_PITY = 150;
 export const LUCKY_ODDS = [
   { mult: 0, rate: 45, name: '꽝' },
   { mult: 1, rate: 25, name: '본전' },
