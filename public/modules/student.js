@@ -415,7 +415,7 @@ function homeRecommendations(A) {
 function home(A) {
   const p = A.data.profile;
   return `<div class="home-context home-context-v1327"><div><span>SUMUS VOCA</span><b>${esc(p.school || A.school || '학교 미설정')} · ${esc(p.class_name || '')}</b></div></div>
-    ${noticeBanner(A)}${pushPrompt(A)}
+    ${noticeBanner(A)}${legendBanner(A)}${pushPrompt(A)}
     ${compactGrowth(A)}`;
 }
 // V13.77 선생님 공지 (shown for a few days, until the student closes it) and 알림.
@@ -426,6 +426,15 @@ function noticeBanner(A) {
   try { closed = localStorage.getItem('sumus:notice-closed') === n.id; } catch {}
   if (closed) return '';
   return `<section class="notice-v1377" role="status"><span class="notice-mark" aria-hidden="true">${uiArt('notice')}</span><div><small>${esc(n.from_name)}${n.class_name ? ` · ${esc(n.class_name)}` : ''} · ${date(n.at)}</small><p>${esc(n.text)}</p></div><button type="button" class="notice-close" data-action="notice-close" data-id="${esc(n.id)}" aria-label="공지 닫기">×</button></section>`;
+}
+// V13.89 전설 소식: a separate gold banner for two days, so it never hides 선생님 공지.
+function legendBanner(A) {
+  const n = A.data.legend_news;
+  if (!n) return '';
+  let closed = false;
+  try { closed = localStorage.getItem('sumus:legend-closed') === n.id; } catch {}
+  if (closed) return '';
+  return `<section class="legend-news-v1389" role="status"><img src="/assets/lucky/legend-badge.webp" alt="" aria-hidden="true"><div><small>전설 소식 · ${date(n.at)}</small><p>${esc(n.text)}</p></div><button type="button" class="notice-close" data-action="legend-close" data-id="${esc(n.id)}" aria-label="전설 소식 닫기">×</button></section>`;
 }
 export const pushSupport = () => {
   const ios = /iPhone|iPad|iPod/i.test(navigator.userAgent);

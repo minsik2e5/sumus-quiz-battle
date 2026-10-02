@@ -778,6 +778,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'push-off') return disablePush(b);
     if (d.action === 'push-later') { try { localStorage.setItem('sumus:push-later', String(Date.now() + 7 * 86400000)); } catch {} return renderKeepScroll(); }
     if (d.action === 'notice-close') { try { localStorage.setItem('sumus:notice-closed', d.id); } catch {} return renderKeepScroll(); }
+    if (d.action === 'legend-close') { try { localStorage.setItem('sumus:legend-closed', d.id); } catch {} return renderKeepScroll(); }
     if (d.action === 'notice') return noticeModal();
     if (d.action === 'install-qr') { window.open('/install?qr=1', '_blank', 'noopener'); return; }
     if (d.starPractice) return openStarPractice();

@@ -15,7 +15,7 @@ import { DAY_MS, rankingWeek, gradeOf, rankGrade, battleStreaks, createCompetiti
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
 import { createVapidKeys } from './push.mjs';
-import { pushState, pushView, addSubscription, removeSubscription, postNotice, noticeFor, eveningReminders } from './notify.mjs';
+import { pushState, pushView, addSubscription, removeSubscription, postNotice, noticeFor, postLegend, legendFor, eveningReminders } from './notify.mjs';
 import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { middleGrade3Books } from './middle-vocab.mjs';
 import { middleGrade2Books } from './middle-vocab-grade2.mjs';
@@ -29,6 +29,8 @@ const withoutLegacySeonbu44 = book => {
   if (!isSeonbu || !Array.isArray(book.words) || !book.words.some(word => String(word.range_code) === '44')) return book;
   return { ...book, words: book.words.filter(word => String(word.range_code) !== '44') };
 };
+// 기린을 / 해치를: the object particle that fits the name.
+const eulReul = name => { const c = String(name).charCodeAt(String(name).length - 1) - 0xAC00; return c >= 0 && c <= 11171 && c % 28 ? `${name}을` : `${name}를`; };
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const requireRole = (p, role) => { if (p.role !== role) fail('이 기능을 사용할 권한이 없습니다.', 403); };
 const integer = (n, min, max, label) => { if (!Number.isInteger(Number(n)) || Number(n) < min || Number(n) > max) fail(`${label}을 확인해주세요.`); return Number(n); };
@@ -1015,6 +1017,7 @@ export async function service(state, method, path, body, token, options = {}) {
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
+      legend_news: teacher ? null : legendFor(state, studentSchool, now),
       push_reach: teacher && selectedSchool ? studentProfiles.filter(s => (state.push?.subs?.[s.id] || []).length).length : null,
       notices_sent: teacher && selectedSchool ? (state.push?.notices || []).filter(n => n.school_id === selectedSchool.id).slice(-5).reverse() : null,
       tournaments: (state.tournaments || []).filter(t => teacher ? t.school_id === selectedSchool?.id && (t.status !== 'cancelled' || now - (t.finished_at || t.created_at) < DAY_MS) : t.players.includes(p.id) && (t.status === 'active' || (t.status === 'finished' && now - (t.finished_at || 0) < 3 * DAY_MS)))
@@ -1300,10 +1303,10 @@ export async function service(state, method, path, body, token, options = {}) {
     const school = schoolForProfile(state, p);
     let announcement = {};
     if (school) {
-      const students = state.profiles.filter(x => isRankedStudent(x) && schoolForProfile(state, x)?.id === school.id);
+      const students = state.profiles.filter(x => x.id !== p.id && isRankedStudent(x) && schoolForProfile(state, x)?.id === school.id);
       const name = CHARACTERS[result.legendary.key]?.ko || '전설 펫';
-      const posted = postNotice(state, { display_name: '전설 소식' }, school, students, { text: `${p.display_name} 학생이 행운 뽑기에서 전설 펫 ${name}를 만났어요!`, id: randomUUID() });
-      announcement = { notice: posted.notice, _push: [posted.message] };
+      const posted = postLegend(state, school, students, { text: `${p.display_name} 학생이 행운 뽑기에서 전설 펫 ${eulReul(name)} 만났어요!`, id: randomUUID() });
+      announcement = { legend_news: posted.news, _push: students.length ? [posted.message] : [] };
     }
     return { ...result, ...announcement, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
   }

@@ -9,6 +9,8 @@ import { LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET, LEGENDARY_RATE, 
 // bursts open, and the coins count up. A tap skips to the result; reduced motion shows it at once.
 
 export const MULT_CLASS = { 0: 't-miss', 1: 't-common', 2: 't-rare', 3: 't-legendary' };
+// 기린과 / 해치와
+const gwaWa = name => { const c = name.charCodeAt(name.length - 1) - 0xAC00; return name + (c >= 0 && c <= 11171 && c % 28 ? '과' : '와'); };
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -69,7 +71,7 @@ export function luckyCard(state, bet, balance) {
       <div class="lk-odds" aria-label="확률">${LUCKY_ODDS.slice().reverse().map(o => `<span class="${MULT_CLASS[o.mult]}"><b>${o.mult ? `×${o.mult}` : '꽝'}</b><em>${o.rate}%</em></span>`).join('')}</div>
     </div>
     <div class="lk-bets" role="group" aria-label="걸 코인">${(l.bets || LUCKY_BETS).map(b => `<button type="button" class="lk-bet ${bet === b ? 'on' : ''}" data-ga="bet" data-bet="${b}" aria-pressed="${bet === b}"><span class="lk-stack" aria-hidden="true">${'<i></i>'.repeat(b / 10)}</span><b>${b}</b></button>`).join('')}</div>
-    <div class="lk-legend-status ${legend.owned ? 'owned' : ''}"><img src="/assets/lucky/legend-badge.webp" alt=""><span><b>${legend.owned ? `전설 펫 ${esc(CHARACTERS[legend.key]?.ko || '')}와 만났어요` : `전설 펫 ${legend.rate}%`}</b><small>${legend.owned ? '학생 한 명당 한 마리만 만날 수 있어요' : `행운 뽑기 전용 · ${num(legend.remaining)}회 안에 확정`}</small></span></div>
+    <div class="lk-legend-status ${legend.owned ? 'owned' : ''}"><img src="/assets/lucky/legend-badge.webp" alt=""><span><b>${legend.owned ? `전설 펫 ${esc(gwaWa(CHARACTERS[legend.key]?.ko || ''))} 만났어요` : `전설 펫 ${legend.rate}%`}</b><small>${legend.owned ? '학생 한 명당 한 마리만 만날 수 있어요' : `행운 뽑기 전용 · ${num(legend.remaining)}회 안에 확정`}</small></span></div>
     <button type="button" class="lk-go" data-ga="pull" ${can ? '' : 'disabled'}>${left > 0 ? (balance >= bet ? `<span>뽑기!</span><em>${coin()}${bet}</em>` : '<span>코인이 부족해요</span>') : '<span>오늘 뽑기 끝! 내일 또 만나요</span>'}</button>
     ${tickets ? `<button type="button" class="lk-ticket" data-ga="ticket"><img class="lk-ticket-art" src="/assets/lucky/ticket.webp" alt=""> 뽑기권 ${tickets}장 · ${coin()}${LUCKY_TICKET_BET} 공짜 뽑기</button>` : ''}
     ${recent.length ? `<div class="lk-recent"><span>최근</span>${recent.map(r => `<i class="${MULT_CLASS[r.mult]}">${r.mult ? `×${r.mult}` : '꽝'}</i>`).join('')}${todayNet ? `<em class="${todayNet > 0 ? 'up' : 'down'}">오늘 ${todayNet > 0 ? '+' : '−'}${num(Math.abs(todayNet))}</em>` : ''}</div>` : ''}

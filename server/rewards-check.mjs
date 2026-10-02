@@ -126,7 +126,9 @@ export async function runRewardsChecks(assert, expectStatus) {
   profile('qa-rw-a').lucky = { legend_pulls: LEGENDARY_PITY - 1 };
   (profile('qa-rw-a').gacha ||= {}).tickets = 1;
   const schoolLegend = await service(state, 'POST', '/lucky/pull', { ticket: true }, tokens['qa-rw-a']);
-  assert(schoolLegend.legendary?.guaranteed && schoolLegend.profile.avatar_key === schoolLegend.legendary.key && schoolLegend.stats.pets.some(pet => pet.key === schoolLegend.legendary.key) && schoolLegend.notice?.text.includes('전설 펫') && schoolLegend._push?.[0]?.to.includes('qa-rw-b'), 'V13.89 a pity pull gives the legendary egg, makes it the partner and sends the news to the school');
+  assert(schoolLegend.legendary?.guaranteed && schoolLegend.profile.avatar_key === schoolLegend.legendary.key && schoolLegend.stats.pets.some(pet => pet.key === schoolLegend.legendary.key) && schoolLegend.legend_news?.text.includes('전설 펫') && !schoolLegend.notice && schoolLegend._push?.[0]?.to.includes('qa-rw-b') && !schoolLegend._push[0].to.includes('qa-rw-a') && schoolLegend._push[0].tag === 'legend', 'V13.89 a pity pull gives the legendary egg, makes it the partner and sends the news to the school');
+  const bootLegend = await service(state, 'GET', '/bootstrap', {}, tokens['qa-rw-b']);
+  assert(bootLegend.legend_news?.id === schoolLegend.legend_news.id && !(state.push?.notices || []).some(n => n.id === schoolLegend.legend_news.id), 'V13.89 the news shows as its own home banner and never replaces (or poses as) 선생님 공지');
   const rankC = (await service(state, 'GET', '/bootstrap', {}, tokens['qa-rw-c'])).ranking.find(r => r.is_me);
   assert(rankC.all_coins === 400, 'V13.68 coin capsule winnings are not counted in the coin ranking');
   await expectStatus(404, () => service(state, 'POST', '/gacha/pull', {}, tokens['qa-rw-c']), 'V13.68 the decoration capsule machine is gone');
