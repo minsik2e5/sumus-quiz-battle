@@ -8,7 +8,8 @@
 @keyframes lk-drop{0%{opacity:0;transform:translateY(-18px)}20%{opacity:1}100%{opacity:1;transform:translateY(38px)}}
 .lk-ticket-art{display:block;width:22px;height:22px;object-fit:contain;flex:0 0 auto}
 .lk-cap{width:120px;height:150px;margin:-75px 0 0 -60px}
-.lk-cap img{position:absolute;left:50%;display:block;width:120px;height:auto;max-width:none;transform:translateX(-50%);pointer-events:none;user-select:none}
+/* left:0 (not translateX): the opening animation sets transform on each half. */
+.lk-cap img{position:absolute;left:0;display:block;width:120px;height:auto;max-width:none;pointer-events:none;user-select:none}
 .lk-cap .top{top:auto;bottom:50%;border-radius:0;background:none;box-shadow:none}
 .lk-cap .bot{top:50%;bottom:auto;border-radius:0;background:none;box-shadow:none}
 .lk-result-art{display:block;width:96px;height:96px;object-fit:contain}
