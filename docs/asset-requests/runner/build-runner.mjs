@@ -2,8 +2,9 @@
 //   node docs/asset-requests/runner/build-runner.mjs
 // 한 프롬프트 = 그림 4장(2×2 시트, 1024×1024). 받은 시트는 slice-map.csv대로 4칸으로 잘라 앱에 넣어요.
 // 급한 순서: 01 가위바위보·로보 → 02 펫 표정 → 03 UI 아이콘·트로피 → 04 다시 만들 것 → 05 가위바위보 팔(만화 연출)
-// → 06 로보 쉬움·보통 표정, 코인 뽑기 머신·캡슐, 알 반응 (Codex 작업: CODEX_PROMPT_06.md).
-import { writeFileSync } from 'node:fs';
+// → 06 로보 쉬움·보통 표정, 코인 뽑기 머신·캡슐, 알 반응 (Codex 작업: CODEX_PROMPT_06.md)
+// → 07 전설 펫 4종(뽑기 전용): 07a 설정 시트(참고 그림 없이) → 단계별 참고 그림 → 07b 표정·알 반응.
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -219,11 +220,66 @@ for (const [a, b] of [['dog', 'pig'], ['cat', 'dragon'], ['panda', 'snake'], ['r
   ]);
 }
 
+/* 07 전설 펫 4종 (코인 뽑기에서만 나와요). 처음 그리는 캐릭터라 두 번에 나눠요.
+   07a: 펫마다 설정 시트(알 · 아기 · 성장 · 최종)와 공용 전설 알 연출. 참고 그림 없이 새 대화에서.
+   07b: 07a를 잘라 만든 단계별 참고 그림(ref-<펫>-<단계>.png)을 올리고 표정 4개씩, 알 반응. */
+const F7A = '07a-legend-design.txt', F7B = '07b-legend-expressions.txt';
+const LEGENDS = {
+  haechi: { ko: '해치', base: 'a Korean mythical guardian beast "haechi": a chubby lion-dog with fluffy cream-white fur, a soft jade-green curly mane and tail tip shaped like little clouds, one small jade horn on the forehead, a tiny golden bell on a red cord collar, big glossy amber eyes, pink blush', egg: 'a large pearl-white egg with jade-green cloud swirl patterns, a tiny golden bell charm and a small glowing jade gem on top, resting on a small golden cloud cushion', f: {
+    1: 'baby stage: small, very round and fluffy, sitting, a tiny nub of a horn, the mane only a few small cloud curls',
+    2: 'grown stage: bigger and standing on four legs, a fuller cloud-shaped jade mane, jade swirl markings on the legs, a longer horn (NOT a round sitting baby)',
+    3: 'final stage: a majestic guardian standing proud, a large flowing cloud mane edged in gold, golden swirl markings, a glowing jade horn, soft golden clouds swirling around its paws, a few sparkles (NOT a round baby)' } },
+  phoenix: { ko: '불새', base: 'a mythical firebird (phoenix): warm scarlet, orange and gold feathers, a curled golden crest of feathers on the head, a small red diamond gem on the forehead, long tail feathers tipped with soft flame-like gold, a small golden beak, big glossy dark eyes, pink blush; cute and friendly, not scary', egg: 'a large egg with a scarlet-to-gold gradient, flame-feather patterns and a small golden crown motif, softly glowing, resting in a little nest of golden feathers', f: {
+    1: 'baby stage: a small round fluffy chick, tiny wings, a short tail with one flame feather, sitting',
+    2: 'grown stage: a slimmer young bird with a longer neck, bigger folded wings and two long tail plumes, standing (NOT a round chick)',
+    3: 'final stage: a majestic phoenix with wide spread flame-gold wings, long trailing tail plumes with golden eye-spots like a peacock, a crown of feathers, a few tiny floating embers and sparkles (NOT a round chick)' } },
+  whale: { ko: '별고래', base: 'a mythical star whale that swims in the night sky: a deep indigo-blue back and a soft lavender belly, constellation patterns of tiny glowing stars on its back, rounded fins, a little spout of stardust, big glossy eyes, pink blush; it floats in the air', egg: 'an egg like a night sky: deep indigo with sparkling star dots and a small golden crescent moon, resting on a small soft cloud', f: {
+    1: 'baby stage: a small round chubby baby whale with tiny fins, floating',
+    2: 'grown stage: a longer young whale with wavy fins, more constellation stars and a soft aurora ribbon trailing behind (NOT a round baby)',
+    3: 'final stage: a majestic star whale with a long graceful body, flowing translucent fins like a nebula, a glowing star crown, an aurora trail and two tiny planets orbiting it (NOT a round baby)' } },
+  qilin: { ko: '기린', base: 'an East Asian mythical qilin (a gentle unicorn-like beast): a deer-like body with soft white fur, an iridescent pastel rainbow mane and tail (pink, mint, lavender, gold), little mint-and-gold scales along the back and legs, small golden ornaments on the forehead and legs, one golden spiral horn, golden hooves, big glossy violet eyes, pink blush', egg: 'a pearl egg with an iridescent rainbow scale pattern and a small golden spiral-horn motif on top, resting on a soft pastel cloud', f: {
+    1: 'baby stage: a small round fawn-like baby, sitting, a nub of a horn, a tiny rainbow tuft',
+    2: 'grown stage: a slender young qilin standing on long legs, a longer rainbow mane, more mint scales (NOT a round sitting baby)',
+    3: 'final stage: a majestic qilin with a flowing silky rainbow mane, a glowing spiral horn, golden cloud-shaped flames around its hooves, sparkles (NOT a round baby)' } }
+};
+for (const [key, pet] of Object.entries(LEGENDS)) sheet(F7A, `${pet.ko} 설정 시트`, 'pet', `${pet.ko}, ${pet.base}. This is a LEGENDARY pet: a little more radiant than an ordinary pet, with a soft golden rim light. Draw the same character at four growth steps; each cell must clearly be the same creature, getting bigger and grander.`, [
+  [`${key}-0`, `${pet.ko} 알`, `EGG: ${pet.egg}. Just the egg, no creature`, `public/assets/pets/${key}-0.webp`],
+  [`${key}-1`, `${pet.ko} 아기`, `BABY: the ${pet.f[1]}, happy calm face, front 3/4 view`, `public/assets/pets/${key}-1.webp`],
+  [`${key}-2`, `${pet.ko} 성장`, `GROWN: the ${pet.f[2]}, happy calm face, front 3/4 view`, `public/assets/pets/${key}-2.webp`],
+  [`${key}-3`, `${pet.ko} 최종`, `FINAL: the ${pet.f[3]}, happy calm face, front 3/4 view`, `public/assets/pets/${key}-3.webp`]
+]);
+sheet(F7A, '전설 알 연출', 'icon', 'a LEGENDARY egg for a capsule-toy prize: the same egg in the first three cells — a large shiny golden egg with rainbow gem inlays and a laurel-leaf band around the middle.', [
+  ['legend-egg', '전설 알', 'IDLE: the golden legendary egg floating, a soft rainbow halo behind it, a few sparkles', 'public/assets/lucky/legend-egg.webp'],
+  ['legend-egg-glow', '전설 알(빛남)', 'ABOUT TO HATCH: the same egg shaking and glowing brighter, thin cracks of rainbow light running over the shell, motion lines', 'public/assets/lucky/legend-egg-glow.webp'],
+  ['legend-egg-burst', '전설 알(깨짐)', 'BURST: the egg breaking open, the top shell flying up, beams of rainbow light and sparkles pouring out, no creature visible', 'public/assets/lucky/legend-egg-burst.webp'],
+  ['legend-badge', '전설 배지', 'BADGE: a round legendary emblem in rainbow and gold with small wings on both sides and a star in the middle, no letters', 'public/assets/lucky/legend-badge.webp']
+]);
+// The firebird has wings and the whale fins: the poses say paw, wing or fin.
+const EXPRS_L = EXPRS.map(([e, ko, text]) => [e, ko, e === 'sad' ? 'SAD: slightly sad pouty face with teary sparkling eyes, ears, crest or fins drooping a little, still cute (not crying hard); keep the same face, horn or crest and markings as the other cells'
+  : e === 'cheer' ? 'CHEERING: energetic pose with one front paw, wing or fin raised high, determined sparkling eyes, small motion sparkles'
+  : e === 'eat' ? 'EATING: happily eating from a small round mint food bowl in front of it, cheeks puffed, a few crumbs, eyes curved in joy' : text]);
+for (const [key, pet] of Object.entries(LEGENDS)) for (const form of [1, 2, 3]) {
+  sheet(F7B, `${pet.ko} ${FORM_KO[form]} 표정`, 'pet', `${pet.ko}, ${pet.base}. This is the ${pet.f[form]}. A legendary pet: a soft golden rim light.`,
+    EXPRS_L.map(([expr, ko, text]) => [`${key}-${form}-${expr}`, `${pet.ko} ${FORM_KO[form]} ${ko}`, text, `public/assets/pets/${key}-${form}-${expr}.webp`]));
+}
+for (const [a, b] of [['haechi', 'phoenix'], ['whale', 'qilin']]) {
+  sheet(F7B, `${LEGENDS[a].ko} · ${LEGENDS[b].ko} 알 반응`, 'egg', `two legendary pet eggs (the reference picture shows them side by side). The TOP row cells show ${LEGENDS[a].ko}'s egg: ${LEGENDS[a].egg}. The BOTTOM row cells show ${LEGENDS[b].ko}'s egg: ${LEGENDS[b].egg}.`, [
+    [`${a}-0-happy`, `${LEGENDS[a].ko} 알 기뻐함`, EGG_HAPPY, `public/assets/pets/${a}-0-happy.webp`],
+    [`${a}-0-eat`, `${LEGENDS[a].ko} 알 따뜻해짐`, EGG_WARM, `public/assets/pets/${a}-0-eat.webp`],
+    [`${b}-0-happy`, `${LEGENDS[b].ko} 알 기뻐함`, EGG_HAPPY, `public/assets/pets/${b}-0-happy.webp`],
+    [`${b}-0-eat`, `${LEGENDS[b].ko} 알 따뜻해짐`, EGG_WARM, `public/assets/pets/${b}-0-eat.webp`]
+  ]);
+}
+
 /* 쓰기 */
 const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
 for (const [file, list] of byFile) writeFileSync(resolve(here, file), list.map(p => p.text).join('\n---\n') + '\n');
 writeFileSync(resolve(here, '00-all-in-order.txt'), prompts.map(p => p.text).join('\n---\n') + '\n');
+// Sheets that each need their own chat (their own reference picture) also go one per file in split/.
+const SPLIT = new Set([F5, F6, F7A, F7B]);
+mkdirSync(resolve(here, 'split'), { recursive: true });
+for (const [file, list] of byFile) if (SPLIT.has(file)) list.forEach((p, i) => writeFileSync(resolve(here, 'split', `${file.slice(0, file.startsWith('07') ? 3 : 2)}-${i + 1} ${p.title.replace(/[\\/:*?"<>|()]/g, '').replace(/\s+/g, ' ').trim()}.txt`), p.text + '\n'));
 const csv = v => `"${String(v).replace(/"/g, '""')}"`;
 writeFileSync(resolve(here, 'slice-map.csv'), '﻿' + ['list,prompt_no,sheet,cell,key,name,app_file', ...slices.map(s => [s.file, String(s.no).padStart(3, '0'), s.title, s.cell, s.key, s.name, s.out].map(csv).join(','))].join('\n') + '\n');
 console.log([...byFile].map(([f, l]) => `${f}: ${l.length} prompts → ${l.length * 4} images`).join('\n'));

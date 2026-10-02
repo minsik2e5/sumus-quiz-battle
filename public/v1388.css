@@ -1,0 +1,16 @@
+/* V13.88: 그림으로 바꾼 코인 뽑기 머신, 캡슐, 뽑기권과 결과 장식. */
+.lk-machine-art,.lk-machine-lit{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:50% 100%;pointer-events:none;user-select:none}
+.lk-machine-art{z-index:1}
+.lk-machine-lit{z-index:2;opacity:0;transition:opacity .16s ease}
+.lk-machine.spin .lk-machine-lit,.lk-machine.drop .lk-machine-lit{opacity:1}
+.lk-machine>.lk-coin-in{z-index:3;left:calc(70% - 10px);top:calc(68% - 44px)}
+.lk-machine>.lk-drop{z-index:3;left:calc(50% - 13px);top:calc(90% - 13px);width:26px;height:26px;border-radius:0;background:url(/assets/lucky/capsule.webp) center/contain no-repeat;opacity:0}
+@keyframes lk-drop{0%{opacity:0;transform:translateY(-18px)}20%{opacity:1}100%{opacity:1;transform:translateY(38px)}}
+.lk-ticket-art{display:block;width:22px;height:22px;object-fit:contain;flex:0 0 auto}
+.lk-cap{width:120px;height:150px;margin:-75px 0 0 -60px}
+/* left:0 (not translateX): the opening animation sets transform on each half. */
+.lk-cap img{position:absolute;left:0;display:block;width:120px;height:auto;max-width:none;pointer-events:none;user-select:none}
+.lk-cap .top{top:auto;bottom:50%;border-radius:0;background:none;box-shadow:none}
+.lk-cap .bot{top:50%;bottom:auto;border-radius:0;background:none;box-shadow:none}
+.lk-result-art{display:block;width:96px;height:96px;object-fit:contain}
+@media (prefers-reduced-motion:reduce){.lk-machine-lit{transition:none}}

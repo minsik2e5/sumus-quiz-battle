@@ -6,6 +6,7 @@
 // - 펫 표정용 fit-sheets.mjs처럼, 붙어 있는 그림 덩어리의 중심이 어느 칸에 있는지로 나눠요.
 // - --base가 있으면 그 그림(public/assets/<base>.webp)과 키·가운데·발 위치를 맞춰요(같은 시트는 같은 배율).
 //   없으면 정사각형(--size, 기본 256px) 가운데에 여백을 두고 넣어요.
+// - --stand면 펫 그림처럼 칸마다 따로 512px 캔버스 바닥(발 491px)에 세워요(키 20~491px, 양옆 12px). 새 펫의 기본 그림용.
 // - --trim이면 정사각형에 넣지 않고 그림 테두리에 딱 맞게 잘라요(같은 시트는 같은 배율, 가장 넓은 칸이 --size px).
 //   예) 캡슐 위·아래 반쪽처럼 앱에서 위아래로 맞붙여 쓰는 그림.
 import sharp from 'sharp';
@@ -15,6 +16,7 @@ const ASSETS = fileURLToPath(new URL('../../../public/assets/', import.meta.url)
 const args = process.argv.slice(2);
 const opt = name => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : null; };
 const ti = args.indexOf('--trim'), trim = ti >= 0 && !!args.splice(ti, 1);
+const si = args.indexOf('--stand'), stand = si >= 0 && !!args.splice(si, 1);
 const preview = opt('--preview'), baseName = opt('--base'), size = Number(opt('--size') || 256);
 const [sheet, ...names] = args;
 if (!sheet || names.length !== 4) {
@@ -83,6 +85,18 @@ if (base) {
 
 const tiles = [];
 for (const c of cells) {
+  if (stand) {
+    // Each picture on its own: as big as fits 488 × 471 px, centred, feet on y = 491.
+    const ks = Math.min(488 / c.b.w, 471 / c.b.h), w = Math.round(c.b.w * ks), h = Math.round(c.b.h * ks);
+    const crop = await sharp(c.buf, { raw: { width: W, height: H, channels: 4 } }).extract({ left: c.b.x0, top: c.b.y0, width: c.b.w, height: c.b.h }).png().toBuffer();
+    const img = await sharp(crop).resize(w, h).toBuffer();
+    const out = await sharp({ create: { width: 512, height: 512, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
+      .composite([{ input: img, left: Math.round((512 - w) / 2), top: 492 - h }]).webp({ quality: 82, alphaQuality: 90, effort: 6 }).toBuffer();
+    await sharp(out).toFile(`${ASSETS}${c.name}.webp`);
+    tiles.push({ name: c.name, out });
+    console.log(`saved public/assets/${c.name}.webp`);
+    continue;
+  }
   const crop = await sharp(c.buf, { raw: { width: W, height: H, channels: 4 } }).extract({ left: c.b.x0, top: c.b.y0, width: c.b.w, height: c.b.h }).png().toBuffer();
   const w = Math.round(c.b.w * k), h = Math.round(c.b.h * k);
   const img = await sharp(crop).resize(w, h).toBuffer();

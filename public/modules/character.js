@@ -6,17 +6,20 @@ const LEGACY = { lumi:'dog', nox:'cat', blaze:'dog', tide:'cat', zeph:'dragon', 
 // happy (petting, wins), eat (feeding), sad (losses, a long absence), cheer (attacking, starting).
 // A pose not drawn yet falls back to the still sprite.
 // V13.85 로보 (final form) has its own yacha poses: attack, hurt, happy, sad.
+// 알(0단계)은 기뻐함(쓰다듬기)과 따뜻해짐(eat 자리, 알 데워주기)만 있다.
 const ALL = ['happy', 'eat', 'sad', 'cheer'];
+const EGG = ['happy', 'eat'];
+const ROBOT = ['happy', 'sad', 'attack', 'hurt'];
 const EXPRESSIONS = {
-  dog: { 1: ALL, 2: ALL, 3: ALL },
-  pig: { 1: ALL, 2: ALL, 3: ALL },
-  cat: { 1: ALL, 2: ALL, 3: ALL },
-  dragon: { 1: ALL, 2: ALL, 3: ALL },
-  panda: { 1: ALL, 2: ALL, 3: ALL },
-  snake: { 1: ALL, 2: ALL, 3: ALL },
-  rabbit: { 1: ALL, 2: ALL, 3: ALL },
-  fox: { 1: ALL, 2: ALL, 3: ALL },
-  robot: { 3: ['happy', 'sad', 'attack', 'hurt'] }
+  dog: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  pig: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  cat: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  dragon: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  panda: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  snake: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  rabbit: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  fox: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  robot: { 1: ROBOT, 2: ROBOT, 3: ROBOT }
 };
 const EXPR_ALIAS = { win: 'happy', hurt: 'sad', lose: 'sad', feed: 'eat', pet: 'happy', attack: 'cheer' };
 // The pose drawn for this pet: its own picture first (로보's attack), else the shared one.
