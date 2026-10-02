@@ -1,0 +1,7 @@
+Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
+Style: glossy 3D game UI icon, soft pastel palette with SUMUS mint green (#10B981) accents, chunky friendly shapes, clean edges readable at 48 pixels, one object per cell, slight top-down front view.
+Subject: a LEGENDARY egg for a capsule-toy prize: the same egg in the first three cells — a large shiny golden egg with rainbow gem inlays and a laurel-leaf band around the middle.
+TOP-LEFT cell: IDLE: the golden legendary egg floating, a soft rainbow halo behind it, a few sparkles
+TOP-RIGHT cell: ABOUT TO HATCH: the same egg shaking and glowing brighter, thin cracks of rainbow light running over the shell, motion lines
+BOTTOM-LEFT cell: BURST: the egg breaking open, the top shell flying up, beams of rainbow light and sparkles pouring out, no creature visible
+BOTTOM-RIGHT cell: BADGE: a round legendary emblem in rainbow and gold with small wings on both sides and a star in the middle, no letters
