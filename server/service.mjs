@@ -5,7 +5,7 @@ import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
 import { battleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
 import { STUDY_COINS, GIFT_AMOUNTS, RPS_MAX_WINS } from '../public/modules/rewards.js';
-import { marketView, trade as stockTrade, rebaseMarket, newMarket } from './market.mjs';
+import { marketView, trade as stockTrade, rebaseMarket, marketQuiz, marketAnswer } from './market.mjs';
 import { MARKET_OPEN } from '../public/modules/market.js';
 // V13.82 문법 증권거래소 is on hold: closed unless switched on.
 const marketOpen = state => MARKET_OPEN || state.market?.open === true;
@@ -1312,7 +1312,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const result = rpsCash(p);
     return { ...result, rps: rpsFor(state, p), points_balance: coinBalance(state, p) };
   }
-  // V13.82 문법 증권거래소: prices of this hour, and an order at that price.
+  // V13.82 문법 증권거래소: prices of this tick (10 minutes since V13.87), and an order at that price.
   if (path === '/market' && method === 'GET') {
     requireRole(p, 'student');
     if (!marketOpen(state)) fail('문법 증권거래소는 준비 중이에요.', 404);
@@ -1321,11 +1321,24 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/market/trade' && method === 'POST') {
     requireRole(p, 'student');
     if (!marketOpen(state)) fail('문법 증권거래소는 준비 중이에요.', 404);
-    if (!state.market?.seed) state.market = { ...newMarket(), ...(state.market || {}) };
+    rebaseMarket(state);
     if (body.side === 'buy' && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 주식을 살 수 있어요.', 409);
     const done = stockTrade(state, p, { key: str(body.key, 12), side: str(body.side, 8), qty: body.qty, price: body.price }, coinBalance(state, p));
     const balance = coinBalance(state, p);
     return { trade: done, points_balance: balance, market: marketView(state, p, balance) };
+  }
+  // V13.87 내부 정보: a grammar question on a share, then (answered right) a hint on its next move.
+  if (path === '/market/quiz' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!marketOpen(state)) fail('문법 증권거래소는 준비 중이에요.', 404);
+    rebaseMarket(state);
+    return { quiz: marketQuiz(state, p, str(body.key, 12)) };
+  }
+  if (path === '/market/answer' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!marketOpen(state)) fail('문법 증권거래소는 준비 중이에요.', 404);
+    const result = marketAnswer(state, p, body.answer);
+    return { result, market: marketView(state, p, coinBalance(state, p)) };
   }
   // V13.70 robot practice match: announced at the start, paid (a few coins and 경험치) at the end.
   if (path === '/battle/practice/start' && method === 'POST') {

@@ -1,28 +1,37 @@
 // V13.82 문법 증권거래소 (rules and share list: public/modules/market.js).
 //
-// Prices move every hour on the hour. Each hour's move is drawn from a seed kept only in the
-// state (state.market.seed, never sent to a browser), so the next price cannot be worked out
-// from the app's code. A price is a random walk pulled back toward its base, with a rare news
-// jump, kept between MARKET.min_x and MARKET.max_x times the base. The whole path is a pure
-// function of the seed and the hour, so a GET can show it without saving anything.
+// Prices move every 10 minutes (V13.87; a "tick"). Each tick's move is drawn from a seed kept
+// only in the state (state.market.seed, never sent to a browser), so the next price cannot be
+// worked out from the app's code. A price is a random walk pulled back toward its base, with a
+// rare news jump, kept between MARKET.min_x and MARKET.max_x times the base. The whole path is a
+// pure function of the seed and the tick, so a GET can show it without saving anything.
+// A market drawn before V13.87 (hourly, no `unit`) is replaced by a new 10-minute one.
+//
+// V13.87 내부 정보: a right answer to a grammar quiz on a share (server/market-quiz.mjs) shows
+// whether its price an hour later (MARKET.hint_ticks) is above or below the price now; the hint is
+// right MARKET.hint_acc of the time, the same for everyone (it is drawn from the seed too), and
+// lasts until that time.
 //
 // A student's shares live on the profile:
 //   stocks { h: { KEY: { q, cost } }, paid, bought, realized, day, trades, log[] }
 // Buying adds to points_spent; selling adds to stocks.paid (rewardIncome), like other games.
 import { createHash, randomBytes } from 'node:crypto';
-import { STOCKS, MARKET, stockOf, tradeFee, newsText } from '../public/modules/market.js';
+import { STOCKS, MARKET, TICK_MS, stockOf, tradeFee, newsText } from '../public/modules/market.js';
 import { dayKey } from '../public/modules/core.js';
+import { MARKET_QUIZ } from './market-quiz.mjs';
 
-export const HOUR_MS = 3600000;
-export const hourOf = now => Math.floor(now / HOUR_MS);
+export const tickOf = now => Math.floor(now / TICK_MS);
+const UNIT = 't10';
+const QUIZ_TTL_MS = 5 * 60000;
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const STOCK_LOG_KEEP = 20;
 const NEWS_KEEP = 24;
 
-// A new market starts with two days of history already drawn, so the first chart is not empty.
+// A new market starts with some history already drawn, so the first chart is not empty.
 export function newMarket(now = Date.now()) {
-  return { seed: randomBytes(16).toString('hex'), start: hourOf(now) - MARKET.history - 24 };
+  return { seed: randomBytes(16).toString('hex'), start: tickOf(now) - MARKET.history - 36, unit: UNIT };
 }
+const isCurrent = market => !!market?.seed && market.unit === UNIT;
 
 function uniform(seed, key, hour, n) {
   const d = createHash('sha256').update(`${seed}:${key}:${hour}:${n}`).digest();
@@ -44,18 +53,13 @@ function pathTo(market, hour) {
     c = { start: market.start, hour: market.start, raw, hist: Object.fromEntries(STOCKS.map(s => [s.key, [priceOf(raw[s.key])]])), news: [] };
     paths.set(seed, c);
   }
-  // A market nobody opened for months catches up quickly (a few thousand hashes per stock).
+  // A market nobody opened for days catches up quickly (a few thousand hashes per stock).
   while (c.hour < hour) {
     c.hour++;
     for (const s of STOCKS) {
-      const p = c.raw[s.key];
-      let move = s.vol * gauss(seed, s.key, c.hour) + MARKET.revert * Math.log(s.base / p);
-      if (uniform(seed, s.key, c.hour, 2) < MARKET.news_rate) {
-        const up = uniform(seed, s.key, c.hour, 3) < 0.5, size = 0.08 + uniform(seed, s.key, c.hour, 4) * 0.12;
-        move += up ? size : -size;
-        c.news.push({ hour: c.hour, key: s.key, up, pick: Math.floor(uniform(seed, s.key, c.hour, 5) * 1000) });
-      }
-      c.raw[s.key] = Math.min(s.base * MARKET.max_x, Math.max(s.base * MARKET.min_x, p * Math.exp(move)));
+      const next = step(seed, s, c.raw[s.key], c.hour);
+      if (next.news) c.news.push(next.news);
+      c.raw[s.key] = next.raw;
       const h = c.hist[s.key];
       h.push(priceOf(c.raw[s.key]));
       if (h.length > MARKET.history + 25) h.splice(0, h.length - MARKET.history - 25);
@@ -65,12 +69,37 @@ function pathTo(market, hour) {
   return c;
 }
 const priceOf = raw => Math.max(1, Math.round(raw));
+// One tick of one share: the new raw price, and its news when it jumped. (`c.hour` above counts
+// ticks; the name is kept from the hourly market.)
+function step(seed, s, p, tick) {
+  let move = s.vol * MARKET.tick_vol * gauss(seed, s.key, tick) + MARKET.revert * Math.log(s.base / p), news = null;
+  if (uniform(seed, s.key, tick, 2) < MARKET.news_rate) {
+    const up = uniform(seed, s.key, tick, 3) < 0.5, size = 0.06 + uniform(seed, s.key, tick, 4) * 0.1;
+    move += up ? size : -size;
+    news = { hour: tick, key: s.key, up, pick: Math.floor(uniform(seed, s.key, tick, 5) * 1000) };
+  }
+  return { raw: Math.min(s.base * MARKET.max_x, Math.max(s.base * MARKET.min_x, p * Math.exp(move))), news };
+}
 
 export function marketPrices(state, now = Date.now()) {
-  const market = state.market?.seed ? state.market : null;
+  const market = isCurrent(state.market) ? state.market : null;
   if (!market) return null;
-  const hour = hourOf(now), c = pathTo(market, hour);
-  return { hour, prices: Object.fromEntries(STOCKS.map(s => [s.key, c.hist[s.key].at(-1)])), hist: c.hist, news: c.news };
+  const hour = tickOf(now), c = pathTo(market, hour);
+  return { hour, prices: Object.fromEntries(STOCKS.map(s => [s.key, c.hist[s.key].at(-1)])), hist: c.hist, news: c.news, raw: c.raw };
+}
+// The hint for a share at a tick: is its price MARKET.hint_ticks later above or below the price
+// now, right MARKET.hint_acc of the time. Worked out on a copy of the path, so the cache never
+// holds a future price.
+export function marketHint(state, key, now = Date.now()) {
+  const s = stockOf(key), m = s && marketPrices(state, now);
+  if (!m) return null;
+  let raw = m.raw[key];
+  for (let t = m.hour + 1; t <= m.hour + MARKET.hint_ticks; t++) raw = step(state.market.seed, s, raw, t).raw;
+  const later = priceOf(raw), price = m.prices[key];
+  const truth = later > price ? 'up' : later < price ? 'down' : 'flat';
+  const right = uniform(state.market.seed, key, m.hour, 9) < MARKET.hint_acc;
+  const dir = right || truth === 'flat' ? truth : truth === 'up' ? 'down' : 'up';
+  return { key, dir, price, tick: m.hour, until: (m.hour + MARKET.hint_ticks) * TICK_MS };
 }
 
 function holdingsOf(p) {
@@ -83,11 +112,15 @@ export function marketView(state, p, balance, now = Date.now()) {
   if (!m) return { open: false };
   const st = p?.stocks || {}, today = dayKey(now);
   const trades = st.day === today ? Number(st.trades || 0) : 0;
+  const hintsUsed = st.hint_day === today ? Number(st.hints || 0) : 0;
+  // `open` is the price an hour (six ticks) ago.
   const stocks = STOCKS.map(s => {
     const hist = m.hist[s.key].slice(-MARKET.history - 1);
-    const price = hist.at(-1), prev = hist.at(-2) ?? price, open = hist.at(-25) ?? hist[0];
-    return { key: s.key, name: s.name, short: s.short, color: s.color, tip: s.tip, price, prev, open, hist: hist.slice(-MARKET.history) };
+    const price = hist.at(-1), prev = hist.at(-2) ?? price, open = hist.at(-7) ?? hist[0];
+    return { key: s.key, name: s.name, short: s.short, color: s.color, tip: s.tip, ex: s.ex, trap: s.trap, price, prev, open, hist: hist.slice(-MARKET.history) };
   });
+  const tips = (st.tips || []).filter(x => x.tick <= m.hour && m.hour < x.tick + MARKET.hint_ticks && stockOf(x.key))
+    .map(x => ({ key: x.key, dir: x.dir, price: x.price, until: (x.tick + MARKET.hint_ticks) * TICK_MS }));
   const prices = m.prices;
   const holdings = holdingsOf(p || {}).map(([key, x]) => {
     const q = Number(x.q), cost = Math.round(Number(x.cost || 0)), value = prices[key] * q;
@@ -95,8 +128,9 @@ export function marketView(state, p, balance, now = Date.now()) {
   });
   const value = holdings.reduce((n, x) => n + x.value, 0), cost = holdings.reduce((n, x) => n + x.cost, 0);
   return {
-    open: true, hour: m.hour, next_at: (m.hour + 1) * HOUR_MS, stocks,
-    news: m.news.slice(-8).reverse().map(n => ({ key: n.key, up: n.up, at: n.hour * HOUR_MS, text: newsText(n) })),
+    open: true, tick: m.hour, tick_min: MARKET.tick_min, next_at: (m.hour + 1) * TICK_MS, stocks,
+    news: m.news.slice(-8).reverse().map(n => ({ key: n.key, up: n.up, at: n.hour * TICK_MS, text: newsText(n) })),
+    hints: { left: Math.max(0, MARKET.hints_daily - hintsUsed), daily: MARKET.hints_daily, acc: MARKET.hint_acc, active: tips },
     me: { holdings, value, cost, pl: value - cost, pl_pct: cost ? Math.round((value - cost) / cost * 1000) / 10 : 0, realized: Math.round(Number(st.realized || 0)), cash: balance, trades_left: Math.max(0, MARKET.daily_trades - trades), recent: (st.log || []).slice(-6).reverse() },
     rules: MARKET
   };
@@ -144,17 +178,56 @@ export function trade(state, p, { key, side, qty, price }, balance, now = Date.n
   return { side, key: s.key, qty, price: current, fee, total };
 }
 
-// Every two weeks (from the hourly sweep) the path restarts three days back from the prices it
-// had reached, so a server waking up never has to replay months of hours. Same prices after.
-const REBASE_AFTER_H = 14 * 24;
+// Every two days (from the sweep) the path restarts a little way back from the prices it had
+// reached, so a server waking up never replays many ticks. Same prices after.
+const REBASE_AFTER = 2 * 24 * 6;
 export function rebaseMarket(state, now = Date.now()) {
   const market = state.market;
   // `open` (switching the market on through the state) is kept.
   const keep = market?.open === true ? { open: true } : {};
-  if (!market?.seed) { state.market = { ...newMarket(now), ...keep }; return true; }
-  const hour = hourOf(now);
-  if (hour - market.start < REBASE_AFTER_H) return false;
-  const start = hour - MARKET.history - 24, c = pathTo(market, start);
-  state.market = { seed: market.seed, start, from: { ...c.raw }, ...keep };
+  if (!isCurrent(market)) { state.market = { ...newMarket(now), ...keep }; return true; }
+  const tick = tickOf(now);
+  if (tick - market.start < REBASE_AFTER) return false;
+  const start = tick - MARKET.history - 36, c = pathTo(market, start);
+  state.market = { seed: market.seed, start, from: { ...c.raw }, unit: UNIT, ...keep };
   return true;
+}
+
+/* ---------- V13.87 내부 정보: a grammar quiz on a share, then a hint on its next move ---------- */
+const quizOf = key => Object.hasOwn(MARKET_QUIZ, key) ? MARKET_QUIZ[key] : null;
+// A question for a share (not one of the last few the student saw). Asking uses up a hint of the
+// day, so asking again and again to find an easy question does not pay.
+export function marketQuiz(state, p, key, now = Date.now(), random = Math.random) {
+  const s = stockOf(key), bank = s && quizOf(s.key);
+  if (!bank) fail('종목을 확인해주세요.');
+  if (!marketPrices(state, now)) fail('거래소가 아직 열리지 않았어요.', 409);
+  const st = p.stocks ||= {}, today = dayKey(now);
+  if (st.hint_day !== today) { st.hint_day = today; st.hints = 0; }
+  if (Number(st.hints || 0) >= MARKET.hints_daily) fail(`내부 정보는 하루 ${MARKET.hints_daily}번까지예요. 내일 또 도전해요!`, 409);
+  const seen = (st.quiz_seen || []).filter(x => x.startsWith(`${s.key}:`));
+  const fresh = bank.map((_, i) => i).filter(i => !seen.includes(`${s.key}:${i}`));
+  const pool = fresh.length ? fresh : bank.map((_, i) => i);
+  const i = pool[Math.floor(random() * pool.length) % pool.length];
+  st.hints = Number(st.hints || 0) + 1;
+  st.quiz = { key: s.key, i, at: now };
+  st.quiz_seen = [...(st.quiz_seen || []).filter(x => x !== `${s.key}:${i}`), `${s.key}:${i}`].slice(-20);
+  return { key: s.key, q: bank[i].q, c: bank[i].c, left: Math.max(0, MARKET.hints_daily - st.hints) };
+}
+// The answer to the question asked: right → the hint (kept until the next price comes).
+export function marketAnswer(state, p, answer, now = Date.now()) {
+  const st = p.stocks || {}, quiz = st.quiz;
+  if (!quiz || now - Number(quiz.at || 0) > QUIZ_TTL_MS) { if (st.quiz) delete st.quiz; fail('문제를 다시 받아 주세요.', 409); }
+  const bank = quizOf(quiz.key), item = bank?.[quiz.i];
+  if (!item) { delete st.quiz; fail('문제를 다시 받아 주세요.', 409); }
+  delete st.quiz;
+  const pick = Number(answer);
+  if (!Number.isInteger(pick) || pick < 0 || pick >= item.c.length) fail('답을 골라주세요.');
+  const right = pick === item.a;
+  st.quiz_right = Number(st.quiz_right || 0) + (right ? 1 : 0);
+  const base = { key: quiz.key, right, answer: item.a, why: item.why };
+  if (!right) return base;
+  const hint = marketHint(state, quiz.key, now);
+  if (!hint) return base;
+  st.tips = [...(st.tips || []).filter(x => hint.tick < x.tick + MARKET.hint_ticks && x.key !== hint.key), { key: hint.key, dir: hint.dir, price: hint.price, tick: hint.tick }].slice(-MARKET.hints_daily);
+  return { ...base, hint: { dir: hint.dir, price: hint.price, until: hint.until, acc: MARKET.hint_acc } };
 }

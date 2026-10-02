@@ -7,7 +7,7 @@ import { titleState } from './titles-ui.js';
 import { CHARACTERS, EGG_PRICE } from './core.js';
 import { luckyCard, luckyShow, machineSpin, machineDrop, unlockSound } from './lucky.js';
 import { rpsCard, rpsMatch } from './rps.js';
-import { stocksCard, loadMarket, openStock, startStockClock } from './stocks.js';
+import { stocksCard, loadMarket, openStock, stockIntro, startStockClock } from './stocks.js';
 import { RPS_BETS } from './rewards.js';
 
 // 놀이터: the coin capsule (코인 뽑기, V13.68) and the egg shop, plus the decorations kept from the retired V13.67 capsule machine (모은 꾸미기, under 나). The server
@@ -117,7 +117,7 @@ export function mountArcade(el, A) {
       return playRps(A, r.dataset.rps === 'resume');
     }
     const k = event.target.closest('[data-stk]');
-    if (k) return openStock(k.dataset.key, { onBalance: value => setBalance(A, value), onChange: draw });
+    if (k) return k.dataset.stk === 'intro' ? stockIntro() : openStock(k.dataset.key, { onBalance: value => setBalance(A, value), onChange: draw });
   });
   // A redraw waits while a capsule or a match is on screen (it would replace the machine).
   const quietDraw = () => { if (!current?.busy) draw(); };

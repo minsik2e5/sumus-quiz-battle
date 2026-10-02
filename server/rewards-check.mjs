@@ -15,8 +15,9 @@ import { battleQuestions, spellHint, spellable } from '../public/modules/battle-
 import { createPracticeMatch } from '../public/modules/battle-bot.js';
 import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
 import { addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, rpsPlay, rpsCash, rpsView, rewardIncome } from './rewards.mjs';
-import { marketPrices } from './market.mjs';
-import { STOCKS, MARKET, MARKET_OPEN, tradeFee, newsText } from '../public/modules/market.js';
+import { marketPrices, marketHint, rebaseMarket, tickOf, newMarket } from './market.mjs';
+import { MARKET_QUIZ } from './market-quiz.mjs';
+import { STOCKS, MARKET, MARKET_OPEN, TICK_MS, tradeFee, newsText } from '../public/modules/market.js';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 // A small deterministic random source for the odds checks.
@@ -454,24 +455,22 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(tstats.rps_jackpots === 1 && titleUnlocked('rpsjack', tstats) && !titleUnlocked('rpsgod', tstats), 'V13.82 the ×8 title opens with the first ×8');
   const rps82 = source('../public/modules/rps.js');
   assert(rps82.includes('const TALK = {') && rps82.includes("box.classList.toggle('tense', tense)") && rps82.includes("stamp(res.done ? '×8!' : 'WIN!'") && rps82.includes('function skipIntro()') && rps82.includes('robotRow(g.robot)'), 'V13.82 the match: entrance, 로보\'s talk, clash stamp, tension, 로보\'s last hands');
-  // 문법 증권거래소 (on hold: shipped switched off, checked here switched on through the state)
-  assert(MARKET_OPEN === false, 'V13.82 문법 증권거래소 is on hold');
-  await expectStatus(404, () => service(state, 'GET', '/market', {}, tG), 'V13.82 while on hold the market is closed');
-  await expectStatus(404, () => service(state, 'POST', '/market/trade', { key: 'REL', side: 'buy', qty: 1, price: 1 }, tG), 'V13.82 and takes no orders');
-  sweep(state);
-  assert(!state.market?.seed && (await service(state, 'GET', '/rewards', {}, tG)).market_open === false, 'V13.82 no market seed is made, and the app is told it is closed');
-  state.market = { open: true };
+  // 문법 증권거래소 (V13.87 open, real coins, a price every 10 minutes)
+  assert(MARKET_OPEN === true && MARKET.tick_min === 10 && TICK_MS === 600000, 'V13.87 문법 증권거래소 is open, and prices move every 10 minutes');
   sweep(state);
   const sseed = state.market.seed;
-  assert(typeof sseed === 'string' && sseed.length >= 32, 'V13.82 the hourly sweep gives the market a secret seed');
+  assert(typeof sseed === 'string' && sseed.length >= 32 && state.market.unit === 't10' && (await service(state, 'GET', '/rewards', {}, tG)).market_open === true, 'V13.82 the sweep gives the market a secret seed (V13.87 a 10-minute market)');
+  const hourly = { market: { seed: 'old-hourly-seed-0123456789abcdef00', start: 100 } };
+  assert(marketPrices(hourly) === null && rebaseMarket(hourly) && hourly.market.unit === 't10' && hourly.market.seed !== 'old-hourly-seed-0123456789abcdef00' && marketPrices(hourly), 'V13.87 a market drawn hourly before is replaced by a new 10-minute one');
   const before82 = JSON.stringify(state.market);
   const smk = (await service(state, 'GET', '/market', {}, tG)).market;
-  assert(JSON.stringify(state.market) === before82 && smk.open && smk.stocks.length === STOCKS.length && smk.stocks.every(s => s.hist.length === MARKET.history && s.price > 0) && !JSON.stringify(smk).includes(sseed), 'V13.82 the market shows 10 shares with 48 hours of prices (never the seed), without saving anything');
+  assert(JSON.stringify(state.market) === before82 && smk.open && smk.stocks.length === STOCKS.length && smk.stocks.every(s => s.hist.length === MARKET.history && s.price > 0) && !JSON.stringify(smk).includes(sseed), 'V13.82 the market shows 10 shares with 48 prices (8 hours since V13.87; never the seed), without saving anything');
+  assert(smk.next_at === (tickOf(Date.now()) + 1) * TICK_MS && smk.tick_min === 10 && smk.hints.left === MARKET.hints_daily && smk.stocks.every(s => s.ex && s.trap), 'V13.87 the next price comes on the next 10 minutes; 내부 정보 3 a day; every share has an example and a common mistake');
   const sprices = marketPrices(state, Date.now() + 3600000 * 500);
   assert(STOCKS.every(s => sprices.hist[s.key].every(v => v >= Math.floor(s.base * MARKET.min_x) && v <= Math.ceil(s.base * MARKET.max_x))), 'V13.82 prices stay between 0.3× and 3× of their base');
   const again82 = marketPrices({ market: { ...state.market } }, Date.now() + 3600000 * 500);
   assert(STOCKS.every(s => again82.prices[s.key] === sprices.prices[s.key]), 'V13.82 the same seed always gives the same prices (nothing to store)');
-  const other82 = marketPrices({ market: { seed: 'another-seed-0123456789abcdef0000', start: state.market.start } }, Date.now());
+  const other82 = marketPrices({ market: { seed: 'another-seed-0123456789abcdef0000', start: state.market.start, unit: 't10' } }, Date.now());
   assert(STOCKS.some(s => other82.prices[s.key] !== smk.stocks.find(x => x.key === s.key).price), 'V13.82 another seed gives other prices');
   const srel = smk.stocks.find(s => s.key === 'REL');
   const cash0 = await balance('qa-rw-h');
@@ -487,6 +486,32 @@ export async function runRewardsChecks(assert, expectStatus) {
   profile('qa-rw-h').stocks.h = { REL: { q: MARKET.max_hold, cost: 1 } };
   await expectStatus(409, () => service(state, 'POST', '/market/trade', { key: 'REL', side: 'buy', qty: 1, price: srel.price }, tG), 'V13.82 at most 100 shares of one stock');
   delete profile('qa-rw-h').stocks.h.REL;
+  // V13.87 내부 정보: a grammar question per share; a right answer shows the next move (7 in 10 right)
+  assert(STOCKS.every(s => (MARKET_QUIZ[s.key] || []).length >= 5 && MARKET_QUIZ[s.key].every(x => x.c.length === 4 && Number.isInteger(x.a) && x.a >= 0 && x.a < 4 && x.why)), 'V13.87 five questions for every share, four choices each');
+  await expectStatus(409, () => service(state, 'POST', '/market/answer', { answer: 0 }, tG), 'V13.87 no answer without a question');
+  const q1 = (await service(state, 'POST', '/market/quiz', { key: 'REL' }, tG)).quiz;
+  const asked1 = profile('qa-rw-h').stocks.quiz, right1 = MARKET_QUIZ.REL[asked1.i].a;
+  assert(q1.c.length === 4 && q1.left === MARKET.hints_daily - 1 && !('a' in q1) && !JSON.stringify(q1).includes(MARKET_QUIZ.REL[asked1.i].why), 'V13.87 the question reaches the app without its answer');
+  const wrong1 = await service(state, 'POST', '/market/answer', { answer: (right1 + 1) % 4 }, tG);
+  assert(wrong1.result.right === false && wrong1.result.answer === right1 && !wrong1.result.hint && !wrong1.market.hints.active.length, 'V13.87 a wrong answer shows the right one and the reason, but no hint');
+  await service(state, 'POST', '/market/quiz', { key: 'REL' }, tG);
+  const asked2 = profile('qa-rw-h').stocks.quiz;
+  assert(asked2.i !== asked1.i, 'V13.87 the next question is another one');
+  const right2 = await service(state, 'POST', '/market/answer', { answer: MARKET_QUIZ.REL[asked2.i].a }, tG);
+  const hintNow = marketHint(state, 'REL');
+  assert(right2.result.right === true && ['up', 'down', 'flat'].includes(right2.result.hint.dir) && right2.result.hint.dir === hintNow.dir && right2.result.hint.until === right2.market.next_at + (MARKET.hint_ticks - 1) * TICK_MS && right2.result.hint.price === srel.price && right2.market.hints.active.some(h => h.key === 'REL' && h.dir === hintNow.dir), 'V13.87 a right answer shows the hint until the next price, on the board too');
+  await service(state, 'POST', '/market/quiz', { key: 'GER' }, tG);
+  await expectStatus(409, () => service(state, 'POST', '/market/quiz', { key: 'PART' }, tG), 'V13.87 three 내부 정보 a day');
+  await expectStatus(400, () => service(state, 'POST', '/market/quiz', { key: 'constructor' }, tG), 'V13.87 only listed shares have questions');
+  // On a market drawn long enough ago: the hint against the real price an hour later.
+  const hstate = { market: newMarket(Date.now() - 600 * TICK_MS) };
+  let hits = 0, calls = 0;
+  for (let t = tickOf(Date.now()) - 300; t < tickOf(Date.now()) - MARKET.hint_ticks; t++) for (const s of STOCKS) {
+    const h = marketHint(hstate, s.key, t * TICK_MS + 1000), later = marketPrices(hstate, (t + MARKET.hint_ticks) * TICK_MS + 1000).prices[s.key];
+    if (later === h.price) continue;
+    calls++; if (h.dir === (later > h.price ? 'up' : 'down')) hits++;
+  }
+  assert(calls > 2000 && hits / calls > .69 && hits / calls < .81, `V13.87 hints about the price an hour later are right about 3 times in 4 (${Math.round(hits / calls * 100)}%)`);
   assert(newsText({ key: 'SUBJ', up: true, pick: 1 }).includes('가정법은') && newsText({ key: 'PART', up: true, pick: 1 }).includes('분사는'), 'V13.82 news lines use 은/는 by the last letter');
   const arcade82 = source('../public/modules/arcade.js'), css82 = source('../public/v1382.css'), build82 = source('./build-assets.mjs');
   assert(arcade82.includes('rpsCard(rewards(current.A).rps') && arcade82.includes("rewards(current.A).market_open ? stocksCard() : ''") && arcade82.includes("openStock(k.dataset.key") && build82.includes('"v1382.css"') && css82.includes('.rps-show{') && css82.includes('.stk-card{'), 'V13.82 놀이터 shows 가위바위보 and 문법 증권거래소');

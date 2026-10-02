@@ -1,0 +1,60 @@
+/* V13.87 문법 증권거래소 for students new to shares: the guide, 내부 정보 (quiz → hint), and each
+   share's example sentence and common mistake. The board is dark (v1382), a share's page is light. */
+.stk-head{align-items:center}
+.stk-head>div{flex:1;min-width:0}
+.stk-head h2{font-size:clamp(18px,5.2vw,22px);white-space:nowrap}
+.stk-guide{flex:none;appearance:none;border:1px solid rgba(116,192,252,.45);border-radius:999px;background:none;color:#a5d8ff;font:inherit;font-size:12px;font-weight:800;padding:5px 10px;cursor:pointer;white-space:nowrap}
+.stk-guide:active{background:rgba(116,192,252,.16)}
+.stk-name small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stk-row .stk-logo{position:relative}
+.stk-logo-hint{position:absolute;right:-7px;bottom:-6px;font-style:normal;font-size:9.5px;font-weight:900;line-height:1;padding:2px 3px;border-radius:7px;border:1.5px solid #fff;white-space:nowrap;color:#fff;background:#868e96}
+.stk-logo-hint.up{background:#e03131}.stk-logo-hint.down{background:#1c7ed6}
+
+/* 내부 정보 on a share's page */
+.stk-intel-btn{appearance:none;width:100%;border:2px dashed #845ef7;border-radius:14px;background:#f3f0ff;color:#5f3dc4;font:inherit;cursor:pointer;padding:10px 12px;display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left}
+.stk-intel-btn span{font-size:15px;font-weight:900}
+.stk-intel-btn small{font-size:12px;font-weight:700;color:#7048e8}
+.stk-intel-btn:disabled{border-color:#ced4da;background:#f8f9fa;color:#868e96;cursor:default}
+.stk-intel-btn:disabled small{color:#868e96}
+.stk-quiz{border-radius:14px;padding:12px;background:#f3f0ff;border:1.5px solid #d0bfff;display:flex;flex-direction:column;gap:8px}
+.stk-quiz>small{font-size:11.5px;font-weight:900;color:#7048e8;letter-spacing:.02em}
+.stk-quiz>b{font-size:15px;line-height:1.45;color:#212529}
+.stk-quiz-c{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.stk-quiz-c button{appearance:none;border:1.5px solid #d0bfff;border-radius:11px;background:#fff;color:#343a40;font:inherit;font-size:13.5px;font-weight:800;padding:10px 8px;cursor:pointer;text-align:left;min-width:0;overflow-wrap:anywhere}
+.stk-quiz-c button:active,.stk-quiz-c button.picked{background:#e5dbff;border-color:#845ef7}
+.stk-quiz.wrong{background:#fff5f5;border-color:#ffc9c9}
+.stk-quiz.wrong>b{color:#c92a2a}
+.stk-quiz.wrong p{margin:0;font-size:13px;line-height:1.55;color:#495057}
+.stk-quiz.wrong small{font-size:12px;color:#868e96}
+.stk-quiz.wrong .stk-intel-btn{border-style:solid}
+.stk-quiz.hint{flex-direction:row;align-items:center;gap:12px}
+.stk-quiz.hint.up{background:#fff5f5;border-color:#ffa8a8}
+.stk-quiz.hint.down{background:#e7f5ff;border-color:#a5d8ff}
+.stk-quiz.hint.flat{background:#f8f9fa;border-color:#dee2e6}
+.stk-quiz.hint>div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.stk-quiz.hint b{font-size:15px;color:#212529}
+.stk-quiz.hint small{font-size:12px;color:#495057;line-height:1.45}
+.stk-quiz.hint .stk-why{color:#2b8a3e}
+.stk-hint-big{flex:none;font-size:34px;line-height:1;animation:stk-hint-pop .5s cubic-bezier(.2,1.6,.4,1)}
+@keyframes stk-hint-pop{from{transform:scale(.3) rotate(-20deg);opacity:0}}
+
+/* what the share is about */
+.stk-learn{display:flex;flex-direction:column;gap:6px}
+.stk-ex,.stk-trap{margin:0;font-size:13px;line-height:1.55;border-radius:12px;padding:9px 12px;display:flex;flex-direction:column;gap:2px}
+.stk-ex small,.stk-trap small{font-size:11px;font-weight:900;letter-spacing:.04em}
+.stk-ex{background:#ebfbee;color:#2b8a3e}
+.stk-ex mark{background:#b2f2bb;color:#1b5e20;border-radius:4px;padding:0 3px;font-weight:900}
+.stk-trap{background:#fff9db;color:#8a5a00}
+
+/* the guide */
+.stk-intro{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding-top:6px}
+.stk-intro-mark{font-size:46px;line-height:1}
+.stk-intro small{font-size:11.5px;font-weight:900;color:#1c7ed6;letter-spacing:.04em}
+.stk-intro h2{margin:0;font-size:21px;text-wrap:balance}
+.stk-intro p{margin:0;font-size:14px;line-height:1.7;color:#495057;text-align:left}
+.stk-intro-dots{display:flex;gap:6px;margin-top:4px}
+.stk-intro-dots i{width:7px;height:7px;border-radius:50%;background:#dee2e6}
+.stk-intro-dots i.on{width:20px;border-radius:999px;background:#1c7ed6}
+.stk-intro-btns{display:flex;gap:8px;width:100%;margin-top:6px}
+.stk-intro-btns .btn{flex:1}
+@media (prefers-reduced-motion:reduce){.stk-hint-big{animation:none}}
