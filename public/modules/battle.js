@@ -1,6 +1,6 @@
 import { api, esc, icon, toast, num, rangeLabel } from './ui.js';
 import { CHARACTERS, PET_FORMS } from './core.js';
-import { avatar, petKey } from './character.js';
+import { avatar, petKey, showPose } from './character.js';
 import { getRanges } from './student.js';
 import { petJosa } from './pet-moments.js';
 import { startPractice } from './sessions.js';
@@ -704,8 +704,10 @@ function pop(side, text, kind = '') {
   d.style.left = (r.left - a.left + r.width * .22) + 'px'; d.style.top = (r.top - a.top + r.height * .1) + 'px';
   arena.appendChild(d); setTimeout(() => d.remove(), 1050);
 }
-function hit(side) { const el = document.getElementById('yb-pet-' + side); if (!el) return; el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); }
-function lunge(side) { if (reduced()) return; const el = document.getElementById('yb-pet-' + side); if (!el) return; el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 240); }
+// V13.85 the pets act out the hit: the attacker shows its attack (cheer) pose, the one hit its
+// hurt (sad) pose, for a moment (로보 has its own punch and flinch).
+function hit(side) { const el = document.getElementById('yb-pet-' + side); if (!el) return; el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); showPose(el, 'hurt', 900); }
+function lunge(side) { const el = document.getElementById('yb-pet-' + side); if (!el) return; showPose(el, 'attack', 900); if (reduced()) return; el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 240); }
 const sideOf = pid => pid === B.view.me ? 'me' : 'op';
 
 function showCountdown(deadline) {

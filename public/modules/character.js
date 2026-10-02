@@ -5,6 +5,7 @@ const LEGACY = { lumi:'dog', nox:'cat', blaze:'dog', tide:'cat', zeph:'dragon', 
 // V13.84 expressions (/assets/pets/<pet>-<form>-<expr>.webp, fitted to the still sprite):
 // happy (petting, wins), eat (feeding), sad (losses, a long absence), cheer (attacking, starting).
 // A pose not drawn yet falls back to the still sprite.
+// V13.85 로보 (final form) has its own yacha poses: attack, hurt, happy, sad.
 const ALL = ['happy', 'eat', 'sad', 'cheer'];
 const EXPRESSIONS = {
   dog: { 1: ALL, 2: ALL, 3: ALL },
@@ -14,13 +15,38 @@ const EXPRESSIONS = {
   panda: { 1: ALL, 2: ALL, 3: ALL },
   snake: { 1: ALL, 2: ALL, 3: ALL },
   rabbit: { 1: ALL, 2: ALL, 3: ALL },
-  fox: { 1: ALL, 2: ALL, 3: ALL }
+  fox: { 1: ALL, 2: ALL, 3: ALL },
+  robot: { 3: ['happy', 'sad', 'attack', 'hurt'] }
 };
 const EXPR_ALIAS = { win: 'happy', hurt: 'sad', lose: 'sad', feed: 'eat', pet: 'happy', attack: 'cheer' };
+// The pose drawn for this pet: its own picture first (로보's attack), else the shared one.
+const drawnPose = (key, form, expression) => {
+  const list = EXPRESSIONS[key]?.[form] || [];
+  return list.includes(expression) ? expression : list.includes(EXPR_ALIAS[expression]) ? EXPR_ALIAS[expression] : null;
+};
 // The art of a pet's pose, or null when that pose is not drawn (callers keep the still sprite).
 export function expressionSrc(key, form, expression) {
-  const k = petKey(key), f = Math.max(0, Math.min(3, Math.round(Number(form)) || 0)), e = EXPR_ALIAS[expression] || expression;
-  return (EXPRESSIONS[k]?.[f] || []).includes(e) ? `/assets/pets/${k}-${f}-${e}.webp` : null;
+  const k = petKey(key), f = Math.max(0, Math.min(3, Math.round(Number(form)) || 0)), e = drawnPose(k, f, expression);
+  return e ? `/assets/pets/${k}-${f}-${e}.webp` : null;
+}
+// Swaps a shown pet's picture to a pose for a while, then back to the still sprite. `art` holds
+// the avatar(); a pose not drawn does nothing. Quick repeats keep the first still picture.
+export function showPose(art, pose, ms = 2800) {
+  const img = art?.querySelector('.avatar-art img');
+  if (!img) return;
+  const still = img._still || img.getAttribute('src');
+  const m = still?.match(/\/assets\/pets\/([a-z]+)-(\d)\.webp$/);
+  const src = m && expressionSrc(m[1], Number(m[2]), pose);
+  if (!src) return;
+  const pre = new Image();
+  pre.onload = () => {
+    if (!img.isConnected) return;
+    img._still = still;
+    img.setAttribute('src', src);
+    clearTimeout(img._pose);
+    img._pose = setTimeout(() => { if (img.isConnected) img.setAttribute('src', still); img._still = null; }, ms);
+  };
+  pre.src = src;
 }
 // Sprites are fitted one by one, so growth is added back gently (feet stay anchored).
 const GROW = [.86, .86, .93, 1];
@@ -47,8 +73,8 @@ export function avatar(key = 'dog', options = {}) {
   const { size = '', form: rawForm = 1, accessory = 'none', frame = 'basic', expression = 'normal' } = options;
   const form = Math.max(0, Math.min(3, Math.round(Number(rawForm)) || 0));
   const small = SMALL.has(size);
-  const expr = EXPR_ALIAS[expression] || expression;
-  const hasExpr = !small && expr !== 'normal' && (EXPRESSIONS[key]?.[form] || []).includes(expr);
+  const expr = small || expression === 'normal' ? null : drawnPose(key, form, expression);
+  const hasExpr = !!expr;
   const src = `/assets/pets/${key}-${form}${hasExpr ? '-' + expr : ''}${small ? '-s' : ''}.webp`;
   const label = `${c.ko}, ${PET_FORMS[form]}`;
   const badge = !small && ACCESSORY_ICONS[accessory] ? `<span class="pet-acc-badge" aria-hidden="true"><svg viewBox="0 0 24 24">${ACCESSORY_ICONS[accessory]}</svg></span>` : '';

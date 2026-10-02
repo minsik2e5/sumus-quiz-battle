@@ -1,6 +1,7 @@
 import { api, $, $$, icon, esc, time, date, recordRangeLabel, scope, toast, modal, buttonBusy } from './ui.js';
 import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo, grade, displayEnglish, TEST_SECONDS_PER_QUESTION, TEST_LEAVE_LIMIT, testDurationSec } from './core.js';
 import { avatar } from './character.js';
+import { uiArt } from './emblems.js';
 import { EXAM_XP_PER_ANSWER, EXAM_COINS, STUDY_COINS } from './rewards.js';
 
 // V13.73: a 발음 듣기 button next to an English word shown as the question (never next to a
@@ -116,7 +117,7 @@ async function flushDraft() {
 }
 function renderExam() {
   const x = examState, a = x.attempt, answered = Object.values(a.answers).filter(v => v?.trim()).length;
-  const header = `<header class="session-header"><div class="row between"><h1>${x.review ? '최종 답안 확인' : '실전시험'}</h1><span class="exam-timer" id="exam-timer">${icon('clock')}<span id="timer-value">${time(Math.ceil((a.deadline - Date.now() - x.offset) / 1000))}</span></span></div><div class="question-count row between"><span>${esc(x.exam.title)}</span><span id="answered-count">${answered} / ${a.total} 답변</span></div><div class="progress"><i style="width:${answered / a.total * 100}%"></i></div></header>`;
+  const header = `<header class="session-header"><div class="row between"><h1>${x.review ? '최종 답안 확인' : '실전시험'}</h1><span class="exam-timer" id="exam-timer">${uiArt('stopwatch', 'timer-art')}<span id="timer-value">${time(Math.ceil((a.deadline - Date.now() - x.offset) / 1000))}</span></span></div><div class="question-count row between"><span>${esc(x.exam.title)}</span><span id="answered-count">${answered} / ${a.total} 답변</span></div><div class="progress"><i style="width:${answered / a.total * 100}%"></i></div></header>`;
   if (x.review) {
     mount(`<div class="session-app">${header}<main class="question-area"><div class="review-head"><span class="pill">제출 전 확인</span><h2>${answered === a.total ? '모든 문제에 답했어요.' : `${a.total - answered}문제가 남아 있어요.`}</h2><p>번호를 누르면 해당 답안을 수정할 수 있어요.</p></div><div class="answer-grid">${a.questions.map((q, i) => `<button data-question="${i}" class="${a.answers[i]?.trim() ? 'answered' : ''}" aria-label="${i + 1}번 ${a.answers[i]?.trim() ? '답변 완료' : '미응답'}">${i + 1}</button>`).join('')}</div><div>${a.questions.map((q, i) => `<button class="review-item" data-question="${i}"><span>${String(i + 1).padStart(2, '0')}</span><div class="grow"><p>${esc(q.prompt)}</p><small>${esc(a.answers[i] || '미응답')}</small></div>${icon('chevron')}</button>`).join('')}</div><div id="save-state" class="save-state"></div><button class="btn ink full" id="final-submit">최종 제출하기</button><button class="text-button" id="review-back" style="width:100%">문제로 돌아가기</button><div id="submit-error" role="alert"></div></main></div>`);
     $$('[data-question]').forEach(b => b.onclick = () => { x.index = Number(b.dataset.question); x.review = false; renderExam(); });
@@ -1027,7 +1028,7 @@ async function testLeaveBack() {
   await syncPracticeState();
   if (practiceState?.finished || A?.screen !== 'practice') return true;
   const last = leaves >= limit - 1;
-  const close = modal(`<div class="test-leave-warn-v1376"><span class="test-leave-count">${leaves}<small>/${limit}</small></span><h2>시험 화면을 나갔어요</h2><p>나간 기록은 선생님께 보내는 결과에 남아요.${last ? '<br><b>한 번 더 나가면 지금까지 푼 답으로 자동 제출돼요.</b>' : `<br>${limit}번째로 나가면 자동 제출돼요.`}</p><button class="btn primary full" id="test-leave-ok">시험 계속 풀기</button></div>`, '실전시험');
+  const close = modal(`<div class="test-leave-warn-v1376">${uiArt('leave-warn', 'test-leave-art')}<span class="test-leave-count">${leaves}<small>/${limit}</small></span><h2>시험 화면을 나갔어요</h2><p>나간 기록은 선생님께 보내는 결과에 남아요.${last ? '<br><b>한 번 더 나가면 지금까지 푼 답으로 자동 제출돼요.</b>' : `<br>${limit}번째로 나가면 자동 제출돼요.`}</p><button class="btn primary full" id="test-leave-ok">시험 계속 풀기</button></div>`, '실전시험');
   $('#test-leave-ok').onclick = close;
   navigator.vibrate?.([30, 40, 30]);
   return true;

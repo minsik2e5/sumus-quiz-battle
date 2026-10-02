@@ -93,3 +93,6 @@ export function trophy(size = 'md') {
 }
 
 export const coin = (cls = '') => `<i class="coin-ico ${cls}" aria-hidden="true"></i>`;
+// V13.85 drawn UI icons (/assets/ui/<key>.webp, 256px, transparent). Decorative: the text beside
+// them says what they are.
+export const uiArt = (key, cls = '') => `<img class="ui-art ${cls}" src="/assets/ui/${key}.webp" alt="" width="256" height="256" decoding="async" draggable="false">`;
