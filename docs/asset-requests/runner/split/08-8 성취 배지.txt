@@ -1,5 +1,6 @@
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
 Style: shiny 3D game trophy/badge, metallic with soft gem highlights, symmetric, readable at 64 pixels, one object per cell.
+STYLE REFERENCE: the attached picture (style-ref-badges.png) shows trophies and badges already used in this game. Draw the new medals or stamps in exactly that style: the same shiny metal and gem rendering, the same clean outline and soft sparkles. Do NOT copy the reference objects.
 Subject: round achievement medals of the same shape and size: a thick round medal with a soft beveled rim and a short ribbon at the top.
 TOP-LEFT cell: a GOLD medal with a big shining white star burst in the middle
 TOP-RIGHT cell: a SILVER medal with three small orange flames in a row rising from left to right

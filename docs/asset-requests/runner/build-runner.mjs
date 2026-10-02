@@ -391,6 +391,22 @@ sheet(F8, '결과 도장', 'emblem', 'round result stamps of the same size, like
   ['ui-result-retry', '결과 다시 도전 (60점 미만)', 'a soft PEACH scalloped stamp with a white curved arrow going around in a circle and a small heart', 'public/assets/ui/result-retry.webp']
 ]);
 
+/* 그림체 기준 그림: 08·09는 처음 그리는 그림이라, 이미 앱에 있는 그림을 같이 올려 그림체를 맞춰요. */
+const STYLE_REF = {
+  pets: 'STYLE REFERENCE: the attached picture (style-ref-pets.png) shows four OTHER pets from this same game. Draw the new pet in exactly that art style: the same crisp, clean shapes and edges, the same clear soft pastel colors (not washed out, not hazy), the same glossy eyes with white highlights, the same light cel-like shading with a thin warm rim light, the same simple fur tufts and the same body proportions (big head, short legs). Do NOT make it softer, blurrier, foggier, more painterly or more watercolor-like than the reference, and do NOT copy the reference animals.',
+  icons: 'STYLE REFERENCE: the attached picture (style-ref-icons.png) shows icons already used in this game. Draw the new icons in exactly that style: the same glossy 3D toy-like plastic look, the same chunky rounded shapes, the same bright mint-and-cream palette, the same clean edges and soft lighting. Do NOT copy the reference objects.',
+  badges: 'STYLE REFERENCE: the attached picture (style-ref-badges.png) shows trophies and badges already used in this game. Draw the new medals or stamps in exactly that style: the same shiny metal and gem rendering, the same clean outline and soft sparkles. Do NOT copy the reference objects.'
+};
+const refOf = p => p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
+for (const p of prompts) {
+  const ref = refOf(p);
+  if (!ref) continue;
+  const lines = p.text.split('\n').filter(l => !l.startsWith('If a reference picture of this character'));
+  lines.splice(2, 0, STYLE_REF[ref]);
+  p.text = lines.join('\n');
+  p.ref = `refs/style-ref-${ref}.png`;
+}
+
 /* 쓰기 */
 const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
