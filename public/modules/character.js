@@ -2,19 +2,19 @@ import { CHARACTERS, PET_FORMS } from './core.js';
 // Illustrated pets: /assets/pets/<pet>-<form>.webp (512px, transparent, feet on a shared
 // baseline) plus a 160px `-s` copy for small avatars. `form` is 0 (egg) .. 3 (final).
 const LEGACY = { lumi:'dog', nox:'cat', blaze:'dog', tide:'cat', zeph:'dragon', terra:'panda' };
-// V13.83 expressions (/assets/pets/<pet>-<form>-<expr>.webp, fitted to the still sprite):
+// V13.84 expressions (/assets/pets/<pet>-<form>-<expr>.webp, fitted to the still sprite):
 // happy (petting, wins), eat (feeding), sad (losses, a long absence), cheer (attacking, starting).
-// A pose not drawn yet (or redrawn because it did not match) falls back to the still sprite.
-const ALL = ['happy', 'eat', 'sad', 'cheer'], NO_SAD = ['happy', 'eat', 'cheer'];
+// A pose not drawn yet falls back to the still sprite.
+const ALL = ['happy', 'eat', 'sad', 'cheer'];
 const EXPRESSIONS = {
   dog: { 1: ALL, 2: ALL, 3: ALL },
-  pig: { 1: NO_SAD, 2: NO_SAD, 3: NO_SAD },
-  // 나비·용이·밤부: the grown and final sheets came out in the baby's body (no growth), so only
-  // the baby's poses are used until they are redrawn.
-  cat: { 1: ALL },
-  dragon: { 1: ALL },
-  panda: { 1: ALL },
-  snake: { 1: ALL, 2: ALL }
+  pig: { 1: ALL, 2: ALL, 3: ALL },
+  cat: { 1: ALL, 2: ALL, 3: ALL },
+  dragon: { 1: ALL, 2: ALL, 3: ALL },
+  panda: { 1: ALL, 2: ALL, 3: ALL },
+  snake: { 1: ALL, 2: ALL, 3: ALL },
+  rabbit: { 1: ALL, 2: ALL, 3: ALL },
+  fox: { 1: ALL, 2: ALL, 3: ALL }
 };
 const EXPR_ALIAS = { win: 'happy', hurt: 'sad', lose: 'sad', feed: 'eat', pet: 'happy', attack: 'cheer' };
 // The art of a pet's pose, or null when that pose is not drawn (callers keep the still sprite).

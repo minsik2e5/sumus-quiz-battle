@@ -496,8 +496,8 @@ export async function runRewardsChecks(assert, expectStatus) {
   const { existsSync } = await import('node:fs');
   const exprFiles = [];
   for (const pet of ['dog', 'pig', 'cat', 'dragon', 'panda', 'snake', 'rabbit', 'fox']) for (const form of [1, 2, 3]) for (const e of ['happy', 'eat', 'sad', 'cheer']) { const src = expressionSrc(pet, form, e); if (src) exprFiles.push(src); }
-  assert(exprFiles.length === 41 && exprFiles.every(src => existsSync(fileURLToPath(new URL('../public' + src, import.meta.url)))), 'V13.83 every listed pet pose has its picture (41 drawn so far)');
-  assert(expressionSrc('dog', 3, 'feed') === '/assets/pets/dog-3-eat.webp' && expressionSrc('dog', 1, 'hurt') === '/assets/pets/dog-1-sad.webp' && expressionSrc('pig', 1, 'sad') === null && expressionSrc('fox', 2, 'happy') === null && expressionSrc('dog', 0, 'happy') === null && expressionSrc('cat', 2, 'happy') === null && expressionSrc('panda', 3, 'eat') === null, 'V13.83 poses map (feed→eat, hurt→sad); a pose not drawn keeps the still sprite');
+  assert(exprFiles.length === 96 && exprFiles.every(src => existsSync(fileURLToPath(new URL('../public' + src, import.meta.url)))), 'V13.84 every listed pet pose has its picture (96 drawn)');
+  assert(expressionSrc('dog', 3, 'feed') === '/assets/pets/dog-3-eat.webp' && expressionSrc('dog', 1, 'hurt') === '/assets/pets/dog-1-sad.webp' && expressionSrc('pig', 1, 'sad') === '/assets/pets/pig-1-sad.webp' && expressionSrc('fox', 2, 'happy') === '/assets/pets/fox-2-happy.webp' && expressionSrc('cat', 2, 'happy') === '/assets/pets/cat-2-happy.webp' && expressionSrc('panda', 3, 'eat') === '/assets/pets/panda-3-eat.webp' && expressionSrc('dog', 0, 'happy') === null, 'V13.84 poses map (feed→eat, hurt→sad); a pose not drawn keeps the still sprite');
   const app83 = source('../public/app.js');
   assert(app83.includes("showPose(art, kind === 'feed' ? 'eat' : 'happy')") && app83.includes("showPose(art, 'sad', 2200)"), 'V13.83 feeding and petting show the eating or happy pose; a long absence shows sad, then happy');
 }
