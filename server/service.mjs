@@ -1014,7 +1014,7 @@ export async function service(state, method, path, body, token, options = {}) {
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
       rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now) },
-      care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now),
+      care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
       legend_news: teacher ? null : legendFor(state, studentSchool, now),
@@ -1226,12 +1226,12 @@ export async function service(state, method, path, body, token, options = {}) {
     return { sent: targets.length, amount, total: targets.length * amount, gifts_sent: p.gifts_sent.slice(-10).reverse(),
       _push: [{ to: targets.map(x => x.id), title: `🎁 ${p.display_name || '선생님'}의 선물이 도착했어요`, body: `응원 코인 ${amount}개${note ? ` · ${note}` : ''}`, url: '/?go=home', tag: 'gift' }] };
   }
-  // V13.76 펫 교감 (once a day each) and starred words (어려운 단어 ⭐, kept on the account).
+  // V13.76 펫 교감 (once a day each, V13.90: for each pet) and starred words (어려운 단어 ⭐, kept on the account).
   if (path === '/pet/care' && method === 'POST') {
     requireRole(p, 'student');
     const now = Date.now();
     const result = petCare(p, str(body.kind, 10), { pet: activePetKey(state, p.id), now });
-    return { ...result, care: careView(p, lastActiveBefore(state, p, now), now), stats: stats(state, p) };
+    return { ...result, care: careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)), stats: stats(state, p) };
   }
   if (path === '/stars' && method === 'POST') {
     requireRole(p, 'student');
