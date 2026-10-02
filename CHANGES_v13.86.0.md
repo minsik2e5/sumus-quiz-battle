@@ -1,6 +1,6 @@
 # SUMUS VOCA v13.86.0: 가위바위보 만화 연출
 
-> 확인용 브랜치(`claude/rps-comic-stage`)예요. v13.85.0(PR #79) 위에 쌓았어요.
+> 확인용 브랜치(`claude/rps-comic-stage`)에서 미리보기로 확인한 뒤 반영했어요.
 
 ## 화면
 - **번개로 갈라진 화면**
