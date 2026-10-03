@@ -1,0 +1,9 @@
+Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
+Style: shiny 3D game trophy/badge, metallic with soft gem highlights, symmetric, readable at 64 pixels, one object per cell.
+STYLE REFERENCE — before drawing, open "07a-5.png" in the Google Drive folder "SUMUS 전설 펫 07 (Runner용)" (legendary egg and badge) and "06-3.png" in the Google Drive folder "SUMUS 에셋 05·06 (Runner용)" (jackpot): they show shiny game art already used in this app. Draw the new medals or stamps in exactly that style: the same shiny metal and gem rendering, the same clean outline and soft sparkles. Do NOT copy the reference objects.
+Subject: round result stamps of the same size, like a teacher's cute reward stamp: a thick round badge with a scalloped rim and a soft glossy finish (no letters, no numbers).
+TOP-LEFT cell: a GOLD scalloped stamp with a big shining star and a small crown on top, a few sparkles
+TOP-RIGHT cell: a MINT scalloped stamp with a big white thumbs-up and two small stars
+BOTTOM-LEFT cell: a SKY-BLUE scalloped stamp with a big white smiling check mark
+BOTTOM-RIGHT cell: a soft PEACH scalloped stamp with a white curved arrow going around in a circle and a small heart
+WHEN DONE — upload the finished transparent PNG to Google Drive, into the folder "SUMUS 메뉴·학습 08 (Runner용)", named exactly "08-9.png" (if a file with that name is already there, replace it). Actually save the file to Google Drive; showing the picture in the chat is not enough.

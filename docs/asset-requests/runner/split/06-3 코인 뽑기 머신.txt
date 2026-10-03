@@ -4,3 +4,4 @@ TOP-LEFT cell: MACHINE: a cute capsule toy machine (gachapon) seen straight from
 TOP-RIGHT cell: MACHINE LIT UP: exactly the same machine, same size and position, but every bulb shines bright yellow, the dome glows with a soft golden light and a few sparkles pop around it
 BOTTOM-LEFT cell: TICKET: a golden admission ticket with notched edges and a small capsule picture printed in the middle, slightly tilted, no letters
 BOTTOM-RIGHT cell: JACKPOT: an opened toy capsule with a fountain of shiny gold coins bursting out of it, golden rays behind, sparkles, no letters
+WHEN DONE — upload the finished transparent PNG to Google Drive, into the folder "SUMUS 에셋 05·06 (Runner용)", named exactly "06-3.png" (if a file with that name is already there, replace it). Actually save the file to Google Drive; showing the picture in the chat is not enough.

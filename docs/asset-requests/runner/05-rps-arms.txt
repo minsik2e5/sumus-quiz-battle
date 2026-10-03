@@ -5,6 +5,7 @@ TOP-LEFT cell: ROCK: a tight closed fist, knuckles facing right toward the oppon
 TOP-RIGHT cell: SCISSORS: index and middle fingers stretched straight forward to the right in a V shape, the other fingers folded
 BOTTOM-LEFT cell: PAPER: an open flat hand, all five fingers stretched straight forward to the right and slightly spread, palm facing down
 BOTTOM-RIGHT cell: GIVE UP: the hand holds a small white flag on a short stick, the flag waving, a tiny sweat drop (used when 로보 loses big)
+WHEN DONE — upload the finished transparent PNG to Google Drive, into the folder "SUMUS 에셋 05·06 (Runner용)", named exactly "05-1.png" (if a file with that name is already there, replace it). Actually save the file to Google Drive; showing the picture in the chat is not enough.
 ---
 Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512). Leave generous empty space around every illustration so nothing touches or crosses the middle lines or the image edges. Use a real transparent background (PNG alpha) — do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no labels, no watermark, no ground shadow. Do not ask me any questions; just generate the image.
 Style: glossy 3D cartoon game art, chunky friendly shapes, bold clean outline, soft studio lighting with a gentle rim light, clean shading, the same look as cute 3D mobile-game hand icons. Side view. Every cell shows exactly the same arm (same length, thickness, colors and sleeve); only the hand changes. In every cell the arm lies HORIZONTALLY across the middle of the cell at the same height, about 80% of the cell width long, so the four arms can be swapped in place.
@@ -13,3 +14,4 @@ TOP-LEFT cell: ROCK: a tight closed fist, knuckles facing left toward the oppone
 TOP-RIGHT cell: SCISSORS: index and middle fingers stretched straight forward to the left in a V shape, the other fingers folded
 BOTTOM-LEFT cell: PAPER: an open flat hand, all five fingers stretched straight forward to the left and slightly spread, palm facing down
 BOTTOM-RIGHT cell: THUMBS UP: a fist with the thumb pointing straight up, a few small sparkles (used when taking the coins)
+WHEN DONE — upload the finished transparent PNG to Google Drive, into the folder "SUMUS 에셋 05·06 (Runner용)", named exactly "05-2.png" (if a file with that name is already there, replace it). Actually save the file to Google Drive; showing the picture in the chat is not enough.

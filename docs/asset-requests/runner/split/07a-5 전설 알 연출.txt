@@ -5,3 +5,4 @@ TOP-LEFT cell: IDLE: the golden legendary egg floating, a soft rainbow halo behi
 TOP-RIGHT cell: ABOUT TO HATCH: the same egg shaking and glowing brighter, thin cracks of rainbow light running over the shell, motion lines
 BOTTOM-LEFT cell: BURST: the egg breaking open, the top shell flying up, beams of rainbow light and sparkles pouring out, no creature visible
 BOTTOM-RIGHT cell: BADGE: a round legendary emblem in rainbow and gold with small wings on both sides and a star in the middle, no letters
+WHEN DONE — upload the finished transparent PNG to Google Drive, into the folder "SUMUS 전설 펫 07 (Runner용)", named exactly "07a-5.png" (if a file with that name is already there, replace it). Actually save the file to Google Drive; showing the picture in the chat is not enough.

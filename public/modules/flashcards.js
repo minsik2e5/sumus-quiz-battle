@@ -4,6 +4,7 @@
 // card. The cards you did not know come back round after round until every card is known.
 // Known words are kept on this phone (per student), so the list can show 외운 단어 n/N.
 import { esc, icon } from './ui.js';
+import { artOr } from './emblems.js';
 
 const PREF_KEY = 'sumus:fc-prefs';
 const knownKey = id => 'sumus:fc-known:' + id;
@@ -57,7 +58,7 @@ export function openFlashcards({ words, title = '', profileId = 'me', isStarred 
     const someKnown = before > 0 && before < all.length;
     box.innerHTML = `<div class="fc-top"><button type="button" class="fc-x" data-fc="close" aria-label="닫기">${icon('close')}</button><span class="fc-top-title">${esc(title)}</span><span></span></div>
       <div class="fc-setup">
-        <div class="fc-setup-head"><span class="fc-deck-art" aria-hidden="true"><i></i><i></i><i></i></span><h2>카드로 가리고 외우기</h2><p>${esc(title)} · ${all.length}개${before ? ` · 외운 단어 ${before}개` : ''}</p></div>
+        <div class="fc-setup-head"><span class="fc-deck-art" aria-hidden="true">${artOr('flash-deck', '<i></i><i></i><i></i>')}</span><h2>카드로 가리고 외우기</h2><p>${esc(title)} · ${all.length}개${before ? ` · 외운 단어 ${before}개` : ''}</p></div>
         <div class="fc-opt"><span class="fc-opt-label">먼저 볼 쪽</span><div class="fc-seg" role="group" aria-label="먼저 볼 쪽">
           <button type="button" data-fc-face="word" aria-pressed="${prefs.face === 'word'}">영어 보고 뜻</button>
           <button type="button" data-fc-face="meaning" aria-pressed="${prefs.face === 'meaning'}">뜻 보고 영어</button></div></div>
@@ -229,7 +230,7 @@ export function openFlashcards({ words, title = '', profileId = 'me', isStarred 
       buzz([20, 40, 20]);
       box.innerHTML = `<div class="fc-top"><button type="button" class="fc-x" data-fc="close" aria-label="닫기">${icon('close')}</button><span></span><span></span></div>
         <div class="fc-end all-known">
-          <span class="fc-end-burst" aria-hidden="true">🎉</span>
+          <span class="fc-end-burst" aria-hidden="true">${artOr('flash-done', '🎉')}</span>
           <h2>다 외웠어요!</h2>
           <p>${esc(title)} ${total}/${all.length}개를 모두 아는 카드로 만들었어요${st.round > 1 ? ` · ${st.round}라운드` : ''}.</p>
           ${onQuiz ? `<button type="button" class="fc-start" data-fc="quiz">바로 확인 테스트 <small>${prefs.face === 'word' ? '영어 → 뜻' : '뜻 → 영어'} · ${Math.min(200, all.length)}문제</small></button>` : ''}

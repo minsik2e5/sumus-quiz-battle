@@ -96,3 +96,7 @@ export const coin = (cls = '') => `<i class="coin-ico ${cls}" aria-hidden="true"
 // V13.85 drawn UI icons (/assets/ui/<key>.webp, 256px, transparent). Decorative: the text beside
 // them says what they are.
 export const uiArt = (key, cls = '') => `<img class="ui-art ${cls}" src="/assets/ui/${key}.webp" alt="" width="256" height="256" decoding="async" draggable="false">`;
+// V13.91 drawn art that is on its way (asset list 08): the line icon stands in until the picture
+// is added here, so a missing file never shows as a broken image.
+export const ART_READY = new Set([]);
+export const artOr = (key, fallback, cls = '') => ART_READY.has(key) ? uiArt(key, cls) : fallback;

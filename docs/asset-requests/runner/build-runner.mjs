@@ -271,15 +271,180 @@ for (const [a, b] of [['haechi', 'phoenix'], ['whale', 'qilin']]) {
   ]);
 }
 
+/* 09 새 기본 펫 8종 (07 전설 펫과 같은 2단계: 09a 설정 시트 → 잘라서 참고 그림 → 09b 표정) */
+const F9A = '09a-new-pets-design.txt', F9B = '09b-new-pets-expressions.txt';
+const NEW_PETS = {
+  capybara: { ko: '유자', type: '카피바라', base: 'a chubby round capybara with warm caramel-brown fur, a blunt rounded snout, tiny round ears, small calm eyes with a sleepy happy look, pink blush, a little orange yuzu fruit with one green leaf resting on its head', egg: 'a warm caramel egg with darker brown spots and a small orange yuzu-fruit pattern, resting in a little nest of green leaves', f: {
+    1: 'baby stage: small and very round, sitting, a tiny yuzu on the head, no other accessories',
+    2: 'grown stage: bigger and longer, standing on four short legs, a green leaf scarf with a small gold star charm (NOT a round sitting baby)',
+    3: 'final stage: large, calm and proud, a fluffy mint towel worn like a cape fastened with a gold star clasp, a crown of three little yuzu fruits with leaves, soft steam swirls and golden sparkles around (NOT a small baby)' } },
+  penguin: { ko: '펭이', type: '펭귄', base: 'a chubby penguin with a navy-blue back and head, a white belly and face, a small orange beak and orange feet, big glossy dark eyes, pink blush, a soft sky-blue knitted scarf', egg: 'a pale ice-blue egg with white snowflake patterns, resting on a small block of ice', f: {
+    1: 'baby stage: a small fluffy blue-grey chick covered in soft down, tiny flippers, the sky-blue scarf a little too big',
+    2: 'grown stage: a taller, sleek young penguin standing upright, the sky-blue scarf with a small gold star charm (NOT a fluffy chick)',
+    3: 'final stage: a tall proud emperor-style penguin with a golden-yellow neck patch, a long flowing sky-blue scarf, a small ice crown, snowflake sparkles around (NOT a fluffy chick)' } },
+  owl: { ko: '올리', type: '부엉이', base: 'a round little owl with soft lavender-purple and cream feathers, big tufted ear feathers, a heart-shaped cream face, big glossy amber eyes behind small round golden glasses, a tiny beak, pink blush', egg: 'a lavender egg with cream crescent-moon and tiny closed-book patterns (no letters), resting in a small nest of twigs', f: {
+    1: 'baby stage: a small round fluffy owlet, the golden glasses slightly too big for its face',
+    2: 'grown stage: a bigger owl with neatly folded wings, a small mint scholar cap with a gold star tassel (NOT a round fluffy owlet)',
+    3: 'final stage: a majestic wise owl with wide spread wings edged in gold, the scholar cap, a small glowing open book with blank pages floating beside it, golden sparkles (NOT a round owlet)' } },
+  hamster: { ko: '쿠키', type: '햄스터', base: 'a tiny chubby hamster with golden-yellow and cream fur, a white belly, round pink ears, big glossy black eyes, very puffy cheeks, a tiny pink nose, pink blush', egg: 'a cream-yellow egg with small sunflower-seed patterns, resting in a nest of soft wood shavings', f: {
+    1: 'baby stage: a very small round fluff ball, no accessories',
+    2: 'grown stage: a bit bigger, standing on its hind legs holding a sunflower seed, a small green scarf with a gold star charm',
+    3: 'final stage: bigger and proud, a sunflower crown, a little golden cape with a gold star clasp, golden sparkles (NOT a tiny fluff ball)' } },
+  shark: { ko: '파도', type: '아기 상어', base: 'a cute shark with smooth sky-blue skin, a white belly, a rounded dorsal fin, a happy smile with tiny friendly rounded teeth (never scary), big glossy dark eyes, pink blush; it floats in the air as if swimming', egg: 'a sky-blue egg with white wave patterns, resting on a little cushion of sea foam next to a small shell', f: {
+    1: 'baby stage: a small round chubby baby shark floating, tiny fins',
+    2: 'grown stage: a longer, sleek young shark with a small mint scarf and a gold star charm, a few bubbles around (NOT a round baby)',
+    3: 'final stage: a big majestic friendly shark with a flowing aqua wave-shaped cape, a small coral crown, bubbles and golden sparkles (NOT a round baby, still friendly)' } },
+  alpaca: { ko: '몽글', type: '알파카', base: 'a fluffy alpaca with cloud-like white wool tinted soft lavender at the tips, a long neck, a cream face, small upright ears, big glossy dark eyes with long lashes, pink blush, a little rainbow pom-pom tassel by one ear', egg: 'a fluffy-looking white egg with lavender wool-swirl patterns, resting on a small pastel blanket', f: {
+    1: 'baby stage: a small round ball of wool with short legs, sitting',
+    2: 'grown stage: taller with a long neck, standing on four legs, a woven mint scarf with a gold star charm (NOT a round sitting baby)',
+    3: 'final stage: a grand alpaca with an enormous cloud-like fluffy mane, a colorful woven poncho with gold trim, little pom-pom flowers, golden sparkles (NOT a small baby)' } },
+  hedgehog: { ko: '도치', type: '고슴도치', base: 'a tiny round hedgehog with soft beige-brown spines (rounded and soft-looking, not sharp), a cream face and belly, small round ears, big glossy dark eyes, a little pink nose, pink blush, a small red apple stuck on its back spines', egg: 'a beige egg covered in soft rounded spike bumps, resting in a nest of autumn leaves', f: {
+    1: 'baby stage: a tiny round ball, the apple very small',
+    2: 'grown stage: bigger, standing on its hind legs, a small green scarf with a gold star charm, the red apple on its back',
+    3: 'final stage: bigger and proud, the spines tipped with gold, a crown of autumn leaves, a little golden cape, golden sparkles (NOT a tiny ball)' } },
+  otter: { ko: '달이', type: '수달', base: 'a sleek little otter with glossy chocolate-brown fur, a cream face and belly, small round ears, whiskers, big glossy dark eyes, pink blush, holding a small pink seashell', egg: 'a chocolate-brown egg with cream wave stripes and a small pink seashell motif, resting on smooth river stones', f: {
+    1: 'baby stage: a small round baby otter floating on its back, hugging the pink shell',
+    2: 'grown stage: a longer young otter standing on its hind legs, a mint scarf with a gold star charm, holding the shell (NOT a round baby)',
+    3: 'final stage: a grand otter with a flowing river-blue cape with gold trim, holding a shining pearl in an open shell, water-drop sparkles (NOT a round baby)' } }
+};
+for (const [key, pet] of Object.entries(NEW_PETS)) sheet(F9A, `${pet.ko} ${pet.type} 설정 시트`, 'pet', `${pet.ko}, ${pet.base}. Draw the same character at four growth steps; each cell must clearly be the same creature, getting bigger and grander.`, [
+  [`${key}-0`, `${pet.ko} 알`, `EGG: ${pet.egg}. Just the egg, no creature`, `public/assets/pets/${key}-0.webp`],
+  [`${key}-1`, `${pet.ko} 아기`, `BABY: the ${pet.f[1]}, happy calm face, front 3/4 view`, `public/assets/pets/${key}-1.webp`],
+  [`${key}-2`, `${pet.ko} 성장`, `GROWN: the ${pet.f[2]}, happy calm face, front 3/4 view`, `public/assets/pets/${key}-2.webp`],
+  [`${key}-3`, `${pet.ko} 최종`, `FINAL: the ${pet.f[3]}, happy calm face, front 3/4 view`, `public/assets/pets/${key}-3.webp`]
+]);
+// Wings, flippers and fins: the poses say so, and each pet keeps its own item.
+const EXPRS_N = EXPRS.map(([e, ko, text]) => [e, ko, e === 'sad' ? 'SAD: slightly sad pouty face with teary sparkling eyes, ears, feathers or fins drooping a little, still cute (not crying hard); keep the same face, markings and item (fruit, glasses, scarf, apple or shell) as the other cells'
+  : e === 'cheer' ? 'CHEERING: energetic pose with one front paw, wing, flipper or fin raised high, determined sparkling eyes, small motion sparkles'
+  : e === 'eat' ? 'EATING: happily eating from a small round mint food bowl in front of it, cheeks puffed, a few crumbs, eyes curved in joy' : text]);
+for (const [key, pet] of Object.entries(NEW_PETS)) for (const form of [1, 2, 3]) {
+  sheet(F9B, `${pet.ko} ${FORM_KO[form]} 표정`, 'pet', `${pet.ko}, ${pet.base}. This is the ${pet.f[form]}.`,
+    EXPRS_N.map(([expr, ko, text]) => [`${key}-${form}-${expr}`, `${pet.ko} ${FORM_KO[form]} ${ko}`, text, `public/assets/pets/${key}-${form}-${expr}.webp`]));
+}
+for (const [a, b] of [['capybara', 'penguin'], ['owl', 'hamster'], ['shark', 'alpaca'], ['hedgehog', 'otter']]) {
+  sheet(F9B, `${NEW_PETS[a].ko} · ${NEW_PETS[b].ko} 알 반응`, 'egg', `two pet eggs (the reference picture shows them side by side). The TOP row cells show ${NEW_PETS[a].ko}'s egg: ${NEW_PETS[a].egg}. The BOTTOM row cells show ${NEW_PETS[b].ko}'s egg: ${NEW_PETS[b].egg}.`, [
+    [`${a}-0-happy`, `${NEW_PETS[a].ko} 알 기뻐함`, EGG_HAPPY, `public/assets/pets/${a}-0-happy.webp`],
+    [`${a}-0-eat`, `${NEW_PETS[a].ko} 알 따뜻해짐`, EGG_WARM, `public/assets/pets/${a}-0-eat.webp`],
+    [`${b}-0-happy`, `${NEW_PETS[b].ko} 알 기뻐함`, EGG_HAPPY, `public/assets/pets/${b}-0-happy.webp`],
+    [`${b}-0-eat`, `${NEW_PETS[b].ko} 알 따뜻해짐`, EGG_WARM, `public/assets/pets/${b}-0-eat.webp`]
+  ]);
+}
+
+/* 08 메뉴 · 학습 화면 · 성취 배지 (선 아이콘과 이모지로 남아 있던 자리) */
+const F8 = '08-menu-learning.txt';
+const MENU = 'All icons in this set are one family (the same lighting, outline softness, color palette and level of detail), like the tab-bar icons of one premium mobile game. Keep every icon simple and bold so it stays clear at 28 pixels: big rounded shapes, at most three main colors, no thin lines, no tiny details. If a picture of earlier icons from this set was attached in this conversation, match its style exactly.';
+const menu = (title, cells) => sheet(F8, title, 'icon', MENU, cells.map(([key, ko, desc]) => [`ui-${key}`, ko, desc, `public/assets/ui/${key}.webp`]));
+menu('메뉴 아이콘 1 (하단 메뉴)', [
+  ['nav-home', '하단 메뉴 홈', 'a small cozy house with a rounded mint roof, a round cream door and one warm yellow window'],
+  ['nav-study', '하단 메뉴 학습', 'an open book with mint covers and a short yellow pencil lying across it'],
+  ['nav-yacha', '하단 메뉴 야차전', 'two chunky cartoon swords crossed in an X with mint blades and gold handles, a small yellow lightning spark where they cross'],
+  ['nav-arcade', '하단 메뉴 놀이터', 'a chunky handheld game controller in mint with one red round button and a yellow cross pad']
+]);
+menu('메뉴 아이콘 2 (나 · 나 화면 메뉴)', [
+  ['nav-me', '하단 메뉴 나', 'a round friendly head-and-shoulders avatar bust of a child in a mint hoodie, simple happy face, no hair details'],
+  ['me-pets', '내 펫·꾸미기', 'a big soft paw print in warm peach with a small pink bow ribbon on its top right'],
+  ['me-ranking', '랭킹', 'a three-step winners podium in mint with a small golden crown floating above the tallest middle step'],
+  ['me-titles', '칭호 도감', 'a chunky closed album book in lavender with a round gold medal and ribbon on its cover']
+]);
+menu('메뉴 아이콘 3 (나 화면 메뉴 · 야차전 방식)', [
+  ['me-records', '내 기록', 'a mint clipboard with a white sheet showing a rising zigzag line graph and a small check mark'],
+  ['me-settings', '계정·설정', 'a chunky rounded gear in soft gray-blue with a small mint circle in its center'],
+  ['mode-speed', '스피드전', 'a bold yellow lightning bolt with short orange speed streaks behind it'],
+  ['mode-skill', '실력전', 'a chunky mint pencil writing a short curved line next to a small red-and-white target']
+]);
+menu('메뉴 아이콘 4 (나 화면 메뉴)', [
+  ['me-attendance', '출석 도장', 'a small mint calendar block with a big round red stamp mark pressed on it (no numbers)'],
+  ['me-stars', '어려운 단어', 'a small stack of two word cards with a chubby golden star sticker on the top card (no letters)'],
+  ['me-notify', '알림', 'a chunky golden bell with a mint bow on top and two short ringing curves'],
+  ['me-install', '앱 설치', 'a chunky rounded smartphone in mint with a big white downward arrow on its screen']
+]);
+menu('메뉴 아이콘 5 (꾸미기 · 펫 잠금 · 빈 기록)', [
+  ['me-gacha', '모은 꾸미기', 'a small round toy capsule half open with a pink ribbon and a tiny sparkle popping out'],
+  ['pet-locked', '아직 못 만난 펫 (상점의 알)', 'a plain cream egg partly covered by a soft lavender cloth, a tiny sparkle, mysterious but friendly (no face, no question mark)'],
+  ['pet-legend-locked', '아직 못 만난 전설 펫', 'a dark navy egg silhouette with a thin glowing golden outline and three tiny gold stars around it (no face, no question mark)'],
+  ['empty-records', '아직 기록 없음', 'an empty mint clipboard with a small green sprout growing from its top clip']
+]);
+STYLE.scene = 'Style: premium cute 3D-painted mobile-game illustration, soft pastel colors with SUMUS mint green (#10B981) accents, gentle warm rim light, clean soft shading. One small object-group per cell (no characters, no scenery, no floor), slightly top-down front view, readable at 96 pixels, filling about 75% of its cell.';
+sheet(F8, '학습 · 시험 카드 그림', 'scene', null, [
+  ['ui-study-vocab', '단어 학습', 'a fan of three colorful word flash cards (blank, no letters) with a mint pencil and two small sparkles', 'public/assets/ui/study-vocab.webp'],
+  ['ui-study-grammar', '어법·어휘', 'an open notebook with a few soft colored highlighter stripes on its pages (no readable text) and a mint highlighter pen lying on it', 'public/assets/ui/study-grammar.webp'],
+  ['ui-exam-practice', '연습시험', 'a mint clipboard holding a sheet with three green check marks in a column and a short yellow pencil', 'public/assets/ui/exam-practice.webp'],
+  ['ui-exam-test', '실전시험', 'an answer sheet with rows of round bubbles (a few filled in dark gray), a pencil, and a small round gold medal with a red ribbon on its corner', 'public/assets/ui/exam-test.webp']
+]);
+sheet(F8, '추천 학습 · 카드 외우기', 'scene', null, [
+  ['ui-study-daily', '오늘의 추천 학습', 'a small stack of three books with a little mint flag planted on top and a warm small sun behind it', 'public/assets/ui/study-daily.webp'],
+  ['ui-flash-deck', '카드로 외우기', 'a neat fan of three flash cards: each card is white on the top half and mint green on the bottom half (like a cover over the bottom), no letters', 'public/assets/ui/flash-deck.webp'],
+  ['ui-flash-done', '다 외웠어요', 'the same white-and-mint flash cards tossed up joyfully with colorful confetti and a big round gold badge with a white check mark in front', 'public/assets/ui/flash-done.webp'],
+  ['ui-word-empty', '빈 단어 목록', 'an empty woven basket in soft cream with a single small golden star resting beside it, calm and friendly', 'public/assets/ui/word-empty.webp']
+]);
+sheet(F8, '성취 배지', 'emblem', 'round achievement medals of the same shape and size: a thick round medal with a soft beveled rim and a short ribbon at the top.', [
+  ['ui-badge-first100', '첫 100점', 'a GOLD medal with a big shining white star burst in the middle', 'public/assets/ui/badge-first100.webp'],
+  ['ui-badge-streak90', '3회 연속 90점+', 'a SILVER medal with three small orange flames in a row rising from left to right', 'public/assets/ui/badge-streak90.webp'],
+  ['ui-badge-english100', '영어쓰기 100점', 'a MINT-ENAMEL medal with a white fountain-pen nib in the middle and a few sparkles', 'public/assets/ui/badge-english100.webp'],
+  ['ui-badge-master', '범위 MASTER', 'a PURPLE-GEM medal with a small golden crown above a golden laurel wreath', 'public/assets/ui/badge-master.webp']
+]);
+
+sheet(F8, '결과 도장', 'emblem', 'round result stamps of the same size, like a teacher\'s cute reward stamp: a thick round badge with a scalloped rim and a soft glossy finish (no letters, no numbers).', [
+  ['ui-result-perfect', '결과 PERFECT (100점)', 'a GOLD scalloped stamp with a big shining star and a small crown on top, a few sparkles', 'public/assets/ui/result-perfect.webp'],
+  ['ui-result-great', '결과 아주 잘했어요 (80점+)', 'a MINT scalloped stamp with a big white thumbs-up and two small stars', 'public/assets/ui/result-great.webp'],
+  ['ui-result-good', '결과 잘했어요 (60점+)', 'a SKY-BLUE scalloped stamp with a big white smiling check mark', 'public/assets/ui/result-good.webp'],
+  ['ui-result-retry', '결과 다시 도전 (60점 미만)', 'a soft PEACH scalloped stamp with a white curved arrow going around in a circle and a small heart', 'public/assets/ui/result-retry.webp']
+]);
+
+/* Google Drive: 그림을 그리는 GPT는 Drive에서 참고 그림을 열어 보고, 결과를 Drive 폴더에 올려요.
+   규칙: 시트별 파일(split/)로 나가는 모든 주문서는 DRIVE에 폴더가 있어야 하고(없으면 멈춰요),
+   끝에 "이 폴더에 이 이름으로 올리기"가 붙어요. 처음 그리는 그림(08·09a)은 기존 그림을 열어 보고 그림체를 맞춰요. */
+const DRIVE = {
+  [F5]: 'SUMUS 에셋 05·06 (Runner용)', [F6]: 'SUMUS 에셋 05·06 (Runner용)',
+  [F7A]: 'SUMUS 전설 펫 07 (Runner용)', [F7B]: 'SUMUS 전설 펫 07 (Runner용)',
+  [F8]: 'SUMUS 메뉴·학습 08 (Runner용)',
+  [F9A]: 'SUMUS 새 기본 펫 09 (Runner용)', [F9B]: 'SUMUS 새 기본 펫 09 (Runner용)'
+};
+const PET_SPRITES = 'SUMUS_PET_SPRITES_ALL_20261002/original_1254';
+const KEEP = 'Do NOT make it softer, blurrier, foggier, more painterly or more watercolor-like than the reference.';
+const STYLE_REF = {
+  pets: `STYLE REFERENCE — before drawing, open these pictures in Google Drive and study them: the existing pets of this game in the Drive folder "${PET_SPRITES}" (the folders MONG, NABI, PINKY and BAMBOO, each with 01_baby.png, 02_grown.png and 03_final.png). Draw the new pet in exactly that art style: the same crisp, clean shapes and edges, the same clear soft pastel colors (not washed out, not hazy), the same glossy eyes with white highlights, the same light cel-like shading with a thin warm rim light, the same simple fur tufts and the same body proportions (big head, short legs). ${KEEP} Do NOT copy the reference animals.`,
+  icons: `STYLE REFERENCE — before drawing, open "06-3.png" and "06-4.png" in the Google Drive folder "${DRIVE[F6]}": they show game art already used in this app (capsule machine, ticket, jackpot, capsules). Draw the new icons in exactly that style: the same glossy 3D toy-like look, the same chunky rounded shapes, the same bright pastel-and-mint palette, the same clean edges and soft lighting. Do NOT copy the reference objects.`,
+  badges: `STYLE REFERENCE — before drawing, open "07a-5.png" in the Google Drive folder "${DRIVE[F7A]}" (legendary egg and badge) and "06-3.png" in the Google Drive folder "${DRIVE[F6]}" (jackpot): they show shiny game art already used in this app. Draw the new medals or stamps in exactly that style: the same shiny metal and gem rendering, the same clean outline and soft sparkles. Do NOT copy the reference objects.`
+};
+const refOf = p => p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
+const NEW_ORDER = Object.keys(NEW_PETS);
+const sheetName = (file, i) => `${file.slice(0, /^\d\d[ab]-/.test(file) ? 3 : 2)}-${i + 1}`;
+
 /* 쓰기 */
 const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
+const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B]);
+for (const [file, list] of byFile) list.forEach((p, i) => {
+  if (!SPLIT.has(file)) return;
+  if (!DRIVE[file]) throw new Error(`${file}: Google Drive 폴더(DRIVE)가 없어요. 주문서에는 업로드 위치가 꼭 있어야 해요.`);
+  let lines = p.text.split('\n');
+  const ref = refOf(p);
+  if (ref) {
+    lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
+    lines.splice(2, 0, STYLE_REF[ref]);
+    p.ref = `Drive: ${ref === 'pets' ? PET_SPRITES : ref === 'icons' ? '06-3.png, 06-4.png' : '07a-5.png, 06-3.png'}`;
+  }
+  // 메뉴 아이콘 2~5번 시트: 같은 세트의 첫 시트(08-1.png)와도 맞춰요.
+  if (file === F8 && ref === 'icons' && /메뉴 아이콘 [2-9]/.test(p.title)) lines.splice(3, 0, `Also open "08-1.png" in the same Google Drive folder "${DRIVE[F8]}" (the first icons of this set) if it is there, and match it exactly.`);
+  // 09b: 그 펫의 설정 시트(09a-N.png)를 Drive에서 열어 얼굴·무늬·크기를 맞춰요.
+  if (file === F9B) {
+    const keys = NEW_ORDER.filter(k => p.title.includes(NEW_PETS[k].ko));
+    const sheets = keys.map(k => `"09a-${NEW_ORDER.indexOf(k) + 1}.png"`).join(' and ');
+    lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
+    lines.splice(3, 0, `CHARACTER REFERENCE — before drawing, open ${sheets} (the design sheet${keys.length > 1 ? 's' : ''}: egg, baby, grown, final) in the Google Drive folder "${DRIVE[F9B]}" and match ${keys.length > 1 ? 'each egg' : 'this pet\'s face, colors, markings, accessories and the body size of this growth stage'} exactly. ${KEEP}`);
+    p.ref = `Drive: ${sheets}`;
+  }
+  const name = sheetName(file, i);
+  lines.push(`WHEN DONE — upload the finished transparent PNG to Google Drive, into the folder "${DRIVE[file]}", named exactly "${name}.png" (if a file with that name is already there, replace it). Actually save the file to Google Drive; showing the picture in the chat is not enough.`);
+  p.text = lines.join('\n');
+  p.drive = `${DRIVE[file]} / ${name}.png`;
+});
 for (const [file, list] of byFile) writeFileSync(resolve(here, file), list.map(p => p.text).join('\n---\n') + '\n');
 writeFileSync(resolve(here, '00-all-in-order.txt'), prompts.map(p => p.text).join('\n---\n') + '\n');
 // Sheets that each need their own chat (their own reference picture) also go one per file in split/.
-const SPLIT = new Set([F5, F6, F7A, F7B]);
 mkdirSync(resolve(here, 'split'), { recursive: true });
-for (const [file, list] of byFile) if (SPLIT.has(file)) list.forEach((p, i) => writeFileSync(resolve(here, 'split', `${file.slice(0, file.startsWith('07') ? 3 : 2)}-${i + 1} ${p.title.replace(/[\\/:*?"<>|()]/g, '').replace(/\s+/g, ' ').trim()}.txt`), p.text + '\n'));
+for (const [file, list] of byFile) if (SPLIT.has(file)) list.forEach((p, i) => writeFileSync(resolve(here, 'split', `${sheetName(file, i)} ${p.title.replace(/[\\/:*?"<>|()]/g, '').replace(/\s+/g, ' ').trim()}.txt`), p.text + '\n'));
 const csv = v => `"${String(v).replace(/"/g, '""')}"`;
 writeFileSync(resolve(here, 'slice-map.csv'), '﻿' + ['list,prompt_no,sheet,cell,key,name,app_file', ...slices.map(s => [s.file, String(s.no).padStart(3, '0'), s.title, s.cell, s.key, s.name, s.out].map(csv).join(','))].join('\n') + '\n');
 console.log([...byFile].map(([f, l]) => `${f}: ${l.length} prompts → ${l.length * 4} images`).join('\n'));

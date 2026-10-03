@@ -5,7 +5,7 @@ import { getRanges } from './student.js';
 import { petJosa } from './pet-moments.js';
 import { startPractice } from './sessions.js';
 import { TITLES, TITLE_KEYS, titleProgress } from './titles.js';
-import { titleBadge, titleEmblem, tierEmblem, coin, trophy } from './emblems.js';
+import { titleBadge, titleEmblem, tierEmblem, coin, trophy, artOr } from './emblems.js';
 import { titleState, openTitleDetail } from './titles-ui.js';
 import { mountLeagueBoard, clearLeagueCache, shownTitle } from './league-ui.js';
 import { createPracticeMatch, practiceQuestions, BOT_LEVELS } from './battle-bot.js';
@@ -233,7 +233,7 @@ function playTab(h) {
     <section class="yb-card">
       <h2>대결 준비</h2>
       <div class="yb-label">대결 방식</div>
-      <div class="yb-modes" role="group" aria-label="대결 방식">${Object.entries(BATTLE_MODES).map(([key, m]) => `<button type="button" class="yb-mode ${key} ${B.mode === key ? 'on' : ''}" data-yb="mode" data-mode="${key}" aria-pressed="${B.mode === key}"><span class="yb-mode-ico">${MODE_ICONS[key]}</span><b>${m.name}</b><small>${m.desc}</small></button>`).join('')}</div>
+      <div class="yb-modes" role="group" aria-label="대결 방식">${Object.entries(BATTLE_MODES).map(([key, m]) => `<button type="button" class="yb-mode ${key} ${B.mode === key ? 'on' : ''}" data-yb="mode" data-mode="${key}" aria-pressed="${B.mode === key}"><span class="yb-mode-ico">${artOr('mode-' + key, MODE_ICONS[key], 'mode-art')}</span><b>${m.name}</b><small>${m.desc}</small></button>`).join('')}</div>
       <p class="yb-note yb-mode-note">${B.mode === 'skill' ? '두 문제에 한 번은 <b>뜻을 보고 철자를 써요</b>. 쓰기 정답은 두 배로 세고, 빠르기는 조금만 더해요. 2분 동안 겨뤄요.' : '뜻 고르기 4지선다예요. <b>빨리 맞힐수록</b> 세게 공격해요. 1분 30초 동안 겨뤄요.'}</p>
       <div class="yb-label">단어 범위 <small>${B.ranges.size ? `${B.ranges.size}개 범위 · ${selectedWords}단어` : '범위를 골라주세요'}</small></div>
       <div class="yb-ranges">${codes.map(c => `<button type="button" class="yb-chip ${B.ranges.has(c) ? 'on' : ''}" data-yb="range" data-code="${esc(c)}" aria-pressed="${B.ranges.has(c)}">${esc(rangeLabel(A.data.profile.school, c))}<small>${counts.get(c) || 0}</small></button>`).join('') || '<p class="yb-muted">학습할 단어 범위가 없어요.</p>'}</div>

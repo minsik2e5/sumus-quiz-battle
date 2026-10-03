@@ -5,3 +5,4 @@ TOP-LEFT cell: ROCK: a tight closed fist, knuckles facing right toward the oppon
 TOP-RIGHT cell: SCISSORS: index and middle fingers stretched straight forward to the right in a V shape, the other fingers folded
 BOTTOM-LEFT cell: PAPER: an open flat hand, all five fingers stretched straight forward to the right and slightly spread, palm facing down
 BOTTOM-RIGHT cell: GIVE UP: the hand holds a small white flag on a short stick, the flag waving, a tiny sweat drop (used when 로보 loses big)
+WHEN DONE — upload the finished transparent PNG to Google Drive, into the folder "SUMUS 에셋 05·06 (Runner용)", named exactly "05-1.png" (if a file with that name is already there, replace it). Actually save the file to Google Drive; showing the picture in the chat is not enough.

@@ -1,19 +1,22 @@
-import { CHARACTERS, STANDARD_PET_KEYS, ACCESSORIES, FRAMES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, petForm, unlocked, levelInfo, dayKey, cardTier, testDurationSec, TEST_LEAVE_LIMIT } from './core.js';
+import { CHARACTERS, STANDARD_PET_KEYS, LEGENDARY_PET_KEYS, ACCESSORIES, FRAMES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, petForm, unlocked, levelInfo, dayKey, cardTier, testDurationSec, TEST_LEAVE_LIMIT } from './core.js';
 import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar, petKey, RUN_SHEETS } from './character.js';
 import { knownWords } from './flashcards.js';
 import { petDisplayName, petJosa } from './pet-moments.js';
 import { TITLES, TITLE_KEYS } from './titles.js';
-import { titleBadge, titleEmblem, tierEmblem, coin, trophy, uiArt } from './emblems.js';
+import { titleBadge, titleEmblem, tierEmblem, coin, trophy, uiArt, artOr } from './emblems.js';
 import { titlesPage, titleState, titleCount } from './titles-ui.js';
 import { tournamentCard } from './tournament-ui.js';
 import { shownTitle } from './league-ui.js';
 import { arcadePage, gachaBookPage, capsuleArt } from './arcade.js';
+import { petBookPage } from './petbook.js';
 import { ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, GACHA_ITEMS, GACHA_TIERS } from './rewards.js';
 // V13.68 menu: what students do. 학습 holds word study, tests and records; 나 holds what they
 // collect. Pages without their own button light up the one they belong to.
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['yacha', '야차전', 'battle'], ['arcade', '놀이터', 'arcade'], ['me', '나', 'user']];
-const NAV_OF = { exam: 'practice', records: 'practice', ranking: 'home', studio: 'me', titles: 'me', gachabook: 'me' };
+// V13.91 drawn menu icons (asset list 08-1·2), used once they are in ART_READY.
+const NAV_ART = { home: 'nav-home', practice: 'nav-study', yacha: 'nav-yacha', arcade: 'nav-arcade', me: 'nav-me' };
+const NAV_OF = { exam: 'practice', records: 'practice', ranking: 'home', studio: 'me', titles: 'me', gachabook: 'me', petbook: 'me' };
 // V13.70 the ranking also opens from 나 (A.rankFrom), and then belongs to 나.
 export const navOf = (tab, A = null) => tab === 'ranking' && A?.rankFrom === 'me' ? 'me' : NAV_OF[tab] || tab;
 // V13.66: coins (코인) sit in the header on every tab; tapping opens the wallet.
@@ -23,10 +26,10 @@ function coinChip(A) {
 }
 export function shell(A, content) {
   const p = A.data.profile;
-  return `<div class="student-app"><main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div>${p.preview_owner_id ? '<button class="preview-exit-v1359" data-action="exit-student-preview">← 교사 화면</button>' : ''}${A.data.stats?.needs_pet_pick ? '' : coinChip(A)}<button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${navOf(A.tab, A) === id ? 'active' : ''}" ${navOf(A.tab, A) === id ? 'aria-current="page"' : ''}>${icon(i)}<span>${name}</span></button>`).join('')}</nav></div>`;
+  return `<div class="student-app"><main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div>${p.preview_owner_id ? '<button class="preview-exit-v1359" data-action="exit-student-preview">← 교사 화면</button>' : ''}${A.data.stats?.needs_pet_pick ? '' : coinChip(A)}<button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${navOf(A.tab, A) === id ? 'active' : ''}" ${navOf(A.tab, A) === id ? 'aria-current="page"' : ''}>${artOr(NAV_ART[id], icon(i), 'nav-art')}<span>${name}</span></button>`).join('')}</nav></div>`;
 }
 export function studentPage(A) {
-  return shell(A, ({ home, practice, exam, ranking, records, studio, titles: titlesPage, arcade: arcadePage, yacha: yachaPage, me: mePage, gachabook: gachaBookPage }[A.tab] || home)(A));
+  return shell(A, ({ home, practice, exam, ranking, records, studio, titles: titlesPage, arcade: arcadePage, yacha: yachaPage, me: mePage, gachabook: gachaBookPage, petbook: petBookPage }[A.tab] || home)(A));
 }
 export function getRanges(A, school = A.school, grade = null) {
   const books = A.data.books.filter(book => !grade || !book.grade || book.grade === grade);
@@ -182,19 +185,19 @@ function achievementBadges(A) {
   for (const item of history) { if (!item.visible || !item.final || item.score === null) { streak = 0; continue; } streak = item.score >= 90 ? streak + 1 : 0; if (streak >= 3) { streak90 = true; break; } }
   const english100 = history.some(item => item.visible && item.final && item.score === 100 && (item.mode === 'spell' || item.mode === 'write_en'));
   const badges = [
-    { key: 'first100', label: '첫 100점', detail: '처음으로 100점을 달성했어요', earned: first100, icon: 'sparkle' },
-    { key: 'streak90', label: '3회 연속 90점+', detail: '세 번 연속 90점 이상', earned: streak90, icon: 'flame' },
-    { key: 'english100', label: '영어쓰기 100점', detail: '영어 직접 쓰기 만점', earned: english100, icon: 'records' }
+    { key: 'first100', label: '첫 100점', detail: '처음으로 100점을 달성했어요', earned: first100, icon: 'sparkle', art: 'badge-first100' },
+    { key: 'streak90', label: '3회 연속 90점+', detail: '세 번 연속 90점 이상', earned: streak90, icon: 'flame', art: 'badge-streak90' },
+    { key: 'english100', label: '영어쓰기 100점', detail: '영어 직접 쓰기 만점', earned: english100, icon: 'records', art: 'badge-english100' }
   ];
   const mastered = Object.values(A.data.word_mastery?.ranges || {}).filter(state => ['master','perfect'].includes(state.status)).sort((a,b) => String(a.range_code).localeCompare(String(b.range_code), 'ko', { numeric: true }));
-  for (const state of mastered) badges.push({ key: 'master-' + state.range_code, label: `${A.data.profile.division === 'middle' ? state.range_code + '과' : rangeLabel(A.school, state.range_code)} MASTER`, detail: state.status === 'perfect' ? '정답률 100% 완전 정복' : '최근 성취 95% 이상', earned: true, icon: 'check' });
+  for (const state of mastered) badges.push({ key: 'master-' + state.range_code, label: `${A.data.profile.division === 'middle' ? state.range_code + '과' : rangeLabel(A.school, state.range_code)} MASTER`, detail: state.status === 'perfect' ? '정답률 100% 완전 정복' : '최근 성취 95% 이상', earned: true, icon: 'check', art: 'badge-master' });
   return badges;
 }
 function achievementSection(A, full = false) {
   const badges = achievementBadges(A);
   const visible = full ? badges : [...badges.filter(item => item.earned), ...badges.filter(item => !item.earned)].slice(0, 4);
   const earned = badges.filter(item => item.earned).length;
-  return `<div class="section-title"><h2>성취 배지</h2>${full ? `<span class="tiny muted">${earned}개 달성</span>` : '<button class="text-button" data-go="records">전체 보기 ' + icon('chevron') + '</button>'}</div><div class="achievement-grid">${visible.map(item => `<div class="achievement-badge ${item.earned ? 'earned' : 'locked'}"><span>${icon(item.earned ? item.icon : 'lock')}</span><div><b>${esc(item.label)}</b><small>${esc(item.earned ? item.detail : '아직 도전 중')}</small></div></div>`).join('')}</div>`;
+  return `<div class="section-title"><h2>성취 배지</h2>${full ? `<span class="tiny muted">${earned}개 달성</span>` : '<button class="text-button" data-go="records">전체 보기 ' + icon('chevron') + '</button>'}</div><div class="achievement-grid">${visible.map(item => `<div class="achievement-badge ${item.earned ? 'earned' : 'locked'}"><span>${item.earned ? artOr(item.art, icon(item.icon), 'badge-art') : icon('lock')}</span><div><b>${esc(item.label)}</b><small>${esc(item.earned ? item.detail : '아직 도전 중')}</small></div></div>`).join('')}</div>`;
 }
 // Progress bar inside the home button, e.g. "8/20".
 function homeProgress(done, goal, label) {
@@ -454,6 +457,23 @@ function pushPrompt(A) {
   try { if (Number(localStorage.getItem('sumus:push-later') || 0) > Date.now()) return ''; } catch {}
   return `<section class="push-prompt-v1377"><span class="push-bell" aria-hidden="true">${uiArt('bell')}</span><div><b>알림 켜기</b><small>선생님 공지·도전장·선물을 바로 알려 줄게요</small></div><button type="button" class="btn primary small" data-action="push-on">켜기</button><button type="button" class="push-later" data-action="push-later" aria-label="나중에">나중에</button></section>`;
 }
+// V13.91 an empty list with its drawn picture (asset list 08-8) once it is in ART_READY.
+const emptyArt = (art, name, title, sub = '') => `<div class="empty-state">${artOr(art, icon(name), 'empty-art')}<h3>${title}</h3>${sub ? `<p>${sub}</p>` : ''}</div>`;
+// V13.91 나 메뉴판: everything else the student can open, as one grid of app-style icons.
+function meMenu(A, { gachaHave, att }) {
+  const s = pushSupport(), stars = (A.memStars || []).length;
+  const item = (attrs, art, label, note = '') => `<button type="button" class="me-menu-item" ${attrs}><span class="me-menu-art">${art}</span><b>${label}</b>${note ? `<small>${note}</small>` : ''}</button>`;
+  const items = [
+    item('data-go="records"', artOr('me-records', icon('records')), '내 기록'),
+    att.done ? item('data-go="home"', artOr('me-attendance', uiArt('attendance')), '출석 도장', att.streak >= 2 ? `${att.streak}일 연속` : '오늘 완료') : item('data-action="attend"', artOr('me-attendance', uiArt('attendance')), '출석 도장', '<i class="me-menu-dot">오늘 아직</i>'),
+    item('data-action="me-stars"', artOr('me-stars', uiArt('star-word')), '어려운 단어', stars ? `★ ${num(stars)}개` : ''),
+    item('data-action="me-notify"', artOr('me-notify', uiArt('bell')), '알림', A.pushHere ? '켜짐' : '꺼짐'),
+    gachaHave ? item('data-go="gachabook"', artOr('me-gacha', icon('arcade')), '모은 꾸미기', `${gachaHave}개`) : '',
+    !s.installed ? `<a class="me-menu-item" href="/install"><span class="me-menu-art">${artOr('me-install', uiArt('install'))}</span><b>앱 설치</b></a>` : '',
+    item('data-action="account"', artOr('me-settings', icon('shield')), '계정·설정')
+  ].filter(Boolean);
+  return `<section class="me-menu-v1391" aria-label="메뉴"><h2>메뉴</h2><div class="me-menu-grid">${items.join('')}</div></section>`;
+}
 function meNotify(A) {
   const s = pushSupport(), push = A.data.push || {};
   const here = A.pushHere === true;
@@ -465,8 +485,7 @@ function meNotify(A) {
     <label class="push-row"><span><b>저녁 7시 공부 알림</b><small>오늘 공부를 안 했으면 한 번 알려 줘요</small></span><input type="checkbox" class="switch" data-push-daily ${push.daily !== false ? 'checked' : ''}></label>
     <button type="button" class="text-button" data-action="push-off">이 휴대폰 알림 끄기</button>`;
   else body = `<p>선생님 공지, 친구의 도전장, 선물, 저녁 공부 알림을 받아요.</p><button type="button" class="btn primary full" data-action="push-on">🔔 알림 켜기</button>`;
-  const install = !s.installed ? `<a class="me-install-v1377" href="/install"><span class="me-install-art" aria-hidden="true">${uiArt('install')}</span><span><b>앱으로 설치하기</b><small>홈 화면 아이콘으로 바로 열려요</small></span>${icon('chevron')}</a>` : '';
-  return `<section class="me-notify-v1377" aria-label="알림"><h2>알림</h2>${body}</section>${install}`;
+  return `<section class="me-notify-v1377" id="me-notify" aria-label="알림"><h2>알림</h2>${body}</section>`;
 }
 // V13.76 ⭐ 어려운 단어: the starred words of this school and grade, practised together.
 export function starredWords(A) {
@@ -486,12 +505,12 @@ function studyHub(A) {
   ${studyDailyCard(A)}
   <div class="study-hub-grid study-hub-simple">
     <button class="study-hub-card vocab" data-study="vocab">
-      <span class="study-hub-icon">${icon('practice')}</span>
+      <span class="study-hub-icon">${artOr('study-vocab', icon('practice'), 'hub-art')}</span>
       <div><span class="pill green">VOCAB</span><h2>단어 학습</h2></div>
       <span class="study-hub-arrow">${icon('arrow')}</span>
     </button>
     <button class="study-hub-card grammar" data-study="grammar">
-      <span class="study-hub-icon">${icon('records')}</span>
+      <span class="study-hub-icon">${artOr('study-grammar', icon('records'), 'hub-art')}</span>
       <div><span class="pill">GRAMMAR</span><h2>어법·어휘</h2></div>
       <span class="study-hub-arrow">${icon('arrow')}</span>
     </button>
@@ -616,7 +635,7 @@ function flashcardEntry(A, visible) {
   if (!visible.length) return '';
   const known = knownWords(A.data.profile.id), done = visible.filter(word => known.has(word.id)).length;
   const pct = Math.round(done / visible.length * 100);
-  return `<button type="button" class="fc-entry-v1390" data-flashcards="true"><span class="fc-entry-art" aria-hidden="true"><i></i><i></i><i></i></span><span class="fc-entry-text"><small>뜻을 가리고 한 장씩</small><strong>카드로 외우기</strong><em>${done ? `외운 단어 ${done}/${visible.length}` : `${visible.length}장 · 커버를 내려서 확인해요`}</em>${done ? `<span class="fc-entry-bar" aria-hidden="true"><i style="width:${pct}%"></i></span>` : ''}</span><b>${icon('arrow')}</b></button>`;
+  return `<button type="button" class="fc-entry-v1390" data-flashcards="true"><span class="fc-entry-art" aria-hidden="true">${artOr('flash-deck', '<i></i><i></i><i></i>')}</span><span class="fc-entry-text"><small>뜻을 가리고 한 장씩</small><strong>카드로 외우기</strong><em>${done ? `외운 단어 ${done}/${visible.length}` : `${visible.length}장 · 커버를 내려서 확인해요`}</em>${done ? `<span class="fc-entry-bar" aria-hidden="true"><i style="width:${pct}%"></i></span>` : ''}</span><b>${icon('arrow')}</b></button>`;
 }
 function memorizationPanel(A) {
   const middle = A.data.profile.division === 'middle';
@@ -669,7 +688,7 @@ function memorizationPanel(A) {
           <button class="memorize-word" data-memorize-word="${esc(word.id)}" aria-label="${esc(word.word)} ${show ? '영어 보기' : '뜻 보기'}"><span class="memorize-no">${index + 1}</span><strong>${esc(front)}</strong></button>
           <button class="memorize-sound" data-memorize-speak="${esc(word.id)}" aria-label="${esc(word.word)} 발음 듣기">${icon('sound')}</button>
         </div>`;
-      }).join('') : `<div class="memorize-empty">${starredOnly ? '이 범위에 ★ 표시한 단어가 없어요. 헷갈리는 단어의 ☆를 눌러 모아 두세요.' : '표시할 단어가 없어요. 범위를 선택해주세요.'}</div>`}</div>
+      }).join('') : `<div class="memorize-empty">${artOr('word-empty', '', 'empty-art')}${starredOnly ? '이 범위에 ★ 표시한 단어가 없어요. 헷갈리는 단어의 ☆를 눌러 모아 두세요.' : '표시할 단어가 없어요. 범위를 선택해주세요.'}</div>`}</div>
     </section>`;
 }
 function durationText(seconds) {
@@ -697,7 +716,7 @@ function studyDailyCard(A) {
   if (!(daily?.target > 0)) return '';
   const goal = Number(daily.goal_today || daily.target), done = Number(daily.done_today || 0), mix = daily.mix || {};
   if (daily.completed_today) return `<button type="button" class="home-next-v1358 is-done-v1363 study-daily-v1371" data-quick-practice="true"><span><small>오늘의 추천 학습</small><strong>오늘 목표 달성!</strong><em>더 풀면 새로 필요한 단어를 골라줘요.</em>${homeProgress(goal, goal, '오늘 학습')}</span><b>한 번 더 하기 ${icon('arrow')}</b></button>`;
-  return `<button type="button" class="home-next-v1358 study-daily-v1371" data-quick-practice="true"><span><small>오늘의 추천 학습</small><strong>${done > 0 ? `오늘 ${goal - done}개 남았어요` : `오늘은 ${daily.target}개만 끝내요`}</strong><em>오답 ${mix.wrong || 0} · 복습 ${mix.review || 0} · 새 단어 ${mix.new || 0}</em>${homeProgress(done, goal, '오늘 학습')}</span><b>${done > 0 ? '오늘 학습 계속' : '오늘 학습 시작'} ${icon('arrow')}</b></button>`;
+  return `<button type="button" class="home-next-v1358 study-daily-v1371" data-quick-practice="true">${artOr('study-daily', '', 'daily-art')}<span><small>오늘의 추천 학습</small><strong>${done > 0 ? `오늘 ${goal - done}개 남았어요` : `오늘은 ${daily.target}개만 끝내요`}</strong><em>오답 ${mix.wrong || 0} · 복습 ${mix.review || 0} · 새 단어 ${mix.new || 0}</em>${homeProgress(done, goal, '오늘 학습')}</span><b>${done > 0 ? '오늘 학습 계속' : '오늘 학습 시작'} ${icon('arrow')}</b></button>`;
 }
 function practice(A) {
   if (A.studyView === 'vocab') return vocabPractice(A);
@@ -730,12 +749,13 @@ function mePage(A) {
       <span class="me-pet">${pet ? avatar(pet.key, { form: Math.max(1, pet.form), accessory: p.avatar_accessory, frame: p.avatar_frame }) : ''}</span>
       <div class="me-who"><strong>${esc(p.display_name)}</strong><small>${esc(p.school || '')} · ${esc(p.class_name || '')} · Lv.${num(g.level || 1)}</small>${titleBadge(t.equipped, { size: 'sm' })}</div>
     </section>
-    <div class="me-tiles-v1368${gachaHave ? ' four' : ''}">
-      <button type="button" class="me-tile pet" data-go="studio"><span class="me-ico">${icon('user')}</span><b>내 펫·꾸미기</b><small>펫 ${owned}/${Object.keys(CHARACTERS).length}</small></button>
-      <button type="button" class="me-tile rank" data-go="ranking" data-from="me" data-rank-grade="${esc((A.data.ranking || []).find(r => r.is_me)?.grade || '')}"><span class="me-ico">${icon('ranking')}</span><b>랭킹</b><small>${myRankLine(A)}</small></button>
-      <button type="button" class="me-tile titles" data-go="titles"><span class="me-ico">${icon('star')}</span><b>칭호 도감</b><small>${titleCount(A)}${(t.fresh || []).length ? ' · <i class="me-new">NEW</i>' : ''}</small></button>
-      ${gachaHave ? `<button type="button" class="me-tile gacha" data-go="gachabook"><span class="me-ico">${icon('arcade')}</span><b>모은 꾸미기</b><small>${gachaHave}개</small></button>` : ''}
+    <div class="me-tiles-v1368 four">
+      <button type="button" class="me-tile pet" data-go="studio"><span class="me-ico">${artOr('me-pets', icon('user'))}</span><b>내 펫·꾸미기</b><small>펫 ${owned}/${Object.keys(CHARACTERS).length}</small></button>
+      <button type="button" class="me-tile rank" data-go="ranking" data-from="me" data-rank-grade="${esc((A.data.ranking || []).find(r => r.is_me)?.grade || '')}"><span class="me-ico">${artOr('me-ranking', icon('ranking'))}</span><b>랭킹</b><small>${myRankLine(A)}</small></button>
+      <button type="button" class="me-tile titles" data-go="titles"><span class="me-ico">${artOr('me-titles', icon('star'))}</span><b>칭호 도감</b><small>${titleCount(A)}${(t.fresh || []).length ? ' · <i class="me-new">NEW</i>' : ''}</small></button>
+      <button type="button" class="me-tile petbook" data-go="petbook"><span class="me-ico">${artOr('me-petbook', icon('sparkle'))}</span><b>펫 도감</b><small>${owned}/${STANDARD_PET_KEYS.length + LEGENDARY_PET_KEYS.length}마리</small></button>
     </div>
+    ${meMenu(A, { gachaHave, att })}
     <section class="me-stats-v1368" aria-label="내 기록">
       <div><b>${num(g.streak || 0)}<small>일</small></b><span>연속 학습</span></div>
       <div><b>${num(att.total || 0)}<small>번</small></b><span>출석</span></div>
@@ -760,8 +780,8 @@ function exam(A) {
   if (!A.examKind) {
     return `${studyTabs(A)}<div class="page-heading exam-choice-heading premium-page-heading"><span class="premium-eyebrow">TEST</span><h1>시험</h1></div>
       <div class="exam-kind-grid">
-        <button class="exam-kind-card practice" data-exam-kind="practice"><span class="square-icon">${icon('practice')}</span><div><span class="pill green">PRACTICE</span><h2>연습시험</h2><p>문제마다 바로 채점</p></div>${icon('arrow')}</button>
-        <button class="exam-kind-card test" data-exam-kind="test"><span class="square-icon">${icon('exam')}</span><div><span class="pill">TEST</span><h2>실전시험</h2><p>마지막에 한꺼번에 채점</p></div>${icon('arrow')}</button>
+        <button class="exam-kind-card practice" data-exam-kind="practice"><span class="square-icon">${artOr('exam-practice', icon('practice'), 'hub-art')}</span><div><span class="pill green">PRACTICE</span><h2>연습시험</h2><p>문제마다 바로 채점</p></div>${icon('arrow')}</button>
+        <button class="exam-kind-card test" data-exam-kind="test"><span class="square-icon">${artOr('exam-test', icon('exam'), 'hub-art')}</span><div><span class="pill">TEST</span><h2>실전시험</h2><p>마지막에 한꺼번에 채점</p></div>${icon('arrow')}</button>
       </div>`;
   }
   if (!['write_meaning','spell','eng2mean','mean2eng'].includes(A.mode)) A.mode = 'write_meaning';
@@ -873,7 +893,7 @@ function ranking(A) {
     ${modeNote ? `<p class="rank-mode-note-v1366">${coin()} ${esc(modeNote)}</p>` : ''}
     ${myIndex >= 0 ? `<div class="my-rank-card"><span>내 ${scopeLabel} 순위</span><strong>${rankNo(items[myIndex])}<small>위</small></strong><p>${rankScore(items[myIndex][metric], mode)} · ${esc(periodTitle)}</p></div>` : ''}
     ${showPodium ? podium(items.slice(0, 3), metric, mode, rankNo) : ''}
-    <div class="rank-list">${rows.length ? rows.map((p, index) => `<div class="rank-row ${p.is_me ? 'me' : ''} ${!showPodium && index < 3 && Number(p[metric] || 0) ? 'top-rank top-' + (index + 1) : ''}"><span class="rank-number">${rankNo(p)}</span>${avatar(p.avatar_key, { size: 'mini', form: p.private ? 1 : Math.max(1, p.pet_form ?? petForm(p.level)) })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill green">나</span>' : ''}</strong><small><span class="rank-grade">${esc(p.grade || '')}</span> · ${p.private ? '프로필 비공개' : `Lv.${p.level} · ${esc(p.pet_name || CHARACTERS[petKey(p.avatar_key)].ko)}`}</small>${shownTitle(p.title) ? `<span class="rank-title-v1366">${titleBadge(p.title, { size: 'xs' })}</span>` : ''}</div><span class="rank-score">${rankScore(p[metric], mode)}</span></div>`).join('') : showPodium ? '' : empty('ranking', `${scopeLabel}에 아직 연습 기록이 없어요`, '학습을 시작하면 순위가 바로 생겨요.')}</div>
+    <div class="rank-list">${rows.length ? rows.map((p, index) => `<div class="rank-row ${p.is_me ? 'me' : ''} ${!showPodium && index < 3 && Number(p[metric] || 0) ? 'top-rank top-' + (index + 1) : ''}"><span class="rank-number">${rankNo(p)}</span>${avatar(p.avatar_key, { size: 'mini', form: p.private ? 1 : Math.max(1, p.pet_form ?? petForm(p.level)) })}<div class="grow"><strong>${esc(p.display_name)} ${p.is_me ? '<span class="pill green">나</span>' : ''}</strong><small><span class="rank-grade">${esc(p.grade || '')}</span> · ${p.private ? '프로필 비공개' : `Lv.${p.level} · ${esc(p.pet_name || CHARACTERS[petKey(p.avatar_key)].ko)}`}</small>${shownTitle(p.title) ? `<span class="rank-title-v1366">${titleBadge(p.title, { size: 'xs' })}</span>` : ''}</div><span class="rank-score">${rankScore(p[metric], mode)}</span></div>`).join('') : showPodium ? '' : emptyArt('empty-records', 'ranking', `${scopeLabel}에 아직 연습 기록이 없어요`, '학습을 시작하면 순위가 바로 생겨요.')}</div>
     <p class="quiet-note">주간 기록은 매주 월요일 새로 시작하고 통합 기록은 계속 누적돼요. 시험 성적은 랭킹에 포함하지 않아요.</p>`;
 }
 function records(A) {
@@ -914,7 +934,7 @@ function records(A) {
     <section class="record-summary-v1327"><div class="record-summary-main"><span>이번 주 평균</span><strong>${weeklyAvg === null ? '—' : weeklyAvg}<small>${weeklyAvg === null ? '' : '점'}</small></strong><p>${weeklyScores.length}회 학습 기록</p></div><div class="record-summary-side"><div><span>최고 점수</span><b>${best === null ? '—' : best + '점'}</b></div><div><span>누적 학습</span><b>${combined.length}회</b></div><div><span>누적 문제</span><b>${num(totalQuestions)}</b></div></div></section>
     <section class="record-achievements-v1327">${achievementSection(A, true)}</section>
     <div class="segment record-filter-v1327"><button data-record-tab="all" class="${tab === 'all' ? 'selected' : ''}">전체</button><button data-record-tab="selftest" class="${tab === 'selftest' ? 'selected' : ''}">실전</button><button data-record-tab="practice" class="${tab === 'practice' ? 'selected' : ''}">연습</button></div>
-    <div class="record-timeline-v1327">${visible.length ? visible.map(rowHtml).join('') : empty('records','아직 기록이 없어요','첫 학습을 마치면 여기에 기록이 쌓여요.')}</div>`;
+    <div class="record-timeline-v1327">${visible.length ? visible.map(rowHtml).join('') : emptyArt('empty-records', 'records', '아직 기록이 없어요', '첫 학습을 마치면 여기에 기록이 쌓여요.')}</div>`;
 }
 // First pet: chosen once. It starts with all the XP the student has already earned.
 function petPicker(A) {
@@ -933,7 +953,7 @@ function studio(A) {
   const missing = STANDARD_PET_KEYS.filter(key => !owned.some(x => x.key === key));
   const petCard = key => {
     const pet = owned.find(x => x.key === key);
-    if (!pet) return `<div class="character-option pet-locked" aria-label="${CHARACTERS[key].type}, 아직 만나지 못했어요"><span class="pet-locked-art">?</span><b>???</b><small>${CHARACTERS[key].legendary ? '행운 뽑기 전용' : '상점의 알'}</small></div>`;
+    if (!pet) return `<div class="character-option pet-locked" aria-label="${CHARACTERS[key].type}, 아직 만나지 못했어요"><span class="pet-locked-art">${artOr(CHARACTERS[key].legendary ? 'pet-legend-locked' : 'pet-locked', '?', 'locked-art')}</span><b>???</b><small>${CHARACTERS[key].legendary ? '행운 뽑기 전용' : '상점의 알'}</small></div>`;
     return `<button data-style="avatar_key" data-value="${key}" class="character-option ${s.avatar_key === key ? 'selected' : ''}" aria-pressed="${s.avatar_key === key}">${avatar(key, { form: pet.form })}<b>${esc(petDisplayName(pet))}</b><small>${pet.form ? `Lv.${pet.level} · ${PET_FORMS[pet.form]}` : '알'}</small></button>`;
   };
   const shop = `<button type="button" class="pet-shop-banner" data-action="egg-shop"><span class="pet-shop-banner-egg" aria-hidden="true">?</span><span><strong>랜덤 알 상점</strong><small>${missing.length ? `${num(EGG_PRICE)}코인 · 상점에서 아직 못 만난 친구 ${missing.length}마리` : '상점 펫을 모두 모았어요!'}</small></span><b>${coin()}${num(g.points_balance || 0)}</b></button>`;

@@ -5,3 +5,4 @@ TOP-LEFT cell: ROCK: a tight closed fist, knuckles facing left toward the oppone
 TOP-RIGHT cell: SCISSORS: index and middle fingers stretched straight forward to the left in a V shape, the other fingers folded
 BOTTOM-LEFT cell: PAPER: an open flat hand, all five fingers stretched straight forward to the left and slightly spread, palm facing down
 BOTTOM-RIGHT cell: THUMBS UP: a fist with the thumb pointing straight up, a few small sparkles (used when taking the coins)
+WHEN DONE — upload the finished transparent PNG to Google Drive, into the folder "SUMUS 에셋 05·06 (Runner용)", named exactly "05-2.png" (if a file with that name is already there, replace it). Actually save the file to Google Drive; showing the picture in the chat is not enough.
