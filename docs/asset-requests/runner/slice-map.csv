@@ -483,3 +483,7 @@
 "08-menu-learning.txt","121","결과 도장","오른쪽 위","ui-result-great","결과 아주 잘했어요 (80점+)","public/assets/ui/result-great.webp"
 "08-menu-learning.txt","121","결과 도장","왼쪽 아래","ui-result-good","결과 잘했어요 (60점+)","public/assets/ui/result-good.webp"
 "08-menu-learning.txt","121","결과 도장","오른쪽 아래","ui-result-retry","결과 다시 도전 (60점 미만)","public/assets/ui/result-retry.webp"
+"08-menu-learning.txt","122","메뉴 아이콘 6 (펫 도감 · 영웅 펫)","왼쪽 위","ui-me-petbook","펫 도감","public/assets/ui/me-petbook.webp"
+"08-menu-learning.txt","122","메뉴 아이콘 6 (펫 도감 · 영웅 펫)","오른쪽 위","ui-pet-epic-locked","아직 못 만난 영웅 펫","public/assets/ui/pet-epic-locked.webp"
+"08-menu-learning.txt","122","메뉴 아이콘 6 (펫 도감 · 영웅 펫)","왼쪽 아래","ui-epic-egg","영웅 알 (알 상점)","public/assets/ui/epic-egg.webp"
+"08-menu-learning.txt","122","메뉴 아이콘 6 (펫 도감 · 영웅 펫)","오른쪽 아래","ui-epic-badge","영웅 배지","public/assets/ui/epic-badge.webp"

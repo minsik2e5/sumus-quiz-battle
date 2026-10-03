@@ -1,6 +1,7 @@
 import { $, api, esc, num, toast } from './ui.js';
 import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, STANDARD_PET_KEYS, EPIC_PET_KEYS, cleanPetName } from './core.js';
 import { epicShow } from './lucky.js';
+import { uiArt, ART_READY } from './emblems.js';
 import { avatar, petKey } from './character.js';
 
 // Pet moments: the hatch (egg -> baby) and evolution scenes shown on the home screen the
@@ -230,7 +231,7 @@ export function openEggShop(A, onChanged, kind = 'basic') {
     const short = Math.max(0, egg.price - Number(g.points_balance || 0));
     body.innerHTML = `<div class="pet-shop egg-shop-v1392 ${kind}">
       <div class="egg-shop-tabs" role="tablist">${Object.entries(EGGS).map(([k, e]) => `<button type="button" role="tab" data-egg-kind="${k}" aria-selected="${k === kind}" class="${k === kind ? 'selected' : ''} ${k}">${k === 'epic' ? '<i aria-hidden="true">★</i>' : ''}${e.name}<small>${num(e.price)}코인</small></button>`).join('')}</div>
-      <div class="pet-shop-egg ${kind}" aria-hidden="true"><span>${kind === 'epic' ? '★' : '?'}</span></div>
+      ${kind === 'epic' && ART_READY.has('epic-egg') ? `<div class="pet-shop-egg-art" aria-hidden="true">${uiArt('epic-egg')}</div>` : `<div class="pet-shop-egg ${kind}" aria-hidden="true"><span>${kind === 'epic' ? '★' : '?'}</span></div>`}
       <p class="pet-moment-msg">${kind === 'epic' ? '<b class="egg-shop-tier">영웅</b> 어떤 친구가 들어 있을까요?' : '어떤 친구가 들어 있을까요?'}</p>
       <p class="pet-shop-copy">${kind === 'epic' ? `전설 바로 아래 등급, 영웅 펫 ${missing.length}마리 중 한 마리의 알이 나와요.<br>영웅 펫마다 새로운 야차전 특기가 있어요.` : `아직 만나지 못한 기본 펫 ${missing.length}마리 중 한 마리의 알이 나와요.`}<br>새 알은 바로 파트너가 되고, 함께 공부하면 Lv.3에 태어나요.</p>
       <div class="pet-shop-price"><span>가격</span><b><i class="coin-ico" aria-hidden="true"></i>${num(egg.price)}</b><span>가진 코인</span><b><i class="coin-ico" aria-hidden="true"></i>${num(g.points_balance || 0)}</b></div>
