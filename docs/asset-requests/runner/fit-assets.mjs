@@ -38,18 +38,20 @@ let corner = 0;
 for (const [x, y] of [[2, 2], [W - 3, 2], [2, H - 3], [W - 3, H - 3]]) corner = Math.max(corner, data[(y * W + x) * 4 + 3]);
 if (corner > 10) { console.error(`배경이 투명하지 않아요(모서리 alpha ${corner}). 다시 만들어 주세요.`); process.exit(2); }
 
-// 붙어 있는 그림 덩어리 찾기
+// 붙어 있는 그림 덩어리 찾기. 희미한 빛(alpha 24 이하)은 덩어리를 잇지 않아요: 옆 칸 그림의 빛이 닿아도 한 덩어리가 되지 않게요.
+// 희미한 픽셀은 덩어리 대신 자기 자리가 있는 칸으로 가요.
+const SOLID = 24;
 const label = new Int32Array(N).fill(-1), comps = [], stack = new Int32Array(N);
 for (let i = 0; i < N; i++) {
-  if (label[i] !== -1 || data[i * 4 + 3] <= 8) continue;
+  if (label[i] !== -1 || data[i * 4 + 3] <= SOLID) continue;
   const id = comps.length; let sp = 0, n = 0, sx = 0, sy = 0;
   stack[sp++] = i; label[i] = id;
   while (sp) {
     const p = stack[--sp], x = p % W, y = (p / W) | 0; n++; sx += x; sy += y;
-    if (x > 0 && label[p - 1] === -1 && data[(p - 1) * 4 + 3] > 8) { label[p - 1] = id; stack[sp++] = p - 1; }
-    if (x < W - 1 && label[p + 1] === -1 && data[(p + 1) * 4 + 3] > 8) { label[p + 1] = id; stack[sp++] = p + 1; }
-    if (y > 0 && label[p - W] === -1 && data[(p - W) * 4 + 3] > 8) { label[p - W] = id; stack[sp++] = p - W; }
-    if (y < H - 1 && label[p + W] === -1 && data[(p + W) * 4 + 3] > 8) { label[p + W] = id; stack[sp++] = p + W; }
+    if (x > 0 && label[p - 1] === -1 && data[(p - 1) * 4 + 3] > SOLID) { label[p - 1] = id; stack[sp++] = p - 1; }
+    if (x < W - 1 && label[p + 1] === -1 && data[(p + 1) * 4 + 3] > SOLID) { label[p + 1] = id; stack[sp++] = p + 1; }
+    if (y > 0 && label[p - W] === -1 && data[(p - W) * 4 + 3] > SOLID) { label[p - W] = id; stack[sp++] = p - W; }
+    if (y < H - 1 && label[p + W] === -1 && data[(p + W) * 4 + 3] > SOLID) { label[p + W] = id; stack[sp++] = p + W; }
   }
   comps.push({ n, cx: sx / n, cy: sy / n });
 }
@@ -65,7 +67,10 @@ const cells = [];
 for (let q = 0; q < 4; q++) {
   if (names[q] === '-') continue;
   const buf = Buffer.alloc(N * 4);
-  for (let i = 0; i < N; i++) if (label[i] >= 0 && quad[label[i]] === q) data.copy(buf, i * 4, i * 4, i * 4 + 4);
+  for (let i = 0; i < N; i++) {
+    const own = label[i] >= 0 ? quad[label[i]] : data[i * 4 + 3] > 8 ? (((i / W) | 0) >= H / 2 ? 2 : 0) + (i % W >= W / 2 ? 1 : 0) : -1;
+    if (own === q) data.copy(buf, i * 4, i * 4, i * 4 + 4);
+  }
   const b = bboxOf(buf, W, H);
   if (!b) { console.error(`${names[q]}: 칸이 비어 있어요.`); process.exit(3); }
   cells.push({ buf, b, name: names[q] });
