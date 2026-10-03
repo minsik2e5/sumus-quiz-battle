@@ -5,6 +5,7 @@
 // → 06 로보 쉬움·보통 표정, 코인 뽑기 머신·캡슐, 알 반응 (Codex 작업: CODEX_PROMPT_06.md)
 // → 07 전설 펫 4종(뽑기 전용): 07a 설정 시트(참고 그림 없이) → 단계별 참고 그림 → 07b 표정·알 반응.
 import { writeFileSync, mkdirSync } from 'node:fs';
+import { TITLES, TITLE_TIERS } from '../../../public/modules/titles.js';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -425,6 +426,114 @@ sheet(F10, '몬스터 화면 아이콘', 'icon', 'All icons in this set are one 
   ['ui-monster-hard', '하드 배지', 'the same shield badge shape in DEEP CRIMSON with three white stars and small orange flames licking up from behind it', 'public/assets/ui/monster-hard.webp']
 ]);
 
+/* 11 칭호 메달 (V13.96): 칭호 65개(옛 뽑기 칭호 3개 포함)마다 자기 메달 + 칭호 화면 그림 3개.
+   테두리(모양·색)는 등급을 말해요. 지금 앱의 SVG 메달과 같은 모양 규칙이에요:
+   일반 동그라미 · 희귀 육각형 · 영웅 방패 · 전설 금빛 햇살 · 한정 무지개 리본. 가운데 그림은 칭호마다 달라요.
+   칭호가 새로 생기면 TITLE_MOTIFS에 한 줄을 더해요(없으면 멈춰요). */
+const F11 = '11-titles.txt';
+STYLE.title = 'Style: shiny 3D game achievement medal, glossy enamel and polished metal, soft gem highlights, a clean bold outline, a symmetric frame, front view, one medal per cell, centered, about 78% of the cell, readable at 48 pixels. The FRAME (shape, rim and enamel color) shows the rarity tier and must be exactly as described for each cell. The small picture in the middle of the medal is different for every medal: a simple bold cute 3D object, mostly white or light colored with soft color accents, slightly raised from the enamel. No text, no letters, no numbers on the medals.';
+const TITLE_FRAMES = {
+  common: 'FRAME: a ROUND medal with a thick polished mint-silver rim and a soft MINT GREEN enamel face',
+  rare: 'FRAME: a HEXAGON badge (pointy top) with a polished silver rim and a deep SAPPHIRE BLUE enamel face',
+  epic: 'FRAME: a SHIELD-shaped crest with a polished lavender-silver rim, a rich AMETHYST PURPLE enamel face and a small violet gem at the top',
+  legendary: 'FRAME: a ROUND GOLD medal ringed by a gold sunburst of short pointed rays, a small gold star on top, a rich golden enamel face and a warm golden glow',
+  limited: 'FRAME: a ROUND medal with a shimmering RAINBOW holographic rim, a dark midnight-navy enamel face, and two short rainbow ribbon tails hanging below it'
+};
+const TITLE_MOTIFS = {
+  // 일반
+  rookie: 'a small green sprout growing out of a tiny footprint',
+  focus: 'a bullseye target with a pencil stuck in the very center like an arrow',
+  words100: 'a little seedling whose two leaves are small blank word cards',
+  streak3: 'three small flames side by side, the third one the brightest',
+  perfect1: 'a white answer sheet with a big red circle mark on it and one small gold star',
+  win1: 'one small silver sword pointing up with a tiny victory sparkle at its tip',
+  pets2: 'two small paw prints side by side with a tiny pink heart above them',
+  study10: 'an open notebook with a yellow pencil lying across it',
+  attend7: 'a small calendar card filled with round red stamp marks',
+  rps10: 'a cute cartoon hand making a V sign (scissors)',
+  bot1: 'the cute white robot head with a black visor screen showing dizzy swirl eyes in mint lines',
+  gift1: 'a small gift box with a mint ribbon and a heart-shaped tag',
+  monster1: 'a cute lime-green jelly slime with dizzy swirl eyes and a small sword stuck in the ground beside it',
+  // 희귀
+  words500: 'a small open treasure chest overflowing with blank word cards',
+  streak: 'a ring of seven small flames around a bright sparkle',
+  perfect5: 'a rubber stamp stamping a gold star, with two more gold stars beside it',
+  combo: 'a bright lightning bolt with a trail of small chain links behind it',
+  pets4: 'four small paw prints arranged in a diamond, each a different pastel color',
+  win10: 'a sword and a small round shield crossed',
+  yacha3: 'a swirling white whirlwind gust with three small stars spinning in it',
+  level10: 'a young sapling tree with a small upward arrow beside it',
+  study50: 'a neat stack of three books with a red apple on top',
+  attend30: 'a calendar with a mint ribbon rosette pinned on it',
+  monster10: 'a target with a round horned monster silhouette in the center and three claw marks',
+  bothunter: 'the cute white robot head inside a target reticle',
+  skill10: 'a glowing pet paw crackling with small lightning sparks',
+  exam3: 'a test paper with a small stopwatch in front of it',
+  g_lucky: 'a glossy four-leaf clover with a tiny sparkle',
+  // 영웅
+  words1000: 'a craftsman\'s hammer above a glowing gem-like block of blank word cards',
+  streak14: 'a big flame wrapped by a ribbon loop shaped like an infinity sign',
+  perfect20: 'a radiant gold star with small white wings',
+  combo20: 'a speeding little steam locomotive made of lightning',
+  master: 'an open glowing spell book with sparkles rising from its pages',
+  win50: 'a general\'s helmet with a tall red plume',
+  yachaking: 'a small gold crown on top of two crossed swords',
+  comeback: 'a heart with a crack that is sealed by a glowing lightning bolt',
+  flawless: 'a spotless shining shield without a single scratch, one big sparkle on it',
+  rpsjack: 'three cartoon hands in a row (fist, V sign, open palm) with a burst of gold coins above them',
+  monsterhard: 'a sword planted in front of a small flaming crimson shield',
+  words2000: 'a graduation cap on top of a thick book',
+  study150: 'a glowing pencil with a golden halo and small wings',
+  attend100: 'a calendar inside a laurel wreath',
+  combo30: 'a tall roaring flame with lightning bolts inside it',
+  skill50: 'a pet paw and a child\'s hand touching, a glowing heart between them',
+  g_golden: 'a golden hand with sparkles around its fingertips',
+  // 전설
+  words3000: 'a floating glowing dictionary with small wings',
+  streak30: 'a crescent moon with a bright flame beside it',
+  legend: 'a pair of radiant white angel wings',
+  pets8: 'a ring of small paw prints around a small crown',
+  win100: 'a cute fierce yaksha (oni) mask with two small horns, not scary',
+  diamond: 'a large brilliant faceted diamond',
+  champion: 'a gold trophy cup with two handles',
+  rpsgod: 'a glowing open hand with a golden halo above it',
+  level30: 'a prismatic crystal shard glowing with rainbow light',
+  level40: 'a sparkling rainbow star with little twinkles around it',
+  level50: 'a phoenix rising with spread flaming wings',
+  level60: 'a crown with one huge gem and small lightning sparks',
+  monsterlord: 'a golden bow and arrow crossed over a curved monster horn',
+  perfect50: 'a circle of small gold stars like a constellation around one big star',
+  yacha10: 'a flaming sword pointing up',
+  g_god: 'a golden capsule toy bursting open with light',
+  // 한정
+  weekly1: 'a gold medal with a laurel branch',
+  weekly2: 'a silver medal with a laurel branch',
+  weekly3: 'a bronze medal with a laurel branch',
+  leagueking: 'a gold crown above a small league shield'
+};
+const TIER_ORDER_11 = ['common', 'rare', 'epic', 'legendary', 'limited'];
+const titleKeys11 = TIER_ORDER_11.flatMap(tier => Object.keys(TITLES).filter(key => TITLES[key].tier === tier));
+const missingMotif = Object.keys(TITLES).filter(key => !TITLE_MOTIFS[key]);
+if (missingMotif.length) throw new Error(`11-titles: 가운데 그림(TITLE_MOTIFS)이 없는 칭호가 있어요: ${missingMotif.join(', ')}`);
+// The leftover cells of the last sheet: pictures for the 칭호 도감 screen (same medal family).
+const TITLE_EXTRAS = [
+  ['ui-titles-hero', '칭호 도감 맨 위', 'NOT a medal: a small glass display shelf holding five medals of this set (a round mint one, a blue hexagon, a purple shield, a gold sunburst and a rainbow-ribbon one), a few sparkles', 'public/assets/ui/titles-hero.webp'],
+  ['ui-title-equipped', '장착 중 표시', 'NOT a medal: a small mint green ribbon rosette pin with a white check mark in the middle', 'public/assets/ui/title-equipped.webp'],
+  ['ui-title-new', '새 칭호 표시', 'NOT a medal: a small burst of golden light with a tiny sparkling medal in the middle and confetti bits flying out', 'public/assets/ui/title-new.webp']
+];
+const cells11 = [
+  ...titleKeys11.map(key => [`title-${key}`, `${TITLES[key].name} (${TITLE_TIERS[TITLES[key].tier].name})`, `${TITLE_FRAMES[TITLES[key].tier]}. CENTER: ${TITLE_MOTIFS[key]}.`, `public/assets/titles/${key}.webp`]),
+  ...TITLE_EXTRAS
+].slice(0, Math.ceil(titleKeys11.length / 4) * 4);
+// First sheet that shows each tier, so later sheets can match its frame.
+const TITLE_TIER_SHEET = {};
+for (let i = 0; i < cells11.length; i += 4) {
+  const group = cells11.slice(i, i + 4);
+  for (const c of group) { const key = c[0].replace(/^title-/, ''); if (TITLES[key] && !TITLE_TIER_SHEET[TITLES[key].tier]) TITLE_TIER_SHEET[TITLES[key].tier] = i / 4 + 1; }
+  const tiers = [...new Set(group.map(c => TITLES[c[0].replace(/^title-/, '')]?.tier).filter(Boolean))].map(t => TITLE_TIERS[t].name);
+  sheet(F11, `칭호 메달 ${i / 4 + 1} (${tiers.join('·')}${group.some(c => !c[0].startsWith('title-')) ? ' + 칭호 화면 그림' : ''})`, 'title', 'All medals of this set are one family, like the achievement medals of one premium mobile game: the same lighting, metal finish, outline and level of detail.', group);
+}
+
 /* Google Drive: 그림을 그리는 GPT는 Drive에서 참고 그림을 열어 보고, 결과를 Drive 폴더에 올려요.
    규칙: 시트별 파일(split/)로 나가는 모든 주문서는 DRIVE에 폴더가 있어야 하고(없으면 멈춰요),
    끝에 "이 폴더에 이 이름으로 올리기"가 붙어요. 처음 그리는 그림(08·09a)은 기존 그림을 열어 보고 그림체를 맞춰요. */
@@ -433,7 +542,8 @@ const DRIVE = {
   [F7A]: 'SUMUS 전설 펫 07 (Runner용)', [F7B]: 'SUMUS 전설 펫 07 (Runner용)',
   [F8]: 'SUMUS 메뉴·학습 08 (Runner용)',
   [F9A]: 'SUMUS 새 기본 펫 09 (Runner용)', [F9B]: 'SUMUS 새 기본 펫 09 (Runner용)',
-  [F10]: 'SUMUS 몬스터 10 (Runner용)'
+  [F10]: 'SUMUS 몬스터 10 (Runner용)',
+  [F11]: 'SUMUS 칭호 11 (Runner용)'
 };
 const PET_SPRITES = 'SUMUS_PET_SPRITES_ALL_20261002/original_1254';
 const KEEP = 'Do NOT make it softer, blurrier, foggier, more painterly or more watercolor-like than the reference.';
@@ -441,16 +551,17 @@ const STYLE_REF = {
   pets: `STYLE REFERENCE — before drawing, open these pictures in Google Drive and study them: the existing pets of this game in the Drive folder "${PET_SPRITES}" (the folders MONG, NABI, PINKY and BAMBOO, each with 01_baby.png, 02_grown.png and 03_final.png). Draw the new pet in exactly that art style: the same crisp, clean shapes and edges, the same clear soft pastel colors (not washed out, not hazy), the same glossy eyes with white highlights, the same light cel-like shading with a thin warm rim light, the same simple fur tufts and the same body proportions (big head, short legs). ${KEEP} Do NOT copy the reference animals.`,
   icons: `STYLE REFERENCE — before drawing, open "06-3.png" and "06-4.png" in the Google Drive folder "${DRIVE[F6]}": they show game art already used in this app (capsule machine, ticket, jackpot, capsules). Draw the new icons in exactly that style: the same glossy 3D toy-like look, the same chunky rounded shapes, the same bright pastel-and-mint palette, the same clean edges and soft lighting. Do NOT copy the reference objects.`,
   monsters: `STYLE REFERENCE — before drawing, open these pictures in Google Drive and study them: the pets of this game in the Drive folder "${PET_SPRITES}" (the folders MONG, NABI, PINKY and BAMBOO, 02_grown.png and 03_final.png) and "09a-1.png" in the Google Drive folder "${DRIVE[F9A]}". Draw the monster in exactly that art style and rendering quality: the same crisp, clean shapes and edges, the same clear colors, the same glossy eyes with white highlights, the same light cel-like shading and rim light, so it looks like it belongs in the same game as those pets. ${KEEP} Do NOT copy the reference pets. Also open "10-1.png" in the Google Drive folder "${DRIVE[F10]}" (the first monster of this set) if it is there, and match its finish and size.`,
-  badges: `STYLE REFERENCE — before drawing, open "07a-5.png" in the Google Drive folder "${DRIVE[F7A]}" (legendary egg and badge) and "06-3.png" in the Google Drive folder "${DRIVE[F6]}" (jackpot): they show shiny game art already used in this app. Draw the new medals or stamps in exactly that style: the same shiny metal and gem rendering, the same clean outline and soft sparkles. Do NOT copy the reference objects.`
+  badges: `STYLE REFERENCE — before drawing, open "07a-5.png" in the Google Drive folder "${DRIVE[F7A]}" (legendary egg and badge) and "06-3.png" in the Google Drive folder "${DRIVE[F6]}" (jackpot): they show shiny game art already used in this app. Draw the new medals or stamps in exactly that style: the same shiny metal and gem rendering, the same clean outline and soft sparkles. Do NOT copy the reference objects.`,
+  titles: `STYLE REFERENCE — before drawing, open these pictures in Google Drive and study them: "07a-5.png" in the Google Drive folder "${DRIVE[F7A]}" (legendary badge), "06-3.png" in the Google Drive folder "${DRIVE[F6]}" (jackpot and ticket) and "10-10.png" in the Google Drive folder "${DRIVE[F10]}" (shield badges) if it is there. They show shiny game art already used in this app. Draw the medals in exactly that style: the same glossy 3D toy-like metal and enamel, the same chunky rounded shapes, the same clean edges and soft sparkles, the same bright clear colors. ${KEEP} Do NOT copy the reference objects.`
 };
-const refOf = p => p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
+const refOf = p => p.file === F11 ? 'titles' : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
 const NEW_ORDER = Object.keys(NEW_PETS);
 const sheetName = (file, i) => `${file.slice(0, /^\d\d[ab]-/.test(file) ? 3 : 2)}-${i + 1}`;
 
 /* 쓰기 */
 const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
-const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10]);
+const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11]);
 for (const [file, list] of byFile) list.forEach((p, i) => {
   if (!SPLIT.has(file)) return;
   if (!DRIVE[file]) throw new Error(`${file}: Google Drive 폴더(DRIVE)가 없어요. 주문서에는 업로드 위치가 꼭 있어야 해요.`);
@@ -459,7 +570,14 @@ for (const [file, list] of byFile) list.forEach((p, i) => {
   if (ref) {
     lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
     lines.splice(2, 0, STYLE_REF[ref]);
-    p.ref = `Drive: ${ref === 'pets' || ref === 'monsters' ? PET_SPRITES : ref === 'icons' ? '06-3.png, 06-4.png' : '07a-5.png, 06-3.png'}`;
+    p.ref = `Drive: ${ref === 'pets' || ref === 'monsters' ? PET_SPRITES : ref === 'icons' ? '06-3.png, 06-4.png' : ref === 'titles' ? '07a-5.png, 06-3.png, 10-10.png' : '07a-5.png, 06-3.png'}`;
+  }
+  // 11 칭호: 뒤 시트는 같은 등급이 처음 나온 시트(와 11-1)를 열어 테두리·크기를 똑같이 맞춰요.
+  if (file === F11 && i > 0) {
+    // Sheet numbers start at 1; this is sheet i + 1, so an earlier sheet has a number <= i.
+    const tiersHere = Object.keys(TITLE_FRAMES).filter(tier => p.text.includes(TITLE_FRAMES[tier]));
+    const earlier = [...new Set([1, ...tiersHere.map(tier => TITLE_TIER_SHEET[tier]).filter(n => n <= i)])].map(n => `"11-${n}.png"`);
+    lines.splice(3, 0, `Also open ${earlier.join(' and ')} in the same Google Drive folder "${DRIVE[F11]}" (earlier medals of this set) if they are there, and match their medal size, metal finish and lighting exactly; a medal of the same tier must have exactly the same frame.`);
   }
   // 메뉴 아이콘 2~5번 시트: 같은 세트의 첫 시트(08-1.png)와도 맞춰요.
   if (file === F8 && ref === 'icons' && /메뉴 아이콘 [2-9]/.test(p.title)) lines.splice(3, 0, `Also open "08-1.png" in the same Google Drive folder "${DRIVE[F8]}" (the first icons of this set) if it is there, and match it exactly.`);

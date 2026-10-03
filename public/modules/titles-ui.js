@@ -1,6 +1,6 @@
 import { $, api, esc, num, toast, icon, modal, buttonBusy } from './ui.js';
 import { TITLES, TITLE_TIERS, TITLE_GROUPS, TITLE_KEYS, LEAGUE_TIERS, titleProgress, visibleTitleKeys, titleCoins } from './titles.js';
-import { titleEmblem, titleBadge, coin } from './emblems.js';
+import { titleEmblem, titleBadge, coin, artOr } from './emblems.js';
 import { coinShower, coinReward, playReward, giftMoment } from './celebrate.js';
 
 // V13.66 title collection (칭호 도감): the page, one title's card, and the moment a new title
@@ -20,7 +20,7 @@ function titleCard(key, t, have) {
   const pct = prog ? Math.round(prog[0] / prog[1] * 100) : 0;
   const foot = prog
     ? `<span class="tt-prog" aria-hidden="true"><i style="width:${pct}%"></i></span><span class="tt-prog-num">${progressText(key, prog)}</span>`
-    : equipped ? '<span class="tt-tier-tag equipped">장착 중</span>' : `<span class="tt-tier-tag tier-${item.tier}">${TITLE_TIERS[item.tier].name}</span>`;
+    : equipped ? `<span class="tt-tier-tag equipped">${artOr('title-equipped', '', 'tt-tag-art')}장착 중</span>` : `<span class="tt-tier-tag tier-${item.tier}">${TITLE_TIERS[item.tier].name}</span>`;
   return `<button type="button" class="tt-card tier-${item.tier}${on ? ' is-on' : ''}${equipped ? ' is-equipped' : ''}" data-title-open="${key}" aria-label="${esc(item.name)} · ${TITLE_TIERS[item.tier].name} 칭호 · ${equipped ? '달고 있어요' : on ? '얻었어요' : '아직 잠겨 있어요'}">
     ${titleEmblem(key, { size: 'md', locked: !on })}
     <b>${esc(item.name)}</b>
@@ -44,7 +44,7 @@ export function titlesPage(A) {
     return `<span class="tt-tier-chip tier-${tier}"><span><i aria-hidden="true"></i>${TITLE_TIERS[tier].name}</span><b>${all.filter(key => have.has(key)).length}/${all.length}</b></span>`;
   }).join('');
   return `<button type="button" class="page-back-v1368" data-go="me">${icon('back')}나</button>
-    <div class="page-heading tt-page-head"><span class="premium-eyebrow">TITLE COLLECTION</span><h1>칭호 도감</h1><p>칭호를 달면 랭킹·야차전·도전장에서 친구들에게 보여요.</p></div>
+    <div class="page-heading tt-page-head">${artOr('titles-hero', '', 'tt-head-art')}<span class="premium-eyebrow">TITLE COLLECTION</span><h1>칭호 도감</h1><p>칭호를 달면 랭킹·야차전·도전장에서 친구들에게 보여요.</p></div>
     <section class="tt-hero tier-${eq.tier}">
       <button type="button" class="tt-hero-medal" data-title-open="${t.equipped}" aria-label="달고 있는 칭호 ${esc(eq.name)} 자세히 보기">${titleEmblem(t.equipped, { size: 'lg' })}</button>
       <div class="tt-hero-copy"><small>지금 달고 있는 칭호</small>${titleBadge(t.equipped, { size: 'md' })}<span class="tt-hero-desc">${esc(eq.desc)}</span></div>
@@ -135,7 +135,7 @@ function introMoment(A, onChanged) {
   const best = byTier(t.unlocked).reverse().slice(0, 8);
   const body = overlay('칭호 도감', 'legendary');
   body.innerHTML = `<div class="tt-intro">
-    <span class="tt-moment-kicker">NEW · 칭호 도감</span>
+    <span class="tt-moment-kicker">${artOr('title-new', '', 'tt-kicker-art')}NEW · 칭호 도감</span>
     <h2>칭호 도감이 열렸어요!</h2>
     <p>지금까지의 기록으로 <b>${t.unlocked.length}개</b>의 칭호를 모았어요.</p>
     <div class="tt-intro-grid">${best.map((key, i) => `<span style="--i:${i}">${titleEmblem(key, { size: 'md' })}<small>${esc(TITLES[key].name)}</small></span>`).join('')}</div>
@@ -167,7 +167,7 @@ function unlockMoment(A, keys, onChanged) {
     $('.tt-moment').className = `modal tt-moment tier-${item.tier}`;
     body.innerHTML = `<div class="tt-unlock" data-state="${reduced() ? 'shown' : 'enter'}">
       <div class="tt-moment-stage"><span class="tt-rays" aria-hidden="true"></span><span class="tt-glow" aria-hidden="true"></span><div class="tt-moment-medal">${titleEmblem(key, { size: 'xl' })}</div><div class="tt-bits" aria-hidden="true"></div></div>
-      <span class="tt-moment-kicker">새 칭호 획득!</span>
+      <span class="tt-moment-kicker">${artOr('title-new', '', 'tt-kicker-art')}새 칭호 획득!</span>
       <span class="tt-ribbon tier-${item.tier}">${TITLE_TIERS[item.tier].name} 칭호</span>
       <h2>${esc(item.name)}</h2>
       <p>${esc(item.how)} 달성!</p>
@@ -204,7 +204,7 @@ function paydayMoment(A, list, onChanged) {
   const total = unpaidTotal(list);
   const body = overlay('칭호 보상', 'legendary');
   body.innerHTML = `<div class="tt-intro tt-payday">
-    <span class="tt-moment-kicker">NEW · 칭호 보상</span>
+    <span class="tt-moment-kicker">${artOr('title-new', '', 'tt-kicker-art')}NEW · 칭호 보상</span>
     <h2>칭호 보상이 도착했어요!</h2>
     <p>이제 칭호를 얻으면 코인을 받아요. 지금까지 모은 칭호 <b>${list.length}개</b>의 보상이에요.</p>
     <div class="tt-intro-grid">${keys.slice(0, 8).map((key, i) => `<span style="--i:${i}">${titleEmblem(key, { size: 'md' })}<small>${esc(TITLES[key].name)} · ${titleCoins(key)}</small></span>`).join('')}</div>

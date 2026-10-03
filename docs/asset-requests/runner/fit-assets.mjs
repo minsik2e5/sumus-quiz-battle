@@ -12,6 +12,8 @@
 //       node docs/asset-requests/runner/fit-assets.mjs 10-1.png monsters/slime monsters/slime-attack monsters/slime-hurt monsters/slime-down --stand-same
 // - --trim이면 정사각형에 넣지 않고 그림 테두리에 딱 맞게 잘라요(같은 시트는 같은 배율, 가장 넓은 칸이 --size px).
 //   예) 캡슐 위·아래 반쪽처럼 앱에서 위아래로 맞붙여 쓰는 그림.
+// - --small 96이면 작은 그림(<이름>-s.webp, 96px)도 같이 만들어요. 작게 여러 개 보이는 그림용.
+//   예) 칭호 메달(11-titles): node docs/asset-requests/runner/fit-assets.mjs 11-1.png titles/rookie titles/focus titles/words100 titles/streak3 --small 96
 import sharp from 'sharp';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync } from 'node:fs';
@@ -23,7 +25,7 @@ const opt = name => { const i = args.indexOf(name); return i >= 0 ? args.splice(
 const ti = args.indexOf('--trim'), trim = ti >= 0 && !!args.splice(ti, 1);
 const ssi = args.indexOf('--stand-same'), standSame = ssi >= 0 && !!args.splice(ssi, 1);
 const si = args.indexOf('--stand'), stand = standSame || (si >= 0 && !!args.splice(si, 1));
-const preview = opt('--preview'), baseName = opt('--base'), size = Number(opt('--size') || 256);
+const preview = opt('--preview'), baseName = opt('--base'), size = Number(opt('--size') || 256), small = Number(opt('--small') || 0);
 const [sheet, ...names] = args;
 if (!sheet || names.length !== 4) {
   console.error('사용법: node fit-assets.mjs <sheet.png> <TL> <TR> <BL> <BR> [--base pets/robot-3] [--size 256] [--preview out.png]');
@@ -122,6 +124,11 @@ for (const c of cells) {
   await sharp(out).toFile(`${ASSETS}${c.name}.webp`);
   tiles.push({ name: c.name, out });
   console.log(`saved public/assets/${c.name}.webp`);
+}
+// --small: the same picture again at small × small px (<name>-s.webp).
+if (small) for (const t of tiles) {
+  await sharp(t.out).resize(small, small, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } }).webp({ quality: 84, alphaQuality: 90, effort: 6 }).toFile(`${ASSETS}${t.name}-s.webp`);
+  console.log(`saved public/assets/${t.name}-s.webp`);
 }
 
 // 확인용: (--base면 맨 왼쪽에 기준 그림) 새 그림들 (어두운 배경)

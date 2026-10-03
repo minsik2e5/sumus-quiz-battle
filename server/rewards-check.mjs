@@ -640,6 +640,27 @@ export async function runRewardsChecks(assert, expectStatus) {
     const battle95 = source('../public/modules/battle.js'), css95 = source('../public/v1395.css');
     assert(battle95.includes("holdPose(pet, 'down')") && battle95.includes('avatar-art avatar-img mon-art') && battle95.includes("uiArt('monster-tab', 'ya-tab-art')") && battle95.includes("uiArt('monster-' + level, cls)") && !battle95.includes('LEVEL_ICONS') && css95.includes('.yb-pet.fx-down.mon-down{') && css95.includes('.mh-result-down.art{') && source('./build-assets.mjs').includes('"v1395.css"'), 'V13.95 몬스터 탭 아이콘, 이지·노말·하드 방패 배지, 쓰러짐 그림은 기울이지 않는다');
   }
+  /* ---------- V13.96 칭호 메달 그림 주문서 (11-titles) ---------- */
+  {
+    const { existsSync } = await import('node:fs');
+    const { TITLE_ART, titleEmblem } = await import('../public/modules/emblems.js');
+    const map96 = source('../docs/asset-requests/runner/slice-map.csv').split('\n').filter(line => line.startsWith('"11-titles.txt"'));
+    const prompts96 = source('../docs/asset-requests/runner/11-titles.txt').split('\n---\n');
+    const keys96 = Object.keys(TITLES);
+    assert(keys96.length === 65 && keys96.every(key => map96.some(line => line.endsWith(`"public/assets/titles/${key}.webp"`))) && map96.length === 68 && prompts96.length === 17, 'V13.96 칭호 65개(옛 뽑기 칭호 포함)마다 메달 그림 주문이 있다: 시트 17장 = 메달 65개 + 칭호 화면 그림 3개');
+    assert(prompts96.every(p => p.includes('STYLE REFERENCE — before drawing, open') && p.includes('Google Drive folder') && /named exactly "11-\d+\.png"/.test(p) && p.includes('"SUMUS 칭호 11 (Runner용)"')) && prompts96.slice(1).every(p => p.includes('Also open "11-1.png"')), 'V13.96 칭호 주문서마다 Drive의 기존 그림을 열어 그림체를 맞추고, 정해진 Drive 폴더에 정확한 이름(11-N.png)으로 저장하라고 적혀 있다');
+    // One frame per medal, by tier: as many frame lines of a tier as titles of that tier.
+    const tierFrames = { common: 'mint-silver rim', rare: 'HEXAGON badge', epic: 'SHIELD-shaped crest', legendary: 'ROUND GOLD medal', limited: 'RAINBOW holographic rim' };
+    const allText96 = prompts96.join('\n'), countOf = s => allText96.split(s).length - 1;
+    assert(Object.entries(tierFrames).every(([tier, phrase]) => countOf(phrase) === keys96.filter(key => TITLES[key].tier === tier).length), 'V13.96 메달 테두리는 등급을 말한다(일반 민트 동그라미 · 희귀 육각형 · 영웅 방패 · 전설 금빛 햇살 · 한정 무지개)');
+    // The app: a title with a picture shows it (big file from 58px, the 96px copy at 34px); the rest keep the SVG medal.
+    TITLE_ART.add('rookie');
+    const drawn = titleEmblem('rookie', { size: 'md' }), drawnSmall = titleEmblem('rookie', { size: 'sm', locked: true }), fallback = titleEmblem('focus', { size: 'md' });
+    TITLE_ART.delete('rookie');
+    assert(drawn.includes('src="/assets/titles/rookie.webp"') && drawnSmall.includes('src="/assets/titles/rookie-s.webp"') && drawnSmall.includes('tt-lock') && !drawn.includes('<svg viewBox="0 0 64 64">') && fallback.includes('<svg viewBox="0 0 64 64">') && [...TITLE_ART].every(key => TITLES[key] && existsSync(fileURLToPath(new URL(`../public/assets/titles/${key}.webp`, import.meta.url))) && existsSync(fileURLToPath(new URL(`../public/assets/titles/${key}-s.webp`, import.meta.url)))), 'V13.96 그림이 등록된 칭호는 메달 그림(큰 그림 · 34px은 작은 그림)으로, 나머지는 지금 SVG 메달로 보이고, 등록된 그림은 파일이 있다');
+    const ui96 = source('../public/modules/titles-ui.js'), css96 = source('../public/v1396.css');
+    assert(["artOr('titles-hero'", "artOr('title-equipped'", "artOr('title-new'"].every(x => ui96.includes(x)) && css96.includes('.tt-emblem .tt-art{') && css96.includes('.tt-emblem.is-locked .tt-art{') && source('./build-assets.mjs').includes('"v1396.css"') && source('../docs/asset-requests/runner/fit-assets.mjs').includes("opt('--small')"), 'V13.96 칭호 도감 그림 3개 자리, 메달 그림의 잠김·미리보기 모습, 작은 그림을 만드는 --small');
+  }
   /* ---------- V13.93 08 그림 40장 ---------- */
   const ready93 = [...emblems91.matchAll(/ART_READY = new Set\(\[([^\]]*)\]/g)].flatMap(m => [...m[1].matchAll(/'([a-z0-9-]+)'/g)].map(x => x[1]));
   const arcade93 = source('../public/modules/arcade.js'), shop93 = source('../public/modules/pet-moments.js');
