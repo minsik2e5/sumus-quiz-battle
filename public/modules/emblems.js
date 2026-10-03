@@ -98,5 +98,13 @@ export const coin = (cls = '') => `<i class="coin-ico ${cls}" aria-hidden="true"
 export const uiArt = (key, cls = '') => `<img class="ui-art ${cls}" src="/assets/ui/${key}.webp" alt="" width="256" height="256" decoding="async" draggable="false">`;
 // V13.91 drawn art that is on its way (asset list 08): the line icon stands in until the picture
 // is added here, so a missing file never shows as a broken image.
-export const ART_READY = new Set([]);
+export const ART_READY = new Set([
+  'nav-home', 'nav-study', 'nav-yacha', 'nav-arcade', 'nav-me', 'me-pets',
+  'me-ranking', 'me-titles', 'me-records', 'me-settings', 'mode-speed', 'mode-skill',
+  'me-attendance', 'me-stars', 'me-notify', 'me-install', 'me-gacha', 'pet-locked',
+  'pet-legend-locked', 'empty-records', 'study-vocab', 'study-grammar', 'exam-practice', 'exam-test',
+  'study-daily', 'flash-deck', 'flash-done', 'word-empty', 'badge-first100', 'badge-streak90',
+  'badge-english100', 'badge-master', 'result-perfect', 'result-great', 'result-good', 'result-retry',
+  'me-petbook', 'pet-epic-locked', 'epic-egg', 'epic-badge'
+]);
 export const artOr = (key, fallback, cls = '') => ART_READY.has(key) ? uiArt(key, cls) : fallback;

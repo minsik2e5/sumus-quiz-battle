@@ -1,5 +1,5 @@
 import { esc, num } from './ui.js';
-import { coin } from './emblems.js';
+import { coin, artOr } from './emblems.js';
 import { CHARACTERS } from './core.js';
 import { LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE } from './rewards.js';
 
@@ -79,7 +79,7 @@ export function luckyCard(state, bet, balance) {
     </div>
     <div class="lk-bets" role="group" aria-label="걸 코인">${(l.bets || LUCKY_BETS).map(b => `<button type="button" class="lk-bet ${bet === b ? 'on' : ''}" data-ga="bet" data-bet="${b}" aria-pressed="${bet === b}"><span class="lk-stack" aria-hidden="true">${'<i></i>'.repeat(b / 10)}</span><b>${b}</b></button>`).join('')}</div>
     <div class="lk-legend-status ${legend.owned ? 'owned' : ''}"><img src="/assets/lucky/legend-badge.webp" alt=""><span><b>${legend.owned ? `전설 펫 ${esc(gwaWa(CHARACTERS[legend.key]?.ko || ''))} 만났어요` : `전설 펫 ${legend.rate}%`}</b><small>${legend.owned ? '학생 한 명당 한 마리만 만날 수 있어요' : `행운 뽑기 전용 · ${num(legend.remaining)}회 안에 확정`}</small></span></div>
-    ${l.epic?.left ? `<div class="lk-epic-status"><span aria-hidden="true">★</span><b>영웅 펫 ${l.epic.rate}%</b><small>전설이 아닐 때 · 아직 못 만난 영웅 ${num(l.epic.left)}마리 중 하나</small></div>` : ''}
+    ${l.epic?.left ? `<div class="lk-epic-status"><span aria-hidden="true">${artOr('epic-badge', '★', 'epic-badge-art')}</span><b>영웅 펫 ${l.epic.rate}%</b><small>전설이 아닐 때 · 아직 못 만난 영웅 ${num(l.epic.left)}마리 중 하나</small></div>` : ''}
     <button type="button" class="lk-go" data-ga="pull" ${can ? '' : 'disabled'}>${left > 0 ? (balance >= bet ? `<span>뽑기!</span><em>${coin()}${bet}</em>` : '<span>코인이 부족해요</span>') : '<span>오늘 뽑기 끝! 내일 또 만나요</span>'}</button>
     ${tickets ? `<button type="button" class="lk-ticket" data-ga="ticket"><img class="lk-ticket-art" src="/assets/lucky/ticket.webp" alt=""> 뽑기권 ${tickets}장 · ${coin()}${LUCKY_TICKET_BET} 공짜 뽑기</button>` : ''}
     ${recent.length ? `<div class="lk-recent"><span>최근</span>${recent.map(r => `<i class="${MULT_CLASS[r.mult]}">${r.mult ? `×${r.mult}` : '꽝'}</i>`).join('')}${todayNet ? `<em class="${todayNet > 0 ? 'up' : 'down'}">오늘 ${todayNet > 0 ? '+' : '−'}${num(Math.abs(todayNet))}</em>` : ''}</div>` : ''}
@@ -236,7 +236,7 @@ export function epicShow({ key, res = null, again = false, againLabel = '' }) {
         <div class="lgx-art">
           <img class="lgx-future" src="/assets/pets/${key}-3.webp" alt="" aria-hidden="true">
           <img class="lgx-pet" src="/assets/pets/${key}-0.webp" alt="${esc(name)}의 알">
-          <span class="lgx-epic-badge" aria-hidden="true">★<small>영웅</small></span>
+          ${artOr('epic-badge', '<span class="lgx-epic-badge" aria-hidden="true">★<small>영웅</small></span>', 'lgx-epic-badge-art')}
         </div>
         <div class="lgx-card">
           <span class="lk-legend-kicker">EPIC PET · ${esc(c.type || '')}</span><h2>영웅 펫을 만났어요!</h2><h3>${esc(name)}의 알</h3>
