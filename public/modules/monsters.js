@@ -17,8 +17,11 @@ export const MONSTERS = [
   { key: 'finalking', name: '수능 대마왕', line: '시험지 갑옷을 입은 마지막 대마왕', color: '#b91c1c', temp: { pet: 'qilin', form: 3, filter: 'hue-rotate(-40deg) saturate(1.6) brightness(.82) contrast(1.1)' } }
 ];
 // Monsters whose own pictures are in public/assets/monsters (<key>.webp, <key>-attack.webp,
-// <key>-hurt.webp, <key>-down.webp). Empty until the asset sheets (folder 10) are cut.
-export const MONSTER_ART = new Set([]);
+// <key>-hurt.webp, <key>-down.webp). V13.95: all nine, cut from the sheets 10-1 … 10-9 (the
+// four poses of a sheet at one scale, feet on the floor like the pets). `temp` stays as the
+// fallback for a monster added later without pictures.
+export const MONSTER_ART = new Set(['slime', 'forgetghost', 'clock', 'golem', 'phone', 'pirate', 'owlnight', 'dictdragon', 'finalking']);
+export const MONSTER_POSES = ['attack', 'hurt', 'down'];
 export const monsterOf = index => MONSTERS[((index % MONSTERS.length) + MONSTERS.length) % MONSTERS.length];
 
 // 이지 · 노말 · 하드. The monster answers like the practice robot (`accuracy`, `min`..`max` ms)

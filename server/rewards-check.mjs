@@ -11,8 +11,8 @@ import { DAY_MS, rankingWeek, createCompetition } from './competition.mjs';
 import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX, CHARACTERS, LEGENDARY_PET_KEYS, STANDARD_PET_KEYS, EPIC_PET_KEYS, EPIC_EGG_PRICE, petTier } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, visibleTitleKeys, titleUnlocked } from '../public/modules/titles.js';
 import { createBattle, connect, answer, tick, battleView, petSkill, SKILL_RULES, BATTLE, PET_SKILLS, MONSTER_SKILLS, forfeit } from '../public/modules/battle-engine.js';
-import { MONSTERS, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, monsterParts, monsterOpen } from '../public/modules/monsters.js';
-import { expressionSrc } from '../public/modules/character.js';
+import { MONSTERS, MONSTER_ART, MONSTER_POSES, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, monsterParts, monsterOpen } from '../public/modules/monsters.js';
+import { expressionSrc, holdPose, showPose } from '../public/modules/character.js';
 import { battleQuestions, spellHint, spellable, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { createPracticeMatch, BOT_LEVELS, BOT_HP } from '../public/modules/battle-bot.js';
 import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
@@ -621,6 +621,24 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(battle94b.includes("['monster', '몬스터']") && battle94b.includes('function monsterTab()') && battle94b.includes("api('/monster/start'") && battle94b.includes("api('/monster/finish'") && battle94b.includes('ko: true') && css94b.includes('.mh-part{') && source('./service.mjs').includes("path === '/monster/start'"), 'V13.94 야차전의 몬스터 탭에서 파트별 몬스터를 이지·노말·하드로 잡는다');
     assert(battle94b.includes('function strike(') && battle94b.includes("strike(atk, def,") && battle94b.includes('skill: true, attacker: p') && battle94b.includes('function knockout(') && ['.fx-shot{', '.fx-ring{', '.fx-claw{', '.fx-beam{', '.fx-ko{', '@keyframes fx-shake-l'].every(x => css94b.includes(x)), 'V13.94 공격 이펙트: 날아가는 공격·충격파·불꽃·화면 흔들림, 특기는 광선, 몬스터는 할퀴기, 쓰러뜨리면 K.O.!');
     assert(battle94b.includes('ya-chip-study') && battle94b.includes('class="ya-picked') && battle94b.includes('ya-rm-duel') && battle94b.includes('친구가 다른 번호를 외우고 있다면?'), 'V13.94 내 단어 범위: 단어 수·학습 중 표시·고른 범위 요약·각자/같은 범위 그림 설명');
+  }
+  /* ---------- V13.95 몬스터 그림 (시트 10-1 … 10-10) ---------- */
+  {
+    const { existsSync } = await import('node:fs');
+    const asset = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));
+    // Canvas size from the webp header (VP8X chunk: width-1 and height-1, 24-bit little endian).
+    const webpSize = name => { const b = readFileSync(asset(name)); return b.toString('ascii', 12, 16) === 'VP8X' ? `${1 + b.readUIntLE(24, 3)}x${1 + b.readUIntLE(27, 3)}` : ''; };
+    const monsterArt = MONSTERS.flatMap(m => ['', ...MONSTER_POSES.map(p => '-' + p)].map(p => `monsters/${m.key}${p}`));
+    assert(MONSTERS.every(m => MONSTER_ART.has(m.key)) && monsterArt.length === 36 && monsterArt.every(n => existsSync(asset(n)) && webpSize(n) === '512x512'), 'V13.95 몬스터 9종 × 기본·공격·맞음·쓰러짐 36장이 512px 그림으로 있다');
+    assert(['monster-tab', 'monster-easy', 'monster-normal', 'monster-hard'].every(n => existsSync(asset('ui/' + n)) && webpSize('ui/' + n) === '256x256'), 'V13.95 몬스터 화면 아이콘 4개(몬스터 탭 · 이지 · 노말 · 하드 배지)');
+    // Poses: a monster picture swaps like a pet's, and a knocked-out one stays down.
+    const fakeArt = src => { const img = { src, isConnected: true, getAttribute: () => img.src, setAttribute: (k, v) => { img.src = v; } }; return { img, querySelector: () => img }; };
+    const down = fakeArt('/assets/monsters/slime.webp');
+    const held = holdPose(down, 'down');
+    showPose(down, 'hurt', 10); // held: returns before loading anything (no Image in node)
+    assert(held && down.img.src === '/assets/monsters/slime-down.webp' && down.img._held && !holdPose(fakeArt('/assets/monsters/slime.webp'), 'eat'),'V13.95 몬스터는 쓰러지면 쓰러짐 그림으로 바뀌고 그대로 남는다(맞은 그림으로 돌아가지 않는다)');
+    const battle95 = source('../public/modules/battle.js'), css95 = source('../public/v1395.css');
+    assert(battle95.includes("holdPose(pet, 'down')") && battle95.includes('avatar-art avatar-img mon-art') && battle95.includes("uiArt('monster-tab', 'ya-tab-art')") && battle95.includes("uiArt('monster-' + level, cls)") && !battle95.includes('LEVEL_ICONS') && css95.includes('.yb-pet.fx-down.mon-down{') && css95.includes('.mh-result-down.art{') && source('./build-assets.mjs').includes('"v1395.css"'), 'V13.95 몬스터 탭 아이콘, 이지·노말·하드 방패 배지, 쓰러짐 그림은 기울이지 않는다');
   }
   /* ---------- V13.93 08 그림 40장 ---------- */
   const ready93 = [...emblems91.matchAll(/ART_READY = new Set\(\[([^\]]*)\]/g)].flatMap(m => [...m[1].matchAll(/'([a-z0-9-]+)'/g)].map(x => x[1]));
