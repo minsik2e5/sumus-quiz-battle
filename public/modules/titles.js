@@ -23,6 +23,7 @@
 //   exams        V13.73: teacher exams submitted
 //   gifts        V13.73: coin gifts received from a teacher
 //   rps_wins     V13.82: 가위바위보 throws won; rps_jackpots: ×8 pots (three wins in a row)
+//   monster_wins V13.94: monsters beaten (몬스터 잡기, any level); monster_hard: at 하드
 // Limited titles belong to one week: they are held only while last week's result stands.
 
 export const TITLE_TIERS = {
@@ -32,7 +33,7 @@ export const TITLE_TIERS = {
   legendary: { name: '전설', order: 4 },
   limited: { name: '한정', order: 5 }
 };
-export const TITLE_GROUPS = { study: '학습', yacha: '야차전', collect: '수집', gacha: '뽑기', arcade: '놀이터', limited: '한정' };
+export const TITLE_GROUPS = { study: '학습', yacha: '야차전', monster: '몬스터', collect: '수집', gacha: '뽑기', arcade: '놀이터', limited: '한정' };
 // V13.73: coins for a new title, by tier (paid once when the student first sees it; a limited
 // title pays again each week it is won). 첫걸음 and retired capsule titles pay nothing.
 export const TITLE_COINS = { common: 10, rare: 30, epic: 60, legendary: 120, limited: 60 };
@@ -91,6 +92,11 @@ export const TITLES = {
   level60: { name: 'MAX', tier: 'legendary', group: 'study', stat: 'level', goal: 60, icon: 'crown', how: 'Lv.60 달성(최고 레벨)', desc: '더 오를 곳이 없는 최고 레벨.' },
   study50: { name: '성실한 학생', tier: 'rare', group: 'study', stat: 'studies', goal: 50, icon: 'book', how: '10문제 이상 학습 50번', desc: '꾸준함이 최고의 재능이에요.' },
   attend30: { name: '개근상', tier: 'rare', group: 'study', stat: 'attendance', goal: 30, icon: 'calendar', how: '출석 체크 30번', desc: '빠짐없이 출석하는 모범생.' },
+  // V13.94 몬스터 잡기
+  monster1: { name: '몬스터 사냥 입문', tier: 'common', group: 'monster', stat: 'monster_wins', goal: 1, icon: 'sword', how: '몬스터 1마리 처치', desc: '첫 몬스터를 쓰러뜨렸어요.' },
+  monster10: { name: '몬스터 헌터', tier: 'rare', group: 'monster', stat: 'monster_wins', goal: 10, icon: 'target', how: '몬스터 10번 처치', desc: '몬스터들이 이름만 들어도 도망가요.' },
+  monsterhard: { name: '하드 정복자', tier: 'epic', group: 'monster', stat: 'monster_hard', goal: 1, icon: 'flame', how: '하드 몬스터 1마리 처치', desc: '정말 어려운 하드 몬스터를 이겼어요!' },
+  monsterlord: { name: '전설의 사냥꾼', tier: 'legendary', group: 'monster', stat: 'monster_hard', goal: 5, icon: 'crown', how: '하드 몬스터 5번 처치', desc: '하드 몬스터도 이 사냥꾼 앞에서는 떨어요.' },
   bothunter: { name: '로보 사냥꾼', tier: 'rare', group: 'yacha', stat: 'bot_hard_wins', goal: 5, icon: 'target', how: '어려움 로보 5번 이기기', desc: '어려운 로보도 문제없어요.' },
   skill10: { name: '스킬 달인', tier: 'rare', group: 'yacha', stat: 'skills', goal: 10, icon: 'bolt', how: '야차전에서 펫 스킬 10번 발동', desc: '연속 정답으로 펫의 힘을 깨웠어요.' },
   exam3: { name: '실전 강자', tier: 'rare', group: 'study', stat: 'exams', goal: 3, icon: 'target', how: '선생님 실전시험 3번 응시', desc: '실전에서도 떨지 않아요.' },

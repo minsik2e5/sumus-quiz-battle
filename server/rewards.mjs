@@ -6,6 +6,7 @@ import {
   RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome
 } from '../public/modules/rewards.js';
 import { titleCoins } from '../public/modules/titles.js';
+import { MONSTER_LEVELS, MONSTER_DAILY, MONSTER_MIN_MS, MONSTER_TRY, monsterOpen } from '../public/modules/monsters.js';
 
 // Coin rewards and games (rules and odds: public/modules/rewards.js). Everything lives on the
 // student's profile:
@@ -368,6 +369,52 @@ export function botFinish(p, { id, result, right, pet, now = Date.now() }) {
   const reward = botReward(live.level, outcome);
   addBonus(p, { xp: reward.xp, coins: reward.coins, pet, now });
   return { paid: true, coins: reward.coins, xp: reward.xp, result: outcome, level: live.level, ...botView(p, now) };
+}
+
+/* ---------- V13.94 몬스터 잡기 ---------- */
+//   monster { cleared: { [part key]: { easy, normal, hard: first clear time } }, day, count,
+//             wins, hard_wins, live: { id, part, level, at } }
+// A fight is announced when it starts (the server checks the part and that the level is open)
+// and pays when it ends: the first clear of a part at a level pays MONSTER_LEVELS[level].first,
+// any later fight (won: `again`, lost after answering `need` words: MONSTER_TRY) pays only
+// MONSTER_DAILY times a day.
+export function monsterView(p, now = Date.now()) {
+  const m = p.bonus?.monster || {};
+  const used = m.day === dayKey(now) ? Number(m.count || 0) : 0;
+  return { cleared: m.cleared || {}, left: Math.max(0, MONSTER_DAILY - used), daily: MONSTER_DAILY, wins: Number(m.wins || 0), hard_wins: Number(m.hard_wins || 0) };
+}
+export function monsterStart(p, { part, level, parts, id, now = Date.now() }) {
+  if (!MONSTER_LEVELS[level]) fail('난이도를 골라주세요.');
+  const found = (parts || []).find(x => x.key === part);
+  if (!found) fail('이 파트를 찾지 못했어요. 화면을 새로 고쳐 주세요.', 404);
+  const m = (p.bonus ||= {}).monster ||= {};
+  if (!monsterOpen(m.cleared?.[part], level)) fail(level === 'hard' ? '노말을 먼저 깨야 하드에 도전할 수 있어요.' : '이지를 먼저 깨야 노말에 도전할 수 있어요.', 409);
+  m.live = { id, part, level, at: now };
+  return { id, part, level, monster: found.monster.key, ...monsterView(p, now) };
+}
+export function monsterFinish(p, { id, result, right, pet, now = Date.now() }) {
+  const m = (p.bonus ||= {}).monster ||= {};
+  const live = m.live;
+  if (!live || live.id !== id) fail('몬스터 전투를 찾지 못했어요.', 404);
+  delete m.live;
+  const L = MONSTER_LEVELS[live.level], won = result === 'win';
+  const answered = Math.max(0, Math.min(200, Math.floor(Number(right) || 0)));
+  const base = { result: won ? 'win' : 'lose', level: live.level, part: live.part };
+  if (won && now - live.at < MONSTER_MIN_MS) return { paid: false, reason: 'short', ...base, ...monsterView(p, now) };
+  if (answered < L.need) return { paid: false, reason: 'few', need: L.need, ...base, ...monsterView(p, now) };
+  const cleared = (m.cleared ||= {})[live.part] ||= {};
+  if (won) { m.wins = Number(m.wins || 0) + 1; if (live.level === 'hard') m.hard_wins = Number(m.hard_wins || 0) + 1; }
+  let reward, first = false;
+  if (won && !cleared[live.level]) { cleared[live.level] = now; reward = L.first; first = true; }
+  else {
+    const today = dayKey(now);
+    if (m.day !== today) { m.day = today; m.count = 0; }
+    if (Number(m.count || 0) >= MONSTER_DAILY) return { paid: false, reason: 'daily', ...base, ...monsterView(p, now) };
+    m.count = Number(m.count || 0) + 1;
+    reward = won ? L.again : MONSTER_TRY;
+  }
+  addBonus(p, { xp: reward.xp, coins: reward.coins, pet, now });
+  return { paid: true, first, coins: reward.coins, xp: reward.xp, ...base, ...monsterView(p, now) };
 }
 
 // A submitted teacher exam: 경험치 for every answered question, coins for answering half of it.

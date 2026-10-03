@@ -1,0 +1,68 @@
+// V13.94 몬스터 잡기: the student's word ranges, in order, are grouped into parts (파트) of about
+// 60 words; every part has a monster to beat at 이지, 노말 and 하드. Shared by the server (which
+// checks the part, unlocks levels and pays) and the app (which runs the fight on the phone with
+// the yacha engine, like the robot practice match).
+
+// The nine monsters of the plan (docs/asset-requests 05-bosses). Until their pictures arrive
+// (MONSTER_ART), each borrows a pet picture recoloured with a CSS filter (`temp`).
+export const MONSTERS = [
+  { key: 'slime', name: '스펠링 슬라임', line: '글자를 뒤죽박죽 섞어 버리는 말랑 슬라임', color: '#5fcf6a', temp: { pet: 'whale', form: 2, filter: 'hue-rotate(-95deg) saturate(1.5)' } },
+  { key: 'forgetghost', name: '까먹귀', line: '외운 단어를 지우개로 지워 버리는 꼬마 유령', color: '#b9a3ff', temp: { pet: 'phoenix', form: 1, filter: 'hue-rotate(210deg) saturate(.7) brightness(1.15)' } },
+  { key: 'clock', name: '째깍 도둑', line: '시험 시간을 훔쳐 가는 시계 괴물', color: '#e0a23a', temp: { pet: 'robot', form: 2, filter: 'hue-rotate(-140deg) saturate(1.6) brightness(.95)' } },
+  { key: 'golem', name: '문법 골렘', line: '문법 블록과 문장부호로 만든 돌 골렘', color: '#8f9bab', temp: { pet: 'robot', form: 3, filter: 'grayscale(.75) brightness(.92) contrast(1.15)' } },
+  { key: 'phone', name: '폰마왕', line: '알림으로 공부를 방해하는 스마트폰 마왕', color: '#8b5cf6', temp: { pet: 'robot', form: 1, filter: 'hue-rotate(95deg) saturate(1.7) brightness(.9)' } },
+  { key: 'pirate', name: '오답 해적 선장', line: '틀린 답을 모아 배를 만든 해적 선장', color: '#e5484d', temp: { pet: 'shark', form: 3, filter: 'hue-rotate(150deg) saturate(1.5) brightness(.92)' } },
+  { key: 'owlnight', name: '밤샘 부엉 대장', line: '밤새 공부를 방해하는 졸린 부엉이 장군', color: '#3b5bdb', temp: { pet: 'owl', form: 3, filter: 'hue-rotate(185deg) saturate(1.3) brightness(.8)' } },
+  { key: 'dictdragon', name: '딕셔너리 드래곤', line: '사전 날개를 펼친 거대한 드래곤', color: '#4f46e5', temp: { pet: 'dragon', form: 3, filter: 'hue-rotate(45deg) saturate(1.4) brightness(.88)' } },
+  { key: 'finalking', name: '수능 대마왕', line: '시험지 갑옷을 입은 마지막 대마왕', color: '#b91c1c', temp: { pet: 'qilin', form: 3, filter: 'hue-rotate(-40deg) saturate(1.6) brightness(.82) contrast(1.1)' } }
+];
+// Monsters whose own pictures are in public/assets/monsters (<key>.webp, <key>-attack.webp,
+// <key>-hurt.webp, <key>-down.webp). Empty until the asset sheets (folder 10) are cut.
+export const MONSTER_ART = new Set([]);
+export const monsterOf = index => MONSTERS[((index % MONSTERS.length) + MONSTERS.length) % MONSTERS.length];
+
+// 이지 · 노말 · 하드. The monster answers like the practice robot (`accuracy`, `min`..`max` ms)
+// with its own HP and skill, and it has to be knocked out before time runs out (otherwise the
+// monster wins). 하드 is 실력전 (spelling mixed in). In thousands of simulated fights:
+//   이지  — a student who knows 3 words in 4 wins 80%
+//   노말  — a student who knows 9 words in 10 wins 80% (3 in 4: 12%)
+//   하드  — a student who knows almost every word wins about a third (9 in 10: 16%)
+// The first clear pays a lot; clearing again pays a little, MONSTER_DAILY times a day.
+// `need`: words to answer right for a fight to pay at all.
+export const MONSTER_LEVELS = {
+  easy: { name: '이지', mode: 'speed', accuracy: .45, min: 3200, max: 7200, hp: 320, monsterHp: 200, skill: 'bump', need: 5,
+    first: { coins: 50, xp: 150 }, again: { coins: 6, xp: 40 } },
+  normal: { name: '노말', mode: 'speed', accuracy: .72, min: 2000, max: 5000, hp: 320, monsterHp: 330, skill: 'roar', need: 8,
+    first: { coins: 150, xp: 350 }, again: { coins: 12, xp: 70 } },
+  hard: { name: '하드', mode: 'skill', accuracy: .85, min: 1500, max: 3600, hp: 300, monsterHp: 330, skill: 'rage', need: 12,
+    first: { coins: 500, xp: 1000 }, again: { coins: 30, xp: 120 } }
+};
+export const MONSTER_LEVEL_KEYS = ['easy', 'normal', 'hard'];
+export const MONSTER_DAILY = 5;
+export const MONSTER_MIN_MS = 30000; // a fight cannot be won faster than this
+export const MONSTER_TRY = { coins: 2, xp: 20 }; // a lost fight that answered `need` words
+
+// Natural order of range codes: 2 before 10, '41~42' after '40', L1 after the numbers.
+const codeKey = code => { const m = String(code).match(/^(\D*)(\d+)/); return m ? [m[1], Number(m[2]), String(code)] : [String(code), 0, String(code)]; };
+const byCode = (a, b) => { const x = codeKey(a), y = codeKey(b); return x[0].localeCompare(y[0]) || x[1] - y[1] || x[2].localeCompare(y[2]); };
+
+// Parts from the ranges of a grade (`counts`: Map code -> words). A part takes ranges in order
+// until it has 60 words or 3 ranges; a last part under 30 words joins the one before it.
+// Ranges with fewer than 4 words are left out.
+export const PART_WORDS = 60, PART_RANGES = 3;
+export function monsterParts(counts) {
+  const codes = [...counts.keys()].map(String).filter(code => (counts.get(code) || 0) >= 4).sort(byCode);
+  const parts = [];
+  let cur = null;
+  for (const code of codes) {
+    if (!cur || cur.words >= PART_WORDS || cur.codes.length >= PART_RANGES) parts.push(cur = { codes: [], words: 0 });
+    cur.codes.push(code); cur.words += counts.get(code) || 0;
+  }
+  const last = parts[parts.length - 1];
+  if (parts.length > 1 && last.words < 30) { const prev = parts[parts.length - 2]; prev.codes.push(...last.codes); prev.words += last.words; parts.pop(); }
+  return parts.filter(p => p.words >= 8).map((p, index) => ({ ...p, index, key: p.codes.join('+'), monster: monsterOf(index) }));
+}
+// Which levels of a part are open: 노말 after 이지, 하드 after 노말 (cleared: { easy, normal, hard }).
+export function monsterOpen(cleared = {}, level) {
+  return level === 'easy' || (level === 'normal' && !!cleared.easy) || (level === 'hard' && !!cleared.normal);
+}

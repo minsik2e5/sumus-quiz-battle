@@ -12,6 +12,7 @@ import { createPracticeMatch, practiceQuestions, BOT_LEVELS } from './battle-bot
 import { BATTLE, BATTLE_MODES, PET_SKILLS, PET_SKILL_NEED, petSkill } from './battle-engine.js';
 import { BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, BOT_MIN_RIGHT } from './rewards.js';
 import { tournamentCard, openBracket } from './tournament-ui.js';
+import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterParts, monsterOpen } from './monsters.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
 // the match, and the result. A match runs in a battle room on the server (or, for a practice
@@ -96,13 +97,22 @@ function later(fn, ms) {
   cur.timers = [...(cur.timers || []), id];
 }
 const petName = pet => pet?.name || CHARACTERS[petKey(pet?.key)]?.ko || '';
+// V13.94 몬스터 잡기: a monster's picture (its own art once it arrives, until then a pet picture
+// recoloured), and who a player is in the match lines (a monster has no pet name).
+function monsterPic(m, { size = '', pose = '' } = {}) {
+  const mon = MONSTERS.find(x => x.key === m?.key) || MONSTERS[0];
+  if (MONSTER_ART.has(mon.key)) return `<div class="avatar-art mon-art ${size}"><img src="/assets/monsters/${mon.key}${pose ? '-' + pose : ''}.webp" alt="${esc(mon.name)}" width="512" height="512" decoding="async" draggable="false"></div>`;
+  return `<div class="mon-temp ${size}" style="--mon-filter:${mon.temp.filter};--mon-color:${mon.color}">${avatar(mon.temp.pet, { size, form: mon.temp.form })}</div>`;
+}
+const petArt = (p, opts = {}) => p?.monster ? monsterPic(p.monster, opts) : avatar(p?.pet?.key, { form: p?.pet?.form ?? 1, ...opts });
+const whoName = p => p?.monster ? (MONSTERS.find(x => x.key === p.monster.key)?.name || p.name) : petName(p?.pet);
 
 // opts.accept: a challenge from the home screen ({ code, stake, host }) to confirm right away.
 // opts.tournament: { tid, mid } a tournament match to start or join (V13.66).
 export async function openBattle(A, exit, opts = {}) {
   closeSocket();
   host = opts.embedded || null;
-  B = { A, exit, embedded: !!host, stake: 10, ranges: null, joinCode: '', tab: opts.tab || 'play', botLevel: 'normal', mode: pref('sumus-yacha-mode', 'speed') === 'skill' ? 'skill' : 'speed' };
+  B = { A, exit, embedded: !!host, stake: 10, ranges: null, joinCode: '', tab: opts.tab || A.yachaTab || 'play', botLevel: 'normal', mode: pref('sumus-yacha-mode', 'speed') === 'skill' ? 'skill' : 'speed' };
   root().innerHTML = shell('<div class="yb-loading">야차전을 준비하고 있어요…</div>');
   bindRoot();
   try {
@@ -169,13 +179,16 @@ function bindRoot() {
     if (act === 'range') { toggleRange(b.dataset.code); return; }
     if (act === 'stake') { B.stake = Number(b.dataset.stake); lobby(); return; }
     if (act === 'range-mode') { setPref('sumus-yacha-range-mode', b.dataset.rangeMode === 'same' ? 'same' : 'each'); lobby(); return; }
-    if (act === 'tab') { B.tab = b.dataset.tab; lobby(); window.scrollTo(0, 0); return; }
+    if (act === 'tab') { B.tab = B.A.yachaTab = b.dataset.tab; lobby(); window.scrollTo(0, 0); return; }
     if (act === 'bot-level') { B.botLevel = b.dataset.level; lobby(); return; }
     if (act === 'mode') { B.mode = b.dataset.mode === 'skill' ? 'skill' : 'speed'; setPref('sumus-yacha-mode', B.mode); lobby(); return; }
     if (act === 'key') return spellKey(b.dataset.key);
     if (act === 'spell-go') return spellSubmit();
     if (act === 'bot') return startBotMatch(b);
     if (act === 'bot-again') return botAgain();
+    if (act === 'monster-go') return askMonster(b.dataset.part, b.dataset.level);
+    if (act === 'monster-again') { const m = B.monsterSetup; nextScreen(); return m ? startMonster(m.part, m.level) : null; }
+    if (act === 'monster-list') { B.A.tab = 'yacha'; B.A.yachaTab = 'monster'; return leaveScreen(); }
     if (act === 'title') return openTitleDetail(B.A, b.dataset.key);
     if (act === 'create') return createRoom(b);
     if (act === 'challenge') return pickFriend(b);
@@ -202,7 +215,7 @@ function lobbyRanges() {
     const pick = [known(saved), known(selected)].find(list => list.reduce((n, c) => n + (counts.get(c) || 0), 0) >= 8);
     B.ranges = new Set(pick || codes.filter(c => (counts.get(c) || 0) >= 8).slice(0, 1));
   }
-  return { codes, counts };
+  return { codes, counts, studying: (selected || []).map(String) };
 }
 function toggleRange(code) { B.ranges.has(code) ? B.ranges.delete(code) : B.ranges.add(code); setPref(rangesKey(), JSON.stringify([...B.ranges])); lobby(); }
 // V13.94 단어 범위: 'each' — a friend who studies another range gets the words of their own range
@@ -219,7 +232,7 @@ function rangeDeal(room) {
 
 function lobby() {
   const A = B.A, g = A.data.stats, h = B.history || { record: { wins: 0, losses: 0, draws: 0 }, battles: [], lost_today: 0, daily_loss_cap: 150 };
-  const tab = ['play', 'league', 'me'].includes(B.tab) ? B.tab : 'play';
+  const tab = ['play', 'monster', 'league', 'me'].includes(B.tab) ? B.tab : 'play';
   const pet = g.pet, league = h.league || A.data.league, r = h.record;
   const played = r.wins + r.losses + r.draws;
   main(`
@@ -243,8 +256,8 @@ function lobby() {
       </div>
       ${petSkillChip(pet)}
     </section>
-    <div class="ya-tabs" role="group" aria-label="야차전 메뉴">${[['play', '대결'], ['league', '리그 랭킹'], ['me', '내 전적']].map(([key, label]) => `<button type="button" data-yb="tab" data-tab="${key}" class="${tab === key ? 'selected' : ''}" aria-pressed="${tab === key}">${label}</button>`).join('')}</div>
-    ${tab === 'league' ? `<div class="lg-board" data-league-board data-period="${B.leaguePeriod === 'all' ? 'all' : 'week'}" data-fresh="1"></div>` : tab === 'me' ? myRecord(h) : playTab(h)}`);
+    <div class="ya-tabs" role="group" aria-label="야차전 메뉴">${[['play', '대결'], ['monster', '몬스터'], ['league', '리그'], ['me', '내 전적']].map(([key, label]) => `<button type="button" data-yb="tab" data-tab="${key}" class="${tab === key ? 'selected' : ''}" aria-pressed="${tab === key}">${label}</button>`).join('')}</div>
+    ${tab === 'league' ? `<div class="lg-board" data-league-board data-period="${B.leaguePeriod === 'all' ? 'all' : 'week'}" data-fresh="1"></div>` : tab === 'me' ? myRecord(h) : tab === 'monster' ? monsterTab() : playTab(h)}`);
   if (tab === 'league') mountLeagueBoard(document.querySelector('#yb-main [data-league-board]'), period => { B.leaguePeriod = period; });
 }
 // V13.72: what my pet does in a match, and what every pet does (the other player's too).
@@ -262,7 +275,7 @@ const MODE_FACTS = {
 };
 function playTab(h) {
   const A = B.A, g = A.data.stats;
-  const { codes, counts } = lobbyRanges();
+  const { codes, counts, studying } = lobbyRanges();
   // History is fetched each time the lobby opens, so its balance is fresher than stats.
   const balance = Number(h.points_balance ?? g.points_balance ?? 0), lossLeft = Math.max(0, h.daily_loss_cap - h.lost_today);
   const selectedWords = [...B.ranges].reduce((n, c) => n + (counts.get(c) || 0), 0);
@@ -284,14 +297,21 @@ function playTab(h) {
       </button>`).join('')}</div>
       <p class="ya-hint">${B.mode === 'skill' ? '두 문제에 한 번은 <b>뜻을 보고 철자를 써요</b>. 쓰기 정답은 두 배로 세요.' : '뜻을 골라 공격해요. <b>2초 안에 맞히면 크리티컬!</b>'} 마지막 ${Math.round(BATTLE.FEVER_MS / 1000)}초는 피버 타임(공격력 ${BATTLE.FEVER_MULT}배).</p>
 
-      ${step(2, '내 단어 범위', B.ranges.size ? `${B.ranges.size}개 범위 · <b>${num(selectedWords)}</b>단어` : '범위를 골라주세요')}
-      <div class="ya-ranges">${codes.map(c => `<button type="button" class="ya-chip ${B.ranges.has(c) ? 'on' : ''}" data-yb="range" data-code="${esc(c)}" aria-pressed="${B.ranges.has(c)}">${esc(rangeLabel(A.data.profile.school, c))}<small>${counts.get(c) || 0}</small></button>`).join('') || '<p class="yb-muted">학습할 단어 범위가 없어요.</p>'}</div>
-      ${B.ranges.size && !wordsOk ? '<p class="ya-warn">단어가 8개 이상 되도록 범위를 더 골라주세요.</p>' : ''}
+      ${step(2, '내 단어 범위', '대결에 나올 단어')}
+      <p class="ya-explain">지금 외우고 있는 <b>단어장 번호</b>를 눌러 골라요. 여러 개 골라도 돼요.${studying.length ? ' <span class="ya-study-tag">학습 중</span>은 학습 화면에서 고른 범위예요.' : ''}</p>
+      <div class="ya-ranges">${codes.map(c => `<button type="button" class="ya-chip ${B.ranges.has(c) ? 'on' : ''}" data-yb="range" data-code="${esc(c)}" aria-pressed="${B.ranges.has(c)}" aria-label="${esc(rangeLabel(A.data.profile.school, c))} ${counts.get(c) || 0}단어${studying.includes(c) ? ' 학습 중' : ''}">${studying.includes(c) ? '<i class="ya-chip-study">학습 중</i>' : ''}<b>${esc(rangeLabel(A.data.profile.school, c))}</b><small>${counts.get(c) || 0}단어</small><span class="ya-chip-check" aria-hidden="true">${icon('check')}</span></button>`).join('') || '<p class="yb-muted">학습할 단어 범위가 없어요.</p>'}</div>
+      <div class="ya-picked ${wordsOk ? 'ok' : 'need'}" aria-live="polite">${B.ranges.size
+        ? `${wordsOk ? icon('check') : '!'}<span><b>${esc(rangesText([...B.ranges]))}</b> · ${num(selectedWords)}단어${wordsOk ? '로 대결해요' : ' — 8단어 이상이 되게 더 골라 주세요'}</span>`
+        : '!<span>위에서 단어장 번호를 하나 이상 눌러 주세요</span>'}</div>
+
+      <div class="ya-sub">친구가 다른 번호를 외우고 있다면?</div>
       <div class="ya-rangemode" role="group" aria-label="친구 단어">
-        <button type="button" data-yb="range-mode" data-range-mode="each" class="${each ? 'on' : ''}" aria-pressed="${each}"><b>각자 내 범위</b><small>친구는 친구 범위 단어</small></button>
-        <button type="button" data-yb="range-mode" data-range-mode="same" class="${each ? '' : 'on'}" aria-pressed="${!each}"><b>같은 범위로</b><small>친구도 내 범위 단어</small></button>
+        ${[['each', '각자 내 범위', '추천', '나는 내 번호, 친구는 친구 번호 단어', B.ranges.size ? rangesText([...B.ranges]) : '24번', '친구 번호'], ['same', '같은 범위로', '', '친구도 내가 고른 번호 단어', B.ranges.size ? rangesText([...B.ranges]) : '24번', B.ranges.size ? rangesText([...B.ranges]) : '24번']].map(([key, title, badge, line, mine, theirs]) => `<button type="button" data-yb="range-mode" data-range-mode="${key}" class="ya-rm ${key} ${rangeMode() === key ? 'on' : ''}" aria-pressed="${rangeMode() === key}">
+          <span class="ya-rm-duel" aria-hidden="true"><span class="ya-rm-side">${A.data.stats.pet ? avatar(A.data.stats.pet.key, { size: 'mini', form: Math.max(1, A.data.stats.pet.form) }) : ''}<em>${esc(mine)}</em></span><b>VS</b><span class="ya-rm-side friend"><i>?</i><em>${esc(theirs)}</em></span></span>
+          <span class="ya-rm-title"><b>${title}</b>${badge ? `<i>${badge}</i>` : ''}</span><small>${line}</small>
+        </button>`).join('')}
       </div>
-      <p class="ya-hint">${each ? '같은 학년이면 외우는 부분이 달라도 괜찮아요. <b>매 턴 둘 다 자기 범위 단어</b>가 나오고, 같은 시간 안에 겨뤄요.' : '친구도 <b>내가 고른 범위</b>의 단어로 겨뤄요.'}</p>
+      <p class="ya-hint">${each ? '같은 학년이면 외우는 부분이 달라도 괜찮아요. 매 턴 <b>둘 다 자기가 외우는 단어</b>가 나와서 공평해요.' : '친구가 내 번호를 같이 외웠을 때 좋아요.'}</p>
 
       ${step(3, '판돈', `가진 코인 ${num(balance)}`)}
       <div class="ya-stakes">${STAKES.map(s => `<button type="button" class="ya-stake ${B.stake === s ? 'on' : ''}" data-yb="stake" data-stake="${s}" aria-pressed="${B.stake === s}" aria-label="판돈 ${s}코인" ${balance < s || s > lossLeft ? 'disabled' : ''}>${coin()}<b>${s}</b></button>`).join('')}</div>
@@ -464,6 +484,137 @@ function botAgain() {
   startBotMatch();
 }
 
+/* ---------- V13.94 몬스터 잡기 ---------- */
+// The student's word ranges, in order, make parts (파트); each part's monster is beaten at
+// 이지 → 노말 → 하드. The fight is the robot practice match with the monster as the opponent:
+// it has its own HP and skill and must be knocked out before time runs out.
+const monsterState = () => B.A.data.rewards?.monster || { cleared: {}, left: MONSTER_DAILY, daily: MONSTER_DAILY, wins: 0, hard_wins: 0 };
+function myParts() { const { counts } = lobbyRanges(); return monsterParts(counts); }
+const LEVEL_ICONS = { easy: '★', normal: '★★', hard: '★★★' };
+function monsterTab() {
+  const parts = myParts(), st = monsterState(), cleared = st.cleared || {};
+  const total = parts.length * 3, done = parts.reduce((n, p) => n + MONSTER_LEVEL_KEYS.filter(k => cleared[p.key]?.[k]).length, 0);
+  const hardDone = parts.filter(p => cleared[p.key]?.hard).length;
+  return `<section class="mh-hero" aria-label="몬스터 잡기">
+      <div class="mh-hero-art" aria-hidden="true">${monsterPic(parts[0]?.monster || MONSTERS[0])}</div>
+      <span class="mh-kicker">MONSTER HUNT</span>
+      <h2>몬스터 잡기</h2>
+      <p>내 단어장을 <b>파트</b>로 나눠 몬스터가 하나씩 지키고 있어요. <b>이지 → 노말 → 하드</b> 순서로 깨요.</p>
+      <div class="mh-stats"><div><b>${num(done)}</b><span>/ ${num(total)} 처치</span></div><div class="hard"><b>${num(hardDone)}</b><span>하드 정복</span></div><div><b>${num(st.left)}</b><span>/ ${num(st.daily)} 오늘 다시 보상</span></div></div>
+      <ul class="mh-rules"><li>⏱ 시간 안에 <b>쓰러뜨려야</b> 이겨요</li><li>🎁 처음 잡으면 <b>큰 보상</b></li><li>🔥 하드는 철자 쓰기까지, <b>정말 어려워요</b></li></ul>
+    </section>
+    ${parts.length ? `<div class="mh-list">${parts.map(p => monsterCard(p, cleared[p.key] || {})).join('')}</div>` : '<p class="yb-muted">학습할 단어 범위가 없어서 몬스터가 아직 없어요.</p>'}`;
+}
+function monsterCard(p, c) {
+  const m = p.monster;
+  return `<article class="mh-part${c.hard ? ' conquered' : ''}" style="--mc:${m.color}">
+    <div class="mh-mon">${monsterPic(m)}<span class="mh-no">PART ${p.index + 1}</span>${c.hard ? '<span class="mh-crown" aria-label="하드 정복">👑</span>' : ''}</div>
+    <div class="mh-info">
+      <h3>${esc(m.name)}</h3>
+      <p>${esc(m.line)}</p>
+      <div class="mh-range">${esc(rangesText(p.codes))} · ${num(p.words)}단어</div>
+      <div class="mh-levels">${MONSTER_LEVEL_KEYS.map(k => {
+        const L = MONSTER_LEVELS[k], open = monsterOpen(c, k), won = !!c[k];
+        const sub = won ? `처치 완료 · 다시 ${coin()}${L.again.coins}` : open ? `첫 처치 ${coin()}${num(L.first.coins)}` : k === 'hard' ? '노말을 먼저' : '이지를 먼저';
+        return `<button type="button" class="mh-lv ${k}${won ? ' won' : ''}${open ? '' : ' locked'}" data-yb="monster-go" data-part="${esc(p.key)}" data-level="${k}" ${open ? '' : 'disabled'} aria-label="${esc(m.name)} ${L.name}${won ? ' 처치 완료' : open ? '' : ' 잠김'}"><b>${won ? icon('check') : open ? '' : icon('lock')}${L.name}</b><i>${LEVEL_ICONS[k]}</i><small>${sub}</small></button>`;
+      }).join('')}</div>
+    </div>
+  </article>`;
+}
+// What a level means, before the fight starts.
+function askMonster(partKey, level) {
+  const p = myParts().find(x => x.key === partKey), L = MONSTER_LEVELS[level];
+  if (!p || !L) return toast('몬스터를 찾지 못했어요.');
+  const c = monsterState().cleared?.[p.key] || {}, first = !c[level];
+  const reward = first ? L.first : L.again;
+  confirmBox(`<div class="mh-ask ${level}" style="--mc:${p.monster.color}">
+      <div class="mh-ask-mon">${monsterPic(p.monster)}</div>
+      <span class="mh-ask-lv">${L.name} ${LEVEL_ICONS[level]}</span>
+      <h2>${esc(p.monster.name)}</h2>
+      <ul class="mh-ask-facts">
+        <li><b>${L.mode === 'skill' ? '실력전' : '스피드전'}</b>${L.mode === 'skill' ? '뜻 고르기 + 철자 쓰기' : '뜻 고르기 4지선다'}</li>
+        <li><b>HP</b>나 ${num(L.hp)} · 몬스터 ${num(L.monsterHp)}</li>
+        <li><b>시간</b>${minutesText(matchMs(L.mode))} 안에 쓰러뜨려야 이겨요</li>
+        <li><b>단어</b>${esc(rangesText(p.codes))} · ${num(p.words)}단어</li>
+        <li class="reward"><b>${first ? '첫 처치' : '다시 처치'}</b>${coin()}${num(reward.coins)} · 경험치 ${num(reward.xp)}${first ? '' : ` <small>(오늘 ${monsterState().left}번 남음)</small>`}</li>
+      </ul>
+      ${level === 'hard' ? '<p class="mh-warn">하드 몬스터는 거의 틀리지 않고 아주 빨라요. 단어를 완벽하게 외웠을 때 도전하세요!</p>' : ''}
+    </div>`, '그만두기', '도전!', yes => { if (yes) startMonster(p.key, level); });
+}
+function startMonster(partKey, level) {
+  const A = B.A, p = myParts().find(x => x.key === partKey), L = MONSTER_LEVELS[level];
+  if (!p || !L) return toast('몬스터를 찾지 못했어요.');
+  const { words } = getRanges(A, A.school, A.data.profile.class_name);
+  const questions = practiceQuestions(words.filter(w => p.codes.includes(String(w.range_code))), L.mode);
+  if (questions.length < 8) return toast('뜻이 서로 다른 단어가 부족해요.');
+  goFull();
+  closeSocket(false);
+  B.room = { id: 'monster', practice: true, monster: { part: p.key, level }, stake: 0 };
+  B.view = null;
+  B.monsterSetup = { part: p.key, level };
+  B.monsterReward = null;
+  const ticket = api('/monster/start', { part: p.key, level }).then(res => res.id).catch(err => { toast(err.message); return null; });
+  const foe = { name: p.monster.name, pet: { key: p.monster.temp.pet, form: p.monster.temp.form, skill: L.skill }, monster: { key: p.monster.key, level }, hp: L.monsterHp };
+  B.local = createPracticeMatch({ me: meAsPlayer(), questions, mode: L.mode, onMessage, foe, skill: L, hp: L.hp, ko: true, label: `몬스터 · ${L.name}` });
+  B.local.ticket = ticket;
+  main(`<div class="yb-loading">${esc(p.monster.name)}이(가) 나타났어요…</div>`);
+  B.local.start();
+}
+function drawMonsterResult() {
+  const v = B.view, r = v.result || {}, m = me(), f = foe(), local = B.local, setup = B.monsterSetup || {};
+  const won = r.winner === v.me, L = MONSTER_LEVELS[setup.level] || MONSTER_LEVELS.easy;
+  const mon = MONSTERS.find(x => x.key === f.monster?.key) || MONSTERS[0];
+  closeSocket();
+  if (!B.resultSounded) { B.resultSounded = true; sfx(won ? 'win' : 'lose', won ? [60, 50, 120] : 0); }
+  const why = won ? (r.reason === 'forfeit' ? '' : `${esc(mon.name)}을(를) 쓰러뜨렸어요!`) : r.reason === 'forfeit' ? '도전을 그만뒀어요' : f.hp > 0 && m.hp > 0 ? '시간 안에 쓰러뜨리지 못했어요' : '내 펫이 쓰러졌어요';
+  const missed = r.review?.[v.me] || [];
+  main(`<section class="yb-card mh-result ${won ? 'win' : 'lose'} ${setup.level || ''}" style="--mc:${mon.color}">
+    <span class="yb-result-kind">몬스터 잡기 · ${esc(L.name)}</span>
+    <div class="mh-result-stage">${won ? `<div class="mh-result-down">${monsterPic(f.monster, { pose: 'down' })}</div>` : `<div class="mh-result-mon">${monsterPic(f.monster, { pose: 'attack' })}</div>`}<div class="mh-result-pet">${avatar(m.pet?.key, { form: m.pet?.form ?? 1, expression: won ? 'win' : 'hurt' })}</div></div>
+    <div class="mh-result-badge">${won ? '처치 성공!' : '실패…'}</div>
+    <p class="yb-result-lead">${why} · 내 HP ${num(Math.max(0, m.hp))} · 몬스터 HP ${num(Math.max(0, f.hp))}</p>
+    <div class="yb-result-points mh-reward" id="mh-reward">${monsterRewardText()}</div>
+    <button type="button" class="btn primary full" data-yb="monster-again">${won ? '한 번 더' : '다시 도전'} <small>${esc(mon.name)} · ${esc(L.name)}</small></button>
+    <div class="btn-row yb-result-actions"><button type="button" class="btn" data-yb="home">홈으로</button><button type="button" class="btn" data-yb="monster-list">몬스터 목록</button></div>
+  </section>
+  ${missed.length ? `<section class="yb-card yb-review"><h2>이번 전투에서 놓친 단어 <small>${missed.length}개</small></h2><ul>${missed.slice(0, 10).map(w => `<li><b>${esc(w.word)}</b><span>${esc(w.meaning)}</span></li>`).join('')}</ul><button type="button" class="btn primary full" data-yb="review">놓친 단어 연습하기</button></section>` : ''}`);
+  if (won && !reduced()) burstConfetti(document.querySelector('.mh-result-stage'));
+  claimMonsterReward(won ? 'win' : 'lose', local);
+}
+function monsterRewardText() {
+  const r = B.monsterReward;
+  if (!r) return '보상 확인 중…';
+  if (r.paid) return `${r.first ? '<em class="mh-first">첫 처치 보상!</em>' : ''}${coin()}+${num(r.coins)} · 경험치 +${num(r.xp)}`;
+  const need = MONSTER_LEVELS[B.monsterSetup?.level]?.need || 5;
+  return { few: `단어를 ${need}개 이상 맞히면 보상을 받아요`, daily: '오늘 다시 잡기 보상은 다 받았어요 (첫 처치는 언제나 받아요)', short: '너무 빨리 끝난 전투예요', error: '보상을 확인하지 못했어요' }[r.reason] || '보상 없음';
+}
+async function claimMonsterReward(outcome, local) {
+  const cur = B;
+  if (!local || local.claimed) return;
+  local.claimed = true;
+  const id = await local.ticket;
+  let res = { paid: false, reason: 'error' };
+  if (id) { try { res = await api('/monster/finish', { id, result: outcome, right: local.myRight() }); } catch { res = { paid: false, reason: 'error' }; } }
+  if (B !== cur) return;
+  B.monsterReward = res;
+  if (res.cleared && B.A.data.rewards) B.A.data.rewards.monster = { cleared: res.cleared, left: res.left, daily: res.daily, wins: res.wins, hard_wins: res.hard_wins };
+  if (res.paid && res.stats) Object.assign(B.A.data.stats, res.stats);
+  const el = document.getElementById('mh-reward');
+  if (el) { el.innerHTML = monsterRewardText(); if (res.paid) el.classList.add('paid'); if (res.first) el.classList.add('first'); }
+}
+// A small burst of paper pieces over an element (the monster went down).
+function burstConfetti(el) {
+  if (!el) return;
+  const colors = ['#f4c64f', '#7fe0b8', '#ff8a65', '#b9a3ff', '#5ec7ff'];
+  for (let i = 0; i < 26; i++) {
+    const bit = document.createElement('i');
+    bit.className = 'mh-bit';
+    bit.style.cssText = `--x:${Math.round(Math.random() * 260 - 130)}px;--y:${Math.round(-60 - Math.random() * 120)}px;--r:${Math.round(Math.random() * 720 - 360)}deg;background:${colors[i % colors.length]};animation-delay:${Math.round(Math.random() * 180)}ms`;
+    el.appendChild(bit);
+    setTimeout(() => bit.remove(), 1600);
+  }
+}
+
 /* ---------- V13.66 academy tournament ---------- */
 async function playTournament(tid, mid, button) {
   if (!tid || !mid) return;
@@ -594,8 +745,8 @@ function drawMatch() {
     <div class="yb-arena" id="yb-arena">
       <div class="yb-banner">夜叉</div><div class="yb-centerline"></div><div class="yb-ring"></div>
       ${hud(f, 'op')}
-      <div class="yb-pet op" id="yb-pet-op">${avatar(f.pet?.key, { form: f.pet?.form ?? 1 })}</div>
-      <div class="yb-pet me" id="yb-pet-me">${avatar(m.pet?.key, { form: m.pet?.form ?? 1 })}</div>
+      <div class="yb-pet op${f.monster ? ' monster' : ''}" id="yb-pet-op">${petArt(f)}</div>
+      <div class="yb-pet me" id="yb-pet-me">${petArt(m)}</div>
       ${hud(m, 'me')}
       <div class="yb-flash" id="yb-flash"></div>
       <div class="yb-vs-v1366" id="yb-vs" hidden>${vsSide(f, 'op')}<b class="yb-vs-mark">VS</b>${vsSide(m, 'me')}</div>
@@ -627,12 +778,12 @@ function rangesText(codes) {
 }
 // V13.66: both players' names come with their title and league tier.
 function vsSide(p, side) {
-  return `<div class="yb-vs-side ${side}">${B.view?.own_words && p.ranges?.length ? `<span class="yb-vs-range">${esc(rangesText(p.ranges))}</span>` : ''}<span class="yb-vs-pet">${avatar(p.pet?.key, { size: 'mini', form: p.pet?.form ?? 1 })}</span><b>${esc(p.name)}${p.bot ? ' <i class="yb-ai">AI</i>' : ''}</b>${shownTitle(p.title) ? titleBadge(p.title, { size: 'xs' }) : ''}${p.tier ? `<span class="yb-vs-tier">${tierEmblem(p.tier, { size: 'xs' })}${esc({ bronze: '브론즈', silver: '실버', gold: '골드', diamond: '다이아' }[p.tier] || '')}</span>` : ''}</div>`;
+  return `<div class="yb-vs-side ${side}">${B.view?.own_words && p.ranges?.length ? `<span class="yb-vs-range">${esc(rangesText(p.ranges))}</span>` : ''}<span class="yb-vs-pet">${petArt(p, { size: 'mini' })}</span><b>${esc(p.name)}${p.bot ? ' <i class="yb-ai">AI</i>' : ''}</b>${shownTitle(p.title) ? titleBadge(p.title, { size: 'xs' }) : ''}${p.tier ? `<span class="yb-vs-tier">${tierEmblem(p.tier, { size: 'xs' })}${esc({ bronze: '브론즈', silver: '실버', gold: '골드', diamond: '다이아' }[p.tier] || '')}</span>` : ''}</div>`;
 }
 function hud(p, side) {
   return `<div class="yb-hud ${side}" id="yb-hud-${side}">
-    <div class="yb-hud-row"><span class="yb-hud-name">${esc(petName(p.pet))}</span><span class="yb-hud-lv">${PET_FORMS[p.pet?.form ?? 1] || ''}</span></div>
-    <div class="yb-hud-who">${p.tier ? tierEmblem(p.tier, { size: 'xs' }) : ''}${esc(p.name)}${side === 'me' ? ' · 나' : ''}${p.bot ? ' <i class="yb-ai">AI</i>' : ''}${p.streak >= 2 ? ` <span class="yb-streak">${p.streak}연승</span>` : ''}</div>
+    <div class="yb-hud-row"><span class="yb-hud-name">${esc(whoName(p))}</span><span class="yb-hud-lv">${p.monster ? esc(MONSTER_LEVELS[p.monster.level]?.name || '') : PET_FORMS[p.pet?.form ?? 1] || ''}</span></div>
+    <div class="yb-hud-who">${p.monster ? `<b class="mh-hud-tag">MONSTER</b>${esc(MONSTER_LEVELS[p.monster.level]?.name || '')} 몬스터` : `${p.tier ? tierEmblem(p.tier, { size: 'xs' }) : ''}${esc(p.name)}${side === 'me' ? ' · 나' : ''}${p.bot ? ' <i class="yb-ai">AI</i>' : ''}${p.streak >= 2 ? ` <span class="yb-streak">${p.streak}연승</span>` : ''}`}</div>
     ${shownTitle(p.title) ? `<div class="yb-hud-title">${titleBadge(p.title, { size: 'xs' })}</div>` : ''}
     <div class="yb-hpbar"><i>HP</i><div class="yb-track"><div class="yb-fill" id="yb-hp-${side}"></div></div><b class="yb-hp-num" id="yb-hpn-${side}">${Math.max(0, p.hp)}</b></div>
     <div class="yb-hud-foot"><div class="yb-gauge-v1372" id="yb-gauge-${side}"></div><div class="yb-fx" id="yb-fx-${side}"></div></div>
@@ -648,7 +799,7 @@ function effectBadges(fx = {}, pet = null) {
 }
 function refreshHud() {
   for (const [side, p] of [['me', me()], ['op', foe()]]) {
-    const pct = Math.min(100, Math.max(0, p.hp) / maxHp() * 100), fill = document.getElementById('yb-hp-' + side);
+    const pct = Math.min(100, Math.max(0, p.hp) / (p.max_hp || maxHp()) * 100), fill = document.getElementById('yb-hp-' + side);
     if (fill) { fill.style.width = pct + '%'; fill.style.backgroundColor = pct > 50 ? '#2fbf71' : pct > 20 ? '#f2b233' : '#e5484d'; }
     const hpn = document.getElementById('yb-hpn-' + side);
     if (hpn) hpn.textContent = Math.max(0, p.hp);
@@ -780,6 +931,45 @@ function hit(side) { const el = document.getElementById('yb-pet-' + side); if (!
 function lunge(side) { const el = document.getElementById('yb-pet-' + side); if (!el) return; showPose(el, 'attack', 900); if (reduced()) return; el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 240); }
 const sideOf = pid => pid === B.view.me ? 'me' : 'op';
 
+// V13.94 attack effects: a shot flies from the attacker to the one hit (a thick beam for a pet
+// skill, claw marks from a monster), then an impact ring, sparks and a shake that grows with
+// the damage. Everything is drawn over the arena and removed by itself.
+function fxColor(p) { return p?.monster ? (MONSTERS.find(x => x.key === p.monster.key)?.color || '#e5484d') : (CHARACTERS[petKey(p?.pet?.key)]?.color || '#f4c64f'); }
+function fxCenter(side, arena) {
+  const pet = document.getElementById('yb-pet-' + side); if (!pet) return null;
+  const a = arena.getBoundingClientRect(), r = pet.getBoundingClientRect();
+  return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height * .52 };
+}
+function fxAdd(arena, cls, css, ms) { const el = document.createElement('div'); el.className = cls; Object.assign(el.style, css); arena.appendChild(el); setTimeout(() => el.remove(), ms); return el; }
+function strike(atk, def, { dmg = 0, crit = false, skill = false, attacker = null } = {}) {
+  const arena = document.getElementById('yb-arena'); if (!arena || reduced()) return;
+  const from = fxCenter(atk, arena), to = fxCenter(def, arena); if (!from || !to) return;
+  const color = fxColor(attacker), big = skill || crit || dmg >= 22;
+  if (skill) {
+    const len = Math.hypot(to.x - from.x, to.y - from.y), ang = Math.atan2(to.y - from.y, to.x - from.x);
+    fxAdd(arena, 'fx-beam', { left: from.x + 'px', top: from.y + 'px', width: len + 'px', transform: `rotate(${ang}rad)`, '--fx': color }, 520);
+  } else {
+    const shot = fxAdd(arena, 'fx-shot' + (big ? ' big' : ''), { left: from.x + 'px', top: from.y + 'px', '--fx': color }, 400);
+    shot.animate([{ transform: 'translate(-50%,-50%) scale(.6)', opacity: .4 }, { transform: `translate(calc(-50% + ${to.x - from.x}px), calc(-50% + ${to.y - from.y}px)) scale(${big ? 1.5 : 1.1})`, opacity: 1 }], { duration: 230, easing: 'cubic-bezier(.3,.1,.7,1)', fill: 'forwards' });
+  }
+  setTimeout(() => {
+    fxAdd(arena, 'fx-ring' + (big ? ' big' : ''), { left: to.x + 'px', top: to.y + 'px', '--fx': color }, 600);
+    for (let i = 0; i < (big ? 12 : 7); i++) {
+      const a = Math.PI * 2 * i / (big ? 12 : 7) + Math.random() * .4, dist = (big ? 70 : 46) + Math.random() * 24;
+      fxAdd(arena, 'fx-spark', { left: to.x + 'px', top: to.y + 'px', '--fx': color, '--dx': Math.cos(a) * dist + 'px', '--dy': Math.sin(a) * dist + 'px' }, 560);
+    }
+    if (attacker?.monster) fxAdd(arena, 'fx-claw', { left: to.x + 'px', top: to.y + 'px' }, 620);
+    arena.classList.remove('fx-shake-s', 'fx-shake-l'); void arena.offsetWidth;
+    arena.classList.add(big ? 'fx-shake-l' : 'fx-shake-s');
+  }, skill ? 180 : 230);
+}
+function knockout(side) {
+  const arena = document.getElementById('yb-arena'); if (!arena) return;
+  fxAdd(arena, 'fx-ko', {}, 1300).textContent = 'K.O.!';
+  if (!reduced()) { arena.classList.remove('fx-shake-l'); void arena.offsetWidth; arena.classList.add('fx-shake-l'); }
+  document.getElementById('yb-pet-' + side)?.classList.add('fx-down');
+}
+
 function showCountdown(deadline) {
   const box = document.getElementById('yb-countdown'); if (!box) return;
   box.hidden = false;
@@ -882,8 +1072,9 @@ function applyEvent(e) {
       const label = e.boost ? '<em>스킬</em> 공격!' : e.fast ? '<em>크리티컬</em> 공격!' : e.spell ? '<em>철자</em> 공격!' : '공격!';
       if (atk === 'me') sfx(strong ? 'crit' : 'hit', e.boost || e.fever ? 30 : 0);
       else later(() => sfx('hurt', e.boost || e.fever ? [80, 40, 80] : 70), reduced() ? 0 : 230);
-      say(`${atk === 'op' ? '상대 ' : ''}${esc(petName(P[e.attacker].pet))}의 ${label}`, `${atk === 'me' ? '정답! 상대를 기다려요' : '상대가 맞혔어요'}${e.guard ? ` · ${def === 'me' ? '내' : '상대'} 펫이 ${e.guard}만큼 막았어요` : ''}`);
+      say(`${atk === 'op' && !P[e.attacker].monster ? '상대 ' : ''}${esc(whoName(P[e.attacker]))}의 ${label}`, `${atk === 'me' ? '정답! 상대를 기다려요' : '상대가 맞혔어요'}${e.guard ? ` · ${def === 'me' ? '내' : '상대'} 펫이 ${e.guard}만큼 막았어요` : ''}`);
       lunge(atk);
+      if (e.dmg) strike(atk, def, { dmg: e.dmg, crit: e.fast || e.fever, attacker: P[e.attacker] });
       later(() => { if (e.boost || e.fast || e.spell) flash(e.boost ? 'rgba(255,214,90,.9)' : e.spell ? 'rgba(150,230,210,.75)' : 'rgba(255,236,160,.8)'); if (e.dmg) { hit(def); pop(def, `-${e.dmg}${e.boost ? ' 스킬!' : e.fast ? ' 크리티컬!' : e.spell ? ' 철자!' : e.fever ? ' 피버!' : ''}`, strong || e.spell ? 'crit' : ''); } if (e.guard) pop(def, e.dmg ? `막기 ${e.guard}` : '다 막았다!', 'info'); refreshHud(); }, reduced() ? 0 : 230);
       // Redraw only my own buttons: the other player's hit must not replace my question.
       if (atk === 'me') drawQuestion();
@@ -898,8 +1089,8 @@ function applyEvent(e) {
     later(() => {
       sfx('skill', side === 'me' ? 30 : 50);
       flash(side === 'me' ? 'rgba(255,214,90,.8)' : 'rgba(170,160,255,.65)');
-      skillBanner(side, `${side === 'op' ? '상대 ' : ''}${esc(petName(p.pet))}의 ${esc(e.name)}!`, e.desc);
-      if (e.dmg) { hit(other); pop(other, `-${e.dmg} 스킬!`, 'crit'); }
+      skillBanner(side, `${side === 'op' && !p.monster ? '상대 ' : ''}${esc(whoName(p))}의 ${esc(e.name)}!`, e.desc);
+      if (e.dmg) { strike(side, other, { dmg: e.dmg, skill: true, attacker: p }); hit(other); pop(other, `-${e.dmg} 스킬!`, 'crit'); }
       if (e.heal) pop(side, `+${e.heal}`, 'heal');
       refreshHud();
     }, reduced() ? 0 : 520);
@@ -917,12 +1108,16 @@ function applyEvent(e) {
     v.phase = 'finished'; v.result = e.result;
     const loser = e.result.loser ? sideOf(e.result.loser) : null;
     if (loser) document.getElementById('yb-pet-' + loser)?.classList.add('faint');
+    // A knock-out (not time running out) gets its own moment before the result.
+    const ko = loser && Number(e.result.hp?.[e.result.loser]) <= 0 && e.result.reason === 'end';
+    if (ko) later(() => knockout(loser), reduced() ? 0 : 350);
     cancelAnimationFrame(B.raf);
-    later(drawResult, reduced() ? 0 : 1100);
+    later(drawResult, reduced() ? 0 : ko ? 1700 : 1100);
   }
 }
 
 function drawResult() {
+  if (B.room?.monster) return drawMonsterResult();
   const v = B.view, r = v.result || {}, m = me(), local = B.local;
   const outcome = !r.winner ? 'draw' : r.winner === v.me ? 'win' : 'lose';
   const practice = !!B.room?.practice, tournament = !practice && /^대회/.test(v.label || '');
@@ -935,7 +1130,7 @@ function drawResult() {
   const missed = r.review?.[v.me] || [];
   const finishedAt = Number(r.finished_at || Date.now());
   const canRematch = !practice && !tournament && r.reason !== 'cancelled' && serverNow() - finishedAt < REMATCH_MS;
-  const hpMe = r.hp?.[v.me] ?? m.hp, special = !practice && outcome === 'win' && r.reason === 'end' ? (hpMe === 100 ? '퍼펙트 게임!' : hpMe > 0 && hpMe <= 20 ? '기적의 역전승!' : '') : '';
+  const hpMe = r.hp?.[v.me] ?? m.hp, special = !practice && outcome === 'win' && r.reason === 'end' ? (hpMe === (r.max_hp || 100) ? '퍼펙트 게임!' : hpMe > 0 && hpMe <= (r.max_hp || 100) / 5 ? '기적의 역전승!' : '') : '';
   main(`<section class="yb-card yb-result ${outcome}${practice ? ' practice' : ''}${tournament ? ' tournament' : ''}">
     <span class="yb-result-kind">${practice || tournament ? `${esc(v.label || '')} · ` : ''}${modeName(v.mode)}</span>
     <div class="yb-result-pet">${avatar(m.pet?.key, { form: m.pet?.form ?? 1, expression: outcome === 'win' ? 'win' : outcome === 'lose' ? 'hurt' : 'normal' })}</div>

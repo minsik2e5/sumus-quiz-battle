@@ -137,6 +137,8 @@ export function createCompetition(state, now = Date.now()) {
     attendance: p => Number(p?.attendance?.total || 0),
     bot_wins: p => Number(p?.bonus?.bot?.wins || 0),
     bot_hard_wins: p => Number(p?.bonus?.bot?.hard_wins || 0),
+    monster_wins: p => Number(p?.bonus?.monster?.wins || 0),
+    monster_hard: p => Number(p?.bonus?.monster?.hard_wins || 0),
     // V13.82 가위바위보: throws won, and ×8 (three wins in a row) pots.
     rps_wins: p => Number(p?.rps?.wins_total || 0),
     rps_jackpots: p => Number(p?.rps?.jackpots || 0),

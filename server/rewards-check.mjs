@@ -10,12 +10,13 @@ import { service, scopedWords, sweep } from './service.mjs';
 import { DAY_MS, rankingWeek, createCompetition } from './competition.mjs';
 import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX, CHARACTERS, LEGENDARY_PET_KEYS, STANDARD_PET_KEYS, EPIC_PET_KEYS, EPIC_EGG_PRICE, petTier } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, visibleTitleKeys, titleUnlocked } from '../public/modules/titles.js';
-import { createBattle, connect, answer, tick, battleView, petSkill, SKILL_RULES, BATTLE, PET_SKILLS } from '../public/modules/battle-engine.js';
+import { createBattle, connect, answer, tick, battleView, petSkill, SKILL_RULES, BATTLE, PET_SKILLS, MONSTER_SKILLS, forfeit } from '../public/modules/battle-engine.js';
+import { MONSTERS, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, monsterParts, monsterOpen } from '../public/modules/monsters.js';
 import { expressionSrc } from '../public/modules/character.js';
 import { battleQuestions, spellHint, spellable, pairedBattleQuestions } from '../public/modules/battle-questions.js';
-import { createPracticeMatch } from '../public/modules/battle-bot.js';
+import { createPracticeMatch, BOT_LEVELS, BOT_HP } from '../public/modules/battle-bot.js';
 import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
-import { addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome } from './rewards.mjs';
+import { monsterStart, monsterFinish, monsterView, addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome } from './rewards.mjs';
 import { marketPrices } from './market.mjs';
 import { STOCKS, MARKET, MARKET_OPEN, tradeFee, newsText } from '../public/modules/market.js';
 
@@ -586,6 +587,40 @@ export async function runRewardsChecks(assert, expectStatus) {
     const battle94 = source('../public/modules/battle.js'), css94 = source('../public/v1394.css'), build94 = source('./build-assets.mjs');
     assert(battle94.includes("data-yb=\"range-mode\"") && battle94.includes('range_mode: rangeMode()') && battle94.includes('range_codes: myRanges()') && battle94.includes('rangeDeal(room)') && battle94.includes('rangeDeal(invite)') && battle94.includes('const mine = e.own?.[v.me] || e;') && battle94.includes('e.answers?.[v.me] ?? e.answer') && battle94.includes('sumus-yacha-ranges:'), 'V13.94 야차전: the lobby sends 각자 내 범위 or 같은 범위로, a joining friend brings their own range and sees whose words come, and each phone draws its own word');
     assert(battle94.includes('class="ya-hero"') && battle94.includes('class="ya-panel ya-setup"') && ['대결 방식', '내 단어 범위', '판돈'].every(t => battle94.includes(`'${t}'`)) && battle94.includes('class="ya-cta"') && css94.includes('.ya-hero{') && css94.includes('@media (min-width:768px)') && css94.includes('.ya-play{grid-template-columns') && build94.includes('"v1394.css"') && !battle94.includes('const MAX_HP = 100'), 'V13.94 야차전 메뉴 화면: 밤의 대결장 히어로, 3단계 대결 준비, 패드에서는 두 칸');
+  }
+  /* ---------- V13.94 로보 연습 · 몬스터 잡기 · 공격 이펙트 · 호야 그림 ---------- */
+  {
+    assert(BOT_HP === 400 && BOT_LEVELS.easy.accuracy === .68 && BOT_LEVELS.normal.accuracy === .84 && BOT_LEVELS.hard.accuracy === .95 && BOT_LEVELS.hard.max <= 2700 && source('../public/modules/battle-bot.js').includes('hp = BOT_HP'), 'V13.94 로보 연습: 더 정확하고 빠른 로보, HP 400으로 한 판이 약 2분');
+    const counts = new Map([['24', 47], ['29', 40], ['31', 27], ['32', 27], ['33', 28], ['2', 3], ['10', 20], ['L1', 68]]);
+    const parts = monsterParts(counts);
+    assert(parts.map(p => p.key).join('|') === '10+24|29+31|32+33+L1' && parts.every(p => p.words >= 8 && p.monster === MONSTERS[p.index % MONSTERS.length]) && monsterParts(new Map([...counts].reverse())).map(p => p.key).join('|') === parts.map(p => p.key).join('|'), 'V13.94 몬스터 파트: 범위를 번호 순서로 묶고(60단어 또는 3범위까지, 4단어 미만 범위 제외), 파트마다 몬스터가 정해진다');
+    assert(monsterOpen({}, 'easy') && !monsterOpen({}, 'normal') && monsterOpen({ easy: 1 }, 'normal') && !monsterOpen({ easy: 1 }, 'hard') && monsterOpen({ easy: 1, normal: 1 }, 'hard'), 'V13.94 이지 → 노말 → 하드 순서로 열린다');
+    assert(MONSTER_LEVELS.hard.mode === 'skill' && MONSTER_LEVELS.hard.first.coins >= 3 * MONSTER_LEVELS.normal.first.coins && MONSTER_LEVELS.normal.first.coins > MONSTER_LEVELS.easy.first.coins && Object.values(MONSTER_LEVELS).every(L => MONSTER_SKILLS[L.skill] && L.first.coins > L.again.coins), 'V13.94 하드는 실력전이고 첫 처치 보상이 가장 크다');
+    const kid = { id: 'qa-mh', pets: [{ key: 'dog' }], bonus: {} };
+    const t0 = Date.parse('2026-10-03T03:00:00Z');
+    const fight = (level, result, right, at, part = parts[0].key) => { const r = monsterStart(kid, { part, level, parts, id: 'f-' + at, now: at }); return monsterFinish(kid, { id: r.id, result, right, now: at + 60000 }); };
+    let refused = 0; try { monsterStart(kid, { part: parts[0].key, level: 'normal', parts, id: 'x', now: t0 }); } catch (err) { refused = err.status; }
+    let missing = 0; try { monsterStart(kid, { part: 'made+up', level: 'easy', parts, id: 'y', now: t0 }); } catch (err) { missing = err.status; }
+    const firstWin = fight('easy', 'win', 9, t0);
+    const again = fight('easy', 'win', 9, t0 + 100000);
+    const few = fight('easy', 'lose', 2, t0 + 200000);
+    const quick = monsterFinish(kid, { id: monsterStart(kid, { part: parts[0].key, level: 'easy', parts, id: 'q', now: t0 }).id, result: 'win', right: 9, now: t0 + 5000 });
+    assert(refused === 409 && missing === 404 && firstWin.paid && firstWin.first && firstWin.coins === MONSTER_LEVELS.easy.first.coins && again.paid && !again.first && again.coins === MONSTER_LEVELS.easy.again.coins && !few.paid && few.reason === 'few' && !quick.paid && quick.reason === 'short' && monsterView(kid, t0).cleared[parts[0].key].easy === t0 + 60000, 'V13.94 몬스터 보상: 잠긴 난이도·없는 파트는 거절, 첫 처치는 큰 보상, 다시 잡으면 작은 보상, 단어를 덜 맞히거나 너무 빨리 끝나면 없음');
+    for (let i = 0; i < MONSTER_DAILY; i++) fight('easy', 'lose', 9, t0 + 300000 + i * 100000);
+    const capped = fight('easy', 'win', 9, t0 + 900000), hardFirst = (fight('normal', 'win', 12, t0 + 1000000), fight('hard', 'win', 14, t0 + 1100000));
+    assert(!capped.paid && capped.reason === 'daily' && hardFirst.paid && hardFirst.first && hardFirst.coins === MONSTER_LEVELS.hard.first.coins && kid.bonus.monster.hard_wins === 1 && bonusRecords(kid).reduce((n, r) => n + r.reward_points, 0) === MONSTER_LEVELS.easy.first.coins + MONSTER_LEVELS.easy.again.coins + (MONSTER_DAILY - 1) * MONSTER_TRY.coins + MONSTER_LEVELS.normal.first.coins + MONSTER_LEVELS.hard.first.coins, 'V13.94 다시 잡기 보상은 하루 몇 번까지, 첫 처치(하드 포함)는 그와 상관없이 언제나 받는다');
+    assert(['monster1', 'monster10', 'monsterhard', 'monsterlord'].every(key => TITLES[key]?.group === 'monster') && TITLES.monsterlord.tier === 'legendary', 'V13.94 몬스터 칭호 4개');
+    // The engine: a monster brings its own HP and skill, and wins if time runs out.
+    const mq = Array.from({ length: 6 }, (_, i) => ({ word_id: 'm' + i, prompt: 'w' + i, options: ['a', 'b', 'c', 'd'], answer: 0 }));
+    const mb = createBattle({ id: 'mb', players: [{ id: 'me', name: '나', pet: { key: 'dog' } }, { id: 'mon', name: '슬라임', pet: { key: 'whale', skill: 'rage' }, monster: { key: 'slime', level: 'hard' }, hp: 330 }], questions: mq, hp: 300, timeoutWinner: 'mon', now: 0 });
+    connect(mb, 'me', 0); connect(mb, 'mon', 0); tick(mb, BATTLE.COUNTDOWN_MS);
+    const view = battleView(mb, 'me');
+    const timeUp = tick(mb, mb.ends_at + 1).concat(tick(mb, mb.ends_at + 5000)).find(e => e.type === 'end');
+    assert(mb.players.me.hp === 300 && mb.players.mon.hp === 330 && view.players.mon.max_hp === 330 && view.players.me.max_hp === 300 && view.players.mon.monster.key === 'slime' && petSkill(mb.players.mon.pet).name === MONSTER_SKILLS.rage.name && timeUp?.result.winner === 'mon', 'V13.94 몬스터는 자기 HP와 특기를 갖고, 시간 안에 쓰러뜨리지 못하면 몬스터가 이긴다');
+    const battle94b = source('../public/modules/battle.js'), css94b = source('../public/v1394.css');
+    assert(battle94b.includes("['monster', '몬스터']") && battle94b.includes('function monsterTab()') && battle94b.includes("api('/monster/start'") && battle94b.includes("api('/monster/finish'") && battle94b.includes('ko: true') && css94b.includes('.mh-part{') && source('./service.mjs').includes("path === '/monster/start'"), 'V13.94 야차전의 몬스터 탭에서 파트별 몬스터를 이지·노말·하드로 잡는다');
+    assert(battle94b.includes('function strike(') && battle94b.includes("strike(atk, def,") && battle94b.includes('skill: true, attacker: p') && battle94b.includes('function knockout(') && ['.fx-shot{', '.fx-ring{', '.fx-claw{', '.fx-beam{', '.fx-ko{', '@keyframes fx-shake-l'].every(x => css94b.includes(x)), 'V13.94 공격 이펙트: 날아가는 공격·충격파·불꽃·화면 흔들림, 특기는 광선, 몬스터는 할퀴기, 쓰러뜨리면 K.O.!');
+    assert(battle94b.includes('ya-chip-study') && battle94b.includes('class="ya-picked') && battle94b.includes('ya-rm-duel') && battle94b.includes('친구가 다른 번호를 외우고 있다면?'), 'V13.94 내 단어 범위: 단어 수·학습 중 표시·고른 범위 요약·각자/같은 범위 그림 설명');
   }
   /* ---------- V13.93 08 그림 40장 ---------- */
   const ready93 = [...emblems91.matchAll(/ART_READY = new Set\(\[([^\]]*)\]/g)].flatMap(m => [...m[1].matchAll(/'([a-z0-9-]+)'/g)].map(x => x[1]));
