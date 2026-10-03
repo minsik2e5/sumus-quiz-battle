@@ -390,6 +390,13 @@ sheet(F8, '결과 도장', 'emblem', 'round result stamps of the same size, like
   ['ui-result-good', '결과 잘했어요 (60점+)', 'a SKY-BLUE scalloped stamp with a big white smiling check mark', 'public/assets/ui/result-good.webp'],
   ['ui-result-retry', '결과 다시 도전 (60점 미만)', 'a soft PEACH scalloped stamp with a white curved arrow going around in a circle and a small heart', 'public/assets/ui/result-retry.webp']
 ]);
+// V13.92: the pet dex tile and the 영웅 (epic) pets. Last in the list so 08-1~9 keep their numbers.
+menu('메뉴 아이콘 6 (펫 도감 · 영웅 펫)', [
+  ['me-petbook', '펫 도감', 'a chunky open picture book in soft peach showing a big paw print on the left page and a small egg on the right page, a tiny gold star bookmark (no letters)'],
+  ['pet-epic-locked', '아직 못 만난 영웅 펫', 'a deep violet egg silhouette with a thin glowing lavender outline and three tiny silver stars around it (no face, no question mark)'],
+  ['epic-egg', '영웅 알 (알 상점)', 'a glossy violet egg with a big white star on its front and small lilac star patterns, resting on a small round purple cushion with gold tassels, a few sparkles'],
+  ['epic-badge', '영웅 배지', 'a shiny round violet gem badge with small silver wings on both sides and a white star in the middle, a soft lavender glow (no letters)']
+]);
 
 /* Google Drive: 그림을 그리는 GPT는 Drive에서 참고 그림을 열어 보고, 결과를 Drive 폴더에 올려요.
    규칙: 시트별 파일(split/)로 나가는 모든 주문서는 DRIVE에 폴더가 있어야 하고(없으면 멈춰요),
