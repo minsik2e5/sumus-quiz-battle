@@ -284,3 +284,7 @@ body[data-widget]:not([data-widget="all"]) .desktop-check-list,
 body[data-widget]:not([data-widget="all"]) .desktop-class-list { flex: 1 1 auto; max-height: none; min-height: 0; overflow: auto; }
 body[data-widget="notes"] .note-text { flex: 1 1 auto; height: auto; min-height: 0; }
 body[data-widget="notes"] .desktop-widget-section { display: flex; flex-direction: column; }
+
+.chk-row .grip { color: #c3cad3; cursor: grab; font-style: normal; font-size: 12px; letter-spacing: -2px; line-height: 20px; width: 10px; flex: none; user-select: none; }
+.chk-row:hover .grip { color: #8b95a1; }
+.chk-row.dragging { opacity: .45; background: #eef4ff; border-radius: 8px; }

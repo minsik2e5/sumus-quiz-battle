@@ -43,6 +43,7 @@ function draw() {
   if (!store?.data) return;
   // Do not redraw under the cursor (a memo being typed, a time being changed, a note line).
   const ae = document.activeElement;
+  if (dragging) return;
   if (ae && root.contains(ae) && ((ae.id === 'w-memo' && ae.value) || ae.dataset.time || ae.dataset.noteTask || ae.dataset.noteRoutine || ae.id === 'w-note-text' || ae.id === 'w-note-title')) { drawStatus(); return; }
   const s = S(), ov = s.scheduleOverrides[today], classes = C.classesOn(today, s), p = C.dayProgress(s, today);
   const tasks = s.tasks.filter(t => t.date === today).sort((a, b) => (a.start ?? '').localeCompare(b.start ?? ''));
@@ -54,8 +55,18 @@ function draw() {
     work: () => sec('clock-3', '출퇴근 · 생활', mins != null ? `<em>${C.fmtDuration(mins)} 근무</em>` : '', `<div class="desktop-time-list">${ATT.map(([k, l]) => `<div><span>${l}</span>${at[k] ? input(`type="time" value="${esc(at[k])}" data-time="${k}" aria-label="${l} 시간"`) : `<button type="button" data-now="${k}">지금</button>`}</div>`).join('')}</div>`),
     classes: () => sec('book-open-check', '오늘 수업', ov ? `<em>${esc(ov.label)}</em>` : '', `<div class="desktop-class-list">${classes.length ? classes.map((c, i) => { if (!c) return ''; const key = `${today}-${i}`, done = !!s.classDone[key], [st, en] = C.SLOT_TIMES[i] || ['보강', '']; return `<label class="${done ? 'done' : ''}">${checkbox(done, `data-class="${key}"`)}<span><b>${i + 1}</b><strong>${esc(c)}</strong><small>${st}–${en}</small></span></label>`; }).join('') : '<p>오늘은 수업이 없어요.</p>'}</div>`),
     quick: () => sec('plus', '일정 메모', '', `<div class="desktop-memo-add">${input('id="w-memo" maxlength="80" placeholder="할 일을 빠르게 적어보세요" autocomplete="off"')}<button type="button" data-act="memo" disabled aria-label="메모 추가">${icon('plus')}</button></div>`),
-    checklist: () => sec('list-checks', '오늘 체크리스트', `<em>${doneTasks + doneRoutines}/${tasks.length + routines.length}</em>`,
-      `<div class="desktop-check-list">${tasks.map(t => `<div class="chk-row ${t.done ? 'done' : ''}">${checkbox(t.done, `data-task="${esc(t.id)}"`)}<span><strong>${esc(t.title)}</strong><input class="sub-note" data-note-task="${esc(t.id)}" maxlength="60" value="${esc(t.note || '')}" placeholder="${!t.start || t.start === t.end ? '작게 메모' : `${esc(t.start)}–${esc(t.end)} · 작게 메모`}" aria-label="${esc(t.title)} 메모"></span></div>`).join('')}${routines.map(r => { const on = !!s.routineChecks[`${today}-${r.id}`]; return `<div class="chk-row ${on ? 'done' : ''}">${checkbox(on, `data-routine="${esc(r.id)}"`)}<span><strong>${esc(r.title)}</strong><input class="sub-note" data-note-routine="${esc(r.id)}" maxlength="60" value="${esc(r.note || '')}" placeholder="매일 루틴 · 작게 메모" aria-label="${esc(r.title)} 메모"></span></div>`; }).join('')}${!tasks.length && !routines.length ? '<p>체크할 항목이 없어요.</p>' : ''}</div>`),
+    checklist: () => {
+      // One list of today's tasks and daily routines; the order can be changed by dragging ⋮⋮.
+      const items = [...tasks.map(t => ({ k: `t:${t.id}`, t })), ...routines.map(r => ({ k: `r:${r.id}`, r }))].map((x, n) => ({ ...x, n }));
+      const ord = s.checkOrder?.[today] || [], pos = x => { const i = ord.indexOf(x.k); return i < 0 ? 1e6 + x.n : i; };
+      items.sort((a, b) => pos(a) - pos(b));
+      const row = x => {
+        if (x.t) { const t = x.t; return `<div class="chk-row ${t.done ? 'done' : ''}" draggable="true" data-ck="${esc(x.k)}"><i class="grip" aria-hidden="true">⋮⋮</i>${checkbox(t.done, `data-task="${esc(t.id)}"`)}<span><strong>${esc(t.title)}</strong><input class="sub-note" data-note-task="${esc(t.id)}" maxlength="60" value="${esc(t.note || '')}" placeholder="${!t.start || t.start === t.end ? '작게 메모' : `${esc(t.start)}–${esc(t.end)} · 작게 메모`}" aria-label="${esc(t.title)} 메모"></span></div>`; }
+        const r = x.r, on = !!s.routineChecks[`${today}-${r.id}`];
+        return `<div class="chk-row ${on ? 'done' : ''}" draggable="true" data-ck="${esc(x.k)}"><i class="grip" aria-hidden="true">⋮⋮</i>${checkbox(on, `data-routine="${esc(r.id)}"`)}<span><strong>${esc(r.title)}</strong><input class="sub-note" data-note-routine="${esc(r.id)}" maxlength="60" value="${esc(r.note || '')}" placeholder="매일 루틴 · 작게 메모" aria-label="${esc(r.title)} 메모"></span></div>`;
+      };
+      return sec('list-checks', '오늘 체크리스트', `<em>${doneTasks + doneRoutines}/${tasks.length + routines.length}</em>`, `<div class="desktop-check-list" id="w-checks">${items.map(row).join('')}${!items.length ? '<p>체크할 항목이 없어요.</p>' : ''}</div>`);
+    },
     notes: () => {
       const list = s.notes, cur = list.find(n => n.id === Q.get('n')) || list[0];
       return sec('file-text', '메모장', '', `<div class="note-tabs">${list.map(n => `<button type="button" class="${n.id === cur?.id ? 'on' : ''}" data-note-open="${esc(n.id)}">${esc(n.title || '제목 없음')}</button>`).join('')}<button type="button" data-act="note-new" aria-label="새 메모">${icon('plus')}</button></div>${cur
@@ -130,6 +141,23 @@ root.addEventListener('click', e => {
 root.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.time) { change(s => { (s.attendance[today] ||= { clockIn: '', clockOut: '' })[t.dataset.time] = t.value; }, { render: false }); patchWork(); }
+});
+// 체크리스트 순서 바꾸기 (끌어서 놓기)
+let dragging = null;
+root.addEventListener('dragstart', e => { const r = e.target.closest?.('.chk-row'); if (!r) return; dragging = r; r.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', r.dataset.ck); } catch {} });
+root.addEventListener('dragover', e => {
+  if (!dragging) return;
+  const list = document.getElementById('w-checks'), over = e.target.closest?.('.chk-row');
+  if (!list || !over || over === dragging || !list.contains(over)) { if (list?.contains(e.target)) e.preventDefault(); return; }
+  e.preventDefault();
+  const b = over.getBoundingClientRect();
+  list.insertBefore(dragging, e.clientY < b.top + b.height / 2 ? over : over.nextSibling);
+});
+root.addEventListener('dragend', () => {
+  if (!dragging) return;
+  dragging.classList.remove('dragging'); dragging = null;
+  const keys = [...document.querySelectorAll('#w-checks .chk-row')].map(r => r.dataset.ck);
+  change(s => { const o = (s.checkOrder ||= {}); o[today] = keys; for (const d of Object.keys(o).sort().slice(0, -14)) delete o[d]; }, { render: false });
 });
 root.addEventListener('input', e => {
   const t = e.target, d = t.dataset;

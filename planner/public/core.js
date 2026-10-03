@@ -85,7 +85,8 @@ export function createDefaultState(today) {
     monthlyClassPlans: {}, scheduleOverrides: {},
     exams: DEFAULT_EXAMS.map(x => ({ ...x })),
     examHistory: {},
-    notes: []
+    notes: [],
+    checkOrder: {}
   };
 }
 
@@ -105,7 +106,8 @@ export function normalizeState(st, today) {
     monthlyClassPlans: st.monthlyClassPlans ?? {}, scheduleOverrides: st.scheduleOverrides ?? {},
     exams: st.exams?.length ? st.exams : n.exams,
     examHistory: st.examHistory ?? {},
-    notes: Array.isArray(st.notes) ? st.notes : []
+    notes: Array.isArray(st.notes) ? st.notes : [],
+    checkOrder: st.checkOrder && typeof st.checkOrder === 'object' ? st.checkOrder : {}
   };
 }
 
