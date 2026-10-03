@@ -67,10 +67,20 @@ function medal(tier, iconName) {
 // Big emblem (collection, pop-ups). opts: { size: 'sm'|'md'|'lg'|'xl', locked, preview }
 // A locked title still shows its own medal, faded (locked) or in colour (preview), with a lock.
 const LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/></svg>';
+// V13.96 drawn title medals (asset list 11: /assets/titles/<key>.webp, 256px, and <key>-s.webp,
+// 96px, for the 34px size; 58px and up stay sharp on 3× phones with the big one). A title
+// listed here shows its picture; the rest keep the drawn
+// SVG medal, so a missing file never shows as a broken image. Empty until the sheets 11-1 …
+// 11-17 are cut.
+export const TITLE_ART = new Set([]);
 export function titleEmblem(key, opts = {}) {
-  const t = TITLES[key] || TITLES.rookie;
-  const locked = !!(opts.locked || opts.preview);
-  return `<span class="tt-emblem tt-emblem-${opts.size || 'md'} tier-${t.tier}${opts.locked ? ' is-locked' : ''}${opts.preview ? ' is-preview' : ''}" aria-hidden="true"><svg viewBox="0 0 64 64">${medal(t.tier, t.icon)}</svg>${locked ? `<i class="tt-lock">${LOCK}</i>` : ''}</span>`;
+  const k = TITLES[key] ? key : 'rookie', t = TITLES[k];
+  const locked = !!(opts.locked || opts.preview), size = opts.size || 'md';
+  const big = size !== 'sm';
+  const pic = TITLE_ART.has(k)
+    ? `<img class="tt-art" src="/assets/titles/${k}${big ? '' : '-s'}.webp" alt="" width="${big ? 256 : 96}" height="${big ? 256 : 96}" decoding="async" draggable="false">`
+    : `<svg viewBox="0 0 64 64">${medal(t.tier, t.icon)}</svg>`;
+  return `<span class="tt-emblem tt-emblem-${size} tier-${t.tier}${opts.locked ? ' is-locked' : ''}${opts.preview ? ' is-preview' : ''}" aria-hidden="true">${pic}${locked ? `<i class="tt-lock">${LOCK}</i>` : ''}</span>`;
 }
 // Title chip next to a name. opts: { size: 'xs'|'sm'|'md' }
 export function titleBadge(key, opts = {}) {
