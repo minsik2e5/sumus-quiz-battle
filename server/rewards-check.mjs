@@ -535,7 +535,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   const css86 = source('../public/v1386.css');
   const css861 = source('../public/v13861.css');
   assert(build85.includes('"v13861.css"') && css861.includes('.home-stack-v1360 .partner-card-btn{max-width:312px}') && css861.includes('.partner-art .avatar-art{position:absolute;left:50%;bottom:0') && css861.includes('.pet-say{left:auto;right:4%'), 'V13.86.1 the home card pet is a little bigger and stands on its frame; the bubble keeps off its face');
-  assert(rps85.includes('rps-arena comic') && rps85.includes('const ARM_ART = false') && rps85.includes("fist('me', res.pick, 'shown')") && rps85.includes('id="rps-mine"') && build85.includes('"v1386.css"') && css86.includes('.rps-vsburst{') && css86.includes('.rps-comic .bolt{') && css86.includes('.rps-arena.comic.win .rps-arm.me{'), 'V13.86 가위바위보 is a comic panel: a lightning split, a VS burst, arms from the edges, hand bars (arm art switches on with ARM_ART)');
+  assert(rps85.includes('rps-arena comic') && rps85.includes('const ARM_ART = true') && rps85.includes("fist('me', res.pick, 'shown')") && rps85.includes('id="rps-mine"') && build85.includes('"v1386.css"') && css86.includes('.rps-vsburst{') && css86.includes('.rps-comic .bolt{') && css86.includes('.rps-arena.comic.win .rps-arm.me{'), 'V13.86 가위바위보 is a comic panel: a lightning split, a VS burst, arms from the edges, hand bars (arm art switches on with ARM_ART)');
   assert(battle85.includes("showPose(el, 'hurt', 900)") && battle85.includes("showPose(el, 'attack', 900)"), 'V13.85 yacha pets show their attack and hurt poses');
   assert(build85.includes('"v1385.css"') && css85.includes('.coin-ico{background:url(/assets/ui/coin.webp)') && student85.includes("hatched ? 'care-feed' : 'care-warm'") && student85.includes("uiArt('notice')") && student85.includes("uiArt('gift', 'att-gift-art')"), 'V13.85 UI icons: pet care, notice, bell, install, attendance, the drawn coin');
 
@@ -654,17 +654,31 @@ export async function runRewardsChecks(assert, expectStatus) {
     const allText96 = prompts96.join('\n'), countOf = s => allText96.split(s).length - 1;
     assert(Object.entries(tierFrames).every(([tier, phrase]) => countOf(phrase) === keys96.filter(key => TITLES[key].tier === tier).length), 'V13.96 메달 테두리는 등급을 말한다(일반 민트 동그라미 · 희귀 육각형 · 영웅 방패 · 전설 금빛 햇살 · 한정 무지개)');
     // The app: a title with a picture shows it (big file from 58px, the 96px copy at 34px); the rest keep the SVG medal.
-    TITLE_ART.add('rookie');
+    const registered = [...TITLE_ART];
+    TITLE_ART.clear(); TITLE_ART.add('rookie');
     const drawn = titleEmblem('rookie', { size: 'md' }), drawnSmall = titleEmblem('rookie', { size: 'sm', locked: true }), fallback = titleEmblem('focus', { size: 'md' });
-    TITLE_ART.delete('rookie');
-    assert(drawn.includes('src="/assets/titles/rookie.webp"') && drawnSmall.includes('src="/assets/titles/rookie-s.webp"') && drawnSmall.includes('tt-lock') && !drawn.includes('<svg viewBox="0 0 64 64">') && fallback.includes('<svg viewBox="0 0 64 64">') && [...TITLE_ART].every(key => TITLES[key] && existsSync(fileURLToPath(new URL(`../public/assets/titles/${key}.webp`, import.meta.url))) && existsSync(fileURLToPath(new URL(`../public/assets/titles/${key}-s.webp`, import.meta.url)))), 'V13.96 그림이 등록된 칭호는 메달 그림(큰 그림 · 34px은 작은 그림)으로, 나머지는 지금 SVG 메달로 보이고, 등록된 그림은 파일이 있다');
+    TITLE_ART.clear(); registered.forEach(key => TITLE_ART.add(key));
+    assert(drawn.includes('src="/assets/titles/rookie.webp"') && drawnSmall.includes('src="/assets/titles/rookie-s.webp"') && drawnSmall.includes('tt-lock') && !drawn.includes('<svg viewBox="0 0 64 64">') && fallback.includes('<svg viewBox="0 0 64 64">') && registered.every(key => TITLES[key] && existsSync(fileURLToPath(new URL(`../public/assets/titles/${key}.webp`, import.meta.url))) && existsSync(fileURLToPath(new URL(`../public/assets/titles/${key}-s.webp`, import.meta.url)))), 'V13.96 그림이 등록된 칭호는 메달 그림(큰 그림 · 34px은 작은 그림)으로, 나머지는 지금 SVG 메달로 보이고, 등록된 그림은 파일이 있다');
     const ui96 = source('../public/modules/titles-ui.js'), css96 = source('../public/v1396.css');
     assert(["artOr('titles-hero'", "artOr('title-equipped'", "artOr('title-new'"].every(x => ui96.includes(x)) && css96.includes('.tt-emblem .tt-art{') && css96.includes('.tt-emblem.is-locked .tt-art{') && source('./build-assets.mjs').includes('"v1396.css"') && source('../docs/asset-requests/runner/fit-assets.mjs').includes("opt('--small')"), 'V13.96 칭호 도감 그림 3개 자리, 메달 그림의 잠김·미리보기 모습, 작은 그림을 만드는 --small');
+  }
+  /* ---------- V13.97 그림 연결: 칭호 메달 65개 · 가위바위보 팔 · 몬스터 화면 아이콘 ---------- */
+  {
+    const { existsSync } = await import('node:fs');
+    const { TITLE_ART, ART_READY } = await import('../public/modules/emblems.js');
+    const asset = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));
+    const webpSize = name => { const b = readFileSync(asset(name)); return b.toString('ascii', 12, 16) === 'VP8X' ? `${1 + b.readUIntLE(24, 3)}x${1 + b.readUIntLE(27, 3)}` : ''; };
+    const keys97 = Object.keys(TITLES);
+    assert(keys97.every(key => TITLE_ART.has(key)) && TITLE_ART.size === keys97.length && keys97.every(key => webpSize(`titles/${key}`) === '256x256' && webpSize(`titles/${key}-s`) === '96x96'), 'V13.97 칭호 65개 모두 메달 그림이 있다(256px, 작은 그림 96px)');
+    assert(['titles-hero', 'title-equipped', 'title-new'].every(key => ART_READY.has(key) && webpSize(`ui/${key}`) === '256x256'), 'V13.97 칭호 도감 그림 3개(진열장 · 장착 중 · 새 칭호)가 있고 등록되어 있다');
+    const arms = ['robot-rock', 'robot-scissors', 'robot-paper', 'robot-flag', 'me-rock', 'me-scissors', 'me-paper', 'me-thumb'];
+    const armSizes = arms.map(a => webpSize(`rps/arm-${a}`));
+    assert(arms.every(a => existsSync(asset(`rps/arm-${a}`))) && armSizes.slice(0, 4).every(s => s === armSizes[0]) && armSizes.slice(4).every(s => s === armSizes[4]) && source('../public/modules/rps.js').includes('const ARM_ART = true'), 'V13.97 가위바위보 팔 8장이 있고, 로보 팔 4장·내 팔 4장은 크기가 같아 포즈를 바꿔도 팔이 움직이지 않는다');
   }
   /* ---------- V13.93 08 그림 40장 ---------- */
   const ready93 = [...emblems91.matchAll(/ART_READY = new Set\(\[([^\]]*)\]/g)].flatMap(m => [...m[1].matchAll(/'([a-z0-9-]+)'/g)].map(x => x[1]));
   const arcade93 = source('../public/modules/arcade.js'), shop93 = source('../public/modules/pet-moments.js');
-  assert(ready93.length === 40 && wired91.every(key => ready93.includes(key)) && ['me-petbook', 'pet-epic-locked', 'epic-egg', 'epic-badge'].every(key => ready93.includes(key)) && student90.includes("'pet-epic-locked'") && arcade93.includes("artOr('epic-egg'") && lucky89.includes("artOr('epic-badge'") && shop93.includes("uiArt('epic-egg')"), 'V13.93 08 그림 40장(펫 도감·영웅 펫 4장 포함)이 모두 들어가 선 아이콘 대신 보인다');
+  assert(ready93.length === 43 /* the 40 of list 08, + 3 for the 칭호 도감 (V13.97) */ && wired91.every(key => ready93.includes(key)) && ['me-petbook', 'pet-epic-locked', 'epic-egg', 'epic-badge'].every(key => ready93.includes(key)) && student90.includes("'pet-epic-locked'") && arcade93.includes("artOr('epic-egg'") && lucky89.includes("artOr('epic-badge'") && shop93.includes("uiArt('epic-egg')"), 'V13.93 08 그림 40장(펫 도감·영웅 펫 4장 포함)이 모두 들어가 선 아이콘 대신 보인다');
   /* ---------- V13.92 영웅 펫 · 패드 화면 ---------- */
   assert(EPIC_PET_KEYS.join() === 'capybara,penguin,owl,hamster,shark,alpaca,hedgehog,otter' && STANDARD_PET_KEYS.length === 8 && EPIC_PET_KEYS.every(key => CHARACTERS[key].epic && !CHARACTERS[key].legendary && petTier(key) === 'epic') && petTier('dog') === 'basic' && petTier('qilin') === 'legendary' && EPIC_RATE === 3 && EPIC_EGG_PRICE === 1200, 'V13.92 영웅 펫 8마리는 기본과 전설 사이 등급이고, 영웅 알은 1,200코인, 뽑기 확률은 3%다');
   const epicFiles = EPIC_PET_KEYS.flatMap(key => [0, 1, 2, 3].flatMap(f => [`/assets/pets/${key}-${f}.webp`, `/assets/pets/${key}-${f}-s.webp`, ...(f ? ['happy', 'eat', 'sad', 'cheer'] : ['happy', 'eat']).map(e => expressionSrc(key, f, e))]));

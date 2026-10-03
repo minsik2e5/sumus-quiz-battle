@@ -10,7 +10,7 @@
 .tt-emblem.is-preview .tt-art{filter:saturate(.85) opacity(.92)}
 
 /* 칭호 도감 screen pictures (shown once they are drawn, see ART_READY). */
-.tt-page-head:has(.tt-head-art){position:relative;padding-right:96px}
-.tt-page-head .tt-head-art{position:absolute;right:-4px;top:-8px;width:96px;height:96px;filter:drop-shadow(0 6px 10px rgba(30,40,60,.18))}
+.tt-page-head:has(.tt-head-art){position:relative;padding-right:120px}
+.tt-page-head .tt-head-art{position:absolute;right:-6px;top:-4px;width:128px;height:128px;object-fit:contain;filter:drop-shadow(0 6px 10px rgba(30,40,60,.18))}
 .tt-tier-tag.equipped .tt-tag-art{width:15px;height:15px;margin:-3px 3px -3px -2px;vertical-align:middle}
 .tt-moment-kicker .tt-kicker-art{width:22px;height:22px;margin:-6px 5px -5px 0;vertical-align:middle}

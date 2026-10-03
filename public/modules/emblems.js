@@ -70,9 +70,22 @@ const LOCK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
 // V13.96 drawn title medals (asset list 11: /assets/titles/<key>.webp, 256px, and <key>-s.webp,
 // 96px, for the 34px size; 58px and up stay sharp on 3× phones with the big one). A title
 // listed here shows its picture; the rest keep the drawn
-// SVG medal, so a missing file never shows as a broken image. Empty until the sheets 11-1 …
-// 11-17 are cut.
-export const TITLE_ART = new Set([]);
+// SVG medal, so a missing file never shows as a broken image. V13.97: all 65, cut from the
+// sheets 11-1 … 11-16 (each medal fitted on its own, so a medal of one tier is the same size on
+// every sheet).
+export const TITLE_ART = new Set([
+  'rookie', 'focus', 'words100', 'streak3', 'perfect1', 'win1',
+  'words500', 'streak', 'perfect5', 'combo', 'pets4', 'win10',
+  'yacha3', 'words1000', 'streak14', 'perfect20', 'combo20', 'master',
+  'win50', 'yachaking', 'comeback', 'flawless', 'words3000', 'streak30',
+  'legend', 'pets8', 'win100', 'diamond', 'champion', 'weekly1',
+  'weekly2', 'weekly3', 'leagueking', 'pets2', 'study10', 'attend7',
+  'rps10', 'rpsjack', 'rpsgod', 'bot1', 'gift1', 'level10',
+  'level30', 'level40', 'level50', 'level60', 'study50', 'attend30',
+  'monster1', 'monster10', 'monsterhard', 'monsterlord', 'bothunter', 'skill10',
+  'exam3', 'words2000', 'study150', 'attend100', 'combo30', 'skill50',
+  'perfect50', 'yacha10', 'g_lucky', 'g_golden', 'g_god'
+]);
 export function titleEmblem(key, opts = {}) {
   const k = TITLES[key] ? key : 'rookie', t = TITLES[k];
   const locked = !!(opts.locked || opts.preview), size = opts.size || 'md';
@@ -115,6 +128,7 @@ export const ART_READY = new Set([
   'pet-legend-locked', 'empty-records', 'study-vocab', 'study-grammar', 'exam-practice', 'exam-test',
   'study-daily', 'flash-deck', 'flash-done', 'word-empty', 'badge-first100', 'badge-streak90',
   'badge-english100', 'badge-master', 'result-perfect', 'result-great', 'result-good', 'result-retry',
-  'me-petbook', 'pet-epic-locked', 'epic-egg', 'epic-badge'
+  'me-petbook', 'pet-epic-locked', 'epic-egg', 'epic-badge',
+  'titles-hero', 'title-equipped', 'title-new'
 ]);
 export const artOr = (key, fallback, cls = '') => ART_READY.has(key) ? uiArt(key, cls) : fallback;

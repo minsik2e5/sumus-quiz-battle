@@ -12,8 +12,8 @@
 // its fist, throws its hand, then reacts (gloats, gets dizzy, glitches at ×8, thinks on a tie).
 // V13.86 a comic panel: the screen splits along a lightning bolt (로보's half, my half) with a VS
 // burst in the middle, and two arms reach in from the screen edges, pump, and smash together.
-// Until the arm pictures are drawn (05-rps-arms.txt) the arms are drawn sleeves ending in the
-// hand medals; set ARM_ART once /assets/rps/arm-<robot|me>-<hand>.webp exist.
+// V13.97 the arm pictures (05-rps-arms, /assets/rps/arm-<robot|me>-<hand>.webp) are in; before
+// that the arms were drawn sleeves ending in the hand medals (ARM_ART = false still does that).
 import { api, esc, num, toast } from './ui.js';
 import { avatar } from './character.js';
 import { coin } from './emblems.js';
@@ -38,7 +38,7 @@ const SFX = {
 const ART = '/assets/rps/';
 const ROBOT_STILL = '/assets/pets/robot-3.webp';
 const ROBOT_POSES = ['ready', 'rock', 'scissors', 'paper', 'win', 'lose', 'shock', 'think'];
-const ARM_ART = false;
+const ARM_ART = true;
 const handArt = (hand, px = 256) => `<img src="${ART}hand-${hand}.webp" alt="" width="${px}" height="${px}" decoding="async" draggable="false">`;
 const ladder = (wins, bet) => Array.from({ length: RPS_MAX_WINS }, (_, i) => `<span class="rps-step${wins > i ? ' on' : ''}${wins === i ? ' next' : ''}"><b>×${2 ** (i + 1)}</b><small>${num(bet * 2 ** (i + 1))}</small></span>`).join('');
 const medal = (hand, cls = '') => `<span class="rps-medal art${hand ? ` h-${hand}` : ' idle'}${cls ? ` ${cls}` : ''}">${handArt(hand || 'rock')}</span>`;
