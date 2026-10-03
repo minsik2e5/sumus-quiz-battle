@@ -6,3 +6,4 @@ TOP-LEFT cell: ATTACK: a dynamic forward punch with a glowing mint energy trail 
 TOP-RIGHT cell: HIT: flinching backward with one arm raised to block, face screen shows > < eyes, a few small white impact stars
 BOTTOM-LEFT cell: HAPPY: jumping with both arms up, face screen shows big happy ^ ^ eyes and a wide smile, small hearts
 BOTTOM-RIGHT cell: SAD: sitting slumped, face screen shows teary droopy eyes, antenna ball drooping and dim
+WHEN DONE — upload the finished transparent PNG to Google Drive, into the folder "SUMUS 에셋 05·06 (Runner용)", named exactly "06-2.png" (if a file with that name is already there, replace it). Actually save the file to Google Drive; showing the picture in the chat is not enough.

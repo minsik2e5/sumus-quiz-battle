@@ -391,31 +391,60 @@ sheet(F8, '결과 도장', 'emblem', 'round result stamps of the same size, like
   ['ui-result-retry', '결과 다시 도전 (60점 미만)', 'a soft PEACH scalloped stamp with a white curved arrow going around in a circle and a small heart', 'public/assets/ui/result-retry.webp']
 ]);
 
-/* 그림체 기준 그림: 08·09는 처음 그리는 그림이라, 이미 앱에 있는 그림을 같이 올려 그림체를 맞춰요. */
+/* Google Drive: 그림을 그리는 GPT는 Drive에서 참고 그림을 열어 보고, 결과를 Drive 폴더에 올려요.
+   규칙: 시트별 파일(split/)로 나가는 모든 주문서는 DRIVE에 폴더가 있어야 하고(없으면 멈춰요),
+   끝에 "이 폴더에 이 이름으로 올리기"가 붙어요. 처음 그리는 그림(08·09a)은 기존 그림을 열어 보고 그림체를 맞춰요. */
+const DRIVE = {
+  [F5]: 'SUMUS 에셋 05·06 (Runner용)', [F6]: 'SUMUS 에셋 05·06 (Runner용)',
+  [F7A]: 'SUMUS 전설 펫 07 (Runner용)', [F7B]: 'SUMUS 전설 펫 07 (Runner용)',
+  [F8]: 'SUMUS 메뉴·학습 08 (Runner용)',
+  [F9A]: 'SUMUS 새 기본 펫 09 (Runner용)', [F9B]: 'SUMUS 새 기본 펫 09 (Runner용)'
+};
+const PET_SPRITES = 'SUMUS_PET_SPRITES_ALL_20261002/original_1254';
+const KEEP = 'Do NOT make it softer, blurrier, foggier, more painterly or more watercolor-like than the reference.';
 const STYLE_REF = {
-  pets: 'STYLE REFERENCE: the attached picture (style-ref-pets.png) shows four OTHER pets from this same game. Draw the new pet in exactly that art style: the same crisp, clean shapes and edges, the same clear soft pastel colors (not washed out, not hazy), the same glossy eyes with white highlights, the same light cel-like shading with a thin warm rim light, the same simple fur tufts and the same body proportions (big head, short legs). Do NOT make it softer, blurrier, foggier, more painterly or more watercolor-like than the reference, and do NOT copy the reference animals.',
-  icons: 'STYLE REFERENCE: the attached picture (style-ref-icons.png) shows icons already used in this game. Draw the new icons in exactly that style: the same glossy 3D toy-like plastic look, the same chunky rounded shapes, the same bright mint-and-cream palette, the same clean edges and soft lighting. Do NOT copy the reference objects.',
-  badges: 'STYLE REFERENCE: the attached picture (style-ref-badges.png) shows trophies and badges already used in this game. Draw the new medals or stamps in exactly that style: the same shiny metal and gem rendering, the same clean outline and soft sparkles. Do NOT copy the reference objects.'
+  pets: `STYLE REFERENCE — before drawing, open these pictures in Google Drive and study them: the existing pets of this game in the Drive folder "${PET_SPRITES}" (the folders MONG, NABI, PINKY and BAMBOO, each with 01_baby.png, 02_grown.png and 03_final.png). Draw the new pet in exactly that art style: the same crisp, clean shapes and edges, the same clear soft pastel colors (not washed out, not hazy), the same glossy eyes with white highlights, the same light cel-like shading with a thin warm rim light, the same simple fur tufts and the same body proportions (big head, short legs). ${KEEP} Do NOT copy the reference animals.`,
+  icons: `STYLE REFERENCE — before drawing, open "06-3.png" and "06-4.png" in the Google Drive folder "${DRIVE[F6]}": they show game art already used in this app (capsule machine, ticket, jackpot, capsules). Draw the new icons in exactly that style: the same glossy 3D toy-like look, the same chunky rounded shapes, the same bright pastel-and-mint palette, the same clean edges and soft lighting. Do NOT copy the reference objects.`,
+  badges: `STYLE REFERENCE — before drawing, open "07a-5.png" in the Google Drive folder "${DRIVE[F7A]}" (legendary egg and badge) and "06-3.png" in the Google Drive folder "${DRIVE[F6]}" (jackpot): they show shiny game art already used in this app. Draw the new medals or stamps in exactly that style: the same shiny metal and gem rendering, the same clean outline and soft sparkles. Do NOT copy the reference objects.`
 };
 const refOf = p => p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
-for (const p of prompts) {
-  const ref = refOf(p);
-  if (!ref) continue;
-  const lines = p.text.split('\n').filter(l => !l.startsWith('If a reference picture of this character'));
-  lines.splice(2, 0, STYLE_REF[ref]);
-  p.text = lines.join('\n');
-  p.ref = `refs/style-ref-${ref}.png`;
-}
+const NEW_ORDER = Object.keys(NEW_PETS);
+const sheetName = (file, i) => `${file.slice(0, /^\d\d[ab]-/.test(file) ? 3 : 2)}-${i + 1}`;
 
 /* 쓰기 */
 const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
+const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B]);
+for (const [file, list] of byFile) list.forEach((p, i) => {
+  if (!SPLIT.has(file)) return;
+  if (!DRIVE[file]) throw new Error(`${file}: Google Drive 폴더(DRIVE)가 없어요. 주문서에는 업로드 위치가 꼭 있어야 해요.`);
+  let lines = p.text.split('\n');
+  const ref = refOf(p);
+  if (ref) {
+    lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
+    lines.splice(2, 0, STYLE_REF[ref]);
+    p.ref = `Drive: ${ref === 'pets' ? PET_SPRITES : ref === 'icons' ? '06-3.png, 06-4.png' : '07a-5.png, 06-3.png'}`;
+  }
+  // 메뉴 아이콘 2~5번 시트: 같은 세트의 첫 시트(08-1.png)와도 맞춰요.
+  if (file === F8 && ref === 'icons' && /메뉴 아이콘 [2-9]/.test(p.title)) lines.splice(3, 0, `Also open "08-1.png" in the same Google Drive folder "${DRIVE[F8]}" (the first icons of this set) if it is there, and match it exactly.`);
+  // 09b: 그 펫의 설정 시트(09a-N.png)를 Drive에서 열어 얼굴·무늬·크기를 맞춰요.
+  if (file === F9B) {
+    const keys = NEW_ORDER.filter(k => p.title.includes(NEW_PETS[k].ko));
+    const sheets = keys.map(k => `"09a-${NEW_ORDER.indexOf(k) + 1}.png"`).join(' and ');
+    lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
+    lines.splice(3, 0, `CHARACTER REFERENCE — before drawing, open ${sheets} (the design sheet${keys.length > 1 ? 's' : ''}: egg, baby, grown, final) in the Google Drive folder "${DRIVE[F9B]}" and match ${keys.length > 1 ? 'each egg' : 'this pet\'s face, colors, markings, accessories and the body size of this growth stage'} exactly. ${KEEP}`);
+    p.ref = `Drive: ${sheets}`;
+  }
+  const name = sheetName(file, i);
+  lines.push(`WHEN DONE — upload the finished transparent PNG to Google Drive, into the folder "${DRIVE[file]}", named exactly "${name}.png" (if a file with that name is already there, replace it). Actually save the file to Google Drive; showing the picture in the chat is not enough.`);
+  p.text = lines.join('\n');
+  p.drive = `${DRIVE[file]} / ${name}.png`;
+});
 for (const [file, list] of byFile) writeFileSync(resolve(here, file), list.map(p => p.text).join('\n---\n') + '\n');
 writeFileSync(resolve(here, '00-all-in-order.txt'), prompts.map(p => p.text).join('\n---\n') + '\n');
 // Sheets that each need their own chat (their own reference picture) also go one per file in split/.
-const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B]);
 mkdirSync(resolve(here, 'split'), { recursive: true });
-for (const [file, list] of byFile) if (SPLIT.has(file)) list.forEach((p, i) => writeFileSync(resolve(here, 'split', `${file.slice(0, /^\d\d[ab]-/.test(file) ? 3 : 2)}-${i + 1} ${p.title.replace(/[\\/:*?"<>|()]/g, '').replace(/\s+/g, ' ').trim()}.txt`), p.text + '\n'));
+for (const [file, list] of byFile) if (SPLIT.has(file)) list.forEach((p, i) => writeFileSync(resolve(here, 'split', `${sheetName(file, i)} ${p.title.replace(/[\\/:*?"<>|()]/g, '').replace(/\s+/g, ' ').trim()}.txt`), p.text + '\n'));
 const csv = v => `"${String(v).replace(/"/g, '""')}"`;
 writeFileSync(resolve(here, 'slice-map.csv'), '﻿' + ['list,prompt_no,sheet,cell,key,name,app_file', ...slices.map(s => [s.file, String(s.no).padStart(3, '0'), s.title, s.cell, s.key, s.name, s.out].map(csv).join(','))].join('\n') + '\n');
 console.log([...byFile].map(([f, l]) => `${f}: ${l.length} prompts → ${l.length * 4} images`).join('\n'));
