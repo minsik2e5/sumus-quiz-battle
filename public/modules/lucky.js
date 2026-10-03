@@ -49,7 +49,14 @@ const SFX = {
   even: () => tone([587, 698], { type: 'triangle', gap: .1, len: .18, vol: .04 }),
   win: () => { tone([659, 784, 988, 1319], { type: 'triangle', gap: .08, len: .2, vol: .045 }); buzz([30, 40, 30]); },
   jackpot: () => { tone([523, 659, 784, 1047, 1319, 1568], { type: 'square', gap: .09, len: .24, vol: .03 }); buzz([40, 50, 40, 50, 120]); },
-  miss: () => tone([392, 330, 262], { type: 'triangle', gap: .15, len: .28, vol: .04 })
+  miss: () => tone([392, 330, 262], { type: 'triangle', gap: .15, len: .28, vol: .04 }),
+  // V13.91 the legendary show
+  rumble: () => { tone([62, 58], { type: 'sawtooth', len: .9, gap: .25, vol: .05, slide: -12 }); buzz([60, 80, 60]); },
+  rise: () => tone([220, 330, 440, 587, 784], { type: 'sine', len: .32, gap: .16, vol: .035, slide: 60 }),
+  beat: n => { tone([70 + n * 10, 70 + n * 10], { type: 'sine', len: .14, gap: .16, vol: .09 + n * .02, slide: -30 }); buzz([35, 90, 45]); },
+  crack: () => { tone([1900, 1400, 2300, 1700], { type: 'square', len: .035, gap: .05, vol: .025 }); buzz(25); },
+  boom: () => { tone([95], { type: 'sawtooth', len: .7, vol: .1, slide: -60 }); tone([2637, 3136], { type: 'triangle', len: .5, gap: .04, vol: .03, slide: -900 }); buzz([90, 40, 180]); },
+  fanfare: () => { tone([523, 659, 784, 1047], { type: 'triangle', gap: .11, len: .22, vol: .05 }); setTimeout(() => tone([784, 1047, 1319, 1568, 2093], { type: 'square', gap: .09, len: .3, vol: .028 }), 520); setTimeout(() => tone([1047, 1319, 1568], { type: 'triangle', gap: 0, len: 1.1, vol: .035 }), 1050); }
 };
 
 /* ---------- the machine ---------- */
@@ -112,63 +119,90 @@ function confetti() {
   const colors = ['#ffd35a', '#ff6b8a', '#5ac8fa', '#6ee7a8', '#a78bfa', '#ff9f43'];
   return Array.from({ length: 46 }, (_, i) => `<i class="lk-conf" style="left:${(i * 53) % 100}%;--c:${colors[i % colors.length]};--d:${(1.6 + (i % 7) * .22).toFixed(2)}s;--delay:${((i % 9) * .07).toFixed(2)}s;--r:${(i * 47) % 360}deg"></i>`).join('');
 }
+// V13.91 전설 연출: about six seconds, built so nobody can miss it. The screen goes dark and
+// rumbles, the legendary egg rises, its heart beats three times, light cracks out of it, a white
+// flash and shock rings, then rays turn behind the pet's egg with the shadow of what it grows
+// into, the letters of LEGENDARY drop in and gold rains down. A tap jumps to the reveal;
+// reduced motion shows the reveal at once.
+function stars(n) {
+  return Array.from({ length: n }, (_, i) => `<i class="lgx-star" style="left:${(i * 37) % 100}%;--d:${(2.2 + (i % 6) * .35).toFixed(2)}s;--delay:${((i % 11) * .18).toFixed(2)}s;--s:${.6 + (i % 4) * .25}"></i>`).join('');
+}
+function motes(n) {
+  return Array.from({ length: n }, (_, i) => { const a = i / n * Math.PI * 2, r = 150 + (i * 53) % 120; return `<i class="lgx-mote" style="--x:${Math.round(Math.cos(a) * r)}px;--y:${Math.round(Math.sin(a) * r)}px;--d:${(.9 + (i % 5) * .12).toFixed(2)}s;--delay:${((i % 7) * .1).toFixed(2)}s"></i>`; }).join('');
+}
 function legendaryShow(res, { again = false, againLabel = '' } = {}) {
   return new Promise(resolve => {
-    const key = res.legendary.key, name = CHARACTERS[key]?.ko || '전설 펫';
+    const key = res.legendary.key, c = CHARACTERS[key] || {}, name = c.ko || '전설 펫';
     const box = document.createElement('div');
-    box.className = 'lk-show lk-legend-show';
+    box.className = 'lk-show lk-legend-show lgx';
+    box.style.setProperty('--lc', c.color || '#e9a23b');
+    box.style.setProperty('--ll', c.light || '#ffe08a');
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
     box.setAttribute('aria-label', `전설 펫 ${name} 획득`);
     box.innerHTML = `<div class="lk-legend-sky" aria-hidden="true"></div>
-      <div class="lk-legend-stage" id="lk-legend-stage" aria-hidden="true">
-        <img class="lk-legend-glow" src="/assets/lucky/legend-egg-glow.webp" alt="">
-        <img class="lk-legend-egg" src="/assets/lucky/legend-egg.webp" alt="">
-        <img class="lk-legend-burst" src="/assets/lucky/legend-egg-burst.webp" alt="">
+      <div class="lgx-rays" aria-hidden="true"></div>
+      <div class="lgx-omen" aria-hidden="true"><i></i><span>특별한 기운이 느껴져요…</span></div>
+      <div class="lgx-motes" aria-hidden="true">${motes(28)}</div>
+      <div class="lgx-stage" aria-hidden="true">
+        <div class="lgx-aura"></div>
+        <img class="lgx-glow" src="/assets/lucky/legend-egg-glow.webp" alt="">
+        <img class="lgx-egg" src="/assets/lucky/legend-egg.webp" alt="">
+        <img class="lgx-burst" src="/assets/lucky/legend-egg-burst.webp" alt="">
       </div>
-      <div class="lk-legend-result" id="lk-legend-result" hidden>
-        <img class="lk-legend-badge" src="/assets/lucky/legend-badge.webp" alt="전설">
-        <img class="lk-legend-pet" src="/assets/pets/${key}-0.webp" alt="${esc(name)}의 알">
-        <span class="lk-legend-kicker">LEGENDARY PET</span><h2>전설 펫을 만났어요!</h2><h3>${esc(name)}의 알</h3>
-        <p>${res.legendary.guaranteed ? `${num(res.legendary.pull)}번째 뽑기 확정 보상이에요.` : '0.5%의 행운이 찾아왔어요!'} 학교 친구들에게도 소식이 전해져요.</p>
-        <small>코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}</small>
-        <div class="lk-actions">${again ? `<button type="button" class="lk-again" data-lk="again">한 번 더 <em>${againLabel}</em></button>` : ''}<button type="button" class="lk-ok" data-lk="ok">확인</button></div>
+      <div class="lgx-rings" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="lgx-flash" aria-hidden="true"></div>
+      <div class="lgx-reveal" id="lgx-reveal" hidden>
+        <div class="lgx-word" aria-hidden="true">${[...'LEGENDARY'].map((ch, i) => `<b style="--i:${i}">${ch}</b>`).join('')}</div>
+        <div class="lgx-art">
+          <img class="lgx-future" src="/assets/pets/${key}-3.webp" alt="" aria-hidden="true">
+          <img class="lgx-pet" src="/assets/pets/${key}-0.webp" alt="${esc(name)}의 알">
+          <img class="lgx-badge" src="/assets/lucky/legend-badge.webp" alt="전설">
+        </div>
+        <div class="lgx-card">
+          <span class="lk-legend-kicker">LEGENDARY PET · ${esc(c.type || '')}</span><h2>전설 펫을 만났어요!</h2><h3>${esc(name)}의 알</h3>
+          <p>${res.legendary.guaranteed ? `${num(res.legendary.pull)}번째 뽑기 확정 보상이에요.` : `${LEGENDARY_RATE}%의 행운이 찾아왔어요!`} 뒤에 비치는 모습으로 자라요. 학교 친구들에게도 소식이 전해져요.</p>
+          <small>코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}</small>
+          <div class="lk-actions">${again ? `<button type="button" class="lk-again" data-lk="again">한 번 더 <em>${againLabel}</em></button>` : ''}<button type="button" class="lk-ok" data-lk="ok">확인</button></div>
+        </div>
       </div>
+      <div class="lgx-rain" aria-hidden="true"></div>
       <button type="button" class="lk-skip" data-lk="skip">건너뛰기</button>`;
     document.body.appendChild(box);
-    const stage = box.querySelector('#lk-legend-stage'), result = box.querySelector('#lk-legend-result');
-    let shown = false;
+    const reveal = box.querySelector('#lgx-reveal');
+    let shown = false, ready = false;
     const close = go => { box.classList.add('bye'); setTimeout(() => box.remove(), 180); resolve(!!go); };
     const showResult = () => {
       if (shown) return;
       shown = true;
-      box.classList.add('legend-opened');
+      box.classList.add('p4', 'p5', 'legend-opened');
       box.querySelector('.lk-skip')?.remove();
-      stage.remove();
-      result.hidden = false;
+      reveal.hidden = false;
+      box.querySelector('.lgx-rain').innerHTML = stars(36);
       box.insertAdjacentHTML('beforeend', `<div class="lk-confetti" aria-hidden="true">${confetti()}</div>`);
-      SFX.jackpot();
-      (box.querySelector('.lk-again') || box.querySelector('.lk-ok')).focus({ preventScroll: true });
+      SFX.fanfare();
+      // The buttons wait a moment, so a tap meant to skip does not close the reveal.
+      setTimeout(() => { ready = true; box.classList.add('ready'); (box.querySelector('.lk-again') || box.querySelector('.lk-ok'))?.focus({ preventScroll: true }); }, reduced() ? 0 : 900);
     };
+    const flashThenShow = () => { if (shown) return; box.classList.add('p4'); SFX.boom(); setTimeout(showResult, reduced() ? 0 : 380); };
     box.addEventListener('click', e => {
       const b = e.target.closest('[data-lk]');
-      if (!shown) return showResult();
+      if (!shown) return flashThenShow();
+      if (!ready) return;
       if (b?.dataset.lk === 'again') return close(true);
       if (b?.dataset.lk === 'ok') return close(false);
     });
-    box.addEventListener('keydown', e => { if (e.key === 'Escape' && shown) close(false); });
+    box.addEventListener('keydown', e => { if (e.key === 'Escape' && ready) close(false); });
     requestAnimationFrame(() => box.classList.add('open'));
     if (reduced()) return showResult();
+    const step = (ms, fn) => new Promise(r => setTimeout(() => { if (!shown) fn(); r(); }, ms));
     (async () => {
-      await wait(250);
-      stage.classList.add('awaken');
-      SFX.wobble(2);
-      await wait(1100);
-      if (shown) return;
-      stage.classList.add('burst');
-      SFX.pop();
-      await wait(650);
-      showResult();
+      await step(120, () => { box.classList.add('p0'); SFX.rumble(); });
+      await step(900, () => { box.classList.add('p1'); SFX.rise(); });
+      for (let n = 0; n < 3; n++) await step(n ? 520 : 900, () => { box.classList.remove('beat'); void box.offsetWidth; box.classList.add('p2', 'beat', `b${n + 1}`); SFX.beat(n); });
+      await step(560, () => { box.classList.add('p3'); SFX.crack(); });
+      await step(520, () => { box.classList.add('p4'); SFX.boom(); });
+      await step(420, showResult);
     })();
   });
 }

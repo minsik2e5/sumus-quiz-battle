@@ -37,3 +37,103 @@ img.locked-art{width:76%;height:76%;object-fit:contain}
 img.result-stamp{display:block;width:96px;height:96px;margin:4px auto -6px;object-fit:contain;animation:stampIn .45s cubic-bezier(.3,1.6,.5,1) .15s both}
 @keyframes stampIn{from{opacity:0;transform:scale(1.8) rotate(-12deg)}}
 @media (prefers-reduced-motion:reduce){img.result-stamp{animation:none}}
+
+/* V13.91 펫 도감 (나 → 펫 도감) */
+.pb-progress{display:grid;gap:6px;margin:4px 0 18px;padding:14px 16px;border:1px solid #d5ece3;border-radius:20px;background:linear-gradient(135deg,#f2fbf7,#fff 60%,#fff9e8)}
+.pb-progress div{display:flex;align-items:baseline;gap:6px}.pb-progress div b{font-size:30px;font-weight:950;color:#0f7a58;font-variant-numeric:tabular-nums}.pb-progress div span{font-size:13px;font-weight:800;color:#51736a}
+.pb-progress i{display:block;height:10px;border-radius:99px;background:linear-gradient(90deg,#10b981 var(--p),#e3efea var(--p))}
+.pb-progress small{font-size:12px;color:#6b7c78}
+.pb-section{display:flex;align-items:center;gap:8px;margin:16px 0 10px;font-size:17px}.pb-section:before{content:'';width:6px;height:18px;border-radius:3px;background:#10b981}.pb-section.legend:before{background:linear-gradient(#ffd36a,#e39a2b)}
+.pb-grid{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:760px){.pb-grid{grid-template-columns:1fr 1fr}}
+.pb-card{padding:12px 12px 10px;border:2px solid var(--pl);border-radius:22px;background:#fff;box-shadow:0 6px 16px rgba(30,60,50,.07)}
+.pb-card header{display:flex;align-items:center;gap:7px;min-width:0}
+.pb-card header b{font-size:18px;font-weight:950}.pb-card header em{font-style:normal;font-size:12px;font-weight:800;color:#6b7c78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pb-no{font-size:11px;font-weight:900;color:var(--pc);background:var(--ps);padding:3px 7px;border-radius:8px}
+.pb-type{margin-left:auto;font-size:11px;font-weight:800;color:var(--pc);background:var(--ps);padding:3px 9px;border-radius:99px;white-space:nowrap}
+.pb-legend{font-size:11px;font-weight:950;color:#8a5a00;background:linear-gradient(#ffe9a8,#ffcf5a);padding:3px 8px;border-radius:99px;white-space:nowrap}
+.pb-forms{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
+.pb-form{margin:0;text-align:center}
+.pb-form .pb-sprite{display:block;width:100%;aspect-ratio:1;height:auto;object-fit:contain;border-radius:16px;background:radial-gradient(circle at 50% 62%,var(--ps),#fff 72%)}
+.pb-sprite.shadow{filter:brightness(0) opacity(.16);background:none}
+.pb-form figcaption{margin-top:2px;font-size:11px;font-weight:800;color:#9aa8a4}.pb-form.seen figcaption{color:#2d3a37}
+.pb-card footer{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:8px;padding-top:8px;border-top:1.5px dashed #e7efec;font-size:12px;color:#6b7c78}
+.pb-card footer b{font-size:13px;color:#22302d}
+.pb-skill{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:900;color:#fff;background:var(--pc);padding:3px 7px;border-radius:7px}
+.pb-skill.gold{background:linear-gradient(#f0b444,#d98a2b)}.pb-skill.lock{background:#a5b3af}.pb-skill svg{width:11px;height:11px}
+.pb-lv{margin-left:auto;font-size:11px;font-weight:900;color:var(--pc)}
+.pb-card.unmet{border-color:#e5ece9;background:#fbfcfc}
+.pb-card.legend{border:3px solid transparent;background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,#ffe08a,#e9a23b,#fff3c4,#d98a2b) border-box}
+.pb-card.legend.met{box-shadow:0 8px 24px rgba(220,150,40,.22);background:linear-gradient(160deg,#fffaf0,#fff 55%) padding-box,linear-gradient(135deg,#ffe08a,#e9a23b,#fff3c4,#d98a2b) border-box}
+.pb-card.legend .pb-form .pb-sprite:not(.shadow){background:radial-gradient(circle at 50% 62%,#fff1c9,#fff 72%)}
+.pb-card.legend.unmet .pb-sprite.shadow{filter:brightness(0) opacity(.22) drop-shadow(0 0 6px rgba(240,180,60,.9))}
+.me-tile.petbook .me-ico{background:#fdeee0;color:#d9822b}
+
+/* V13.91 전설 연출 (lucky.js legendaryShow): p0 어둠·예감 → p1 알이 떠오름 → p2 심장 박동 3번 → p3 빛이 새어 나옴 → p4 섬광·충격파 → p5 공개 */
+.lgx{background:#05030f;transition:opacity .25s,background 1.2s}
+.lgx.p2{background:radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--lc) 38%,#140b2e) 0%,#05030f 62%)}
+.lgx.p5{background:radial-gradient(circle at 50% 42%,color-mix(in srgb,var(--ll) 55%,#3b2470) 0%,#1a0f3d 45%,#05030f 100%)}
+.lgx .lk-legend-sky{opacity:0;transition:opacity 1.2s}.lgx.p1 .lk-legend-sky{opacity:.45}.lgx.p5 .lk-legend-sky{opacity:.8}
+.lgx-omen{position:absolute;left:0;right:0;top:50%;display:grid;justify-items:center;gap:14px;opacity:0;transform:translateY(-50%);transition:opacity .5s;pointer-events:none}
+.lgx-omen i{display:block;height:2px;width:0;background:linear-gradient(90deg,transparent,#ffe28a,#fff,#ffe28a,transparent);box-shadow:0 0 18px 4px rgba(255,214,90,.55);transition:width .9s cubic-bezier(.2,.8,.2,1)}
+.lgx-omen span{font-size:15px;font-weight:900;letter-spacing:.08em;color:#ffe9a8;text-shadow:0 0 12px rgba(255,200,60,.7);animation:lgxFlicker .9s steps(2) infinite}
+.lgx.p0 .lgx-omen{opacity:1}.lgx.p0 .lgx-omen i{width:min(80vw,420px)}.lgx.p1 .lgx-omen{opacity:0;transition-duration:.35s}
+.lgx-stage{position:absolute;left:50%;top:50%;width:min(70vw,340px);aspect-ratio:1;transform:translate(-50%,calc(-50% + 70vh)) scale(.55);transition:transform 1.05s cubic-bezier(.16,.9,.25,1.08);pointer-events:none}
+.lgx.p1 .lgx-stage{transform:translate(-50%,-50%) scale(1)}
+.lgx-stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.lgx-aura{position:absolute;inset:-30%;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--ll) 85%,#fff) 0%,color-mix(in srgb,var(--lc) 60%,transparent) 32%,transparent 62%);opacity:.2;transition:opacity .35s,transform .35s}
+.lgx.b1 .lgx-aura{opacity:.45}.lgx.b2 .lgx-aura{opacity:.7;transform:scale(1.1)}.lgx.b3 .lgx-aura{opacity:1;transform:scale(1.25)}
+.lgx-glow{opacity:.6;animation:lkLegendGlow 1.2s ease-in-out infinite alternate}
+.lgx-egg{inset:14%!important;width:72%!important;height:72%!important;filter:drop-shadow(0 18px 22px rgba(0,0,0,.45))}
+.lgx-burst{opacity:0;transform:scale(.4);transition:opacity .3s,transform .5s cubic-bezier(.2,.8,.2,1)}
+.lgx.beat .lgx-egg{animation:lgxBeat .46s cubic-bezier(.3,1.6,.5,1)}
+.lgx.beat .lgx-stage{animation:lgxShake .46s linear}
+.lgx.p3 .lgx-egg{animation:lgxRattle .09s linear infinite}
+.lgx.p3 .lgx-burst{opacity:.55;transform:scale(.78)}
+.lgx.p4 .lgx-egg,.lgx.p4 .lgx-glow{opacity:0;transition:opacity .15s}
+.lgx.p4 .lgx-burst{opacity:0;transform:scale(1.9);transition:opacity .6s .1s,transform .6s}
+.lgx.p5 .lgx-stage{display:none}
+.lgx-motes{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none}
+.lgx-mote{position:absolute;width:6px;height:6px;margin:-3px;border-radius:50%;background:#fff3b8;box-shadow:0 0 10px 3px color-mix(in srgb,var(--ll) 80%,#ffd25a);opacity:0}
+.lgx.p1 .lgx-mote{animation:lgxMote var(--d) ease-in var(--delay) 3}
+.lgx.p4 .lgx-motes{display:none}
+.lgx-rings{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none}
+.lgx-rings i{position:absolute;left:-60px;top:-60px;width:120px;height:120px;border-radius:50%;border:5px solid #fff4c2;box-shadow:0 0 30px color-mix(in srgb,var(--ll) 90%,#ffd25a),inset 0 0 22px rgba(255,236,160,.8);opacity:0}
+.lgx.p4 .lgx-rings i{animation:lgxRing .9s cubic-bezier(.1,.7,.3,1) both}.lgx.p4 .lgx-rings i:nth-child(2){animation-delay:.12s}.lgx.p4 .lgx-rings i:nth-child(3){animation-delay:.26s}
+.lgx-flash{position:absolute;inset:0;background:radial-gradient(circle,#fff 0%,#fffbe6 40%,color-mix(in srgb,var(--ll) 70%,#fff) 100%);opacity:0;pointer-events:none;z-index:6}
+.lgx.p4 .lgx-flash{animation:lgxFlash .85s ease-out both}
+.lgx-rays{position:absolute;left:50%;top:42%;width:170vmax;height:170vmax;margin:-85vmax 0 0 -85vmax;border-radius:50%;opacity:0;pointer-events:none;background:repeating-conic-gradient(from 0deg,color-mix(in srgb,var(--ll) 60%,transparent) 0deg 7deg,transparent 7deg 18deg,rgba(255,226,130,.35) 18deg 22deg,transparent 22deg 30deg);-webkit-mask:radial-gradient(circle,#000 0%,rgba(0,0,0,.65) 22%,transparent 52%);mask:radial-gradient(circle,#000 0%,rgba(0,0,0,.65) 22%,transparent 52%);transition:opacity .8s}
+.lgx.p3 .lgx-rays{opacity:.25}.lgx.p5 .lgx-rays{opacity:1;animation:lgxSpin 22s linear infinite}
+.lgx-reveal[hidden]{display:none!important}
+.lgx-reveal{position:relative;z-index:4;display:flex;flex-direction:column;align-items:center;width:min(92vw,430px);max-height:100%;padding:12px 0 calc(12px + env(safe-area-inset-bottom,0px))}
+.lgx-word{display:flex;gap:2px;margin-bottom:2px}
+.lgx-word b{display:block;font-size:clamp(26px,8.6vw,40px);font-weight:950;letter-spacing:.02em;background:linear-gradient(180deg,#fffbe6 10%,#ffd95a 45%,#f0a500 70%,#fff3c0 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 0 #8a5600) drop-shadow(0 0 12px rgba(255,205,70,.65));animation:lgxDrop .55s cubic-bezier(.3,1.7,.5,1) calc(.08s * var(--i)) both}
+.lgx-art{position:relative;width:min(64vw,270px);aspect-ratio:1;margin:-4px 0 -6px}
+.lgx-art img{position:absolute;object-fit:contain}
+.lgx-future{inset:-6%;width:112%;height:112%;filter:brightness(0) invert(1) drop-shadow(0 0 16px color-mix(in srgb,var(--ll) 90%,#fff)) drop-shadow(0 0 34px var(--lc));opacity:.4;animation:lgxFuture 1.4s ease-out .25s both}
+.lgx-pet{inset:12%;width:76%;height:76%;filter:drop-shadow(0 16px 20px rgba(0,0,0,.45)) drop-shadow(0 0 22px rgba(255,226,140,.55));animation:lgxPet .8s cubic-bezier(.25,1.5,.45,1) both,lgxFloat 2.6s ease-in-out 1s infinite}
+.lgx-badge{right:-2%;top:2%;width:30%;height:30%;filter:drop-shadow(0 4px 10px rgba(255,190,40,.6));animation:lgxBadge .6s cubic-bezier(.3,1.8,.5,1) .7s both}
+.lgx-card{width:100%;padding:16px 20px 16px;border:1.5px solid rgba(255,224,112,.8);border-radius:26px;text-align:center;background:linear-gradient(150deg,rgba(55,28,91,.92),rgba(20,17,61,.95));box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 0 4px rgba(255,214,90,.12),inset 0 1px rgba(255,255,255,.25);animation:lgxCard .6s cubic-bezier(.2,.9,.25,1.15) .45s both}
+.lgx-card h2{margin:4px 0 0;font-size:24px;color:#fff4b8}.lgx-card h3{margin:2px 0 0;font-size:20px;color:#fff}
+.lgx-card p{margin:8px auto 4px;max-width:330px;color:#e9e1ff;font-size:13px;line-height:1.55}.lgx-card>small{display:block;color:#bdb3d8;font-size:11px}
+.lgx-card .lk-actions{margin-top:12px;opacity:.35;transition:opacity .3s}.lgx.ready .lgx-card .lk-actions{opacity:1}
+.lgx-rain{position:absolute;inset:0;pointer-events:none;z-index:3;overflow:hidden}
+.lgx-star{position:absolute;top:-24px;width:14px;height:14px;transform:scale(var(--s));background:radial-gradient(circle,#fff 0 18%,transparent 20%),conic-gradient(from 45deg,#ffe28a 0 25%,transparent 0 50%,#ffe28a 0 75%,transparent 0);clip-path:polygon(50% 0,62% 38%,100% 50%,62% 62%,50% 100%,38% 62%,0 50%,38% 38%);filter:drop-shadow(0 0 4px #ffd25a);animation:lgxFall var(--d) linear var(--delay) infinite}
+.lgx .lk-skip{z-index:7}
+@keyframes lgxFlicker{50%{opacity:.55}}
+@keyframes lgxBeat{0%{transform:scale(1)}35%{transform:scale(1.12)}60%{transform:scale(.97)}100%{transform:scale(1)}}
+@keyframes lgxShake{20%{translate:-4px 2px}40%{translate:4px -2px}60%{translate:-3px -1px}80%{translate:2px 2px}}
+@keyframes lgxRattle{0%{transform:rotate(-5deg) translateX(-3px)}50%{transform:rotate(5deg) translateX(3px)}100%{transform:rotate(-5deg) translateX(-3px)}}
+@keyframes lgxMote{0%{opacity:0;transform:translate(var(--x),var(--y)) scale(.6)}25%{opacity:1}100%{opacity:0;transform:translate(0,0) scale(.2)}}
+@keyframes lgxRing{0%{opacity:1;transform:scale(.3)}100%{opacity:0;transform:scale(7)}}
+@keyframes lgxFlash{0%{opacity:0}12%{opacity:1}35%{opacity:1}100%{opacity:0}}
+@keyframes lgxSpin{to{transform:rotate(1turn)}}
+@keyframes lgxDrop{0%{opacity:0;transform:translateY(-60px) scale(1.6)}100%{opacity:1;transform:none}}
+@keyframes lgxFuture{0%{opacity:0;transform:scale(.7)}100%{opacity:.4;transform:none}}
+@keyframes lgxPet{0%{opacity:0;transform:scale(.2) rotate(-12deg)}100%{opacity:1;transform:none}}
+@keyframes lgxFloat{50%{translate:0 -8px}}
+@keyframes lgxBadge{0%{opacity:0;transform:scale(2.4) rotate(-30deg)}100%{opacity:1;transform:none}}
+@keyframes lgxCard{0%{opacity:0;transform:translateY(60px)}100%{opacity:1;transform:none}}
+@keyframes lgxFall{0%{transform:translateY(0) rotate(0) scale(var(--s))}100%{transform:translateY(110vh) rotate(540deg) scale(var(--s))}}
+@media(max-height:700px){.lgx-art{width:min(52vw,210px)}.lgx-card{padding:12px 16px}.lgx-card p{font-size:12px}.lgx-word b{font-size:clamp(22px,7vw,32px)}}
+@media(prefers-reduced-motion:reduce){.lgx *,.lgx{animation:none!important;transition:none!important}.lgx-future{opacity:.4}}

@@ -1,4 +1,4 @@
-import { CHARACTERS, STANDARD_PET_KEYS, ACCESSORIES, FRAMES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, petForm, unlocked, levelInfo, dayKey, cardTier, testDurationSec, TEST_LEAVE_LIMIT } from './core.js';
+import { CHARACTERS, STANDARD_PET_KEYS, LEGENDARY_PET_KEYS, ACCESSORIES, FRAMES, PRACTICE_TYPES, EXAM_TYPES, PRACTICE_SECONDS_PER_QUESTION, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, petForm, unlocked, levelInfo, dayKey, cardTier, testDurationSec, TEST_LEAVE_LIMIT } from './core.js';
 import { icon, esc, num, date, rangeLabel, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar, petKey, RUN_SHEETS } from './character.js';
 import { knownWords } from './flashcards.js';
@@ -9,13 +9,14 @@ import { titlesPage, titleState, titleCount } from './titles-ui.js';
 import { tournamentCard } from './tournament-ui.js';
 import { shownTitle } from './league-ui.js';
 import { arcadePage, gachaBookPage, capsuleArt } from './arcade.js';
+import { petBookPage } from './petbook.js';
 import { ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, GACHA_ITEMS, GACHA_TIERS } from './rewards.js';
 // V13.68 menu: what students do. 학습 holds word study, tests and records; 나 holds what they
 // collect. Pages without their own button light up the one they belong to.
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['yacha', '야차전', 'battle'], ['arcade', '놀이터', 'arcade'], ['me', '나', 'user']];
 // V13.91 drawn menu icons (asset list 08-1·2), used once they are in ART_READY.
 const NAV_ART = { home: 'nav-home', practice: 'nav-study', yacha: 'nav-yacha', arcade: 'nav-arcade', me: 'nav-me' };
-const NAV_OF = { exam: 'practice', records: 'practice', ranking: 'home', studio: 'me', titles: 'me', gachabook: 'me' };
+const NAV_OF = { exam: 'practice', records: 'practice', ranking: 'home', studio: 'me', titles: 'me', gachabook: 'me', petbook: 'me' };
 // V13.70 the ranking also opens from 나 (A.rankFrom), and then belongs to 나.
 export const navOf = (tab, A = null) => tab === 'ranking' && A?.rankFrom === 'me' ? 'me' : NAV_OF[tab] || tab;
 // V13.66: coins (코인) sit in the header on every tab; tapping opens the wallet.
@@ -28,7 +29,7 @@ export function shell(A, content) {
   return `<div class="student-app"><main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div>${p.preview_owner_id ? '<button class="preview-exit-v1359" data-action="exit-student-preview">← 교사 화면</button>' : ''}${A.data.stats?.needs_pet_pick ? '' : coinChip(A)}<button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${navOf(A.tab, A) === id ? 'active' : ''}" ${navOf(A.tab, A) === id ? 'aria-current="page"' : ''}>${artOr(NAV_ART[id], icon(i), 'nav-art')}<span>${name}</span></button>`).join('')}</nav></div>`;
 }
 export function studentPage(A) {
-  return shell(A, ({ home, practice, exam, ranking, records, studio, titles: titlesPage, arcade: arcadePage, yacha: yachaPage, me: mePage, gachabook: gachaBookPage }[A.tab] || home)(A));
+  return shell(A, ({ home, practice, exam, ranking, records, studio, titles: titlesPage, arcade: arcadePage, yacha: yachaPage, me: mePage, gachabook: gachaBookPage, petbook: petBookPage }[A.tab] || home)(A));
 }
 export function getRanges(A, school = A.school, grade = null) {
   const books = A.data.books.filter(book => !grade || !book.grade || book.grade === grade);
@@ -748,10 +749,11 @@ function mePage(A) {
       <span class="me-pet">${pet ? avatar(pet.key, { form: Math.max(1, pet.form), accessory: p.avatar_accessory, frame: p.avatar_frame }) : ''}</span>
       <div class="me-who"><strong>${esc(p.display_name)}</strong><small>${esc(p.school || '')} · ${esc(p.class_name || '')} · Lv.${num(g.level || 1)}</small>${titleBadge(t.equipped, { size: 'sm' })}</div>
     </section>
-    <div class="me-tiles-v1368">
+    <div class="me-tiles-v1368 four">
       <button type="button" class="me-tile pet" data-go="studio"><span class="me-ico">${artOr('me-pets', icon('user'))}</span><b>내 펫·꾸미기</b><small>펫 ${owned}/${Object.keys(CHARACTERS).length}</small></button>
       <button type="button" class="me-tile rank" data-go="ranking" data-from="me" data-rank-grade="${esc((A.data.ranking || []).find(r => r.is_me)?.grade || '')}"><span class="me-ico">${artOr('me-ranking', icon('ranking'))}</span><b>랭킹</b><small>${myRankLine(A)}</small></button>
       <button type="button" class="me-tile titles" data-go="titles"><span class="me-ico">${artOr('me-titles', icon('star'))}</span><b>칭호 도감</b><small>${titleCount(A)}${(t.fresh || []).length ? ' · <i class="me-new">NEW</i>' : ''}</small></button>
+      <button type="button" class="me-tile petbook" data-go="petbook"><span class="me-ico">${artOr('me-petbook', icon('sparkle'))}</span><b>펫 도감</b><small>${owned}/${STANDARD_PET_KEYS.length + LEGENDARY_PET_KEYS.length}마리</small></button>
     </div>
     ${meMenu(A, { gachaHave, att })}
     <section class="me-stats-v1368" aria-label="내 기록">
