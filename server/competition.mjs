@@ -93,6 +93,8 @@ function longestDayRun(sessions) {
   return best;
 }
 const hpOf = (b, pid) => { const v = b.hp?.[pid]; return v === undefined || v === null ? NaN : Number(v); };
+// V13.94: full HP went from 100 to 250; a match keeps the full HP it was played with.
+const maxHpOf = b => Number(b.max_hp) || 100;
 
 export function createCompetition(state, now = Date.now()) {
   const sessionsBy = new Map(), battlesBy = new Map();
@@ -119,8 +121,8 @@ export function createCompetition(state, now = Date.now()) {
     pets: p => Array.isArray(p?.pets) ? p.pets.length : 0,
     wins: (p, pid) => winsOf(pid).length,
     win_streak: (p, pid) => battleStreaks(ctx.battlesOf(pid), pid).best_streak,
-    comebacks: (p, pid) => winsOf(pid).filter(b => b.reason === 'end' && hpOf(b, pid) > 0 && hpOf(b, pid) <= 20).length,
-    flawless: (p, pid) => winsOf(pid).filter(b => b.reason === 'end' && hpOf(b, pid) === 100).length,
+    comebacks: (p, pid) => winsOf(pid).filter(b => b.reason === 'end' && hpOf(b, pid) > 0 && hpOf(b, pid) <= maxHpOf(b) / 5).length,
+    flawless: (p, pid) => winsOf(pid).filter(b => b.reason === 'end' && hpOf(b, pid) === maxHpOf(b)).length,
     league_best: (p, pid) => {
       const weeks = new Map();
       for (const b of ctx.countedOf(pid)) {

@@ -9,8 +9,8 @@
 //   pets         pets met
 //   wins         yacha wins (the same friend counts at most 3 times a day)
 //   win_streak   best yacha win streak
-//   comebacks    wins with 20 HP or less left
-//   flawless     wins with all 100 HP left
+//   comebacks    wins with a fifth of the HP or less left (20 of 100, 50 of 250)
+//   flawless     wins with full HP left
 //   league_best  best weekly league tier reached (1 silver .. 3 diamond)
 //   championships  academy tournaments won
 //   weekly_rank  last week's 경험치 rank in the student's grade (1..3, 0 = none)
@@ -60,8 +60,8 @@ export const TITLES = {
   master: { name: '단어 마스터', tier: 'epic', group: 'study', stat: 'level', goal: 15, icon: 'book', how: 'Lv.15 달성', desc: '단어라면 자신 있어요.' },
   win50: { name: '야차 장군', tier: 'epic', group: 'yacha', stat: 'wins', goal: 50, icon: 'shield', how: '야차전 50승', desc: '수많은 대결을 이겨 낸 장군.' },
   yachaking: { name: '야차왕', tier: 'epic', group: 'yacha', stat: 'win_streak', goal: 5, icon: 'crown', how: '야차전 5연승', desc: '다섯 번 연속으로 이긴 야차의 왕.' },
-  comeback: { name: '기적의 역전', tier: 'epic', group: 'yacha', stat: 'comebacks', goal: 1, icon: 'heart', how: 'HP 20 이하로 남기고 승리', desc: '끝날 때까지 끝난 게 아니에요!' },
-  flawless: { name: '퍼펙트 게임', tier: 'epic', group: 'yacha', stat: 'flawless', goal: 1, icon: 'target', how: 'HP 100 그대로 승리', desc: '한 대도 맞지 않고 이겼어요.' },
+  comeback: { name: '기적의 역전', tier: 'epic', group: 'yacha', stat: 'comebacks', goal: 1, icon: 'heart', how: 'HP를 5분의 1 이하로 남기고 승리', desc: '끝날 때까지 끝난 게 아니에요!' },
+  flawless: { name: '퍼펙트 게임', tier: 'epic', group: 'yacha', stat: 'flawless', goal: 1, icon: 'target', how: 'HP 가득 그대로 승리', desc: '한 대도 맞지 않고 이겼어요.' },
   words3000: { name: '살아있는 사전', tier: 'legendary', group: 'study', stat: 'correct', goal: 3000, icon: 'gem', how: '맞힌 단어 3,000개', desc: '걸어 다니는 영어 사전.' },
   streak30: { name: '한 달의 전설', tier: 'legendary', group: 'study', stat: 'best_days', goal: 30, icon: 'flame', how: '30일 연속 학습', desc: '한 달 내내 멈추지 않은 전설.' },
   legend: { name: '한계를 넘어서', tier: 'legendary', group: 'study', stat: 'level', goal: 20, icon: 'wing', how: 'Lv.20 달성', desc: '한계를 넘어 최종 진화!' },

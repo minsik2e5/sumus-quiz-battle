@@ -31,3 +31,30 @@ export function battleQuestions(words, mode = 'speed', limit = 40) {
     return choiceQuestion(word, pool);
   }).filter(q => q.kind === 'spell' || (q.options.length === 4 && q.answer >= 0));
 }
+
+// V13.94 각자 내 범위: two players of the same grade who study different ranges. Each gets the
+// words of their own range, and the n-th words of both lists are of the same kind (both four
+// choices, or both spelling in 실력전), so a turn has one clock for both. A small range is
+// shuffled again when it runs out, so both lists are `limit` words long.
+const validQuestion = q => q && (q.kind === 'spell' || (q.options.length === 4 && q.answer >= 0));
+export function pairedBattleQuestions(wordsA, wordsB, mode = 'speed', limit = 40) {
+  const pools = [wordsA, wordsB].map(words => words.filter(word => word?.id && word.meaning));
+  if (!pools.every(pool => pool.length)) return [[], []];
+  const canSpell = mode === 'skill' && pools.every(pool => pool.some(spellable));
+  const decks = pools.map(() => []);
+  const draw = (k, spell) => {
+    const deck = decks[k];
+    if (!deck.some(word => !spell || spellable(word))) deck.push(...shuffle(spell ? pools[k].filter(spellable) : pools[k]));
+    const i = spell ? deck.findIndex(spellable) : 0;
+    return deck.splice(i, 1)[0];
+  };
+  const out = [[], []];
+  // A pair that cannot be asked (meanings too alike for four choices) is skipped; the tries
+  // stop well before an endless loop on a range with too few different meanings.
+  for (let tries = 0; out[0].length < limit && tries < limit * 3; tries++) {
+    const spell = canSpell && out[0].length % 2 === 1;
+    const pair = [0, 1].map(k => { const word = draw(k, spell); return spell ? spellQuestion(word) : choiceQuestion(word, pools[k]); });
+    if (pair.every(validQuestion)) { out[0].push(pair[0]); out[1].push(pair[1]); }
+  }
+  return out;
+}

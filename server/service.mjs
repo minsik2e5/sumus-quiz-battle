@@ -2,7 +2,7 @@ import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
 import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, EPIC_EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
-import { battleQuestions } from '../public/modules/battle-questions.js';
+import { battleQuestions, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
 import { STUDY_COINS, GIFT_AMOUNTS, RPS_MAX_WINS } from '../public/modules/rewards.js';
 import { marketView, trade as stockTrade, rebaseMarket, newMarket } from './market.mjs';
@@ -458,7 +458,7 @@ export function tidyBattles(state, now = Date.now()) {
     if (expired) { Object.assign(b, { status: 'cancelled', reason: 'expired', finished_at: now }); changed = true; }
     // A finished match keeps its ranges while a rematch can still be asked for.
     const rematchOpen = b.status === 'finished' && now - (b.finished_at || 0) < BATTLE_REMATCH_WINDOW_MS;
-    if (!['waiting', 'active'].includes(b.status) && (b.tickets || (b.range_codes && !rematchOpen))) { delete b.tickets; if (!rematchOpen) delete b.range_codes; changed = true; }
+    if (!['waiting', 'active'].includes(b.status) && (b.tickets || ((b.range_codes || b.guest_range_codes) && !rematchOpen))) { delete b.tickets; if (!rematchOpen) { delete b.range_codes; delete b.guest_range_codes; } changed = true; }
   }
   const kept = state.battles.filter(b => !(b.status === 'cancelled' && now - (b.finished_at || b.created_at) >= BATTLE_KEEP_CANCELLED_MS));
   if (kept.length !== state.battles.length) { state.battles = kept; changed = true; }
@@ -480,10 +480,15 @@ function findJoinableBattle(state, p, code, now) {
 }
 const battleLossToday = (state, pid, now) => (state.battles || []).filter(b => b.status === 'finished' && b.loser === pid && dayKey(b.finished_at) === dayKey(now)).reduce((n, b) => n + b.stake, 0);
 // What the room shows about a player: pet, win streak, and (V13.66) title and league tier.
-function battlePlayer(state, p, ctx = createCompetition(state)) {
+function battlePlayer(state, p, ranges = null, ctx = createCompetition(state)) {
   const pet = pointsAndPets(state, p, xpSessions(state, p.id, p)).pet;
-  return { id: p.id, name: p.display_name, pet: pet ? { key: pet.key, form: pet.form, name: pet.name || '' } : null, streak: battleRecord(state, p.id).streak, title: ctx.displayTitle(p), tier: ctx.league(p.id).tier.key };
+  return { id: p.id, name: p.display_name, pet: pet ? { key: pet.key, form: pet.form, name: pet.name || '' } : null, streak: battleRecord(state, p.id).streak, title: ctx.displayTitle(p), tier: ctx.league(p.id).tier.key, ...(ranges ? { ranges } : {}) };
 }
+// V13.94 단어 범위: 'each' (each player gets the words of their own range; the default) or
+// 'same' (both get the host's words: a tournament, an old room, or a host who asked for it).
+const rangeModeOf = value => value === 'same' ? 'same' : 'each';
+const cleanRanges = value => Array.isArray(value) ? [...new Set(value.map(String))].slice(0, 60) : [];
+const sameRanges = (a, b) => a.length === b.length && a.every(code => b.includes(code));
 function checkBattleEntry(state, p, stake, now) {
   if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
   if (openBattleFor(state, p.id, now)) fail('이미 진행 중인 대결이 있어요.', 409);
@@ -504,7 +509,7 @@ function openBattleRoom(state, p, school, stake, rangeCodes, now, extra = {}) {
   if (words.length < 8) fail('단어가 8개 이상인 범위를 골라주세요.', 409);
   // V13.67: 스피드전 (four choices) or 실력전 (spelling words mixed in).
   const mode = battleMode(extra.mode);
-  extra = { ...extra, mode };
+  extra = { ...extra, mode, range_mode: extra.tournament_id ? 'same' : rangeModeOf(extra.range_mode) };
   const questions = battleQuestions(words, mode, BATTLE_QUESTIONS);
   if (questions.length < 8) fail('뜻이 서로 다른 단어가 부족해요. 범위를 더 골라주세요.', 409);
   state.battles ||= [];
@@ -514,7 +519,7 @@ function openBattleRoom(state, p, school, stake, rangeCodes, now, extra = {}) {
   const battle = { id: randomUUID(), code, status: 'waiting', school_id: school.id, division: school.division, grade: gradeOf(p.class_name), host_id: p.id, guest_id: null, stake, range_codes: rangeCodes, tickets: { [p.id]: battleTicket() }, created_at: now, ...extra };
   state.battles.push(battle);
   return { id: battle.id, code, stake, status: 'waiting', ticket: battle.tickets[p.id], expires_at: now + BATTLE_WAIT_MS,
-    mode, _battle: { action: 'init', id: battle.id, stake, label: extra.label || null, mode, host: battlePlayer(state, p), questions, tickets: battle.tickets, expires_at: now + BATTLE_WAIT_MS } };
+    mode, range_mode: battle.range_mode, _battle: { action: 'init', id: battle.id, stake, label: extra.label || null, mode, host: battlePlayer(state, p, rangeCodes), questions, tickets: battle.tickets, expires_at: now + BATTLE_WAIT_MS } };
 }
 
 // V13.61 challenges: a room for one named friend of the same school and grade. The friend
@@ -532,7 +537,7 @@ function battleInviteFor(state, p, now) {
   if (!b) return null;
   const host = state.profiles.find(x => x.id === b.host_id);
   const t = b.tournament_id ? (state.tournaments || []).find(x => x.id === b.tournament_id) : null;
-  return { id: b.id, code: b.code, stake: b.stake, mode: battleMode(b.mode), host: host?.display_name || '', expires_at: b.created_at + BATTLE_WAIT_MS, ...(t ? { tournament: { id: t.id, name: t.name, round: b.label || '' } } : {}) };
+  return { id: b.id, code: b.code, stake: b.stake, mode: battleMode(b.mode), range_mode: rangeModeOf(b.range_mode), host_ranges: b.range_codes || [], host: host?.display_name || '', expires_at: b.created_at + BATTLE_WAIT_MS, ...(t ? { tournament: { id: t.id, name: t.name, round: b.label || '' } } : {}) };
 }
 
 // Called by the battle room (never by a browser) when a match ends. Idempotent.
@@ -543,7 +548,9 @@ export function settleBattle(state, result) {
   if (result.reason === 'cancelled' || !b.guest_id) { b.status = 'cancelled'; b.finished_at = Date.now(); return true; }
   const winner = players.includes(result.winner) ? result.winner : null;
   const skills = Object.fromEntries(players.map(id => [id, Math.max(0, Math.min(99, Math.floor(Number(result.skills?.[id]) || 0)))]).filter(([, n]) => n > 0));
-  Object.assign(b, { status: 'finished', winner, loser: winner ? players.find(id => id !== winner) : null, reason: String(result.reason || 'end').slice(0, 20), hp: result.hp || {}, ...(Object.keys(skills).length ? { skills } : {}), finished_at: Date.now() });
+  // V13.94: HP went from 100 to 250; a match keeps the full HP it was played with.
+  const maxHp = Math.max(1, Math.min(1000, Math.floor(Number(result.max_hp) || 100)));
+  Object.assign(b, { status: 'finished', winner, loser: winner ? players.find(id => id !== winner) : null, reason: String(result.reason || 'end').slice(0, 20), hp: result.hp || {}, max_hp: maxHp, ...(Object.keys(skills).length ? { skills } : {}), finished_at: Date.now() });
   if (b.tournament_id) settleTournamentMatch(state, b);
   return true;
 }
@@ -1388,8 +1395,7 @@ export async function service(state, method, path, body, token, options = {}) {
     checkBattleEntry(state, p, stake, now);
     const school = schoolForProfile(state, p);
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
-    const rangeCodes = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : [];
-    return openBattleRoom(state, p, school, stake, rangeCodes, now, { mode: body.mode });
+    return openBattleRoom(state, p, school, stake, cleanRanges(body.range_codes), now, { mode: body.mode, range_mode: body.range_mode });
   }
   // Rematch: either player may ask within two minutes of the end; the room is only for the
   // other player, who accepts it on the result screen (stake shown again before joining).
@@ -1407,7 +1413,10 @@ export async function service(state, method, path, body, token, options = {}) {
     checkBattleEntry(state, p, previous.stake, now);
     const school = schoolForProfile(state, p);
     if (!school || school.id !== previous.school_id) fail('학생 학교 설정을 확인해주세요.', 409);
-    return { ...openBattleRoom(state, p, school, previous.stake, previous.range_codes, now, { invite_id: opponentId, rematch_of: previous.id, mode: previous.mode }), rematch: true };
+    // Each player keeps the range they played with (a match before V13.94 had one range).
+    const hostRanges = previous.range_codes, guestRanges = previous.guest_range_codes || previous.range_codes;
+    const [mine, theirs] = previous.host_id === p.id ? [hostRanges, guestRanges] : [guestRanges, hostRanges];
+    return { ...openBattleRoom(state, p, school, previous.stake, mine, now, { invite_id: opponentId, rematch_of: previous.id, mode: previous.mode, range_mode: previous.range_mode || 'same', guest_range_codes: theirs }), rematch: true };
   }
   if (path === '/battle/rematch-offer' && method === 'GET') {
     requireRole(p, 'student');
@@ -1440,10 +1449,10 @@ export async function service(state, method, path, body, token, options = {}) {
     if (friend.invited) fail(`${friend.name}이(가) 다른 도전장을 먼저 받았어요. 조금 뒤에 다시 보내요.`, 409);
     const school = schoolForProfile(state, p);
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
-    const rangeCodes = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : [];
+    const rangeCodes = cleanRanges(body.range_codes);
     // One phone alert per friend every few minutes, however often a challenge is re-sent.
     const pushedLately = (state.battles || []).some(b => b.challenge && !b.tournament_id && b.host_id === p.id && b.invite_id === friend.id && now - (b.created_at || 0) < CHALLENGE_PUSH_GAP_MS);
-    return { ...openBattleRoom(state, p, school, stake, rangeCodes, now, { invite_id: friend.id, challenge: true, mode: body.mode }), challenge: true, friend: friend.name,
+    return { ...openBattleRoom(state, p, school, stake, rangeCodes, now, { invite_id: friend.id, challenge: true, mode: body.mode, range_mode: body.range_mode }), challenge: true, friend: friend.name,
       _push: pushedLately ? [] : [{ to: [friend.id], title: `⚔️ ${p.display_name}의 도전장!`, body: `야차전 도전장이 왔어요${stake ? ` · 판돈 ${stake}코인` : ''}. 몇 분 안에 받아 주세요!`, url: '/?go=challenge', tag: 'challenge', urgent: true }] };
   }
   if (path === '/battle/invite' && method === 'GET') {
@@ -1462,7 +1471,7 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const battle = findJoinableBattle(state, p, str(body.code, 12).replace(/\D/g, ''), Date.now());
     if (battle.host_id === p.id) fail('내가 만든 방이에요. 친구에게 코드를 알려주세요.', 409);
-    return { code: battle.code, stake: battle.stake, mode: battleMode(battle.mode), host: state.profiles.find(x => x.id === battle.host_id)?.display_name || '', expires_at: battle.created_at + BATTLE_WAIT_MS };
+    return { code: battle.code, stake: battle.stake, mode: battleMode(battle.mode), range_mode: rangeModeOf(battle.range_mode), host_ranges: battle.range_codes || [], host: state.profiles.find(x => x.id === battle.host_id)?.display_name || '', expires_at: battle.created_at + BATTLE_WAIT_MS };
   }
   if (path === '/battle/join' && method === 'POST') {
     requireRole(p, 'student');
@@ -1477,10 +1486,26 @@ export async function service(state, method, path, body, token, options = {}) {
     // The host's coins are only held once the match starts: coins spent while waiting
     // (코인 뽑기) must not leave a stake the host can no longer pay.
     if (battle.stake > 0 && coinBalance(state, host) < battle.stake) fail('방을 만든 친구의 코인이 판돈보다 적어졌어요. 다른 방에 들어가 주세요.', 409);
-    Object.assign(battle, { guest_id: p.id, status: 'active', joined_at: now });
+    // V13.94 각자 내 범위: the guest brings the range they study (or, for a rematch, the one they
+    // played with). A different range gives each player words of their own on every turn; the
+    // same range (or none, from an old screen) plays the host's words as before.
+    const hostRanges = battle.range_codes || [];
+    let guestRanges = hostRanges, own = null;
+    const asked = Array.isArray(body.range_codes) ? cleanRanges(body.range_codes) : battle.guest_range_codes || [];
+    if (rangeModeOf(battle.range_mode) === 'each' && asked.length && !sameRanges(asked, hostRanges)) {
+      const school = schoolForProfile(state, p);
+      if (!school || school.id !== battle.school_id) fail('학생 학교 설정을 확인해주세요.', 409);
+      const guestWords = scopedWords(state, school.id, asked, p.class_name);
+      if (guestWords.length < 8) fail('내 단어 범위에 단어가 8개 이상 있어야 해요. 야차전에서 범위를 더 골라 주세요.', 409);
+      const [forHost, forGuest] = pairedBattleQuestions(scopedWords(state, school.id, hostRanges, host.class_name), guestWords, battleMode(battle.mode), BATTLE_QUESTIONS);
+      if (forGuest.length < 8) fail('뜻이 서로 다른 단어가 부족해요. 야차전에서 범위를 더 골라 주세요.', 409);
+      own = { [host.id]: forHost, [p.id]: forGuest };
+      guestRanges = asked;
+    }
+    Object.assign(battle, { guest_id: p.id, status: 'active', joined_at: now, guest_range_codes: guestRanges });
     battle.tickets[p.id] = battleTicket();
-    return { id: battle.id, stake: battle.stake, status: 'active', ticket: battle.tickets[p.id], opponent: host.display_name,
-      _battle: { action: 'join', id: battle.id, guest: battlePlayer(state, p), tickets: battle.tickets } };
+    return { id: battle.id, stake: battle.stake, status: 'active', ticket: battle.tickets[p.id], opponent: host.display_name, own_words: !!own,
+      _battle: { action: 'join', id: battle.id, guest: battlePlayer(state, p, guestRanges), tickets: battle.tickets, ...(own ? { own } : {}) } };
   }
   if (path.startsWith('/battle/rooms/') && path.endsWith('/cancel') && method === 'POST') {
     requireRole(p, 'student');

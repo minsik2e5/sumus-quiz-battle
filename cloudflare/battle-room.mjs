@@ -64,7 +64,9 @@ export class BattleRoom {
     } else if (msg.action === 'join' && this.room && !this.room.closed && !this.room.battle) {
       this.room.guest = msg.guest;
       this.room.tickets = msg.tickets;
-      this.room.battle = createBattle({ id: this.room.id, players: [this.room.host, msg.guest], questions: this.room.questions, stake: this.room.stake, label: this.room.label, mode: this.room.mode, now });
+      // V13.94: `own` when the two players study different ranges (each gets their own words).
+      const own = msg.own && msg.own[this.room.host.id]?.length && msg.own[msg.guest.id]?.length ? msg.own : null;
+      this.room.battle = createBattle({ id: this.room.id, players: [this.room.host, msg.guest], questions: own ? own[this.room.host.id] : this.room.questions, own, stake: this.room.stake, label: this.room.label, mode: this.room.mode, now });
       this.room.connect_deadline = now + CONNECT_MS;
       // The host may already be waiting on a socket.
       for (const ws of this.ctx.getWebSockets(this.room.host.id)) {

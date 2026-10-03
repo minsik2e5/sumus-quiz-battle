@@ -12,7 +12,7 @@ import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier,
 import { TITLES, TITLE_KEYS, visibleTitleKeys, titleUnlocked } from '../public/modules/titles.js';
 import { createBattle, connect, answer, tick, battleView, petSkill, SKILL_RULES, BATTLE, PET_SKILLS } from '../public/modules/battle-engine.js';
 import { expressionSrc } from '../public/modules/character.js';
-import { battleQuestions, spellHint, spellable } from '../public/modules/battle-questions.js';
+import { battleQuestions, spellHint, spellable, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { createPracticeMatch } from '../public/modules/battle-bot.js';
 import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
 import { addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome } from './rewards.mjs';
@@ -51,7 +51,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   connect(duel, 'x', now); connect(duel, 'y', now); tick(duel, now + BATTLE.COUNTDOWN_MS);
   const t1 = now + BATTLE.COUNTDOWN_MS, sq = duel.questions[duel.turn.q];
   const openView = JSON.stringify(battleView(duel, 'x'));
-  assert(duel.mode === 'skill' && duel.ends_at - t1 === 120000 && duel.deadline - t1 === SKILL_RULES.SPELL_TURN_MS && sq.kind === 'spell' && !openView.includes(`"${sq.text}"`) && !openView.includes('accept') && battleView(duel, 'x').question.hint === sq.hint, 'V13.67 실력전 lasts 2 minutes, a spelling word gets 16 seconds and the room never sends its spelling while it is open');
+  assert(duel.mode === 'skill' && duel.ends_at - t1 === 150000 && duel.deadline - t1 === SKILL_RULES.SPELL_TURN_MS && sq.kind === 'spell' && !openView.includes(`"${sq.text}"`) && !openView.includes('accept') && battleView(duel, 'x').question.hint === sq.hint, 'V13.94 실력전 lasts 2 minutes 30 seconds, a spelling word gets 16 seconds and the room never sends its spelling while it is open');
   const wrongSpell = answer(duel, 'y', 'zzzz', t1 + 1000);
   const typed = answer(duel, 'x', ` ${sq.text.toUpperCase()} `, t1 + 8000);
   const hitSpell = typed.find(e => e.type === 'attack'), reveal = typed.find(e => e.type === 'reveal');
@@ -63,7 +63,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   const speedDuel = createBattle({ id: 'qa-speed', players: [{ id: 'x', name: 'X' }, { id: 'y', name: 'Y' }], questions: speedQs, now });
   connect(speedDuel, 'x', now); connect(speedDuel, 'y', now); tick(speedDuel, t1);
   const fast = answer(speedDuel, 'x', speedDuel.questions[speedDuel.turn.q].answer, t1 + 500).find(e => e.type === 'attack');
-  assert(speedDuel.mode === 'speed' && speedDuel.ends_at - t1 === 90000 && fast.fast && fast.dmg > quick.dmg, 'V13.67 스피드전 keeps its rules: 90 seconds, fast answers are critical');
+  assert(speedDuel.mode === 'speed' && speedDuel.ends_at - t1 === 120000 && fast.fast && fast.dmg > quick.dmg, 'V13.67 스피드전 keeps its rules: 2 minutes (V13.94), fast answers are critical');
   const room = await service(state, 'POST', '/battle/rooms', { stake: 10, range_codes: range, mode: 'skill' }, tokens['qa-rw-a']);
   const stored = state.battles.find(b => b.id === room.id);
   assert(room.mode === 'skill' && room._battle.mode === 'skill' && room._battle.questions.some(q => q.kind === 'spell') && stored.mode === 'skill', 'V13.67 a room is opened as 실력전 and the room gets spelling words');
@@ -576,6 +576,17 @@ export async function runRewardsChecks(assert, expectStatus) {
   const petbook91 = source('../public/modules/petbook.js');
   assert(petbook91.includes('export function petBookPage(A)') && petbook91.includes('STANDARD_PET_KEYS') && petbook91.includes('LEGENDARY_PET_KEYS') && css91.includes('.pb-sprite.shadow{') && petbook91.includes('PET_SKILLS[key]') && student90.includes("petbook: petBookPage") && student90.includes('data-go="petbook"') && css91.includes('.pb-card{') && [...STANDARD_PET_KEYS, ...LEGENDARY_PET_KEYS].every(key => [0, 1, 2, 3].every(f => existsSync(fileURLToPath(new URL(`../public/assets/pets/${key}-${f}-s.webp`, import.meta.url))))), 'V13.91 학생은 나 → 펫 도감에서 모든 펫을 보고, 못 만난 펫은 그림자와 만나는 법으로 보인다');
   assert(lucky89.includes("box.className = 'lk-show lk-legend-show lgx'") && ['p0', 'p1', 'p2', 'p3', 'p4'].every(c => lucky89.includes(`'${c}'`)) && lucky89.includes('lgx-future') && lucky89.includes('SFX.fanfare()') && lucky89.includes('SFX.boom()') && lucky89.includes('if (reduced()) return showResult();') && lucky89.includes('if (!ready) return;') && css91.includes('.lgx.p4 .lgx-flash{') && css91.includes('@keyframes lgxRing'), 'V13.91 전설 펫을 뽑으면 어둠·박동·섬광·공개로 이어지는 연출이 나오고, 누르면 건너뛰고, 움직임 줄이기면 바로 결과가 보인다');
+  /* ---------- V13.94 야차전: 각자 내 범위 · 더 긴 대결 · 새 메뉴 화면 ---------- */
+  {
+    const mk = (prefix, n, typed = true) => Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, word: typed ? `${prefix}word${'abcdefghijklmnop'[i]}` : `${prefix}-${i}!`, meaning: `${prefix} 뜻 ${i}` }));
+    const [qa, qb] = pairedBattleQuestions(mk('aa', 30), mk('bb', 9), 'skill', 40);
+    assert(qa.length === 40 && qb.length === 40 && qa.every((q, i) => (q.kind || 'choice') === (qb[i].kind || 'choice')) && qa.some(q => q.kind === 'spell') && qa.every(q => q.word_id.startsWith('aa')) && qb.every(q => q.word_id.startsWith('bb')) && new Set(qb.map(q => q.word_id)).size === 9, 'V13.94 각자 내 범위 questions: each list is from its own range, the n-th words are the same kind, and a small range is shuffled again');
+    const [sa, sb] = pairedBattleQuestions(mk('cc', 12), mk('dd', 12, false), 'skill', 20);
+    assert(sa.length === 20 && [...sa, ...sb].every(q => q.kind !== 'spell') && !spellable(mk('dd', 1, false)[0]), 'V13.94 when one range has no word to spell, both players get four choices only');
+    const battle94 = source('../public/modules/battle.js'), css94 = source('../public/v1394.css'), build94 = source('./build-assets.mjs');
+    assert(battle94.includes("data-yb=\"range-mode\"") && battle94.includes('range_mode: rangeMode()') && battle94.includes('range_codes: myRanges()') && battle94.includes('rangeDeal(room)') && battle94.includes('rangeDeal(invite)') && battle94.includes('const mine = e.own?.[v.me] || e;') && battle94.includes('e.answers?.[v.me] ?? e.answer') && battle94.includes('sumus-yacha-ranges:'), 'V13.94 야차전: the lobby sends 각자 내 범위 or 같은 범위로, a joining friend brings their own range and sees whose words come, and each phone draws its own word');
+    assert(battle94.includes('class="ya-hero"') && battle94.includes('class="ya-panel ya-setup"') && ['대결 방식', '내 단어 범위', '판돈'].every(t => battle94.includes(`'${t}'`)) && battle94.includes('class="ya-cta"') && css94.includes('.ya-hero{') && css94.includes('@media (min-width:768px)') && css94.includes('.ya-play{grid-template-columns') && build94.includes('"v1394.css"') && !battle94.includes('const MAX_HP = 100'), 'V13.94 야차전 메뉴 화면: 밤의 대결장 히어로, 3단계 대결 준비, 패드에서는 두 칸');
+  }
   /* ---------- V13.93 08 그림 40장 ---------- */
   const ready93 = [...emblems91.matchAll(/ART_READY = new Set\(\[([^\]]*)\]/g)].flatMap(m => [...m[1].matchAll(/'([a-z0-9-]+)'/g)].map(x => x[1]));
   const arcade93 = source('../public/modules/arcade.js'), shop93 = source('../public/modules/pet-moments.js');
