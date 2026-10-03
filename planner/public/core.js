@@ -84,7 +84,8 @@ export function createDefaultState(today) {
     rangeItems: Object.fromEntries(COHORTS.map(c => [c.id, c.items])),
     monthlyClassPlans: {}, scheduleOverrides: {},
     exams: DEFAULT_EXAMS.map(x => ({ ...x })),
-    examHistory: {}
+    examHistory: {},
+    notes: []
   };
 }
 
@@ -103,7 +104,8 @@ export function normalizeState(st, today) {
     rangeItems: { ...n.rangeItems, ...(st.rangeItems ?? {}) },
     monthlyClassPlans: st.monthlyClassPlans ?? {}, scheduleOverrides: st.scheduleOverrides ?? {},
     exams: st.exams?.length ? st.exams : n.exams,
-    examHistory: st.examHistory ?? {}
+    examHistory: st.examHistory ?? {},
+    notes: Array.isArray(st.notes) ? st.notes : []
   };
 }
 
