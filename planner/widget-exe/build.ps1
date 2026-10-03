@@ -17,6 +17,6 @@ $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
   /resource:"$w\mascot\bell.png",mascot.bell.png `
   /resource:"$w\mascot\rest.png",mascot.rest.png `
   /resource:"$w\mascot\cheer.png",mascot.cheer.png `
-  "$w\src\Program.cs" "$w\src\Mascot.cs"
+  "$w\src\Program.cs" "$w\src\Mascot.cs" "$w\src\Widgets.cs"
 if ($LASTEXITCODE -ne 0) { throw "csc failed: $LASTEXITCODE" }
 "{0:N0} bytes" -f (Get-Item "$w\out\SUMUS_Widget.exe").Length
