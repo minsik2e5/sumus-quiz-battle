@@ -12,6 +12,10 @@
 //       node docs/asset-requests/runner/fit-assets.mjs 10-1.png monsters/slime monsters/slime-attack monsters/slime-hurt monsters/slime-down --stand-same
 // - --trim이면 정사각형에 넣지 않고 그림 테두리에 딱 맞게 잘라요(같은 시트는 같은 배율, 가장 넓은 칸이 --size px).
 //   예) 캡슐 위·아래 반쪽처럼 앱에서 위아래로 맞붙여 쓰는 그림.
+// - --fit-each면 칸마다 따로 같은 크기(가장 긴 쪽이 --size의 88%)로 맞춰 정사각형 가운데에 넣어요.
+//   칭호 메달처럼 시트마다 크기가 달라 보이면 안 되는 그림용. 예) 칭호 메달(11-titles)
+// - --union이면 시트 4칸을 같은 창(4칸을 합친 가장 큰 범위)으로 잘라요. 가운데 높이와 팔 쪽 끝이 4장 모두 같아서
+//   포즈를 바꿔 끼워도 몸이 안 움직여요. 가로가 --size보다 길면 줄여요. 예) 가위바위보 팔(05-rps-arms)
 // - --small 96이면 작은 그림(<이름>-s.webp, 96px)도 같이 만들어요. 작게 여러 개 보이는 그림용.
 //   예) 칭호 메달(11-titles): node docs/asset-requests/runner/fit-assets.mjs 11-1.png titles/rookie titles/focus titles/words100 titles/streak3 --small 96
 import sharp from 'sharp';
@@ -23,6 +27,8 @@ const ASSETS = fileURLToPath(new URL('../../../public/assets/', import.meta.url)
 const args = process.argv.slice(2);
 const opt = name => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : null; };
 const ti = args.indexOf('--trim'), trim = ti >= 0 && !!args.splice(ti, 1);
+const fei = args.indexOf('--fit-each'), fitEach = fei >= 0 && !!args.splice(fei, 1);
+const uni = args.indexOf('--union'), union = uni >= 0 && !!args.splice(uni, 1);
 const ssi = args.indexOf('--stand-same'), standSame = ssi >= 0 && !!args.splice(ssi, 1);
 const si = args.indexOf('--stand'), stand = standSame || (si >= 0 && !!args.splice(si, 1));
 const preview = opt('--preview'), baseName = opt('--base'), size = Number(opt('--size') || 256), small = Number(opt('--small') || 0);
@@ -81,7 +87,7 @@ for (let q = 0; q < 4; q++) {
   }
   const b = bboxOf(buf, W, H);
   if (!b) { console.error(`${names[q]}: 칸이 비어 있어요.`); process.exit(3); }
-  cells.push({ buf, b, name: names[q] });
+  cells.push({ buf, b, name: names[q], q });
 }
 
 // 같은 시트 = 같은 배율. --base면 그 그림의 키에, 아니면 가장 큰 칸이 정사각형의 88%를 채우게.
@@ -96,6 +102,18 @@ if (base) {
   k = Math.min(...cells.map(c => size * .88 / Math.max(c.b.w, c.b.h)));
 }
 
+// --union: one window for the four cells, in cell-local coordinates. Its middle line is the median
+// of the cells' own middles (the arm), so a flag or sparkles above do not push the arm down.
+let win = null;
+if (union) {
+  const hw = W / 2, hh = H / 2, loc = cells.map(c => ({ x0: c.b.x0 - (c.q % 2) * hw, x1: c.b.x1 - (c.q % 2) * hw, y0: c.b.y0 - (c.q >> 1) * hh, y1: c.b.y1 - (c.q >> 1) * hh }));
+  const mids = loc.map(l => (l.y0 + l.y1) / 2).sort((a, b) => a - b), axis = (mids[1] + mids[2]) / 2;
+  const half = Math.ceil(Math.max(...loc.map(l => Math.max(axis - l.y0, l.y1 - axis))));
+  const x0 = Math.min(...loc.map(l => l.x0)), x1 = Math.max(...loc.map(l => l.x1));
+  win = { x0, w: x1 - x0 + 1, y0: Math.max(0, Math.round(axis) - half), h: Math.min(hh, 2 * half + 1) };
+  win.h = Math.min(win.h, hh - win.y0);
+  win.k = Math.min(1, size / win.w);
+}
 const tiles = [];
 // --stand-same: one scale for the sheet, so the largest cell fits 488 × 471 px.
 const kSame = Math.min(...cells.map(c => Math.min(488 / c.b.w, 471 / c.b.h)));
@@ -113,8 +131,18 @@ for (const c of cells) {
     console.log(`saved public/assets/${c.name}.webp`);
     continue;
   }
+  if (union) {
+    const left = (c.q % 2) * (W / 2) + win.x0, top = (c.q >> 1) * (H / 2) + win.y0;
+    const out = await sharp(c.buf, { raw: { width: W, height: H, channels: 4 } }).extract({ left, top, width: win.w, height: win.h })
+      .resize(Math.round(win.w * win.k), Math.round(win.h * win.k)).webp({ quality: 82, alphaQuality: 90, effort: 6 }).toBuffer();
+    await sharp(out).toFile(`${ASSETS}${c.name}.webp`);
+    tiles.push({ name: c.name, out });
+    console.log(`saved public/assets/${c.name}.webp (${Math.round(win.w * win.k)} × ${Math.round(win.h * win.k)})`);
+    continue;
+  }
   const crop = await sharp(c.buf, { raw: { width: W, height: H, channels: 4 } }).extract({ left: c.b.x0, top: c.b.y0, width: c.b.w, height: c.b.h }).png().toBuffer();
-  const w = Math.round(c.b.w * k), h = Math.round(c.b.h * k);
+  const kc = fitEach ? size * .88 / Math.max(c.b.w, c.b.h) : k;
+  const w = Math.round(c.b.w * kc), h = Math.round(c.b.h * kc);
   const img = await sharp(crop).resize(w, h).toBuffer();
   const CW = base ? base.W : trim ? w : size, CH = base ? base.H : trim ? h : size;
   const left = base ? Math.max(6, Math.min(CW - w - 6, Math.round((base.x0 + base.x1) / 2 - w / 2))) : Math.round((CW - w) / 2);
