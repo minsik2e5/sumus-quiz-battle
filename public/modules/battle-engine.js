@@ -57,7 +57,16 @@ export const PET_SKILLS = {
   cat: { name: '사뿐 회피', desc: '다음에 받는 공격 −16', guard: [16] },
   pig: { name: '말랑 방패', desc: '다음에 받는 공격 2번 −8씩', guard: [8, 8] },
   panda: { name: '대나무 간식', desc: 'HP +13', heal: 13 },
-  rabbit: { name: '깡총 연타', desc: '2번 연속 맞히면 바로 7 피해', burst: 7, need: 2 }
+  rabbit: { name: '깡총 연타', desc: '2번 연속 맞히면 바로 7 피해', burst: 7, need: 2 },
+  // V13.92 영웅 펫: the same strength as the others (about 15 in all), in new mixes.
+  capybara: { name: '느긋한 온천', desc: 'HP +9, 다음에 받는 공격 −6', heal: 9, guard: [6] },
+  penguin: { name: '얼음 미끄럼', desc: '다음에 받는 공격 3번 −6씩', guard: [6, 6, 6] },
+  owl: { name: '지혜의 눈', desc: '다음 공격 3번 +6씩', boost: [6, 6, 6] },
+  hamster: { name: '볼 빵빵 저장', desc: '다음 공격 +8, 다음에 받는 공격 −8', boost: [8], guard: [8] },
+  shark: { name: '파도 물기', desc: '바로 6 피해, 3문제 동안 3씩 피해', burst: 6, poison: 3, turns: 3 },
+  alpaca: { name: '폭신 털', desc: 'HP +5, 다음에 받는 공격 2번 −5씩', heal: 5, guard: [5, 5] },
+  hedgehog: { name: '가시 갑옷', desc: '바로 6 피해, 다음에 받는 공격 −8', burst: 6, guard: [8] },
+  otter: { name: '조개 깨기', desc: '4번 연속 맞히면 바로 20 피해', burst: 20, need: 4 }
 };
 const NO_SKILL_PETS = new Set(['haechi', 'phoenix', 'whale', 'qilin']);
 // The practice robot (or no pet) uses 몽이's. Legendary pets deliberately have no battle skill.

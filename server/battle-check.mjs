@@ -163,7 +163,7 @@ export function runBattleChecks(assert) {
   }
   {
     // Every pet has one skill; the robot and a player without a pet use 몽이's.
-    assert(Object.keys(PET_SKILLS).length === 8 && Object.values(PET_SKILLS).every(x => x.name && x.desc), 'V13.72 all eight pets have a named skill');
+    assert(Object.keys(PET_SKILLS).length === 16 && Object.values(PET_SKILLS).every(x => x.name && x.desc), 'V13.72 all eight pets have a named skill');
     assert(petSkill({ key: 'robot' }).key === 'dog' && petSkill(null).key === 'dog' && petSkill({ key: 'pig' }).need === PET_SKILL_NEED, 'V13.72 the practice robot and a player without a pet use 몽이\'s skill');
     const r = startedWith('robot', 'fox');
     const view = battleView(r, 'guest');

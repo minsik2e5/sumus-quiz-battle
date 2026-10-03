@@ -26,7 +26,7 @@ function coinChip(A) {
 }
 export function shell(A, content) {
   const p = A.data.profile;
-  return `<div class="student-app"><main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div>${p.preview_owner_id ? '<button class="preview-exit-v1359" data-action="exit-student-preview">← 교사 화면</button>' : ''}${A.data.stats?.needs_pet_pick ? '' : coinChip(A)}<button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴">${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${navOf(A.tab, A) === id ? 'active' : ''}" ${navOf(A.tab, A) === id ? 'aria-current="page"' : ''}>${artOr(NAV_ART[id], icon(i), 'nav-art')}<span>${name}</span></button>`).join('')}</nav></div>`;
+  return `<div class="student-app"><main class="student-main"><header class="app-header"><div class="brand"><img src="/sumus-logo-green.svg" alt=""><div>SUMUS <span>VOCA</span></div></div>${p.preview_owner_id ? '<button class="preview-exit-v1359" data-action="exit-student-preview">← 교사 화면</button>' : ''}${A.data.stats?.needs_pet_pick ? '' : coinChip(A)}<button class="profile-dot" data-action="account" aria-label="내 계정">${esc(p.display_name.slice(0, 1))}</button></header>${content}</main><nav class="bottom-nav" aria-label="주 메뉴"><div class="nav-brand" aria-hidden="true"><img src="/sumus-logo-green.svg" alt=""><span>SUMUS <b>VOCA</b></span></div>${studentTabs.map(([id, name, i]) => `<button data-go="${id}" class="${navOf(A.tab, A) === id ? 'active' : ''}" ${navOf(A.tab, A) === id ? 'aria-current="page"' : ''}>${artOr(NAV_ART[id], icon(i), 'nav-art')}<span>${name}</span></button>`).join('')}</nav></div>`;
 }
 export function studentPage(A) {
   return shell(A, ({ home, practice, exam, ranking, records, studio, titles: titlesPage, arcade: arcadePage, yacha: yachaPage, me: mePage, gachabook: gachaBookPage, petbook: petBookPage }[A.tab] || home)(A));
@@ -753,7 +753,7 @@ function mePage(A) {
       <button type="button" class="me-tile pet" data-go="studio"><span class="me-ico">${artOr('me-pets', icon('user'))}</span><b>내 펫·꾸미기</b><small>펫 ${owned}/${Object.keys(CHARACTERS).length}</small></button>
       <button type="button" class="me-tile rank" data-go="ranking" data-from="me" data-rank-grade="${esc((A.data.ranking || []).find(r => r.is_me)?.grade || '')}"><span class="me-ico">${artOr('me-ranking', icon('ranking'))}</span><b>랭킹</b><small>${myRankLine(A)}</small></button>
       <button type="button" class="me-tile titles" data-go="titles"><span class="me-ico">${artOr('me-titles', icon('star'))}</span><b>칭호 도감</b><small>${titleCount(A)}${(t.fresh || []).length ? ' · <i class="me-new">NEW</i>' : ''}</small></button>
-      <button type="button" class="me-tile petbook" data-go="petbook"><span class="me-ico">${artOr('me-petbook', icon('sparkle'))}</span><b>펫 도감</b><small>${owned}/${STANDARD_PET_KEYS.length + LEGENDARY_PET_KEYS.length}마리</small></button>
+      <button type="button" class="me-tile petbook" data-go="petbook"><span class="me-ico">${artOr('me-petbook', icon('sparkle'))}</span><b>펫 도감</b><small>${owned}/${Object.keys(CHARACTERS).length}마리</small></button>
     </div>
     ${meMenu(A, { gachaHave, att })}
     <section class="me-stats-v1368" aria-label="내 기록">
@@ -953,7 +953,7 @@ function studio(A) {
   const missing = STANDARD_PET_KEYS.filter(key => !owned.some(x => x.key === key));
   const petCard = key => {
     const pet = owned.find(x => x.key === key);
-    if (!pet) return `<div class="character-option pet-locked" aria-label="${CHARACTERS[key].type}, 아직 만나지 못했어요"><span class="pet-locked-art">${artOr(CHARACTERS[key].legendary ? 'pet-legend-locked' : 'pet-locked', '?', 'locked-art')}</span><b>???</b><small>${CHARACTERS[key].legendary ? '행운 뽑기 전용' : '상점의 알'}</small></div>`;
+    if (!pet) return `<div class="character-option pet-locked" aria-label="${CHARACTERS[key].type}, 아직 만나지 못했어요"><span class="pet-locked-art">${artOr(CHARACTERS[key].legendary ? 'pet-legend-locked' : 'pet-locked', CHARACTERS[key].epic ? '★' : '?', 'locked-art')}</span><b>???</b><small>${CHARACTERS[key].legendary ? '행운 뽑기 전용' : CHARACTERS[key].epic ? '영웅 알 · 뽑기' : '상점의 알'}</small></div>`;
     return `<button data-style="avatar_key" data-value="${key}" class="character-option ${s.avatar_key === key ? 'selected' : ''}" aria-pressed="${s.avatar_key === key}">${avatar(key, { form: pet.form })}<b>${esc(petDisplayName(pet))}</b><small>${pet.form ? `Lv.${pet.level} · ${PET_FORMS[pet.form]}` : '알'}</small></button>`;
   };
   const shop = `<button type="button" class="pet-shop-banner" data-action="egg-shop"><span class="pet-shop-banner-egg" aria-hidden="true">?</span><span><strong>랜덤 알 상점</strong><small>${missing.length ? `${num(EGG_PRICE)}코인 · 상점에서 아직 못 만난 친구 ${missing.length}마리` : '상점 펫을 모두 모았어요!'}</small></span><b>${coin()}${num(g.points_balance || 0)}</b></button>`;

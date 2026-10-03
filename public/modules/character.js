@@ -23,6 +23,14 @@ const EXPRESSIONS = {
   phoenix: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   whale: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   qilin: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  capybara: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  penguin: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  owl: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  hamster: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  shark: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  alpaca: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  hedgehog: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  otter: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   robot: { 1: ROBOT, 2: ROBOT, 3: ROBOT }
 };
 const EXPR_ALIAS = { win: 'happy', hurt: 'sad', lose: 'sad', feed: 'eat', pet: 'happy', attack: 'cheer' };

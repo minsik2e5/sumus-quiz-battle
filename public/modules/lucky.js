@@ -1,7 +1,7 @@
 import { esc, num } from './ui.js';
 import { coin } from './emblems.js';
 import { CHARACTERS } from './core.js';
-import { LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET, LEGENDARY_RATE, LEGENDARY_PITY } from './rewards.js';
+import { LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE } from './rewards.js';
 
 // V13.68 코인 뽑기: the machine on the 놀이터 page and the show when a capsule comes out.
 // The server has already decided the result (server/rewards.mjs pullLucky); this module only
@@ -79,6 +79,7 @@ export function luckyCard(state, bet, balance) {
     </div>
     <div class="lk-bets" role="group" aria-label="걸 코인">${(l.bets || LUCKY_BETS).map(b => `<button type="button" class="lk-bet ${bet === b ? 'on' : ''}" data-ga="bet" data-bet="${b}" aria-pressed="${bet === b}"><span class="lk-stack" aria-hidden="true">${'<i></i>'.repeat(b / 10)}</span><b>${b}</b></button>`).join('')}</div>
     <div class="lk-legend-status ${legend.owned ? 'owned' : ''}"><img src="/assets/lucky/legend-badge.webp" alt=""><span><b>${legend.owned ? `전설 펫 ${esc(gwaWa(CHARACTERS[legend.key]?.ko || ''))} 만났어요` : `전설 펫 ${legend.rate}%`}</b><small>${legend.owned ? '학생 한 명당 한 마리만 만날 수 있어요' : `행운 뽑기 전용 · ${num(legend.remaining)}회 안에 확정`}</small></span></div>
+    ${l.epic?.left ? `<div class="lk-epic-status"><span aria-hidden="true">★</span><b>영웅 펫 ${l.epic.rate}%</b><small>전설이 아닐 때 · 아직 못 만난 영웅 ${num(l.epic.left)}마리 중 하나</small></div>` : ''}
     <button type="button" class="lk-go" data-ga="pull" ${can ? '' : 'disabled'}>${left > 0 ? (balance >= bet ? `<span>뽑기!</span><em>${coin()}${bet}</em>` : '<span>코인이 부족해요</span>') : '<span>오늘 뽑기 끝! 내일 또 만나요</span>'}</button>
     ${tickets ? `<button type="button" class="lk-ticket" data-ga="ticket"><img class="lk-ticket-art" src="/assets/lucky/ticket.webp" alt=""> 뽑기권 ${tickets}장 · ${coin()}${LUCKY_TICKET_BET} 공짜 뽑기</button>` : ''}
     ${recent.length ? `<div class="lk-recent"><span>최근</span>${recent.map(r => `<i class="${MULT_CLASS[r.mult]}">${r.mult ? `×${r.mult}` : '꽝'}</i>`).join('')}${todayNet ? `<em class="${todayNet > 0 ? 'up' : 'down'}">오늘 ${todayNet > 0 ? '+' : '−'}${num(Math.abs(todayNet))}</em>` : ''}</div>` : ''}
@@ -206,9 +207,86 @@ function legendaryShow(res, { again = false, againLabel = '' } = {}) {
     })();
   });
 }
+// V13.92 영웅 펫: the same show, shorter and in violet (about three and a half seconds): a
+// violet omen, the pet's own egg rises, two heartbeats, one flash and ring, then the EPIC
+// letters and the egg with the shadow of its final form. `res` is the coin capsule (with its
+// "한 번 더"), or nothing when the egg came from the shop.
+export function epicShow({ key, res = null, again = false, againLabel = '' }) {
+  return new Promise(resolve => {
+    const c = CHARACTERS[key] || {}, name = c.ko || '영웅 펫';
+    const box = document.createElement('div');
+    box.className = 'lk-show lk-legend-show lgx epic';
+    box.style.setProperty('--lc', c.color || '#8b5cf6');
+    box.style.setProperty('--ll', c.light || '#d8c8ff');
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', `영웅 펫 ${name} 획득`);
+    box.innerHTML = `<div class="lk-legend-sky" aria-hidden="true"></div>
+      <div class="lgx-rays" aria-hidden="true"></div>
+      <div class="lgx-omen" aria-hidden="true"><i></i><span>반짝이는 기운이 느껴져요…</span></div>
+      <div class="lgx-motes" aria-hidden="true">${motes(18)}</div>
+      <div class="lgx-stage" aria-hidden="true">
+        <div class="lgx-aura"></div>
+        <img class="lgx-egg epic-egg" src="/assets/pets/${key}-0.webp" alt="">
+      </div>
+      <div class="lgx-rings" aria-hidden="true"><i></i></div>
+      <div class="lgx-flash" aria-hidden="true"></div>
+      <div class="lgx-reveal" id="lgx-reveal" hidden>
+        <div class="lgx-word" aria-hidden="true">${[...'EPIC'].map((ch, i) => `<b style="--i:${i}">${ch}</b>`).join('')}</div>
+        <div class="lgx-art">
+          <img class="lgx-future" src="/assets/pets/${key}-3.webp" alt="" aria-hidden="true">
+          <img class="lgx-pet" src="/assets/pets/${key}-0.webp" alt="${esc(name)}의 알">
+          <span class="lgx-epic-badge" aria-hidden="true">★<small>영웅</small></span>
+        </div>
+        <div class="lgx-card">
+          <span class="lk-legend-kicker">EPIC PET · ${esc(c.type || '')}</span><h2>영웅 펫을 만났어요!</h2><h3>${esc(name)}의 알</h3>
+          <p>${res ? `${EPIC_RATE}%의 행운으로 영웅 알이 나왔어요!` : '영웅 알에서 나온 친구예요!'} 뒤에 비치는 모습으로 자라고, 야차전에서 새 특기를 써요.</p>
+          ${res ? `<small>코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}</small>` : ''}
+          <div class="lk-actions">${again ? `<button type="button" class="lk-again" data-lk="again">한 번 더 <em>${againLabel}</em></button>` : ''}<button type="button" class="lk-ok" data-lk="ok">확인</button></div>
+        </div>
+      </div>
+      <div class="lgx-rain" aria-hidden="true"></div>
+      <button type="button" class="lk-skip" data-lk="skip">건너뛰기</button>`;
+    document.body.appendChild(box);
+    const reveal = box.querySelector('#lgx-reveal');
+    let shown = false, ready = false;
+    const close = go => { box.classList.add('bye'); setTimeout(() => box.remove(), 180); resolve(!!go); };
+    const showResult = () => {
+      if (shown) return;
+      shown = true;
+      box.classList.add('p4', 'p5', 'legend-opened');
+      box.querySelector('.lk-skip')?.remove();
+      reveal.hidden = false;
+      box.querySelector('.lgx-rain').innerHTML = stars(18);
+      box.insertAdjacentHTML('beforeend', `<div class="lk-confetti" aria-hidden="true">${confetti()}</div>`);
+      SFX.win();
+      setTimeout(() => { ready = true; box.classList.add('ready'); (box.querySelector('.lk-again') || box.querySelector('.lk-ok'))?.focus({ preventScroll: true }); }, reduced() ? 0 : 700);
+    };
+    const flashThenShow = () => { if (shown) return; box.classList.add('p4'); SFX.pop(); setTimeout(showResult, reduced() ? 0 : 300); };
+    box.addEventListener('click', e => {
+      const b = e.target.closest('[data-lk]');
+      if (!shown) return flashThenShow();
+      if (!ready) return;
+      if (b?.dataset.lk === 'again') return close(true);
+      if (b?.dataset.lk === 'ok') return close(false);
+    });
+    box.addEventListener('keydown', e => { if (e.key === 'Escape' && ready) close(false); });
+    requestAnimationFrame(() => box.classList.add('open'));
+    if (reduced()) return showResult();
+    const step = (ms, fn) => new Promise(r => setTimeout(() => { if (!shown) fn(); r(); }, ms));
+    (async () => {
+      await step(100, () => { box.classList.add('p0'); buzz(30); });
+      await step(650, () => { box.classList.add('p1'); SFX.rise(); });
+      for (let n = 0; n < 2; n++) await step(n ? 480 : 800, () => { box.classList.remove('beat'); void box.offsetWidth; box.classList.add('p2', 'beat', `b${n + 2}`); SFX.beat(n); });
+      await step(480, () => { box.classList.add('p4'); SFX.pop(); buzz([60, 30, 90]); });
+      await step(320, showResult);
+    })();
+  });
+}
 // Resolves when the student closes it: true for "한 번 더" (offered when `again`).
 export function luckyShow(res, { again = false, againLabel = '' } = {}) {
   if (res.legendary) return legendaryShow(res, { again, againLabel });
+  if (res.epic) return epicShow({ key: res.epic.key, res, again, againLabel });
   return new Promise(resolve => {
     const cls = MULT_CLASS[res.mult] || 't-miss';
     const box = document.createElement('div');

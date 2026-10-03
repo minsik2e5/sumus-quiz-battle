@@ -1,6 +1,6 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
-import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, STANDARD_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, EPIC_EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
 import { battleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
@@ -1299,6 +1299,7 @@ export async function service(state, method, path, body, token, options = {}) {
     // Like eggs: a stake waiting in a yacha room is not spent elsewhere (a free ticket is fine).
     if (body.ticket !== true && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 코인 뽑기를 할 수 있어요.', 409);
     const result = pullLucky(p, Number(body.bet), coinBalance(state, p), { ticket: body.ticket === true });
+    if (result.epic) return { ...result, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     if (!result.legendary) return { ...result, points_balance: coinBalance(state, p) };
     const school = schoolForProfile(state, p);
     let announcement = {};
@@ -1352,18 +1353,20 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/shop/egg' && method === 'POST') {
     requireRole(p, 'student');
     if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
-    const missing = STANDARD_PET_KEYS.filter(key => !p.pets.some(x => x.key === key));
-    if (!missing.length) fail('모든 펫을 모았어요!', 409);
+    // V13.92: `kind: 'epic'` is the 영웅 알 (a 영웅 pet not met yet); otherwise the basic egg.
+    const epic = body.kind === 'epic', price = epic ? EPIC_EGG_PRICE : EGG_PRICE;
+    const missing = (epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter(key => !p.pets.some(x => x.key === key));
+    if (!missing.length) fail(epic ? '영웅 펫을 모두 모았어요!' : '모든 펫을 모았어요!', 409);
     if (openBattleFor(state, p.id, Date.now())) fail('대결이 끝난 뒤에 알을 살 수 있어요.', 409);
     const balance = pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance;
-    if (balance < EGG_PRICE) fail(`코인이 ${EGG_PRICE - balance}개 부족해요.`);
+    if (balance < price) fail(`코인이 ${price - balance}개 부족해요.`);
     const key = missing[randomBytes(4).readUInt32BE(0) % missing.length];
     const now = Date.now();
-    p.pets.push({ key, acquired_at: now });
-    p.points_spent = Number(p.points_spent || 0) + EGG_PRICE;
-    (p.purchases ||= []).push({ item: 'egg', key, price: EGG_PRICE, at: now });
+    p.pets.push({ key, acquired_at: now, ...(epic ? { epic: true } : {}) });
+    p.points_spent = Number(p.points_spent || 0) + price;
+    (p.purchases ||= []).push({ item: epic ? 'epic_egg' : 'egg', key, price, at: now });
     p.avatar_key = key;
-    return { key, profile: publicProfile(p) };
+    return { key, epic, profile: publicProfile(p) };
   }
   if (path === '/profile/pet-name' && method === 'POST') {
     requireRole(p, 'student');

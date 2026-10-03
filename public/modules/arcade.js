@@ -4,7 +4,7 @@ import { GACHA_ITEMS, GACHA_KEYS, GACHA_TIERS, GACHA_TIER_KEYS, GACHA_KINDS, own
 import { titleEmblem, coin, uiArt } from './emblems.js';
 import { TITLES } from './titles.js';
 import { titleState } from './titles-ui.js';
-import { CHARACTERS, STANDARD_PET_KEYS, EGG_PRICE } from './core.js';
+import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, EGG_PRICE, EPIC_EGG_PRICE } from './core.js';
 import { luckyCard, luckyShow, machineSpin, machineDrop, unlockSound } from './lucky.js';
 import { rpsCard, rpsMatch } from './rps.js';
 import { stocksCard, loadMarket, openStock, startStockClock } from './stocks.js';
@@ -55,9 +55,11 @@ export function gachaBookPage() {
 }
 // The pet egg shop, below the games.
 function shopHtml(A) {
-  const g = A.data.stats || {}, owned = (g.pets || []).filter(pet => STANDARD_PET_KEYS.includes(pet.key)).length, total = STANDARD_PET_KEYS.length;
+  const g = A.data.stats || {}, has = key => (g.pets || []).some(pet => pet.key === key);
+  const left = STANDARD_PET_KEYS.filter(key => !has(key)).length, epicLeft = EPIC_PET_KEYS.filter(key => !has(key)).length;
   return `<section class="ga-card ga-shop">
-    <button type="button" class="ga-shop-row" data-action="egg-shop"><span class="ga-egg art" aria-hidden="true">${uiArt('egg-shop')}</span><span><b>랜덤 알 상점</b><small>${owned < total ? `상점에서 아직 못 만난 친구 ${total - owned}마리` : '상점 펫을 모두 모았어요!'}</small></span><em>${coin()}${num(EGG_PRICE)}</em></button>
+    <button type="button" class="ga-shop-row" data-action="egg-shop"><span class="ga-egg art" aria-hidden="true">${uiArt('egg-shop')}</span><span><b>랜덤 알 상점</b><small>${left ? `상점에서 아직 못 만난 친구 ${left}마리` : '기본 펫을 모두 모았어요!'}</small></span><em>${coin()}${num(EGG_PRICE)}</em></button>
+    <button type="button" class="ga-shop-row epic" data-action="egg-shop" data-egg="epic"><span class="ga-egg epic" aria-hidden="true">★</span><span><b>영웅 알 <i class="ga-epic-tag">영웅</i></b><small>${epicLeft ? `전설 바로 아래 등급 · 아직 못 만난 영웅 ${epicLeft}마리` : '영웅 펫을 모두 모았어요!'}</small></span><em>${coin()}${num(EPIC_EGG_PRICE)}</em></button>
   </section>`;
 }
 // V13.68 coin capsule: the machine and its show live in lucky.js.
@@ -149,7 +151,7 @@ async function pull(A, ticket, button) {
     if (rewards(A).gacha) rewards(A).gacha.tickets = res.lucky.tickets;
     await machineDrop(machine);
     const balance = Number(res.points_balance);
-    if (res.legendary) {
+    if (res.legendary || res.epic) {
       if (res.profile) Object.assign(A.data.profile, res.profile);
       if (res.stats) Object.assign(A.data.stats, res.stats);
     }
