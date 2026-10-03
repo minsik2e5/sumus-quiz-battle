@@ -1,6 +1,6 @@
 import { api, esc, icon, toast, num, rangeLabel } from './ui.js';
 import { CHARACTERS, PET_FORMS } from './core.js';
-import { avatar, petKey, showPose } from './character.js';
+import { avatar, petKey, showPose, holdPose } from './character.js';
 import { getRanges } from './student.js';
 import { petJosa } from './pet-moments.js';
 import { startPractice } from './sessions.js';
@@ -99,9 +99,10 @@ function later(fn, ms) {
 const petName = pet => pet?.name || CHARACTERS[petKey(pet?.key)]?.ko || '';
 // V13.94 몬스터 잡기: a monster's picture (its own art once it arrives, until then a pet picture
 // recoloured), and who a player is in the match lines (a monster has no pet name).
+// V13.95 the art sits in the same box as a pet picture (avatar-img), so showPose() can swap it.
 function monsterPic(m, { size = '', pose = '' } = {}) {
   const mon = MONSTERS.find(x => x.key === m?.key) || MONSTERS[0];
-  if (MONSTER_ART.has(mon.key)) return `<div class="avatar-art mon-art ${size}"><img src="/assets/monsters/${mon.key}${pose ? '-' + pose : ''}.webp" alt="${esc(mon.name)}" width="512" height="512" decoding="async" draggable="false"></div>`;
+  if (MONSTER_ART.has(mon.key)) return `<div class="avatar-art avatar-img mon-art ${size}" style="--pet-grow:1"><img src="/assets/monsters/${mon.key}${pose ? '-' + pose : ''}.webp" alt="${esc(mon.name)}" width="512" height="512" decoding="async" draggable="false"></div>`;
   return `<div class="mon-temp ${size}" style="--mon-filter:${mon.temp.filter};--mon-color:${mon.color}">${avatar(mon.temp.pet, { size, form: mon.temp.form })}</div>`;
 }
 const petArt = (p, opts = {}) => p?.monster ? monsterPic(p.monster, opts) : avatar(p?.pet?.key, { form: p?.pet?.form ?? 1, ...opts });
@@ -256,7 +257,7 @@ function lobby() {
       </div>
       ${petSkillChip(pet)}
     </section>
-    <div class="ya-tabs" role="group" aria-label="야차전 메뉴">${[['play', '대결'], ['monster', '몬스터'], ['league', '리그'], ['me', '내 전적']].map(([key, label]) => `<button type="button" data-yb="tab" data-tab="${key}" class="${tab === key ? 'selected' : ''}" aria-pressed="${tab === key}">${label}</button>`).join('')}</div>
+    <div class="ya-tabs" role="group" aria-label="야차전 메뉴">${[['play', '대결'], ['monster', '몬스터'], ['league', '리그'], ['me', '내 전적']].map(([key, label]) => `<button type="button" data-yb="tab" data-tab="${key}" class="${tab === key ? 'selected' : ''}" aria-pressed="${tab === key}">${key === 'monster' ? uiArt('monster-tab', 'ya-tab-art') : ''}${label}</button>`).join('')}</div>
     ${tab === 'league' ? `<div class="lg-board" data-league-board data-period="${B.leaguePeriod === 'all' ? 'all' : 'week'}" data-fresh="1"></div>` : tab === 'me' ? myRecord(h) : tab === 'monster' ? monsterTab() : playTab(h)}`);
   if (tab === 'league') mountLeagueBoard(document.querySelector('#yb-main [data-league-board]'), period => { B.leaguePeriod = period; });
 }
@@ -490,7 +491,8 @@ function botAgain() {
 // it has its own HP and skill and must be knocked out before time runs out.
 const monsterState = () => B.A.data.rewards?.monster || { cleared: {}, left: MONSTER_DAILY, daily: MONSTER_DAILY, wins: 0, hard_wins: 0 };
 function myParts() { const { counts } = lobbyRanges(); return monsterParts(counts); }
-const LEVEL_ICONS = { easy: '★', normal: '★★', hard: '★★★' };
+// V13.95 이지 · 노말 · 하드 badges: a mint, blue and burning crimson shield with 1–3 stars.
+const levelBadge = (level, cls) => uiArt('monster-' + level, cls);
 function monsterTab() {
   const parts = myParts(), st = monsterState(), cleared = st.cleared || {};
   const total = parts.length * 3, done = parts.reduce((n, p) => n + MONSTER_LEVEL_KEYS.filter(k => cleared[p.key]?.[k]).length, 0);
@@ -516,7 +518,7 @@ function monsterCard(p, c) {
       <div class="mh-levels">${MONSTER_LEVEL_KEYS.map(k => {
         const L = MONSTER_LEVELS[k], open = monsterOpen(c, k), won = !!c[k];
         const sub = won ? `처치 완료 · 다시 ${coin()}${L.again.coins}` : open ? `첫 처치 ${coin()}${num(L.first.coins)}` : k === 'hard' ? '노말을 먼저' : '이지를 먼저';
-        return `<button type="button" class="mh-lv ${k}${won ? ' won' : ''}${open ? '' : ' locked'}" data-yb="monster-go" data-part="${esc(p.key)}" data-level="${k}" ${open ? '' : 'disabled'} aria-label="${esc(m.name)} ${L.name}${won ? ' 처치 완료' : open ? '' : ' 잠김'}"><b>${won ? icon('check') : open ? '' : icon('lock')}${L.name}</b><i>${LEVEL_ICONS[k]}</i><small>${sub}</small></button>`;
+        return `<button type="button" class="mh-lv ${k}${won ? ' won' : ''}${open ? '' : ' locked'}" data-yb="monster-go" data-part="${esc(p.key)}" data-level="${k}" ${open ? '' : 'disabled'} aria-label="${esc(m.name)} ${L.name}${won ? ' 처치 완료' : open ? '' : ' 잠김'}"><b>${won ? icon('check') : open ? '' : icon('lock')}${L.name}</b>${levelBadge(k, 'mh-lv-art')}<small>${sub}</small></button>`;
       }).join('')}</div>
     </div>
   </article>`;
@@ -529,7 +531,7 @@ function askMonster(partKey, level) {
   const reward = first ? L.first : L.again;
   confirmBox(`<div class="mh-ask ${level}" style="--mc:${p.monster.color}">
       <div class="mh-ask-mon">${monsterPic(p.monster)}</div>
-      <span class="mh-ask-lv">${L.name} ${LEVEL_ICONS[level]}</span>
+      <span class="mh-ask-lv">${levelBadge(level, 'mh-ask-lv-art')}${L.name}</span>
       <h2>${esc(p.monster.name)}</h2>
       <ul class="mh-ask-facts">
         <li><b>${L.mode === 'skill' ? '실력전' : '스피드전'}</b>${L.mode === 'skill' ? '뜻 고르기 + 철자 쓰기' : '뜻 고르기 4지선다'}</li>
@@ -570,7 +572,7 @@ function drawMonsterResult() {
   const missed = r.review?.[v.me] || [];
   main(`<section class="yb-card mh-result ${won ? 'win' : 'lose'} ${setup.level || ''}" style="--mc:${mon.color}">
     <span class="yb-result-kind">몬스터 잡기 · ${esc(L.name)}</span>
-    <div class="mh-result-stage">${won ? `<div class="mh-result-down">${monsterPic(f.monster, { pose: 'down' })}</div>` : `<div class="mh-result-mon">${monsterPic(f.monster, { pose: 'attack' })}</div>`}<div class="mh-result-pet">${avatar(m.pet?.key, { form: m.pet?.form ?? 1, expression: won ? 'win' : 'hurt' })}</div></div>
+    <div class="mh-result-stage">${won ? `<div class="mh-result-down${MONSTER_ART.has(mon.key) ? ' art' : ''}">${monsterPic(f.monster, { pose: 'down' })}</div>` : `<div class="mh-result-mon">${monsterPic(f.monster, { pose: 'attack' })}</div>`}<div class="mh-result-pet">${avatar(m.pet?.key, { form: m.pet?.form ?? 1, expression: won ? 'win' : 'hurt' })}</div></div>
     <div class="mh-result-badge">${won ? '처치 성공!' : '실패…'}</div>
     <p class="yb-result-lead">${why} · 내 HP ${num(Math.max(0, m.hp))} · 몬스터 HP ${num(Math.max(0, f.hp))}</p>
     <div class="yb-result-points mh-reward" id="mh-reward">${monsterRewardText()}</div>
@@ -967,7 +969,10 @@ function knockout(side) {
   const arena = document.getElementById('yb-arena'); if (!arena) return;
   fxAdd(arena, 'fx-ko', {}, 1300).textContent = 'K.O.!';
   if (!reduced()) { arena.classList.remove('fx-shake-l'); void arena.offsetWidth; arena.classList.add('fx-shake-l'); }
-  document.getElementById('yb-pet-' + side)?.classList.add('fx-down');
+  const pet = document.getElementById('yb-pet-' + side);
+  pet?.classList.add('fx-down');
+  // V13.95 a monster with its own pictures falls into its drawn 쓰러짐 pose (no tilt, see v1395.css).
+  if (pet?.classList.contains('monster') && holdPose(pet, 'down')) pet.classList.add('mon-down');
 }
 
 function showCountdown(deadline) {

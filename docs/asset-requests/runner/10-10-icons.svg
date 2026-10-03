@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+  
+  <linearGradient id="mintRim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9fbe9"/><stop offset="1" stop-color="#34d399"/></linearGradient>
+  <linearGradient id="mintFace" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6ee7b7"/><stop offset="1" stop-color="#10B981"/></linearGradient>
+  <linearGradient id="skyRim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e0f2fe"/><stop offset="1" stop-color="#38bdf8"/></linearGradient>
+  <linearGradient id="skyFace" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7dd3fc"/><stop offset="1" stop-color="#0ea5e9"/></linearGradient>
+  <linearGradient id="crimRim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fecaca"/><stop offset="1" stop-color="#dc2626"/></linearGradient>
+  <linearGradient id="crimFace" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f43f5e"/><stop offset="1" stop-color="#9f1239"/></linearGradient>
+  <linearGradient id="starG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#f1f5f9"/></linearGradient>
+  <linearGradient id="flameG" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ea580c"/><stop offset=".6" stop-color="#fb923c"/><stop offset="1" stop-color="#fbbf24"/></linearGradient>
+  <linearGradient id="faceG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c4b5fd"/><stop offset=".55" stop-color="#a78bfa"/><stop offset="1" stop-color="#7c3aed"/></linearGradient>
+  <linearGradient id="hornG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fde68a"/><stop offset="1" stop-color="#f59e0b"/></linearGradient>
+  <linearGradient id="goldG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fef08a"/><stop offset=".5" stop-color="#fbbf24"/><stop offset="1" stop-color="#d97706"/></linearGradient>
+  <linearGradient id="bladeG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#cbd5e1"/><stop offset=".5" stop-color="#f8fafc"/><stop offset="1" stop-color="#94a3b8"/></linearGradient>
+  <linearGradient id="hiltG" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#34d399"/><stop offset=".5" stop-color="#6ee7b7"/><stop offset="1" stop-color="#059669"/></linearGradient>
+  <linearGradient id="mShield" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6ee7b7"/><stop offset="1" stop-color="#10B981"/></linearGradient>
+</defs>
+<!-- TL -->
+<g transform="translate(0 0)">
+  <!-- shield behind -->
+  <g transform="translate(256 322) scale(.74) translate(-256 -268)">
+    <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="url(#goldG)"/>
+    <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="none" stroke="#b45309" stroke-opacity=".4" stroke-width="3"/>
+    <g transform="translate(256 268) scale(.86) translate(-256 -268)">
+      <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="url(#mShield)"/>
+      <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="6"/>
+    </g>
+    <path d="M150 132 C190 140 226 134 256 116 C240 150 200 168 158 170 C152 160 150 146 150 132 Z" fill="#fff" opacity=".5"/>
+  </g>
+  
+  <g transform="translate(256 340) rotate(-40)">
+    <rect x="-17" y="-205" width="34" height="232" rx="9" fill="url(#bladeG)"/>
+    <path d="M-17 -197 L0 -236 L17 -197 Z" fill="#e5e7eb"/>
+    <rect x="-3" y="-196" width="5" height="212" rx="2.5" fill="#fff" opacity=".75"/>
+    <rect x="-52" y="22" width="104" height="24" rx="12" fill="url(#goldG)"/>
+    <ellipse cx="-12" cy="29" rx="26" ry="4" fill="#fff" opacity=".6"/>
+    <rect x="-17" y="42" width="34" height="62" rx="13" fill="url(#hiltG)"/>
+    <circle cx="0" cy="110" r="19" fill="url(#goldG)"/>
+    <ellipse cx="-6" cy="104" rx="6" ry="4" fill="#fff" opacity=".7"/>
+  </g>
+  <g transform="translate(256 340) rotate(40)">
+    <rect x="-17" y="-205" width="34" height="232" rx="9" fill="url(#bladeG)"/>
+    <path d="M-17 -197 L0 -236 L17 -197 Z" fill="#e5e7eb"/>
+    <rect x="-3" y="-196" width="5" height="212" rx="2.5" fill="#fff" opacity=".75"/>
+    <rect x="-52" y="22" width="104" height="24" rx="12" fill="url(#goldG)"/>
+    <ellipse cx="-12" cy="29" rx="26" ry="4" fill="#fff" opacity=".6"/>
+    <rect x="-17" y="42" width="34" height="62" rx="13" fill="url(#hiltG)"/>
+    <circle cx="0" cy="110" r="19" fill="url(#goldG)"/>
+    <ellipse cx="-6" cy="104" rx="6" ry="4" fill="#fff" opacity=".7"/>
+  </g>
+  <!-- monster face peeking over the shield -->
+  <g transform="translate(0 4)">
+    <path d="M172 118 C154 82 170 54 190 46 C196 74 208 92 218 106 Z" fill="url(#hornG)"/>
+    <path d="M340 118 C358 82 342 54 322 46 C316 74 304 92 294 106 Z" fill="url(#hornG)"/>
+    <ellipse cx="256" cy="184" rx="104" ry="90" fill="url(#faceG)"/>
+    <ellipse cx="256" cy="184" rx="104" ry="90" fill="none" stroke="#6d28d9" stroke-opacity=".4" stroke-width="4"/>
+    <ellipse cx="206" cy="124" rx="44" ry="18" fill="#fff" opacity=".5" transform="rotate(-24 206 124)"/>
+    <ellipse cx="217" cy="176" rx="22" ry="27" fill="#fff"/>
+    <ellipse cx="295" cy="176" rx="22" ry="27" fill="#fff"/>
+    <ellipse cx="223" cy="182" rx="13" ry="18" fill="#2e1065"/>
+    <ellipse cx="289" cy="182" rx="13" ry="18" fill="#2e1065"/>
+    <circle cx="228" cy="174" r="6" fill="#fff"/><circle cx="294" cy="174" r="6" fill="#fff"/>
+    <circle cx="219" cy="189" r="2.5" fill="#fff"/><circle cx="285" cy="189" r="2.5" fill="#fff"/>
+    <path d="M192 144 Q216 130 240 144" stroke="#4c1d95" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <path d="M272 144 Q296 130 320 144" stroke="#4c1d95" stroke-width="8" fill="none" stroke-linecap="round"/>
+    <ellipse cx="177" cy="214" rx="15" ry="9" fill="#f472b6" opacity=".6"/>
+    <ellipse cx="335" cy="214" rx="15" ry="9" fill="#f472b6" opacity=".6"/>
+    <path d="M216 222 Q256 262 296 222 Q256 236 216 222 Z" fill="#4c1d95" stroke="#4c1d95" stroke-width="6" stroke-linejoin="round"/>
+    <path d="M237 230 L246 244 L256 232 Z" fill="#fff"/>
+    <path d="M266 232 L274 244 L282 230 Z" fill="#fff"/>
+  </g>
+  <polygon points="408.0,70.0 412.7,89.5 432.7,88.0 415.6,98.5 423.3,117.0 408.0,104.0 392.7,117.0 400.4,98.5 383.3,88.0 403.3,89.5" fill="#fff" stroke="#fde68a" stroke-width="6" stroke-linejoin="round"/>
+  <circle cx="436" cy="140" r="5" fill="#fff"/></g>
+<!-- TR -->
+<g transform="translate(512 0)">
+  <g transform="translate(256 262) scale(.92) translate(-256 -262)">
+    <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="url(#mintRim)" />
+    <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="none" stroke="#047857" stroke-width="3" opacity=".35"/>
+    <g transform="translate(256 268) scale(.84) translate(-256 -268)">
+      <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="url(#mintFace)" />
+      <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="5"/>
+    </g>
+    
+  <polygon points="256.0,203.0 273.5,240.9 315.0,245.8 284.3,274.2 292.4,315.2 256.0,294.8 219.6,315.2 227.7,274.2 197.0,245.8 238.5,240.9" fill="#047857" opacity=".35" stroke="#047857" stroke-width="17.360000000000003" stroke-linejoin="round"/>
+  <polygon points="256.0,200.0 273.5,237.9 315.0,242.8 284.3,271.2 292.4,312.2 256.0,291.8 219.6,312.2 227.7,271.2 197.0,242.8 238.5,237.9" fill="url(#starG)" stroke="#fff" stroke-width="16.12" stroke-linejoin="round"/>
+  <ellipse cx="238.64" cy="242.16" rx="12.4" ry="7.4399999999999995" fill="#fff" opacity=".95" transform="rotate(-35 238.64 242.16)"/>
+    <!-- gloss -->
+    <path d="M150 132 C190 140 226 134 256 116 C240 150 200 168 158 170 C152 160 150 146 150 132 Z" fill="#fff" opacity=".55"/>
+    <ellipse cx="146" cy="196" rx="7" ry="16" fill="#fff" opacity=".6" transform="rotate(-8 146 196)"/>
+    <ellipse cx="150" cy="226" rx="4" ry="4" fill="#fff" opacity=".6"/>
+  </g></g>
+<!-- BL -->
+<g transform="translate(0 512)">
+  <g transform="translate(256 262) scale(.92) translate(-256 -262)">
+    <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="url(#skyRim)" />
+    <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="none" stroke="#0369a1" stroke-width="3" opacity=".35"/>
+    <g transform="translate(256 268) scale(.84) translate(-256 -268)">
+      <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="url(#skyFace)" />
+      <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="5"/>
+    </g>
+    
+  <polygon points="210.0,223.0 221.8,248.7 249.9,252.0 229.2,271.2 234.7,299.0 210.0,285.2 185.3,299.0 190.8,271.2 170.1,252.0 198.2,248.7" fill="#0369a1" opacity=".35" stroke="#0369a1" stroke-width="11.760000000000002" stroke-linejoin="round"/>
+  <polygon points="210.0,220.0 221.8,245.7 249.9,249.0 229.2,268.2 234.7,296.0 210.0,282.2 185.3,296.0 190.8,268.2 170.1,249.0 198.2,245.7" fill="url(#starG)" stroke="#fff" stroke-width="10.92" stroke-linejoin="round"/>
+  <ellipse cx="198.24" cy="248.56" rx="8.4" ry="5.04" fill="#fff" opacity=".95" transform="rotate(-35 198.24 248.56)"/>
+  <polygon points="302.0,223.0 313.8,248.7 341.9,252.0 321.2,271.2 326.7,299.0 302.0,285.2 277.3,299.0 282.8,271.2 262.1,252.0 290.2,248.7" fill="#0369a1" opacity=".35" stroke="#0369a1" stroke-width="11.760000000000002" stroke-linejoin="round"/>
+  <polygon points="302.0,220.0 313.8,245.7 341.9,249.0 321.2,268.2 326.7,296.0 302.0,282.2 277.3,296.0 282.8,268.2 262.1,249.0 290.2,245.7" fill="url(#starG)" stroke="#fff" stroke-width="10.92" stroke-linejoin="round"/>
+  <ellipse cx="290.24" cy="248.56" rx="8.4" ry="5.04" fill="#fff" opacity=".95" transform="rotate(-35 290.24 248.56)"/>
+    <!-- gloss -->
+    <path d="M150 132 C190 140 226 134 256 116 C240 150 200 168 158 170 C152 160 150 146 150 132 Z" fill="#fff" opacity=".55"/>
+    <ellipse cx="146" cy="196" rx="7" ry="16" fill="#fff" opacity=".6" transform="rotate(-8 146 196)"/>
+    <ellipse cx="150" cy="226" rx="4" ry="4" fill="#fff" opacity=".6"/>
+  </g></g>
+<!-- BR: flames behind -->
+<g transform="translate(512 512)">
+  <g transform="translate(160 160) rotate(-20) scale(0.64)">
+    <path d="M0 0 C-44 -6 -52 -64 -16 -106 C-14 -82 0 -74 8 -90 C14 -118 32 -134 38 -164 C70 -118 62 -54 42 -26 C30 -8 14 0 0 0 Z" fill="url(#flameG)"/>
+    <path d="M2 -8 C-18 -16 -20 -44 -4 -64 C0 -50 10 -48 14 -58 C26 -44 24 -22 2 -8 Z" fill="#fde047"/>
+  </g><g transform="translate(256 150) rotate(0) scale(0.66)">
+    <path d="M0 0 C-44 -6 -52 -64 -16 -106 C-14 -82 0 -74 8 -90 C14 -118 32 -134 38 -164 C70 -118 62 -54 42 -26 C30 -8 14 0 0 0 Z" fill="url(#flameG)"/>
+    <path d="M2 -8 C-18 -16 -20 -44 -4 -64 C0 -50 10 -48 14 -58 C26 -44 24 -22 2 -8 Z" fill="#fde047"/>
+  </g><g transform="translate(352 160) rotate(20) scale(0.64)">
+    <path d="M0 0 C-44 -6 -52 -64 -16 -106 C-14 -82 0 -74 8 -90 C14 -118 32 -134 38 -164 C70 -118 62 -54 42 -26 C30 -8 14 0 0 0 Z" fill="url(#flameG)"/>
+    <path d="M2 -8 C-18 -16 -20 -44 -4 -64 C0 -50 10 -48 14 -58 C26 -44 24 -22 2 -8 Z" fill="#fde047"/>
+  </g><g transform="translate(134 280) rotate(-50) scale(0.56)">
+    <path d="M0 0 C-44 -6 -52 -64 -16 -106 C-14 -82 0 -74 8 -90 C14 -118 32 -134 38 -164 C70 -118 62 -54 42 -26 C30 -8 14 0 0 0 Z" fill="url(#flameG)"/>
+    <path d="M2 -8 C-18 -16 -20 -44 -4 -64 C0 -50 10 -48 14 -58 C26 -44 24 -22 2 -8 Z" fill="#fde047"/>
+  </g><g transform="translate(378 280) rotate(50) scale(0.56)">
+    <path d="M0 0 C-44 -6 -52 -64 -16 -106 C-14 -82 0 -74 8 -90 C14 -118 32 -134 38 -164 C70 -118 62 -54 42 -26 C30 -8 14 0 0 0 Z" fill="url(#flameG)"/>
+    <path d="M2 -8 C-18 -16 -20 -44 -4 -64 C0 -50 10 -48 14 -58 C26 -44 24 -22 2 -8 Z" fill="#fde047"/>
+  </g>
+  
+  <g transform="translate(256 262) scale(.92) translate(-256 -262)">
+    <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="url(#crimRim)" />
+    <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="none" stroke="#7f1d1d" stroke-width="3" opacity=".35"/>
+    <g transform="translate(256 268) scale(.84) translate(-256 -268)">
+      <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="url(#crimFace)" />
+      <path d="M256 84 C300 108 358 116 408 112 C412 252 384 366 256 440 C128 366 100 252 104 112 C154 116 212 108 256 84 Z" fill="none" stroke="#fff" stroke-opacity=".55" stroke-width="5"/>
+    </g>
+    
+  <polygon points="256.0,181.0 266.2,203.0 290.2,205.9 272.4,222.3 277.2,246.1 256.0,234.3 234.8,246.1 239.6,222.3 221.8,205.9 245.8,203.0" fill="#7f1d1d" opacity=".35" stroke="#7f1d1d" stroke-width="10.080000000000002" stroke-linejoin="round"/>
+  <polygon points="256.0,178.0 266.2,200.0 290.2,202.9 272.4,219.3 277.2,243.1 256.0,231.3 234.8,243.1 239.6,219.3 221.8,202.9 245.8,200.0" fill="url(#starG)" stroke="#fff" stroke-width="9.36" stroke-linejoin="round"/>
+  <ellipse cx="245.92" cy="202.48" rx="7.2" ry="4.32" fill="#fff" opacity=".95" transform="rotate(-35 245.92 202.48)"/>
+  <polygon points="196.0,261.0 206.2,283.0 230.2,285.9 212.4,302.3 217.2,326.1 196.0,314.3 174.8,326.1 179.6,302.3 161.8,285.9 185.8,283.0" fill="#7f1d1d" opacity=".35" stroke="#7f1d1d" stroke-width="10.080000000000002" stroke-linejoin="round"/>
+  <polygon points="196.0,258.0 206.2,280.0 230.2,282.9 212.4,299.3 217.2,323.1 196.0,311.3 174.8,323.1 179.6,299.3 161.8,282.9 185.8,280.0" fill="url(#starG)" stroke="#fff" stroke-width="9.36" stroke-linejoin="round"/>
+  <ellipse cx="185.92" cy="282.48" rx="7.2" ry="4.32" fill="#fff" opacity=".95" transform="rotate(-35 185.92 282.48)"/>
+  <polygon points="316.0,261.0 326.2,283.0 350.2,285.9 332.4,302.3 337.2,326.1 316.0,314.3 294.8,326.1 299.6,302.3 281.8,285.9 305.8,283.0" fill="#7f1d1d" opacity=".35" stroke="#7f1d1d" stroke-width="10.080000000000002" stroke-linejoin="round"/>
+  <polygon points="316.0,258.0 326.2,280.0 350.2,282.9 332.4,299.3 337.2,323.1 316.0,311.3 294.8,323.1 299.6,299.3 281.8,282.9 305.8,280.0" fill="url(#starG)" stroke="#fff" stroke-width="9.36" stroke-linejoin="round"/>
+  <ellipse cx="305.92" cy="282.48" rx="7.2" ry="4.32" fill="#fff" opacity=".95" transform="rotate(-35 305.92 282.48)"/>
+    <!-- gloss -->
+    <path d="M150 132 C190 140 226 134 256 116 C240 150 200 168 158 170 C152 160 150 146 150 132 Z" fill="#fff" opacity=".55"/>
+    <ellipse cx="146" cy="196" rx="7" ry="16" fill="#fff" opacity=".6" transform="rotate(-8 146 196)"/>
+    <ellipse cx="150" cy="226" rx="4" ry="4" fill="#fff" opacity=".6"/>
+  </g>
+</g>
+</svg>

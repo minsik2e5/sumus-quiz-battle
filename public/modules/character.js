@@ -46,16 +46,33 @@ export function expressionSrc(key, form, expression) {
 }
 // Swaps a shown pet's picture to a pose for a while, then back to the still sprite. `art` holds
 // the avatar(); a pose not drawn does nothing. Quick repeats keep the first still picture.
+// V13.95 a monster's picture (/assets/monsters/<key>.webp) swaps to <key>-attack / -hurt the
+// same way. holdPose() puts a pose up for good (a knocked-out monster stays down).
+const MONSTER_POSE = new Set(['attack', 'hurt', 'down']);
+function poseSrc(still, pose) {
+  const m = still?.match(/\/assets\/pets\/([a-z]+)-(\d)\.webp$/);
+  if (m) return expressionSrc(m[1], Number(m[2]), pose);
+  const mon = MONSTER_POSE.has(pose) && still?.match(/\/assets\/monsters\/([a-z]+)\.webp$/);
+  return mon ? `/assets/monsters/${mon[1]}-${pose}.webp` : null;
+}
+export function holdPose(art, pose) {
+  const img = art?.querySelector('.avatar-art img');
+  const src = img && poseSrc(img._still || img.getAttribute('src'), pose);
+  if (!src) return false;
+  clearTimeout(img._pose);
+  img._held = true;
+  img.setAttribute('src', src);
+  return true;
+}
 export function showPose(art, pose, ms = 2800) {
   const img = art?.querySelector('.avatar-art img');
-  if (!img) return;
+  if (!img || img._held) return;
   const still = img._still || img.getAttribute('src');
-  const m = still?.match(/\/assets\/pets\/([a-z]+)-(\d)\.webp$/);
-  const src = m && expressionSrc(m[1], Number(m[2]), pose);
+  const src = poseSrc(still, pose);
   if (!src) return;
   const pre = new Image();
   pre.onload = () => {
-    if (!img.isConnected) return;
+    if (!img.isConnected || img._held) return;
     img._still = still;
     img.setAttribute('src', src);
     clearTimeout(img._pose);

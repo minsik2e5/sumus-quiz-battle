@@ -1,5 +1,5 @@
 // 2×2 시트 한 장(로보 · 가위바위보 · UI 아이콘 · 트로피)을 4칸으로 나눠 public/assets/ 아래에 넣어요.
-//   node docs/asset-requests/runner/fit-assets.mjs <sheet.png> <왼쪽위> <오른쪽위> <왼쪽아래> <오른쪽아래> [--base pets/robot-3] [--size 256] [--trim] [--preview out.png]
+//   node docs/asset-requests/runner/fit-assets.mjs <sheet.png> <왼쪽위> <오른쪽위> <왼쪽아래> <오른쪽아래> [--base pets/robot-3] [--size 256] [--trim] [--stand | --stand-same] [--preview out.png]
 //   예) node docs/asset-requests/runner/fit-assets.mjs out/043.png ui/care-feed ui/care-pet ui/care-warm ui/notice
 //       node docs/asset-requests/runner/fit-assets.mjs out/001.png rps/robot-rock rps/robot-scissors rps/robot-paper rps/robot-ready --base pets/robot-3
 // - 칸 이름은 public/assets/ 아래 경로(확장자 없이). "-"인 칸은 버려요.
@@ -7,16 +7,22 @@
 // - --base가 있으면 그 그림(public/assets/<base>.webp)과 키·가운데·발 위치를 맞춰요(같은 시트는 같은 배율).
 //   없으면 정사각형(--size, 기본 256px) 가운데에 여백을 두고 넣어요.
 // - --stand면 펫 그림처럼 칸마다 따로 512px 캔버스 바닥(발 491px)에 세워요(키 20~491px, 양옆 12px). 새 펫의 기본 그림용.
+// - --stand-same은 --stand와 같지만 시트 4칸을 같은 배율로 세워요(가장 큰 칸이 488 × 471px에 맞게).
+//   포즈를 바꿔 끼워도 크기가 튀지 않아야 하는 그림용. 예) 몬스터 기본 · 공격 · 맞음 · 쓰러짐(10-monsters)
+//       node docs/asset-requests/runner/fit-assets.mjs 10-1.png monsters/slime monsters/slime-attack monsters/slime-hurt monsters/slime-down --stand-same
 // - --trim이면 정사각형에 넣지 않고 그림 테두리에 딱 맞게 잘라요(같은 시트는 같은 배율, 가장 넓은 칸이 --size px).
 //   예) 캡슐 위·아래 반쪽처럼 앱에서 위아래로 맞붙여 쓰는 그림.
 import sharp from 'sharp';
 import { fileURLToPath } from 'node:url';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 const ASSETS = fileURLToPath(new URL('../../../public/assets/', import.meta.url));
 const args = process.argv.slice(2);
 const opt = name => { const i = args.indexOf(name); return i >= 0 ? args.splice(i, 2)[1] : null; };
 const ti = args.indexOf('--trim'), trim = ti >= 0 && !!args.splice(ti, 1);
-const si = args.indexOf('--stand'), stand = si >= 0 && !!args.splice(si, 1);
+const ssi = args.indexOf('--stand-same'), standSame = ssi >= 0 && !!args.splice(ssi, 1);
+const si = args.indexOf('--stand'), stand = standSame || (si >= 0 && !!args.splice(si, 1));
 const preview = opt('--preview'), baseName = opt('--base'), size = Number(opt('--size') || 256);
 const [sheet, ...names] = args;
 if (!sheet || names.length !== 4) {
@@ -89,10 +95,13 @@ if (base) {
 }
 
 const tiles = [];
+// --stand-same: one scale for the sheet, so the largest cell fits 488 × 471 px.
+const kSame = Math.min(...cells.map(c => Math.min(488 / c.b.w, 471 / c.b.h)));
 for (const c of cells) {
+  mkdirSync(dirname(`${ASSETS}${c.name}.webp`), { recursive: true });
   if (stand) {
     // Each picture on its own: as big as fits 488 × 471 px, centred, feet on y = 491.
-    const ks = Math.min(488 / c.b.w, 471 / c.b.h), w = Math.round(c.b.w * ks), h = Math.round(c.b.h * ks);
+    const ks = standSame ? kSame : Math.min(488 / c.b.w, 471 / c.b.h), w = Math.round(c.b.w * ks), h = Math.round(c.b.h * ks);
     const crop = await sharp(c.buf, { raw: { width: W, height: H, channels: 4 } }).extract({ left: c.b.x0, top: c.b.y0, width: c.b.w, height: c.b.h }).png().toBuffer();
     const img = await sharp(crop).resize(w, h).toBuffer();
     const out = await sharp({ create: { width: 512, height: 512, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } })
