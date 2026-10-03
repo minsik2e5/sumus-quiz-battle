@@ -288,3 +288,10 @@ body[data-widget="notes"] .desktop-widget-section { display: flex; flex-directio
 .chk-row .grip { color: #c3cad3; cursor: grab; font-style: normal; font-size: 12px; letter-spacing: -2px; line-height: 20px; width: 10px; flex: none; user-select: none; }
 .chk-row:hover .grip { color: #8b95a1; }
 .chk-row.dragging { opacity: .45; background: #eef4ff; border-radius: 8px; }
+
+/* 위젯 창(EXE)에서는 글자가 아닌 빈 곳 어디를 잡아도 끌어 옮길 수 있음. 입력·버튼·목록 안은 제외 */
+body { -webkit-app-region: drag; }
+input, textarea, button, select, a, [role=checkbox], label, .chk-row, .desktop-check-list, .desktop-class-list, .note-text, .note-tabs, .desktop-time-list > div, .desktop-widget-page ::-webkit-scrollbar { -webkit-app-region: no-drag; }
+.w-plus { color: #3182f6; background: #e7f0ff; border: 0; border-radius: 8px; width: 24px; height: 24px; margin-left: 4px; font-size: 18px; line-height: 1; font-weight: 700; cursor: pointer; }
+.w-plus:hover { background: #d3e5ff; }
+.desktop-widget-head .w-close { margin-left: 4px; }

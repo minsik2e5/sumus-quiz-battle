@@ -163,6 +163,7 @@ namespace SumusWidget
                     string msg = a.TryGetWebMessageAsString();
                     if (msg == "retry") Reload();
                     else if (msg == "close") host.RemoveWidget(Id);
+                    else if (msg == "menu") host.ShowWidgetMenu(Id);
                     else if (msg != null && msg.StartsWith("n:")) host.SetNote(Id, msg.Substring(2));
                 };
                 web.CoreWebView2.Navigate(host.UrlFor(Id));
@@ -358,8 +359,23 @@ namespace SumusWidget
             w.Close(); w.Dispose();
             SaveSettings();
         }
+        // 위젯 안의 + 버튼이나 오른쪽 클릭: 위젯 추가 · 이 위젯 닫기 메뉴
+        public void ShowWidgetMenu(string id)
+        {
+            ContextMenuStrip m = new ContextMenuStrip();
+            ToolStripMenuItem add = new ToolStripMenuItem("위젯 추가");
+            foreach (string[] k in Kinds.All) { string kind = k[0]; add.DropDownItems.Add(k[1], null, delegate { AddWidget(kind); }); }
+            m.Items.Add(add);
+            if (id != null) m.Items.Add("이 위젯 닫기", null, delegate { RemoveWidget(id); });
+            m.Items.Add("모든 위젯 새로고침", null, delegate { foreach (WidgetWindow w in windows) w.Reload(); });
+            m.Items.Add(pinned ? "바탕화면에 붙이기" : "항상 위에 표시", null, delegate { SetPinned(!pinned); });
+            m.Items.Add(new ToolStripSeparator());
+            m.Items.Add("위젯 프로그램 종료", null, delegate { ExitThread(); });
+            m.Show(Cursor.Position);
+        }
         void ShowAllFront()
         {
+            if (windows.Count == 0) { ShowWidgetMenu(null); return; }
             foreach (WidgetWindow w in windows) { if (w.WindowState == FormWindowState.Minimized) w.WindowState = FormWindowState.Normal; w.BringFront(); }
             frontTimer.Stop(); frontTimer.Start();
         }

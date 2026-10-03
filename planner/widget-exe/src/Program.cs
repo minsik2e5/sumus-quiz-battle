@@ -23,14 +23,14 @@ using Microsoft.Web.WebView2.WinForms;
 [assembly: AssemblyProduct("SUMUS Widget")]
 [assembly: AssemblyCompany("SUMUS")]
 [assembly: AssemblyCopyright("SUMUS")]
-[assembly: AssemblyVersion("3.0.0.0")]
-[assembly: AssemblyFileVersion("3.0.0.0")]
+[assembly: AssemblyVersion("3.1.0.0")]
+[assembly: AssemblyFileVersion("3.1.0.0")]
 
 namespace SumusWidget
 {
     static class App
     {
-        public const string Version = "3.0.0";
+        public const string Version = "3.1.0";
         public const string DefaultUrl = "https://sumus-planner.minsik2e5.workers.dev/widget";
         public const string PlannerUrl = "https://sumus-planner.minsik2e5.workers.dev/";
         public const string AppName = "SUMUS 오늘 위젯";

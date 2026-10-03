@@ -76,9 +76,9 @@ function draw() {
     clock: () => `<div class="w-clock"><b id="w-clock-t"></b><span id="w-clock-d"></span></div>`
   };
   const head = KIND === 'all'
-    ? `<header class="desktop-widget-head"><div class="desktop-widget-logo">S</div><div><strong>SUMUS TODAY</strong><span>${C.fmtLong(today)}</span></div><i id="w-dot"></i><button type="button" data-act="refresh" aria-label="새로고침">${icon('refresh-cw')}</button></header>
+    ? `<header class="desktop-widget-head"><div class="desktop-widget-logo">S</div><div><strong>SUMUS TODAY</strong><span>${C.fmtLong(today)}</span></div><i id="w-dot"></i><button type="button" data-act="refresh" aria-label="새로고침">${icon('refresh-cw')}</button>${inExe ? `<button type="button" class="w-plus" data-act="add-widget" aria-label="위젯 추가·메뉴" title="위젯 추가 · 메뉴">+</button>` : ''}</header>
     <div class="desktop-widget-progress"><div>${icon('sparkles')}<strong>오늘 ${p.completed}/${p.total || 0} 완료</strong></div><span><b style="width: ${p.total ? Math.round(p.completed / p.total * 100) : 0}%;"></b></span></div>`
-    : `<header class="desktop-widget-head slim"><div class="desktop-widget-logo">S</div><div><strong>${TITLES[KIND] || 'SUMUS'}</strong><span>${C.fmtLong(today)}</span></div><i id="w-dot"></i>${inExe ? `<button type="button" class="w-close" data-act="close-widget" aria-label="이 위젯 닫기">×</button>` : ''}</header>`;
+    : `<header class="desktop-widget-head slim"><div class="desktop-widget-logo">S</div><div><strong>${TITLES[KIND] || 'SUMUS'}</strong><span>${C.fmtLong(today)}</span></div><i id="w-dot"></i>${inExe ? `<button type="button" class="w-plus" data-act="add-widget" aria-label="위젯 추가·메뉴" title="위젯 추가 · 메뉴">+</button><button type="button" class="w-close" data-act="close-widget" aria-label="이 위젯 닫기" title="이 위젯 닫기">×</button>` : ''}</header>`;
   const body = KIND === 'all' ? ['work', 'classes', 'quick', 'checklist'].map(k => parts[k]()).join('') : (parts[KIND] || parts.classes)();
   const foot = KIND === 'all' ? `<footer><div>${inExe ? '' : '<a href="/SUMUS_Widget_Installer.zip" download>Windows 설치</a>'}<button type="button" data-act="planner">${icon('external-link')} 전체 플래너</button></div><span id="w-status"></span></footer>` : '<footer class="slim"><span id="w-status"></span></footer>';
   root.innerHTML = `<main class="desktop-widget-page kind-${KIND}"><section class="desktop-widget-card">${head}${body}${foot}</section></main>`;
@@ -130,6 +130,7 @@ root.addEventListener('click', e => {
     if (day !== today) toast(`${C.fmtMd(day)} 밤 취침으로 기록했어요.`);
     return;
   }
+  if (d.act === 'add-widget') { window.chrome?.webview?.postMessage('menu'); return; }
   if (d.act === 'close-widget') { window.chrome?.webview?.postMessage('close'); return; }
   if (d.noteOpen) { Q.set('n', d.noteOpen); window.chrome?.webview?.postMessage('n:' + d.noteOpen); history.replaceState(null, '', '?' + Q); draw(); return; }
   if (d.act === 'note-new') { const id = `n${Date.now()}`; change(s => { s.notes.push({ id, title: '', text: '', updatedAt: Date.now() }); }); Q.set('n', id); history.replaceState(null, '', '?' + Q); draw(); setTimeout(() => document.getElementById('w-note-title')?.focus(), 30); return; }
@@ -142,6 +143,8 @@ root.addEventListener('change', e => {
   const t = e.target;
   if (t.dataset.time) { change(s => { (s.attendance[today] ||= { clockIn: '', clockOut: '' })[t.dataset.time] = t.value; }, { render: false }); patchWork(); }
 });
+// 위젯 어디서나 오른쪽 클릭 → 위젯 추가·닫기 메뉴 (입력칸 안은 제외)
+document.addEventListener('contextmenu', e => { if (!inExe || e.target.closest('textarea, input')) return; e.preventDefault(); window.chrome?.webview?.postMessage('menu'); });
 // 체크리스트 순서 바꾸기 (끌어서 놓기)
 let dragging = null;
 root.addEventListener('dragstart', e => { const r = e.target.closest?.('.chk-row'); if (!r) return; dragging = r; r.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', r.dataset.ck); } catch {} });
