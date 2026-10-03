@@ -1,0 +1,100 @@
+/* V13.92 영웅 펫 (EPIC): violet, one step below the gold of the legendary pets */
+:root{--epic:#8b5cf6;--epic-deep:#6d28d9;--epic-soft:#f3edff}
+/* 펫 도감 */
+.pb-section.epic:before{background:linear-gradient(#c4b5fd,#7c3aed)}
+.pb-section small{font-size:12px;font-weight:800;color:#7c6aa6}
+.pb-epic{font-size:11px;font-weight:950;color:#fff;background:linear-gradient(#a78bfa,#7c3aed);padding:3px 8px;border-radius:99px;white-space:nowrap}
+.pb-card.epic{border:3px solid transparent;background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,#ddd0ff,#8b5cf6,#efe9ff,#6d28d9) border-box}
+.pb-card.epic.met{box-shadow:0 8px 22px rgba(124,58,237,.18);background:linear-gradient(160deg,#faf7ff,#fff 55%) padding-box,linear-gradient(135deg,#ddd0ff,#8b5cf6,#efe9ff,#6d28d9) border-box}
+.pb-card.epic.unmet .pb-sprite.shadow{filter:brightness(0) opacity(.2) drop-shadow(0 0 5px rgba(139,92,246,.85))}
+/* 알 상점 */
+.egg-shop-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%;margin-top:30px;padding:4px;border-radius:16px;background:#f1f4f3}
+.egg-shop-tabs button{appearance:none;border:0;border-radius:12px;padding:9px 6px;font:inherit;font-size:14px;font-weight:900;color:#51625e;background:none;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer}
+.egg-shop-tabs button small{font-size:11px;font-weight:800;color:#8a9894}
+.egg-shop-tabs button.selected{background:#fff;color:#1f2a2e;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.egg-shop-tabs button.epic i{font-style:normal;color:var(--epic);margin-right:2px}
+.egg-shop-tabs button.epic.selected{color:var(--epic-deep);box-shadow:0 2px 10px rgba(124,58,237,.22),inset 0 0 0 1.5px #c4b5fd}
+.pet-shop-egg.epic{background:radial-gradient(ellipse 14% 10% at 34% 24%,rgba(255,255,255,.9),transparent),linear-gradient(160deg,#ede4ff,#a78bfa 55%,#6d28d9);box-shadow:0 0 0 4px #efe9ff,0 10px 30px rgba(124,58,237,.35);color:#fff;animation:epicEggGlow 1.6s ease-in-out infinite alternate}
+.pet-shop-egg.epic span{text-shadow:0 2px 8px rgba(76,29,149,.6)}
+.egg-shop-tier{display:inline-block;margin-right:4px;padding:1px 8px;border-radius:99px;font-size:12px;color:#fff;background:linear-gradient(#a78bfa,#7c3aed);vertical-align:2px}
+@keyframes epicEggGlow{to{box-shadow:0 0 0 6px #e4d9ff,0 10px 40px rgba(124,58,237,.55)}}
+/* 놀이터 */
+.ga-shop-row.epic b{display:inline-flex;align-items:center;gap:5px}
+.ga-egg.epic{display:grid;place-items:center;color:#fff;font-size:20px;background:linear-gradient(160deg,#ede4ff,#a78bfa 55%,#6d28d9);box-shadow:0 4px 12px rgba(124,58,237,.3)}
+.ga-epic-tag{font-style:normal;font-size:10.5px;font-weight:900;color:#fff;background:linear-gradient(#a78bfa,#7c3aed);padding:1px 7px;border-radius:99px}
+.lk-epic-status{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center;margin:-4px 0 12px;padding:8px 12px;border:1px solid #ddd0ff;border-radius:14px;background:linear-gradient(135deg,#f6f1ff,#fff 60%)}
+.lk-epic-status span{grid-row:span 2;display:grid;place-items:center;width:30px;height:30px;border-radius:50%;color:#fff;background:linear-gradient(#a78bfa,#7c3aed);font-size:15px}
+.lk-epic-status b{color:var(--epic-deep);font-size:13px;text-align:left}.lk-epic-status small{color:#6f6675;font-size:11px;text-align:left}
+/* 영웅 연출 (lucky.js epicShow): the legendary show's stages, violet and shorter */
+.lgx.epic.p2{background:radial-gradient(circle at 50% 50%,color-mix(in srgb,var(--lc) 30%,#1b0f3a) 0%,#05030f 62%)}
+.lgx.epic.p5{background:radial-gradient(circle at 50% 42%,#6d4bb8 0%,#26145a 45%,#07041a 100%)}
+.lgx.epic .lgx-omen i{background:linear-gradient(90deg,transparent,#c4b5fd,#fff,#c4b5fd,transparent);box-shadow:0 0 18px 4px rgba(167,139,250,.6)}
+.lgx.epic .lgx-omen span{color:#e4d9ff;text-shadow:0 0 12px rgba(167,139,250,.8)}
+.lgx.epic .lgx-aura{background:radial-gradient(circle,#f3edff 0%,rgba(139,92,246,.75) 32%,transparent 62%)}
+.lgx.epic .lgx-egg.epic-egg{inset:10%!important;width:80%!important;height:80%!important;filter:drop-shadow(0 0 18px rgba(167,139,250,.9)) drop-shadow(0 16px 20px rgba(0,0,0,.4))}
+.lgx.epic .lgx-mote{background:#f3edff;box-shadow:0 0 10px 3px #a78bfa}
+.lgx.epic .lgx-rings i{border-color:#efe9ff;box-shadow:0 0 30px #a78bfa,inset 0 0 22px rgba(221,208,255,.8)}
+.lgx.epic .lgx-flash{background:radial-gradient(circle,#fff 0%,#f3edff 45%,#c4b5fd 100%)}
+.lgx.epic.p4 .lgx-flash{animation-duration:.6s}
+.lgx.epic .lgx-rays{background:repeating-conic-gradient(from 0deg,rgba(196,181,253,.55) 0deg 7deg,transparent 7deg 18deg,rgba(255,255,255,.25) 18deg 21deg,transparent 21deg 30deg)}
+.lgx.epic.p5 .lgx-rays{opacity:.75;animation-duration:30s}
+.lgx.epic .lgx-word b{background:linear-gradient(180deg,#fff 10%,#ddd0ff 40%,#8b5cf6 72%,#efe9ff 100%);-webkit-background-clip:text;background-clip:text;filter:drop-shadow(0 2px 0 #4c1d95) drop-shadow(0 0 12px rgba(167,139,250,.75));font-size:clamp(34px,11vw,52px)}
+.lgx.epic .lgx-future{filter:brightness(0) invert(1) drop-shadow(0 0 14px #ddd0ff) drop-shadow(0 0 30px var(--lc))}
+.lgx.epic .lgx-pet{filter:drop-shadow(0 16px 20px rgba(0,0,0,.45)) drop-shadow(0 0 22px rgba(196,181,253,.7))}
+.lgx-epic-badge{position:absolute;right:0;top:4%;display:grid;place-items:center;width:27%;aspect-ratio:1;border-radius:50%;color:#fff;font-size:clamp(22px,7vw,32px);line-height:1;background:radial-gradient(circle at 35% 30%,#ede4ff,#8b5cf6 60%,#5b21b6);box-shadow:0 0 0 3px #efe9ff,0 6px 16px rgba(76,29,149,.55);animation:lgxBadge .6s cubic-bezier(.3,1.8,.5,1) .6s both}
+.lgx-epic-badge small{font-size:clamp(9px,2.6vw,12px);font-weight:950;margin-top:-6px}
+.lgx.epic .lgx-card{border-color:rgba(196,181,253,.85);background:linear-gradient(150deg,rgba(62,36,120,.93),rgba(24,16,64,.96));box-shadow:0 20px 60px rgba(0,0,0,.5),0 0 0 4px rgba(167,139,250,.14),inset 0 1px rgba(255,255,255,.25)}
+.lgx.epic .lk-legend-kicker{color:#ddd0ff}.lgx.epic .lgx-card h2{color:#efe9ff}
+.lgx.epic .lgx-star{background:radial-gradient(circle,#fff 0 18%,transparent 20%),conic-gradient(from 45deg,#ddd0ff 0 25%,transparent 0 50%,#ddd0ff 0 75%,transparent 0);filter:drop-shadow(0 0 4px #a78bfa)}
+
+/* V13.92 패드 화면: from 768px wide the 5 menus move to a left rail and the page uses the width.
+   Phones keep the bottom menu exactly as before. */
+.nav-brand{display:none}
+@media (min-width:768px){
+  :root{--rail:96px}
+  .student-app{width:auto!important;max-width:none!important;margin:0!important;padding-left:var(--rail);box-shadow:none!important;background:#f3f6f5!important}
+  .student-main{width:auto!important;max-width:1080px!important;margin:0 auto!important;padding:18px 32px 40px!important;padding-bottom:40px!important;background:transparent!important;box-shadow:none!important}
+  .student-main .app-header .brand{visibility:hidden}
+  .bottom-nav{left:0!important;top:0!important;bottom:0!important;right:auto!important;transform:none!important;width:var(--rail)!important;height:100dvh;display:flex!important;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:6px!important;padding:18px 10px calc(18px + env(safe-area-inset-bottom,0px))!important;border-top:0!important;border-right:1px solid #e3e9e7;box-shadow:4px 0 24px rgba(27,39,61,.04)!important;background:rgba(255,255,255,.97)!important}
+  .bottom-nav .nav-brand{display:flex;flex-direction:column;align-items:center;gap:4px;margin:0 0 14px;font-size:10px;font-weight:900;letter-spacing:.04em;color:#22302d;text-align:center}
+  .bottom-nav .nav-brand img{width:36px;height:36px}
+  .bottom-nav .nav-brand b{color:#10b981;font-weight:900}
+  .bottom-nav>button{flex:none;display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:68px;border-radius:18px!important;padding:8px 4px!important}
+  .bottom-nav>button span{font-size:12.5px!important}
+  .bottom-nav>button svg{width:24px!important;height:24px!important}
+  .bottom-nav img.nav-art{width:34px;height:34px}
+  /* 홈 (패드 세로): the partner card centred on top, the day's cards two by two below */
+  .home-stack-v1360{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px 18px;align-items:start}
+  .home-stack-v1360>*{min-width:0}
+  .home-stack-v1360>.partner-card-v1358{grid-column:1 / -1;width:min(100%,440px);justify-self:center}
+  .home-stack-v1360>.att-card{grid-column:1 / -1}
+  .home-stack-v1360>:empty{display:none}
+  /* 나 */
+  .me-tiles-v1368.four{grid-template-columns:repeat(4,minmax(0,1fr))!important}
+  .me-menu-grid{grid-template-columns:repeat(7,minmax(0,1fr))!important}
+  .me-stats-v1368{max-width:none}
+  /* 학습 */
+  .study-hub-simple{grid-template-columns:1fr 1fr!important}
+  /* 놀이터: the machine and the games side by side */
+  [data-arcade]:not([data-arcade-view]){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+  [data-arcade]:not([data-arcade-view])>*{margin:0!important;min-width:0}
+  /* full-screen study, cards and the yacha match stay a readable width, centred */
+  .session-app{max-width:680px!important;width:100%!important}
+  #yb-main{max-width:min(760px,calc((100dvh - 400px) * 1.54));min-width:min(100%,520px);margin-inline:auto}
+  .fc-v1390>*{width:100%;max-width:720px;margin-inline:auto}
+  /* 펫 도감·칭호 */
+  .pb-grid{grid-template-columns:1fr 1fr}
+}
+@media (min-width:1100px){
+  :root{--rail:212px}
+  .bottom-nav{padding:22px 14px!important}
+  .bottom-nav .nav-brand{flex-direction:row;justify-content:flex-start;gap:9px;margin:0 6px 22px;font-size:16px;letter-spacing:0}
+  .bottom-nav .nav-brand img{width:34px;height:34px}
+  .bottom-nav>button{flex-direction:row!important;justify-content:flex-start!important;gap:12px;min-height:54px;padding:8px 16px!important}
+  /* 홈 (패드 가로): the partner card on the left, the day's cards on the right */
+  .home-stack-v1360{grid-template-columns:400px minmax(0,1fr);gap:18px 24px}
+  .home-stack-v1360>.partner-card-v1358{grid-column:1;grid-row:1 / span 20;width:100%;justify-self:stretch;position:sticky;top:16px}
+  .home-stack-v1360>:not(.partner-card-v1358){grid-column:2!important}
+  .bottom-nav>button span{font-size:15px!important;font-weight:850}
+  .pb-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}

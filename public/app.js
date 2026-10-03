@@ -820,7 +820,7 @@ $('#app').addEventListener('click', async event => {
     }
     if (d.action === 'pet-name') return openPetNameModal(A, petChanged);
     if (d.action === 'choose-pet') return confirmFirstPet(d.key);
-    if (d.action === 'egg-shop') return openEggShop(A, petChanged);
+    if (d.action === 'egg-shop') return openEggShop(A, petChanged, d.egg === 'epic' ? 'epic' : 'basic');
     if (d.action === 'vocab-more') { moreVocab(A); $('#vocab-table').innerHTML = vocabTable(A); return; }
     if (d.action === 'battle') return navigate('yacha');
     if (d.action === 'coins') return walletModal();

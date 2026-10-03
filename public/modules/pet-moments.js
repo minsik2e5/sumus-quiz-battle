@@ -1,5 +1,6 @@
 import { $, api, esc, num, toast } from './ui.js';
-import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, cleanPetName } from './core.js';
+import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, STANDARD_PET_KEYS, EPIC_PET_KEYS, cleanPetName } from './core.js';
+import { epicShow } from './lucky.js';
 import { avatar, petKey } from './character.js';
 
 // Pet moments: the hatch (egg -> baby) and evolution scenes shown on the home screen the
@@ -212,40 +213,52 @@ export function openPetNameModal(A, onChanged) {
 }
 
 // Shop: buy a random egg, then reveal which pet's egg it was.
-export function openEggShop(A, onChanged) {
+// V13.92: two eggs. The basic egg (a basic pet not met yet) and the 영웅 알 (a 영웅 pet not
+// met yet); a 영웅 egg opens with its own show.
+const EGGS = {
+  basic: { name: '랜덤 알', price: EGG_PRICE, keys: STANDARD_PET_KEYS, all: '기본 펫을 모두 모았어요!' },
+  epic: { name: '영웅 알', price: EPIC_EGG_PRICE, keys: EPIC_PET_KEYS, all: '영웅 펫을 모두 모았어요!' }
+};
+export function openEggShop(A, onChanged, kind = 'basic') {
   const g = A.data.stats;
   if (momentOpen || !g?.pet) return;
-  const missing = Object.keys(CHARACTERS).filter(key => !g.pets.some(x => x.key === key));
-  const short = Math.max(0, EGG_PRICE - Number(g.points_balance || 0));
   momentOpen = true;
-  const body = openOverlay('랜덤 알 상점');
-  body.innerHTML = `<div class="pet-shop">
-    <div class="pet-shop-egg" aria-hidden="true"><span>?</span></div>
-    <p class="pet-moment-msg">어떤 친구가 들어 있을까요?</p>
-    <p class="pet-shop-copy">아직 만나지 못한 ${missing.length}마리 중 한 마리의 알이 나와요.<br>새 알은 바로 파트너가 되고, 함께 공부하면 Lv.3에 태어나요.</p>
-    <div class="pet-shop-price"><span>가격</span><b><i class="coin-ico" aria-hidden="true"></i>${num(EGG_PRICE)}</b><span>가진 코인</span><b><i class="coin-ico" aria-hidden="true"></i>${num(g.points_balance || 0)}</b></div>
-    <p class="pet-name-error" role="alert">${!missing.length ? '모든 펫을 모았어요!' : short ? `코인이 ${num(short)}개 더 필요해요. 공부하면 코인이 쌓여요.` : ''}</p>
-    <div class="pet-moment-actions"><button type="button" class="btn" data-pet-later>닫기</button><button type="button" class="btn primary" data-pet-buy ${!missing.length || short ? 'disabled' : ''}>${num(EGG_PRICE)}코인으로 알 사기</button></div>
-  </div>`;
+  const body = openOverlay('알 상점');
   const close = changed => closeOverlay(changed, onChanged);
-  $('[data-pet-close]').onclick = () => close(false);
-  body.querySelector('[data-pet-later]').onclick = () => close(false);
-  body.querySelector('[data-pet-buy]').onclick = async event => {
-    const button = event.currentTarget; button.disabled = true;
-    try {
-      const { key } = await api('/shop/egg', {});
-      const name = CHARACTERS[key].ko;
-      body.innerHTML = `<div class="pet-shop">
-        <div class="pet-shop-reveal">${avatar(key, { form: 0 })}</div>
-        <p class="pet-moment-msg"><b>${esc(petJosa(name, '이', ''))}</b>의 알이에요!</p>
-        <p class="pet-shop-copy">지금부터 ${esc(petJosa(name, '과', '와'))} 함께 공부해요.<br>Lv.3이 되면 알이 깨져요.</p>
-        <div class="pet-moment-actions"><button type="button" class="btn primary" data-pet-done>좋아요!</button></div>
-      </div>`;
-      body.querySelector('[data-pet-done]').onclick = () => close(true);
-      $('[data-pet-close]').onclick = () => close(true);
-    } catch (err) {
-      body.querySelector('.pet-name-error').textContent = err.message;
-      button.disabled = false;
-    }
+  const draw = () => {
+    const egg = EGGS[kind], missing = egg.keys.filter(key => !g.pets.some(x => x.key === key));
+    const short = Math.max(0, egg.price - Number(g.points_balance || 0));
+    body.innerHTML = `<div class="pet-shop egg-shop-v1392 ${kind}">
+      <div class="egg-shop-tabs" role="tablist">${Object.entries(EGGS).map(([k, e]) => `<button type="button" role="tab" data-egg-kind="${k}" aria-selected="${k === kind}" class="${k === kind ? 'selected' : ''} ${k}">${k === 'epic' ? '<i aria-hidden="true">★</i>' : ''}${e.name}<small>${num(e.price)}코인</small></button>`).join('')}</div>
+      <div class="pet-shop-egg ${kind}" aria-hidden="true"><span>${kind === 'epic' ? '★' : '?'}</span></div>
+      <p class="pet-moment-msg">${kind === 'epic' ? '<b class="egg-shop-tier">영웅</b> 어떤 친구가 들어 있을까요?' : '어떤 친구가 들어 있을까요?'}</p>
+      <p class="pet-shop-copy">${kind === 'epic' ? `전설 바로 아래 등급, 영웅 펫 ${missing.length}마리 중 한 마리의 알이 나와요.<br>영웅 펫마다 새로운 야차전 특기가 있어요.` : `아직 만나지 못한 기본 펫 ${missing.length}마리 중 한 마리의 알이 나와요.`}<br>새 알은 바로 파트너가 되고, 함께 공부하면 Lv.3에 태어나요.</p>
+      <div class="pet-shop-price"><span>가격</span><b><i class="coin-ico" aria-hidden="true"></i>${num(egg.price)}</b><span>가진 코인</span><b><i class="coin-ico" aria-hidden="true"></i>${num(g.points_balance || 0)}</b></div>
+      <p class="pet-name-error" role="alert">${!missing.length ? egg.all : short ? `코인이 ${num(short)}개 더 필요해요. 공부하면 코인이 쌓여요.` : ''}</p>
+      <div class="pet-moment-actions"><button type="button" class="btn" data-pet-later>닫기</button><button type="button" class="btn primary" data-pet-buy ${!missing.length || short ? 'disabled' : ''}>${num(egg.price)}코인으로 ${egg.name} 사기</button></div>
+    </div>`;
+    body.querySelectorAll('[data-egg-kind]').forEach(b => { b.onclick = () => { kind = b.dataset.eggKind; draw(); }; });
+    body.querySelector('[data-pet-later]').onclick = () => close(false);
+    body.querySelector('[data-pet-buy]').onclick = async event => {
+      const button = event.currentTarget; button.disabled = true;
+      try {
+        const { key, epic } = await api('/shop/egg', { kind });
+        if (epic) { close(true); await epicShow({ key, from: 'shop' }); return; }
+        const name = CHARACTERS[key].ko;
+        body.innerHTML = `<div class="pet-shop">
+          <div class="pet-shop-reveal">${avatar(key, { form: 0 })}</div>
+          <p class="pet-moment-msg"><b>${esc(petJosa(name, '이', ''))}</b>의 알이에요!</p>
+          <p class="pet-shop-copy">지금부터 ${esc(petJosa(name, '과', '와'))} 함께 공부해요.<br>Lv.3이 되면 알이 깨져요.</p>
+          <div class="pet-moment-actions"><button type="button" class="btn primary" data-pet-done>좋아요!</button></div>
+        </div>`;
+        body.querySelector('[data-pet-done]').onclick = () => close(true);
+        $('[data-pet-close]').onclick = () => close(true);
+      } catch (err) {
+        body.querySelector('.pet-name-error').textContent = err.message;
+        button.disabled = false;
+      }
+    };
   };
+  $('[data-pet-close]').onclick = () => close(false);
+  draw();
 }

@@ -574,9 +574,11 @@ function hud(p, side) {
 }
 
 // Pet skill effects still waiting: a bonus on my next attacks, a guard, poison.
-function effectBadges(fx = {}) {
+// 파도's bite hurts over a few words like 초롱's poison; it is named after the pet.
+const dotName = pet => pet?.key === 'shark' ? '물기' : '독';
+function effectBadges(fx = {}, pet = null) {
   const list = (xs, sign) => xs.length > 1 && xs.every(x => x === xs[0]) ? `${sign}${xs[0]} ×${xs.length}` : xs.map(x => sign + x).join(' ');
-  return [fx.boost?.length && `<b class="boost">공격 ${list(fx.boost, '+')}</b>`, fx.guard?.length && `<b class="guard">방어 ${list(fx.guard, '−')}</b>`, fx.poison > 0 && `<b class="poison">독 ${fx.poison}번</b>`].filter(Boolean);
+  return [fx.boost?.length && `<b class="boost">공격 ${list(fx.boost, '+')}</b>`, fx.guard?.length && `<b class="guard">방어 ${list(fx.guard, '−')}</b>`, fx.poison > 0 && `<b class="poison">${dotName(pet)} ${fx.poison}번</b>`].filter(Boolean);
 }
 function refreshHud() {
   for (const [side, p] of [['me', me()], ['op', foe()]]) {
@@ -592,7 +594,7 @@ function refreshHud() {
       box.setAttribute('aria-label', skill.need > 0 ? `${skill.name} 게이지 ${gauge}/${skill.need}` : '전설 펫은 펫 특기가 없어요');
     }
     const fx = document.getElementById('yb-fx-' + side);
-    if (fx) fx.innerHTML = [...effectBadges(p.effects), !p.connected && B.view.phase !== 'waiting' && '<b class="off">연결 끊김</b>'].filter(Boolean).join('');
+    if (fx) fx.innerHTML = [...effectBadges(p.effects, p.pet), !p.connected && B.view.phase !== 'waiting' && '<b class="off">연결 끊김</b>'].filter(Boolean).join('');
     document.getElementById('yb-pet-' + side)?.classList.toggle('buff', !!p.effects?.boost?.length);
     document.getElementById('yb-pet-' + side)?.classList.toggle('guarded', !!p.effects?.guard?.length);
   }
@@ -840,7 +842,7 @@ function applyEvent(e) {
     const side = sideOf(e.target);
     P[e.target].hp = e.hp;
     P[e.player].effects = { ...(P[e.player].effects || {}), poison: e.left };
-    later(() => { hit(side); pop(side, `-${e.dmg} 독`, 'poison'); refreshHud(); }, reduced() ? 0 : 700);
+    later(() => { hit(side); pop(side, `-${e.dmg} ${dotName(P[e.player].pet)}`, 'poison'); refreshHud(); }, reduced() ? 0 : 700);
     refreshHud(); return;
   }
   if (e.type === 'end') {

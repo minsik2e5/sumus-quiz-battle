@@ -17,6 +17,8 @@ export const LUCKY_TICKET_BET = 10;
 // has not met one gets one on the 150th pull at the latest, and can own only one legendary pet.
 export const LEGENDARY_RATE = 0.5;
 export const LEGENDARY_PITY = 150;
+// V13.92 영웅 펫: a capsule that is not legendary has a 3% chance of a 영웅 egg (one not met yet).
+export const EPIC_RATE = 3;
 export const LUCKY_ODDS = [
   { mult: 0, rate: 45, name: '꽝' },
   { mult: 1, rate: 25, name: '본전' },

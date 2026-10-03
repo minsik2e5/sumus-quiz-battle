@@ -48,16 +48,29 @@ export const CHARACTERS = {
   haechi: { name: 'HAECHI', ko: '해치', type: '한국 수호수', color: '#63B89B', light: '#BFE8D7', soft: '#F0FBF6', legendary: true },
   phoenix: { name: 'PHOENIX', ko: '불새', type: '봉황', color: '#E96A2E', light: '#FFD06A', soft: '#FFF3E8', legendary: true },
   whale: { name: 'STAR WHALE', ko: '별고래', type: '별고래', color: '#4659B8', light: '#A9B7FF', soft: '#F0F1FF', legendary: true },
-  qilin: { name: 'QILIN', ko: '기린', type: '동양 신수', color: '#77C9B2', light: '#F2C9F0', soft: '#FFF7FC', legendary: true }
+  qilin: { name: 'QILIN', ko: '기린', type: '동양 신수', color: '#77C9B2', light: '#F2C9F0', soft: '#FFF7FC', legendary: true },
+  // V13.92 영웅 펫: one step below the legendary pets (영웅 알 in the shop, or a coin capsule).
+  capybara: { name: 'YUJA', ko: '유자', type: '카피바라', color: '#C08A4E', light: '#EBCB9C', soft: '#FBF3E8', epic: true },
+  penguin: { name: 'PENGI', ko: '펭이', type: '펭귄', color: '#3E5A9A', light: '#A9C8F0', soft: '#EEF4FC', epic: true },
+  owl: { name: 'OLLIE', ko: '올리', type: '부엉이', color: '#9A7BC9', light: '#D9C8F2', soft: '#F6F1FD', epic: true },
+  hamster: { name: 'COOKIE', ko: '쿠키', type: '햄스터', color: '#D9A52E', light: '#F6DC8E', soft: '#FFF8E6', epic: true },
+  shark: { name: 'PADO', ko: '파도', type: '아기 상어', color: '#3B8FD9', light: '#A6D3F7', soft: '#EDF6FE', epic: true },
+  alpaca: { name: 'MONGGEUL', ko: '몽글', type: '알파카', color: '#A98BC4', light: '#E4D6F2', soft: '#F8F4FC', epic: true },
+  hedgehog: { name: 'DOCHI', ko: '도치', type: '고슴도치', color: '#B07A3E', light: '#E8C79A', soft: '#FBF4EA', epic: true },
+  otter: { name: 'DARI', ko: '달이', type: '수달', color: '#7A5233', light: '#D6B595', soft: '#F8F1EA', epic: true }
 };
 export const LEGENDARY_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].legendary);
-export const STANDARD_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].legendary);
+export const EPIC_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].epic);
+export const STANDARD_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].legendary && !CHARACTERS[key].epic);
+// The pet tiers, lowest first: 기본 (the shop egg), 영웅, 전설.
+export const petTier = key => CHARACTERS[key]?.legendary ? 'legendary' : CHARACTERS[key]?.epic ? 'epic' : 'basic';
 // Pet growth: an egg, then three evolution forms. `form` is 0 (egg) .. 3 (final).
 export const PET_FORMS = ['알', '아기', '성장', '최종'];
 export const PET_FORM_LEVELS = [1, 3, 10, 20];
 export const petForm = (level = 1) => PET_FORM_LEVELS.reduce((form, min, i) => (Number(level) >= min ? i : form), 0);
 export const PET_NAME_MAX = 8;
 export const EGG_PRICE = 400; // V13.73: 800 -> 400
+export const EPIC_EGG_PRICE = 1200; // V13.92 영웅 알: a random 영웅 pet not met yet
 // Student-chosen pet name, checked the same way on the device and on the server.
 // An empty name is allowed and means "use the pet's default name".
 export function cleanPetName(value) {

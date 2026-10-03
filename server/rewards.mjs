@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
-import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS } from '../public/modules/core.js';
+import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, EPIC_PET_KEYS } from '../public/modules/core.js';
 import {
-  ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, drawLucky,
+  ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky,
   BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX, GIFT_LOG_KEEP,
   RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome
 } from '../public/modules/rewards.js';
@@ -179,7 +179,8 @@ export function luckyView(p, now = Date.now()) {
     bets: LUCKY_BETS, daily: LUCKY_DAILY, left: Math.max(0, LUCKY_DAILY - plays), odds: LUCKY_ODDS,
     ticket_bet: LUCKY_TICKET_BET, tickets: Number(p.gacha?.tickets || 0),
     recent: (l.log || []).slice(-6).reverse(),
-    legend: { rate: LEGENDARY_RATE, pity: LEGENDARY_PITY, pulls: legendPulls, remaining: legendary ? 0 : Math.max(0, LEGENDARY_PITY - legendPulls), owned: !!legendary, key: legendary?.key || null }
+    legend: { rate: LEGENDARY_RATE, pity: LEGENDARY_PITY, pulls: legendPulls, remaining: legendary ? 0 : Math.max(0, LEGENDARY_PITY - legendPulls), owned: !!legendary, key: legendary?.key || null },
+    epic: { rate: EPIC_RATE, left: EPIC_PET_KEYS.filter(key => !(p.pets || []).some(pet => pet.key === key)).length, total: EPIC_PET_KEYS.length }
   };
 }
 // A ticket plays a 10-coin capsule for free and does not count toward the three a day.
@@ -216,9 +217,18 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
       legendary = { key, guaranteed, pull: l.legend_pulls };
     }
   }
+  // V13.92: not legendary this time, then a 3% chance of a 영웅 egg the student has not met yet.
+  let epic = null;
+  const epicLeft = EPIC_PET_KEYS.filter(key => !(p.pets || []).some(pet => pet.key === key));
+  if (!legendary && (p.pets || []).length && epicLeft.length && random() * 100 < EPIC_RATE) {
+    const key = epicLeft[Math.min(epicLeft.length - 1, Math.floor(random() * epicLeft.length))];
+    p.pets.push({ key, acquired_at: now, epic: true });
+    p.avatar_key = key;
+    epic = { key };
+  }
   l.paid = Number(l.paid || 0) + paid;
-  l.log = [...(l.log || []), { at: now, bet, mult: odd.mult, ticket, ...(legendary ? { legendary: legendary.key } : {}) }].slice(-LUCKY_LOG_KEEP);
-  return { bet, mult: odd.mult, name: odd.name, paid, ticket, legendary, lucky: luckyView(p, now) };
+  l.log = [...(l.log || []), { at: now, bet, mult: odd.mult, ticket, ...(legendary ? { legendary: legendary.key } : {}), ...(epic ? { epic: epic.key } : {}) }].slice(-LUCKY_LOG_KEEP);
+  return { bet, mult: odd.mult, name: odd.name, paid, ticket, legendary, epic, lucky: luckyView(p, now) };
 }
 
 /* ---------- V13.82 가위바위보 ---------- */
