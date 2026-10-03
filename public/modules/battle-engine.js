@@ -4,18 +4,22 @@
 // V13.66) and the release check drive it the same way.
 // The state is plain JSON and can be stored between WebSocket messages.
 
+// V13.94: matches ended after 7–9 words (two good players knocked each other out in about
+// 30 seconds). HP is now 250 and matches are longer, so a match is about 17–20 words and two
+// players of the same level usually fight to the fever time. Every damage number (and every
+// pet skill) stays the same, so the pets keep the balance they had.
 export const BATTLE = {
-  MATCH_MS: 90000,     // one match
+  MATCH_MS: 120000,    // one match
   TURN_MS: 8000,       // one word
   REVEAL_MS: 1400,     // pause after a word is resolved
   COUNTDOWN_MS: 3000,  // after both players are connected
   RECONNECT_MS: 15000, // a dropped player may come back within this
-  MAX_HP: 100,
+  MAX_HP: 250,
   FAST_MS: 2000,       // answers faster than this are critical hits
   HIT: 12,             // damage of a correct answer
   SPEED_BONUS: 0.5,    // extra damage per second left on the word
   CRIT: 1.25,          // a fast answer multiplies the damage
-  FEVER_MS: 15000,     // the last 15 seconds of a match are fever time
+  FEVER_MS: 20000,     // the last 20 seconds of a match are fever time
   FEVER_MULT: 1.5,     // hits in fever time do 1.5x damage
   REVIEW_MAX: 20       // words listed per player on the result screen
 };
@@ -23,8 +27,8 @@ export const BATTLE = {
 // in spelling words typed on an in-app keyboard: a spelled word hits hardest, speed adds only
 // a little and there are no critical hits, so knowing the word decides the match.
 export const BATTLE_MODES = {
-  speed: { name: '스피드전', desc: '4지선다 · 빠를수록 세게', match_ms: 90000 },
-  skill: { name: '실력전', desc: '철자 쓰기 섞임 · 정확도로 승부', match_ms: 120000 }
+  speed: { name: '스피드전', desc: '4지선다 · 빠를수록 세게', match_ms: 120000 },
+  skill: { name: '실력전', desc: '철자 쓰기 섞임 · 정확도로 승부', match_ms: 150000 }
 };
 export const SKILL_RULES = {
   CHOICE_TURN_MS: 9000,
@@ -68,10 +72,16 @@ export const PET_SKILLS = {
   hedgehog: { name: '가시 갑옷', desc: '바로 6 피해, 다음에 받는 공격 −8', burst: 6, guard: [8] },
   otter: { name: '조개 깨기', desc: '4번 연속 맞히면 바로 20 피해', burst: 20, need: 4 }
 };
+// V13.94 몬스터 잡기: a monster's own skill (its `pet.skill`), stronger at harder levels.
+export const MONSTER_SKILLS = {
+  bump: { name: '몸통 박치기', desc: '바로 10 피해', burst: 10 },
+  roar: { name: '포효', desc: '다음 공격 2번 +12씩', boost: [12, 12] },
+  rage: { name: '광폭화', desc: '바로 18 피해, 다음 공격 +12', burst: 18, boost: [12] }
+};
 const NO_SKILL_PETS = new Set(['haechi', 'phoenix', 'whale', 'qilin']);
 // The practice robot (or no pet) uses 몽이's. Legendary pets deliberately have no battle skill.
 export const petSkillKey = pet => NO_SKILL_PETS.has(pet?.key) ? 'none' : PET_SKILLS[pet?.key] ? pet.key : 'dog';
-export const petSkill = pet => petSkillKey(pet) === 'none'
+export const petSkill = pet => MONSTER_SKILLS[pet?.skill] ? { key: pet.skill, need: PET_SKILL_NEED, ...MONSTER_SKILLS[pet.skill] } : petSkillKey(pet) === 'none'
   ? { key: 'none', name: '특기 없음', desc: '전설 펫은 펫 특기를 사용하지 않아요.', need: 0 }
   : ({ key: petSkillKey(pet), need: PET_SKILL_NEED, ...PET_SKILLS[petSkillKey(pet)] });
 
@@ -80,24 +90,41 @@ const other = (state, pid) => state.order.find(id => id !== pid);
 // players: [{ id, name, pet, streak, title, tier, bot }] (host first);
 // questions: [{ word_id, prompt, options[4], answer }] or, in 실력전, also spelling words
 // [{ word_id, kind: 'spell', prompt (meaning), hint, text, accept[] }]. `label` names a match
-// that is not an ordinary one ('대회 8강', '연습 경기').
-export function createBattle({ id, players, questions, stake = 0, label = null, mode = 'speed', now }) {
+// that is not an ordinary one ('대회 8강', '연습 경기'). A player may bring their own full HP
+// (`hp`, a monster); `timeoutWinner` wins when time runs out with both still standing (a
+// monster has to be knocked out in time).
+// V13.94 `own`: { [player id]: questions } when the two players study different ranges. Each
+// player then gets a word of their own range on every turn (the lists are built so the n-th
+// words are of the same kind, so a turn has one clock), and `questions` is the host's list.
+// `hp` (V13.94): full HP of this match; the robot practice match uses more (BOT_HP).
+export function createBattle({ id, players, questions, own = null, stake = 0, label = null, mode = 'speed', hp = BATTLE.MAX_HP, timeoutWinner = null, now }) {
   if (players.length !== 2 || players[0].id === players[1].id) throw Error('battle needs two different players');
   if (!questions.length) throw Error('battle needs questions');
+  if (own && !players.every(p => own[p.id]?.length)) throw Error('battle needs questions for both players');
   return {
     id, stake, label: label || null, mode: battleMode(mode), created_at: now, phase: 'waiting', seq: 0,
+    max_hp: hp, ...(timeoutWinner ? { timeout_winner: timeoutWinner } : {}),
     order: players.map(p => p.id),
     players: Object.fromEntries(players.map(p => [p.id, {
       id: p.id, name: p.name, pet: p.pet || null, streak: Number(p.streak || 0), title: p.title || null, tier: p.tier || null, bot: !!p.bot,
-      hp: BATTLE.MAX_HP, gauge: 0, boost: [], guard: [], poison: 0,
+      ranges: Array.isArray(p.ranges) ? p.ranges.slice(0, 60).map(String) : null, ...(p.monster ? { monster: p.monster } : {}),
+      hp: Number(p.hp) || hp, ...(Number(p.hp) ? { max_hp: Number(p.hp) } : {}), gauge: 0, boost: [], guard: [], poison: 0,
       connected: false, dropped_at: null, correct: 0, answer_ms: 0, skills_used: 0, missed: []
     }])),
-    questions, idx: -1, turn: null,
+    questions, ...(own ? { own } : {}), idx: -1, turn: null,
     started_at: null, ends_at: null, deadline: null, result: null
   };
 }
 
 function event(state, type, data = {}) { state.seq++; return { type, seq: state.seq, ...data }; }
+// A room started before V13.94 has no max_hp: it was 100 then.
+const maxHp = state => state.max_hp || 100;
+// The word a player answers on the open turn: their own list's, or the shared one.
+function qOf(state, pid) {
+  const list = state.own?.[pid];
+  return list ? list[state.idx % list.length] : state.questions[state.turn.q];
+}
+const ownPublic = (state, fn) => state.own ? { own: Object.fromEntries(state.order.map(id => [id, fn(qOf(state, id))])) } : {};
 
 // What a player sees of a question: never the answer.
 function questionPublic(q) {
@@ -105,7 +132,7 @@ function questionPublic(q) {
 }
 function questionEvent(state) {
   const q = state.questions[state.turn.q];
-  return event(state, 'question', { n: state.idx + 1, ...questionPublic(q), started_at: state.turn.started_at, deadline: state.deadline });
+  return event(state, 'question', { n: state.idx + 1, ...questionPublic(q), ...ownPublic(state, questionPublic), started_at: state.turn.started_at, deadline: state.deadline });
 }
 const answerOf = q => q.kind === 'spell' ? q.text : q.answer;
 
@@ -121,7 +148,7 @@ function nextQuestion(state, now) {
 
 // Words a player got wrong or let run out, for review after the match.
 function markMissed(state, pid) {
-  const p = state.players[pid], wordId = state.questions[state.turn.q]?.word_id;
+  const p = state.players[pid], wordId = qOf(state, pid)?.word_id;
   p.missed ||= [];
   if (wordId && !p.missed.includes(wordId) && p.missed.length < BATTLE.REVIEW_MAX) p.missed.push(wordId);
 }
@@ -147,14 +174,15 @@ function finish(state, now, reason, loserId = null) {
   const [a, b] = state.order.map(id => state.players[id]);
   let winner = null, tiebreak = null;
   if (loserId) winner = other(state, loserId);
+  else if (reason === 'end' && state.timeout_winner && a.hp > 0 && b.hp > 0) winner = state.timeout_winner;
   else if (a.hp !== b.hp) winner = a.hp > b.hp ? a.id : b.id;
   else ({ winner, tiebreak } = breakTie(state, a, b));
   const review = Object.fromEntries(state.order.map(id => [id, (state.players[id].missed || []).map(wordId => {
-    const q = state.questions.find(item => item.word_id === wordId);
+    const q = (state.own?.[id] || state.questions).find(item => item.word_id === wordId);
     return q ? { word_id: wordId, ...questionWord(q) } : null;
   }).filter(Boolean)]));
   // V13.73: pet skills set off, per player (the 스킬 titles count them).
-  state.result = { winner, loser: winner ? other(state, winner) : null, reason, ...(tiebreak ? { tiebreak } : {}), stake: state.stake, finished_at: now, hp: { [a.id]: a.hp, [b.id]: b.hp }, skills: { [a.id]: a.skills_used || 0, [b.id]: b.skills_used || 0 }, review };
+  state.result = { winner, loser: winner ? other(state, winner) : null, reason, ...(tiebreak ? { tiebreak } : {}), stake: state.stake, finished_at: now, max_hp: maxHp(state), hp: { [a.id]: a.hp, [b.id]: b.hp }, skills: { [a.id]: a.skills_used || 0, [b.id]: b.skills_used || 0 }, review };
   return [event(state, 'end', { result: state.result })];
 }
 
@@ -169,7 +197,7 @@ function reveal(state, now) {
 // both players have answered or its time runs out, and the answer is revealed only then.
 function attack(state, attackerId, ms, now) {
   const attacker = state.players[attackerId], defender = state.players[other(state, attackerId)];
-  const q = state.questions[state.turn.q], skill = state.mode === 'skill', spell = q.kind === 'spell';
+  const q = qOf(state, attackerId), skill = state.mode === 'skill', spell = q.kind === 'spell';
   // 실력전 has no critical hits.
   const fast = !skill && ms < BATTLE.FAST_MS;
   attacker.correct++; attacker.answer_ms += ms;
@@ -202,7 +230,7 @@ function firePetSkill(state, p, foe) {
   if (s.boost) p.boost = [...s.boost];
   if (s.guard) p.guard = [...s.guard];
   if (s.poison) p.poison = s.turns;
-  if (s.heal) p.hp = Math.min(BATTLE.MAX_HP, p.hp + s.heal);
+  if (s.heal) p.hp = Math.min(p.max_hp || maxHp(state), p.hp + s.heal);
   if (s.burst) foe.hp = Math.max(0, foe.hp - s.burst);
   markKo(state, p.id, foe);
   return event(state, 'petskill', { player: p.id, skill: s.key, name: s.name, desc: s.desc, dmg: s.burst || 0, heal: s.heal || 0, hp: { [p.id]: p.hp, [foe.id]: foe.hp }, effects: effectsOf(p) });
@@ -221,7 +249,7 @@ function settle(state, now, timeout) {
   }
   reveal(state, now);
   const answer = answerOf(state.questions[state.turn.q]);
-  const events = [event(state, state.turn.hits ? 'reveal' : 'miss', { timeout, answer })];
+  const events = [event(state, state.turn.hits ? 'reveal' : 'miss', { timeout, answer, ...(state.own ? { answers: ownPublic(state, answerOf).own } : {}) })];
   for (const id of state.order) {
     const p = state.players[id];
     if (!(p.poison > 0)) continue;
@@ -267,7 +295,7 @@ export function answer(state, pid, choice, now) {
   // Answers after the deadline do not count, even if the room has not woken up yet.
   if (!p || state.phase !== 'question' || !turn || turn.resolved || now >= state.deadline) return [];
   if (turn.locked[pid]) return [];
-  const q = state.questions[turn.q];
+  const q = qOf(state, pid);
   let right;
   if (q.kind === 'spell') {
     if (typeof choice !== 'string' || !choice.trim() || choice.length > 60) return [];
@@ -318,14 +346,15 @@ export function nextWake(state) {
 // What a (re)connecting player needs to draw the screen. Never includes the answer
 // of an open word.
 export function battleView(state, pid) {
-  const turn = state.turn, q = turn ? state.questions[turn.q] : null;
+  const turn = state.turn, q = turn ? qOf(state, pid) : null;
   return {
     id: state.id, me: pid, phase: state.phase, seq: state.seq, stake: state.stake, label: state.label || null, mode: state.mode || 'speed',
+    max_hp: maxHp(state), own_words: !!state.own,
     order: state.order, started_at: state.started_at, ends_at: state.ends_at, deadline: state.deadline, fever_ms: BATTLE.FEVER_MS,
     players: Object.fromEntries(state.order.map(id => {
       const p = state.players[id];
       const s = petSkill(p.pet);
-      return [id, { id, name: p.name, pet: p.pet, streak: p.streak || 0, title: p.title || null, tier: p.tier || null, bot: !!p.bot, hp: p.hp, gauge: p.gauge || 0, skill: { key: s.key, name: s.name, desc: s.desc, need: s.need }, effects: effectsOf(p), connected: p.connected }];
+      return [id, { id, name: p.name, pet: p.pet, streak: p.streak || 0, title: p.title || null, tier: p.tier || null, bot: !!p.bot, ranges: p.ranges || null, monster: p.monster || null, max_hp: p.max_hp || maxHp(state), hp: p.hp, gauge: p.gauge || 0, skill: { key: s.key, name: s.name, desc: s.desc, need: s.need }, effects: effectsOf(p), connected: p.connected }];
     })),
     question: q && ['question', 'reveal'].includes(state.phase) ? {
       n: state.idx + 1, ...questionPublic(q), started_at: turn.started_at,

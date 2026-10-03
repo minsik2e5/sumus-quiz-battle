@@ -93,6 +93,8 @@ function longestDayRun(sessions) {
   return best;
 }
 const hpOf = (b, pid) => { const v = b.hp?.[pid]; return v === undefined || v === null ? NaN : Number(v); };
+// V13.94: full HP went from 100 to 250; a match keeps the full HP it was played with.
+const maxHpOf = b => Number(b.max_hp) || 100;
 
 export function createCompetition(state, now = Date.now()) {
   const sessionsBy = new Map(), battlesBy = new Map();
@@ -119,8 +121,8 @@ export function createCompetition(state, now = Date.now()) {
     pets: p => Array.isArray(p?.pets) ? p.pets.length : 0,
     wins: (p, pid) => winsOf(pid).length,
     win_streak: (p, pid) => battleStreaks(ctx.battlesOf(pid), pid).best_streak,
-    comebacks: (p, pid) => winsOf(pid).filter(b => b.reason === 'end' && hpOf(b, pid) > 0 && hpOf(b, pid) <= 20).length,
-    flawless: (p, pid) => winsOf(pid).filter(b => b.reason === 'end' && hpOf(b, pid) === 100).length,
+    comebacks: (p, pid) => winsOf(pid).filter(b => b.reason === 'end' && hpOf(b, pid) > 0 && hpOf(b, pid) <= maxHpOf(b) / 5).length,
+    flawless: (p, pid) => winsOf(pid).filter(b => b.reason === 'end' && hpOf(b, pid) === maxHpOf(b)).length,
     league_best: (p, pid) => {
       const weeks = new Map();
       for (const b of ctx.countedOf(pid)) {
@@ -135,6 +137,8 @@ export function createCompetition(state, now = Date.now()) {
     attendance: p => Number(p?.attendance?.total || 0),
     bot_wins: p => Number(p?.bonus?.bot?.wins || 0),
     bot_hard_wins: p => Number(p?.bonus?.bot?.hard_wins || 0),
+    monster_wins: p => Number(p?.bonus?.monster?.wins || 0),
+    monster_hard: p => Number(p?.bonus?.monster?.hard_wins || 0),
     // V13.82 가위바위보: throws won, and ×8 (three wins in a row) pots.
     rps_wins: p => Number(p?.rps?.wins_total || 0),
     rps_jackpots: p => Number(p?.rps?.jackpots || 0),

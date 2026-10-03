@@ -1,5 +1,5 @@
 // Release checks for the yacha battle rules (server/battle-engine.mjs).
-import { BATTLE, PET_SKILLS, PET_SKILL_NEED, petSkill, createBattle, connect, disconnect, forfeit, answer, tick, nextWake, battleView } from './battle-engine.mjs';
+import { BATTLE, BATTLE_MODES, PET_SKILLS, PET_SKILL_NEED, petSkill, createBattle, connect, disconnect, forfeit, answer, tick, nextWake, battleView } from './battle-engine.mjs';
 
 const questions = Array.from({ length: 6 }, (_, i) => ({ word_id: 'w' + i, prompt: 'word' + i, options: ['a', 'b', 'c', 'd'], answer: i % 4 }));
 const players = [{ id: 'host', name: '호스트', pet: { key: 'fox', form: 2 } }, { id: 'guest', name: '게스트', pet: { key: 'cat', form: 1 } }];
@@ -149,9 +149,9 @@ export function runBattleChecks(assert) {
     playWord(s, { host: false, guest: false });
     assert(s.players.host.hp === hostHp - 10 && s.players.guest.poison === 0, 'V13.72 the poison bites 3 words in all, even words nobody answers');
     const p = startedWith('panda', 'dragon');
-    p.players.host.hp = 95;
+    p.players.host.hp = BATTLE.MAX_HP - 5;
     for (let i = 0; i < PET_SKILL_NEED; i++) playWord(p, { host: true, guest: false });
-    assert(p.players.host.hp === BATTLE.MAX_HP && p.players.host.skills_used === 1, 'V13.72 밤부 heals 13 but not above 100');
+    assert(p.players.host.hp === BATTLE.MAX_HP && p.players.host.skills_used === 1, 'V13.72 밤부 heals 13 but not above full HP');
     const d = startedWith('panda', 'dragon');
     for (let i = 0; i < PET_SKILL_NEED; i++) playWord(d, { host: false, guest: true });
     assert(d.players.host.hp === BATTLE.MAX_HP - 3 * slowHit(4.5) - 13, 'V13.72 용이 hits for 13 at once');
@@ -247,5 +247,30 @@ export function runBattleChecks(assert) {
     const late = tick(s, 1000 + BATTLE.COUNTDOWN_MS + 60000);
     const q = late.find(e => e.type === 'question');
     assert(q && q.deadline === 1000 + BATTLE.COUNTDOWN_MS + 60000 + BATTLE.TURN_MS && !late.some(e => e.type === 'miss'), 'a room that wakes up late still gives the word its full time');
+  }
+  {
+    // V13.94 longer matches: HP 250, 스피드전 2분, 실력전 2분 30초, fever the last 20 seconds.
+    assert(BATTLE.MAX_HP === 250 && BATTLE_MODES.speed.match_ms === 120000 && BATTLE_MODES.skill.match_ms === 150000 && BATTLE.FEVER_MS === 20000 && fresh().max_hp === 250 && fresh().players.host.hp === 250, 'V13.94 matches last longer: HP 250, 2 minutes (실력전 2:30), fever the last 20 seconds');
+    const legacy = fresh(); delete legacy.max_hp; legacy.players.host.hp = 95;
+    connect(legacy, 'host', 1000); connect(legacy, 'guest', 1000); tick(legacy, 1000 + BATTLE.COUNTDOWN_MS);
+    assert(battleView(legacy, 'host').max_hp === 100, 'V13.94 a room started before the change keeps its full HP of 100');
+    // 각자 내 범위: each player answers a word of their own list on the same turn.
+    const mine = Array.from({ length: 6 }, (_, i) => ({ word_id: 'h' + i, prompt: 'host' + i, options: ['a', 'b', 'c', 'd'], answer: i % 4 }));
+    const theirs = Array.from({ length: 6 }, (_, i) => ({ word_id: 'g' + i, prompt: 'guest' + i, options: ['a', 'b', 'c', 'd'], answer: (i + 1) % 4 }));
+    const s = createBattle({ id: 'own', players: [{ ...players[0], ranges: ['24'] }, { ...players[1], ranges: ['31'] }], questions: mine, own: { host: mine, guest: theirs }, stake: 10, now: 1000 });
+    connect(s, 'host', 1000); connect(s, 'guest', 1000);
+    const first = tick(s, 1000 + BATTLE.COUNTDOWN_MS).find(e => e.type === 'question');
+    const t = 1000 + BATTLE.COUNTDOWN_MS;
+    const hv = battleView(s, 'host'), gv = battleView(s, 'guest');
+    assert(first.own.host.prompt === 'host0' && first.own.guest.prompt === 'guest0' && !('answer' in first.own.guest) && hv.question.prompt === 'host0' && gv.question.prompt === 'guest0' && gv.own_words && gv.players.guest.ranges.join() === '31', 'V13.94 each player sees a word of their own range on the same turn, without its answer');
+    const guestHostAnswer = answer(s, 'guest', 0, t + 2500);
+    assert(guestHostAnswer.some(e => e.type === 'wrong') && s.players.guest.missed.join() === 'g0', 'V13.94 a player is marked on their own word (the host\'s answer is wrong for the guest)');
+    const hit = answer(s, 'host', 0, t + 3000);
+    const reveal = hit.find(e => e.type === 'reveal');
+    assert(hit.some(e => e.type === 'attack' && e.attacker === 'host') && reveal?.answers?.host === 0 && reveal.answers.guest === 1, 'V13.94 the reveal tells each player the answer of their own word');
+    tick(s, t + 3000 + BATTLE.REVEAL_MS);
+    assert(battleView(s, 'guest').question.prompt === 'guest1' && battleView(s, 'host').question.prompt === 'host1', 'V13.94 the next turn moves both lists on');
+    const end = forfeit(s, 'host', t + 5000).find(e => e.type === 'end');
+    assert(end.result.review.guest[0]?.word === 'guest0' && end.result.max_hp === 250, 'V13.94 the result lists the words each player missed from their own range');
   }
 }

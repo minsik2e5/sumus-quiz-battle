@@ -85,6 +85,17 @@ export async function runCompetitionChecks(assert, expectStatus) {
   assert(countedMatches(ctx.battlesOf('qa-cc-a'), 'qa-cc-a').length === 6 && aStats.wins === 5, 'V13.66 the same friend counts at most three times a day for titles and the league (4 wins over one friend count 3)');
   assert(aStats.comebacks === 1 && aStats.flawless === 1, 'V13.66 a win with 20 HP or less is a comeback and a win at 100 HP is flawless (a forfeit is neither)');
   assert(aStats.win_streak === 3 && titleUnlocked('win1', aStats) && titleUnlocked('comeback', aStats) && titleUnlocked('flawless', aStats) && titleUnlocked('yacha3', aStats) && !titleUnlocked('yachaking', aStats) && !titleUnlocked('win10', aStats), 'V13.66 yacha titles follow the record (3 wins in a row over different friends is 3연승 돌풍)');
+  {
+    // V13.94: full HP is 250 now; a comeback is a fifth of it or less, flawless is all of it.
+    const s94 = structuredClone(state);
+    s94.battles = [
+      match('qa-cc-n1', 'qa-cc-a', 'qa-cc-b', 'qa-cc-a', t0 + 1000, { hp: { 'qa-cc-a': 50, 'qa-cc-b': 0 }, max_hp: 250 }),
+      match('qa-cc-n2', 'qa-cc-a', 'qa-cc-c', 'qa-cc-a', t0 + 2000, { hp: { 'qa-cc-a': 250, 'qa-cc-c': 0 }, max_hp: 250 }),
+      match('qa-cc-n3', 'qa-cc-a', 'qa-cc-d', 'qa-cc-a', t0 + 3000, { hp: { 'qa-cc-a': 100, 'qa-cc-d': 0 }, max_hp: 250 })
+    ];
+    const s94Stats = createCompetition(s94, now).titleStats(s94.profiles.find(p => p.id === 'qa-cc-a'));
+    assert(s94Stats.comebacks === 1 && s94Stats.flawless === 1, 'V13.94 with 250 HP a win with 50 HP or less is a comeback and only a full 250 is flawless (100 left is neither)');
+  }
   const lg = ctx.league('qa-cc-a');
   assert(lg.points === 5 * 3 + 1 && lg.wins === 5 && lg.draws === 1 && lg.losses === 0 && lg.win_rate === 83 && lg.tier.key === 'gold' && lg.tier.next.key === 'diamond' && lg.tier.next.need === 14, 'V13.66 weekly league: 3 points a win, 1 a draw, counted matches only; 16 points is gold, 14 short of diamond');
   assert(leagueTier(0).key === 'bronze' && leagueTier(6).key === 'silver' && leagueTier(15).key === 'gold' && leagueTier(30).key === 'diamond' && leagueTier(30).next === null && LEAGUE_TIERS.length === 4, 'V13.66 league tiers: bronze, silver 6, gold 15, diamond 30');

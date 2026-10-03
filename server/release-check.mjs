@@ -69,7 +69,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.93.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.94.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -427,6 +427,46 @@ export async function runReleaseCheck() {
       const expiredRow = state.battles.find(b => b.id === again.id);
       expiredRow.finished_at = Date.now() - 3 * 60000;
       await expectStatus(409, () => service(state, 'POST', '/battle/rematch', { battle_id: again.id }, studentToken), 'V13.56 a rematch can only be asked within two minutes of the end');
+
+      // V13.94 각자 내 범위: a friend of the same grade who studies another range.
+      {
+        const before94 = new Set(state.battles.map(b => b.id));
+        const rangeOk = code => { try { return scopedWords(state, battleSchool.id, [code], petStudent.class_name).length >= 8; } catch { return false; } };
+        const otherRange = [...new Set(danwonWords.map(w => String(w.range_code)))].find(code => code !== battleRange && rangeOk(code));
+        assert(otherRange, 'V13.94 release check found a second range with enough words');
+        const idsOf = code => new Set(scopedWords(state, battleSchool.id, [code], petStudent.class_name).map(w => w.id));
+        const hostIds = idsOf(battleRange), guestIds = idsOf(otherRange);
+        const eachRoom = await service(state, 'POST', '/battle/rooms', { stake: 10, range_codes: [battleRange], range_mode: 'each' }, studentToken);
+        const eachRow = state.battles.find(b => b.id === eachRoom.id);
+        const eachPreview = await service(state, 'GET', '/battle/preview', { code: eachRoom.code }, guestToken);
+        assert(eachRoom.range_mode === 'each' && eachRow.range_mode === 'each' && eachPreview.range_mode === 'each' && eachPreview.host_ranges.join() === battleRange && eachRoom._battle.host.ranges.join() === battleRange, 'V13.94 a room is 각자 내 범위 by default and the friend sees the host\'s range before joining');
+        const eachJoin = await service(state, 'POST', '/battle/join', { code: eachRoom.code, stake: 10, range_codes: [otherRange] }, guestToken);
+        const own = eachJoin._battle.own || {}, hostQs = own[petStudent.id] || [], guestQs = own[guestStudent.id] || [];
+        assert(eachJoin.own_words && hostQs.length >= 8 && hostQs.length === guestQs.length && hostQs.every(q => hostIds.has(q.word_id)) && guestQs.every(q => guestIds.has(q.word_id)) && hostQs.every((q, i) => (q.kind || 'choice') === (guestQs[i].kind || 'choice')) && eachRow.guest_range_codes.join() === otherRange && eachJoin._battle.guest.ranges.join() === otherRange, 'V13.94 a friend who studies another range joins with it: each player gets words of their own range, the same kind on every turn');
+        settleBattle(state, { id: eachRoom.id, winner: petStudent.id, loser: guestStudent.id, reason: 'end', hp: { [petStudent.id]: 40, [guestStudent.id]: 0 }, max_hp: 250 });
+        assert(eachRow.max_hp === 250 && settleBattle(state, { id: 'missing' }) === false, 'V13.94 a finished match keeps the full HP it was played with (250)');
+        const eachRematch = await service(state, 'POST', '/battle/rematch', { battle_id: eachRoom.id }, guestToken);
+        const rematchEach = state.battles.find(b => b.id === eachRematch.id);
+        assert(rematchEach.range_mode === 'each' && rematchEach.range_codes.join() === otherRange && rematchEach.guest_range_codes.join() === battleRange, 'V13.94 a rematch keeps each player\'s range (the one who asks hosts with their own)');
+        const rematchJoin = await service(state, 'POST', '/battle/join', { code: eachRematch.code, stake: 10 }, studentToken);
+        assert(rematchJoin.own_words && rematchJoin._battle.own[petStudent.id].every(q => hostIds.has(q.word_id)) && rematchJoin._battle.own[guestStudent.id].every(q => guestIds.has(q.word_id)), 'V13.94 joining the rematch brings back the range played before');
+        settleBattle(state, { id: eachRematch.id, reason: 'cancelled' });
+        const sameRoom = await service(state, 'POST', '/battle/rooms', { stake: 10, range_codes: [battleRange], range_mode: 'same' }, studentToken);
+        const sameJoin = await service(state, 'POST', '/battle/join', { code: sameRoom.code, stake: 10, range_codes: [otherRange] }, guestToken);
+        assert(!sameJoin.own_words && !sameJoin._battle.own && state.battles.find(b => b.id === sameRoom.id).guest_range_codes.join() === battleRange, 'V13.94 같은 범위로: the friend plays the host\'s words whatever range they study');
+        settleBattle(state, { id: sameRoom.id, reason: 'cancelled' });
+        const oldRoom = await service(state, 'POST', '/battle/rooms', { stake: 10, range_codes: [battleRange] }, studentToken);
+        const oldJoin = await service(state, 'POST', '/battle/join', { code: oldRoom.code, stake: 10 }, guestToken);
+        assert(!oldJoin.own_words && !oldJoin._battle.own, 'V13.94 a join without a range (an old screen) plays the host\'s words as before');
+        settleBattle(state, { id: oldRoom.id, reason: 'cancelled' });
+        await service(state, 'POST', '/battle/rooms', { stake: 10, range_codes: [battleRange] }, studentToken).then(r => state.battles.find(b => b.id === r.id)).then(async row => {
+          await expectStatus(400, () => service(state, 'POST', '/battle/join', { code: row.code, stake: 10, range_codes: ['no-such-range'] }, guestToken), 'V13.94 a range that does not exist is refused');
+          assert(row.status === 'waiting' && !row.guest_id, 'V13.94 a refused join leaves the room waiting');
+          row.status = 'cancelled'; row.finished_at = Date.now();
+        });
+        // These rooms are only for this check: the record checks below start from the list as it was.
+        state.battles = state.battles.filter(b => before94.has(b.id));
+      }
 
       // V13.56 win streaks: wins over the same friend on the same day count once.
       const streakBefore = (await service(state, 'GET', '/battle/history', {}, studentToken)).record;
@@ -1126,7 +1166,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.93.0') && indexHtml.includes('/app.bundle.css?v=13.93.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.94.0') && indexHtml.includes('/app.bundle.css?v=13.94.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1147,7 +1187,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.93.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.94.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');

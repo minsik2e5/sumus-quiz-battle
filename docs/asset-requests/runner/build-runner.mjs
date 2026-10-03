@@ -398,6 +398,33 @@ menu('메뉴 아이콘 6 (펫 도감 · 영웅 펫)', [
   ['epic-badge', '영웅 배지', 'a shiny round violet gem badge with small silver wings on both sides and a white star in the middle, a soft lavender glow (no letters)']
 ]);
 
+/* 10 몬스터 잡기 (V13.94): 몬스터 9종 × 기본·공격·맞음·쓰러짐 + 몬스터 화면 아이콘 */
+const F10 = '10-monsters.txt';
+STYLE.monster = 'Style: cute-but-mighty chibi 3D game monster for a teen vocabulary game, the same rendering quality as the pets of this game: bold readable silhouette, playful menace (never gory, never truly scary), glossy materials, crisp clean edges, clear saturated colors, strong soft rim light. Every cell shows exactly the same monster design (same colors, shape, size and accessories); only the pose and expression change. Full body, facing the viewer\'s LEFT (toward the player), centered, about 80% of the cell height, transparent background, no ground shadow, no text.';
+const MONSTER_DESIGNS = [
+  ['slime', '스펠링 슬라임', 'a wobbly jelly slime made of soft lime-green jelly with jumbled alphabet letter shapes floating inside (letters only as shapes, no readable words), two big silly eyes and a wide grin'],
+  ['forgetghost', '까먹귀', 'a mischievous little lavender ghost holding a giant pink eraser, a trail of faded letter shapes behind it, cheeky closed-eye grin'],
+  ['clock', '째깍 도둑', 'a sneaky round brass alarm-clock monster with a black bandit mask, clock hands as thin arms, a small sack of stolen minutes (glowing sand) on its back'],
+  ['golem', '문법 골렘', 'a sturdy stone golem built from gray grammar blocks and big punctuation marks (comma, period, question mark shapes), glowing teal rune lines'],
+  ['phone', '폰마왕', 'a demon-king smartphone with two red notification bubbles as horns, a glowing tempting screen face with a cheeky grin, a tiny purple cape'],
+  ['pirate', '오답 해적 선장', 'a pirate captain made of crossed-out red answer sheets, a red X eyepatch, a pirate hat, a red pen held like a parrot on its shoulder'],
+  ['owlnight', '밤샘 부엉 대장', 'a huge sleepy-but-grumpy navy owl general with dark circles under its eyes, armor of stacked notebooks, a tiny nightcap'],
+  ['dictdragon', '딕셔너리 드래곤', 'a grand indigo dragon whose wings are open dictionary pages and whose scales look like tiny letter tiles (shapes only), golden horns'],
+  ['finalking', '수능 대마왕', 'the final boss: a towering exam demon king in an armor of test papers, a crown of pencils, a long OMR-card cape (rows of bubbles), glowing red eyes but a funny smug face']
+];
+for (const [key, ko, look] of MONSTER_DESIGNS) sheet(F10, `몬스터 ${ko}`, 'monster', `"${ko}": ${look}.`, [
+  [`monster-${key}`, `${ko} 기본`, 'IDLE: standing ready in a confident taunting pose, a playful smug face', `public/assets/monsters/${key}.webp`],
+  [`monster-${key}-attack`, `${ko} 공격`, 'ATTACK: lunging forward to the LEFT with its signature move, motion lines and a burst of its own color, fierce but cute face', `public/assets/monsters/${key}-attack.webp`],
+  [`monster-${key}-hurt`, `${ko} 맞음`, 'HURT: knocked back to the right, squinting eyes, small white impact stars around it', `public/assets/monsters/${key}-hurt.webp`],
+  [`monster-${key}-down`, `${ko} 쓰러짐`, 'DEFEATED: flopped down on its back or side, swirly dizzy eyes, a few small stars circling above it, comical not sad', `public/assets/monsters/${key}-down.webp`]
+]);
+sheet(F10, '몬스터 화면 아이콘', 'icon', 'All icons in this set are one family, like the icons of one premium mobile game; keep each simple and bold so it stays clear at 32 pixels.', [
+  ['ui-monster-tab', '몬스터 탭', 'a cute round purple monster face peeking over a crossed sword and shield, cheeky grin, one small sparkle', 'public/assets/ui/monster-tab.webp'],
+  ['ui-monster-easy', '이지 배지', 'a small rounded shield badge in soft MINT GREEN with one white star in the middle', 'public/assets/ui/monster-easy.webp'],
+  ['ui-monster-normal', '노말 배지', 'the same shield badge shape in SKY BLUE with two white stars side by side', 'public/assets/ui/monster-normal.webp'],
+  ['ui-monster-hard', '하드 배지', 'the same shield badge shape in DEEP CRIMSON with three white stars and small orange flames licking up from behind it', 'public/assets/ui/monster-hard.webp']
+]);
+
 /* Google Drive: 그림을 그리는 GPT는 Drive에서 참고 그림을 열어 보고, 결과를 Drive 폴더에 올려요.
    규칙: 시트별 파일(split/)로 나가는 모든 주문서는 DRIVE에 폴더가 있어야 하고(없으면 멈춰요),
    끝에 "이 폴더에 이 이름으로 올리기"가 붙어요. 처음 그리는 그림(08·09a)은 기존 그림을 열어 보고 그림체를 맞춰요. */
@@ -405,23 +432,25 @@ const DRIVE = {
   [F5]: 'SUMUS 에셋 05·06 (Runner용)', [F6]: 'SUMUS 에셋 05·06 (Runner용)',
   [F7A]: 'SUMUS 전설 펫 07 (Runner용)', [F7B]: 'SUMUS 전설 펫 07 (Runner용)',
   [F8]: 'SUMUS 메뉴·학습 08 (Runner용)',
-  [F9A]: 'SUMUS 새 기본 펫 09 (Runner용)', [F9B]: 'SUMUS 새 기본 펫 09 (Runner용)'
+  [F9A]: 'SUMUS 새 기본 펫 09 (Runner용)', [F9B]: 'SUMUS 새 기본 펫 09 (Runner용)',
+  [F10]: 'SUMUS 몬스터 10 (Runner용)'
 };
 const PET_SPRITES = 'SUMUS_PET_SPRITES_ALL_20261002/original_1254';
 const KEEP = 'Do NOT make it softer, blurrier, foggier, more painterly or more watercolor-like than the reference.';
 const STYLE_REF = {
   pets: `STYLE REFERENCE — before drawing, open these pictures in Google Drive and study them: the existing pets of this game in the Drive folder "${PET_SPRITES}" (the folders MONG, NABI, PINKY and BAMBOO, each with 01_baby.png, 02_grown.png and 03_final.png). Draw the new pet in exactly that art style: the same crisp, clean shapes and edges, the same clear soft pastel colors (not washed out, not hazy), the same glossy eyes with white highlights, the same light cel-like shading with a thin warm rim light, the same simple fur tufts and the same body proportions (big head, short legs). ${KEEP} Do NOT copy the reference animals.`,
   icons: `STYLE REFERENCE — before drawing, open "06-3.png" and "06-4.png" in the Google Drive folder "${DRIVE[F6]}": they show game art already used in this app (capsule machine, ticket, jackpot, capsules). Draw the new icons in exactly that style: the same glossy 3D toy-like look, the same chunky rounded shapes, the same bright pastel-and-mint palette, the same clean edges and soft lighting. Do NOT copy the reference objects.`,
+  monsters: `STYLE REFERENCE — before drawing, open these pictures in Google Drive and study them: the pets of this game in the Drive folder "${PET_SPRITES}" (the folders MONG, NABI, PINKY and BAMBOO, 02_grown.png and 03_final.png) and "09a-1.png" in the Google Drive folder "${DRIVE[F9A]}". Draw the monster in exactly that art style and rendering quality: the same crisp, clean shapes and edges, the same clear colors, the same glossy eyes with white highlights, the same light cel-like shading and rim light, so it looks like it belongs in the same game as those pets. ${KEEP} Do NOT copy the reference pets. Also open "10-1.png" in the Google Drive folder "${DRIVE[F10]}" (the first monster of this set) if it is there, and match its finish and size.`,
   badges: `STYLE REFERENCE — before drawing, open "07a-5.png" in the Google Drive folder "${DRIVE[F7A]}" (legendary egg and badge) and "06-3.png" in the Google Drive folder "${DRIVE[F6]}" (jackpot): they show shiny game art already used in this app. Draw the new medals or stamps in exactly that style: the same shiny metal and gem rendering, the same clean outline and soft sparkles. Do NOT copy the reference objects.`
 };
-const refOf = p => p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
+const refOf = p => p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
 const NEW_ORDER = Object.keys(NEW_PETS);
 const sheetName = (file, i) => `${file.slice(0, /^\d\d[ab]-/.test(file) ? 3 : 2)}-${i + 1}`;
 
 /* 쓰기 */
 const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
-const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B]);
+const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10]);
 for (const [file, list] of byFile) list.forEach((p, i) => {
   if (!SPLIT.has(file)) return;
   if (!DRIVE[file]) throw new Error(`${file}: Google Drive 폴더(DRIVE)가 없어요. 주문서에는 업로드 위치가 꼭 있어야 해요.`);
@@ -430,7 +459,7 @@ for (const [file, list] of byFile) list.forEach((p, i) => {
   if (ref) {
     lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
     lines.splice(2, 0, STYLE_REF[ref]);
-    p.ref = `Drive: ${ref === 'pets' ? PET_SPRITES : ref === 'icons' ? '06-3.png, 06-4.png' : '07a-5.png, 06-3.png'}`;
+    p.ref = `Drive: ${ref === 'pets' || ref === 'monsters' ? PET_SPRITES : ref === 'icons' ? '06-3.png, 06-4.png' : '07a-5.png, 06-3.png'}`;
   }
   // 메뉴 아이콘 2~5번 시트: 같은 세트의 첫 시트(08-1.png)와도 맞춰요.
   if (file === F8 && ref === 'icons' && /메뉴 아이콘 [2-9]/.test(p.title)) lines.splice(3, 0, `Also open "08-1.png" in the same Google Drive folder "${DRIVE[F8]}" (the first icons of this set) if it is there, and match it exactly.`);

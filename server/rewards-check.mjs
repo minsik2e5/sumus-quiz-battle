@@ -10,12 +10,13 @@ import { service, scopedWords, sweep } from './service.mjs';
 import { DAY_MS, rankingWeek, createCompetition } from './competition.mjs';
 import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX, CHARACTERS, LEGENDARY_PET_KEYS, STANDARD_PET_KEYS, EPIC_PET_KEYS, EPIC_EGG_PRICE, petTier } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, visibleTitleKeys, titleUnlocked } from '../public/modules/titles.js';
-import { createBattle, connect, answer, tick, battleView, petSkill, SKILL_RULES, BATTLE, PET_SKILLS } from '../public/modules/battle-engine.js';
+import { createBattle, connect, answer, tick, battleView, petSkill, SKILL_RULES, BATTLE, PET_SKILLS, MONSTER_SKILLS, forfeit } from '../public/modules/battle-engine.js';
+import { MONSTERS, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, monsterParts, monsterOpen } from '../public/modules/monsters.js';
 import { expressionSrc } from '../public/modules/character.js';
-import { battleQuestions, spellHint, spellable } from '../public/modules/battle-questions.js';
-import { createPracticeMatch } from '../public/modules/battle-bot.js';
+import { battleQuestions, spellHint, spellable, pairedBattleQuestions } from '../public/modules/battle-questions.js';
+import { createPracticeMatch, BOT_LEVELS, BOT_HP } from '../public/modules/battle-bot.js';
 import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
-import { addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome } from './rewards.mjs';
+import { monsterStart, monsterFinish, monsterView, addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome } from './rewards.mjs';
 import { marketPrices } from './market.mjs';
 import { STOCKS, MARKET, MARKET_OPEN, tradeFee, newsText } from '../public/modules/market.js';
 
@@ -51,7 +52,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   connect(duel, 'x', now); connect(duel, 'y', now); tick(duel, now + BATTLE.COUNTDOWN_MS);
   const t1 = now + BATTLE.COUNTDOWN_MS, sq = duel.questions[duel.turn.q];
   const openView = JSON.stringify(battleView(duel, 'x'));
-  assert(duel.mode === 'skill' && duel.ends_at - t1 === 120000 && duel.deadline - t1 === SKILL_RULES.SPELL_TURN_MS && sq.kind === 'spell' && !openView.includes(`"${sq.text}"`) && !openView.includes('accept') && battleView(duel, 'x').question.hint === sq.hint, 'V13.67 실력전 lasts 2 minutes, a spelling word gets 16 seconds and the room never sends its spelling while it is open');
+  assert(duel.mode === 'skill' && duel.ends_at - t1 === 150000 && duel.deadline - t1 === SKILL_RULES.SPELL_TURN_MS && sq.kind === 'spell' && !openView.includes(`"${sq.text}"`) && !openView.includes('accept') && battleView(duel, 'x').question.hint === sq.hint, 'V13.94 실력전 lasts 2 minutes 30 seconds, a spelling word gets 16 seconds and the room never sends its spelling while it is open');
   const wrongSpell = answer(duel, 'y', 'zzzz', t1 + 1000);
   const typed = answer(duel, 'x', ` ${sq.text.toUpperCase()} `, t1 + 8000);
   const hitSpell = typed.find(e => e.type === 'attack'), reveal = typed.find(e => e.type === 'reveal');
@@ -63,7 +64,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   const speedDuel = createBattle({ id: 'qa-speed', players: [{ id: 'x', name: 'X' }, { id: 'y', name: 'Y' }], questions: speedQs, now });
   connect(speedDuel, 'x', now); connect(speedDuel, 'y', now); tick(speedDuel, t1);
   const fast = answer(speedDuel, 'x', speedDuel.questions[speedDuel.turn.q].answer, t1 + 500).find(e => e.type === 'attack');
-  assert(speedDuel.mode === 'speed' && speedDuel.ends_at - t1 === 90000 && fast.fast && fast.dmg > quick.dmg, 'V13.67 스피드전 keeps its rules: 90 seconds, fast answers are critical');
+  assert(speedDuel.mode === 'speed' && speedDuel.ends_at - t1 === 120000 && fast.fast && fast.dmg > quick.dmg, 'V13.67 스피드전 keeps its rules: 2 minutes (V13.94), fast answers are critical');
   const room = await service(state, 'POST', '/battle/rooms', { stake: 10, range_codes: range, mode: 'skill' }, tokens['qa-rw-a']);
   const stored = state.battles.find(b => b.id === room.id);
   assert(room.mode === 'skill' && room._battle.mode === 'skill' && room._battle.questions.some(q => q.kind === 'spell') && stored.mode === 'skill', 'V13.67 a room is opened as 실력전 and the room gets spelling words');
@@ -576,6 +577,51 @@ export async function runRewardsChecks(assert, expectStatus) {
   const petbook91 = source('../public/modules/petbook.js');
   assert(petbook91.includes('export function petBookPage(A)') && petbook91.includes('STANDARD_PET_KEYS') && petbook91.includes('LEGENDARY_PET_KEYS') && css91.includes('.pb-sprite.shadow{') && petbook91.includes('PET_SKILLS[key]') && student90.includes("petbook: petBookPage") && student90.includes('data-go="petbook"') && css91.includes('.pb-card{') && [...STANDARD_PET_KEYS, ...LEGENDARY_PET_KEYS].every(key => [0, 1, 2, 3].every(f => existsSync(fileURLToPath(new URL(`../public/assets/pets/${key}-${f}-s.webp`, import.meta.url))))), 'V13.91 학생은 나 → 펫 도감에서 모든 펫을 보고, 못 만난 펫은 그림자와 만나는 법으로 보인다');
   assert(lucky89.includes("box.className = 'lk-show lk-legend-show lgx'") && ['p0', 'p1', 'p2', 'p3', 'p4'].every(c => lucky89.includes(`'${c}'`)) && lucky89.includes('lgx-future') && lucky89.includes('SFX.fanfare()') && lucky89.includes('SFX.boom()') && lucky89.includes('if (reduced()) return showResult();') && lucky89.includes('if (!ready) return;') && css91.includes('.lgx.p4 .lgx-flash{') && css91.includes('@keyframes lgxRing'), 'V13.91 전설 펫을 뽑으면 어둠·박동·섬광·공개로 이어지는 연출이 나오고, 누르면 건너뛰고, 움직임 줄이기면 바로 결과가 보인다');
+  /* ---------- V13.94 야차전: 각자 내 범위 · 더 긴 대결 · 새 메뉴 화면 ---------- */
+  {
+    const mk = (prefix, n, typed = true) => Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, word: typed ? `${prefix}word${'abcdefghijklmnop'[i]}` : `${prefix}-${i}!`, meaning: `${prefix} 뜻 ${i}` }));
+    const [qa, qb] = pairedBattleQuestions(mk('aa', 30), mk('bb', 9), 'skill', 40);
+    assert(qa.length === 40 && qb.length === 40 && qa.every((q, i) => (q.kind || 'choice') === (qb[i].kind || 'choice')) && qa.some(q => q.kind === 'spell') && qa.every(q => q.word_id.startsWith('aa')) && qb.every(q => q.word_id.startsWith('bb')) && new Set(qb.map(q => q.word_id)).size === 9, 'V13.94 각자 내 범위 questions: each list is from its own range, the n-th words are the same kind, and a small range is shuffled again');
+    const [sa, sb] = pairedBattleQuestions(mk('cc', 12), mk('dd', 12, false), 'skill', 20);
+    assert(sa.length === 20 && [...sa, ...sb].every(q => q.kind !== 'spell') && !spellable(mk('dd', 1, false)[0]), 'V13.94 when one range has no word to spell, both players get four choices only');
+    const battle94 = source('../public/modules/battle.js'), css94 = source('../public/v1394.css'), build94 = source('./build-assets.mjs');
+    assert(battle94.includes("data-yb=\"range-mode\"") && battle94.includes('range_mode: rangeMode()') && battle94.includes('range_codes: myRanges()') && battle94.includes('rangeDeal(room)') && battle94.includes('rangeDeal(invite)') && battle94.includes('const mine = e.own?.[v.me] || e;') && battle94.includes('e.answers?.[v.me] ?? e.answer') && battle94.includes('sumus-yacha-ranges:'), 'V13.94 야차전: the lobby sends 각자 내 범위 or 같은 범위로, a joining friend brings their own range and sees whose words come, and each phone draws its own word');
+    assert(battle94.includes('class="ya-hero"') && battle94.includes('class="ya-panel ya-setup"') && ['대결 방식', '내 단어 범위', '판돈'].every(t => battle94.includes(`'${t}'`)) && battle94.includes('class="ya-cta"') && css94.includes('.ya-hero{') && css94.includes('@media (min-width:768px)') && css94.includes('.ya-play{grid-template-columns') && build94.includes('"v1394.css"') && !battle94.includes('const MAX_HP = 100'), 'V13.94 야차전 메뉴 화면: 밤의 대결장 히어로, 3단계 대결 준비, 패드에서는 두 칸');
+  }
+  /* ---------- V13.94 로보 연습 · 몬스터 잡기 · 공격 이펙트 · 호야 그림 ---------- */
+  {
+    assert(BOT_HP === 400 && BOT_LEVELS.easy.accuracy === .68 && BOT_LEVELS.normal.accuracy === .84 && BOT_LEVELS.hard.accuracy === .95 && BOT_LEVELS.hard.max <= 2700 && source('../public/modules/battle-bot.js').includes('hp = BOT_HP'), 'V13.94 로보 연습: 더 정확하고 빠른 로보, HP 400으로 한 판이 약 2분');
+    const counts = new Map([['24', 47], ['29', 40], ['31', 27], ['32', 27], ['33', 28], ['2', 3], ['10', 20], ['L1', 68]]);
+    const parts = monsterParts(counts);
+    assert(parts.map(p => p.key).join('|') === '10+24|29+31|32+33+L1' && parts.every(p => p.words >= 8 && p.monster === MONSTERS[p.index % MONSTERS.length]) && monsterParts(new Map([...counts].reverse())).map(p => p.key).join('|') === parts.map(p => p.key).join('|'), 'V13.94 몬스터 파트: 범위를 번호 순서로 묶고(60단어 또는 3범위까지, 4단어 미만 범위 제외), 파트마다 몬스터가 정해진다');
+    assert(monsterOpen({}, 'easy') && !monsterOpen({}, 'normal') && monsterOpen({ easy: 1 }, 'normal') && !monsterOpen({ easy: 1 }, 'hard') && monsterOpen({ easy: 1, normal: 1 }, 'hard'), 'V13.94 이지 → 노말 → 하드 순서로 열린다');
+    assert(MONSTER_LEVELS.hard.mode === 'skill' && MONSTER_LEVELS.hard.first.coins >= 3 * MONSTER_LEVELS.normal.first.coins && MONSTER_LEVELS.normal.first.coins > MONSTER_LEVELS.easy.first.coins && Object.values(MONSTER_LEVELS).every(L => MONSTER_SKILLS[L.skill] && L.first.coins > L.again.coins), 'V13.94 하드는 실력전이고 첫 처치 보상이 가장 크다');
+    const kid = { id: 'qa-mh', pets: [{ key: 'dog' }], bonus: {} };
+    const t0 = Date.parse('2026-10-03T03:00:00Z');
+    const fight = (level, result, right, at, part = parts[0].key) => { const r = monsterStart(kid, { part, level, parts, id: 'f-' + at, now: at }); return monsterFinish(kid, { id: r.id, result, right, now: at + 60000 }); };
+    let refused = 0; try { monsterStart(kid, { part: parts[0].key, level: 'normal', parts, id: 'x', now: t0 }); } catch (err) { refused = err.status; }
+    let missing = 0; try { monsterStart(kid, { part: 'made+up', level: 'easy', parts, id: 'y', now: t0 }); } catch (err) { missing = err.status; }
+    const firstWin = fight('easy', 'win', 9, t0);
+    const again = fight('easy', 'win', 9, t0 + 100000);
+    const few = fight('easy', 'lose', 2, t0 + 200000);
+    const quick = monsterFinish(kid, { id: monsterStart(kid, { part: parts[0].key, level: 'easy', parts, id: 'q', now: t0 }).id, result: 'win', right: 9, now: t0 + 5000 });
+    assert(refused === 409 && missing === 404 && firstWin.paid && firstWin.first && firstWin.coins === MONSTER_LEVELS.easy.first.coins && again.paid && !again.first && again.coins === MONSTER_LEVELS.easy.again.coins && !few.paid && few.reason === 'few' && !quick.paid && quick.reason === 'short' && monsterView(kid, t0).cleared[parts[0].key].easy === t0 + 60000, 'V13.94 몬스터 보상: 잠긴 난이도·없는 파트는 거절, 첫 처치는 큰 보상, 다시 잡으면 작은 보상, 단어를 덜 맞히거나 너무 빨리 끝나면 없음');
+    for (let i = 0; i < MONSTER_DAILY; i++) fight('easy', 'lose', 9, t0 + 300000 + i * 100000);
+    const capped = fight('easy', 'win', 9, t0 + 900000), hardFirst = (fight('normal', 'win', 12, t0 + 1000000), fight('hard', 'win', 14, t0 + 1100000));
+    assert(!capped.paid && capped.reason === 'daily' && hardFirst.paid && hardFirst.first && hardFirst.coins === MONSTER_LEVELS.hard.first.coins && kid.bonus.monster.hard_wins === 1 && bonusRecords(kid).reduce((n, r) => n + r.reward_points, 0) === MONSTER_LEVELS.easy.first.coins + MONSTER_LEVELS.easy.again.coins + (MONSTER_DAILY - 1) * MONSTER_TRY.coins + MONSTER_LEVELS.normal.first.coins + MONSTER_LEVELS.hard.first.coins, 'V13.94 다시 잡기 보상은 하루 몇 번까지, 첫 처치(하드 포함)는 그와 상관없이 언제나 받는다');
+    assert(['monster1', 'monster10', 'monsterhard', 'monsterlord'].every(key => TITLES[key]?.group === 'monster') && TITLES.monsterlord.tier === 'legendary', 'V13.94 몬스터 칭호 4개');
+    // The engine: a monster brings its own HP and skill, and wins if time runs out.
+    const mq = Array.from({ length: 6 }, (_, i) => ({ word_id: 'm' + i, prompt: 'w' + i, options: ['a', 'b', 'c', 'd'], answer: 0 }));
+    const mb = createBattle({ id: 'mb', players: [{ id: 'me', name: '나', pet: { key: 'dog' } }, { id: 'mon', name: '슬라임', pet: { key: 'whale', skill: 'rage' }, monster: { key: 'slime', level: 'hard' }, hp: 330 }], questions: mq, hp: 300, timeoutWinner: 'mon', now: 0 });
+    connect(mb, 'me', 0); connect(mb, 'mon', 0); tick(mb, BATTLE.COUNTDOWN_MS);
+    const view = battleView(mb, 'me');
+    const timeUp = tick(mb, mb.ends_at + 1).concat(tick(mb, mb.ends_at + 5000)).find(e => e.type === 'end');
+    assert(mb.players.me.hp === 300 && mb.players.mon.hp === 330 && view.players.mon.max_hp === 330 && view.players.me.max_hp === 300 && view.players.mon.monster.key === 'slime' && petSkill(mb.players.mon.pet).name === MONSTER_SKILLS.rage.name && timeUp?.result.winner === 'mon', 'V13.94 몬스터는 자기 HP와 특기를 갖고, 시간 안에 쓰러뜨리지 못하면 몬스터가 이긴다');
+    const battle94b = source('../public/modules/battle.js'), css94b = source('../public/v1394.css');
+    assert(battle94b.includes("['monster', '몬스터']") && battle94b.includes('function monsterTab()') && battle94b.includes("api('/monster/start'") && battle94b.includes("api('/monster/finish'") && battle94b.includes('ko: true') && css94b.includes('.mh-part{') && source('./service.mjs').includes("path === '/monster/start'"), 'V13.94 야차전의 몬스터 탭에서 파트별 몬스터를 이지·노말·하드로 잡는다');
+    assert(battle94b.includes('function strike(') && battle94b.includes("strike(atk, def,") && battle94b.includes('skill: true, attacker: p') && battle94b.includes('function knockout(') && ['.fx-shot{', '.fx-ring{', '.fx-claw{', '.fx-beam{', '.fx-ko{', '@keyframes fx-shake-l'].every(x => css94b.includes(x)), 'V13.94 공격 이펙트: 날아가는 공격·충격파·불꽃·화면 흔들림, 특기는 광선, 몬스터는 할퀴기, 쓰러뜨리면 K.O.!');
+    assert(battle94b.includes('ya-chip-study') && battle94b.includes('class="ya-picked') && battle94b.includes('ya-rm-duel') && battle94b.includes('친구가 다른 번호를 외우고 있다면?'), 'V13.94 내 단어 범위: 단어 수·학습 중 표시·고른 범위 요약·각자/같은 범위 그림 설명');
+  }
   /* ---------- V13.93 08 그림 40장 ---------- */
   const ready93 = [...emblems91.matchAll(/ART_READY = new Set\(\[([^\]]*)\]/g)].flatMap(m => [...m[1].matchAll(/'([a-z0-9-]+)'/g)].map(x => x[1]));
   const arcade93 = source('../public/modules/arcade.js'), shop93 = source('../public/modules/pet-moments.js');

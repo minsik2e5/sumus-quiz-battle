@@ -6,11 +6,16 @@ import { battleQuestions } from './battle-questions.js';
 // it is there for when no friend is around. It talks to the battle screen with the same
 // messages a room sends ('view', 'events'), so the screen draws it like any match.
 
+// V13.94: the robot was too easy and a match was over in about a minute. It answers more
+// often and faster now, and a practice match has more HP (BOT_HP), so it lasts about 2 minutes
+// (실력전 about 2:30). In thousands of simulated matches a student who knows almost every word
+// beats 어려움 about half the time; 보통 is for a student who knows most of them.
 export const BOT_LEVELS = {
-  easy: { name: '쉬움', form: 1, accuracy: .58, min: 3000, max: 7000 },
-  normal: { name: '보통', form: 2, accuracy: .74, min: 2100, max: 5600 },
-  hard: { name: '어려움', form: 3, accuracy: .88, min: 1300, max: 4200 }
+  easy: { name: '쉬움', form: 1, accuracy: .68, min: 2500, max: 6000 },
+  normal: { name: '보통', form: 2, accuracy: .84, min: 1600, max: 4200 },
+  hard: { name: '어려움', form: 3, accuracy: .95, min: 1000, max: 2700 }
 };
+export const BOT_HP = 400;
 export const BOT_ID = 'practice-bot';
 const EMOTE_REPLIES = { lol: 'lol', come: 'come', gg: 'gg', nice: 'nice' };
 
@@ -20,10 +25,13 @@ export function practiceQuestions(words, mode = 'speed') {
 }
 
 // V13.67: the practice partner is 로보, a robot pet that grows with the level.
-export function createPracticeMatch({ me, questions, level = 'normal', mode = 'speed', onMessage, random = Math.random }) {
-  const lv = BOT_LEVELS[level] || BOT_LEVELS.normal;
-  const bot = { id: BOT_ID, name: `연습 상대 · ${lv.name}`, pet: { key: 'robot', form: lv.form, name: `AI 로보` }, bot: true };
-  const state = createBattle({ id: `practice-${Date.now()}`, players: [me, bot], questions, stake: 0, label: '연습 경기', mode, now: Date.now() });
+// V13.94 몬스터 잡기 uses the same match with a monster instead of the robot: `foe` (name, pet
+// with the monster's skill, `monster`, its own `hp`), `skill` ({ accuracy, min, max } of the
+// monster), `hp` (the student's) and `ko` (the monster wins if time runs out).
+export function createPracticeMatch({ me, questions, level = 'normal', mode = 'speed', onMessage, random = Math.random, foe = null, skill = null, hp = BOT_HP, ko = false, label = '연습 경기' }) {
+  const lv = skill || BOT_LEVELS[level] || BOT_LEVELS.normal;
+  const bot = foe ? { ...foe, id: BOT_ID, bot: true } : { id: BOT_ID, name: `연습 상대 · ${lv.name}`, pet: { key: 'robot', form: lv.form, name: `AI 로보` }, bot: true };
+  const state = createBattle({ id: `practice-${Date.now()}`, players: [me, bot], questions, stake: 0, label, mode, hp, timeoutWinner: ko ? BOT_ID : null, now: Date.now() });
   let closed = false, loop = null, botTimer = null, emoteTimer = null;
   const now = () => Date.now();
   const deliver = message => { if (!closed) onMessage({ ...message, now: now() }); };
