@@ -272,3 +272,15 @@ footer.slim { justify-content: flex-end; padding-top: 4px; display: flex; }
 body[data-widget]:not([data-widget="all"]) .desktop-widget-title > svg, body[data-widget]:not([data-widget="all"]) .desktop-widget-title > strong { display: none; }
 body[data-widget]:not([data-widget="all"]) .desktop-widget-title { justify-content: flex-end; margin-bottom: 4px; }
 body[data-widget]:not([data-widget="all"]) .desktop-widget-title:not(:has(em)) { display: none; }
+
+.w-close { color: #b0b8c1; background: 0 0; border: 0; border-radius: 8px; width: 24px; height: 24px; margin-left: auto; font-size: 18px; line-height: 1; cursor: pointer; }
+.w-close:hover { color: #e5484d; background: #fdecec; }
+
+/* 위젯 조각: 창을 키우면 안의 내용도 같이 커짐 */
+body[data-widget]:not([data-widget="all"]) .desktop-widget-page { padding: 0; min-height: 100vh; height: 100vh; }
+body[data-widget]:not([data-widget="all"]) .desktop-widget-card { width: 100%; height: 100vh; min-height: 0; margin: 0; border: 0; border-radius: 0; display: flex; flex-direction: column; }
+body[data-widget]:not([data-widget="all"]) .desktop-widget-section { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+body[data-widget]:not([data-widget="all"]) .desktop-check-list,
+body[data-widget]:not([data-widget="all"]) .desktop-class-list { flex: 1 1 auto; max-height: none; min-height: 0; overflow: auto; }
+body[data-widget="notes"] .note-text { flex: 1 1 auto; height: auto; min-height: 0; }
+body[data-widget="notes"] .desktop-widget-section { display: flex; flex-direction: column; }

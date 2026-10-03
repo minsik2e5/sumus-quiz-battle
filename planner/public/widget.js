@@ -67,7 +67,7 @@ function draw() {
   const head = KIND === 'all'
     ? `<header class="desktop-widget-head"><div class="desktop-widget-logo">S</div><div><strong>SUMUS TODAY</strong><span>${C.fmtLong(today)}</span></div><i id="w-dot"></i><button type="button" data-act="refresh" aria-label="새로고침">${icon('refresh-cw')}</button></header>
     <div class="desktop-widget-progress"><div>${icon('sparkles')}<strong>오늘 ${p.completed}/${p.total || 0} 완료</strong></div><span><b style="width: ${p.total ? Math.round(p.completed / p.total * 100) : 0}%;"></b></span></div>`
-    : `<header class="desktop-widget-head slim"><div class="desktop-widget-logo">S</div><div><strong>${TITLES[KIND] || 'SUMUS'}</strong><span>${C.fmtLong(today)}</span></div><i id="w-dot"></i></header>`;
+    : `<header class="desktop-widget-head slim"><div class="desktop-widget-logo">S</div><div><strong>${TITLES[KIND] || 'SUMUS'}</strong><span>${C.fmtLong(today)}</span></div><i id="w-dot"></i>${inExe ? `<button type="button" class="w-close" data-act="close-widget" aria-label="이 위젯 닫기">×</button>` : ''}</header>`;
   const body = KIND === 'all' ? ['work', 'classes', 'quick', 'checklist'].map(k => parts[k]()).join('') : (parts[KIND] || parts.classes)();
   const foot = KIND === 'all' ? `<footer><div>${inExe ? '' : '<a href="/SUMUS_Widget_Installer.zip" download>Windows 설치</a>'}<button type="button" data-act="planner">${icon('external-link')} 전체 플래너</button></div><span id="w-status"></span></footer>` : '<footer class="slim"><span id="w-status"></span></footer>';
   root.innerHTML = `<main class="desktop-widget-page kind-${KIND}"><section class="desktop-widget-card">${head}${body}${foot}</section></main>`;
@@ -119,7 +119,8 @@ root.addEventListener('click', e => {
     if (day !== today) toast(`${C.fmtMd(day)} 밤 취침으로 기록했어요.`);
     return;
   }
-  if (d.noteOpen) { Q.set('n', d.noteOpen); history.replaceState(null, '', '?' + Q); draw(); return; }
+  if (d.act === 'close-widget') { window.chrome?.webview?.postMessage('close'); return; }
+  if (d.noteOpen) { Q.set('n', d.noteOpen); window.chrome?.webview?.postMessage('n:' + d.noteOpen); history.replaceState(null, '', '?' + Q); draw(); return; }
   if (d.act === 'note-new') { const id = `n${Date.now()}`; change(s => { s.notes.push({ id, title: '', text: '', updatedAt: Date.now() }); }); Q.set('n', id); history.replaceState(null, '', '?' + Q); draw(); setTimeout(() => document.getElementById('w-note-title')?.focus(), 30); return; }
   if (d.act === 'note-del') { if (!confirm('이 메모를 지울까요?')) return; change(s => { s.notes = s.notes.filter(n => n.id !== d.note); }); Q.delete('n'); history.replaceState(null, '', '?' + Q); draw(); return; }
   if (d.act === 'refresh') store.refresh().then(ch => ch || draw());
