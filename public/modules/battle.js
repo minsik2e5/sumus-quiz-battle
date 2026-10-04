@@ -82,6 +82,38 @@ function sfx(name, buzz = 0) {
   } catch {}
   if (buzz) try { navigator.vibrate?.(buzz); } catch {}
 }
+// V13.104 전투 화면 효과 소리: a falling low tone (a thump, heavier with the damage), a tick that
+// climbs with the combo and a KO boom with a noise burst. Vibration only with the sound on.
+function buzzFx(pattern) { if (soundOn() && 'vibrate' in navigator) try { navigator.vibrate(pattern); } catch {} }
+function sweep(f0, f1, len, vol, type = 'sine', at = 0) {
+  const t = audio.currentTime + at, o = audio.createOscillator(), g = audio.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + len);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .008); g.gain.exponentialRampToValueAtTime(.0001, t + len);
+  o.connect(g); g.connect(audio.destination); o.start(t); o.stop(t + len + .02);
+}
+function noise(len, vol, at = 0) {
+  const t = audio.currentTime + at, n = Math.floor(audio.sampleRate * len), buf = audio.createBuffer(1, n, audio.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n) ** 2;
+  const s = audio.createBufferSource(), g = audio.createGain(), lp = audio.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 900; s.buffer = buf; g.gain.value = vol;
+  s.connect(lp); lp.connect(g); g.connect(audio.destination); s.start(t);
+}
+function sfxThump(dmg, crit = false) {
+  if (!soundOn()) return;
+  const tier = dmgTier(dmg);
+  try { unlockAudio(); sweep(150 + tier * 10, 42, .16 + tier * .05, .05 + tier * .025); if (tier > 1 || crit) noise(.09 + tier * .03, .05 + tier * .03); if (crit) sweep(1400, 700, .12, .03, 'square', .02); } catch {}
+  if (tier >= 3 || crit) buzzFx(crit ? [35, 25, 60] : 45);
+}
+function sfxCombo(n) {
+  if (!soundOn()) return;
+  const f = 620 * 2 ** (Math.min(n - 2, 10) / 12 * 2);
+  try { unlockAudio(); sweep(f, f * 1.5, .09, .035, 'triangle'); sweep(f * 1.5, f * 2, .08, .025, 'triangle', .06); } catch {}
+}
+function sfxKO() {
+  if (!soundOn()) return;
+  try { unlockAudio(); sweep(110, 28, .9, .14); sweep(220, 40, .5, .05, 'sawtooth'); noise(.5, .16); noise(.3, .08, .18); } catch {}
+  buzzFx([90, 50, 180]);
+}
 
 // V13.68: the lobby is drawn inside the 야차전 tab (`host`, with the app's menu around it);
 // a room or a match takes the whole screen (#app).
@@ -920,6 +952,7 @@ function drawMatch() {
   if (v.phase === 'waiting') say('상대가 들어오기를 기다리는 중…', '둘 다 연결되면 3초 뒤에 시작해요.');
   if (v.phase === 'countdown') showCountdown(v.deadline);
   if (v.question) drawQuestion();
+  drawCombo(false);
   loop();
 }
 
@@ -1137,9 +1170,14 @@ function flash(color) { const f = document.getElementById('yb-flash'); if (!f) r
 function pop(side, text, kind = '') {
   const arena = document.getElementById('yb-arena'), pet = document.getElementById('yb-pet-' + side); if (!arena || !pet) return;
   const a = arena.getBoundingClientRect(), r = pet.getBoundingClientRect(), d = document.createElement('div');
-  d.className = 'yb-pop ' + kind; d.textContent = text;
+  // V13.104 the damage number grows with the damage (t1~t3); fever hits burn red.
+  const dmg = /^-(\d+)/.exec(text)?.[1];
+  d.className = 'yb-pop ' + kind + (dmg ? ` fx-num t${dmgTier(+dmg)}${B.fever ? ' fever' : ''}` : ''); d.textContent = text;
+  if (dmg) d.innerHTML = `<b>-${dmg}</b>${text.length > dmg.length + 1 ? `<small>${esc(text.slice(dmg.length + 1).trim())}</small>` : ''}`;
   d.style.left = (r.left - a.left + r.width * .22) + 'px'; d.style.top = (r.top - a.top + r.height * .1) + 'px';
   arena.appendChild(d); setTimeout(() => d.remove(), 1050);
+  // V13.104 a big number stays inside the arena (centred on the pet, never cut off at the side).
+  if (dmg) { const w = d.offsetWidth; d.style.left = Math.max(6, Math.min(a.width - w - 6, r.left - a.left + r.width / 2 - w / 2)) + 'px'; d.style.top = Math.max(46, r.top - a.top + r.height * .05) + 'px'; }
 }
 // V13.85 the pets act out the hit: the attacker shows its attack (cheer) pose, the one hit its
 // hurt (sad) pose, for a moment (로보 has its own punch and flinch).
@@ -1156,7 +1194,9 @@ function fxCenter(side, arena) {
   const a = arena.getBoundingClientRect(), r = pet.getBoundingClientRect();
   return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height * .52 };
 }
-function fxAdd(arena, cls, css, ms) { const el = document.createElement('div'); el.className = cls; Object.assign(el.style, css); arena.appendChild(el); setTimeout(() => el.remove(), ms); return el; }
+// V13.104: at most FX_MAX effect pieces at once; extra sparks are simply not drawn.
+const FX_MAX = 24;
+function fxAdd(arena, cls, css, ms) { const el = document.createElement('div'); if (cls === 'fx-spark' && arena.querySelectorAll('[data-fx]').length >= FX_MAX) return el; el.dataset.fx = ''; el.className = cls; Object.assign(el.style, css); arena.appendChild(el); setTimeout(() => el.remove(), ms); return el; }
 function strike(atk, def, { dmg = 0, crit = false, skill = false, attacker = null } = {}) {
   const arena = document.getElementById('yb-arena'); if (!arena || reduced()) return;
   const from = fxCenter(atk, arena), to = fxCenter(def, arena); if (!from || !to) return;
@@ -1175,14 +1215,98 @@ function strike(atk, def, { dmg = 0, crit = false, skill = false, attacker = nul
       fxAdd(arena, 'fx-spark', { left: to.x + 'px', top: to.y + 'px', '--fx': color, '--dx': Math.cos(a) * dist + 'px', '--dy': Math.sin(a) * dist + 'px' }, 560);
     }
     if (attacker?.monster) fxAdd(arena, 'fx-claw', { left: to.x + 'px', top: to.y + 'px' }, 620);
-    arena.classList.remove('fx-shake-s', 'fx-shake-l'); void arena.offsetWidth;
-    arena.classList.add(big ? 'fx-shake-l' : 'fx-shake-s');
+    // V13.104 타격감: a white flash on the one hit, a short hit-stop, then a shake by damage.
+    impact(arena, def, to, { dmg, crit, skill });
   }, skill ? 180 : 230);
+}
+// ---------- V13.104 전투 화면 효과 (presentation only; the rules are in battle-engine.js) ----------
+// Damage tiers: small (a plain hit), medium, big (a fast or fever hit, a skill).
+function dmgTier(dmg) { return dmg >= 28 ? 3 : dmg >= 16 ? 2 : 1; }
+const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl'];
+function shake(arena, cls) {
+  if (reduced()) return;
+  arena.classList.remove(...SHAKES); void arena.offsetWidth; arena.classList.add(cls);
+}
+// Hit-stop: the arena's animations hold for a blink (~90 ms) so the hit lands, then go on.
+function hitStop(arena, ms = 90) {
+  if (reduced()) return;
+  arena.classList.add('fx-stop');
+  clearTimeout(arena.fxStopTimer); arena.fxStopTimer = setTimeout(() => arena.classList.remove('fx-stop'), ms);
+}
+function impact(arena, def, at, { dmg = 0, crit = false, skill = false } = {}) {
+  const tier = Math.max(dmgTier(dmg), skill ? 3 : 1);
+  fxAdd(arena, 'fx-impact' + (tier >= 2 ? ' big' : ''), { left: at.x + 'px', top: at.y + 'px' }, 380);
+  const pet = document.getElementById('yb-pet-' + def);
+  if (pet) { pet.classList.remove('fx-white'); void pet.offsetWidth; pet.classList.add('fx-white'); setTimeout(() => pet.classList.remove('fx-white'), 260); }
+  hitStop(arena, tier >= 3 || crit ? 110 : 70);
+  shake(arena, crit ? 'fx-shake-xl' : SHAKES[tier - 1]);
+}
+// 크리티컬: a fast answer (the engine's `fast` flag) stamps CRITICAL! over the one hit.
+function critStamp(def) {
+  const arena = document.getElementById('yb-arena'); if (!arena) return;
+  // In the free band between the two HUDs, so it covers neither the damage number nor the combo.
+  const a = arena.getBoundingClientRect(), op = document.getElementById('yb-hud-op')?.getBoundingClientRect(), mine = document.getElementById('yb-hud-me')?.getBoundingClientRect();
+  const y = op && mine ? (op.bottom + mine.top) / 2 - a.top : a.height * .45;
+  fxAdd(arena, 'fx-crit' + (def === 'me' ? ' on-me' : ''), { left: a.width * (def === 'me' ? .62 : .4) + 'px', top: y + 'px' }, 900).textContent = 'CRITICAL!';
+}
+// Per-match display state: my combo and whether the cut-in played (reset for a new match).
+function fxState() {
+  const id = B.view?.id || B.view?.started_at || 'local';
+  if (B.fx?.id !== id) B.fx = { id, combo: 0, cut: false, finish: false };
+  return B.fx;
+}
+// 콤보: my right answers in a row (a wrong answer or a missed word resets it). Display only.
+function comboUp() {
+  const s = fxState(); s.combo++;
+  if (s.combo >= 2) sfxCombo(s.combo);
+  drawCombo(true);
+}
+function comboReset() { const s = fxState(); if (!s.combo) return; s.combo = 0; drawCombo(false); }
+function drawCombo(bump) {
+  const hud = document.getElementById('yb-hud-me'); if (!hud) return;
+  let box = document.getElementById('yb-combo');
+  const n = fxState().combo;
+  if (n < 2) { if (box) { box.classList.add('out'); setTimeout(() => box.remove(), 260); box.id = ''; } return; }
+  if (!box) { box = document.createElement('div'); box.id = 'yb-combo'; box.className = 'fx-combo'; box.setAttribute('aria-live', 'polite'); hud.appendChild(box); }
+  box.innerHTML = `<b>${n}</b><span>COMBO</span>`;
+  box.style.setProperty('--heat', String(Math.min(1, (n - 2) / 6)));
+  box.className = 'fx-combo' + (n >= 5 ? ' hot' : '') + (n >= 8 ? ' max' : '');
+  if (bump && !reduced()) { box.classList.remove('bump'); void box.offsetWidth; box.classList.add('bump'); }
+}
+// 입장 컷인: who I fight and in what match, once at the countdown. A monster comes in bigger
+// and redder; a boss darker, with a shake. Never blocks taps (pointer-events: none).
+function cutIn() {
+  const s = fxState(); if (s.cut) return; s.cut = true;
+  const arena = document.getElementById('yb-arena'); if (!arena) return;
+  const f = foe(), v = B.view, label = v.label || modeName(v.mode);
+  const boss = !!(v.boss || /보스/.test(label)), monster = !!f.monster;
+  const el = fxAdd(arena, 'fx-cutin' + (monster ? ' monster' : '') + (boss ? ' boss' : ''), {}, 1200);
+  el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = `<div class="fx-cutin-band"><span class="fx-cutin-label">${esc(label)}</span><b class="fx-cutin-name">${monster ? '' : 'VS '}${esc(whoName(f))}</b>${monster ? `<span class="fx-cutin-tag">${boss ? 'BOSS' : 'MONSTER'}</span>` : ''}</div>`;
+  if (boss) { shake(arena, 'fx-shake-l'); sfxThump(40); }
+}
+// 피니셔: the blow that empties an HP bar: a short slow motion on the arena, a flash, and K.O.
+function finisher(side) {
+  const s = fxState(); if (s.finish) return; s.finish = true;
+  const arena = document.getElementById('yb-arena'); if (!arena || reduced()) return;
+  arena.classList.add('fx-finish');
+  fxAdd(arena, 'fx-vignette', {}, 900);
+  // Slow every running arena animation for ~0.4 s (Web Animations: CSS ones included).
+  const anims = arena.getAnimations?.({ subtree: true }) || [];
+  anims.forEach(a => { try { a.playbackRate = .3; } catch {} });
+  setTimeout(() => { anims.forEach(a => { try { a.playbackRate = 1; } catch {} }); arena.classList.remove('fx-finish'); }, 420);
+  const at = fxCenter(side, arena);
+  if (at) fxAdd(arena, 'fx-impact big ko', { left: at.x + 'px', top: at.y + 'px' }, 600);
 }
 function knockout(side) {
   const arena = document.getElementById('yb-arena'); if (!arena) return;
+  const s = fxState(); if (s.ko) return; s.ko = true;
+  arena.classList.add('fx-ko-on');
+  // V13.104 K.O. comes with a white flash, rays behind the letters and a boom.
+  if (!reduced()) { flash('rgba(255,255,255,.95)'); fxAdd(arena, 'fx-ko-rays', {}, 1300); }
+  sfxKO();
   fxAdd(arena, 'fx-ko', {}, 1300).textContent = 'K.O.!';
-  if (!reduced()) { arena.classList.remove('fx-shake-l'); void arena.offsetWidth; arena.classList.add('fx-shake-l'); }
+  shake(arena, 'fx-shake-xl');
   const pet = document.getElementById('yb-pet-' + side);
   pet?.classList.add('fx-down');
   // V13.95 a monster with its own pictures falls into its drawn 쓰러짐 pose (no tilt, see v1395.css).
@@ -1201,6 +1325,7 @@ function showCountdown(deadline) {
     box.textContent = left; later(step, 150);
   };
   step();
+  cutIn();
   say('곧 시작해요!', '연속으로 맞히면 펫 스킬이 저절로 나가요.');
 }
 
@@ -1252,6 +1377,7 @@ function applyEvent(e) {
     if (e.player !== v.me) v.question.opDone = true;
     if (e.player === v.me) {
       sfx('wrong', 40);
+      comboReset();
       v.question.locked = true; v.question.judged = true;
       document.querySelector('.yb-answer.picked')?.classList.add('wrong');
       document.querySelectorAll('.yb-answer').forEach(b => { b.disabled = true; });
@@ -1268,10 +1394,11 @@ function applyEvent(e) {
     // A word left to run out empties the gauge, like a wrong answer.
     if (e.type === 'miss') {
       for (const id of v.order) P[id].gauge = 0;
+      comboReset();
       say(e.timeout ? '시간 초과!' : '둘 다 놓쳤어요!', line);
     } else {
       // `judged`: the room took my answer (V13.99: the word locks as soon as an answer is sent).
-      if (e.timeout && !v.question.judged) { P[v.me].gauge = 0; setStatus('me', '시간 초과!'); }
+      if (e.timeout && !v.question.judged) { P[v.me].gauge = 0; setStatus('me', '시간 초과!'); comboReset(); }
       if (e.timeout && !v.question.opDone) foe().gauge = 0;
       say('정답 공개', line);
     }
@@ -1295,6 +1422,12 @@ function applyEvent(e) {
       say(`${atk === 'op' && !P[e.attacker].monster ? '상대 ' : ''}${esc(whoName(P[e.attacker]))}의 ${label}`, `${atk === 'me' ? '정답! 상대를 기다려요' : '상대가 맞혔어요'}${e.guard ? ` · ${def === 'me' ? '내' : '상대'} 펫이 ${e.guard}만큼 막았어요` : ''}`);
       lunge(atk);
       if (e.dmg) strike(atk, def, { dmg: e.dmg, crit: e.fast || e.fever, attacker: P[e.attacker] });
+      // V13.104: my combo, the CRITICAL! stamp, a thump by damage and the finishing blow.
+      if (atk === 'me') comboUp();
+      const lethal = e.dmg && Number(e.hp[e.defender]) <= 0;
+      // The K.O. plays right on the blow; the room's 'end' may come a moment later.
+      if (lethal) { fxState().lethalAt = Date.now(); later(() => finisher(def), reduced() ? 0 : 200); later(() => knockout(def), reduced() ? 0 : 620); }
+      later(() => { if (e.dmg) sfxThump(e.dmg, e.fast); if (e.fast && e.dmg) critStamp(def); }, reduced() ? 0 : 230);
       later(() => { if (e.boost || e.fast || e.spell) flash(e.boost ? 'rgba(255,214,90,.9)' : e.spell ? 'rgba(150,230,210,.75)' : 'rgba(255,236,160,.8)'); if (e.dmg) { hit(def); pop(def, `-${e.dmg}${e.boost ? ' 스킬!' : e.fast ? ' 크리티컬!' : e.spell ? ' 철자!' : e.fever ? ' 피버!' : ''}`, strong || e.spell ? 'crit' : ''); } if (e.guard) pop(def, e.dmg ? `막기 ${e.guard}` : '다 막았다!', 'info'); refreshHud(); }, reduced() ? 0 : 230);
       // Redraw only my own buttons: the other player's hit must not replace my question.
       if (atk === 'me') drawQuestion();
@@ -1311,6 +1444,7 @@ function applyEvent(e) {
       flash(side === 'me' ? 'rgba(255,214,90,.8)' : 'rgba(170,160,255,.65)');
       skillBanner(side, `${side === 'op' && !p.monster ? '상대 ' : ''}${esc(whoName(p))}의 ${esc(e.name)}!`, e.desc);
       if (e.dmg) { strike(side, other, { dmg: e.dmg, skill: true, attacker: p }); hit(other); pop(other, `-${e.dmg} 스킬!`, 'crit'); }
+      if (e.dmg) later(() => sfxThump(Math.max(28, e.dmg)), reduced() ? 0 : 180);
       if (e.heal) pop(side, `+${e.heal}`, 'heal');
       refreshHud();
     }, reduced() ? 0 : 520);
@@ -1330,9 +1464,13 @@ function applyEvent(e) {
     if (loser) document.getElementById('yb-pet-' + loser)?.classList.add('faint');
     // A knock-out (not time running out) gets its own moment before the result.
     const ko = loser && Number(e.result.hp?.[e.result.loser]) <= 0 && e.result.reason === 'end';
-    if (ko) later(() => knockout(loser), reduced() ? 0 : 350);
+    // V13.104 피니셔: slow motion on the last blow, then K.O.; the result waits 0.3 s more
+    // than before (2.0 s in all after a K.O.), never longer.
+    if (ko && !reduced()) later(() => finisher(loser), 200);
+    if (ko) later(() => knockout(loser), reduced() ? 0 : 620);
     cancelAnimationFrame(B.raf);
-    later(drawResult, reduced() ? 0 : ko ? 1700 : 1100);
+    const since = Date.now() - (fxState().lethalAt || Date.now());
+    later(drawResult, reduced() ? 0 : ko ? Math.max(700, 2000 - since) : 1100);
   }
 }
 
