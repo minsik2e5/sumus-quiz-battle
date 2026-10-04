@@ -1,0 +1,3 @@
+import {integer,sqliteTable,text,uniqueIndex} from 'drizzle-orm/sqlite-core';
+export const ledger=sqliteTable('ledger',{workspace:text('workspace').primaryKey(),revision:integer('revision').notNull(),stateJson:text('state_json').notNull(),updatedAt:text('updated_at').notNull()});
+export const versions=sqliteTable('ledger_versions',{id:integer('id').primaryKey({autoIncrement:true}),workspace:text('workspace').notNull(),revision:integer('revision').notNull(),stateJson:text('state_json').notNull(),createdAt:text('created_at').notNull()},t=>[uniqueIndex('ledger_versions_workspace_revision').on(t.workspace,t.revision)]);

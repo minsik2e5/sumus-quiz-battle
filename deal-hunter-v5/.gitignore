@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.env.local
+.env.*.local
+supabase/.env
+*.log
+test-results/
+
+.env
+.env.*
+!.env.example
+!supabase/.env.example
+data/
+*backup*.json
+ledger-*.json

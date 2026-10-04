@@ -1,0 +1,2 @@
+[functions.deal-hunter-v5-api]
+verify_jwt = false
