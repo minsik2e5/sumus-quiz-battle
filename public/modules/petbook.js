@@ -1,4 +1,4 @@
-import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, EPIC_EGG_PRICE } from './core.js';
+import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE } from './core.js';
 import { icon, esc, num } from './ui.js';
 import { PET_SKILLS } from './battle-engine.js';
 import { petDisplayName } from './pet-moments.js';
@@ -16,7 +16,7 @@ function card(key, no, pet) {
     const seen = met && f <= form;
     return `<figure class="pb-form ${seen ? 'seen' : ''}">${sprite(key, f, !seen)}<figcaption>${seen ? label : f ? `Lv.${PET_FORM_LEVELS[f]}` : '알'}</figcaption></figure>`;
   }).join('');
-  const how = legend ? `코인 뽑기 ${LEGENDARY_RATE}% · ${num(LEGENDARY_PITY)}번 안에 확정` : epic ? `영웅 알 ${num(EPIC_EGG_PRICE)}코인 · 코인 뽑기 ${EPIC_RATE}%` : `상점의 랜덤 알 · ${num(EGG_PRICE)}코인`;
+  const how = legend ? `코인 뽑기 ${LEGENDARY_RATE}% · 영웅 알 ${EPIC_EGG_LEGENDARY_RATE}% · 뽑기 ${num(LEGENDARY_PITY)}번 안에 확정` : epic ? `영웅 알 ${num(EPIC_EGG_PRICE)}코인 · 코인 뽑기 ${EPIC_RATE}%` : `상점의 랜덤 알 · ${num(EGG_PRICE)}코인`;
   const foot = met
     ? skill ? `<span class="pb-skill">야차전 특기</span><b>${esc(skill.name)}</b><small>${esc(skill.desc)}</small>` : `<span class="pb-skill gold">전설 펫</span><small>특기 대신 전설의 빛을 두르고 있어요</small>`
     : `<span class="pb-skill lock">${icon('lock')}만나는 법</span><small>${how}</small>`;

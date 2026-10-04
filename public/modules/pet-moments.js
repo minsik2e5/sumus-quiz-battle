@@ -1,6 +1,6 @@
 import { $, api, esc, num, toast } from './ui.js';
-import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, STANDARD_PET_KEYS, EPIC_PET_KEYS, cleanPetName } from './core.js';
-import { epicShow } from './lucky.js';
+import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, STANDARD_PET_KEYS, EPIC_PET_KEYS, cleanPetName } from './core.js';
+import { epicShow, legendaryShow } from './lucky.js';
 import { uiArt, ART_READY } from './emblems.js';
 import { avatar, petKey } from './character.js';
 
@@ -225,25 +225,33 @@ export function openEggShop(A, onChanged, kind = 'basic') {
   if (momentOpen || !g?.pet) return;
   momentOpen = true;
   const body = openOverlay('알 상점');
-  const close = changed => closeOverlay(changed, onChanged);
+  // V13.98: closing is held while a purchase is on its way, so the coins spent always refresh the app.
+  let buying = false;
+  const close = changed => { if (!buying) closeOverlay(changed, onChanged); };
   const draw = () => {
     const egg = EGGS[kind], missing = egg.keys.filter(key => !g.pets.some(x => x.key === key));
+    const hasLegend = g.pets.some(x => CHARACTERS[x.key]?.legendary);
     const short = Math.max(0, egg.price - Number(g.points_balance || 0));
     body.innerHTML = `<div class="pet-shop egg-shop-v1392 ${kind}">
       <div class="egg-shop-tabs" role="tablist">${Object.entries(EGGS).map(([k, e]) => `<button type="button" role="tab" data-egg-kind="${k}" aria-selected="${k === kind}" class="${k === kind ? 'selected' : ''} ${k}">${k === 'epic' ? '<i aria-hidden="true">★</i>' : ''}${e.name}<small>${num(e.price)}코인</small></button>`).join('')}</div>
       ${kind === 'epic' && ART_READY.has('epic-egg') ? `<div class="pet-shop-egg-art" aria-hidden="true">${uiArt('epic-egg')}</div>` : `<div class="pet-shop-egg ${kind}" aria-hidden="true"><span>${kind === 'epic' ? '★' : '?'}</span></div>`}
       <p class="pet-moment-msg">${kind === 'epic' ? '<b class="egg-shop-tier">영웅</b> 어떤 친구가 들어 있을까요?' : '어떤 친구가 들어 있을까요?'}</p>
-      <p class="pet-shop-copy">${kind === 'epic' ? `전설 바로 아래 등급, 영웅 펫 ${missing.length}마리 중 한 마리의 알이 나와요.<br>영웅 펫마다 새로운 야차전 특기가 있어요.` : `아직 만나지 못한 기본 펫 ${missing.length}마리 중 한 마리의 알이 나와요.`}<br>새 알은 바로 파트너가 되고, 함께 공부하면 Lv.3에 태어나요.</p>
+      <p class="pet-shop-copy">${kind === 'epic' ? `전설 바로 아래 등급, 영웅 펫 ${missing.length}마리 중 한 마리의 알이 나와요.<br>영웅 펫마다 새로운 야차전 특기가 있어요.${hasLegend ? '' : `<br><b class="egg-shop-legend">${EPIC_EGG_LEGENDARY_RATE}% 확률로 전설 펫이 나와요!</b>`}` : `아직 만나지 못한 기본 펫 ${missing.length}마리 중 한 마리의 알이 나와요.`}<br>새 알은 바로 파트너가 되고, 함께 공부하면 Lv.3에 태어나요.</p>
       <div class="pet-shop-price"><span>가격</span><b><i class="coin-ico" aria-hidden="true"></i>${num(egg.price)}</b><span>가진 코인</span><b><i class="coin-ico" aria-hidden="true"></i>${num(g.points_balance || 0)}</b></div>
       <p class="pet-name-error" role="alert">${!missing.length ? egg.all : short ? `코인이 ${num(short)}개 더 필요해요. 공부하면 코인이 쌓여요.` : ''}</p>
       <div class="pet-moment-actions"><button type="button" class="btn" data-pet-later>닫기</button><button type="button" class="btn primary" data-pet-buy ${!missing.length || short ? 'disabled' : ''}>${num(egg.price)}코인으로 ${egg.name} 사기</button></div>
     </div>`;
-    body.querySelectorAll('[data-egg-kind]').forEach(b => { b.onclick = () => { kind = b.dataset.eggKind; draw(); }; });
+    body.querySelectorAll('[data-egg-kind]').forEach(b => { b.onclick = () => { if (buying) return; kind = b.dataset.eggKind; draw(); }; });
     body.querySelector('[data-pet-later]').onclick = () => close(false);
     body.querySelector('[data-pet-buy]').onclick = async event => {
       const button = event.currentTarget; button.disabled = true;
+      buying = true;
       try {
-        const { key, epic } = await api('/shop/egg', { kind });
+        const res = await api('/shop/egg', { kind });
+        buying = false;
+        const { key, epic } = res;
+        // V13.98: a 영웅 알 can open as a legendary pet (1%), with the legendary show.
+        if (res.legendary) { close(true); await legendaryShow(res); return; }
         if (epic) { close(true); await epicShow({ key, from: 'shop' }); return; }
         const name = CHARACTERS[key].ko;
         body.innerHTML = `<div class="pet-shop">
@@ -255,6 +263,7 @@ export function openEggShop(A, onChanged, kind = 'basic') {
         body.querySelector('[data-pet-done]').onclick = () => close(true);
         $('[data-pet-close]').onclick = () => close(true);
       } catch (err) {
+        buying = false;
         body.querySelector('.pet-name-error').textContent = err.message;
         button.disabled = false;
       }

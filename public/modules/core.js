@@ -70,7 +70,9 @@ export const PET_FORM_LEVELS = [1, 3, 10, 20];
 export const petForm = (level = 1) => PET_FORM_LEVELS.reduce((form, min, i) => (Number(level) >= min ? i : form), 0);
 export const PET_NAME_MAX = 8;
 export const EGG_PRICE = 400; // V13.73: 800 -> 400
-export const EPIC_EGG_PRICE = 1200; // V13.92 영웅 알: a random 영웅 pet not met yet
+export const EPIC_EGG_PRICE = 800; // V13.92 영웅 알: a random 영웅 pet not met yet (V13.98: 1200 -> 800)
+// V13.98: a 영웅 알 bought by a student without a legendary pet opens as a legendary pet 1% of the time.
+export const EPIC_EGG_LEGENDARY_RATE = 1;
 // Student-chosen pet name, checked the same way on the device and on the server.
 // An empty name is allowed and means "use the pet's default name".
 export function cleanPetName(value) {

@@ -8,7 +8,7 @@ import { emptyState } from './state.mjs';
 import { passwordHash, publicProfile, hashToken } from './auth.mjs';
 import { service, scopedWords, sweep } from './service.mjs';
 import { DAY_MS, rankingWeek, createCompetition } from './competition.mjs';
-import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX, CHARACTERS, LEGENDARY_PET_KEYS, STANDARD_PET_KEYS, EPIC_PET_KEYS, EPIC_EGG_PRICE, petTier } from '../public/modules/core.js';
+import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX, CHARACTERS, LEGENDARY_PET_KEYS, STANDARD_PET_KEYS, EPIC_PET_KEYS, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, EGG_PRICE, petTier } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, visibleTitleKeys, titleUnlocked } from '../public/modules/titles.js';
 import { createBattle, connect, answer, tick, battleView, petSkill, SKILL_RULES, BATTLE, PET_SKILLS, MONSTER_SKILLS, forfeit } from '../public/modules/battle-engine.js';
 import { MONSTERS, MONSTER_ART, MONSTER_POSES, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, monsterParts, monsterOpen } from '../public/modules/monsters.js';
@@ -16,7 +16,7 @@ import { expressionSrc, holdPose, showPose } from '../public/modules/character.j
 import { battleQuestions, spellHint, spellable, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { createPracticeMatch, BOT_LEVELS, BOT_HP } from '../public/modules/battle-bot.js';
 import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
-import { monsterStart, monsterFinish, monsterView, addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome } from './rewards.mjs';
+import { monsterStart, monsterFinish, monsterView, addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome, openEgg, luckyView as luckyViewOf } from './rewards.mjs';
 import { marketPrices } from './market.mjs';
 import { STOCKS, MARKET, MARKET_OPEN, tradeFee, newsText } from '../public/modules/market.js';
 
@@ -563,7 +563,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(LEGENDARY_PET_KEYS.every(key => CHARACTERS[key].legendary && petSkill({ key }).key === 'none'), 'V13.89 전설 펫에는 야차전 펫 특기가 없다');
   const lucky89 = source('../public/modules/lucky.js'), arcade89 = source('../public/modules/arcade.js'), service89 = source('./service.mjs'), css89 = source('../public/v1389.css'), build89 = source('./build-assets.mjs');
   assert(lucky89.includes('legend-egg-glow.webp') && lucky89.includes('legend-egg-burst.webp') && lucky89.includes('legend-badge.webp') && lucky89.includes('function legendaryShow(') && css89.includes('.lk-legend-show{') && build89.includes('"v1389.css"'), 'V13.89 전설 알의 빛남·깨짐·배지 연출과 전설 결과 화면이 빌드에 들어간다');
-  assert(arcade89.includes('LEGENDARY_RATE') && service89.includes('postNotice(state') && service89.includes('(epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter') && service89.includes('학생이 행운 뽑기에서 전설 펫'), 'V13.89 확률과 천장을 안내하고, 전설 획득은 학교에 알리며, 알 상점에서는 일반 펫만 나온다');
+  assert(arcade89.includes('LEGENDARY_RATE') && service89.includes('postNotice(state') && service89.includes('(epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter') && service89.includes('학생이 ${where}에서 전설 펫') && service89.includes("announceLegend(state, p, result.legendary.key, '행운 뽑기')"), 'V13.89 확률과 천장을 안내하고, 전설 획득은 학교에 알리며, 랜덤 알에서는 일반 펫만 나온다');
   const fc90 = source('../public/modules/flashcards.js'), student90 = source('../public/modules/student.js'), app90 = source('../public/app.js'), css90 = source('../public/v1390.css');
   assert(fc90.includes('export function openFlashcards(') && fc90.includes('KNOWN_AT') && fc90.includes("data-fc=\"next-round\"") && fc90.includes("data-fc=\"star-left\"") && fc90.includes("'eng2mean' : 'mean2eng'") && student90.includes('data-flashcards="true"') && student90.includes('export function memorizeDeck(') && app90.includes('if (d.flashcards) return openCards();') && app90.includes('openFlashcards({') && css90.includes('.fc-cover{') && build89.includes('"v1390.css"'), 'V13.90 단어 학습에서 카드로 가리고 외우기: 커버를 끝까지 내리면 아는 카드, 헷갈리는 카드만 다음 라운드, ★ 담기와 확인 테스트');
   assert(css90.includes('.lk-machine{width:220px') && css90.includes('.lk-result-art{width:156px') && student90.includes('pet-care-more-v1390'), 'V13.90 코인 뽑기 기계·캡슐·결과 그림이 커지고, 펫이 여러 마리면 다른 펫도 돌볼 수 있다고 알려 준다');
@@ -680,7 +680,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   const arcade93 = source('../public/modules/arcade.js'), shop93 = source('../public/modules/pet-moments.js');
   assert(ready93.length === 43 /* the 40 of list 08, + 3 for the 칭호 도감 (V13.97) */ && wired91.every(key => ready93.includes(key)) && ['me-petbook', 'pet-epic-locked', 'epic-egg', 'epic-badge'].every(key => ready93.includes(key)) && student90.includes("'pet-epic-locked'") && arcade93.includes("artOr('epic-egg'") && lucky89.includes("artOr('epic-badge'") && shop93.includes("uiArt('epic-egg')"), 'V13.93 08 그림 40장(펫 도감·영웅 펫 4장 포함)이 모두 들어가 선 아이콘 대신 보인다');
   /* ---------- V13.92 영웅 펫 · 패드 화면 ---------- */
-  assert(EPIC_PET_KEYS.join() === 'capybara,penguin,owl,hamster,shark,alpaca,hedgehog,otter' && STANDARD_PET_KEYS.length === 8 && EPIC_PET_KEYS.every(key => CHARACTERS[key].epic && !CHARACTERS[key].legendary && petTier(key) === 'epic') && petTier('dog') === 'basic' && petTier('qilin') === 'legendary' && EPIC_RATE === 3 && EPIC_EGG_PRICE === 1200, 'V13.92 영웅 펫 8마리는 기본과 전설 사이 등급이고, 영웅 알은 1,200코인, 뽑기 확률은 3%다');
+  assert(EPIC_PET_KEYS.join() === 'capybara,penguin,owl,hamster,shark,alpaca,hedgehog,otter' && STANDARD_PET_KEYS.length === 8 && EPIC_PET_KEYS.every(key => CHARACTERS[key].epic && !CHARACTERS[key].legendary && petTier(key) === 'epic') && petTier('dog') === 'basic' && petTier('qilin') === 'legendary' && EPIC_RATE === 3, 'V13.92 영웅 펫 8마리는 기본과 전설 사이 등급이고, 뽑기 확률은 3%다');
   const epicFiles = EPIC_PET_KEYS.flatMap(key => [0, 1, 2, 3].flatMap(f => [`/assets/pets/${key}-${f}.webp`, `/assets/pets/${key}-${f}-s.webp`, ...(f ? ['happy', 'eat', 'sad', 'cheer'] : ['happy', 'eat']).map(e => expressionSrc(key, f, e))]));
   assert(epicFiles.length === 8 * 4 * 2 + 8 * (2 + 12) && epicFiles.every(src => src && existsSync(fileURLToPath(new URL('../public' + src, import.meta.url)))), 'V13.92 영웅 펫 8마리의 알·아기·성장·최종 그림, 작은 그림, 표정 96장, 알 반응 16장이 모두 있다');
   assert(EPIC_PET_KEYS.every(key => PET_SKILLS[key]?.name && PET_SKILLS[key].desc && petSkill({ key }).key === key) && petSkill({ key: 'otter' }).need === 4 && petSkill({ key: 'owl' }).need === 3 && LEGENDARY_PET_KEYS.every(key => petSkill({ key }).key === 'none'), 'V13.92 영웅 펫마다 새 야차전 특기가 있고, 전설 펫에는 여전히 특기가 없다');
@@ -692,4 +692,43 @@ export async function runRewardsChecks(assert, expectStatus) {
   const service92 = source('./service.mjs'), shop92 = source('../public/modules/pet-moments.js'), css92 = source('../public/v1392.css'), studentShell92 = source('../public/modules/student.js'), build92 = source('./build-assets.mjs');
   assert(service92.includes("const epic = body.kind === 'epic', price = epic ? EPIC_EGG_PRICE : EGG_PRICE;") && service92.includes('(epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter') && shop92.includes("await api('/shop/egg', { kind })") && shop92.includes('await epicShow({ key, from: \'shop\' })') && lucky89.includes('export function epicShow(') && lucky89.includes("if (res.epic) return epicShow(") && petbook91.includes('EPIC_PET_KEYS.map') && build92.includes('"v1392.css"'), 'V13.92 알 상점에서 영웅 알을 사면 영웅 연출이 나오고, 펫 도감에 영웅 펫 칸이 있다');
   assert(css92.includes('@media (min-width:768px)') && css92.includes('.bottom-nav .nav-brand{display:flex') && css92.includes('.home-stack-v1360{display:grid!important') && css92.includes('.session-app{max-width:680px!important') && studentShell92.includes('<div class="nav-brand" aria-hidden="true">'), 'V13.92 패드(768px 이상)에서는 메뉴가 왼쪽 세로 줄로 가고 화면을 넓게 쓰며, 휴대폰은 하단 메뉴 그대로다');
+
+  {
+    /* ---------- V13.98 영웅 알 800코인 · 영웅 알에서 전설 1% ---------- */
+    assert(EPIC_EGG_PRICE === 800 && EGG_PRICE === 400 && EPIC_EGG_LEGENDARY_RATE === 1, 'V13.98 영웅 알은 800코인이고, 1% 확률로 전설 펫이 나온다(랜덤 알은 400코인 그대로)');
+    const fresh = () => ({ pets: [{ key: 'dog' }], avatar_key: 'dog', points_spent: 0 });
+    const lucky = fresh(), luckyEgg = openEgg(lucky, { epic: true, missing: EPIC_PET_KEYS, price: EPIC_EGG_PRICE, random: values([.0099, .5]), now });
+    assert(luckyEgg.legendary && LEGENDARY_PET_KEYS.includes(luckyEgg.key) && lucky.pets.some(pet => pet.key === luckyEgg.key && pet.legendary) && lucky.avatar_key === luckyEgg.key && lucky.points_spent === 800 && lucky.lucky.legend_key === luckyEgg.key && lucky.purchases[0].item === 'epic_egg' && lucky.purchases[0].legendary, 'V13.98 영웅 알의 1% 행운이면 전설 펫이 나오고(코인 800 사용), 전설 기록이 남는다');
+    const plain = fresh(), plainEgg = openEgg(plain, { epic: true, missing: EPIC_PET_KEYS, price: EPIC_EGG_PRICE, random: values([.01, .5]), now });
+    assert(!plainEgg.legendary && EPIC_PET_KEYS.includes(plainEgg.key) && plain.pets.some(pet => pet.key === plainEgg.key && pet.epic), 'V13.98 1%를 넘으면 영웅 알은 영웅 펫이다');
+    const owner = { pets: [{ key: 'dog' }, { key: 'haechi', legendary: true }], points_spent: 0 }, ownerEgg = openEgg(owner, { epic: true, missing: EPIC_PET_KEYS, price: EPIC_EGG_PRICE, random: values([0, .5]), now });
+    assert(!ownerEgg.legendary && EPIC_PET_KEYS.includes(ownerEgg.key) && owner.pets.filter(pet => LEGENDARY_PET_KEYS.includes(pet.key)).length === 1, 'V13.98 전설 펫이 이미 있으면 영웅 알에서 전설이 다시 나오지 않는다(전설은 한 마리까지)');
+    const basic = fresh(), basicEgg = openEgg(basic, { epic: false, missing: ['cat'], price: EGG_PRICE, random: values([0, 0]), now });
+    assert(!basicEgg.legendary && basicEgg.key === 'cat' && basic.points_spent === 400, 'V13.98 랜덤 알에서는 전설이 나오지 않는다');
+    const service98 = source('./service.mjs'), shop98 = source('../public/modules/pet-moments.js'), lucky98 = source('../public/modules/lucky.js');
+    assert(service98.includes("openEgg(p, { epic, missing, price })") && service98.includes("announceLegend(state, p, key, '영웅 알')") && shop98.includes('if (res.legendary) { close(true); await legendaryShow(res); return; }') && lucky98.includes('export function legendaryShow(') && lucky98.includes('res.legendary.egg'), 'V13.98 영웅 알에서 전설이 나오면 전설 연출이 나오고 학교 소식이 전해진다');
+    /* ---------- V13.98 가위바위보: 10분 넘게 둔 판은 이어 던지면 정리된다 ---------- */
+    const day98 = dayKey(now), old98 = now - RPS_STALE_MS - 60000;
+    const tie98 = { rps: { day: day98, plays: 1, live: { id: 'x', bet: 20, pot: 20, wins: 0, ties: 1, await: 'pick', at: old98 } }, points_spent: 20 };
+    const tieRes = rpsPlay(tie98, { bet: NaN, pick: 'rock' }, 100, { random: values([0]), now });
+    assert(tieRes.settled && tieRes.paid === 20 && tie98.rps.live === null && tie98.rps.plays === 1 && tie98.rps.paid === 20, 'V13.98 비긴 채 10분 넘게 둔 판을 이어 던지면 건 코인을 돌려받고 판이 정리된다(전에는 오류로 판이 멈춰 있었다)');
+    const won98 = { rps: { day: day98, plays: 1, live: { id: 'y', bet: 10, pot: 20, wins: 1, ties: 0, await: 'choice', at: old98 } }, points_spent: 10 };
+    const wonRes = rpsPlay(won98, { pick: 'rock', double: true }, 100, { random: values([0]), now });
+    assert(wonRes.settled && wonRes.paid === 20 && won98.rps.live === null, 'V13.98 이긴 채 10분 넘게 둔 판에 더블을 누르면 딴 코인을 받고 판이 정리된다');
+    const next98 = { rps: { day: day98, plays: 1, live: { id: 'z', bet: 10, pot: 10, wins: 0, ties: 1, await: 'pick', at: old98 } }, points_spent: 10 };
+    const nextRes = rpsPlay(next98, { bet: 30, pick: 'rock' }, 100, { random: values([0]), now });
+    assert(!nextRes.settled && nextRes.bet === 30 && next98.rps.plays === 2 && next98.rps.paid === 10 && next98.rps.log.length >= 1, 'V13.98 새 판(걸 코인 있음)을 시작하면 오래 둔 판은 정리되고 새 판이 바로 시작된다');
+    const rps98 = source('../public/modules/rps.js');
+    assert(rps98.includes('if (res.settled) {') && rps98.includes("setBalance(res.points_balance);\n      if (A.data.rewards && res.rps)") && rps98.includes('한 판 최대'), 'V13.98 가위바위보 화면은 던질 때마다 코인을 맞추고, 정리된 판을 알려 준다');
+    /* ---------- V13.98 코인 뽑기 ‘오늘 ±’은 하루 전체를 센다 ---------- */
+    const net98 = { pets: [{ key: 'dog' }, { key: 'haechi' }, ...EPIC_PET_KEYS.map(key => ({ key }))], lucky: {}, gacha: { tickets: 2 }, points_spent: 0 };
+    const rolls98 = [.1, .95, .1, .95, .1, .5, .5];
+    const pulls98 = rolls98.map((roll, i) => pullLucky(net98, 10, 1000, { ticket: i >= 5, random: values([roll]), now }));
+    const want98 = pulls98.reduce((n, r) => n + (r.ticket ? r.paid : r.paid - r.bet), 0);
+    assert(pulls98.length === 7 && net98.lucky.log.length === 6 && luckyViewOf(net98, now).today_net === want98 && luckyViewOf(net98, now + DAY_MS).today_net === null, 'V13.98 뽑기를 6번 넘게 해도 ‘오늘 ±’은 그날 뽑기를 모두 센다');
+    /* ---------- V13.98 카드 잘림 · 자동 회전 ---------- */
+    const css98 = source('../public/v1398.css'), student98 = source('../public/modules/student.js'), manifest98 = JSON.parse(source('../public/manifest.webmanifest'));
+    assert(css98.includes('.partner-card-v1358 .partner-inner{grid-template-columns:minmax(0,1fr)}') && student98.includes('<span class="partner-stars" aria-label="모은 펫 ${owned}/${total}"><b aria-hidden="true">★</b>${owned}<small>/${total}</small></span>') && !student98.includes("'☆'.repeat") && source('./build-assets.mjs').includes('"v1398.css"'), 'V13.98 홈 파트너 카드는 펫이 20마리여도 카드 밖으로 잘리지 않는다(별 20개 대신 ★ 모은 수/전체)');
+    assert(manifest98.orientation === 'any' && css98.includes('@media (min-width:768px) and (max-height:560px)'), 'V13.98 설치한 앱이 기기를 돌리는 대로 가로·세로로 바뀌고, 옆으로 눕힌 휴대폰에서도 메뉴 다섯 개가 다 보인다');
+  }
 }

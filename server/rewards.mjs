@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, EPIC_PET_KEYS } from '../public/modules/core.js';
+import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, EPIC_PET_KEYS, EPIC_EGG_LEGENDARY_RATE } from '../public/modules/core.js';
 import {
   ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky,
   BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX, GIFT_LOG_KEEP,
@@ -180,6 +180,7 @@ export function luckyView(p, now = Date.now()) {
     bets: LUCKY_BETS, daily: LUCKY_DAILY, left: Math.max(0, LUCKY_DAILY - plays), odds: LUCKY_ODDS,
     ticket_bet: LUCKY_TICKET_BET, tickets: Number(p.gacha?.tickets || 0),
     recent: (l.log || []).slice(-6).reverse(),
+    today_net: l.net_day === today ? Number(l.net || 0) : null,
     legend: { rate: LEGENDARY_RATE, pity: LEGENDARY_PITY, pulls: legendPulls, remaining: legendary ? 0 : Math.max(0, LEGENDARY_PITY - legendPulls), owned: !!legendary, key: legendary?.key || null },
     epic: { rate: EPIC_RATE, left: EPIC_PET_KEYS.filter(key => !(p.pets || []).some(pet => pet.key === key)).length, total: EPIC_PET_KEYS.length }
   };
@@ -228,8 +229,28 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
     epic = { key };
   }
   l.paid = Number(l.paid || 0) + paid;
+  // V13.98: today's net, kept apart from the log (which keeps only the last few pulls).
+  if (l.net_day !== today) { l.net_day = today; l.net = 0; }
+  l.net = Number(l.net || 0) + (ticket ? paid : paid - bet);
   l.log = [...(l.log || []), { at: now, bet, mult: odd.mult, ticket, ...(legendary ? { legendary: legendary.key } : {}), ...(epic ? { epic: epic.key } : {}) }].slice(-LUCKY_LOG_KEEP);
   return { bet, mult: odd.mult, name: odd.name, paid, ticket, legendary, epic, lucky: luckyView(p, now) };
+}
+
+/* ---------- 알 상점 ---------- */
+// Opens a bought egg (the price is paid by the caller). `missing` are the pets of that egg the
+// student has not met yet. V13.98: a 영웅 알 opens as a legendary pet EPIC_EGG_LEGENDARY_RATE% of
+// the time for a student who has none yet (a student owns at most one legendary pet).
+export function openEgg(p, { epic, missing, price, random = secureRandom, now = Date.now() }) {
+  const hasLegend = (p.pets || []).some(pet => LEGENDARY_PET_KEYS.includes(pet.key));
+  const legendary = !!epic && !hasLegend && random() * 100 < EPIC_EGG_LEGENDARY_RATE;
+  const pool = legendary ? LEGENDARY_PET_KEYS : missing;
+  const key = pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
+  (p.pets ||= []).push({ key, acquired_at: now, ...(legendary ? { legendary: true } : epic ? { epic: true } : {}) });
+  p.points_spent = Number(p.points_spent || 0) + price;
+  (p.purchases ||= []).push({ item: epic ? 'epic_egg' : 'egg', key, price, at: now, ...(legendary ? { legendary: true } : {}) });
+  p.avatar_key = key;
+  if (legendary) { const l = p.lucky ||= {}; l.legend_key = key; l.legend_at = now; }
+  return { key, legendary };
 }
 
 /* ---------- V13.82 가위바위보 ---------- */
@@ -253,7 +274,7 @@ function rpsSettle(r, now, paid) {
   const live = r.live;
   r.paid = Number(r.paid || 0) + paid;
   r.best = Math.max(Number(r.best || 0), live.wins);
-  r.biggest = Math.max(Number(r.biggest || 0), paid);
+  r.biggest = Math.max(Number(r.biggest || 0), paid); // everything paid back in one game (bet included)
   if (live.wins >= RPS_MAX_WINS) r.jackpots = Number(r.jackpots || 0) + 1;
   r.log = [...(r.log || []), { at: now, bet: live.bet, wins: live.wins, paid }].slice(-RPS_LOG_KEEP);
   r.live = null;
@@ -271,7 +292,14 @@ export function rpsPlay(p, { bet, pick, double = false }, balance, { random = se
   const r = p.rps ||= {};
   const today = dayKey(now);
   if (r.day !== today) { r.day = today; r.plays = 0; }
-  rpsSettleStale(r, now);
+  // V13.98: a game left open for 10 minutes is settled first. When the throw only continued that
+  // game (no new bet, or a 더블), the answer is the settlement itself; before, the throw then asked
+  // for a bet, failed, and the failed request undid the settlement, so the game stayed stuck.
+  const stale = r.live;
+  const refund = rpsSettleStale(r, now);
+  if (stale && !r.live && (double || !RPS_BETS.includes(bet))) {
+    return { settled: true, pick, robot: null, result: 'settled', pot: stale.pot, wins: stale.wins, bet: stale.bet, paid: refund, done: true, rps: rpsView(p, now) };
+  }
   if (r.live?.await === 'choice' && !double) fail('받을지 더블 도전할지 먼저 골라주세요.', 409);
   if (!r.live) {
     if (!RPS_BETS.includes(bet)) fail('걸 코인을 골라주세요.');
