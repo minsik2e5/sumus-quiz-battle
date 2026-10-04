@@ -32,14 +32,16 @@ export const monsterOf = index => MONSTERS[((index % MONSTERS.length) + MONSTERS
 //   노말  — a student who knows 9 words in 10 wins 80% (3 in 4: 12%)
 //   하드  — a student who knows almost every word wins about a third (9 in 10: 16%)
 // The first clear pays a lot; clearing again pays a little, MONSTER_DAILY times a day.
+// V13.102 coins: first 50/150/500 -> 30/90/200, again 6/12/30 -> 4/8/12 (경험치 is unchanged).
+// Replaying hard 5 times used to pay as much as a whole day of study.
 // `need`: words to answer right for a fight to pay at all.
 export const MONSTER_LEVELS = {
   easy: { name: '이지', mode: 'speed', accuracy: .45, min: 3200, max: 7200, hp: 320, monsterHp: 200, skill: 'bump', need: 5,
-    first: { coins: 50, xp: 150 }, again: { coins: 6, xp: 40 } },
+    first: { coins: 30, xp: 150 }, again: { coins: 4, xp: 40 } },
   normal: { name: '노말', mode: 'speed', accuracy: .72, min: 2000, max: 5000, hp: 320, monsterHp: 330, skill: 'roar', need: 8,
-    first: { coins: 150, xp: 350 }, again: { coins: 12, xp: 70 } },
+    first: { coins: 90, xp: 350 }, again: { coins: 8, xp: 70 } },
   hard: { name: '하드', mode: 'skill', accuracy: .85, min: 1500, max: 3600, hp: 300, monsterHp: 330, skill: 'rage', need: 12,
-    first: { coins: 500, xp: 1000 }, again: { coins: 30, xp: 120 } }
+    first: { coins: 200, xp: 1000 }, again: { coins: 12, xp: 120 } }
 };
 export const MONSTER_LEVEL_KEYS = ['easy', 'normal', 'hard'];
 export const MONSTER_DAILY = 5;
