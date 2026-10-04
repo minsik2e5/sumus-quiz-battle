@@ -18,8 +18,8 @@ const io = new Server(server, {
 process.on('uncaughtException', (e) => console.error('[uncaught]', e));
 process.on('unhandledRejection', (e) => console.error('[unhandled]', e));
 
-// 환경변수(F_*)에 들어 있으면 그걸, 없으면 public 폴더 파일을 사용
-const fileOr = (env, file) => process.env[env] || fs.readFileSync(path.join(__dirname, 'public', file), 'utf8');
+// public 폴더의 파일만 사용 (예전 배포에서 쓰던 F_* 환경변수가 남아 있어도 무시 — 옛 화면이 섞여 나오지 않게)
+const fileOr = (_env, file) => fs.readFileSync(path.join(__dirname, 'public', file), 'utf8');
 app.get('/host', (_, res) => {
   let html = fileOr('F_HOST', 'host.html');
   if (!html.includes('host-remote.js')) html = html.replace('</body>', '<script src="/host-remote.js"></script>\n</body>');
