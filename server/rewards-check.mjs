@@ -11,12 +11,12 @@ import { DAY_MS, rankingWeek, createCompetition } from './competition.mjs';
 import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX, CHARACTERS, LEGENDARY_PET_KEYS, STANDARD_PET_KEYS, EPIC_PET_KEYS, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, EGG_PRICE, petTier } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, visibleTitleKeys, titleUnlocked } from '../public/modules/titles.js';
 import { createBattle, connect, answer, tick, battleView, petSkill, SKILL_RULES, BATTLE, PET_SKILLS, MONSTER_SKILLS, forfeit } from '../public/modules/battle-engine.js';
-import { MONSTERS, MONSTER_ART, MONSTER_POSES, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, MONSTER_MS_PER_RIGHT, monsterParts, monsterOpen } from '../public/modules/monsters.js';
+import { MONSTERS, MONSTER_ART, MONSTER_POSES, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, MONSTER_MS_PER_RIGHT, monsterParts, monsterOpen, partClears, monsterFirstReward, partKeyCodes } from '../public/modules/monsters.js';
 import { expressionSrc, holdPose, showPose } from '../public/modules/character.js';
 import { battleQuestions, spellHint, spellable, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { createPracticeMatch, BOT_LEVELS, BOT_HP } from '../public/modules/battle-bot.js';
 import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
-import { monsterStart, monsterFinish, monsterView, addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome, openEgg, luckyView as luckyViewOf } from './rewards.mjs';
+import { monsterStart, monsterFinish, monsterView, monsterMigrate, monsterRanges, addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome, openEgg, luckyView as luckyViewOf } from './rewards.mjs';
 import { marketPrices } from './market.mjs';
 import { STOCKS, MARKET, MARKET_OPEN, tradeFee, newsText } from '../public/modules/market.js';
 
@@ -605,7 +605,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     const again = fight('easy', 'win', 9, t0 + 100000);
     const few = fight('easy', 'lose', 2, t0 + 200000);
     const quick = monsterFinish(kid, { id: monsterStart(kid, { part: parts[0].key, level: 'easy', parts, id: 'q', now: t0 }).id, result: 'win', right: 9, now: t0 + 5000 });
-    assert(refused === 409 && missing === 404 && firstWin.paid && firstWin.first && firstWin.coins === MONSTER_LEVELS.easy.first.coins && again.paid && !again.first && again.coins === MONSTER_LEVELS.easy.again.coins && !few.paid && few.reason === 'few' && !quick.paid && quick.reason === 'short' && monsterView(kid, t0).cleared[parts[0].key].easy === t0 + 60000, 'V13.94 몬스터 보상: 잠긴 난이도·없는 파트는 거절, 첫 처치는 큰 보상, 다시 잡으면 작은 보상, 단어를 덜 맞히거나 너무 빨리 끝나면 없음');
+    assert(refused === 409 && missing === 404 && firstWin.paid && firstWin.first && firstWin.coins === MONSTER_LEVELS.easy.first.coins && again.paid && !again.first && again.coins === MONSTER_LEVELS.easy.again.coins && !few.paid && few.reason === 'few' && !quick.paid && quick.reason === 'short' && monsterView(kid, t0, { parts }).cleared[parts[0].key].easy === t0 + 60000, 'V13.94 몬스터 보상: 잠긴 난이도·없는 파트는 거절, 첫 처치는 큰 보상, 다시 잡으면 작은 보상, 단어를 덜 맞히거나 너무 빨리 끝나면 없음');
     for (let i = 0; i < MONSTER_DAILY; i++) fight('easy', 'lose', 9, t0 + 300000 + i * 100000);
     const capped = fight('easy', 'win', 9, t0 + 900000), hardFirst = (fight('normal', 'win', 12, t0 + 1000000), fight('hard', 'win', 14, t0 + 1100000));
     assert(!capped.paid && capped.reason === 'daily' && hardFirst.paid && hardFirst.first && hardFirst.coins === MONSTER_LEVELS.hard.first.coins && kid.bonus.monster.hard_wins === 1 && bonusRecords(kid).reduce((n, r) => n + r.reward_points, 0) === MONSTER_LEVELS.easy.first.coins + MONSTER_LEVELS.easy.again.coins + (MONSTER_DAILY - 1) * MONSTER_TRY.coins + MONSTER_LEVELS.normal.first.coins + MONSTER_LEVELS.hard.first.coins, 'V13.94 다시 잡기 보상은 하루 몇 번까지, 첫 처치(하드 포함)는 그와 상관없이 언제나 받는다');
@@ -629,6 +629,76 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(battle94b.includes("['monster', '몬스터']") && battle94b.includes('function monsterTab()') && battle94b.includes("api('/monster/start'") && battle94b.includes("api('/monster/finish'") && battle94b.includes('ko: true') && css94b.includes('.mh-part{') && source('./service.mjs').includes("path === '/monster/start'"), 'V13.94 야차전의 몬스터 탭에서 파트별 몬스터를 이지·노말·하드로 잡는다');
     assert(battle94b.includes('function strike(') && battle94b.includes("strike(atk, def,") && battle94b.includes('skill: true, attacker: p') && battle94b.includes('function knockout(') && ['.fx-shot{', '.fx-ring{', '.fx-claw{', '.fx-beam{', '.fx-ko{', '@keyframes fx-shake-l'].every(x => css94b.includes(x)), 'V13.94 공격 이펙트: 날아가는 공격·충격파·불꽃·화면 흔들림, 특기는 광선, 몬스터는 할퀴기, 쓰러뜨리면 K.O.!');
     assert(battle94b.includes('ya-chip-study') && battle94b.includes('class="ya-picked') && battle94b.includes('ya-rm-duel') && battle94b.includes('친구가 다른 번호를 외우고 있다면?'), 'V13.94 내 단어 범위: 단어 수·학습 중 표시·고른 범위 요약·각자/같은 범위 그림 설명');
+  }
+  /* ---------- V13.100 몬스터 클리어는 범위마다 (파트 묶음이 바뀌어도 기록·보상 유지) ---------- */
+  {
+    const t0 = Date.parse('2026-10-04T03:00:00Z');
+    const LV = ['easy', 'normal', 'hard'];
+    const sumFirst = MONSTER_LEVELS.easy.first.coins + MONSTER_LEVELS.normal.first.coins + MONSTER_LEVELS.hard.first.coins;
+    // A student's fights straight on the reward functions (`scope`: school|grade).
+    const hunter = (id, scope) => {
+      const kid = { id, pets: [{ key: 'dog' }], bonus: {} };
+      let at = t0;
+      const fight = (parts, key, level, result = 'win') => { const r = monsterStart(kid, { part: key, level, parts, scope, id: `${id}-${at}`, now: at }); const f = monsterFinish(kid, { id: r.id, result, right: 20, scope, parts, now: at + 60000 }); at += 100000; return f; };
+      const clearAll = parts => parts.flatMap(p => LV.map(level => fight(parts, p.key, level)));
+      const coins = () => bonusRecords(kid).reduce((n, r) => n + r.reward_points, 0);
+      const view = parts => monsterView(kid, at, { scope, parts });
+      return { kid, fight, clearAll, coins, view };
+    };
+    const allCleared = (h, parts) => parts.every(p => LV.every(level => h.view(parts).cleared[p.key]?.[level]));
+    // 재현 1: 범위 1의 단어가 29 → 30개가 되면 묶음이 '1+2+3' → '1+2' | '3'으로 바뀐다.
+    const before1 = monsterParts(new Map([['1', 29], ['2', 30], ['3', 40]])), after1 = monsterParts(new Map([['1', 30], ['2', 30], ['3', 40]]));
+    assert(before1.map(p => p.key).join('|') === '1+2+3' && after1.map(p => p.key).join('|') === '1+2|3', 'V13.100 재현: 단어 수 29 → 30이면 파트 묶음이 바뀐다');
+    const a = hunter('qa-mh100-a', 'danwon-high|고1A');
+    a.clearAll(before1);
+    const paidBefore = a.coins();
+    const again1 = a.clearAll(after1);
+    assert(paidBefore === sumFirst && allCleared(a, after1) && again1.every(r => !r.first && (r.paid || r.reason === 'daily')) && a.coins() === paidBefore + again1.reduce((n, r) => n + (r.paid ? r.coins : 0), 0) && a.coins() - paidBefore < 100, 'V13.100 단어 수가 바뀌어 파트가 다시 묶여도 클리어가 그대로 보이고, 첫 처치 보상(700코인)을 다시 받지 않는다');
+    // 재현 2: 범위 4(10단어)가 추가되면 '3' → '3+4'. 그 파트만 다시 열리고, 새 범위 몫만 받는다.
+    const after2 = monsterParts(new Map([['1', 30], ['2', 30], ['3', 40], ['4', 10]]));
+    const b = hunter('qa-mh100-b', 'danwon-high|고1A');
+    b.clearAll(after1);
+    const v2 = b.view(after2), p34 = after2.find(p => p.key === '3+4');
+    let locked = 0; try { b.fight(after2, '3+4', 'normal'); } catch (err) { locked = err.status; }
+    const coinsBefore2 = b.coins();
+    const new2 = LV.map(level => b.fight(after2, '3+4', level));
+    const share = 10 / 50;
+    assert(after2.map(p => p.key).join('|') === '1+2|3+4' && LV.every(k => v2.cleared['1+2']?.[k]) && !v2.cleared['3+4'] && locked === 409
+      && new2.every((r, i) => r.paid && r.first && r.share === share && r.coins === Math.ceil(MONSTER_LEVELS[LV[i]].first.coins * share) && r.xp === Math.ceil(MONSTER_LEVELS[LV[i]].first.xp * share))
+      && b.coins() - coinsBefore2 === 10 + 30 + 100 && allCleared(b, after2) && b.view(after2).ranges['4'].hard, 'V13.100 범위가 추가된 파트만 이지부터 다시 열리고, 첫 처치는 새 범위 단어 비율만큼(10/50 → 10·30·100코인)만 준다');
+    assert(monsterFirstReward(p34, {}, 'hard').coins === MONSTER_LEVELS.hard.first.coins && monsterFirstReward(p34, { 3: { hard: 1 }, 4: { hard: 1 } }, 'hard') === null && partClears(p34, { 3: { easy: 5 }, 4: { easy: 9, normal: 3 } }).easy === 9 && !partClears(p34, { 3: { easy: 5 }, 4: { easy: 9, normal: 3 } }).normal, 'V13.100 처음 깨는 파트는 전액, 다 깬 파트는 첫 처치 없음, 파트 클리어는 모든 범위가 깼을 때');
+    // 학교·학년이 다르면 같은 범위 번호라도 따로 기록한다.
+    assert(Object.keys(monsterRanges(b.kid, 'danwon-high|고2A')).length === 0 && Object.keys(b.kid.bonus.monster.ranges).every(k => k.startsWith('danwon-high|고1A|')), 'V13.100 클리어 키는 학교|학년|범위');
+    // 옛 기록(V13.94–V13.99: 파트 키) 옮기기. 하나도 사라지지 않는다.
+    assert(partKeyCodes('10+24+L1') .join(',') === '10,24,L1' && partKeyCodes('1+2+5', ['1+2', '5']).join(',') === '1+2,5', 'V13.100 옛 파트 키를 범위 번호로 푼다(+가 들어간 범위 번호는 그대로)');
+    const legacy = { '10+24': { easy: 100, normal: 200, hard: 300 }, '29+31': { easy: 400 }, '32+33+L1': { easy: 500, normal: 600 } };
+    const old = { id: 'qa-mh100-old', pets: [{ key: 'dog' }], bonus: { monster: { cleared: structuredClone(legacy), wins: 6, hard_wins: 1 } } };
+    const oldParts = monsterParts(new Map([['24', 47], ['29', 40], ['31', 27], ['32', 27], ['33', 28], ['10', 20], ['L1', 68]]));
+    const readView = monsterView(old, t0, { scope: 's|g', parts: oldParts });
+    assert(old.bonus.monster.cleared && !old.bonus.monster.ranges && readView.cleared['10+24'].hard === 300 && readView.cleared['29+31'].easy === 400 && !readView.cleared['29+31'].normal && readView.cleared['32+33+L1'].normal === 600, 'V13.100 옮기기 전에도(읽을 때) 옛 클리어가 그대로 보인다');
+    assert(monsterMigrate(old, 's|g', oldParts.flatMap(p => p.codes)) && !monsterMigrate(old, 's|g') && JSON.stringify(old.bonus.monster.cleared_v1) === JSON.stringify(legacy) && !old.bonus.monster.cleared
+      && old.bonus.monster.ranges['s|g|10'].hard === 300 && old.bonus.monster.ranges['s|g|24'].easy === 100 && old.bonus.monster.ranges['s|g|31'].easy === 400 && !old.bonus.monster.ranges['s|g|31'].normal && old.bonus.monster.ranges['s|g|L1'].normal === 600
+      && JSON.stringify(monsterView(old, t0, { scope: 's|g', parts: oldParts }).cleared) === JSON.stringify(readView.cleared) && old.bonus.monster.wins === 6, 'V13.100 옛 cleared를 범위마다 옮기고(cleared_v1에 원본 보관), 다시 돌려도 바뀌지 않고, 보이는 클리어·처치 수는 똑같다');
+    // Through the service: a teacher's word changes (more words, a new meaning) never change the record.
+    state.schools.push({ id: 'qa-mh-school', name: '몬스터고', full_name: '몬스터고등학교', division: 'high', active: true, sort_order: 90 });
+    const words = [['1', 29], ['2', 30], ['3', 40]].flatMap(([code, n]) => Array.from({ length: n }, (_, i) => ({ id: `qa-mh-${code}-${i}`, range_code: code, word: `w${code}x${i}`, meaning: `뜻${code}-${i}` })));
+    const book = { id: 'qa-mh-book', school_id: 'qa-mh-school', school: '몬스터고', division: 'high', grade: '고1A', title: '몬스터 단어', words };
+    state.extraBooks.push(book);
+    state.profiles.push(student('qa-mh100-svc', '몬헌', { school_id: 'qa-mh-school', school: '몬스터고', bonus: { monster: { cleared: { '1+2+3': { easy: t0, normal: t0 + 1, hard: t0 + 2 } } } } }));
+    const svcToken = await login('qa-mh100-svc');
+    const monView = async () => (await service(state, 'GET', '/bootstrap', {}, svcToken)).rewards.monster;
+    const shown0 = await monView();
+    book.words.push({ id: 'qa-mh-1-x', range_code: '1', word: 'extra', meaning: '추가' }); // range 1: 29 → 30, parts '1+2' | '3'
+    const shown1 = await monView();
+    book.words[0].meaning = '바뀐 뜻';
+    const shown2 = await monView();
+    const svc = profile('qa-mh100-svc');
+    const start = await service(state, 'POST', '/monster/start', { part: '3', level: 'hard' }, svcToken);
+    svc.bonus.monster.live.at -= 60000;
+    const finish = await service(state, 'POST', '/monster/finish', { id: start.id, result: 'win', right: 20 }, svcToken);
+    assert(shown0.cleared['1+2+3']?.hard && shown1.cleared['1+2']?.hard && shown1.cleared['3']?.hard && JSON.stringify(shown2) === JSON.stringify(shown1) && svc.bonus.monster.ranges['qa-mh-school|고1A|3'].hard === t0 + 2 && svc.bonus.monster.cleared_v1['1+2+3'] && finish.paid && !finish.first && finish.coins === MONSTER_LEVELS.hard.again.coins, 'V13.100 (서비스) 옛 기록이 범위 단어 수가 바뀐 뒤에도 클리어로 보이고, 뜻을 고쳐도 그대로이며, 다시 잡으면 작은 보상만 준다');
+    const battle100 = source('../public/modules/battle.js');
+    assert(battle100.includes('partClears(p, st.ranges)') && battle100.includes('monsterFirstReward(p, st.ranges, level)') && battle100.includes("'새 범위 처치'") && battle100.includes('ranges: res.ranges'), 'V13.100 몬스터 화면도 범위 기록으로 클리어·처치 수·하드 정복·첫 처치 보상을 보여 준다');
   }
   /* ---------- V13.95 몬스터 그림 (시트 10-1 … 10-10) ---------- */
   {

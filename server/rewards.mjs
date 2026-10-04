@@ -6,7 +6,7 @@ import {
   RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome
 } from '../public/modules/rewards.js';
 import { titleCoins } from '../public/modules/titles.js';
-import { MONSTER_LEVELS, MONSTER_DAILY, MONSTER_MIN_MS, MONSTER_MS_PER_RIGHT, MONSTER_TRY, monsterOpen } from '../public/modules/monsters.js';
+import { MONSTER_LEVELS, MONSTER_DAILY, MONSTER_MIN_MS, MONSTER_MS_PER_RIGHT, MONSTER_TRY, MONSTER_LEVEL_KEYS, monsterOpen, partClears, monsterFirstReward, partKeyCodes } from '../public/modules/monsters.js';
 
 // Coin rewards and games (rules and odds: public/modules/rewards.js). Everything lives on the
 // student's profile:
@@ -400,52 +400,105 @@ export function botFinish(p, { id, result, right, pet, now = Date.now() }) {
 }
 
 /* ---------- V13.94 몬스터 잡기 ---------- */
-//   monster { cleared: { [part key]: { easy, normal, hard: first clear time } }, day, count,
-//             wins, hard_wins, live: { id, part, level, at } }
+//   monster { ranges: { ['<school id>|<grade>|<range code>']: { easy, normal, hard: first clear time } },
+//             cleared_v1: { [V13.94 part key]: { easy, normal, hard } } (moved, kept as it was),
+//             day, count, wins, hard_wins, live: { id, part, level, at, scope, codes, sizes } }
 // A fight is announced when it starts (the server checks the part and that the level is open)
 // and pays when it ends: the first clear of a part at a level pays MONSTER_LEVELS[level].first,
 // any later fight (won: `again`, lost after answering `need` words: MONSTER_TRY) pays only
 // MONSTER_DAILY times a day.
-export function monsterView(p, now = Date.now()) {
+// V13.100: clears are kept per range of the student's school and grade (`scope`), not per part:
+// the parts are regrouped when a teacher adds a range or words, which used to hide clears and pay
+// the first clear again. A part is cleared when every range in it is (partClears); a part that
+// got a new range pays only the share of its words not cleared yet (monsterFirstReward).
+export const monsterScope = (schoolId, grade) => `${schoolId || ''}|${grade || ''}`;
+// The clears of one school and grade: { [range code]: { easy, normal, hard } }. Clears of V13.99
+// not moved yet (monsterMigrate runs on the next fight) are read the same way, without changing p.
+export function monsterRanges(p, scope = '', known = []) {
+  const m = p?.bonus?.monster || {}, head = scope + '|', out = {};
+  const put = (code, level, at) => { const c = out[code] ||= {}; if (!c[level] || at < c[level]) c[level] = at; };
+  for (const [key, value] of Object.entries(m.ranges || {})) {
+    if (!key.startsWith(head)) continue;
+    for (const level of MONSTER_LEVEL_KEYS) if (Number(value?.[level])) put(key.slice(head.length), level, Number(value[level]));
+  }
+  for (const [key, levels] of Object.entries(m.cleared && typeof m.cleared === 'object' ? m.cleared : {})) {
+    for (const level of MONSTER_LEVEL_KEYS) {
+      const at = Number(levels?.[level]) || 0;
+      if (at) for (const code of partKeyCodes(key, known)) put(code, level, at);
+    }
+  }
+  return out;
+}
+function markRange(m, scope, code, level, at) {
+  const c = (m.ranges ||= {})[`${scope}|${code}`] ||= {};
+  if (!c[level] || at < c[level]) c[level] = at;
+}
+// V13.100: move the V13.94–V13.99 clears (keyed by the part, the codes joined by '+') onto each of
+// their ranges in `scope` (the student's school and grade when it runs; `known`: the range codes
+// of that grade, so a code holding '+' stays whole). The old map is kept as `cleared_v1`; running
+// it again changes nothing. Returns whether anything moved.
+export function monsterMigrate(p, scope = '', known = []) {
+  const m = p?.bonus?.monster;
+  if (!m?.cleared || typeof m.cleared !== 'object') return false;
+  for (const [code, levels] of Object.entries(monsterRanges(p, scope, known))) {
+    for (const [level, at] of Object.entries(levels)) markRange(m, scope, code, level, at);
+  }
+  m.cleared_v1 = { ...(m.cleared_v1 || {}), ...m.cleared };
+  delete m.cleared;
+  return true;
+}
+// `scope` and `parts` (monsterParts of the student's grade): `ranges` is the clears per range,
+// `cleared` the same seen per part ({ [part key]: { easy, normal, hard } }).
+export function monsterView(p, now = Date.now(), { scope = '', parts = null } = {}) {
   const m = p.bonus?.monster || {};
   const used = m.day === dayKey(now) ? Number(m.count || 0) : 0;
-  return { cleared: m.cleared || {}, left: Math.max(0, MONSTER_DAILY - used), daily: MONSTER_DAILY, wins: Number(m.wins || 0), hard_wins: Number(m.hard_wins || 0) };
+  const ranges = monsterRanges(p, scope, (parts || []).flatMap(x => x.codes));
+  const cleared = Object.fromEntries((parts || []).map(part => [part.key, partClears(part, ranges)]).filter(([, c]) => Object.keys(c).length));
+  return { ranges, cleared, left: Math.max(0, MONSTER_DAILY - used), daily: MONSTER_DAILY, wins: Number(m.wins || 0), hard_wins: Number(m.hard_wins || 0) };
 }
-export function monsterStart(p, { part, level, parts, id, now = Date.now() }) {
+export function monsterStart(p, { part, level, parts, scope = '', id, now = Date.now() }) {
   if (!MONSTER_LEVELS[level]) fail('난이도를 골라주세요.');
   const found = (parts || []).find(x => x.key === part);
   if (!found) fail('이 파트를 찾지 못했어요. 화면을 새로 고쳐 주세요.', 404);
   const m = (p.bonus ||= {}).monster ||= {};
-  if (!monsterOpen(m.cleared?.[part], level)) fail(level === 'hard' ? '노말을 먼저 깨야 하드에 도전할 수 있어요.' : '이지를 먼저 깨야 노말에 도전할 수 있어요.', 409);
-  m.live = { id, part, level, at: now };
-  return { id, part, level, monster: found.monster.key, ...monsterView(p, now) };
+  monsterMigrate(p, scope, (parts || []).flatMap(x => x.codes));
+  if (!monsterOpen(partClears(found, monsterRanges(p, scope)), level)) fail(level === 'hard' ? '노말을 먼저 깨야 하드에 도전할 수 있어요.' : '이지를 먼저 깨야 노말에 도전할 수 있어요.', 409);
+  // The part as it is now: the fight is paid on these ranges even if the grouping changes meanwhile.
+  m.live = { id, part, level, at: now, scope, codes: [...found.codes], sizes: [...(found.sizes || [])] };
+  return { id, part, level, monster: found.monster.key, ...monsterView(p, now, { scope, parts }) };
 }
-export function monsterFinish(p, { id, result, right, pet, now = Date.now() }) {
+export function monsterFinish(p, { id, result, right, pet, scope: nowScope = '', parts = null, now = Date.now() }) {
   const m = (p.bonus ||= {}).monster ||= {};
   const live = m.live;
   if (!live || live.id !== id) fail('몬스터 전투를 찾지 못했어요.', 404);
   delete m.live;
+  // A fight started before V13.100 has no scope or codes: the part key is split.
+  const scope = live.scope ?? nowScope, codes = Array.isArray(live.codes) ? live.codes : partKeyCodes(live.part, (parts || []).flatMap(x => x.codes));
+  monsterMigrate(p, scope, codes);
+  const view = () => monsterView(p, now, { scope: nowScope, parts });
   const L = MONSTER_LEVELS[live.level], won = result === 'win';
   const answered = Math.max(0, Math.min(200, Math.floor(Number(right) || 0)));
   const base = { result: won ? 'win' : 'lose', level: live.level, part: live.part };
-  if (won && now - live.at < MONSTER_MIN_MS) return { paid: false, reason: 'short', ...base, ...monsterView(p, now) };
-  if (answered < L.need) return { paid: false, reason: 'few', need: L.need, ...base, ...monsterView(p, now) };
+  if (won && now - live.at < MONSTER_MIN_MS) return { paid: false, reason: 'short', ...base, ...view() };
+  if (answered < L.need) return { paid: false, reason: 'few', need: L.need, ...base, ...view() };
   // V13.99: a lost fight is checked for time too (before, only a win was): the right answers
   // it claims (at least `need`) take MONSTER_MS_PER_RIGHT each.
-  if (!won && now - live.at < answered * MONSTER_MS_PER_RIGHT) return { paid: false, reason: 'short', ...base, ...monsterView(p, now) };
-  const cleared = (m.cleared ||= {})[live.part] ||= {};
+  if (!won && now - live.at < answered * MONSTER_MS_PER_RIGHT) return { paid: false, reason: 'short', ...base, ...view() };
   if (won) { m.wins = Number(m.wins || 0) + 1; if (live.level === 'hard') m.hard_wins = Number(m.hard_wins || 0) + 1; }
+  const firstPay = won ? monsterFirstReward({ codes, sizes: live.sizes }, monsterRanges(p, scope), live.level) : null;
   let reward, first = false;
-  if (won && !cleared[live.level]) { cleared[live.level] = now; reward = L.first; first = true; }
-  else {
+  if (firstPay) {
+    for (const code of codes) markRange(m, scope, code, live.level, now);
+    reward = firstPay; first = true;
+  } else {
     const today = dayKey(now);
     if (m.day !== today) { m.day = today; m.count = 0; }
-    if (Number(m.count || 0) >= MONSTER_DAILY) return { paid: false, reason: 'daily', ...base, ...monsterView(p, now) };
+    if (Number(m.count || 0) >= MONSTER_DAILY) return { paid: false, reason: 'daily', ...base, ...view() };
     m.count = Number(m.count || 0) + 1;
     reward = won ? L.again : MONSTER_TRY;
   }
   addBonus(p, { xp: reward.xp, coins: reward.coins, pet, now });
-  return { paid: true, first, coins: reward.coins, xp: reward.xp, ...base, ...monsterView(p, now) };
+  return { paid: true, first, ...(first && firstPay.share < 1 ? { share: firstPay.share } : {}), coins: reward.coins, xp: reward.xp, ...base, ...view() };
 }
 
 // A submitted teacher exam: 경험치 for every answered question, coins for answering half of it.

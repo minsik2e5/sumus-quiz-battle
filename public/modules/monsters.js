@@ -1,5 +1,6 @@
 // V13.94 몬스터 잡기: the student's word ranges, in order, are grouped into parts (파트) of about
-// 60 words; every part has a monster to beat at 이지, 노말 and 하드. Shared by the server (which
+// 60 words; every part has a monster to beat at 이지, 노말 and 하드. V13.100: clears are kept per
+// range, not per part (see partClears). Shared by the server (which
 // checks the part, unlocks levels and pays) and the app (which runs the fight on the phone with
 // the yacha engine, like the robot practice match).
 
@@ -67,9 +68,50 @@ export function monsterParts(counts) {
   }
   const last = parts[parts.length - 1];
   if (parts.length > 1 && last.words < 30) { const prev = parts[parts.length - 2]; prev.codes.push(...last.codes); prev.words += last.words; parts.pop(); }
-  return parts.filter(p => p.words >= 8).map((p, index) => ({ ...p, index, key: p.codes.join('+'), monster: monsterOf(index) }));
+  // V13.100 `sizes`: words of each range (same order as `codes`), for the first-clear share.
+  return parts.filter(p => p.words >= 8).map((p, index) => ({ ...p, sizes: p.codes.map(code => counts.get(code) || 0), index, key: p.codes.join('+'), monster: monsterOf(index) }));
 }
-// Which levels of a part are open: 노말 after 이지, 하드 after 노말 (cleared: { easy, normal, hard }).
+// V13.100 클리어는 범위마다 기록한다 (`ranges`: { [range code]: { easy, normal, hard: first clear time } }
+// of the student's school and grade). The grouping into parts changes when a teacher adds a range
+// or words, so a part is cleared at a level when every range in it is; a part that got a new range
+// opens again from 이지, and its first clear pays only the share of words not cleared yet.
+export function partClears(part, ranges = {}) {
+  const out = {};
+  for (const level of MONSTER_LEVEL_KEYS) {
+    const times = (part?.codes || []).map(code => Number(ranges[code]?.[level]) || 0);
+    if (times.length && times.every(Boolean)) out[level] = Math.max(...times);
+  }
+  return out;
+}
+// Words of the part not cleared at `level` yet, out of all its words (0 … 1).
+export function monsterNewShare(part, ranges = {}, level) {
+  const codes = part?.codes || [], sizes = codes.map((code, i) => Math.max(0, Number(part.sizes?.[i]) || 0));
+  const total = sizes.reduce((n, x) => n + x, 0);
+  const fresh = codes.reduce((n, code, i) => n + (ranges[code]?.[level] ? 0 : total ? sizes[i] : 1), 0);
+  return total ? fresh / total : codes.length ? fresh / codes.length : 0;
+}
+// The first-clear reward of a level: the whole MONSTER_LEVELS[level].first for a part never
+// cleared, the share of new words (rounded up) when ranges were added, null when all are cleared.
+export function monsterFirstReward(part, ranges = {}, level) {
+  const L = MONSTER_LEVELS[level], share = monsterNewShare(part, ranges, level);
+  if (!L || share <= 0) return null;
+  return share >= 1 ? { ...L.first, share: 1 } : { coins: Math.ceil(L.first.coins * share), xp: Math.ceil(L.first.xp * share), share };
+}
+// V13.100: a cleared-part key of V13.94–V13.99 (the codes joined by '+') back into its range codes.
+// A teacher's range code may hold '+' itself, so the known codes of the grade are matched first
+// (longest first); what is left is split at every '+'.
+export function partKeyCodes(key, known = []) {
+  const bits = String(key || '').split('+'), set = new Set([...known].map(String)), out = [];
+  for (let i = 0; i < bits.length;) {
+    let j = bits.length;
+    while (j > i + 1 && !set.has(bits.slice(i, j).join('+'))) j--;
+    out.push(bits.slice(i, j).join('+'));
+    i = j;
+  }
+  return out.filter(Boolean);
+}
+// Which levels of a part are open: 노말 after 이지, 하드 after 노말 (cleared: { easy, normal, hard },
+// from partClears).
 export function monsterOpen(cleared = {}, level) {
   return level === 'easy' || (level === 'normal' && !!cleared.easy) || (level === 'hard' && !!cleared.normal);
 }

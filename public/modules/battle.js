@@ -12,7 +12,7 @@ import { createPracticeMatch, practiceQuestions, BOT_LEVELS } from './battle-bot
 import { BATTLE, BATTLE_MODES, PET_SKILLS, PET_SKILL_NEED, petSkill } from './battle-engine.js';
 import { BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, BOT_MIN_RIGHT } from './rewards.js';
 import { tournamentCard, openBracket } from './tournament-ui.js';
-import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterParts, monsterOpen } from './monsters.js';
+import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterParts, monsterOpen, partClears, monsterFirstReward } from './monsters.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
 // the match, and the result. A match runs in a battle room on the server (or, for a practice
@@ -489,14 +489,19 @@ function botAgain() {
 // The student's word ranges, in order, make parts (파트); each part's monster is beaten at
 // 이지 → 노말 → 하드. The fight is the robot practice match with the monster as the opponent:
 // it has its own HP and skill and must be knocked out before time runs out.
-const monsterState = () => B.A.data.rewards?.monster || { cleared: {}, left: MONSTER_DAILY, daily: MONSTER_DAILY, wins: 0, hard_wins: 0 };
+const monsterState = () => B.A.data.rewards?.monster || { ranges: {}, cleared: {}, left: MONSTER_DAILY, daily: MONSTER_DAILY, wins: 0, hard_wins: 0 };
+// V13.100: clears are kept per range (`ranges`); a part is cleared when all its ranges are. An
+// older server sends only `cleared` (per part key).
+const partCleared = (p, st = monsterState()) => st.ranges ? partClears(p, st.ranges) : (st.cleared?.[p.key] || {});
+// The first-clear reward of a level: all of it, or the share of new words when ranges were added.
+const firstReward = (p, level, st = monsterState()) => st.ranges ? monsterFirstReward(p, st.ranges, level) : { ...MONSTER_LEVELS[level].first, share: 1 };
 function myParts() { const { counts } = lobbyRanges(); return monsterParts(counts); }
 // V13.95 이지 · 노말 · 하드 badges: a mint, blue and burning crimson shield with 1–3 stars.
 const levelBadge = (level, cls) => uiArt('monster-' + level, cls);
 function monsterTab() {
-  const parts = myParts(), st = monsterState(), cleared = st.cleared || {};
-  const total = parts.length * 3, done = parts.reduce((n, p) => n + MONSTER_LEVEL_KEYS.filter(k => cleared[p.key]?.[k]).length, 0);
-  const hardDone = parts.filter(p => cleared[p.key]?.hard).length;
+  const parts = myParts(), st = monsterState(), cleared = new Map(parts.map(p => [p.key, partCleared(p, st)]));
+  const total = parts.length * 3, done = parts.reduce((n, p) => n + MONSTER_LEVEL_KEYS.filter(k => cleared.get(p.key)[k]).length, 0);
+  const hardDone = parts.filter(p => cleared.get(p.key).hard).length;
   return `<section class="mh-hero" aria-label="몬스터 잡기">
       <div class="mh-hero-art" aria-hidden="true">${monsterPic(parts[0]?.monster || MONSTERS[0])}</div>
       <span class="mh-kicker">MONSTER HUNT</span>
@@ -505,9 +510,9 @@ function monsterTab() {
       <div class="mh-stats"><div><b>${num(done)}</b><span>/ ${num(total)} 처치</span></div><div class="hard"><b>${num(hardDone)}</b><span>하드 정복</span></div><div><b>${num(st.left)}</b><span>/ ${num(st.daily)} 오늘 다시 보상</span></div></div>
       <ul class="mh-rules"><li>⏱ 시간 안에 <b>쓰러뜨려야</b> 이겨요</li><li>🎁 처음 잡으면 <b>큰 보상</b></li><li>🔥 하드는 철자 쓰기까지, <b>정말 어려워요</b></li></ul>
     </section>
-    ${parts.length ? `<div class="mh-list">${parts.map(p => monsterCard(p, cleared[p.key] || {})).join('')}</div>` : '<p class="yb-muted">학습할 단어 범위가 없어서 몬스터가 아직 없어요.</p>'}`;
+    ${parts.length ? `<div class="mh-list">${parts.map(p => monsterCard(p, cleared.get(p.key), st)).join('')}</div>` : '<p class="yb-muted">학습할 단어 범위가 없어서 몬스터가 아직 없어요.</p>'}`;
 }
-function monsterCard(p, c) {
+function monsterCard(p, c, st) {
   const m = p.monster;
   return `<article class="mh-part${c.hard ? ' conquered' : ''}" style="--mc:${m.color}">
     <div class="mh-mon">${monsterPic(m)}<span class="mh-no">PART ${p.index + 1}</span>${c.hard ? '<span class="mh-crown" aria-label="하드 정복">👑</span>' : ''}</div>
@@ -517,7 +522,8 @@ function monsterCard(p, c) {
       <div class="mh-range">${esc(rangesText(p.codes))} · ${num(p.words)}단어</div>
       <div class="mh-levels">${MONSTER_LEVEL_KEYS.map(k => {
         const L = MONSTER_LEVELS[k], open = monsterOpen(c, k), won = !!c[k];
-        const sub = won ? `처치 완료 · 다시 ${coin()}${L.again.coins}` : open ? `첫 처치 ${coin()}${num(L.first.coins)}` : k === 'hard' ? '노말을 먼저' : '이지를 먼저';
+        const pay = won ? null : firstReward(p, k, st);
+        const sub = won ? `처치 완료 · 다시 ${coin()}${L.again.coins}` : open ? `${pay?.share < 1 ? '새 범위' : '첫 처치'} ${coin()}${num(pay?.coins ?? L.first.coins)}` : k === 'hard' ? '노말을 먼저' : '이지를 먼저';
         return `<button type="button" class="mh-lv ${k}${won ? ' won' : ''}${open ? '' : ' locked'}" data-yb="monster-go" data-part="${esc(p.key)}" data-level="${k}" ${open ? '' : 'disabled'} aria-label="${esc(m.name)} ${L.name}${won ? ' 처치 완료' : open ? '' : ' 잠김'}"><b>${won ? icon('check') : open ? '' : icon('lock')}${L.name}</b>${levelBadge(k, 'mh-lv-art')}<small>${sub}</small></button>`;
       }).join('')}</div>
     </div>
@@ -527,8 +533,8 @@ function monsterCard(p, c) {
 function askMonster(partKey, level) {
   const p = myParts().find(x => x.key === partKey), L = MONSTER_LEVELS[level];
   if (!p || !L) return toast('몬스터를 찾지 못했어요.');
-  const c = monsterState().cleared?.[p.key] || {}, first = !c[level];
-  const reward = first ? L.first : L.again;
+  const c = partCleared(p), first = !c[level];
+  const pay = first ? firstReward(p, level) : null, reward = pay || L.again, partial = pay?.share < 1;
   confirmBox(`<div class="mh-ask ${level}" style="--mc:${p.monster.color}">
       <div class="mh-ask-mon">${monsterPic(p.monster)}</div>
       <span class="mh-ask-lv">${levelBadge(level, 'mh-ask-lv-art')}${L.name}</span>
@@ -538,7 +544,7 @@ function askMonster(partKey, level) {
         <li><b>HP</b>나 ${num(L.hp)} · 몬스터 ${num(L.monsterHp)}</li>
         <li><b>시간</b>${minutesText(matchMs(L.mode))} 안에 쓰러뜨려야 이겨요</li>
         <li><b>단어</b>${esc(rangesText(p.codes))} · ${num(p.words)}단어</li>
-        <li class="reward"><b>${first ? '첫 처치' : '다시 처치'}</b>${coin()}${num(reward.coins)} · 경험치 ${num(reward.xp)}${first ? '' : ` <small>(오늘 ${monsterState().left}번 남음)</small>`}</li>
+        <li class="reward"><b>${partial ? '새 범위 처치' : first ? '첫 처치' : '다시 처치'}</b>${coin()}${num(reward.coins)} · 경험치 ${num(reward.xp)}${first ? partial ? ' <small>(새로 생긴 범위 단어만큼)</small>' : '' : ` <small>(오늘 ${monsterState().left}번 남음)</small>`}</li>
       </ul>
       ${level === 'hard' ? '<p class="mh-warn">하드 몬스터는 거의 틀리지 않고 아주 빨라요. 단어를 완벽하게 외웠을 때 도전하세요!</p>' : ''}
     </div>`, '그만두기', '도전!', yes => { if (yes) startMonster(p.key, level); });
@@ -586,7 +592,7 @@ function drawMonsterResult() {
 function monsterRewardText() {
   const r = B.monsterReward;
   if (!r) return '보상 확인 중…';
-  if (r.paid) return `${r.first ? '<em class="mh-first">첫 처치 보상!</em>' : ''}${coin()}+${num(r.coins)} · 경험치 +${num(r.xp)}`;
+  if (r.paid) return `${r.first ? `<em class="mh-first">${r.share ? '새 범위 처치 보상!' : '첫 처치 보상!'}</em>` : ''}${coin()}+${num(r.coins)} · 경험치 +${num(r.xp)}`;
   const need = MONSTER_LEVELS[B.monsterSetup?.level]?.need || 5;
   return { few: `단어를 ${need}개 이상 맞히면 보상을 받아요`, daily: '오늘 다시 잡기 보상은 다 받았어요 (첫 처치는 언제나 받아요)', short: '너무 빨리 끝난 전투예요', error: '보상을 확인하지 못했어요' }[r.reason] || '보상 없음';
 }
@@ -599,7 +605,7 @@ async function claimMonsterReward(outcome, local) {
   if (id) { try { res = await api('/monster/finish', { id, result: outcome, right: local.myRight() }); } catch { res = { paid: false, reason: 'error' }; } }
   if (B !== cur) return;
   B.monsterReward = res;
-  if (res.cleared && B.A.data.rewards) B.A.data.rewards.monster = { cleared: res.cleared, left: res.left, daily: res.daily, wins: res.wins, hard_wins: res.hard_wins };
+  if (res.cleared && B.A.data.rewards) B.A.data.rewards.monster = { ranges: res.ranges, cleared: res.cleared, left: res.left, daily: res.daily, wins: res.wins, hard_wins: res.hard_wins };
   if (res.paid && res.stats) Object.assign(B.A.data.stats, res.stats);
   const el = document.getElementById('mh-reward');
   if (el) { el.innerHTML = monsterRewardText(); if (res.paid) el.classList.add('paid'); if (res.first) el.classList.add('first'); }
