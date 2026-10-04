@@ -37,14 +37,13 @@ const TIEBREAKS = {
   speed: mine => mine ? '정답 속도가 더 빨라서 이겼어요' : '상대의 정답 속도가 더 빨랐어요'
 };
 const EMOTES = { lol: 'ㅋㅋ', come: '덤벼!', gg: 'GG', nice: '좋았어!' };
-// V13.67 modes: 스피드전 (the original) and 실력전 (spelling words on an in-app keyboard).
+// V13.67 modes: 스피드전 (the original) and 실력전 (spelling words typed on the phone's keyboard, V13.103).
 const MODE_ICONS = {
   speed: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>',
   skill: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 20 1-4L16 5l3 3L8 19zM14 7l3 3"/></svg>'
 };
 const modeName = mode => BATTLE_MODES[mode === 'skill' ? 'skill' : 'speed'].name;
 const modeTag = mode => `<span class="yb-mode-tag ${mode === 'skill' ? 'skill' : 'speed'}">${MODE_ICONS[mode === 'skill' ? 'skill' : 'speed']}${modeName(mode)}</span>`;
-const KEY_ROWS = ['qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
 const REMATCH_MS = 2 * 60000;
 
 let B = null; // current screen state
@@ -959,7 +958,7 @@ function revealLine(q, answer) {
 
 /* ---------- V13.67 실력전 spelling words ---------- */
 // The hint shows the first letter of each word (already filled in); the player types the
-// rest on the in-app keyboard (phone keyboards would autocorrect the spelling).
+// rest on the phone's own keyboard (V13.103; before, an in-app keyboard).
 const blanks = q => [...q.hint].filter(ch => ch === '_').length;
 function spelled(q) {
   let i = 0;
@@ -982,10 +981,73 @@ function drawSpell(q) {
   // Once the word is revealed the right spelling shows (in yellow), even after a wrong try.
   const state = q.right ? 'right' : done ? 'reveal' : q.wrong ? 'wrong' : '';
   const box = document.getElementById('yb-answers');
-  box.innerHTML = `<div class="yb-spell ${state}" id="yb-spell">
-      <div class="yb-spell-slots" id="yb-spell-slots" aria-label="입력한 철자 ${esc(spelled(q))}">${spellSlots(q)}</div>
-      <div class="yb-kb" role="group" aria-label="알파벳 자판">${KEY_ROWS.map((row, r) => `<div class="yb-kb-row">${r === 2 ? `<button type="button" class="yb-key wide" data-yb="key" data-key="back" aria-label="지우기" ${closed ? 'disabled' : ''}>⌫</button>` : ''}${[...row].map(k => `<button type="button" class="yb-key" data-yb="key" data-key="${k}" ${closed ? 'disabled' : ''}>${k}</button>`).join('')}${r === 2 ? `<button type="button" class="yb-key go" data-yb="spell-go" id="yb-spell-go" ${closed || !full ? 'disabled' : ''}>공격!</button>` : ''}</div>`).join('')}</div>
+  // V13.103: the letters are typed on the phone's own keyboard, the one the tests use. The input
+  // lies invisibly over the letter boxes; a tap on them opens the keyboard. It stays in place from
+  // one spelling word to the next, so the keyboard does not close and open between words.
+  let input = box.querySelector('#yb-spell-input');
+  if (!input) {
+    box.innerHTML = `<div class="yb-spell" id="yb-spell">
+      <div class="yb-spell-field">
+        <div class="yb-spell-slots" id="yb-spell-slots"></div>
+        <input id="yb-spell-input" class="yb-spell-input" type="text" inputmode="text" lang="en" enterkeyhint="send" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="영어 철자 입력">
+      </div>
+      <p class="yb-spell-tip" id="yb-spell-tip">글자 칸을 눌러 <b>영어</b>로 써요 · Enter로 공격</p>
+      <button type="button" class="yb-key go yb-spell-go" data-yb="spell-go" id="yb-spell-go">공격!</button>
     </div>`;
+    input = box.querySelector('#yb-spell-input');
+    bindSpellInput(input);
+  }
+  box.querySelector('#yb-spell').className = `yb-spell ${state}`;
+  const slots = document.getElementById('yb-spell-slots');
+  slots.innerHTML = spellSlots(q);
+  slots.setAttribute('aria-label', `입력한 철자 ${spelled(q)}`);
+  const go = document.getElementById('yb-spell-go');
+  go.disabled = closed || !full;
+  input.value = q.typed.join('');
+  // A spelling word right after a word typed on the keyboard keeps typing; otherwise a phone waits for a tap.
+  // (Computers and pads with a keyboard always focus; a phone opens the keyboard only from a tap.)
+  if (!closed && (B.typing || window.matchMedia?.('(pointer: fine)').matches)) input.focus({ preventScroll: true });
+}
+// Letters typed (or pasted) are turned into the answer: only a-z, as many as there are blanks.
+// Korean letters (한/영 key) are dropped with a hint.
+function spellType(raw) {
+  const q = B?.view?.question, input = document.getElementById('yb-spell-input');
+  if (!q || q.kind !== 'spell' || !input) return;
+  if (q.locked || q.answer !== undefined) { input.value = q.typed.join(''); return; }
+  q.typed = [...String(raw).toLowerCase().replace(/[^a-z]/g, '')].slice(0, blanks(q));
+  const tip = document.getElementById('yb-spell-tip');
+  if (tip) tip.classList.toggle('warn', /[ㄱ-ㆎ가-힣]/.test(raw));
+  syncSpell(q);
+}
+function syncSpell(q) {
+  const input = document.getElementById('yb-spell-input');
+  if (input && input.value !== q.typed.join('')) input.value = q.typed.join('');
+  const slots = document.getElementById('yb-spell-slots');
+  if (slots) { slots.innerHTML = spellSlots(q); slots.setAttribute('aria-label', `입력한 철자 ${spelled(q)}`); }
+  const go = document.getElementById('yb-spell-go');
+  if (go) go.disabled = q.typed.length !== blanks(q);
+}
+function bindSpellInput(input) {
+  input.addEventListener('input', event => { if (!event.isComposing) spellType(input.value); });
+  input.addEventListener('compositionend', () => spellType(input.value));
+  input.addEventListener('keydown', event => {
+    if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); spellSubmit(); }
+  });
+  // The arena shrinks while the keyboard is up, so the fight stays on screen above it.
+  input.addEventListener('focus', () => {
+    B.typing = true;
+    document.querySelector('.battle-app')?.classList.add('yb-typing');
+    setTimeout(() => { if (input.isConnected) document.getElementById('yb-spell-go')?.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' }); }, 220);
+  });
+  input.addEventListener('blur', () => {
+    // Moving to a dialog or to the next word's input is not leaving the keyboard; a tap elsewhere is.
+    setTimeout(() => {
+      const now = document.getElementById('yb-spell-input');
+      if (now && document.activeElement === now) return;
+      if (!dialogOpen()) B.typing = false;
+      document.querySelector('.battle-app')?.classList.remove('yb-typing');
+    }, 120);
+  });
 }
 function spellKey(key) {
   const q = B?.view?.question;
@@ -993,16 +1055,14 @@ function spellKey(key) {
   if (key === 'back') q.typed.pop();
   else if (/^[a-z]$/.test(key) && q.typed.length < blanks(q)) q.typed.push(key);
   else return;
-  const slots = document.getElementById('yb-spell-slots');
-  if (slots) { slots.innerHTML = spellSlots(q); slots.setAttribute('aria-label', `입력한 철자 ${spelled(q)}`); }
-  const go = document.getElementById('yb-spell-go');
-  if (go) go.disabled = q.typed.length !== blanks(q);
+  syncSpell(q);
 }
 function spellSubmit() {
   const q = B?.view?.question;
   if (!q || q.kind !== 'spell' || q.locked || q.answer !== undefined || q.typed.length !== blanks(q)) return;
   if (!send({ type: 'answer', choice: spelled(q), ...(Number.isInteger(q.idx) ? { idx: q.idx } : {}) })) return;
   q.locked = true;
+  // The input stays enabled (a disabled one closes the keyboard); typed letters are ignored while locked.
   document.querySelectorAll('#yb-spell button').forEach(b => { b.disabled = true; });
 }
 // A hardware keyboard (tablets, computers) types too.
@@ -1013,6 +1073,8 @@ function hookKeys() {
   window.addEventListener('keydown', event => {
     // V13.101: a dialog on screen (giving up, …) gets the keys: Enter is its button, not the answer.
     if (!document.getElementById('yb-spell') || dialogOpen() || event.ctrlKey || event.metaKey || event.altKey) return;
+    // Typing into the input is handled there (V13.103); this is only for a keyboard with nothing focused.
+    if (event.target?.id === 'yb-spell-input') return;
     const key = event.key === 'Backspace' ? 'back' : event.key === 'Enter' ? 'go' : event.key.toLowerCase();
     if (key === 'go') { event.preventDefault(); return spellSubmit(); }
     if (key === 'back' || /^[a-z]$/.test(key)) { event.preventDefault(); spellKey(key); }
@@ -1026,7 +1088,7 @@ function drawQuestion() {
   document.getElementById('yb-q-word').classList.toggle('meaning', q.kind === 'spell');
   document.querySelector('.battle-app')?.classList.toggle('yb-spelling', q.kind === 'spell');
   if (q.kind === 'spell') drawSpell(q);
-  else document.getElementById('yb-answers').innerHTML = q.options.map((o, i) => `<button type="button" class="yb-answer ${q.answer === i ? 'right' : ''} ${q.answer !== undefined && q.answer !== i ? 'dim' : ''} ${q.picked === i ? 'picked' : ''} ${q.picked === i && q.hit ? 'hit' : ''}" data-yb="answer" data-choice="${i}" aria-label="${i + 1}번 ${esc(o)} 공격" ${q.locked || q.answer !== undefined ? 'disabled' : ''}><span class="yb-tag"><b>${i + 1}</b></span><span class="yb-ko">${esc(o)}</span></button>`).join('');
+  else { B.typing = false; document.querySelector('.battle-app')?.classList.remove('yb-typing'); document.getElementById('yb-answers').innerHTML = q.options.map((o, i) => `<button type="button" class="yb-answer ${q.answer === i ? 'right' : ''} ${q.answer !== undefined && q.answer !== i ? 'dim' : ''} ${q.picked === i ? 'picked' : ''} ${q.picked === i && q.hit ? 'hit' : ''}" data-yb="answer" data-choice="${i}" aria-label="${i + 1}번 ${esc(o)} 공격" ${q.locked || q.answer !== undefined ? 'disabled' : ''}><span class="yb-tag"><b>${i + 1}</b></span><span class="yb-ko">${esc(o)}</span></button>`).join(''); }
   // The word itself is in the question card; the line only says what to do.
   if (q.answer === undefined && !q.locked) say(q.kind === 'spell' ? '뜻을 보고 <em>영어 철자</em>를 써요!' : '알맞은 <em>뜻</em>을 누르면 바로 공격!', q.kind === 'spell' ? '쓰기 정답은 두 배로 세요.' : '');
 }

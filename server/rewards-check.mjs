@@ -812,6 +812,11 @@ export async function runRewardsChecks(assert, expectStatus) {
     const css98 = source('../public/v1398.css'), student98 = source('../public/modules/student.js'), manifest98 = JSON.parse(source('../public/manifest.webmanifest'));
     assert(css98.includes('.partner-card-v1358 .partner-inner{grid-template-columns:minmax(0,1fr)}') && student98.includes('<span class="partner-stars" aria-label="모은 펫 ${owned}/${total}"><b aria-hidden="true">★</b>${owned}<small>/${total}</small></span>') && !student98.includes("'☆'.repeat") && source('./build-assets.mjs').includes('"v1398.css"'), 'V13.98 홈 파트너 카드는 펫이 20마리여도 카드 밖으로 잘리지 않는다(별 20개 대신 ★ 모은 수/전체)');
     assert(manifest98.orientation === 'any' && css98.includes('@media (min-width:768px) and (max-height:560px)'), 'V13.98 설치한 앱이 기기를 돌리는 대로 가로·세로로 바뀌고, 옆으로 눕힌 휴대폰에서도 메뉴 다섯 개가 다 보인다');
+    /* ---------- V13.103 철자 쓰기는 폰 기본 키보드로 ---------- */
+    const battle103 = source('../public/modules/battle.js');
+    assert(battle103.includes('id="yb-spell-input"') && battle103.includes('autocapitalize="off" autocorrect="off" spellcheck="false"') && battle103.includes('enterkeyhint="send"') && battle103.includes('lang="en"') && !battle103.includes('KEY_ROWS') && !battle103.includes('class="yb-kb"') && !battle103.includes('data-yb="key"'), 'V13.103 야차전·몬스터전 철자 쓰기는 앱 자판 대신 시험 볼 때와 같은 폰 기본 키보드(자동 수정·대문자 꺼짐)로 쓴다');
+    assert(battle103.includes("if (event.target?.id === 'yb-spell-input') return;") && battle103.includes("if (event.key === 'Enter' && !event.isComposing)") && battle103.includes("replace(/[^a-z]/g, '')") && battle103.includes('.slice(0, blanks(q))') && battle103.includes('function syncSpell(') && battle103.includes('input.value = q.typed.join') && /입력은 막지 않고|stays enabled/.test(battle103), 'V13.103 입력칸은 영어 a~z만 받고(한글은 안내), Enter로 공격하며, 낸 뒤에는 입력을 무시하되 키보드는 유지한다');
+    assert(css98.includes('.yb-spell-input{position:absolute;inset:0') && css98.includes('font-size:16px') && css98.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/8.2}') && battle103.includes("classList.add('yb-typing')"), 'V13.103 키보드가 올라오면 전투 화면(경기장)이 줄어 단어와 글자 칸이 키보드 위에 보인다(16px 글자로 확대 방지)');
     /* ---------- V13.101 로보 연습전·몬스터 끝내기 영수증 ---------- */
     {
       const t1 = Date.parse('2026-10-04T03:00:00Z');
