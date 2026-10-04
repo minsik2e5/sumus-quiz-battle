@@ -92,7 +92,8 @@ export function createPracticeMatch({ me, questions, level = 'normal', mode = 's
       }
       if (message.type === 'ping' || message.type === 'sync') return;
       const events = tick(state, t);
-      if (message.type === 'answer') events.push(...answer(state, me.id, typeof message.choice === 'string' ? message.choice.slice(0, 60) : Number(message.choice), t));
+      // V13.99: the word number (idx) as in a battle room, so a late tap is not counted twice.
+      if (message.type === 'answer') events.push(...answer(state, me.id, typeof message.choice === 'string' ? message.choice.slice(0, 60) : Number(message.choice), t, Number.isInteger(message.idx) ? message.idx : undefined));
       else if (message.type === 'leave') events.push(...forfeit(state, me.id, t));
       emit(events);
     },

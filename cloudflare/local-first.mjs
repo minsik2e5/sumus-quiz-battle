@@ -184,6 +184,22 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
   let mode = forceFull || !supabase.partsRevision ? 'full' : 'unknown';
   let modeCheckedAt = 0;
   let fullError = null;
+  // V13.99: when an upload last succeeded (and how), kept in ctx.storage so /api/health still
+  // shows it after a restart. Reading it is best-effort: storage without get/put just skips it.
+  let lastOkAt = 0;
+  let lastOkMode = null;
+  const loaded = Promise.resolve()
+    .then(() => storage?.get?.(['supabase_last_ok_at', 'supabase_last_ok_mode']))
+    .then(saved => {
+      const at = Number(saved?.get?.('supabase_last_ok_at')) || 0;
+      if (at > lastOkAt) { lastOkAt = at; lastOkMode = saved.get('supabase_last_ok_mode') || null; }
+    })
+    .catch(() => {});
+  function markOk(how) {
+    lastOkAt = Date.now();
+    lastOkMode = how;
+    Promise.resolve(storage?.put?.({ supabase_last_ok_at: lastOkAt, supabase_last_ok_mode: how })).catch(() => {});
+  }
 
   const pending = () => {
     const status = local.status();
@@ -317,7 +333,8 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
     if (running) return running;
     running = (async () => {
       try {
-        if (await resolveMode() === 'parts') {
+        const how = await resolveMode();
+        if (how === 'parts') {
           await pushParts();
           await maybeFullCopy();
         } else {
@@ -325,6 +342,7 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
           // a newer snapshot waits for the next scheduled upload.
           while (await pushFull() && minIntervalMs <= 0) { /* next snapshot */ }
         }
+        markOk(how);
         failures = 0;
         lastError = null;
         pendingSince = 0;
@@ -351,6 +369,8 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
     pending,
     // Stops background retries (used when a test discards an object instance).
     close() { closed = true; clearTimeout(timer); timer = null; },
+    // Resolves once the saved last-success time has been read.
+    loaded,
     status: () => ({
       pending: pending(),
       mode: mode === 'unknown' ? null : mode,
@@ -361,6 +381,12 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
       last_upload_kb: lastUploadKb,
       last_error: lastError,
       full_copy_at: local.status().fullAt || null,
+      // V13.99: last successful run (nothing left to upload) and the way the backup is stored:
+      // 'parts', 'full', or 'checking' until the first upload finds out.
+      last_ok_at: lastOkAt || null,
+      last_ok_mode: lastOkMode,
+      backup_mode: mode === 'unknown' ? 'checking' : mode,
+      backup_forced_full: !!forceFull,
       full_copy_error: fullError
     })
   };

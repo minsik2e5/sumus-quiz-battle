@@ -6,7 +6,7 @@ import {
   RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome
 } from '../public/modules/rewards.js';
 import { titleCoins } from '../public/modules/titles.js';
-import { MONSTER_LEVELS, MONSTER_DAILY, MONSTER_MIN_MS, MONSTER_TRY, monsterOpen } from '../public/modules/monsters.js';
+import { MONSTER_LEVELS, MONSTER_DAILY, MONSTER_MIN_MS, MONSTER_MS_PER_RIGHT, MONSTER_TRY, monsterOpen } from '../public/modules/monsters.js';
 
 // Coin rewards and games (rules and odds: public/modules/rewards.js). Everything lives on the
 // student's profile:
@@ -430,6 +430,9 @@ export function monsterFinish(p, { id, result, right, pet, now = Date.now() }) {
   const base = { result: won ? 'win' : 'lose', level: live.level, part: live.part };
   if (won && now - live.at < MONSTER_MIN_MS) return { paid: false, reason: 'short', ...base, ...monsterView(p, now) };
   if (answered < L.need) return { paid: false, reason: 'few', need: L.need, ...base, ...monsterView(p, now) };
+  // V13.99: a lost fight is checked for time too (before, only a win was): the right answers
+  // it claims (at least `need`) take MONSTER_MS_PER_RIGHT each.
+  if (!won && now - live.at < answered * MONSTER_MS_PER_RIGHT) return { paid: false, reason: 'short', ...base, ...monsterView(p, now) };
   const cleared = (m.cleared ||= {})[live.part] ||= {};
   if (won) { m.wins = Number(m.wins || 0) + 1; if (live.level === 'hard') m.hard_wins = Number(m.hard_wins || 0) + 1; }
   let reward, first = false;

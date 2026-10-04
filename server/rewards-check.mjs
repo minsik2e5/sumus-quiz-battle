@@ -11,7 +11,7 @@ import { DAY_MS, rankingWeek, createCompetition } from './competition.mjs';
 import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX, CHARACTERS, LEGENDARY_PET_KEYS, STANDARD_PET_KEYS, EPIC_PET_KEYS, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, EGG_PRICE, petTier } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, visibleTitleKeys, titleUnlocked } from '../public/modules/titles.js';
 import { createBattle, connect, answer, tick, battleView, petSkill, SKILL_RULES, BATTLE, PET_SKILLS, MONSTER_SKILLS, forfeit } from '../public/modules/battle-engine.js';
-import { MONSTERS, MONSTER_ART, MONSTER_POSES, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, monsterParts, monsterOpen } from '../public/modules/monsters.js';
+import { MONSTERS, MONSTER_ART, MONSTER_POSES, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, MONSTER_MS_PER_RIGHT, monsterParts, monsterOpen } from '../public/modules/monsters.js';
 import { expressionSrc, holdPose, showPose } from '../public/modules/character.js';
 import { battleQuestions, spellHint, spellable, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { createPracticeMatch, BOT_LEVELS, BOT_HP } from '../public/modules/battle-bot.js';
@@ -77,7 +77,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(bot.bot.pet.key === 'robot' && bot.bot.pet.form === 3, 'V13.67 the practice partner is the robot 로보, grown by level');
   bot.close();
   const roomSource = source('../cloudflare/battle-room.mjs'), battleUi = source('../public/modules/battle.js');
-  assert(roomSource.includes("mode: this.room.mode") && roomSource.includes("typeof msg.choice === 'string'") && battleUi.includes('data-yb="mode"') && battleUi.includes('function spellKey(') && battleUi.includes("send({ type: 'answer', choice: spelled(q) })"), 'V13.67 the battle room keeps the mode and takes typed answers; the lobby picks the mode; words are typed on the in-app keyboard');
+  assert(roomSource.includes("mode: this.room.mode") && roomSource.includes("typeof msg.choice === 'string'") && battleUi.includes('data-yb="mode"') && battleUi.includes('function spellKey(') && battleUi.includes("send({ type: 'answer', choice: spelled(q), "), 'V13.67 the battle room keeps the mode and takes typed answers; the lobby picks the mode; words are typed on the in-app keyboard');
 
   /* ---------- attendance ---------- */
   const before = await balance('qa-rw-b');
@@ -610,6 +610,14 @@ export async function runRewardsChecks(assert, expectStatus) {
     const capped = fight('easy', 'win', 9, t0 + 900000), hardFirst = (fight('normal', 'win', 12, t0 + 1000000), fight('hard', 'win', 14, t0 + 1100000));
     assert(!capped.paid && capped.reason === 'daily' && hardFirst.paid && hardFirst.first && hardFirst.coins === MONSTER_LEVELS.hard.first.coins && kid.bonus.monster.hard_wins === 1 && bonusRecords(kid).reduce((n, r) => n + r.reward_points, 0) === MONSTER_LEVELS.easy.first.coins + MONSTER_LEVELS.easy.again.coins + (MONSTER_DAILY - 1) * MONSTER_TRY.coins + MONSTER_LEVELS.normal.first.coins + MONSTER_LEVELS.hard.first.coins, 'V13.94 다시 잡기 보상은 하루 몇 번까지, 첫 처치(하드 포함)는 그와 상관없이 언제나 받는다');
     assert(['monster1', 'monster10', 'monsterhard', 'monsterlord'].every(key => TITLES[key]?.group === 'monster') && TITLES.monsterlord.tier === 'legendary', 'V13.94 몬스터 칭호 4개');
+    // V13.99: a lost fight is checked for time too, by how long the right answers take.
+    const loser = { id: 'qa-mh-lose', pets: [{ key: 'dog' }], bonus: {} };
+    const lose = (right, ms, at) => monsterFinish(loser, { id: monsterStart(loser, { part: parts[0].key, level: 'easy', parts, id: 'l-' + at, now: at }).id, result: 'lose', right, now: at + ms });
+    const fakeLoss = lose(9, 5000, t0);
+    const fakeNeed = lose(MONSTER_LEVELS.easy.need, MONSTER_LEVELS.easy.need * MONSTER_MS_PER_RIGHT - 1, t0 + 100000);
+    // An honest quick loss: 3 s countdown, then each word at least ~1 s answer + 1.4 s reveal.
+    const fastHonest = lose(MONSTER_LEVELS.easy.need, 3000 + MONSTER_LEVELS.easy.need * 2400, t0 + 200000);
+    assert(!fakeLoss.paid && fakeLoss.reason === 'short' && !fakeNeed.paid && fakeNeed.reason === 'short' && fastHonest.paid && MONSTER_MS_PER_RIGHT === 1500, 'V13.99 몬스터에게 진 판도 최소 시간(정답 1개당 1.5초)을 넘어야 보상, 정상적으로 빨리 진 판은 받는다');
     // The engine: a monster brings its own HP and skill, and wins if time runs out.
     const mq = Array.from({ length: 6 }, (_, i) => ({ word_id: 'm' + i, prompt: 'w' + i, options: ['a', 'b', 'c', 'd'], answer: 0 }));
     const mb = createBattle({ id: 'mb', players: [{ id: 'me', name: '나', pet: { key: 'dog' } }, { id: 'mon', name: '슬라임', pet: { key: 'whale', skill: 'rage' }, monster: { key: 'slime', level: 'hard' }, hp: 330 }], questions: mq, hp: 300, timeoutWinner: 'mon', now: 0 });

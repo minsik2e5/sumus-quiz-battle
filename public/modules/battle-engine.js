@@ -132,7 +132,8 @@ function questionPublic(q) {
 }
 function questionEvent(state) {
   const q = state.questions[state.turn.q];
-  return event(state, 'question', { n: state.idx + 1, ...questionPublic(q), ...ownPublic(state, questionPublic), started_at: state.turn.started_at, deadline: state.deadline });
+  // V13.99 `idx`: the word number the phone sends back with its answer.
+  return event(state, 'question', { n: state.idx + 1, idx: state.idx, ...questionPublic(q), ...ownPublic(state, questionPublic), started_at: state.turn.started_at, deadline: state.deadline });
 }
 const answerOf = q => q.kind === 'spell' ? q.text : q.answer;
 
@@ -142,7 +143,9 @@ function nextQuestion(state, now) {
   state.idx++;
   state.turn = { q: state.idx % state.questions.length, started_at: now, locked: {}, hits: 0, resolved: false };
   state.phase = 'question';
-  state.deadline = now + turnMs(state, state.questions[state.turn.q]);
+  // V13.99: a word opened just before the end gets only the time left, not a full turn
+  // (the screen showed 0 seconds while the last word could still attack).
+  state.deadline = Math.min(now + turnMs(state, state.questions[state.turn.q]), state.ends_at ?? Infinity);
   return [questionEvent(state)];
 }
 
@@ -290,10 +293,15 @@ export function forfeit(state, pid, now) {
   return finish(state, now, 'forfeit', pid);
 }
 
-export function answer(state, pid, choice, now) {
+// V13.99 `idx`: the word the answer was given for. An answer for another word (a tap that
+// arrived after the word closed) is ignored; an older app sends no number and is taken as is.
+export function answer(state, pid, choice, now, idx) {
   const p = state.players[pid], turn = state.turn;
-  // Answers after the deadline do not count, even if the room has not woken up yet.
+  // Answers after the deadline or the end of the match do not count, even if the room has
+  // not woken up yet.
   if (!p || state.phase !== 'question' || !turn || turn.resolved || now >= state.deadline) return [];
+  if (state.ends_at && now >= state.ends_at) return [];
+  if (idx !== undefined && idx !== null && idx !== state.idx) return [];
   if (turn.locked[pid]) return [];
   const q = qOf(state, pid);
   let right;
@@ -318,6 +326,10 @@ export function tick(state, now) {
   const events = [];
   for (let guard = 0; guard < 8 && state.phase !== 'finished'; guard++) {
     const dropped = state.order.find(id => !state.players[id].connected && state.players[id].dropped_at !== null && now - state.players[id].dropped_at >= BATTLE.RECONNECT_MS);
+    // V13.99: the match time is up: it ends now, before any word or reveal timer, unless a
+    // dropped player's grace ran out before the end (that is still a disconnect loss).
+    const over = !!state.ends_at && now >= state.ends_at && ['question', 'reveal'].includes(state.phase);
+    if (over && !(dropped && state.players[dropped].dropped_at + BATTLE.RECONNECT_MS < state.ends_at)) { events.push(...finish(state, now, 'end')); break; }
     if (dropped && state.phase !== 'waiting') { events.push(...finish(state, now, 'disconnect', dropped)); break; }
     if (state.deadline === null || now < state.deadline) break;
     // Timers restart from `now`, not from the missed deadline: if the room wakes up
@@ -339,7 +351,9 @@ export function nextWake(state) {
   if (state.phase === 'finished') return null;
   // Before the match starts a dropped player only matters to the room's connect deadline.
   const graceEnds = state.phase === 'waiting' ? [] : state.order.map(id => state.players[id].dropped_at === null ? null : state.players[id].dropped_at + BATTLE.RECONNECT_MS);
-  const times = [state.deadline, ...graceEnds].filter(t => t !== null);
+  // V13.99: also the end of the match (a reveal pause can run past it).
+  const end = ['question', 'reveal'].includes(state.phase) ? state.ends_at : null;
+  const times = [state.deadline, end, ...graceEnds].filter(t => t !== null && t !== undefined);
   return times.length ? Math.min(...times) : null;
 }
 
@@ -357,7 +371,7 @@ export function battleView(state, pid) {
       return [id, { id, name: p.name, pet: p.pet, streak: p.streak || 0, title: p.title || null, tier: p.tier || null, bot: !!p.bot, ranges: p.ranges || null, monster: p.monster || null, max_hp: p.max_hp || maxHp(state), hp: p.hp, gauge: p.gauge || 0, skill: { key: s.key, name: s.name, desc: s.desc, need: s.need }, effects: effectsOf(p), connected: p.connected }];
     })),
     question: q && ['question', 'reveal'].includes(state.phase) ? {
-      n: state.idx + 1, ...questionPublic(q), started_at: turn.started_at,
+      n: state.idx + 1, idx: state.idx, ...questionPublic(q), started_at: turn.started_at,
       locked: !!turn.locked[pid], answer: state.phase === 'reveal' ? answerOf(q) : undefined
     } : null,
     result: state.result
