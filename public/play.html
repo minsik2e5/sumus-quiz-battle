@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b2a4a">
+<title>SUMUS ISLAND QUIZ</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+:root{--navy:#0b2a4a;--gold:#f2c14e;--gold2:#d9a21b;--muted:#6b7c93;--line:#dde5ee}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;font-family:Pretendard,'Apple SD Gothic Neo',sans-serif;background:#0a9fd4;color:#13233a;overscroll-behavior:none}
+button{font:inherit;border:0;cursor:pointer}
+.hidden{display:none!important}
+
+/* 입장 */
+#join{min-height:100%;display:grid;place-items:center;padding:24px;background:linear-gradient(#2fd0ee,#0a9fd4)}
+.jbox{width:100%;max-width:380px;background:#fff;border-radius:24px;border:5px solid var(--gold);box-shadow:0 8px 0 var(--gold2);padding:24px 20px}
+.jbox h1{margin:0 0 4px;font-size:22px;font-weight:900;color:var(--navy)}
+.jbox p{margin:0 0 18px;color:var(--muted);font-size:14px}
+.jbox label{display:block;font-size:13px;font-weight:800;color:var(--muted);margin:12px 0 6px}
+.jbox input{width:100%;border:2px solid var(--line);border-radius:14px;padding:13px 14px;font-size:20px;font-weight:800;outline:none;font-family:inherit}
+.jbox input:focus{border-color:var(--navy)}
+#pinIn{letter-spacing:6px;text-align:center;font-size:28px}
+.swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.swatches button{aspect-ratio:1;border-radius:50%;border:3px solid transparent}
+.swatches button.on{border-color:var(--navy);box-shadow:0 0 0 3px #fff inset}
+.jgo{margin-top:20px;width:100%;padding:16px;border-radius:16px;background:var(--navy);color:#fff;font-weight:900;font-size:19px}
+.jerr{color:#c2364f;font-weight:700;font-size:14px;min-height:20px;margin-top:10px;text-align:center}
+.conn{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--muted);margin-top:6px}
+.conn i{width:8px;height:8px;border-radius:50%;background:#f5a524}
+.conn.ok i{background:#1fb36b}.conn.bad i{background:#c2364f}
+.reset{display:block;margin:10px auto 0;background:none;color:var(--muted);font-size:12px;text-decoration:underline}
+
+/* 플레이 */
+#play{position:fixed;inset:0;display:flex;flex-direction:column;background:linear-gradient(#2fd0ee,#0a9fd4);padding-top:env(safe-area-inset-top)}
+.bar{display:flex;align-items:center;gap:8px;padding:10px 12px 6px;color:#fff}
+.me{display:flex;align-items:center;gap:8px;background:rgba(11,42,74,.8);border-radius:999px;padding:6px 14px 6px 6px;font-weight:900}
+.me i{width:22px;height:22px;border-radius:50%;border:2px solid #fff}
+.status{margin-left:auto;background:rgba(11,42,74,.8);border-radius:999px;padding:7px 14px;font-weight:900;font-size:14px}
+.status.dead{background:#c2364f}
+.tm{background:#ffe15a;color:#2b1d00;border-radius:999px;padding:7px 12px;font-weight:900;min-width:44px;text-align:center}
+
+.qbox{margin:4px 12px 0;background:#fff;border-radius:18px;border:4px solid var(--gold);padding:10px 12px}
+.qtext{font-weight:900;font-size:17px;line-height:1.3;text-align:center;word-break:keep-all}
+.qimg{display:block;max-height:70px;max-width:60%;margin:6px auto 0;border-radius:8px}
+.olist{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.olist.n3 .o:last-child{grid-column:1/-1}
+.o{display:flex;align-items:center;gap:6px;border:3px solid currentColor;border-radius:12px;padding:5px 8px;font-weight:900;font-size:15px;color:#1a1a1a;min-height:40px;transition:transform .2s,opacity .2s}
+.o .n{flex:none;width:24px;height:24px;border-radius:50%;color:#fff;display:grid;place-items:center;font-size:13px}
+.o img{max-height:30px;max-width:56px;border-radius:5px}
+.o span.t{word-break:keep-all;line-height:1.15;color:#1a1a1a}
+.o.here{transform:scale(1.04);box-shadow:0 0 0 3px #0b2a4a}
+.o.correct{box-shadow:0 0 0 4px #ffe15a;transform:scale(1.05)}
+.o.wrong{opacity:.35}
+.wait{margin:6px 12px 0;background:rgba(11,42,74,.8);color:#fff;border-radius:16px;padding:12px 14px;font-weight:800;font-size:15px;text-align:center;line-height:1.45}
+
+.mapwrap{flex:1;position:relative;min-height:0}
+#map{position:absolute;inset:0;width:100%;height:100%}
+.joyhint{position:absolute;left:0;right:0;bottom:calc(14px + env(safe-area-inset-bottom));text-align:center;color:rgba(255,255,255,.9);font-weight:800;font-size:14px;pointer-events:none;text-shadow:0 1px 3px rgba(0,40,80,.5)}
+#joy{position:absolute;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;background:rgba(255,255,255,.22);border:3px solid rgba(255,255,255,.7);pointer-events:none}
+#knob{position:absolute;left:50%;top:50%;width:54px;height:54px;margin:-27px 0 0 -27px;border-radius:50%;background:#fff;box-shadow:0 4px 10px rgba(0,40,80,.35)}
+
+.result{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;z-index:5}
+.result div{background:#fff;border-radius:22px;padding:18px 28px;font-weight:900;font-size:30px;text-align:center;box-shadow:0 10px 0 rgba(0,0,0,.15);animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+.result small{display:block;font-size:15px;color:var(--muted);margin-top:4px}
+@keyframes pop{from{transform:scale(.4);opacity:0}}
+
+#endv{position:fixed;inset:0;background:rgba(6,26,48,.85);color:#fff;display:grid;place-items:center;text-align:center;z-index:10;padding:24px}
+#endv .big{font-size:56px;font-weight:900;color:var(--gold)}
+#endv .sub{font-size:18px;font-weight:800;margin-top:8px}
+#endv .sc{color:#c9d7ea;margin-top:6px}
+</style>
+</head>
+<body>
+
+<section id="join">
+  <div class="jbox">
+    <h1>SUMUS ISLAND QUIZ</h1>
+    <p>정답 구역으로 내 캐릭터를 옮기세요.</p>
+    <label for="pinIn">방 번호</label>
+    <input id="pinIn" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000">
+    <label for="nameIn">이름</label>
+    <input id="nameIn" maxlength="8" autocomplete="off" placeholder="최대 8글자">
+    <label>캐릭터 색</label>
+    <div class="swatches" id="sw"></div>
+    <button class="jgo" id="joinBtn">입장하기</button>
+    <div class="jerr" id="jerr"></div>
+    <div class="conn" id="conn"><i></i><span>서버 연결 중…</span></div>
+    <button class="reset" id="resetBtn">입장이 안 되면: 저장된 정보 지우고 다시</button>
+  </div>
+</section>
+
+<section id="play" class="hidden">
+  <div class="bar">
+    <div class="me"><i id="meDot"></i><span id="meName"></span></div>
+    <div class="status" id="status">대기 중</div>
+    <div class="tm hidden" id="tm">10</div>
+  </div>
+  <div class="wait" id="wait">선생님이 시작하면 문제가 나와요.<br>지금 화면을 끌어서 움직여 보세요!</div>
+  <div class="qbox hidden" id="qbox">
+    <div class="qtext" id="qtext"></div>
+    <img class="qimg hidden" id="qimg" alt="">
+    <div class="olist" id="olist"></div>
+  </div>
+  <div class="mapwrap" id="mapwrap">
+    <canvas id="map"></canvas>
+    <div id="joy" class="hidden"><div id="knob"></div></div>
+    <div class="joyhint" id="joyhint">화면 아무 곳이나 누르고 끌면 움직여요</div>
+    <div class="result hidden" id="result"></div>
+  </div>
+</section>
+
+<section id="endv" class="hidden"><div><div class="big" id="eBig"></div><div class="sub" id="eSub"></div><div class="sc" id="eSc"></div></div></section>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/common.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+const ZC = IQ.ZONE;
+const COLORS = ['#ff4d6d', '#3d7bff', '#22c55e', '#ffb020', '#a855f7', '#14b8a6', '#f97316', '#ec4899', '#64748b', '#0ea5e9'];
+const LS = 'sumus-island-player';
+const saved = JSON.parse(localStorage.getItem(LS) || '{}');
+const urlPin = new URLSearchParams(location.search).get('pin');
+$('#pinIn').value = urlPin || saved.pin || '';
+$('#nameIn').value = saved.name || '';
+let color = saved.color || COLORS[Math.floor(Math.random() * COLORS.length)];
+$('#sw').innerHTML = COLORS.map(c => `<button style="background:${c}" data-c="${c}" class="${c === color ? 'on' : ''}" aria-label="색 선택"></button>`).join('');
+$('#sw').onclick = (e) => { const c = e.target.dataset.c; if (!c) return; color = c; document.querySelectorAll('#sw button').forEach(b => b.classList.toggle('on', b.dataset.c === c)); };
+if (urlPin && !saved.name) $('#nameIn').focus();
+
+const socket = io(); // 기본 방식(폴링으로 연결 후 웹소켓으로 전환)이 통신사·앱 내 브라우저에서 가장 안정적
+// 오류를 서버 로그로 보내서 원인을 확인할 수 있게
+const report = (msg) => { try { socket.emit('clientlog', { msg: String(msg).slice(0, 300), ua: navigator.userAgent.slice(0, 160), pin: $('#pinIn').value }); } catch (e) {} };
+addEventListener('error', (e) => report('error: ' + e.message + ' @' + (e.lineno || '')));
+addEventListener('unhandledrejection', (e) => report('rejection: ' + (e.reason && e.reason.message || e.reason)));
+function setConn(cls, text) { const c = $('#conn'); c.className = 'conn ' + cls; c.querySelector('span').textContent = text; }
+let firstTry = Date.now();
+socket.on('connect', () => setConn('ok', '서버 연결됨'));
+socket.on('connect_error', (e) => { setConn('bad', Date.now() - firstTry < 70000 ? '서버 깨우는 중… (처음엔 최대 1분)' : '서버에 연결할 수 없습니다. 와이파이/데이터를 확인하세요'); });
+socket.on('disconnect', () => setConn('bad', '연결 끊김 — 다시 연결 중…'));
+$('#resetBtn').onclick = () => { localStorage.removeItem(LS); location.href = '/play' + (urlPin ? '?pin=' + urlPin : ''); };
+let me = null, phase = { phase: 'none' }, players = new Map(), rosterMap = new Map(), joined = false;
+
+function join(auto) {
+  const pin = $('#pinIn').value.trim(), name = $('#nameIn').value.trim();
+  if (!auto) { if (!/^\d{4}$/.test(pin)) return ($('#jerr').textContent = '방 번호 4자리를 입력하세요.'); if (!name) return ($('#jerr').textContent = '이름을 입력하세요.'); }
+  const pid = saved.pin === pin ? saved.pid : null;
+  $('#joinBtn').disabled = true;
+  if (!socket.connected && !auto) $('#jerr').textContent = '서버에 연결하는 중입니다. 잠시만 기다려 주세요…';
+  const timer = setTimeout(() => { $('#joinBtn').disabled = false; if (!joined) { $('#jerr').textContent = '응답이 없습니다. 잠시 후 다시 눌러 주세요.'; report('join timeout connected=' + socket.connected); } }, 15000);
+  socket.emit('player:join', { pin, name, pid, color }, (r) => {
+    clearTimeout(timer);
+    $('#joinBtn').disabled = false; $('#jerr').textContent = '';
+    if (r.redirect) { location.href = r.redirect; return; }
+    if (!r.ok) report('join fail: ' + r.error);
+    if (!r.ok) { $('#jerr').textContent = r.error; joined = false; showJoin(); return; }
+    me = r.me; joined = true;
+    Object.assign(saved, { pin, name: me.name, color: me.color, pid: r.pid }); localStorage.setItem(LS, JSON.stringify(saved));
+    $('#meDot').style.background = me.color; $('#meName').textContent = me.name;
+    $('#join').classList.add('hidden'); $('#play').classList.remove('hidden'); resize();
+  });
+}
+function showJoin() { $('#play').classList.add('hidden'); $('#endv').classList.add('hidden'); $('#join').classList.remove('hidden'); }
+$('#joinBtn').onclick = () => join(false);
+$('#nameIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') join(false); });
+$('#pinIn').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, ''); });
+
+socket.on('connect', () => { if (joined || (saved.pid && saved.pin && saved.pin === ($('#pinIn').value || ''))) join(true); });
+socket.on('kicked', () => { joined = false; localStorage.setItem(LS, JSON.stringify({ name: saved.name, color })); saved.pid = null; showJoin(); $('#jerr').textContent = '선생님이 방에서 내보냈습니다.'; });
+socket.on('roster', (list) => {
+  rosterMap = new Map(list.map(p => [p.id, p]));
+  if (me && !rosterMap.has(me.id) && joined) { joined = false; showJoin(); return; }
+  if (me) me = rosterMap.get(me.id) || me; updateStatus();
+});
+socket.on('s', (arr) => IQ.applyState(players, arr, performance.now()));
+socket.on('phase', (p) => { const prev = phase; phase = p; onPhase(prev); });
+
+function myAlive() { return me && rosterMap.get(me.id) ? rosterMap.get(me.id).alive : true; }
+function updateStatus() {
+  const st = $('#status');
+  const alive = myAlive();
+  st.classList.toggle('dead', !alive && phase.mode === 'survival');
+  if (!alive && phase.mode === 'survival') st.textContent = '탈락 · 관전 중';
+  else if (phase.phase === 'lobby') st.textContent = '대기 중';
+  else st.textContent = phase.mode === 'score' ? `${(rosterMap.get(me?.id) || {}).score || 0}점` : `생존 ${phase.alive ?? ''}명`;
+}
+
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function onPhase(prev) {
+  const p = phase.phase;
+  $('#endv').classList.toggle('hidden', p !== 'end');
+  $('#wait').classList.toggle('hidden', p !== 'lobby');
+  $('#qbox').classList.toggle('hidden', !(p === 'question' || p === 'reveal'));
+  $('#tm').classList.toggle('hidden', p !== 'question');
+  $('#result').classList.add('hidden');
+  if (p === 'question' || p === 'reveal') {
+    const q = phase.q;
+    $('#qtext').textContent = q.text || '문제를 잘 들어 보세요!';
+    $('#qimg').classList.toggle('hidden', !q.image); if (q.image) $('#qimg').src = q.image;
+    $('#olist').className = 'olist n' + q.options.length;
+    $('#olist').innerHTML = q.options.map((o, i) => `<div class="o" style="color:${ZC[i].fill}"><span class="n" style="background:${ZC[i].fill}">${i + 1}</span>${o.image ? `<img src="${o.image}" alt="">` : ''}<span class="t">${esc(o.text)}</span></div>`).join('');
+    if (p === 'question') { phase.endsAtLocal = performance.now() + phase.remain; if (prev.phase !== 'question') buzz(40); }
+  }
+  if (p === 'reveal' && me) {
+    const r = phase.reveal;
+    document.querySelectorAll('#olist .o').forEach((el, i) => el.classList.add(i === r.correct ? 'correct' : 'wrong'));
+    const wasAlive = !r.eliminated.includes(me.id) && (myAlive() || r.eliminated.includes(me.id));
+    const inPlay = r.wrong.includes(me.id) || wasAlive;
+    if (inPlay && Date.now() - r.at < 4000) {
+      const wrong = r.wrong.includes(me.id);
+      let html;
+      if (!wrong) html = `<div style="color:#1fb36b">정답!<small>${phase.mode === 'score' ? '+100점' : '살아남았어요'}</small></div>`;
+      else if (r.eliminated.includes(me.id)) html = `<div style="color:#c2364f">탈락…<small>끝까지 구경해요</small></div>`;
+      else html = `<div style="color:#f5a524">오답<small>${r.saved ? '전원 오답이라 살았어요' : '다음 문제 힘내요'}</small></div>`;
+      setTimeout(() => { $('#result').innerHTML = html; $('#result').classList.remove('hidden'); buzz(wrong ? [80, 60, 80] : 60); }, 500);
+    }
+  }
+  if (p === 'end' && me) {
+    const r = phase.result; const rank = r.ranking.findIndex(x => x.id === me.id) + 1; const mine = r.ranking[rank - 1] || {};
+    if (r.mode === 'survival') {
+      const win = r.survivors.includes(me.id);
+      $('#eBig').textContent = win ? (r.survivors.length === 1 ? '우승!' : '생존!') : '수고했어요';
+      $('#eSub').textContent = win ? (r.survivors.length === 1 ? '최후의 1인입니다' : `생존자 ${r.survivors.length}명 중 한 명`) : '다음엔 끝까지 살아남아요';
+    } else { $('#eBig').textContent = `${rank}위`; $('#eSub').textContent = `${r.ranking.length}명 중`; }
+    $('#eSc').textContent = `${mine.score || 0}점`;
+  }
+  updateStatus();
+}
+function buzz(p) { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} }
+
+/* ── 조이스틱 ── */
+const wrap = $('#mapwrap'), joy = $('#joy'), knob = $('#knob');
+let touchId = null, ox = 0, oy = 0, inX = 0, inY = 0, lastSent = 0, sentX = 0, sentY = 0;
+const JR = 60;
+function setIn(x, y) { inX = x; inY = y; }
+wrap.addEventListener('pointerdown', (e) => {
+  if (touchId !== null) return; touchId = e.pointerId; wrap.setPointerCapture(e.pointerId);
+  const r = wrap.getBoundingClientRect(); ox = e.clientX - r.left; oy = e.clientY - r.top;
+  joy.style.left = ox + 'px'; joy.style.top = oy + 'px'; joy.classList.remove('hidden'); knob.style.transform = '';
+  $('#joyhint').classList.add('hidden'); e.preventDefault();
+});
+wrap.addEventListener('pointermove', (e) => {
+  if (e.pointerId !== touchId) return;
+  const r = wrap.getBoundingClientRect(); let dx = e.clientX - r.left - ox, dy = e.clientY - r.top - oy;
+  const d = Math.hypot(dx, dy); if (d > JR) { dx *= JR / d; dy *= JR / d; }
+  knob.style.transform = `translate(${dx}px,${dy}px)`;
+  const m = Math.min(1, d / JR); const dead = 0.12;
+  if (m < dead) setIn(0, 0); else { const k = (m - dead) / (1 - dead); setIn(dx / d * k, dy / d * k); }
+  e.preventDefault();
+});
+function endTouch(e) { if (e.pointerId !== touchId) return; touchId = null; joy.classList.add('hidden'); setIn(0, 0); sendInput(true); }
+wrap.addEventListener('pointerup', endTouch); wrap.addEventListener('pointercancel', endTouch);
+document.addEventListener('touchmove', (e) => { if (!$('#play').classList.contains('hidden')) e.preventDefault(); }, { passive: false });
+// PC 테스트용 키보드
+const keys = new Set();
+addEventListener('keydown', (e) => { if (e.target.tagName === 'INPUT') return; keys.add(e.key.toLowerCase()); kb(); });
+addEventListener('keyup', (e) => { keys.delete(e.key.toLowerCase()); kb(); });
+function kb() {
+  if (touchId !== null) return;
+  const x = (keys.has('arrowright') || keys.has('d') ? 1 : 0) - (keys.has('arrowleft') || keys.has('a') ? 1 : 0);
+  const y = (keys.has('arrowdown') || keys.has('s') ? 1 : 0) - (keys.has('arrowup') || keys.has('w') ? 1 : 0);
+  const m = Math.hypot(x, y) || 1; setIn(x / m, y / m);
+}
+function sendInput(force) {
+  if (!joined) return;
+  const now = performance.now();
+  const changed = Math.abs(inX - sentX) > 0.03 || Math.abs(inY - sentY) > 0.03;
+  if (force || (changed && now - lastSent > 45) || ((inX || inY) && now - lastSent > 400)) {
+    socket.volatile.emit('i', [+inX.toFixed(2), +inY.toFixed(2)]); sentX = inX; sentY = inY; lastSent = now;
+  }
+}
+
+/* ── 미니맵 ── */
+const cv = $('#map'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize() { const r = cv.getBoundingClientRect(); DPR = Math.min(2, devicePixelRatio || 1); W = r.width; H = r.height; cv.width = W * DPR; cv.height = H * DPR; }
+addEventListener('resize', resize);
+let lastT = performance.now();
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now; const t = now / 1000;
+  sendInput(false);
+  if ($('#play').classList.contains('hidden') || !W) return;
+  IQ.stepInterp(players, dt);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H);
+  const rx = Math.min(W * 0.46, (H * 0.86) / 2.2 / 0.52);
+  const G = IQ.geom(W / 2, H * 0.44, rx);
+  IQ.drawIsland(ctx, G, true);
+  const zones = (phase.phase === 'question' || phase.phase === 'reveal') ? phase.zones : null;
+  if (zones) zones.forEach((z, i) => IQ.drawZone(ctx, G, z, i, phase.phase === 'reveal' ? (i === phase.reveal.correct ? 'correct' : 'wrong') : 'question', t));
+  const s = G.rx * 0.07;
+  const meE = me && players.get(me.id);
+  const list = [...players.entries()].filter(([id, e]) => e.alive && id !== (me && me.id)).sort((a, b) => a[1].y - b[1].y);
+  for (const [id, e] of list) {
+    const info = rosterMap.get(id); if (!info) continue;
+    const [x, y] = IQ.proj(G, e.x, e.y);
+    ctx.fillStyle = 'rgba(0,40,70,.2)'; ctx.beginPath(); ctx.ellipse(x, y, s * 0.4, s * 0.14, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = info.color; ctx.beginPath(); ctx.arc(x, y - s * 0.4, s * 0.32, 0, 7); ctx.fill();
+  }
+  if (meE && (meE.alive || phase.mode === 'score')) {
+    const [x, y] = IQ.proj(G, meE.x, meE.y);
+    IQ.drawChar(ctx, x, y, s * 1.5, me.color, t, meE.moving, meE.face, '나', { me: true, ring: '#ffe15a' });
+  }
+  // 내가 서 있는 구역 표시
+  const zi = zones && meE && meE.alive ? IQ.zoneOf(zones, meE.tx, meE.ty) : -1;
+  document.querySelectorAll('#olist .o').forEach((el, i) => el.classList.toggle('here', phase.phase === 'question' && i === zi));
+  if (phase.phase === 'question') {
+    const remain = Math.max(0, phase.endsAtLocal - now) / 1000;
+    $('#tm').textContent = Math.ceil(remain);
+  }
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

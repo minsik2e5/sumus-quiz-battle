@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b2a4a">
+<title>무궁화 꽃이 피었습니다 — SUMUS ISLAND</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+:root{--navy:#0b2a4a;--gold:#f2c14e;--gold2:#d9a21b;--muted:#6b7c93;--line:#dde5ee;--red:#e2364f;--green:#1fb36b;--yellow:#f5a524}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html,body{margin:0;height:100%;font-family:Pretendard,'Apple SD Gothic Neo',sans-serif;background:#0f5e93;color:#13233a;overscroll-behavior:none;overflow:hidden}
+input{-webkit-user-select:text;user-select:text}
+button{font:inherit;border:0;cursor:pointer}
+.hidden{display:none!important}
+#join{min-height:100%;display:grid;place-items:center;padding:24px;background:linear-gradient(#5fb8f0,#0f5e93)}
+.jbox{width:100%;max-width:380px;background:#fff;border-radius:24px;border:5px solid var(--gold);box-shadow:0 8px 0 var(--gold2);padding:22px 20px}
+.jbox h1{margin:0;font-size:13px;font-weight:800;color:var(--muted)}
+.jbox h2{margin:2px 0 14px;font-size:22px;font-weight:900;color:var(--navy)}
+.jbox label{display:block;font-size:13px;font-weight:800;color:var(--muted);margin:12px 0 6px}
+.jbox input{width:100%;border:2px solid var(--line);border-radius:14px;padding:13px 14px;font-size:20px;font-weight:800;outline:none;font-family:inherit}
+#pinIn{letter-spacing:6px;text-align:center;font-size:28px}
+.sw{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.sw button{aspect-ratio:1;border-radius:50%;border:3px solid transparent}
+.sw button.on{border-color:var(--navy);box-shadow:0 0 0 3px #fff inset}
+.jgo{margin-top:18px;width:100%;padding:16px;border-radius:16px;background:var(--navy);color:#fff;font-weight:900;font-size:19px}
+.jerr{color:var(--red);font-weight:700;font-size:14px;min-height:20px;margin-top:10px;text-align:center}
+.conn{display:flex;align-items:center;justify-content:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--muted)}
+.conn i{width:8px;height:8px;border-radius:50%;background:var(--yellow)}.conn.ok i{background:var(--green)}.conn.bad i{background:var(--red)}
+
+#game{position:fixed;inset:0;display:flex;flex-direction:column;padding:calc(10px + env(safe-area-inset-top)) 14px calc(14px + env(safe-area-inset-bottom));background:#123b66;transition:background .15s;color:#fff}
+#game.go{background:#14905a}#game.stop{background:#c42a43}#game.warn{background:#d98a0c}#game.wait{background:#123b66}#game.done{background:#0b2a4a}
+.top{display:flex;align-items:center;gap:8px}
+.me{display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.25);border-radius:999px;padding:6px 14px 6px 6px;font-weight:900}
+.me i{width:22px;height:22px;border-radius:50%;border:2px solid #fff}
+.pill{margin-left:auto;background:rgba(0,0,0,.25);border-radius:999px;padding:7px 12px;font-weight:900;font-size:14px}
+.syl{display:flex;justify-content:center;gap:4px;margin:14px 0 4px}
+.syl span{width:8.4vw;max-width:34px;aspect-ratio:1;border-radius:8px;background:rgba(255,255,255,.2);display:grid;place-items:center;font-weight:900;font-size:min(4.6vw,19px);color:rgba(255,255,255,.5)}
+.syl span.on{background:#fff;color:var(--navy)}
+#say{text-align:center;font-weight:900;font-size:min(15vw,72px);line-height:1.1;margin-top:2vh;text-shadow:0 4px 0 rgba(0,0,0,.18)}
+#sub{text-align:center;font-weight:800;font-size:16px;opacity:.9;min-height:22px}
+.prog{position:relative;height:16px;border-radius:999px;background:rgba(255,255,255,.22);margin:2.4vh 6px 0}
+.prog b{position:absolute;left:0;top:0;bottom:0;border-radius:999px;background:#fff;width:0;transition:width .12s linear}
+.prog .flag{position:absolute;right:-6px;top:-10px;font-size:22px}
+.prog .dot{position:absolute;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);transition:left .12s linear}
+.space{flex:1}
+#runBtn{align-self:center;width:min(62vw,280px);aspect-ratio:1;border-radius:50%;background:#fff;color:var(--navy);font-weight:900;font-size:min(7vw,30px);line-height:1.25;box-shadow:0 12px 0 rgba(0,0,0,.25);touch-action:none;transition:transform .06s}
+#runBtn.down{transform:translateY(8px) scale(.97);box-shadow:0 4px 0 rgba(0,0,0,.25);background:#ffe15a}
+#runBtn:disabled{opacity:.45}
+#runBtn small{display:block;font-size:.5em;font-weight:800;opacity:.6}
+#over{position:fixed;inset:0;display:grid;place-items:center;text-align:center;z-index:10;padding:24px;color:#fff}
+#over .b{font-size:min(16vw,76px);font-weight:900;text-shadow:0 5px 0 rgba(0,0,0,.2)}
+#over .s{font-size:18px;font-weight:800;margin-top:8px;opacity:.95}
+#toast{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);background:#fff;color:var(--yellow);border-radius:20px;padding:14px 22px;font-weight:900;font-size:26px;z-index:11;box-shadow:0 10px 0 rgba(0,0,0,.2)}
+</style>
+</head>
+<body>
+<section id="join">
+  <div class="jbox">
+    <h1>SUMUS ISLAND · PART 2</h1>
+    <h2>무궁화 꽃이 피었습니다</h2>
+    <label for="pinIn">방 번호</label>
+    <input id="pinIn" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000">
+    <label for="nameIn">이름</label>
+    <input id="nameIn" maxlength="8" autocomplete="off" placeholder="최대 8글자">
+    <label>캐릭터 색</label>
+    <div class="sw" id="sw"></div>
+    <button class="jgo" id="joinBtn">입장하기</button>
+    <div class="jerr" id="jerr"></div>
+    <div class="conn" id="conn"><i></i><span>서버 연결 중…</span></div>
+  </div>
+</section>
+
+<section id="game" class="hidden wait">
+  <div class="top"><div class="me"><i id="meDot"></i><span id="meName"></span></div><div class="pill" id="pill">대기 중</div></div>
+  <div class="syl" id="syl"></div>
+  <div id="say">기다려요</div>
+  <div id="sub">선생님이 시작하면 술래가 외치기 시작해요</div>
+  <div class="prog"><b id="bar"></b><span class="dot" id="dot"></span><span class="flag">🏁</span></div>
+  <div class="space"></div>
+  <button id="runBtn" disabled>꾹 누르면<br>달려요<small>떼면 멈춰요</small></button>
+</section>
+<div id="over" class="hidden"></div>
+<div id="toast" class="hidden"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+const SYL = ['무', '궁', '화', '꽃', '이', '피', '었', '습', '니', '다'];
+const COLORS = ['#ff4d6d', '#3d7bff', '#22c55e', '#ffb020', '#a855f7', '#14b8a6', '#f97316', '#ec4899', '#64748b', '#0ea5e9'];
+const LS = 'sumus-mg-player';
+const saved = JSON.parse(localStorage.getItem(LS) || '{}');
+const urlPin = new URLSearchParams(location.search).get('pin');
+$('#pinIn').value = urlPin || '';
+$('#nameIn').value = saved.name || JSON.parse(localStorage.getItem('sumus-island-player') || '{}').name || '';
+let color = saved.color || COLORS[Math.floor(Math.random() * COLORS.length)];
+$('#sw').innerHTML = COLORS.map(c => `<button style="background:${c}" data-c="${c}" class="${c === color ? 'on' : ''}"></button>`).join('');
+$('#sw').onclick = (e) => { const c = e.target.dataset.c; if (!c) return; color = c; document.querySelectorAll('#sw button').forEach(b => b.classList.toggle('on', b.dataset.c === c)); };
+$('#syl').innerHTML = SYL.map(s => `<span>${s}</span>`).join('');
+
+const socket = io();
+const report = (msg) => { try { socket.emit('clientlog', { msg: 'mg ' + String(msg).slice(0, 280), ua: navigator.userAgent.slice(0, 160), pin: $('#pinIn').value }); } catch (e) {} };
+addEventListener('error', (e) => report('error: ' + e.message + ' @' + (e.lineno || '')));
+const setConn = (c, t) => { $('#conn').className = 'conn ' + c; $('#conn span').textContent = t; };
+const t0 = Date.now();
+socket.on('connect', () => setConn('ok', '서버 연결됨'));
+socket.on('connect_error', () => setConn('bad', Date.now() - t0 < 70000 ? '서버 깨우는 중… (처음엔 최대 1분)' : '서버에 연결할 수 없습니다'));
+socket.on('disconnect', () => setConn('bad', '연결 끊김 — 다시 연결 중…'));
+
+let me = null, joined = false, phase = { phase: 'none' }, W8 = { main: 'back', syl: 0, crab: 'off' }, roster = new Map(), myZ = 0;
+function join(auto) {
+  const pin = $('#pinIn').value.trim(), name = $('#nameIn').value.trim();
+  if (!auto) { if (!/^\d{4}$/.test(pin)) return ($('#jerr').textContent = '방 번호 4자리를 입력하세요.'); if (!name) return ($('#jerr').textContent = '이름을 입력하세요.'); }
+  const pid = saved.pin === pin ? saved.pid : null;
+  $('#joinBtn').disabled = true;
+  const timer = setTimeout(() => { $('#joinBtn').disabled = false; if (!joined) $('#jerr').textContent = '응답이 없습니다. 잠시 후 다시 눌러 주세요.'; }, 15000);
+  socket.emit('mg:join', { pin, name, pid, color }, (r) => {
+    clearTimeout(timer); $('#joinBtn').disabled = false;
+    if (r.redirect) { location.href = r.redirect; return; }
+    if (!r.ok) { $('#jerr').textContent = r.error; joined = false; report('join fail ' + r.error); return; }
+    me = r.me; joined = true; Object.assign(saved, { pin, name: me.name, color: me.color, pid: r.pid }); localStorage.setItem(LS, JSON.stringify(saved));
+    $('#meDot').style.background = me.color; $('#meName').textContent = me.name;
+    $('#join').classList.add('hidden'); $('#game').classList.remove('hidden'); render();
+  });
+}
+$('#joinBtn').onclick = () => join(false);
+$('#nameIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') join(false); });
+$('#pinIn').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, ''); });
+socket.on('connect', () => { if (joined) join(true); });
+socket.on('mg:kicked', () => { joined = false; $('#game').classList.add('hidden'); $('#join').classList.remove('hidden'); $('#jerr').textContent = '선생님이 방에서 내보냈습니다.'; });
+socket.on('mg:phase', (p) => { phase = p; if (p.phase !== 'play') setRun(false); render(); });
+socket.on('mg:w', (w) => { const prev = W8; W8 = w; if ((w.main === 'look' && prev.main !== 'look') || (w.crab === 'warn' && prev.crab !== 'warn')) buzz(w.main === 'look' ? 220 : [60, 60, 60]); render(); });
+socket.on('mg:roster', (l) => { roster = new Map(l.map(p => [p.id, p])); render(); });
+socket.on('mg:s', (arr) => { if (!me) return; for (let i = 0; i < arr.length; i += 4) if (arr[i] === me.id) { myZ = arr[i + 1] / 1000; $('#bar').style.width = (myZ * 100) + '%'; $('#dot').style.left = (myZ * 100) + '%'; } });
+socket.on('mg:caught', ({ id, back }) => { if (!me || id !== me.id) return; buzz([200, 80, 200]); setRun(false); if (back) toast('잡혔다! 출발선으로'); });
+socket.on('mg:fin', ({ id, order }) => { if (me && id === me.id) buzz([60, 40, 60, 40, 120]); });
+
+function render() {
+  if (!me) return;
+  const info = roster.get(me.id) || me, p = phase.phase, g = $('#game');
+  $('#dot').style.background = me.color;
+  document.querySelectorAll('#syl span').forEach((s, i) => s.classList.toggle('on', i < W8.syl));
+  let cls = 'wait', say = '기다려요', sub = '', can = false;
+  if (p === 'lobby') { say = '준비!'; sub = '선생님이 시작하면 술래가 외치기 시작해요'; }
+  else if (p === 'ready') { say = '곧 시작!'; sub = '버튼을 꾹 누르면 달리고, 떼면 멈춰요'; }
+  else if (p === 'play') {
+    can = info.state === 'run';
+    if (W8.main === 'look' || W8.main === 'turn') { cls = 'stop'; say = '멈춰!'; sub = '술래가 보고 있어요 — 손 떼세요!'; }
+    else if (W8.crab === 'look') { cls = 'stop'; say = '멈춰!'; sub = '꽃게가 보고 있어요!'; }
+    else if (W8.crab === 'warn') { cls = 'warn'; say = '꽃게 주의!'; sub = '꽃게가 곧 돌아봐요'; }
+    else { cls = 'go'; say = '달려!'; sub = W8.main === 'back' && W8.syl === 0 ? '술래가 다시 외치기 시작해요' : '다 외치기 전에 멈출 준비!'; }
+  }
+  if (info.state === 'fin') { cls = 'done'; can = false; }
+  g.className = cls; $('#say').textContent = say; $('#sub').textContent = sub;
+  $('#runBtn').disabled = !can; if (!can && running) { running = true; setRunForce(false); }
+  $('#pill').textContent = p === 'play' ? `LEVEL ${W8.level || 1}` : p === 'end' ? '끝' : '대기 중';
+  // 덮개 화면
+  const ov = $('#over');
+  if (info.state === 'out' && p !== 'lobby') { ov.style.background = 'rgba(160,20,40,.92)'; ov.innerHTML = `<div><div class="b">${p === 'end' && !info.order ? '아쉬워요' : '잡혔다!'}</div><div class="s">${p === 'end' ? '다음 판에 다시 도전!' : '끝까지 응원해요'}</div></div>`; ov.classList.remove('hidden'); }
+  else if (info.state === 'fin') { ov.style.background = 'rgba(20,144,90,.94)'; ov.innerHTML = `<div><div class="b">통과!</div><div class="s">${info.order}등으로 들어왔어요${info.backs ? ` · ${info.backs}번 잡힘` : ''}</div></div>`; ov.classList.remove('hidden'); }
+  else ov.classList.add('hidden');
+}
+let tTimer = 0;
+function toast(t) { const el = $('#toast'); el.textContent = t; el.classList.remove('hidden'); clearTimeout(tTimer); tTimer = setTimeout(() => el.classList.add('hidden'), 1300); }
+function buzz(p) { try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} }
+
+/* ── 달리기 버튼 ── */
+let running = false, pointer = null;
+function setRunForce(v) { running = !!v; $('#runBtn').classList.toggle('down', running); socket.emit('mg:run', running); }
+function setRun(v) {
+  v = !!v && joined && phase.phase === 'play' && !$('#runBtn').disabled;
+  if (v === running) return; running = v;
+  $('#runBtn').classList.toggle('down', v);
+  socket.emit('mg:run', v);
+}
+setInterval(() => { if (running) socket.emit('mg:run', true); }, 500); // 혹시 신호가 빠져도 유지
+const btn = $('#runBtn');
+btn.addEventListener('pointerdown', (e) => { pointer = e.pointerId; btn.setPointerCapture(e.pointerId); setRun(true); e.preventDefault(); });
+const up = (e) => { if (e.pointerId !== pointer) return; pointer = null; setRun(false); };
+btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up); btn.addEventListener('lostpointercapture', up);
+addEventListener('contextmenu', (e) => e.preventDefault());
+addEventListener('blur', () => setRun(false));
+document.addEventListener('visibilitychange', () => { if (document.hidden) setRun(false); });
+addEventListener('keydown', (e) => { if (e.code === 'Space' && !e.repeat && e.target.tagName !== 'INPUT') { e.preventDefault(); setRun(true); } });
+addEventListener('keyup', (e) => { if (e.code === 'Space') setRun(false); });
+</script>
+</body>
+</html>

@@ -1,0 +1,810 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SUMUS ISLAND QUIZ — 선생님 화면</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+:root{--navy:#0b2a4a;--navy2:#123b66;--gold:#f2c14e;--gold2:#d9a21b;--ink:#13233a;--muted:#6b7c93;--line:#dde5ee;--bg:#f3f6fa;
+  --z1:#ef4565;--z2:#3b6cf6;--z3:#1fb36b;--z4:#f5a524}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:Pretendard,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;color:var(--ink);background:var(--bg)}
+button{font:inherit;cursor:pointer;border:0}
+input,select,textarea{font:inherit;color:inherit}
+.hidden{display:none!important}
+
+/* ───── 설정 화면 ───── */
+#setup{min-height:100%;display:grid;grid-template-columns:1fr 360px;gap:0}
+.s-main{padding:32px 40px 80px;overflow:auto}
+.s-side{background:var(--navy);color:#fff;padding:32px 28px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:22px}
+.brand{font-weight:900;font-size:26px;letter-spacing:-.5px;line-height:1.15}
+.brand small{display:block;font-weight:600;font-size:14px;color:#9fb6d3;letter-spacing:0;margin-top:6px}
+.s-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap}
+.s-head h2{margin:0;font-size:22px}
+.s-head .tools{display:flex;gap:8px;flex-wrap:wrap}
+.btn{padding:10px 14px;border-radius:10px;background:#fff;border:1px solid var(--line);font-weight:700;font-size:14px}
+.btn:hover{border-color:#b9c7d8}
+.btn.primary{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn.gold{background:var(--gold);color:#2b1d00;border-color:var(--gold)}
+.qcard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px 18px 14px;margin-bottom:14px}
+.qtop{display:flex;gap:10px;align-items:flex-start}
+.qnum{flex:none;width:34px;height:34px;border-radius:10px;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:800}
+.qtext{flex:1;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:16px;font-weight:700;min-height:42px;resize:vertical}
+.qimg{flex:none}
+.thumb{width:42px;height:42px;border-radius:10px;border:1px dashed #b9c7d8;background:#f7f9fc center/contain no-repeat;display:grid;place-items:center;color:var(--muted);font-size:18px;position:relative}
+.thumb.has{border-style:solid}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 10px 44px}
+.opt{display:flex;align-items:center;gap:8px;border:2px solid var(--line);border-radius:12px;padding:6px 8px;background:#fff}
+.opt.ans{border-color:var(--navy);background:#f2f6fb}
+.opt .dot{flex:none;width:26px;height:26px;border-radius:50%;color:#fff;font-weight:800;display:grid;place-items:center;font-size:14px}
+.opt input[type=text]{flex:1;border:0;outline:0;font-size:15px;min-width:0;background:transparent}
+.opt .ansbtn{font-size:12px;padding:4px 7px;border-radius:7px;background:#eef2f7;color:var(--muted);font-weight:700;white-space:nowrap}
+.opt.ans .ansbtn{background:var(--navy);color:#fff}
+.opt .x{background:none;color:#a0aec0;font-size:16px;padding:0 2px}
+.qfoot{display:flex;align-items:center;gap:10px;margin-left:44px;font-size:13px;color:var(--muted)}
+.qfoot select{border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:#fff}
+.qfoot .sp{flex:1}
+.link{background:none;color:var(--navy2);font-weight:700;font-size:13px;padding:4px 6px}
+.link.del{color:#c2364f}
+.addq{width:100%;padding:16px;border-radius:16px;border:2px dashed #b9c7d8;background:transparent;font-weight:800;color:var(--navy2);font-size:15px}
+.side-block label{display:block;font-size:13px;color:#9fb6d3;font-weight:700;margin-bottom:8px}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:rgba(255,255,255,.08);border-radius:12px;padding:4px;gap:4px}
+.seg button{padding:11px 6px;border-radius:9px;background:transparent;color:#c9d7ea;font-weight:800;font-size:14px}
+.seg button.on{background:#fff;color:var(--navy)}
+.hint{font-size:12.5px;color:#9fb6d3;line-height:1.5;margin-top:8px}
+.chk{display:flex;gap:10px;align-items:center;font-weight:700;font-size:14px}
+.chk input{width:18px;height:18px}
+.side-spacer{flex:1}
+.bigstart{padding:18px;border-radius:14px;background:var(--gold);color:#2b1d00;font-weight:900;font-size:19px}
+.bigstart:disabled{opacity:.5}
+.err{color:#ffb4c0;font-size:13px;min-height:18px}
+
+/* 모달 */
+.modal{position:fixed;inset:0;background:rgba(8,20,36,.55);display:grid;place-items:center;z-index:50}
+.modal .box{background:#fff;border-radius:18px;padding:24px;width:min(760px,92vw)}
+.modal h3{margin:0 0 6px}
+.modal p{margin:0 0 12px;color:var(--muted);font-size:14px;line-height:1.55}
+.modal textarea{width:100%;height:260px;border:1px solid var(--line);border-radius:12px;padding:12px;font-size:14px;line-height:1.6}
+.modal .row{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+code{background:#eef2f7;border-radius:6px;padding:1px 6px;font-size:13px}
+
+/* ───── 게임 화면 ───── */
+#game{position:fixed;inset:0;overflow:hidden;background:#0a9fd4}
+#cv{position:absolute;inset:0;width:100%;height:100%}
+.hud-tl{position:absolute;left:24px;top:20px;display:flex;gap:10px;z-index:5}
+.chip{background:rgba(11,42,74,.86);color:#fff;border-radius:999px;padding:10px 18px;font-weight:800;font-size:clamp(14px,1.3vw,22px);display:flex;align-items:center;gap:8px;backdrop-filter:blur(6px)}
+.chip b{color:var(--gold)}
+.hud-tr{position:absolute;right:20px;top:20px;display:flex;gap:8px;z-index:5}
+.ibtn{width:44px;height:44px;border-radius:12px;background:rgba(11,42,74,.7);color:#fff;font-size:18px;display:grid;place-items:center}
+
+/* 문제 카드 — 영상처럼 금테 카드 */
+#qcard{position:absolute;left:50%;top:2.2vh;transform:translateX(-50%);width:min(62vw,1150px);z-index:4;
+  background:#fff;border:6px solid var(--gold);border-radius:26px;box-shadow:0 10px 0 var(--gold2),0 18px 40px rgba(0,50,90,.25);padding:1.6vh 2vw 1.8vh;text-align:center}
+#qcard .qn{position:absolute;left:18px;top:-18px;background:var(--navy);color:var(--gold);font-weight:900;border-radius:999px;padding:6px 16px;font-size:clamp(13px,1.1vw,20px)}
+#qcard .qt{font-weight:900;font-size:clamp(22px,2.6vw,52px);line-height:1.2;letter-spacing:-.5px;color:#2a1a00;word-break:keep-all}
+#qcard .qi{max-height:11vh;max-width:40%;margin:.8vh auto 0;display:block;border-radius:10px}
+#qcard .ops{display:flex;gap:1.2vw;justify-content:center;margin-top:1.4vh;flex-wrap:nowrap}
+#qcard .op{flex:1;max-width:25%;border-radius:16px;border:4px solid currentColor;background:#fff;padding:.8vh .8vw;display:flex;align-items:center;gap:.6vw;justify-content:center;min-height:6vh;transition:transform .25s,opacity .25s}
+#qcard .op .n{flex:none;width:clamp(26px,2.2vw,42px);height:clamp(26px,2.2vw,42px);border-radius:50%;color:#fff;font-weight:900;display:grid;place-items:center;font-size:clamp(14px,1.3vw,24px)}
+#qcard .op .t{font-weight:900;font-size:clamp(16px,1.7vw,34px);color:#1a1a1a;word-break:keep-all;line-height:1.15}
+#qcard .op img{max-height:7vh;max-width:9vw;border-radius:8px}
+#qcard .op.correct{transform:scale(1.07);box-shadow:0 0 0 6px rgba(255,225,90,.9)}
+#qcard .op.wrong{opacity:.35}
+#qcard .op .cnt{white-space:nowrap;font-weight:800;color:var(--muted);font-size:clamp(12px,1vw,18px)}
+
+/* 타이머 링 */
+#timer{position:absolute;right:3vw;bottom:4vh;width:clamp(110px,10vw,180px);height:clamp(110px,10vw,180px);z-index:5}
+#timer svg{width:100%;height:100%;transform:rotate(-90deg)}
+#timer .num{position:absolute;inset:0;display:grid;place-items:center;font-weight:900;color:#fff;font-size:clamp(44px,4.6vw,86px);text-shadow:0 3px 0 rgba(0,40,80,.35)}
+#timer.hot .num{color:#ffe15a;animation:beat .5s ease-in-out infinite alternate}
+@keyframes beat{to{transform:scale(1.15)}}
+
+/* 공개 배너 */
+#banner{position:absolute;left:50%;bottom:5vh;transform:translateX(-50%);z-index:6;text-align:center;pointer-events:none}
+#banner .b1{display:inline-block;background:var(--navy);color:#fff;border-radius:18px;padding:1.2vh 2.4vw;font-weight:900;font-size:clamp(22px,2.4vw,46px);box-shadow:0 8px 0 rgba(0,0,0,.18)}
+#banner .b1 b{color:var(--gold)}
+#banner .b2{margin-top:1vh;display:inline-block;background:#fff;color:#c2364f;border-radius:14px;padding:.8vh 1.6vw;font-weight:900;font-size:clamp(16px,1.6vw,30px)}
+#banner .b2.safe{color:var(--z3)}
+.pop{animation:pop .45s cubic-bezier(.2,1.6,.4,1)}
+@keyframes pop{from{transform:scale(.5);opacity:0}}
+
+/* 하단 조작바 */
+#ctrl{position:absolute;left:24px;bottom:22px;display:flex;gap:10px;z-index:7}
+#ctrl .btn{padding:14px 20px;font-size:16px;border-radius:14px;box-shadow:0 4px 0 rgba(0,0,0,.15)}
+#ctrl .key{font-size:12px;opacity:.6;margin-left:6px}
+
+/* 대기실 패널 */
+#lobby{position:absolute;left:2.4vw;top:12vh;bottom:4vh;width:min(30vw,500px);z-index:6;background:#fff;border-radius:26px;border:6px solid var(--gold);box-shadow:0 10px 0 var(--gold2);padding:2.4vh 1.8vw;display:flex;flex-direction:column;gap:1.4vh}
+#lobby .title{font-weight:900;font-size:clamp(18px,1.6vw,30px);color:var(--navy)}
+#lobby .join{display:flex;gap:1.2vw;align-items:center}
+#lobby .qr{width:clamp(120px,11vw,210px);height:clamp(120px,11vw,210px);border-radius:14px;border:1px solid var(--line);flex:none;image-rendering:pixelated}
+#lobby .pinbox .lbl{font-size:clamp(12px,.95vw,16px);color:var(--muted);font-weight:700}
+#lobby .pin{font-weight:900;font-size:clamp(48px,5vw,96px);letter-spacing:4px;color:var(--navy);line-height:1}
+#lobby .url{font-weight:800;font-size:clamp(12px,1vw,18px);color:var(--navy2);word-break:break-all;margin-top:.6vh}
+#lobby .cnt{font-weight:800;color:var(--ink);font-size:clamp(14px,1.2vw,22px);display:flex;justify-content:space-between;align-items:center}
+#lobby .plist{flex:1;overflow:auto;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;border-top:1px solid var(--line);padding-top:1vh}
+.pchip{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:5px 10px 5px 6px;font-weight:700;font-size:clamp(12px,.95vw,16px);background:#fff}
+.pchip i{width:14px;height:14px;border-radius:50%}
+.pchip.off{opacity:.45}
+.pchip:hover{border-color:#c2364f}
+.pchip:hover::after{content:'내보내기';font-size:11px;color:#c2364f}
+#lobby .row{display:flex;gap:8px}
+#lobby .row .btn{flex:1}
+#lobby .go{padding:1.8vh;border-radius:16px;background:var(--navy);color:#fff;font-weight:900;font-size:clamp(18px,1.6vw,28px)}
+#lobby .small{font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#lobby .small button{background:none;color:var(--navy2);font-weight:700;font-size:12px;padding:0;text-decoration:underline}
+
+/* 결과 */
+#end{position:absolute;inset:0;z-index:20;background:rgba(6,26,48,.72);display:grid;place-items:center}
+#end .box{width:min(980px,92vw);text-align:center;color:#fff}
+#end h1{font-size:clamp(34px,4vw,72px);margin:0 0 3vh;font-weight:900;color:var(--gold)}
+.podium{display:flex;justify-content:center;align-items:flex-end;gap:1.6vw;margin-bottom:3vh}
+.pod{width:clamp(140px,14vw,240px);text-align:center}
+.pod .nm{font-weight:900;font-size:clamp(18px,1.8vw,34px);margin-bottom:1vh;word-break:keep-all}
+.pod .sc{font-weight:700;color:#c9d7ea;font-size:clamp(13px,1vw,18px);margin-bottom:1vh}
+.pod .blk{border-radius:18px 18px 0 0;background:#fff;color:var(--navy);font-weight:900;font-size:clamp(36px,3.4vw,64px);display:grid;place-items:center}
+.pod.r1 .blk{background:var(--gold);height:26vh}
+.pod.r2 .blk{height:18vh}
+.pod.r3 .blk{height:13vh;background:#ffd9b0}
+.survivors{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:3vh}
+.survivors span{background:#fff;color:var(--navy);border-radius:999px;padding:10px 20px;font-weight:900;font-size:clamp(18px,1.6vw,30px)}
+.rest{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-height:18vh;overflow:auto;margin-bottom:3vh}
+.rest span{background:rgba(255,255,255,.12);border-radius:10px;padding:6px 12px;font-weight:700;font-size:14px}
+#end .row{display:flex;gap:10px;justify-content:center}
+#end .row .btn{padding:14px 22px;font-size:16px}
+#confetti{position:absolute;inset:0;pointer-events:none;z-index:21}
+/* 즉석 문제 패널 */
+#live{position:absolute;left:50%;bottom:2.5vh;transform:translateX(-50%);width:min(760px,94vw);z-index:15;background:#fff;border-radius:22px;border:5px solid var(--navy);box-shadow:0 14px 40px rgba(0,30,60,.35);padding:16px 18px}
+#live .lh{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+#live .lh b{font-size:18px;font-weight:900;color:var(--navy)}
+#live .lh .sp{flex:1}
+#live .tpl{display:flex;gap:6px}
+#live .tpl button,#live .seg2 button{padding:7px 11px;border-radius:9px;background:#eef2f7;font-weight:800;font-size:13px;color:var(--navy)}
+#live .seg2 button.on{background:var(--navy);color:#fff}
+#live textarea{width:100%;border:2px solid var(--line);border-radius:12px;padding:10px 12px;font-size:17px;font-weight:800;resize:none;height:52px;outline:none}
+#live textarea:focus,#live .lo input:focus{border-color:var(--navy)}
+#live .los{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+#live .lo{display:flex;align-items:center;gap:8px;border:3px solid var(--line);border-radius:12px;padding:4px 8px 4px 4px;background:#fff}
+#live .lo.ans{border-color:var(--navy);background:#f2f6fb}
+#live .lo button{flex:none;width:34px;height:34px;border-radius:50%;color:#fff;font-weight:900;font-size:15px}
+#live .lo.ans button{box-shadow:0 0 0 3px #fff,0 0 0 6px var(--navy)}
+#live .lo input{flex:1;border:0;outline:0;font-size:16px;font-weight:800;min-width:0;background:transparent}
+#live .lf{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;font-weight:700;color:var(--muted)}
+#live .lf .sp{flex:1}
+#live .go2{padding:13px 26px;border-radius:13px;background:var(--gold);color:#2b1d00;font-weight:900;font-size:17px}
+#live .lerr{color:#c2364f;font-weight:800;font-size:13px}
+#live .x{background:none;font-size:20px;color:var(--muted);padding:2px 6px}
+
+</style>
+</head>
+<body>
+
+<!-- ───────── 설정 ───────── -->
+<section id="setup">
+  <div class="s-main">
+    <div class="s-head">
+      <h2>문제 만들기 <span id="qcount" style="color:var(--muted);font-size:16px;font-weight:700"></span></h2>
+      <div class="tools">
+        <button class="btn" id="bulkBtn">한 번에 붙여넣기</button>
+        <button class="btn" id="exportBtn">파일로 저장</button>
+        <button class="btn" id="importBtn">파일 불러오기</button>
+        <button class="btn" id="clearBtn">전체 삭제</button>
+        <input type="file" id="importFile" accept=".json" class="hidden">
+      </div>
+    </div>
+    <div id="qlist"></div>
+    <button class="addq" id="addQ">+ 문제 추가</button>
+  </div>
+  <aside class="s-side">
+    <div class="brand">SUMUS ISLAND QUIZ<small>정답 구역으로 달려가는 실시간 퀴즈</small></div>
+    <div class="side-block">
+      <label>게임 방식</label>
+      <div class="seg" id="modeSeg">
+        <button data-m="survival" class="on">서바이벌</button>
+        <button data-m="score">점수전</button>
+      </div>
+      <div class="hint" id="modeHint"></div>
+    </div>
+    <div class="side-block">
+      <label>진행</label>
+      <div class="chk"><input type="checkbox" id="gather" checked><span>문제마다 가운데로 모으기</span></div>
+      <div class="hint">끄면 학생이 이전 문제 위치에서 출발합니다.</div>
+    </div>
+    <div class="side-spacer"></div>
+    <div class="err" id="setupErr"></div>
+    <button class="bigstart" id="createBtn">방 열기</button>
+    <div class="hint" style="text-align:center;margin-top:-10px">문제 없이 열어도 됩니다 — 게임 중 즉석으로 출제</div>
+  </aside>
+</section>
+
+<!-- ───────── 게임 ───────── -->
+<section id="game" class="hidden">
+  <canvas id="cv"></canvas>
+  <div class="hud-tl">
+    <div class="chip">방 <b id="hPin">----</b></div>
+    <div class="chip" id="hAlive">0명</div>
+  </div>
+  <div class="hud-tr">
+    <div class="chip hidden" id="hQn"></div>
+    <button class="ibtn" id="muteBtn" title="소리">🔊</button>
+    <button class="ibtn" id="fsBtn" title="전체 화면">⛶</button>
+  </div>
+
+  <div id="qcard" class="hidden">
+    <div class="qt" id="qt"></div>
+    <img class="qi hidden" id="qi" alt="">
+    <div class="ops" id="ops"></div>
+  </div>
+
+  <div id="timer" class="hidden">
+    <svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="44" fill="rgba(11,42,74,.55)" stroke="rgba(255,255,255,.25)" stroke-width="8"/>
+      <circle id="tring" cx="50" cy="50" r="44" fill="none" stroke="#ffe15a" stroke-width="8" stroke-linecap="round" stroke-dasharray="276.46" stroke-dashoffset="0"/></svg>
+    <div class="num" id="tnum">10</div>
+  </div>
+
+  <div id="banner" class="hidden"></div>
+
+  <div id="lobby" class="hidden">
+    <div class="title">휴대폰으로 들어오세요</div>
+    <div class="join">
+      <img class="qr" id="qr" alt="QR">
+      <div class="pinbox">
+        <div class="lbl">방 번호</div>
+        <div class="pin" id="lPin">----</div>
+        <div class="url" id="lUrl"></div>
+      </div>
+    </div>
+    <div class="cnt"><span id="lCnt">0명 입장</span><span style="font-size:.7em;color:var(--muted)" id="lMode"></span></div>
+    <div class="plist" id="plist"></div>
+    <div class="small">테스트: <button id="bot10">봇 10명 추가</button><button id="botClr">봇 지우기</button><span style="flex:1"></span><button id="backEdit">문제 수정</button></div>
+    <div class="row"><button class="go" id="goBtn" style="flex:2">게임 시작</button><button class="go" id="liveBtn2" style="flex:1;background:var(--gold);color:#2b1d00">즉석 문제</button></div>
+  </div>
+
+  <div id="ctrl" class="hidden">
+    <button class="btn" id="revealBtn">바로 정답 공개<span class="key">Space</span></button>
+    <button class="btn primary" id="nextBtn">다음 문제<span class="key">Space</span></button>
+    <button class="btn gold" id="liveBtn">즉석 문제<span class="key">Q</span></button>
+    <button class="btn" id="finishBtn">게임 끝내기</button>
+  </div>
+
+
+  <div id="live" class="hidden">
+    <div class="lh"><b>즉석 문제</b>
+      <div class="tpl"><button data-tpl="ox">O / X</button><button data-tpl="num">번호만</button><button data-tpl="clear">비우기</button></div>
+      <span class="sp"></span><button class="x" id="liveClose" title="닫기 (Esc)">✕</button></div>
+    <textarea id="liveQ" placeholder="문제 (비워 두면 '문제를 잘 들어 보세요'로 표시 — 말로 내거나 칠판에 쓸 때)"></textarea>
+    <div class="los" id="liveOpts"></div>
+    <div class="lf">보기 <div class="seg2" id="liveN"><button data-n="2">2</button> <button data-n="3">3</button> <button data-n="4">4</button></div>
+      시간 <div class="seg2" id="liveT"><button data-t="5">5</button> <button data-t="10">10</button> <button data-t="15">15</button> <button data-t="20">20</button> <button data-t="30">30</button></div>초
+      <label style="display:flex;gap:5px;align-items:center"><input type="checkbox" id="liveSave">목록에도 저장</label>
+      <span class="sp"></span><span class="lerr" id="liveErr"></span>
+      <button class="go2" id="liveGo">출제 <span style="font-size:12px;opacity:.6">Ctrl+Enter</span></button></div>
+  </div>
+
+  <div id="end" class="hidden">
+    <canvas id="confetti"></canvas>
+    <div class="box">
+      <h1 id="endTitle">최후의 생존자</h1>
+      <div id="endBody"></div>
+      <div class="row">
+        <button class="btn gold" id="againBtn">같은 문제로 다시</button>
+        <button class="btn" id="liveBtn3">즉석 문제로 이어하기</button>
+        <button class="btn" id="editBtn">문제 수정</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 일괄 입력 모달 -->
+<div class="modal hidden" id="bulkModal"><div class="box">
+  <h3>한 번에 붙여넣기</h3>
+  <p>한 줄에 한 문제. <code>|</code>로 구분하고, 정답 보기 앞에 <code>*</code>를 붙입니다. 끝에 숫자를 쓰면 제한 시간(초)입니다.<br>
+  예) <code>abandon의 뜻은? | *버리다 | 얻다 | 지키다 | 10</code><br>
+  엑셀에서 복사한 탭 구분 표도 됩니다(문제, 보기들, 정답번호, 시간).</p>
+  <textarea id="bulkText" placeholder="abandon의 뜻은? | *버리다 | 얻다 | 10&#10;She ___ to school every day. | go | *goes | going | gone"></textarea>
+  <div class="row"><label class="chk" style="margin-right:auto;font-size:13px"><input type="checkbox" id="bulkReplace">기존 문제 지우고 넣기</label>
+    <button class="btn" id="bulkCancel">취소</button><button class="btn primary" id="bulkOk">추가</button></div>
+</div></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/common.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+const ZC = IQ.ZONE;
+const STORE = 'sumus-island-quiz:v1';
+
+/* ═════════ 문제 편집 ═════════ */
+const SAMPLE = [
+  { text: 'abandon의 뜻은?', options: [{ text: '버리다' }, { text: '얻다' }], answer: 0, time: 10 },
+  { text: 'She ___ to school every day.', options: [{ text: 'go' }, { text: 'goes' }, { text: 'going' }], answer: 1, time: 12 },
+  { text: '철자가 올바른 것은?', options: [{ text: 'necessary' }, { text: 'neccesary' }, { text: 'necesary' }, { text: 'neccessary' }], answer: 0, time: 12 },
+  { text: '"I am looking forward to ___ you."', options: [{ text: 'see' }, { text: 'seeing' }], answer: 1, time: 10 },
+  { text: 'reluctant의 뜻은?', options: [{ text: '꺼리는' }, { text: '열렬한' }, { text: '서두르는' }, { text: '확신하는' }], answer: 0, time: 10 },
+];
+let Q = load();
+let settings = Object.assign({ mode: 'survival', gather: true }, JSON.parse(localStorage.getItem(STORE + ':cfg') || '{}'));
+
+function load() { try { const v = JSON.parse(localStorage.getItem(STORE)); if (Array.isArray(v) && v.length) return v; } catch (e) {} return JSON.parse(JSON.stringify(SAMPLE)); }
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify(Q)); $('#setupErr').textContent = ''; }
+  catch (e) { $('#setupErr').textContent = '사진이 많아 브라우저 저장 공간이 부족합니다. "파일로 저장"으로 백업해 두세요.'; }
+  localStorage.setItem(STORE + ':cfg', JSON.stringify(settings));
+}
+function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+function renderList() {
+  $('#qcount').textContent = `${Q.length}문제`;
+  $('#qlist').innerHTML = Q.map((q, qi) => `
+    <div class="qcard" data-q="${qi}">
+      <div class="qtop">
+        <div class="qnum">${qi + 1}</div>
+        <textarea class="qtext" rows="1" data-f="text" placeholder="문제를 입력하세요">${esc(q.text)}</textarea>
+        <button class="thumb qimg ${q.image ? 'has' : ''}" data-img="q" title="문제 사진" style="${q.image ? `background-image:url(${q.image})` : ''}">${q.image ? '' : '🖼'}</button>
+      </div>
+      <div class="opts">
+        ${q.options.map((o, oi) => `
+          <div class="opt ${q.answer === oi ? 'ans' : ''}">
+            <span class="dot" style="background:${ZC[oi].fill}">${oi + 1}</span>
+            <input type="text" data-o="${oi}" value="${esc(o.text)}" placeholder="보기 ${oi + 1}">
+            <button class="thumb ${o.image ? 'has' : ''}" data-img="${oi}" title="보기 사진" style="width:30px;height:30px;font-size:13px;${o.image ? `background-image:url(${o.image})` : ''}">${o.image ? '' : '🖼'}</button>
+            <button class="ansbtn" data-ans="${oi}">${q.answer === oi ? '정답' : '정답으로'}</button>
+            ${q.options.length > 2 ? `<button class="x" data-rm="${oi}" title="보기 삭제">✕</button>` : ''}
+          </div>`).join('')}
+      </div>
+      <div class="qfoot">
+        제한 시간
+        <select data-f="time">${[5, 7, 10, 12, 15, 20, 30].map(t => `<option ${q.time == t ? 'selected' : ''}>${t}</option>`).join('')}</select>초
+        ${q.options.length < 4 ? `<button class="link" data-addopt>+ 보기 추가</button>` : ''}
+        <span class="sp"></span>
+        ${qi > 0 ? `<button class="link" data-up>위로</button>` : ''}
+        <button class="link" data-dup>복제</button>
+        <button class="link del" data-del>삭제</button>
+      </div>
+    </div>`).join('');
+  $('#qlist').querySelectorAll('.qtext').forEach(autoGrow);
+}
+function autoGrow(t) { t.style.height = 'auto'; t.style.height = t.scrollHeight + 'px'; }
+
+$('#qlist').addEventListener('input', (e) => {
+  const card = e.target.closest('.qcard'); if (!card) return; const q = Q[+card.dataset.q];
+  if (e.target.dataset.f === 'text') { q.text = e.target.value; autoGrow(e.target); }
+  if (e.target.dataset.o != null) q.options[+e.target.dataset.o].text = e.target.value;
+  if (e.target.dataset.f === 'time') q.time = +e.target.value;
+  save();
+});
+$('#qlist').addEventListener('change', (e) => { if (e.target.dataset.f === 'time') { Q[+e.target.closest('.qcard').dataset.q].time = +e.target.value; save(); } });
+$('#qlist').addEventListener('click', async (e) => {
+  const card = e.target.closest('.qcard'); if (!card) return;
+  const qi = +card.dataset.q, q = Q[qi]; const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.ans != null) q.answer = +b.dataset.ans;
+  else if (b.dataset.rm != null) { const r = +b.dataset.rm; q.options.splice(r, 1); if (q.answer === r) q.answer = 0; else if (q.answer > r) q.answer--; }
+  else if (b.hasAttribute('data-addopt')) q.options.push({ text: '' });
+  else if (b.hasAttribute('data-del')) { if (!confirm(`${qi + 1}번 문제를 삭제할까요?`)) return; Q.splice(qi, 1); }
+  else if (b.hasAttribute('data-dup')) Q.splice(qi + 1, 0, JSON.parse(JSON.stringify(q)));
+  else if (b.hasAttribute('data-up')) [Q[qi - 1], Q[qi]] = [Q[qi], Q[qi - 1]];
+  else if (b.dataset.img != null) {
+    const target = b.dataset.img === 'q' ? q : q.options[+b.dataset.img];
+    if (target.image) { if (confirm('사진을 지울까요?')) target.image = null; else return; }
+    else { const url = await pickImage(); if (!url) return; target.image = url; }
+  } else return;
+  save(); renderList();
+});
+$('#addQ').onclick = () => { Q.push({ text: '', options: [{ text: '' }, { text: '' }], answer: 0, time: 10 }); save(); renderList(); const l = $('#qlist').lastElementChild; l.scrollIntoView({ behavior: 'smooth' }); l.querySelector('.qtext').focus(); };
+$('#clearBtn').onclick = () => { if (confirm('모든 문제를 지울까요?')) { Q = []; save(); renderList(); } };
+
+function pickImage() {
+  return new Promise((res) => {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/*';
+    inp.onchange = () => {
+      const f = inp.files[0]; if (!f) return res(null);
+      const img = new Image(); img.onload = () => {
+        const m = 360, k = Math.min(1, m / Math.max(img.width, img.height));
+        const c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        res(f.type === 'image/png' ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.85));
+        URL.revokeObjectURL(img.src);
+      }; img.src = URL.createObjectURL(f);
+    };
+    inp.click();
+  });
+}
+
+// 일괄 입력
+$('#bulkBtn').onclick = () => { $('#bulkModal').classList.remove('hidden'); $('#bulkText').focus(); };
+$('#bulkCancel').onclick = () => $('#bulkModal').classList.add('hidden');
+$('#bulkOk').onclick = () => {
+  const out = [];
+  for (const raw of $('#bulkText').value.split('\n')) {
+    const line = raw.trim(); if (!line) continue;
+    const piped = line.includes('|');
+    let parts = (piped ? line.split('|') : line.split('\t')).map(s => s.trim()).filter(Boolean);
+    let time = 10, ansNum = null;
+    const isNum = (v) => /^\d+$/.test(v);
+    if (piped) { if (parts.length >= 4 && isNum(parts[parts.length - 1])) time = +parts.pop(); }
+    else {
+      if (parts.length >= 5 && isNum(parts[parts.length - 1]) && isNum(parts[parts.length - 2])) { time = +parts.pop(); ansNum = +parts.pop(); }
+      else if (parts.length >= 4 && isNum(parts[parts.length - 1])) ansNum = +parts.pop();
+    }
+    if (parts.length < 3) continue;
+    const text = parts.shift();
+    let answer = 0; const options = parts.slice(0, 4).map((t, i) => { if (t.startsWith('*')) { answer = i; t = t.slice(1).trim(); } return { text: t }; });
+    if (ansNum) answer = Math.min(options.length - 1, ansNum - 1);
+    if (options.length >= 2) out.push({ text, options, answer, time: Math.max(5, Math.min(60, time)) });
+  }
+  if (!out.length) return alert('형식에 맞는 줄이 없습니다. 예시를 확인해 주세요.');
+  Q = $('#bulkReplace').checked ? out : Q.concat(out);
+  save(); renderList(); $('#bulkModal').classList.add('hidden'); $('#bulkText').value = '';
+};
+$('#exportBtn').onclick = () => {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(Q)], { type: 'application/json' }));
+  a.download = `아일랜드퀴즈_${new Date().toISOString().slice(0, 10)}.json`; a.click();
+};
+$('#importBtn').onclick = () => $('#importFile').click();
+$('#importFile').onchange = async (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  try { const v = JSON.parse(await f.text()); if (!Array.isArray(v)) throw 0; Q = v; save(); renderList(); } catch (_) { alert('이 파일은 읽을 수 없습니다. 이 프로그램에서 저장한 .json 파일을 골라 주세요.'); }
+  e.target.value = '';
+};
+
+function renderMode() {
+  document.querySelectorAll('#modeSeg button').forEach(b => b.classList.toggle('on', b.dataset.m === settings.mode));
+  $('#modeHint').textContent = settings.mode === 'survival'
+    ? '틀린 구역에 있거나 구역 밖에 있으면 물에 빠져 탈락합니다. 마지막까지 남는 사람이 우승. 전원이 틀리면 아무도 탈락하지 않습니다.'
+    : '아무도 탈락하지 않습니다. 정답 구역에 있으면 100점. 끝나면 점수 순위를 보여줍니다.';
+  $('#gather').checked = settings.gather;
+}
+$('#modeSeg').onclick = (e) => { const m = e.target.dataset.m; if (!m) return; settings.mode = m; save(); renderMode(); };
+$('#gather').onchange = (e) => { settings.gather = e.target.checked; save(); };
+
+function validQuestions() {
+  return Q.map(q => ({ ...q, options: q.options.filter(o => (o.text || '').trim() || o.image) }))
+    .map(q => ({ ...q, answer: Math.min(q.answer, q.options.length - 1) }))
+    .filter(q => ((q.text || '').trim() || q.image) && q.options.length >= 2);
+}
+
+/* ═════════ 소켓 ═════════ */
+const socket = io();
+let room = null, phase = { phase: 'none' }, players = new Map(), rosterMap = new Map();
+let joinURL = '';
+
+$('#createBtn').onclick = () => {
+  const qs = validQuestions();
+  if (qs.length < Q.length) $('#setupErr').textContent = `내용이 빈 문제 ${Q.length - qs.length}개는 빼고 시작합니다.`;
+  $('#createBtn').disabled = true;
+  if (room) { // 이미 열린 방 → 문제·설정만 갱신
+    socket.emit('host:config', { questions: qs, mode: settings.mode, gather: settings.gather });
+    $('#createBtn').disabled = false; showGame(); return;
+  }
+  socket.emit('host:create', { questions: qs, mode: settings.mode, gather: settings.gather }, (r) => {
+    $('#createBtn').disabled = false;
+    if (!r.ok) return ($('#setupErr').textContent = r.error);
+    room = { pin: r.pin }; sessionStorage.setItem(STORE + ':host', JSON.stringify(r));
+    setupJoin(r.pin); showGame();
+  });
+};
+
+function recreateRoom() {
+  socket.emit('host:create', { questions: validQuestions(), mode: settings.mode, gather: settings.gather }, (r) => {
+    if (!r.ok) return;
+    room = { pin: r.pin }; sessionStorage.setItem(STORE + ':host', JSON.stringify(r)); setupJoin(r.pin);
+    alert(`서버가 다시 시작되어 새 방을 열었습니다.\n새 방 번호: ${r.pin}\n학생들은 다시 입장해야 합니다.`);
+  });
+}
+async function setupJoin(pin) {
+  let origin = location.origin;
+  if (/^(localhost|127\.|\[?::1)/.test(location.hostname)) {
+    try { const info = await (await fetch('/api/info')).json(); if (info.ips[0]) origin = `http://${info.ips[0]}:${location.port || 80}`; } catch (e) {}
+  }
+  joinURL = `${origin}/play?pin=${pin}`;
+  $('#qr').src = `/api/qr?text=${encodeURIComponent(joinURL)}`;
+  $('#lUrl').textContent = joinURL.replace(/^https?:\/\//, '');
+  $('#lPin').textContent = pin; $('#hPin').textContent = pin;
+}
+
+socket.on('connect', () => {
+  const saved = JSON.parse(sessionStorage.getItem(STORE + ':host') || 'null');
+  if (saved && !room) socket.emit('host:resume', saved, (r) => { if (r.ok) { room = { pin: r.pin }; setupJoin(r.pin); showGame(); } else sessionStorage.removeItem(STORE + ':host'); });
+  else if (saved && room) socket.emit('host:resume', saved, (r) => { if (!r.ok) recreateRoom(); });
+});
+socket.on('roster', (list) => { rosterMap = new Map(list.map(p => [p.id, p])); renderRoster(); updateAlive(); });
+socket.on('s', (arr) => IQ.applyState(players, arr, performance.now()));
+socket.on('phase', (p) => { const prev = phase; phase = p; phase.recvAt = performance.now(); onPhase(prev); });
+
+function showGame() { $('#setup').classList.add('hidden'); $('#game').classList.remove('hidden'); resize(); }
+function showSetup() { $('#game').classList.add('hidden'); $('#setup').classList.remove('hidden'); renderList(); renderMode(); }
+
+function renderRoster() {
+  const list = [...rosterMap.values()];
+  $('#lCnt').textContent = `${list.length}명 입장`;
+  $('#plist').innerHTML = list.map(p => `<button class="pchip ${p.connected ? '' : 'off'}" data-id="${p.id}"><i style="background:${p.color}"></i>${esc(p.name)}</button>`).join('');
+}
+$('#plist').onclick = (e) => { const b = e.target.closest('.pchip'); if (b && confirm(`${b.textContent.replace('내보내기', '')} 학생을 내보낼까요?`)) socket.emit('host:kick', b.dataset.id); };
+$('#bot10').onclick = () => socket.emit('host:bots', 10);
+$('#botClr').onclick = () => socket.emit('host:clearbots');
+$('#backEdit').onclick = showSetup;
+$('#editBtn').onclick = () => { socket.emit('host:reset'); showSetup(); };
+$('#againBtn').onclick = () => socket.emit('host:reset');
+$('#goBtn').onclick = () => { if (!rosterMap.size) return alert('아직 들어온 학생이 없습니다.'); if (!phase.total) return openLive(); socket.emit('host:next'); };
+$('#nextBtn').onclick = () => socket.emit('host:next');
+$('#revealBtn').onclick = () => socket.emit('host:next');
+$('#finishBtn').onclick = () => { if (confirm('게임을 끝내고 결과를 볼까요?')) socket.emit('host:finish'); };
+document.addEventListener('keydown', (e) => {
+  if ($('#game').classList.contains('hidden') || e.target.tagName === 'INPUT') return;
+  if (e.target.tagName === 'TEXTAREA') return;
+  if (!$('#live').classList.contains('hidden')) return;
+  if ((e.code === 'Space' || e.code === 'Enter') && (phase.phase === 'question' || phase.phase === 'reveal')) { e.preventDefault(); socket.emit('host:next'); }
+  if (e.code === 'KeyQ' && ['lobby', 'reveal', 'end'].includes(phase.phase)) { e.preventDefault(); openLive(); }
+});
+$('#fsBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+
+function updateAlive() {
+  const list = [...rosterMap.values()];
+  const alive = list.filter(p => p.alive).length;
+  $('#hAlive').innerHTML = phase.phase === 'lobby' || phase.mode === 'score' ? `<b>${list.length}</b>명 참여` : `생존 <b>${alive}</b> / ${list.length}`;
+}
+
+/* ═════════ 단계 처리 ═════════ */
+let revealFx = null; // {at, eliminated:Set, correct}
+function onPhase(prev) {
+  const p = phase.phase;
+  $('#lobby').classList.toggle('hidden', p !== 'lobby');
+  $('#qcard').classList.toggle('hidden', !(p === 'question' || p === 'reveal'));
+  $('#timer').classList.toggle('hidden', p !== 'question');
+  $('#ctrl').classList.toggle('hidden', !(p === 'question' || p === 'reveal'));
+  $('#revealBtn').classList.toggle('hidden', p !== 'question');
+  $('#nextBtn').classList.toggle('hidden', p !== 'reveal');
+  $('#end').classList.toggle('hidden', p !== 'end');
+  $('#hQn').classList.toggle('hidden', !(p === 'question' || p === 'reveal'));
+  $('#liveBtn').classList.toggle('hidden', p !== 'reveal');
+  if (p === 'question') closeLive();
+  $('#goBtn').textContent = phase.total ? '게임 시작' : '첫 문제 내기';
+  $('#banner').classList.add('hidden');
+  $('#lMode').textContent = phase.mode === 'survival' ? '서바이벌' : '점수전';
+  updateAlive();
+
+  if (p === 'question' || p === 'reveal') {
+    const q = phase.q;
+    $('#hQn').innerHTML = `문제 <b>${phase.qIndex + 1}</b> / ${phase.total}`;
+    $('#qt').textContent = q.text || '문제를 잘 들어 보세요!';
+    $('#qi').classList.toggle('hidden', !q.image); if (q.image) $('#qi').src = q.image;
+    $('#ops').innerHTML = q.options.map((o, i) => `
+      <div class="op" data-i="${i}" style="color:${ZC[i].fill}">
+        <span class="n" style="background:${ZC[i].fill}">${i + 1}</span>
+        ${o.image ? `<img src="${o.image}" alt="">` : ''}
+        ${o.text ? `<span class="t">${esc(o.text)}</span>` : ''}
+        <span class="cnt"></span>
+      </div>`).join('');
+    if (p === 'question') { phase.endsAtLocal = performance.now() + phase.remain; lastBeep = -1; if (prev.phase !== 'question') sfx('start'); }
+  }
+  if (p === 'reveal') {
+    const r = phase.reveal;
+    document.querySelectorAll('#ops .op').forEach((el, i) => el.classList.add(i === r.correct ? 'correct' : 'wrong'));
+    const fresh = Date.now() - r.at < 4000;
+    revealFx = { at: performance.now() - (fresh ? 0 : 9999), eliminated: new Set(r.eliminated), correct: r.correct, wrong: new Set(r.wrong) };
+    const o = phase.q.options[r.correct];
+    let b2 = '';
+    if (phase.mode === 'survival') b2 = r.saved ? `<div class="b2 safe pop">전원 오답! 이번엔 모두 살려 줍니다</div>` : r.eliminated.length ? `<div class="b2 pop">${r.eliminated.length}명 탈락</div>` : `<div class="b2 safe pop">탈락자 없음!</div>`;
+    else b2 = `<div class="b2 safe pop">정답 ${phase.q.options.length ? r.counts[r.correct] : 0}명 +100점</div>`;
+    setTimeout(() => {
+      $('#banner').innerHTML = `<div class="b1 pop">정답 <b>${r.correct + 1}번</b>${o.text ? ' · ' + esc(o.text) : ''}</div><br>${b2}`;
+      $('#banner').classList.remove('hidden');
+    }, fresh ? 500 : 0);
+    if (fresh) { sfx('reveal'); if (r.eliminated.length) setTimeout(() => sfx('splash'), 1500); }
+    const last = phase.qIndex >= phase.total - 1 || (phase.mode === 'survival' && phase.alive <= 1);
+    $('#nextBtn').classList.toggle('primary', true);
+    $('#nextBtn').firstChild.textContent = last ? '결과 보기' : '다음 문제';
+  } else revealFx = null;
+  if (p === 'end') showEnd();
+}
+
+function showEnd() {
+  const r = phase.result; const rk = r.ranking;
+  let html = '';
+  if (r.mode === 'survival') {
+    const surv = rk.filter(x => r.survivors.includes(x.id));
+    $('#endTitle').textContent = surv.length === 1 ? '최후의 1인' : surv.length ? `생존자 ${surv.length}명` : '생존자 없음';
+    html += `<div class="survivors">${surv.map(s => `<span style="box-shadow:0 0 0 4px ${s.color}">${esc(s.name)}</span>`).join('')}</div>`;
+    html += `<div class="rest">${rk.filter(x => !r.survivors.includes(x.id)).map(x => `<span>${esc(x.name)} · ${x.score}점</span>`).join('')}</div>`;
+  } else {
+    $('#endTitle').textContent = '최종 순위';
+    const top = rk.slice(0, 3); const order = [1, 0, 2].filter(i => top[i]);
+    html += `<div class="podium">${order.map(i => `<div class="pod r${i + 1}"><div class="nm">${esc(top[i].name)}</div><div class="sc">${top[i].score}점</div><div class="blk">${i + 1}</div></div>`).join('')}</div>`;
+    html += `<div class="rest">${rk.slice(3).map((x, i) => `<span>${i + 4}위 ${esc(x.name)} · ${x.score}점</span>`).join('')}</div>`;
+  }
+  $('#endBody').innerHTML = html;
+  sfx('win'); confetti();
+}
+
+/* ═════════ 렌더링 ═════════ */
+const cv = $('#cv'), ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1, layoutX = 0.5;
+function resize() { DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; cv.width = W * DPR; cv.height = H * DPR; }
+addEventListener('resize', resize);
+
+let lastT = performance.now(), lastBeep = -1;
+function frame(now) {
+  const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now; const t = now / 1000;
+  requestAnimationFrame(frame);
+  if ($('#game').classList.contains('hidden')) return;
+  IQ.stepInterp(players, dt);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  IQ.drawWater(ctx, W, H, t);
+
+  // 섬 배치: 문제 카드 아래 공간에 맞춤, 대기실에선 오른쪽으로
+  const lobby = phase.phase === 'lobby';
+  layoutX += ((lobby ? 0.66 : 0.5) - layoutX) * Math.min(1, dt * 4);
+  const cardH = $('#qcard').classList.contains('hidden') ? H * 0.1 : $('#qcard').offsetHeight + H * 0.05;
+  const topY = Math.max(H * 0.12, cardH + H * 0.03), bottomY = H * 0.97;
+  const ry = Math.min((bottomY - topY) / 2.2, W * (lobby ? 0.29 : 0.4) * 0.52);
+  const G = IQ.geom(W * layoutX, topY + ry, ry / 0.52);
+  IQ.drawIsland(ctx, G);
+
+  // 구역
+  const zones = (phase.phase === 'question' || phase.phase === 'reveal') ? phase.zones : null;
+  const counts = zones ? zones.map(() => 0) : [];
+  if (zones) {
+    for (const [id, e] of players) if (e.alive || (revealFx && revealFx.eliminated.has(id))) { const z = IQ.zoneOf(zones, e.tx, e.ty); if (z >= 0) counts[z]++; }
+    zones.forEach((z, i) => IQ.drawZone(ctx, G, z, i, phase.phase === 'reveal' ? (i === revealFx.correct ? 'correct' : 'wrong') : 'question', t));
+  }
+
+  // 캐릭터 (깊이 순)
+  const s = G.rx * 0.058;
+  const list = [];
+  const sinceReveal = revealFx ? (now - revealFx.at) / 1000 : 0;
+  for (const [id, e] of players) {
+    const info = rosterMap.get(id); if (!info) continue;
+    let fall = null;
+    if (!e.alive) {
+      if (!(revealFx && revealFx.eliminated.has(id))) continue;
+      const u = (sinceReveal - 1.0) / 0.9; // 1초 뒤 튕겨나감
+      if (u > 1.9) continue;
+      fall = u;
+    }
+    list.push({ id, e, info, fall });
+  }
+  list.sort((a, b) => a.e.y - b.e.y);
+  const splashes = [];
+  for (const { e, info, fall } of list) {
+    let [x, y] = IQ.proj(G, e.x, e.y); let alpha = 1, lift = 0;
+    if (fall != null) {
+      if (fall > 0) {
+        const u = Math.min(1, fall);
+        let dx = e.x, dy = e.y; const d = Math.hypot(dx, dy) || 1; dx /= d; dy /= d;
+        if (Math.hypot(e.x, e.y) < 0.01) { dx = 1; dy = 0; }
+        const [ex, ey] = IQ.proj(G, dx * 1.18, dy * 1.18 + 0.12);
+        x = x + (ex - x) * u; y = y + (ey - y) * u; lift = Math.sin(Math.PI * u) * s * 4;
+        if (fall >= 1) { splashes.push([ex, ey + G.th, fall - 1]); continue; }
+      } else {
+        x += Math.sin(t * 40) * s * 0.08; // 탈락 직전 흔들림
+      }
+    }
+    IQ.drawChar(ctx, x, y - lift, s, info.color, t + info.id.charCodeAt(0) * 0.37, e.moving && fall == null, e.face, info.name, { alpha });
+  }
+  for (const [x, y, u] of splashes) {
+    ctx.save(); ctx.globalAlpha = Math.max(0, 1 - u / 0.9);
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = s * 0.18;
+    for (const k of [1, 0.6]) { ctx.beginPath(); ctx.ellipse(x, y, s * (0.6 + u * 2.4) * k, s * (0.2 + u * 0.8) * k, 0, 0, 7); ctx.stroke(); }
+    ctx.fillStyle = '#fff'; for (let j = 0; j < 6; j++) { const a = j / 6 * Math.PI * 2; ctx.beginPath(); ctx.arc(x + Math.cos(a) * s * u * 1.6, y - Math.sin(u * Math.PI) * s * 1.4 + Math.sin(a) * s * 0.3, s * 0.12, 0, 7); ctx.fill(); }
+    ctx.restore();
+  }
+
+  // 구역 이름표 + 인원수
+  if (zones) zones.forEach((z, i) => {
+    const [x, y] = IQ.proj(G, z.x, z.y - z.r);
+    const fs = Math.max(14, G.rx * 0.042);
+    ctx.font = `900 ${fs}px Pretendard, sans-serif`;
+    const label = `${i + 1}  ·  ${counts[i]}명`;
+    const w = ctx.measureText(label).width + fs * 1.2, h = fs * 1.6;
+    ctx.save(); if (phase.phase === 'reveal' && i !== revealFx.correct) ctx.globalAlpha = 0.45;
+    ctx.fillStyle = IQ.ZONE[i].dark; IQ.roundRect(ctx, x - w / 2, y - h - fs * 0.3, w, h, h / 2); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, x, y - h / 2 - fs * 0.3);
+    ctx.restore();
+  });
+  document.querySelectorAll('#ops .op .cnt').forEach((el, i) => { el.textContent = counts[i] != null ? `${counts[i]}명` : ''; });
+
+  // 타이머
+  if (phase.phase === 'question') {
+    const remain = Math.max(0, phase.endsAtLocal - now) / 1000;
+    const sec = Math.ceil(remain);
+    $('#tnum').textContent = sec;
+    $('#tring').style.strokeDashoffset = 276.46 * (1 - remain / phase.timeLimit);
+    $('#timer').classList.toggle('hot', sec <= 3);
+    if (sec <= 3 && sec > 0 && sec !== lastBeep) { lastBeep = sec; sfx('tick'); }
+  }
+}
+requestAnimationFrame(frame);
+
+/* ═════════ 소리 ═════════ */
+let AC = null, muted = false;
+$('#muteBtn').onclick = () => { muted = !muted; $('#muteBtn').textContent = muted ? '🔇' : '🔊'; };
+function tone(f, d, type = 'sine', v = 0.18, when = 0, slide) {
+  if (muted) return; AC = AC || new AudioContext();
+  const o = AC.createOscillator(), g = AC.createGain(); const t0 = AC.currentTime + when;
+  o.type = type; o.frequency.setValueAtTime(f, t0); if (slide) o.frequency.exponentialRampToValueAtTime(slide, t0 + d);
+  g.gain.setValueAtTime(v, t0); g.gain.exponentialRampToValueAtTime(0.001, t0 + d);
+  o.connect(g).connect(AC.destination); o.start(t0); o.stop(t0 + d);
+}
+function sfx(k) {
+  try {
+    if (k === 'tick') tone(880, 0.12, 'square', 0.08);
+    if (k === 'start') { tone(523, 0.12, 'triangle'); tone(784, 0.18, 'triangle', 0.18, 0.12); }
+    if (k === 'reveal') { tone(660, 0.12, 'triangle'); tone(990, 0.3, 'triangle', 0.2, 0.12); }
+    if (k === 'splash') { tone(300, 0.4, 'sawtooth', 0.06, 0, 60); }
+    if (k === 'win') [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.25, 'triangle', 0.16, i * 0.13));
+  } catch (e) {}
+}
+document.addEventListener('pointerdown', () => { if (!AC) try { AC = new AudioContext(); } catch (e) {} }, { once: true });
+
+/* ═════════ 축하 효과 ═════════ */
+function confetti() {
+  const c = $('#confetti'), g = c.getContext('2d'); c.width = innerWidth; c.height = innerHeight;
+  const cols = ['#ffe15a', '#ef4565', '#3b6cf6', '#1fb36b', '#fff'];
+  const ps = Array.from({ length: 160 }, () => ({ x: Math.random() * c.width, y: -Math.random() * c.height * 0.5, vx: (Math.random() - .5) * 2, vy: 2 + Math.random() * 3, r: Math.random() * 6, c: cols[Math.random() * 5 | 0], a: Math.random() * 6 }));
+  const t0 = performance.now();
+  (function f(now) {
+    if (now - t0 > 6000 || phase.phase !== 'end') return g.clearRect(0, 0, c.width, c.height);
+    g.clearRect(0, 0, c.width, c.height);
+    for (const p of ps) { p.x += p.vx; p.y += p.vy; p.a += 0.1; g.save(); g.translate(p.x, p.y); g.rotate(p.a); g.fillStyle = p.c; g.fillRect(-4, -2, 8 + p.r, 5); g.restore(); }
+    requestAnimationFrame(f);
+  })(t0);
+}
+
+
+/* ═════════ 즉석 문제 ═════════ */
+const LIVE = Object.assign({ n: 2, time: 10, opts: ['', '', '', ''], save: false }, JSON.parse(localStorage.getItem(STORE + ':live') || '{}'));
+let liveAns = -1;
+function renderLive() {
+  $('#liveOpts').innerHTML = Array.from({ length: LIVE.n }, (_, i) => `
+    <div class="lo ${liveAns === i ? 'ans' : ''}"><button style="background:${ZC[i].fill}" data-a="${i}" title="정답으로">${i + 1}</button>
+    <input data-i="${i}" value="${esc(LIVE.opts[i])}" placeholder="보기 ${i + 1}"></div>`).join('');
+  document.querySelectorAll('#liveN button').forEach(b => b.classList.toggle('on', +b.dataset.n === LIVE.n));
+  document.querySelectorAll('#liveT button').forEach(b => b.classList.toggle('on', +b.dataset.t === LIVE.time));
+  $('#liveSave').checked = LIVE.save;
+}
+function persistLive() { localStorage.setItem(STORE + ':live', JSON.stringify(LIVE)); }
+function openLive() {
+  liveAns = -1; $('#liveErr').textContent = '';
+  renderLive(); $('#live').classList.remove('hidden'); $('#end').classList.add('hidden');
+  setTimeout(() => $('#liveQ').focus(), 30);
+}
+function closeLive() { $('#live').classList.add('hidden'); if (phase.phase === 'end') $('#end').classList.remove('hidden'); }
+$('#liveBtn').onclick = openLive; $('#liveBtn2').onclick = () => { if (!rosterMap.size) return alert('아직 들어온 학생이 없습니다.'); openLive(); };
+$('#liveBtn3').onclick = openLive;
+$('#liveClose').onclick = closeLive;
+$('#liveOpts').addEventListener('input', (e) => { if (e.target.dataset.i != null) { LIVE.opts[+e.target.dataset.i] = e.target.value; persistLive(); } });
+$('#liveOpts').addEventListener('click', (e) => { const a = e.target.dataset.a; if (a == null) return; liveAns = +a; $('#liveErr').textContent = ''; renderLive(); });
+$('#liveN').onclick = (e) => { const n = +e.target.dataset.n; if (!n) return; LIVE.n = n; if (liveAns >= n) liveAns = -1; persistLive(); renderLive(); };
+$('#liveT').onclick = (e) => { const t = +e.target.dataset.t; if (!t) return; LIVE.time = t; persistLive(); renderLive(); };
+$('#liveSave').onchange = (e) => { LIVE.save = e.target.checked; persistLive(); };
+document.querySelector('#live .tpl').onclick = (e) => {
+  const t = e.target.dataset.tpl; if (!t) return;
+  if (t === 'ox') { LIVE.n = 2; LIVE.opts = ['O', 'X', '', '']; }
+  if (t === 'num') LIVE.opts = ['1번', '2번', '3번', '4번'];
+  if (t === 'clear') { LIVE.opts = ['', '', '', '']; $('#liveQ').value = ''; }
+  liveAns = -1; persistLive(); renderLive();
+};
+function submitLive() {
+  const options = LIVE.opts.slice(0, LIVE.n).map((t, i) => ({ text: t.trim() || `${i + 1}번` }));
+  if (liveAns < 0) return ($('#liveErr').textContent = '정답 번호를 눌러 주세요');
+  if (!rosterMap.size) return ($('#liveErr').textContent = '아직 들어온 학생이 없습니다');
+  const q = { text: $('#liveQ').value.trim(), options, answer: liveAns, time: LIVE.time };
+  socket.emit('host:live', q, (r) => {
+    if (!r.ok) return ($('#liveErr').textContent = r.error);
+    if (LIVE.save) { Q.push(JSON.parse(JSON.stringify({ ...q, text: q.text || '(말로 낸 문제)' }))); save(); }
+    $('#liveQ').value = ''; closeLive();
+  });
+}
+$('#liveGo').onclick = submitLive;
+document.addEventListener('keydown', (e) => {
+  if ($('#live').classList.contains('hidden')) return;
+  if (e.key === 'Escape') { e.preventDefault(); closeLive(); }
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submitLive(); }
+  // Alt+1~4 로 정답 지정
+  if (e.altKey && /^Digit[1-4]$/.test(e.code)) { const i = +e.code.slice(5) - 1; if (i < LIVE.n) { e.preventDefault(); liveAns = i; renderLive(); } }
+});
+
+renderList(); renderMode();
+</script>
+</body>
+</html>

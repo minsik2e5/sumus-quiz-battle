@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>조작 창 — SUMUS ISLAND QUIZ</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+:root{--navy:#0b2a4a;--navy2:#123b66;--gold:#f2c14e;--ink:#13233a;--muted:#6b7c93;--line:#dde5ee;--bg:#eef2f7;--ok:#1fb36b;--bad:#c2364f}
+*{box-sizing:border-box}
+html,body{margin:0;font-family:Pretendard,'Apple SD Gothic Neo','Malgun Gothic',sans-serif;color:var(--ink);background:var(--bg)}
+button{font:inherit;cursor:pointer;border:0}
+input,textarea{font:inherit;color:inherit}
+.hidden{display:none!important}
+header{position:sticky;top:0;z-index:5;background:var(--navy);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:10px}
+header .t{font-weight:900;font-size:16px}
+header .pin{font-weight:900;color:var(--gold)}
+header .sp{flex:1}
+.pill{border-radius:999px;padding:6px 12px;font-weight:800;font-size:13px;background:rgba(255,255,255,.14)}
+.pill.q{background:var(--gold);color:#2b1d00}
+.pill.r{background:var(--ok)}
+.dot{width:10px;height:10px;border-radius:50%;background:#e85d75}
+.dot.on{background:#3ee08f}
+main{padding:12px;display:flex;flex-direction:column;gap:12px}
+.card{background:#fff;border-radius:16px;border:1px solid var(--line);padding:14px}
+.card h3{margin:0 0 10px;font-size:13px;color:var(--muted);font-weight:800;display:flex;align-items:center;gap:8px}
+.card h3 .sp{flex:1}
+.qt{font-weight:900;font-size:19px;line-height:1.3;word-break:keep-all;margin-bottom:10px}
+.opts{display:grid;gap:6px}
+.op{display:flex;align-items:center;gap:8px;border:2px solid var(--line);border-radius:12px;padding:7px 10px;font-weight:800}
+.op .n{flex:none;width:26px;height:26px;border-radius:50%;color:#fff;display:grid;place-items:center;font-size:13px}
+.op .tx{flex:1;word-break:keep-all}
+.op .c{font-weight:900;color:var(--muted);min-width:42px;text-align:right}
+.op.ans{border-color:var(--ok);background:#effaf4}
+.op.ans .tx::after{content:'  정답';color:var(--ok);font-size:12px}
+.muted{color:var(--muted);font-size:13px;line-height:1.5}
+.next{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+.acts{display:grid;grid-template-columns:2fr 1fr 1fr;gap:8px}
+.big{padding:16px 10px;border-radius:14px;background:var(--navy);color:#fff;font-weight:900;font-size:17px}
+.big:disabled{opacity:.4;cursor:default}
+.sec{padding:10px;border-radius:14px;background:#fff;border:1px solid var(--line);font-weight:800;font-size:14px}
+.key{font-size:11px;opacity:.6;margin-left:4px;font-weight:700}
+.autobar{display:flex;align-items:center;gap:10px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:10px 12px;font-weight:800;font-size:14px}
+.autobar .sp{flex:1}
+.autobar .cd{color:var(--navy);font-variant-numeric:tabular-nums}
+.toggle{padding:7px 12px;border-radius:10px;font-weight:900;font-size:13px;background:#eef2f7;color:var(--muted)}
+.toggle.on{background:var(--ok);color:#fff}
+/* 즉석 문제 */
+.tpl{display:flex;gap:6px}
+.tpl button,.seg button{padding:6px 10px;border-radius:9px;background:#eef2f7;font-weight:800;font-size:12.5px;color:var(--navy)}
+.seg{display:flex;gap:4px}
+.seg button.on{background:var(--navy);color:#fff}
+#liveQ{width:100%;border:2px solid var(--line);border-radius:12px;padding:10px 12px;font-size:16px;font-weight:800;resize:vertical;min-height:50px;outline:none}
+#liveQ:focus,.lo input:focus{border-color:var(--navy)}
+.los{display:grid;gap:6px;margin:8px 0}
+.lo{display:flex;align-items:center;gap:8px;border:3px solid var(--line);border-radius:12px;padding:3px 8px 3px 3px}
+.lo.ans{border-color:var(--ok);background:#effaf4}
+.lo button{flex:none;width:34px;height:34px;border-radius:50%;color:#fff;font-weight:900}
+.lo.ans button{box-shadow:0 0 0 3px #fff,0 0 0 5px var(--ok)}
+.lo input{flex:1;border:0;outline:0;font-size:16px;font-weight:800;min-width:0;background:transparent}
+.lo .pick{font-size:11px;color:var(--muted);font-weight:700;white-space:nowrap}
+.lo.ans .pick{color:var(--ok)}
+.lf{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:10px}
+.go{width:100%;padding:15px;border-radius:14px;background:var(--gold);color:#2b1d00;font-weight:900;font-size:17px}
+.go:disabled{background:#e3e8ef;color:#8a99ad;cursor:default}
+.err{color:var(--bad);font-weight:800;font-size:13px;min-height:18px;margin-top:6px;text-align:center}
+/* 학생 */
+.plist{display:flex;flex-wrap:wrap;gap:6px}
+.pc{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:5px 10px 5px 6px;font-weight:700;font-size:13px;background:#fff}
+.pc i{width:12px;height:12px;border-radius:50%}
+.pc.dead{opacity:.45;text-decoration:line-through}
+.pc.off::after{content:'연결 끊김';font-size:10px;color:var(--bad)}
+.lost{position:fixed;inset:0;background:rgba(8,20,36,.7);display:grid;place-items:center;z-index:20;color:#fff;text-align:center;padding:24px;font-weight:800;line-height:1.6}
+</style>
+</head>
+<body>
+<header>
+  <span class="dot" id="conn"></span>
+  <span class="t">조작 창 · 방 <span class="pin" id="pin">----</span></span>
+  <span class="sp"></span>
+  <span class="pill" id="state">연결 중</span>
+</header>
+
+<main>
+  <section class="card">
+    <h3>지금 화면<span class="sp"></span><span id="qn"></span></h3>
+    <div id="nowBox"></div>
+    <div class="next muted" id="nextBox"></div>
+  </section>
+
+  <section class="acts">
+    <button class="big" id="mainBtn">게임 시작</button>
+    <button class="sec" id="finishBtn">게임 끝내기</button>
+    <button class="sec" id="resetBtn">처음으로</button>
+  </section>
+
+  <section class="autobar"><span>자동 진행</span><span class="cd muted" id="autoCd">정답 공개 5초 뒤 다음 문제</span><span class="sp"></span><button class="toggle" id="autoBtn">켜짐</button></section>
+
+  <section class="card">
+    <h3>즉석 문제
+      <span class="sp"></span>
+      <span class="tpl"><button data-tpl="ox">O / X</button><button data-tpl="num">번호만</button><button data-tpl="clear">비우기</button></span>
+    </h3>
+    <textarea id="liveQ" rows="2" placeholder="문제 (비워 두면 '문제를 잘 들어 보세요!'로 표시)"></textarea>
+    <div class="los" id="liveOpts"></div>
+    <div class="lf">보기 <span class="seg" id="liveN"><button data-n="2">2</button><button data-n="3">3</button><button data-n="4">4</button></span>
+      시간 <span class="seg" id="liveT"><button data-t="5">5</button><button data-t="10">10</button><button data-t="15">15</button><button data-t="20">20</button><button data-t="30">30</button></span>초
+      <label style="display:flex;gap:5px;align-items:center;margin-left:auto"><input type="checkbox" id="liveSave">목록에도 저장</label></div>
+    <button class="go" id="liveGo">출제 <span class="key">Ctrl+Enter</span></button>
+    <div class="err" id="liveErr"></div>
+  </section>
+
+  <section class="card">
+    <h3>학생 <span id="pcount"></span><span class="sp"></span><span style="font-weight:600">눌러서 내보내기 · 탈락자는 살리기</span></h3>
+    <div class="plist" id="plist"></div>
+  </section>
+</main>
+
+<div class="lost hidden" id="lost">방을 찾을 수 없습니다.<br>프로젝터 화면에서 방을 연 뒤<br>'조작 창 열기'를 다시 눌러 주세요.</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/common.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+const ZC = IQ.ZONE;
+const STORE = 'sumus-island-quiz:v1';
+const qs = new URLSearchParams(location.search);
+let cred = { pin: qs.get('pin'), key: qs.get('key') };
+let phase = { phase: 'none' }, info = {}, rosterMap = new Map(), players = new Map(), endsAt = 0;
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ── 연결 ── */
+const socket = io();
+function resume() {
+  socket.emit('host:resume', { pin: cred.pin, hostKey: cred.key }, (r) => {
+    $('#lost').classList.toggle('hidden', r.ok);
+    $('#pin').textContent = cred.pin || '----';
+  });
+}
+socket.on('connect', () => { $('#conn').classList.add('on'); resume(); });
+socket.on('disconnect', () => $('#conn').classList.remove('on'));
+let autoEnd = 0;
+socket.on('phase', (p) => { phase = p; if (p.phase === 'question') endsAt = performance.now() + p.remain; autoEnd = p.phase === 'reveal' && p.autoRemain ? performance.now() + p.autoRemain : 0; render(); });
+socket.on('hostinfo', (h) => { info = h; render(); });
+socket.on('roster', (l) => { rosterMap = new Map(l.map(p => [p.id, p])); renderPlayers(); render(); });
+socket.on('s', (arr) => { IQ.applyState(players, arr, performance.now()); });
+
+// 프로젝터 창과 연결 신호 (같은 브라우저)
+const ch = new BroadcastChannel('sumus-island-ctrl');
+const hello = () => ch.postMessage({ type: 'hello', pin: cred.pin, key: cred.key });
+hello(); setInterval(hello, 2000);
+addEventListener('pagehide', () => ch.postMessage({ type: 'bye' }));
+ch.onmessage = (e) => { const m = e.data || {}; if (m.type === 'room' && (m.pin !== cred.pin || m.key !== cred.key)) { cred = { pin: m.pin, key: m.key }; history.replaceState(null, '', `/control?pin=${m.pin}&key=${encodeURIComponent(m.key)}`); resume(); } };
+
+/* ── 화면 ── */
+function counts() {
+  const c = (phase.zones || []).map(() => 0);
+  if (!phase.zones) return c;
+  for (const [id, e] of players) if (e.alive || (phase.reveal && phase.reveal.eliminated.includes(id))) { const z = IQ.zoneOf(phase.zones, e.tx, e.ty); if (z >= 0) c[z]++; }
+  return c;
+}
+function render() {
+  const p = phase.phase;
+  const st = $('#state');
+  st.className = 'pill' + (p === 'question' ? ' q' : p === 'reveal' ? ' r' : '');
+  st.textContent = { lobby: '대기실', question: '진행 중', reveal: '정답 공개', end: '결과 화면' }[p] || '연결 중';
+  $('#qn').textContent = (p === 'question' || p === 'reveal') ? `문제 ${phase.qIndex + 1} / ${phase.total}` : '';
+
+  const mb = $('#mainBtn');
+  if (p === 'lobby') { mb.innerHTML = phase.total ? '게임 시작<span class="key">Space</span>' : '준비한 문제 없음'; mb.disabled = !phase.total; }
+  else if (p === 'question') { mb.innerHTML = '바로 정답 공개<span class="key">Space</span>'; mb.disabled = false; }
+  else if (p === 'reveal') { const last = !info.left || (phase.mode === 'survival' && phase.alive <= 1 && rosterMap.size >= 2); mb.innerHTML = (last ? '결과 보기' : '다음 문제') + '<span class="key">Space</span>'; mb.disabled = false; }
+  else { mb.textContent = '결과 화면'; mb.disabled = true; }
+
+  if (p === 'question' || p === 'reveal') {
+    const c = counts(); const q = phase.q;
+    $('#nowBox').innerHTML = `<div class="qt">${esc(q.text || '(말로 내는 문제)')}</div><div class="opts">${q.options.map((o, i) =>
+      `<div class="op ${i === info.answer ? 'ans' : ''}"><span class="n" style="background:${ZC[i].fill}">${i + 1}</span><span class="tx">${esc(o.text || '(사진)')}</span><span class="c">${c[i] ?? 0}명</span></div>`).join('')}</div>`;
+  } else if (p === 'lobby') {
+    $('#nowBox').innerHTML = `<div class="muted">학생 ${rosterMap.size}명 입장. ${phase.total ? `준비한 문제 ${phase.total}개로 시작하거나, 아래에서 즉석 문제를 바로 내세요.` : '아래에서 즉석 문제를 내면 바로 시작됩니다.'}</div>`;
+  } else if (p === 'end') {
+    const r = phase.result || { ranking: [] };
+    $('#nowBox').innerHTML = `<div class="muted">${r.mode === 'survival' ? `생존자: ${r.ranking.filter(x => r.survivors.includes(x.id)).map(x => esc(x.name)).join(', ') || '없음'}` : `1위: ${esc((r.ranking[0] || {}).name || '-')}`}<br>즉석 문제를 내면 이어서 진행됩니다.</div>`;
+  }
+  $('#nextBox').innerHTML = info.next ? `다음 준비 문제: <b>${esc(info.next.text || '(말로 내는 문제)')}</b> (남은 ${info.left}개)` : (p === 'lobby' ? '' : '준비한 문제는 다 냈습니다.');
+
+  $('#autoBtn').textContent = phase.auto ? '켜짐' : '꺼짐'; $('#autoBtn').classList.toggle('on', !!phase.auto);
+  const busy = p === 'question';
+  $('#liveGo').disabled = busy;
+  $('#liveGo').innerHTML = busy ? '문제 진행 중 — 정답 공개 후 출제' : '출제 <span class="key">Ctrl+Enter</span>';
+}
+function renderPlayers() {
+  const list = [...rosterMap.values()];
+  const alive = list.filter(p => p.alive).length;
+  $('#pcount').textContent = phase.mode === 'survival' && phase.phase !== 'lobby' ? `생존 ${alive} / ${list.length}` : `${list.length}명`;
+  $('#plist').innerHTML = list.map(p => `<button class="pc ${p.alive ? '' : 'dead'} ${p.connected ? '' : 'off'}" data-id="${p.id}"><i style="background:${p.color}"></i>${esc(p.name)}</button>`).join('') || '<span class="muted">아직 아무도 없습니다.</span>';
+}
+$('#plist').onclick = (e) => {
+  const b = e.target.closest('.pc'); if (!b) return; const p = rosterMap.get(b.dataset.id); if (!p) return;
+  if (!p.alive) { if (confirm(`${p.name} 학생을 다시 살릴까요?`)) socket.emit('host:revive', p.id); }
+  else if (confirm(`${p.name} 학생을 내보낼까요?`)) socket.emit('host:kick', p.id);
+};
+$('#autoBtn').onclick = () => { const v = !phase.auto; localStorage.setItem(STORE + ':auto', v ? 'on' : 'off'); socket.emit('host:auto', v); };
+setInterval(() => {
+  const left = autoEnd ? Math.ceil((autoEnd - performance.now()) / 1000) : 0;
+  $('#autoCd').textContent = left > 0 ? `${left}초 뒤 자동으로 넘어감 — 즉석 문제 쓸 시간이 필요하면 끄세요` : (phase.auto ? '정답 공개 5초 뒤 다음 문제 (준비한 문제가 있을 때)' : '정답 공개 후 직접 넘김');
+  if (phase.phase === 'question') { $('#state').textContent = `진행 중 · ${Math.ceil(Math.max(0, endsAt - performance.now()) / 1000)}초`; }
+  if (phase.phase === 'question' || phase.phase === 'reveal') {
+    const c = counts(); document.querySelectorAll('.op .c').forEach((el, i) => el.textContent = `${c[i] ?? 0}명`);
+  }
+}, 250);
+
+/* ── 진행 버튼 ── */
+$('#mainBtn').onclick = () => socket.emit('host:next');
+$('#finishBtn').onclick = () => { if (phase.phase !== 'lobby' && confirm('게임을 끝내고 결과를 보여줄까요?')) socket.emit('host:finish'); };
+$('#resetBtn').onclick = () => { if (confirm('대기실로 돌아갑니다. 점수와 탈락이 모두 초기화됩니다.')) socket.emit('host:reset'); };
+document.addEventListener('keydown', (e) => {
+  const typing = ['INPUT', 'TEXTAREA'].includes(e.target.tagName);
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submitLive(); return; }
+  if (e.altKey && /^Digit[1-4]$/.test(e.code)) { const i = +e.code.slice(5) - 1; if (i < LIVE.n) { e.preventDefault(); liveAns = i; renderLive(); } return; }
+  if (!typing && e.code === 'Space' && !$('#mainBtn').disabled) { e.preventDefault(); socket.emit('host:next'); }
+});
+
+/* ── 즉석 문제 ── */
+const LIVE = Object.assign({ n: 2, time: 10, opts: ['', '', '', ''], save: false }, JSON.parse(localStorage.getItem(STORE + ':live') || '{}'));
+let liveAns = -1;
+function persistLive() { localStorage.setItem(STORE + ':live', JSON.stringify(LIVE)); }
+function renderLive() {
+  $('#liveOpts').innerHTML = Array.from({ length: LIVE.n }, (_, i) => `
+    <div class="lo ${liveAns === i ? 'ans' : ''}"><button style="background:${ZC[i].fill}" data-a="${i}" title="정답으로">${i + 1}</button>
+    <input data-i="${i}" value="${esc(LIVE.opts[i])}" placeholder="보기 ${i + 1}"><span class="pick">${liveAns === i ? '정답' : '번호 눌러 정답'}</span></div>`).join('');
+  document.querySelectorAll('#liveN button').forEach(b => b.classList.toggle('on', +b.dataset.n === LIVE.n));
+  document.querySelectorAll('#liveT button').forEach(b => b.classList.toggle('on', +b.dataset.t === LIVE.time));
+  $('#liveSave').checked = LIVE.save;
+}
+$('#liveOpts').addEventListener('input', (e) => { if (e.target.dataset.i != null) { LIVE.opts[+e.target.dataset.i] = e.target.value; persistLive(); } });
+$('#liveOpts').addEventListener('click', (e) => { const a = e.target.dataset.a; if (a == null) return; liveAns = +a; $('#liveErr').textContent = ''; renderLive(); });
+$('#liveN').onclick = (e) => { const n = +e.target.dataset.n; if (!n) return; LIVE.n = n; if (liveAns >= n) liveAns = -1; persistLive(); renderLive(); };
+$('#liveT').onclick = (e) => { const t = +e.target.dataset.t; if (!t) return; LIVE.time = t; persistLive(); renderLive(); };
+$('#liveSave').onchange = (e) => { LIVE.save = e.target.checked; persistLive(); };
+document.querySelector('.tpl').onclick = (e) => {
+  const t = e.target.dataset.tpl; if (!t) return;
+  if (t === 'ox') { LIVE.n = 2; LIVE.opts = ['O', 'X', '', '']; }
+  if (t === 'num') LIVE.opts = ['1번', '2번', '3번', '4번'];
+  if (t === 'clear') { LIVE.opts = ['', '', '', '']; $('#liveQ').value = ''; }
+  liveAns = -1; persistLive(); renderLive();
+};
+function submitLive() {
+  if ($('#liveGo').disabled) return ($('#liveErr').textContent = '정답 공개 후에 낼 수 있습니다');
+  if (liveAns < 0) return ($('#liveErr').textContent = '정답 번호를 눌러 주세요');
+  if (!rosterMap.size) return ($('#liveErr').textContent = '아직 들어온 학생이 없습니다');
+  const options = LIVE.opts.slice(0, LIVE.n).map((t, i) => ({ text: t.trim() || `${i + 1}번` }));
+  const q = { text: $('#liveQ').value.trim(), options, answer: liveAns, time: LIVE.time };
+  socket.emit('host:live', q, (r) => {
+    if (!r.ok) return ($('#liveErr').textContent = r.error);
+    $('#liveErr').textContent = '';
+    if (LIVE.save) {
+      try { const list = JSON.parse(localStorage.getItem(STORE) || '[]'); list.push({ ...q, text: q.text || '(말로 낸 문제)' }); localStorage.setItem(STORE, JSON.stringify(list)); } catch (e) {}
+    }
+    $('#liveQ').value = ''; liveAns = -1; renderLive();
+  });
+}
+$('#liveGo').onclick = submitLive;
+
+renderLive(); render();
+</script>
+</body>
+</html>
