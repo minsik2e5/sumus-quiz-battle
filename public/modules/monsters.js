@@ -43,6 +43,10 @@ export const MONSTER_LEVELS = {
 export const MONSTER_LEVEL_KEYS = ['easy', 'normal', 'hard'];
 export const MONSTER_DAILY = 5;
 export const MONSTER_MIN_MS = 30000; // a fight cannot be won faster than this
+// V13.99: a lost fight pays only after `need` right answers, and answering takes time: at least
+// 1.5 s per right answer (a real word needs the tap plus the 1.4 s reveal, after a 3 s countdown),
+// so an honest quick loss always passes and a made-up result sent at once does not.
+export const MONSTER_MS_PER_RIGHT = 1500;
 export const MONSTER_TRY = { coins: 2, xp: 20 }; // a lost fight that answered `need` words
 
 // Natural order of range codes: 2 before 10, '41~42' after '40', L1 after the numbers.

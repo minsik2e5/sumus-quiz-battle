@@ -7,6 +7,7 @@ import { builtinBooks } from './service.mjs';
 import { VocaStateObject } from '../cloudflare/worker.mjs';
 import { createLocalRepository, createSupabaseSync } from '../cloudflare/local-first.mjs';
 import { assembleState } from '../cloudflare/state-parts.mjs';
+import { runBattleRoomChecks } from './battle-room-check.mjs';
 
 const deepCopy = value => structuredClone(value);
 
@@ -34,7 +35,12 @@ function createStorageMock() {
       try { const result = callback(); db.exec('COMMIT'); return result; }
       catch (error) { db.exec('ROLLBACK'); throw error; }
     },
-    setAlarm(time) { this.alarm = time; }
+    setAlarm(time) { this.alarm = time; },
+    // Key-value API of ctx.storage (V13.99: last successful backup time).
+    kv: new Map(),
+    // Like the real API: a key or a list of keys (-> Map), a key and value or an object of entries.
+    async get(key) { return Array.isArray(key) ? new Map(key.filter(k => this.kv.has(k)).map(k => [k, this.kv.get(k)])) : this.kv.get(key); },
+    async put(key, value) { if (typeof key === 'object') for (const [k, v] of Object.entries(key)) this.kv.set(k, v); else this.kv.set(key, value); }
   };
 }
 
@@ -212,6 +218,11 @@ export async function runCloudflareCheck() {
     assert.equal(health.payload.storage.mode, 'local-first');
     assert.equal(health.payload.storage.supabase_pending, true, '상태 점검에서 백업 대기를 보여야 합니다.');
     assert(health.payload.storage.state_breakdown?.keys_kb?.sessions >= 0 && Number.isInteger(health.payload.storage.state_breakdown.practices.active), '상태 점검에서 항목별 크기를 보여야 합니다.');
+    // V13.99: when the backup last succeeded (kept in ctx.storage) and how it is stored.
+    const lastOk = health.payload.storage.supabase_last_ok_at;
+    assert(Number.isFinite(lastOk) && lastOk > 0 && lastOk <= Date.now(), `V13.99 상태 점검에서 마지막 백업 성공 시각을 보여야 합니다: ${lastOk}`);
+    assert.equal(storage.kv.get('supabase_last_ok_at'), lastOk, 'V13.99 마지막 백업 성공 시각은 ctx.storage에 저장해야 합니다.');
+    assert.equal(health.payload.storage.supabase_backup_mode, 'full', 'V13.99 상태 점검에서 백업 방식(full)을 보여야 합니다.');
 
     // 5. Restart with changes Supabase has not received: local wins, then uploads.
     object.sync.close();
@@ -222,6 +233,8 @@ export async function runCloudflareCheck() {
     assert.equal(failReads, 1, '미동기화 변경이 있으면 Supabase를 읽지 않고 로컬로 시작해야 합니다.');
     failReads = 0;
     assert(object.mutations.current().state.practices.some(item => item.id === duringOutage.payload.id), '미동기화 로컬 변경이 재시작 후에도 유지되어야 합니다.');
+    const afterRestart = await call('/api/health');
+    assert.equal(afterRestart.payload.storage.supabase_last_ok_at, lastOk, 'V13.99 재시작 뒤에도 마지막 백업 성공 시각이 남아 있어야 합니다.');
     await syncNow();
     assert(persisted.practices.some(item => item.id === duringOutage.payload.id), '복구 후 Supabase가 따라잡아야 합니다.');
 
@@ -277,6 +290,8 @@ export async function runCloudflareCheck() {
       const commitsBefore = commits;
       await object.sync.run();
       assert.equal(object.sync.status().mode, 'parts', '파트 함수가 있으면 파트 백업을 써야 합니다.');
+      const partsHealth = (await call('/api/health')).payload.storage;
+      assert(partsHealth.supabase_backup_mode === 'parts' && partsHealth.supabase_last_ok_mode === 'parts' && partsHealth.supabase_last_ok_at >= lastOk, 'V13.99 상태 점검에서 백업 방식(parts)과 마지막 성공을 보여야 합니다.');
       assert(partsStore.revision >= 1 && partsStore.parts['o:keys'] && partsStore.parts['k:profiles'], '첫 파트 백업은 모든 파트를 올려야 합니다.');
       assert.equal(commits, commitsBefore + 1, '파트 백업 중에도 전체 사본(v12)을 주기적으로 남겨야 합니다.');
 
@@ -332,7 +347,7 @@ export async function runCloudflareCheck() {
 
 // pathToFileURL: a hand-built `file://${path}` never matches on Windows, which made this check exit 0 without running.
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  runCloudflareCheck().catch(error => {
+  runCloudflareCheck().then(runBattleRoomChecks).catch(error => {
     console.error('[cloudflare-check] FAIL', error);
     process.exitCode = 1;
   });

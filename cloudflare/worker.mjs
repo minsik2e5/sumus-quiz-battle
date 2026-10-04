@@ -352,10 +352,13 @@ export class VocaStateObject {
       if (pushMessages.length) this.ctx.waitUntil(this.deliverPush(pushMessages, url.origin).catch(error => console.error('[push]', error?.message)));
       const elapsed = Date.now() - startedAt;
       const { commitMs, commitBytes } = this.local.metrics;
+      // The last successful backup time is read from ctx.storage once, after a restart.
+      if (url.pathname === '/api/health') await this.sync.loaded;
       const sync = this.sync.status();
       if (request.method !== 'GET' && elapsed > 1500) console.warn('[slow-mutation]', url.pathname.replace(/\/[0-9a-f-]{36}/g, '/:id'), { elapsed, commitMs, commitBytes });
       // Public health output shows whether the Supabase backup is keeping up.
-      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.json.length || 0) / 1024), state_breakdown: this.sizeReport() };
+      // V13.99: supabase_last_ok_at (kept in ctx.storage) and the backup way (parts/full).
+      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.json.length || 0) / 1024), state_breakdown: this.sizeReport() };
       const responseHeaders = {
         // Visible in DevTools > Network > Timing, so slow saves can be measured on a real phone.
         // commit = local durable write; supabase = last background upload.

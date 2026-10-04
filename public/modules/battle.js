@@ -195,7 +195,7 @@ function bindRoot() {
     if (act === 'challenge') return pickFriend(b);
     if (act === 'join') return joinRoom(b);
     if (act === 'cancel') return cancelRoom(b);
-    if (act === 'answer') { if (B.view?.question) B.view.question.picked = Number(b.dataset.choice); return send({ type: 'answer', choice: Number(b.dataset.choice) }, b); }
+    if (act === 'answer') return pickChoice(Number(b.dataset.choice), b);
     if (act === 'leave') return confirmLeave();
     if (act === 'again') { B.A.tab = 'yacha'; return leaveScreen(); }
   };
@@ -671,11 +671,25 @@ function closeSocket(final = true) {
   B.local?.close();
   B.local = null;
 }
+// Returns whether the message left the phone.
 function send(message, button) {
-  if (B?.local) { if (button) button.classList.add('picked'); B.local.send(message); return; }
-  if (B?.ws?.readyState !== 1) return toast('대결 방과 연결되지 않았어요.');
+  if (B?.local) { if (button) button.classList.add('picked'); B.local.send(message); return true; }
+  if (B?.ws?.readyState !== 1) { toast('대결 방과 연결되지 않았어요.'); return false; }
   if (button) button.classList.add('picked');
   B.ws.send(JSON.stringify(message));
+  return true;
+}
+// V13.99: an answer carries the number of its word (idx), so a tap that arrives after the word
+// closed is not counted for the next one, and the word takes no more taps once one was sent.
+function pickChoice(choice, button) {
+  const q = B?.view?.question;
+  if (!q || q.locked || q.answer !== undefined) return;
+  // `picked` before sending: a practice match answers at once and draws from it.
+  const before = q.picked;
+  q.picked = choice;
+  if (!send({ type: 'answer', choice, ...(Number.isInteger(q.idx) ? { idx: q.idx } : {}) }, button)) { q.picked = before; return; }
+  q.locked = true;
+  document.querySelectorAll('.yb-answer').forEach(b => { b.disabled = true; });
 }
 function setNote(text) { const n = document.getElementById('yb-top-note'); if (n) n.textContent = text; }
 
@@ -686,7 +700,7 @@ function onMessage(msg) {
   if (msg.type === 'view') {
     // A view after a reconnect or reload has the word but not what this phone typed for it.
     const q = msg.view?.question;
-    if (q) Object.assign(q, { typed: [], hint: q.hint || '', options: q.options || [], opDone: !!q.opDone });
+    if (q) Object.assign(q, { typed: [], hint: q.hint || '', options: q.options || [], opDone: !!q.opDone, judged: !!q.locked });
     B.view = msg.view; return drawMatch();
   }
   if (msg.type === 'events' && B.view) { for (const e of msg.events) applyEvent(e); }
@@ -885,9 +899,9 @@ function spellKey(key) {
 function spellSubmit() {
   const q = B?.view?.question;
   if (!q || q.kind !== 'spell' || q.locked || q.answer !== undefined || q.typed.length !== blanks(q)) return;
+  if (!send({ type: 'answer', choice: spelled(q), ...(Number.isInteger(q.idx) ? { idx: q.idx } : {}) })) return;
   q.locked = true;
   document.querySelectorAll('#yb-spell button').forEach(b => { b.disabled = true; });
-  send({ type: 'answer', choice: spelled(q) });
 }
 // A hardware keyboard (tablets, computers) types too.
 let keysHooked = false;
@@ -1025,7 +1039,7 @@ function applyEvent(e) {
     v.phase = 'question'; v.deadline = e.deadline;
     // V13.94 각자 내 범위: each player has a word of their own range on the same turn.
     const mine = e.own?.[v.me] || e;
-    v.question = { n: e.n, kind: mine.kind || 'choice', prompt: mine.prompt, hint: mine.hint || '', options: mine.options || [], started_at: e.started_at, locked: false, opDone: false, answer: undefined, typed: [] };
+    v.question = { n: e.n, idx: e.idx, kind: mine.kind || 'choice', prompt: mine.prompt, hint: mine.hint || '', options: mine.options || [], started_at: e.started_at, locked: false, opDone: false, answer: undefined, typed: [] };
     if (!document.getElementById('yb-arena')) return drawMatch();
     setStatus('me', ''); setStatus('op', '');
     const vs = document.getElementById('yb-vs'); if (vs) vs.hidden = true;
@@ -1038,7 +1052,7 @@ function applyEvent(e) {
     if (e.player !== v.me) v.question.opDone = true;
     if (e.player === v.me) {
       sfx('wrong', 40);
-      v.question.locked = true;
+      v.question.locked = true; v.question.judged = true;
       document.querySelector('.yb-answer.picked')?.classList.add('wrong');
       document.querySelectorAll('.yb-answer').forEach(b => { b.disabled = true; });
       if (v.question.kind === 'spell') { v.question.wrong = true; drawQuestion(); }
@@ -1056,7 +1070,8 @@ function applyEvent(e) {
       for (const id of v.order) P[id].gauge = 0;
       say(e.timeout ? '시간 초과!' : '둘 다 놓쳤어요!', line);
     } else {
-      if (e.timeout && !v.question.locked) { P[v.me].gauge = 0; setStatus('me', '시간 초과!'); }
+      // `judged`: the room took my answer (V13.99: the word locks as soon as an answer is sent).
+      if (e.timeout && !v.question.judged) { P[v.me].gauge = 0; setStatus('me', '시간 초과!'); }
       if (e.timeout && !v.question.opDone) foe().gauge = 0;
       say('정답 공개', line);
     }
@@ -1068,7 +1083,7 @@ function applyEvent(e) {
       P[e.attacker].hp = e.hp[e.attacker]; P[e.defender].hp = e.hp[e.defender];
       P[e.attacker].gauge = e.gauge ?? P[e.attacker].gauge;
       if (e.effects) for (const id of Object.keys(e.effects)) P[id].effects = e.effects[id];
-      if (atk === 'me') { v.question.locked = true; v.question.hit = true; } else v.question.opDone = true;
+      if (atk === 'me') { v.question.locked = true; v.question.hit = true; v.question.judged = true; } else v.question.opDone = true;
       if (e.spell && atk === 'me') v.question.right = true;
       const need = (P[e.attacker].skill || petSkill(P[e.attacker].pet)).need;
       setStatus(atk, `${(e.ms / 1000).toFixed(1)}초 ${e.spell ? '철자 ' : ''}정답!${atk === 'me' && e.gauge ? ` 스킬 ${e.gauge}/${need}` : ''}`);

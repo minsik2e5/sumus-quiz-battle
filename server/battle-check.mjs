@@ -1,4 +1,5 @@
 // Release checks for the yacha battle rules (server/battle-engine.mjs).
+import { readFileSync } from 'node:fs';
 import { BATTLE, BATTLE_MODES, PET_SKILLS, PET_SKILL_NEED, petSkill, createBattle, connect, disconnect, forfeit, answer, tick, nextWake, battleView } from './battle-engine.mjs';
 
 const questions = Array.from({ length: 6 }, (_, i) => ({ word_id: 'w' + i, prompt: 'word' + i, options: ['a', 'b', 'c', 'd'], answer: i % 4 }));
@@ -272,5 +273,56 @@ export function runBattleChecks(assert) {
     assert(battleView(s, 'guest').question.prompt === 'guest1' && battleView(s, 'host').question.prompt === 'host1', 'V13.94 the next turn moves both lists on');
     const end = forfeit(s, 'host', t + 5000).find(e => e.type === 'end');
     assert(end.result.review.guest[0]?.word === 'guest0' && end.result.max_hp === 250, 'V13.94 the result lists the words each player missed from their own range');
+  }
+  /* ---------- V13.99 경기 종료 시각 · 문제 번호 ---------- */
+  {
+    // A word opened just before the match ends gets only the time that is left, not a full turn.
+    const { s, t } = started();
+    answer(s, 'host', correct(s), t + 500); answer(s, 'guest', correct(s), t + 500);
+    s.ends_at = t + 2500; // the reveal ends at t + 1900, 0.6 s before the match ends
+    const opened = tick(s, t + 1900).find(e => e.type === 'question');
+    assert(opened && s.deadline === s.ends_at && opened.deadline === s.ends_at, 'V13.99 the last word closes when the match ends (deadline = ends_at)');
+    assert(answer(s, 'host', correct(s), s.ends_at).length === 0 && answer(s, 'host', correct(s), s.ends_at + 400).length === 0 && s.players.host.correct === 1, 'V13.99 an answer at or after ends_at does not attack');
+    assert(nextWake(s) <= s.ends_at, 'V13.99 the room wakes up when the match ends');
+    const over = tick(s, s.ends_at + 50);
+    assert(s.phase === 'finished' && over.some(e => e.type === 'end' && e.result.reason === 'end'), 'V13.99 tick ends the match at ends_at');
+  }
+  {
+    // A reveal running past ends_at: the match ends at ends_at, not when the reveal pause ends.
+    const { s, t } = started();
+    s.ends_at = t + 1000;
+    answer(s, 'host', correct(s), t + 500); answer(s, 'guest', wrong(s), t + 500);
+    assert(s.phase === 'reveal' && s.deadline > s.ends_at && nextWake(s) === s.ends_at, 'V13.99 nextWake includes ends_at during the reveal');
+    tick(s, s.ends_at);
+    assert(s.phase === 'finished' && s.result.reason === 'end', 'V13.99 tick ends the match at ends_at even in the middle of a reveal');
+  }
+  {
+    // A player dropped long before the end still loses by disconnect, not by time.
+    const { s, t } = started();
+    s.ends_at = t + 20000;
+    disconnect(s, 'guest', t + 1000);
+    tick(s, t + 30000);
+    assert(s.result?.reason === 'disconnect' && s.result.loser === 'guest', 'V13.99 a grace period that ran out before ends_at is still a disconnect loss');
+  }
+  {
+    // The answer of the previous word must not count for the next one.
+    const { s, t } = started();
+    const q0 = s.idx;
+    assert(battleView(s, 'host').question.idx === q0, 'V13.99 the view carries the word number (idx)');
+    answer(s, 'host', wrong(s), t + 1000); answer(s, 'guest', wrong(s), t + 1000);
+    const next = tick(s, t + 1000 + BATTLE.REVEAL_MS).find(e => e.type === 'question');
+    assert(next && next.idx === s.idx && s.idx === q0 + 1, 'V13.99 the question event carries the word number (idx)');
+    const late = answer(s, 'host', correct(s), t + 3000, q0);
+    assert(late.length === 0 && !s.turn.locked.host, 'V13.99 an answer sent for the previous word is ignored');
+    const legacy = answer(s, 'guest', correct(s), t + 3100);
+    const current = answer(s, 'host', correct(s), t + 3200, s.idx);
+    assert(legacy.some(e => e.type === 'attack' && e.attacker === 'guest') && current.some(e => e.type === 'attack' && e.attacker === 'host'), 'V13.99 an answer with the current number, or none (older app), still counts');
+  }
+  {
+    // The phone sends the word number with every answer and takes no more taps for that word.
+    const ui = readFileSync(new URL('../public/modules/battle.js', import.meta.url), 'utf8');
+    const bot = readFileSync(new URL('../public/modules/battle-bot.js', import.meta.url), 'utf8');
+    assert(ui.includes("v.question = { n: e.n, idx: e.idx,") && (ui.match(/\{ idx: q\.idx \}/g) || []).length === 2 && ui.includes('q.picked = choice;') && ui.includes("{ idx: q.idx } : {}) }, button)) { q.picked = before; return; }\n  q.locked = true;") && ui.includes("if (act === 'answer') return pickChoice("), 'V13.99 battle.js sends idx with choice and spelling answers and locks the word once sent');
+    assert(bot.includes('Number.isInteger(message.idx) ? message.idx : undefined'), 'V13.99 the practice match (로보·몬스터) passes idx to the same engine');
   }
 }
