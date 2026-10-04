@@ -534,6 +534,34 @@ for (let i = 0; i < cells11.length; i += 4) {
   sheet(F11, `칭호 메달 ${i / 4 + 1} (${tiers.join('·')}${group.some(c => !c[0].startsWith('title-')) ? ' + 칭호 화면 그림' : ''})`, 'title', 'All medals of this set are one family, like the achievement medals of one premium mobile game: the same lighting, metal finish, outline and level of detail.', group);
 }
 
+/* 12 몬스터 2탄 (V13.104~): 레벨이 계속 이어지는 몬스터전에 쓸 새 몬스터 9종 + 단계 아이콘 4개.
+   9종은 앞에서 뒤로 갈수록 덩치가 크고 위엄 있게 보여요(레벨이 올라갈수록 어려워지는 몬스터).
+   각 몬스터는 10과 같은 4가지 모습(기본·공격·맞음·쓰러짐). 앱에서 쓰는 key는 아래 표와 같아요(코드는 나중에 이 key를 읽어요). */
+const F12 = '12-monsters.txt';
+const MONSTER2_DESIGNS = [
+  ['mochi', '암기 모찌', 'a small, soft, round white rice-cake (mochi) blob with a pale pink cheek-blush, a tiny yellow sticky-note headband (no writing on it) and two sparkly sleepy-cute eyes; the smallest and friendliest monster of the whole set'],
+  ['pencilworm', '샤프 벌레', 'a chubby mint-green caterpillar made of stacked mechanical-pencil segments, a sharp pencil-tip nose, a pink eraser cap on the tail end, thin blue lead-line streaks on its sides'],
+  ['mimic', '노트 미믹', 'a treasure-chest-shaped monster disguised as a thick spiral notebook: the cover opens like a mouth with white paper pages as sharp teeth, a long pink bookmark tongue, two wide eyes peeking from the cover'],
+  ['sleepcloud', '졸음 구름', 'a fluffy lavender-grey storm cloud with half-closed droopy eyes, a big yawn, floating little blue "z" shaped sparkles (no letters) and a tiny nightcap tuft, dripping dreamy sparkles instead of rain'],
+  ['alarmwolf', '알람 늑대', 'a lean dark-blue wolf howling with a loud round alarm bell on top of its head like a crown, jagged yellow sound-wave rings around its mouth, bandaged-looking paws, bright amber eyes'],
+  ['scrollgoblin', '무한 스크롤 도깨비', 'a mischievous orange goblin (dokkaebi) with one small horn, holding an endlessly long unrolling paper scroll that trails behind it in loops, hypnotic swirl eyes and a huge sly grin (generic scroll, no real app or brand logos)'],
+  ['proctor', '감독 기사', 'a stern armored exam-proctor knight with a giant stopwatch as a round shield and a long red pen as a lance, a helmet with a small bell, steady-glaring but funny eyes behind the visor slit'],
+  ['cramwizard', '벼락치기 마법사', 'an exhausted-but-powerful night-before-the-exam wizard with a tall crooked purple hat covered in sticky notes (no writing), a coffee cup glowing like a magic staff, messy hair, dark circles and crackling purple lightning around the hands'],
+  ['mockhydra', '모의고사 히드라', 'a huge three-headed hydra made of rolled and folded test papers in cream, mint and pink, each head wearing a different silly expression, bubble-sheet circle patterns on its scales (shapes only), glowing gold eyes; the largest and most majestic monster of the set, but still cute-but-mighty']
+];
+for (const [key, ko, look] of MONSTER2_DESIGNS) sheet(F12, `몬스터2 ${ko}`, 'monster', `"${ko}": ${look}.`, [
+  [`monster-${key}`, `${ko} 기본`, 'IDLE: standing ready in a confident taunting pose, a playful smug face', `public/assets/monsters/${key}.webp`],
+  [`monster-${key}-attack`, `${ko} 공격`, 'ATTACK: lunging forward to the LEFT with its signature move, motion lines and a burst of its own color, fierce but cute face', `public/assets/monsters/${key}-attack.webp`],
+  [`monster-${key}-hurt`, `${ko} 맞음`, 'HURT: knocked back to the right, squinting eyes, small white impact stars around it', `public/assets/monsters/${key}-hurt.webp`],
+  [`monster-${key}-down`, `${ko} 쓰러짐`, 'DEFEATED: flopped down on its back or side, swirly dizzy eyes, a few small stars circling above it, comical not sad', `public/assets/monsters/${key}-down.webp`]
+]);
+sheet(F12, '몬스터 단계(레벨) 아이콘', 'icon', 'All icons in this set are one family, like the icons of one premium mobile game; keep each simple and bold so it stays clear at 48 pixels. Each icon is a "stage plate": a rounded shield-shaped plaque with a flat, EMPTY center (the app writes the level number there, so leave the middle plain and free of any drawing, letters or numbers).', [
+  ['ui-monster-stage', '단계 판(열림)', 'a stage plate in warm sky BLUE metal with a thin white rim and two tiny crossed swords tucked behind it, a soft glow, flat empty center', 'public/assets/ui/monster-stage.webp'],
+  ['ui-monster-stage-lock', '단계 판(잠김)', 'the same stage plate shape in dull steel GREY with a heavy chain wrapped around it and a small padlock hanging at the bottom, no glow, flat empty center', 'public/assets/ui/monster-stage-lock.webp'],
+  ['ui-monster-stage-clear', '단계 판(깸)', 'the same stage plate shape in shiny GOLD with a small green leaf wreath on both sides and one big white star above it, a few sparkles, flat empty center', 'public/assets/ui/monster-stage-clear.webp'],
+  ['ui-monster-stage-boss', '단계 판(보스)', 'the same stage plate shape in DEEP CRIMSON and black metal with two small curved horns on top and tiny orange flames licking up from behind it, flat empty center', 'public/assets/ui/monster-stage-boss.webp']
+]);
+
 /* Google Drive: 그림을 그리는 GPT는 Drive에서 참고 그림을 열어 보고, 결과를 Drive 폴더에 올려요.
    규칙: 시트별 파일(split/)로 나가는 모든 주문서는 DRIVE에 폴더가 있어야 하고(없으면 멈춰요),
    끝에 "이 폴더에 이 이름으로 올리기"가 붙어요. 처음 그리는 그림(08·09a)은 기존 그림을 열어 보고 그림체를 맞춰요. */
@@ -543,6 +571,7 @@ const DRIVE = {
   [F8]: 'SUMUS 메뉴·학습 08 (Runner용)',
   [F9A]: 'SUMUS 새 기본 펫 09 (Runner용)', [F9B]: 'SUMUS 새 기본 펫 09 (Runner용)',
   [F10]: 'SUMUS 몬스터 10 (Runner용)',
+  [F12]: 'SUMUS 몬스터 12 (Runner용)',
   [F11]: 'SUMUS 칭호 11 (Runner용)'
 };
 const PET_SPRITES = 'SUMUS_PET_SPRITES_ALL_20261002/original_1254';
@@ -554,14 +583,16 @@ const STYLE_REF = {
   badges: `STYLE REFERENCE — before drawing, open "07a-5.png" in the Google Drive folder "${DRIVE[F7A]}" (legendary egg and badge) and "06-3.png" in the Google Drive folder "${DRIVE[F6]}" (jackpot): they show shiny game art already used in this app. Draw the new medals or stamps in exactly that style: the same shiny metal and gem rendering, the same clean outline and soft sparkles. Do NOT copy the reference objects.`,
   titles: `STYLE REFERENCE — before drawing, open these pictures in Google Drive and study them: "07a-5.png" in the Google Drive folder "${DRIVE[F7A]}" (legendary badge), "06-3.png" in the Google Drive folder "${DRIVE[F6]}" (jackpot and ticket) and "10-10.png" in the Google Drive folder "${DRIVE[F10]}" (shield badges) if it is there. They show shiny game art already used in this app. Draw the medals in exactly that style: the same glossy 3D toy-like metal and enamel, the same chunky rounded shapes, the same clean edges and soft sparkles, the same bright clear colors. ${KEEP} Do NOT copy the reference objects.`
 };
-const refOf = p => p.file === F11 ? 'titles' : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
+STYLE_REF.monsters12 = STYLE_REF.monsters.replace(/Also open "10-1\.png"[^\n]*$/, `Also open the first monsters of this game in the Google Drive folder "${DRIVE[F10]}" ("10-1.png" and "10-8.png"; this new set is their second batch, so match their finish, size and level of detail exactly) and, if it is there, "12-1.png" in the Google Drive folder "${DRIVE[F12]}" (the first monster of the new set), and match its finish and size too. Do NOT copy the existing monsters; this is a new design.`);
+STYLE_REF.icons12 = `${STYLE_REF.icons} Also open "10-10.png" in the Google Drive folder "${DRIVE[F10]}" (the monster screen icons: tab and difficulty badges) and match its finish and size.`;
+const refOf = p => p.file === F11 ? 'titles' : p.file === F12 ? (/아이콘/.test(p.title) ? 'icons12' : 'monsters12') : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
 const NEW_ORDER = Object.keys(NEW_PETS);
 const sheetName = (file, i) => `${file.slice(0, /^\d\d[ab]-/.test(file) ? 3 : 2)}-${i + 1}`;
 
 /* 쓰기 */
 const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
-const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11]);
+const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11, F12]);
 for (const [file, list] of byFile) list.forEach((p, i) => {
   if (!SPLIT.has(file)) return;
   if (!DRIVE[file]) throw new Error(`${file}: Google Drive 폴더(DRIVE)가 없어요. 주문서에는 업로드 위치가 꼭 있어야 해요.`);
@@ -570,7 +601,7 @@ for (const [file, list] of byFile) list.forEach((p, i) => {
   if (ref) {
     lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
     lines.splice(2, 0, STYLE_REF[ref]);
-    p.ref = `Drive: ${ref === 'pets' || ref === 'monsters' ? PET_SPRITES : ref === 'icons' ? '06-3.png, 06-4.png' : ref === 'titles' ? '07a-5.png, 06-3.png, 10-10.png' : '07a-5.png, 06-3.png'}`;
+    p.ref = `Drive: ${ref === 'pets' || ref === 'monsters' ? PET_SPRITES : ref === 'monsters12' ? `${PET_SPRITES}, 10-1.png, 10-8.png` : ref === 'icons12' ? '06-3.png, 06-4.png, 10-10.png' : ref === 'icons' ? '06-3.png, 06-4.png' : ref === 'titles' ? '07a-5.png, 06-3.png, 10-10.png' : '07a-5.png, 06-3.png'}`;
   }
   // 11 칭호: 뒤 시트는 같은 등급이 처음 나온 시트(와 11-1)를 열어 테두리·크기를 똑같이 맞춰요.
   if (file === F11 && i > 0) {

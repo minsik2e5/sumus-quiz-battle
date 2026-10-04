@@ -22,7 +22,8 @@
 | **`05-rps-arms.txt`** | 2 | 8 | **가위바위보 팔**: 로보 팔(왼쪽에서) · 내 팔(오른쪽에서) × 바위 · 가위 · 보 + 항복 깃발 · 엄지척 |
 | **`06-robot-lucky-eggs.txt`** | 8 | 32 | **Codex 작업(`CODEX_PROMPT_06.md`)**: 로보 쉬움·보통 야차전 동작 · 코인 뽑기 머신과 캡슐 · 알 반응(8종 × 기뻐함·따뜻해짐) |
 | **`11-titles.txt`** | 17 | 68 | **칭호 메달**: 칭호 65개(옛 뽑기 칭호 포함)마다 메달 1개 + 칭호 도감 그림 3개. Drive 주문서 "11 칭호 주문서", 저장은 "SUMUS 칭호 11 (Runner용)" 폴더. 자르기: `fit-assets.mjs <시트> titles/<키> … --small 96` |
-| `00-all-in-order.txt` | 47 | 188 | 위 파일을 모두 합친 것 |
+| **`12-monsters.txt`** | 10 | 40 | **몬스터 2탄**: 새 몬스터 9종(기본·공격·맞음·쓰러짐) + 몬스터 단계(레벨) 판 아이콘 4개. 레벨이 계속 이어지는 몬스터전에 써요. Drive 폴더 "SUMUS 몬스터 12 (Runner용)", 파일은 `12-1.png` ~ `12-10.png` |
+| `00-all-in-order.txt` | 159 | 636 | 위 파일을 모두 합친 것 |
 
 - `slice-map.csv`: 몇 번째 프롬프트의 어느 칸이 어떤 그림인지, 앱 안의 어느 파일이 되는지 적혀 있어요.
 - `05`를 돌릴 때: 로보 팔은 `refs/ref-robot.png`를 먼저 올려요. 내 팔은 참고 그림 없이 돌려요. 팔 방향(로보는 손이 오른쪽, 내 팔은 손이 왼쪽)이 반대로 나오면 그 프롬프트만 다시 돌려요.
@@ -62,3 +63,24 @@ ChatGPT는 대화에 먼저 올린 그림(아기)을 따라 그리는 경향이 
 ## 목록 고치기
 - 프롬프트의 문구, 칸 내용, 펫 설명은 `build-runner.mjs`에서 고쳐요.
 - 고친 뒤 `node docs/asset-requests/runner/build-runner.mjs`를 실행하면 목록이 다시 만들어져요.
+
+## 12 몬스터 2탄 (레벨 몬스터전용)
+`12-monsters.txt`는 프롬프트 10개이고, 시트마다 `split/12-N …txt`로도 나눠져 있어요(새 대화에서 한 장씩 돌릴 때).
+- 시트 1~9가 몬스터이고, 앞에서 뒤로 갈수록 덩치가 크고 위엄 있게 그려요. 시트 10은 단계 판 아이콘이에요.
+- 그림을 그리는 쪽이 **Google Drive에 `SUMUS 몬스터 12 (Runner용)` 폴더로 `12-N.png` 이름 그대로** 올려요. 그러면 제가 자르고 webp로 바꿔서 앱에 연결해요.
+- 그림체는 Drive의 기존 몬스터(`SUMUS 몬스터 10 (Runner용)`의 `10-1.png`, `10-8.png`)와 펫 그림을 열어 보고 맞춰요(주문서에 들어 있어요).
+
+| 시트 | key | 이름 | 앱 파일(기본·공격·맞음·쓰러짐) |
+|---|---|---|---|
+| 12-1 | mochi | 암기 모찌 | `public/assets/monsters/mochi{,-attack,-hurt,-down}.webp` |
+| 12-2 | pencilworm | 샤프 벌레 | `…/pencilworm…` |
+| 12-3 | mimic | 노트 미믹 | `…/mimic…` |
+| 12-4 | sleepcloud | 졸음 구름 | `…/sleepcloud…` |
+| 12-5 | alarmwolf | 알람 늑대 | `…/alarmwolf…` |
+| 12-6 | scrollgoblin | 무한 스크롤 도깨비 | `…/scrollgoblin…` |
+| 12-7 | proctor | 감독 기사 | `…/proctor…` |
+| 12-8 | cramwizard | 벼락치기 마법사 | `…/cramwizard…` |
+| 12-9 | mockhydra | 모의고사 히드라 | `…/mockhydra…` |
+| 12-10 | (아이콘 4) | 단계 판: 열림 · 잠김 · 깸 · 보스 | `public/assets/ui/monster-stage{,-lock,-clear,-boss}.webp` |
+
+단계 판 아이콘은 가운데를 **비워서** 그려요(레벨 숫자는 앱이 써요).
