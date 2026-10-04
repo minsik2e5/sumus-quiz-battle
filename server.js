@@ -694,7 +694,7 @@ function setupSession(socket, on) {
 
 server.listen(PORT, () => {
   console.log('\n  SUMUS ISLAND QUIZ 서버 실행 중');
-  console.log(`  ▶ 선생님 PC:  http://localhost:${PORT}/host`);
+  console.log(`  ▶ 선생님 PC:  http://localhost:${PORT}/   (홈에서 수업 방 열기)`);
   for (const ip of lanIPs()) console.log(`  ▶ 학생 폰:    http://${ip}:${PORT}/play   (같은 와이파이)`);
   console.log('');
 });
