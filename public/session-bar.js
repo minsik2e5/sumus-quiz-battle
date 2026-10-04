@@ -33,11 +33,12 @@
     });
   };
 
-  // 홈에서 문제를 못 보냈으면(처음 쓰는 PC) 이 화면의 문제 목록으로 한 번 채움
-  if (!isMg && !sess.qsync) {
+  // 방에 문제가 없으면(홈에서 못 보냈거나 서버가 방을 새로 만든 경우) 이 화면의 문제 목록으로 채움
+  if (!isMg) {
+    let checked = false;
     socket.on('phase', (p) => {
-      if (sess.qsync || !inSession()) return;
-      sess.qsync = true; sessionStorage.setItem(SESS, JSON.stringify(sess));
+      if (checked || !inSession()) return;
+      checked = true;
       if (p.phase === 'lobby' && !p.total) { const qs = validQuestions(); if (qs.length) socket.emit('host:config', { questions: qs }); }
     });
   }

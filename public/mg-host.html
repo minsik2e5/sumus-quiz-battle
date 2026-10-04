@@ -166,7 +166,8 @@ socket.on('connect', () => {
     if (r.ok) { room = saved; setupJoin(saved.pin); $('#setup').classList.add('hidden'); onPhase(phase.phase); return; }
     // 서버가 재시작됨 → 같은 번호로 다시 열기
     const sess = JSON.parse(sessionStorage.getItem('sumus-sess') || 'null'); // 수업 방이면 퀴즈쇼와 같은 번호로 다시 묶기
-    socket.emit('mg:create', { ...cfg, pin: saved.pin, sk: sess && sess.pin === saved.pin ? sess.key : undefined }, (n) => { if (!n.ok) return; room = n; sessionStorage.setItem(KEY + ':host', JSON.stringify(n)); setupJoin(n.pin); $('#setup').classList.add('hidden'); onPhase(phase.phase); });
+    socket.emit('mg:create', { ...cfg, pin: saved.pin, sk: sess && sess.pin === saved.pin ? sess.key : undefined }, (n) => { if (!n.ok) return; room = n; sessionStorage.setItem(KEY + ':host', JSON.stringify(n)); setupJoin(n.pin); $('#setup').classList.add('hidden'); onPhase(phase.phase);
+      if (n.pin !== saved.pin) alert(`서버가 다시 시작되어 새 방을 열었습니다.\n새 방 번호: ${n.pin}\n학생들은 다시 입장해야 합니다.`); });
   });
 });
 async function setupJoin(pin) {

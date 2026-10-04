@@ -67,17 +67,27 @@ const rooms = new Map();
 const rand = (a, b) => a + Math.random() * (b - a);
 const uid = () => Math.random().toString(36).slice(2, 10);
 
+const MAX_ROOMS = 300; // 장난으로 방을 끝없이 만들어 서버가 멈추지 않게
 function newPin() {
-  let p;
-  do { p = String(Math.floor(1000 + Math.random() * 9000)); } while (rooms.has(p) || mgRooms.has(p) || sessions.has(p));
-  return p;
+  if (rooms.size + mgRooms.size >= MAX_ROOMS) return null;
+  for (let k = 0; k < 500; k++) {
+    const p = String(Math.floor(1000 + Math.random() * 9000));
+    if (!rooms.has(p) && !mgRooms.has(p) && !sessions.has(p)) return p;
+  }
+  return null;
 }
+const FULL = { ok: false, error: '지금은 방을 더 열 수 없습니다. 잠시 후 다시 시도해 주세요.' };
 
 // ───────── 수업 방(세션): 퀴즈쇼와 무궁화가 같은 방 번호를 함께 씀 ─────────
 const sessions = new Map(); // pin → { key, active: 'quiz' | 'mg' }
 const mgRooms = new Map();
 // 다른 게임이 이 번호를 쓰고 있어도 같은 수업 방 키를 가졌으면 함께 쓸 수 있음
-function pinFree(pin, other, sk) { if (!other.has(pin)) return true; const s = sessions.get(pin); return !!(sk && s && s.key === sk); }
+// (서버 재시작 직후 학생이 먼저 만들어 둔 빈 퀴즈 방(orphan)도 비어 있는 것으로 봄)
+function pinFree(pin, other, sk) { const o = other.get(pin); if (!o || o.orphan) return true; const s = sessions.get(pin); return !!(sk && s && s.key === sk); }
+// 수업 방에서 지금 진행하지 않는 쪽 게임인지 (듀얼 모니터 조작 창 등이 뒤에서 진행시키지 않게)
+const inactive = (r, kind) => { const s = linked(r) && sessions.get(r.pin); return !!(s && s.active !== kind); };
+// 오래된 방 정리: 수업 방이면 짝이 되는 방이 쓰인 시각도 함께 봄
+function lastTouched(r, other) { const o = linked(r) && other.get(r.pin); return Math.max(r.touched, o && linked(o) ? o.touched : 0); }
 // 서버가 다시 켜져 세션이 사라졌으면 호스트가 가진 키로 다시 묶음
 function linkSession(pin, sk, kind) { if (sk && !sessions.has(pin)) sessions.set(pin, { key: sk, active: kind }); }
 const linked = (r) => { const s = r && sessions.get(r.pin); return !!(s && r.sk === s.key); };
@@ -282,6 +292,9 @@ function newRoom(pin, extra) {
 io.on('connection', (socket) => {
   // 잘못된 데이터가 와도 서버가 죽지 않도록 모든 이벤트를 감쌈
   const on = (ev, fn) => socket.on(ev, (...a) => { try { fn(...a); } catch (e) { console.error('[' + ev + ']', e); } });
+  // 방 만들기는 한 연결에서 1분에 10번까지
+  let made = [];
+  socket.canCreate = () => { const now = Date.now(); made = made.filter(t => now - t < 60e3); if (made.length >= 10) return false; made.push(now); return true; };
   setup(socket, on);
   setupMG(socket, on);
   setupSession(socket, on);
@@ -289,6 +302,7 @@ io.on('connection', (socket) => {
 function setup(socket, on) {
   on('host:create', (cfg, ack) => {
     cfg = cfg || {};
+    if (!socket.canCreate()) return ack && ack(FULL);
     const qs = sanitizeQuestions(cfg.questions);
     // 서버 재시작 후 같은 방 번호로 다시 열기: 학생들이 먼저 재접속해 만들어 둔 빈 방을 이어받음
     const want = /^\d{4}$/.test(String(cfg.pin || '')) ? String(cfg.pin) : null;
@@ -296,7 +310,11 @@ function setup(socket, on) {
     const sk = typeof cfg.sk === 'string' ? cfg.sk : null;
     const settings = { hostKey: uid(), hostSocket: socket.id, questions: qs, mode: cfg.mode === 'score' ? 'score' : 'survival', gather: cfg.gather !== false, auto: cfg.auto !== false, orphan: false, touched: Date.now() };
     if (room && room.orphan) Object.assign(room, settings);
-    else { const pin = want && !rooms.has(want) && pinFree(want, mgRooms, sk) ? want : newPin(); room = newRoom(pin, settings); rooms.set(pin, room); }
+    else {
+      const pin = want && !rooms.has(want) && pinFree(want, mgRooms, sk) ? want : newPin();
+      if (!pin) return ack && ack(FULL);
+      room = newRoom(pin, settings); rooms.set(pin, room);
+    }
     const pin = room.pin;
     if (sk && pin === want) { linkSession(pin, sk, 'quiz'); room.sk = sk; }
     console.log('[room]', pin, 'opened', qs.length + ' questions', want ? '(asked ' + want + ')' : '');
@@ -308,7 +326,7 @@ function setup(socket, on) {
   on('host:resume', (d, ack) => {
     const { pin, hostKey } = d || {};
     const room = rooms.get(String(pin));
-    if (!room || room.hostKey !== hostKey) return ack && ack({ ok: false });
+    if (!room || !hostKey || room.hostKey !== hostKey) return ack && ack({ ok: false });
     room.hostSocket = socket.id; socket.join(room.pin); socket.join(room.pin + '#h'); socket.data = { role: 'host', pin: room.pin };
     ack && ack({ ok: true, pin: room.pin, mode: room.mode });
     socket.emit('phase', phasePayload(room)); socket.emit('roster', roster(room)); socket.emit('hostinfo', hostInfo(room));
@@ -317,7 +335,8 @@ function setup(socket, on) {
   const hostRoom = () => {
     const d = socket.data || {};
     if (d.role !== 'host') return null;
-    const r = rooms.get(d.pin); if (r) r.touched = Date.now(); return r;
+    const r = rooms.get(d.pin); if (!r || inactive(r, 'quiz')) return null;
+    r.touched = Date.now(); return r;
   };
   on('host:next', () => { const r = hostRoom(); if (r) next(r); });
   on('host:finish', () => { const r = hostRoom(); if (r && r.phase !== 'lobby') finish(r); });
@@ -351,7 +370,7 @@ function setup(socket, on) {
     const r = hostRoom(); if (!r) return;
     const p = r.players.get(id); if (!p) return;
     r.players.delete(id);
-    if (p.socketId) io.to(p.socketId).emit('kicked');
+    if (p.socketId) { io.to(p.socketId).emit('kicked'); io.in(p.socketId).socketsLeave([r.pin, 'mg' + r.pin]); }
     emitRoster(r);
     const o = linked(r) && mgRooms.get(r.pin); if (o && o.players.delete(id)) mgEmitRoster(o);
   });
@@ -383,8 +402,8 @@ function setup(socket, on) {
     if (sess && sess.active === 'mg' && mgRooms.has(pin)) return ack && ack({ ok: false, redirect: '/m?pin=' + pin });
     // 서버가 다시 켜진 직후: 전에 들어와 있던 학생이면 같은 번호의 빈 방을 만들어 기다림
     // (서버가 켜진 지 10분 이내일 때만 — 오래된 방 번호로 유령 방이 생기지 않게)
-    if (!room && pid && /^\d{4}$/.test(pin) && process.uptime() < 600) { room = newRoom(pin, { orphan: true }); rooms.set(pin, room); }
     if (!room && mgRooms.has(pin)) return ack && ack({ ok: false, redirect: '/m?pin=' + pin });
+    if (!room && pid && /^\d{4}$/.test(pin) && process.uptime() < 600) { room = newRoom(pin, { orphan: true }); rooms.set(pin, room); }
     if (!room) { console.log('[join-fail] no room', pin); return ack && ack({ ok: false, error: '방 번호를 확인해 주세요. 선생님 화면의 번호가 바뀌었을 수 있어요.' }); }
     name = String(name || '').trim().slice(0, 8);
     let p = pid && room.players.get(pid);
@@ -452,7 +471,7 @@ function sanitizeQuestions(qs, allowBlank) {
 setInterval(() => {
   const now = Date.now();
   for (const [pin, r] of rooms) {
-    const idle = now - r.touched, empty = ![...r.players.values()].some(p => p.connected);
+    const idle = now - lastTouched(r, mgRooms), empty = ![...r.players.values()].some(p => p.connected);
     if (idle > 3 * 3600e3 || (r.orphan && empty && idle > 10 * 60e3)) { clearTimeout(r.timer); clearTimeout(r.autoTimer); rooms.delete(pin); }
   }
 }, 60e3);
@@ -584,26 +603,35 @@ function mgTick() {
 setInterval(() => { try { mgTick(); } catch (e) { console.error('[mgtick]', e); } }, TICK);
 
 function setupMG(socket, on) {
-  const hostRoom = () => { const d = socket.data || {}; if (d.role !== 'mghost') return null; const r = mgRooms.get(d.pin); if (r) r.touched = Date.now(); return r; };
+  const hostRoom = () => { const d = socket.data || {}; if (d.role !== 'mghost') return null; const r = mgRooms.get(d.pin); if (!r || inactive(r, 'mg')) return null; r.touched = Date.now(); return r; };
   const joinHost = (r) => { socket.join('mg' + r.pin); socket.data = { role: 'mghost', pin: r.pin }; socket.emit('mg:phase', mgPhaseMsg(r)); socket.emit('mg:w', mgWatch(r)); socket.emit('mg:roster', mgRoster(r)); };
   on('mg:create', (cfg, ack) => {
     cfg = cfg || {};
     const want = /^\d{4}$/.test(String(cfg.pin || '')) ? String(cfg.pin) : null;
+    if (!socket.canCreate()) return ack && ack(FULL);
     const sk = typeof cfg.sk === 'string' ? cfg.sk : null;
     const pin = want && !mgRooms.has(want) && pinFree(want, rooms, sk) ? want : newPin();
+    if (!pin) return ack && ack(FULL);
     const r = mgNewRoom(pin, cfg);
     if (sk && pin === want) { linkSession(pin, sk, 'mg'); r.sk = sk; }
+    // 서버 재시작 직후 /play 쪽 빈 방에서 기다리던 학생들을 무궁화로 데려옴
+    const orphan = rooms.get(pin);
+    if (orphan && orphan.orphan) {
+      if (!linked(r)) { rooms.delete(pin); }
+      else sessions.get(pin).active = 'mg';
+      io.to(pin).emit('goto', '/m?pin=' + pin);
+    }
     mgRooms.set(pin, r); console.log('[mg-room]', pin, r.mode, r.time + 's', 'L' + r.level);
     joinHost(r); ack && ack({ ok: true, pin, hostKey: r.hostKey });
   });
-  on('mg:resume', (d, ack) => { const { pin, hostKey } = d || {}; const r = mgRooms.get(String(pin)); if (!r || r.hostKey !== hostKey) return ack && ack({ ok: false }); joinHost(r); ack && ack({ ok: true, pin: r.pin }); });
+  on('mg:resume', (d, ack) => { const { pin, hostKey } = d || {}; const r = mgRooms.get(String(pin)); if (!r || !hostKey || r.hostKey !== hostKey) return ack && ack({ ok: false }); joinHost(r); ack && ack({ ok: true, pin: r.pin }); });
   on('mg:config', (cfg) => { const r = hostRoom(); if (!r || r.phase !== 'lobby') return; cfg = cfg || {};
     if (cfg.mode) r.mode = cfg.mode === 'back' ? 'back' : 'out'; if (cfg.time) r.time = Math.max(30, Math.min(300, Number(cfg.time) || 120));
     if (cfg.level) r.startLevel = r.level = Math.max(1, Math.min(5, Number(cfg.level) || 1)); mgEmitPhase(r); mgEmitWatch(r); });
   on('mg:start', () => { const r = hostRoom(); if (!r || r.phase !== 'lobby' || !r.players.size) return; r.phase = 'ready'; r.readyAt = Date.now() + 3500; r.level = r.startLevel; mgEmitPhase(r); mgEmitWatch(r); });
   on('mg:stop', () => { const r = hostRoom(); if (r && r.phase === 'play') mgFinish(r, 'stop'); });
   on('mg:reset', () => { const r = hostRoom(); if (r) mgReset(r); });
-  on('mg:kick', (id) => { const r = hostRoom(); if (!r) return; const p = r.players.get(id); if (!p) return; r.players.delete(id); if (p.socketId) io.to(p.socketId).emit('mg:kicked'); mgEmitRoster(r);
+  on('mg:kick', (id) => { const r = hostRoom(); if (!r) return; const p = r.players.get(id); if (!p) return; r.players.delete(id); if (p.socketId) { io.to(p.socketId).emit('mg:kicked'); io.in(p.socketId).socketsLeave([r.pin, 'mg' + r.pin]); } mgEmitRoster(r);
     const o = linked(r) && rooms.get(r.pin); if (o && o.players.delete(id)) emitRoster(o); });
   on('mg:bots', (n) => { const r = hostRoom(); if (!r) return;
     const names = ['민준', '서연', '도윤', '하은', '시우', '지유', '예준', '수아', '주원', '지호', '서윤', '하준', '지안', '은우', '채원'];
@@ -625,7 +653,7 @@ function setupMG(socket, on) {
     if (!p) {
       if (!name) return ack && ack({ ok: false, error: '이름을 입력해 주세요.' });
       if (r.players.size >= 60) return ack && ack({ ok: false, error: '방이 가득 찼습니다.' });
-      p = { id: carry ? pid : uid(), name, color: COLORS.includes(color) ? color : COLORS[r.players.size % COLORS.length], x: mgLane(r), z: 0, state: r.phase === 'lobby' ? 'run' : 'out', run: false };
+      p = { id: carry ? pid : uid(), name, color: COLORS.includes(color) ? color : COLORS[r.players.size % COLORS.length], x: mgLane(r), z: 0, state: r.phase === 'lobby' || r.phase === 'ready' ? 'run' : 'out', run: false };
       r.players.set(p.id, p);
     } else { if (name) p.name = name; if (COLORS.includes(color)) p.color = color; }
     p.socketId = socket.id; p.connected = true; r.touched = Date.now();
@@ -648,7 +676,7 @@ function setupMG(socket, on) {
 }
 setInterval(() => {
   const now = Date.now();
-  for (const [pin, r] of mgRooms) if (now - r.touched > 3 * 3600e3) mgRooms.delete(pin);
+  for (const [pin, r] of mgRooms) if (now - lastTouched(r, rooms) > 3 * 3600e3) mgRooms.delete(pin);
   for (const pin of sessions.keys()) if (!rooms.has(pin) && !mgRooms.has(pin)) sessions.delete(pin);
 }, 60e3);
 
@@ -658,9 +686,13 @@ setInterval(() => {
 function setupSession(socket, on) {
   on('sess:create', (cfg, ack) => {
     cfg = cfg || {}; const q = cfg.quiz || {};
+    if (!socket.canCreate()) return ack && ack(FULL);
     const pin = newPin(), key = uid(), active = cfg.first === 'mg' ? 'mg' : 'quiz';
-    sessions.set(pin, { key, active });
-    const qr = newRoom(pin, { hostKey: uid(), sk: key, questions: sanitizeQuestions(q.questions), mode: q.mode === 'score' ? 'score' : 'survival', gather: q.gather !== false, auto: q.auto !== false });
+    if (!pin) return ack && ack(FULL);
+    // 한쪽 방이 사라져 다시 만들 때 쓰도록 홈 설정을 함께 보관
+    const quizCfg = { questions: sanitizeQuestions(q.questions), mode: q.mode === 'score' ? 'score' : 'survival', gather: q.gather !== false, auto: q.auto !== false };
+    sessions.set(pin, { key, active, quizCfg, mgCfg: cfg.mg || {} });
+    const qr = newRoom(pin, { hostKey: uid(), sk: key, ...quizCfg, questions: quizCfg.questions.slice() });
     rooms.set(pin, qr);
     const mr = mgNewRoom(pin, cfg.mg); mr.sk = key; mgRooms.set(pin, mr);
     console.log('[session]', pin, 'opened', qr.questions.length + ' questions', 'first=' + active);
@@ -678,8 +710,14 @@ function setupSession(socket, on) {
     const pin = r.pin, s = sessions.get(pin);
     to = to === 'mg' ? 'mg' : 'quiz';
     // 서버 재시작 등으로 한쪽 방이 없으면 새로 만듦
-    if (!mgRooms.has(pin)) mgRooms.set(pin, Object.assign(mgNewRoom(pin), { sk: s.key }));
-    if (!rooms.has(pin)) rooms.set(pin, newRoom(pin, { hostKey: uid(), sk: s.key }));
+    if (!mgRooms.has(pin)) mgRooms.set(pin, Object.assign(mgNewRoom(pin, s.mgCfg), { sk: s.key }));
+    const old = rooms.get(pin);
+    if (!old || old.orphan) {
+      const q = s.quizCfg || {};
+      const nr = newRoom(pin, { hostKey: uid(), sk: s.key, ...q, questions: (q.questions || []).slice() });
+      if (old) nr.players = old.players; // 서버 재시작 후 먼저 들어와 기다리던 학생은 그대로
+      rooms.set(pin, nr);
+    }
     const qr = rooms.get(pin), mr = mgRooms.get(pin);
     // 진행 중이던 게임은 정리
     if (to === 'quiz' && (mr.phase === 'ready' || mr.phase === 'play')) mgReset(mr);

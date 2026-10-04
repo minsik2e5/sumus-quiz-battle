@@ -153,7 +153,7 @@ $('#openBtn').onclick = () => {
   }, (r) => {
     clearTimeout(t); $('#openBtn').disabled = false;
     if (!r || !r.ok) return ($('#err').textContent = '방을 열지 못했습니다.');
-    sessionStorage.setItem(SESS, JSON.stringify({ pin: r.pin, key: r.key, qsync: !!qs }));
+    sessionStorage.setItem(SESS, JSON.stringify({ pin: r.pin, key: r.key }));
     sessionStorage.setItem(QSTORE + ':host', JSON.stringify(r.quiz));
     sessionStorage.setItem(MKEY + ':host', JSON.stringify(r.mg));
     go(r.active);

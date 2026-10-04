@@ -152,7 +152,10 @@ function join(auto) {
   socket.emit('player:join', { pin, name, pid, color }, (r) => {
     clearTimeout(timer);
     $('#joinBtn').disabled = false; $('#jerr').textContent = '';
-    if (r.redirect) { location.href = r.redirect; return; }
+    if (r.redirect) { // 무궁화로 안내: 이름·색을 남겨 두어 다시 입력하지 않게
+      localStorage.setItem(LS, JSON.stringify({ pin, name: name || saved.name, color, pid: saved.pin === pin ? saved.pid : null }));
+      location.href = r.redirect + '&auto=1'; return;
+    }
     if (!r.ok) report('join fail: ' + r.error);
     if (!r.ok) { $('#jerr').textContent = r.error; joined = false; showJoin(); return; }
     me = r.me; joined = true;
@@ -166,7 +169,9 @@ $('#joinBtn').onclick = () => join(false);
 $('#nameIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') join(false); });
 $('#pinIn').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, ''); });
 
-socket.on('connect', () => { if (joined || (saved.pid && saved.pin && saved.pin === ($('#pinIn').value || ''))) join(true); });
+// 다른 게임에서 안내받아 왔으면(&auto=1) 이름이 있을 때 바로 입장
+const autoIn = new URLSearchParams(location.search).has('auto');
+socket.on('connect', () => { if (joined || (saved.pid && saved.pin && saved.pin === ($('#pinIn').value || '')) || (autoIn && saved.name && saved.pin === urlPin)) join(true); });
 socket.on('goto', (u) => { location.href = u; }); // 선생님이 PART 2로 넘김
 socket.on('kicked', () => { joined = false; localStorage.setItem(LS, JSON.stringify({ name: saved.name, color })); saved.pid = null; showJoin(); $('#jerr').textContent = '선생님이 방에서 내보냈습니다.'; });
 socket.on('roster', (list) => {
