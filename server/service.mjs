@@ -10,7 +10,7 @@ import { marketView, trade as stockTrade, rebaseMarket, newMarket } from './mark
 import { MARKET_OPEN } from '../public/modules/market.js';
 // V13.82 문법 증권거래소 is on hold: closed unless switched on.
 const marketOpen = state => MARKET_OPEN || state.market?.open === true;
-import { rpsView, rpsPlay, rpsCash } from './rewards.mjs';
+import { rpsView, rpsPlay, rpsCash, openEgg } from './rewards.mjs';
 import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, monsterStart, monsterFinish, monsterView, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
@@ -470,6 +470,15 @@ export function tidyBattles(state, now = Date.now()) {
     if (tournaments.length !== state.tournaments.length) { state.tournaments = tournaments; changed = true; }
   }
   return changed;
+}
+// A legendary pet (coin capsule or, V13.98, a 영웅 알) is news for the whole school.
+function announceLegend(state, p, key, where) {
+  const school = schoolForProfile(state, p);
+  if (!school) return {};
+  const students = state.profiles.filter(x => x.id !== p.id && isRankedStudent(x) && schoolForProfile(state, x)?.id === school.id);
+  const name = CHARACTERS[key]?.ko || '전설 펫';
+  const posted = postLegend(state, school, students, { text: `${p.display_name} 학생이 ${where}에서 전설 펫 ${eulReul(name)} 만났어요!`, id: randomUUID() });
+  return { legend_news: posted.news, _push: students.length ? [posted.message] : [] };
 }
 function findJoinableBattle(state, p, code, now) {
   const battle = (state.battles || []).find(b => b.code === code && b.status === 'waiting' && battleIsOpen(b, now));
@@ -1309,15 +1318,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const result = pullLucky(p, Number(body.bet), coinBalance(state, p), { ticket: body.ticket === true });
     if (result.epic) return { ...result, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     if (!result.legendary) return { ...result, points_balance: coinBalance(state, p) };
-    const school = schoolForProfile(state, p);
-    let announcement = {};
-    if (school) {
-      const students = state.profiles.filter(x => x.id !== p.id && isRankedStudent(x) && schoolForProfile(state, x)?.id === school.id);
-      const name = CHARACTERS[result.legendary.key]?.ko || '전설 펫';
-      const posted = postLegend(state, school, students, { text: `${p.display_name} 학생이 행운 뽑기에서 전설 펫 ${eulReul(name)} 만났어요!`, id: randomUUID() });
-      announcement = { legend_news: posted.news, _push: students.length ? [posted.message] : [] };
-    }
-    return { ...result, ...announcement, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
+    return { ...result, ...announceLegend(state, p, result.legendary.key, '행운 뽑기'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
   }
   // V13.82 가위바위보 against 로보: a throw (a new game with `bet`, or the pot again after a win
   // with `double`), and taking the pot after a win.
@@ -1383,12 +1384,8 @@ export async function service(state, method, path, body, token, options = {}) {
     if (openBattleFor(state, p.id, Date.now())) fail('대결이 끝난 뒤에 알을 살 수 있어요.', 409);
     const balance = pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance;
     if (balance < price) fail(`코인이 ${price - balance}개 부족해요.`);
-    const key = missing[randomBytes(4).readUInt32BE(0) % missing.length];
-    const now = Date.now();
-    p.pets.push({ key, acquired_at: now, ...(epic ? { epic: true } : {}) });
-    p.points_spent = Number(p.points_spent || 0) + price;
-    (p.purchases ||= []).push({ item: epic ? 'epic_egg' : 'egg', key, price, at: now });
-    p.avatar_key = key;
+    const { key, legendary } = openEgg(p, { epic, missing, price });
+    if (legendary) return { key, epic: false, legendary: { key, egg: true }, ...announceLegend(state, p, key, '영웅 알'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     return { key, epic, profile: publicProfile(p) };
   }
   if (path === '/profile/pet-name' && method === 'POST') {

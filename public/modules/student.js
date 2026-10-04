@@ -274,7 +274,7 @@ function partnerCard(A) {
               <span class="partner-skill"><i>연</i><span>연속 학습<small>쉬지 않고 공부한 날</small></span><b>${Number(g.streak || 0)}일</b></span>
             </span>
             <span class="partner-evo"><span class="partner-evo-row"><span>${nextLine}</span><span>${form === 3 ? `경험치 ${num(partner.xp || 0)}` : `경험치 ${num(partner.remaining || 0)} 남음`}</span></span><span class="partner-bar" aria-label="레벨 진행률 ${Math.round(Number(partner.percent || 0))}%"><i style="width:${percent}%"></i></span></span>
-            <span class="partner-foot"><span class="partner-stars" aria-label="모은 펫 ${owned}/${total}">${'★'.repeat(owned)}${'☆'.repeat(Math.max(0, total - owned))}</span><span>No.${number} · SUMUS<b class="card-rarity rarity-${tier.key}" title="${tier.name}">${tier.label}</b></span></span>
+            <span class="partner-foot"><span class="partner-stars" aria-label="모은 펫 ${owned}/${total}"><b aria-hidden="true">★</b>${owned}<small>/${total}</small></span><span>No.${number} · SUMUS<b class="card-rarity rarity-${tier.key}" title="${tier.name}">${tier.label}</b></span></span>
           </span>
           <span class="partner-sheen" aria-hidden="true"></span>
           ${cardFx(tier)}
@@ -953,7 +953,7 @@ function studio(A) {
   const missing = STANDARD_PET_KEYS.filter(key => !owned.some(x => x.key === key));
   const petCard = key => {
     const pet = owned.find(x => x.key === key);
-    if (!pet) return `<div class="character-option pet-locked" aria-label="${CHARACTERS[key].type}, 아직 만나지 못했어요"><span class="pet-locked-art">${artOr(CHARACTERS[key].legendary ? 'pet-legend-locked' : CHARACTERS[key].epic ? 'pet-epic-locked' : 'pet-locked', CHARACTERS[key].epic ? '★' : '?', 'locked-art')}</span><b>???</b><small>${CHARACTERS[key].legendary ? '행운 뽑기 전용' : CHARACTERS[key].epic ? '영웅 알 · 뽑기' : '상점의 알'}</small></div>`;
+    if (!pet) return `<div class="character-option pet-locked" aria-label="${CHARACTERS[key].type}, 아직 만나지 못했어요"><span class="pet-locked-art">${artOr(CHARACTERS[key].legendary ? 'pet-legend-locked' : CHARACTERS[key].epic ? 'pet-epic-locked' : 'pet-locked', CHARACTERS[key].epic ? '★' : '?', 'locked-art')}</span><b>???</b><small>${CHARACTERS[key].legendary ? '행운 뽑기 · 영웅 알' : CHARACTERS[key].epic ? '영웅 알 · 뽑기' : '상점의 알'}</small></div>`;
     return `<button data-style="avatar_key" data-value="${key}" class="character-option ${s.avatar_key === key ? 'selected' : ''}" aria-pressed="${s.avatar_key === key}">${avatar(key, { form: pet.form })}<b>${esc(petDisplayName(pet))}</b><small>${pet.form ? `Lv.${pet.level} · ${PET_FORMS[pet.form]}` : '알'}</small></button>`;
   };
   const shop = `<button type="button" class="pet-shop-banner" data-action="egg-shop"><span class="pet-shop-banner-egg" aria-hidden="true">?</span><span><strong>랜덤 알 상점</strong><small>${missing.length ? `${num(EGG_PRICE)}코인 · 상점에서 아직 못 만난 친구 ${missing.length}마리` : '상점 펫을 모두 모았어요!'}</small></span><b>${coin()}${num(g.points_balance || 0)}</b></button>`;

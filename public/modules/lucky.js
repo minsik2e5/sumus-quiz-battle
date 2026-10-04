@@ -1,6 +1,6 @@
 import { esc, num } from './ui.js';
 import { coin, artOr } from './emblems.js';
-import { CHARACTERS } from './core.js';
+import { CHARACTERS, EPIC_EGG_LEGENDARY_RATE } from './core.js';
 import { LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE } from './rewards.js';
 
 // V13.68 코인 뽑기: the machine on the 놀이터 page and the show when a capsule comes out.
@@ -65,7 +65,8 @@ export function luckyCard(state, bet, balance) {
   const legend = l.legend || { rate: LEGENDARY_RATE, pity: LEGENDARY_PITY, pulls: 0, remaining: LEGENDARY_PITY, owned: false, key: null };
   const can = left > 0 && balance >= bet;
   const recent = (l.recent || []).slice(0, 5);
-  const todayNet = (l.recent || []).filter(r => sameDay(r.at)).reduce((n, r) => n + (r.ticket ? r.bet * r.mult : r.bet * r.mult - r.bet), 0);
+  // V13.98: the server's count of the whole day (the recent list holds only the last six pulls).
+  const todayNet = Number.isFinite(l.today_net) ? l.today_net : (l.recent || []).filter(r => sameDay(r.at)).reduce((n, r) => n + (r.ticket ? r.bet * r.mult : r.bet * r.mult - r.bet), 0);
   return `<section class="lk-card" id="lk-card">
     <div class="lk-head"><div><small>COIN CAPSULE</small><h2>코인 뽑기</h2></div><span class="lk-left" aria-label="오늘 남은 뽑기 ${left}번">${Array.from({ length: l.daily || LUCKY_DAILY }, (_, i) => `<i class="${i < left ? 'on' : ''}"></i>`).join('')}<b>${left}/${l.daily || LUCKY_DAILY}</b></span></div>
     <div class="lk-stagebox">
@@ -131,7 +132,7 @@ function stars(n) {
 function motes(n) {
   return Array.from({ length: n }, (_, i) => { const a = i / n * Math.PI * 2, r = 150 + (i * 53) % 120; return `<i class="lgx-mote" style="--x:${Math.round(Math.cos(a) * r)}px;--y:${Math.round(Math.sin(a) * r)}px;--d:${(.9 + (i % 5) * .12).toFixed(2)}s;--delay:${((i % 7) * .1).toFixed(2)}s"></i>`; }).join('');
 }
-function legendaryShow(res, { again = false, againLabel = '' } = {}) {
+export function legendaryShow(res, { again = false, againLabel = '' } = {}) {
   return new Promise(resolve => {
     const key = res.legendary.key, c = CHARACTERS[key] || {}, name = c.ko || '전설 펫';
     const box = document.createElement('div');
@@ -162,8 +163,8 @@ function legendaryShow(res, { again = false, againLabel = '' } = {}) {
         </div>
         <div class="lgx-card">
           <span class="lk-legend-kicker">LEGENDARY PET · ${esc(c.type || '')}</span><h2>전설 펫을 만났어요!</h2><h3>${esc(name)}의 알</h3>
-          <p>${res.legendary.guaranteed ? `${num(res.legendary.pull)}번째 뽑기 확정 보상이에요.` : `${LEGENDARY_RATE}%의 행운이 찾아왔어요!`} 뒤에 비치는 모습으로 자라요. 학교 친구들에게도 소식이 전해져요.</p>
-          <small>코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}</small>
+          <p>${res.legendary.egg ? `영웅 알에서 ${EPIC_EGG_LEGENDARY_RATE}%의 행운으로 전설 펫이 나왔어요!` : res.legendary.guaranteed ? `${num(res.legendary.pull)}번째 뽑기 확정 보상이에요.` : `${LEGENDARY_RATE}%의 행운이 찾아왔어요!`} 뒤에 비치는 모습으로 자라요. 학교 친구들에게도 소식이 전해져요.</p>
+          <small>${res.legendary.egg ? '알 상점 · 영웅 알' : `코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}`}</small>
           <div class="lk-actions">${again ? `<button type="button" class="lk-again" data-lk="again">한 번 더 <em>${againLabel}</em></button>` : ''}<button type="button" class="lk-ok" data-lk="ok">확인</button></div>
         </div>
       </div>

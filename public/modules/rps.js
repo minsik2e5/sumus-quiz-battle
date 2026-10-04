@@ -81,7 +81,7 @@ export function rpsCard(state, bet, balance) {
     <div class="rps-card-ladder">${ladder(-1, bet)}</div>
     ${live ? '' : `<div class="lk-bets" role="group" aria-label="걸 코인">${(s.bets || RPS_BETS).map(b => `<button type="button" class="lk-bet ${bet === b ? 'on' : ''}" data-rps="bet" data-bet="${b}" aria-pressed="${bet === b}"><span>${coin()}${b}</span></button>`).join('')}</div>`}
     <button type="button" class="rps-go" data-rps="${live ? 'resume' : 'play'}" ${can ? '' : 'disabled'}>${live ? `<span>하던 판 이어서</span><em>${coin()}${num(live.pot)}</em>` : left > 0 ? (balance >= bet ? `<span>로보에게 도전!</span><em>${coin()}${bet}</em>` : '<span>코인이 부족해요</span>') : '<span>오늘 판을 다 했어요</span>'}</button>
-    ${played ? `<div class="rps-stats"><span><b>${num(st.wins)}</b>승</span><span><b>${num(st.ties)}</b>무</span><span><b>${num(st.losses)}</b>패</span><span>최고 <b>${num(s.best || 0)}</b>연승</span><span>최대 <b>+${num(st.biggest || 0)}</b></span>${st.jackpots ? `<span class="jack">×8 <b>${num(st.jackpots)}</b>번</span>` : ''}</div>` : ''}
+    ${played ? `<div class="rps-stats"><span><b>${num(st.wins)}</b>승</span><span><b>${num(st.ties)}</b>무</span><span><b>${num(st.losses)}</b>패</span><span>최고 <b>${num(s.best || 0)}</b>연승</span><span>한 판 최대 <b>${num(st.biggest || 0)}</b>코인 받음</span>${st.jackpots ? `<span class="jack">×8 <b>${num(st.jackpots)}</b>번</span>` : ''}</div>` : ''}
     ${recent.length ? `<div class="lk-recent"><span>최근</span>${recent.map(r => `<i class="${r.paid ? 'up' : 'down'}">${r.paid ? `+${num(r.paid - r.bet)}` : `−${num(r.bet)}`}</i>`).join('')}</div>` : ''}
     <p class="lk-note">하루 ${s.daily || RPS_DAILY}판 · 이기면 2배, 계속 이기면 ×4 · ×8 · 비기면 한 번 더 · 로보는 무작위로 내요(로보의 말은 믿거나 말거나!)</p>
   </section>`;
@@ -231,8 +231,29 @@ export function rpsMatch(A, { bet, live = null, onBalance }) {
       }
       let res;
       try { res = await request; }
-      catch (err) { toast(err.message); g.busy = false; banner(''); robotPose(null); controls(); return; }
+      catch (err) {
+        toast(err.message); banner(''); robotPose(null);
+        // V13.98: the server still has a game waiting for 받기/더블 (opened on another screen):
+        // show that game so it can be taken or doubled.
+        const live = await api('/rewards').then(r => { if (A.data.rewards) A.data.rewards.rps = r.rps; setBalance(r.points_balance); return r.rps?.live; }).catch(() => null);
+        if (live) Object.assign(g, { bet: live.bet, pot: live.pot, wins: live.wins, phase: live.await === 'choice' ? 'choice' : 'pick', fresh: false });
+        if (live) { $('#rps-ladder').innerHTML = ladder(g.wins, g.bet); potTo(g.pot); }
+        g.busy = false; controls(); return;
+      }
       g.fresh = false;
+      // V13.98: the bet is taken on the first throw, so the coins follow every answer; the game is
+      // the server's (another phone may have started it).
+      setBalance(res.points_balance);
+      if (A.data.rewards && res.rps) A.data.rewards.rps = res.rps;
+      if (res.settled) {
+        // A game left for 10 minutes was settled instead: its pot (or, after a tie, the bet) is paid.
+        g.left = Number(res.rps?.left ?? g.left);
+        resetHands(); robotPose('think'); banner('');
+        toast(res.paid ? `오래 둔 판을 정리했어요. ${num(res.paid)}코인을 받았어요!` : '오래 둔 판을 정리했어요.');
+        g.wins = 0; g.phase = 'end'; g.busy = false;
+        return controls();
+      }
+      if (Number(res.bet) > 0 && res.bet !== g.bet) { g.bet = res.bet; $('#rps-ladder').innerHTML = ladder(res.wins || 0, g.bet); }
       // Hands fly to the middle and clash.
       $('#rps-robot').innerHTML = fist('robot', res.robot, 'shown'); $('#rps-me').innerHTML = fist('me', res.pick, 'shown');
       g.mine = [res.pick, ...g.mine].slice(0, 8);
