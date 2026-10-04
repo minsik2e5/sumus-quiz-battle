@@ -1,0 +1,104 @@
+/* V13.104 단어 미니게임 (철자 타일 · O/X 연타 · 폭탄 해제): a card over the battle screen.
+   A sheet at the bottom of a phone (the thumb reaches every button), a card in the middle of a
+   pad. 움직임 줄이기 (and .mg-calm): no shake, no pop, no moving bar. */
+.mg-overlay{position:fixed;inset:0;z-index:9000;display:flex;align-items:flex-end;justify-content:center;background:rgba(12,24,30,.68);-webkit-tap-highlight-color:transparent;overscroll-behavior:contain}
+.mg-overlay[hidden],.mg-overlay [hidden]{display:none!important}
+.mg-card{box-sizing:border-box;width:min(100%,560px);max-height:100dvh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;background:#fff;color:#17242f;border-radius:22px 22px 0 0;padding:12px 16px calc(16px + env(safe-area-inset-bottom,0px));box-shadow:0 -8px 30px rgba(0,0,0,.28)}
+.mg-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.mg-tag{font-size:13px;font-weight:800;color:#8a5a00;background:#fff3d1;border-radius:999px;padding:5px 11px}
+.mg-kind-bomb .mg-tag{color:#1d4f86;background:#e1eefb}
+.mg-skip{font:inherit;font-size:13px;font-weight:700;color:#5d6d68;background:#eef3f0;border:0;border-radius:999px;padding:8px 14px;min-height:36px;cursor:pointer}
+.mg-clock{display:flex;align-items:center;gap:10px}
+.mg-bar{flex:1;height:10px;border-radius:999px;background:#e3ebe7;overflow:hidden}
+.mg-bar i{display:block;height:100%;width:100%;border-radius:999px;background:#2fbf71}
+.mg-clock.low .mg-bar i{background:#e5484d}
+#mg-sec{min-width:2ch;text-align:right;font-weight:900;font-size:20px;font-variant-numeric:tabular-nums}
+.mg-clock.low #mg-sec{color:#c62f34}
+.mg-body{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;min-height:150px;justify-content:center}
+.mg-body h2{margin:0}
+.mg-icon{font-size:44px;line-height:1}
+.mg-body h2#mg-title{font-size:24px;font-weight:900}
+.mg-line{margin:0;font-size:15px;color:#33433e}
+.mg-prize{margin:0;font-size:15px;color:#5d6d68}
+.mg-prize b{color:#8a5a00}
+.mg-prize.got{font-size:17px;color:#17242f}
+.mg-note{margin:0;font-size:12.5px;color:#5d6d68}
+.mg-sr{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mg-hint{margin:0;font-size:13px;color:#5d6d68}
+.mg-count{margin:0;font-size:13px;font-weight:700;color:#5d6d68}
+.mg-meaning{margin:0;font-size:26px;line-height:1.25;font-weight:900;word-break:keep-all;overflow-wrap:anywhere}
+.mg-status{margin:0;min-height:20px;font-size:13.5px;color:#5d6d68;word-break:keep-all}
+.mg-stars{font-size:40px;letter-spacing:4px;color:#d3dbd7}
+.mg-stars.s1,.mg-stars.s2,.mg-stars.s3{color:#f2b233}
+.mg-foot{display:flex;flex-direction:column;gap:8px}
+.mg-go{font:inherit;font-size:19px;font-weight:900;min-height:56px;border:0;border-radius:14px;background:#1f9d62;color:#fff;cursor:pointer;box-shadow:0 3px 0 #15714a}
+.mg-go:active{transform:translateY(2px);box-shadow:0 1px 0 #15714a}
+.mg-later{font:inherit;font-size:14px;font-weight:700;min-height:44px;border:0;background:transparent;color:#5d6d68;cursor:pointer;text-decoration:underline}
+.mg-card button:focus-visible{outline:3px solid #1d6fe0;outline-offset:2px}
+
+/* 1. 철자 타일 */
+.mg-slots{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.mg-slots span{width:34px;height:44px;display:inline-flex;align-items:center;justify-content:center;border-bottom:4px solid #b9c7c1;background:#f3f7f5;border-radius:8px 8px 0 0;font-size:24px;font-weight:900}
+.mg-slots span.on{border-bottom-color:#2fbf71;background:#e6f7ee}
+.mg-slots span.next{border-bottom-color:#f2b233}
+.mg-tiles{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}
+.mg-tiles .mg-tile{flex:0 0 calc(25% - 6px)}
+.mg-tile{position:relative;font:inherit;font-size:26px;font-weight:900;min-height:60px;border:0;border-radius:14px;background:#e8f0ec;color:#17242f;box-shadow:0 3px 0 #b9c7c1;cursor:pointer;touch-action:manipulation}
+.mg-tile:active{transform:translateY(2px);box-shadow:0 1px 0 #b9c7c1}
+.mg-tile.used{visibility:hidden}
+.mg-tile.bad{background:#fde3e3;box-shadow:0 0 0 3px #e5484d inset;animation:mg-shake .32s}
+.mg-tile.bad::after{content:"✕";position:absolute;top:3px;right:7px;font-size:13px;color:#c62f34}
+
+/* 2. O/X 연타 */
+.mg-pair{display:flex;flex-direction:column;gap:6px;align-items:center;min-height:92px;justify-content:center}
+.mg-eng{font-size:34px;font-weight:900;letter-spacing:.3px;overflow-wrap:anywhere}
+.mg-mean{font-size:24px;font-weight:800;color:#1d4f86;word-break:keep-all}
+.mg-last{margin:0;min-height:20px;font-size:13px;color:#5d6d68}
+.mg-last .ok{color:#15714a;font-weight:800}
+.mg-last .miss{color:#c62f34;font-weight:800}
+.mg-score{margin:0;font-size:13px;font-weight:700;color:#5d6d68}
+.mg-ox-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mg-ox{font:inherit;font-size:19px;font-weight:900;min-height:96px;border:0;border-radius:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;touch-action:manipulation}
+.mg-ox b{font-size:34px;line-height:1}
+.mg-ox.no{background:#fde3e3;color:#a3252a;box-shadow:0 4px 0 #e6a9ab}
+.mg-ox.yes{background:#dff5e8;color:#15714a;box-shadow:0 4px 0 #9ad3b3}
+.mg-ox:active{transform:translateY(2px)}
+.mg-ox.good{outline:4px solid #2fbf71;outline-offset:-4px}
+.mg-ox.bad{outline:4px solid #e5484d;outline-offset:-4px}
+
+/* 3. 폭탄 해제 */
+.mg-pips{display:flex;gap:8px;justify-content:center}
+.mg-pips i{width:22px;height:22px;border-radius:50%;border:3px solid #b9c7c1;background:#fff;box-sizing:border-box}
+.mg-pips i.on{background:#e8a317;border-color:#e8a317}
+.mg-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;border-radius:16px}
+.mg-cards.bad{box-shadow:0 0 0 3px #e5484d;animation:mg-shake .32s}
+.mg-card-word{font:inherit;font-size:19px;font-weight:800;min-height:68px;padding:8px;border:0;border-radius:16px;background:#e1eefb;color:#12385f;box-shadow:0 3px 0 #a9c7e6;cursor:pointer;overflow-wrap:anywhere;touch-action:manipulation}
+.mg-card-word:active{transform:translateY(2px);box-shadow:0 1px 0 #a9c7e6}
+
+@keyframes mg-shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+/* A pad (or a phone on its side with room): a card in the middle. */
+@media (min-width:700px){
+  .mg-overlay{align-items:center}
+  .mg-card{border-radius:22px;padding:18px 22px 22px;gap:14px;box-shadow:0 10px 40px rgba(0,0,0,.35)}
+  .mg-tile{min-height:64px}
+}
+/* Low screens (a phone on its side): smaller buttons, the card scrolls if it must. */
+@media (max-height:520px){
+  .mg-card{gap:6px;padding-top:8px}
+  .mg-body{min-height:0;gap:4px}
+  .mg-meaning{font-size:20px}.mg-eng{font-size:26px}.mg-mean{font-size:19px}
+  .mg-tiles .mg-tile{flex-basis:calc(12.5% - 7px);min-height:48px;font-size:22px}
+  .mg-ox{min-height:64px}.mg-card-word{min-height:52px}
+  .mg-slots span{height:36px}
+}
+@media (max-width:359px){
+  .mg-meaning{font-size:22px}.mg-eng{font-size:28px}.mg-tile{font-size:22px}
+}
+/* 움직임 줄이기: the system setting and the app's own flag. */
+@media (prefers-reduced-motion:reduce){
+  .mg-overlay *{animation:none!important;transition:none!important}
+  .mg-go:active,.mg-tile:active,.mg-ox:active,.mg-card-word:active{transform:none}
+}
+.mg-calm *{animation:none!important;transition:none!important}
+.mg-calm .mg-go:active,.mg-calm .mg-tile:active,.mg-calm .mg-ox:active,.mg-calm .mg-card-word:active{transform:none}
