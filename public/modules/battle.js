@@ -1,4 +1,4 @@
-import { api, esc, icon, toast, num, rangeLabel } from './ui.js';
+import { api, esc, icon, toast, num, rangeLabel, modal, dialogOpen, buttonBusy } from './ui.js';
 import { CHARACTERS, PET_FORMS } from './core.js';
 import { avatar, petKey, showPose, holdPose } from './character.js';
 import { getRanges } from './student.js';
@@ -186,9 +186,10 @@ function bindRoot() {
     if (act === 'key') return spellKey(b.dataset.key);
     if (act === 'spell-go') return spellSubmit();
     if (act === 'bot') return startBotMatch(b);
-    if (act === 'bot-again') return botAgain();
+    if (act === 'bot-again') return botAgain(b);
+    if (act === 'reward-retry') return retryReward(b);
     if (act === 'monster-go') return askMonster(b.dataset.part, b.dataset.level);
-    if (act === 'monster-again') { const m = B.monsterSetup; nextScreen(); return m ? startMonster(m.part, m.level) : null; }
+    if (act === 'monster-again') { const m = B.monsterSetup; nextScreen(); return m ? startMonster(m.part, m.level, b) : null; }
     if (act === 'monster-list') { B.A.tab = 'yacha'; B.A.yachaTab = 'monster'; return leaveScreen(); }
     if (act === 'title') return openTitleDetail(B.A, b.dataset.key);
     if (act === 'create') return createRoom(b);
@@ -415,7 +416,7 @@ function acceptChallenge(invite) {
       const joined = await api('/battle/join', { code: invite.code, stake: invite.stake, range_codes: myRanges() });
       if (B === cur) enterRoom({ ...joined, host: false });
     } catch (err) { toast(err.message); }
-  });
+  }, false, invite.tournament ? '대회 경기 입장' : '도전장 받기');
 }
 // Joining shows the stake and the host first; the match can start as soon as we connect.
 async function joinRoom(button) {
@@ -432,16 +433,19 @@ async function joinRoom(button) {
       const joined = await api('/battle/join', { code: room.code, stake: room.stake, range_codes: myRanges() });
       if (B === cur) enterRoom({ ...joined, host: false });
     } catch (err) { toast(err.message); button.disabled = false; }
-  });
+  }, false, '대결 방 참가');
 }
-function confirmBox(html, noLabel, yesLabel, done, danger = false) {
-  const box = document.createElement('div');
-  box.className = 'yb-confirm';
-  box.innerHTML = `<div class="yb-confirm-card" role="dialog" aria-modal="true">${html}<div class="btn-row"><button type="button" class="btn" data-confirm="no">${noLabel}</button><button type="button" class="btn ${danger ? 'danger' : 'primary'}" data-confirm="yes">${yesLabel}</button></div></div>`;
-  box.onclick = e => { const c = e.target.closest('[data-confirm]')?.dataset.confirm; if (!c) return; box.remove(); done(c === 'yes'); };
-  box.onkeydown = e => { if (e.key === 'Escape') { box.remove(); done(false); } };
-  document.querySelector('.battle-app')?.appendChild(box);
-  box.querySelector('[data-confirm="no"]').focus();
+// V13.101: the confirm boxes are the app's dialog (ui.js modal: named, Tab stays inside, Escape
+// closes, focus goes back). Closing it any other way than the yes button is a no. Returns close.
+function confirmBox(html, noLabel, yesLabel, done, danger = false, title = '확인') {
+  let answered = false;
+  const answer = yes => { if (answered) return; answered = true; done(yes); };
+  const close = modal(`<div class="yb-confirm-card">${html}<div class="btn-row"><button type="button" class="btn" data-confirm="no">${noLabel}</button><button type="button" class="btn ${danger ? 'danger' : 'primary'}" data-confirm="yes">${yesLabel}</button></div></div>`, title, { className: 'yb-modal-v13101', onClose: () => answer(false) });
+  const card = document.querySelector('#modal-root .yb-modal-v13101');
+  card.querySelector('[data-confirm="no"]').onclick = () => close();
+  card.querySelector('[data-confirm="yes"]').onclick = () => { answered = true; close(); done(true); };
+  card.querySelector('[data-confirm="no"]').focus();
+  return close;
 }
 async function cancelRoom(button) {
   button.disabled = true;
@@ -459,31 +463,103 @@ function meAsPlayer() {
   const A = B.A, pet = A.data.stats.pet;
   return { id: A.data.profile.id, name: A.data.profile.display_name, pet: pet ? { key: pet.key, form: pet.form, name: pet.name || '' } : null, streak: 0, title: titleState(A).equipped, tier: A.data.league?.tier?.key || null };
 }
-function startBotMatch(button) {
-  const A = B.A;
+// V13.101: the start is registered before the match begins (the server pays only a match it
+// knows). If that fails the student is told now, not on the result screen, and picks whether to
+// play without a reward.
+async function startBotMatch(button) {
+  const A = B.A, cur = B;
   const { words } = getRanges(A, A.school, A.data.profile.class_name);
   const questions = practiceQuestions(words.filter(word => B.ranges.has(word.range_code)), B.mode);
   if (questions.length < 8) return toast('뜻이 서로 다른 단어가 부족해요. 범위를 더 골라주세요.');
-  if (button) button.disabled = true;
+  const setup = { ranges: [...B.ranges], level: B.botLevel, mode: B.mode };
+  buttonBusy(button);
+  const reg = await registerStart('/battle/practice/start', { level: setup.level, mode: setup.mode });
+  buttonBusy(button, false);
+  if (B !== cur) return;
+  if (reg.error) return startFailed(reg.error, () => { if (B === cur) beginBotMatch(questions, setup, null); });
+  beginBotMatch(questions, setup, reg.id);
+}
+function beginBotMatch(questions, setup, ticket) {
   goFull();
   closeSocket(false);
   B.room = { id: 'practice', practice: true, stake: 0 };
   B.view = null;
-  B.practiceSetup = { ranges: [...B.ranges], level: B.botLevel, mode: B.mode };
-  B.botReward = null;
-  // The server notes the start (and the level); a match it never heard of pays nothing.
-  const ticket = api('/battle/practice/start', { level: B.botLevel, mode: B.mode }).then(res => res.id).catch(() => null);
-  B.local = createPracticeMatch({ me: meAsPlayer(), questions, level: B.botLevel, mode: B.mode, onMessage });
+  B.practiceSetup = setup;
+  B.botReward = ticket ? null : { paid: false, reason: 'unregistered' };
+  B.local = createPracticeMatch({ me: meAsPlayer(), questions, level: setup.level, mode: setup.mode, onMessage });
   B.local.ticket = ticket;
   main('<div class="yb-loading">로보를 부르고 있어요…</div>');
   B.local.start();
 }
-function botAgain() {
+function botAgain(button) {
   const setup = B.practiceSetup;
   nextScreen();
   if (setup) { B.ranges = new Set(setup.ranges); B.botLevel = setup.level; B.mode = setup.mode || 'speed'; }
-  startBotMatch();
+  startBotMatch(button);
 }
+
+/* ---------- V13.101 reward receipts ---------- */
+// A finished match's result is kept on the phone (localStorage) from the moment it is sent until
+// the server answers. The server keeps a receipt per match id (rewards.mjs), so sending it again
+// returns the same answer and never pays twice: a lost connection only shows 다시 받기, and a
+// result that never got an answer is sent again when the app opens or before the next match.
+const UNCLAIMED_KEY = 'sumus-yacha-unclaimed';
+const UNCLAIMED_DAYS = 7; // the server keeps receipts that long (RECEIPT_DAYS)
+const FINISH_PATHS = { bot: '/battle/practice/finish', monster: '/monster/finish' };
+function unclaimed() {
+  let list = [];
+  try { list = JSON.parse(localStorage.getItem(UNCLAIMED_KEY) || '[]'); } catch {}
+  const cut = Date.now() - UNCLAIMED_DAYS * 86400000;
+  return (Array.isArray(list) ? list : []).filter(x => x?.id && FINISH_PATHS[x.kind] && Number(x.at || 0) >= cut);
+}
+function saveUnclaimed(list) {
+  try { if (list.length) localStorage.setItem(UNCLAIMED_KEY, JSON.stringify(list.slice(-10))); else localStorage.removeItem(UNCLAIMED_KEY); } catch {}
+}
+const isUnclaimed = id => unclaimed().some(x => x.id === id);
+// The server answered for good (paid, not paid, or never heard of it): nothing left to send.
+const settledError = err => [400, 404, 409].includes(Number(err?.status));
+async function sendClaim(entry) {
+  saveUnclaimed([...unclaimed().filter(x => x.id !== entry.id), entry]);
+  try {
+    const res = await api(FINISH_PATHS[entry.kind], { id: entry.id, result: entry.result, right: entry.right });
+    saveUnclaimed(unclaimed().filter(x => x.id !== entry.id));
+    return res;
+  } catch (err) {
+    if (settledError(err)) saveUnclaimed(unclaimed().filter(x => x.id !== entry.id));
+    throw err;
+  }
+}
+// Sends the results this student never got an answer for. Returns the coins they paid, and
+// `failed` when the server could not be reached (the rest waits for the next time).
+export async function resendUnclaimed(profileId) {
+  let coins = 0, xp = 0, sent = 0;
+  for (const entry of unclaimed().filter(x => x.profile === profileId)) {
+    try { const res = await sendClaim(entry); sent++; if (res.paid) { coins += Number(res.coins || 0); xp += Number(res.xp || 0); } }
+    catch (err) { if (!settledError(err)) return { coins, xp, sent, failed: err }; }
+  }
+  return { coins, xp, sent, failed: null };
+}
+// Before a new start: the server keeps one open match per kind, so a result still waiting on
+// this phone is sent first (a new start would replace the match it belongs to).
+async function registerStart(path, body) {
+  const before = await resendUnclaimed(B.A.data.profile.id);
+  if (before.failed) return { error: before.failed };
+  if (before.coins) toast(`지난 대결 보상 ${num(before.coins)}코인을 받았어요.`);
+  try { return { id: (await api(path, body)).id }; }
+  catch (err) { return { error: err }; }
+}
+function startFailed(err, playAnyway) {
+  if (!err.transient) return toast(err.message);
+  confirmBox(`<h2>보상 등록을 하지 못했어요</h2><p>${esc(err.message || '연결을 확인해주세요.')}<br>지금 시작하면 이번 판은 <b>보상을 받을 수 없어요</b>. 연결을 확인하고 다시 눌러도 돼요.</p>`, '그만두기', '보상 없이 시작', yes => { if (yes) playAnyway(); }, false, '보상 등록 실패');
+}
+// The 다시 받기 button on a result card.
+function retryReward(button) {
+  const local = B?.claimLocal;
+  if (!local || local.claimed) return;
+  buttonBusy(button);
+  if (B.room?.monster) claimMonsterReward(local.outcome, local); else claimBotReward(local.outcome, local);
+}
+const retryButton = () => ' <button type="button" class="btn small yb-retry-v13101" data-yb="reward-retry">다시 받기</button>';
 
 /* ---------- V13.94 몬스터 잡기 ---------- */
 // The student's word ranges, in order, make parts (파트); each part's monster is beaten at
@@ -547,21 +623,30 @@ function askMonster(partKey, level) {
         <li class="reward"><b>${partial ? '새 범위 처치' : first ? '첫 처치' : '다시 처치'}</b>${coin()}${num(reward.coins)} · 경험치 ${num(reward.xp)}${first ? partial ? ' <small>(새로 생긴 범위 단어만큼)</small>' : '' : ` <small>(오늘 ${monsterState().left}번 남음)</small>`}</li>
       </ul>
       ${level === 'hard' ? '<p class="mh-warn">하드 몬스터는 거의 틀리지 않고 아주 빨라요. 단어를 완벽하게 외웠을 때 도전하세요!</p>' : ''}
-    </div>`, '그만두기', '도전!', yes => { if (yes) startMonster(p.key, level); });
+    </div>`, '그만두기', '도전!', yes => { if (yes) startMonster(p.key, level); }, false, `${p.monster.name} ${L.name} 도전`);
 }
-function startMonster(partKey, level) {
-  const A = B.A, p = myParts().find(x => x.key === partKey), L = MONSTER_LEVELS[level];
+async function startMonster(partKey, level, button) {
+  const A = B.A, cur = B, p = myParts().find(x => x.key === partKey), L = MONSTER_LEVELS[level];
   if (!p || !L) return toast('몬스터를 찾지 못했어요.');
   const { words } = getRanges(A, A.school, A.data.profile.class_name);
   const questions = practiceQuestions(words.filter(w => p.codes.includes(String(w.range_code))), L.mode);
   if (questions.length < 8) return toast('뜻이 서로 다른 단어가 부족해요.');
+  // V13.101: registered before the fight (see startBotMatch).
+  buttonBusy(button);
+  const reg = await registerStart('/monster/start', { part: p.key, level });
+  buttonBusy(button, false);
+  if (B !== cur) return;
+  if (reg.error) return startFailed(reg.error, () => { if (B === cur) beginMonster(p, level, questions, null); });
+  beginMonster(p, level, questions, reg.id);
+}
+function beginMonster(p, level, questions, ticket) {
+  const L = MONSTER_LEVELS[level];
   goFull();
   closeSocket(false);
   B.room = { id: 'monster', practice: true, monster: { part: p.key, level }, stake: 0 };
   B.view = null;
   B.monsterSetup = { part: p.key, level };
-  B.monsterReward = null;
-  const ticket = api('/monster/start', { part: p.key, level }).then(res => res.id).catch(err => { toast(err.message); return null; });
+  B.monsterReward = ticket ? null : { paid: false, reason: 'unregistered' };
   const foe = { name: p.monster.name, pet: { key: p.monster.temp.pet, form: p.monster.temp.form, skill: L.skill }, monster: { key: p.monster.key, level }, hp: L.monsterHp };
   B.local = createPracticeMatch({ me: meAsPlayer(), questions, mode: L.mode, onMessage, foe, skill: L, hp: L.hp, ko: true, label: `몬스터 · ${L.name}` });
   B.local.ticket = ticket;
@@ -594,15 +679,25 @@ function monsterRewardText() {
   if (!r) return '보상 확인 중…';
   if (r.paid) return `${r.first ? `<em class="mh-first">${r.share ? '새 범위 처치 보상!' : '첫 처치 보상!'}</em>` : ''}${coin()}+${num(r.coins)} · 경험치 +${num(r.xp)}`;
   const need = MONSTER_LEVELS[B.monsterSetup?.level]?.need || 5;
-  return { few: `단어를 ${need}개 이상 맞히면 보상을 받아요`, daily: '오늘 다시 잡기 보상은 다 받았어요 (첫 처치는 언제나 받아요)', short: '너무 빨리 끝난 전투예요', error: '보상을 확인하지 못했어요' }[r.reason] || '보상 없음';
+  if (r.reason === 'error') return r.retry ? `보상을 받지 못했어요.${retryButton()}` : '보상을 확인하지 못했어요';
+  return { few: `단어를 ${need}개 이상 맞히면 보상을 받아요`, daily: '오늘 다시 잡기 보상은 다 받았어요 (첫 처치는 언제나 받아요)', short: '너무 빨리 끝난 전투예요', unregistered: '보상 등록 없이 한 전투예요' }[r.reason] || '보상 없음';
 }
 async function claimMonsterReward(outcome, local) {
   const cur = B;
   if (!local || local.claimed) return;
   local.claimed = true;
+  local.outcome = outcome;
+  cur.claimLocal = local;
   const id = await local.ticket;
-  let res = { paid: false, reason: 'error' };
-  if (id) { try { res = await api('/monster/finish', { id, result: outcome, right: local.myRight() }); } catch { res = { paid: false, reason: 'error' }; } }
+  if (!id) return;
+  let res;
+  try { res = await sendClaim({ kind: 'monster', id, result: outcome, right: local.myRight(), profile: cur.A.data.profile.id, at: Date.now() }); }
+  catch (err) {
+    // V13.101: not lost — kept on the phone; 다시 받기 (or the next app start) sends it again.
+    const retry = isUnclaimed(id);
+    if (retry) local.claimed = false;
+    res = { paid: false, reason: 'error', retry };
+  }
   if (B !== cur) return;
   B.monsterReward = res;
   if (res.cleared && B.A.data.rewards) B.A.data.rewards.monster = { ranges: res.ranges, cleared: res.cleared, left: res.left, daily: res.daily, wins: res.wins, hard_wins: res.hard_wins };
@@ -671,6 +766,7 @@ function openSocket() {
 }
 function closeSocket(final = true) {
   if (!B) return;
+  if (final) { const ask = B.leaveAsk; B.leaveAsk = null; ask?.(); }
   if (final) { B.closing = true; clearInterval(B.pinger); cancelAnimationFrame(B.raf); clearInterval(B.waitTimer); (B.timers || []).forEach(clearTimeout); B.timers = []; }
   try { B.ws?.close(); } catch {}
   B.ws = null;
@@ -915,7 +1011,8 @@ function hookKeys() {
   if (keysHooked) return;
   keysHooked = true;
   window.addEventListener('keydown', event => {
-    if (!document.getElementById('yb-spell') || event.ctrlKey || event.metaKey || event.altKey) return;
+    // V13.101: a dialog on screen (giving up, …) gets the keys: Enter is its button, not the answer.
+    if (!document.getElementById('yb-spell') || dialogOpen() || event.ctrlKey || event.metaKey || event.altKey) return;
     const key = event.key === 'Backspace' ? 'back' : event.key === 'Enter' ? 'go' : event.key.toLowerCase();
     if (key === 'go') { event.preventDefault(); return spellSubmit(); }
     if (key === 'back' || /^[a-z]$/.test(key)) { event.preventDefault(); spellKey(key); }
@@ -1180,17 +1277,24 @@ function botRewardText() {
   const r = B.botReward;
   if (!r) return '보상 확인 중…';
   if (r.paid) return `${coin()}+${num(r.coins)} · 경험치 +${num(r.xp)}`;
-  return { few: `단어를 ${BOT_MIN_RIGHT}개 이상 맞히면 보상을 받아요`, daily: '오늘 연습 보상은 다 받았어요', forfeit: '포기한 경기는 보상이 없어요' }[r.reason] || '연습 경기 · 보상 없음';
+  if (r.reason === 'error' && r.retry) return `보상을 받지 못했어요.${retryButton()}`;
+  return { few: `단어를 ${BOT_MIN_RIGHT}개 이상 맞히면 보상을 받아요`, daily: '오늘 연습 보상은 다 받았어요', forfeit: '포기한 경기는 보상이 없어요', unregistered: '보상 등록 없이 한 연습이에요', error: '보상을 확인하지 못했어요' }[r.reason] || '연습 경기 · 보상 없음';
 }
 async function claimBotReward(outcome, local) {
   const cur = B;
   if (!local || local.claimed) return;
   local.claimed = true;
+  local.outcome = outcome;
+  cur.claimLocal = local;
   const id = await local.ticket;
-  let res = { paid: false, reason: 'error' };
-  if (id) {
-    try { res = await api('/battle/practice/finish', { id, result: outcome, right: local.myRight() }); }
-    catch { res = { paid: false, reason: 'error' }; }
+  if (!id) return;
+  let res;
+  try { res = await sendClaim({ kind: 'bot', id, result: outcome, right: local.myRight(), profile: cur.A.data.profile.id, at: Date.now() }); }
+  catch (err) {
+    // V13.101: not lost — kept on the phone; 다시 받기 (or the next app start) sends it again.
+    const retry = isUnclaimed(id);
+    if (retry) local.claimed = false;
+    res = { paid: false, reason: 'error', retry };
   }
   if (B !== cur) return;
   B.botReward = res;
@@ -1292,14 +1396,17 @@ function confirmLeave() {
   const cur = B;
   // Before the match starts, leaving calls it off without moving any points.
   if (B.view.phase === 'waiting') {
-    return confirmBox('<h2>대결을 취소할까요?</h2><p>아직 시작 전이라 코인은 그대로예요.</p>', '기다릴게요', '취소하기', yes => {
+    cur.leaveAsk = confirmBox('<h2>대결을 취소할까요?</h2><p>아직 시작 전이라 코인은 그대로예요.</p>', '기다릴게요', '취소하기', yes => {
       if (!yes || B !== cur) return;
       send({ type: 'leave' });
       later(leaveScreen, 200);
-    });
+    }, false, '대결 취소 확인');
+    return;
   }
   const lossText = B.room?.practice ? '연습 경기라 코인은 그대로예요.' : B.view.stake ? `판돈 ${num(B.view.stake)}코인을 잃어요.` : '대회 경기는 상대가 다음 라운드에 올라가요.';
-  confirmBox(`<h2>대결을 포기할까요?</h2><p>지금 나가면 <b>패배</b>로 처리돼요. ${lossText}</p>`, '계속할게요', '포기하기', yes => { if (yes && B === cur) send({ type: 'leave' }); }, true);
+  // V13.101: the app's dialog (named, Tab stays inside, Escape is 계속할게요, focus goes back), and
+  // the spelling keys wait while it is open (hookKeys). It closes by itself when the match ends.
+  cur.leaveAsk = confirmBox(`<h2>대결을 포기할까요?</h2><p>지금 나가면 <b>패배</b>로 처리돼요. ${lossText}</p>`, '계속할게요', '포기하기', yes => { if (yes && B === cur) send({ type: 'leave' }); }, true, '대결 포기 확인');
 }
 function tryExit() {
   if (B?.view && B.view.phase !== 'finished' && !B.closing) return confirmLeave();

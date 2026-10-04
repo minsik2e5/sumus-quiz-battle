@@ -16,7 +16,7 @@ import { expressionSrc, holdPose, showPose } from '../public/modules/character.j
 import { battleQuestions, spellHint, spellable, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { createPracticeMatch, BOT_LEVELS, BOT_HP } from '../public/modules/battle-bot.js';
 import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
-import { monsterStart, monsterFinish, monsterView, monsterMigrate, monsterRanges, addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome, openEgg, luckyView as luckyViewOf } from './rewards.mjs';
+import { botStart, botFinish, RECEIPT_KEEP, RECEIPT_DAYS, monsterStart, monsterFinish, monsterView, monsterMigrate, monsterRanges, addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome, openEgg, luckyView as luckyViewOf } from './rewards.mjs';
 import { marketPrices } from './market.mjs';
 import { STOCKS, MARKET, MARKET_OPEN, tradeFee, newsText } from '../public/modules/market.js';
 
@@ -183,7 +183,10 @@ export async function runRewardsChecks(assert, expectStatus) {
   const s0 = await statsOf('qa-rw-b');
   const quickStart = await service(state, 'POST', '/battle/practice/start', { level: 'hard', mode: 'speed' }, tB);
   const tooQuick = await service(state, 'POST', '/battle/practice/finish', { id: quickStart.id, result: 'win', right: 9 }, tB);
-  await expectStatus(404, () => service(state, 'POST', '/battle/practice/finish', { id: quickStart.id, result: 'win', right: 9 }, tB), 'V13.70 a robot match pays once');
+  // V13.101: the same finish again gets the same answer (its receipt), never a second pay-out.
+  const tooQuickAgain = await service(state, 'POST', '/battle/practice/finish', { id: quickStart.id, result: 'win', right: 9 }, tB);
+  assert(!tooQuickAgain.paid && tooQuickAgain.reason === 'short' && tooQuickAgain.again, 'V13.70 a robot match pays once (V13.101: sent again, it gets the same answer)');
+  await expectStatus(404, () => service(state, 'POST', '/battle/practice/finish', { id: 'made-up', result: 'win', right: 9 }, tB), 'V13.70 a robot match the server never started pays nothing');
   const play = async (level, result, right) => {
     const start = await service(state, 'POST', '/battle/practice/start', { level, mode: 'skill' }, tB);
     B.bonus.bot_live.at -= 60000;
@@ -235,7 +238,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(luckyUi.includes('export function luckyShow(') && luckyUi.includes('function machineSpin(') && luckyUi.includes("const shakes = res.mult === 0 ? 1 : res.mult === 1 ? 2 : 3") && luckyUi.includes('data-lk="skip"') && luckyUi.includes('prefers-reduced-motion') && arcade.includes('luckyCard(luckyState(A)'), 'V13.68 the coin capsule has a machine and a show: coin in, dial, the capsule shakes more for better results, bursts open; it can be skipped and respects reduced motion');
   assert(homeUi.includes('attendanceCard(') && arcade.includes('/lucky/pull') && !arcade.includes('/chance/') && !arcade.includes('더블 찬스') && arcade.includes('확률'), 'V13.67 the home screen has the attendance card; the coin arcade has the capsule machine (with its odds); V13.70 no double chance');
   const battleV70 = source('../public/modules/battle.js'), sessionsUi = source('../public/modules/sessions.js'), appUi = source('../public/app.js'), buildUi = source('./build-assets.mjs');
-  assert(battleV70.includes("api('/battle/practice/start'") && battleV70.includes("api('/battle/practice/finish'") && battleV70.includes('botRewardLine()') && sessionsUi.includes('a.reward ?') && homeUi.includes('data-go="ranking" data-from="me"') && homeUi.includes("A.rankFrom === 'me' ? backTo('me', '나')") && appUi.includes("A.rankFrom = d.from || 'home'") && !appUi.includes('wallet-chance') && buildUi.includes('"v1370.css"'), 'V13.70 robot and exam rewards show in the app; 나 opens the ranking; the wallet has no double chance');
+  assert(battleV70.includes("registerStart('/battle/practice/start'") && battleV70.includes("bot: '/battle/practice/finish'") && battleV70.includes('botRewardLine()') && sessionsUi.includes('a.reward ?') && homeUi.includes('data-go="ranking" data-from="me"') && homeUi.includes("A.rankFrom === 'me' ? backTo('me', '나')") && appUi.includes("A.rankFrom = d.from || 'home'") && !appUi.includes('wallet-chance') && buildUi.includes('"v1370.css"'), 'V13.70 robot and exam rewards show in the app; 나 opens the ranking; the wallet has no double chance');
   assert(battleV70.indexOf('id="yb-answers"') < battleV70.indexOf('id="yb-myskill"') && battleV70.includes('yb-strip-v1370') && battleV70.includes('yb-hpn-'), 'V13.70 the match shows the answers right under the word, the clock beside the message line and HP numbers');
 
   /* ---------- V13.76 펫 교감 ---------- */
@@ -626,7 +629,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     const timeUp = tick(mb, mb.ends_at + 1).concat(tick(mb, mb.ends_at + 5000)).find(e => e.type === 'end');
     assert(mb.players.me.hp === 300 && mb.players.mon.hp === 330 && view.players.mon.max_hp === 330 && view.players.me.max_hp === 300 && view.players.mon.monster.key === 'slime' && petSkill(mb.players.mon.pet).name === MONSTER_SKILLS.rage.name && timeUp?.result.winner === 'mon', 'V13.94 몬스터는 자기 HP와 특기를 갖고, 시간 안에 쓰러뜨리지 못하면 몬스터가 이긴다');
     const battle94b = source('../public/modules/battle.js'), css94b = source('../public/v1394.css');
-    assert(battle94b.includes("['monster', '몬스터']") && battle94b.includes('function monsterTab()') && battle94b.includes("api('/monster/start'") && battle94b.includes("api('/monster/finish'") && battle94b.includes('ko: true') && css94b.includes('.mh-part{') && source('./service.mjs').includes("path === '/monster/start'"), 'V13.94 야차전의 몬스터 탭에서 파트별 몬스터를 이지·노말·하드로 잡는다');
+    assert(battle94b.includes("['monster', '몬스터']") && battle94b.includes('function monsterTab()') && battle94b.includes("registerStart('/monster/start'") && battle94b.includes("monster: '/monster/finish'") && battle94b.includes('ko: true') && css94b.includes('.mh-part{') && source('./service.mjs').includes("path === '/monster/start'"), 'V13.94 야차전의 몬스터 탭에서 파트별 몬스터를 이지·노말·하드로 잡는다');
     assert(battle94b.includes('function strike(') && battle94b.includes("strike(atk, def,") && battle94b.includes('skill: true, attacker: p') && battle94b.includes('function knockout(') && ['.fx-shot{', '.fx-ring{', '.fx-claw{', '.fx-beam{', '.fx-ko{', '@keyframes fx-shake-l'].every(x => css94b.includes(x)), 'V13.94 공격 이펙트: 날아가는 공격·충격파·불꽃·화면 흔들림, 특기는 광선, 몬스터는 할퀴기, 쓰러뜨리면 K.O.!');
     assert(battle94b.includes('ya-chip-study') && battle94b.includes('class="ya-picked') && battle94b.includes('ya-rm-duel') && battle94b.includes('친구가 다른 번호를 외우고 있다면?'), 'V13.94 내 단어 범위: 단어 수·학습 중 표시·고른 범위 요약·각자/같은 범위 그림 설명');
   }
@@ -808,5 +811,68 @@ export async function runRewardsChecks(assert, expectStatus) {
     const css98 = source('../public/v1398.css'), student98 = source('../public/modules/student.js'), manifest98 = JSON.parse(source('../public/manifest.webmanifest'));
     assert(css98.includes('.partner-card-v1358 .partner-inner{grid-template-columns:minmax(0,1fr)}') && student98.includes('<span class="partner-stars" aria-label="모은 펫 ${owned}/${total}"><b aria-hidden="true">★</b>${owned}<small>/${total}</small></span>') && !student98.includes("'☆'.repeat") && source('./build-assets.mjs').includes('"v1398.css"'), 'V13.98 홈 파트너 카드는 펫이 20마리여도 카드 밖으로 잘리지 않는다(별 20개 대신 ★ 모은 수/전체)');
     assert(manifest98.orientation === 'any' && css98.includes('@media (min-width:768px) and (max-height:560px)'), 'V13.98 설치한 앱이 기기를 돌리는 대로 가로·세로로 바뀌고, 옆으로 눕힌 휴대폰에서도 메뉴 다섯 개가 다 보인다');
+    /* ---------- V13.101 로보 연습전·몬스터 끝내기 영수증 ---------- */
+    {
+      const t1 = Date.parse('2026-10-04T03:00:00Z');
+      const coinsOf = kid => bonusRecords(kid).reduce((n, r) => n + r.reward_points, 0);
+      const xpOf = kid => bonusRecords(kid).reduce((n, r) => n + r.xp, 0);
+      const kid = { id: 'qa-rc', pets: [{ key: 'dog' }], bonus: {} };
+      botStart(kid, { level: 'hard', mode: 'speed', id: 'rc-1', now: t1 });
+      const paid1 = botFinish(kid, { id: 'rc-1', result: 'win', right: 8, now: t1 + 60000 });
+      const coins1 = coinsOf(kid), xp1 = xpOf(kid), count1 = kid.bonus.bot.count, wins1 = kid.bonus.bot.wins;
+      const again1 = botFinish(kid, { id: 'rc-1', result: 'win', right: 8, now: t1 + 61000 });
+      const again1b = botFinish(kid, { id: 'rc-1', result: 'lose', right: 99, now: t1 + 62000 });
+      assert(paid1.paid && paid1.coins === BOT_WIN_REWARDS.hard.coins && !paid1.again && again1.paid && again1.again && again1.coins === paid1.coins && again1.xp === paid1.xp && again1.result === 'win' && again1b.coins === paid1.coins && again1b.result === 'win'
+        && coinsOf(kid) === coins1 && xpOf(kid) === xp1 && kid.bonus.bot.count === count1 && kid.bonus.bot.wins === wins1 && again1.left === BOT_DAILY - 1,
+        'V13.101 로보 연습전: 같은 id로 끝내기를 다시 보내면 같은 결과(코인·경험치·승패)를 돌려주고, 두 번 지급하지 않는다(판 수·승수도 그대로)');
+      botStart(kid, { level: 'easy', mode: 'speed', id: 'rc-2', now: t1 + 100000 });
+      const few2 = botFinish(kid, { id: 'rc-2', result: 'win', right: 1, now: t1 + 200000 });
+      const few2again = botFinish(kid, { id: 'rc-2', result: 'win', right: 9, now: t1 + 201000 });
+      assert(!few2.paid && few2.reason === 'few' && !few2again.paid && few2again.reason === 'few' && coinsOf(kid) === coins1, 'V13.101 보상 없는 결과도 영수증에 남아, 다시 보내도(맞힌 수를 바꿔도) 그대로다');
+      botStart(kid, { level: 'normal', mode: 'speed', id: 'rc-3', now: t1 + 300000 });
+      const old1 = botFinish(kid, { id: 'rc-1', result: 'win', right: 8, now: t1 + 301000 });
+      let missing = 0; try { botFinish(kid, { id: 'rc-x', result: 'win', right: 8, now: t1 + 302000 }); } catch (err) { missing = err.status; }
+      let blank = 0; try { botFinish(kid, { id: '', result: 'win', right: 8, now: t1 + 302000 }); } catch (err) { blank = err.status; }
+      assert(old1.again && old1.coins === paid1.coins && kid.bonus.bot_live?.id === 'rc-3' && missing === 404 && blank === 404 && coinsOf(kid) === coins1, 'V13.101 새 판을 시작해도 지난 판의 영수증은 그대로 답하고(진행 중인 판은 지우지 않음), 모르는 id·빈 id는 찾지 못한다');
+      // Monster fights: the first clear is answered again the same way, the clear is marked once.
+      const mParts = monsterParts(new Map([['1', 20], ['2', 20]]));
+      const mkid = { id: 'qa-rc-m', pets: [{ key: 'dog' }], bonus: {} };
+      const mStart = monsterStart(mkid, { part: mParts[0].key, level: 'easy', parts: mParts, scope: 's|g', id: 'rc-m1', now: t1 });
+      const mWin = monsterFinish(mkid, { id: mStart.id, result: 'win', right: 9, scope: 's|g', parts: mParts, now: t1 + 60000 });
+      const mCoins = coinsOf(mkid), mWins = mkid.bonus.monster.wins, mRanges = JSON.stringify(mkid.bonus.monster.ranges);
+      const mAgain = monsterFinish(mkid, { id: mStart.id, result: 'win', right: 9, scope: 's|g', parts: mParts, now: t1 + 70000 });
+      assert(mWin.paid && mWin.first && mWin.coins === MONSTER_LEVELS.easy.first.coins && mAgain.paid && mAgain.first && mAgain.again && mAgain.coins === mWin.coins && mAgain.xp === mWin.xp && mAgain.part === mWin.part
+        && coinsOf(mkid) === mCoins && mkid.bonus.monster.wins === mWins && JSON.stringify(mkid.bonus.monster.ranges) === mRanges && mAgain.cleared[mParts[0].key]?.easy,
+        'V13.101 몬스터 끝내기: 같은 id로 다시 보내면 같은 첫 처치 결과를 돌려주고, 두 번 지급하지 않는다(처치 수·클리어 기록 그대로)');
+      // Only the last few receipts are kept, and tidyProfileLogs drops the old ones.
+      for (let i = 0; i < RECEIPT_KEEP + 4; i++) { botStart(kid, { level: 'easy', mode: 'speed', id: `rc-n${i}`, now: t1 + 400000 + i * 100000 }); botFinish(kid, { id: `rc-n${i}`, result: 'lose', right: 1, now: t1 + 450000 + i * 100000 }); }
+      let gone = 0; try { botFinish(kid, { id: 'rc-1', result: 'win', right: 8, now: t1 + 9e6 }); } catch (err) { gone = err.status; }
+      assert(kid.bonus.done.length === RECEIPT_KEEP && gone === 404 && coinsOf(kid) === coins1, `V13.101 영수증은 최근 ${RECEIPT_KEEP}개만 남고, 밀려난 판을 다시 보내도 지급하지 않는다`);
+      const tidyState = { profiles: [kid, mkid] };
+      const tidied = tidyProfileLogs(tidyState, t1 + RECEIPT_DAYS * DAY_MS + 120000);
+      assert(tidied && mkid.bonus.done.length === 0 && kid.bonus.done.length === RECEIPT_KEEP && tidyProfileLogs(tidyState, t1 + (RECEIPT_DAYS + 1) * DAY_MS + 3e6) && kid.bonus.done.length === 0 && !tidyProfileLogs(tidyState, t1 + 30 * DAY_MS), `V13.101 tidyProfileLogs가 ${RECEIPT_DAYS}일 지난 영수증을 정리한다(한 번 정리하면 더 할 일이 없다)`);
+      // Through the service: the reward answer lost on the way back is sent again.
+      state.profiles.push(student('qa-rc-svc', '영수'));
+      const rcToken = await login('qa-rc-svc'), rc = profile('qa-rc-svc');
+      const rcBefore = (await service(state, 'GET', '/rewards', {}, rcToken)).points_balance;
+      const svcStart = await service(state, 'POST', '/battle/practice/start', { level: 'normal', mode: 'speed' }, rcToken);
+      rc.bonus.bot_live.at -= 60000;
+      const svcPaid = await service(state, 'POST', '/battle/practice/finish', { id: svcStart.id, result: 'win', right: 6 }, rcToken);
+      const svcAgain = await service(state, 'POST', '/battle/practice/finish', { id: svcStart.id, result: 'win', right: 6 }, rcToken);
+      const rcPublic = JSON.stringify((await service(state, 'GET', '/bootstrap', {}, rcToken)).profile);
+      assert(svcPaid.paid && svcAgain.paid && svcAgain.again && svcAgain.coins === svcPaid.coins && svcAgain.points_balance === svcPaid.points_balance && svcPaid.points_balance === rcBefore + BOT_WIN_REWARDS.normal.coins && rc.bonus.done.length === 1 && !rcPublic.includes(svcStart.id), 'V13.101 (서비스) 응답만 끊겨 다시 보내도 같은 결과·같은 잔액이고, 영수증은 학생에게 보내는 프로필에 실리지 않는다');
+      // The app: claimed goes back on failure with 다시 받기, results wait on the phone, the start is registered first.
+      const b101 = source('../public/modules/battle.js'), app101 = source('../public/app.js'), ui101 = source('../public/modules/ui.js'), css101 = source('../public/v13101.css');
+      assert(b101.includes("const UNCLAIMED_KEY = 'sumus-yacha-unclaimed'") && b101.includes('if (retry) local.claimed = false;') && (b101.match(/if \(retry\) local\.claimed = false;/g) || []).length === 2 && b101.includes('data-yb="reward-retry"') && b101.includes("if (act === 'reward-retry') return retryReward(b);")
+        && b101.includes('saveUnclaimed([...unclaimed().filter(x => x.id !== entry.id), entry]);') && b101.includes('if (settledError(err)) saveUnclaimed(') && app101.includes('resendUnclaimed(A.data.profile.id)') && app101.includes('function startPolling() {\n  resendBattleRewards();'),
+        'V13.101 앱: 보상 요청이 실패하면 claimed를 되돌리고 다시 받기 버튼을 보여 주며, 결과는 답을 받을 때까지 휴대폰에 남아 앱을 다시 열면 다시 보낸다');
+      assert(b101.includes("const reg = await registerStart('/battle/practice/start'") && b101.includes("const reg = await registerStart('/monster/start'") && b101.indexOf("registerStart('/battle/practice/start'") < b101.indexOf('function beginBotMatch(') && b101.includes("'보상 등록 실패'") && b101.includes('const before = await resendUnclaimed(B.A.data.profile.id);') && !b101.includes(".then(res => res.id).catch(() => null)"),
+        'V13.101 앱: 시작 등록이 끝난 뒤에 전투를 시작하고, 실패하면 시작 전에 알려 준다(남은 결과를 먼저 보낸다)');
+      // 야차전 포기 확인창: the app's dialog, keys wait, Tab stays inside, Escape closes, focus goes back.
+      assert(b101.includes("'대결 포기 확인'") && b101.includes("modal(`<div class=\"yb-confirm-card\">") && b101.includes('if (!document.getElementById(\'yb-spell\') || dialogOpen() ||') && b101.includes('const ask = B.leaveAsk; B.leaveAsk = null; ask?.();') && !b101.includes("box.className = 'yb-confirm';\n  box.innerHTML = `<div class=\"yb-confirm-card\" role=\"dialog\"")
+        && ui101.includes('role="dialog" aria-modal="true" aria-label="${esc(title)}"') && ui101.includes("if (e.key === 'Escape') { e.preventDefault(); close(); return; }") && ui101.includes("if (e.key === 'Tab') {") && ui101.includes('prior?.focus?.()') && ui101.includes('onClose?.();') && ui101.includes("export const dialogOpen = () => !!document.querySelector('#modal-root .modal, .yb-confirm');")
+        && css101.includes('.modal.yb-modal-v13101{') && source('./build-assets.mjs').includes('"v13101.css"'),
+        'V13.101 야차전 포기 확인창은 앱 공통 모달(이름·aria-modal·Tab 가두기·Escape·포커스 되돌리기)을 쓰고, 열려 있는 동안 철자 단축키(Enter·알파벳)가 멈추며, 경기가 끝나면 저절로 닫힌다');
+    }
   }
 }

@@ -21,6 +21,8 @@ import { MONSTER_LEVELS, MONSTER_DAILY, MONSTER_MIN_MS, MONSTER_MS_PER_RIGHT, MO
 //                reached) comes back (never sent: see publicProfile)
 //   bonus        V13.70 { log[{d, k, xp, c, at}], bot{day, count}, bot_live{id, level, mode, at} }
 //                경험치 and coins from robot matches and teacher exams, one entry per day and pet
+//                V13.101 done[{id, k, at, r}]: receipts of the last finished robot matches and
+//                monster fights (see keepReceipt)
 // Coins received here (attendance, old capsule refunds, coin capsule and double chance pay-outs)
 // are added to the balance in service.mjs pointsAndPets; coins paid (capsules, bets) go to
 // points_spent. Bonus 경험치 and coins join the student's records as bonus rows (bonusRecords).
@@ -106,6 +108,8 @@ export function tidyProfileLogs(state, now = Date.now()) {
     if (p.gacha && 'log' in p.gacha) { delete p.gacha.log; changed = true; }
     if (p.chance && 'log' in p.chance) { delete p.chance.log; changed = true; }
     if (refundRemovedBadges(p)) changed = true;
+    const b = p.bonus;
+    if (Array.isArray(b?.done)) { const next = trimReceipts(b.done, now); if (next.length !== b.done.length) { b.done = next; changed = true; } }
   }
   return changed;
 }
@@ -367,6 +371,22 @@ export function bonusRecords(p) {
   }));
 }
 
+// V13.101 receipts: a finished robot match or monster fight keeps what it decided (paid or not)
+// under its id, so the same finish sent again (the answer was lost on the way back, or the app
+// sends a result it never got an answer for) gets the same answer and is never paid twice. The
+// match's `live` entry is gone by then, so a receipt is the only way it can be answered.
+export const RECEIPT_KEEP = 10;
+export const RECEIPT_DAYS = 7;
+function trimReceipts(list, now) {
+  const cut = now - RECEIPT_DAYS * DAY_MS;
+  return list.filter(x => x?.id && Number(x.at || 0) >= cut).slice(-RECEIPT_KEEP);
+}
+const findReceipt = (b, kind, id) => (id && Array.isArray(b?.done) ? b.done.find(x => x.id === id && x.k === kind) : null) || null;
+function keepReceipt(b, kind, id, result, now) {
+  b.done = trimReceipts([...(Array.isArray(b.done) ? b.done : []).filter(x => !(x?.id === id && x.k === kind)), { id, k: kind, at: now, r: result }], now);
+  return result;
+}
+
 // A robot match is announced when it starts (the server keeps the level) and pays when it ends.
 export function botStart(p, { level, mode, id, now = Date.now() }) {
   const b = p.bonus ||= {};
@@ -380,23 +400,28 @@ export function botView(p, now = Date.now()) {
 }
 export function botFinish(p, { id, result, right, pet, now = Date.now() }) {
   const b = p.bonus ||= {};
+  const seen = findReceipt(b, 'bot', id);
+  if (seen) return { ...seen.r, again: true, ...botView(p, now) };
   const live = b.bot_live;
-  if (!live || live.id !== id) fail('연습 대결을 찾지 못했어요.', 404);
+  if (!id || !live || live.id !== id) fail('연습 대결을 찾지 못했어요.', 404);
   delete b.bot_live;
+  return { ...keepReceipt(b, 'bot', id, botSettle(p, b, live, { result, right, pet, now }), now), ...botView(p, now) };
+}
+function botSettle(p, b, live, { result, right, pet, now }) {
   const outcome = ['win', 'lose', 'draw'].includes(result) ? result : 'lose';
   const answered = Math.max(0, Math.min(200, Math.floor(Number(right) || 0)));
-  if (now - live.at < BOT_MIN_MS) return { paid: false, reason: 'short', ...botView(p, now) };
-  if (answered < BOT_MIN_RIGHT) return { paid: false, reason: 'few', ...botView(p, now) };
+  if (now - live.at < BOT_MIN_MS) return { paid: false, reason: 'short' };
+  if (answered < BOT_MIN_RIGHT) return { paid: false, reason: 'few' };
   const today = dayKey(now);
   const bot = b.bot ||= {};
   if (bot.day !== today) { bot.day = today; bot.count = 0; }
-  if (Number(bot.count || 0) >= BOT_DAILY) return { paid: false, reason: 'daily', ...botView(p, now) };
+  if (Number(bot.count || 0) >= BOT_DAILY) return { paid: false, reason: 'daily' };
   bot.count = Number(bot.count || 0) + 1;
   // V13.73: lifetime wins for the 로보 titles (paid matches only).
   if (outcome === 'win') { bot.wins = Number(bot.wins || 0) + 1; if (live.level === 'hard') bot.hard_wins = Number(bot.hard_wins || 0) + 1; }
   const reward = botReward(live.level, outcome);
   addBonus(p, { xp: reward.xp, coins: reward.coins, pet, now });
-  return { paid: true, coins: reward.coins, xp: reward.xp, result: outcome, level: live.level, ...botView(p, now) };
+  return { paid: true, coins: reward.coins, xp: reward.xp, result: outcome, level: live.level };
 }
 
 /* ---------- V13.94 몬스터 잡기 ---------- */
@@ -468,22 +493,29 @@ export function monsterStart(p, { part, level, parts, scope = '', id, now = Date
   return { id, part, level, monster: found.monster.key, ...monsterView(p, now, { scope, parts }) };
 }
 export function monsterFinish(p, { id, result, right, pet, scope: nowScope = '', parts = null, now = Date.now() }) {
-  const m = (p.bonus ||= {}).monster ||= {};
+  const b = p.bonus ||= {};
+  const m = b.monster ||= {};
+  const view = () => monsterView(p, now, { scope: nowScope, parts });
+  const seen = findReceipt(b, 'monster', id);
+  if (seen) return { ...seen.r, again: true, ...view() };
   const live = m.live;
-  if (!live || live.id !== id) fail('몬스터 전투를 찾지 못했어요.', 404);
+  if (!id || !live || live.id !== id) fail('몬스터 전투를 찾지 못했어요.', 404);
   delete m.live;
+  const settled = monsterSettle(p, m, live, { result, right, pet, nowScope, parts, now });
+  return { ...keepReceipt(b, 'monster', id, settled, now), ...view() };
+}
+function monsterSettle(p, m, live, { result, right, pet, nowScope, parts, now }) {
   // A fight started before V13.100 has no scope or codes: the part key is split.
   const scope = live.scope ?? nowScope, codes = Array.isArray(live.codes) ? live.codes : partKeyCodes(live.part, (parts || []).flatMap(x => x.codes));
   monsterMigrate(p, scope, codes);
-  const view = () => monsterView(p, now, { scope: nowScope, parts });
   const L = MONSTER_LEVELS[live.level], won = result === 'win';
   const answered = Math.max(0, Math.min(200, Math.floor(Number(right) || 0)));
   const base = { result: won ? 'win' : 'lose', level: live.level, part: live.part };
-  if (won && now - live.at < MONSTER_MIN_MS) return { paid: false, reason: 'short', ...base, ...view() };
-  if (answered < L.need) return { paid: false, reason: 'few', need: L.need, ...base, ...view() };
+  if (won && now - live.at < MONSTER_MIN_MS) return { paid: false, reason: 'short', ...base };
+  if (answered < L.need) return { paid: false, reason: 'few', need: L.need, ...base };
   // V13.99: a lost fight is checked for time too (before, only a win was): the right answers
   // it claims (at least `need`) take MONSTER_MS_PER_RIGHT each.
-  if (!won && now - live.at < answered * MONSTER_MS_PER_RIGHT) return { paid: false, reason: 'short', ...base, ...view() };
+  if (!won && now - live.at < answered * MONSTER_MS_PER_RIGHT) return { paid: false, reason: 'short', ...base };
   if (won) { m.wins = Number(m.wins || 0) + 1; if (live.level === 'hard') m.hard_wins = Number(m.hard_wins || 0) + 1; }
   const firstPay = won ? monsterFirstReward({ codes, sizes: live.sizes }, monsterRanges(p, scope), live.level) : null;
   let reward, first = false;
@@ -493,12 +525,12 @@ export function monsterFinish(p, { id, result, right, pet, scope: nowScope = '',
   } else {
     const today = dayKey(now);
     if (m.day !== today) { m.day = today; m.count = 0; }
-    if (Number(m.count || 0) >= MONSTER_DAILY) return { paid: false, reason: 'daily', ...base, ...view() };
+    if (Number(m.count || 0) >= MONSTER_DAILY) return { paid: false, reason: 'daily', ...base };
     m.count = Number(m.count || 0) + 1;
     reward = won ? L.again : MONSTER_TRY;
   }
   addBonus(p, { xp: reward.xp, coins: reward.coins, pet, now });
-  return { paid: true, first, ...(first && firstPay.share < 1 ? { share: firstPay.share } : {}), coins: reward.coins, xp: reward.xp, ...base, ...view() };
+  return { paid: true, first, ...(first && firstPay.share < 1 ? { share: firstPay.share } : {}), coins: reward.coins, xp: reward.xp, ...base };
 }
 
 // A submitted teacher exam: 경험치 for every answered question, coins for answering half of it.
