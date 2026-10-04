@@ -35,3 +35,18 @@
   .bottom-nav img.nav-art{width:28px;height:28px}
   .bottom-nav>button span{font-size:11.5px!important}
 }
+
+/* V13.103 철자 쓰기는 폰 기본 키보드(시험 볼 때와 같은 자판)로 쓴다.
+   The input lies invisibly over the letter boxes; a tap on them opens the keyboard. While the
+   keyboard is up the arena is shorter, so the fight and the word stay on screen above it. */
+.yb-spell-field{position:relative}
+.yb-spell-input{position:absolute;inset:0;width:100%;height:100%;opacity:0;border:0;padding:0;margin:0;background:transparent;color:transparent;caret-color:transparent;font-size:16px;cursor:text;-webkit-appearance:none;appearance:none}
+.yb-spell-field .yb-spell-slots{min-height:52px;padding:6px 0;cursor:text}
+.yb-spell-tip{margin:0;text-align:center;font-size:12.5px;color:#5d6d68}
+.yb-spell-tip.warn{color:#b3261e;font-weight:800}
+.yb-spell-tip.warn::after{content:" · 한/영 키를 눌러 영어로 바꿔요"}
+.yb-spell-go{width:100%;max-width:none;flex:none;height:50px;font-size:17px;border-radius:12px}
+.yb-spell.right .yb-spell-tip,.yb-spell.reveal .yb-spell-tip,.yb-spell.wrong .yb-spell-tip{visibility:hidden}
+.battle-app.yb-typing .yb-arena{aspect-ratio:16/8.2}
+.battle-app.yb-typing .yb-emotes,.battle-app.yb-typing .yb-myskill-v1372,.battle-app.yb-typing .yb-leave,.battle-app.yb-typing .yb-spell-tip{display:none}
+.battle-app.yb-typing{padding-bottom:12px}

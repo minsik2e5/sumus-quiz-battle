@@ -598,7 +598,8 @@ export async function runRewardsChecks(assert, expectStatus) {
     const parts = monsterParts(counts);
     assert(parts.map(p => p.key).join('|') === '10+24|29+31|32+33+L1' && parts.every(p => p.words >= 8 && p.monster === MONSTERS[p.index % MONSTERS.length]) && monsterParts(new Map([...counts].reverse())).map(p => p.key).join('|') === parts.map(p => p.key).join('|'), 'V13.94 몬스터 파트: 범위를 번호 순서로 묶고(60단어 또는 3범위까지, 4단어 미만 범위 제외), 파트마다 몬스터가 정해진다');
     assert(monsterOpen({}, 'easy') && !monsterOpen({}, 'normal') && monsterOpen({ easy: 1 }, 'normal') && !monsterOpen({ easy: 1 }, 'hard') && monsterOpen({ easy: 1, normal: 1 }, 'hard'), 'V13.94 이지 → 노말 → 하드 순서로 열린다');
-    assert(MONSTER_LEVELS.hard.mode === 'skill' && MONSTER_LEVELS.hard.first.coins >= 3 * MONSTER_LEVELS.normal.first.coins && MONSTER_LEVELS.normal.first.coins > MONSTER_LEVELS.easy.first.coins && Object.values(MONSTER_LEVELS).every(L => MONSTER_SKILLS[L.skill] && L.first.coins > L.again.coins), 'V13.94 하드는 실력전이고 첫 처치 보상이 가장 크다');
+    assert(['easy', 'normal', 'hard'].map(k => MONSTER_LEVELS[k].first.coins).join() === '30,90,200' && ['easy', 'normal', 'hard'].map(k => MONSTER_LEVELS[k].again.coins).join() === '8,15,20' && ['easy', 'normal', 'hard'].map(k => MONSTER_LEVELS[k].first.xp).join() === '150,350,1000' && MONSTER_LEVELS.hard.again.coins * MONSTER_DAILY <= 100, 'V13.102 몬스터 코인: 처음 깰 때 30/90/200, 다시 이길 때 8/15/20(경험치는 그대로), 하드 반복은 하루 100코인까지');
+    assert(MONSTER_LEVELS.hard.mode === 'skill' && MONSTER_LEVELS.hard.first.coins >= 2 * MONSTER_LEVELS.normal.first.coins && MONSTER_LEVELS.normal.first.coins > MONSTER_LEVELS.easy.first.coins && Object.values(MONSTER_LEVELS).every(L => MONSTER_SKILLS[L.skill] && L.first.coins > L.again.coins), 'V13.94 하드는 실력전이고 첫 처치 보상이 가장 크다');
     const kid = { id: 'qa-mh', pets: [{ key: 'dog' }], bonus: {} };
     const t0 = Date.parse('2026-10-03T03:00:00Z');
     const fight = (level, result, right, at, part = parts[0].key) => { const r = monsterStart(kid, { part, level, parts, id: 'f-' + at, now: at }); return monsterFinish(kid, { id: r.id, result, right, now: at + 60000 }); };
@@ -668,7 +669,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     const share = 10 / 50;
     assert(after2.map(p => p.key).join('|') === '1+2|3+4' && LV.every(k => v2.cleared['1+2']?.[k]) && !v2.cleared['3+4'] && locked === 409
       && new2.every((r, i) => r.paid && r.first && r.share === share && r.coins === Math.ceil(MONSTER_LEVELS[LV[i]].first.coins * share) && r.xp === Math.ceil(MONSTER_LEVELS[LV[i]].first.xp * share))
-      && b.coins() - coinsBefore2 === 10 + 30 + 100 && allCleared(b, after2) && b.view(after2).ranges['4'].hard, 'V13.100 범위가 추가된 파트만 이지부터 다시 열리고, 첫 처치는 새 범위 단어 비율만큼(10/50 → 10·30·100코인)만 준다');
+      && b.coins() - coinsBefore2 === 6 + 18 + 40 && allCleared(b, after2) && b.view(after2).ranges['4'].hard, 'V13.100 범위가 추가된 파트만 이지부터 다시 열리고, 첫 처치는 새 범위 단어 비율만큼(10/50 → 6·18·40코인, V13.102)만 준다');
     assert(monsterFirstReward(p34, {}, 'hard').coins === MONSTER_LEVELS.hard.first.coins && monsterFirstReward(p34, { 3: { hard: 1 }, 4: { hard: 1 } }, 'hard') === null && partClears(p34, { 3: { easy: 5 }, 4: { easy: 9, normal: 3 } }).easy === 9 && !partClears(p34, { 3: { easy: 5 }, 4: { easy: 9, normal: 3 } }).normal, 'V13.100 처음 깨는 파트는 전액, 다 깬 파트는 첫 처치 없음, 파트 클리어는 모든 범위가 깼을 때');
     // 학교·학년이 다르면 같은 범위 번호라도 따로 기록한다.
     assert(Object.keys(monsterRanges(b.kid, 'danwon-high|고2A')).length === 0 && Object.keys(b.kid.bonus.monster.ranges).every(k => k.startsWith('danwon-high|고1A|')), 'V13.100 클리어 키는 학교|학년|범위');
@@ -811,6 +812,11 @@ export async function runRewardsChecks(assert, expectStatus) {
     const css98 = source('../public/v1398.css'), student98 = source('../public/modules/student.js'), manifest98 = JSON.parse(source('../public/manifest.webmanifest'));
     assert(css98.includes('.partner-card-v1358 .partner-inner{grid-template-columns:minmax(0,1fr)}') && student98.includes('<span class="partner-stars" aria-label="모은 펫 ${owned}/${total}"><b aria-hidden="true">★</b>${owned}<small>/${total}</small></span>') && !student98.includes("'☆'.repeat") && source('./build-assets.mjs').includes('"v1398.css"'), 'V13.98 홈 파트너 카드는 펫이 20마리여도 카드 밖으로 잘리지 않는다(별 20개 대신 ★ 모은 수/전체)');
     assert(manifest98.orientation === 'any' && css98.includes('@media (min-width:768px) and (max-height:560px)'), 'V13.98 설치한 앱이 기기를 돌리는 대로 가로·세로로 바뀌고, 옆으로 눕힌 휴대폰에서도 메뉴 다섯 개가 다 보인다');
+    /* ---------- V13.103 철자 쓰기는 폰 기본 키보드로 ---------- */
+    const battle103 = source('../public/modules/battle.js');
+    assert(battle103.includes('id="yb-spell-input"') && battle103.includes('autocapitalize="off" autocorrect="off" spellcheck="false"') && battle103.includes('enterkeyhint="send"') && battle103.includes('lang="en"') && !battle103.includes('KEY_ROWS') && !battle103.includes('class="yb-kb"') && !battle103.includes('data-yb="key"'), 'V13.103 야차전·몬스터전 철자 쓰기는 앱 자판 대신 시험 볼 때와 같은 폰 기본 키보드(자동 수정·대문자 꺼짐)로 쓴다');
+    assert(battle103.includes("if (event.target?.id === 'yb-spell-input') return;") && battle103.includes("if (event.key === 'Enter' && !event.isComposing)") && battle103.includes("replace(/[^a-z]/g, '')") && battle103.includes('.slice(0, blanks(q))') && battle103.includes('function syncSpell(') && battle103.includes('input.value = q.typed.join') && /입력은 막지 않고|stays enabled/.test(battle103), 'V13.103 입력칸은 영어 a~z만 받고(한글은 안내), Enter로 공격하며, 낸 뒤에는 입력을 무시하되 키보드는 유지한다');
+    assert(css98.includes('.yb-spell-input{position:absolute;inset:0') && css98.includes('font-size:16px') && css98.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/8.2}') && battle103.includes("classList.add('yb-typing')"), 'V13.103 키보드가 올라오면 전투 화면(경기장)이 줄어 단어와 글자 칸이 키보드 위에 보인다(16px 글자로 확대 방지)');
     /* ---------- V13.101 로보 연습전·몬스터 끝내기 영수증 ---------- */
     {
       const t1 = Date.parse('2026-10-04T03:00:00Z');
