@@ -1,0 +1,9 @@
+/* V13.101 야차전 confirm boxes in the app's dialog (ui.js modal): the same small card as before
+   (.yb-confirm-card), with the dialog's close button kept out of the title's way. */
+.modal.yb-modal-v13101{max-width:340px;padding:18px;border-radius:20px;text-align:center}
+.modal.yb-modal-v13101 .modal-close{right:10px;top:10px;width:30px;height:30px}
+.modal.yb-modal-v13101 .yb-confirm-card{padding:0;max-width:none;border-radius:0;background:none}
+.modal.yb-modal-v13101 .yb-confirm-card>h2:first-child{padding:0 30px}
+.modal.yb-modal-v13101:focus{outline:none}
+/* 다시 받기 on a result card when the reward answer did not come back. */
+.yb-retry-v13101{display:inline-flex;margin:6px 0 0 6px!important;vertical-align:middle}

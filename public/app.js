@@ -7,7 +7,7 @@ import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocab
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
 import { maybePetMoment, openPetNameModal, openEggShop, petJosa } from './modules/pet-moments.js';
 import { maybeCardLevelUp } from './modules/card-levelup.js';
-import { mountYacha } from './modules/battle.js';
+import { mountYacha, resendUnclaimed } from './modules/battle.js';
 import { maybeTitleMoment, openTitleDetail } from './modules/titles-ui.js';
 import { mountLeagueBoard } from './modules/league-ui.js';
 import { coin } from './modules/emblems.js';
@@ -563,7 +563,17 @@ document.addEventListener('toggle', event => {
   if (event.target?.classList?.contains('tn-past')) A.tnPastOpen = event.target.open;
   if (event.target?.classList?.contains('grammar-fold-v1375')) A.grammarOpen = event.target.open;
 }, true);
+// V13.101: a robot match or monster fight whose reward answer never came back (the connection
+// dropped, the app was closed) is sent again when the app opens; the server answers it once.
+async function resendBattleRewards() {
+  if (A.data?.profile?.role !== 'student') return;
+  const done = await resendUnclaimed(A.data.profile.id).catch(() => null);
+  if (!done?.coins || !A.data) return;
+  toast(`지난 대결 보상 ${done.coins.toLocaleString('ko-KR')}코인을 받았어요.`);
+  if (!A.screen) { try { await refresh(); renderKeepScroll(); } catch {} }
+}
 function startPolling() {
+  resendBattleRewards();
   startInvitePolling();
   startTournamentPolling();
   clearInterval(poll);

@@ -65,16 +65,35 @@ export async function api(path, body, method) {
   throw lastError || Object.assign(new Error('연결을 확인해주세요.'), { status: 0, transient: true });
 }
 export function buttonBusy(button, busy = true) { if (!button) return; button.disabled = busy; button.classList.toggle('busy', busy); if (busy) button.setAttribute('aria-busy', 'true'); else button.removeAttribute('aria-busy'); }
-export function modal(content, title = '안내') {
+// The app's one dialog: named (aria-label), modal, Tab stays inside, Escape and the backdrop
+// close it, and focus goes back where it was. V13.101 opts: `onClose` runs once however it
+// closes; `className` styles the card (the 야차전 confirm boxes).
+const FOCUSABLE = 'button:not(:disabled),[href],input:not(:disabled),select:not(:disabled),textarea:not(:disabled),[tabindex="0"]';
+export function modal(content, title = '안내', { onClose, className = '' } = {}) {
   const prior = document.activeElement;
-  $('#modal-root').innerHTML = `<div class="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}"><button class="icon-button modal-close" data-close aria-label="닫기">${icon('close')}</button>${content}</section></div>`;
-  const close = () => { $('#modal-root').innerHTML = ''; prior?.focus?.(); };
-  $('[data-close]').onclick = close;
-  $('.modal-backdrop').onclick = e => { if (e.target.classList.contains('modal-backdrop')) close(); };
-  $('.modal').onkeydown = e => {
-    if (e.key === 'Escape') close();
-    if (e.key === 'Tab') { const nodes = $$('button:not(:disabled),input,select,textarea,[tabindex="0"]', $('.modal')); const first = nodes[0], last = nodes.at(-1); if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); } else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); } }
+  $('#modal-root').innerHTML = `<div class="modal-backdrop"><section class="modal${className ? ' ' + esc(className) : ''}" role="dialog" aria-modal="true" aria-label="${esc(title)}" tabindex="-1"><button class="icon-button modal-close" data-close aria-label="닫기">${icon('close')}</button>${content}</section></div>`;
+  const box = $('#modal-root .modal');
+  let open = true;
+  const close = () => {
+    if (!open) return;
+    open = false;
+    // A newer dialog took its place: leave that one alone.
+    if (box.isConnected) { $('#modal-root').innerHTML = ''; prior?.focus?.(); }
+    onClose?.();
   };
-  $('[data-close]').focus(); return close;
+  $('[data-close]', box).onclick = close;
+  $('.modal-backdrop').onclick = e => { if (e.target.classList.contains('modal-backdrop')) close(); };
+  box.onkeydown = e => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key === 'Tab') {
+      const nodes = $$(FOCUSABLE, box); if (!nodes.length) { e.preventDefault(); return; }
+      const first = nodes[0], last = nodes.at(-1), at = document.activeElement;
+      if (e.shiftKey && (at === first || at === box || !box.contains(at))) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (at === last || !box.contains(at))) { e.preventDefault(); first.focus(); }
+    }
+  };
+  $('[data-close]', box).focus(); return close;
 }
+// Whether a dialog is open (the app's modal or a 야차전 box): keyboard shortcuts wait meanwhile.
+export const dialogOpen = () => !!document.querySelector('#modal-root .modal, .yb-confirm');
 export const field = (label, name, input) => `<label class="field"><span>${label}</span>${input || `<input name="${name}" required>`}</label>`;
