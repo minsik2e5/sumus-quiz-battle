@@ -88,11 +88,11 @@ button{font:inherit;border:0;cursor:pointer}
 const $ = (s) => document.querySelector(s);
 const SYL = ['무', '궁', '화', '꽃', '이', '피', '었', '습', '니', '다'];
 const COLORS = ['#ff4d6d', '#3d7bff', '#22c55e', '#ffb020', '#a855f7', '#14b8a6', '#f97316', '#ec4899', '#64748b', '#0ea5e9'];
-const LS = 'sumus-mg-player';
+const LS = 'sumus-island-player'; // 퀴즈쇼와 같은 저장소 → 수업 방에서 넘어와도 같은 학생
 const saved = JSON.parse(localStorage.getItem(LS) || '{}');
 const urlPin = new URLSearchParams(location.search).get('pin');
 $('#pinIn').value = urlPin || '';
-$('#nameIn').value = saved.name || JSON.parse(localStorage.getItem('sumus-island-player') || '{}').name || '';
+$('#nameIn').value = saved.name || '';
 let color = saved.color || COLORS[Math.floor(Math.random() * COLORS.length)];
 $('#sw').innerHTML = COLORS.map(c => `<button style="background:${c}" data-c="${c}" class="${c === color ? 'on' : ''}"></button>`).join('');
 $('#sw').onclick = (e) => { const c = e.target.dataset.c; if (!c) return; color = c; document.querySelectorAll('#sw button').forEach(b => b.classList.toggle('on', b.dataset.c === c)); };
@@ -126,8 +126,9 @@ function join(auto) {
 $('#joinBtn').onclick = () => join(false);
 $('#nameIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') join(false); });
 $('#pinIn').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, ''); });
-socket.on('connect', () => { if (joined) join(true); });
-socket.on('mg:kicked', () => { joined = false; $('#game').classList.add('hidden'); $('#join').classList.remove('hidden'); $('#jerr').textContent = '선생님이 방에서 내보냈습니다.'; });
+socket.on('connect', () => { if (joined || (saved.pid && saved.pin && saved.pin === $('#pinIn').value)) join(true); });
+socket.on('goto', (u) => { location.href = u; }); // 선생님이 PART 1로 넘김
+socket.on('mg:kicked', () => { joined = false; saved.pid = null; localStorage.setItem(LS, JSON.stringify({ name: saved.name, color })); $('#game').classList.add('hidden'); $('#join').classList.remove('hidden'); $('#jerr').textContent = '선생님이 방에서 내보냈습니다.'; });
 socket.on('mg:phase', (p) => { phase = p; if (p.phase !== 'play') setRun(false); render(); });
 socket.on('mg:w', (w) => { const prev = W8; W8 = w; if ((w.main === 'look' && prev.main !== 'look') || (w.crab === 'warn' && prev.crab !== 'warn')) buzz(w.main === 'look' ? 220 : [60, 60, 60]); render(); });
 socket.on('mg:roster', (l) => { roster = new Map(l.map(p => [p.id, p])); render(); });

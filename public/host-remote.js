@@ -75,7 +75,9 @@
   // ── 서버가 다시 켜졌을 때: 같은 방 번호로 다시 열어 학생들이 자동으로 돌아오게 ──
   window.recreateRoom = function () {
     const old = creds();
-    socket.emit('host:create', { questions: validQuestions(), mode: settings.mode, gather: settings.gather, auto: autoPref(), pin: old && old.pin }, (r) => {
+    const sess = JSON.parse(sessionStorage.getItem('sumus-sess') || 'null'); // 수업 방이면 무궁화와 같은 번호로 다시 묶기
+    const sk = sess && old && sess.pin === old.pin ? sess.key : undefined;
+    socket.emit('host:create', { questions: validQuestions(), mode: settings.mode, gather: settings.gather, auto: autoPref(), pin: old && old.pin, sk }, (r) => {
       if (!r.ok) return;
       room = { pin: r.pin }; sessionStorage.setItem(STORE + ':host', JSON.stringify(r)); setupJoin(r.pin);
       syncedPin = r.pin;

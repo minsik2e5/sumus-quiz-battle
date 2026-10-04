@@ -484,6 +484,14 @@ $('#createBtn').onclick = () => {
   });
 };
 
+// 홈의 '문제 편집'으로 들어온 경우: 방을 열지 않고 문제만 고친 뒤 홈으로
+const EDIT_ONLY = new URLSearchParams(location.search).has('edit');
+if (EDIT_ONLY) {
+  $('#createBtn').textContent = '저장하고 홈으로';
+  $('#createBtn').onclick = () => { save(); location.href = '/'; };
+  $('#createBtn').nextElementSibling.textContent = '문제는 이 브라우저에 자동 저장됩니다.';
+}
+
 function recreateRoom() {
   socket.emit('host:create', { questions: validQuestions(), mode: settings.mode, gather: settings.gather }, (r) => {
     if (!r.ok) return;
@@ -503,8 +511,14 @@ async function setupJoin(pin) {
 }
 
 socket.on('connect', () => {
+  if (EDIT_ONLY) return;
   const saved = JSON.parse(sessionStorage.getItem(STORE + ':host') || 'null');
-  if (saved && !room) socket.emit('host:resume', saved, (r) => { if (r.ok) { room = { pin: r.pin }; setupJoin(r.pin); showGame(); } else sessionStorage.removeItem(STORE + ':host'); });
+  const sess = JSON.parse(sessionStorage.getItem('sumus-sess') || 'null');
+  if (saved && !room) socket.emit('host:resume', saved, (r) => {
+    if (r.ok) { room = { pin: r.pin }; setupJoin(r.pin); showGame(); }
+    else if (sess && sess.pin === saved.pin) { room = { pin: saved.pin }; recreateRoom(); showGame(); } // 수업 방: 서버가 다시 켜져도 같은 번호로
+    else sessionStorage.removeItem(STORE + ':host');
+  });
   else if (saved && room) socket.emit('host:resume', saved, (r) => { if (!r.ok) recreateRoom(); });
 });
 socket.on('roster', (list) => { rosterMap = new Map(list.map(p => [p.id, p])); renderRoster(); updateAlive(); });
@@ -806,5 +820,6 @@ document.addEventListener('keydown', (e) => {
 
 renderList(); renderMode();
 </script>
+<script src="/session-bar.js"></script>
 </body>
 </html>

@@ -1,11 +1,163 @@
 <!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SUMUS ISLAND</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
-<style>body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:Pretendard,sans-serif;background:linear-gradient(#5fb8f0,#0f5e93)}
-.b{background:#fff;border:6px solid #f2c14e;box-shadow:0 10px 0 #d9a21b;border-radius:26px;padding:28px;width:min(460px,90vw)}
-h1{margin:0 0 4px;color:#0b2a4a;font-weight:900;text-align:center}p{margin:0 0 18px;color:#6b7c93;text-align:center;font-size:14px}
-.g{display:grid;gap:10px}a{display:flex;justify-content:space-between;align-items:center;padding:16px 18px;border-radius:16px;font-weight:900;font-size:17px;text-decoration:none;background:#eef2f7;color:#0b2a4a}
-a small{font-weight:700;color:#6b7c93;font-size:12px}a.p{background:#0b2a4a;color:#fff}a.p small{color:#9fb6d3}</style></head>
-<body><div class="b"><h1>SUMUS ISLAND</h1><p>학생은 선생님 화면의 QR을 찍어 들어오세요</p>
-<div class="g"><a class="p" href="/host">PART 1 · 퀴즈쇼 <small>선생님 화면</small></a><a class="p" href="/mg">PART 2 · 무궁화 꽃이 피었습니다 <small>선생님 화면</small></a>
-<a href="/play">학생 입장 <small>방 번호만 넣으면 PART 1·2 자동 연결</small></a></div></div></body></html>
+<style>
+:root{--navy:#0b2a4a;--muted:#6b7c93;--gold:#f2c14e;--gold2:#d9a21b;--line:#e3e9f1;--soft:#eef2f7}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;font-family:Pretendard,sans-serif;background:linear-gradient(#5fb8f0,#0f5e93);color:var(--navy);display:flex;justify-content:center;padding:28px 16px}
+.b{background:#fff;border:6px solid var(--gold);box-shadow:0 10px 0 var(--gold2);border-radius:26px;padding:26px;width:min(860px,100%);align-self:flex-start}
+h1{margin:0;font-weight:900;text-align:center;font-size:30px}
+.sub{margin:4px 0 20px;color:var(--muted);text-align:center;font-size:14px}
+.resume{display:none;align-items:center;gap:12px;background:#fff7dc;border:2px solid var(--gold);border-radius:16px;padding:12px 16px;margin-bottom:16px;font-weight:800}
+.resume.on{display:flex}.resume span{flex:1}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:720px){.cols{grid-template-columns:1fr}}
+.part{border:2px solid var(--line);border-radius:18px;padding:16px}
+.part h2{margin:0 0 12px;font-size:17px;font-weight:900;display:flex;align-items:center;gap:8px}
+.part h2 i{font-style:normal;background:var(--navy);color:#fff;border-radius:8px;padding:2px 8px;font-size:12px}
+.field{margin-bottom:12px}.field:last-child{margin-bottom:0}
+label.l{display:block;font-size:13px;font-weight:800;color:var(--muted);margin-bottom:6px}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{flex:1;min-width:52px;border:0;border-radius:12px;padding:10px 8px;background:var(--soft);color:var(--navy);font:inherit;font-weight:800;font-size:14px;cursor:pointer}
+.seg button.on{background:var(--navy);color:#fff}
+.chk{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;margin-top:6px;cursor:pointer}
+.chk input{width:18px;height:18px;accent-color:var(--navy)}
+.hint{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.45}
+.qbox{display:flex;align-items:center;gap:10px;background:var(--soft);border-radius:12px;padding:10px 12px;font-weight:800;font-size:14px}
+.qbox span{flex:1}
+a.btn,button.btn{display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:12px;padding:9px 14px;background:#fff;color:var(--navy);font:inherit;font-weight:800;font-size:14px;text-decoration:none;cursor:pointer;box-shadow:inset 0 0 0 2px var(--line)}
+.first{margin:16px 0 0}
+.go{display:block;width:100%;margin-top:16px;border:0;border-radius:18px;padding:18px;background:var(--navy);color:#fff;font:inherit;font-weight:900;font-size:20px;cursor:pointer;box-shadow:0 6px 0 #061a2f}
+.go:disabled{opacity:.6}
+.err{color:#e5484d;font-weight:700;font-size:14px;text-align:center;margin-top:10px;min-height:1em}
+.more{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px;padding-top:14px;border-top:2px dashed var(--line)}
+.more a{font-size:13px;padding:8px 12px}
+</style></head>
+<body><div class="b">
+  <h1>SUMUS ISLAND</h1>
+  <p class="sub">수업 방 하나로 퀴즈쇼와 무궁화 꽃이 피었습니다를 이어서 진행해요</p>
+
+  <div class="resume" id="resume"><span id="resumeT"></span><button class="btn" id="resumeBtn">이어서 하기</button></div>
+
+  <div class="cols">
+    <section class="part">
+      <h2><i>PART 1</i>퀴즈쇼</h2>
+      <div class="field"><label class="l">게임 방식</label>
+        <div class="seg" id="qMode"><button data-v="survival">서바이벌</button><button data-v="score">점수전</button></div>
+        <div class="hint" id="qModeHint"></div></div>
+      <div class="field"><label class="l">진행</label>
+        <label class="chk"><input type="checkbox" id="qGather"> 문제마다 가운데로 모으기</label>
+        <label class="chk"><input type="checkbox" id="qAuto"> 정답 공개 5초 뒤 자동으로 다음 문제</label></div>
+      <div class="field"><label class="l">문제</label>
+        <div class="qbox"><span id="qCount"></span><a class="btn" href="/host?edit=1">문제 편집</a></div>
+        <div class="hint">게임 중에도 즉석 문제를 낼 수 있어요.</div></div>
+    </section>
+    <section class="part">
+      <h2><i>PART 2</i>무궁화 꽃이 피었습니다</h2>
+      <div class="field"><label class="l">잡히면</label>
+        <div class="seg" id="mMode"><button data-v="out">탈락</button><button data-v="back">출발선으로</button></div>
+        <div class="hint" id="mModeHint"></div></div>
+      <div class="field"><label class="l">제한 시간</label>
+        <div class="seg" id="mTime"><button data-v="60">1분</button><button data-v="90">1분 30초</button><button data-v="120">2분</button><button data-v="180">3분</button></div></div>
+      <div class="field"><label class="l">시작 난이도 (두 바퀴마다 한 단계씩, 최대 5)</label>
+        <div class="seg" id="mLv"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button></div>
+        <div class="hint">3단계부터 꽃게 술래, 4단계부터 두 번 돌아보기가 나와요.</div></div>
+    </section>
+  </div>
+
+  <div class="field first"><label class="l">먼저 시작할 게임</label>
+    <div class="seg" id="first"><button data-v="quiz">PART 1 · 퀴즈쇼</button><button data-v="mg">PART 2 · 무궁화</button></div>
+    <div class="hint">게임 화면 오른쪽 위 노란 버튼으로 언제든 다른 게임으로 넘어가요. 학생 화면도 함께 넘어갑니다.</div></div>
+
+  <button class="go" id="openBtn">수업 방 열기</button>
+  <div class="err" id="err"></div>
+
+  <div class="more">
+    <a class="btn" href="/play">학생 입장</a>
+    <a class="btn" href="/host" data-solo>PART 1만 따로 열기</a>
+    <a class="btn" href="/mg" data-solo>PART 2만 따로 열기</a>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+// 각 게임 화면과 같은 저장소를 써서, 여기서 바꾼 설정이 게임 화면에도 그대로 보임
+const QSTORE = 'sumus-island-quiz:v1', MKEY = 'sumus-mg', SESS = 'sumus-sess', FIRST = 'sumus-home:first';
+const read = (k, d) => { try { return Object.assign(d, JSON.parse(localStorage.getItem(k) || '{}')); } catch (e) { return d; } };
+const qcfg = read(QSTORE + ':cfg', { mode: 'survival', gather: true });
+const mcfg = read(MKEY + ':cfg', { mode: 'out', time: 120, level: 1 });
+let first = localStorage.getItem(FIRST) === 'mg' ? 'mg' : 'quiz';
+
+function seg(id, get, set) {
+  const el = $(id);
+  const paint = () => el.querySelectorAll('button').forEach(b => b.classList.toggle('on', String(get()) === b.dataset.v));
+  el.onclick = (e) => { const v = e.target.dataset.v; if (!v) return; set(v); paint(); hints(); };
+  paint();
+}
+const saveQ = () => localStorage.setItem(QSTORE + ':cfg', JSON.stringify(qcfg));
+const saveM = () => localStorage.setItem(MKEY + ':cfg', JSON.stringify(mcfg));
+seg('#qMode', () => qcfg.mode, (v) => { qcfg.mode = v; saveQ(); });
+seg('#mMode', () => mcfg.mode, (v) => { mcfg.mode = v; saveM(); });
+seg('#mTime', () => mcfg.time, (v) => { mcfg.time = +v; saveM(); });
+seg('#mLv', () => mcfg.level, (v) => { mcfg.level = +v; saveM(); });
+seg('#first', () => first, (v) => { first = v; localStorage.setItem(FIRST, v); });
+$('#qGather').checked = qcfg.gather !== false;
+$('#qGather').onchange = (e) => { qcfg.gather = e.target.checked; saveQ(); };
+$('#qAuto').checked = localStorage.getItem(QSTORE + ':auto') !== 'off';
+$('#qAuto').onchange = (e) => localStorage.setItem(QSTORE + ':auto', e.target.checked ? 'on' : 'off');
+function hints() {
+  $('#qModeHint').textContent = qcfg.mode === 'survival' ? '틀리면 물에 빠져 탈락. 마지막까지 남는 사람이 우승.' : '탈락 없이 정답마다 100점, 끝나면 점수 순위.';
+  $('#mModeHint').textContent = mcfg.mode === 'out' ? '술래가 볼 때 움직이면 탈락. 시간 안에 결승선을 넘으면 통과.' : '잡혀도 출발선으로 돌아갈 뿐. 처음 하는 반에 추천.';
+}
+hints();
+
+// 문제 목록 (문제 편집 화면에서 저장한 것)
+function questions() {
+  try {
+    const v = JSON.parse(localStorage.getItem(QSTORE));
+    if (!Array.isArray(v) || !v.length) return null; // 비어 있으면 게임 화면이 샘플 문제를 씀
+    return v.map(q => ({ ...q, options: (q.options || []).filter(o => (o.text || '').trim() || o.image) }))
+      .filter(q => ((q.text || '').trim() || q.image) && q.options.length >= 2);
+  } catch (e) { return null; }
+}
+const qs = questions();
+$('#qCount').textContent = qs ? `${qs.length}문제 준비됨` : '샘플 문제 5개 (편집에서 바꾸기)';
+
+// 따로 열기: 이 탭의 수업 방 연결을 끊고 예전처럼 한 게임만
+document.querySelectorAll('[data-solo]').forEach(a => a.onclick = () => {
+  [SESS, QSTORE + ':host', MKEY + ':host'].forEach(k => sessionStorage.removeItem(k));
+});
+
+const socket = io();
+const go = (active) => { location.href = active === 'mg' ? '/mg' : '/host'; };
+
+// 이 탭에서 연 수업 방이 아직 살아 있으면 이어서 하기
+const sess = JSON.parse(sessionStorage.getItem(SESS) || 'null');
+if (sess) socket.emit('sess:info', sess, (r) => {
+  if (!r || !r.ok) return;
+  $('#resumeT').textContent = `진행 중인 수업 방 ${sess.pin} · 지금 ${r.active === 'mg' ? 'PART 2 무궁화' : 'PART 1 퀴즈쇼'}`;
+  $('#resume').classList.add('on');
+  $('#resumeBtn').onclick = () => go(r.active);
+  $('#openBtn').textContent = '새 수업 방 열기';
+});
+
+$('#openBtn').onclick = () => {
+  if (sess && $('#resume').classList.contains('on') && !confirm(`진행 중인 수업 방 ${sess.pin}을 두고 새 방을 열까요?\n학생들은 새 방 번호로 다시 들어와야 합니다.`)) return;
+  $('#openBtn').disabled = true; $('#err').textContent = '';
+  const t = setTimeout(() => { $('#openBtn').disabled = false; $('#err').textContent = '서버 응답이 없습니다. 잠시 후 다시 눌러 주세요. (처음엔 서버가 깨어나는 데 최대 1분)'; }, 15000);
+  socket.emit('sess:create', {
+    first,
+    quiz: { questions: qs || undefined, mode: qcfg.mode, gather: qcfg.gather !== false, auto: $('#qAuto').checked },
+    mg: { mode: mcfg.mode, time: mcfg.time, level: mcfg.level },
+  }, (r) => {
+    clearTimeout(t); $('#openBtn').disabled = false;
+    if (!r || !r.ok) return ($('#err').textContent = '방을 열지 못했습니다.');
+    sessionStorage.setItem(SESS, JSON.stringify({ pin: r.pin, key: r.key, qsync: !!qs }));
+    sessionStorage.setItem(QSTORE + ':host', JSON.stringify(r.quiz));
+    sessionStorage.setItem(MKEY + ':host', JSON.stringify(r.mg));
+    go(r.active);
+  });
+};
+</script>
+</body></html>

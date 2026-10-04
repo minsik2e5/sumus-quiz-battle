@@ -167,6 +167,7 @@ $('#nameIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') join(fa
 $('#pinIn').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/\D/g, ''); });
 
 socket.on('connect', () => { if (joined || (saved.pid && saved.pin && saved.pin === ($('#pinIn').value || ''))) join(true); });
+socket.on('goto', (u) => { location.href = u; }); // 선생님이 PART 2로 넘김
 socket.on('kicked', () => { joined = false; localStorage.setItem(LS, JSON.stringify({ name: saved.name, color })); saved.pid = null; showJoin(); $('#jerr').textContent = '선생님이 방에서 내보냈습니다.'; });
 socket.on('roster', (list) => {
   rosterMap = new Map(list.map(p => [p.id, p]));
