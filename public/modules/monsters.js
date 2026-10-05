@@ -92,6 +92,8 @@ export const STAGE_BOSS_EVERY = 5;
 // but at least STAGE_AGAIN_MIN and at most STAGE_AGAIN_MAX coins a fight; at 20% level 1 paid 1/2/3 coins).
 export const STAGE_REWARD = { easy: { coins: 5, xp: 60 }, normal: { coins: 10, xp: 120 }, hard: { coins: 15, xp: 240 } };
 export const STAGE_REWARD_STEP = 0.12, STAGE_REWARD_MAX = 4, STAGE_BOSS_REWARD = 1.5, STAGE_BOSS_HP = 1.08;
+// V13.106 첫 처치 코인은 1.5배(경험치와 다시 잡기 보상은 그대로: 다시 잡기는 1.5배 하기 전 값에서 계산한다).
+export const STAGE_FIRST_COIN_BOOST = 1.5;
 export const STAGE_AGAIN_SHARE = 0.5;
 export const STAGE_AGAIN_MIN = { easy: 3, normal: 5, hard: 8 }, STAGE_AGAIN_MAX = 25;
 export const cleanStage = value => Math.max(1, Math.min(9999, Math.floor(Number(value) || 1)));
@@ -106,7 +108,8 @@ export function stageLevel(stage, level) {
   const pick = key => s <= STAGE_ANCHOR ? mix(from[key], at[key], x) : mix(at[key], cap[key], x);
   const boss = isBossStage(s);
   const grow = Math.min(STAGE_REWARD_MAX, 1 + STAGE_REWARD_STEP * (s - 1)) * (boss ? STAGE_BOSS_REWARD : 1);
-  const first = { coins: Math.round(STAGE_REWARD[level].coins * grow), xp: Math.round(STAGE_REWARD[level].xp * grow) };
+  const base = Math.round(STAGE_REWARD[level].coins * grow);
+  const first = { coins: Math.round(base * STAGE_FIRST_COIN_BOOST), xp: Math.round(STAGE_REWARD[level].xp * grow) };
   return {
     ...L, stage: s, boss,
     accuracy: Math.round(pick('accuracy') * 1000) / 1000,
@@ -114,7 +117,7 @@ export function stageLevel(stage, level) {
     monsterHp: Math.round(pick('monsterHp') * (boss ? STAGE_BOSS_HP : 1)),
     need: Math.round(pick('need')),
     first,
-    again: { coins: Math.min(STAGE_AGAIN_MAX, Math.max(STAGE_AGAIN_MIN[level], Math.round(first.coins * STAGE_AGAIN_SHARE))), xp: Math.max(1, Math.round(first.xp * STAGE_AGAIN_SHARE)) }
+    again: { coins: Math.min(STAGE_AGAIN_MAX, Math.max(STAGE_AGAIN_MIN[level], Math.round(base * STAGE_AGAIN_SHARE))), xp: Math.max(1, Math.round(first.xp * STAGE_AGAIN_SHARE)) }
   };
 }
 
