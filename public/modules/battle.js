@@ -14,7 +14,7 @@ import { BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, BOT_MIN_RIGHT } from './rew
 import { tournamentCard, openBracket } from './tournament-ui.js';
 import { openMiniGame } from './word-minigame-ui.js';
 import { bonusText } from './word-minigame.js';
-import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterParts, monsterOpen, partClears, monsterFirstReward } from './monsters.js';
+import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterOpen, stageLevel, stageMonster, isBossStage } from './monsters.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
 // the match, and the result. A match runs in a battle room on the server (or, for a practice
@@ -84,6 +84,38 @@ function sfx(name, buzz = 0) {
   } catch {}
   if (buzz) try { navigator.vibrate?.(buzz); } catch {}
 }
+// V13.105 전투 화면 효과 소리: a falling low tone (a thump, heavier with the damage), a tick that
+// climbs with the combo and a KO boom with a noise burst. Vibration only with the sound on.
+function buzzFx(pattern) { if (soundOn() && 'vibrate' in navigator) try { navigator.vibrate(pattern); } catch {} }
+function sweep(f0, f1, len, vol, type = 'sine', at = 0) {
+  const t = audio.currentTime + at, o = audio.createOscillator(), g = audio.createGain();
+  o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + len);
+  g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + .008); g.gain.exponentialRampToValueAtTime(.0001, t + len);
+  o.connect(g); g.connect(audio.destination); o.start(t); o.stop(t + len + .02);
+}
+function noise(len, vol, at = 0) {
+  const t = audio.currentTime + at, n = Math.floor(audio.sampleRate * len), buf = audio.createBuffer(1, n, audio.sampleRate), d = buf.getChannelData(0);
+  for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / n) ** 2;
+  const s = audio.createBufferSource(), g = audio.createGain(), lp = audio.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 900; s.buffer = buf; g.gain.value = vol;
+  s.connect(lp); lp.connect(g); g.connect(audio.destination); s.start(t);
+}
+function sfxThump(dmg, crit = false) {
+  if (!soundOn()) return;
+  const tier = dmgTier(dmg);
+  try { unlockAudio(); sweep(150 + tier * 10, 42, .16 + tier * .05, .05 + tier * .025); if (tier > 1 || crit) noise(.09 + tier * .03, .05 + tier * .03); if (crit) sweep(1400, 700, .12, .03, 'square', .02); } catch {}
+  if (tier >= 3 || crit) buzzFx(crit ? [35, 25, 60] : 45);
+}
+function sfxCombo(n) {
+  if (!soundOn()) return;
+  const f = 620 * 2 ** (Math.min(n - 2, 10) / 12 * 2);
+  try { unlockAudio(); sweep(f, f * 1.5, .09, .035, 'triangle'); sweep(f * 1.5, f * 2, .08, .025, 'triangle', .06); } catch {}
+}
+function sfxKO() {
+  if (!soundOn()) return;
+  try { unlockAudio(); sweep(110, 28, .9, .14); sweep(220, 40, .5, .05, 'sawtooth'); noise(.5, .16); noise(.3, .08, .18); } catch {}
+  buzzFx([90, 50, 180]);
+}
 
 // V13.68: the lobby is drawn inside the 야차전 tab (`host`, with the app's menu around it);
 // a room or a match takes the whole screen (#app).
@@ -101,13 +133,15 @@ const petName = pet => pet?.name || CHARACTERS[petKey(pet?.key)]?.ko || '';
 // V13.94 몬스터 잡기: a monster's picture (its own art once it arrives, until then a pet picture
 // recoloured), and who a player is in the match lines (a monster has no pet name).
 // V13.95 the art sits in the same box as a pet picture (avatar-img), so showPose() can swap it.
+// V13.105 a monster coming round again stronger (level 19 and up, `round`) is tinted.
 function monsterPic(m, { size = '', pose = '' } = {}) {
-  const mon = MONSTERS.find(x => x.key === m?.key) || MONSTERS[0];
-  if (MONSTER_ART.has(mon.key)) return `<div class="avatar-art avatar-img mon-art ${size}" style="--pet-grow:1"><img src="/assets/monsters/${mon.key}${pose ? '-' + pose : ''}.webp" alt="${esc(mon.name)}" width="512" height="512" decoding="async" draggable="false"></div>`;
-  return `<div class="mon-temp ${size}" style="--mon-filter:${mon.temp.filter};--mon-color:${mon.color}">${avatar(mon.temp.pet, { size, form: mon.temp.form })}</div>`;
+  const mon = MONSTERS.find(x => x.key === m?.key) || MONSTERS[0], round = Math.min(9, Math.max(0, Number(m?.round) || 0));
+  const cls = round ? ' mon-round' : '', tint = round ? `;--mon-round:${round * 40}deg` : '';
+  if (MONSTER_ART.has(mon.key)) return `<div class="avatar-art avatar-img mon-art ${size}${cls}" style="--pet-grow:1${tint}"><img src="/assets/monsters/${mon.key}${pose ? '-' + pose : ''}.webp" alt="${esc(mon.name)}" width="512" height="512" decoding="async" draggable="false"></div>`;
+  return `<div class="mon-temp ${size}${cls}" style="--mon-filter:${mon.temp.filter};--mon-color:${mon.color}${tint}">${avatar(mon.temp.pet, { size, form: mon.temp.form })}</div>`;
 }
 const petArt = (p, opts = {}) => p?.monster ? monsterPic(p.monster, opts) : avatar(p?.pet?.key, { form: p?.pet?.form ?? 1, ...opts });
-const whoName = p => p?.monster ? (MONSTERS.find(x => x.key === p.monster.key)?.name || p.name) : petName(p?.pet);
+const whoName = p => p?.monster ? (p.name || MONSTERS.find(x => x.key === p.monster.key)?.name) : petName(p?.pet);
 
 // opts.accept: a challenge from the home screen ({ code, stake, host }) to confirm right away.
 // opts.tournament: { tid, mid } a tournament match to start or join (V13.66).
@@ -189,8 +223,10 @@ function bindRoot() {
     if (act === 'bot') return startBotMatch(b);
     if (act === 'bot-again') return botAgain(b);
     if (act === 'reward-retry') return retryReward(b);
-    if (act === 'monster-go') return askMonster(b.dataset.part, b.dataset.level);
-    if (act === 'monster-again') { const m = B.monsterSetup; nextScreen(); return m ? startMonster(m.part, m.level, b) : null; }
+    if (act === 'monster-go') return askMonster(Number(b.dataset.stage), b.dataset.level);
+    if (act === 'monster-again') { const m = B.monsterSetup; nextScreen(); return m ? startMonster(m.stage, m.level, b) : null; }
+    if (act === 'monster-more') { B.monsterAll = !B.monsterAll; lobby(); return; }
+    if (act === 'monster-words') { B.monsterWordsOpen = !(B.monsterWordsOpen || !monsterWords().ok); lobby(); return; }
     if (act === 'monster-list') { B.A.tab = 'yacha'; B.A.yachaTab = 'monster'; return leaveScreen(); }
     if (act === 'title') return openTitleDetail(B.A, b.dataset.key);
     if (act === 'create') return createRoom(b);
@@ -571,124 +607,153 @@ function retryReward(button) {
 }
 const retryButton = () => ' <button type="button" class="btn small yb-retry-v13101" data-yb="reward-retry">다시 받기</button>';
 
-/* ---------- V13.94 몬스터 잡기 ---------- */
-// The student's word ranges, in order, make parts (파트); each part's monster is beaten at
-// 이지 → 노말 → 하드. The fight is the robot practice match with the monster as the opponent:
-// it has its own HP and skill and must be knocked out before time runs out.
-const monsterState = () => B.A.data.rewards?.monster || { ranges: {}, cleared: {}, left: MONSTER_DAILY, daily: MONSTER_DAILY, wins: 0, hard_wins: 0 };
-// V13.100: clears are kept per range (`ranges`); a part is cleared when all its ranges are. An
-// older server sends only `cleared` (per part key).
-const partCleared = (p, st = monsterState()) => st.ranges ? partClears(p, st.ranges) : (st.cleared?.[p.key] || {});
-// The first-clear reward of a level: all of it, or the share of new words when ranges were added.
-const firstReward = (p, level, st = monsterState()) => st.ranges ? monsterFirstReward(p, st.ranges, level) : { ...MONSTER_LEVELS[level].first, share: 1 };
-function myParts() { const { counts } = lobbyRanges(); return monsterParts(counts); }
+/* ---------- V13.94 몬스터 잡기 → V13.105 끝없는 레벨 ---------- */
+// Levels 1, 2, 3 … without end; a level's 이지 → 노말 → 하드 open in order and its 하드 opens the
+// next level. The fight is the robot practice match with the monster as the opponent (its own HP
+// and skill, knocked out before time runs out), on the words the student picked (B.ranges, the
+// same ranges as 야차전 and the robot practice).
+const monsterState = () => {
+  const st = B.A.data.rewards?.monster || {};
+  return { stage: Math.max(1, Number(st.stage) || 1), clear: st.clear || {}, best: Number(st.best || 0), left: st.left ?? MONSTER_DAILY, daily: st.daily ?? MONSTER_DAILY, wins: Number(st.wins || 0), hard_wins: Number(st.hard_wins || 0) };
+};
+const stageWon = (st, stage, level) => stage < st.stage || (stage === st.stage && !!st.clear[level]);
+const stageOpen = (st, stage, level) => stage < st.stage || (stage === st.stage && monsterOpen(st.clear, level));
+function monsterWords() {
+  const { codes, counts } = lobbyRanges();
+  const picked = [...B.ranges].filter(code => codes.includes(code));
+  const n = picked.reduce((a, code) => a + (counts.get(code) || 0), 0);
+  return { codes, counts, picked, n, ok: n >= 8 };
+}
 // V13.95 이지 · 노말 · 하드 badges: a mint, blue and burning crimson shield with 1–3 stars.
 const levelBadge = (level, cls) => uiArt('monster-' + level, cls);
+// V13.105 a level number on its plate (open · locked · cleared · boss); drawn in CSS until the
+// plate pictures of sheet 12-10 arrive.
+const stagePlate = (stage, kind) => `<span class="ms-plate ${kind}" aria-hidden="true">${artOr('monster-stage' + (kind === 'open' ? '' : '-' + kind), '', 'ms-plate-art')}<b>${stage}</b></span>`;
 function monsterTab() {
-  const parts = myParts(), st = monsterState(), cleared = new Map(parts.map(p => [p.key, partCleared(p, st)]));
-  const total = parts.length * 3, done = parts.reduce((n, p) => n + MONSTER_LEVEL_KEYS.filter(k => cleared.get(p.key)[k]).length, 0);
-  const hardDone = parts.filter(p => cleared.get(p.key).hard).length;
-  return `<section class="mh-hero" aria-label="몬스터 잡기">
-      <div class="mh-hero-art" aria-hidden="true">${monsterPic(parts[0]?.monster || MONSTERS[0])}</div>
-      <span class="mh-kicker">MONSTER HUNT</span>
-      <h2>몬스터 잡기</h2>
-      <p>내 단어장을 <b>파트</b>로 나눠 몬스터가 하나씩 지키고 있어요. <b>이지 → 노말 → 하드</b> 순서로 깨요.</p>
-      <div class="mh-stats"><div><b>${num(done)}</b><span>/ ${num(total)} 처치</span></div><div class="hard"><b>${num(hardDone)}</b><span>하드 정복</span></div><div><b>${num(st.left)}</b><span>/ ${num(st.daily)} 오늘 다시 보상</span></div></div>
-      <ul class="mh-rules"><li>⏱ 시간 안에 <b>쓰러뜨려야</b> 이겨요</li><li>🎁 처음 잡으면 <b>큰 보상</b></li><li>🔥 하드는 철자 쓰기까지, <b>정말 어려워요</b></li></ul>
+  const st = monsterState(), w = monsterWords(), A = B.A;
+  const cur = stageMonster(st.stage), boss = isBossStage(st.stage);
+  const shown = B.monsterAll ? st.stage - 1 : Math.min(st.stage - 1, 5);
+  const past = Array.from({ length: shown }, (_, i) => st.stage - 1 - i);
+  return `<section class="mh-hero ms-hero" aria-label="몬스터 레벨">
+      <div class="mh-hero-art" aria-hidden="true">${monsterPic(cur)}</div>
+      <span class="mh-kicker">MONSTER LEVEL</span>
+      <h2>몬스터 레벨 <b class="ms-now">${num(st.stage)}</b></h2>
+      <p>레벨마다 <b>이지 → 노말 → 하드</b>를 깨면 다음 레벨이 열려요. 레벨이 오를수록 몬스터가 세지고 <b>처음 잡을 때 보상</b>도 커져요.</p>
+      <div class="mh-stats"><div><b>${num(st.best)}</b><span>깬 레벨</span></div><div class="hard"><b>${num(st.hard_wins)}</b><span>하드 처치</span></div><div><b>${num(st.left)}</b><span>/ ${num(st.daily)} 오늘 다시 보상</span></div></div>
     </section>
-    ${parts.length ? `<div class="mh-list">${parts.map(p => monsterCard(p, cleared.get(p.key), st)).join('')}</div>` : '<p class="yb-muted">학습할 단어 범위가 없어서 몬스터가 아직 없어요.</p>'}`;
+    <section class="ya-panel ms-words${B.monsterWordsOpen || !w.ok ? ' open' : ''}" aria-label="싸울 단어">
+      <div class="ms-words-row"><span class="ms-words-k">싸울 단어</span><b class="${w.ok ? 'ok' : 'need'}">${w.picked.length ? `${esc(rangesText(w.picked))} · ${num(w.n)}단어` : '아직 안 골랐어요'}</b><button type="button" class="btn small" data-yb="monster-words" aria-expanded="${!!(B.monsterWordsOpen || !w.ok)}">${B.monsterWordsOpen || !w.ok ? '접기' : '바꾸기'}</button></div>
+      ${B.monsterWordsOpen || !w.ok ? `<p class="ms-words-tip">야차전·연습 대결과 같은 범위예요. 지금 외우는 번호를 골라요.</p>
+      <div class="ya-ranges">${w.codes.map(c => `<button type="button" class="ya-chip ${B.ranges.has(c) ? 'on' : ''}" data-yb="range" data-code="${esc(c)}" aria-pressed="${B.ranges.has(c)}" aria-label="${esc(rangeLabel(A.data.profile.school, c))} ${w.counts.get(c) || 0}단어">${esc(rangeLabel(A.data.profile.school, c))}<small>${w.counts.get(c) || 0}</small></button>`).join('')}</div>
+      <div class="ya-picked ${w.ok ? 'ok' : 'need'}" aria-live="polite">${w.picked.length ? `${w.ok ? icon('check') : '!'}<span><b>${esc(rangesText(w.picked))}</b> · ${num(w.n)}단어${w.ok ? '로 싸워요' : ' — 8단어 이상이 되게 더 골라 주세요'}</span>` : '!<span>단어장 번호를 하나 이상 눌러 주세요</span>'}</div>` : ''}
+    </section>
+    <div class="ms-list">
+      ${[2, 1].map(k => stageLocked(st.stage + k)).join('')}
+      ${stageCard(st, st.stage, w.ok, true)}
+      ${past.map(stage => stageCard(st, stage, w.ok, false)).join('')}
+      ${st.stage - 1 > 5 ? `<button type="button" class="btn full ms-more" data-yb="monster-more">${B.monsterAll ? '접기' : `지난 레벨 모두 보기 (${num(st.stage - 1)})`}</button>` : ''}
+    </div>`;
 }
-function monsterCard(p, c, st) {
-  const m = p.monster;
-  return `<article class="mh-part${c.hard ? ' conquered' : ''}" style="--mc:${m.color}">
-    <div class="mh-mon">${monsterPic(m)}<span class="mh-no">PART ${p.index + 1}</span>${c.hard ? '<span class="mh-crown" aria-label="하드 정복">👑</span>' : ''}</div>
-    <div class="mh-info">
-      <h3>${esc(m.name)}</h3>
-      <p>${esc(m.line)}</p>
-      <div class="mh-range">${esc(rangesText(p.codes))} · ${num(p.words)}단어</div>
-      <div class="mh-levels">${MONSTER_LEVEL_KEYS.map(k => {
-        const L = MONSTER_LEVELS[k], open = monsterOpen(c, k), won = !!c[k];
-        const pay = won ? null : firstReward(p, k, st);
-        const sub = won ? `처치 완료 · 다시 ${coin()}${L.again.coins}` : open ? `${pay?.share < 1 ? '새 범위' : '첫 처치'} ${coin()}${num(pay?.coins ?? L.first.coins)}` : k === 'hard' ? '노말을 먼저' : '이지를 먼저';
-        return `<button type="button" class="mh-lv ${k}${won ? ' won' : ''}${open ? '' : ' locked'}" data-yb="monster-go" data-part="${esc(p.key)}" data-level="${k}" ${open ? '' : 'disabled'} aria-label="${esc(m.name)} ${L.name}${won ? ' 처치 완료' : open ? '' : ' 잠김'}"><b>${won ? icon('check') : open ? '' : icon('lock')}${L.name}</b>${levelBadge(k, 'mh-lv-art')}<small>${sub}</small></button>`;
-      }).join('')}</div>
+// A level not open yet: the monster's shadow.
+function stageLocked(stage) {
+  const m = stageMonster(stage), boss = isBossStage(stage);
+  return `<article class="ms-stage locked${boss ? ' boss' : ''}" aria-label="레벨 ${stage} 잠김"><div class="ms-head">${stagePlate(stage, 'lock')}<div class="ms-shadow" aria-hidden="true">${monsterPic(m, { size: 'mini' })}</div><div class="ms-info"><h3>${boss ? '<em class="ms-boss">BOSS</em>' : ''}???</h3><p>앞 레벨의 하드를 깨면 열려요</p></div></div></article>`;
+}
+function stageCard(st, stage, wordsOk, now) {
+  const m = stageMonster(stage), boss = isBossStage(stage), done = stage < st.stage;
+  return `<article class="ms-stage ${now ? 'now' : 'done'}${boss ? ' boss' : ''}" style="--mc:${m.color}" aria-label="레벨 ${stage}${done ? ' 깸' : ' 도전 중'}">
+    <div class="ms-head">
+      ${stagePlate(stage, done ? 'clear' : boss ? 'boss' : 'open')}
+      <div class="ms-mon">${monsterPic(m, { size: now ? '' : 'mini' })}</div>
+      <div class="ms-info"><h3>${boss ? '<em class="ms-boss">BOSS</em>' : ''}${esc(m.title)}</h3>${now ? `<p>${esc(m.line)}</p>` : done ? '<p>처치 완료 · 다시 잡기</p>' : ''}</div>
     </div>
+    <div class="mh-levels ms-levels">${MONSTER_LEVEL_KEYS.map(k => {
+      const L = stageLevel(stage, k), open = stageOpen(st, stage, k), won = stageWon(st, stage, k), go = open && wordsOk;
+      const sub = won ? `다시 ${coin()}${num(L.again.coins)}` : open ? `첫 처치 ${coin()}${num(L.first.coins)}` : k === 'hard' ? '노말을 먼저' : '이지를 먼저';
+      return `<button type="button" class="mh-lv ${k}${won ? ' won' : ''}${open ? '' : ' locked'}" data-yb="monster-go" data-stage="${stage}" data-level="${k}" ${go ? '' : 'disabled'} aria-label="레벨 ${stage} ${esc(m.title)} ${L.name}${won ? ' 처치 완료' : open ? '' : ' 잠김'}"><b>${won ? icon('check') : open ? '' : icon('lock')}${L.name}</b>${now ? levelBadge(k, 'mh-lv-art') : ''}<small>${sub}</small></button>`;
+    }).join('')}</div>
   </article>`;
 }
-// What a level means, before the fight starts.
-function askMonster(partKey, level) {
-  const p = myParts().find(x => x.key === partKey), L = MONSTER_LEVELS[level];
-  if (!p || !L) return toast('몬스터를 찾지 못했어요.');
-  const c = partCleared(p), first = !c[level];
-  const pay = first ? firstReward(p, level) : null, reward = pay || L.again, partial = pay?.share < 1;
-  confirmBox(`<div class="mh-ask ${level}" style="--mc:${p.monster.color}">
-      <div class="mh-ask-mon">${monsterPic(p.monster)}</div>
-      <span class="mh-ask-lv">${levelBadge(level, 'mh-ask-lv-art')}${L.name}</span>
-      <h2>${esc(p.monster.name)}</h2>
+// What a fight means, before it starts.
+function askMonster(stage, level) {
+  const st = monsterState(), L = stageLevel(stage, level), m = stageMonster(stage), w = monsterWords();
+  if (!L || !stageOpen(st, stage, level)) return toast('아직 열리지 않은 몬스터예요.');
+  if (!w.ok) return toast('싸울 단어를 8개 이상 골라 주세요.');
+  const first = !stageWon(st, stage, level), reward = first ? L.first : L.again;
+  confirmBox(`<div class="mh-ask ${level}${L.boss ? ' boss' : ''}" style="--mc:${m.color}">
+      <div class="mh-ask-mon">${monsterPic(m)}</div>
+      <span class="mh-ask-lv">${levelBadge(level, 'mh-ask-lv-art')}레벨 ${num(stage)} · ${L.name}${L.boss ? ' · <b>보스</b>' : ''}</span>
+      <h2>${esc(m.title)}</h2>
       <ul class="mh-ask-facts">
         <li><b>${L.mode === 'skill' ? '실력전' : '스피드전'}</b>${L.mode === 'skill' ? '뜻 고르기 + 철자 쓰기' : '뜻 고르기 4지선다'}</li>
         <li><b>HP</b>나 ${num(L.hp)} · 몬스터 ${num(L.monsterHp)}</li>
         <li><b>시간</b>${minutesText(matchMs(L.mode))} 안에 쓰러뜨려야 이겨요</li>
-        <li><b>단어</b>${esc(rangesText(p.codes))} · ${num(p.words)}단어</li>
-        <li class="reward"><b>${partial ? '새 범위 처치' : first ? '첫 처치' : '다시 처치'}</b>${coin()}${num(reward.coins)} · 경험치 ${num(reward.xp)}${first ? partial ? ' <small>(새로 생긴 범위 단어만큼)</small>' : '' : ` <small>(오늘 ${monsterState().left}번 남음)</small>`}</li>
+        <li><b>단어</b>${esc(rangesText(w.picked))} · ${num(w.n)}단어</li>
+        <li class="reward"><b>${first ? '첫 처치' : '다시 처치'}</b>${coin()}${num(reward.coins)} · 경험치 ${num(reward.xp)}${first ? '' : ` <small>(오늘 ${st.left}번 남음)</small>`}</li>
       </ul>
-      ${level === 'hard' ? '<p class="mh-warn">하드 몬스터는 거의 틀리지 않고 아주 빨라요. 단어를 완벽하게 외웠을 때 도전하세요!</p>' : ''}
-    </div>`, '그만두기', '도전!', yes => { if (yes) startMonster(p.key, level); }, false, `${p.monster.name} ${L.name} 도전`);
+      ${level === 'hard' ? `<p class="mh-warn">하드는 철자 쓰기까지 나와요. 깨면 <b>레벨 ${num(stage + 1)}</b>이 열려요!</p>` : ''}
+    </div>`, '그만두기', '도전!', yes => { if (yes) startMonster(stage, level); }, false, `레벨 ${stage} ${m.title} ${L.name} 도전`);
 }
-async function startMonster(partKey, level, button) {
-  const A = B.A, cur = B, p = myParts().find(x => x.key === partKey), L = MONSTER_LEVELS[level];
-  if (!p || !L) return toast('몬스터를 찾지 못했어요.');
+async function startMonster(stage, level, button) {
+  const A = B.A, cur = B, L = stageLevel(stage, level), w = monsterWords();
+  if (!L) return toast('몬스터를 찾지 못했어요.');
   const { words } = getRanges(A, A.school, A.data.profile.class_name);
-  const questions = practiceQuestions(words.filter(w => p.codes.includes(String(w.range_code))), L.mode);
-  if (questions.length < 8) return toast('뜻이 서로 다른 단어가 부족해요.');
+  const questions = practiceQuestions(words.filter(x => w.picked.includes(String(x.range_code))), L.mode);
+  if (questions.length < 8) return toast('뜻이 서로 다른 단어가 부족해요. 범위를 더 골라 주세요.');
   // V13.101: registered before the fight (see startBotMatch).
   buttonBusy(button);
-  const reg = await registerStart('/monster/start', { part: p.key, level });
+  const reg = await registerStart('/monster/start', { stage, level, range_codes: w.picked });
   buttonBusy(button, false);
   if (B !== cur) return;
-  if (reg.error) return startFailed(reg.error, () => { if (B === cur) beginMonster(p, level, questions, null); });
-  beginMonster(p, level, questions, reg.id);
+  if (reg.error) return startFailed(reg.error, () => { if (B === cur) beginMonster(stage, level, questions, null); });
+  beginMonster(stage, level, questions, reg.id);
 }
-function beginMonster(p, level, questions, ticket) {
-  const L = MONSTER_LEVELS[level];
+function beginMonster(stage, level, questions, ticket) {
+  const L = stageLevel(stage, level), m = stageMonster(stage);
   goFull();
   closeSocket(false);
-  B.room = { id: 'monster', practice: true, monster: { part: p.key, level }, stake: 0 };
+  B.room = { id: 'monster', practice: true, monster: { stage, level }, stake: 0 };
   B.view = null;
-  B.monsterSetup = { part: p.key, level };
+  B.monsterSetup = { stage, level };
   B.monsterReward = ticket ? null : { paid: false, reason: 'unregistered' };
-  const foe = { name: p.monster.name, pet: { key: p.monster.temp.pet, form: p.monster.temp.form, skill: L.skill }, monster: { key: p.monster.key, level }, hp: L.monsterHp };
-  B.local = createPracticeMatch({ me: meAsPlayer(), questions, mode: L.mode, onMessage, foe, skill: L, hp: L.hp, ko: true, label: `몬스터 · ${L.name}`, minigame: miniGameHook });
+  const foe = { name: m.title, pet: { key: m.temp.pet, form: m.temp.form, skill: L.skill }, monster: { key: m.key, level, stage, round: m.round, boss: L.boss }, hp: L.monsterHp };
+  B.local = createPracticeMatch({ me: meAsPlayer(), questions, mode: L.mode, onMessage, foe, skill: L, hp: L.hp, ko: true, label: `레벨 ${stage}${L.boss ? ' · 보스' : ''} · ${L.name}`, minigame: miniGameHook });
   B.local.ticket = ticket;
-  main(`<div class="yb-loading">${esc(p.monster.name)}이(가) 나타났어요…</div>`);
+  main(`<div class="yb-loading">${esc(m.title)}이(가) 나타났어요…</div>`);
   B.local.start();
 }
 function drawMonsterResult() {
-  const v = B.view, r = v.result || {}, m = me(), f = foe(), local = B.local, setup = B.monsterSetup || {};
-  const won = r.winner === v.me, L = MONSTER_LEVELS[setup.level] || MONSTER_LEVELS.easy;
-  const mon = MONSTERS.find(x => x.key === f.monster?.key) || MONSTERS[0];
+  const v = B.view, r = v.result || {}, me_ = me(), f = foe(), local = B.local, setup = B.monsterSetup || { stage: 1, level: 'easy' };
+  const won = r.winner === v.me, L = stageLevel(setup.stage, setup.level) || stageLevel(1, 'easy');
+  const mon = stageMonster(setup.stage);
   closeSocket();
   if (!B.resultSounded) { B.resultSounded = true; sfx(won ? 'win' : 'lose', won ? [60, 50, 120] : 0); }
-  const why = won ? (r.reason === 'forfeit' ? '' : `${esc(mon.name)}을(를) 쓰러뜨렸어요!`) : r.reason === 'forfeit' ? '도전을 그만뒀어요' : f.hp > 0 && m.hp > 0 ? '시간 안에 쓰러뜨리지 못했어요' : '내 펫이 쓰러졌어요';
+  const why = won ? (r.reason === 'forfeit' ? '' : `${esc(mon.title)}을(를) 쓰러뜨렸어요!`) : r.reason === 'forfeit' ? '도전을 그만뒀어요' : f.hp > 0 && me_.hp > 0 ? '시간 안에 쓰러뜨리지 못했어요' : '내 펫이 쓰러졌어요';
   const missed = r.review?.[v.me] || [];
-  main(`<section class="yb-card mh-result ${won ? 'win' : 'lose'} ${setup.level || ''}" style="--mc:${mon.color}">
-    <span class="yb-result-kind">몬스터 잡기 · ${esc(L.name)}</span>
-    <div class="mh-result-stage">${won ? `<div class="mh-result-down${MONSTER_ART.has(mon.key) ? ' art' : ''}">${monsterPic(f.monster, { pose: 'down' })}</div>` : `<div class="mh-result-mon">${monsterPic(f.monster, { pose: 'attack' })}</div>`}<div class="mh-result-pet">${avatar(m.pet?.key, { form: m.pet?.form ?? 1, expression: won ? 'win' : 'hurt' })}</div></div>
+  main(`<section class="yb-card mh-result ${won ? 'win' : 'lose'} ${setup.level || ''}${L.boss ? ' boss' : ''}" style="--mc:${mon.color}">
+    <span class="yb-result-kind">몬스터 레벨 ${num(setup.stage)}${L.boss ? ' · 보스' : ''} · ${esc(L.name)}</span>
+    <div class="mh-result-stage">${won ? `<div class="mh-result-down${MONSTER_ART.has(mon.key) ? ' art' : ''}">${monsterPic(f.monster, { pose: 'down' })}</div>` : `<div class="mh-result-mon">${monsterPic(f.monster, { pose: 'attack' })}</div>`}<div class="mh-result-pet">${avatar(me_.pet?.key, { form: me_.pet?.form ?? 1, expression: won ? 'win' : 'hurt' })}</div></div>
     <div class="mh-result-badge">${won ? '처치 성공!' : '실패…'}</div>
-    <p class="yb-result-lead">${why} · 내 HP ${num(Math.max(0, m.hp))} · 몬스터 HP ${num(Math.max(0, f.hp))}</p>
+    <p class="yb-result-lead">${why} · 내 HP ${num(Math.max(0, me_.hp))} · 몬스터 HP ${num(Math.max(0, f.hp))}</p>
     <div class="yb-result-points mh-reward" id="mh-reward">${monsterRewardText()}</div>
-    <button type="button" class="btn primary full" data-yb="monster-again">${won ? '한 번 더' : '다시 도전'} <small>${esc(mon.name)} · ${esc(L.name)}</small></button>
-    <div class="btn-row yb-result-actions"><button type="button" class="btn" data-yb="home">홈으로</button><button type="button" class="btn" data-yb="monster-list">몬스터 목록</button></div>
+    <div id="mh-next">${monsterNextButton(won)}</div>
+    <div class="btn-row yb-result-actions"><button type="button" class="btn" data-yb="home">홈으로</button><button type="button" class="btn" data-yb="monster-list">몬스터 레벨</button></div>
   </section>
   ${missed.length ? `<section class="yb-card yb-review"><h2>이번 전투에서 놓친 단어 <small>${missed.length}개</small></h2><ul>${missed.slice(0, 10).map(w => `<li><b>${esc(w.word)}</b><span>${esc(w.meaning)}</span></li>`).join('')}</ul><button type="button" class="btn primary full" data-yb="review">놓친 단어 연습하기</button></section>` : ''}`);
   if (won && !reduced()) burstConfetti(document.querySelector('.mh-result-stage'));
   claimMonsterReward(won ? 'win' : 'lose', local);
 }
+// After a fight: the next level when this one opened it, otherwise the same fight again.
+function monsterNextButton(won) {
+  const r = B.monsterReward, setup = B.monsterSetup || { stage: 1, level: 'easy' }, L = stageLevel(setup.stage, setup.level);
+  if (r?.stage_up) return `<div class="ms-up" role="status"><b>레벨 ${num(r.stage_up)} 열림!</b><span>${esc(stageMonster(r.stage_up).title)}이(가) 기다려요</span></div><button type="button" class="btn primary full" data-yb="monster-list">다음 레벨 보러 가기</button>`;
+  return `<button type="button" class="btn primary full" data-yb="monster-again">${won ? '한 번 더' : '다시 도전'} <small>레벨 ${num(setup.stage)} · ${esc(L?.name || '')}</small></button>`;
+}
 function monsterRewardText() {
   const r = B.monsterReward;
   if (!r) return '보상 확인 중…';
-  if (r.paid) return `${r.first ? `<em class="mh-first">${r.share ? '새 범위 처치 보상!' : '첫 처치 보상!'}</em>` : ''}${coin()}+${num(r.coins)} · 경험치 +${num(r.xp)}`;
-  const need = MONSTER_LEVELS[B.monsterSetup?.level]?.need || 5;
+  if (r.paid) return `${r.first ? `<em class="mh-first">${r.boss ? '보스 첫 처치 보상!' : '첫 처치 보상!'}</em>` : ''}${coin()}+${num(r.coins)} · 경험치 +${num(r.xp)}`;
+  const need = stageLevel(B.monsterSetup?.stage || 1, B.monsterSetup?.level || 'easy')?.need || 5;
   if (r.reason === 'error') return r.retry ? `보상을 받지 못했어요.${retryButton()}` : '보상을 확인하지 못했어요';
   return { few: `단어를 ${need}개 이상 맞히면 보상을 받아요`, daily: '오늘 다시 잡기 보상은 다 받았어요 (첫 처치는 언제나 받아요)', short: '너무 빨리 끝난 전투예요', unregistered: '보상 등록 없이 한 전투예요' }[r.reason] || '보상 없음';
 }
@@ -710,10 +775,12 @@ async function claimMonsterReward(outcome, local) {
   }
   if (B !== cur) return;
   B.monsterReward = res;
-  if (res.cleared && B.A.data.rewards) B.A.data.rewards.monster = { ranges: res.ranges, cleared: res.cleared, left: res.left, daily: res.daily, wins: res.wins, hard_wins: res.hard_wins };
+  if (res.stage !== undefined && B.A.data.rewards) B.A.data.rewards.monster = { stage: res.stage, clear: res.clear || {}, best: res.best, left: res.left, daily: res.daily, wins: res.wins, hard_wins: res.hard_wins };
   if (res.paid && res.stats) Object.assign(B.A.data.stats, res.stats);
   const el = document.getElementById('mh-reward');
   if (el) { el.innerHTML = monsterRewardText(); if (res.paid) el.classList.add('paid'); if (res.first) el.classList.add('first'); }
+  const next = document.getElementById('mh-next');
+  if (next && res.stage_up) next.innerHTML = monsterNextButton(outcome === 'win');
 }
 // A small burst of paper pieces over an element (the monster went down).
 function burstConfetti(el) {
@@ -896,6 +963,7 @@ function drawMatch() {
   if (v.phase === 'waiting') say('상대가 들어오기를 기다리는 중…', '둘 다 연결되면 3초 뒤에 시작해요.');
   if (v.phase === 'countdown') showCountdown(v.deadline);
   if (v.question) drawQuestion();
+  drawCombo(false);
   loop();
 }
 
@@ -910,8 +978,8 @@ function vsSide(p, side) {
 }
 function hud(p, side) {
   return `<div class="yb-hud ${side}" id="yb-hud-${side}">
-    <div class="yb-hud-row"><span class="yb-hud-name">${esc(whoName(p))}</span><span class="yb-hud-lv">${p.monster ? esc(MONSTER_LEVELS[p.monster.level]?.name || '') : PET_FORMS[p.pet?.form ?? 1] || ''}</span></div>
-    <div class="yb-hud-who">${p.monster ? `<b class="mh-hud-tag">MONSTER</b>${esc(MONSTER_LEVELS[p.monster.level]?.name || '')} 몬스터` : `${p.tier ? tierEmblem(p.tier, { size: 'xs' }) : ''}${esc(p.name)}${side === 'me' ? ' · 나' : ''}${p.bot ? ' <i class="yb-ai">AI</i>' : ''}${p.streak >= 2 ? ` <span class="yb-streak">${p.streak}연승</span>` : ''}`}</div>
+    <div class="yb-hud-row"><span class="yb-hud-name">${esc(whoName(p))}</span><span class="yb-hud-lv">${p.monster ? esc((p.monster.stage ? `Lv.${p.monster.stage} ` : '') + (MONSTER_LEVELS[p.monster.level]?.name || '')) : PET_FORMS[p.pet?.form ?? 1] || ''}</span></div>
+    <div class="yb-hud-who">${p.monster ? `<b class="mh-hud-tag">${p.monster.boss ? 'BOSS' : 'MONSTER'}</b>${p.monster.stage ? `레벨 ${p.monster.stage} · ` : ''}${esc(MONSTER_LEVELS[p.monster.level]?.name || '')} 몬스터` : `${p.tier ? tierEmblem(p.tier, { size: 'xs' }) : ''}${esc(p.name)}${side === 'me' ? ' · 나' : ''}${p.bot ? ' <i class="yb-ai">AI</i>' : ''}${p.streak >= 2 ? ` <span class="yb-streak">${p.streak}연승</span>` : ''}`}</div>
     ${shownTitle(p.title) ? `<div class="yb-hud-title">${titleBadge(p.title, { size: 'xs' })}</div>` : ''}
     <div class="yb-hpbar"><i>HP</i><div class="yb-track"><div class="yb-fill" id="yb-hp-${side}"></div></div><b class="yb-hp-num" id="yb-hpn-${side}">${Math.max(0, p.hp)}</b></div>
     <div class="yb-hud-foot"><div class="yb-gauge-v1372" id="yb-gauge-${side}"></div><div class="yb-fx" id="yb-fx-${side}"></div></div>
@@ -1113,9 +1181,14 @@ function flash(color) { const f = document.getElementById('yb-flash'); if (!f) r
 function pop(side, text, kind = '') {
   const arena = document.getElementById('yb-arena'), pet = document.getElementById('yb-pet-' + side); if (!arena || !pet) return;
   const a = arena.getBoundingClientRect(), r = pet.getBoundingClientRect(), d = document.createElement('div');
-  d.className = 'yb-pop ' + kind; d.textContent = text;
+  // V13.105 the damage number grows with the damage (t1~t3); fever hits burn red.
+  const dmg = /^-(\d+)/.exec(text)?.[1];
+  d.className = 'yb-pop ' + kind + (dmg ? ` fx-num t${dmgTier(+dmg)}${B.fever ? ' fever' : ''}` : ''); d.textContent = text;
+  if (dmg) d.innerHTML = `<b>-${dmg}</b>${text.length > dmg.length + 1 ? `<small>${esc(text.slice(dmg.length + 1).trim())}</small>` : ''}`;
   d.style.left = (r.left - a.left + r.width * .22) + 'px'; d.style.top = (r.top - a.top + r.height * .1) + 'px';
   arena.appendChild(d); setTimeout(() => d.remove(), 1050);
+  // V13.105 a big number stays inside the arena (centred on the pet, never cut off at the side).
+  if (dmg) { const w = d.offsetWidth; d.style.left = Math.max(6, Math.min(a.width - w - 6, r.left - a.left + r.width / 2 - w / 2)) + 'px'; d.style.top = Math.max(46, r.top - a.top + r.height * .05) + 'px'; }
 }
 // V13.85 the pets act out the hit: the attacker shows its attack (cheer) pose, the one hit its
 // hurt (sad) pose, for a moment (로보 has its own punch and flinch).
@@ -1132,7 +1205,9 @@ function fxCenter(side, arena) {
   const a = arena.getBoundingClientRect(), r = pet.getBoundingClientRect();
   return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height * .52 };
 }
-function fxAdd(arena, cls, css, ms) { const el = document.createElement('div'); el.className = cls; Object.assign(el.style, css); arena.appendChild(el); setTimeout(() => el.remove(), ms); return el; }
+// V13.105: at most FX_MAX effect pieces at once; extra sparks are simply not drawn.
+const FX_MAX = 24;
+function fxAdd(arena, cls, css, ms) { const el = document.createElement('div'); if (cls === 'fx-spark' && arena.querySelectorAll('[data-fx]').length >= FX_MAX) return el; el.dataset.fx = ''; el.className = cls; Object.assign(el.style, css); arena.appendChild(el); setTimeout(() => el.remove(), ms); return el; }
 function strike(atk, def, { dmg = 0, crit = false, skill = false, attacker = null } = {}) {
   const arena = document.getElementById('yb-arena'); if (!arena || reduced()) return;
   const from = fxCenter(atk, arena), to = fxCenter(def, arena); if (!from || !to) return;
@@ -1151,14 +1226,98 @@ function strike(atk, def, { dmg = 0, crit = false, skill = false, attacker = nul
       fxAdd(arena, 'fx-spark', { left: to.x + 'px', top: to.y + 'px', '--fx': color, '--dx': Math.cos(a) * dist + 'px', '--dy': Math.sin(a) * dist + 'px' }, 560);
     }
     if (attacker?.monster) fxAdd(arena, 'fx-claw', { left: to.x + 'px', top: to.y + 'px' }, 620);
-    arena.classList.remove('fx-shake-s', 'fx-shake-l'); void arena.offsetWidth;
-    arena.classList.add(big ? 'fx-shake-l' : 'fx-shake-s');
+    // V13.105 타격감: a white flash on the one hit, a short hit-stop, then a shake by damage.
+    impact(arena, def, to, { dmg, crit, skill });
   }, skill ? 180 : 230);
+}
+// ---------- V13.105 전투 화면 효과 (presentation only; the rules are in battle-engine.js) ----------
+// Damage tiers: small (a plain hit), medium, big (a fast or fever hit, a skill).
+function dmgTier(dmg) { return dmg >= 28 ? 3 : dmg >= 16 ? 2 : 1; }
+const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl'];
+function shake(arena, cls) {
+  if (reduced()) return;
+  arena.classList.remove(...SHAKES); void arena.offsetWidth; arena.classList.add(cls);
+}
+// Hit-stop: the arena's animations hold for a blink (~90 ms) so the hit lands, then go on.
+function hitStop(arena, ms = 90) {
+  if (reduced()) return;
+  arena.classList.add('fx-stop');
+  clearTimeout(arena.fxStopTimer); arena.fxStopTimer = setTimeout(() => arena.classList.remove('fx-stop'), ms);
+}
+function impact(arena, def, at, { dmg = 0, crit = false, skill = false } = {}) {
+  const tier = Math.max(dmgTier(dmg), skill ? 3 : 1);
+  fxAdd(arena, 'fx-impact' + (tier >= 2 ? ' big' : ''), { left: at.x + 'px', top: at.y + 'px' }, 380);
+  const pet = document.getElementById('yb-pet-' + def);
+  if (pet) { pet.classList.remove('fx-white'); void pet.offsetWidth; pet.classList.add('fx-white'); setTimeout(() => pet.classList.remove('fx-white'), 260); }
+  hitStop(arena, tier >= 3 || crit ? 110 : 70);
+  shake(arena, crit ? 'fx-shake-xl' : SHAKES[tier - 1]);
+}
+// 크리티컬: a fast answer (the engine's `fast` flag) stamps CRITICAL! over the one hit.
+function critStamp(def) {
+  const arena = document.getElementById('yb-arena'); if (!arena) return;
+  // In the free band between the two HUDs, so it covers neither the damage number nor the combo.
+  const a = arena.getBoundingClientRect(), op = document.getElementById('yb-hud-op')?.getBoundingClientRect(), mine = document.getElementById('yb-hud-me')?.getBoundingClientRect();
+  const y = op && mine ? (op.bottom + mine.top) / 2 - a.top : a.height * .45;
+  fxAdd(arena, 'fx-crit' + (def === 'me' ? ' on-me' : ''), { left: a.width * (def === 'me' ? .62 : .4) + 'px', top: y + 'px' }, 900).textContent = 'CRITICAL!';
+}
+// Per-match display state: my combo and whether the cut-in played (reset for a new match).
+function fxState() {
+  const id = B.view?.id || B.view?.started_at || 'local';
+  if (B.fx?.id !== id) B.fx = { id, combo: 0, cut: false, finish: false };
+  return B.fx;
+}
+// 콤보: my right answers in a row (a wrong answer or a missed word resets it). Display only.
+function comboUp() {
+  const s = fxState(); s.combo++;
+  if (s.combo >= 2) sfxCombo(s.combo);
+  drawCombo(true);
+}
+function comboReset() { const s = fxState(); if (!s.combo) return; s.combo = 0; drawCombo(false); }
+function drawCombo(bump) {
+  const hud = document.getElementById('yb-hud-me'); if (!hud) return;
+  let box = document.getElementById('yb-combo');
+  const n = fxState().combo;
+  if (n < 2) { if (box) { box.classList.add('out'); setTimeout(() => box.remove(), 260); box.id = ''; } return; }
+  if (!box) { box = document.createElement('div'); box.id = 'yb-combo'; box.className = 'fx-combo'; box.setAttribute('aria-live', 'polite'); hud.appendChild(box); }
+  box.innerHTML = `<b>${n}</b><span>COMBO</span>`;
+  box.style.setProperty('--heat', String(Math.min(1, (n - 2) / 6)));
+  box.className = 'fx-combo' + (n >= 5 ? ' hot' : '') + (n >= 8 ? ' max' : '');
+  if (bump && !reduced()) { box.classList.remove('bump'); void box.offsetWidth; box.classList.add('bump'); }
+}
+// 입장 컷인: who I fight and in what match, once at the countdown. A monster comes in bigger
+// and redder; a boss darker, with a shake. Never blocks taps (pointer-events: none).
+function cutIn() {
+  const s = fxState(); if (s.cut) return; s.cut = true;
+  const arena = document.getElementById('yb-arena'); if (!arena) return;
+  const f = foe(), v = B.view, label = v.label || modeName(v.mode);
+  const boss = !!(v.boss || /보스/.test(label)), monster = !!f.monster;
+  const el = fxAdd(arena, 'fx-cutin' + (monster ? ' monster' : '') + (boss ? ' boss' : ''), {}, 1200);
+  el.setAttribute('aria-hidden', 'true');
+  el.innerHTML = `<div class="fx-cutin-band"><span class="fx-cutin-label">${esc(label)}</span><b class="fx-cutin-name">${monster ? '' : 'VS '}${esc(whoName(f))}</b>${monster ? `<span class="fx-cutin-tag">${boss ? 'BOSS' : 'MONSTER'}</span>` : ''}</div>`;
+  if (boss) { shake(arena, 'fx-shake-l'); sfxThump(40); }
+}
+// 피니셔: the blow that empties an HP bar: a short slow motion on the arena, a flash, and K.O.
+function finisher(side) {
+  const s = fxState(); if (s.finish) return; s.finish = true;
+  const arena = document.getElementById('yb-arena'); if (!arena || reduced()) return;
+  arena.classList.add('fx-finish');
+  fxAdd(arena, 'fx-vignette', {}, 900);
+  // Slow every running arena animation for ~0.4 s (Web Animations: CSS ones included).
+  const anims = arena.getAnimations?.({ subtree: true }) || [];
+  anims.forEach(a => { try { a.playbackRate = .3; } catch {} });
+  setTimeout(() => { anims.forEach(a => { try { a.playbackRate = 1; } catch {} }); arena.classList.remove('fx-finish'); }, 420);
+  const at = fxCenter(side, arena);
+  if (at) fxAdd(arena, 'fx-impact big ko', { left: at.x + 'px', top: at.y + 'px' }, 600);
 }
 function knockout(side) {
   const arena = document.getElementById('yb-arena'); if (!arena) return;
+  const s = fxState(); if (s.ko) return; s.ko = true;
+  arena.classList.add('fx-ko-on');
+  // V13.105 K.O. comes with a white flash, rays behind the letters and a boom.
+  if (!reduced()) { flash('rgba(255,255,255,.95)'); fxAdd(arena, 'fx-ko-rays', {}, 1300); }
+  sfxKO();
   fxAdd(arena, 'fx-ko', {}, 1300).textContent = 'K.O.!';
-  if (!reduced()) { arena.classList.remove('fx-shake-l'); void arena.offsetWidth; arena.classList.add('fx-shake-l'); }
+  shake(arena, 'fx-shake-xl');
   const pet = document.getElementById('yb-pet-' + side);
   pet?.classList.add('fx-down');
   // V13.95 a monster with its own pictures falls into its drawn 쓰러짐 pose (no tilt, see v1395.css).
@@ -1177,6 +1336,7 @@ function showCountdown(deadline) {
     box.textContent = left; later(step, 150);
   };
   step();
+  cutIn();
   say('곧 시작해요!', '연속으로 맞히면 펫 스킬이 저절로 나가요.');
 }
 
@@ -1239,6 +1399,7 @@ function applyEvent(e) {
     if (e.player !== v.me) v.question.opDone = true;
     if (e.player === v.me) {
       sfx('wrong', 40);
+      comboReset();
       v.question.locked = true; v.question.judged = true;
       document.querySelector('.yb-answer.picked')?.classList.add('wrong');
       document.querySelectorAll('.yb-answer').forEach(b => { b.disabled = true; });
@@ -1255,10 +1416,11 @@ function applyEvent(e) {
     // A word left to run out empties the gauge, like a wrong answer.
     if (e.type === 'miss') {
       for (const id of v.order) P[id].gauge = 0;
+      comboReset();
       say(e.timeout ? '시간 초과!' : '둘 다 놓쳤어요!', line);
     } else {
       // `judged`: the room took my answer (V13.99: the word locks as soon as an answer is sent).
-      if (e.timeout && !v.question.judged) { P[v.me].gauge = 0; setStatus('me', '시간 초과!'); }
+      if (e.timeout && !v.question.judged) { P[v.me].gauge = 0; setStatus('me', '시간 초과!'); comboReset(); }
       if (e.timeout && !v.question.opDone) foe().gauge = 0;
       say('정답 공개', line);
     }
@@ -1282,6 +1444,12 @@ function applyEvent(e) {
       say(`${atk === 'op' && !P[e.attacker].monster ? '상대 ' : ''}${esc(whoName(P[e.attacker]))}의 ${label}`, `${atk === 'me' ? '정답! 상대를 기다려요' : '상대가 맞혔어요'}${e.guard ? ` · ${def === 'me' ? '내' : '상대'} 펫이 ${e.guard}만큼 막았어요` : ''}`);
       lunge(atk);
       if (e.dmg) strike(atk, def, { dmg: e.dmg, crit: e.fast || e.fever, attacker: P[e.attacker] });
+      // V13.105: my combo, the CRITICAL! stamp, a thump by damage and the finishing blow.
+      if (atk === 'me') comboUp();
+      const lethal = e.dmg && Number(e.hp[e.defender]) <= 0;
+      // The K.O. plays right on the blow; the room's 'end' may come a moment later.
+      if (lethal) { fxState().lethalAt = Date.now(); later(() => finisher(def), reduced() ? 0 : 200); later(() => knockout(def), reduced() ? 0 : 620); }
+      later(() => { if (e.dmg) sfxThump(e.dmg, e.fast); if (e.fast && e.dmg) critStamp(def); }, reduced() ? 0 : 230);
       later(() => { if (e.boost || e.fast || e.spell) flash(e.boost ? 'rgba(255,214,90,.9)' : e.spell ? 'rgba(150,230,210,.75)' : 'rgba(255,236,160,.8)'); if (e.dmg) { hit(def); pop(def, `-${e.dmg}${e.boost ? ' 스킬!' : e.fast ? ' 크리티컬!' : e.spell ? ' 철자!' : e.fever ? ' 피버!' : ''}`, strong || e.spell ? 'crit' : ''); } if (e.guard) pop(def, e.dmg ? `막기 ${e.guard}` : '다 막았다!', 'info'); refreshHud(); }, reduced() ? 0 : 230);
       // Redraw only my own buttons: the other player's hit must not replace my question.
       if (atk === 'me') drawQuestion();
@@ -1298,6 +1466,7 @@ function applyEvent(e) {
       flash(side === 'me' ? 'rgba(255,214,90,.8)' : 'rgba(170,160,255,.65)');
       skillBanner(side, `${side === 'op' && !p.monster ? '상대 ' : ''}${esc(whoName(p))}의 ${esc(e.name)}!`, e.desc);
       if (e.dmg) { strike(side, other, { dmg: e.dmg, skill: true, attacker: p }); hit(other); pop(other, `-${e.dmg} 스킬!`, 'crit'); }
+      if (e.dmg) later(() => sfxThump(Math.max(28, e.dmg)), reduced() ? 0 : 180);
       if (e.heal) pop(side, `+${e.heal}`, 'heal');
       refreshHud();
     }, reduced() ? 0 : 520);
@@ -1317,9 +1486,13 @@ function applyEvent(e) {
     if (loser) document.getElementById('yb-pet-' + loser)?.classList.add('faint');
     // A knock-out (not time running out) gets its own moment before the result.
     const ko = loser && Number(e.result.hp?.[e.result.loser]) <= 0 && e.result.reason === 'end';
-    if (ko) later(() => knockout(loser), reduced() ? 0 : 350);
+    // V13.105 피니셔: slow motion on the last blow, then K.O.; the result waits 0.3 s more
+    // than before (2.0 s in all after a K.O.), never longer.
+    if (ko && !reduced()) later(() => finisher(loser), 200);
+    if (ko) later(() => knockout(loser), reduced() ? 0 : 620);
     cancelAnimationFrame(B.raf);
-    later(drawResult, reduced() ? 0 : ko ? 1700 : 1100);
+    const since = Date.now() - (fxState().lethalAt || Date.now());
+    later(drawResult, reduced() ? 0 : ko ? Math.max(700, 2000 - since) : 1100);
   }
 }
 

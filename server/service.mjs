@@ -1373,7 +1373,12 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
     const ctx = monsterContext(state, p);
     if (!ctx.school) fail('학생 학교 설정을 확인해주세요.', 409);
-    return monsterStart(p, { part: str(body.part, 400), level: str(body.level, 10), parts: ctx.parts, scope: ctx.scope, id: id(), now: Date.now() });
+    // V13.104: a level number and the ranges the student fights with (their own school and grade,
+    // 8 words or more, like the robot practice). An old screen sends a part: its ranges are used.
+    const asked = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : (ctx.parts.find(x => x.key === str(body.part, 400))?.codes || []);
+    if (!asked.length) fail('싸울 단어 범위를 골라주세요.');
+    if (scopedWords(state, ctx.school.id, asked, p.class_name).length < 8) fail('단어가 8개 이상 되게 범위를 골라주세요.', 409);
+    return monsterStart(p, { stage: body.stage, level: str(body.level, 10), codes: asked, parts: ctx.parts, scope: ctx.scope, id: id(), now: Date.now() });
   }
   if (path === '/monster/finish' && method === 'POST') {
     requireRole(p, 'student');

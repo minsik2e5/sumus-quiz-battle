@@ -6,7 +6,7 @@ import {
   RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome
 } from '../public/modules/rewards.js';
 import { titleCoins } from '../public/modules/titles.js';
-import { MONSTER_LEVELS, MONSTER_DAILY, MONSTER_MIN_MS, MONSTER_MS_PER_RIGHT, MONSTER_TRY, MONSTER_LEVEL_KEYS, monsterOpen, partClears, monsterFirstReward, partKeyCodes } from '../public/modules/monsters.js';
+import { MONSTER_LEVELS, MONSTER_DAILY, MONSTER_MIN_MS, MONSTER_MS_PER_RIGHT, MONSTER_TRY, MONSTER_LEVEL_KEYS, monsterOpen, partClears, partKeyCodes, stageLevel, cleanStage, stageMonster } from '../public/modules/monsters.js';
 
 // Coin rewards and games (rules and odds: public/modules/rewards.js). Everything lives on the
 // student's profile:
@@ -472,25 +472,46 @@ export function monsterMigrate(p, scope = '', known = []) {
   delete m.cleared;
   return true;
 }
-// `scope` and `parts` (monsterParts of the student's grade): `ranges` is the clears per range,
-// `cleared` the same seen per part ({ [part key]: { easy, normal, hard } }).
+/* ---------- V13.105 끝없는 레벨 ----------
+   monster { stage: the level open now (1 …), clear: { easy, normal, hard } of that level (first
+   clear times), best: the highest level cleared, from_parts (V13.105 move), … as above }.
+   A level's 이지 → 노말 → 하드 open in order; clearing its 하드 opens the next level. The first clear
+   of a level at a difficulty pays stageLevel(stage, level).first; any other fight (a level already
+   cleared, won: `again`; lost after `need` words: MONSTER_TRY) pays MONSTER_DAILY times a day.
+   V13.94–V13.103 cleared parts (per range since V13.100) move once: every part cleared up to 하드
+   counts as a level cleared (no coins again), and 이지/노말 of a part not finished carry over. */
+export function monsterProgress(p, { scope = '', parts = null } = {}) {
+  const m = p?.bonus?.monster || {};
+  if (Number.isFinite(Number(m.stage)) && Number(m.stage) >= 1) return { stage: cleanStage(m.stage), clear: { ...(m.clear || {}) }, best: Number(m.best || 0), moved: false };
+  const ranges = monsterRanges(p, scope, (parts || []).flatMap(x => x.codes));
+  const done = (parts || []).map(part => partClears(part, ranges));
+  const full = done.filter(c => c.hard).length;
+  const partial = done.filter(c => !c.hard).sort((a, b) => Object.keys(b).length - Object.keys(a).length)[0] || {};
+  const clear = partial.normal ? { easy: partial.easy || partial.normal, normal: partial.normal } : partial.easy ? { easy: partial.easy } : {};
+  return { stage: full + 1, clear, best: full, moved: true, from_parts: full };
+}
+function monsterSaveProgress(m, prog, now) {
+  m.stage = prog.stage; m.clear = { ...prog.clear }; m.best = prog.best;
+  if (prog.moved) m.from_parts = { parts: prog.from_parts, at: now };
+}
 export function monsterView(p, now = Date.now(), { scope = '', parts = null } = {}) {
   const m = p.bonus?.monster || {};
   const used = m.day === dayKey(now) ? Number(m.count || 0) : 0;
-  const ranges = monsterRanges(p, scope, (parts || []).flatMap(x => x.codes));
-  const cleared = Object.fromEntries((parts || []).map(part => [part.key, partClears(part, ranges)]).filter(([, c]) => Object.keys(c).length));
-  return { ranges, cleared, left: Math.max(0, MONSTER_DAILY - used), daily: MONSTER_DAILY, wins: Number(m.wins || 0), hard_wins: Number(m.hard_wins || 0) };
+  const prog = monsterProgress(p, { scope, parts });
+  return { stage: prog.stage, clear: prog.clear, best: prog.best, left: Math.max(0, MONSTER_DAILY - used), daily: MONSTER_DAILY, wins: Number(m.wins || 0), hard_wins: Number(m.hard_wins || 0) };
 }
-export function monsterStart(p, { part, level, parts, scope = '', id, now = Date.now() }) {
+// `codes`: the word ranges the student fights with (checked by the service: their own school and
+// grade, 8 words or more). A level below the open one is a replay at any difficulty.
+export function monsterStart(p, { stage, level, codes = [], parts, scope = '', id, now = Date.now() }) {
   if (!MONSTER_LEVELS[level]) fail('난이도를 골라주세요.');
-  const found = (parts || []).find(x => x.key === part);
-  if (!found) fail('이 파트를 찾지 못했어요. 화면을 새로 고쳐 주세요.', 404);
   const m = (p.bonus ||= {}).monster ||= {};
-  monsterMigrate(p, scope, (parts || []).flatMap(x => x.codes));
-  if (!monsterOpen(partClears(found, monsterRanges(p, scope)), level)) fail(level === 'hard' ? '노말을 먼저 깨야 하드에 도전할 수 있어요.' : '이지를 먼저 깨야 노말에 도전할 수 있어요.', 409);
-  // The part as it is now: the fight is paid on these ranges even if the grouping changes meanwhile.
-  m.live = { id, part, level, at: now, scope, codes: [...found.codes], sizes: [...(found.sizes || [])] };
-  return { id, part, level, monster: found.monster.key, ...monsterView(p, now, { scope, parts }) };
+  const prog = monsterProgress(p, { scope, parts });
+  if (prog.moved) { monsterMigrate(p, scope, (parts || []).flatMap(x => x.codes)); monsterSaveProgress(m, prog, now); }
+  const s = stage === undefined || stage === null || stage === '' ? prog.stage : cleanStage(stage);
+  if (s > prog.stage) fail('아직 열리지 않은 레벨이에요. 앞 레벨의 하드까지 깨면 열려요.', 409);
+  if (s === prog.stage && !monsterOpen(prog.clear, level)) fail(level === 'hard' ? '노말을 먼저 깨야 하드에 도전할 수 있어요.' : '이지를 먼저 깨야 노말에 도전할 수 있어요.', 409);
+  m.live = { id, stage: s, level, at: now, scope, codes: [...codes].map(String).slice(0, 60) };
+  return { id, stage: s, level, monster: stageMonster(s).key, ...monsterView(p, now, { scope, parts }) };
 }
 export function monsterFinish(p, { id, result, right, pet, scope: nowScope = '', parts = null, now = Date.now() }) {
   const b = p.bonus ||= {};
@@ -505,23 +526,27 @@ export function monsterFinish(p, { id, result, right, pet, scope: nowScope = '',
   return { ...keepReceipt(b, 'monster', id, settled, now), ...view() };
 }
 function monsterSettle(p, m, live, { result, right, pet, nowScope, parts, now }) {
-  // A fight started before V13.100 has no scope or codes: the part key is split.
-  const scope = live.scope ?? nowScope, codes = Array.isArray(live.codes) ? live.codes : partKeyCodes(live.part, (parts || []).flatMap(x => x.codes));
-  monsterMigrate(p, scope, codes);
-  const L = MONSTER_LEVELS[live.level], won = result === 'win';
+  const prog = monsterProgress(p, { scope: live.scope ?? nowScope, parts });
+  if (prog.moved) { monsterMigrate(p, live.scope ?? nowScope, (parts || []).flatMap(x => x.codes)); monsterSaveProgress(m, prog, now); }
+  // A fight started before V13.105 (a part, no level number) is played again at level 1 and can
+  // not be a first clear.
+  const legacy = !Number.isFinite(Number(live.stage));
+  const stage = legacy ? 1 : cleanStage(live.stage);
+  const L = stageLevel(stage, live.level) || stageLevel(1, 'easy'), won = result === 'win';
   const answered = Math.max(0, Math.min(200, Math.floor(Number(right) || 0)));
-  const base = { result: won ? 'win' : 'lose', level: live.level, part: live.part };
+  const base = { result: won ? 'win' : 'lose', level: live.level, fought: stage };
   if (won && now - live.at < MONSTER_MIN_MS) return { paid: false, reason: 'short', ...base };
   if (answered < L.need) return { paid: false, reason: 'few', need: L.need, ...base };
-  // V13.99: a lost fight is checked for time too (before, only a win was): the right answers
-  // it claims (at least `need`) take MONSTER_MS_PER_RIGHT each.
+  // V13.99: a lost fight is checked for time too: the right answers it claims take MONSTER_MS_PER_RIGHT each.
   if (!won && now - live.at < answered * MONSTER_MS_PER_RIGHT) return { paid: false, reason: 'short', ...base };
   if (won) { m.wins = Number(m.wins || 0) + 1; if (live.level === 'hard') m.hard_wins = Number(m.hard_wins || 0) + 1; }
-  const firstPay = won ? monsterFirstReward({ codes, sizes: live.sizes }, monsterRanges(p, scope), live.level) : null;
-  let reward, first = false;
-  if (firstPay) {
-    for (const code of codes) markRange(m, scope, code, live.level, now);
-    reward = firstPay; first = true;
+  const first = won && !legacy && stage === prog.stage && !prog.clear[live.level] && monsterOpen(prog.clear, live.level);
+  let reward, up = false;
+  if (first) {
+    const clear = { ...prog.clear, [live.level]: now };
+    if (live.level === 'hard') { up = true; m.stage = stage + 1; m.clear = {}; m.best = Math.max(Number(m.best || 0), stage); }
+    else { m.stage = stage; m.clear = clear; m.best = Number(m.best || prog.best || 0); }
+    reward = L.first;
   } else {
     const today = dayKey(now);
     if (m.day !== today) { m.day = today; m.count = 0; }
@@ -530,7 +555,7 @@ function monsterSettle(p, m, live, { result, right, pet, nowScope, parts, now })
     reward = won ? L.again : MONSTER_TRY;
   }
   addBonus(p, { xp: reward.xp, coins: reward.coins, pet, now });
-  return { paid: true, first, ...(first && firstPay.share < 1 ? { share: firstPay.share } : {}), coins: reward.coins, xp: reward.xp, ...base };
+  return { paid: true, first, ...(up ? { stage_up: stage + 1 } : {}), ...(L.boss ? { boss: true } : {}), coins: reward.coins, xp: reward.xp, ...base };
 }
 
 // A submitted teacher exam: 경험치 for every answered question, coins for answering half of it.

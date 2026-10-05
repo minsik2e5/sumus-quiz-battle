@@ -15,15 +15,35 @@ export const MONSTERS = [
   { key: 'pirate', name: '오답 해적 선장', line: '틀린 답을 모아 배를 만든 해적 선장', color: '#e5484d', temp: { pet: 'shark', form: 3, filter: 'hue-rotate(150deg) saturate(1.5) brightness(.92)' } },
   { key: 'owlnight', name: '밤샘 부엉 대장', line: '밤새 공부를 방해하는 졸린 부엉이 장군', color: '#3b5bdb', temp: { pet: 'owl', form: 3, filter: 'hue-rotate(185deg) saturate(1.3) brightness(.8)' } },
   { key: 'dictdragon', name: '딕셔너리 드래곤', line: '사전 날개를 펼친 거대한 드래곤', color: '#4f46e5', temp: { pet: 'dragon', form: 3, filter: 'hue-rotate(45deg) saturate(1.4) brightness(.88)' } },
-  { key: 'finalking', name: '수능 대마왕', line: '시험지 갑옷을 입은 마지막 대마왕', color: '#b91c1c', temp: { pet: 'qilin', form: 3, filter: 'hue-rotate(-40deg) saturate(1.6) brightness(.82) contrast(1.1)' } }
+  { key: 'finalking', name: '수능 대마왕', line: '시험지 갑옷을 입은 마지막 대마왕', color: '#b91c1c', temp: { pet: 'qilin', form: 3, filter: 'hue-rotate(-40deg) saturate(1.6) brightness(.82) contrast(1.1)' } },
+  // V13.105 몬스터 2탄 (주문서 docs/asset-requests/runner/12-monsters.txt). Until the pictures of sheets
+  // 12-1 … 12-9 arrive they borrow a recoloured pet picture like the first nine did.
+  { key: 'mochi', name: '암기 모찌', line: '외운 단어를 말랑하게 뭉개 버리는 찹쌀 모찌', color: '#e8a7b8', temp: { pet: 'hamster', form: 1, filter: 'saturate(.25) brightness(1.22)' } },
+  { key: 'pencilworm', name: '샤프 벌레', line: '샤프심을 갉아 먹는 초록 애벌레', color: '#3fbf8f', temp: { pet: 'snake', form: 2, filter: 'hue-rotate(25deg) saturate(1.25)' } },
+  { key: 'mimic', name: '노트 미믹', line: '노트인 척하다가 덥석 무는 미믹', color: '#c9894a', temp: { pet: 'robot', form: 2, filter: 'sepia(.6) hue-rotate(-20deg) saturate(1.5)' } },
+  { key: 'sleepcloud', name: '졸음 구름', line: '공부만 하면 졸음을 뿌리는 구름', color: '#8b93c9', temp: { pet: 'whale', form: 1, filter: 'grayscale(.55) hue-rotate(200deg) brightness(1.08)' } },
+  { key: 'alarmwolf', name: '알람 늑대', line: '알람 소리로 집중을 깨뜨리는 늑대', color: '#3d5a99', temp: { pet: 'fox', form: 3, filter: 'hue-rotate(190deg) saturate(1.2) brightness(.85)' } },
+  { key: 'scrollgoblin', name: '무한 스크롤 도깨비', line: '끝없는 스크롤로 시간을 훔치는 도깨비', color: '#f08a3c', temp: { pet: 'fox', form: 2, filter: 'saturate(1.6) hue-rotate(-10deg)' } },
+  { key: 'proctor', name: '감독 기사', line: '시계 방패를 든 엄격한 시험 감독 기사', color: '#6b7b93', temp: { pet: 'robot', form: 3, filter: 'grayscale(.35) hue-rotate(160deg) brightness(.9)' } },
+  { key: 'cramwizard', name: '벼락치기 마법사', line: '시험 전날 밤 커피로 마법을 부리는 마법사', color: '#7c4dcc', temp: { pet: 'owl', form: 3, filter: 'hue-rotate(40deg) saturate(1.5) brightness(.85)' } },
+  { key: 'mockhydra', name: '모의고사 히드라', line: '머리 셋 달린 모의고사 괴물', color: '#2f9e8f', temp: { pet: 'dragon', form: 3, filter: 'sepia(.45) saturate(1.3) hue-rotate(80deg)' } }
 ];
+// V13.105 the monster of each level: small to big, the first and the second nine mixed. After the
+// 18th level they come round again stronger ("+1", "+2" …).
+export const MONSTER_ORDER = ['mochi', 'slime', 'pencilworm', 'forgetghost', 'mimic', 'clock', 'sleepcloud', 'golem', 'alarmwolf', 'phone', 'scrollgoblin', 'pirate', 'proctor', 'owlnight', 'cramwizard', 'dictdragon', 'mockhydra', 'finalking'];
+export function stageMonster(stage) {
+  const s = Math.max(1, Math.floor(Number(stage) || 1)), i = (s - 1) % MONSTER_ORDER.length, round = Math.floor((s - 1) / MONSTER_ORDER.length);
+  const m = MONSTERS.find(x => x.key === MONSTER_ORDER[i]) || MONSTERS[0];
+  return { ...m, round, title: round ? `${m.name} +${round}` : m.name };
+}
 // Monsters whose own pictures are in public/assets/monsters (<key>.webp, <key>-attack.webp,
 // <key>-hurt.webp, <key>-down.webp). V13.95: all nine, cut from the sheets 10-1 … 10-9 (the
 // four poses of a sheet at one scale, feet on the floor like the pets). `temp` stays as the
 // fallback for a monster added later without pictures.
 export const MONSTER_ART = new Set(['slime', 'forgetghost', 'clock', 'golem', 'phone', 'pirate', 'owlnight', 'dictdragon', 'finalking']);
 export const MONSTER_POSES = ['attack', 'hurt', 'down'];
-export const monsterOf = index => MONSTERS[((index % MONSTERS.length) + MONSTERS.length) % MONSTERS.length];
+// V13.94 parts (kept for moving the old clears) took the first nine in turn.
+export const monsterOf = index => MONSTERS[((index % 9) + 9) % 9];
 
 // 이지 · 노말 · 하드. The monster answers like the practice robot (`accuracy`, `min`..`max` ms)
 // with its own HP and skill, and it has to be knocked out before time runs out (otherwise the
@@ -44,6 +64,56 @@ export const MONSTER_LEVELS = {
     first: { coins: 200, xp: 1000 }, again: { coins: 20, xp: 120 } }
 };
 export const MONSTER_LEVEL_KEYS = ['easy', 'normal', 'hard'];
+
+/* ---------- V13.105 끝없는 레벨 (stages) ----------
+   몬스터전은 레벨 1, 2, 3 … 끝없이 이어진다. 레벨마다 이지 · 노말 · 하드가 있고, 한 레벨의 셋을
+   모두 깨야 다음 레벨이 열린다. 레벨 1은 셋 다 쉽고, 레벨 10에서 V13.94의 이지 · 노말 · 하드
+   세기가 되고, 그 뒤로는 점점 상한(STAGE_CAP)에 가까워진다. 보상(처음 깰 때)은 레벨이 오를수록
+   늘고(STAGE_REWARD_MAX배까지), 5레벨마다 보스(보상 1.5배, 몬스터 HP 1.08배).
+   레벨 N의 단어는 학생이 고른 범위(야차전과 같은 범위)라서, 레벨은 단어장과 상관없이 이어진다. */
+// The fight at stage 1 and at stage 10 (= V13.94 MONSTER_LEVELS), and the limit far beyond.
+const STAGE_START = {
+  easy: { accuracy: .2, min: 4400, max: 9000, monsterHp: 130, need: 4 },
+  normal: { accuracy: .4, min: 3200, max: 6800, monsterHp: 210, need: 6 },
+  hard: { accuracy: .55, min: 2400, max: 5200, monsterHp: 230, need: 8 }
+};
+export const STAGE_CAP = {
+  easy: { accuracy: .75, min: 2300, max: 5000, monsterHp: 330, need: 7 },
+  normal: { accuracy: .85, min: 1650, max: 3900, monsterHp: 430, need: 10 },
+  hard: { accuracy: .93, min: 1200, max: 2900, monsterHp: 430, need: 14 }
+};
+export const STAGE_ANCHOR = 10;     // the stage where V13.94's 이지 · 노말 · 하드 are reached
+export const STAGE_CLIMB = 0.97;    // after STAGE_ANCHOR, each stage closes 3% of the gap to STAGE_CAP
+export const STAGE_BOSS_EVERY = 5;
+// First-clear reward at stage 1 (coins, 경험치); it grows by STAGE_REWARD_STEP a stage up to
+// STAGE_REWARD_MAX times. A cleared fight played again pays STAGE_AGAIN_SHARE of it.
+export const STAGE_REWARD = { easy: { coins: 5, xp: 60 }, normal: { coins: 10, xp: 120 }, hard: { coins: 15, xp: 240 } };
+export const STAGE_REWARD_STEP = 0.12, STAGE_REWARD_MAX = 4, STAGE_BOSS_REWARD = 1.5, STAGE_BOSS_HP = 1.08;
+export const STAGE_AGAIN_SHARE = 0.2;
+export const cleanStage = value => Math.max(1, Math.min(9999, Math.floor(Number(value) || 1)));
+export const isBossStage = stage => cleanStage(stage) % STAGE_BOSS_EVERY === 0;
+const mix = (a, b, x) => a + (b - a) * x;
+// The fight of a stage at a level: MONSTER_LEVELS[level] with this stage's strength and rewards.
+export function stageLevel(stage, level) {
+  const L = MONSTER_LEVELS[level];
+  if (!L) return null;
+  const s = cleanStage(stage), from = STAGE_START[level], at = MONSTER_LEVELS[level], cap = STAGE_CAP[level];
+  const x = s <= STAGE_ANCHOR ? (s - 1) / (STAGE_ANCHOR - 1) : 1 - STAGE_CLIMB ** (s - STAGE_ANCHOR);
+  const pick = key => s <= STAGE_ANCHOR ? mix(from[key], at[key], x) : mix(at[key], cap[key], x);
+  const boss = isBossStage(s);
+  const grow = Math.min(STAGE_REWARD_MAX, 1 + STAGE_REWARD_STEP * (s - 1)) * (boss ? STAGE_BOSS_REWARD : 1);
+  const first = { coins: Math.round(STAGE_REWARD[level].coins * grow), xp: Math.round(STAGE_REWARD[level].xp * grow) };
+  return {
+    ...L, stage: s, boss,
+    accuracy: Math.round(pick('accuracy') * 1000) / 1000,
+    min: Math.round(pick('min')), max: Math.round(pick('max')),
+    monsterHp: Math.round(pick('monsterHp') * (boss ? STAGE_BOSS_HP : 1)),
+    need: Math.round(pick('need')),
+    first,
+    again: { coins: Math.max(1, Math.round(first.coins * STAGE_AGAIN_SHARE)), xp: Math.max(1, Math.round(first.xp * STAGE_AGAIN_SHARE)) }
+  };
+}
+
 export const MONSTER_DAILY = 5;
 export const MONSTER_MIN_MS = 30000; // a fight cannot be won faster than this
 // V13.99: a lost fight pays only after `need` right answers, and answering takes time: at least

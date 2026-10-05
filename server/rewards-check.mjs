@@ -11,12 +11,13 @@ import { DAY_MS, rankingWeek, createCompetition } from './competition.mjs';
 import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX, CHARACTERS, LEGENDARY_PET_KEYS, STANDARD_PET_KEYS, EPIC_PET_KEYS, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, EGG_PRICE, petTier } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, visibleTitleKeys, titleUnlocked } from '../public/modules/titles.js';
 import { createBattle, connect, answer, tick, battleView, petSkill, SKILL_RULES, BATTLE, PET_SKILLS, MONSTER_SKILLS, forfeit } from '../public/modules/battle-engine.js';
-import { MONSTERS, MONSTER_ART, MONSTER_POSES, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, MONSTER_MS_PER_RIGHT, monsterParts, monsterOpen, partClears, monsterFirstReward, partKeyCodes } from '../public/modules/monsters.js';
+import { MONSTERS, MONSTER_ART, MONSTER_POSES, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, MONSTER_MS_PER_RIGHT, monsterParts, monsterOpen, partClears, partKeyCodes, stageLevel, stageMonster, isBossStage, MONSTER_ORDER, STAGE_REWARD, STAGE_REWARD_MAX, STAGE_AGAIN_SHARE } from '../public/modules/monsters.js';
+import { simulate as simulateMonster } from './monster-sim.mjs';
 import { expressionSrc, holdPose, showPose } from '../public/modules/character.js';
 import { battleQuestions, spellHint, spellable, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { createPracticeMatch, BOT_LEVELS, BOT_HP } from '../public/modules/battle-bot.js';
 import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
-import { botStart, botFinish, RECEIPT_KEEP, RECEIPT_DAYS, monsterStart, monsterFinish, monsterView, monsterMigrate, monsterRanges, addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome, openEgg, luckyView as luckyViewOf } from './rewards.mjs';
+import { botStart, botFinish, RECEIPT_KEEP, RECEIPT_DAYS, monsterStart, monsterFinish, monsterView, monsterMigrate, monsterRanges, monsterProgress, addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome, openEgg, luckyView as luckyViewOf } from './rewards.mjs';
 import { marketPrices } from './market.mjs';
 import { STOCKS, MARKET, MARKET_OPEN, tradeFee, newsText } from '../public/modules/market.js';
 
@@ -596,32 +597,57 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(BOT_HP === 400 && BOT_LEVELS.easy.accuracy === .68 && BOT_LEVELS.normal.accuracy === .84 && BOT_LEVELS.hard.accuracy === .95 && BOT_LEVELS.hard.max <= 2700 && source('../public/modules/battle-bot.js').includes('hp = BOT_HP'), 'V13.94 로보 연습: 더 정확하고 빠른 로보, HP 400으로 한 판이 약 2분');
     const counts = new Map([['24', 47], ['29', 40], ['31', 27], ['32', 27], ['33', 28], ['2', 3], ['10', 20], ['L1', 68]]);
     const parts = monsterParts(counts);
-    assert(parts.map(p => p.key).join('|') === '10+24|29+31|32+33+L1' && parts.every(p => p.words >= 8 && p.monster === MONSTERS[p.index % MONSTERS.length]) && monsterParts(new Map([...counts].reverse())).map(p => p.key).join('|') === parts.map(p => p.key).join('|'), 'V13.94 몬스터 파트: 범위를 번호 순서로 묶고(60단어 또는 3범위까지, 4단어 미만 범위 제외), 파트마다 몬스터가 정해진다');
+    assert(parts.map(p => p.key).join('|') === '10+24|29+31|32+33+L1' && parts.every(p => p.words >= 8 && p.monster === MONSTERS[p.index % 9]) && monsterParts(new Map([...counts].reverse())).map(p => p.key).join('|') === parts.map(p => p.key).join('|'), 'V13.94 몬스터 파트: 범위를 번호 순서로 묶고(60단어 또는 3범위까지, 4단어 미만 범위 제외), 파트마다 몬스터가 정해진다');
     assert(monsterOpen({}, 'easy') && !monsterOpen({}, 'normal') && monsterOpen({ easy: 1 }, 'normal') && !monsterOpen({ easy: 1 }, 'hard') && monsterOpen({ easy: 1, normal: 1 }, 'hard'), 'V13.94 이지 → 노말 → 하드 순서로 열린다');
-    assert(['easy', 'normal', 'hard'].map(k => MONSTER_LEVELS[k].first.coins).join() === '30,90,200' && ['easy', 'normal', 'hard'].map(k => MONSTER_LEVELS[k].again.coins).join() === '8,15,20' && ['easy', 'normal', 'hard'].map(k => MONSTER_LEVELS[k].first.xp).join() === '150,350,1000' && MONSTER_LEVELS.hard.again.coins * MONSTER_DAILY <= 100, 'V13.102 몬스터 코인: 처음 깰 때 30/90/200, 다시 이길 때 8/15/20(경험치는 그대로), 하드 반복은 하루 100코인까지');
-    assert(MONSTER_LEVELS.hard.mode === 'skill' && MONSTER_LEVELS.hard.first.coins >= 2 * MONSTER_LEVELS.normal.first.coins && MONSTER_LEVELS.normal.first.coins > MONSTER_LEVELS.easy.first.coins && Object.values(MONSTER_LEVELS).every(L => MONSTER_SKILLS[L.skill] && L.first.coins > L.again.coins), 'V13.94 하드는 실력전이고 첫 처치 보상이 가장 크다');
+    /* ---------- V13.105 끝없는 레벨: 레벨마다 이지 → 노말 → 하드, 하드를 깨면 다음 레벨 ---------- */
+    const lv = (stage, k) => stageLevel(stage, k);
+    assert(['easy', 'normal', 'hard'].map(k => lv(1, k).first.coins).join() === '5,10,15' && ['easy', 'normal', 'hard'].map(k => lv(1, k).first.xp).join() === '60,120,240'
+      && lv(2, 'hard').first.coins > lv(1, 'hard').first.coins && lv(11, 'hard').first.coins > lv(9, 'hard').first.coins
+      && lv(99, 'hard').first.coins === STAGE_REWARD.hard.coins * STAGE_REWARD_MAX && lv(100, 'hard').first.coins === Math.round(STAGE_REWARD.hard.coins * STAGE_REWARD_MAX * 1.5)
+      && ['easy', 'normal', 'hard'].every(k => lv(30, k).again.coins === Math.max(1, Math.round(lv(30, k).first.coins * STAGE_AGAIN_SHARE)) && lv(30, k).again.coins * MONSTER_DAILY <= 100),
+      'V13.105 보상: 레벨 1은 이지/노말/하드 5/10/15코인으로 낮게 시작해 레벨마다 오르고(최대 4배), 보스(5레벨마다)는 1.5배, 다시 잡기는 첫 처치의 20%(하루 5번)');
+    assert(['easy', 'normal', 'hard'].every(k => ['accuracy', 'min', 'max', 'need', 'hp', 'mode', 'skill'].every(key => lv(10, k)[key] === MONSTER_LEVELS[k][key]) && lv(10, k).monsterHp === Math.round(MONSTER_LEVELS[k].monsterHp * 1.08))
+      && ['easy', 'normal', 'hard'].every(k => lv(1, k).accuracy < lv(5, k).accuracy && lv(5, k).accuracy < lv(10, k).accuracy && lv(10, k).accuracy < lv(30, k).accuracy && lv(30, k).accuracy < lv(200, k).accuracy && lv(1, k).min > lv(30, k).min)
+      && lv(1, 'hard').mode === 'skill' && lv(1, 'easy').mode === 'speed' && isBossStage(5) && isBossStage(10) && !isBossStage(11) && lv(5, 'hard').boss && lv(15, 'normal').monsterHp > lv(14, 'normal').monsterHp,
+      'V13.105 난이도: 레벨이 오를수록 몬스터가 정확하고 빨라지고(레벨 10이 V13.94의 이지·노말·하드), 하드는 실력전, 5레벨마다 보스');
+    // The curve, from fights simulated on the real engine (server/monster-sim.mjs, fixed seed).
+    const winRate = (stage, k, know) => simulateMonster(stage, k, know, 160);
+    const w1 = winRate(1, 'hard', .98), w5e = winRate(5, 'easy', .75), w10 = winRate(10, 'hard', .98), w30 = winRate(30, 'hard', .98), w60n = winRate(60, 'normal', .9);
+    assert(w1 >= .9 && w5e >= .85 && w10 >= .2 && w10 <= .6 && w30 <= .2 && w60n <= .2, `V13.105 시뮬레이션: 레벨 1 하드는 거의 다 아는 학생이 거의 이기고(${Math.round(w1 * 100)}%), 레벨 10 하드는 지금 하드 수준(${Math.round(w10 * 100)}%), 레벨 30 하드·레벨 60 노말은 아주 어렵다(${Math.round(w30 * 100)}%, ${Math.round(w60n * 100)}%)`);
+    assert(MONSTER_ORDER.length === 18 && new Set(MONSTER_ORDER).size === 18 && MONSTER_ORDER.every(k => MONSTERS.some(m => m.key === k && m.temp?.pet && m.temp.filter)) && stageMonster(1).key === 'mochi' && stageMonster(18).key === 'finalking' && stageMonster(19).key === 'mochi' && stageMonster(19).round === 1 && stageMonster(19).title === '암기 모찌 +1' && stageMonster(37).round === 2,
+      'V13.105 몬스터 18종(새 9종 포함)이 작은 것부터 큰 것 순서로 레벨을 지키고, 18레벨 뒤에는 "+1"로 더 세게 다시 나온다(그림이 오기 전에는 펫 그림 색 바꾸기)');
     const kid = { id: 'qa-mh', pets: [{ key: 'dog' }], bonus: {} };
     const t0 = Date.parse('2026-10-03T03:00:00Z');
-    const fight = (level, result, right, at, part = parts[0].key) => { const r = monsterStart(kid, { part, level, parts, id: 'f-' + at, now: at }); return monsterFinish(kid, { id: r.id, result, right, now: at + 60000 }); };
-    let refused = 0; try { monsterStart(kid, { part: parts[0].key, level: 'normal', parts, id: 'x', now: t0 }); } catch (err) { refused = err.status; }
-    let missing = 0; try { monsterStart(kid, { part: 'made+up', level: 'easy', parts, id: 'y', now: t0 }); } catch (err) { missing = err.status; }
-    const firstWin = fight('easy', 'win', 9, t0);
-    const again = fight('easy', 'win', 9, t0 + 100000);
-    const few = fight('easy', 'lose', 2, t0 + 200000);
-    const quick = monsterFinish(kid, { id: monsterStart(kid, { part: parts[0].key, level: 'easy', parts, id: 'q', now: t0 }).id, result: 'win', right: 9, now: t0 + 5000 });
-    assert(refused === 409 && missing === 404 && firstWin.paid && firstWin.first && firstWin.coins === MONSTER_LEVELS.easy.first.coins && again.paid && !again.first && again.coins === MONSTER_LEVELS.easy.again.coins && !few.paid && few.reason === 'few' && !quick.paid && quick.reason === 'short' && monsterView(kid, t0, { parts }).cleared[parts[0].key].easy === t0 + 60000, 'V13.94 몬스터 보상: 잠긴 난이도·없는 파트는 거절, 첫 처치는 큰 보상, 다시 잡으면 작은 보상, 단어를 덜 맞히거나 너무 빨리 끝나면 없음');
-    for (let i = 0; i < MONSTER_DAILY; i++) fight('easy', 'lose', 9, t0 + 300000 + i * 100000);
-    const capped = fight('easy', 'win', 9, t0 + 900000), hardFirst = (fight('normal', 'win', 12, t0 + 1000000), fight('hard', 'win', 14, t0 + 1100000));
-    assert(!capped.paid && capped.reason === 'daily' && hardFirst.paid && hardFirst.first && hardFirst.coins === MONSTER_LEVELS.hard.first.coins && kid.bonus.monster.hard_wins === 1 && bonusRecords(kid).reduce((n, r) => n + r.reward_points, 0) === MONSTER_LEVELS.easy.first.coins + MONSTER_LEVELS.easy.again.coins + (MONSTER_DAILY - 1) * MONSTER_TRY.coins + MONSTER_LEVELS.normal.first.coins + MONSTER_LEVELS.hard.first.coins, 'V13.94 다시 잡기 보상은 하루 몇 번까지, 첫 처치(하드 포함)는 그와 상관없이 언제나 받는다');
+    const fight = (stage, level, result, right, at) => { const r = monsterStart(kid, { stage, level, codes: ['1'], id: 'f-' + at, now: at }); return monsterFinish(kid, { id: r.id, result, right, now: at + 60000 }); };
+    let refused = 0; try { monsterStart(kid, { stage: 1, level: 'normal', id: 'x', now: t0 }); } catch (err) { refused = err.status; }
+    let ahead = 0; try { monsterStart(kid, { stage: 2, level: 'easy', id: 'y', now: t0 }); } catch (err) { ahead = err.status; }
+    const firstWin = fight(1, 'easy', 'win', 9, t0);
+    const again = fight(1, 'easy', 'win', 9, t0 + 100000);
+    const few = fight(1, 'easy', 'lose', 2, t0 + 200000);
+    const quick = monsterFinish(kid, { id: monsterStart(kid, { stage: 1, level: 'easy', id: 'q', now: t0 }).id, result: 'win', right: 9, now: t0 + 5000 });
+    assert(refused === 409 && ahead === 409 && firstWin.paid && firstWin.first && firstWin.coins === lv(1, 'easy').first.coins && again.paid && !again.first && again.coins === lv(1, 'easy').again.coins && !few.paid && few.reason === 'few' && !quick.paid && quick.reason === 'short',
+      'V13.105 몬스터 보상: 잠긴 난이도·안 열린 레벨은 거절, 첫 처치는 그 레벨의 보상, 다시 잡으면 작은 보상, 단어를 덜 맞히거나 너무 빨리 끝나면 없음');
+    for (let i = 0; i < MONSTER_DAILY; i++) fight(1, 'easy', 'lose', 9, t0 + 300000 + i * 100000);
+    const capped = fight(1, 'easy', 'win', 9, t0 + 900000);
+    const normalFirst = fight(1, 'normal', 'win', 12, t0 + 1000000), hardFirst = fight(1, 'hard', 'win', 14, t0 + 1100000);
+    const view1 = monsterView(kid, t0 + 1200000);
+    const next = fight(2, 'easy', 'win', 9, t0 + 1300000);
+    assert(!capped.paid && capped.reason === 'daily' && normalFirst.first && hardFirst.paid && hardFirst.first && hardFirst.stage_up === 2 && hardFirst.coins === lv(1, 'hard').first.coins && view1.stage === 2 && view1.best === 1 && !Object.keys(view1.clear).length
+      && next.first && next.coins === lv(2, 'easy').first.coins && monsterView(kid, t0).clear.easy && kid.bonus.monster.hard_wins === 1 && kid.bonus.monster.wins >= 4,
+      'V13.105 하루 다시 잡기 보상은 5번까지(첫 처치는 언제나), 하드를 처음 깨면 다음 레벨이 열리고(이지부터), 다음 레벨 첫 처치는 그 레벨 보상');
+    // The 하드 farming the teacher saw: a cleared 하드 played again pays 20% of its first clear only.
+    const farm = fight(1, 'hard', 'win', 14, t0 + DAY_MS);
+    assert(farm.paid && !farm.first && farm.coins === lv(1, 'hard').again.coins && farm.coins <= Math.ceil(lv(1, 'hard').first.coins / 5), 'V13.105 이미 깬 하드를 다시 잡으면 첫 처치의 20%만(하드 반복으로 코인을 쓸어 담지 못한다)');
     assert(['monster1', 'monster10', 'monsterhard', 'monsterlord'].every(key => TITLES[key]?.group === 'monster') && TITLES.monsterlord.tier === 'legendary', 'V13.94 몬스터 칭호 4개');
     // V13.99: a lost fight is checked for time too, by how long the right answers take.
     const loser = { id: 'qa-mh-lose', pets: [{ key: 'dog' }], bonus: {} };
-    const lose = (right, ms, at) => monsterFinish(loser, { id: monsterStart(loser, { part: parts[0].key, level: 'easy', parts, id: 'l-' + at, now: at }).id, result: 'lose', right, now: at + ms });
+    const lose = (right, ms, at) => monsterFinish(loser, { id: monsterStart(loser, { stage: 1, level: 'easy', id: 'l-' + at, now: at }).id, result: 'lose', right, now: at + ms });
+    const need1 = lv(1, 'easy').need;
     const fakeLoss = lose(9, 5000, t0);
-    const fakeNeed = lose(MONSTER_LEVELS.easy.need, MONSTER_LEVELS.easy.need * MONSTER_MS_PER_RIGHT - 1, t0 + 100000);
+    const fakeNeed = lose(need1, need1 * MONSTER_MS_PER_RIGHT - 1, t0 + 100000);
     // An honest quick loss: 3 s countdown, then each word at least ~1 s answer + 1.4 s reveal.
-    const fastHonest = lose(MONSTER_LEVELS.easy.need, 3000 + MONSTER_LEVELS.easy.need * 2400, t0 + 200000);
-    assert(!fakeLoss.paid && fakeLoss.reason === 'short' && !fakeNeed.paid && fakeNeed.reason === 'short' && fastHonest.paid && MONSTER_MS_PER_RIGHT === 1500, 'V13.99 몬스터에게 진 판도 최소 시간(정답 1개당 1.5초)을 넘어야 보상, 정상적으로 빨리 진 판은 받는다');
+    const fastHonest = lose(need1, 3000 + need1 * 2400, t0 + 200000);
+    assert(!fakeLoss.paid && fakeLoss.reason === 'short' && !fakeNeed.paid && fakeNeed.reason === 'short' && fastHonest.paid && MONSTER_MS_PER_RIGHT === 1500, 'V13.99 몬스터에게 진 판도 최소 시간(정답 1개당 1.5초) 검사를 받는다');
     // The engine: a monster brings its own HP and skill, and wins if time runs out.
     const mq = Array.from({ length: 6 }, (_, i) => ({ word_id: 'm' + i, prompt: 'w' + i, options: ['a', 'b', 'c', 'd'], answer: 0 }));
     const mb = createBattle({ id: 'mb', players: [{ id: 'me', name: '나', pet: { key: 'dog' } }, { id: 'mon', name: '슬라임', pet: { key: 'whale', skill: 'rage' }, monster: { key: 'slime', level: 'hard' }, hp: 330 }], questions: mq, hp: 300, timeoutWinner: 'mon', now: 0 });
@@ -634,75 +660,56 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(battle94b.includes('function strike(') && battle94b.includes("strike(atk, def,") && battle94b.includes('skill: true, attacker: p') && battle94b.includes('function knockout(') && ['.fx-shot{', '.fx-ring{', '.fx-claw{', '.fx-beam{', '.fx-ko{', '@keyframes fx-shake-l'].every(x => css94b.includes(x)), 'V13.94 공격 이펙트: 날아가는 공격·충격파·불꽃·화면 흔들림, 특기는 광선, 몬스터는 할퀴기, 쓰러뜨리면 K.O.!');
     assert(battle94b.includes('ya-chip-study') && battle94b.includes('class="ya-picked') && battle94b.includes('ya-rm-duel') && battle94b.includes('친구가 다른 번호를 외우고 있다면?'), 'V13.94 내 단어 범위: 단어 수·학습 중 표시·고른 범위 요약·각자/같은 범위 그림 설명');
   }
-  /* ---------- V13.100 몬스터 클리어는 범위마다 (파트 묶음이 바뀌어도 기록·보상 유지) ---------- */
+  /* ---------- V13.105 옛 몬스터 기록 옮기기 (파트 → 레벨) · 서버 경로 ---------- */
   {
-    const t0 = Date.parse('2026-10-04T03:00:00Z');
-    const LV = ['easy', 'normal', 'hard'];
-    const sumFirst = MONSTER_LEVELS.easy.first.coins + MONSTER_LEVELS.normal.first.coins + MONSTER_LEVELS.hard.first.coins;
-    // A student's fights straight on the reward functions (`scope`: school|grade).
-    const hunter = (id, scope) => {
-      const kid = { id, pets: [{ key: 'dog' }], bonus: {} };
-      let at = t0;
-      const fight = (parts, key, level, result = 'win') => { const r = monsterStart(kid, { part: key, level, parts, scope, id: `${id}-${at}`, now: at }); const f = monsterFinish(kid, { id: r.id, result, right: 20, scope, parts, now: at + 60000 }); at += 100000; return f; };
-      const clearAll = parts => parts.flatMap(p => LV.map(level => fight(parts, p.key, level)));
-      const coins = () => bonusRecords(kid).reduce((n, r) => n + r.reward_points, 0);
-      const view = parts => monsterView(kid, at, { scope, parts });
-      return { kid, fight, clearAll, coins, view };
-    };
-    const allCleared = (h, parts) => parts.every(p => LV.every(level => h.view(parts).cleared[p.key]?.[level]));
-    // 재현 1: 범위 1의 단어가 29 → 30개가 되면 묶음이 '1+2+3' → '1+2' | '3'으로 바뀐다.
-    const before1 = monsterParts(new Map([['1', 29], ['2', 30], ['3', 40]])), after1 = monsterParts(new Map([['1', 30], ['2', 30], ['3', 40]]));
-    assert(before1.map(p => p.key).join('|') === '1+2+3' && after1.map(p => p.key).join('|') === '1+2|3', 'V13.100 재현: 단어 수 29 → 30이면 파트 묶음이 바뀐다');
-    const a = hunter('qa-mh100-a', 'danwon-high|고1A');
-    a.clearAll(before1);
-    const paidBefore = a.coins();
-    const again1 = a.clearAll(after1);
-    assert(paidBefore === sumFirst && allCleared(a, after1) && again1.every(r => !r.first && (r.paid || r.reason === 'daily')) && a.coins() === paidBefore + again1.reduce((n, r) => n + (r.paid ? r.coins : 0), 0) && a.coins() - paidBefore < 100, 'V13.100 단어 수가 바뀌어 파트가 다시 묶여도 클리어가 그대로 보이고, 첫 처치 보상(700코인)을 다시 받지 않는다');
-    // 재현 2: 범위 4(10단어)가 추가되면 '3' → '3+4'. 그 파트만 다시 열리고, 새 범위 몫만 받는다.
-    const after2 = monsterParts(new Map([['1', 30], ['2', 30], ['3', 40], ['4', 10]]));
-    const b = hunter('qa-mh100-b', 'danwon-high|고1A');
-    b.clearAll(after1);
-    const v2 = b.view(after2), p34 = after2.find(p => p.key === '3+4');
-    let locked = 0; try { b.fight(after2, '3+4', 'normal'); } catch (err) { locked = err.status; }
-    const coinsBefore2 = b.coins();
-    const new2 = LV.map(level => b.fight(after2, '3+4', level));
-    const share = 10 / 50;
-    assert(after2.map(p => p.key).join('|') === '1+2|3+4' && LV.every(k => v2.cleared['1+2']?.[k]) && !v2.cleared['3+4'] && locked === 409
-      && new2.every((r, i) => r.paid && r.first && r.share === share && r.coins === Math.ceil(MONSTER_LEVELS[LV[i]].first.coins * share) && r.xp === Math.ceil(MONSTER_LEVELS[LV[i]].first.xp * share))
-      && b.coins() - coinsBefore2 === 6 + 18 + 40 && allCleared(b, after2) && b.view(after2).ranges['4'].hard, 'V13.100 범위가 추가된 파트만 이지부터 다시 열리고, 첫 처치는 새 범위 단어 비율만큼(10/50 → 6·18·40코인, V13.102)만 준다');
-    assert(monsterFirstReward(p34, {}, 'hard').coins === MONSTER_LEVELS.hard.first.coins && monsterFirstReward(p34, { 3: { hard: 1 }, 4: { hard: 1 } }, 'hard') === null && partClears(p34, { 3: { easy: 5 }, 4: { easy: 9, normal: 3 } }).easy === 9 && !partClears(p34, { 3: { easy: 5 }, 4: { easy: 9, normal: 3 } }).normal, 'V13.100 처음 깨는 파트는 전액, 다 깬 파트는 첫 처치 없음, 파트 클리어는 모든 범위가 깼을 때');
-    // 학교·학년이 다르면 같은 범위 번호라도 따로 기록한다.
-    assert(Object.keys(monsterRanges(b.kid, 'danwon-high|고2A')).length === 0 && Object.keys(b.kid.bonus.monster.ranges).every(k => k.startsWith('danwon-high|고1A|')), 'V13.100 클리어 키는 학교|학년|범위');
-    // 옛 기록(V13.94–V13.99: 파트 키) 옮기기. 하나도 사라지지 않는다.
-    assert(partKeyCodes('10+24+L1') .join(',') === '10,24,L1' && partKeyCodes('1+2+5', ['1+2', '5']).join(',') === '1+2,5', 'V13.100 옛 파트 키를 범위 번호로 푼다(+가 들어간 범위 번호는 그대로)');
-    const legacy = { '10+24': { easy: 100, normal: 200, hard: 300 }, '29+31': { easy: 400 }, '32+33+L1': { easy: 500, normal: 600 } };
-    const old = { id: 'qa-mh100-old', pets: [{ key: 'dog' }], bonus: { monster: { cleared: structuredClone(legacy), wins: 6, hard_wins: 1 } } };
-    const oldParts = monsterParts(new Map([['24', 47], ['29', 40], ['31', 27], ['32', 27], ['33', 28], ['10', 20], ['L1', 68]]));
-    const readView = monsterView(old, t0, { scope: 's|g', parts: oldParts });
-    assert(old.bonus.monster.cleared && !old.bonus.monster.ranges && readView.cleared['10+24'].hard === 300 && readView.cleared['29+31'].easy === 400 && !readView.cleared['29+31'].normal && readView.cleared['32+33+L1'].normal === 600, 'V13.100 옮기기 전에도(읽을 때) 옛 클리어가 그대로 보인다');
-    assert(monsterMigrate(old, 's|g', oldParts.flatMap(p => p.codes)) && !monsterMigrate(old, 's|g') && JSON.stringify(old.bonus.monster.cleared_v1) === JSON.stringify(legacy) && !old.bonus.monster.cleared
-      && old.bonus.monster.ranges['s|g|10'].hard === 300 && old.bonus.monster.ranges['s|g|24'].easy === 100 && old.bonus.monster.ranges['s|g|31'].easy === 400 && !old.bonus.monster.ranges['s|g|31'].normal && old.bonus.monster.ranges['s|g|L1'].normal === 600
-      && JSON.stringify(monsterView(old, t0, { scope: 's|g', parts: oldParts }).cleared) === JSON.stringify(readView.cleared) && old.bonus.monster.wins === 6, 'V13.100 옛 cleared를 범위마다 옮기고(cleared_v1에 원본 보관), 다시 돌려도 바뀌지 않고, 보이는 클리어·처치 수는 똑같다');
-    // Through the service: a teacher's word changes (more words, a new meaning) never change the record.
+    const t0 = Date.parse('2026-10-05T03:00:00Z');
+    // V13.100 helpers stay for the move: old part keys back into range codes, clears per range.
+    assert(partKeyCodes('10+24+L1').join(',') === '10,24,L1' && partKeyCodes('1+2+5', ['1+2', '5']).join(',') === '1+2,5', 'V13.100 옛 파트 키를 범위 번호로 푼다(+가 들어간 범위 번호는 그대로)');
+    const parts = monsterParts(new Map([['1', 30], ['2', 30], ['3', 40], ['4', 50], ['5', 60]]));
+    // Two parts cleared up to 하드, a third with 이지 only: level 3 with 이지 already cleared, no coins again.
+    const ranges = Object.fromEntries(parts.slice(0, 2).flatMap(p => p.codes).map(code => [`s|g|${code}`, { easy: t0, normal: t0 + 1, hard: t0 + 2 }]).concat(parts[2].codes.map(code => [`s|g|${code}`, { easy: t0 + 3 }])));
+    const vet = { id: 'qa-mh104-vet', pets: [{ key: 'dog' }], bonus: { monster: { ranges: structuredClone(ranges), wins: 7, hard_wins: 2 } } };
+    const read = monsterView(vet, t0, { scope: 's|g', parts });
+    const coinsBefore = bonusRecords(vet).reduce((n, r) => n + r.reward_points, 0), unsaved = !vet.bonus.monster.stage;
+    const started = monsterStart(vet, { stage: 3, level: 'normal', codes: ['1'], parts, scope: 's|g', id: 'v1', now: t0 });
+    assert(parts.length === 3 && read.stage === 3 && read.best === 2 && read.clear.easy && !read.clear.normal && unsaved
+      && started.stage === 3 && vet.bonus.monster.stage === 3 && vet.bonus.monster.best === 2 && vet.bonus.monster.from_parts?.parts === 2 && JSON.stringify(vet.bonus.monster.ranges) === JSON.stringify(ranges)
+      && vet.bonus.monster.wins === 7 && bonusRecords(vet).reduce((n, r) => n + r.reward_points, 0) === coinsBefore,
+      'V13.105 옛 기록: 하드까지 깬 파트 수만큼 레벨을 깬 것으로 치고(코인은 다시 주지 않음), 끝까지 못 깬 파트의 이지·노말은 이어서, 원래 기록은 그대로 둔다');
+    const late = monsterFinish(vet, { id: 'v1', result: 'win', right: 12, scope: 's|g', parts, now: t0 + 60000 });
+    assert(late.paid && late.first && late.coins === stageLevel(3, 'normal').first.coins && monsterProgress(vet, { scope: 's|g', parts }).stage === 3 && monsterView(vet, t0 + 60000, { scope: 's|g', parts }).clear.normal, 'V13.105 옮긴 뒤에는 레벨 3 노말부터 이어서 첫 처치 보상을 받는다');
+    // V13.94–V13.99 cleared map (part keys) is read too.
+    const old = { id: 'qa-mh104-old', pets: [{ key: 'dog' }], bonus: { monster: { cleared: { [parts[0].key]: { easy: 1, normal: 2, hard: 3 } } } } };
+    assert(monsterView(old, t0, { scope: 's|g', parts }).stage === 2 && monsterProgress({ bonus: {} }).stage === 1 && monsterMigrate(old, 's|g', parts.flatMap(p => p.codes)) && old.bonus.monster.cleared_v1, 'V13.105 V13.94의 파트 기록도 레벨로 읽고, 기록이 없으면 레벨 1부터');
+    // A fight of the old screen (a part, no level number) still settles: never a first clear.
+    const legacyKid = { id: 'qa-mh104-leg', pets: [{ key: 'dog' }], bonus: { monster: { stage: 1, clear: {}, live: { id: 'old', part: '1+2', level: 'easy', at: t0 } } } };
+    const legacyEnd = monsterFinish(legacyKid, { id: 'old', result: 'win', right: 9, now: t0 + 60000 });
+    assert(legacyEnd.paid && !legacyEnd.first && legacyKid.bonus.monster.stage === 1 && !legacyKid.bonus.monster.clear.easy, 'V13.105 업데이트 전에 시작한 전투는 다시 잡기로 끝난다(레벨 기록은 그대로)');
+    // Through the service: the ranges the student picked (their school and grade, 8 words or more).
     state.schools.push({ id: 'qa-mh-school', name: '몬스터고', full_name: '몬스터고등학교', division: 'high', active: true, sort_order: 90 });
-    const words = [['1', 29], ['2', 30], ['3', 40]].flatMap(([code, n]) => Array.from({ length: n }, (_, i) => ({ id: `qa-mh-${code}-${i}`, range_code: code, word: `w${code}x${i}`, meaning: `뜻${code}-${i}` })));
-    const book = { id: 'qa-mh-book', school_id: 'qa-mh-school', school: '몬스터고', division: 'high', grade: '고1A', title: '몬스터 단어', words };
-    state.extraBooks.push(book);
-    state.profiles.push(student('qa-mh100-svc', '몬헌', { school_id: 'qa-mh-school', school: '몬스터고', bonus: { monster: { cleared: { '1+2+3': { easy: t0, normal: t0 + 1, hard: t0 + 2 } } } } }));
-    const svcToken = await login('qa-mh100-svc');
-    const monView = async () => (await service(state, 'GET', '/bootstrap', {}, svcToken)).rewards.monster;
-    const shown0 = await monView();
-    book.words.push({ id: 'qa-mh-1-x', range_code: '1', word: 'extra', meaning: '추가' }); // range 1: 29 → 30, parts '1+2' | '3'
-    const shown1 = await monView();
-    book.words[0].meaning = '바뀐 뜻';
-    const shown2 = await monView();
-    const svc = profile('qa-mh100-svc');
-    const start = await service(state, 'POST', '/monster/start', { part: '3', level: 'hard' }, svcToken);
+    const words = [['1', 29], ['2', 30], ['3', 5]].flatMap(([code, n]) => Array.from({ length: n }, (_, i) => ({ id: `qa-mh-${code}-${i}`, range_code: code, word: `w${code}x${i}`, meaning: `뜻${code}-${i}` })));
+    state.extraBooks.push({ id: 'qa-mh-book', school_id: 'qa-mh-school', school: '몬스터고', division: 'high', grade: '고1A', title: '몬스터 단어', words });
+    state.profiles.push(student('qa-mh104-svc', '몬헌', { school_id: 'qa-mh-school', school: '몬스터고', bonus: { monster: { cleared: { '1+2+3': { easy: t0, normal: t0 + 1, hard: t0 + 2 } } } } }));
+    const svcToken = await login('qa-mh104-svc');
+    const shown = (await service(state, 'GET', '/bootstrap', {}, svcToken)).rewards.monster;
+    let noRange = 0; try { await service(state, 'POST', '/monster/start', { stage: 2, level: 'easy', range_codes: [] }, svcToken); } catch (err) { noRange = err.status; }
+    let tooFew = 0; try { await service(state, 'POST', '/monster/start', { stage: 2, level: 'easy', range_codes: ['3'] }, svcToken); } catch (err) { tooFew = err.status; }
+    let strange = 0; try { await service(state, 'POST', '/monster/start', { stage: 2, level: 'easy', range_codes: ['99'] }, svcToken); } catch (err) { strange = err.status || 1; }
+    let locked = 0; try { await service(state, 'POST', '/monster/start', { stage: 3, level: 'easy', range_codes: ['1'] }, svcToken); } catch (err) { locked = err.status; }
+    const start = await service(state, 'POST', '/monster/start', { stage: 2, level: 'easy', range_codes: ['1', '3'] }, svcToken);
+    const svc = profile('qa-mh104-svc');
     svc.bonus.monster.live.at -= 60000;
     const finish = await service(state, 'POST', '/monster/finish', { id: start.id, result: 'win', right: 20 }, svcToken);
-    assert(shown0.cleared['1+2+3']?.hard && shown1.cleared['1+2']?.hard && shown1.cleared['3']?.hard && JSON.stringify(shown2) === JSON.stringify(shown1) && svc.bonus.monster.ranges['qa-mh-school|고1A|3'].hard === t0 + 2 && svc.bonus.monster.cleared_v1['1+2+3'] && finish.paid && !finish.first && finish.coins === MONSTER_LEVELS.hard.again.coins, 'V13.100 (서비스) 옛 기록이 범위 단어 수가 바뀐 뒤에도 클리어로 보이고, 뜻을 고쳐도 그대로이며, 다시 잡으면 작은 보상만 준다');
-    const battle100 = source('../public/modules/battle.js');
-    assert(battle100.includes('partClears(p, st.ranges)') && battle100.includes('monsterFirstReward(p, st.ranges, level)') && battle100.includes("'새 범위 처치'") && battle100.includes('ranges: res.ranges'), 'V13.100 몬스터 화면도 범위 기록으로 클리어·처치 수·하드 정복·첫 처치 보상을 보여 준다');
+    assert(shown.stage === 2 && shown.best === 1 && noRange === 400 && tooFew === 409 && strange && locked === 409 && start.stage === 2 && start.monster === stageMonster(2).key && svc.bonus.monster.live === undefined
+      && JSON.stringify(svc.bonus.monster.ranges ? Object.keys(svc.bonus.monster.ranges).length : 0) !== '' && finish.paid && finish.first && finish.coins === stageLevel(2, 'easy').first.coins && finish.stage === 2 && finish.clear.easy,
+      'V13.105 /monster/start: 레벨 번호와 고른 단어 범위(같은 학교·학년, 8단어 이상)로 시작하고, 안 열린 레벨은 거절, 끝내면 그 레벨 첫 처치 보상');
+    const oldScreen = await service(state, 'POST', '/monster/start', { part: '1+2+3', level: 'normal' }, svcToken);
+    assert(oldScreen.stage === 2 && oldScreen.level === 'normal' && svc.bonus.monster.live.codes.join() === '1,2,3', 'V13.105 예전 화면(파트로 시작)도 지금 레벨로 시작한다');
+    delete svc.bonus.monster.live;
+    const battle104 = source('../public/modules/battle.js'), css104 = source('../public/v13105.css');
+    assert(battle104.includes("registerStart('/monster/start', { stage, level, range_codes: w.picked })") && battle104.includes('function stageCard(') && battle104.includes('function stageLocked(') && battle104.includes("data-yb=\"monster-go\" data-stage=") && battle104.includes('stage_up') && battle104.includes("label: `레벨 ${stage}${L.boss ? ' · 보스' : ''} · ${L.name}`")
+      && css104.includes('.ms-plate{') && css104.includes('.ms-stage.boss.now') && css104.includes('.mon-temp.mon-round') && source('./build-assets.mjs').includes('"v13105.css"'),
+      'V13.105 몬스터 탭: 지금 레벨 카드(이지·노말·하드), 다음 레벨 그림자, 지난 레벨 다시 하기, 레벨 판 숫자, 싸울 단어 범위 고르기, 레벨 업 안내');
   }
   /* ---------- V13.95 몬스터 그림 (시트 10-1 … 10-10) ---------- */
   {
@@ -710,8 +717,8 @@ export async function runRewardsChecks(assert, expectStatus) {
     const asset = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));
     // Canvas size from the webp header (VP8X chunk: width-1 and height-1, 24-bit little endian).
     const webpSize = name => { const b = readFileSync(asset(name)); return b.toString('ascii', 12, 16) === 'VP8X' ? `${1 + b.readUIntLE(24, 3)}x${1 + b.readUIntLE(27, 3)}` : ''; };
-    const monsterArt = MONSTERS.flatMap(m => ['', ...MONSTER_POSES.map(p => '-' + p)].map(p => `monsters/${m.key}${p}`));
-    assert(MONSTERS.every(m => MONSTER_ART.has(m.key)) && monsterArt.length === 36 && monsterArt.every(n => existsSync(asset(n)) && webpSize(n) === '512x512'), 'V13.95 몬스터 9종 × 기본·공격·맞음·쓰러짐 36장이 512px 그림으로 있다');
+    const monsterArt = MONSTERS.slice(0, 9).flatMap(m => ['', ...MONSTER_POSES.map(p => '-' + p)].map(p => `monsters/${m.key}${p}`));
+    assert(MONSTERS.slice(0, 9).every(m => MONSTER_ART.has(m.key)) && monsterArt.length === 36 && monsterArt.every(n => existsSync(asset(n)) && webpSize(n) === '512x512'), 'V13.95 몬스터 9종 × 기본·공격·맞음·쓰러짐 36장이 512px 그림으로 있다');
     assert(['monster-tab', 'monster-easy', 'monster-normal', 'monster-hard'].every(n => existsSync(asset('ui/' + n)) && webpSize('ui/' + n) === '256x256'), 'V13.95 몬스터 화면 아이콘 4개(몬스터 탭 · 이지 · 노말 · 하드 배지)');
     // Poses: a monster picture swaps like a pet's, and a knocked-out one stays down.
     const fakeArt = src => { const img = { src, isConnected: true, getAttribute: () => img.src, setAttribute: (k, v) => { img.src = v; } }; return { img, querySelector: () => img }; };
@@ -817,6 +824,16 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(battle103.includes('id="yb-spell-input"') && battle103.includes('autocapitalize="off" autocorrect="off" spellcheck="false"') && battle103.includes('enterkeyhint="send"') && battle103.includes('lang="en"') && !battle103.includes('KEY_ROWS') && !battle103.includes('class="yb-kb"') && !battle103.includes('data-yb="key"'), 'V13.103 야차전·몬스터전 철자 쓰기는 앱 자판 대신 시험 볼 때와 같은 폰 기본 키보드(자동 수정·대문자 꺼짐)로 쓴다');
     assert(battle103.includes("if (event.target?.id === 'yb-spell-input') return;") && battle103.includes("if (event.key === 'Enter' && !event.isComposing)") && battle103.includes("replace(/[^a-z]/g, '')") && battle103.includes('.slice(0, blanks(q))') && battle103.includes('function syncSpell(') && battle103.includes('input.value = q.typed.join') && /입력은 막지 않고|stays enabled/.test(battle103), 'V13.103 입력칸은 영어 a~z만 받고(한글은 안내), Enter로 공격하며, 낸 뒤에는 입력을 무시하되 키보드는 유지한다');
     assert(css98.includes('.yb-spell-input{position:absolute;inset:0') && css98.includes('font-size:16px') && css98.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/8.2}') && battle103.includes("classList.add('yb-typing')"), 'V13.103 키보드가 올라오면 전투 화면(경기장)이 줄어 단어와 글자 칸이 키보드 위에 보인다(16px 글자로 확대 방지)');
+    /* ---------- V13.105 전투 화면 효과 ---------- */
+    const css104 = source('../public/v13105fx.css'), build104 = source('./build-assets.mjs');
+    assert(/"v13105\.css",\s*"v13105fx\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css)가 묶음 CSS 목록의 맨 끝에 들어간다');
+    assert(battle103.includes('function hitStop(') && battle103.includes("classList.add('fx-stop')") && css104.includes('.yb-arena.fx-stop *{animation-play-state:paused!important}') && battle103.includes('function dmgTier(') && battle103.includes("const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl']") && battle103.includes("` fx-num t${dmgTier(+dmg)}"), 'V13.105 맞는 순간 잠깐 멈추고(히트스톱), 데미지가 클수록 더 세게 흔들리고 숫자가 커진다');
+    assert(battle103.includes('function comboUp(') && battle103.includes('function comboReset(') && battle103.includes("if (atk === 'me') comboUp();") && (battle103.match(/comboReset\(\);/g) || []).length >= 3 && css104.includes('.fx-combo'), 'V13.105 내가 연속으로 맞히면 2콤보부터 내 HUD 위에 콤보가 뜨고, 틀리거나 놓치면 0으로 돌아간다(화면 표시만)');
+    assert(battle103.includes('if (e.fast && e.dmg) critStamp(def);') && battle103.includes("'CRITICAL!'") && battle103.includes("crit ? 'fx-shake-xl'"), 'V13.105 빠른 정답(fast)이면 CRITICAL! 도장과 더 센 흔들림이 나온다');
+    assert(battle103.includes('function finisher(') && battle103.includes('a.playbackRate = .3') && battle103.includes("later(drawResult, reduced() ? 0 : ko ? Math.max(700, 2000 - since) : 1100)") && battle103.includes("'K.O.!'"), 'V13.105 마지막 한 방은 슬로 모션·섬광·K.O. 뒤 결과가 나오고, 결과는 예전보다 0.3초만 늦어진다');
+    assert(battle103.includes('function cutIn(') && battle103.includes('v.label || modeName(v.mode)') && battle103.includes('/보스/.test(label)') && css104.includes('.fx-cutin.monster') && css104.includes('.fx-cutin.boss') && css104.includes('.fx-cutin{inset:0;z-index:9;display:grid;place-items:center;overflow:hidden}') && /\.yb-arena \.fx-impact,[^{]*\{position:absolute;pointer-events:none\}/.test(css104), 'V13.105 시작 카운트다운에 상대 이름 컷인(몬스터는 크고 빨갛게, 보스는 어둡게)이 나오고 터치를 막지 않는다');
+    assert(battle103.includes('function sfxThump(') && battle103.includes('function sfxCombo(') && battle103.includes('function sfxKO(') && battle103.includes("function buzzFx(pattern) { if (soundOn() && 'vibrate' in navigator)"), 'V13.105 데미지만큼 무거운 타격음, 콤보마다 올라가는 소리, K.O. 소리가 있고 진동은 소리를 켰을 때만 울린다');
+    assert(battle103.includes('const FX_MAX = 24;') && css104.includes('@media (prefers-reduced-motion:reduce)') && css104.includes('.fx-impact,.fx-vignette,.fx-ko-rays{display:none}') && css104.includes('.battle-app.yb-typing .fx-combo'), 'V13.105 효과 조각은 24개까지만 그리고, 동작 줄이기에서는 새 효과가 멈추며, 글자 칠 때 짧아진 경기장에서도 맞게 보인다');
     /* ---------- V13.101 로보 연습전·몬스터 끝내기 영수증 ---------- */
     {
       const t1 = Date.parse('2026-10-04T03:00:00Z');
@@ -841,14 +858,13 @@ export async function runRewardsChecks(assert, expectStatus) {
       let blank = 0; try { botFinish(kid, { id: '', result: 'win', right: 8, now: t1 + 302000 }); } catch (err) { blank = err.status; }
       assert(old1.again && old1.coins === paid1.coins && kid.bonus.bot_live?.id === 'rc-3' && missing === 404 && blank === 404 && coinsOf(kid) === coins1, 'V13.101 새 판을 시작해도 지난 판의 영수증은 그대로 답하고(진행 중인 판은 지우지 않음), 모르는 id·빈 id는 찾지 못한다');
       // Monster fights: the first clear is answered again the same way, the clear is marked once.
-      const mParts = monsterParts(new Map([['1', 20], ['2', 20]]));
       const mkid = { id: 'qa-rc-m', pets: [{ key: 'dog' }], bonus: {} };
-      const mStart = monsterStart(mkid, { part: mParts[0].key, level: 'easy', parts: mParts, scope: 's|g', id: 'rc-m1', now: t1 });
-      const mWin = monsterFinish(mkid, { id: mStart.id, result: 'win', right: 9, scope: 's|g', parts: mParts, now: t1 + 60000 });
-      const mCoins = coinsOf(mkid), mWins = mkid.bonus.monster.wins, mRanges = JSON.stringify(mkid.bonus.monster.ranges);
-      const mAgain = monsterFinish(mkid, { id: mStart.id, result: 'win', right: 9, scope: 's|g', parts: mParts, now: t1 + 70000 });
-      assert(mWin.paid && mWin.first && mWin.coins === MONSTER_LEVELS.easy.first.coins && mAgain.paid && mAgain.first && mAgain.again && mAgain.coins === mWin.coins && mAgain.xp === mWin.xp && mAgain.part === mWin.part
-        && coinsOf(mkid) === mCoins && mkid.bonus.monster.wins === mWins && JSON.stringify(mkid.bonus.monster.ranges) === mRanges && mAgain.cleared[mParts[0].key]?.easy,
+      const mStart = monsterStart(mkid, { stage: 1, level: 'easy', codes: ['1'], id: 'rc-m1', now: t1 });
+      const mWin = monsterFinish(mkid, { id: mStart.id, result: 'win', right: 9, now: t1 + 60000 });
+      const mCoins = coinsOf(mkid), mWins = mkid.bonus.monster.wins, mClear = JSON.stringify(mkid.bonus.monster.clear);
+      const mAgain = monsterFinish(mkid, { id: mStart.id, result: 'win', right: 9, now: t1 + 70000 });
+      assert(mWin.paid && mWin.first && mWin.coins === stageLevel(1, 'easy').first.coins && mAgain.paid && mAgain.first && mAgain.again && mAgain.coins === mWin.coins && mAgain.xp === mWin.xp && mAgain.fought === mWin.fought
+        && coinsOf(mkid) === mCoins && mkid.bonus.monster.wins === mWins && JSON.stringify(mkid.bonus.monster.clear) === mClear && mAgain.clear.easy,
         'V13.101 몬스터 끝내기: 같은 id로 다시 보내면 같은 첫 처치 결과를 돌려주고, 두 번 지급하지 않는다(처치 수·클리어 기록 그대로)');
       // Only the last few receipts are kept, and tidyProfileLogs drops the old ones.
       for (let i = 0; i < RECEIPT_KEEP + 4; i++) { botStart(kid, { level: 'easy', mode: 'speed', id: `rc-n${i}`, now: t1 + 400000 + i * 100000 }); botFinish(kid, { id: `rc-n${i}`, result: 'lose', right: 1, now: t1 + 450000 + i * 100000 }); }
