@@ -143,7 +143,7 @@ let autoEnd = 0;
 socket.on('phase', (p) => { phase = p; if (p.phase === 'question') endsAt = performance.now() + p.remain; autoEnd = p.phase === 'reveal' && p.autoRemain ? performance.now() + p.autoRemain : 0; render(); });
 socket.on('hostinfo', (h) => { info = h; render(); });
 socket.on('roster', (l) => { rosterMap = new Map(l.map(p => [p.id, p])); renderPlayers(); render(); });
-socket.on('s', (arr) => { IQ.applyState(players, arr, performance.now()); });
+socket.on('s', (arr, st) => { IQ.applyState(players, arr, performance.now(), st); });
 
 // 프로젝터 창과 연결 신호 (같은 브라우저)
 const ch = new BroadcastChannel('sumus-island-ctrl');

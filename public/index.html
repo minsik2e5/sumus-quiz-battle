@@ -5,13 +5,14 @@
 :root{--navy:#0b2a4a;--muted:#6b7c93;--gold:#f2c14e;--gold2:#d9a21b;--line:#e3e9f1;--soft:#eef2f7}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;font-family:Pretendard,sans-serif;background:linear-gradient(#5fb8f0,#0f5e93);color:var(--navy);display:flex;justify-content:center;padding:28px 16px}
-.b{background:#fff;border:6px solid var(--gold);box-shadow:0 10px 0 var(--gold2);border-radius:26px;padding:26px;width:min(860px,100%);align-self:flex-start}
+.b{background:#fff;border:6px solid var(--gold);box-shadow:0 10px 0 var(--gold2);border-radius:26px;padding:26px;width:min(1120px,100%);align-self:flex-start}
 h1{margin:0;font-weight:900;text-align:center;font-size:30px}
 .sub{margin:4px 0 20px;color:var(--muted);text-align:center;font-size:14px}
 .resume{display:none;align-items:center;gap:12px;background:#fff7dc;border:2px solid var(--gold);border-radius:16px;padding:12px 16px;margin-bottom:16px;font-weight:800}
 .resume.on{display:flex}.resume span{flex:1}
-.cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-@media (max-width:720px){.cols{grid-template-columns:1fr}}
+.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+@media (max-width:980px){.cols{grid-template-columns:1fr}}
+.need{display:none;background:#ffe9e9;border:2px solid #f3a5a5;border-radius:14px;padding:10px 14px;margin-bottom:14px;font-weight:800;color:#a02b2b;text-align:center}.need.on{display:block}
 .part{border:2px solid var(--line);border-radius:18px;padding:16px}
 .part h2{margin:0 0 12px;font-size:17px;font-weight:900;display:flex;align-items:center;gap:8px}
 .part h2 i{font-style:normal;background:var(--navy);color:#fff;border-radius:8px;padding:2px 8px;font-size:12px}
@@ -35,7 +36,8 @@ a.btn,button.btn{display:inline-flex;align-items:center;justify-content:center;b
 </style></head>
 <body><div class="b">
   <h1>SUMUS ISLAND</h1>
-  <p class="sub">수업 방 하나로 퀴즈쇼와 무궁화 꽃이 피었습니다를 이어서 진행해요</p>
+  <p class="sub">수업 방 하나로 퀴즈쇼 · 무궁화 꽃이 피었습니다 · 단체 줄넘기를 오가며 진행해요</p>
+  <div class="need" id="need">먼저 아래에서 수업 방을 열어 주세요. (선생님 화면은 수업 방 안에서만 열려요)</div>
 
   <div class="resume" id="resume"><span id="resumeT"></span><button class="btn" id="resumeBtn">이어서 하기</button></div>
 
@@ -63,19 +65,26 @@ a.btn,button.btn{display:inline-flex;align-items:center;justify-content:center;b
         <div class="seg" id="mLv"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button></div>
         <div class="hint">3단계부터 꽃게 술래, 4단계부터 두 번 돌아보기가 나와요.</div></div>
     </section>
+    <section class="part">
+      <h2><i>PART 3</i>단체 줄넘기</h2>
+      <div class="field"><label class="l">걸리면</label>
+        <div class="seg" id="jMode"><button data-v="out">탈락</button><button data-v="life">하트 3개</button></div>
+        <div class="hint" id="jModeHint"></div></div>
+      <div class="field"><label class="l">시작 단계 (6단계까지 자동으로 올라가요)</label>
+        <div class="seg" id="jLv"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button></div>
+        <div class="hint">모두가 동시에 줄을 넘어요. 단계가 오를수록 빨라지고 박자가 어려워져요(따-따-다 · 점점 빨라짐 · 뜸 들이기).</div></div>
+    </section>
   </div>
 
   <div class="field first"><label class="l">먼저 시작할 게임</label>
-    <div class="seg" id="first"><button data-v="quiz">PART 1 · 퀴즈쇼</button><button data-v="mg">PART 2 · 무궁화</button></div>
-    <div class="hint">게임 화면 오른쪽 위 노란 버튼으로 언제든 다른 게임으로 넘어가요. 학생 화면도 함께 넘어갑니다.</div></div>
+    <div class="seg" id="first"><button data-v="quiz">PART 1 · 퀴즈쇼</button><button data-v="mg">PART 2 · 무궁화</button><button data-v="jr">PART 3 · 줄넘기</button></div>
+    <div class="hint">방을 연 뒤에도 게임 화면 오른쪽 위 ①②③ 버튼으로 언제든 바꿀 수 있어요. 학생 화면도 함께 넘어갑니다(방은 그대로).</div></div>
 
   <button class="go" id="openBtn">수업 방 열기</button>
   <div class="err" id="err"></div>
 
   <div class="more">
     <a class="btn" href="/play">학생 입장</a>
-    <a class="btn" href="/host" data-solo>PART 1만 따로 열기</a>
-    <a class="btn" href="/mg" data-solo>PART 2만 따로 열기</a>
   </div>
 </div>
 
@@ -83,11 +92,14 @@ a.btn,button.btn{display:inline-flex;align-items:center;justify-content:center;b
 <script>
 const $ = (s) => document.querySelector(s);
 // 각 게임 화면과 같은 저장소를 써서, 여기서 바꾼 설정이 게임 화면에도 그대로 보임
-const QSTORE = 'sumus-island-quiz:v1', MKEY = 'sumus-mg', SESS = 'sumus-sess', FIRST = 'sumus-home:first';
+const QSTORE = 'sumus-island-quiz:v1', MKEY = 'sumus-mg', JKEY = 'sumus-jr', SESS = 'sumus-sess', FIRST = 'sumus-home:first';
+const NAMES = { quiz: 'PART 1 퀴즈쇼', mg: 'PART 2 무궁화', jr: 'PART 3 줄넘기' }, PATHS = { quiz: '/host', mg: '/mg', jr: '/jr' };
+if (/[?&]need=1/.test(location.search)) { $('#need').classList.add('on'); history.replaceState(null, '', '/'); }
 const read = (k, d) => { try { return Object.assign(d, JSON.parse(localStorage.getItem(k) || '{}')); } catch (e) { return d; } };
 const qcfg = read(QSTORE + ':cfg', { mode: 'survival', gather: true });
 const mcfg = read(MKEY + ':cfg', { mode: 'out', time: 120, level: 1 });
-let first = localStorage.getItem(FIRST) === 'mg' ? 'mg' : 'quiz';
+const jcfg = read(JKEY + ':cfg', { mode: 'out', level: 1 });
+let first = ['mg', 'jr'].includes(localStorage.getItem(FIRST)) ? localStorage.getItem(FIRST) : 'quiz';
 
 function seg(id, get, set) {
   const el = $(id);
@@ -97,10 +109,13 @@ function seg(id, get, set) {
 }
 const saveQ = () => localStorage.setItem(QSTORE + ':cfg', JSON.stringify(qcfg));
 const saveM = () => localStorage.setItem(MKEY + ':cfg', JSON.stringify(mcfg));
+const saveJ = () => localStorage.setItem(JKEY + ':cfg', JSON.stringify(jcfg));
 seg('#qMode', () => qcfg.mode, (v) => { qcfg.mode = v; saveQ(); });
 seg('#mMode', () => mcfg.mode, (v) => { mcfg.mode = v; saveM(); });
 seg('#mTime', () => mcfg.time, (v) => { mcfg.time = +v; saveM(); });
 seg('#mLv', () => mcfg.level, (v) => { mcfg.level = +v; saveM(); });
+seg('#jMode', () => jcfg.mode, (v) => { jcfg.mode = v; saveJ(); });
+seg('#jLv', () => jcfg.level, (v) => { jcfg.level = +v; saveJ(); });
 seg('#first', () => first, (v) => { first = v; localStorage.setItem(FIRST, v); });
 $('#qGather').checked = qcfg.gather !== false;
 $('#qGather').onchange = (e) => { qcfg.gather = e.target.checked; saveQ(); };
@@ -109,6 +124,7 @@ $('#qAuto').onchange = (e) => localStorage.setItem(QSTORE + ':auto', e.target.ch
 function hints() {
   $('#qModeHint').textContent = qcfg.mode === 'survival' ? '틀리면 물에 빠져 탈락. 마지막까지 남는 사람이 우승.' : '탈락 없이 정답마다 100점, 끝나면 점수 순위.';
   $('#mModeHint').textContent = mcfg.mode === 'out' ? '술래가 볼 때 움직이면 탈락. 시간 안에 결승선을 넘으면 통과.' : '잡혀도 출발선으로 돌아갈 뿐. 처음 하는 반에 추천.';
+  $('#jModeHint').textContent = jcfg.mode === 'out' ? '줄에 걸리면 바다로 풍덩, 탈락. 마지막까지 남는 학생이 우승.' : '걸리면 하트가 하나씩 깎여요. 처음 하는 반에 추천.';
 }
 hints();
 
@@ -124,19 +140,14 @@ function questions() {
 const qs = questions();
 $('#qCount').textContent = qs ? `${qs.length}문제 준비됨` : '샘플 문제 5개 (편집에서 바꾸기)';
 
-// 따로 열기: 이 탭의 수업 방 연결을 끊고 예전처럼 한 게임만
-document.querySelectorAll('[data-solo]').forEach(a => a.onclick = () => {
-  [SESS, QSTORE + ':host', MKEY + ':host'].forEach(k => sessionStorage.removeItem(k));
-});
-
 const socket = io();
-const go = (active) => { location.href = active === 'mg' ? '/mg' : '/host'; };
+const go = (active) => { location.href = PATHS[active] || '/host'; };
 
 // 이 탭에서 연 수업 방이 아직 살아 있으면 이어서 하기
 const sess = JSON.parse(sessionStorage.getItem(SESS) || 'null');
 if (sess) socket.emit('sess:info', sess, (r) => {
   if (!r || !r.ok) return;
-  $('#resumeT').textContent = `진행 중인 수업 방 ${sess.pin} · 지금 ${r.active === 'mg' ? 'PART 2 무궁화' : 'PART 1 퀴즈쇼'}`;
+  $('#resumeT').textContent = `진행 중인 수업 방 ${sess.pin} · 지금 ${NAMES[r.active] || NAMES.quiz}`;
   $('#resume').classList.add('on');
   $('#resumeBtn').onclick = () => go(r.active);
   $('#openBtn').textContent = '새 수업 방 열기';
@@ -150,12 +161,14 @@ $('#openBtn').onclick = () => {
     first,
     quiz: { questions: qs || undefined, mode: qcfg.mode, gather: qcfg.gather !== false, auto: $('#qAuto').checked },
     mg: { mode: mcfg.mode, time: mcfg.time, level: mcfg.level },
+    jr: { mode: jcfg.mode, level: jcfg.level },
   }, (r) => {
     clearTimeout(t); $('#openBtn').disabled = false;
     if (!r || !r.ok) return ($('#err').textContent = '방을 열지 못했습니다.');
     sessionStorage.setItem(SESS, JSON.stringify({ pin: r.pin, key: r.key }));
     sessionStorage.setItem(QSTORE + ':host', JSON.stringify(r.quiz));
     sessionStorage.setItem(MKEY + ':host', JSON.stringify(r.mg));
+    sessionStorage.setItem(JKEY + ':host', JSON.stringify(r.jr));
     go(r.active);
   });
 };

@@ -340,22 +340,98 @@ window.IQ = (() => {
     return -1;
   }
 
-  // 서버 상태 → 보간용 맵
-  function applyState(map, arr, nowMs) {
+  // ── 서버 시계 ──
+  // 서버 시각 = performance.now() + offset. 짧게 왕복한 표본일수록 정확해서 가장 빠른 3개의 평균을 씀.
+  function makeClock(socket) {
+    const S = []; let off = 0, have = false, rtt = 0;
+    function once() {
+      const t0 = performance.now();
+      socket.emit('time', null, (st) => {
+        if (typeof st !== 'number') return;
+        const t1 = performance.now();
+        S.push({ r: t1 - t0, o: st - (t0 + (t1 - t0) / 2) }); if (S.length > 12) S.shift();
+        const best = S.slice().sort((a, b) => a.r - b.r).slice(0, 3);
+        off = best.reduce((a, b) => a + b.o, 0) / best.length; rtt = best[0].r; have = true;
+      });
+    }
+    function sync(n) { let i = 0; const f = () => { once(); if (++i < (n || 6)) setTimeout(f, 140); }; f(); }
+    socket.on('connect', () => { S.length = 0; sync(6); });
+    if (socket.connected) sync(6);
+    setInterval(() => { if (socket.connected) once(); }, 7000);
+    return { now: () => performance.now() + off, get rtt() { return rtt; }, get ready() { return have; }, sync };
+  }
+
+  // ── 위치 스냅샷 보간 ──
+  // 서버는 20Hz 로 위치를 보냄. 그대로 따라가면 뚝뚝 끊겨 보이므로, 서버 시간 기준으로 "조금 과거(DELAY)"를 그려서
+  // 항상 두 스냅샷 사이를 부드럽게 이어 붙임. 늦게 도착하면 잠깐 속도를 유지(외삽)했다가 멈춤.
+  const DELAY = 110;
+  let clkOff = null; // 서버시각 - 내 performance.now (왕복 지연이 가장 짧았던 표본 쪽으로 수렴)
+  function noteClock(serverT, nowMs) {
+    const d = serverT - nowMs;
+    if (clkOff == null || d > clkOff) clkOff = d; else clkOff += (d - clkOff) * 0.02;
+  }
+  // 임의의 스냅샷 목록 b=[{t,...}] 를 지금 그릴 시각에 맞춰 찾음 → {a, c, u}  (u>1 이면 외삽, 120ms 까지만)
+  function sampleBuf(b) {
+    const rt = performance.now() + (clkOff || 0) - DELAY;
+    let a = b[0], c = b[0];
+    if (rt >= b[b.length - 1].t) { a = b[b.length - 2] || b[b.length - 1]; c = b[b.length - 1]; }
+    else if (rt > b[0].t) { for (let i = 0; i < b.length - 1; i++) if (rt >= b[i].t && rt <= b[i + 1].t) { a = b[i]; c = b[i + 1]; break; } }
+    const span = Math.max(1, c.t - a.t);
+    let u = c === a ? 0 : (rt - a.t) / span;
+    if (u > 1) u = Math.min(1 + 120 / span, u); else if (u < 0) u = 0;
+    return { a, c, u, span };
+  }
+  function applyState(map, arr, nowMs, serverT) {
+    if (typeof serverT !== 'number') serverT = nowMs;
+    noteClock(serverT, nowMs);
     const seen = new Set();
     for (let i = 0; i < arr.length; i += 4) {
       const id = arr[i], x = arr[i + 1] / 1000, y = arr[i + 2] / 1000, f = arr[i + 3];
       seen.add(id);
       let e = map.get(id);
-      if (!e) { e = { x, y, tx: x, ty: y }; map.set(id, e); }
-      e.tx = x; e.ty = y; e.alive = !!(f & 1); e.moving = !!(f & 2); e.face = f & 4 ? -1 : 1; e.seen = nowMs;
+      if (!e) { e = { x, y, tx: x, ty: y, buf: [] }; map.set(id, e); }
+      const b = e.buf, last = b[b.length - 1];
+      if (last && Math.hypot(x - last.x, y - last.y) > 0.4) b.length = 0; // 순간이동(위치 모으기·부활)은 이어 붙이지 않음
+      if (!last || serverT > last.t) b.push({ t: serverT, x, y, f });
+      if (b.length > 10) b.shift();
+      e.tx = x; e.ty = y; e.seen = nowMs;
     }
     for (const id of [...map.keys()]) if (!seen.has(id)) map.delete(id);
   }
   function stepInterp(map, dt) {
-    const k = 1 - Math.exp(-dt * 16);
-    for (const e of map.values()) { e.x += (e.tx - e.x) * k; e.y += (e.ty - e.y) * k; }
+    const rt = performance.now() + (clkOff || 0) - DELAY;
+    for (const e of map.values()) {
+      const b = e.buf; if (!b || !b.length) continue;
+      let a = b[0], c = b[0];
+      if (rt >= b[b.length - 1].t) { a = b[b.length - 2] || b[b.length - 1]; c = b[b.length - 1]; }
+      else if (rt > b[0].t) { for (let i = 0; i < b.length - 1; i++) if (rt >= b[i].t && rt <= b[i + 1].t) { a = b[i]; c = b[i + 1]; break; } }
+      const span = Math.max(1, c.t - a.t);
+      let u = (rt - a.t) / span;
+      if (c === a) u = 0; else if (u > 1) u = Math.min(1 + 120 / span, u); // 새 스냅샷이 늦으면 120ms 까지만 이어서 감
+      else if (u < 0) u = 0;
+      const bx = a.x + (c.x - a.x) * u, by = a.y + (c.y - a.y) * u;
+      const sp = c === a ? 0 : Math.hypot(c.x - a.x, c.y - a.y) / (span / 1000); // 지금 속도(섬 반지름/초)
+      e.bx = bx; e.by = by; e.alive = !!(c.f & 1); e.face = c.f & 4 ? -1 : 1; e.moving = sp > 0.08 && !!(c.f & 2) || sp > 0.2; e.speed = sp;
+    }
+    // 서로 겹치지 않게 살짝 밀어내는 효과는 화면에서만 (서버 위치는 건드리지 않음)
+    separate(map, dt);
+  }
+  function separate(map, dt) {
+    const list = [...map.values()].filter(e => e.alive && e.bx != null);
+    for (const e of list) { e.sx = e.sx || 0; e.sy = e.sy || 0; e.px = 0; e.py = 0; }
+    const R = 0.075;
+    for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+      const a = list[i], b = list[j];
+      let dx = (b.bx + b.sx) - (a.bx + a.sx), dy = (b.by + b.sy) - (a.by + a.sy); const d = Math.hypot(dx, dy);
+      if (d < R) {
+        if (d < 1e-5) { dx = Math.cos(i + j); dy = Math.sin(i + j); } else { dx /= d; dy /= d; }
+        const push = (R - d) * 0.5; a.px -= dx * push; a.py -= dy * push; b.px += dx * push; b.py += dy * push;
+      }
+    }
+    const k = 1 - Math.exp(-dt * 9), decay = Math.exp(-dt * 0.7);
+    for (const e of list) { e.sx = (e.sx + e.px * k) * decay; e.sy = (e.sy + e.py * k) * decay; const m = Math.hypot(e.sx, e.sy); if (m > 0.12) { e.sx *= 0.12 / m; e.sy *= 0.12 / m; } }
+    for (const e of map.values()) { if (e.bx == null) continue; const ox = e.alive ? (e.sx || 0) : 0, oy = e.alive ? (e.sy || 0) : 0; e.x = e.bx + ox; e.y = e.by + oy; }
   }
 
-  return { ZONE, hash, drawWater, geom, proj, drawIsland, drawZone, drawChar, roundRect, zoneOf, applyState, stepInterp };
+  return { ZONE, hash, drawWater, geom, proj, drawIsland, drawZone, drawChar, roundRect, zoneOf, applyState, stepInterp, makeClock, shade, noteClock, sampleBuf };
 })();

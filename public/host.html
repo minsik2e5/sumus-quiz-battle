@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="ko">
 <head>
+<script>if(!sessionStorage.getItem('sumus-sess')&&!/[?&]edit=1/.test(location.search))location.replace('/?need=1');</script>
+
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUMUS ISLAND QUIZ — 선생님 화면</title>
@@ -522,7 +524,7 @@ socket.on('connect', () => {
   else if (saved && room) socket.emit('host:resume', saved, (r) => { if (!r.ok) recreateRoom(); });
 });
 socket.on('roster', (list) => { rosterMap = new Map(list.map(p => [p.id, p])); renderRoster(); updateAlive(); });
-socket.on('s', (arr) => IQ.applyState(players, arr, performance.now()));
+socket.on('s', (arr, st) => IQ.applyState(players, arr, performance.now(), st));
 socket.on('phase', (p) => { const prev = phase; phase = p; phase.recvAt = performance.now(); onPhase(prev); });
 
 function showGame() { $('#setup').classList.add('hidden'); $('#game').classList.remove('hidden'); resize(); }

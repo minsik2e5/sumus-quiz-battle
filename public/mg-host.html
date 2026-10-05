@@ -1,6 +1,8 @@
 <!doctype html>
 <html lang="ko">
 <head>
+<script>if(!sessionStorage.getItem('sumus-sess')&&!/[?&]edit=1/.test(location.search))location.replace('/?need=1');</script>
+
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SUMUS ISLAND PART 2 — 무궁화 꽃이 피었습니다</title>
@@ -181,12 +183,15 @@ async function setupJoin(pin) {
 socket.on('mg:phase', (p) => { const prev = phase.phase; phase = p; endsAtLocal = performance.now() + p.remain; readyAtLocal = performance.now() + p.readyRemain; onPhase(prev); });
 socket.on('mg:w', (w) => { const prev = W8; W8 = w; onWatch(prev); });
 socket.on('mg:roster', (l) => { roster = new Map(l.map(p => [p.id, p])); renderRoster(); });
-socket.on('mg:s', (arr) => {
-  const seen = new Set();
+socket.on('mg:s', (arr, st) => {
+  const seen = new Set(), nowMs = performance.now(); IQ.noteClock(typeof st === 'number' ? st : nowMs, nowMs);
+  const t = typeof st === 'number' ? st : nowMs;
   for (let i = 0; i < arr.length; i += 4) {
     const id = arr[i], z = arr[i + 1] / 1000, x = arr[i + 2] / 1000, f = arr[i + 3]; seen.add(id);
-    let e = players.get(id); if (!e) { e = { z, x, dz: z }; players.set(id, e); }
-    if (z < e.tz - 0.2) e.dz = z; // 출발선으로 돌아간 경우 즉시 이동(연출은 따로)
+    let e = players.get(id); if (!e) { e = { z, x, dz: z, sb: [] }; players.set(id, e); }
+    const last = e.sb[e.sb.length - 1];
+    if (last && z < last.z - 0.2) e.sb.length = 0; // 출발선으로 돌아간 경우 즉시 이동(연출은 따로)
+    if (!last || t > last.t) e.sb.push({ t, z }); if (e.sb.length > 10) e.sb.shift();
     e.tz = z; e.x = x; e.run = !!(f & 1); e.out = !!(f & 2); e.fin = !!(f & 4);
   }
   for (const id of [...players.keys()]) if (!seen.has(id)) players.delete(id);
@@ -502,7 +507,7 @@ function frame(now) {
   const list = [];
   for (const [id, e] of players) {
     const info = roster.get(id); if (!info) continue;
-    if (e.tz != null) e.dz += (e.tz - e.dz) * k;
+    if (e.sb && e.sb.length) { const q = IQ.sampleBuf(e.sb); e.dz = q.a.z + (q.c.z - q.a.z) * q.u; }
     if (e.out && !fx.some(f => f.id === id && f.type === 'fall')) continue;
     list.push([id, e, info]);
   }

@@ -141,6 +141,9 @@ socket.on('connect_error', (e) => { setConn('bad', Date.now() - firstTry < 70000
 socket.on('disconnect', () => setConn('bad', '연결 끊김 — 다시 연결 중…'));
 $('#resetBtn').onclick = () => { localStorage.removeItem(LS); location.href = '/play' + (urlPin ? '?pin=' + urlPin : ''); };
 let me = null, phase = { phase: 'none' }, players = new Map(), rosterMap = new Map(), joined = false;
+// 내 캐릭터는 폰에서 직접 움직임(서버 왕복을 기다리지 않아 즉시 반응) — 위치만 서버에 알려 주고, 서버는 속도 제한만 검사
+const mine = { x: 0, y: 0, vx: 0, vy: 0, face: 1, moving: false, ready: false, ep: 0, sentAt: 0, sentMoving: false };
+const SPEED = 0.92, ISLAND_R = 0.93;
 
 function join(auto) {
   const pin = $('#pinIn').value.trim(), name = $('#nameIn').value.trim();
@@ -159,6 +162,7 @@ function join(auto) {
     if (!r.ok) report('join fail: ' + r.error);
     if (!r.ok) { $('#jerr').textContent = r.error; joined = false; showJoin(); return; }
     me = r.me; joined = true;
+    if (r.pos) { mine.x = r.pos.x; mine.y = r.pos.y; mine.vx = mine.vy = 0; mine.ep = r.pos.ep | 0; mine.ready = true; }
     Object.assign(saved, { pin, name: me.name, color: me.color, pid: r.pid }); localStorage.setItem(LS, JSON.stringify(saved));
     $('#meDot').style.background = me.color; $('#meName').textContent = me.name;
     $('#join').classList.add('hidden'); $('#play').classList.remove('hidden'); resize();
@@ -179,7 +183,9 @@ socket.on('roster', (list) => {
   if (me && !rosterMap.has(me.id) && joined) { joined = false; showJoin(); return; }
   if (me) me = rosterMap.get(me.id) || me; updateStatus();
 });
-socket.on('s', (arr) => IQ.applyState(players, arr, performance.now()));
+socket.on('s', (arr, st) => IQ.applyState(players, arr, performance.now(), st));
+// 서버가 내 위치를 강제로 옮긴 경우(문제마다 가운데로 모으기·부활): 내 화면의 위치도 바로 맞춤
+socket.on('tp', (d) => { mine.x = d.x; mine.y = d.y; mine.vx = mine.vy = 0; mine.ep = d.ep; mine.ready = true; });
 socket.on('phase', (p) => { const prev = phase; phase = p; onPhase(prev); });
 
 function myAlive() { return me && rosterMap.get(me.id) ? rosterMap.get(me.id).alive : true; }
@@ -255,7 +261,7 @@ wrap.addEventListener('pointermove', (e) => {
   if (m < dead) setIn(0, 0); else { const k = (m - dead) / (1 - dead); setIn(dx / d * k, dy / d * k); }
   e.preventDefault();
 });
-function endTouch(e) { if (e.pointerId !== touchId) return; touchId = null; joy.classList.add('hidden'); setIn(0, 0); sendInput(true); }
+function endTouch(e) { if (e.pointerId !== touchId) return; touchId = null; joy.classList.add('hidden'); setIn(0, 0); }
 wrap.addEventListener('pointerup', endTouch); wrap.addEventListener('pointercancel', endTouch);
 document.addEventListener('touchmove', (e) => { if (!$('#play').classList.contains('hidden')) e.preventDefault(); }, { passive: false });
 // PC 테스트용 키보드
@@ -268,12 +274,28 @@ function kb() {
   const y = (keys.has('arrowdown') || keys.has('s') ? 1 : 0) - (keys.has('arrowup') || keys.has('w') ? 1 : 0);
   const m = Math.hypot(x, y) || 1; setIn(x / m, y / m);
 }
-function sendInput(force) {
-  if (!joined) return;
-  const now = performance.now();
-  const changed = Math.abs(inX - sentX) > 0.03 || Math.abs(inY - sentY) > 0.03;
-  if (force || (changed && now - lastSent > 45) || ((inX || inY) && now - lastSent > 400)) {
-    socket.volatile.emit('i', [+inX.toFixed(2), +inY.toFixed(2)]); sentX = inX; sentY = inY; lastSent = now;
+// 가속·감속이 있는 부드러운 이동 (서버의 SPEED 와 같은 최고 속도)
+function stepMine(dt) {
+  const sv = me && players.get(me.id);
+  const canMove = mine.ready && (phase.phase === 'lobby' || phase.phase === 'question') && (!sv || sv.alive || phase.mode === 'score');
+  if (!canMove) { mine.vx = mine.vy = 0; mine.moving = false; return; }
+  let ix = inX, iy = inY; const m = Math.hypot(ix, iy); if (m > 1) { ix /= m; iy /= m; }
+  const k = 1 - Math.exp(-dt * 13);
+  mine.vx += (ix * SPEED - mine.vx) * k; mine.vy += (iy * SPEED - mine.vy) * k;
+  mine.x += mine.vx * dt; mine.y += mine.vy * dt;
+  const d = Math.hypot(mine.x, mine.y);
+  if (d > ISLAND_R) { mine.x *= ISLAND_R / d; mine.y *= ISLAND_R / d; const nx = mine.x / d, ny = mine.y / d, out = mine.vx * nx + mine.vy * ny; if (out > 0) { mine.vx -= out * nx; mine.vy -= out * ny; } }
+  mine.moving = Math.hypot(mine.vx, mine.vy) > 0.1;
+  if (Math.abs(mine.vx) > 0.05) mine.face = mine.vx < 0 ? -1 : 1;
+  // 멈춰 있을 때 서버 위치와 많이 어긋났으면(예: 순간이동 막힘) 천천히 서버 쪽으로 맞춤
+  if (!mine.moving && sv && Math.hypot(sv.tx - mine.x, sv.ty - mine.y) > 0.03 && performance.now() - mine.sentAt > 900) { mine.x += (sv.tx - mine.x) * Math.min(1, dt * 2); mine.y += (sv.ty - mine.y) * Math.min(1, dt * 2); }
+}
+function reportPos(now) {
+  if (!joined || !mine.ready) return;
+  const mv = mine.moving;
+  if ((mv && now - mine.sentAt > 48) || (!mv && mine.sentMoving)) {
+    socket.volatile.emit('p', [+mine.x.toFixed(4), +mine.y.toFixed(4), mine.face, mv ? 1 : 0, mine.ep]);
+    mine.sentAt = now; mine.sentMoving = mv;
   }
 }
 
@@ -286,8 +308,8 @@ let lastT = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now; const t = now / 1000;
-  sendInput(false);
   if ($('#play').classList.contains('hidden') || !W) return;
+  stepMine(dt); reportPos(now);
   IQ.stepInterp(players, dt);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, W, H);
   const rx = Math.min(W * 0.46, (H * 0.86) / 2.2 / 0.52);
@@ -296,7 +318,8 @@ function frame(now) {
   const zones = (phase.phase === 'question' || phase.phase === 'reveal') ? phase.zones : null;
   if (zones) zones.forEach((z, i) => IQ.drawZone(ctx, G, z, i, phase.phase === 'reveal' ? (i === phase.reveal.correct ? 'correct' : 'wrong') : 'question', t));
   const s = G.rx * 0.07;
-  const meE = me && players.get(me.id);
+  const sv = me && players.get(me.id);
+  const meE = me && mine.ready ? { x: mine.x, y: mine.y, tx: mine.x, ty: mine.y, moving: mine.moving, face: mine.face, alive: sv ? sv.alive : true } : null;
   const list = [...players.entries()].filter(([id, e]) => e.alive && id !== (me && me.id)).sort((a, b) => a[1].y - b[1].y);
   for (const [id, e] of list) {
     const info = rosterMap.get(id); if (!info) continue;
