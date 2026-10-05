@@ -472,9 +472,9 @@ export function monsterMigrate(p, scope = '', known = []) {
   delete m.cleared;
   return true;
 }
-/* ---------- V13.104 끝없는 레벨 ----------
+/* ---------- V13.105 끝없는 레벨 ----------
    monster { stage: the level open now (1 …), clear: { easy, normal, hard } of that level (first
-   clear times), best: the highest level cleared, from_parts (V13.104 move), … as above }.
+   clear times), best: the highest level cleared, from_parts (V13.105 move), … as above }.
    A level's 이지 → 노말 → 하드 open in order; clearing its 하드 opens the next level. The first clear
    of a level at a difficulty pays stageLevel(stage, level).first; any other fight (a level already
    cleared, won: `again`; lost after `need` words: MONSTER_TRY) pays MONSTER_DAILY times a day.
@@ -528,7 +528,7 @@ export function monsterFinish(p, { id, result, right, pet, scope: nowScope = '',
 function monsterSettle(p, m, live, { result, right, pet, nowScope, parts, now }) {
   const prog = monsterProgress(p, { scope: live.scope ?? nowScope, parts });
   if (prog.moved) { monsterMigrate(p, live.scope ?? nowScope, (parts || []).flatMap(x => x.codes)); monsterSaveProgress(m, prog, now); }
-  // A fight started before V13.104 (a part, no level number) is played again at level 1 and can
+  // A fight started before V13.105 (a part, no level number) is played again at level 1 and can
   // not be a first clear.
   const legacy = !Number.isFinite(Number(live.stage));
   const stage = legacy ? 1 : cleanStage(live.stage);

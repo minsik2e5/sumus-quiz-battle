@@ -1,4 +1,4 @@
-// V13.104 몬스터 레벨 시뮬레이션: the real battle engine (public/modules/battle-engine.js) on a
+// V13.105 몬스터 레벨 시뮬레이션: the real battle engine (public/modules/battle-engine.js) on a
 // virtual clock, the monster answering like battle-bot.js, and a student who knows a share of the
 // words. `node server/monster-sim.mjs` prints win rates by stage; the release check uses
 // `simulate` with a fixed seed to keep the difficulty curve where it was tuned.

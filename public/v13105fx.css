@@ -1,4 +1,4 @@
-/* ---------- V13.104 전투 화면 효과 (야차전 · 로보 연습 · 몬스터전) ----------
+/* ---------- V13.105 전투 화면 효과 (야차전 · 로보 연습 · 몬스터전) ----------
    타격감(히트스톱·흔들림·데미지 숫자), 콤보, 크리티컬, 피니셔(K.O.), 입장 컷인.
    transform과 opacity만 움직이고, 동작 줄이기 설정에서는 꺼진다. */
 .yb-arena .fx-impact,.yb-arena .fx-crit,.yb-arena .fx-cutin,.yb-arena .fx-vignette,.yb-arena .fx-ko-rays{position:absolute;pointer-events:none}

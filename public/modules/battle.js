@@ -12,6 +12,8 @@ import { createPracticeMatch, practiceQuestions, BOT_LEVELS } from './battle-bot
 import { BATTLE, BATTLE_MODES, PET_SKILLS, PET_SKILL_NEED, petSkill } from './battle-engine.js';
 import { BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, BOT_MIN_RIGHT } from './rewards.js';
 import { tournamentCard, openBracket } from './tournament-ui.js';
+import { openMiniGame } from './word-minigame-ui.js';
+import { bonusText } from './word-minigame.js';
 import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterOpen, stageLevel, stageMonster, isBossStage } from './monsters.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
@@ -82,7 +84,7 @@ function sfx(name, buzz = 0) {
   } catch {}
   if (buzz) try { navigator.vibrate?.(buzz); } catch {}
 }
-// V13.104 전투 화면 효과 소리: a falling low tone (a thump, heavier with the damage), a tick that
+// V13.105 전투 화면 효과 소리: a falling low tone (a thump, heavier with the damage), a tick that
 // climbs with the combo and a KO boom with a noise burst. Vibration only with the sound on.
 function buzzFx(pattern) { if (soundOn() && 'vibrate' in navigator) try { navigator.vibrate(pattern); } catch {} }
 function sweep(f0, f1, len, vol, type = 'sine', at = 0) {
@@ -131,7 +133,7 @@ const petName = pet => pet?.name || CHARACTERS[petKey(pet?.key)]?.ko || '';
 // V13.94 몬스터 잡기: a monster's picture (its own art once it arrives, until then a pet picture
 // recoloured), and who a player is in the match lines (a monster has no pet name).
 // V13.95 the art sits in the same box as a pet picture (avatar-img), so showPose() can swap it.
-// V13.104 a monster coming round again stronger (level 19 and up, `round`) is tinted.
+// V13.105 a monster coming round again stronger (level 19 and up, `round`) is tinted.
 function monsterPic(m, { size = '', pose = '' } = {}) {
   const mon = MONSTERS.find(x => x.key === m?.key) || MONSTERS[0], round = Math.min(9, Math.max(0, Number(m?.round) || 0));
   const cls = round ? ' mon-round' : '', tint = round ? `;--mon-round:${round * 40}deg` : '';
@@ -514,6 +516,15 @@ async function startBotMatch(button) {
   if (reg.error) return startFailed(reg.error, () => { if (B === cur) beginBotMatch(questions, setup, null); });
   beginBotMatch(questions, setup, reg.id);
 }
+// V13.104 단어 미니게임: the practice match asks for a word game between two words (see
+// createPracticeMatch); the battle screen draws it over the match. The clock under it stands
+// still (loop() skips while B.mini) and the match runs on when the card closes.
+function miniGameHook({ kind, words, finish }) {
+  const cur = B;
+  cur.mini = true;
+  const cancel = openMiniGame({ kind, words, reduced: reduced(), sfx, finish: result => { cur.mini = false; finish(result); } });
+  return () => { cur.mini = false; cancel(); };
+}
 function beginBotMatch(questions, setup, ticket) {
   goFull();
   closeSocket(false);
@@ -521,7 +532,7 @@ function beginBotMatch(questions, setup, ticket) {
   B.view = null;
   B.practiceSetup = setup;
   B.botReward = ticket ? null : { paid: false, reason: 'unregistered' };
-  B.local = createPracticeMatch({ me: meAsPlayer(), questions, level: setup.level, mode: setup.mode, onMessage });
+  B.local = createPracticeMatch({ me: meAsPlayer(), questions, level: setup.level, mode: setup.mode, onMessage, minigame: miniGameHook });
   B.local.ticket = ticket;
   main('<div class="yb-loading">로보를 부르고 있어요…</div>');
   B.local.start();
@@ -596,7 +607,7 @@ function retryReward(button) {
 }
 const retryButton = () => ' <button type="button" class="btn small yb-retry-v13101" data-yb="reward-retry">다시 받기</button>';
 
-/* ---------- V13.94 몬스터 잡기 → V13.104 끝없는 레벨 ---------- */
+/* ---------- V13.94 몬스터 잡기 → V13.105 끝없는 레벨 ---------- */
 // Levels 1, 2, 3 … without end; a level's 이지 → 노말 → 하드 open in order and its 하드 opens the
 // next level. The fight is the robot practice match with the monster as the opponent (its own HP
 // and skill, knocked out before time runs out), on the words the student picked (B.ranges, the
@@ -615,7 +626,7 @@ function monsterWords() {
 }
 // V13.95 이지 · 노말 · 하드 badges: a mint, blue and burning crimson shield with 1–3 stars.
 const levelBadge = (level, cls) => uiArt('monster-' + level, cls);
-// V13.104 a level number on its plate (open · locked · cleared · boss); drawn in CSS until the
+// V13.105 a level number on its plate (open · locked · cleared · boss); drawn in CSS until the
 // plate pictures of sheet 12-10 arrive.
 const stagePlate = (stage, kind) => `<span class="ms-plate ${kind}" aria-hidden="true">${artOr('monster-stage' + (kind === 'open' ? '' : '-' + kind), '', 'ms-plate-art')}<b>${stage}</b></span>`;
 function monsterTab() {
@@ -706,7 +717,7 @@ function beginMonster(stage, level, questions, ticket) {
   B.monsterSetup = { stage, level };
   B.monsterReward = ticket ? null : { paid: false, reason: 'unregistered' };
   const foe = { name: m.title, pet: { key: m.temp.pet, form: m.temp.form, skill: L.skill }, monster: { key: m.key, level, stage, round: m.round, boss: L.boss }, hp: L.monsterHp };
-  B.local = createPracticeMatch({ me: meAsPlayer(), questions, mode: L.mode, onMessage, foe, skill: L, hp: L.hp, ko: true, label: `레벨 ${stage}${L.boss ? ' · 보스' : ''} · ${L.name}` });
+  B.local = createPracticeMatch({ me: meAsPlayer(), questions, mode: L.mode, onMessage, foe, skill: L, hp: L.hp, ko: true, label: `레벨 ${stage}${L.boss ? ' · 보스' : ''} · ${L.name}`, minigame: miniGameHook });
   B.local.ticket = ticket;
   main(`<div class="yb-loading">${esc(m.title)}이(가) 나타났어요…</div>`);
   B.local.start();
@@ -1170,13 +1181,13 @@ function flash(color) { const f = document.getElementById('yb-flash'); if (!f) r
 function pop(side, text, kind = '') {
   const arena = document.getElementById('yb-arena'), pet = document.getElementById('yb-pet-' + side); if (!arena || !pet) return;
   const a = arena.getBoundingClientRect(), r = pet.getBoundingClientRect(), d = document.createElement('div');
-  // V13.104 the damage number grows with the damage (t1~t3); fever hits burn red.
+  // V13.105 the damage number grows with the damage (t1~t3); fever hits burn red.
   const dmg = /^-(\d+)/.exec(text)?.[1];
   d.className = 'yb-pop ' + kind + (dmg ? ` fx-num t${dmgTier(+dmg)}${B.fever ? ' fever' : ''}` : ''); d.textContent = text;
   if (dmg) d.innerHTML = `<b>-${dmg}</b>${text.length > dmg.length + 1 ? `<small>${esc(text.slice(dmg.length + 1).trim())}</small>` : ''}`;
   d.style.left = (r.left - a.left + r.width * .22) + 'px'; d.style.top = (r.top - a.top + r.height * .1) + 'px';
   arena.appendChild(d); setTimeout(() => d.remove(), 1050);
-  // V13.104 a big number stays inside the arena (centred on the pet, never cut off at the side).
+  // V13.105 a big number stays inside the arena (centred on the pet, never cut off at the side).
   if (dmg) { const w = d.offsetWidth; d.style.left = Math.max(6, Math.min(a.width - w - 6, r.left - a.left + r.width / 2 - w / 2)) + 'px'; d.style.top = Math.max(46, r.top - a.top + r.height * .05) + 'px'; }
 }
 // V13.85 the pets act out the hit: the attacker shows its attack (cheer) pose, the one hit its
@@ -1194,7 +1205,7 @@ function fxCenter(side, arena) {
   const a = arena.getBoundingClientRect(), r = pet.getBoundingClientRect();
   return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height * .52 };
 }
-// V13.104: at most FX_MAX effect pieces at once; extra sparks are simply not drawn.
+// V13.105: at most FX_MAX effect pieces at once; extra sparks are simply not drawn.
 const FX_MAX = 24;
 function fxAdd(arena, cls, css, ms) { const el = document.createElement('div'); if (cls === 'fx-spark' && arena.querySelectorAll('[data-fx]').length >= FX_MAX) return el; el.dataset.fx = ''; el.className = cls; Object.assign(el.style, css); arena.appendChild(el); setTimeout(() => el.remove(), ms); return el; }
 function strike(atk, def, { dmg = 0, crit = false, skill = false, attacker = null } = {}) {
@@ -1215,11 +1226,11 @@ function strike(atk, def, { dmg = 0, crit = false, skill = false, attacker = nul
       fxAdd(arena, 'fx-spark', { left: to.x + 'px', top: to.y + 'px', '--fx': color, '--dx': Math.cos(a) * dist + 'px', '--dy': Math.sin(a) * dist + 'px' }, 560);
     }
     if (attacker?.monster) fxAdd(arena, 'fx-claw', { left: to.x + 'px', top: to.y + 'px' }, 620);
-    // V13.104 타격감: a white flash on the one hit, a short hit-stop, then a shake by damage.
+    // V13.105 타격감: a white flash on the one hit, a short hit-stop, then a shake by damage.
     impact(arena, def, to, { dmg, crit, skill });
   }, skill ? 180 : 230);
 }
-// ---------- V13.104 전투 화면 효과 (presentation only; the rules are in battle-engine.js) ----------
+// ---------- V13.105 전투 화면 효과 (presentation only; the rules are in battle-engine.js) ----------
 // Damage tiers: small (a plain hit), medium, big (a fast or fever hit, a skill).
 function dmgTier(dmg) { return dmg >= 28 ? 3 : dmg >= 16 ? 2 : 1; }
 const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl'];
@@ -1302,7 +1313,7 @@ function knockout(side) {
   const arena = document.getElementById('yb-arena'); if (!arena) return;
   const s = fxState(); if (s.ko) return; s.ko = true;
   arena.classList.add('fx-ko-on');
-  // V13.104 K.O. comes with a white flash, rays behind the letters and a boom.
+  // V13.105 K.O. comes with a white flash, rays behind the letters and a boom.
   if (!reduced()) { flash('rgba(255,255,255,.95)'); fxAdd(arena, 'fx-ko-rays', {}, 1300); }
   sfxKO();
   fxAdd(arena, 'fx-ko', {}, 1300).textContent = 'K.O.!';
@@ -1334,6 +1345,8 @@ function loop() {
   cancelAnimationFrame(B.raf);
   const frame = () => {
     if (!B?.view || B.view.phase === 'finished') return;
+    // V13.104: a word game is open: the match clock stands still behind it.
+    if (B.mini) { B.raf = requestAnimationFrame(frame); return; }
     const v = B.view, now = serverNow();
     const clock = document.getElementById('yb-clock');
     if (clock) { const left = v.ends_at ? Math.max(0, v.ends_at - now) : matchMs(v.mode); clock.textContent = clockText(left); clock.parentElement.classList.toggle('warn', left <= (v.fever_ms || 15000) && !!v.ends_at); }
@@ -1360,6 +1373,15 @@ function applyEvent(e) {
   if (e.type === 'presence') { P[e.player].connected = e.connected; if (e.player !== v.me) setStatus('op', e.connected ? '' : '상대 연결이 끊겼어요. 15초 기다려요'); refreshHud(); return; }
   if (e.type === 'countdown') { v.phase = 'countdown'; v.deadline = e.deadline; if (!document.getElementById('yb-arena')) drawMatch(); showCountdown(e.deadline); drawEmotes(); return; }
   if (e.type === 'start') { v.ends_at = e.ends_at; return; }
+  // V13.104: a word game was played; the match clock moved on by its length and the prize
+  // (a bonus on the next attacks or a guard) shows under my HP bar like a pet skill's.
+  if (e.type === 'minibonus') {
+    if (e.ends_at) v.ends_at = e.ends_at;
+    if (e.effects) for (const id of Object.keys(e.effects)) if (P[id]) P[id].effects = e.effects[id];
+    refreshHud();
+    if (e.stars) { sfx('skill', 30); skillBanner('me', '미니게임 성공!', bonusText(e.kind, e.stars)); }
+    return;
+  }
   if (e.type === 'question') {
     v.phase = 'question'; v.deadline = e.deadline;
     // V13.94 각자 내 범위: each player has a word of their own range on the same turn.
@@ -1422,7 +1444,7 @@ function applyEvent(e) {
       say(`${atk === 'op' && !P[e.attacker].monster ? '상대 ' : ''}${esc(whoName(P[e.attacker]))}의 ${label}`, `${atk === 'me' ? '정답! 상대를 기다려요' : '상대가 맞혔어요'}${e.guard ? ` · ${def === 'me' ? '내' : '상대'} 펫이 ${e.guard}만큼 막았어요` : ''}`);
       lunge(atk);
       if (e.dmg) strike(atk, def, { dmg: e.dmg, crit: e.fast || e.fever, attacker: P[e.attacker] });
-      // V13.104: my combo, the CRITICAL! stamp, a thump by damage and the finishing blow.
+      // V13.105: my combo, the CRITICAL! stamp, a thump by damage and the finishing blow.
       if (atk === 'me') comboUp();
       const lethal = e.dmg && Number(e.hp[e.defender]) <= 0;
       // The K.O. plays right on the blow; the room's 'end' may come a moment later.
@@ -1464,7 +1486,7 @@ function applyEvent(e) {
     if (loser) document.getElementById('yb-pet-' + loser)?.classList.add('faint');
     // A knock-out (not time running out) gets its own moment before the result.
     const ko = loser && Number(e.result.hp?.[e.result.loser]) <= 0 && e.result.reason === 'end';
-    // V13.104 피니셔: slow motion on the last blow, then K.O.; the result waits 0.3 s more
+    // V13.105 피니셔: slow motion on the last blow, then K.O.; the result waits 0.3 s more
     // than before (2.0 s in all after a K.O.), never longer.
     if (ko && !reduced()) later(() => finisher(loser), 200);
     if (ko) later(() => knockout(loser), reduced() ? 0 : 620);

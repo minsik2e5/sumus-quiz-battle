@@ -1,5 +1,6 @@
 import { createBattle, connect, answer, forfeit, tick, battleView, BATTLE, SKILL_RULES } from './battle-engine.js';
 import { battleQuestions } from './battle-questions.js';
+import { miniDue, miniWords, pickGame, miniBonus, addBonus } from './word-minigame.js';
 
 // V13.66 practice match (연습 상대): a yacha match against a computer pet, run entirely on the
 // phone with the same engine as the battle rooms. No stake, no records, no league points;
@@ -28,11 +29,19 @@ export function practiceQuestions(words, mode = 'speed') {
 // V13.94 몬스터 잡기 uses the same match with a monster instead of the robot: `foe` (name, pet
 // with the monster's skill, `monster`, its own `hp`), `skill` ({ accuracy, min, max } of the
 // monster), `hp` (the student's) and `ko` (the monster wins if time runs out).
-export function createPracticeMatch({ me, questions, level = 'normal', mode = 'speed', onMessage, random = Math.random, foe = null, skill = null, hp = BOT_HP, ko = false, label = '연습 경기' }) {
+// V13.104 `minigame`: ({ kind, words, finish }) => cancel. After the reveal of every 6th word a
+// short word game may open (word-minigame.js). The match stands still until `finish({ kind,
+// stars })` is called (stars 0 = skipped or lost): both clocks and the robot's answer wait, then
+// run on for as long as the game took. The prize is only a bonus on the next attacks (or a
+// guard), never coins, and the right answers the server pays by (`myRight`) are not touched.
+export function createPracticeMatch({ me, questions, level = 'normal', mode = 'speed', onMessage, random = Math.random, foe = null, skill = null, hp = BOT_HP, ko = false, label = '연습 경기', minigame = null }) {
   const lv = skill || BOT_LEVELS[level] || BOT_LEVELS.normal;
   const bot = foe ? { ...foe, id: BOT_ID, bot: true } : { id: BOT_ID, name: `연습 상대 · ${lv.name}`, pet: { key: 'robot', form: lv.form, name: `AI 로보` }, bot: true };
   const state = createBattle({ id: `practice-${Date.now()}`, players: [me, bot], questions, stake: 0, label, mode, hp, timeoutWinner: ko ? BOT_ID : null, now: Date.now() });
   let closed = false, loop = null, botTimer = null, emoteTimer = null;
+  // V13.104: `pausedAt` is set while a word game is open; `mini.last` is the last game's kind.
+  let pausedAt = null, cancelMini = null;
+  const mini = { done: 0, last: null, idx: -1 };
   const now = () => Date.now();
   const deliver = message => { if (!closed) onMessage({ ...message, now: now() }); };
   const emit = events => {
@@ -67,6 +76,35 @@ export function createPracticeMatch({ me, questions, level = 'normal', mode = 's
   function react(e) {
     if (e.type === 'question') planAnswer(e);
   }
+  // V13.104: the reveal of every 6th word is over and the match would go on: a word game may come first.
+  function openMini(t) {
+    // `mini.idx`: the word a game was already offered after (the reveal is still on when it ends).
+    if (!minigame || state.phase !== 'reveal' || t < state.deadline || mini.idx === state.idx) return false;
+    const mine = state.players[me.id], theirs = state.players[BOT_ID], asked = state.idx + 1;
+    if (!miniDue({ asked, done: mini.done, leftMs: state.ends_at - t, myHp: mine.hp, foeHp: theirs.hp })) return false;
+    mini.done++; mini.idx = state.idx;
+    const words = miniWords(state.questions, asked, mine.missed || [], random), kind = pickGame(words, mini.last, random);
+    if (!kind) return false;
+    pausedAt = t;
+    clearTimeout(botTimer);
+    let answered = false;
+    const finish = (result = {}) => { if (!answered && !closed && pausedAt !== null) { answered = true; resumeMini(result.kind || kind, result.stars); } };
+    cancelMini = minigame({ kind, words, finish }) || null;
+    return true;
+  }
+  function resumeMini(kind, stars = 0) {
+    const t = now(), gap = Math.max(0, t - pausedAt), mine = state.players[me.id];
+    pausedAt = null; cancelMini = null;
+    mini.last = kind;
+    state.ends_at += gap;
+    if (state.started_at) state.started_at += gap;
+    state.deadline = t;
+    const bonus = miniBonus(kind, Math.max(0, Math.min(3, Number(stars) || 0)));
+    mine.boost = addBonus(mine.boost, bonus.boost);
+    mine.guard = addBonus(mine.guard, bonus.guard);
+    const given = bonus.boost.length || bonus.guard.length;
+    deliver({ type: 'events', events: [{ type: 'minibonus', seq: ++state.seq, player: me.id, kind, stars: given ? stars : 0, ends_at: state.ends_at, effects: { [me.id]: { boost: [...mine.boost], guard: [...mine.guard], poison: mine.poison || 0 } } }] });
+  }
 
   return {
     id: state.id,
@@ -77,7 +115,7 @@ export function createPracticeMatch({ me, questions, level = 'normal', mode = 's
       connect(state, BOT_ID, now());
       deliver({ type: 'view', view: battleView(state, me.id) });
       emit(connect(state, me.id, now()));
-      loop = setInterval(() => { if (!closed) emit(tick(state, now())); }, 100);
+      loop = setInterval(() => { if (closed || pausedAt !== null) return; const t = now(); if (!openMini(t)) emit(tick(state, t)); }, 100);
     },
     send(message) {
       if (closed) return;
@@ -91,12 +129,20 @@ export function createPracticeMatch({ me, questions, level = 'normal', mode = 's
         return;
       }
       if (message.type === 'ping' || message.type === 'sync') return;
+      // V13.104: while a word game is open the match stands still (only leaving works).
+      if (pausedAt !== null) {
+        if (message.type !== 'leave') return;
+        cancelMini?.(); cancelMini = null; pausedAt = null;
+      }
       const events = tick(state, t);
       // V13.99: the word number (idx) as in a battle room, so a late tap is not counted twice.
       if (message.type === 'answer') events.push(...answer(state, me.id, typeof message.choice === 'string' ? message.choice.slice(0, 60) : Number(message.choice), t, Number.isInteger(message.idx) ? message.idx : undefined));
       else if (message.type === 'leave') events.push(...forfeit(state, me.id, t));
       emit(events);
     },
-    close() { closed = true; stop(); clearTimeout(emoteTimer); }
+    // V13.104: a word game that is still open is closed with the match.
+    close() { closed = true; stop(); clearTimeout(emoteTimer); cancelMini?.(); cancelMini = null; },
+    // How many word games opened in this match (for the release check).
+    miniCount: () => mini.done
   };
 }

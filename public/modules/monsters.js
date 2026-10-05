@@ -16,7 +16,7 @@ export const MONSTERS = [
   { key: 'owlnight', name: '밤샘 부엉 대장', line: '밤새 공부를 방해하는 졸린 부엉이 장군', color: '#3b5bdb', temp: { pet: 'owl', form: 3, filter: 'hue-rotate(185deg) saturate(1.3) brightness(.8)' } },
   { key: 'dictdragon', name: '딕셔너리 드래곤', line: '사전 날개를 펼친 거대한 드래곤', color: '#4f46e5', temp: { pet: 'dragon', form: 3, filter: 'hue-rotate(45deg) saturate(1.4) brightness(.88)' } },
   { key: 'finalking', name: '수능 대마왕', line: '시험지 갑옷을 입은 마지막 대마왕', color: '#b91c1c', temp: { pet: 'qilin', form: 3, filter: 'hue-rotate(-40deg) saturate(1.6) brightness(.82) contrast(1.1)' } },
-  // V13.104 몬스터 2탄 (주문서 docs/asset-requests/runner/12-monsters.txt). Until the pictures of sheets
+  // V13.105 몬스터 2탄 (주문서 docs/asset-requests/runner/12-monsters.txt). Until the pictures of sheets
   // 12-1 … 12-9 arrive they borrow a recoloured pet picture like the first nine did.
   { key: 'mochi', name: '암기 모찌', line: '외운 단어를 말랑하게 뭉개 버리는 찹쌀 모찌', color: '#e8a7b8', temp: { pet: 'hamster', form: 1, filter: 'saturate(.25) brightness(1.22)' } },
   { key: 'pencilworm', name: '샤프 벌레', line: '샤프심을 갉아 먹는 초록 애벌레', color: '#3fbf8f', temp: { pet: 'snake', form: 2, filter: 'hue-rotate(25deg) saturate(1.25)' } },
@@ -28,7 +28,7 @@ export const MONSTERS = [
   { key: 'cramwizard', name: '벼락치기 마법사', line: '시험 전날 밤 커피로 마법을 부리는 마법사', color: '#7c4dcc', temp: { pet: 'owl', form: 3, filter: 'hue-rotate(40deg) saturate(1.5) brightness(.85)' } },
   { key: 'mockhydra', name: '모의고사 히드라', line: '머리 셋 달린 모의고사 괴물', color: '#2f9e8f', temp: { pet: 'dragon', form: 3, filter: 'sepia(.45) saturate(1.3) hue-rotate(80deg)' } }
 ];
-// V13.104 the monster of each level: small to big, the first and the second nine mixed. After the
+// V13.105 the monster of each level: small to big, the first and the second nine mixed. After the
 // 18th level they come round again stronger ("+1", "+2" …).
 export const MONSTER_ORDER = ['mochi', 'slime', 'pencilworm', 'forgetghost', 'mimic', 'clock', 'sleepcloud', 'golem', 'alarmwolf', 'phone', 'scrollgoblin', 'pirate', 'proctor', 'owlnight', 'cramwizard', 'dictdragon', 'mockhydra', 'finalking'];
 export function stageMonster(stage) {
@@ -65,7 +65,7 @@ export const MONSTER_LEVELS = {
 };
 export const MONSTER_LEVEL_KEYS = ['easy', 'normal', 'hard'];
 
-/* ---------- V13.104 끝없는 레벨 (stages) ----------
+/* ---------- V13.105 끝없는 레벨 (stages) ----------
    몬스터전은 레벨 1, 2, 3 … 끝없이 이어진다. 레벨마다 이지 · 노말 · 하드가 있고, 한 레벨의 셋을
    모두 깨야 다음 레벨이 열린다. 레벨 1은 셋 다 쉽고, 레벨 10에서 V13.94의 이지 · 노말 · 하드
    세기가 되고, 그 뒤로는 점점 상한(STAGE_CAP)에 가까워진다. 보상(처음 깰 때)은 레벨이 오를수록

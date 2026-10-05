@@ -599,23 +599,23 @@ export async function runRewardsChecks(assert, expectStatus) {
     const parts = monsterParts(counts);
     assert(parts.map(p => p.key).join('|') === '10+24|29+31|32+33+L1' && parts.every(p => p.words >= 8 && p.monster === MONSTERS[p.index % 9]) && monsterParts(new Map([...counts].reverse())).map(p => p.key).join('|') === parts.map(p => p.key).join('|'), 'V13.94 몬스터 파트: 범위를 번호 순서로 묶고(60단어 또는 3범위까지, 4단어 미만 범위 제외), 파트마다 몬스터가 정해진다');
     assert(monsterOpen({}, 'easy') && !monsterOpen({}, 'normal') && monsterOpen({ easy: 1 }, 'normal') && !monsterOpen({ easy: 1 }, 'hard') && monsterOpen({ easy: 1, normal: 1 }, 'hard'), 'V13.94 이지 → 노말 → 하드 순서로 열린다');
-    /* ---------- V13.104 끝없는 레벨: 레벨마다 이지 → 노말 → 하드, 하드를 깨면 다음 레벨 ---------- */
+    /* ---------- V13.105 끝없는 레벨: 레벨마다 이지 → 노말 → 하드, 하드를 깨면 다음 레벨 ---------- */
     const lv = (stage, k) => stageLevel(stage, k);
     assert(['easy', 'normal', 'hard'].map(k => lv(1, k).first.coins).join() === '5,10,15' && ['easy', 'normal', 'hard'].map(k => lv(1, k).first.xp).join() === '60,120,240'
       && lv(2, 'hard').first.coins > lv(1, 'hard').first.coins && lv(11, 'hard').first.coins > lv(9, 'hard').first.coins
       && lv(99, 'hard').first.coins === STAGE_REWARD.hard.coins * STAGE_REWARD_MAX && lv(100, 'hard').first.coins === Math.round(STAGE_REWARD.hard.coins * STAGE_REWARD_MAX * 1.5)
       && ['easy', 'normal', 'hard'].every(k => lv(30, k).again.coins === Math.max(1, Math.round(lv(30, k).first.coins * STAGE_AGAIN_SHARE)) && lv(30, k).again.coins * MONSTER_DAILY <= 100),
-      'V13.104 보상: 레벨 1은 이지/노말/하드 5/10/15코인으로 낮게 시작해 레벨마다 오르고(최대 4배), 보스(5레벨마다)는 1.5배, 다시 잡기는 첫 처치의 20%(하루 5번)');
+      'V13.105 보상: 레벨 1은 이지/노말/하드 5/10/15코인으로 낮게 시작해 레벨마다 오르고(최대 4배), 보스(5레벨마다)는 1.5배, 다시 잡기는 첫 처치의 20%(하루 5번)');
     assert(['easy', 'normal', 'hard'].every(k => ['accuracy', 'min', 'max', 'need', 'hp', 'mode', 'skill'].every(key => lv(10, k)[key] === MONSTER_LEVELS[k][key]) && lv(10, k).monsterHp === Math.round(MONSTER_LEVELS[k].monsterHp * 1.08))
       && ['easy', 'normal', 'hard'].every(k => lv(1, k).accuracy < lv(5, k).accuracy && lv(5, k).accuracy < lv(10, k).accuracy && lv(10, k).accuracy < lv(30, k).accuracy && lv(30, k).accuracy < lv(200, k).accuracy && lv(1, k).min > lv(30, k).min)
       && lv(1, 'hard').mode === 'skill' && lv(1, 'easy').mode === 'speed' && isBossStage(5) && isBossStage(10) && !isBossStage(11) && lv(5, 'hard').boss && lv(15, 'normal').monsterHp > lv(14, 'normal').monsterHp,
-      'V13.104 난이도: 레벨이 오를수록 몬스터가 정확하고 빨라지고(레벨 10이 V13.94의 이지·노말·하드), 하드는 실력전, 5레벨마다 보스');
+      'V13.105 난이도: 레벨이 오를수록 몬스터가 정확하고 빨라지고(레벨 10이 V13.94의 이지·노말·하드), 하드는 실력전, 5레벨마다 보스');
     // The curve, from fights simulated on the real engine (server/monster-sim.mjs, fixed seed).
     const winRate = (stage, k, know) => simulateMonster(stage, k, know, 160);
     const w1 = winRate(1, 'hard', .98), w5e = winRate(5, 'easy', .75), w10 = winRate(10, 'hard', .98), w30 = winRate(30, 'hard', .98), w60n = winRate(60, 'normal', .9);
-    assert(w1 >= .9 && w5e >= .85 && w10 >= .2 && w10 <= .6 && w30 <= .2 && w60n <= .2, `V13.104 시뮬레이션: 레벨 1 하드는 거의 다 아는 학생이 거의 이기고(${Math.round(w1 * 100)}%), 레벨 10 하드는 지금 하드 수준(${Math.round(w10 * 100)}%), 레벨 30 하드·레벨 60 노말은 아주 어렵다(${Math.round(w30 * 100)}%, ${Math.round(w60n * 100)}%)`);
+    assert(w1 >= .9 && w5e >= .85 && w10 >= .2 && w10 <= .6 && w30 <= .2 && w60n <= .2, `V13.105 시뮬레이션: 레벨 1 하드는 거의 다 아는 학생이 거의 이기고(${Math.round(w1 * 100)}%), 레벨 10 하드는 지금 하드 수준(${Math.round(w10 * 100)}%), 레벨 30 하드·레벨 60 노말은 아주 어렵다(${Math.round(w30 * 100)}%, ${Math.round(w60n * 100)}%)`);
     assert(MONSTER_ORDER.length === 18 && new Set(MONSTER_ORDER).size === 18 && MONSTER_ORDER.every(k => MONSTERS.some(m => m.key === k && m.temp?.pet && m.temp.filter)) && stageMonster(1).key === 'mochi' && stageMonster(18).key === 'finalking' && stageMonster(19).key === 'mochi' && stageMonster(19).round === 1 && stageMonster(19).title === '암기 모찌 +1' && stageMonster(37).round === 2,
-      'V13.104 몬스터 18종(새 9종 포함)이 작은 것부터 큰 것 순서로 레벨을 지키고, 18레벨 뒤에는 "+1"로 더 세게 다시 나온다(그림이 오기 전에는 펫 그림 색 바꾸기)');
+      'V13.105 몬스터 18종(새 9종 포함)이 작은 것부터 큰 것 순서로 레벨을 지키고, 18레벨 뒤에는 "+1"로 더 세게 다시 나온다(그림이 오기 전에는 펫 그림 색 바꾸기)');
     const kid = { id: 'qa-mh', pets: [{ key: 'dog' }], bonus: {} };
     const t0 = Date.parse('2026-10-03T03:00:00Z');
     const fight = (stage, level, result, right, at) => { const r = monsterStart(kid, { stage, level, codes: ['1'], id: 'f-' + at, now: at }); return monsterFinish(kid, { id: r.id, result, right, now: at + 60000 }); };
@@ -626,7 +626,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     const few = fight(1, 'easy', 'lose', 2, t0 + 200000);
     const quick = monsterFinish(kid, { id: monsterStart(kid, { stage: 1, level: 'easy', id: 'q', now: t0 }).id, result: 'win', right: 9, now: t0 + 5000 });
     assert(refused === 409 && ahead === 409 && firstWin.paid && firstWin.first && firstWin.coins === lv(1, 'easy').first.coins && again.paid && !again.first && again.coins === lv(1, 'easy').again.coins && !few.paid && few.reason === 'few' && !quick.paid && quick.reason === 'short',
-      'V13.104 몬스터 보상: 잠긴 난이도·안 열린 레벨은 거절, 첫 처치는 그 레벨의 보상, 다시 잡으면 작은 보상, 단어를 덜 맞히거나 너무 빨리 끝나면 없음');
+      'V13.105 몬스터 보상: 잠긴 난이도·안 열린 레벨은 거절, 첫 처치는 그 레벨의 보상, 다시 잡으면 작은 보상, 단어를 덜 맞히거나 너무 빨리 끝나면 없음');
     for (let i = 0; i < MONSTER_DAILY; i++) fight(1, 'easy', 'lose', 9, t0 + 300000 + i * 100000);
     const capped = fight(1, 'easy', 'win', 9, t0 + 900000);
     const normalFirst = fight(1, 'normal', 'win', 12, t0 + 1000000), hardFirst = fight(1, 'hard', 'win', 14, t0 + 1100000);
@@ -634,10 +634,10 @@ export async function runRewardsChecks(assert, expectStatus) {
     const next = fight(2, 'easy', 'win', 9, t0 + 1300000);
     assert(!capped.paid && capped.reason === 'daily' && normalFirst.first && hardFirst.paid && hardFirst.first && hardFirst.stage_up === 2 && hardFirst.coins === lv(1, 'hard').first.coins && view1.stage === 2 && view1.best === 1 && !Object.keys(view1.clear).length
       && next.first && next.coins === lv(2, 'easy').first.coins && monsterView(kid, t0).clear.easy && kid.bonus.monster.hard_wins === 1 && kid.bonus.monster.wins >= 4,
-      'V13.104 하루 다시 잡기 보상은 5번까지(첫 처치는 언제나), 하드를 처음 깨면 다음 레벨이 열리고(이지부터), 다음 레벨 첫 처치는 그 레벨 보상');
+      'V13.105 하루 다시 잡기 보상은 5번까지(첫 처치는 언제나), 하드를 처음 깨면 다음 레벨이 열리고(이지부터), 다음 레벨 첫 처치는 그 레벨 보상');
     // The 하드 farming the teacher saw: a cleared 하드 played again pays 20% of its first clear only.
     const farm = fight(1, 'hard', 'win', 14, t0 + DAY_MS);
-    assert(farm.paid && !farm.first && farm.coins === lv(1, 'hard').again.coins && farm.coins <= Math.ceil(lv(1, 'hard').first.coins / 5), 'V13.104 이미 깬 하드를 다시 잡으면 첫 처치의 20%만(하드 반복으로 코인을 쓸어 담지 못한다)');
+    assert(farm.paid && !farm.first && farm.coins === lv(1, 'hard').again.coins && farm.coins <= Math.ceil(lv(1, 'hard').first.coins / 5), 'V13.105 이미 깬 하드를 다시 잡으면 첫 처치의 20%만(하드 반복으로 코인을 쓸어 담지 못한다)');
     assert(['monster1', 'monster10', 'monsterhard', 'monsterlord'].every(key => TITLES[key]?.group === 'monster') && TITLES.monsterlord.tier === 'legendary', 'V13.94 몬스터 칭호 4개');
     // V13.99: a lost fight is checked for time too, by how long the right answers take.
     const loser = { id: 'qa-mh-lose', pets: [{ key: 'dog' }], bonus: {} };
@@ -660,7 +660,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(battle94b.includes('function strike(') && battle94b.includes("strike(atk, def,") && battle94b.includes('skill: true, attacker: p') && battle94b.includes('function knockout(') && ['.fx-shot{', '.fx-ring{', '.fx-claw{', '.fx-beam{', '.fx-ko{', '@keyframes fx-shake-l'].every(x => css94b.includes(x)), 'V13.94 공격 이펙트: 날아가는 공격·충격파·불꽃·화면 흔들림, 특기는 광선, 몬스터는 할퀴기, 쓰러뜨리면 K.O.!');
     assert(battle94b.includes('ya-chip-study') && battle94b.includes('class="ya-picked') && battle94b.includes('ya-rm-duel') && battle94b.includes('친구가 다른 번호를 외우고 있다면?'), 'V13.94 내 단어 범위: 단어 수·학습 중 표시·고른 범위 요약·각자/같은 범위 그림 설명');
   }
-  /* ---------- V13.104 옛 몬스터 기록 옮기기 (파트 → 레벨) · 서버 경로 ---------- */
+  /* ---------- V13.105 옛 몬스터 기록 옮기기 (파트 → 레벨) · 서버 경로 ---------- */
   {
     const t0 = Date.parse('2026-10-05T03:00:00Z');
     // V13.100 helpers stay for the move: old part keys back into range codes, clears per range.
@@ -675,16 +675,16 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(parts.length === 3 && read.stage === 3 && read.best === 2 && read.clear.easy && !read.clear.normal && unsaved
       && started.stage === 3 && vet.bonus.monster.stage === 3 && vet.bonus.monster.best === 2 && vet.bonus.monster.from_parts?.parts === 2 && JSON.stringify(vet.bonus.monster.ranges) === JSON.stringify(ranges)
       && vet.bonus.monster.wins === 7 && bonusRecords(vet).reduce((n, r) => n + r.reward_points, 0) === coinsBefore,
-      'V13.104 옛 기록: 하드까지 깬 파트 수만큼 레벨을 깬 것으로 치고(코인은 다시 주지 않음), 끝까지 못 깬 파트의 이지·노말은 이어서, 원래 기록은 그대로 둔다');
+      'V13.105 옛 기록: 하드까지 깬 파트 수만큼 레벨을 깬 것으로 치고(코인은 다시 주지 않음), 끝까지 못 깬 파트의 이지·노말은 이어서, 원래 기록은 그대로 둔다');
     const late = monsterFinish(vet, { id: 'v1', result: 'win', right: 12, scope: 's|g', parts, now: t0 + 60000 });
-    assert(late.paid && late.first && late.coins === stageLevel(3, 'normal').first.coins && monsterProgress(vet, { scope: 's|g', parts }).stage === 3 && monsterView(vet, t0 + 60000, { scope: 's|g', parts }).clear.normal, 'V13.104 옮긴 뒤에는 레벨 3 노말부터 이어서 첫 처치 보상을 받는다');
+    assert(late.paid && late.first && late.coins === stageLevel(3, 'normal').first.coins && monsterProgress(vet, { scope: 's|g', parts }).stage === 3 && monsterView(vet, t0 + 60000, { scope: 's|g', parts }).clear.normal, 'V13.105 옮긴 뒤에는 레벨 3 노말부터 이어서 첫 처치 보상을 받는다');
     // V13.94–V13.99 cleared map (part keys) is read too.
     const old = { id: 'qa-mh104-old', pets: [{ key: 'dog' }], bonus: { monster: { cleared: { [parts[0].key]: { easy: 1, normal: 2, hard: 3 } } } } };
-    assert(monsterView(old, t0, { scope: 's|g', parts }).stage === 2 && monsterProgress({ bonus: {} }).stage === 1 && monsterMigrate(old, 's|g', parts.flatMap(p => p.codes)) && old.bonus.monster.cleared_v1, 'V13.104 V13.94의 파트 기록도 레벨로 읽고, 기록이 없으면 레벨 1부터');
+    assert(monsterView(old, t0, { scope: 's|g', parts }).stage === 2 && monsterProgress({ bonus: {} }).stage === 1 && monsterMigrate(old, 's|g', parts.flatMap(p => p.codes)) && old.bonus.monster.cleared_v1, 'V13.105 V13.94의 파트 기록도 레벨로 읽고, 기록이 없으면 레벨 1부터');
     // A fight of the old screen (a part, no level number) still settles: never a first clear.
     const legacyKid = { id: 'qa-mh104-leg', pets: [{ key: 'dog' }], bonus: { monster: { stage: 1, clear: {}, live: { id: 'old', part: '1+2', level: 'easy', at: t0 } } } };
     const legacyEnd = monsterFinish(legacyKid, { id: 'old', result: 'win', right: 9, now: t0 + 60000 });
-    assert(legacyEnd.paid && !legacyEnd.first && legacyKid.bonus.monster.stage === 1 && !legacyKid.bonus.monster.clear.easy, 'V13.104 업데이트 전에 시작한 전투는 다시 잡기로 끝난다(레벨 기록은 그대로)');
+    assert(legacyEnd.paid && !legacyEnd.first && legacyKid.bonus.monster.stage === 1 && !legacyKid.bonus.monster.clear.easy, 'V13.105 업데이트 전에 시작한 전투는 다시 잡기로 끝난다(레벨 기록은 그대로)');
     // Through the service: the ranges the student picked (their school and grade, 8 words or more).
     state.schools.push({ id: 'qa-mh-school', name: '몬스터고', full_name: '몬스터고등학교', division: 'high', active: true, sort_order: 90 });
     const words = [['1', 29], ['2', 30], ['3', 5]].flatMap(([code, n]) => Array.from({ length: n }, (_, i) => ({ id: `qa-mh-${code}-${i}`, range_code: code, word: `w${code}x${i}`, meaning: `뜻${code}-${i}` })));
@@ -702,14 +702,14 @@ export async function runRewardsChecks(assert, expectStatus) {
     const finish = await service(state, 'POST', '/monster/finish', { id: start.id, result: 'win', right: 20 }, svcToken);
     assert(shown.stage === 2 && shown.best === 1 && noRange === 400 && tooFew === 409 && strange && locked === 409 && start.stage === 2 && start.monster === stageMonster(2).key && svc.bonus.monster.live === undefined
       && JSON.stringify(svc.bonus.monster.ranges ? Object.keys(svc.bonus.monster.ranges).length : 0) !== '' && finish.paid && finish.first && finish.coins === stageLevel(2, 'easy').first.coins && finish.stage === 2 && finish.clear.easy,
-      'V13.104 /monster/start: 레벨 번호와 고른 단어 범위(같은 학교·학년, 8단어 이상)로 시작하고, 안 열린 레벨은 거절, 끝내면 그 레벨 첫 처치 보상');
+      'V13.105 /monster/start: 레벨 번호와 고른 단어 범위(같은 학교·학년, 8단어 이상)로 시작하고, 안 열린 레벨은 거절, 끝내면 그 레벨 첫 처치 보상');
     const oldScreen = await service(state, 'POST', '/monster/start', { part: '1+2+3', level: 'normal' }, svcToken);
-    assert(oldScreen.stage === 2 && oldScreen.level === 'normal' && svc.bonus.monster.live.codes.join() === '1,2,3', 'V13.104 예전 화면(파트로 시작)도 지금 레벨로 시작한다');
+    assert(oldScreen.stage === 2 && oldScreen.level === 'normal' && svc.bonus.monster.live.codes.join() === '1,2,3', 'V13.105 예전 화면(파트로 시작)도 지금 레벨로 시작한다');
     delete svc.bonus.monster.live;
-    const battle104 = source('../public/modules/battle.js'), css104 = source('../public/v13104.css');
+    const battle104 = source('../public/modules/battle.js'), css104 = source('../public/v13105.css');
     assert(battle104.includes("registerStart('/monster/start', { stage, level, range_codes: w.picked })") && battle104.includes('function stageCard(') && battle104.includes('function stageLocked(') && battle104.includes("data-yb=\"monster-go\" data-stage=") && battle104.includes('stage_up') && battle104.includes("label: `레벨 ${stage}${L.boss ? ' · 보스' : ''} · ${L.name}`")
-      && css104.includes('.ms-plate{') && css104.includes('.ms-stage.boss.now') && css104.includes('.mon-temp.mon-round') && source('./build-assets.mjs').includes('"v13104.css"'),
-      'V13.104 몬스터 탭: 지금 레벨 카드(이지·노말·하드), 다음 레벨 그림자, 지난 레벨 다시 하기, 레벨 판 숫자, 싸울 단어 범위 고르기, 레벨 업 안내');
+      && css104.includes('.ms-plate{') && css104.includes('.ms-stage.boss.now') && css104.includes('.mon-temp.mon-round') && source('./build-assets.mjs').includes('"v13105.css"'),
+      'V13.105 몬스터 탭: 지금 레벨 카드(이지·노말·하드), 다음 레벨 그림자, 지난 레벨 다시 하기, 레벨 판 숫자, 싸울 단어 범위 고르기, 레벨 업 안내');
   }
   /* ---------- V13.95 몬스터 그림 (시트 10-1 … 10-10) ---------- */
   {
@@ -824,16 +824,16 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(battle103.includes('id="yb-spell-input"') && battle103.includes('autocapitalize="off" autocorrect="off" spellcheck="false"') && battle103.includes('enterkeyhint="send"') && battle103.includes('lang="en"') && !battle103.includes('KEY_ROWS') && !battle103.includes('class="yb-kb"') && !battle103.includes('data-yb="key"'), 'V13.103 야차전·몬스터전 철자 쓰기는 앱 자판 대신 시험 볼 때와 같은 폰 기본 키보드(자동 수정·대문자 꺼짐)로 쓴다');
     assert(battle103.includes("if (event.target?.id === 'yb-spell-input') return;") && battle103.includes("if (event.key === 'Enter' && !event.isComposing)") && battle103.includes("replace(/[^a-z]/g, '')") && battle103.includes('.slice(0, blanks(q))') && battle103.includes('function syncSpell(') && battle103.includes('input.value = q.typed.join') && /입력은 막지 않고|stays enabled/.test(battle103), 'V13.103 입력칸은 영어 a~z만 받고(한글은 안내), Enter로 공격하며, 낸 뒤에는 입력을 무시하되 키보드는 유지한다');
     assert(css98.includes('.yb-spell-input{position:absolute;inset:0') && css98.includes('font-size:16px') && css98.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/8.2}') && battle103.includes("classList.add('yb-typing')"), 'V13.103 키보드가 올라오면 전투 화면(경기장)이 줄어 단어와 글자 칸이 키보드 위에 보인다(16px 글자로 확대 방지)');
-    /* ---------- V13.104 전투 화면 효과 ---------- */
-    const css104 = source('../public/v13104fx.css'), build104 = source('./build-assets.mjs');
-    assert(/"v13104\.css",\s*"v13104fx\.css"\s*\]/.test(build104), 'V13.104 전투 효과 CSS(v13104fx.css)가 묶음 CSS 목록의 맨 끝에 들어간다');
-    assert(battle103.includes('function hitStop(') && battle103.includes("classList.add('fx-stop')") && css104.includes('.yb-arena.fx-stop *{animation-play-state:paused!important}') && battle103.includes('function dmgTier(') && battle103.includes("const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl']") && battle103.includes("` fx-num t${dmgTier(+dmg)}"), 'V13.104 맞는 순간 잠깐 멈추고(히트스톱), 데미지가 클수록 더 세게 흔들리고 숫자가 커진다');
-    assert(battle103.includes('function comboUp(') && battle103.includes('function comboReset(') && battle103.includes("if (atk === 'me') comboUp();") && (battle103.match(/comboReset\(\);/g) || []).length >= 3 && css104.includes('.fx-combo'), 'V13.104 내가 연속으로 맞히면 2콤보부터 내 HUD 위에 콤보가 뜨고, 틀리거나 놓치면 0으로 돌아간다(화면 표시만)');
-    assert(battle103.includes('if (e.fast && e.dmg) critStamp(def);') && battle103.includes("'CRITICAL!'") && battle103.includes("crit ? 'fx-shake-xl'"), 'V13.104 빠른 정답(fast)이면 CRITICAL! 도장과 더 센 흔들림이 나온다');
-    assert(battle103.includes('function finisher(') && battle103.includes('a.playbackRate = .3') && battle103.includes("later(drawResult, reduced() ? 0 : ko ? Math.max(700, 2000 - since) : 1100)") && battle103.includes("'K.O.!'"), 'V13.104 마지막 한 방은 슬로 모션·섬광·K.O. 뒤 결과가 나오고, 결과는 예전보다 0.3초만 늦어진다');
-    assert(battle103.includes('function cutIn(') && battle103.includes('v.label || modeName(v.mode)') && battle103.includes('/보스/.test(label)') && css104.includes('.fx-cutin.monster') && css104.includes('.fx-cutin.boss') && css104.includes('.fx-cutin{inset:0;z-index:9;display:grid;place-items:center;overflow:hidden}') && /\.yb-arena \.fx-impact,[^{]*\{position:absolute;pointer-events:none\}/.test(css104), 'V13.104 시작 카운트다운에 상대 이름 컷인(몬스터는 크고 빨갛게, 보스는 어둡게)이 나오고 터치를 막지 않는다');
-    assert(battle103.includes('function sfxThump(') && battle103.includes('function sfxCombo(') && battle103.includes('function sfxKO(') && battle103.includes("function buzzFx(pattern) { if (soundOn() && 'vibrate' in navigator)"), 'V13.104 데미지만큼 무거운 타격음, 콤보마다 올라가는 소리, K.O. 소리가 있고 진동은 소리를 켰을 때만 울린다');
-    assert(battle103.includes('const FX_MAX = 24;') && css104.includes('@media (prefers-reduced-motion:reduce)') && css104.includes('.fx-impact,.fx-vignette,.fx-ko-rays{display:none}') && css104.includes('.battle-app.yb-typing .fx-combo'), 'V13.104 효과 조각은 24개까지만 그리고, 동작 줄이기에서는 새 효과가 멈추며, 글자 칠 때 짧아진 경기장에서도 맞게 보인다');
+    /* ---------- V13.105 전투 화면 효과 ---------- */
+    const css104 = source('../public/v13105fx.css'), build104 = source('./build-assets.mjs');
+    assert(/"v13105\.css",\s*"v13105fx\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css)가 묶음 CSS 목록의 맨 끝에 들어간다');
+    assert(battle103.includes('function hitStop(') && battle103.includes("classList.add('fx-stop')") && css104.includes('.yb-arena.fx-stop *{animation-play-state:paused!important}') && battle103.includes('function dmgTier(') && battle103.includes("const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl']") && battle103.includes("` fx-num t${dmgTier(+dmg)}"), 'V13.105 맞는 순간 잠깐 멈추고(히트스톱), 데미지가 클수록 더 세게 흔들리고 숫자가 커진다');
+    assert(battle103.includes('function comboUp(') && battle103.includes('function comboReset(') && battle103.includes("if (atk === 'me') comboUp();") && (battle103.match(/comboReset\(\);/g) || []).length >= 3 && css104.includes('.fx-combo'), 'V13.105 내가 연속으로 맞히면 2콤보부터 내 HUD 위에 콤보가 뜨고, 틀리거나 놓치면 0으로 돌아간다(화면 표시만)');
+    assert(battle103.includes('if (e.fast && e.dmg) critStamp(def);') && battle103.includes("'CRITICAL!'") && battle103.includes("crit ? 'fx-shake-xl'"), 'V13.105 빠른 정답(fast)이면 CRITICAL! 도장과 더 센 흔들림이 나온다');
+    assert(battle103.includes('function finisher(') && battle103.includes('a.playbackRate = .3') && battle103.includes("later(drawResult, reduced() ? 0 : ko ? Math.max(700, 2000 - since) : 1100)") && battle103.includes("'K.O.!'"), 'V13.105 마지막 한 방은 슬로 모션·섬광·K.O. 뒤 결과가 나오고, 결과는 예전보다 0.3초만 늦어진다');
+    assert(battle103.includes('function cutIn(') && battle103.includes('v.label || modeName(v.mode)') && battle103.includes('/보스/.test(label)') && css104.includes('.fx-cutin.monster') && css104.includes('.fx-cutin.boss') && css104.includes('.fx-cutin{inset:0;z-index:9;display:grid;place-items:center;overflow:hidden}') && /\.yb-arena \.fx-impact,[^{]*\{position:absolute;pointer-events:none\}/.test(css104), 'V13.105 시작 카운트다운에 상대 이름 컷인(몬스터는 크고 빨갛게, 보스는 어둡게)이 나오고 터치를 막지 않는다');
+    assert(battle103.includes('function sfxThump(') && battle103.includes('function sfxCombo(') && battle103.includes('function sfxKO(') && battle103.includes("function buzzFx(pattern) { if (soundOn() && 'vibrate' in navigator)"), 'V13.105 데미지만큼 무거운 타격음, 콤보마다 올라가는 소리, K.O. 소리가 있고 진동은 소리를 켰을 때만 울린다');
+    assert(battle103.includes('const FX_MAX = 24;') && css104.includes('@media (prefers-reduced-motion:reduce)') && css104.includes('.fx-impact,.fx-vignette,.fx-ko-rays{display:none}') && css104.includes('.battle-app.yb-typing .fx-combo'), 'V13.105 효과 조각은 24개까지만 그리고, 동작 줄이기에서는 새 효과가 멈추며, 글자 칠 때 짧아진 경기장에서도 맞게 보인다');
     /* ---------- V13.101 로보 연습전·몬스터 끝내기 영수증 ---------- */
     {
       const t1 = Date.parse('2026-10-04T03:00:00Z');
