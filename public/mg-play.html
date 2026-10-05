@@ -119,7 +119,7 @@ function join(auto) {
   const timer = setTimeout(() => { $('#joinBtn').disabled = false; if (!joined) $('#jerr').textContent = '응답이 없습니다. 잠시 후 다시 눌러 주세요.'; }, 15000);
   socket.emit('mg:join', { pin, name, pid, color }, (r) => {
     clearTimeout(timer); $('#joinBtn').disabled = false;
-    if (r.redirect) { keepMe(pin, name); location.href = r.redirect + '&auto=1'; return; }
+    if (r.redirect) { keepMe(pin, name); location.href = r.redirect; return; }
     if (!r.ok) {
       $('#jerr').textContent = r.error; joined = false; report('join fail ' + r.error);
       $('#game').classList.add('hidden'); $('#join').classList.remove('hidden');

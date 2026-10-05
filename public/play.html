@@ -157,7 +157,7 @@ function join(auto) {
     $('#joinBtn').disabled = false; $('#jerr').textContent = '';
     if (r.redirect) { // 무궁화로 안내: 이름·색을 남겨 두어 다시 입력하지 않게
       localStorage.setItem(LS, JSON.stringify({ pin, name: name || saved.name, color, pid: saved.pin === pin ? saved.pid : null }));
-      location.href = r.redirect + '&auto=1'; return;
+      location.href = r.redirect; return;
     }
     if (!r.ok) report('join fail: ' + r.error);
     if (!r.ok) { $('#jerr').textContent = r.error; joined = false; showJoin(); return; }
