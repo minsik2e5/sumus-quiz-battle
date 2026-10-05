@@ -657,14 +657,14 @@ function monsterTab() {
 // A level not open yet: the monster's shadow.
 function stageLocked(stage) {
   const m = stageMonster(stage), boss = isBossStage(stage);
-  return `<article class="ms-stage locked${boss ? ' boss' : ''}" aria-label="레벨 ${stage} 잠김"><div class="ms-head">${stagePlate(stage, 'lock')}<div class="ms-shadow" aria-hidden="true">${monsterPic(m, { size: 'mini' })}</div><div class="ms-info"><h3>${boss ? '<em class="ms-boss">BOSS</em>' : ''}???</h3><p>앞 레벨의 하드를 깨면 열려요</p></div></div></article>`;
+  return `<article class="ms-stage locked${boss ? ' boss' : ''}" aria-label="레벨 ${stage} 잠김"><div class="ms-head">${stagePlate(stage, 'lock')}<div class="ms-shadow" aria-hidden="true">${monsterPic(m)}</div><div class="ms-info"><h3>${boss ? '<em class="ms-boss">BOSS</em>' : ''}???</h3><p>앞 레벨의 하드를 깨면 열려요</p></div></div></article>`;
 }
 function stageCard(st, stage, wordsOk, now) {
   const m = stageMonster(stage), boss = isBossStage(stage), done = stage < st.stage;
   return `<article class="ms-stage ${now ? 'now' : 'done'}${boss ? ' boss' : ''}" style="--mc:${m.color}" aria-label="레벨 ${stage}${done ? ' 깸' : ' 도전 중'}">
     <div class="ms-head">
       ${stagePlate(stage, done ? 'clear' : boss ? 'boss' : 'open')}
-      <div class="ms-mon">${monsterPic(m, { size: now ? '' : 'mini' })}</div>
+      <div class="ms-mon">${monsterPic(m)}</div>
       <div class="ms-info"><h3>${boss ? '<em class="ms-boss">BOSS</em>' : ''}${esc(m.title)}</h3>${now ? `<p>${esc(m.line)}</p>` : done ? '<p>처치 완료 · 다시 잡기</p>' : ''}</div>
     </div>
     <div class="mh-levels ms-levels">${MONSTER_LEVEL_KEYS.map(k => {

@@ -37,10 +37,12 @@ export function stageMonster(stage) {
   return { ...m, round, title: round ? `${m.name} +${round}` : m.name };
 }
 // Monsters whose own pictures are in public/assets/monsters (<key>.webp, <key>-attack.webp,
-// <key>-hurt.webp, <key>-down.webp). V13.95: all nine, cut from the sheets 10-1 … 10-9 (the
+// <key>-hurt.webp, <key>-down.webp). V13.95: the first nine, cut from the sheets 10-1 … 10-9 (the
 // four poses of a sheet at one scale, feet on the floor like the pets). `temp` stays as the
 // fallback for a monster added later without pictures.
-export const MONSTER_ART = new Set(['slime', 'forgetghost', 'clock', 'golem', 'phone', 'pirate', 'owlnight', 'dictdragon', 'finalking']);
+export const MONSTER_ART = new Set(['slime', 'forgetghost', 'clock', 'golem', 'phone', 'pirate', 'owlnight', 'dictdragon', 'finalking',
+  // V13.106: the second nine, cut from the sheets 12-1 … 12-9 the same way (the four poses at one scale)
+  'mochi', 'pencilworm', 'mimic', 'sleepcloud', 'alarmwolf', 'scrollgoblin', 'proctor', 'cramwizard', 'mockhydra']);
 export const MONSTER_POSES = ['attack', 'hurt', 'down'];
 // V13.94 parts (kept for moving the old clears) took the first nine in turn.
 export const monsterOf = index => MONSTERS[((index % 9) + 9) % 9];

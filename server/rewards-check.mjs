@@ -711,14 +711,27 @@ export async function runRewardsChecks(assert, expectStatus) {
       && css104.includes('.ms-plate{') && css104.includes('.ms-stage.boss.now') && css104.includes('.mon-temp.mon-round') && source('./build-assets.mjs').includes('"v13105.css"'),
       'V13.105 몬스터 탭: 지금 레벨 카드(이지·노말·하드), 다음 레벨 그림자, 지난 레벨 다시 하기, 레벨 판 숫자, 싸울 단어 범위 고르기, 레벨 업 안내');
   }
+  /* ---------- V13.106 몬스터 2탄 그림 (시트 12-1 … 12-10) ---------- */
+  {
+    const { existsSync } = await import('node:fs');
+    const asset = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));
+    const webpSize = name => { const b = readFileSync(asset(name)); return b.toString('ascii', 12, 16) === 'VP8X' ? `${1 + b.readUIntLE(24, 3)}x${1 + b.readUIntLE(27, 3)}` : ''; };
+    const second = ['mochi', 'pencilworm', 'mimic', 'sleepcloud', 'alarmwolf', 'scrollgoblin', 'proctor', 'cramwizard', 'mockhydra'];
+    const plates = ['monster-stage', 'monster-stage-lock', 'monster-stage-clear', 'monster-stage-boss'];
+    const { ART_READY } = await import('../public/modules/emblems.js');
+    assert(second.every(k => MONSTER_ART.has(k) && ['', '-attack', '-hurt', '-down'].every(p => existsSync(asset(`monsters/${k}${p}`)) && webpSize(`monsters/${k}${p}`) === '512x512')) && MONSTER_ORDER.every(k => MONSTER_ART.has(k)),
+      'V13.106 새 몬스터 9종(암기 모찌 … 모의고사 히드라)의 기본·공격·맞음·쓰러짐 36장이 있고 모두 그림으로 보인다(임시 펫 그림은 이제 안 쓴다)');
+    assert(plates.every(k => ART_READY.has(k) && existsSync(asset(`ui/${k}`)) && webpSize(`ui/${k}`) === '256x256') && source('../public/modules/battle.js').includes("artOr('monster-stage' + (kind === 'open' ? '' : '-' + kind), '', 'ms-plate-art')"),
+      'V13.106 몬스터 레벨 판 그림 4개(열림·잠김·깸·보스)가 있고 레벨 목록의 판에 쓰인다');
+  }
   /* ---------- V13.95 몬스터 그림 (시트 10-1 … 10-10) ---------- */
   {
     const { existsSync } = await import('node:fs');
     const asset = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));
     // Canvas size from the webp header (VP8X chunk: width-1 and height-1, 24-bit little endian).
     const webpSize = name => { const b = readFileSync(asset(name)); return b.toString('ascii', 12, 16) === 'VP8X' ? `${1 + b.readUIntLE(24, 3)}x${1 + b.readUIntLE(27, 3)}` : ''; };
-    const monsterArt = MONSTERS.slice(0, 9).flatMap(m => ['', ...MONSTER_POSES.map(p => '-' + p)].map(p => `monsters/${m.key}${p}`));
-    assert(MONSTERS.slice(0, 9).every(m => MONSTER_ART.has(m.key)) && monsterArt.length === 36 && monsterArt.every(n => existsSync(asset(n)) && webpSize(n) === '512x512'), 'V13.95 몬스터 9종 × 기본·공격·맞음·쓰러짐 36장이 512px 그림으로 있다');
+    const monsterArt = MONSTERS.flatMap(m => ['', ...MONSTER_POSES.map(p => '-' + p)].map(p => `monsters/${m.key}${p}`));
+    assert(MONSTERS.every(m => MONSTER_ART.has(m.key)) && monsterArt.length === 72 && monsterArt.every(n => existsSync(asset(n)) && webpSize(n) === '512x512'), 'V13.95 · V13.106 몬스터 18종 × 기본·공격·맞음·쓰러짐 72장이 512px 그림으로 있다');
     assert(['monster-tab', 'monster-easy', 'monster-normal', 'monster-hard'].every(n => existsSync(asset('ui/' + n)) && webpSize('ui/' + n) === '256x256'), 'V13.95 몬스터 화면 아이콘 4개(몬스터 탭 · 이지 · 노말 · 하드 배지)');
     // Poses: a monster picture swaps like a pet's, and a knocked-out one stays down.
     const fakeArt = src => { const img = { src, isConnected: true, getAttribute: () => img.src, setAttribute: (k, v) => { img.src = v; } }; return { img, querySelector: () => img }; };
@@ -767,7 +780,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   /* ---------- V13.93 08 그림 40장 ---------- */
   const ready93 = [...emblems91.matchAll(/ART_READY = new Set\(\[([^\]]*)\]/g)].flatMap(m => [...m[1].matchAll(/'([a-z0-9-]+)'/g)].map(x => x[1]));
   const arcade93 = source('../public/modules/arcade.js'), shop93 = source('../public/modules/pet-moments.js');
-  assert(ready93.length === 43 /* the 40 of list 08, + 3 for the 칭호 도감 (V13.97) */ && wired91.every(key => ready93.includes(key)) && ['me-petbook', 'pet-epic-locked', 'epic-egg', 'epic-badge'].every(key => ready93.includes(key)) && student90.includes("'pet-epic-locked'") && arcade93.includes("artOr('epic-egg'") && lucky89.includes("artOr('epic-badge'") && shop93.includes("uiArt('epic-egg')"), 'V13.93 08 그림 40장(펫 도감·영웅 펫 4장 포함)이 모두 들어가 선 아이콘 대신 보인다');
+  assert(ready93.length === 47 /* the 40 of list 08, + 3 for the 칭호 도감 (V13.97), + 4 monster level plates (V13.106) */ && wired91.every(key => ready93.includes(key)) && ['me-petbook', 'pet-epic-locked', 'epic-egg', 'epic-badge'].every(key => ready93.includes(key)) && student90.includes("'pet-epic-locked'") && arcade93.includes("artOr('epic-egg'") && lucky89.includes("artOr('epic-badge'") && shop93.includes("uiArt('epic-egg')"), 'V13.93 08 그림 40장(펫 도감·영웅 펫 4장 포함)이 모두 들어가 선 아이콘 대신 보인다');
   /* ---------- V13.92 영웅 펫 · 패드 화면 ---------- */
   assert(EPIC_PET_KEYS.join() === 'capybara,penguin,owl,hamster,shark,alpaca,hedgehog,otter' && STANDARD_PET_KEYS.length === 8 && EPIC_PET_KEYS.every(key => CHARACTERS[key].epic && !CHARACTERS[key].legendary && petTier(key) === 'epic') && petTier('dog') === 'basic' && petTier('qilin') === 'legendary' && EPIC_RATE === 3, 'V13.92 영웅 펫 8마리는 기본과 전설 사이 등급이고, 뽑기 확률은 3%다');
   const epicFiles = EPIC_PET_KEYS.flatMap(key => [0, 1, 2, 3].flatMap(f => [`/assets/pets/${key}-${f}.webp`, `/assets/pets/${key}-${f}-s.webp`, ...(f ? ['happy', 'eat', 'sad', 'cheer'] : ['happy', 'eat']).map(e => expressionSrc(key, f, e))]));
