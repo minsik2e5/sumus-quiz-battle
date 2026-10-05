@@ -129,6 +129,8 @@ export const ART_READY = new Set([
   'study-daily', 'flash-deck', 'flash-done', 'word-empty', 'badge-first100', 'badge-streak90',
   'badge-english100', 'badge-master', 'result-perfect', 'result-great', 'result-good', 'result-retry',
   'me-petbook', 'pet-epic-locked', 'epic-egg', 'epic-badge',
-  'titles-hero', 'title-equipped', 'title-new'
+  'titles-hero', 'title-equipped', 'title-new',
+  // V13.106 몬스터 레벨 판(시트 12-10): 열림 · 잠김 · 깸 · 보스
+  'monster-stage', 'monster-stage-lock', 'monster-stage-clear', 'monster-stage-boss'
 ]);
 export const artOr = (key, fallback, cls = '') => ART_READY.has(key) ? uiArt(key, cls) : fallback;

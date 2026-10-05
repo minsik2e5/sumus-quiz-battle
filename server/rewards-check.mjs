@@ -11,7 +11,7 @@ import { DAY_MS, rankingWeek, createCompetition } from './competition.mjs';
 import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX, CHARACTERS, LEGENDARY_PET_KEYS, STANDARD_PET_KEYS, EPIC_PET_KEYS, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, EGG_PRICE, petTier } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, visibleTitleKeys, titleUnlocked } from '../public/modules/titles.js';
 import { createBattle, connect, answer, tick, battleView, petSkill, SKILL_RULES, BATTLE, PET_SKILLS, MONSTER_SKILLS, forfeit } from '../public/modules/battle-engine.js';
-import { MONSTERS, MONSTER_ART, MONSTER_POSES, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, MONSTER_MS_PER_RIGHT, monsterParts, monsterOpen, partClears, partKeyCodes, stageLevel, stageMonster, isBossStage, MONSTER_ORDER, STAGE_REWARD, STAGE_REWARD_MAX, STAGE_AGAIN_SHARE } from '../public/modules/monsters.js';
+import { MONSTERS, MONSTER_ART, MONSTER_POSES, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, MONSTER_MS_PER_RIGHT, monsterParts, monsterOpen, partClears, partKeyCodes, stageLevel, stageMonster, isBossStage, MONSTER_ORDER, STAGE_REWARD, STAGE_REWARD_MAX, STAGE_AGAIN_SHARE, STAGE_AGAIN_MIN, STAGE_AGAIN_MAX, STAGE_FIRST_COIN_BOOST, STAGE_COIN_MULT } from '../public/modules/monsters.js';
 import { simulate as simulateMonster } from './monster-sim.mjs';
 import { expressionSrc, holdPose, showPose } from '../public/modules/character.js';
 import { battleQuestions, spellHint, spellable, pairedBattleQuestions } from '../public/modules/battle-questions.js';
@@ -601,11 +601,12 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(monsterOpen({}, 'easy') && !monsterOpen({}, 'normal') && monsterOpen({ easy: 1 }, 'normal') && !monsterOpen({ easy: 1 }, 'hard') && monsterOpen({ easy: 1, normal: 1 }, 'hard'), 'V13.94 이지 → 노말 → 하드 순서로 열린다');
     /* ---------- V13.105 끝없는 레벨: 레벨마다 이지 → 노말 → 하드, 하드를 깨면 다음 레벨 ---------- */
     const lv = (stage, k) => stageLevel(stage, k);
-    assert(['easy', 'normal', 'hard'].map(k => lv(1, k).first.coins).join() === '5,10,15' && ['easy', 'normal', 'hard'].map(k => lv(1, k).first.xp).join() === '60,120,240'
+    assert(['easy', 'normal', 'hard'].map(k => lv(1, k).first.coins).join() === '15,30,45' && ['easy', 'normal', 'hard'].map(k => lv(1, k).first.xp).join() === '60,120,240'
       && lv(2, 'hard').first.coins > lv(1, 'hard').first.coins && lv(11, 'hard').first.coins > lv(9, 'hard').first.coins
-      && lv(99, 'hard').first.coins === STAGE_REWARD.hard.coins * STAGE_REWARD_MAX && lv(100, 'hard').first.coins === Math.round(STAGE_REWARD.hard.coins * STAGE_REWARD_MAX * 1.5)
-      && ['easy', 'normal', 'hard'].every(k => lv(30, k).again.coins === Math.max(1, Math.round(lv(30, k).first.coins * STAGE_AGAIN_SHARE)) && lv(30, k).again.coins * MONSTER_DAILY <= 100),
-      'V13.105 보상: 레벨 1은 이지/노말/하드 5/10/15코인으로 낮게 시작해 레벨마다 오르고(최대 4배), 보스(5레벨마다)는 1.5배, 다시 잡기는 첫 처치의 20%(하루 5번)');
+      && lv(99, 'hard').first.coins === Math.round(STAGE_REWARD.hard.coins * STAGE_REWARD_MAX * STAGE_FIRST_COIN_BOOST * STAGE_COIN_MULT) && lv(100, 'hard').first.coins === Math.round(Math.round(STAGE_REWARD.hard.coins * STAGE_REWARD_MAX * 1.5) * STAGE_FIRST_COIN_BOOST * STAGE_COIN_MULT)
+      && ['easy', 'normal', 'hard'].every(k => lv(29, k).again.coins === Math.min(STAGE_AGAIN_MAX * STAGE_COIN_MULT, Math.max(STAGE_AGAIN_MIN[k] * STAGE_COIN_MULT, Math.round(Math.round(STAGE_REWARD[k].coins * Math.min(STAGE_REWARD_MAX, 1 + 0.12 * 28)) * STAGE_AGAIN_SHARE * STAGE_COIN_MULT))) && lv(29, k).again.coins * MONSTER_DAILY <= 250)
+      && ['easy', 'normal', 'hard'].map(k => lv(1, k).again.coins).join() === '6,10,16' && ['easy', 'normal', 'hard'].map(k => lv(10, k).again.coins).join() === '16,31,47' && lv(100, 'hard').again.coins === 50 && MONSTER_TRY.coins === 4 && ['easy', 'normal', 'hard'].every(k => [1, 5, 10, 30, 100].every(n => lv(n, k).again.coins < lv(n, k).first.coins)),
+      'V13.106 보상: 첫 처치는 레벨 1에서 이지/노말/하드 15/30/45코인으로 시작해 레벨마다 오르고(최대 4배), 보스(5레벨마다)는 1.5배, 다시 잡기는 6/10/16코인부터(최대 50코인, 하루 5번), 져도 4코인(몬스터 코인은 처음 값의 2배)');
     assert(['easy', 'normal', 'hard'].every(k => ['accuracy', 'min', 'max', 'need', 'hp', 'mode', 'skill'].every(key => lv(10, k)[key] === MONSTER_LEVELS[k][key]) && lv(10, k).monsterHp === Math.round(MONSTER_LEVELS[k].monsterHp * 1.08))
       && ['easy', 'normal', 'hard'].every(k => lv(1, k).accuracy < lv(5, k).accuracy && lv(5, k).accuracy < lv(10, k).accuracy && lv(10, k).accuracy < lv(30, k).accuracy && lv(30, k).accuracy < lv(200, k).accuracy && lv(1, k).min > lv(30, k).min)
       && lv(1, 'hard').mode === 'skill' && lv(1, 'easy').mode === 'speed' && isBossStage(5) && isBossStage(10) && !isBossStage(11) && lv(5, 'hard').boss && lv(15, 'normal').monsterHp > lv(14, 'normal').monsterHp,
@@ -637,7 +638,7 @@ export async function runRewardsChecks(assert, expectStatus) {
       'V13.105 하루 다시 잡기 보상은 5번까지(첫 처치는 언제나), 하드를 처음 깨면 다음 레벨이 열리고(이지부터), 다음 레벨 첫 처치는 그 레벨 보상');
     // The 하드 farming the teacher saw: a cleared 하드 played again pays 20% of its first clear only.
     const farm = fight(1, 'hard', 'win', 14, t0 + DAY_MS);
-    assert(farm.paid && !farm.first && farm.coins === lv(1, 'hard').again.coins && farm.coins <= Math.ceil(lv(1, 'hard').first.coins / 5), 'V13.105 이미 깬 하드를 다시 잡으면 첫 처치의 20%만(하드 반복으로 코인을 쓸어 담지 못한다)');
+    assert(farm.paid && !farm.first && farm.coins === lv(1, 'hard').again.coins && farm.coins === 16 && farm.coins < lv(1, 'hard').first.coins, 'V13.106 이미 깬 하드를 다시 잡으면 첫 처치보다 적고(레벨 1은 16코인), 하루 5번·한 번 최대 50코인이라 반복만으로는 첫 처치보다 적다');
     assert(['monster1', 'monster10', 'monsterhard', 'monsterlord'].every(key => TITLES[key]?.group === 'monster') && TITLES.monsterlord.tier === 'legendary', 'V13.94 몬스터 칭호 4개');
     // V13.99: a lost fight is checked for time too, by how long the right answers take.
     const loser = { id: 'qa-mh-lose', pets: [{ key: 'dog' }], bonus: {} };
@@ -711,14 +712,27 @@ export async function runRewardsChecks(assert, expectStatus) {
       && css104.includes('.ms-plate{') && css104.includes('.ms-stage.boss.now') && css104.includes('.mon-temp.mon-round') && source('./build-assets.mjs').includes('"v13105.css"'),
       'V13.105 몬스터 탭: 지금 레벨 카드(이지·노말·하드), 다음 레벨 그림자, 지난 레벨 다시 하기, 레벨 판 숫자, 싸울 단어 범위 고르기, 레벨 업 안내');
   }
+  /* ---------- V13.106 몬스터 2탄 그림 (시트 12-1 … 12-10) ---------- */
+  {
+    const { existsSync } = await import('node:fs');
+    const asset = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));
+    const webpSize = name => { const b = readFileSync(asset(name)); return b.toString('ascii', 12, 16) === 'VP8X' ? `${1 + b.readUIntLE(24, 3)}x${1 + b.readUIntLE(27, 3)}` : ''; };
+    const second = ['mochi', 'pencilworm', 'mimic', 'sleepcloud', 'alarmwolf', 'scrollgoblin', 'proctor', 'cramwizard', 'mockhydra'];
+    const plates = ['monster-stage', 'monster-stage-lock', 'monster-stage-clear', 'monster-stage-boss'];
+    const { ART_READY } = await import('../public/modules/emblems.js');
+    assert(second.every(k => MONSTER_ART.has(k) && ['', '-attack', '-hurt', '-down'].every(p => existsSync(asset(`monsters/${k}${p}`)) && webpSize(`monsters/${k}${p}`) === '512x512')) && MONSTER_ORDER.every(k => MONSTER_ART.has(k)),
+      'V13.106 새 몬스터 9종(암기 모찌 … 모의고사 히드라)의 기본·공격·맞음·쓰러짐 36장이 있고 모두 그림으로 보인다(임시 펫 그림은 이제 안 쓴다)');
+    assert(plates.every(k => ART_READY.has(k) && existsSync(asset(`ui/${k}`)) && webpSize(`ui/${k}`) === '256x256') && source('../public/modules/battle.js').includes("artOr('monster-stage' + (kind === 'open' ? '' : '-' + kind), '', 'ms-plate-art')"),
+      'V13.106 몬스터 레벨 판 그림 4개(열림·잠김·깸·보스)가 있고 레벨 목록의 판에 쓰인다');
+  }
   /* ---------- V13.95 몬스터 그림 (시트 10-1 … 10-10) ---------- */
   {
     const { existsSync } = await import('node:fs');
     const asset = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));
     // Canvas size from the webp header (VP8X chunk: width-1 and height-1, 24-bit little endian).
     const webpSize = name => { const b = readFileSync(asset(name)); return b.toString('ascii', 12, 16) === 'VP8X' ? `${1 + b.readUIntLE(24, 3)}x${1 + b.readUIntLE(27, 3)}` : ''; };
-    const monsterArt = MONSTERS.slice(0, 9).flatMap(m => ['', ...MONSTER_POSES.map(p => '-' + p)].map(p => `monsters/${m.key}${p}`));
-    assert(MONSTERS.slice(0, 9).every(m => MONSTER_ART.has(m.key)) && monsterArt.length === 36 && monsterArt.every(n => existsSync(asset(n)) && webpSize(n) === '512x512'), 'V13.95 몬스터 9종 × 기본·공격·맞음·쓰러짐 36장이 512px 그림으로 있다');
+    const monsterArt = MONSTERS.flatMap(m => ['', ...MONSTER_POSES.map(p => '-' + p)].map(p => `monsters/${m.key}${p}`));
+    assert(MONSTERS.every(m => MONSTER_ART.has(m.key)) && monsterArt.length === 72 && monsterArt.every(n => existsSync(asset(n)) && webpSize(n) === '512x512'), 'V13.95 · V13.106 몬스터 18종 × 기본·공격·맞음·쓰러짐 72장이 512px 그림으로 있다');
     assert(['monster-tab', 'monster-easy', 'monster-normal', 'monster-hard'].every(n => existsSync(asset('ui/' + n)) && webpSize('ui/' + n) === '256x256'), 'V13.95 몬스터 화면 아이콘 4개(몬스터 탭 · 이지 · 노말 · 하드 배지)');
     // Poses: a monster picture swaps like a pet's, and a knocked-out one stays down.
     const fakeArt = src => { const img = { src, isConnected: true, getAttribute: () => img.src, setAttribute: (k, v) => { img.src = v; } }; return { img, querySelector: () => img }; };
@@ -767,7 +781,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   /* ---------- V13.93 08 그림 40장 ---------- */
   const ready93 = [...emblems91.matchAll(/ART_READY = new Set\(\[([^\]]*)\]/g)].flatMap(m => [...m[1].matchAll(/'([a-z0-9-]+)'/g)].map(x => x[1]));
   const arcade93 = source('../public/modules/arcade.js'), shop93 = source('../public/modules/pet-moments.js');
-  assert(ready93.length === 43 /* the 40 of list 08, + 3 for the 칭호 도감 (V13.97) */ && wired91.every(key => ready93.includes(key)) && ['me-petbook', 'pet-epic-locked', 'epic-egg', 'epic-badge'].every(key => ready93.includes(key)) && student90.includes("'pet-epic-locked'") && arcade93.includes("artOr('epic-egg'") && lucky89.includes("artOr('epic-badge'") && shop93.includes("uiArt('epic-egg')"), 'V13.93 08 그림 40장(펫 도감·영웅 펫 4장 포함)이 모두 들어가 선 아이콘 대신 보인다');
+  assert(ready93.length === 47 /* the 40 of list 08, + 3 for the 칭호 도감 (V13.97), + 4 monster level plates (V13.106) */ && wired91.every(key => ready93.includes(key)) && ['me-petbook', 'pet-epic-locked', 'epic-egg', 'epic-badge'].every(key => ready93.includes(key)) && student90.includes("'pet-epic-locked'") && arcade93.includes("artOr('epic-egg'") && lucky89.includes("artOr('epic-badge'") && shop93.includes("uiArt('epic-egg')"), 'V13.93 08 그림 40장(펫 도감·영웅 펫 4장 포함)이 모두 들어가 선 아이콘 대신 보인다');
   /* ---------- V13.92 영웅 펫 · 패드 화면 ---------- */
   assert(EPIC_PET_KEYS.join() === 'capybara,penguin,owl,hamster,shark,alpaca,hedgehog,otter' && STANDARD_PET_KEYS.length === 8 && EPIC_PET_KEYS.every(key => CHARACTERS[key].epic && !CHARACTERS[key].legendary && petTier(key) === 'epic') && petTier('dog') === 'basic' && petTier('qilin') === 'legendary' && EPIC_RATE === 3, 'V13.92 영웅 펫 8마리는 기본과 전설 사이 등급이고, 뽑기 확률은 3%다');
   const epicFiles = EPIC_PET_KEYS.flatMap(key => [0, 1, 2, 3].flatMap(f => [`/assets/pets/${key}-${f}.webp`, `/assets/pets/${key}-${f}-s.webp`, ...(f ? ['happy', 'eat', 'sad', 'cheer'] : ['happy', 'eat']).map(e => expressionSrc(key, f, e))]));

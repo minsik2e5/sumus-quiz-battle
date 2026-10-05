@@ -37,10 +37,12 @@ export function stageMonster(stage) {
   return { ...m, round, title: round ? `${m.name} +${round}` : m.name };
 }
 // Monsters whose own pictures are in public/assets/monsters (<key>.webp, <key>-attack.webp,
-// <key>-hurt.webp, <key>-down.webp). V13.95: all nine, cut from the sheets 10-1 … 10-9 (the
+// <key>-hurt.webp, <key>-down.webp). V13.95: the first nine, cut from the sheets 10-1 … 10-9 (the
 // four poses of a sheet at one scale, feet on the floor like the pets). `temp` stays as the
 // fallback for a monster added later without pictures.
-export const MONSTER_ART = new Set(['slime', 'forgetghost', 'clock', 'golem', 'phone', 'pirate', 'owlnight', 'dictdragon', 'finalking']);
+export const MONSTER_ART = new Set(['slime', 'forgetghost', 'clock', 'golem', 'phone', 'pirate', 'owlnight', 'dictdragon', 'finalking',
+  // V13.106: the second nine, cut from the sheets 12-1 … 12-9 the same way (the four poses at one scale)
+  'mochi', 'pencilworm', 'mimic', 'sleepcloud', 'alarmwolf', 'scrollgoblin', 'proctor', 'cramwizard', 'mockhydra']);
 export const MONSTER_POSES = ['attack', 'hurt', 'down'];
 // V13.94 parts (kept for moving the old clears) took the first nine in turn.
 export const monsterOf = index => MONSTERS[((index % 9) + 9) % 9];
@@ -86,10 +88,16 @@ export const STAGE_ANCHOR = 10;     // the stage where V13.94's 이지 · 노말
 export const STAGE_CLIMB = 0.97;    // after STAGE_ANCHOR, each stage closes 3% of the gap to STAGE_CAP
 export const STAGE_BOSS_EVERY = 5;
 // First-clear reward at stage 1 (coins, 경험치); it grows by STAGE_REWARD_STEP a stage up to
-// STAGE_REWARD_MAX times. A cleared fight played again pays STAGE_AGAIN_SHARE of it.
+// STAGE_REWARD_MAX times. A cleared fight played again pays STAGE_AGAIN_SHARE of it (V13.106: 20% -> 50%,
+// but at least STAGE_AGAIN_MIN and at most STAGE_AGAIN_MAX coins a fight; at 20% level 1 paid 1/2/3 coins).
 export const STAGE_REWARD = { easy: { coins: 5, xp: 60 }, normal: { coins: 10, xp: 120 }, hard: { coins: 15, xp: 240 } };
 export const STAGE_REWARD_STEP = 0.12, STAGE_REWARD_MAX = 4, STAGE_BOSS_REWARD = 1.5, STAGE_BOSS_HP = 1.08;
-export const STAGE_AGAIN_SHARE = 0.2;
+// V13.106 첫 처치 코인은 1.5배(다시 잡기는 1.5배 하기 전 값에서 계산한다). 그 위에 몬스터 코인 전반을 STAGE_COIN_MULT배
+// (첫 처치 · 다시 잡기와 그 최소·최대 · 져도 받는 코인). 경험치는 그대로.
+export const STAGE_FIRST_COIN_BOOST = 1.5;
+export const STAGE_COIN_MULT = 2;
+export const STAGE_AGAIN_SHARE = 0.5;
+export const STAGE_AGAIN_MIN = { easy: 3, normal: 5, hard: 8 }, STAGE_AGAIN_MAX = 25;
 export const cleanStage = value => Math.max(1, Math.min(9999, Math.floor(Number(value) || 1)));
 export const isBossStage = stage => cleanStage(stage) % STAGE_BOSS_EVERY === 0;
 const mix = (a, b, x) => a + (b - a) * x;
@@ -102,7 +110,8 @@ export function stageLevel(stage, level) {
   const pick = key => s <= STAGE_ANCHOR ? mix(from[key], at[key], x) : mix(at[key], cap[key], x);
   const boss = isBossStage(s);
   const grow = Math.min(STAGE_REWARD_MAX, 1 + STAGE_REWARD_STEP * (s - 1)) * (boss ? STAGE_BOSS_REWARD : 1);
-  const first = { coins: Math.round(STAGE_REWARD[level].coins * grow), xp: Math.round(STAGE_REWARD[level].xp * grow) };
+  const base = Math.round(STAGE_REWARD[level].coins * grow);
+  const first = { coins: Math.round(base * STAGE_FIRST_COIN_BOOST * STAGE_COIN_MULT), xp: Math.round(STAGE_REWARD[level].xp * grow) };
   return {
     ...L, stage: s, boss,
     accuracy: Math.round(pick('accuracy') * 1000) / 1000,
@@ -110,7 +119,7 @@ export function stageLevel(stage, level) {
     monsterHp: Math.round(pick('monsterHp') * (boss ? STAGE_BOSS_HP : 1)),
     need: Math.round(pick('need')),
     first,
-    again: { coins: Math.max(1, Math.round(first.coins * STAGE_AGAIN_SHARE)), xp: Math.max(1, Math.round(first.xp * STAGE_AGAIN_SHARE)) }
+    again: { coins: Math.min(STAGE_AGAIN_MAX * STAGE_COIN_MULT, Math.max(STAGE_AGAIN_MIN[level] * STAGE_COIN_MULT, Math.round(base * STAGE_AGAIN_SHARE * STAGE_COIN_MULT))), xp: Math.max(1, Math.round(first.xp * STAGE_AGAIN_SHARE)) }
   };
 }
 
@@ -120,7 +129,7 @@ export const MONSTER_MIN_MS = 30000; // a fight cannot be won faster than this
 // 1.5 s per right answer (a real word needs the tap plus the 1.4 s reveal, after a 3 s countdown),
 // so an honest quick loss always passes and a made-up result sent at once does not.
 export const MONSTER_MS_PER_RIGHT = 1500;
-export const MONSTER_TRY = { coins: 2, xp: 20 }; // a lost fight that answered `need` words
+export const MONSTER_TRY = { coins: 4, xp: 20 }; // a lost fight that answered `need` words (V13.106: 2 -> 4 coins)
 
 // Natural order of range codes: 2 before 10, '41~42' after '40', L1 after the numbers.
 const codeKey = code => { const m = String(code).match(/^(\D*)(\d+)/); return m ? [m[1], Number(m[2]), String(code)] : [String(code), 0, String(code)]; };
