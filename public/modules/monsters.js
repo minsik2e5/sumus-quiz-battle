@@ -88,10 +88,12 @@ export const STAGE_ANCHOR = 10;     // the stage where V13.94's 이지 · 노말
 export const STAGE_CLIMB = 0.97;    // after STAGE_ANCHOR, each stage closes 3% of the gap to STAGE_CAP
 export const STAGE_BOSS_EVERY = 5;
 // First-clear reward at stage 1 (coins, 경험치); it grows by STAGE_REWARD_STEP a stage up to
-// STAGE_REWARD_MAX times. A cleared fight played again pays STAGE_AGAIN_SHARE of it.
+// STAGE_REWARD_MAX times. A cleared fight played again pays STAGE_AGAIN_SHARE of it (V13.106: 20% -> 50%,
+// but at least STAGE_AGAIN_MIN and at most STAGE_AGAIN_MAX coins a fight; at 20% level 1 paid 1/2/3 coins).
 export const STAGE_REWARD = { easy: { coins: 5, xp: 60 }, normal: { coins: 10, xp: 120 }, hard: { coins: 15, xp: 240 } };
 export const STAGE_REWARD_STEP = 0.12, STAGE_REWARD_MAX = 4, STAGE_BOSS_REWARD = 1.5, STAGE_BOSS_HP = 1.08;
-export const STAGE_AGAIN_SHARE = 0.2;
+export const STAGE_AGAIN_SHARE = 0.5;
+export const STAGE_AGAIN_MIN = { easy: 3, normal: 5, hard: 8 }, STAGE_AGAIN_MAX = 25;
 export const cleanStage = value => Math.max(1, Math.min(9999, Math.floor(Number(value) || 1)));
 export const isBossStage = stage => cleanStage(stage) % STAGE_BOSS_EVERY === 0;
 const mix = (a, b, x) => a + (b - a) * x;
@@ -112,7 +114,7 @@ export function stageLevel(stage, level) {
     monsterHp: Math.round(pick('monsterHp') * (boss ? STAGE_BOSS_HP : 1)),
     need: Math.round(pick('need')),
     first,
-    again: { coins: Math.max(1, Math.round(first.coins * STAGE_AGAIN_SHARE)), xp: Math.max(1, Math.round(first.xp * STAGE_AGAIN_SHARE)) }
+    again: { coins: Math.min(STAGE_AGAIN_MAX, Math.max(STAGE_AGAIN_MIN[level], Math.round(first.coins * STAGE_AGAIN_SHARE))), xp: Math.max(1, Math.round(first.xp * STAGE_AGAIN_SHARE)) }
   };
 }
 
