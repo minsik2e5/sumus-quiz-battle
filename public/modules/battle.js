@@ -12,6 +12,8 @@ import { createPracticeMatch, practiceQuestions, BOT_LEVELS } from './battle-bot
 import { BATTLE, BATTLE_MODES, PET_SKILLS, PET_SKILL_NEED, petSkill } from './battle-engine.js';
 import { BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, BOT_MIN_RIGHT } from './rewards.js';
 import { tournamentCard, openBracket } from './tournament-ui.js';
+import { openMiniGame } from './word-minigame-ui.js';
+import { bonusText } from './word-minigame.js';
 import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterParts, monsterOpen, partClears, monsterFirstReward } from './monsters.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
@@ -478,6 +480,15 @@ async function startBotMatch(button) {
   if (reg.error) return startFailed(reg.error, () => { if (B === cur) beginBotMatch(questions, setup, null); });
   beginBotMatch(questions, setup, reg.id);
 }
+// V13.104 단어 미니게임: the practice match asks for a word game between two words (see
+// createPracticeMatch); the battle screen draws it over the match. The clock under it stands
+// still (loop() skips while B.mini) and the match runs on when the card closes.
+function miniGameHook({ kind, words, finish }) {
+  const cur = B;
+  cur.mini = true;
+  const cancel = openMiniGame({ kind, words, reduced: reduced(), sfx, finish: result => { cur.mini = false; finish(result); } });
+  return () => { cur.mini = false; cancel(); };
+}
 function beginBotMatch(questions, setup, ticket) {
   goFull();
   closeSocket(false);
@@ -485,7 +496,7 @@ function beginBotMatch(questions, setup, ticket) {
   B.view = null;
   B.practiceSetup = setup;
   B.botReward = ticket ? null : { paid: false, reason: 'unregistered' };
-  B.local = createPracticeMatch({ me: meAsPlayer(), questions, level: setup.level, mode: setup.mode, onMessage });
+  B.local = createPracticeMatch({ me: meAsPlayer(), questions, level: setup.level, mode: setup.mode, onMessage, minigame: miniGameHook });
   B.local.ticket = ticket;
   main('<div class="yb-loading">로보를 부르고 있어요…</div>');
   B.local.start();
@@ -647,7 +658,7 @@ function beginMonster(p, level, questions, ticket) {
   B.monsterSetup = { part: p.key, level };
   B.monsterReward = ticket ? null : { paid: false, reason: 'unregistered' };
   const foe = { name: p.monster.name, pet: { key: p.monster.temp.pet, form: p.monster.temp.form, skill: L.skill }, monster: { key: p.monster.key, level }, hp: L.monsterHp };
-  B.local = createPracticeMatch({ me: meAsPlayer(), questions, mode: L.mode, onMessage, foe, skill: L, hp: L.hp, ko: true, label: `몬스터 · ${L.name}` });
+  B.local = createPracticeMatch({ me: meAsPlayer(), questions, mode: L.mode, onMessage, foe, skill: L, hp: L.hp, ko: true, label: `몬스터 · ${L.name}`, minigame: miniGameHook });
   B.local.ticket = ticket;
   main(`<div class="yb-loading">${esc(p.monster.name)}이(가) 나타났어요…</div>`);
   B.local.start();
@@ -1174,6 +1185,8 @@ function loop() {
   cancelAnimationFrame(B.raf);
   const frame = () => {
     if (!B?.view || B.view.phase === 'finished') return;
+    // V13.104: a word game is open: the match clock stands still behind it.
+    if (B.mini) { B.raf = requestAnimationFrame(frame); return; }
     const v = B.view, now = serverNow();
     const clock = document.getElementById('yb-clock');
     if (clock) { const left = v.ends_at ? Math.max(0, v.ends_at - now) : matchMs(v.mode); clock.textContent = clockText(left); clock.parentElement.classList.toggle('warn', left <= (v.fever_ms || 15000) && !!v.ends_at); }
@@ -1200,6 +1213,15 @@ function applyEvent(e) {
   if (e.type === 'presence') { P[e.player].connected = e.connected; if (e.player !== v.me) setStatus('op', e.connected ? '' : '상대 연결이 끊겼어요. 15초 기다려요'); refreshHud(); return; }
   if (e.type === 'countdown') { v.phase = 'countdown'; v.deadline = e.deadline; if (!document.getElementById('yb-arena')) drawMatch(); showCountdown(e.deadline); drawEmotes(); return; }
   if (e.type === 'start') { v.ends_at = e.ends_at; return; }
+  // V13.104: a word game was played; the match clock moved on by its length and the prize
+  // (a bonus on the next attacks or a guard) shows under my HP bar like a pet skill's.
+  if (e.type === 'minibonus') {
+    if (e.ends_at) v.ends_at = e.ends_at;
+    if (e.effects) for (const id of Object.keys(e.effects)) if (P[id]) P[id].effects = e.effects[id];
+    refreshHud();
+    if (e.stars) { sfx('skill', 30); skillBanner('me', '미니게임 성공!', bonusText(e.kind, e.stars)); }
+    return;
+  }
   if (e.type === 'question') {
     v.phase = 'question'; v.deadline = e.deadline;
     // V13.94 각자 내 범위: each player has a word of their own range on the same turn.
