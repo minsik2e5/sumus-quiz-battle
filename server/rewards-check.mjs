@@ -11,7 +11,7 @@ import { DAY_MS, rankingWeek, createCompetition } from './competition.mjs';
 import { dayKey, unlocked, FRAMES, ACCESSORIES, MAX_LEVEL, CARD_TIERS, cardTier, levelInfo, PET_CARE, PET_MISS_DAYS, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, STARS_MAX, CHARACTERS, LEGENDARY_PET_KEYS, STANDARD_PET_KEYS, EPIC_PET_KEYS, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, EGG_PRICE, petTier } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, visibleTitleKeys, titleUnlocked } from '../public/modules/titles.js';
 import { createBattle, connect, answer, tick, battleView, petSkill, SKILL_RULES, BATTLE, PET_SKILLS, MONSTER_SKILLS, forfeit } from '../public/modules/battle-engine.js';
-import { MONSTERS, MONSTER_ART, MONSTER_POSES, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, MONSTER_MS_PER_RIGHT, monsterParts, monsterOpen, partClears, partKeyCodes, stageLevel, stageMonster, isBossStage, MONSTER_ORDER, STAGE_REWARD, STAGE_REWARD_MAX, STAGE_AGAIN_SHARE, STAGE_AGAIN_MIN, STAGE_AGAIN_MAX, STAGE_FIRST_COIN_BOOST } from '../public/modules/monsters.js';
+import { MONSTERS, MONSTER_ART, MONSTER_POSES, MONSTER_LEVELS, MONSTER_DAILY, MONSTER_TRY, MONSTER_MS_PER_RIGHT, monsterParts, monsterOpen, partClears, partKeyCodes, stageLevel, stageMonster, isBossStage, MONSTER_ORDER, STAGE_REWARD, STAGE_REWARD_MAX, STAGE_AGAIN_SHARE, STAGE_AGAIN_MIN, STAGE_AGAIN_MAX, STAGE_FIRST_COIN_BOOST, STAGE_COIN_MULT } from '../public/modules/monsters.js';
 import { simulate as simulateMonster } from './monster-sim.mjs';
 import { expressionSrc, holdPose, showPose } from '../public/modules/character.js';
 import { battleQuestions, spellHint, spellable, pairedBattleQuestions } from '../public/modules/battle-questions.js';
@@ -601,12 +601,12 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(monsterOpen({}, 'easy') && !monsterOpen({}, 'normal') && monsterOpen({ easy: 1 }, 'normal') && !monsterOpen({ easy: 1 }, 'hard') && monsterOpen({ easy: 1, normal: 1 }, 'hard'), 'V13.94 이지 → 노말 → 하드 순서로 열린다');
     /* ---------- V13.105 끝없는 레벨: 레벨마다 이지 → 노말 → 하드, 하드를 깨면 다음 레벨 ---------- */
     const lv = (stage, k) => stageLevel(stage, k);
-    assert(['easy', 'normal', 'hard'].map(k => lv(1, k).first.coins).join() === '8,15,23' && ['easy', 'normal', 'hard'].map(k => lv(1, k).first.xp).join() === '60,120,240'
+    assert(['easy', 'normal', 'hard'].map(k => lv(1, k).first.coins).join() === '15,30,45' && ['easy', 'normal', 'hard'].map(k => lv(1, k).first.xp).join() === '60,120,240'
       && lv(2, 'hard').first.coins > lv(1, 'hard').first.coins && lv(11, 'hard').first.coins > lv(9, 'hard').first.coins
-      && lv(99, 'hard').first.coins === Math.round(STAGE_REWARD.hard.coins * STAGE_REWARD_MAX * STAGE_FIRST_COIN_BOOST) && lv(100, 'hard').first.coins === Math.round(Math.round(STAGE_REWARD.hard.coins * STAGE_REWARD_MAX * 1.5) * STAGE_FIRST_COIN_BOOST)
-      && ['easy', 'normal', 'hard'].every(k => lv(29, k).again.coins === Math.min(STAGE_AGAIN_MAX, Math.max(STAGE_AGAIN_MIN[k], Math.round(Math.round(STAGE_REWARD[k].coins * Math.min(STAGE_REWARD_MAX, 1 + 0.12 * 28)) * STAGE_AGAIN_SHARE))) && lv(29, k).again.coins * MONSTER_DAILY <= 125)
-      && ['easy', 'normal', 'hard'].map(k => lv(1, k).again.coins).join() === '3,5,8' && ['easy', 'normal', 'hard'].map(k => lv(10, k).again.coins).join() === '8,16,24' && lv(100, 'hard').again.coins === 25 && ['easy', 'normal', 'hard'].every(k => [1, 5, 10, 30, 100].every(n => lv(n, k).again.coins < lv(n, k).first.coins)),
-      'V13.106 보상: 첫 처치는 레벨 1에서 이지/노말/하드 8/15/23코인(전보다 1.5배)으로 시작해 레벨마다 오르고(최대 4배), 보스(5레벨마다)는 1.5배, 다시 잡기는 1.5배 하기 전 첫 처치의 50%(최소 3/5/8, 한 번에 최대 25코인, 하루 5번)');
+      && lv(99, 'hard').first.coins === Math.round(STAGE_REWARD.hard.coins * STAGE_REWARD_MAX * STAGE_FIRST_COIN_BOOST * STAGE_COIN_MULT) && lv(100, 'hard').first.coins === Math.round(Math.round(STAGE_REWARD.hard.coins * STAGE_REWARD_MAX * 1.5) * STAGE_FIRST_COIN_BOOST * STAGE_COIN_MULT)
+      && ['easy', 'normal', 'hard'].every(k => lv(29, k).again.coins === Math.min(STAGE_AGAIN_MAX * STAGE_COIN_MULT, Math.max(STAGE_AGAIN_MIN[k] * STAGE_COIN_MULT, Math.round(Math.round(STAGE_REWARD[k].coins * Math.min(STAGE_REWARD_MAX, 1 + 0.12 * 28)) * STAGE_AGAIN_SHARE * STAGE_COIN_MULT))) && lv(29, k).again.coins * MONSTER_DAILY <= 250)
+      && ['easy', 'normal', 'hard'].map(k => lv(1, k).again.coins).join() === '6,10,16' && ['easy', 'normal', 'hard'].map(k => lv(10, k).again.coins).join() === '16,31,47' && lv(100, 'hard').again.coins === 50 && MONSTER_TRY.coins === 4 && ['easy', 'normal', 'hard'].every(k => [1, 5, 10, 30, 100].every(n => lv(n, k).again.coins < lv(n, k).first.coins)),
+      'V13.106 보상: 첫 처치는 레벨 1에서 이지/노말/하드 15/30/45코인으로 시작해 레벨마다 오르고(최대 4배), 보스(5레벨마다)는 1.5배, 다시 잡기는 6/10/16코인부터(최대 50코인, 하루 5번), 져도 4코인(몬스터 코인은 처음 값의 2배)');
     assert(['easy', 'normal', 'hard'].every(k => ['accuracy', 'min', 'max', 'need', 'hp', 'mode', 'skill'].every(key => lv(10, k)[key] === MONSTER_LEVELS[k][key]) && lv(10, k).monsterHp === Math.round(MONSTER_LEVELS[k].monsterHp * 1.08))
       && ['easy', 'normal', 'hard'].every(k => lv(1, k).accuracy < lv(5, k).accuracy && lv(5, k).accuracy < lv(10, k).accuracy && lv(10, k).accuracy < lv(30, k).accuracy && lv(30, k).accuracy < lv(200, k).accuracy && lv(1, k).min > lv(30, k).min)
       && lv(1, 'hard').mode === 'skill' && lv(1, 'easy').mode === 'speed' && isBossStage(5) && isBossStage(10) && !isBossStage(11) && lv(5, 'hard').boss && lv(15, 'normal').monsterHp > lv(14, 'normal').monsterHp,
@@ -638,7 +638,7 @@ export async function runRewardsChecks(assert, expectStatus) {
       'V13.105 하루 다시 잡기 보상은 5번까지(첫 처치는 언제나), 하드를 처음 깨면 다음 레벨이 열리고(이지부터), 다음 레벨 첫 처치는 그 레벨 보상');
     // The 하드 farming the teacher saw: a cleared 하드 played again pays 20% of its first clear only.
     const farm = fight(1, 'hard', 'win', 14, t0 + DAY_MS);
-    assert(farm.paid && !farm.first && farm.coins === lv(1, 'hard').again.coins && farm.coins === 8 && farm.coins < lv(1, 'hard').first.coins, 'V13.106 이미 깬 하드를 다시 잡으면 첫 처치의 절반쯤(레벨 1은 8코인)이고, 하루 5번·한 번 최대 25코인이라 반복만으로는 첫 처치보다 적다');
+    assert(farm.paid && !farm.first && farm.coins === lv(1, 'hard').again.coins && farm.coins === 16 && farm.coins < lv(1, 'hard').first.coins, 'V13.106 이미 깬 하드를 다시 잡으면 첫 처치보다 적고(레벨 1은 16코인), 하루 5번·한 번 최대 50코인이라 반복만으로는 첫 처치보다 적다');
     assert(['monster1', 'monster10', 'monsterhard', 'monsterlord'].every(key => TITLES[key]?.group === 'monster') && TITLES.monsterlord.tier === 'legendary', 'V13.94 몬스터 칭호 4개');
     // V13.99: a lost fight is checked for time too, by how long the right answers take.
     const loser = { id: 'qa-mh-lose', pets: [{ key: 'dog' }], bonus: {} };
