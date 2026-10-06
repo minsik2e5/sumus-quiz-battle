@@ -33,5 +33,6 @@
 - `npm ci`: 완료.
 - `npm run build:assets`: PASS (`content-validation`, `browser-syntax` 포함). 이 명령으로 `public/sw.js`가 갱신됐다.
 - `npm run check`: 실패. `[release-check] FAIL · V13.99 battle.js sends idx with choice and spelling answers and locks the word once sent`
+- 로컬 Windows 체크아웃의 `battle.js`는 CRLF이며, 해당 검사는 LF 줄바꿈이 포함된 문자열을 그대로 찾는다. 줄바꿈을 LF로 정규화하면 그 문자열이 존재한다. PR의 GitHub `release-check`는 PASS.
 - `npm run check:cloudflare`: PASS.
 - 그림 176개 모두 파일 존재, 512×512/160×160 크기, 알파 채널 확인.
