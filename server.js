@@ -551,7 +551,9 @@ function sanitizeQuestions(qs, allowBlank) {
 // PART 2 — 무궁화 꽃이 피었습니다 (술래가 볼 때 움직이면 잡힘)
 // ═══════════════════════════════════════════════════════════════
 const MG_SYL = ['무', '궁', '화', '꽃', '이', '피', '었', '습', '니', '다'];
-const MG_SPEED = 0.062;   // 트랙 길이 1 → 계속 달리면 약 16초 (5~6바퀴 걸려 난이도가 끝까지 올라감)
+const MG_SPEED = 0.062;   // 거리 '보통'일 때: 계속 달리면 약 16초. 거리 설정(dist 1 / 1.5 / 2)으로 나눠서 길게 만듦
+const MG_DISTS = [1, 1.5, 2];
+const mgDist = (v) => (MG_DISTS.includes(Number(v)) ? Number(v) : 1.5);
 // 레벨별 난이도: 음절 간격, 흔들림, 막판 가속 확률, 중간 멈춤(속임) 확률, 반응 유예, 보는 시간, 두 번 돌아보기, 꽃게 술래 등장 확률
 const MG_LV = [null,
   { syl: 0.42, jit: 0.05, accel: 0.0, fake: 0.0, grace: 0.75, look: [1.8, 2.2], dbl: 0.0, crab: 0.0 },
@@ -564,14 +566,14 @@ function mgNewRoom(pin, cfg) {
   cfg = cfg || {};
   const lv = Math.max(1, Math.min(5, Number(cfg.level) || 1));
   return { pin, kind: 'mg', hostKey: uid(), players: new Map(), mode: cfg.mode === 'back' ? 'back' : 'out', time: Math.max(30, Math.min(300, Number(cfg.time) || 120)),
-    startLevel: lv, level: lv, phase: 'lobby', cycle: 0, main: 'back', crab: 'off', syl: 0, finN: 0, touched: Date.now() };
+    startLevel: lv, level: lv, dist: mgDist(cfg.dist), phase: 'lobby', cycle: 0, main: 'back', crab: 'off', syl: 0, finN: 0, touched: Date.now() };
 }
 
 function mgPublic(p) { return { id: p.id, name: p.name, color: p.color, state: p.state, order: p.order || 0, backs: p.backs || 0, connected: p.connected || p.bot, bot: !!p.bot }; }
 function mgRoster(r) { return [...r.players.values()].map(mgPublic); }
 function mgPhaseMsg(r) {
   return { phase: r.phase, mode: r.mode, level: r.level, timeLimit: r.time, remain: r.endsAt ? Math.max(0, r.endsAt - Date.now()) : 0,
-    readyRemain: r.readyAt ? Math.max(0, r.readyAt - Date.now()) : 0, result: r.phase === 'end' ? r.result : null, startLevel: r.startLevel };
+    readyRemain: r.readyAt ? Math.max(0, r.readyAt - Date.now()) : 0, result: r.phase === 'end' ? r.result : null, startLevel: r.startLevel, dist: r.dist };
 }
 function mgWatch(r) { return { main: r.main, syl: r.syl, crab: r.crab, level: r.level, cycle: r.cycle, crabOn: r.level >= 3 && MG_LV[r.level].crab > 0 }; }
 const mgEmitPhase = (r) => io.to('mg' + r.pin).emit('mg:phase', mgPhaseMsg(r));
@@ -658,7 +660,7 @@ function mgTick() {
       for (const p of r.players.values()) {
         if (p.state !== 'run') continue;
         if (watching && p.run && !(p.immuneUntil > now)) { mgCatch(r, p, now); continue; }
-        if (p.run) { p.z += MG_SPEED * dt; if (p.z >= 1) { p.z = 1; p.state = 'fin'; p.order = ++r.finN; p.run = false; io.to('mg' + r.pin).emit('mg:fin', { id: p.id, order: p.order }); mgEmitRoster(r); } }
+        if (p.run) { p.z += MG_SPEED / (r.dist || 1) * dt; if (p.z >= 1) { p.z = 1; p.state = 'fin'; p.order = ++r.finN; p.run = false; io.to('mg' + r.pin).emit('mg:fin', { id: p.id, order: p.order }); mgEmitRoster(r); } }
       }
       const active = [...r.players.values()].filter(p => p.state === 'run').length;
       if (now >= r.endsAt) mgFinish(r, 'time');
@@ -691,7 +693,8 @@ function setupMG(socket, on) {
   on('mg:resume', (d, ack) => { const { pin, hostKey } = d || {}; const r = mgRooms.get(String(pin)); if (!r || !hostKey || r.hostKey !== hostKey) return ack && ack({ ok: false }); joinHost(r); ack && ack({ ok: true, pin: r.pin }); });
   on('mg:config', (cfg) => { const r = hostRoom(); if (!r || r.phase !== 'lobby') return; cfg = cfg || {};
     if (cfg.mode) r.mode = cfg.mode === 'back' ? 'back' : 'out'; if (cfg.time) r.time = Math.max(30, Math.min(300, Number(cfg.time) || 120));
-    if (cfg.level) r.startLevel = r.level = Math.max(1, Math.min(5, Number(cfg.level) || 1)); mgEmitPhase(r); mgEmitWatch(r); });
+    if (cfg.level) r.startLevel = r.level = Math.max(1, Math.min(5, Number(cfg.level) || 1));
+    if (cfg.dist) r.dist = mgDist(cfg.dist); mgEmitPhase(r); mgEmitWatch(r); });
   on('mg:start', () => { const r = hostRoom(); if (!r || r.phase !== 'lobby' || !r.players.size) return; r.phase = 'ready'; r.readyAt = Date.now() + 3500; r.level = r.startLevel; mgEmitPhase(r); mgEmitWatch(r); });
   on('mg:stop', () => { const r = hostRoom(); if (r && r.phase === 'play') mgFinish(r, 'stop'); });
   on('mg:reset', () => { const r = hostRoom(); if (r) mgReset(r); });

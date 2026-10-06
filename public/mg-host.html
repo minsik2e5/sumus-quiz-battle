@@ -107,6 +107,9 @@ select{font:inherit}
       <div class="hint" id="modeHint"></div></div>
     <div class="field"><label>제한 시간</label>
       <div class="seg" id="sTime"><button data-v="60">1분</button><button data-v="90">1분 30초</button><button data-v="120" class="on">2분</button><button data-v="180">3분</button></div></div>
+    <div class="field"><label>달리는 거리</label>
+      <div class="seg" id="sDist"><button data-v="1">보통</button><button data-v="1.5" class="on">길게</button><button data-v="2">아주 길게</button></div>
+      <div class="hint">길수록 결승선까지 오래 걸려요. (보통: 계속 달리면 약 16초 · 길게 24초 · 아주 길게 32초)</div></div>
     <div class="field"><label>시작 난이도 (두 바퀴마다 한 단계씩 올라감, 최대 5)</label>
       <div class="seg" id="sLv"><button data-v="1" class="on">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button></div>
       <div class="hint">3단계부터 꽃게 술래가 나와서 외치는 도중에 힐끔 봅니다. 4단계부터는 돌아봤다가 다시 홱 돌아보기도 합니다.</div></div>
@@ -142,7 +145,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<':
 const SYL = ['무', '궁', '화', '꽃', '이', '피', '었', '습', '니', '다'];
 
 /* ── 설정 ── */
-const cfg = Object.assign({ mode: 'out', time: 120, level: 1 }, JSON.parse(localStorage.getItem(KEY + ':cfg') || '{}'));
+const cfg = Object.assign({ mode: 'out', time: 120, level: 1, dist: 1.5 }, JSON.parse(localStorage.getItem(KEY + ':cfg') || '{}'));
 function segBind(id, key) {
   const el = $(id);
   const paint = () => el.querySelectorAll('button').forEach(b => b.classList.toggle('on', String(cfg[key]) === b.dataset.v));
@@ -150,7 +153,7 @@ function segBind(id, key) {
   paint();
 }
 function hint() { $('#modeHint').textContent = cfg.mode === 'out' ? '술래가 볼 때 움직이면 바다로 퐁당, 탈락입니다. 시간 안에 결승선을 넘은 사람만 통과.' : '잡혀도 탈락하지 않고 출발선으로 돌아갑니다. 처음 하는 반에 추천.'; }
-segBind('#sMode', 'mode'); segBind('#sTime', 'time'); segBind('#sLv', 'level'); hint();
+segBind('#sMode', 'mode'); segBind('#sTime', 'time'); segBind('#sLv', 'level'); segBind('#sDist', 'dist'); hint();
 
 /* ── 소켓 ── */
 const socket = io();
@@ -208,7 +211,7 @@ function onPhase(prev) {
   $('#ctrl').classList.toggle('hidden', !(p === 'play' || p === 'ready'));
   $('#end').classList.toggle('hidden', p !== 'end');
   $('#hLv').textContent = `LEVEL ${phase.level || 1}`;
-  $('#lSet').textContent = `${phase.mode === 'back' ? '출발선으로' : '탈락'} · ${Math.round(phase.timeLimit / 60 * 10) / 10}분 · ${phase.startLevel}단계부터`;
+  $('#lSet').textContent = `${phase.mode === 'back' ? '출발선으로' : '탈락'} · ${Math.round(phase.timeLimit / 60 * 10) / 10}분 · ${phase.startLevel}단계부터 · 거리 ${({ 1: '보통', 1.5: '길게', 2: '아주 길게' })[phase.dist] || '길게'}`;
   if (p === 'ready' && prev !== 'ready') countdown();
   if (p === 'play' && prev === 'ready') showBig('시작!', 900);
   if (p === 'end') showEnd();

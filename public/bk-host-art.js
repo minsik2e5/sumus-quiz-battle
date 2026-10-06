@@ -205,20 +205,26 @@
   }
 
   // ═════════ 공 ═════════
+  // 흰 공(곧게 오는 공)과 노란 공(바나나킥) 두 가지
   function buildBall() {
-    const S = 128, c = mk(S, S), g = c.getContext('2d'), R = S / 2 - 2;
+    const S = 128, R = S / 2 - 2;
+    const face = (base, panel, seam) => {
+    const c = mk(S, S), g = c.getContext('2d');
     g.translate(S / 2, S / 2);
-    g.fillStyle = '#f7f9fc'; g.beginPath(); g.arc(0, 0, R, 0, TAU); g.fill();
+    g.fillStyle = base; g.beginPath(); g.arc(0, 0, R, 0, TAU); g.fill();
     g.save(); g.beginPath(); g.arc(0, 0, R, 0, TAU); g.clip();
     const pent = (x, y, r, a) => { g.beginPath(); for (let i = 0; i < 5; i++) { const b = a + i * TAU / 5; g.lineTo(x + Math.cos(b) * r, y + Math.sin(b) * r); } g.closePath(); g.fill(); };
-    g.fillStyle = '#1b2433'; pent(0, 0, R * 0.3, -Math.PI / 2);
-    g.strokeStyle = 'rgba(40,50,70,.6)'; g.lineWidth = R * 0.04;
+    g.fillStyle = panel; pent(0, 0, R * 0.3, -Math.PI / 2);
+    g.strokeStyle = seam; g.lineWidth = R * 0.04;
     for (let i = 0; i < 5; i++) {
       const a = -Math.PI / 2 + i * TAU / 5, b = a + Math.PI / 5;
       g.beginPath(); g.moveTo(Math.cos(a) * R * 0.3, Math.sin(a) * R * 0.3); g.lineTo(Math.cos(a) * R * 0.62, Math.sin(a) * R * 0.62); g.stroke();
       pent(Math.cos(b) * R * 0.92, Math.sin(b) * R * 0.92, R * 0.3, b);
     }
     g.restore();
+    return c;
+    };
+    const c = face('#f7f9fc', '#1b2433', 'rgba(40,50,70,.6)'), yc = face('#ffd93b', '#5b4a00', 'rgba(110,85,0,.6)');
     const sh = mk(S, S), q = sh.getContext('2d'); q.translate(S / 2, S / 2);
     let gr = q.createRadialGradient(-R * 0.35, -R * 0.4, R * 0.05, 0, 0, R);
     gr.addColorStop(0, 'rgba(255,255,255,.55)'); gr.addColorStop(0.35, 'rgba(255,255,255,0)'); gr.addColorStop(0.75, 'rgba(10,30,60,.12)'); gr.addColorStop(1, 'rgba(10,30,60,.5)');
@@ -227,7 +233,7 @@
     const shd = mk(64, 64), w = shd.getContext('2d');
     gr = w.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, 'rgba(0,12,20,.55)'); gr.addColorStop(0.6, 'rgba(0,12,20,.25)'); gr.addColorStop(1, 'rgba(0,12,20,0)');
     w.fillStyle = gr; w.fillRect(0, 0, 64, 64);
-    return { ball: c, shade: sh, shadow: shd };
+    return { ball: c, yball: yc, shade: sh, shadow: shd };
   }
 
   // ═════════ 공용 작은 그림 ═════════

@@ -54,7 +54,9 @@ module.exports = function createBK(ctx) {
   }
 
   // ── 슛 만들기 ──
-  const volleyFor = (d) => { const u = Math.random(); const p3 = d > 0.62 ? lerp(0, 0.28, (d - 0.62) / 0.38) : 0, p2 = d > 0.28 ? lerp(0.05, 0.5, (d - 0.28) / 0.72) : 0; return u < p3 ? 3 : u < p3 + p2 ? 2 : 1; };
+  // 영상(원본 게임)처럼: 공은 한 번에 1~2개, 비행 시간 약 1.6초 → 0.95초
+  const flightT = (d) => lerp(1.6, 0.95, d) * 1000;
+  const volleyFor = (d) => (d > 0.25 && Math.random() < lerp(0.1, 0.45, (d - 0.25) / 0.75) ? 2 : 1);
   // 이전 슛이 도착한 위치에서 이 시간 안에 닿을 수 있어야(= 이론상 막을 수 있어야) 공정함
   const reachable = (prev, x1, t1) => {
     if (!prev) return true;
@@ -68,18 +70,18 @@ module.exports = function createBK(ctx) {
     r.lastShooter = k; return k;
   }
   function makeVolley(r, d, tk) {
-    const n = volleyFor(d), T = lerp(1.9, 0.85, d) * 1000, list = [];
+    const n = volleyFor(d), T = flightT(d), list = [];
     const stag = lerp(520, 330, d);
     for (let i = 0; i < n; i++) {
       const t0 = Math.round(tk + i * stag * rand(0.9, 1.1)), t1 = Math.round(t0 + T * rand(0.97, 1.03));
       let x1 = 0, ok = false;
       for (let k = 0; k < 14 && !ok; k++) { x1 = rand(-0.88, 0.88); ok = reachable(r.lastArr, x1, t1); }
       if (!ok) { const dir = x1 > r.lastArr.x ? 1 : -1; x1 = clamp(r.lastArr.x + dir * (BK.V * 0.82 * Math.max(0, (t1 - r.lastArr.t) / 1000) + 2 * BK.REACH * 0.8) * 0.9, -0.88, 0.88); }
-      const straight = Math.random() < lerp(0.6, 0.05, d);
-      const A = straight ? rand(-0.03, 0.03) : (Math.random() < 0.5 ? -1 : 1) * lerp(0.1, 0.5, d) * rand(0.7, 1);
-      const knuckle = d > 0.45 && Math.random() < lerp(0.2, 0.6, (d - 0.45) / 0.55);
-      const dx = knuckle ? (Math.random() < 0.5 ? -1 : 1) * lerp(0.12, 0.3, d) : 0;
-      const s = { id: ++r.shotN, shooter: i === 0 || !r.lastShooter ? pickShooter(r) : r.lastShooter, t0, t1, x0: +rand(-0.8, 0.8).toFixed(3), x1: +x1.toFixed(3), A: +A.toFixed(3), dx: +dx.toFixed(3), s: +rand(0.58, 0.74).toFixed(3), lob: +rand(0.2, 0.5).toFixed(2),
+      // 노란 공(바나나킥)이 대부분이고 살짝 휘어서 옴, 흰 공은 곧게 옴
+      const straight = Math.random() < 0.3;
+      const A = straight ? rand(-0.015, 0.015) : (Math.random() < 0.5 ? -1 : 1) * lerp(0.08, 0.26, d) * rand(0.7, 1);
+      const knuckle = false, dx = 0;
+      const s = { id: ++r.shotN, shooter: i === 0 || !r.lastShooter ? pickShooter(r) : r.lastShooter, t0, t1, x0: +rand(-0.3, 0.3).toFixed(3), x1: +x1.toFixed(3), A: +A.toFixed(3), dx: +dx.toFixed(3), s: +rand(0.58, 0.74).toFixed(3), lob: +rand(0.2, 0.5).toFixed(2),
         kind: knuckle ? 'knuckle' : straight ? 'straight' : 'banana', judged: false };
       list.push(s); r.shots.push(s); r.lastArr = { x: x1, t: t1 };
     }
@@ -151,7 +153,7 @@ module.exports = function createBK(ctx) {
         const lv = BK.levelOf(d);
         if (lv > r.level) { r.level = lv; io.to(room(r)).emit('bk:level', { n: lv, name: BK.LEVELS[lv].name, t: now }); }
         // 다음 슛 묶음을 약 1.4초 앞서 알려 줌
-        while (!r.endAt && r.nextKick - now < 1400 && !(r.mode === 'score' && r.nextKick > r.endsAt - lerp(1.9, 0.85, d) * 1000)) {
+        while (!r.endAt && r.nextKick - now < 1400 && !(r.mode === 'score' && r.nextKick > r.endsAt - flightT(d))) {
           const list = makeVolley(r, diff(r, Math.max(now, r.nextKick)), Math.max(r.nextKick, now + 1100));
           const last = list[list.length - 1];
           r.nextKick = last.t0 + lerp(2600, 1150, d) * rand(0.88, 1.12);

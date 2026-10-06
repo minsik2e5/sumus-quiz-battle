@@ -627,9 +627,9 @@ function onRes(r) {
 /* ═════════ 공 그리기 ═════════ */
 const TRAIL = 14;
 function trailCol(s, u) { return s.kind === 'knuckle' && u >= s.s - 0.02 ? '255,107,213' : s.kind === 'banana' ? '255,225,77' : '190,240,255'; }
-function drawBallSpr(x, y, r, ang, alpha) {
+function drawBallSpr(x, y, r, ang, alpha, yellow) {
   ctx.globalAlpha = alpha;
-  ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.drawImage(BALL.ball, -r, -r, r * 2, r * 2); ctx.restore();
+  ctx.save(); ctx.translate(x, y); ctx.rotate(ang); ctx.drawImage(yellow ? BALL.yball : BALL.ball, -r, -r, r * 2, r * 2); ctx.restore();
   ctx.drawImage(BALL.shade, x - r, y - r, r * 2, r * 2);
   ctx.globalAlpha = 1;
 }
@@ -639,6 +639,7 @@ function drawShadow(x, gyy, r, lift, alpha) {
 }
 function spinOf(s) { return s.kind === 'knuckle' ? 1.2 : (8 + Math.abs(s.A || 0) * 30) * (s.A < 0 ? -1 : 1); }
 function drawPreview(s, vt) {
+  return; // 공 방향 표시는 하지 않음 (원본 게임처럼 공만 보고 막기)
   const T = s.t1 - s.t0, d = s.d || 0;
   let a = clamp((0.55 - d) / 0.2, 0, 1) * 0.6; if (a <= 0.01) return;
   if (vt > s.t0) a *= 1 - clamp((vt - s.t0) / (T * 0.45), 0, 1);
@@ -667,7 +668,7 @@ function drawFlying(s, vt) {
     ctx.strokeStyle = `rgba(${trailCol(s, bk.u)},${0.6 * f})`; ctx.lineWidth = p.r * 1.3 * f + 1;
     ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(q.x, q.y); ctx.stroke(); px = q.x; py = q.y;
   }
-  drawBallSpr(x, p.y, p.r, (vt - s.t0) / 1000 * spinOf(s), 1);
+  drawBallSpr(x, p.y, p.r, (vt - s.t0) / 1000 * spinOf(s), 1, s.kind === 'banana');
 }
 function drawAfter(s, vt, layer) {
   const a = vt - s.t1; if (a < 0 || !s.outcome) return;
@@ -680,14 +681,14 @@ function drawAfter(s, vt, layer) {
     const lift = (Lg.chest - Lg.rb) * (1 - drop) + bounce;
     const alpha = 1 - sstep((a - 950) / 400); if (alpha <= 0) return;
     drawShadow(A.bxs(X, u), g, r, lift, alpha);
-    drawBallSpr(A.bxs(X, u), g - r - lift, r, spin + a / 1000 * 4, alpha);
+    drawBallSpr(A.bxs(X, u), g - r - lift, r, spin + a / 1000 * 4, alpha, s.kind === 'banana');
   } else {
     const q = Math.min(1, a / 650), u = 1 - 0.38 * sstep(a / 700), X = s.bx1 + s.rdx * q;
     const k = A.sc(u), r = Lg.rb * Math.pow(k, 0.62), g = A.gy(u);
     const lift = (Lg.chest - Lg.rb) * (1 - q) + Math.sin(q * Math.PI) * Lg.GHp * 0.42 * k;
     const alpha = 1 - sstep((a - 420) / 330); if (alpha <= 0) return;
     drawShadow(A.bxs(X, u), g, r, lift, alpha * 0.8);
-    drawBallSpr(A.bxs(X, u), g - r - lift, r, spin - a / 1000 * 14, alpha);
+    drawBallSpr(A.bxs(X, u), g - r - lift, r, spin - a / 1000 * 14, alpha, s.kind === 'banana');
   }
 }
 
@@ -749,7 +750,7 @@ function drawStrikers(vt, t, pn) {
     for (const s of v.shots) {
       if (vt >= s.t0) continue;
       const p = ballScr(s.x0, 0, 0), ap = sstep((vt - v.tIn) / 300);
-      drawShadow(p.x, p.g, p.r, 0, ap); drawBallSpr(p.x, p.y + (1 - ap) * p.r * 2, p.r, 0, ap);
+      drawShadow(p.x, p.g, p.r, 0, ap); drawBallSpr(p.x, p.y + (1 - ap) * p.r * 2, p.r, 0, ap, s.kind === 'banana');
     }
   }
   for (const v of volleys) if (v.st.visible) A.drawStriker(ctx, v.kind, v.st.x, v.st.y, G, t, v.st);

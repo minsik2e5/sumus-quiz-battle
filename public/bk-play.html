@@ -949,13 +949,15 @@ function ballScreen(s, t) {
   const hv = b.h + ARRIVE_H * b.u * b.u;
   return { x: PX(b.x, b.u), y: PY(b.u, hv), gy: PY(b.u, 0), r: GH * BK.BR * 1.35 * Math.pow(scl(b.u), 1.6), u: b.u, wx: b.x };
 }
-function drawBall(X, Y, r, spin, alpha) {
+// yellow: 바나나킥 공(노란 공), 아니면 흰 공
+function drawBall(X, Y, r, spin, alpha, yellow) {
   ctx.save(); ctx.globalAlpha = alpha == null ? 1 : alpha; ctx.translate(X, Y);
   const gg = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r);
-  gg.addColorStop(0, '#ffffff'); gg.addColorStop(0.7, '#e8eef4'); gg.addColorStop(1, '#9aa8b8');
+  if (yellow) { gg.addColorStop(0, '#fff7c2'); gg.addColorStop(0.7, '#ffd93b'); gg.addColorStop(1, '#c79a00'); }
+  else { gg.addColorStop(0, '#ffffff'); gg.addColorStop(0.7, '#e8eef4'); gg.addColorStop(1, '#9aa8b8'); }
   ctx.fillStyle = gg; ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.fill();
   ctx.save(); ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.clip();
-  ctx.fillStyle = '#1b2433';
+  ctx.fillStyle = yellow ? '#5b4a00' : '#1b2433';
   for (let i = 0; i < 4; i++) { const a = spin + i * Math.PI / 2, d = r * (i === 0 ? 0.05 : 0.68); const px = Math.cos(a) * d, py = Math.sin(a) * d * 0.9; ctx.beginPath(); for (let k = 0; k < 5; k++) { const b2 = a + k * Math.PI * 0.4; ctx.lineTo(px + Math.cos(b2) * r * 0.27, py + Math.sin(b2) * r * 0.27); } ctx.fill(); }
   ctx.restore();
   ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = Math.max(1, r * 0.08); ctx.beginPath(); ctx.arc(0, 0, r, 0, 7); ctx.stroke();
@@ -1150,7 +1152,7 @@ function draw() {
     // 너클볼: 꺾이는 순간 반짝
     if (s.kind === 'knuckle' && s.dx) { const sw = s.s || 0.7; if (u > sw - 0.04 && u < sw + 0.12) { const a = 1 - Math.abs(u - (sw + 0.03)) / 0.1; ctx.strokeStyle = `rgba(255,90,200,${Math.max(0, a).toFixed(3)})`; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 2.2, 0, 7); ctx.stroke(); } }
     const spin = (now >= s.t0 ? (now - s.t0) / 1000 : 0) * (8 + Math.abs(s.A || 0) * 30) * (s.A < 0 ? -1 : 1);
-    drawBall(p.x, p.y, p.r, spin, s.demo ? 0.75 : 1);
+    drawBall(p.x, p.y, p.r, spin, s.demo ? 0.75 : 1, s.kind === 'banana');
     // 곧 도착: 골라인 위 도착 지점 표시 없음 (스스로 읽기) — 대신 마지막 순간 반짝
     if (T > 0 && s.t1 - now < 120 && !s.demo) { ctx.strokeStyle = 'rgba(255,255,255,.5)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, p.r * 1.5, 0, 7); ctx.stroke(); }
   }
@@ -1176,7 +1178,7 @@ function drawNetBall(s, el) {
     const rr = r * (2 + 4 * k); ctx.strokeStyle = `rgba(200,240,255,${(0.5 * (1 - el / 500)).toFixed(3)})`; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.ellipse(X, Y, rr, rr * 0.7, 0, 0, 7); ctx.stroke();
   }
-  drawBall(X, Y + (el > 300 ? Math.min(1, (el - 300) / 300) * (PY(uu, 0) - Y) : 0), r, el / 200, Math.max(0, a) * (s.demo ? 0.75 : 1));
+  drawBall(X, Y + (el > 300 ? Math.min(1, (el - 300) / 300) * (PY(uu, 0) - Y) : 0), r, el / 200, Math.max(0, a) * (s.demo ? 0.75 : 1), s.kind === 'banana');
 }
 function drawSavedBall(s, el, gx) {
   if (el > 1100) return;
@@ -1187,7 +1189,7 @@ function drawSavedBall(s, el, gx) {
     const k = (el - hold) / 900, side = bx >= gx ? 1 : -1;
     X = X0 + side * k * GH * 0.9; Y = Y0 - Math.sin(Math.PI * Math.min(1, k * 1.2)) * GH * 0.35 + k * k * GH * 0.5; r *= 1 + k * 0.5; a = 1 - k;
   } else if (el < 120) { ctx.fillStyle = `rgba(255,255,255,${(0.6 * (1 - el / 120)).toFixed(3)})`; ctx.beginPath(); ctx.arc(X, Y, r * 2.4, 0, 7); ctx.fill(); }
-  drawBall(X, Y, r, el / 120, Math.max(0, a) * (s.demo ? 0.75 : 1));
+  drawBall(X, Y, r, el / 120, Math.max(0, a) * (s.demo ? 0.75 : 1), s.kind === 'banana');
 }
 requestAnimationFrame(frame);
 </script>

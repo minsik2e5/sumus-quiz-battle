@@ -62,6 +62,8 @@ a.btn,button.btn{display:inline-flex;align-items:center;justify-content:center;b
         <div class="hint" id="mModeHint"></div></div>
       <div class="field"><label class="l">제한 시간</label>
         <div class="seg" id="mTime"><button data-v="60">1분</button><button data-v="90">1분 30초</button><button data-v="120">2분</button><button data-v="180">3분</button></div></div>
+      <div class="field"><label class="l">달리는 거리</label>
+        <div class="seg" id="mDist"><button data-v="1">보통</button><button data-v="1.5">길게</button><button data-v="2">아주 길게</button></div></div>
       <div class="field"><label class="l">시작 난이도 (두 바퀴마다 한 단계씩, 최대 5)</label>
         <div class="seg" id="mLv"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button></div>
         <div class="hint">3단계부터 꽃게 술래, 4단계부터 두 번 돌아보기가 나와요.</div></div>
@@ -107,7 +109,7 @@ const NAMES = { quiz: 'PART 1 퀴즈쇼', mg: 'PART 2 무궁화', jr: 'PART 3 �
 if (/[?&]need=1/.test(location.search)) { $('#need').classList.add('on'); history.replaceState(null, '', '/'); }
 const read = (k, d) => { try { return Object.assign(d, JSON.parse(localStorage.getItem(k) || '{}')); } catch (e) { return d; } };
 const qcfg = read(QSTORE + ':cfg', { mode: 'survival', gather: true });
-const mcfg = read(MKEY + ':cfg', { mode: 'out', time: 120, level: 1 });
+const mcfg = read(MKEY + ':cfg', { mode: 'out', time: 120, level: 1, dist: 1.5 });
 const jcfg = read(JKEY + ':cfg', { mode: 'out', level: 1 });
 const bcfg = read(BKEY + ':cfg', { mode: 'out', time: 120 });
 let first = ['mg', 'jr', 'bk'].includes(localStorage.getItem(FIRST)) ? localStorage.getItem(FIRST) : 'quiz';
@@ -126,6 +128,7 @@ seg('#qMode', () => qcfg.mode, (v) => { qcfg.mode = v; saveQ(); });
 seg('#mMode', () => mcfg.mode, (v) => { mcfg.mode = v; saveM(); });
 seg('#mTime', () => mcfg.time, (v) => { mcfg.time = +v; saveM(); });
 seg('#mLv', () => mcfg.level, (v) => { mcfg.level = +v; saveM(); });
+seg('#mDist', () => mcfg.dist, (v) => { mcfg.dist = +v; saveM(); });
 seg('#jMode', () => jcfg.mode, (v) => { jcfg.mode = v; saveJ(); });
 seg('#jLv', () => jcfg.level, (v) => { jcfg.level = +v; saveJ(); });
 seg('#bMode', () => bcfg.mode, (v) => { bcfg.mode = v; saveB(); });
@@ -176,7 +179,7 @@ $('#openBtn').onclick = () => {
   socket.emit('sess:create', {
     first,
     quiz: { questions: qs || undefined, mode: qcfg.mode, gather: qcfg.gather !== false, auto: $('#qAuto').checked },
-    mg: { mode: mcfg.mode, time: mcfg.time, level: mcfg.level },
+    mg: { mode: mcfg.mode, time: mcfg.time, level: mcfg.level, dist: mcfg.dist },
     jr: { mode: jcfg.mode, level: jcfg.level },
     bk: { mode: bcfg.mode, time: bcfg.time },
   }, (r) => {
