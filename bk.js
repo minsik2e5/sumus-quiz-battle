@@ -209,7 +209,7 @@ module.exports = function createBK(ctx) {
       const r = hostRoom(); if (!r) return;
       const names = ['민준', '서연', '도윤', '하은', '시우', '지유', '예준', '수아', '주원', '지호', '서윤', '하준', '지안', '은우', '채원'];
       for (let i = 0; i < Math.min(30, n | 0); i++) {
-        const id = 'bot_' + uid(), p = { id, bot: true, skill: rand(0.55, 0.98), name: names[Math.floor(Math.random() * names.length)] + '(봇)', color: COLORS[r.players.size % COLORS.length], slot: r.slotN++ };
+        const id = 'bot_' + uid(), p = { id, bot: true, skill: rand(0.72, 0.99), name: names[Math.floor(Math.random() * names.length)] + '(봇)', color: COLORS[r.players.size % COLORS.length], slot: r.slotN++ };
         resetStats(r, p); if (r.phase === 'play' && r.mode === 'out') p.state = 'out';
         r.players.set(id, p);
       }
