@@ -836,11 +836,11 @@ export async function runRewardsChecks(assert, expectStatus) {
     /* ---------- V13.103 철자 쓰기는 폰 기본 키보드로 ---------- */
     const battle103 = source('../public/modules/battle.js');
     assert(battle103.includes('id="yb-spell-input"') && battle103.includes('autocapitalize="off" autocorrect="off" spellcheck="false"') && battle103.includes('enterkeyhint="send"') && battle103.includes('lang="en"') && !battle103.includes('KEY_ROWS') && !battle103.includes('class="yb-kb"') && !battle103.includes('data-yb="key"'), 'V13.103 야차전·몬스터전 철자 쓰기는 앱 자판 대신 시험 볼 때와 같은 폰 기본 키보드(자동 수정·대문자 꺼짐)로 쓴다');
-    assert(battle103.includes("if (event.target?.id === 'yb-spell-input') return;") && battle103.includes("if (event.key === 'Enter' && !event.isComposing)") && battle103.includes("replace(/[^a-z]/g, '')") && battle103.includes('.slice(0, blanks(q))') && battle103.includes('function syncSpell(') && battle103.includes('input.value = q.typed.join') && /입력은 막지 않고|stays enabled/.test(battle103), 'V13.103 입력칸은 영어 a~z만 받고(한글은 안내), Enter로 공격하며, 낸 뒤에는 입력을 무시하되 키보드는 유지한다');
+    assert(battle103.includes("if (event.target?.id === 'yb-spell-input') return;") && battle103.includes("input.addEventListener('keydown', event => { if (event.key === 'Enter' || event.keyCode === 13) go(event); });") && battle103.includes("replace(/[^a-z]/g, '')") && battle103.includes('.slice(0, blanks(q))') && battle103.includes('function syncSpell(') && battle103.includes('input.value = q.typed.join') && /입력은 막지 않고|stays enabled/.test(battle103), 'V13.103 입력칸은 영어 a~z만 받고(한글은 안내), Enter로 공격하며, 낸 뒤에는 입력을 무시하되 키보드는 유지한다');
     assert(css98.includes('.yb-spell-input{position:absolute;inset:0') && css98.includes('font-size:16px') && css98.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/8.2}') && battle103.includes("classList.add('yb-typing')"), 'V13.103 키보드가 올라오면 전투 화면(경기장)이 줄어 단어와 글자 칸이 키보드 위에 보인다(16px 글자로 확대 방지)');
     /* ---------- V13.105 전투 화면 효과 ---------- */
     const css104 = source('../public/v13105fx.css'), build104 = source('./build-assets.mjs');
-    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
+    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
     assert(battle103.includes('function hitStop(') && battle103.includes("classList.add('fx-stop')") && css104.includes('.yb-arena.fx-stop [data-fx]{animation-play-state:paused!important}') && battle103.includes('function dmgTier(') && battle103.includes("const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl']") && battle103.includes("` fx-num t${dmgTier(+dmg)}"), 'V13.105 맞는 순간 잠깐 멈추고(히트스톱), 데미지가 클수록 더 세게 흔들리고 숫자가 커진다');
     assert(battle103.includes('function comboUp(') && battle103.includes('function comboReset(') && battle103.includes("if (atk === 'me') comboUp();") && (battle103.match(/comboReset\(\);/g) || []).length >= 3 && css104.includes('.fx-combo'), 'V13.105 내가 연속으로 맞히면 2콤보부터 내 HUD 위에 콤보가 뜨고, 틀리거나 놓치면 0으로 돌아간다(화면 표시만)');
     assert(battle103.includes('if (e.fast && e.dmg) critStamp(def);') && battle103.includes("'CRITICAL!'") && battle103.includes("crit ? 'fx-shake-xl'"), 'V13.105 빠른 정답(fast)이면 CRITICAL! 도장과 더 센 흔들림이 나온다');
@@ -863,6 +863,19 @@ export async function runRewardsChecks(assert, expectStatus) {
         && app107.includes("if (d.action === 'egg-buy') return eggBuy(") && app107.includes("if (!b.classList.contains('confirm'))") && pm107.includes('export async function buyEgg(A, onChanged, kind)') && pm107.includes("api('/shop/egg', { kind: kind === 'epic' ? 'epic' : 'basic' })")
         && css107.includes('.egg-stand{position:relative'),
         'V13.107 놀이터 알 상점은 코인 뽑기 바로 아래 큰 판으로 바로 보이고(랜덤 알 · 영웅 알 나란히), 사기 버튼을 두 번 눌러야 산다(서버 /shop/egg 그대로)');
+    }
+    /* ---------- V13.108 안드로이드 키보드(조합 입력)로 철자 쓰기 ---------- */
+    {
+      const css108 = source('../public/v13108.css');
+      assert(battle103.includes("input.addEventListener('input', event => spellType(input.value, composing || !!event.isComposing));") && !battle103.includes('if (!event.isComposing) spellType(')
+        && battle103.includes("input.addEventListener('compositionstart', () => { composing = true; });") && battle103.includes("input.addEventListener('compositionend', () => { composing = false; spellType(input.value); });")
+        && battle103.includes("if (input && !composing && input.value !== q.typed.join('')) input.value = q.typed.join('');")
+        && battle103.includes("if (input.value !== q.typed.join('')) input.value = q.typed.join('');") && !/\n  input\.value = q\.typed\.join\(''\);\n/.test(battle103),
+        'V13.108 갤럭시·지보드처럼 영어도 조합으로 치는 키보드에서 친 글자가 바로 칸에 보이고, 화면을 다시 그려도 입력칸을 덮어쓰지 않아 글자가 빠지거나 엉키지 않는다');
+      assert(battle103.includes("event.inputType === 'insertLineBreak'") && battle103.includes('const go = event => { event.preventDefault(); spellType(input.value); spellSubmit(); };'),
+        'V13.108 키보드의 보내기(Enter)는 단어를 치는 중이어도 지금까지 친 글자로 공격한다');
+      assert(battle103.includes('function fitTyping()') && battle103.includes("window.visualViewport.addEventListener('resize'") && css108.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/6.4}'),
+        'V13.108 키보드가 올라오면 경기장·단어·글자 칸·공격! 버튼이 키보드 위에 함께 보이게 줄이고 맞춰 스크롤한다');
     }
     /* ---------- V13.101 로보 연습전·몬스터 끝내기 영수증 ---------- */
     {
