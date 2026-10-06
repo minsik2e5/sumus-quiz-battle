@@ -18,7 +18,7 @@ SUMUS VOCA(저장소 `minsik2e5/sumus-quiz-battle`)의 그림 주문서 14~17로
   - 그 브랜치에 `docs/asset-requests/runner/14a-halloween-pets-design.txt`가 없으면 주문서 PR이 아직 머지되지 않은 것이다. 그때는 `claude/zealous-franklin-9qhw79`에서 시작한다.
 - **PR까지만 만든다. 머지하지 않는다.** 머지하면 운영에 바로 배포된다.
 - **운영 Supabase에 연결하지 않는다.**
-- 그림 생성 키는 Codex 환경 변수 `OPENAI_API_KEY`만 쓴다. 키를 코드, 커밋, PR에 남기지 않는다.
+- **그림은 Codex에 내장된 그림 생성 기능으로 만든다.** OpenAI API 키(`OPENAI_API_KEY`)나 유료 API를 쓰지 않는다. 키가 없다고 멈추지 않는다.
 - `public/assets/` 아래 그림과 아래 "기록"에 적은 파일 말고는 고치지 않는다. 앱 코드, 게임 규칙, 코인, 확률, 서버 로직, 점검 파일은 건드리지 않는다.
 - 원본 시트 PNG는 커밋하지 않는다. 임시 폴더(`/tmp/art/`)에 둔다.
 - 기존 그림 파일은 지우지 않는다. `dog-*` 같은 패턴으로 지우지 않는다(예전에 `-s.webp`가 같이 지워졌다).
@@ -32,17 +32,17 @@ SUMUS VOCA(저장소 `minsik2e5/sumus-quiz-battle`)의 그림 주문서 14~17로
 ### 프롬프트 손보기 (Drive 대신 참고 그림 첨부)
 주문서는 그림 GPT가 Google Drive를 여는 방식으로 쓰여 있다. Codex는 Drive를 쓰지 않으니 보내기 전에 이렇게 바꾼다.
 1. 다음으로 **시작하는 줄을 지운다**: `STYLE REFERENCE`, `STYLE AND CHARACTER REFERENCE`, `CHARACTER REFERENCE`, `Also open`, `WHEN DONE`
-2. 아래 표의 참고 그림이 있으면 프롬프트 **세 번째 줄**에 이 문장을 넣는다:
+2. 아래 표의 참고 그림이 있으면 그 그림을 같이 보여 주고, 프롬프트 **세 번째 줄**에 이 문장을 넣는다:
    `REFERENCE IMAGES ARE ATTACHED: match their art style, rendering quality, crisp clean edges and colors exactly. If a reference shows this same character, keep its face, colors, markings and accessories exactly. Do NOT copy any other animal or character shown in the references. Do NOT make it softer, blurrier or more painterly than the references.`
    - 16 시트는 이 문장을 하나 더 넣는다: `The attached baby picture is this pet's baby stage: keep its face, fur colors, markings and eyes. The attached panda is ONLY the target quality (do NOT copy it). The old grown/final designs were too plain: make the new stages clearly grander.`
 
 ## 1. 그림 만들기
-- 참고 그림이 있는 시트: OpenAI Images **edit** API
-  - `model: "gpt-image-1"`, `image: [참고 그림들]`, `prompt: <손본 프롬프트>`
-  - 옵션: `size: "1024x1024"`, `quality: "high"`, `background: "transparent"`, `output_format: "png"`, `n: 2`
-- 배경 시트(`14b-9`, `15-1`~`15-4`): **generate** API
-  - `size: "1536x1024"`, `quality: "high"`, `background: "opaque"`, `output_format: "png"`, `n: 2`
-- 후보 2장 중 점검을 통과한 나은 것을 고른다. 둘 다 실패하면 다시 만든다. 시트마다 최대 4번이다.
+- **Codex의 내장 그림 생성 기능**으로 시트를 하나씩 만든다. API를 직접 부르지 않는다.
+- 2×2 시트: 1024×1024, **투명 배경 PNG**. 아래 표의 참고 그림이 있으면 그 그림을 함께 보여 주고(첨부) 만든다.
+- 배경 시트(`14b-9`, `15-1`~`15-4`): 가로 1536×1024, 배경을 꽉 채운 PNG(투명 아님).
+- 만든 그림은 `/tmp/art/<시트 번호>.png`로 저장한다(예: `/tmp/art/14a-1.png`).
+- 결과가 점검을 통과하지 못하면 같은 프롬프트로 다시 만든다. 시트마다 최대 4번이다.
+- 투명 배경이 안 나오고 흰색이나 단색 배경으로 나오면, 시트 둘레가 그 단색일 때만 그 색을 투명으로 바꿔도 된다(`sharp` 등으로). 그림 안쪽 색은 건드리지 않는다. 체크무늬를 그려 넣은 그림은 다시 만든다.
 - **순서를 지킨다.** 표정 시트는 같은 펫의 설정 시트를 먼저 만들고 잘라 넣은 뒤, 그 그림을 참고 그림으로 쓴다.
 
 ### 참고 그림 (`public/assets/` 아래 경로)
