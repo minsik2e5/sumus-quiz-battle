@@ -5,13 +5,14 @@
 :root{--navy:#0b2a4a;--muted:#6b7c93;--gold:#f2c14e;--gold2:#d9a21b;--line:#e3e9f1;--soft:#eef2f7}
 *{box-sizing:border-box}
 body{margin:0;min-height:100vh;font-family:Pretendard,sans-serif;background:linear-gradient(#5fb8f0,#0f5e93);color:var(--navy);display:flex;justify-content:center;padding:28px 16px}
-.b{background:#fff;border:6px solid var(--gold);box-shadow:0 10px 0 var(--gold2);border-radius:26px;padding:26px;width:min(1120px,100%);align-self:flex-start}
+.b{background:#fff;border:6px solid var(--gold);box-shadow:0 10px 0 var(--gold2);border-radius:26px;padding:26px;width:min(1400px,100%);align-self:flex-start}
 h1{margin:0;font-weight:900;text-align:center;font-size:30px}
 .sub{margin:4px 0 20px;color:var(--muted);text-align:center;font-size:14px}
 .resume{display:none;align-items:center;gap:12px;background:#fff7dc;border:2px solid var(--gold);border-radius:16px;padding:12px 16px;margin-bottom:16px;font-weight:800}
 .resume.on{display:flex}.resume span{flex:1}
-.cols{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-@media (max-width:980px){.cols{grid-template-columns:1fr}}
+.cols{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media (max-width:1180px){.cols{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:640px){.cols{grid-template-columns:1fr}}
 .need{display:none;background:#ffe9e9;border:2px solid #f3a5a5;border-radius:14px;padding:10px 14px;margin-bottom:14px;font-weight:800;color:#a02b2b;text-align:center}.need.on{display:block}
 .part{border:2px solid var(--line);border-radius:18px;padding:16px}
 .part h2{margin:0 0 12px;font-size:17px;font-weight:900;display:flex;align-items:center;gap:8px}
@@ -74,10 +75,19 @@ a.btn,button.btn{display:inline-flex;align-items:center;justify-content:center;b
         <div class="seg" id="jLv"><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button><button data-v="4">4</button><button data-v="5">5</button></div>
         <div class="hint">모두가 동시에 줄을 넘어요. 단계가 오를수록 빨라지고 박자가 어려워져요(따-따-다 · 점점 빨라짐 · 뜸 들이기).</div></div>
     </section>
+    <section class="part">
+      <h2><i>PART 4</i>바나나킥</h2>
+      <div class="field"><label class="l">방식</label>
+        <div class="seg" id="bMode"><button data-v="out">탈락</button><button data-v="score">점수전</button></div>
+        <div class="hint" id="bModeHint"></div></div>
+      <div class="field" id="bTimeBox"><label class="l">시간 (점수전)</label>
+        <div class="seg" id="bTime"><button data-v="60">1분</button><button data-v="120">2분</button><button data-v="180">3분</button></div></div>
+      <div class="hint">모두가 자기 캐릭터로 골키퍼가 돼요. 좌우 버튼으로 막아요. 시간이 지날수록 슛이 빠르고 더 휘어져요(바나나킥·연속 슛·너클볼).</div>
+    </section>
   </div>
 
   <div class="field first"><label class="l">먼저 시작할 게임</label>
-    <div class="seg" id="first"><button data-v="quiz">PART 1 · 퀴즈쇼</button><button data-v="mg">PART 2 · 무궁화</button><button data-v="jr">PART 3 · 줄넘기</button></div>
+    <div class="seg" id="first"><button data-v="quiz">PART 1 · 퀴즈쇼</button><button data-v="mg">PART 2 · 무궁화</button><button data-v="jr">PART 3 · 줄넘기</button><button data-v="bk">PART 4 · 바나나킥</button></div>
     <div class="hint">방을 연 뒤에도 게임 화면 오른쪽 위 ①②③ 버튼으로 언제든 바꿀 수 있어요. 학생 화면도 함께 넘어갑니다(방은 그대로).</div></div>
 
   <button class="go" id="openBtn">수업 방 열기</button>
@@ -92,14 +102,15 @@ a.btn,button.btn{display:inline-flex;align-items:center;justify-content:center;b
 <script>
 const $ = (s) => document.querySelector(s);
 // 각 게임 화면과 같은 저장소를 써서, 여기서 바꾼 설정이 게임 화면에도 그대로 보임
-const QSTORE = 'sumus-island-quiz:v1', MKEY = 'sumus-mg', JKEY = 'sumus-jr', SESS = 'sumus-sess', FIRST = 'sumus-home:first';
-const NAMES = { quiz: 'PART 1 퀴즈쇼', mg: 'PART 2 무궁화', jr: 'PART 3 줄넘기' }, PATHS = { quiz: '/host', mg: '/mg', jr: '/jr' };
+const QSTORE = 'sumus-island-quiz:v1', MKEY = 'sumus-mg', JKEY = 'sumus-jr', BKEY = 'sumus-bk', SESS = 'sumus-sess', FIRST = 'sumus-home:first';
+const NAMES = { quiz: 'PART 1 퀴즈쇼', mg: 'PART 2 무궁화', jr: 'PART 3 줄넘기', bk: 'PART 4 바나나킥' }, PATHS = { quiz: '/host', mg: '/mg', jr: '/jr', bk: '/bk' };
 if (/[?&]need=1/.test(location.search)) { $('#need').classList.add('on'); history.replaceState(null, '', '/'); }
 const read = (k, d) => { try { return Object.assign(d, JSON.parse(localStorage.getItem(k) || '{}')); } catch (e) { return d; } };
 const qcfg = read(QSTORE + ':cfg', { mode: 'survival', gather: true });
 const mcfg = read(MKEY + ':cfg', { mode: 'out', time: 120, level: 1 });
 const jcfg = read(JKEY + ':cfg', { mode: 'out', level: 1 });
-let first = ['mg', 'jr'].includes(localStorage.getItem(FIRST)) ? localStorage.getItem(FIRST) : 'quiz';
+const bcfg = read(BKEY + ':cfg', { mode: 'out', time: 120 });
+let first = ['mg', 'jr', 'bk'].includes(localStorage.getItem(FIRST)) ? localStorage.getItem(FIRST) : 'quiz';
 
 function seg(id, get, set) {
   const el = $(id);
@@ -110,12 +121,15 @@ function seg(id, get, set) {
 const saveQ = () => localStorage.setItem(QSTORE + ':cfg', JSON.stringify(qcfg));
 const saveM = () => localStorage.setItem(MKEY + ':cfg', JSON.stringify(mcfg));
 const saveJ = () => localStorage.setItem(JKEY + ':cfg', JSON.stringify(jcfg));
+const saveB = () => localStorage.setItem(BKEY + ':cfg', JSON.stringify(bcfg));
 seg('#qMode', () => qcfg.mode, (v) => { qcfg.mode = v; saveQ(); });
 seg('#mMode', () => mcfg.mode, (v) => { mcfg.mode = v; saveM(); });
 seg('#mTime', () => mcfg.time, (v) => { mcfg.time = +v; saveM(); });
 seg('#mLv', () => mcfg.level, (v) => { mcfg.level = +v; saveM(); });
 seg('#jMode', () => jcfg.mode, (v) => { jcfg.mode = v; saveJ(); });
 seg('#jLv', () => jcfg.level, (v) => { jcfg.level = +v; saveJ(); });
+seg('#bMode', () => bcfg.mode, (v) => { bcfg.mode = v; saveB(); });
+seg('#bTime', () => bcfg.time, (v) => { bcfg.time = +v; saveB(); });
 seg('#first', () => first, (v) => { first = v; localStorage.setItem(FIRST, v); });
 $('#qGather').checked = qcfg.gather !== false;
 $('#qGather').onchange = (e) => { qcfg.gather = e.target.checked; saveQ(); };
@@ -124,6 +138,8 @@ $('#qAuto').onchange = (e) => localStorage.setItem(QSTORE + ':auto', e.target.ch
 function hints() {
   $('#qModeHint').textContent = qcfg.mode === 'survival' ? '틀리면 물에 빠져 탈락. 마지막까지 남는 사람이 우승.' : '탈락 없이 정답마다 100점, 끝나면 점수 순위.';
   $('#mModeHint').textContent = mcfg.mode === 'out' ? '술래가 볼 때 움직이면 탈락. 시간 안에 결승선을 넘으면 통과.' : '잡혀도 출발선으로 돌아갈 뿐. 처음 하는 반에 추천.';
+  $('#bModeHint').textContent = bcfg.mode === 'out' ? '한 골 먹으면 탈락. 시간이 지날수록 어려워지고, 마지막까지 남는 학생이 우승.' : '탈락 없이 정해진 시간 동안 가장 많이 막은(점수 높은) 학생이 우승.';
+  $('#bTimeBox').style.display = bcfg.mode === 'score' ? '' : 'none';
   $('#jModeHint').textContent = jcfg.mode === 'out' ? '줄에 걸리면 바다로 풍덩, 탈락. 마지막까지 남는 학생이 우승.' : '걸리면 하트가 하나씩 깎여요. 처음 하는 반에 추천.';
 }
 hints();
@@ -162,6 +178,7 @@ $('#openBtn').onclick = () => {
     quiz: { questions: qs || undefined, mode: qcfg.mode, gather: qcfg.gather !== false, auto: $('#qAuto').checked },
     mg: { mode: mcfg.mode, time: mcfg.time, level: mcfg.level },
     jr: { mode: jcfg.mode, level: jcfg.level },
+    bk: { mode: bcfg.mode, time: bcfg.time },
   }, (r) => {
     clearTimeout(t); $('#openBtn').disabled = false;
     if (!r || !r.ok) return ($('#err').textContent = '방을 열지 못했습니다.');
@@ -169,6 +186,7 @@ $('#openBtn').onclick = () => {
     sessionStorage.setItem(QSTORE + ':host', JSON.stringify(r.quiz));
     sessionStorage.setItem(MKEY + ':host', JSON.stringify(r.mg));
     sessionStorage.setItem(JKEY + ':host', JSON.stringify(r.jr));
+    sessionStorage.setItem(BKEY + ':host', JSON.stringify(r.bk));
     go(r.active);
   });
 };

@@ -7,6 +7,7 @@ const fs = require('fs');
 const QRCode = require('qrcode');
 const { Server } = require('socket.io');
 const createJR = require('./jr');
+const createBK = require('./bk');
 
 const PORT = process.env.PORT || 3000;
 const app = express();
@@ -31,6 +32,8 @@ app.get('/mg', (_, res) => res.type('html').send(fileOr('F_MGHOST', 'mg-host.htm
 app.get('/m', (_, res) => res.type('html').send(fileOr('F_MGPLAY', 'mg-play.html')));
 app.get('/jr', (_, res) => res.type('html').send(fileOr('', 'jr-host.html')));
 app.get('/j', (_, res) => res.type('html').send(fileOr('', 'jr-play.html')));
+app.get('/bk', (_, res) => res.type('html').send(fileOr('', 'bk-host.html')));
+app.get('/b', (_, res) => res.type('html').send(fileOr('', 'bk-play.html')));
 app.get('/host-remote.js', (_, res) => res.type('js').send(fileOr('F_HOSTREMOTE', 'host-remote.js')));
 app.use(express.static(path.join(__dirname, 'public')));
 app.get('/', (_, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
@@ -143,7 +146,9 @@ function adoptOrphans(kind, pin, isLinked) {
   if (!isLinked) KINDS.quiz.rooms.delete(pin); else sessions.get(pin).active = kind;
   io.to(pin).emit('goto', KINDS[kind].path + '?pin=' + pin + '&auto=1');
 }
-const jr = createJR({ io, uid, rand, COLORS, linked, inactive, carryFrom, activeRedirect, removeFromPeers, claimPin, linkSession, adoptOrphans, FULL });
+const gameCtx = { io, uid, rand, COLORS, linked, inactive, carryFrom, activeRedirect, removeFromPeers, claimPin, linkSession, adoptOrphans, FULL };
+const jr = createJR(gameCtx);
+const bk = createBK(gameCtx);
 
 function spawnPos(room) {
   const zs = room.zones || [];
@@ -290,6 +295,7 @@ setInterval(() => {
   try { tickRooms(); } catch (e) { console.error('[tick]', e); }
   try { mgTick(); } catch (e) { console.error('[mgtick]', e); }
   try { jr.tick(Date.now(), tickN); } catch (e) { console.error('[jrtick]', e); }
+  try { bk.tick(Date.now(), tickN); } catch (e) { console.error('[bktick]', e); }
 }, TICK);
 function tickRooms() {
   const dt = TICK / 1000;
@@ -361,6 +367,7 @@ io.on('connection', (socket) => {
   setup(socket, on);
   setupMG(socket, on);
   jr.setup(socket, on);
+  bk.setup(socket, on);
   setupSession(socket, on);
 });
 function setup(socket, on) {
@@ -751,7 +758,10 @@ KINDS.mg = { rooms: mgRooms, path: '/m', host: '/mg', kicked: 'mg:kicked', role:
 KINDS.jr = { rooms: jr.rooms, path: '/j', host: '/jr', kicked: 'jr:kicked', role: 'jrhost', emitRoster: jr.emitRoster, sockRoom: (pin) => 'jr' + pin,
   make: (pin, cfg, key) => Object.assign(jr.newRoom(pin, cfg), { sk: key }),
   reset: (r) => { if (r.phase !== 'lobby') jr.reset(r); } };
-const roleKind = { host: 'quiz', mghost: 'mg', jrhost: 'jr' };
+KINDS.bk = { rooms: bk.rooms, path: '/b', host: '/bk', kicked: 'bk:kicked', role: 'bkhost', emitRoster: bk.emitRoster, sockRoom: (pin) => 'bk' + pin,
+  make: (pin, cfg, key) => Object.assign(bk.newRoom(pin, cfg), { sk: key }),
+  reset: (r) => { if (r.phase !== 'lobby') bk.reset(r); } };
+const roleKind = { host: 'quiz', mghost: 'mg', jrhost: 'jr', bkhost: 'bk' };
 const credsOf = (pin) => Object.fromEntries(kindList().map(k => [k, { ok: true, pin, hostKey: KINDS[k].rooms.get(pin).hostKey }]));
 
 function setupSession(socket, on) {
@@ -761,7 +771,7 @@ function setupSession(socket, on) {
     const pin = newPin(); if (!pin) return ack && ack(FULL);
     const key = uid(), active = KINDS[cfg.first] ? cfg.first : 'quiz';
     // 한쪽 방이 사라져 다시 만들 때 쓰도록 홈 설정을 함께 보관
-    const cfgs = { quiz: { questions: sanitizeQuestions(q.questions), mode: q.mode === 'score' ? 'score' : 'survival', gather: q.gather !== false, auto: q.auto !== false }, mg: cfg.mg || {}, jr: cfg.jr || {} };
+    const cfgs = { quiz: { questions: sanitizeQuestions(q.questions), mode: q.mode === 'score' ? 'score' : 'survival', gather: q.gather !== false, auto: q.auto !== false }, mg: cfg.mg || {}, jr: cfg.jr || {}, bk: cfg.bk || {} };
     sessions.set(pin, { key, active, cfgs });
     for (const k of kindList()) KINDS[k].rooms.set(pin, KINDS[k].make(pin, cfgs[k], key));
     console.log('[session]', pin, 'opened', cfgs.quiz.questions.length + ' questions', 'first=' + active);

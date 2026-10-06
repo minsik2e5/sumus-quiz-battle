@@ -2,15 +2,16 @@
 // host.html / mg-host.html / jr-host.html 끝에서 불러옴 — 각 페이지의 socket, phase 를 그대로 사용
 (() => {
   const SESS = 'sumus-sess';
-  const KEYS = { quiz: 'sumus-island-quiz:v1:host', mg: 'sumus-mg:host', jr: 'sumus-jr:host' };
+  const KEYS = { quiz: 'sumus-island-quiz:v1:host', mg: 'sumus-mg:host', jr: 'sumus-jr:host', bk: 'sumus-bk:host' };
   const GAMES = [
     { id: 'quiz', label: '퀴즈쇼', no: '1', path: '/host', busy: ['question', 'reveal'] },
     { id: 'mg', label: '무궁화', no: '2', path: '/mg', busy: ['ready', 'play'] },
     { id: 'jr', label: '줄넘기', no: '3', path: '/jr', busy: ['ready', 'play'] },
+    { id: 'bk', label: '바나나킥', no: '4', path: '/bk', busy: ['ready', 'play'] },
   ];
   let sess = null; try { sess = JSON.parse(sessionStorage.getItem(SESS) || 'null'); } catch (e) {}
   if (!sess) return;
-  const cur = location.pathname.startsWith('/mg') ? 'mg' : location.pathname.startsWith('/jr') ? 'jr' : 'quiz';
+  const cur = location.pathname.startsWith('/mg') ? 'mg' : location.pathname.startsWith('/jr') ? 'jr' : location.pathname.startsWith('/bk') ? 'bk' : 'quiz';
   const mine = () => { try { return JSON.parse(sessionStorage.getItem(KEYS[cur]) || 'null'); } catch (e) { return null; } };
   const inSession = () => { const c = mine(); return !!(c && c.pin === sess.pin); };
 
