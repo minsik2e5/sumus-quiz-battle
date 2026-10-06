@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, EPIC_PET_KEYS, EPIC_EGG_LEGENDARY_RATE } from '../public/modules/core.js';
+import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, EPIC_PET_KEYS, EPIC_EGG_LEGENDARY_RATE, SEASONS, seasonKeys, seasonsOver } from '../public/modules/core.js';
 import {
   ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky,
   BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX, GIFT_LOG_KEEP,
@@ -227,10 +227,12 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
   let epic = null;
   const epicLeft = EPIC_PET_KEYS.filter(key => !(p.pets || []).some(pet => pet.key === key));
   if (!legendary && (p.pets || []).length && epicLeft.length && random() * 100 < EPIC_RATE) {
-    const key = epicLeft[Math.min(epicLeft.length - 1, Math.floor(random() * epicLeft.length))];
-    p.pets.push({ key, acquired_at: now, epic: true });
+    // V13.109: after its season, a limited pet sometimes comes out of this 영웅 egg instead.
+    const limited = limitedFromEpic(p, random, now);
+    const key = limited || epicLeft[Math.min(epicLeft.length - 1, Math.floor(random() * epicLeft.length))];
+    p.pets.push({ key, acquired_at: now, ...(limited ? { limited: true } : { epic: true }) });
     p.avatar_key = key;
-    epic = { key };
+    epic = { key, ...(limited ? { limited: true } : {}) };
   }
   l.paid = Number(l.paid || 0) + paid;
   // V13.98: today's net, kept apart from the log (which keeps only the last few pulls).
@@ -240,21 +242,35 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
   return { bet, mult: odd.mult, name: odd.name, paid, ticket, legendary, epic, lucky: luckyView(p, now) };
 }
 
+/* ---------- V13.109 시즌 한정 펫 ---------- */
+// After its season a limited pet hides in 영웅 eggs: a 영웅 result (영웅 알, or the 영웅 egg of a coin
+// capsule) is a limited pet the student does not have yet `after_rate`% of the time.
+export function limitedFromEpic(p, random = secureRandom, now = Date.now()) {
+  const has = key => (p.pets || []).some(pet => pet.key === key);
+  const left = seasonsOver(now).flatMap(id => seasonKeys(id).filter(key => !has(key)).map(key => ({ key, rate: SEASONS[id].after_rate })));
+  if (!left.length || !(random() * 100 < left[0].rate)) return null;
+  return left[Math.min(left.length - 1, Math.floor(random() * left.length))].key;
+}
+
 /* ---------- 알 상점 ---------- */
 // Opens a bought egg (the price is paid by the caller). `missing` are the pets of that egg the
 // student has not met yet. V13.98: a 영웅 알 opens as a legendary pet EPIC_EGG_LEGENDARY_RATE% of
 // the time for a student who has none yet (a student owns at most one legendary pet).
-export function openEgg(p, { epic, missing, price, random = secureRandom, now = Date.now() }) {
+// V13.109: `season` is a season egg (its limited pets not met yet are `missing`); after a season,
+// a 영웅 알 may hold one of its limited pets instead (limitedFromEpic).
+export function openEgg(p, { epic, season = null, missing, price, random = secureRandom, now = Date.now() }) {
   const hasLegend = (p.pets || []).some(pet => LEGENDARY_PET_KEYS.includes(pet.key));
   const legendary = !!epic && !hasLegend && random() * 100 < EPIC_EGG_LEGENDARY_RATE;
+  const fromEpic = epic && !legendary ? limitedFromEpic(p, random, now) : null;
   const pool = legendary ? LEGENDARY_PET_KEYS : missing;
-  const key = pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
-  (p.pets ||= []).push({ key, acquired_at: now, ...(legendary ? { legendary: true } : epic ? { epic: true } : {}) });
+  const key = fromEpic || pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
+  const limited = !!season || !!fromEpic;
+  (p.pets ||= []).push({ key, acquired_at: now, ...(legendary ? { legendary: true } : limited ? { limited: true } : epic ? { epic: true } : {}) });
   p.points_spent = Number(p.points_spent || 0) + price;
-  (p.purchases ||= []).push({ item: epic ? 'epic_egg' : 'egg', key, price, at: now, ...(legendary ? { legendary: true } : {}) });
+  (p.purchases ||= []).push({ item: season ? `${season}_egg` : epic ? 'epic_egg' : 'egg', key, price, at: now, ...(legendary ? { legendary: true } : {}), ...(fromEpic ? { limited: true } : {}) });
   p.avatar_key = key;
   if (legendary) { const l = p.lucky ||= {}; l.legend_key = key; l.legend_at = now; }
-  return { key, legendary };
+  return { key, legendary, limited };
 }
 
 /* ---------- V13.82 가위바위보 ---------- */

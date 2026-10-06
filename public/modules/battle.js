@@ -1,5 +1,5 @@
 import { api, esc, icon, toast, num, rangeLabel, modal, dialogOpen, buttonBusy } from './ui.js';
-import { CHARACTERS, PET_FORMS } from './core.js';
+import { CHARACTERS, PET_FORMS, seasonOnSale } from './core.js';
 import { avatar, petKey, showPose, holdPose } from './character.js';
 import { getRanges } from './student.js';
 import { petJosa } from './pet-moments.js';
@@ -140,6 +140,9 @@ function monsterPic(m, { size = '', pose = '' } = {}) {
   if (MONSTER_ART.has(mon.key)) return `<div class="avatar-art avatar-img mon-art ${size}${cls}" style="--pet-grow:1${tint}"><img src="/assets/monsters/${mon.key}${pose ? '-' + pose : ''}.webp" alt="${esc(mon.name)}" width="512" height="512" decoding="async" draggable="false"></div>`;
   return `<div class="mon-temp ${size}${cls}" style="--mon-filter:${mon.temp.filter};--mon-color:${mon.color}${tint}">${avatar(mon.temp.pet, { size, form: mon.temp.form })}</div>`;
 }
+// V13.109 전투 배경: a monster fight in the forest (a boss in the boss hall), the robot in its
+// training room, a match on the rooftop arena; in a season (할로윈) the matches use its stage.
+const arenaBg = f => f?.monster ? (f.monster.boss ? 'bg-boss' : 'bg-forest') : seasonOnSale() ? `bg-${seasonOnSale().id}` : B.room?.practice || B.local ? 'bg-practice' : 'bg-arena';
 const petArt = (p, opts = {}) => p?.monster ? monsterPic(p.monster, opts) : avatar(p?.pet?.key, { form: p?.pet?.form ?? 1, ...opts });
 const whoName = p => p?.monster ? (p.name || MONSTERS.find(x => x.key === p.monster.key)?.name) : petName(p?.pet);
 
@@ -950,7 +953,7 @@ function drawMatch() {
   // V13.70 easier to read: a smaller arena, one line for what is happening next to the clock,
   // and the answers right under the word (V13.72: my pet's skill below them, no buttons).
   main(`
-    <div class="yb-arena" id="yb-arena">
+    <div class="yb-arena has-bg" id="yb-arena" style="--yb-bg:url('/assets/battle/${arenaBg(f)}.webp')">
       <div class="yb-banner">夜叉</div><div class="yb-centerline"></div><div class="yb-ring"></div>
       ${hud(f, 'op')}
       <div class="yb-pet op${f.monster ? ' monster' : ''}" id="yb-pet-op">${petArt(f)}</div>
