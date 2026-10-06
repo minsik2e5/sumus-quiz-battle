@@ -137,25 +137,7 @@ code{background:#eef2f7;border-radius:6px;padding:1px 6px;font-size:13px}
 #lobby .small{font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 #lobby .small button{background:none;color:var(--navy2);font-weight:700;font-size:12px;padding:0;text-decoration:underline}
 
-/* 결과 */
-#end{position:absolute;inset:0;z-index:20;background:rgba(6,26,48,.72);display:grid;place-items:center}
-#end .box{width:min(980px,92vw);text-align:center;color:#fff}
-#end h1{font-size:clamp(34px,4vw,72px);margin:0 0 3vh;font-weight:900;color:var(--gold)}
-.podium{display:flex;justify-content:center;align-items:flex-end;gap:1.6vw;margin-bottom:3vh}
-.pod{width:clamp(140px,14vw,240px);text-align:center}
-.pod .nm{font-weight:900;font-size:clamp(18px,1.8vw,34px);margin-bottom:1vh;word-break:keep-all}
-.pod .sc{font-weight:700;color:#c9d7ea;font-size:clamp(13px,1vw,18px);margin-bottom:1vh}
-.pod .blk{border-radius:18px 18px 0 0;background:#fff;color:var(--navy);font-weight:900;font-size:clamp(36px,3.4vw,64px);display:grid;place-items:center}
-.pod.r1 .blk{background:var(--gold);height:26vh}
-.pod.r2 .blk{height:18vh}
-.pod.r3 .blk{height:13vh;background:#ffd9b0}
-.survivors{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:3vh}
-.survivors span{background:#fff;color:var(--navy);border-radius:999px;padding:10px 20px;font-weight:900;font-size:clamp(18px,1.6vw,30px)}
-.rest{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-height:18vh;overflow:auto;margin-bottom:3vh}
-.rest span{background:rgba(255,255,255,.12);border-radius:10px;padding:6px 12px;font-weight:700;font-size:14px}
-#end .row{display:flex;gap:10px;justify-content:center}
-#end .row .btn{padding:14px 22px;font-size:16px}
-#confetti{position:absolute;inset:0;pointer-events:none;z-index:21}
+/* 결과: /ceremony.js (시상식) */
 /* 즉석 문제 패널 */
 #live{position:absolute;left:50%;bottom:2.5vh;transform:translateX(-50%);width:min(760px,94vw);z-index:15;background:#fff;border-radius:22px;border:5px solid var(--navy);box-shadow:0 14px 40px rgba(0,30,60,.35);padding:16px 18px}
 #live .lh{display:flex;align-items:center;gap:10px;margin-bottom:10px}
@@ -284,18 +266,6 @@ code{background:#eef2f7;border-radius:6px;padding:1px 6px;font-size:13px}
       <button class="go2" id="liveGo">출제 <span style="font-size:12px;opacity:.6">Ctrl+Enter</span></button></div>
   </div>
 
-  <div id="end" class="hidden">
-    <canvas id="confetti"></canvas>
-    <div class="box">
-      <h1 id="endTitle">최후의 생존자</h1>
-      <div id="endBody"></div>
-      <div class="row">
-        <button class="btn gold" id="againBtn">같은 문제로 다시</button>
-        <button class="btn" id="liveBtn3">즉석 문제로 이어하기</button>
-        <button class="btn" id="editBtn">문제 수정</button>
-      </div>
-    </div>
-  </div>
 </section>
 
 <!-- 일괄 입력 모달 -->
@@ -311,6 +281,7 @@ code{background:#eef2f7;border-radius:6px;padding:1px 6px;font-size:13px}
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="/common.js"></script>
+<script src="/ceremony.js"></script>
 <script>
 const $ = (s) => document.querySelector(s);
 const ZC = IQ.ZONE;
@@ -539,8 +510,6 @@ $('#plist').onclick = (e) => { const b = e.target.closest('.pchip'); if (b && co
 $('#bot10').onclick = () => socket.emit('host:bots', 10);
 $('#botClr').onclick = () => socket.emit('host:clearbots');
 $('#backEdit').onclick = showSetup;
-$('#editBtn').onclick = () => { socket.emit('host:reset'); showSetup(); };
-$('#againBtn').onclick = () => socket.emit('host:reset');
 $('#goBtn').onclick = () => { if (!rosterMap.size) return alert('아직 들어온 학생이 없습니다.'); if (!phase.total) return openLive(); socket.emit('host:next'); };
 $('#nextBtn').onclick = () => socket.emit('host:next');
 $('#revealBtn').onclick = () => socket.emit('host:next');
@@ -570,7 +539,6 @@ function onPhase(prev) {
   $('#ctrl').classList.toggle('hidden', !(p === 'question' || p === 'reveal'));
   $('#revealBtn').classList.toggle('hidden', p !== 'question');
   $('#nextBtn').classList.toggle('hidden', p !== 'reveal');
-  $('#end').classList.toggle('hidden', p !== 'end');
   $('#hQn').classList.toggle('hidden', !(p === 'question' || p === 'reveal'));
   $('#liveBtn').classList.toggle('hidden', p !== 'reveal');
   if (p === 'question') closeLive();
@@ -611,27 +579,31 @@ function onPhase(prev) {
     $('#nextBtn').classList.toggle('primary', true);
     $('#nextBtn').firstChild.textContent = last ? '결과 보기' : '다음 문제';
   } else revealFx = null;
-  if (p === 'end') showEnd();
+  if (p === 'end' && prev.phase !== 'end' && $('#live').classList.contains('hidden')) showEnd(prev.phase !== 'none');
+  if (p !== 'end') CEREMONY.hide();
 }
 
-function showEnd() {
-  const r = phase.result; const rk = r.ranking;
-  let html = '';
-  if (r.mode === 'survival') {
-    const surv = rk.filter(x => r.survivors.includes(x.id));
-    $('#endTitle').textContent = surv.length === 1 ? '최후의 1인' : surv.length ? `생존자 ${surv.length}명` : '생존자 없음';
-    html += `<div class="survivors">${surv.map(s => `<span style="box-shadow:0 0 0 4px ${s.color}">${esc(s.name)}</span>`).join('')}</div>`;
-    html += `<div class="rest">${rk.filter(x => !r.survivors.includes(x.id)).map(x => `<span>${esc(x.name)} · ${x.score}점</span>`).join('')}</div>`;
-  } else {
-    $('#endTitle').textContent = '최종 순위';
-    const top = rk.slice(0, 3); const order = [1, 0, 2].filter(i => top[i]);
-    html += `<div class="podium">${order.map(i => `<div class="pod r${i + 1}"><div class="nm">${esc(top[i].name)}</div><div class="sc">${top[i].score}점</div><div class="blk">${i + 1}</div></div>`).join('')}</div>`;
-    html += `<div class="rest">${rk.slice(3).map((x, i) => `<span>${i + 4}위 ${esc(x.name)} · ${x.score}점</span>`).join('')}</div>`;
-  }
-  $('#endBody').innerHTML = html;
-  sfx('win'); confetti();
+function showEnd(fresh) { // 시상식: /ceremony.js
+  const r = phase.result || { ranking: [], survivors: [], mode: phase.mode }; const rk = r.ranking || [];
+  const survival = r.mode === 'survival', sv = new Set(r.survivors || []);
+  const surv = rk.filter(x => sv.has(x.id));
+  const title = survival ? (surv.length === 1 ? '최후의 1인' : surv.length ? `생존자 ${surv.length}명` : '생존자 없음') : '최종 순위';
+  const subtitle = [survival ? `참가 ${rk.length}명 중 ${surv.length}명 생존` : `참가 ${rk.length}명`, r.why === 'stop' ? '중간에 끝낸 게임' : ''].filter(Boolean).join(' · ');
+  CEREMONY.show({
+    parent: '#game',
+    badge: `PART 1 · 퀴즈쇼 · ${survival ? '서바이벌' : '점수전'}`, title, subtitle,
+    podium: survival ? Math.min(3, surv.length) : 3,
+    ranking: rk.map(x => ({ id: x.id, name: x.name, color: x.color, main: `${(+x.score || 0).toLocaleString('ko-KR')}점`,
+      tag: survival ? (sv.has(x.id) ? '생존' : '탈락') : '',
+      stats: [x.correct != null ? `정답 ${x.correct}개` : ''] })),
+    buttons: [
+      { label: '같은 문제로 다시', primary: true, onClick: () => socket.emit('host:reset') },
+      { label: '즉석 문제로 이어하기', onClick: openLive },
+      { label: '문제 수정', onClick: () => { socket.emit('host:reset'); showSetup(); } },
+    ],
+    sound: true, muted: () => muted, instant: !fresh,
+  });
 }
-
 /* ═════════ 렌더링 ═════════ */
 const cv = $('#cv'), ctx = cv.getContext('2d');
 let W = 0, H = 0, DPR = 1, layoutX = 0.5;
@@ -752,21 +724,6 @@ function sfx(k) {
 }
 document.addEventListener('pointerdown', () => { if (!AC) try { AC = new AudioContext(); } catch (e) {} }, { once: true });
 
-/* ═════════ 축하 효과 ═════════ */
-function confetti() {
-  const c = $('#confetti'), g = c.getContext('2d'); c.width = innerWidth; c.height = innerHeight;
-  const cols = ['#ffe15a', '#ef4565', '#3b6cf6', '#1fb36b', '#fff'];
-  const ps = Array.from({ length: 160 }, () => ({ x: Math.random() * c.width, y: -Math.random() * c.height * 0.5, vx: (Math.random() - .5) * 2, vy: 2 + Math.random() * 3, r: Math.random() * 6, c: cols[Math.random() * 5 | 0], a: Math.random() * 6 }));
-  const t0 = performance.now();
-  (function f(now) {
-    if (now - t0 > 6000 || phase.phase !== 'end') return g.clearRect(0, 0, c.width, c.height);
-    g.clearRect(0, 0, c.width, c.height);
-    for (const p of ps) { p.x += p.vx; p.y += p.vy; p.a += 0.1; g.save(); g.translate(p.x, p.y); g.rotate(p.a); g.fillStyle = p.c; g.fillRect(-4, -2, 8 + p.r, 5); g.restore(); }
-    requestAnimationFrame(f);
-  })(t0);
-}
-
-
 /* ═════════ 즉석 문제 ═════════ */
 const LIVE = Object.assign({ n: 2, time: 10, opts: ['', '', '', ''], save: false }, JSON.parse(localStorage.getItem(STORE + ':live') || '{}'));
 let liveAns = -1;
@@ -781,12 +738,11 @@ function renderLive() {
 function persistLive() { localStorage.setItem(STORE + ':live', JSON.stringify(LIVE)); }
 function openLive() {
   liveAns = -1; $('#liveErr').textContent = '';
-  renderLive(); $('#live').classList.remove('hidden'); $('#end').classList.add('hidden');
+  renderLive(); $('#live').classList.remove('hidden'); CEREMONY.hide();
   setTimeout(() => $('#liveQ').focus(), 30);
 }
-function closeLive() { $('#live').classList.add('hidden'); if (phase.phase === 'end') $('#end').classList.remove('hidden'); }
+function closeLive() { $('#live').classList.add('hidden'); if (phase.phase === 'end' && !CEREMONY.showing) showEnd(false); }
 $('#liveBtn').onclick = openLive; $('#liveBtn2').onclick = () => { if (!rosterMap.size) return alert('아직 들어온 학생이 없습니다.'); openLive(); };
-$('#liveBtn3').onclick = openLive;
 $('#liveClose').onclick = closeLive;
 $('#liveOpts').addEventListener('input', (e) => { if (e.target.dataset.i != null) { LIVE.opts[+e.target.dataset.i] = e.target.value; persistLive(); } });
 $('#liveOpts').addEventListener('click', (e) => { const a = e.target.dataset.a; if (a == null) return; liveAns = +a; $('#liveErr').textContent = ''; renderLive(); });

@@ -81,27 +81,7 @@ button{font:inherit;cursor:pointer;border:0}
 @keyframes stgIn{0%{opacity:0;transform:translate(-50%,-30px) scale(.8)}12%{opacity:1;transform:translate(-50%,0) scale(1.05)}20%{transform:translate(-50%,0) scale(1)}82%{opacity:1}100%{opacity:0;transform:translate(-50%,-10px)}}
 #conn{position:fixed;left:50%;bottom:70px;transform:translateX(-50%);z-index:9;background:rgba(226,54,79,.92);color:#fff;font-weight:800;padding:8px 18px;border-radius:999px}
 
-/* 결과 */
-#end{position:fixed;inset:0;z-index:20;background:rgba(14,10,40,.8);display:grid;place-items:center;color:#fff;text-align:center;overflow:auto}
-#end .box{padding:3vh 2vw;max-width:96vw}
-#end h1{font-size:clamp(34px,4vw,70px);margin:0;color:var(--gold);font-weight:900;letter-spacing:-1px}
-#end .sub{font-size:clamp(15px,1.4vw,24px);font-weight:800;color:#d9e3f5;margin:.6vh 0 2.4vh}
-.podium{display:flex;justify-content:center;align-items:flex-end;gap:1.4vw;margin-bottom:2.2vh}
-.pod{width:clamp(130px,13vw,230px);display:flex;flex-direction:column;align-items:center}
-.pod canvas{width:clamp(84px,8vw,150px);height:clamp(96px,9.2vw,172px)}
-.pod .nm{font-weight:900;font-size:clamp(18px,1.7vw,32px);margin:.3vh 0 .2vh;word-break:keep-all}
-.pod .st{font-size:clamp(11px,.9vw,15px);font-weight:700;color:#c9d7ea;margin-bottom:.8vh}
-.pod .blk{width:100%;border-radius:16px 16px 0 0;background:#fff;color:var(--navy);font-weight:900;font-size:clamp(34px,3.2vw,60px);display:grid;place-items:center}
-.pod.r1 .blk{background:var(--gold);height:15vh}.pod.r2 .blk{height:10vh}.pod.r3 .blk{height:7vh;background:#ffd9b0}
-.rest{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:6px;max-width:min(1300px,92vw);margin:0 auto 2.2vh;max-height:22vh;overflow:auto;text-align:left}
-.rest div{background:rgba(255,255,255,.1);border-radius:10px;padding:6px 12px;font-weight:700;font-size:clamp(12px,.95vw,16px);display:flex;gap:8px;align-items:center;white-space:nowrap}
-.rest b{color:var(--gold);min-width:2em}
-.rest i{width:11px;height:11px;border-radius:50%;flex:none}
-.rest em{font-style:normal;color:#c9d7ea;font-weight:600;overflow:hidden;text-overflow:ellipsis}
-#end .row{display:flex;gap:10px;justify-content:center}
-#end .row .btn{font-size:18px;padding:13px 26px}
-.pod .blk{line-height:1;overflow:hidden}
-@media (max-height:700px){#end .box{padding:1.5vh 2vw}#end h1{font-size:30px}#end .sub{margin:.3vh 0 1.2vh;font-size:14px}.pod canvas{width:64px;height:74px}.pod .nm{font-size:16px}.pod .st{font-size:10px}.pod .blk{font-size:24px}.pod.r1 .blk{height:9vh}.pod.r2 .blk{height:6.5vh}.pod.r3 .blk{height:5vh}.podium{margin-bottom:1.2vh}.rest{max-height:20vh;margin-bottom:1.2vh}.rest div{padding:3px 10px}#end .row .btn{font-size:15px;padding:9px 20px}}
+/* 결과: /ceremony.js (시상식) */
 </style>
 </head>
 <body>
@@ -144,20 +124,12 @@ button{font:inherit;cursor:pointer;border:0}
   <div class="row"><button class="start" id="startBtn">시작 <span style="font-size:.6em;opacity:.6">Space</span></button></div>
 </section>
 
-<section id="end" class="hidden">
-  <div class="box">
-    <h1 id="endTitle">결과</h1>
-    <div class="sub" id="endSub"></div>
-    <div class="podium" id="podium"></div>
-    <div class="rest" id="rest"></div>
-    <div class="row"><button class="btn gold" id="againBtn">한 판 더</button><button class="btn" id="setBtn">설정 바꾸기</button></div>
-  </div>
-</section>
 <canvas id="fxc"></canvas>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="/common.js"></script>
 <script src="/jr-common.js"></script>
+<script src="/ceremony.js"></script>
 <script>
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -260,7 +232,6 @@ function applyPhase(prev) {
   const p = phase.phase, inGame = p === 'play' || p === 'ready';
   $('#lobby').classList.toggle('hidden', p !== 'lobby' || !room);
   $('#ctrl').classList.toggle('hidden', !inGame);
-  $('#end').classList.toggle('hidden', p !== 'end');
   $('#dots').classList.toggle('hidden', !inGame || !plan);
   if (p === 'lobby') {
     if (prev !== 'lobby') { plan = null; bannerQ = null; $('#big').classList.add('hidden'); $('#stg').className = 'hidden'; for (const k in results) delete results[k]; streak = 0; fx.length = 0; for (const e of ents.values()) { e.fall = null; e.trip = 0; e.shieldUntil = 0; e.jumps.length = 0; } readyAt = 0; }
@@ -268,7 +239,7 @@ function applyPhase(prev) {
   }
   if (p === 'ready' && prev !== 'ready') { plan = null; syncEnts(true); for (const k in results) delete results[k]; streak = 0; }
   if (p === 'end' && prev !== 'end') showEnd(prev !== 'none');
-  if (p !== 'end') confetti.length = 0;
+  if (p !== 'end') CEREMONY.hide();
   paintSegs(); updateHud(); measureLobby(); placeDots();
 }
 
@@ -319,8 +290,8 @@ $('#plist').onclick = (e) => { const b = e.target.closest('.pc'); if (b && confi
 $('#bot10').onclick = () => socket.emit('jr:bots', 10);
 $('#botClr').onclick = () => socket.emit('jr:clearbots');
 $('#startBtn').onclick = () => { if (!roster.size) return alert('아직 들어온 학생이 없습니다.'); unlockAudio(); socket.emit('jr:start'); };
-$('#againBtn').onclick = () => socket.emit('jr:reset');
-$('#setBtn').onclick = () => { socket.emit('jr:reset'); setTimeout(() => { const s = $('.sets'); s.style.outline = '3px solid var(--gold)'; s.style.borderRadius = '10px'; setTimeout(() => s.style.outline = '', 1600); }, 300); };
+const playAgain = () => socket.emit('jr:reset');
+const changeSettings = () => { socket.emit('jr:reset'); setTimeout(() => { const s = $('.sets'); s.style.outline = '3px solid var(--gold)'; s.style.borderRadius = '10px'; setTimeout(() => s.style.outline = '', 1600); }, 300); };
 $('#stopBtn').onclick = () => { if (confirm('지금 끝내고 결과를 볼까요?')) socket.emit('jr:stop'); };
 $('#resetBtn').onclick = () => { if (confirm('게임을 멈추고 대기실로 돌아갈까요?')) socket.emit('jr:reset'); };
 $('#fsBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
@@ -1054,12 +1025,9 @@ function render() {
     if (rem <= 0 && !goShown) { goShown = true; if (rem > -1200) { showBig('점프!', 800, '#7dffb0'); sfx('go'); } }
   }
   if (bannerQ && now >= bannerQ.at && (phase.phase === 'play' || phase.phase === 'ready')) { const b = bannerQ; bannerQ = null; if (now - b.at < 1500 && !document.hidden) showStage(b.stage, b.name, b.final); updateHud(); }
-  if (phase.phase === 'end') { drawPodium(t); }
-  drawConfetti();
 }
 
-/* ═════════ 결과 ═════════ */
-let podCvs = [];
+/* ═════════ 결과 (시상식: /ceremony.js) ═════════ */
 function showEnd(fresh) {
   const r = phase.result || { ranking: [], why: 'stop', stage: phase.stage };
   const rk = r.ranking || [], alive = rk.filter(x => x.alive);
@@ -1068,38 +1036,15 @@ function showEnd(fresh) {
   else if (r.why === 'last') { title = rk[0] ? `👑 ${rk[0].name} 최후의 1인!` : '최후의 1인!'; sub = `STAGE ${r.stage} 까지 버텼어요`; }
   else if (r.why === 'out') { title = '모두 걸렸어요 ㅠㅠ'; sub = `STAGE ${r.stage} 까지 도전! 다음엔 더 멀리!`; }
   else { title = '여기까지! 결과 발표'; sub = `STAGE ${r.stage} 에서 멈췄어요 · 생존 ${alive.length}명`; }
-  $('#endTitle').textContent = title; $('#endSub').textContent = sub;
   const stageLbl = (x) => x.alive ? (r.why === 'clear' ? '완주' : '생존') : `${x.outStage}단계 탈락`;
-  const top = rk.slice(0, 3), order = [1, 0, 2].filter(i => top[i]);
-  $('#podium').innerHTML = order.map(i => `<div class="pod r${i + 1}"><canvas width="170" height="195" data-i="${i}"></canvas><div class="nm">${esc(top[i].name)}</div><div class="st">${stageLbl(top[i])} · PERFECT ${top[i].perfect} · 콤보 ${top[i].best}</div><div class="blk">${i + 1}</div></div>`).join('');
-  podCvs = [...document.querySelectorAll('#podium canvas')].map(c => ({ c, p: top[+c.dataset.i], i: +c.dataset.i }));
-  $('#rest').innerHTML = rk.slice(3).map((x, i) => `<div><b>${i + 4}</b><i style="background:${esc(x.color)}"></i>${esc(x.name)}<em>· ${stageLbl(x)} · PERFECT ${x.perfect} · 최고 콤보 ${x.best}</em></div>`).join('');
-  if (fresh) { burstConfetti(); sfx('win'); }
-}
-function drawPodium(t) {
-  for (const { c, p, i } of podCvs) {
-    const g = c.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, c.width, c.height);
-    const hop = i === 0 ? Math.abs(Math.sin(t * 4)) * 18 : Math.abs(Math.sin(t * 3 + i)) * 6;
-    IQ.drawChar(g, c.width / 2, c.height - 14 - hop, 52, p.color, t, false, 1, null, { seed: p.id });
-    if (i === 0) { g.fillStyle = '#f2c14e'; g.strokeStyle = '#a8740a'; g.lineWidth = 2; const cx = c.width / 2 + 2, cy = c.height - 14 - hop - 52 * 2.35;
-      g.beginPath(); g.moveTo(cx - 26, cy + 12); g.lineTo(cx - 28, cy - 12); g.lineTo(cx - 13, cy); g.lineTo(cx, cy - 18); g.lineTo(cx + 13, cy); g.lineTo(cx + 28, cy - 12); g.lineTo(cx + 26, cy + 12); g.closePath(); g.fill(); g.stroke(); }
-  }
-}
-const confetti = [];
-const CCOL = ['#f2c14e', '#ef4565', '#3b6cf6', '#1fb36b', '#f5a524', '#c084fc', '#7dd3fc', '#ffffff'];
-function burstConfetti() {
-  for (let i = 0; i < 220; i++) confetti.push({ x: W * (0.2 + rnd() * 0.6), y: H * 0.35, vx: (rnd() - 0.5) * W * 0.9, vy: -H * (0.5 + rnd() * 0.9), r: 5 + rnd() * 7, a: rnd() * 6, va: (rnd() - 0.5) * 14, c: CCOL[i % CCOL.length], life: 0 });
-  for (let i = 0; i < 120; i++) confetti.push({ x: rnd() * W, y: -rnd() * H * 0.6, vx: (rnd() - 0.5) * 60, vy: rnd() * 80, r: 5 + rnd() * 6, a: rnd() * 6, va: (rnd() - 0.5) * 10, c: CCOL[i % CCOL.length], life: 0 });
-}
-function drawConfetti() {
-  fctx.setTransform(DPR, 0, 0, DPR, 0, 0); fctx.clearRect(0, 0, W, H);
-  if (!confetti.length) return;
-  const dt = frameDt;
-  for (let i = confetti.length - 1; i >= 0; i--) {
-    const p = confetti[i]; p.life += dt; p.vy += H * 0.9 * dt; p.vx *= Math.pow(0.35, dt); p.vy = Math.min(p.vy, H * 0.28); p.x += p.vx * dt + Math.sin(p.life * 5 + p.a) * 30 * dt; p.y += p.vy * dt; p.a += p.va * dt;
-    if (p.y > H + 20 || p.life > 9) { confetti.splice(i, 1); continue; }
-    fctx.save(); fctx.translate(p.x, p.y); fctx.rotate(p.a); fctx.scale(1, Math.cos(p.life * 8 + p.a)); fctx.fillStyle = p.c; fctx.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2); fctx.restore();
-  }
+  const num = (n) => (+n || 0).toLocaleString('ko-KR');
+  CEREMONY.show({
+    badge: `PART 3 · 단체 줄넘기 · ${(r.mode || phase.mode) === 'life' ? '하트 3개' : '걸리면 탈락'}`, title, subtitle: sub,
+    ranking: rk.map(x => ({ id: x.id, name: x.name, color: x.color, main: stageLbl(x),
+      stats: [`${num(x.score)}점`, `PERFECT ${x.perfect}`, `최고 콤보 ${x.best}`, `점프 ${x.jumps}`] })),
+    buttons: [{ label: '한 판 더', primary: true, onClick: playAgain }, { label: '설정 바꾸기', onClick: changeSettings }],
+    sound: true, muted: () => muted, instant: !fresh,
+  });
 }
 
 /* ═════════ 소리 (WebAudio 합성) ═════════ */

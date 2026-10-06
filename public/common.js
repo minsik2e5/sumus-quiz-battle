@@ -262,11 +262,11 @@ window.IQ = (() => {
     }
     // 팔 (뒤)
     const arm = (k) => {
-      const ax = x + k * s * 0.43, ay = by - s * 0.98, ang = (moving ? -sw * k * 0.9 : 0.15 * k);
+      const ax = x + k * s * 0.43, ay = by - s * 0.98, ang = opts.arms ? opts.arms[k < 0 ? 0 : 1] : (moving ? -sw * k * 0.9 : 0.15 * k); // opts.arms=[왼팔,오른팔] 각도(0=아래) — 시상식 포즈
       ctx.save(); ctx.translate(ax, ay); ctx.rotate(ang);
       ctx.fillStyle = shade(color, -0.15); ctx.strokeStyle = OL; ctx.lineWidth = lw;
       roundRect(ctx, -s * 0.09, 0, s * 0.18, s * 0.4, s * 0.09); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = '#ffd9bb'; ctx.beginPath(); ctx.arc(0, s * 0.42, s * 0.09, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = opts.glove || '#ffd9bb'; ctx.beginPath(); ctx.arc(0, s * 0.42, s * (opts.glove ? 0.15 : 0.09), 0, 7); ctx.fill(); ctx.stroke();
       ctx.restore();
     };
     arm(-face);

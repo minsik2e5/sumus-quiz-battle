@@ -61,20 +61,7 @@ select{font:inherit}
 .pop{animation:pop .5s cubic-bezier(.2,1.6,.4,1)}
 @keyframes pop{from{transform:translate(-50%,-50%) scale(.3);opacity:0}}
 
-/* 결과 */
-#end{position:fixed;inset:0;z-index:20;background:rgba(6,26,48,.78);display:grid;place-items:center;color:#fff;text-align:center}
-#end h1{font-size:clamp(34px,4vw,70px);margin:0 0 2vh;color:var(--gold);font-weight:900}
-.podium{display:flex;justify-content:center;align-items:flex-end;gap:1.4vw;margin-bottom:2.5vh}
-.pod{width:clamp(130px,13vw,230px)}
-.pod .nm{font-weight:900;font-size:clamp(18px,1.7vw,32px);margin-bottom:.8vh;word-break:keep-all}
-.pod .blk{border-radius:16px 16px 0 0;background:#fff;color:var(--navy);font-weight:900;font-size:clamp(34px,3.2vw,60px);display:grid;place-items:center}
-.pod.r1 .blk{background:var(--gold);height:24vh}.pod.r2 .blk{height:16vh}.pod.r3 .blk{height:11vh;background:#ffd9b0}
-.lists{display:flex;gap:2vw;justify-content:center;margin-bottom:3vh;max-width:90vw}
-.lists > div{max-width:42vw}
-.lists h3{margin:0 0 1vh;font-size:clamp(14px,1.2vw,20px);color:#c9d7ea}
-.tags{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-height:22vh;overflow:auto}
-.tags span{background:rgba(255,255,255,.12);border-radius:10px;padding:6px 12px;font-weight:700;font-size:14px}
-#end .row{display:flex;gap:10px;justify-content:center}
+/* 결과: /ceremony.js (시상식) */
 </style>
 </head>
 <body>
@@ -127,17 +114,9 @@ select{font:inherit}
   <div class="row"><button class="start" id="startBtn">시작 <span style="font-size:.6em;opacity:.6">Space</span></button></div>
 </section>
 
-<section id="end" class="hidden">
-  <div>
-    <h1 id="endTitle">결과</h1>
-    <div class="podium" id="podium"></div>
-    <div class="lists"><div><h3 id="finH"></h3><div class="tags" id="finL"></div></div><div><h3 id="outH"></h3><div class="tags" id="outL"></div></div></div>
-    <div class="row"><button class="btn gold" id="againBtn">한 판 더</button><button class="btn" id="setBtn">설정 바꾸기</button></div>
-  </div>
-</section>
-
 <script src="/socket.io/socket.io.js"></script>
 <script src="/common.js"></script>
+<script src="/ceremony.js"></script>
 <script>
 const $ = (s) => document.querySelector(s);
 const KEY = 'sumus-mg';
@@ -209,12 +188,12 @@ function onPhase(prev) {
   $('#hudL').classList.toggle('hidden', !room);
   $('#hCnt').classList.toggle('hidden', !(p === 'play' || p === 'ready'));
   $('#ctrl').classList.toggle('hidden', !(p === 'play' || p === 'ready'));
-  $('#end').classList.toggle('hidden', p !== 'end');
   $('#hLv').textContent = `LEVEL ${phase.level || 1}`;
   $('#lSet').textContent = `${phase.mode === 'back' ? '출발선으로' : '탈락'} · ${Math.round(phase.timeLimit / 60 * 10) / 10}분 · ${phase.startLevel}단계부터 · 거리 ${({ 1: '보통', 1.5: '길게', 2: '아주 길게' })[phase.dist] || '길게'}`;
   if (p === 'ready' && prev !== 'ready') countdown();
   if (p === 'play' && prev === 'ready') showBig('시작!', 900);
-  if (p === 'end') showEnd();
+  if (p === 'end' && prev !== 'end') showEnd(prev !== 'none');
+  if (p !== 'end') CEREMONY.hide();
   if (p === 'lobby') fx.length = 0;
 }
 let lastLv = 1;
@@ -235,9 +214,9 @@ function renderRoster() {
 $('#plist').onclick = (e) => { const b = e.target.closest('.pc'); if (b && confirm('이 학생을 내보낼까요?')) socket.emit('mg:kick', b.dataset.id); };
 $('#bot10').onclick = () => socket.emit('mg:bots', 10);
 $('#botClr').onclick = () => socket.emit('mg:clearbots');
-$('#cfgBtn').onclick = $('#setBtn').onclick = () => { if (phase.phase === 'end') socket.emit('mg:reset'); $('#setup').classList.remove('hidden'); $('#openBtn').textContent = '이대로 적용'; };
+const openSettings = () => { if (phase.phase === 'end') socket.emit('mg:reset'); $('#setup').classList.remove('hidden'); $('#openBtn').textContent = '이대로 적용'; };
+$('#cfgBtn').onclick = openSettings;
 $('#startBtn').onclick = () => { if (!roster.size) return alert('아직 들어온 학생이 없습니다.'); socket.emit('mg:start'); };
-$('#againBtn').onclick = () => socket.emit('mg:reset');
 $('#stopBtn').onclick = () => { if (confirm('지금 끝내고 결과를 볼까요?')) socket.emit('mg:stop'); };
 $('#resetBtn').onclick = () => { if (confirm('대기실로 돌아갈까요?')) socket.emit('mg:reset'); };
 $('#fsBtn').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
@@ -255,18 +234,25 @@ function countdown() {
   const step = () => { const left = Math.ceil((readyAtLocal - performance.now()) / 1000); if (phase.phase !== 'ready') return; if (left > 0) { showBig(left, 900); sfx('tick'); setTimeout(step, 1000); } };
   setTimeout(step, Math.max(0, (readyAtLocal - performance.now()) % 1000));
 }
-function showEnd() {
-  const r = phase.result || { ranking: [] }; const rk = r.ranking;
-  const fin = rk.filter(x => x.fin), out = rk.filter(x => !x.fin);
-  $('#endTitle').textContent = fin.length ? `통과 ${fin.length}명!` : '아무도 통과하지 못했어요';
-  const top = fin.slice(0, 3), order = [1, 0, 2].filter(i => top[i]);
-  $('#podium').innerHTML = order.map(i => `<div class="pod r${i + 1}"><div class="nm">${esc(top[i].name)}</div><div class="blk">${i + 1}</div></div>`).join('');
-  $('#finH').textContent = fin.length > 3 ? '통과 순서' : ''; $('#finL').innerHTML = fin.length > 3 ? fin.slice(3).map(x => `<span>${x.order}등 ${esc(x.name)}</span>`).join('') : '';
-  $('#outH').textContent = out.length ? (phase.mode === 'back' ? '시간 안에 못 들어온 학생' : '탈락') : '';
-  $('#outL').innerHTML = out.map(x => `<span>${esc(x.name)} · ${x.z}%${x.backs ? ` · ${x.backs}번 잡힘` : ''}</span>`).join('');
-  sfx('win');
+function showEnd(fresh) { // 시상식: /ceremony.js
+  const r = phase.result || { ranking: [] }; const rk = r.ranking || [];
+  const fin = rk.filter(x => x.fin), back = phase.mode === 'back';
+  const sec = (t) => t == null ? '' : `${(+t).toFixed(1)}초`;
+  const distLbl = ({ 1: '보통', 1.5: '길게', 2: '아주 길게' })[r.dist || phase.dist] || '';
+  CEREMONY.show({
+    badge: `PART 2 · 무궁화 꽃이 피었습니다 · ${back ? '출발선으로' : '탈락'}${distLbl ? ` · 거리 ${distLbl}` : ''}`,
+    title: fin.length ? `통과 ${fin.length}명!` : '아무도 통과하지 못했어요',
+    subtitle: fin.length ? `1등 ${fin[0].name}${fin[0].t != null ? ` · ${sec(fin[0].t)}` : ''}${rk.length > fin.length ? ` · ${back ? '시간 안에 못 들어온 학생' : '탈락'} ${rk.length - fin.length}명` : ''}` : (rk.length ? '가장 멀리 간 순서로 보여 줘요' : ''),
+    podium: Math.min(3, fin.length),
+    ranking: rk.map(x => x.fin
+      ? { id: x.id, name: x.name, color: x.color, rank: x.order || undefined, main: x.t != null ? sec(x.t) : `${x.order}등 통과`,
+          stats: [x.t != null ? `${x.order}등 통과` : '', x.backs ? `${x.backs}번 잡힘` : ''] }
+      : { id: x.id, name: x.name, color: x.color, main: `${x.z}%`, tag: back || x.timeout ? '시간 초과' : '탈락', tagColor: '#c9405a',
+          stats: [x.backs ? `${x.backs}번 잡힘` : ''] }),
+    buttons: [{ label: '한 판 더', primary: true, onClick: () => socket.emit('mg:reset') }, { label: '설정 바꾸기', onClick: openSettings }],
+    sound: true, muted: () => muted, instant: !fresh,
+  });
 }
-
 /* ═════════ 그리기 ═════════ */
 const cv = $('#cv'), ctx = cv.getContext('2d');
 let W = 0, H = 0, DPR = 1;
