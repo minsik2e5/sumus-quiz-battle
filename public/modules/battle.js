@@ -730,16 +730,27 @@ function drawMonsterResult() {
   if (!B.resultSounded) { B.resultSounded = true; sfx(won ? 'win' : 'lose', won ? [60, 50, 120] : 0); }
   const why = won ? (r.reason === 'forfeit' ? '' : `${esc(mon.title)}을(를) 쓰러뜨렸어요!`) : r.reason === 'forfeit' ? '도전을 그만뒀어요' : f.hp > 0 && me_.hp > 0 ? '시간 안에 쓰러뜨리지 못했어요' : '내 펫이 쓰러졌어요';
   const missed = r.review?.[v.me] || [];
+  const right = local?.myRight?.() ?? me_.correct ?? 0;
+  // V13.107: one framed scene (monster and pet on the same floor), the result title, three small
+  // numbers, then the reward panel and the buttons.
   main(`<section class="yb-card mh-result ${won ? 'win' : 'lose'} ${setup.level || ''}${L.boss ? ' boss' : ''}" style="--mc:${mon.color}">
     <span class="yb-result-kind">몬스터 레벨 ${num(setup.stage)}${L.boss ? ' · 보스' : ''} · ${esc(L.name)}</span>
-    <div class="mh-result-stage">${won ? `<div class="mh-result-down${MONSTER_ART.has(mon.key) ? ' art' : ''}">${monsterPic(f.monster, { pose: 'down' })}</div>` : `<div class="mh-result-mon">${monsterPic(f.monster, { pose: 'attack' })}</div>`}<div class="mh-result-pet">${avatar(me_.pet?.key, { form: me_.pet?.form ?? 1, expression: won ? 'win' : 'hurt' })}</div></div>
+    <div class="mh-result-stage">
+      ${won ? `<div class="mh-result-down${MONSTER_ART.has(mon.key) ? ' art' : ''}">${monsterPic(f.monster, { pose: 'down' })}</div>` : `<div class="mh-result-mon">${monsterPic(f.monster, { pose: 'attack' })}</div>`}
+      <div class="mh-result-pet">${avatar(me_.pet?.key, { form: me_.pet?.form ?? 1, expression: won ? 'win' : 'hurt' })}</div>
+    </div>
     <div class="mh-result-badge">${won ? '처치 성공!' : '실패…'}</div>
-    <p class="yb-result-lead">${why} · 내 HP ${num(Math.max(0, me_.hp))} · 몬스터 HP ${num(Math.max(0, f.hp))}</p>
-    <div class="yb-result-points mh-reward" id="mh-reward">${monsterRewardText()}</div>
-    <div id="mh-next">${monsterNextButton(won)}</div>
+    ${why ? `<p class="mh-result-why">${why}</p>` : ''}
+    <div class="mh-stats">
+      <span><small>내 HP</small><b>${num(Math.max(0, me_.hp))}</b></span>
+      <span><small>몬스터 HP</small><b>${num(Math.max(0, f.hp))}</b></span>
+      <span><small>맞힌 단어</small><b>${num(right)}</b></span>
+    </div>
+    <div class="mh-reward" id="mh-reward">${monsterRewardText()}</div>
+    <div class="mh-next" id="mh-next">${monsterNextButton(won)}</div>
     <div class="btn-row yb-result-actions"><button type="button" class="btn" data-yb="home">홈으로</button><button type="button" class="btn" data-yb="monster-list">몬스터 레벨</button></div>
   </section>
-  ${missed.length ? `<section class="yb-card yb-review"><h2>이번 전투에서 놓친 단어 <small>${missed.length}개</small></h2><ul>${missed.slice(0, 10).map(w => `<li><b>${esc(w.word)}</b><span>${esc(w.meaning)}</span></li>`).join('')}</ul><button type="button" class="btn primary full" data-yb="review">놓친 단어 연습하기</button></section>` : ''}`);
+  ${missed.length ? `<section class="yb-card yb-review mh-review"><h2>이번 전투에서 놓친 단어 <small>${missed.length}개</small></h2><ul>${missed.slice(0, 10).map(w => `<li><b>${esc(w.word)}</b><span>${esc(w.meaning)}</span></li>`).join('')}</ul><button type="button" class="btn primary full" data-yb="review">놓친 단어 연습하기</button></section>` : ''}`);
   if (won && !reduced()) burstConfetti(document.querySelector('.mh-result-stage'));
   claimMonsterReward(won ? 'win' : 'lose', local);
 }
@@ -751,11 +762,13 @@ function monsterNextButton(won) {
 }
 function monsterRewardText() {
   const r = B.monsterReward;
-  if (!r) return '보상 확인 중…';
-  if (r.paid) return `${r.first ? `<em class="mh-first">${r.boss ? '보스 첫 처치 보상!' : '첫 처치 보상!'}</em>` : ''}${coin()}+${num(r.coins)} · 경험치 +${num(r.xp)}`;
+  if (!r) return '<p class="mh-rw-note wait">보상 확인 중…</p>';
+  if (r.paid) return `${r.first ? `<span class="mh-rw-tag">${r.boss ? '보스 첫 처치 보상' : '첫 처치 보상'}</span>` : '<span class="mh-rw-tag again">처치 보상</span>'}
+    <div class="mh-rw-row"><span class="mh-rw-chip coin">${coin()}<b>+${num(r.coins)}</b><small>코인</small></span><span class="mh-rw-chip xp"><i>EXP</i><b>+${num(r.xp)}</b><small>경험치</small></span></div>`;
   const need = stageLevel(B.monsterSetup?.stage || 1, B.monsterSetup?.level || 'easy')?.need || 5;
-  if (r.reason === 'error') return r.retry ? `보상을 받지 못했어요.${retryButton()}` : '보상을 확인하지 못했어요';
-  return { few: `단어를 ${need}개 이상 맞히면 보상을 받아요`, daily: '오늘 다시 잡기 보상은 다 받았어요 (첫 처치는 언제나 받아요)', short: '너무 빨리 끝난 전투예요', unregistered: '보상 등록 없이 한 전투예요' }[r.reason] || '보상 없음';
+  if (r.reason === 'error') return `<p class="mh-rw-note">${r.retry ? `보상을 받지 못했어요.${retryButton()}` : '보상을 확인하지 못했어요'}</p>`;
+  const text = { few: `단어를 <b>${need}개 이상</b> 맞히면 보상을 받아요`, daily: '오늘 다시 잡기 보상은 다 받았어요 (첫 처치는 언제나 받아요)', short: '너무 빨리 끝난 전투예요', unregistered: '보상 등록 없이 한 전투예요' }[r.reason] || '이번 전투는 보상이 없어요';
+  return `<p class="mh-rw-note">${text}</p>`;
 }
 async function claimMonsterReward(outcome, local) {
   const cur = B;
@@ -1192,7 +1205,7 @@ function pop(side, text, kind = '') {
 }
 // V13.85 the pets act out the hit: the attacker shows its attack (cheer) pose, the one hit its
 // hurt (sad) pose, for a moment (로보 has its own punch and flinch).
-function hit(side) { const el = document.getElementById('yb-pet-' + side); if (!el) return; el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); showPose(el, 'hurt', 900); }
+function hit(side) { const el = document.getElementById('yb-pet-' + side); if (!el) return; el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); clearTimeout(el.hitTimer); el.hitTimer = setTimeout(() => el.classList.remove('hit'), 560); showPose(el, 'hurt', 900); }
 function lunge(side) { const el = document.getElementById('yb-pet-' + side); if (!el) return; showPose(el, 'attack', 900); if (reduced()) return; el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 240); }
 const sideOf = pid => pid === B.view.me ? 'me' : 'op';
 

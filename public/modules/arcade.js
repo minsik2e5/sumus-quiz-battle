@@ -53,13 +53,31 @@ export function gachaBookPage() {
     <div class="page-heading arcade-head"><span class="premium-eyebrow">MY COLLECTION</span><h1>모은 꾸미기</h1><p>예전 뽑기 머신에서 모은 오라와 칭호예요. 눌러서 착용해요.</p></div>
     <div data-arcade data-arcade-view="book"></div>`;
 }
-// The pet egg shop, below the games.
-function shopHtml(A) {
+// V13.107 알 상점: a stand on the page like the capsule machine and 가위바위보, the two eggs side by
+// side with their price and a buy button (a second tap buys; see app.js `egg-buy`).
+function eggSlot(A, kind) {
   const g = A.data.stats || {}, has = key => (g.pets || []).some(pet => pet.key === key);
-  const left = STANDARD_PET_KEYS.filter(key => !has(key)).length, epicLeft = EPIC_PET_KEYS.filter(key => !has(key)).length;
-  return `<section class="ga-card ga-shop">
-    <button type="button" class="ga-shop-row" data-action="egg-shop"><span class="ga-egg art" aria-hidden="true">${uiArt('egg-shop')}</span><span><b>랜덤 알 상점</b><small>${left ? `상점에서 아직 못 만난 친구 ${left}마리` : '기본 펫을 모두 모았어요!'}</small></span><em>${coin()}${num(EGG_PRICE)}</em></button>
-    <button type="button" class="ga-shop-row epic" data-action="egg-shop" data-egg="epic"><span class="ga-egg epic${ART_READY.has('epic-egg') ? ' art' : ''}" aria-hidden="true">${artOr('epic-egg', '★')}</span><span><b>영웅 알 <i class="ga-epic-tag">영웅</i></b><small>${epicLeft ? `전설 바로 아래 등급 · 아직 못 만난 영웅 ${epicLeft}마리` : '영웅 펫을 모두 모았어요!'}</small></span><em>${coin()}${num(EPIC_EGG_PRICE)}</em></button>
+  const epic = kind === 'epic', price = epic ? EPIC_EGG_PRICE : EGG_PRICE;
+  const missing = (epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter(key => !has(key)).length;
+  const hasLegend = (g.pets || []).some(pet => CHARACTERS[pet.key]?.legendary);
+  const short = Math.max(0, price - Number(g.points_balance || 0));
+  const art = epic ? artOr('epic-egg', '<span class="egg-slot-plain epic">★</span>') : uiArt('egg-shop');
+  const label = !missing ? '모두 모았어요' : short ? `<span>${coin()}${num(price)}</span><small>${num(short)}코인 부족</small>` : `<span>${coin()}${num(price)}</span><small>사기</small>`;
+  return `<div class="egg-slot ${kind}${!missing ? ' done' : ''}">
+    <span class="egg-slot-tag">${epic ? '★ 영웅' : '기본'}</span>
+    <div class="egg-slot-art" aria-hidden="true">${art}</div>
+    <b class="egg-slot-name">${epic ? '영웅 알' : '랜덤 알'}</b>
+    <small class="egg-slot-sub">${missing ? `못 만난 친구 ${missing}마리` : (epic ? '영웅 펫을 다 모았어요' : '기본 펫을 다 모았어요')}</small>
+    ${epic && missing && !hasLegend ? '<em class="egg-slot-legend">1% 전설 찬스</em>' : ''}
+    <button type="button" class="egg-slot-buy" data-action="egg-buy" data-egg="${kind}" ${!missing || short ? 'disabled' : ''} aria-label="${epic ? '영웅 알' : '랜덤 알'} ${num(price)}코인${short ? `, ${num(short)}코인 부족` : ''}">${label}</button>
+  </div>`;
+}
+function shopHtml(A) {
+  return `<section class="egg-stand" id="egg-stand">
+    <div class="egg-stand-head"><div><small>PET EGG SHOP</small><h2>알 상점</h2></div><span class="egg-stand-wallet">${coin()}<b>${num(A.data.stats?.points_balance || 0)}</b></span></div>
+    <p class="egg-stand-lead">새 알은 바로 파트너가 되고, 함께 공부하면 <b>Lv.3</b>에 태어나요.</p>
+    <div class="egg-stand-grid">${eggSlot(A, 'basic')}${eggSlot(A, 'epic')}</div>
+    <p class="lk-note">랜덤 알은 아직 못 만난 기본 펫, 영웅 알은 아직 못 만난 영웅 펫이 나와요 · 사기 버튼을 한 번 더 누르면 사요</p>
   </section>`;
 }
 // V13.68 coin capsule: the machine and its show live in lucky.js.
@@ -135,7 +153,7 @@ async function playRps(A, resume) {
 }
 function draw() {
   if (!current?.el.isConnected) return;
-  current.el.innerHTML = current.el.dataset.arcadeView === 'book' ? collectionHtml(current.A) : `${machineHtml(current.A)}${rpsCard(rewards(current.A).rps, rpsBet, Number(current.A.data.stats?.points_balance || 0))}${rewards(current.A).market_open ? stocksCard() : ''}${shopHtml(current.A)}`;
+  current.el.innerHTML = current.el.dataset.arcadeView === 'book' ? collectionHtml(current.A) : `${machineHtml(current.A)}${shopHtml(current.A)}${rpsCard(rewards(current.A).rps, rpsBet, Number(current.A.data.stats?.points_balance || 0))}${rewards(current.A).market_open ? stocksCard() : ''}`;
 }
 
 /* coin capsule */
