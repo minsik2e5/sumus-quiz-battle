@@ -113,7 +113,7 @@ module.exports = function createBK(ctx) {
       ? (b.state === 'in') - (a.state === 'in') || (b.outAt || 0) - (a.outAt || 0) || b.score - a.score
       : b.score - a.score || b.saves - a.saves || a.goals - b.goals);
     r.result = { why, mode: r.mode, time: r.time, ranking: rank.map(p => ({ id: p.id, name: p.name, color: p.color, alive: p.state === 'in', score: p.score, saves: p.saves, goals: p.goals, perfect: p.perfect, best: p.best,
-      survived: Math.round(((p.state === 'in' ? now : p.outAt) - r.playAt) / 1000) })) };
+      survived: Math.max(0, Math.round(((p.state === 'in' ? now : p.outAt) - r.playAt) / 1000)) })) };
     r.phase = 'end'; r.endAt = 0; emitPhase(r); emitRoster(r);
   }
 

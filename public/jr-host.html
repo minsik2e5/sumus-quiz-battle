@@ -799,7 +799,7 @@ function bodyGrad(color) { let g = gradCache.get(color); if (!g) { g = ctx.creat
 function headGrad(face) { const k = 'h' + face; let g = gradCache.get(k); if (!g) { const hx = face * 0.02, hy = -1.62; g = ctx.createRadialGradient(hx - 0.18, hy - 0.18, 0.06, hx, hy, 0.6); g.addColorStop(0, '#ffe8d2'); g.addColorStop(1, '#f6c9a2'); gradCache.set(k, g); } return g; }
 function rr(x, y, w, h, r) { IQ.roundRect(ctx, x, y, w, h, r); }
 function kid(x, y, s, color, seed, o) {
-  const style = seed % 4, hair = HAIR[(seed >> 3) % HAIR.length], face = o.face || 1, arms = o.arms || 0, tuck = o.tuck || 0, sq = o.sq || 0, st = o.st || 0;
+  const style = seed % 4, hair = HAIR[(seed >>> 3) % HAIR.length], face = o.face || 1, arms = o.arms || 0, tuck = o.tuck || 0, sq = o.sq || 0, st = o.st || 0;
   ctx.save(); ctx.translate(x, y); if (o.rot) ctx.rotate(o.rot);
   ctx.scale(s * (1 + 0.18 * sq - 0.08 * st), s * (1 - 0.26 * sq + 0.14 * st));
   if (o.alpha != null) ctx.globalAlpha = o.alpha;

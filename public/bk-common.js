@@ -49,7 +49,7 @@
       const tb = Math.floor((now - (keepMs || 2500)) / DT) * DT;
       if (tb <= this.base.t) return;
       this.base = simulate(this.base, this.ev, tb);
-      this.ev = this.ev.filter(e => e.t > tb);
+      this.ev = this.ev.filter(e => e.t > tb - DT); // 마지막 한 걸음(DT) 안의 입력은 아직 적용 전이므로 남겨 둠
     }
   }
 

@@ -234,7 +234,7 @@ window.IQ = (() => {
   // 캐릭터: (x,y)=발 위치, s=크기
   function drawChar(ctx, x, y, s, color, t, moving, face, name, opts = {}) {
     const h = hash(opts.seed != null ? opts.seed : (name || color));
-    const style = h % 4, hair = HAIR[(h >> 3) % HAIR.length];
+    const style = h % 4, hair = HAIR[(h >>> 3) % HAIR.length];
     const run = moving ? t * 15 : 0;
     const bob = moving ? -Math.abs(Math.sin(run)) * s * 0.16 : Math.sin(t * 2.4 + h) * s * 0.025;
     const sw = moving ? Math.sin(run) : 0;
