@@ -1095,41 +1095,51 @@ function drawSpell(q) {
   slots.setAttribute('aria-label', `입력한 철자 ${spelled(q)}`);
   const go = document.getElementById('yb-spell-go');
   go.disabled = closed || !full;
-  input.value = q.typed.join('');
+  // V13.108: written only when it differs. Writing the same text again (each redraw: the other
+  // player answering, the clock…) breaks an Android keyboard's word in progress (Samsung, Gboard).
+  if (input.value !== q.typed.join('')) input.value = q.typed.join('');
   // A spelling word right after a word typed on the keyboard keeps typing; otherwise a phone waits for a tap.
   // (Computers and pads with a keyboard always focus; a phone opens the keyboard only from a tap.)
   if (!closed && (B.typing || window.matchMedia?.('(pointer: fine)').matches)) input.focus({ preventScroll: true });
+  if (B.typing && !closed && !full && !q.typed.length) fitTypingSoon();
 }
 // Letters typed (or pasted) are turned into the answer: only a-z, as many as there are blanks.
 // Korean letters (한/영 key) are dropped with a hint.
-function spellType(raw) {
+// V13.108: Android keyboards (Samsung, Gboard) type English as a word "in progress" (composition)
+// too, so every input counts at once, composing or not; while a word is in progress the input
+// itself is left alone (the boxes follow it), and it is cleaned when the word ends.
+function spellType(raw, composing = false) {
   const q = B?.view?.question, input = document.getElementById('yb-spell-input');
   if (!q || q.kind !== 'spell' || !input) return;
-  if (q.locked || q.answer !== undefined) { input.value = q.typed.join(''); return; }
+  if (q.locked || q.answer !== undefined) { if (!composing && input.value !== q.typed.join('')) input.value = q.typed.join(''); return; }
   q.typed = [...String(raw).toLowerCase().replace(/[^a-z]/g, '')].slice(0, blanks(q));
   const tip = document.getElementById('yb-spell-tip');
   if (tip) tip.classList.toggle('warn', /[ㄱ-ㆎ가-힣]/.test(raw));
-  syncSpell(q);
+  syncSpell(q, composing);
 }
-function syncSpell(q) {
+function syncSpell(q, composing = false) {
   const input = document.getElementById('yb-spell-input');
-  if (input && input.value !== q.typed.join('')) input.value = q.typed.join('');
+  if (input && !composing && input.value !== q.typed.join('')) input.value = q.typed.join('');
   const slots = document.getElementById('yb-spell-slots');
   if (slots) { slots.innerHTML = spellSlots(q); slots.setAttribute('aria-label', `입력한 철자 ${spelled(q)}`); }
   const go = document.getElementById('yb-spell-go');
   if (go) go.disabled = q.typed.length !== blanks(q);
 }
 function bindSpellInput(input) {
-  input.addEventListener('input', event => { if (!event.isComposing) spellType(input.value); });
-  input.addEventListener('compositionend', () => spellType(input.value));
-  input.addEventListener('keydown', event => {
-    if (event.key === 'Enter' && !event.isComposing) { event.preventDefault(); spellSubmit(); }
-  });
+  let composing = false;
+  input.addEventListener('compositionstart', () => { composing = true; });
+  input.addEventListener('input', event => spellType(input.value, composing || !!event.isComposing));
+  input.addEventListener('compositionend', () => { composing = false; spellType(input.value); });
+  // Enter (보내기) attacks, even in the middle of a word on an Android keyboard.
+  const go = event => { event.preventDefault(); spellType(input.value); spellSubmit(); };
+  input.addEventListener('keydown', event => { if (event.key === 'Enter' || event.keyCode === 13) go(event); });
+  input.addEventListener('beforeinput', event => { if (event.inputType === 'insertLineBreak' || event.inputType === 'insertParagraph') go(event); });
   // The arena shrinks while the keyboard is up, so the fight stays on screen above it.
+  hookFit();
   input.addEventListener('focus', () => {
     B.typing = true;
     document.querySelector('.battle-app')?.classList.add('yb-typing');
-    setTimeout(() => { if (input.isConnected) document.getElementById('yb-spell-go')?.scrollIntoView({ block: 'nearest', behavior: reduced() ? 'auto' : 'smooth' }); }, 220);
+    fitTypingSoon();
   });
   input.addEventListener('blur', () => {
     // Moving to a dialog or to the next word's input is not leaving the keyboard; a tap elsewhere is.
@@ -1140,6 +1150,30 @@ function bindSpellInput(input) {
       document.querySelector('.battle-app')?.classList.remove('yb-typing');
     }, 120);
   });
+}
+// V13.108: with the phone keyboard up, the fight stays in sight: the page scrolls so the arena
+// starts right under the top bar; on a short screen 공격! sits just above the keyboard instead.
+// It follows the keyboard (visualViewport) as it opens and closes.
+function fitTyping() {
+  const arena = document.getElementById('yb-arena'), go = document.getElementById('yb-spell-go');
+  if (!B?.typing || !arena || !go || !document.querySelector('.battle-app.yb-typing')) return;
+  const vv = window.visualViewport, top = vv ? vv.offsetTop : 0, bottom = top + (vv ? vv.height : window.innerHeight);
+  const bar = document.querySelector('.yb-top')?.getBoundingClientRect().bottom ?? 0;
+  const a = arena.getBoundingClientRect(), g = go.getBoundingClientRect();
+  let d = a.top - Math.max(top, bar) - 4;
+  if (g.bottom - d > bottom - 6) d = g.bottom - (bottom - 6);
+  if (Math.abs(d) > 2) window.scrollBy(0, d);
+}
+let fitTimers = [];
+function fitTypingSoon() {
+  fitTimers.forEach(clearTimeout);
+  fitTimers = [60, 260, 600].map(ms => setTimeout(fitTyping, ms));
+}
+let fitHooked = false;
+function hookFit() {
+  if (fitHooked || !window.visualViewport) return;
+  fitHooked = true;
+  window.visualViewport.addEventListener('resize', () => { if (B?.typing) fitTypingSoon(); });
 }
 function spellKey(key) {
   const q = B?.view?.question;

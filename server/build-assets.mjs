@@ -81,7 +81,8 @@ const cssSources = [
   "v13104.css",
   "v13105.css",
   "v13105fx.css",
-  "v13107.css"
+  "v13107.css",
+  "v13108.css"
 ];
 const cssBundlePath = resolve(root, 'public/app.bundle.css');
 
