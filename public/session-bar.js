@@ -60,4 +60,6 @@
       if (p.phase === 'lobby' && !p.total && typeof validQuestions === 'function') { const qs = validQuestions(); if (qs.length) socket.emit('host:config', { questions: qs }); }
     });
   }
+  // 오늘의 리그 · SUMUS RECORD (선생님 화면 공용)
+  const lg = document.createElement('script'); lg.src = '/league.js'; document.body.appendChild(lg);
 })();

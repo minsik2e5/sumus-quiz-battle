@@ -102,9 +102,10 @@ module.exports = function createJR(ctx) {
   function finish(r, why) {
     const ps = [...r.players.values()];
     const rank = ps.slice().sort((a, b) => (b.state === 'in') - (a.state === 'in') || (b.outStage || 0) - (a.outStage || 0) || b.score - a.score);
-    r.result = { why, stage: r.stage, stages: LAST, mode: r.mode, ranking: rank.map(p => ({ id: p.id, name: p.name, color: p.color, alive: p.state === 'in', hearts: p.hearts, score: p.score, jumps: p.jumps, perfect: p.perfect, best: p.best, outStage: p.outStage || 0 })) };
+    r.result = { why, stage: r.stage, stages: LAST, mode: r.mode, ranking: rank.map(p => ({ id: p.id, name: p.name, color: p.color, alive: p.state === 'in', hearts: p.hearts, score: p.score, jumps: p.jumps, perfect: p.perfect, best: p.best, outStage: p.outStage || 0, bot: !!p.bot })) };
     r.phase = 'end'; r.endAt = 0; r.nextStage = 0;
     emitPhase(r); emitRoster(r);
+    ctx.onFinish && ctx.onFinish(r, 'jr');
   }
 
   function botAct(r, now) {

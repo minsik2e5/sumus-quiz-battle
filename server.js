@@ -146,7 +146,7 @@ function adoptOrphans(kind, pin, isLinked) {
   if (!isLinked) KINDS.quiz.rooms.delete(pin); else sessions.get(pin).active = kind;
   io.to(pin).emit('goto', KINDS[kind].path + '?pin=' + pin + '&auto=1');
 }
-const gameCtx = { io, uid, rand, COLORS, linked, inactive, carryFrom, activeRedirect, removeFromPeers, claimPin, linkSession, adoptOrphans, FULL };
+const gameCtx = { io, uid, rand, COLORS, linked, inactive, carryFrom, activeRedirect, removeFromPeers, claimPin, linkSession, adoptOrphans, FULL, onFinish: (r, kind) => leagueAdd(r, kind, r.result) };
 const jr = createJR(gameCtx);
 const bk = createBK(gameCtx);
 
@@ -248,15 +248,16 @@ function reveal(room) {
   emitRoster(room);
 }
 
-function finish(room) {
+function finish(room, why) {
   clearTimeout(room.timer); clearTimeout(room.autoTimer); room.autoAt = 0;
   const ps = [...room.players.values()];
   const survivors = ps.filter(p => p.alive);
   const ranking = ps.slice().sort((a, b) => (b.alive - a.alive) * (room.mode === 'survival' ? 1 : 0) || b.score - a.score)
-    .map(p => ({ id: p.id, name: p.name, color: p.color, score: p.score, alive: p.alive }));
-  room.result = { mode: room.mode, survivors: survivors.map(p => p.id), ranking };
+    .map(p => ({ id: p.id, name: p.name, color: p.color, score: p.score, alive: p.alive, correct: Math.round(p.score / 100), bot: !!p.bot }));
+  room.result = { why: why || 'done', mode: room.mode, survivors: survivors.map(p => p.id), ranking };
   room.phase = 'end';
   emitPhase(room);
+  leagueAdd(room, 'quiz', room.result);
 }
 
 // 서바이벌: 2명 이상으로 시작했는데 1명만 남으면 종료 (혼자 테스트할 땐 계속 진행)
@@ -369,6 +370,7 @@ io.on('connection', (socket) => {
   jr.setup(socket, on);
   bk.setup(socket, on);
   setupSession(socket, on);
+  setupLeague(socket, on);
 });
 function setup(socket, on) {
   on('host:create', (cfg, ack) => {
@@ -410,7 +412,7 @@ function setup(socket, on) {
     r.touched = Date.now(); return r;
   };
   on('host:next', () => { const r = hostRoom(); if (r) next(r); });
-  on('host:finish', () => { const r = hostRoom(); if (r && r.phase !== 'lobby') finish(r); });
+  on('host:finish', () => { const r = hostRoom(); if (r && r.phase !== 'lobby') finish(r, 'stop'); });
   on('host:reset', () => { const r = hostRoom(); if (r) resetRoom(r); });
   on('host:config', (cfg) => {
     const r = hostRoom(); if (!r || r.phase !== 'lobby') return;
@@ -624,9 +626,10 @@ function mgFinish(r, why) {
   for (const p of ps) if (p.state === 'run') { p.state = 'out'; p.timeout = true; }
   const fin = ps.filter(p => p.state === 'fin').sort((a, b) => a.order - b.order);
   const rest = ps.filter(p => p.state !== 'fin').sort((a, b) => b.z - a.z);
-  r.result = { why, ranking: [...fin, ...rest].map(p => ({ id: p.id, name: p.name, color: p.color, fin: p.state === 'fin', order: p.order || 0, z: Math.round(p.z * 100), backs: p.backs || 0, timeout: !!p.timeout })) };
+  r.result = { why, dist: r.dist, ranking: [...fin, ...rest].map(p => ({ id: p.id, name: p.name, color: p.color, fin: p.state === 'fin', order: p.order || 0, z: Math.round(p.z * 100), backs: p.backs || 0, timeout: !!p.timeout, t: p.state === 'fin' && p.finT ? Math.round(p.finT * 10) / 10 : null, bot: !!p.bot })) };
   r.phase = 'end'; r.endsAt = 0; r.main = 'back'; r.crab = 'off';
   mgEmitPhase(r); mgEmitWatch(r); mgEmitRoster(r);
+  leagueAdd(r, 'mg', r.result);
 }
 function mgReset(r) {
   r.phase = 'lobby'; r.endsAt = 0; r.readyAt = 0; r.cycle = 0; r.level = r.startLevel; r.main = 'back'; r.crab = 'off'; r.syl = 0; r.plan = null; r.result = null; r.finN = 0;
@@ -637,7 +640,7 @@ function mgReset(r) {
 function mgTick() {
   const now = Date.now(), dt = TICK / 1000;
   for (const r of mgRooms.values()) {
-    if (r.phase === 'ready' && now >= r.readyAt) { r.phase = 'play'; r.readyAt = 0; r.endsAt = now + r.time * 1000; mgPlanCycle(r); mgEmitPhase(r); }
+    if (r.phase === 'ready' && now >= r.readyAt) { r.phase = 'play'; r.readyAt = 0; r.playAt = now; r.endsAt = now + r.time * 1000; mgPlanCycle(r); mgEmitPhase(r); }
     if (r.phase === 'play') {
       // 일정표 진행
       const el = (now - r.planStart) / 1000;
@@ -660,7 +663,7 @@ function mgTick() {
       for (const p of r.players.values()) {
         if (p.state !== 'run') continue;
         if (watching && p.run && !(p.immuneUntil > now)) { mgCatch(r, p, now); continue; }
-        if (p.run) { p.z += MG_SPEED / (r.dist || 1) * dt; if (p.z >= 1) { p.z = 1; p.state = 'fin'; p.order = ++r.finN; p.run = false; io.to('mg' + r.pin).emit('mg:fin', { id: p.id, order: p.order }); mgEmitRoster(r); } }
+        if (p.run) { p.z += MG_SPEED / (r.dist || 1) * dt; if (p.z >= 1) { p.z = 1; p.state = 'fin'; p.finT = (now - (r.playAt || now)) / 1000; p.order = ++r.finN; p.run = false; io.to('mg' + r.pin).emit('mg:fin', { id: p.id, order: p.order }); mgEmitRoster(r); } }
       }
       const active = [...r.players.values()].filter(p => p.state === 'run').length;
       if (now >= r.endsAt) mgFinish(r, 'time');
@@ -766,6 +769,68 @@ KINDS.bk = { rooms: bk.rooms, path: '/b', host: '/bk', kicked: 'bk:kicked', role
   reset: (r) => { if (r.phase !== 'lobby') bk.reset(r); } };
 const roleKind = { host: 'quiz', mghost: 'mg', jrhost: 'jr', bkhost: 'bk' };
 const credsOf = (pin) => Object.fromEntries(kindList().map(k => [k, { ok: true, pin, hostKey: KINDS[k].rooms.get(pin).hostKey }]));
+
+// ═══════════════════════════════════════════════════════════════
+// 오늘의 리그 — 한 판이 끝날 때마다 순위로 리그 점수를 주고, 수업 끝에 정산
+// 기록은 서버(수업 방)에 두고, 선생님 브라우저에도 사본을 저장(서버가 잠들어 지워지면 되살림)
+// ═══════════════════════════════════════════════════════════════
+const leaguePts = (rank, n) => (rank === 1 ? 10 : rank === 2 ? 8 : rank === 3 ? 6 : rank <= Math.ceil(n * 0.3) ? 4 : 2);
+const KIND_NAME = { quiz: 'PART 1 퀴즈쇼', mg: 'PART 2 무궁화', jr: 'PART 3 줄넘기', bk: 'PART 4 바나나킥' };
+function roundLabel(kind, r, result) {
+  if (kind === 'quiz') return result.mode === 'score' ? '점수전' : '서바이벌';
+  if (kind === 'mg') return ({ 1: '거리 보통', 1.5: '거리 길게', 2: '거리 아주 길게' })[result.dist] || '';
+  if (kind === 'jr') return result.mode === 'life' ? '하트 3개' : '탈락';
+  if (kind === 'bk') return result.mode === 'score' ? '점수전 ' + Math.round(result.time / 60) + '분' : '탈락';
+  return '';
+}
+function leagueOf(pin) { const s = sessions.get(pin); if (!s) return null; return s.league || (s.league = { rounds: [], seq: 0 }); }
+function leagueAdd(r, kind, result) {
+  if (!linked(r) || !result || !Array.isArray(result.ranking) || !result.ranking.length) return;
+  const L = leagueOf(r.pin), n = result.ranking.length;
+  L.rounds.push({ id: ++L.seq, kind, name: KIND_NAME[kind], label: roundLabel(kind, r, result), at: Date.now(), why: result.why || 'done', counted: result.why !== 'stop',
+    entries: result.ranking.map((e, i) => ({ id: e.id, name: e.name, color: e.color, bot: !!e.bot, rank: i + 1, pts: leaguePts(i + 1, n) })) });
+  emitLeague(r.pin);
+}
+function standings(L) {
+  const m = new Map();
+  for (const rd of L.rounds) {
+    if (!rd.counted) continue;
+    for (const e of rd.entries) {
+      const s = m.get(e.id) || { id: e.id, name: e.name, color: e.color, bot: e.bot, total: 0, played: 0, golds: 0, by: {} };
+      s.name = e.name; s.color = e.color; s.total += e.pts; s.played++; if (e.rank === 1) s.golds++; s.by[rd.id] = e.pts;
+      m.set(e.id, s);
+    }
+  }
+  return [...m.values()].sort((a, b) => b.total - a.total || b.golds - a.golds || a.name.localeCompare(b.name, 'ko'));
+}
+const leagueMsg = (L) => ({ rounds: L.rounds, standings: standings(L) });
+function emitLeague(pin) { const L = leagueOf(pin); if (!L) return; const msg = leagueMsg(L); for (const k of kindList()) io.to(KINDS[k].sockRoom(pin)).emit('league:update', msg); }
+function setupLeague(socket, on) {
+  // 수업 방 선생님 화면에서만
+  const hostL = () => { const d = socket.data || {}, kind = roleKind[d.role], r = kind && KINDS[kind].rooms.get(d.pin); return linked(r) ? { pin: r.pin, L: leagueOf(r.pin) } : null; };
+  on('league:get', (_, ack) => { const h = hostL(); typeof ack === 'function' && ack(h ? { ok: true, ...leagueMsg(h.L) } : { ok: false }); });
+  on('league:toggle', (d) => { const h = hostL(); if (!h || !d) return; const rd = h.L.rounds.find(x => x.id === d.id); if (rd) { rd.counted = !!d.counted; emitLeague(h.pin); } });
+  on('league:reset', () => { const h = hostL(); if (!h) return; h.L.rounds = []; emitLeague(h.pin); });
+  // 서버가 다시 켜져 비어 있으면 선생님 브라우저의 사본으로 되살림
+  on('league:restore', (d, ack) => {
+    const h = hostL(); if (!h || !d || !Array.isArray(d.rounds)) return typeof ack === 'function' && ack({ ok: false });
+    if (h.L.rounds.length === 0 && d.rounds.length) {
+      h.L.rounds = d.rounds.slice(0, 200).map(rd => ({ id: rd.id | 0, kind: String(rd.kind || ''), name: String(rd.name || '').slice(0, 30), label: String(rd.label || '').slice(0, 30), at: Number(rd.at) || 0, why: String(rd.why || ''), counted: !!rd.counted,
+        entries: (Array.isArray(rd.entries) ? rd.entries : []).slice(0, 80).map(e => ({ id: String(e.id), name: String(e.name || '').slice(0, 8), color: COLORS.includes(e.color) ? e.color : COLORS[0], bot: !!e.bot, rank: e.rank | 0, pts: Math.max(0, Math.min(10, e.pts | 0)) })) }));
+      h.L.seq = Math.max(0, ...h.L.rounds.map(x => x.id));
+      emitLeague(h.pin);
+    }
+    typeof ack === 'function' && ack({ ok: true, ...leagueMsg(h.L) });
+  });
+  // 최종 정산: 학생 폰에도 각자 결과
+  on('league:final', () => { const h = hostL(); if (!h) return; const msg = leagueMsg(h.L); for (const k of kindList()) io.to(KINDS[k].sockRoom(h.pin)).emit('league:final', msg); });
+  // SUMUS RECORD 신기록: 선생님 브라우저가 판단해서 알려 주면 학생들에게 전달
+  on('rec:new', (d) => {
+    const h = hostL(); if (!h || !d) return;
+    const msg = { kind: String(d.kind || ''), label: String(d.label || '').slice(0, 40), value: String(d.value || '').slice(0, 20), prev: String(d.prev || '').slice(0, 40), name: String(d.name || '').slice(0, 8), id: String(d.id || '') };
+    for (const k of kindList()) io.to(KINDS[k].sockRoom(h.pin)).emit('rec:news', msg);
+  });
+}
 
 function setupSession(socket, on) {
   on('sess:create', (cfg, ack) => {
