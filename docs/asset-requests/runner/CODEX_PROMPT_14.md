@@ -54,7 +54,7 @@ SUMUS VOCA(저장소 `minsik2e5/sumus-quiz-battle`)의 그림 주문서 14~17로
 | 14b-4~6 부우 아기·성장·최종 표정 | `pets/ghost-<1·2·3>.webp` (14a-2에서 만든 것) |
 | 14b-7 알 반응 | `pets/pumpkincat-0.webp`, `pets/ghost-0.webp` |
 | 14b-8 할로윈 아이콘 | `ui/epic-egg.webp`, `ui/egg-shop.webp` |
-| 14b-9, 15-1~4 배경 | 없음 (generate) |
+| 14b-9, 15-1~4 배경 | 없음 |
 | 16-1 몽이 새 성장 | `pets/dog-1.webp`, `pets/panda-3.webp` |
 | 16-2 몽이 새 최종 | `pets/dog-1.webp`, `pets/panda-3.webp`, **새** `pets/dog-2.webp`(16-1에서 만든 것) |
 | 16-3 핑키 새 성장 | `pets/pig-1.webp`, `pets/panda-3.webp` |
