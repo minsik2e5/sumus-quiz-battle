@@ -562,6 +562,121 @@ sheet(F12, '몬스터 단계(레벨) 아이콘', 'icon', 'All icons in this set 
   ['ui-monster-stage-boss', '단계 판(보스)', 'the same stage plate shape in DEEP CRIMSON and black metal with two small curved horns on top and tiny orange flames licking up from behind it, flat empty center', 'public/assets/ui/monster-stage-boss.webp']
 ]);
 
+/* 14 할로윈 한정 (가장 급함) · 15 전투 배경 · 16 몽이·핑키 다시 그리기 · 17 새 펫 8종 (V13.109~)
+   14a·17a 설정 시트(알·아기·성장·최종) → 14b·17b 표정(그 펫의 설정 시트를 Drive에서 열어 맞춤).
+   배경(14 할로윈 배경, 15)은 2×2 시트가 아니라 가로 그림 한 장(1536×1024, 투명 아님)이에요. */
+const F14A = '14a-halloween-pets-design.txt', F14B = '14b-halloween-pets-expressions.txt', F15 = '15-battle-backgrounds.txt', F16 = '16-mong-pinky-remake.txt', F17A = '17a-new-pets-design.txt', F17B = '17b-new-pets-expressions.txt';
+const HALLOWEEN_PETS = {
+  pumpkincat: { ko: '호박냥', type: '호박 고양이', base: 'a cute orange tabby cat with soft tangerine fur and darker orange stripes, a cream belly and muzzle, big glossy golden-amber eyes, pink blush, a curly green vine with one small leaf wrapped around the tail tip, wearing a small carved jack-o\'-lantern pumpkin as a hat (its carved face is a friendly smile with a soft warm glow inside). Cute and cozy, never scary', egg: 'a round pumpkin-orange egg with soft pumpkin ribs, a short green stem and a curly vine on top, small purple bat and star patterns (no face on the egg), resting on a little purple cushion', f: {
+    1: 'baby stage: a tiny round fluffy kitten sitting inside the bottom half of a small pumpkin shell, the pumpkin hat a little too big, no other accessories',
+    2: 'grown stage: a slim young cat standing on four legs with a longer body and tail (NOT a round kitten), the jack-o\'-lantern hat, a purple scarf with a small gold star charm',
+    3: 'final stage: a large, elegant, proud cat with long legs and silky fur edged in a warm golden-orange glow, a flowing purple-and-orange witch-style cape with gold trim fastened by a gold star clasp, a bigger glowing jack-o\'-lantern crown-hat with carved star shapes, two small friendly pumpkin lanterns floating beside it, golden-orange sparkles (NOT a round kitten)' } },
+  ghost: { ko: '부우', type: '꼬마 유령', base: 'a cute round little ghost with a soft milky-white, slightly translucent glowing body that fades into a short wavy tail at the bottom (no legs), tiny round arms, big glossy dark-violet eyes with white highlights, pink blush, a small lavender bow on its head. It floats in the air. Friendly and adorable, never scary (no fangs, no dark holes for eyes)', egg: 'a pale lavender egg with a soft inner glow, white swirling wisp patterns and tiny stars (no face on the egg), resting on a small purple cushion', f: {
+    1: 'baby stage: a tiny round ghost blob with a very short tail, the lavender bow, floating low',
+    2: 'grown stage: a bigger ghost with a longer flowing tail and longer arms (NOT a tiny blob), a small purple witch hat with a gold star, holding a tiny glowing candy lantern',
+    3: 'final stage: a grand floating ghost with a long flowing tail, a flowing starry midnight-purple cloak with gold trim and a gold star clasp, a small crown of floating soft lights, a ring of tiny friendly ghost-lights and stars circling it, lavender and golden sparkles (NOT a tiny blob, still cute)' } }
+};
+const NEW_PETS_17 = {
+  squirrel: { ko: '도토리', type: '다람쥐', tier: 'basic', base: 'a chubby red squirrel with warm russet-orange fur, a cream belly, tufted ears with pink insides, big glossy dark eyes, pink blush, a huge fluffy curled tail, holding an acorn', egg: 'a warm brown egg with an acorn-cap pattern on top and small leaf patterns, resting in a nest of autumn leaves', f: {
+    1: 'baby stage: small and very round, sitting and hugging an acorn, no other accessories',
+    2: 'grown stage: a slimmer young squirrel standing on its hind legs (NOT a round baby), a leaf-green scarf with a small gold star charm, a tiny satchel full of acorns',
+    3: 'final stage: large and proud, an acorn-cap crown with a gold star, a flowing autumn-leaf cape with gold trim, glowing golden acorns floating around, golden sparkles (NOT a round baby)' } },
+  turtle: { ko: '느릿', type: '거북이', tier: 'basic', base: 'a cute little turtle with a soft mint-green body, a rounded glossy teal shell with soft hexagon patterns, big glossy happy eyes, pink blush, a calm sleepy smile', egg: 'a mint egg with a soft hexagon shell pattern, resting on a small mound of sand with one pebble', f: {
+    1: 'baby stage: tiny and round with a small soft shell, no accessories',
+    2: 'grown stage: bigger, standing on four sturdy legs (NOT a tiny baby), a mint scarf with a small gold star charm, a small flower growing on top of the shell',
+    3: 'final stage: a large wise turtle whose shell is a tiny garden island with small trees, flowers and a little gold star on top, a golden rim around the shell, a small golden crown, glowing water-drop sparkles (NOT a tiny baby)' } },
+  duck: { ko: '꽥꽥', type: '오리', tier: 'basic', base: 'a round fluffy duck with soft lemon-yellow feathers, a white chest, an orange bill and orange webbed feet, big glossy dark eyes, pink blush', egg: 'a pale yellow egg with small blue wave patterns, resting in a little nest of reeds', f: {
+    1: 'baby stage: a tiny round fluffy duckling, no accessories',
+    2: 'grown stage: a taller young duck with smooth feathers and folded wings (NOT a fluffy duckling), a little navy sailor collar with a small gold star charm',
+    3: 'final stage: a grand duck captain with a navy captain coat with gold buttons and gold trim, a captain hat with a gold star, a small splash of water and golden sparkles around (NOT a fluffy duckling)' } },
+  sheep: { ko: '뭉실', type: '양', tier: 'basic', base: 'a fluffy sheep with cream-white curly wool tinted soft peach at the tips (NOT lavender; it must look different from an alpaca: a short neck, a round body and small curled horns), a cream face, small curled golden-cream horns, big glossy dark eyes, pink blush, a small bell on a ribbon', egg: 'a fluffy-looking cream egg with soft peach cloud-swirl patterns, resting on a small tuft of green grass', f: {
+    1: 'baby stage: a small round ball of wool with tiny legs, no horns yet, the little bell',
+    2: 'grown stage: a bigger lamb standing on four legs (NOT a round ball), small curled horns, a mint ribbon with a gold star bell',
+    3: 'final stage: a grand sheep with huge cloud-like wool glowing softly at the edges, large curled golden horns, a crown of tiny white flowers, small floating fluffy clouds and golden sparkles (NOT a round ball)' } },
+  redpanda: { ko: '단풍', type: '레서판다', tier: 'epic', base: 'a red panda with rich russet-red fur, white face markings, dark brown legs, a big fluffy tail with cream rings, big glossy dark eyes, pink blush, a small red maple leaf tucked by one ear', egg: 'a russet-red egg with cream ring stripes and maple-leaf patterns, resting on a pile of red maple leaves', f: {
+    1: 'baby stage: a small round fluffy cub holding a maple leaf, no other accessories',
+    2: 'grown stage: a sleeker young red panda standing on its hind legs (NOT a round cub), a maple-leaf scarf with a small gold star charm',
+    3: 'final stage: a grand red panda with tail rings glowing autumn-gold, a cape of red and orange maple leaves with gold trim and a gold star clasp, a maple-leaf crown, glowing maple leaves swirling around (NOT a round cub)' } },
+  arcticfox: { ko: '눈송', type: '북극여우', tier: 'epic', base: 'a snow-white arctic fox with very fluffy fur, icy-blue tips on the ears and tail, a small pale-blue snowflake mark on the forehead, big glossy ice-blue eyes, pink blush, a big fluffy tail', egg: 'a white egg with frosty blue crystal patterns, resting on a small pile of snow', f: {
+    1: 'baby stage: a small round fluffy kit, no accessories',
+    2: 'grown stage: a sleek young fox with long legs (NOT a round kit), an icy-blue scarf with a small gold star charm',
+    3: 'final stage: a majestic fox with three huge flowing snowy tails glowing icy-blue at the tips, an ice-crystal crown, soft aurora-colored ribbons of light around it, snowflake sparkles (NOT a round kit)' } },
+  koala: { ko: '쿨쿨', type: '코알라', tier: 'epic', base: 'a soft grey koala with big round fluffy ears with white tufts, a big dark glossy nose, sleepy happy eyes, pink blush, holding a small eucalyptus sprig', egg: 'a soft grey egg with green eucalyptus-leaf patterns, resting in a small nest of branches', f: {
+    1: 'baby stage: a small round sleepy baby koala hugging a eucalyptus leaf, no other accessories',
+    2: 'grown stage: a bigger koala standing up (NOT a round baby), a small blue nightcap with a star pom-pom, a eucalyptus-leaf scarf with a gold star charm',
+    3: 'final stage: a grand dream-guardian koala in a flowing midnight-blue cloak covered with tiny stars and gold trim, a crescent-moon crown, floating little stars and soft dreamy clouds, eucalyptus leaves (NOT a round baby)' } },
+  parrot: { ko: '앵두', type: '앵무새', tier: 'epic', base: 'a cheerful parrot with bright scarlet-red, sunny yellow and sky-blue feathers, a curved ivory beak, big glossy dark eyes, pink blush, a small cherry pin on its head feather', egg: 'a red-and-yellow egg with tropical feather patterns, resting in a nest with one small cherry', f: {
+    1: 'baby stage: a small round fluffy chick with tiny wings, no accessories',
+    2: 'grown stage: a sleek young parrot with folded colorful wings and a longer tail (NOT a fluffy chick), a mint scarf with a small gold star charm',
+    3: 'final stage: a majestic parrot with huge spread rainbow wings edged in gold, long flowing tail feathers, a small golden crown with a cherry-red gem, golden sparkles (NOT a fluffy chick)' } }
+};
+const EXPRS_X = EXPRS.map(([e, ko, text]) => [e, ko, e === 'sad' ? 'SAD: slightly sad pouty face with teary sparkling eyes, ears, wings, feathers or tail drooping a little, still cute (not crying hard); keep the same face, markings and item (hat, bow, scarf, acorn, leaf or shell) as the other cells'
+  : e === 'cheer' ? 'CHEERING: energetic pose with one front paw, arm, wing or flipper raised high, determined sparkling eyes, small motion sparkles'
+  : e === 'eat' ? 'EATING: happily eating from a small round mint food bowl in front of it (the ghost eats a candy from the bowl), cheeks puffed, a few crumbs, eyes curved in joy' : text]);
+const designSheets = (file, pets, extra = () => '') => { for (const [key, pet] of Object.entries(pets)) sheet(file, `${pet.ko} ${pet.type} 설정 시트`, 'pet', `${pet.ko}, ${pet.base}. ${extra(pet)}Draw the same character at four growth steps; each cell must clearly be the same creature, getting bigger and grander.`, [
+  [`${key}-0`, `${pet.ko} 알`, `EGG: ${pet.egg}. Just the egg, no creature`, `public/assets/pets/${key}-0.webp`],
+  [`${key}-1`, `${pet.ko} 아기`, `BABY: the ${pet.f[1]}, happy calm face, front 3/4 view`, `public/assets/pets/${key}-1.webp`],
+  [`${key}-2`, `${pet.ko} 성장`, `GROWN: the ${pet.f[2]}, happy calm face, front 3/4 view`, `public/assets/pets/${key}-2.webp`],
+  [`${key}-3`, `${pet.ko} 최종`, `FINAL: the ${pet.f[3]}, happy calm face, front 3/4 view`, `public/assets/pets/${key}-3.webp`]
+]); };
+const exprSheets = (file, pets, pairs, extra = () => '') => {
+  for (const [key, pet] of Object.entries(pets)) for (const form of [1, 2, 3]) sheet(file, `${pet.ko} ${FORM_KO[form]} 표정`, 'pet', `${pet.ko}, ${pet.base}. This is the ${pet.f[form]}.${extra(pet)}`,
+    EXPRS_X.map(([expr, ko, text]) => [`${key}-${form}-${expr}`, `${pet.ko} ${FORM_KO[form]} ${ko}`, text, `public/assets/pets/${key}-${form}-${expr}.webp`]));
+  for (const [a, b] of pairs) sheet(file, `${pets[a].ko} · ${pets[b].ko} 알 반응`, 'egg', `two pet eggs (the reference pictures show them). The TOP row cells show ${pets[a].ko}'s egg: ${pets[a].egg}. The BOTTOM row cells show ${pets[b].ko}'s egg: ${pets[b].egg}.`, [
+    [`${a}-0-happy`, `${pets[a].ko} 알 기뻐함`, EGG_HAPPY, `public/assets/pets/${a}-0-happy.webp`],
+    [`${a}-0-eat`, `${pets[a].ko} 알 따뜻해짐`, EGG_WARM, `public/assets/pets/${a}-0-eat.webp`],
+    [`${b}-0-happy`, `${pets[b].ko} 알 기뻐함`, EGG_HAPPY, `public/assets/pets/${b}-0-happy.webp`],
+    [`${b}-0-eat`, `${pets[b].ko} 알 따뜻해짐`, EGG_WARM, `public/assets/pets/${b}-0-eat.webp`]
+  ]);
+};
+// A wide background picture (one image, not a 2×2 sheet).
+const BG = 'Create ONE wide landscape image, 1536×1024 pixels: a 2D battle-stage BACKGROUND for a cute premium mobile pet-battle game (players are high-school students). Paint it fully to every edge (no transparency, no border, no frame, no rounded corners). NO characters, NO animals, NO creatures, NO people. No text, no letters, no numbers, no logos, no UI, no watermark. Do not ask me any questions; just generate the image.';
+const BG_LAYOUT = 'COMPOSITION (important, the game puts its own characters and name tags on top): the camera looks slightly down at a wide flat stage floor that fills the lower 60% of the picture. One character will stand on the floor in the UPPER-RIGHT area and one in the LOWER-LEFT area, so keep those two standing spots flat, open and uncluttered. Name tags will cover the TOP-LEFT corner and the area right of the lower-left character, so keep the top-left corner and the lower-right quarter calm and simple (soft colors, little detail). Put the interesting details around the outer edges and in the far background. The floor is crisp; the far background is slightly softer and lighter for depth. A gentle vignette toward the edges.';
+const BG_STYLE = 'Style: the same premium cute 3D-painted anime game art as the pets of this game: clear soft colors (not washed out, not hazy), clean shapes, soft cel-like shading, gentle rim light, friendly and inviting.';
+const BG_REF = `STYLE REFERENCE — before drawing, open the pets of this game in the Google Drive folder "SUMUS_PET_SPRITES_ALL_20261002/original_1254" (MONG, NABI, PINKY and BAMBOO, 03_final.png) and the monsters "10-1.png" and "10-8.png" in the Google Drive folder "SUMUS 몬스터 10 (Runner용)". The background must look like it belongs in the same game as those characters (same rendering quality and color mood), and those characters must stand out clearly in front of it. Do NOT draw those characters.`;
+function scene(file, title, key, look, out) {
+  const no = prompts.length + 1;
+  prompts.push({ file, no, title, bg: true, text: [BG, BG_STYLE, `Scene: ${look}`, BG_LAYOUT].join('\n') });
+  slices.push({ file, no, title, cell: '전체', key, name: title, out });
+}
+designSheets(F14A, HALLOWEEN_PETS, () => 'A limited Halloween pet: spooky-cute, cozy and friendly (never scary). ');
+exprSheets(F14B, HALLOWEEN_PETS, [['pumpkincat', 'ghost']], () => ' A limited Halloween pet: spooky-cute, never scary.');
+sheet(F14B, '할로윈 알 상점 아이콘', 'icon', 'Halloween items for the pet shop of this game, spooky-cute and friendly, in purple, orange and gold.', [
+  ['ui-halloween-egg', '할로윈 알', 'HALLOWEEN EGG: a round pumpkin-orange egg with small purple bat and star patterns and a short green stem with a curly vine on top, resting on a small purple velvet cushion with gold tassels, a few orange and purple sparkles around (the same size and framing as a shop egg icon)', 'public/assets/ui/halloween-egg.webp'],
+  ['ui-limited-badge', '한정 배지', 'LIMITED BADGE: a small round badge in deep purple and orange enamel with a gold rim, a tiny jack-o\'-lantern and a star in the middle, a little ribbon below (no letters)', 'public/assets/ui/limited-badge.webp'],
+  ['ui-halloween-deco-pumpkins', '할로윈 장식(호박)', 'DECORATION: a small cozy cluster of three smiling jack-o\'-lantern pumpkins with a soft warm glow inside, a few wrapped candies and a curly vine, seen from the front', 'public/assets/ui/halloween-deco-pumpkins.webp'],
+  ['ui-halloween-deco-moon', '할로윈 장식(달)', 'DECORATION: a big friendly crescent moon with three small cute bats flying around it and a few twinkling stars', 'public/assets/ui/halloween-deco-moon.webp']
+]);
+scene(F14B, '할로윈 전투 배경', 'bg-halloween', 'a Halloween pumpkin-patch plaza at night under a big friendly moon: a round stone battle floor with an orange-and-purple painted ring, smiling jack-o\'-lantern lanterns and candy around the edges, strings of small orange and purple lights, a cute crooked little haunted house far back, tiny bat silhouettes in the sky. Spooky-cute and cozy, never scary; bright enough that the characters are easy to see.', 'public/assets/battle/bg-halloween.webp');
+scene(F15, '야차전 아레나 배경', 'bg-arena', 'a school rooftop battle arena on a clear golden afternoon: a round painted battle circle on a light stone floor with mint-green and gold trim, a low railing, cheerful blank flags and pennants (no text) on poles, string lights, a few cherry trees in big pots, the top of a school building and soft clouds in a blue sky far back.', 'public/assets/battle/bg-arena.webp');
+scene(F15, '로보 연습장 배경', 'bg-practice', 'a bright, clean high-tech training room: white and mint floor panels with a softly glowing mint circle in the middle, cute round training targets and padded training dummies at the sides, a few floating holographic panels with simple blank shapes (no text), big windows with daylight far back.', 'public/assets/battle/bg-practice.webp');
+scene(F15, '몬스터 숲 배경', 'bg-forest', 'a magical forest clearing at blue dusk: a flat mossy floor with a ring of old stones, glowing blue and pink mushrooms, fireflies, tall soft trees, a little stream, light purple-blue mist far back. Mysterious and adventurous but friendly, not scary.', 'public/assets/battle/bg-forest.webp');
+scene(F15, '보스방 배경', 'bg-boss', 'an ancient castle boss hall: a dark polished stone floor with a large glowing crimson-and-gold magic circle, tall stone pillars, braziers with warm flames, deep red banners (no text), red-violet light from high windows. Dramatic and powerful but still readable and suitable for students; the floor must stay clear and lit enough for the characters.', 'public/assets/battle/bg-boss.webp');
+// 16 몽이·핑키: 알과 아기(1단계)는 그대로, 성장·최종을 밤부 최종만큼 화려하게 다시 그려요.
+const REMAKE = {
+  dog: { ko: '몽이', drive: 'MONG', base: PETS.dog.base, f: {
+    2: 'NEW grown stage: a taller, athletic young Shiba with longer legs, a fuller curled tail and a cream ruff on the chest (clearly bigger and more mature than the round baby), a mint-green neckerchief with a gold star badge and a small leather satchel strap across the chest',
+    3: 'NEW final stage: a large, majestic heroic Shiba guardian standing proud: a thick flowing cream-and-gold ruff like a mane, a flowing mint-and-white knight cape with gold embroidery fastened by a glowing gold star clasp, a light golden shoulder guard, the huge fluffy tail tipped with a soft golden glow, small floating golden stars and leaf motes around. NO wings' } },
+  pig: { ko: '핑키', drive: 'PINKY', base: PETS.pig.base, f: {
+    2: 'NEW grown stage: a sturdier, taller young pig with longer legs (clearly bigger than the round baby), a mint scarf with a gold star charm and a small crown of pink cherry blossoms between the ears',
+    3: 'NEW final stage: a large, elegant noble pig standing proud: a flowing rose-pink and cream royal cape with gold trim and a gold star clasp, a small gold tiara with a pink gem, glowing cherry-blossom petals swirling around, a soft golden aura. NO wings. The big round pig snout stays clearly visible' } }
+};
+const REMAKE_EXPRS = EXPRS.map(([e, ko, text]) => [e, ko, e === 'eat' ? 'EATING: happily eating from a small round mint food bowl in front of it, cheeks puffed, a few crumbs, eyes curved in joy' : text]);
+for (const [key, pet] of Object.entries(REMAKE)) for (const form of [2, 3]) {
+  sheet(F16, `${pet.ko} 새 ${FORM_KO[form]}`, 'pet', `${pet.ko}, ${pet.base}. This is the ${pet.f[form]}. As grand, detailed and polished as the panda BAMBOO's final form.`, [
+    [`${key}-${form}`, `${pet.ko} 새 ${FORM_KO[form]}`, `DEFAULT: standing, happy calm face, front 3/4 view`, `public/assets/pets/${key}-${form}.webp`],
+    ...REMAKE_EXPRS.filter(([e]) => e !== 'cheer').map(([expr, ko, text]) => [`${key}-${form}-${expr}`, `${pet.ko} 새 ${FORM_KO[form]} ${ko}`, text, `public/assets/pets/${key}-${form}-${expr}.webp`])
+  ]);
+}
+sheet(F16, '몽이 · 핑키 새 응원', 'pet', `TOP row: 몽이, ${PETS.dog.base}. BOTTOM row: 핑키, ${PETS.pig.base}. Each cell shows the NEW design of that pet and stage from the reference sheets.`, [
+  ['dog-2-cheer', '몽이 새 성장 응원', `CHEERING: 몽이 ${REMAKE.dog.f[2]}; energetic pose with one front paw raised high, determined sparkling eyes, small motion sparkles`, 'public/assets/pets/dog-2-cheer.webp'],
+  ['dog-3-cheer', '몽이 새 최종 응원', `CHEERING: 몽이 ${REMAKE.dog.f[3]}; energetic pose with one front paw raised high, determined sparkling eyes, small motion sparkles`, 'public/assets/pets/dog-3-cheer.webp'],
+  ['pig-2-cheer', '핑키 새 성장 응원', `CHEERING: 핑키 ${REMAKE.pig.f[2]}; energetic pose with one front hoof raised high, determined sparkling eyes, small motion sparkles`, 'public/assets/pets/pig-2-cheer.webp'],
+  ['pig-3-cheer', '핑키 새 최종 응원', `CHEERING: 핑키 ${REMAKE.pig.f[3]}; energetic pose with one front hoof raised high, determined sparkling eyes, small motion sparkles`, 'public/assets/pets/pig-3-cheer.webp']
+]);
+designSheets(F17A, NEW_PETS_17, pet => pet.tier === 'epic' ? 'A 영웅 (epic) pet, one rank below legendary: a little grander and more sparkling than a basic pet, with a soft golden rim light. ' : '');
+exprSheets(F17B, NEW_PETS_17, [['squirrel', 'turtle'], ['duck', 'sheep'], ['redpanda', 'arcticfox'], ['koala', 'parrot']], pet => pet.tier === 'epic' ? ' A 영웅 (epic) pet: a soft golden rim light.' : '');
+
 /* Google Drive: 그림을 그리는 GPT는 Drive에서 참고 그림을 열어 보고, 결과를 Drive 폴더에 올려요.
    규칙: 시트별 파일(split/)로 나가는 모든 주문서는 DRIVE에 폴더가 있어야 하고(없으면 멈춰요),
    끝에 "이 폴더에 이 이름으로 올리기"가 붙어요. 처음 그리는 그림(08·09a)은 기존 그림을 열어 보고 그림체를 맞춰요. */
@@ -572,7 +687,11 @@ const DRIVE = {
   [F9A]: 'SUMUS 새 기본 펫 09 (Runner용)', [F9B]: 'SUMUS 새 기본 펫 09 (Runner용)',
   [F10]: 'SUMUS 몬스터 10 (Runner용)',
   [F12]: 'SUMUS 몬스터 12 (Runner용)',
-  [F11]: 'SUMUS 칭호 11 (Runner용)'
+  [F11]: 'SUMUS 칭호 11 (Runner용)',
+  [F14A]: 'SUMUS 할로윈 14 (Runner용)', [F14B]: 'SUMUS 할로윈 14 (Runner용)',
+  [F15]: 'SUMUS 전투 배경 15 (Runner용)',
+  [F16]: 'SUMUS 몽이·핑키 16 (Runner용)',
+  [F17A]: 'SUMUS 새 펫 17 (Runner용)', [F17B]: 'SUMUS 새 펫 17 (Runner용)'
 };
 const PET_SPRITES = 'SUMUS_PET_SPRITES_ALL_20261002/original_1254';
 const KEEP = 'Do NOT make it softer, blurrier, foggier, more painterly or more watercolor-like than the reference.';
@@ -585,14 +704,14 @@ const STYLE_REF = {
 };
 STYLE_REF.monsters12 = STYLE_REF.monsters.replace(/Also open "10-1\.png"[^\n]*$/, `Also open the first monsters of this game in the Google Drive folder "${DRIVE[F10]}" ("10-1.png" and "10-8.png"; this new set is their second batch, so match their finish, size and level of detail exactly) and, if it is there, "12-1.png" in the Google Drive folder "${DRIVE[F12]}" (the first monster of the new set), and match its finish and size too. Do NOT copy the existing monsters; this is a new design.`);
 STYLE_REF.icons12 = `${STYLE_REF.icons} Also open "10-10.png" in the Google Drive folder "${DRIVE[F10]}" (the monster screen icons: tab and difficulty badges) and match its finish and size.`;
-const refOf = p => p.file === F11 ? 'titles' : p.file === F12 ? (/아이콘/.test(p.title) ? 'icons12' : 'monsters12') : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
+const refOf = p => p.bg ? null : p.file === F14A || p.file === F17A ? 'pets' : p.file === F14B && /아이콘/.test(p.title) ? 'icons' : p.file === F11 ? 'titles' : p.file === F12 ? (/아이콘/.test(p.title) ? 'icons12' : 'monsters12') : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
 const NEW_ORDER = Object.keys(NEW_PETS);
 const sheetName = (file, i) => `${file.slice(0, /^\d\d[ab]-/.test(file) ? 3 : 2)}-${i + 1}`;
 
 /* 쓰기 */
 const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
-const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11, F12]);
+const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11, F12, F14A, F14B, F15, F16, F17A, F17B]);
 for (const [file, list] of byFile) list.forEach((p, i) => {
   if (!SPLIT.has(file)) return;
   if (!DRIVE[file]) throw new Error(`${file}: Google Drive 폴더(DRIVE)가 없어요. 주문서에는 업로드 위치가 꼭 있어야 해요.`);
@@ -620,7 +739,35 @@ for (const [file, list] of byFile) list.forEach((p, i) => {
     lines.splice(3, 0, `CHARACTER REFERENCE — before drawing, open ${sheets} (the design sheet${keys.length > 1 ? 's' : ''}: egg, baby, grown, final) in the Google Drive folder "${DRIVE[F9B]}" and match ${keys.length > 1 ? 'each egg' : 'this pet\'s face, colors, markings, accessories and the body size of this growth stage'} exactly. ${KEEP}`);
     p.ref = `Drive: ${sheets}`;
   }
+  // 14b·17b: 그 펫의 설정 시트(14a-N / 17a-N)를 열어 맞춰요. 배경은 기존 캐릭터를 열어 그림체만 맞춰요.
+  const XB = { [F14B]: [F14A, HALLOWEEN_PETS, '14a'], [F17B]: [F17A, NEW_PETS_17, '17a'] }[file];
+  if (XB && !p.bg && !/아이콘/.test(p.title)) {
+    const order = Object.keys(XB[1]), keys = order.filter(k => p.title.includes(XB[1][k].ko));
+    const sheets = keys.map(k => `"${XB[2]}-${order.indexOf(k) + 1}.png"`).join(' and ');
+    lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
+    lines.splice(3, 0, `CHARACTER REFERENCE — before drawing, open ${sheets} (the design sheet${keys.length > 1 ? 's' : ''}: egg, baby, grown, final) in the Google Drive folder "${DRIVE[XB[0]]}" and match ${keys.length > 1 ? 'each egg' : 'this pet\'s face, colors, markings, accessories and the body size of this growth stage'} exactly. ${KEEP}`);
+    p.ref = `Drive: ${sheets}`;
+  }
+  if (p.bg) {
+    lines.splice(2, 0, BG_REF);
+    if (file === F15 && i > 0) lines.splice(3, 0, `Also open "15-1.png" in the same Google Drive folder "${DRIVE[F15]}" (the first background of this set) if it is there, and match its camera angle, floor size, lighting style and level of detail exactly.`);
+    p.ref = `Drive: ${PET_SPRITES}, 10-1.png, 10-8.png`;
+  }
+  // 16: 지금 몽이·핑키(아기는 그대로 이어받기)와 목표 퀄리티(밤부 최종)를 열어 보고, 뒤 시트는 앞 시트의 새 디자인을 따라요.
+  if (file === F16) {
+    const pets = Object.values(REMAKE).filter(r => p.title.includes(r.ko));
+    lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
+    lines.splice(2, 0, `STYLE AND CHARACTER REFERENCE — before drawing, open these pictures in the Google Drive folder "${PET_SPRITES}": ${pets.map(r => `${r.drive}/01_baby.png (keep exactly this face, fur colors, markings and eyes; the new design grows from this baby)`).join(' and ')}, and BAMBOO/03_final.png (the target quality: the new grown and final stages must be as grand, detailed and polished as this panda). This is a REDESIGN of the grown and final stages: do NOT copy the old ${pets.map(r => `${r.drive}/02_grown.png and ${r.drive}/03_final.png`).join(' or ')} (they were too plain), and make each stage clearly different and grander than the one before. Clean transparent cut-out: no white halo, no leftover background around the outline. ${KEEP}`);
+    const earlier = { '몽이 새 최종': '16-1', '핑키 새 최종': '16-3', '몽이 · 핑키 새 응원': '16-1", "16-2", "16-3" and "16-4' }[p.title];
+    if (earlier) lines.splice(3, 0, `Also open "${earlier}.png" in the same Google Drive folder "${DRIVE[F16]}" (the new design made earlier in this set) and keep the same new design exactly.`);
+    p.ref = `Drive: ${pets.map(r => r.drive + '/01_baby').join(', ')}, BAMBOO/03_final`;
+  }
   const name = sheetName(file, i);
+  if (p.bg) {
+    lines.push(`WHEN DONE — upload the finished PNG (1536×1024, fully painted, not transparent) to Google Drive, into the folder "${DRIVE[file]}", named exactly "${name}.png" (if a file with that name is already there, replace it). Actually save the file to Google Drive; showing the picture in the chat is not enough.`);
+    p.text = lines.join('\n'); p.drive = `${DRIVE[file]} / ${name}.png`;
+    return;
+  }
   lines.push(`WHEN DONE — upload the finished transparent PNG to Google Drive, into the folder "${DRIVE[file]}", named exactly "${name}.png" (if a file with that name is already there, replace it). Actually save the file to Google Drive; showing the picture in the chat is not enough.`);
   p.text = lines.join('\n');
   p.drive = `${DRIVE[file]} / ${name}.png`;
