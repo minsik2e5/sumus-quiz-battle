@@ -165,6 +165,33 @@ function closeOverlay(changed, onChanged) {
   if (changed) onChanged?.();
 }
 
+// The basic egg just bought: whose egg it is (shared by the shop window and the 놀이터 egg stand).
+function eggRevealHtml(body, key, done) {
+  const name = CHARACTERS[key].ko;
+  body.innerHTML = `<div class="pet-shop">
+    <div class="pet-shop-reveal">${avatar(key, { form: 0 })}</div>
+    <p class="pet-moment-msg"><b>${esc(petJosa(name, '이', ''))}</b>의 알이에요!</p>
+    <p class="pet-shop-copy">지금부터 ${esc(petJosa(name, '과', '와'))} 함께 공부해요.<br>Lv.3이 되면 알이 깨져요.</p>
+    <div class="pet-moment-actions"><button type="button" class="btn primary" data-pet-done>좋아요!</button></div>
+  </div>`;
+  body.querySelector('[data-pet-done]').onclick = done;
+  $('[data-pet-close]').onclick = done;
+}
+// V13.107 놀이터 알 상점: buy an egg straight from the egg stand (no shop window first), then the
+// same reveal as the shop window: a basic egg's name card, the 영웅 or the legendary show.
+export async function buyEgg(A, onChanged, kind) {
+  if (momentOpen || !A.data?.stats?.pet) return null;
+  momentOpen = true;
+  let res;
+  try { res = await api('/shop/egg', { kind: kind === 'epic' ? 'epic' : 'basic' }); }
+  finally { momentOpen = false; }
+  if (res.legendary) { onChanged?.(); await legendaryShow(res); return res; }
+  if (res.epic) { onChanged?.(); await epicShow({ key: res.key, from: 'shop' }); return res; }
+  momentOpen = true;
+  eggRevealHtml(openOverlay('새 알'), res.key, () => closeOverlay(true, onChanged));
+  return res;
+}
+
 // Call after each student render; plays a moment when the pet has reached a new form.
 export function maybePetMoment(A, onChanged) {
   const p = A.data?.profile, pet = A.data?.stats?.pet;
@@ -253,15 +280,7 @@ export function openEggShop(A, onChanged, kind = 'basic') {
         // V13.98: a 영웅 알 can open as a legendary pet (1%), with the legendary show.
         if (res.legendary) { close(true); await legendaryShow(res); return; }
         if (epic) { close(true); await epicShow({ key, from: 'shop' }); return; }
-        const name = CHARACTERS[key].ko;
-        body.innerHTML = `<div class="pet-shop">
-          <div class="pet-shop-reveal">${avatar(key, { form: 0 })}</div>
-          <p class="pet-moment-msg"><b>${esc(petJosa(name, '이', ''))}</b>의 알이에요!</p>
-          <p class="pet-shop-copy">지금부터 ${esc(petJosa(name, '과', '와'))} 함께 공부해요.<br>Lv.3이 되면 알이 깨져요.</p>
-          <div class="pet-moment-actions"><button type="button" class="btn primary" data-pet-done>좋아요!</button></div>
-        </div>`;
-        body.querySelector('[data-pet-done]').onclick = () => close(true);
-        $('[data-pet-close]').onclick = () => close(true);
+        eggRevealHtml(body, key, () => close(true));
       } catch (err) {
         buying = false;
         body.querySelector('.pet-name-error').textContent = err.message;

@@ -145,7 +145,7 @@
 .home-battle-v1354 span:nth-child(2){flex:1;min-width:0}
 .home-battle-v1354 .icon{width:18px;height:18px;color:#9fd9c2}
 
-@keyframes ybHit{0%,100%{filter:none;translate:0}15%{filter:brightness(2.2) saturate(0);translate:-6px 0}35%{translate:6px 0}55%{filter:brightness(2) saturate(0);translate:-4px 0}75%{translate:3px 0}}
+@keyframes ybHit{0%,100%{translate:0}15%{translate:-6px 0}35%{translate:6px 0}55%{translate:-4px 0}75%{translate:3px 0}}
 @keyframes ybPop{0%{opacity:0;transform:translateY(8px) scale(.6)}20%{opacity:1;transform:translateY(-6px) scale(1.15)}100%{opacity:0;transform:translateY(-38px) scale(1)}}
 @keyframes ybFlash{0%{opacity:0}20%{opacity:1}100%{opacity:0}}
 @keyframes ybReady{50%{box-shadow:0 0 0 2px #f2a60c inset,0 3px 0 #e8cf92,0 0 12px rgba(242,166,12,.55)}}

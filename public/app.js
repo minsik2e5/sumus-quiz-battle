@@ -5,7 +5,7 @@ import { studentPage, getRanges, updateRangeSummary, starredWords, pushSupport, 
 import { openFlashcards } from './modules/flashcards.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel, careIds } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
-import { maybePetMoment, openPetNameModal, openEggShop, petJosa } from './modules/pet-moments.js';
+import { maybePetMoment, openPetNameModal, openEggShop, buyEgg, petJosa } from './modules/pet-moments.js';
 import { maybeCardLevelUp } from './modules/card-levelup.js';
 import { mountYacha, resendUnclaimed } from './modules/battle.js';
 import { maybeTitleMoment, openTitleDetail } from './modules/titles-ui.js';
@@ -199,6 +199,20 @@ function render() {
     queueMicrotask(() => maybeCardLevelUp(A));
     queueMicrotask(() => maybeTitleMoment(A, moved => { if (moved) { render(); window.scrollTo(0, 0); } else renderKeepScroll(); }));
   }
+}
+// V13.107 놀이터 알 상점: the first tap asks, a second tap within 3 s buys.
+async function eggBuy(b, kind) {
+  if (b.disabled) return;
+  if (!b.classList.contains('confirm')) {
+    b.dataset.label = b.innerHTML; b.classList.add('confirm'); b.innerHTML = '<span>한 번 더 누르면</span><small>사요!</small>';
+    clearTimeout(b.confirmTimer);
+    b.confirmTimer = setTimeout(() => { if (b.isConnected && !b.disabled) { b.classList.remove('confirm'); b.innerHTML = b.dataset.label; } }, 3000);
+    return;
+  }
+  clearTimeout(b.confirmTimer);
+  b.disabled = true; b.innerHTML = '<span>알을 고르는 중…</span>';
+  try { if (!await buyEgg(A, petChanged, kind)) throw Error('잠시 후 다시 눌러 주세요.'); }
+  catch (err) { toast(err.message); if (b.isConnected) { b.disabled = false; b.classList.remove('confirm'); b.innerHTML = b.dataset.label; } }
 }
 async function petChanged() { try { await refresh(); A.style = null; renderKeepScroll(); } catch (err) { toast(err.message); } }
 function confirmFirstPet(key) {
@@ -831,6 +845,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'pet-name') return openPetNameModal(A, petChanged);
     if (d.action === 'choose-pet') return confirmFirstPet(d.key);
     if (d.action === 'egg-shop') return openEggShop(A, petChanged, d.egg === 'epic' ? 'epic' : 'basic');
+    if (d.action === 'egg-buy') return eggBuy(b, d.egg === 'epic' ? 'epic' : 'basic');
     if (d.action === 'vocab-more') { moreVocab(A); $('#vocab-table').innerHTML = vocabTable(A); return; }
     if (d.action === 'battle') return navigate('yacha');
     if (d.action === 'coins') return walletModal();

@@ -1,0 +1,124 @@
+/* ---------- V13.107 몬스터전 결과 화면 ----------
+   한 장면(바닥 위의 몬스터와 내 펫) → 결과 제목 → 숫자 세 칸 → 보상 판 → 버튼.
+   모든 판은 같은 둥근 모서리(16px)와 같은 안쪽 여백을 쓴다. */
+.mh-result{display:flex;flex-direction:column;align-items:stretch;gap:12px;padding:16px;text-align:center;overflow:hidden}
+.mh-result .yb-result-kind{align-self:center}
+.mh-result-stage{position:relative;height:auto;aspect-ratio:16/9;max-height:210px;margin:0;border-radius:18px;display:flex;align-items:flex-end;justify-content:center;gap:0;padding:0 6% 7%;overflow:hidden;isolation:isolate;
+  background:radial-gradient(120% 90% at 50% 0%,color-mix(in srgb,var(--mc,#8b5cf6) 22%,#fff) 0%,color-mix(in srgb,var(--mc,#8b5cf6) 10%,#f7f4ff) 55%,#efeaf8 100%)}
+.mh-result-stage::before{content:"";position:absolute;left:-10%;right:-10%;bottom:-38%;height:62%;border-radius:50%;z-index:-1;background:linear-gradient(180deg,color-mix(in srgb,var(--mc,#8b5cf6) 16%,#fff),color-mix(in srgb,var(--mc,#8b5cf6) 26%,#e9e2f6))}
+.mh-result-stage::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.55;background:repeating-conic-gradient(from 0deg at 50% 115%,rgba(255,255,255,.55) 0 6deg,transparent 6deg 16deg)}
+.mh-result.lose .mh-result-stage{background:radial-gradient(120% 90% at 50% 0%,#eef1f5 0%,#e3e8ef 60%,#d9dfe8 100%)}
+.mh-result.lose .mh-result-stage::before{background:linear-gradient(180deg,#e2e7ee,#cfd6e0)}
+.mh-result.lose .mh-result-stage::after{display:none}
+.mh-result-stage>div{position:relative;flex:1 1 0;max-width:46%;display:flex;justify-content:center}
+.mh-result-stage>div::after{content:"";position:absolute;left:18%;right:18%;bottom:2%;height:9%;border-radius:50%;background:rgba(40,25,70,.18);filter:blur(3px);z-index:-1}
+.mh-result-stage .avatar-art{width:100%;height:auto;max-width:150px;aspect-ratio:1;margin:0}
+.mh-result-stage .avatar-art img{width:100%;height:100%;object-fit:contain}
+.mh-result-down:not(.art){transform:rotate(-78deg) translateY(18%)}
+
+.mh-result-badge{font-size:clamp(28px,8.4vw,36px);line-height:1.1;margin-top:2px}
+.mh-result-why{margin:-6px 0 0;font-size:13.5px;font-weight:700;color:#5b6474}
+
+.mh-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.mh-stats span{display:flex;flex-direction:column;gap:2px;padding:9px 6px;border-radius:14px;background:#f5f3fa}
+.mh-stats small{font-size:11.5px;font-weight:800;color:#7a7f8c}
+.mh-stats b{font-size:18px;font-weight:900;color:#1d1430;font-variant-numeric:tabular-nums}
+
+/* 보상 판 */
+.mh-reward{position:relative;display:flex;flex-direction:column;align-items:center;gap:10px;margin:0;padding:14px 14px 16px;border-radius:16px;background:#f6f8f7;box-shadow:none!important}
+.mh-reward.paid{background:linear-gradient(160deg,#effaf5,#dff5eb)}
+.mh-reward.first{background:linear-gradient(160deg,#fff7dc,#ffeaa6)!important;box-shadow:inset 0 0 0 1.5px rgba(214,160,30,.55)!important}
+.mh-rw-tag{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;font-size:12.5px;font-weight:900;letter-spacing:.02em;color:#fff;background:linear-gradient(90deg,#d08a10,#f2b62a);box-shadow:0 2px 0 rgba(150,90,0,.25)}
+.mh-rw-tag::before{content:"★"}
+.mh-rw-tag.again{color:#07815f;background:#d6f2e5;box-shadow:none}
+.mh-rw-tag.again::before{content:none}
+.mh-rw-row{display:flex;justify-content:center;gap:10px;width:100%}
+.mh-rw-chip{flex:1 1 0;max-width:170px;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 8px;border-radius:14px;background:rgba(255,255,255,.85);box-shadow:0 1px 0 rgba(0,0,0,.05)}
+.mh-rw-chip b{font-size:24px;font-weight:900;letter-spacing:-.02em;color:#1d1430;font-variant-numeric:tabular-nums}
+.mh-rw-chip small{font-size:12px;font-weight:800;color:#7a7f8c}
+.mh-rw-chip .coin-ico{font-size:22px;margin:0}
+.mh-rw-chip.xp i{font-style:normal;font-size:10.5px;font-weight:900;letter-spacing:.04em;color:#fff;background:#6d4bd8;border-radius:6px;padding:2px 5px}
+.mh-rw-note{margin:0;font-size:15px;font-weight:700;line-height:1.45;color:#4b5563;word-break:keep-all}
+.mh-rw-note b{color:#1d1430}
+.mh-rw-note.wait{color:#8a93a3}
+.mh-rw-note .btn{margin-top:8px}
+
+.mh-next{display:flex;flex-direction:column;gap:10px}
+.mh-next .btn small{margin-left:6px;font-size:12.5px;opacity:.85}
+.mh-result .yb-result-actions{margin:0}
+.mh-review{margin-top:12px}
+
+@media (prefers-reduced-motion:reduce){.mh-result-stage::after{display:none}}
+
+/* ---------- V13.107 학습 · 어법·어휘 지문 목록 ----------
+   지문 카드를 한 줄짜리로: 번호 타일 → 제목과 작은 칩 → 화살표. 범위 머리판은 대비를 높인다. */
+.study-school-card{padding:14px 18px!important;border-radius:20px!important}
+.grammar-range-head{position:relative;overflow:hidden;align-items:center!important;padding:20px 20px 20px 22px!important;border-radius:22px!important;background:linear-gradient(135deg,#17213a 0%,#24365e 60%,#2f4a7c 100%)!important;color:#fff}
+.grammar-range-head::after{content:"";position:absolute;right:-30px;top:-40px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(130,170,255,.22),rgba(130,170,255,0) 70%);pointer-events:none}
+.grammar-range-head .eyebrow{color:#9fe3c7!important;font-size:11.5px!important;letter-spacing:.04em!important}
+.grammar-range-head h2{font-size:clamp(19px,5.4vw,22px)!important;line-height:1.3!important;word-break:keep-all}
+.grammar-range-count{flex:none;align-self:center;padding:7px 12px;border-radius:999px;font-size:13px;font-weight:900;background:rgba(255,255,255,.14)!important;color:#fff!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.grammar-range-head.gangseo{background:linear-gradient(135deg,#123a31 0%,#1d5547 60%,#2a6e5c 100%)!important;border:0!important}
+.grammar-range-head.gangseo h2{color:#fff!important}
+.grammar-range-head.gangseo .eyebrow{color:#ffe7a8!important}
+
+.grammar-set-card.gx-card{display:flex;align-items:center;gap:14px;min-height:0!important;padding:14px 14px 14px 14px!important;border-radius:20px!important;border:1px solid #e7eaf0!important;background:#fff;box-shadow:0 4px 14px rgba(27,39,61,.05)!important;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
+.grammar-set-card.gx-card:hover{transform:translateY(-1px);border-color:#c9d6f5!important;box-shadow:0 10px 24px rgba(27,39,61,.09)!important}
+.grammar-set-card.gx-card:active{transform:scale(.985)}
+.gx-tile{flex:none;width:58px;height:58px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:linear-gradient(160deg,#eef3ff,#dfe8ff);color:#2f5ee0;box-shadow:inset 0 0 0 1px rgba(56,103,240,.12)}
+.gx-tile small{font-size:10.5px;font-weight:800;letter-spacing:-.02em;color:#5b7be0;white-space:nowrap}
+.gx-tile b{font-size:22px;font-weight:900;line-height:1;letter-spacing:-.03em}
+.gx-tile.long b{font-size:15px}
+.gx-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:7px}
+.gx-title{font-size:15px;font-weight:850;line-height:1.35;color:#172337;letter-spacing:-.02em;word-break:keep-all;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.gx-meta{display:flex;flex-wrap:wrap;gap:6px}
+.gx-chip{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:800;color:#5b6474;background:#f2f4f8}
+.gx-chip.state{color:#3867f0;background:#eef3ff}
+.gx-chip.state.master{color:#067647;background:#e3f8ec}
+.gx-go{flex:none;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#f2f5fb;color:#3867f0}
+.gx-go .icon{width:17px;height:17px}
+.grammar-set-card.gx-card.mastered{border-color:#c6ecd6!important;background:linear-gradient(180deg,#fff,#f6fdf9)}
+.grammar-set-card.gx-card.mastered .gx-tile{background:linear-gradient(160deg,#e8f9ef,#d2f2df);color:#067647;box-shadow:inset 0 0 0 1px rgba(6,118,71,.14)}
+.grammar-set-card.gx-card.mastered .gx-tile small{color:#2f8a5f}
+.grammar-set-card.gx-card.mastered .gx-go{background:#e3f8ec;color:#067647}
+
+/* ---------- V13.107 놀이터 알 상점 ----------
+   코인 뽑기 · 가위바위보와 같은 큰 판. 두 알이 나란히 서 있고, 각자 가격과 사기 버튼을 가진다. */
+.egg-stand{position:relative;overflow:hidden;border-radius:24px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:12px;color:#fff;
+  background:radial-gradient(120% 90% at 50% 0%,#2fd3a6 0%,#12917a 42%,#0b4a52 100%);box-shadow:0 14px 34px rgba(12,110,95,.3)}
+.egg-stand::before{content:'';position:absolute;inset:-40%;background:conic-gradient(from 0deg,transparent 0 20deg,rgba(255,255,255,.07) 20deg 40deg,transparent 40deg 60deg,rgba(255,255,255,.07) 60deg 80deg,transparent 80deg);animation:rps-rays 22s linear infinite;pointer-events:none}
+.egg-stand>*{position:relative}
+.egg-stand-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.egg-stand-head small{font-size:10.5px;font-weight:900;letter-spacing:.16em;color:#ffe08a}
+.egg-stand-head h2{margin:2px 0 0;font-size:22px;font-weight:900;letter-spacing:-.03em;color:#fff}
+.egg-stand-wallet{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:999px;background:rgba(0,0,0,.22);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18);font-size:14px}
+.egg-stand-wallet b{font-weight:900;font-variant-numeric:tabular-nums}
+.egg-stand-lead{margin:-4px 0 0;font-size:13px;line-height:1.5;color:rgba(255,255,255,.88)}
+.egg-stand-lead b{color:#ffe08a}
+.egg-stand-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.egg-slot{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:12px 10px 10px;border-radius:20px;text-align:center;color:#17302b;
+  background:linear-gradient(180deg,rgba(255,255,255,.97),rgba(236,250,245,.95));box-shadow:0 8px 18px rgba(0,40,35,.22)}
+.egg-slot.epic{color:#2a1650;background:linear-gradient(180deg,#fbf8ff,#ece4ff);box-shadow:0 8px 18px rgba(40,10,90,.28),inset 0 0 0 1.5px rgba(139,92,246,.35)}
+.egg-slot-tag{position:absolute;left:10px;top:10px;padding:2px 8px;border-radius:999px;font-size:10.5px;font-weight:900;color:#0f6b58;background:#d9f5ea}
+.egg-slot.epic .egg-slot-tag{color:#fff;background:linear-gradient(90deg,#7c4ddb,#a77bff)}
+.egg-slot-art{width:100%;max-width:120px;aspect-ratio:1;display:grid;place-items:center;margin-top:6px}
+.egg-slot-art img,.egg-slot-art svg{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 8px 10px rgba(0,0,0,.18));animation:egg-wobble 3.2s ease-in-out infinite;transform-origin:50% 90%}
+.egg-slot.epic .egg-slot-art img{animation-delay:-1.6s}
+@keyframes egg-wobble{0%,70%,100%{transform:rotate(0)}76%{transform:rotate(-6deg)}82%{transform:rotate(5deg)}88%{transform:rotate(-3deg)}94%{transform:rotate(1deg)}}
+.egg-slot-plain{display:grid;place-items:center;width:78%;aspect-ratio:.8;border-radius:50% 50% 46% 46%/58% 58% 42% 42%;font-size:34px;color:#fff;background:linear-gradient(160deg,#a78bfa,#6d28d9)}
+.egg-slot-name{font-size:16px;font-weight:900;letter-spacing:-.02em}
+.egg-slot-sub{font-size:11.5px;font-weight:700;color:#5d6f69}
+.egg-slot.epic .egg-slot-sub{color:#6b5a8e}
+.egg-slot-legend{font-style:normal;font-size:11px;font-weight:900;color:#a15c00;background:linear-gradient(90deg,#fff1c2,#ffe08a);padding:2px 8px;border-radius:999px;box-shadow:0 0 10px rgba(255,200,60,.55)}
+.egg-slot-buy{margin-top:auto;width:100%;min-height:46px;margin-top:8px;border:0;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font:inherit;cursor:pointer;color:#fff;
+  background:linear-gradient(180deg,#22c08f,#0d9a72);box-shadow:0 4px 0 #087356;transition:transform .12s,box-shadow .12s}
+.egg-slot-buy span{display:inline-flex;align-items:center;gap:4px;font-size:15px;font-weight:900}
+.egg-slot-buy small{font-size:11px;font-weight:800;opacity:.9}
+.egg-slot.epic .egg-slot-buy{background:linear-gradient(180deg,#8b5cf6,#6d3fd8);box-shadow:0 4px 0 #4c27a8}
+.egg-slot-buy:active:not(:disabled){transform:translateY(3px);box-shadow:0 1px 0 #087356}
+.egg-slot-buy.confirm{background:linear-gradient(180deg,#ffb22e,#f08a00)!important;box-shadow:0 4px 0 #b86400!important;animation:egg-ask .9s ease-in-out infinite}
+@keyframes egg-ask{50%{transform:scale(1.03)}}
+.egg-slot-buy:disabled{cursor:default;color:#7d8b87;background:#e6ecea!important;box-shadow:none!important}
+.egg-slot-buy:disabled small{color:#c0392b;opacity:1}
+.egg-slot.done .egg-slot-art{opacity:.55}
+@media (prefers-reduced-motion:reduce){.egg-stand::before,.egg-slot-art img,.egg-slot-buy.confirm{animation:none}}

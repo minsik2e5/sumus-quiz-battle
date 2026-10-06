@@ -840,14 +840,30 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(css98.includes('.yb-spell-input{position:absolute;inset:0') && css98.includes('font-size:16px') && css98.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/8.2}') && battle103.includes("classList.add('yb-typing')"), 'V13.103 키보드가 올라오면 전투 화면(경기장)이 줄어 단어와 글자 칸이 키보드 위에 보인다(16px 글자로 확대 방지)');
     /* ---------- V13.105 전투 화면 효과 ---------- */
     const css104 = source('../public/v13105fx.css'), build104 = source('./build-assets.mjs');
-    assert(/"v13105\.css",\s*"v13105fx\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css)가 묶음 CSS 목록의 맨 끝에 들어간다');
-    assert(battle103.includes('function hitStop(') && battle103.includes("classList.add('fx-stop')") && css104.includes('.yb-arena.fx-stop *{animation-play-state:paused!important}') && battle103.includes('function dmgTier(') && battle103.includes("const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl']") && battle103.includes("` fx-num t${dmgTier(+dmg)}"), 'V13.105 맞는 순간 잠깐 멈추고(히트스톱), 데미지가 클수록 더 세게 흔들리고 숫자가 커진다');
+    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
+    assert(battle103.includes('function hitStop(') && battle103.includes("classList.add('fx-stop')") && css104.includes('.yb-arena.fx-stop [data-fx]{animation-play-state:paused!important}') && battle103.includes('function dmgTier(') && battle103.includes("const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl']") && battle103.includes("` fx-num t${dmgTier(+dmg)}"), 'V13.105 맞는 순간 잠깐 멈추고(히트스톱), 데미지가 클수록 더 세게 흔들리고 숫자가 커진다');
     assert(battle103.includes('function comboUp(') && battle103.includes('function comboReset(') && battle103.includes("if (atk === 'me') comboUp();") && (battle103.match(/comboReset\(\);/g) || []).length >= 3 && css104.includes('.fx-combo'), 'V13.105 내가 연속으로 맞히면 2콤보부터 내 HUD 위에 콤보가 뜨고, 틀리거나 놓치면 0으로 돌아간다(화면 표시만)');
     assert(battle103.includes('if (e.fast && e.dmg) critStamp(def);') && battle103.includes("'CRITICAL!'") && battle103.includes("crit ? 'fx-shake-xl'"), 'V13.105 빠른 정답(fast)이면 CRITICAL! 도장과 더 센 흔들림이 나온다');
     assert(battle103.includes('function finisher(') && battle103.includes('a.playbackRate = .3') && battle103.includes("later(drawResult, reduced() ? 0 : ko ? Math.max(700, 2000 - since) : 1100)") && battle103.includes("'K.O.!'"), 'V13.105 마지막 한 방은 슬로 모션·섬광·K.O. 뒤 결과가 나오고, 결과는 예전보다 0.3초만 늦어진다');
     assert(battle103.includes('function cutIn(') && battle103.includes('v.label || modeName(v.mode)') && battle103.includes('/보스/.test(label)') && css104.includes('.fx-cutin.monster') && css104.includes('.fx-cutin.boss') && css104.includes('.fx-cutin{inset:0;z-index:9;display:grid;place-items:center;overflow:hidden}') && /\.yb-arena \.fx-impact,[^{]*\{position:absolute;pointer-events:none\}/.test(css104), 'V13.105 시작 카운트다운에 상대 이름 컷인(몬스터는 크고 빨갛게, 보스는 어둡게)이 나오고 터치를 막지 않는다');
     assert(battle103.includes('function sfxThump(') && battle103.includes('function sfxCombo(') && battle103.includes('function sfxKO(') && battle103.includes("function buzzFx(pattern) { if (soundOn() && 'vibrate' in navigator)"), 'V13.105 데미지만큼 무거운 타격음, 콤보마다 올라가는 소리, K.O. 소리가 있고 진동은 소리를 켰을 때만 울린다');
     assert(battle103.includes('const FX_MAX = 24;') && css104.includes('@media (prefers-reduced-motion:reduce)') && css104.includes('.fx-impact,.fx-vignette,.fx-ko-rays{display:none}') && css104.includes('.battle-app.yb-typing .fx-combo'), 'V13.105 효과 조각은 24개까지만 그리고, 동작 줄이기에서는 새 효과가 멈추며, 글자 칠 때 짧아진 경기장에서도 맞게 보인다');
+    /* ---------- V13.107 전투 흰 섬광 · 몬스터 결과 · 어법 목록 · 놀이터 알 상점 ---------- */
+    {
+      const css107 = source('../public/v13107.css'), css54 = source('../public/v1354.css'), arcade107 = source('../public/modules/arcade.js'), app107 = source('../public/app.js'), pm107 = source('../public/modules/pet-moments.js'), st107 = source('../public/modules/student.js');
+      assert(!css104.includes('.yb-arena.fx-stop *') && !/filter:brightness\(2\.6\)/.test(css104) && /\.yb-pet\.fx-white \.avatar-art\{animation:fx-white \.26s ease-out\}/.test(css104) && /@keyframes fx-white\{0%\{filter:[^}]*\}100%\{filter:none\}\}/.test(css104)
+        && /@keyframes ybHit\{[^@]*\}\}/.test(css54) && !/@keyframes ybHit\{[^\n]*brightness/.test(css54) && battle103.includes("el.hitTimer = setTimeout(() => el.classList.remove('hit'), 560)"),
+        'V13.107 맞을 때 하얀 섬광은 끝나면 반드시 원래 색으로 돌아가는 애니메이션이고, 히트스톱은 효과 조각만 멈춰 펫이 하얗게 굳지 않는다(아이폰 Safari)');
+      assert(battle103.includes('<div class="mh-reward" id="mh-reward">') && !battle103.includes('yb-result-points mh-reward') && battle103.includes('<div class="mh-stats">') && battle103.includes('<span class="mh-rw-tag">') && battle103.includes('<p class="mh-rw-note">${text}</p>')
+        && css107.includes('.mh-reward{position:relative;display:flex') && css107.includes('.mh-rw-note{margin:0;font-size:15px') && css107.includes('.mh-result-stage{position:relative;height:auto;aspect-ratio:16/9'),
+        'V13.107 몬스터전 결과: 장면 틀 하나, 숫자 세 칸(내 HP·몬스터 HP·맞힌 단어), 둥근 보상 판(첫 처치 리본·코인·경험치 칩), 보상 없음 안내는 15px 글씨');
+      assert(st107.includes('function grammarTile(number)') && st107.includes('class="gx-tile') && css107.includes('.grammar-set-card.gx-card{display:flex') && css107.includes('-webkit-line-clamp:2'),
+        'V13.107 어법·어휘 지문 카드: 번호 타일(“1과 본문” 위에 큰 번호) · 두 줄 제목 · 칩 · 화살표의 한 줄 카드');
+      assert(arcade107.includes('<section class="egg-stand" id="egg-stand">') && arcade107.includes('${machineHtml(current.A)}${shopHtml(current.A)}${rpsCard(') && arcade107.includes('data-action="egg-buy"') && !arcade107.includes('ga-shop-row')
+        && app107.includes("if (d.action === 'egg-buy') return eggBuy(") && app107.includes("if (!b.classList.contains('confirm'))") && pm107.includes('export async function buyEgg(A, onChanged, kind)') && pm107.includes("api('/shop/egg', { kind: kind === 'epic' ? 'epic' : 'basic' })")
+        && css107.includes('.egg-stand{position:relative'),
+        'V13.107 놀이터 알 상점은 코인 뽑기 바로 아래 큰 판으로 바로 보이고(랜덤 알 · 영웅 알 나란히), 사기 버튼을 두 번 눌러야 산다(서버 /shop/egg 그대로)');
+    }
     /* ---------- V13.101 로보 연습전·몬스터 끝내기 영수증 ---------- */
     {
       const t1 = Date.parse('2026-10-04T03:00:00Z');

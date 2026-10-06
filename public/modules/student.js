@@ -517,17 +517,27 @@ function studyHub(A) {
   </div>
   ${starPracticeButton(A, 'in-hub')}`;
 }
+// V13.107: the passage number as a two-line tile ("1과 본문" over a big "1"; a mock-exam item
+// shows "No." over its number), the title, then small chips for sentences and state.
+function grammarTile(number) {
+  const text = String(number || '');
+  const lesson = text.match(/^(.+?)\s*·\s*본문\s*(.+)$/);
+  if (lesson) return { top: `${lesson[1]} 본문`, main: lesson[2] };
+  if (/^[\d~\-\s]+$/.test(text)) return { top: 'No.', main: text.replace(/\s+/g, '') };
+  return { top: '', main: text };
+}
 function grammarCards(A, passages) {
   return passages.map(p => {
     const saved = savedGrammarProgress(A, p);
     const mastered = Boolean(saved?.mastered);
-    return `<button class="grammar-set-card premium ${mastered ? 'mastered' : ''}" data-action="grammar-choice" data-grammar-id="${esc(p.id)}">
-      <div class="grammar-set-top">
-        <span class="grammar-number">${esc(p.number)}</span>
-        <div class="grow"><b>${esc(p.subtitle)}</b><small>${mastered ? '학습 완료' : p.sentences.length + '문장'}</small></div>
-        <span class="grammar-state ${mastered ? 'master' : ''}">${mastered ? 'MASTER' : '학습'}</span>
-      </div>
-      <div class="grammar-set-cta">${mastered ? '다시 보기' : '시작하기'} ${icon('arrow')}</div>
+    const tile = grammarTile(p.number);
+    return `<button class="grammar-set-card premium gx-card ${mastered ? 'mastered' : ''}" data-action="grammar-choice" data-grammar-id="${esc(p.id)}" aria-label="${esc(p.number)} ${esc(p.subtitle)} ${mastered ? '다시 보기' : '시작하기'}">
+      <span class="gx-tile${tile.main.length > 3 ? ' long' : ''}">${tile.top ? `<small>${esc(tile.top)}</small>` : ''}<b>${esc(tile.main)}</b></span>
+      <span class="gx-body">
+        <b class="gx-title">${esc(p.subtitle)}</b>
+        <span class="gx-meta"><span class="gx-chip">${p.sentences.length}문장</span><span class="gx-chip state ${mastered ? 'master' : ''}">${mastered ? 'MASTER' : '어법 선택형'}</span></span>
+      </span>
+      <span class="gx-go" aria-hidden="true">${mastered ? icon('check') : icon('arrow')}</span>
     </button>`;
   }).join('');
 }
