@@ -1,5 +1,6 @@
 import { $, api, esc, num, icon, toast } from './ui.js';
 import { coin } from './emblems.js';
+import { CHARACTERS, petTier } from './core.js';
 
 // V13.73 celebrations shared by the title moment and the teacher's coin gift: coins raining
 // over a pop-up, a number counting up, and the gift box a student opens.
@@ -42,11 +43,24 @@ const buzz = pattern => { try { navigator.vibrate?.(pattern); } catch {} };
 
 // Gifts waiting for the student (bootstrap `gifts`): one box for all of them. Opening it asks
 // the server to mark them opened (the coins were already counted when they were sent).
+// V13.111 선생님 알: what each egg gift became (its egg picture, the pet's name and tier).
+const TIER_KO = { basic: '기본', epic: '영웅', legendary: '전설' };
+function eggCards(gifts) {
+  const eggs = gifts.filter(g => g.kind === 'egg');
+  if (!eggs.length) return '';
+  return `<div class="cel-eggs">${eggs.map(g => {
+    if (!g.egg) return `<div class="cel-egg full"><span class="cel-egg-art">${coin()}</span><b>펫을 모두 모았어요!</b><small>대신 ${num(g.amount)}코인</small></div>`;
+    const c = CHARACTERS[g.egg.key] || {}, tier = g.egg.tier || petTier(g.egg.key);
+    return `<div class="cel-egg ${tier}" style="--pc:${c.color || '#8b5cf6'}"><span class="cel-egg-art"><img src="/assets/pets/${g.egg.key}-0.webp" alt="" width="96" height="96"></span><i class="cel-egg-tier">${tier === 'basic' ? '' : '★ '}${TIER_KO[tier] || ''}</i><b>${esc(c.ko || '새 친구')}의 알</b><small>${esc(c.type || '')}</small></div>`;
+  }).join('')}</div><p class="cel-egg-note">새 알은 <b>내 펫</b>에 들어갔어요. 파트너로 바꾸면 함께 공부하며 자라요.</p>`;
+}
 export function giftMoment(A, gifts, done) {
   const total = gifts.reduce((n, g) => n + Number(g.amount || 0), 0);
+  const hasEgg = gifts.some(g => g.kind === 'egg');
   const from = [...new Set(gifts.map(g => g.from_name).filter(Boolean))];
-  const notes = gifts.filter(g => g.note).slice(-3);
-  $('#modal-root').innerHTML = `<div class="modal-backdrop cel-gift-backdrop"><section class="modal cel-gift" role="dialog" aria-modal="true" aria-label="선생님의 코인 선물">
+  // V13.111: the same words sent with several gifts (e.g. three eggs at once) show once.
+  const notes = [...new Map(gifts.filter(g => g.note).map(g => [g.note, g])).values()].slice(-3);
+  $('#modal-root').innerHTML = `<div class="modal-backdrop cel-gift-backdrop"><section class="modal cel-gift" role="dialog" aria-modal="true" aria-label="${hasEgg ? '선생님의 선물' : '선생님의 코인 선물'}">
     <div class="cel-gift-stage" data-state="closed">
       <span class="cel-gift-rays" aria-hidden="true"></span>
       <button type="button" class="cel-box" data-gift-open aria-label="선물 상자 열기">
@@ -58,6 +72,7 @@ export function giftMoment(A, gifts, done) {
     <h2 class="cel-gift-title">선물이 도착했어요!</h2>
     ${notes.length ? `<div class="cel-notes">${notes.map(g => `<p>“${esc(g.note)}”</p>`).join('')}</div>` : ''}
     <div class="cel-gift-reward" hidden>${coinReward(total)}${gifts.length > 1 ? `<small class="cel-gift-count">선물 ${gifts.length}개</small>` : ''}</div>
+    <div class="cel-gift-eggs" hidden></div>
     <div class="pet-moment-actions"><button type="button" class="btn primary full" data-gift-go>${icon('sparkle')}상자 열기</button></div>
   </section></div>`;
   const stage = $('.cel-gift-stage'), button = $('[data-gift-go]');
@@ -83,8 +98,20 @@ export function giftMoment(A, gifts, done) {
     }
     stage.dataset.state = 'open';
     buzz([30, 50, 30, 50, 120]);
-    $('.cel-gift-title').textContent = '코인 선물 받았어요!';
-    $('.cel-gift-reward').hidden = false;
+    // V13.111: egg gifts show the pets they became (the pets are in 내 펫 now).
+    const openedGifts = Array.isArray(res?.gifts) ? res.gifts : gifts;
+    const eggs = openedGifts.filter(g => g.kind === 'egg'), coinsNow = Number(res?.coins ?? total);
+    if (res?.stats && A.data) A.data.stats = res.stats;
+    if (res?.profile && A.data) A.data.profile = { ...A.data.profile, ...res.profile };
+    $('.cel-gift-title').textContent = !eggs.length ? '코인 선물 받았어요!' : openedGifts.some(g => g.kind !== 'egg') ? '선물을 받았어요!' : '선생님 알을 받았어요!';
+    if (eggs.length) {
+      const box = $('.cel-gift-eggs');
+      box.innerHTML = eggCards(openedGifts);
+      box.hidden = false;
+      if (eggs.some(g => g.egg?.tier === 'legendary')) $('.cel-gift').classList.add('legend');
+      else if (eggs.some(g => g.egg?.tier === 'epic')) $('.cel-gift').classList.add('epic');
+    }
+    $('.cel-gift-reward').hidden = !(coinsNow > 0);
     coinShower($('.cel-gift'), 26, 2);
     playReward($('.cel-gift'), 420);
     button.innerHTML = '고마워요!';

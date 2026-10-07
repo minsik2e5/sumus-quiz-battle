@@ -19,7 +19,8 @@ import { createPracticeMatch, BOT_LEVELS, BOT_HP } from '../public/modules/battl
 import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
 import { botStart, botFinish, RECEIPT_KEEP, RECEIPT_DAYS, monsterStart, monsterFinish, monsterView, monsterMigrate, monsterRanges, monsterProgress, addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome, openEgg, luckyView as luckyViewOf } from './rewards.mjs';
 import { marketPrices } from './market.mjs';
-import { limitedFromEpic } from './rewards.mjs';
+import { limitedFromEpic, giveGift, openGifts, giftEggPick } from './rewards.mjs';
+import { GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS } from '../public/modules/rewards.js';
 import { field as petField } from './pet-sim.mjs';
 import { SEASONS, LIMITED_PET_KEYS, seasonOnSale, seasonsOver } from '../public/modules/core.js';
 import { STOCKS, MARKET, MARKET_OPEN, tradeFee, newsText } from '../public/modules/market.js';
@@ -843,7 +844,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(css98.includes('.yb-spell-input{position:absolute;inset:0') && css98.includes('font-size:16px') && css98.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/8.2}') && battle103.includes("classList.add('yb-typing')"), 'V13.103 키보드가 올라오면 전투 화면(경기장)이 줄어 단어와 글자 칸이 키보드 위에 보인다(16px 글자로 확대 방지)');
     /* ---------- V13.105 전투 화면 효과 ---------- */
     const css104 = source('../public/v13105fx.css'), build104 = source('./build-assets.mjs');
-    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css",\s*"v13109\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
+    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css",\s*"v13109\.css",\s*"v13111\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
     assert(battle103.includes('function hitStop(') && battle103.includes("classList.add('fx-stop')") && css104.includes('.yb-arena.fx-stop [data-fx]{animation-play-state:paused!important}') && battle103.includes('function dmgTier(') && battle103.includes("const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl']") && battle103.includes("` fx-num t${dmgTier(+dmg)}"), 'V13.105 맞는 순간 잠깐 멈추고(히트스톱), 데미지가 클수록 더 세게 흔들리고 숫자가 커진다');
     assert(battle103.includes('function comboUp(') && battle103.includes('function comboReset(') && battle103.includes("if (atk === 'me') comboUp();") && (battle103.match(/comboReset\(\);/g) || []).length >= 3 && css104.includes('.fx-combo'), 'V13.105 내가 연속으로 맞히면 2콤보부터 내 HUD 위에 콤보가 뜨고, 틀리거나 놓치면 0으로 돌아간다(화면 표시만)');
     assert(battle103.includes('if (e.fast && e.dmg) critStamp(def);') && battle103.includes("'CRITICAL!'") && battle103.includes("crit ? 'fx-shake-xl'"), 'V13.105 빠른 정답(fast)이면 CRITICAL! 도장과 더 센 흔들림이 나온다');
@@ -879,6 +880,32 @@ export async function runRewardsChecks(assert, expectStatus) {
         'V13.108 키보드의 보내기(Enter)는 단어를 치는 중이어도 지금까지 친 글자로 공격한다');
       assert(battle103.includes('function fitTyping()') && battle103.includes("window.visualViewport.addEventListener('resize'") && css108.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/6.4}'),
         'V13.108 키보드가 올라오면 경기장·단어·글자 칸·공격! 버튼이 키보드 위에 함께 보이게 줄이고 맞춰 스크롤한다');
+    }
+    /* ---------- V13.111 선생님 알 선물 ---------- */
+    {
+      const seq = list => { const v = [...list]; return () => v.length ? v.shift() : 0; };
+      assert(GIFT_EGG_ODDS.basic === 84 && GIFT_EGG_ODDS.epic === 15 && GIFT_EGG_ODDS.legendary === 1 && GIFT_EGG_FULL_COINS === 400
+        && giftEggPick({ pets: [{ key: 'dog' }] }, seq([0.005, 0])).tier === 'legendary' && giftEggPick({ pets: [{ key: 'dog' }] }, seq([0.10, 0])).tier === 'epic' && giftEggPick({ pets: [{ key: 'dog' }] }, seq([0.5, 0])).tier === 'basic'
+        && giftEggPick({ pets: [{ key: 'dog' }, { key: 'haechi' }] }, seq([0.005, 0])).tier === 'epic',
+        'V13.111 선생님 알은 기본 84% · 영웅 15% · 전설 1%이고, 전설이 이미 있으면 그 1%는 영웅이 된다');
+      const allBasic = { pets: STANDARD_PET_KEYS.map(key => ({ key })) }, allEpic = { pets: [{ key: 'dog' }, ...EPIC_PET_KEYS.map(key => ({ key }))] };
+      const everyPet = { pets: [...STANDARD_PET_KEYS, ...EPIC_PET_KEYS, 'haechi'].map(key => ({ key })) };
+      assert(giftEggPick(allBasic, seq([0.5, 0])).tier === 'epic' && giftEggPick(allEpic, seq([0.10, 0])).tier === 'basic' && giftEggPick(everyPet, seq([0.5, 0])) === null
+        && [giftEggPick({ pets: [{ key: 'dog' }] }, seq([0.5, 0])), giftEggPick({ pets: [{ key: 'dog' }] }, seq([0.10, .99]))].every(e => !LIMITED_PET_KEYS.includes(e.key) && e.key !== 'dog'),
+        'V13.111 선생님 알은 언제나 아직 없는 펫(기본이 다 차면 영웅, 영웅이 다 차면 기본)이고 한정 펫은 나오지 않는다');
+      const kidG = { pets: [{ key: 'dog' }], avatar_key: 'dog', gift_box: { total: 0, count: 0, log: [] } };
+      for (let i = 0; i < 30; i++) giveGift(kidG, { kind: 'egg', id: 'egg' + i, from: 't', fromName: '선생님', now: i });
+      giveGift(kidG, { amount: 30, id: 'coin1', from: 't', fromName: '선생님', now: 99 });
+      const totalBefore = kidG.gift_box.total;
+      const openedG = openGifts(kidG, 1000, () => .5);
+      const keysG = kidG.pets.map(pet => pet.key);
+      assert(totalBefore === 30 && openedG.length === 31 && new Set(keysG).size === keysG.length && keysG.length === STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length && kidG.avatar_key === 'dog'
+        && openedG.filter(g => g.full).length === 30 - (keysG.length - 1) && kidG.gift_box.total === 30 + GIFT_EGG_FULL_COINS * (30 - (keysG.length - 1)) && openGifts(kidG, 2000).length === 0,
+        'V13.111 선생님 알을 여러 개 열어도 펫이 겹치지 않고 내 펫에만 들어가며(파트너 그대로), 다 모은 뒤에는 알마다 400코인, 한 번 연 선물은 다시 열리지 않는다');
+      const service111 = source('./service.mjs'), app111 = source('../public/app.js'), cel111 = source('../public/modules/celebrate.js');
+      assert(service111.includes("const egg = body.kind === 'egg';") && service111.includes("announceLegend(state, p, legend.egg.key, '선생님 알 선물')") && service111.includes("'선생님 알 1개'")
+        && app111.includes('data-gk="egg"') && app111.includes("{ kind: 'egg', note:") && cel111.includes('function eggCards(gifts)') && cel111.includes('새 알은 <b>내 펫</b>에 들어갔어요') && cel111.includes('const openedGifts = ') && !/const opened = /.test(cel111) && source('../public/v13111.css').includes('.cel-gift-reward[hidden]{display:none}'),
+        'V13.111 선생님 선물 창에 코인 | 선생님 알 탭이 있고, 학생은 선물 상자에서 나온 펫 알을 보며, 전설이면 학교 소식이 전해진다');
     }
     /* ---------- V13.110 새 펫 8종 (기본 4 · 영웅 4) ---------- */
     {

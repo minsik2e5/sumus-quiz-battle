@@ -1215,7 +1215,11 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/gifts/open' && method === 'POST') {
     requireRole(p, 'student');
     const gifts = openGifts(p, Date.now());
-    return { gifts, coins: gifts.reduce((n, g) => n + g.amount, 0), points_balance: coinBalance(state, p) };
+    // V13.111: an egg gift that opened as a legendary pet is told to the school, like the shop's.
+    const legend = gifts.find(g => g.egg?.tier === 'legendary');
+    const eggs = gifts.some(g => g.egg);
+    return { gifts, coins: gifts.reduce((n, g) => n + Number(g.amount || 0), 0), points_balance: coinBalance(state, p),
+      ...(eggs ? { profile: publicProfile(p), stats: stats(state, p) } : {}), ...(legend ? announceLegend(state, p, legend.egg.key, '선생님 알 선물') : {}) };
   }
   if (path === '/teacher/class-league' && method === 'GET') {
     requireRole(p, 'teacher');
@@ -1236,8 +1240,10 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'teacher');
     const school = activeTeacherSchool(state, p);
     if (!school) fail('관리 학교를 확인해주세요.', 409);
-    const amount = Number(body.amount);
-    if (!GIFT_AMOUNTS.includes(amount)) fail('선물할 코인을 골라주세요.');
+    // V13.111: `kind: 'egg'` sends a 선생님 알 (기본 84% · 영웅 15% · 전설 1%) instead of coins.
+    const egg = body.kind === 'egg';
+    const amount = egg ? 0 : Number(body.amount);
+    if (!egg && !GIFT_AMOUNTS.includes(amount)) fail('선물할 코인을 골라주세요.');
     const pool = state.profiles.filter(x => isRankedStudent(x) && schoolForProfile(state, x)?.id === school.id);
     const className = str(body.class_name, 20);
     const ids = new Set((Array.isArray(body.student_ids) ? body.student_ids : []).map(value => str(value, 80)).filter(Boolean));
@@ -1245,11 +1251,11 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!targets.length) fail('선물 받을 학생을 골라주세요.');
     if (targets.length > 300) fail('한 번에 300명까지 선물할 수 있어요.');
     const now = Date.now(), note = str(body.note, 60);
-    for (const x of targets) giveGift(x, { id: randomUUID(), amount, note, from: p.id, fromName: p.display_name || '선생님', now });
+    for (const x of targets) giveGift(x, { id: randomUUID(), kind: egg ? 'egg' : 'coins', amount, note, from: p.id, fromName: p.display_name || '선생님', now });
     const label = body.all === true ? `${school.name} 전체` : className ? className : targets.length === 1 ? targets[0].display_name : `${targets[0].display_name} 외 ${targets.length - 1}명`;
-    p.gifts_sent = [...(p.gifts_sent || []), { at: now, amount, count: targets.length, label, note: note.slice(0, 40), school_id: school.id }].slice(-30);
-    return { sent: targets.length, amount, total: targets.length * amount, gifts_sent: p.gifts_sent.slice(-10).reverse(),
-      _push: [{ to: targets.map(x => x.id), title: `🎁 ${p.display_name || '선생님'}의 선물이 도착했어요`, body: `응원 코인 ${amount}개${note ? ` · ${note}` : ''}`, url: '/?go=home', tag: 'gift' }] };
+    p.gifts_sent = [...(p.gifts_sent || []), { at: now, ...(egg ? { kind: 'egg' } : {}), amount, count: targets.length, label, note: note.slice(0, 40), school_id: school.id }].slice(-30);
+    return { sent: targets.length, ...(egg ? { kind: 'egg' } : {}), amount, total: targets.length * amount, gifts_sent: p.gifts_sent.slice(-10).reverse(),
+      _push: [{ to: targets.map(x => x.id), title: `🎁 ${p.display_name || '선생님'}의 선물이 도착했어요`, body: `${egg ? '선생님 알 1개' : `응원 코인 ${amount}개`}${note ? ` · ${note}` : ''}`, url: '/?go=home', tag: 'gift' }] };
   }
   // V13.76 펫 교감 (once a day each, V13.90: for each pet) and starred words (어려운 단어 ⭐, kept on the account).
   if (path === '/pet/care' && method === 'POST') {

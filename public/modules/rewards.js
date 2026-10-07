@@ -57,6 +57,10 @@ export const ownedDecorations = items => GACHA_KEYS.filter(key => Number(items?.
 export const GIFT_AMOUNTS = [10, 30, 50, 100];
 export const GIFT_NOTE_MAX = 40;
 export const GIFT_LOG_KEEP = 20;
+// V13.111 선생님 알 선물: a pet egg instead of coins. Opened in the gift box; never a pet the
+// student already has (basic → 영웅 → coins when a tier is full), never a limited pet.
+export const GIFT_EGG_ODDS = { legendary: 1, epic: 15, basic: 84 };
+export const GIFT_EGG_FULL_COINS = 400; // a student who already has every pet gets these instead
 
 // V13.73 study coins (원장님과 정한 중간안). A practice pays only when it is finished and at least
 // 60% of its answers are right; `cap` is the daily limit of study coins.
