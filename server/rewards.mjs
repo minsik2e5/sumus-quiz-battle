@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto';
-import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, EPIC_PET_KEYS, EPIC_EGG_LEGENDARY_RATE, SEASONS, seasonKeys, seasonsOver } from '../public/modules/core.js';
+import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, EPIC_PET_KEYS, STANDARD_PET_KEYS, EPIC_EGG_LEGENDARY_RATE, SEASONS, seasonKeys, seasonsOver } from '../public/modules/core.js';
 import {
   ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky,
-  BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX, GIFT_LOG_KEEP,
+  BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX, GIFT_LOG_KEEP, GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS,
   RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome
 } from '../public/modules/rewards.js';
 import { titleCoins } from '../public/modules/titles.js';
@@ -58,21 +58,59 @@ export function payTitles(p, keys, payKey, weekKey) {
 /* ---------- V13.73 teacher coin gifts ---------- */
 // The coins count as soon as a gift is sent (`total`); the box on the student's screen is only
 // the moment of opening it. The log keeps the last GIFT_LOG_KEEP gifts (all unopened ones).
-export function giveGift(p, { amount, note = '', from, fromName, now = Date.now(), id }) {
-  if (!GIFT_AMOUNTS.includes(amount)) fail('선물할 코인을 골라주세요.');
+// V13.111: `kind: 'egg'` is a pet egg (no coins now; which pet is decided when it is opened).
+export function giveGift(p, { kind = 'coins', amount, note = '', from, fromName, now = Date.now(), id }) {
+  const egg = kind === 'egg';
+  if (!egg && !GIFT_AMOUNTS.includes(amount)) fail('선물할 코인을 골라주세요.');
   const box = p.gift_box ||= { total: 0, count: 0, log: [] };
-  box.total = Number(box.total || 0) + amount;
+  if (!egg) box.total = Number(box.total || 0) + amount;
   box.count = Number(box.count || 0) + 1;
-  const log = [...(box.log || []), { id, amount, note: String(note || '').trim().slice(0, GIFT_NOTE_MAX), from, from_name: fromName, at: now, opened: false }];
+  const log = [...(box.log || []), { id, ...(egg ? { kind: 'egg', amount: 0 } : { amount }), note: String(note || '').trim().slice(0, GIFT_NOTE_MAX), from, from_name: fromName, at: now, opened: false }];
   const opened = log.filter(g => g.opened), closed = log.filter(g => !g.opened);
   box.log = [...opened.slice(-Math.max(0, GIFT_LOG_KEEP - closed.length)), ...closed].sort((a, b) => a.at - b.at);
   return box;
 }
-export const giftsWaiting = p => (p?.gift_box?.log || []).filter(g => !g.opened).map(g => ({ id: g.id, amount: g.amount, note: g.note, from_name: g.from_name, at: g.at }));
-export function openGifts(p, now = Date.now()) {
-  const waiting = giftsWaiting(p);
-  for (const g of p?.gift_box?.log || []) if (!g.opened) { g.opened = true; g.opened_at = now; }
-  return waiting;
+export const giftsWaiting = p => (p?.gift_box?.log || []).filter(g => !g.opened).map(g => ({ id: g.id, ...(g.kind === 'egg' ? { kind: 'egg' } : {}), amount: g.amount, note: g.note, from_name: g.from_name, at: g.at }));
+// V13.111 선생님 알: 기본 84% · 영웅 15% · 전설 1% (a student has at most one legendary pet; then
+// it is 영웅). Always a pet the student does not have yet: a full tier moves to the other one, and
+// a student with every pet gets GIFT_EGG_FULL_COINS instead. Limited pets never come from it.
+export function giftEggPick(p, random = secureRandom) {
+  const has = key => (p.pets || []).some(pet => pet.key === key);
+  const pick = list => list[Math.min(list.length - 1, Math.floor(random() * list.length))];
+  const left = { basic: STANDARD_PET_KEYS.filter(k => !has(k)), epic: EPIC_PET_KEYS.filter(k => !has(k)) };
+  const hasLegend = LEGENDARY_PET_KEYS.some(has);
+  const r = random() * 100;
+  let tier = r < GIFT_EGG_ODDS.legendary ? 'legendary' : r < GIFT_EGG_ODDS.legendary + GIFT_EGG_ODDS.epic ? 'epic' : 'basic';
+  if (tier === 'legendary' && hasLegend) tier = 'epic';
+  if (tier === 'legendary') return { key: pick(LEGENDARY_PET_KEYS), tier };
+  if (!left[tier].length) tier = tier === 'basic' ? 'epic' : 'basic';
+  if (!left[tier].length) return null;
+  return { key: pick(left[tier]), tier };
+}
+// Opens every waiting gift. Coins were counted when sent; an egg becomes a pet now (into 내 펫,
+// the partner stays the same), or its coins when the student already has every pet.
+export function openGifts(p, now = Date.now(), random = secureRandom) {
+  const out = [];
+  for (const g of p?.gift_box?.log || []) {
+    if (g.opened) continue;
+    g.opened = true; g.opened_at = now;
+    const item = { id: g.id, amount: g.amount, note: g.note, from_name: g.from_name, at: g.at };
+    if (g.kind === 'egg') {
+      item.kind = 'egg';
+      const egg = giftEggPick(p, random);
+      if (egg) {
+        (p.pets ||= []).push({ key: egg.key, acquired_at: now, gift: true, ...(egg.tier === 'legendary' ? { legendary: true } : egg.tier === 'epic' ? { epic: true } : {}) });
+        if (egg.tier === 'legendary') { const l = p.lucky ||= {}; l.legend_key = egg.key; l.legend_at = now; }
+        g.egg = item.egg = egg;
+      } else {
+        p.gift_box.total = Number(p.gift_box.total || 0) + GIFT_EGG_FULL_COINS;
+        g.amount = item.amount = GIFT_EGG_FULL_COINS;
+        item.full = true;
+      }
+    }
+    out.push(item);
+  }
+  return out;
 }
 // V13.70 the double chance is gone; one left open gives back its bet, or the pot a right answer
 // had already reached (the student could have kept it).
