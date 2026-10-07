@@ -20,6 +20,7 @@ import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LE
 import { botStart, botFinish, RECEIPT_KEEP, RECEIPT_DAYS, monsterStart, monsterFinish, monsterView, monsterMigrate, monsterRanges, monsterProgress, addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome, openEgg, luckyView as luckyViewOf } from './rewards.mjs';
 import { marketPrices } from './market.mjs';
 import { limitedFromEpic } from './rewards.mjs';
+import { field as petField } from './pet-sim.mjs';
 import { SEASONS, LIMITED_PET_KEYS, seasonOnSale, seasonsOver } from '../public/modules/core.js';
 import { STOCKS, MARKET, MARKET_OPEN, tradeFee, newsText } from '../public/modules/market.js';
 
@@ -557,7 +558,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(build88.includes('"v1388.css"'), 'V13.88 뽑기 그림 스타일이 빌드 목록에 있다');
 
   /* ---------- V13.89 전설 펫 ---------- */
-  assert(LEGENDARY_RATE === 0.5 && LEGENDARY_PITY === 150 && LEGENDARY_PET_KEYS.join() === 'haechi,phoenix,whale,qilin' && STANDARD_PET_KEYS.length === 8, 'V13.89 전설 펫은 네 마리, 0.5% 확률, 150회 확정이며 일반 펫과 분리된다');
+  assert(LEGENDARY_RATE === 0.5 && LEGENDARY_PITY === 150 && LEGENDARY_PET_KEYS.join() === 'haechi,phoenix,whale,qilin' && STANDARD_PET_KEYS.length === 12, 'V13.89 전설 펫은 네 마리, 0.5% 확률, 150회 확정이며 일반 펫과 분리된다');
   const values = xs => () => xs.shift() ?? .99;
   const legendProfile = { pets: [{ key: 'dog' }], avatar_key: 'dog', lucky: { legend_pulls: 148 }, points_spent: 0 };
   const beforePity = pullLucky(legendProfile, 10, 100, { random: values([.5, .99]), now });
@@ -785,15 +786,15 @@ export async function runRewardsChecks(assert, expectStatus) {
   const arcade93 = source('../public/modules/arcade.js'), shop93 = source('../public/modules/pet-moments.js');
   assert(ready93.length === 47 /* the 40 of list 08, + 3 for the 칭호 도감 (V13.97), + 4 monster level plates (V13.106) */ && wired91.every(key => ready93.includes(key)) && ['me-petbook', 'pet-epic-locked', 'epic-egg', 'epic-badge'].every(key => ready93.includes(key)) && student90.includes("'pet-epic-locked'") && arcade93.includes("artOr('epic-egg'") && lucky89.includes("artOr('epic-badge'") && shop93.includes("uiArt('epic-egg')"), 'V13.93 08 그림 40장(펫 도감·영웅 펫 4장 포함)이 모두 들어가 선 아이콘 대신 보인다');
   /* ---------- V13.92 영웅 펫 · 패드 화면 ---------- */
-  assert(EPIC_PET_KEYS.join() === 'capybara,penguin,owl,hamster,shark,alpaca,hedgehog,otter' && STANDARD_PET_KEYS.length === 8 && EPIC_PET_KEYS.every(key => CHARACTERS[key].epic && !CHARACTERS[key].legendary && petTier(key) === 'epic') && petTier('dog') === 'basic' && petTier('qilin') === 'legendary' && EPIC_RATE === 3, 'V13.92 영웅 펫 8마리는 기본과 전설 사이 등급이고, 뽑기 확률은 3%다');
+  assert(EPIC_PET_KEYS.join() === 'capybara,penguin,owl,hamster,shark,alpaca,hedgehog,otter,redpanda,arcticfox,koala,parrot' && STANDARD_PET_KEYS.length === 12 && EPIC_PET_KEYS.every(key => CHARACTERS[key].epic && !CHARACTERS[key].legendary && petTier(key) === 'epic') && petTier('dog') === 'basic' && petTier('qilin') === 'legendary' && EPIC_RATE === 3, 'V13.92 영웅 펫 8마리는 기본과 전설 사이 등급이고, 뽑기 확률은 3%다');
   const epicFiles = EPIC_PET_KEYS.flatMap(key => [0, 1, 2, 3].flatMap(f => [`/assets/pets/${key}-${f}.webp`, `/assets/pets/${key}-${f}-s.webp`, ...(f ? ['happy', 'eat', 'sad', 'cheer'] : ['happy', 'eat']).map(e => expressionSrc(key, f, e))]));
-  assert(epicFiles.length === 8 * 4 * 2 + 8 * (2 + 12) && epicFiles.every(src => src && existsSync(fileURLToPath(new URL('../public' + src, import.meta.url)))), 'V13.92 영웅 펫 8마리의 알·아기·성장·최종 그림, 작은 그림, 표정 96장, 알 반응 16장이 모두 있다');
+  assert(epicFiles.length === EPIC_PET_KEYS.length * (4 * 2 + 2 + 12) && EPIC_PET_KEYS.length === 12 && epicFiles.every(src => src && existsSync(fileURLToPath(new URL('../public' + src, import.meta.url)))), 'V13.92 영웅 펫 8마리의 알·아기·성장·최종 그림, 작은 그림, 표정 96장, 알 반응 16장이 모두 있다');
   assert(EPIC_PET_KEYS.every(key => PET_SKILLS[key]?.name && PET_SKILLS[key].desc && petSkill({ key }).key === key) && petSkill({ key: 'otter' }).need === 4 && petSkill({ key: 'owl' }).need === 3 && LEGENDARY_PET_KEYS.every(key => petSkill({ key }).key === 'none'), 'V13.92 영웅 펫마다 새 야차전 특기가 있고, 전설 펫에는 여전히 특기가 없다');
   const epicProfile = { pets: [{ key: 'dog' }], avatar_key: 'dog', lucky: {}, points_spent: 0 };
   const epicPull = pullLucky(epicProfile, 10, 100, { random: values([.5, .99, .01, .4]), now });
   const allEpic = { pets: [{ key: 'dog' }, ...EPIC_PET_KEYS.map(key => ({ key }))], lucky: {}, points_spent: 0 };
   const noEpic = pullLucky(allEpic, 10, 100, { random: values([.5, .99, 0]), now });
-  assert(!epicPull.legendary && EPIC_PET_KEYS.includes(epicPull.epic?.key) && epicProfile.pets.some(pet => pet.key === epicPull.epic.key && pet.epic) && epicProfile.avatar_key === epicPull.epic.key && epicPull.lucky.epic.left === 7 && noEpic.epic === null && allEpic.pets.length === 9, 'V13.92 코인 뽑기에서 전설이 아니면 3% 확률로 아직 못 만난 영웅 펫의 알이 나오고, 다 모으면 더 나오지 않는다');
+  assert(!epicPull.legendary && EPIC_PET_KEYS.includes(epicPull.epic?.key) && epicProfile.pets.some(pet => pet.key === epicPull.epic.key && pet.epic) && epicProfile.avatar_key === epicPull.epic.key && epicPull.lucky.epic.left === EPIC_PET_KEYS.length - 1 && noEpic.epic === null && allEpic.pets.length === EPIC_PET_KEYS.length + 1, 'V13.92 코인 뽑기에서 전설이 아니면 3% 확률로 아직 못 만난 영웅 펫의 알이 나오고, 다 모으면 더 나오지 않는다');
   const service92 = source('./service.mjs'), shop92 = source('../public/modules/pet-moments.js'), css92 = source('../public/v1392.css'), studentShell92 = source('../public/modules/student.js'), build92 = source('./build-assets.mjs');
   assert(service92.includes("const epic = body.kind === 'epic', price = season ? season.price : epic ? EPIC_EGG_PRICE : EGG_PRICE;") && service92.includes('(season ? season.keys : epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter') && shop92.includes("await api('/shop/egg', { kind })") && shop92.includes("if (res.epic) { await epicShow({ key: res.key, from: 'shop' }); return true; }") && lucky89.includes('export function epicShow(') && lucky89.includes("if (res.epic) return epicShow(") && petbook91.includes('EPIC_PET_KEYS.map') && build92.includes('"v1392.css"'), 'V13.92 알 상점에서 영웅 알을 사면 영웅 연출이 나오고, 펫 도감에 영웅 펫 칸이 있다');
   assert(css92.includes('@media (min-width:768px)') && css92.includes('.bottom-nav .nav-brand{display:flex') && css92.includes('.home-stack-v1360{display:grid!important') && css92.includes('.session-app{max-width:680px!important') && studentShell92.includes('<div class="nav-brand" aria-hidden="true">'), 'V13.92 패드(768px 이상)에서는 메뉴가 왼쪽 세로 줄로 가고 화면을 넓게 쓰며, 휴대폰은 하단 메뉴 그대로다');
@@ -878,6 +879,20 @@ export async function runRewardsChecks(assert, expectStatus) {
         'V13.108 키보드의 보내기(Enter)는 단어를 치는 중이어도 지금까지 친 글자로 공격한다');
       assert(battle103.includes('function fitTyping()') && battle103.includes("window.visualViewport.addEventListener('resize'") && css108.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/6.4}'),
         'V13.108 키보드가 올라오면 경기장·단어·글자 칸·공격! 버튼이 키보드 위에 함께 보이게 줄이고 맞춰 스크롤한다');
+    }
+    /* ---------- V13.110 새 펫 8종 (기본 4 · 영웅 4) ---------- */
+    {
+      const NEW_BASIC = ['squirrel', 'turtle', 'duck', 'sheep'], NEW_EPIC = ['redpanda', 'arcticfox', 'koala', 'parrot'];
+      assert(NEW_BASIC.every(key => STANDARD_PET_KEYS.includes(key) && petTier(key) === 'basic') && NEW_EPIC.every(key => EPIC_PET_KEYS.includes(key) && petTier(key) === 'epic')
+        && [...NEW_BASIC, ...NEW_EPIC].every(key => CHARACTERS[key].ko && CHARACTERS[key].type && PET_SKILLS[key]?.name && petSkill({ key }).key === key),
+        'V13.110 새 기본 펫 4종(도토리·느릿·꽥꽥·뭉실)은 랜덤 알에, 새 영웅 펫 4종(단풍·눈송·쿨쿨·앵두)은 영웅 알에 들어가고 저마다 야차전 특기가 있다');
+      const asset = name => fileURLToPath(new URL(`../public/assets/pets/${name}.webp`, import.meta.url));
+      assert([...NEW_BASIC, ...NEW_EPIC].every(key => [0, 1, 2, 3].every(f => existsSync(asset(`${key}-${f}`)) && existsSync(asset(`${key}-${f}-s`)) && (f ? ['happy', 'eat', 'sad', 'cheer'] : ['happy', 'eat']).every(e => expressionSrc(key, f, e) && existsSync(asset(`${key}-${f}-${e}`))))),
+        'V13.110 새 펫 8종의 알·아기·성장·최종 그림, 작은 그림, 표정 96장, 알 반응 16장이 모두 있다');
+      // The real engine, seeded: each new pet wins about as often as the field (V13.72 band, with room for the small sample).
+      const r = petField(Object.keys(PET_SKILLS), { n: 10, seed: 5 });
+      assert([...NEW_BASIC, ...NEW_EPIC].every(key => ['speed', 'skill'].every(m => r[m][key] > .42 && r[m][key] < .58)),
+        'V13.110 시뮬레이션(server/pet-sim.mjs)에서 새 펫 8종의 승률이 다른 펫 전체를 상대로 42~58% 안이다(조정은 47~54%로 맞춤)');
     }
     /* ---------- V13.109 할로윈 한정 펫 · 전투 배경 ---------- */
     {

@@ -70,7 +70,16 @@ export const PET_SKILLS = {
   shark: { name: '파도 물기', desc: '바로 6 피해, 3문제 동안 3씩 피해', burst: 6, poison: 3, turns: 3 },
   alpaca: { name: '폭신 털', desc: 'HP +5, 다음에 받는 공격 2번 −5씩', heal: 5, guard: [5, 5] },
   hedgehog: { name: '가시 갑옷', desc: '바로 6 피해, 다음에 받는 공격 −8', burst: 6, guard: [8] },
-  otter: { name: '조개 깨기', desc: '4번 연속 맞히면 바로 20 피해', burst: 20, need: 4 }
+  otter: { name: '조개 깨기', desc: '4번 연속 맞히면 바로 20 피해', burst: 20, need: 4 },
+  // V13.110 새 기본 펫 4종 · 영웅 펫 4종 (server/pet-sim.mjs로 맞춘 세기)
+  squirrel: { name: '도토리 저장', desc: '다음 공격 +10, HP +5', boost: [10], heal: 5 },
+  turtle: { name: '단단한 등껍질', desc: '다음에 받는 공격 −10, HP +4', guard: [10], heal: 4 },
+  duck: { name: '물장구', desc: '바로 8 피해, 다음 공격 +6', burst: 8, boost: [6] },
+  sheep: { name: '양털 구름', desc: 'HP +4, 다음에 받는 공격 2번 −5씩', heal: 4, guard: [5, 5] },
+  redpanda: { name: '단풍 회오리', desc: '바로 5 피해, 다음 공격 2번 +5씩', burst: 5, boost: [5, 5] },
+  arcticfox: { name: '눈보라', desc: '3문제 동안 3씩 피해, 다음에 받는 공격 −6', poison: 3, turns: 3, guard: [6] },
+  koala: { name: '꿀잠', desc: 'HP +7, 다음 공격 +7', heal: 7, boost: [7] },
+  parrot: { name: '따라 말하기', desc: '2번 연속 맞히면 다음 공격 +9', boost: [9], need: 2 }
 };
 // V13.94 몬스터 잡기: a monster's own skill (its `pet.skill`), stronger at harder levels.
 export const MONSTER_SKILLS = {
