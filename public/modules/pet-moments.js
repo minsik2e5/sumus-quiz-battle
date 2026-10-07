@@ -1,5 +1,5 @@
 import { $, api, esc, num, toast } from './ui.js';
-import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, STANDARD_PET_KEYS, EPIC_PET_KEYS, cleanPetName } from './core.js';
+import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, STANDARD_PET_KEYS, EPIC_PET_KEYS, seasonOnSale, cleanPetName } from './core.js';
 import { epicShow, legendaryShow } from './lucky.js';
 import { uiArt, ART_READY } from './emblems.js';
 import { avatar, petKey } from './character.js';
@@ -183,10 +183,9 @@ export async function buyEgg(A, onChanged, kind) {
   if (momentOpen || !A.data?.stats?.pet) return null;
   momentOpen = true;
   let res;
-  try { res = await api('/shop/egg', { kind: kind === 'epic' ? 'epic' : 'basic' }); }
+  try { res = await api('/shop/egg', { kind: kind === 'epic' || kind === 'season' ? kind : 'basic' }); }
   finally { momentOpen = false; }
-  if (res.legendary) { onChanged?.(); await legendaryShow(res); return res; }
-  if (res.epic) { onChanged?.(); await epicShow({ key: res.key, from: 'shop' }); return res; }
+  if (res.legendary || res.epic || res.limited) { onChanged?.(); await eggShow(res, kind); return res; }
   momentOpen = true;
   eggRevealHtml(openOverlay('새 알'), res.key, () => closeOverlay(true, onChanged));
   return res;
@@ -247,6 +246,15 @@ const EGGS = {
   basic: { name: '랜덤 알', price: EGG_PRICE, keys: STANDARD_PET_KEYS, all: '기본 펫을 모두 모았어요!' },
   epic: { name: '영웅 알', price: EPIC_EGG_PRICE, keys: EPIC_PET_KEYS, all: '영웅 펫을 모두 모았어요!' }
 };
+// V13.109: the season's egg joins the shop while its season is on.
+const eggsNow = () => { const s = seasonOnSale(); return s ? { ...EGGS, season: { name: s.egg, price: s.price, keys: s.keys, all: `${s.name} 한정 펫을 모두 모았어요!`, until: s.until } } : EGGS; };
+// After a purchase: the legendary, 영웅 or limited show, or the basic egg's name card (null).
+async function eggShow(res, kind) {
+  if (res.legendary) { await legendaryShow(res); return true; }
+  if (res.limited) { await epicShow({ key: res.key, from: kind === 'season' ? 'season' : 'shop' }); return true; }
+  if (res.epic) { await epicShow({ key: res.key, from: 'shop' }); return true; }
+  return false;
+}
 export function openEggShop(A, onChanged, kind = 'basic') {
   const g = A.data.stats;
   if (momentOpen || !g?.pet) return;
@@ -256,14 +264,16 @@ export function openEggShop(A, onChanged, kind = 'basic') {
   let buying = false;
   const close = changed => { if (!buying) closeOverlay(changed, onChanged); };
   const draw = () => {
-    const egg = EGGS[kind], missing = egg.keys.filter(key => !g.pets.some(x => x.key === key));
+    const eggs = eggsNow();
+    if (!eggs[kind]) kind = 'basic';
+    const egg = eggs[kind], missing = egg.keys.filter(key => !g.pets.some(x => x.key === key));
     const hasLegend = g.pets.some(x => CHARACTERS[x.key]?.legendary);
     const short = Math.max(0, egg.price - Number(g.points_balance || 0));
     body.innerHTML = `<div class="pet-shop egg-shop-v1392 ${kind}">
-      <div class="egg-shop-tabs" role="tablist">${Object.entries(EGGS).map(([k, e]) => `<button type="button" role="tab" data-egg-kind="${k}" aria-selected="${k === kind}" class="${k === kind ? 'selected' : ''} ${k}">${k === 'epic' ? '<i aria-hidden="true">★</i>' : ''}${e.name}<small>${num(e.price)}코인</small></button>`).join('')}</div>
-      ${kind === 'epic' && ART_READY.has('epic-egg') ? `<div class="pet-shop-egg-art" aria-hidden="true">${uiArt('epic-egg')}</div>` : `<div class="pet-shop-egg ${kind}" aria-hidden="true"><span>${kind === 'epic' ? '★' : '?'}</span></div>`}
-      <p class="pet-moment-msg">${kind === 'epic' ? '<b class="egg-shop-tier">영웅</b> 어떤 친구가 들어 있을까요?' : '어떤 친구가 들어 있을까요?'}</p>
-      <p class="pet-shop-copy">${kind === 'epic' ? `전설 바로 아래 등급, 영웅 펫 ${missing.length}마리 중 한 마리의 알이 나와요.<br>영웅 펫마다 새로운 야차전 특기가 있어요.${hasLegend ? '' : `<br><b class="egg-shop-legend">${EPIC_EGG_LEGENDARY_RATE}% 확률로 전설 펫이 나와요!</b>`}` : `아직 만나지 못한 기본 펫 ${missing.length}마리 중 한 마리의 알이 나와요.`}<br>새 알은 바로 파트너가 되고, 함께 공부하면 Lv.3에 태어나요.</p>
+      <div class="egg-shop-tabs" role="tablist">${Object.entries(eggs).map(([k, e]) => `<button type="button" role="tab" data-egg-kind="${k}" aria-selected="${k === kind}" class="${k === kind ? 'selected' : ''} ${k}">${k === 'epic' ? '<i aria-hidden="true">★</i>' : k === 'season' ? '<i aria-hidden="true">🎃</i>' : ''}${e.name}<small>${num(e.price)}코인</small></button>`).join('')}</div>
+      ${kind === 'season' ? `<div class="pet-shop-egg-art" aria-hidden="true">${uiArt('halloween-egg')}</div>` : kind === 'epic' && ART_READY.has('epic-egg') ? `<div class="pet-shop-egg-art" aria-hidden="true">${uiArt('epic-egg')}</div>` : `<div class="pet-shop-egg ${kind}" aria-hidden="true"><span>${kind === 'epic' ? '★' : '?'}</span></div>`}
+      <p class="pet-moment-msg">${kind === 'season' ? '<b class="egg-shop-tier limited">한정</b> 어떤 친구가 들어 있을까요?' : kind === 'epic' ? '<b class="egg-shop-tier">영웅</b> 어떤 친구가 들어 있을까요?' : '어떤 친구가 들어 있을까요?'}</p>
+      <p class="pet-shop-copy">${kind === 'season' ? `할로윈 한정 펫 ${missing.length}마리 중 한 마리의 알이 나와요.<br><b class="egg-shop-legend">${egg.until}까지만 팔아요!</b> 그 뒤에는 영웅 알에서만 가끔 나와요.` : kind === 'epic' ? `전설 바로 아래 등급, 영웅 펫 ${missing.length}마리 중 한 마리의 알이 나와요.<br>영웅 펫마다 새로운 야차전 특기가 있어요.${hasLegend ? '' : `<br><b class="egg-shop-legend">${EPIC_EGG_LEGENDARY_RATE}% 확률로 전설 펫이 나와요!</b>`}` : `아직 만나지 못한 기본 펫 ${missing.length}마리 중 한 마리의 알이 나와요.`}<br>새 알은 바로 파트너가 되고, 함께 공부하면 Lv.3에 태어나요.</p>
       <div class="pet-shop-price"><span>가격</span><b><i class="coin-ico" aria-hidden="true"></i>${num(egg.price)}</b><span>가진 코인</span><b><i class="coin-ico" aria-hidden="true"></i>${num(g.points_balance || 0)}</b></div>
       <p class="pet-name-error" role="alert">${!missing.length ? egg.all : short ? `코인이 ${num(short)}개 더 필요해요. 공부하면 코인이 쌓여요.` : ''}</p>
       <div class="pet-moment-actions"><button type="button" class="btn" data-pet-later>닫기</button><button type="button" class="btn primary" data-pet-buy ${!missing.length || short ? 'disabled' : ''}>${num(egg.price)}코인으로 ${egg.name} 사기</button></div>
@@ -276,11 +286,9 @@ export function openEggShop(A, onChanged, kind = 'basic') {
       try {
         const res = await api('/shop/egg', { kind });
         buying = false;
-        const { key, epic } = res;
         // V13.98: a 영웅 알 can open as a legendary pet (1%), with the legendary show.
-        if (res.legendary) { close(true); await legendaryShow(res); return; }
-        if (epic) { close(true); await epicShow({ key, from: 'shop' }); return; }
-        eggRevealHtml(body, key, () => close(true));
+        if (res.legendary || res.epic || res.limited) { close(true); await eggShow(res, kind); return; }
+        eggRevealHtml(body, res.key, () => close(true));
       } catch (err) {
         buying = false;
         body.querySelector('.pet-name-error').textContent = err.message;

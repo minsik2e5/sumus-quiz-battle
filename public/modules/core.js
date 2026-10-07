@@ -57,13 +57,33 @@ export const CHARACTERS = {
   shark: { name: 'PADO', ko: '파도', type: '아기 상어', color: '#3B8FD9', light: '#A6D3F7', soft: '#EDF6FE', epic: true },
   alpaca: { name: 'MONGGEUL', ko: '몽글', type: '알파카', color: '#A98BC4', light: '#E4D6F2', soft: '#F8F4FC', epic: true },
   hedgehog: { name: 'DOCHI', ko: '도치', type: '고슴도치', color: '#B07A3E', light: '#E8C79A', soft: '#FBF4EA', epic: true },
-  otter: { name: 'DARI', ko: '달이', type: '수달', color: '#7A5233', light: '#D6B595', soft: '#F8F1EA', epic: true }
+  otter: { name: 'DARI', ko: '달이', type: '수달', color: '#7A5233', light: '#D6B595', soft: '#F8F1EA', epic: true },
+  // V13.109 한정 펫: sold for one season only (its own egg), then found only in 영웅 eggs. No yacha skill.
+  pumpkincat: { name: 'HOBAK', ko: '호박냥', type: '호박 고양이', color: '#E8842C', light: '#FFC98A', soft: '#FFF3E6', limited: 'halloween' },
+  ghost: { name: 'BOO', ko: '부우', type: '꼬마 유령', color: '#8E7CC3', light: '#DCD3F5', soft: '#F7F4FE', limited: 'halloween' }
 };
 export const LEGENDARY_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].legendary);
 export const EPIC_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].epic);
-export const STANDARD_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].legendary && !CHARACTERS[key].epic);
-// The pet tiers, lowest first: 기본 (the shop egg), 영웅, 전설.
-export const petTier = key => CHARACTERS[key]?.legendary ? 'legendary' : CHARACTERS[key]?.epic ? 'epic' : 'basic';
+export const LIMITED_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].limited);
+export const STANDARD_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].legendary && !CHARACTERS[key].epic && !CHARACTERS[key].limited);
+// The pet tiers, lowest first: 기본 (the shop egg), 영웅, 전설. 한정 sits beside them (a season's pets).
+export const petTier = key => CHARACTERS[key]?.legendary ? 'legendary' : CHARACTERS[key]?.epic ? 'epic' : CHARACTERS[key]?.limited ? 'limited' : 'basic';
+// V13.109 시즌 한정: the season's egg is sold from `start` to `end` (Korea time, `end` included).
+// After the season its pets come only from 영웅 eggs: a 영웅 result (영웅 알 or 코인 뽑기) is one of
+// them `after_rate`% of the time, while the student still misses one.
+export const SEASONS = {
+  halloween: { name: '할로윈', egg: '할로윈 알', price: 600, start: '2026-10-01', end: '2026-11-07', until: '11월 첫째 주(11/7)', after_rate: 5 }
+};
+const kstDay = now => new Date(Number(now) + 9 * 3600000).toISOString().slice(0, 10);
+export const seasonKeys = id => LIMITED_PET_KEYS.filter(key => CHARACTERS[key].limited === id);
+// The season whose egg is on sale now (or null).
+export function seasonOnSale(now = Date.now()) {
+  const day = kstDay(now);
+  const id = Object.keys(SEASONS).find(k => day >= SEASONS[k].start && day <= SEASONS[k].end);
+  return id ? { id, ...SEASONS[id], keys: seasonKeys(id) } : null;
+}
+// Limited pets of seasons already over: these hide in 영웅 eggs.
+export const seasonsOver = (now = Date.now()) => Object.keys(SEASONS).filter(id => kstDay(now) > SEASONS[id].end);
 // Pet growth: an egg, then three evolution forms. `form` is 0 (egg) .. 3 (final).
 export const PET_FORMS = ['알', '아기', '성장', '최종'];
 export const PET_FORM_LEVELS = [1, 3, 10, 20];

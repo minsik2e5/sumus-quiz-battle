@@ -1,6 +1,6 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
-import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, EPIC_EGG_PRICE, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, EPIC_EGG_PRICE, seasonOnSale, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
 import { battleQuestions, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
@@ -1390,13 +1390,17 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
     // V13.92: `kind: 'epic'` is the 영웅 알 (a 영웅 pet not met yet); otherwise the basic egg.
-    const epic = body.kind === 'epic', price = epic ? EPIC_EGG_PRICE : EGG_PRICE;
-    const missing = (epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter(key => !p.pets.some(x => x.key === key));
-    if (!missing.length) fail(epic ? '영웅 펫을 모두 모았어요!' : '모든 펫을 모았어요!', 409);
+    // V13.109: `kind: 'season'` is the season egg, sold only while its season is on (seasonOnSale).
+    const season = body.kind === 'season' ? seasonOnSale(Date.now()) : null;
+    if (body.kind === 'season' && !season) fail('한정 알 판매 기간이 끝났어요. 이제 영웅 알에서 가끔 나와요!', 409);
+    const epic = body.kind === 'epic', price = season ? season.price : epic ? EPIC_EGG_PRICE : EGG_PRICE;
+    const missing = (season ? season.keys : epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter(key => !p.pets.some(x => x.key === key));
+    if (!missing.length) fail(season ? `${season.name} 한정 펫을 모두 모았어요!` : epic ? '영웅 펫을 모두 모았어요!' : '모든 펫을 모았어요!', 409);
     if (openBattleFor(state, p.id, Date.now())) fail('대결이 끝난 뒤에 알을 살 수 있어요.', 409);
     const balance = pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance;
     if (balance < price) fail(`코인이 ${price - balance}개 부족해요.`);
-    const { key, legendary } = openEgg(p, { epic, missing, price });
+    const { key, legendary, limited } = openEgg(p, { epic, season: season?.id || null, missing, price });
+    if (limited) return { key, epic: false, limited: true, season: season?.id || CHARACTERS[key]?.limited, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     if (legendary) return { key, epic: false, legendary: { key, egg: true }, ...announceLegend(state, p, key, '영웅 알'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     return { key, epic, profile: publicProfile(p) };
   }

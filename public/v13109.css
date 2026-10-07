@@ -1,0 +1,53 @@
+/* ---------- V13.109 할로윈 한정 · 전투 배경 ---------- */
+
+/* 전투 배경: 그림 한 장이 경기장을 채우고, 예전 줄무늬 바닥과 장식은 숨긴다. */
+.yb-arena.has-bg{background:#1d2430 var(--yb-bg) center 62%/cover no-repeat}
+.yb-arena.has-bg::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(180deg,rgba(10,14,24,.12),rgba(10,14,24,0) 30%,rgba(10,14,24,0) 70%,rgba(10,14,24,.18))}
+.yb-arena.has-bg .yb-banner,.yb-arena.has-bg .yb-ring,.yb-arena.has-bg .yb-centerline,.yb-arena.has-bg:before{display:none}
+.yb-arena.has-bg .yb-pet .avatar-art img{filter:drop-shadow(0 8px 6px rgba(20,12,30,.38))}
+.yb-arena.has-bg .yb-pet::before{content:"";position:absolute;left:18%;right:18%;bottom:4%;height:9%;border-radius:50%;background:rgba(15,10,25,.32);filter:blur(4px);z-index:-1}
+
+/* 놀이터 알 상점: 시즌 알이 맨 위에 가로로 크게 */
+.egg-slot.season{flex-direction:row;align-items:center;gap:12px;padding:14px 14px 14px 10px;overflow:hidden;text-align:left;color:#fff;
+  background:radial-gradient(120% 140% at 0% 0%,#5b3a9e 0%,#2d1b5e 55%,#1a1038 100%);box-shadow:0 10px 22px rgba(30,10,60,.45),inset 0 0 0 1.5px rgba(255,170,60,.55)}
+.egg-slot.season .egg-slot-art{flex:none;width:38%;max-width:150px;margin:0;position:relative;z-index:1}
+.egg-season-text{position:relative;z-index:1;flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:4px}
+.egg-slot.season .egg-slot-tag{position:static;display:inline-flex;align-items:center;gap:4px;color:#2d1b5e;background:linear-gradient(90deg,#ffb347,#ffd27a)}
+.egg-season-badge{width:16px;height:16px}
+.egg-slot.season .egg-slot-name{font-size:19px;color:#fff}
+.egg-slot.season .egg-slot-sub{color:#d9cdf5}
+.egg-season-until{font-style:normal;font-size:12px;font-weight:900;color:#ffcf7a}
+.egg-slot.season .egg-slot-buy{margin-top:6px;background:linear-gradient(180deg,#ff9f2e,#e8740c);box-shadow:0 4px 0 #a14f00}
+.egg-slot.season .egg-slot-buy:active:not(:disabled){box-shadow:0 1px 0 #a14f00}
+.egg-season-deco{position:absolute;pointer-events:none;opacity:.9}
+.egg-season-deco img{width:100%;height:100%;object-fit:contain}
+.egg-season-deco.moon{right:-6px;top:-8px;width:70px;height:70px;opacity:.75}
+.egg-season-deco.pumpkins{right:-8px;bottom:-14px;width:84px;height:84px;opacity:.55}
+.egg-stand .egg-slot.season+.egg-stand-grid{margin-top:0}
+
+/* 알 상점 창: 한정 탭 */
+.egg-shop-tabs:has(button.season){grid-template-columns:1fr 1fr 1fr}
+.egg-shop-tabs button.season i{font-style:normal;margin-right:2px}
+.egg-shop-tabs button.season.selected{background:linear-gradient(180deg,#fff3e2,#ffe2bd);color:#7a3b00}
+.egg-shop-tier.limited{background:linear-gradient(90deg,#ff9f2e,#8b5cf6)!important;color:#fff}
+.egg-shop-v1392.season .pet-shop-egg-art img{filter:drop-shadow(0 10px 18px rgba(232,116,12,.35))}
+
+/* 한정 펫 연출: 주황·보라 */
+.lgx.limited.p2{background:radial-gradient(circle at 50% 50%,#5a2a10 0%,#0a0612 62%)}
+.lgx.limited.p5{background:radial-gradient(circle at 50% 42%,#7a3fb8 0%,#2d1458 45%,#0a0414 100%)}
+.lgx.limited .lgx-aura{background:radial-gradient(circle,#fff1dc 0%,rgba(255,150,40,.75) 32%,transparent 62%)}
+.lgx.limited .lgx-mote{background:#ffe2b8;box-shadow:0 0 10px 3px #ff9f2e}
+.lgx.limited .lgx-rings i{border-color:#ffe2b8;box-shadow:0 0 30px #ff9f2e,inset 0 0 22px rgba(255,210,150,.8)}
+.lgx.limited .lgx-omen i{background:linear-gradient(90deg,transparent,#ffb347,#fff,#ffb347,transparent);box-shadow:0 0 18px 4px rgba(255,160,60,.6)}
+.lgx.limited .lgx-omen span{color:#ffe2b8;text-shadow:0 0 12px rgba(255,160,60,.8)}
+.lgx.limited .lgx-egg.epic-egg{filter:drop-shadow(0 0 18px rgba(255,160,60,.9)) drop-shadow(0 16px 20px rgba(0,0,0,.4))}
+
+/* 도감: 한정 펫 */
+.pb-section.limited:before{background:linear-gradient(#ffb347,#8b5cf6)}
+.pb-limited{font-size:11px;font-weight:950;color:#fff;background:linear-gradient(90deg,#ff9f2e,#8b5cf6);padding:3px 8px;border-radius:99px;white-space:nowrap}
+.pb-card.limited{border:3px solid transparent;background:linear-gradient(#fff,#fff) padding-box,linear-gradient(135deg,#ffd27a,#ff9f2e,#c4b5fd,#6d28d9) border-box}
+.pb-card.limited.met{box-shadow:0 8px 22px rgba(232,116,12,.18);background:linear-gradient(160deg,#fff7ee,#fff 55%) padding-box,linear-gradient(135deg,#ffd27a,#ff9f2e,#c4b5fd,#6d28d9) border-box}
+.pb-card.limited.unmet .pb-sprite.shadow{filter:brightness(0) opacity(.2) drop-shadow(0 0 5px rgba(255,150,40,.85))}
+.pb-skill.limited{background:linear-gradient(90deg,#ff9f2e,#8b5cf6)}
+
+@media (prefers-reduced-motion:reduce){.egg-season-deco{display:none}}
