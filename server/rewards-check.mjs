@@ -19,6 +19,8 @@ import { createPracticeMatch, BOT_LEVELS, BOT_HP } from '../public/modules/battl
 import { ATTENDANCE_REWARDS, GACHA_KEYS, LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_XP_PER_ANSWER, EXAM_COINS, RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome } from '../public/modules/rewards.js';
 import { botStart, botFinish, RECEIPT_KEEP, RECEIPT_DAYS, monsterStart, monsterFinish, monsterView, monsterMigrate, monsterRanges, monsterProgress, addBonus, bonusRecords, tidyProfileLogs, BADGE_REFUND, pullLucky, rpsPlay, rpsCash, rpsView, rewardIncome, openEgg, luckyView as luckyViewOf } from './rewards.mjs';
 import { marketPrices } from './market.mjs';
+import { limitedFromEpic } from './rewards.mjs';
+import { SEASONS, LIMITED_PET_KEYS, seasonOnSale, seasonsOver } from '../public/modules/core.js';
 import { STOCKS, MARKET, MARKET_OPEN, tradeFee, newsText } from '../public/modules/market.js';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
@@ -567,7 +569,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(LEGENDARY_PET_KEYS.every(key => CHARACTERS[key].legendary && petSkill({ key }).key === 'none'), 'V13.89 전설 펫에는 야차전 펫 특기가 없다');
   const lucky89 = source('../public/modules/lucky.js'), arcade89 = source('../public/modules/arcade.js'), service89 = source('./service.mjs'), css89 = source('../public/v1389.css'), build89 = source('./build-assets.mjs');
   assert(lucky89.includes('legend-egg-glow.webp') && lucky89.includes('legend-egg-burst.webp') && lucky89.includes('legend-badge.webp') && lucky89.includes('function legendaryShow(') && css89.includes('.lk-legend-show{') && build89.includes('"v1389.css"'), 'V13.89 전설 알의 빛남·깨짐·배지 연출과 전설 결과 화면이 빌드에 들어간다');
-  assert(arcade89.includes('LEGENDARY_RATE') && service89.includes('postNotice(state') && service89.includes('(epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter') && service89.includes('학생이 ${where}에서 전설 펫') && service89.includes("announceLegend(state, p, result.legendary.key, '행운 뽑기')"), 'V13.89 확률과 천장을 안내하고, 전설 획득은 학교에 알리며, 랜덤 알에서는 일반 펫만 나온다');
+  assert(arcade89.includes('LEGENDARY_RATE') && service89.includes('postNotice(state') && service89.includes('(season ? season.keys : epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter') && service89.includes('학생이 ${where}에서 전설 펫') && service89.includes("announceLegend(state, p, result.legendary.key, '행운 뽑기')"), 'V13.89 확률과 천장을 안내하고, 전설 획득은 학교에 알리며, 랜덤 알에서는 일반 펫만 나온다');
   const fc90 = source('../public/modules/flashcards.js'), student90 = source('../public/modules/student.js'), app90 = source('../public/app.js'), css90 = source('../public/v1390.css');
   assert(fc90.includes('export function openFlashcards(') && fc90.includes('KNOWN_AT') && fc90.includes("data-fc=\"next-round\"") && fc90.includes("data-fc=\"star-left\"") && fc90.includes("'eng2mean' : 'mean2eng'") && student90.includes('data-flashcards="true"') && student90.includes('export function memorizeDeck(') && app90.includes('if (d.flashcards) return openCards();') && app90.includes('openFlashcards({') && css90.includes('.fc-cover{') && build89.includes('"v1390.css"'), 'V13.90 단어 학습에서 카드로 가리고 외우기: 커버를 끝까지 내리면 아는 카드, 헷갈리는 카드만 다음 라운드, ★ 담기와 확인 테스트');
   assert(css90.includes('.lk-machine{width:220px') && css90.includes('.lk-result-art{width:156px') && student90.includes('pet-care-more-v1390'), 'V13.90 코인 뽑기 기계·캡슐·결과 그림이 커지고, 펫이 여러 마리면 다른 펫도 돌볼 수 있다고 알려 준다');
@@ -793,7 +795,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   const noEpic = pullLucky(allEpic, 10, 100, { random: values([.5, .99, 0]), now });
   assert(!epicPull.legendary && EPIC_PET_KEYS.includes(epicPull.epic?.key) && epicProfile.pets.some(pet => pet.key === epicPull.epic.key && pet.epic) && epicProfile.avatar_key === epicPull.epic.key && epicPull.lucky.epic.left === 7 && noEpic.epic === null && allEpic.pets.length === 9, 'V13.92 코인 뽑기에서 전설이 아니면 3% 확률로 아직 못 만난 영웅 펫의 알이 나오고, 다 모으면 더 나오지 않는다');
   const service92 = source('./service.mjs'), shop92 = source('../public/modules/pet-moments.js'), css92 = source('../public/v1392.css'), studentShell92 = source('../public/modules/student.js'), build92 = source('./build-assets.mjs');
-  assert(service92.includes("const epic = body.kind === 'epic', price = epic ? EPIC_EGG_PRICE : EGG_PRICE;") && service92.includes('(epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter') && shop92.includes("await api('/shop/egg', { kind })") && shop92.includes('await epicShow({ key, from: \'shop\' })') && lucky89.includes('export function epicShow(') && lucky89.includes("if (res.epic) return epicShow(") && petbook91.includes('EPIC_PET_KEYS.map') && build92.includes('"v1392.css"'), 'V13.92 알 상점에서 영웅 알을 사면 영웅 연출이 나오고, 펫 도감에 영웅 펫 칸이 있다');
+  assert(service92.includes("const epic = body.kind === 'epic', price = season ? season.price : epic ? EPIC_EGG_PRICE : EGG_PRICE;") && service92.includes('(season ? season.keys : epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter') && shop92.includes("await api('/shop/egg', { kind })") && shop92.includes("if (res.epic) { await epicShow({ key: res.key, from: 'shop' }); return true; }") && lucky89.includes('export function epicShow(') && lucky89.includes("if (res.epic) return epicShow(") && petbook91.includes('EPIC_PET_KEYS.map') && build92.includes('"v1392.css"'), 'V13.92 알 상점에서 영웅 알을 사면 영웅 연출이 나오고, 펫 도감에 영웅 펫 칸이 있다');
   assert(css92.includes('@media (min-width:768px)') && css92.includes('.bottom-nav .nav-brand{display:flex') && css92.includes('.home-stack-v1360{display:grid!important') && css92.includes('.session-app{max-width:680px!important') && studentShell92.includes('<div class="nav-brand" aria-hidden="true">'), 'V13.92 패드(768px 이상)에서는 메뉴가 왼쪽 세로 줄로 가고 화면을 넓게 쓰며, 휴대폰은 하단 메뉴 그대로다');
 
   {
@@ -809,7 +811,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     const basic = fresh(), basicEgg = openEgg(basic, { epic: false, missing: ['cat'], price: EGG_PRICE, random: values([0, 0]), now });
     assert(!basicEgg.legendary && basicEgg.key === 'cat' && basic.points_spent === 400, 'V13.98 랜덤 알에서는 전설이 나오지 않는다');
     const service98 = source('./service.mjs'), shop98 = source('../public/modules/pet-moments.js'), lucky98 = source('../public/modules/lucky.js');
-    assert(service98.includes("openEgg(p, { epic, missing, price })") && service98.includes("announceLegend(state, p, key, '영웅 알')") && shop98.includes('if (res.legendary) { close(true); await legendaryShow(res); return; }') && lucky98.includes('export function legendaryShow(') && lucky98.includes('res.legendary.egg'), 'V13.98 영웅 알에서 전설이 나오면 전설 연출이 나오고 학교 소식이 전해진다');
+    assert(service98.includes("openEgg(p, { epic, season: season?.id || null, missing, price })") && service98.includes("announceLegend(state, p, key, '영웅 알')") && shop98.includes('if (res.legendary) { await legendaryShow(res); return true; }') && shop98.includes('if (res.legendary || res.epic || res.limited) { close(true); await eggShow(res, kind); return; }') && lucky98.includes('export function legendaryShow(') && lucky98.includes('res.legendary.egg'), 'V13.98 영웅 알에서 전설이 나오면 전설 연출이 나오고 학교 소식이 전해진다');
     /* ---------- V13.98 가위바위보: 10분 넘게 둔 판은 이어 던지면 정리된다 ---------- */
     const day98 = dayKey(now), old98 = now - RPS_STALE_MS - 60000;
     const tie98 = { rps: { day: day98, plays: 1, live: { id: 'x', bet: 20, pot: 20, wins: 0, ties: 1, await: 'pick', at: old98 } }, points_spent: 20 };
@@ -840,7 +842,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(css98.includes('.yb-spell-input{position:absolute;inset:0') && css98.includes('font-size:16px') && css98.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/8.2}') && battle103.includes("classList.add('yb-typing')"), 'V13.103 키보드가 올라오면 전투 화면(경기장)이 줄어 단어와 글자 칸이 키보드 위에 보인다(16px 글자로 확대 방지)');
     /* ---------- V13.105 전투 화면 효과 ---------- */
     const css104 = source('../public/v13105fx.css'), build104 = source('./build-assets.mjs');
-    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
+    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css",\s*"v13109\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
     assert(battle103.includes('function hitStop(') && battle103.includes("classList.add('fx-stop')") && css104.includes('.yb-arena.fx-stop [data-fx]{animation-play-state:paused!important}') && battle103.includes('function dmgTier(') && battle103.includes("const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl']") && battle103.includes("` fx-num t${dmgTier(+dmg)}"), 'V13.105 맞는 순간 잠깐 멈추고(히트스톱), 데미지가 클수록 더 세게 흔들리고 숫자가 커진다');
     assert(battle103.includes('function comboUp(') && battle103.includes('function comboReset(') && battle103.includes("if (atk === 'me') comboUp();") && (battle103.match(/comboReset\(\);/g) || []).length >= 3 && css104.includes('.fx-combo'), 'V13.105 내가 연속으로 맞히면 2콤보부터 내 HUD 위에 콤보가 뜨고, 틀리거나 놓치면 0으로 돌아간다(화면 표시만)');
     assert(battle103.includes('if (e.fast && e.dmg) critStamp(def);') && battle103.includes("'CRITICAL!'") && battle103.includes("crit ? 'fx-shake-xl'"), 'V13.105 빠른 정답(fast)이면 CRITICAL! 도장과 더 센 흔들림이 나온다');
@@ -860,7 +862,7 @@ export async function runRewardsChecks(assert, expectStatus) {
       assert(st107.includes('function grammarTile(number)') && st107.includes('class="gx-tile') && css107.includes('.grammar-set-card.gx-card{display:flex') && css107.includes('-webkit-line-clamp:2'),
         'V13.107 어법·어휘 지문 카드: 번호 타일(“1과 본문” 위에 큰 번호) · 두 줄 제목 · 칩 · 화살표의 한 줄 카드');
       assert(arcade107.includes('<section class="egg-stand" id="egg-stand">') && arcade107.includes('${machineHtml(current.A)}${shopHtml(current.A)}${rpsCard(') && arcade107.includes('data-action="egg-buy"') && !arcade107.includes('ga-shop-row')
-        && app107.includes("if (d.action === 'egg-buy') return eggBuy(") && app107.includes("if (!b.classList.contains('confirm'))") && pm107.includes('export async function buyEgg(A, onChanged, kind)') && pm107.includes("api('/shop/egg', { kind: kind === 'epic' ? 'epic' : 'basic' })")
+        && app107.includes("if (d.action === 'egg-buy') return eggBuy(") && app107.includes("if (!b.classList.contains('confirm'))") && pm107.includes('export async function buyEgg(A, onChanged, kind)') && pm107.includes("api('/shop/egg', { kind: kind === 'epic' || kind === 'season' ? kind : 'basic' })")
         && css107.includes('.egg-stand{position:relative'),
         'V13.107 놀이터 알 상점은 코인 뽑기 바로 아래 큰 판으로 바로 보이고(랜덤 알 · 영웅 알 나란히), 사기 버튼을 두 번 눌러야 산다(서버 /shop/egg 그대로)');
     }
@@ -876,6 +878,44 @@ export async function runRewardsChecks(assert, expectStatus) {
         'V13.108 키보드의 보내기(Enter)는 단어를 치는 중이어도 지금까지 친 글자로 공격한다');
       assert(battle103.includes('function fitTyping()') && battle103.includes("window.visualViewport.addEventListener('resize'") && css108.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/6.4}'),
         'V13.108 키보드가 올라오면 경기장·단어·글자 칸·공격! 버튼이 키보드 위에 함께 보이게 줄이고 맞춰 스크롤한다');
+    }
+    /* ---------- V13.109 할로윈 한정 펫 · 전투 배경 ---------- */
+    {
+      const kst = t => Date.parse(t + '+09:00');
+      const H = SEASONS.halloween;
+      assert(LIMITED_PET_KEYS.join() === 'pumpkincat,ghost' && LIMITED_PET_KEYS.every(key => petTier(key) === 'limited' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && petSkill({ key }).key === 'none')
+        && H.price === 600 && H.end === '2026-11-07' && H.after_rate === 5 && /11\/7/.test(H.until),
+        'V13.109 할로윈 한정 펫 2종(호박냥·부우)은 기본·영웅 알에 섞이지 않고, 야차전 특기가 없으며, 할로윈 알은 600코인에 11/7까지 판다');
+      assert(seasonOnSale(kst('2026-10-01T00:00:00'))?.id === 'halloween' && seasonOnSale(kst('2026-11-07T23:59:00'))?.id === 'halloween' && seasonOnSale(kst('2026-11-08T00:00:00')) === null && seasonOnSale(kst('2026-09-30T23:59:00')) === null
+        && seasonsOver(kst('2026-11-07T23:59:00')).length === 0 && seasonsOver(kst('2026-11-08T00:00:00')).join() === 'halloween',
+        'V13.109 할로윈 알은 한국 시간 11월 7일 밤까지 팔고, 11월 8일부터 판매가 끝난 시즌이 된다');
+      const after = kst('2026-11-20T12:00:00'), during = kst('2026-10-20T12:00:00');
+      const kidL = () => ({ pets: [{ key: 'dog' }] });
+      const always = () => 0, never = () => .99;
+      assert(limitedFromEpic(kidL(), always, during) === null && LIMITED_PET_KEYS.includes(limitedFromEpic(kidL(), always, after)) && limitedFromEpic(kidL(), never, after) === null
+        && limitedFromEpic({ pets: [{ key: 'dog' }, { key: 'pumpkincat' }, { key: 'ghost' }] }, always, after) === null,
+        'V13.109 판매 기간에는 영웅 알에서 한정 펫이 나오지 않고, 기간이 끝나면 아직 없는 한정 펫이 5% 확률로 나온다(다 모으면 안 나온다)');
+      let seq = [0.5, 0, 0]; const rnd = () => seq.length ? seq.shift() : 0;
+      const egg = kidL(); const opened = openEgg(egg, { epic: true, missing: ['capybara'], price: 800, random: rnd, now: after });
+      assert(opened.limited && LIMITED_PET_KEYS.includes(opened.key) && egg.pets.some(pet => pet.key === opened.key && pet.limited) && egg.purchases[0].item === 'epic_egg' && egg.purchases[0].limited,
+        'V13.109 기간이 끝난 뒤 영웅 알을 사면 5% 확률로 한정 펫 알이 나온다(전설 1%가 먼저)');
+      const egg2 = kidL(); const opened2 = openEgg(egg2, { season: 'halloween', missing: ['ghost'], price: 600, random: () => 0, now: during });
+      assert(opened2.key === 'ghost' && opened2.limited && egg2.purchases[0].item === 'halloween_egg' && egg2.purchases[0].price === 600, 'V13.109 할로윈 알은 아직 없는 할로윈 펫을 준다');
+      const cap = { pets: [{ key: 'dog' }, { key: 'haechi' }], lucky: {} };
+      seq = [0.01, 0.0, 0.0, 0.0, 0.0];
+      const pulled = pullLucky(cap, LUCKY_BETS[0], 1000, { random: rnd, now: after });
+      assert(pulled.epic?.limited && LIMITED_PET_KEYS.includes(pulled.epic.key) && cap.pets.some(pet => pet.key === pulled.epic.key && pet.limited),
+        'V13.109 기간이 끝난 뒤 코인 뽑기의 영웅 알도 5% 확률로 한정 펫이다');
+      const service109 = source('./service.mjs'), arcade109 = source('../public/modules/arcade.js'), petbook109 = source('../public/modules/petbook.js'), lucky109 = source('../public/modules/lucky.js'), battle109 = source('../public/modules/battle.js'), css109 = source('../public/v13109.css');
+      assert(service109.includes("const season = body.kind === 'season' ? seasonOnSale(Date.now()) : null;") && service109.includes("if (body.kind === 'season' && !season) fail(")
+        && arcade109.includes('function seasonSlot(A)') && arcade109.includes('data-egg="season"') && petbook109.includes('LIMITED_PET_KEYS.map') && lucky109.includes("season ? 'LIMITED' : 'EPIC'"),
+        'V13.109 서버는 판매 기간에만 할로윈 알을 팔고, 놀이터 알 상점 맨 위에 할로윈 알(마감일·D-day)이, 도감에 한정 펫 칸이 있다');
+      const asset = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));
+      assert(['battle/bg-arena', 'battle/bg-practice', 'battle/bg-forest', 'battle/bg-boss', 'battle/bg-halloween', 'ui/halloween-egg', 'ui/limited-badge'].every(name => existsSync(asset(name)))
+        && LIMITED_PET_KEYS.every(key => [0, 1, 2, 3].every(f => existsSync(asset(`pets/${key}-${f}`)) && existsSync(asset(`pets/${key}-${f}-s`))) && [1, 2, 3].every(f => ['happy', 'eat', 'sad', 'cheer'].every(e => existsSync(asset(`pets/${key}-${f}-${e}`)))))
+        && expressionSrc('pumpkincat', 3, 'cheer') === '/assets/pets/pumpkincat-3-cheer.webp'
+        && battle109.includes("const arenaBg = f => f?.monster ? (f.monster.boss ? 'bg-boss' : 'bg-forest')") && css109.includes('.yb-arena.has-bg{background:#1d2430 var(--yb-bg)'),
+        'V13.109 할로윈 펫·아이콘·전투 배경 5장이 있고, 몬스터전은 숲(보스는 보스방), 로보는 연습장, 야차전은 아레나(할로윈 기간은 할로윈) 배경을 쓴다');
     }
     /* ---------- V13.101 로보 연습전·몬스터 끝내기 영수증 ---------- */
     {

@@ -4,7 +4,7 @@ import { GACHA_ITEMS, GACHA_KEYS, GACHA_TIERS, GACHA_TIER_KEYS, GACHA_KINDS, own
 import { titleEmblem, coin, uiArt, artOr, ART_READY } from './emblems.js';
 import { TITLES } from './titles.js';
 import { titleState } from './titles-ui.js';
-import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, EGG_PRICE, EPIC_EGG_PRICE } from './core.js';
+import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, EGG_PRICE, EPIC_EGG_PRICE, seasonOnSale } from './core.js';
 import { luckyCard, luckyShow, machineSpin, machineDrop, unlockSound } from './lucky.js';
 import { rpsCard, rpsMatch } from './rps.js';
 import { stocksCard, loadMarket, openStock, startStockClock } from './stocks.js';
@@ -72,10 +72,32 @@ function eggSlot(A, kind) {
     <button type="button" class="egg-slot-buy" data-action="egg-buy" data-egg="${kind}" ${!missing || short ? 'disabled' : ''} aria-label="${epic ? '영웅 알' : '랜덤 알'} ${num(price)}코인${short ? `, ${num(short)}코인 부족` : ''}">${label}</button>
   </div>`;
 }
+// V13.109 한정 알: while a season is on, its egg leads the stand (with the last day of the sale).
+function seasonSlot(A) {
+  const s = seasonOnSale(); if (!s) return '';
+  const g = A.data.stats || {}, missing = s.keys.filter(key => !(g.pets || []).some(pet => pet.key === key)).length;
+  const short = Math.max(0, s.price - Number(g.points_balance || 0));
+  const kst = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+  const days = Math.round((Date.parse(s.end) - Date.parse(kst)) / 86400000);
+  const label = !missing ? '모두 모았어요' : short ? `<span>${coin()}${num(s.price)}</span><small>${num(short)}코인 부족</small>` : `<span>${coin()}${num(s.price)}</span><small>사기</small>`;
+  return `<div class="egg-slot season ${s.id}${!missing ? ' done' : ''}">
+    <span class="egg-season-deco moon" aria-hidden="true">${uiArt('halloween-deco-moon')}</span>
+    <span class="egg-season-deco pumpkins" aria-hidden="true">${uiArt('halloween-deco-pumpkins')}</span>
+    <div class="egg-slot-art" aria-hidden="true">${uiArt('halloween-egg')}</div>
+    <div class="egg-season-text">
+      <span class="egg-slot-tag">${uiArt('limited-badge', 'egg-season-badge')}${s.name} 한정</span>
+      <b class="egg-slot-name">${esc(s.egg)}</b>
+      <small class="egg-slot-sub">${missing ? `호박냥 · 부우 중 못 만난 친구 ${missing}마리` : '할로윈 한정 펫을 다 모았어요'}</small>
+      <em class="egg-season-until">${Number(s.end.slice(5, 7))}/${Number(s.end.slice(8))}까지 판매${days >= 0 ? ` · ${days ? `D-${days}` : '오늘 마지막!'}` : ''}</em>
+      <button type="button" class="egg-slot-buy" data-action="egg-buy" data-egg="season" ${!missing || short ? 'disabled' : ''} aria-label="${esc(s.egg)} ${num(s.price)}코인${short ? `, ${num(short)}코인 부족` : ''}">${label}</button>
+    </div>
+  </div>`;
+}
 function shopHtml(A) {
   return `<section class="egg-stand" id="egg-stand">
     <div class="egg-stand-head"><div><small>PET EGG SHOP</small><h2>알 상점</h2></div><span class="egg-stand-wallet">${coin()}<b>${num(A.data.stats?.points_balance || 0)}</b></span></div>
     <p class="egg-stand-lead">새 알은 바로 파트너가 되고, 함께 공부하면 <b>Lv.3</b>에 태어나요.</p>
+    ${seasonSlot(A)}
     <div class="egg-stand-grid">${eggSlot(A, 'basic')}${eggSlot(A, 'epic')}</div>
     <p class="lk-note">랜덤 알은 아직 못 만난 기본 펫, 영웅 알은 아직 못 만난 영웅 펫이 나와요 · 사기 버튼을 한 번 더 누르면 사요</p>
   </section>`;

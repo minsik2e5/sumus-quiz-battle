@@ -31,6 +31,8 @@ const EXPRESSIONS = {
   alpaca: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   hedgehog: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   otter: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  pumpkincat: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  ghost: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   robot: { 1: ROBOT, 2: ROBOT, 3: ROBOT }
 };
 const EXPR_ALIAS = { win: 'happy', hurt: 'sad', lose: 'sad', feed: 'eat', pet: 'happy', attack: 'cheer' };

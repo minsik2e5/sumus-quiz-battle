@@ -1,6 +1,6 @@
 import { esc, num } from './ui.js';
 import { coin, artOr } from './emblems.js';
-import { CHARACTERS, EPIC_EGG_LEGENDARY_RATE } from './core.js';
+import { CHARACTERS, EPIC_EGG_LEGENDARY_RATE, SEASONS } from './core.js';
 import { LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE } from './rewards.js';
 
 // V13.68 코인 뽑기: the machine on the 놀이터 page and the show when a capsule comes out.
@@ -212,16 +212,18 @@ export function legendaryShow(res, { again = false, againLabel = '' } = {}) {
 // violet omen, the pet's own egg rises, two heartbeats, one flash and ring, then the EPIC
 // letters and the egg with the shadow of its final form. `res` is the coin capsule (with its
 // "한 번 더"), or nothing when the egg came from the shop.
-export function epicShow({ key, res = null, again = false, againLabel = '' }) {
+export function epicShow({ key, res = null, again = false, againLabel = '', from = '' }) {
   return new Promise(resolve => {
     const c = CHARACTERS[key] || {}, name = c.ko || '영웅 펫';
+    // V13.109: a season's limited pet (its egg in season, or a 영웅 egg after it) has its own words.
+    const season = c.limited ? SEASONS[c.limited] : null;
     const box = document.createElement('div');
-    box.className = 'lk-show lk-legend-show lgx epic';
+    box.className = `lk-show lk-legend-show lgx epic${season ? ' limited' : ''}`;
     box.style.setProperty('--lc', c.color || '#8b5cf6');
     box.style.setProperty('--ll', c.light || '#d8c8ff');
     box.setAttribute('role', 'dialog');
     box.setAttribute('aria-modal', 'true');
-    box.setAttribute('aria-label', `영웅 펫 ${name} 획득`);
+    box.setAttribute('aria-label', `${season ? '한정' : '영웅'} 펫 ${name} 획득`);
     box.innerHTML = `<div class="lk-legend-sky" aria-hidden="true"></div>
       <div class="lgx-rays" aria-hidden="true"></div>
       <div class="lgx-omen" aria-hidden="true"><i></i><span>반짝이는 기운이 느껴져요…</span></div>
@@ -233,15 +235,15 @@ export function epicShow({ key, res = null, again = false, againLabel = '' }) {
       <div class="lgx-rings" aria-hidden="true"><i></i></div>
       <div class="lgx-flash" aria-hidden="true"></div>
       <div class="lgx-reveal" id="lgx-reveal" hidden>
-        <div class="lgx-word" aria-hidden="true">${[...'EPIC'].map((ch, i) => `<b style="--i:${i}">${ch}</b>`).join('')}</div>
+        <div class="lgx-word" aria-hidden="true">${[...(season ? 'LIMITED' : 'EPIC')].map((ch, i) => `<b style="--i:${i}">${ch}</b>`).join('')}</div>
         <div class="lgx-art">
           <img class="lgx-future" src="/assets/pets/${key}-3.webp" alt="" aria-hidden="true">
           <img class="lgx-pet" src="/assets/pets/${key}-0.webp" alt="${esc(name)}의 알">
-          ${artOr('epic-badge', '<span class="lgx-epic-badge" aria-hidden="true">★<small>영웅</small></span>', 'lgx-epic-badge-art')}
+          ${season ? `<img class="ui-art lgx-epic-badge-art" src="/assets/ui/limited-badge.webp" alt="" aria-hidden="true">` : artOr('epic-badge', '<span class="lgx-epic-badge" aria-hidden="true">★<small>영웅</small></span>', 'lgx-epic-badge-art')}
         </div>
         <div class="lgx-card">
-          <span class="lk-legend-kicker">EPIC PET · ${esc(c.type || '')}</span><h2>영웅 펫을 만났어요!</h2><h3>${esc(name)}의 알</h3>
-          <p>${res ? `${EPIC_RATE}%의 행운으로 영웅 알이 나왔어요!` : '영웅 알에서 나온 친구예요!'} 뒤에 비치는 모습으로 자라고, 야차전에서 새 특기를 써요.</p>
+          <span class="lk-legend-kicker">${season ? `${esc(season.name)} LIMITED` : 'EPIC'} PET · ${esc(c.type || '')}</span><h2>${season ? `${esc(season.name)} 한정 펫을 만났어요!` : '영웅 펫을 만났어요!'}</h2><h3>${esc(name)}의 알</h3>
+          <p>${season ? `${from === 'season' ? `${esc(season.egg)}에서 나온 친구예요!` : `영웅 알에서 ${season.after_rate}%의 행운으로 ${esc(season.name)} 한정 펫이 나왔어요!`} 뒤에 비치는 모습으로 자라요. 한정 펫은 야차전 특기 대신 특별한 모습을 가졌어요.` : `${res ? `${EPIC_RATE}%의 행운으로 영웅 알이 나왔어요!` : '영웅 알에서 나온 친구예요!'} 뒤에 비치는 모습으로 자라고, 야차전에서 새 특기를 써요.`}</p>
           ${res ? `<small>코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}</small>` : ''}
           <div class="lk-actions">${again ? `<button type="button" class="lk-again" data-lk="again">한 번 더 <em>${againLabel}</em></button>` : ''}<button type="button" class="lk-ok" data-lk="ok">확인</button></div>
         </div>
