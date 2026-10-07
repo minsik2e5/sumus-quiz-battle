@@ -21,6 +21,7 @@ import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { middleGrade3Books } from './middle-vocab.mjs';
 import { middleGrade2Books } from './middle-vocab-grade2.mjs';
 import { ybmKimHighBooks, ybmKimRetiredWords } from './high-vocab-ybm-kim.mjs';
+import { ybmKimFinalBooks } from './high-vocab-ybm-kim-final.mjs';
 import { compactSession } from './state.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
 export const APP_VERSION = packageInfo.version;
@@ -377,7 +378,10 @@ export function dailyQuestProgress(sessions, activePractice, target, now = Date.
   const done = Math.min(goal, finishedAnswers + (running ? Number(running.score_total || 0) : 0));
   return { done_today: done, goal_today: goal, completed_today: done >= goal };
 }
-export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, ...middleGrade2Books, ...middleGrade3Books, ...ybmKimHighBooks, ...state.extraBooks]; }
+// V13.112 시험 구분: every book is of 'midterm' (중간고사) or 'final' (기말고사). The books that were there before
+// the final exam words came are all 중간고사; the final ones carry exam_period: 'final' themselves.
+const withExamPeriod = book => book.exam_period === 'final' || book.exam_period === 'midterm' ? book : { ...book, exam_period: 'midterm' };
+export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, ...middleGrade2Books, ...middleGrade3Books, ...ybmKimHighBooks, ...ybmKimFinalBooks, ...state.extraBooks].map(withExamPeriod); }
 export function scopedWords(state, schoolRef, ranges, grade = null) {
   const school = schoolByRef(state, schoolRef);
   if (!school || !Array.isArray(ranges) || !ranges.length) fail('학교와 범위를 선택해주세요.');

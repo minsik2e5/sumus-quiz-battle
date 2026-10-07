@@ -437,7 +437,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(sync81.includes('if (!previous.size && supabase.readParts)') && sync81.includes("removed = Object.keys(remote.parts || {}).filter(key => !parts.has(key))"), 'V13.81 sending every part again also removes parts deleted here');
   assert(battle81.includes("Object.assign(q, { typed: [], hint: q.hint || ''") && battle81.includes("f.invited ? ' · 도전장 받는 중'"), 'V13.81 a 실력전 word after a reconnect can be typed; friends with a 도전장 show it');
   assert(app81.includes("if (go === 'challenge')") && app81.includes('A.yachaOpts = { accept: invite }; return navigate(\'yacha\')'), 'V13.81 the 도전장 alert opens the challenge');
-  assert(!student81.includes('/^L\\\\d+$/') && !app81.includes('/^L\\\\d+$/') && student81.includes('const textbookCodes = state.codes.filter(code => /^L\\d+$/i.test(String(code)));'), 'V13.81 the 교과서 tab finds textbook lessons (L1, L2)');
+  assert(!student81.includes('/^L\\\\d+$/') && !app81.includes('/^L\\\\d+$/') && student81.includes('const textbookCodes = periodCodes.filter(code => /^L\\d+$/i.test(String(code)));'), 'V13.81 the 교과서 tab finds textbook lessons (L1, L2; V13.112: of the 기말고사 / 중간고사 tab shown)');
   assert(gift81.includes('if (Array.isArray(res?.gifts) && !res.gifts.length)') && lucky81.includes("if (audio) { if (audio.state !== 'running') audio.resume"), 'V13.81 a gift opened on another phone is not shown again; capsule sounds wake after iOS pauses them');
 
   /* ---------- V13.82 가위바위보 · 문법 증권거래소 · more capsules and study coins ---------- */
@@ -844,7 +844,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(css98.includes('.yb-spell-input{position:absolute;inset:0') && css98.includes('font-size:16px') && css98.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/8.2}') && battle103.includes("classList.add('yb-typing')"), 'V13.103 키보드가 올라오면 전투 화면(경기장)이 줄어 단어와 글자 칸이 키보드 위에 보인다(16px 글자로 확대 방지)');
     /* ---------- V13.105 전투 화면 효과 ---------- */
     const css104 = source('../public/v13105fx.css'), build104 = source('./build-assets.mjs');
-    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css",\s*"v13109\.css",\s*"v13111\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
+    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css",\s*"v13109\.css",\s*"v13111\.css",\s*"v13112\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
     assert(battle103.includes('function hitStop(') && battle103.includes("classList.add('fx-stop')") && css104.includes('.yb-arena.fx-stop [data-fx]{animation-play-state:paused!important}') && battle103.includes('function dmgTier(') && battle103.includes("const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl']") && battle103.includes("` fx-num t${dmgTier(+dmg)}"), 'V13.105 맞는 순간 잠깐 멈추고(히트스톱), 데미지가 클수록 더 세게 흔들리고 숫자가 커진다');
     assert(battle103.includes('function comboUp(') && battle103.includes('function comboReset(') && battle103.includes("if (atk === 'me') comboUp();") && (battle103.match(/comboReset\(\);/g) || []).length >= 3 && css104.includes('.fx-combo'), 'V13.105 내가 연속으로 맞히면 2콤보부터 내 HUD 위에 콤보가 뜨고, 틀리거나 놓치면 0으로 돌아간다(화면 표시만)');
     assert(battle103.includes('if (e.fast && e.dmg) critStamp(def);') && battle103.includes("'CRITICAL!'") && battle103.includes("crit ? 'fx-shake-xl'"), 'V13.105 빠른 정답(fast)이면 CRITICAL! 도장과 더 센 흔들림이 나온다');

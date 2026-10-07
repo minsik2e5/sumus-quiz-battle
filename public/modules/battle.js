@@ -1,7 +1,7 @@
 import { api, esc, icon, toast, num, rangeLabel, modal, dialogOpen, buttonBusy } from './ui.js';
 import { CHARACTERS, PET_FORMS, seasonOnSale } from './core.js';
 import { avatar, petKey, showPose, holdPose } from './character.js';
-import { getRanges } from './student.js';
+import { getRanges, periodFolders } from './student.js';
 import { petJosa } from './pet-moments.js';
 import { startPractice } from './sessions.js';
 import { TITLES, TITLE_KEYS, titleProgress } from './titles.js';
@@ -341,7 +341,7 @@ function playTab(h) {
 
       ${step(2, '내 단어 범위', '대결에 나올 단어')}
       <p class="ya-explain">지금 외우고 있는 <b>단어장 번호</b>를 눌러 골라요. 여러 개 골라도 돼요.${studying.length ? ' <span class="ya-study-tag">학습 중</span>은 학습 화면에서 고른 범위예요.' : ''}</p>
-      <div class="ya-ranges">${codes.map(c => `<button type="button" class="ya-chip ${B.ranges.has(c) ? 'on' : ''}" data-yb="range" data-code="${esc(c)}" aria-pressed="${B.ranges.has(c)}" aria-label="${esc(rangeLabel(A.data.profile.school, c))} ${counts.get(c) || 0}단어${studying.includes(c) ? ' 학습 중' : ''}">${studying.includes(c) ? '<i class="ya-chip-study">학습 중</i>' : ''}<b>${esc(rangeLabel(A.data.profile.school, c))}</b><small>${counts.get(c) || 0}단어</small><span class="ya-chip-check" aria-hidden="true">${icon('check')}</span></button>`).join('') || '<p class="yb-muted">학습할 단어 범위가 없어요.</p>'}</div>
+      ${codes.length ? periodFolders(A, codes, { wrap: 'ya-ranges', selected: [...B.ranges], count: c => counts.get(c) || 0, option: c => `<button type="button" class="ya-chip ${B.ranges.has(c) ? 'on' : ''}" data-yb="range" data-code="${esc(c)}" aria-pressed="${B.ranges.has(c)}" aria-label="${esc(rangeLabel(A.data.profile.school, c))} ${counts.get(c) || 0}단어${studying.includes(c) ? ' 학습 중' : ''}">${studying.includes(c) ? '<i class="ya-chip-study">학습 중</i>' : ''}<b>${esc(rangeLabel(A.data.profile.school, c))}</b><small>${counts.get(c) || 0}단어</small><span class="ya-chip-check" aria-hidden="true">${icon('check')}</span></button>` }) : '<div class="ya-ranges"><p class="yb-muted">학습할 단어 범위가 없어요.</p></div>'}
       <div class="ya-picked ${wordsOk ? 'ok' : 'need'}" aria-live="polite">${B.ranges.size
         ? `${wordsOk ? icon('check') : '!'}<span><b>${esc(rangesText([...B.ranges]))}</b> · ${num(selectedWords)}단어${wordsOk ? '로 대결해요' : ' — 8단어 이상이 되게 더 골라 주세요'}</span>`
         : '!<span>위에서 단어장 번호를 하나 이상 눌러 주세요</span>'}</div>
@@ -647,7 +647,7 @@ function monsterTab() {
     <section class="ya-panel ms-words${B.monsterWordsOpen || !w.ok ? ' open' : ''}" aria-label="싸울 단어">
       <div class="ms-words-row"><span class="ms-words-k">싸울 단어</span><b class="${w.ok ? 'ok' : 'need'}">${w.picked.length ? `${esc(rangesText(w.picked))} · ${num(w.n)}단어` : '아직 안 골랐어요'}</b><button type="button" class="btn small" data-yb="monster-words" aria-expanded="${!!(B.monsterWordsOpen || !w.ok)}">${B.monsterWordsOpen || !w.ok ? '접기' : '바꾸기'}</button></div>
       ${B.monsterWordsOpen || !w.ok ? `<p class="ms-words-tip">야차전·연습 대결과 같은 범위예요. 지금 외우는 번호를 골라요.</p>
-      <div class="ya-ranges">${w.codes.map(c => `<button type="button" class="ya-chip ${B.ranges.has(c) ? 'on' : ''}" data-yb="range" data-code="${esc(c)}" aria-pressed="${B.ranges.has(c)}" aria-label="${esc(rangeLabel(A.data.profile.school, c))} ${w.counts.get(c) || 0}단어">${esc(rangeLabel(A.data.profile.school, c))}<small>${w.counts.get(c) || 0}</small></button>`).join('')}</div>
+      ${periodFolders(A, w.codes, { wrap: 'ya-ranges', selected: [...B.ranges], count: c => w.counts.get(c) || 0, option: c => `<button type="button" class="ya-chip ${B.ranges.has(c) ? 'on' : ''}" data-yb="range" data-code="${esc(c)}" aria-pressed="${B.ranges.has(c)}" aria-label="${esc(rangeLabel(A.data.profile.school, c))} ${w.counts.get(c) || 0}단어">${esc(rangeLabel(A.data.profile.school, c))}<small>${w.counts.get(c) || 0}</small></button>` })}
       <div class="ya-picked ${w.ok ? 'ok' : 'need'}" aria-live="polite">${w.picked.length ? `${w.ok ? icon('check') : '!'}<span><b>${esc(rangesText(w.picked))}</b> · ${num(w.n)}단어${w.ok ? '로 싸워요' : ' — 8단어 이상이 되게 더 골라 주세요'}</span>` : '!<span>단어장 번호를 하나 이상 눌러 주세요</span>'}</div>` : ''}
     </section>
     <div class="ms-list">

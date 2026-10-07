@@ -1,7 +1,7 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date, num, rangeLabel } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm } from './modules/core.js';
 import { avatar, showPose } from './modules/character.js';
-import { studentPage, getRanges, updateRangeSummary, starredWords, pushSupport, memorizeDeck } from './modules/student.js';
+import { studentPage, getRanges, periodFolders, activePeriod, inPeriod, updateRangeSummary, starredWords, pushSupport, memorizeDeck } from './modules/student.js';
 import { openFlashcards } from './modules/flashcards.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel, careIds } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
@@ -652,9 +652,22 @@ $('#app').addEventListener('click', async event => {
     if (d.memorizeRangeType) {
       A.memorizeRangeType = d.memorizeRangeType;
       const info = getRanges(A);
-      const codes = info.codes.filter(code => d.memorizeRangeType === 'textbook' ? /^L\d+$/i.test(String(code)) : !/^L\d+$/i.test(String(code)));
+      const period = activePeriod(A, info.codes);
+      const codes = info.codes.filter(code => inPeriod(A, period, code) && (d.memorizeRangeType === 'textbook' ? /^L\d+$/i.test(String(code)) : !/^L\d+$/i.test(String(code))));
       A.memorizeRange = String(codes[0] || '');
       A.memRevealed = []; A.memorizeFilter = 'all'; savePreferences(); renderKeepScroll(); return;
+    }
+    // V13.112: 기말고사 / 중간고사 tab of 단어 학습 and 시험 설정: show that kind's ranges (the 모의고사 / 교과서 tab
+    // goes to the first kind that has some) and keep only the picked ranges of that kind.
+    if (d.memorizePeriod || d.highPeriod) {
+      A.rangePeriod = d.memorizePeriod || d.highPeriod;
+      const info = getRanges(A), codes = info.codes.filter(code => inPeriod(A, A.rangePeriod, code));
+      const mock = codes.filter(code => !/^L\d+$/i.test(String(code))), book = codes.filter(code => /^L\d+$/i.test(String(code)));
+      A.memorizeRangeType = A.highRangeType = mock.length ? 'mock' : 'textbook';
+      A.memorizeRange = String((mock.length ? mock : book)[0] || '');
+      A.ranges[info.key] = info.selected.filter(code => codes.includes(code));
+      if (!A.ranges[info.key].length) A.ranges[info.key] = codes.slice(0, 2);
+      A.memRevealed = []; A.memorizeFilter = 'all'; A.target = 20; savePreferences(); renderKeepScroll(); return;
     }
     if (d.memorizeRange) { A.memorizeRange = d.memorizeRange; A.memRevealed = []; A.memorizeFilter = 'all'; savePreferences(); renderKeepScroll(); return; }
     if (d.memorizeFilter) { A.memorizeFilter = d.memorizeFilter === 'starred' ? 'starred' : 'all'; savePreferences(); render(); return; }
@@ -707,7 +720,8 @@ $('#app').addEventListener('click', async event => {
     if (d.highRangeType) { A.highRangeType = d.highRangeType; A.target = 20; savePreferences(); renderKeepScroll(); return; }
     if (d.highRangeAll) {
       const info = getRanges(A);
-      const visibleCodes = info.codes.filter(code => d.highRangeType === 'textbook' ? /^L\d+$/i.test(String(code)) : !/^L\d+$/i.test(String(code)));
+      const period = activePeriod(A, info.codes);
+      const visibleCodes = info.codes.filter(code => inPeriod(A, period, code) && (d.highRangeType === 'textbook' ? /^L\d+$/i.test(String(code)) : !/^L\d+$/i.test(String(code))));
       const current = new Set(info.selected);
       visibleCodes.forEach(code => d.highRangeAll === 'true' ? current.add(code) : current.delete(code));
       A.ranges[info.key] = [...current]; savePreferences(); render(); return;
@@ -1086,7 +1100,7 @@ function examEditModal(id) {
   if (!exam) return toast('시험을 찾을 수 없어요.');
   const locked = A.data.attempts.some(a => a.exam_id === id);
   const { codes, words } = getRanges(A, A.school, examRangeGrade(exam.class_name));
-  const rangeChecks = codes.map(code => `<label class="range-option"><input type="checkbox" name="range_code" value="${esc(code)}" ${exam.range_codes.includes(code) ? 'checked' : ''} ${locked ? 'disabled' : ''}><span>${esc(code)}<small>${words.filter(w => w.range_code === code).length}개 단어</small></span></label>`).join('');
+  const rangeChecks = periodFolders(A, codes, { wrap: 'teacher-range', bare: true, selected: exam.range_codes, count: code => words.filter(w => w.range_code === code).length, option: code => `<label class="range-option"><input type="checkbox" name="range_code" value="${esc(code)}" ${exam.range_codes.includes(code) ? 'checked' : ''} ${locked ? 'disabled' : ''}><span>${esc(code)}<small>${words.filter(w => w.range_code === code).length}개 단어</small></span></label>` });
   const typeOptions = Object.entries(EXAM_TYPES).map(([key, type]) => `<option value="${key}" ${exam.exam_type === key ? 'selected' : ''}>${esc(type.label)}</option>`).join('');
   const classOptions = [...new Set([...examTargetOptions(), exam.class_name])].map(name => `<option value="${esc(name)}" ${name === exam.class_name ? 'selected' : ''}>${esc(examTargetLabel(name))}</option>`).join('');
   const close = modal(`<h2>시험 수정</h2><p>${esc(exam.school)} · ${locked ? '응시 기록 있음' : '아직 응시 기록 없음'}</p>
@@ -1273,7 +1287,7 @@ function addAssignment() {
   const classOptions = classes.map(name => `<option value="${esc(name)}">${esc(name)}</option>`).join('');
   const rangeHtml = className => {
     const info = getRanges(A, A.school, className);
-    return info.codes.map((code, index) => `<label class="range-option"><input type="checkbox" value="${esc(code)}" ${index < 2 ? 'checked' : ''}><span>${esc(code)}<small>${info.words.filter(word => word.range_code === code).length}개 단어</small></span></label>`).join('');
+    return periodFolders(A, info.codes, { wrap: 'range-grid', bare: true, selected: info.codes.slice(0, 2), count: code => info.words.filter(word => word.range_code === code).length, option: code => `<label class="range-option"><input type="checkbox" value="${esc(code)}" ${info.codes.indexOf(code) < 2 ? 'checked' : ''}><span>${esc(code)}<small>${info.words.filter(word => word.range_code === code).length}개 단어</small></span></label>` });
   };
   const close = modal(`<h2>연습 과제 만들기</h2><p>${esc(A.school)}의 학년별 단어 범위를 선택해 배정하세요.</p><form id="assignment-form"><input type="hidden" name="school_id" value="${esc(A.data.profile.active_school_id)}"><label class="field"><span>과제명</span><input name="title" required placeholder="예: 중간고사 단어 복습"></label><div class="form-columns"><label class="field"><span>반</span><select id="assignment-class" name="class_name" required>${classOptions}</select></label><label class="field"><span>목표 문제 수</span><input name="target_questions" type="number" min="5" max="500" value="40" required></label></div><div class="locked-school">${icon('shield')}<div><b>${esc(A.school)}</b><small>현재 관리 중인 학교</small></div></div><div class="range-grid" id="assignment-ranges">${rangeHtml(defaultClass)}</div><label class="field" style="margin-top:18px"><span>마감일</span><input name="due" type="date" required></label><div class="form-error" id="assignment-error" role="alert"></div><button class="btn primary full" type="submit">과제 배정하기</button></form>`, '연습 과제 배정');
   $('#assignment-class').addEventListener('change', event => { $('#assignment-ranges').innerHTML = rangeHtml(event.target.value); });
@@ -1497,7 +1511,7 @@ function tournamentCreateModal() {
     const tick = list.filter(open).length <= MAX_PLAYERS;
     $('#tn-players').innerHTML = list.length ? list.map(p => { const ok = open(p); const why = busy.has(p.id) ? '다른 대회 참가 중' : !ok ? '아직 펫을 고르지 않았어요' : `Lv.${p.stats?.level || 1}`; return `<label class="tn-pick-item ${ok ? '' : 'off'}"><input type="checkbox" name="student" value="${esc(p.id)}" ${ok ? (tick ? 'checked' : '') : 'disabled'}><span><b>${esc(p.display_name)}</b><small>${esc(p.class_name)} · ${why}</small></span></label>`; }).join('') : '<p class="tiny muted">이 대상의 활성 학생이 없어요.</p>';
     const info = getRanges(A, A.school, middle ? target : null);
-    $('#tn-ranges').innerHTML = info.codes.map((code, index) => `<label class="range-option"><input type="checkbox" name="range" value="${esc(code)}" ${index < 2 ? 'checked' : ''}><span>${esc(middle ? `${code}과` : rangeLabel(A.school, code))}<small>${info.words.filter(word => word.range_code === code).length}개 단어</small></span></label>`).join('') || '<p class="tiny muted">단어 범위가 없어요.</p>';
+    $('#tn-ranges').innerHTML = periodFolders(A, info.codes, { wrap: 'teacher-range', bare: true, selected: info.codes.slice(0, 2), count: code => info.words.filter(word => word.range_code === code).length, option: code => `<label class="range-option"><input type="checkbox" name="range" value="${esc(code)}" ${info.codes.indexOf(code) < 2 ? 'checked' : ''}><span>${esc(middle ? `${code}과` : rangeLabel(A.school, code))}<small>${info.words.filter(word => word.range_code === code).length}개 단어</small></span></label>` }) || '<p class="tiny muted">단어 범위가 없어요.</p>';
     count();
   };
   $('#tn-target').onchange = fill;
