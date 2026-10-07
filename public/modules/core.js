@@ -58,6 +58,15 @@ export const CHARACTERS = {
   alpaca: { name: 'MONGGEUL', ko: '몽글', type: '알파카', color: '#A98BC4', light: '#E4D6F2', soft: '#F8F4FC', epic: true },
   hedgehog: { name: 'DOCHI', ko: '도치', type: '고슴도치', color: '#B07A3E', light: '#E8C79A', soft: '#FBF4EA', epic: true },
   otter: { name: 'DARI', ko: '달이', type: '수달', color: '#7A5233', light: '#D6B595', soft: '#F8F1EA', epic: true },
+  // V13.110 새 펫: 기본 4종(랜덤 알) · 영웅 4종(영웅 알).
+  squirrel: { name: 'DOTORI', ko: '도토리', type: '다람쥐', color: '#C8642E', light: '#F1B27A', soft: '#FFF2E8' },
+  turtle: { name: 'NEURIT', ko: '느릿', type: '거북이', color: '#3FA58A', light: '#A8E3CF', soft: '#EEFAF5' },
+  duck: { name: 'KKWAK', ko: '꽥꽥', type: '오리', color: '#E9B92E', light: '#FBE48C', soft: '#FFFBEA' },
+  sheep: { name: 'MUNGSIL', ko: '뭉실', type: '양', color: '#D9A27E', light: '#F6DCC8', soft: '#FFF7F1' },
+  redpanda: { name: 'DANPUNG', ko: '단풍', type: '레서판다', color: '#C2452D', light: '#F2A27E', soft: '#FFF0EA', epic: true },
+  arcticfox: { name: 'NUNSONG', ko: '눈송', type: '북극여우', color: '#5E9BD6', light: '#C9E2F7', soft: '#F2F8FE', epic: true },
+  koala: { name: 'KULKUL', ko: '쿨쿨', type: '코알라', color: '#7C8697', light: '#D3D8E2', soft: '#F5F6F9', epic: true },
+  parrot: { name: 'AENGDU', ko: '앵두', type: '앵무새', color: '#D9382E', light: '#FFC24A', soft: '#FFF4EC', epic: true },
   // V13.109 한정 펫: sold for one season only (its own egg), then found only in 영웅 eggs. No yacha skill.
   pumpkincat: { name: 'HOBAK', ko: '호박냥', type: '호박 고양이', color: '#E8842C', light: '#FFC98A', soft: '#FFF3E6', limited: 'halloween' },
   ghost: { name: 'BOO', ko: '부우', type: '꼬마 유령', color: '#8E7CC3', light: '#DCD3F5', soft: '#F7F4FE', limited: 'halloween' }
