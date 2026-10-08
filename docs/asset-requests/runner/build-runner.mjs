@@ -719,6 +719,106 @@ const NEW_PETS_18 = {
 designSheets(F18A, NEW_PETS_18, pet => pet.tier === 'epic' ? 'A 영웅 (epic) pet, one rank below legendary: a little grander and more sparkling than a basic pet, with a soft golden rim light. ' : '');
 exprSheets(F18B, NEW_PETS_18, [['frog', 'sapsaree'], ['deer', 'bear'], ['seal', 'wolf'], ['crocodile', 'octopus']], pet => ` In every cell that says a paw, arm, wing, flipper or hand is raised, this pet raises ${pet.limb} instead.${pet.tier === 'epic' ? ' A 영웅 (epic) pet: a soft golden rim light.' : ''}`);
 
+/* 19 신화 펫 5종 · 전설 천마 · 이벤트 한정 펫 + 신화 등장 연출 그림 (V13.115~)
+   새 등급 신화(mythic): 구미호 · 청룡 · 백호 · 주작 · 현무(사신수). 전설 위, 아주 낮은 확률로 어떤 알에서든 나와요.
+   천마는 전설(legend), 주먹이는 이벤트 한정(수능·기말 응원).
+   19a 설정 시트(7장) → 19b 표정·알 반응(25장) / 19c 신화 연출 효과(3장) / 19d 등장 포즈(2장) / 19e 등장 배경(세로 5장).
+   이름(ko)은 그림 주문에만 쓰는 이름이고, 앱 이름은 펫을 등록할 때 정해요. `limb`: 응원 동작에서 "앞발·팔을 들어요"가 뜻하는 곳. */
+const F19A = '19a-mythic-pets-design.txt', F19B = '19b-mythic-pets-expressions.txt', F19C = '19c-mythic-fx.txt', F19D = '19d-mythic-reveal-poses.txt', F19E = '19e-mythic-reveal-scenes.txt';
+const NEW_PETS_19 = {
+  gumiho: { ko: '미호', type: '구미호', tier: 'mythic', limb: 'one front paw', base: 'a graceful young fox with silky snow-white fur, soft sky-blue fox-fire markings on the forehead, paws and ear insides, big glossy violet-blue eyes with white highlights, pink blush, tall pointed ears, a calm gentle closed-mouth smile, and a small round glowing blue fox bead floating beside it. Cute and friendly, never sly or scary. It must look different from the orange fox 호야 and the arctic fox 눈송: violet eyes, blue fox-fire markings, a glowing fox bead and (at the later stages) several tails', egg: 'an opalescent pearl-white egg with a faint prismatic shimmer, nine thin sky-blue flame-swirl lines winding around it and a small crescent-moon mark, floating a little above a small cloud with tiny blue fox-fire wisps around', f: {
+    1: 'baby stage: a tiny round fluffy white fox kit with ONE small fluffy tail tipped with a little blue flame, sitting, a tiny glowing blue bead beside it, no other accessories',
+    2: 'grown stage: a slim young fox standing on four legs (NOT a round kit) with THREE flowing tails each tipped with blue fox-fire, a small sky-blue ribbon with a gold star charm, the glowing fox bead floating beside it',
+    3: 'final stage: a large, majestic and graceful nine-tailed fox standing proud: NINE huge flowing silky white tails fanned out behind it like a peacock, each tail tipped with a different soft glowing flame color (blue, violet, pink, mint, gold), a flowing sheer sky-blue and white sash, a small golden crescent-moon ornament on the forehead, a large glowing blue fox bead and floating blue fox-fire lanterns around it, drifting petals and prismatic sparkles (NOT a kit; noble and kind, never sly or scary)' } },
+  cheongryong: { ko: '청룡', type: '청룡', tier: 'mythic', limb: 'one front claw', base: 'a Korean-style Eastern azure dragon (cheongryong, the Azure Dragon of the East): a long graceful WINGLESS serpentine body in glossy sapphire-blue scales shading to turquoise, a cream belly, a flowing silver-white mane and two long whiskers, small golden antler-like horns, big glossy gold eyes with white highlights, pink blush, a calm gentle closed-mouth smile, and a glowing blue pearl held near it, floating on a small soft cloud. Cute chibi proportions (big head), friendly, never scary. It must look different from the white Western-style dragon 용이: Eastern, wingless, long and serpentine, with a mane and long whiskers', egg: 'an iridescent sapphire-blue egg with silver cloud-swirl and wave patterns, a thin golden dragon-scale band around the middle, floating on a little cloud with a faint lightning glow', f: {
+    1: 'baby stage: a tiny chubby baby dragon curled on a small cloud with a very short body, tiny horn buds and short whiskers, no other accessories',
+    2: 'grown stage: a longer young dragon in graceful S-curves on a cloud (NOT a short chubby baby), small golden horns, a silver mane, holding a glowing blue pearl, a small ribbon with a gold star charm',
+    3: 'final stage: a majestic azure dragon soaring in grand coils through swirling storm clouds, shimmering sapphire scales edged in gold, a flowing silver mane and long whiskers, big golden antler-like horns, a huge glowing blue pearl at its chest, small cute lightning sparks and prismatic water drops around (NOT a short baby; powerful but friendly: mouth closed, no big teeth)' } },
+  baekho: { ko: '백호', type: '백호', tier: 'mythic', limb: 'one front paw', base: 'a white tiger cub (baekho, the White Tiger of the West): snowy white fluffy fur with soft deep-indigo stripes, a cream belly, big glossy ice-blue eyes with white highlights, pink blush, small rounded ears with pink insides, a calm gentle closed-mouth smile (no fangs showing), a small silver crescent mark on the forehead. Cute and friendly. It must look different from the arctic fox 눈송 and the wolf 달빛: a tiger face with bold stripes and a short round muzzle', egg: 'a frosty white-silver egg with soft indigo tiger-stripe patterns and swirling wind lines, resting on a small snowy rock', f: {
+    1: 'baby stage: a tiny, very round fluffy white tiger cub with small indigo stripes, sitting, no accessories',
+    2: 'grown stage: a sleek young tiger standing on four legs with a longer body and legs (NOT a round cub), a silver scarf with a small gold star charm, small swirls of wind around its paws',
+    3: 'final stage: a large, majestic white tiger standing proud on a mountain rock, silver-white fur glowing with a prismatic rim light, bold indigo stripes, a silver-and-gold shoulder guard and a flowing silver-white cape with gold trim fastened by a gold star clasp, a glowing silver crescent on the forehead, swirling wind and snow-like sparkles, a huge soft full moon behind it (NOT a round cub; noble and gentle: mouth closed, no bared teeth)' } },
+  jujak: { ko: '주작', type: '주작', tier: 'mythic', limb: 'one wing', base: 'the Vermilion Bird of the South (jujak): a graceful, slim, long-legged bird with vivid vermilion-red feathers, golden-yellow cheeks and chest, a crest of five pointed golden feathers, two long flowing ribbon-like tail feathers (like a crane and a pheasant), a small golden beak, big glossy ruby eyes with white highlights, pink blush, a gentle face. Cute and friendly. It must look different from the legendary phoenix 불새: slimmer, vermilion-red with a five-feather crest, long legs and two long ribbon tails; not a round flame-winged firebird', egg: 'a vermilion-red egg with golden sun-ray and five-feather patterns and tiny ember sparkles, resting on a small nest of red-gold feathers on a stone', f: {
+    1: 'baby stage: a tiny round fluffy chick with red down, a small crest of three feathers and one short ribbon tail, no other accessories',
+    2: 'grown stage: a slim young bird standing on long legs with folded wings and two longer ribbon tails (NOT a round chick), a small golden ribbon with a gold star charm, a tiny ember near the crest',
+    3: 'final stage: a majestic vermilion bird soaring with long elegant red-gold wings spread wide, five long flowing golden crest feathers, two very long ribbon tail feathers trailing like comets of soft red and gold flame, a small golden sun disc behind its head, floating embers and prismatic sparkles (NOT a round chick; graceful and friendly)' } },
+  hyeonmu: { ko: '현무', type: '현무', tier: 'mythic', limb: 'one front foot', base: 'the Black Tortoise of the North (hyeonmu): a cute round tortoise with a dark navy-black shell with glowing soft teal constellation-line patterns, a deep-teal body, big glossy dark-blue eyes with white highlights, pink blush, a gentle smile, and a small friendly dark-teal snake wrapped around the shell with its head resting on top, a small star on the snake\'s forehead. Cute and friendly. It must look different from the mint turtle 느릿 and the snake 초롱: a dark navy shell with glowing star lines and a snake coiled on it', egg: 'a deep navy egg with glowing teal constellation lines and small star dots, a thin snake-coil band around the middle, resting on a smooth dark pebble in shallow water ripples', f: {
+    1: 'baby stage: a tiny round tortoise with a small dark shell and a tiny snake curled on it, no other accessories',
+    2: 'grown stage: a bigger tortoise standing on four sturdy legs (NOT a tiny baby) with a clear constellation pattern on the shell, a longer snake coiled around the shell, a small teal ribbon with a gold star charm',
+    3: 'final stage: a giant ancient tortoise whose shell is a night sky with glowing constellations and a tiny mountain, a long elegant dark-teal snake coiled around the whole shell with its head raised, water ripples and a gentle aurora around, floating teal and gold star sparkles (NOT a tiny baby; wise, calm and friendly)' } },
+  cheonma: { ko: '천마', type: '천마', tier: 'legend', limb: 'one front hoof', base: 'a Silla-style flying horse (cheonma): a graceful young white horse with soft silky fur, a flowing mane and tail of deep-blue starry galaxy with tiny sparkling stars, golden hooves, big glossy dark eyes with white highlights, pink blush, a small gold star on the forehead (NO horn), and a pair of wings made of soft white clouds with little stars. Cute chibi, friendly. It must look different from the legendary qilin 기린 (a unicorn-like beast with a horn and a rainbow mane): a plain horse with cloud wings and a galaxy mane, no horn', egg: 'a large pearl-white egg with a deep-blue starry galaxy band around the middle, small cloud-wing shapes on the sides and golden star dots, softly glowing, floating on a small cloud', f: {
+    1: 'baby stage: a tiny round foal with a short fluffy galaxy-blue mane and tiny cloud-wing nubs, standing on wobbly legs, no other accessories',
+    2: 'grown stage: a slender young horse standing on long legs (NOT a round foal) with medium cloud wings half open, a longer starry mane, a small blue ribbon with a gold star charm',
+    3: 'final stage: a majestic winged horse rearing gracefully with huge wings of clouds and stars spread wide, a long flowing galaxy-blue mane and tail full of stars, golden hooves leaving a trail of star dust, a small golden star crown, a golden cloud-pattern saddle cloth (NOT a round foal)' } },
+  riceball: { ko: '주먹이', type: '주먹밥 병아리', tier: 'event', limb: 'one wing', base: 'a round fluffy cream-white chick shaped almost like a rounded-triangle rice ball (onigiri): a soft rounded-triangle body, a thin black nori (seaweed) band around its belly, a tiny orange beak, tiny round wings, small orange feet, big glossy black eyes with white highlights, big pink blush, a few tiny black sesame-seed freckles on one cheek, a little tuft of rice grains on top of the head. Cute and cozy. It is an ORIGINAL character: do not make it look like a bear, a cat or any existing cartoon character', egg: 'a white egg shaped like a rounded-triangle rice ball with a thin black nori band and tiny black sesame dots, resting on a small bamboo mat', f: {
+    1: 'baby stage: a tiny rice-ball chick sitting and holding a small rice ball with both wings, no other accessories',
+    2: 'grown stage: a slightly taller chick standing, a white headband with a small red sun dot (no letters), a small pencil tucked under one wing, holding a rice ball',
+    3: 'final stage: a proud, grand chick with a golden headband with a star (no letters), a flowing white-and-gold cheer cape with a gold star clasp, holding a big golden rice ball like a trophy, floating cherry-blossom petals, small golden sparkles and tiny floating rice grains (still small, round and cute)' } }
+};
+const TIER_D = {
+  mythic: 'A 신화 (mythic) pet: the HIGHEST rank of this game, above legendary. It must be the most spectacular, richly detailed design of all pets, with a soft prismatic rainbow-gold rim light, a faint holographic shimmer and floating motifs of its own element. ',
+  legend: 'A 전설 (legendary) pet: a little more radiant than an ordinary pet, with a soft golden rim light. ',
+  event: 'A limited event pet for exam cheering season: cozy, cheerful and extra cute. '
+};
+const TIER_X = { mythic: ' A 신화 (mythic) pet: a soft prismatic golden rim light.', legend: ' A 전설 (legendary) pet: a soft golden rim light.', event: ' A limited event pet: cozy and cute.' };
+designSheets(F19A, NEW_PETS_19, pet => TIER_D[pet.tier]);
+exprSheets(F19B, NEW_PETS_19, [['gumiho', 'cheongryong'], ['baekho', 'jujak'], ['hyeonmu', 'cheonma']], pet => ` In every cell that says a paw, arm, wing, flipper or hand is raised, this pet raises ${pet.limb} instead.${TIER_X[pet.tier] || ''}`);
+sheet(F19B, '주먹이 알 반응 · 응원 알 아이콘', 'egg', `the TOP row cells show 주먹이's egg (the reference picture shows it): ${NEW_PETS_19.riceball.egg}. The BOTTOM row cells are two event shop icons (they are NOT egg reactions).`, [
+  ['riceball-0-happy', '주먹이 알 기뻐함', EGG_HAPPY, 'public/assets/pets/riceball-0-happy.webp'],
+  ['riceball-0-eat', '주먹이 알 따뜻해짐', EGG_WARM, 'public/assets/pets/riceball-0-eat.webp'],
+  ['ui-cheer-egg', '응원 알 아이콘', 'EVENT SHOP ICON (not an egg reaction): the event egg of a limited cheer-up pet: a white rounded-triangle rice-ball-shaped egg with a black nori band and tiny sesame dots, a red-and-white cheer headband tied around it (no letters), resting on a small bamboo mat with a few golden sparkles (same size and framing as a shop egg icon)', 'public/assets/ui/cheer-egg.webp'],
+  ['ui-cheer-deco', '응원 장식', 'DECORATION (not an egg reaction): a cozy cluster of two rice balls on a small plate, a sticky rice cake and a golden candy, a red-and-white cheer headband and a small sprig of cherry blossom, seen from the front', 'public/assets/ui/cheer-deco.webp']
+]);
+STYLE.fx = 'Style: premium 2D mobile-game visual effect sprite, glowing painted light with soft prismatic rainbow and gold colors, crisp readable shapes, NO characters, NO animals and NO objects other than the effect itself, centered in each cell, and the effect fades out to fully transparent at its edges (no hard background, no box).';
+sheet(F19C, '신화 알 균열 4단계', 'fx', 'the cracks of a MYTHIC egg hatching, drawn as an overlay: only glowing crack lines on a transparent background (NO egg, NO outline of an egg), spread over an egg-shaped area about 70% of the cell width and 85% of the cell height, in the same position and size in all four cells, so the four overlays can be swapped over any egg picture.', [
+  ['fx-mythic-crack-1', '균열 1', 'CRACK STAGE 1: three thin glowing white-gold hairline cracks near the upper middle, a faint rainbow light leaking from them, very small', 'public/assets/fx/mythic-crack-1.webp'],
+  ['fx-mythic-crack-2', '균열 2', 'CRACK STAGE 2: about six glowing cracks branching across the upper and middle area, brighter white-gold light with prismatic rainbow edges leaking out, a few tiny sparkles', 'public/assets/fx/mythic-crack-2.webp'],
+  ['fx-mythic-crack-3', '균열 3', 'CRACK STAGE 3: a wide web of glowing cracks over most of the egg-shaped area, strong white-gold light streaming out of the cracks, prismatic rainbow glows, small floating star sparkles', 'public/assets/fx/mythic-crack-3.webp'],
+  ['fx-mythic-crack-4', '균열 4', 'CRACK STAGE 4: the egg is about to burst: huge wide glowing cracks everywhere, blinding white-gold light pouring out, a few shell shards flying outward, prismatic rainbow flares and many sparkles', 'public/assets/fx/mythic-crack-4.webp']
+]);
+sheet(F19C, '신화 빛 효과', 'fx', 'four separate light effects for the moment a mythic pet appears.', [
+  ['fx-mythic-rays', '빛줄기', 'A RADIAL SUNBURST: many long soft golden-white light rays radiating from a bright center in all directions, the center glowing white, the rays fading out to transparent toward the cell edges, a faint rainbow tint at the ray tips', 'public/assets/fx/mythic-rays.webp'],
+  ['fx-mythic-ring', '충격파 링', 'A SHOCKWAVE RING: one perfect round ring of prismatic light (gold, pink, mint, sky blue, violet) with a soft glow on both sides, the center of the ring completely transparent, thin sparkles on the ring', 'public/assets/fx/mythic-ring.webp'],
+  ['fx-mythic-stars', '별 파티클', 'A BURST OF PARTICLES: a loose cloud of sparkling four-point stars, diamonds and tiny dots in gold, white, pink, mint and violet spread evenly over the cell, bigger ones glowing, no center object', 'public/assets/fx/mythic-stars.webp'],
+  ['fx-mythic-aurora', '오로라 띠', 'AN AURORA RIBBON: one wide soft flowing arc of aurora light in green, teal, violet, pink and blue with gentle wavy curtains, fading to transparent at both ends and edges', 'public/assets/fx/mythic-aurora.webp']
+]);
+sheet(F19C, '신화 등급 장식', 'fx', 'four shiny decoration pieces for the MYTHIC rank of a pet game (the rank above legendary); no letters or numbers on any of them.', [
+  ['ui-mythic-badge', '신화 배지', 'MYTHIC BADGE: a round crest in iridescent prismatic enamel (rainbow-opal) with a bright gold rim, a small winged star and a gem in the middle, short golden wings on both sides, a few sparkles (readable at 64 pixels)', 'public/assets/ui/mythic-badge.webp'],
+  ['ui-mythic-frame', '신화 카드 테두리', 'A VERTICAL CARD FRAME (portrait rectangle, about 3:4): a thin iridescent rainbow-gold border with ornate golden corners and small star gems, the whole inside of the frame completely transparent and empty', 'public/assets/ui/mythic-frame.webp'],
+  ['ui-mythic-banner', '신화 배너', 'A BANNER: a wide golden ribbon banner with small golden wings on both ends and a tiny crown on top, the ribbon plain and EMPTY (no letters), soft prismatic sheen and sparkles', 'public/assets/ui/mythic-banner.webp'],
+  ['ui-mythic-egg', '신화 알', 'A MYTHIC EGG: a large iridescent opal egg with shifting rainbow colors, golden filigree lines, small floating star gems orbiting it, resting on a small prismatic crystal cushion, softly glowing (same size and framing as a shop egg icon)', 'public/assets/ui/mythic-egg.webp']
+]);
+const POSE19 = {
+  gumiho: 'standing proud and tall, all nine tails fanned out wide behind it, head raised, eyes glowing, looking at the viewer',
+  cheongryong: 'rising in a huge spiral toward the viewer, body coiling through clouds, mane flying, holding the glowing pearl up',
+  baekho: 'leaping toward the viewer in mid-air with its cape and fur flowing, bright eyes, mouth closed',
+  jujak: 'wings spread to their full width, rising upward, the long ribbon tails trailing below',
+  hyeonmu: 'rising out of the water, the shell glowing with constellations, the snake raised high beside it',
+  cheonma: 'rearing up on its hind legs with huge cloud wings spread wide, mane and tail streaming with stars'
+};
+const REVEAL = 'REVEAL POSE: the pet in its FINAL stage in a dramatic heroic pose, front 3/4 view, drawn larger and more detailed than usual, filling about 92% of the cell height.';
+sheet(F19D, '미호 · 청룡 · 백호 · 주작 등장 포즈', 'pet', 'four different mythic pets, one per cell, each in a dramatic reveal pose of its FINAL stage (the reference sheets show each pet). Each cell is a different creature; keep each pet exactly as designed.', ['gumiho', 'cheongryong', 'baekho', 'jujak'].map(key => [`${key}-reveal`, `${NEW_PETS_19[key].ko} 등장 포즈`, `${NEW_PETS_19[key].ko} (${NEW_PETS_19[key].type}), FINAL stage: ${REVEAL} ${POSE19[key]}`, `public/assets/pets/${key}-reveal.webp`]));
+STYLE.reveal2 = 'Style: for the two TOP cells, premium cute chibi fantasy pet, soft 3D-painted anime illustration (same style as the pets of this game), full body. For the two BOTTOM cells, premium 2D mobile-game visual effects with glowing prismatic rainbow and gold light, no characters. Every cell is separate and centered.';
+sheet(F19D, '현무 · 천마 등장 포즈 · 신화 오라', 'reveal2', 'TOP row: two different pets, each in a dramatic reveal pose of its FINAL stage (the reference sheets show each pet). BOTTOM row: two light effects.', [
+  ['hyeonmu-reveal', '현무 등장 포즈', `${NEW_PETS_19.hyeonmu.ko} (${NEW_PETS_19.hyeonmu.type}), FINAL stage: ${REVEAL} ${POSE19.hyeonmu}`, 'public/assets/pets/hyeonmu-reveal.webp'],
+  ['cheonma-reveal', '천마 등장 포즈', `${NEW_PETS_19.cheonma.ko} (${NEW_PETS_19.cheonma.type}), FINAL stage: ${REVEAL} ${POSE19.cheonma}`, 'public/assets/pets/cheonma-reveal.webp'],
+  ['ui-mythic-aura', '신화 오라', 'EFFECT (no creature): a huge soft round halo of prismatic light behind a pet: a glowing disk of gold, pink, mint, sky blue and violet with a bright soft center and a gently fading edge, thin light rings around it, a few sparkles', 'public/assets/ui/mythic-aura.webp'],
+  ['ui-mythic-sparkles', '신화 반짝이', 'EFFECT (no creature): a sparkle sheet: a loose scatter of glittering four-point stars, tiny diamonds and soft glowing dots in gold, white, pink and mint, bigger ones with long light rays', 'public/assets/ui/mythic-sparkles.webp']
+]);
+// 19e 등장 배경: 세로 한 장(1024×1536, 투명 아님). 펫은 앱이 그 위에 올려요.
+const BGT = 'Create ONE tall portrait image, 1024×1536 pixels: a full-screen 2D REVEAL BACKGROUND for a cute premium mobile pet game (players are high-school students), shown on a phone in portrait when a MYTHIC pet appears. Paint it fully to every edge (no transparency, no border, no frame, no rounded corners). NO characters, NO animals, NO creatures, NO people. No text, no letters, no numbers, no logos, no UI, no watermark. Do not ask me any questions; just generate the image.';
+const BGT_LAYOUT = 'COMPOSITION (important, the game puts its own pet, light effects and a title on top): epic scale and a strong sense of awe. A bright glowing focal point sits at the CENTER, slightly below the middle, where the pet will appear (the area around it is open, soft and uncluttered, about 60% of the width and 45% of the height). The TOP 20% stays calm and simple (a title goes there). Put the rich details, depth and scenery around the outer edges and far away. Light rays and floating elements point toward the center. A gentle vignette toward the edges.';
+function sceneTall(file, title, key, look, out) {
+  const no = prompts.length + 1;
+  prompts.push({ file, no, title, bg: true, size: '1024×1536', text: [BGT, BG_STYLE, `Scene: ${look}`, BGT_LAYOUT].join('\n') });
+  slices.push({ file, no, title, cell: '전체', key, name: title, out });
+}
+sceneTall(F19E, '미호 등장 배경', 'bg-gumiho', 'a magical moonlit night over a misty Korean mountain valley: a gigantic full moon, drifting cherry-blossom petals, many floating blue fox-fire lanterns, soft violet-blue clouds and a faint aurora, a glowing pale-blue light at the center.', 'public/assets/reveal/bg-gumiho.webp');
+sceneTall(F19E, '청룡 등장 배경', 'bg-cheongryong', 'a dawn sky of swirling sapphire-blue storm clouds with golden light breaking through, floating rocky islands with green bamboo and pine trees, faint lightning glows deep in the clouds, silver mist, a bright blue-white glow at the center.', 'public/assets/reveal/bg-cheongryong.webp');
+sceneTall(F19E, '백호 등장 배경', 'bg-baekho', 'a snowy mountain ridge at night under a huge silver moon: drifting snow and wind swirls, silver-white bamboo and pine, glittering ice crystals, deep indigo sky with a few stars, a bright silver-white glow at the center.', 'public/assets/reveal/bg-baekho.webp');
+sceneTall(F19E, '주작 등장 배경', 'bg-jujak', 'a blazing vermilion sunrise sky over a distant volcanic peak: huge fire-colored clouds in red, orange and gold, floating embers and soft sparks, golden rays, warm glowing haze, a bright red-gold glow at the center.', 'public/assets/reveal/bg-jujak.webp');
+sceneTall(F19E, '현무 등장 배경', 'bg-hyeonmu', 'a calm deep midnight sea under a sky full of glowing constellations: gentle turquoise-glowing waves with ink-like swirls, the star-filled sky reflected on the water, a soft aurora, faint ancient stone pillars far away, a bright teal glow at the center.', 'public/assets/reveal/bg-hyeonmu.webp');
+
 /* Google Drive: 그림을 그리는 GPT는 Drive에서 참고 그림을 열어 보고, 결과를 Drive 폴더에 올려요.
    규칙: 시트별 파일(split/)로 나가는 모든 주문서는 DRIVE에 폴더가 있어야 하고(없으면 멈춰요),
    끝에 "이 폴더에 이 이름으로 올리기"가 붙어요. 처음 그리는 그림(08·09a)은 기존 그림을 열어 보고 그림체를 맞춰요. */
@@ -734,7 +834,8 @@ const DRIVE = {
   [F15]: 'SUMUS 전투 배경 15 (Runner용)',
   [F16]: 'SUMUS 몽이·핑키 16 (Runner용)',
   [F17A]: 'SUMUS 새 펫 17 (Runner용)', [F17B]: 'SUMUS 새 펫 17 (Runner용)',
-  [F18A]: 'SUMUS 새 펫 18 (Runner용)', [F18B]: 'SUMUS 새 펫 18 (Runner용)'
+  [F18A]: 'SUMUS 새 펫 18 (Runner용)', [F18B]: 'SUMUS 새 펫 18 (Runner용)',
+  [F19A]: 'SUMUS 신화 펫 19 (Runner용)', [F19B]: 'SUMUS 신화 펫 19 (Runner용)', [F19C]: 'SUMUS 신화 펫 19 (Runner용)', [F19D]: 'SUMUS 신화 펫 19 (Runner용)', [F19E]: 'SUMUS 신화 펫 19 (Runner용)'
 };
 const PET_SPRITES = 'SUMUS_PET_SPRITES_ALL_20261002/original_1254';
 const KEEP = 'Do NOT make it softer, blurrier, foggier, more painterly or more watercolor-like than the reference.';
@@ -747,14 +848,14 @@ const STYLE_REF = {
 };
 STYLE_REF.monsters12 = STYLE_REF.monsters.replace(/Also open "10-1\.png"[^\n]*$/, `Also open the first monsters of this game in the Google Drive folder "${DRIVE[F10]}" ("10-1.png" and "10-8.png"; this new set is their second batch, so match their finish, size and level of detail exactly) and, if it is there, "12-1.png" in the Google Drive folder "${DRIVE[F12]}" (the first monster of the new set), and match its finish and size too. Do NOT copy the existing monsters; this is a new design.`);
 STYLE_REF.icons12 = `${STYLE_REF.icons} Also open "10-10.png" in the Google Drive folder "${DRIVE[F10]}" (the monster screen icons: tab and difficulty badges) and match its finish and size.`;
-const refOf = p => p.bg ? null : p.file === F14A || p.file === F17A || p.file === F18A ? 'pets' : p.file === F14B && /아이콘/.test(p.title) ? 'icons' : p.file === F11 ? 'titles' : p.file === F12 ? (/아이콘/.test(p.title) ? 'icons12' : 'monsters12') : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
+const refOf = p => p.bg ? null : p.file === F19C ? 'badges' : p.file === F19A ? 'pets' : p.file === F14A || p.file === F17A || p.file === F18A ? 'pets' : p.file === F14B && /아이콘/.test(p.title) ? 'icons' : p.file === F11 ? 'titles' : p.file === F12 ? (/아이콘/.test(p.title) ? 'icons12' : 'monsters12') : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
 const NEW_ORDER = Object.keys(NEW_PETS);
-const sheetName = (file, i) => `${file.slice(0, /^\d\d[ab]-/.test(file) ? 3 : 2)}-${i + 1}`;
+const sheetName = (file, i) => `${file.slice(0, /^\d\d[a-e]-/.test(file) ? 3 : 2)}-${i + 1}`;
 
 /* 쓰기 */
 const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
-const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11, F12, F14A, F14B, F15, F16, F17A, F17B, F18A, F18B]);
+const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11, F12, F14A, F14B, F15, F16, F17A, F17B, F18A, F18B, F19A, F19B, F19C, F19D, F19E]);
 for (const [file, list] of byFile) list.forEach((p, i) => {
   if (!SPLIT.has(file)) return;
   if (!DRIVE[file]) throw new Error(`${file}: Google Drive 폴더(DRIVE)가 없어요. 주문서에는 업로드 위치가 꼭 있어야 해요.`);
@@ -783,12 +884,19 @@ for (const [file, list] of byFile) list.forEach((p, i) => {
     p.ref = `Drive: ${sheets}`;
   }
   // 14b·17b: 그 펫의 설정 시트(14a-N / 17a-N)를 열어 맞춰요. 배경은 기존 캐릭터를 열어 그림체만 맞춰요.
-  const XB = { [F14B]: [F14A, HALLOWEEN_PETS, '14a'], [F17B]: [F17A, NEW_PETS_17, '17a'], [F18B]: [F18A, NEW_PETS_18, '18a'] }[file];
+  const XB = { [F14B]: [F14A, HALLOWEEN_PETS, '14a'], [F17B]: [F17A, NEW_PETS_17, '17a'], [F18B]: [F18A, NEW_PETS_18, '18a'], [F19B]: [F19A, NEW_PETS_19, '19a'] }[file];
   if (XB && !p.bg && !/아이콘/.test(p.title)) {
     const order = Object.keys(XB[1]), keys = order.filter(k => p.title.includes(XB[1][k].ko));
     const sheets = keys.map(k => `"${XB[2]}-${order.indexOf(k) + 1}.png"`).join(' and ');
     lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
     lines.splice(3, 0, `CHARACTER REFERENCE — before drawing, open ${sheets} (the design sheet${keys.length > 1 ? 's' : ''}: egg, baby, grown, final) in the Google Drive folder "${DRIVE[XB[0]]}" and match ${keys.length > 1 ? 'each egg' : 'this pet\'s face, colors, markings, accessories and the body size of this growth stage'} exactly. ${KEEP}`);
+    p.ref = `Drive: ${sheets}`;
+  }
+  if (file === F19D) {
+    const order = Object.keys(NEW_PETS_19), keys = order.filter(k => p.title.includes(NEW_PETS_19[k].ko));
+    const sheets = keys.map(k => `"19a-${order.indexOf(k) + 1}.png"`).join(', ');
+    lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
+    lines.splice(3, 0, `CHARACTER REFERENCE — before drawing, open ${sheets} (the design sheets: egg, baby, grown, final) in the Google Drive folder "${DRIVE[F19A]}". Each pet in this sheet is the FINAL stage (the bottom-right cell) of its design sheet: keep its face, colors, markings, accessories and proportions exactly, only change the pose. ${KEEP}`);
     p.ref = `Drive: ${sheets}`;
   }
   if (p.bg) {
@@ -807,7 +915,7 @@ for (const [file, list] of byFile) list.forEach((p, i) => {
   }
   const name = sheetName(file, i);
   if (p.bg) {
-    lines.push(`WHEN DONE — upload the finished PNG (1536×1024, fully painted, not transparent) to Google Drive, into the folder "${DRIVE[file]}", named exactly "${name}.png" (if a file with that name is already there, replace it). Actually save the file to Google Drive; showing the picture in the chat is not enough.`);
+    lines.push(`WHEN DONE — upload the finished PNG (${p.size || '1536×1024'}, fully painted, not transparent) to Google Drive, into the folder "${DRIVE[file]}", named exactly "${name}.png" (if a file with that name is already there, replace it). Actually save the file to Google Drive; showing the picture in the chat is not enough.`);
     p.text = lines.join('\n'); p.drive = `${DRIVE[file]} / ${name}.png`;
     return;
   }
