@@ -14,7 +14,7 @@ import { BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, BOT_MIN_RIGHT } from './rew
 import { tournamentCard, openBracket } from './tournament-ui.js';
 import { openMiniGame } from './word-minigame-ui.js';
 import { bonusText } from './word-minigame.js';
-import { elementOf, paletteOf, fxShot, fxImpact, fxSpeedLines, fxPunch, fxSkillCutIn, fxShield, fxHeal, fxPowerUp, fxToxic, fxEdge, fxRank, comboRank, auraLevel } from './battle-fx.js';
+import { elementOf, paletteOf, tierOf, fxCap, fxShot, fxImpact, fxSpeedLines, fxPunch, fxSkillCutIn, fxSignature, fxLunge, fxRecoil, fxShield, fxHeal, fxPowerUp, fxToxic, fxEdge, fxRank, comboRank, auraLevel } from './battle-fx.js';
 import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterOpen, stageLevel, stageMonster, isBossStage } from './monsters.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
@@ -1251,8 +1251,8 @@ function pop(side, text, kind = '') {
 }
 // V13.85 the pets act out the hit: the attacker shows its attack (cheer) pose, the one hit its
 // hurt (sad) pose, for a moment (로보 has its own punch and flinch).
-function hit(side) { const el = document.getElementById('yb-pet-' + side); if (!el) return; el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); clearTimeout(el.hitTimer); el.hitTimer = setTimeout(() => el.classList.remove('hit'), 560); showPose(el, 'hurt', 900); }
-function lunge(side) { const el = document.getElementById('yb-pet-' + side); if (!el) return; showPose(el, 'attack', 900); if (reduced()) return; el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 240); }
+function hit(side) { const el = document.getElementById('yb-pet-' + side); if (!el) return; if (!reduced()) fxRecoil(el, side === 'me' ? -1 : 1); el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); clearTimeout(el.hitTimer); el.hitTimer = setTimeout(() => el.classList.remove('hit'), 560); showPose(el, 'hurt', 900); }
+function lunge(side) { const el = document.getElementById('yb-pet-' + side); if (!el) return; showPose(el, 'attack', 900); if (reduced()) return; fxLunge(el, side === 'me' ? 1 : -1); el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 240); }
 const sideOf = pid => pid === B.view.me ? 'me' : 'op';
 
 // V13.94 attack effects: a shot flies from the attacker to the one hit (a thick beam for a pet
@@ -1283,14 +1283,17 @@ function strike(atk, def, { dmg = 0, crit = false, skill = false, attacker = nul
   const from = fxCenter(atk, arena), to = fxCenter(def, arena); if (!from || !to) return;
   // V13.115 속성: a pet attacks with the element of its look (battle-fx.js); a monster keeps its own claws.
   const el = attacker?.monster ? null : elementOf(attacker?.pet?.key);
+  // V13.115 등급: a rarer pet (영웅 · 전설 · 신화) gets a grander show (battle-fx.js).
+  const rank = el ? tierOf(CHARACTERS[petKey(attacker.pet.key)]) : 0;
+  fxCap(rank);
   const color = el ? paletteOf(attacker.pet.key).c1 : fxColor(attacker), big = skill || crit || dmg >= 22;
   if (el) sfxShot(el, big);
   if (skill) {
     const len = Math.hypot(to.x - from.x, to.y - from.y), ang = Math.atan2(to.y - from.y, to.x - from.x);
     fxAdd(arena, 'fx-beam', { left: from.x + 'px', top: from.y + 'px', width: len + 'px', transform: `rotate(${ang}rad)`, '--fx': color }, 520);
-    if (el) fxShot(arena, from, to, el, { big: true, ms: 180 });
+    if (el) fxShot(arena, from, to, el, { big: true, ms: 180, rank });
   } else if (el) {
-    fxShot(arena, from, to, el, { big });
+    fxShot(arena, from, to, el, { big, rank });
   } else {
     const shot = fxAdd(arena, 'fx-shot' + (big ? ' big' : ''), { left: from.x + 'px', top: from.y + 'px', '--fx': color }, 400);
     shot.animate([{ transform: 'translate(-50%,-50%) scale(.6)', opacity: .4 }, { transform: `translate(calc(-50% + ${to.x - from.x}px), calc(-50% + ${to.y - from.y}px)) scale(${big ? 1.5 : 1.1})`, opacity: 1 }], { duration: 230, easing: 'cubic-bezier(.3,.1,.7,1)', fill: 'forwards' });
@@ -1298,7 +1301,8 @@ function strike(atk, def, { dmg = 0, crit = false, skill = false, attacker = nul
   setTimeout(() => {
     fxAdd(arena, 'fx-ring' + (big ? ' big' : ''), { left: to.x + 'px', top: to.y + 'px', '--fx': color }, 600);
     if (el) {
-      fxImpact(arena, to, el, big ? 3 : dmgTier(dmg));
+      fxImpact(arena, to, el, big ? 3 : dmgTier(dmg), rank);
+      if (rank >= 3 && (skill || crit)) fxSignature(arena, from, to, petKey(attacker.pet.key));
       if (big) { fxSpeedLines(arena, to, el); fxPunch(arena, skill ? .06 : .04); }
     } else for (let i = 0; i < (big ? 12 : 7); i++) {
       const a = Math.PI * 2 * i / (big ? 12 : 7) + Math.random() * .4, dist = (big ? 70 : 46) + Math.random() * 24;
@@ -1553,7 +1557,7 @@ function applyEvent(e) {
       sfx('skill', side === 'me' ? 30 : 50);
       flash(side === 'me' ? 'rgba(255,214,90,.8)' : 'rgba(170,160,255,.65)');
       const arena = document.getElementById('yb-arena');
-      if (arena && !reduced()) fxSkillCutIn(arena, { side, portrait: petArt(p, { size: 'mini' }), name: esc(e.name), desc: esc(e.desc), petName: esc(whoName(p)), el: skillElement(p) });
+      if (arena && !reduced()) fxSkillCutIn(arena, { side, portrait: petArt(p, { size: 'mini' }), name: esc(e.name), desc: esc(e.desc), petName: esc(whoName(p)), el: skillElement(p), rank: p.monster ? 0 : tierOf(CHARACTERS[petKey(p.pet?.key)]) });
     }, reduced() ? 0 : 380);
     later(() => {
       skillBanner(side, `${side === 'op' && !p.monster ? '상대 ' : ''}${esc(whoName(p))}의 ${esc(e.name)}!`, e.desc);

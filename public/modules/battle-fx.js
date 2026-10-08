@@ -38,13 +38,19 @@ const SHAPES = {
   toxic: (a, b) => `<circle cx="12" cy="12" r="9.5" fill="${a}"/><circle cx="12" cy="12" r="9.5" fill="none" stroke="${b}" stroke-width="1.6"/><ellipse cx="8.6" cy="8.4" rx="2.6" ry="1.6" fill="${b}" opacity=".9" transform="rotate(-35 8.6 8.4)"/>`,
   star: (a, b) => `<path d="M12 1l2.9 8.1L23 12l-8.1 2.9L12 23l-2.9-8.1L1 12l8.1-2.9z" fill="${a}" stroke="${b}" stroke-width="1.2" stroke-linejoin="round"/>`
 };
+const svgc = (kind, c1, c2, size) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true" focusable="false">${SHAPES[kind](c1, c2)}</svg>`;
 const svg = (kind, el, size) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true" focusable="false">${SHAPES[kind](ELEMENTS[el].c1, ELEMENTS[el].c2)}</svg>`;
 
 /* ---------- 바탕 도구 ---------- */
 export const FX2_MAX = 44;
+// A rarer pet gets a grander show: the cap grows with the pet's rank (0 basic · 1 epic · 2 legendary · 3 mythic).
+export const FX2_CAP = [44, 52, 60, 66];
+let capNow = FX2_MAX;
+export const tierOf = c => c?.mythic ? 3 : c?.legendary ? 2 : c?.epic ? 1 : 0;
+export const fxCap = rank => { capNow = FX2_CAP[Math.max(0, Math.min(3, rank | 0))]; };
 const live = arena => arena.querySelectorAll('[data-fx]').length;
 function piece(arena, className, css, ms, html = '') {
-  if (!arena || live(arena) >= FX2_MAX) return null;
+  if (!arena || live(arena) >= capNow) return null;
   const el = document.createElement('div');
   el.dataset.fx = '';
   el.className = `fx2 ${className}`;
@@ -61,8 +67,8 @@ const tr = (x, y, extra = '') => `translate(calc(-50% + ${x}px), calc(-50% + ${y
 
 /* ---------- 날아가는 공격 ---------- */
 // A shot of the pet's element flies from `from` to `to` (arena pixels). `big`: a bigger one.
-export function fxShot(arena, from, to, el, { big = false, ms = 230 } = {}) {
-  const dx = to.x - from.x, dy = to.y - from.y, ang = Math.atan2(dy, dx), size = big ? 46 : 32;
+export function fxShot(arena, from, to, el, { big = false, ms = 230, rank = 0 } = {}) {
+  const dx = to.x - from.x, dy = to.y - from.y, ang = Math.atan2(dy, dx), size = Math.round((big ? 46 : 32) * (1 + .14 * rank));
   const kind = el === 'wind' ? 'wind' : el;
   const shot = piece(arena, `fx2-shot ${el}`, { left: from.x + 'px', top: from.y + 'px', '--c1': ELEMENTS[el].c1 }, ms + 260, svg(kind, el, size));
   if (!shot) return;
@@ -72,20 +78,21 @@ export function fxShot(arena, from, to, el, { big = false, ms = 230 } = {}) {
     { transform: tr(0, 0, `${baseRot} scale(.5)`), opacity: .3 },
     { transform: tr(dx, dy, `${baseRot} rotate(${spin}deg) scale(${big ? 1.35 : 1})`), opacity: 1 }
   ], { duration: ms, easing: 'cubic-bezier(.3,.05,.7,1)' });
-  // A trail of copies behind the shot (3 small afterimages).
-  for (let i = 1; i <= 3; i++) {
-    const ghost = piece(arena, `fx2-ghost ${el}`, { left: from.x + 'px', top: from.y + 'px', opacity: 0 }, ms + 200, svg(kind, el, Math.round(size * (1 - i * .16))));
+  // A trail of copies behind the shot: 3 small afterimages, 2 more for each rank.
+  const ghosts = 3 + rank * 2, k = .5 / ghosts;
+  for (let i = 1; i <= ghosts; i++) {
+    const ghost = piece(arena, `fx2-ghost ${el}`, { left: from.x + 'px', top: from.y + 'px', opacity: 0 }, ms + 200, svg(kind, el, Math.max(10, Math.round(size * (1 - i * k)))));
     run(ghost, [
       { transform: tr(0, 0, `${baseRot} scale(.45)`), opacity: 0 },
-      { transform: tr(dx * (1 - i * .09), dy * (1 - i * .09), `${baseRot} rotate(${spin * (1 - i * .09)}deg)`), opacity: .5 - i * .12 },
-      { transform: tr(dx * (1 - i * .09), dy * (1 - i * .09), `${baseRot} rotate(${spin * (1 - i * .09)}deg) scale(.5)`), opacity: 0 }
+      { transform: tr(dx * (1 - i * .07), dy * (1 - i * .07), `${baseRot} rotate(${spin * (1 - i * .07)}deg)`), opacity: Math.max(.1, .55 - i * .08) },
+      { transform: tr(dx * (1 - i * .07), dy * (1 - i * .07), `${baseRot} rotate(${spin * (1 - i * .07)}deg) scale(.5)`), opacity: 0 }
     ], { duration: ms + 120, easing: 'ease-out', delay: i * 18 });
   }
 }
 
 /* ---------- 맞는 순간 ---------- */
 // The hit: a burst that depends on the element. tier 1 small, 2 medium, 3 big (skill, fever, K.O.).
-export function fxImpact(arena, at, el, tier = 1) {
+export function fxImpact(arena, at, el, tier = 1, rank = 0) {
   const n = tier >= 3 ? 12 : tier === 2 ? 9 : 6, P = ELEMENTS[el], put = (kind, x, y, size, ms, frames, delay = 0) => run(piece(arena, `fx2-bit ${el}`, { left: at.x + 'px', top: at.y + 'px' }, ms + delay + 80, svg(kind, el, size)), frames, { duration: ms, delay, easing: 'cubic-bezier(.1,.8,.3,1)' });
   const ring = (size, ms, c = P.c1, squash = 1, delay = 0) => run(piece(arena, 'fx2-ring', { left: at.x + 'px', top: at.y + 'px', width: size + 'px', height: size * squash + 'px', borderColor: c, boxShadow: `0 0 14px ${c}` }, ms + delay + 80), [{ transform: 'translate(-50%,-50%) scale(.2)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 0 }], { duration: ms, delay, easing: 'cubic-bezier(.1,.9,.3,1)' });
   for (let i = 0; i < n; i++) {
@@ -109,6 +116,66 @@ export function fxImpact(arena, at, el, tier = 1) {
   else if (el === 'wind') {
     for (const rot of [-32, 28]) run(piece(arena, 'fx2-slash', { left: at.x + 'px', top: at.y + 'px', '--c': P.c2, '--cg': P.c1, width: 150 + tier * 40 + 'px' }, 460), [{ transform: `translate(-50%,-50%) rotate(${rot}deg) scaleX(.1)`, opacity: 1 }, { transform: `translate(-50%,-50%) rotate(${rot}deg) scaleX(1)`, opacity: 1, offset: .35 }, { transform: `translate(-50%,-50%) rotate(${rot}deg) scaleX(1.05)`, opacity: 0 }], { duration: 440, easing: 'cubic-bezier(.1,.9,.3,1)' });
   } else { ring(120 + tier * 40, 480, P.c2); }
+  // Rank: epic = a second, golden ring; legendary = + a dome of the element and star glitter; mythic = + a prismatic ring.
+  if (rank >= 1) ring((150 + tier * 36) * 1.2, 620, '#ffd23f', 1, 110);
+  if (rank >= 2) {
+    fxDome(arena, at, el);
+    for (let i = 0; i < 6; i++) { const a = rand(0, 6.28), d = rand(46, 100); run(piece(arena, 'fx2-bit star', { left: at.x + 'px', top: at.y + 'px' }, 760, svg('star', 'star', Math.round(rand(12, 20)))), [{ transform: tr(0, 0, 'scale(.2)'), opacity: 1 }, { transform: tr(Math.cos(a) * d, Math.sin(a) * d, 'rotate(90deg) scale(1)'), opacity: 1, offset: .5 }, { transform: tr(Math.cos(a) * d * 1.2, Math.sin(a) * d * 1.2 - 16, 'scale(.2)'), opacity: 0 }], { duration: 640, delay: i * 30, easing: 'ease-out' }); }
+  }
+  if (rank >= 3) fxPrism(arena, at);
+}
+// A big translucent dome of the element's colors that swells over the hit (legendary and up).
+export function fxDome(arena, at, el) {
+  const P = ELEMENTS[el];
+  run(piece(arena, 'fx2-dome', { left: at.x + 'px', top: at.y + 'px', '--c1': P.c1, '--c2': P.c2 }, 820), [{ transform: 'translate(-50%,-50%) scale(.25)', opacity: .95 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: .75, offset: .45 }, { transform: 'translate(-50%,-50%) scale(1.25)', opacity: 0 }], { duration: 740, easing: 'cubic-bezier(.1,.8,.3,1)' });
+}
+// A rainbow ring (mythic).
+export function fxPrism(arena, at) {
+  run(piece(arena, 'fx2-prism', { left: at.x + 'px', top: at.y + 'px' }, 900), [{ transform: 'translate(-50%,-50%) scale(.2) rotate(0deg)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.1) rotate(120deg)', opacity: .9, offset: .55 }, { transform: 'translate(-50%,-50%) scale(1.5) rotate(200deg)', opacity: 0 }], { duration: 820, easing: 'cubic-bezier(.1,.8,.3,1)' });
+}
+// The whole arena washes over in the element's color for a moment (a legendary or mythic skill).
+export function fxWash(arena, el) {
+  const P = ELEMENTS[el];
+  run(piece(arena, 'fx2-wash', { '--c1': P.c1, '--c2': P.c2 }, 1000), [{ opacity: 0 }, { opacity: 1, offset: .25 }, { opacity: .8, offset: .7 }, { opacity: 0 }], { duration: 920 });
+}
+
+/* ---------- 신화 필살 연출 (펫마다 하나) ---------- */
+export const SIGNATURE_KEYS = ['gumiho', 'cheongryong', 'baekho', 'jujak', 'hyeonmu'];
+// A mythic pet's own move on a skill or a critical hit: nine fox-fires, a lightning bolt, three
+// silver claw marks, columns of fire, a star map in a tide (from and to are arena pixels).
+export function fxSignature(arena, from, to, key) {
+  const bit = (kind, c1, c2, size, x0, y0, frames, ms, delay = 0) => run(piece(arena, 'fx2-bit', { left: x0 + 'px', top: y0 + 'px' }, ms + delay + 100, svgc(kind, c1, c2, size)), frames, { duration: ms, delay, easing: 'cubic-bezier(.3,.1,.6,1)' });
+  const dx = to.x - from.x, dy = to.y - from.y;
+  if (key === 'gumiho') {
+    for (let i = 0; i < 9; i++) {
+      const spread = (i - 4) * 16, hue = ['#7fd0ff', '#b69cff', '#ff9ad5', '#9af0c8', '#ffe08a'][i % 5];
+      bit('flame', hue, '#ffffff', 26, from.x, from.y, [{ transform: tr(0, 0, 'scale(.4)'), opacity: 0 }, { transform: tr(dx * .3, dy * .3 + spread, 'scale(1.05)'), opacity: 1, offset: .35 }, { transform: tr(dx, dy, 'scale(1.2)'), opacity: 1, offset: .85 }, { transform: tr(dx, dy, 'scale(.5)'), opacity: 0 }], 520, i * 42);
+    }
+  } else if (key === 'cheongryong') {
+    const bolt = piece(arena, 'fx2-bolt', { left: to.x + 'px', top: '0px', height: to.y + 'px' }, 760, '<svg viewBox="0 0 60 100" preserveAspectRatio="none" width="60" height="100%" aria-hidden="true"><path d="M34 0 L18 34 L33 38 L12 100 L46 46 L30 42 Z" fill="#effaff" stroke="#4fb6ff" stroke-width="3" stroke-linejoin="round"/></svg>');
+    run(bolt, [{ opacity: 0, transform: 'translateX(-50%) scaleY(.2)' }, { opacity: 1, transform: 'translateX(-50%) scaleY(1)', offset: .15 }, { opacity: .2, offset: .3 }, { opacity: 1, offset: .45 }, { opacity: 0, transform: 'translateX(-50%) scaleY(1)' }], { duration: 640 });
+    run(piece(arena, 'fx2-ring', { left: to.x + 'px', top: to.y + 'px', width: '170px', height: '170px', borderColor: '#9fd8ff', boxShadow: '0 0 20px #4fb6ff' }, 700), [{ transform: 'translate(-50%,-50%) scale(.2)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 0 }], { duration: 560, delay: 120 });
+  } else if (key === 'baekho') {
+    [-38, 4, 40].forEach((rot, i) => run(piece(arena, 'fx2-slash', { left: to.x + 'px', top: to.y + 'px', '--c': '#ffffff', '--cg': '#9fb7ff', width: '210px' }, 620), [{ transform: `translate(-50%,-50%) rotate(${rot}deg) scaleX(.1)`, opacity: 1 }, { transform: `translate(-50%,-50%) rotate(${rot}deg) scaleX(1)`, opacity: 1, offset: .3 }, { transform: `translate(-50%,-50%) rotate(${rot}deg) scaleX(1.05)`, opacity: 0 }], { duration: 520, delay: i * 90, easing: 'cubic-bezier(.1,.9,.3,1)' }));
+  } else if (key === 'jujak') {
+    for (let i = 0; i < 5; i++) bit('flame', '#ff4a2a', '#ffd23f', 54, to.x + (i - 2) * 30, to.y + 34, [{ transform: tr(0, 20, 'scaleY(.2)'), opacity: 0 }, { transform: tr(0, -20, 'scaleY(1.25)'), opacity: 1, offset: .4 }, { transform: tr(0, -70, 'scaleY(.8)'), opacity: 0 }], 640, i * 60);
+  } else if (key === 'hyeonmu') {
+    [150, 110, 70].forEach((size, i) => run(piece(arena, 'fx2-ring', { left: to.x + 'px', top: to.y + 18 + 'px', width: size + 'px', height: size * .4 + 'px', borderColor: '#7fe8ff', boxShadow: '0 0 14px #34c6d8' }, 800), [{ transform: 'translate(-50%,-50%) scale(.2)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.3)', opacity: 0 }], { duration: 640, delay: i * 110, easing: 'ease-out' }));
+    for (let i = 0; i < 7; i++) { const a = rand(0, 6.28), d = rand(30, 82); bit('star', '#bff6ff', '#ffffff', Math.round(rand(11, 18)), to.x, to.y - 10, [{ transform: tr(0, 0, 'scale(.2)'), opacity: 0 }, { transform: tr(Math.cos(a) * d, Math.sin(a) * d - 20, 'scale(1)'), opacity: 1, offset: .4 }, { transform: tr(Math.cos(a) * d, Math.sin(a) * d - 30, 'scale(.4)'), opacity: 0 }], 700, i * 50); }
+  } else fxPrism(arena, to);
+}
+
+/* ---------- 몸짓: 공격하러 튀어 나가기 · 맞고 움찔하기 ---------- */
+// The pet itself moves (the individual translate, scale and rotate properties, so they add to the
+// CSS transforms the arena already has): a crouch, a lunge and a squash on the attacker; a
+// recoil, a tilt and a squash on the one hit. dir: +1 moves right, -1 left.
+export function fxLunge(el, dir = 1) {
+  if (!el) return;
+  try { el.animate([{ translate: '0 0', scale: '1 1' }, { translate: `${-8 * dir}px 3px`, scale: '.94 1.07', offset: .28 }, { translate: `${30 * dir}px -6px`, scale: '1.12 .92', offset: .55 }, { translate: '0 0', scale: '1 1' }], { duration: 380, easing: 'ease-out' }); } catch {}
+}
+export function fxRecoil(el, dir = 1) {
+  if (!el) return;
+  try { el.animate([{ translate: '0 0', rotate: '0deg', scale: '1 1' }, { translate: `${16 * dir}px -4px`, rotate: `${-9 * dir}deg`, scale: '.92 1.08', offset: .2 }, { translate: `${9 * dir}px 0`, rotate: `${-5 * dir}deg`, scale: '1.04 .96', offset: .5 }, { translate: '0 0', rotate: '0deg', scale: '1 1' }], { duration: 420, easing: 'ease-out' }); } catch {}
 }
 
 /* ---------- 속도선 · 화면 쿵 ---------- */
@@ -125,11 +192,14 @@ export function fxPunch(arena, amount = .045) {
 /* ---------- 스킬 컷인 ---------- */
 // A pet skill goes off: a diagonal band in the element's colors sweeps in with the pet's picture
 // and the skill's name, holds a blink, and sweeps out (~0.95 s). It never blocks taps.
-export function fxSkillCutIn(arena, { side, portrait = '', name = '', desc = '', petName = '', el = 'star' }) {
+export function fxSkillCutIn(arena, { side, portrait = '', name = '', desc = '', petName = '', el = 'star', rank = 0 }) {
   const P = ELEMENTS[el];
-  const box = piece(arena, `fx2-cut ${side}`, { '--c1': P.c1, '--c2': P.c2, '--c3': P.c3 }, 1100, `<div class="fx2-cut-dim"></div><div class="fx2-cut-band"><div class="fx2-cut-lines"></div><div class="fx2-cut-pet">${portrait}</div><div class="fx2-cut-text"><small>${petName}</small><b>${name}</b><em>${desc}</em></div></div>`);
+  const box = piece(arena, `fx2-cut ${side} t${rank}`, { '--c1': P.c1, '--c2': P.c2, '--c3': P.c3 }, 1100, `<div class="fx2-cut-dim"></div><div class="fx2-cut-band"><div class="fx2-cut-lines"></div><div class="fx2-cut-pet">${portrait}</div><div class="fx2-cut-text"><small>${petName}</small><b>${name}</b><em>${desc}</em></div></div>`);
   if (!box) return;
   box.setAttribute('aria-hidden', 'true');
+  // Rank: epic = glitter around the band and a gold edge; legendary = + the whole arena washes in the element's color.
+  if (rank >= 2) fxWash(arena, el);
+  if (rank >= 1) for (let i = 0; i < 5 + rank * 2; i++) run(piece(arena, 'fx2-bit star', { left: rand(8, 92) + '%', top: rand(24, 72) + '%' }, 1000, svg('star', 'star', Math.round(rand(11, 20)))), [{ transform: tr(0, 0, 'scale(.1)'), opacity: 0 }, { transform: tr(0, -8, 'scale(1) rotate(60deg)'), opacity: 1, offset: .4 }, { transform: tr(0, -22, 'scale(.2) rotate(120deg)'), opacity: 0 }], { duration: 760, delay: 120 + i * 70 });
   const from = side === 'me' ? '-110%' : '110%';
   const band = box.querySelector('.fx2-cut-band'), dim = box.querySelector('.fx2-cut-dim');
   // (Easing is set per step: the way in is fast, the hold is still, the way out accelerates.)
