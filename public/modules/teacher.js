@@ -1,7 +1,7 @@
 import { EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, dayKey } from './core.js';
 import { icon, esc, num, date, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar } from './character.js';
-import { rangePicker, selectedCount, getRanges } from './student.js';
+import { rangePicker, selectedCount, getRanges, periodGroups } from './student.js';
 import { bracketHtml } from './tournament-ui.js';
 import { coin, trophy } from './emblems.js';
 // V13.76 실전시험: how often the student left the test screen (the third time hands it in).
@@ -316,7 +316,11 @@ export function vocabTable(A) {
   // V13.75 one chip per range (with its word count): pick a range instead of scrolling.
   const counts = new Map();
   for (const w of words) if (!middle || !A.vocabGrade || w.grade === A.vocabGrade) counts.set(w.range_code, (counts.get(w.range_code) || 0) + 1);
-  const chips = counts.size > 1 ? `<div class="vocab-ranges-v1375" role="group" aria-label="범위 고르기"><button type="button" data-vocab-range="" class="${A.vocabRange ? '' : 'on'}">전체<b>${num([...counts.values()].reduce((n, c) => n + c, 0))}</b></button>${[...counts].map(([code, n]) => `<button type="button" data-vocab-range="${esc(code)}" class="${A.vocabRange === code ? 'on' : ''}">${esc(recordRangeLabel({ division: middle ? 'middle' : 'high', school: A.school }, code))}<b>${num(n)}</b></button>`).join('')}</div>` : '';
+  // V13.112: a school with both 기말고사 and 중간고사 ranges gets a small label before each group of chips.
+  const chip = ([code, n]) => `<button type="button" data-vocab-range="${esc(code)}" class="${A.vocabRange === code ? 'on' : ''}">${esc(recordRangeLabel({ division: middle ? 'middle' : 'high', school: A.school }, code))}<b>${num(n)}</b></button>`;
+  const periods = periodGroups(A, [...counts.keys()]);
+  const rangeChips = periods[0].period ? periods.map(group => `<span class="vocab-period-tag ${group.period}">${group.label}</span>${group.codes.map(code => chip([code, counts.get(code)])).join('')}`).join('') : [...counts].map(chip).join('');
+  const chips = counts.size > 1 ? `<div class="vocab-ranges-v1375" role="group" aria-label="범위 고르기"><button type="button" data-vocab-range="" class="${A.vocabRange ? '' : 'on'}">전체<b>${num([...counts.values()].reduce((n, c) => n + c, 0))}</b></button>${rangeChips}</div>` : '';
   return `${chips}<div class="panel-head"><div><h2>${A.school} 단어장</h2><span>원본 뜻은 유지하고, 기본 유효답과 승인된 허용 뜻의 출처를 따로 관리합니다.</span></div><span>${list.length}개 단어</span></div><div class="table-scroll"><table class="vocab-table"><thead><tr>${gradeHead}<th>범위</th><th>영어</th><th>기본 뜻</th><th>허용 뜻</th><th>관리</th></tr></thead><tbody>${list.slice(0, vocabLimit(A)).map(w => {
     const aliases = A.data.meaning_aliases?.[w.id] || [];
     const meta = A.data.meaning_alias_meta?.[w.id] || [];

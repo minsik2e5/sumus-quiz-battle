@@ -31,12 +31,61 @@ export function shell(A, content) {
 export function studentPage(A) {
   return shell(A, ({ home, practice, exam, ranking, records, studio, titles: titlesPage, arcade: arcadePage, yacha: yachaPage, me: mePage, gachabook: gachaBookPage, petbook: petBookPage }[A.tab] || home)(A));
 }
+// V13.112 시험 구분: a range belongs to 중간고사 (midterm) or 기말고사 (final) by the book it is in
+// (books without exam_period are 중간고사). Where a school has both, the range pickers show two
+// folders (기말고사 first, open); a school with only one kind shows the plain list as before.
+const PERIOD_LABEL = { final: '기말고사', midterm: '중간고사' };
+const periodMaps = new WeakMap();
+function codePeriods(A) {
+  const books = A.data?.books || [];
+  let map = periodMaps.get(books);
+  if (!map) {
+    map = new Map();
+    for (const book of books) {
+      const period = book.exam_period === 'final' ? 'final' : 'midterm';
+      for (const code of new Set((book.words || []).map(word => String(word.range_code)))) if (!map.has(code) || period === 'final') map.set(code, period);
+    }
+    periodMaps.set(books, map);
+  }
+  return map;
+}
+export const periodOfCode = (A, code) => codePeriods(A).get(String(code)) || 'midterm';
+export function periodGroups(A, codes) {
+  const groups = ['final', 'midterm'].map(period => ({ period, label: PERIOD_LABEL[period], codes: codes.filter(code => periodOfCode(A, code) === period) })).filter(group => group.codes.length);
+  return groups.length > 1 ? groups : [{ period: null, label: '', codes }];
+}
+// `option(code)` makes one range; `wrap` is the class of the box that holds them.
+// The pickers that already have 모의고사 / 교과서 tabs (단어 학습, 시험 설정, 연습 시작) get 기말고사 / 중간고사
+// tabs above them instead of folders: `activePeriod` is the kind shown now (null where a school has
+// only one kind), `inPeriod` keeps the ranges of that kind, `periodTabs` draws the two buttons.
+export function activePeriod(A, codes) {
+  const groups = periodGroups(A, codes);
+  if (!groups[0].period) return null;
+  if (!groups.some(group => group.period === A.rangePeriod)) A.rangePeriod = groups[0].period;
+  return A.rangePeriod;
+}
+export const inPeriod = (A, period, code) => !period || periodOfCode(A, code) === period;
+export function periodTabs(A, codes, attr = 'data-range-period') {
+  const groups = periodGroups(A, codes), active = activePeriod(A, codes);
+  return groups[0].period ? `<div class="segment exam-source-tabs period-tabs" role="group" aria-label="시험 구분">${groups.map(group => `<button type="button" ${attr}="${group.period}" class="${active === group.period ? 'selected' : ''}" aria-pressed="${active === group.period}">${group.label}</button>`).join('')}</div>` : '';
+}
+// `bare`: the caller already has the box around the list, so a school with one kind gets the plain options.
+export function periodFolders(A, codes, { wrap, option, selected = [], count = () => 0, bare = false }) {
+  const groups = periodGroups(A, codes), chosen = new Set(selected.map(String));
+  if (!groups[0].period) return bare ? codes.map(option).join('') : `<div class="${wrap}">${codes.map(option).join('')}</div>`;
+  return `<div class="range-folders">${groups.map(group => {
+    const words = group.codes.reduce((n, code) => n + count(code), 0), open = group.period === 'final' || group.codes.some(code => chosen.has(String(code)));
+    return `<details class="range-folder ${group.period}" data-period="${group.period}"${open ? ' open' : ''}><summary><b>${group.label}</b><small>${group.codes.length}개 범위 · ${words}단어</small></summary><div class="${wrap}">${group.codes.map(option).join('')}</div></details>`;
+  }).join('')}</div>`;
+}
 export function getRanges(A, school = A.school, grade = null) {
   const books = A.data.books.filter(book => !grade || !book.grade || book.grade === grade);
   const words = books.flatMap(book => book.words || []);
   const codes = [...new Set(words.map(w => w.range_code))];
   const key = grade ? school + '::' + grade : school;
-  A.ranges[key] ??= codes.slice(0, 2);
+  // V13.112: while the final exam (기말고사) words are there, a student who has not picked yet starts with those.
+  const finalCodes = codes.filter(code => periodOfCode(A, code) === 'final');
+  A.ranges[key] ??= (finalCodes.length ? finalCodes : codes).slice(0, 2);
   A.ranges[key] = A.ranges[key].filter(code => codes.includes(code));
   return { words, codes, selected: A.ranges[key], key };
 }
@@ -102,11 +151,12 @@ function todayWordQuest(A, goal = 20) {
 }
 export function rangePicker(A, teacher = false, grade = null) {
   const { words, codes, selected } = getRanges(A, A.school, grade);
-  return `<div class="${teacher ? 'teacher-range' : 'range-grid'}">${codes.map(c => {
+  const option = c => {
     const state = !teacher ? wordQuestState(A, c) : null;
     const meta = !teacher ? wordQuestMeta(state) : null;
     return `<label class="range-option ${meta ? 'quest-range ' + meta.cls : ''}"><input type="checkbox" data-range="${c}" ${grade ? `data-range-grade="${esc(grade)}"` : ''} ${selected.includes(c) ? 'checked' : ''} aria-label="${esc(rangeLabel(A.school, c))}"><span>${esc(rangeLabel(A.school, c))}<small>${words.filter(w => w.range_code === c).length}개 단어${meta ? ' · ' + meta.detail : ''}</small>${meta ? `<em class="quest-status ${meta.cls}">${meta.label}</em>` : ''}</span></label>`;
-  }).join('')}</div><div class="scope-tools"><span id="scope-count">${selected.length}개 범위 · ${selectedCount(A, grade)}개 단어</span><div><button data-range-all="true">전체 선택</button><button data-range-all="false">해제</button></div></div>`;
+  };
+  return `${periodFolders(A, codes, { wrap: teacher ? 'teacher-range' : 'range-grid', option, selected, count: c => words.filter(w => w.range_code === c).length })}<div class="scope-tools"><span id="scope-count">${selected.length}개 범위 · ${selectedCount(A, grade)}개 단어</span><div><button data-range-all="true">전체 선택</button><button data-range-all="false">해제</button></div></div>`;
 }
 function grammarPassagesForSchool(A) {
   return Array.isArray(A.grammarData?.passages) ? A.grammarData.passages : [];
@@ -663,15 +713,17 @@ function memorizationPanel(A) {
       })()
     : (() => {
         const state = highSchoolMemorizeState(A);
-        const textbookCodes = state.codes.filter(code => /^L\d+$/i.test(String(code)));
-        const mockCodes = state.codes.filter(code => !/^L\d+$/i.test(String(code)));
+        // V13.112: 기말고사 / 중간고사 first, then 모의고사 / 교과서 within it.
+        const period = activePeriod(A, state.codes), periodCodes = state.codes.filter(code => inPeriod(A, period, code));
+        const textbookCodes = periodCodes.filter(code => /^L\d+$/i.test(String(code)));
+        const mockCodes = periodCodes.filter(code => !/^L\d+$/i.test(String(code)));
         const availableTypes = [['mock','모의고사',mockCodes],['textbook','교과서',textbookCodes]].filter(([, , codes]) => codes.length);
         if (!availableTypes.some(([key]) => key === A.memorizeRangeType)) A.memorizeRangeType = textbookCodes.includes(state.code) ? 'textbook' : (availableTypes[0]?.[0] || 'mock');
         const visibleCodes = A.memorizeRangeType === 'textbook' ? textbookCodes : mockCodes;
         if (visibleCodes.length && !visibleCodes.includes(state.code)) A.memorizeRange = String(visibleCodes[0]);
         const activeCode = String(A.memorizeRange || visibleCodes[0] || '');
         const tabs = availableTypes.length > 1 ? `<div class="segment exam-source-tabs memorize-source-tabs">${availableTypes.map(([key,label]) => `<button data-memorize-range-type="${key}" class="${A.memorizeRangeType === key ? 'selected' : ''}">${label}</button>`).join('')}</div>` : '';
-        return schoolSwitch(A) + tabs + `<div class="memorize-range-strip" role="tablist" aria-label="학습 범위">${visibleCodes.map(range => {
+        return schoolSwitch(A) + periodTabs(A, state.codes, 'data-memorize-period') + tabs + `<div class="memorize-range-strip" role="tablist" aria-label="학습 범위">${visibleCodes.map(range => {
           const code = String(range);
           const count = state.words.filter(word => String(word.range_code) === code).length;
           const selected = code === activeCode;
@@ -828,8 +880,10 @@ function exam(A) {
       </div>`;
   } else {
     const state = getRanges(A);
-    const textbookCodes = state.codes.filter(code => /^L\d+$/i.test(String(code)));
-    const mockCodes = state.codes.filter(code => !/^L\d+$/i.test(String(code)));
+    // V13.112: 기말고사 / 중간고사 first, then 모의고사 / 교과서 within it.
+    const period = activePeriod(A, state.codes), periodCodes = state.codes.filter(code => inPeriod(A, period, code));
+    const textbookCodes = periodCodes.filter(code => /^L\d+$/i.test(String(code)));
+    const mockCodes = periodCodes.filter(code => !/^L\d+$/i.test(String(code)));
     const availableTypes = [['mock','모의고사',mockCodes],['textbook','교과서',textbookCodes]].filter(([, , codes]) => codes.length);
     if (!availableTypes.some(([key]) => key === A.highRangeType)) A.highRangeType = availableTypes[0]?.[0] || 'mock';
     const visibleCodes = A.highRangeType === 'textbook' ? textbookCodes : mockCodes;
@@ -838,7 +892,7 @@ function exam(A) {
     scopeLabel = visibleSelected.map(code => recordRangeLabel({ division: 'high', school: A.school }, code)).join(' · ') || '범위 미선택';
     const typeTabs = availableTypes.length > 1 ? `<div class="segment exam-source-tabs">${availableTypes.map(([key,label]) => `<button data-high-range-type="${key}" class="${A.highRangeType === key ? 'selected' : ''}">${label}</button>`).join('')}</div>` : '';
     const picker = `<div class="range-grid">${visibleCodes.map(c => `<label class="range-option"><input type="checkbox" data-range="${esc(c)}" ${visibleSelected.includes(c) ? 'checked' : ''}><span>${esc(rangeLabel(A.school, c))}<small>${state.words.filter(w => w.range_code === c).length}개 단어</small></span></label>`).join('')}</div><div class="scope-tools"><span id="scope-count">${visibleSelected.length}개 범위 · ${count}개 단어</span><div><button data-high-range-all="true">전체 선택</button><button data-high-range-all="false">해제</button></div></div>`;
-    scopeUi = schoolSwitch(A) + typeTabs + picker;
+    scopeUi = schoolSwitch(A) + periodTabs(A, state.codes, 'data-high-period') + typeTabs + picker;
   }
   const target = middle ? count : (A.target === 'all' ? count : Math.min(count, Number(A.target || 20)));
   return `<div class="exam-mode-switch segment"><button data-exam-kind="practice" class="${!testMode ? 'selected' : ''}">연습시험</button><button data-exam-kind="test" class="${testMode ? 'selected' : ''}">실전시험</button></div>

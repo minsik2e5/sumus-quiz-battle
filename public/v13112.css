@@ -1,0 +1,22 @@
+/* V13.112 시험 구분: range pickers show 기말고사 and 중간고사 as two folders (a school with only
+   one kind shows the plain list as before). 기말고사 is open; 중간고사 opens when it holds a pick. */
+.range-folders{display:grid;gap:10px;grid-column:1/-1;width:100%;min-width:0;margin-top:6px}
+.range-folder{border:1px solid #dbe6e0;border-radius:16px;background:#fff;overflow:hidden}
+.range-folder>summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:48px;padding:10px 14px;cursor:pointer;font-size:15px;-webkit-tap-highlight-color:transparent}
+.range-folder>summary::-webkit-details-marker{display:none}
+.range-folder>summary b{font-weight:900}
+.range-folder>summary small{margin-left:auto;font-size:12.5px;font-weight:700;opacity:.78}
+.range-folder>summary::after{content:"";flex:none;width:8px;height:8px;border-right:2.5px solid currentColor;border-bottom:2.5px solid currentColor;transform:rotate(45deg) translate(-2px,-2px)}
+.range-folder[open]>summary::after{transform:rotate(-135deg) translate(-2px,-2px)}
+.range-folder.final>summary{background:#e3f6ec;color:#14663f}
+.range-folder.midterm>summary{background:#e9eff7;color:#2a4a70}
+.range-folder>div{padding:10px}
+.range-folder>summary:focus-visible{outline:3px solid #1d6fe0;outline-offset:-3px}
+.range-folder .range-grid{margin-top:0}
+.ya-panel .range-folder>div.ya-ranges{padding:8px}
+.vocab-period-tag{display:inline-flex;align-items:center;flex:none;padding:7px 4px 7px 10px;font-size:12px;font-weight:900;color:#5d6d68}
+.vocab-period-tag.final{color:#14663f}
+.vocab-period-tag.midterm{color:#2a4a70}
+@media (prefers-reduced-motion:reduce){.range-folder>summary::after{transition:none}}
+.period-tabs{margin-bottom:8px}
+.period-tabs button{min-height:44px}

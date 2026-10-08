@@ -1,6 +1,7 @@
 import { api, $, $$, icon, esc, time, date, recordRangeLabel, scope, toast, modal, buttonBusy } from './ui.js';
 import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo, grade, displayEnglish, TEST_SECONDS_PER_QUESTION, TEST_LEAVE_LIMIT, testDurationSec } from './core.js';
 import { avatar } from './character.js';
+import { getRanges, activePeriod, inPeriod } from './student.js';
 import { uiArt, artOr } from './emblems.js';
 import { EXAM_XP_PER_ANSWER, EXAM_COINS, STUDY_COINS } from './rewards.js';
 
@@ -338,7 +339,9 @@ async function syncPracticeState() {
 }
 
 export async function startPractice(options = {}) {
-  const selectedHighRanges = (A.ranges[A.school] || []).filter(code => {
+  // V13.112: only the ranges of the 기말고사 / 중간고사 tab on screen (a school with one kind: all of them).
+  const shownPeriod = A.data?.books ? activePeriod(A, getRanges(A).codes) : null;
+  const selectedHighRanges = (A.ranges[A.school] || []).filter(code => inPeriod(A, shownPeriod, code)).filter(code => {
     if (A.highRangeType === 'textbook') return /^L\d+$/i.test(String(code));
     if (A.highRangeType === 'mock') return !/^L\d+$/i.test(String(code));
     return true;

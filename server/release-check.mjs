@@ -11,6 +11,7 @@ import { runBattleChecks } from './battle-check.mjs';
 import { runCompetitionChecks } from './competition-check.mjs';
 import { runRewardsChecks } from './rewards-check.mjs';
 import { runCoinsChecks } from './coins-check.mjs';
+import { runFinalWordsChecks } from './final-words-check.mjs';
 import { runMinigameChecks } from './minigame-check.mjs';
 import { runPushChecks } from './push-check.mjs';
 import { compactSession, migrateState, stateSizeReport } from './state.mjs';
@@ -70,12 +71,12 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.111.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.112.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
     const bySchool = school => runtimeBooks.filter(book => book.school === school).flatMap(book => book.words || []);
-    assert(bySchool('단원고').length === 542, '단원고 vocabulary = 542 (existing 362 + YBM Kim READING DB 68 + 112)');
+    assert(bySchool('단원고').length === 542 + 268, '단원고 vocabulary = 810 (existing 362 + YBM Kim READING DB 68 + 112 + 기말고사 3과 본문 114 + 4과 본문 154)');
     {
       const ybm = bySchool('단원고').filter(word => word.id.startsWith('high:ybm-kim:common2:'));
       const byId = id => ybm.find(word => word.id === id);
@@ -89,7 +90,7 @@ export async function runReleaseCheck() {
       assert(displayEnglish(charged.word) === 'be charged with' && grade('write_en', 'be charged with', charged), 'grammar note (+동명사) is not part of the expected English answer');
     }
     const gangseoWords = bySchool('강서고');
-    assert(gangseoWords.length === 354 + 180, '강서고 vocabulary = 354 mock-exam words + 180 YBM textbook words (same textbook as 단원고)');
+    assert(gangseoWords.length === 354 + 180 + 268, '강서고 vocabulary = 354 mock-exam words + 180 YBM textbook words + 268 기말고사 words (same textbook as 단원고)');
     {
       const danwonYbm = bySchool('단원고').filter(word => word.id.startsWith('high:ybm-kim:common2:'));
       const gangseoYbm = gangseoWords.filter(word => word.id.startsWith('high:ybm-kim:gangseo:common2:'));
@@ -1167,7 +1168,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.111.0') && indexHtml.includes('/app.bundle.css?v=13.111.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.112.0') && indexHtml.includes('/app.bundle.css?v=13.112.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1188,7 +1189,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.111.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.112.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -1407,6 +1408,7 @@ export async function runReleaseCheck() {
     await runCompetitionChecks(assert, expectStatus);
     await runRewardsChecks(assert, expectStatus);
     await runCoinsChecks(assert, expectStatus);
+    await runFinalWordsChecks(assert);
     await runMinigameChecks(assert);
     await runPushChecks(assert, expectStatus);
 
