@@ -12,6 +12,7 @@ import { runCompetitionChecks } from './competition-check.mjs';
 import { runRewardsChecks } from './rewards-check.mjs';
 import { runCoinsChecks } from './coins-check.mjs';
 import { runFinalWordsChecks } from './final-words-check.mjs';
+import { runPetOrderChecks } from './pet-order-check.mjs';
 import { runMinigameChecks } from './minigame-check.mjs';
 import { runPushChecks } from './push-check.mjs';
 import { compactSession, migrateState, stateSizeReport } from './state.mjs';
@@ -1409,6 +1410,7 @@ export async function runReleaseCheck() {
     await runRewardsChecks(assert, expectStatus);
     await runCoinsChecks(assert, expectStatus);
     await runFinalWordsChecks(assert);
+    runPetOrderChecks(assert);
     await runMinigameChecks(assert);
     await runPushChecks(assert, expectStatus);
 
