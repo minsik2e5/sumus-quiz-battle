@@ -396,7 +396,7 @@
 .tn-champ small{font-size:11px;color:#8b8466}
 @keyframes tnLive{0%,100%{box-shadow:0 0 0 2px #12b886 inset}50%{box-shadow:0 0 0 2px #12b886 inset,0 0 0 4px rgba(18,184,134,.18)}}
 /* teacher */
-.teacher-app.tv2 .tv2-bottom-nav{grid-template-columns:repeat(6,minmax(0,1fr))}
+.teacher-app.tv2 .tv2-bottom-nav{grid-template-columns:repeat(7,minmax(0,1fr))}
 .tn-intro{display:flex;align-items:center;gap:16px;justify-content:space-between;background:linear-gradient(135deg,#fffaf0,#fff)!important;border:1px solid #f0dca0}
 .tn-intro h2{margin:0 0 4px}
 .tn-intro p{margin:0;font-size:13px;color:#5d6d68;line-height:1.55}
