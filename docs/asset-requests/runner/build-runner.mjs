@@ -677,6 +677,48 @@ sheet(F16, '몽이 · 핑키 새 응원', 'pet', `TOP row: 몽이, ${PETS.dog.ba
 designSheets(F17A, NEW_PETS_17, pet => pet.tier === 'epic' ? 'A 영웅 (epic) pet, one rank below legendary: a little grander and more sparkling than a basic pet, with a soft golden rim light. ' : '');
 exprSheets(F17B, NEW_PETS_17, [['squirrel', 'turtle'], ['duck', 'sheep'], ['redpanda', 'arcticfox'], ['koala', 'parrot']], pet => pet.tier === 'epic' ? ' A 영웅 (epic) pet: a soft golden rim light.' : '');
 
+/* 18 새 펫 8종 (V13.114~): 물범 · 개구리 · 삽살개 · 사슴 · 늑대 · 곰 · 악어 · 문어. 17과 같은 틀이에요.
+   18a 설정 시트(알·아기·성장·최종) → 18b 표정(그 펫의 설정 시트를 열어 맞춤) + 알 반응.
+   기본 4(개구리 · 삽살개 · 사슴 · 곰) + 영웅 4(물범 · 늑대 · 악어 · 문어). 이름(ko)은 그림 주문에만 쓰는 임시 이름이고, 앱 이름은 펫을 등록할 때 정해요.
+   `limb`: 응원·쓰다듬기 동작에서 "앞발·팔을 들어요"가 이 펫에서는 어디를 뜻하는지(문어는 촉수, 개구리는 손). */
+const F18A = '18a-new-pets-design.txt', F18B = '18b-new-pets-expressions.txt';
+const NEW_PETS_18 = {
+  frog: { ko: '폴짝', type: '개구리', tier: 'basic', limb: 'one webbed hand', base: 'a round chubby frog with a soft spring-green body, a cream-yellow belly, a few small darker-green spots on the back, big round glossy eyes on top of the head with white highlights, pink blush, a wide happy smile, small webbed hands and feet with round toe pads', egg: 'a pale green egg with soft jelly-bubble patterns and small lily-pad shapes, floating on a small lily pad', f: {
+    1: 'baby stage: a tiny, very round froglet sitting on a small lily pad, no other accessories',
+    2: 'grown stage: a longer-legged young frog crouching as if about to jump (NOT a round baby), a mint scarf with a small gold star charm, a small pink water-lily flower beside one eye',
+    3: 'final stage: a large proud frog sitting upright on a big lily-pad throne, a small golden crown with a green gem, a flowing leaf-green cape with gold trim fastened by a gold star clasp, glowing water drops and golden sparkles around (NOT a round baby)' } },
+  sapsaree: { ko: '복실', type: '삽살개', tier: 'basic', limb: 'one front paw', base: 'a fluffy Sapsaree (a Korean shaggy dog) with long, soft, wavy cream-white and light-gray fur that falls over its forehead like a fringe (the big glossy dark eyes and the round black nose still show through), small floppy ears half hidden in the fur, a fluffy tail curled up over its back, pink blush. It must look different from the orange Shiba 몽이: long shaggy cream-gray fur, no orange', egg: 'a cream egg with soft shaggy wavy-line fur patterns in light gray and a tiny blue ribbon, resting on a small cushion of fluffy cloud-like fur', f: {
+    1: 'baby stage: a tiny round puffball of fur with only the eyes, nose and tiny paws showing, no accessories',
+    2: 'grown stage: a bigger young dog standing on four legs with long flowing fur (NOT a round puffball), an indigo-blue scarf with a small gold star charm',
+    3: 'final stage: a large, majestic guardian Sapsaree with long silky fur flowing like a cloud, a flowing indigo-blue cape with soft traditional Korean cloud patterns and gold trim fastened by a gold star clasp, a small gold ornament on the collar, glowing blue-white sparkles (NOT a round puffball)' } },
+  deer: { ko: '새싹', type: '사슴', tier: 'basic', limb: 'one front hoof', base: 'a gentle young deer with warm caramel-brown fur, a cream belly, soft white spots on the back, big soft glossy eyes with long lashes, pink blush, small rounded ears with pink insides, a small white tail tuft, tiny budding antlers with one small green leaf sprouting from each', egg: 'a soft caramel egg with white spot patterns and a tiny green leaf sprout on top, resting on a bed of moss and clover', f: {
+    1: 'baby stage: a tiny fawn with white spots and a single small green sprout between its ears, no antlers yet, no other accessories',
+    2: 'grown stage: a slender young deer standing tall on long legs (NOT a wobbly fawn), small antlers with leaf buds, a mint scarf with a small gold star charm',
+    3: 'final stage: a majestic stag with grand antlers shaped like a glowing blossoming tree with small cherry flowers, leaves and tiny gold stars hanging from them, a flowing leaf-green cape with gold trim fastened by a gold star clasp, golden-green fireflies and sparkles around (NOT a fawn)' } },
+  bear: { ko: '든든', type: '곰', tier: 'basic', limb: 'one front paw', base: 'a sturdy round brown bear with soft chestnut-brown fur, a lighter tan muzzle and belly patch, small round ears with pink insides, big glossy dark eyes, pink blush, a small friendly smile. It must look different from the panda 밤부, the koala 쿨쿨 and the red panda 단풍: plain chestnut-brown, no black-and-white or red markings', egg: 'a warm honey-brown egg with golden honeycomb hexagon patterns and one small drip of honey, resting on a small log slice', f: {
+    1: 'baby stage: a tiny round fluffy cub hugging a small honey pot, no other accessories',
+    2: 'grown stage: a bigger young bear standing on its hind legs holding a honey jar (NOT a round cub), an amber scarf with a small gold star charm',
+    3: 'final stage: a large, strong but friendly bear standing proud, a flowing amber-and-cream cape with gold trim fastened by a gold star clasp, a golden honeycomb crown with an amber gem, glowing honey drops and a few tiny cute bees floating around (NOT a round cub)' } },
+  seal: { ko: '동글', type: '물범', tier: 'epic', limb: 'one flipper', base: 'a round chubby harbor-seal pup with smooth silver-gray fur sprinkled with soft dark spots, a cream belly, big glossy black eyes with white highlights, long white whiskers, a small button nose, pink blush, short flippers, a sleepy sweet smile. It must look different from the penguin 펭이, the otter 달이 and the shark 파도: a plump spotted seal body with no tail fin', egg: 'a pale silver-blue egg with soft wave and pebble patterns and small shell shapes, resting on a small rock at the water edge', f: {
+    1: 'baby stage: a tiny, very round pup with soft white-gray fur lying on its belly, no accessories',
+    2: 'grown stage: a sleeker young seal sitting upright on its tail with its front flippers raised (NOT a round pup), a sea-blue scarf with a small gold star charm and a small starfish clip',
+    3: 'final stage: a grand seal with glossy silver-blue fur shimmering with a soft golden rim, a flowing sea-blue cape with white wave patterns and gold trim fastened by a gold star clasp, a crown of pearls and small shells, a big glowing pearl balanced on its nose, floating bubbles and golden sparkles (NOT a round pup)' } },
+  wolf: { ko: '달빛', type: '늑대', tier: 'epic', limb: 'one front paw', base: 'a young wolf pup with soft silver-gray fur, a lighter cream chest and muzzle, a darker gray back and tail tip, pointed ears with pink insides, big glossy amber eyes, pink blush, a small silver crescent-moon mark on the forehead, a big fluffy tail, a calm kind smile with the mouth closed. It must look different from the arctic fox 눈송 and the fox 호야: a longer muzzle, gray (not white, not orange) fur, a crescent mark (not a snowflake)', egg: 'a deep blue-gray egg with silver crescent-moon and star patterns, resting on a bed of moonlit grass', f: {
+    1: 'baby stage: a small round fluffy pup with oversized paws and ears, no accessories',
+    2: 'grown stage: a leaner young wolf standing tall on four legs with a thick ruff around the neck (NOT a round pup), a navy scarf with a small gold star charm',
+    3: 'final stage: a large, majestic and kind wolf, silver fur glowing softly like moonlight with a golden rim, a thick flowing ruff, a flowing deep-navy cape with silver stars and gold trim fastened by a gold star clasp, a glowing crescent-moon circlet, a big soft full moon behind it and floating starlight (NOT a round pup; noble and gentle, never fierce: mouth closed, no bared teeth)' } },
+  crocodile: { ko: '덥썩', type: '악어', tier: 'epic', limb: 'one front foot', base: 'a cute baby-faced crocodile with a soft olive-green body, a cream-yellow belly, rounded bumpy darker-green scales along the back, a short wide snout with a closed friendly smile and two tiny round nostrils (no sharp teeth showing), big glossy golden eyes on top of the head with white highlights, pink blush, short stubby legs, a thick curled tail. Cute and friendly, never scary', egg: 'a speckled olive-green egg with darker scale-texture patterns, resting in a nest of reeds at the riverbank', f: {
+    1: 'baby stage: a tiny, very round hatchling with a stubby tail and a small piece of eggshell still on its head, no other accessories',
+    2: 'grown stage: a longer young crocodile standing on four short sturdy legs (NOT a round hatchling), a mint scarf with a small gold star charm, small rounded ridge spikes along the back',
+    3: 'final stage: a grand crocodile king with glossy emerald scales edged in gold, a flowing jungle-green cape with gold trim fastened by a gold star clasp, a golden crown with an emerald gem, floating water-lily petals and golden sparkles around, a big friendly closed-mouth smile (NOT a round hatchling; never scary: no open jaws, no big teeth)' } },
+  octopus: { ko: '말랑', type: '문어', tier: 'epic', limb: 'one tentacle', base: 'a cute round octopus with a soft coral-pink and lavender body, a big smooth round head, eight short curly tentacles with pale-pink suckers, big glossy dark-violet eyes with white highlights, pink blush, a tiny happy smile, a small seashell bow on the head. It must look different from the jellyfish-like or squid shapes: a round head and eight short curly tentacles', egg: 'a pearly lavender egg with soft swirling wave and bubble patterns and tiny suction-cup dots, resting on a seashell', f: {
+    1: 'baby stage: a tiny, very round octopus with short stubby tentacles, the small seashell bow, no other accessories',
+    2: 'grown stage: a bigger octopus with longer curly tentacles holding a tiny starfish and a small bubble (NOT a tiny baby), a mint ribbon with a small gold star charm',
+    3: 'final stage: a grand octopus with long elegant swirling tentacles, each holding a small treasure (a pearl, a shell, a starfish, a tiny gold star), a pearl crown with an aqua gem, a shimmering sea-silk cape draped over its head with gold trim and a gold star clasp, floating bubbles and golden sparkles (NOT a tiny baby)' } }
+};
+designSheets(F18A, NEW_PETS_18, pet => pet.tier === 'epic' ? 'A 영웅 (epic) pet, one rank below legendary: a little grander and more sparkling than a basic pet, with a soft golden rim light. ' : '');
+exprSheets(F18B, NEW_PETS_18, [['frog', 'sapsaree'], ['deer', 'bear'], ['seal', 'wolf'], ['crocodile', 'octopus']], pet => ` In every cell that says a paw, arm, wing, flipper or hand is raised, this pet raises ${pet.limb} instead.${pet.tier === 'epic' ? ' A 영웅 (epic) pet: a soft golden rim light.' : ''}`);
+
 /* Google Drive: 그림을 그리는 GPT는 Drive에서 참고 그림을 열어 보고, 결과를 Drive 폴더에 올려요.
    규칙: 시트별 파일(split/)로 나가는 모든 주문서는 DRIVE에 폴더가 있어야 하고(없으면 멈춰요),
    끝에 "이 폴더에 이 이름으로 올리기"가 붙어요. 처음 그리는 그림(08·09a)은 기존 그림을 열어 보고 그림체를 맞춰요. */
@@ -691,7 +733,8 @@ const DRIVE = {
   [F14A]: 'SUMUS 할로윈 14 (Runner용)', [F14B]: 'SUMUS 할로윈 14 (Runner용)',
   [F15]: 'SUMUS 전투 배경 15 (Runner용)',
   [F16]: 'SUMUS 몽이·핑키 16 (Runner용)',
-  [F17A]: 'SUMUS 새 펫 17 (Runner용)', [F17B]: 'SUMUS 새 펫 17 (Runner용)'
+  [F17A]: 'SUMUS 새 펫 17 (Runner용)', [F17B]: 'SUMUS 새 펫 17 (Runner용)',
+  [F18A]: 'SUMUS 새 펫 18 (Runner용)', [F18B]: 'SUMUS 새 펫 18 (Runner용)'
 };
 const PET_SPRITES = 'SUMUS_PET_SPRITES_ALL_20261002/original_1254';
 const KEEP = 'Do NOT make it softer, blurrier, foggier, more painterly or more watercolor-like than the reference.';
@@ -704,14 +747,14 @@ const STYLE_REF = {
 };
 STYLE_REF.monsters12 = STYLE_REF.monsters.replace(/Also open "10-1\.png"[^\n]*$/, `Also open the first monsters of this game in the Google Drive folder "${DRIVE[F10]}" ("10-1.png" and "10-8.png"; this new set is their second batch, so match their finish, size and level of detail exactly) and, if it is there, "12-1.png" in the Google Drive folder "${DRIVE[F12]}" (the first monster of the new set), and match its finish and size too. Do NOT copy the existing monsters; this is a new design.`);
 STYLE_REF.icons12 = `${STYLE_REF.icons} Also open "10-10.png" in the Google Drive folder "${DRIVE[F10]}" (the monster screen icons: tab and difficulty badges) and match its finish and size.`;
-const refOf = p => p.bg ? null : p.file === F14A || p.file === F17A ? 'pets' : p.file === F14B && /아이콘/.test(p.title) ? 'icons' : p.file === F11 ? 'titles' : p.file === F12 ? (/아이콘/.test(p.title) ? 'icons12' : 'monsters12') : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
+const refOf = p => p.bg ? null : p.file === F14A || p.file === F17A || p.file === F18A ? 'pets' : p.file === F14B && /아이콘/.test(p.title) ? 'icons' : p.file === F11 ? 'titles' : p.file === F12 ? (/아이콘/.test(p.title) ? 'icons12' : 'monsters12') : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
 const NEW_ORDER = Object.keys(NEW_PETS);
 const sheetName = (file, i) => `${file.slice(0, /^\d\d[ab]-/.test(file) ? 3 : 2)}-${i + 1}`;
 
 /* 쓰기 */
 const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
-const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11, F12, F14A, F14B, F15, F16, F17A, F17B]);
+const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11, F12, F14A, F14B, F15, F16, F17A, F17B, F18A, F18B]);
 for (const [file, list] of byFile) list.forEach((p, i) => {
   if (!SPLIT.has(file)) return;
   if (!DRIVE[file]) throw new Error(`${file}: Google Drive 폴더(DRIVE)가 없어요. 주문서에는 업로드 위치가 꼭 있어야 해요.`);
@@ -740,7 +783,7 @@ for (const [file, list] of byFile) list.forEach((p, i) => {
     p.ref = `Drive: ${sheets}`;
   }
   // 14b·17b: 그 펫의 설정 시트(14a-N / 17a-N)를 열어 맞춰요. 배경은 기존 캐릭터를 열어 그림체만 맞춰요.
-  const XB = { [F14B]: [F14A, HALLOWEEN_PETS, '14a'], [F17B]: [F17A, NEW_PETS_17, '17a'] }[file];
+  const XB = { [F14B]: [F14A, HALLOWEEN_PETS, '14a'], [F17B]: [F17A, NEW_PETS_17, '17a'], [F18B]: [F18A, NEW_PETS_18, '18a'] }[file];
   if (XB && !p.bg && !/아이콘/.test(p.title)) {
     const order = Object.keys(XB[1]), keys = order.filter(k => p.title.includes(XB[1][k].ko));
     const sheets = keys.map(k => `"${XB[2]}-${order.indexOf(k) + 1}.png"`).join(' and ');
