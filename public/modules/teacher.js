@@ -4,6 +4,7 @@ import { avatar } from './character.js';
 import { rangePicker, selectedCount, getRanges, periodGroups } from './student.js';
 import { bracketHtml } from './tournament-ui.js';
 import { coin, trophy } from './emblems.js';
+import { teacherPetDex } from './petbook.js';
 // V13.76 실전시험: how often the student left the test screen (the third time hands it in).
 function leaveNote(s) {
   const n = Number(s.leave_count || 0);
@@ -26,7 +27,7 @@ const passageNumberLabel = passage => /과/.test(String(passage.number)) ? Strin
 const grammarCache = new Map();
 let grammarLoaded = null;
 export function onTeacherGrammarLoaded(callback) { grammarLoaded = callback; }
-const tabs = [['dashboard', '대시보드', 'home'], ['students', '학생 관리', 'user'], ['books', '단어 데이터', 'practice'], ['disputes', '뜻 이의제기', 'records'], ['results', '결과 분석', 'ranking'], ['tournaments', '야차 대회', 'battle']];
+const tabs = [['dashboard', '대시보드', 'home'], ['students', '학생 관리', 'user'], ['books', '단어 데이터', 'practice'], ['disputes', '뜻 이의제기', 'records'], ['results', '결과 분석', 'ranking'], ['tournaments', '야차 대회', 'battle'], ['petdex', '펫 도감', 'sparkle']];
 const ALL_CLASSES = '__ALL__';
 const targetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
 const targetMatches = (target, profile) => target === ALL_CLASSES || profile.class_name === target;
@@ -36,7 +37,7 @@ export function teacherPage(A) {
   const title = tabs.find(t => t[0] === A.tab)?.[1] || '대시보드';
   const pendingDisputes = (A.data.meaning_disputes || []).filter(item => item.status === 'pending').length;
   const actions = A.tab === 'students' ? `<button class="btn primary" data-action="add-student">${icon('plus')} 학생 등록</button>` : A.tab === 'results' ? `<button class="btn secondary" data-action="export-results">${icon('download')} 결과 내보내기</button>` : A.tab === 'tournaments' ? `<button class="btn primary" data-action="tournament-new">${icon('plus')} 대회 만들기</button>` : A.tab === 'dashboard' || !A.tab ? `<button class="btn secondary notice-top-v1377" data-action="notice">📢 공지 보내기</button><button class="btn secondary install-qr-v1377" data-action="install-qr" title="교실 TV에 띄우면 학생들이 찍어서 앱을 설치해요">📲 앱 설치 QR</button><button class="btn secondary tv2-gift-top-v1375" data-action="gift">${icon('gift')} 코인 선물</button>` : '';
-  const content = ({ dashboard, students, books, disputes, results, tournaments }[A.tab] || dashboard)(A);
+  const content = ({ dashboard, students, books, disputes, results, tournaments, petdex: teacherPetDex }[A.tab] || dashboard)(A);
   const divisionOptions = [['middle','중등부'],['high','고등부']].filter(([id]) => (A.data.divisions || []).includes(id)).map(([id,label]) => `<option value="${id}" ${id === A.data.profile.active_division ? 'selected' : ''}>${label}</option>`).join('');
   const schoolOptions = A.data.schools.map(s => `<option value="${esc(s.id)}" ${s.id === A.data.profile.active_school_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   const division = A.data.profile.active_division;

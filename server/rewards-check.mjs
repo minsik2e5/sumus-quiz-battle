@@ -844,7 +844,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(css98.includes('.yb-spell-input{position:absolute;inset:0') && css98.includes('font-size:16px') && css98.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/8.2}') && battle103.includes("classList.add('yb-typing')"), 'V13.103 키보드가 올라오면 전투 화면(경기장)이 줄어 단어와 글자 칸이 키보드 위에 보인다(16px 글자로 확대 방지)');
     /* ---------- V13.105 전투 화면 효과 ---------- */
     const css104 = source('../public/v13105fx.css'), build104 = source('./build-assets.mjs');
-    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css",\s*"v13109\.css",\s*"v13111\.css",\s*"v13112\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
+    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css",\s*"v13109\.css",\s*"v13111\.css",\s*"v13112\.css",\s*"v13113\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
     assert(battle103.includes('function hitStop(') && battle103.includes("classList.add('fx-stop')") && css104.includes('.yb-arena.fx-stop [data-fx]{animation-play-state:paused!important}') && battle103.includes('function dmgTier(') && battle103.includes("const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl']") && battle103.includes("` fx-num t${dmgTier(+dmg)}"), 'V13.105 맞는 순간 잠깐 멈추고(히트스톱), 데미지가 클수록 더 세게 흔들리고 숫자가 커진다');
     assert(battle103.includes('function comboUp(') && battle103.includes('function comboReset(') && battle103.includes("if (atk === 'me') comboUp();") && (battle103.match(/comboReset\(\);/g) || []).length >= 3 && css104.includes('.fx-combo'), 'V13.105 내가 연속으로 맞히면 2콤보부터 내 HUD 위에 콤보가 뜨고, 틀리거나 놓치면 0으로 돌아간다(화면 표시만)');
     assert(battle103.includes('if (e.fast && e.dmg) critStamp(def);') && battle103.includes("'CRITICAL!'") && battle103.includes("crit ? 'fx-shake-xl'"), 'V13.105 빠른 정답(fast)이면 CRITICAL! 도장과 더 센 흔들림이 나온다');
@@ -880,6 +880,14 @@ export async function runRewardsChecks(assert, expectStatus) {
         'V13.108 키보드의 보내기(Enter)는 단어를 치는 중이어도 지금까지 친 글자로 공격한다');
       assert(battle103.includes('function fitTyping()') && battle103.includes("window.visualViewport.addEventListener('resize'") && css108.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/6.4}'),
         'V13.108 키보드가 올라오면 경기장·단어·글자 칸·공격! 버튼이 키보드 위에 함께 보이게 줄이고 맞춰 스크롤한다');
+    }
+    /* ---------- V13.113 선생님 화면의 펫 도감 ---------- */
+    {
+      const teacher112 = source('../public/modules/teacher.js'), petbook112 = source('../public/modules/petbook.js'), css112 = source('../public/v13113.css'), css66 = source('../public/v1366.css');
+      assert(teacher112.includes("['petdex', '펫 도감', 'sparkle']") && teacher112.includes('petdex: teacherPetDex') && teacher112.includes("import { teacherPetDex } from './petbook.js';")
+        && petbook112.includes('export function teacherPetDex(A)') && petbook112.includes('card(key, ++no, { form: 3 }, ownersOf(key))') && petbook112.includes('<b>얻는 법</b>') && petbook112.includes('<b>보유 학생</b>')
+        && petbook112.includes("seasonOnSale()?.id === c.limited ? '있는' : '있었던'") && /\.teacher-app\.tv2 \.tv2-bottom-nav\{grid-template-columns:repeat\(7,/.test(css66) && css112.includes('.pb-teacher{') && source('./build-assets.mjs').includes('"v13113.css"'),
+        'V13.113 선생님 화면에 "펫 도감" 메뉴가 있어 펫 전체(모든 단계·특기·얻는 법)와 우리 학교 학생 보유 현황을 보고, 한정 펫 문구는 판매 중에는 "있는"이라고 쓴다');
     }
     /* ---------- V13.111 선생님 알 선물 ---------- */
     {

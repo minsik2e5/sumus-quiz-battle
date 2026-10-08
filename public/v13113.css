@@ -1,0 +1,12 @@
+/* ---------- V13.113 선생님 화면의 펫 도감 ---------- */
+.pb-teacher-sum{margin-bottom:14px}
+.pb-teacher-sum small b{color:#a15c00}
+.pb-card .pb-teacher{display:grid;gap:6px;margin-top:8px;padding-top:9px;border-top:1px dashed color-mix(in srgb,var(--pc) 35%,#e6e9ef)}
+.pb-teacher p{margin:0;font-size:12.5px;line-height:1.5;color:#475569;display:flex;flex-wrap:wrap;gap:4px 6px;align-items:baseline}
+.pb-teacher p>b{flex:none;font-size:11px;font-weight:900;color:#fff;background:#94a3b8;border-radius:6px;padding:1px 6px}
+.pb-owner-names span{padding:1px 8px;border-radius:999px;background:var(--ps);color:#334155;font-weight:800;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--pc) 30%,#fff)}
+.pb-owner-names em{font-style:normal;color:#64748b}
+.pb-owner-names em.partner{color:#0f766e;font-weight:800}
+.pb-owners.none{color:#94a3b8}
+.pb-card .pb-owners{font-variant-numeric:tabular-nums}
+@media (min-width:1100px){.teacher-main .pb-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
