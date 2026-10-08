@@ -14,6 +14,7 @@ import { BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, BOT_MIN_RIGHT } from './rew
 import { tournamentCard, openBracket } from './tournament-ui.js';
 import { openMiniGame } from './word-minigame-ui.js';
 import { bonusText } from './word-minigame.js';
+import { elementOf, paletteOf, fxShot, fxImpact, fxSpeedLines, fxPunch, fxSkillCutIn, fxShield, fxHeal, fxPowerUp, fxToxic, fxEdge, fxRank, comboRank, auraLevel } from './battle-fx.js';
 import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterOpen, stageLevel, stageMonster, isBossStage } from './monsters.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
@@ -105,6 +106,13 @@ function sfxThump(dmg, crit = false) {
   const tier = dmgTier(dmg);
   try { unlockAudio(); sweep(150 + tier * 10, 42, .16 + tier * .05, .05 + tier * .025); if (tier > 1 || crit) noise(.09 + tier * .03, .05 + tier * .03); if (crit) sweep(1400, 700, .12, .03, 'square', .02); } catch {}
   if (tier >= 3 || crit) buzzFx(crit ? [35, 25, 60] : 45);
+}
+// V13.115 the shot of an element leaves with its own whoosh (water bubbles up, ice rings high, fire roars low).
+const SHOT_SFX = { flame: [320, 120, 'sawtooth', .03], ice: [2400, 1500, 'triangle', .025], water: [380, 900, 'sine', .04], leaf: [900, 500, 'triangle', .025], earth: [160, 70, 'square', .035], wind: [1200, 380, 'triangle', .03], toxic: [260, 520, 'sine', .035], star: [900, 1700, 'triangle', .03] };
+function sfxShot(el, big = false) {
+  if (!soundOn()) return;
+  const [f0, f1, type, vol] = SHOT_SFX[el] || SHOT_SFX.star;
+  try { unlockAudio(); noise(.11, .03 + (big ? .02 : 0)); sweep(f0, f1, .18, vol + (big ? .015 : 0), type); } catch {}
 }
 function sfxCombo(n) {
   if (!soundOn()) return;
@@ -1015,6 +1023,7 @@ function refreshHud() {
     if (fill) { fill.style.width = pct + '%'; fill.style.backgroundColor = pct > 50 ? '#2fbf71' : pct > 20 ? '#f2b233' : '#e5484d'; }
     const hpn = document.getElementById('yb-hpn-' + side);
     if (hpn) hpn.textContent = Math.max(0, p.hp);
+    if (side === 'me') fxEdge(document.getElementById('yb-arena'), 'low', p.hp > 0 && pct <= 25 && B.view?.phase !== 'finished');
     const skill = p.skill || petSkill(p.pet), gauge = skill.need > 0 ? Math.min(p.gauge || 0, skill.need) : 0;
     const box = document.getElementById('yb-gauge-' + side);
     if (box) {
@@ -1250,6 +1259,17 @@ const sideOf = pid => pid === B.view.me ? 'me' : 'op';
 // skill, claw marks from a monster), then an impact ring, sparks and a shake that grows with
 // the damage. Everything is drawn over the arena and removed by itself.
 function fxColor(p) { return p?.monster ? (MONSTERS.find(x => x.key === p.monster.key)?.color || '#e5484d') : (CHARACTERS[petKey(p?.pet?.key)]?.color || '#f4c64f'); }
+// V13.115 which element a pet's skill is drawn with, and what else it shows (heal, shield, power-up, poison).
+const skillElement = p => p?.monster ? 'flame' : elementOf(p?.pet?.key);
+function skillExtras(side, other, p, e) {
+  const arena = document.getElementById('yb-arena'); if (!arena || reduced()) return;
+  const s = petSkill(p.pet), at = fxCenter(side, arena), el = skillElement(p);
+  if (!at) return;
+  if (e.heal) fxHeal(arena, at);
+  if (s.guard?.length) fxShield(arena, at, '#7fd0ff');
+  if (s.boost?.length) fxPowerUp(arena, at, el);
+  if (s.poison) { const foeAt = fxCenter(other, arena); if (foeAt) fxToxic(arena, foeAt); }
+}
 function fxCenter(side, arena) {
   const pet = document.getElementById('yb-pet-' + side); if (!pet) return null;
   const a = arena.getBoundingClientRect(), r = pet.getBoundingClientRect();
@@ -1257,21 +1277,30 @@ function fxCenter(side, arena) {
 }
 // V13.105: at most FX_MAX effect pieces at once; extra sparks are simply not drawn.
 const FX_MAX = 24;
-function fxAdd(arena, cls, css, ms) { const el = document.createElement('div'); if (cls === 'fx-spark' && arena.querySelectorAll('[data-fx]').length >= FX_MAX) return el; el.dataset.fx = ''; el.className = cls; Object.assign(el.style, css); arena.appendChild(el); setTimeout(() => el.remove(), ms); return el; }
+function fxAdd(arena, cls, css, ms) { const el = document.createElement('div'); if (cls === 'fx-spark' && arena.querySelectorAll('[data-fx]').length >= FX_MAX) return el; el.dataset.fx = ''; el.className = cls; for (const [key, value] of Object.entries(css)) key.startsWith('--') ? el.style.setProperty(key, value) : (el.style[key] = value); arena.appendChild(el); setTimeout(() => el.remove(), ms); return el; }
 function strike(atk, def, { dmg = 0, crit = false, skill = false, attacker = null } = {}) {
   const arena = document.getElementById('yb-arena'); if (!arena || reduced()) return;
   const from = fxCenter(atk, arena), to = fxCenter(def, arena); if (!from || !to) return;
-  const color = fxColor(attacker), big = skill || crit || dmg >= 22;
+  // V13.115 속성: a pet attacks with the element of its look (battle-fx.js); a monster keeps its own claws.
+  const el = attacker?.monster ? null : elementOf(attacker?.pet?.key);
+  const color = el ? paletteOf(attacker.pet.key).c1 : fxColor(attacker), big = skill || crit || dmg >= 22;
+  if (el) sfxShot(el, big);
   if (skill) {
     const len = Math.hypot(to.x - from.x, to.y - from.y), ang = Math.atan2(to.y - from.y, to.x - from.x);
     fxAdd(arena, 'fx-beam', { left: from.x + 'px', top: from.y + 'px', width: len + 'px', transform: `rotate(${ang}rad)`, '--fx': color }, 520);
+    if (el) fxShot(arena, from, to, el, { big: true, ms: 180 });
+  } else if (el) {
+    fxShot(arena, from, to, el, { big });
   } else {
     const shot = fxAdd(arena, 'fx-shot' + (big ? ' big' : ''), { left: from.x + 'px', top: from.y + 'px', '--fx': color }, 400);
     shot.animate([{ transform: 'translate(-50%,-50%) scale(.6)', opacity: .4 }, { transform: `translate(calc(-50% + ${to.x - from.x}px), calc(-50% + ${to.y - from.y}px)) scale(${big ? 1.5 : 1.1})`, opacity: 1 }], { duration: 230, easing: 'cubic-bezier(.3,.1,.7,1)', fill: 'forwards' });
   }
   setTimeout(() => {
     fxAdd(arena, 'fx-ring' + (big ? ' big' : ''), { left: to.x + 'px', top: to.y + 'px', '--fx': color }, 600);
-    for (let i = 0; i < (big ? 12 : 7); i++) {
+    if (el) {
+      fxImpact(arena, to, el, big ? 3 : dmgTier(dmg));
+      if (big) { fxSpeedLines(arena, to, el); fxPunch(arena, skill ? .06 : .04); }
+    } else for (let i = 0; i < (big ? 12 : 7); i++) {
       const a = Math.PI * 2 * i / (big ? 12 : 7) + Math.random() * .4, dist = (big ? 70 : 46) + Math.random() * 24;
       fxAdd(arena, 'fx-spark', { left: to.x + 'px', top: to.y + 'px', '--fx': color, '--dx': Math.cos(a) * dist + 'px', '--dy': Math.sin(a) * dist + 'px' }, 560);
     }
@@ -1321,8 +1350,14 @@ function comboUp() {
   const s = fxState(); s.combo++;
   if (s.combo >= 2) sfxCombo(s.combo);
   drawCombo(true);
+  // V13.115 a rank word at 3 · 5 · 8 · 12 in a row, and a glow around my pet from 5.
+  const rank = comboRank(s.combo), arena = document.getElementById('yb-arena');
+  if (rank && arena && !reduced()) { const at = fxCenter('me', arena); if (at) fxRank(arena, { x: at.x, y: at.y - 74 }, rank[1], rank[2]); }
+  setAura(auraLevel(s.combo));
 }
-function comboReset() { const s = fxState(); if (!s.combo) return; s.combo = 0; drawCombo(false); }
+function comboReset() { const s = fxState(); if (!s.combo) return; s.combo = 0; drawCombo(false); setAura(0); }
+// The glow (CSS classes fx-aura-1..3) around my pet while the combo is hot.
+function setAura(level) { const pet = document.getElementById('yb-pet-me'); if (pet) { pet.classList.remove('fx-aura-1', 'fx-aura-2', 'fx-aura-3'); if (level) pet.classList.add('fx-aura-' + level); } }
 function drawCombo(bump) {
   const hud = document.getElementById('yb-hud-me'); if (!hud) return;
   let box = document.getElementById('yb-combo');
@@ -1405,6 +1440,7 @@ function loop() {
     if (fever !== !!B.fever) {
       B.fever = fever;
       document.getElementById('yb-arena')?.classList.toggle('fever', fever);
+      fxEdge(document.getElementById('yb-arena'), 'fever', fever);
       clock?.parentElement.classList.toggle('fever', fever);
       if (fever) { flash('rgba(255,90,90,.55)'); sfx('fever', [60, 40, 60]); const banner = document.getElementById('yb-fever'); if (banner) { banner.hidden = false; later(() => { banner.hidden = true; }, 1800); } }
     }
@@ -1493,6 +1529,7 @@ function applyEvent(e) {
       else later(() => sfx('hurt', e.boost || e.fever ? [80, 40, 80] : 70), reduced() ? 0 : 230);
       say(`${atk === 'op' && !P[e.attacker].monster ? '상대 ' : ''}${esc(whoName(P[e.attacker]))}의 ${label}`, `${atk === 'me' ? '정답! 상대를 기다려요' : '상대가 맞혔어요'}${e.guard ? ` · ${def === 'me' ? '내' : '상대'} 펫이 ${e.guard}만큼 막았어요` : ''}`);
       lunge(atk);
+      if (e.guard && !reduced()) later(() => { const arena = document.getElementById('yb-arena'), at = arena && fxCenter(def, arena); if (at) fxShield(arena, at); }, 240);
       if (e.dmg) strike(atk, def, { dmg: e.dmg, crit: e.fast || e.fever, attacker: P[e.attacker] });
       // V13.105: my combo, the CRITICAL! stamp, a thump by damage and the finishing blow.
       if (atk === 'me') comboUp();
@@ -1511,15 +1548,21 @@ function applyEvent(e) {
     const p = P[e.player], side = sideOf(e.player), other = side === 'me' ? 'op' : 'me', foeId = v.order.find(id => id !== e.player);
     p.gauge = 0; p.effects = e.effects;
     P[e.player].hp = e.hp[e.player]; P[foeId].hp = e.hp[foeId];
+    // V13.115 컷인: the skill's band (element colors, the pet's picture, its name) sweeps in first, then the blow.
     later(() => {
       sfx('skill', side === 'me' ? 30 : 50);
       flash(side === 'me' ? 'rgba(255,214,90,.8)' : 'rgba(170,160,255,.65)');
+      const arena = document.getElementById('yb-arena');
+      if (arena && !reduced()) fxSkillCutIn(arena, { side, portrait: petArt(p, { size: 'mini' }), name: esc(e.name), desc: esc(e.desc), petName: esc(whoName(p)), el: skillElement(p) });
+    }, reduced() ? 0 : 380);
+    later(() => {
       skillBanner(side, `${side === 'op' && !p.monster ? '상대 ' : ''}${esc(whoName(p))}의 ${esc(e.name)}!`, e.desc);
       if (e.dmg) { strike(side, other, { dmg: e.dmg, skill: true, attacker: p }); hit(other); pop(other, `-${e.dmg} 스킬!`, 'crit'); }
       if (e.dmg) later(() => sfxThump(Math.max(28, e.dmg)), reduced() ? 0 : 180);
       if (e.heal) pop(side, `+${e.heal}`, 'heal');
+      skillExtras(side, other, p, e);
       refreshHud();
-    }, reduced() ? 0 : 520);
+    }, reduced() ? 0 : 880);
     refreshHud(); return;
   }
   // 초롱's poison bites as a word closes.
@@ -1527,7 +1570,7 @@ function applyEvent(e) {
     const side = sideOf(e.target);
     P[e.target].hp = e.hp;
     P[e.player].effects = { ...(P[e.player].effects || {}), poison: e.left };
-    later(() => { hit(side); pop(side, `-${e.dmg} ${dotName(P[e.player].pet)}`, 'poison'); refreshHud(); }, reduced() ? 0 : 700);
+    later(() => { const arena = document.getElementById('yb-arena'), at = arena && !reduced() && fxCenter(side, arena); if (at) fxToxic(arena, at); hit(side); pop(side, `-${e.dmg} ${dotName(P[e.player].pet)}`, 'poison'); refreshHud(); }, reduced() ? 0 : 700);
     refreshHud(); return;
   }
   if (e.type === 'end') {
