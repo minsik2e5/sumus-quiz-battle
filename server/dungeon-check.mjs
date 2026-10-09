@@ -1,7 +1,7 @@
 // Release checks for V13.120 던전 엔진 (server/dungeon-engine.mjs, docs/dungeon-design.md 2~8번):
 // 입장 조건, 등급컷 열림, 문제 풀 보충, 보기 수, 피해 계산, 파티 게이지, 기절·부활, 끊김·포기,
 // 휴식과 기록 시계, 보스 3페이즈, 만점 모드, 결과 보고 키, 시뮬레이션 클리어율.
-import { createDungeon, join, ready, leave, disconnect, reconnect, answer, tick, nextWake, view, openCuts, partyCuts, dungeonPool, hitDamage, floorSpec, gradeExtraMs, reportId, DUNGEON, CUTS, FLOORS, MONSTERS, TRAITS, BOSS } from './dungeon-engine.mjs';
+import { createDungeon, join, ready, leave, disconnect, reconnect, answer, tick, nextWake, view, openCuts, partyCuts, dungeonPool, hitDamage, floorSpec, gradeExtraMs, reportId, dungeonCoins, DUNGEON_COINS, DUNGEON, CUTS, FLOORS, MONSTERS, TRAITS, BOSS } from './dungeon-engine.mjs';
 import { clearRate, run, student, seeded } from './dungeon-sim.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
 
@@ -238,6 +238,12 @@ export function runDungeonChecks(assert) {
     const qs = q(s, 'p0');
     assert(qs.deadline - qs.started_at === FLOORS[0].limit.c3 + gradeExtraMs('중2') - 500 && Object.values(TRAITS).every(x => x.name && x.desc), 'V13.120 몬스터 특징마다 이름과 설명이 있고, 모래시계 마녀는 제한 시간을 0.5초 줄인다');
   }
+
+  /* ---------- 코인 (선생님 확정) ---------- */
+  assert(['c3', 'c2', 'c1'].map(cut => dungeonCoins({ cut, cleared: true, first: true })).join() === '150,300,500' && dungeonCoins({ cut: 'c1', cleared: true, first: true, today: 9 }) === 500, 'V13.120 던전 처음 클리어 코인: 3등급 컷 150 · 2등급 컷 300 · 1등급 컷 500(하루 횟수와 상관없이)');
+  assert(dungeonCoins({ cut: 'c3', cleared: true, right: 60 }) === 30 && dungeonCoins({ cut: 'c3', cleared: true, right: 200 }) === 40 && dungeonCoins({ cut: 'c2', cleared: true, right: 200 }) === 50 && dungeonCoins({ cut: 'c1', cleared: true, right: 200 }) === 60 && dungeonCoins({ cut: 'c1', cleared: true, right: 50 }) === 35, 'V13.120 던전 반복 클리어 코인: 정답 1개당 0.5 · 0.6 · 0.7, 한 판 최대 40 · 50 · 60');
+  assert(DUNGEON_COINS.daily === 3 && dungeonCoins({ cut: 'c3', cleared: true, right: 80, today: 2 }) === 40 && dungeonCoins({ cut: 'c3', cleared: true, right: 80, today: 3 }) === 0, 'V13.120 던전 반복 보상은 하루 3회까지(그 뒤에도 플레이는 되고 보상만 없다)');
+  assert(dungeonCoins({ cut: 'c3', cleared: false, right: 80 }) === 0 && dungeonCoins({ cut: 'c3', cleared: true, first: true, reward: false }) === 0 && dungeonCoins({ cut: 'max', cleared: true, first: true }) === 0 && dungeonCoins({ cut: 'c3', cleared: true, right: -5 }) === 0, 'V13.120 실패 · 봇 · 포기 · 만점 모드는 아직 코인이 없다(위로 보상 수치는 미정)');
 
   /* ---------- 같은 씨앗이면 같은 판 · 시뮬레이션 ---------- */
   const once = seed => { const r = seeded(seed); return JSON.stringify(run('c2', [student(r), student(r), student(r)], r, { grade: '중2', pets: ['dog', 'cat', 'owl'] })); };

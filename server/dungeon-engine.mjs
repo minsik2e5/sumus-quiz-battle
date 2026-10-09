@@ -7,7 +7,7 @@
 //
 // 수치는 server/dungeon-sim.mjs 시뮬레이션으로 3명 첫 도전 클리어율 60% · 35% · 10%에 맞춘 뒤,
 // 선생님 요청으로 제한 시간을 모두 1초 줄였다(52% · 18% · 1%).
-// 코인은 이 엔진이 정하지 않는다(서버가 문제 수와 난이도로 계산한다. 수치는 확인 뒤 기록·보상 세션에서).
+// 코인은 판 결과로 서버가 계산한다(dungeonCoins, 학생·방이 정하지 않는다). 지급 연결은 기록·보상 세션에서.
 import { elementOf } from '../public/modules/battle-fx.js';
 
 export const DUNGEON = {
@@ -457,6 +457,23 @@ function finish(state, now, cleared) {
   return [event(state, 'finished', { result: state.result })];
 }
 // 결과는 끝날 때 메인 상태 객체에 한 번 보고한다. 같은 방·같은 시작 시각이면 같은 키라 두 번 지급되지 않는다.
+// 코인 (2026-10-09 선생님 확정): 단계별 처음 클리어 3등급 150 · 2등급 300 · 1등급 500(+ 칭호),
+// 반복 클리어는 하루 3회까지 정답 1개당 0.5 · 0.6 · 0.7코인, 한 판 최대 40 · 50 · 60.
+// 실패 위로 · 만점 모드 도달 · 주간 1위 코인은 아직 정하지 않았다(0을 돌려준다).
+export const DUNGEON_COINS = {
+  first: { c3: 150, c2: 300, c1: 500 },
+  per_right: { c3: 0.5, c2: 0.6, c1: 0.7 },
+  again_max: { c3: 40, c2: 50, c1: 60 },
+  daily: 3
+};
+// 한 학생의 코인. `first`: 이 등급컷을 처음 깼는지, `today`: 오늘 이미 보상받은 던전 판 수.
+// 처음 클리어는 하루 횟수와 상관없이 준다. 봇·포기한 학생은 0.
+export function dungeonCoins({ cut, cleared, first = false, right = 0, today = 0, reward = true }) {
+  if (!reward || !cleared || !DUNGEON_COINS.first[cut]) return 0;
+  if (first) return DUNGEON_COINS.first[cut];
+  if (today >= DUNGEON_COINS.daily) return 0;
+  return Math.min(DUNGEON_COINS.again_max[cut], Math.floor(Math.max(0, Number(right) || 0) * DUNGEON_COINS.per_right[cut]));
+}
 export const reportId = state => `dungeon:${state.id}:${state.started_at ?? state.created_at}`;
 
 /* ---------- 답 · 시계 ---------- */
