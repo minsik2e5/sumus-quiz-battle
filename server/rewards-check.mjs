@@ -22,7 +22,7 @@ import { marketPrices } from './market.mjs';
 import { limitedFromEpic, giveGift, openGifts, giftEggPick } from './rewards.mjs';
 import { GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS } from '../public/modules/rewards.js';
 import { field as petField } from './pet-sim.mjs';
-import { SEASONS, LIMITED_PET_KEYS, seasonOnSale, seasonsOver } from '../public/modules/core.js';
+import { SEASONS, LIMITED_PET_KEYS, seasonOnSale, seasonsOver, seasonKeys, seasonStage } from '../public/modules/core.js';
 import { STOCKS, MARKET, MARKET_OPEN, tradeFee, newsText } from '../public/modules/market.js';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
@@ -559,7 +559,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(build88.includes('"v1388.css"'), 'V13.88 뽑기 그림 스타일이 빌드 목록에 있다');
 
   /* ---------- V13.89 전설 펫 ---------- */
-  assert(LEGENDARY_RATE === 0.5 && LEGENDARY_PITY === 150 && LEGENDARY_PET_KEYS.join() === 'haechi,phoenix,whale,qilin' && STANDARD_PET_KEYS.length === 16, 'V13.89 전설 펫은 네 마리, 0.5% 확률, 150회 확정이며 일반 펫과 분리된다');
+  assert(LEGENDARY_RATE === 0.5 && LEGENDARY_PITY === 150 && LEGENDARY_PET_KEYS.join() === 'haechi,whale,qilin,cheonma' && STANDARD_PET_KEYS.length === 16, 'V13.89 전설 펫은 네 마리(V13.118: 불새 대신 천마), 0.5% 확률, 150회 확정이며 일반 펫과 분리된다');
   const values = xs => () => xs.shift() ?? .99;
   const legendProfile = { pets: [{ key: 'dog' }], avatar_key: 'dog', lucky: { legend_pulls: 148 }, points_spent: 0 };
   const beforePity = pullLucky(legendProfile, 10, 100, { random: values([.5, .99]), now });
@@ -571,7 +571,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(LEGENDARY_PET_KEYS.every(key => CHARACTERS[key].legendary && petSkill({ key }).key === 'none'), 'V13.89 전설 펫에는 야차전 펫 특기가 없다');
   const lucky89 = source('../public/modules/lucky.js'), arcade89 = source('../public/modules/arcade.js'), service89 = source('./service.mjs'), css89 = source('../public/v1389.css'), build89 = source('./build-assets.mjs');
   assert(lucky89.includes('legend-egg-glow.webp') && lucky89.includes('legend-egg-burst.webp') && lucky89.includes('legend-badge.webp') && lucky89.includes('function legendaryShow(') && css89.includes('.lk-legend-show{') && build89.includes('"v1389.css"'), 'V13.89 전설 알의 빛남·깨짐·배지 연출과 전설 결과 화면이 빌드에 들어간다');
-  assert(arcade89.includes('LEGENDARY_RATE') && service89.includes('postNotice(state') && service89.includes('(season ? season.keys : epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter') && service89.includes('학생이 ${where}에서 전설 펫') && service89.includes("announceLegend(state, p, result.legendary.key, '행운 뽑기')"), 'V13.89 확률과 천장을 안내하고, 전설 획득은 학교에 알리며, 랜덤 알에서는 일반 펫만 나온다');
+  assert(arcade89.includes('LEGENDARY_RATE') && service89.includes('postNotice(state') && service89.includes('(season ? season.keys : epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter') && service89.includes('학생이 ${where}에서 ${rank} 펫') && service89.includes("announceLegend(state, p, result.legendary.key, '행운 뽑기')"), 'V13.89 확률과 천장을 안내하고, 전설 획득은 학교에 알리며, 랜덤 알에서는 일반 펫만 나온다');
   const fc90 = source('../public/modules/flashcards.js'), student90 = source('../public/modules/student.js'), app90 = source('../public/app.js'), css90 = source('../public/v1390.css');
   assert(fc90.includes('export function openFlashcards(') && fc90.includes('KNOWN_AT') && fc90.includes("data-fc=\"next-round\"") && fc90.includes("data-fc=\"star-left\"") && fc90.includes("'eng2mean' : 'mean2eng'") && student90.includes('data-flashcards="true"') && student90.includes('export function memorizeDeck(') && app90.includes('if (d.flashcards) return openCards();') && app90.includes('openFlashcards({') && css90.includes('.fc-cover{') && build89.includes('"v1390.css"'), 'V13.90 단어 학습에서 카드로 가리고 외우기: 커버를 끝까지 내리면 아는 카드, 헷갈리는 카드만 다음 라운드, ★ 담기와 확인 테스트');
   assert(css90.includes('.lk-machine{width:220px') && css90.includes('.lk-result-art{width:156px') && student90.includes('pet-care-more-v1390'), 'V13.90 코인 뽑기 기계·캡슐·결과 그림이 커지고, 펫이 여러 마리면 다른 펫도 돌볼 수 있다고 알려 준다');
@@ -813,7 +813,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     const basic = fresh(), basicEgg = openEgg(basic, { epic: false, missing: ['cat'], price: EGG_PRICE, random: values([0, 0]), now });
     assert(!basicEgg.legendary && basicEgg.key === 'cat' && basic.points_spent === 400, 'V13.98 랜덤 알에서는 전설이 나오지 않는다');
     const service98 = source('./service.mjs'), shop98 = source('../public/modules/pet-moments.js'), lucky98 = source('../public/modules/lucky.js');
-    assert(service98.includes("openEgg(p, { epic, season: season?.id || null, missing, price })") && service98.includes("announceLegend(state, p, key, '영웅 알')") && shop98.includes('if (res.legendary) { await legendaryShow(res); return true; }') && shop98.includes('if (res.legendary || res.epic || res.limited) { close(true); await eggShow(res, kind); return; }') && lucky98.includes('export function legendaryShow(') && lucky98.includes('res.legendary.egg'), 'V13.98 영웅 알에서 전설이 나오면 전설 연출이 나오고 학교 소식이 전해진다');
+    assert(service98.includes("openEgg(p, { epic, season: season?.id || null, missing, price })") && service98.includes("announceLegend(state, p, key, '영웅 알')") && shop98.includes('if (res.legendary) { await legendaryShow(res); return true; }') && shop98.includes('if (res.mythic || res.legendary || res.epic || res.limited) { close(true); await eggShow(res, kind); return; }') && lucky98.includes('export function legendaryShow(') && lucky98.includes('res.legendary.egg'), 'V13.98 영웅 알에서 전설이 나오면 전설 연출이 나오고 학교 소식이 전해진다');
     /* ---------- V13.98 가위바위보: 10분 넘게 둔 판은 이어 던지면 정리된다 ---------- */
     const day98 = dayKey(now), old98 = now - RPS_STALE_MS - 60000;
     const tie98 = { rps: { day: day98, plays: 1, live: { id: 'x', bet: 20, pot: 20, wins: 0, ties: 1, await: 'pick', at: old98 } }, points_spent: 20 };
@@ -844,7 +844,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(css98.includes('.yb-spell-input{position:absolute;inset:0') && css98.includes('font-size:16px') && css98.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/8.2}') && battle103.includes("classList.add('yb-typing')"), 'V13.103 키보드가 올라오면 전투 화면(경기장)이 줄어 단어와 글자 칸이 키보드 위에 보인다(16px 글자로 확대 방지)');
     /* ---------- V13.105 전투 화면 효과 ---------- */
     const css104 = source('../public/v13105fx.css'), build104 = source('./build-assets.mjs');
-    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css",\s*"v13109\.css",\s*"v13111\.css",\s*"v13112\.css",\s*"v13113\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
+    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css",\s*"v13109\.css",\s*"v13111\.css",\s*"v13112\.css",\s*"v13113\.css",\s*"v13118\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
     assert(battle103.includes('function hitStop(') && battle103.includes("classList.add('fx-stop')") && css104.includes('.yb-arena.fx-stop [data-fx]{animation-play-state:paused!important}') && battle103.includes('function dmgTier(') && battle103.includes("const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl']") && battle103.includes("` fx-num t${dmgTier(+dmg)}"), 'V13.105 맞는 순간 잠깐 멈추고(히트스톱), 데미지가 클수록 더 세게 흔들리고 숫자가 커진다');
     assert(battle103.includes('function comboUp(') && battle103.includes('function comboReset(') && battle103.includes("if (atk === 'me') comboUp();") && (battle103.match(/comboReset\(\);/g) || []).length >= 3 && css104.includes('.fx-combo'), 'V13.105 내가 연속으로 맞히면 2콤보부터 내 HUD 위에 콤보가 뜨고, 틀리거나 놓치면 0으로 돌아간다(화면 표시만)');
     assert(battle103.includes('if (e.fast && e.dmg) critStamp(def);') && battle103.includes("'CRITICAL!'") && battle103.includes("crit ? 'fx-shake-xl'"), 'V13.105 빠른 정답(fast)이면 CRITICAL! 도장과 더 센 흔들림이 나온다');
@@ -952,25 +952,25 @@ export async function runRewardsChecks(assert, expectStatus) {
     /* ---------- V13.109 할로윈 한정 펫 · 전투 배경 ---------- */
     {
       const kst = t => Date.parse(t + '+09:00');
-      const H = SEASONS.halloween;
-      assert(LIMITED_PET_KEYS.join() === 'pumpkincat,ghost' && LIMITED_PET_KEYS.every(key => petTier(key) === 'limited' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && petSkill({ key }).key === 'none')
-        && H.price === 600 && H.end === '2026-11-07' && H.after_rate === 5 && /11\/7/.test(H.until),
-        'V13.109 할로윈 한정 펫 2종(호박냥·부우)은 기본·영웅 알에 섞이지 않고, 야차전 특기가 없으며, 할로윈 알은 600코인에 11/7까지 판다');
-      assert(seasonOnSale(kst('2026-10-01T00:00:00'))?.id === 'halloween' && seasonOnSale(kst('2026-11-07T23:59:00'))?.id === 'halloween' && seasonOnSale(kst('2026-11-08T00:00:00')) === null && seasonOnSale(kst('2026-09-30T23:59:00')) === null
-        && seasonsOver(kst('2026-11-07T23:59:00')).length === 0 && seasonsOver(kst('2026-11-08T00:00:00')).join() === 'halloween',
-        'V13.109 할로윈 알은 한국 시간 11월 7일 밤까지 팔고, 11월 8일부터 판매가 끝난 시즌이 된다');
-      const after = kst('2026-11-20T12:00:00'), during = kst('2026-10-20T12:00:00');
+      const H = SEASONS.autumn;
+      assert(LIMITED_PET_KEYS.join() === 'pumpkincat,ghost,riceball,tissue,glue' && LIMITED_PET_KEYS.every(key => petTier(key) === 'limited' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && petSkill({ key }).key === 'none')
+        && H.price === 600 && H.end === '2026-11-30' && H.after_rate === 5 && /11월 30일/.test(H.until),
+        'V13.117 가을 이벤트 한정 펫 5종(호박냥·부우·주먹이·술술이·찰싹이)은 기본·영웅 알에 섞이지 않고, 야차전 특기가 없으며, 가을 이벤트 알은 600코인에 11/30까지 판다');
+      assert(seasonOnSale(kst('2026-10-01T00:00:00'))?.id === 'autumn' && seasonOnSale(kst('2026-11-30T23:59:00'))?.id === 'autumn' && seasonOnSale(kst('2026-12-01T00:00:00')) === null && seasonOnSale(kst('2026-09-30T23:59:00')) === null
+        && seasonsOver(kst('2026-11-30T23:59:00')).length === 0 && seasonsOver(kst('2026-12-01T00:00:00')).join() === 'autumn',
+        'V13.117 가을 이벤트 알은 한국 시간 11월 30일 밤까지 팔고, 12월 1일부터 판매가 끝난 시즌이 된다');
+      const after = kst('2026-12-05T12:00:00'), during = kst('2026-10-20T12:00:00');
       const kidL = () => ({ pets: [{ key: 'dog' }] });
       const always = () => 0, never = () => .99;
       assert(limitedFromEpic(kidL(), always, during) === null && LIMITED_PET_KEYS.includes(limitedFromEpic(kidL(), always, after)) && limitedFromEpic(kidL(), never, after) === null
-        && limitedFromEpic({ pets: [{ key: 'dog' }, { key: 'pumpkincat' }, { key: 'ghost' }] }, always, after) === null,
+        && limitedFromEpic({ pets: [{ key: 'dog' }, { key: 'pumpkincat' }, { key: 'ghost' }, { key: 'riceball' }, { key: 'tissue' }, { key: 'glue' }] }, always, after) === null,
         'V13.109 판매 기간에는 영웅 알에서 한정 펫이 나오지 않고, 기간이 끝나면 아직 없는 한정 펫이 5% 확률로 나온다(다 모으면 안 나온다)');
       let seq = [0.5, 0, 0]; const rnd = () => seq.length ? seq.shift() : 0;
       const egg = kidL(); const opened = openEgg(egg, { epic: true, missing: ['capybara'], price: 800, random: rnd, now: after });
       assert(opened.limited && LIMITED_PET_KEYS.includes(opened.key) && egg.pets.some(pet => pet.key === opened.key && pet.limited) && egg.purchases[0].item === 'epic_egg' && egg.purchases[0].limited,
         'V13.109 기간이 끝난 뒤 영웅 알을 사면 5% 확률로 한정 펫 알이 나온다(전설 1%가 먼저)');
-      const egg2 = kidL(); const opened2 = openEgg(egg2, { season: 'halloween', missing: ['ghost'], price: 600, random: () => 0, now: during });
-      assert(opened2.key === 'ghost' && opened2.limited && egg2.purchases[0].item === 'halloween_egg' && egg2.purchases[0].price === 600, 'V13.109 할로윈 알은 아직 없는 할로윈 펫을 준다');
+      const egg2 = kidL(); const opened2 = openEgg(egg2, { season: 'autumn', missing: ['ghost'], price: 600, random: () => 0, now: during });
+      assert(opened2.key === 'ghost' && opened2.limited && egg2.purchases[0].item === 'autumn_egg' && egg2.purchases[0].price === 600, 'V13.117 가을 이벤트 알은 아직 없는 이벤트 펫을 준다');
       const cap = { pets: [{ key: 'dog' }, { key: 'haechi' }], lucky: {} };
       seq = [0.01, 0.0, 0.0, 0.0, 0.0];
       const pulled = pullLucky(cap, LUCKY_BETS[0], 1000, { random: rnd, now: after });
@@ -981,11 +981,33 @@ export async function runRewardsChecks(assert, expectStatus) {
         && arcade109.includes('function seasonSlot(A)') && arcade109.includes('data-egg="season"') && petbook109.includes('LIMITED_PET_KEYS.map') && lucky109.includes("season ? 'LIMITED' : 'EPIC'"),
         'V13.109 서버는 판매 기간에만 할로윈 알을 팔고, 놀이터 알 상점 맨 위에 할로윈 알(마감일·D-day)이, 도감에 한정 펫 칸이 있다');
       const asset = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));
-      assert(['battle/bg-arena', 'battle/bg-practice', 'battle/bg-forest', 'battle/bg-boss', 'battle/bg-halloween', 'ui/halloween-egg', 'ui/limited-badge'].every(name => existsSync(asset(name)))
+      assert(['battle/bg-arena', 'battle/bg-practice', 'battle/bg-forest', 'battle/bg-boss', 'battle/bg-halloween', 'ui/halloween-egg', 'ui/limited-badge', 'ui/event-egg', 'ui/event-badge', 'ui/event-deco-autumn', 'ui/event-deco-cheer'].every(name => existsSync(asset(name)))
         && LIMITED_PET_KEYS.every(key => [0, 1, 2, 3].every(f => existsSync(asset(`pets/${key}-${f}`)) && existsSync(asset(`pets/${key}-${f}-s`))) && [1, 2, 3].every(f => ['happy', 'eat', 'sad', 'cheer'].every(e => existsSync(asset(`pets/${key}-${f}-${e}`)))))
         && expressionSrc('pumpkincat', 3, 'cheer') === '/assets/pets/pumpkincat-3-cheer.webp'
         && battle109.includes("const arenaBg = f => f?.monster ? (f.monster.boss ? 'bg-boss' : 'bg-forest')") && css109.includes('.yb-arena.has-bg{background:#1d2430 var(--yb-bg)'),
         'V13.109 할로윈 펫·아이콘·전투 배경 5장이 있고, 몬스터전은 숲(보스는 보스방), 로보는 연습장, 야차전은 아레나(할로윈 기간은 할로윈) 배경을 쓴다');
+    }
+    /* ---------- V13.117 가을 이벤트 알: 할로윈 펫 2종 + 응원 펫 3종을 한 알에서 ---------- */
+    {
+      const kst = t => Date.parse(t + '+09:00');
+      const core117 = source('../public/modules/core.js'), arcade117 = source('../public/modules/arcade.js'), moments117 = source('../public/modules/pet-moments.js'), battle117 = source('../public/modules/battle.js'), engine117 = source('../public/modules/battle-engine.js'), char117 = source('../public/modules/character.js');
+      const EVENT5 = ['pumpkincat', 'ghost', 'riceball', 'tissue', 'glue'];
+      assert(seasonKeys('autumn').join() === EVENT5.join() && !SEASONS.halloween && SEASONS.autumn.egg === '가을 이벤트 알' && SEASONS.autumn.start === '2026-10-01' && SEASONS.autumn.end === '2026-11-30',
+        'V13.117 가을 이벤트 알은 한 알에 한정 펫 5종이고(주먹이·술술이·찰싹이 추가) 10/1부터 11/30까지 판다');
+      assert(seasonStage(kst('2026-10-20T12:00:00')) === 'halloween' && seasonStage(kst('2026-11-07T23:59:00')) === 'halloween' && seasonStage(kst('2026-11-08T00:00:00')) === null && seasonOnSale(kst('2026-11-08T00:00:00'))?.id === 'autumn' && seasonStage(kst('2026-12-01T00:00:00')) === null,
+        'V13.117 전투 배경은 할로윈 그림을 11월 7일 밤까지만 쓰고, 알은 11월 30일까지 계속 판다');
+      const kid5 = { pets: [{ key: 'dog' }, { key: 'pumpkincat' }, { key: 'ghost' }] }, got = [], now5 = kst('2026-11-15T12:00:00');
+      for (let i = 0; i < 3; i++) { const miss = EVENT5.filter(k => !kid5.pets.some(pet => pet.key === k)); got.push(openEgg(kid5, { season: 'autumn', missing: miss, price: 600, random: () => 0, now: now5 }).key); }
+      assert(got.join() === 'riceball,tissue,glue' && new Set(kid5.pets.map(pet => pet.key)).size === kid5.pets.length && kid5.pets.filter(pet => pet.limited).length === 3,
+        'V13.117 한 알씩 열수록 겹치지 않게 아직 없는 이벤트 펫이 나온다(5마리 모으기 최대 5알 = 3,000코인)');
+      assert(EVENT5.every(key => petTier(key) === 'limited' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && petSkill({ key }).key === 'none') && ['riceball', 'tissue', 'glue'].every(key => engine117.includes("'" + key + "'") && char117.includes(key + ': { 0: EGG, 1: ALL, 2: ALL, 3: ALL }')),
+        'V13.117 새 한정 펫 3종은 한정 등급이고 야차전 특기가 없으며 그림(알·표정)이 등록돼 있다');
+      assert(arcade117.includes("uiArt('event-egg')") && arcade117.includes("uiArt('event-badge', 'egg-season-badge')") && arcade117.includes('호박냥 · 부우 · 주먹이 · 술술이 · 찰싹이 중 못 만난 친구') && moments117.includes("uiArt('event-egg')") && moments117.includes('가을 이벤트 한정 펫(할로윈 · 수능 응원)') && !arcade117.includes('halloween-egg') && !moments117.includes('halloween-egg'),
+        'V13.117 놀이터 알 상점과 알 가게 창은 가을 이벤트 알 그림·안내 문구를 쓴다');
+      assert(battle117.includes('seasonStage() ? `bg-${seasonStage()}`') && !battle117.includes('seasonOnSale') && core117.includes("stage: 'halloween', stage_end: '2026-11-07'"), 'V13.117 야차전 배경은 가을 이벤트(할로윈)를 11/7까지만 쓴다');
+      const asset5 = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));
+      assert(['riceball', 'tissue', 'glue'].every(key => [0, 1, 2, 3].every(f => existsSync(asset5(`pets/${key}-${f}`)) && existsSync(asset5(`pets/${key}-${f}-s`))) && [1, 2, 3].every(f => ['happy', 'eat', 'sad', 'cheer'].every(e => existsSync(asset5(`pets/${key}-${f}-${e}`)))) && existsSync(asset5(`pets/${key}-0-happy`)) && existsSync(asset5(`pets/${key}-0-eat`))),
+        'V13.117 주먹이·술술이·찰싹이의 그림(알·아기·성장·최종·작은 그림·표정·알 반응)이 모두 있다');
     }
     /* ---------- V13.101 로보 연습전·몬스터 끝내기 영수증 ---------- */
     {

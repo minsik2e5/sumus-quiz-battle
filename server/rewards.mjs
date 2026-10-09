@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
-import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, EPIC_PET_KEYS, STANDARD_PET_KEYS, EPIC_EGG_LEGENDARY_RATE, SEASONS, seasonKeys, seasonsOver } from '../public/modules/core.js';
+import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, EPIC_PET_KEYS, STANDARD_PET_KEYS, EPIC_EGG_LEGENDARY_RATE, SEASONS, seasonKeys, seasonsOver } from '../public/modules/core.js';
 import {
-  ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, drawLucky,
+  ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, MYTHIC_RATE, drawLucky,
   BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX, GIFT_LOG_KEEP, GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS,
   RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome
 } from '../public/modules/rewards.js';
@@ -30,6 +30,16 @@ import { MONSTER_LEVELS, MONSTER_DAILY, MONSTER_MIN_MS, MONSTER_MS_PER_RIGHT, MO
 const DAY_MS = 86400000;
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 export const secureRandom = () => randomBytes(4).readUInt32BE(0) / 2 ** 32;
+// V13.118 신화: any egg (shop egg, 영웅 알, coin capsule, teacher gift egg) can open as a mythic pet the student has not
+// met yet, at MYTHIC_RATE[source] percent, with no pity. The roll uses its own random source so that the checks can
+// set it (setMythicRandom) and a tiny real chance never flips one of them.
+let mythicRandom = secureRandom;
+export const setMythicRandom = fn => { mythicRandom = fn || secureRandom; };
+export function mythicRoll(p, source) {
+  const left = MYTHIC_PET_KEYS.filter(key => !(p.pets || []).some(pet => pet.key === key));
+  if (!left.length || !(mythicRandom() * 100 < (MYTHIC_RATE[source] || 0))) return null;
+  return left[Math.min(left.length - 1, Math.floor(mythicRandom() * left.length))];
+}
 
 export function rewardIncome(p) {
   return Number(p?.attendance?.coins || 0) + Number(p?.gacha?.refund || 0) + Number(p?.chance?.paid || 0) + Number(p?.lucky?.paid || 0) + chanceRefund(p)
@@ -75,6 +85,8 @@ export const giftsWaiting = p => (p?.gift_box?.log || []).filter(g => !g.opened)
 // it is 영웅). Always a pet the student does not have yet: a full tier moves to the other one, and
 // a student with every pet gets GIFT_EGG_FULL_COINS instead. Limited pets never come from it.
 export function giftEggPick(p, random = secureRandom) {
+  const mythicKey = mythicRoll(p, 'gift');
+  if (mythicKey) return { key: mythicKey, tier: 'mythic' };
   const has = key => (p.pets || []).some(pet => pet.key === key);
   const pick = list => list[Math.min(list.length - 1, Math.floor(random() * list.length))];
   const left = { basic: STANDARD_PET_KEYS.filter(k => !has(k)), epic: EPIC_PET_KEYS.filter(k => !has(k)) };
@@ -99,7 +111,7 @@ export function openGifts(p, now = Date.now(), random = secureRandom) {
       item.kind = 'egg';
       const egg = giftEggPick(p, random);
       if (egg) {
-        (p.pets ||= []).push({ key: egg.key, acquired_at: now, gift: true, ...(egg.tier === 'legendary' ? { legendary: true } : egg.tier === 'epic' ? { epic: true } : {}) });
+        (p.pets ||= []).push({ key: egg.key, acquired_at: now, gift: true, ...(egg.tier === 'mythic' ? { mythic: true } : egg.tier === 'legendary' ? { legendary: true } : egg.tier === 'epic' ? { epic: true } : {}) });
         if (egg.tier === 'legendary') { const l = p.lucky ||= {}; l.legend_key = egg.key; l.legend_at = now; }
         g.egg = item.egg = egg;
       } else {
@@ -247,9 +259,13 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
   }
   const odd = drawLucky(random);
   const paid = bet * odd.mult;
+  // V13.118: a tiny chance of a mythic pet first (no pity); then the legendary and 영웅 chances only when it was not mythic.
+  const mythicKey = mythicRoll(p, 'capsule');
+  let mythic = null;
+  if (mythicKey) { (p.pets ||= []).push({ key: mythicKey, acquired_at: now, mythic: true }); p.avatar_key = mythicKey; mythic = { key: mythicKey }; }
   let legendary = null;
   const hasLegend = (p.pets || []).some(pet => LEGENDARY_PET_KEYS.includes(pet.key));
-  if (!hasLegend) {
+  if (!mythic && !hasLegend) {
     l.legend_pulls = Number(l.legend_pulls || 0) + 1;
     const guaranteed = l.legend_pulls >= LEGENDARY_PITY;
     if (guaranteed || random() * 100 < LEGENDARY_RATE) {
@@ -264,7 +280,7 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
   // V13.92: not legendary this time, then a 3% chance of a 영웅 egg the student has not met yet.
   let epic = null;
   const epicLeft = EPIC_PET_KEYS.filter(key => !(p.pets || []).some(pet => pet.key === key));
-  if (!legendary && (p.pets || []).length && epicLeft.length && random() * 100 < EPIC_RATE) {
+  if (!mythic && !legendary && (p.pets || []).length && epicLeft.length && random() * 100 < EPIC_RATE) {
     // V13.109: after its season, a limited pet sometimes comes out of this 영웅 egg instead.
     const limited = limitedFromEpic(p, random, now);
     const key = limited || epicLeft[Math.min(epicLeft.length - 1, Math.floor(random() * epicLeft.length))];
@@ -276,8 +292,8 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
   // V13.98: today's net, kept apart from the log (which keeps only the last few pulls).
   if (l.net_day !== today) { l.net_day = today; l.net = 0; }
   l.net = Number(l.net || 0) + (ticket ? paid : paid - bet);
-  l.log = [...(l.log || []), { at: now, bet, mult: odd.mult, ticket, ...(legendary ? { legendary: legendary.key } : {}), ...(epic ? { epic: epic.key } : {}) }].slice(-LUCKY_LOG_KEEP);
-  return { bet, mult: odd.mult, name: odd.name, paid, ticket, legendary, epic, lucky: luckyView(p, now) };
+  l.log = [...(l.log || []), { at: now, bet, mult: odd.mult, ticket, ...(mythic ? { mythic: mythic.key } : {}), ...(legendary ? { legendary: legendary.key } : {}), ...(epic ? { epic: epic.key } : {}) }].slice(-LUCKY_LOG_KEEP);
+  return { bet, mult: odd.mult, name: odd.name, paid, ticket, mythic, legendary, epic, lucky: luckyView(p, now) };
 }
 
 /* ---------- V13.109 시즌 한정 펫 ---------- */
@@ -297,6 +313,15 @@ export function limitedFromEpic(p, random = secureRandom, now = Date.now()) {
 // V13.109: `season` is a season egg (its limited pets not met yet are `missing`); after a season,
 // a 영웅 알 may hold one of its limited pets instead (limitedFromEpic).
 export function openEgg(p, { epic, season = null, missing, price, random = secureRandom, now = Date.now() }) {
+  // V13.118: a basic or 영웅 egg (not a season egg) can open as a mythic pet, whatever the egg's own pool.
+  const mythicKey = season ? null : mythicRoll(p, epic ? 'epic' : 'basic');
+  if (mythicKey) {
+    (p.pets ||= []).push({ key: mythicKey, acquired_at: now, mythic: true });
+    p.points_spent = Number(p.points_spent || 0) + price;
+    (p.purchases ||= []).push({ item: epic ? 'epic_egg' : 'egg', key: mythicKey, price, at: now, mythic: true });
+    p.avatar_key = mythicKey;
+    return { key: mythicKey, legendary: false, limited: false, mythic: true };
+  }
   const hasLegend = (p.pets || []).some(pet => LEGENDARY_PET_KEYS.includes(pet.key));
   const legendary = !!epic && !hasLegend && random() * 100 < EPIC_EGG_LEGENDARY_RATE;
   const fromEpic = epic && !legendary ? limitedFromEpic(p, random, now) : null;

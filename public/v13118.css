@@ -1,0 +1,78 @@
+/* ---------- V13.118 신화 연출 · 도감 ---------- */
+/* The mythic reveal (lucky.js mythicShow): the pet's own scene fills the screen. Phases (classes on .mx):
+   p0 dark + omen · p1 egg rises · p2 heartbeats (k1..k3 cracks grow) · p3 last crack, light leaks · p4 flash, ring, stars
+   · p5 name cut · p6 the pet (result). */
+.mx{--mc:#7ba7e8;--ml:#d5e4fb;background:#06040f;color:#fff}
+.mx>*{position:absolute}
+.mx-bg{inset:0;background-size:cover;background-position:50% 55%;opacity:0;filter:brightness(.45) saturate(.9);transform:scale(1.12);transition:opacity 1.2s ease,filter 1.2s ease,transform 6s ease-out}
+.mx.p1 .mx-bg{opacity:.7;transform:scale(1.04)}
+.mx.p4 .mx-bg,.mx.mx-opened .mx-bg{opacity:1;filter:brightness(1) saturate(1.05);transform:scale(1)}
+.mx-dim{inset:0;background:radial-gradient(circle at 50% 46%,rgba(6,4,15,0) 0%,rgba(6,4,15,.55) 62%,rgba(6,4,15,.9) 100%);transition:opacity .6s}
+.mx.p4 .mx-dim,.mx.mx-opened .mx-dim{opacity:.35}
+.mx-aurora{left:-10%;top:-6%;width:120%;height:44%;object-fit:cover;opacity:0;mix-blend-mode:screen;transition:opacity 1.4s}
+.mx.p1 .mx-aurora{opacity:.8}.mx.mx-opened .mx-aurora{opacity:.55}
+.mx-rays{left:50%;top:46%;width:150vmax;height:150vmax;margin:-75vmax 0 0 -75vmax;object-fit:contain;opacity:0;mix-blend-mode:screen;animation:mx-spin 18s linear infinite;transition:opacity .5s}
+.mx.p3 .mx-rays{opacity:.45}.mx.p4 .mx-rays,.mx.mx-opened .mx-rays{opacity:.9}
+.mx-omen{left:0;right:0;top:36%;display:flex;flex-direction:column;align-items:center;gap:12px;opacity:0;transition:opacity .6s;pointer-events:none}
+.mx-omen i{width:72px;height:72px;border-radius:50%;background:radial-gradient(circle,#fff 0,var(--ml) 32%,transparent 70%);animation:mx-pulse 1.4s ease-in-out infinite}
+.mx-omen span{font-size:15px;font-weight:700;letter-spacing:.04em;color:#e9e4ff;text-shadow:0 2px 12px #000}
+.mx.p0 .mx-omen{opacity:1}.mx.p2 .mx-omen,.mx.p3 .mx-omen,.mx.p4 .mx-omen{opacity:0}
+.mx-stage{left:50%;top:46%;width:min(66vw,300px);aspect-ratio:1/1.12;transform:translate(-50%,-50%) translateY(40%) scale(.7);opacity:0;transition:transform 1s cubic-bezier(.2,.8,.2,1),opacity .6s}
+.mx.p1 .mx-stage{transform:translate(-50%,-50%);opacity:1}
+.mx.p4 .mx-stage{opacity:0;transform:translate(-50%,-50%) scale(1.5);transition:transform .35s ease-in,opacity .3s}
+.mx-egg{inset:0;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 0 28px var(--ml))}
+.mx-crack{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;mix-blend-mode:screen;transition:opacity .25s}
+.mx.k1 .c1,.mx.k2 .c1,.mx.k3 .c1{opacity:.9}
+.mx.k2 .c2,.mx.k3 .c2{opacity:.95}.mx.k3 .c3{opacity:1}.mx.k4 .c4{opacity:1;filter:brightness(1.8)}
+.mx.beat .mx-stage{animation:mx-beat .5s ease-out}
+.mx.b2 .mx-stage{animation-duration:.55s}.mx.b3 .mx-stage{animation-duration:.6s}
+.mx.p3 .mx-stage{animation:mx-shake .12s linear infinite}
+.mx-ring{left:50%;top:46%;width:30vmax;height:30vmax;margin:-15vmax 0 0 -15vmax;object-fit:contain;opacity:0;transform:scale(.2);mix-blend-mode:screen;pointer-events:none}
+.mx.p4 .mx-ring{animation:mx-ring 1.1s ease-out forwards}
+.mx-burst{left:50%;top:46%;width:90vmax;height:90vmax;margin:-45vmax 0 0 -45vmax;object-fit:contain;opacity:0;transform:scale(.1);mix-blend-mode:screen;pointer-events:none}
+.mx.p4 .mx-burst{animation:mx-burst 1.4s cubic-bezier(.1,.7,.2,1) forwards}
+.mx-flash{inset:0;background:#fff;opacity:0;pointer-events:none}
+.mx.p4 .mx-flash{animation:mx-flash .7s ease-out forwards}
+.mx-name{left:0;right:0;top:36%;height:150px;display:grid;place-items:center;opacity:0;transform:scale(.6);pointer-events:none}
+.mx-name img{position:absolute;left:50%;top:50%;width:min(112vw,520px);transform:translate(-50%,-50%);filter:drop-shadow(0 6px 22px rgba(0,0,0,.6))}
+.mx-name-kicker{position:relative;z-index:1;margin-top:-34px;font-size:12px;letter-spacing:.5em;font-weight:900;color:#fff4c2;text-shadow:0 0 12px #f8b84a}
+.mx-name b{position:relative;z-index:1;font-family:'Jua',sans-serif;font-weight:400;font-size:52px;line-height:1.05;color:#fff;text-shadow:0 3px 0 #6d28d9,0 0 22px var(--ml)}
+.mx.p5:not(.mx-opened) .mx-name{animation:mx-name 1.6s cubic-bezier(.2,.9,.2,1) forwards}
+.mx.mx-opened .mx-name{display:none}
+.mx-reveal{inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:calc(env(safe-area-inset-top,0px) + 12px) 18px calc(env(safe-area-inset-bottom,0px) + 16px);overflow:auto;z-index:4}
+.mx-reveal[hidden]{display:none}
+.mx-pet{position:relative;width:min(88vw,430px);aspect-ratio:1;flex:none;animation:mx-appear 1s cubic-bezier(.2,1.1,.3,1) both}
+.mx-aura{inset:0;position:absolute;width:100%;height:100%;object-fit:contain;mix-blend-mode:screen;animation:mx-spin 22s linear infinite;opacity:.85}
+.mx-art{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 16px 24px rgba(0,0,0,.55));animation:mx-float 3.6s ease-in-out infinite}
+.mx-sparkles{position:absolute;inset:-6%;width:112%;height:112%;object-fit:contain;mix-blend-mode:screen;animation:mx-twinkle 2.2s ease-in-out infinite}
+.mx-card{position:relative;width:min(92vw,440px);padding:16px 18px 14px;border-radius:22px;text-align:center;background:linear-gradient(180deg,rgba(24,14,58,.82),rgba(10,6,28,.9));border:1.5px solid rgba(255,230,150,.7);box-shadow:0 0 30px rgba(255,214,102,.35),inset 0 0 22px rgba(167,139,250,.25);animation:mx-in .6s .5s cubic-bezier(.3,1.4,.5,1) both}
+.mx-badge{position:absolute;left:50%;top:-30px;width:60px;height:60px;transform:translateX(-50%);filter:drop-shadow(0 4px 10px rgba(0,0,0,.5))}
+.mx-kicker{display:block;margin-top:18px;font-size:11px;font-weight:900;letter-spacing:.14em;color:#ffe9a0}
+.mx-card h2{margin:4px 0 0;font-size:22px;font-weight:900;color:#fff}
+.mx-card h3{margin:2px 0 6px;font-family:'Jua',sans-serif;font-weight:400;font-size:34px;line-height:1.1;color:#fff4c2;text-shadow:0 2px 0 #6d28d9,0 0 16px var(--ml)}
+.mx-card p{margin:0;font-size:14px;line-height:1.45;color:#ece7ff}
+.mx-card small{display:block;margin-top:4px;font-size:12px;color:#c9bff0}
+.mx-card .lk-actions{margin-top:12px;opacity:.35;transition:opacity .3s}.mx.ready .mx-card .lk-actions{opacity:1}
+.mx .lgx-rain{z-index:3}.mx .lgx-star{background:radial-gradient(circle,#fff 0 18%,transparent 20%),conic-gradient(from 45deg,#fff0b0 0 25%,transparent 0 50%,#fff0b0 0 75%,transparent 0);filter:drop-shadow(0 0 5px #ffd36a)}
+.mx .lk-skip{z-index:7}
+@keyframes mx-spin{to{transform:rotate(360deg)}}
+@keyframes mx-pulse{0%,100%{transform:scale(.8);opacity:.7}50%{transform:scale(1.25);opacity:1}}
+@keyframes mx-beat{0%{transform:translate(-50%,-50%) scale(1)}35%{transform:translate(-50%,-50%) scale(1.12)}100%{transform:translate(-50%,-50%) scale(1)}}
+@keyframes mx-shake{0%,100%{transform:translate(-50%,-50%) translateX(0)}25%{transform:translate(-50%,-50%) translateX(-5px)}75%{transform:translate(-50%,-50%) translateX(5px)}}
+@keyframes mx-ring{0%{opacity:.95;transform:scale(.2)}100%{opacity:0;transform:scale(2.2)}}
+@keyframes mx-burst{0%{opacity:1;transform:scale(.1) rotate(0)}100%{opacity:0;transform:scale(1.15) rotate(40deg)}}
+@keyframes mx-flash{0%{opacity:1}100%{opacity:0}}
+@keyframes mx-name{0%{opacity:0;transform:scale(.6)}25%{opacity:1;transform:scale(1.04)}80%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.08)}}
+@keyframes mx-appear{0%{opacity:0;transform:scale(.55) translateY(30px)}100%{opacity:1;transform:none}}
+@keyframes mx-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes mx-twinkle{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes mx-in{0%{opacity:0;transform:translateY(24px) scale(.94)}100%{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.mx-rays,.mx-aura,.mx-art,.mx-sparkles,.mx-omen i{animation:none!important}.mx-pet,.mx-card{animation:none!important}.mx-bg{transition:none}}
+/* The dex and the teacher's dex: the mythic tier (above legendary) */
+.pb-section.mythic{color:#7c3aed}.pb-section.mythic small{color:#8b5cf6}
+.pb-card.mythic{border:1.5px solid transparent;background:linear-gradient(var(--ps,#faf7ff),var(--ps,#faf7ff)) padding-box,linear-gradient(135deg,#ffd36a,#f472b6,#8b5cf6,#38bdf8) border-box;box-shadow:0 6px 18px rgba(139,92,246,.2)}
+.pb-card.mythic.unmet{filter:saturate(.8)}
+.pb-mythic{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:900;color:#fff;background:linear-gradient(90deg,#8b5cf6,#ec4899);letter-spacing:.04em}
+.pb-skill.mythic{background:linear-gradient(90deg,#ede9fe,#fce7f3);color:#6d28d9}
+.cel-gift.mythic .cel-egg-tier,.cel-egg.mythic .cel-egg-tier{background:linear-gradient(90deg,#8b5cf6,#ec4899);color:#fff}
+.cel-egg.mythic{border-color:#c4b5fd;box-shadow:0 0 18px rgba(167,139,250,.55)}

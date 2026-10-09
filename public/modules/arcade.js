@@ -81,13 +81,13 @@ function seasonSlot(A) {
   const days = Math.round((Date.parse(s.end) - Date.parse(kst)) / 86400000);
   const label = !missing ? '모두 모았어요' : short ? `<span>${coin()}${num(s.price)}</span><small>${num(short)}코인 부족</small>` : `<span>${coin()}${num(s.price)}</span><small>사기</small>`;
   return `<div class="egg-slot season ${s.id}${!missing ? ' done' : ''}">
-    <span class="egg-season-deco moon" aria-hidden="true">${uiArt('halloween-deco-moon')}</span>
-    <span class="egg-season-deco pumpkins" aria-hidden="true">${uiArt('halloween-deco-pumpkins')}</span>
-    <div class="egg-slot-art" aria-hidden="true">${uiArt('halloween-egg')}</div>
+    <span class="egg-season-deco moon" aria-hidden="true">${uiArt('event-deco-autumn')}</span>
+    <span class="egg-season-deco pumpkins" aria-hidden="true">${uiArt('event-deco-cheer')}</span>
+    <div class="egg-slot-art" aria-hidden="true">${uiArt('event-egg')}</div>
     <div class="egg-season-text">
-      <span class="egg-slot-tag">${uiArt('limited-badge', 'egg-season-badge')}${s.name} 한정</span>
+      <span class="egg-slot-tag">${uiArt('event-badge', 'egg-season-badge')}${s.name} 한정</span>
       <b class="egg-slot-name">${esc(s.egg)}</b>
-      <small class="egg-slot-sub">${missing ? `호박냥 · 부우 중 못 만난 친구 ${missing}마리` : '할로윈 한정 펫을 다 모았어요'}</small>
+      <small class="egg-slot-sub">${missing ? `호박냥 · 부우 · 주먹이 · 술술이 · 찰싹이 중 못 만난 친구 ${missing}마리` : '가을 이벤트 펫을 다 모았어요'}</small>
       <em class="egg-season-until">${Number(s.end.slice(5, 7))}/${Number(s.end.slice(8))}까지 판매${days >= 0 ? ` · ${days ? `D-${days}` : '오늘 마지막!'}` : ''}</em>
       <button type="button" class="egg-slot-buy" data-action="egg-buy" data-egg="season" ${!missing || short ? 'disabled' : ''} aria-label="${esc(s.egg)} ${num(s.price)}코인${short ? `, ${num(short)}코인 부족` : ''}">${label}</button>
     </div>
@@ -191,7 +191,7 @@ async function pull(A, ticket, button) {
     if (rewards(A).gacha) rewards(A).gacha.tickets = res.lucky.tickets;
     await machineDrop(machine);
     const balance = Number(res.points_balance);
-    if (res.legendary || res.epic) {
+    if (res.mythic || res.legendary || res.epic) {
       if (res.profile) Object.assign(A.data.profile, res.profile);
       if (res.stats) Object.assign(A.data.stats, res.stats);
     }
