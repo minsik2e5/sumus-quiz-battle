@@ -1,0 +1,90 @@
+/* ---------- V13.127 고등 단어 고르기 다듬기 ----------
+   과 칩(고른 개수 + 진행 막대) 바로 아래에 그 과의 카드 하나: 머리(큰 개수 · 전체/비우기) · 진행 막대 ·
+   20개씩 구간 칸(칸마다 채움 막대, 단어 학습은 ✓외운 수) · 접히는 직접 고르기(미리보기).
+   시험은 아래 고정 바에 합계와 시작 버튼. 움직임은 transform/opacity만, 동작 줄이기에서는 끈다. */
+:root{--hp-green:#13a77d;--hp-deep:#087a56;--hp-soft:#effbf6;--hp-line:#e1e6ec;--hp-ink:#20332d;--hp-sub:#8b9994;--hp-warn:#c2410c}
+
+/* 과 칩 */
+.memorize-range-strip.hp-strip-v13127{background:none!important;padding-bottom:4px;margin-bottom:0}
+.hp-chip-v13127{position:relative;overflow:hidden;gap:4px!important}
+.hp-chip-v13127 small b{color:var(--hp-deep);font-weight:900}
+.hp-chip-v13127.has-pick:not(.selected){border-color:#bce9db}
+.hp-chip-v13127 .hp-chip-bar{position:absolute;left:12px;right:12px;bottom:8px;height:3px;border-radius:9px;background:#edf1f4;overflow:hidden}
+.hp-chip-v13127 .hp-chip-bar i{display:block;height:100%;border-radius:inherit;background:var(--hp-green)}
+.hp-chip-v13127.selected{box-shadow:0 10px 22px rgba(18,185,129,.14)!important}
+.hp-chip-v13127.selected:after{content:"";position:absolute;left:50%;bottom:-1px;width:14px;height:7px;transform:translateX(-50%);background:#fff;clip-path:polygon(50% 0,100% 100%,0 100%)}
+
+/* 카드 */
+.hp-card-v13127{margin-top:8px;padding:16px 14px 14px;border:1px solid #d6efe5;border-radius:24px;background:linear-gradient(180deg,#fff 0,#fbfefd 100%);box-shadow:0 12px 30px rgba(20,52,43,.07)}
+.hp-head-v13127{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.hp-title small{display:block;font-size:11px;font-weight:850;color:#55947e;letter-spacing:-.01em}
+.hp-title strong{display:flex;align-items:baseline;gap:5px;margin-top:3px;color:var(--hp-ink)}
+.hp-title strong b{font-size:30px;line-height:1;font-weight:900;letter-spacing:-.04em;color:var(--hp-deep);font-variant-numeric:tabular-nums}
+.hp-title strong span{font-size:13px;font-weight:750;color:var(--hp-sub)}
+.hp-head-actions{display:flex;gap:6px;flex:0 0 auto}
+.hp-head-actions button{min-height:34px;padding:0 12px;border:1px solid var(--hp-line);border-radius:999px;background:#fff;color:#4d5b6c;font-size:12px;font-weight:850;touch-action:manipulation}
+.hp-head-actions button:first-child{color:var(--hp-deep);border-color:#bce9db;background:var(--hp-soft)}
+.hp-head-actions button:disabled{opacity:.42}
+.hp-meter-v13127{height:6px;margin:12px 0 14px;border-radius:9px;background:#edf2f0;overflow:hidden}
+.hp-meter-v13127 i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#34c99a,var(--hp-green));transition:width .28s cubic-bezier(.2,.8,.2,1)}
+
+/* 구간 칸 */
+.hp-tiles-v13127{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:7px}
+.hp-tile-v13127{position:relative;overflow:hidden;min-height:58px;padding:8px 6px 11px;border:1px solid var(--hp-line);border-radius:15px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;touch-action:manipulation;transition:transform .12s ease,border-color .15s ease,background .15s ease}
+.hp-tile-range{font-size:13px;font-weight:900;color:#3f4b5a;letter-spacing:-.03em;font-variant-numeric:tabular-nums}
+.hp-tile-count{font-size:10px;font-weight:800;color:#9aa4b2;font-variant-numeric:tabular-nums}
+.hp-tile-known{position:absolute;top:4px;right:5px;font-style:normal;font-size:9px;font-weight:900;color:#7c6ad8;letter-spacing:-.02em}
+.hp-tile-fill{position:absolute;left:8px;right:8px;bottom:5px;height:3px;border-radius:9px;background:#eef1f4;overflow:hidden}
+.hp-tile-fill i{display:block;height:100%;border-radius:inherit;background:var(--hp-green)}
+.hp-tile-v13127.part{border-color:#bce9db;background:#f6fcf9}
+.hp-tile-v13127.part .hp-tile-count{color:var(--hp-deep)}
+.hp-tile-v13127.full{border-color:var(--hp-green);background:var(--hp-green);box-shadow:0 7px 16px rgba(19,167,125,.2)}
+.hp-tile-v13127.full .hp-tile-range{color:#fff}
+.hp-tile-v13127.full .hp-tile-count{color:#d9fff1}
+.hp-tile-v13127.full .hp-tile-known{color:#fff}
+.hp-tile-v13127.full .hp-tile-fill{background:rgba(255,255,255,.28)}
+.hp-tile-v13127.full .hp-tile-fill i{background:#fff}
+.hp-tile-v13127:active{transform:scale(.95)}
+.hp-hint-v13127{margin:10px 2px 0;font-size:11px;font-weight:700;color:var(--hp-sub);line-height:1.45;word-break:keep-all}
+.hp-card-v13127.is-empty .hp-hint-v13127{color:var(--hp-deep)}
+.hp-card-v13127.is-empty .hp-tile-v13127:first-child{border-color:var(--hp-green);box-shadow:0 0 0 3px rgba(19,167,125,.12)}
+
+/* 직접 고르기 */
+.hp-direct-v13127{margin-top:12px;border-radius:18px!important}
+.hp-direct-toggle{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px;padding:12px 14px;border:0;background:#f8fbfa;text-align:left;touch-action:manipulation}
+.hp-direct-toggle strong{display:block;font-size:14px;letter-spacing:-.03em;color:var(--hp-ink)}
+.hp-direct-toggle small{display:block;margin-top:2px;font-size:11px;color:var(--hp-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hp-direct-toggle i{font-style:normal;font-size:11px;font-weight:850;color:var(--hp-deep);white-space:nowrap}
+.hp-direct-toggle i:after{content:"";display:inline-block;width:6px;height:6px;margin-left:6px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-2px) rotate(45deg);transition:transform .2s ease}
+.hp-direct-toggle[aria-expanded="true"]{border-bottom:1px solid #edf2f0}
+.hp-direct-toggle[aria-expanded="true"] i:after{transform:translateY(1px) rotate(-135deg)}
+.hp-list-v13127{max-height:min(44vh,360px)}
+
+/* 시험: 아래 고정 바 */
+.exam-start-inline.hp-dock-v13127{position:sticky;bottom:calc(84px + env(safe-area-inset-bottom));z-index:12;padding:12px 12px 12px!important;border:1px solid #d6efe5;border-radius:22px!important;background:rgba(255,255,255,.95)!important;box-shadow:0 12px 34px rgba(20,52,43,.14)!important;backdrop-filter:blur(14px)}
+.hp-dock-v13127 p{margin:0 2px 9px!important;display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 8px;text-align:left!important;white-space:normal!important}
+.hp-dock-v13127 p span{font-size:10px!important;font-weight:850;color:#55947e}
+.hp-dock-v13127 p b{flex-basis:100%;font-size:15px;font-weight:900;color:var(--hp-deep);letter-spacing:-.03em;word-break:keep-all;font-variant-numeric:tabular-nums}
+.hp-dock-v13127 p em{flex-basis:100%;font-style:normal;font-size:11px;font-weight:800;color:var(--hp-warn)}
+.hp-dock-v13127.empty{border-color:var(--hp-line)}
+.hp-dock-v13127.empty p b{color:#9aa4b2}
+.hp-dock-v13127.over{border-color:#fdba8c;background:rgba(255,247,241,.96)!important}
+.hp-dock-v13127.over p b{color:var(--hp-warn)}
+
+/* 연출: 방금 누른 칸이 톡, 개수가 바뀌면 숫자가 통 */
+@keyframes hp-pop{0%{transform:scale(.92)}55%{transform:scale(1.06)}100%{transform:scale(1)}}
+@keyframes hp-sweep{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes hp-bump{0%{transform:translateY(5px);opacity:.3}60%{transform:translateY(-2px);opacity:1}100%{transform:none}}
+.hp-tile-v13127.just{animation:hp-pop .32s cubic-bezier(.2,.9,.3,1.2)}
+.hp-tile-v13127.just .hp-tile-fill i{transform-origin:left;animation:hp-sweep .36s ease-out}
+.hp-title strong.bump b{display:inline-block;animation:hp-bump .3s ease-out}
+@media (prefers-reduced-motion:reduce){
+  .hp-tile-v13127.just,.hp-tile-v13127.just .hp-tile-fill i,.hp-title strong.bump b{animation:none}
+  .hp-meter-v13127 i,.hp-tile-v13127{transition:none}
+}
+@media (max-width:420px){
+  .hp-card-v13127{padding:14px 12px 12px;border-radius:22px}
+  .hp-tiles-v13127{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+  .hp-tile-v13127{min-height:54px;border-radius:14px}
+  .hp-tile-range{font-size:12.5px}
+}
