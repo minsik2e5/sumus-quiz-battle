@@ -1,8 +1,12 @@
-import { service, sweep, preauthenticateLogin, settleBattle, runEveningReminders } from '../server/service.mjs';
+import { service, sweep, preauthenticateLogin, settleBattle, undoDungeon, runEveningReminders } from '../server/service.mjs';
+import { createDungeonReporter } from '../server/dungeon-reports.mjs';
 import { sendPush } from '../server/push.mjs';
 import { dropEndpoints } from '../server/notify.mjs';
 import { BattleRoom, battleReportKey } from './battle-room.mjs';
 export { BattleRoom };
+// V13.128 던전 방: 파티 하나에 방 하나.
+import { DungeonRoom, dungeonReportKey } from './dungeon-room.mjs';
+export { DungeonRoom };
 import { selfSignup } from '../server/signup.mjs';
 import { examAdmin } from '../server/exam-admin.mjs';
 import { migrateState, stateSizeReport } from '../server/state.mjs';
@@ -280,6 +284,14 @@ export class VocaStateObject {
         await this.mutations.durable(state => settleBattle(state, body) ? { ok: true } : NO_MUTATION);
         return json({ ok: true });
       }
+      // V13.128: 던전 방이 끝난 판(또는 시작 못 하고 닫힌 방)을 한 번 보고한다. 같은 report_id는 한 번만 처리.
+      if (url.pathname === '/api/internal/dungeon-result') {
+        if (request.headers.get('X-Dungeon-Key') !== await dungeonReportKey(this.env)) throw Object.assign(Error('허용되지 않은 요청입니다.'), { status: 403 });
+        // 몰려 온 보고는 모아서 한 번에, 이미 처리한 보고는 복사 없이 바로 끝낸다(server/dungeon-reports.mjs).
+        this.dungeonReporter ||= createDungeonReporter({ current: () => this.mutations.current(), durable: fn => this.mutations.durable(fn) });
+        await this.dungeonReporter(body);
+        return json({ ok: true });
+      }
       const address = request.headers.get('CF-Connecting-IP') || 'unknown';
       const cookie = request.headers.get('cookie') || '';
       const token = cookie.split(';').map(value => value.trim()).find(value => value.startsWith('sumus_session='))?.slice(14) || '';
@@ -302,6 +314,9 @@ export class VocaStateObject {
       if (url.pathname === '/api/profile/password') this.rateLimit(`${address}:password:${hashToken(token).slice(0, 16)}`, 8, 15 * 60000, '비밀번호 변경 시도가 많습니다. 잠시 후 다시 시도해주세요.');
       if (url.pathname === '/api/battle/join' || url.pathname === '/api/battle/preview') {
         this.rateLimit(`${address}:battle-join`, 30, 10 * 60000, '대결 방 참가 시도가 많아요. 잠시 후 다시 시도해주세요.');
+      }
+      if (url.pathname === '/api/dungeon/join' || url.pathname === '/api/dungeon/preview') {
+        this.rateLimit(`${address}:dungeon-join`, 30, 10 * 60000, '던전 방 참가 시도가 많아요. 잠시 후 다시 시도해주세요.');
       }
       if (this.rates.size > 10000) {
         for (const [key, values] of this.rates) if (values.at(-1) < Date.now() - 30 * 60000) this.rates.delete(key);
@@ -339,13 +354,25 @@ export class VocaStateObject {
       // `_battles` (V13.66) carries several room messages, e.g. when a tournament is called off.
       const roomMessages = [...(result?._battle ? [result._battle] : []), ...(Array.isArray(result?._battles) ? result._battles : [])];
       const pushMessages = Array.isArray(result?._push) ? result._push : [];
-      if (result && typeof result === 'object') { delete result._battle; delete result._battles; delete result._push; }
+      // V13.128 던전 방 준비(문제와 입장표는 방에만 간다).
+      const dungeonMessages = result?._dungeon ? [result._dungeon] : [];
+      if (result && typeof result === 'object') { delete result._battle; delete result._battles; delete result._push; delete result._dungeon; }
       for (const message of roomMessages) {
         const room = this.env.BATTLE_ROOM.get(this.env.BATTLE_ROOM.idFromName(message.id));
         const reply = await room.fetch('https://battle/admin', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(message) }).catch(() => null);
         if (!reply?.ok && message.action !== 'cancel') {
           await this.mutations.durable(state => settleBattle(state, { id: message.id, reason: 'cancelled' }) ? true : NO_MUTATION);
           throw Object.assign(Error('대결 방을 준비하지 못했어요. 잠시 후 다시 시도해주세요.'), { status: 503 });
+        }
+      }
+      for (const message of dungeonMessages) {
+        const room = this.env.DUNGEON_ROOM.get(this.env.DUNGEON_ROOM.idFromName(message.id));
+        const reply = await room.fetch('https://dungeon/admin', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(message) }).catch(() => null);
+        if (!reply?.ok && message.action !== 'leave') {
+          // 방이 받지 못했다(가득 참, 이미 시작함, 연결 실패): 메인 상태를 되돌리고 방의 이유를 알려 준다.
+          const why = await reply?.json().catch(() => null);
+          await this.mutations.durable(state => undoDungeon(state, message) ? true : NO_MUTATION);
+          throw Object.assign(Error(why?.error || '던전 방을 준비하지 못했어요. 잠시 후 다시 시도해주세요.'), { status: reply && reply.status < 500 ? 409 : 503 });
         }
       }
       // After the rooms are ready: a 도전장 for a room that failed to open is never sent.
@@ -418,6 +445,14 @@ export default {
       const origin = request.headers.get('origin');
       if (origin && new URL(origin).host !== url.host) return securityHeaders(json({ error: '허용되지 않은 요청입니다.' }, 403), url.pathname);
       return env.BATTLE_ROOM.get(env.BATTLE_ROOM.idFromName(battleSocket[1])).fetch(request);
+    }
+    // V13.128 던전 방 소켓도 방으로 바로 간다.
+    const dungeonSocket = url.pathname.match(/^\/api\/dungeon\/ws\/([0-9a-f-]{36})$/);
+    if (dungeonSocket) {
+      if (request.headers.get('Upgrade') !== 'websocket') return securityHeaders(json({ error: 'WebSocket 연결이 필요해요.' }, 426), url.pathname);
+      const origin = request.headers.get('origin');
+      if (origin && new URL(origin).host !== url.host) return securityHeaders(json({ error: '허용되지 않은 요청입니다.' }, 403), url.pathname);
+      return env.DUNGEON_ROOM.get(env.DUNGEON_ROOM.idFromName(dungeonSocket[1])).fetch(request);
     }
     if (url.pathname.startsWith('/api/')) {
       const id = env.VOCA_STATE.idFromName('main');
