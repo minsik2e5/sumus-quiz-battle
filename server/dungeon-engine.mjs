@@ -5,8 +5,8 @@
 // 상태는 평범한 JSON이라 메시지 사이에 저장할 수 있고, 무작위도 상태 안의 씨앗(seed)으로만 뽑는다.
 // 정답 판정과 방 시계가 여기(서버)에 있어서 폰은 선택 번호만 보낸다(야차전 방식).
 //
-// 수치는 server/dungeon-sim.mjs 시뮬레이션으로 3명 첫 도전 클리어율
-// 3등급 컷 약 60% · 2등급 컷 약 35% · 1등급 컷 약 10%에 맞췄다.
+// 수치는 server/dungeon-sim.mjs 시뮬레이션으로 3명 첫 도전 클리어율 60% · 35% · 10%에 맞춘 뒤,
+// 선생님 요청으로 제한 시간을 모두 1초 줄였다(52% · 18% · 1%).
 // 코인은 이 엔진이 정하지 않는다(서버가 문제 수와 난이도로 계산한다. 수치는 확인 뒤 기록·보상 세션에서).
 import { elementOf } from '../public/modules/battle-fx.js';
 
@@ -71,12 +71,12 @@ export const CUT_KEYS = ['c3', 'c2', 'c1', 'max'];
 // 12·14·16·18·20·40은 한 판이 약 4분이라 7~9분이 되게 ×1.8 했고, 피격을 낮춰 클리어율을 맞췄다, limit는 등급컷별 한 문제 제한 시간.
 // 피격(hitAdd)은 등급컷 피격에 더한다. 보스는 마지막 줄.
 export const FLOORS = [
-  { floor: 1, options: 4, limit: { c3: 9000, c2: 8000, c1: 7000 }, hp: 54, hitAdd: 0, bg: '야자 교실' },
-  { floor: 2, options: 4, limit: { c3: 8000, c2: 7000, c1: 6000 }, hp: 61, hitAdd: 1, bg: '복도' },
-  { floor: 3, options: 5, limit: { c3: 7500, c2: 6500, c1: 5500 }, hp: 68, hitAdd: 2, bg: '과학실' },
-  { floor: 4, options: 5, limit: { c3: 7000, c2: 6000, c1: 5000 }, hp: 76, hitAdd: 3, bg: '도서관 서고' },
-  { floor: 5, options: 6, limit: { c3: 6500, c2: 5500, c1: 4500 }, hp: 83, hitAdd: 4, bg: '채점실' },
-  { floor: 6, options: 6, limit: { c3: 6000, c2: 5000, c1: 4000 }, hp: 173, hitAdd: 5, bg: '보스방', boss: true }
+  { floor: 1, options: 4, limit: { c3: 8000, c2: 7000, c1: 6000 }, hp: 54, hitAdd: 0, bg: '야자 교실' },
+  { floor: 2, options: 4, limit: { c3: 7000, c2: 6000, c1: 5000 }, hp: 61, hitAdd: 1, bg: '복도' },
+  { floor: 3, options: 5, limit: { c3: 6500, c2: 5500, c1: 4500 }, hp: 68, hitAdd: 2, bg: '과학실' },
+  { floor: 4, options: 5, limit: { c3: 6000, c2: 5000, c1: 4000 }, hp: 76, hitAdd: 3, bg: '도서관 서고' },
+  { floor: 5, options: 6, limit: { c3: 5500, c2: 4500, c1: 3500 }, hp: 83, hitAdd: 4, bg: '채점실' },
+  { floor: 6, options: 6, limit: { c3: 5000, c2: 4000, c1: 3000 }, hp: 173, hitAdd: 5, bg: '보스방', boss: true }
 ];
 
 // 학년(·범위 난이도)에 따라 조금 더 주는 시간. 파티는 같은 학년이라 파티 안에서는 같다.

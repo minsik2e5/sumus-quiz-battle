@@ -70,8 +70,8 @@ export function runDungeonChecks(assert) {
     const v = view(s, 'p0');
     assert(v.question && !('answer' in v.question) && v.players.length === 3 && !JSON.stringify(v).includes('"answer"') && v.monster.hp === v.monster.max_hp, 'V13.120 화면에는 내 문제만 가고 정답 번호는 보내지 않는다');
     assert(FLOORS.map(f => f.options).join() === '4,4,5,5,6,6' && FLOORS.at(-1).boss && FLOORS.length === 6, 'V13.120 보기 수: 1~2층 4개, 3~4층 5개, 5층·보스 6개');
-    assert(['c3', 'c2', 'c1'].every(cut => FLOORS.every((f, i) => i === 0 || f.limit[cut] < FLOORS[i - 1].limit[cut])) && FLOORS.every(f => f.limit.c3 > f.limit.c2 && f.limit.c2 > f.limit.c1) && floorSpec('c3', 1).limit === 9000 && floorSpec('c1', 6).limit === 4000, 'V13.120 제한 시간은 층이 오를수록, 등급컷이 오를수록 짧다(3등급 컷 1층 9초 … 1등급 컷 보스 4초)');
-    assert(gradeExtraMs('중1') > gradeExtraMs('중3') && gradeExtraMs('중3') > gradeExtraMs('고3') && gradeExtraMs('고3') === 0 && gradeExtraMs('모름') === 0 && q(s, 'p0').deadline - q(s, 'p0').started_at === 9000 + gradeExtraMs('중2'), 'V13.120 제한 시간은 학년에 따라 조금 더 준다(파티가 같은 학년이라 파티 안에서는 같다)');
+    assert(['c3', 'c2', 'c1'].every(cut => FLOORS.every((f, i) => i === 0 || f.limit[cut] < FLOORS[i - 1].limit[cut])) && FLOORS.every(f => f.limit.c3 > f.limit.c2 && f.limit.c2 > f.limit.c1) && floorSpec('c3', 1).limit === 8000 && floorSpec('c1', 6).limit === 3000, 'V13.120 제한 시간은 층이 오를수록, 등급컷이 오를수록 짧다(3등급 컷 1층 8초 … 1등급 컷 보스 3초, 선생님 요청으로 초안보다 1초씩 짧게)');
+    assert(gradeExtraMs('중1') > gradeExtraMs('중3') && gradeExtraMs('중3') > gradeExtraMs('고3') && gradeExtraMs('고3') === 0 && gradeExtraMs('모름') === 0 && q(s, 'p0').deadline - q(s, 'p0').started_at === FLOORS[0].limit.c3 + gradeExtraMs('중2'), 'V13.120 제한 시간은 학년에 따라 조금 더 준다(파티가 같은 학년이라 파티 안에서는 같다)');
     const n0 = q(s, 'p0').n, t = DUNGEON.INTRO_MS;
     assert(answer(s, 'p0', q(s, 'p0').answer, t + 500, n0 + 1).length === 0 && q(s, 'p0').n === n0, 'V13.120 다른 문제 번호로 온 답(늦게 온 답)은 버린다');
     const hp0 = s.players.p1.hp, deadline = q(s, 'p1').deadline;
@@ -185,8 +185,9 @@ export function runDungeonChecks(assert) {
     const hp = target.hp;
     wrong(s, target.id, m.mark_at + 10);
     assert(hp - target.hp === (CUTS.c3.hit + FLOORS[5].hitAdd) * DUNGEON.MARK_HIT && !m.mark, 'V13.120 채점 중에 틀리면 두 배로 맞는다');
-    m.hp = Math.round(m.max_hp * 0.31);
-    t = m.mark_at + 2000; tick(s, t);
+    m.hp = Math.floor(m.max_hp * DUNGEON.PHASE3_AT) + 5;
+    t = target.next_at; tick(s, t);
+    for (const id of ['p0', 'p1', 'p2']) { s.players[id].hp = DUNGEON.MAX_HP; s.players[id].down = false; if (s.players[id].q) s.players[id].q.deadline = t + 999999; }
     const pid = ['p0', 'p1', 'p2'].find(id => q(s, id));
     const ev3 = right(s, pid, t + 10);
     assert(m.stage === 3 && ev3.some(e => e.type === 'core_open') && m.core.goal === 3 * DUNGEON.CORE_PER_PLAYER, 'V13.120 보스 체력 30% 아래: 3페이즈 핵 노출(목표 = 서 있는 인원 × 3 정답)');
@@ -242,7 +243,7 @@ export function runDungeonChecks(assert) {
   const once = seed => { const r = seeded(seed); return JSON.stringify(run('c2', [student(r), student(r), student(r)], r, { grade: '중2', pets: ['dog', 'cat', 'owl'] })); };
   assert(once(3) === once(3), 'V13.120 같은 씨앗이면 같은 판이 나온다(무작위는 상태 안의 씨앗으로만)');
   const rates = { c3: clearRate('c3', 3, 300).rate, c2: clearRate('c2', 3, 300).rate, c1: clearRate('c1', 3, 300).rate };
-  assert(rates.c3 >= 0.5 && rates.c3 <= 0.7 && rates.c2 >= 0.27 && rates.c2 <= 0.43 && rates.c1 >= 0.05 && rates.c1 <= 0.16, `V13.120 시뮬레이션(3명 첫 도전) 클리어율이 목표 근처: 3등급 컷 ${Math.round(rates.c3 * 100)}%(≈60) · 2등급 컷 ${Math.round(rates.c2 * 100)}%(≈35) · 1등급 컷 ${Math.round(rates.c1 * 100)}%(≈10)`);
+  assert(rates.c3 >= 0.42 && rates.c3 <= 0.62 && rates.c2 >= 0.1 && rates.c2 <= 0.26 && rates.c1 <= 0.05, `V13.120 시뮬레이션(3명 첫 도전) 클리어율이 목표 근처: 3등급 컷 ${Math.round(rates.c3 * 100)}%(≈52) · 2등급 컷 ${Math.round(rates.c2 * 100)}%(≈18) · 1등급 컷 ${Math.round(rates.c1 * 100)}%(≈1)`);
   const duo = clearRate('c3', 2, 300);
   assert(duo.rate >= 0.4 && duo.rate <= rates.c3 + 0.05 && duo.avg_ms > 6 * 60000 && duo.avg_ms < 9.5 * 60000, 'V13.120 2인 파티도 3인과 비슷하게 깰 수 있고(조금 어렵게), 한 판은 약 7~9분이다');
 }
