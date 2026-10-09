@@ -633,6 +633,8 @@ $('#app').addEventListener('click', async event => {
       if (d.go === 'ranking') A.rankFrom = d.from || 'home';
       // V13.71: the 나 tile shows the grade's weekly rank, so open the ranking on that view.
       if (d.go === 'ranking' && d.rankGrade) { A.rankScope = d.rankGrade; A.rankPeriod = 'week'; A.rankMode = 'xp'; savePreferences(); }
+      // V13.123: the dashboard 실전시험 panel opens the results page on that tab.
+      if (d.go === 'results' && d.resultsView) { A.resultsView = d.resultsView; A.resultsLimit = 30; }
       return navigate(d.go);
     }
     if (d.action === 'student-preview' && A.data.profile.role === 'teacher') {
