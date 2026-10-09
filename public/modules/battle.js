@@ -15,6 +15,7 @@ import { tournamentCard, openBracket } from './tournament-ui.js';
 import { openMiniGame } from './word-minigame-ui.js';
 import { bonusText } from './word-minigame.js';
 import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterOpen, stageLevel, stageMonster, isBossStage } from './monsters.js';
+import { playSound, unlockSound, preloadSound } from './sound.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
 // the match, and the result. A match runs in a battle room on the server (or, for a practice
@@ -65,12 +66,21 @@ const SFX = {
   win: [[523, 659, 784, 1047], { gap: .1, len: .22 }], lose: [[392, 330, 262], { gap: .14, len: .26, type: 'triangle' }],
   emote: [[990], { len: .06, vol: .025 }]
 };
+// V13.116: the same moments play recorded sound files first (sound.js); the tones above are the
+// fallback while a file is not downloaded yet.
+const SFX_FILE = {
+  tick: ['tick'], go: ['combo'], hit: ['hit', { vary: .04 }], crit: ['smash'], hurt: ['hurt', { vary: .03 }], wrong: ['wrong'],
+  skill: ['skill'], fever: ['combo', { rate: 1.12 }], win: ['clear'], lose: ['fail'], emote: ['tap', { gain: .7 }]
+};
 function unlockAudio() {
   if (!soundOn()) return;
+  unlockSound(); preloadSound(['smash', 'clear', 'fail', 'burst']);
   try { audio ??= new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch {}
 }
 function sfx(name, buzz = 0) {
   if (!soundOn()) return;
+  const file = SFX_FILE[name];
+  if (file && playSound(...file)) { if (buzz) try { navigator.vibrate?.(buzz); } catch {} return; }
   const [notes, { type = 'sine', gap = .07, len = .14, vol = .045 } = {}] = SFX[name] || [[]];
   try {
     unlockAudio();
@@ -103,16 +113,24 @@ function noise(len, vol, at = 0) {
 function sfxThump(dmg, crit = false) {
   if (!soundOn()) return;
   const tier = dmgTier(dmg);
+  if (playSound(tier >= 3 || crit ? 'smash' : 'hit', { rate: 1.06 - tier * .04, gain: .8 + tier * .07, vary: .04 })) {
+    if (crit) playSound('slash', { gain: .6, at: .02 });
+    if (tier >= 3 || crit) buzzFx(crit ? [35, 25, 60] : 45);
+    return;
+  }
   try { unlockAudio(); sweep(150 + tier * 10, 42, .16 + tier * .05, .05 + tier * .025); if (tier > 1 || crit) noise(.09 + tier * .03, .05 + tier * .03); if (crit) sweep(1400, 700, .12, .03, 'square', .02); } catch {}
   if (tier >= 3 || crit) buzzFx(crit ? [35, 25, 60] : 45);
 }
 function sfxCombo(n) {
   if (!soundOn()) return;
+  // two semitones higher per combo step, at most an octave
+  if (playSound('correct', { rate: 2 ** (Math.min(Math.max(n - 2, 0), 6) / 6), gain: .7 })) return;
   const f = 620 * 2 ** (Math.min(n - 2, 10) / 12 * 2);
   try { unlockAudio(); sweep(f, f * 1.5, .09, .035, 'triangle'); sweep(f * 1.5, f * 2, .08, .025, 'triangle', .06); } catch {}
 }
 function sfxKO() {
   if (!soundOn()) return;
+  if (playSound('smash', { rate: .8, gain: 1.1 })) { playSound('burst', { at: .06, rate: .9 }); buzzFx([90, 50, 180]); return; }
   try { unlockAudio(); sweep(110, 28, .9, .14); sweep(220, 40, .5, .05, 'sawtooth'); noise(.5, .16); noise(.3, .08, .18); } catch {}
   buzzFx([90, 50, 180]);
 }

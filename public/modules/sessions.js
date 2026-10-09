@@ -1,6 +1,7 @@
 import { api, $, $$, icon, esc, time, date, recordRangeLabel, scope, toast, modal, buttonBusy } from './ui.js';
 import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo, grade, displayEnglish, TEST_SECONDS_PER_QUESTION, TEST_LEAVE_LIMIT, testDurationSec } from './core.js';
 import { avatar } from './character.js';
+import { playSound } from './sound.js';
 import { getRanges, activePeriod, inPeriod } from './student.js';
 import { uiArt, artOr } from './emblems.js';
 import { EXAM_XP_PER_ANSWER, EXAM_COINS, STUDY_COINS } from './rewards.js';
@@ -881,6 +882,8 @@ async function answerPractice(answer, button) {
   finally { answering = false; }
 }
 function sound(ok, milestone) {
+  // V13.116: the sound file first; this screen has its own sound switch (A.sound), so the yacha switch does not apply.
+  if (playSound(ok ? (milestone ? 'combo' : 'correct') : 'wrong', { always: true, vary: ok ? .015 : 0 })) return;
   try { audio ??= new (window.AudioContext || window.webkitAudioContext)(); audio.resume().catch(() => {}); const t = audio.currentTime; const notes = ok ? milestone ? [523, 659, 784] : [660, 880] : [220]; notes.forEach((f, i) => { const o = audio.createOscillator(), g = audio.createGain(); o.type = 'sine'; o.frequency.value = f; g.gain.setValueAtTime(.0001, t + i * .065); g.gain.exponentialRampToValueAtTime(.035, t + i * .065 + .01); g.gain.exponentialRampToValueAtTime(.0001, t + i * .065 + .15); o.connect(g); g.connect(audio.destination); o.start(t + i * .065); o.stop(t + i * .065 + .16); }); } catch {}
 }
 function finishPracticeView() {
