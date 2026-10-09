@@ -1,7 +1,7 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date, num, rangeLabel } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm } from './modules/core.js';
 import { avatar, showPose } from './modules/character.js';
-import { studentPage, getRanges, periodFolders, activePeriod, inPeriod, updateRangeSummary, starredWords, pushSupport, memorizeDeck, highExamSelection, HIGH_PICK_STORES, HIGH_PICK_CHUNK, HIGH_EXAM_MAX } from './modules/student.js';
+import { studentPage, getRanges, periodFolders, activePeriod, inPeriod, updateRangeSummary, starredWords, pushSupport, memorizeDeck, highExamSelection, HIGH_PICK_STORES, HIGH_EXAM_MAX, toggleHighChunk } from './modules/student.js';
 import { openFlashcards } from './modules/flashcards.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel, careIds } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
@@ -191,14 +191,17 @@ function renderKeepScroll() {
 function renderKeepPick() {
   const lists = Object.fromEntries($$('[data-high-list]').map(el => [el.dataset.highList, el.scrollTop]));
   renderKeepScroll();
+  A.highPickLast = null;
   Object.entries(lists).forEach(([scope, top]) => { const el = $(`[data-high-list="${scope}"]`); if (el) el.scrollTop = top; });
 }
 function highPickWords(code) {
   return A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(code));
 }
-function setHighPick(scope, code, ids) {
+function setHighPick(scope, code, ids, chunk = null) {
   const store = HIGH_PICK_STORES[scope];
   if (!store || !code) return;
+  // V13.127: 방금 누른 칸과 개수 변화를 기억해 두면 다시 그릴 때 그 칸만 톡 튀고 숫자가 바뀌는 연출을 한다.
+  A.highPickLast = { scope, code: String(code), chunk, count: (A[store]?.[code] || []).length };
   A[store] = { ...(A[store] || {}), [code]: ids };
   if (scope === 'memo') { A.memorizeFilter = 'all'; A.memRevealed = []; }
   savePreferences();
@@ -750,11 +753,10 @@ $('#app').addEventListener('click', async event => {
       visibleCodes.forEach(code => d.highRangeAll === 'true' ? current.add(code) : current.delete(code));
       A.ranges[info.key] = [...current]; savePreferences(); render(); return;
     }
-    if (d.highChunk && d.highScope) {
-      const lessonWords = highPickWords(d.highCode);
-      const from = d.highChunk === 'all' ? 0 : Math.max(0, Number(d.highChunk) || 0);
-      const to = d.highChunk === 'all' ? lessonWords.length : from + HIGH_PICK_CHUNK;
-      setHighPick(d.highScope, d.highCode, lessonWords.slice(from, to).map(word => word.id));
+    if (d.highChunk !== undefined && d.highScope) {
+      // V13.127: 칸을 누르면 그 20개를 더하고, 다 들어 있으면 뺀다.
+      const lessonWords = highPickWords(d.highCode), from = Math.max(0, Number(d.highChunk) || 0);
+      setHighPick(d.highScope, d.highCode, toggleHighChunk(lessonWords, A[HIGH_PICK_STORES[d.highScope]]?.[d.highCode], from), from);
       renderKeepPick(); return;
     }
     if (d.highAll && d.highScope) { setHighPick(d.highScope, d.highCode, d.highAll === 'true' ? highPickWords(d.highCode).map(word => word.id) : []); renderKeepPick(); return; }

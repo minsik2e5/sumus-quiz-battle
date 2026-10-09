@@ -721,22 +721,47 @@ export function memorizeDeck(A) {
   const range = middle ? `${code}과` : rangeLabel(A.school, code);
   return { words: starredOnly ? starPool.filter(word => stars.has(word.id)) : words, title: starredOnly ? `${range} ★ 어려운 단어` : middle ? range : `${range} · 고른 단어` };
 }
-// V13.124 빠른 버튼(1~20 · 21~40 … · 전체)과 접고 펴는 체크 목록(중학교 체크 목록 CSS를 그대로 쓴다).
-function highWordPicker(A, { scope, code, lessonWords, ids, open }) {
-  const chosen = new Set(ids), n = lessonWords.length;
+// V13.127 구간 칸을 누르면 그 20개를 더하고, 다 들어 있으면 뺀다(여러 구간을 같이 고를 수 있다).
+export function toggleHighChunk(lessonWords, ids, from) {
+  const chunk = lessonWords.slice(from, from + HIGH_PICK_CHUNK).map(word => word.id);
+  const set = new Set(ids || []);
+  const full = chunk.length > 0 && chunk.every(id => set.has(id));
+  chunk.forEach(id => full ? set.delete(id) : set.add(id));
+  return lessonWords.filter(word => set.has(word.id)).map(word => word.id);
+}
+// V13.127 과 칩: 고른 개수와 얇은 진행 막대.
+function highLessonChip(A, { code, total, picked, on, attr }) {
+  const pct = total ? Math.round(picked / total * 100) : 0;
+  const target = attr === 'data-memorize-range' ? `data-memorize-range="${esc(code)}"` : `data-high-exam-lesson="${esc(code)}"`;
+  return `<button role="tab" aria-selected="${on}" ${target} class="hp-chip-v13127 ${on ? 'selected' : ''} ${picked ? 'has-pick' : ''}"><strong>${esc(rangeLabel(A.school, code))}</strong><small>${picked ? `<b>${picked}</b> / ` : ''}${total}개</small><span class="hp-chip-bar" aria-hidden="true"><i style="width:${pct}%"></i></span></button>`;
+}
+// V13.127 고른 과의 카드 하나: 머리(개수) · 20개씩 구간 칸(채움 막대, 단어 학습은 ✓외운 수) · 접히는 직접 고르기(미리보기).
+function highPickCard(A, { scope, code, lessonWords, ids, open }) {
+  const chosen = new Set(ids), n = lessonWords.length, k = ids.length;
   const attrs = `data-high-scope="${scope}" data-high-code="${esc(code)}"`;
-  const isChunk = (from, to) => ids.length === to - from && lessonWords.slice(from, to).every(word => chosen.has(word.id));
-  const chunks = [];
-  for (let from = 0; from < n; from += HIGH_PICK_CHUNK) chunks.push([from, Math.min(n, from + HIGH_PICK_CHUNK)]);
-  const allOn = n > 0 && ids.length === n;
-  const quick = chunks.map(([from, to]) => { const on = !allOn && isChunk(from, to); return `<button type="button" ${attrs} data-high-chunk="${from}" class="${on ? 'selected' : ''}" aria-pressed="${on}">${from + 1}~${to}</button>`; }).join('')
-    + `<button type="button" ${attrs} data-high-chunk="all" class="all ${allOn ? 'selected' : ''}" aria-pressed="${allOn}">전체 ${n}</button>`;
-  return `<div class="high-pick-v13124" data-scope="${scope}">
-    <div class="high-pick-quick-v13124" role="group" aria-label="빠른 선택">${quick}</div>
-    <div class="middle-direct-picker-v1343 high-pick-box-v13124">
-      <button type="button" class="high-pick-toggle-v13124" data-high-pick-toggle="${scope}" aria-expanded="${open}"><span><strong>직접 고르기</strong><small>번호·단어·뜻을 보고 체크해요</small></span><b>${ids.length}개 선택</b><i aria-hidden="true">${open ? '접기' : '펼치기'}</i></button>
-      ${open ? `<div class="middle-direct-actions-v1343"><button type="button" ${attrs} data-high-all="true">전체 선택</button><button type="button" ${attrs} data-high-all="false">전체 해제</button></div>
-      <div class="middle-direct-list-v1343 high-pick-list-v13124" data-high-list="${scope}">${lessonWords.map((word, index) => `<label class="middle-direct-word-v1343 ${chosen.has(word.id) ? 'selected' : ''}">
+  const known = scope === 'memo' ? knownWords(A.data.profile.id) : null;
+  const last = A.highPickLast || {}, justChunk = last.scope === scope && last.code === String(code) ? last.chunk : null;
+  const bump = last.scope === scope && last.code === String(code) && last.count !== k;
+  const tiles = [];
+  for (let from = 0; from < n; from += HIGH_PICK_CHUNK) {
+    const slice = lessonWords.slice(from, from + HIGH_PICK_CHUNK), got = slice.filter(word => chosen.has(word.id)).length;
+    const pct = Math.round(got / slice.length * 100), full = got === slice.length, kn = known ? slice.filter(word => known.has(word.id)).length : 0;
+    tiles.push(`<button type="button" ${attrs} data-high-chunk="${from}" class="hp-tile-v13127 ${full ? 'full' : got ? 'part' : ''} ${justChunk === from ? 'just' : ''}" aria-pressed="${full}" aria-label="${from + 1}~${from + slice.length}번 ${got}개 선택${full ? ', 누르면 빼기' : ', 누르면 더하기'}"><span class="hp-tile-range">${from + 1}~${from + slice.length}</span><span class="hp-tile-count">${got ? `${got}/${slice.length}` : `${slice.length}개`}</span>${kn ? `<em class="hp-tile-known" title="카드로 외운 단어">✓${kn}</em>` : ''}<span class="hp-tile-fill" aria-hidden="true"><i style="width:${pct}%"></i></span></button>`);
+  }
+  const picked = lessonWords.filter(word => chosen.has(word.id));
+  const preview = k ? `${picked.slice(0, 3).map(word => esc(word.word)).join(', ')}${k > 3 ? ` 외 ${k - 3}개` : ''}` : '아직 고른 단어가 없어요';
+  const label = scope === 'memo' ? '오늘 외울 단어' : '시험 볼 단어';
+  return `<div class="hp-card-v13127 ${k ? '' : 'is-empty'}" data-scope="${scope}">
+    <div class="hp-head-v13127">
+      <div class="hp-title"><small>${esc(rangeLabel(A.school, code))} · ${label}</small><strong class="${bump ? 'bump' : ''}"><b>${k}</b><span>/ ${n}개</span></strong></div>
+      <div class="hp-head-actions"><button type="button" ${attrs} data-high-all="true" ${k === n ? 'disabled' : ''}>전체</button><button type="button" ${attrs} data-high-all="false" ${k ? '' : 'disabled'}>비우기</button></div>
+    </div>
+    <div class="hp-meter-v13127" aria-hidden="true"><i style="width:${n ? Math.round(k / n * 100) : 0}%"></i></div>
+    <div class="hp-tiles-v13127" role="group" aria-label="20개씩 고르기">${tiles.join('')}</div>
+    <p class="hp-hint-v13127">${k ? '칸을 누르면 그 20개를 더하고, 다 찬 칸을 다시 누르면 빼요.' : '칸을 눌러 단어를 골라요. 1~20부터 시작해 보세요!'}</p>
+    <div class="middle-direct-picker-v1343 hp-direct-v13127">
+      <button type="button" class="hp-direct-toggle" data-high-pick-toggle="${scope}" aria-expanded="${open}"><span><strong>직접 고르기</strong><small>${preview}</small></span><i aria-hidden="true">${open ? '접기' : '펼치기'}</i></button>
+      ${open ? `<div class="middle-direct-list-v1343 hp-list-v13127" data-high-list="${scope}">${lessonWords.map((word, index) => `<label class="middle-direct-word-v1343 ${chosen.has(word.id) ? 'selected' : ''}">
         <input type="checkbox" ${attrs} data-high-word="${esc(word.id)}" ${chosen.has(word.id) ? 'checked' : ''}>
         <span class="middle-direct-check-v1343"></span>
         <span class="middle-direct-number-v1343">${index + 1}</span>
@@ -776,11 +801,11 @@ function memorizationPanel(A) {
         if (visibleCodes.length && !visibleCodes.includes(state.code)) A.memorizeRange = String(visibleCodes[0]);
         const activeCode = String(A.memorizeRange || visibleCodes[0] || '');
         const tabs = availableTypes.length > 1 ? `<div class="segment exam-source-tabs memorize-source-tabs">${availableTypes.map(([key,label]) => `<button data-memorize-range-type="${key}" class="${A.memorizeRangeType === key ? 'selected' : ''}">${label}</button>`).join('')}</div>` : '';
-        return schoolSwitch(A) + periodTabs(A, state.codes, 'data-memorize-period') + tabs + `<div class="memorize-range-strip" role="tablist" aria-label="학습 범위">${visibleCodes.map(range => {
+        return schoolSwitch(A) + periodTabs(A, state.codes, 'data-memorize-period') + tabs + `<div class="memorize-range-strip hp-strip-v13127" role="tablist" aria-label="학습 범위">${visibleCodes.map(range => {
           const code = String(range);
-          const count = state.words.filter(word => String(word.range_code) === code).length;
-          const selected = code === activeCode;
-          return `<button role="tab" aria-selected="${selected}" data-memorize-range="${esc(code)}" class="${selected ? 'selected' : ''}"><strong>${esc(rangeLabel(A.school, range))}</strong><small>${count}개</small></button>`;
+          const lessonWords = state.words.filter(word => String(word.range_code) === code);
+          const ids = A.highWordIds?.[code], chosen = new Set(Array.isArray(ids) ? ids : []);
+          return highLessonChip(A, { code, total: lessonWords.length, picked: lessonWords.filter(word => chosen.has(word.id)).length, on: code === activeCode, attr: 'data-memorize-range' });
         }).join('')}</div>`;
       })();
   // 과 칩이 과를 바꿀 수 있으니 단어는 그 뒤에 고른다.
@@ -791,14 +816,11 @@ function memorizationPanel(A) {
     const state = highSchoolMemorizeState(A);
     if (!state.lessonWords.length) return '';
     const ids = state.pickedWords.map(word => word.id);
-    return `<section class="setup-section high-today-v13124"><div class="step-label"><span>02</span>오늘 외울 단어</div>
-      <p class="high-pick-summary-v13124"><b>${esc(rangeLabel(A.school, state.code))}</b> ${state.lessonWords.length}개 중 <strong>${ids.length}개</strong> 선택</p>
-      ${highWordPicker(A, { scope: 'memo', code: state.code, lessonWords: state.lessonWords, ids, open: A.highPickOpen === true })}</section>`;
+    return highPickCard(A, { scope: 'memo', code: state.code, lessonWords: state.lessonWords, ids, open: A.highPickOpen === true });
   })();
   return `<div class="study-subhead"><button class="study-back" data-study="hub">${icon('back')} 학습</button><span class="pill green">VOCAB</span></div>
     <div class="page-heading memorize-heading premium-page-heading"><span class="premium-eyebrow">VOCABULARY</span><h1>단어 학습</h1></div>
-    <section class="setup-section"><div class="step-label"><span>01</span>범위</div>${rangeUi}</section>
-    ${pickUi}
+    <section class="setup-section"><div class="step-label"><span>01</span>${middle ? '범위' : '범위 · 오늘 외울 단어'}</div>${rangeUi}${pickUi}</section>
     <section class="memorize-shell">
       <div class="memorize-toolbar">
         <div class="segment compact"><button data-memorize-filter="all" class="${!starredOnly ? 'selected' : ''}">${middle ? '전체' : '고른 단어'} ${words.length}</button><button data-memorize-filter="starred" class="${starredOnly ? 'selected' : ''}">★ 어려운 단어 ${starredInScope.length}</button></div>
@@ -968,13 +990,9 @@ function exam(A) {
     over = count > HIGH_EXAM_MAX;
     scopeLabel = parts.length ? `${parts.map(lesson => `${rangeLabel(A.school, lesson.code)} ${lesson.picked.length}`).join(' + ')} = ${count}개` : '단어 미선택';
     const typeTabs = availableTypes.length > 1 ? `<div class="segment exam-source-tabs">${availableTypes.map(([key,label]) => `<button data-high-range-type="${key}" class="${A.highRangeType === key ? 'selected' : ''}">${label}</button>`).join('')}</div>` : '';
-    const chips = `<div class="memorize-range-strip high-exam-strip-v13124" role="tablist" aria-label="시험 볼 과">${lessons.map(lesson => {
-      const on = lesson.code === String(A.highExamOpen);
-      return `<button role="tab" aria-selected="${on}" data-high-exam-lesson="${esc(lesson.code)}" class="${on ? 'selected' : ''} ${lesson.picked.length ? 'has-pick' : ''}"><strong>${esc(rangeLabel(A.school, lesson.code))}</strong><small>${lesson.picked.length ? `<b>${lesson.picked.length}</b>/` : ''}${lesson.lessonWords.length}개</small></button>`;
-    }).join('')}</div>`;
-    const picker = openLesson ? highWordPicker(A, { scope: 'exam', code: openLesson.code, lessonWords: openLesson.lessonWords, ids: A.highExamWordIds[openLesson.code], open: A.highExamPickOpen !== false }) : '';
-    const total = `<div class="high-exam-total-v13124 ${over ? 'over' : ''} ${count ? '' : 'empty'}" id="high-exam-total"><span>시험 볼 단어</span><b>${count ? esc(scopeLabel) : '0개'}</b>${over ? `<em>한 번에 최대 ${HIGH_EXAM_MAX}개까지 볼 수 있어요. ${count - HIGH_EXAM_MAX}개를 빼 주세요.</em>` : count ? '' : '<em>시험 볼 단어를 먼저 선택해주세요</em>'}</div>`;
-    scopeUi = schoolSwitch(A) + periodTabs(A, state.codes, 'data-high-period') + typeTabs + chips + picker + total;
+    const chips = `<div class="memorize-range-strip hp-strip-v13127" role="tablist" aria-label="시험 볼 과">${lessons.map(lesson => highLessonChip(A, { code: lesson.code, total: lesson.lessonWords.length, picked: lesson.picked.length, on: lesson.code === String(A.highExamOpen), attr: 'data-high-exam-lesson' })).join('')}</div>`;
+    const picker = openLesson ? highPickCard(A, { scope: 'exam', code: openLesson.code, lessonWords: openLesson.lessonWords, ids: A.highExamWordIds[openLesson.code], open: A.highExamPickOpen !== false }) : '';
+    scopeUi = schoolSwitch(A) + periodTabs(A, state.codes, 'data-high-period') + typeTabs + chips + picker;
   }
   const target = count;
   return `<div class="exam-mode-switch segment"><button data-exam-kind="practice" class="${!testMode ? 'selected' : ''}">연습시험</button><button data-exam-kind="test" class="${testMode ? 'selected' : ''}">실전시험</button></div>
@@ -982,7 +1000,7 @@ function exam(A) {
     <section class="setup-section"><div class="step-label"><span>01</span>시험 범위</div>${scopeUi}</section>
     <section class="setup-section"><div class="step-label"><span>02</span>시험 방식</div>${examWritingPicker(A, testMode)}</section>
     ${testMode && count && !over ? `<div class="test-rules-v1380"><span>⏳ 시험 전체 <b>${(sec => sec % 60 ? `${Math.floor(sec / 60)}분 ${sec % 60}초` : `${sec / 60}분`)(testDurationSec(A.mode, target || count))}</b> · 문제마다 재지 않아요</span><span>⏭ 헷갈리면 <b>PASS</b> → 마지막에 다시 나와요</span><span>📵 다른 앱으로 <b>${TEST_LEAVE_LIMIT}번</b> 나가면 자동 제출</span></div>` : ''}
-    <div class="exam-start-inline"><p>${count || middle ? `${esc(scopeLabel)} · ${target || 0}문제 · ${esc(PRACTICE_TYPES[A.mode] || '뜻쓰기')}` : '시험 볼 단어를 먼저 선택해주세요'}</p><button class="btn primary full" data-action="start-exam-run" ${count && !over ? '' : 'disabled'}>${testMode ? '실전시험 시작' : '연습시험 시작'} ${icon('arrow')}</button></div>`;
+    ${middle ? `<div class="exam-start-inline"><p>${esc(scopeLabel)} · ${target || 0}문제 · ${esc(PRACTICE_TYPES[A.mode] || '뜻쓰기')}</p>` : `<div class="exam-start-inline hp-dock-v13127 ${over ? 'over' : count ? '' : 'empty'}" id="high-exam-total"><p><span>시험 볼 단어 · ${esc(PRACTICE_TYPES[A.mode] || '뜻쓰기')}</span><b>${count ? esc(scopeLabel) : '0개'}</b>${over ? `<em>한 번에 최대 ${HIGH_EXAM_MAX}개까지 볼 수 있어요. ${count - HIGH_EXAM_MAX}개를 빼 주세요.</em>` : count ? '' : '<em>시험 볼 단어를 먼저 선택해주세요</em>'}</p>`}<button class="btn primary full" data-action="start-exam-run" ${count && !over ? '' : 'disabled'}>${testMode ? '실전시험 시작' : '연습시험 시작'} ${icon('arrow')}</button></div>`;
 }
 
 // V13.66 ranking: 학습 랭킹 (경험치 · 코인 · 연습량 · 연속 학습, with a top-3 podium and titles)
