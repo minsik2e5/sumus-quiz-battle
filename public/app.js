@@ -40,7 +40,7 @@ function preferences() {
     A.middleChunkSize = [20,25,30].includes(Number(v.middleChunkSize)) ? Number(v.middleChunkSize) : (A.middleChunkSize || 20);
     A.middleStartIndex = Math.max(0, Number(v.middleStartIndex || 0));
     A.middleWordIds = Array.isArray(v.middleWordIds) ? v.middleWordIds : (A.middleWordIds || []);
-    // V13.121 고등 단어 고르기: 과마다 고른 단어(단어 학습 / 시험)를 폰에 저장한다.
+    // V13.124 고등 단어 고르기: 과마다 고른 단어(단어 학습 / 시험)를 폰에 저장한다.
     const pickMap = value => value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).filter(([, ids]) => Array.isArray(ids)).map(([code, ids]) => [code, ids.map(String)])) : {};
     A.highWordIds = pickMap(v.highWordIds);
     A.highExamWordIds = pickMap(v.highExamWordIds);
@@ -187,7 +187,7 @@ function renderKeepScroll() {
   render();
   requestAnimationFrame(() => window.scrollTo(0, y));
 }
-// V13.121: 고등 단어 체크 목록은 안에서 스크롤되니, 다시 그려도 목록 안 위치를 지킨다.
+// V13.124: 고등 단어 체크 목록은 안에서 스크롤되니, 다시 그려도 목록 안 위치를 지킨다.
 function renderKeepPick() {
   const lists = Object.fromEntries($$('[data-high-list]').map(el => [el.dataset.highList, el.scrollTop]));
   renderKeepScroll();
@@ -655,6 +655,8 @@ $('#app').addEventListener('click', async event => {
       if (d.go === 'ranking') A.rankFrom = d.from || 'home';
       // V13.71: the 나 tile shows the grade's weekly rank, so open the ranking on that view.
       if (d.go === 'ranking' && d.rankGrade) { A.rankScope = d.rankGrade; A.rankPeriod = 'week'; A.rankMode = 'xp'; savePreferences(); }
+      // V13.123: the dashboard 실전시험 panel opens the results page on that tab.
+      if (d.go === 'results' && d.resultsView) { A.resultsView = d.resultsView; A.resultsLimit = 30; }
       return navigate(d.go);
     }
     if (d.action === 'student-preview' && A.data.profile.role === 'teacher') {
@@ -859,7 +861,7 @@ $('#app').addEventListener('click', async event => {
         const target = A.target === 'all' ? 'all' : Math.min(words.length, Number(A.target || words.length));
         await startPractice({ wordIds: words.map(word => word.id), target, mode: A.mode, runMode, examStyle: true, confirmed: true });
       } else {
-        // V13.121: 고른 단어만 출제한다(개수 = 고른 단어 수, 서버 한도 200개).
+        // V13.124: 고른 단어만 출제한다(개수 = 고른 단어 수, 서버 한도 200개).
         const { wordIds } = highExamSelection(A);
         if (!wordIds.length) { buttonBusy(b, false); return toast('시험 볼 단어를 먼저 선택해주세요.'); }
         if (wordIds.length > HIGH_EXAM_MAX) { buttonBusy(b, false); return toast(`한 번에 최대 ${HIGH_EXAM_MAX}개까지 시험 볼 수 있어요.`); }

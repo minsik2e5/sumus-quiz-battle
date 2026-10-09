@@ -79,7 +79,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.121.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.124.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -791,8 +791,19 @@ export async function runReleaseCheck() {
     }, studentToken);
     assert(durableTestDispute.word_id === testWrongWordId && durableTestDispute.status === 'pending', 'completed test-mode meaning answer can be disputed from durable first-pass record after response-cache churn');
     await service(state, 'PATCH', '/meaning-disputes/' + durableTestDispute.id + '/resolve', { action: 'reject' }, teacherToken);
+    // V13.123: a finished 실전시험 reaches the teacher without the student sending it; 연습 stays as before.
+    {
+      assert(!state.sessions.find(item => item.id === testStarted.id)?.shared_to_teacher_at, 'V13.123 the check finishes a 실전시험 without sharing it first');
+      const teacherBeforeShare = await service(state, 'GET', '/bootstrap', {}, teacherToken);
+      const unsent = teacherBeforeShare.sessions.find(item => item.id === testStarted.id);
+      assert(unsent && unsent.run_mode === 'test' && !unsent.shared_to_teacher_at && unsent.score === 80 && unsent.correct === 4 && unsent.total === 5 && Number.isFinite(unsent.duration_sec) && unsent.ended_at > 0 && unsent.leave_count === 0 && unsent.pass_count === 0, 'V13.123 the teacher bootstrap carries a finished 실전시험 the student never sent, with score, time, leaves and PASS');
+      const finishedTests = state.sessions.filter(item => item.run_mode === 'test' && item.student_id === unsent.student_id).map(item => item.id).sort().join();
+      assert(teacherBeforeShare.sessions.filter(item => item.run_mode === 'test' && item.student_id === unsent.student_id).map(item => item.id).sort().join() === finishedTests, 'V13.123 every finished 실전시험 of the student reaches the teacher');
+      const practiceIds = state.sessions.filter(item => item.run_mode !== 'test' && item.student_id === unsent.student_id).map(item => item.id).sort().join();
+      assert(practiceIds && teacherBeforeShare.sessions.filter(item => item.run_mode !== 'test' && item.student_id === unsent.student_id).map(item => item.id).sort().join() === practiceIds, 'V13.123 연습 records reach the teacher as before');
+    }
     const sharedTest = await service(state, 'POST', `/practice/${testStarted.id}/share`, {}, studentToken);
-    assert(sharedTest.shared_to_teacher_at > 0, 'student can share a completed self-test with the teacher');
+    assert(sharedTest.shared_to_teacher_at > 0, 'student can share a completed self-test with the teacher (old app screens keep working)');
     assert(Object.keys(sharedTest).sort().join() === 'id,shared_to_teacher_at' && sharedTest.id === testStarted.id, 'V13.65 sharing answers with just the id and time (not the whole result)');
     const sharedStored = state.sessions.find(item => item.id === testStarted.id);
     assert(sharedStored?.shared_to_teacher_at === sharedTest.shared_to_teacher_at, 'shared self-test timestamp persists in the saved session');
@@ -903,6 +914,16 @@ export async function runReleaseCheck() {
       assert(JSON.stringify(old.sessions) === compacted, 'record compaction is idempotent');
       const after = await service(old, 'GET', '/bootstrap', {}, studentToken);
       assert(canonical(after.sessions) === canonical(before.sessions), 'bootstrap returns the same records after compaction');
+      // V13.123: the teacher still sees score, time, leaves, PASS and correct count of old 실전시험.
+      {
+        const keep = ['id', 'run_mode', 'score', 'correct', 'total', 'duration_sec', 'ended_at', 'leave_count', 'leave_ms', 'left_out', 'pass_count', 'auto_submitted'];
+        const pick = list => canonical(list.filter(item => item.run_mode === 'test').map(item => Object.fromEntries(keep.map(k => [k, item[k]]))));
+        const oldTests = mine.filter(item => item.run_mode === 'test');
+        assert(oldTests.length > 0 && oldTests.every(item => keep.every(k => k in item)), 'V13.123 the check compacts an old 실전시험 that has every summary field');
+        const teacherAfterCompact = await service(old, 'GET', '/bootstrap', {}, teacherToken);
+        const studentTests = list => list.filter(item => item.student_id === student.id);
+        assert(pick(studentTests(teacherAfterCompact.sessions)) === pick(studentTests(state.sessions)) && studentTests(teacherAfterCompact.sessions).some(item => item.run_mode === 'test'), 'V13.123 old 실전시험 keep score, time, leaves, PASS and correct count for the teacher after compaction');
+      }
       const recent = old.sessions.find(item => item.student_id === student.id && !mine.includes(item) && Array.isArray(item.answer_records) && item.answer_records.length);
       assert(!recent || recent.answer_records.every(record => 'word' in record), 'recent records are left as stored');
 
@@ -1141,14 +1162,14 @@ export async function runReleaseCheck() {
         // V13.75: the student list filters and shows the last activity itself; the old observer that
         // patched the table after every render (and could loop) is gone.
         assert(!teacherExtra.includes('MutationObserver') && !teacherExtra.includes('enhanceStudentsPage') && teacherUi.includes("quick === 'off' ? !p.active") && teacherUi.includes('agoLabel(t)'), 'V13.75 the teacher student list filters by status and shows the last activity without a DOM observer');
-        const shares = [...sessionsUi.matchAll(/share-self-test'\)\?\.addEventListener\('click', async event => \{([\s\S]*?)\n  \}\);/g)].map(m => m[1]);
-        assert(shares.length === 2 && shares.every(body => body.includes('const button = event.currentTarget;') && !body.slice(body.indexOf('await api')).includes('event.currentTarget') && !body.includes('await refresh()') && body.includes('shareDone(button)')), 'V13.65 "결과 보내기" keeps its button across the request and does not reload everything afterwards');
+        // V13.123: the "결과 보내기" button is gone; both result screens say the teacher sees it already.
+        assert(!sessionsUi.includes('share-self-test') && !sessionsUi.includes('/share') && !sessionsUi.includes('선생님께 결과 보내기') && !sessionsUi.includes('전송 완료') && (sessionsUi.match(/선생님이 이 결과를 바로 확인해요/g) || []).length === 2, 'V13.123 실전시험 results show a short note instead of a send button, also for old sent records');
         assert(teacherUi.includes('list.slice(0, vocabLimit(A))') && teacherUi.includes('data-action="vocab-more"') && appUi65.includes("d.action === 'vocab-more'") && css1365.includes('.teacher-app.tv2 tbody tr{content-visibility:auto'), 'V13.65 the teacher word list starts with 80 rows and long teacher lists skip offscreen layout');
         // V13.83: the redrawn 몽이 now has poses drawn from its new art (the old happy face is gone).
         assert(charUi.includes('dog: { 0: EGG, 1: ALL, 2: ALL, 3: ALL }') && existsSync(fileURLToPath(new URL('../public/assets/pets/dog-2-happy.webp', import.meta.url))) && existsSync(fileURLToPath(new URL('../public/assets/pets/dog-3-s.webp', import.meta.url))), 'V13.65 몽이 growing/final art redrawn; V13.83 its poses match the new art');
       }
     }
-    assert(teacherModule.includes('grammar_progress') && teacherModule.includes('학생이 보낸 실전 결과'), 'teacher dashboard combines grammar progress with student-shared self-test results');
+    assert(teacherModule.includes('grammar_progress') && teacherModule.includes('실전시험 결과') && !teacherModule.includes('학생이 보낸'), 'teacher dashboard combines grammar progress with 실전시험 results');
     assert(bundleCss.includes('.v136-dashboard-grid') && !indexHtml.includes('teacher-dashboard.js'), 'dashboard styles are bundled and stale missing module is removed');
     assert(dashboardCss.includes('.v136-dashboard-grid') && dashboardCss.includes('@media(max-width:760px)'), 'teacher dashboard has responsive styles');
     assert(v137Css.includes('.exam-ops-table') && v137Css.includes('.word-conquest-card') && bundleCss.includes('.exam-ops-table'), 'V13.7 teacher proportions and word quest styles are bundled');
@@ -1176,7 +1197,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.121.0') && indexHtml.includes('/app.bundle.css?v=13.121.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.124.0') && indexHtml.includes('/app.bundle.css?v=13.124.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1197,7 +1218,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.121.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.124.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -1227,10 +1248,10 @@ export async function runReleaseCheck() {
     assert(appJs.includes('memorize-flip-out') && appJs.includes('memorize-flip-in'), 'V13.25 vocabulary tap uses a short flip and fade transition');
     assert(v1315Css.includes('.primary-mode-grid') && studentModule.includes('영어 직접 쓰기') && studentModule.includes('data-practice-record'), 'meaning and English writing remain first-class scored modes');
     assert(studentModule.includes('function records(A)') && studentModule.includes('이번 주 평균') && !sessionsModule.includes('${timerHtml}'), 'student home and record summaries remain available while visible question timer is removed');
-    assert(teacherModule.includes('학생별 연습 기록') && teacherModule.includes('학생이 보낸 실전 결과') && teacherModule.includes('data-practice-record') && appJs.includes('openPracticeRecord'), 'teacher can inspect practice history and student-shared real-test results');
+    assert(teacherModule.includes('학생별 연습 기록') && teacherModule.includes('실전시험 결과') && teacherModule.includes('data-practice-record') && appJs.includes('openPracticeRecord'), 'teacher can inspect practice history and student-shared real-test results');
     assert(studentModule.includes('첫 100점') && studentModule.includes('3회 연속 90점+') && studentModule.includes('영어쓰기 100점') && studentModule.includes('achievementSection'), 'student achievement badges remain present');
     assert(studentModule.includes("result_visibility === 'visible'") && studentModule.includes("filter(Number.isFinite)") && studentModule.includes("'공개 대기'"), 'legacy assigned-exam visibility remains safe in historical records');
-    assert(teacherModule.includes('sharedSelfTests') && teacherModule.includes('shared_to_teacher_at') && teacherModule.includes('학생이 보낸 실전 결과'), 'teacher dashboard is centered on student-shared real-test results');
+    assert(teacherModule.includes('const selfTests = finishedSelfTests(d.sessions)') && teacherModule.includes("filter(item => item.run_mode === 'test').sort((a, b) => testEndedAt(b) - testEndedAt(a))") && !teacherModule.includes('shared_to_teacher_at') && teacherModule.includes('<h2>실전시험 결과</h2>'), 'V13.123 the teacher dashboard lists every finished 실전시험, newest finish first, sent or not');
     assert(uiModule.includes('recordRangeLabel') && studentModule.includes('recordRangeLabel(s, code)') && sessionsModule.includes('recordRangeLabel'), 'middle and high range labels stay consistent');
     assert(sessionsModule.includes('미응답') && sessionsModule.includes('data-finish-practice-dispute'), 'saved exam results separate unanswered answers and keep meaning disputes');
     assert(sessionsModule.includes('이미 진행 중인 학습이 있어요') && sessionsModule.includes('기존 연습 저장 후 새 설정 시작'), 'active session mismatch still warns before reuse');
@@ -1319,8 +1340,12 @@ export async function runReleaseCheck() {
     assert(sessionsModule.includes("const modeLabel = testMode ? '실전시험' : '연습시험'") && !sessionsModule.includes('${timerHtml}') && sessionsModule.includes('keyboard-focus'), 'V13.30 practice and real exams share one focused untimed question screen with keyboard handling');
     assert(sessionsModule.includes('answer-impact-compact') && sessionsModule.includes('result-reward-top') && sessionsModule.includes('missingWordIds'), 'V13.30 keeps calm answer feedback and complete result review');
     assert(!teacherModule.match(/const tabs = .*assignments/) && !teacherModule.match(/const tabs = .*exams/), 'teacher navigation keeps assignment and teacher-created exam operations removed');
-    assert(teacherModule.includes('학생이 보낸 실전 결과') && teacherModule.includes('shared_to_teacher_at'), 'teacher results focus on student-shared real exams');
-    assert(sessionsModule.includes('/share') && sessionsModule.includes('선생님께 결과 보내기') && sessionsModule.includes('animateTestResult'), 'real exam result can be shared and keeps result impact');
+    assert(teacherModule.includes('const selfTests = finishedSelfTests(allSessions)') && teacherModule.includes("'실전시험 결과가 아직 없어요'") && teacherModule.includes("sent ? '끝난 시간'") && !teacherModule.includes("'전송'") && teacherModule.includes('passNote(s)'), 'V13.123 teacher results show every finished 실전시험 with its finish time and PASS instead of a send date');
+    assert(sessionsModule.includes('선생님이 이 결과를 바로 확인해요') && sessionsModule.includes('animateTestResult'), 'V13.123 real exam result tells the student the teacher sees it and keeps result impact');
+    {
+      const rd123 = f => readFileSync(fileURLToPath(new URL(f, import.meta.url)), 'utf8');
+      assert(rd123('../public/v13123.css').includes('.self-test-auto-note-v13123') && rd123('../public/app.bundle.css').includes('.self-test-auto-note-v13123') && rd123('../public/app.js').includes("d.go === 'results' && d.resultsView") && teacherModule.includes('data-go="results" data-results-view="sent"'), 'V13.123 the note style is bundled and the dashboard opens the 실전시험 tab');
+    }
     assert(sessionsModule.includes('answerImpact') && v1321Css.includes('.answer-impact-check') && v1321Css.includes('.perfect-impact'), 'practice correct answers and perfect real exams keep short impact effects');
     assert(v1322Css.includes('.study-hub-simple') && v1322Css.includes('.memorize-sound') && v1322Css.includes('.exam-kind-grid') && v1322Css.includes('.question-timer.danger'), 'V13.22 final learning, pronunciation, exam selector, and tension timer styles are loaded');
     assert(v1323Css.includes('.study-hub-simple .study-hub-card') && v1323Css.includes('.memorize-list') && v1323Css.includes('.exam-kind-card') && v1323Css.includes('.exam-question-area') && v1323Css.includes('.result-page-v1320'), 'V13.23 premium mobile visual system covers learning, memorization, exam, and result screens');
