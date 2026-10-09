@@ -819,6 +819,44 @@ sceneTall(F19E, '백호 등장 배경', 'bg-baekho', 'a snowy mountain ridge at 
 sceneTall(F19E, '주작 등장 배경', 'bg-jujak', 'a blazing vermilion sunrise sky over a distant volcanic peak: huge fire-colored clouds in red, orange and gold, floating embers and soft sparks, golden rays, warm glowing haze, a bright red-gold glow at the center.', 'public/assets/reveal/bg-jujak.webp');
 sceneTall(F19E, '현무 등장 배경', 'bg-hyeonmu', 'a calm deep midnight sea under a sky full of glowing constellations: gentle turquoise-glowing waves with ink-like swirls, the star-filled sky reflected on the water, a soft aurora, faint ancient stone pillars far away, a bright teal glow at the center.', 'public/assets/reveal/bg-hyeonmu.webp');
 
+/* 20 펫 전투 자세: 공격하는 자세(attack)와 맞는 자세(hurt) — 새 펫 8종 · 신화 5종 · 천마 (V13.116~)
+   지금은 공격 때 응원(cheer) 그림, 맞을 때 시무룩(sad) 그림을 빌려 쓰고 있어요(로보와 몬스터만 전용 그림).
+   펫마다 아기·성장·최종 3단계 × 2자세 = 6장. 한 시트는 같은 단계의 두 펫(위 줄 앞 펫, 아래 줄 뒤 펫)의
+   공격·맞음이에요. 시트 20-1~3 = 첫 쌍의 아기·성장·최종, 20-4~6 = 둘째 쌍 …, 모두 21장(그림 84개).
+   파일 이름은 <key>-<단계>-attack / <key>-<단계>-hurt (로보와 같은 이름 규칙)이고, 앱은 이 이름이 있으면 그 그림을 쓰고
+   없으면 응원·시무룩 그림으로 대신해요. */
+const F20 = '20-pet-battle-poses.txt';
+const POSE_PAIRS = [['frog', 'sapsaree'], ['deer', 'bear'], ['seal', 'wolf'], ['crocodile', 'octopus'], ['gumiho', 'cheongryong'], ['baekho', 'jujak'], ['hyeonmu', 'cheonma']];
+const POSE_PETS = { ...NEW_PETS_18, ...NEW_PETS_19 };
+const POSE_SERIES = Object.fromEntries([...Object.keys(NEW_PETS_18).map((k, i) => [k, ['18a', i + 1]]), ...Object.keys(NEW_PETS_19).map((k, i) => [k, ['19a', i + 1]])]);
+const ATTACK_MOVE = {
+  frog: 'a big jump toward the right with both webbed hands stretched forward',
+  sapsaree: 'pouncing forward to the right with one front paw swiping',
+  deer: 'lowering its head and charging forward to the right with its antlers first',
+  bear: 'a big paw swipe forward to the right, the whole body leaning into it',
+  seal: 'sliding forward to the right on its belly and slapping with one flipper',
+  wolf: 'leaping forward to the right with one front paw slashing',
+  crocodile: 'lunging forward to the right with its closed-mouth head and a swinging tail',
+  octopus: 'striking forward to the right with one tentacle stretched far out',
+  gumiho: 'lunging forward to the right with one front paw while all its tails flare and a fox-fire glows in the paw',
+  cheongryong: 'diving forward to the right in a coil with its claws out and its mane streaming',
+  baekho: 'leaping forward to the right with one front paw slashing, the cape and fur flying back',
+  jujak: 'swooping forward to the right with its wings swept back and the two tail ribbons streaming',
+  hyeonmu: 'ramming forward to the right with its shell while the snake strikes out ahead',
+  cheonma: 'charging forward to the right with its cloud wings spread wide and its hooves forward'
+};
+const ATTACK_X = 'ATTACK: ';
+const HURT_X = 'HURT: flinching from a hit that comes from the right: eyes squeezed shut, the body leaning back and to the left, ears, tail, wings or tentacles flung back, two or three small impact stars and one sweat drop beside the head; still cute (NOT injured: no blood, no tears streaming, no wounds)';
+for (const [a, b] of POSE_PAIRS) for (const form of [1, 2, 3]) {
+  const pa = POSE_PETS[a], pb = POSE_PETS[b];
+  sheet(F20, `${pa.ko} · ${pb.ko} ${FORM_KO[form]} 공격·맞음`, 'pet',
+    `two different pets of the same growth step (the reference pictures show each one). TOP row: ${pa.ko}, ${pa.base}. This is the ${pa.f[form]}. BOTTOM row: ${pb.ko}, ${pb.base}. This is the ${pb.f[form]}. Each pet keeps exactly the design, size and accessories of its reference picture of this growth step; only the pose changes. Both face the viewer's right.`,
+    [a, b].flatMap(key => [
+      [`${key}-${form}-attack`, `${POSE_PETS[key].ko} ${FORM_KO[form]} 공격`, `${ATTACK_X}${POSE_PETS[key].ko} in a dynamic attack pose: ${ATTACK_MOVE[key]}; the body stretched forward, a determined sparkling expression (a small open battle-cry mouth only if the pet is not a predator; predators keep the mouth closed), a few small motion lines`, `public/assets/pets/${key}-${form}-attack.webp`],
+      [`${key}-${form}-hurt`, `${POSE_PETS[key].ko} ${FORM_KO[form]} 맞음`, `${HURT_X}`, `public/assets/pets/${key}-${form}-hurt.webp`]
+    ]));
+}
+
 /* 21 이벤트 한정 펫 2종(술술이 · 찰싹이) + 가을 이벤트 알 아이콘 (V13.116~)
    수능·기말 응원 시즌 이벤트 알(할로윈 호박냥·부우, 주먹이와 한 알)에서 나오는 새 펫이에요.
    동물이 아니라 학용품이 살아난 동글동글한 마스코트(그림체는 기존 펫과 같게). 사진 속 실제 캐릭터를 따라 그리지 않아요.
@@ -991,6 +1029,7 @@ const DRIVE = {
   [F17A]: 'SUMUS 새 펫 17 (Runner용)', [F17B]: 'SUMUS 새 펫 17 (Runner용)',
   [F18A]: 'SUMUS 새 펫 18 (Runner용)', [F18B]: 'SUMUS 새 펫 18 (Runner용)',
   [F19A]: 'SUMUS 신화 펫 19 (Runner용)', [F19B]: 'SUMUS 신화 펫 19 (Runner용)', [F19C]: 'SUMUS 신화 펫 19 (Runner용)', [F19D]: 'SUMUS 신화 펫 19 (Runner용)', [F19E]: 'SUMUS 신화 펫 19 (Runner용)',
+  [F20]: 'SUMUS 전투 자세 20 (Runner용)',
   [F21A]: 'SUMUS 이벤트 펫 21 (Runner용)', [F21B]: 'SUMUS 이벤트 펫 21 (Runner용)',
   [F22A]: 'SUMUS 던전 몬스터 22 (Runner용)', [F22B]: 'SUMUS 던전 몬스터 22 (Runner용)',
   [F23A]: 'SUMUS 던전 배경·UI 23 (Runner용)', [F23B]: 'SUMUS 던전 배경·UI 23 (Runner용)', [F23C]: 'SUMUS 던전 배경·UI 23 (Runner용)'
@@ -1007,14 +1046,14 @@ const STYLE_REF = {
 STYLE_REF.monsters12 = STYLE_REF.monsters.replace(/Also open "10-1\.png"[^\n]*$/, `Also open the first monsters of this game in the Google Drive folder "${DRIVE[F10]}" ("10-1.png" and "10-8.png"; this new set is their second batch, so match their finish, size and level of detail exactly) and, if it is there, "12-1.png" in the Google Drive folder "${DRIVE[F12]}" (the first monster of the new set), and match its finish and size too. Do NOT copy the existing monsters; this is a new design.`);
 STYLE_REF.monsters22 = STYLE_REF.monsters.replace(/Also open "10-1\.png"[^\n]*$/, `Also open the existing monsters of this game in the Google Drive folder "${DRIVE[F10]}" ("10-1.png" and "10-8.png") and in "${DRIVE[F12]}" ("12-1.png" and "12-9.png"; this dungeon set is a new batch, so match their finish, size and level of detail exactly). Do NOT copy the existing monsters; these are new designs.`);
 STYLE_REF.icons12 = `${STYLE_REF.icons} Also open "10-10.png" in the Google Drive folder "${DRIVE[F10]}" (the monster screen icons: tab and difficulty badges) and match its finish and size.`;
-const refOf = p => p.bg ? null : p.file === F21A ? 'pets' : p.file === F21B && /아이콘/.test(p.title) ? 'icons' : p.file === F22A || p.file === F22B ? 'monsters22' : p.file === F23B ? 'icons12' : p.file === F23C ? 'titles' : p.file === F19C ? 'badges' : p.file === F19A ? 'pets' : p.file === F14A || p.file === F17A || p.file === F18A ? 'pets' : p.file === F14B && /아이콘/.test(p.title) ? 'icons' : p.file === F11 ? 'titles' : p.file === F12 ? (/아이콘/.test(p.title) ? 'icons12' : 'monsters12') : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
+const refOf = p => p.bg ? null : p.file === F20 ? 'pets' : p.file === F21A ? 'pets' : p.file === F21B && /아이콘/.test(p.title) ? 'icons' : p.file === F22A || p.file === F22B ? 'monsters22' : p.file === F23B ? 'icons12' : p.file === F23C ? 'titles' : p.file === F19C ? 'badges' : p.file === F19A ? 'pets' : p.file === F14A || p.file === F17A || p.file === F18A ? 'pets' : p.file === F14B && /아이콘/.test(p.title) ? 'icons' : p.file === F11 ? 'titles' : p.file === F12 ? (/아이콘/.test(p.title) ? 'icons12' : 'monsters12') : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
 const NEW_ORDER = Object.keys(NEW_PETS);
 const sheetName = (file, i) => `${file.slice(0, /^\d\d[a-e]-/.test(file) ? 3 : 2)}-${i + 1}`;
 
 /* 쓰기 */
 const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
-const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11, F12, F14A, F14B, F15, F16, F17A, F17B, F18A, F18B, F19A, F19B, F19C, F19D, F19E, F21A, F21B, F22A, F22B, F23A, F23B, F23C]);
+const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11, F12, F14A, F14B, F15, F16, F17A, F17B, F18A, F18B, F19A, F19B, F19C, F19D, F19E, F21A, F21B, F22A, F22B, F23A, F23B, F23C, F20]);
 for (const [file, list] of byFile) list.forEach((p, i) => {
   if (!SPLIT.has(file)) return;
   if (!DRIVE[file]) throw new Error(`${file}: Google Drive 폴더(DRIVE)가 없어요. 주문서에는 업로드 위치가 꼭 있어야 해요.`);
@@ -1050,6 +1089,14 @@ for (const [file, list] of byFile) list.forEach((p, i) => {
     lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
     lines.splice(3, 0, `CHARACTER REFERENCE — before drawing, open ${sheets} (the design sheet${keys.length > 1 ? 's' : ''}: egg, baby, grown, final) in the Google Drive folder "${DRIVE[XB[0]]}" and match ${keys.length > 1 ? 'each egg' : 'this pet\'s face, colors, markings, accessories and the body size of this growth stage'} exactly. ${KEEP}`);
     p.ref = `Drive: ${sheets}`;
+  }
+  // 20 전투 자세: 두 펫의 설정 시트(18a-N / 19a-N)를 열어 그 단계의 모습을 맞춰요.
+  if (file === F20) {
+    const keys = Object.keys(POSE_PETS).filter(k => p.title.includes(POSE_PETS[k].ko));
+    const sheets = keys.map(k => `"${POSE_SERIES[k][0]}-${POSE_SERIES[k][1]}.png" in the Google Drive folder "${DRIVE[POSE_SERIES[k][0] === '18a' ? F18A : F19A]}"`).join(' and ');
+    lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
+    lines.splice(3, 0, `CHARACTER REFERENCE — before drawing, open ${sheets} (the design sheets: egg, baby, grown, final). Draw the growth step named in the Subject (baby = top-right cell, grown = bottom-left cell, final = bottom-right cell of each design sheet) and match each pet's face, colors, markings, accessories and body size exactly. ${KEEP}`);
+    p.ref = `Drive: ${keys.map(k => `${POSE_SERIES[k][0]}-${POSE_SERIES[k][1]}`).join(', ')}`;
   }
   if (file === F22A && i % 2 === 1) lines.splice(3, 0, `Also open "22a-${i}.png" in the same Google Drive folder "${DRIVE[F22A]}" (sheet 1 of this monster's poses) and keep exactly the same monster design, colors, body size and proportions; only the poses change.`);
   if (file === F22B && i > 0) lines.splice(3, 0, `Also open ${Array.from({ length: i }, (_, n) => `"22b-${n + 1}.png"`).join(' and ')} in the same Google Drive folder "${DRIVE[F22B]}" (the earlier poses of this boss) and keep exactly the same boss design, colors, body size and proportions; only the poses change.`);
