@@ -44,7 +44,7 @@ const buzz = pattern => { try { navigator.vibrate?.(pattern); } catch {} };
 // Gifts waiting for the student (bootstrap `gifts`): one box for all of them. Opening it asks
 // the server to mark them opened (the coins were already counted when they were sent).
 // V13.111 선생님 알: what each egg gift became (its egg picture, the pet's name and tier).
-const TIER_KO = { basic: '기본', epic: '영웅', legendary: '전설' };
+const TIER_KO = { basic: '기본', epic: '영웅', legendary: '전설', mythic: '신화' };
 function eggCards(gifts) {
   const eggs = gifts.filter(g => g.kind === 'egg');
   if (!eggs.length) return '';
@@ -108,7 +108,8 @@ export function giftMoment(A, gifts, done) {
       const box = $('.cel-gift-eggs');
       box.innerHTML = eggCards(openedGifts);
       box.hidden = false;
-      if (eggs.some(g => g.egg?.tier === 'legendary')) $('.cel-gift').classList.add('legend');
+      if (eggs.some(g => g.egg?.tier === 'mythic')) $('.cel-gift').classList.add('legend', 'mythic');
+      else if (eggs.some(g => g.egg?.tier === 'legendary')) $('.cel-gift').classList.add('legend');
       else if (eggs.some(g => g.egg?.tier === 'epic')) $('.cel-gift').classList.add('epic');
     }
     $('.cel-gift-reward').hidden = !(coinsNow > 0);

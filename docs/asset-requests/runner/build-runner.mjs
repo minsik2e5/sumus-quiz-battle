@@ -819,6 +819,199 @@ sceneTall(F19E, '백호 등장 배경', 'bg-baekho', 'a snowy mountain ridge at 
 sceneTall(F19E, '주작 등장 배경', 'bg-jujak', 'a blazing vermilion sunrise sky over a distant volcanic peak: huge fire-colored clouds in red, orange and gold, floating embers and soft sparks, golden rays, warm glowing haze, a bright red-gold glow at the center.', 'public/assets/reveal/bg-jujak.webp');
 sceneTall(F19E, '현무 등장 배경', 'bg-hyeonmu', 'a calm deep midnight sea under a sky full of glowing constellations: gentle turquoise-glowing waves with ink-like swirls, the star-filled sky reflected on the water, a soft aurora, faint ancient stone pillars far away, a bright teal glow at the center.', 'public/assets/reveal/bg-hyeonmu.webp');
 
+/* 20 펫 전투 자세: 공격하는 자세(attack)와 맞는 자세(hurt) — 새 펫 8종 · 신화 5종 · 천마 (V13.116~)
+   지금은 공격 때 응원(cheer) 그림, 맞을 때 시무룩(sad) 그림을 빌려 쓰고 있어요(로보와 몬스터만 전용 그림).
+   펫마다 아기·성장·최종 3단계 × 2자세 = 6장. 한 시트는 같은 단계의 두 펫(위 줄 앞 펫, 아래 줄 뒤 펫)의
+   공격·맞음이에요. 시트 20-1~3 = 첫 쌍의 아기·성장·최종, 20-4~6 = 둘째 쌍 …, 모두 21장(그림 84개).
+   파일 이름은 <key>-<단계>-attack / <key>-<단계>-hurt (로보와 같은 이름 규칙)이고, 앱은 이 이름이 있으면 그 그림을 쓰고
+   없으면 응원·시무룩 그림으로 대신해요. */
+const F20 = '20-pet-battle-poses.txt';
+const POSE_PAIRS = [['frog', 'sapsaree'], ['deer', 'bear'], ['seal', 'wolf'], ['crocodile', 'octopus'], ['gumiho', 'cheongryong'], ['baekho', 'jujak'], ['hyeonmu', 'cheonma']];
+const POSE_PETS = { ...NEW_PETS_18, ...NEW_PETS_19 };
+const POSE_SERIES = Object.fromEntries([...Object.keys(NEW_PETS_18).map((k, i) => [k, ['18a', i + 1]]), ...Object.keys(NEW_PETS_19).map((k, i) => [k, ['19a', i + 1]])]);
+const ATTACK_MOVE = {
+  frog: 'a big jump toward the right with both webbed hands stretched forward',
+  sapsaree: 'pouncing forward to the right with one front paw swiping',
+  deer: 'lowering its head and charging forward to the right with its antlers first',
+  bear: 'a big paw swipe forward to the right, the whole body leaning into it',
+  seal: 'sliding forward to the right on its belly and slapping with one flipper',
+  wolf: 'leaping forward to the right with one front paw slashing',
+  crocodile: 'lunging forward to the right with its closed-mouth head and a swinging tail',
+  octopus: 'striking forward to the right with one tentacle stretched far out',
+  gumiho: 'lunging forward to the right with one front paw while all its tails flare and a fox-fire glows in the paw',
+  cheongryong: 'diving forward to the right in a coil with its claws out and its mane streaming',
+  baekho: 'leaping forward to the right with one front paw slashing, the cape and fur flying back',
+  jujak: 'swooping forward to the right with its wings swept back and the two tail ribbons streaming',
+  hyeonmu: 'ramming forward to the right with its shell while the snake strikes out ahead',
+  cheonma: 'charging forward to the right with its cloud wings spread wide and its hooves forward'
+};
+const ATTACK_X = 'ATTACK: ';
+const HURT_X = 'HURT: flinching from a hit that comes from the right: eyes squeezed shut, the body leaning back and to the left, ears, tail, wings or tentacles flung back, two or three small impact stars and one sweat drop beside the head; still cute (NOT injured: no blood, no tears streaming, no wounds)';
+for (const [a, b] of POSE_PAIRS) for (const form of [1, 2, 3]) {
+  const pa = POSE_PETS[a], pb = POSE_PETS[b];
+  sheet(F20, `${pa.ko} · ${pb.ko} ${FORM_KO[form]} 공격·맞음`, 'pet',
+    `two different pets of the same growth step (the reference pictures show each one). TOP row: ${pa.ko}, ${pa.base}. This is the ${pa.f[form]}. BOTTOM row: ${pb.ko}, ${pb.base}. This is the ${pb.f[form]}. Each pet keeps exactly the design, size and accessories of its reference picture of this growth step; only the pose changes. Both face the viewer's right.`,
+    [a, b].flatMap(key => [
+      [`${key}-${form}-attack`, `${POSE_PETS[key].ko} ${FORM_KO[form]} 공격`, `${ATTACK_X}${POSE_PETS[key].ko} in a dynamic attack pose: ${ATTACK_MOVE[key]}; the body stretched forward, a determined sparkling expression (a small open battle-cry mouth only if the pet is not a predator; predators keep the mouth closed), a few small motion lines`, `public/assets/pets/${key}-${form}-attack.webp`],
+      [`${key}-${form}-hurt`, `${POSE_PETS[key].ko} ${FORM_KO[form]} 맞음`, `${HURT_X}`, `public/assets/pets/${key}-${form}-hurt.webp`]
+    ]));
+}
+
+/* 21 이벤트 한정 펫 2종(술술이 · 찰싹이) + 가을 이벤트 알 아이콘 (V13.116~)
+   수능·기말 응원 시즌 이벤트 알(할로윈 호박냥·부우, 주먹이와 한 알)에서 나오는 새 펫이에요.
+   동물이 아니라 학용품이 살아난 동글동글한 마스코트(그림체는 기존 펫과 같게). 사진 속 실제 캐릭터를 따라 그리지 않아요.
+   21a 설정 시트(2장) → 21b 표정·알 반응·알 아이콘(8장). 이름(ko)은 그림 주문에만 쓰는 이름이에요. */
+const F21A = '21a-event-pets-design.txt', F21B = '21b-event-pets-expressions.txt';
+const OBJ21 = 'This pet is NOT an animal: it is an everyday school-supply object come to life as a round, soft, plush-like mascot (a very simple face made of two small glossy dot eyes with white highlights, a tiny mouth and big round pink blush circles; tiny stubby arms and feet). Extra cute, in exactly the same art style as the other pets of this game. It is an ORIGINAL character: do not make it look like any existing cartoon, game or toy mascot (no striped cheek marks, no drooping eyebrow lines, no animal ears). ';
+const EVENT_PETS_21 = {
+  tissue: { ko: '술술이', type: '두루마리 휴지', tier: 'event', limb: 'one tiny arm', base: 'a round, chubby, plush-like toilet-paper-roll mascot: a soft cream-white cylinder body about as wide as it is tall, a small round pale-pink paper-roll hole on top, a long gentle ribbon of soft white tissue unrolling from the top like a little scarf-tail with a tiny curl at its end, two small glossy dot eyes, a tiny smiling mouth, big round pink blush circles each with a tiny white star, tiny stubby cream arms and feet. Calm, gentle and extra cute. Its meaning is "may your problems unroll smoothly"', egg: 'a cream-white egg gently wrapped by a loop of soft white tissue ribbon with tiny pastel star marks and a small pink bow knot, resting on a small soft cushion', f: {
+    1: 'baby stage: a tiny round roll about as wide as tall with a very short tissue tail and one small curl, no accessories',
+    2: 'grown stage: a slightly taller roll standing on stubby legs (NOT a tiny baby), a longer ribbon of tissue floating up and curling behind it like a scarf, a mint headband with a small gold star charm',
+    3: 'final stage: a grand, proud, much larger roll with endless silky white tissue ribbons swirling around it in graceful spirals like a cape and soft wings, small golden star sparkles drifting along the ribbons, a golden headband with a star (no letters) and a tiny golden bow, soft pastel glow (still round, soft and cute)' } },
+  glue: { ko: '찰싹이', type: '딱풀', tier: 'event', limb: 'one tiny arm', base: 'a round, chubby, plush-like glue-stick mascot: a soft sky-blue rounded cylinder body with a thick white twist-up cap worn on its head like a little hat (a tiny round knob on top of the cap), a glossy clear heart-shaped dab of glue on one side and a tiny heart-shaped glue drip, two small glossy dot eyes, a tiny cheerful mouth, big round pink blush circles each with a tiny white heart, tiny stubby white arms and feet. Cheerful and extra cute. Its meaning is "stick to your goal"', egg: 'a pale sky-blue egg with a white band on top like a glue-stick cap, small clear heart-shaped glue drops and tiny star stickers stuck on it, resting on a small soft cushion', f: {
+    1: 'baby stage: a tiny round glue stick with a cap that is a little too big for it and one small glue heart, no other accessories',
+    2: 'grown stage: a slightly taller glue stick standing on stubby legs (NOT a tiny baby), the cap worn as a cute hat, a few star stickers stuck on its body, a mint scarf with a small gold star charm',
+    3: 'final stage: a grand, proud, much larger glue stick wearing a cape of sparkling clear glue-hearts and stars stuck together in flowing layers, a golden headband with a star (no letters), many glittering star stickers and hearts floating around it, soft pastel glow (still round, soft and cute)' } }
+};
+designSheets(F21A, EVENT_PETS_21, pet => TIER_D.event + OBJ21);
+exprSheets(F21B, EVENT_PETS_21, [['tissue', 'glue']], pet => ` In every cell that says a paw, arm, wing, flipper or hand is raised, this pet raises ${pet.limb} instead.${TIER_X.event} ${OBJ21}`);
+sheet(F21B, '가을 이벤트 알 상점 아이콘', 'icon', 'Items for the autumn event shop of this pet game (Halloween + exam-cheering season), cozy, cute and friendly, in warm pumpkin orange, lavender, cream and sky blue with gold sparkles.', [
+  ['ui-event-egg', '가을 이벤트 알', 'AUTUMN EVENT EGG: a big warm round cream egg with a pumpkin-orange band with tiny stars, a lavender ghost-wisp swirl, a white tissue-ribbon bow and a sky-blue heart-shaped glue drop on it, a red-and-white cheer headband tied around it (no letters), resting on a small purple velvet cushion with gold tassels and a few golden sparkles (the same size and framing as a shop egg icon)', 'public/assets/ui/event-egg.webp'],
+  ['ui-event-badge', '이벤트 한정 배지', 'EVENT LIMITED BADGE: a small round badge in deep purple and warm orange enamel with a gold rim, a tiny gold star and a tiny autumn leaf in the middle, a little ribbon below (no letters); it must look different from the existing Halloween limited badge (a jack-o\'-lantern badge)', 'public/assets/ui/event-badge.webp'],
+  ['ui-event-deco-cheer', '이벤트 장식(응원)', 'DECORATION: a cozy cluster of a tissue roll with a ribbon, a glue stick, a rice ball, a pencil, a golden candy and a red-and-white cheer headband (no letters), seen from the front', 'public/assets/ui/event-deco-cheer.webp'],
+  ['ui-event-deco-autumn', '이벤트 장식(가을)', 'DECORATION: a cozy cluster of red and orange autumn leaves, two small smiling pumpkins, a crescent moon and a few twinkling stars, seen from the front', 'public/assets/ui/event-deco-autumn.webp']
+]);
+
+/* 22 던전 몬스터 (기말고사 지옥 던전). 일반 15종(층마다 크기별로 무작위 등장 + 만점 모드) + 보스 킬러 골렘 1종.
+   일반: 8포즈(기본 · 기본2 · 준비 · 공격 · 공격2 · 스킬 · 맞음 · 쓰러짐) = 2시트, 보스: 12포즈 = 3시트.
+   기본 · 공격 · 맞음 · 쓰러짐은 기존 몬스터(10·12)와 같은 파일 이름(<key>.webp, -attack, -hurt, -down)이고, 새 포즈는 -idle2 -windup -attack2 -skill.
+   크기(size) S·M·L: 앱이 화면에 그릴 때 쓰는 배율 분류예요(그림은 모두 같은 크기로 그려 자르고, 앱이 배율을 곱해요). 던전 1~2층은 S·M, 3~4층은 M·L, 5층은 L에서 무작위로 나와요(코드가 이 표를 읽어요).
+   기존 몬스터 18종과 닮지 않게 새로 디자인해요(까먹귀와 빨간펜 귀신, 문법 골렘과 킬러 골렘, 째깍 도둑과 모래시계 마녀 등). */
+const F22A = '22a-dungeon-monsters.txt', F22B = '22b-dungeon-boss.txt';
+const DMON_NOTE = ' This monster belongs to a horror-themed "final-exam hell" dungeon: a touch more eerie than the other monsters (cold rim lights, glowing eyes, tattered edges) but still cute-but-mighty, funny, never gory and never truly scary. The creature\'s body size, colors and proportions must be identical in every cell of the set (only the pose changes), as if all poses were frames of one animation set.';
+STYLE.dmon = STYLE.monster + DMON_NOTE;
+const P22 = {
+  idle: 'IDLE: standing ready in a confident taunting pose, a playful smug face',
+  idle2: 'IDLE 2: the very same standing pose as IDLE but breathing in: the body a little taller or puffed, limbs and loose parts shifted slightly, eyes half-blinking; the same position and the same size as IDLE so that alternating the two looks like a breathing loop',
+  windup: 'WIND-UP: crouched and pulled back toward the RIGHT, gathering energy for an attack, eyes glaring, a faint glow in its own color (the pose right before ATTACK 1)',
+  hurt: 'HURT: knocked back to the right, squinting eyes, small white impact stars around it',
+  down: 'DEFEATED: flopped down on its back or side, swirly dizzy eyes, a few small stars circling above it, comical not sad'
+};
+const DUNGEON_MONSTERS = [
+  { key: 'nightzombie', ko: '밤샘 좀비', size: 'M', floor: '1~2층', look: 'a sleepy slouching zombie student in a wrinkled school uniform with a loosened tie, pale mint-green skin, huge dark-circle eyes, a messy bed-head of hair, an energy-drink can with a straw clutched in one hand and a chewed pencil in the pocket; funny and tired, not gory (no wounds, no exposed bones)', move1: 'a slow dramatic lunge with both arms stretched forward like a sleepwalker, a shock-wave of tiny sparkling caffeine bubbles', move2: 'chugging the energy drink and then hurling the can forward, trailing neon-green sparkles', skill: 'a glowing neon-green caffeine aura swirling around it, wide glowing eyes, the can raised high' },
+  { key: 'redpenghost', ko: '빨간펜 귀신', size: 'M', floor: '2~3층', look: 'a tall, slim, pale-white ghost with a long wavy tail, its body covered in red-ink scribble marks (check marks and crossed-out shapes only, no readable text), holding a giant glossy red pen like a staff, a strict half-lidded face with tiny round glasses and a small red ink-drop on the cheek; clearly taller and thinner than the small lavender ghost 까먹귀', move1: 'a sweeping diagonal slash with the giant red pen leaving a glowing red ink trail', move2: 'drawing a big glowing red X in the air and pushing it forward', skill: 'rows of floating glowing red check marks and crossed circles orbiting it while it holds the pen above its head' },
+  { key: 'wrongmummy', ko: '오답노트 미라', size: 'M', floor: '2~3층', look: 'a chubby mummy wrapped in long strips of notebook paper covered with red circles and scribbled doodles (no readable writing), a few loose paper ends fluttering, two glowing orange eyes in the dark gap of the wrapping, small stubby arms, a pencil stuck in the wrapping like a hairpin; spooky-cute, no gore', move1: 'the wrapping strips shooting forward like long whips', move2: 'a heavy belly-flop body slam with paper confetti bursting out', skill: 'the paper strips spinning into a whirlwind around it, glowing orange eyes, loose pages flying' },
+  { key: 'testspider', ko: '시험지 거미', size: 'M', floor: '3~4층', look: 'a big round-bodied spider whose body is a crumpled test-paper ball in cream, eight legs made of rolled paper strips tipped with pencil points, a cluster of cute big glowing magenta eyes, hanging from a long paper-strip thread; a soft paper texture, never realistic or creepy', move1: 'dropping down from its thread to stab forward with its front legs', move2: 'spitting a spray of paper-strip web balls forward', skill: 'weaving a glowing magenta web of test-paper strips between all its legs' },
+  { key: 'omrreaper', ko: 'OMR 사신', size: 'L', floor: '4~5층', look: 'a small hooded grim reaper in a deep indigo cloak patterned with rows of bubble-sheet circles (shapes only, some filled in), holding a scythe whose blade is a long OMR card with filled circles, glowing cyan eyes inside the hood, a tiny floating lantern beside it; cute but eerie, no skull', move1: 'a wide scythe swing producing a crescent of cyan light', move2: 'a spinning leap with the scythe whirling over its head', skill: 'many floating bubble circles appearing around it and filling in one by one with glowing cyan, the scythe raised' },
+  { key: 'chalkangler', ko: '칠판 아귀', size: 'L', floor: '3~5층', look: 'a big anglerfish-like monster whose body is a green chalkboard with chalk-drawn doodle shapes (no readable text), a huge cute-menacing mouth lined with white chalk-stick teeth (rounded, not sharp), a glowing lure on a long wire that ends in a glowing ball of white chalk dust, small fins shaped like board erasers', move1: 'a big chomp lunging forward with the chalk-stick teeth', move2: 'blowing a thick cloud of white chalk dust forward', skill: 'the lure flashing brightly while chalk-drawn circles and arrows fly out of its body' },
+  { key: 'nightbat', ko: '야자 박쥐', size: 'S', floor: '1~2층', look: 'a small round fluffy purple bat with big cute ears, glowing yellow eyes, tiny wings shaped like open notebooks, a soft desk-lamp glow on its belly and a blank night-study headband, hovering in the air; tiny mouth, no fangs', move1: 'a fast dive-bomb forward with its wings folded', move2: 'flapping its wings to shoot a fan of small glowing paper-plane projectiles', skill: 'screeching: yellow sound-wave rings from its open round mouth (no fangs), eyes glowing brightly' },
+  { key: 'blinkjelly', ko: '깜빡 해파리', size: 'M', floor: '2~4층', look: 'a floating jellyfish whose translucent teal dome is a flickering fluorescent ceiling lamp with a glowing white tube pattern, long dangling tentacles made of electric cords with plug tips, sleepy blinking eyes, a soft glow', move1: 'whipping its tentacle cords forward with small electric sparks', move2: 'flashing a bright white-blue strobe flash from its dome', skill: 'the dome flickering rapidly between bright and dark with arcs of blue lightning around it' },
+  { key: 'bagturtle', ko: '책가방 거북', size: 'L', floor: '3~5층', look: 'a big sturdy tortoise whose shell is an overstuffed navy school backpack with straps, zipper pockets, keychains, notebooks and a water bottle sticking out, a calm determined face, thick legs, a blank name tag', move1: 'a slow heavy forward head-butt', move2: 'tucking into the backpack shell and rolling forward in a spin', skill: 'the backpack opening and shooting out a burst of books and notebooks upward' },
+  { key: 'cheatninja', ko: '커닝 닌자', size: 'S', floor: '1~3층', look: 'a small agile ninja student in a navy ninja outfit with a blank headband, tiny hidden paper scrolls (cheat sheets, no writing) tucked in every sleeve and belt, a cheeky wink above the mask; funny, not scary', move1: 'a quick dash with a paper-shuriken throw', move2: 'a spinning slash with two rolled-paper kunai', skill: 'splitting into afterimages: three faint ghost copies, scrolls flying out of all its sleeves' },
+  { key: 'labskeleton', ko: '과학실 해골', size: 'M', floor: '2~4층', look: 'a cute chibi anatomy-model skeleton in a too-big white lab coat and safety goggles pushed up on its bony head, big round friendly eye sockets with tiny glowing green dots, holding a bubbling green flask; clean smooth bones, no gore, comical', move1: 'a clattering punch forward with its arm', move2: 'throwing the bubbling flask forward in a green splash', skill: 'raising the flask while many glowing green bubbles and tiny beakers float up around it, a small chemical-smoke cloud' },
+  { key: 'pianofang', ko: '피아노 마귀', size: 'L', floor: '4~5층', look: 'a small upright piano monster painted glossy black, its ivory keys forming a wide grinning mouth with rounded square key-teeth (no sharp fangs), two glowing violet eyes on top, a music stand as a crest, little wooden legs with tiny wheels, floating music-note shapes', move1: 'a heavy charge forward on its wheels, the keys snapping like a mouth', move2: 'hammering its keys to shoot a spread of glowing purple music-note projectiles', skill: 'the lid flipping open with a huge glowing violet shock-wave of notes and a wide chord ring' },
+  { key: 'homeworkogre', ko: '수행평가 오거', size: 'L', floor: '3~5층', look: 'a big green ogre student in a tiny too-small school vest, carrying a huge teetering stack of project folders and rolled posters on its back, holding a club made from a giant rolled poster, a dopey friendly-grumpy face with small round blunt tusks (no sharp fangs), blank sticky notes all over its shoulders', move1: 'a heavy overhead club slam', move2: 'throwing a flurry of project folders forward like boomerangs', skill: 'the stack on its back glowing as it roars with the club lifted, sticky notes flying' },
+  { key: 'gatehound', ko: '교문 불독', size: 'L', floor: '3~5층', look: 'a stocky grumpy bulldog gate guard wearing a bright-yellow safety armband and a whistle, a collar of blunt rounded studs (no sharp spikes), a stern drooping face with a rounded underbite and no sharp teeth, standing like a gatekeeper', move1: 'a charging shoulder-bash forward', move2: 'a loud bark launching round yellow sound-wave rings from the whistle', skill: 'blowing the whistle: big golden shock-wave rings and a glowing paw-print stamp effect' },
+  { key: 'sandwitch', ko: '모래시계 마녀', size: 'M', floor: '2~4층', look: 'a floating witch whose body is a big hourglass of glowing violet sand, a pointed witch hat, two long hair braids made of falling sand, sleepy-sly half-closed eyes, small hands holding a tiny broom that is a pencil; the sand never stops falling', move1: 'sweeping the pencil-broom forward to shoot a stream of glowing sand', move2: 'flipping upside-down and slamming the hourglass forward in a burst of sand', skill: 'the hourglass glowing while sand swirls into a ring and a clock-face-shaped circle (no numbers) behind her' }
+];
+for (const m of DUNGEON_MONSTERS) {
+  const { key, ko } = m, sk = 'dmon', subject = `"${ko}": ${m.look}.`;
+  sheet(F22A, `던전 몬스터 ${ko} 1 (기본·준비·공격)`, sk, `${subject} Sheet 1 of 2 of its poses (the other sheet has ATTACK 2, SKILL, HURT and DEFEATED).`, [
+    [`monster-${key}`, `${ko} 기본`, P22.idle, `public/assets/monsters/${key}.webp`],
+    [`monster-${key}-idle2`, `${ko} 기본2`, P22.idle2, `public/assets/monsters/${key}-idle2.webp`],
+    [`monster-${key}-windup`, `${ko} 준비`, P22.windup, `public/assets/monsters/${key}-windup.webp`],
+    [`monster-${key}-attack`, `${ko} 공격`, `ATTACK 1: ${m.move1}; lunging toward the LEFT with motion lines and a burst of its own color, fierce but cute face`, `public/assets/monsters/${key}-attack.webp`]
+  ]);
+  sheet(F22A, `던전 몬스터 ${ko} 2 (공격2·스킬·맞음·쓰러짐)`, sk, `${subject} Sheet 2 of 2 of its poses (the other sheet has IDLE, IDLE 2, WIND-UP and ATTACK 1).`, [
+    [`monster-${key}-attack2`, `${ko} 공격2`, `ATTACK 2: a clearly DIFFERENT attack from ATTACK 1: ${m.move2}; toward the LEFT with motion lines and a burst of its own color, fierce but cute face`, `public/assets/monsters/${key}-attack2.webp`],
+    [`monster-${key}-skill`, `${ko} 스킬`, `SKILL: ${m.skill}; its most dramatic and powerful pose, standing in place, a strong glow in its own color`, `public/assets/monsters/${key}-skill.webp`],
+    [`monster-${key}-hurt`, `${ko} 맞음`, P22.hurt, `public/assets/monsters/${key}-hurt.webp`],
+    [`monster-${key}-down`, `${ko} 쓰러짐`, P22.down, `public/assets/monsters/${key}-down.webp`]
+  ]);
+}
+const BOSS22 = { key: 'killergolem', ko: '킬러 골렘', look: 'THE BOSS of the dungeon: a towering giant golem built from stacked textbooks and exam papers in cream, red and charcoal, a glowing crimson core in its chest like a furnace, a head that is a horned test paper with big angry-but-funny eyes and a jagged grin of paper edges, one arm ending in a giant glossy red pen, the other arm a heavy fist made of a stack of books, small red flames licking out of the cracks; clearly different from the gray stone golem 문법 골렘 (gray stone with teal runes): this one is paper and books with a red core and a red-pen arm; no readable text' };
+{
+  const { key, ko } = BOSS22, subject = `"${ko}": ${BOSS22.look}.`, out = suffix => `public/assets/monsters/${key}${suffix}.webp`;
+  sheet(F22B, `던전 보스 ${ko} 1 (기본·준비·공격)`, 'dmon', `${subject} Sheet 1 of 3 of its 12 poses.`, [
+    [`monster-${key}`, `${ko} 기본`, P22.idle, out('')],
+    [`monster-${key}-idle2`, `${ko} 기본2`, P22.idle2, out('-idle2')],
+    [`monster-${key}-windup`, `${ko} 준비`, P22.windup, out('-windup')],
+    [`monster-${key}-attack`, `${ko} 공격`, 'ATTACK 1: a huge diagonal slash with the giant red pen arm toward the LEFT, a glowing red ink trail and motion lines, fierce but funny face', out('-attack')]
+  ]);
+  sheet(F22B, `던전 보스 ${ko} 2 (공격2·스킬·맞음·쓰러짐)`, 'dmon', `${subject} Sheet 2 of 3 of its 12 poses.`, [
+    [`monster-${key}-attack2`, `${ko} 공격2`, 'ATTACK 2: a clearly DIFFERENT attack from ATTACK 1: a crushing overhead slam with the heavy book-stack fist toward the LEFT, paper pages bursting out around the impact', out('-attack2')],
+    [`monster-${key}-skill`, `${ko} 스킬`, 'SKILL ("red-pen grading"): the red pen raised high while giant glowing red check marks and X marks hang in the air around it, its core glowing brighter, standing in place', out('-skill')],
+    [`monster-${key}-hurt`, `${ko} 맞음`, P22.hurt, out('-hurt')],
+    [`monster-${key}-down`, `${ko} 쓰러짐`, 'DEFEATED: collapsing into a big pile of books and loose test papers with its horned paper head on top, the red core flickering out, swirly dizzy eyes, a few small stars above, comical not sad', out('-down')]
+  ]);
+  sheet(F22B, `던전 보스 ${ko} 3 (분노·핵 노출·포효·핵 맞음)`, 'dmon', `${subject} Sheet 3 of 3 of its 12 poses: the extra poses for the boss phases.`, [
+    [`monster-${key}-rage`, `${ko} 분노 기본`, 'RAGE IDLE (phase 3): the same standing pose as IDLE but furious: bigger red flames from the cracks, glowing red eyes, the paper edges of its jagged grin standing up, the core blazing', out('-rage')],
+    [`monster-${key}-core`, `${ko} 핵 노출`, 'CORE EXPOSED: the chest panel of books swung open to show a big bright crimson-and-gold core, the golem leaning back a little, looking vulnerable but still defiant, a pulsing glow around the core', out('-core')],
+    [`monster-${key}-roar`, `${ko} 포효`, 'PHASE ROAR: head thrown back and arms spread wide in a huge roar, a big shock-wave ring of red light and flying paper pages around it, small flames everywhere (used when the boss changes phase)', out('-roar')],
+    [`monster-${key}-corehurt`, `${ko} 핵 맞음`, 'CORE HIT: the chest panel open and the core being struck: the core flashing white, cracks of light spreading from it, the golem recoiling in pain with squinting eyes, white impact stars', out('-corehurt')]
+  ]);
+}
+
+/* 23 던전 배경(가로 8장) · 던전 UI 아이콘(20개) · 던전 칭호 메달(8개). 던전 그림은 public/assets/dungeon/ 과 ui/·titles/ 에 새 파일로 넣어요.
+   배경 레이아웃: 큰 몬스터는 오른쪽 위, 파티 펫 2~3마리는 왼쪽 아래에 나란히 서요. */
+const F23A = '23a-dungeon-backgrounds.txt', F23B = '23b-dungeon-ui.txt', F23C = '23c-dungeon-titles.txt';
+const BG_LAYOUT_D = 'COMPOSITION (important, the game puts its own characters and name tags on top): the camera looks slightly down at a wide flat stage floor that fills the lower 60% of the picture. ONE LARGE monster will stand on the floor in the UPPER-RIGHT area, and up to THREE small pets will stand side by side in a row across the LOWER-LEFT area, so keep those spots flat, open and uncluttered. Name tags and health bars will cover the TOP of the picture and the lower-right quarter, so keep the top 15% and the lower-right quarter calm and simple (soft colors, little detail). Put the interesting details around the outer edges and in the far background. The floor is crisp; the far background is slightly softer and lighter for depth. A gentle vignette toward the edges. Mood: eerie but cute, a "final-exam hell" school at night, never gory and never truly scary, still bright enough that the characters are easy to see.';
+function sceneD(file, title, key, look) {
+  const no = prompts.length + 1;
+  prompts.push({ file, no, title, bg: true, text: [BG, BG_STYLE, `Scene: ${look}`, BG_LAYOUT_D].join('\n') });
+  slices.push({ file, no, title, cell: '전체', key, name: title, out: `public/assets/dungeon/${key}.webp` });
+}
+sceneD(F23A, '던전 입구 배경', 'bg-gate', 'the entrance of the "Final-Exam Hell" dungeon: a huge rusty iron school gate with rows of blank exam papers pinned to its bars, a path of cracked stone tiles leading to it, flickering paper lanterns, thick violet-red fog at the base, a pale moon over a dark school building far back.');
+sceneD(F23A, '던전 1층 배경(야자 교실)', 'bg-f1', 'floor 1: an empty classroom at night during forced night-study: desks and chairs scattered and stacked, a blackboard with blank chalk doodles, cold blue moonlight through tall windows, a few glowing desk lamps, tiny floating dust and a half-eaten snack on a desk.');
+sceneD(F23A, '던전 2층 배경(복도)', 'bg-f2', 'floor 2: a long school corridor at night: rows of lockers, a shiny checkered floor, ceiling fluorescent lights flickering with a cold green-white glow, a wet-floor sign, bulletin boards with blank papers, a distant glowing exit sign.');
+sceneD(F23A, '던전 3층 배경(과학실)', 'bg-f3', 'floor 3: a science lab at night: black lab tables with glowing green flasks and bubbling beakers, shelves of jars with soft glowing liquids, a periodic-table-style wall poster made only of blank colored squares (no letters), green mist drifting along the floor.');
+sceneD(F23A, '던전 4층 배경(도서관 서고)', 'bg-f4', 'floor 4: a gigantic school library stack at night: towering dark-wood bookshelves, floating open books and loose pages drifting in the air, thin paper-strip cobwebs in the corners, warm amber reading lamps, a spiral staircase far back.');
+sceneD(F23A, '던전 5층 배경(채점실)', 'bg-f5', 'floor 5: a vast grading room: towering stacks of exam papers like paper skyscrapers, giant red pens stuck upright in the floor like pillars, scattered papers, a red-lit haze from hanging red lamps, glowing red check marks and cross shapes floating faintly in the air.');
+sceneD(F23A, '던전 보스방 배경', 'bg-boss', 'the boss hall of the dungeon: a huge auditorium turned exam hell: mountains of test papers on both sides, floating bubble-sheet cards, a river of glowing red ink with a stone bridge-like floor in the middle, a giant blank clock face on the far wall, red-violet fire in iron braziers, dramatic crimson-and-gold light from above.');
+sceneD(F23A, '만점 모드 배경(무한 탑)', 'bg-endless', 'the endless tower of the perfect-score mode: a spiral stone tower of floors rising into a starry violet-gold sky, each level lit by golden lanterns, floating golden exam papers and stars, soft aurora ribbons, a bright golden-white glow at the top. Mysterious and grand, not scary.');
+sheet(F23B, '던전 등급컷 배지 아이콘', 'icon', 'Rank badges of the exam-grade dungeon tiers, one family of shield-shaped badges that look better and better from left to right; keep each simple and bold so it stays clear at 48 pixels; NO letters and NO numbers (the app writes them).', [
+  ['ui-dungeon-rank3', '3등급 컷 배지', 'a rounded shield badge in warm BRONZE metal with a thin rim and one small orange gem in the middle, a soft glow', 'public/assets/ui/dungeon-rank3.webp'],
+  ['ui-dungeon-rank2', '2등급 컷 배지', 'the same shield badge shape in shiny SILVER metal with two small wings on the sides and one small blue gem in the middle', 'public/assets/ui/dungeon-rank2.webp'],
+  ['ui-dungeon-rank1', '1등급 컷 배지', 'the same shield badge shape in bright GOLD with a small crown on top, a green leaf wreath on both sides and one red gem in the middle, a few sparkles', 'public/assets/ui/dungeon-rank1.webp'],
+  ['ui-dungeon-perfect', '만점 배지', 'a large faceted DIAMOND-shaped badge with a prismatic rainbow-gold shine, a small golden crown and soft rainbow flames rising behind it, many sparkles; the most spectacular of the four', 'public/assets/ui/dungeon-perfect.webp']
+]);
+sheet(F23B, '던전 입구·보상 아이콘', 'icon', 'Dungeon entrance and reward icons, cute, glossy and friendly with a slightly eerie purple-and-gold mood; keep each simple and bold so it stays clear at 64 pixels; no letters.', [
+  ['ui-dungeon-door', '던전 문(닫힘)', 'a big arched dark-wood and iron dungeon door, closed, with a heavy iron lock, small purple glowing runes shaped like simple circles and stars (no letters) and two tiny blank exam papers pinned on it', 'public/assets/ui/dungeon-door.webp'],
+  ['ui-dungeon-door-open', '던전 문(열림)', 'the same arched dungeon door swung open, a warm golden-white light pouring out of the gap with a few sparkles, dark purple fog at the bottom', 'public/assets/ui/dungeon-door-open.webp'],
+  ['ui-dungeon-chest', '보상 상자(닫힘)', 'a chunky treasure chest in deep purple wood with gold trim and a round golden lock, a small star on the lid, closed, a faint glow', 'public/assets/ui/dungeon-chest.webp'],
+  ['ui-dungeon-chest-open', '보상 상자(열림)', 'the same treasure chest opened wide, golden coins, sparkling gems and a glowing star bursting out, golden light rays', 'public/assets/ui/dungeon-chest-open.webp']
+]);
+sheet(F23B, '던전 전투 상태 아이콘', 'icon', 'Battle status icons for a party dungeon, cute, glossy and bold; keep each simple so it stays clear at 48 pixels; no letters and no numbers.', [
+  ['ui-dungeon-faint', '기절', 'FAINTED: a ring of three small yellow stars circling around two swirly dizzy spiral eyes, a tiny grey puff, comical and cute', 'public/assets/ui/dungeon-faint.webp'],
+  ['ui-dungeon-revive', '부활', 'REVIVE: a glowing pink heart with small white angel wings and a soft golden halo above it, a few rising sparkles', 'public/assets/ui/dungeon-revive.webp'],
+  ['ui-dungeon-gauge', '파티 게이지', 'PARTY GAUGE: a glowing crystal orb in a golden ornate holder, half-filled with swirling rainbow light, a few sparks', 'public/assets/ui/dungeon-gauge.webp'],
+  ['ui-dungeon-ultimate', '합동 필살', 'COMBINED ULTIMATE: a bold emblem of three small crossed glowing weapons-of-light (a flame, a droplet and a leaf shape) meeting in a big star burst, golden rim, rainbow sparks', 'public/assets/ui/dungeon-ultimate.webp']
+]);
+sheet(F23B, '던전 보스 패턴 아이콘', 'icon', 'Boss mechanic markers for a dungeon, cute, glossy and bold; keep each simple so it stays clear at 48 pixels; no letters and no numbers.', [
+  ['ui-dungeon-mark', '채점 표적', 'GRADING TARGET: a bright red round target mark with a big glowing red check-mark-like swoosh over it, small red ink splashes, urgent and clear', 'public/assets/ui/dungeon-mark.webp'],
+  ['ui-dungeon-core', '핵', 'BOSS CORE: a big glowing crimson-and-gold crystal core with a pulsing aura and tiny cracks of light, floating, a few embers', 'public/assets/ui/dungeon-core.webp'],
+  ['ui-dungeon-break', '브레이크', 'BREAK: a shattering shield or armor plate cracking apart into glowing pieces with white impact stars and golden sparks', 'public/assets/ui/dungeon-break.webp'],
+  ['ui-dungeon-hourglass', '시간 임박', 'TIME WARNING: a cute hourglass with glowing orange-red sand almost run out, small urgent sparks and two tiny motion lines at the sides', 'public/assets/ui/dungeon-hourglass.webp']
+]);
+sheet(F23B, '던전 메뉴·파티 아이콘', 'icon', 'Dungeon menu and party icons, cute, glossy and friendly; keep each simple and bold so it stays clear at 48 pixels; no letters and no numbers.', [
+  ['ui-dungeon-tab', '던전 탭', 'a small arched dungeon gate with a glowing purple doorway and a crossed sword and shield in front of it, one tiny sparkle', 'public/assets/ui/dungeon-tab.webp'],
+  ['ui-dungeon-slot', '파티 빈자리 틀', 'an empty round party-member slot: a circular golden frame with a soft dark-violet inside and a faint plus-shaped glow in the middle (a plain plus shape, no letters)', 'public/assets/ui/dungeon-slot.webp'],
+  ['ui-dungeon-invite', '파티 초대', 'a party invitation: a cute sealed envelope with a golden star wax seal and two tiny wings flapping, a few sparkles', 'public/assets/ui/dungeon-invite.webp'],
+  ['ui-dungeon-record', '기록', 'a record icon: a shiny gold stopwatch with a small laurel wreath and a tiny crown on top, a few sparkles', 'public/assets/ui/dungeon-record.webp']
+]);
+sheet(F23C, '던전 칭호 메달 1', 'emblem', 'Title medals for a dungeon game, one family of round enamel medals with a thin metal rim, each with a clear simple emblem in the middle; readable at 64 pixels; no letters and no numbers. The metal of the rim shows the tier: bronze, silver or gold.', [
+  ['dungeon-first', '첫 던전 클리어', 'a BRONZE-rimmed medal with a small open dungeon door letting golden light out, a tiny star above', 'public/assets/titles/dungeon-first.webp'],
+  ['dungeon-rank3', '3등급 컷 클리어', 'a BRONZE-rimmed medal with a small shield and a single sparkle, warm orange enamel', 'public/assets/titles/dungeon-rank3.webp'],
+  ['dungeon-rank2', '2등급 컷 클리어', 'a SILVER-rimmed medal with a small winged shield, cool blue enamel', 'public/assets/titles/dungeon-rank2.webp'],
+  ['dungeon-rank1', '1등급 컷 클리어', 'a GOLD-rimmed medal with a crowned shield and a small laurel wreath, deep red enamel', 'public/assets/titles/dungeon-rank1.webp']
+]);
+sheet(F23C, '던전 칭호 메달 2', 'emblem', 'Title medals for a dungeon game, one family of round enamel medals with a thin metal rim, each with a clear simple emblem in the middle; readable at 64 pixels; no letters and no numbers. The metal of the rim shows the tier: silver, gold or a special prismatic one.', [
+  ['dungeon-perfect', '만점 도전', 'a PRISMATIC rainbow-gold-rimmed medal with a faceted diamond and tiny flames, the most spectacular of the set', 'public/assets/titles/dungeon-perfect.webp'],
+  ['dungeon-flawless', '무사고 클리어', 'a GOLD-rimmed medal with a heart-shaped shield with a small check-mark-like swoosh, soft pink enamel', 'public/assets/titles/dungeon-flawless.webp'],
+  ['dungeon-record', '신기록', 'a GOLD-rimmed medal with a stopwatch and a small shooting star, bright teal enamel', 'public/assets/titles/dungeon-record.webp'],
+  ['dungeon-hunter', '던전 사냥꾼', 'a SILVER-rimmed medal with two crossed swords over a small monster silhouette-free shield, deep purple enamel', 'public/assets/titles/dungeon-hunter.webp']
+]);
+
 /* Google Drive: 그림을 그리는 GPT는 Drive에서 참고 그림을 열어 보고, 결과를 Drive 폴더에 올려요.
    규칙: 시트별 파일(split/)로 나가는 모든 주문서는 DRIVE에 폴더가 있어야 하고(없으면 멈춰요),
    끝에 "이 폴더에 이 이름으로 올리기"가 붙어요. 처음 그리는 그림(08·09a)은 기존 그림을 열어 보고 그림체를 맞춰요. */
@@ -835,7 +1028,11 @@ const DRIVE = {
   [F16]: 'SUMUS 몽이·핑키 16 (Runner용)',
   [F17A]: 'SUMUS 새 펫 17 (Runner용)', [F17B]: 'SUMUS 새 펫 17 (Runner용)',
   [F18A]: 'SUMUS 새 펫 18 (Runner용)', [F18B]: 'SUMUS 새 펫 18 (Runner용)',
-  [F19A]: 'SUMUS 신화 펫 19 (Runner용)', [F19B]: 'SUMUS 신화 펫 19 (Runner용)', [F19C]: 'SUMUS 신화 펫 19 (Runner용)', [F19D]: 'SUMUS 신화 펫 19 (Runner용)', [F19E]: 'SUMUS 신화 펫 19 (Runner용)'
+  [F19A]: 'SUMUS 신화 펫 19 (Runner용)', [F19B]: 'SUMUS 신화 펫 19 (Runner용)', [F19C]: 'SUMUS 신화 펫 19 (Runner용)', [F19D]: 'SUMUS 신화 펫 19 (Runner용)', [F19E]: 'SUMUS 신화 펫 19 (Runner용)',
+  [F20]: 'SUMUS 전투 자세 20 (Runner용)',
+  [F21A]: 'SUMUS 이벤트 펫 21 (Runner용)', [F21B]: 'SUMUS 이벤트 펫 21 (Runner용)',
+  [F22A]: 'SUMUS 던전 몬스터 22 (Runner용)', [F22B]: 'SUMUS 던전 몬스터 22 (Runner용)',
+  [F23A]: 'SUMUS 던전 배경·UI 23 (Runner용)', [F23B]: 'SUMUS 던전 배경·UI 23 (Runner용)', [F23C]: 'SUMUS 던전 배경·UI 23 (Runner용)'
 };
 const PET_SPRITES = 'SUMUS_PET_SPRITES_ALL_20261002/original_1254';
 const KEEP = 'Do NOT make it softer, blurrier, foggier, more painterly or more watercolor-like than the reference.';
@@ -847,15 +1044,16 @@ const STYLE_REF = {
   titles: `STYLE REFERENCE — before drawing, open these pictures in Google Drive and study them: "07a-5.png" in the Google Drive folder "${DRIVE[F7A]}" (legendary badge), "06-3.png" in the Google Drive folder "${DRIVE[F6]}" (jackpot and ticket) and "10-10.png" in the Google Drive folder "${DRIVE[F10]}" (shield badges) if it is there. They show shiny game art already used in this app. Draw the medals in exactly that style: the same glossy 3D toy-like metal and enamel, the same chunky rounded shapes, the same clean edges and soft sparkles, the same bright clear colors. ${KEEP} Do NOT copy the reference objects.`
 };
 STYLE_REF.monsters12 = STYLE_REF.monsters.replace(/Also open "10-1\.png"[^\n]*$/, `Also open the first monsters of this game in the Google Drive folder "${DRIVE[F10]}" ("10-1.png" and "10-8.png"; this new set is their second batch, so match their finish, size and level of detail exactly) and, if it is there, "12-1.png" in the Google Drive folder "${DRIVE[F12]}" (the first monster of the new set), and match its finish and size too. Do NOT copy the existing monsters; this is a new design.`);
+STYLE_REF.monsters22 = STYLE_REF.monsters.replace(/Also open "10-1\.png"[^\n]*$/, `Also open the existing monsters of this game in the Google Drive folder "${DRIVE[F10]}" ("10-1.png" and "10-8.png") and in "${DRIVE[F12]}" ("12-1.png" and "12-9.png"; this dungeon set is a new batch, so match their finish, size and level of detail exactly). Do NOT copy the existing monsters; these are new designs.`);
 STYLE_REF.icons12 = `${STYLE_REF.icons} Also open "10-10.png" in the Google Drive folder "${DRIVE[F10]}" (the monster screen icons: tab and difficulty badges) and match its finish and size.`;
-const refOf = p => p.bg ? null : p.file === F19C ? 'badges' : p.file === F19A ? 'pets' : p.file === F14A || p.file === F17A || p.file === F18A ? 'pets' : p.file === F14B && /아이콘/.test(p.title) ? 'icons' : p.file === F11 ? 'titles' : p.file === F12 ? (/아이콘/.test(p.title) ? 'icons12' : 'monsters12') : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
+const refOf = p => p.bg ? null : p.file === F20 ? 'pets' : p.file === F21A ? 'pets' : p.file === F21B && /아이콘/.test(p.title) ? 'icons' : p.file === F22A || p.file === F22B ? 'monsters22' : p.file === F23B ? 'icons12' : p.file === F23C ? 'titles' : p.file === F19C ? 'badges' : p.file === F19A ? 'pets' : p.file === F14A || p.file === F17A || p.file === F18A ? 'pets' : p.file === F14B && /아이콘/.test(p.title) ? 'icons' : p.file === F11 ? 'titles' : p.file === F12 ? (/아이콘/.test(p.title) ? 'icons12' : 'monsters12') : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
 const NEW_ORDER = Object.keys(NEW_PETS);
 const sheetName = (file, i) => `${file.slice(0, /^\d\d[a-e]-/.test(file) ? 3 : 2)}-${i + 1}`;
 
 /* 쓰기 */
 const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
-const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11, F12, F14A, F14B, F15, F16, F17A, F17B, F18A, F18B, F19A, F19B, F19C, F19D, F19E]);
+const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11, F12, F14A, F14B, F15, F16, F17A, F17B, F18A, F18B, F19A, F19B, F19C, F19D, F19E, F21A, F21B, F22A, F22B, F23A, F23B, F23C, F20]);
 for (const [file, list] of byFile) list.forEach((p, i) => {
   if (!SPLIT.has(file)) return;
   if (!DRIVE[file]) throw new Error(`${file}: Google Drive 폴더(DRIVE)가 없어요. 주문서에는 업로드 위치가 꼭 있어야 해요.`);
@@ -864,7 +1062,7 @@ for (const [file, list] of byFile) list.forEach((p, i) => {
   if (ref) {
     lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
     lines.splice(2, 0, STYLE_REF[ref]);
-    p.ref = `Drive: ${ref === 'pets' || ref === 'monsters' ? PET_SPRITES : ref === 'monsters12' ? `${PET_SPRITES}, 10-1.png, 10-8.png` : ref === 'icons12' ? '06-3.png, 06-4.png, 10-10.png' : ref === 'icons' ? '06-3.png, 06-4.png' : ref === 'titles' ? '07a-5.png, 06-3.png, 10-10.png' : '07a-5.png, 06-3.png'}`;
+    p.ref = `Drive: ${ref === 'pets' || ref === 'monsters' ? PET_SPRITES : ref === 'monsters12' || ref === 'monsters22' ? `${PET_SPRITES}, 10-1.png, 10-8.png, 12-1.png` : ref === 'icons12' ? '06-3.png, 06-4.png, 10-10.png' : ref === 'icons' ? '06-3.png, 06-4.png' : ref === 'titles' ? '07a-5.png, 06-3.png, 10-10.png' : '07a-5.png, 06-3.png'}`;
   }
   // 11 칭호: 뒤 시트는 같은 등급이 처음 나온 시트(와 11-1)를 열어 테두리·크기를 똑같이 맞춰요.
   if (file === F11 && i > 0) {
@@ -884,7 +1082,7 @@ for (const [file, list] of byFile) list.forEach((p, i) => {
     p.ref = `Drive: ${sheets}`;
   }
   // 14b·17b: 그 펫의 설정 시트(14a-N / 17a-N)를 열어 맞춰요. 배경은 기존 캐릭터를 열어 그림체만 맞춰요.
-  const XB = { [F14B]: [F14A, HALLOWEEN_PETS, '14a'], [F17B]: [F17A, NEW_PETS_17, '17a'], [F18B]: [F18A, NEW_PETS_18, '18a'], [F19B]: [F19A, NEW_PETS_19, '19a'] }[file];
+  const XB = { [F14B]: [F14A, HALLOWEEN_PETS, '14a'], [F17B]: [F17A, NEW_PETS_17, '17a'], [F18B]: [F18A, NEW_PETS_18, '18a'], [F19B]: [F19A, NEW_PETS_19, '19a'], [F21B]: [F21A, EVENT_PETS_21, '21a'] }[file];
   if (XB && !p.bg && !/아이콘/.test(p.title)) {
     const order = Object.keys(XB[1]), keys = order.filter(k => p.title.includes(XB[1][k].ko));
     const sheets = keys.map(k => `"${XB[2]}-${order.indexOf(k) + 1}.png"`).join(' and ');
@@ -892,6 +1090,16 @@ for (const [file, list] of byFile) list.forEach((p, i) => {
     lines.splice(3, 0, `CHARACTER REFERENCE — before drawing, open ${sheets} (the design sheet${keys.length > 1 ? 's' : ''}: egg, baby, grown, final) in the Google Drive folder "${DRIVE[XB[0]]}" and match ${keys.length > 1 ? 'each egg' : 'this pet\'s face, colors, markings, accessories and the body size of this growth stage'} exactly. ${KEEP}`);
     p.ref = `Drive: ${sheets}`;
   }
+  // 20 전투 자세: 두 펫의 설정 시트(18a-N / 19a-N)를 열어 그 단계의 모습을 맞춰요.
+  if (file === F20) {
+    const keys = Object.keys(POSE_PETS).filter(k => p.title.includes(POSE_PETS[k].ko));
+    const sheets = keys.map(k => `"${POSE_SERIES[k][0]}-${POSE_SERIES[k][1]}.png" in the Google Drive folder "${DRIVE[POSE_SERIES[k][0] === '18a' ? F18A : F19A]}"`).join(' and ');
+    lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
+    lines.splice(3, 0, `CHARACTER REFERENCE — before drawing, open ${sheets} (the design sheets: egg, baby, grown, final). Draw the growth step named in the Subject (baby = top-right cell, grown = bottom-left cell, final = bottom-right cell of each design sheet) and match each pet's face, colors, markings, accessories and body size exactly. ${KEEP}`);
+    p.ref = `Drive: ${keys.map(k => `${POSE_SERIES[k][0]}-${POSE_SERIES[k][1]}`).join(', ')}`;
+  }
+  if (file === F22A && i % 2 === 1) lines.splice(3, 0, `Also open "22a-${i}.png" in the same Google Drive folder "${DRIVE[F22A]}" (sheet 1 of this monster's poses) and keep exactly the same monster design, colors, body size and proportions; only the poses change.`);
+  if (file === F22B && i > 0) lines.splice(3, 0, `Also open ${Array.from({ length: i }, (_, n) => `"22b-${n + 1}.png"`).join(' and ')} in the same Google Drive folder "${DRIVE[F22B]}" (the earlier poses of this boss) and keep exactly the same boss design, colors, body size and proportions; only the poses change.`);
   if (file === F19D) {
     const order = Object.keys(NEW_PETS_19), keys = order.filter(k => p.title.includes(NEW_PETS_19[k].ko));
     const sheets = keys.map(k => `"19a-${order.indexOf(k) + 1}.png"`).join(', ');
@@ -901,6 +1109,7 @@ for (const [file, list] of byFile) list.forEach((p, i) => {
   }
   if (p.bg) {
     lines.splice(2, 0, BG_REF);
+    if (file === F23A && i > 0) lines.splice(3, 0, `Also open "23a-1.png" in the same Google Drive folder "${DRIVE[F23A]}" (the first background of this set) if it is there, and match its camera angle, floor size, lighting style and level of detail exactly.`);
     if (file === F15 && i > 0) lines.splice(3, 0, `Also open "15-1.png" in the same Google Drive folder "${DRIVE[F15]}" (the first background of this set) if it is there, and match its camera angle, floor size, lighting style and level of detail exactly.`);
     p.ref = `Drive: ${PET_SPRITES}, 10-1.png, 10-8.png`;
   }

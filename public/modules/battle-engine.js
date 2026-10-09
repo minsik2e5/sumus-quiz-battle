@@ -79,7 +79,15 @@ export const PET_SKILLS = {
   redpanda: { name: '단풍 회오리', desc: '바로 5 피해, 다음 공격 2번 +5씩', burst: 5, boost: [5, 5] },
   arcticfox: { name: '눈보라', desc: '3문제 동안 3씩 피해, 다음에 받는 공격 −6', poison: 3, turns: 3, guard: [6] },
   koala: { name: '꿀잠', desc: 'HP +7, 다음 공격 +7', heal: 7, boost: [7] },
-  parrot: { name: '따라 말하기', desc: '2번 연속 맞히면 다음 공격 +9', boost: [9], need: 2 }
+  parrot: { name: '따라 말하기', desc: '2번 연속 맞히면 다음 공격 +9', boost: [9], need: 2 },
+  frog: { name: '연잎 도약', desc: '바로 7 피해, 다음 공격 +7', burst: 7, boost: [7] },
+  sapsaree: { name: '복슬 보호', desc: '다음에 받는 공격 2번 −8씩', guard: [8, 8] },
+  deer: { name: '새싹의 기운', desc: 'HP +8, 다음 공격 +6', heal: 8, boost: [6] },
+  bear: { name: '든든한 품', desc: 'HP +6, 다음에 받는 공격 −8', heal: 6, guard: [8] },
+  seal: { name: '물방울 튕기기', desc: '바로 6 피해, 다음에 받는 공격 −9', burst: 6, guard: [9] },
+  wolf: { name: '달빛 질주', desc: '다음 공격 +6, 이후 2번 +5씩', boost: [6, 5, 5] },
+  crocodile: { name: '늪지 물결', desc: '바로 9 피해, HP +5', burst: 9, heal: 5 },
+  octopus: { name: '말랑 촉수', desc: '다음 공격 +8, 다음에 받는 공격 −7', boost: [8], guard: [7] }
 };
 // V13.94 몬스터 잡기: a monster's own skill (its `pet.skill`), stronger at harder levels.
 export const MONSTER_SKILLS = {
@@ -87,13 +95,15 @@ export const MONSTER_SKILLS = {
   roar: { name: '포효', desc: '다음 공격 2번 +12씩', boost: [12, 12] },
   rage: { name: '광폭화', desc: '바로 18 피해, 다음 공격 +12', burst: 18, boost: [12] }
 };
-// V13.109: the season's limited pets (호박냥 · 부우) have no yacha skill either.
-const LIMITED_SKILLESS = new Set(['pumpkincat', 'ghost']);
-const NO_SKILL_PETS = new Set(['haechi', 'phoenix', 'whale', 'qilin', ...LIMITED_SKILLESS]);
+// V13.109: the season's limited pets (호박냥 · 부우; V13.117: 주먹이 · 술술이 · 찰싹이) have no yacha skill either.
+const LIMITED_SKILLESS = new Set(['pumpkincat', 'ghost', 'riceball', 'tissue', 'glue']);
+// V13.118: 천마 (legendary) and the five mythic pets have no yacha skill either (their show is the reveal).
+const MYTHIC_SKILLESS = new Set(['gumiho', 'cheongryong', 'baekho', 'jujak', 'hyeonmu']);
+const NO_SKILL_PETS = new Set(['haechi', 'phoenix', 'whale', 'qilin', 'cheonma', ...MYTHIC_SKILLESS, ...LIMITED_SKILLESS]);
 // The practice robot (or no pet) uses 몽이's. Legendary pets deliberately have no battle skill.
 export const petSkillKey = pet => NO_SKILL_PETS.has(pet?.key) ? 'none' : PET_SKILLS[pet?.key] ? pet.key : 'dog';
 export const petSkill = pet => MONSTER_SKILLS[pet?.skill] ? { key: pet.skill, need: PET_SKILL_NEED, ...MONSTER_SKILLS[pet.skill] } : petSkillKey(pet) === 'none'
-  ? { key: 'none', name: '특기 없음', desc: LIMITED_SKILLESS.has(pet?.key) ? '한정 펫은 펫 특기를 사용하지 않아요.' : '전설 펫은 펫 특기를 사용하지 않아요.', need: 0 }
+  ? { key: 'none', name: '특기 없음', desc: LIMITED_SKILLESS.has(pet?.key) ? '한정 펫은 펫 특기를 사용하지 않아요.' : MYTHIC_SKILLESS.has(pet?.key) ? '신화 펫은 펫 특기를 사용하지 않아요.' : '전설 펫은 펫 특기를 사용하지 않아요.', need: 0 }
   : ({ key: petSkillKey(pet), need: PET_SKILL_NEED, ...PET_SKILLS[petSkillKey(pet)] });
 
 const other = (state, pid) => state.order.find(id => id !== pid);

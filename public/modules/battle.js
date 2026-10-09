@@ -1,5 +1,5 @@
 import { api, esc, icon, toast, num, rangeLabel, modal, dialogOpen, buttonBusy } from './ui.js';
-import { CHARACTERS, PET_FORMS, seasonOnSale } from './core.js';
+import { CHARACTERS, PET_FORMS, seasonStage } from './core.js';
 import { avatar, petKey, showPose, holdPose } from './character.js';
 import { getRanges, periodFolders } from './student.js';
 import { petJosa } from './pet-moments.js';
@@ -16,6 +16,7 @@ import { openMiniGame } from './word-minigame-ui.js';
 import { bonusText } from './word-minigame.js';
 import { elementOf, paletteOf, tierOf, fxCap, fxShot, fxImpact, fxSpeedLines, fxPunch, fxSkillCutIn, fxSignature, fxLunge, fxRecoil, fxShield, fxHeal, fxPowerUp, fxToxic, fxEdge, fxRank, comboRank, auraLevel } from './battle-fx.js';
 import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterOpen, stageLevel, stageMonster, isBossStage } from './monsters.js';
+import { playSound, unlockSound, preloadSound } from './sound.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
 // the match, and the result. A match runs in a battle room on the server (or, for a practice
@@ -66,12 +67,21 @@ const SFX = {
   win: [[523, 659, 784, 1047], { gap: .1, len: .22 }], lose: [[392, 330, 262], { gap: .14, len: .26, type: 'triangle' }],
   emote: [[990], { len: .06, vol: .025 }]
 };
+// V13.116: the same moments play recorded sound files first (sound.js); the tones above are the
+// fallback while a file is not downloaded yet.
+const SFX_FILE = {
+  tick: ['tick'], go: ['combo'], hit: ['hit', { vary: .04 }], crit: ['smash'], hurt: ['hurt', { vary: .03 }], wrong: ['wrong'],
+  skill: ['skill'], fever: ['combo', { rate: 1.12 }], win: ['clear'], lose: ['fail'], emote: ['tap', { gain: .7 }]
+};
 function unlockAudio() {
   if (!soundOn()) return;
+  unlockSound(); preloadSound(['smash', 'clear', 'fail', 'burst']);
   try { audio ??= new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch {}
 }
 function sfx(name, buzz = 0) {
   if (!soundOn()) return;
+  const file = SFX_FILE[name];
+  if (file && playSound(...file)) { if (buzz) try { navigator.vibrate?.(buzz); } catch {} return; }
   const [notes, { type = 'sine', gap = .07, len = .14, vol = .045 } = {}] = SFX[name] || [[]];
   try {
     unlockAudio();
@@ -104,6 +114,11 @@ function noise(len, vol, at = 0) {
 function sfxThump(dmg, crit = false) {
   if (!soundOn()) return;
   const tier = dmgTier(dmg);
+  if (playSound(tier >= 3 || crit ? 'smash' : 'hit', { rate: 1.06 - tier * .04, gain: .8 + tier * .07, vary: .04 })) {
+    if (crit) playSound('slash', { gain: .6, at: .02 });
+    if (tier >= 3 || crit) buzzFx(crit ? [35, 25, 60] : 45);
+    return;
+  }
   try { unlockAudio(); sweep(150 + tier * 10, 42, .16 + tier * .05, .05 + tier * .025); if (tier > 1 || crit) noise(.09 + tier * .03, .05 + tier * .03); if (crit) sweep(1400, 700, .12, .03, 'square', .02); } catch {}
   if (tier >= 3 || crit) buzzFx(crit ? [35, 25, 60] : 45);
 }
@@ -116,11 +131,14 @@ function sfxShot(el, big = false) {
 }
 function sfxCombo(n) {
   if (!soundOn()) return;
+  // two semitones higher per combo step, at most an octave
+  if (playSound('correct', { rate: 2 ** (Math.min(Math.max(n - 2, 0), 6) / 6), gain: .7 })) return;
   const f = 620 * 2 ** (Math.min(n - 2, 10) / 12 * 2);
   try { unlockAudio(); sweep(f, f * 1.5, .09, .035, 'triangle'); sweep(f * 1.5, f * 2, .08, .025, 'triangle', .06); } catch {}
 }
 function sfxKO() {
   if (!soundOn()) return;
+  if (playSound('smash', { rate: .8, gain: 1.1 })) { playSound('burst', { at: .06, rate: .9 }); buzzFx([90, 50, 180]); return; }
   try { unlockAudio(); sweep(110, 28, .9, .14); sweep(220, 40, .5, .05, 'sawtooth'); noise(.5, .16); noise(.3, .08, .18); } catch {}
   buzzFx([90, 50, 180]);
 }
@@ -149,8 +167,8 @@ function monsterPic(m, { size = '', pose = '' } = {}) {
   return `<div class="mon-temp ${size}${cls}" style="--mon-filter:${mon.temp.filter};--mon-color:${mon.color}${tint}">${avatar(mon.temp.pet, { size, form: mon.temp.form })}</div>`;
 }
 // V13.109 전투 배경: a monster fight in the forest (a boss in the boss hall), the robot in its
-// training room, a match on the rooftop arena; in a season (할로윈) the matches use its stage.
-const arenaBg = f => f?.monster ? (f.monster.boss ? 'bg-boss' : 'bg-forest') : seasonOnSale() ? `bg-${seasonOnSale().id}` : B.room?.practice || B.local ? 'bg-practice' : 'bg-arena';
+// training room, a match on the rooftop arena; until 11/7 (the Halloween part of the 가을 이벤트) the matches use the Halloween stage.
+const arenaBg = f => f?.monster ? (f.monster.boss ? 'bg-boss' : 'bg-forest') : seasonStage() ? `bg-${seasonStage()}` : B.room?.practice || B.local ? 'bg-practice' : 'bg-arena';
 const petArt = (p, opts = {}) => p?.monster ? monsterPic(p.monster, opts) : avatar(p?.pet?.key, { form: p?.pet?.form ?? 1, ...opts });
 const whoName = p => p?.monster ? (p.name || MONSTERS.find(x => x.key === p.monster.key)?.name) : petName(p?.pet);
 
