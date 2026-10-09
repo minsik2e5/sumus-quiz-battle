@@ -291,9 +291,11 @@ function toggleRange(code) { B.ranges.has(code) ? B.ranges.delete(code) : B.rang
 const rangeMode = () => pref('sumus-yacha-range-mode', 'each') === 'same' ? 'same' : 'each';
 const myRanges = () => (B.ranges ? [...B.ranges] : []);
 // What the joining student is told about the words before saying yes.
+// V13.125: a room of another school is always 각자 내 범위 (its codes are that school's 과).
 function rangeDeal(room) {
   const hostRanges = room.host_ranges || [], mine = myRanges();
   const same = !mine.length || (mine.length === hostRanges.length && mine.every(code => hostRanges.includes(code)));
+  if (room.cross_school) return `<p class="ya-deal each"><b>각자 내 범위</b>로 겨뤄요. 학교가 달라서 각자 우리 학교 단어가 나와요.<span>나: ${esc(mine.length ? rangesText(mine) : '범위를 골라 주세요')} · ${esc(room.host)}(${esc(room.host_school)}): ${esc(rangesText(hostRanges, room.host_school))}</span></p>`;
   if (room.range_mode === 'each' && !same) return `<p class="ya-deal each"><b>각자 내 범위</b>로 겨뤄요.<span>나: ${esc(rangesText(mine))} · ${esc(room.host)}: ${esc(rangesText(hostRanges))}</span></p>`;
   return hostRanges.length ? `<p class="ya-deal"><b>${esc(rangesText(hostRanges))}</b> 단어로 겨뤄요.</p>` : '';
 }
@@ -379,7 +381,7 @@ function playTab(h) {
           <span class="ya-rm-title"><b>${title}</b>${badge ? `<i>${badge}</i>` : ''}</span><small>${line}</small>
         </button>`).join('')}
       </div>
-      <p class="ya-hint">${each ? '같은 학년이면 외우는 부분이 달라도 괜찮아요. 매 턴 <b>둘 다 자기가 외우는 단어</b>가 나와서 공평해요.' : '친구가 내 번호를 같이 외웠을 때 좋아요.'}</p>
+      <p class="ya-hint">${each ? '같은 학년이면 외우는 부분이 달라도 괜찮아요. 매 턴 <b>둘 다 자기가 외우는 단어</b>가 나와서 공평해요.' : '친구가 내 번호를 같이 외웠을 때 좋아요. 다른 학교 친구와는 학교마다 번호가 달라서 늘 각자 내 범위로 겨뤄요.'}</p>
 
       ${step(3, '판돈', `가진 코인 ${num(balance)}`)}
       <div class="ya-stakes">${STAKES.map(s => `<button type="button" class="ya-stake ${B.stake === s ? 'on' : ''}" data-yb="stake" data-stake="${s}" aria-pressed="${B.stake === s}" aria-label="판돈 ${s}코인" ${balance < s || s > lossLeft ? 'disabled' : ''}>${coin()}<b>${s}</b></button>`).join('')}</div>
@@ -437,7 +439,9 @@ async function createRoom(button) {
     enterRoom({ ...room, host: true });
   } catch (err) { toast(err.message); button.disabled = false; }
 }
-// V13.61 challenge: pick a friend of the same school and grade; the room is only for them.
+// V13.125: who a student can battle (the teacher's 다른 학교와 야차전 switch, on by default).
+const whoCanBattle = () => B.A.data.battle_cross_school === false ? '같은 학교·학년 친구' : '같은 학년 친구(다른 학교도 가능)';
+// V13.61 challenge: pick a friend of the same grade (V13.125: other schools too); the room is only for them.
 async function pickFriend(button) {
   button.disabled = true;
   let friends;
@@ -448,12 +452,12 @@ async function pickFriend(button) {
   const box = document.createElement('div');
   box.className = 'yb-confirm';
   box.innerHTML = `<div class="yb-confirm-card yb-friends-v1361" role="dialog" aria-modal="true" aria-label="도전장 보낼 친구">
-    <h2>누구에게 도전할까요?</h2><p class="yb-note">${modeName(B.mode)} · 판돈 ${num(B.stake)}코인 · ${rangeMode() === 'each' ? '친구는 친구가 외우는 범위로, 나는 내 범위로 겨뤄요' : '고른 범위로 같이 겨뤄요'}. 친구 홈 화면에 도전장이 떠요.</p>
+    <h2>누구에게 도전할까요?</h2><p class="yb-note">${modeName(B.mode)} · 판돈 ${num(B.stake)}코인 · ${rangeMode() === 'each' ? '친구는 친구가 외우는 범위로, 나는 내 범위로 겨뤄요' : '고른 범위로 같이 겨뤄요(다른 학교 친구는 각자 내 범위)'}. 친구 홈 화면에 도전장이 떠요.</p>
     <div class="yb-friend-list">${friends.length ? friends.map(f => `<button type="button" class="yb-friend" data-friend="${esc(f.id)}" ${f.busy || f.invited ? 'disabled' : ''}>
       <span class="yb-friend-pet">${f.pet ? avatar(f.pet.key, { form: f.pet.form }) : ''}</span>
-      <span class="yb-friend-name"><b>${esc(f.name)}</b><small>${esc(f.class_name)}${f.busy ? ' · 대결 중' : f.invited ? ' · 도전장 받는 중' : ''}</small>${shownTitle(f.title) ? titleBadge(f.title, { size: 'xs' }) : ''}</span>
+      <span class="yb-friend-name"><b>${esc(f.name)}</b><small>${esc([f.school, f.class_name].filter(Boolean).join(' · '))}${f.busy ? ' · 대결 중' : f.invited ? ' · 도전장 받는 중' : ''}</small>${shownTitle(f.title) ? titleBadge(f.title, { size: 'xs' }) : ''}</span>
       ${f.tier ? `<span class="yb-friend-tier">${tierEmblem(f.tier, { size: 'sm' })}</span>` : ''}
-    </button>`).join('') : '<p class="yb-muted">같은 학교·학년 친구가 아직 없어요. 아래 <b>연습 상대</b>와 먼저 겨뤄 봐요!</p>'}</div>
+    </button>`).join('') : `<p class="yb-muted">${whoCanBattle()}가 아직 없어요. 아래 <b>연습 상대</b>와 먼저 겨뤄 봐요!</p>`}</div>
     <button type="button" class="btn full" data-friend-close>닫기</button></div>`;
   box.onclick = async e => {
     if (e.target === box || e.target.closest('[data-friend-close]')) { box.remove(); return; }
@@ -474,7 +478,7 @@ function acceptChallenge(invite) {
   const cur = B;
   const text = invite.tournament
     ? `<h2>${esc(invite.tournament.name)}</h2>${modeTag(invite.mode)}<p><b>${esc(invite.tournament.round)}</b> · ${esc(petJosa(invite.host, '과', '와'))} 겨뤄요.<br>판돈 없는 대회 경기예요. 들어가면 바로 시작해요.</p>`
-    : `<h2>${esc(invite.host)}의 도전장</h2>${modeTag(invite.mode)}${rangeDeal(invite)}<p>판돈 <b>${num(invite.stake)}코인</b>을 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(invite.stake)}코인을 잃어요.</p>`;
+    : `<h2>${invite.host_school ? `<small class="yb-from-school-v13125">${esc(invite.host_school)}</small>` : ''}${esc(invite.host)}의 도전장</h2>${modeTag(invite.mode)}${rangeDeal(invite)}<p>판돈 <b>${num(invite.stake)}코인</b>을 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(invite.stake)}코인을 잃어요.</p>`;
   if (invite.tournament) B.tournament = { tid: invite.tournament.id };
   confirmBox(text, '나중에', invite.tournament ? '입장하기' : '도전 받기', async yes => {
     if (B !== cur || !yes) return;
@@ -492,7 +496,7 @@ async function joinRoom(button) {
   try { room = await api(`/battle/preview?code=${B.joinCode}`); }
   catch (err) { toast(err.message); button.disabled = false; return; }
   const cur = B;
-  confirmBox(`<h2>${esc(room.host)}의 방</h2>${modeTag(room.mode)}${rangeDeal(room)}<p>판돈 <b>${num(room.stake)}코인</b>을 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(room.stake)}코인을 잃어요.</p>`, '돌아가기', '참가하기', async yes => {
+  confirmBox(`<h2>${room.host_school ? `<small class="yb-from-school-v13125">${esc(room.host_school)}</small>` : ''}${esc(room.host)}의 방</h2>${modeTag(room.mode)}${rangeDeal(room)}<p>판돈 <b>${num(room.stake)}코인</b>을 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(room.stake)}코인을 잃어요.</p>`, '돌아가기', '참가하기', async yes => {
     if (B !== cur) return;
     if (!yes) { button.disabled = false; return; }
     try {
@@ -955,7 +959,7 @@ function waitingRoom(expiresAt = B.room.expires_at) {
   else main(`<section class="yb-card yb-waiting">
     <span class="yb-eyebrow">친구를 기다리는 중</span>
     <div class="yb-code" aria-label="대결 방 코드 ${esc(code)}">${esc(code.slice(0, 3))}<i></i>${esc(code.slice(3))}</div>
-    <p>같은 학교·학년 친구에게 이 코드를 알려주세요.<br>친구가 <b>야차전 → 코드로 참가</b>에 입력하면 시작해요.</p>
+    <p>${whoCanBattle()}에게 이 코드를 알려주세요.<br>친구가 <b>야차전 → 코드로 참가</b>에 입력하면 시작해요.</p>
     <p class="yb-note">판돈 ${B.room.stake}코인 · <span id="yb-wait-left"></span></p>
     <button type="button" class="btn full" data-yb="cancel">방 취소</button>
   </section>`);
@@ -1010,13 +1014,15 @@ function drawMatch() {
 }
 
 // "24번 · 25번 외 2": the ranges a player plays with (V13.94 각자 내 범위).
-function rangesText(codes) {
-  const labels = (codes || []).map(code => rangeLabel(B.A.data.profile.school, code));
+// V13.125: another school's codes are labelled with that school's names (선부고 외부 21 ...).
+function rangesText(codes, school = B.A.data.profile.school) {
+  const labels = (codes || []).map(code => rangeLabel(school || B.A.data.profile.school, code));
   return labels.length > 2 ? `${labels.slice(0, 2).join(' · ')} 외 ${labels.length - 2}` : labels.join(' · ');
 }
 // V13.66: both players' names come with their title and league tier.
 function vsSide(p, side) {
-  return `<div class="yb-vs-side ${side}">${B.view?.own_words && p.ranges?.length ? `<span class="yb-vs-range">${esc(rangesText(p.ranges))}</span>` : ''}<span class="yb-vs-pet">${petArt(p, { size: 'mini' })}</span><b>${esc(p.name)}${p.bot ? ' <i class="yb-ai">AI</i>' : ''}</b>${shownTitle(p.title) ? titleBadge(p.title, { size: 'xs' }) : ''}${p.tier ? `<span class="yb-vs-tier">${tierEmblem(p.tier, { size: 'xs' })}${esc({ bronze: '브론즈', silver: '실버', gold: '골드', diamond: '다이아' }[p.tier] || '')}</span>` : ''}</div>`;
+  const otherSchool = p.school && p.school !== B.A.data.profile.school ? p.school : '';
+  return `<div class="yb-vs-side ${side}">${B.view?.own_words && p.ranges?.length ? `<span class="yb-vs-range">${esc(rangesText(p.ranges, p.school))}</span>` : ''}<span class="yb-vs-pet">${petArt(p, { size: 'mini' })}</span><b>${esc(p.name)}${p.bot ? ' <i class="yb-ai">AI</i>' : ''}</b>${otherSchool ? `<small class="yb-vs-school-v13125">${esc(otherSchool)}</small>` : ''}${shownTitle(p.title) ? titleBadge(p.title, { size: 'xs' }) : ''}${p.tier ? `<span class="yb-vs-tier">${tierEmblem(p.tier, { size: 'xs' })}${esc({ bronze: '브론즈', silver: '실버', gold: '골드', diamond: '다이아' }[p.tier] || '')}</span>` : ''}</div>`;
 }
 function hud(p, side) {
   return `<div class="yb-hud ${side}" id="yb-hud-${side}">

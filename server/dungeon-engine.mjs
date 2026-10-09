@@ -1,4 +1,4 @@
-// V13.120 던전 엔진 (docs/dungeon-design.md 2~8번): 같은 학년 2~3명이 실시간으로 같이 싸우는
+// V13.126 던전 엔진 (docs/dungeon-design.md 2~8번): 같은 학년 2~3명이 실시간으로 같이 싸우는
 // "기말고사 지옥" 던전의 규칙만 담는다. 전송도 시계도 없다. battle-engine.js처럼 모든 함수가 `now`(ms)를
 // 받고 방에 보낼 이벤트를 돌려주므로, 다음 세션의 DungeonRoom(Durable Object), 시뮬레이션
 // (server/dungeon-sim.mjs), 검사(server/dungeon-check.mjs)가 같은 방식으로 돌린다.

@@ -221,7 +221,7 @@ export async function openPracticeRecord(sessionId) {
       : unanswered
         ? `<div class="result-note">미응답 ${unanswered}개가 있어요.</div>`
         : '<div class="result-note">오답 상세가 저장되지 않은 이전 기록이에요.</div>';
-  const close = modal(`<span class="pill">${esc(PRACTICE_TYPES[session.mode] || '연습')} · ${runLabel}</span><h2>${esc(session.school || '')} · ${rangeText}</h2><div class="result-number">${statusText}</div><div class="detail-grid"><div><b>${session.correct} / ${session.total}</b><small>정답</small></div><div><b>${wrongCount}</b><small>오답</small></div><div><b>${unanswered}</b><small>미응답</small></div><div><b>${time(session.duration_sec || 0)}</b><small>소요시간</small></div></div><section style="margin-top:18px"><div class="section-title"><h3>답안 확인</h3></div>${wrongHtml}</section>${session.run_mode === 'test' && A.data.profile.role === 'student' ? (session.shared_to_teacher_at ? '<button class="btn self-test-share-done full" disabled>✓ 선생님께 전송 완료</button>' : '<button class="btn self-test-share full" id="record-share-self-test">선생님께 결과 보내기</button>') : ''}${missed.length && A.data.profile.role === 'student' ? '<button class="btn primary full" id="retry-wrong-practice">틀린·미응답 단어 다시 연습</button>' : ''}`, '내 연습 기록');
+  const close = modal(`<span class="pill">${esc(PRACTICE_TYPES[session.mode] || '연습')} · ${runLabel}</span><h2>${esc(session.school || '')} · ${rangeText}</h2><div class="result-number">${statusText}</div><div class="detail-grid"><div><b>${session.correct} / ${session.total}</b><small>정답</small></div><div><b>${wrongCount}</b><small>오답</small></div><div><b>${unanswered}</b><small>미응답</small></div><div><b>${time(session.duration_sec || 0)}</b><small>소요시간</small></div></div><section style="margin-top:18px"><div class="section-title"><h3>답안 확인</h3></div>${wrongHtml}</section>${session.run_mode === 'test' && A.data.profile.role === 'student' ? '<p class="self-test-auto-note-v13123">✓ 선생님이 이 결과를 바로 확인해요</p>' : ''}${missed.length && A.data.profile.role === 'student' ? '<button class="btn primary full" id="retry-wrong-practice">틀린·미응답 단어 다시 연습</button>' : ''}`, '내 연습 기록');
   $$('[data-practice-dispute]').forEach(button => button.addEventListener('click', async () => {
     button.disabled = true;
     try {
@@ -230,17 +230,6 @@ export async function openPracticeRecord(sessionId) {
       toast('뜻 이의제기를 보냈어요.');
     } catch (error) { button.disabled = false; toast(error.message); }
   }));
-  $('#record-share-self-test')?.addEventListener('click', async event => {
-    // Keep the button: event.currentTarget is null once the request has awaited.
-    const button = event.currentTarget;
-    buttonBusy(button);
-    try {
-      const shared = await api(`/practice/${session.id}/share`, {}, 'POST');
-      session.shared_to_teacher_at = shared.shared_to_teacher_at;
-      markShared(session.id, shared.shared_to_teacher_at);
-      shareDone(button);
-    } catch (error) { buttonBusy(button, false); toast(error.message); }
-  });
   $('#retry-wrong-practice')?.addEventListener('click', async event => {
     buttonBusy(event.currentTarget);
     try {
@@ -605,20 +594,6 @@ function answerImpact(feedback) {
   requestAnimationFrame(() => impact.classList.add('show'));
   setTimeout(() => impact.remove(), feedback.milestone ? 560 : 440);
 }
-// V13.65: a shared result is marked in the data already on the phone instead of
-// reloading everything (that second round trip made "결과 보내기" feel stuck).
-function markShared(id, at) {
-  const data = globalThis.__SUMUS_BOOTSTRAP__;
-  const row = data?.sessions?.find(item => item.id === id);
-  if (row) row.shared_to_teacher_at = at;
-}
-function shareDone(button) {
-  buttonBusy(button, false);
-  button.className = 'btn self-test-share-done full';
-  button.disabled = true;
-  button.textContent = '✓ 선생님께 전송 완료';
-  toast('실전 결과를 선생님께 보냈어요.');
-}
 // V13.91 a reward stamp over the score (asset list 08-9), shown once the pictures are in ART_READY.
 const resultStamp = score => artOr(score >= 100 ? 'result-perfect' : score >= 80 ? 'result-great' : score >= 60 ? 'result-good' : 'result-retry', '', 'result-stamp');
 function animateTestResult(score, perfect) {
@@ -939,27 +914,13 @@ function finishPracticeView() {
     ${x.reward_note ? `<p class="result-reward-note-v1373">${esc(x.reward_note)}</p>` : ''}
     <p class="result-next-copy">${esc(statusText)}</p>
     ${primaryCta}
-    ${x.run_mode === 'test' ? (x.shared_to_teacher_at ? '<button class="btn self-test-share-done full" disabled>✓ 선생님께 전송 완료</button>' : '<button class="btn self-test-share full" id="share-self-test">선생님께 결과 보내기</button>') : ''}
+    ${x.run_mode === 'test' ? '<p class="self-test-auto-note-v13123">✓ 선생님이 이 결과를 바로 확인해요</p>' : ''}
     ${answerRows.length || reviewCount ? '<button class="btn full" id="practice-answer-review">답안 보기</button>' : ''}
     <div id="practice-answer-details" class="answer-review-panel" hidden>${detailHtml}</div>
     <div class="result-secondary-actions"><button class="text-button" id="practice-records">내 기록</button><button class="text-button" id="practice-home">홈으로</button></div>
     <p class="quiet-note">코인은 끝까지 풀고 정답률 ${Math.round(STUDY_COINS.min_accuracy * 100)}% 이상일 때 학습 완료·만점·꾸준함으로 쌓이고(하루 ${STUDY_COINS.cap}개까지), 경험치는 맞힌 만큼 쌓여요. 점수는 오답 복습 재정답으로 올라가지 않고, 승인된 재채점만 반영돼요.</p>
   </main></div>`);
   if (x.run_mode === 'test' && !interrupted) animateTestResult(score, perfect);
-  $('#share-self-test')?.addEventListener('click', async event => {
-    // Keep the button: event.currentTarget is null once the request has awaited.
-    const button = event.currentTarget;
-    buttonBusy(button);
-    try {
-      const shared = await api(`/practice/${x.id}/share`, {}, 'POST');
-      x.shared_to_teacher_at = shared.shared_to_teacher_at;
-      markShared(x.id, shared.shared_to_teacher_at);
-      shareDone(button);
-    } catch (error) {
-      buttonBusy(button, false);
-      toast(error.message);
-    }
-  });
   $$('[data-finish-practice-dispute]').forEach(button => button.addEventListener('click', async () => {
     button.disabled = true;
     try {
@@ -1036,7 +997,7 @@ async function testLeaveBack() {
   await syncPracticeState();
   if (practiceState?.finished || A?.screen !== 'practice') return true;
   const last = leaves >= limit - 1;
-  const close = modal(`<div class="test-leave-warn-v1376">${uiArt('leave-warn', 'test-leave-art')}<span class="test-leave-count">${leaves}<small>/${limit}</small></span><h2>시험 화면을 나갔어요</h2><p>나간 기록은 선생님께 보내는 결과에 남아요.${last ? '<br><b>한 번 더 나가면 지금까지 푼 답으로 자동 제출돼요.</b>' : `<br>${limit}번째로 나가면 자동 제출돼요.`}</p><button class="btn primary full" id="test-leave-ok">시험 계속 풀기</button></div>`, '실전시험');
+  const close = modal(`<div class="test-leave-warn-v1376">${uiArt('leave-warn', 'test-leave-art')}<span class="test-leave-count">${leaves}<small>/${limit}</small></span><h2>시험 화면을 나갔어요</h2><p>나간 기록은 선생님이 보는 결과에 남아요.${last ? '<br><b>한 번 더 나가면 지금까지 푼 답으로 자동 제출돼요.</b>' : `<br>${limit}번째로 나가면 자동 제출돼요.`}</p><button class="btn primary full" id="test-leave-ok">시험 계속 풀기</button></div>`, '실전시험');
   $('#test-leave-ok').onclick = close;
   navigator.vibrate?.([30, 40, 30]);
   return true;

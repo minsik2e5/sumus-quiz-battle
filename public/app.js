@@ -1,7 +1,7 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date, num, rangeLabel } from './modules/ui.js';
 import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm } from './modules/core.js';
 import { avatar, showPose } from './modules/character.js';
-import { studentPage, getRanges, periodFolders, activePeriod, inPeriod, updateRangeSummary, starredWords, pushSupport, memorizeDeck } from './modules/student.js';
+import { studentPage, getRanges, periodFolders, activePeriod, inPeriod, updateRangeSummary, starredWords, pushSupport, memorizeDeck, highExamSelection, HIGH_PICK_STORES, HIGH_PICK_CHUNK, HIGH_EXAM_MAX } from './modules/student.js';
 import { openFlashcards } from './modules/flashcards.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel, careIds } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
@@ -40,6 +40,11 @@ function preferences() {
     A.middleChunkSize = [20,25,30].includes(Number(v.middleChunkSize)) ? Number(v.middleChunkSize) : (A.middleChunkSize || 20);
     A.middleStartIndex = Math.max(0, Number(v.middleStartIndex || 0));
     A.middleWordIds = Array.isArray(v.middleWordIds) ? v.middleWordIds : (A.middleWordIds || []);
+    // V13.124 고등 단어 고르기: 과마다 고른 단어(단어 학습 / 시험)를 폰에 저장한다.
+    const pickMap = value => value && typeof value === 'object' && !Array.isArray(value) ? Object.fromEntries(Object.entries(value).filter(([, ids]) => Array.isArray(ids)).map(([code, ids]) => [code, ids.map(String)])) : {};
+    A.highWordIds = pickMap(v.highWordIds);
+    A.highExamWordIds = pickMap(v.highExamWordIds);
+    A.highExamOpen = String(v.highExamOpen || '');
     A.rankMode = v.rankMode || A.rankMode || 'xp';
     A.rankScope = v.rankScope || A.rankScope || 'all';
     A.rankPeriod = v.rankPeriod || A.rankPeriod || 'week';
@@ -125,6 +130,7 @@ function savePreferences() {
       rankMode: A.rankMode, rankScope: A.rankScope, rankPeriod: A.rankPeriod, rankView: A.rankView, leaguePeriod: A.leaguePeriod,
       middleRange: A.middleRange, middleChunkSize: A.middleChunkSize || 20, middleStartIndex: A.middleStartIndex || 0,
       middleWordIds: A.middleWordIds || [], memorizeFilter: A.memorizeFilter || 'all',
+      highWordIds: A.highWordIds || {}, highExamWordIds: A.highExamWordIds || {}, highExamOpen: A.highExamOpen || '',
       memorizeRange: A.memorizeRange || '', memStars: A.memStars || []
     }));
   } catch {}
@@ -180,6 +186,22 @@ function renderKeepScroll() {
   const y = window.scrollY;
   render();
   requestAnimationFrame(() => window.scrollTo(0, y));
+}
+// V13.124: 고등 단어 체크 목록은 안에서 스크롤되니, 다시 그려도 목록 안 위치를 지킨다.
+function renderKeepPick() {
+  const lists = Object.fromEntries($$('[data-high-list]').map(el => [el.dataset.highList, el.scrollTop]));
+  renderKeepScroll();
+  Object.entries(lists).forEach(([scope, top]) => { const el = $(`[data-high-list="${scope}"]`); if (el) el.scrollTop = top; });
+}
+function highPickWords(code) {
+  return A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(code));
+}
+function setHighPick(scope, code, ids) {
+  const store = HIGH_PICK_STORES[scope];
+  if (!store || !code) return;
+  A[store] = { ...(A[store] || {}), [code]: ids };
+  if (scope === 'memo') { A.memorizeFilter = 'all'; A.memRevealed = []; }
+  savePreferences();
 }
 // Teacher grammar summaries fill in once the school's dataset arrives.
 onTeacherGrammarLoaded(() => { if (A.data?.profile?.role === 'teacher' && !A.screen && !document.querySelector('#modal-root .modal') && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) renderKeepScroll(); });
@@ -540,7 +562,7 @@ function startInvitePolling() {
       const before = A.data.battle_invite;
       if ((invite?.id || null) === (before?.id || null) && !invite) return;
       A.data.battle_invite = invite;
-      if (invite && invite.id !== before?.id) { toast(`${invite.host}의 도전장이 왔어요!`); navigator.vibrate?.(80); }
+      if (invite && invite.id !== before?.id) { toast(`${invite.host_school ? invite.host_school + ' ' : ''}${invite.host}의 도전장이 왔어요!`); navigator.vibrate?.(80); }
       renderKeepScroll();
     } catch {}
   }, 20000);
@@ -633,6 +655,8 @@ $('#app').addEventListener('click', async event => {
       if (d.go === 'ranking') A.rankFrom = d.from || 'home';
       // V13.71: the 나 tile shows the grade's weekly rank, so open the ranking on that view.
       if (d.go === 'ranking' && d.rankGrade) { A.rankScope = d.rankGrade; A.rankPeriod = 'week'; A.rankMode = 'xp'; savePreferences(); }
+      // V13.123: the dashboard 실전시험 panel opens the results page on that tab.
+      if (d.go === 'results' && d.resultsView) { A.resultsView = d.resultsView; A.resultsLimit = 30; }
       return navigate(d.go);
     }
     if (d.action === 'student-preview' && A.data.profile.role === 'teacher') {
@@ -726,6 +750,19 @@ $('#app').addEventListener('click', async event => {
       visibleCodes.forEach(code => d.highRangeAll === 'true' ? current.add(code) : current.delete(code));
       A.ranges[info.key] = [...current]; savePreferences(); render(); return;
     }
+    if (d.highChunk && d.highScope) {
+      const lessonWords = highPickWords(d.highCode);
+      const from = d.highChunk === 'all' ? 0 : Math.max(0, Number(d.highChunk) || 0);
+      const to = d.highChunk === 'all' ? lessonWords.length : from + HIGH_PICK_CHUNK;
+      setHighPick(d.highScope, d.highCode, lessonWords.slice(from, to).map(word => word.id));
+      renderKeepPick(); return;
+    }
+    if (d.highAll && d.highScope) { setHighPick(d.highScope, d.highCode, d.highAll === 'true' ? highPickWords(d.highCode).map(word => word.id) : []); renderKeepPick(); return; }
+    if (d.highPickToggle) {
+      if (d.highPickToggle === 'exam') A.highExamPickOpen = A.highExamPickOpen === false; else A.highPickOpen = A.highPickOpen !== true;
+      renderKeepScroll(); return;
+    }
+    if (d.highExamLesson) { A.highExamOpen = d.highExamLesson; A.highExamPickOpen = true; savePreferences(); renderKeepScroll(); return; }
     if (d.middleWordAll) {
       const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
       A.middleWordIds = d.middleWordAll === 'true' ? words.map(word => word.id) : [];
@@ -824,7 +861,11 @@ $('#app').addEventListener('click', async event => {
         const target = A.target === 'all' ? 'all' : Math.min(words.length, Number(A.target || words.length));
         await startPractice({ wordIds: words.map(word => word.id), target, mode: A.mode, runMode, examStyle: true, confirmed: true });
       } else {
-        await startPractice({ runMode, examStyle: true, confirmed: true });
+        // V13.124: 고른 단어만 출제한다(개수 = 고른 단어 수, 서버 한도 200개).
+        const { wordIds } = highExamSelection(A);
+        if (!wordIds.length) { buttonBusy(b, false); return toast('시험 볼 단어를 먼저 선택해주세요.'); }
+        if (wordIds.length > HIGH_EXAM_MAX) { buttonBusy(b, false); return toast(`한 번에 최대 ${HIGH_EXAM_MAX}개까지 시험 볼 수 있어요.`); }
+        await startPractice({ wordIds, target: 'all', mode: A.mode, runMode, examStyle: true, confirmed: true });
       }
       return;
     }
@@ -876,6 +917,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'class-tv') { A.screen = 'class-tv'; window.scrollTo(0, 0); return openClassTv(A, async () => { A.screen = null; try { await refresh(); } catch {} render(); }); }
     if (d.action === 'class-tv-link') return classTvLink();
     if (d.action === 'tournament-cancel') return cancelTournament(d.id, b);
+    if (d.action === 'battle-cross-school') return toggleCrossSchool(b);
     if (d.tnDecide) return decideTournamentMatch(d.tnDecide, d.match, d.winner, d.name, b);
     if (d.action === 'battle-accept' && A.data.battle_invite) { const invite = A.data.battle_invite; A.data.battle_invite = null; A.yachaOpts = { accept: invite }; return navigate('yacha'); }
     if (d.action === 'battle-decline') { buttonBusy(b); await api('/battle/invite/decline', { id: d.id }); A.data.battle_invite = null; renderKeepScroll(); toast('도전장을 거절했어요.'); return; }
@@ -891,6 +933,14 @@ $('#app').addEventListener('click', async event => {
 $('#app').addEventListener('change', event => {
   const input = event.target;
   if (!A.data || A.screen) return;
+  if (input.dataset.highWord !== undefined && input.dataset.highScope) {
+    const store = HIGH_PICK_STORES[input.dataset.highScope], code = input.dataset.highCode;
+    const set = new Set(A[store]?.[code] || []);
+    input.checked ? set.add(input.dataset.highWord) : set.delete(input.dataset.highWord);
+    setHighPick(input.dataset.highScope, code, highPickWords(code).filter(word => set.has(word.id)).map(word => word.id));
+    renderKeepPick();
+    return;
+  }
   if (input.dataset.middleWord !== undefined) {
     const set = new Set(A.middleWordIds || []);
     input.checked ? set.add(input.dataset.middleWord) : set.delete(input.dataset.middleWord);
@@ -1537,6 +1587,13 @@ async function decideTournamentMatch(tid, matchId, winnerId, name, button) {
   if (!confirm(`${name} 학생을 이 경기의 승자로 정할까요?\n결석·기권처럼 경기를 할 수 없을 때 써요. 되돌릴 수 없어요.`)) return;
   buttonBusy(button);
   try { await api(`/teacher/tournaments/${encodeURIComponent(tid)}/winner`, { match_id: matchId, winner_id: winnerId }); await refresh(); renderKeepScroll(); toast(`${name} 학생이 다음 라운드로 올라갔어요.`); }
+  catch (err) { toast(err.message); buttonBusy(button, false); }
+}
+// V13.125: 다른 학교와 야차전 허용 켜기/끄기 (선생님 야차 대회 탭).
+async function toggleCrossSchool(button) {
+  const next = A.data.battle_settings?.cross_school === false;
+  buttonBusy(button);
+  try { const r = await api('/teacher/battle-settings', { cross_school: next }); A.data.battle_settings = r.battle_settings; renderKeepScroll(); toast(next ? '다른 학교 같은 학년 학생과도 야차전을 할 수 있어요.' : '이제 같은 학교끼리만 야차전을 해요.'); }
   catch (err) { toast(err.message); buttonBusy(button, false); }
 }
 async function cancelTournament(id, button) {
