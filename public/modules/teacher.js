@@ -450,7 +450,13 @@ export function tournamentPanel(t) {
 function tournaments(A) {
   const list = A.data.tournaments || [];
   const active = list.filter(t => t.status === 'active'), past = list.filter(t => t.status !== 'active');
-  return `<section class="panel tn-intro">
+  // V13.125: 다른 학교와 야차전 허용 (one switch for the academy, on by default).
+  const cross = A.data.battle_settings?.cross_school !== false;
+  return `<section class="panel xs-switch-v13125">
+      <div class="xs-copy"><h2>다른 학교와 야차전 허용</h2><p>켜 두면 학교가 달라도 <b>같은 부·같은 학년</b>(예: 강서고 고1 ↔ 단원고 고1)이면 친구 목록·도전장·방 코드로 겨뤄요. 단어는 각자 자기 학교 범위로 나와요. 끄면 같은 학교끼리만 해요. 대회·주간 리그·랭킹은 학교별 그대로예요.</p></div>
+      <button type="button" class="xs-toggle-v13125 ${cross ? 'on' : ''}" role="switch" aria-checked="${cross}" aria-label="다른 학교와 야차전 허용" data-action="battle-cross-school"><i aria-hidden="true"></i><span>${cross ? '켜짐' : '꺼짐'}</span></button>
+    </section>
+    <section class="panel tn-intro">
       ${trophy('xl')}<div class="tn-intro-copy"><h2>학원 야차 대회</h2><p>같은 학년 학생들을 골라 토너먼트를 열어요. 판돈 없이 겨루고, 이기면 다음 라운드로 올라가요. 학생은 <b>홈 화면의 대회 알림</b>에서 경기를 시작하고, 우승하면 <b>SUMUS 챔피언</b> 칭호와 상금을 받아요.</p></div>
     </section>
     ${active.length ? active.map(tournamentPanel).join('') : empty('battle', '진행 중인 대회가 없어요', '대회 만들기로 첫 토너먼트를 열어 보세요.')}

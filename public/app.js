@@ -562,7 +562,7 @@ function startInvitePolling() {
       const before = A.data.battle_invite;
       if ((invite?.id || null) === (before?.id || null) && !invite) return;
       A.data.battle_invite = invite;
-      if (invite && invite.id !== before?.id) { toast(`${invite.host}의 도전장이 왔어요!`); navigator.vibrate?.(80); }
+      if (invite && invite.id !== before?.id) { toast(`${invite.host_school ? invite.host_school + ' ' : ''}${invite.host}의 도전장이 왔어요!`); navigator.vibrate?.(80); }
       renderKeepScroll();
     } catch {}
   }, 20000);
@@ -917,6 +917,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'class-tv') { A.screen = 'class-tv'; window.scrollTo(0, 0); return openClassTv(A, async () => { A.screen = null; try { await refresh(); } catch {} render(); }); }
     if (d.action === 'class-tv-link') return classTvLink();
     if (d.action === 'tournament-cancel') return cancelTournament(d.id, b);
+    if (d.action === 'battle-cross-school') return toggleCrossSchool(b);
     if (d.tnDecide) return decideTournamentMatch(d.tnDecide, d.match, d.winner, d.name, b);
     if (d.action === 'battle-accept' && A.data.battle_invite) { const invite = A.data.battle_invite; A.data.battle_invite = null; A.yachaOpts = { accept: invite }; return navigate('yacha'); }
     if (d.action === 'battle-decline') { buttonBusy(b); await api('/battle/invite/decline', { id: d.id }); A.data.battle_invite = null; renderKeepScroll(); toast('도전장을 거절했어요.'); return; }
@@ -1586,6 +1587,13 @@ async function decideTournamentMatch(tid, matchId, winnerId, name, button) {
   if (!confirm(`${name} 학생을 이 경기의 승자로 정할까요?\n결석·기권처럼 경기를 할 수 없을 때 써요. 되돌릴 수 없어요.`)) return;
   buttonBusy(button);
   try { await api(`/teacher/tournaments/${encodeURIComponent(tid)}/winner`, { match_id: matchId, winner_id: winnerId }); await refresh(); renderKeepScroll(); toast(`${name} 학생이 다음 라운드로 올라갔어요.`); }
+  catch (err) { toast(err.message); buttonBusy(button, false); }
+}
+// V13.125: 다른 학교와 야차전 허용 켜기/끄기 (선생님 야차 대회 탭).
+async function toggleCrossSchool(button) {
+  const next = A.data.battle_settings?.cross_school === false;
+  buttonBusy(button);
+  try { const r = await api('/teacher/battle-settings', { cross_school: next }); A.data.battle_settings = r.battle_settings; renderKeepScroll(); toast(next ? '다른 학교 같은 학년 학생과도 야차전을 할 수 있어요.' : '이제 같은 학교끼리만 야차전을 해요.'); }
   catch (err) { toast(err.message); buttonBusy(button, false); }
 }
 async function cancelTournament(id, button) {

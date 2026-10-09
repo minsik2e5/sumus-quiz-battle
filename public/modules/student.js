@@ -380,7 +380,7 @@ function yachaAlerts(A) {
     </section>`;
     return `<section class="home-yacha-v1360 invite" aria-label="도전장">
       <span class="hy-mark" aria-hidden="true">夜</span>
-      <span class="hy-text"><small>도전장이 왔어요!</small><strong>${esc(invite.host)}의 도전</strong><em>판돈 ${num(invite.stake)}코인 · ${left}분 안에 받아요</em></span>
+      <span class="hy-text"><small>도전장이 왔어요!</small><strong>${invite.host_school ? `${esc(invite.host_school)} ` : ''}${esc(invite.host)}의 도전</strong><em>판돈 ${num(invite.stake)}코인 · ${left}분 안에 받아요</em></span>
       <span class="hy-actions"><button type="button" class="hy-no" data-action="battle-decline" data-id="${esc(invite.id)}">거절</button><button type="button" class="hy-go" data-action="battle-accept">도전 받기 ${icon('arrow')}</button></span>
     </section>`;
   }

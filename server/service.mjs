@@ -12,7 +12,7 @@ import { MARKET_OPEN } from '../public/modules/market.js';
 const marketOpen = state => MARKET_OPEN || state.market?.open === true;
 import { rpsView, rpsPlay, rpsCash, openEgg } from './rewards.mjs';
 import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, monsterStart, monsterFinish, monsterView, monsterScope, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts } from './rewards.mjs';
-import { DAY_MS, rankingWeek, gradeOf, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
+import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
 import { createVapidKeys } from './push.mjs';
@@ -492,25 +492,50 @@ function announceLegend(state, p, key, where, rank = '전설') {
   const posted = postLegend(state, school, students, { text: `${p.display_name} 학생이 ${where}에서 ${rank} 펫 ${eulReul(name)} 만났어요!`, id: randomUUID(), ...(rank === '신화' ? { title: '✨ 신화 소식' } : {}) });
   return { legend_news: posted.news, _push: students.length ? [posted.message] : [] };
 }
+// V13.125 다른 학교와 야차전: while the teacher's switch is on (the default), a student battles
+// anyone of the same 부 and 학년 (sameGradeBand); off, only the same school and grade as before.
+const battleCrossSchool = state => state.battleSettings?.cross_school !== false;
+const battleWhoText = state => battleCrossSchool(state) ? '같은 학년 친구(다른 학교도 가능)' : '같은 학교·학년 친구';
+function battleMatchable(state, a, b) {
+  const sa = schoolForProfile(state, a), sb = schoolForProfile(state, b);
+  if (!sa || !sb || gradeOf(a.class_name) !== gradeOf(b.class_name)) return false;
+  if (sa.id === sb.id) return true;
+  return battleCrossSchool(state) && sameGradeBand({ division: sa.division, class_name: a.class_name }, { division: sb.division, class_name: b.class_name });
+}
+// Whether p may enter this waiting room. Asked again on every join, so turning the switch off
+// closes rooms of other schools that are still waiting. Tournament rooms stay in their school.
+function battleRoomOpenTo(state, battle, p) {
+  const school = schoolForProfile(state, p);
+  if (!school || gradeOf(p.class_name) !== battle.grade) return false;
+  if (school.id === battle.school_id) return true;
+  if (battle.tournament_id || !battleCrossSchool(state)) return false;
+  const hostSchool = state.schools.find(s => s.id === battle.school_id);
+  return !!hostSchool && sameGradeBand({ division: hostSchool.division, class_name: battle.grade }, { division: school.division, class_name: p.class_name });
+}
 function findJoinableBattle(state, p, code, now) {
   const battle = (state.battles || []).find(b => b.code === code && b.status === 'waiting' && battleIsOpen(b, now));
-  const school = schoolForProfile(state, p);
-  // Rooms of other schools or grades, and rematch rooms for someone else, answer exactly
-  // like missing ones, so codes cannot be probed.
-  if (!battle || school?.id !== battle.school_id || gradeOf(p.class_name) !== battle.grade || (battle.invite_id && battle.invite_id !== p.id)) fail('대결 방을 찾지 못했어요. 코드를 다시 확인해주세요. 같은 학교·학년 친구의 방만 들어갈 수 있어요.', 404);
+  // Rooms of other grades (or, with the switch off, other schools), and rematch rooms for
+  // someone else, answer exactly like missing ones, so codes cannot be probed.
+  if (!battle || !battleRoomOpenTo(state, battle, p) || (battle.invite_id && battle.invite_id !== p.id)) fail(`대결 방을 찾지 못했어요. 코드를 다시 확인해주세요. ${battleWhoText(state)}의 방만 들어갈 수 있어요.`, 404);
   return battle;
 }
 const battleLossToday = (state, pid, now) => (state.battles || []).filter(b => b.status === 'finished' && b.loser === pid && dayKey(b.finished_at) === dayKey(now)).reduce((n, b) => n + b.stake, 0);
 // What the room shows about a player: pet, win streak, and (V13.66) title and league tier.
 function battlePlayer(state, p, ranges = null, ctx = createCompetition(state)) {
   const pet = pointsAndPets(state, p, xpSessions(state, p.id, p)).pet;
-  return { id: p.id, name: p.display_name, pet: pet ? { key: pet.key, form: pet.form, name: pet.name || '' } : null, streak: battleRecord(state, p.id).streak, title: ctx.displayTitle(p), tier: ctx.league(p.id).tier.key, ...(ranges ? { ranges } : {}) };
+  return { id: p.id, name: p.display_name, school: schoolForProfile(state, p)?.name || '', pet: pet ? { key: pet.key, form: pet.form, name: pet.name || '' } : null, streak: battleRecord(state, p.id).streak, title: ctx.displayTitle(p), tier: ctx.league(p.id).tier.key, ...(ranges ? { ranges } : {}) };
 }
 // V13.94 단어 범위: 'each' (each player gets the words of their own range; the default) or
 // 'same' (both get the host's words: a tournament, an old room, or a host who asked for it).
 const rangeModeOf = value => value === 'same' ? 'same' : 'each';
 const cleanRanges = value => Array.isArray(value) ? [...new Set(value.map(String))].slice(0, 60) : [];
 const sameRanges = (a, b) => a.length === b.length && a.every(code => b.includes(code));
+// What a joining student is told about a room's school. Range codes mean different 과 at each
+// school (21 and 24), so a room of another school is always 각자 내 범위.
+function battleRoomSchools(state, battle, p) {
+  const hostSchool = state.schools.find(s => s.id === battle.school_id), cross = !!hostSchool && hostSchool.id !== schoolForProfile(state, p)?.id;
+  return { range_mode: cross ? 'each' : rangeModeOf(battle.range_mode), host_school: hostSchool?.name || '', cross_school: cross };
+}
 function checkBattleEntry(state, p, stake, now) {
   if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
   if (openBattleFor(state, p.id, now)) fail('이미 진행 중인 대결이 있어요.', 409);
@@ -544,22 +569,30 @@ function openBattleRoom(state, p, school, stake, rangeCodes, now, extra = {}) {
     mode, range_mode: battle.range_mode, _battle: { action: 'init', id: battle.id, stake, label: extra.label || null, mode, host: battlePlayer(state, p, rangeCodes), questions, tickets: battle.tickets, expires_at: now + BATTLE_WAIT_MS } };
 }
 
-// V13.61 challenges: a room for one named friend of the same school and grade. The friend
-// sees it on the home screen (bootstrap + a light poll) and accepts or declines it there.
+// V13.61 challenges: a room for one named friend. The friend sees it on the home screen
+// (bootstrap + a light poll) and accepts or declines it there. V13.125: friends of the same 부 and
+// 학년 at other schools too (battleMatchable), in one list with the school name: my school first
+// (my class on top), then the other schools.
 function battleFriends(state, p, now) {
-  const school = schoolForProfile(state, p), grade = gradeOf(p.class_name);
+  const school = schoolForProfile(state, p);
   const ctx = createCompetition(state, now);
   return state.profiles
-    .filter(x => x.id !== p.id && x.role === 'student' && x.active !== false && !x.preview_owner_id && x.pets?.length && schoolForProfile(state, x)?.id === school?.id && gradeOf(x.class_name) === grade)
-    .map(x => { const pet = pointsAndPets(state, x, xpSessions(state, x.id, x)).pet; return { id: x.id, name: x.display_name, class_name: x.class_name || '', same_class: x.class_name === p.class_name, pet: pet ? { key: pet.key, form: pet.form } : null, title: ctx.displayTitle(x), tier: ctx.league(x.id).tier.key, busy: !!openBattleFor(state, x.id, now), invited: !!battleInviteFor(state, x, now) }; })
-    .sort((a, b) => Number(b.same_class) - Number(a.same_class) || a.name.localeCompare(b.name, 'ko'));
+    .filter(x => x.id !== p.id && x.role === 'student' && x.active !== false && !x.preview_owner_id && x.pets?.length && battleMatchable(state, p, x))
+    .map(x => {
+      const pet = pointsAndPets(state, x, xpSessions(state, x.id, x)).pet, xs = schoolForProfile(state, x), mine = xs?.id === school?.id;
+      return { id: x.id, name: x.display_name, school: xs?.name || '', class_name: x.class_name || '', same_class: mine && x.class_name === p.class_name, pet: pet ? { key: pet.key, form: pet.form } : null, title: ctx.displayTitle(x), tier: ctx.league(x.id).tier.key, busy: !!openBattleFor(state, x.id, now), invited: !!battleInviteFor(state, x, now), _order: [mine ? 0 : 1, xs?.sort_order || 999] };
+    })
+    .sort((a, b) => Number(b.same_class) - Number(a.same_class) || a._order[0] - b._order[0] || a._order[1] - b._order[1] || a.name.localeCompare(b.name, 'ko'))
+    .map(({ _order, ...x }) => x);
 }
 function battleInviteFor(state, p, now) {
   const b = (state.battles || []).filter(x => x.challenge && x.invite_id === p.id && x.status === 'waiting' && battleIsOpen(x, now)).sort((x, y) => y.created_at - x.created_at)[0];
   if (!b) return null;
+  // V13.125: a challenge from another school disappears once the switch is turned off.
+  if (!battleRoomOpenTo(state, b, p)) return null;
   const host = state.profiles.find(x => x.id === b.host_id);
   const t = b.tournament_id ? (state.tournaments || []).find(x => x.id === b.tournament_id) : null;
-  return { id: b.id, code: b.code, stake: b.stake, mode: battleMode(b.mode), range_mode: rangeModeOf(b.range_mode), host_ranges: b.range_codes || [], host: host?.display_name || '', expires_at: b.created_at + BATTLE_WAIT_MS, ...(t ? { tournament: { id: t.id, name: t.name, round: b.label || '' } } : {}) };
+  return { id: b.id, code: b.code, stake: b.stake, mode: battleMode(b.mode), ...battleRoomSchools(state, b, p), host_ranges: b.range_codes || [], host: host?.display_name || '', expires_at: b.created_at + BATTLE_WAIT_MS, ...(t ? { tournament: { id: t.id, name: t.name, round: b.label || '' } } : {}) };
 }
 
 // Called by the battle room (never by a browser) when a match ends. Idempotent.
@@ -1049,6 +1082,9 @@ export async function service(state, method, path, body, token, options = {}) {
       legend_news: teacher ? null : legendFor(state, studentSchool, now),
       push_reach: teacher && selectedSchool ? studentProfiles.filter(s => (state.push?.subs?.[s.id] || []).length).length : null,
       notices_sent: teacher && selectedSchool ? (state.push?.notices || []).filter(n => n.school_id === selectedSchool.id).slice(-5).reverse() : null,
+      // V13.125: the 다른 학교와 야차전 switch (teacher), and the wording of the yacha screens (student).
+      battle_settings: teacher ? { cross_school: battleCrossSchool(state) } : null,
+      battle_cross_school: teacher ? null : battleCrossSchool(state),
       tournaments: (state.tournaments || []).filter(t => teacher ? t.school_id === selectedSchool?.id && (t.status !== 'cancelled' || now - (t.finished_at || t.created_at) < DAY_MS) : t.players.includes(p.id) && (t.status === 'active' || (t.status === 'finished' && now - (t.finished_at || 0) < 3 * DAY_MS)))
         .sort((a, b) => b.created_at - a.created_at).slice(0, 12).map(t => tournamentView(state, competition, t, p, now))
     };
@@ -1224,6 +1260,13 @@ export async function service(state, method, path, body, token, options = {}) {
     const eggs = gifts.some(g => g.egg);
     return { gifts, coins: gifts.reduce((n, g) => n + Number(g.amount || 0), 0), points_balance: coinBalance(state, p),
       ...(eggs ? { profile: publicProfile(p), stats: stats(state, p) } : {}), ...(mythic ? announceLegend(state, p, mythic.egg.key, '선생님 알 선물', '신화') : legend ? announceLegend(state, p, legend.egg.key, '선생님 알 선물') : {}) };
+  }
+  // V13.125: 다른 학교와 야차전 허용 (on by default). One switch for the whole academy.
+  if (path === '/teacher/battle-settings' && method === 'POST') {
+    requireRole(p, 'teacher');
+    if (typeof body.cross_school !== 'boolean') fail('켜기 또는 끄기를 골라 주세요.');
+    state.battleSettings = { ...(state.battleSettings || {}), cross_school: body.cross_school, updated_at: Date.now(), updated_by: p.id };
+    return { battle_settings: { cross_school: battleCrossSchool(state) } };
   }
   if (path === '/teacher/class-league' && method === 'GET') {
     requireRole(p, 'teacher');
@@ -1452,12 +1495,15 @@ export async function service(state, method, path, body, token, options = {}) {
     if (existing?.host_id === p.id) return { id: existing.id, code: existing.code, stake: existing.stake, status: existing.status, ticket: existing.tickets[p.id], expires_at: existing.created_at + BATTLE_WAIT_MS, rematch: true };
     if (existing) fail('상대가 먼저 설욕전을 신청했어요. 아래에서 수락해 주세요.', 409);
     checkBattleEntry(state, p, previous.stake, now);
-    const school = schoolForProfile(state, p);
-    if (!school || school.id !== previous.school_id) fail('학생 학교 설정을 확인해주세요.', 409);
+    const school = schoolForProfile(state, p), opponent = state.profiles.find(x => x.id === opponentId);
+    if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
+    // V13.125: the same rule as a new challenge (another school while the switch is on).
+    if (!opponent || !battleMatchable(state, p, opponent)) fail(`설욕전은 ${battleWhoText(state)}와만 할 수 있어요.`, 409);
+    const cross = schoolForProfile(state, opponent)?.id !== school.id;
     // Each player keeps the range they played with (a match before V13.94 had one range).
     const hostRanges = previous.range_codes, guestRanges = previous.guest_range_codes || previous.range_codes;
     const [mine, theirs] = previous.host_id === p.id ? [hostRanges, guestRanges] : [guestRanges, hostRanges];
-    return { ...openBattleRoom(state, p, school, previous.stake, mine, now, { invite_id: opponentId, rematch_of: previous.id, mode: previous.mode, range_mode: previous.range_mode || 'same', guest_range_codes: theirs }), rematch: true };
+    return { ...openBattleRoom(state, p, school, previous.stake, mine, now, { invite_id: opponentId, rematch_of: previous.id, mode: previous.mode, range_mode: cross ? 'each' : previous.range_mode || 'same', guest_range_codes: theirs }), rematch: true };
   }
   if (path === '/battle/rematch-offer' && method === 'GET') {
     requireRole(p, 'student');
@@ -1484,7 +1530,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!BATTLE_STAKES.includes(stake)) fail('판돈을 선택해주세요.');
     checkBattleEntry(state, p, stake, now);
     const friend = battleFriends(state, p, now).find(x => x.id === str(body.friend_id, 64));
-    if (!friend) fail('같은 학교·학년 친구에게만 도전장을 보낼 수 있어요.', 404);
+    if (!friend) fail(`${battleWhoText(state)}에게만 도전장을 보낼 수 있어요.`, 404);
     if (friend.busy) fail(`${friend.name}이(가) 지금 다른 대결 중이에요. 조금 뒤에 다시 보내요.`, 409);
     // The friend sees one challenge at a time, so a second one would wait unseen.
     if (friend.invited) fail(`${friend.name}이(가) 다른 도전장을 먼저 받았어요. 조금 뒤에 다시 보내요.`, 409);
@@ -1493,8 +1539,10 @@ export async function service(state, method, path, body, token, options = {}) {
     const rangeCodes = cleanRanges(body.range_codes);
     // One phone alert per friend every few minutes, however often a challenge is re-sent.
     const pushedLately = (state.battles || []).some(b => b.challenge && !b.tournament_id && b.host_id === p.id && b.invite_id === friend.id && now - (b.created_at || 0) < CHALLENGE_PUSH_GAP_MS);
-    return { ...openBattleRoom(state, p, school, stake, rangeCodes, now, { invite_id: friend.id, challenge: true, mode: body.mode, range_mode: body.range_mode }), challenge: true, friend: friend.name,
-      _push: pushedLately ? [] : [{ to: [friend.id], title: `⚔️ ${p.display_name}의 도전장!`, body: `야차전 도전장이 왔어요${stake ? ` · 판돈 ${stake}코인` : ''}. 몇 분 안에 받아 주세요!`, url: '/?go=challenge', tag: 'challenge', urgent: true }] };
+    // V13.125: a friend of another school always plays the words of their own school's range.
+    const cross = schoolForProfile(state, state.profiles.find(x => x.id === friend.id))?.id !== school.id;
+    return { ...openBattleRoom(state, p, school, stake, rangeCodes, now, { invite_id: friend.id, challenge: true, mode: body.mode, range_mode: cross ? 'each' : body.range_mode }), challenge: true, friend: friend.name, friend_school: friend.school,
+      _push: pushedLately ? [] : [{ to: [friend.id], title: `⚔️ ${school.name} ${p.display_name}의 도전장!`, body: `야차전 도전장이 왔어요${stake ? ` · 판돈 ${stake}코인` : ''}. 몇 분 안에 받아 주세요!`, url: '/?go=challenge', tag: 'challenge', urgent: true }] };
   }
   if (path === '/battle/invite' && method === 'GET') {
     requireRole(p, 'student');
@@ -1512,7 +1560,7 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const battle = findJoinableBattle(state, p, str(body.code, 12).replace(/\D/g, ''), Date.now());
     if (battle.host_id === p.id) fail('내가 만든 방이에요. 친구에게 코드를 알려주세요.', 409);
-    return { code: battle.code, stake: battle.stake, mode: battleMode(battle.mode), range_mode: rangeModeOf(battle.range_mode), host_ranges: battle.range_codes || [], host: state.profiles.find(x => x.id === battle.host_id)?.display_name || '', expires_at: battle.created_at + BATTLE_WAIT_MS };
+    return { code: battle.code, stake: battle.stake, mode: battleMode(battle.mode), ...battleRoomSchools(state, battle, p), host_ranges: battle.range_codes || [], host: state.profiles.find(x => x.id === battle.host_id)?.display_name || '', expires_at: battle.created_at + BATTLE_WAIT_MS };
   }
   if (path === '/battle/join' && method === 'POST') {
     requireRole(p, 'student');
@@ -1530,22 +1578,28 @@ export async function service(state, method, path, body, token, options = {}) {
     // V13.94 각자 내 범위: the guest brings the range they study (or, for a rematch, the one they
     // played with). A different range gives each player words of their own on every turn; the
     // same range (or none, from an old screen) plays the host's words as before.
+    // V13.125: each player's words come from their own school (the host's from the host's school).
+    // Range codes mean different 과 at each school, so a match of two schools is always 각자 내
+    // 범위, even when the host asked for 'same' or the two codes happen to match.
+    const guestSchool = schoolForProfile(state, p), hostSchool = schoolForProfile(state, host);
+    if (!guestSchool || !hostSchool) fail('학생 학교 설정을 확인해주세요.', 409);
+    const crossSchool = guestSchool.id !== hostSchool.id;
     const hostRanges = battle.range_codes || [];
     let guestRanges = hostRanges, own = null;
     const asked = Array.isArray(body.range_codes) ? cleanRanges(body.range_codes) : battle.guest_range_codes || [];
-    if (rangeModeOf(battle.range_mode) === 'each' && asked.length && !sameRanges(asked, hostRanges)) {
-      const school = schoolForProfile(state, p);
-      if (!school || school.id !== battle.school_id) fail('학생 학교 설정을 확인해주세요.', 409);
-      const guestWords = scopedWords(state, school.id, asked, p.class_name);
+    if (crossSchool && !asked.length) fail('다른 학교 친구와는 각자 내 범위로 겨뤄요. 야차전에서 내 단어 범위를 골라 주세요.', 409);
+    const rangeMode = crossSchool ? 'each' : rangeModeOf(battle.range_mode);
+    if (rangeMode === 'each' && asked.length && (crossSchool || !sameRanges(asked, hostRanges))) {
+      const guestWords = scopedWords(state, guestSchool.id, asked, p.class_name);
       if (guestWords.length < 8) fail('내 단어 범위에 단어가 8개 이상 있어야 해요. 야차전에서 범위를 더 골라 주세요.', 409);
-      const [forHost, forGuest] = pairedBattleQuestions(scopedWords(state, school.id, hostRanges, host.class_name), guestWords, battleMode(battle.mode), BATTLE_QUESTIONS);
+      const [forHost, forGuest] = pairedBattleQuestions(scopedWords(state, hostSchool.id, hostRanges, host.class_name), guestWords, battleMode(battle.mode), BATTLE_QUESTIONS);
       if (forGuest.length < 8) fail('뜻이 서로 다른 단어가 부족해요. 야차전에서 범위를 더 골라 주세요.', 409);
       own = { [host.id]: forHost, [p.id]: forGuest };
       guestRanges = asked;
     }
-    Object.assign(battle, { guest_id: p.id, status: 'active', joined_at: now, guest_range_codes: guestRanges });
+    Object.assign(battle, { guest_id: p.id, status: 'active', joined_at: now, guest_range_codes: guestRanges, ...(crossSchool ? { range_mode: 'each', guest_school_id: guestSchool.id } : {}) });
     battle.tickets[p.id] = battleTicket();
-    return { id: battle.id, stake: battle.stake, status: 'active', ticket: battle.tickets[p.id], opponent: host.display_name, own_words: !!own,
+    return { id: battle.id, stake: battle.stake, status: 'active', ticket: battle.tickets[p.id], opponent: host.display_name, opponent_school: hostSchool.name, range_mode: rangeMode, own_words: !!own,
       _battle: { action: 'join', id: battle.id, guest: battlePlayer(state, p, guestRanges), tickets: battle.tickets, ...(own ? { own } : {}) } };
   }
   if (path.startsWith('/battle/rooms/') && path.endsWith('/cancel') && method === 'POST') {
