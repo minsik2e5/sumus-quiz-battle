@@ -124,7 +124,7 @@ export async function runPushChecks(assert, expectStatus) {
   const gift = await service(state, 'POST', '/teacher/gifts', { amount: 10, student_ids: ['qa-pu-a'], note: '최고!' }, t.qa_pu_teacher);
   assert(gift._push?.[0]?.to?.join() === 'qa-pu-a' && gift._push[0].title.includes('선물'), 'V13.77 a gift sends a notification');
   const svc = source('./service.mjs');
-  assert(svc.includes("title: `⚔️ ${p.display_name}의 도전장!`") && svc.includes("url: '/?go=challenge', tag: 'challenge', urgent: true"), 'V13.77 a 도전장 sends a notification to the friend');
+  assert(svc.includes("title: `⚔️ ${school.name} ${p.display_name}의 도전장!`") && svc.includes("url: '/?go=challenge', tag: 'challenge', urgent: true"), 'V13.77 a 도전장 sends a notification to the friend (V13.122: with the sender\'s school)');
 
   // 저녁 공부 알림
   const reminders = runEveningReminders(state, now);

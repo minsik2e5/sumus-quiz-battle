@@ -40,7 +40,7 @@ export function stateSizeReport(state) {
 }
 
 export function emptyState() {
-  return { schema_version: 18, schools: structuredClone(DEFAULT_SCHOOLS), profiles: [], tokens: [], sessions: [], mastery: {}, grammarProgress: {}, meaningAliases: {}, meaningAliasMeta: {}, meaningDisputes: [], assignments: [], exams: [], examAttempts: [], practices: [], extraBooks: [], battles: [], tournaments: [] };
+  return { schema_version: 18, schools: structuredClone(DEFAULT_SCHOOLS), profiles: [], tokens: [], sessions: [], mastery: {}, grammarProgress: {}, meaningAliases: {}, meaningAliasMeta: {}, meaningDisputes: [], assignments: [], exams: [], examAttempts: [], practices: [], extraBooks: [], battles: [], tournaments: [], battleSettings: { cross_school: true } };
 }
 
 export function migrateState(state) {
@@ -48,6 +48,9 @@ export function migrateState(state) {
   for (const key of ['profiles', 'tokens', 'sessions', 'assignments', 'exams', 'examAttempts', 'practices', 'extraBooks', 'meaningDisputes', 'battles', 'tournaments']) {
     if (!Array.isArray(state[key])) { state[key] = []; changed = true; }
   }
+  // V13.122: 다른 학교와 야차전 허용 starts on; a state from before has no switch yet.
+  if (!state.battleSettings || typeof state.battleSettings !== 'object' || Array.isArray(state.battleSettings)) { state.battleSettings = { cross_school: true }; changed = true; }
+  else if (typeof state.battleSettings.cross_school !== 'boolean') { state.battleSettings.cross_school = true; changed = true; }
   if (!state.mastery || typeof state.mastery !== 'object' || Array.isArray(state.mastery)) { state.mastery = {}; changed = true; }
   if (!state.grammarProgress || typeof state.grammarProgress !== 'object' || Array.isArray(state.grammarProgress)) { state.grammarProgress = {}; changed = true; }
   if (!state.meaningAliases || typeof state.meaningAliases !== 'object' || Array.isArray(state.meaningAliases)) { state.meaningAliases = {}; changed = true; }
