@@ -95,8 +95,8 @@ export const MONSTER_SKILLS = {
   roar: { name: '포효', desc: '다음 공격 2번 +12씩', boost: [12, 12] },
   rage: { name: '광폭화', desc: '바로 18 피해, 다음 공격 +12', burst: 18, boost: [12] }
 };
-// V13.109: the season's limited pets (호박냥 · 부우) have no yacha skill either.
-const LIMITED_SKILLESS = new Set(['pumpkincat', 'ghost']);
+// V13.109: the season's limited pets (호박냥 · 부우; V13.117: 주먹이 · 술술이 · 찰싹이) have no yacha skill either.
+const LIMITED_SKILLESS = new Set(['pumpkincat', 'ghost', 'riceball', 'tissue', 'glue']);
 const NO_SKILL_PETS = new Set(['haechi', 'phoenix', 'whale', 'qilin', ...LIMITED_SKILLESS]);
 // The practice robot (or no pet) uses 몽이's. Legendary pets deliberately have no battle skill.
 export const petSkillKey = pet => NO_SKILL_PETS.has(pet?.key) ? 'none' : PET_SKILLS[pet?.key] ? pet.key : 'dog';

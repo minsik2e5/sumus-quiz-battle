@@ -76,8 +76,12 @@ export const CHARACTERS = {
   crocodile: { name: 'DEOPSSAK', ko: '덥썩', type: '악어', color: '#6FAD68', light: '#BFE0A1', soft: '#F0F8E9', epic: true },
   octopus: { name: 'MALLANG', ko: '말랑', type: '문어', color: '#CB84B8', light: '#F0C1DF', soft: '#FFF1F8', epic: true },
   // V13.109 한정 펫: sold for one season only (its own egg), then found only in 영웅 eggs. No yacha skill.
-  pumpkincat: { name: 'HOBAK', ko: '호박냥', type: '호박 고양이', color: '#E8842C', light: '#FFC98A', soft: '#FFF3E6', limited: 'halloween' },
-  ghost: { name: 'BOO', ko: '부우', type: '꼬마 유령', color: '#8E7CC3', light: '#DCD3F5', soft: '#F7F4FE', limited: 'halloween' }
+  // V13.117: the 가을 이벤트 알 holds all five: the Halloween pair and the exam-cheering three.
+  pumpkincat: { name: 'HOBAK', ko: '호박냥', type: '호박 고양이', color: '#E8842C', light: '#FFC98A', soft: '#FFF3E6', limited: 'autumn' },
+  ghost: { name: 'BOO', ko: '부우', type: '꼬마 유령', color: '#8E7CC3', light: '#DCD3F5', soft: '#F7F4FE', limited: 'autumn' },
+  riceball: { name: 'JUMEOKI', ko: '주먹이', type: '주먹밥 병아리', color: '#8C7B6B', light: '#F3E9D8', soft: '#FFFAF1', limited: 'autumn' },
+  tissue: { name: 'SULSUL', ko: '술술이', type: '두루마리 휴지', color: '#D9A441', light: '#FBE7B0', soft: '#FFFBEF', limited: 'autumn' },
+  glue: { name: 'CHALSSAK', ko: '찰싹이', type: '딱풀', color: '#6FA8DC', light: '#CFE6F8', soft: '#F1F8FE', limited: 'autumn' }
 };
 export const LEGENDARY_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].legendary);
 export const EPIC_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].epic);
@@ -89,7 +93,8 @@ export const petTier = key => CHARACTERS[key]?.legendary ? 'legendary' : CHARACT
 // After the season its pets come only from 영웅 eggs: a 영웅 result (영웅 알 or 코인 뽑기) is one of
 // them `after_rate`% of the time, while the student still misses one.
 export const SEASONS = {
-  halloween: { name: '할로윈', egg: '할로윈 알', price: 600, start: '2026-10-01', end: '2026-11-07', until: '11월 첫째 주(11/7)', after_rate: 5 }
+  // V13.117: the Halloween egg became the 가을 이벤트 알 (Halloween + 수능·기말 응원), on sale until 11/30.
+  autumn: { name: '가을 이벤트', egg: '가을 이벤트 알', price: 600, start: '2026-10-01', end: '2026-11-30', until: '11월 30일', after_rate: 5, stage: 'halloween', stage_end: '2026-11-07' }
 };
 const kstDay = now => new Date(Number(now) + 9 * 3600000).toISOString().slice(0, 10);
 export const seasonKeys = id => LIMITED_PET_KEYS.filter(key => CHARACTERS[key].limited === id);
@@ -98,6 +103,11 @@ export function seasonOnSale(now = Date.now()) {
   const day = kstDay(now);
   const id = Object.keys(SEASONS).find(k => day >= SEASONS[k].start && day <= SEASONS[k].end);
   return id ? { id, ...SEASONS[id], keys: seasonKeys(id) } : null;
+}
+// V13.117: the battle stage of the season (the Halloween one), only until `stage_end` (11/7), though the egg sells until 11/30.
+export function seasonStage(now = Date.now()) {
+  const s = seasonOnSale(now);
+  return s?.stage && kstDay(now) <= (s.stage_end || s.end) ? s.stage : null;
 }
 // Limited pets of seasons already over: these hide in 영웅 eggs.
 export const seasonsOver = (now = Date.now()) => Object.keys(SEASONS).filter(id => kstDay(now) > SEASONS[id].end);

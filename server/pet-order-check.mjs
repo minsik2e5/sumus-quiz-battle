@@ -49,7 +49,7 @@ export function runPetOrderChecks(assert) {
   const part = name => read(`${dir}${name}`).split('\n---\n');
   const d19 = part('19a-mythic-pets-design.txt'), e19 = part('19b-mythic-pets-expressions.txt'), f19 = part('19c-mythic-fx.txt'), p19 = part('19d-mythic-reveal-poses.txt'), s19 = part('19e-mythic-reveal-scenes.txt');
   assert(d19.length === 7 && e19.length === 25 && f19.length === 3 && p19.length === 2 && s19.length === 5, 'V13.115 그림 주문서 19: 설정 7 · 표정·알 반응 25 · 효과 3 · 등장 포즈 2 · 세로 배경 5');
-  assert(PETS19.every(key => !CHARACTERS[key]), 'V13.115 신화 5종(구미호 청룡 백호 주작 현무) · 천마 · 주먹이의 key는 아직 앱에 없는 펫이다');
+  assert(PETS19.filter(key => key !== 'riceball').every(key => !CHARACTERS[key]) && CHARACTERS.riceball?.limited === 'autumn', 'V13.115 신화 5종(구미호 청룡 백호 주작 현무) · 천마의 key는 아직 앱에 없는 펫이고, 주먹이는 V13.117에서 가을 이벤트 한정 펫으로 등록됐다');
   const rows19 = read(`${dir}slice-map.csv`).split('\n').filter(line => /^"19[a-e]-/.test(line)).map(line => line.match(/"((?:[^"]|"")*)"/g).map(cell => cell.slice(1, -1)));
   const files19 = rows19.map(row => row[6]);
   assert(rows19.length === 153 && new Set(files19).size === rows19.length, 'V13.115 slice-map: 19번 칸이 서로 다른 앱 파일 이름에 이어진다 (25 · 100 · 12 · 8 · 5 시트 칸)');
@@ -69,7 +69,7 @@ export function runPetOrderChecks(assert) {
   const cheer = [...d19, ...e19, ...f19].join('\n');
   assert(!/(sharp teeth|fangs showing|blood|skull)/i.test(cheer.replace(/no (sharp |big )?teeth[^.]*/gi, '').replace(/no fangs[^).]*/gi, '').replace(/never (sly or )?scary[^.]*/gi, '')) && /mouth (closed|closed-mouth)|closed-mouth/.test(cheer), 'V13.115 호랑이·용 등 신화 펫이 무섭지 않다(입 다묾, 날카로운 이빨 없음)');
   const names19 = d19.map(text => text.match(/^Subject: ([^,]+),/m)?.[1]);
-  assert(names19.length === 7 && new Set(names19).size === 7 && names19.every(name => name && !Object.values(Object.fromEntries(Object.entries(CHARACTERS).map(([key, value]) => [key, value.ko]))).includes(name)), 'V13.115 새 펫 7종의 임시 이름은 서로 다르고 지금 있는 펫 이름과 겹치지 않는다');
+  assert(names19.length === 7 && new Set(names19).size === 7 && names19.every(name => name && (name === '주먹이' ? CHARACTERS.riceball?.ko === name : !Object.values(Object.fromEntries(Object.entries(CHARACTERS).map(([key, value]) => [key, value.ko]))).includes(name))), 'V13.115 새 펫 7종의 임시 이름은 서로 다르고 지금 있는 펫 이름과 겹치지 않는다');
   const codex19 = read(`${dir}CODEX_PROMPT_19.md`);
   assert(PETS19.every(key => codex19.includes(`\`${key}\``)) && codex19.includes('PR까지만 만든다. 머지하지 않는다.') && codex19.includes('운영 Supabase에 연결하지 않는다') && codex19.includes('앱 코드는 고치지 않는다') && codex19.includes('내장 그림 생성 기능') && codex19.includes('DONE_19.md') && codex19.includes('`D`(삭제)와 `M`(수정)이 하나도 없어야 한다') && codex19.includes('실제 만화·게임 캐릭터를 따라 그리지 않는다') && codex19.includes('public/assets/reveal/bg-') && codex19.includes('--union') && codex19.includes('181개') && codex19.includes('-s.webp'), 'V13.115 Codex 지시서(CODEX_PROMPT_19.md): 7종 key, PR까지만, 운영 DB·앱 코드 금지, 내장 그림 기능, 새 파일만, 만화 캐릭터 금지, 균열 정렬, 세로 배경 저장, 181개, 작은 그림');
   assert(readme.includes('`19a-mythic-pets-design.txt`') && readme.includes('`19e-mythic-reveal-scenes.txt`') && readme.includes('CODEX_PROMPT_19.md') && readdirSync(here(`${dir}split`)).filter(name => /^19[a-e]-/.test(name)).length === 42, 'V13.115 주문서 README에 19a~19e가 있고 split/에 19번 시트 42장이 있다');
@@ -99,7 +99,7 @@ export function runPetOrderChecks(assert) {
   const oldFiles = new Set(read(`${dir}slice-map.csv`).split('\n').slice(1).filter(line => line && !/^"2[123][abc]?-/.test(line)).map(line => cells(line)[6])), newFiles = rows2x.map(row => row[6]);
   assert(rows2x.length === 40 + 132 + 8 + 20 + 8 && new Set(newFiles).size === newFiles.length && newFiles.every(file => !oldFiles.has(file)), '그림 주문서 21~23 slice-map: 새 칸 208개(펫 40 · 몬스터 132 · 배경 8 · UI 20 · 칭호 8)가 서로, 그리고 기존 주문서와 겹치지 않는 앱 파일 이름에 이어진다');
   const files21 = [...rowsOf('21a'), ...rowsOf('21b')];
-  assert(EVENT21.every(key => !CHARACTERS[key]) && ['술술이', '찰싹이'].every(name => !Object.values(CHARACTERS).some(c => c.ko === name)), '그림 주문서 21: 술술이(tissue) · 찰싹이(glue)의 key와 이름은 아직 앱에 없는 펫이다');
+  assert(EVENT21.every(key => CHARACTERS[key]?.limited === 'autumn') && ['술술이', '찰싹이'].every(name => Object.values(CHARACTERS).filter(c => c.ko === name).length === 1), '그림 주문서 21: 술술이(tissue) · 찰싹이(glue)는 V13.117에서 가을 이벤트 한정 펫으로 등록됐고 이름이 겹치지 않는다');
   assert(EVENT21.every(key => {
     const names = files21.filter(file => file.startsWith(`public/assets/pets/${key}-`)).map(file => file.slice('public/assets/pets/'.length, -5));
     const want = [0, 1, 2, 3].map(form => `${key}-${form}`);

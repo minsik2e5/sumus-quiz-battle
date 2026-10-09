@@ -1,5 +1,5 @@
 import { api, esc, icon, toast, num, rangeLabel, modal, dialogOpen, buttonBusy } from './ui.js';
-import { CHARACTERS, PET_FORMS, seasonOnSale } from './core.js';
+import { CHARACTERS, PET_FORMS, seasonStage } from './core.js';
 import { avatar, petKey, showPose, holdPose } from './character.js';
 import { getRanges, periodFolders } from './student.js';
 import { petJosa } from './pet-moments.js';
@@ -159,8 +159,8 @@ function monsterPic(m, { size = '', pose = '' } = {}) {
   return `<div class="mon-temp ${size}${cls}" style="--mon-filter:${mon.temp.filter};--mon-color:${mon.color}${tint}">${avatar(mon.temp.pet, { size, form: mon.temp.form })}</div>`;
 }
 // V13.109 전투 배경: a monster fight in the forest (a boss in the boss hall), the robot in its
-// training room, a match on the rooftop arena; in a season (할로윈) the matches use its stage.
-const arenaBg = f => f?.monster ? (f.monster.boss ? 'bg-boss' : 'bg-forest') : seasonOnSale() ? `bg-${seasonOnSale().id}` : B.room?.practice || B.local ? 'bg-practice' : 'bg-arena';
+// training room, a match on the rooftop arena; until 11/7 (the Halloween part of the 가을 이벤트) the matches use the Halloween stage.
+const arenaBg = f => f?.monster ? (f.monster.boss ? 'bg-boss' : 'bg-forest') : seasonStage() ? `bg-${seasonStage()}` : B.room?.practice || B.local ? 'bg-practice' : 'bg-arena';
 const petArt = (p, opts = {}) => p?.monster ? monsterPic(p.monster, opts) : avatar(p?.pet?.key, { form: p?.pet?.form ?? 1, ...opts });
 const whoName = p => p?.monster ? (p.name || MONSTERS.find(x => x.key === p.monster.key)?.name) : petName(p?.pet);
 
