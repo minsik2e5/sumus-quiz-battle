@@ -46,9 +46,17 @@ export const CHARACTERS = {
   rabbit: { name: 'TORI', ko: '토리', type: '토끼', color: '#F09AAE', light: '#FFD3DC', soft: '#FFF1F4' },
   fox: { name: 'HOYA', ko: '호야', type: '여우', color: '#E8893A', light: '#F8C27D', soft: '#FFF4E8' },
   haechi: { name: 'HAECHI', ko: '해치', type: '한국 수호수', color: '#63B89B', light: '#BFE8D7', soft: '#F0FBF6', legendary: true },
-  phoenix: { name: 'PHOENIX', ko: '불새', type: '봉황', color: '#E96A2E', light: '#FFD06A', soft: '#FFF3E8', legendary: true },
+  // V13.118: 불새 is retired (nobody owned it) because 주작 became its mythic cousin. It stays here so an old record still draws; it is no longer in any egg or the dex.
+  phoenix: { name: 'PHOENIX', ko: '불새', type: '봉황', color: '#E96A2E', light: '#FFD06A', soft: '#FFF3E8', legendary: true, retired: true },
   whale: { name: 'STAR WHALE', ko: '별고래', type: '별고래', color: '#4659B8', light: '#A9B7FF', soft: '#F0F1FF', legendary: true },
   qilin: { name: 'QILIN', ko: '기린', type: '동양 신수', color: '#77C9B2', light: '#F2C9F0', soft: '#FFF7FC', legendary: true },
+  // V13.118 전설 천마, and the new top tier 신화 (mythic): 구미호 + the four guardian beasts. A mythic pet comes from any egg at a tiny chance (rewards.js MYTHIC_RATE), with no pity.
+  cheonma: { name: 'CHEONMA', ko: '천마', type: '날개 달린 말', color: '#5A56C9', light: '#C9C7F5', soft: '#F2F1FD', legendary: true },
+  gumiho: { name: 'MIHO', ko: '미호', type: '구미호', color: '#7BA7E8', light: '#D5E4FB', soft: '#F3F7FE', mythic: true },
+  cheongryong: { name: 'CHEONGRYONG', ko: '청룡', type: '사신수 · 동쪽', color: '#2E8FD6', light: '#BEE0F8', soft: '#EFF8FE', mythic: true },
+  baekho: { name: 'BAEKHO', ko: '백호', type: '사신수 · 서쪽', color: '#8E9CC4', light: '#E0E6F5', soft: '#F6F8FD', mythic: true },
+  jujak: { name: 'JUJAK', ko: '주작', type: '사신수 · 남쪽', color: '#E2503A', light: '#FFC9A8', soft: '#FFF1EA', mythic: true },
+  hyeonmu: { name: 'HYEONMU', ko: '현무', type: '사신수 · 북쪽', color: '#2E8C86', light: '#A9E0DA', soft: '#EAF8F6', mythic: true },
   // V13.92 영웅 펫: one step below the legendary pets (영웅 알 in the shop, or a coin capsule).
   capybara: { name: 'YUJA', ko: '유자', type: '카피바라', color: '#C08A4E', light: '#EBCB9C', soft: '#FBF3E8', epic: true },
   penguin: { name: 'PENGI', ko: '펭이', type: '펭귄', color: '#3E5A9A', light: '#A9C8F0', soft: '#EEF4FC', epic: true },
@@ -83,12 +91,15 @@ export const CHARACTERS = {
   tissue: { name: 'SULSUL', ko: '술술이', type: '두루마리 휴지', color: '#D9A441', light: '#FBE7B0', soft: '#FFFBEF', limited: 'autumn' },
   glue: { name: 'CHALSSAK', ko: '찰싹이', type: '딱풀', color: '#6FA8DC', light: '#CFE6F8', soft: '#F1F8FE', limited: 'autumn' }
 };
-export const LEGENDARY_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].legendary);
+export const LEGENDARY_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].legendary && !CHARACTERS[key].retired);
+// The pets a student can ever meet (a retired pet such as 불새 is left out of every count and list).
+export const ACTIVE_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].retired);
+export const MYTHIC_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].mythic);
 export const EPIC_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].epic);
 export const LIMITED_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].limited);
-export const STANDARD_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].legendary && !CHARACTERS[key].epic && !CHARACTERS[key].limited);
-// The pet tiers, lowest first: 기본 (the shop egg), 영웅, 전설. 한정 sits beside them (a season's pets).
-export const petTier = key => CHARACTERS[key]?.legendary ? 'legendary' : CHARACTERS[key]?.epic ? 'epic' : CHARACTERS[key]?.limited ? 'limited' : 'basic';
+export const STANDARD_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].legendary && !CHARACTERS[key].mythic && !CHARACTERS[key].epic && !CHARACTERS[key].limited);
+// The pet tiers, lowest first: 기본 (the shop egg), 영웅, 전설, 신화 (V13.118). 한정 sits beside them (a season's pets).
+export const petTier = key => CHARACTERS[key]?.mythic ? 'mythic' : CHARACTERS[key]?.legendary ? 'legendary' : CHARACTERS[key]?.epic ? 'epic' : CHARACTERS[key]?.limited ? 'limited' : 'basic';
 // V13.109 시즌 한정: the season's egg is sold from `start` to `end` (Korea time, `end` included).
 // After the season its pets come only from 영웅 eggs: a 영웅 result (영웅 알 or 코인 뽑기) is one of
 // them `after_rate`% of the time, while the student still misses one.

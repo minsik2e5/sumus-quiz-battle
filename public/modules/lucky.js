@@ -1,7 +1,7 @@
 import { esc, num } from './ui.js';
 import { coin, artOr } from './emblems.js';
 import { CHARACTERS, EPIC_EGG_LEGENDARY_RATE, SEASONS } from './core.js';
-import { LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE } from './rewards.js';
+import { LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, MYTHIC_RATE } from './rewards.js';
 import { playSound, unlockSound as unlockSoundFiles, preloadSound } from './sound.js';
 
 // V13.68 코인 뽑기: the machine on the 놀이터 page and the show when a capsule comes out.
@@ -62,6 +62,7 @@ const SFX = {
   beat: n => { snd('wiggle', { rate: .55 + n * .1, gain: 1.1 }, () => tone([70 + n * 10, 70 + n * 10], { type: 'sine', len: .14, gap: .16, vol: .09 + n * .02, slide: -30 })); buzz([35, 90, 45]); },
   crack: () => { snd('crack', {}, () => tone([1900, 1400, 2300, 1700], { type: 'square', len: .035, gap: .05, vol: .025 })); buzz(25); },
   boom: () => { snd('burst', {}, () => { tone([95], { type: 'sawtooth', len: .7, vol: .1, slide: -60 }); tone([2637, 3136], { type: 'triangle', len: .5, gap: .04, vol: .03, slide: -900 }); }); buzz([90, 40, 180]); },
+  mythic: () => { snd('fanfare-mythic', {}, () => { tone([523, 659, 784, 1047, 1319, 1568, 2093], { type: 'triangle', gap: .09, len: .3, vol: .05 }); setTimeout(() => tone([1047, 1319, 1568, 2093], { type: 'triangle', gap: 0, len: 1.6, vol: .04 }), 800); }); buzz([60, 40, 60, 40, 200]); },
   fanfare: () => snd('fanfare-legend', {}, () => { tone([523, 659, 784, 1047], { type: 'triangle', gap: .11, len: .22, vol: .05 }); setTimeout(() => tone([784, 1047, 1319, 1568, 2093], { type: 'square', gap: .09, len: .3, vol: .028 }), 520); setTimeout(() => tone([1047, 1319, 1568], { type: 'triangle', gap: 0, len: 1.1, vol: .035 }), 1050); })
 };
 
@@ -215,6 +216,94 @@ export function legendaryShow(res, { again = false, againLabel = '' } = {}) {
     })();
   });
 }
+// V13.118 신화 연출: the whole screen turns into the pet's own scene (reveal/bg-<key>.webp), about eight seconds.
+// It goes dark and rumbles, the mythic egg rises with an aurora, its heart beats three times and a crack grows over it
+// (fx/mythic-crack-1..4), a last crack lets the light out, then a white flash, a shock ring and a burst of stars, the
+// name cut ("신화 펫" + the name) slides in and the pet appears large in front of its scene with its aura and sparkles.
+// `res.mythic` is { key, egg?: true } from an egg of the shop or a gift, or { key } from a coin capsule (then `res` is
+// the whole capsule result with its "한 번 더"). A tap jumps to the reveal; reduced motion shows the reveal at once.
+export function mythicShow(res, { again = false, againLabel = '' } = {}) {
+  preloadSound(['boss', 'wiggle', 'crack', 'burst', 'combo', 'coin', 'fanfare-mythic']);
+  return new Promise(resolve => {
+    const key = res.mythic.key, c = CHARACTERS[key] || {}, name = c.ko || '신화 펫';
+    const box = document.createElement('div');
+    box.className = 'lk-show mx';
+    box.style.setProperty('--mc', c.color || '#7ba7e8');
+    box.style.setProperty('--ml', c.light || '#d5e4fb');
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-modal', 'true');
+    box.setAttribute('aria-label', `신화 펫 ${name} 획득`);
+    box.innerHTML = `<div class="mx-bg" style="background-image:url(/assets/reveal/bg-${key}.webp)" aria-hidden="true"></div>
+      <div class="mx-dim" aria-hidden="true"></div>
+      <img class="mx-aurora" src="/assets/fx/mythic-aurora.webp" alt="" aria-hidden="true">
+      <img class="mx-rays" src="/assets/fx/mythic-rays.webp" alt="" aria-hidden="true">
+      <div class="mx-omen" aria-hidden="true"><i></i><span>믿을 수 없는 기운이 느껴져요…</span></div>
+      <div class="mx-stage" aria-hidden="true">
+        <img class="mx-egg" src="/assets/ui/mythic-egg.webp" alt="">
+        <img class="mx-crack c1" src="/assets/fx/mythic-crack-1.webp" alt="">
+        <img class="mx-crack c2" src="/assets/fx/mythic-crack-2.webp" alt="">
+        <img class="mx-crack c3" src="/assets/fx/mythic-crack-3.webp" alt="">
+        <img class="mx-crack c4" src="/assets/fx/mythic-crack-4.webp" alt="">
+      </div>
+      <img class="mx-ring" src="/assets/fx/mythic-ring.webp" alt="" aria-hidden="true">
+      <img class="mx-burst" src="/assets/fx/mythic-stars.webp" alt="" aria-hidden="true">
+      <div class="mx-flash" aria-hidden="true"></div>
+      <div class="mx-name" aria-hidden="true"><img src="/assets/ui/mythic-banner.webp" alt=""><span class="mx-name-kicker">MYTHIC</span><b>${esc(name)}</b></div>
+      <div class="mx-reveal" id="mx-reveal" hidden>
+        <div class="mx-pet">
+          <img class="mx-aura" src="/assets/ui/mythic-aura.webp" alt="" aria-hidden="true">
+          <img class="mx-art" src="/assets/pets/${key}-reveal.webp" alt="${esc(name)}">
+          <img class="mx-sparkles" src="/assets/ui/mythic-sparkles.webp" alt="" aria-hidden="true">
+        </div>
+        <div class="mx-card">
+          <img class="mx-badge" src="/assets/ui/mythic-badge.webp" alt="신화">
+          <span class="mx-kicker">MYTHIC PET · ${esc(c.type || '')}</span><h2>신화 펫을 만났어요!</h2><h3>${esc(name)}</h3>
+          <p>${res.mythic.egg ? `${res.mythic.epic ? '영웅 알' : '랜덤 알'}에서 아주 낮은 확률의 행운으로 신화 펫이 나왔어요!` : res.mythic.gift ? '선생님이 보내 주신 알에서 신화 펫이 나왔어요!' : `코인 뽑기에서 ${MYTHIC_RATE.capsule}%의 행운으로 신화 펫이 나왔어요!`}</p>
+          <small>${res.mythic.egg ? '알 상점' : res.mythic.gift ? '선생님 알 선물' : `코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}`} · 전교에 소식이 전해졌어요</small>
+          <div class="lk-actions">${again ? `<button type="button" class="lk-again" data-lk="again">한 번 더 <em>${againLabel}</em></button>` : ''}<button type="button" class="lk-ok" data-lk="ok">확인</button></div>
+        </div>
+      </div>
+      <div class="lgx-rain" aria-hidden="true"></div>
+      <button type="button" class="lk-skip" data-lk="skip">건너뛰기</button>`;
+    document.body.appendChild(box);
+    const reveal = box.querySelector('#mx-reveal');
+    let shown = false, ready = false;
+    const close = go => { box.classList.add('bye'); setTimeout(() => box.remove(), 180); resolve(!!go); };
+    const showResult = () => {
+      if (shown) return;
+      shown = true;
+      box.classList.add('p5', 'p6', 'mx-opened');
+      box.querySelector('.lk-skip')?.remove();
+      reveal.hidden = false;
+      box.querySelector('.lgx-rain').innerHTML = stars(40);
+      box.insertAdjacentHTML('beforeend', `<div class="lk-confetti" aria-hidden="true">${confetti()}</div>`);
+      SFX.mythic();
+      // The buttons wait a moment, so a tap meant to skip does not close the reveal.
+      setTimeout(() => { ready = true; box.classList.add('ready'); (box.querySelector('.lk-again') || box.querySelector('.lk-ok'))?.focus({ preventScroll: true }); }, reduced() ? 0 : 1100);
+    };
+    const flashThenShow = () => { if (shown) return; box.classList.add('p4'); SFX.boom(); setTimeout(showResult, reduced() ? 0 : 420); };
+    box.addEventListener('click', e => {
+      const b = e.target.closest('[data-lk]');
+      if (!shown) return flashThenShow();
+      if (!ready) return;
+      if (b?.dataset.lk === 'again') return close(true);
+      if (b?.dataset.lk === 'ok') return close(false);
+    });
+    box.addEventListener('keydown', e => { if (e.key === 'Escape' && ready) close(false); });
+    requestAnimationFrame(() => box.classList.add('open'));
+    if (reduced()) return showResult();
+    const step = (ms, fn) => new Promise(r => setTimeout(() => { if (!shown) fn(); r(); }, ms));
+    (async () => {
+      await step(120, () => { box.classList.add('p0'); SFX.rumble(); });
+      await step(1000, () => { box.classList.add('p1'); SFX.rise(); });
+      for (let n = 0; n < 3; n++) await step(n ? 620 : 1000, () => { box.classList.remove('beat'); void box.offsetWidth; box.classList.add('p2', 'beat', `b${n + 1}`, `k${n + 1}`); SFX.beat(n); SFX.crack(); });
+      await step(700, () => { box.classList.add('p3', 'k4'); SFX.crack(); });
+      await step(620, () => { box.classList.add('p4'); SFX.boom(); });
+      await step(520, () => { box.classList.add('p5'); });
+      await step(1500, showResult);
+    })();
+  });
+}
 // V13.92 영웅 펫: the same show, shorter and in violet (about three and a half seconds): a
 // violet omen, the pet's own egg rises, two heartbeats, one flash and ring, then the EPIC
 // letters and the egg with the shadow of its final form. `res` is the coin capsule (with its
@@ -297,6 +386,7 @@ export function epicShow({ key, res = null, again = false, againLabel = '', from
 // Resolves when the student closes it: true for "한 번 더" (offered when `again`).
 export function luckyShow(res, { again = false, againLabel = '' } = {}) {
   preloadSound(['wiggle', 'pop', 'coin', 'coins', 'levelup', 'fanfare-epic', 'fail']);
+  if (res.mythic) return mythicShow(res, { again, againLabel });
   if (res.legendary) return legendaryShow(res, { again, againLabel });
   if (res.epic) return epicShow({ key: res.epic.key, res, again, againLabel });
   return new Promise(resolve => {

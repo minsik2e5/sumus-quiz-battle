@@ -559,7 +559,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(build88.includes('"v1388.css"'), 'V13.88 뽑기 그림 스타일이 빌드 목록에 있다');
 
   /* ---------- V13.89 전설 펫 ---------- */
-  assert(LEGENDARY_RATE === 0.5 && LEGENDARY_PITY === 150 && LEGENDARY_PET_KEYS.join() === 'haechi,phoenix,whale,qilin' && STANDARD_PET_KEYS.length === 16, 'V13.89 전설 펫은 네 마리, 0.5% 확률, 150회 확정이며 일반 펫과 분리된다');
+  assert(LEGENDARY_RATE === 0.5 && LEGENDARY_PITY === 150 && LEGENDARY_PET_KEYS.join() === 'haechi,whale,qilin,cheonma' && STANDARD_PET_KEYS.length === 16, 'V13.89 전설 펫은 네 마리(V13.118: 불새 대신 천마), 0.5% 확률, 150회 확정이며 일반 펫과 분리된다');
   const values = xs => () => xs.shift() ?? .99;
   const legendProfile = { pets: [{ key: 'dog' }], avatar_key: 'dog', lucky: { legend_pulls: 148 }, points_spent: 0 };
   const beforePity = pullLucky(legendProfile, 10, 100, { random: values([.5, .99]), now });
@@ -571,7 +571,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(LEGENDARY_PET_KEYS.every(key => CHARACTERS[key].legendary && petSkill({ key }).key === 'none'), 'V13.89 전설 펫에는 야차전 펫 특기가 없다');
   const lucky89 = source('../public/modules/lucky.js'), arcade89 = source('../public/modules/arcade.js'), service89 = source('./service.mjs'), css89 = source('../public/v1389.css'), build89 = source('./build-assets.mjs');
   assert(lucky89.includes('legend-egg-glow.webp') && lucky89.includes('legend-egg-burst.webp') && lucky89.includes('legend-badge.webp') && lucky89.includes('function legendaryShow(') && css89.includes('.lk-legend-show{') && build89.includes('"v1389.css"'), 'V13.89 전설 알의 빛남·깨짐·배지 연출과 전설 결과 화면이 빌드에 들어간다');
-  assert(arcade89.includes('LEGENDARY_RATE') && service89.includes('postNotice(state') && service89.includes('(season ? season.keys : epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter') && service89.includes('학생이 ${where}에서 전설 펫') && service89.includes("announceLegend(state, p, result.legendary.key, '행운 뽑기')"), 'V13.89 확률과 천장을 안내하고, 전설 획득은 학교에 알리며, 랜덤 알에서는 일반 펫만 나온다');
+  assert(arcade89.includes('LEGENDARY_RATE') && service89.includes('postNotice(state') && service89.includes('(season ? season.keys : epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter') && service89.includes('학생이 ${where}에서 ${rank} 펫') && service89.includes("announceLegend(state, p, result.legendary.key, '행운 뽑기')"), 'V13.89 확률과 천장을 안내하고, 전설 획득은 학교에 알리며, 랜덤 알에서는 일반 펫만 나온다');
   const fc90 = source('../public/modules/flashcards.js'), student90 = source('../public/modules/student.js'), app90 = source('../public/app.js'), css90 = source('../public/v1390.css');
   assert(fc90.includes('export function openFlashcards(') && fc90.includes('KNOWN_AT') && fc90.includes("data-fc=\"next-round\"") && fc90.includes("data-fc=\"star-left\"") && fc90.includes("'eng2mean' : 'mean2eng'") && student90.includes('data-flashcards="true"') && student90.includes('export function memorizeDeck(') && app90.includes('if (d.flashcards) return openCards();') && app90.includes('openFlashcards({') && css90.includes('.fc-cover{') && build89.includes('"v1390.css"'), 'V13.90 단어 학습에서 카드로 가리고 외우기: 커버를 끝까지 내리면 아는 카드, 헷갈리는 카드만 다음 라운드, ★ 담기와 확인 테스트');
   assert(css90.includes('.lk-machine{width:220px') && css90.includes('.lk-result-art{width:156px') && student90.includes('pet-care-more-v1390'), 'V13.90 코인 뽑기 기계·캡슐·결과 그림이 커지고, 펫이 여러 마리면 다른 펫도 돌볼 수 있다고 알려 준다');
@@ -813,7 +813,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     const basic = fresh(), basicEgg = openEgg(basic, { epic: false, missing: ['cat'], price: EGG_PRICE, random: values([0, 0]), now });
     assert(!basicEgg.legendary && basicEgg.key === 'cat' && basic.points_spent === 400, 'V13.98 랜덤 알에서는 전설이 나오지 않는다');
     const service98 = source('./service.mjs'), shop98 = source('../public/modules/pet-moments.js'), lucky98 = source('../public/modules/lucky.js');
-    assert(service98.includes("openEgg(p, { epic, season: season?.id || null, missing, price })") && service98.includes("announceLegend(state, p, key, '영웅 알')") && shop98.includes('if (res.legendary) { await legendaryShow(res); return true; }') && shop98.includes('if (res.legendary || res.epic || res.limited) { close(true); await eggShow(res, kind); return; }') && lucky98.includes('export function legendaryShow(') && lucky98.includes('res.legendary.egg'), 'V13.98 영웅 알에서 전설이 나오면 전설 연출이 나오고 학교 소식이 전해진다');
+    assert(service98.includes("openEgg(p, { epic, season: season?.id || null, missing, price })") && service98.includes("announceLegend(state, p, key, '영웅 알')") && shop98.includes('if (res.legendary) { await legendaryShow(res); return true; }') && shop98.includes('if (res.mythic || res.legendary || res.epic || res.limited) { close(true); await eggShow(res, kind); return; }') && lucky98.includes('export function legendaryShow(') && lucky98.includes('res.legendary.egg'), 'V13.98 영웅 알에서 전설이 나오면 전설 연출이 나오고 학교 소식이 전해진다');
     /* ---------- V13.98 가위바위보: 10분 넘게 둔 판은 이어 던지면 정리된다 ---------- */
     const day98 = dayKey(now), old98 = now - RPS_STALE_MS - 60000;
     const tie98 = { rps: { day: day98, plays: 1, live: { id: 'x', bet: 20, pot: 20, wins: 0, ties: 1, await: 'pick', at: old98 } }, points_spent: 20 };
@@ -844,7 +844,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(css98.includes('.yb-spell-input{position:absolute;inset:0') && css98.includes('font-size:16px') && css98.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/8.2}') && battle103.includes("classList.add('yb-typing')"), 'V13.103 키보드가 올라오면 전투 화면(경기장)이 줄어 단어와 글자 칸이 키보드 위에 보인다(16px 글자로 확대 방지)');
     /* ---------- V13.105 전투 화면 효과 ---------- */
     const css104 = source('../public/v13105fx.css'), build104 = source('./build-assets.mjs');
-    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css",\s*"v13109\.css",\s*"v13111\.css",\s*"v13112\.css",\s*"v13113\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
+    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css",\s*"v13109\.css",\s*"v13111\.css",\s*"v13112\.css",\s*"v13113\.css",\s*"v13118\.css"\s*\]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
     assert(battle103.includes('function hitStop(') && battle103.includes("classList.add('fx-stop')") && css104.includes('.yb-arena.fx-stop [data-fx]{animation-play-state:paused!important}') && battle103.includes('function dmgTier(') && battle103.includes("const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl']") && battle103.includes("` fx-num t${dmgTier(+dmg)}"), 'V13.105 맞는 순간 잠깐 멈추고(히트스톱), 데미지가 클수록 더 세게 흔들리고 숫자가 커진다');
     assert(battle103.includes('function comboUp(') && battle103.includes('function comboReset(') && battle103.includes("if (atk === 'me') comboUp();") && (battle103.match(/comboReset\(\);/g) || []).length >= 3 && css104.includes('.fx-combo'), 'V13.105 내가 연속으로 맞히면 2콤보부터 내 HUD 위에 콤보가 뜨고, 틀리거나 놓치면 0으로 돌아간다(화면 표시만)');
     assert(battle103.includes('if (e.fast && e.dmg) critStamp(def);') && battle103.includes("'CRITICAL!'") && battle103.includes("crit ? 'fx-shake-xl'"), 'V13.105 빠른 정답(fast)이면 CRITICAL! 도장과 더 센 흔들림이 나온다');

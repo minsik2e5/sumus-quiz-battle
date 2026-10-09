@@ -78,11 +78,11 @@ export function postNotice(state, teacher, school, students, { text, className =
 }
 // V13.89 전설 소식: kept apart from 선생님 공지 — the home screen shows only the latest notice,
 // so a legendary pull must never hide (or, in the teacher's sent list, pose as) the teacher's own.
-export function postLegend(state, school, students, { text, now = Date.now(), id }) {
+export function postLegend(state, school, students, { text, now = Date.now(), id, title = '🌟 전설 소식' }) {
   const push = pushState(state);
   const news = { id, school_id: school.id, text, at: now };
   push.legends = [...(Array.isArray(push.legends) ? push.legends : []), news].slice(-30);
-  return { news, message: { to: students.map(s => s.id), title: '🌟 전설 소식', body: text, url: '/?go=home', tag: 'legend' } };
+  return { news, message: { to: students.map(s => s.id), title, body: text, url: '/?go=home', tag: 'legend' } };
 }
 export function legendFor(state, school, now = Date.now()) {
   const n = (state.push?.legends || []).filter(x => x.school_id === school?.id && now - x.at < LEGEND_SHOW_DAYS * DAY).at(-1);

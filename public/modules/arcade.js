@@ -191,7 +191,7 @@ async function pull(A, ticket, button) {
     if (rewards(A).gacha) rewards(A).gacha.tickets = res.lucky.tickets;
     await machineDrop(machine);
     const balance = Number(res.points_balance);
-    if (res.legendary || res.epic) {
+    if (res.mythic || res.legendary || res.epic) {
       if (res.profile) Object.assign(A.data.profile, res.profile);
       if (res.stats) Object.assign(A.data.stats, res.stats);
     }

@@ -97,11 +97,13 @@ export const MONSTER_SKILLS = {
 };
 // V13.109: the season's limited pets (호박냥 · 부우; V13.117: 주먹이 · 술술이 · 찰싹이) have no yacha skill either.
 const LIMITED_SKILLESS = new Set(['pumpkincat', 'ghost', 'riceball', 'tissue', 'glue']);
-const NO_SKILL_PETS = new Set(['haechi', 'phoenix', 'whale', 'qilin', ...LIMITED_SKILLESS]);
+// V13.118: 천마 (legendary) and the five mythic pets have no yacha skill either (their show is the reveal).
+const MYTHIC_SKILLESS = new Set(['gumiho', 'cheongryong', 'baekho', 'jujak', 'hyeonmu']);
+const NO_SKILL_PETS = new Set(['haechi', 'phoenix', 'whale', 'qilin', 'cheonma', ...MYTHIC_SKILLESS, ...LIMITED_SKILLESS]);
 // The practice robot (or no pet) uses 몽이's. Legendary pets deliberately have no battle skill.
 export const petSkillKey = pet => NO_SKILL_PETS.has(pet?.key) ? 'none' : PET_SKILLS[pet?.key] ? pet.key : 'dog';
 export const petSkill = pet => MONSTER_SKILLS[pet?.skill] ? { key: pet.skill, need: PET_SKILL_NEED, ...MONSTER_SKILLS[pet.skill] } : petSkillKey(pet) === 'none'
-  ? { key: 'none', name: '특기 없음', desc: LIMITED_SKILLESS.has(pet?.key) ? '한정 펫은 펫 특기를 사용하지 않아요.' : '전설 펫은 펫 특기를 사용하지 않아요.', need: 0 }
+  ? { key: 'none', name: '특기 없음', desc: LIMITED_SKILLESS.has(pet?.key) ? '한정 펫은 펫 특기를 사용하지 않아요.' : MYTHIC_SKILLESS.has(pet?.key) ? '신화 펫은 펫 특기를 사용하지 않아요.' : '전설 펫은 펫 특기를 사용하지 않아요.', need: 0 }
   : ({ key: petSkillKey(pet), need: PET_SKILL_NEED, ...PET_SKILLS[petSkillKey(pet)] });
 
 const other = (state, pid) => state.order.find(id => id !== pid);

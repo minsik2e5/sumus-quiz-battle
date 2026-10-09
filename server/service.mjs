@@ -484,12 +484,12 @@ export function tidyBattles(state, now = Date.now()) {
   return changed;
 }
 // A legendary pet (coin capsule or, V13.98, a 영웅 알) is news for the whole school.
-function announceLegend(state, p, key, where) {
+function announceLegend(state, p, key, where, rank = '전설') {
   const school = schoolForProfile(state, p);
   if (!school) return {};
   const students = state.profiles.filter(x => x.id !== p.id && isRankedStudent(x) && schoolForProfile(state, x)?.id === school.id);
-  const name = CHARACTERS[key]?.ko || '전설 펫';
-  const posted = postLegend(state, school, students, { text: `${p.display_name} 학생이 ${where}에서 전설 펫 ${eulReul(name)} 만났어요!`, id: randomUUID() });
+  const name = CHARACTERS[key]?.ko || `${rank} 펫`;
+  const posted = postLegend(state, school, students, { text: `${p.display_name} 학생이 ${where}에서 ${rank} 펫 ${eulReul(name)} 만났어요!`, id: randomUUID(), ...(rank === '신화' ? { title: '✨ 신화 소식' } : {}) });
   return { legend_news: posted.news, _push: students.length ? [posted.message] : [] };
 }
 function findJoinableBattle(state, p, code, now) {
@@ -1220,10 +1220,10 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const gifts = openGifts(p, Date.now());
     // V13.111: an egg gift that opened as a legendary pet is told to the school, like the shop's.
-    const legend = gifts.find(g => g.egg?.tier === 'legendary');
+    const legend = gifts.find(g => g.egg?.tier === 'legendary'), mythic = gifts.find(g => g.egg?.tier === 'mythic');
     const eggs = gifts.some(g => g.egg);
     return { gifts, coins: gifts.reduce((n, g) => n + Number(g.amount || 0), 0), points_balance: coinBalance(state, p),
-      ...(eggs ? { profile: publicProfile(p), stats: stats(state, p) } : {}), ...(legend ? announceLegend(state, p, legend.egg.key, '선생님 알 선물') : {}) };
+      ...(eggs ? { profile: publicProfile(p), stats: stats(state, p) } : {}), ...(mythic ? announceLegend(state, p, mythic.egg.key, '선생님 알 선물', '신화') : legend ? announceLegend(state, p, legend.egg.key, '선생님 알 선물') : {}) };
   }
   if (path === '/teacher/class-league' && method === 'GET') {
     requireRole(p, 'teacher');
@@ -1335,6 +1335,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (body.ticket !== true && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 코인 뽑기를 할 수 있어요.', 409);
     const result = pullLucky(p, Number(body.bet), coinBalance(state, p), { ticket: body.ticket === true });
     if (result.epic) return { ...result, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
+    if (result.mythic) return { ...result, ...announceLegend(state, p, result.mythic.key, '행운 뽑기', '신화'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     if (!result.legendary) return { ...result, points_balance: coinBalance(state, p) };
     return { ...result, ...announceLegend(state, p, result.legendary.key, '행운 뽑기'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
   }
@@ -1409,7 +1410,8 @@ export async function service(state, method, path, body, token, options = {}) {
     if (openBattleFor(state, p.id, Date.now())) fail('대결이 끝난 뒤에 알을 살 수 있어요.', 409);
     const balance = pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance;
     if (balance < price) fail(`코인이 ${price - balance}개 부족해요.`);
-    const { key, legendary, limited } = openEgg(p, { epic, season: season?.id || null, missing, price });
+    const { key, legendary, limited, mythic } = openEgg(p, { epic, season: season?.id || null, missing, price });
+    if (mythic) return { key, epic: false, mythic: { key, egg: true, epic }, ...announceLegend(state, p, key, epic ? '영웅 알' : '랜덤 알', '신화'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     if (limited) return { key, epic: false, limited: true, season: season?.id || CHARACTERS[key]?.limited, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     if (legendary) return { key, epic: false, legendary: { key, egg: true }, ...announceLegend(state, p, key, '영웅 알'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     return { key, epic, profile: publicProfile(p) };

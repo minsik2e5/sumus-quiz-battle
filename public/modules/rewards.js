@@ -19,6 +19,8 @@ export const LEGENDARY_RATE = 0.5;
 export const LEGENDARY_PITY = 150;
 // V13.92 영웅 펫: a capsule that is not legendary has a 3% chance of a 영웅 egg (one not met yet).
 export const EPIC_RATE = 3;
+// V13.118 신화: the chance (in %) that an egg opens as a mythic pet the student has not met yet, by where the egg came from. No pity, and the same for every student.
+export const MYTHIC_RATE = { basic: 0.1, epic: 0.2, gift: 0.1, capsule: 0.03 };
 export const LUCKY_ODDS = [
   { mult: 0, rate: 45, name: '꽝' },
   { mult: 1, rate: 25, name: '본전' },

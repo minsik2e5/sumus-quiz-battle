@@ -1,6 +1,6 @@
 import { $, api, esc, num, toast } from './ui.js';
 import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, STANDARD_PET_KEYS, EPIC_PET_KEYS, seasonOnSale, cleanPetName } from './core.js';
-import { epicShow, legendaryShow } from './lucky.js';
+import { epicShow, legendaryShow, mythicShow } from './lucky.js';
 import { uiArt, ART_READY } from './emblems.js';
 import { avatar, petKey } from './character.js';
 import { playSound, preloadSound } from './sound.js';
@@ -193,7 +193,7 @@ export async function buyEgg(A, onChanged, kind) {
   let res;
   try { res = await api('/shop/egg', { kind: kind === 'epic' || kind === 'season' ? kind : 'basic' }); }
   finally { momentOpen = false; }
-  if (res.legendary || res.epic || res.limited) { onChanged?.(); await eggShow(res, kind); return res; }
+  if (res.mythic || res.legendary || res.epic || res.limited) { onChanged?.(); await eggShow(res, kind); return res; }
   momentOpen = true;
   eggRevealHtml(openOverlay('새 알'), res.key, () => closeOverlay(true, onChanged));
   return res;
@@ -258,6 +258,7 @@ const EGGS = {
 const eggsNow = () => { const s = seasonOnSale(); return s ? { ...EGGS, season: { name: s.egg, price: s.price, keys: s.keys, all: `${s.name} 한정 펫을 모두 모았어요!`, until: s.until } } : EGGS; };
 // After a purchase: the legendary, 영웅 or limited show, or the basic egg's name card (null).
 async function eggShow(res, kind) {
+  if (res.mythic) { await mythicShow(res); return true; }
   if (res.legendary) { await legendaryShow(res); return true; }
   if (res.limited) { await epicShow({ key: res.key, from: kind === 'season' ? 'season' : 'shop' }); return true; }
   if (res.epic) { await epicShow({ key: res.key, from: 'shop' }); return true; }
@@ -295,7 +296,7 @@ export function openEggShop(A, onChanged, kind = 'basic') {
         const res = await api('/shop/egg', { kind });
         buying = false;
         // V13.98: a 영웅 알 can open as a legendary pet (1%), with the legendary show.
-        if (res.legendary || res.epic || res.limited) { close(true); await eggShow(res, kind); return; }
+        if (res.mythic || res.legendary || res.epic || res.limited) { close(true); await eggShow(res, kind); return; }
         eggRevealHtml(body, res.key, () => close(true));
       } catch (err) {
         buying = false;
