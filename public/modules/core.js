@@ -67,6 +67,14 @@ export const CHARACTERS = {
   arcticfox: { name: 'NUNSONG', ko: '눈송', type: '북극여우', color: '#5E9BD6', light: '#C9E2F7', soft: '#F2F8FE', epic: true },
   koala: { name: 'KULKUL', ko: '쿨쿨', type: '코알라', color: '#7C8697', light: '#D3D8E2', soft: '#F5F6F9', epic: true },
   parrot: { name: 'AENGDU', ko: '앵두', type: '앵무새', color: '#D9382E', light: '#FFC24A', soft: '#FFF4EC', epic: true },
+  frog: { name: 'POLJJAK', ko: '폴짝', type: '개구리', color: '#65B95E', light: '#BCE991', soft: '#F0FAEA' },
+  sapsaree: { name: 'BOKSIL', ko: '복실', type: '삽살개', color: '#A9A9A0', light: '#E5E2D8', soft: '#FAF8F2' },
+  deer: { name: 'SAESSAK', ko: '새싹', type: '사슴', color: '#BA8B5D', light: '#EACAA0', soft: '#FCF5E9' },
+  bear: { name: 'DEUNDEUN', ko: '든든', type: '곰', color: '#A87955', light: '#DCB895', soft: '#F8EFE7' },
+  seal: { name: 'DONGGEUL', ko: '동글', type: '물범', color: '#80A5B8', light: '#C8E3EA', soft: '#F0F9FA', epic: true },
+  wolf: { name: 'DALBIT', ko: '달빛', type: '늑대', color: '#7385AE', light: '#C4CDE8', soft: '#F1F3FC', epic: true },
+  crocodile: { name: 'DEOPSSAK', ko: '덥썩', type: '악어', color: '#6FAD68', light: '#BFE0A1', soft: '#F0F8E9', epic: true },
+  octopus: { name: 'MALLANG', ko: '말랑', type: '문어', color: '#CB84B8', light: '#F0C1DF', soft: '#FFF1F8', epic: true },
   // V13.109 한정 펫: sold for one season only (its own egg), then found only in 영웅 eggs. No yacha skill.
   pumpkincat: { name: 'HOBAK', ko: '호박냥', type: '호박 고양이', color: '#E8842C', light: '#FFC98A', soft: '#FFF3E6', limited: 'halloween' },
   ghost: { name: 'BOO', ko: '부우', type: '꼬마 유령', color: '#8E7CC3', light: '#DCD3F5', soft: '#F7F4FE', limited: 'halloween' }

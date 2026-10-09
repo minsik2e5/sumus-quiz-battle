@@ -15,7 +15,7 @@ export function runPetOrderChecks(assert) {
   const dir = '../docs/asset-requests/runner/';
   const design = read(`${dir}18a-new-pets-design.txt`).split('\n---\n'), expr = read(`${dir}18b-new-pets-expressions.txt`).split('\n---\n');
   assert(design.length === 8 && expr.length === 28, 'V13.114 그림 주문서 18: 설정 시트 8장(펫마다 1장), 표정 시트 24장 + 알 반응 4장');
-  assert(KEYS.every(key => !CHARACTERS[key]), 'V13.114 새 펫 8종의 key(frog sapsaree deer bear seal wolf crocodile octopus)는 아직 앱에 없는 펫이다');
+  assert(KEYS.every(key => CHARACTERS[key]), 'V13.114 새 펫 8종의 key(frog sapsaree deer bear seal wolf crocodile octopus)가 앱에 등록됐다');
   const csv = read(`${dir}slice-map.csv`).split('\n').filter(line => /^"18[ab]-/.test(line));
   const rows = csv.map(line => line.match(/"((?:[^"]|"")*)"/g).map(cell => cell.slice(1, -1)));
   const files = rows.map(row => row[6]);
@@ -36,7 +36,7 @@ export function runPetOrderChecks(assert) {
   const own = Object.fromEntries(Object.entries(CHARACTERS).map(([key, value]) => [key, value.ko]));
   const koOf = text => text.match(/^Subject: ([^,]+),/m)?.[1];
   const names = design.map(koOf);
-  assert(names.length === 8 && new Set(names).size === 8 && names.every(name => name && !Object.values(own).includes(name)), 'V13.114 새 펫의 임시 이름 8개는 서로 다르고 지금 있는 펫 이름과 겹치지 않는다');
+  assert(names.length === 8 && new Set(names).size === 8 && names.every((name, i) => name === own[KEYS[i]]), 'V13.114 주문서 이름 8개가 앱에 등록된 이름과 일치한다');
   assert(expr.filter(text => !/two pet eggs/.test(text)).filter(text => /^Subject: 말랑,/m.test(text)).every(text => text.includes('raises one tentacle instead')) && expr.filter(text => /^Subject: 폴짝,/m.test(text)).every(text => text.includes('raises one webbed hand instead')) && expr.filter(text => /^Subject: 동글,/m.test(text)).every(text => text.includes('raises one flipper instead')), 'V13.114 응원 동작은 펫 몸에 맞게 문어 촉수 · 개구리 손 · 물범 지느러미를 든다');
   assert(design.filter(text => /Shiba|shaggy/.test(text)).length >= 1 && design.every(text => !/(sharp teeth|fangs|blood|skull)/i.test(text.replace(/never scary[^.]*\./gi, '').replace(/no (sharp )?teeth[^.]*/gi, '').replace(/no fangs[^)]*/gi, ''))), 'V13.114 늑대·악어를 포함해 무서운 표현(날카로운 이빨, 피, 해골)이 주문에 없다');
   const codex = read(`${dir}CODEX_PROMPT_18.md`);
