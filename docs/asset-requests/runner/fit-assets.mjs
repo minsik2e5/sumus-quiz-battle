@@ -10,6 +10,8 @@
 // - --stand-same은 --stand와 같지만 시트 4칸을 같은 배율로 세워요(가장 큰 칸이 488 × 471px에 맞게).
 //   포즈를 바꿔 끼워도 크기가 튀지 않아야 하는 그림용. 예) 몬스터 기본 · 공격 · 맞음 · 쓰러짐(10-monsters)
 //       node docs/asset-requests/runner/fit-assets.mjs 10-1.png monsters/slime monsters/slime-attack monsters/slime-hurt monsters/slime-down --stand-same
+//   포즈가 두 시트에 나뉜 몬스터(22-던전)는 --scale-max로 두 시트를 같은 배율에 맞춰요: 각 시트를 한 번 자르면 "scale 0.xxxx"가 출력돼요.
+//   두 값 중 작은 값을 큰 쪽 시트에 --scale-max 0.xxxx로 줘서 그 시트를 다시 잘라요.
 // - --trim이면 정사각형에 넣지 않고 그림 테두리에 딱 맞게 잘라요(같은 시트는 같은 배율, 가장 넓은 칸이 --size px).
 //   예) 캡슐 위·아래 반쪽처럼 앱에서 위아래로 맞붙여 쓰는 그림.
 // - --fit-each면 칸마다 따로 같은 크기(가장 긴 쪽이 --size의 88%)로 맞춰 정사각형 가운데에 넣어요.
@@ -31,7 +33,7 @@ const fei = args.indexOf('--fit-each'), fitEach = fei >= 0 && !!args.splice(fei,
 const uni = args.indexOf('--union'), union = uni >= 0 && !!args.splice(uni, 1);
 const ssi = args.indexOf('--stand-same'), standSame = ssi >= 0 && !!args.splice(ssi, 1);
 const si = args.indexOf('--stand'), stand = standSame || (si >= 0 && !!args.splice(si, 1));
-const preview = opt('--preview'), baseName = opt('--base'), size = Number(opt('--size') || 256), small = Number(opt('--small') || 0);
+const preview = opt('--preview'), baseName = opt('--base'), size = Number(opt('--size') || 256), small = Number(opt('--small') || 0), scaleMax = Number(opt('--scale-max') || 0);
 const [sheet, ...names] = args;
 if (!sheet || names.length !== 4) {
   console.error('사용법: node fit-assets.mjs <sheet.png> <TL> <TR> <BL> <BR> [--base pets/robot-3] [--size 256] [--preview out.png]');
@@ -116,7 +118,8 @@ if (union) {
 }
 const tiles = [];
 // --stand-same: one scale for the sheet, so the largest cell fits 488 × 471 px.
-const kSame = Math.min(...cells.map(c => Math.min(488 / c.b.w, 471 / c.b.h)));
+const kSame = Math.min(scaleMax || Infinity, ...cells.map(c => Math.min(488 / c.b.w, 471 / c.b.h)));
+if (standSame) console.log(`scale ${kSame.toFixed(4)}`);
 for (const c of cells) {
   mkdirSync(dirname(`${ASSETS}${c.name}.webp`), { recursive: true });
   if (stand) {
