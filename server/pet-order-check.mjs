@@ -4,6 +4,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { CHARACTERS } from '../public/modules/core.js';
+import { MONSTERS } from '../public/modules/monsters.js';
 
 const here = path => fileURLToPath(new URL(path, import.meta.url));
 const read = path => readFileSync(here(path), 'utf8');
@@ -72,4 +73,48 @@ export function runPetOrderChecks(assert) {
   const codex19 = read(`${dir}CODEX_PROMPT_19.md`);
   assert(PETS19.every(key => codex19.includes(`\`${key}\``)) && codex19.includes('PR까지만 만든다. 머지하지 않는다.') && codex19.includes('운영 Supabase에 연결하지 않는다') && codex19.includes('앱 코드는 고치지 않는다') && codex19.includes('내장 그림 생성 기능') && codex19.includes('DONE_19.md') && codex19.includes('`D`(삭제)와 `M`(수정)이 하나도 없어야 한다') && codex19.includes('실제 만화·게임 캐릭터를 따라 그리지 않는다') && codex19.includes('public/assets/reveal/bg-') && codex19.includes('--union') && codex19.includes('181개') && codex19.includes('-s.webp'), 'V13.115 Codex 지시서(CODEX_PROMPT_19.md): 7종 key, PR까지만, 운영 DB·앱 코드 금지, 내장 그림 기능, 새 파일만, 만화 캐릭터 금지, 균열 정렬, 세로 배경 저장, 181개, 작은 그림');
   assert(readme.includes('`19a-mythic-pets-design.txt`') && readme.includes('`19e-mythic-reveal-scenes.txt`') && readme.includes('CODEX_PROMPT_19.md') && readdirSync(here(`${dir}split`)).filter(name => /^19[a-e]-/.test(name)).length === 42, 'V13.115 주문서 README에 19a~19e가 있고 split/에 19번 시트 42장이 있다');
+  /* ---------- 21 이벤트 펫 · 22 던전 몬스터 · 23 던전 배경·UI·칭호 ---------- */
+  const EVENT21 = ['tissue', 'glue'];
+  const SIZE22 = { nightzombie: 'M', redpenghost: 'M', wrongmummy: 'M', testspider: 'M', omrreaper: 'L', chalkangler: 'L', nightbat: 'S', blinkjelly: 'M', bagturtle: 'L', cheatninja: 'S', labskeleton: 'M', pianofang: 'L', homeworkogre: 'L', gatehound: 'L', sandwitch: 'M' };
+  const MON22 = Object.keys(SIZE22), BOSS = 'killergolem';
+  const d21 = part('21a-event-pets-design.txt'), e21 = part('21b-event-pets-expressions.txt'), m22 = part('22a-dungeon-monsters.txt'), b22 = part('22b-dungeon-boss.txt');
+  const bg23 = part('23a-dungeon-backgrounds.txt'), ui23 = part('23b-dungeon-ui.txt'), t23 = part('23c-dungeon-titles.txt');
+  assert(d21.length === 2 && e21.length === 8 && m22.length === 30 && b22.length === 3 && bg23.length === 8 && ui23.length === 5 && t23.length === 2, '그림 주문서 21~23: 이벤트 펫 설정 2·표정 8 / 던전 몬스터 30·보스 3 / 배경 8·UI 5·칭호 2');
+  const cells = line => line.match(/"((?:[^"]|"")*)"/g).map(cell => cell.slice(1, -1));
+  const rows2x = read(`${dir}slice-map.csv`).split('\n').filter(line => /^"2[123][abc]?-/.test(line)).map(cells);
+  const rowsOf = prefix => rows2x.filter(row => row[0].startsWith(prefix)).map(row => row[6]);
+  const oldFiles = new Set(read(`${dir}slice-map.csv`).split('\n').slice(1).filter(line => line && !/^"2[123][abc]?-/.test(line)).map(line => cells(line)[6])), newFiles = rows2x.map(row => row[6]);
+  assert(rows2x.length === 40 + 132 + 8 + 20 + 8 && new Set(newFiles).size === newFiles.length && newFiles.every(file => !oldFiles.has(file)), '그림 주문서 21~23 slice-map: 새 칸 208개(펫 40 · 몬스터 132 · 배경 8 · UI 20 · 칭호 8)가 서로, 그리고 기존 주문서와 겹치지 않는 앱 파일 이름에 이어진다');
+  const files21 = [...rowsOf('21a'), ...rowsOf('21b')];
+  assert(EVENT21.every(key => !CHARACTERS[key]) && ['술술이', '찰싹이'].every(name => !Object.values(CHARACTERS).some(c => c.ko === name)), '그림 주문서 21: 술술이(tissue) · 찰싹이(glue)의 key와 이름은 아직 앱에 없는 펫이다');
+  assert(EVENT21.every(key => {
+    const names = files21.filter(file => file.startsWith(`public/assets/pets/${key}-`)).map(file => file.slice('public/assets/pets/'.length, -5));
+    const want = [0, 1, 2, 3].map(form => `${key}-${form}`);
+    for (const form of [1, 2, 3]) for (const expression of ['happy', 'eat', 'sad', 'cheer']) want.push(`${key}-${form}-${expression}`);
+    want.push(`${key}-0-happy`, `${key}-0-eat`);
+    return names.length === 18 && want.every(name => names.includes(name));
+  }) && ['event-egg', 'event-badge', 'event-deco-cheer', 'event-deco-autumn'].every(name => files21.includes(`public/assets/ui/${name}.webp`)), '그림 주문서 21: 이벤트 펫마다 앱이 읽는 그림 18개(알·아기·성장·최종 + 표정 12 + 알 반응 2)와 알 상점 아이콘 4개가 모두 주문에 있다');
+  assert(d21.every(text => text.includes('A limited event pet') && text.includes('NOT an animal') && text.includes('ORIGINAL character') && text.includes('no striped cheek marks') && /STYLE REFERENCE/.test(text) && text.includes('SUMUS 이벤트 펫 21 (Runner용)')) && e21.every(text => text.includes('SUMUS 이벤트 펫 21 (Runner용)')) && e21.filter(text => !/Items for the autumn event shop/.test(text)).every(text => /CHARACTER REFERENCE — before drawing, open "21a-\d\.png"/.test(text)), '그림 주문서 21: 설정 시트는 동물이 아닌 새 캐릭터(줄무늬 볼 금지)이고 Drive 업로드·참고 줄이 있으며, 표정 시트는 그 펫의 21a 설정 시트를 열어 맞춘다');
+  const files22 = [...rowsOf('22a'), ...rowsOf('22b')];
+  const existingMonsters = new Set(MONSTERS.map(monster => monster.key));
+  assert(MON22.length === 15 && [...MON22, BOSS].every(key => !existingMonsters.has(key)) && MON22.every(key => {
+    const names = files22.filter(file => new RegExp(`^public/assets/monsters/${key}(-[a-z0-9]+)?\\.webp$`).test(file)).map(file => file.slice('public/assets/monsters/'.length, -5));
+    const want = [key, `${key}-idle2`, `${key}-windup`, `${key}-attack`, `${key}-attack2`, `${key}-skill`, `${key}-hurt`, `${key}-down`];
+    return names.length === 8 && want.every(name => names.includes(name));
+  }), '그림 주문서 22: 던전 일반 몬스터 15종은 기존 몬스터 18종과 key가 다르고, 몬스터마다 8포즈(기본·기본2·준비·공격·공격2·스킬·맞음·쓰러짐)가 모두 주문에 있다');
+  assert((() => {
+    const names = files22.filter(file => new RegExp(`^public/assets/monsters/${BOSS}(-[a-z0-9]+)?\\.webp$`).test(file)).map(file => file.slice('public/assets/monsters/'.length, -5));
+    return names.length === 12 && [BOSS, ...['idle2', 'windup', 'attack', 'attack2', 'skill', 'hurt', 'down', 'rage', 'core', 'roar', 'corehurt'].map(pose => `${BOSS}-${pose}`)].every(name => names.includes(name));
+  })(), '그림 주문서 22: 보스 킬러 골렘(killergolem)은 12포즈(8포즈 + 분노 · 핵 노출 · 포효 · 핵 맞음)가 모두 주문에 있다');
+  assert(m22.every(text => text.includes('SUMUS 던전 몬스터 22 (Runner용)') && text.includes('facing the viewer\'s LEFT') && text.includes('final-exam hell') && /STYLE REFERENCE/.test(text) && text.includes('never gory')) && b22.every(text => text.includes('SUMUS 던전 몬스터 22 (Runner용)') && text.includes('never gory')) && m22.filter((text, i) => i % 2 === 1).every((text, n) => text.includes(`Also open "22a-${2 * n + 1}.png"`)) && b22[1].includes('"22b-1.png"') && b22[2].includes('"22b-1.png" and "22b-2.png"'), '그림 주문서 22: 몬스터는 왼쪽을 보고 으스스하지만 피 없이 귀엽고, Drive 업로드·참고 줄이 있으며, 둘째·셋째 시트는 앞 시트를 열어 같은 디자인·크기로 맞춘다');
+  const horror = [...m22, ...b22, ...bg23].join('\n').replace(/never gory/gi, '').replace(/no gore/gi, '').replace(/no skull/gi, '').replace(/no exposed bones/gi, '').replace(/no sharp teeth/gi, '').replace(/no sharp fangs/gi, '').replace(/no fangs/gi, '').replace(/never realistic or creepy/gi, '');
+  assert(!/(sharp teeth|fangs showing|blood|gore\b|skull)/i.test(horror), '그림 주문서 22~23: 피 · 이빨 · 해골 표현이 없다(귀엽고 으스스한 수준)');
+  const codex21 = read(`${dir}CODEX_PROMPT_21.md`), codex22 = read(`${dir}CODEX_PROMPT_22.md`);
+  assert(EVENT21.every(key => codex21.includes(`\`${key}\``)) && codex21.includes('PR까지만 만든다. 머지하지 않는다.') && codex21.includes('운영 Supabase에 연결하지 않는다') && codex21.includes('앱 코드는 고치지 않는다') && codex21.includes('따라 그리지 않는다') && codex21.includes('**48개**') && codex21.includes('-s.webp'), '그림 주문서 21 Codex 지시서(CODEX_PROMPT_21.md): 2종 key, PR까지만, 운영 DB·앱 코드 금지, 새 캐릭터, 48개, 작은 그림');
+  assert([...MON22, BOSS].every(key => new RegExp(`\`${key}\` \\| [^|]+ \\| ${SIZE22[key] || '보스'} \\|`).test(codex22)) && codex22.includes('PR까지만 만든다. 머지하지 않는다.') && codex22.includes('운영 Supabase에 연결하지 않는다') && codex22.includes('앱 코드는 고치지 않는다') && codex22.includes('--scale-max') && codex22.includes('**176개**') && codex22.includes('기존 몬스터 18종') && codex22.includes('따라 그리지 않는다'), '그림 주문서 22·23 Codex 지시서(CODEX_PROMPT_22.md): 몬스터 16종 key·크기 표, PR까지만, 운영 DB·앱 코드 금지, 두 시트 배율 맞추기, 176개, 기존 몬스터 보호');
+  assert(bg23.every(text => text.includes('1536×1024') && text.includes('NO characters, NO animals') && text.includes('ONE LARGE monster') && text.includes('SUMUS 던전 배경·UI 23 (Runner용)')) && rowsOf('23a').join() === ['gate', 'f1', 'f2', 'f3', 'f4', 'f5', 'boss', 'endless'].map(name => `public/assets/dungeon/bg-${name}.webp`).join(), '그림 주문서 23: 던전 배경 8장은 가로 1536×1024, 캐릭터 없음, 큰 몬스터·파티 자리를 비워 두고 dungeon/bg-*.webp에 이어진다');
+  assert(rowsOf('23b').length === 20 && rowsOf('23b').every(file => /^public\/assets\/ui\/dungeon-[a-z0-9-]+\.webp$/.test(file)) && rowsOf('23c').length === 8 && rowsOf('23c').every(file => /^public\/assets\/titles\/dungeon-[a-z0-9]+\.webp$/.test(file)) && ui23.every(text => text.includes('no letters') && text.includes('SUMUS 던전 배경·UI 23 (Runner용)')) && t23.every(text => text.includes('no letters and no numbers')), '그림 주문서 23: 던전 UI 아이콘 20개(ui/dungeon-*)와 칭호 메달 8개(titles/dungeon-*)가 글자 없이 주문에 있다');
+  assert(readme.includes('`21a-event-pets-design.txt`') && readme.includes('`22a-dungeon-monsters.txt`') && readme.includes('`23c-dungeon-titles.txt`') && readme.includes('CODEX_PROMPT_21.md') && readme.includes('CODEX_PROMPT_22.md') && readme.includes(`| \`00-all-in-order.txt\` | ${allCount} | ${allCount * 4} |`) && readdirSync(here(`${dir}split`)).filter(name => /^2[123][a-c]?-/.test(name)).length === 58, '그림 주문서 21~23: README에 새 주문서와 Codex 지시서가 있고 합본 개수가 맞으며 split/에 21~23번 시트 58장이 있다');
+  const fit = read(`${dir}fit-assets.mjs`), designDoc = read('../docs/dungeon-design.md');
+  assert(fit.includes('--scale-max') && fit.includes('console.log(`scale ') && ['킬러 골렘', '불새', '2026-11-30', '120단어', '3등급 컷', '봇이 낀 파티는 기록 제외', 'dungeon-engine', 'DungeonRoom'].every(word => designDoc.includes(word)), '그림 주문서 21~23: 자르기 도구에 두 시트 배율 맞추기(--scale-max)가 있고 던전 설계 문서(docs/dungeon-design.md)에 확정 사항이 있다');
 }
