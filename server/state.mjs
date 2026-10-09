@@ -48,7 +48,7 @@ export function migrateState(state) {
   for (const key of ['profiles', 'tokens', 'sessions', 'assignments', 'exams', 'examAttempts', 'practices', 'extraBooks', 'meaningDisputes', 'battles', 'tournaments']) {
     if (!Array.isArray(state[key])) { state[key] = []; changed = true; }
   }
-  // V13.122: 다른 학교와 야차전 허용 starts on; a state from before has no switch yet.
+  // V13.125: 다른 학교와 야차전 허용 starts on; a state from before has no switch yet.
   if (!state.battleSettings || typeof state.battleSettings !== 'object' || Array.isArray(state.battleSettings)) { state.battleSettings = { cross_school: true }; changed = true; }
   else if (typeof state.battleSettings.cross_school !== 'boolean') { state.battleSettings.cross_school = true; changed = true; }
   if (!state.mastery || typeof state.mastery !== 'object' || Array.isArray(state.mastery)) { state.mastery = {}; changed = true; }

@@ -34,7 +34,7 @@ export function rankingWeek(now = Date.now()) {
   };
 }
 export const gradeOf = className => String(className || '').match(/^(중[1-3]|고[1-3])/)?.[1] || String(className || '');
-// V13.122: the same 부 (중학교/고등학교) and the same 학년 (고1A and 고1B are both 고1), whichever
+// V13.125: the same 부 (중학교/고등학교) and the same 학년 (고1A and 고1B are both 고1), whichever
 // school. a and b are { division, class_name }. 야차전 across schools uses it, and the dungeon lobby
 // (docs/dungeon-design.md: 학교가 달라도 같은 학년이면 된다) is meant to use the same rule.
 export const sameGradeBand = (a, b) => {

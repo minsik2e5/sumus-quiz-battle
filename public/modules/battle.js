@@ -291,7 +291,7 @@ function toggleRange(code) { B.ranges.has(code) ? B.ranges.delete(code) : B.rang
 const rangeMode = () => pref('sumus-yacha-range-mode', 'each') === 'same' ? 'same' : 'each';
 const myRanges = () => (B.ranges ? [...B.ranges] : []);
 // What the joining student is told about the words before saying yes.
-// V13.122: a room of another school is always 각자 내 범위 (its codes are that school's 과).
+// V13.125: a room of another school is always 각자 내 범위 (its codes are that school's 과).
 function rangeDeal(room) {
   const hostRanges = room.host_ranges || [], mine = myRanges();
   const same = !mine.length || (mine.length === hostRanges.length && mine.every(code => hostRanges.includes(code)));
@@ -439,9 +439,9 @@ async function createRoom(button) {
     enterRoom({ ...room, host: true });
   } catch (err) { toast(err.message); button.disabled = false; }
 }
-// V13.122: who a student can battle (the teacher's 다른 학교와 야차전 switch, on by default).
+// V13.125: who a student can battle (the teacher's 다른 학교와 야차전 switch, on by default).
 const whoCanBattle = () => B.A.data.battle_cross_school === false ? '같은 학교·학년 친구' : '같은 학년 친구(다른 학교도 가능)';
-// V13.61 challenge: pick a friend of the same grade (V13.122: other schools too); the room is only for them.
+// V13.61 challenge: pick a friend of the same grade (V13.125: other schools too); the room is only for them.
 async function pickFriend(button) {
   button.disabled = true;
   let friends;
@@ -478,7 +478,7 @@ function acceptChallenge(invite) {
   const cur = B;
   const text = invite.tournament
     ? `<h2>${esc(invite.tournament.name)}</h2>${modeTag(invite.mode)}<p><b>${esc(invite.tournament.round)}</b> · ${esc(petJosa(invite.host, '과', '와'))} 겨뤄요.<br>판돈 없는 대회 경기예요. 들어가면 바로 시작해요.</p>`
-    : `<h2>${invite.host_school ? `<small class="yb-from-school-v13122">${esc(invite.host_school)}</small>` : ''}${esc(invite.host)}의 도전장</h2>${modeTag(invite.mode)}${rangeDeal(invite)}<p>판돈 <b>${num(invite.stake)}코인</b>을 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(invite.stake)}코인을 잃어요.</p>`;
+    : `<h2>${invite.host_school ? `<small class="yb-from-school-v13125">${esc(invite.host_school)}</small>` : ''}${esc(invite.host)}의 도전장</h2>${modeTag(invite.mode)}${rangeDeal(invite)}<p>판돈 <b>${num(invite.stake)}코인</b>을 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(invite.stake)}코인을 잃어요.</p>`;
   if (invite.tournament) B.tournament = { tid: invite.tournament.id };
   confirmBox(text, '나중에', invite.tournament ? '입장하기' : '도전 받기', async yes => {
     if (B !== cur || !yes) return;
@@ -496,7 +496,7 @@ async function joinRoom(button) {
   try { room = await api(`/battle/preview?code=${B.joinCode}`); }
   catch (err) { toast(err.message); button.disabled = false; return; }
   const cur = B;
-  confirmBox(`<h2>${room.host_school ? `<small class="yb-from-school-v13122">${esc(room.host_school)}</small>` : ''}${esc(room.host)}의 방</h2>${modeTag(room.mode)}${rangeDeal(room)}<p>판돈 <b>${num(room.stake)}코인</b>을 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(room.stake)}코인을 잃어요.</p>`, '돌아가기', '참가하기', async yes => {
+  confirmBox(`<h2>${room.host_school ? `<small class="yb-from-school-v13125">${esc(room.host_school)}</small>` : ''}${esc(room.host)}의 방</h2>${modeTag(room.mode)}${rangeDeal(room)}<p>판돈 <b>${num(room.stake)}코인</b>을 걸고 대결해요.<br>들어가면 바로 시작하고, 지면 ${num(room.stake)}코인을 잃어요.</p>`, '돌아가기', '참가하기', async yes => {
     if (B !== cur) return;
     if (!yes) { button.disabled = false; return; }
     try {
@@ -1014,7 +1014,7 @@ function drawMatch() {
 }
 
 // "24번 · 25번 외 2": the ranges a player plays with (V13.94 각자 내 범위).
-// V13.122: another school's codes are labelled with that school's names (선부고 외부 21 ...).
+// V13.125: another school's codes are labelled with that school's names (선부고 외부 21 ...).
 function rangesText(codes, school = B.A.data.profile.school) {
   const labels = (codes || []).map(code => rangeLabel(school || B.A.data.profile.school, code));
   return labels.length > 2 ? `${labels.slice(0, 2).join(' · ')} 외 ${labels.length - 2}` : labels.join(' · ');
@@ -1022,7 +1022,7 @@ function rangesText(codes, school = B.A.data.profile.school) {
 // V13.66: both players' names come with their title and league tier.
 function vsSide(p, side) {
   const otherSchool = p.school && p.school !== B.A.data.profile.school ? p.school : '';
-  return `<div class="yb-vs-side ${side}">${B.view?.own_words && p.ranges?.length ? `<span class="yb-vs-range">${esc(rangesText(p.ranges, p.school))}</span>` : ''}<span class="yb-vs-pet">${petArt(p, { size: 'mini' })}</span><b>${esc(p.name)}${p.bot ? ' <i class="yb-ai">AI</i>' : ''}</b>${otherSchool ? `<small class="yb-vs-school-v13122">${esc(otherSchool)}</small>` : ''}${shownTitle(p.title) ? titleBadge(p.title, { size: 'xs' }) : ''}${p.tier ? `<span class="yb-vs-tier">${tierEmblem(p.tier, { size: 'xs' })}${esc({ bronze: '브론즈', silver: '실버', gold: '골드', diamond: '다이아' }[p.tier] || '')}</span>` : ''}</div>`;
+  return `<div class="yb-vs-side ${side}">${B.view?.own_words && p.ranges?.length ? `<span class="yb-vs-range">${esc(rangesText(p.ranges, p.school))}</span>` : ''}<span class="yb-vs-pet">${petArt(p, { size: 'mini' })}</span><b>${esc(p.name)}${p.bot ? ' <i class="yb-ai">AI</i>' : ''}</b>${otherSchool ? `<small class="yb-vs-school-v13125">${esc(otherSchool)}</small>` : ''}${shownTitle(p.title) ? titleBadge(p.title, { size: 'xs' }) : ''}${p.tier ? `<span class="yb-vs-tier">${tierEmblem(p.tier, { size: 'xs' })}${esc({ bronze: '브론즈', silver: '실버', gold: '골드', diamond: '다이아' }[p.tier] || '')}</span>` : ''}</div>`;
 }
 function hud(p, side) {
   return `<div class="yb-hud ${side}" id="yb-hud-${side}">
