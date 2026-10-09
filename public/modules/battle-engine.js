@@ -79,7 +79,15 @@ export const PET_SKILLS = {
   redpanda: { name: '단풍 회오리', desc: '바로 5 피해, 다음 공격 2번 +5씩', burst: 5, boost: [5, 5] },
   arcticfox: { name: '눈보라', desc: '3문제 동안 3씩 피해, 다음에 받는 공격 −6', poison: 3, turns: 3, guard: [6] },
   koala: { name: '꿀잠', desc: 'HP +7, 다음 공격 +7', heal: 7, boost: [7] },
-  parrot: { name: '따라 말하기', desc: '2번 연속 맞히면 다음 공격 +9', boost: [9], need: 2 }
+  parrot: { name: '따라 말하기', desc: '2번 연속 맞히면 다음 공격 +9', boost: [9], need: 2 },
+  frog: { name: '연잎 도약', desc: '바로 7 피해, 다음 공격 +7', burst: 7, boost: [7] },
+  sapsaree: { name: '복슬 보호', desc: '다음에 받는 공격 2번 −8씩', guard: [8, 8] },
+  deer: { name: '새싹의 기운', desc: 'HP +8, 다음 공격 +6', heal: 8, boost: [6] },
+  bear: { name: '든든한 품', desc: 'HP +6, 다음에 받는 공격 −8', heal: 6, guard: [8] },
+  seal: { name: '물방울 튕기기', desc: '바로 6 피해, 다음에 받는 공격 −9', burst: 6, guard: [9] },
+  wolf: { name: '달빛 질주', desc: '다음 공격 +6, 이후 2번 +5씩', boost: [6, 5, 5] },
+  crocodile: { name: '늪지 물결', desc: '바로 9 피해, HP +5', burst: 9, heal: 5 },
+  octopus: { name: '말랑 촉수', desc: '다음 공격 +8, 다음에 받는 공격 −7', boost: [8], guard: [7] }
 };
 // V13.94 몬스터 잡기: a monster's own skill (its `pet.skill`), stronger at harder levels.
 export const MONSTER_SKILLS = {
