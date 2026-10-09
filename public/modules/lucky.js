@@ -2,6 +2,7 @@ import { esc, num } from './ui.js';
 import { coin, artOr } from './emblems.js';
 import { CHARACTERS, EPIC_EGG_LEGENDARY_RATE, SEASONS } from './core.js';
 import { LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE } from './rewards.js';
+import { playSound, unlockSound as unlockSoundFiles, preloadSound } from './sound.js';
 
 // V13.68 코인 뽑기: the machine on the 놀이터 page and the show when a capsule comes out.
 // The server has already decided the result (server/rewards.mjs pullLucky); this module only
@@ -19,6 +20,7 @@ const soundOn = () => { try { return (localStorage.getItem('sumus-yacha-sound') 
 let audio = null;
 export function unlockSound() {
   if (!soundOn()) return;
+  unlockSoundFiles();
   // iOS suspends the sound after the app was in the background or a call: wake it on the next tap.
   if (audio) { if (audio.state !== 'running') audio.resume?.().catch(() => {}); return; }
   try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch { audio = null; }
@@ -39,24 +41,28 @@ function tone(freqs, { type = 'sine', len = .12, gap = .07, vol = .05, slide = 0
   });
 }
 const buzz = pattern => { try { if (soundOn()) navigator.vibrate?.(pattern); } catch {} };
+// V13.116: each moment plays its sound file first (sound.js); the tones are the fallback while the
+// file is not downloaded yet.
+const snd = (key, opts, fallback) => { if (!playSound(key, opts)) fallback(); };
 const SFX = {
-  clink: () => tone([1568, 2349], { type: 'triangle', len: .07, gap: .06, vol: .04 }),
-  tick: () => tone([1100], { type: 'square', len: .025, vol: .02 }),
-  thud: () => { tone([170], { len: .2, slide: -90, vol: .09 }); buzz(18); },
-  wobble: n => tone([520 + n * 90], { type: 'triangle', len: .08, vol: .035 }),
-  pop: () => tone([380], { type: 'triangle', len: .16, slide: 700, vol: .06 }),
-  coins: n => tone(Array.from({ length: Math.min(8, 2 + n) }, (_, i) => 1760 + (i % 3) * 330), { type: 'triangle', len: .09, gap: .055, vol: .03 }),
-  even: () => tone([587, 698], { type: 'triangle', gap: .1, len: .18, vol: .04 }),
-  win: () => { tone([659, 784, 988, 1319], { type: 'triangle', gap: .08, len: .2, vol: .045 }); buzz([30, 40, 30]); },
-  jackpot: () => { tone([523, 659, 784, 1047, 1319, 1568], { type: 'square', gap: .09, len: .24, vol: .03 }); buzz([40, 50, 40, 50, 120]); },
-  miss: () => tone([392, 330, 262], { type: 'triangle', gap: .15, len: .28, vol: .04 }),
-  // V13.91 the legendary show
-  rumble: () => { tone([62, 58], { type: 'sawtooth', len: .9, gap: .25, vol: .05, slide: -12 }); buzz([60, 80, 60]); },
-  rise: () => tone([220, 330, 440, 587, 784], { type: 'sine', len: .32, gap: .16, vol: .035, slide: 60 }),
-  beat: n => { tone([70 + n * 10, 70 + n * 10], { type: 'sine', len: .14, gap: .16, vol: .09 + n * .02, slide: -30 }); buzz([35, 90, 45]); },
-  crack: () => { tone([1900, 1400, 2300, 1700], { type: 'square', len: .035, gap: .05, vol: .025 }); buzz(25); },
-  boom: () => { tone([95], { type: 'sawtooth', len: .7, vol: .1, slide: -60 }); tone([2637, 3136], { type: 'triangle', len: .5, gap: .04, vol: .03, slide: -900 }); buzz([90, 40, 180]); },
-  fanfare: () => { tone([523, 659, 784, 1047], { type: 'triangle', gap: .11, len: .22, vol: .05 }); setTimeout(() => tone([784, 1047, 1319, 1568, 2093], { type: 'square', gap: .09, len: .3, vol: .028 }), 520); setTimeout(() => tone([1047, 1319, 1568], { type: 'triangle', gap: 0, len: 1.1, vol: .035 }), 1050); }
+  clink: () => snd('coin', { gain: .8 }, () => tone([1568, 2349], { type: 'triangle', len: .07, gap: .06, vol: .04 })),
+  tick: () => snd('tick', { gain: .8, vary: .03 }, () => tone([1100], { type: 'square', len: .025, vol: .02 })),
+  thud: () => { snd('wiggle', { rate: .8 }, () => tone([170], { len: .2, slide: -90, vol: .09 })); buzz(18); },
+  wobble: n => snd('wiggle', { rate: 1 + n * .12, gain: .8 }, () => tone([520 + n * 90], { type: 'triangle', len: .08, vol: .035 })),
+  pop: () => snd('pop', {}, () => tone([380], { type: 'triangle', len: .16, slide: 700, vol: .06 })),
+  coins: n => snd(n >= 4 ? 'coins' : 'coin', {}, () => tone(Array.from({ length: Math.min(8, 2 + n) }, (_, i) => 1760 + (i % 3) * 330), { type: 'triangle', len: .09, gap: .055, vol: .03 })),
+  even: () => snd('coin', { rate: .9 }, () => tone([587, 698], { type: 'triangle', gap: .1, len: .18, vol: .04 })),
+  win: () => { snd('levelup', {}, () => tone([659, 784, 988, 1319], { type: 'triangle', gap: .08, len: .2, vol: .045 })); buzz([30, 40, 30]); },
+  epic: () => { snd('fanfare-epic', {}, () => tone([659, 784, 988, 1319], { type: 'triangle', gap: .08, len: .2, vol: .045 })); buzz([30, 40, 30]); },
+  jackpot: () => { snd('fanfare-epic', {}, () => tone([523, 659, 784, 1047, 1319, 1568], { type: 'square', gap: .09, len: .24, vol: .03 })); buzz([40, 50, 40, 50, 120]); },
+  miss: () => snd('fail', {}, () => tone([392, 330, 262], { type: 'triangle', gap: .15, len: .28, vol: .04 })),
+  // V13.91 the legendary show (V13.116: the low drone of the boss sound, cut before its boom)
+  rumble: () => { snd('boss', { dur: 1.5 }, () => tone([62, 58], { type: 'sawtooth', len: .9, gap: .25, vol: .05, slide: -12 })); buzz([60, 80, 60]); },
+  rise: () => snd('combo', { rate: .75 }, () => tone([220, 330, 440, 587, 784], { type: 'sine', len: .32, gap: .16, vol: .035, slide: 60 })),
+  beat: n => { snd('wiggle', { rate: .55 + n * .1, gain: 1.1 }, () => tone([70 + n * 10, 70 + n * 10], { type: 'sine', len: .14, gap: .16, vol: .09 + n * .02, slide: -30 })); buzz([35, 90, 45]); },
+  crack: () => { snd('crack', {}, () => tone([1900, 1400, 2300, 1700], { type: 'square', len: .035, gap: .05, vol: .025 })); buzz(25); },
+  boom: () => { snd('burst', {}, () => { tone([95], { type: 'sawtooth', len: .7, vol: .1, slide: -60 }); tone([2637, 3136], { type: 'triangle', len: .5, gap: .04, vol: .03, slide: -900 }); }); buzz([90, 40, 180]); },
+  fanfare: () => snd('fanfare-legend', {}, () => { tone([523, 659, 784, 1047], { type: 'triangle', gap: .11, len: .22, vol: .05 }); setTimeout(() => tone([784, 1047, 1319, 1568, 2093], { type: 'square', gap: .09, len: .3, vol: .028 }), 520); setTimeout(() => tone([1047, 1319, 1568], { type: 'triangle', gap: 0, len: 1.1, vol: .035 }), 1050); })
 };
 
 /* ---------- the machine ---------- */
@@ -133,6 +139,7 @@ function motes(n) {
   return Array.from({ length: n }, (_, i) => { const a = i / n * Math.PI * 2, r = 150 + (i * 53) % 120; return `<i class="lgx-mote" style="--x:${Math.round(Math.cos(a) * r)}px;--y:${Math.round(Math.sin(a) * r)}px;--d:${(.9 + (i % 5) * .12).toFixed(2)}s;--delay:${((i % 7) * .1).toFixed(2)}s"></i>`; }).join('');
 }
 export function legendaryShow(res, { again = false, againLabel = '' } = {}) {
+  preloadSound(['boss', 'combo', 'wiggle', 'crack', 'burst', 'fanfare-legend']);
   return new Promise(resolve => {
     const key = res.legendary.key, c = CHARACTERS[key] || {}, name = c.ko || '전설 펫';
     const box = document.createElement('div');
@@ -213,6 +220,7 @@ export function legendaryShow(res, { again = false, againLabel = '' } = {}) {
 // letters and the egg with the shadow of its final form. `res` is the coin capsule (with its
 // "한 번 더"), or nothing when the egg came from the shop.
 export function epicShow({ key, res = null, again = false, againLabel = '', from = '' }) {
+  preloadSound(['combo', 'wiggle', 'pop', 'fanfare-epic']);
   return new Promise(resolve => {
     const c = CHARACTERS[key] || {}, name = c.ko || '영웅 펫';
     // V13.109: a season's limited pet (its egg in season, or a 영웅 egg after it) has its own words.
@@ -262,7 +270,7 @@ export function epicShow({ key, res = null, again = false, againLabel = '', from
       reveal.hidden = false;
       box.querySelector('.lgx-rain').innerHTML = stars(18);
       box.insertAdjacentHTML('beforeend', `<div class="lk-confetti" aria-hidden="true">${confetti()}</div>`);
-      SFX.win();
+      SFX.epic();
       setTimeout(() => { ready = true; box.classList.add('ready'); (box.querySelector('.lk-again') || box.querySelector('.lk-ok'))?.focus({ preventScroll: true }); }, reduced() ? 0 : 700);
     };
     const flashThenShow = () => { if (shown) return; box.classList.add('p4'); SFX.pop(); setTimeout(showResult, reduced() ? 0 : 300); };
@@ -288,6 +296,7 @@ export function epicShow({ key, res = null, again = false, againLabel = '', from
 }
 // Resolves when the student closes it: true for "한 번 더" (offered when `again`).
 export function luckyShow(res, { again = false, againLabel = '' } = {}) {
+  preloadSound(['wiggle', 'pop', 'coin', 'coins', 'levelup', 'fanfare-epic', 'fail']);
   if (res.legendary) return legendaryShow(res, { again, againLabel });
   if (res.epic) return epicShow({ key: res.epic.key, res, again, againLabel });
   return new Promise(resolve => {

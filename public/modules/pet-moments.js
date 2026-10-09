@@ -3,6 +3,7 @@ import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EG
 import { epicShow, legendaryShow } from './lucky.js';
 import { uiArt, ART_READY } from './emblems.js';
 import { avatar, petKey } from './character.js';
+import { playSound, preloadSound } from './sound.js';
 
 // Pet moments: the hatch (egg -> baby) and evolution scenes shown on the home screen the
 // first time a student's pet reaches a new form, plus the pet-name form.
@@ -101,6 +102,9 @@ function hatchScene(body, key, name, onHatched) {
     body.querySelectorAll('.pet-cracks path').forEach((p, i) => p.classList.toggle('on', i < taps));
     egg.classList.remove('wobble', 'big'); void egg.offsetWidth;
     egg.classList.add('wobble'); if (taps > 1) egg.classList.add('big');
+    // V13.116 sound: a knock that rises with each tap, cracks from the second tap
+    if (taps === 1) preloadSound(['pop', 'fanfare-basic']);
+    playSound('wiggle', { rate: 1 + taps * .12, vary: .02 }); if (taps > 1) playSound('crack', { rate: .9 + taps * .08, gain: taps < HATCH_TAPS ? .7 : 1, at: .04 });
     if (taps < HATCH_TAPS) { msg.textContent = taps === 1 ? '앗, 금이 갔어요!' : '조금만 더! 한 번만 더 두드려요'; return; }
     busy = true; clearTimeout(autoTimer);
     msg.textContent = '알이 빛나기 시작했어요…';
@@ -108,6 +112,7 @@ function hatchScene(body, key, name, onHatched) {
     setTimeout(() => {
       const flash = body.querySelector('.pet-flash'); flash.classList.remove('on'); void flash.offsetWidth; flash.classList.add('on');
       burst(body.querySelector('.pet-bits'), 24, true);
+      playSound('pop'); playSound('fanfare-basic', { at: .15 });
       scene.dataset.state = 'hatched';
       msg.innerHTML = `<b>${esc(petJosa(name, '이', '가'))}</b> 태어났어요!`;
       body.querySelector('.pet-moment-actions').remove();
@@ -141,19 +146,22 @@ function evolveScene(body, key, name, from, to, onEvolved) {
     stage.classList.add('show-to');
     const flash = body.querySelector('.pet-flash'); flash.classList.remove('on'); void flash.offsetWidth; flash.classList.add('on');
     burst(body.querySelector('.pet-bits'), 18, false);
+    playSound('burst', { rate: 1.1, gain: .8 }); playSound('levelup', { at: .2 });
     scene.dataset.state = 'done';
     msg.innerHTML = `<b>${esc(petJosa(name, '이', '가'))}</b> ${PET_FORMS[to]} 모습으로 진화했어요!`;
     onEvolved();
   };
   body.querySelector('[data-pet-evolve]').onclick = () => {
     body.querySelector('.pet-moment-actions').remove();
+    preloadSound(['combo', 'tick', 'burst', 'levelup']);
     if (reducedMotion()) return finish();
     scene.dataset.state = 'charging';
+    playSound('combo', { rate: .7 });
     setTimeout(() => {
       scene.dataset.state = 'flicker';
       msg.textContent = `${petJosa(name, '이', '가')} 진화하고 있어요!`;
       let t = 0;
-      EVO_FLICKER.forEach((gap, i) => { t += gap; setTimeout(() => stage.classList.toggle('show-to', i % 2 === 0), t); });
+      EVO_FLICKER.forEach((gap, i) => { t += gap; setTimeout(() => { stage.classList.toggle('show-to', i % 2 === 0); playSound('tick', { rate: 1 + i * .06, gain: .7 }); }, t); });
       setTimeout(finish, t + 350);
     }, EVO_CHARGE_MS);
   };
