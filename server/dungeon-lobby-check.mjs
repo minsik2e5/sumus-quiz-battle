@@ -168,5 +168,5 @@ export async function runDungeonLobbyChecks(assert, expectStatus) {
   assert(ui.includes('/assets/dungeon/${file}.webp') && ui.includes("'bg-boss'") && ui.includes("monSrc(m.key, idlePose(m))") && ui.includes("return 'core'") && ui.includes("return 'rage'") && ui.includes("'idle2'") && ui.includes("/assets/ui/dungeon-mark.webp") && ui.includes("/assets/ui/dungeon-faint.webp"), 'V13.130 던전 배경(층 · 보스방 · 끝없는 탑), 몬스터 자세(숨쉬기 · 분노 · 핵 · 맞음 · 공격 · 포효), UI 그림(채점 표적 · 기절 · 핵 · 브레이크 · 모래시계)을 쓴다');
   assert(css129.includes("font-family: 'Jua'") && css129.includes("/assets/fonts/jua-latin.woff2") && css129.includes('unicode-range') && source('../public/assets/fonts/Jua-OFL.txt').includes('SIL Open Font License') && source('./index.mjs').includes("'.woff2': 'font/woff2'"), 'V13.130 전투 글자(숫자 · 단어)는 주아 글꼴(OFL, 영어 · 한글 나눠서 쓰는 화면에서만 받는다)');
   assert(sound.includes("'boss-slam': .9") && css129.includes('@media (prefers-reduced-motion: reduce)'), 'V13.130 전투 효과음 · 움직임 줄이기');
-  assert(battle.includes("['dungeon', '던전']") && battle.includes('openDungeon(A, exit)') && app.includes("if (go === 'dungeon')"), 'V13.128 야차전 탭의 던전 메뉴와 초대 알림 링크');
+  assert(battle.includes("['dungeon', '던전', 'dungeon-tab']") && battle.includes('openDungeon(A, exit)') && app.includes("if (go === 'dungeon')"), 'V13.128 야차전 탭의 던전 메뉴와 초대 알림 링크');
 }

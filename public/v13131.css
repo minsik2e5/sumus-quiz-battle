@@ -1,0 +1,170 @@
+/* V13.131 야차전 탭 화면 정리 (Design A안: 대결 탭 · 단어 범위 창 · 친구 목록 · 톤 맞추기)
+   색: 초록 #0E8A5F 하나 + 회색. 버튼 52px(큰 것, 화면에 하나) · 40px. 글자 19 / 15 / 12.
+   로보 보라, 판돈 노란 배경, 짙은 초록 도전장 띠는 쓰지 않는다. 그림은 우리 앱 그림. */
+:root{--yl-g:#0E8A5F;--yl-g-dk:#0B5E43;--yl-deep:#0F4D39;--yl-soft:#E6F4EE;--yl-bg:#F3F6F4;--yl-line:#E1E8E4;--yl-line2:#CFDCD5;--yl-ink:#14211B;--yl-gray:#5E6E66;--yl-gray2:#8A9891;--yl-t1:19px;--yl-t2:15px;--yl-t3:12px}
+
+/* ---- 펫 카드(대결장 배경) ---- */
+.yl-hero{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:22px;color:#fff;background:linear-gradient(rgba(15,77,57,.72),rgba(15,77,57,.92)),var(--arena) center/cover}
+.yl-hero-pet{flex:none;width:64px;height:64px;border-radius:18px;background:rgba(255,255,255,.1);display:grid;place-items:center;overflow:hidden}
+.yl-hero-pet .avatar-art{width:64px;height:64px;margin:0;border:0;border-radius:0;background:none;box-shadow:none;animation:none}
+.yl-hero-copy{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:6px}
+.yl-hero h1{margin:0;font-size:var(--yl-t1);font-weight:800;line-height:1.25;color:#fff}
+.yl-hero h1{display:flex;align-items:center}
+.yl-hero h1 span{min-width:0}
+.yl-record{display:flex;gap:12px;font-size:var(--yl-t3);color:#CFE6DB}
+.yl-record b{color:#fff;font-size:var(--yl-t2);font-weight:800}
+.yl-league{flex:none;padding:6px 10px;border:0;border-radius:999px;background:rgba(255,255,255,.14);color:#fff;font-family:inherit;font-size:var(--yl-t3);font-weight:700;cursor:pointer}
+
+/* ---- 작은 ? 와 그 안의 설명 ---- */
+.yl-q{position:relative;flex:none;width:20px;height:20px;margin-left:6px;padding:0;border:1px solid var(--yl-line2);border-radius:50%;background:#fff;color:var(--yl-gray);font-family:inherit;font-size:var(--yl-t3);font-weight:700;line-height:1;display:inline-grid;place-items:center;vertical-align:middle;cursor:pointer}
+.yl-q::after{content:"";position:absolute;inset:-10px}
+.yl-q.on{border-color:var(--yl-g);background:var(--yl-soft);color:var(--yl-g-dk)}
+.yl-hero .yl-q{border-color:rgba(255,255,255,.6);background:transparent;color:#fff}
+.yl-hero .yl-q.on{background:rgba(255,255,255,.22)}
+.yl-help{margin:0 0 12px;padding:10px 12px;border-radius:12px;background:var(--yl-bg);color:var(--yl-gray);font-size:var(--yl-t3);line-height:1.55}
+.yl-help b{color:var(--yl-ink)}
+.yl-note-card{margin-top:12px;padding:12px 14px;border-radius:16px;border:1px solid var(--yl-line);background:#fff;color:var(--yl-gray);font-size:var(--yl-t3)}
+.yl-note-card>b{color:var(--yl-ink);font-size:var(--yl-t2)}
+.yl-note-card p{margin:4px 0 0;line-height:1.55}
+.yl-note-card summary{margin-top:8px;color:var(--yl-g-dk);font-weight:700;cursor:pointer}
+.yl-note-card ul{margin:8px 0 0;padding:0;list-style:none;display:grid;gap:6px}
+.yl-note-card li{display:flex;align-items:center;gap:10px;padding:4px 6px;border-radius:12px}
+.yl-note-card li.mine{background:var(--yl-soft)}
+.yl-note-card li>span:last-child{display:flex;flex-direction:column;min-width:0}
+.yl-note-card li b{color:var(--yl-ink);font-size:var(--yl-t3)}
+.yl-skill-pet{flex:none;width:36px;height:36px;border-radius:12px;background:#F0F4F2;overflow:hidden;display:block}
+.yl-skill-pet .avatar-art{width:36px;height:36px;margin:0;border:0;border-radius:0;background:none;box-shadow:none;animation:none}
+
+/* ---- 탭 4개 한 줄 ---- */
+.yl-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;margin:12px 0;padding:4px;border-radius:14px;background:#E3EAE6}
+.yl-tabs button{height:56px;border:0;border-radius:10px;background:transparent;color:var(--yl-gray);font-family:inherit;font-size:var(--yl-t3);font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer}
+.yl-tabs button.on{background:#fff;color:var(--yl-g-dk);box-shadow:0 1px 3px rgba(20,33,27,.12)}
+.yl-tab-art{width:26px;height:26px;object-fit:contain}
+
+/* ---- 설정 카드 한 장 ---- */
+.yl-card{border:1px solid var(--yl-line);border-radius:20px;background:#fff}
+.yl-setup{padding:0 16px}
+.yl-blk{padding:6px 0 4px;border-bottom:1px solid #EEF2EF}
+.yl-blk:last-child{border-bottom:0}
+.yl-row{display:flex;align-items:center;gap:12px;padding:10px 0 8px}
+.yl-k{flex:none;width:64px;display:flex;align-items:center;gap:4px;color:var(--yl-gray);font-size:var(--yl-t2);font-weight:700}
+.yl-k img{width:24px;height:24px;object-fit:contain}
+.yl-hint{margin:0 0 10px 76px;display:flex;align-items:center;color:var(--yl-gray);font-size:var(--yl-t3);white-space:nowrap}
+.yl-modes{flex:1 1 auto;min-width:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.yl-mode{height:40px;padding:0 8px;border:1px solid #DCE5E0;border-radius:12px;background:#fff;color:var(--yl-ink);font-family:inherit;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer}
+.yl-mode b{font-size:var(--yl-t2);font-weight:700;white-space:nowrap}
+.yl-mode-art{width:28px;height:28px;object-fit:contain}
+.yl-mode.on{border-color:var(--yl-g);background:var(--yl-g);color:#fff}
+.yl-words{width:100%;display:flex;align-items:center;gap:12px;padding:10px 0 12px;border:0;background:none;color:var(--yl-ink);font-family:inherit;text-align:left;cursor:pointer}
+.yl-words>b{flex:1 1 auto;min-width:0;font-size:var(--yl-t2);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.yl-words>b span{color:var(--yl-gray);font-size:var(--yl-t3);font-weight:500}
+.yl-words.need>b{color:var(--yl-gray)}
+.yl-words .icon{flex:none;width:20px;height:20px;color:var(--yl-gray)}
+.yl-rms{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding-bottom:10px}
+.yl-rm{position:relative}
+.yl-rm>button:first-child{width:100%;padding:12px 8px;border:1px solid #DCE5E0;border-radius:16px;background:#fff;color:var(--yl-ink);font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer}
+.yl-rm>button.on{border-color:var(--yl-g);background:#F2FAF6;box-shadow:0 0 0 1px var(--yl-g)}
+.yl-rm .yl-q{position:absolute;top:6px;right:6px;margin:0}
+.yl-duel{display:flex;align-items:center;gap:4px}
+.yl-duel .avatar-art{width:34px;height:34px;margin:0;border:0;border-radius:0;background:none;box-shadow:none;animation:none}
+.yl-duel i{color:var(--yl-g);font-size:var(--yl-t3);font-style:italic;font-weight:800}
+.yl-duel em{width:34px;height:34px;border-radius:50%;background:#E8EDEA;color:var(--yl-gray2);font-size:var(--yl-t2);font-style:normal;font-weight:800;display:flex;align-items:center;justify-content:center}
+.yl-chips{display:flex;gap:4px}
+.yl-chips i{padding:2px 6px;border-radius:6px;font-size:var(--yl-t3);font-style:normal;font-weight:700;white-space:nowrap}
+.yl-chips .mine{background:var(--yl-deep);color:#fff}
+.yl-chips .friend{background:var(--yl-soft);color:var(--yl-g-dk)}
+.yl-rm b{font-size:var(--yl-t2);font-weight:700}
+.yl-rm b small{margin-left:4px;padding:1px 5px;border-radius:5px;background:var(--yl-g);color:#fff;font-size:var(--yl-t3);font-weight:700;vertical-align:1px}
+.yl-stakes{flex:1 1 auto;min-width:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.yl-stake{height:40px;border:1px solid #DCE5E0;border-radius:12px;background:#fff;color:var(--yl-ink);font-family:inherit;display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer}
+.yl-stake img{width:20px;height:20px;object-fit:contain}
+.yl-stake b{font-size:var(--yl-t2);font-weight:700}
+.yl-stake.on{border-color:var(--yl-g);background:var(--yl-g);color:#fff}
+.yl-stake:disabled{opacity:.45;cursor:default}
+
+/* ---- 큰 버튼 하나 · 작은 버튼 ---- */
+.yl-cta{width:100%;height:52px;margin-top:12px;border:0;border-radius:16px;background:var(--yl-g);color:#fff;font-family:inherit;font-size:var(--yl-t1);font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer}
+.yl-cta:disabled{background:#C3CFC9;cursor:default}
+.yl-cta-art{width:34px;height:34px;object-fit:contain}
+.yl-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.yl-sm{height:40px;border:1px solid var(--yl-line2);border-radius:12px;background:#fff;color:var(--yl-ink);font-family:inherit;font-size:var(--yl-t2);font-weight:700;cursor:pointer}
+.yl-sm:disabled{opacity:.45;cursor:default}
+
+/* ---- 로보 연습 카드 ---- */
+.yl-bot{margin-top:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.yl-bot .yl-help{margin:0}
+.yl-bot-head{display:flex;align-items:center;gap:12px}
+.yl-bot-head>div{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.yl-bot-head h3{margin:0;font-size:var(--yl-t1);font-weight:800}
+.yl-bot-head>div>span{color:var(--yl-gray);font-size:var(--yl-t3)}
+.yl-bot-pet{position:relative;flex:none;width:64px;height:64px;border-radius:18px;background:var(--yl-soft);display:grid;place-items:center}
+.yl-bot-pet .avatar-art{width:54px;height:54px;margin:0;border:0;border-radius:0;background:none;box-shadow:none;animation:none}
+.yl-bot-pet i{position:absolute;right:-6px;bottom:-6px;padding:2px 6px;border-radius:7px;background:var(--yl-deep);color:#fff;font-size:var(--yl-t3);font-style:normal;font-weight:800}
+.yl-levels{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.yl-level{height:52px;border:1px solid #DCE5E0;border-radius:12px;background:#fff;color:var(--yl-ink);font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;cursor:pointer}
+.yl-level b{font-size:var(--yl-t2);font-weight:700}
+.yl-level span{font-size:var(--yl-t3);opacity:.85}
+.yl-level.on{border-color:var(--yl-g);background:var(--yl-g);color:#fff}
+.yl-bot-reward{display:flex;align-items:center;justify-content:center;gap:14px;padding:10px;border-radius:12px;background:var(--yl-bg);font-size:var(--yl-t3);white-space:nowrap}
+.yl-bot-reward span{display:flex;align-items:center;gap:4px}
+.yl-bot-reward span:first-child b{color:var(--yl-g-dk)}
+.yl-bot-reward span:last-child b{color:var(--yl-gray)}
+.yl-bot-reward img{width:18px;height:18px;object-fit:contain}
+.yl-go{height:40px;border:0;border-radius:12px;background:var(--yl-soft);color:var(--yl-g-dk);font-family:inherit;font-size:var(--yl-t2);font-weight:800;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer}
+.yl-go .icon{width:18px;height:18px}
+.yl-go:disabled{opacity:.45;cursor:default}
+
+/* ---- 기록: [리그 | 내 전적] ---- */
+.ya-seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:4px;padding:4px;border-radius:12px;background:#EEF2EF}
+.ya-seg button{height:40px;padding:0 12px;border:0;border-radius:9px;background:transparent;color:var(--yl-gray);font-family:inherit;font-size:var(--yl-t2);font-weight:700;cursor:pointer}
+.ya-seg button.on{background:#fff;color:var(--yl-g-dk);box-shadow:0 1px 3px rgba(20,33,27,.12)}
+.yl-record-seg{margin-bottom:12px}
+.yl-tabs button:focus-visible,.yl-mode:focus-visible,.yl-words:focus-visible,.yl-rm button:focus-visible,.yl-stake:focus-visible,.yl-cta:focus-visible,.yl-sm:focus-visible,.yl-level:focus-visible,.yl-go:focus-visible,.yl-q:focus-visible,.yl-league:focus-visible,.ya-seg button:focus-visible,.fl-go:focus-visible,.rs-codes button:focus-visible{outline:3px solid rgba(14,138,95,.4);outline-offset:2px}
+
+/* ---- 바닥에서 올라오는 창: 단어 범위 · 코드로 참가 · 친구 목록 ---- */
+.modal-backdrop.ya-sheet-back{display:flex;align-items:flex-end;justify-content:center;padding:0;background:rgba(40,46,43,.62);backdrop-filter:none}
+#modal-root .modal.ya-sheet{width:100%;max-width:480px;max-height:calc(100dvh - 24px);margin:0;padding:10px 18px calc(22px + env(safe-area-inset-bottom,0px));border-radius:26px 26px 0 0!important;box-shadow:0 -10px 40px rgba(20,33,27,.2)!important;text-align:left;display:flex;flex-direction:column;gap:14px;animation:ya-sheet-up .22s ease-out}
+.ya-sheet-grab{align-self:center;flex:none;display:block;width:40px;height:5px;border-radius:3px;background:#D5DED9}
+.ya-sheet .modal-close{top:14px;right:16px;width:40px;height:40px;border-radius:12px;background:#F0F4F2}
+.ya-sheet-body{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:14px}
+@keyframes ya-sheet-up{from{transform:translateY(32px);opacity:.5}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){#modal-root .modal.ya-sheet{animation:none}}
+.rs-head h2{margin:0;padding-right:52px;display:flex;align-items:center;gap:8px;font-size:var(--yl-t1);font-weight:800;color:var(--yl-ink)}
+.rs-art{width:32px;height:32px;object-fit:contain}
+.rs-sheet .yl-hint{margin:-6px 0 0}
+.rs-sheet .yl-cta{margin-top:0}
+.rs-codes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.rs-codes button{height:60px;border:1px solid #DCE5E0;border-radius:14px;background:#fff;color:var(--yl-ink);font-family:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer}
+.rs-codes b{font-size:var(--yl-t2)}
+.rs-codes span{font-size:var(--yl-t3);opacity:.8}
+.rs-codes button.on{border-color:var(--yl-g);background:var(--yl-g);color:#fff}
+.rs-friend{display:flex;align-items:center;gap:10px;padding-top:12px;border-top:1px solid #EEF2EF}
+.rs-friend>b{flex:1 1 auto;font-size:var(--yl-t2);font-weight:700;color:var(--yl-ink)}
+.rs-friend .ya-seg{flex:none}
+.rs-code{height:52px;width:100%;box-sizing:border-box;border:1px solid var(--yl-line2);border-radius:14px;background:#fff;color:var(--yl-ink);font-family:inherit;font-size:var(--yl-t1);font-weight:800;letter-spacing:.3em;text-align:center}
+.rs-code:focus{outline:3px solid rgba(14,138,95,.4);outline-offset:1px}
+
+/* 친구 목록: 야차전 도전장 · 던전 초대 공통 */
+#modal-root .modal.fl-sheet{height:min(720px,calc(100dvh - 24px));overflow:hidden}
+.fl-head{display:flex;align-items:center;gap:10px;padding-right:52px}
+.fl-art{flex:none;display:block;width:36px;height:36px}
+.fl-art img{display:block;width:36px;height:36px;object-fit:contain}
+.fl-head h2{margin:0;font-size:var(--yl-t1);font-weight:800;color:var(--yl-ink)}
+.fl-head div>span{display:block;margin-top:2px;color:var(--yl-gray);font-size:var(--yl-t3)}
+.fl-list{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column}
+.fl-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #EEF2EF}
+.fl-pet{flex:none;display:block;width:44px;height:44px;border-radius:14px;background:#F0F4F2;overflow:hidden}
+#modal-root .fl-pet .avatar-art{width:44px;height:44px;margin:0;border:0;border-radius:0;background:none;box-shadow:none;animation:none}
+.fl-who{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:2px}
+.fl-who b{font-size:var(--yl-t2);font-weight:700;color:var(--yl-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fl-who span{color:var(--yl-gray);font-size:var(--yl-t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fl-status{flex:none;padding:0 6px;color:var(--yl-gray2);font-size:var(--yl-t3)}
+.fl-go{flex:none;height:40px;padding:0 16px;border:0;border-radius:12px;background:var(--yl-g);color:#fff;font-family:inherit;font-size:var(--yl-t2);font-weight:800;cursor:pointer}
+.fl-go.sent{background:#EEF2EF;color:var(--yl-gray);cursor:default}
+.fl-go.busy{opacity:.6}
+.fl-note{flex:none;margin:0;color:var(--yl-gray);font-size:var(--yl-t3);text-align:center}
+.fl-empty{margin:28px 0;color:var(--yl-gray);font-size:var(--yl-t2);text-align:center;line-height:1.5}
+.ya-seg button i{font-style:normal;font-weight:500;opacity:.75}
+.yl-record-seg ~ .lg-board .lg-period{background:#EEF2EF}
+.yl-record-seg ~ .lg-board .lg-period button{color:var(--yl-gray)}
+.yl-record-seg ~ .lg-board .lg-period button.selected{background:#fff;color:var(--yl-g-dk)}

@@ -4,6 +4,8 @@ import { getRanges } from './student.js';
 import { comboRank } from './battle-fx.js';
 import { createDungeonFx } from './dungeon-fx.js';
 import { playSound, preloadSound, soundOn } from './sound.js';
+import { uiArt } from './emblems.js';
+import { openFriendSheet } from './friend-sheet.js';
 
 // V13.128 던전 화면 (docs/dungeon-design.md 2 · 3번): 던전 입구(등급컷 · 범위 · 방 만들기 · 초대 코드 · 받은 초대),
 // 로비(파티 3자리, 친구 부르기, 봇 동료, 준비), 입장 연출, 층 전투, 휴식, 결과.
@@ -234,18 +236,17 @@ async function pickFriend() {
   let friends;
   try { ({ friends } = await api('/dungeon/friends')); } catch (err) { return toast(err.message); }
   if (!D) return;
-  const cut = D.view?.cut;
-  const close = modal(`<div class="dg-friends">${friends.length ? friends.map(f => {
-    const locked = cut && cut !== 'c3' && !(f.cleared || []).includes({ c2: 'c3', c1: 'c2', max: 'c1' }[cut]);
-    return `<div class="dg-friend">${f.pet ? avatar(f.pet.key, { form: f.pet.form, size: 'mini' }) : ''}<div><b>${esc(f.name)}</b><span>${esc(f.school)}${f.same_class ? ' · 우리 반' : ''}${f.busy ? ' · 던전 중' : ''}${locked ? ' · 단계 잠김' : ''}</span></div><button type="button" class="btn primary" data-friend="${esc(f.id)}" ${f.busy || locked ? 'disabled' : ''}>부르기</button></div>`;
-  }).join('') : '<p>같은 학년 친구가 아직 없어요. 초대 코드를 알려 주세요.</p>'}</div>`, '같은 학년 친구 부르기');
-  document.querySelector('.dg-friends')?.addEventListener('click', async event => {
-    const b = event.target.closest('[data-friend]'); if (!b || b.disabled) return;
-    buttonBusy(b);
-    try { const res = await api('/dungeon/invite', { friend_id: b.dataset.friend }); toast(`${res.friend}에게 초대를 보냈어요.`); b.textContent = '보냈어요'; }
-    catch (err) { buttonBusy(b, false); toast(err.message); }
+  const cut = D.view?.cut, locked = f => cut && cut !== 'c3' && !(f.cleared || []).includes({ c2: 'c3', c1: 'c2', max: 'c1' }[cut]);
+  openFriendSheet({
+    art: uiArt('dungeon-tab'), title: '누구를 부를까요?', sub: `${D.view?.cut_name || '던전'} · 같은 학년`,
+    friends, mySchool: D.A.data.profile.school, goLabel: '부르기', doneLabel: '보냈어요', where: f => f.school,
+    status: f => f.busy ? '던전 중' : locked(f) ? '단계 잠김' : '',
+    empty: '같은 학년 친구가 아직 없어요. 초대 코드를 알려 주세요.',
+    onPick: async (f, ui) => {
+      try { const res = await api('/dungeon/invite', { friend_id: f.id }); toast(`${res.friend}에게 초대를 보냈어요.`); ui.sent(); }
+      catch (err) { toast(err.message); ui.reset(); }
+    }
   });
-  void close;
 }
 async function addBot(b) {
   buttonBusy(b);

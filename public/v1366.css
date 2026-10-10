@@ -311,9 +311,6 @@
 .yb-bot-v1366 .yb-chip.on{background:#ece6ff;color:#5a36c9;box-shadow:0 0 0 1.5px #7b5be0 inset}
 .yb-bot-go{background:#5a36c9;color:#fff;border-color:#5a36c9}
 .yb-bot-go:disabled{background:#d8d2ea;border-color:#d8d2ea}
-.yb-friend-name{flex:1;gap:3px}
-.yb-friend-name .tt-chip{align-self:flex-start}
-.yb-friend-tier{flex:none}
 .yb-me-rate{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center}
 .yb-me-ring{--p:0;width:92px;height:92px;border-radius:50%;display:grid;place-content:center;text-align:center;background:radial-gradient(closest-side,#fff 78%,transparent 79% 100%),conic-gradient(#12b886 calc(var(--p)*1%),#e6ece9 0)}
 .yb-me-ring b{font-size:22px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
@@ -437,7 +434,7 @@
 .tn-intro .btn{white-space:nowrap;flex:none}
 #tn-count.warn{color:#b54708}
 /* chips inside older containers keep their own size, border and colour */
-.yb-friend-name .tt-chip b,.partner-titles .tt-chip b{font-size:inherit;color:inherit}
+.partner-titles .tt-chip b{font-size:inherit;color:inherit}
 .partner-titles .tt-chip{border:1px solid var(--bd);padding:2px 8px 2px 2px;font-size:10.5px}
 .partner-titles .tt-chip.tier-limited{border:1.5px solid transparent}
 .yb-hero-league span{white-space:nowrap}
