@@ -60,7 +60,7 @@
 .dg-seats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .dg-slot { position: relative; display: grid; justify-items: center; gap: 2px; padding: 10px 6px 12px; border-radius: 16px; background: rgba(255, 255, 255, .07); text-align: center; min-height: 150px; }
 .dg-slot .avatar-art { width: 76px; height: 72px; animation: none; }
-.dg-slot .avatar-art img, .dg-member .avatar-art img, .dg-friend .avatar-art img { width: 100%; height: 100%; object-fit: contain; }
+.dg-slot .avatar-art img, .dg-member .avatar-art img { width: 100%; height: 100%; object-fit: contain; }
 .dg-slot b { font-size: 13.5px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dg-slot span { font-size: 11px; color: #c9b8e6; }
 .dg-slot em { font-style: normal; font-size: 11.5px; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: rgba(255, 255, 255, .1); }
@@ -70,11 +70,6 @@
 .dg-slot.empty { place-content: center; border: 2px dashed rgba(255, 255, 255, .16); background: transparent; }
 .dg-slot.empty i { font-style: normal; color: #9c8ab9; font-size: 13px; }
 .dg-ready { min-height: 52px; font-size: 17px; }
-.dg-friends { display: grid; gap: 8px; max-height: 60vh; overflow: auto; }
-.dg-friend { display: flex; align-items: center; gap: 10px; }
-.dg-friend .avatar-art { width: 42px; height: 40px; margin: 0; animation: none; }
-.dg-friend > div { flex: 1; min-width: 0; display: grid; }
-.dg-friend span { font-size: 12px; opacity: .75; }
 
 /* 전투 */
 .dg-battle { display: grid; gap: 10px; }

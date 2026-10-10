@@ -1,19 +1,5 @@
 /* SUMUS VOCA V13.61 · yacha challenges */
 .yb-start-v1361{display:flex;flex-direction:column;gap:8px}
-/* friend picker */
-.yb-friends-v1361{text-align:left;max-height:min(80vh,560px);display:flex;flex-direction:column;gap:10px}
-.yb-friends-v1361 h2{margin:0;text-align:center}
-.yb-friends-v1361 .yb-note{margin:0;text-align:center}
-.yb-friend-list{display:flex;flex-direction:column;gap:6px;overflow:auto;min-height:0}
-.yb-friend{appearance:none;border:1px solid #dfe7e3;background:#fff;border-radius:14px;padding:8px 10px;display:flex;align-items:center;gap:10px;font:inherit;text-align:left;cursor:pointer;color:#16241f}
-.yb-friend:disabled{opacity:.5;cursor:default}
-.yb-friend:not(:disabled):active{background:#edf9f4}
-.yb-friend-pet{flex:none;width:42px;height:42px;border-radius:12px;background:#eef5f1;display:grid;place-items:center;overflow:hidden}
-.yb-friend-pet .avatar-art{width:40px;height:40px;margin:0;box-shadow:none;background:none;border:0}
-.yb-friend-pet .avatar-art img{width:100%;height:100%;object-fit:contain}
-.yb-friend-name{display:flex;flex-direction:column;min-width:0}
-.yb-friend-name b{font-size:15px}
-.yb-friend-name small{font-size:12px;color:#6c7c77}
 /* home banner while a challenge waits */
 .home-yacha-v1360.invite{cursor:default;background:linear-gradient(145deg,#6b2a1f,#2a120d);box-shadow:0 12px 26px rgba(80,24,14,.32);animation:hy-pulse 1.8s ease-in-out infinite}
 .home-yacha-v1360.invite small{color:#ffc9a8}
