@@ -431,7 +431,21 @@ function results(A) {
     ${tabsBar}
     ${filterBar}
     ${body}
-    ${legacyTable}`;
+    ${legacyTable}
+    ${trimPanel(A)}`;
+}
+// V13.131 오래된 기록 정리: 대상 보기 → 보관 파일(JSON) 내려받기 → 정리하기. 받은 파일과 같을 때만 서버가 지운다.
+function trimPanel(A) {
+  const t = A.storageTrim, saved = A.storageArchived;
+  const count = t ? `<p>정리할 기록: 연습 기록 <b>${num(t.sessions)}</b>개 · 시험 응시 <b>${num(t.attempts)}</b>개 · 약 <b>${num(t.kb)}</b>KB</p>` : '';
+  const done = saved ? `<p>보관 파일을 받았어요(연습 ${num(saved.sessions)}개 · 시험 ${num(saved.attempts)}개). 파일이 저장된 것을 확인한 뒤 정리하기를 눌러 주세요.</p>` : '';
+  return `<section class="panel trim-v13131"><div class="panel-head"><div><h2>오래된 기록 정리</h2><span>연습 기록은 90일, 시험 문제지는 시험이 끝나고 30일이 지나면 답안 목록을 지워 저장 공간을 줄여요. 날짜 · 점수 · 정답 수 · 경험치 · 코인은 그대로예요. 처리 안 된 이의제기와 재채점 중인 시험은 남겨 둬요.</span></div></div>
+    ${count}${done}
+    <div class="trim-actions-v13131" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button type="button" class="btn secondary" data-action="trim-check">정리할 기록 보기</button>
+      <button type="button" class="btn secondary" data-action="trim-archive" ${t && (t.sessions || t.attempts) ? '' : 'disabled'}>${icon('download')} 보관 파일 내려받기</button>
+      <button type="button" class="btn primary" data-action="trim-run" ${saved ? '' : 'disabled'}>정리하기</button>
+    </div></section>`;
 }
 // V13.66 academy yacha tournaments: open a bracket for a grade, watch it live, decide a match
 // when a student cannot play.

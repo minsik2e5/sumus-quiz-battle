@@ -11,10 +11,18 @@ function fakeSocket() {
 function fakeCtx() {
   const store = new Map(), sockets = [];
   const ctx = {
-    alarm: null, store,
+    alarm: null, store, writes: [],
     storage: {
-      async get(key) { return store.has(key) ? structuredClone(store.get(key)) : undefined; },
-      async put(key, value) { store.set(key, structuredClone(value)); },
+      // Durable Object 저장소처럼 키 하나 또는 키 배열(Map으로 돌려준다), 값 하나 또는 객체 묶음(한 번에 쓰기).
+      async get(key) {
+        if (Array.isArray(key)) return new Map(key.filter(k => store.has(k)).map(k => [k, structuredClone(store.get(k))]));
+        return store.has(key) ? structuredClone(store.get(key)) : undefined;
+      },
+      async put(key, value) {
+        const entries = typeof key === 'object' ? Object.entries(key) : [[key, value]];
+        ctx.writes.push(entries.map(([k, v]) => [k, JSON.stringify(v).length]));
+        for (const [k, v] of entries) store.set(k, structuredClone(v));
+      },
       async setAlarm(time) { ctx.alarm = time; },
       async deleteAll() { store.clear(); ctx.alarm = null; }
     },
@@ -237,8 +245,44 @@ export async function runDungeonRoomChecks() {
       assert(letters.length === q.word.length && letters.every((e, i) => e.ok && e.pos === i + 1 && !('ch' in e)) && done?.right && done.word === q.word && events.some(e => e.type === 'hit' && e.kind === 'spell'), '글자마다 몇 칸인지만 알리고, 다 쓰면 정답 · 쓰기 피해');
     });
 
+    /* ---------- 11. V13.131 저장: 문제 목록은 처음 한 번만, 답할 때는 바뀌는 상태만 ---------- */
+    await check('11 문제 목록 따로 저장', async () => {
+      const big = Array.from({ length: 180 }, (_, i) => ({ word_id: 'w' + i, prompt: 'word' + i, meaning: '뜻' + i, wrong: [1, 2, 3, 4, 5].map(k => `오답${i}-${k}`), wrong_en: [1, 2, 3, 4, 5].map(k => `wrong${i}${k}`) }));
+      const { room, sockets, ctx } = await openRoom({ bots: 1, words: big });
+      const s = () => room.room.state;
+      const keysWritten = ctx.writes.flat().map(([k]) => k);
+      assert(['q:a', 'q:b', 'q:bot-1'].every(k => keysWritten.filter(x => x === k).length === 1), `문제 목록은 학생마다 한 번만 저장한다: ${keysWritten.join(', ')}`);
+      assert(!JSON.stringify(ctx.store.get('room')).includes('"questions"'), "'room' 키에는 문제 목록이 없다");
+      await send(room, sockets.a, { type: 'ready' }); await send(room, sockets.b, { type: 'ready' });
+      clock += DUNGEON.INTRO_MS; await room.alarm();
+      assert(s().phase === 'fight', '1층 시작');
+      ctx.writes.length = 0;
+      const q = s().players.a.q;
+      clock = q.started_at + 800;
+      await send(room, sockets.a, { type: 'answer', choice: q.answer, n: q.n });
+      const write = ctx.writes.at(-1);
+      const listBytes = JSON.stringify(big).length;
+      assert(write && write.length === 1 && write[0][0] === 'room' && write[0][1] < listBytes, `답 하나는 'room'만 저장하고 문제 목록(${listBytes}바이트 × 3명)보다 작다: ${JSON.stringify(write)}`);
+      // 다시 깨어나도(새 객체) 문제 목록이 그대로 붙어서 판이 이어진다.
+      const before = JSON.stringify(s());
+      const again = new DungeonRoom(ctx, env);
+      await again.ready;
+      assert.deepEqual(again.room.state, JSON.parse(before), '다시 깨어난 방은 문제 목록까지 똑같다');
+      ctx.writes.length = 0;
+      await again.save();
+      assert(ctx.writes.at(-1).every(([k]) => k === 'room'), '다시 깨어난 뒤에도 문제 목록을 다시 쓰지 않는다');
+      // 예전 방식(문제 목록이 'room' 안)으로 저장된 방도 그대로 열리고, 다음 저장 때 옮겨진다.
+      const legacy = fakeCtx();
+      legacy.store.set('room', { id: 'old', tickets: {}, bots: {}, ended: false, reported: false, closed: false, state: JSON.parse(before) });
+      const old = new DungeonRoom(legacy, env);
+      await old.ready;
+      assert.deepEqual(old.room.state, JSON.parse(before), '예전 방식으로 저장된 방도 그대로 연다');
+      await old.save();
+      assert(legacy.store.has('q:a') && !JSON.stringify(legacy.store.get('room')).includes('"questions"'), "예전 방은 다음 저장 때 문제 목록을 'q:' 키로 옮긴다");
+    });
+
     if (failures.length) throw Error(`[dungeon-room-check] FAIL\n  - ${failures.join('\n  - ')}`);
-    console.log('[dungeon-room-check] PASS lobby/ready · full run with bot · one report · lobby close · join refused · messages · reconnect · report backoff · bot plan · spelling letters');
+    console.log('[dungeon-room-check] PASS lobby/ready · full run with bot · one report · lobby close · join refused · messages · reconnect · report backoff · bot plan · spelling letters · questions stored once');
   } finally {
     Date.now = realNow;
     globalThis.Response = RealResponse;

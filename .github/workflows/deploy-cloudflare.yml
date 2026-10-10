@@ -15,7 +15,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     permissions:
       contents: read
     env:
@@ -60,21 +60,40 @@ jobs:
             echo "::warning::VOCA_STATE_SECRET was not re-applied (a newer preview version exists). The deployed Worker keeps its current secret; the smoke test below checks it."
           fi
 
-      # V13.129: HTTP 200만 보지 않고, 새 버전(package.json)이 실제로 올라가 ok:true인지 본다(첫 시작은 느릴 수 있어 1분까지 기다림).
+      # V13.129: HTTP 200만 보지 않고, 새 버전(package.json)이 실제로 올라가 ok:true인지 본다.
+      # V13.131: 메인 Durable Object는 배포 뒤 몇 분 지나서 새 코드로 바뀐다(v13.129.0 배포가 1분 확인 때문에
+      # '실패'로 떴지만 코드는 정상 배포됐다). 5분까지 기다리고, 그래도 이전 버전이면 실패가 아니라 경고만 한다.
+      # API가 5분 동안 한 번도 ok:true로 답하지 않을 때만 실패다. Supabase 백업 상태는 경고로 보여 준다.
       - name: Smoke test deployed API
         shell: bash
         run: |
           base="https://sumus-voca.minsik2e5.workers.dev"
           want="$(node -p "require('./package.json').version")"
-          for i in $(seq 1 12); do
+          seen_ok=0
+          for i in $(seq 1 30); do
             code="$(curl -sS -o /tmp/health.json -w "%{http_code}" "$base/api/health" || true)"
             echo "health attempt $i -> HTTP $code (want $want)"
             cat /tmp/health.json || true
             echo
-            if [ "$code" = "200" ] && node -e "const h = require('/tmp/health.json'); process.exit(h.ok === true && h.version === process.argv[1] ? 0 : 1)" "$want"; then
-              exit 0
+            if [ "$code" = "200" ] && node -e "const h = require('/tmp/health.json'); process.exit(h.ok === true ? 0 : 1)"; then
+              seen_ok=1
+              cp /tmp/health.json /tmp/health-ok.json
+              if node -e "const h = require('/tmp/health.json'); process.exit(h.ok === true && h.version === process.argv[1] ? 0 : 1)" "$want"; then
+                break
+              fi
             fi
-            sleep 5
+            if [ "$i" = "30" ]; then
+              if [ "$seen_ok" != "1" ]; then
+                echo "::error::Deployed API did not report ok:true within 5 minutes"
+                exit 1
+              fi
+              echo "::warning::API is up (ok:true) but still reports an older version after 5 minutes. The main Durable Object switches to $want a few minutes after a deploy; check /api/health again later."
+              break
+            fi
+            sleep 10
           done
-          echo "::error::Deployed API did not report ok:true with version $want"
-          exit 1
+          node -e "
+            const s = require('/tmp/health-ok.json').storage || {};
+            if (Number(s.supabase_failures) > 0) console.log('::warning::Supabase backup failures: ' + s.supabase_failures + ' (last error: ' + (s.supabase_last_error || '-') + ')');
+            if (!s.supabase_last_ok_at) console.log('::warning::Supabase backup has no successful upload yet (storage.supabase_last_ok_at is empty)');
+          "

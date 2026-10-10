@@ -23,6 +23,7 @@ import { middleGrade2Books } from './middle-vocab-grade2.mjs';
 import { ybmKimHighBooks, ybmKimRetiredWords } from './high-vocab-ybm-kim.mjs';
 import { ybmKimFinalBooks } from './high-vocab-ybm-kim-final.mjs';
 import { compactSession } from './state.mjs';
+import { trimSummary, trimArchive, trimRecords, attemptTotal } from './storage-trim.mjs';
 import { DUNGEON, CUTS, CUT_KEYS, openCuts } from './dungeon-engine.mjs';
 import { dungeonQuestions } from './dungeon-words.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
@@ -427,10 +428,10 @@ function lastActiveBefore(state, p, now = Date.now()) {
 const coinBalance = (state, p) => pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance;
 // Coins (코인, stored as reward points) are earned per finished practice and as tournament
 // prizes, spent in the shop, and won or lost in yacha battles; pets grow separately with 경험치.
-function pointsAndPets(state, p, sessions) {
+function pointsAndPets(state, p, sessions, battles = null) {
   const earned = sessions.reduce((n, s) => n + Number(s.reward_points || 0), 0);
   const spent = Number(p.points_spent || 0);
-  const battle = battleRecord(state, p.id);
+  const battle = battleRecord(state, p.id, battles);
   const prizes = tournamentPrizes(state, p.id);
   const pets = petProgress(p.pets, sessions, p.avatar_key);
   // Stakes of matches that have not been settled yet are held back, so a late result can
@@ -440,6 +441,10 @@ function pointsAndPets(state, p, sessions) {
   const bonus = rewardIncome(p);
   return { reward_points: earned, points_spent: spent, prize_points: prizes, bonus_points: bonus, points_balance: Math.max(0, earned + prizes + bonus - spent + battle.net - battle.held), battle, pets, pet: pets.find(x => x.active) || null, needs_pet_pick: p.role === 'student' && !pets.length };
 }
+
+// V13.131: 펫만 필요할 때(친구 목록, 대결 방 참가자). 친구마다 전체 sessions · battles를 훑는 pointsAndPets 대신
+// createCompetition이 한 번 나눠 둔 학생별 기록(ctx.sessionsOf = 연습 + 보너스 줄, xpSessions와 같다)으로 센다.
+const activePetOf = (ctx, p) => petProgress(p.pets, ctx.sessionsOf(p.id), p.avatar_key).find(x => x.active) || null;
 
 // Yacha battles: 1:1 word duels between students of the same school and grade. The
 // match itself runs in a battle room (cloudflare/battle-room.mjs); this state only
@@ -456,10 +461,24 @@ const BATTLE_REMATCH_WINDOW_MS = 2 * 60000; // a rematch can be asked for this l
 // the league and titles still count only three matches a day with the same friend.
 const battleIsOpen = (b, now) => (b.status === 'waiting' && now - b.created_at < BATTLE_WAIT_MS) || (b.status === 'active' && now - (b.joined_at || b.created_at) < BATTLE_STALE_MS);
 const openBattleFor = (state, pid, now) => (state.battles || []).find(b => (b.host_id === pid || b.guest_id === pid) && battleIsOpen(b, now));
-function battleRecord(state, pid) {
-  const rows = (state.battles || []).filter(b => b.status === 'finished' && (b.host_id === pid || b.guest_id === pid));
+// V13.131: 선생님 화면처럼 여러 학생의 battleRecord를 한 번에 셀 때, 대결 목록을 학생마다 다시 훑지 않고 한 번만 나눠 둔다.
+function battleIndex(state) {
+  const index = new Map();
+  for (const b of state.battles || []) {
+    if (b.status !== 'finished' && b.status !== 'active') continue;
+    for (const pid of new Set([b.host_id, b.guest_id])) {
+      if (!pid) continue;
+      if (!index.has(pid)) index.set(pid, { finished: [], active: [] });
+      index.get(pid)[b.status].push(b);
+    }
+  }
+  return index;
+}
+function battleRecord(state, pid, index = null) {
+  const mine = index ? index.get(pid) || { finished: [], active: [] } : null;
+  const rows = mine ? mine.finished : (state.battles || []).filter(b => b.status === 'finished' && (b.host_id === pid || b.guest_id === pid));
   const wins = rows.filter(b => b.winner === pid), losses = rows.filter(b => b.loser === pid);
-  const held = (state.battles || []).filter(b => b.status === 'active' && (b.host_id === pid || b.guest_id === pid)).reduce((n, b) => n + b.stake, 0);
+  const held = (mine ? mine.active : (state.battles || []).filter(b => b.status === 'active' && (b.host_id === pid || b.guest_id === pid))).reduce((n, b) => n + b.stake, 0);
   return { wins: wins.length, losses: losses.length, draws: rows.length - wins.length - losses.length, win_rate: rows.length ? Math.round(wins.length / rows.length * 100) : null, net: wins.reduce((n, b) => n + b.stake, 0) - losses.reduce((n, b) => n + b.stake, 0), held, ...battleStreaks(rows, pid) };
 }
 // Closes rooms nobody joined, calls off matches that never reported, drops tickets and
@@ -524,7 +543,7 @@ function findJoinableBattle(state, p, code, now) {
 const battleLossToday = (state, pid, now) => (state.battles || []).filter(b => b.status === 'finished' && b.loser === pid && dayKey(b.finished_at) === dayKey(now)).reduce((n, b) => n + b.stake, 0);
 // What the room shows about a player: pet, win streak, and (V13.66) title and league tier.
 function battlePlayer(state, p, ranges = null, ctx = createCompetition(state)) {
-  const pet = pointsAndPets(state, p, xpSessions(state, p.id, p)).pet;
+  const pet = activePetOf(ctx, p);
   return { id: p.id, name: p.display_name, school: schoolForProfile(state, p)?.name || '', pet: pet ? { key: pet.key, form: pet.form, name: pet.name || '' } : null, streak: battleRecord(state, p.id).streak, title: ctx.displayTitle(p), tier: ctx.league(p.id).tier.key, ...(ranges ? { ranges } : {}) };
 }
 // V13.94 단어 범위: 'each' (each player gets the words of their own range; the default) or
@@ -581,7 +600,7 @@ function battleFriends(state, p, now) {
   return state.profiles
     .filter(x => x.id !== p.id && x.role === 'student' && x.active !== false && !x.preview_owner_id && x.pets?.length && battleMatchable(state, p, x))
     .map(x => {
-      const pet = pointsAndPets(state, x, xpSessions(state, x.id, x)).pet, xs = schoolForProfile(state, x), mine = xs?.id === school?.id;
+      const pet = activePetOf(ctx, x), xs = schoolForProfile(state, x), mine = xs?.id === school?.id;
       return { id: x.id, name: x.display_name, school: xs?.name || '', class_name: x.class_name || '', same_class: mine && x.class_name === p.class_name, pet: pet ? { key: pet.key, form: pet.form } : null, title: ctx.displayTitle(x), tier: ctx.league(x.id).tier.key, busy: !!openBattleFor(state, x.id, now), invited: !!battleInviteFor(state, x, now), _order: [mine ? 0 : 1, xs?.sort_order || 999] };
     })
     .sort((a, b) => Number(b.same_class) - Number(a.same_class) || a._order[0] - b._order[0] || a._order[1] - b._order[1] || a.name.localeCompare(b.name, 'ko'))
@@ -698,10 +717,11 @@ function dungeonRoomView(state, d, p) {
 // 같은 학년 친구 목록(내 반 → 우리 학교 → 다른 학교). 펫이 있는 학생만.
 function dungeonFriends(state, p, now) {
   const school = schoolForProfile(state, p);
+  const ctx = createCompetition(state, now);
   return state.profiles
     .filter(x => x.id !== p.id && x.role === 'student' && x.active !== false && !x.preview_owner_id && x.pets?.length && dungeonMatchable(state, p, x))
     .map(x => {
-      const pet = pointsAndPets(state, x, xpSessions(state, x.id, x)).pet, xs = schoolForProfile(state, x), mine = xs?.id === school?.id;
+      const pet = activePetOf(ctx, x), xs = schoolForProfile(state, x), mine = xs?.id === school?.id;
       return { id: x.id, name: x.display_name, school: xs?.name || '', same_class: mine && x.class_name === p.class_name, pet: pet ? { key: pet.key, form: pet.form } : null, cleared: dungeonCleared(x), busy: !!openDungeonFor(state, x.id, now), _order: [mine ? 0 : 1, xs?.sort_order || 999] };
     })
     .sort((a, b) => Number(b.same_class) - Number(a.same_class) || a._order[0] - b._order[0] || a._order[1] - b._order[1] || a.name.localeCompare(b.name, 'ko'))
@@ -769,7 +789,7 @@ export function weekCorrect(sessions, now = Date.now()) {
   const { start, end } = rankingWeek(now);
   return (sessions || []).filter(s => s.created_at >= start && s.created_at < end).reduce((n, s) => n + Number(s.correct || 0), 0);
 }
-function stats(state, p, sessions = mySessions(state, p.id)) {
+function stats(state, p, sessions = mySessions(state, p.id), battles = null) {
   // V13.70: 경험치 and coins also come from robot matches and exams (bonus rows); counts of
   // practices, words and accuracy stay with the practices.
   const all = [...sessions, ...bonusRecords(p)];
@@ -782,7 +802,7 @@ function stats(state, p, sessions = mySessions(state, p.id)) {
     week_correct: weekCorrect(sessions),
     today_total: today.reduce((n, s) => n + s.total, 0),
     today_xp: todayAll.reduce((n, s) => n + (s.xp || 0), 0),
-    ...pointsAndPets(state, p, all),
+    ...pointsAndPets(state, p, all, battles),
     today_reward_points: todayAll.reduce((n, s) => n + Number(s.reward_points || 0), 0),
     // V13.73: the wallet's daily bar counts study coins only, like the daily cap does.
     today_study_points: today.reduce((n, s) => n + Number(s.reward_points || 0), 0),
@@ -925,7 +945,7 @@ function attemptView(a, state, profile) {
   return {
     id: a.id, exam_id: a.exam_id, student_id: a.student_id, status: a.status,
     started_at: a.started_at, deadline: a.deadline, submitted_at: a.submitted_at,
-    auto_submitted: a.auto_submitted, total: a.questions.length,
+    auto_submitted: a.auto_submitted, total: attemptTotal(a),
     result_visibility: resultVisible ? 'visible' : 'withheld',
     grading_status: gradingStatus,
     ...(a.status === 'active' ? { questions: a.questions.map(publicQuestion), answers: a.answers, revision: a.revision, lease: a.lease } : {}),
@@ -1180,6 +1200,8 @@ export async function service(state, method, path, body, token, options = {}) {
       sessionsByStudent.get(session.student_id).push(session);
     }
     const attempts = state.examAttempts.filter(a => teacher ? visibleExamIds.has(a.exam_id) : a.student_id === p.id);
+    // V13.131: 학생마다 대결 목록 전체를 다시 훑지 않게 한 번 나눠 둔다.
+    const battlesByStudent = teacher ? battleIndex(state) : null;
     const books = allBooks(state).filter(b => sameSchool(b, selectedSchool) && (teacher || !b.grade || b.grade === p.class_name));
     const schools = (teacher ? teacherSchools(state, p, selectedDivision) : [selectedSchool]).filter(Boolean).map(s => ({ id: s.id, name: s.name, full_name: s.full_name, division: s.division }));
     const profile = { ...publicProfile(p), division: selectedDivision, ...(teacher && selectedSchool ? { active_division: selectedDivision, active_school_id: selectedSchool.id, active_school: selectedSchool.name } : {}) };
@@ -1210,7 +1232,7 @@ export async function service(state, method, path, body, token, options = {}) {
       daily_quest: !!activePractice.daily_quest
     } : null;
     return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes, ...dailyQuestProgress(sessions, activePractice, dailyQuest.target) } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
-      profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stars: undefined, care: undefined, stats: stats(state, s, sessionsByStudent.get(s.id) || []) })) : [],
+      profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stars: undefined, care: undefined, stats: stats(state, s, sessionsByStudent.get(s.id) || [], battlesByStudent) })) : [],
       sessions: sessions.map(teacher ? sessionSummary : hydrateSession), exams: visibleExams,
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
       attempts: attempts.map(a => attemptSummary(a, state, p)), server_time: Date.now(),
@@ -1237,6 +1259,19 @@ export async function service(state, method, path, body, token, options = {}) {
       tournaments: (state.tournaments || []).filter(t => teacher ? t.school_id === selectedSchool?.id && (t.status !== 'cancelled' || now - (t.finished_at || t.created_at) < DAY_MS) : t.players.includes(p.id) && (t.status === 'active' || (t.status === 'finished' && now - (t.finished_at || 0) < 3 * DAY_MS)))
         .sort((a, b) => b.created_at - a.created_at).slice(0, 12).map(t => tournamentView(state, competition, t, p, now))
     };
+  }
+  // V13.131 오래된 기록 줄이기(server/storage-trim.mjs). 선생님이 맡은 학교의 기록만 본다.
+  // 대상 요약 → 보관 파일(지울 내용 전체 JSON) → 그 파일의 지문이 같을 때만 정리.
+  if (path === '/teacher/storage-trim' || path === '/teacher/storage-archive') {
+    requireRole(p, 'teacher');
+    const schoolIds = new Set(p.school_ids || []), now = Date.now();
+    if (path === '/teacher/storage-archive' && method === 'GET') return { archive: trimArchive(state, now, schoolIds, { hydrate: hydrateSession }) };
+    if (method === 'GET') return { trim: trimSummary(state, now, schoolIds) };
+    if (path === '/teacher/storage-trim' && method === 'POST') {
+      const trimmed = trimRecords(state, { fingerprint: str(body.fingerprint, 80), archived_at: Number(body.archived_at) }, now, schoolIds, p.id);
+      return { trimmed, trim: trimSummary(state, now, schoolIds) };
+    }
+    fail('요청 방식을 확인해주세요.', 405);
   }
   if (path === '/teacher/student-preview' && method === 'POST') {
     requireRole(p, 'teacher');
@@ -2173,7 +2208,7 @@ export async function service(state, method, path, body, token, options = {}) {
       if (!exam || !sameSchool(exam, school) || exam.exam_type !== 'write_meaning') fail('뜻쓰기 시험에서만 이의제기할 수 있어요.', 403);
       // A dispute reveals whether the answer was right and the correct meaning.
       if (!exam.release_result) fail('결과가 공개된 뒤에 이의제기할 수 있어요.', 403);
-      questionIndex = integer(body.question_index, 0, Math.max(0, attempt.questions.length - 1), '문항 번호');
+      questionIndex = integer(body.question_index, 0, Math.max(0, attemptTotal(attempt) - 1), '문항 번호');
       const detail = attempt.details?.[questionIndex];
       word = attempt.keys?.[questionIndex] || findWord(state, detail?.word_id);
       submittedAnswer = detail?.answer || attempt.answers?.[questionIndex] || '';
@@ -2803,3 +2838,6 @@ function practiceView(x, state) {
     stats: growthFor(xpSessions(state, x.student_id)), server_time: Date.now()
   };
 }
+
+// V13.131 검사용(server/storage-trim-check.mjs): 친구 목록 · 선생님 통계를 가볍게 바꾼 뒤 예전 계산과 같은지 비교한다.
+export const lightCountsForCheck = { pointsAndPets, xpSessions, activePetOf, battleIndex, stats, battleFriends, dungeonFriends };
