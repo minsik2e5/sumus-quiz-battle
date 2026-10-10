@@ -4,6 +4,7 @@ import { emptyState } from './state.mjs';
 import { passwordHash } from './auth.mjs';
 import { allBooks, service } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
+import { runDungeonLoadCheck } from './dungeon-load.mjs';
 
 const STUDENTS = 20;
 const QUESTIONS = 30;
@@ -141,7 +142,8 @@ export async function runStressCheck() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  runStressCheck().catch(error => {
+  // V13.128 던전: 한 반(10파티)과 여러 반(40파티)이 한꺼번에 방을 열고 결과를 보고할 때.
+  runStressCheck().then(() => runDungeonLoadCheck({ parties: 10 })).then(() => runDungeonLoadCheck({ parties: 40 })).catch(error => {
     console.error(error);
     process.exitCode = 1;
   });

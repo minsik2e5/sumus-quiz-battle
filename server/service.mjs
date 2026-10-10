@@ -23,6 +23,8 @@ import { middleGrade2Books } from './middle-vocab-grade2.mjs';
 import { ybmKimHighBooks, ybmKimRetiredWords } from './high-vocab-ybm-kim.mjs';
 import { ybmKimFinalBooks } from './high-vocab-ybm-kim-final.mjs';
 import { compactSession } from './state.mjs';
+import { DUNGEON, CUTS, CUT_KEYS, openCuts } from './dungeon-engine.mjs';
+import { dungeonQuestions } from './dungeon-words.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
 export const APP_VERSION = packageInfo.version;
 export const builtinBooks = builtinBooksData;
@@ -617,6 +619,145 @@ function settleTournamentMatch(state, b) {
   if (b.winner && [found.match.a, found.match.b].includes(b.winner)) decideMatch(t, found.match.id, b.winner, 'match', b.finished_at);
   else { found.match.draws = Number(found.match.draws || 0) + 1; delete found.match.battle_id; }
 }
+/* ---------- V13.128 던전 방 (docs/dungeon-design.md 2 · 9번) ---------- */
+// 파티 하나 = 던전 방 하나(cloudflare/dungeon-room.mjs). 이 상태에는 방 목록(초대 코드, 파티원, 입장표)만 두고,
+// 판은 방이 server/dungeon-engine.mjs로 돌린다. 방은 끝날 때(또는 아무도 시작하지 않고 닫힐 때) 결과를
+// 여기에 한 번 보고한다(settleDungeon, report_id로 두 번 처리하지 않는다). 코인 · 보드는 기록 · 보상 세션에서.
+export const DUNGEON_LOBBY_MS = 15 * 60000;     // 방(로비)에서 15분 안에 시작하지 않으면 닫힌다(방이 보고한다)
+const DUNGEON_ABANDON_MS = 2 * 3600000;        // 그때까지 보고가 없는 방은 정리한다
+const DUNGEON_KEEP_MS = 7 * 86400000;          // 끝난 방 기록은 일주일만 둔다(상태가 계속 커지지 않게)
+const DUNGEON_ROOMS_PER_10_MIN = 8;
+const DUNGEON_INVITE_PUSH_GAP_MS = 3 * 60000;  // 같은 친구에게 초대 알림은 3분에 한 번
+export const DUNGEON_BOT_LIMIT = 2;            // 빈자리 봇 동료(방장 + 봇 2 = 3명)
+const dungeonIsOpen = (d, now) => d.status === 'open' && now - d.created_at < DUNGEON_ABANDON_MS;
+const dungeonMembers = d => (d.members || []).filter(id => !(d.left || []).includes(id));
+const openDungeonFor = (state, pid, now) => (state.dungeons || []).find(d => dungeonIsOpen(d, now) && dungeonMembers(d).includes(pid));
+// 같은 학년이면 학교가 달라도 된다(설계 2번). 부(중·고)와 학년이 같아야 한다.
+function dungeonMatchable(state, a, b) {
+  const sa = schoolForProfile(state, a), sb = schoolForProfile(state, b);
+  if (!sa || !sb || gradeOf(a.class_name) !== gradeOf(b.class_name)) return false;
+  return sa.id === sb.id || sameGradeBand({ division: sa.division, class_name: a.class_name }, { division: sb.division, class_name: b.class_name });
+}
+const dungeonCleared = p => CUT_KEYS.filter(cut => (p.dungeon_cleared || []).includes(cut));
+// 학생 한 명의 던전 문제 풀: 고른 범위(+ 앞쪽 범위 · 나머지 단어 · 틀린 단어로 보충, server/dungeon-words.mjs).
+function dungeonQuestionsFor(state, p, rangeCodes) {
+  const school = schoolForProfile(state, p);
+  if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
+  const ranges = cleanRanges(rangeCodes);
+  const own = scopedWords(state, school.id, ranges, p.class_name);
+  const words = wordsForSchoolGrade(state, school, p.class_name);
+  const byCode = (a, b) => String(a).localeCompare(String(b), 'ko', { numeric: true });
+  const first = [...ranges].sort(byCode)[0];
+  const picked = new Set(ranges);
+  // 앞쪽 범위: 고른 범위보다 앞에 있는 과, 가까운 과부터.
+  const earlierCodes = [...new Set(words.map(w => String(w.range_code)))].filter(code => !picked.has(code) && byCode(code, first) < 0).sort(byCode).reverse();
+  const earlier = earlierCodes.flatMap(code => words.filter(w => String(w.range_code) === code));
+  const extra = words.filter(w => !picked.has(String(w.range_code)) && !earlierCodes.includes(String(w.range_code)));
+  const mastery = state.mastery[p.id] || {};
+  const wrong = words.filter(w => Number(mastery[w.id]?.wrong || 0) > 0);
+  const all = allBooks(state).filter(book => !book.school_id || schoolByRef(state, book.school_id)?.division === school.division).flatMap(book => book.words || []);
+  const built = dungeonQuestions({ own, earlier, extra, wrong, all });
+  if (!built.ok) fail(`던전 문제 풀이 ${built.min}단어 이상이어야 해요. 지금 ${built.questions.length}단어예요. 범위를 더 골라 주세요.`, 409);
+  return { ranges, ...built };
+}
+function dungeonPlayer(state, p, rangeCodes) {
+  const pet = pointsAndPets(state, p, xpSessions(state, p.id, p)).pet;
+  const built = dungeonQuestionsFor(state, p, rangeCodes);
+  return { player: { id: p.id, name: p.display_name, grade: gradeOf(p.class_name), school: schoolForProfile(state, p)?.name || '', pet: pet ? { key: pet.key, form: pet.form, name: pet.name || '' } : null, questions: built.questions, cleared: dungeonCleared(p), bot: false }, ranges: built.ranges, own: built.own };
+}
+function checkDungeonEntry(state, p, now) {
+  if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
+  if (openDungeonFor(state, p.id, now)) fail('이미 들어가 있는 던전 방이 있어요.', 409);
+}
+// 방 목록 정리: 오래 보고가 없는 방을 닫고, 끝난 방의 입장표를 지우고, 일주일 지난 방을 잊는다.
+export function tidyDungeons(state, now = Date.now()) {
+  if (!Array.isArray(state.dungeons)) return false;
+  let changed = false;
+  for (const d of state.dungeons) {
+    if (d.status === 'open' && now - d.created_at >= DUNGEON_ABANDON_MS) { Object.assign(d, { status: 'cancelled', reason: 'expired', finished_at: now }); changed = true; }
+    if (d.status !== 'open' && (d.tickets || d.invites?.length)) { delete d.tickets; d.invites = []; changed = true; }
+  }
+  const kept = state.dungeons.filter(d => d.status === 'open' || now - (d.finished_at || d.created_at) < DUNGEON_KEEP_MS);
+  if (kept.length !== state.dungeons.length) { state.dungeons = kept; changed = true; }
+  return changed;
+}
+// 초대 코드로 찾기. 다른 학년 방은 없는 방과 똑같이 답한다(코드를 떠보지 못하게).
+function findJoinableDungeon(state, p, code, now) {
+  const d = (state.dungeons || []).find(x => x.code === code && dungeonIsOpen(x, now) && now - x.created_at < DUNGEON_LOBBY_MS);
+  const host = d && state.profiles.find(x => x.id === d.host_id);
+  if (!d || !host || !dungeonMatchable(state, host, p)) fail('던전 방을 찾지 못했어요. 코드를 다시 확인해주세요. 같은 학년 친구의 방만 들어갈 수 있어요.', 404);
+  return d;
+}
+function dungeonRoomView(state, d, p) {
+  const host = state.profiles.find(x => x.id === d.host_id);
+  return { id: d.id, code: d.code, cut: d.cut, cut_name: CUTS[d.cut]?.name || '', grade: d.grade, host: host?.display_name || '', host_school: schoolForProfile(state, host)?.name || '', is_host: d.host_id === p.id,
+    members: dungeonMembers(d).length + Number(d.bots || 0), max: DUNGEON.MAX_PLAYERS, ticket: d.tickets?.[p.id] || null, expires_at: d.created_at + DUNGEON_LOBBY_MS };
+}
+// 같은 학년 친구 목록(내 반 → 우리 학교 → 다른 학교). 펫이 있는 학생만.
+function dungeonFriends(state, p, now) {
+  const school = schoolForProfile(state, p);
+  return state.profiles
+    .filter(x => x.id !== p.id && x.role === 'student' && x.active !== false && !x.preview_owner_id && x.pets?.length && dungeonMatchable(state, p, x))
+    .map(x => {
+      const pet = pointsAndPets(state, x, xpSessions(state, x.id, x)).pet, xs = schoolForProfile(state, x), mine = xs?.id === school?.id;
+      return { id: x.id, name: x.display_name, school: xs?.name || '', same_class: mine && x.class_name === p.class_name, pet: pet ? { key: pet.key, form: pet.form } : null, cleared: dungeonCleared(x), busy: !!openDungeonFor(state, x.id, now), _order: [mine ? 0 : 1, xs?.sort_order || 999] };
+    })
+    .sort((a, b) => Number(b.same_class) - Number(a.same_class) || a._order[0] - b._order[0] || a._order[1] - b._order[1] || a.name.localeCompare(b.name, 'ko'))
+    .map(({ _order, ...x }) => x);
+}
+// 나를 부른 방(아직 들어갈 수 있는 것만, 최근 것부터).
+function dungeonInvitesFor(state, p, now) {
+  return (state.dungeons || [])
+    .filter(d => dungeonIsOpen(d, now) && now - d.created_at < DUNGEON_LOBBY_MS && (d.invites || []).includes(p.id) && !dungeonMembers(d).includes(p.id))
+    .filter(d => { const host = state.profiles.find(x => x.id === d.host_id); return host && dungeonMatchable(state, host, p); })
+    .sort((a, b) => b.created_at - a.created_at).slice(0, 3)
+    .map(d => dungeonRoomView(state, d, p));
+}
+// 아직 처리하지 않은 보고인지(상태를 복사하지 않고 지금 상태만 본다. server/dungeon-reports.mjs).
+export const dungeonReportPending = (state, report) => (state.dungeons || []).some(x => x.id === report?.id && x.status === 'open');
+// 방이 보고하는 결과(브라우저는 부르지 못한다). 같은 report_id는 한 번만 처리한다.
+// 결과: { id, report_id, cancelled } 또는 { id, report_id, result: 엔진 result }.
+export function settleDungeon(state, report) {
+  const d = (state.dungeons || []).find(x => x.id === report?.id);
+  if (!d || d.status !== 'open') return false;
+  const now = Date.now();
+  if (report.cancelled || !report.result) { Object.assign(d, { status: 'cancelled', reason: String(report.reason || 'closed').slice(0, 20), finished_at: now }); return true; }
+  const r = report.result, members = new Set(d.members || []);
+  if (!report.report_id || r.report_id !== report.report_id) return false;
+  const cut = CUTS[r.cut] ? r.cut : d.cut;
+  const players = (Array.isArray(r.players) ? r.players : []).slice(0, DUNGEON.MAX_PLAYERS).map(x => ({
+    id: String(x.id || '').slice(0, 64), name: String(x.name || '').slice(0, 20), bot: !!x.bot, out: !!x.out,
+    right: Math.max(0, Math.floor(Number(x.right) || 0)), answered: Math.max(0, Math.floor(Number(x.answered) || 0)),
+    accuracy: Math.max(0, Math.min(1, Number(x.accuracy) || 0)), share: Math.max(0, Math.min(1, Number(x.share) || 0)), downs: Math.max(0, Math.floor(Number(x.downs) || 0)),
+    // 보상 대상: 이 방에 들어온 학생, 봇 · 포기 아님(엔진 reward). 코인 지급은 기록 · 보상 세션에서.
+    reward: !!x.reward && !x.bot && !x.out && members.has(String(x.id))
+  }));
+  Object.assign(d, { status: 'finished', report_id: report.report_id, finished_at: now, result: { cleared: !!r.cleared, cut, size: players.length, reached: Math.max(0, Math.floor(Number(r.reached) || 0)), floor: Math.max(0, Math.floor(Number(r.floor) || 0)), time_ms: Math.max(0, Math.floor(Number(r.time_ms) || 0)), record: !!r.record, no_down: !!r.no_down, players } });
+  // 깬 등급컷은 다음 단계를 여는 데만 쓴다(만점은 기록만).
+  if (r.cleared && cut !== 'max') for (const x of players) {
+    if (!x.reward) continue;
+    const profile = state.profiles.find(y => y.id === x.id);
+    if (profile && !(profile.dungeon_cleared || []).includes(cut)) profile.dungeon_cleared = [...(profile.dungeon_cleared || []), cut];
+  }
+  return true;
+}
+// 방이 방 준비(_dungeon)를 받지 못했을 때 되돌린다(Cloudflare 래퍼가 부른다).
+export function undoDungeon(state, message) {
+  const d = (state.dungeons || []).find(x => x.id === message?.id);
+  if (!d || d.status !== 'open') return false;
+  if (message.action === 'init') { Object.assign(d, { status: 'cancelled', reason: 'room', finished_at: Date.now() }); return true; }
+  if (message.action === 'join') {
+    const pid = message.player?.id;
+    if (d.tickets) delete d.tickets[pid];
+    // 나갔다가 다시 들어오려던 학생은 나간 채로 둔다(결과에는 남는다).
+    if (message.rejoin) d.left = [...new Set([...(d.left || []), pid])];
+    else d.members = (d.members || []).filter(id => id !== pid);
+    return true;
+  }
+  if (message.action === 'bot') { d.bots = Math.max(0, Number(d.bots || 0) - 1); return true; }
+  return false;
+}
+const dungeonTicket = () => randomBytes(18).toString('hex');
 function activePetKey(state, studentId) {
   const p = state.profiles.find(x => x.id === studentId);
   return p?.pets?.some(x => x.key === p.avatar_key) ? p.avatar_key : undefined;
@@ -916,6 +1057,7 @@ export function sweep(state, now = Date.now()) {
   if (compactOldSessions(state, now)) changed = true;
   if (autoResolveMeaningDisputes(state) > 0) changed = true;
   if (tidyBattles(state)) changed = true;
+  if (tidyDungeons(state, now)) changed = true;
   if (tidyProfileLogs(state, now)) changed = true;
   // V13.82 문법 증권거래소: a seed for the prices on first start, and a shorter path now and then.
   if (marketOpen(state) && rebaseMarket(state, now)) changed = true;
@@ -1467,6 +1609,107 @@ export async function service(state, method, path, body, token, options = {}) {
     if (error) fail(error);
     if (name) pet.name = name; else delete pet.name;
     return publicProfile(p);
+  }
+  // V13.128 던전 방. `_dungeon`은 Cloudflare 래퍼가 던전 방(cloudflare/dungeon-room.mjs)에 넘기고 응답에서 지운다.
+  if (path === '/dungeon/home' && method === 'GET') {
+    requireRole(p, 'student');
+    const now = Date.now(), cleared = dungeonCleared(p), open = openCuts(cleared);
+    const d = openDungeonFor(state, p.id, now);
+    const recent = (state.dungeons || []).filter(x => x.status === 'finished' && (x.members || []).includes(p.id)).sort((a, b) => b.finished_at - a.finished_at).slice(0, 5)
+      .map(x => ({ id: x.id, cut: x.result.cut, cut_name: CUTS[x.result.cut]?.name || '', cleared: x.result.cleared, reached: x.result.reached, time_ms: x.result.time_ms, size: x.result.size, finished_at: x.finished_at }));
+    return { cuts: CUT_KEYS.map(key => ({ key, name: CUTS[key].name, open: open.includes(key), cleared: cleared.includes(key) })), room: d ? dungeonRoomView(state, d, p) : null, invites: dungeonInvitesFor(state, p, now), recent, pool_min: DUNGEON.POOL_MIN };
+  }
+  if (path === '/dungeon/rooms' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    tidyDungeons(state, now);
+    checkDungeonEntry(state, p, now);
+    if ((state.dungeons || []).filter(d => d.host_id === p.id && now - (d.created_at || 0) < 600000).length >= DUNGEON_ROOMS_PER_10_MIN) fail('방을 너무 자주 만들었어요. 잠시 뒤에 다시 해 주세요.', 429);
+    const cut = str(body.cut, 8) || 'c3';
+    if (!CUTS[cut]) fail('등급컷을 골라주세요.');
+    if (!openCuts(dungeonCleared(p)).includes(cut)) fail('아직 열리지 않은 등급컷이에요. 앞 단계를 먼저 깨요.', 409);
+    const school = schoolForProfile(state, p);
+    if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
+    const { player, ranges } = dungeonPlayer(state, p, body.range_codes);
+    state.dungeons ||= [];
+    const openCodes = new Set(state.dungeons.filter(d => dungeonIsOpen(d, now)).map(d => d.code));
+    let code;
+    do code = String(100000 + (randomBytes(4).readUInt32BE(0) % 900000)); while (openCodes.has(code));
+    const d = { id: randomUUID(), code, status: 'open', school_id: school.id, division: school.division, grade: gradeOf(p.class_name), cut, host_id: p.id, members: [p.id], left: [], invites: [], pushed: {}, bots: 0, tickets: { [p.id]: dungeonTicket() }, range_codes: ranges, created_at: now };
+    state.dungeons.push(d);
+    return { room: dungeonRoomView(state, d, p), _dungeon: { action: 'init', id: d.id, cut, grade: d.grade, host: player, ticket: d.tickets[p.id], seed: randomBytes(4).readUInt32BE(0), lobby_until: now + DUNGEON_LOBBY_MS } };
+  }
+  if (path === '/dungeon/preview' && method === 'GET') {
+    requireRole(p, 'student');
+    const d = findJoinableDungeon(state, p, str(body.code, 12).replace(/\D/g, ''), Date.now());
+    return { room: dungeonRoomView(state, d, p), cut_open: openCuts(dungeonCleared(p)).includes(d.cut) };
+  }
+  if (path === '/dungeon/join' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    tidyDungeons(state, now);
+    const d = findJoinableDungeon(state, p, str(body.code, 12).replace(/\D/g, ''), now);
+    if (dungeonMembers(d).includes(p.id)) return { room: dungeonRoomView(state, d, p) };
+    checkDungeonEntry(state, p, now);
+    if (dungeonMembers(d).length + Number(d.bots || 0) >= DUNGEON.MAX_PLAYERS) fail('파티가 가득 찼어요. 다른 방에 들어가 주세요.', 409);
+    if (!openCuts(dungeonCleared(p)).includes(d.cut)) fail(`${CUTS[d.cut].name}이 아직 열리지 않았어요. 앞 단계를 먼저 깨요.`, 409);
+    const { player } = dungeonPlayer(state, p, body.range_codes);
+    const rejoin = (d.left || []).includes(p.id);
+    d.left = (d.left || []).filter(id => id !== p.id);
+    if (!d.members.includes(p.id)) d.members.push(p.id);
+    d.invites = (d.invites || []).filter(id => id !== p.id);
+    d.tickets ||= {};
+    d.tickets[p.id] = dungeonTicket();
+    return { room: dungeonRoomView(state, d, p), _dungeon: { action: 'join', id: d.id, player, ticket: d.tickets[p.id], ...(rejoin ? { rejoin: true } : {}) } };
+  }
+  if (path === '/dungeon/friends' && method === 'GET') {
+    requireRole(p, 'student');
+    return { friends: dungeonFriends(state, p, Date.now()) };
+  }
+  if (path === '/dungeon/invite' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    const d = openDungeonFor(state, p.id, now);
+    if (!d || d.host_id !== p.id) fail('방장만 친구를 부를 수 있어요.', 409);
+    if (now - d.created_at >= DUNGEON_LOBBY_MS) fail('방이 닫혔어요. 새 방을 만들어 주세요.', 409);
+    if (dungeonMembers(d).length + Number(d.bots || 0) >= DUNGEON.MAX_PLAYERS) fail('파티가 가득 찼어요.', 409);
+    const friend = dungeonFriends(state, p, now).find(x => x.id === str(body.friend_id, 64));
+    if (!friend) fail('같은 학년 친구만 부를 수 있어요.', 404);
+    if (friend.busy) fail(`${friend.name}이(가) 지금 다른 던전에 있어요.`, 409);
+    d.invites = [...new Set([...(d.invites || []), friend.id])];
+    d.pushed ||= {};
+    const pushedLately = now - Number(d.pushed[friend.id] || 0) < DUNGEON_INVITE_PUSH_GAP_MS;
+    if (!pushedLately) d.pushed[friend.id] = now;
+    const school = schoolForProfile(state, p);
+    return { ok: true, friend: friend.name, _push: pushedLately ? [] : [{ to: [friend.id], title: `🗝️ ${school?.name || ''} ${p.display_name}의 던전 초대!`.replace('  ', ' '), body: `기말고사 지옥 · ${CUTS[d.cut].name}에 같이 가요. 초대 코드 ${d.code}`, url: '/?go=dungeon', tag: 'dungeon-invite', urgent: true }] };
+  }
+  if (path === '/dungeon/invite/decline' && method === 'POST') {
+    requireRole(p, 'student');
+    const d = (state.dungeons || []).find(x => x.id === str(body.id, 64) && (x.invites || []).includes(p.id));
+    if (!d) return { ok: true };
+    d.invites = d.invites.filter(id => id !== p.id);
+    return { ok: true };
+  }
+  if (path === '/dungeon/bot' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    const d = openDungeonFor(state, p.id, now);
+    if (!d || d.host_id !== p.id) fail('방장만 봇 동료를 부를 수 있어요.', 409);
+    if (dungeonMembers(d).length + Number(d.bots || 0) >= DUNGEON.MAX_PLAYERS) fail('파티가 가득 찼어요.', 409);
+    if (Number(d.bots || 0) >= DUNGEON_BOT_LIMIT) fail(`봇 동료는 ${DUNGEON_BOT_LIMIT}명까지예요.`, 409);
+    // 봇 동료는 방장의 범위 단어를 푼다. 봇이 낀 파티는 기록에서 빠진다(엔진 result.record).
+    const built = dungeonQuestionsFor(state, p, d.range_codes || []);
+    d.bots = Number(d.bots || 0) + 1;
+    return { room: dungeonRoomView(state, d, p), _dungeon: { action: 'bot', id: d.id, player: { id: `bot-${d.bots}`, name: `봇 동료 ${d.bots}`, grade: d.grade, pet: { key: 'robot', form: 2, name: 'AI 로보' }, questions: built.questions, bot: true } } };
+  }
+  if (path === '/dungeon/leave' && method === 'POST') {
+    requireRole(p, 'student');
+    const d = openDungeonFor(state, p.id, Date.now());
+    if (!d) return { ok: true };
+    // 로비에서 나가면 자리가 빈다. 판이 시작된 뒤에는 방이 끊김으로 처리한다(90초 뒤 포기, 보상 제외).
+    // 방장이 로비에서 나가면 방이 닫히고, 방이 그 사실을 한 번 보고한다.
+    d.left = [...new Set([...(d.left || []), p.id])];
+    return { ok: true, _dungeon: { action: 'leave', id: d.id, pid: p.id } };
   }
   // Yacha battle rooms. `_battle` in a response is consumed by the Cloudflare wrapper,
   // which forwards it to the battle room and strips it before replying.

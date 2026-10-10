@@ -513,7 +513,7 @@ function noticeModal() {
   };
 }
 // Notification links (/?go=yacha) and the app's shortcuts open that tab.
-const GO_TABS = new Set(['home', 'practice', 'exam', 'yacha', 'arcade', 'me', 'ranking', 'records', 'titles', 'challenge']);
+const GO_TABS = new Set(['home', 'practice', 'exam', 'yacha', 'arcade', 'me', 'ranking', 'records', 'titles', 'challenge', 'dungeon']);
 function openGo(go) {
   if (!GO_TABS.has(go) || !A.data || A.data.profile.role !== 'student' || A.screen || A.data.stats?.needs_pet_pick) return false;
   // V13.81: a 도전장 notification opens the challenge itself (or home, if it is gone).
@@ -526,6 +526,8 @@ function openGo(go) {
     });
     return true;
   }
+  // V13.128 던전 초대 알림(/?go=dungeon): 야차전의 던전 탭을 연다.
+  if (go === 'dungeon') { A.yachaTab = 'dungeon'; navigate('yacha'); return true; }
   navigate(go);
   if (go === 'home' || go === 'yacha') refresh().then(() => { if (!A.screen) renderKeepScroll(); }).catch(() => {});
   return true;

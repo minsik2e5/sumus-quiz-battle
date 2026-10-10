@@ -8,6 +8,7 @@ import { VocaStateObject } from '../cloudflare/worker.mjs';
 import { createLocalRepository, createSupabaseSync } from '../cloudflare/local-first.mjs';
 import { assembleState } from '../cloudflare/state-parts.mjs';
 import { runBattleRoomChecks } from './battle-room-check.mjs';
+import { runDungeonRoomChecks } from './dungeon-room-check.mjs';
 
 const deepCopy = value => structuredClone(value);
 
@@ -347,7 +348,7 @@ export async function runCloudflareCheck() {
 
 // pathToFileURL: a hand-built `file://${path}` never matches on Windows, which made this check exit 0 without running.
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  runCloudflareCheck().then(runBattleRoomChecks).catch(error => {
+  runCloudflareCheck().then(runBattleRoomChecks).then(runDungeonRoomChecks).catch(error => {
     console.error('[cloudflare-check] FAIL', error);
     process.exitCode = 1;
   });

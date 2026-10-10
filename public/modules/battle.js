@@ -17,6 +17,7 @@ import { bonusText } from './word-minigame.js';
 import { elementOf, paletteOf, tierOf, fxCap, fxShot, fxImpact, fxSpeedLines, fxPunch, fxSkillCutIn, fxSignature, fxLunge, fxRecoil, fxShield, fxHeal, fxPowerUp, fxToxic, fxEdge, fxRank, comboRank, auraLevel } from './battle-fx.js';
 import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterOpen, stageLevel, stageMonster, isBossStage } from './monsters.js';
 import { playSound, unlockSound, preloadSound } from './sound.js';
+import { openDungeon } from './dungeon.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
 // the match, and the result. A match runs in a battle room on the server (or, for a practice
@@ -256,6 +257,8 @@ function bindRoot() {
     if (act === 'monster-again') { const m = B.monsterSetup; nextScreen(); return m ? startMonster(m.stage, m.level, b) : null; }
     if (act === 'monster-more') { B.monsterAll = !B.monsterAll; lobby(); return; }
     if (act === 'monster-words') { B.monsterWordsOpen = !(B.monsterWordsOpen || !monsterWords().ok); lobby(); return; }
+    // V13.128 던전: 탭에서 던전 화면(dungeon.js, 전체 화면)으로 넘어간다. 나오면 야차전 던전 탭으로 돌아온다.
+    if (act === 'dungeon') { const { A, exit } = B; clearInterval(B.offerTimer); closeSocket(); root().onclick = null; root().oninput = null; B = null; host = null; A.yachaTab = 'dungeon'; return openDungeon(A, exit); }
     if (act === 'monster-list') { B.A.tab = 'yacha'; B.A.yachaTab = 'monster'; return leaveScreen(); }
     if (act === 'title') return openTitleDetail(B.A, b.dataset.key);
     if (act === 'create') return createRoom(b);
@@ -302,7 +305,7 @@ function rangeDeal(room) {
 
 function lobby() {
   const A = B.A, g = A.data.stats, h = B.history || { record: { wins: 0, losses: 0, draws: 0 }, battles: [], lost_today: 0, daily_loss_cap: 150 };
-  const tab = ['play', 'monster', 'league', 'me'].includes(B.tab) ? B.tab : 'play';
+  const tab = ['play', 'monster', 'dungeon', 'league', 'me'].includes(B.tab) ? B.tab : 'play';
   const pet = g.pet, league = h.league || A.data.league, r = h.record;
   const played = r.wins + r.losses + r.draws;
   main(`
@@ -326,8 +329,8 @@ function lobby() {
       </div>
       ${petSkillChip(pet)}
     </section>
-    <div class="ya-tabs" role="group" aria-label="야차전 메뉴">${[['play', '대결'], ['monster', '몬스터'], ['league', '리그'], ['me', '내 전적']].map(([key, label]) => `<button type="button" data-yb="tab" data-tab="${key}" class="${tab === key ? 'selected' : ''}" aria-pressed="${tab === key}">${key === 'monster' ? uiArt('monster-tab', 'ya-tab-art') : ''}${label}</button>`).join('')}</div>
-    ${tab === 'league' ? `<div class="lg-board" data-league-board data-period="${B.leaguePeriod === 'all' ? 'all' : 'week'}" data-fresh="1"></div>` : tab === 'me' ? myRecord(h) : tab === 'monster' ? monsterTab() : playTab(h)}`);
+    <div class="ya-tabs" role="group" aria-label="야차전 메뉴">${[['play', '대결'], ['monster', '몬스터'], ['dungeon', '던전'], ['league', '리그'], ['me', '내 전적']].map(([key, label]) => `<button type="button" data-yb="tab" data-tab="${key}" class="${tab === key ? 'selected' : ''}" aria-pressed="${tab === key}">${key === 'monster' ? uiArt('monster-tab', 'ya-tab-art') : ''}${label}</button>`).join('')}</div>
+    ${tab === 'league' ? `<div class="lg-board" data-league-board data-period="${B.leaguePeriod === 'all' ? 'all' : 'week'}" data-fresh="1"></div>` : tab === 'me' ? myRecord(h) : tab === 'dungeon' ? dungeonCard() : tab === 'monster' ? monsterTab() : playTab(h)}`);
   if (tab === 'league') mountLeagueBoard(document.querySelector('#yb-main [data-league-board]'), period => { B.leaguePeriod = period; });
 }
 // V13.72: what my pet does in a match, and what every pet does (the other player's too).
@@ -855,6 +858,11 @@ async function playTournament(tid, mid, button) {
 function showBracket(tid) {
   if (!B || !tid) return;
   openBracket(tid, B.A.data.profile.id, (B.A.data.tournaments || []).find(item => item.id === tid) || null);
+}
+
+// V13.128 던전 탭: 입구 카드(킬러 골렘 그림, 규칙 요약). 방 만들기 · 초대는 던전 화면에서.
+function dungeonCard() {
+  return `<section class="yb-card dg-tab-card"><img src="/assets/monsters/killergolem.webp" alt="" width="512" height="512" decoding="async" draggable="false"><div><span class="dg-kicker">2~3명 실시간 파티 · 같은 학년</span><h2>기말고사 지옥 던전</h2><p>친구와 함께 1층부터 보스 킬러 골렘까지! 맞히면 공격, 동료가 기절하면 3연속 정답으로 살려요. 빈자리는 봇 동료로 채울 수 있어요.</p><button type="button" class="btn primary full" data-yb="dungeon">던전 입장</button></div></section>`;
 }
 
 /* ---------- room connection ---------- */

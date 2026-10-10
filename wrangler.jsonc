@@ -25,6 +25,10 @@
       {
         "name": "BATTLE_ROOM",
         "class_name": "BattleRoom"
+      },
+      {
+        "name": "DUNGEON_ROOM",
+        "class_name": "DungeonRoom"
       }
     ]
   },
@@ -39,6 +43,12 @@
       "tag": "v2",
       "new_sqlite_classes": [
         "BattleRoom"
+      ]
+    },
+    {
+      "tag": "v3",
+      "new_sqlite_classes": [
+        "DungeonRoom"
       ]
     }
   ],
