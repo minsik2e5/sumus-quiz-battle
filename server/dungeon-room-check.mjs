@@ -1,7 +1,7 @@
 // V13.128 던전 방(cloudflare/dungeon-room.mjs) 검사. battle-room-check.mjs처럼 Durable Object 자리에 가짜 시계 ·
 // 저장소 · 알람 · 소켓을 두고 방을 끝까지 돌린다. cloudflare-check.mjs가 부른다.
 import assert from 'node:assert/strict';
-import { DungeonRoom, planBot, DUNGEON_BOT } from '../cloudflare/dungeon-room.mjs';
+import { DungeonRoom, planBot, DUNGEON_BOT, BOT_SPELL_SLOW } from '../cloudflare/dungeon-room.mjs';
 import { DUNGEON } from './dungeon-engine.mjs';
 import { settleDungeon, undoDungeon } from './service.mjs';
 
@@ -47,15 +47,15 @@ export async function runDungeonRoomChecks() {
     VOCA_STATE: { idFromName: name => name, get: () => ({ fetch: async (url, init) => { reports.push({ url, key: init.headers['X-Dungeon-Key'], body: JSON.parse(init.body) }); return new RealResponse('{}', { status: reportOk ? 200 : 503 }); } }) }
   };
   let seq = 0;
-  async function openRoom({ bots = 1, guests = ['b'] } = {}) {
+  async function openRoom({ bots = 1, guests = ['b'], words = questions } = {}) {
     const ctx = fakeCtx(), room = new DungeonRoom(ctx, env);
     let r = 0; room.random = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
     await room.ready;
     const id = `room-${++seq}`;
     const admin = msg => room.admin({ id, ...msg }).then(res => res.json().then(body => ({ status: res.status, ...body })));
-    assert.equal((await admin({ action: 'init', cut: 'c3', grade: '고1', host: player('a'), ticket: 't-a', seed: 7, lobby_until: clock + 15 * 60000 })).ok, true, '방 만들기');
-    for (const g of guests) assert.equal((await admin({ action: 'join', player: player(g), ticket: 't-' + g })).ok, true, '참가');
-    for (let i = 1; i <= bots; i++) assert.equal((await admin({ action: 'bot', player: player(`bot-${i}`, { name: `봇 동료 ${i}`, bot: true }) })).ok, true, '봇 동료');
+    assert.equal((await admin({ action: 'init', cut: 'c3', grade: '고1', host: player('a', { questions: words }), ticket: 't-a', seed: 7, lobby_until: clock + 15 * 60000 })).ok, true, '방 만들기');
+    for (const g of guests) assert.equal((await admin({ action: 'join', player: player(g, { questions: words }), ticket: 't-' + g })).ok, true, '참가');
+    for (let i = 1; i <= bots; i++) assert.equal((await admin({ action: 'bot', player: player(`bot-${i}`, { name: `봇 동료 ${i}`, bot: true, questions: words }) })).ok, true, '봇 동료');
     const sockets = {};
     const connect = async pid => { await room.accept(new URL(`https://dungeon/ws?ticket=t-${pid}`)); sockets[pid] = ctx.getWebSockets(pid).at(-1); return sockets[pid]; };
     for (const pid of ['a', ...guests]) await connect(pid);
@@ -208,10 +208,37 @@ export async function runDungeonRoomChecks() {
       assert.equal(planBot(q, () => 0).at, 1000 + DUNGEON_BOT.min, '가장 빠르면 min 뒤');
       assert.equal(planBot(q, () => 0.99).at, null, '제한 시간 안에 못 하면 답하지 않는다(시간 초과)');
       assert(planBot(q, () => 0.5).right && !planBot(q, () => 0.99).right, `정답률 ${DUNGEON_BOT.accuracy}`);
+      assert.equal(planBot({ ...q, kind: 'spell', deadline: 1000 + 16000 }, () => 0).at, 1000 + Math.round(DUNGEON_BOT.min * BOT_SPELL_SLOW), 'V13.130 영어 쓰기 문제는 봇도 ×1.8 오래 걸린다');
+    });
+
+    /* ---------- 9. V13.130 영어 쓰기: 폰은 글자 하나와 문제 번호만, 방이 채점 ---------- */
+    await check('9 영어 쓰기 글자', async () => {
+      const spellWords = Array.from({ length: 130 }, (_, i) => ({ word_id: 's' + i, prompt: 'abcdefghij'.slice(0, 4 + (i % 4)) + 'xyz'[i % 3], meaning: '뜻' + i, wrong: [1, 2, 3, 4, 5].map(k => `오답${i}-${k}`), wrong_en: [1, 2, 3, 4, 5].map(k => `word${i}${k}`) }));
+      const { room, sockets } = await openRoom({ bots: 1, guests: [], words: spellWords });
+      await send(room, sockets.a, { type: 'ready' });
+      clock += DUNGEON.INTRO_MS; await room.alarm();
+      const s = room.room.state;
+      for (let i = 0; i < 12 && s.players.a.q?.kind !== 'spell'; i++) {
+        const q = s.players.a.q;
+        if (q) await send(room, sockets.a, { type: 'answer', choice: q.answer, n: q.n });
+        clock += DUNGEON.REVEAL_MS + 10; await room.alarm();
+      }
+      const q = s.players.a.q;
+      assert(q?.kind === 'spell', '네 번째 문제는 영어 쓰기');
+      const v = lastView(sockets.a).question;
+      assert(v.kind === 'spell' && v.tiles.length >= 10 && !JSON.stringify(v).includes(`"${q.word}"`), '폰이 받은 쓰기 문제에는 정답 철자가 없다');
+      const seq = s.seq;
+      for (const bad of [{ type: 'letter', ch: 7, n: q.n }, { type: 'letter', ch: q.word[0] }, { type: 'letter', ch: q.word[0], n: q.n - 1 }, { type: 'answer', choice: 0, n: q.n }]) await send(room, sockets.a, bad);
+      assert(room.room.state.seq === seq && room.room.state.players.a.q.pos === 0, '글자가 아닌 것 · 번호 없는 글자 · 지난 번호 · 보기 번호 답은 무시한다');
+      sockets.a.sent.length = 0;
+      for (const ch of q.word) await send(room, sockets.a, { type: 'letter', ch, n: q.n });
+      const events = sockets.a.sent.filter(m => m.type === 'events').flatMap(m => m.events);
+      const letters = events.filter(e => e.type === 'letter'), done = events.find(e => e.type === 'answered' && e.pid === 'a');
+      assert(letters.length === q.word.length && letters.every((e, i) => e.ok && e.pos === i + 1 && !('ch' in e)) && done?.right && done.word === q.word && events.some(e => e.type === 'hit' && e.kind === 'spell'), '글자마다 몇 칸인지만 알리고, 다 쓰면 정답 · 쓰기 피해');
     });
 
     if (failures.length) throw Error(`[dungeon-room-check] FAIL\n  - ${failures.join('\n  - ')}`);
-    console.log('[dungeon-room-check] PASS lobby/ready · full run with bot · one report · lobby close · join refused · messages · reconnect · report backoff · bot plan');
+    console.log('[dungeon-room-check] PASS lobby/ready · full run with bot · one report · lobby close · join refused · messages · reconnect · report backoff · bot plan · spelling letters');
   } finally {
     Date.now = realNow;
     globalThis.Response = RealResponse;

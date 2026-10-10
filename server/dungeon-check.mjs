@@ -1,8 +1,8 @@
 // Release checks for V13.126 던전 엔진 (server/dungeon-engine.mjs, docs/dungeon-design.md 2~8번):
-// 입장 조건, 등급컷 열림, 문제 풀 보충, 보기 수, 피해 계산, 파티 게이지, 기절·부활, 끊김·포기,
+// 입장 조건, 등급컷 열림, 문제 풀 보충, 보기 수, 피해 계산, 파티 게이지, 기절·부활, 끊김·포기, 문제 종류(V13.130),
 // 휴식과 기록 시계, 보스 3페이즈, 만점 모드, 결과 보고 키, 시뮬레이션 클리어율.
-import { createDungeon, join, ready, leave, disconnect, reconnect, answer, tick, nextWake, view, openCuts, partyCuts, dungeonPool, hitDamage, floorSpec, gradeExtraMs, reportId, dungeonCoins, DUNGEON_COINS, DUNGEON, CUTS, FLOORS, MONSTERS, TRAITS, BOSS } from './dungeon-engine.mjs';
-import { clearRate, run, student, seeded } from './dungeon-sim.mjs';
+import { createDungeon, join, ready, leave, disconnect, reconnect, answer, letter, settle as settleOne, kindOf, spellable, spellLimit, KIND_NAMES, tick, nextWake, view, openCuts, partyCuts, dungeonPool, hitDamage, floorSpec, gradeExtraMs, reportId, dungeonCoins, DUNGEON_COINS, DUNGEON, CUTS, FLOORS, MONSTERS, TRAITS, BOSS } from './dungeon-engine.mjs';
+import { clearRate, run, student, seeded, SIM_WORDS } from './dungeon-sim.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
 
 const WORDS = Array.from({ length: 130 }, (_, i) => ({ word_id: 'w' + i, prompt: 'word' + i, meaning: '뜻' + i, wrong: [1, 2, 3, 4, 5].map(k => '뜻' + ((i + k * 11) % 130)) }));
@@ -244,6 +244,58 @@ export function runDungeonChecks(assert) {
   assert(dungeonCoins({ cut: 'c3', cleared: true, right: 60 }) === 30 && dungeonCoins({ cut: 'c3', cleared: true, right: 200 }) === 40 && dungeonCoins({ cut: 'c2', cleared: true, right: 200 }) === 50 && dungeonCoins({ cut: 'c1', cleared: true, right: 200 }) === 60 && dungeonCoins({ cut: 'c1', cleared: true, right: 50 }) === 35, 'V13.126 던전 반복 클리어 코인: 정답 1개당 0.5 · 0.6 · 0.7, 한 판 최대 40 · 50 · 60');
   assert(DUNGEON_COINS.daily === 3 && dungeonCoins({ cut: 'c3', cleared: true, right: 80, today: 2 }) === 40 && dungeonCoins({ cut: 'c3', cleared: true, right: 80, today: 3 }) === 0, 'V13.126 던전 반복 보상은 하루 3회까지(그 뒤에도 플레이는 되고 보상만 없다)');
   assert(dungeonCoins({ cut: 'c3', cleared: false, right: 80 }) === 0 && dungeonCoins({ cut: 'c3', cleared: true, first: true, reward: false }) === 0 && dungeonCoins({ cut: 'max', cleared: true, first: true }) === 0 && dungeonCoins({ cut: 'c3', cleared: true, right: -5 }) === 0, 'V13.126 실패 · 봇 · 포기 · 만점 모드는 아직 코인이 없다(위로 보상 수치는 미정)');
+
+  /* ---------- V13.130 문제 종류: 뜻 고르기 · 영어 고르기 · 영어 쓰기 ---------- */
+  {
+    const kinds = [];
+    const s = createDungeon({ id: 'k', cut: 'c3', grade: '중2', seed: 9, now: 0 });
+    for (let i = 0; i < 3; i++) join(s, member('p' + i, { pet: { key: ['dog', 'cat', 'owl'][i] }, questions: SIM_WORDS }), 0);
+    for (let i = 0; i < 3; i++) ready(s, 'p' + i, 0);
+    let t = DUNGEON.INTRO_MS; tick(s, t);
+    for (let i = 0; i < 5; i++) { kinds.push(q(s, 'p0').kind); if (i < 4) { settleOne(s, 'p0', true, t + 200); t = settle(s, t + 200); } }
+    assert(DUNGEON.KINDS.join() === 'mean,eng,mean,spell,eng' && kinds.join() === DUNGEON.KINDS.join() && KIND_NAMES.spell === '영어 쓰기', `V13.130 문제 종류는 학생마다 뜻 고르기 → 영어 고르기 → 뜻 고르기 → 영어 쓰기 → 영어 고르기 순서로 돈다 (${kinds.join()})`);
+    assert(kindOf({ served: 3 }, { prompt: 'look up', wrong_en: ['a', 'b', 'c', 'd', 'e'] }) === 'eng' && kindOf({ served: 3 }, { prompt: 'look up' }) === 'mean' && kindOf({ served: 1 }, { prompt: 'apple' }) === 'mean' && kindOf({ served: 3 }, { prompt: 'Apple', wrong_en: ['a', 'b', 'c', 'd', 'e'] }) === 'spell' && !spellable('ab') && !spellable('elevenletter') && spellable('memorize'), 'V13.130 쓸 수 없는 단어(띄어쓰기 · 3글자 미만 · 11글자 이상)는 영어 고르기로, 영어 오답이 모자라면 뜻 고르기로 바뀐다');
+    const eng = createDungeon({ id: 'e', cut: 'c3', grade: '중2', seed: 4, now: 0 });
+    for (let i = 0; i < 2; i++) join(eng, member('p' + i, { questions: SIM_WORDS }), 0);
+    ready(eng, 'p0', 0); ready(eng, 'p1', 0); tick(eng, DUNGEON.INTRO_MS);
+    settleOne(eng, 'p0', true, DUNGEON.INTRO_MS + 100); tick(eng, DUNGEON.INTRO_MS + 100 + DUNGEON.REVEAL_MS);
+    const qe = q(eng, 'p0'), src = SIM_WORDS.find(w => w.word_id === qe.word_id), ve = view(eng, 'p0').question;
+    assert(qe.kind === 'eng' && qe.prompt === src.meaning && qe.options[qe.answer] === src.prompt && qe.options.every(o => o === src.prompt || src.wrong_en.includes(o)) && ve.kind === 'eng' && !('answer' in ve), 'V13.130 영어 고르기: 뜻을 보여 주고 보기는 영어(정답 + 영어 오답), 폰에는 정답 번호가 가지 않는다');
+  }
+  {
+    // 영어 쓰기: p0의 네 번째 문제가 쓰기다.
+    const s = createDungeon({ id: 'sp', cut: 'c3', grade: '중2', seed: 21, now: 0 });
+    for (let i = 0; i < 3; i++) join(s, member('p' + i, { pet: { key: ['dog', 'cat', 'owl'][i] }, questions: SIM_WORDS }), 0);
+    for (let i = 0; i < 3; i++) ready(s, 'p' + i, 0);
+    let t = DUNGEON.INTRO_MS; tick(s, t);
+    for (let i = 0; i < 3; i++) { settleOne(s, 'p0', true, t + 200); t = settle(s, t + 200); }
+    const qs = q(s, 'p0'), vq = view(s, 'p0', t).question;
+    const limit = floorSpec('c3', 1).limit + gradeExtraMs('중2');
+    assert(qs.kind === 'spell' && vq.kind === 'spell' && vq.tiles.length >= DUNGEON.SPELL_TILES_MIN && vq.tiles.length <= DUNGEON.SPELL_TILES_MAX && [...qs.word].every(c => vq.tiles.includes(c)) && vq.len === qs.word.length && vq.filled === '' && vq.miss === 0 && !('word' in vq) && !('options' in vq) && !JSON.stringify(vq).includes(`"${qs.word}"`) && vq.prompt === SIM_WORDS.find(w => w.word_id === qs.word_id).meaning, 'V13.130 영어 쓰기: 뜻과 글자 칸(단어 글자 + 헷갈리는 글자, 10~14칸)만 보내고 정답 철자는 폰에 보내지 않는다');
+    assert(qs.deadline - qs.started_at === spellLimit(limit, qs.word) && spellLimit(limit, qs.word) === Math.min(16000, Math.round(limit * 1.8 + qs.word.length * 250)) && spellLimit(8000, 'abcdefghij') === 16000, 'V13.130 쓰기 제한 시간 = 그 층 제한 시간 × 1.8 + 글자당 0.25초(최대 16초)');
+    answer(s, 'p0', 0, t + 100, qs.n);
+    assert(q(s, 'p0') === qs && qs.pos === 0, 'V13.130 쓰기 문제에는 보기 번호 답(answer)이 통하지 않는다');
+    const first = letter(s, 'p0', qs.word[0].toUpperCase(), t + 150, qs.n), ev = first.find(e => e.type === 'letter');
+    assert(ev && ev.ok && ev.pos === 1 && !('ch' in ev) && view(s, 'p0', t + 150).question.filled === qs.word[0] && letter(s, 'p0', 'ab', t + 160, qs.n).length === 0 && letter(s, 'p0', qs.word[1], t + 160, qs.n + 1).length === 0, 'V13.130 맞는 글자면 한 칸 채운다(대소문자 무시). 이벤트에는 몇 칸인지만 있고 글자는 없으며, 두 글자 · 지난 문제 번호는 무시한다');
+    const hp = s.monster.hp;
+    let out = [], at = t + 200;
+    for (let i = 1; i < qs.word.length; i++) { out = letter(s, 'p0', qs.word[i], at, qs.n); at += 120; }
+    const done = out.find(e => e.type === 'answered'), hit = out.find(e => e.type === 'hit');
+    assert(done?.right && done.kind === 'spell' && done.word === qs.word && hit?.kind === 'spell' && hp - s.monster.hp === hit.damage && hitDamage({ bonus: DUNGEON.SPELL_BONUS }) === 16 && hitDamage({}) === 10, 'V13.130 마지막 칸을 채우면 정답: 쓰기 정답은 피해 ×1.6(같은 속도 · 콤보에서 10 → 16), 끝난 뒤에야 철자를 알려 준다');
+    // 틀린 글자 3번이면 오답, 맞는 피해는 ×0.4.
+    t = settle(s, at);
+    for (let i = 0; i < 6 && q(s, 'p0')?.kind !== 'spell'; i++) { settleOne(s, 'p0', true, t + 100); t = settle(s, t + 100); }
+    const q2 = q(s, 'p0'), bad = 'abcdefghijklmnopqrstuvwxyz'.split('').find(c => c !== q2.word[0]);
+    const hp0 = s.players.p0.hp;
+    let o2 = [];
+    for (let i = 0; i < DUNGEON.SPELL_MISS; i++) o2 = letter(s, 'p0', bad, t + 100 + i * 50, q2.n);
+    const miss = o2.find(e => e.type === 'answered'), struck = o2.find(e => e.type === 'struck');
+    const full = Math.round((CUTS.c3.hit + FLOORS[0].hitAdd) * DUNGEON.SPELL_MISS_HIT);
+    assert(q2.kind === 'spell' && miss && !miss.right && miss.word === q2.word && struck?.damage === full && hp0 - s.players.p0.hp === full && DUNGEON.SPELL_MISS === 3 && DUNGEON.SPELL_MISS_HIT === .4, `V13.130 틀린 글자 3번이면 오답(정답 철자를 보여 줌), 쓰기 오답에 맞는 피해는 ×0.4 (${struck?.damage})`);
+    const bot = createDungeon({ id: 'b', cut: 'c3', grade: '중2', seed: 3, now: 0 });
+    join(bot, member('a', { questions: SIM_WORDS }), 0); join(bot, member('b', { questions: SIM_WORDS }), 0); ready(bot, 'a', 0); ready(bot, 'b', 0); tick(bot, DUNGEON.INTRO_MS);
+    assert(settleOne(bot, 'a', true, DUNGEON.INTRO_MS + 100).some(e => e.type === 'answered' && e.right) && settleOne(bot, 'a', true, DUNGEON.INTRO_MS + 200).length === 0, 'V13.130 settle(봇 동료 · 시뮬레이션)은 문제 종류와 상관없이 맞힘 · 틀림으로 바로 푼다(답한 뒤에는 다음 문제 전까지 아무 일도 없다)');
+  }
 
   /* ---------- 같은 씨앗이면 같은 판 · 시뮬레이션 ---------- */
   const once = seed => { const r = seeded(seed); return JSON.stringify(run('c2', [student(r), student(r), student(r)], r, { grade: '중2', pets: ['dog', 'cat', 'owl'] })); };

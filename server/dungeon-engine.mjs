@@ -54,8 +54,24 @@ export const DUNGEON = {
   ENDLESS_BOSS_EVERY: 5,
   ENDLESS_HP_GROW: 1.06,
   ENDLESS_LIMIT_STEP: 100,
-  ENDLESS_LIMIT_MIN: 3000
+  ENDLESS_LIMIT_MIN: 3000,
+  // V13.130 문제 종류: mean(영어 → 뜻 고르기) · eng(뜻 → 영어 고르기) · spell(뜻 → 영어 쓰기).
+  // 학생마다 문제 번호 순서로 돌아간다(뜻 40% · 영어 40% · 쓰기 20%). 쓸 수 없는 단어(띄어쓰기 · 기호 · 3글자 미만
+  // · 11글자 이상)는 영어 고르기로, 영어 오답이 모자란 단어는 뜻 고르기로 바꾼다.
+  KINDS: ['mean', 'eng', 'mean', 'spell', 'eng'],
+  SPELL_TIME: 1.8,           // 쓰기 제한 시간 = 그 층 제한 시간 × 1.8 + 글자당 0.25초 (최대 16초)
+  SPELL_PER_LETTER_MS: 250,
+  SPELL_MAX_MS: 16000,
+  SPELL_MISS: 3,             // 틀린 글자 3번이면 오답
+  SPELL_BONUS: 1.6,          // 쓰기 정답은 피해 ×1.6 (더 어렵고 오래 걸린다)
+  SPELL_MISS_HIT: 0.4,       // 쓰기를 틀리면 몬스터에게 맞는 피해 ×0.4 (뜻을 아는데 철자만 틀리는 일이 많다)
+  SPELL_TILES_MIN: 10,       // 글자 칸 = 단어 글자 + 헷갈리는 글자, 10~14칸
+  SPELL_TILES_MAX: 14
 };
+export const KIND_NAMES = { mean: '뜻 고르기', eng: '영어 고르기', spell: '영어 쓰기' };
+const DECOY_LETTERS = 'abcdefghilmnoprstuvwy';
+// 쓸 수 있는 단어: 알파벳만 3~10글자.
+export const spellable = word => /^[a-z]{3,10}$/.test(String(word || '').trim().toLowerCase());
 
 // 등급컷(난이도). 앞 단계를 깨야 다음이 열린다. `hp`: 몬스터 체력 배율, `hit`: 오답·시간 초과 피격.
 // 몬스터 체력·제한 시간·피격은 시뮬레이션(server/dungeon-sim.mjs)으로 맞춘 확정값이다.
@@ -206,7 +222,7 @@ export function createDungeon({ id, cut = 'c3', grade, host, dungeon = 'final-he
   };
 }
 
-// 참가. player: { id, name, grade, pet: { key, … }, questions: [{ word_id, prompt, meaning, wrong: [5개 이상] }],
+// 참가. player: { id, name, grade, pet: { key, … }, questions: [{ word_id, prompt, meaning, wrong: [5개 이상], wrong_en: [영어 오답 5개, 없으면 영어 고르기 대신 뜻 고르기] }],
 // cleared: ['c3', …], bot }. 같은 학년, 최대 3명, 문제 풀 120단어 이상, 이 등급컷이 열린 학생만 들어온다.
 export function join(state, player, now) {
   const out = [];
@@ -292,6 +308,15 @@ function limitOf(state, p) {
   const rage = state.monster?.boss && state.monster.stage === 3 ? DUNGEON.RAGE_MS : 0;
   return Math.max(DUNGEON.MIN_LIMIT_MS, spec.limit + p.extra_ms + (trait?.limit || 0) - rage);
 }
+export const spellLimit = (limit, word) => Math.min(DUNGEON.SPELL_MAX_MS, Math.round(limit * DUNGEON.SPELL_TIME + String(word).length * DUNGEON.SPELL_PER_LETTER_MS));
+// 이번 문제의 종류. 학생마다 낸 문제 수(served)로 돌아가므로 같은 씨앗이면 같은 순서다.
+export function kindOf(p, q) {
+  const engOk = Array.isArray(q.wrong_en) && q.wrong_en.length >= 5;
+  let kind = DUNGEON.KINDS[p.served % DUNGEON.KINDS.length];
+  if (kind === 'spell' && !spellable(q.prompt)) kind = 'eng';
+  if (kind === 'eng' && !engOk) kind = 'mean';
+  return kind;
+}
 function nextWord(state, p) {
   if (p.retry.length && p.retry[0].due <= p.served) return p.retry.shift().q;
   const q = p.questions[p.cursor % p.questions.length];
@@ -300,25 +325,35 @@ function nextWord(state, p) {
 }
 function serve(state, p, now) {
   if (p.out || p.down || !p.connected || state.phase !== 'fight') return [];
-  const q = nextWord(state, p), n = floorSpec(state.cut, state.floor).options;
-  const options = shuffle(state, [q.meaning, ...shuffle(state, q.wrong).slice(0, n - 1)]);
-  const answer = options.indexOf(q.meaning);
-  const wrongIdx = options.map((_, i) => i).filter(i => i !== answer);
-  const trait = state.monster?.trait;
-  // 특징: 붕대는 오답 한 칸을 가린다. 빨간펜 X는 바로 앞 문제를 틀렸을 때 오답 한 칸에 X. 정답은 가리지 않는다.
-  const covered = trait === 'bandage' ? pick(state, wrongIdx) : null;
-  const marked = trait === 'redx' && p.last_wrong ? pick(state, wrongIdx.filter(i => i !== covered)) : null;
+  const q = nextWord(state, p), n = floorSpec(state.cut, state.floor).options, kind = kindOf(p, q);
   p.served++;
-  p.q = { n: p.served, word_id: q.word_id, prompt: q.prompt, options, answer, covered, marked, started_at: now, deadline: now + limitOf(state, p), src: q };
+  if (kind === 'spell') {
+    // 영어 쓰기: 단어 글자와 헷갈리는 글자를 섞은 칸. 정답 철자는 폰에 보내지 않고 글자마다 방이 채점한다.
+    const word = String(q.prompt).trim().toLowerCase();
+    const size = Math.max(DUNGEON.SPELL_TILES_MIN, Math.min(DUNGEON.SPELL_TILES_MAX, word.length + 3));
+    const tiles = shuffle(state, [...word, ...Array.from({ length: size - word.length }, () => pick(state, DECOY_LETTERS))]);
+    p.q = { n: p.served, kind, word_id: q.word_id, prompt: q.meaning, word, tiles, pos: 0, miss: 0, options: null, answer: null, covered: null, marked: null, started_at: now, deadline: now + spellLimit(limitOf(state, p), word), src: q };
+  } else {
+    // 뜻 고르기는 영어를 보고 뜻을, 영어 고르기는 뜻을 보고 영어를 고른다.
+    const right = kind === 'eng' ? q.prompt : q.meaning, wrong = kind === 'eng' ? q.wrong_en : q.wrong;
+    const options = shuffle(state, [right, ...shuffle(state, wrong).slice(0, n - 1)]);
+    const answer = options.indexOf(right);
+    const wrongIdx = options.map((_, i) => i).filter(i => i !== answer);
+    const trait = state.monster?.trait;
+    // 특징: 붕대는 오답 한 칸을 가린다. 빨간펜 X는 바로 앞 문제를 틀렸을 때 오답 한 칸에 X. 정답은 가리지 않는다.
+    const covered = trait === 'bandage' ? pick(state, wrongIdx) : null;
+    const marked = trait === 'redx' && p.last_wrong ? pick(state, wrongIdx.filter(i => i !== covered)) : null;
+    p.q = { n: p.served, kind, word_id: q.word_id, prompt: kind === 'eng' ? q.meaning : q.prompt, options, answer, covered, marked, started_at: now, deadline: now + limitOf(state, p), src: q };
+  }
   p.next_at = null;
   return [event(state, 'question', { pid: p.id, n: p.served, deadline: p.q.deadline })];
 }
 
 /* ---------- 피해 ---------- */
-export function hitDamage({ leftShare = 0, combo = 0, element = 1, armor = 1 }) {
+export function hitDamage({ leftShare = 0, combo = 0, element = 1, armor = 1, bonus = 1 }) {
   const speed = 1 + DUNGEON.SPEED_BONUS * Math.max(0, Math.min(1, leftShare));
   const comboMult = Math.min(DUNGEON.COMBO_MAX, 1 + DUNGEON.COMBO_UP * Math.floor(combo / DUNGEON.COMBO_STEP));
-  return Math.max(1, Math.round(DUNGEON.HIT * speed * comboMult * element * armor));
+  return Math.max(1, Math.round(DUNGEON.HIT * speed * comboMult * element * armor * bonus));
 }
 function damageMonster(state, amount, pid, now, kind) {
   const m = state.monster;
@@ -493,19 +528,50 @@ export function answer(state, pid, choice, now, n = null) {
   if (now > p.q.deadline) return tick(state, now);
   const out = tick(state, now);
   if (state.phase !== 'fight' || !p.q || (n !== null && n !== p.q.n)) return out;
+  if (p.q.kind === 'spell') return out; // 쓰기 문제는 글자(letter)로만 푼다
   const c = Number.isInteger(choice) ? choice : typeof choice === 'string' && /^\d{1,2}$/.test(choice) ? Number(choice) : -1;
   if (!Number.isInteger(c) || c < 0 || c >= p.q.options.length || c === p.q.covered) return out;
   return [...out, ...resolve(state, p, c === p.q.answer, now, false)];
 }
+// V13.130 영어 쓰기: 학생이 글자 칸 하나를 눌렀다(글자 하나와 문제 번호만). 다음 글자와 같으면 한 칸 채우고,
+// 다 채우면 정답. 다르면 실수 하나, 실수 3번이면 오답. 이벤트에는 몇 칸 채웠는지만 있고 글자는 없다.
+export function letter(state, pid, ch, now, n = null) {
+  const p = state.players[pid];
+  if (state.phase !== 'fight' || !p || p.q?.kind !== 'spell' || p.down || p.out) return [];
+  if (n !== null && n !== p.q.n) return [];
+  if (now > p.q.deadline) return tick(state, now);
+  const out = tick(state, now);
+  const q = p.q;
+  if (state.phase !== 'fight' || q?.kind !== 'spell' || (n !== null && n !== q.n)) return out;
+  const c = typeof ch === 'string' ? ch.toLowerCase() : '';
+  if (!/^[a-z]$/.test(c)) return out;
+  const ok = c === q.word[q.pos];
+  if (ok) q.pos++; else q.miss++;
+  out.push(event(state, 'letter', { pid, n: q.n, ok, pos: q.pos, miss: q.miss }));
+  if (q.pos >= q.word.length) out.push(...resolve(state, p, true, now, false));
+  else if (q.miss >= DUNGEON.SPELL_MISS) out.push(...resolve(state, p, false, now, false));
+  return out;
+}
+// 봇 동료와 시뮬레이션: 문제 종류와 상관없이 맞힘 · 틀림으로 바로 푼다(사람의 답은 answer · letter로만).
+export function settle(state, pid, right, now, n = null) {
+  const p = state.players[pid];
+  if (state.phase !== 'fight' || !p || !p.q || p.down || p.out) return [];
+  if (n !== null && n !== p.q.n) return [];
+  if (now > p.q.deadline) return tick(state, now);
+  const out = tick(state, now);
+  if (state.phase !== 'fight' || !p.q || (n !== null && n !== p.q.n)) return out;
+  return [...out, ...resolve(state, p, !!right, now, false)];
+}
 function resolve(state, p, right, now, timeout) {
   const q = p.q, m = state.monster, out = [];
   p.q = null; p.answered++;
-  out.push(event(state, 'answered', { pid: p.id, n: q.n, right, timeout, answer: q.answer }));
+  out.push(event(state, 'answered', { pid: p.id, n: q.n, kind: q.kind, right, timeout, answer: q.answer, ...(q.kind === 'spell' ? { word: q.word } : {}) }));
   if (right) {
     p.right++; p.combo++; p.best_combo = Math.max(p.best_combo, p.combo); p.last_wrong = false;
     const leftShare = (q.deadline - now) / (q.deadline - q.started_at);
     const armor = TRAITS[m.trait]?.armor || 1;
-    out.push(...damageMonster(state, hitDamage({ leftShare, combo: p.combo, element: state.element_bonus, armor }), p.id, now, 'answer'));
+    const bonus = q.kind === 'spell' ? DUNGEON.SPELL_BONUS : 1;
+    out.push(...damageMonster(state, hitDamage({ leftShare, combo: p.combo, element: state.element_bonus, armor, bonus }), p.id, now, q.kind === 'spell' ? 'spell' : 'answer'));
     if (state.phase !== 'fight') return out;
     if (p.mark_left > 0 && --p.mark_left === 0 && m.mark === p.id) { m.mark = null; m.blocked++; out.push(event(state, 'mark_blocked', { pid: p.id })); }
     out.push(...addGauge(state, p.id, now));
@@ -519,7 +585,7 @@ function resolve(state, p, right, now, timeout) {
     p.retry.push({ due: p.served + DUNGEON.RETRY_GAP, q: q.src });
     const marked = p.mark_left > 0 && m.mark === p.id;
     if (marked) { p.mark_left = 0; m.mark = null; out.push(event(state, 'mark_failed', { pid: p.id })); }
-    out.push(...monsterStrike(state, p, now, marked ? DUNGEON.MARK_HIT : 1));
+    out.push(...monsterStrike(state, p, now, (marked ? DUNGEON.MARK_HIT : 1) * (q.kind === 'spell' ? DUNGEON.SPELL_MISS_HIT : 1)));
   }
   if (state.phase === 'fight' && !p.down && !p.out && p.connected) p.next_at = now + DUNGEON.REVEAL_MS;
   return out;
@@ -590,6 +656,13 @@ export function nextWake(state) {
 }
 
 /* ---------- 화면에 보낼 것 ---------- */
+// 내 문제. 고르기 문제는 보기만(정답 번호 없음), 쓰기 문제는 글자 칸과 이미 맞힌 앞 글자만 보낸다.
+function questionView(q) {
+  const base = { n: q.n, kind: q.kind || 'mean', prompt: q.prompt, started_at: q.started_at, deadline: q.deadline };
+  return q.kind === 'spell'
+    ? { ...base, tiles: q.tiles, len: q.word.length, filled: q.word.slice(0, q.pos), miss: q.miss, miss_max: DUNGEON.SPELL_MISS }
+    : { ...base, options: q.options, covered: q.covered, marked: q.marked };
+}
 // 한 학생에게 보내는 상태. 정답 번호와 다른 학생의 문제는 보내지 않는다.
 export function view(state, pid, now = null) {
   const me = state.players[pid];
@@ -610,7 +683,7 @@ export function view(state, pid, now = null) {
       return { id, name: p.name, pet: p.pet, element: p.element, bot: p.bot, ready: p.ready, connected: p.connected, out: p.out,
         hp: p.hp, max_hp: DUNGEON.MAX_HP, down: p.down, combo: p.combo, rescue: p.rescue, mark_left: p.mark_left, right: p.right, answered: p.answered };
     }),
-    question: me?.q ? { n: me.q.n, prompt: me.q.prompt, options: me.q.options, covered: me.q.covered, marked: me.q.marked, started_at: me.q.started_at, deadline: me.q.deadline } : null,
+    question: me?.q ? questionView(me.q) : null,
     result: state.result
   };
 }

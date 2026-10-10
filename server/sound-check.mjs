@@ -12,10 +12,10 @@ export function runSoundChecks(assert) {
   const dir = '../public/assets/sfx/';
   const files = readdirSync(here(dir)).filter(name => name.endsWith('.mp3'));
   const sizes = Object.fromEntries(files.map(name => [name.slice(0, -4), statSync(here(dir + name)).size]));
-  assert(SOUND_KEYS.length === 26 && SOUND_KEYS.every(key => sizes[key] > 0) && files.length === SOUND_KEYS.length, 'V13.116 효과음 26개(key마다 public/assets/sfx/<key>.mp3 하나)가 있고 남는 파일이 없다');
+  assert(SOUND_KEYS.length === 49 && SOUND_KEYS.every(key => sizes[key] > 0) && files.length === SOUND_KEYS.length, 'V13.116 효과음(V13.130: 던전 전투 23개를 더해 49개, key마다 public/assets/sfx/<key>.mp3 하나)이 있고 남는 파일이 없다');
   const mp3 = name => { const b = readFileSync(here(dir + name + '.mp3')); return (b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0); };
   const total = Object.values(sizes).reduce((a, b) => a + b, 0);
-  assert(SOUND_KEYS.every(mp3) && SOUND_KEYS.every(key => sizes[key] <= 200 * 1024) && total <= 1.2 * 1024 * 1024, `V13.116 효과음은 모두 mp3이고 하나에 200KB, 합쳐서 1.2MB 이하다 (지금 ${Math.round(total / 1024)}KB)`);
+  assert(SOUND_KEYS.every(mp3) && SOUND_KEYS.every(key => sizes[key] <= 200 * 1024) && total <= 2 * 1024 * 1024, `V13.116 효과음은 모두 mp3이고 하나에 200KB, 합쳐서 2MB 이하다(V13.130: 1.2MB → 2MB, 처음 쓸 때만 받는다) (지금 ${Math.round(total / 1024)}KB)`);
   assert(SOUND_KEYS.every(key => SOUND_GAIN[key] > 0 && SOUND_GAIN[key] <= 1), 'V13.116 효과음마다 기본 음량(0~1)이 있다');
 
   const sound = read('../public/modules/sound.js');
@@ -33,5 +33,11 @@ export function runSoundChecks(assert) {
   const build = read('build-assets.mjs');
   assert(build.includes('webmanifest|mp3)$/') && build.includes('assets\\/.+\\.(?:webp|mp3))$/'), 'V13.116 효과음 파일도 배포 해시에 들어가고(바뀌면 설치된 앱이 새로 받음), 처음 쓸 때 받아 둔다');
   const doc = read('../docs/sound-library.md');
-  assert(SOUND_KEYS.every(key => doc.includes(`\`${key}\``)) && doc.includes('CC0') && doc.includes('Mixkit'), 'V13.116 docs/sound-library.md에 효과음 26개의 출처와 라이선스가 있다');
+  assert(SOUND_KEYS.every(key => doc.includes(`\`${key}\``)) && doc.includes('CC0') && doc.includes('Mixkit'), 'V13.116 docs/sound-library.md에 효과음 49개의 출처와 라이선스가 있다');
+
+  /* ---------- V13.130 던전 전투 효과음 ---------- */
+  const dungeon = read('../public/modules/dungeon.js'), synth = read('../docs/sound/battle-synth.mjs');
+  const battleKeys = ['atk-star', 'atk-leaf', 'atk-wind', 'hit-star', 'hit-leaf', 'hit-wind', 'dmg-tick', 'crit', 'boss-charge', 'warn-beep', 'boss-slam', 'shield-block', 'ult-riser', 'ult-impact', 'boss-roar', 'type-key', 'type-ok', 'type-wrong', 'spell-done', 'faint', 'revive', 'combo-10', 'boss-down'];
+  assert(battleKeys.every(key => SOUND_KEYS.includes(key) && synth.includes(`def('${key}'`)), 'V13.130 던전 전투 효과음 23개는 sound.js에 있고 docs/sound/battle-synth.mjs로 다시 만들 수 있다');
+  assert(dungeon.includes("from './sound.js'") && ['dmg-tick', 'boss-slam', 'shield-block', 'ult-riser', 'ult-impact', 'boss-roar', 'boss-down', 'type-key', 'type-ok', 'type-wrong', 'spell-done', 'faint', 'revive', 'combo-10', 'boss-charge', 'warn-beep', 'crit'].every(key => dungeon.includes(`'${key}'`)) && dungeon.includes('sfx(`atk-${snd}`') && dungeon.includes('sfx(e.kind === \'spell\' ? \'crit\' : `hit-${snd}`') && dungeon.includes('preloadSound(SFX_BATTLE)'), 'V13.130 던전 전투: 펫 속성별 발사 · 맞힘, 피해 숫자 틱, 보스 채점 · 내려찍기 · 포효, 방패, 합동 필살, 쓰기 글자 칸, 기절 · 부활에 소리가 있고 들어갈 때 미리 받는다');
 }

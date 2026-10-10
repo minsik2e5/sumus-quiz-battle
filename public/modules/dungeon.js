@@ -1,19 +1,20 @@
 import { api, esc, icon, toast, num, rangeLabel, buttonBusy, modal } from './ui.js';
-import { avatar } from './character.js';
+import { avatar, expressionSrc, petKey } from './character.js';
 import { getRanges } from './student.js';
-import { ELEMENTS, fxShot, fxImpact, fxPunch, fxEdge, fxHeal, fxPowerUp, fxRank, fxShield, comboRank } from './battle-fx.js';
+import { comboRank } from './battle-fx.js';
+import { createDungeonFx } from './dungeon-fx.js';
+import { playSound, preloadSound, soundOn } from './sound.js';
 
 // V13.128 던전 화면 (docs/dungeon-design.md 2 · 3번): 던전 입구(등급컷 · 범위 · 방 만들기 · 초대 코드 · 받은 초대),
 // 로비(파티 3자리, 친구 부르기, 봇 동료, 준비), 입장 연출, 층 전투, 휴식, 결과.
 // 판은 던전 방(cloudflare/dungeon-room.mjs)이 돌리고, 이 화면은 방이 보낸 view와 이벤트를 그리고 선택 번호만 보낸다.
-// 그림은 아직 던전용 포즈 · 배경 · UI를 연결하지 않았다(5번 세션). 몬스터는 /assets/monsters/의 기본 그림을 쓴다.
-// 전투 효과는 battle-fx.js, 움직임 줄이기를 켠 폰에서는 효과를 그리지 않는다. A.screen === 'dungeon'일 때 #app을 쓴다.
+// V13.130 전투 화면: 세로(세우면) · 가로(눕히면) 무대, 던전 배경 · 몬스터 자세(숨쉬기 · 맞음 · 공격 · 포효 · 핵) · UI 그림,
+// 펫 속성별 발사체와 메이플식으로 쌓이는 피해 숫자(dungeon-fx.js), 합동 필살 컷인, 전투 효과음(sound.js),
+// 문제 세 종류(뜻 고르기 · 영어 고르기 · 영어 쓰기). 쓰기는 누른 글자 하나씩 보내고 방이 채점한다.
+// 움직임 줄이기를 켠 폰에서는 효과를 그리지 않는다. A.screen === 'dungeon'일 때 #app을 쓴다.
 
 const EMOTES = { cheer: '힘내!', help: '도와줘!', nice: '나이스!', gg: '수고했어!' };
 const CUT_DESC = { c3: '처음 도전', c2: '3등급 컷을 깨면 열려요', c1: '2등급 컷을 깨면 열려요', max: '세 단계를 모두 깨면 열려요 · 끝없는 층' };
-// 몬스터 크기(S · M · L)는 화면 폭에 대한 배율. 보스는 정사각 430px 안팎(몸이 화면 폭의 약 70%).
-const SIZE_W = { S: 52, M: 60, L: 68 };
-const FLOOR_BG = ['#3a2d5c', '#2c3d5e', '#25504f', '#4a3a2a', '#5a2b33', '#3b1020'];
 
 let D = null;
 const root = () => document.getElementById('app');
@@ -50,6 +51,7 @@ function closeAll() {
   D.closing = true;
   (D.timers || []).forEach(clearTimeout);
   cancelAnimationFrame(D.raf);
+  leaveStage();
   clearInterval(D.pinger);
   try { D.ws?.close(); } catch {}
   D.ws = null;
@@ -81,6 +83,8 @@ function onClick(event) {
   if (act === 'bot') return addBot(b);
   if (act === 'copy') return copyCode();
   if (act === 'answer') return pick(Number(b.dataset.choice), b);
+  if (act === 'tile') return tapTile(Number(b.dataset.i), b);
+  if (act === 'sound') return toggleSound(b);
   if (act === 'emote') return emote(b.dataset.emote, b);
   if (act === 'again') { closeAll(); const { A, exit } = D; return openDungeon(A, exit); }
   if (act === 'home') return leaveScreen();
@@ -249,195 +253,669 @@ async function addBot(b) {
   buttonBusy(b, false);
 }
 
-/* ---------- 전투 ---------- */
+/* ---------- 전투 무대 ----------
+   V13.130: 폰을 세우면 세로 무대(390×844), 눕히면 가로 무대(844×390)를 그리고 화면에 맞춰 키운다.
+   세로는 위 전투 · 가운데 파티 게이지 · 아래 문제 칸, 가로는 왼쪽 파티 · 오른쪽 몬스터 · 아래 메이플식 칸
+   (내 상태 · 문제 · 보기 단축키 · 파티 게이지)이다. 가로에만 파티 창 · 층 지도 · 채점/핵 막대가 있다. */
+const STAGE = {
+  land: { w: 844, h: 390, foot: 252, pets: [[26, 106], [118, 112], [214, 124]], mon: { cx: 655, foot: 262, boss: 430, S: 200, M: 230, L: 260 }, cols: [540, 620, 700], base: 184 },
+  port: { w: 390, h: 844, foot: 474, pets: [[0, 138], [106, 128], [212, 128]], mon: { cx: 245, foot: 380, boss: 430, S: 230, M: 260, L: 290 }, cols: [150, 240, 320], base: 236 }
+};
+// 그림 안에서 발이 닿는 높이와 맞는 자리(그림 크기에 대한 비율). 보스 그림은 위아래 여백이 크다.
+const FOOT = { boss: .96, mon: .93 }, HIT_AT = { boss: .68, mon: .48 };
+const RANK_ICON = { c3: 'dungeon-rank3', c2: 'dungeon-rank2', c1: 'dungeon-rank1', max: 'dungeon-perfect' };
+// 속성 → 효과음 묶음(별빛 · 풀 · 바람 세 가지 소리로 여덟 속성을 낸다).
+const EL_SOUND = { star: 'star', flame: 'star', ice: 'star', leaf: 'leaf', earth: 'leaf', wind: 'wind', water: 'wind', toxic: 'wind' };
+const KIND_HINT = { mean: '알맞은 뜻을 고르세요', eng: '알맞은 영어를 고르세요', spell: '뜻을 보고 영어를 써요 · 글자 칸을 차례로 눌러요' };
+const KIND_LABEL = { mean: '뜻 고르기', eng: '영어 고르기', spell: '영어 쓰기' };
+const SFX_BATTLE = ['atk-star', 'atk-leaf', 'atk-wind', 'hit-star', 'hit-leaf', 'hit-wind', 'dmg-tick', 'crit', 'boss-slam', 'smash', 'type-key', 'type-ok', 'type-wrong', 'spell-done', 'correct', 'wrong', 'faint', 'revive'];
+const SFX_BOSS = ['boss-charge', 'warn-beep', 'shield-block', 'boss-roar', 'ult-riser', 'ult-impact', 'boss-down', 'combo-10'];
+const sfx = (key, opts) => playSound(key, opts);
+
+const $id = id => document.getElementById(id);
+const mode = () => (innerWidth > innerHeight ? 'land' : 'port');
+const L = () => STAGE[D.mode];
+// 그림을 바꿀 때 새 그림을 먼저 풀어 둔 뒤 바꾼다(바꾸는 순간 그림이 잠깐 비지 않게).
+function swapSrc(img, src) {
+  if (!img || img.getAttribute('src') === src) return;
+  img._want = src;
+  const pre = new Image(); pre.src = src;
+  (pre.decode ? pre.decode() : Promise.resolve()).catch(() => {}).then(() => { if (img._want === src) img.src = src; });
+}
+const retrig = (el, cls) => { if (!el) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+
 function battleScreen(v) {
   D.phase = 'battle';
+  D.mode = mode();
   main(`
-    <section class="dg-battle">
-      <div class="dg-hud"><span class="dg-floor" id="dg-floor"></span><span class="dg-clock" id="dg-clock">0:00</span></div>
-      <div class="dg-arena" id="dg-arena">
-        <div class="dg-monster" id="dg-monster"></div>
-        <div class="dg-boss" id="dg-boss"></div>
-        <div class="dg-party" id="dg-party"></div>
-        <div class="dg-banner" id="dg-banner" aria-live="polite"></div>
+    <div class="dgs-wrap" id="dgs-wrap">
+      <div class="dgs-holder" id="dgs-holder">
+        <section class="dgs ${D.mode}" id="dgs" aria-label="던전 전투">
+          <div class="dgs-world" id="dgs-world">
+            <img class="dgs-bg" id="dgs-bg" alt="" decoding="async" draggable="false">
+            <div class="dgs-shade"></div>
+            <div class="dgs-mon-shadow" id="dgs-mon-shadow"></div>
+            <div class="dgs-mon" id="dgs-mon"><img id="dgs-mon-img" alt="" decoding="async" draggable="false"></div>
+            <div class="dgs-core" id="dgs-core"><img src="/assets/ui/dungeon-core.webp" alt="" draggable="false"><span>약점</span></div>
+            <div class="dgs-pets" id="dgs-pets"></div>
+            <canvas class="dgs-fx" id="dgs-fx" aria-hidden="true"></canvas>
+            <div class="dgs-layer" id="dgs-layer"></div>
+            <img class="dgs-break" id="dgs-break" src="/assets/ui/dungeon-break.webp" alt="" draggable="false">
+            <div class="dgs-vig"></div>
+          </div>
+          <div class="dgs-title" id="dgs-title"></div>
+          <div class="dgs-monbar" id="dgs-monbar"><div class="dgs-monname"><b id="dgs-mon-name"></b><span id="dgs-mon-tag"></span><em id="dgs-mon-hp"></em></div><div class="dgs-hp"><i class="lag" id="dgs-hp-lag"></i><i class="fill" id="dgs-hp-fill"></i><s id="dgs-tick2"></s><s id="dgs-tick3"></s></div><div class="dgs-phases" id="dgs-phases"></div></div>
+          <div class="dgs-alert" id="dgs-alert" aria-live="polite"></div>
+          <div class="dgs-feed" id="dgs-feed"></div>
+          <div class="dgs-party" id="dgs-party"></div>
+          <div class="dgs-rec"><img src="/assets/ui/dungeon-hourglass.webp" alt="" draggable="false"><span>기록</span><b id="dg-clock">0:00</b></div>
+          <button type="button" class="dgs-tool exit" data-dg="exit" aria-label="던전에서 나가기">${icon('back')}</button><button type="button" class="dgs-tool snd" data-dg="sound" aria-pressed="${soundOn()}" aria-label="소리">${icon(soundOn() ? 'sound' : 'mute')}</button>
+          <div class="dgs-combo" id="dgs-combo"><b></b><span>COMBO</span></div>
+          <div class="dgs-dim" id="dgs-dim"></div>
+          <div class="dgs-cutin" id="dgs-cutin"></div>
+          <div class="dgs-flash" id="dgs-flash"></div>
+          <div class="dgs-banner" id="dgs-banner" aria-live="polite"><b></b><span></span></div>
+          <div class="dgs-hud" id="dgs-hud">
+            <div class="dgs-me" id="dgs-me"></div>
+            <div class="dgs-ask" id="dg-ask"></div>
+            <div class="dgs-gauge" id="dgs-gauge"><img id="dgs-gauge-ico" src="/assets/ui/dungeon-ultimate.webp" alt="" draggable="false"><div><span id="dgs-gauge-txt"></span><i><b id="dgs-gauge-fill"></b></i></div></div>
+          </div>
+        </section>
       </div>
-      <div class="dg-gauge" id="dg-gauge" aria-label="파티 게이지"><i></i><span></span></div>
-      <div class="dg-ask" id="dg-ask"></div>
-    </section>`);
-  D.qn = null; D.monsterKey = null;
+    </div>`);
+  D.qn = null; D.monsterKey = null; D.petSig = null; D.spell = null; D.feed = [];
+  D.fx?.stop();
+  D.fx = createDungeonFx($id('dgs-fx'), { width: L().w, height: L().h, reduced });
+  D.onResize = () => { if (D?.phase === 'battle') fitStage(); };
+  addEventListener('resize', D.onResize);
+  D.onKey = onKey;
+  addEventListener('keydown', D.onKey);
+  $id('dgs-world').addEventListener('animationend', e => { if (e.target.id === 'dgs-world') e.target.classList.remove('shake', 'shake-big'); });
+  for (const type of ['animationend', 'animationcancel']) $id('dgs-mon').addEventListener(type, e => { if (e.target.id === 'dgs-mon') e.target.classList.remove('hit', 'slam'); });
+  preloadSound(SFX_BATTLE);
+  fitStage();
   tickLoop();
 }
-function updateBattle(v, prev) {
-  const myId = D.A.data.profile.id;
-  const arena = document.getElementById('dg-arena');
-  if (arena) arena.style.setProperty('--dg-bg', FLOOR_BG[Math.max(0, Math.min(5, (v.monster?.boss ? 6 : v.floor) - 1))]);
-  const floor = document.getElementById('dg-floor');
-  if (floor) floor.textContent = v.floor ? `${v.monster?.boss ? '보스' : `${v.floor}층`}${v.last_floor ? ` / ${v.last_floor}` : ''} · ${v.cut_name}` : v.cut_name;
-  // 몬스터: 바뀔 때만 다시 그린다(맞는 효과가 끊기지 않게).
-  const m = v.monster, box = document.getElementById('dg-monster');
-  if (box && m && D.monsterKey !== `${v.floor}:${m.key}`) {
-    D.monsterKey = `${v.floor}:${m.key}`;
-    const w = m.boss ? 'min(430px, 100%)' : `${SIZE_W[m.size] || 54}%`;
-    box.innerHTML = `<div class="dg-mon-name"><b>${esc(m.name)}</b>${m.trait ? `<span title="${esc(m.trait.desc)}">${esc(m.trait.name)}</span>` : ''}</div><div class="dg-hp"><i></i><span></span></div><img class="dg-mon-img${m.boss ? ' boss' : ''}" id="dg-mon-img" src="/assets/monsters/${esc(m.key)}.webp" alt="${esc(m.name)}" style="width:${w}" width="512" height="512" decoding="async" draggable="false">`;
-    box.querySelector('img').onerror = event => { event.target.onerror = null; event.target.src = '/assets/monsters/golem.webp'; };
-    if (m.trait) banner(`${m.name} · ${m.trait.name}`, m.trait.desc);
+// 화면 크기에 맞춰 무대를 키운다. 방향이 바뀌면 무대를 바꾸고 파티 · 몬스터 자리를 다시 잡는다.
+function fitStage() {
+  const wrap = $id('dgs-wrap'), stage = $id('dgs'), holder = $id('dgs-holder');
+  if (!wrap || !stage) return;
+  const next = mode();
+  if (next !== D.mode) { D.mode = next; stage.className = `dgs ${next}`; D.petSig = null; D.monsterKey = null; D.qn = null; }
+  const box = wrap.getBoundingClientRect(), cs = getComputedStyle(wrap);
+  const aw = box.width - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight), ah = box.height - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+  const s = Math.max(.3, Math.min(aw / L().w, ah / L().h));
+  holder.style.width = `${L().w * s}px`; holder.style.height = `${L().h * s}px`;
+  stage.style.transform = `scale(${s})`;
+  D.scale = s;
+  D.fx?.resize(L().w, L().h, s);
+  if (D.view) updateBattle(D.view, null);
+}
+
+/* 몬스터 */
+const monBox = m => {
+  const lay = L().mon, boss = !!m?.boss, w = boss ? lay.boss : (lay[m?.size] || lay.M);
+  return { w, x: lay.cx - w / 2, y: lay.foot - w * (boss ? FOOT.boss : FOOT.mon), boss };
+};
+function monHit(jitter = true) {
+  const m = D.view?.monster, b = monBox(m), j = jitter ? 1 : 0;
+  if (m?.boss && m.stage === 3) return { x: b.x + b.w * .52 + (Math.random() - .5) * 24 * j, y: b.y + b.w * .66 + (Math.random() - .5) * 20 * j };
+  return { x: b.x + b.w / 2 + (Math.random() - .5) * b.w * .3 * j, y: b.y + b.w * (b.boss ? HIT_AT.boss : HIT_AT.mon) + (Math.random() - .5) * b.w * .2 * j };
+}
+const monSrc = (key, pose) => `/assets/monsters/${key}${pose ? '-' + pose : ''}.webp`;
+function idlePose(m) {
+  if (!m) return '';
+  if (m.boss && m.stage === 3) return 'core';
+  if (m.boss && m.stage === 2) return 'rage';
+  return D.idleFlip ? 'idle2' : '';
+}
+// 잠깐 다른 자세(맞음 · 공격 · 포효 …)를 보여 주고 원래 자세로 돌아온다. 그림이 없으면 기본 그림.
+function pose(name, ms = 380) {
+  const img = $id('dgs-mon-img'), m = D.view?.monster;
+  if (!img || !m) return;
+  D.posing = name !== 'down' ? serverNow() + ms : Infinity; D.poseName = name;
+  swapSrc(img, monSrc(m.key, name));
+  clearTimeout(D.poseTimer);
+  if (name !== 'down') D.poseTimer = setTimeout(() => { D.posing = 0; if ($id('dgs-mon-img') === img) swapSrc(img, monSrc(m.key, idlePose(D.view?.monster))); }, ms);
+}
+function drawMonster(v) {
+  const m = v.monster, box = $id('dgs-mon'), img = $id('dgs-mon-img'), shadow = $id('dgs-mon-shadow');
+  if (!box || !m) return;
+  const key = `${D.mode}:${v.floor}:${m.key}`;
+  if (D.monsterKey !== key) {
+    D.monsterKey = key; D.posing = 0;
+    const b = monBox(m);
+    Object.assign(box.style, { left: `${b.x}px`, top: `${b.y}px`, width: `${b.w}px`, height: `${b.w}px` });
+    box.className = `dgs-mon${m.boss ? ' boss' : ''}`;
+    Object.assign(shadow.style, { left: `${L().mon.cx - b.w * .36}px`, top: `${L().mon.foot - 14}px`, width: `${b.w * .72}px` });
+    img.alt = m.name;
+    img.onerror = () => { img.onerror = null; img.src = monSrc(m.key, ''); };
+    img.src = monSrc(m.key, idlePose(m));
+    for (const p of ['idle2', 'windup', 'attack', 'attack2', 'skill', 'hurt', 'down', ...(m.boss ? ['rage', 'core', 'roar', 'corehurt'] : [])]) new Image().src = monSrc(m.key, p);
+    const bg = $id('dgs-bg'), file = m.boss ? 'bg-boss' : v.floor > 5 ? 'bg-endless' : `bg-f${Math.max(1, v.floor)}`;
+    if (bg && !bg.src.endsWith(`/${file}.webp`)) bg.src = `/assets/dungeon/${file}.webp`;
+    D.fx?.setEmbers(m.boss ? 22 : 8);
+    if (m.boss) preloadSound(SFX_BOSS);
   }
-  if (box && m) {
+  const core = $id('dgs-core');
+  if (core) {
+    const on = !!(m.boss && m.core?.open_until), b = monBox(m);
+    core.classList.toggle('on', on);
+    if (on) Object.assign(core.style, { left: `${b.x + b.w * .52 - 24}px`, top: `${b.y + b.w * .66 - 24}px` });
+  }
+}
+
+/* 파티 */
+// 세로는 내 펫이 왼쪽(이름표가 크게), 가로는 내 펫이 보스와 가장 가까운 오른쪽이다.
+function partyOrder(v) {
+  const myId = D.A.data.profile.id, me = v.players.filter(p => p.id === myId), others = v.players.filter(p => p.id !== myId);
+  return D.mode === 'port' ? [...me, ...others] : [...others, ...me];
+}
+const petArt = (p, face) => {
+  const key = petKey(p.pet?.key || 'dog'), form = p.pet?.form ?? 3;
+  return (face && expressionSrc(key, form, face)) || `/assets/pets/${key}-${form}.webp`;
+};
+function slotOf(pid) { return D.slots?.get(pid) || null; }
+function petCenter(pid) {
+  const s = slotOf(pid);
+  if (!s) return { x: L().w * .25, y: L().foot - 60 };
+  return { x: s.x + s.size * .58, y: L().foot - s.size * .52 };
+}
+function drawParty(v) {
+  const myId = D.A.data.profile.id, list = partyOrder(v), host = $id('dgs-pets');
+  if (!host) return;
+  const sig = `${D.mode}:${list.map(p => p.id).join(',')}`;
+  if (D.petSig !== sig) {
+    D.petSig = sig; D.slots = new Map();
+    host.innerHTML = list.map((p, i) => {
+      const [x, size] = L().pets[i] || L().pets[0];
+      D.slots.set(p.id, { x, size, i });
+      return `<div class="dgs-pet${p.id === myId ? ' me' : ''}" data-pid="${esc(p.id)}" style="left:${x}px;top:${L().foot - size}px;width:${size}px;height:${size}px">
+        <i class="sh"></i><img class="art" src="${petArt(p)}" alt="${esc(p.name)}의 펫" decoding="async" draggable="false">
+        <img class="ico faint" src="/assets/ui/dungeon-faint.webp" alt="" draggable="false"><img class="ico mark" src="/assets/ui/dungeon-mark.webp" alt="" draggable="false">
+        <div class="dgs-card"><b>${esc(p.id === myId ? `${p.name} (나)` : p.name)}${p.bot ? ' · 봇' : ''}</b><em></em><i><u></u></i></div></div>`;
+    }).join('');
+    host.querySelectorAll('.dgs-pet').forEach(el => { const done = e => { if (e.target.classList.contains('art')) el.classList.remove('lunge', 'hurt'); }; el.addEventListener('animationend', done); el.addEventListener('animationcancel', done); });
+    // 공격 · 맞음 · 기쁨 표정 그림을 미리 받아 둔다(처음 바꿀 때 그림이 잠깐 비지 않게).
+    for (const p of list) for (const face of ['attack', 'hurt', 'happy']) { const src = petArt(p, face); if (src) new Image().src = src; }
+  }
+  for (const p of list) {
+    const el = host.querySelector(`.dgs-pet[data-pid="${CSS.escape(String(p.id))}"]`);
+    if (!el) continue;
+    const marked = v.monster?.boss && v.monster.mark === p.id;
+    el.classList.toggle('down', !!p.down); el.classList.toggle('out', !!p.out); el.classList.toggle('off', !p.connected && !p.bot); el.classList.toggle('marked', !!marked);
+    const hp = Math.max(0, p.hp / p.max_hp * 100);
+    el.querySelector('.dgs-card u').style.width = `${hp}%`;
+    el.querySelector('.dgs-card u').className = hp < 35 ? 'low' : '';
+    el.querySelector('.dgs-card em').textContent = p.down ? '기절' : p.out ? '포기' : !p.connected && !p.bot ? '연결 끊김' : marked ? '표적' : p.combo >= 2 ? `${p.combo}연속` : '';
+  }
+  // 가로: 파티 창(층 지도 · 이름 · 체력 · 이번 문제 상태).
+  const panel = $id('dgs-party');
+  if (panel && D.mode === 'land') {
+    const last = v.last_floor || v.floor || 1;
+    const rooms = Array.from({ length: Math.min(6, last) }, (_, i) => `<span class="${i + 1 < v.floor ? 'done' : i + 1 === v.floor ? 'now' : ''}${i + 1 === last && last <= 6 ? ' boss' : ''}"></span>`).join('<em></em>');
+    panel.innerHTML = `<div class="dgs-phead"><b>${v.monster?.boss ? '보스층' : v.floor ? `${v.floor}층` : ''} · ${esc(v.cut_name)}</b><div class="dgs-rooms" aria-hidden="true">${rooms}</div></div>${v.players.map(p => {
+      const st = p.down ? '<i class="chip down">기절</i>' : p.out ? '<i class="chip down">포기</i>' : !p.connected && !p.bot ? '<i class="chip off">끊김</i>' : p.combo >= 3 ? `<i class="chip hot">${p.combo}</i>` : '';
+      return `<div class="dgs-prow${p.id === myId ? ' me' : ''}"><span>${esc(p.id === myId ? '나' : p.name)}${p.bot ? ' · 봇' : ''}</span>${st}<i class="mini"><u style="width:${Math.max(0, p.hp / p.max_hp * 100)}%"></u></i></div>`;
+    }).join('')}`;
+  }
+}
+
+/* 위 정보 */
+function drawTop(v) {
+  const m = v.monster, myId = D.A.data.profile.id;
+  const title = $id('dgs-title');
+  if (title) title.innerHTML = `<img src="/assets/ui/${RANK_ICON[v.cut] || 'dungeon-rank3'}.webp" alt="${esc(v.cut_name)}" draggable="false"><div><b>${m?.boss ? '보스 · 킬러 골렘' : v.floor ? `${v.floor}층 · ${esc(m?.name || '')}` : '기말고사 지옥'}</b><span>기말고사 지옥 · ${esc(v.cut_name)} · ${v.players.length}명</span></div>`;
+  if (m) {
     const share = Math.max(0, m.hp / m.max_hp);
-    box.querySelector('.dg-hp i').style.width = `${share * 100}%`;
-    box.querySelector('.dg-hp span').textContent = `${num(m.hp)} / ${num(m.max_hp)}`;
-    box.classList.toggle('low', share < .3);
+    $id('dgs-mon-name').textContent = m.name;
+    $id('dgs-mon-tag').textContent = m.boss ? ['', '1페이즈', '2페이즈 · 빨간펜 채점', '3페이즈 · 핵 노출'][m.stage] || '' : m.trait ? m.trait.name : '';
+    $id('dgs-mon-tag').title = m.trait?.desc || '';
+    $id('dgs-mon-hp').textContent = `${Math.ceil(share * 100)}% · ${num(Math.max(0, m.hp))}`;
+    $id('dgs-hp-fill').style.width = `${share * 100}%`; $id('dgs-hp-lag').style.width = `${share * 100}%`;
+    $id('dgs-tick2').hidden = $id('dgs-tick3').hidden = !m.boss;
+    $id('dgs-phases').innerHTML = m.boss ? [['1페이즈', 1], ['2 채점', 2], ['3 핵', 3]].map(([t, s]) => `<span class="${m.stage === s ? 'on' : ''}">${m.stage === s ? ['', '1페이즈', '2페이즈 · 빨간펜 채점', '3페이즈 · 핵 노출'][s] : t}</span>`).join('') : '';
+    $id('dgs-world').classList.toggle('p2', !!(m.boss && m.stage === 2)); $id('dgs-world').classList.toggle('p3', !!(m.boss && m.stage === 3));
   }
-  // 보스: 페이즈, 채점 표적, 핵.
-  const boss = document.getElementById('dg-boss');
-  if (boss) {
+  // 채점 표적 · 핵 (세로는 카드, 가로는 보스 체력 아래 막대).
+  const alert = $id('dgs-alert');
+  if (alert) {
     const target = m?.boss && m.mark ? v.players.find(p => p.id === m.mark) : null;
     const core = m?.boss && m.core?.open_until ? m.core : null;
-    boss.innerHTML = m?.boss ? `<span class="dg-stage s${m.stage}">${['', '1페이즈', '빨간펜 채점', '핵 노출 · 분노'][m.stage] || ''}</span>${target ? `<span class="dg-mark${target.id === myId ? ' me' : ''}">✏️ 채점 표적: ${esc(target.id === myId ? '나' : target.name)}${target.id === myId ? ` · ${target.mark_left}문제 연속!` : ''}</span>` : ''}${core ? `<span class="dg-core">💠 핵 ${core.count}/${core.goal}</span>` : ''}` : '';
+    let html = '';
+    if (target) {
+      const mine = target.id === myId, done = 3 - (target.mark_left || 0);
+      html = `<div class="dgs-al mark${mine ? ' mine' : ''}"><img src="/assets/ui/dungeon-mark.webp" alt="" draggable="false"><div><b>빨간펜 채점!</b><span>${mine ? '내가 표적! 다음 3문제를 연속으로 맞혀 막아요' : `${esc(target.name)} 표적 · 3문제 연속 정답이면 막아요`}</span><p>${[0, 1, 2].map(i => `<i class="${i < done ? 'on' : ''}">${i < done ? i + 1 : ''}</i>`).join('')}</p></div></div>`;
+    } else if (core) {
+      html = `<div class="dgs-al core"><img src="/assets/ui/dungeon-core.webp" alt="" draggable="false"><div><b>핵이 드러났다!</b><span>파티가 정답 ${core.goal}개를 채우면 브레이크!</span><p class="bar"><i style="width:${Math.min(100, core.count / core.goal * 100)}%"></i><em>${core.count}/${core.goal}</em></p></div><strong id="dgs-core-left"></strong></div>`;
+    }
+    alert.innerHTML = html;
+    alert.classList.toggle('on', !!html);
+    $id('dgs-feed')?.classList.toggle('hide', !!html);
   }
-  // 파티: 체력, 기절, 콤보, 연결.
-  const party = document.getElementById('dg-party');
-  if (party) party.innerHTML = v.players.map(p => `<div class="dg-member${p.id === myId ? ' me' : ''}${p.down ? ' down' : ''}${p.out ? ' out' : ''}${p.connected || p.bot ? '' : ' off'}" data-pid="${esc(p.id)}" style="--el:${ELEMENTS[p.element]?.c1 || '#ffd23f'}">${p.pet ? avatar(p.pet.key, { form: p.pet.form, size: 'mini' }) : ''}<b>${esc(p.id === myId ? '나' : p.name)}</b><div class="dg-mhp"><i style="width:${Math.max(0, p.hp / p.max_hp * 100)}%"></i></div>${p.combo >= 3 ? `<em>${p.combo}콤보</em>` : ''}${p.down ? '<strong>기절</strong>' : p.out ? '<strong>포기</strong>' : !p.connected && !p.bot ? '<strong>연결 끊김</strong>' : ''}</div>`).join('');
-  const gauge = document.getElementById('dg-gauge');
-  if (gauge) { gauge.querySelector('i').style.width = `${v.gauge_max ? v.gauge / v.gauge_max * 100 : 0}%`; gauge.querySelector('span').textContent = `파티 게이지 ${v.gauge}/${v.gauge_max}${v.element_bonus > 1 ? ' · 속성 3색 +30%' : ''}`; }
-  if (arena && !reduced()) fxEdge(arena, 'low', !!D.me && !D.me.down && D.me.hp <= 30);
-  drawAsk(v);
 }
-// 내 문제: 새 문제 번호가 오면 그린다. 답한 뒤 다음 문제 전까지는 정답 표시를 그대로 둔다.
+
+/* 게이지 · 내 상태 · 콤보 */
+function drawGauge(v) {
+  const m = v.monster, core = m?.boss && m.core?.open_until ? m.core : null;
+  const fill = $id('dgs-gauge-fill'), txt = $id('dgs-gauge-txt'), ico = $id('dgs-gauge-ico'), box = $id('dgs-gauge');
+  if (!fill) return;
+  const share = core ? core.count / core.goal : v.gauge_max ? v.gauge / v.gauge_max : 0;
+  box.style.setProperty('--g', `${Math.min(100, share * 100)}%`);
+  box.classList.toggle('core', !!core); box.classList.toggle('ready', !core && share >= .85);
+  const icoSrc = `/assets/ui/${core ? 'dungeon-break' : 'dungeon-ultimate'}.webp`;
+  if (!ico.src.endsWith(icoSrc)) ico.src = icoSrc;
+  txt.innerHTML = core ? `<span>브레이크까지 · 파티 정답</span><b>${core.count}/${core.goal}</b>` : `<span>${D.mode === 'land' ? '합동 필살' : `파티 게이지${v.element_bonus > 1 ? ' · 서로 다른 속성 3마리 +30%' : ''}`}</span><b>${Math.round(share * 100)}%</b>`;
+}
+function drawMe(v) {
+  const me = D.me, box = $id('dgs-me');
+  if (box && me && D.mode === 'land') {
+    box.innerHTML = `<div class="hd"><img src="${petArt(me)}" alt="" draggable="false"><div><b>${esc(me.name)}</b><span>${esc(v.grade)} · ${esc(v.cut_name)}</span></div></div>
+      <div class="bar hp"><span>HP</span><i><u style="width:${Math.max(0, me.hp / me.max_hp * 100)}%"></u><em>${num(Math.max(0, me.hp))}/${num(me.max_hp)}</em></i></div>
+      <div class="bar sp"><span>콤보</span><i><u style="width:${Math.min(100, (me.combo % 5) / 5 * 100 + (me.combo >= 25 ? 100 : 0))}%"></u><em>${me.combo}연속 · ×${Math.min(1.5, 1 + .1 * Math.floor(me.combo / 5)).toFixed(1)}</em></i></div>`;
+  }
+  const combo = $id('dgs-combo');
+  if (combo && me) {
+    const c = me.combo || 0, was = Number(combo.dataset.n || 0);
+    combo.dataset.n = c;
+    combo.classList.toggle('on', c >= 3);
+    combo.querySelector('b').textContent = c;
+    combo.querySelector('span').textContent = c >= 5 ? `COMBO ×${Math.min(1.5, 1 + .1 * Math.floor(c / 5)).toFixed(1)}` : 'COMBO';
+    if (c > was && c >= 3) retrig(combo, 'pop');
+    if (c > was && c > 0 && c % 10 === 0) { sfx('combo-10'); say(D.mode === 'land' ? 300 : 300, D.mode === 'land' ? 60 : 380, `${c} 콤보!`, '#fde68a'); }
+  }
+}
+
+function updateBattle(v, prev) {
+  if (!$id('dgs')) return;
+  drawMonster(v);
+  drawParty(v);
+  drawTop(v);
+  drawGauge(v);
+  drawMe(v);
+  $id('dgs-world')?.classList.toggle('low', !!D.me && !D.me.down && D.me.hp <= 30);
+  drawAsk(v);
+  void prev;
+}
+
+/* ---------- 문제 칸 ---------- */
+// 새 문제 번호가 오면 그린다. 답한 뒤 다음 문제 전까지는 정답 표시를 그대로 둔다. 쓰기 문제는 방이 보낸 진행(채운 글자 · 실수)을 덧그린다.
 function drawAsk(v) {
-  const ask = document.getElementById('dg-ask');
+  const ask = $id('dg-ask');
   if (!ask) return;
   const me = D.me, q = v.question;
-  if (v.phase === 'rest') { D.qn = null; ask.innerHTML = `<div class="dg-rest"><b>휴식</b><span id="dg-rest-left"></span><p>${num(v.floor + 1)}층으로 올라가요. 기절한 친구는 체력 30%로 일어나요.</p></div>`; return; }
-  if (v.phase === 'intro') { ask.innerHTML = '<div class="dg-rest"><b>입장 준비</b><p>문이 열리면 바로 첫 문제가 나와요.</p></div>'; return; }
+  if (v.phase === 'rest') { if (D.qn !== 'rest') { D.qn = 'rest'; ask.innerHTML = `<div class="dg-rest dgs-rest"><b>휴식</b><span id="dg-rest-left"></span><p>${num(v.floor + 1)}층으로 올라가요. 기절한 친구는 체력 30%로 일어나요.</p></div>`; } return; }
+  if (v.phase === 'intro') { if (D.qn !== 'intro') { D.qn = 'intro'; ask.innerHTML = '<div class="dg-rest dgs-rest"><b>입장 준비</b><p>문이 열리면 바로 첫 문제가 나와요.</p></div>'; } return; }
   if (me?.down) {
-    if (D.qn !== 'down') { D.qn = 'down'; ask.innerHTML = `<div class="dg-down"><b>기절했어요</b><p>동료가 3연속 정답이면 일어나요. 응원을 보내요!</p><div class="dg-emotes">${Object.entries(EMOTES).map(([k, t]) => `<button type="button" class="btn ghost" data-dg="emote" data-emote="${k}">${t}</button>`).join('')}</div></div>`; }
+    if (D.qn !== 'down') { D.qn = 'down'; ask.innerHTML = `<div class="dg-down dgs-rest"><b>기절했어요</b><p>동료가 3연속 정답이면 일어나요. 응원을 보내요!</p><div class="dg-emotes">${Object.entries(EMOTES).map(([k, t]) => `<button type="button" class="btn ghost" data-dg="emote" data-emote="${k}">${t}</button>`).join('')}</div></div>`; }
     return;
   }
-  if (!q || D.qn === q.n) return;
-  D.qn = q.n; D.picked = null;
+  if (!q) return;
+  if (D.qn === q.n) { if (q.kind === 'spell') drawSpell(q); return; }
+  D.qn = q.n; D.picked = null; D.tick = 4;
+  const kind = q.kind || 'mean', trait = v.monster?.trait?.key;
+  const head = `<div class="dgs-qhead"><span class="dgs-kind ${kind}">${KIND_LABEL[kind]}</span><span class="dgs-left" id="dgs-time-left"></span></div>`;
+  const timer = '<div class="dgs-time"><img src="/assets/ui/dungeon-hourglass.webp" alt="" draggable="false"><i><b id="dg-time"></b></i></div>';
+  const prompt = `<h2 class="dgs-prompt ${kind === 'mean' ? 'en' : 'ko'}${trait === 'blink' ? ' blink' : ''}">${esc(q.prompt)}</h2>`;
+  if (kind === 'spell') {
+    // 화면을 다시 그릴 때(방향 바뀜)는 이미 맞힌 글자만큼 칸을 쓴 것으로 되살린다.
+    D.spell = { n: q.n, queue: [], used: new Set() };
+    for (const ch of q.filled || '') { const k = q.tiles.findIndex((c, j) => c === ch && !D.spell.used.has(j)); if (k >= 0) D.spell.used.add(k); }
+    ask.innerHTML = `<div class="dgs-q spell"><div class="dgs-qbox">${head}${prompt}<div class="dgs-slots" id="dgs-slots">${Array.from({ length: q.len }, () => '<i></i>').join('')}</div><p class="dgs-hint" id="dgs-hint"></p>${timer}</div>
+      <div class="dgs-tiles" style="--cols:${Math.ceil(q.tiles.length / 2)}">${q.tiles.map((c, i) => { const used = D.spell.used.has(i); return `<button type="button" class="dgs-tile${used ? ' used' : ''}" data-dg="tile" data-i="${i}" aria-label="글자 ${esc(c)}" ${used ? 'disabled' : ''}>${esc(c)}</button>`; }).join('')}</div></div>`;
+    drawSpell(q);
+    return;
+  }
+  D.spell = null;
   const n = q.options.length;
-  ask.innerHTML = `<div class="dg-q"><div class="dg-time"><i id="dg-time"></i></div><h2 class="dg-word${v.monster?.trait?.key === 'blink' ? ' blink' : ''}">${esc(q.prompt)}</h2><div class="dg-options n${n}${v.monster?.trait?.key === 'web' ? ' web' : ''}">${q.options.map((o, i) => {
-    const covered = i === q.covered, marked = i === q.marked;
-    return `<button type="button" class="dg-opt${covered ? ' covered' : ''}${marked ? ' marked' : ''}" data-dg="answer" data-choice="${i}" ${covered ? 'disabled aria-label="붕대로 가려진 보기"' : ''}>${covered ? '붕대' : esc(o)}</button>`;
-  }).join('')}</div></div>`;
+  ask.innerHTML = `<div class="dgs-q ${kind}"><div class="dgs-qbox">${head}${prompt}<p class="dgs-hint">${KIND_HINT[kind]} · ${n}개 중 1개</p>${timer}</div>
+    <div class="dgs-options n${n}${trait === 'web' ? ' web' : ''}">${q.options.map((o, i) => {
+      const covered = i === q.covered, marked = i === q.marked;
+      return `<button type="button" class="dgs-opt${kind === 'eng' ? ' en' : ''}${covered ? ' covered' : ''}${marked ? ' marked' : ''}" data-dg="answer" data-choice="${i}" ${covered ? 'disabled aria-label="붕대로 가려진 보기"' : ''}><kbd>${i + 1}</kbd><span>${covered ? '붕대' : esc(o)}</span></button>`;
+    }).join('')}</div></div>`;
+}
+function drawSpell(q) {
+  const slots = $id('dgs-slots');
+  if (!slots || !D.spell || D.spell.n !== q.n) return;
+  const filled = q.filled || '';
+  slots.querySelectorAll('i').forEach((el, i) => {
+    if (el.classList.contains('miss')) return;
+    el.textContent = filled[i] || '';
+    el.className = i < filled.length ? 'f' : i === filled.length ? 'cur' : '';
+  });
+  const hint = $id('dgs-hint');
+  if (hint) hint.textContent = `${q.len}글자 · 실수 ${q.miss}/${q.miss_max}`;
 }
 function pick(choice, b) {
   const q = D.view?.question;
-  if (!q || D.picked !== null || q.n !== D.qn) return;
+  if (!q || q.kind === 'spell' || D.picked !== null || q.n !== D.qn) return;
   // V13.129: 연결이 끊긴 사이에는 누르지 않은 것으로 둔다(보기가 잠기지 않게).
   if (D.ws?.readyState !== 1) return toast('연결 중이에요. 잠시 뒤 눌러 주세요.');
   D.picked = choice;
   b.classList.add('picked');
-  document.querySelectorAll('.dg-opt').forEach(x => { x.disabled = true; });
+  document.querySelectorAll('.dgs-opt').forEach(x => { x.disabled = true; });
   send({ type: 'answer', choice, n: q.n });
+}
+// 영어 쓰기: 누른 글자 하나를 보내고, 방의 답(letter 이벤트)이 오면 그 칸을 쓰거나 흔든다.
+function tapTile(i, b) {
+  const q = D.view?.question;
+  if (!q || q.kind !== 'spell' || !D.spell || D.spell.n !== q.n || q.n !== D.qn || D.spell.used.has(i) || D.spell.queue.includes(i) || D.spell.done) return;
+  // 연결이 끊긴 사이에는 보내지 않는다(V13.129 보기와 같다).
+  if (D.ws?.readyState !== 1) return toast('연결 중이에요. 잠시 뒤 눌러 주세요.');
+  D.spell.queue.push(i);
+  b?.classList.add('wait');
+  retrig(b, 'press');
+  sfx('type-key', { vary: .04 });
+  send({ type: 'letter', ch: q.tiles[i], n: q.n });
+}
+function onKey(event) {
+  if (!D || D.phase !== 'battle' || event.ctrlKey || event.metaKey || event.altKey || event.target?.tagName === 'INPUT') return;
+  const q = D.view?.question;
+  if (!q || D.me?.down) return;
+  if (q.kind === 'spell' && /^[a-z]$/i.test(event.key)) {
+    const ch = event.key.toLowerCase();
+    const i = q.tiles.findIndex((c, k) => c === ch && !D.spell?.used.has(k) && !D.spell?.queue.includes(k));
+    if (i >= 0) tapTile(i, document.querySelector(`.dgs-tile[data-i="${i}"]`));
+    else if (D.spell && D.spell.n === q.n && !D.spell.done && D.ws?.readyState === 1) { D.spell.queue.push(-1); sfx('type-key'); send({ type: 'letter', ch, n: q.n }); }
+  } else if (q.kind !== 'spell' && /^[1-6]$/.test(event.key)) {
+    const b = document.querySelector(`.dgs-opt[data-choice="${Number(event.key) - 1}"]`);
+    if (b && !b.disabled) pick(Number(event.key) - 1, b);
+  }
 }
 function emote(key, b) {
   send({ type: 'emote', emote: key });
   if (b) { b.disabled = true; later(() => { b.disabled = false; }, 3000); }
 }
-// 시계: 경과 시간, 내 문제의 남은 시간, 휴식 · 입장 남은 시간.
+function toggleSound(b) {
+  const on = !soundOn();
+  try { localStorage.setItem('sumus-yacha-sound', on ? 'on' : 'off'); } catch {}
+  b.setAttribute('aria-pressed', on); b.innerHTML = icon(on ? 'sound' : 'mute');
+  if (on) { preloadSound(SFX_BATTLE); sfx('correct', { gain: .6 }); }
+}
+
+// 시계: 경과 시간, 내 문제의 남은 시간(마지막 3초 째깍), 핵 남은 시간, 휴식 · 입장 남은 시간, 몬스터 숨쉬기 자세.
 function tickLoop() {
   cancelAnimationFrame(D.raf);
+  let flipAt = 0;
   const step = () => {
     if (!D || D.closing || D.phase !== 'battle') return;
     const v = D.view, now = serverNow();
-    const c = document.getElementById('dg-clock');
+    const c = $id('dg-clock');
     if (c && v) c.textContent = clock(v.started_at ? now - v.started_at : 0);
-    const bar = document.getElementById('dg-time'), q = v?.question;
-    if (bar && q && q.n === D.qn) { const left = Math.max(0, (q.deadline - now) / (q.deadline - q.started_at)); bar.style.width = `${left * 100}%`; bar.classList.toggle('hurry', left < .3); }
-    const rest = document.getElementById('dg-rest-left');
+    const bar = $id('dg-time'), q = v?.question;
+    if (bar && q && q.n === D.qn) {
+      const leftMs = Math.max(0, q.deadline - now), left = leftMs / (q.deadline - q.started_at);
+      bar.style.width = `${left * 100}%`; bar.classList.toggle('hurry', left < .3);
+      const lt = $id('dgs-time-left'); if (lt) lt.textContent = `${(leftMs / 1000).toFixed(1)}초`;
+      const sec = Math.ceil(leftMs / 1000);
+      if (sec < D.tick && sec > 0 && sec <= 3 && D.picked === null && !D.spell?.done) { D.tick = sec; sfx('tick', { gain: .7 }); }
+    }
+    const coreLeft = $id('dgs-core-left'), core = v?.monster?.core;
+    if (coreLeft && core?.open_until) coreLeft.innerHTML = `<b>${Math.max(0, Math.ceil((core.open_until - now) / 1000))}</b><span>초 남음</span>`;
+    const rest = $id('dg-rest-left');
     if (rest && v?.rest_until) rest.textContent = `${Math.max(0, Math.ceil((v.rest_until - now) / 1000))}초`;
-    const intro = document.getElementById('dg-intro-left');
+    const intro = $id('dg-intro-left');
     if (intro && v?.intro_until) intro.textContent = Math.max(0, Math.ceil((v.intro_until - now) / 1000)) || '시작!';
+    if (now > flipAt) {
+      flipAt = now + 900; D.idleFlip = !D.idleFlip;
+      const img = $id('dgs-mon-img'), m = v?.monster;
+      if (img && m && !(D.posing > now) && v.phase !== 'finished') swapSrc(img, monSrc(m.key, idlePose(m)));
+    }
     D.raf = requestAnimationFrame(step);
   };
   D.raf = requestAnimationFrame(step);
 }
 function introOverlay(v) {
-  const arena = document.getElementById('dg-arena');
-  if (!arena || arena.querySelector('.dg-door')) return;
+  const world = $id('dgs-world');
+  if (!world || world.querySelector('.dg-door')) return;
   const el = document.createElement('div');
   el.className = `dg-door${reduced() ? ' still' : ''}`;
   el.innerHTML = `<i class="l"></i><i class="r"></i><div><span>${esc(v.cut_name)}</span><b>기말고사 지옥</b><em id="dg-intro-left"></em></div>`;
-  arena.appendChild(el);
+  world.appendChild(el);
+  sfx('door');
   later(() => el.classList.add('open'), Math.max(0, (v.intro_until || 0) - serverNow() - 700));
   later(() => el.remove(), Math.max(0, (v.intro_until || 0) - serverNow() + 900));
 }
-function banner(title, sub = '') {
-  const el = document.getElementById('dg-banner');
+function banner(title, sub = '', cls = '') {
+  const el = $id('dgs-banner');
   if (!el) return;
-  el.innerHTML = `<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}`;
-  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  el.className = `dgs-banner ${cls}`;
+  el.querySelector('b').textContent = title;
+  el.querySelector('span').textContent = sub; el.querySelector('span').hidden = !sub;
+  retrig(el, 'show');
 }
+function say(x, y, text, color = '#fff') {
+  const layer = $id('dgs-layer');
+  if (!layer) return;
+  const el = document.createElement('div');
+  el.className = 'dgs-say'; el.textContent = text; el.style.left = `${x}px`; el.style.top = `${y}px`; el.style.color = color;
+  layer.appendChild(el);
+  setTimeout(() => el.remove(), 1100);
+}
+const flash = cls => retrig($id('dgs-flash'), cls);
+const shake = big => { if (!reduced()) retrig($id('dgs-world'), big ? 'shake-big' : 'shake'); };
 
 /* ---------- 이벤트 → 효과 ---------- */
-function centerOf(el, arena) {
-  const a = arena.getBoundingClientRect(), r = el.getBoundingClientRect();
-  return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height / 2 };
+// 피해 숫자를 메이플처럼 줄줄이 쌓는다. 숫자는 방이 계산한 피해 그대로다(합동 필살 · 브레이크 · 쓰기 보너스만 몇 줄로 나눠 보여 주고 합은 같다).
+function stack(x, y, lines, { tag = '', tagCls = '', big = false, gap = 70, step = 31 } = {}) {
+  const layer = $id('dgs-layer');
+  if (!layer) return;
+  const box = document.createElement('div');
+  box.className = 'dgs-stack'; box.style.left = `${x}px`; box.style.top = `${y}px`;
+  lines.forEach((l, i) => {
+    const d = document.createElement('div');
+    d.className = `dgs-dl ${l.cls || ''}${big ? ' big' : ''}`; d.textContent = l.text;
+    d.style.top = `${-i * step}px`; d.style.animationDelay = `${i * gap}ms`;
+    box.appendChild(d);
+  });
+  if (tag) { const t = document.createElement('div'); t.className = `dgs-dtag ${tagCls}`; t.textContent = tag; t.style.top = `${-lines.length * step - 6}px`; t.style.animationDelay = `${(lines.length - 1) * gap}ms`; box.appendChild(t); }
+  layer.appendChild(box);
+  setTimeout(() => box.remove(), 1500 + lines.length * gap);
 }
-function popNumber(arena, at, text, cls) {
-  const el = document.createElement('div');
-  el.className = `dg-pop ${cls}`; el.textContent = text;
-  el.style.left = `${at.x}px`; el.style.top = `${at.y}px`;
-  arena.appendChild(el);
-  setTimeout(() => el.remove(), 1000);
+// 합이 total인 n개의 숫자(조금씩 다르게).
+function split(total, n) {
+  n = Math.max(1, Math.min(n, total));
+  const w = Array.from({ length: n }, () => .75 + Math.random() * .5), sum = w.reduce((a, b) => a + b, 0);
+  const out = w.map(x => Math.max(1, Math.floor(total * x / sum)));
+  out[0] += total - out.reduce((a, b) => a + b, 0);
+  return out;
 }
-function pose(name, ms = 380) {
-  const img = document.getElementById('dg-mon-img'), m = D.view?.monster;
-  if (!img || !m) return;
-  img.src = `/assets/monsters/${m.key}-${name}.webp`;
-  clearTimeout(D.poseTimer);
-  if (name !== 'down') D.poseTimer = setTimeout(() => { if (document.getElementById('dg-mon-img') === img) img.src = `/assets/monsters/${m.key}.webp`; }, ms);
+const petEl = pid => document.querySelector(`.dgs-pet[data-pid="${CSS.escape(String(pid))}"]`);
+const playerOf = pid => D.view?.players.find(x => x.id === pid);
+function petFace(pid, face, ms) {
+  const el = petEl(pid), p = playerOf(pid);
+  if (!el || !p) return;
+  const img = el.querySelector('.art');
+  clearTimeout(el._faceT);
+  swapSrc(img, petArt(p, face));
+  if (ms) el._faceT = setTimeout(() => { if (!p.down) swapSrc(img, petArt(playerOf(pid) || p)); }, ms);
+}
+function colOf(pid) { const s = slotOf(pid); return L().cols[s ? s.i : 1] ?? L().cols[1]; }
+function hitShow(e, myId) {
+  const p = playerOf(e.pid), el = p?.element || 'star', snd = EL_SOUND[el] || 'star', mine = e.pid === myId;
+  const big = e.kind === 'special' || e.kind === 'break';
+  const to = monHit(!big);
+  const land = () => {
+    if (!$id('dgs')) return;
+    D.fx?.impact(big ? 'star' : el, to.x, to.y, big);
+    if (big) { D.fx?.impact('flame', to.x - 18, to.y + 8, true, false); D.fx?.impact('water', to.x + 18, to.y - 8, true, false); }
+    let lines, opt = {};
+    if (e.kind === 'special') { lines = split(e.damage, 6).map((d, i) => ({ text: num(d), cls: i % 2 ? 'crit' : '' })); opt = { big: true, step: 34, gap: 90, tag: '합동 필살', tagCls: 'ult' }; }
+    else if (e.kind === 'break') { lines = split(e.damage, 4).map(d => ({ text: num(d), cls: 'weak' })); opt = { big: true, step: 34, gap: 90, tag: '브레이크!', tagCls: 'weak' }; }
+    else if (e.kind === 'spell') { const base = Math.max(1, Math.round(e.damage / 1.6)); lines = [{ text: num(base), cls: mine ? 'mine' : '' }, { text: num(e.damage - base), cls: 'crit' }].filter(l => l.text !== '0'); opt = { tag: '쓰기 보너스', tagCls: 'spell' }; }
+    else if (e.kind === 'auto') { lines = [{ text: num(e.damage), cls: 'small' }]; }
+    else { lines = [{ text: num(e.damage), cls: mine ? 'mine' : '' }]; if (p?.combo >= 5) opt.tag = `${p.combo}콤보`; }
+    const x = big ? (D.mode === 'land' ? 640 : 250) : colOf(e.pid);
+    stack(x, big ? (D.mode === 'land' ? 232 : 300) : L().base - (slotOf(e.pid)?.i || 0) * 6, lines, opt);
+    $id('dgs-mon') && retrig($id('dgs-mon'), 'hit');
+    const m = D.view?.monster;
+    if (m && !(D.posing > serverNow() && D.poseName === 'roar')) pose(m.boss && m.stage === 3 ? 'corehurt' : 'hurt', 220);
+    if (big) { sfx('ult-impact', { gain: e.kind === 'break' ? .8 : 1 }); flash('white'); shake(true); }
+    else sfx(e.kind === 'spell' ? 'crit' : `hit-${snd}`, { gain: mine ? 1 : .7, vary: .04 });
+    lines.forEach((_, k) => { if (k) sfx('dmg-tick', { gain: .55, at: k * (big ? .09 : .07), rate: 1 + k * .07 }); });
+    if (!big) shake(false);
+    if (!mine && e.pid && (e.kind === 'answer' || e.kind === 'spell')) feed(p, e.damage, e.kind === 'spell');
+  };
+  if (big) { const wait = Math.max(0, (D.cutinUntil || 0) - Date.now()); return later(land, wait); }
+  if (e.kind === 'auto' || !e.pid || !slotOf(e.pid)) return land();
+  const pet = petEl(e.pid);
+  retrig(pet, 'lunge'); petFace(e.pid, 'attack', 520);
+  sfx(`atk-${snd}`, { gain: mine ? .9 : .55, vary: .04 });
+  const from = petCenter(e.pid);
+  if (EL_SOUND[el] === 'leaf') { for (let k = 0; k < 4; k++) later(() => D.fx?.shoot(from, { x: to.x + (Math.random() - .5) * 36, y: to.y + (Math.random() - .5) * 36 }, el, 420, k ? () => D.fx?.impact(el, to.x, to.y) : land), k * 70); }
+  else D.fx ? D.fx.shoot({ x: from.x + 24, y: from.y - 10 }, to, el, 340, land) : land();
+  if (e.kind === 'spell' && D.fx) later(() => D.fx?.shoot({ x: from.x + 24, y: from.y - 30 }, { x: to.x - 20, y: to.y - 20 }, el, 340, () => D.fx?.impact(el, to.x - 20, to.y - 20)), 110);
+}
+// 세로 화면 왼쪽 위: 동료 정답 알림(최근 두 개).
+function feed(p, damage, spell) {
+  const box = $id('dgs-feed');
+  if (!box || !p) return;
+  D.feed = [{ name: p.name, damage, spell, at: Date.now() }, ...(D.feed || [])].slice(0, 2);
+  box.innerHTML = D.feed.map((f, i) => `<span class="${i ? 'old' : ''}"><b>${esc(f.name)}</b> ${f.spell ? '쓰기 정답' : '정답'} · ${num(f.damage)} 피해</span>`).join('');
+  clearTimeout(D.feedT);
+  D.feedT = setTimeout(() => { if ($id('dgs-feed')) { D.feed = []; $id('dgs-feed').innerHTML = ''; } }, 3200);
+}
+function cutin(v) {
+  const box = $id('dgs-cutin');
+  if (!box) return;
+  const pets = partyOrder(v).filter(p => !p.down && !p.out);
+  box.innerHTML = `<div class="band"><i></i></div>${pets.map((p, i) => `<img class="cp c${i}" src="${petArt(p, 'attack')}" alt="" draggable="false">`).join('')}<div class="ct"><small>TEAM ULTIMATE</small><b>합동 필살!</b><span>${v.element_bonus > 1 ? '서로 다른 속성 3마리 +30%' : '모두의 정답으로 게이지가 찼어요'}</span></div>`;
+  retrig(box, 'go');
+  $id('dgs-dim')?.classList.add('on');
+  later(() => { box.classList.remove('go'); $id('dgs-dim')?.classList.remove('on'); }, 1500);
 }
 function play(e) {
-  const arena = document.getElementById('dg-arena'), myId = D.A.data.profile.id;
-  if (e.type === 'floor') banner(e.boss ? '보스 등장! 킬러 골렘' : `${e.floor}층`, e.bg);
-  if (e.type === 'boss_phase') banner(`페이즈 ${e.stage}`, e.name);
-  if (e.type === 'mark' && e.pid === myId) banner('✏️ 채점 표적!', '다음 3문제를 연속으로 맞혀야 막아요');
-  if (e.type === 'core_open') banner('💠 핵 노출!', `모두 함께 ${e.goal}문제를 맞히면 브레이크`);
-  if (e.type === 'rest') banner('층 클리어!', '6초 휴식');
-  if (e.type === 'forfeit') banner(`${nameOf(e.pid)} 포기`, '연결이 90초 넘게 끊겼어요');
-  if (e.type === 'answered' && e.pid === myId) {
-    const opts = document.querySelectorAll('.dg-opt');
-    opts[e.answer]?.classList.add('right');
-    if (!e.right && D.picked !== null) opts[D.picked]?.classList.add('wrong');
-    if (e.timeout) document.querySelector('.dg-q')?.classList.add('late');
-    opts.forEach(x => { x.disabled = true; });
-  }
-  if (!arena || reduced()) return;
-  const monster = document.getElementById('dg-mon-img');
-  const memberEl = pid => arena.querySelector(`.dg-member[data-pid="${CSS.escape(String(pid))}"]`);
-  const at = monster ? centerOf(monster, arena) : { x: arena.clientWidth / 2, y: arena.clientHeight * .35 };
-  if (e.type === 'hit') {
-    const p = D.view?.players.find(x => x.id === e.pid), el = p?.element || 'star', from = e.pid && memberEl(e.pid);
-    if (from && e.kind !== 'auto') fxShot(arena, centerOf(from, arena), at, el, { big: e.pid === myId });
-    later(() => { fxImpact(arena, at, el, e.kind === 'special' || e.kind === 'break' ? 3 : e.pid === myId ? 2 : 1); popNumber(arena, at, `-${e.damage}`, e.pid === myId ? 'mine' : ''); pose('hurt'); }, from ? 230 : 0);
-  }
-  if (e.type === 'special') { banner('합동 필살기!', `${nameOf(e.pid)}의 정답으로 게이지가 찼어요`); fxPunch(arena, .06); fxPowerUp(arena, at, 'star'); }
-  if (e.type === 'break') { banner('브레이크!', '핵이 부서졌어요'); fxPunch(arena, .08); }
-  if (e.type === 'struck') {
-    const el = memberEl(e.pid);
-    pose('attack', 420);
-    if (el) { const where = centerOf(el, arena); popNumber(arena, where, `-${e.damage}`, 'hurt'); el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
-    if (e.pid === myId) fxPunch(arena, .035);
-  }
-  if (e.type === 'mark_blocked' && e.pid === myId) { const el = memberEl(e.pid); if (el) fxShield(arena, centerOf(el, arena)); banner('채점 방어!', '3문제 연속 정답'); }
-  if (e.type === 'revive') { const el = memberEl(e.pid); if (el) fxHeal(arena, centerOf(el, arena)); if (e.by) banner(`${nameOf(e.pid)} 부활!`, `${nameOf(e.by)}의 3연속 정답`); }
-  if (e.type === 'defeat') { pose('down'); fxImpact(arena, at, 'star', 3); }
-  if (e.type === 'emote') { const el = memberEl(e.pid); if (el) { const bubble = document.createElement('i'); bubble.className = 'dg-bubble'; bubble.textContent = EMOTES[e.emote] || ''; el.appendChild(bubble); setTimeout(() => bubble.remove(), 1800); } }
-  if (e.type === 'answered' && e.right && e.pid === myId) {
-    const me = D.view?.players.find(x => x.id === myId), rank = comboRank((me?.combo || 0) + 1);
-    if (rank) fxRank(arena, { x: arena.clientWidth / 2, y: arena.clientHeight * .6 }, rank[1], rank[2]);
+  if (!$id('dgs')) return;
+  const myId = D.A.data.profile.id, v = D.view, fast = reduced();
+  switch (e.type) {
+    case 'floor':
+      banner(e.boss ? '보스 등장! 킬러 골렘' : `${e.floor}층`, e.boss ? '기말고사 지옥의 끝' : e.bg, e.boss ? 'red' : '');
+      sfx(e.boss ? 'boss' : 'door');
+      if (e.boss) { later(() => { pose('roar', 1300); sfx('boss-roar', { gain: .8 }); shake(true); }, 600); }
+      break;
+    case 'answered':
+      if (e.pid !== myId) break;
+      if (e.kind === 'spell') {
+        if (D.spell) D.spell.done = true;
+        document.querySelectorAll('.dgs-tile').forEach(x => { x.disabled = true; });
+        const slots = $id('dgs-slots');
+        if (e.right) { slots?.classList.add('done'); sfx('spell-done'); }
+        else {
+          slots?.querySelectorAll('i').forEach((el, i) => { if (!el.classList.contains('f')) { el.textContent = e.word?.[i] || ''; el.className = 'miss'; } });
+          sfx('wrong');
+        }
+      } else {
+        const opts = document.querySelectorAll('.dgs-opt');
+        opts[e.answer]?.classList.add('right');
+        if (!e.right && D.picked !== null) opts[D.picked]?.classList.add('wrong');
+        opts.forEach(x => { x.disabled = true; });
+        sfx(e.right ? 'correct' : 'wrong');
+      }
+      if (e.timeout) document.querySelector('.dgs-q')?.classList.add('late');
+      if (e.right) {
+        const me = playerOf(myId), rank = comboRank((me?.combo || 0) + 1);
+        if (rank) say(D.mode === 'land' ? 300 : 120, D.mode === 'land' ? 96 : 300, rank[1], rank[2]);
+      }
+      break;
+    case 'letter': {
+      if (e.pid !== myId || !D.spell || D.spell.n !== e.n) break;
+      const i = D.spell.queue.shift(), tile = i >= 0 ? document.querySelector(`.dgs-tile[data-i="${i}"]`) : null;
+      tile?.classList.remove('wait');
+      if (e.ok) { if (i >= 0) { D.spell.used.add(i); tile?.classList.add('used'); if (tile) tile.disabled = true; } sfx('type-ok', { rate: 1 + e.pos * .06, gain: .8 }); }
+      else { retrig(tile || $id('dgs-slots'), 'no'); sfx('type-wrong', { gain: .7 }); }
+      break;
+    }
+    case 'hit': hitShow(e, myId); break;
+    case 'special':
+      if (fast) banner('합동 필살!', '모두의 정답으로 게이지가 찼어요', 'gold'); else cutin(v);
+      D.cutinUntil = Date.now() + (fast ? 300 : 1350);
+      sfx('ult-riser', { gain: .9 });
+      partyOrder(v).forEach((p, i) => { if (p.down || p.out) return; later(() => { retrig(petEl(p.id), 'lunge'); petFace(p.id, 'attack', 900); D.fx?.shoot(petCenter(p.id), monHit(false), p.element || 'star', 420, null, -60 - i * 20); }, (fast ? 300 : 1350) - 380 + i * 60); });
+      break;
+    case 'break':
+      banner('브레이크!', '핵이 부서졌어요', 'gold');
+      later(() => { const b = $id('dgs-break'); if (b) { const at = monHit(false); Object.assign(b.style, { left: `${at.x + 30}px`, top: `${at.y + 10}px` }); retrig(b, 'go'); } sfx('crit'); }, 120);
+      break;
+    case 'struck': {
+      const el = petEl(e.pid), m = v?.monster;
+      pose('windup', 180);
+      later(() => {
+        pose(D.markFail === e.pid ? 'attack2' : 'attack', 520);
+        retrig($id('dgs-mon'), 'slam');
+        later(() => {
+          if (!$id('dgs')) return;
+          const at = petCenter(e.pid);
+          D.fx?.slash(at.x, at.y);
+          if (m?.boss || D.markFail === e.pid) D.fx?.dust(at.x - 70, at.x + 70, L().foot);
+          retrig(el, 'hurt'); petFace(e.pid, 'hurt', 1000);
+          stack(at.x - 6, at.y - 40, [{ text: `-${num(e.damage)}`, cls: 'hurt' }]);
+          sfx(m?.boss ? 'boss-slam' : 'smash', { gain: m?.boss ? .9 : .8, vary: .05 });
+          sfx('hurt', { gain: .45, at: .1 });
+          shake(!!m?.boss || D.markFail === e.pid);
+          if (e.pid === myId) flash('red');
+          D.markFail = null;
+        }, 160);
+      }, 180);
+      break;
+    }
+    case 'down': say(petCenter(e.pid).x - 30, L().foot - 150, '기절', '#e9d5ff'); sfx('faint'); break;
+    case 'revive': {
+      const at = petCenter(e.pid);
+      D.fx?.heal(at.x, at.y);
+      stack(at.x, at.y - 40, [{ text: `+${num(e.hp)}`, cls: 'heal' }]);
+      petFace(e.pid, 'happy', 900);
+      sfx('revive');
+      if (e.by) banner(`${nameOf(e.pid)} 부활!`, `${nameOf(e.by)}의 3연속 정답`, 'green');
+      break;
+    }
+    case 'mark':
+      banner('✏️ 빨간펜 채점!', e.pid === myId ? '내가 표적! 다음 3문제를 연속으로 맞혀야 막아요' : `${nameOf(e.pid)} 표적 · 3문제 연속 정답이면 막아요`, 'red');
+      pose('skill', 1000);
+      sfx('boss-charge', { dur: 1.6, gain: .8 });
+      if (e.pid === myId) sfx('warn-beep', { at: .3 });
+      break;
+    case 'mark_blocked': {
+      const el = petEl(e.pid);
+      retrig(el, 'shield');
+      sfx('shield-block');
+      banner('채점 방어!', `${nameOf(e.pid)}의 3연속 정답`, 'blue');
+      pose('hurt', 500);
+      break;
+    }
+    case 'mark_failed': D.markFail = e.pid; banner('채점 실패!', '빨간펜이 크게 내려쳐요', 'red'); break;
+    case 'core_open': banner('💠 핵 노출!', `모두 함께 ${e.goal}문제를 맞히면 브레이크`, 'gold'); sfx('boss', { gain: .7 }); pose('roar', 900); break;
+    case 'core_close': if (!e.broke) banner('핵이 닫혔어요', '잠시 뒤 다시 열려요'); break;
+    case 'boss_phase': banner(`${e.stage}페이즈 · ${e.name}`, e.stage === 3 ? '가슴의 핵을 노려요 · 제한 시간 −1초' : '킬러 골렘이 화가 났어요', 'red'); pose('roar', 1300); sfx('boss-roar', { gain: .85 }); flash('red'); shake(true); break;
+    case 'defeat': {
+      const at = monHit(false);
+      pose('down');
+      D.fx?.impact('star', at.x, at.y, true);
+      sfx(e.boss ? 'boss-down' : 'burst', { gain: e.boss ? .9 : .7 });
+      if (e.boss) { D.fx?.confetti(); later(() => sfx('fanfare-epic'), 1300); }
+      break;
+    }
+    case 'rest': banner('층 클리어!', '6초 휴식', 'green'); sfx('clear', { gain: .7 }); break;
+    case 'forfeit': banner(`${nameOf(e.pid)} 포기`, '연결이 90초 넘게 끊겼어요'); break;
+    case 'emote': { const el = petEl(e.pid); if (el) { const bubble = document.createElement('i'); bubble.className = 'dg-bubble'; bubble.textContent = EMOTES[e.emote] || ''; el.appendChild(bubble); setTimeout(() => bubble.remove(), 1800); } break; }
   }
 }
 const nameOf = pid => { const p = D.view?.players.find(x => x.id === pid); return p ? (p.id === D.A.data.profile.id ? '나' : p.name) : ''; };
+
+// 무대를 떠날 때: 효과 캔버스를 멈추고 창 크기 · 키보드 듣기를 뗀다.
+function leaveStage() {
+  D.fx?.stop(); D.fx = null;
+  if (D.onResize) removeEventListener('resize', D.onResize);
+  if (D.onKey) removeEventListener('keydown', D.onKey);
+  D.onResize = D.onKey = null;
+}
 
 /* ---------- 결과 ---------- */
 function resultScreen(v) {
   if (D.phase === 'result') return;
   D.phase = 'result';
   cancelAnimationFrame(D.raf);
+  leaveStage();
+  if (!v.result?.cleared) playSound('fail');
   const r = v.result, myId = D.A.data.profile.id;
   note('');
   main(`

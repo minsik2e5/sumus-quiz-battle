@@ -1,10 +1,12 @@
 // V13.126 던전 밸런스 시뮬레이션: 진짜 던전 엔진(server/dungeon-engine.mjs)을 가상 시계로 돌린다.
 // 학생 모형(아래 student)은 monster-sim.mjs와 같은 방식이다: 아는 단어는 1.3~3.5초 안에 맞히고,
 // 모르는 단어는 2.5~6초 뒤에 찍는다. 보기가 많을수록 조금 느리다. 틀린 단어는 정답을 본 뒤 절반쯤 외운다.
+// V13.130 영어 쓰기: 아는 단어도 철자까지 쓰는 건 80%만, 1.1초 + 글자당 0.26~0.44초 걸린다. 못 쓰는 단어는
+// 1.5~4초 안에 틀린 글자 3번으로 끝난다. 영어 고르기는 뜻 고르기와 같은 속도로 본다.
 // "3명 첫 도전"은 반 학생 분포(아는 비율 평균 82%, 속도 개인차)에서 뽑은 세 명이 그 등급컷을 처음 하는 판이다.
 // `node server/dungeon-sim.mjs [판 수]`는 등급컷 × 인원(2인/3인) 클리어율과 시간, 층별 실패 위치를 표로 찍는다.
 // 출시 검사(dungeon-check.mjs)는 고정 씨앗으로 `clearRate`를 돌려 목표 클리어율에서 벗어나지 않는지 본다.
-import { createDungeon, join, ready, answer, tick, nextWake, floorSpec, DUNGEON, FLOORS, CUTS, GRADE_EXTRA_MS } from './dungeon-engine.mjs';
+import { createDungeon, join, ready, answer, settle, tick, nextWake, floorSpec, DUNGEON, FLOORS, CUTS, GRADE_EXTRA_MS } from './dungeon-engine.mjs';
 
 // 작은 씨앗 무작위(mulberry32): 같은 씨앗이면 같은 결과.
 export function seeded(seed = 1) {
@@ -14,8 +16,11 @@ export function seeded(seed = 1) {
 const gauss = random => { let u = 0, v = 0; while (!u) u = random(); while (!v) v = random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
 const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 
-// 시뮬레이션용 단어 풀(120단어, 오답 보기 5개씩).
-export const SIM_WORDS = Array.from({ length: 140 }, (_, i) => ({ word_id: 'w' + i, prompt: 'word' + i, meaning: '뜻' + i, wrong: [1, 2, 3, 4, 5].map(k => '뜻' + ((i + k * 17) % 140)) }));
+// 시뮬레이션용 단어 풀(140단어, 뜻 오답 5개 · 영어 오답 5개씩). 영어는 쓰기 문제가 나오게 알파벳 4~9글자.
+const ABC = 'abcdefghijklmnopqrstuvwxyz';
+const simWord = i => { let w = '', x = i + 27; while (x > 0) { w += ABC[x % 26]; x = Math.floor(x / 26); } for (let k = 0; w.length < 4 + (i % 6); k++) w += ABC[(i * 7 + k * 3) % 26]; return w; };
+export const SIM_WORDS = Array.from({ length: 140 }, (_, i) => ({ word_id: 'w' + i, prompt: simWord(i), meaning: '뜻' + i, wrong: [1, 2, 3, 4, 5].map(k => '뜻' + ((i + k * 17) % 140)), wrong_en: [1, 2, 3, 4, 5].map(k => simWord((i + k * 23) % 140)) }));
+export const SPELL_RECALL = 0.8;
 const PETS = ['dog', 'cat', 'dragon', 'penguin', 'panda', 'snake', 'bear', 'otter', 'owl', 'fox', 'rabbit', 'shark', 'koala', 'hedgehog', 'wolf', 'qilin'];
 const GRADES = Object.keys(GRADE_EXTRA_MS);
 
@@ -40,9 +45,15 @@ export function run(cut, party, random = Math.random, { grade = null, pets = nul
   const plan = (pid, st) => {
     const q = s.players[pid].q;
     if (!q || plans.get(pid)?.n === q.n) return;
-    const n = q.options.length, slow = st.speed * (1 + 0.08 * (n - 4));
     const known = knows.get(pid).get(q.word_id) || st.learned.has(q.word_id);
     const slip = random() < 0.03;
+    if (q.kind === 'spell') {
+      const can = known && !slip && random() < SPELL_RECALL;
+      const at = q.started_at + (can ? 1100 + q.word.length * (260 + random() * 180) : 1500 + random() * 2500) * st.speed;
+      plans.set(pid, { n: q.n, at, spell: true, word: q.word_id, right: can });
+      return;
+    }
+    const n = q.options.length, slow = st.speed * (1 + 0.08 * (n - 4));
     let at, choice;
     if (known && !slip) { at = q.started_at + (1300 + random() * 2200) * slow; choice = q.answer; }
     else {
@@ -60,7 +71,8 @@ export function run(cut, party, random = Math.random, { grade = null, pets = nul
     for (const [pid, p] of plans) if (s.players[pid].q?.n === p.n && p.at < s.players[pid].q.deadline && (!next || p.at < next.p.at)) next = { pid, p };
     if (next && (wake === null || next.p.at <= wake)) {
       plans.delete(next.pid);
-      answer(s, next.pid, next.p.choice, next.p.at, next.p.n);
+      if (next.p.spell) settle(s, next.pid, next.p.right, next.p.at, next.p.n);
+      else answer(s, next.pid, next.p.choice, next.p.at, next.p.n);
       if (!next.p.right && random() < 0.5) party[Number(next.pid.slice(1))].learned.add(next.p.word);
     } else if (wake !== null) {
       for (const [pid, p] of plans) if (s.players[pid].q && s.players[pid].q.deadline <= wake && random() < 0.5) party[Number(pid.slice(1))].learned.add(p.word);

@@ -4,11 +4,11 @@
 // (cloudflare/battle-room.mjs 방식). 결과는 판이 끝날 때(또는 시작하지 못하고 닫힐 때) 메인 상태 객체에
 // 한 번 보고한다. 보고가 실패하면 점점 길게 쉬며 다시 보내고, 메인은 report_id로 두 번 처리하지 않는다.
 // 빈자리 봇 동료는 battle-bot.js의 '보통' 로보처럼 정해진 확률과 시간으로 방이 대신 답한다.
-import { createDungeon, join, ready, leave, answer, tick, nextWake, view, disconnect, reconnect, DUNGEON } from '../server/dungeon-engine.mjs';
+import { createDungeon, join, ready, leave, answer, letter, settle, tick, nextWake, view, disconnect, reconnect, DUNGEON } from '../server/dungeon-engine.mjs';
 import { BOT_LEVELS } from '../public/modules/battle-bot.js';
 import { reportRetryMs } from './battle-room.mjs';
 
-const MESSAGE_TYPES = new Set(['sync', 'ping', 'ready', 'answer', 'emote']);
+const MESSAGE_TYPES = new Set(['sync', 'ping', 'ready', 'answer', 'letter', 'emote']);
 const MESSAGE_MAX = 1024;
 const CLOSE_AFTER_MS = 60000; // 끝난 방은 늦게 돌아온 폰에 결과를 보여 줄 만큼만 남긴다
 // 응원 이모트: 정해진 것만(자유 글 없음), 3초에 하나, 한 판에 40개까지. 기절한 학생도 보낼 수 있다.
@@ -24,8 +24,10 @@ export async function dungeonReportKey(env) {
 }
 
 // 봇의 다음 답: 언제(문제가 열린 뒤 min~max), 맞힐지(정답률). 제한 시간 안에 못 하면 시간 초과로 둔다.
+// V13.130 영어 쓰기 문제는 글자를 하나씩 누르는 만큼 오래(×1.8) 걸린다.
+export const BOT_SPELL_SLOW = 1.8;
 export function planBot(q, random = Math.random, level = DUNGEON_BOT) {
-  const delay = level.min + random() * (level.max - level.min);
+  const delay = (level.min + random() * (level.max - level.min)) * (q.kind === 'spell' ? BOT_SPELL_SLOW : 1);
   const at = q.started_at + delay;
   return { n: q.n, at: at < q.deadline - 150 ? Math.round(at) : null, right: random() < level.accuracy };
 }
@@ -173,6 +175,8 @@ export class DungeonRoom {
     if (msg.type === 'ready') events.push(...ready(r.state, pid, now, msg.on !== false));
     // 폰은 선택 번호와 문제 번호(n)만 보낸다. 판정은 엔진이 한다.
     else if (msg.type === 'answer') events.push(...answer(r.state, pid, Number.isInteger(msg.choice) ? msg.choice : -1, now, Number.isInteger(msg.n) ? msg.n : -1));
+    // V13.130 영어 쓰기: 누른 글자 하나와 문제 번호만. 맞는지는 엔진이 정답 철자와 비교한다.
+    else if (msg.type === 'letter') events.push(...letter(r.state, pid, typeof msg.ch === 'string' ? msg.ch.slice(0, 1) : '', now, Number.isInteger(msg.n) ? msg.n : -1));
     if (!events.length) return;
     this.planBots();
     await this.save();
@@ -252,10 +256,8 @@ export class DungeonRoom {
       const plan = r.bots?.[id], p = s.players[id];
       if (!plan?.at || now < plan.at || !p?.q || p.q.n !== plan.n || s.phase !== 'fight') continue;
       plan.at = null;
-      const q = p.q;
-      const wrong = q.options.map((_, i) => i).filter(i => i !== q.answer && i !== q.covered);
-      const choice = plan.right ? q.answer : wrong[Math.floor(this.random() * wrong.length)];
-      out.push(...answer(s, id, choice, now, q.n));
+      // 봇은 문제 종류(고르기 · 쓰기)와 상관없이 계획한 대로 맞히거나 틀린다.
+      out.push(...settle(s, id, plan.right, now, p.q.n));
       this.planBots();
     }
     return out;

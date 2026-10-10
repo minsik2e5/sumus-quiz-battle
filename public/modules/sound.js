@@ -10,7 +10,12 @@ export const SOUND_GAIN = {
   correct: .8, wrong: .7, combo: .75, tick: .45, tap: .45, coin: .75, coins: .7,
   wiggle: .85, crack: .9, burst: .9, pop: .85,
   'fanfare-basic': .8, 'fanfare-epic': .85, 'fanfare-legend': .9, 'fanfare-mythic': .95, clear: .85, levelup: .75, fail: .65,
-  hit: .8, slash: .75, smash: .9, hurt: .75, skill: .8, boss: .9, door: .8, step: .6
+  hit: .8, slash: .75, smash: .9, hurt: .75, skill: .8, boss: .9, door: .8, step: .6,
+  // V13.130 던전 전투(docs/sound/battle-synth.mjs로 합성): 펫 속성별 발사 · 맞힘, 피해 숫자 틱, 치명타,
+  // 보스 기 모으기 · 경고 · 내려찍기 · 포효 · 쓰러짐, 방패, 합동 필살, 영어 쓰기 글자 칸, 기절 · 부활, 10콤보.
+  'atk-star': .6, 'atk-leaf': .65, 'atk-wind': .6, 'hit-star': .75, 'hit-leaf': .75, 'hit-wind': .75, 'dmg-tick': .4, crit: .85,
+  'boss-charge': .75, 'warn-beep': .45, 'boss-slam': .9, 'shield-block': .8, 'ult-riser': .8, 'ult-impact': .95, 'boss-roar': .9,
+  'type-key': .5, 'type-ok': .55, 'type-wrong': .4, 'spell-done': .7, faint: .6, revive: .7, 'combo-10': .7, 'boss-down': .9
 };
 export const SOUND_KEYS = Object.keys(SOUND_GAIN);
 // 첫 터치 때 미리 받아 두는 작은 소리(자주 쓰이는 것). 큰 팡파르는 연출이 시작될 때 preloadSound로 받는다.
