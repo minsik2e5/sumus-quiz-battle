@@ -84,6 +84,7 @@ function onClick(event) {
   if (act === 'emote') return emote(b.dataset.emote, b);
   if (act === 'again') { closeAll(); const { A, exit } = D; return openDungeon(A, exit); }
   if (act === 'home') return leaveScreen();
+  if (act === 'leave-room') { buttonBusy(b); return api('/dungeon/leave', {}).catch(() => {}).then(() => { closeAll(); const { A, exit } = D; return openDungeon(A, exit); }); }
 }
 
 /* ---------- 던전 입구 ---------- */
@@ -163,12 +164,14 @@ function openSocket() {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/dungeon/ws/${D.room.id}?ticket=${encodeURIComponent(D.room.ticket)}`);
   D.ws = ws;
   ws.onmessage = event => { let msg; try { msg = JSON.parse(event.data); } catch { return; } if (D?.ws === ws) onMessage(msg); };
-  ws.onopen = () => { D.retries = 0; note(''); };
+  // V13.129: 다시 연결되면 첫 화면에서 문제를 새로 그린다(끊긴 사이 누른 보기가 잠긴 채 남지 않게).
+  ws.onopen = () => { D.retries = 0; D.qn = null; note(''); };
   ws.onclose = event => {
     if (D?.ws !== ws || D.closing || D.view?.phase === 'finished' || D.ended) return;
-    if (event.code === 4000) { D.ended = true; return main('<section class="dg-card dg-center"><h2>다른 화면에서 던전을 열었어요</h2><p>방금 연 화면에서 이어서 해요.</p><button type="button" class="btn primary" data-dg="home">나가기</button></section>'); }
+    if (event.code === 4000) { D.ended = true; D.replaced = true; return main('<section class="dg-card dg-center"><h2>다른 화면에서 던전을 열었어요</h2><p>방금 연 화면에서 이어서 해요.</p><button type="button" class="btn primary" data-dg="home">나가기</button></section>'); }
     D.retries = (D.retries || 0) + 1;
-    if (D.retries > 8) return toast('던전 방에 다시 연결하지 못했어요.');
+    // V13.129: 방이 닫혔거나 들어갈 수 없으면 '나가기'로 방에서 빠져나와 입구로 돌아간다.
+    if (D.retries > 8) { D.ended = true; return main('<section class="dg-card dg-center"><h2>던전 방에 연결하지 못했어요</h2><p>방이 닫혔을 수 있어요. 나가서 다시 들어가 주세요.</p><button type="button" class="btn primary" data-dg="leave-room">나가서 던전 입구로</button></section>'); }
     note('연결이 끊겨 다시 연결하는 중…');
     later(() => { if (D.ws === ws) openSocket(); }, Math.min(4000, 600 * D.retries));
   };
@@ -322,6 +325,8 @@ function drawAsk(v) {
 function pick(choice, b) {
   const q = D.view?.question;
   if (!q || D.picked !== null || q.n !== D.qn) return;
+  // V13.129: 연결이 끊긴 사이에는 누르지 않은 것으로 둔다(보기가 잠기지 않게).
+  if (D.ws?.readyState !== 1) return toast('연결 중이에요. 잠시 뒤 눌러 주세요.');
   D.picked = choice;
   b.classList.add('picked');
   document.querySelectorAll('.dg-opt').forEach(x => { x.disabled = true; });
@@ -449,7 +454,10 @@ function resultScreen(v) {
 /* ---------- 나가기 ---------- */
 async function tryExit() {
   const phase = D.view?.phase;
-  if (!D.room || D.ended || !phase || phase === 'finished') return leaveScreen();
+  // V13.129: 판이 끝났거나 방이 닫혔으면 바로 나간다. 방에 들어가 있던 중이면 서버에도 나간다고 알린다.
+  // 다른 화면에서 같은 방을 열었으면 그 화면이 방을 이어 간다(여기서는 나가기를 보내지 않는다).
+  if (!D.room || phase === 'finished' || D.replaced) return leaveScreen();
+  if (D.ended || !phase) { try { await api('/dungeon/leave', {}); } catch {} return leaveScreen(); }
   const fighting = phase !== 'lobby';
   const ask = fighting ? '지금 나가면 90초 뒤 포기 처리되고 보상을 받지 못해요. 그동안 펫이 대신 싸워요.' : D.view.host === D.A.data.profile.id ? '방장이 나가면 방이 닫혀요.' : '로비에서 나갈까요?';
   const close = modal(`<p>${ask}</p><div class="dg-row"><button type="button" class="btn danger" id="dg-leave-yes">나가기</button><button type="button" class="btn ghost" id="dg-leave-no">계속하기</button></div>`, '던전에서 나가기');

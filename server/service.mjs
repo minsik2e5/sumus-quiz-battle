@@ -597,6 +597,8 @@ function battleInviteFor(state, p, now) {
   return { id: b.id, code: b.code, stake: b.stake, mode: battleMode(b.mode), ...battleRoomSchools(state, b, p), host_ranges: b.range_codes || [], host: host?.display_name || '', expires_at: b.created_at + BATTLE_WAIT_MS, ...(t ? { tournament: { id: t.id, name: t.name, round: b.label || '' } } : {}) };
 }
 
+// V13.129: 아직 정산하지 않은 대결인지(상태를 복사하지 않고 지금 상태만 본다). 이미 끝난 대결의 재시도 보고는 바로 끝낸다.
+export const battleReportPending = (state, result) => (state.battles || []).some(x => x.id === result?.id && ['waiting', 'active'].includes(x.status));
 // Called by the battle room (never by a browser) when a match ends. Idempotent.
 export function settleBattle(state, result) {
   const b = (state.battles || []).find(x => x.id === result?.id);
@@ -1052,7 +1054,12 @@ function rpsHall(state, p, now = Date.now()) {
 const rpsFor = (state, p, now = Date.now()) => ({ ...rpsView(p, now), hall: rpsHall(state, p, now) });
 export function sweep(state, now = Date.now()) {
   let changed = false;
-  for (const a of state.examAttempts) if (a.status === 'active' && a.deadline <= Date.now()) { finishExam(a, state, true); changed = true; }
+  for (const a of state.examAttempts) if (a.status === 'active' && a.deadline <= Date.now()) {
+    // V13.129: 기록이 망가진 응시 하나 때문에 정리가 매번 실패하면 모든 요청이 막힌다. 그 응시만 제출로 닫는다.
+    try { finishExam(a, state, true); }
+    catch (error) { console.error('[sweep] exam attempt', a.id, error?.message); Object.assign(a, { status: 'submitted', submitted_at: Date.now(), auto_submitted: true, auto_error: true, lease: null }); }
+    changed = true;
+  }
   if (closeStalePractices(state, now)) changed = true;
   if (compactOldSessions(state, now)) changed = true;
   if (autoResolveMeaningDisputes(state) > 0) changed = true;

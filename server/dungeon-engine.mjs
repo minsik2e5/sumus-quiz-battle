@@ -230,6 +230,8 @@ export function join(state, player, now) {
     right: 0, wrong: 0, timeouts: 0, answered: 0, damage: 0, downs: 0, revived: 0
   };
   out.push(event(state, 'joined', { pid: player.id, name: state.players[player.id].name }));
+  // V13.129: 이미 준비한 방장에게 봇 동료(처음부터 준비)가 들어오면 바로 시작한다.
+  out.push(...maybeBegin(state, now));
   return out;
 }
 
@@ -238,9 +240,12 @@ export function ready(state, pid, now, on = true) {
   const p = state.players[pid];
   if (!p || state.phase !== 'lobby') return [];
   p.ready = !!on;
-  const out = [event(state, 'ready', { pid, ready: p.ready })];
-  if (state.order.length >= DUNGEON.MIN_PLAYERS && state.order.every(id => state.players[id].ready)) out.push(...begin(state, now));
-  return out;
+  return [event(state, 'ready', { pid, ready: p.ready }), ...maybeBegin(state, now)];
+}
+// V13.129: 2명 이상, 모두 준비, 모두 연결(봇은 늘 연결)이면 시작. 참가 · 준비 · 나가기 · 다시 연결 뒤에 본다.
+function maybeBegin(state, now) {
+  if (state.phase !== 'lobby' || state.order.length < DUNGEON.MIN_PLAYERS) return [];
+  return state.order.every(id => state.players[id].ready && (state.players[id].connected || state.players[id].bot)) ? begin(state, now) : [];
 }
 function begin(state, now) {
   state.phase = 'intro';
@@ -257,12 +262,14 @@ export function leave(state, pid, now) {
   state.order = state.order.filter(id => id !== pid);
   delete state.players[pid];
   if (state.host === pid) state.host = state.order[0] || null;
-  return [event(state, 'left', { pid })];
+  return [event(state, 'left', { pid }), ...maybeBegin(state, now)];
 }
 export function disconnect(state, pid, now) {
   const p = state.players[pid];
   if (!p || !p.connected || p.out) return [];
   p.connected = false; p.dropped_at = now; p.auto_at = now + DUNGEON.AUTO_MS;
+  // V13.129: 로비에서 끊기면 준비가 풀린다(없는 학생과 시작해서 바로 포기 처리되지 않게).
+  if (state.phase === 'lobby') p.ready = false;
   // 끊긴 학생의 문제는 멈춘다(맞지도 않는다). 펫이 자동으로 공격하며 기다린다.
   p.q = null; p.next_at = null;
   return [event(state, 'dropped', { pid })];
@@ -351,7 +358,8 @@ function rescue(state, p, now) {
   if (!fallen.length) { p.rescue = 0; return []; }
   if (++p.rescue < DUNGEON.REVIVE_STREAK) return [];
   p.rescue = 0;
-  const who = fallen[0];
+  // V13.129: 연결된 친구부터 살린다(끊긴 친구는 살아나도 답하지 못한다).
+  const who = fallen.find(x => x.connected) || fallen[0];
   who.down = false; who.hp = Math.round(DUNGEON.MAX_HP * DUNGEON.REVIVE_HP); who.revived++;
   return [event(state, 'revive', { pid: who.id, by: p.id, hp: who.hp }), ...serve(state, who, now)];
 }
@@ -540,7 +548,8 @@ function tickOnce(state, now) {
     if (!p.connected && now >= p.dropped_at + DUNGEON.DROP_MS) {
       p.out = true; p.q = null; p.next_at = null; p.auto_at = null;
       out.push(event(state, 'forfeit', { pid: p.id }));
-      if (!standing(state).length) return [...out, ...finish(state, now, false)];
+      // V13.129: 사람이 모두 포기하면 봇 동료끼리 계속 싸우지 않고 끝낸다(실패, 보상 없음).
+      if (!standing(state).length || !active(state).some(x => !x.bot)) return [...out, ...finish(state, now, false)];
       continue;
     }
     if (!p.connected && !p.down && p.auto_at && now >= p.auto_at) {
