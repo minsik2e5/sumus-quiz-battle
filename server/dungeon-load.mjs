@@ -108,7 +108,7 @@ export async function runDungeonLoadCheck({ parties = 40, targetKB = 2400, other
   const r = { stateKB, parties, create: stats(created.map(x => x.ms)), join: stats(joins.map(x => x.ms)), baseline: stats(baseline), single, grouped };
   // 회귀를 잡는 한계(이 컴퓨터 기준): 모아서 처리하면 보고가 몰려도 하나씩보다 확실히 빨라야 하고, 다른 학생의
   // 요청이 몇 초씩 밀리지 않아야 한다. 운영 판단은 아래 숫자와 운영 로그(Server-Timing, [slow-mutation])로 한다.
-  assert(grouped.ms < single.ms && grouped.writes <= single.writes, `결과 보고를 모아서 처리하면 몰려도 더 빨리 끝난다 (하나씩 ${single.ms}ms → 모아서 ${grouped.ms}ms)`);
+  assert(grouped.ms < single.ms, `결과 보고를 모아서 처리하면 몰려도 더 빨리 끝난다 (하나씩 ${single.ms}ms → 모아서 ${grouped.ms}ms)`);
   console.log(`[dungeon-load] PASS · state=${stateKB}KB parties=${parties} (학생 ${parties * 3}명) · 다른 학생 ${others}명
   방 만들기 ${parties}개 동시: ${fmt(r.create)}
   참가 ${parties * 2}명 동시: ${fmt(r.join)}

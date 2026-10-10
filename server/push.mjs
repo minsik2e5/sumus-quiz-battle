@@ -83,7 +83,8 @@ export async function sendPush(subscription, message, vapid, { subject, fetchImp
   // A topic replaces an older message with the same topic still waiting on the push service.
   if (message.tag && /^[A-Za-z0-9_-]{1,32}$/.test(message.tag)) headers.Topic = message.tag;
   try {
-    const res = await fetchImpl(subscription.endpoint, { method: 'POST', headers, body });
+    // V13.129: 응답이 없는 푸시 서버 하나가 묶음 보내기와 저녁 알림을 붙잡지 않게 8초에서 끊는다.
+    const res = await fetchImpl(subscription.endpoint, { method: 'POST', headers, body, signal: AbortSignal.timeout(8000) });
     return { ok: res.status >= 200 && res.status < 300, gone: res.status === 404 || res.status === 410, status: res.status };
   } catch (error) {
     return { ok: false, gone: false, status: 0, error: error?.message };

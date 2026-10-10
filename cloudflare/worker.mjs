@@ -1,4 +1,4 @@
-import { service, sweep, preauthenticateLogin, settleBattle, undoDungeon, runEveningReminders } from '../server/service.mjs';
+import { service, sweep, preauthenticateLogin, settleBattle, battleReportPending, undoDungeon, runEveningReminders } from '../server/service.mjs';
 import { createDungeonReporter } from '../server/dungeon-reports.mjs';
 import { sendPush } from '../server/push.mjs';
 import { dropEndpoints } from '../server/notify.mjs';
@@ -40,9 +40,30 @@ function safeError(error, status) {
     : error?.message || '요청을 처리하지 못했습니다.';
 }
 
-async function readJson(request, max = 100000) {
-  const text = await request.text();
-  if (text.length > max) throw Object.assign(Error('요청이 너무 큽니다.'), { status: 413 });
+// V13.129: 본문을 다 읽기 전에 크기를 본다. 예전에는 끝까지 읽은 뒤에 길이를 봐서 아주 큰 요청 하나가
+// 상태 객체의 메모리(128MB)를 채울 수 있었다. 한글은 UTF-8로 글자당 3바이트라 바이트 한도는 글자 한도의 4배.
+export const bodyByteLimit = max => max * 4;
+export async function readJson(request, max = 100000) {
+  const tooBig = () => Object.assign(Error('요청이 너무 큽니다.'), { status: 413 });
+  const limit = bodyByteLimit(max);
+  if (Number(request.headers.get('content-length') || 0) > limit) throw tooBig();
+  let text = '';
+  if (request.body) {
+    const reader = request.body.getReader(), chunks = [];
+    let size = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) { reader.cancel().catch(() => {}); throw tooBig(); }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(size);
+    let at = 0;
+    for (const chunk of chunks) { bytes.set(chunk, at); at += chunk.byteLength; }
+    text = new TextDecoder().decode(bytes);
+  }
+  if (text.length > max) throw tooBig();
   try { return text ? JSON.parse(text) : {}; }
   catch { throw Object.assign(Error('요청 형식을 확인해주세요.'), { status: 400 }); }
 }
@@ -281,6 +302,8 @@ export class VocaStateObject {
       // Battle rooms report finished matches here (the public worker blocks /api/internal/).
       if (url.pathname === '/api/internal/battle-result') {
         if (request.headers.get('X-Battle-Key') !== await battleReportKey(this.env)) throw Object.assign(Error('허용되지 않은 요청입니다.'), { status: 403 });
+        // V13.129: 이미 정산한 대결의 재시도 보고는 상태를 복사하지 않고 바로 끝낸다.
+        if (!battleReportPending(this.mutations.current().state, body)) return json({ ok: true });
         await this.mutations.durable(state => settleBattle(state, body) ? { ok: true } : NO_MUTATION);
         return json({ ok: true });
       }
@@ -318,6 +341,10 @@ export class VocaStateObject {
       if (url.pathname === '/api/dungeon/join' || url.pathname === '/api/dungeon/preview') {
         this.rateLimit(`${address}:dungeon-join`, 30, 10 * 60000, '던전 방 참가 시도가 많아요. 잠시 후 다시 시도해주세요.');
       }
+      // V13.129: 학생 한 명(로그인 세션)의 요청 수 제한. 고장 난 화면이 요청을 쏟아 내도 한 줄짜리 저장 줄을
+      // 다 차지하지 못하게 한다(넉넉하게: 변경 10초에 60번, 첫 화면 불러오기 1분에 60번).
+      if (token && request.method !== 'GET') this.rateLimit(`user:${hashToken(token).slice(0, 16)}`, 60, 10000, '요청이 너무 많아요. 잠시 후 다시 시도해주세요.');
+      if (token && url.pathname === '/api/bootstrap') this.rateLimit(`boot:${hashToken(token).slice(0, 16)}`, 60, 60000, '요청이 너무 많아요. 잠시 후 다시 시도해주세요.');
       if (this.rates.size > 10000) {
         for (const [key, values] of this.rates) if (values.at(-1) < Date.now() - 30 * 60000) this.rates.delete(key);
       }
@@ -328,7 +355,9 @@ export class VocaStateObject {
       const sweepDue = Date.now() - this.sweptAt > 3600000;
       if (hasExpiredAttempt || sweepDue) {
         if (sweepDue) this.sweptAt = Date.now();
-        await this.mutations.durable(state => sweep(state) ? true : NO_MUTATION);
+        // V13.129: 정리가 실패해도 학생의 요청은 그대로 처리한다(실패는 로그로 남긴다).
+        try { await this.mutations.durable(state => sweep(state) ? true : NO_MUTATION); }
+        catch (error) { console.error('[sweep]', error?.message); }
       }
 
       // scrypt takes tens of ms; doing it inside durable() would stall every
@@ -438,6 +467,8 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/api/internal/')) return securityHeaders(json({ error: '요청한 기능을 찾을 수 없습니다.' }, 404), url.pathname);
+    // V13.129: 너무 큰 요청은 상태 객체에 보내기 전에 막는다(단어장 가져오기가 가장 크다: 100만 글자).
+    if (url.pathname.startsWith('/api/') && Number(request.headers.get('content-length') || 0) > bodyByteLimit(1000000)) return securityHeaders(json({ error: '요청이 너무 큽니다.' }, 413), url.pathname);
     // Battle sockets go straight to their room; a 101 response must not be re-wrapped.
     const battleSocket = url.pathname.match(/^\/api\/battle\/ws\/([0-9a-f-]{36})$/);
     if (battleSocket) {

@@ -23,8 +23,8 @@ jobs:
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       VOCA_STATE_SECRET: ${{ secrets.VOCA_STATE_SECRET }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with:
           node-version: '24'
           cache: npm
@@ -60,17 +60,21 @@ jobs:
             echo "::warning::VOCA_STATE_SECRET was not re-applied (a newer preview version exists). The deployed Worker keeps its current secret; the smoke test below checks it."
           fi
 
+      # V13.129: HTTP 200만 보지 않고, 새 버전(package.json)이 실제로 올라가 ok:true인지 본다(첫 시작은 느릴 수 있어 1분까지 기다림).
       - name: Smoke test deployed API
         shell: bash
         run: |
           base="https://sumus-voca.minsik2e5.workers.dev"
-          code="000"
-          for i in 1 2 3 4 5; do
+          want="$(node -p "require('./package.json').version")"
+          for i in $(seq 1 12); do
             code="$(curl -sS -o /tmp/health.json -w "%{http_code}" "$base/api/health" || true)"
-            echo "health attempt $i -> HTTP $code"
+            echo "health attempt $i -> HTTP $code (want $want)"
             cat /tmp/health.json || true
             echo
-            [ "$code" = "200" ] && break
-            sleep 3
+            if [ "$code" = "200" ] && node -e "const h = require('/tmp/health.json'); process.exit(h.ok === true && h.version === process.argv[1] ? 0 : 1)" "$want"; then
+              exit 0
+            fi
+            sleep 5
           done
-          test "$code" = "200"
+          echo "::error::Deployed API did not report ok:true with version $want"
+          exit 1
