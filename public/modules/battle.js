@@ -309,7 +309,7 @@ function rangeDeal(room) {
   return hostRanges.length ? `<p class="ya-deal"><b>${esc(rangesText(hostRanges))}</b> 단어로 겨뤄요.</p>` : '';
 }
 
-// V13.131 야차전 탭 (Design A안): 대결 · 몬스터 · 던전 · 기록 한 줄. 기록 안에 [리그 | 내 전적].
+// V13.132 야차전 탭 (Design A안): 대결 · 몬스터 · 던전 · 기록 한 줄. 기록 안에 [리그 | 내 전적].
 // 이전 탭 이름(league · me)은 기록으로 열린다. 설명 문장은 작은 ? 안에 들어 있다.
 const LOBBY_TABS = [['play', '대결', 'nav-yacha'], ['monster', '몬스터', 'monster-tab'], ['dungeon', '던전', 'dungeon-tab'], ['record', '기록', 'trophy-s']];
 const tabOf = key => key === 'league' || key === 'me' ? 'record' : LOBBY_TABS.some(([k]) => k === key) ? key : 'play';

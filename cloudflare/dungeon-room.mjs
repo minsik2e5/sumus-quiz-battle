@@ -32,15 +32,47 @@ export function planBot(q, random = Math.random, level = DUNGEON_BOT) {
   return { n: q.n, at: at < q.deadline - 150 ? Math.round(at) : null, right: random() < level.accuracy };
 }
 
+export const questionKey = pid => `q:${pid}`;
+
 export class DungeonRoom {
   constructor(ctx, env) {
     this.ctx = ctx;
     this.env = env;
     this.random = Math.random;
-    this.ready = ctx.blockConcurrencyWhile(async () => { this.room = (await ctx.storage.get('room')) || null; });
+    this.ready = ctx.blockConcurrencyWhile(() => this.load());
   }
 
-  async save() { await this.ctx.storage.put('room', this.room); }
+  // V13.131: 문제 목록(학생당 최대 180문제)은 참가할 때 한 번만 'q:<학생>' 키에 저장하고, 답할 때마다 저장하는
+  // 'room'에는 바뀌는 상태만 넣는다(예전에는 답 하나마다 파티 전원의 문제 목록까지 통째로 다시 썼다).
+  // savedQuestions: 학생 → 저장해 둔 문제 목록. 같은 배열이면 다시 쓰지 않는다(나갔다 다시 들어오면 새 배열).
+  async load() {
+    this.savedQuestions = new Map();
+    const room = (await this.ctx.storage.get('room')) || null;
+    const players = room?.state?.players || {};
+    // 예전 방식으로 저장된 방은 문제 목록이 'room' 안에 있다: 그대로 쓰고 다음 저장 때 'q:' 키로 옮긴다.
+    const missing = Object.keys(players).filter(id => !Array.isArray(players[id].questions));
+    const stored = missing.length ? await this.ctx.storage.get(missing.map(questionKey)) : new Map();
+    for (const id of missing) {
+      players[id].questions = stored.get(questionKey(id)) || [];
+      this.savedQuestions.set(id, players[id].questions);
+    }
+    this.room = room;
+  }
+
+  async save() {
+    const r = this.room;
+    if (!r) return;
+    const entries = {}, written = [], players = {};
+    for (const [id, p] of Object.entries(r.state?.players || {})) {
+      const { questions, ...rest } = p;
+      players[id] = rest;
+      if (this.savedQuestions.get(id) !== questions) { entries[questionKey(id)] = questions || []; written.push([id, questions]); }
+    }
+    entries.room = r.state ? { ...r, state: { ...r.state, players } } : r;
+    // 한 번에(원자적으로) 쓴다: 문제 목록 없이 'room'만 저장되는 일이 없다.
+    await this.ctx.storage.put(entries);
+    for (const [id, questions] of written) this.savedQuestions.set(id, questions);
+  }
 
   // 다음 알람: 엔진의 다음 시각, 봇의 답, 로비 마감, 보고 재시도, 방 지우기 중 가장 이른 것.
   async schedule() {
@@ -223,6 +255,7 @@ export class DungeonRoom {
       for (const ws of this.ctx.getWebSockets()) ws.close(1000, 'done');
       await this.ctx.storage.deleteAll();
       this.room = null;
+      this.savedQuestions = new Map();
       return;
     }
     if (!r.ended && r.state.phase === 'lobby' && now >= r.lobby_until) {

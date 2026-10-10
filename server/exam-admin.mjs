@@ -1,5 +1,6 @@
 import { hashToken } from './auth.mjs';
 import { meaningReviewCandidate } from './meaning-review.mjs';
+import { attemptTotal } from './storage-trim.mjs';
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 
@@ -53,7 +54,7 @@ function attemptSummary(a, exam) {
     auto_submitted: !!a.auto_submitted,
     score: Number.isFinite(a.score) ? a.score : null,
     correct: Number.isFinite(a.correct) ? a.correct : null,
-    total: Array.isArray(a.questions) ? a.questions.length : null,
+    total: Array.isArray(a.questions) || Number.isFinite(Number(a.total)) ? attemptTotal(a) : null,
     review_pending: pendingReviewCount(a, exam)
   };
 }
@@ -69,7 +70,9 @@ function attemptDetails(a, exam) {
 
 function recalcAttempt(a) {
   a.correct = (a.details || []).filter(d => d.correct).length;
-  a.score = a.questions?.length ? Math.round(a.correct / a.questions.length * 100) : 0;
+  // V13.131: 정리한 응시는 questions가 없고 total에 문제 수가 있다.
+  const total = attemptTotal(a);
+  a.score = total ? Math.round(a.correct / total * 100) : 0;
 }
 
 function attemptForExam(state, exam, attemptId) {

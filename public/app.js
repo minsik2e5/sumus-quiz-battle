@@ -922,6 +922,9 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'class-tv-link') return classTvLink();
     if (d.action === 'tournament-cancel') return cancelTournament(d.id, b);
     if (d.action === 'battle-cross-school') return toggleCrossSchool(b);
+    if (d.action === 'trim-check') return trimCheck(b);
+    if (d.action === 'trim-archive') return trimArchiveDownload(b);
+    if (d.action === 'trim-run') return trimRun(b);
     if (d.tnDecide) return decideTournamentMatch(d.tnDecide, d.match, d.winner, d.name, b);
     if (d.action === 'battle-accept' && A.data.battle_invite) { const invite = A.data.battle_invite; A.data.battle_invite = null; A.yachaOpts = { accept: invite }; return navigate('yacha'); }
     if (d.action === 'battle-decline') { buttonBusy(b); await api('/battle/invite/decline', { id: d.id }); A.data.battle_invite = null; renderKeepScroll(); toast('도전장을 거절했어요.'); return; }
@@ -1599,6 +1602,38 @@ async function toggleCrossSchool(button) {
   buttonBusy(button);
   try { const r = await api('/teacher/battle-settings', { cross_school: next }); A.data.battle_settings = r.battle_settings; renderKeepScroll(); toast(next ? '다른 학교 같은 학년 학생과도 야차전을 할 수 있어요.' : '이제 같은 학교끼리만 야차전을 해요.'); }
   catch (err) { toast(err.message); buttonBusy(button, false); }
+}
+// V13.131 오래된 기록 정리(선생님 결과 탭): 대상 보기 → 보관 파일 내려받기 → 정리하기.
+async function trimCheck(button) {
+  buttonBusy(button);
+  try { A.storageTrim = (await api('/teacher/storage-trim')).trim; A.storageArchived = null; renderKeepScroll(); }
+  catch (err) { toast(err.message); buttonBusy(button, false); }
+}
+async function trimArchiveDownload(button) {
+  buttonBusy(button);
+  try {
+    // 큰 파일(수 MB)이라 기본 12초보다 오래 기다린다.
+    const r = await fetch('/api/teacher/storage-archive', { credentials: 'same-origin', signal: AbortSignal.timeout(90000) });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok || !data.archive) throw Error(data.error || '보관 파일을 만들지 못했어요.');
+    const archive = data.archive, text = JSON.stringify(archive);
+    const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+    const link = document.createElement('a'); link.href = url; link.download = `SUMUS_기록보관_${new Date(archive.created_at).toISOString().slice(0, 10)}.json`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+    A.storageArchived = { fingerprint: archive.fingerprint, archived_at: archive.created_at, sessions: archive.counts.sessions, attempts: archive.counts.attempts };
+    renderKeepScroll(); toast('보관 파일을 내려받았어요. 저장된 것을 확인한 뒤 정리하기를 눌러 주세요.');
+  } catch (err) { toast(err.message || '보관 파일을 만들지 못했어요.'); buttonBusy(button, false); }
+}
+async function trimRun(button) {
+  const saved = A.storageArchived;
+  if (!saved || !confirm(`보관 파일에 담긴 연습 기록 ${saved.sessions}개 · 시험 응시 ${saved.attempts}개의 답안 목록을 서버에서 지울까요?
+점수 · 경험치 · 코인은 그대로예요. 되돌릴 수 없어요.`)) return;
+  buttonBusy(button);
+  try {
+    const r = await api('/teacher/storage-trim', { fingerprint: saved.fingerprint, archived_at: saved.archived_at });
+    A.storageTrim = r.trim; A.storageArchived = null;
+    await refresh(); renderKeepScroll();
+    toast(`정리했어요: 연습 ${r.trimmed.sessions}개 · 시험 ${r.trimmed.attempts}개 · 약 ${r.trimmed.kb}KB`);
+  } catch (err) { toast(err.message); buttonBusy(button, false); }
 }
 async function cancelTournament(id, button) {
   if (!confirm('이 대회를 취소할까요? 진행 중인 기록은 남지만 더 이상 경기를 할 수 없어요.')) return;

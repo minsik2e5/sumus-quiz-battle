@@ -1,6 +1,6 @@
 import { modal } from './ui.js';
 
-// V13.131 bottom sheet: the app's one dialog (modal(): named, Tab stays inside, Escape and the
+// V13.132 bottom sheet: the app's one dialog (modal(): named, Tab stays inside, Escape and the
 // backdrop close it, focus goes back) drawn as a sheet that rises from the bottom. The 야차전
 // range picker, the code box and the friend list use it. `set(html)` redraws the body in place,
 // so a tap inside the sheet does not move focus.

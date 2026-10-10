@@ -218,6 +218,8 @@ export async function openPracticeRecord(sessionId) {
       }).join('')
     : perfect
       ? '<div class="result-note">PERFECT · 모든 문항을 맞혔어요.</div>'
+      : session.details_trimmed_at
+        ? '<div class="result-note">90일이 지나 답안 목록을 정리한 기록이에요. 점수와 정답 수는 그대로예요.</div>'
       : unanswered
         ? `<div class="result-note">미응답 ${unanswered}개가 있어요.</div>`
         : '<div class="result-note">오답 상세가 저장되지 않은 이전 기록이에요.</div>';

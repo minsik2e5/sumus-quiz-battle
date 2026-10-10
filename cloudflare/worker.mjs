@@ -100,17 +100,17 @@ function createSupabaseRepository(env) {
     return payload;
   }
 
-  async function load() {
+  async function load(timeoutMs = 12000) {
     // Read at start-up blocks the first requests, so it keeps a short timeout (a synced
     // local snapshot is used if Supabase is slow).
-    const rows = await rpc('voca_v12_state_read', { p_secret: secret }, 12000);
+    const rows = await rpc('voca_v12_state_read', { p_secret: secret }, timeoutMs);
     const row = Array.isArray(rows) ? rows[0] : rows;
     if (!row || row.revision === undefined || !row.data) throw Object.assign(Error('영구 저장 데이터를 불러오지 못했습니다.'), { status: 503 });
     return { revision: Number(row.revision), state: row.data };
   }
 
   return {
-    read: load,
+    read: timeoutMs => load(timeoutMs),
     async readRevision() { return (await load()).revision; },
     // `json` is the already-serialized state from the local snapshot, so the
     // background upload does not stringify the whole state a second time.
@@ -119,9 +119,9 @@ function createSupabaseRepository(env) {
       return Number(await rpc('voca_v12_state_commit', payload, 45000));
     },
     // Parts backup (supabase/voca_v13_parts.sql).
-    async partsRevision() { return Number(await rpc('voca_v13_state_revision', { p_secret: secret }, 12000)); },
-    async readParts() {
-      const rows = await rpc('voca_v13_state_read', { p_secret: secret }, 20000);
+    async partsRevision(timeoutMs = 12000) { return Number(await rpc('voca_v13_state_revision', { p_secret: secret }, timeoutMs)); },
+    async readParts(timeoutMs = 20000) {
+      const rows = await rpc('voca_v13_state_read', { p_secret: secret }, timeoutMs);
       const row = Array.isArray(rows) ? rows[0] : rows;
       return { revision: Number(row?.revision || 0), parts: row?.parts && typeof row.parts === 'object' ? row.parts : {} };
     },
@@ -133,6 +133,24 @@ function createSupabaseRepository(env) {
     }
   };
 }
+
+// V13.131: 시작(blockConcurrencyWhile, Cloudflare 제한 30초) 안에서 Supabase를 기다리는 시간은 모두 합쳐
+// BOOT_BUDGET_MS까지. 예전에는 파트 번호(12초) + 파트 읽기(20초)처럼 이어지면 32초가 되어 시작이 끊길 수 있었다.
+// 시간이 모자라면 로컬 사본으로 시작한다. 로컬 사본이 없을 때만 남은 시간이 적어도 v12 사본을 5초 더 기다린다.
+export const BOOT_BUDGET_MS = 20000;
+const BOOT_MIN_CALL_MS = 1000;
+export function bootTimer(budgetMs = BOOT_BUDGET_MS, now = () => Date.now()) {
+  const deadline = now() + budgetMs;
+  return {
+    left: () => Math.max(0, deadline - now()),
+    // 이번 호출의 시간 제한: 원래 제한과 남은 시간 중 짧은 쪽. 남은 시간이 1초보다 적으면 0(부르지 않는다).
+    limit(defaultMs, share = 1) {
+      const left = Math.floor(this.left() * share);
+      return left < BOOT_MIN_CALL_MS ? 0 : Math.min(defaultMs, left);
+    }
+  };
+}
+const bootOutOfTime = () => Object.assign(Error('시작 시간 안에 영구 저장 서버가 답하지 않았습니다.'), { status: 503, detail: 'boot budget used up' });
 
 export class VocaStateObject {
   constructor(ctx, env) {
@@ -173,18 +191,24 @@ export class VocaStateObject {
     const hasLocal = this.local.hasSnapshot();
     const status = this.local.status();
     if (hasLocal && status.syncedVersion < status.version) return this.local.read();
+    // V13.131: Supabase를 기다리는 시간은 모두 합쳐 BOOT_BUDGET_MS(20초)까지.
+    const timer = bootTimer(Number(this.env.BOOT_BUDGET_MS) || BOOT_BUDGET_MS);
     // Backed up as parts: only the parts copy is compared. The v12 copy is then just a
     // periodic safety copy, hours older, and must never replace a synced local snapshot.
     if (hasLocal && status.partsRevision !== null && this.env.SUPABASE_BACKUP_MODE !== 'full') {
       let remoteRevision;
       try {
-        remoteRevision = await this.supabase.partsRevision();
+        // 번호 확인은 남은 시간의 절반까지만: 바뀌었으면 파트를 읽을 시간이 남게 한다.
+        const ms = timer.limit(12000, 0.5);
+        if (!ms) throw bootOutOfTime();
+        remoteRevision = await this.supabase.partsRevision(ms);
       } catch (error) {
         console.error('[boot] parts backup unavailable; starting from the local snapshot', error?.detail || error?.message);
         return this.local.read();
       }
       if (remoteRevision !== status.partsRevision) {
-        const remoteParts = await this.readPartsBackup();
+        // 시간이 모자라거나 읽지 못하면 null: 로컬 사본으로 시작한다(다음 동기화가 차이를 다시 본다).
+        const remoteParts = await this.readPartsBackup(timer.limit(20000));
         if (remoteParts) {
           console.warn('[boot] parts backup changed outside this object; adopting it', { local: status.partsRevision, remote: remoteParts.revision });
           this.local.adoptRemoteParts(remoteParts.state, remoteParts.revision, remoteParts.hashes);
@@ -194,7 +218,8 @@ export class VocaStateObject {
     }
     // No local copy: the parts backup, when it is set up and filled, is the freshest copy.
     if (!hasLocal && this.env.SUPABASE_BACKUP_MODE !== 'full') {
-      const remoteParts = await this.readPartsBackup();
+      // 로컬 사본이 없으면 실패할 때 v12 사본을 읽을 시간을 남긴다(남은 시간의 60%까지).
+      const remoteParts = await this.readPartsBackup(timer.limit(20000, 0.6));
       if (remoteParts) {
         this.local.adoptRemoteParts(remoteParts.state, remoteParts.revision, remoteParts.hashes);
         return this.local.read();
@@ -202,7 +227,10 @@ export class VocaStateObject {
     }
     let remote;
     try {
-      remote = await this.supabase.read();
+      // 로컬 사본이 없으면 시작할 다른 방법이 없어서, 시간이 모자라도 5초는 기다린다(합계 최대 25초 < 30초).
+      const ms = timer.limit(12000) || (hasLocal ? 0 : 5000);
+      if (!ms) throw bootOutOfTime();
+      remote = await this.supabase.read(ms);
     } catch (error) {
       if (!hasLocal) throw error;
       console.error('[boot] Supabase unavailable; starting from the local snapshot', error.message);
@@ -217,9 +245,10 @@ export class VocaStateObject {
 
   // The state from the parts backup, or null when it is missing, empty or unreachable
   // (then the v12 copy is used as before).
-  async readPartsBackup() {
+  async readPartsBackup(timeoutMs = 20000) {
     try {
-      const { revision, parts } = await this.supabase.readParts();
+      if (!timeoutMs) throw bootOutOfTime();
+      const { revision, parts } = await this.supabase.readParts(timeoutMs);
       if (!revision || !parts['o:keys']) return null;
       const state = assembleState(parts);
       const hashes = await Promise.all([...partitionState(state)].map(async ([key, text]) => [key, await hashText(text)]));

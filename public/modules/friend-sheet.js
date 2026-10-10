@@ -2,7 +2,7 @@ import { esc } from './ui.js';
 import { avatar } from './character.js';
 import { openSheet } from './sheet.js';
 
-// V13.131 friend list, one for the 야차전 challenge and the 던전 invite: a bottom sheet with
+// V13.132 friend list, one for the 야차전 challenge and the 던전 invite: a bottom sheet with
 // 우리 반 · 우리 학교 · 다른 학교 tabs. A row is a 44px round pet face, the name on one line
 // (… when long), a small button, and gray text instead of the button while the friend is busy.
 // The pet face sits in a fixed box, so it never stretches however the row is laid out.
