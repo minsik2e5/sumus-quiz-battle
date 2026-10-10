@@ -7,7 +7,7 @@ import { emptyState, migrateState } from './state.mjs';
 import { passwordHash } from './auth.mjs';
 import { service, settleDungeon, undoDungeon, tidyDungeons, DUNGEON_LOBBY_MS, DUNGEON_BOT_LIMIT } from './service.mjs';
 import { createDungeon, join, DUNGEON, FLOORS, CUTS, DUNGEON_COINS } from './dungeon-engine.mjs';
-import { dungeonQuestions, pickWrong, distractorIndex, DUNGEON_POOL_MAX } from './dungeon-words.mjs';
+import { dungeonQuestions, pickWrong, distractorIndex, pickWrongEnglish, englishIndex, DUNGEON_POOL_MAX } from './dungeon-words.mjs';
 import { createBatcher, createDungeonReporter } from './dungeon-reports.mjs';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
@@ -33,6 +33,10 @@ export async function runDungeonLobbyChecks(assert, expectStatus) {
   const big = dungeonQuestions({ own: Array.from({ length: 400 }, (_, i) => ({ id: 'b' + i, word: 'big' + i, meaning: `큰뜻${i}`, part_of_speech: 'n' })) }, random);
   assert(big.questions.length === DUNGEON_POOL_MAX, `V13.128 고른 범위가 크면 한 판 문제 풀은 ${DUNGEON_POOL_MAX}개`);
   assert(!dungeonQuestions({ own: words.slice(0, 50), all: words }, random).ok, 'V13.128 보충해도 120단어가 안 되면 들어갈 수 없다');
+  // V13.130 영어 고르기용 영어 오답 5개: 같은 품사 · 비슷한 길이, 자기 자신 · 같은 뜻 단어는 빼고 서로 다르다.
+  const enWrong = pickWrongEnglish(words.at(-1), englishIndex(words), random);
+  assert(enWrong.length === 5 && new Set(enWrong.map(w => w.toLowerCase())).size === 5 && !enWrong.includes('twin') && !enWrong.includes('noun1') && enWrong.every(w => w.startsWith('noun')), `V13.130 영어 오답 5개는 서로 다르고, 같은 품사이며, 자기 자신과 같은 뜻 단어가 없다 (${enWrong.join(', ')})`);
+  assert(built.questions.every(q => q.wrong_en?.length === 5 && !q.wrong_en.includes(q.prompt)) && !dungeonQuestions({ own: words.slice(0, 2), all: words.slice(0, 2) }, random).questions.length, 'V13.130 문제마다 영어 오답(wrong_en)이 붙는다(뜻 오답이 모자란 작은 단어장은 문제를 만들지 않는다)');
 
   /* ---------- 준비: 같은 학년 세 학교 학생, 다른 학년 · 중학생 ---------- */
   const state = emptyState();
@@ -153,6 +157,16 @@ export async function runDungeonLobbyChecks(assert, expectStatus) {
   const ui = source('../public/modules/dungeon.js'), battle = source('../public/modules/battle.js'), app = source('../public/app.js');
   assert(/send\(\{ type: 'answer', choice, n: q\.n \}\)/.test(ui) && !/\.answer\b(?!ed)/.test(ui.replace(/e\.answer/g, '')), 'V13.128 화면은 선택 번호와 문제 번호만 보낸다(정답 번호는 받지 않는다)');
   assert(ui.includes("from './battle-fx.js'") && ui.includes('reduced()') && ui.includes('/assets/monsters/'), 'V13.128 전투 효과는 battle-fx.js, 움직임 줄이기 존중, 임시 그림은 기존 몬스터 그림');
-  assert(ui.includes("min(430px, 100%)"), 'V13.128 보스는 정사각 430px 안팎으로 크게(설계 5번)');
+  assert(/land: \{[^\n]*boss: 430/.test(ui) && /port: \{[^\n]*boss: 430/.test(ui), 'V13.128 보스는 정사각 430px 안팎으로 크게(설계 5번, V13.130: 세로 · 가로 무대 모두)');
+  /* ---------- V13.130 전투 무대 ---------- */
+  const fx = source('../public/modules/dungeon-fx.js'), css129 = source('../public/v13130.css'), sound = source('../public/modules/sound.js');
+  assert(ui.includes("innerWidth > innerHeight ? 'land' : 'port'") && ui.includes("land: { w: 844, h: 390") && ui.includes("port: { w: 390, h: 844") && ui.includes("addEventListener('resize', D.onResize)") && ui.includes('stage.style.transform = `scale(${s})`') && css129.includes('.dgs.land { width: 844px; height: 390px; }') && css129.includes('.dgs.port { width: 390px; height: 844px; }'), 'V13.130 폰을 세우면 세로(390×844), 눕히면 가로(844×390) 무대를 그리고 화면에 맞춰 키운다(돌리면 바로 바뀐다)');
+  assert(css129.includes('.dgs.land .dgs-party {') && css129.includes('.dgs-party { display: none; }') && ui.includes("D.mode === 'land'") && ui.includes('dgs-rooms') && css129.includes('.dgs.land .dgs-alert {'), 'V13.130 가로에만 파티 창 · 층 지도가 있고, 채점 표적 · 핵은 보스 체력 아래 막대로(세로는 카드)');
+  assert(ui.includes("send({ type: 'letter', ch: q.tiles[i], n: q.n })") && ui.includes("case 'letter':") && ui.includes('D.spell.queue.shift()') && ui.includes("data-dg=\"tile\"") && !ui.includes('q.word') && ui.includes('e.word'), 'V13.130 영어 쓰기: 누른 글자 하나와 문제 번호만 보내고, 방의 letter 이벤트로 칸을 쓰거나 흔든다(정답 철자는 끝난 뒤 answered 이벤트로만)');
+  assert(ui.includes("KIND_LABEL = { mean: '뜻 고르기', eng: '영어 고르기', spell: '영어 쓰기' }") && ui.includes("class=\"dgs-kind ${kind}\""), 'V13.130 문제 칸에 문제 종류(뜻 고르기 · 영어 고르기 · 영어 쓰기)를 보여 준다');
+  assert(ui.includes("from './dungeon-fx.js'") && fx.includes('MAX_PARTS = 420') && fx.includes('if (reduced() || parts.length >= MAX_PARTS) return;') && fx.includes("if (reduced()) { onHit?.(); return; }") && ui.includes("split(e.damage, 6)") && ui.includes("D.cutinUntil"), 'V13.130 펫 속성별 발사체 · 맞는 순간 효과(조각 420개까지, 움직임 줄이기면 그리지 않고 바로 맞음), 피해 숫자는 방이 계산한 값 그대로 쌓고 합동 필살은 컷인 뒤에 터진다');
+  assert(ui.includes('/assets/dungeon/${file}.webp') && ui.includes("'bg-boss'") && ui.includes("monSrc(m.key, idlePose(m))") && ui.includes("return 'core'") && ui.includes("return 'rage'") && ui.includes("'idle2'") && ui.includes("/assets/ui/dungeon-mark.webp") && ui.includes("/assets/ui/dungeon-faint.webp"), 'V13.130 던전 배경(층 · 보스방 · 끝없는 탑), 몬스터 자세(숨쉬기 · 분노 · 핵 · 맞음 · 공격 · 포효), UI 그림(채점 표적 · 기절 · 핵 · 브레이크 · 모래시계)을 쓴다');
+  assert(css129.includes("font-family: 'Jua'") && css129.includes("/assets/fonts/jua-latin.woff2") && css129.includes('unicode-range') && source('../public/assets/fonts/Jua-OFL.txt').includes('SIL Open Font License') && source('./index.mjs').includes("'.woff2': 'font/woff2'"), 'V13.130 전투 글자(숫자 · 단어)는 주아 글꼴(OFL, 영어 · 한글 나눠서 쓰는 화면에서만 받는다)');
+  assert(sound.includes("'boss-slam': .9") && css129.includes('@media (prefers-reduced-motion: reduce)'), 'V13.130 전투 효과음 · 움직임 줄이기');
   assert(battle.includes("['dungeon', '던전']") && battle.includes('openDungeon(A, exit)') && app.includes("if (go === 'dungeon')"), 'V13.128 야차전 탭의 던전 메뉴와 초대 알림 링크');
 }

@@ -30,6 +30,29 @@
 | `boss` | 전설 연출의 낮은 울림(앞 1.5초), 던전 보스 등장(던전 세션에서 연결) | 우리가 합성(`docs/sound/synth.mjs`의 `boss_enter`) | 4.78초 |
 | `door` | 던전 문(던전 세션에서 연결) | Kenney rpg-audio 팩 `doorOpen_1` (CC0) | |
 | `step` | 던전 층 이동(던전 세션에서 연결) | Kenney rpg-audio 팩 `footstep00` (CC0) | |
+| `atk-star` | 던전: 별빛 · 불꽃 · 얼음 펫의 발사 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `atk-star`) | |
+| `atk-leaf` | 던전: 풀 · 바위 펫의 발사(잎 네 발) | 우리가 합성(`docs/sound/battle-synth.mjs`의 `atk-leaf`) | |
+| `atk-wind` | 던전: 바람 · 물 · 독 펫의 발사 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `atk-wind`) | |
+| `hit-star` | 던전: 별빛 계열이 맞힘 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `hit-star`) | |
+| `hit-leaf` | 던전: 풀 계열이 맞힘 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `hit-leaf`) | |
+| `hit-wind` | 던전: 바람 계열이 맞힘 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `hit-wind`) | |
+| `dmg-tick` | 던전: 피해 숫자가 한 줄씩 쌓일 때(줄마다 높아짐) | 우리가 합성(`docs/sound/battle-synth.mjs`의 `dmg-tick`) | |
+| `crit` | 던전: 영어 쓰기 정답 · 브레이크 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `crit`) | |
+| `boss-charge` | 던전: 보스가 빨간펜 채점을 준비함 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `boss-charge`) | |
+| `warn-beep` | 던전: 내가 채점 표적이 됨 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `warn-beep`) | |
+| `boss-slam` | 던전: 보스가 내려찍음 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `boss-slam`) | |
+| `shield-block` | 던전: 채점 방어(3연속 정답) | 우리가 합성(`docs/sound/battle-synth.mjs`의 `shield-block`) | |
+| `ult-riser` | 던전: 합동 필살 컷인 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `ult-riser`) | |
+| `ult-impact` | 던전: 합동 필살 · 브레이크가 터짐 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `ult-impact`) | |
+| `boss-roar` | 던전: 보스 등장 · 페이즈 바뀜 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `boss-roar`) | |
+| `type-key` | 던전: 영어 쓰기 글자 칸 누름 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `type-key`) | |
+| `type-ok` | 던전: 맞는 글자(칸마다 높아짐) | 우리가 합성(`docs/sound/battle-synth.mjs`의 `type-ok`) | |
+| `type-wrong` | 던전: 틀린 글자 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `type-wrong`) | |
+| `spell-done` | 던전: 단어를 다 씀 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `spell-done`) | |
+| `faint` | 던전: 펫 기절 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `faint`) | |
+| `revive` | 던전: 펫 부활 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `revive`) | |
+| `combo-10` | 던전: 10콤보마다 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `combo-10`) | |
+| `boss-down` | 던전: 보스가 쓰러짐 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `boss-down`) | |
 
 ## 출처와 라이선스
 - **우리가 합성한 소리**: `docs/sound/synth.mjs`로 만든다(종소리 배음 · 마림바 · 쓸어올리는 바람 소리 · 저음 울림 · 반짝이 · 리버브를 겹침). 다시 만들 때: `npm i --no-save @breezystack/lamejs` 후 `node docs/sound/synth.mjs <출력 폴더>` → 원하는 파일을 `public/assets/sfx/<key>.mp3`로 복사. 우리가 만든 것이라 제약이 없다.
