@@ -3,9 +3,8 @@
 // 채점과 핵은 알람으로 깨워서 처리한다. 하이버네이션 API를 쓰므로 바뀔 때마다 저장한 뒤에 답한다
 // (cloudflare/battle-room.mjs 방식). 결과는 판이 끝날 때(또는 시작하지 못하고 닫힐 때) 메인 상태 객체에
 // 한 번 보고한다. 보고가 실패하면 점점 길게 쉬며 다시 보내고, 메인은 report_id로 두 번 처리하지 않는다.
-// 빈자리 봇 동료는 battle-bot.js의 '보통' 로보처럼 정해진 확률과 시간으로 방이 대신 답한다.
+// 빈자리 봇 동료는 정해진 확률과 시간(DUNGEON_BOT, 평균 학생보다 조금 약하게)으로 방이 대신 답한다.
 import { createDungeon, join, ready, leave, answer, letter, settle, tick, nextWake, view, disconnect, reconnect, DUNGEON } from '../server/dungeon-engine.mjs';
-import { BOT_LEVELS } from '../public/modules/battle-bot.js';
 import { reportRetryMs } from './battle-room.mjs';
 
 const MESSAGE_TYPES = new Set(['sync', 'ping', 'ready', 'answer', 'letter', 'emote']);
@@ -14,8 +13,9 @@ const CLOSE_AFTER_MS = 60000; // 끝난 방은 늦게 돌아온 폰에 결과를
 // 응원 이모트: 정해진 것만(자유 글 없음), 3초에 하나, 한 판에 40개까지. 기절한 학생도 보낼 수 있다.
 export const DUNGEON_EMOTES = ['cheer', 'help', 'nice', 'gg'];
 const EMOTE_GAP_MS = 3000, EMOTE_MAX = 40;
-// 봇 동료: battle-bot.js '보통' 로보의 정답률과 답하는 시간.
-export const DUNGEON_BOT = BOT_LEVELS.normal;
+// 봇 동료: 정답률과 답하는 시간. V13.135 '보통' 로보(84% · 1.6~4.2초)는 평균 학생보다 피해를 1.4배 넘게
+// 줘서 봇과 가면 친구와 갈 때보다 훨씬 쉬웠다. 평균 학생의 약 0.85배가 되게 낮췄다(server/dungeon-room-check.mjs).
+export const DUNGEON_BOT = { name: '던전 동료', accuracy: 0.72, min: 2000, max: 5000 };
 
 // 던전 방만 결과를 보고할 수 있게 방과 메인이 같은 키를 만든다(야차전 키와는 다르다).
 export async function dungeonReportKey(env) {

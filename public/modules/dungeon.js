@@ -67,6 +67,10 @@ async function leaveScreen() {
   D = null;
   await exit?.();
 }
+// V13.135 렉 줄이기: 같은 내용이면 다시 쓰지 않는다(매 프레임 · 매 상태마다 DOM을 다시 만들면 폰에서 버벅인다).
+const setHTML = (el, html) => { if (el && el._h !== html) { el._h = html; el.innerHTML = html; } };
+const setText = (el, text) => { text = String(text); if (el && el._t !== text) { el._t = text; el.textContent = text; } };
+const setStyle = (el, key, value) => { if (el && el.style[key] !== value) el.style[key] = value; };
 const main = html => { const m = document.getElementById('dg-main'); if (m) m.innerHTML = html; };
 const note = text => { const n = document.getElementById('dg-note'); if (n) n.textContent = text; };
 
@@ -474,10 +478,10 @@ function drawParty(v) {
   if (panel && D.mode === 'land') {
     const last = v.last_floor || v.floor || 1;
     const rooms = Array.from({ length: Math.min(6, last) }, (_, i) => `<span class="${i + 1 < v.floor ? 'done' : i + 1 === v.floor ? 'now' : ''}${i + 1 === last && last <= 6 ? ' boss' : ''}"></span>`).join('<em></em>');
-    panel.innerHTML = `<div class="dgs-phead"><b>${v.monster?.boss ? '보스층' : v.floor ? `${v.floor}층` : ''} · ${esc(v.cut_name)}</b><div class="dgs-rooms" aria-hidden="true">${rooms}</div></div>${v.players.map(p => {
+    setHTML(panel, `<div class="dgs-phead"><b>${v.monster?.boss ? '보스층' : v.floor ? `${v.floor}층` : ''} · ${esc(v.cut_name)}</b><div class="dgs-rooms" aria-hidden="true">${rooms}</div></div>${v.players.map(p => {
       const st = p.down ? '<i class="chip down">기절</i>' : p.out ? '<i class="chip down">포기</i>' : !p.connected && !p.bot ? '<i class="chip off">끊김</i>' : p.combo >= 3 ? `<i class="chip hot">${p.combo}</i>` : '';
       return `<div class="dgs-prow${p.id === myId ? ' me' : ''}"><span>${esc(p.id === myId ? '나' : p.name)}${p.bot ? ' · 봇' : ''}</span>${st}<i class="mini"><u style="width:${Math.max(0, p.hp / p.max_hp * 100)}%"></u></i></div>`;
-    }).join('')}`;
+    }).join('')}`);
   }
 }
 
@@ -485,7 +489,7 @@ function drawParty(v) {
 function drawTop(v) {
   const m = v.monster, myId = D.A.data.profile.id;
   const title = $id('dgs-title');
-  if (title) title.innerHTML = `<img src="/assets/ui/${RANK_ICON[v.cut] || 'dungeon-rank3'}.webp" alt="${esc(v.cut_name)}" draggable="false"><div><b>${m?.boss ? '보스 · 킬러 골렘' : v.floor ? `${v.floor}층 · ${esc(m?.name || '')}` : '기말고사 지옥'}</b><span>기말고사 지옥 · ${esc(v.cut_name)} · ${v.players.length}명</span></div>`;
+  setHTML(title, `<img src="/assets/ui/${RANK_ICON[v.cut] || 'dungeon-rank3'}.webp" alt="${esc(v.cut_name)}" draggable="false"><div><b>${m?.boss ? '보스 · 킬러 골렘' : v.floor ? `${v.floor}층 · ${esc(m?.name || '')}` : '기말고사 지옥'}</b><span>기말고사 지옥 · ${esc(v.cut_name)} · ${v.players.length}명</span></div>`);
   if (m) {
     const share = Math.max(0, m.hp / m.max_hp);
     $id('dgs-mon-name').textContent = m.name;
@@ -494,7 +498,7 @@ function drawTop(v) {
     $id('dgs-mon-hp').textContent = `${Math.ceil(share * 100)}% · ${num(Math.max(0, m.hp))}`;
     $id('dgs-hp-fill').style.width = `${share * 100}%`; $id('dgs-hp-lag').style.width = `${share * 100}%`;
     $id('dgs-tick2').hidden = $id('dgs-tick3').hidden = !m.boss;
-    $id('dgs-phases').innerHTML = m.boss ? [['1페이즈', 1], ['2 채점', 2], ['3 핵', 3]].map(([t, s]) => `<span class="${m.stage === s ? 'on' : ''}">${m.stage === s ? ['', '1페이즈', '2페이즈 · 빨간펜 채점', '3페이즈 · 핵 노출'][s] : t}</span>`).join('') : '';
+    setHTML($id('dgs-phases'), m.boss ? [['1페이즈', 1], ['2 채점', 2], ['3 핵', 3]].map(([t, s]) => `<span class="${m.stage === s ? 'on' : ''}">${m.stage === s ? ['', '1페이즈', '2페이즈 · 빨간펜 채점', '3페이즈 · 핵 노출'][s] : t}</span>`).join('') : '');
     $id('dgs-world').classList.toggle('p2', !!(m.boss && m.stage === 2)); $id('dgs-world').classList.toggle('p3', !!(m.boss && m.stage === 3));
   }
   // 채점 표적 · 핵 (세로는 카드, 가로는 보스 체력 아래 막대).
@@ -509,7 +513,7 @@ function drawTop(v) {
     } else if (core) {
       html = `<div class="dgs-al core"><img src="/assets/ui/dungeon-core.webp" alt="" draggable="false"><div><b>핵이 드러났다!</b><span>파티가 정답 ${core.goal}개를 채우면 브레이크!</span><p class="bar"><i style="width:${Math.min(100, core.count / core.goal * 100)}%"></i><em>${core.count}/${core.goal}</em></p></div><strong id="dgs-core-left"></strong></div>`;
     }
-    alert.innerHTML = html;
+    setHTML(alert, html);
     alert.classList.toggle('on', !!html);
     $id('dgs-feed')?.classList.toggle('hide', !!html);
   }
@@ -525,14 +529,14 @@ function drawGauge(v) {
   box.classList.toggle('core', !!core); box.classList.toggle('ready', !core && share >= .85);
   const icoSrc = `/assets/ui/${core ? 'dungeon-break' : 'dungeon-ultimate'}.webp`;
   if (!ico.src.endsWith(icoSrc)) ico.src = icoSrc;
-  txt.innerHTML = core ? `<span>브레이크까지 · 파티 정답</span><b>${core.count}/${core.goal}</b>` : `<span>${D.mode === 'land' ? '합동 필살' : `파티 게이지${v.element_bonus > 1 ? ' · 서로 다른 속성 3마리 +30%' : ''}`}</span><b>${Math.round(share * 100)}%</b>`;
+  setHTML(txt, core ? `<span>브레이크까지 · 파티 정답</span><b>${core.count}/${core.goal}</b>` : `<span>${D.mode === 'land' ? '합동 필살' : `파티 게이지${v.element_bonus > 1 ? ' · 서로 다른 속성 3마리 +30%' : ''}`}</span><b>${Math.round(share * 100)}%</b>`);
 }
 function drawMe(v) {
   const me = D.me, box = $id('dgs-me');
   if (box && me && D.mode === 'land') {
-    box.innerHTML = `<div class="hd"><img src="${petArt(me)}" alt="" draggable="false"><div><b>${esc(me.name)}</b><span>${esc(v.grade)} · ${esc(v.cut_name)}</span></div></div>
+    setHTML(box, `<div class="hd"><img src="${petArt(me)}" alt="" draggable="false"><div><b>${esc(me.name)}</b><span>${esc(v.grade)} · ${esc(v.cut_name)}</span></div></div>
       <div class="bar hp"><span>HP</span><i><u style="width:${Math.max(0, me.hp / me.max_hp * 100)}%"></u><em>${num(Math.max(0, me.hp))}/${num(me.max_hp)}</em></i></div>
-      <div class="bar sp"><span>콤보</span><i><u style="width:${Math.min(100, (me.combo % 5) / 5 * 100 + (me.combo >= 25 ? 100 : 0))}%"></u><em>${me.combo}연속 · ×${Math.min(1.5, 1 + .1 * Math.floor(me.combo / 5)).toFixed(1)}</em></i></div>`;
+      <div class="bar sp"><span>콤보</span><i><u style="width:${Math.min(100, (me.combo % 5) / 5 * 100 + (me.combo >= 25 ? 100 : 0))}%"></u><em>${me.combo}연속 · ×${Math.min(1.5, 1 + .1 * Math.floor(me.combo / 5)).toFixed(1)}</em></i></div>`);
   }
   const combo = $id('dgs-combo');
   if (combo && me) {
@@ -661,21 +665,21 @@ function tickLoop() {
     if (!D || D.closing || D.phase !== 'battle') return;
     const v = D.view, now = serverNow();
     const c = $id('dg-clock');
-    if (c && v) c.textContent = clock(v.started_at ? now - v.started_at : 0);
+    if (c && v) setText(c, clock(v.started_at ? now - v.started_at : 0));
     const bar = $id('dg-time'), q = v?.question;
     if (bar && q && q.n === D.qn) {
       const leftMs = Math.max(0, q.deadline - now), left = leftMs / (q.deadline - q.started_at);
-      bar.style.width = `${left * 100}%`; bar.classList.toggle('hurry', left < .3);
-      const lt = $id('dgs-time-left'); if (lt) lt.textContent = `${(leftMs / 1000).toFixed(1)}초`;
+      setStyle(bar, 'transform', `scaleX(${left.toFixed(3)})`); if (bar.classList.contains('hurry') !== left < .3) bar.classList.toggle('hurry', left < .3);
+      setText($id('dgs-time-left'), `${(leftMs / 1000).toFixed(1)}초`);
       const sec = Math.ceil(leftMs / 1000);
       if (sec < D.tick && sec > 0 && sec <= 3 && D.picked === null && !D.spell?.done) { D.tick = sec; sfx('tick', { gain: .7 }); }
     }
     const coreLeft = $id('dgs-core-left'), core = v?.monster?.core;
-    if (coreLeft && core?.open_until) coreLeft.innerHTML = `<b>${Math.max(0, Math.ceil((core.open_until - now) / 1000))}</b><span>초 남음</span>`;
+    if (coreLeft && core?.open_until) setHTML(coreLeft, `<b>${Math.max(0, Math.ceil((core.open_until - now) / 1000))}</b><span>초 남음</span>`);
     const rest = $id('dg-rest-left');
-    if (rest && v?.rest_until) rest.textContent = `${Math.max(0, Math.ceil((v.rest_until - now) / 1000))}초`;
+    if (rest && v?.rest_until) setText(rest, `${Math.max(0, Math.ceil((v.rest_until - now) / 1000))}초`);
     const intro = $id('dg-intro-left');
-    if (intro && v?.intro_until) intro.textContent = Math.max(0, Math.ceil((v.intro_until - now) / 1000)) || '시작!';
+    if (intro && v?.intro_until) setText(intro, Math.max(0, Math.ceil((v.intro_until - now) / 1000)) || '시작!');
     if (now > flipAt) {
       flipAt = now + 900; D.idleFlip = !D.idleFlip;
       const img = $id('dgs-mon-img'), m = v?.monster;

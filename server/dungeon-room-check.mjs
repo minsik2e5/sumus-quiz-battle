@@ -2,6 +2,7 @@
 // 저장소 · 알람 · 소켓을 두고 방을 끝까지 돌린다. cloudflare-check.mjs가 부른다.
 import assert from 'node:assert/strict';
 import { DungeonRoom, planBot, DUNGEON_BOT, BOT_SPELL_SLOW } from '../cloudflare/dungeon-room.mjs';
+import { BOT_LEVELS } from '../public/modules/battle-bot.js';
 import { DUNGEON } from './dungeon-engine.mjs';
 import { settleDungeon, undoDungeon } from './service.mjs';
 
@@ -210,12 +211,13 @@ export async function runDungeonRoomChecks() {
       assert(room.room.reported, '보고가 되면 끝');
     });
 
-    /* ---------- 8. 봇 동료: 보통 로보의 정답률과 시간, 제한 시간을 넘기면 시간 초과 ---------- */
+    /* ---------- 8. 봇 동료: 던전 봇의 정답률과 시간, 제한 시간을 넘기면 시간 초과 ---------- */
     await check('8 봇 계획', async () => {
       const q = { n: 3, started_at: 1000, deadline: 1000 + 3000 };
       assert.equal(planBot(q, () => 0).at, 1000 + DUNGEON_BOT.min, '가장 빠르면 min 뒤');
       assert.equal(planBot(q, () => 0.99).at, null, '제한 시간 안에 못 하면 답하지 않는다(시간 초과)');
       assert(planBot(q, () => 0.5).right && !planBot(q, () => 0.99).right, `정답률 ${DUNGEON_BOT.accuracy}`);
+      assert(DUNGEON_BOT.accuracy === 0.72 && DUNGEON_BOT.min === 2000 && DUNGEON_BOT.max === 5000 && DUNGEON_BOT.accuracy < BOT_LEVELS.normal.accuracy && DUNGEON_BOT.min > BOT_LEVELS.normal.min, 'V13.135 던전 봇 동료는 보통 로보보다 약하게(정답률 72% · 2~5초, 평균 학생 피해의 약 0.85배)');
       assert.equal(planBot({ ...q, kind: 'spell', deadline: 1000 + 16000 }, () => 0).at, 1000 + Math.round(DUNGEON_BOT.min * BOT_SPELL_SLOW), 'V13.130 영어 쓰기 문제는 봇도 ×1.8 오래 걸린다');
     });
 

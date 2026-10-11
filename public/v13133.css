@@ -7,3 +7,6 @@
 @media (orientation: portrait) { .dgs-rotate { display: flex; } }
 @media (prefers-reduced-motion: reduce) { .dgs-rotate svg { animation: none; transform: rotate(-90deg); } }
 .dg-land-hint { color: #fde68a; }
+
+/* V13.135 렉 줄이기: 문제 시간 막대는 폭 대신 transform으로 줄인다(매 프레임 레이아웃을 다시 하지 않게). */
+.dgs-time b { transform-origin: left center; will-change: transform; }
