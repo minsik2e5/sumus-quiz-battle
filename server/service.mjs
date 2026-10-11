@@ -37,7 +37,15 @@ const withoutLegacySeonbu44 = book => {
 // 기린을 / 해치를: the object particle that fits the name.
 const eulReul = name => { const c = String(name).charCodeAt(String(name).length - 1) - 0xAC00; return c >= 0 && c <= 11171 && c % 28 ? `${name}을` : `${name}를`; };
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
-const requireRole = (p, role) => { if (p.role !== role) fail('이 기능을 사용할 권한이 없습니다.', 403); };
+// V13.134: 한 브라우저의 로그인(쿠키)은 모든 탭이 같이 쓴다. 다른 탭에서 학생 미리보기나 학생 로그인을 하면
+// 선생님 탭의 요청도 그 학생으로 온다. 그때는 무엇 때문인지와 어떻게 돌아가는지를 알려 준다.
+export const PREVIEW_TEACHER_MESSAGE = '지금 이 브라우저는 학생 미리보기 중이에요. 새로고침한 뒤 미리보기를 끝내고 선생님 화면으로 돌아가 주세요.';
+export const NOT_TEACHER_MESSAGE = '선생님 계정으로 로그인되어 있지 않아요. 새로고침한 뒤 선생님 계정으로 로그인해 주세요.';
+const requireRole = (p, role) => {
+  if (p.role === role) return;
+  if (role === 'teacher') fail(p.preview_owner_id ? PREVIEW_TEACHER_MESSAGE : NOT_TEACHER_MESSAGE, 403);
+  fail('이 기능을 사용할 권한이 없습니다.', 403);
+};
 const integer = (n, min, max, label) => { if (!Number.isInteger(Number(n)) || Number(n) < min || Number(n) > max) fail(`${label}을 확인해주세요.`); return Number(n); };
 const str = (s, max = 120) => typeof s === 'string' ? s.trim().slice(0, max) : '';
 // A table lookup by a key from the request: own keys only (never 'constructor' or '__proto__').
@@ -1110,6 +1118,12 @@ const MUTATING_WITHOUT_METHOD_CHECK = /^\/(?:logout|practice\/[^/]+\/(?:answer|n
 export async function service(state, method, path, body, token, options = {}) {
   if (method === 'GET' && MUTATING_WITHOUT_METHOD_CHECK.test(path)) fail('요청 방식을 확인해주세요.', 405);
   if (path === '/health') return { ok: true, version: APP_VERSION, schema_version: state.schema_version, ready: state.profiles.some(p => p.role === 'teacher') || process.env.AUTH_PROVIDER === 'supabase' };
+  // V13.134: 이 브라우저에 지금 로그인된 계정(화면이 다른 탭 때문에 바뀌었는지 확인용). 자기 세션만 알려 준다.
+  if (path === '/session/who' && method === 'GET') {
+    const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now());
+    const who = auth && state.profiles.find(x => x.id === auth.user_id && x.active);
+    return who ? { profile_id: who.id, role: who.role, preview: !!who.preview_owner_id } : { profile_id: null };
+  }
   if (path === '/session' && method === 'GET') { const auth = state.tokens.find(t => t.hash === hashToken(token || '') && t.expires_at > Date.now()); return { authenticated: state.profiles.some(p => p.id === auth?.user_id && p.active) }; }
   // V13.71 교실 TV link: a bracket-only view for the classroom screen, opened with a random link
   // the teacher makes (no teacher login on the shared TV). It lasts until a day after the

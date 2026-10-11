@@ -51,6 +51,8 @@ export async function api(path, body, method) {
       try { data = await r.json(); } catch {}
       if (!r.ok) {
         const error = Object.assign(new Error(data.error || '연결을 확인해주세요.'), { status: r.status, transient: r.status >= 500 });
+        // V13.134: 권한이 없다는 답이면 화면이 다른 탭의 로그인 때문에 바뀌었는지 앱이 확인한다(app.js).
+        if (r.status === 403 && !path.startsWith('/session')) window.dispatchEvent(new CustomEvent('sumus:forbidden'));
         if (requestMethod === 'GET' && error.transient && attempt + 1 < attempts) { lastError = error; await new Promise(resolve => setTimeout(resolve, 220)); continue; }
         throw error;
       }

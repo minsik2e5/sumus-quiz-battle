@@ -330,6 +330,23 @@ window.addEventListener('online', async () => {
   if (!A.data || A.screen) return;
   try { await refresh(); renderKeepScroll(); } catch {}
 });
+// V13.134: 한 브라우저의 로그인은 모든 탭이 같이 쓴다. 다른 탭에서 학생 미리보기 · 다른 계정 로그인을 하면 이 탭의
+// 화면은 그대로인데 요청은 그 계정으로 가서 '권한이 없어요'가 난다. 탭이 다시 보이거나 권한 오류가 나면 지금 로그인된
+// 계정을 확인하고, 다르면 새로고침을 안내한다.
+let sessionCheckAt = 0, sessionNotice = false;
+async function checkSessionOwner(force = false) {
+  if (!A.data?.profile || sessionNotice || (!force && Date.now() - sessionCheckAt < 5000)) return;
+  sessionCheckAt = Date.now();
+  let who;
+  try { who = await api('/session/who'); } catch { return; }
+  if (!who || who.profile_id === A.data.profile.id || sessionNotice) return;
+  sessionNotice = true;
+  const what = who.preview ? '학생 미리보기' : who.profile_id ? (who.role === 'teacher' ? '다른 선생님 계정' : '학생 계정') : '로그아웃';
+  const close = modal(`<p>다른 탭에서 <b>${what}</b>을(를) 해서 이 브라우저의 로그인이 바뀌었어요. 이 화면에서 누른 것은 지금 로그인된 계정으로 처리돼요.</p><p class="tiny muted">새로고침하면 지금 로그인된 계정으로 열려요. 선생님 화면이 필요하면 미리보기를 끝내거나 선생님 계정으로 다시 로그인해 주세요.</p><div class="modal-actions"><button type="button" class="btn primary full" id="session-reload">새로고침</button></div>`, '로그인이 바뀌었어요', { onClose: () => { sessionNotice = false; } });
+  $('#session-reload').onclick = () => { close(); location.reload(); };
+}
+window.addEventListener('sumus:forbidden', () => checkSessionOwner(true));
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkSessionOwner(); });
 window.addEventListener('pageshow', async event => {
   if (!event.persisted || !A.data || A.screen) return;
   try { await refresh(); renderKeepScroll(); } catch {}

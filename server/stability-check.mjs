@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
 import { emptyState } from './state.mjs';
-import { sweep, battleReportPending } from './service.mjs';
+import { sweep, battleReportPending, service, PREVIEW_TEACHER_MESSAGE, NOT_TEACHER_MESSAGE } from './service.mjs';
+import { hashToken } from './auth.mjs';
 import { readJson, bodyByteLimit } from '../cloudflare/worker.mjs';
 import { createDungeon, join, ready, leave, disconnect, reconnect, answer, tick, DUNGEON } from './dungeon-engine.mjs';
 
@@ -57,6 +58,25 @@ export async function runStabilityChecks(assert) {
   const deploy = source('../.github/workflows/deploy-cloudflare.yml'), ci = source('../.github/workflows/release-check.yml');
   assert(deploy.includes("h.ok === true && h.version === process.argv[1]") && deploy.includes("require('./package.json').version"), 'V13.129 배포 확인: 새 버전이 실제로 올라가 ok:true인지 본다');
   assert(!/@v4\b/.test(deploy + ci) && deploy.includes('actions/checkout@v5') && ci.includes('actions/setup-node@v5'), 'V13.129 GitHub Actions checkout · setup-node v5(Node 24 실행 환경)');
+
+  /* ---------- V13.134 다른 탭의 학생 미리보기 · 학생 로그인 ---------- */
+  {
+    const st = emptyState();
+    const school = st.schools.find(x => x.id === 'gangseo-high');
+    st.profiles.push({ id: 'qa-t', username: 'qa_t', display_name: '선생님', role: 'teacher', active: true, school_ids: [school.id], division_ids: ['high'], active_division: 'high', active_school_id: school.id, created_at: Date.now() });
+    st.profiles.push({ id: 'qa-s', username: 'qa_s', display_name: '학생', role: 'student', active: true, class_name: '고1A', school_id: school.id, school: school.name, division: 'high', pets: [{ key: 'dog' }], created_at: Date.now() });
+    const tok = (id, extra = {}) => { const raw = 'tok-' + id + Math.random(); st.tokens.push({ hash: hashToken(raw), user_id: id, expires_at: Date.now() + 3600000, ...extra }); return raw; };
+    const teacher = tok('qa-t');
+    const preview = (await service(st, 'POST', '/teacher/student-preview', { school_id: school.id, grade: '고1A' }, teacher))._cookie;
+    const fails = async (who) => { try { await service(st, 'POST', '/teacher/gifts', { amount: 10, all: true }, who); return null; } catch (error) { return error; } };
+    const e1 = await fails(preview), e2 = await fails(tok('qa-s'));
+    assert(e1?.status === 403 && e1.message === PREVIEW_TEACHER_MESSAGE, 'V13.134 학생 미리보기 로그인으로 선생님 기능을 누르면 "미리보기 중"이라고 알려 준다');
+    assert(e2?.status === 403 && e2.message === NOT_TEACHER_MESSAGE, 'V13.134 학생 로그인으로 선생님 기능을 누르면 "선생님 계정으로 로그인되어 있지 않아요"');
+    const w1 = await service(st, 'GET', '/session/who', {}, preview), w2 = await service(st, 'GET', '/session/who', {}, teacher), w3 = await service(st, 'GET', '/session/who', {}, 'nope');
+    assert(w1.role === 'student' && w1.preview === true && w2.profile_id === 'qa-t' && w2.role === 'teacher' && w3.profile_id === null && Object.keys(w2).sort().join() === 'preview,profile_id,role', 'V13.134 /session/who는 이 브라우저에 지금 로그인된 자기 계정(아이디 · 역할 · 미리보기 여부)만 알려 준다');
+    const uiJs = source('../public/modules/ui.js'), app = source('../public/app.js');
+    assert(uiJs.includes("if (r.status === 403 && !path.startsWith('/session')) window.dispatchEvent(new CustomEvent('sumus:forbidden'));") && app.includes("window.addEventListener('sumus:forbidden', () => checkSessionOwner(true));") && app.includes("if (document.visibilityState === 'visible') checkSessionOwner();") && app.includes("await api('/session/who')") && app.includes('로그인이 바뀌었어요'), 'V13.134 권한 오류가 나거나 탭이 다시 보이면 지금 로그인된 계정을 확인하고, 다르면 새로고침을 안내한다');
+  }
 
   /* ---------- 던전: 로비 시작 ---------- */
   let now = 1000;
