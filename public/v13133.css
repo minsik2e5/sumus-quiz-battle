@@ -1,0 +1,9 @@
+/* V13.133 던전 전투는 가로 전용: 폰이 세로면 '가로로 돌려 주세요'가 무대를 덮는다(전투 · 입장 · 휴식). */
+.dgs-rotate { display: none; position: absolute; inset: 0; z-index: 60; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; background: #07050b; color: #f5efff; text-align: center; }
+.dgs-rotate svg { color: #fde68a; animation: dgs-rotate-hint 1.8s ease-in-out infinite; }
+.dgs-rotate b { font-size: 21px; }
+.dgs-rotate span { font-size: 14px; color: #c9b8e6; }
+@keyframes dgs-rotate-hint { 0%, 30% { transform: rotate(0deg); } 60%, 100% { transform: rotate(-90deg); } }
+@media (orientation: portrait) { .dgs-rotate { display: flex; } }
+@media (prefers-reduced-motion: reduce) { .dgs-rotate svg { animation: none; transform: rotate(-90deg); } }
+.dg-land-hint { color: #fde68a; }

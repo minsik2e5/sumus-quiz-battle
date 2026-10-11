@@ -21,7 +21,9 @@ const CUT_DESC = { c3: '처음 도전', c2: '3등급 컷을 깨면 열려요', c
 let D = null;
 const root = () => document.getElementById('app');
 const serverNow = () => Date.now() + (D?.offset || 0);
-const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+// V13.133: 움직임 줄이기 설정은 한 번만 물어 두고 바뀌면 따라간다(효과 조각마다 새로 묻지 않게).
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
+const reduced = () => REDUCED.matches;
 const clock = ms => `${Math.floor(Math.max(0, ms) / 60000)}:${String(Math.floor(Math.max(0, ms) / 1000) % 60).padStart(2, '0')}`;
 function later(fn, ms) { const cur = D; const id = setTimeout(() => { if (D === cur && !cur.closing) fn(); }, ms); cur.timers.push(id); }
 
@@ -80,7 +82,7 @@ function onClick(event) {
   if (act === 'join') return joinByCode(b, D.code);
   if (act === 'accept') return joinByCode(b, b.dataset.code);
   if (act === 'decline') return declineInvite(b);
-  if (act === 'ready') return send({ type: 'ready', on: b.dataset.on !== '0' });
+  if (act === 'ready') { if (b.dataset.on !== '0') lockLandscape(); return send({ type: 'ready', on: b.dataset.on !== '0' }); }
   if (act === 'friends') return pickFriend();
   if (act === 'bot') return addBot(b);
   if (act === 'copy') return copyCode();
@@ -227,6 +229,7 @@ function lobbyScreen(v) {
       ${host && !full ? `<div class="dg-row"><button type="button" class="btn" data-dg="friends">${icon('user')} 친구 부르기</button><button type="button" class="btn ghost" data-dg="bot">🤖 봇 동료</button></div>` : ''}
       <button type="button" class="btn ${me?.ready ? 'ghost' : 'primary'} full dg-ready" data-dg="ready" data-on="${me?.ready ? '0' : '1'}">${me?.ready ? '준비 취소' : '준비 완료!'}</button>
       <p class="dg-hint">${v.players.length < 2 ? '한 명 더 있어야 시작할 수 있어요.' : v.players.every(p => p.ready) ? '곧 시작해요!' : '모두 준비하면 바로 시작해요.'}</p>
+      <p class="dg-hint dg-land-hint">⟲ 전투는 가로 화면이에요. 준비를 누르고 폰을 눕혀 주세요.</p>
     </section>`);
 }
 async function copyCode() {
@@ -274,7 +277,22 @@ const SFX_BOSS = ['boss-charge', 'warn-beep', 'shield-block', 'boss-roar', 'ult-
 const sfx = (key, opts) => playSound(key, opts);
 
 const $id = id => document.getElementById(id);
-const mode = () => (innerWidth > innerHeight ? 'land' : 'port');
+// V13.133 던전 전투는 가로 전용(선생님 결정): 무대는 늘 가로로 그리고, 폰이 세로면 '가로로 돌려 주세요'가 덮는다.
+const mode = () => 'land';
+// 준비를 누를 때(손가락으로 누른 순간이어야 한다) 전체 화면 + 가로 고정을 시도한다. 안드로이드 크롬 · 설치한 앱은
+// 되고, 아이폰 사파리는 방향 고정이 없어 안내 화면만 보인다. 실패해도 조용히 넘어간다.
+async function lockLandscape() {
+  try {
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) { await document.documentElement.requestFullscreen({ navigationUI: 'hide' }); D.fullscreen = true; }
+  } catch {}
+  try { await screen.orientation?.lock?.('landscape'); D.locked = true; } catch {}
+}
+function releaseLandscape() {
+  if (!D) return;
+  try { if (D.locked) screen.orientation?.unlock?.(); } catch {}
+  try { if (D.fullscreen && document.fullscreenElement) document.exitFullscreen?.(); } catch {}
+  D.locked = D.fullscreen = false;
+}
 const L = () => STAGE[D.mode];
 // 그림을 바꿀 때 새 그림을 먼저 풀어 둔 뒤 바꾼다(바꾸는 순간 그림이 잠깐 비지 않게).
 function swapSrc(img, src) {
@@ -290,6 +308,7 @@ function battleScreen(v) {
   D.mode = mode();
   main(`
     <div class="dgs-wrap" id="dgs-wrap">
+      <div class="dgs-rotate" role="alert"><svg viewBox="0 0 48 48" width="72" height="72" aria-hidden="true"><rect x="13" y="6" width="22" height="36" rx="4" fill="none" stroke="currentColor" stroke-width="3"></rect><path d="M8 30a16 16 0 0 0 10 12M40 18A16 16 0 0 0 30 6" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"></path><path d="M30 2l1 5-5 1M18 46l-1-5 5-1" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg><b>폰을 가로로 돌려 주세요</b><span>던전 전투는 가로 화면에서만 할 수 있어요</span></div>
       <div class="dgs-holder" id="dgs-holder">
         <section class="dgs ${D.mode}" id="dgs" aria-label="던전 전투">
           <div class="dgs-world" id="dgs-world">
@@ -904,6 +923,7 @@ const nameOf = pid => { const p = D.view?.players.find(x => x.id === pid); retur
 
 // 무대를 떠날 때: 효과 캔버스를 멈추고 창 크기 · 키보드 듣기를 뗀다.
 function leaveStage() {
+  releaseLandscape();
   D.fx?.stop(); D.fx = null;
   if (D.onResize) removeEventListener('resize', D.onResize);
   if (D.onKey) removeEventListener('keydown', D.onKey);
