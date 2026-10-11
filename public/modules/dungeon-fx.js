@@ -4,8 +4,13 @@ import { ELEMENTS } from './battle-fx.js';
 // 몬스터 내려찍기 먼지와 파편, 부활 빛, 클리어 꽃가루, 보스방 불티. 좌표는 무대의 논리 크기
 // (가로 844×390, 세로 390×844)이고 화면 배율은 resize(scale)로 받는다.
 // 효과 조각은 MAX_PARTS개까지만 그린다(오래된 폰에서도 버벅이지 않게). 움직임 줄이기면 아무것도 그리지 않는다.
+// V13.133 렉 줄이기: 폰(화면 배율 3)에서 캔버스를 화면 해상도 그대로(약 300만 픽셀) 매 프레임 다시 그려서
+// 전투 15초 중 10초를 이 파일이 썼다. 캔버스 배율은 1.5배까지(빛 효과라 차이가 거의 안 보인다),
+// 조각은 180개까지, 발사체 꼬리는 1초에 30개씩, 불티만 남았을 때는 1초에 30번만 그린다.
 
-const MAX_PARTS = 420;
+export const MAX_PARTS = 180;
+export const FX_PIXEL_RATIO_MAX = 1.5;
+const TRAIL_EVERY = 1 / 30, EMBER_FRAME_MS = 33;
 const rnd = (a, b) => a + Math.random() * (b - a);
 const pick = list => list[Math.floor(Math.random() * list.length)];
 // 속성별 발사체 모양: star 별, leaf 잎, wind 소용돌이, flame 불덩이, ice 얼음 조각, water 물방울, earth 돌, toxic 거품.
@@ -18,7 +23,7 @@ export function createDungeonFx(canvas, { width, height, reduced = () => false }
   const parts = [], shots = [], ember = [];
 
   function resize(w, h, s) {
-    W = w; H = h; scale = s * (window.devicePixelRatio || 1);
+    W = w; H = h; scale = s * Math.min(FX_PIXEL_RATIO_MAX, window.devicePixelRatio || 1);
     canvas.width = Math.round(W * scale); canvas.height = Math.round(H * scale);
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
   }
@@ -68,7 +73,7 @@ export function createDungeonFx(canvas, { width, height, reduced = () => false }
     shots.push({ x0: from.x, y0: from.y, x1: to.x, y1: to.y, t: 0, dur: ms / 1000, el, shape, arc: arc ?? (shape === 'leaf' ? -rnd(60, 110) : shape === 'swirl' ? -36 : -18), onHit, ph: Math.random() * 6, x: from.x, y: from.y });
     wake();
   }
-  function setEmbers(n) { embers = reduced() ? 0 : n; if (embers) wake(); }
+  function setEmbers(n) { embers = reduced() ? 0 : Math.min(12, n); if (embers) wake(); }
 
   function starPath(r) { ctx.beginPath(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * .45 : r; ctx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } ctx.closePath(); }
   function step(dt) {
@@ -78,7 +83,8 @@ export function createDungeonFx(canvas, { width, height, reduced = () => false }
       const wob = p.shape === 'swirl' ? Math.sin(k * 14 + p.ph) * 16 * (1 - k) : 0;
       p.x = p.x0 + (p.x1 - p.x0) * e; p.y = p.y0 + (p.y1 - p.y0) * e + p.arc * Math.sin(Math.PI * k) + wob;
       const c = colorsOf(p.el);
-      for (let j = 0; j < (p.shape === 'star' ? 3 : 2); j++) add({ x: p.x + rnd(-3, 3), y: p.y + rnd(-3, 3), vx: rnd(-30, 30), vy: rnd(-30, 30), size: rnd(2, p.shape === 'star' ? 6 : 4), max: rnd(.2, .42), color: pick(c) });
+      p.trail = (p.trail || 0) + dt;
+      if (p.trail >= TRAIL_EVERY) { p.trail = 0; for (let j = 0; j < (p.shape === 'star' ? 2 : 1); j++) add({ x: p.x + rnd(-3, 3), y: p.y + rnd(-3, 3), vx: rnd(-30, 30), vy: rnd(-30, 30), size: rnd(2, p.shape === 'star' ? 6 : 4), max: rnd(.2, .42), color: pick(c) }); }
       if (k >= 1) { shots.splice(i, 1); p.onHit?.(); }
     }
     for (let i = parts.length - 1; i >= 0; i--) {
@@ -132,6 +138,8 @@ export function createDungeonFx(canvas, { width, height, reduced = () => false }
   function frame(now) {
     raf = 0;
     if (!alive) return;
+    // 불티만 남았으면 1초에 30번만 그린다(맞는 효과가 없을 때 계속 60번 그리지 않게).
+    if (!parts.length && !shots.length && last && now - last < EMBER_FRAME_MS) { raf = requestAnimationFrame(frame); return; }
     const dt = Math.min(.05, (now - (last || now)) / 1000); last = now;
     step(dt); draw();
     if (parts.length || shots.length || embers) raf = requestAnimationFrame(frame);

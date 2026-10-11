@@ -21,7 +21,9 @@ const CUT_DESC = { c3: '처음 도전', c2: '3등급 컷을 깨면 열려요', c
 let D = null;
 const root = () => document.getElementById('app');
 const serverNow = () => Date.now() + (D?.offset || 0);
-const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+// V13.133: 움직임 줄이기 설정은 한 번만 물어 두고 바뀌면 따라간다(효과 조각마다 새로 묻지 않게).
+const REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
+const reduced = () => REDUCED.matches;
 const clock = ms => `${Math.floor(Math.max(0, ms) / 60000)}:${String(Math.floor(Math.max(0, ms) / 1000) % 60).padStart(2, '0')}`;
 function later(fn, ms) { const cur = D; const id = setTimeout(() => { if (D === cur && !cur.closing) fn(); }, ms); cur.timers.push(id); }
 
