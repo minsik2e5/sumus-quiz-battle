@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { pathToFileURL } from 'node:url';
-import { DatabaseSync } from 'node:sqlite';
+import { createStorageMock } from './storage-mock.mjs';
 import { passwordHash } from './auth.mjs';
 import { emptyState } from './state.mjs';
 import { builtinBooks } from './service.mjs';
@@ -9,41 +9,9 @@ import { createLocalRepository, createSupabaseSync } from '../cloudflare/local-f
 import { assembleState } from '../cloudflare/state-parts.mjs';
 import { runBattleRoomChecks } from './battle-room-check.mjs';
 import { runDungeonRoomChecks } from './dungeon-room-check.mjs';
+import { runWriteBudgetChecks } from './write-budget-check.mjs';
 
 const deepCopy = value => structuredClone(value);
-
-// Minimal stand-in for a SQLite-backed Durable Object's ctx.storage, backed by
-// node:sqlite so the real SQL statements run.
-function createStorageMock() {
-  const db = new DatabaseSync(':memory:');
-  let failWrites = 0;
-  return {
-    alarm: null,
-    failNextWrite() { failWrites += 1; },
-    sql: {
-      exec(query, ...bindings) {
-        if (failWrites > 0 && /^\s*(INSERT|DELETE)/i.test(query)) {
-          failWrites -= 1;
-          throw new Error('simulated disk failure');
-        }
-        const statement = db.prepare(query);
-        const rows = /^\s*SELECT/i.test(query) ? statement.all(...bindings) : (statement.run(...bindings), []);
-        return { toArray: () => rows, one: () => rows[0] };
-      }
-    },
-    transactionSync(callback) {
-      db.exec('BEGIN');
-      try { const result = callback(); db.exec('COMMIT'); return result; }
-      catch (error) { db.exec('ROLLBACK'); throw error; }
-    },
-    setAlarm(time) { this.alarm = time; },
-    // Key-value API of ctx.storage (V13.99: last successful backup time).
-    kv: new Map(),
-    // Like the real API: a key or a list of keys (-> Map), a key and value or an object of entries.
-    async get(key) { return Array.isArray(key) ? new Map(key.filter(k => this.kv.has(k)).map(k => [k, this.kv.get(k)])) : this.kv.get(key); },
-    async put(key, value) { if (typeof key === 'object') for (const [k, v] of Object.entries(key)) this.kv.set(k, v); else this.kv.set(key, value); }
-  };
-}
 
 export async function runCloudflareCheck() {
   const book = builtinBooks.find(item => item.school === '단원고');
@@ -131,10 +99,14 @@ export async function runCloudflareCheck() {
   const env = {
     SUPABASE_URL: 'https://example.supabase.co',
     SUPABASE_ANON_KEY: 'test-anon-key',
-    VOCA_STATE_SECRET: 'test-state-secret'
+    VOCA_STATE_SECRET: 'test-state-secret',
+    // 검사는 요청을 하나씩 보내므로 쓰기 모으기 창을 끈다(모으기는 아래 V13.144 검사가 따로 본다).
+    VOCA_COMMIT_GROUP_MS: 0
   };
   // A new object on the same storage is what a Durable Object restart looks like.
   const boot = () => new VocaStateObject({ storage, blockConcurrencyWhile: callback => callback(), waitUntil: () => {} }, env);
+  // 한 저장소에는 상태 객체가 하나만 산다(Cloudflare가 보장). 곁가지 검사용 객체는 자기 저장소를 쓴다.
+  const bootSide = () => new VocaStateObject({ storage: createStorageMock(), blockConcurrencyWhile: callback => callback(), waitUntil: () => {} }, env);
   const client = object => async (path, options = {}) => {
     const response = await object.fetch(new Request(`https://sumus-voca.example${path}`, {
       method: options.method || 'GET',
@@ -168,7 +140,7 @@ export async function runCloudflareCheck() {
 
     // V13.136: 맞게 로그인한 횟수는 세지 않는다. 같은 아이디로 틀린 시도만 5분에 10번까지.
     {
-      const lockCall = client(boot());
+      const lockCall = client(bootSide());
       const right = { username: 'student_preserved', password: 'Student123!', role: 'student' };
       const wrong = { ...right, password: 'wrong-password' };
       for (let i = 0; i < 15; i++) await lockCall('/api/login', { method: 'POST', body: right });
@@ -181,7 +153,7 @@ export async function runCloudflareCheck() {
 
     // V13.141: 가입 코드 확인은 로그인 없이 되고, 학교·반만 알려 준다. 틀린 코드는 같은 기기 30분에 20번까지.
     {
-      const codeObject = boot(), codeCall = client(codeObject);
+      const codeObject = bootSide(), codeCall = client(codeObject);
       await codeObject.ready;
       const entry = codeObject.mutations.current().state.signupCodes.find(item => item.school_id === 'gangseo-high' && item.class_name === '고1A');
       const found = await codeCall('/api/signup/check', { method: 'POST', body: { code: entry.code } });
@@ -190,7 +162,7 @@ export async function runCloudflareCheck() {
       const blocked = await codeCall('/api/signup/check', { method: 'POST', status: 429, body: { code: entry.code } });
       assert.match(blocked.payload.error || '', /30분/, '틀린 가입 코드 20번 뒤에는 30분 쉬어야 합니다.');
       await codeCall('/api/signup', { method: 'POST', status: 429, body: { code: entry.code, username: 'blocked_join', password: 'Blocked123!', display_name: '막힘' } });
-      const joined = await client(boot())('/api/signup', { method: 'POST', body: { code: entry.code, username: 'cf_code_join', password: 'CfJoin123!', display_name: '코드가입' } });
+      const joined = await client(bootSide())('/api/signup', { method: 'POST', body: { code: entry.code, username: 'cf_code_join', password: 'CfJoin123!', display_name: '코드가입' } });
       assert.equal(joined.payload.class_name, '고1A', '맞는 가입 코드로 운영 서버에서 가입되어야 합니다.');
       assert.ok(!JSON.stringify(joined.payload).includes(entry.code), '가입 응답에 코드가 없어야 합니다.');
     }
@@ -251,7 +223,9 @@ export async function runCloudflareCheck() {
     // V13.99: when the backup last succeeded (kept in ctx.storage) and how it is stored.
     const lastOk = health.payload.storage.supabase_last_ok_at;
     assert(Number.isFinite(lastOk) && lastOk > 0 && lastOk <= Date.now(), `V13.99 상태 점검에서 마지막 백업 성공 시각을 보여야 합니다: ${lastOk}`);
-    assert.equal(storage.kv.get('supabase_last_ok_at'), lastOk, 'V13.99 마지막 백업 성공 시각은 ctx.storage에 저장해야 합니다.');
+    // V13.144: 따로 쓰지 않고, 백업이 어차피 쓰는 meta 한 줄에 같이 둔다.
+    assert.equal(createLocalRepository(storage).status().okAt, lastOk, 'V13.99 마지막 백업 성공 시각은 로컬 meta에 저장해야 합니다.');
+    assert.equal(storage.kv.has('supabase_last_ok_at'), false, 'V13.144 마지막 백업 시각을 위해 줄을 따로 쓰지 않아야 합니다.');
     assert.equal(health.payload.storage.supabase_backup_mode, 'full', 'V13.99 상태 점검에서 백업 방식(full)을 보여야 합니다.');
 
     // 5. Restart with changes Supabase has not received: local wins, then uploads.
@@ -329,7 +303,10 @@ export async function runCloudflareCheck() {
       await object.sync.run();
       partsStore.patches = [];
       await call(`/api/practice/${run.payload.id}/answer`, { method: 'POST', cookie: partsCookie, body: { question_id: run.payload.question_id, answer: '__parts__' } });
+      const rowsBeforeSync = storage.rowsWritten;
       await object.sync.run();
+      // V13.144: 파트 백업 한 번이 로컬에 쓰는 줄은 해시 한 줄 + meta 한 줄뿐(예전: 바뀐 파트마다 한 줄 + meta 여러 줄 + 성공 시각 2줄).
+      assert(storage.rowsWritten - rowsBeforeSync <= 2, `V13.144 파트 백업은 로컬에 2줄 이하로 써야 합니다: ${storage.rowsWritten - rowsBeforeSync}`);
       const sent = partsStore.patches.flatMap(patch => patch.keys);
       assert(sent.length > 0 && sent.every(key => key.includes('student-preserved') || key.startsWith('o:')), `답 하나에는 그 학생의 파트만 올라가야 합니다: ${sent.join(', ')}`);
       assert(!sent.includes('k:profiles') && !sent.some(key => key.startsWith('a:sessions:')), '바뀌지 않은 파트는 다시 올리지 않아야 합니다.');
@@ -377,7 +354,7 @@ export async function runCloudflareCheck() {
 
 // pathToFileURL: a hand-built `file://${path}` never matches on Windows, which made this check exit 0 without running.
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  runCloudflareCheck().then(runBattleRoomChecks).then(runDungeonRoomChecks).catch(error => {
+  runCloudflareCheck().then(runWriteBudgetChecks).then(runBattleRoomChecks).then(runDungeonRoomChecks).catch(error => {
     console.error('[cloudflare-check] FAIL', error);
     process.exitCode = 1;
   });
