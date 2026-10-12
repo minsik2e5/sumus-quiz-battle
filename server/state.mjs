@@ -40,12 +40,12 @@ export function stateSizeReport(state) {
 }
 
 export function emptyState() {
-  return { schema_version: 18, schools: structuredClone(DEFAULT_SCHOOLS), profiles: [], tokens: [], sessions: [], mastery: {}, grammarProgress: {}, meaningAliases: {}, meaningAliasMeta: {}, meaningDisputes: [], assignments: [], exams: [], examAttempts: [], practices: [], extraBooks: [], battles: [], tournaments: [], battleSettings: { cross_school: true } };
+  return { schema_version: 18, schools: structuredClone(DEFAULT_SCHOOLS), profiles: [], tokens: [], sessions: [], mastery: {}, grammarProgress: {}, meaningAliases: {}, meaningAliasMeta: {}, meaningDisputes: [], assignments: [], exams: [], examAttempts: [], practices: [], extraBooks: [], battles: [], tournaments: [], rewardEvents: [], battleSettings: { cross_school: true } };
 }
 
 export function migrateState(state) {
   let changed = false;
-  for (const key of ['profiles', 'tokens', 'sessions', 'assignments', 'exams', 'examAttempts', 'practices', 'extraBooks', 'meaningDisputes', 'battles', 'tournaments']) {
+  for (const key of ['profiles', 'tokens', 'sessions', 'assignments', 'exams', 'examAttempts', 'practices', 'extraBooks', 'meaningDisputes', 'battles', 'tournaments', 'rewardEvents']) {
     if (!Array.isArray(state[key])) { state[key] = []; changed = true; }
   }
   // V13.125: 다른 학교와 야차전 허용 starts on; a state from before has no switch yet.

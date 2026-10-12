@@ -17,6 +17,7 @@ import { openClassTv } from './modules/class-tv.js';
 import { mountArcade, attendanceMoment } from './modules/arcade.js';
 import { LUCKY_BETS, ATTENDANCE_REWARDS, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_COINS, STUDY_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX, GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS } from './modules/rewards.js';
 import { TITLE_COINS } from './modules/titles.js';
+import { rewardEventModal } from './modules/reward-events-ui.js';
 import { EGG_PRICE } from './modules/core.js';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
@@ -905,6 +906,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'notice-close') { try { localStorage.setItem('sumus:notice-closed', d.id); } catch {} return renderKeepScroll(); }
     if (d.action === 'legend-close') { try { localStorage.setItem('sumus:legend-closed', d.id); } catch {} return renderKeepScroll(); }
     if (d.action === 'notice') return noticeModal();
+    if (d.action === 'reward-events') return rewardEventModal(A);
     if (d.action === 'install-qr') { window.open('/install?qr=1', '_blank', 'noopener'); return; }
     if (d.starPractice) return openStarPractice();
     if (d.action === 'partner-flip') {
@@ -1399,10 +1401,12 @@ async function attend(button) {
 }
 function walletModal() {
   const g = A.data.stats, today = Number(g.today_study_points ?? g.today_reward_points ?? 0), C = STUDY_COINS;
+  // V13.142: 학습 보상 이벤트 중에는 하루 학습 코인 한도도 배율만큼(server/reward-events.mjs).
+  const ev = A.data.reward_event, cap = ev ? Math.floor(C.cap * Number(ev.multiplier || 1)) : C.cap;
   const close = modal(`<div class="wallet-v1366">
     <div class="wallet-top">${coin()}<div><small>내 코인</small><strong>${num(g.points_balance || 0)}<span>코인</span></strong></div></div>
     <p class="wallet-note"><b>경험치와 코인은 달라요.</b> 경험치는 맞힐수록 쌓여서 레벨·펫 성장·랭킹에 쓰이고, 코인은 모아서 쓰는 돈이에요.</p>
-    <div class="wallet-today"><div class="row"><span>오늘 공부로 모은 코인</span><b>${num(today)} / ${C.cap}</b></div><div class="wallet-bar"><i style="width:${Math.min(100, Math.round(today / C.cap * 100))}%"></i></div><small class="wallet-rule-v1373">끝까지 풀고, 정답률 ${Math.round(C.min_accuracy * 100)}% 이상일 때 받아요</small></div>
+    <div class="wallet-today"><div class="row"><span>오늘 공부로 모은 코인</span><b>${num(today)} / ${cap}</b></div><div class="wallet-bar"><i style="width:${Math.min(100, Math.round(today / cap * 100))}%"></i></div><small class="wallet-rule-v1373">끝까지 풀고, 정답률 ${Math.round(C.min_accuracy * 100)}% 이상일 때 받아요${ev ? ` · 🎉 이벤트 중이라 하루 ${cap}개까지` : ""}</small></div>
     <h3>모으는 법</h3>
     <ul class="wallet-list">
       <li><span>학습 완료 (10·20·30문제)</span><b>+${C.t10}·${C.t20}·${C.t30}</b></li>
