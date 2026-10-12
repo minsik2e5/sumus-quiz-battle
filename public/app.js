@@ -259,19 +259,14 @@ function navigate(tab) {
 }
 function signupView(division = A.division) {
   A.role = 'student'; A.division = division;
-  const divisionName = division === 'middle' ? '중등부' : '고등부';
-  const schools = division === 'middle'
-    ? [{ id:'wonil-middle', name:'원일중' }]
-    : [{ id:'danwon-high', name:'단원고' }, { id:'seonbu-high', name:'선부고' }, { id:'gangseo-high', name:'강서고' }];
-  const classes = division === 'middle' ? ['중2','중3'] : ['고1A','고1B'];
+  // V13.141: 학교·반은 선생님이 준 반별 가입 코드로 정해진다(고정 학교 목록 없음).
   $('#app').innerHTML = `<div class="auth auth-v1327"><form class="auth-form auth-card-v1327 signup-card-v1332" id="signup-form">
     <div class="auth-hero-v1330"><img src="/sumus-logo-green.svg" alt="SUMUS VOCA"><h1>SUMUS <em>VOCA</em></h1><p>나만의 학습 계정을 만들어요</p></div>
     <button type="button" class="auth-back-student" data-back-login>← 로그인으로</button>
-    <div class="division-segment auth-division-v1327"><button type="button" data-signup-division="middle" class="${division === 'middle' ? 'selected' : ''}">중등부</button><button type="button" data-signup-division="high" class="${division === 'high' ? 'selected' : ''}">고등부</button></div>
-    <div class="auth-title-v1327"><span>JOIN SUMUS</span><h1>학생 회원가입</h1><p>${divisionName} 학교와 반을 선택해 주세요.</p></div>
-    <div class="signup-grid-v1332">
-      <label class="field"><span>학교</span><select name="school_id" required>${schools.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select></label>
-      <label class="field"><span>학년 / 반</span><select name="class_name" required>${classes.map(x=>`<option value="${x}">${x}</option>`).join('')}</select></label>
+    <div class="auth-title-v1327"><span>JOIN SUMUS</span><h1>학생 회원가입</h1><p>선생님께 받은 가입 코드를 넣어 주세요.</p></div>
+    <div class="signup-code-v13141">
+      <label class="field"><span>가입 코드</span><div class="signup-code-row"><input name="code" required maxlength="12" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="예: K7M2QX"><button type="button" class="btn" id="signup-code-check">확인</button></div></label>
+      <div class="signup-code-result" id="signup-code-result" aria-live="polite"></div>
     </div>
     <div class="auth-fields-v1327">
       <label class="field"><span>이름</span><input name="display_name" placeholder="학생 이름" required maxlength="40"></label>
@@ -286,12 +281,23 @@ function signupView(division = A.division) {
     e.preventDefault(); const b = $('[type="submit"]', e.currentTarget); buttonBusy(b); $('#signup-error').textContent = '';
     try {
       const values = Object.fromEntries(new FormData(e.currentTarget));
-      await api('/signup', { ...values, division });
-      const login = await api('/login', { username: values.username, password: values.password, role:'student', division });
-      A.role = login.profile?.role || 'student'; A.division = division; await refresh(); preferences(); A.tab = A.data.profile.avatar_key ? 'home' : 'studio'; render(); startPolling();
+      const joined = await api('/signup', values);
+      const joinedDivision = joined.division || division;
+      const login = await api('/login', { username: values.username, password: values.password, role:'student', division: joinedDivision });
+      A.role = login.profile?.role || 'student'; A.division = joinedDivision; await refresh(); preferences(); A.tab = A.data.profile.avatar_key ? 'home' : 'studio'; render(); startPolling();
     } catch (err) { $('#signup-error').textContent = err.message; buttonBusy(b, false); }
   };
-  $$('[data-signup-division]').forEach(b => b.onclick = () => signupView(b.dataset.signupDivision));
+  const codeInput = $('[name="code"]'), codeResult = $('#signup-code-result');
+  const showCode = (text, ok) => { codeResult.textContent = text; codeResult.className = 'signup-code-result' + (ok ? ' ok' : text ? ' bad' : ''); };
+  codeInput.addEventListener('input', () => { const v = codeInput.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); if (v !== codeInput.value) codeInput.value = v; showCode('', false); });
+  $('#signup-code-check').onclick = async e => {
+    const button = e.currentTarget; // await 뒤에는 e.currentTarget이 비므로 먼저 잡아 둔다.
+    if (!codeInput.value.trim()) { showCode('가입 코드를 확인해 주세요.', false); codeInput.focus(); return; }
+    buttonBusy(button);
+    try { const found = await api('/signup/check', { code: codeInput.value }); showCode(`${found.school} · ${found.class_name}`, true); }
+    catch (err) { showCode(err.message, false); }
+    finally { buttonBusy(button, false); }
+  };
   $('[data-back-login]').onclick = () => loginView('student', division);
   $('#toggle-signup-password').onclick = e => { const input = $('[name="password"]'); input.type = input.type === 'password' ? 'text' : 'password'; e.currentTarget.textContent = input.type === 'password' ? '보기' : '숨기기'; };
 }
@@ -680,6 +686,7 @@ $('#app').addEventListener('click', async event => {
       if (d.go === 'ranking' && d.rankGrade) { A.rankScope = d.rankGrade; A.rankPeriod = 'week'; A.rankMode = 'xp'; savePreferences(); }
       // V13.123: the dashboard 실전시험 panel opens the results page on that tab.
       if (d.go === 'results' && d.resultsView) { A.resultsView = d.resultsView; A.resultsLimit = 30; }
+      if (d.go === 'students' && d.studentQuick !== undefined) A.studentQuick = d.studentQuick;
       return navigate(d.go);
     }
     if (d.action === 'student-preview' && A.data.profile.role === 'teacher') {
@@ -818,6 +825,22 @@ $('#app').addEventListener('click', async event => {
     if (d.careAll !== undefined) { A.careAll = !A.careAll; renderKeepScroll(); return; }
     if (d.giftTo) return giftModal([d.giftTo]);
     if (d.action === 'gift-care') return giftModal(careIds(A, d.care));
+    // V13.141 반별 가입 코드(새 코드 만들기·켜기/끄기)와 새로 가입한 학생 이름·반 고치기.
+    if (d.signupCodeNew || d.signupCodeToggle) {
+      const [school_id, class_name] = (d.signupCodeNew || d.signupCodeToggle).split('|');
+      const row = (A.data.signup_codes || []).find(r => r.school_id === school_id && r.class_name === class_name);
+      if (d.signupCodeNew && row?.code && !confirm(`${row.school} ${class_name}의 새 가입 코드를 만들까요?
+지금 코드(${row.code})로는 더 이상 가입할 수 없어요.`)) return;
+      const payload = d.signupCodeNew ? { school_id, class_name, regenerate: true } : { school_id, class_name, active: !row?.active };
+      buttonBusy(b);
+      try { await api('/teacher/signup-codes', payload); await refresh(); renderKeepScroll(); toast(d.signupCodeNew ? '새 가입 코드를 만들었어요.' : payload.active ? '이 반 가입을 켰어요.' : '이 반 가입을 껐어요.'); } catch (err) { toast(err.message); buttonBusy(b, false); }
+      return;
+    }
+    if (d.newStudentSave) {
+      const tr = b.closest('[data-new-row]'); buttonBusy(b);
+      try { await api('/students/' + d.newStudentSave, { display_name: $('.new-name', tr).value, class_name: $('.new-class', tr).value }, 'PATCH'); await refresh(); renderKeepScroll(); toast('학생 정보를 저장했어요.'); } catch (err) { toast(err.message); buttonBusy(b, false); }
+      return;
+    }
     if (d.studentQuick !== undefined) { A.studentQuick = d.studentQuick; $('#student-table').innerHTML = studentFiltered(A); return; }
     if (d.studentSort) {
       A.studentSortDir = A.studentSort === d.studentSort ? (A.studentSortDir === 'asc' ? 'desc' : 'asc') : (d.studentSort === 'name' ? 'asc' : 'desc');
@@ -1351,7 +1374,7 @@ function studentModal(id) {
   const wordMastery = A.data.word_mastery?.[id] || {};
   const schoolOptions = A.data.schools.map(s => `<option value="${esc(s.id)}" ${s.id === p.school_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   const classOptions = [...new Set([...activeClassOptions(), p.class_name].filter(Boolean))].map(c => `<option value="${esc(c)}" ${c === p.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('');
-  const close = modal(`<h2>${esc(p.display_name)}</h2><p>${esc(p.class_name)} · ${p.school} · ${esc(p.username)}</p><div class="detail-grid"><div><b>${p.stats.today_total}문제</b><small>오늘 학습량</small></div><div><b>${p.stats.accuracy}%</b><small>연습 정답률</small></div><div><b>${p.stats.weak}개</b><small>취약 단어</small></div><div><b>${attempts.length}회</b><small>실전시험 응시</small></div></div><div class="sumus-detail-section"><h3>시험범위 정복</h3><div class="detail-grid"><div><b>${wordMastery.mastered || 0}/${wordMastery.total_ranges || 0}</b><small>단어 MASTER</small></div><div><b>${wordMastery.conquest || 0}%</b><small>단어 정복도</small></div><div><b>${grammarMastered}</b><small>어법 MASTER</small></div><div><b>${grammarItems.length}</b><small>어법 학습 지문</small></div></div><p class="sumus-account-note">${grammarRecent ? `최근 어법 학습 ${date(grammarRecent.updated_at)}` : '어법·어휘 학습 기록 없음'}</p></div><form id="student-update"><label class="field"><span>학교 변경</span><select name="school_id">${schoolOptions}</select></label><label class="field"><span>반 변경</span><select name="class_name" required>${classOptions}</select></label><label class="field"><span>새 비밀번호 (변경할 때만)</span><input name="password" type="password" minlength="8" autocomplete="new-password" placeholder="8자 이상"></label><label class="checkbox-line"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}>계정 활성화</label><div class="form-error" id="update-error" role="alert"></div><button class="btn primary full" type="submit">변경 저장</button><div class="sumus-account-actions"><button class="btn" type="button" id="student-quick-reset">비밀번호 12345678로 재설정</button><button class="btn sumus-danger" type="button" id="student-quick-delete">학생 계정 삭제</button></div></form>`, '학생 정보');
+  const close = modal(`<h2>${esc(p.display_name)}</h2><p>${esc(p.class_name)} · ${p.school} · ${esc(p.username)}</p><div class="detail-grid"><div><b>${p.stats.today_total}문제</b><small>오늘 학습량</small></div><div><b>${p.stats.accuracy}%</b><small>연습 정답률</small></div><div><b>${p.stats.weak}개</b><small>취약 단어</small></div><div><b>${attempts.length}회</b><small>실전시험 응시</small></div></div><div class="sumus-detail-section"><h3>시험범위 정복</h3><div class="detail-grid"><div><b>${wordMastery.mastered || 0}/${wordMastery.total_ranges || 0}</b><small>단어 MASTER</small></div><div><b>${wordMastery.conquest || 0}%</b><small>단어 정복도</small></div><div><b>${grammarMastered}</b><small>어법 MASTER</small></div><div><b>${grammarItems.length}</b><small>어법 학습 지문</small></div></div><p class="sumus-account-note">${grammarRecent ? `최근 어법 학습 ${date(grammarRecent.updated_at)}` : '어법·어휘 학습 기록 없음'}</p></div><form id="student-update"><label class="field"><span>이름</span><input name="display_name" value="${esc(p.display_name)}" required maxlength="40"></label><label class="field"><span>학교 변경</span><select name="school_id">${schoolOptions}</select></label><label class="field"><span>반 변경</span><select name="class_name" required>${classOptions}</select></label><label class="field"><span>새 비밀번호 (변경할 때만)</span><input name="password" type="password" minlength="8" autocomplete="new-password" placeholder="8자 이상"></label><label class="checkbox-line"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}>계정 활성화</label><div class="form-error" id="update-error" role="alert"></div><button class="btn primary full" type="submit">변경 저장</button><div class="sumus-account-actions"><button class="btn" type="button" id="student-quick-reset">비밀번호 12345678로 재설정</button><button class="btn sumus-danger" type="button" id="student-quick-delete">학생 계정 삭제</button></div></form>`, '학생 정보');
   $('#student-update').onsubmit = async e => { e.preventDefault(); const v = Object.fromEntries(new FormData(e.currentTarget)); try { await api('/students/' + id, { ...v, active: v.active === 'on' }, 'PATCH'); close(); await refresh(); render(); toast('학생 정보를 저장했어요.'); } catch (err) { $('#update-error').textContent = err.message; } };
   $('#student-quick-reset').onclick = async e => { if (!confirm(p.display_name + ' 학생의 비밀번호를 12345678로 재설정할까요?')) return; buttonBusy(e.currentTarget); try { await api('/students/' + id, { password: '12345678' }, 'PATCH'); toast('비밀번호를 12345678로 재설정했어요.'); } catch (err) { toast(err.message); } finally { buttonBusy(e.currentTarget, false); } };
   $('#student-quick-delete').onclick = async e => { if (!confirm(p.display_name + ' 학생 계정을 삭제할까요?\n연습 기록과 시험 기록도 함께 삭제됩니다.')) return; buttonBusy(e.currentTarget); try { await api('/students/' + id, {}, 'DELETE'); close(); await refresh(); render(); toast('학생 계정을 삭제했어요.'); } catch (err) { toast(err.message); buttonBusy(e.currentTarget, false); } };

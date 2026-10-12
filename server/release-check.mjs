@@ -26,6 +26,7 @@ import { runDungeonLobbyChecks } from './dungeon-lobby-check.mjs';
 import { runYachaTabChecks } from './yacha-tab-check.mjs';
 import { runStabilityChecks } from './stability-check.mjs';
 import { runStorageTrimChecks } from './storage-trim-check.mjs';
+import { runSignupCodeChecks } from './signup-code-check.mjs';
 import { compactSession, migrateState, stateSizeReport } from './state.mjs';
 import { openGrammarChoiceSample } from '../public/grammar-choice-sample.js';
 
@@ -85,7 +86,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.139.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.141.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -149,9 +150,10 @@ export async function runReleaseCheck() {
     assert(grade('write_meaning', '감소', { word: 'decline', meaning: '감소하다', accepted_meanings: ['감소'] }), 'teacher-approved cross-part-of-speech exception remains valid');
 
     const state = emptyState();
+    // V13.141: 학교·반은 반별 가입 코드로 정해진다.
+    const wonilMiddle3 = state.signupCodes.find(item => item.school_id === 'wonil-middle' && item.class_name === '중3').code;
     const selfSigned = await selfSignup(state, {
-      username: 'qa_signup', password: 'QaSignup123!', display_name: '가입테스트', class_name: '중3',
-      school_id: 'wonil-middle', division: 'middle'
+      username: 'qa_signup', password: 'QaSignup123!', display_name: '가입테스트', code: wonilMiddle3
     });
     assert(selfSigned.ok === true && selfSigned.division === 'middle' && selfSigned.class_name === '중3', 'student self-signup creates a middle-school account');
     const selfSignupLogin = await service(state, 'POST', '/login', {
@@ -161,8 +163,7 @@ export async function runReleaseCheck() {
     const selfSignupBootstrap = await service(state, 'GET', '/bootstrap', {}, selfSignupLogin._cookie);
     assert(selfSignupBootstrap.profile.school_id === 'wonil-middle' && selfSignupBootstrap.profile.class_name === '중3', 'self-signup account keeps the selected school and class');
     await expectStatus(409, () => selfSignup(state, {
-      username: 'qa_signup', password: 'QaSignup123!', display_name: '중복가입', class_name: '중3',
-      school_id: 'wonil-middle', division: 'middle'
+      username: 'qa_signup', password: 'QaSignup123!', display_name: '중복가입', code: wonilMiddle3
     }), 'duplicate self-signup username is rejected');
     state.profiles.push({
       id: 'qa-teacher', role: 'teacher', username: 'qa_teacher', password_hash: await passwordHash('QaTeacher123!'),
@@ -1185,7 +1186,7 @@ export async function runReleaseCheck() {
     assert(!appJs.includes("id=\"account-school\"") && studentModule.includes('선생님 관리'), 'student self-service school change is removed');
     assert(v138Css.includes('.division-segment') && v138Css.includes('.dispute-card') && bundleCss.includes('.division-segment'), 'V13.8 division and dispute styles are bundled');
     assert(appJs.includes('data-division="middle"') && appJs.includes('/teacher/division') && appJs.includes('login.profile?.role'), 'login auto-detects role while teacher controls separate middle and high divisions');
-    assert(appJs.includes("$('[data-signup-division]').forEach"), 'signup division buttons use the multi-node helper so the signup form remains interactive');
+    assert(appJs.includes("$('#signup-code-check').onclick") && !appJs.includes('data-signup-division'), 'V13.141 signup picks school and class from the class signup code (no division buttons)');
     assert(teacherModule.includes('뜻 이의제기') && teacherModule.includes('data-dispute-global') && teacherModule.includes('data-dispute-once'), 'teacher meaning-dispute inbox is present');
     assert(sessionsModule.includes('이 답도 맞는 것 같아요') && sessionsModule.includes('/meaning-disputes'), 'meaning-writing student dispute buttons are present');
     assert(v139Css.includes('.rank-scope') && v139Css.includes('.my-rank-card') && bundleCss.includes('.rank-scope'), 'V13.9 academy ranking styles are bundled');
@@ -1203,7 +1204,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.139.0') && indexHtml.includes('/app.bundle.css?v=13.139.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.141.0') && indexHtml.includes('/app.bundle.css?v=13.141.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1224,7 +1225,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.139.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.141.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -1461,6 +1462,7 @@ export async function runReleaseCheck() {
     runYachaTabChecks(assert);
     await runStabilityChecks(assert);
     await runStorageTrimChecks(assert, expectStatus);
+    await runSignupCodeChecks(assert, expectStatus);
 
     console.log(`[release-check] PASS ${checks.length}/${checks.length}`);
     return { ok: true, count: checks.length };

@@ -80,5 +80,5 @@ export function runYachaTabChecks(assert) {
   assert(!/\.dg-friend/.test(source('../public/v13128.css')) && !/\.yb-friend/.test(source('../public/v1361.css') + source('../public/v1366.css')), 'V13.132 던전 초대 창에서 펫 그림을 가로로 늘리던 규칙(.dg-friend > div { flex: 1 })이 없다');
 
   /* ---------- 묶음 CSS ---------- */
-  assert(/"v13130\.css",\s*"v13132\.css"(,\s*"v13133\.css")?\s*]/.test(build), 'V13.132 v13132.css는 야차전 화면 CSS 중 맨 끝(앞 화면 CSS를 덮어쓰는 자리). V13.133 v13133.css는 던전 가로 안내 전용이라 그 뒤에 와도 된다');
+  assert(/"v13130\.css",\s*"v13132\.css"(,\s*"v13133\.css")?(,\s*"v1314\d\.css")*\s*]/.test(build), 'V13.132 v13132.css는 야차전 화면 CSS 중 맨 끝(앞 화면 CSS를 덮어쓰는 자리). V13.133 v13133.css는 던전 가로 안내 전용, V13.14x CSS(가입 코드 등)는 야차전과 겹치지 않아 그 뒤에 와도 된다');
 }

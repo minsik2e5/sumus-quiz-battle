@@ -31,7 +31,9 @@ export async function runStabilityChecks(assert) {
     const bad = files.filter(file => /(^|[^$\w])\$\('[^']*'\)\.(forEach|map|filter|some|every)\(/m.test(source(file)));
     assert(!bad.length, 'V13.137 $(…)에 forEach/map을 쓰지 않는다(요소 하나라서 오류): ' + bad.join(', '));
     const view = app.slice(app.indexOf('function signupView('), app.indexOf('function loginView('));
-    assert(view.indexOf("$('#signup-form').onsubmit") > 0 && view.indexOf("$('#signup-form').onsubmit") < view.indexOf("$$('[data-signup-division]')"), 'V13.137 회원가입 제출 처리를 맨 먼저 단다(뒤에서 오류가 나도 비밀번호가 주소창으로 가지 않게)');
+    // V13.141: 학교·반 버튼 대신 가입 코드 확인 버튼. 제출 처리는 여전히 다른 처리보다 먼저 단다.
+    const firstHandler = Math.min(...["$('#signup-code-check')", "$('[data-back-login]')", "$('#toggle-signup-password')", "addEventListener("].map(text => view.indexOf(text)).filter(index => index > 0));
+    assert(view.indexOf("$('#signup-form').onsubmit") > 0 && view.indexOf("$('#signup-form').onsubmit") < firstHandler, 'V13.137 회원가입 제출 처리를 맨 먼저 단다(뒤에서 오류가 나도 비밀번호가 주소창으로 가지 않게)');
     assert(app.includes("if (/[?&](password|username)=/.test(location.search)) history.replaceState(null, '', '/');"), 'V13.137 주소창에 남은 비밀번호(?password=)는 앱을 열자마자 지운다');
   }
 

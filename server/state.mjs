@@ -1,3 +1,5 @@
+import { seedSignupCodes } from './signup.mjs';
+
 export const DEFAULT_SCHOOLS = [
   { id: 'wonil-middle', name: '원일중', full_name: '원일중학교', division: 'middle', active: true, sort_order: 5 },
   { id: 'danwon-high', name: '단원고', full_name: '단원고등학교', division: 'high', active: true, sort_order: 10 },
@@ -40,7 +42,9 @@ export function stateSizeReport(state) {
 }
 
 export function emptyState() {
-  return { schema_version: 18, schools: structuredClone(DEFAULT_SCHOOLS), profiles: [], tokens: [], sessions: [], mastery: {}, grammarProgress: {}, meaningAliases: {}, meaningAliasMeta: {}, meaningDisputes: [], assignments: [], exams: [], examAttempts: [], practices: [], extraBooks: [], battles: [], tournaments: [], battleSettings: { cross_school: true } };
+  const state = { schema_version: 18, schools: structuredClone(DEFAULT_SCHOOLS), profiles: [], tokens: [], sessions: [], mastery: {}, grammarProgress: {}, meaningAliases: {}, meaningAliasMeta: {}, meaningDisputes: [], assignments: [], exams: [], examAttempts: [], practices: [], extraBooks: [], battles: [], tournaments: [], battleSettings: { cross_school: true } };
+  seedSignupCodes(state);
+  return state;
 }
 
 export function migrateState(state) {
@@ -137,6 +141,9 @@ export function migrateState(state) {
     const school = state.schools.find(item => item.id === dispute.school_id);
     if (school && dispute.division !== school.division) { dispute.division = school.division; changed = true; }
   }
+  // V13.141 반별 가입 코드: 코드가 없던 옛 state는 가입이 막힌 채로 시작하지 않게, 처음 한 번
+  // 기존 반마다 켜진 코드를 만들어 둔다(선생님이 학생 관리 화면에서 보고 나눠 준다).
+  if (!Array.isArray(state.signupCodes)) { seedSignupCodes(state); changed = true; }
   if (state.schema_version !== 18) { state.schema_version = 18; changed = true; }
   return changed;
 }
