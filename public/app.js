@@ -281,9 +281,7 @@ function signupView(division = A.division) {
     <div class="form-error" id="signup-error" role="alert"></div>
     <button class="btn primary full auth-submit-v1327" type="submit">회원가입하고 시작하기 ${icon('arrow')}</button>
   </form></div>`;
-  $('[data-signup-division]').forEach(b => b.onclick = () => signupView(b.dataset.signupDivision));
-  $('[data-back-login]').onclick = () => loginView('student', division);
-  $('#toggle-signup-password').onclick = e => { const input = $('[name="password"]'); input.type = input.type === 'password' ? 'text' : 'password'; e.currentTarget.textContent = input.type === 'password' ? '보기' : '숨기기'; };
+  // V13.137: 제출 처리를 맨 먼저 단다. 아래 줄에서 오류가 나도 폼이 주소창으로 비밀번호를 보내지 않게.
   $('#signup-form').onsubmit = async e => {
     e.preventDefault(); const b = $('[type="submit"]', e.currentTarget); buttonBusy(b); $('#signup-error').textContent = '';
     try {
@@ -293,6 +291,9 @@ function signupView(division = A.division) {
       A.role = login.profile?.role || 'student'; A.division = division; await refresh(); preferences(); A.tab = A.data.profile.avatar_key ? 'home' : 'studio'; render(); startPolling();
     } catch (err) { $('#signup-error').textContent = err.message; buttonBusy(b, false); }
   };
+  $$('[data-signup-division]').forEach(b => b.onclick = () => signupView(b.dataset.signupDivision));
+  $('[data-back-login]').onclick = () => loginView('student', division);
+  $('#toggle-signup-password').onclick = e => { const input = $('[name="password"]'); input.type = input.type === 'password' ? 'text' : 'password'; e.currentTarget.textContent = input.type === 'password' ? '보기' : '숨기기'; };
 }
 function loginView(role = A.role, division = A.division) {
   A.role = role; A.division = division;
@@ -1667,6 +1668,8 @@ if (tvToken) {
   A.screen = 'class-tv';
   openClassTv(A, () => location.replace('/'), { token: classTvToken });
 } else {
+// V13.137: 고장 난 회원가입 화면(V13.32~13.136)이 비밀번호를 주소창(?password=…)에 남겼다. 열자마자 지운다.
+if (/[?&](password|username)=/.test(location.search)) history.replaceState(null, '', '/');
 loginView();
 try {
   // Ask for the data directly: a 401 means "not logged in", so a separate
