@@ -172,7 +172,7 @@ function showExamResult(data) {
   $('#result-home').onclick = async () => { leaveSession(); A.tab = 'exam'; await refresh(); redraw(); };
   $('#result-answers')?.addEventListener('click', () => {
     $('#result-details').innerHTML = a.details.map((d, index) => `<div class="wrong-word"><span class="pill ${d.correct ? 'green' : 'red'}">${d.number}번 ${d.correct ? '정답' : '오답'}</span><p><b>${esc(d.word)}</b></p><p>${esc(d.meaning)}</p><small>내 답안: ${esc(d.answer || '미응답')}</small>${!d.correct && d.type === 'write_meaning' && d.answer ? `<button class="meaning-dispute-button" data-exam-dispute="${index}">🙋 이 답도 맞는 것 같아요</button>` : ''}</div>`).join('');
-    $('[data-exam-dispute]').forEach(button => button.addEventListener('click', async () => {
+    $$('[data-exam-dispute]').forEach(button => button.addEventListener('click', async () => {
       button.disabled = true;
       try {
         await api('/meaning-disputes', { source_type: 'exam', source_id: a.id, question_index: Number(button.dataset.examDispute) }, 'POST');

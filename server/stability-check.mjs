@@ -1,7 +1,7 @@
 // V13.129 서버 안정화 · 던전 버그 수정 검사. 바뀐 규칙마다 하나씩:
 // 저장할 때 상태를 한 번 더 복사하지 않기, 큰 요청 먼저 막기, 정리(sweep) 실패 격리, 푸시 시간 제한,
 // 학생별 요청 제한, 정산된 대결 보고는 복사 없이 끝내기, 배포 확인(버전), 던전 로비 · 기절 · 봇 · 화면 고침.
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
 import { emptyState } from './state.mjs';
@@ -21,6 +21,18 @@ export async function runStabilityChecks(assert) {
     const localSrc = readFileSync(new URL('./index.mjs', import.meta.url), 'utf8');
     assert(workerSrc.includes('const LOGIN_FAIL_MAX = 10;') && workerSrc.includes('const LOGIN_FAIL_WINDOW_MS = 5 * 60000;') && workerSrc.includes('if (result._cookie && loginKey) this.rates.delete(loginKey);') && !workerSrc.includes('15분 후 다시 시도'), 'V13.136 운영 서버: 맞게 로그인하면 기록을 지우고, 틀린 로그인만 5분에 10번까지(15분 잠금 없음)');
     assert(localSrc.includes("rateLimit(loginKey, 10, 5 * 60000,") && localSrc.includes('if (result._cookie && loginKey) rates.delete(loginKey);') && !localSrc.includes('15분 후 다시 시도'), 'V13.136 로컬 서버도 같은 로그인 규칙');
+  }
+
+  /* ---------- V13.137 회원가입 화면 고장 ---------- */
+  {
+    const app = source('../public/app.js');
+    const files = ['../public/app.js', ...readdirSync(fileURLToPath(new URL('../public/modules/', import.meta.url))).filter(name => name.endsWith('.js')).map(name => '../public/modules/' + name)];
+    // $는 요소 하나(querySelector), 여러 개는 $$. $('…').forEach는 화면 코드를 중간에서 멈추게 한다.
+    const bad = files.filter(file => /(^|[^$\w])\$\('[^']*'\)\.(forEach|map|filter|some|every)\(/m.test(source(file)));
+    assert(!bad.length, 'V13.137 $(…)에 forEach/map을 쓰지 않는다(요소 하나라서 오류): ' + bad.join(', '));
+    const view = app.slice(app.indexOf('function signupView('), app.indexOf('function loginView('));
+    assert(view.indexOf("$('#signup-form').onsubmit") > 0 && view.indexOf("$('#signup-form').onsubmit") < view.indexOf("$$('[data-signup-division]')"), 'V13.137 회원가입 제출 처리를 맨 먼저 단다(뒤에서 오류가 나도 비밀번호가 주소창으로 가지 않게)');
+    assert(app.includes("if (/[?&](password|username)=/.test(location.search)) history.replaceState(null, '', '/');"), 'V13.137 주소창에 남은 비밀번호(?password=)는 앱을 열자마자 지운다');
   }
 
   /* ---------- 저장: 상태를 한 번 더 복사하지 않는다 ---------- */
