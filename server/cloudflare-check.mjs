@@ -179,6 +179,22 @@ export async function runCloudflareCheck() {
       assert.match(locked.payload.error || locked.payload.message || '', /5분/, '틀린 시도가 10번 쌓이면 5분 쉬라고 알려야 합니다.');
     }
 
+    // V13.141: 가입 코드 확인은 로그인 없이 되고, 학교·반만 알려 준다. 틀린 코드는 같은 기기 30분에 20번까지.
+    {
+      const codeObject = boot(), codeCall = client(codeObject);
+      await codeObject.ready;
+      const entry = codeObject.mutations.current().state.signupCodes.find(item => item.school_id === 'gangseo-high' && item.class_name === '고1A');
+      const found = await codeCall('/api/signup/check', { method: 'POST', body: { code: entry.code } });
+      assert.deepEqual(found.payload, { ok: true, school: '강서고', class_name: '고1A', division: 'high' }, '맞는 가입 코드는 학교·반만 알려 줘야 합니다.');
+      for (let i = 0; i < 20; i++) await codeCall('/api/signup/check', { method: 'POST', status: 400, body: { code: 'ZZZZZZ' } });
+      const blocked = await codeCall('/api/signup/check', { method: 'POST', status: 429, body: { code: entry.code } });
+      assert.match(blocked.payload.error || '', /30분/, '틀린 가입 코드 20번 뒤에는 30분 쉬어야 합니다.');
+      await codeCall('/api/signup', { method: 'POST', status: 429, body: { code: entry.code, username: 'blocked_join', password: 'Blocked123!', display_name: '막힘' } });
+      const joined = await client(boot())('/api/signup', { method: 'POST', body: { code: entry.code, username: 'cf_code_join', password: 'CfJoin123!', display_name: '코드가입' } });
+      assert.equal(joined.payload.class_name, '고1A', '맞는 가입 코드로 운영 서버에서 가입되어야 합니다.');
+      assert.ok(!JSON.stringify(joined.payload).includes(entry.code), '가입 응답에 코드가 없어야 합니다.');
+    }
+
     const bootstrap = await call('/api/bootstrap', { cookie });
     assert.equal(bootstrap.payload.stats.points, 900, '기존 XP가 그대로 노출되어야 합니다.');
     assert.equal(bootstrap.payload.stats.practice_count, 1, '기존 학습 기록이 보존되어야 합니다.');

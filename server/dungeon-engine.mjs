@@ -7,7 +7,7 @@
 //
 // 수치는 server/dungeon-sim.mjs 시뮬레이션으로 3명 첫 도전 클리어율 60% · 35% · 10%에 맞춘 뒤,
 // 선생님 요청으로 제한 시간을 모두 1초 줄였다(52% · 18% · 1%).
-// 코인은 판 결과로 서버가 계산한다(dungeonReward, 학생·방이 정하지 않는다). V13.140: 지급 · 기록은 server/dungeon-records.mjs.
+// 코인은 판 결과로 서버가 계산한다(dungeonReward, 학생·방이 정하지 않는다). V13.143: 지급 · 기록은 server/dungeon-records.mjs.
 import { elementOf } from '../public/modules/battle-fx.js';
 
 export const DUNGEON = {
@@ -502,7 +502,7 @@ function finish(state, now, cleared) {
 // 결과는 끝날 때 메인 상태 객체에 한 번 보고한다. 같은 방·같은 시작 시각이면 같은 키라 두 번 지급되지 않는다.
 // 코인 (2026-10-09 선생님 확정): 단계별 처음 클리어 3등급 150 · 2등급 300 · 1등급 500(+ 칭호),
 // 반복 클리어는 하루 3회까지 정답 1개당 0.5 · 0.6 · 0.7코인, 한 판 최대 40 · 50 · 60.
-// V13.140 (제안, `node server/dungeon-sim.mjs coins` 표): 실패 위로는 도달한 층 × 4 · 5 · 6코인(정답 × 같은 단가,
+// V13.143 (제안, `node server/dungeon-sim.mjs coins` 표): 실패 위로는 도달한 층 × 4 · 5 · 6코인(정답 × 같은 단가,
 // 한 판 최대 40 · 50 · 60 안에서), 만점 모드 한 판은 도달 층 × 6(정답 × 0.7, 최대 60), 5층 단위로 처음 도달하면
 // 100 · 150 · 200 · 250 · 300(30층부터는 100씩. 시뮬레이션에서 5층 보스를 넘는 파티는 7%, 10층은 2%). 반복 · 위로 · 만점 한 판은 하루 3회를 같이 쓰고, 정답이 10개보다 적으면
 // 주지 않는다(가만히 있는 판 막기). 처음 클리어 · 5층 도달은 하루 횟수와 상관없다. 주간 1위 파티 코인은 칭호(dungeon-week).
@@ -528,7 +528,7 @@ export function dungeonCoins({ cut, cleared, first = false, right = 0, today = 0
   if (today >= DUNGEON_COINS.daily) return 0;
   return Math.min(DUNGEON_COINS.again_max[cut], Math.floor(Math.max(0, Number(right) || 0) * DUNGEON_COINS.per_right[cut]));
 }
-// V13.140 한 판의 보상 전체. 서버가 결과의 정답 수 · 도달 층 · 등급컷으로만 계산한다(방 · 학생이 정하지 않는다).
+// V13.143 한 판의 보상 전체. 서버가 결과의 정답 수 · 도달 층 · 등급컷으로만 계산한다(방 · 학생이 정하지 않는다).
 // `best`: 만점 모드에서 전에 도달한 최고 층. 돌려주는 것: { coins, items: [{ key, label, coins }], daily(하루 횟수를 썼는지), note }.
 export function dungeonReward({ cut, cleared, first = false, right = 0, reached = 0, today = 0, best = 0, reward = true }) {
   const C = DUNGEON_COINS, items = [];

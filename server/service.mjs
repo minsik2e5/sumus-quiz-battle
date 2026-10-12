@@ -15,6 +15,7 @@ import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn
 import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
+import { signupCodeRows, updateSignupCode } from './signup.mjs';
 import { createVapidKeys } from './push.mjs';
 import { pushState, pushView, addSubscription, removeSubscription, postNotice, noticeFor, postLegend, legendFor, eveningReminders } from './notify.mjs';
 import { seonbu44Correction } from './seonbu44-correction.mjs';
@@ -26,6 +27,7 @@ import { ybmParkSeonbuBooks } from './high-vocab-ybm-park-seonbu.mjs';
 import { compactSession } from './state.mjs';
 import { trimSummary, trimArchive, trimRecords, attemptTotal } from './storage-trim.mjs';
 import { DUNGEON, CUTS, CUT_KEYS, openCuts, DUNGEON_COINS } from './dungeon-engine.mjs';
+import { activeEventFor, studentEventView, teacherEventView, teacherOwns, keptEvents, createRewardEvent, endRewardEvent, deleteRewardEvent, eventCoins, eventXp } from './reward-events.mjs';
 import { dungeonQuestions } from './dungeon-words.mjs';
 import { settleDungeonRecords, dungeonBoardsView, dungeonLastView } from './dungeon-records.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
@@ -653,7 +655,7 @@ function settleTournamentMatch(state, b) {
 /* ---------- V13.128 던전 방 (docs/dungeon-design.md 2 · 9번) ---------- */
 // 파티 하나 = 던전 방 하나(cloudflare/dungeon-room.mjs). 이 상태에는 방 목록(초대 코드, 파티원, 입장표)만 두고,
 // 판은 방이 server/dungeon-engine.mjs로 돌린다. 방은 끝날 때(또는 아무도 시작하지 않고 닫힐 때) 결과를
-// 여기에 한 번 보고한다(settleDungeon, report_id로 두 번 처리하지 않는다). V13.140: 코인 · 기록 보드 · 칭호는 server/dungeon-records.mjs.
+// 여기에 한 번 보고한다(settleDungeon, report_id로 두 번 처리하지 않는다). V13.143: 코인 · 기록 보드 · 칭호는 server/dungeon-records.mjs.
 export const DUNGEON_LOBBY_MS = 15 * 60000;     // 방(로비)에서 15분 안에 시작하지 않으면 닫힌다(방이 보고한다)
 const DUNGEON_ABANDON_MS = 2 * 3600000;        // 그때까지 보고가 없는 방은 정리한다
 const DUNGEON_KEEP_MS = 7 * 86400000;          // 끝난 방 기록은 일주일만 둔다(상태가 계속 커지지 않게)
@@ -765,7 +767,7 @@ export function settleDungeon(state, report, now = Date.now()) {
     pet: x.pet && typeof x.pet === 'object' ? { key: String(x.pet.key || '').slice(0, 24), form: Math.max(0, Math.min(3, Math.floor(Number(x.pet.form) || 0))) } : null
   }));
   Object.assign(d, { status: 'finished', report_id: report.report_id, finished_at: now, result: { cleared: !!r.cleared, cut, size: players.length, reached: Math.max(0, Math.floor(Number(r.reached) || 0)), floor: Math.max(0, Math.floor(Number(r.floor) || 0)), time_ms: Math.max(0, Math.floor(Number(r.time_ms) || 0)), record: !!r.record, no_down: !!r.no_down, players } });
-  // V13.140 깬 등급컷 열기 · 코인(서버가 정답 수 · 층 · 등급컷으로 계산) · 기록 보드 · 칭호 숫자(server/dungeon-records.mjs).
+  // V13.143 깬 등급컷 열기 · 코인(서버가 정답 수 · 층 · 등급컷으로 계산) · 기록 보드 · 칭호 숫자(server/dungeon-records.mjs).
   const { board, rewards } = settleDungeonRecords(state, d, now);
   Object.assign(d.result, { board, rewards });
   return true;
@@ -1263,10 +1265,14 @@ export async function service(state, method, path, body, token, options = {}) {
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
+      // V13.142 학습 보상 이벤트: 학생에게는 지금 자기에게 걸린 진행 중 이벤트 하나만.
+      reward_event: teacher ? null : studentEventView(activeEventFor(state, p, now)),
       legend_news: teacher ? null : legendFor(state, studentSchool, now),
       push_reach: teacher && selectedSchool ? studentProfiles.filter(s => (state.push?.subs?.[s.id] || []).length).length : null,
       notices_sent: teacher && selectedSchool ? (state.push?.notices || []).filter(n => n.school_id === selectedSchool.id).slice(-5).reverse() : null,
       // V13.125: the 다른 학교와 야차전 switch (teacher), and the wording of the yacha screens (student).
+      // V13.141 반별 가입 코드: 선생님에게만, 지금 부서의 맡은 학교 반마다 한 줄.
+      signup_codes: teacher ? signupCodeRows(state, schools) : null,
       battle_settings: teacher ? { cross_school: battleCrossSchool(state) } : null,
       battle_cross_school: teacher ? null : battleCrossSchool(state),
       tournaments: (state.tournaments || []).filter(t => teacher ? t.school_id === selectedSchool?.id && (t.status !== 'cancelled' || now - (t.finished_at || t.created_at) < DAY_MS) : t.players.includes(p.id) && (t.status === 'active' || (t.status === 'finished' && now - (t.finished_at || 0) < 3 * DAY_MS)))
@@ -1554,6 +1560,23 @@ export async function service(state, method, path, body, token, options = {}) {
     push.prefs[p.id] = { ...(push.prefs[p.id] || {}), daily: body.daily !== false };
     return { push: pushView(state, p) };
   }
+  // V13.142 학습 보상 이벤트(server/reward-events.mjs): 선생님만 만들고 끝내고 지운다.
+  if (path === '/teacher/reward-events' || path.startsWith('/teacher/reward-events/')) {
+    requireRole(p, 'teacher');
+    const now = Date.now();
+    const list = () => keptEvents(state, now).filter(e => teacherOwns(p, e)).sort((a, b) => b.start_at - a.start_at).map(e => teacherEventView(state, e, now));
+    if (path === '/teacher/reward-events' && method === 'GET') return { events: list(), server_time: now };
+    if (path === '/teacher/reward-events' && method === 'POST') {
+      const event = createRewardEvent(state, p, body, { now, id: randomUUID() });
+      return { event: teacherEventView(state, event, now), events: list(), server_time: now };
+    }
+    const m = /^\/teacher\/reward-events\/([\w-]{1,64})\/(end|delete)$/.exec(path);
+    if (m && method === 'POST') {
+      if (m[2] === 'end') endRewardEvent(state, p, m[1], now); else deleteRewardEvent(state, p, m[1]);
+      return { events: list(), server_time: now };
+    }
+    fail('요청 방식을 확인해주세요.', 405);
+  }
   if (path === '/teacher/notice' && method === 'POST') {
     requireRole(p, 'teacher');
     const school = activeTeacherSchool(state, p);
@@ -1672,12 +1695,12 @@ export async function service(state, method, path, body, token, options = {}) {
     const d = openDungeonFor(state, p.id, now);
     const recent = (state.dungeons || []).filter(x => x.status === 'finished' && (x.members || []).includes(p.id)).sort((a, b) => b.finished_at - a.finished_at).slice(0, 5)
       .map(x => ({ id: x.id, cut: x.result.cut, cut_name: CUTS[x.result.cut]?.name || '', cleared: x.result.cleared, reached: x.result.reached, time_ms: x.result.time_ms, size: x.result.size, finished_at: x.finished_at }));
-    // V13.140 오늘 남은 보상 판(반복 · 위로 · 만점 한 판이 같이 쓴다)과 처음 클리어 코인.
+    // V13.143 오늘 남은 보상 판(반복 · 위로 · 만점 한 판이 같이 쓴다)과 처음 클리어 코인.
     const plays = p.dungeon?.day === dayKey(now) ? Number(p.dungeon.plays || 0) : 0;
     const reward = { daily: DUNGEON_COINS.daily, plays_left: Math.max(0, DUNGEON_COINS.daily - plays), first: DUNGEON_COINS.first, again_max: DUNGEON_COINS.again_max, max_floor: Number(p.dungeon?.max_floor || 0), clears: Number(p.dungeon?.clears || 0), coins: Number(p.dungeon?.coins || 0) };
     return { cuts: CUT_KEYS.map(key => ({ key, name: CUTS[key].name, open: open.includes(key), cleared: cleared.includes(key) })), room: d ? dungeonRoomView(state, d, p) : null, invites: dungeonInvitesFor(state, p, now), recent, pool_min: DUNGEON.POOL_MIN, reward };
   }
-  // V13.140 기록 보드(내 학년 · 등급컷 4 × 인원 2, 주간 · 역대 상위 10팀, 내 파티 최고 기록)와 방금 끝난 판의 보상.
+  // V13.143 기록 보드(내 학년 · 등급컷 4 × 인원 2, 주간 · 역대 상위 10팀, 내 파티 최고 기록)와 방금 끝난 판의 보상.
   if (path === '/dungeon/boards' && method === 'GET') {
     requireRole(p, 'student');
     return dungeonBoardsView(state, p, gradeOf(p.class_name), Date.now());
@@ -2053,6 +2076,13 @@ export async function service(state, method, path, body, token, options = {}) {
     const opened = openBattleRoom(state, p, school, 0, t.range_codes, now, { invite_id: opponentId, challenge: true, tournament_id: t.id, match_id: mine.match.id, label, mode: t.mode });
     return { ...opened, host: true, challenge: true, tournament: label, friend: opponent?.display_name || '' };
   }
+  // V13.141 반별 가입 코드: 새 코드 만들기(옛 코드는 바로 막힘) 또는 켜기/끄기.
+  if (path === '/teacher/signup-codes' && method === 'POST') {
+    requireRole(p, 'teacher');
+    const school = schoolByRef(state, body.school_id);
+    if (!school || !p.school_ids?.includes(school.id) || school.division !== activeTeacherDivision(p)) fail('현재 부서의 담당 학교를 확인해주세요.', 403);
+    return { code: updateSignupCode(state, school, str(body.class_name, 30), { regenerate: body.regenerate === true, active: typeof body.active === 'boolean' ? body.active : undefined }) };
+  }
   if (path === '/students' && method === 'POST') {
     requireRole(p, 'teacher');
     const school = schoolByRef(state, body.school_id || body.school);
@@ -2083,6 +2113,12 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!nextSchool || !p.school_ids?.includes(nextSchool.id) || nextSchool.division !== activeTeacherDivision(p)) fail('현재 부서의 담당 학교를 확인해주세요.', 403);
     const nextClass = str(body.class_name, 30) || student.class_name;
     if (!divisionClassAllowed(nextSchool.division, nextClass)) fail(`${divisionLabel(nextSchool.division)} 반을 선택해주세요.`);
+    // V13.141: 새로 가입한 학생의 이름도 선생님이 바로 고친다.
+    if (body.display_name !== undefined) {
+      const displayName = str(body.display_name, 40);
+      if (displayName.length < 2) fail('이름을 2자 이상 입력해주세요.');
+      student.display_name = displayName;
+    }
     if (typeof body.active === 'boolean') student.active = body.active;
     student.class_name = nextClass;
     if (student.school_id !== nextSchool.id) {
@@ -2716,7 +2752,7 @@ function removePracticeTimer(x) {
 // timer) with at least 60% of the answers right (STUDY_COINS in public/modules/rewards.js):
 // quitting midway or tapping at random pays no coins. XP for right answers is kept either way.
 const hadBonus = (sessions, label) => sessions.some(session => (session.reward_breakdown || []).some(item => item.label === label));
-function practiceReward(x, state, endedAt, answeredCount, perfect, { complete = true, correct = answeredCount } = {}) {
+function practiceReward(x, state, endedAt, answeredCount, perfect, { complete = true, correct = answeredCount, event = null } = {}) {
   // Rewards follow answers actually given, not the requested target: finishing
   // an empty practice must not earn points or keep a streak alive.
   if (answeredCount <= 0) return { points: 0, breakdown: [] };
@@ -2746,9 +2782,13 @@ function practiceReward(x, state, endedAt, answeredCount, perfect, { complete = 
     if (projected === 7) add('7일 연속 학습', C.streak7);
   }
 
-  const raw = breakdown.reduce((sum, item) => sum + item.points, 0);
+  // V13.142 학습 보상 이벤트(server/reward-events.mjs): 끝난 시각(서버 시간)에 걸린 이벤트만, 기본 코인에 배율을 곱한다.
+  const base = breakdown.reduce((sum, item) => sum + item.points, 0);
+  const boost = eventCoins(event, base, C.cap);
+  if (boost.line) breakdown.push(boost.line);
+  const raw = base + boost.bonus;
   const earnedToday = todaySessions.reduce((sum, session) => sum + Number(session.reward_points || 0), 0);
-  const available = Math.max(0, C.cap - earnedToday);
+  const available = Math.max(0, boost.cap - earnedToday);
   const points = Math.min(raw, available);
   if (points < raw) breakdown.push({ label: '일일 보상 한도 적용', points: points - raw });
   return { points, breakdown };
@@ -2774,10 +2814,18 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false } = {
   const perfect = score === 100 && wrongCount === 0 && unansweredCount === 0;
   // A timer that ran out counts as finished only with at least half of the words answered.
   const complete = natural || answerRecords.length >= scoreTotal || (autoSubmitted && answerRecords.length * 2 >= scoreTotal);
-  const reward = practiceReward(x, state, endedAt, answerRecords.length, perfect, { complete, correct: scoreCorrect });
+  // V13.142: the event in effect when the practice ended (server time). Coins: see practiceReward.
+  // 경험치 goes up only for a practice finished to its end (a practice left midway keeps its own 경험치).
+  const student = state.profiles.find(item => item.id === x.student_id);
+  const event = answerRecords.length ? activeEventFor(state, student, endedAt) : null;
+  const reward = practiceReward(x, state, endedAt, answerRecords.length, perfect, { complete, correct: scoreCorrect, event });
+  const xpBonus = complete ? eventXp(event, Number(x.xp || 0)) : 0;
+  const eventCoin = (reward.breakdown || []).find(item => item.event)?.points || 0;
+  x.xp = Number(x.xp || 0) + xpBonus;
   x.reward_points = reward.points;
   x.reward_breakdown = reward.breakdown;
   x.reward_note = reward.note || null;
+  x.reward_event = event && (eventCoin || xpBonus) ? { id: event.id, name: event.name, multiplier: event.multiplier, coins: eventCoin, xp: xpBonus } : null;
   const rec = {
     id: x.id,
     student_id: x.student_id,
@@ -2804,6 +2852,7 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false } = {
     reward_points: reward.points,
     reward_breakdown: reward.breakdown,
     ...(reward.note ? { reward_note: reward.note } : {}),
+    ...(x.reward_event ? { reward_event: x.reward_event } : {}),
     best_combo: x.best,
     duration_sec: Math.max(0, Math.round((endedAt - x.started_at) / 1000)),
     limit_sec: Number(x.duration_sec || 0),
@@ -2839,7 +2888,7 @@ function practiceView(x, state) {
     range_codes: x.range_codes || [], cover_all: !!x.cover_all, daily_quest: !!x.daily_quest, assignment_id: x.assignment_id || null,
     manual_selection: !!x.manual_selection, exam_style: !!x.exam_style, quest_mix: x.quest_mix || null, word_ids: [...(x.words || [])],
     covered: x.seen?.length || 0, total: x.total, correct: hideTestScore ? null : x.correct, score_total: x.finished ? scoreTotal : (x.score_total || 0), score_correct: hideTestScore ? null : scoreCorrect, score: hideTestScore ? null : score,
-    xp: hideTestScore ? null : x.xp, reward_points: x.finished ? Number(x.reward_points || 0) : undefined, reward_breakdown: x.finished ? (x.reward_breakdown || []) : undefined, reward_note: x.finished ? (x.reward_note || null) : undefined, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
+    xp: hideTestScore ? null : x.xp, reward_points: x.finished ? Number(x.reward_points || 0) : undefined, reward_breakdown: x.finished ? (x.reward_breakdown || []) : undefined, reward_note: x.finished ? (x.reward_note || null) : undefined, reward_event: x.finished ? (x.reward_event || null) : undefined, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
     started_at: x.started_at, finished_at: x.finished_at || null, ended_at: x.ended_at || null, finalized_at: x.finalized_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
     timer_mode: x.timer_mode || 'session', question_duration_sec: Number(x.question_duration_sec || 0), question_started_at: x.question_started_at || null, question_deadline: x.question_deadline || null,
     auto_submitted: !!x.auto_submitted,

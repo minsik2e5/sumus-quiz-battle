@@ -155,7 +155,7 @@ export function createCompetition(state, now = Date.now()) {
     gifts: p => Number(p?.gift_box?.count || 0),
     weekly_rank: (p, pid) => ctx.awards().weeklyRank.get(pid) || 0,
     league_king: (p, pid) => ctx.awards().leagueKings.has(pid) ? 1 : 0,
-    // V13.140 던전(server/dungeon-records.mjs): 클리어 · 등급컷 · 무사고 · 역대 1위 · 만점 최고 층, 지난주 보드 1위.
+    // V13.143 던전(server/dungeon-records.mjs): 클리어 · 등급컷 · 무사고 · 역대 1위 · 만점 최고 층, 지난주 보드 1위.
     ...Object.fromEntries(Object.keys(dungeonTitleStats(null)).map(stat => [stat, p => dungeonTitleStats(p)[stat]])),
     dungeon_week_king: (p, pid) => (kings ??= dungeonKings(state, now)).has(pid) ? 1 : 0,
     // V13.67 capsule-only titles: owned when the capsule was pulled.

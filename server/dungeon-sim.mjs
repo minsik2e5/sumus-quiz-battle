@@ -86,7 +86,7 @@ export function run(cut, party, random = Math.random, { grade = null, pets = nul
   return { boss: m ? { marks: m.marks, blocked: m.blocked, cores: m.cores, breaks: m.breaks, stage: m.stage, ms: s.finished_at - s.phase_at } : null, cleared: !!r.cleared, time_ms: r.time_ms || 0, floor: s.floor, downs: s.order.reduce((n, id) => n + s.players[id].downs, 0), accuracy: r.players ? r.players.reduce((n, p) => n + p.accuracy, 0) / r.players.length : 0, reached: r.reached || 0, rights: (r.players || []).map(p => p.right) };
 }
 
-// V13.140 코인: 반 학생 분포 파티로 `n`판을 돌려 한 학생이 받는 반복(이미 깬 등급컷) 코인을 센다(하루 첫 판 기준).
+// V13.143 코인: 반 학생 분포 파티로 `n`판을 돌려 한 학생이 받는 반복(이미 깬 등급컷) 코인을 센다(하루 첫 판 기준).
 // 만점 모드는 1등급 컷까지 깬 학생(아는 비율 평균 92%)으로 돌린다. 한 판 코인은 서버와 같은 dungeonReward.
 export function coinStudy(cut, size = 3, n = 200, seed = 21) {
   const random = seeded(seed * 104729 + CUTS[cut].order * 31 + size);

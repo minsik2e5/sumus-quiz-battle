@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto';
 import { migrateState, repository } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
 import { service, sweep } from './service.mjs';
-import { selfSignup } from './signup.mjs';
+import { selfSignup, checkSignupCode, signupCodeGuard } from './signup.mjs';
 import { examAdmin } from './exam-admin.mjs';
 import { createMutationCoordinator, NO_MUTATION } from './mutation-coordinator.mjs';
 const root = resolve(fileURLToPath(new URL('../public/', import.meta.url)));
@@ -97,9 +97,14 @@ const server = http.createServer(async (req, res) => {
         rateLimit(loginKey, 10, 5 * 60000, '비밀번호를 여러 번 틀렸어요. 5분 후 다시 시도해주세요.');
         rateLimit(address + ':all', 500, 15 * 60000, '요청이 많습니다. 잠시 후 다시 시도해주세요.');
       }
+      // V13.141: 틀린 가입 코드는 같은 기기에서 30분에 20번까지(맞은 시도는 세지 않는다).
+      const signupCodeTry = url.pathname === '/api/signup' || url.pathname === '/api/signup/check';
+      const countWrongCode = signupCodeTry ? signupCodeGuard(rates, address) : null;
+      const withCodeCount = async fn => { try { return await fn(); } catch (error) { countWrongCode?.(error); throw error; } };
       if (url.pathname === '/api/signup') {
         const username = String(body.username || '').trim().toLowerCase();
-        rateLimit(address + ':signup', 12, 30 * 60000, '회원가입 시도가 많습니다. 잠시 후 다시 시도해주세요.');
+        // 가입 코드가 막아 주므로, 한 교실(같은 와이파이)이 함께 가입할 수 있게 넉넉히 둔다.
+        rateLimit(address + ':signup', 60, 30 * 60000, '회원가입 시도가 많습니다. 잠시 후 다시 시도해주세요.');
         rateLimit(address + ':signup:' + username, 4, 30 * 60000, '같은 아이디로 가입 시도가 많습니다. 잠시 후 다시 시도해주세요.');
       }
       if (rates.size > 10000) for (const [k, values] of rates) if (values.at(-1) < Date.now() - 30 * 60000) rates.delete(k);
@@ -110,11 +115,13 @@ const server = http.createServer(async (req, res) => {
         return adminOutput !== undefined
           ? adminOutput
           : url.pathname === '/api/signup' && req.method === 'POST'
-            ? await selfSignup(state, body)
+            ? await withCodeCount(() => selfSignup(state, body))
             : await service(state, req.method, path, body, token);
       };
       const fastPracticeAnswer = req.method === 'POST' && /^\/api\/practice\/[^/]+\/answer$/.test(url.pathname);
-      const result = req.method === 'GET'
+      const result = url.pathname === '/api/signup/check'
+        ? await withCodeCount(() => checkSignupCode(mutations.current().state, body))
+        : req.method === 'GET'
         ? await execute(mutations.current().state)
         : fastPracticeAnswer
           ? await mutations.fast(execute)

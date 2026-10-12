@@ -11,6 +11,7 @@ import { shownTitle } from './league-ui.js';
 import { arcadePage, gachaBookPage, capsuleArt } from './arcade.js';
 import { petBookPage } from './petbook.js';
 import { ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, GACHA_ITEMS, GACHA_TIERS } from './rewards.js';
+import { rewardEventBanner } from './reward-events-ui.js';
 // V13.68 menu: what students do. 학습 holds word study, tests and records; 나 holds what they
 // collect. Pages without their own button light up the one they belong to.
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['yacha', '야차전', 'battle'], ['arcade', '놀이터', 'arcade'], ['me', '나', 'user']];
@@ -474,7 +475,7 @@ function homeRecommendations(A) {
 function home(A) {
   const p = A.data.profile;
   return `<div class="home-context home-context-v1327"><div><span>SUMUS VOCA</span><b>${esc(p.school || A.school || '학교 미설정')} · ${esc(p.class_name || '')}</b></div></div>
-    ${noticeBanner(A)}${legendBanner(A)}${pushPrompt(A)}
+    ${rewardEventBanner(A)}${noticeBanner(A)}${legendBanner(A)}${pushPrompt(A)}
     ${compactGrowth(A)}`;
 }
 // V13.77 선생님 공지 (shown for a few days, until the student closes it) and 알림.

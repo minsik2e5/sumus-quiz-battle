@@ -15,7 +15,7 @@ import { openFriendSheet } from './friend-sheet.js';
 // 펫 속성별 발사체와 메이플식으로 쌓이는 피해 숫자(dungeon-fx.js), 합동 필살 컷인, 전투 효과음(sound.js),
 // 문제 세 종류(뜻 고르기 · 영어 고르기 · 영어 쓰기). 쓰기는 누른 글자 하나씩 보내고 방이 채점한다.
 // 움직임 줄이기를 켠 폰에서는 효과를 그리지 않는다. A.screen === 'dungeon'일 때 #app을 쓴다.
-// V13.140 기록 · 보상: 결과 화면이 방의 보고가 처리되기를 기다렸다가(/dungeon/last) 받은 코인 · 새 칭호 · 신기록을 보여 주고,
+// V13.143 기록 · 보상: 결과 화면이 방의 보고가 처리되기를 기다렸다가(/dungeon/last) 받은 코인 · 새 칭호 · 신기록을 보여 주고,
 // 던전 입구에 '기록 보드' 탭(내 학년 · 등급컷 × 2 · 3인, 이번 주 · 역대 상위 10팀, 내 파티 최고 기록)을 둔다.
 
 const EMOTES = { cheer: '힘내!', help: '도와줘!', nice: '나이스!', gg: '수고했어!' };
@@ -968,7 +968,7 @@ function resultScreen(v) {
   loadResultReward(D.room?.id);
 }
 
-/* ---------- V13.140 기록 보드 ---------- */
+/* ---------- V13.143 기록 보드 ---------- */
 const tabsBar = () => `<div class="dg-tabs" role="tablist" aria-label="던전 메뉴"><button type="button" role="tab" class="dg-tab${D.tab !== 'board' ? ' on' : ''}" data-dg="tab" data-tab="enter" aria-selected="${D.tab !== 'board'}">⚔️ 입장</button><button type="button" role="tab" class="dg-tab${D.tab === 'board' ? ' on' : ''}" data-dg="tab" data-tab="board" aria-selected="${D.tab === 'board'}">🏆 기록 보드</button></div>`;
 async function openBoards(force = false) {
   D.tab = 'board';
@@ -1007,7 +1007,7 @@ function boardScreen() {
     </section>`);
 }
 
-/* ---------- V13.140 결과 화면 보상 · 신기록 ---------- */
+/* ---------- V13.143 결과 화면 보상 · 신기록 ---------- */
 // 방이 결과를 메인에 보고하고 처리될 때까지 잠깐 걸린다(몰리면 모아서 처리). 처리되면 보상을 그린다.
 async function loadResultReward(id, tries = 0) {
   const cur = D;

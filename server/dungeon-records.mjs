@@ -1,4 +1,4 @@
-// V13.140 던전 기록 · 보상 (docs/dungeon-design.md 7 · 8번). 방이 보고한 결과(settleDungeon)를 받아
+// V13.143 던전 기록 · 보상 (docs/dungeon-design.md 7 · 8번). 방이 보고한 결과(settleDungeon)를 받아
 //  1) 학생마다 코인(dungeonReward: 처음 클리어 · 반복 · 위로 · 만점 5층 도달)을 주고 하루 3회를 센다.
 //  2) 기록 보드(학년 × 등급컷 × 인원 2 · 3인, 주간 · 역대)에 넣는다. 봇이 끼거나 포기한 친구가 있는 판은 넣지 않는다
 //     (엔진 result.record). 보상은 받는다.

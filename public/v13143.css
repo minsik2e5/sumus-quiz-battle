@@ -1,4 +1,4 @@
-/* V13.140 던전 기록 · 보상: 입구 탭(입장 · 기록 보드), 보상 카드, 기록 보드, 결과 화면의 코인 · 새 칭호 · 신기록 연출 */
+/* V13.143 던전 기록 · 보상: 입구 탭(입장 · 기록 보드), 보상 카드, 기록 보드, 결과 화면의 코인 · 새 칭호 · 신기록 연출 */
 
 /* 입구 탭 */
 .dg-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; padding: 4px; border-radius: 16px; background: rgba(0, 0, 0, .28); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07); }
