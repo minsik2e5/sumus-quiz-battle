@@ -243,10 +243,8 @@ function dashboard(A) {
   const grammarUsed = grammar.touched > 0 || weak.choices.length > 0;
   // V13.75: the four numbers that need the teacher, one list of students to look after, the
   // class race, then what students sent. Grammar analysis folds away until there is data.
-  const joined = newSignups(d);
   return `
     ${kpiCards(A, care)}
-    <button type="button" class="new-signup-banner-v13141 ${joined.length ? '' : 'zero'}" data-go="students" data-student-quick="new">${icon('user')}<span><b>새로 가입한 학생 ${num(joined.length)}명</b><small>최근 7일 · ${joined.length ? '눌러서 이름과 반을 바로 고쳐요' : '반별 가입 코드는 학생 관리에 있어요'}</small></span>${icon('chevron')}</button>
     <div class="dash-grid-v1375">
       ${carePanel(A, care)}
       <div class="dash-side-v1375">${classLeaguePanel(d.class_league)}${examPanel(d)}</div>
@@ -286,12 +284,12 @@ function dashboard(A) {
   `;
 }
 // V13.75 학생 관리: quick filters, sortable columns, one compact row per student.
-const QUICK = [['', '전체'], ['new', '새로 가입'], ['today', '오늘 안 함'], ['week', '이번 주 미접속'], ['low', '정답률 60% 미만'], ['off', '일시 중지']];
+const QUICK = [['', '전체'], ['today', '오늘 안 함'], ['week', '이번 주 미접속'], ['low', '정답률 60% 미만'], ['off', '일시 중지']];
 const SORTS = { name: '이름', recent: '최근 활동', today: '오늘', week: '이번 주', accuracy: '정답률', weak: '취약 단어' };
 export function studentFiltered(A) {
   const d = A.data, q = (A.search || '').toLowerCase();
   const care = careGroups(d), work = weekWork(d);
-  const sets = { today: new Set(care.groups.today.map(p => p.id)), week: new Set(care.groups.week.map(p => p.id)), new: new Set(newSignups(d).map(p => p.id)) };
+  const sets = { today: new Set(care.groups.today.map(p => p.id)), week: new Set(care.groups.week.map(p => p.id)) };
   const quick = QUICK.some(([k]) => k === A.studentQuick) ? A.studentQuick : '';
   const pass = p => (!A.classFilter || p.class_name === A.classFilter) && `${p.display_name} ${p.username}`.toLowerCase().includes(q) && (
     !quick ? true : quick === 'off' ? !p.active : quick === 'low' ? p.active && p.stats.practice_count > 0 && p.stats.accuracy < 60 : sets[quick].has(p.id));
@@ -302,28 +300,14 @@ export function studentFiltered(A) {
   const th = (key, label) => `<th${key === 'accuracy' ? ' class="num"' : ''}><button type="button" data-student-sort="${key}" class="${sort === key ? 'on' : ''}" aria-label="${label}로 정렬">${label}${sort === key ? (dir > 0 ? ' ↓' : ' ↑') : ''}</button></th>`;
   const chips = `<div class="st-quick-v1375" role="group" aria-label="빠른 필터">${QUICK.map(([k, label]) => `<button type="button" data-student-quick="${k}" class="${quick === k ? 'on' : ''}">${label}<b>${count(k)}</b></button>`).join('')}</div>`;
   if (!d.profiles.length) return chips + empty('user', '등록된 학생이 없어요', '학생 등록으로 첫 계정을 만들어주세요.');
-  if (!list.length) return chips + (quick === 'new' ? empty('user', '최근 7일에 새로 가입한 학생이 없어요', '가입 코드로 가입한 학생이 여기에 나와요.') : empty('user', '조건에 맞는 학생이 없어요', '다른 필터를 골라 보세요.'));
-  // V13.141: 새로 가입한 학생은 이름·반을 이 자리에서 바로 고친다.
-  if (quick === 'new') return `${chips}<div class="table-scroll"><table class="student-ops-table new-signup-table-v13141"><thead><tr><th>이름</th><th>반</th><th>아이디</th><th>가입</th><th></th></tr></thead><tbody>${list.map(p => `<tr data-new-row="${p.id}"><td><input class="new-name" aria-label="${esc(p.display_name)} 이름" value="${esc(p.display_name)}" maxlength="40"></td><td><select class="new-class" aria-label="${esc(p.display_name)} 반">${[...new Set([...divisionClasses(A), p.class_name])].map(c => `<option ${c === p.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></td><td><small>${esc(p.username)}</small></td><td><small>${agoLabel(p.created_at)}</small></td><td class="st-act"><button type="button" class="btn small" data-new-student-save="${p.id}">저장</button></td></tr>`).join('')}</tbody></table></div><p class="st-count-v1375">최근 7일 동안 가입 코드로 가입한 학생 ${num(list.length)}명</p>`;
+  if (!list.length) return chips + empty('user', '조건에 맞는 학생이 없어요', '다른 필터를 골라 보세요.');
   return `${chips}<div class="table-scroll"><table class="student-ops-table st-table-v1375"><thead><tr>${th('name', '학생')}<th>반</th>${th('recent', '최근 활동')}${th('today', '오늘')}${th('week', '이번 주')}${th('accuracy', '정답률')}${th('weak', '취약 단어')}<th></th></tr></thead><tbody>${list.map(p => {
     const w = work.get(p.id), t = care.last.get(p.id) || 0, late = p.active && Date.now() - t >= 3 * DAY;
     return `<tr class="${p.active ? '' : 'off'}"><td class="tv2-cell-name"><button class="table-name" data-student="${p.id}">${avatar(p.avatar_key, { size: 'mini' })}<div><strong>${esc(p.display_name)}</strong><small>Lv.${p.stats.level} · ${esc(p.username)}${p.active ? '' : ' · 일시 중지'}</small></div></button></td><td data-label="반">${esc(p.class_name)}</td><td data-label="최근 활동"><span class="st-when ${late ? 'late' : ''}">${agoLabel(t)}</span></td><td data-label="오늘"><strong>${num(p.stats.today_total)}</strong><small>문제</small></td><td data-label="이번 주"><strong>${num(w?.total || 0)}</strong><small>문제 · ${num(w?.count || 0)}회</small></td><td data-label="정답률" class="num"><div class="stat-bar"><div class="progress"><i style="width:${p.stats.accuracy}%"></i></div><span class="${p.stats.practice_count && p.stats.accuracy < 60 ? 'lo' : ''}">${p.stats.practice_count ? `${p.stats.accuracy}%` : '-'}</span></div></td><td data-label="취약 단어">${num(p.stats.weak)}개</td><td class="st-act"><button type="button" class="icon-button st-gift" data-gift-to="${p.id}" aria-label="${esc(p.display_name)}에게 코인 선물" title="코인 선물">${icon('gift')}</button></td></tr>`;
   }).join('')}</tbody></table></div><p class="st-count-v1375">${num(list.length)}명 표시 · 이름을 누르면 기록과 계정 관리가 열려요</p>`;
 }
 function students(A) {
-  return `<div class="toolbar st-toolbar-v1375"><div class="search">${icon('search')}<input id="student-search" aria-label="학생 검색" placeholder="이름 또는 아이디 검색" value="${esc(A.search || '')}"></div><select id="class-filter" aria-label="반 필터"><option value="">전체 반</option>${[...new Set(A.data.profiles.map(p => p.class_name))].map(c => `<option ${c === A.classFilter ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select><button type="button" class="btn secondary gift-btn-v1373" data-action="gift">${icon('gift')} 코인 선물</button></div><section class="panel st-panel-v1375" id="student-table">${studentFiltered(A)}</section>${signupCodePanel(A)}`;
-}
-// V13.141 반별 가입 코드: 학생은 이 코드를 넣어야 가입할 수 있고, 코드가 학교·반을 정한다.
-// 꺼진 반이나 코드가 없는 반에는 가입이 안 된다. 새 코드를 만들면 옛 코드는 바로 못 쓴다.
-export function newSignups(d, now = Date.now()) { return (d.profiles || []).filter(p => p.self_signup && Number(p.created_at || 0) >= now - 7 * DAY); }
-function signupCodePanel(A) {
-  const rows = A.data.signup_codes || [];
-  return `<section class="panel signup-codes-v13141" id="signup-codes"><div class="panel-head"><div><h2>반별 가입 코드</h2><span>학생은 이 코드로 가입해요 · 학교와 반이 자동으로 정해져요</span></div></div>
-    ${rows.length ? `<div class="table-scroll"><table class="student-ops-table signup-code-table"><thead><tr><th>학교</th><th>반</th><th>가입 코드</th><th>가입</th><th></th></tr></thead><tbody>${rows.map(r => {
-      const key = `${esc(r.school_id)}|${esc(r.class_name)}`;
-      return `<tr class="${r.active ? '' : 'off'}"><td>${esc(r.school)}</td><td>${esc(r.class_name)}</td><td><code class="signup-code">${r.code ? esc(r.code) : '—'}</code></td><td>${r.code ? `<button type="button" class="signup-code-switch ${r.active ? 'on' : ''}" role="switch" aria-checked="${r.active}" data-signup-code-toggle="${key}" aria-label="${esc(r.school)} ${esc(r.class_name)} 가입 ${r.active ? '끄기' : '켜기'}"><i></i>${r.active ? '켜짐' : '꺼짐'}</button>` : '<small>코드 없음 · 가입 막힘</small>'}</td><td class="st-act"><button type="button" class="btn small secondary" data-signup-code-new="${key}">새 코드 만들기</button></td></tr>`;
-    }).join('')}</tbody></table></div>` : '<div class="v136-empty-line">맡은 학교가 없어요.</div>'}
-  </section>`;
+  return `<div class="toolbar st-toolbar-v1375"><div class="search">${icon('search')}<input id="student-search" aria-label="학생 검색" placeholder="이름 또는 아이디 검색" value="${esc(A.search || '')}"></div><select id="class-filter" aria-label="반 필터"><option value="">전체 반</option>${[...new Set(A.data.profiles.map(p => p.class_name))].map(c => `<option ${c === A.classFilter ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select><button type="button" class="btn secondary gift-btn-v1373" data-action="gift">${icon('gift')} 코인 선물</button></div><section class="panel st-panel-v1375" id="student-table">${studentFiltered(A)}</section>`;
 }
 const aliasSourceLabel = source => source === 'appeal' ? '학생 이의제기' : source === 'teacher' ? '선생님 추가' : '기존 허용답';
 export function vocabTable(A) {
