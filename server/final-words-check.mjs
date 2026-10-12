@@ -7,6 +7,7 @@ import { emptyState } from './state.mjs';
 import { passwordHash } from './auth.mjs';
 import { service, allBooks } from './service.mjs';
 import { ybmKimFinalBooks, YBM_KIM_FINAL_COUNTS } from './high-vocab-ybm-kim-final.mjs';
+import { ybmParkSeonbuBooks, YBM_PARK_SEONBU_COUNTS } from './high-vocab-ybm-park-seonbu.mjs';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 
@@ -29,10 +30,10 @@ export async function runFinalWordsChecks(assert) {
 
   /* ---------- 중간고사 / 기말고사 ---------- */
   const finals = books.filter(book => book.exam_period === 'final');
-  assert(finals.length === 4 && finals.every(book => book.id.includes(':final:')) && books.every(book => book.exam_period === 'final' || book.exam_period === 'midterm'), 'V13.112 모든 책은 중간고사(midterm) 또는 기말고사(final)이고, 기말고사는 이번 3·4과 책 4권뿐이다');
+  assert(finals.length === 5 && finals.every(book => book.id.includes(':final:')) && books.every(book => book.exam_period === 'final' || book.exam_period === 'midterm'), 'V13.112 모든 책은 중간고사(midterm) 또는 기말고사(final)이고, 기말고사는 3·4과 책 4권(단원고·강서고)과 선부고 2과 1권(V13.138)이다');
   const midterm = books.filter(book => book.exam_period === 'midterm');
   assert(midterm.some(book => book.school_id === 'danwon-high' && book.words.some(w => w.range_code === '24')) && midterm.some(book => book.school_id === 'danwon-high' && book.id === 'high:ybm-kim:common2:lesson1') && midterm.some(book => book.id === 'high:ybm-kim:gangseo:common2:lesson2') && midterm.some(book => book.school_id === 'seonbu-high') && midterm.some(book => book.division === 'middle'), 'V13.112 지금까지 있던 책(모의고사 번호 범위, 교과서 1~2과, 선부고, 중등부)은 모두 중간고사로 묶인다');
-  assert(!finals.some(book => book.school_id === 'seonbu-high' || book.division === 'middle'), 'V13.112 선부고와 중등부는 아직 기말고사 단어가 없다');
+  assert(!finals.some(book => book.division === 'middle') && finals.filter(book => book.school_id === 'seonbu-high').map(book => book.id).join() === 'high:ybm-park:seonbu:final:common2:lesson2', 'V13.112 중등부는 아직 기말고사 단어가 없고, 선부고 기말고사는 2과(V13.138)뿐이다');
   const extra = allBooks({ extraBooks: [{ id: 'x', school_id: 'danwon-high', school: '단원고', division: 'high', words: [] }, { id: 'y', school_id: 'danwon-high', school: '단원고', division: 'high', exam_period: 'final', words: [] }] });
   assert(extra.find(book => book.id === 'x').exam_period === 'midterm' && extra.find(book => book.id === 'y').exam_period === 'final', 'V13.112 선생님이 올린 책도 exam_period가 없으면 중간고사다');
 
@@ -44,13 +45,28 @@ export async function runFinalWordsChecks(assert) {
   for (const id of ['qa-fw-d', 'qa-fw-g', 'qa-fw-s']) tokens[id] = (await service(state, 'POST', '/login', { username: id, password: 'QaFinal1!', division: 'high' }, null))._cookie;
   const boot = Object.fromEntries(await Promise.all(Object.keys(tokens).map(async id => [id, await service(state, 'GET', '/bootstrap', {}, tokens[id])])));
   const rangesOf = (id, period) => [...new Set(boot[id].books.filter(book => book.exam_period === period).flatMap(book => book.words.map(w => w.range_code)))].sort().join();
-  assert(rangesOf('qa-fw-d', 'final') === 'L3,L4' && rangesOf('qa-fw-g', 'final') === 'L3,L4' && rangesOf('qa-fw-s', 'final') === '' && rangesOf('qa-fw-d', 'midterm').includes('L1') && rangesOf('qa-fw-d', 'midterm').includes('24') && !rangesOf('qa-fw-d', 'midterm').includes('L3') && boot['qa-fw-s'].books.every(book => book.exam_period === 'midterm'), 'V13.112 단원고·강서고 학생은 기말고사 L3·L4와 중간고사 범위를 따로 받고, 선부고 학생은 중간고사만 받는다');
+  assert(rangesOf('qa-fw-d', 'final') === 'L3,L4' && rangesOf('qa-fw-g', 'final') === 'L3,L4' && rangesOf('qa-fw-s', 'final') === 'L2' && rangesOf('qa-fw-d', 'midterm').includes('L1') && rangesOf('qa-fw-d', 'midterm').includes('24') && !rangesOf('qa-fw-d', 'midterm').includes('L3') && boot['qa-fw-s'].books.every(book => book.exam_period === 'midterm' || book.id === 'high:ybm-park:seonbu:final:common2:lesson2'), 'V13.112 단원고·강서고 학생은 기말고사 L3·L4와 중간고사 범위를 따로 받고, 선부고 학생은 중간고사와 기말고사 2과(V13.138)를 받는다');
   const own = id => boot[id].books.flatMap(book => book.words).filter(w => /^L[34]$/.test(w.range_code));
   assert(own('qa-fw-d').length === 268 && own('qa-fw-d').every(w => w.school_id === 'danwon-high') && own('qa-fw-g').length === 268 && own('qa-fw-g').every(w => w.school_id === 'gangseo-high') && own('qa-fw-s').length === 0, 'V13.112 기말고사 단어 268개는 자기 학교 것만 보인다');
   for (const [id, school] of [['qa-fw-d', '단원고'], ['qa-fw-g', '강서고']]) {
     const started = await service(state, 'POST', '/practice/start', { school, range_codes: ['L3', 'L4'], mode: 'write_meaning', target: 10, run_mode: 'practice', exam_style: true }, tokens[id]);
     const practice = state.practices.find(x => x.id === started.id);
     assert(practice.words.length >= 10 && practice.words.every(wordId => wordId.includes(':final:')) && ['L3', 'L4'].every(code => practice.range_codes.includes(code)), `V13.112 ${school} 학생이 기말고사 범위(L3·L4)로 연습을 시작하면 기말고사 단어만 나온다`);
+  }
+
+  /* ---------- V13.138 선부고 YBM(박준언) 2과 본문 · 본문 외 지문 ---------- */
+  {
+    const [sb] = ybmParkSeonbuBooks, words = sb.words, reading = words.filter(w => w.section === '본문'), further = words.filter(w => w.section === '본문 외 지문');
+    assert(ybmParkSeonbuBooks.length === 1 && sb.school_id === 'seonbu-high' && sb.school === '선부고' && sb.division === 'high' && sb.exam_period === 'final' && words.length === 80 && reading.length === 67 && further.length === 13 && YBM_PARK_SEONBU_COUNTS.reading === 67 && YBM_PARK_SEONBU_COUNTS.further === 13, 'V13.138 선부고 2과: 본문 67 + 본문 외 지문 13 = 80개, 기말고사');
+    assert(words.every((w, i) => w.range_code === 'L2' && w.school_id === 'seonbu-high' && w.exam_period === 'final' && w.order === i + 1 && w.id === `high:ybm-park:seonbu:final:common2:lesson2:${String(i + 1).padStart(3, '0')}` && w.word.trim() && w.meaning.trim() && !/Answer Key|공통영어2|- \d+ -/.test(w.meaning) && /^(n|v|a|adv|prep|int|phrase)(\.|$)/.test(w.part_of_speech)), 'V13.138 선부고 2과 단어는 모두 L2·기말고사·순서 id·뜻·품사가 있고, PDF 머리글이 뜻에 섞이지 않았다');
+    assert(reading[0].word === 'tap' && reading.at(-1).word === 'agriculture' && further[0].word === 'known as ~' && further.at(-1).word === 'predict' && words.findIndex(w => w.section === '본문 외 지문') === 67, 'V13.138 순서는 어휘 목록 그대로(본문 → 본문 외 지문)');
+    const find = word => words.find(w => w.word === word)?.meaning;
+    assert(find('drought') === '가뭄' && find('Black Friday').startsWith('추수감사절 다음 금요일') && find('hardship') === '어려움[곤란]' && find('try one\'s luck') === '운을 걸고 해보다' && new Set(words.map(w => w.word.toLowerCase())).size === 80, 'V13.138 뜻은 정답지(TEST 1) 그대로, 같은 단어는 없다');
+    const seonbuOwn = boot['qa-fw-s'].books.flatMap(book => book.words).filter(w => w.range_code === 'L2');
+    assert(seonbuOwn.length === 80 && !boot['qa-fw-d'].books.some(book => book.id.includes('ybm-park')) && !boot['qa-fw-g'].books.some(book => book.id.includes('ybm-park')), 'V13.138 선부고 학생만 2과 80개를 받고, 단원고·강서고에는 안 보인다');
+    const started = await service(state, 'POST', '/practice/start', { school: '선부고', range_codes: ['L2'], mode: 'write_meaning', target: 10, run_mode: 'practice', exam_style: true }, tokens['qa-fw-s']);
+    const practice = state.practices.find(x => x.id === started.id);
+    assert(practice.words.length >= 10 && practice.words.every(wordId => wordId.startsWith('high:ybm-park:seonbu:final:common2:lesson2:')), 'V13.138 선부고 학생이 2과로 연습을 시작하면 2과 단어만 나온다');
   }
 
   /* ---------- screens ---------- */
