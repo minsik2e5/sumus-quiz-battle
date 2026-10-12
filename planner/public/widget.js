@@ -20,7 +20,7 @@ async function boot() {
   store = createStore({ normalize: st => C.normalizeState(st, C.todayKst()), onChange: draw, onStatus: st => { status = st.state === 'dirty' ? 'saving' : st.state; drawStatus(); } });
   for (let a = 0; ; a++) {
     try { await store.load(); break; }
-    catch (err) { if (err.status === 401) { location.reload(); return; } root.innerHTML = pinChecking('연결을 기다리는 중이에요…'); await new Promise(r => setTimeout(r, Math.min(30000, 2000 * (a + 1)))); }
+    catch (err) { if (err.status === 401) { location.reload(); return; } root.innerHTML = pinChecking('연결을 기다리는 중이에요…'); shown = ''; await new Promise(r => setTimeout(r, Math.min(30000, 2000 * (a + 1)))); }
   }
   draw();
   setInterval(refresh, 30000);
@@ -81,9 +81,16 @@ function draw() {
     : `<header class="desktop-widget-head slim"><div class="desktop-widget-logo">S</div><div><strong>${TITLES[KIND] || 'SUMUS'}</strong><span>${C.fmtLong(today)}</span></div><i id="w-dot"></i>${inExe ? `<button type="button" class="w-plus" data-act="add-widget" aria-label="위젯 추가·메뉴" title="위젯 추가 · 메뉴">+</button><button type="button" class="w-close" data-act="close-widget" aria-label="이 위젯 닫기" title="이 위젯 닫기">×</button>` : ''}</header>`;
   const body = KIND === 'all' ? ['work', 'classes', 'quick', 'checklist'].map(k => parts[k]()).join('') : (parts[KIND] || parts.classes)();
   const foot = KIND === 'all' ? `<footer><div>${inExe ? '' : '<a href="/SUMUS_Widget_Installer.zip" download>Windows 설치</a>'}<button type="button" data-act="planner">${icon('external-link')} 전체 플래너</button></div><span id="w-status"></span></footer>` : '<footer class="slim"><span id="w-status"></span></footer>';
-  root.innerHTML = `<main class="desktop-widget-page kind-${KIND}"><section class="desktop-widget-card">${head}${body}${foot}</section></main>`;
+  // Same markup as what is on screen: leave the page alone (no flash, no scroll jump).
+  // The 30-second check, window focus and the refresh button all land here with nothing new.
+  const html = `<main class="desktop-widget-page kind-${KIND}"><section class="desktop-widget-card">${head}${body}${foot}</section></main>`;
+  if (html === shown && root.firstElementChild) { drawStatus(); tickClock(); return; }
+  const keep = root.querySelector('.desktop-widget-card'), scroll = keep ? [keep.scrollTop, root.scrollTop, document.scrollingElement?.scrollTop || 0] : null;
+  root.innerHTML = shown = html;
+  if (scroll) { const c = root.querySelector('.desktop-widget-card'); if (c) c.scrollTop = scroll[0]; root.scrollTop = scroll[1]; if (document.scrollingElement) document.scrollingElement.scrollTop = scroll[2]; }
   drawStatus(); tickClock();
 }
+let shown = '';
 function tickClock() {
   const t = document.getElementById('w-clock-t'); if (!t) return;
   const n = new Date(Date.now() + 9 * 3600000), iso = n.toISOString();

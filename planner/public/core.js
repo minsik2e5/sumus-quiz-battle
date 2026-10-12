@@ -210,9 +210,29 @@ export function rollExam(s, examId, now = Date.now()) {
   return true;
 }
 // Exams whose last day has passed move on by themselves (every device agrees: the same key).
+// 기말고사 dates known ahead of time. Each is put on its exam once, when that exam has moved on to
+// 기말고사 and has no date yet (so a date edited or cleared later is never overwritten).
+// 선부고 end date is not announced yet (12/7 start only) — a 4-day window like the midterm; edit it when known.
+export const FINAL_EXAM_DATES = {
+  danwon: { start: '2026-11-30', end: '2026-12-02' },
+  gangseo: { start: '2026-12-10', end: '2026-12-15' },
+  seonbu: { start: '2026-12-07', end: '2026-12-10' }
+};
+export function applyFinalDates(s) {
+  s.migrations ||= {};
+  let changed = false;
+  for (const [id, d] of Object.entries(FINAL_EXAM_DATES)) {
+    const flag = `final-dates-${id}`, x = examsOf(s).find(e => e.id === id);
+    if (s.migrations[flag] || !x || !/기말/.test(x.label) || !examUndated(x)) continue;
+    s.exams = examsOf(s).map(e => e.id === id ? { ...e, ...d } : { ...e });
+    s.migrations[flag] = true; changed = true;
+  }
+  return changed;
+}
 export function autoRollExams(s, today, now = Date.now()) {
   const done = [];
   for (const x of examsOf(s)) if (!examUndated(x) && x.end < today && x.cohortIds?.length) { if (rollExam(s, x.id, now)) done.push(x.school); }
+  applyFinalDates(s);
   return done;
 }
 // One-off (2026-10-01, 원장님 요청): 단원고·선부고 go to 기말고사 now.
@@ -222,4 +242,5 @@ export function applyMigrations(s, now = Date.now()) {
     for (const id of ['danwon', 'seonbu']) { const x = examsOf(s).find(e => e.id === id); if (x && /중간/.test(x.label)) rollExam(s, id, now); }
     s.migrations['2026-10-01-final'] = true;
   }
+  applyFinalDates(s);
 }

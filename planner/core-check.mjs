@@ -1,5 +1,5 @@
 // Checks of the planner rules (public/core.js).
-import { createDefaultState, normalizeState, classesOn, rangeStats, pace, remainingClasses, examForCohort, examStatus, rollExam, autoRollExams, applyMigrations, workDuration, sleepDay, findPrevCohortLesson, addDays, fmtLong, dayProgress } from './public/core.js';
+import { createDefaultState, normalizeState, classesOn, rangeStats, pace, remainingClasses, examForCohort, examStatus, rollExam, autoRollExams, applyMigrations, applyFinalDates, workDuration, sleepDay, findPrevCohortLesson, addDays, fmtLong, dayProgress } from './public/core.js';
 
 export async function runCoreChecks(assert) {
   let n = 0; const ok = (c, l) => { n++; assert(c, l); };
@@ -11,7 +11,7 @@ export async function runCoreChecks(assert) {
   ok(s.exams.length === 5 && s.exams.find(x => x.id === 'seonbu').end === '2026-10-02' && s.rangeItems.gangseo.length === 1 && s.rangeItems['danwon-a'].length === 15 && rangeStats(s, 'gangseo').pct === 100, 'normalize keeps stored lists, adds exams');
   ok(examStatus(examForCohort('gangseo', s, '2026-10-01'), '2026-10-01') === 'D-11' && remainingClasses('2026-10-01', 'gangseo', s) > 0, 'exam status and remaining lessons');
   // the one-off move of 단원고·선부고 to 기말고사
-  const t = normalizeState({ tasks: [], rangeChecks: { 'danwon-a-text-1': true, 'seonbu-text-3': true, 'gangseo-text-1': true } }, '2026-10-01');
+  const t = normalizeState({ tasks: [], migrations: { 'final-dates-danwon': true, 'final-dates-seonbu': true, 'final-dates-gangseo': true }, rangeChecks: { 'danwon-a-text-1': true, 'seonbu-text-3': true, 'gangseo-text-1': true } }, '2026-10-01');
   applyMigrations(t, Date.parse('2026-10-01T05:00:00Z'));
   const dw = t.exams.find(x => x.id === 'danwon'), sb = t.exams.find(x => x.id === 'seonbu');
   ok(dw.label === '기말고사' && dw.start === '' && sb.label === '기말고사' && t.rangeItems['danwon-a'].length === 0 && t.rangeItems['danwon-b'].length === 0 && t.rangeItems.seonbu.length === 0, '단원고·선부고 move to 기말고사 with empty ranges');
@@ -23,6 +23,16 @@ export async function runCoreChecks(assert) {
   ok(autoRollExams(t, '2026-10-14').length === 0, 'nothing moves during the exam');
   ok(autoRollExams(t, '2026-10-15').includes('강서고') && t.exams.find(x => x.id === 'gangseo').label === '기말고사' && t.examHistory.gangseo[0].checks['text-1'] === true, '강서고 moves on the day after');
   ok(autoRollExams(t, '2026-10-16').length === 0 && t.examHistory.gangseo.length === 1, 'and only once');
+  // 기말고사 dates are put on once, only on an undated 기말고사 (강서고 after it moves on), and never again
+  const f = normalizeState({ tasks: [] }, '2026-10-12');
+  applyMigrations(f, Date.parse('2026-10-12T00:00:00Z'));
+  const fx = id => f.exams.find(x => x.id === id);
+  ok(fx('danwon').start === '2026-11-30' && fx('danwon').end === '2026-12-02' && fx('seonbu').start === '2026-12-07' && fx('seonbu').end === '2026-12-10', '단원고·선부고 기말 dates registered');
+  ok(fx('gangseo').label === '중간고사' && fx('gangseo').end === '2026-10-14', '강서고 midterm untouched while it runs');
+  ok(autoRollExams(f, '2026-10-15').includes('강서고') && fx('gangseo').start === '2026-12-10' && fx('gangseo').end === '2026-12-15', '강서고 기말 dates registered when it moves on');
+  fx('danwon').start = '2026-11-27'; applyMigrations(f); autoRollExams(f, '2026-10-16');
+  ok(fx('danwon').start === '2026-11-27' && applyFinalDates(f) === false, 'an edited date is not overwritten');
+  ok(examStatus(fx('danwon'), '2026-10-12') === 'D-46' && examForCohort('danwon-a', f, '2026-10-12').id === 'danwon', 'the 기말 exam counts down');
   ok(workDuration('09:10', '18:15') === '9시간 5분' && workDuration('22:00', '01:00') === '3시간', 'work time');
   ok(sleepDay(Date.parse('2026-10-01T15:40:00Z')) === '2026-10-01' && sleepDay(Date.parse('2026-10-01T13:00:00Z')) === '2026-10-01', 'sleep after midnight counts for the night before');
   const r = normalizeState({ tasks: [], cohortLessonRecords: { '2026-09-29-2-gangseo': { plan: 'p', actual: '본문 1과' } } }, '2026-10-01');
