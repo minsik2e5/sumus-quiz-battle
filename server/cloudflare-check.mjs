@@ -166,6 +166,19 @@ export async function runCloudflareCheck() {
       method: 'POST', status: 401, body: { username: 'student_preserved', password: 'wrong-password', role: 'student' }
     });
 
+    // V13.136: 맞게 로그인한 횟수는 세지 않는다. 같은 아이디로 틀린 시도만 5분에 10번까지.
+    {
+      const lockCall = client(boot());
+      const right = { username: 'student_preserved', password: 'Student123!', role: 'student' };
+      const wrong = { ...right, password: 'wrong-password' };
+      for (let i = 0; i < 15; i++) await lockCall('/api/login', { method: 'POST', body: right });
+      for (let i = 0; i < 9; i++) await lockCall('/api/login', { method: 'POST', status: 401, body: wrong });
+      await lockCall('/api/login', { method: 'POST', body: right });
+      for (let i = 0; i < 10; i++) await lockCall('/api/login', { method: 'POST', status: 401, body: wrong });
+      const locked = await lockCall('/api/login', { method: 'POST', status: 429, body: right });
+      assert.match(locked.payload.error || locked.payload.message || '', /5분/, '틀린 시도가 10번 쌓이면 5분 쉬라고 알려야 합니다.');
+    }
+
     const bootstrap = await call('/api/bootstrap', { cookie });
     assert.equal(bootstrap.payload.stats.points, 900, '기존 XP가 그대로 노출되어야 합니다.');
     assert.equal(bootstrap.payload.stats.practice_count, 1, '기존 학습 기록이 보존되어야 합니다.');

@@ -15,6 +15,14 @@ const questions = Array.from({ length: 130 }, (_, i) => ({ word_id: 'w' + i, pro
 const player = (id, extra = {}) => ({ id, name: id, grade: '고1', pet: { key: 'dog' }, questions, cleared: [], ...extra });
 
 export async function runStabilityChecks(assert) {
+  /* ---------- V13.136 로그인 제한: 틀린 시도만 센다 ---------- */
+  {
+    const workerSrc = readFileSync(new URL('../cloudflare/worker.mjs', import.meta.url), 'utf8');
+    const localSrc = readFileSync(new URL('./index.mjs', import.meta.url), 'utf8');
+    assert(workerSrc.includes('const LOGIN_FAIL_MAX = 10;') && workerSrc.includes('const LOGIN_FAIL_WINDOW_MS = 5 * 60000;') && workerSrc.includes('if (result._cookie && loginKey) this.rates.delete(loginKey);') && !workerSrc.includes('15분 후 다시 시도'), 'V13.136 운영 서버: 맞게 로그인하면 기록을 지우고, 틀린 로그인만 5분에 10번까지(15분 잠금 없음)');
+    assert(localSrc.includes("rateLimit(loginKey, 10, 5 * 60000,") && localSrc.includes('if (result._cookie && loginKey) rates.delete(loginKey);') && !localSrc.includes('15분 후 다시 시도'), 'V13.136 로컬 서버도 같은 로그인 규칙');
+  }
+
   /* ---------- 저장: 상태를 한 번 더 복사하지 않는다 ---------- */
   let committed = null;
   const repo = { async read() { return { state: {}, revision: 0 }; }, async commit(state) { committed = state; } };

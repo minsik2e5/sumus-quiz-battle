@@ -15,6 +15,10 @@ import { createMutationCoordinator, NO_MUTATION } from '../server/mutation-coord
 import { createLocalRepository, createSupabaseSync } from './local-first.mjs';
 import { partitionState, assembleState, hashText } from './state-parts.mjs';
 
+// V13.136: 같은 아이디로 5분에 10번 틀리면 5분 쉰다(맞게 로그인한 횟수는 세지 않는다).
+const LOGIN_FAIL_MAX = 10;
+const LOGIN_FAIL_WINDOW_MS = 5 * 60000;
+
 const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' };
 
 // Changes allowed without a session. Everything else needs a live token of an active profile
@@ -352,9 +356,11 @@ export class VocaStateObject {
       if (request.method !== 'GET' && !OPEN_POST_PATHS.has(url.pathname) && !hasLiveSession(this.mutations.current().state, token)) {
         throw Object.assign(Error('다시 로그인해주세요.'), { status: 401 });
       }
-      if (url.pathname === '/api/login') {
-        const key = `${address}:${String(body.username || '').trim().toLowerCase()}`;
-        this.rateLimit(key, 10, 15 * 60000, '로그인 시도가 많습니다. 15분 후 다시 시도해주세요.');
+      // V13.136: 로그인 제한은 틀린 시도만 센다. 맞게 로그인하면 그 아이디의 기록을 지우고(아래 _cookie),
+      // 같은 아이디로 5분에 10번 틀렸을 때만 5분 쉰다.
+      const loginKey = url.pathname === '/api/login' ? `${address}:${String(body.username || '').trim().toLowerCase()}` : '';
+      if (loginKey) {
+        this.rateLimit(loginKey, LOGIN_FAIL_MAX, LOGIN_FAIL_WINDOW_MS, '비밀번호를 여러 번 틀렸어요. 5분 후 다시 시도해주세요.');
         this.rateLimit(`${address}:all`, 500, 15 * 60000, '요청이 많습니다. 잠시 후 다시 시도해주세요.');
       }
       if (url.pathname === '/api/signup') {
@@ -451,6 +457,7 @@ export class VocaStateObject {
           ? `app;dur=${elapsed}`
           : `app;dur=${elapsed}, commit;dur=${commitMs};desc="local ${commitBytes} bytes", supabase;dur=${sync.last_sync_ms}`
       };
+      if (result._cookie && loginKey) this.rates.delete(loginKey);
       if (result._cookie) {
         responseHeaders['Set-Cookie'] = `sumus_session=${result._cookie}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800; Secure`;
         delete result._cookie;

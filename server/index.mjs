@@ -91,9 +91,10 @@ const server = http.createServer(async (req, res) => {
       }
       const body = await readJson(req);
       const address = req.socket.remoteAddress || 'unknown';
-      if (url.pathname === '/api/login') {
-        const key = address + ':' + String(body.username || '').trim().toLowerCase();
-        rateLimit(key, 10, 15 * 60000, '로그인 시도가 많습니다. 15분 후 다시 시도해주세요.');
+      // V13.136: 틀린 로그인만 센다(맞게 로그인하면 기록을 지운다). 5분에 10번 틀리면 5분 쉰다.
+      const loginKey = url.pathname === '/api/login' ? address + ':' + String(body.username || '').trim().toLowerCase() : '';
+      if (loginKey) {
+        rateLimit(loginKey, 10, 5 * 60000, '비밀번호를 여러 번 틀렸어요. 5분 후 다시 시도해주세요.');
         rateLimit(address + ':all', 500, 15 * 60000, '요청이 많습니다. 잠시 후 다시 시도해주세요.');
       }
       if (url.pathname === '/api/signup') {
@@ -119,6 +120,7 @@ const server = http.createServer(async (req, res) => {
           ? await mutations.fast(execute)
           : await mutations.durable(execute);
       const secure = process.env.COOKIE_SECURE === 'true' || process.env.NODE_ENV === 'production';
+      if (result._cookie && loginKey) rates.delete(loginKey);
       if (result._cookie) { res.setHeader('Set-Cookie', `sumus_session=${result._cookie}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800${secure ? '; Secure' : ''}`); delete result._cookie; }
       if (result._clearCookie) { res.setHeader('Set-Cookie', 'sumus_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'); delete result._clearCookie; }
       // Battle rooms (with the answers) exist only on Cloudflare; never send them to a browser.
