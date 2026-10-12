@@ -5,6 +5,7 @@ import { levelInfo, petProgress } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked, LEAGUE_POINTS, LEAGUE_PAIR_DAY_CAP, leagueTier, leagueTierIndex } from '../public/modules/titles.js';
 import { GACHA_ITEMS, GACHA_KEYS } from '../public/modules/rewards.js';
 import { bonusRecords } from './rewards.mjs';
+import { dungeonTitleStats, dungeonKings } from './dungeon-records.mjs';
 
 export const DAY_MS = 86400000;
 export const KST_OFFSET_MS = 9 * 3600000;
@@ -116,7 +117,7 @@ export function createCompetition(state, now = Date.now()) {
   const exams = new Map();
   for (const a of state.examAttempts || []) if (a.status === 'submitted') exams.set(a.student_id, (exams.get(a.student_id) || 0) + 1);
   const countedCache = new Map(), statCache = new Map();
-  let awards = null;
+  let awards = null, kings = null;
   const inWindow = window => b => b.finished_at >= window.start && b.finished_at < window.end;
   const winsOf = pid => ctx.countedOf(pid).filter(b => b.winner === pid);
   const STATS = {
@@ -154,6 +155,9 @@ export function createCompetition(state, now = Date.now()) {
     gifts: p => Number(p?.gift_box?.count || 0),
     weekly_rank: (p, pid) => ctx.awards().weeklyRank.get(pid) || 0,
     league_king: (p, pid) => ctx.awards().leagueKings.has(pid) ? 1 : 0,
+    // V13.140 던전(server/dungeon-records.mjs): 클리어 · 등급컷 · 무사고 · 역대 1위 · 만점 최고 층, 지난주 보드 1위.
+    ...Object.fromEntries(Object.keys(dungeonTitleStats(null)).map(stat => [stat, p => dungeonTitleStats(p)[stat]])),
+    dungeon_week_king: (p, pid) => (kings ??= dungeonKings(state, now)).has(pid) ? 1 : 0,
     // V13.67 capsule-only titles: owned when the capsule was pulled.
     ...Object.fromEntries(GACHA_KEYS.filter(key => GACHA_ITEMS[key].kind === 'title').map(key => [`item_${key}`, p => Number(p?.gacha?.items?.[key] || 0)]))
   };

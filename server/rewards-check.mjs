@@ -753,7 +753,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     const { TITLE_ART, titleEmblem } = await import('../public/modules/emblems.js');
     const map96 = source('../docs/asset-requests/runner/slice-map.csv').split('\n').filter(line => line.startsWith('"11-titles.txt"'));
     const prompts96 = source('../docs/asset-requests/runner/11-titles.txt').split('\n---\n');
-    const keys96 = Object.keys(TITLES);
+    const keys96 = Object.keys(TITLES).filter(key => !key.startsWith('dungeon-')); // V13.140 던전 칭호는 그림 23c(dungeon-reward-check.mjs)
     assert(keys96.length === 65 && keys96.every(key => map96.some(line => line.endsWith(`"public/assets/titles/${key}.webp"`))) && map96.length === 68 && prompts96.length === 17, 'V13.96 칭호 65개(옛 뽑기 칭호 포함)마다 메달 그림 주문이 있다: 시트 17장 = 메달 65개 + 칭호 화면 그림 3개');
     assert(prompts96.every(p => p.includes('STYLE REFERENCE — before drawing, open') && p.includes('Google Drive folder') && /named exactly "11-\d+\.png"/.test(p) && p.includes('"SUMUS 칭호 11 (Runner용)"')) && prompts96.slice(1).every(p => p.includes('Also open "11-1.png"')), 'V13.96 칭호 주문서마다 Drive의 기존 그림을 열어 그림체를 맞추고, 정해진 Drive 폴더에 정확한 이름(11-N.png)으로 저장하라고 적혀 있다');
     // One frame per medal, by tier: as many frame lines of a tier as titles of that tier.
@@ -776,7 +776,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     const asset = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));
     const webpSize = name => { const b = readFileSync(asset(name)); return b.toString('ascii', 12, 16) === 'VP8X' ? `${1 + b.readUIntLE(24, 3)}x${1 + b.readUIntLE(27, 3)}` : ''; };
     const keys97 = Object.keys(TITLES);
-    assert(keys97.every(key => TITLE_ART.has(key)) && TITLE_ART.size === keys97.length && keys97.every(key => webpSize(`titles/${key}`) === '256x256' && webpSize(`titles/${key}-s`) === '96x96'), 'V13.97 칭호 65개 모두 메달 그림이 있다(256px, 작은 그림 96px)');
+    assert(keys97.every(key => TITLE_ART.has(key)) && TITLE_ART.size === keys97.length && keys97.filter(key => !key.startsWith('dungeon-')).length === 65 && keys97.every(key => webpSize(`titles/${key}`) === '256x256' && webpSize(`titles/${key}-s`) === '96x96'), 'V13.97 칭호 65개 모두 메달 그림이 있다(256px, 작은 그림 96px)');
     assert(['titles-hero', 'title-equipped', 'title-new'].every(key => ART_READY.has(key) && webpSize(`ui/${key}`) === '256x256'), 'V13.97 칭호 도감 그림 3개(진열장 · 장착 중 · 새 칭호)가 있고 등록되어 있다');
     const arms = ['robot-rock', 'robot-scissors', 'robot-paper', 'robot-flag', 'me-rock', 'me-scissors', 'me-paper', 'me-thumb'];
     const armSizes = arms.map(a => webpSize(`rps/arm-${a}`));
@@ -844,7 +844,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(css98.includes('.yb-spell-input{position:absolute;inset:0') && css98.includes('font-size:16px') && css98.includes('.battle-app.yb-typing .yb-arena{aspect-ratio:16/8.2}') && battle103.includes("classList.add('yb-typing')"), 'V13.103 키보드가 올라오면 전투 화면(경기장)이 줄어 단어와 글자 칸이 키보드 위에 보인다(16px 글자로 확대 방지)');
     /* ---------- V13.105 전투 화면 효과 ---------- */
     const css104 = source('../public/v13105fx.css'), build104 = source('./build-assets.mjs');
-    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css",\s*"v13109\.css",\s*"v13111\.css",\s*"v13112\.css",\s*"v13113\.css",\s*"v13118\.css",\s*"v13119\.css",\s*"v13123\.css",\s*"v13124\.css",\s*"v13125\.css",\s*"v13127\.css",\s*"v13128\.css",\s*"v13130\.css",\s*"v13132\.css",\s*"v13133\.css"\s*]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
+    assert(/"v13105\.css",\s*"v13105fx\.css",\s*"v13107\.css",\s*"v13108\.css",\s*"v13109\.css",\s*"v13111\.css",\s*"v13112\.css",\s*"v13113\.css",\s*"v13118\.css",\s*"v13119\.css",\s*"v13123\.css",\s*"v13124\.css",\s*"v13125\.css",\s*"v13127\.css",\s*"v13128\.css",\s*"v13130\.css",\s*"v13132\.css",\s*"v13133\.css",\s*"v13140\.css"\s*]/.test(build104), 'V13.105 전투 효과 CSS(v13105fx.css) 다음에 V13.107 화면 CSS가 묶음 CSS 목록의 맨 끝에 들어간다');
     assert(battle103.includes('function hitStop(') && battle103.includes("classList.add('fx-stop')") && css104.includes('.yb-arena.fx-stop [data-fx]{animation-play-state:paused!important}') && battle103.includes('function dmgTier(') && battle103.includes("const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl']") && battle103.includes("` fx-num t${dmgTier(+dmg)}"), 'V13.105 맞는 순간 잠깐 멈추고(히트스톱), 데미지가 클수록 더 세게 흔들리고 숫자가 커진다');
     assert(battle103.includes('function comboUp(') && battle103.includes('function comboReset(') && battle103.includes("if (atk === 'me') comboUp();") && (battle103.match(/comboReset\(\);/g) || []).length >= 3 && css104.includes('.fx-combo'), 'V13.105 내가 연속으로 맞히면 2콤보부터 내 HUD 위에 콤보가 뜨고, 틀리거나 놓치면 0으로 돌아간다(화면 표시만)');
     assert(battle103.includes('if (e.fast && e.dmg) critStamp(def);') && battle103.includes("'CRITICAL!'") && battle103.includes("crit ? 'fx-shake-xl'"), 'V13.105 빠른 정답(fast)이면 CRITICAL! 도장과 더 센 흔들림이 나온다');

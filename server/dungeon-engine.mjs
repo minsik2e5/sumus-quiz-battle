@@ -7,7 +7,7 @@
 //
 // 수치는 server/dungeon-sim.mjs 시뮬레이션으로 3명 첫 도전 클리어율 60% · 35% · 10%에 맞춘 뒤,
 // 선생님 요청으로 제한 시간을 모두 1초 줄였다(52% · 18% · 1%).
-// 코인은 판 결과로 서버가 계산한다(dungeonCoins, 학생·방이 정하지 않는다). 지급 연결은 기록·보상 세션에서.
+// 코인은 판 결과로 서버가 계산한다(dungeonReward, 학생·방이 정하지 않는다). V13.140: 지급 · 기록은 server/dungeon-records.mjs.
 import { elementOf } from '../public/modules/battle-fx.js';
 
 export const DUNGEON = {
@@ -494,7 +494,7 @@ function finish(state, now, cleared) {
       const p = state.players[id];
       return { id, name: p.name, bot: p.bot, out: p.out, right: p.right, wrong: p.wrong, timeouts: p.timeouts, answered: p.answered,
         accuracy: p.answered ? Math.round(p.right / p.answered * 1000) / 1000 : 0, share: Math.round(p.damage / total * 1000) / 1000,
-        best_combo: p.best_combo, downs: p.downs, reward: !p.out && !p.bot };
+        best_combo: p.best_combo, downs: p.downs, reward: !p.out && !p.bot, pet: p.pet ? { key: p.pet.key, form: p.pet.form } : null };
     })
   };
   return [event(state, 'finished', { result: state.result })];
@@ -502,20 +502,53 @@ function finish(state, now, cleared) {
 // 결과는 끝날 때 메인 상태 객체에 한 번 보고한다. 같은 방·같은 시작 시각이면 같은 키라 두 번 지급되지 않는다.
 // 코인 (2026-10-09 선생님 확정): 단계별 처음 클리어 3등급 150 · 2등급 300 · 1등급 500(+ 칭호),
 // 반복 클리어는 하루 3회까지 정답 1개당 0.5 · 0.6 · 0.7코인, 한 판 최대 40 · 50 · 60.
-// 실패 위로 · 만점 모드 도달 · 주간 1위 코인은 아직 정하지 않았다(0을 돌려준다).
+// V13.140 (제안, `node server/dungeon-sim.mjs coins` 표): 실패 위로는 도달한 층 × 4 · 5 · 6코인(정답 × 같은 단가,
+// 한 판 최대 40 · 50 · 60 안에서), 만점 모드 한 판은 도달 층 × 6(정답 × 0.7, 최대 60), 5층 단위로 처음 도달하면
+// 100 · 150 · 200 · 250 · 300(30층부터는 100씩. 시뮬레이션에서 5층 보스를 넘는 파티는 7%, 10층은 2%). 반복 · 위로 · 만점 한 판은 하루 3회를 같이 쓰고, 정답이 10개보다 적으면
+// 주지 않는다(가만히 있는 판 막기). 처음 클리어 · 5층 도달은 하루 횟수와 상관없다. 주간 1위 파티 코인은 칭호(dungeon-week).
 export const DUNGEON_COINS = {
   first: { c3: 150, c2: 300, c1: 500 },
-  per_right: { c3: 0.5, c2: 0.6, c1: 0.7 },
-  again_max: { c3: 40, c2: 50, c1: 60 },
-  daily: 3
+  per_right: { c3: 0.5, c2: 0.6, c1: 0.7, max: 0.7 },
+  again_max: { c3: 40, c2: 50, c1: 60, max: 60 },
+  daily: 3,
+  per_floor: { c3: 4, c2: 5, c1: 6, max: 6 },
+  min_right: 10,
+  milestone_every: 5,
+  milestones: [100, 150, 200, 250, 300],
+  milestone_after: 100,
+  week_top: 100
 };
+// 만점 모드 k번째 5층 도달 보상(5층 = 1번째). 25층까지 1,000코인, 30층부터는 100씩.
+export const milestoneCoins = k => DUNGEON_COINS.milestones[Math.max(1, k) - 1] ?? DUNGEON_COINS.milestone_after;
 // 한 학생의 코인. `first`: 이 등급컷을 처음 깼는지, `today`: 오늘 이미 보상받은 던전 판 수.
-// 처음 클리어는 하루 횟수와 상관없이 준다. 봇·포기한 학생은 0.
+// 처음 클리어는 하루 횟수와 상관없이 준다. 봇·포기한 학생은 0. (V13.126 클리어 판만 센다. 전체 보상은 dungeonReward)
 export function dungeonCoins({ cut, cleared, first = false, right = 0, today = 0, reward = true }) {
   if (!reward || !cleared || !DUNGEON_COINS.first[cut]) return 0;
   if (first) return DUNGEON_COINS.first[cut];
   if (today >= DUNGEON_COINS.daily) return 0;
   return Math.min(DUNGEON_COINS.again_max[cut], Math.floor(Math.max(0, Number(right) || 0) * DUNGEON_COINS.per_right[cut]));
+}
+// V13.140 한 판의 보상 전체. 서버가 결과의 정답 수 · 도달 층 · 등급컷으로만 계산한다(방 · 학생이 정하지 않는다).
+// `best`: 만점 모드에서 전에 도달한 최고 층. 돌려주는 것: { coins, items: [{ key, label, coins }], daily(하루 횟수를 썼는지), note }.
+export function dungeonReward({ cut, cleared, first = false, right = 0, reached = 0, today = 0, best = 0, reward = true }) {
+  const C = DUNGEON_COINS, items = [];
+  if (!reward || !C.per_right[cut]) return { coins: 0, items, daily: false, note: reward ? '' : 'bot' };
+  right = Math.max(0, Math.floor(Number(right) || 0));
+  reached = Math.max(0, Math.floor(Number(reached) || 0));
+  let daily = false, note = '';
+  if (cut !== 'max' && cleared && first) items.push({ key: 'first', label: '처음 클리어', coins: C.first[cut] });
+  else if (right < C.min_right) note = 'few';
+  else if (today >= C.daily) note = 'daily';
+  else {
+    const byRight = Math.floor(right * C.per_right[cut]);
+    const coins = Math.min(C.again_max[cut], cleared ? byRight : Math.min(byRight, reached * C.per_floor[cut]));
+    if (coins > 0) { daily = true; items.push({ key: cleared ? 'again' : cut === 'max' ? 'climb' : 'try', label: cleared ? '다시 클리어' : cut === 'max' ? '만점 도전' : '도달 층 위로 보상', coins }); }
+  }
+  if (cut === 'max') {
+    const every = C.milestone_every;
+    for (let k = Math.floor(Math.max(0, best) / every) + 1; k <= Math.floor(reached / every); k++) items.push({ key: 'floor' + k * every, label: `만점 ${k * every}층 처음 도달`, coins: milestoneCoins(k) });
+  }
+  return { coins: items.reduce((n, x) => n + x.coins, 0), items, daily, note };
 }
 export const reportId = state => `dungeon:${state.id}:${state.started_at ?? state.created_at}`;
 

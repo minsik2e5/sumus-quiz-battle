@@ -6,7 +6,10 @@
 // "3명 첫 도전"은 반 학생 분포(아는 비율 평균 82%, 속도 개인차)에서 뽑은 세 명이 그 등급컷을 처음 하는 판이다.
 // `node server/dungeon-sim.mjs [판 수]`는 등급컷 × 인원(2인/3인) 클리어율과 시간, 층별 실패 위치를 표로 찍는다.
 // 출시 검사(dungeon-check.mjs)는 고정 씨앗으로 `clearRate`를 돌려 목표 클리어율에서 벗어나지 않는지 본다.
-import { createDungeon, join, ready, answer, settle, tick, nextWake, floorSpec, DUNGEON, FLOORS, CUTS, GRADE_EXTRA_MS } from './dungeon-engine.mjs';
+import { createDungeon, join, ready, answer, settle, tick, nextWake, floorSpec, dungeonReward, milestoneCoins, DUNGEON, DUNGEON_COINS, FLOORS, CUTS, GRADE_EXTRA_MS } from './dungeon-engine.mjs';
+import { STUDY_COINS, BOT_WIN_REWARDS, BOT_DAILY, ATTENDANCE_REWARDS } from '../public/modules/rewards.js';
+import { MONSTER_DAILY, STAGE_AGAIN_MAX, STAGE_COIN_MULT } from '../public/modules/monsters.js';
+import { TITLES, titleCoins } from '../public/modules/titles.js';
 
 // 작은 씨앗 무작위(mulberry32): 같은 씨앗이면 같은 결과.
 export function seeded(seed = 1) {
@@ -80,7 +83,57 @@ export function run(cut, party, random = Math.random, { grade = null, pets = nul
     } else break;
   }
   const r = s.result || {}, m = s.monster?.boss ? s.monster : null;
-  return { boss: m ? { marks: m.marks, blocked: m.blocked, cores: m.cores, breaks: m.breaks, stage: m.stage, ms: s.finished_at - s.phase_at } : null, cleared: !!r.cleared, time_ms: r.time_ms || 0, floor: s.floor, downs: s.order.reduce((n, id) => n + s.players[id].downs, 0), accuracy: r.players ? r.players.reduce((n, p) => n + p.accuracy, 0) / r.players.length : 0 };
+  return { boss: m ? { marks: m.marks, blocked: m.blocked, cores: m.cores, breaks: m.breaks, stage: m.stage, ms: s.finished_at - s.phase_at } : null, cleared: !!r.cleared, time_ms: r.time_ms || 0, floor: s.floor, downs: s.order.reduce((n, id) => n + s.players[id].downs, 0), accuracy: r.players ? r.players.reduce((n, p) => n + p.accuracy, 0) / r.players.length : 0, reached: r.reached || 0, rights: (r.players || []).map(p => p.right) };
+}
+
+// V13.140 코인: 반 학생 분포 파티로 `n`판을 돌려 한 학생이 받는 반복(이미 깬 등급컷) 코인을 센다(하루 첫 판 기준).
+// 만점 모드는 1등급 컷까지 깬 학생(아는 비율 평균 92%)으로 돌린다. 한 판 코인은 서버와 같은 dungeonReward.
+export function coinStudy(cut, size = 3, n = 200, seed = 21) {
+  const random = seeded(seed * 104729 + CUTS[cut].order * 31 + size);
+  let cleared = 0, coins = 0, clearCoins = 0, clearN = 0, failCoins = 0, failN = 0, reached = 0, best = 0, few = 0;
+  for (let i = 0; i < n; i++) {
+    const party = Array.from({ length: size }, () => cut === 'max' ? student(random, { know: clamp(0.92 + gauss(random) * 0.04, 0.8, 0.99) }) : student(random));
+    const r = run(cut, party, random);
+    reached += r.reached; best = Math.max(best, r.reached);
+    for (const right of r.rights) {
+      const c = dungeonReward({ cut, cleared: r.cleared, right, reached: r.reached }).items.filter(x => !x.key.startsWith('floor')).reduce((s, x) => s + x.coins, 0);
+      if (right < DUNGEON_COINS.min_right) few++;
+      coins += c;
+      if (r.cleared) { clearCoins += c; clearN++; } else { failCoins += c; failN++; }
+    }
+    if (r.cleared) cleared++;
+  }
+  const per = n * size;
+  return { rate: cleared / n, avg: coins / per, clear_avg: clearN ? clearCoins / clearN : 0, fail_avg: failN ? failCoins / failN : 0, reached: reached / n, best, few: few / per };
+}
+
+// `node server/dungeon-sim.mjs 200 coins`: 한 판 코인과, 하루 · 한 주 최대 코인을 다른 콘텐츠와 나란히 찍는다.
+export function coinTable(n = 200) {
+  const rows = [];
+  for (const cut of ['c3', 'c2', 'c1', 'max']) for (const size of [3, 2]) rows.push({ cut, size, ...coinStudy(cut, size, n) });
+  const C = DUNGEON_COINS;
+  const dayMax = C.daily * Math.max(...Object.values(C.again_max));
+  const titleOnce = Object.keys(TITLES).filter(k => TITLES[k].group === 'dungeon' && TITLES[k].tier !== 'limited').reduce((s, k) => s + titleCoins(k), 0);
+  const firstOnce = Object.values(C.first).reduce((s, x) => s + x, 0);
+  const study = { day: STUDY_COINS.cap, week: STUDY_COINS.cap * 7 };
+  const monster = { day: MONSTER_DAILY * STAGE_AGAIN_MAX * STAGE_COIN_MULT };
+  const bot = { day: BOT_DAILY * BOT_WIN_REWARDS.hard.coins };
+  const attend = { week: ATTENDANCE_REWARDS.reduce((s, x) => s + x, 0) };
+  return { rows, dayMax, weekMax: dayMax * 7 + titleCoins('dungeon-week'), titleOnce, firstOnce, milestones: [1, 2, 3, 4, 5].map(milestoneCoins), study, monster, bot, attend };
+}
+export function printCoins(n) {
+  const t = coinTable(n), C = DUNGEON_COINS;
+  console.log(`\n코인 (반복 · 위로 · 만점 한 판, 하루 첫 판 기준, 판 ${n}번씩. 처음 클리어 ${Object.values(C.first).join(' · ')}은 따로)`);
+  console.log('등급컷     인원  클리어   깬 판 평균  진 판 평균  판 평균  한 판 최대  평균 도달 층  정답 10개 미만');
+  for (const r of t.rows) console.log(`${CUTS[r.cut].name.padEnd(7)}  ${r.size}인   ${String(Math.round(r.rate * 100)).padStart(4)}%   ${r.clear_avg.toFixed(1).padStart(8)}   ${r.fail_avg.toFixed(1).padStart(8)}   ${r.avg.toFixed(1).padStart(6)}   ${String(C.again_max[r.cut]).padStart(8)}   ${r.reached.toFixed(1).padStart(10)}   ${Math.round(r.few * 100)}%`);
+  console.log('\n하루 · 한 주 최대 코인 비교 (처음 한 번만 받는 보상은 아래 따로)');
+  console.log('콘텐츠              하루 최대     한 주 최대');
+  console.log(`던전(3판)            ${String(t.dayMax).padStart(6)}      ${String(t.weekMax).padStart(6)}  (주간 1위 칭호 ${titleCoins('dungeon-week')} 포함)`);
+  console.log(`학습(일일 한도)      ${String(t.study.day).padStart(6)}      ${String(t.study.week).padStart(6)}`);
+  console.log(`몬스터 다시 잡기(5번) ${String(t.monster.day).padStart(5)}      ${String(t.monster.day * 7).padStart(6)}`);
+  console.log(`로보 연습(5번, 어려움) ${String(t.bot.day).padStart(4)}      ${String(t.bot.day * 7).padStart(6)}`);
+  console.log(`출석                     —      ${String(t.attend.week).padStart(6)}`);
+  console.log(`\n처음 한 번만: 처음 클리어 합 ${t.firstOnce} + 던전 칭호 8개 코인 ${t.titleOnce} = ${t.firstOnce + t.titleOnce}, 만점 5층 단위 처음 도달 ${t.milestones.join(' · ')}…`);
 }
 
 // 클리어율: 반 학생 분포에서 `size`명을 뽑아 처음 도전하는 판 `n`번.
@@ -117,4 +170,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log(`\n보스 킬러 골렘 (깬 판 평균): 2페이즈 ${DUNGEON.PHASE2_AT * 100}% · 3페이즈 ${DUNGEON.PHASE3_AT * 100}%, 채점 ${DUNGEON.MARK_EVERY_MS / 1000}초마다 ${DUNGEON.MARK_NEED}연속(실패 피격 ×${DUNGEON.MARK_HIT}), 핵 ${DUNGEON.CORE_MS / 1000}초 · 목표 서 있는 인원 × ${DUNGEON.CORE_PER_PLAYER} · 브레이크 ${DUNGEON.BREAK_SHARE * 100}%`);
   console.log('등급컷     인원  보스전 시간  채점 표적  막음   핵 열림  브레이크');
   for (const [cut, size, b] of bosses) if (b.n) console.log(`${CUTS[cut].name.padEnd(7)}  ${size}인   ${mmss(b.ms / b.n).padStart(6)}     ${(b.marks / b.n).toFixed(1).padStart(5)}    ${(b.marks ? Math.round(b.blocked / b.marks * 100) : 0).toString().padStart(3)}%   ${(b.cores / b.n).toFixed(1).padStart(5)}    ${(b.breaks / b.n).toFixed(1).padStart(5)}`);
+  if (process.argv.includes('coins')) printCoins(Math.min(n, 300));
 }

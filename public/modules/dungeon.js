@@ -4,7 +4,8 @@ import { getRanges } from './student.js';
 import { comboRank } from './battle-fx.js';
 import { createDungeonFx } from './dungeon-fx.js';
 import { playSound, preloadSound, soundOn } from './sound.js';
-import { uiArt } from './emblems.js';
+import { uiArt, titleEmblem, coin, tierName } from './emblems.js';
+import { TITLES } from './titles.js';
 import { openFriendSheet } from './friend-sheet.js';
 
 // V13.128 던전 화면 (docs/dungeon-design.md 2 · 3번): 던전 입구(등급컷 · 범위 · 방 만들기 · 초대 코드 · 받은 초대),
@@ -14,6 +15,8 @@ import { openFriendSheet } from './friend-sheet.js';
 // 펫 속성별 발사체와 메이플식으로 쌓이는 피해 숫자(dungeon-fx.js), 합동 필살 컷인, 전투 효과음(sound.js),
 // 문제 세 종류(뜻 고르기 · 영어 고르기 · 영어 쓰기). 쓰기는 누른 글자 하나씩 보내고 방이 채점한다.
 // 움직임 줄이기를 켠 폰에서는 효과를 그리지 않는다. A.screen === 'dungeon'일 때 #app을 쓴다.
+// V13.140 기록 · 보상: 결과 화면이 방의 보고가 처리되기를 기다렸다가(/dungeon/last) 받은 코인 · 새 칭호 · 신기록을 보여 주고,
+// 던전 입구에 '기록 보드' 탭(내 학년 · 등급컷 × 2 · 3인, 이번 주 · 역대 상위 10팀, 내 파티 최고 기록)을 둔다.
 
 const EMOTES = { cheer: '힘내!', help: '도와줘!', nice: '나이스!', gg: '수고했어!' };
 const CUT_DESC = { c3: '처음 도전', c2: '3등급 컷을 깨면 열려요', c1: '2등급 컷을 깨면 열려요', max: '세 단계를 모두 깨면 열려요 · 끝없는 층' };
@@ -28,9 +31,9 @@ const clock = ms => `${Math.floor(Math.max(0, ms) / 60000)}:${String(Math.floor(
 function later(fn, ms) { const cur = D; const id = setTimeout(() => { if (D === cur && !cur.closing) fn(); }, ms); cur.timers.push(id); }
 
 /* ---------- 열고 닫기 ---------- */
-export async function openDungeon(A, exit) {
+export async function openDungeon(A, exit, opts = {}) {
   closeAll();
-  D = { A, exit, timers: [], cut: 'c3', offset: 0, ranges: null, code: '' };
+  D = { A, exit, timers: [], cut: 'c3', offset: 0, ranges: null, code: '', tab: opts.tab === 'board' ? 'board' : 'enter', bsel: opts.bsel || null };
   A.screen = 'dungeon';
   root().innerHTML = `<div class="session-app dg-app"><header class="dg-top"><button type="button" class="yb-back" data-dg="exit" aria-label="나가기">${icon('back')}</button><strong>던전</strong><span class="dg-top-note" id="dg-note"></span></header><main id="dg-main" class="dg-main"><div class="yb-loading">던전 문을 여는 중…</div></main></div>`;
   root().onclick = onClick;
@@ -45,6 +48,7 @@ async function loadHome() {
     if (D.home.room?.ticket) return enterRoom(D.home.room);
     const open = D.home.cuts.filter(c => c.open);
     if (!open.some(c => c.key === D.cut)) D.cut = open.at(-1)?.key || 'c3';
+    if (D.tab === 'board') return openBoards();
     homeScreen();
   } catch (err) {
     main(`<div class="yb-loading"><p>던전을 불러오지 못했어요.<br><small>${esc(err.message)}</small></p><button type="button" class="btn primary" data-dg="retry">다시 시도</button></div>`);
@@ -95,6 +99,10 @@ function onClick(event) {
   if (act === 'sound') return toggleSound(b);
   if (act === 'emote') return emote(b.dataset.emote, b);
   if (act === 'again') { closeAll(); const { A, exit } = D; return openDungeon(A, exit); }
+  if (act === 'see-board') { closeAll(); const { A, exit } = D; return openDungeon(A, exit, { tab: 'board', bsel: D.lastSel || null }); }
+  if (act === 'tab') { if (b.dataset.tab === 'board') return openBoards(); D.tab = 'enter'; return homeScreen(); }
+  if (act === 'board-retry') return openBoards(true);
+  if (act === 'bsel') { D.bsel[b.dataset.k] = b.dataset.k === 'size' ? Number(b.dataset.v) : b.dataset.v; return boardScreen(); }
   if (act === 'home') return leaveScreen();
   if (act === 'leave-room') { buttonBusy(b); return api('/dungeon/leave', {}).catch(() => {}).then(() => { closeAll(); const { A, exit } = D; return openDungeon(A, exit); }); }
 }
@@ -116,6 +124,7 @@ function saveRanges() { try { localStorage.setItem(rangesKey(), JSON.stringify([
 function homeScreen() {
   const A = D.A, h = D.home, { codes, counts } = myRanges();
   const picked = [...D.ranges].reduce((n, c) => n + (counts.get(c) || 0), 0);
+  const rw = h.reward;
   note('');
   main(`
     <section class="dg-hero">
@@ -123,6 +132,8 @@ function homeScreen() {
       <img class="dg-hero-boss" src="/assets/monsters/killergolem.webp" alt="" width="512" height="512" decoding="async" draggable="false">
       <div class="dg-hero-copy"><span class="dg-kicker">2~3명 실시간 파티</span><h1>기말고사 지옥</h1><p>1층부터 보스 <b>킬러 골렘</b>까지 쉬지 않고 올라가요. 같은 학년이면 학교가 달라도 함께해요.</p></div>
     </section>
+    ${tabsBar()}
+    ${rw ? `<section class="dg-card dg-rw-home"><h2>보상 <small>오늘 보상 판 ${num(rw.plays_left)}/${num(rw.daily)}</small></h2><div class="dg-rw-firsts">${['c3', 'c2', 'c1'].map(k => { const c = h.cuts.find(x => x.key === k); return `<div class="${c?.cleared ? 'done' : ''}">${coin()}<b>${num(rw.first[k])}</b><small>${esc(c?.name || '')} 처음 클리어${c?.cleared ? ' ✓' : ''}</small></div>`; }).join('')}</div><p class="dg-hint">처음 깨면 코인과 칭호! 다시 깨거나 져도 하루 ${num(rw.daily)}판까지 정답 수 · 도달 층만큼 코인(한 판 최대 ${num(rw.again_max.c3)}~${num(rw.again_max.c1)}). 만점 모드는 5층마다 처음 도달 보상.</p></section>` : ''}
     ${h.invites?.length ? `<section class="dg-card dg-invites"><h2>받은 초대</h2>${h.invites.map(r => `<div class="dg-invite"><div><b>${esc(r.host)}</b><span>${esc(r.host_school)} · ${esc(r.cut_name)} · ${r.members}/${r.max}명</span></div><button type="button" class="btn primary" data-dg="accept" data-code="${esc(r.code)}">같이 가기</button><button type="button" class="btn ghost" data-dg="decline" data-id="${esc(r.id)}">거절</button></div>`).join('')}</section>` : ''}
     <section class="dg-card">
       <h2>등급컷</h2>
@@ -142,7 +153,8 @@ function homeScreen() {
       <li>맞히면 공격, 빠를수록·콤보가 길수록 세게. 틀리거나 시간이 지나면 몬스터가 때려요.</li>
       <li>모두의 정답으로 <b>파티 게이지</b>가 차면 합동 필살기. 속성이 다른 펫 3마리면 피해 +30%.</li>
       <li>체력이 0이면 기절. 동료가 3연속 정답이면 부활, 층이 바뀌어도 부활해요.</li>
-      <li>빈자리는 봇 동료로 채울 수 있어요(봇이 낀 파티는 기록에서 빠져요). 보상은 곧 열려요.</li>
+      <li>빈자리는 봇 동료로 채울 수 있어요. 봇이 낀 판도 보상은 받지만 기록 보드에는 오르지 않아요.</li>
+      <li>기록 보드는 우리 학년 전체(학교가 달라도) · 등급컷 · 인원별로 이번 주와 역대 상위 10팀. 주간 1위 파티는 칭호와 코인!</li>
     </ul></section>
     ${h.recent?.length ? `<section class="dg-card"><h2>최근 던전</h2>${h.recent.map(r => `<div class="dg-recent ${r.cleared ? 'win' : ''}"><b>${esc(r.cut_name)}</b><span>${r.cleared ? `클리어 ${clock(r.time_ms)}` : `${num(r.reached)}층까지`}</span><small>${r.size}명</small></div>`).join('')}</section>` : ''}`);
 }
@@ -949,9 +961,99 @@ function resultScreen(v) {
       <h1>${r.cleared ? '던전 클리어!' : '전멸…'}</h1>
       <div class="dg-result-stats"><div><b>${clock(r.time_ms)}</b><span>클리어 시간</span></div><div><b>${r.cleared ? '보스' : `${num(r.reached)}층`}</b><span>${r.cleared ? '처치' : '도달'}</span></div><div><b>${r.no_down ? '무사고' : '—'}</b><span>기절 없음</span></div></div>
       <div class="dg-result-players">${r.players.map(p => `<div class="${p.id === myId ? 'me' : ''}"><b>${esc(p.id === myId ? '나' : p.name)}${p.bot ? ' <small>봇</small>' : ''}${p.out ? ' <small>포기</small>' : ''}</b><span>정답 ${num(p.right)}/${num(p.answered)} · ${Math.round(p.accuracy * 100)}%</span><i style="--share:${Math.round(p.share * 100)}%"><em>기여 ${Math.round(p.share * 100)}%</em></i><small>최고 콤보 ${num(p.best_combo)} · 기절 ${num(p.downs)}</small></div>`).join('')}</div>
-      <p class="dg-hint">${r.record ? '기록 보드와 보상은 곧 열려요.' : '봇 동료가 있거나 포기한 친구가 있으면 기록에서 빠져요.'}</p>
-      <div class="dg-row"><button type="button" class="btn primary" data-dg="again">던전 입구로</button><button type="button" class="btn ghost" data-dg="home">나가기</button></div>
+      <div class="dg-reward-box" id="dg-reward" aria-live="polite"><p class="dg-rw-wait"><i aria-hidden="true"></i>보상과 기록을 확인하는 중…</p></div>
+      <div class="dg-row"><button type="button" class="btn primary" data-dg="again">던전 입구로</button><button type="button" class="btn" data-dg="see-board">🏆 기록 보드</button><button type="button" class="btn ghost" data-dg="home">나가기</button></div>
     </section>`);
+  D.lastSel = { cut: r.cut || v.cut || 'c3', size: r.size === 2 ? 2 : 3, period: 'week' };
+  loadResultReward(D.room?.id);
+}
+
+/* ---------- V13.140 기록 보드 ---------- */
+const tabsBar = () => `<div class="dg-tabs" role="tablist" aria-label="던전 메뉴"><button type="button" role="tab" class="dg-tab${D.tab !== 'board' ? ' on' : ''}" data-dg="tab" data-tab="enter" aria-selected="${D.tab !== 'board'}">⚔️ 입장</button><button type="button" role="tab" class="dg-tab${D.tab === 'board' ? ' on' : ''}" data-dg="tab" data-tab="board" aria-selected="${D.tab === 'board'}">🏆 기록 보드</button></div>`;
+async function openBoards(force = false) {
+  D.tab = 'board';
+  const cur = D;
+  if (!D.boards || force) {
+    main(`${tabsBar()}<div class="yb-loading">기록 보드를 불러오는 중…</div>`);
+    try { D.boards = await api('/dungeon/boards'); }
+    catch (err) { if (D === cur && D.tab === 'board') main(`${tabsBar()}<div class="yb-loading"><p>기록 보드를 불러오지 못했어요.<br><small>${esc(err.message)}</small></p><button type="button" class="btn primary" data-dg="board-retry">다시 시도</button></div>`); return; }
+  }
+  if (D === cur && D.tab === 'board') boardScreen();
+}
+const RANK_MEDAL = ['', '🥇', '🥈', '🥉'];
+const boardScore = (b, r) => b.endless ? `<b>${num(r.floor)}층</b><small>${clock(r.time_ms)}</small>` : `<b>${clock(r.time_ms)}</b>`;
+const shortDate = ts => { const d = new Date(ts); return `${d.getMonth() + 1}/${d.getDate()}`; };
+function boardRow(b, r) {
+  return `<li class="dg-brow r${r.rank}${r.me ? ' me' : ''}"><span class="dg-rank">${r.rank <= 3 ? `<i aria-hidden="true">${RANK_MEDAL[r.rank]}</i><span class="sr-only">${r.rank}위</span>` : num(r.rank)}</span><div class="dg-bteam">${r.members.map(m => `<span class="dg-bmem${m.me ? ' me' : ''}">${m.pet ? avatar(m.pet.key, { form: m.pet.form, size: 'mini' }) : ''}<b>${esc(m.me ? '나' : m.name)}</b></span>`).join('')}</div><span class="dg-btime">${boardScore(b, r)}<small>${shortDate(r.at)}</small></span></li>`;
+}
+function boardScreen() {
+  const B = D.boards, h = D.home;
+  const sel = D.bsel ||= { cut: h?.cuts?.filter(c => c.cleared).at(-1)?.key || 'c3', size: 3, period: 'week' };
+  const b = B.boards.find(x => x.cut === sel.cut && x.size === sel.size) || B.boards[0];
+  const rows = sel.period === 'week' ? b.week : b.all, mine = b.mine[sel.period];
+  const chip = (k, v, label) => `<button type="button" class="dg-bchip${String(sel[k]) === String(v) ? ' on' : ''}" data-dg="bsel" data-k="${k}" data-v="${v}" aria-pressed="${String(sel[k]) === String(v)}">${label}</button>`;
+  const end = new Date(B.week_end - 1);
+  note('');
+  main(`
+    <section class="dg-board-hero"><span class="dg-kicker">${esc(B.grade)} 전체 · 학교가 달라도 한 보드</span><h1>던전 기록 보드</h1><p>${b.endless ? '만점 모드는 높이 오른 층 → 빠른 시간 순서' : '보스까지 빠르게 깬 순서'} · 봇 없이 깬 판만 올라가요</p></section>
+    ${tabsBar()}
+    <section class="dg-card dg-board">
+      <div class="dg-bsel" role="group" aria-label="등급컷">${B.boards.filter(x => x.size === 3).map(x => chip('cut', x.cut, esc(x.cut_name))).join('')}</div>
+      <div class="dg-bsel two"><div role="group" aria-label="인원">${chip('size', 3, '3인')}${chip('size', 2, '2인')}</div><div role="group" aria-label="기간">${chip('period', 'week', '이번 주')}${chip('period', 'all', '역대')}</div></div>
+      ${sel.period === 'week' && b.last_top ? `<div class="dg-blast"><span>👑 지난주 1위</span><b>${b.last_top.members.map(m => esc(m.me ? '나' : m.name)).join(' · ')}</b>${boardScore(b, b.last_top)}</div>` : ''}
+      ${rows.length ? `<ol class="dg-blist">${rows.map(r => boardRow(b, r)).join('')}</ol>` : `<div class="dg-bempty"><b>아직 기록이 없어요</b><span>봇 없이 ${b.size}명이 ${b.endless ? '만점 모드에 도전하면' : '깨면'} 첫 기록이 돼요!</span></div>`}
+      <div class="dg-bmine${mine ? '' : ' none'}"><span>내 파티 최고 기록 · ${sel.period === 'week' ? '이번 주' : '역대'}</span>${mine ? boardScore(b, mine) : '<b>—</b>'}</div>
+      <p class="dg-hint">${sel.period === 'week' ? `이번 주 보드는 ${end.getMonth() + 1}/${end.getDate()}(일) 밤에 닫히고 월요일 0시에 새로 시작해요. 주간 1위 파티는 칭호 '던전 주간 1위'와 ${num(100)}코인을 받아요.` : '역대 1위 기록을 세우면 칭호 \'신기록 메이커\'를 받아요.'} 같은 파티는 가장 좋은 기록 하나만 올라가요.</p>
+    </section>`);
+}
+
+/* ---------- V13.140 결과 화면 보상 · 신기록 ---------- */
+// 방이 결과를 메인에 보고하고 처리될 때까지 잠깐 걸린다(몰리면 모아서 처리). 처리되면 보상을 그린다.
+async function loadResultReward(id, tries = 0) {
+  const cur = D;
+  let res = null;
+  try { res = await api('/dungeon/last'); } catch {}
+  if (D !== cur || cur.closing) return;
+  if (!res || res.pending || (id && res.id !== id)) {
+    if (tries < 12) return later(() => loadResultReward(id, tries + 1), Math.min(3000, 600 + tries * 300));
+    return setHTML(document.getElementById('dg-reward'), '<p class="dg-rw-note">보상 확인이 늦어지고 있어요. 받은 코인은 지갑에 그대로 들어가요.</p>');
+  }
+  if (res.cancelled) return setHTML(document.getElementById('dg-reward'), '');
+  D.boards = null;
+  showReward(res);
+}
+const NOTE = { few: n => `정답을 <b>${n}개 이상</b> 맞히면 코인을 받아요.`, daily: () => '오늘 보상 3판을 다 받았어요. 처음 클리어 · 만점 층 보상은 언제나 받아요.' };
+function recordHtml(res) {
+  const bd = res.board, rw = res.reward;
+  if (!bd) return res.record || !(res.cleared || res.cut === 'max') ? '' : '<p class="dg-rw-note">봇 동료나 포기한 친구가 있어서 이번 판은 기록 보드에 오르지 않아요. 보상은 그대로 받아요.</p>';
+  const score = r => res.cut === 'max' ? `${num(r.f)}층` : clock(r.t);
+  const chips = [bd.week_rank ? `<span class="dg-rk week">이번 주 <b>${num(bd.week_rank)}위</b></span>` : '', bd.all_rank ? `<span class="dg-rk all">역대 <b>${num(bd.all_rank)}위</b></span>` : '', rw?.best?.all ? '<span class="dg-rk pb">내 파티 최고 기록!</span>' : rw?.best?.week ? '<span class="dg-rk pb">이번 주 내 최고 기록!</span>' : ''].join('');
+  const confetti = reduced() ? '' : `<span class="dg-confetti" aria-hidden="true">${Array.from({ length: 18 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</span>`;
+  if (bd.all_top) return `<div class="dg-newrec legend" role="status"><span class="dg-newrec-rays" aria-hidden="true"></span>${confetti}<small>${esc(res.cut_name)} · ${res.size}인</small><strong>신기록!</strong><em>우리 학년 역대 1위</em>${bd.beat ? `<span class="dg-newrec-beat">이전 1위 ${score(bd.beat)} → <b>${res.cut === 'max' ? `${num(res.reached)}층` : clock(res.time_ms)}</b></span>` : '<span class="dg-newrec-beat">이 보드의 첫 기록이에요</span>'}</div><div class="dg-rks">${chips}</div>`;
+  if (bd.week_top) return `<div class="dg-newrec week" role="status"><span class="dg-newrec-rays" aria-hidden="true"></span>${confetti}<small>${esc(res.cut_name)} · ${res.size}인</small><strong>이번 주 1위!</strong><em>이대로 주가 끝나면 칭호 '던전 주간 1위'</em></div><div class="dg-rks">${chips}</div>`;
+  return chips ? `<div class="dg-rks">${chips}</div>` : '';
+}
+function showReward(res) {
+  const box = document.getElementById('dg-reward');
+  if (!box) return;
+  const rw = res.reward;
+  const coins = rw ? `<div class="dg-rw-coins${rw.coins ? '' : ' zero'}"><span class="dg-rw-coin">${coin()}<b id="dg-rw-count">+${reduced() ? num(rw.coins) : 0}</b><small>코인</small></span>
+    ${rw.items.length ? `<ul class="dg-rw-items">${rw.items.map((x, i) => `<li style="--i:${i}" class="${x.key === 'first' || x.key.startsWith('floor') ? 'big' : ''}"><span>${esc(x.label)}</span><b>+${num(x.coins)}</b></li>`).join('')}</ul>` : ''}
+    ${rw.note && NOTE[rw.note] ? `<p class="dg-rw-note">${NOTE[rw.note](res.min_right)}</p>` : ''}<p class="dg-rw-left">오늘 보상 판 ${num(rw.plays_left)}/${num(res.daily)} 남음</p></div>` : '<p class="dg-rw-note">포기 처리되어 이번 판은 보상이 없어요.</p>';
+  const titles = rw?.titles?.length ? `<div class="dg-rw-titles">${rw.titles.filter(k => TITLES[k]).map((k, i) => `<div class="dg-rw-title tier-${TITLES[k].tier}" style="--i:${i}">${titleEmblem(k, { size: 'lg' })}<span><small>${esc(tierName(TITLES[k].tier))} 칭호 획득!</small><b>${esc(TITLES[k].name)}</b><em>${esc(TITLES[k].how)}</em></span></div>`).join('')}</div>` : '';
+  box.classList.add('ready');
+  setHTML(box, recordHtml(res) + coins + titles);
+  if (res.board?.all_top) playSound('fanfare-legend');
+  else if (res.board?.week_top || rw?.titles?.length) playSound(rw?.titles?.some(k => TITLES[k]?.tier === 'legendary') ? 'fanfare-legend' : 'fanfare-epic');
+  if (rw?.coins) later(() => { playSound('coins'); countUp(document.getElementById('dg-rw-count'), rw.coins); }, res.board?.all_top || res.board?.week_top ? 900 : 250);
+}
+function countUp(el, to) {
+  if (!el || reduced()) return;
+  const t0 = performance.now(), ms = Math.min(1400, 500 + to * 4);
+  const step = now => { if (!el.isConnected) return; const k = Math.min(1, (now - t0) / ms); el.textContent = '+' + num(Math.round(to * (1 - (1 - k) ** 3))); if (k < 1) requestAnimationFrame(step); else el.parentElement?.classList.add('done'); };
+  requestAnimationFrame(step);
+  // 화면이 가려져 그리기가 멈춰도 마지막 숫자는 맞게 남긴다.
+  later(() => { if (el.isConnected) el.textContent = '+' + num(to); }, ms + 300);
 }
 
 /* ---------- 나가기 ---------- */

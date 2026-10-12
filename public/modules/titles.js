@@ -24,6 +24,10 @@
 //   gifts        V13.73: coin gifts received from a teacher
 //   rps_wins     V13.82: 가위바위보 throws won; rps_jackpots: ×8 pots (three wins in a row)
 //   monster_wins V13.94: monsters beaten (몬스터 잡기, any level); monster_hard: at 하드
+//   dungeon_*    V13.140 던전(server/dungeon-records.mjs dungeonTitleStats): dungeon_clears 클리어한 판,
+//                dungeon_c3 · dungeon_c2 · dungeon_c1 그 등급컷을 깼는지, dungeon_max_floor 만점 모드 최고 층,
+//                dungeon_no_down 아무도 기절하지 않고 깬 판, dungeon_records 역대 보드 1위 기록을 세운 횟수,
+//                dungeon_week_king 지난주 던전 주간 보드 1위 파티였는지(한정)
 // Limited titles belong to one week: they are held only while last week's result stands.
 
 export const TITLE_TIERS = {
@@ -33,11 +37,12 @@ export const TITLE_TIERS = {
   legendary: { name: '전설', order: 4 },
   limited: { name: '한정', order: 5 }
 };
-export const TITLE_GROUPS = { study: '학습', yacha: '야차전', monster: '몬스터', collect: '수집', gacha: '뽑기', arcade: '놀이터', limited: '한정' };
+export const TITLE_GROUPS = { study: '학습', yacha: '야차전', monster: '몬스터', dungeon: '던전', collect: '수집', gacha: '뽑기', arcade: '놀이터', limited: '한정' };
 // V13.73: coins for a new title, by tier (paid once when the student first sees it; a limited
 // title pays again each week it is won). 첫걸음 and retired capsule titles pay nothing.
 export const TITLE_COINS = { common: 10, rare: 30, epic: 60, legendary: 120, limited: 60 };
-export const titleCoins = key => key === 'rookie' || !TITLES[key] || TITLES[key].retired ? 0 : TITLE_COINS[TITLES[key].tier] || 0;
+// V13.140: a title may name its own coins (`coins`): 던전 주간 1위 파티 코인은 그 칭호가 준다.
+export const titleCoins = key => key === 'rookie' || !TITLES[key] || TITLES[key].retired ? 0 : TITLES[key].coins ?? TITLE_COINS[TITLES[key].tier] ?? 0;
 
 // Keys of the first eight titles are kept from V13.56 (students may have one equipped).
 export const TITLES = {
@@ -108,6 +113,19 @@ export const TITLES = {
   perfect50: { name: '만점 전설', tier: 'legendary', group: 'study', stat: 'perfect', goal: 50, icon: 'star', how: '10문제 이상 100점 50번', desc: '100점이 곧 이름이 되었어요.' },
   yacha10: { name: '무적의 야차', tier: 'legendary', group: 'yacha', stat: 'win_streak', goal: 10, icon: 'crown', how: '야차전 10연승', desc: '열 번 연속, 아무도 막지 못했어요.' }
 };
+// V13.140 던전 칭호(docs/dungeon-design.md 8번). 메달 그림은 /assets/titles/dungeon-*.webp(그림 23c).
+// 주간 1위(dungeon-week)는 한정 칭호라 지난주 결과가 있는 동안만 가지고, 이긴 주마다 코인(DUNGEON_COINS.week_top)을 다시 준다.
+Object.assign(TITLES, {
+  'dungeon-first': { name: '던전 첫 클리어', tier: 'common', group: 'dungeon', stat: 'dungeon_clears', goal: 1, icon: 'shield', how: '던전 1번 클리어', desc: '친구들과 처음으로 킬러 골렘을 쓰러뜨렸어요.' },
+  'dungeon-rank3': { name: '3등급 컷 돌파', tier: 'rare', group: 'dungeon', stat: 'dungeon_c3', goal: 1, icon: 'shield', how: '기말고사 지옥 3등급 컷 클리어', desc: '3등급 컷, 이제 시작이에요.' },
+  'dungeon-rank2': { name: '2등급 컷 돌파', tier: 'epic', group: 'dungeon', stat: 'dungeon_c2', goal: 1, icon: 'wing', how: '기말고사 지옥 2등급 컷 클리어', desc: '2등급 컷을 넘은 실력파 파티.' },
+  'dungeon-rank1': { name: '1등급 컷 돌파', tier: 'legendary', group: 'dungeon', stat: 'dungeon_c1', goal: 1, icon: 'crown', how: '기말고사 지옥 1등급 컷 클리어', desc: '가장 빡빡한 1등급 컷까지 깼어요.' },
+  'dungeon-perfect': { name: '만점 도전자', tier: 'legendary', group: 'dungeon', stat: 'dungeon_max_floor', goal: 10, icon: 'gem', how: '만점 모드 10층 도달', desc: '끝없는 만점의 탑을 10층까지 올랐어요.' },
+  'dungeon-flawless': { name: '무사고 클리어', tier: 'epic', group: 'dungeon', stat: 'dungeon_no_down', goal: 1, icon: 'heart', how: '아무도 기절하지 않고 던전 클리어', desc: '한 명도 쓰러지지 않은 완벽한 파티.' },
+  'dungeon-record': { name: '신기록 메이커', tier: 'epic', group: 'dungeon', stat: 'dungeon_records', goal: 1, icon: 'bolt', how: '던전 역대 기록 1위 세우기 (봇 없이)', desc: '우리 학년 던전 역대 1위 기록을 세웠어요.' },
+  'dungeon-hunter': { name: '던전 사냥꾼', tier: 'rare', group: 'dungeon', stat: 'dungeon_clears', goal: 10, icon: 'sword', how: '던전 10번 클리어', desc: '던전이 집처럼 편해요.' },
+  'dungeon-week': { name: '던전 주간 1위', tier: 'limited', group: 'dungeon', stat: 'dungeon_week_king', goal: 1, icon: 'trophy', coins: 100, how: '지난주 던전 주간 보드 1위 파티 (우리 학년)', desc: '지난주 우리 학년 던전 보드 꼭대기!' }
+});
 // V13.67: titles that came out of the capsule machine. V13.68 retired the machine: they stay
 // with the students who have them and are not shown to anyone else (`retired`).
 Object.assign(TITLES, {
