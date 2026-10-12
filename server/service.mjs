@@ -15,6 +15,7 @@ import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn
 import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
+import { signupCodeRows, updateSignupCode } from './signup.mjs';
 import { createVapidKeys } from './push.mjs';
 import { pushState, pushView, addSubscription, removeSubscription, postNotice, noticeFor, postLegend, legendFor, eveningReminders } from './notify.mjs';
 import { seonbu44Correction } from './seonbu44-correction.mjs';
@@ -1272,6 +1273,8 @@ export async function service(state, method, path, body, token, options = {}) {
       push_reach: teacher && selectedSchool ? studentProfiles.filter(s => (state.push?.subs?.[s.id] || []).length).length : null,
       notices_sent: teacher && selectedSchool ? (state.push?.notices || []).filter(n => n.school_id === selectedSchool.id).slice(-5).reverse() : null,
       // V13.125: the 다른 학교와 야차전 switch (teacher), and the wording of the yacha screens (student).
+      // V13.141 반별 가입 코드: 선생님에게만, 지금 부서의 맡은 학교 반마다 한 줄.
+      signup_codes: teacher ? signupCodeRows(state, schools) : null,
       battle_settings: teacher ? { cross_school: battleCrossSchool(state) } : null,
       battle_cross_school: teacher ? null : battleCrossSchool(state),
       tournaments: (state.tournaments || []).filter(t => teacher ? t.school_id === selectedSchool?.id && (t.status !== 'cancelled' || now - (t.finished_at || t.created_at) < DAY_MS) : t.players.includes(p.id) && (t.status === 'active' || (t.status === 'finished' && now - (t.finished_at || 0) < 3 * DAY_MS)))
@@ -2063,6 +2066,13 @@ export async function service(state, method, path, body, token, options = {}) {
     const opened = openBattleRoom(state, p, school, 0, t.range_codes, now, { invite_id: opponentId, challenge: true, tournament_id: t.id, match_id: mine.match.id, label, mode: t.mode });
     return { ...opened, host: true, challenge: true, tournament: label, friend: opponent?.display_name || '' };
   }
+  // V13.141 반별 가입 코드: 새 코드 만들기(옛 코드는 바로 막힘) 또는 켜기/끄기.
+  if (path === '/teacher/signup-codes' && method === 'POST') {
+    requireRole(p, 'teacher');
+    const school = schoolByRef(state, body.school_id);
+    if (!school || !p.school_ids?.includes(school.id) || school.division !== activeTeacherDivision(p)) fail('현재 부서의 담당 학교를 확인해주세요.', 403);
+    return { code: updateSignupCode(state, school, str(body.class_name, 30), { regenerate: body.regenerate === true, active: typeof body.active === 'boolean' ? body.active : undefined }) };
+  }
   if (path === '/students' && method === 'POST') {
     requireRole(p, 'teacher');
     const school = schoolByRef(state, body.school_id || body.school);
@@ -2093,6 +2103,12 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!nextSchool || !p.school_ids?.includes(nextSchool.id) || nextSchool.division !== activeTeacherDivision(p)) fail('현재 부서의 담당 학교를 확인해주세요.', 403);
     const nextClass = str(body.class_name, 30) || student.class_name;
     if (!divisionClassAllowed(nextSchool.division, nextClass)) fail(`${divisionLabel(nextSchool.division)} 반을 선택해주세요.`);
+    // V13.141: 새로 가입한 학생의 이름도 선생님이 바로 고친다.
+    if (body.display_name !== undefined) {
+      const displayName = str(body.display_name, 40);
+      if (displayName.length < 2) fail('이름을 2자 이상 입력해주세요.');
+      student.display_name = displayName;
+    }
     if (typeof body.active === 'boolean') student.active = body.active;
     student.class_name = nextClass;
     if (student.school_id !== nextSchool.id) {

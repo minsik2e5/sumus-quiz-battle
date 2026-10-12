@@ -26,6 +26,7 @@ import { runDungeonLobbyChecks } from './dungeon-lobby-check.mjs';
 import { runYachaTabChecks } from './yacha-tab-check.mjs';
 import { runStabilityChecks } from './stability-check.mjs';
 import { runStorageTrimChecks } from './storage-trim-check.mjs';
+import { runSignupCodeChecks } from './signup-code-check.mjs';
 import { runRewardEventChecks } from './reward-event-check.mjs';
 import { compactSession, migrateState, stateSizeReport } from './state.mjs';
 import { openGrammarChoiceSample } from '../public/grammar-choice-sample.js';
@@ -150,9 +151,10 @@ export async function runReleaseCheck() {
     assert(grade('write_meaning', '감소', { word: 'decline', meaning: '감소하다', accepted_meanings: ['감소'] }), 'teacher-approved cross-part-of-speech exception remains valid');
 
     const state = emptyState();
+    // V13.141: 학교·반은 반별 가입 코드로 정해진다.
+    const wonilMiddle3 = state.signupCodes.find(item => item.school_id === 'wonil-middle' && item.class_name === '중3').code;
     const selfSigned = await selfSignup(state, {
-      username: 'qa_signup', password: 'QaSignup123!', display_name: '가입테스트', class_name: '중3',
-      school_id: 'wonil-middle', division: 'middle'
+      username: 'qa_signup', password: 'QaSignup123!', display_name: '가입테스트', code: wonilMiddle3
     });
     assert(selfSigned.ok === true && selfSigned.division === 'middle' && selfSigned.class_name === '중3', 'student self-signup creates a middle-school account');
     const selfSignupLogin = await service(state, 'POST', '/login', {
@@ -162,8 +164,7 @@ export async function runReleaseCheck() {
     const selfSignupBootstrap = await service(state, 'GET', '/bootstrap', {}, selfSignupLogin._cookie);
     assert(selfSignupBootstrap.profile.school_id === 'wonil-middle' && selfSignupBootstrap.profile.class_name === '중3', 'self-signup account keeps the selected school and class');
     await expectStatus(409, () => selfSignup(state, {
-      username: 'qa_signup', password: 'QaSignup123!', display_name: '중복가입', class_name: '중3',
-      school_id: 'wonil-middle', division: 'middle'
+      username: 'qa_signup', password: 'QaSignup123!', display_name: '중복가입', code: wonilMiddle3
     }), 'duplicate self-signup username is rejected');
     state.profiles.push({
       id: 'qa-teacher', role: 'teacher', username: 'qa_teacher', password_hash: await passwordHash('QaTeacher123!'),
@@ -1186,7 +1187,7 @@ export async function runReleaseCheck() {
     assert(!appJs.includes("id=\"account-school\"") && studentModule.includes('선생님 관리'), 'student self-service school change is removed');
     assert(v138Css.includes('.division-segment') && v138Css.includes('.dispute-card') && bundleCss.includes('.division-segment'), 'V13.8 division and dispute styles are bundled');
     assert(appJs.includes('data-division="middle"') && appJs.includes('/teacher/division') && appJs.includes('login.profile?.role'), 'login auto-detects role while teacher controls separate middle and high divisions');
-    assert(appJs.includes("$('[data-signup-division]').forEach"), 'signup division buttons use the multi-node helper so the signup form remains interactive');
+    assert(appJs.includes("$('#signup-code-check').onclick") && !appJs.includes('data-signup-division'), 'V13.141 signup picks school and class from the class signup code (no division buttons)');
     assert(teacherModule.includes('뜻 이의제기') && teacherModule.includes('data-dispute-global') && teacherModule.includes('data-dispute-once'), 'teacher meaning-dispute inbox is present');
     assert(sessionsModule.includes('이 답도 맞는 것 같아요') && sessionsModule.includes('/meaning-disputes'), 'meaning-writing student dispute buttons are present');
     assert(v139Css.includes('.rank-scope') && v139Css.includes('.my-rank-card') && bundleCss.includes('.rank-scope'), 'V13.9 academy ranking styles are bundled');
@@ -1462,6 +1463,7 @@ export async function runReleaseCheck() {
     runYachaTabChecks(assert);
     await runStabilityChecks(assert);
     await runStorageTrimChecks(assert, expectStatus);
+    await runSignupCodeChecks(assert, expectStatus);
     await runRewardEventChecks(assert, expectStatus);
 
     console.log(`[release-check] PASS ${checks.length}/${checks.length}`);
