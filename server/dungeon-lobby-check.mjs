@@ -16,7 +16,8 @@ export async function runDungeonLobbyChecks(assert, expectStatus) {
   /* ---------- 확정 수치는 이 세션에서 바꾸지 않는다 ---------- */
   assert(FLOORS.map(f => f.limit.c3).join() === '8000,7000,6500,6000,5500,5000' && FLOORS.map(f => f.limit.c1).join() === '6000,5000,4500,4000,3500,3000', 'V13.128 확정 제한 시간(1초 줄인 값)은 그대로');
   assert(DUNGEON_COINS.first.c3 === 150 && DUNGEON_COINS.first.c2 === 300 && DUNGEON_COINS.first.c1 === 500 && DUNGEON_COINS.again_max.c3 === 40 && DUNGEON_COINS.again_max.c1 === 60 && DUNGEON_COINS.daily === 3, 'V13.128 확정 코인 수치는 그대로');
-  assert(!/dungeonCoins|DUNGEON_COINS/.test(source('./service.mjs')) && !/dungeonCoins|DUNGEON_COINS/.test(source('../cloudflare/dungeon-room.mjs')), 'V13.128 코인 지급은 기록 · 보상 세션에서(이번에는 넣지 않는다)');
+  // V13.143: 코인은 메인 서버(server/dungeon-records.mjs)만 계산한다. 방은 결과만 보고하고 코인을 정하지 않는다.
+  assert(!/dungeonCoins|DUNGEON_COINS|dungeonReward/.test(source('../cloudflare/dungeon-room.mjs')) && !/dungeonReward\(/.test(source('./service.mjs')) && /dungeonReward\(/.test(source('./dungeon-records.mjs')), 'V13.143 코인 계산은 메인 서버의 dungeon-records.mjs에서만(방 · 학생이 정하지 않는다)');
 
   /* ---------- 문제 풀: 오답 5개, 같은 품사 · 비슷한 길이, 정답 · 인정 뜻은 오답에 없다 ---------- */
   const words = [

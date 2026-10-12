@@ -26,9 +26,10 @@ import { ybmKimFinalBooks } from './high-vocab-ybm-kim-final.mjs';
 import { ybmParkSeonbuBooks } from './high-vocab-ybm-park-seonbu.mjs';
 import { compactSession } from './state.mjs';
 import { trimSummary, trimArchive, trimRecords, attemptTotal } from './storage-trim.mjs';
-import { DUNGEON, CUTS, CUT_KEYS, openCuts } from './dungeon-engine.mjs';
+import { DUNGEON, CUTS, CUT_KEYS, openCuts, DUNGEON_COINS } from './dungeon-engine.mjs';
 import { activeEventFor, studentEventView, teacherEventView, teacherOwns, keptEvents, createRewardEvent, endRewardEvent, deleteRewardEvent, eventCoins, eventXp } from './reward-events.mjs';
 import { dungeonQuestions } from './dungeon-words.mjs';
+import { settleDungeonRecords, dungeonBoardsView, dungeonLastView } from './dungeon-records.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
 export const APP_VERSION = packageInfo.version;
 export const builtinBooks = builtinBooksData;
@@ -654,7 +655,7 @@ function settleTournamentMatch(state, b) {
 /* ---------- V13.128 던전 방 (docs/dungeon-design.md 2 · 9번) ---------- */
 // 파티 하나 = 던전 방 하나(cloudflare/dungeon-room.mjs). 이 상태에는 방 목록(초대 코드, 파티원, 입장표)만 두고,
 // 판은 방이 server/dungeon-engine.mjs로 돌린다. 방은 끝날 때(또는 아무도 시작하지 않고 닫힐 때) 결과를
-// 여기에 한 번 보고한다(settleDungeon, report_id로 두 번 처리하지 않는다). 코인 · 보드는 기록 · 보상 세션에서.
+// 여기에 한 번 보고한다(settleDungeon, report_id로 두 번 처리하지 않는다). V13.143: 코인 · 기록 보드 · 칭호는 server/dungeon-records.mjs.
 export const DUNGEON_LOBBY_MS = 15 * 60000;     // 방(로비)에서 15분 안에 시작하지 않으면 닫힌다(방이 보고한다)
 const DUNGEON_ABANDON_MS = 2 * 3600000;        // 그때까지 보고가 없는 방은 정리한다
 const DUNGEON_KEEP_MS = 7 * 86400000;          // 끝난 방 기록은 일주일만 둔다(상태가 계속 커지지 않게)
@@ -750,10 +751,9 @@ function dungeonInvitesFor(state, p, now) {
 export const dungeonReportPending = (state, report) => (state.dungeons || []).some(x => x.id === report?.id && x.status === 'open');
 // 방이 보고하는 결과(브라우저는 부르지 못한다). 같은 report_id는 한 번만 처리한다.
 // 결과: { id, report_id, cancelled } 또는 { id, report_id, result: 엔진 result }.
-export function settleDungeon(state, report) {
+export function settleDungeon(state, report, now = Date.now()) {
   const d = (state.dungeons || []).find(x => x.id === report?.id);
   if (!d || d.status !== 'open') return false;
-  const now = Date.now();
   if (report.cancelled || !report.result) { Object.assign(d, { status: 'cancelled', reason: String(report.reason || 'closed').slice(0, 20), finished_at: now }); return true; }
   const r = report.result, members = new Set(d.members || []);
   if (!report.report_id || r.report_id !== report.report_id) return false;
@@ -762,16 +762,14 @@ export function settleDungeon(state, report) {
     id: String(x.id || '').slice(0, 64), name: String(x.name || '').slice(0, 20), bot: !!x.bot, out: !!x.out,
     right: Math.max(0, Math.floor(Number(x.right) || 0)), answered: Math.max(0, Math.floor(Number(x.answered) || 0)),
     accuracy: Math.max(0, Math.min(1, Number(x.accuracy) || 0)), share: Math.max(0, Math.min(1, Number(x.share) || 0)), downs: Math.max(0, Math.floor(Number(x.downs) || 0)),
-    // 보상 대상: 이 방에 들어온 학생, 봇 · 포기 아님(엔진 reward). 코인 지급은 기록 · 보상 세션에서.
-    reward: !!x.reward && !x.bot && !x.out && members.has(String(x.id))
+    // 보상 대상: 이 방에 들어온 학생, 봇 · 포기 아님(엔진 reward). 봇이 낀 판도 보상은 받는다(기록만 빠진다).
+    reward: !!x.reward && !x.bot && !x.out && members.has(String(x.id)),
+    pet: x.pet && typeof x.pet === 'object' ? { key: String(x.pet.key || '').slice(0, 24), form: Math.max(0, Math.min(3, Math.floor(Number(x.pet.form) || 0))) } : null
   }));
   Object.assign(d, { status: 'finished', report_id: report.report_id, finished_at: now, result: { cleared: !!r.cleared, cut, size: players.length, reached: Math.max(0, Math.floor(Number(r.reached) || 0)), floor: Math.max(0, Math.floor(Number(r.floor) || 0)), time_ms: Math.max(0, Math.floor(Number(r.time_ms) || 0)), record: !!r.record, no_down: !!r.no_down, players } });
-  // 깬 등급컷은 다음 단계를 여는 데만 쓴다(만점은 기록만).
-  if (r.cleared && cut !== 'max') for (const x of players) {
-    if (!x.reward) continue;
-    const profile = state.profiles.find(y => y.id === x.id);
-    if (profile && !(profile.dungeon_cleared || []).includes(cut)) profile.dungeon_cleared = [...(profile.dungeon_cleared || []), cut];
-  }
+  // V13.143 깬 등급컷 열기 · 코인(서버가 정답 수 · 층 · 등급컷으로 계산) · 기록 보드 · 칭호 숫자(server/dungeon-records.mjs).
+  const { board, rewards } = settleDungeonRecords(state, d, now);
+  Object.assign(d.result, { board, rewards });
   return true;
 }
 // 방이 방 준비(_dungeon)를 받지 못했을 때 되돌린다(Cloudflare 래퍼가 부른다).
@@ -1697,7 +1695,19 @@ export async function service(state, method, path, body, token, options = {}) {
     const d = openDungeonFor(state, p.id, now);
     const recent = (state.dungeons || []).filter(x => x.status === 'finished' && (x.members || []).includes(p.id)).sort((a, b) => b.finished_at - a.finished_at).slice(0, 5)
       .map(x => ({ id: x.id, cut: x.result.cut, cut_name: CUTS[x.result.cut]?.name || '', cleared: x.result.cleared, reached: x.result.reached, time_ms: x.result.time_ms, size: x.result.size, finished_at: x.finished_at }));
-    return { cuts: CUT_KEYS.map(key => ({ key, name: CUTS[key].name, open: open.includes(key), cleared: cleared.includes(key) })), room: d ? dungeonRoomView(state, d, p) : null, invites: dungeonInvitesFor(state, p, now), recent, pool_min: DUNGEON.POOL_MIN };
+    // V13.143 오늘 남은 보상 판(반복 · 위로 · 만점 한 판이 같이 쓴다)과 처음 클리어 코인.
+    const plays = p.dungeon?.day === dayKey(now) ? Number(p.dungeon.plays || 0) : 0;
+    const reward = { daily: DUNGEON_COINS.daily, plays_left: Math.max(0, DUNGEON_COINS.daily - plays), first: DUNGEON_COINS.first, again_max: DUNGEON_COINS.again_max, max_floor: Number(p.dungeon?.max_floor || 0), clears: Number(p.dungeon?.clears || 0), coins: Number(p.dungeon?.coins || 0) };
+    return { cuts: CUT_KEYS.map(key => ({ key, name: CUTS[key].name, open: open.includes(key), cleared: cleared.includes(key) })), room: d ? dungeonRoomView(state, d, p) : null, invites: dungeonInvitesFor(state, p, now), recent, pool_min: DUNGEON.POOL_MIN, reward };
+  }
+  // V13.143 기록 보드(내 학년 · 등급컷 4 × 인원 2, 주간 · 역대 상위 10팀, 내 파티 최고 기록)와 방금 끝난 판의 보상.
+  if (path === '/dungeon/boards' && method === 'GET') {
+    requireRole(p, 'student');
+    return dungeonBoardsView(state, p, gradeOf(p.class_name), Date.now());
+  }
+  if (path === '/dungeon/last' && method === 'GET') {
+    requireRole(p, 'student');
+    return dungeonLastView(state, p);
   }
   if (path === '/dungeon/rooms' && method === 'POST') {
     requireRole(p, 'student');
