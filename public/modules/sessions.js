@@ -5,6 +5,7 @@ import { playSound } from './sound.js';
 import { getRanges, activePeriod, inPeriod } from './student.js';
 import { uiArt, artOr } from './emblems.js';
 import { EXAM_XP_PER_ANSWER, EXAM_COINS, STUDY_COINS } from './rewards.js';
+import { rewardEventResult } from './reward-events-ui.js';
 
 // V13.73: a 발음 듣기 button next to an English word shown as the question (never next to a
 // Korean meaning: there the English sound would give the answer away).
@@ -914,13 +915,14 @@ function finishPracticeView() {
     ${x.left_out ? `<div class="result-note test-left-out-v1376">시험 중에 화면을 ${Number(x.leaves || TEST_LEAVE_LIMIT)}번 나가서 지금까지 푼 답으로 자동 제출됐어요.</div>` : ''}
     <div class="result-reward-card result-reward-top"><div><span>코인</span><strong><i class="coin-ico" aria-hidden="true"></i>+${Number(x.reward_points || 0)}</strong></div><div><span>경험치</span><strong>+${Number(x.xp || 0)}</strong></div></div>
     ${x.reward_note ? `<p class="result-reward-note-v1373">${esc(x.reward_note)}</p>` : ''}
+    ${rewardEventResult(x)}
     <p class="result-next-copy">${esc(statusText)}</p>
     ${primaryCta}
     ${x.run_mode === 'test' ? '<p class="self-test-auto-note-v13123">✓ 선생님이 이 결과를 바로 확인해요</p>' : ''}
     ${answerRows.length || reviewCount ? '<button class="btn full" id="practice-answer-review">답안 보기</button>' : ''}
     <div id="practice-answer-details" class="answer-review-panel" hidden>${detailHtml}</div>
     <div class="result-secondary-actions"><button class="text-button" id="practice-records">내 기록</button><button class="text-button" id="practice-home">홈으로</button></div>
-    <p class="quiet-note">코인은 끝까지 풀고 정답률 ${Math.round(STUDY_COINS.min_accuracy * 100)}% 이상일 때 학습 완료·만점·꾸준함으로 쌓이고(하루 ${STUDY_COINS.cap}개까지), 경험치는 맞힌 만큼 쌓여요. 점수는 오답 복습 재정답으로 올라가지 않고, 승인된 재채점만 반영돼요.</p>
+    <p class="quiet-note">코인은 끝까지 풀고 정답률 ${Math.round(STUDY_COINS.min_accuracy * 100)}% 이상일 때 학습 완료·만점·꾸준함으로 쌓이고(하루 ${STUDY_COINS.cap}개까지${x.reward_event ? `, 이벤트 중에는 ${Math.floor(STUDY_COINS.cap * Number(x.reward_event.multiplier || 1))}개까지` : ''}), 경험치는 맞힌 만큼 쌓여요. 점수는 오답 복습 재정답으로 올라가지 않고, 승인된 재채점만 반영돼요.</p>
   </main></div>`);
   if (x.run_mode === 'test' && !interrupted) animateTestResult(score, perfect);
   $$('[data-finish-practice-dispute]').forEach(button => button.addEventListener('click', async () => {

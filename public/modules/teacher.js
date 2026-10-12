@@ -1,4 +1,5 @@
 import { EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, dayKey } from './core.js';
+import { rewardEventEntry } from './reward-events-ui.js';
 import { icon, esc, num, date, recordRangeLabel, scope, empty, $, $$ } from './ui.js';
 import { avatar } from './character.js';
 import { rangePicker, selectedCount, getRanges, periodGroups } from './student.js';
@@ -42,7 +43,7 @@ const targetCount = (A, value) => A.data.profiles.filter(p => p.active && target
 export function teacherPage(A) {
   const title = tabs.find(t => t[0] === A.tab)?.[1] || '대시보드';
   const pendingDisputes = (A.data.meaning_disputes || []).filter(item => item.status === 'pending').length;
-  const actions = A.tab === 'students' ? `<button class="btn primary" data-action="add-student">${icon('plus')} 학생 등록</button>` : A.tab === 'results' ? `<button class="btn secondary" data-action="export-results">${icon('download')} 결과 내보내기</button>` : A.tab === 'tournaments' ? `<button class="btn primary" data-action="tournament-new">${icon('plus')} 대회 만들기</button>` : A.tab === 'dashboard' || !A.tab ? `<button class="btn secondary notice-top-v1377" data-action="notice">📢 공지 보내기</button><button class="btn secondary install-qr-v1377" data-action="install-qr" title="교실 TV에 띄우면 학생들이 찍어서 앱을 설치해요">📲 앱 설치 QR</button><button class="btn secondary tv2-gift-top-v1375" data-action="gift">${icon('gift')} 코인 선물</button>` : '';
+  const actions = A.tab === 'students' ? `<button class="btn primary" data-action="add-student">${icon('plus')} 학생 등록</button>` : A.tab === 'results' ? `<button class="btn secondary" data-action="export-results">${icon('download')} 결과 내보내기</button>` : A.tab === 'tournaments' ? `<button class="btn primary" data-action="tournament-new">${icon('plus')} 대회 만들기</button>` : A.tab === 'dashboard' || !A.tab ? `<button class="btn secondary notice-top-v1377" data-action="notice">📢 공지 보내기</button><button class="btn secondary reward-event-top-v13142" data-action="reward-events" aria-label="학습 보상 이벤트" title="학습 보상 이벤트"><span aria-hidden="true">🎉</span><span class="rev-top-label">보상 이벤트</span></button><button class="btn secondary install-qr-v1377" data-action="install-qr" title="교실 TV에 띄우면 학생들이 찍어서 앱을 설치해요">📲 앱 설치 QR</button><button class="btn secondary tv2-gift-top-v1375" data-action="gift">${icon('gift')} 코인 선물</button>` : '';
   const content = ({ dashboard, students, books, disputes, results, tournaments, petdex: teacherPetDex }[A.tab] || dashboard)(A);
   const divisionOptions = [['middle','중등부'],['high','고등부']].filter(([id]) => (A.data.divisions || []).includes(id)).map(([id,label]) => `<option value="${id}" ${id === A.data.profile.active_division ? 'selected' : ''}>${label}</option>`).join('');
   const schoolOptions = A.data.schools.map(s => `<option value="${esc(s.id)}" ${s.id === A.data.profile.active_school_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
@@ -245,6 +246,7 @@ function dashboard(A) {
   // class race, then what students sent. Grammar analysis folds away until there is data.
   const joined = newSignups(d);
   return `
+    ${rewardEventEntry()}
     ${kpiCards(A, care)}
     <button type="button" class="new-signup-banner-v13141 ${joined.length ? '' : 'zero'}" data-go="students" data-student-quick="new">${icon('user')}<span><b>새로 가입한 학생 ${num(joined.length)}명</b><small>최근 7일 · ${joined.length ? '눌러서 이름과 반을 바로 고쳐요' : '반별 가입 코드는 학생 관리에 있어요'}</small></span>${icon('chevron')}</button>
     <div class="dash-grid-v1375">
