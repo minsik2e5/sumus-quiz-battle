@@ -10,3 +10,7 @@
 ## 검사
 - `server/final-words-check.mjs`: 80개(본문 67 + 본문 외 13), 범위 L2·기말고사·순서 id, 뜻에 PDF 머리글이 섞이지 않음, 대표 뜻 확인, 선부고 학생만 받음, 2과로 연습 시작.
 - 기존 "선부고는 기말고사 단어가 없다" 검사를 새 상황에 맞게 고침.
+
+## 배포 고침
+- 이 버전의 운영 배포가 `Received a malformed response from the API`로 실패했습니다. 코드 문제가 아니라 배포 도구 wrangler 4.135.0이 Cloudflare의 배포 목록 응답을 읽지 못한 것입니다.
+- wrangler를 **4.149.0**으로 올렸습니다. `server/stability-check.mjs`에 wrangler 버전 검사를 넣었습니다.

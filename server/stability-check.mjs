@@ -35,6 +35,14 @@ export async function runStabilityChecks(assert) {
     assert(app.includes("if (/[?&](password|username)=/.test(location.search)) history.replaceState(null, '', '/');"), 'V13.137 주소창에 남은 비밀번호(?password=)는 앱을 열자마자 지운다');
   }
 
+  /* ---------- V13.138 배포 도구 ---------- */
+  {
+    // wrangler 4.135.0은 Cloudflare 배포 목록 응답을 읽지 못해 배포가 멈췄다("Received a malformed response from the API").
+    const pkg = JSON.parse(source('../package.json'));
+    const [major, minor] = String(pkg.devDependencies?.wrangler || pkg.dependencies?.wrangler || '').split('.').map(Number);
+    assert(/^\d+\.\d+\.\d+$/.test(pkg.devDependencies?.wrangler || pkg.dependencies?.wrangler || '') && (major > 4 || (major === 4 && minor >= 149)), 'V13.138 배포 도구 wrangler는 정확한 버전으로 4.149.0 이상이다(4.135.0은 운영 배포 실패)');
+  }
+
   /* ---------- 저장: 상태를 한 번 더 복사하지 않는다 ---------- */
   let committed = null;
   const repo = { async read() { return { state: {}, revision: 0 }; }, async commit(state) { committed = state; } };
