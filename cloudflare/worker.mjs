@@ -7,7 +7,7 @@ export { BattleRoom };
 // V13.128 던전 방: 파티 하나에 방 하나.
 import { DungeonRoom, dungeonReportKey } from './dungeon-room.mjs';
 export { DungeonRoom };
-import { selfSignup } from '../server/signup.mjs';
+import { selfSignup, checkSignupCode, signupCodeGuard } from '../server/signup.mjs';
 import { examAdmin } from '../server/exam-admin.mjs';
 import { migrateState, stateSizeReport } from '../server/state.mjs';
 import { hashToken } from '../server/auth.mjs';
@@ -23,7 +23,7 @@ const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' };
 
 // Changes allowed without a session. Everything else needs a live token of an active profile
 // (the same test service() makes, done once more outside the queue).
-const OPEN_POST_PATHS = new Set(['/api/login', '/api/signup']);
+const OPEN_POST_PATHS = new Set(['/api/login', '/api/signup', '/api/signup/check']);
 function hasLiveSession(state, token) {
   if (!token || token.length > 200) return false;
   const hash = hashToken(token), now = Date.now();
@@ -363,10 +363,20 @@ export class VocaStateObject {
         this.rateLimit(loginKey, LOGIN_FAIL_MAX, LOGIN_FAIL_WINDOW_MS, '비밀번호를 여러 번 틀렸어요. 5분 후 다시 시도해주세요.');
         this.rateLimit(`${address}:all`, 500, 15 * 60000, '요청이 많습니다. 잠시 후 다시 시도해주세요.');
       }
+      // V13.141: 틀린 가입 코드는 같은 기기에서 30분에 20번까지(맞은 시도는 세지 않는다).
+      const signupCodeTry = url.pathname === '/api/signup' || url.pathname === '/api/signup/check';
+      const countWrongCode = signupCodeTry ? signupCodeGuard(this.rates, address) : null;
+      const withCodeCount = async fn => { try { return await fn(); } catch (error) { countWrongCode?.(error); throw error; } };
       if (url.pathname === '/api/signup') {
         const username = String(body.username || '').trim().toLowerCase();
-        this.rateLimit(`${address}:signup`, 12, 30 * 60000, '회원가입 시도가 많습니다. 잠시 후 다시 시도해주세요.');
+        // 가입 코드가 막아 주므로, 한 교실(같은 와이파이)이 함께 가입할 수 있게 넉넉히 둔다.
+        this.rateLimit(`${address}:signup`, 60, 30 * 60000, '회원가입 시도가 많습니다. 잠시 후 다시 시도해주세요.');
         this.rateLimit(`${address}:signup:${username}`, 4, 30 * 60000, '같은 아이디로 가입 시도가 많습니다. 잠시 후 다시 시도해주세요.');
+      }
+      // 코드 확인은 아무것도 바꾸지 않으므로 저장 줄을 거치지 않는다.
+      if (url.pathname === '/api/signup/check') {
+        if (request.method !== 'POST') throw Object.assign(Error('지원하지 않는 요청입니다.'), { status: 405 });
+        return json(await withCodeCount(() => checkSignupCode(this.mutations.current().state, body)));
       }
       // Each password check runs scrypt up to three times.
       if (url.pathname === '/api/profile/password') this.rateLimit(`${address}:password:${hashToken(token).slice(0, 16)}`, 8, 15 * 60000, '비밀번호 변경 시도가 많습니다. 잠시 후 다시 시도해주세요.');
@@ -406,7 +416,7 @@ export class VocaStateObject {
         return adminOutput !== undefined
           ? adminOutput
           : url.pathname === '/api/signup' && request.method === 'POST'
-            ? await selfSignup(state, body)
+            ? await withCodeCount(() => selfSignup(state, body))
             : await service(state, request.method, path, body, token, { preauthenticatedUserId, origin: url.origin });
       };
 
