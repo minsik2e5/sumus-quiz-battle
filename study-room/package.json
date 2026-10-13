@@ -1,0 +1,17 @@
+{
+  "name": "sumus-study-room",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SUMUS 공부방 - 학원 학생들이 캐릭터로 함께 공부하는 실시간 공부방",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/academy.test.js test/server.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pg": "^8.13.1",
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1c1a22">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SUMUS 공부방">
+  <title>SUMUS 공부방</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/icon.svg">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <!-- 입장 -->
+  <section id="screen-entry" class="screen entry" hidden>
+    <div class="entry-hero" id="entry-hero"></div>
+    <h1 class="entry-title">SUMUS 공부방</h1>
+    <p class="entry-sub">친구들이랑 같이 공부하기 ✏️</p>
+    <form id="entry-form" class="entry-form" autocomplete="off">
+      <label>반 코드<input id="in-code" inputmode="numeric" pattern="\d*" maxlength="4" placeholder="선생님이 알려준 4자리"></label>
+      <p id="class-name" class="class-name"></p>
+      <label>이름<input id="in-name" maxlength="10" placeholder="반에서 부르는 이름"></label>
+      <label>PIN<input id="in-pin" type="password" inputmode="numeric" pattern="\d*" maxlength="4" placeholder="숫자 4자리 (다음에 로그인할 때 필요)"></label>
+      <p id="entry-error" class="form-error" role="alert"></p>
+      <button type="submit" class="btn primary" data-mode="login">다시 들어가기</button>
+      <button type="button" id="btn-register" class="btn ghost">처음 왔어요 · 가입하기</button>
+    </form>
+  </section>
+
+  <!-- 캐릭터 꾸미기 -->
+  <section id="screen-avatar" class="screen avatar-editor" hidden>
+    <header class="topbar light">
+      <button class="icon-btn" id="avatar-back" aria-label="뒤로">‹</button>
+      <h2>내 캐릭터 꾸미기</h2>
+      <button class="icon-btn" id="avatar-dice" aria-label="랜덤">🎲</button>
+    </header>
+    <div class="avatar-preview"><div id="avatar-preview-card" class="card s-study"></div></div>
+    <div class="avatar-options" id="avatar-options"></div>
+    <div class="avatar-save"><button class="btn primary" id="avatar-save">이 캐릭터로 할래요</button></div>
+  </section>
+
+  <!-- 공부방 -->
+  <section id="screen-room" class="screen room" hidden>
+    <header class="topbar">
+      <div class="room-title"><span id="room-name">공부방</span><span class="heart-dot">♥</span></div>
+      <div class="tabs" role="tablist">
+        <button class="tab" data-view="class" role="tab">우리 반</button>
+        <button class="tab" data-view="all" role="tab">학원 전체</button>
+      </div>
+      <button class="icon-btn" id="btn-menu" aria-label="메뉴">⋮</button>
+    </header>
+    <div id="notices" class="notices"></div>
+    <p id="room-summary" class="room-summary"></p>
+    <div id="grid" class="grid"></div>
+    <p id="conn" class="conn" hidden>연결 중…</p>
+    <nav class="bottombar">
+      <button class="bar-btn" id="btn-sound" aria-label="소리">🔈</button>
+      <button class="bar-btn" id="btn-solo" aria-label="혼자 모드">👤</button>
+      <button class="play" id="btn-play" aria-label="공부 시작"><span></span></button>
+      <button class="bar-btn" id="btn-stats" aria-label="내 기록">🕒</button>
+      <button class="bar-btn" id="btn-bubble" aria-label="말풍선">💬</button>
+    </nav>
+  </section>
+
+  <!-- 혼자 모드 -->
+  <section id="screen-solo" class="screen solo" hidden>
+    <header class="topbar light">
+      <button class="icon-btn" id="solo-back" aria-label="공부방으로">‹</button>
+      <h2>혼자 집중</h2>
+      <span></span>
+    </header>
+    <p class="solo-label" id="solo-label">오늘 공부한 시간</p>
+    <div class="solo-timer"><span id="solo-time">00:00:00</span></div>
+    <div class="solo-friends" id="solo-friends"></div>
+    <div class="solo-avatar" id="solo-avatar"></div>
+    <div class="solo-actions"><button class="play big" id="solo-play" aria-label="공부 시작"><span></span></button></div>
+  </section>
+
+  <!-- 말풍선 시트 -->
+  <div id="sheet-bubble" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <form class="sheet-body bubble-sheet" id="bubble-form">
+      <p class="sheet-title">말풍선에 오늘 할 거 띄워두기</p>
+      <input id="bubble-input" maxlength="20" placeholder="예) 영어 단어 50개, 수학 숙제!" enterkeyhint="send">
+      <div class="bubble-bar">
+        <button type="button" class="link" id="bubble-clear">말풍선 내리기</button>
+        <span class="bubble-left">오늘 남은 횟수 <b id="bubble-left">20</b></span>
+        <button type="submit" class="btn small primary">올리기</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- 기록 시트 -->
+  <div id="sheet-stats" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-body stats-sheet" id="stats-body"></div>
+  </div>
+
+  <!-- 메뉴 시트 -->
+  <div id="sheet-menu" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-body menu-sheet">
+      <p class="sheet-title" id="menu-who"></p>
+      <button class="menu-item" id="menu-avatar">🎨 캐릭터 꾸미기</button>
+      <button class="menu-item" id="menu-install">📲 홈 화면에 추가하는 법</button>
+      <button class="menu-item danger" id="menu-logout">로그아웃</button>
+      <button class="menu-item" data-close>닫기</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="/avatar.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
