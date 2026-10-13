@@ -11,6 +11,9 @@ const BUBBLES_PER_DAY = 20;
 const CHEER_GAP_MS = 1500;
 const STREAK_MIN_MS = 30 * 60 * 1000; // 하루 30분 이상 공부해야 연속 기록으로 친다
 const MAX_TOKENS = 5;
+// 켜두기만 하는 걸 막기 위한 집중 확인: 30~50분마다 한 번, 3분 안에 눌러야 한다
+const CHECK_EVERY_MS = [30 * 60 * 1000, 50 * 60 * 1000];
+const CHECK_WINDOW_MS = 3 * 60 * 1000;
 const STATUS_ORDER = { study: 0, away: 1, rest: 2, offline: 3 };
 
 function sha(value) {
@@ -29,9 +32,23 @@ class AcademyError extends Error {
 }
 
 class Academy {
-  constructor(store, { now = () => Date.now(), onMember = () => {}, onRemove = () => {}, onCheer = () => {}, onNotice = () => {} } = {}) {
+  constructor(store, {
+    now = () => Date.now(),
+    onMember = () => {},
+    onRemove = () => {},
+    onCheer = () => {},
+    onNotice = () => {},
+    onCheckMissed = () => {},
+    checkEveryMs = CHECK_EVERY_MS,
+    checkWindowMs = CHECK_WINDOW_MS,
+    random = Math.random
+  } = {}) {
     this.store = store;
     this.now = now;
+    this.onCheckMissed = onCheckMissed;
+    this.checkEveryMs = checkEveryMs;
+    this.checkWindowMs = checkWindowMs;
+    this.random = random;
     this.onMember = onMember;
     this.onRemove = onRemove;
     this.onCheer = onCheer;
@@ -226,7 +243,7 @@ class Academy {
   liveOf(id) {
     let l = this.live.get(id);
     if (!l) {
-      l = { sockets: 0, since: null, awayAt: null, bubble: null, lastCheer: 0 };
+      l = { sockets: 0, since: null, awayAt: null, bubble: null, lastCheer: 0, check: null, nextCheckAt: null };
       this.live.set(id, l);
     }
     return l;
@@ -234,7 +251,7 @@ class Academy {
 
   record(id, day) {
     const byDay = this.data.daily[id] || (this.data.daily[id] = {});
-    return byDay[day] || (byDay[day] = { ms: 0, b: 0, h: 0 });
+    return byDay[day] || (byDay[day] = { ms: 0, b: 0, h: 0, ok: 0, miss: 0 });
   }
 
   peek(id, day) {
@@ -259,7 +276,7 @@ class Academy {
     s.lastSeen = this.now();
     this.dirty();
     if (l.sockets === 0 && l.since != null) {
-      this.commit(id, this.now());
+      this.commit(id, this.cap(l, this.now()));
       l.awayAt = this.now();
     }
     this.emit(id);
@@ -274,23 +291,52 @@ class Academy {
     this.dirty();
   }
 
+  // 자리비움이나 집중 확인 대기 중에는 그 시점까지만 기록한다
+  cap(l, upTo) {
+    let t = upTo;
+    if (l.awayAt != null) t = Math.min(t, l.awayAt);
+    if (l.check) t = Math.min(t, l.check.at);
+    return t;
+  }
+
+  scheduleCheck(l) {
+    const [min, max] = this.checkEveryMs;
+    l.nextCheckAt = this.now() + min + Math.floor(this.random() * (max - min));
+  }
+
   startStudy(id) {
     this.mustStudent(id);
     const l = this.liveOf(id);
     if (l.since != null && l.awayAt == null) return;
-    if (l.awayAt != null) this.commit(id, l.awayAt);
+    if (l.since != null) this.commit(id, this.cap(l, this.now()));
     l.since = this.now();
     l.awayAt = null;
+    l.check = null;
+    this.scheduleCheck(l);
     this.emit(id);
   }
 
-  stopStudy(id) {
+  stopStudy(id, upTo) {
     const l = this.live.get(id);
     if (!l || l.since == null) return;
-    this.commit(id, l.awayAt != null ? l.awayAt : this.now());
+    // 직접 멈추면 확인 대기 중이었어도 지금까지 인정한다 (화면 앞에 있다는 뜻)
+    this.commit(id, upTo != null ? upTo : (l.awayAt != null ? l.awayAt : this.now()));
     l.since = null;
     l.awayAt = null;
+    l.check = null;
+    l.nextCheckAt = null;
     this.emit(id);
+  }
+
+  confirmCheck(id) {
+    const l = this.live.get(id);
+    if (!l || !l.check || l.since == null) return false;
+    this.record(id, dayKey(l.check.at)).ok += 1;
+    l.check = null;
+    this.scheduleCheck(l);
+    this.dirty();
+    this.emit(id);
+    return true;
   }
 
   setStudy(id, on) {
@@ -342,10 +388,19 @@ class Academy {
     const now = this.now();
     for (const [id, l] of this.live) {
       if (l.since == null) continue;
-      if (l.awayAt != null) {
+      if (l.check && now > l.check.deadline) {
+        const at = l.check.at;
+        this.record(id, dayKey(at)).miss += 1;
+        this.stopStudy(id, Math.min(at, l.awayAt != null ? l.awayAt : at));
+        this.onCheckMissed(id);
+      } else if (l.awayAt != null) {
         if (now - l.awayAt > AWAY_GRACE_MS) this.stopStudy(id);
       } else {
-        this.commit(id, now);
+        this.commit(id, this.cap(l, now));
+        if (!l.check && l.nextCheckAt != null && now >= l.nextCheckAt) {
+          l.check = { at: now, deadline: now + this.checkWindowMs };
+          this.emit(id);
+        }
       }
     }
     const day = dayKey(now);
@@ -408,7 +463,8 @@ class Academy {
     const m = this.member(id);
     if (!m) return null;
     const rec = this.peek(id, this.today());
-    return { ...m, bubblesLeft: BUBBLES_PER_DAY - (rec ? rec.b : 0) };
+    const l = this.live.get(id);
+    return { ...m, bubblesLeft: BUBBLES_PER_DAY - (rec ? rec.b : 0), check: (l && l.check) || null };
   }
 
   roomMembers(view, classCode) {
@@ -511,6 +567,8 @@ class Academy {
         streak: this.streak(s.id),
         bubble: (l && l.bubble) || null,
         bubblesUsed: rec ? rec.b : 0,
+        checksOk: rec ? rec.ok || 0 : 0,
+        checksMissed: rec ? rec.miss || 0 : 0,
         hearts: rec ? rec.h : 0,
         lastSeen: s.lastSeen || null
       };
@@ -551,4 +609,4 @@ function compareMembers(a, b) {
   return STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.name.localeCompare(b.name, 'ko');
 }
 
-module.exports = { Academy, AcademyError, ALL, AWAY_GRACE_MS, BUBBLES_PER_DAY, STREAK_MIN_MS };
+module.exports = { Academy, AcademyError, ALL, AWAY_GRACE_MS, BUBBLES_PER_DAY, STREAK_MIN_MS, CHECK_EVERY_MS, CHECK_WINDOW_MS };

@@ -25,7 +25,8 @@
     muted: saved.get('study.muted') === '1',
     draft: null,
     avatarReturn: 'room',
-    wakeLock: null
+    wakeLock: null,
+    alertedCheck: null
   };
 
   // ---------- 유틸 ----------
@@ -94,7 +95,7 @@
     if (state.muted) return;
     try {
       audio = audio || new (window.AudioContext || window.webkitAudioContext)();
-      const notes = kind === 'start' ? [523, 659, 784] : [880, 1175];
+      const notes = kind === 'start' ? [523, 659, 784] : kind === 'check' ? [784, 988, 784, 988] : [880, 1175];
       notes.forEach((freq, i) => {
         const o = audio.createOscillator();
         const g = audio.createGain();
@@ -339,6 +340,9 @@
         state.notices = msg.notices || [];
         renderNotices();
         break;
+      case 'check_missed':
+        toast('3분 동안 확인이 없어서 공부를 멈췄어요. 확인 창이 뜬 때까지만 기록됐어요.', 6000);
+        break;
       case 'pong':
         state.offset = msg.serverNow - Date.now();
         break;
@@ -467,7 +471,29 @@
     $('#bubble-left').textContent = state.me.bubblesLeft;
     if (!state.members.has(state.me.id) && state.view === 'class') state.members.set(state.me.id, state.me);
     if (!$('#screen-solo').hidden) renderSolo();
+    renderCheck();
     syncWakeLock();
+  }
+
+  // 공부 중 30~50분마다 서버가 집중 확인을 보낸다. 3분 안에 눌러야 시간이 이어진다.
+  function renderCheck() {
+    const check = state.me && state.me.check;
+    $('#check').hidden = !check;
+    document.title = check ? '👀 집중 확인!' : 'SUMUS 공부방';
+    if (!check) return;
+    tickCheck();
+    if (state.alertedCheck !== check.at) {
+      state.alertedCheck = check.at;
+      ding('check');
+      try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch { /* 무시 */ }
+    }
+  }
+
+  function tickCheck() {
+    const check = state.me && state.me.check;
+    if (!check) return;
+    const left = Math.max(0, Math.ceil((check.deadline - serverNow()) / 1000));
+    $('#check-left').textContent = `${Math.floor(left / 60)}:${pad(left % 60)}`;
   }
 
   function toggleStudy() {
@@ -481,6 +507,7 @@
       if (m && m.since) $('.timer', el).textContent = fmt(liveMs(m));
     }
     if (!$('#screen-solo').hidden && state.me) $('#solo-time').textContent = fmt(liveMs(state.me));
+    tickCheck();
   }
 
   // ---------- 혼자 모드 ----------
@@ -557,7 +584,7 @@
           ${s.top.length ? s.top.map((r, i) => `<div class="rank-row"><span class="medal">${medals[i]}</span><span class="f">${Avatar.face(r.avatar)}</span><span>${esc(r.name)}</span><span class="t">${fmtShort(r.ms)}</span></div>`).join('') : '<p class="rank-me">아직 기록이 없어요. 1등 자리가 비어 있어요!</p>'}
           <p class="rank-me">나는 ${s.classSize}명 중 <b>${s.myRank}등</b> · 오늘 받은 응원 ♥ ${s.hearts}</p>
         </div>
-        <p class="rank-me">하루 30분 이상 공부하면 연속 기록이 이어져요.</p>
+        <p class="rank-me">하루 30분 이상 공부하면 연속 기록이 이어져요. 공부 중엔 30~50분마다 집중 확인이 떠요.</p>
         <button class="btn" data-close style="margin-top:12px;background:#f6f3f8">닫기</button>`;
     } catch (err) {
       body.innerHTML = `<p class="sheet-title">내 기록</p><p>${esc(err.message)}</p><button class="btn" data-close>닫기</button>`;
@@ -627,6 +654,7 @@
     $('#btn-bubble').addEventListener('click', openBubble);
     $('#btn-menu').addEventListener('click', openMenu);
     $('#bubble-form').addEventListener('submit', submitBubble);
+    $('#check-ok').addEventListener('click', () => sendWs({ t: 'check_ok' }));
     $('#bubble-clear').addEventListener('click', () => { if (sendWs({ t: 'bubble', text: '' })) closeSheets(); });
     $('#menu-avatar').addEventListener('click', () => { closeSheets(); openAvatarEditor('room'); });
     $('#menu-install').addEventListener('click', () => {

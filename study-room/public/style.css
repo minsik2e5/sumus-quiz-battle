@@ -214,6 +214,15 @@ input { font: inherit; }
 .avatar-save { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(14px + var(--safe-b)); background: linear-gradient(to top, #fff 70%, rgba(255,255,255,0)); }
 .avatar-save .btn { max-width: 528px; margin: 0 auto; }
 
+.check { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: rgba(18,16,24,.72); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+.check-box { width: min(100%, 360px); background: #fff; color: #2c2730; border-radius: 24px; padding: 26px 22px 20px; text-align: center; animation: pop .25s ease-out; }
+.check-emoji { font-size: 52px; animation: wiggle 1.2s ease-in-out infinite; }
+.check-title { margin: 8px 0 4px; font-size: 21px; font-weight: 800; }
+.check-sub { margin: 0 0 18px; color: #8b8494; font-size: 14px; }
+.check-sub b { color: var(--accent); font-variant-numeric: tabular-nums; }
+@keyframes pop { from { transform: scale(.85); opacity: 0; } }
+@keyframes wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
+
 .toast {
   position: fixed; left: 50%; top: calc(64px + var(--safe-t)); transform: translateX(-50%); z-index: 40;
   background: #fff; color: #2c2730; padding: 10px 16px; border-radius: 99px; font-weight: 700; font-size: 14px;

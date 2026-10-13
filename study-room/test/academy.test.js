@@ -151,3 +151,36 @@ test('store persists to a file and reloads', async () => {
   const academy2 = new Academy(again);
   assert.equal(academy2.auth(token).name, '감자');
 });
+
+test('focus check: confirming keeps the time, missing stops at the check time', () => {
+  const clock = { t: Date.parse('2026-10-13T10:00:00+09:00') };
+  const missed = [];
+  const academy = new Academy(new Store(), {
+    now: () => clock.t,
+    random: () => 0,
+    checkEveryMs: [30 * MIN, 50 * MIN],
+    checkWindowMs: 3 * MIN,
+    onCheckMissed: (id) => missed.push(id)
+  });
+  const cls = academy.createClass('A');
+  const s = academy.register({ name: '감자', classCode: cls.code, pin: '1234' }).student;
+  academy.attach(s.id);
+  academy.setStudy(s.id, true);
+  clock.t += 30 * MIN;
+  academy.tick();
+  assert.ok(academy.me(s.id).check, 'check is shown after 30 minutes');
+  clock.t += 1 * MIN;
+  assert.equal(academy.confirmCheck(s.id), true);
+  assert.equal(academy.me(s.id).check, null);
+  clock.t += 30 * MIN;
+  academy.tick();
+  assert.ok(academy.me(s.id).check, 'next check 30 minutes after confirming');
+  clock.t += 3 * MIN + 1000;
+  academy.tick();
+  assert.deepEqual(missed, [s.id]);
+  assert.equal(academy.status(s.id), 'rest');
+  assert.equal(academy.todayMs(s.id), 61 * MIN); // 두 번째 확인이 뜬 시점까지만
+  const row = academy.overview(cls.code).students[0];
+  assert.equal(row.checksOk, 1);
+  assert.equal(row.checksMissed, 1);
+});

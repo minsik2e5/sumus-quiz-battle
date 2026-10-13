@@ -114,6 +114,9 @@ async function createApp({
         if (ws.meta.studentId === event.to || (target && sees(ws, target))) send(ws, { t: 'cheer', ...event });
       }
     },
+    onCheckMissed(id) {
+      for (const ws of sockets) if (ws.meta.studentId === id) send(ws, { t: 'check_missed' });
+    },
     onNotice() {
       for (const ws of sockets) {
         if (ws.meta.studentId) send(ws, { t: 'notices', notices: academy.noticesFor(ws.meta.classCode) });
@@ -373,6 +376,7 @@ async function createApp({
     if (msg.t === 'bubble') return academy.postBubble(id, msg.text);
     if (msg.t === 'cheer') return academy.cheer(id, String(msg.to || ''));
     if (msg.t === 'avatar') return academy.setAvatar(id, msg.avatar);
+    if (msg.t === 'check_ok') return academy.confirmCheck(id);
   }
 
   const tickTimer = setInterval(() => academy.tick(), TICK_MS);

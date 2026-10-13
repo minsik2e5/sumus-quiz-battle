@@ -65,117 +65,171 @@
 
   let uid = 0;
 
+  // 앞머리 끝선: 가운데는 base, 양옆으로 갈수록 sideDrop만큼 내려가며 locks개의 머리카락 끝이 tip만큼 늘어진다
+  function bangEdge(cx, r, base, { locks, tip, sideDrop, tilt = 0, sharp = false }) {
+    const L = cx - r - 8;
+    const R = cx + r + 8;
+    const yAt = (x) => base + Math.pow(Math.abs(x - cx) / r, 2) * sideDrop + (x - cx) * tilt;
+    let d = `L${R} ${yAt(R).toFixed(1)}`;
+    const step = (R - L) / locks;
+    for (let i = 0; i < locks; i += 1) {
+      const x1 = R - step * i;
+      const x2 = R - step * (i + 1);
+      const mx = (x1 + x2) / 2;
+      const t = tip * (0.75 + 0.5 * ((i * 37) % 7) / 7);
+      if (sharp) d += ` Q${(mx + step * 0.15).toFixed(1)} ${(yAt(mx) + t * 0.4).toFixed(1)} ${mx.toFixed(1)} ${(yAt(mx) + t).toFixed(1)} Q${(mx - step * 0.1).toFixed(1)} ${(yAt(x2) + t * 0.3).toFixed(1)} ${x2.toFixed(1)} ${yAt(x2).toFixed(1)}`;
+      else d += ` Q${mx.toFixed(1)} ${(yAt(mx) + t * 2).toFixed(1)} ${x2.toFixed(1)} ${yAt(x2).toFixed(1)}`;
+    }
+    return { d, L, R };
+  }
+
   // pose: 'study'(고개 숙이고 책 보기) | 'rest'(정면 보기)
   function svg(input, opts) {
     const a = normalize(input);
     const pose = opts && opts.pose === 'rest' ? 'rest' : 'study';
+    const study = pose === 'study';
     const id = 'av' + (++uid);
     const hair = HAIR_COLORS[a.hc];
+    const hairDark = shade(hair, -22);
     const top = TOPS[a.top];
+    const topDark = shade(top, -38);
     const cx = 100;
-    const cy = pose === 'study' ? 80 : 72;
-    const r = 44;
-    const eyeY = pose === 'study' ? cy + 17 : cy + 7;
-    const coversEars = a.hair === 'bob' || a.hair === 'long' || a.hair === 'buns';
-    const parts = [];
+    const cy = study ? 84 : 76;
+    const r = 47;
+    const eyeY = study ? cy + 19 : cy + 9;
+    const longish = a.hair === 'bob' || a.hair === 'long' || a.hair === 'buns';
+    const p = [];
 
-    parts.push(`<defs>
-      <radialGradient id="${id}s" cx="45%" cy="38%" r="70%"><stop offset="0" stop-color="#fde7da"/><stop offset="1" stop-color="${SKIN}"/></radialGradient>
-      <radialGradient id="${id}h" cx="40%" cy="30%" r="75%"><stop offset="0" stop-color="${shade(hair, 38)}"/><stop offset="1" stop-color="${hair}"/></radialGradient>
-      <linearGradient id="${id}t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${shade(top, 18)}"/><stop offset="1" stop-color="${shade(top, -14)}"/></linearGradient>
-      <clipPath id="${id}c"><circle cx="${cx}" cy="${cy}" r="${r + 1.5}"/></clipPath>
+    p.push(`<defs>
+      <linearGradient id="${id}w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fcf8f3"/><stop offset="1" stop-color="#f2e9df"/></linearGradient>
+      <radialGradient id="${id}s" cx="40%" cy="34%" r="72%"><stop offset="0" stop-color="#fff2ea"/><stop offset=".55" stop-color="${SKIN}"/><stop offset="1" stop-color="#ecc1aa"/></radialGradient>
+      <radialGradient id="${id}e" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#e8b49c"/><stop offset="1" stop-color="#f3cdb8"/></radialGradient>
+      <radialGradient id="${id}h" cx="38%" cy="22%" r="85%"><stop offset="0" stop-color="${shade(hair, 46)}"/><stop offset=".5" stop-color="${hair}"/><stop offset="1" stop-color="${hairDark}"/></radialGradient>
+      <radialGradient id="${id}t" cx="35%" cy="15%" r="95%"><stop offset="0" stop-color="${shade(top, 26)}"/><stop offset=".6" stop-color="${top}"/><stop offset="1" stop-color="${shade(top, -26)}"/></radialGradient>
+      <radialGradient id="${id}b" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#ff8f8f" stop-opacity=".55"/><stop offset="1" stop-color="#ff8f8f" stop-opacity="0"/></radialGradient>
+      <radialGradient id="${id}sh" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#7a4a2a" stop-opacity=".22"/><stop offset="1" stop-color="#7a4a2a" stop-opacity="0"/></radialGradient>
+      <linearGradient id="${id}d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2d2ac"/><stop offset="1" stop-color="#e2b385"/></linearGradient>
+      <clipPath id="${id}c"><circle cx="${cx}" cy="${cy}" r="${r + 0.5}"/></clipPath>
+      <clipPath id="${id}k"><rect x="0" y="0" width="200" height="${longish ? 200 : a.hair === 'curly' ? cy + 16 : cy + 6}"/></clipPath>
     </defs>`);
 
-    // 몸통(후드티)
-    parts.push(`<path d="M42 150 C42 120 68 110 100 110 C132 110 158 120 158 150 Z" fill="url(#${id}t)"/>`);
-    parts.push(`<path d="M86 112 Q100 128 114 112" fill="none" stroke="${shade(top, -32)}" stroke-width="2.5" stroke-linecap="round" opacity=".55"/>`);
-    parts.push(`<line x1="93" y1="122" x2="92" y2="136" stroke="${shade(top, -40)}" stroke-width="2" stroke-linecap="round" opacity=".45"/><line x1="107" y1="122" x2="108" y2="136" stroke="${shade(top, -40)}" stroke-width="2" stroke-linecap="round" opacity=".45"/>`);
+    // 벽과 그림자
+    p.push(`<rect width="200" height="200" fill="url(#${id}w)"/>`);
+    p.push(`<ellipse cx="100" cy="132" rx="82" ry="48" fill="url(#${id}sh)" opacity=".55"/>`);
 
-    // 뒷머리
+    // 몸통(후드티)
+    p.push(`<path d="M30 160 C30 128 58 114 100 114 C142 114 170 128 170 160 Z" fill="url(#${id}t)"/>`);
+    p.push(`<path d="M64 121 Q100 104 136 121 Q118 134 100 134 Q82 134 64 121 Z" fill="${topDark}" opacity=".45"/>`);
+    p.push(`<ellipse cx="${cx}" cy="${cy + r - 2}" rx="30" ry="9" fill="${topDark}" opacity=".35"/>`);
+    p.push(`<g stroke="${shade(top, top === '#2f3557' ? 120 : 60)}" stroke-width="2.4" stroke-linecap="round" fill="none"><path d="M91 131 Q90 140 92 148"/><path d="M109 131 Q110 140 108 148"/></g><circle cx="92" cy="149" r="2.2" fill="${shade(top, top === '#2f3557' ? 120 : 60)}"/><circle cx="108" cy="149" r="2.2" fill="${shade(top, top === '#2f3557' ? 120 : 60)}"/>`);
+
+    // 뒷머리(머리 볼륨)
+    const backTop = cy - r - 7;
     if (a.hair === 'long') {
-      parts.push(`<path d="M${cx - r - 6} ${cy} C${cx - r - 8} ${cy - r - 8} ${cx + r + 8} ${cy - r - 8} ${cx + r + 6} ${cy} L${cx + r + 4} 146 Q${cx + r - 6} 150 ${cx + r - 14} 146 L${cx - r + 14} 146 Q${cx - r + 6} 150 ${cx - r - 4} 146 Z" fill="url(#${id}h)"/>`);
+      p.push(`<path d="M${cx - r - 8} ${cy - 4} C${cx - r - 10} ${backTop - 2} ${cx + r + 10} ${backTop - 2} ${cx + r + 8} ${cy - 4} C${cx + r + 12} ${cy + 30} ${cx + r + 10} 128 ${cx + r + 6} 150 Q${cx + r - 6} 156 ${cx + r - 16} 150 L${cx + r - 24} ${cy + 30} L${cx - r + 24} ${cy + 30} L${cx - r + 16} 150 Q${cx - r + 6} 156 ${cx - r - 6} 150 C${cx - r - 10} 128 ${cx - r - 12} ${cy + 30} ${cx - r - 8} ${cy - 4} Z" fill="url(#${id}h)"/>`);
+      p.push(`<g stroke="${hairDark}" stroke-width="1.6" opacity=".5" fill="none" stroke-linecap="round"><path d="M${cx - r - 2} ${cy + 20} Q${cx - r - 4} ${cy + 50} ${cx - r + 4} 146"/><path d="M${cx + r + 2} ${cy + 20} Q${cx + r + 4} ${cy + 50} ${cx + r - 4} 146"/></g>`);
     } else if (a.hair === 'bob' || a.hair === 'buns') {
       if (a.hair === 'buns') {
-        parts.push(`<circle cx="${cx - 34}" cy="${cy - 38}" r="17" fill="url(#${id}h)"/><circle cx="${cx + 34}" cy="${cy - 38}" r="17" fill="url(#${id}h)"/>`);
+        for (const s of [-1, 1]) {
+          p.push(`<circle cx="${cx + s * 36}" cy="${cy - 40}" r="19" fill="url(#${id}h)"/><path d="M${cx + s * 36 - 11} ${cy - 50} Q${cx + s * 36} ${cy - 56} ${cx + s * 36 + 9} ${cy - 49}" stroke="#fff" stroke-opacity=".3" stroke-width="4" fill="none" stroke-linecap="round"/>`);
+        }
       }
-      parts.push(`<path d="M${cx - r - 7} ${cy + 4} C${cx - r - 8} ${cy - r - 10} ${cx + r + 8} ${cy - r - 10} ${cx + r + 7} ${cy + 4} L${cx + r + 6} ${cy + 26} Q${cx + r - 4} ${cy + 33} ${cx + r - 12} ${cy + 26} L${cx - r + 12} ${cy + 26} Q${cx - r + 4} ${cy + 33} ${cx - r - 6} ${cy + 26} Z" fill="url(#${id}h)"/>`);
+      const end = a.hair === 'bob' ? cy + 34 : cy + 24;
+      p.push(`<path d="M${cx - r - 9} ${cy} C${cx - r - 10} ${backTop - 4} ${cx + r + 10} ${backTop - 4} ${cx + r + 9} ${cy} L${cx + r + 8} ${end - 4} Q${cx + r + 6} ${end + 4} ${cx + r - 6} ${end} L${cx - r + 6} ${end} Q${cx - r - 6} ${end + 4} ${cx - r - 8} ${end - 4} Z" fill="url(#${id}h)"/>`);
+    } else if (a.hair === 'curly') {
+      let bumps = '';
+      for (let i = 0; i <= 10; i += 1) {
+        const ang = Math.PI * (0.95 + i * 0.11);
+        bumps += `<circle cx="${(cx + Math.cos(ang) * (r + 2)).toFixed(1)}" cy="${(cy - 6 + Math.sin(ang) * (r + 0)).toFixed(1)}" r="12" fill="url(#${id}h)"/>`;
+      }
+      p.push(`<g clip-path="url(#${id}k)">${bumps}</g>`);
+    } else {
+      p.push(`<g clip-path="url(#${id}k)"><ellipse cx="${cx}" cy="${cy - 5}" rx="${r + 5}" ry="${r + 4}" fill="url(#${id}h)"/></g>`);
     }
 
     // 귀
-    if (!coversEars) {
-      parts.push(`<circle cx="${cx - r + 1}" cy="${cy + 8}" r="9" fill="${SKIN_SHADE}"/><circle cx="${cx + r - 1}" cy="${cy + 8}" r="9" fill="${SKIN_SHADE}"/>`);
+    if (!longish) {
+      for (const s of [-1, 1]) {
+        p.push(`<ellipse cx="${cx + s * (r - 1)}" cy="${cy + 9}" rx="9" ry="10" fill="url(#${id}s)"/><ellipse cx="${cx + s * (r)}" cy="${cy + 9}" rx="4.5" ry="5.5" fill="url(#${id}e)"/>`);
+      }
     }
 
     // 얼굴
-    parts.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${id}s)"/>`);
+    p.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${id}s)"/>`);
 
-    // 앞머리(얼굴 원에 맞춰 잘라서 그린다)
-    const topY = cy - r - 4;
-    const L = cx - r - 4;
-    const R = cx + r + 4;
-    let bang;
-    const base = pose === 'study' ? cy + 2 : cy - 12;
-    if (a.hair === 'short') {
-      bang = `M${L} ${topY} L${R} ${topY} L${R} ${base + 2} Q${cx} ${base - 8} ${L} ${base + 2} Z`;
-    } else if (a.hair === 'side') {
-      bang = `M${L} ${topY} L${R} ${topY} L${R} ${base + 4} Q${cx + 10} ${base - 4} ${cx - 8} ${base - 18} Q${cx - 26} ${base - 4} ${L} ${base + 6} Z`;
-    } else if (a.hair === 'curly') {
-      let d = `M${L} ${topY} L${R} ${topY} L${R} ${base}`;
-      const n = 6;
-      const step = (R - L) / n;
-      for (let i = 0; i < n; i += 1) {
-        const x1 = R - step * i;
-        const x2 = R - step * (i + 1);
-        d += ` Q${(x1 + x2) / 2} ${base + 12} ${x2} ${base}`;
+    // 눈, 볼, 코, 입
+    const ery = study ? 3.6 : 5;
+    for (const s of [-1, 1]) {
+      const ex = cx + s * 16;
+      p.push(`<ellipse cx="${ex}" cy="${eyeY}" rx="4.2" ry="${ery}" fill="#2a2120"/>`);
+      if (!study) p.push(`<circle cx="${ex - 1.3}" cy="${eyeY - 2}" r="1.5" fill="#fff"/>`);
+      p.push(`<ellipse cx="${cx + s * 28}" cy="${eyeY + 10}" rx="9" ry="6" fill="url(#${id}b)"/>`);
+    }
+    p.push(`<ellipse cx="${cx}" cy="${eyeY + 6}" rx="2.2" ry="1.5" fill="#e3a98f" opacity=".7"/>`);
+    if (!study) p.push(`<path d="M${cx - 4.5} ${eyeY + 13} Q${cx} ${eyeY + 17} ${cx + 4.5} ${eyeY + 13}" fill="none" stroke="#8a4e43" stroke-width="2" stroke-linecap="round"/>`);
+
+    // 앞머리
+    const base = study ? cy - 2 : cy - 13;
+    const cfg = {
+      short: { locks: 6, tip: 4, sideDrop: 20, sharp: true },
+      side: { locks: 4, tip: 5, sideDrop: 18, tilt: -0.22, sharp: true },
+      curly: { locks: 8, tip: 4.5, sideDrop: 16 },
+      bob: { locks: 7, tip: 1.6, sideDrop: 30 },
+      long: { locks: 7, tip: 1.6, sideDrop: 30 },
+      buns: { locks: 7, tip: 1.6, sideDrop: 30 }
+    }[a.hair];
+    const edge = bangEdge(cx, r, a.hair === 'side' ? base - 2 : base, cfg);
+    const topY = cy - r - 10;
+    p.push(`<g clip-path="url(#${id}c)"><path d="M${edge.L} ${topY} L${edge.R} ${topY} ${edge.d} Z" fill="url(#${id}h)"/>`);
+    // 머리카락 결
+    p.push(`<g stroke="${hairDark}" stroke-width="1.3" opacity=".28" fill="none" stroke-linecap="round"><path d="M${cx - 14} ${base - 16} Q${cx - 17} ${base - 6} ${cx - 20} ${base + 3}"/><path d="M${cx + 12} ${base - 16} Q${cx + 15} ${base - 6} ${cx + 17} ${base + 3}"/></g></g>`);
+    if (longish) {
+      for (const s of [-1, 1]) {
+        p.push(`<path d="M${cx + s * (r + 6)} ${cy - 18} Q${cx + s * (r - 10)} ${cy + 6} ${cx + s * (r - 6)} ${cy + 30} Q${cx + s * (r + 2)} ${cy + 30} ${cx + s * (r + 8)} ${cy + 24} Z" fill="url(#${id}h)"/>`);
       }
-      bang = d + ' Z';
-    } else {
-      const b = base + 4;
-      bang = `M${L} ${topY} L${R} ${topY} L${R} ${b + 6} Q${cx} ${b - 2} ${L} ${b + 6} Z`;
     }
-    parts.push(`<g clip-path="url(#${id}c)"><path d="${bang}" fill="url(#${id}h)"/></g>`);
-    if (a.hair === 'long' || a.hair === 'bob' || a.hair === 'buns') {
-      // 옆머리
-      parts.push(`<path d="M${cx - r - 2} ${cy - 10} Q${cx - r + 6} ${cy + 14} ${cx - r + 4} ${cy + 26} L${cx - r - 6} ${cy + 26} Z" fill="url(#${id}h)"/>`);
-      parts.push(`<path d="M${cx + r + 2} ${cy - 10} Q${cx + r - 6} ${cy + 14} ${cx + r - 4} ${cy + 26} L${cx + r + 6} ${cy + 26} Z" fill="url(#${id}h)"/>`);
-    }
-    parts.push(`<path d="M${cx - 22} ${cy - r + 10} Q${cx - 6} ${cy - r + 2} ${cx + 8} ${cy - r + 6}" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="5" stroke-linecap="round"/>`);
+    // 머리 광택
+    p.push(`<path d="M${cx - 30} ${cy - r + 16} Q${cx - 6} ${cy - r + 1} ${cx + 22} ${cy - r + 12}" fill="none" stroke="#fff" stroke-opacity=".32" stroke-width="5" stroke-linecap="round"/>`);
+    p.push(`<path d="M${cx + 28} ${cy - r + 17} Q${cx + 32} ${cy - r + 20} ${cx + 34} ${cy - r + 24}" fill="none" stroke="#fff" stroke-opacity=".25" stroke-width="4" stroke-linecap="round"/>`);
 
-    // 눈, 볼, 입
-    parts.push(`<ellipse cx="${cx - 15}" cy="${eyeY}" rx="3.6" ry="${pose === 'study' ? 3.4 : 4.4}" fill="#2a2222"/><ellipse cx="${cx + 15}" cy="${eyeY}" rx="3.6" ry="${pose === 'study' ? 3.4 : 4.4}" fill="#2a2222"/>`);
-    parts.push(`<ellipse cx="${cx - 26}" cy="${eyeY + 9}" rx="6.5" ry="4" fill="#ff9a9a" opacity=".35"/><ellipse cx="${cx + 26}" cy="${eyeY + 9}" rx="6.5" ry="4" fill="#ff9a9a" opacity=".35"/>`);
-    if (pose === 'rest') {
-      parts.push(`<path d="M${cx - 5} ${eyeY + 13} Q${cx} ${eyeY + 17} ${cx + 5} ${eyeY + 13}" fill="none" stroke="#7a4b40" stroke-width="2.2" stroke-linecap="round"/>`);
-    }
     if (a.glasses) {
-      parts.push(`<g fill="none" stroke="#3a3330" stroke-width="2.6"><circle cx="${cx - 15}" cy="${eyeY}" r="10"/><circle cx="${cx + 15}" cy="${eyeY}" r="10"/><path d="M${cx - 5} ${eyeY} Q${cx} ${eyeY - 3} ${cx + 5} ${eyeY}"/></g>`);
+      p.push(`<g fill="#fff" fill-opacity=".14" stroke="#3a302d" stroke-width="2.4"><circle cx="${cx - 16}" cy="${eyeY}" r="10.5"/><circle cx="${cx + 16}" cy="${eyeY}" r="10.5"/></g><path d="M${cx - 5.5} ${eyeY - 1} Q${cx} ${eyeY - 4} ${cx + 5.5} ${eyeY - 1}" fill="none" stroke="#3a302d" stroke-width="2.4"/>`);
     }
 
     // 책상
-    parts.push(`<rect x="0" y="146" width="200" height="54" fill="#eac39a"/><rect x="0" y="146" width="200" height="6" fill="#f4d4ae"/>`);
+    p.push(`<rect x="0" y="152" width="200" height="48" fill="url(#${id}d)"/><rect x="0" y="152" width="200" height="3" fill="#fbe3c6"/>`);
+    p.push(`<ellipse cx="100" cy="171" rx="60" ry="9" fill="#8a5530" opacity=".13"/>`);
 
-    // 책과 손
-    if (pose === 'study') {
-      parts.push(`<path d="M100 156 L66 151 L60 172 L100 176 Z" fill="#fffdf8" stroke="#e3d8c8" stroke-width="1.5"/><path d="M100 156 L134 151 L140 172 L100 176 Z" fill="#fffdf8" stroke="#e3d8c8" stroke-width="1.5"/>`);
-      parts.push(`<g stroke="#d9cdbb" stroke-width="1.4"><line x1="72" y1="158" x2="94" y2="161"/><line x1="70" y1="163" x2="94" y2="166"/><line x1="106" y1="161" x2="128" y2="158"/><line x1="106" y1="166" x2="130" y2="163"/></g>`);
-      parts.push(`<ellipse cx="62" cy="162" rx="9" ry="7" fill="${SKIN}"/><ellipse cx="138" cy="162" rx="9" ry="7" fill="${SKIN}"/>`);
+    // 팔과 손
+    for (const s of [-1, 1]) {
+      const hx = study ? cx + s * 40 : cx + s * 36;
+      p.push(`<path d="M${cx + s * 58} 136 Q${cx + s * 62} 156 ${hx + s * 4} 162 L${hx - s * 6} 156 Q${cx + s * 50} 146 ${cx + s * 46} 132 Z" fill="url(#${id}t)"/>`);
+      p.push(`<ellipse cx="${hx}" cy="160" rx="9.5" ry="7.5" fill="url(#${id}s)"/>`);
+    }
+
+    // 책
+    if (study) {
+      p.push(`<path d="M64 156 L136 156 L140 176 L60 176 Z" fill="#7aa3e6"/>`);
+      p.push(`<path d="M100 157 Q84 151 66 154 L62 172 Q82 169 100 174 Z" fill="#fffdf7"/><path d="M100 157 Q116 151 134 154 L138 172 Q118 169 100 174 Z" fill="#fbf6ec"/>`);
+      p.push(`<path d="M100 157 L100 174" stroke="#d9cbb5" stroke-width="1.6"/>`);
+      p.push(`<g stroke="#dccfbd" stroke-width="1.3" stroke-linecap="round"><path d="M72 159 Q84 157 95 160"/><path d="M71 163 Q84 161 95 164"/><path d="M70 167 Q82 165 95 168"/><path d="M105 160 Q116 157 128 159"/><path d="M105 164 Q116 161 129 163"/></g>`);
+      for (const s of [-1, 1]) p.push(`<ellipse cx="${cx + s * 40}" cy="164" rx="9.5" ry="7.5" fill="url(#${id}s)"/>`);
     } else {
-      parts.push(`<rect x="70" y="156" width="56" height="12" rx="3" fill="#ff8b7b"/><rect x="72" y="158" width="52" height="3" fill="#fff" opacity=".6"/>`);
-      parts.push(`<ellipse cx="64" cy="160" rx="9" ry="7" fill="${SKIN}"/><ellipse cx="136" cy="160" rx="9" ry="7" fill="${SKIN}"/>`);
+      p.push(`<rect x="70" y="160" width="60" height="13" rx="3" fill="#ff8b7b"/><rect x="70" y="160" width="60" height="4" rx="2" fill="#fff" opacity=".55"/><rect x="74" y="164" width="52" height="2" fill="#fff" opacity=".5"/>`);
     }
 
     // 책상 소품
     if (a.item === 'plant') {
-      parts.push(`<path d="M163 150 L181 150 L178 168 L166 168 Z" fill="#e0805a"/><circle cx="168" cy="142" r="6" fill="#5fb36a"/><circle cx="176" cy="140" r="6.5" fill="#6cc277"/><circle cx="172" cy="134" r="6" fill="#58a862"/>`);
+      p.push(`<ellipse cx="172" cy="172" rx="13" ry="3" fill="#7a4a2a" opacity=".18"/><path d="M162 153 L182 153 L179 171 L165 171 Z" fill="#e48a62"/><rect x="161" y="151" width="22" height="5" rx="2" fill="#ef9d77"/><path d="M172 151 Q160 140 162 132 Q172 136 172 151 Q174 138 184 134 Q186 144 172 151" fill="#62b56d"/><path d="M172 151 Q170 136 172 128 Q178 138 172 151" fill="#78c983"/>`);
     } else if (a.item === 'books') {
-      parts.push(`<rect x="158" y="156" width="30" height="9" rx="2" fill="#4f7fd9"/><rect x="161" y="148" width="26" height="8" rx="2" fill="#5fbf8a"/><rect x="163" y="160" width="20" height="2" fill="#fff" opacity=".5"/>`);
+      p.push(`<ellipse cx="173" cy="172" rx="17" ry="3" fill="#7a4a2a" opacity=".18"/><rect x="156" y="160" width="34" height="11" rx="2" fill="#4f7fd9"/><rect x="158" y="162" width="30" height="2.5" fill="#fff" opacity=".6"/><rect x="160" y="150" width="28" height="10" rx="2" fill="#5fbf8a"/><rect x="162" y="152" width="24" height="2.5" fill="#fff" opacity=".6"/>`);
     } else if (a.item === 'pencil') {
-      parts.push(`<g transform="rotate(-18 170 160)"><rect x="152" y="157" width="34" height="6" rx="1.5" fill="#ffcf4a"/><path d="M186 157 L194 160 L186 163 Z" fill="#f2c9a0"/><rect x="149" y="157" width="5" height="6" fill="#ff8fa3"/></g>`);
+      p.push(`<g transform="rotate(-20 170 164)"><rect x="150" y="161" width="36" height="6.5" rx="2" fill="#ffcf4a"/><rect x="150" y="161" width="36" height="2.2" fill="#fff" opacity=".45"/><path d="M186 161 L195 164.2 L186 167.5 Z" fill="#f2c9a0"/><path d="M192 163.2 L195 164.2 L192 165.3 Z" fill="#3a302d"/><rect x="146" y="161" width="5" height="6.5" rx="1.5" fill="#ff8fa3"/></g>`);
     } else if (a.item === 'cup') {
-      parts.push(`<rect x="162" y="144" width="18" height="22" rx="4" fill="#fff" stroke="#e0d6c8" stroke-width="1.5"/><path d="M180 149 Q188 151 180 160" fill="none" stroke="#e0d6c8" stroke-width="3"/><rect x="164" y="148" width="14" height="5" fill="#8a5a3b" opacity=".75"/>`);
+      p.push(`<ellipse cx="172" cy="172" rx="14" ry="3" fill="#7a4a2a" opacity=".18"/><path d="M181 154 Q192 156 181 166" fill="none" stroke="#efe6da" stroke-width="3.5"/><rect x="161" y="148" width="22" height="24" rx="5" fill="#fffdf9"/><ellipse cx="172" cy="149" rx="10" ry="2.6" fill="#8a5a3b"/><rect x="163" y="150" width="3" height="18" rx="1.5" fill="#fff" opacity=".8"/>`);
     }
 
-    return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="avatar-svg" aria-hidden="true">${parts.join('')}</svg>`;
+    return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="avatar-svg" aria-hidden="true">${p.join('')}</svg>`;
   }
 
   // 혼자 모드 등에서 쓰는 얼굴만 있는 동그란 아이콘

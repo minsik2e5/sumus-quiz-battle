@@ -115,7 +115,7 @@
       </div>
       <div class="table-wrap">
         ${d.students.length ? `<table>
-          <thead><tr><th>상태</th><th>이름</th>${isAll ? '<th>반</th>' : ''}<th>${isToday ? '오늘' : esc(d.day.slice(5))}</th><th>최근 7일</th><th>7일 추이</th><th>연속</th><th>말풍선</th><th>♥</th><th>마지막 접속</th><th></th></tr></thead>
+          <thead><tr><th>상태</th><th>이름</th>${isAll ? '<th>반</th>' : ''}<th>${isToday ? '오늘' : esc(d.day.slice(5))}</th><th>최근 7일</th><th>7일 추이</th><th>연속</th><th title="공부 중 30~50분마다 뜨는 확인. ✖는 3분 안에 안 눌러서 자동으로 멈춘 횟수">집중 확인</th><th>말풍선</th><th>♥</th><th>마지막 접속</th><th></th></tr></thead>
           <tbody>${d.students.map((s) => row(s, isAll)).join('')}</tbody>
         </table>` : `<p class="empty">아직 학생이 없어요.${cls ? ` 반 코드 <b>${cls.code}</b>를 알려주세요.` : ''}</p>`}
       </div>`;
@@ -136,6 +136,7 @@
       <td class="num">${fmtShort(s.weekMs)}</td>
       <td><span class="spark">${spark}</span></td>
       <td>${s.streak ? `🔥${s.streak}` : '-'}</td>
+      <td>${s.checksOk || s.checksMissed ? `<span class="ok">✔${s.checksOk}</span> ${s.checksMissed ? `<span class="miss">✖${s.checksMissed}</span>` : ''}` : '-'}</td>
       <td>${s.bubble ? `<span class="bub" title="${esc(s.bubble.text)}">${esc(s.bubble.text)}</span> <button class="btn small" data-act="clear-bubble" data-id="${s.id}">지우기</button>` : `<span class="muted">${s.bubblesUsed ? `${s.bubblesUsed}회` : '-'}</span>`}</td>
       <td>${s.hearts || '-'}</td>
       <td class="muted">${fmtSeen(s.lastSeen)}</td>
