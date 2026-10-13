@@ -26,7 +26,10 @@
     draft: null,
     avatarReturn: 'room',
     wakeLock: null,
-    alertedCheck: null
+    alertedCheck: null,
+    cam: null,
+    camPose: null,
+    camStarting: false
   };
 
   // ---------- 유틸 ----------
@@ -113,7 +116,52 @@
   }
 
   function renderSound() {
-    $('#btn-sound').textContent = state.muted ? '🔇' : '🔈';
+    $('#btn-sound').textContent = state.muted ? '🔇 소리 켜기' : '🔈 소리 끄기';
+  }
+
+  // ---------- 카메라 (얼굴 방향 → 캐릭터 자세) ----------
+
+  async function startCam() {
+    if (state.cam || state.camStarting) return;
+    state.camStarting = true;
+    renderCam('준비 중…');
+    try {
+      state.cam = await Cam.start({
+        video: $('#cam-video'),
+        onPose(pose) {
+          if (!pose) return;
+          state.camPose = pose;
+          sendWs({ t: 'cam', on: true, pose }, true);
+          renderCam();
+        }
+      });
+      saved.set('study.cam', '1');
+      toast('카메라 켰어요. 화면을 잠깐 바라봐 주세요 👀');
+    } catch (err) {
+      saved.del('study.cam');
+      toast(err && err.name === 'NotAllowedError' ? '카메라 권한을 허용해 주세요 (브라우저 설정)' : (err.message || '카메라를 켤 수 없어요.'), 4000);
+    } finally {
+      state.camStarting = false;
+      renderCam();
+    }
+  }
+
+  function stopCam(remember = true) {
+    if (state.cam) state.cam.stop();
+    state.cam = null;
+    state.camPose = null;
+    if (remember) saved.del('study.cam');
+    sendWs({ t: 'cam', on: false }, true);
+    renderCam();
+  }
+
+  function renderCam(status) {
+    const on = !!state.cam;
+    $('#btn-cam').classList.toggle('cam-on', on);
+    $('#cam-off').hidden = on;
+    $('#cam-toggle').textContent = state.camStarting ? '준비 중…' : on ? '카메라 끄기' : '카메라 켜기';
+    $('#cam-toggle').disabled = state.camStarting;
+    $('#cam-pose').textContent = status || (on && state.camPose ? Cam.LABEL[state.camPose] : on ? '얼굴 찾는 중…' : '');
   }
 
   // ---------- 화면 꺼짐 방지 ----------
@@ -288,12 +336,12 @@
     };
   }
 
-  function sendWs(msg) {
+  function sendWs(msg, quiet) {
     if (state.ws && state.ws.readyState === WebSocket.OPEN) {
       state.ws.send(JSON.stringify(msg));
       return true;
     }
-    toast('연결 중이에요. 잠시만요!');
+    if (!quiet) toast('연결 중이에요. 잠시만요!');
     return false;
   }
 
@@ -313,6 +361,9 @@
         renderNotices();
         renderGrid();
         renderMe();
+        // 다시 연결되면 카메라 상태를 서버에 다시 알린다
+        if (state.cam && state.camPose) sendWs({ t: 'cam', on: true, pose: state.camPose }, true);
+        else if (!state.cam && saved.get('study.cam') === '1') startCam();
         break;
       case 'member':
         state.members.set(msg.m.id, msg.m);
@@ -339,6 +390,9 @@
       case 'notices':
         state.notices = msg.notices || [];
         renderNotices();
+        break;
+      case 'cam_stopped':
+        toast('5분 넘게 자리에 없어서 공부를 멈췄어요. 자리를 뜬 때까지만 기록됐어요.', 6000);
         break;
       case 'check_missed':
         toast('3분 동안 확인이 없어서 공부를 멈췄어요. 확인 창이 뜬 때까지만 기록됐어요.', 6000);
@@ -371,6 +425,13 @@
 
   const STATUS_ORDER = { study: 0, away: 1, rest: 2, offline: 3 };
   const BADGE = { study: '', away: '자리 비움', rest: '쉬는 중', offline: '오프라인' };
+  const CAM_POSE = { down: 'study', up: 'look', yawn: 'yawn', sleep: 'sleep', gone: 'empty' };
+  const CAM_BADGE = { sleep: '💤 조는 중', gone: '잠깐 자리 비움' };
+
+  function poseOf(m) {
+    if (m.status !== 'study') return 'rest';
+    return (m.cam && CAM_POSE[m.cam]) || 'study';
+  }
 
   function sortedMembers() {
     const meId = state.me && state.me.id;
@@ -409,7 +470,7 @@
       el.innerHTML = '<div class="art"></div><div class="card-top"><span class="timer"></span><span class="name"></span></div><span class="badge"></span>';
       state.cards.set(m.id, el);
     }
-    const pose = m.status === 'study' ? 'study' : 'rest';
+    const pose = poseOf(m);
     const artKey = JSON.stringify(m.avatar) + pose;
     if (el.dataset.art !== artKey) {
       $('.art', el).innerHTML = Avatar.svg(m.avatar, { pose });
@@ -417,10 +478,14 @@
     }
     el.className = `card s-${m.status}${state.me && m.id === state.me.id ? ' me' : ''}`;
     $('.timer', el).textContent = fmt(liveMs(m));
-    $('.name', el).textContent = m.name;
+    $('.name', el).innerHTML = `${esc(m.name)}${m.cam ? '<span class="cam-chip" title="카메라로 확인 중">📷</span>' : ''}`;
     const badge = $('.badge', el);
-    badge.textContent = BADGE[m.status];
-    badge.hidden = !BADGE[m.status];
+    const badgeText = (m.status === 'study' && m.cam && CAM_BADGE[m.cam]) || BADGE[m.status];
+    badge.textContent = badgeText;
+    badge.hidden = !badgeText;
+    let zzz = $('.zzz', el);
+    if (pose === 'sleep' && !zzz) el.insertAdjacentHTML('beforeend', '<span class="zzz">💤</span>');
+    else if (pose !== 'sleep' && zzz) zzz.remove();
 
     let bubble = $('.bubble', el);
     if (m.bubble) {
@@ -472,7 +537,16 @@
     if (!state.members.has(state.me.id) && state.view === 'class') state.members.set(state.me.id, state.me);
     if (!$('#screen-solo').hidden) renderSolo();
     renderCheck();
+    renderGone();
     syncWakeLock();
+  }
+
+  function renderGone() {
+    const at = state.me && state.me.camGoneAt;
+    $('#gone-banner').hidden = !at;
+    if (!at) return;
+    const left = Math.max(0, Math.ceil((at + state.me.camStopMs - serverNow()) / 1000));
+    $('#gone-left').textContent = `${Math.floor(left / 60)}:${pad(left % 60)}`;
   }
 
   // 공부 중 30~50분마다 서버가 집중 확인을 보낸다. 3분 안에 눌러야 시간이 이어진다.
@@ -508,6 +582,8 @@
     }
     if (!$('#screen-solo').hidden && state.me) $('#solo-time').textContent = fmt(liveMs(state.me));
     tickCheck();
+    renderGone();
+    if (state.cam && !state.cam.alive) stopCam(false);
   }
 
   // ---------- 혼자 모드 ----------
@@ -521,7 +597,7 @@
     const m = state.me;
     $('#solo-time').textContent = fmt(liveMs(m));
     $('#solo-label').textContent = m.status === 'study' ? '집중하는 중… 오늘 공부한 시간' : '오늘 공부한 시간 · ▶ 눌러서 시작';
-    const pose = m.status === 'study' ? 'study' : 'rest';
+    const pose = poseOf(m);
     const key = JSON.stringify(m.avatar) + pose;
     const box = $('#solo-avatar');
     if (box.dataset.art !== key) {
@@ -600,6 +676,7 @@
     const token = state.token;
     state.token = null;
     saved.del('study.token');
+    if (state.cam) { state.cam.stop(); state.cam = null; }
     if (state.ws) { const ws = state.ws; state.ws = null; ws.close(); }
     clearTimeout(state.retryTimer);
     state.me = null;
@@ -649,6 +726,8 @@
       toast(state.muted ? '소리 끔' : '소리 켬', 1000);
     });
     $('#btn-solo').addEventListener('click', openSolo);
+    $('#btn-cam').addEventListener('click', () => { renderCam(); openSheet('#sheet-cam'); });
+    $('#cam-toggle').addEventListener('click', () => (state.cam ? stopCam() : startCam()));
     $('#solo-back').addEventListener('click', () => show('screen-room'));
     $('#btn-stats').addEventListener('click', openStats);
     $('#btn-bubble').addEventListener('click', openBubble);
@@ -668,6 +747,11 @@
       if (document.visibilityState !== 'visible') return;
       syncWakeLock();
       if (state.token && !state.ws && !$('#screen-room').hidden) connect();
+      // 다른 앱에 다녀오면 카메라가 꺼져 있을 수 있어 다시 켠다
+      if (saved.get('study.cam') === '1' && (!state.cam || !state.cam.alive) && !$('#screen-room').hidden) {
+        if (state.cam) stopCam(false);
+        startCam();
+      }
     });
     setInterval(tickTimers, 1000);
     setInterval(() => {

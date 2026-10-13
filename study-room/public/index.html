@@ -54,10 +54,11 @@
     </header>
     <div id="notices" class="notices"></div>
     <p id="room-summary" class="room-summary"></p>
+    <div id="gone-banner" class="gone-banner" hidden>🪑 자리 비움 감지 · <b id="gone-left">5:00</b> 뒤 자동으로 멈춰요</div>
     <div id="grid" class="grid"></div>
     <p id="conn" class="conn" hidden>연결 중…</p>
     <nav class="bottombar">
-      <button class="bar-btn" id="btn-sound" aria-label="소리">🔈</button>
+      <button class="bar-btn" id="btn-cam" aria-label="카메라">📷</button>
       <button class="bar-btn" id="btn-solo" aria-label="혼자 모드">👤</button>
       <button class="play" id="btn-play" aria-label="공부 시작"><span></span></button>
       <button class="bar-btn" id="btn-stats" aria-label="내 기록">🕒</button>
@@ -99,12 +100,34 @@
     <div class="sheet-body stats-sheet" id="stats-body"></div>
   </div>
 
+  <!-- 카메라 시트 -->
+  <div id="sheet-cam" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-body cam-sheet">
+      <p class="sheet-title">카메라로 캐릭터 움직이기</p>
+      <div class="cam-preview">
+        <video id="cam-video" playsinline muted></video>
+        <div class="cam-off" id="cam-off">📷<br>카메라 꺼짐</div>
+        <span class="cam-pose" id="cam-pose"></span>
+      </div>
+      <ul class="cam-tips">
+        <li>🔒 영상은 <b>이 폰 밖으로 절대 나가지 않아요.</b> 얼굴 방향만 읽어서 캐릭터를 움직여요.</li>
+        <li>📐 폰을 세워서 얼굴이 화면 안에 들어오게 두세요. 켤 때 <b>화면을 잠깐 바라보면</b> 기준이 잡혀요.</li>
+        <li>📖 고개를 숙이면 공부, 들면 고개 든 모습, 자리를 5분 넘게 비우면 자동으로 멈춰요.</li>
+        <li>⏰ 카메라를 켜두면 "아직 공부 중?" 확인 창이 뜨지 않아요.</li>
+      </ul>
+      <button class="btn primary" id="cam-toggle">카메라 켜기</button>
+      <button class="btn" data-close style="margin-top:8px;background:#f6f3f8">닫기</button>
+    </div>
+  </div>
+
   <!-- 메뉴 시트 -->
   <div id="sheet-menu" class="sheet" hidden>
     <div class="sheet-backdrop" data-close></div>
     <div class="sheet-body menu-sheet">
       <p class="sheet-title" id="menu-who"></p>
       <button class="menu-item" id="menu-avatar">🎨 캐릭터 꾸미기</button>
+      <button class="menu-item" id="btn-sound">🔈 소리 끄기</button>
       <button class="menu-item" id="menu-install">📲 홈 화면에 추가하는 법</button>
       <button class="menu-item danger" id="menu-logout">로그아웃</button>
       <button class="menu-item" data-close>닫기</button>
@@ -124,6 +147,7 @@
   <div id="toast" class="toast" hidden></div>
 
   <script src="/avatar.js"></script>
+  <script src="/camera.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

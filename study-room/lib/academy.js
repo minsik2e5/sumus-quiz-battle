@@ -14,6 +14,9 @@ const MAX_TOKENS = 5;
 // 켜두기만 하는 걸 막기 위한 집중 확인: 30~50분마다 한 번, 3분 안에 눌러야 한다
 const CHECK_EVERY_MS = [30 * 60 * 1000, 50 * 60 * 1000];
 const CHECK_WINDOW_MS = 3 * 60 * 1000;
+// 카메라를 켠 학생: 얼굴이 5분 넘게 안 보이면 자리를 뜬 시점까지만 기록하고 멈춘다
+const CAM_GONE_MS = 5 * 60 * 1000;
+const CAM_POSES = ['down', 'up', 'yawn', 'sleep', 'gone'];
 const STATUS_ORDER = { study: 0, away: 1, rest: 2, offline: 3 };
 
 function sha(value) {
@@ -39,6 +42,7 @@ class Academy {
     onCheer = () => {},
     onNotice = () => {},
     onCheckMissed = () => {},
+    onCamStopped = () => {},
     checkEveryMs = CHECK_EVERY_MS,
     checkWindowMs = CHECK_WINDOW_MS,
     random = Math.random
@@ -46,6 +50,7 @@ class Academy {
     this.store = store;
     this.now = now;
     this.onCheckMissed = onCheckMissed;
+    this.onCamStopped = onCamStopped;
     this.checkEveryMs = checkEveryMs;
     this.checkWindowMs = checkWindowMs;
     this.random = random;
@@ -243,7 +248,7 @@ class Academy {
   liveOf(id) {
     let l = this.live.get(id);
     if (!l) {
-      l = { sockets: 0, since: null, awayAt: null, bubble: null, lastCheer: 0, check: null, nextCheckAt: null };
+      l = { sockets: 0, since: null, awayAt: null, bubble: null, lastCheer: 0, check: null, nextCheckAt: null, cam: null, camGoneAt: null };
       this.live.set(id, l);
     }
     return l;
@@ -251,7 +256,7 @@ class Academy {
 
   record(id, day) {
     const byDay = this.data.daily[id] || (this.data.daily[id] = {});
-    return byDay[day] || (byDay[day] = { ms: 0, b: 0, h: 0, ok: 0, miss: 0 });
+    return byDay[day] || (byDay[day] = { ms: 0, b: 0, h: 0, ok: 0, miss: 0, cms: 0 });
   }
 
   peek(id, day) {
@@ -279,6 +284,10 @@ class Academy {
       this.commit(id, this.cap(l, this.now()));
       l.awayAt = this.now();
     }
+    if (l.sockets === 0) {
+      l.cam = null;
+      l.camGoneAt = null;
+    }
     this.emit(id);
   }
 
@@ -286,7 +295,12 @@ class Academy {
   commit(id, upTo) {
     const l = this.live.get(id);
     if (!l || l.since == null || upTo <= l.since) return;
-    for (const [day, ms] of splitByDay(l.since, upTo)) this.record(id, day).ms += ms;
+    const verified = l.cam != null && l.cam !== 'gone';
+    for (const [day, ms] of splitByDay(l.since, upTo)) {
+      const rec = this.record(id, day);
+      rec.ms += ms;
+      if (verified) rec.cms = (rec.cms || 0) + ms;
+    }
     l.since = upTo;
     this.dirty();
   }
@@ -296,7 +310,31 @@ class Academy {
     let t = upTo;
     if (l.awayAt != null) t = Math.min(t, l.awayAt);
     if (l.check) t = Math.min(t, l.check.at);
+    if (l.cam === 'gone' && l.camGoneAt != null) t = Math.min(t, l.camGoneAt);
     return t;
+  }
+
+  // 카메라 상태 변경 (on=false면 카메라 끔)
+  setCam(id, on, pose) {
+    this.mustStudent(id);
+    const l = this.liveOf(id);
+    const next = on ? (CAM_POSES.includes(pose) ? pose : 'up') : null;
+    if (next === l.cam) return;
+    if (l.since != null && l.awayAt == null) {
+      // 자리를 비웠다 5분 안에 돌아오면 그 사이도 공부 시간으로 치되 '카메라 인증'에서는 뺀다
+      if (l.cam === 'gone') l.camGoneAt = null;
+      this.commit(id, this.cap(l, this.now()));
+    }
+    l.cam = next;
+    if (next === 'gone') {
+      if (l.camGoneAt == null) l.camGoneAt = this.now();
+    } else {
+      // 5분 안에 돌아오면 비운 시간도 이어서 인정한다
+      l.camGoneAt = null;
+    }
+    // 카메라에 얼굴이 보이면 집중 확인은 필요 없다
+    if (next && next !== 'gone' && l.check) this.confirmCheck(id);
+    this.emit(id);
   }
 
   scheduleCheck(l) {
@@ -395,8 +433,12 @@ class Academy {
         this.onCheckMissed(id);
       } else if (l.awayAt != null) {
         if (now - l.awayAt > AWAY_GRACE_MS) this.stopStudy(id);
+      } else if (l.cam === 'gone' && l.camGoneAt != null && now - l.camGoneAt > CAM_GONE_MS) {
+        this.stopStudy(id, l.camGoneAt);
+        this.onCamStopped(id);
       } else {
         this.commit(id, this.cap(l, now));
+        if (l.cam && l.nextCheckAt != null && now >= l.nextCheckAt) this.scheduleCheck(l);
         if (!l.check && l.nextCheckAt != null && now >= l.nextCheckAt) {
           l.check = { at: now, deadline: now + this.checkWindowMs };
           this.emit(id);
@@ -455,7 +497,8 @@ class Academy {
       baseMs: rec ? rec.ms : 0,
       since: status === 'study' ? Math.max(l.since, this.startOfToday()) : null,
       bubble: (l && l.bubble) || null,
-      hearts: rec ? rec.h : 0
+      hearts: rec ? rec.h : 0,
+      cam: (l && l.cam) || null
     };
   }
 
@@ -464,7 +507,13 @@ class Academy {
     if (!m) return null;
     const rec = this.peek(id, this.today());
     const l = this.live.get(id);
-    return { ...m, bubblesLeft: BUBBLES_PER_DAY - (rec ? rec.b : 0), check: (l && l.check) || null };
+    return {
+      ...m,
+      bubblesLeft: BUBBLES_PER_DAY - (rec ? rec.b : 0),
+      check: (l && l.check) || null,
+      camGoneAt: (l && l.cam === 'gone' && l.since != null && l.camGoneAt) || null,
+      camStopMs: CAM_GONE_MS
+    };
   }
 
   roomMembers(view, classCode) {
@@ -540,6 +589,7 @@ class Academy {
       days,
       streak: this.streak(id),
       hearts: rec ? rec.h : 0,
+      camMs: rec ? rec.cms || 0 : 0,
       top: ranking.slice(0, 3).filter((r) => r.ms > 0),
       myRank,
       classSize: ranking.length
@@ -569,6 +619,8 @@ class Academy {
         bubblesUsed: rec ? rec.b : 0,
         checksOk: rec ? rec.ok || 0 : 0,
         checksMissed: rec ? rec.miss || 0 : 0,
+        camMs: rec ? rec.cms || 0 : 0,
+        cam: (l && l.cam) || null,
         hearts: rec ? rec.h : 0,
         lastSeen: s.lastSeen || null
       };
@@ -609,4 +661,4 @@ function compareMembers(a, b) {
   return STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.name.localeCompare(b.name, 'ko');
 }
 
-module.exports = { Academy, AcademyError, ALL, AWAY_GRACE_MS, BUBBLES_PER_DAY, STREAK_MIN_MS, CHECK_EVERY_MS, CHECK_WINDOW_MS };
+module.exports = { Academy, AcademyError, ALL, AWAY_GRACE_MS, BUBBLES_PER_DAY, STREAK_MIN_MS, CHECK_EVERY_MS, CHECK_WINDOW_MS, CAM_GONE_MS };

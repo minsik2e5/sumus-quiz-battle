@@ -9,6 +9,13 @@ const { Store } = require('./lib/store');
 const { Academy, AcademyError, ALL } = require('./lib/academy');
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
+// 얼굴 인식 엔진(MediaPipe)은 npm 패키지에서 바로 내보낸다
+const MEDIAPIPE_DIR = path.join(__dirname, 'node_modules', '@mediapipe', 'tasks-vision');
+const VENDOR_FILES = new Map([
+  ['/vendor/mediapipe/vision_bundle.mjs', 'vision_bundle.mjs'],
+  ...['vision_wasm_internal.js', 'vision_wasm_internal.wasm', 'vision_wasm_nosimd_internal.js', 'vision_wasm_nosimd_internal.wasm']
+    .map((f) => [`/vendor/mediapipe/wasm/${f}`, `wasm/${f}`])
+]);
 const TICK_MS = 15 * 1000;
 const MAX_BODY_BYTES = 16 * 1024;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -18,6 +25,8 @@ const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
+  '.wasm': 'application/wasm',
   '.json': 'application/json; charset=utf-8',
   '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.svg': 'image/svg+xml',
@@ -113,6 +122,9 @@ async function createApp({
         const target = academy.data.students[event.to];
         if (ws.meta.studentId === event.to || (target && sees(ws, target))) send(ws, { t: 'cheer', ...event });
       }
+    },
+    onCamStopped(id) {
+      for (const ws of sockets) if (ws.meta.studentId === id) send(ws, { t: 'cam_stopped' });
     },
     onCheckMissed(id) {
       for (const ws of sockets) if (ws.meta.studentId === id) send(ws, { t: 'check_missed' });
@@ -275,7 +287,24 @@ async function createApp({
     throw new AcademyError('없는 주소예요.', 'not_found');
   }
 
+  function serveFile(res, filePath, cacheControl) {
+    fs.readFile(filePath, (err, data) => {
+      if (err) {
+        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+        return res.end('Not found');
+      }
+      res.writeHead(200, {
+        'Content-Type': TYPES[path.extname(filePath).toLowerCase()] || 'application/octet-stream',
+        'Cache-Control': cacheControl,
+        'X-Content-Type-Options': 'nosniff'
+      });
+      res.end(data);
+    });
+  }
+
   function serveStatic(req, res, url) {
+    const vendor = VENDOR_FILES.get(url.pathname);
+    if (vendor) return serveFile(res, path.join(MEDIAPIPE_DIR, vendor), 'public, max-age=604800');
     let pathname = decodeURIComponent(url.pathname);
     if (pathname === '/') pathname = '/index.html';
     if (pathname === '/teacher') pathname = '/teacher.html';
@@ -284,19 +313,7 @@ async function createApp({
       res.writeHead(403);
       return res.end('Forbidden');
     }
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-        return res.end('Not found');
-      }
-      const ext = path.extname(filePath).toLowerCase();
-      res.writeHead(200, {
-        'Content-Type': TYPES[ext] || 'application/octet-stream',
-        'Cache-Control': ext === '.html' ? 'no-store' : 'no-cache',
-        'X-Content-Type-Options': 'nosniff'
-      });
-      res.end(data);
-    });
+    serveFile(res, filePath, path.extname(filePath).toLowerCase() === '.html' ? 'no-store' : 'no-cache');
   }
 
   const server = http.createServer(async (req, res) => {
@@ -377,6 +394,7 @@ async function createApp({
     if (msg.t === 'cheer') return academy.cheer(id, String(msg.to || ''));
     if (msg.t === 'avatar') return academy.setAvatar(id, msg.avatar);
     if (msg.t === 'check_ok') return academy.confirmCheck(id);
+    if (msg.t === 'cam') return academy.setCam(id, msg.on === true, String(msg.pose || ''));
   }
 
   const tickTimer = setInterval(() => academy.tick(), TICK_MS);

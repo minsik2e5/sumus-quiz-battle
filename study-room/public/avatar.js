@@ -83,11 +83,22 @@
     return { d, L, R };
   }
 
-  // pose: 'study'(고개 숙이고 책 보기) | 'rest'(정면 보기)
+  // 자세별 그림: 고개(숙임/듦), 눈, 입, 책, 사람 유무
+  const POSES = {
+    study: { up: false, eyes: 'down', mouth: null, book: 'open' }, // 고개 숙이고 책 보기
+    rest: { up: true, eyes: 'open', mouth: 'smile', book: 'closed' }, // 쉬는 중
+    look: { up: true, eyes: 'open', mouth: null, book: 'open' }, // 공부 중 고개 듦 (카메라)
+    yawn: { up: true, eyes: 'closed', mouth: 'open', book: 'open' }, // 하품 (카메라)
+    sleep: { up: false, eyes: 'closed', mouth: null, book: 'open' }, // 조는 중 (카메라)
+    empty: { person: false, book: 'open' } // 자리 비움 (카메라)
+  };
+
   function svg(input, opts) {
     const a = normalize(input);
-    const pose = opts && opts.pose === 'rest' ? 'rest' : 'study';
-    const study = pose === 'study';
+    const pose = POSES[opts && opts.pose] ? opts.pose : 'study';
+    const P = POSES[pose];
+    const person = P.person !== false;
+    const study = !P.up;
     const id = 'av' + (++uid);
     const hair = HAIR_COLORS[a.hc];
     const hairDark = shade(hair, -22);
@@ -117,6 +128,10 @@
     p.push(`<rect width="200" height="200" fill="url(#${id}w)"/>`);
     p.push(`<ellipse cx="100" cy="132" rx="82" ry="48" fill="url(#${id}sh)" opacity=".55"/>`);
 
+    if (!person) {
+      // 빈 의자
+      p.push(`<rect x="58" y="92" width="84" height="70" rx="16" fill="#c9976a"/><rect x="64" y="98" width="72" height="58" rx="12" fill="#d8a97b"/><path d="M72 104 Q100 98 128 104" stroke="#e8c39b" stroke-width="4" fill="none" stroke-linecap="round"/>`);
+    } else {
     // 몸통(후드티)
     p.push(`<path d="M30 160 C30 128 58 114 100 114 C142 114 170 128 170 160 Z" fill="url(#${id}t)"/>`);
     p.push(`<path d="M64 121 Q100 104 136 121 Q118 134 100 134 Q82 134 64 121 Z" fill="${topDark}" opacity=".45"/>`);
@@ -158,15 +173,19 @@
     p.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="url(#${id}s)"/>`);
 
     // 눈, 볼, 코, 입
-    const ery = study ? 3.6 : 5;
     for (const s of [-1, 1]) {
       const ex = cx + s * 16;
-      p.push(`<ellipse cx="${ex}" cy="${eyeY}" rx="4.2" ry="${ery}" fill="#2a2120"/>`);
-      if (!study) p.push(`<circle cx="${ex - 1.3}" cy="${eyeY - 2}" r="1.5" fill="#fff"/>`);
+      if (P.eyes === 'closed') {
+        p.push(`<path d="M${ex - 5} ${eyeY} Q${ex} ${eyeY + 4} ${ex + 5} ${eyeY}" fill="none" stroke="#2a2120" stroke-width="2.4" stroke-linecap="round"/>`);
+      } else {
+        p.push(`<ellipse cx="${ex}" cy="${eyeY}" rx="4.2" ry="${P.eyes === 'down' ? 3.6 : 5}" fill="#2a2120"/>`);
+        if (P.eyes === 'open') p.push(`<circle cx="${ex - 1.3}" cy="${eyeY - 2}" r="1.5" fill="#fff"/>`);
+      }
       p.push(`<ellipse cx="${cx + s * 28}" cy="${eyeY + 10}" rx="9" ry="6" fill="url(#${id}b)"/>`);
     }
     p.push(`<ellipse cx="${cx}" cy="${eyeY + 6}" rx="2.2" ry="1.5" fill="#e3a98f" opacity=".7"/>`);
-    if (!study) p.push(`<path d="M${cx - 4.5} ${eyeY + 13} Q${cx} ${eyeY + 17} ${cx + 4.5} ${eyeY + 13}" fill="none" stroke="#8a4e43" stroke-width="2" stroke-linecap="round"/>`);
+    if (P.mouth === 'smile') p.push(`<path d="M${cx - 4.5} ${eyeY + 13} Q${cx} ${eyeY + 17} ${cx + 4.5} ${eyeY + 13}" fill="none" stroke="#8a4e43" stroke-width="2" stroke-linecap="round"/>`);
+    if (P.mouth === 'open') p.push(`<ellipse cx="${cx}" cy="${eyeY + 17}" rx="5.5" ry="7" fill="#8a3f3a"/><ellipse cx="${cx}" cy="${eyeY + 20}" rx="3.4" ry="2.6" fill="#ff8f8f"/>`);
 
     // 앞머리
     const base = study ? cy - 2 : cy - 13;
@@ -196,24 +215,26 @@
       p.push(`<g fill="#fff" fill-opacity=".14" stroke="#3a302d" stroke-width="2.4"><circle cx="${cx - 16}" cy="${eyeY}" r="10.5"/><circle cx="${cx + 16}" cy="${eyeY}" r="10.5"/></g><path d="M${cx - 5.5} ${eyeY - 1} Q${cx} ${eyeY - 4} ${cx + 5.5} ${eyeY - 1}" fill="none" stroke="#3a302d" stroke-width="2.4"/>`);
     }
 
+    }
+
     // 책상
     p.push(`<rect x="0" y="152" width="200" height="48" fill="url(#${id}d)"/><rect x="0" y="152" width="200" height="3" fill="#fbe3c6"/>`);
     p.push(`<ellipse cx="100" cy="171" rx="60" ry="9" fill="#8a5530" opacity=".13"/>`);
 
     // 팔과 손
-    for (const s of [-1, 1]) {
-      const hx = study ? cx + s * 40 : cx + s * 36;
+    for (const s of (person ? [-1, 1] : [])) {
+      const hx = P.book === 'open' ? cx + s * 40 : cx + s * 36;
       p.push(`<path d="M${cx + s * 58} 136 Q${cx + s * 62} 156 ${hx + s * 4} 162 L${hx - s * 6} 156 Q${cx + s * 50} 146 ${cx + s * 46} 132 Z" fill="url(#${id}t)"/>`);
       p.push(`<ellipse cx="${hx}" cy="160" rx="9.5" ry="7.5" fill="url(#${id}s)"/>`);
     }
 
     // 책
-    if (study) {
+    if (P.book === 'open') {
       p.push(`<path d="M64 156 L136 156 L140 176 L60 176 Z" fill="#7aa3e6"/>`);
       p.push(`<path d="M100 157 Q84 151 66 154 L62 172 Q82 169 100 174 Z" fill="#fffdf7"/><path d="M100 157 Q116 151 134 154 L138 172 Q118 169 100 174 Z" fill="#fbf6ec"/>`);
       p.push(`<path d="M100 157 L100 174" stroke="#d9cbb5" stroke-width="1.6"/>`);
       p.push(`<g stroke="#dccfbd" stroke-width="1.3" stroke-linecap="round"><path d="M72 159 Q84 157 95 160"/><path d="M71 163 Q84 161 95 164"/><path d="M70 167 Q82 165 95 168"/><path d="M105 160 Q116 157 128 159"/><path d="M105 164 Q116 161 129 163"/></g>`);
-      for (const s of [-1, 1]) p.push(`<ellipse cx="${cx + s * 40}" cy="164" rx="9.5" ry="7.5" fill="url(#${id}s)"/>`);
+      if (person) for (const s of [-1, 1]) p.push(`<ellipse cx="${cx + s * 40}" cy="164" rx="9.5" ry="7.5" fill="url(#${id}s)"/>`);
     } else {
       p.push(`<rect x="70" y="160" width="60" height="13" rx="3" fill="#ff8b7b"/><rect x="70" y="160" width="60" height="4" rx="2" fill="#fff" opacity=".55"/><rect x="74" y="164" width="52" height="2" fill="#fff" opacity=".5"/>`);
     }
@@ -237,5 +258,5 @@
     return svg(input, { pose: 'rest' }).replace('viewBox="0 0 200 200"', 'viewBox="46 20 108 108"');
   }
 
-  return { HAIR, HAIR_COLORS, TOPS, ITEMS, DEFAULT, normalize, random, svg, face };
+  return { HAIR, HAIR_COLORS, TOPS, ITEMS, DEFAULT, POSES: Object.keys(POSES), normalize, random, svg, face };
 });
