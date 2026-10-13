@@ -1,5 +1,5 @@
 import { $, api, esc, num, toast, icon, modal, buttonBusy } from './ui.js';
-import { TITLES, TITLE_TIERS, TITLE_GROUPS, TITLE_KEYS, LEAGUE_TIERS, titleProgress, visibleTitleKeys, titleCoins } from './titles.js';
+import { TITLES, TITLE_TIERS, TITLE_GROUPS, TITLE_KEYS, LEAGUE_TIERS, titleProgress, visibleTitleKeys, titleCoins, weeklyTitle } from './titles.js';
 import { titleEmblem, titleBadge, coin, artOr } from './emblems.js';
 import { coinShower, coinReward, playReward, giftMoment } from './celebrate.js';
 
@@ -74,9 +74,9 @@ export function openTitleDetail(A, key, onChanged) {
       <h2>${esc(item.name)}</h2>
       <p class="tt-detail-desc">${esc(item.desc)}</p>
       <div class="tt-detail-how ${on ? 'done' : ''}">${icon(on ? 'check' : 'lock')}<span>${esc(item.how)}</span></div>
-      ${titleCoins(key) ? `<div class="tt-detail-coins">${coin()}<span>얻으면 <b>${titleCoins(key)}코인</b>${item.tier === 'limited' ? ' (이긴 주마다)' : ''}</span></div>` : ''}
+      ${titleCoins(key) ? `<div class="tt-detail-coins">${coin()}<span>얻으면 <b>${titleCoins(key)}코인</b>${weeklyTitle(key) ? ' (이긴 주마다)' : ''}</span></div>` : ''}
       ${prog ? `<div class="tt-detail-prog"><span class="tt-prog"><i style="width:${Math.round(prog[0] / prog[1] * 100)}%"></i></span><b>${progressText(key, prog)}</b></div>` : ''}
-      ${item.tier === 'limited' ? `<p class="tt-detail-note">${on ? '이번 주 일요일 밤까지 달 수 있어요.' : '지난주 기록으로 주어지는 한정 칭호예요. 이번 주에 도전하면 다음 주에 받을 수 있어요.'}</p>` : ''}
+      ${weeklyTitle(key) ? `<p class="tt-detail-note">${on ? '이번 주 일요일 밤까지 달 수 있어요.' : '지난주 기록으로 주어지는 한정 칭호예요. 이번 주에 도전하면 다음 주에 받을 수 있어요.'}</p>` : ''}
       <div class="tt-detail-preview"><small>친구에게는 이렇게 보여요</small>${titleBadge(key, { size: 'md' })}</div>
       <button type="button" class="btn primary full" id="tt-equip" ${!on || equipped ? 'disabled' : ''}>${equipped ? '지금 달고 있어요' : on ? '이 칭호 달기' : '아직 얻지 못했어요'}</button>
     </div>`, `${item.name} 칭호`);

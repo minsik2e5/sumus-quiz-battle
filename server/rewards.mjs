@@ -6,7 +6,7 @@ import {
   RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome
 } from '../public/modules/rewards.js';
 import { titleCoins } from '../public/modules/titles.js';
-import { MONSTER_LEVELS, MONSTER_DAILY, MONSTER_MIN_MS, MONSTER_MS_PER_RIGHT, MONSTER_TRY, MONSTER_LEVEL_KEYS, monsterOpen, partClears, partKeyCodes, stageLevel, cleanStage, stageMonster } from '../public/modules/monsters.js';
+import { MONSTER_LEVELS, MONSTER_DAILY, MONSTER_MIN_MS, MONSTER_MS_PER_RIGHT, MONSTER_TRY, MONSTER_LEVEL_KEYS, monsterOpen, partClears, partKeyCodes, stageLevel, cleanStage, stageMonster, isBossStage } from '../public/modules/monsters.js';
 
 // Coin rewards and games (rules and odds: public/modules/rewards.js). Everything lives on the
 // student's profile:
@@ -259,6 +259,12 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
   }
   const odd = drawLucky(random);
   const paid = bet * odd.mult;
+  // V13.148 칭호 '오늘은 운수 대통': 하루에 가장 많이 나온 3배(가장 큰 배수) 수.
+  if (odd.mult === 3) {
+    if (l.big_day !== today) { l.big_day = today; l.big_n = 0; }
+    l.big_n = Number(l.big_n || 0) + 1;
+    l.big_best = Math.max(Number(l.big_best || 0), l.big_n);
+  }
   // V13.118: a tiny chance of a mythic pet first (no pity); then the legendary and 영웅 chances only when it was not mythic.
   const mythicKey = mythicRoll(p, 'capsule');
   let mythic = null;
@@ -618,7 +624,7 @@ function monsterSettle(p, m, live, { result, right, pet, nowScope, parts, now })
   if (answered < L.need) return { paid: false, reason: 'few', need: L.need, ...base };
   // V13.99: a lost fight is checked for time too: the right answers it claims take MONSTER_MS_PER_RIGHT each.
   if (!won && now - live.at < answered * MONSTER_MS_PER_RIGHT) return { paid: false, reason: 'short', ...base };
-  if (won) { m.wins = Number(m.wins || 0) + 1; if (live.level === 'hard') m.hard_wins = Number(m.hard_wins || 0) + 1; }
+  if (won) { m.wins = Number(m.wins || 0) + 1; if (live.level === 'hard') m.hard_wins = Number(m.hard_wins || 0) + 1; if (!legacy && isBossStage(stage)) m.boss_wins = Number(m.boss_wins || 0) + 1; }
   const first = won && !legacy && stage === prog.stage && !prog.clear[live.level] && monsterOpen(prog.clear, live.level);
   let reward, up = false;
   if (first) {

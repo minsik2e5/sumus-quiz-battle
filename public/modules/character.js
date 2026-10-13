@@ -10,6 +10,8 @@ const LEGACY = { lumi:'dog', nox:'cat', blaze:'dog', tide:'cat', zeph:'dragon', 
 const ALL = ['happy', 'eat', 'sad', 'cheer'];
 const EGG = ['happy', 'eat'];
 const ROBOT = ['happy', 'sad', 'attack', 'hurt'];
+// V13.148 새 펫 3탄(그림 24c)은 단계마다 야차전 · 던전 공격 · 맞음 그림이 따로 있다.
+const FIGHT = [...ALL, 'attack', 'hurt'];
 const EXPRESSIONS = {
   dog: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   pig: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
@@ -47,6 +49,16 @@ const EXPRESSIONS = {
   wolf: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   crocodile: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   octopus: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
+  elephant: { 0: EGG, 1: FIGHT, 2: FIGHT, 3: FIGHT },
+  meerkat: { 0: EGG, 1: FIGHT, 2: FIGHT, 3: FIGHT },
+  raccoondog: { 0: EGG, 1: FIGHT, 2: FIGHT, 3: FIGHT },
+  longtit: { 0: EGG, 1: FIGHT, 2: FIGHT, 3: FIGHT },
+  hippo: { 0: EGG, 1: FIGHT, 2: FIGHT, 3: FIGHT },
+  guineapig: { 0: EGG, 1: FIGHT, 2: FIGHT, 3: FIGHT },
+  axolotl: { 0: EGG, 1: FIGHT, 2: FIGHT, 3: FIGHT },
+  chinchilla: { 0: EGG, 1: FIGHT, 2: FIGHT, 3: FIGHT },
+  sloth: { 0: EGG, 1: FIGHT, 2: FIGHT, 3: FIGHT },
+  platypus: { 0: EGG, 1: FIGHT, 2: FIGHT, 3: FIGHT },
   pumpkincat: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   ghost: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   cheonma: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },

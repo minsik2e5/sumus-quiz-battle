@@ -1,7 +1,7 @@
 // V13.66 competition: titles, the weekly yacha league and weekly awards, computed from the
 // state on each request (nothing here is stored). One context per request groups sessions
 // and battles by student once, so ranking lists stay O(sessions + battles).
-import { levelInfo, petProgress } from '../public/modules/core.js';
+import { levelInfo, petProgress, CHARACTERS } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked, LEAGUE_POINTS, LEAGUE_PAIR_DAY_CAP, leagueTier, leagueTierIndex } from '../public/modules/titles.js';
 import { GACHA_ITEMS, GACHA_KEYS } from '../public/modules/rewards.js';
 import { bonusRecords } from './rewards.mjs';
@@ -100,6 +100,16 @@ function longestDayRun(sessions) {
   for (const day of days) { run = prev !== null && day === prev + 1 ? run + 1 : 1; best = Math.max(best, run); prev = day; }
   return best;
 }
+// V13.148 '한 과 정복' 칭호: 정복한 과 수는 단어책 · 단어 기록이 있는 server/service.mjs가 센다(여기서 부르면 서로를 불러 버린다).
+let unitCounter = null;
+export const setUnitCounter = fn => { unitCounter = fn; };
+export const REMATCH_MS = 10 * 60000;
+// 아침 학습: 학습을 시작한 시각이 한국 시간 5시~9시 전.
+export const MORNING_HOURS = [5, 9];
+const kstHour = ts => Math.floor(((Number(ts) + KST_OFFSET_MS) % DAY_MS) / 3600000);
+const kstWeekday = ts => (kstDay(ts) + 4) % 7; // 0 = 일요일
+const isStudy = s => !s.bonus && Number(s.answered_count ?? s.total ?? 0) >= 10;
+const petCount = (p, flag) => (Array.isArray(p?.pets) ? p.pets : []).filter(pet => CHARACTERS[pet?.key]?.[flag]).length;
 const hpOf = (b, pid) => { const v = b.hp?.[pid]; return v === undefined || v === null ? NaN : Number(v); };
 // V13.94: full HP went from 100 to 250; a match keeps the full HP it was played with.
 const maxHpOf = b => Number(b.max_hp) || 100;
@@ -114,8 +124,11 @@ export function createCompetition(state, now = Date.now()) {
   const week = rankingWeek(now), lastWeek = rankingWeek(week.start - 1);
   const champions = new Map();
   for (const t of state.tournaments || []) if (t.status === 'finished' && t.champion) champions.set(t.champion, (champions.get(t.champion) || 0) + 1);
-  const exams = new Map();
-  for (const a of state.examAttempts || []) if (a.status === 'submitted') exams.set(a.student_id, (exams.get(a.student_id) || 0) + 1);
+  const exams = new Map(), examPerfect = new Map();
+  for (const a of state.examAttempts || []) if (a.status === 'submitted') {
+    exams.set(a.student_id, (exams.get(a.student_id) || 0) + 1);
+    if (Number(a.score) === 100) examPerfect.set(a.student_id, (examPerfect.get(a.student_id) || 0) + 1);
+  }
   const countedCache = new Map(), statCache = new Map();
   let awards = null, kings = null;
   const inWindow = window => b => b.finished_at >= window.start && b.finished_at < window.end;
@@ -158,6 +171,32 @@ export function createCompetition(state, now = Date.now()) {
     // V13.143 던전(server/dungeon-records.mjs): 클리어 · 등급컷 · 무사고 · 역대 1위 · 만점 최고 층, 지난주 보드 1위.
     ...Object.fromEntries(Object.keys(dungeonTitleStats(null)).map(stat => [stat, p => dungeonTitleStats(p)[stat]])),
     dungeon_week_king: (p, pid) => (kings ??= dungeonKings(state, now)).has(pid) ? 1 : 0,
+    // V13.148 칭호 2탄(public/modules/titles.js 맨 위 설명).
+    units: p => unitCounter ? unitCounter(state, p) : 0,
+    exam_perfect: (p, pid) => examPerfect.get(pid) || 0,
+    fixes: (p, pid) => Object.values(state.mastery?.[pid] || {}).filter(m => Number(m?.wrong || 0) > 0 && Number(m?.streak || 0) > 0).length,
+    weekend_days: (p, pid) => new Set(ctx.sessionsOf(pid).filter(s => !s.bonus && Number(s.total || 0) > 0 && [0, 6].includes(kstWeekday(s.created_at))).map(s => kstDay(s.created_at))).size,
+    morning_studies: (p, pid) => ctx.sessionsOf(pid).filter(s => { if (!isStudy(s)) return false; const h = kstHour(Number(s.created_at) - Number(s.duration_sec || 0) * 1000); return h >= MORNING_HOURS[0] && h < MORNING_HOURS[1]; }).length,
+    event_studies: (p, pid) => ctx.sessionsOf(pid).filter(s => !s.bonus && s.reward_event).length,
+    away_wins: (p, pid) => winsOf(pid).filter(b => { const o = profiles.get(opponentOf(b, pid)); return o && schoolOf(o) && schoolOf(p) && schoolOf(o) !== schoolOf(p); }).length,
+    rematches: (p, pid) => {
+      const last = new Map();
+      let n = 0;
+      for (const b of [...ctx.battlesOf(pid)].sort((x, y) => x.finished_at - y.finished_at)) {
+        const opp = opponentOf(b, pid), prev = last.get(opp), start = Number(b.created_at || b.finished_at);
+        if (prev && start >= prev && start - prev <= REMATCH_MS) n++;
+        last.set(opp, Number(b.finished_at));
+      }
+      return n;
+    },
+    legend_pets: p => petCount(p, 'legendary'),
+    mythic_pets: p => petCount(p, 'mythic'),
+    season_pets: p => petCount(p, 'limited'),
+    eggs: p => (Array.isArray(p?.purchases) ? p.purchases : []).filter(x => /egg$/.test(String(x?.item || ''))).length,
+    care: p => Number(p?.care?.total || 0),
+    lucky_best_day: p => Number(p?.lucky?.big_best || 0),
+    // 보스 처치는 V13.148부터 센다. 그 전에 하드로 깬 레벨(m.best)에 들어 있던 보스 레벨은 깬 것으로 친다.
+    boss_wins: p => { const m = p?.bonus?.monster || {}; return Math.max(Number(m.boss_wins || 0), Math.floor(Number(m.best || 0) / 5)); },
     // V13.67 capsule-only titles: owned when the capsule was pulled.
     ...Object.fromEntries(GACHA_KEYS.filter(key => GACHA_ITEMS[key].kind === 'title').map(key => [`item_${key}`, p => Number(p?.gacha?.items?.[key] || 0)]))
   };

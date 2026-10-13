@@ -559,7 +559,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(build88.includes('"v1388.css"'), 'V13.88 뽑기 그림 스타일이 빌드 목록에 있다');
 
   /* ---------- V13.89 전설 펫 ---------- */
-  assert(LEGENDARY_RATE === 0.5 && LEGENDARY_PITY === 150 && LEGENDARY_PET_KEYS.join() === 'haechi,whale,qilin,cheonma' && STANDARD_PET_KEYS.length === 16, 'V13.89 전설 펫은 네 마리(V13.118: 불새 대신 천마), 0.5% 확률, 150회 확정이며 일반 펫과 분리된다');
+  assert(LEGENDARY_RATE === 0.5 && LEGENDARY_PITY === 150 && LEGENDARY_PET_KEYS.join() === 'haechi,whale,qilin,cheonma' && STANDARD_PET_KEYS.length === 21, 'V13.89 전설 펫은 네 마리(V13.118: 불새 대신 천마), 0.5% 확률, 150회 확정이며 일반 펫과 분리된다(V13.148: 일반 펫 21종)');
   const values = xs => () => xs.shift() ?? .99;
   const legendProfile = { pets: [{ key: 'dog' }], avatar_key: 'dog', lucky: { legend_pulls: 148 }, points_spent: 0 };
   const beforePity = pullLucky(legendProfile, 10, 100, { random: values([.5, .99]), now });
@@ -757,7 +757,9 @@ export async function runRewardsChecks(assert, expectStatus) {
     const { TITLE_ART, titleEmblem } = await import('../public/modules/emblems.js');
     const map96 = source('../docs/asset-requests/runner/slice-map.csv').split('\n').filter(line => line.startsWith('"11-titles.txt"'));
     const prompts96 = source('../docs/asset-requests/runner/11-titles.txt').split('\n---\n');
-    const keys96 = Object.keys(TITLES).filter(key => !key.startsWith('dungeon-')); // V13.143 던전 칭호는 그림 23c(dungeon-reward-check.mjs)
+    // V13.148 칭호 2탄 40개는 그림 25(아래 V13.148 검사)라서 11 주문서 목록에서 뺀다.
+    const keys25 = new Set(source('../docs/asset-requests/runner/slice-map.csv').split('\n').filter(line => line.startsWith('"25-titles-2.txt"')).map(line => line.match(/titles\/([a-z0-9]+)\.webp"$/)?.[1]).filter(Boolean));
+    const keys96 = Object.keys(TITLES).filter(key => !key.startsWith('dungeon-') && !keys25.has(key)); // V13.143 던전 칭호는 그림 23c(dungeon-reward-check.mjs)
     assert(keys96.length === 65 && keys96.every(key => map96.some(line => line.endsWith(`"public/assets/titles/${key}.webp"`))) && map96.length === 68 && prompts96.length === 17, 'V13.96 칭호 65개(옛 뽑기 칭호 포함)마다 메달 그림 주문이 있다: 시트 17장 = 메달 65개 + 칭호 화면 그림 3개');
     assert(prompts96.every(p => p.includes('STYLE REFERENCE — before drawing, open') && p.includes('Google Drive folder') && /named exactly "11-\d+\.png"/.test(p) && p.includes('"SUMUS 칭호 11 (Runner용)"')) && prompts96.slice(1).every(p => p.includes('Also open "11-1.png"')), 'V13.96 칭호 주문서마다 Drive의 기존 그림을 열어 그림체를 맞추고, 정해진 Drive 폴더에 정확한 이름(11-N.png)으로 저장하라고 적혀 있다');
     // One frame per medal, by tier: as many frame lines of a tier as titles of that tier.
@@ -780,7 +782,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     const asset = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));
     const webpSize = name => { const b = readFileSync(asset(name)); return b.toString('ascii', 12, 16) === 'VP8X' ? `${1 + b.readUIntLE(24, 3)}x${1 + b.readUIntLE(27, 3)}` : ''; };
     const keys97 = Object.keys(TITLES);
-    assert(keys97.every(key => TITLE_ART.has(key)) && TITLE_ART.size === keys97.length && keys97.filter(key => !key.startsWith('dungeon-')).length === 65 && keys97.every(key => webpSize(`titles/${key}`) === '256x256' && webpSize(`titles/${key}-s`) === '96x96'), 'V13.97 칭호 65개 모두 메달 그림이 있다(256px, 작은 그림 96px)');
+    assert(keys97.every(key => TITLE_ART.has(key)) && TITLE_ART.size === keys97.length && keys97.filter(key => !key.startsWith('dungeon-')).length === 105 && keys97.every(key => webpSize(`titles/${key}`) === '256x256' && webpSize(`titles/${key}-s`) === '96x96'), 'V13.97 칭호 65개(V13.148: + 2탄 40개 = 105개) 모두 메달 그림이 있다(256px, 작은 그림 96px)');
     assert(['titles-hero', 'title-equipped', 'title-new'].every(key => ART_READY.has(key) && webpSize(`ui/${key}`) === '256x256'), 'V13.97 칭호 도감 그림 3개(진열장 · 장착 중 · 새 칭호)가 있고 등록되어 있다');
     const arms = ['robot-rock', 'robot-scissors', 'robot-paper', 'robot-flag', 'me-rock', 'me-scissors', 'me-paper', 'me-thumb'];
     const armSizes = arms.map(a => webpSize(`rps/arm-${a}`));
@@ -791,9 +793,9 @@ export async function runRewardsChecks(assert, expectStatus) {
   const arcade93 = source('../public/modules/arcade.js'), shop93 = source('../public/modules/pet-moments.js');
   assert(ready93.length === 47 /* the 40 of list 08, + 3 for the 칭호 도감 (V13.97), + 4 monster level plates (V13.106) */ && wired91.every(key => ready93.includes(key)) && ['me-petbook', 'pet-epic-locked', 'epic-egg', 'epic-badge'].every(key => ready93.includes(key)) && student90.includes("'pet-epic-locked'") && arcade93.includes("artOr('epic-egg'") && lucky89.includes("artOr('epic-badge'") && shop93.includes("uiArt('epic-egg')"), 'V13.93 08 그림 40장(펫 도감·영웅 펫 4장 포함)이 모두 들어가 선 아이콘 대신 보인다');
   /* ---------- V13.92 영웅 펫 · 패드 화면 ---------- */
-  assert(EPIC_PET_KEYS.join() === 'capybara,penguin,owl,hamster,shark,alpaca,hedgehog,otter,redpanda,arcticfox,koala,parrot,seal,wolf,crocodile,octopus' && STANDARD_PET_KEYS.length === 16 && EPIC_PET_KEYS.every(key => CHARACTERS[key].epic && !CHARACTERS[key].legendary && petTier(key) === 'epic') && petTier('dog') === 'basic' && petTier('qilin') === 'legendary' && EPIC_RATE === 3, 'V13.92 영웅 펫은 기본과 전설 사이 등급이고, 뽑기 확률은 3%다');
+  assert(EPIC_PET_KEYS.join() === 'capybara,penguin,owl,hamster,shark,alpaca,hedgehog,otter,redpanda,arcticfox,koala,parrot,seal,wolf,crocodile,octopus,guineapig,axolotl,chinchilla,sloth,platypus' && STANDARD_PET_KEYS.length === 21 /* V13.148 새 펫 3탄 기본 5 · 영웅 5 */ && EPIC_PET_KEYS.every(key => CHARACTERS[key].epic && !CHARACTERS[key].legendary && petTier(key) === 'epic') && petTier('dog') === 'basic' && petTier('qilin') === 'legendary' && EPIC_RATE === 3, 'V13.92 영웅 펫은 기본과 전설 사이 등급이고, 뽑기 확률은 3%다');
   const epicFiles = EPIC_PET_KEYS.flatMap(key => [0, 1, 2, 3].flatMap(f => [`/assets/pets/${key}-${f}.webp`, `/assets/pets/${key}-${f}-s.webp`, ...(f ? ['happy', 'eat', 'sad', 'cheer'] : ['happy', 'eat']).map(e => expressionSrc(key, f, e))]));
-  assert(epicFiles.length === EPIC_PET_KEYS.length * (4 * 2 + 2 + 12) && EPIC_PET_KEYS.length === 16 && epicFiles.every(src => src && existsSync(fileURLToPath(new URL('../public' + src, import.meta.url)))), 'V13.92 영웅 펫의 알·아기·성장·최종 그림, 작은 그림, 표정과 알 반응이 모두 있다');
+  assert(epicFiles.length === EPIC_PET_KEYS.length * (4 * 2 + 2 + 12) && EPIC_PET_KEYS.length === 21 && epicFiles.every(src => src && existsSync(fileURLToPath(new URL('../public' + src, import.meta.url)))), 'V13.92 영웅 펫의 알·아기·성장·최종 그림, 작은 그림, 표정과 알 반응이 모두 있다');
   assert(EPIC_PET_KEYS.every(key => PET_SKILLS[key]?.name && PET_SKILLS[key].desc && petSkill({ key }).key === key) && petSkill({ key: 'otter' }).need === 4 && petSkill({ key: 'owl' }).need === 3 && LEGENDARY_PET_KEYS.every(key => petSkill({ key }).key === 'none'), 'V13.92 영웅 펫마다 새 야차전 특기가 있고, 전설 펫에는 여전히 특기가 없다');
   const epicProfile = { pets: [{ key: 'dog' }], avatar_key: 'dog', lucky: {}, points_spent: 0 };
   const epicPull = pullLucky(epicProfile, 10, 100, { random: values([.5, .99, .01, .4]), now });
@@ -906,13 +908,13 @@ export async function runRewardsChecks(assert, expectStatus) {
         && [giftEggPick({ pets: [{ key: 'dog' }] }, seq([0.5, 0])), giftEggPick({ pets: [{ key: 'dog' }] }, seq([0.10, .99]))].every(e => !LIMITED_PET_KEYS.includes(e.key) && e.key !== 'dog'),
         'V13.111 선생님 알은 언제나 아직 없는 펫(기본이 다 차면 영웅, 영웅이 다 차면 기본)이고 한정 펫은 나오지 않는다');
       const kidG = { pets: [{ key: 'dog' }], avatar_key: 'dog', gift_box: { total: 0, count: 0, log: [] } };
-      for (let i = 0; i < 38; i++) giveGift(kidG, { kind: 'egg', id: 'egg' + i, from: 't', fromName: '선생님', now: i });
+      for (let i = 0; i < 48; i++) giveGift(kidG, { kind: 'egg', id: 'egg' + i, from: 't', fromName: '선생님', now: i });
       giveGift(kidG, { amount: 30, id: 'coin1', from: 't', fromName: '선생님', now: 99 });
       const totalBefore = kidG.gift_box.total;
       const openedG = openGifts(kidG, 1000, () => .5);
       const keysG = kidG.pets.map(pet => pet.key);
-      assert(totalBefore === 30 && openedG.length === 39 && new Set(keysG).size === keysG.length && keysG.length === STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length && kidG.avatar_key === 'dog'
-        && openedG.filter(g => g.full).length === 38 - (keysG.length - 1) && kidG.gift_box.total === 30 + GIFT_EGG_FULL_COINS * (38 - (keysG.length - 1)) && openGifts(kidG, 2000).length === 0,
+      assert(totalBefore === 30 && openedG.length === 49 /* V13.148: 펫이 늘어 알 48개 */ && new Set(keysG).size === keysG.length && keysG.length === STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length && kidG.avatar_key === 'dog'
+        && openedG.filter(g => g.full).length === 48 - (keysG.length - 1) && kidG.gift_box.total === 30 + GIFT_EGG_FULL_COINS * (48 - (keysG.length - 1)) && openGifts(kidG, 2000).length === 0,
         'V13.111 선생님 알을 여러 개 열어도 펫이 겹치지 않고 내 펫에만 들어가며(파트너 그대로), 다 모은 뒤에는 알마다 400코인, 한 번 연 선물은 다시 열리지 않는다');
       const service111 = source('./service.mjs'), app111 = source('../public/app.js'), cel111 = source('../public/modules/celebrate.js');
       assert(service111.includes("const egg = body.kind === 'egg';") && service111.includes("announceLegend(state, p, legend.egg.key, '선생님 알 선물')") && service111.includes("'선생님 알 1개'")

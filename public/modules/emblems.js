@@ -87,7 +87,12 @@ export const TITLE_ART = new Set([
   'perfect50', 'yacha10', 'g_lucky', 'g_golden', 'g_god',
   // V13.143 던전 칭호(그림 23c). 주간 1위(dungeon-week)는 던전 메달이 8개뿐이라 주간 야차왕 메달을 복사해 쓴다.
   'dungeon-first', 'dungeon-rank3', 'dungeon-rank2', 'dungeon-rank1', 'dungeon-perfect', 'dungeon-flawless',
-  'dungeon-record', 'dungeon-hunter', 'dungeon-week'
+  'dungeon-record', 'dungeon-hunter', 'dungeon-week',
+  // V13.148 칭호 2탄 40개(그림 25)
+  'unit1', 'unit3', 'exam10', 'finalclear', 'fix50', 'fix200', 'fix500', 'weekend10', 'morning30', 'streak60',
+  'streak100', 'attend200', 'attend365', 'study300', 'words5000', 'combo50', 'perfect100', 'event10', 'eventlover', 'away1',
+  'away10', 'rematch10', 'comeback5', 'win200', 'skill100', 'legend1', 'mythic1', 'pets12', 'pets20', 'pets30',
+  'seasonall', 'egg10', 'egg50', 'gift5', 'petcare30', 'lucky2', 'rps50', 'monster50', 'monster100', 'boss10'
 ]);
 export function titleEmblem(key, opts = {}) {
   const k = TITLES[key] ? key : 'rookie', t = TITLES[k];

@@ -87,7 +87,18 @@ export const PET_SKILLS = {
   seal: { name: '물방울 튕기기', desc: '바로 6 피해, 다음에 받는 공격 −9', burst: 6, guard: [9] },
   wolf: { name: '달빛 질주', desc: '다음 공격 +6, 이후 2번 +5씩', boost: [6, 5, 5] },
   crocodile: { name: '늪지 물결', desc: '바로 9 피해, HP +5', burst: 9, heal: 5 },
-  octopus: { name: '말랑 촉수', desc: '다음 공격 +8, 다음에 받는 공격 −7', boost: [8], guard: [7] }
+  octopus: { name: '말랑 촉수', desc: '다음 공격 +8, 다음에 받는 공격 −7', boost: [8], guard: [7] },
+  // V13.148 새 펫 3탄: 기본 5 · 영웅 5 (server/pet-sim.mjs로 맞춘 세기)
+  elephant: { name: '코 물대포', desc: '바로 7 피해, 다음에 받는 공격 −8', burst: 7, guard: [8] },
+  meerkat: { name: '망보기', desc: '다음에 받는 공격 −10, 다음 공격 +5', guard: [10], boost: [5] },
+  raccoondog: { name: '나뭇잎 둔갑', desc: 'HP +8, 다음에 받는 공격 −7', heal: 8, guard: [7] },
+  longtit: { name: '깃털 연타', desc: '다음 공격 +6, 이후 2번 +5씩', boost: [6, 5, 5] },
+  hippo: { name: '느긋한 물놀이', desc: 'HP +10, 다음 공격 +4', heal: 10, boost: [4] },
+  guineapig: { name: '오물오물 단어 카드', desc: '2번 연속 맞히면 HP +4, 다음 공격 +5', heal: 4, boost: [5], need: 2 },
+  axolotl: { name: '재생의 물방울', desc: 'HP +6, 3문제 동안 3씩 피해', heal: 6, poison: 3, turns: 3 },
+  chinchilla: { name: '별가루 마법', desc: '바로 7 피해, 다음 공격 +8', burst: 7, boost: [8] },
+  sloth: { name: '느긋한 낮잠', desc: 'HP +8, 다음 공격 +7', heal: 8, boost: [7] },
+  platypus: { name: '꼬리 철썩', desc: '바로 7 피해, 2문제 동안 4씩 피해', burst: 7, poison: 4, turns: 2 }
 };
 // V13.94 몬스터 잡기: a monster's own skill (its `pet.skill`), stronger at harder levels.
 export const MONSTER_SKILLS = {

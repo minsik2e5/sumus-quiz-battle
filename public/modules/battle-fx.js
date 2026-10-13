@@ -18,7 +18,7 @@ export const ELEMENTS = {
 export const PET_ELEMENT = {
   dragon: 'flame', phoenix: 'flame', fox: 'flame', redpanda: 'flame', jujak: 'flame', pumpkincat: 'flame',
   penguin: 'ice', arcticfox: 'ice', sheep: 'ice', baekho: 'ice',
-  shark: 'water', otter: 'water', duck: 'water', whale: 'water', seal: 'water', octopus: 'water', frog: 'water', turtle: 'water', cheongryong: 'water', capybara: 'water',
+  shark: 'water', otter: 'water', elephant: 'water', chinchilla: 'ice', meerkat: 'earth', guineapig: 'earth', hippo: 'earth', raccoondog: 'leaf', sloth: 'leaf', longtit: 'wind', platypus: 'toxic', duck: 'water', whale: 'water', seal: 'water', octopus: 'water', frog: 'water', turtle: 'water', cheongryong: 'water', capybara: 'water',
   panda: 'leaf', koala: 'leaf', deer: 'leaf', squirrel: 'leaf', rabbit: 'leaf', alpaca: 'leaf',
   bear: 'earth', hedgehog: 'earth', hamster: 'earth', pig: 'earth', hyeonmu: 'earth',
   wolf: 'wind', owl: 'wind', parrot: 'wind', cat: 'wind', sapsaree: 'wind', cheonma: 'wind', dog: 'wind',

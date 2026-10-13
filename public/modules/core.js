@@ -83,6 +83,17 @@ export const CHARACTERS = {
   wolf: { name: 'DALBIT', ko: '달빛', type: '늑대', color: '#7385AE', light: '#C4CDE8', soft: '#F1F3FC', epic: true },
   crocodile: { name: 'DEOPSSAK', ko: '덥썩', type: '악어', color: '#6FAD68', light: '#BFE0A1', soft: '#F0F8E9', epic: true },
   octopus: { name: 'MALLANG', ko: '말랑', type: '문어', color: '#CB84B8', light: '#F0C1DF', soft: '#FFF1F8', epic: true },
+  // V13.148 새 펫 3탄(그림 24): 기본 5 + 영웅 5.
+  elephant: { name: 'KORONG', ko: '코롱', type: '아기 코끼리', color: '#7E9BB8', light: '#C9D9EA', soft: '#F2F6FB' },
+  meerkat: { name: 'JJONGGEUT', ko: '쫑긋', type: '미어캣', color: '#C29A62', light: '#EBD5AE', soft: '#FCF6EA' },
+  raccoondog: { name: 'NEOGUL', ko: '너굴', type: '아기 너구리', color: '#8D7C6A', light: '#D9CBB8', soft: '#F8F4EE' },
+  longtit: { name: 'PORONG', ko: '포롱', type: '오목눈이', color: '#D58AA6', light: '#F4D2DF', soft: '#FFF5F9' },
+  hippo: { name: 'HAMUNG', ko: '하뭉', type: '아기 하마', color: '#A688B8', light: '#DCCBE8', soft: '#F8F3FC' },
+  guineapig: { name: 'KKUI', ko: '꾸이', type: '기니피그', color: '#D48A3E', light: '#F4CFA0', soft: '#FFF5EA', epic: true },
+  axolotl: { name: 'UPA', ko: '우파', type: '아홀로틀', color: '#E27A9A', light: '#F8C6D5', soft: '#FFF2F6', epic: true },
+  chinchilla: { name: 'CHINCHIN', ko: '친친', type: '친칠라', color: '#8E8FA8', light: '#D7D8E6', soft: '#F6F6FB', epic: true },
+  sloth: { name: 'NEULBO', ko: '늘보', type: '나무늘보', color: '#8F7A5A', light: '#D9C9A6', soft: '#F8F3E8', epic: true },
+  platypus: { name: 'NAPJAK', ko: '납작', type: '오리너구리', color: '#3E8E8A', light: '#A8DAD4', soft: '#EEF9F7', epic: true },
   // V13.109 한정 펫: sold for one season only (its own egg), then found only in 영웅 eggs. No yacha skill.
   // V13.117: the 가을 이벤트 알 holds all five: the Halloween pair and the exam-cheering three.
   pumpkincat: { name: 'HOBAK', ko: '호박냥', type: '호박 고양이', color: '#E8842C', light: '#FFC98A', soft: '#FFF3E6', limited: 'autumn' },
