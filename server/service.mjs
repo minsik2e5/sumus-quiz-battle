@@ -1,7 +1,7 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
 import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, EPIC_EGG_PRICE, seasonOnSale, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
-import { TITLES, TITLE_KEYS, titleUnlocked } from '../public/modules/titles.js';
+import { TITLES, TITLE_KEYS, titleUnlocked, weeklyTitle } from '../public/modules/titles.js';
 import { battleQuestions, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
 import { monsterParts } from '../public/modules/monsters.js';
@@ -12,7 +12,7 @@ import { MARKET_OPEN } from '../public/modules/market.js';
 const marketOpen = state => MARKET_OPEN || state.market?.open === true;
 import { rpsView, rpsPlay, rpsCash, openEgg } from './rewards.mjs';
 import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, monsterStart, monsterFinish, monsterView, monsterScope, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts } from './rewards.mjs';
-import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate } from './competition.mjs';
+import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate, setUnitCounter } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
 import { signupCodeRows, updateSignupCode } from './signup.mjs';
@@ -286,6 +286,8 @@ function recentRangeResults(list, mastery, limit = 30) {
     .sort((a, b) => Number(b.at) - Number(a.at))
     .slice(0, limit);
 }
+// V13.148 칭호 '한 과 정복' · '교과서 정복자': 학습 화면의 과 정복(정답률 95% 이상으로 모든 단어를 푼 범위) 수.
+setUnitCounter((state, p) => { const school = p?.role === 'student' ? schoolForProfile(state, p) : null; return school ? wordRangeMastery(state, p.id, school, p.class_name).mastered : 0; });
 function wordRangeMastery(state, studentId, school, grade = null) {
   if (!school) return { ranges: {}, mastered: 0, perfect: 0, total_ranges: 0, conquest: 0 };
   const words = wordsForSchoolGrade(state, school, grade);
@@ -896,7 +898,7 @@ function idleStudents(state, ctx, school, now = Date.now()) {
 // The title collection of the signed-in student. `fresh`: titles unlocked since the student
 // last looked (a limited title is new again each week it is won); `intro`: the student has not
 // seen the V13.66 collection yet, so the app shows one summary instead of a pop-up per title.
-const titleSeenKey = (ctx, key) => TITLES[key]?.tier === 'limited' ? `${key}@${ctx.lastWeek.key}` : key;
+const titleSeenKey = (ctx, key) => weeklyTitle(key) ? `${key}@${ctx.lastWeek.key}` : key;
 // V13.73 `unpaid`: held titles whose coins are not paid yet (new ones, and titles won before
 // V13.73); they are paid when the app shows them (/titles/seen).
 function titleView(ctx, p) {

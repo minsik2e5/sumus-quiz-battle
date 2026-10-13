@@ -28,7 +28,13 @@
 //                dungeon_c3 · dungeon_c2 · dungeon_c1 그 등급컷을 깼는지, dungeon_max_floor 만점 모드 최고 층,
 //                dungeon_no_down 아무도 기절하지 않고 깬 판, dungeon_records 역대 보드 1위 기록을 세운 횟수,
 //                dungeon_week_king 지난주 던전 주간 보드 1위 파티였는지(한정)
+//   V13.148 칭호 2탄(그림 25): units 정복한 과(정답률 95% 이상으로 모든 단어를 푼 범위), exam_perfect 실전시험 100점,
+//                fixes 틀렸다가 다시 맞힌 단어, weekend_days 공부한 주말(토·일) 날, morning_studies 아침(5~9시) 학습,
+//                event_studies 보상 이벤트 중 학습, away_wins 다른 학교 친구에게 이긴 야차전, rematches 같은 친구와 10분 안에
+//                다시 한 판, legend_pets · mythic_pets · season_pets 전설 · 신화 · 한정 펫 수, eggs 상점 알을 연 수,
+//                care 펫 교감(쓰다듬기 · 밥) 수, lucky_best_day 코인 뽑기 3배가 하루에 가장 많이 나온 수, boss_wins 보스 몬스터 처치
 // Limited titles belong to one week: they are held only while last week's result stands.
+// V13.148 `once`: 한정 테두리지만 주간 칭호가 아닌 것(신화의 주인): 한 번 받으면 계속 갖고, 코인도 한 번만.
 
 export const TITLE_TIERS = {
   common: { name: '일반', order: 1 },
@@ -126,6 +132,58 @@ Object.assign(TITLES, {
   'dungeon-hunter': { name: '던전 사냥꾼', tier: 'rare', group: 'dungeon', stat: 'dungeon_clears', goal: 10, icon: 'sword', how: '던전 10번 클리어', desc: '던전이 집처럼 편해요.' },
   'dungeon-week': { name: '던전 주간 1위', tier: 'limited', group: 'dungeon', stat: 'dungeon_week_king', goal: 1, icon: 'trophy', coins: 100, how: '지난주 던전 주간 보드 1위 파티 (우리 학년)', desc: '지난주 우리 학년 던전 보드 꼭대기!' }
 });
+// V13.148 칭호 2탄 40개(그림 25: /assets/titles/<key>.webp). 등급 테두리는 그림 그대로다.
+Object.assign(TITLES, {
+  // 교과서 · 시험
+  unit1: { name: '한 과 정복', tier: 'rare', group: 'study', stat: 'units', goal: 1, icon: 'book', how: '한 과의 모든 단어를 정답률 95% 이상으로 정복', desc: '한 과를 완전히 내 것으로 만들었어요.' },
+  unit3: { name: '교과서 정복자', tier: 'epic', group: 'study', stat: 'units', goal: 3, icon: 'book', how: '3개 과 정복(정답률 95% 이상)', desc: '교과서가 점점 내 손안에 들어와요.' },
+  exam10: { name: '실전 베테랑', tier: 'epic', group: 'study', stat: 'exams', goal: 10, icon: 'target', how: '선생님 실전시험 10번 응시', desc: '실전 경험이 쌓인 베테랑.' },
+  finalclear: { name: '기말 올클리어', tier: 'legendary', group: 'study', stat: 'exam_perfect', goal: 3, icon: 'star', how: '선생님 실전시험 100점 3번', desc: '시험지에 금빛 별이 세 번 찍혔어요.' },
+  // 오답 극복
+  fix50: { name: '오답 사냥꾼', tier: 'rare', group: 'study', stat: 'fixes', goal: 50, icon: 'target', how: '틀렸던 단어 50개를 다시 맞히기', desc: '틀린 단어를 끝까지 쫓아가요.' },
+  fix200: { name: '실수는 없다', tier: 'epic', group: 'study', stat: 'fixes', goal: 200, icon: 'heart', how: '틀렸던 단어 200개를 다시 맞히기', desc: '한 번 틀린 단어는 다시 틀리지 않아요.' },
+  fix500: { name: '오답 정복자', tier: 'legendary', group: 'study', stat: 'fixes', goal: 500, icon: 'crown', how: '틀렸던 단어 500개를 다시 맞히기', desc: '오답 노트가 텅 비었어요.' },
+  // 꾸준함
+  weekend10: { name: '주말에도 공부', tier: 'rare', group: 'study', stat: 'weekend_days', goal: 10, icon: 'calendar', how: '주말(토·일)에 공부한 날 10일', desc: '쉬는 날에도 단어를 챙겨요.' },
+  morning30: { name: '아침형 학습자', tier: 'rare', group: 'study', stat: 'morning_studies', goal: 30, icon: 'sprout', how: '아침(5~9시)에 10문제 이상 학습 30번', desc: '하루를 단어로 여는 아침형 인간.' },
+  streak60: { name: '두 달의 집념', tier: 'legendary', group: 'study', stat: 'best_days', goal: 60, icon: 'flame', how: '60일 연속 학습', desc: '두 달 동안 하루도 쉬지 않았어요.' },
+  streak100: { name: '백일의 불꽃', tier: 'legendary', group: 'study', stat: 'best_days', goal: 100, icon: 'flame', how: '100일 연속 학습', desc: '백 일 동안 꺼지지 않은 불꽃.' },
+  attend200: { name: '이백일의 약속', tier: 'legendary', group: 'study', stat: 'attendance', goal: 200, icon: 'calendar', how: '출석 체크 200번', desc: '이백 번의 약속을 지켰어요.' },
+  attend365: { name: '일 년 개근', tier: 'legendary', group: 'study', stat: 'attendance', goal: 365, icon: 'calendar', how: '출석 체크 365번', desc: '일 년 내내 빠짐없이 출석!' },
+  study300: { name: '공부 중독', tier: 'legendary', group: 'study', stat: 'studies', goal: 300, icon: 'book', how: '10문제 이상 학습 300번', desc: '공부를 멈출 수가 없어요.' },
+  // 학습량
+  words5000: { name: '걸어다니는 단어장', tier: 'legendary', group: 'study', stat: 'correct', goal: 5000, icon: 'gem', how: '맞힌 단어 5,000개', desc: '단어장이 걸어 다녀요.' },
+  combo50: { name: '50연속 신화', tier: 'legendary', group: 'study', stat: 'combo', goal: 50, icon: 'bolt', how: '한 번에 50문제 연속 정답', desc: '50번 연속, 신화가 되었어요.' },
+  perfect100: { name: '만점 제조 공장', tier: 'legendary', group: 'study', stat: 'perfect', goal: 100, icon: 'star', how: '10문제 이상 100점 100번', desc: '100점이 공장처럼 찍혀 나와요.' },
+  // 이벤트
+  event10: { name: '이벤트 사냥꾼', tier: 'rare', group: 'study', stat: 'event_studies', goal: 10, icon: 'bolt', how: '보상 이벤트 중에 학습 10번', desc: '이벤트는 놓치지 않아요.' },
+  eventlover: { name: '축제의 주인공', tier: 'epic', group: 'study', stat: 'event_studies', goal: 50, icon: 'star', how: '보상 이벤트 중에 학습 50번', desc: '이벤트가 열리면 언제나 이 자리에!' },
+  // 야차전
+  away1: { name: '원정 첫 승', tier: 'common', group: 'yacha', stat: 'away_wins', goal: 1, icon: 'sword', how: '다른 학교 친구에게 야차전 1승', desc: '다른 학교에서 첫 승리를 거뒀어요.' },
+  away10: { name: '원정 대장', tier: 'epic', group: 'yacha', stat: 'away_wins', goal: 10, icon: 'shield', how: '다른 학교 친구에게 야차전 10승', desc: '어느 학교와 붙어도 자신 있어요.' },
+  rematch10: { name: '다시 한 판!', tier: 'rare', group: 'yacha', stat: 'rematches', goal: 10, icon: 'bolt', how: '같은 친구와 10분 안에 다시 대결 10번', desc: '한 판 더! 끝날 때까지 끝난 게 아니에요.' },
+  comeback5: { name: '역전의 명수', tier: 'legendary', group: 'yacha', stat: 'comebacks', goal: 5, icon: 'heart', how: 'HP를 5분의 1 이하로 남기고 5번 승리', desc: '역전이 특기예요.' },
+  win200: { name: '야차의 전설', tier: 'legendary', group: 'yacha', stat: 'wins', goal: 200, icon: 'crown', how: '야차전 200승', desc: '이백 번을 이긴 전설.' },
+  skill100: { name: '펫과 일심동체', tier: 'legendary', group: 'yacha', stat: 'skills', goal: 100, icon: 'paw', how: '야차전에서 펫 스킬 100번 발동', desc: '펫과 한 몸처럼 움직여요.' },
+  // 펫 · 수집
+  legend1: { name: '전설과의 만남', tier: 'epic', group: 'collect', stat: 'legend_pets', goal: 1, icon: 'wing', how: '전설 펫 만나기', desc: '전설 속 펫이 곁에 왔어요.' },
+  mythic1: { name: '신화의 주인', tier: 'limited', once: true, group: 'collect', stat: 'mythic_pets', goal: 1, icon: 'crown', how: '신화 펫 만나기', desc: '신화 속 펫의 주인이 되었어요.' },
+  pets12: { name: '펫 대가족', tier: 'epic', group: 'collect', stat: 'pets', goal: 12, icon: 'paw', how: '펫 12마리 만나기', desc: '펫 가족이 북적북적해요.' },
+  pets20: { name: '펫 박물관', tier: 'legendary', group: 'collect', stat: 'pets', goal: 20, icon: 'paw', how: '펫 20마리 만나기', desc: '펫 박물관을 열어도 되겠어요.' },
+  pets30: { name: '살아있는 도감', tier: 'legendary', group: 'collect', stat: 'pets', goal: 30, icon: 'book', how: '펫 30마리 만나기', desc: '펫 도감이 살아 움직여요.' },
+  seasonall: { name: '시즌 컬렉터', tier: 'epic', group: 'collect', stat: 'season_pets', goal: 3, icon: 'gem', how: '한정 펫 3마리 만나기', desc: '시즌마다 한정 펫을 놓치지 않아요.' },
+  egg10: { name: '알 콜렉터', tier: 'common', group: 'collect', stat: 'eggs', goal: 5, icon: 'heart', how: '상점에서 알 5개 열기', desc: '알을 모으는 재미에 빠졌어요.' },
+  egg50: { name: '알 부화 장인', tier: 'epic', group: 'collect', stat: 'eggs', goal: 20, icon: 'gem', how: '상점에서 알 20개 열기', desc: '알을 깨우는 손길이 장인급.' },
+  gift5: { name: '선생님의 보물', tier: 'rare', group: 'collect', stat: 'gifts', goal: 5, icon: 'heart', how: '선생님께 코인 선물 5번 받기', desc: '선생님이 아끼는 보물 같은 학생.' },
+  petcare30: { name: '정성 가득 집사', tier: 'rare', group: 'collect', stat: 'care', goal: 30, icon: 'paw', how: '펫 쓰다듬기 · 밥 주기 30번', desc: '펫을 정성껏 돌보는 집사.' },
+  // 놀이터
+  lucky2: { name: '오늘은 운수 대통', tier: 'epic', group: 'arcade', stat: 'lucky_best_day', goal: 2, icon: 'star', how: '코인 뽑기에서 하루에 3배 2번', desc: '오늘은 뭘 해도 되는 날!' },
+  rps50: { name: '가위바위보 달인', tier: 'rare', group: 'arcade', stat: 'rps_wins', goal: 50, icon: 'bolt', how: '가위바위보 50번 이기기', desc: '로보의 다음 손이 다 보여요.' },
+  // 몬스터
+  monster50: { name: '몬스터 퇴치 전문가', tier: 'epic', group: 'monster', stat: 'monster_wins', goal: 50, icon: 'target', how: '몬스터 50번 처치', desc: '몬스터 퇴치라면 맡겨 주세요.' },
+  monster100: { name: '몬스터 킬러', tier: 'legendary', group: 'monster', stat: 'monster_wins', goal: 100, icon: 'sword', how: '몬스터 100번 처치', desc: '백 마리의 몬스터를 쓰러뜨렸어요.' },
+  boss10: { name: '보스 슬레이어', tier: 'legendary', group: 'monster', stat: 'boss_wins', goal: 10, icon: 'crown', how: '보스 몬스터(5레벨마다) 10번 처치', desc: '보스만 골라 잡는 슬레이어.' }
+});
 // V13.67: titles that came out of the capsule machine. V13.68 retired the machine: they stay
 // with the students who have them and are not shown to anyone else (`retired`).
 Object.assign(TITLES, {
@@ -134,6 +192,8 @@ Object.assign(TITLES, {
   g_god: { name: '뽑기의 신', tier: 'legendary', group: 'gacha', stat: 'item_title_god', goal: 1, icon: 'crown', how: '예전 뽑기 머신에서 나온 칭호', desc: '전설을 뽑아낸 행운의 주인공.', retired: true }
 });
 export const TITLE_KEYS = Object.keys(TITLES);
+// 주마다 다시 정해지는 한정 칭호(지난주 결과로만 갖는다). `once`인 한정 테두리 칭호는 아니다.
+export const weeklyTitle = key => TITLES[key]?.tier === 'limited' && !TITLES[key].once;
 // The titles a student sees in the collection: all but retired ones they do not have.
 export const visibleTitleKeys = unlocked => TITLE_KEYS.filter(key => !TITLES[key].retired || unlocked.includes(key));
 
@@ -146,7 +206,7 @@ export function titleUnlocked(key, stats = {}) {
 // [value, goal] for a progress bar; limited titles have no progress (a rank either is or isn't).
 export function titleProgress(key, stats = {}) {
   const t = TITLES[key];
-  if (!t || t.exact || t.tier === 'limited' || t.group === 'gacha') return null;
+  if (!t || t.exact || weeklyTitle(key) || t.group === 'gacha') return null;
   return [Math.min(t.goal, Math.max(0, Number(stats[t.stat] || 0))), t.goal];
 }
 
