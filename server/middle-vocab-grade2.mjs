@@ -1,4 +1,6 @@
-// 중2 YBM(박준언) Lesson 5~6 · 사용자 제공 WORD TEST 기준.
+// 중2 YBM(박준언) Lesson 5~7 · 사용자 제공 WORD TEST 기준.
+// 7과(2026-10-13): EXAM4YOU 「2022 개정 YBM(박준언) 중2 Lesson 7 WORD TEST」의 대화문(CONVERSATION) 17 + 본문(READING) 44,
+// 어휘 목록 순서, 뜻은 정답지(TEST 1). 두 묶음에 다 나오는 free(같은 뜻)는 한 줄, manage(뜻이 다름)는 한 줄에 두 뜻을 합쳤다.
 // 교재 표기 뜻은 meaning에 그대로 유지하고, 뜻쓰기에서 허용할 안전한 표현만 accepted_meanings에 둔다.
 const makeBook = (lesson, entries) => {
   const bookId = `middle:ybm-park:grade2:lesson${lesson}`;
@@ -167,4 +169,66 @@ const lesson6 = [
   ['take time', '시간이 걸리다']
 ];
 
-export const middleGrade2Books = [makeBook(5, lesson5), makeBook(6, lesson6)];
+const lesson7 = [
+  ["missing", "사라진, 없어진"],
+  ["take care of ~", "~을 관리하다", ["관리하다"]],
+  ["agree", "동의하다"],
+  ["post", "(인터넷에) ~을 게시하다", ["게시하다"]],
+  ["city hall", "시청"],
+  ["course", "강좌, 과정"],
+  ["senior", "노인, 연장자"],
+  ["pay for ~", "~의 값을 지불하다", ["값을 지불하다"]],
+  ["stairs", "계단"],
+  ["wheelchair", "휠체어"],
+  ["manage", "(어려움에도) ~을 해내다, ~을 관리하다", ["해내다", "관리하다"]],
+  ["free", "무료의, 공짜의"],
+  ["hurry", "서두르다"],
+  ["until", "~할 때까지", ["할 때까지"]],
+  ["crosswalk", "횡단보도"],
+  ["all the way", "끝까지"],
+  ["totally", "완전히, 전적으로"],
+  ["tax", "세금"],
+  ["build", "~을 짓다, 건설하다", ["짓다"]],
+  ["run", "~을 운영하다, 관리하다", ["운영하다"]],
+  ["care about ~", "~에 신경 쓰다, ~에 관심을 가지다", ["신경 쓰다", "관심을 가지다"]],
+  ["pay", "~을 지불하다, 내다", ["지불하다"]],
+  ["teen", "십 대"],
+  ["surprising", "놀라운"],
+  ["secret", "비밀"],
+  ["come from ~", "~에서 오다", ["에서 오다"]],
+  ["country", "국가"],
+  ["collect", "(세금 등)을 징수하다", ["징수하다"]],
+  ["piggy bank", "돼지 저금통"],
+  ["public", "공공의"],
+  ["put ~ into ...", "~을 …에 넣다"],
+  ["be used for ~", "~에 사용되다", ["사용되다"]],
+  ["road", "도로, 길"],
+  ["history", "역사"],
+  ["land", "땅"],
+  ["war", "전쟁"],
+  ["rich", "부유한"],
+  ["window", "창문"],
+  ["usually", "보통, 대개"],
+  ["mean", "~을 의미하다", ["의미하다"]],
+  ["kind", "종류"],
+  ["different", "여러 다양한"],
+  ["main", "주된, 주요한"],
+  ["income", "수입, 소득"],
+  ["earn", "(돈)을 벌다", ["벌다"]],
+  ["sales", "판매의"],
+  ["for example", "예를 들어"],
+  ["property", "재산, 부동산"],
+  ["own", "~을 소유하다, 가지다", ["소유하다"]],
+  ["thanks to ~", "~덕분에", ["덕분에"]],
+  ["education", "교육"],
+  ["environment", "환경"],
+  ["safety", "안전"],
+  ["streetlight", "가로등"],
+  ["dark", "어두운"],
+  ["waste", "~을 낭비하다", ["낭비하다"]],
+  ["service", "(공공의) 서비스", ["서비스"]],
+  ["wisely", "현명하게"],
+  ["see", "~을 확인하다", ["확인하다"]]
+];
+
+export const middleGrade2Books = [makeBook(5, lesson5), makeBook(6, lesson6), makeBook(7, lesson7)];
