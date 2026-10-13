@@ -1,0 +1,53 @@
+/* V13.142 학습 보상 이벤트: 학생 홈 배너 · 학습 결과 줄 · 선생님 이벤트 창 */
+.reward-event-v13142{display:flex;align-items:center;gap:10px;margin:0 0 12px;padding:12px 14px;border:1px solid #f4c96b;border-radius:18px;background:linear-gradient(120deg,#fff7df,#ffe9b8 60%,#ffdca0);box-shadow:0 6px 16px rgba(214,150,30,.16)}
+.reward-event-v13142 .rev-mark{flex:none;font-size:24px;line-height:1}
+.reward-event-v13142>div{flex:1;min-width:0}
+.reward-event-v13142 b{display:block;font-size:15px;font-weight:900;color:#5a3b00;line-height:1.3}
+.reward-event-v13142 small{display:block;margin-top:2px;font-size:12px;font-weight:800;color:#8a6516;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.reward-event-v13142 .rev-x{flex:none;min-width:46px;padding:6px 8px;border-radius:12px;background:#ff9f1a;color:#fff;font-size:17px;font-weight:900;text-align:center;box-shadow:inset 0 -2px 0 rgba(0,0,0,.12)}
+
+.result-event-v13142{display:flex;align-items:center;gap:10px;margin:10px 0 4px;padding:10px 12px;border:1px solid #f4c96b;border-radius:14px;background:#fff6dc;text-align:left}
+.result-event-v13142>span{flex:none;font-size:20px}
+.result-event-v13142 b{display:block;font-size:13.5px;font-weight:900;color:#5a3b00}
+.result-event-v13142 small{display:block;margin-top:1px;font-size:12.5px;font-weight:800;color:#8a6516}
+
+.reward-event-modal-v13142 h2{margin:0 0 6px}
+.reward-event-modal-v13142>p{margin:0 0 12px;font-size:13px;line-height:1.55;color:#51625c}
+.reward-event-modal-v13142 .rev-form{display:grid;gap:2px}
+.reward-event-modal-v13142 .rev-form input,.reward-event-modal-v13142 .rev-form select{width:100%;min-width:0;font:inherit}
+.reward-event-modal-v13142 .rev-two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.reward-event-modal-v13142 .rev-two .field{min-width:0}
+.reward-event-modal-v13142 .rev-seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.reward-event-modal-v13142 .rev-seg label{position:relative;display:block;cursor:pointer}
+.reward-event-modal-v13142 .rev-seg input{position:absolute;opacity:0;pointer-events:none}
+.reward-event-modal-v13142 .rev-seg b{display:block;padding:10px 0;border:1.5px solid #dbe5e1;border-radius:12px;background:#fff;text-align:center;font-weight:900;color:#51625c}
+.reward-event-modal-v13142 .rev-seg input:checked+b{border-color:#ff9f1a;background:#fff3d6;color:#8a5200}
+.reward-event-modal-v13142 .rev-seg input:focus-visible+b{outline:2px solid #ff9f1a;outline-offset:2px}
+.reward-event-modal-v13142 .rev-error{margin:4px 0;padding:8px 10px;border-radius:10px;background:#fff0ee;color:#b3261e;font-size:12.5px;font-weight:800;line-height:1.5}
+.reward-event-modal-v13142 .rev-events{margin-top:14px;border-top:1px solid #e6eeeb;padding-top:6px}
+.reward-event-modal-v13142 .rev-group{margin:10px 0 6px;font-size:13px;color:#51625c}
+.reward-event-modal-v13142 .rev-list{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.reward-event-modal-v13142 .rev-row{padding:10px 12px;border:1px solid #e3ebe8;border-radius:14px;background:#fff}
+.reward-event-modal-v13142 .rev-row.live{border-color:#f4c96b;background:#fffaf0}
+.reward-event-modal-v13142 .rev-row.ended{opacity:.72}
+.reward-event-modal-v13142 .rev-row-main{display:flex;align-items:center;gap:6px;min-width:0}
+.reward-event-modal-v13142 .rev-row-main b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.reward-event-modal-v13142 .rev-row-main em{flex:none;font-style:normal;font-weight:900;color:#c76f00}
+.reward-event-modal-v13142 .rev-status{flex:none;padding:2px 7px;border-radius:999px;font-size:11px;font-weight:900;background:#eef2f1;color:#51625c}
+.reward-event-modal-v13142 .rev-status.live{background:#ff9f1a;color:#fff}
+.reward-event-modal-v13142 .rev-status.upcoming{background:#e3f1ff;color:#1d5fa8}
+.reward-event-modal-v13142 .rev-row>small{display:block;margin-top:3px;font-size:12px;color:#6c7c77}
+.reward-event-modal-v13142 .rev-row-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;margin-top:6px}
+.reward-event-modal-v13142 .rev-del{color:#b3261e}
+.reward-event-modal-v13142 .rev-empty{margin:10px 0;font-size:13px;color:#6c7c77;text-align:center}
+@media (max-width:520px){.reward-event-modal-v13142 .rev-dates{grid-template-columns:1fr}}
+@media (max-width:340px){.reward-event-modal-v13142 .rev-two{grid-template-columns:1fr}}
+/* 선생님: 큰 화면은 머리말 버튼, 폰(머리말이 이미 꽉 참)은 대시보드 맨 위 한 줄 */
+.reward-event-top-v13142{gap:6px}
+.rev-entry-v13142{display:none;align-items:center;gap:10px;width:100%;margin:0 0 12px;padding:11px 14px;border:1px solid #f4c96b;border-radius:16px;background:linear-gradient(120deg,#fff7df,#ffe9b8);font:inherit;text-align:left;color:#5a3b00;cursor:pointer}
+.rev-entry-v13142>span{flex:none;font-size:22px}
+.rev-entry-v13142>div{flex:1;min-width:0}
+.rev-entry-v13142 b{display:block;font-size:14.5px;font-weight:900}
+.rev-entry-v13142 small{display:block;margin-top:1px;font-size:12px;font-weight:700;color:#8a6516}
+.rev-entry-v13142>i{flex:none;font-style:normal;font-size:22px;color:#c76f00}
+@media (max-width:720px){.reward-event-top-v13142{display:none!important}.rev-entry-v13142{display:flex}}

@@ -7,13 +7,26 @@ export { BattleRoom };
 // V13.128 던전 방: 파티 하나에 방 하나.
 import { DungeonRoom, dungeonReportKey } from './dungeon-room.mjs';
 export { DungeonRoom };
-import { selfSignup } from '../server/signup.mjs';
+import { selfSignup, checkSignupCode, signupCodeGuard } from '../server/signup.mjs';
 import { examAdmin } from '../server/exam-admin.mjs';
 import { migrateState, stateSizeReport } from '../server/state.mjs';
 import { hashToken } from '../server/auth.mjs';
 import { createMutationCoordinator, NO_MUTATION } from '../server/mutation-coordinator.mjs';
 import { createLocalRepository, createSupabaseSync } from './local-first.mjs';
 import { partitionState, assembleState, hashText } from './state-parts.mjs';
+import { WRITE_WARN_PCT } from './cf-limits.mjs';
+
+// V13.144 쓰기 모으기: 저장이 연달아 오면 이 시간(ms) 안에 온 변경을 한 번에 쓴다. 오늘 쓴 양이 70%를 넘으면 2배,
+// 90%를 넘으면 4배로 늘린다. 쉬고 있다가 온 저장은 기다리지 않는다. env.VOCA_COMMIT_GROUP_MS로 바꿀 수 있다.
+export const COMMIT_GROUP_MS = 1500;
+const SYNC_MIN_INTERVAL_MS = 60000;
+// 시작하지 못했을 때(1101 대신) 보내는 답. /api/health에는 원인(앞 300자)과 시작 경고도 붙인다.
+export const BOOT_FAIL_MESSAGE = '서버를 시작하지 못했어요. 잠시 후 다시 시도해 주세요.';
+export function bootFailureResponse(error, pathname, bootWarning = null) {
+  const payload = { ok: false, error: BOOT_FAIL_MESSAGE };
+  if (pathname === '/api/health') Object.assign(payload, { cause: String(error?.detail || error?.message || error || '').slice(0, 300), boot_warning: bootWarning });
+  return json(payload, 503);
+}
 
 // V13.136: 같은 아이디로 5분에 10번 틀리면 5분 쉰다(맞게 로그인한 횟수는 세지 않는다).
 const LOGIN_FAIL_MAX = 10;
@@ -23,7 +36,7 @@ const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' };
 
 // Changes allowed without a session. Everything else needs a live token of an active profile
 // (the same test service() makes, done once more outside the queue).
-const OPEN_POST_PATHS = new Set(['/api/login', '/api/signup']);
+const OPEN_POST_PATHS = new Set(['/api/login', '/api/signup', '/api/signup/check']);
 function hasLiveSession(state, token) {
   if (!token || token.length > 200) return false;
   const hash = hashToken(token), now = Date.now();
@@ -161,27 +174,55 @@ export class VocaStateObject {
     this.ctx = ctx;
     this.env = env;
     this.rates = new Map();
+    this.bootWarning = null;
     this.ready = ctx.blockConcurrencyWhile(async () => {
       this.supabase = createSupabaseRepository(env);
       this.local = createLocalRepository(ctx.storage);
-      this.sync = createSupabaseSync({ local: this.local, supabase: this.supabase, storage: ctx.storage, minIntervalMs: Number(env.SUPABASE_SYNC_MIN_INTERVAL_MS ?? 60000), forceFull: env.SUPABASE_BACKUP_MODE === 'full' });
+      if (this.local.migrationError()) this.bootWarning = `옛 저장 방식으로 읽었어요(옮기기 실패): ${this.local.migrationError()}`.slice(0, 300);
+      const syncInterval = Number(env.SUPABASE_SYNC_MIN_INTERVAL_MS ?? SYNC_MIN_INTERVAL_MS);
+      // V13.144: 오늘 쓴 양이 90%를 넘으면 백업 간격을 5배로(백업도 줄을 쓴다).
+      this.sync = createSupabaseSync({ local: this.local, supabase: this.supabase, storage: ctx.storage, minIntervalMs: () => this.writeLevel() === 'defer' ? syncInterval * 5 : syncInterval, forceFull: env.SUPABASE_BACKUP_MODE === 'full' });
       const initial = await this.loadInitialState();
-      const migrated = migrateState(initial.state);
-      const swept = sweep(initial.state);
+      // V13.144: 시작 정리(migrateState · sweep)와 시작 저장이 실패해도 서버는 켠다. 예전에는 여기서 던지면 상태 객체가
+      // 리셋되고 다음 요청에서 또 던져 모든 요청이 1101이 됐다(2026-10-12, 쓰기 한도 초과로 시작 저장이 실패).
+      // 정리는 복사본에서 해서, 중간에 던져도 읽은 상태는 그대로다.
       this.sweptAt = Date.now();
-      if (migrated || swept) {
-        await this.local.commit(initial.state, initial.revision);
-        initial.revision += 1;
+      try {
+        const working = structuredClone(initial.state);
+        const migrated = migrateState(working);
+        // 90%를 넘은 날은 급하지 않은 정리를 다음 날로 미룬다.
+        const swept = this.writeLevel() === 'defer' ? false : sweep(working);
+        initial.state = working;
+        if (migrated || swept) {
+          try {
+            initial.revision = await this.local.commit(working, initial.revision);
+          } catch (error) {
+            this.bootWarning = `시작 저장 실패(다음 저장 때 다시): ${error?.message || error}`.slice(0, 300);
+            console.error('[boot] start-up save failed; serving anyway', error?.message);
+          }
+        }
+      } catch (error) {
+        this.bootWarning = `시작 정리 실패(정리 없이 켬): ${error?.message || error}`.slice(0, 300);
+        console.error('[boot] migrate/sweep failed; serving the stored state as it is', error?.message);
       }
       this.local.onCommit = () => this.sync.schedule();
+      const groupBase = Math.max(0, Number(env.VOCA_COMMIT_GROUP_MS ?? COMMIT_GROUP_MS) || 0);
       this.mutations = createMutationCoordinator(this.local, initial, {
         flushDelay: 500,
         retryDelay: 2000,
         rollbackOnFailure: true,
+        groupMs: () => groupBase * ({ ok: 1, warn: 2, defer: 4 }[this.writeLevel()] || 1),
         onError: error => console.error('[checkpoint]', error.message)
       });
       if (this.sync.pending()) this.sync.schedule(0);
     });
+    // fetch() and alarm() report a failed start themselves.
+    this.ready.catch(() => {});
+  }
+
+  // V13.144: 오늘(UTC) 쓴 줄 수 단계: 'ok' · 'warn'(70%) · 'defer'(90%, 급하지 않은 쓰기를 미룬다).
+  writeLevel() {
+    return this.local?.writeStats().level || 'ok';
   }
 
   // Chooses the starting state:
@@ -294,7 +335,7 @@ export class VocaStateObject {
   }
 
   async alarm() {
-    await this.ready;
+    try { await this.ready; } catch { return; }
     try { await this.sync.run(); } catch {}
   }
 
@@ -314,8 +355,12 @@ export class VocaStateObject {
   }
 
   async fetch(request) {
-    await this.ready;
     const url = new URL(request.url);
+    try { await this.ready; }
+    catch (error) {
+      console.error('[boot] state object did not start', error?.message);
+      return bootFailureResponse(error, url.pathname, this.bootWarning);
+    }
     try {
       await this.mutations.recover();
       if (!url.pathname.startsWith('/api/')) return json({ error: '요청한 기능을 찾을 수 없습니다.' }, 404);
@@ -363,10 +408,20 @@ export class VocaStateObject {
         this.rateLimit(loginKey, LOGIN_FAIL_MAX, LOGIN_FAIL_WINDOW_MS, '비밀번호를 여러 번 틀렸어요. 5분 후 다시 시도해주세요.');
         this.rateLimit(`${address}:all`, 500, 15 * 60000, '요청이 많습니다. 잠시 후 다시 시도해주세요.');
       }
+      // V13.141: 틀린 가입 코드는 같은 기기에서 30분에 20번까지(맞은 시도는 세지 않는다).
+      const signupCodeTry = url.pathname === '/api/signup' || url.pathname === '/api/signup/check';
+      const countWrongCode = signupCodeTry ? signupCodeGuard(this.rates, address) : null;
+      const withCodeCount = async fn => { try { return await fn(); } catch (error) { countWrongCode?.(error); throw error; } };
       if (url.pathname === '/api/signup') {
         const username = String(body.username || '').trim().toLowerCase();
-        this.rateLimit(`${address}:signup`, 12, 30 * 60000, '회원가입 시도가 많습니다. 잠시 후 다시 시도해주세요.');
+        // 가입 코드가 막아 주므로, 한 교실(같은 와이파이)이 함께 가입할 수 있게 넉넉히 둔다.
+        this.rateLimit(`${address}:signup`, 60, 30 * 60000, '회원가입 시도가 많습니다. 잠시 후 다시 시도해주세요.');
         this.rateLimit(`${address}:signup:${username}`, 4, 30 * 60000, '같은 아이디로 가입 시도가 많습니다. 잠시 후 다시 시도해주세요.');
+      }
+      // 코드 확인은 아무것도 바꾸지 않으므로 저장 줄을 거치지 않는다.
+      if (url.pathname === '/api/signup/check') {
+        if (request.method !== 'POST') throw Object.assign(Error('지원하지 않는 요청입니다.'), { status: 405 });
+        return json(await withCodeCount(() => checkSignupCode(this.mutations.current().state, body)));
       }
       // Each password check runs scrypt up to three times.
       if (url.pathname === '/api/profile/password') this.rateLimit(`${address}:password:${hashToken(token).slice(0, 16)}`, 8, 15 * 60000, '비밀번호 변경 시도가 많습니다. 잠시 후 다시 시도해주세요.');
@@ -387,7 +442,8 @@ export class VocaStateObject {
       const currentState = this.mutations.current().state;
       const hasExpiredAttempt = currentState.examAttempts.some(attempt => attempt.status === 'active' && attempt.deadline <= Date.now());
       // Housekeeping (stale practices, old record compaction) also runs hourly, not only at start-up.
-      const sweepDue = Date.now() - this.sweptAt > 3600000;
+      // V13.144: 오늘 쓴 양이 90%를 넘으면 시간마다 하는 정리는 다음 날로 미룬다(끝난 시험 마감은 그대로 한다).
+      const sweepDue = Date.now() - this.sweptAt > 3600000 && this.writeLevel() !== 'defer';
       if (hasExpiredAttempt || sweepDue) {
         if (sweepDue) this.sweptAt = Date.now();
         // V13.129: 정리가 실패해도 학생의 요청은 그대로 처리한다(실패는 로그로 남긴다).
@@ -406,7 +462,7 @@ export class VocaStateObject {
         return adminOutput !== undefined
           ? adminOutput
           : url.pathname === '/api/signup' && request.method === 'POST'
-            ? await selfSignup(state, body)
+            ? await withCodeCount(() => selfSignup(state, body))
             : await service(state, request.method, path, body, token, { preauthenticatedUserId, origin: url.origin });
       };
 
@@ -449,7 +505,16 @@ export class VocaStateObject {
       if (request.method !== 'GET' && elapsed > 1500) console.warn('[slow-mutation]', url.pathname.replace(/\/[0-9a-f-]{36}/g, '/:id'), { elapsed, commitMs, commitBytes });
       // Public health output shows whether the Supabase backup is keeping up.
       // V13.99: supabase_last_ok_at (kept in ctx.storage) and the backup way (parts/full).
-      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.json.length || 0) / 1024), state_breakdown: this.sizeReport() };
+      const writeStats = this.local.writeStats();
+      if (url.pathname === '/api/health') {
+        // V13.144: 오늘(UTC) 이 상태 객체가 쓴 줄 수와 무료 한도(cloudflare/cf-limits.mjs) 대비 %, 시작 경고.
+        Object.assign(result, { rows_written_today: writeStats.rows, rows_written_pct: writeStats.pct, rows_written_limit: writeStats.limit, rows_written_day: writeStats.day, write_level: writeStats.level, boot_warning: this.bootWarning });
+      }
+      // V13.144: 70%를 넘으면 선생님 첫 화면에 경고.
+      if (url.pathname === '/api/bootstrap' && result?.profile?.role === 'teacher' && writeStats.pct >= WRITE_WARN_PCT) {
+        result.server_write_warning = { pct: Math.round(writeStats.pct), defer: writeStats.level === 'defer', text: `오늘 서버 저장량이 많아요(${Math.round(writeStats.pct)}%)` };
+      }
+      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', storage_format: this.local.format(), last_commit_rows: this.local.metrics.commitRows, supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.size || 0) / 1024), state_breakdown: this.sizeReport() };
       const responseHeaders = {
         // Visible in DevTools > Network > Timing, so slow saves can be measured on a real phone.
         // commit = local durable write; supabase = last background upload.
@@ -523,7 +588,13 @@ export default {
     }
     if (url.pathname.startsWith('/api/')) {
       const id = env.VOCA_STATE.idFromName('main');
-      return securityHeaders(await env.VOCA_STATE.get(id).fetch(request), url.pathname);
+      // V13.144: 상태 객체가 던지면(시작 실패 등) Cloudflare 1101 화면 대신 JSON 503으로 답한다.
+      try {
+        return securityHeaders(await env.VOCA_STATE.get(id).fetch(request), url.pathname);
+      } catch (error) {
+        console.error('[voca-state] call failed', error?.message);
+        return securityHeaders(bootFailureResponse(error, url.pathname), url.pathname);
+      }
     }
     return securityHeaders(await env.ASSETS.fetch(request), url.pathname);
   }
