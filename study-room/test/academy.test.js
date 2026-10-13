@@ -195,3 +195,33 @@ test('teacher adds students in bulk with initial PINs', () => {
   assert.equal(academy.login({ name: '지율', classCode: cls.code, pin }).student.name, '지율');
   assert.equal(academy.overview(cls.code).students.find((s) => s.name === '성욱').lastSeen, null);
 });
+
+test('live study sessions survive a server restart', async () => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'study-')), 'state.json');
+  const clock = { t: Date.parse('2026-10-13T10:00:00+09:00') };
+  const store = new Store({ file, flushDelayMs: 10 });
+  await store.load();
+  const academy = new Academy(store, { now: () => clock.t });
+  const cls = academy.createClass('A');
+  const s = academy.register({ name: '감자', classCode: cls.code, pin: '1234' }).student;
+  academy.attach(s.id);
+  academy.setStudy(s.id, true);
+  academy.postBubble(s.id, '영어');
+  clock.t += 20 * MIN;
+  academy.tick();
+  await store.close();
+
+  clock.t += 1 * MIN;
+  const again = new Store({ file });
+  await again.load();
+  const academy2 = new Academy(again, { now: () => clock.t });
+  assert.equal(academy2.status(s.id), 'away');
+  assert.equal(academy2.member(s.id).bubble.text, '영어');
+  academy2.attach(s.id);
+  clock.t += 4 * MIN;
+  assert.equal(academy2.status(s.id), 'study');
+  assert.equal(academy2.todayMs(s.id), 25 * MIN);
+});

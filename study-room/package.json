@@ -5,7 +5,9 @@
   "description": "SUMUS 공부방 - 학원 학생들이 캐릭터로 함께 공부하는 실시간 공부방",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test test/academy.test.js test/server.test.js test/camera.test.js"
+    "test": "node --test test/academy.test.js test/server.test.js test/camera.test.js",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy"
   },
   "engines": {
     "node": ">=20"
@@ -14,5 +16,8 @@
     "@mediapipe/tasks-vision": "^1.1.0",
     "pg": "^8.13.1",
     "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.150.0"
   }
 }

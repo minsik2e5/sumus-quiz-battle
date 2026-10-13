@@ -52,19 +52,42 @@ npm test
 | `STUDY_DATA_FILE` | DB가 없을 때 쓸 JSON 파일 경로 (기본 `study-room/data/study-room.json`) |
 | `PORT` | 서버 포트 (기본 8790) |
 
-## Render 배포
+## Cloudflare 배포 (권장)
+
+학원 전체를 Durable Object 하나가 맡아 실시간 연결과 기록 저장(내장 SQLite)을 함께 처리합니다. 잠들지 않고, DB를 따로 붙일 필요가 없습니다.
+
+**GitHub 연결로 자동 배포 (Workers Builds)**
+1. Cloudflare 대시보드 → Workers & Pages → Create → **Import a repository** → 이 저장소 선택
+2. Project name: `sumus-study-room` (wrangler.jsonc의 `name`과 같아야 함)
+3. Branch: 배포할 브랜치 / **Root directory**: `study-room`
+4. **Build command**: `npm ci` / **Deploy command**: `npx wrangler deploy`
+5. 첫 배포 뒤 Settings → Variables and Secrets → `STUDY_TEACHER_KEY`를 **Secret**으로 추가
+
+**내 컴퓨터에서 배포**
+```text
+cd study-room
+npm ci
+npx wrangler login
+npx wrangler secret put STUDY_TEACHER_KEY
+npm run cf:deploy
+```
+
+로컬 테스트: `.dev.vars`에 `STUDY_TEACHER_KEY=...`를 적고 `npm run cf:dev` (http://localhost:8787)
+
+## Render 배포 (Node 서버)
 
 1. Render에서 **New → Web Service**, 이 저장소 선택
-2. **Root Directory**: `study-room`
-3. **Build Command**: `npm install` / **Start Command**: `npm start`
-4. 환경 변수 `STUDY_TEACHER_KEY` 설정
-5. 공부 기록이 재배포 때 사라지지 않게 **Render Postgres**를 만들고 그 Internal Database URL을 `DATABASE_URL`로 넣습니다.
-   (DB 없이 쓰면 재배포/재시작 때 기록이 초기화될 수 있습니다.)
+2. **Build Command**: `cd study-room && npm install --omit=dev` / **Start Command**: `cd study-room && npm start`
+3. 환경 변수 `STUDY_TEACHER_KEY` 설정
+4. 기록이 재배포 때 사라지지 않게 Render Postgres의 Internal Database URL을 `DATABASE_URL`로 넣습니다.
 
 ## 구조
 
 ```text
-server.js          HTTP API + WebSocket(/ws) + 정적 파일
+lib/hub.js         API·WebSocket 처리 (Node/Cloudflare 공용)
+server.js          Node 서버 (HTTP + ws + 정적 파일)
+cloudflare/        Cloudflare Worker + Durable Object + SQLite 저장소
+wrangler.jsonc     Cloudflare 배포 설정
 lib/academy.js     반/학생/공부 시간/말풍선/응원/통계 핵심 로직
 lib/store.js       JSON 스냅샷 저장 (Postgres 또는 파일)
 lib/time.js        한국 시간 기준 날짜 계산

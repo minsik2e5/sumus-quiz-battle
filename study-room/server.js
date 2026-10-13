@@ -6,7 +6,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 const { Store } = require('./lib/store');
-const { Academy, AcademyError, ALL } = require('./lib/academy');
+const { createHub, sameOrigin } = require('./lib/hub');
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 // 얼굴 인식 엔진(MediaPipe)은 npm 패키지에서 바로 내보낸다
@@ -18,8 +18,6 @@ const VENDOR_FILES = new Map([
 ]);
 const TICK_MS = 15 * 1000;
 const MAX_BODY_BYTES = 16 * 1024;
-const LOGIN_WINDOW_MS = 15 * 60 * 1000;
-const LOGIN_MAX_FAILS = 8;
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -36,22 +34,6 @@ const TYPES = {
 
 function log(...args) {
   console.log(new Date().toISOString(), ...args);
-}
-
-function safeEqual(a, b) {
-  const A = Buffer.from(String(a));
-  const B = Buffer.from(String(b));
-  return A.length === B.length && crypto.timingSafeEqual(A, B);
-}
-
-function sameOrigin(req) {
-  const origin = req.headers.origin;
-  if (!origin) return true;
-  try {
-    return new URL(origin).host.toLowerCase() === String(req.headers.host || '').toLowerCase();
-  } catch {
-    return false;
-  }
 }
 
 function clientIp(req) {
@@ -77,86 +59,8 @@ async function createApp({
   await store.load();
   say(`storage: ${store.kind}`);
 
-  const sockets = new Set();
-  const loginFails = new Map();
-
-  function send(ws, msg) {
-    if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
-  }
-
-  // 학생 화면: 우리 반 보기면 같은 반 학생만, 학원 전체 보기면 접속 중인 학생 모두를 받는다.
-  function sees(ws, member) {
-    if (ws.meta.view === 'all') return true;
-    return ws.meta.classCode === member.classCode;
-  }
-
-  const academy = new Academy(store, {
-    now,
-    onMember(member) {
-      for (const ws of sockets) {
-        if (!ws.meta.studentId) continue;
-        if (ws.meta.studentId === member.id) send(ws, { t: 'me', me: academy.me(member.id) });
-        if (ws.meta.view === 'all' && member.status === 'offline') send(ws, { t: 'remove', id: member.id });
-        else if (sees(ws, member)) send(ws, { t: 'member', m: member });
-      }
-    },
-    onRemove(id, classCode, deleted) {
-      for (const ws of sockets) {
-        if (ws.meta.studentId === id) {
-          if (deleted) {
-            send(ws, { t: 'kicked' });
-            ws.close(4001, 'removed');
-          } else {
-            const s = academy.data.students[id];
-            ws.meta.classCode = s.classCode;
-            sendWelcome(ws);
-          }
-        } else if (ws.meta.classCode === classCode || ws.meta.view === 'all') {
-          send(ws, { t: 'remove', id });
-        }
-      }
-    },
-    onCheer(event) {
-      for (const ws of sockets) {
-        if (!ws.meta.studentId) continue;
-        const target = academy.data.students[event.to];
-        if (ws.meta.studentId === event.to || (target && sees(ws, target))) send(ws, { t: 'cheer', ...event });
-      }
-    },
-    onCamStopped(id) {
-      for (const ws of sockets) if (ws.meta.studentId === id) send(ws, { t: 'cam_stopped' });
-    },
-    onCheckMissed(id) {
-      for (const ws of sockets) if (ws.meta.studentId === id) send(ws, { t: 'check_missed' });
-    },
-    onNotice() {
-      for (const ws of sockets) {
-        if (ws.meta.studentId) send(ws, { t: 'notices', notices: academy.noticesFor(ws.meta.classCode) });
-      }
-    }
-  });
-
-  function sendWelcome(ws) {
-    const id = ws.meta.studentId;
-    const s = academy.data.students[id];
-    const cls = academy.getClass(s.classCode);
-    send(ws, {
-      t: 'welcome',
-      serverNow: now(),
-      view: ws.meta.view,
-      me: academy.me(id),
-      className: cls ? cls.name : '',
-      members: academy.roomMembers(ws.meta.view, s.classCode),
-      notices: academy.noticesFor(s.classCode)
-    });
-  }
-
-  // ---------- HTTP ----------
-
-  function json(res, status, body) {
-    res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-    res.end(JSON.stringify(body));
-  }
+  const hub = createHub({ store, teacherKey, now, log: say });
+  const { academy } = hub;
 
   function readBody(req) {
     return new Promise((resolve, reject) => {
@@ -165,128 +69,18 @@ async function createApp({
       req.on('data', (chunk) => {
         size += chunk.length;
         if (size > MAX_BODY_BYTES) {
-          reject(new AcademyError('요청이 너무 커요.'));
+          resolve('x'.repeat(MAX_BODY_BYTES + 1));
           req.destroy();
         } else chunks.push(chunk);
       });
-      req.on('end', () => {
-        if (!chunks.length) return resolve({});
-        try {
-          resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
-        } catch {
-          reject(new AcademyError('JSON 형식이 올바르지 않아요.'));
-        }
-      });
+      req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
       req.on('error', reject);
     });
   }
 
-  function bearer(req) {
-    const m = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ''));
-    return m ? m[1].trim() : '';
-  }
-
-  function isTeacher(req) {
-    return safeEqual(String(req.headers['x-teacher-key'] || ''), teacherKey);
-  }
-
-  function checkLoginLimit(key) {
-    const entry = loginFails.get(key);
-    if (entry && now() - entry.first < LOGIN_WINDOW_MS && entry.count >= LOGIN_MAX_FAILS) {
-      throw new AcademyError('여러 번 틀려서 잠시 잠겼어요. 15분 뒤에 다시 하거나 선생님께 PIN 재설정을 부탁하세요.', 'limit');
-    }
-  }
-
-  function noteLoginFail(key) {
-    const entry = loginFails.get(key);
-    if (!entry || now() - entry.first >= LOGIN_WINDOW_MS) loginFails.set(key, { first: now(), count: 1 });
-    else entry.count += 1;
-  }
-
-  const STATUS = { bad_request: 400, unauthorized: 401, not_found: 404, conflict: 409, limit: 429 };
-
-  async function api(req, res, url) {
-    const p = url.pathname;
-    const method = req.method;
-
-    if (p === '/api/class' && method === 'GET') {
-      const cls = academy.getClass(url.searchParams.get('code'));
-      if (!cls) throw new AcademyError('반 코드를 다시 확인해 주세요.', 'not_found');
-      return json(res, 200, { code: cls.code, name: cls.name });
-    }
-    if (p === '/api/register' && method === 'POST') {
-      const body = await readBody(req);
-      const { student, token } = academy.register(body);
-      return json(res, 200, { token, me: academy.me(student.id) });
-    }
-    if (p === '/api/login' && method === 'POST') {
-      const body = await readBody(req);
-      const key = `${clientIp(req)}|${String(body.classCode || '').trim()}|${String(body.name || '').trim()}`;
-      checkLoginLimit(key);
-      try {
-        const { student, token } = academy.login(body);
-        loginFails.delete(key);
-        return json(res, 200, { token, me: academy.me(student.id) });
-      } catch (err) {
-        noteLoginFail(key);
-        throw err;
-      }
-    }
-    if (p.startsWith('/api/me')) {
-      const student = academy.auth(bearer(req));
-      if (!student) throw new AcademyError('다시 로그인해 주세요.', 'unauthorized');
-      if (p === '/api/me' && method === 'GET') return json(res, 200, { me: academy.me(student.id) });
-      if (p === '/api/me/stats' && method === 'GET') return json(res, 200, academy.stats(student.id));
-      if (p === '/api/me/avatar' && method === 'POST') {
-        academy.setAvatar(student.id, (await readBody(req)).avatar);
-        return json(res, 200, { me: academy.me(student.id) });
-      }
-      if (p === '/api/me/logout' && method === 'POST') {
-        academy.logout(bearer(req));
-        return json(res, 200, { ok: true });
-      }
-    }
-
-    if (p.startsWith('/api/teacher')) {
-      if (!isTeacher(req)) throw new AcademyError('선생님 키가 올바르지 않아요.', 'unauthorized');
-      if (p === '/api/teacher/classes' && method === 'GET') return json(res, 200, { classes: academy.listClasses(), today: academy.today() });
-      if (p === '/api/teacher/classes' && method === 'POST') return json(res, 200, { class: academy.createClass((await readBody(req)).name) });
-      let m = /^\/api\/teacher\/classes\/(\d+)$/.exec(p);
-      if (m && method === 'PATCH') return json(res, 200, { class: academy.renameClass(m[1], (await readBody(req)).name) });
-      if (m && method === 'DELETE') {
-        academy.deleteClass(m[1]);
-        return json(res, 200, { ok: true });
-      }
-      m = /^\/api\/teacher\/classes\/(\d+)\/students$/.exec(p);
-      if (m && method === 'POST') return json(res, 200, { results: academy.addStudents(m[1], (await readBody(req)).names) });
-      if (p === '/api/teacher/overview' && method === 'GET') {
-        return json(res, 200, academy.overview(url.searchParams.get('target') || ALL, url.searchParams.get('day') || academy.today()));
-      }
-      if (p === '/api/teacher/notice' && method === 'POST') {
-        const body = await readBody(req);
-        academy.setNotice(String(body.target || ALL), body.text);
-        return json(res, 200, { ok: true });
-      }
-      if (p === '/api/teacher/export.csv' && method === 'GET') {
-        const csv = academy.exportCsv(url.searchParams.get('target') || ALL, url.searchParams.get('from'), url.searchParams.get('to'));
-        res.writeHead(200, { 'Content-Type': 'text/csv; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Disposition': 'attachment; filename="study-records.csv"' });
-        return res.end(csv);
-      }
-      m = /^\/api\/teacher\/students\/([0-9a-f]+)\/(pin|bubble|move)$/.exec(p);
-      if (m && method === 'POST') {
-        const body = await readBody(req);
-        if (m[2] === 'pin') academy.resetPin(m[1], body.pin);
-        else if (m[2] === 'bubble') academy.clearBubble(m[1]);
-        else academy.moveStudent(m[1], String(body.classCode || ''));
-        return json(res, 200, { ok: true });
-      }
-      m = /^\/api\/teacher\/students\/([0-9a-f]+)$/.exec(p);
-      if (m && method === 'DELETE') {
-        academy.removeStudent(m[1]);
-        return json(res, 200, { ok: true });
-      }
-    }
-    throw new AcademyError('없는 주소예요.', 'not_found');
+  function reply(res, out) {
+    res.writeHead(out.status, out.headers);
+    res.end(out.body);
   }
 
   function serveFile(res, filePath, cacheControl) {
@@ -320,17 +114,18 @@ async function createApp({
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', 'http://localhost');
-    if (url.pathname === '/health') return json(res, 200, { ok: true, storage: store.kind, sockets: sockets.size });
+    if (url.pathname === '/health') return reply(res, hub.health());
     if (url.pathname.startsWith('/api/')) {
-      if (req.method !== 'GET' && !sameOrigin(req)) return json(res, 403, { error: '다른 사이트에서 온 요청은 받을 수 없어요.' });
-      try {
-        await api(req, res, url);
-      } catch (err) {
-        if (err instanceof AcademyError) return json(res, STATUS[err.code] || 400, { error: err.message });
-        say('api error', err);
-        return json(res, 500, { error: '서버에 문제가 생겼어요. 잠시 후 다시 해 주세요.' });
-      }
-      return;
+      return reply(res, await hub.api({
+        method: req.method,
+        path: url.pathname,
+        query: url.searchParams,
+        header: (name) => req.headers[name.toLowerCase()],
+        bodyText: req.method === 'GET' ? '' : await readBody(req),
+        ip: clientIp(req),
+        origin: req.headers.origin,
+        host: req.headers.host
+      }));
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.writeHead(405);
@@ -341,67 +136,23 @@ async function createApp({
 
   // ---------- WebSocket ----------
 
-  const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096, verifyClient: ({ req }) => sameOrigin(req) });
+  const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096, verifyClient: ({ req }) => sameOrigin(req.headers.origin, req.headers.host) });
 
   wss.on('connection', (ws) => {
-    ws.meta = { studentId: null, classCode: null, view: 'class' };
+    const conn = {
+      send: (text) => { if (ws.readyState === ws.OPEN) ws.send(text); },
+      close: (code, reason) => ws.close(code, reason)
+    };
     ws.alive = true;
-    sockets.add(ws);
     ws.on('pong', () => { ws.alive = true; });
-
-    ws.on('message', (raw) => {
-      let msg;
-      try {
-        msg = JSON.parse(raw.toString('utf8'));
-      } catch {
-        return;
-      }
-      try {
-        handle(ws, msg);
-      } catch (err) {
-        if (err instanceof AcademyError) send(ws, { t: 'error', msg: err.message, code: err.code });
-        else say('ws error', err);
-      }
-    });
-
-    ws.on('close', () => {
-      sockets.delete(ws);
-      if (ws.meta.studentId) academy.detach(ws.meta.studentId);
-    });
+    hub.connect(conn);
+    ws.on('message', (raw) => hub.message(conn, raw.toString('utf8')));
+    ws.on('close', () => hub.disconnect(conn));
   });
 
-  function handle(ws, msg) {
-    if (msg.t === 'ping') return send(ws, { t: 'pong', serverNow: now() });
-    if (msg.t === 'auth') {
-      if (ws.meta.studentId) return;
-      const student = academy.auth(String(msg.token || ''));
-      if (!student) {
-        send(ws, { t: 'auth_failed' });
-        return ws.close(4001, 'auth');
-      }
-      ws.meta.studentId = student.id;
-      ws.meta.classCode = student.classCode;
-      ws.meta.view = msg.view === 'all' ? 'all' : 'class';
-      academy.attach(student.id);
-      return sendWelcome(ws);
-    }
-    const id = ws.meta.studentId;
-    if (!id) return;
-    if (msg.t === 'view') {
-      ws.meta.view = msg.view === 'all' ? 'all' : 'class';
-      return sendWelcome(ws);
-    }
-    if (msg.t === 'study') return academy.setStudy(id, msg.on === true);
-    if (msg.t === 'bubble') return academy.postBubble(id, msg.text);
-    if (msg.t === 'cheer') return academy.cheer(id, String(msg.to || ''));
-    if (msg.t === 'avatar') return academy.setAvatar(id, msg.avatar);
-    if (msg.t === 'check_ok') return academy.confirmCheck(id);
-    if (msg.t === 'cam') return academy.setCam(id, msg.on === true, String(msg.pose || ''));
-  }
-
-  const tickTimer = setInterval(() => academy.tick(), TICK_MS);
+  const tickTimer = setInterval(() => hub.tick(), TICK_MS);
   const pingTimer = setInterval(() => {
-    for (const ws of sockets) {
+    for (const ws of wss.clients) {
       if (!ws.alive) {
         ws.terminate();
         continue;
@@ -417,7 +168,7 @@ async function createApp({
   async function close() {
     clearInterval(tickTimer);
     clearInterval(pingTimer);
-    for (const ws of sockets) ws.terminate();
+    for (const ws of wss.clients) ws.terminate();
     for (const [id, l] of academy.live) if (l.since != null) academy.commit(id, now());
     await new Promise((resolve) => wss.close(resolve));
     await new Promise((resolve) => server.close(resolve));

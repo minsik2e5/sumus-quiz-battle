@@ -55,6 +55,7 @@ class Store {
     if (this.writing) await this.writing;
     if (!this.pending || this.kind === 'memory') return;
     this.pending = false;
+    if (this.beforeFlush) this.beforeFlush();
     const json = JSON.stringify(this.data);
     this.writing = (async () => {
       try {

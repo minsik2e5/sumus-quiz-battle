@@ -64,6 +64,34 @@ class Academy {
       for (const hash of student.tokens || []) this.tokenIndex.set(hash, student.id);
     }
     this.lastDay = dayKey(this.now());
+    this.restoreLive(this.data.live);
+    // 저장 직전에 실시간 상태(공부 시작 시각, 말풍선 등)도 함께 남겨서 서버가 다시 켜져도 이어지게 한다
+    store.beforeFlush = () => { this.data.live = this.exportLive(); };
+  }
+
+  exportLive() {
+    const out = {};
+    for (const [id, l] of this.live) {
+      if (!this.data.students[id]) continue;
+      if (l.since == null && !l.bubble) continue;
+      out[id] = { since: l.since, awayAt: l.awayAt, bubble: l.bubble, check: l.check, nextCheckAt: l.nextCheckAt };
+    }
+    return out;
+  }
+
+  // 서버가 다시 켜지면 연결은 모두 끊긴 상태라, 공부 중이던 학생은 지금부터 자리비움 유예로 시작한다
+  restoreLive(saved) {
+    if (!saved || typeof saved !== 'object') return;
+    const now = this.now();
+    for (const [id, v] of Object.entries(saved)) {
+      if (!this.data.students[id] || !v) continue;
+      const l = this.liveOf(id);
+      l.since = typeof v.since === 'number' ? v.since : null;
+      l.awayAt = l.since != null ? (typeof v.awayAt === 'number' ? v.awayAt : now) : null;
+      l.bubble = v.bubble && typeof v.bubble.text === 'string' ? v.bubble : null;
+      l.check = v.check && typeof v.check.at === 'number' ? v.check : null;
+      l.nextCheckAt = typeof v.nextCheckAt === 'number' ? v.nextCheckAt : null;
+    }
   }
 
   get data() {
@@ -95,6 +123,7 @@ class Academy {
   createClass(name) {
     const clean = cleanName(name);
     if (!clean) throw new AcademyError('반 이름을 입력해 주세요.');
+    if (Object.values(this.data.classes).some((c) => c.name === clean)) throw new AcademyError('같은 이름의 반이 이미 있어요.', 'conflict');
     let code;
     do code = String(1000 + crypto.randomInt(9000));
     while (this.data.classes[code]);
@@ -551,6 +580,7 @@ class Academy {
   }
 
   emit(id) {
+    this.dirty();
     const m = this.member(id);
     if (m) this.onMember(m);
   }
