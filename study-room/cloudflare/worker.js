@@ -13,7 +13,7 @@ export class AcademyRoom extends DurableObject {
     const log = (...args) => console.log(...args);
     this.store = new SqlStore(ctx.storage.sql, { log });
     this.store.load();
-    this.hub = createHub({ store: this.store, teacherKey: env.STUDY_TEACHER_KEY || '', log });
+    this.hub = createHub({ store: this.store, teacherKey: env.STUDY_TEACHER_KEY || '', teacherKeyHash: env.STUDY_TEACHER_KEY_HASH || '', log });
   }
 
   async fetch(request) {

@@ -10,6 +10,8 @@
     "bindings": [{ "name": "ACADEMY", "class_name": "AcademyRoom" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AcademyRoom"] }],
-  "observability": { "enabled": true }
-  // 선생님 키는 비밀 값으로: npx wrangler secret put STUDY_TEACHER_KEY
+  "observability": { "enabled": true },
+  // 선생님 키의 SHA-256 해시 (키 자체는 저장소에 두지 않는다).
+  // 키를 바꾸려면 이 값을 바꾸거나, 비밀 값 STUDY_TEACHER_KEY를 추가한다 (npx wrangler secret put STUDY_TEACHER_KEY)
+  "vars": { "STUDY_TEACHER_KEY_HASH": "ebe325af1ec7fb6f6d581a871f154718a9bd326a7f8408ac8e8572fdc7cc3c16" }
 }

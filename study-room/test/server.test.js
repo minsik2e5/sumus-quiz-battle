@@ -60,3 +60,14 @@ test('register, join the room over websocket and see a friend study', async () =
     await app.close();
   }
 });
+
+test('teacher key can be checked against a SHA-256 hash', async () => {
+  const { createHub } = require('../lib/hub');
+  const { Store } = require('../lib/store');
+  const hash = require('crypto').createHash('sha256').update('long-secret-key').digest('hex');
+  const hub = createHub({ store: new Store(), teacherKeyHash: hash });
+  const call = (key) => hub.api({ method: 'GET', path: '/api/teacher/classes', query: new URLSearchParams(), header: (n) => (n === 'x-teacher-key' ? key : ''), bodyText: '', ip: 'x' });
+  assert.equal((await call('long-secret-key')).status, 200);
+  assert.equal((await call('wrong')).status, 401);
+  assert.equal((await call('')).status, 401);
+});

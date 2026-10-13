@@ -3,6 +3,7 @@
 // 실행 환경(Node 서버, Cloudflare Durable Object)과 상관없는 공부방 서버 로직.
 // 연결(conn)은 { send(text), close(code, reason), meta } 모양이면 된다.
 
+const crypto = require('crypto');
 const { Academy, AcademyError, ALL } = require('./academy');
 
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
@@ -29,7 +30,15 @@ function sameOrigin(origin, host) {
   }
 }
 
-function createHub({ store, teacherKey, now = () => Date.now(), log = () => {} }) {
+// 선생님 키: 비밀 값(teacherKey) 또는 공개 저장소에 둘 수 있는 SHA-256 해시(teacherKeyHash) 중 하나와 맞으면 통과
+function teacherKeyMatches(given, teacherKey, teacherKeyHash) {
+  if (!given) return false;
+  if (teacherKey && safeEqual(given, teacherKey)) return true;
+  if (teacherKeyHash) return safeEqual(crypto.createHash('sha256').update(given).digest('hex'), String(teacherKeyHash).toLowerCase());
+  return false;
+}
+
+function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), log = () => {} }) {
   const conns = new Set();
   const loginFails = new Map();
 
@@ -275,7 +284,7 @@ function createHub({ store, teacherKey, now = () => Date.now(), log = () => {} }
     }
 
     if (p.startsWith('/api/teacher')) {
-      if (!teacherKey || !safeEqual(String(req.header('x-teacher-key') || ''), teacherKey)) {
+      if (!teacherKeyMatches(String(req.header('x-teacher-key') || ''), teacherKey, teacherKeyHash)) {
         throw new AcademyError('선생님 키가 올바르지 않아요.', 'unauthorized');
       }
       if (p === '/api/teacher/classes' && method === 'GET') return json(200, { classes: academy.listClasses(), today: academy.today() });

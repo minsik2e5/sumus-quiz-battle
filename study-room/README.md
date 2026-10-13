@@ -61,7 +61,7 @@ npm test
 2. Project name: `sumus-study-room` (wrangler.jsonc의 `name`과 같아야 함)
 3. Branch: 배포할 브랜치 / **Root directory**: `study-room`
 4. **Build command**: `npm ci` / **Deploy command**: `npx wrangler deploy`
-5. 첫 배포 뒤 Settings → Variables and Secrets → `STUDY_TEACHER_KEY`를 **Secret**으로 추가
+5. 선생님 키는 `wrangler.jsonc`의 `STUDY_TEACHER_KEY_HASH`(키의 SHA-256 해시)로 확인합니다. 저장소가 공개라 키 자체는 넣지 않습니다. 키를 바꾸려면 새 키의 해시로 바꾸거나 Settings → Variables and Secrets에서 `STUDY_TEACHER_KEY`를 **Secret**으로 추가하세요.
 
 **내 컴퓨터에서 배포**
 ```text
