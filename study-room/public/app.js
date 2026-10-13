@@ -607,12 +607,13 @@
   function renderSolo() {
     const m = state.me;
     $('#solo-time').textContent = fmt(liveMs(m));
-    $('#solo-label').textContent = m.status === 'study' ? '집중하는 중… 오늘 공부한 시간' : '오늘 공부한 시간 · ▶ 눌러서 시작';
+    $('#solo-label').textContent = m.status === 'study' ? '집중하는 중 · 오늘 공부한 시간' : '▶ 눌러서 집중 시작';
     const pose = poseOf(m);
     const key = JSON.stringify(m.avatar) + pose;
     const box = $('#solo-avatar');
     if (box.dataset.art !== key) {
-      box.innerHTML = Avatar.svg(m.avatar, { pose }).replace('viewBox="0 0 200 200"', 'viewBox="0 20 200 160"');
+      // 머리부터 책상까지 크게 잘라서 보여 준다 (벽은 화면 배경을 그대로 쓴다)
+      box.innerHTML = Avatar.svg(m.avatar, { pose, bare: true }).replace('viewBox="0 0 200 200"', 'viewBox="14 30 172 170"');
       box.dataset.art = key;
     }
     renderSoloFriends();
@@ -621,8 +622,11 @@
   function renderSoloFriends() {
     const friends = Array.from(state.members.values()).filter((m) => m.status === 'study' && m.id !== state.me.id);
     $('#solo-friends').innerHTML = friends.length
-      ? friends.slice(0, 5).map((f) => `<div class="f">${Avatar.face(f.avatar)}</div>`).join('') + `<span>친구 ${friends.length}명도 공부 중</span>`
-      : '<span>아직 공부 중인 친구가 없어요</span>';
+      ? friends.slice(0, 3).map((f) => `<div class="f" title="${esc(f.name)}">${Avatar.svg(f.avatar, { pose: 'rest' }).replace('viewBox="0 0 200 200"', 'viewBox="40 22 120 120"')}</div>`).join('')
+        + (friends.length > 3 ? `<span class="more">+${friends.length - 3}</span>` : '')
+      : '<span class="alone">아직 공부 중인 친구가 없어요</span>';
+    const room = state.view === 'all' ? '학원 전체' : (state.className || '우리 반');
+    $('#solo-room').textContent = friends.length ? `${room} · ${friends.length}명이 같이 공부 중` : room;
   }
 
   // ---------- 시트 ----------

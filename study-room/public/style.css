@@ -147,17 +147,31 @@ input { font: inherit; }
 .play.big { width: 84px; height: 84px; }
 
 /* ---------- 혼자 모드 ---------- */
-.solo { background: linear-gradient(180deg, #f3ecff 0%, #fbe7ef 100%); color: #2c2730; display: flex; flex-direction: column; }
-.solo-label { text-align: center; margin: 24px 0 0; color: #8b7f99; font-size: 14px; }
-.solo-timer { text-align: center; font-size: clamp(52px, 16vw, 96px); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -1px; }
-.solo-friends { display: flex; justify-content: center; align-items: center; gap: 4px; min-height: 40px; font-size: 13px; color: #8b7f99; }
-.solo-friends .f { width: 36px; height: 36px; border-radius: 50%; overflow: hidden; background: #fff; border: 2px solid #fff; margin-left: -8px; }
+/* 잼터디처럼: 따뜻한 벽 + 큰 타이머 + 친구 썸네일 + 내 캐릭터 클로즈업 */
+.solo {
+  --solo-w: min(100vw, 560px);
+  position: relative; overflow: hidden; color: #2c2730; display: flex; flex-direction: column; align-items: center;
+  background: repeating-linear-gradient(90deg, #f3ece7 0 54px, #efe7e1 54px 56px), #f3ece7;
+}
+.solo::after {
+  /* 책상이 화면 양끝까지 이어지게 SVG 책상 높이만큼 깔아 둔다 */
+  content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--solo-w) * 0.2791);
+  background: linear-gradient(#f2d2ac, #e2b385); border-top: 3px solid #fbe3c6; z-index: 0;
+}
+.solo-back { position: absolute; top: calc(10px + var(--safe-t)); left: 10px; z-index: 3; width: 42px; height: 42px; border: 0; border-radius: 50%; background: rgba(255,255,255,.7); font-size: 26px; line-height: 1; color: #6d6577; }
+.solo-top { position: relative; z-index: 2; text-align: center; padding-top: calc(9vh + var(--safe-t)); }
+.solo-timer { font-size: clamp(56px, 17vw, 104px); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.02em; line-height: 1; }
+.solo-label { margin: 10px 0 18px; color: #9a8f88; font-size: 14px; font-weight: 600; }
+.solo-friends { display: flex; justify-content: center; align-items: center; min-height: 64px; }
+.solo-friends .f { width: 64px; height: 64px; border-radius: 18px; overflow: hidden; background: var(--card); border: 3px solid #fff; box-shadow: 0 4px 12px rgba(80,50,30,.15); margin-left: -12px; }
 .solo-friends .f:first-child { margin-left: 0; }
 .solo-friends .f svg { width: 100%; height: 100%; display: block; }
-.solo-friends span { margin-left: 8px; }
-.solo-avatar { flex: 1; display: flex; align-items: flex-end; justify-content: center; }
-.solo-avatar svg { width: min(92vw, 440px); height: auto; display: block; }
-.solo-actions { display: flex; justify-content: center; padding: 18px 0 calc(24px + var(--safe-b)); background: var(--desk); }
+.solo-friends .more { margin-left: 8px; font-size: 13px; font-weight: 800; color: #9a8f88; }
+.solo-friends .alone { font-size: 13px; color: #9a8f88; }
+.solo-room { margin: 8px 0 0; font-size: 14px; color: #5d5566; font-weight: 600; }
+.solo-avatar { position: relative; z-index: 1; margin-top: auto; width: var(--solo-w); }
+.solo-avatar svg { width: 100%; height: auto; display: block; }
+.solo-play { position: absolute; z-index: 3; left: 50%; bottom: calc(18px + var(--safe-b)); transform: translateX(-50%); width: 64px; height: 64px; opacity: .92; }
 
 /* ---------- 시트 ---------- */
 .sheet { position: fixed; inset: 0; z-index: 30; }

@@ -124,8 +124,8 @@
       <clipPath id="${id}k"><rect x="0" y="0" width="200" height="${longish ? 200 : a.hair === 'curly' ? cy + 16 : cy + 6}"/></clipPath>
     </defs>`);
 
-    // 벽과 그림자
-    p.push(`<rect width="200" height="200" fill="url(#${id}w)"/>`);
+    // 벽과 그림자 (bare면 벽은 바깥 배경을 쓴다)
+    if (!(opts && opts.bare)) p.push(`<rect width="200" height="200" fill="url(#${id}w)"/>`);
     p.push(`<ellipse cx="100" cy="132" rx="82" ry="48" fill="url(#${id}sh)" opacity=".55"/>`);
 
     if (!person) {

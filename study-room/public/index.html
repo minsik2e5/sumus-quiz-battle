@@ -68,16 +68,15 @@
 
   <!-- 혼자 모드 -->
   <section id="screen-solo" class="screen solo" hidden>
-    <header class="topbar light">
-      <button class="icon-btn" id="solo-back" aria-label="공부방으로">‹</button>
-      <h2>혼자 집중</h2>
-      <span></span>
-    </header>
-    <p class="solo-label" id="solo-label">오늘 공부한 시간</p>
-    <div class="solo-timer"><span id="solo-time">00:00:00</span></div>
-    <div class="solo-friends" id="solo-friends"></div>
+    <button class="solo-back" id="solo-back" aria-label="공부방으로">‹</button>
+    <div class="solo-top">
+      <div class="solo-timer" id="solo-time">00:00:00</div>
+      <p class="solo-label" id="solo-label">오늘 공부한 시간</p>
+      <div class="solo-friends" id="solo-friends"></div>
+      <p class="solo-room" id="solo-room"></p>
+    </div>
     <div class="solo-avatar" id="solo-avatar"></div>
-    <div class="solo-actions"><button class="play big" id="solo-play" aria-label="공부 시작"><span></span></button></div>
+    <button class="play solo-play" id="solo-play" aria-label="공부 시작"><span></span></button>
   </section>
 
   <!-- 말풍선 시트 -->
