@@ -1,7 +1,7 @@
 // Release checks for the pet art order 18 (새 펫 8종 2탄: docs/asset-requests/runner/18a·18b + CODEX_PROMPT_18.md).
 // The order must stay in step with what the app reads (public/assets/pets/<key>-<form>[-<expression>].webp) and with
 // the rules of the order files (Google Drive upload line, one sheet per prompt, no name that an existing pet has).
-import { readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { CHARACTERS } from '../public/modules/core.js';
 import { MONSTERS } from '../public/modules/monsters.js';
@@ -143,7 +143,7 @@ export function runPetOrderChecks(assert) {
     assert(files24.length === 240 && KEYS24.every(key => ['0', '1', '2', '3'].every(f => files24.includes(`public/assets/pets/${key}-${f}.webp`)) && [1, 2, 3].every(f => ['happy', 'eat', 'sad', 'cheer', 'attack', 'hurt'].every(x => files24.includes(`public/assets/pets/${key}-${f}-${x}.webp`))) && ['happy', 'eat'].every(x => files24.includes(`public/assets/pets/${key}-0-${x}.webp`))), '그림 주문서 24: 펫마다 알·3단계 + 표정 12 + 알 반응 2 + 공격·맞음 6 = 24칸, 앱 파일 이름 규칙 그대로');
     assert([...d24, ...e24, ...p24].every(text => text.includes('SUMUS 새 펫 24 (Runner용)') && text.includes('WHEN DONE')) && d24.every(text => text.includes('SUMUS_PET_SPRITES_ALL_20261002') && text.includes('Do NOT copy or resemble any existing cartoon, anime or mascot character')) && p24.every(text => /open "24a-\d+\.png" and "24a-\d+\.png"/.test(text)), '그림 주문서 24: 기존 펫 그림을 열어 그림체를 맞추고, 정해진 Drive 폴더에 정확한 이름으로 저장하고, 만화 캐릭터를 닮지 않게 한다');
     const files25 = rows24('25-titles');
-    assert(files25.length === 40 && new Set(files25).size === 40 && files25.every(file => /^public\/assets\/titles\/[a-z0-9]+\.webp$/.test(file)) && files25.every(file => !readdirSync(here('../public/assets/titles')).includes(file.split('/').pop())) && t25.every(text => text.includes('SUMUS 칭호 25 (Runner용)') && /open "11-\d+\.png"/.test(text) && text.includes('No letters and no numbers')), '그림 주문서 25: 새 칭호 메달 40개(기존 그림과 이름이 겹치지 않음), 11번 메달을 열어 테두리를 맞추고 Drive에 저장');
+    assert(files25.length === 40 && new Set(files25).size === 40 && files25.every(file => /^public\/assets\/titles\/[a-z0-9]+\.webp$/.test(file)) && files25.every(file => existsSync(here(`../${file}`)) && existsSync(here(`../${file.replace(/\.webp$/, '-s.webp')}`))) && t25.every(text => text.includes('SUMUS 칭호 25 (Runner용)') && /open "11-\d+\.png"/.test(text) && text.includes('No letters and no numbers')), '그림 주문서 25: 새 칭호 메달 40개(이름이 서로 겹치지 않고, 256px 본그림 · 96px 작은 그림(-s)이 모두 들어왔다), 11번 메달을 열어 테두리를 맞추고 Drive에 저장');
     const codex24 = read(`${dir}CODEX_PROMPT_24.md`), codex25 = read(`${dir}CODEX_PROMPT_25.md`);
     assert(KEYS24.every(key => codex24.includes(`\`${key}\``)) && [codex24, codex25].every(text => text.includes('PR까지만 만든다. 머지하지 않는다.') && text.includes('운영 Supabase에 연결하지 않는다') && text.includes('앱 코드는 고치지 않는다')) && codex24.includes('닮게 그리지 않는다') && readme.includes('`24a-new-pets-design.txt`') && readme.includes('`25-titles-2.txt`') && readme.includes('CODEX_PROMPT_24.md') && readme.includes('CODEX_PROMPT_25.md'), '그림 주문서 24·25: Codex 지시서(PR까지만, 운영 Supabase 금지, 앱 코드 안 고침)와 README');
   }
