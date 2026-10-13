@@ -184,3 +184,14 @@ test('focus check: confirming keeps the time, missing stops at the check time', 
   assert.equal(row.checksOk, 1);
   assert.equal(row.checksMissed, 1);
 });
+
+test('teacher adds students in bulk with initial PINs', () => {
+  const { academy, cls, join } = setup();
+  join('수아');
+  const results = academy.addStudents(cls.code, ['수아', '지율', ' 성욱 ', '지율', '']);
+  assert.deepEqual(results.map((r) => [r.name, r.status]), [['수아', 'exists'], ['지율', 'added'], ['성욱', 'added']]);
+  const pin = results[1].pin;
+  assert.match(pin, /^\d{4}$/);
+  assert.equal(academy.login({ name: '지율', classCode: cls.code, pin }).student.name, '지율');
+  assert.equal(academy.overview(cls.code).students.find((s) => s.name === '성욱').lastSeen, null);
+});

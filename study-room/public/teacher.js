@@ -95,8 +95,18 @@
         <h2>${isAll ? '학원 전체' : esc(cls.name)}</h2>
         ${cls ? `<span class="code-pill">${cls.code}</span>` : ''}
         <span class="sp"></span>
-        ${cls ? `<button class="btn small" data-act="rename">이름 바꾸기</button><button class="btn small danger" data-act="delete-class">반 삭제</button>` : ''}
+        ${cls ? `<button class="btn small primary" data-act="bulk">학생 추가</button><button class="btn small" data-act="rename">이름 바꾸기</button><button class="btn small danger" data-act="delete-class">반 삭제</button>` : ''}
       </div>
+      ${cls && state.bulkOpen ? `<form class="bulk" id="bulk-form">
+        <p><b>학생 한꺼번에 추가</b> · 이름을 한 줄에 하나씩 적거나 엑셀에서 이름 칸을 복사해 붙여 넣으세요. 학생마다 처음 PIN(숫자 4자리)이 만들어져요.</p>
+        <textarea id="bulk-names" rows="6" placeholder="수아&#10;지율&#10;성욱"></textarea>
+        <div><button class="btn small primary" type="submit">추가하기</button> <button class="btn small" type="button" data-act="bulk">닫기</button></div>
+      </form>` : ''}
+      ${state.bulkResults ? `<div class="bulk-result">
+        <p><b>추가 결과</b> · 학생에게 <b>반 코드 ${cls ? cls.code : ''}</b>, 이름, PIN을 알려주세요. 학생은 "다시 들어가기"로 들어오면 돼요. (이 PIN 목록은 이 화면을 닫으면 다시 볼 수 없어요)</p>
+        <table><thead><tr><th>이름</th><th>PIN</th><th></th></tr></thead><tbody>${state.bulkResults.map((r) => `<tr><td>${esc(r.name)}</td><td class="num">${r.pin || '-'}</td><td class="muted">${r.status === 'added' ? '추가됨' : '이미 있어서 건너뜀'}</td></tr>`).join('')}</tbody></table>
+        <button class="btn small" data-act="copy-pins">이름·PIN 복사 (엑셀에 붙여넣기)</button> <button class="btn small" data-act="close-results">닫기</button>
+      </div>` : ''}
       <p class="join-link">학생 입장 주소: <b>${esc(link)}</b> <button class="btn small" data-act="copy" data-link="${esc(link)}">복사</button></p>
       <div class="tiles">
         <div class="tile"><div class="k">${isToday ? '지금 공부 중' : '선택한 날'}</div><div class="v">${isToday ? `${d.studying}명` : esc(d.day)}</div></div>
@@ -154,7 +164,21 @@
     const a = btn.dataset.act;
     const id = btn.dataset.id;
     try {
-      if (a === 'today') state.day = state.today;
+      if (a === 'bulk') {
+        state.bulkOpen = !state.bulkOpen;
+        renderMain();
+        if (state.bulkOpen) $('#bulk-names').focus();
+        return;
+      } else if (a === 'close-results') {
+        state.bulkResults = null;
+        renderMain();
+        return;
+      } else if (a === 'copy-pins') {
+        const text = ['이름\tPIN', ...state.bulkResults.filter((r) => r.pin).map((r) => `${r.name}\t${r.pin}`)].join('\n');
+        await navigator.clipboard.writeText(text).catch(() => prompt('복사하세요', text));
+        btn.textContent = '복사됨';
+        return;
+      } else if (a === 'today') state.day = state.today;
       else if (a === 'copy') {
         await navigator.clipboard.writeText(btn.dataset.link).catch(() => prompt('주소를 복사하세요', btn.dataset.link));
         btn.textContent = '복사됨';
@@ -226,7 +250,8 @@
     clearInterval(state.timer);
     // 오늘 화면일 때만 10초마다 새로고침 (입력 중이면 건너뜀)
     state.timer = setInterval(() => {
-      const typing = document.activeElement && document.activeElement.tagName === 'INPUT';
+      const typing = document.activeElement && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName);
+      if (state.bulkOpen || state.bulkResults) return;
       if (state.day === state.today && !typing) loadOverview();
     }, 10000);
   }
@@ -270,6 +295,24 @@
     }
   });
   $('#main').addEventListener('submit', async (e) => {
+    if (e.target.id === 'bulk-form') {
+      e.preventDefault();
+      // 줄마다 첫 칸만 이름으로 쓴다 (엑셀에서 점수 칸까지 같이 복사해도 괜찮게)
+      const names = $('#bulk-names').value.split(/\r?\n|,/)
+        .map((line) => line.split('\t')[0].trim())
+        .filter((n) => n && !/^\d+$/.test(n));
+      if (!names.length) return alert('이름을 입력해 주세요.');
+      try {
+        const data = await api(`/api/teacher/classes/${state.target}/students`, { method: 'POST', body: { names } });
+        state.bulkResults = data.results;
+        state.bulkOpen = false;
+        await loadClasses();
+        await loadOverview();
+      } catch (err) {
+        if (err.message !== 'unauthorized') alert(err.message);
+      }
+      return;
+    }
     if (e.target.id !== 'notice-form') return;
     e.preventDefault();
     try {

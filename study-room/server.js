@@ -257,6 +257,8 @@ async function createApp({
         academy.deleteClass(m[1]);
         return json(res, 200, { ok: true });
       }
+      m = /^\/api\/teacher\/classes\/(\d+)\/students$/.exec(p);
+      if (m && method === 'POST') return json(res, 200, { results: academy.addStudents(m[1], (await readBody(req)).names) });
       if (p === '/api/teacher/overview' && method === 'GET') {
         return json(res, 200, academy.overview(url.searchParams.get('target') || ALL, url.searchParams.get('day') || academy.today()));
       }

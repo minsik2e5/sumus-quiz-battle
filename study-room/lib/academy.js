@@ -146,23 +146,50 @@ class Academy {
     if (!clean) throw new AcademyError('이름을 입력해 주세요.');
     if (!/^\d{4}$/.test(String(pin || ''))) throw new AcademyError('PIN은 숫자 4자리예요.');
     if (this.findStudent(code, clean)) throw new AcademyError('이미 같은 이름이 있어요. "다시 들어가기"로 로그인하거나 다른 이름을 써 주세요.', 'conflict');
+    const student = this.createStudent(code, clean, pin, avatar);
+    const token = this.issueToken(student);
+    return { student, token };
+  }
+
+  createStudent(code, name, pin, avatar, lastSeen = this.now()) {
     const student = {
       id: randomHex(8),
-      name: clean,
+      name,
       classCode: code,
       salt: randomHex(8),
       pin: '',
       avatar: Avatar.normalize(avatar || Avatar.random()),
       tokens: [],
       createdAt: this.now(),
-      lastSeen: this.now()
+      lastSeen
     };
     student.pin = this.pinHash(student, pin);
     this.data.students[student.id] = student;
-    const token = this.issueToken(student);
     this.dirty();
     this.emit(student.id);
-    return { student, token };
+    return student;
+  }
+
+  // 선생님이 이름 목록으로 한꺼번에 등록한다. 학생마다 처음 PIN을 무작위로 만들어 돌려준다.
+  addStudents(classCode, names) {
+    const code = String(classCode || '').trim();
+    if (!this.getClass(code)) throw new AcademyError('없는 반이에요.', 'not_found');
+    const list = Array.isArray(names) ? names.slice(0, 200) : [];
+    const seen = new Set();
+    const results = [];
+    for (const raw of list) {
+      const name = cleanName(raw);
+      if (!name || seen.has(name)) continue;
+      seen.add(name);
+      if (this.findStudent(code, name)) {
+        results.push({ name, status: 'exists' });
+        continue;
+      }
+      const pin = String(crypto.randomInt(10000)).padStart(4, '0');
+      this.createStudent(code, name, pin, null, null);
+      results.push({ name, status: 'added', pin });
+    }
+    return results;
   }
 
   login({ name, classCode, pin }) {
