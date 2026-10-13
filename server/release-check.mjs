@@ -88,7 +88,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.144.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.145.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -223,6 +223,9 @@ export async function runReleaseCheck() {
     assert(middle2Lesson5?.words.length === 69 && middle2Lesson6?.words.length === 66, 'middle2 YBM Park lesson5 and lesson6 source counts are 69 and 66');
     assert(middle2Lesson5.words[0].word === 'be interested in ~' && middle2Lesson5.words.at(-1).word === 'explore', 'middle2 YBM lesson5 preserves source order');
     assert(middle2Lesson6.words[0].word === 'throw' && middle2Lesson6.words.at(-1).word === 'take time', 'middle2 YBM lesson6 preserves source order');
+    const middle2Lesson7 = middle2Bootstrap.books.find(book => book.id === 'middle:ybm-park:grade2:lesson7');
+    assert(middle2Lesson7?.words.length === 59 && middle2Lesson7.words[0].word === 'missing' && middle2Lesson7.words.at(-1).word === 'see' && middle2Lesson7.words.every(word => word.range_code === '7' && word.grade === '중2' && word.school_id === 'wonil-middle' && word.meaning.trim()) && new Set(middle2Lesson7.words.map(word => word.word)).size === 59, 'middle2 YBM lesson7: 대화문 17 + 본문 44 (free·manage 한 줄씩) = 59, 어휘 목록 순서, 범위 7');
+    assert(middle2Lesson7.words.find(word => word.word === 'manage').meaning === '(어려움에도) ~을 해내다, ~을 관리하다' && grade('write_meaning', '관리하다', middle2Lesson7.words.find(word => word.word === 'manage')) && grade('write_meaning', '징수하다', middle2Lesson7.words.find(word => word.word === 'collect')) && middle3Bootstrap.books.every(book => !book.id.startsWith('middle:ybm-park:grade2:')), 'middle2 lesson7: 두 뜻을 합친 manage와 괄호 뜻(징수하다)도 뜻쓰기에서 맞고, 중3에게는 안 보인다');
     assert(middle2ImportedBook?.words.length === 8 && middle2ImportedBook.words.every(word => word.grade === '중2'), 'middle2 teacher import remains separate from built-in lessons');
     assert(middle2ImportedBook.words[0].id.startsWith('import:wonil-middle:중2:'), 'middle import uses deterministic grade-scoped word ids');
     const binWord = middle2Lesson6.words.find(word => word.word === 'bin');
@@ -1206,7 +1209,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.144.0') && indexHtml.includes('/app.bundle.css?v=13.144.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.145.0') && indexHtml.includes('/app.bundle.css?v=13.145.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1227,7 +1230,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.144.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.145.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');

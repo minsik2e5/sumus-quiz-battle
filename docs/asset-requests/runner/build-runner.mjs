@@ -1012,6 +1012,146 @@ sheet(F23C, '던전 칭호 메달 2', 'emblem', 'Title medals for a dungeon game
   ['dungeon-hunter', '던전 사냥꾼', 'a SILVER-rimmed medal with two crossed swords over a small monster silhouette-free shield, deep purple enamel', 'public/assets/titles/dungeon-hunter.webp']
 ]);
 
+/* 24 새 펫 10종 (2026-10-12): 기본 5(코끼리 · 미어캣 · 너구리 · 오목눈이 · 하마) + 영웅 5(기니피그 · 아홀로틀 · 친칠라 · 나무늘보 · 오리너구리).
+   기존 47마리와 겹치지 않는 동물만 골랐어요(햄스터·수달·곰·토끼·고슴도치·여우 등은 이미 있음). 전설은 없어요.
+   분위기 참고: 아주 작고 동글동글한 몸, 단순하고 귀여운 얼굴, 큰 볼터치, 작은 소품 하나. 그림체는 기존 펫과 똑같이(3D 페인팅),
+   만화·애니 캐릭터(치이카와 등)를 따라 그리거나 닮게 그리지 않아요.
+   24a 설정 시트(알·아기·성장·최종) → 24b 표정 + 알 반응 → 24c 야차전 공격·맞음 자세. 이름(ko)은 그림 주문에만 쓰는 임시 이름이에요. */
+const F24A = '24a-new-pets-design.txt', F24B = '24b-new-pets-expressions.txt', F24C = '24c-new-pets-battle-poses.txt';
+const MOOD24 = 'Extra small, round and soft like a plush toy: a very simple sweet face (small glossy eyes with white highlights, a tiny mouth, big round pink blush), short stubby limbs, often holding one small prop. Keep exactly the 3D-painted art style of the existing pets of this game. Do NOT copy or resemble any existing cartoon, anime or mascot character (for example Chiikawa, Hachiware or Usagi): this is an original character. ';
+const NEW_PETS_24 = {
+  elephant: { ko: '코롱', type: '아기 코끼리', tier: 'basic', limb: 'its trunk', base: 'a chubby baby elephant with soft powder-blue-gray skin, big round floppy ears with pink insides, a short curly trunk, big glossy dark eyes, pink blush, a tiny tuft of hair on top of the head, short round legs. It must look different from the hippo 하뭉: big ears and a trunk, light blue-gray', egg: 'a powder-blue egg with soft cloud and water-splash patterns, resting on a small puddle with a lily leaf', f: {
+    1: 'baby stage: a tiny, very round baby elephant sitting, its trunk spraying a tiny fountain of water drops, no other accessories',
+    2: 'grown stage: a bigger young elephant standing on four sturdy legs (NOT a round baby), its trunk raised happily, a mint scarf with a small gold star charm',
+    3: 'final stage: a large, gentle, majestic elephant, a small golden headpiece with a blue gem on the forehead, a flowing sky-blue cape with soft cloud patterns and gold trim fastened by a gold star clasp, a little rainbow of water drops from its raised trunk and golden sparkles (NOT a round baby)' } },
+  meerkat: { ko: '쫑긋', type: '미어캣', tier: 'basic', limb: 'one front paw', base: 'a slim, cute meerkat with sandy-tan fur, a cream belly, dark brown eye patches around big glossy eyes, small round ears, a thin tail with a dark tip, pink blush, always standing upright on its hind legs. It must look different from the squirrel 도토리 and the fox 호야: upright stance, sandy color, dark eye patches', egg: 'a sandy-beige egg with soft desert-dune stripes and tiny pebbles, half-buried in a small mound of sand', f: {
+    1: 'baby stage: a tiny round meerkat pup standing upright and peeking around curiously, no accessories',
+    2: 'grown stage: a taller young meerkat standing on watch on a small rock (NOT a round pup), holding a tiny brass telescope, a mint scarf with a small gold star charm',
+    3: 'final stage: a proud meerkat captain standing tall on a sandstone lookout, holding a small golden telescope, a flowing desert-orange cape with gold trim fastened by a gold star clasp, a small golden explorer hat with a star, golden sparkles and a warm sunset glow behind (NOT a round pup)' } },
+  raccoondog: { ko: '너굴', type: '아기 너구리', tier: 'basic', limb: 'one front paw', base: 'a round fluffy raccoon dog (Korean tanuki) with warm gray-brown fur, a dark brown mask-like band around big glossy eyes, small round ears, a cream muzzle, a fluffy plain (not striped) tail, pink blush, a big friendly smile. It must look different from the red panda 단풍 and the fox 호야: gray-brown, round, a plain fluffy tail with no rings', egg: 'a warm gray-brown egg with a soft dark mask-band pattern and a small autumn leaf on top, resting in a nest of fallen leaves', f: {
+    1: 'baby stage: a tiny round raccoon-dog cub hugging a small lunch box wrapped in a cloth, no other accessories',
+    2: 'grown stage: a bigger young raccoon dog standing on its hind legs (NOT a round cub), a big leaf balanced on its head, an orange scarf with a small gold star charm',
+    3: 'final stage: a grand, cheerful raccoon dog sitting on a large leaf cushion, a small golden straw-hat crown, a flowing autumn-orange cape with gold trim fastened by a gold star clasp, floating maple leaves and golden sparkles (NOT a round cub)' } },
+  longtit: { ko: '포롱', type: '오목눈이', tier: 'basic', limb: 'one small wing', base: 'a tiny, fluffy, perfectly round white bird (a long-tailed tit, like a little snowball) with a soft white face, tiny black bead eyes with white highlights, a very small black beak, soft pink-and-black touches on the wings, a long thin black-and-white tail, pink blush. It must look different from the parrot 앵두, the duck 꽥꽥 and the penguin 펭이: a white snowball body with a long thin tail', egg: 'a tiny cream-white egg with soft pink speckles, resting in a small round nest of moss and feathers', f: {
+    1: 'baby stage: a tiny white fluffball chick with stubby wings, holding a tiny pencil, no other accessories',
+    2: 'grown stage: a round fluffy bird perched on a small twig with wings half open (NOT a tiny chick), a long tail, a pink scarf with a small gold star charm',
+    3: 'final stage: a radiant snow-white bird with wings spread wide, a long elegant tail with soft pink-gold glowing tips, a small golden crown with a pink gem, a flowing pale-pink cape with gold trim fastened by a gold star clasp, floating snow-like sparkles and small white feathers (NOT a tiny chick)' } },
+  hippo: { ko: '하뭉', type: '아기 하마', tier: 'basic', limb: 'one front foot', base: 'a very round, chubby baby hippo with soft lavender-pink skin, a big round muzzle with two tiny nostrils, small round ears, tiny bead eyes high on the head with white highlights, pink blush, a closed happy smile, short stubby legs. It must look different from the elephant 코롱 and the pig 핑키: no trunk, no snout tip, lavender-pink and very round', egg: 'a lavender-pink egg with soft water-ripple patterns and small bubbles, resting on a lily pad in a tiny pond', f: {
+    1: 'baby stage: a tiny, very round baby hippo floating in a little ring of water with only its eyes, ears and nose showing above the water, no accessories',
+    2: 'grown stage: a bigger young hippo standing on four short sturdy legs (NOT a round baby), a small flower behind one ear, a lavender scarf with a small gold star charm',
+    3: 'final stage: a large, gentle hippo queen standing in shallow sparkling water, a small golden lotus crown with a pink gem, a flowing lavender cape with water-ripple patterns and gold trim fastened by a gold star clasp, floating lotus petals and golden sparkles (NOT a round baby)' } },
+  guineapig: { ko: '꾸이', type: '기니피그', tier: 'epic', limb: 'one front paw', base: 'a round, loaf-shaped guinea pig with soft patchy fur in cream, caramel-orange and white, a little swirl rosette of fur on top of the head, small petal-shaped ears, big glossy dark eyes, pink blush, a tiny pink nose, no visible tail. It must look different from the hamster 쿠키: bigger and loaf-shaped, patchy three-color fur, a fur rosette on the head, no cheek pouches', egg: 'a cream egg with soft caramel-orange patches and a small swirl pattern on top, resting on a small bed of hay with a tiny carrot', f: {
+    1: 'baby stage: a tiny round guinea-pig pup nibbling a small stack of word cards, no other accessories',
+    2: 'grown stage: a bigger loaf-shaped guinea pig sitting proudly (NOT a tiny pup), carrying a small satchel of word cards, a mint scarf with a small gold star charm',
+    3: 'final stage: a grand guinea pig sage sitting on a velvet cushion, a small golden crown with a carrot-orange gem, a flowing caramel-orange cape with gold trim fastened by a gold star clasp, floating glowing word cards (blank, no letters) and golden sparkles (NOT a tiny pup)' } },
+  axolotl: { ko: '우파', type: '아홀로틀', tier: 'epic', limb: 'one small hand', base: 'a cute axolotl with a soft pastel-pink smooth body, three feathery coral-pink gill fronds on each side of its head, a wide gentle smile, small round glossy black eyes with white highlights, pink blush, small four-fingered hands, a soft paddle tail. It must look different from the frog 폴짝, the octopus 말랑 and the shark 파도: pink, with feathery gills and a long tail', egg: 'a pearly pink jelly-like egg with soft bubble patterns and tiny water-plant sprigs, floating in a small bubble of water', f: {
+    1: 'baby stage: a tiny, very round axolotl with small gill fronds, floating inside a soft water bubble, no other accessories',
+    2: 'grown stage: a longer young axolotl standing on its hind legs (NOT a round baby), holding a small round water-bubble shield, an aqua scarf with a small gold star charm',
+    3: 'final stage: a radiant axolotl with long flowing glowing gill fronds like a crown of coral, a pearl circlet with an aqua gem, a shimmering aqua cape with gold trim fastened by a gold star clasp, floating bubbles, small water plants and golden sparkles (NOT a round baby)' } },
+  chinchilla: { ko: '친친', type: '친칠라', tier: 'epic', limb: 'one front paw', base: 'a round, super-fluffy chinchilla with soft silver-gray velvety fur, a white belly, very big round ears with pink insides, big glossy dark eyes, long white whiskers, pink blush, a fluffy curled tail. It must look different from the hamster 쿠키 and the rabbit 토리: silver-gray, very big round ears, a fluffy tail, no long rabbit ears', egg: 'a silver-gray egg with soft velvety cloud patterns and tiny silver stars, resting on a small mound of moon dust', f: {
+    1: 'baby stage: a tiny round fluffball chinchilla rolling in a little puff of sparkly dust, no accessories',
+    2: 'grown stage: a bigger fluffy chinchilla sitting upright (NOT a round baby), holding a small wand shaped like a highlighter pen with a glowing tip, a lilac scarf with a small gold star charm',
+    3: 'final stage: a majestic chinchilla with silky silver fur shimmering like moonlight, a small silver-gold tiara with a lilac gem, a flowing lilac cape with silver stars and gold trim fastened by a gold star clasp, holding a glowing star-tipped wand, swirling starlight sparkles (NOT a round baby)' } },
+  sloth: { ko: '늘보', type: '나무늘보', tier: 'epic', limb: 'one long arm', base: 'a cute, sleepy baby sloth with soft fluffy light-brown fur, a cream face with dark brown eye stripes, big glossy sleepy eyes with white highlights, a tiny smiling mouth, pink blush, long arms with three soft rounded claws (never sharp). It must look different from the koala 쿨쿨 and the turtle 느릿: long arms, a cream face with eye stripes, light-brown fur', egg: 'a soft brown egg with leafy vine patterns and a tiny sleeping cap on top, hanging from a small branch in a leaf hammock', f: {
+    1: 'baby stage: a tiny round sloth hugging a small pillow and dozing, no other accessories',
+    2: 'grown stage: a bigger young sloth hanging from a short branch by one long arm (NOT a round baby), holding a small word book, a leaf-green scarf with a small gold star charm',
+    3: 'final stage: a wise, majestic sloth relaxing on a big glowing tree branch throne, a small golden leaf crown with a green gem, a flowing forest-green cape with gold trim fastened by a gold star clasp, slowly floating leaves, fireflies and golden sparkles (NOT a round baby)' } },
+  platypus: { ko: '납작', type: '오리너구리', tier: 'epic', limb: 'one webbed front foot', base: 'a cute round platypus with soft chocolate-brown fur, a smooth wide light-gray duck-like bill, small glossy dark eyes with white highlights, pink blush, a flat paddle-shaped tail, small webbed feet. It must look different from the duck 꽥꽥 and the otter 달이: brown fur with a duck bill and a flat paddle tail', egg: 'a soft brown leathery egg with river-pebble patterns and small water ripples, resting on smooth river stones', f: {
+    1: 'baby stage: a tiny round platypus splashing in a small puddle, no other accessories',
+    2: 'grown stage: a bigger young platypus standing on its hind feet (NOT a round baby), wearing small swim goggles pushed up on its head, a teal scarf with a small gold star charm',
+    3: 'final stage: a grand river-guardian platypus riding a small swirl of glowing water, a small golden crown with a teal gem, a flowing teal cape with wave patterns and gold trim fastened by a gold star clasp, floating water drops and golden sparkles (NOT a round baby)' } }
+};
+const PAIRS_24 = [['elephant', 'meerkat'], ['raccoondog', 'longtit'], ['hippo', 'guineapig'], ['axolotl', 'chinchilla'], ['sloth', 'platypus']];
+designSheets(F24A, NEW_PETS_24, pet => MOOD24 + (pet.tier === 'epic' ? 'A 영웅 (epic) pet, one rank below legendary: a little grander and more sparkling than a basic pet, with a soft golden rim light. ' : ''));
+exprSheets(F24B, NEW_PETS_24, PAIRS_24, pet => ` In every cell that says a paw, arm, wing, flipper or hand is raised, this pet raises ${pet.limb} instead.${pet.tier === 'epic' ? ' A 영웅 (epic) pet: a soft golden rim light.' : ''}`);
+const ATTACK_MOVE_24 = {
+  elephant: 'charging forward to the right with its trunk raised and spraying a strong jet of water',
+  meerkat: 'dashing forward to the right low to the ground and thrusting its small telescope like a baton',
+  raccoondog: 'leaping forward to the right and swinging its big leaf like a fan, a gust of leaves flying',
+  longtit: 'swooping forward to the right with its wings swept back and its long tail streaming',
+  hippo: 'a big belly-bump forward to the right with a splash of water',
+  guineapig: 'rolling forward to the right like a fluffy ball, word cards flying',
+  axolotl: 'lunging forward to the right with a burst of bubbles from its gills and its water shield up front',
+  chinchilla: 'hopping forward to the right and pointing its glowing wand, a trail of star sparkles',
+  sloth: 'swinging forward to the right on one long arm with a slow but strong sweep of the other arm (rounded claws, never sharp)',
+  platypus: 'diving forward to the right and slapping with its flat paddle tail, water splashing'
+};
+for (const [a, b] of PAIRS_24) for (const form of [1, 2, 3]) {
+  const pa = NEW_PETS_24[a], pb = NEW_PETS_24[b];
+  sheet(F24C, `${pa.ko} · ${pb.ko} ${FORM_KO[form]} 공격·맞음`, 'pet',
+    `two different pets of the same growth step (the reference pictures show each one). TOP row: ${pa.ko}, ${pa.base}. This is the ${pa.f[form]}. BOTTOM row: ${pb.ko}, ${pb.base}. This is the ${pb.f[form]}. Each pet keeps exactly the design, size and accessories of its reference picture of this growth step; only the pose changes. LEFT cell of each row: ATTACK, RIGHT cell: HURT.`,
+    [a, b].flatMap(key => [
+      [`${key}-${form}-attack`, `${NEW_PETS_24[key].ko} ${FORM_KO[form]} 공격`, `${ATTACK_X}${NEW_PETS_24[key].ko} in a dynamic attack pose: ${ATTACK_MOVE_24[key]}; the body stretched forward, a determined sparkling expression, motion lines behind it; still cute`, `public/assets/pets/${key}-${form}-attack.webp`],
+      [`${key}-${form}-hurt`, `${NEW_PETS_24[key].ko} ${FORM_KO[form]} 맞음`, `${HURT_X}`, `public/assets/pets/${key}-${form}-hurt.webp`]
+    ]));
+}
+
+/* 25 칭호 메달 2탄 (2026-10-12): 칭호를 65개 → 약 110개로 늘려요(던전 칭호 9개는 23c에 이미 있음).
+   테두리(모양·금속·바탕색)는 11 칭호와 똑같은 등급 규칙(TITLE_FRAMES)을 따라요. 앱 이름(name)은 칭호를 등록할 때 바뀔 수 있어요.
+   그림은 public/assets/titles/<key>.webp 에 새 파일로 넣어요(기존 칭호 그림은 덮어쓰지 않아요). */
+const F25 = '25-titles-2.txt';
+const TITLES_25 = [
+  // 교과서·시험
+  ['unit1', '한 과 정복', 'rare', 'an open textbook with a golden check-mark ribbon bookmark'],
+  ['unit3', '교과서 정복자', 'epic', 'a neat stack of three textbooks with a small triumphant flag on top'],
+  ['finalclear', '기말 올클리어', 'legendary', 'an exam paper with a big golden star stamp, framed by a laurel wreath'],
+  ['exam10', '실전 베테랑', 'epic', 'a stopwatch in front of an exam paper with a small shield'],
+  // 오답 극복
+  ['fix50', '오답 사냥꾼', 'rare', 'a magnifying glass over a small red cross that is turning into a green check mark'],
+  ['fix200', '실수는 없다', 'epic', 'a pink eraser wiping away a red mark, leaving sparkles behind'],
+  ['fix500', '오답 정복자', 'legendary', 'a golden eraser wearing a tiny crown, surrounded by sparkles'],
+  // 꾸준함
+  ['weekend10', '주말에도 공부', 'rare', 'a small cozy sofa with an open book on it and a little sun above'],
+  ['morning30', '아침형 학습자', 'rare', 'a sunrise over an open book and a small cup of milk'],
+  ['streak60', '두 달의 집념', 'legendary', 'a bright flame burning inside an hourglass'],
+  ['streak100', '백일의 불꽃', 'legendary', 'a big crowned flame with small orbiting stars'],
+  ['attend200', '이백일의 약속', 'legendary', 'a calendar page tied with a golden ribbon and two small stars'],
+  ['attend365', '일 년 개근', 'legendary', 'a sun and a crescent moon circling a calendar page'],
+  ['study300', '공부 중독', 'legendary', 'a glowing desk lamp shining on an open book with tiny hearts'],
+  // 학습량
+  ['words5000', '걸어다니는 단어장', 'legendary', 'a cute little book with tiny legs walking happily, pages fluttering'],
+  ['combo50', '50연속 신화', 'legendary', 'a chain of glowing links ending in a bright star'],
+  ['perfect100', '만점 제조 공장', 'legendary', 'a small cute factory with chimneys puffing golden stars'],
+  // 이벤트
+  ['event10', '이벤트 사냥꾼', 'rare', 'two stacked gold coins with a bold upward arrow'],
+  ['eventlover', '축제의 주인공', 'epic', 'a party popper bursting with confetti and streamers'],
+  ['seasonall', '시즌 컬렉터', 'epic', 'a small basket holding three seasonal eggs: one pumpkin-orange, one autumn-leaf red, one snowy white'],
+  // 야차전
+  ['away1', '원정 첫 승', 'common', 'a small school building with a little flag and a tiny sword beside it'],
+  ['away10', '원정 대장', 'epic', 'two different school flags crossed under a small crown'],
+  ['rematch10', '다시 한 판!', 'rare', 'two curved arrows circling a small sword'],
+  ['comeback5', '역전의 명수', 'legendary', 'an hourglass flipping over with a lightning bolt'],
+  ['win200', '야차의 전설', 'legendary', 'a glowing golden sword standing in a stone, rays of light'],
+  ['skill100', '펫과 일심동체', 'legendary', 'a paw print and a small hand together forming a heart'],
+  // 펫
+  ['legend1', '전설과의 만남', 'epic', 'a golden egg with small feathered wings'],
+  ['mythic1', '신화의 주인', 'limited', 'a prismatic egg with a swirling galaxy pattern and a soft aura'],
+  ['pets12', '펫 대가족', 'epic', 'three small paw prints inside a heart-shaped frame'],
+  ['pets20', '펫 박물관', 'legendary', 'a tiny museum building with a paw-print emblem on its roof'],
+  ['pets30', '살아있는 도감', 'legendary', 'an open pet-encyclopedia book with a glowing paw print rising out of it'],
+  ['gift5', '선생님의 보물', 'rare', 'a gift box with a heart-shaped ribbon and a tiny star'],
+  ['petcare30', '정성 가득 집사', 'rare', 'a pet food bowl with a small heart above it'],
+  // 놀이터·뽑기
+  ['egg10', '알 콜렉터', 'common', 'a small basket of three eggs'],
+  ['egg50', '알 부화 장인', 'epic', 'a cracked glowing egg in a small nest with sparkles'],
+  ['lucky2', '오늘은 운수 대통', 'epic', 'a four-leaf clover with two small stars'],
+  ['rps50', '가위바위보 달인', 'rare', 'a hand making a V sign with a sparkle'],
+  // 몬스터
+  ['monster50', '몬스터 퇴치 전문가', 'epic', 'a butterfly net with a few stars caught inside'],
+  ['monster100', '몬스터 킬러', 'legendary', 'a small sword over a cute round slime with spiral dizzy eyes'],
+  ['boss10', '보스 슬레이어', 'legendary', 'a giant cracked crown with a small sword in front of it']
+];
+const t25Tiers = TIER_ORDER_11.flatMap(tier => TITLES_25.filter(t => t[2] === tier));
+if (t25Tiers.length !== TITLES_25.length) throw new Error('25-titles: 등급 이름이 틀린 칭호가 있어요');
+const dup25 = TITLES_25.filter(t => TITLES[t[0]] || TITLE_MOTIFS[t[0]]);
+if (dup25.length) throw new Error(`25-titles: 이미 있는 칭호 key예요: ${dup25.map(t => t[0]).join(', ')}`);
+const cells25 = t25Tiers.map(([key, name, tier, motif]) => [`title-${key}`, `${name} (${TITLE_TIERS[tier].name})`, `${TITLE_FRAMES[tier]}. CENTER: ${motif}.`, `public/assets/titles/${key}.webp`]);
+for (let i = 0; i < cells25.length; i += 4) {
+  const group = cells25.slice(i, i + 4);
+  const tiers = [...new Set(group.map(c => t25Tiers.find(t => `title-${t[0]}` === c[0])[2]))].map(t => TITLE_TIERS[t].name);
+  sheet(F25, `칭호 메달 2탄 ${i / 4 + 1} (${tiers.join('·')})`, 'title', 'All medals of this set are one family, like the achievement medals of one premium mobile game: the same lighting, metal finish, outline and level of detail. No letters and no numbers anywhere.', group);
+}
+
 /* Google Drive: 그림을 그리는 GPT는 Drive에서 참고 그림을 열어 보고, 결과를 Drive 폴더에 올려요.
    규칙: 시트별 파일(split/)로 나가는 모든 주문서는 DRIVE에 폴더가 있어야 하고(없으면 멈춰요),
    끝에 "이 폴더에 이 이름으로 올리기"가 붙어요. 처음 그리는 그림(08·09a)은 기존 그림을 열어 보고 그림체를 맞춰요. */
@@ -1032,7 +1172,9 @@ const DRIVE = {
   [F20]: 'SUMUS 전투 자세 20 (Runner용)',
   [F21A]: 'SUMUS 이벤트 펫 21 (Runner용)', [F21B]: 'SUMUS 이벤트 펫 21 (Runner용)',
   [F22A]: 'SUMUS 던전 몬스터 22 (Runner용)', [F22B]: 'SUMUS 던전 몬스터 22 (Runner용)',
-  [F23A]: 'SUMUS 던전 배경·UI 23 (Runner용)', [F23B]: 'SUMUS 던전 배경·UI 23 (Runner용)', [F23C]: 'SUMUS 던전 배경·UI 23 (Runner용)'
+  [F23A]: 'SUMUS 던전 배경·UI 23 (Runner용)', [F23B]: 'SUMUS 던전 배경·UI 23 (Runner용)', [F23C]: 'SUMUS 던전 배경·UI 23 (Runner용)',
+  [F24A]: 'SUMUS 새 펫 24 (Runner용)', [F24B]: 'SUMUS 새 펫 24 (Runner용)', [F24C]: 'SUMUS 새 펫 24 (Runner용)',
+  [F25]: 'SUMUS 칭호 25 (Runner용)'
 };
 const PET_SPRITES = 'SUMUS_PET_SPRITES_ALL_20261002/original_1254';
 const KEEP = 'Do NOT make it softer, blurrier, foggier, more painterly or more watercolor-like than the reference.';
@@ -1046,14 +1188,14 @@ const STYLE_REF = {
 STYLE_REF.monsters12 = STYLE_REF.monsters.replace(/Also open "10-1\.png"[^\n]*$/, `Also open the first monsters of this game in the Google Drive folder "${DRIVE[F10]}" ("10-1.png" and "10-8.png"; this new set is their second batch, so match their finish, size and level of detail exactly) and, if it is there, "12-1.png" in the Google Drive folder "${DRIVE[F12]}" (the first monster of the new set), and match its finish and size too. Do NOT copy the existing monsters; this is a new design.`);
 STYLE_REF.monsters22 = STYLE_REF.monsters.replace(/Also open "10-1\.png"[^\n]*$/, `Also open the existing monsters of this game in the Google Drive folder "${DRIVE[F10]}" ("10-1.png" and "10-8.png") and in "${DRIVE[F12]}" ("12-1.png" and "12-9.png"; this dungeon set is a new batch, so match their finish, size and level of detail exactly). Do NOT copy the existing monsters; these are new designs.`);
 STYLE_REF.icons12 = `${STYLE_REF.icons} Also open "10-10.png" in the Google Drive folder "${DRIVE[F10]}" (the monster screen icons: tab and difficulty badges) and match its finish and size.`;
-const refOf = p => p.bg ? null : p.file === F20 ? 'pets' : p.file === F21A ? 'pets' : p.file === F21B && /아이콘/.test(p.title) ? 'icons' : p.file === F22A || p.file === F22B ? 'monsters22' : p.file === F23B ? 'icons12' : p.file === F23C ? 'titles' : p.file === F19C ? 'badges' : p.file === F19A ? 'pets' : p.file === F14A || p.file === F17A || p.file === F18A ? 'pets' : p.file === F14B && /아이콘/.test(p.title) ? 'icons' : p.file === F11 ? 'titles' : p.file === F12 ? (/아이콘/.test(p.title) ? 'icons12' : 'monsters12') : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
+const refOf = p => p.bg ? null : p.file === F24A || p.file === F24C ? 'pets' : p.file === F25 ? 'titles' : p.file === F20 ? 'pets' : p.file === F21A ? 'pets' : p.file === F21B && /아이콘/.test(p.title) ? 'icons' : p.file === F22A || p.file === F22B ? 'monsters22' : p.file === F23B ? 'icons12' : p.file === F23C ? 'titles' : p.file === F19C ? 'badges' : p.file === F19A ? 'pets' : p.file === F14A || p.file === F17A || p.file === F18A ? 'pets' : p.file === F14B && /아이콘/.test(p.title) ? 'icons' : p.file === F11 ? 'titles' : p.file === F12 ? (/아이콘/.test(p.title) ? 'icons12' : 'monsters12') : p.file === F10 ? (/아이콘/.test(p.title) ? 'icons' : 'monsters') : p.file === F9A ? 'pets' : p.file !== F8 ? null : /성취 배지|결과 도장/.test(p.title) ? 'badges' : 'icons';
 const NEW_ORDER = Object.keys(NEW_PETS);
 const sheetName = (file, i) => `${file.slice(0, /^\d\d[a-e]-/.test(file) ? 3 : 2)}-${i + 1}`;
 
 /* 쓰기 */
 const byFile = new Map();
 for (const p of prompts) (byFile.get(p.file) || byFile.set(p.file, []).get(p.file)).push(p);
-const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11, F12, F14A, F14B, F15, F16, F17A, F17B, F18A, F18B, F19A, F19B, F19C, F19D, F19E, F21A, F21B, F22A, F22B, F23A, F23B, F23C, F20]);
+const SPLIT = new Set([F5, F6, F7A, F7B, F8, F9A, F9B, F10, F11, F12, F14A, F14B, F15, F16, F17A, F17B, F18A, F18B, F19A, F19B, F19C, F19D, F19E, F21A, F21B, F22A, F22B, F23A, F23B, F23C, F20, F24A, F24B, F24C, F25]);
 for (const [file, list] of byFile) list.forEach((p, i) => {
   if (!SPLIT.has(file)) return;
   if (!DRIVE[file]) throw new Error(`${file}: Google Drive 폴더(DRIVE)가 없어요. 주문서에는 업로드 위치가 꼭 있어야 해요.`);
@@ -1082,7 +1224,7 @@ for (const [file, list] of byFile) list.forEach((p, i) => {
     p.ref = `Drive: ${sheets}`;
   }
   // 14b·17b: 그 펫의 설정 시트(14a-N / 17a-N)를 열어 맞춰요. 배경은 기존 캐릭터를 열어 그림체만 맞춰요.
-  const XB = { [F14B]: [F14A, HALLOWEEN_PETS, '14a'], [F17B]: [F17A, NEW_PETS_17, '17a'], [F18B]: [F18A, NEW_PETS_18, '18a'], [F19B]: [F19A, NEW_PETS_19, '19a'], [F21B]: [F21A, EVENT_PETS_21, '21a'] }[file];
+  const XB = { [F14B]: [F14A, HALLOWEEN_PETS, '14a'], [F17B]: [F17A, NEW_PETS_17, '17a'], [F18B]: [F18A, NEW_PETS_18, '18a'], [F19B]: [F19A, NEW_PETS_19, '19a'], [F21B]: [F21A, EVENT_PETS_21, '21a'], [F24B]: [F24A, NEW_PETS_24, '24a'] }[file];
   if (XB && !p.bg && !/아이콘/.test(p.title)) {
     const order = Object.keys(XB[1]), keys = order.filter(k => p.title.includes(XB[1][k].ko));
     const sheets = keys.map(k => `"${XB[2]}-${order.indexOf(k) + 1}.png"`).join(' and ');
@@ -1098,6 +1240,16 @@ for (const [file, list] of byFile) list.forEach((p, i) => {
     lines.splice(3, 0, `CHARACTER REFERENCE — before drawing, open ${sheets} (the design sheets: egg, baby, grown, final). Draw the growth step named in the Subject (baby = top-right cell, grown = bottom-left cell, final = bottom-right cell of each design sheet) and match each pet's face, colors, markings, accessories and body size exactly. ${KEEP}`);
     p.ref = `Drive: ${keys.map(k => `${POSE_SERIES[k][0]}-${POSE_SERIES[k][1]}`).join(', ')}`;
   }
+  // 24c 전투 자세: 두 펫의 설정 시트(24a-N)를 열어 그 단계의 모습을 맞춰요.
+  if (file === F24C) {
+    const order = Object.keys(NEW_PETS_24), keys = order.filter(k => p.title.includes(NEW_PETS_24[k].ko));
+    const sheets = keys.map(k => `"24a-${order.indexOf(k) + 1}.png"`).join(' and ');
+    lines = lines.filter(l => !l.startsWith('If a reference picture of this character'));
+    lines.splice(3, 0, `CHARACTER REFERENCE — before drawing, open ${sheets} (the design sheets: egg, baby, grown, final) in the Google Drive folder "${DRIVE[F24A]}". Draw the growth step named in the Subject (baby = top-right cell, grown = bottom-left cell, final = bottom-right cell of each design sheet) and keep each pet's face, colors, markings, size and accessories exactly; only the pose changes. Also open "20-1.png" in the Google Drive folder "${DRIVE[F20]}" (attack and hurt poses already made for other pets) and match how strong and how cute those poses are.`);
+    p.ref = `Drive: ${keys.map(k => `24a-${order.indexOf(k) + 1}`).join(', ')}, 20-1`;
+  }
+  // 25 칭호 2탄: 11 칭호의 같은 등급 메달을 열어 테두리·크기를 똑같이 맞춰요.
+  if (file === F25) lines.splice(3, 0, `Also open ${[...new Set([1, ...Object.keys(TITLE_FRAMES).filter(tier => p.text.includes(TITLE_FRAMES[tier])).map(tier => TITLE_TIER_SHEET[tier])])].map(n => `"11-${n}.png"`).join(' and ')} in the Google Drive folder "${DRIVE[F11]}" (the first set of title medals of this game) and match their medal size, frame shapes, metal finish and lighting exactly: a medal of the same tier must have exactly the same frame.${i > 0 ? ` Also open "25-1.png" in the same folder as this sheet ("${DRIVE[F25]}") if it is there and match it.` : ''}`);
   if (file === F22A && i % 2 === 1) lines.splice(3, 0, `Also open "22a-${i}.png" in the same Google Drive folder "${DRIVE[F22A]}" (sheet 1 of this monster's poses) and keep exactly the same monster design, colors, body size and proportions; only the poses change.`);
   if (file === F22B && i > 0) lines.splice(3, 0, `Also open ${Array.from({ length: i }, (_, n) => `"22b-${n + 1}.png"`).join(' and ')} in the same Google Drive folder "${DRIVE[F22B]}" (the earlier poses of this boss) and keep exactly the same boss design, colors, body size and proportions; only the poses change.`);
   if (file === F19D) {

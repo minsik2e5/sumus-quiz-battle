@@ -130,4 +130,21 @@ export function runPetOrderChecks(assert) {
   assert(readme.includes('`21a-event-pets-design.txt`') && readme.includes('`22a-dungeon-monsters.txt`') && readme.includes('`23c-dungeon-titles.txt`') && readme.includes('CODEX_PROMPT_21.md') && readme.includes('CODEX_PROMPT_22.md') && readme.includes(`| \`00-all-in-order.txt\` | ${allCount} | ${allCount * 4} |`) && readdirSync(here(`${dir}split`)).filter(name => /^2[123][a-c]?-/.test(name)).length === 58, '그림 주문서 21~23: README에 새 주문서와 Codex 지시서가 있고 합본 개수가 맞으며 split/에 21~23번 시트 58장이 있다');
   const fit = read(`${dir}fit-assets.mjs`), designDoc = read('../docs/dungeon-design.md');
   assert(fit.includes('--scale-max') && fit.includes('console.log(`scale ') && ['킬러 골렘', '불새', '2026-11-30', '120단어', '3등급 컷', '봇이 낀 파티는 기록 제외', 'dungeon-engine', 'DungeonRoom'].every(word => designDoc.includes(word)), '그림 주문서 21~23: 자르기 도구에 두 시트 배율 맞추기(--scale-max)가 있고 던전 설계 문서(docs/dungeon-design.md)에 확정 사항이 있다');
+
+  /* ---------- 그림 주문서 24(새 펫 10종 3탄) · 25(칭호 메달 2탄) ---------- */
+  {
+    const KEYS24 = ['elephant', 'meerkat', 'raccoondog', 'longtit', 'hippo', 'guineapig', 'axolotl', 'chinchilla', 'sloth', 'platypus'];
+    const NAMES24 = ['코롱', '쫑긋', '너굴', '포롱', '하뭉', '꾸이', '우파', '친친', '늘보', '납작'];
+    const d24 = read(`${dir}24a-new-pets-design.txt`).split('\n---\n'), e24 = read(`${dir}24b-new-pets-expressions.txt`).split('\n---\n'), p24 = read(`${dir}24c-new-pets-battle-poses.txt`).split('\n---\n'), t25 = read(`${dir}25-titles-2.txt`).split('\n---\n');
+    const rows24 = list => read(`${dir}slice-map.csv`).split('\n').filter(line => line.startsWith(`"${list}`)).map(line => line.match(/"((?:[^"]|"")*)"/g).map(cell => cell.slice(1, -1))[6]);
+    assert(d24.length === 10 && e24.length === 35 && p24.length === 15 && t25.length === 10, '그림 주문서 24·25: 설정 10 · 표정·알 반응 35 · 전투 자세 15 · 칭호 10시트');
+    assert(KEYS24.every(key => !CHARACTERS[key]) && NAMES24.every(name => !Object.values(CHARACTERS).some(pet => pet.ko === name)), '그림 주문서 24: 새 펫 key와 이름이 기존 펫과 겹치지 않는다');
+    const files24 = [...rows24('24a'), ...rows24('24b'), ...rows24('24c')];
+    assert(files24.length === 240 && KEYS24.every(key => ['0', '1', '2', '3'].every(f => files24.includes(`public/assets/pets/${key}-${f}.webp`)) && [1, 2, 3].every(f => ['happy', 'eat', 'sad', 'cheer', 'attack', 'hurt'].every(x => files24.includes(`public/assets/pets/${key}-${f}-${x}.webp`))) && ['happy', 'eat'].every(x => files24.includes(`public/assets/pets/${key}-0-${x}.webp`))), '그림 주문서 24: 펫마다 알·3단계 + 표정 12 + 알 반응 2 + 공격·맞음 6 = 24칸, 앱 파일 이름 규칙 그대로');
+    assert([...d24, ...e24, ...p24].every(text => text.includes('SUMUS 새 펫 24 (Runner용)') && text.includes('WHEN DONE')) && d24.every(text => text.includes('SUMUS_PET_SPRITES_ALL_20261002') && text.includes('Do NOT copy or resemble any existing cartoon, anime or mascot character')) && p24.every(text => /open "24a-\d+\.png" and "24a-\d+\.png"/.test(text)), '그림 주문서 24: 기존 펫 그림을 열어 그림체를 맞추고, 정해진 Drive 폴더에 정확한 이름으로 저장하고, 만화 캐릭터를 닮지 않게 한다');
+    const files25 = rows24('25-titles');
+    assert(files25.length === 40 && new Set(files25).size === 40 && files25.every(file => /^public\/assets\/titles\/[a-z0-9]+\.webp$/.test(file)) && files25.every(file => !readdirSync(here('../public/assets/titles')).includes(file.split('/').pop())) && t25.every(text => text.includes('SUMUS 칭호 25 (Runner용)') && /open "11-\d+\.png"/.test(text) && text.includes('No letters and no numbers')), '그림 주문서 25: 새 칭호 메달 40개(기존 그림과 이름이 겹치지 않음), 11번 메달을 열어 테두리를 맞추고 Drive에 저장');
+    const codex24 = read(`${dir}CODEX_PROMPT_24.md`), codex25 = read(`${dir}CODEX_PROMPT_25.md`);
+    assert(KEYS24.every(key => codex24.includes(`\`${key}\``)) && [codex24, codex25].every(text => text.includes('PR까지만 만든다. 머지하지 않는다.') && text.includes('운영 Supabase에 연결하지 않는다') && text.includes('앱 코드는 고치지 않는다')) && codex24.includes('닮게 그리지 않는다') && readme.includes('`24a-new-pets-design.txt`') && readme.includes('`25-titles-2.txt`') && readme.includes('CODEX_PROMPT_24.md') && readme.includes('CODEX_PROMPT_25.md'), '그림 주문서 24·25: Codex 지시서(PR까지만, 운영 Supabase 금지, 앱 코드 안 고침)와 README');
+  }
 }
