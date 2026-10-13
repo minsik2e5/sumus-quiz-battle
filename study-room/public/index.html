@@ -115,7 +115,8 @@
   <div id="sheet-cam" class="sheet" hidden>
     <div class="sheet-backdrop" data-close></div>
     <div class="sheet-body cam-sheet">
-      <p class="sheet-title">카메라로 캐릭터 움직이기</p>
+      <p class="sheet-title">카메라로 캐릭터 움직이기 <small class="optional">선택</small></p>
+      <p class="cam-optional">카메라는 <b>안 켜도 돼요.</b> 안 켜도 공부 기록은 똑같이 남아요. 켜면 내 캐릭터가 나를 따라 움직이고, 중간 확인 창도 안 떠요.</p>
       <div class="cam-preview">
         <video id="cam-video" playsinline muted></video>
         <div class="cam-avatar" id="cam-avatar"></div>
@@ -152,10 +153,11 @@
   <!-- 집중 확인 -->
   <div id="check" class="check" hidden role="alertdialog" aria-labelledby="check-title">
     <div class="check-box">
-      <div class="check-emoji">👀</div>
-      <p class="check-title" id="check-title">아직 공부 중이에요?</p>
-      <p class="check-sub"><b id="check-left">3:00</b> 안에 눌러야 공부 시간이 계속 기록돼요</p>
-      <button class="btn primary" id="check-ok">네, 공부 중이에요!</button>
+      <div class="check-avatar" id="check-avatar"></div>
+      <p class="check-title" id="check-title">아직 같이 공부 중이지?</p>
+      <p class="check-msg" id="check-msg"></p>
+      <p class="check-sub"><b id="check-left">5:00</b> 안에 누르면 시간이 그대로 이어져요</p>
+      <button class="btn primary" id="check-ok">응, 계속할래! ✏️</button>
     </div>
   </div>
 

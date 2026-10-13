@@ -404,7 +404,7 @@
         renderNotices();
         break;
       case 'cam_stopped':
-        toast('5분 넘게 자리에 없어서 공부를 멈췄어요. 자리를 뜬 때까지만 기록됐어요.', 6000);
+        toast('자리를 오래 비워서 타이머를 멈춰 뒀어요. 돌아오면 ▶ 눌러서 이어 가요 🙂', 6000);
         break;
       case 'goal':
         if (state.me && msg.id === state.me.id) {
@@ -418,7 +418,7 @@
         }
         break;
       case 'check_missed':
-        toast('3분 동안 확인이 없어서 공부를 멈췄어요. 확인 창이 뜬 때까지만 기록됐어요.', 6000);
+        toast('잠깐 자리를 비운 것 같아서 타이머를 멈춰 뒀어요. ▶ 누르면 바로 이어서 할 수 있어요 🙂', 6000);
         break;
       case 'pong':
         state.offset = msg.serverNow - Date.now();
@@ -581,7 +581,15 @@
     $('#gone-left').textContent = `${Math.floor(left / 60)}:${pad(left % 60)}`;
   }
 
-  // 공부 중 30~50분마다 서버가 집중 확인을 보낸다. 3분 안에 눌러야 시간이 이어진다.
+  // 공부 중 45~75분마다 서버가 집중 확인을 보낸다. 5분 안에 누르면 시간이 이어진다.
+  // 감시처럼 느껴지지 않게 내 캐릭터가 쉬자고 말을 거는 모양으로 보여 준다.
+  const CHECK_MSGS = [
+    '기지개 한 번 쭉 켜고 갈까? 🙆',
+    '물 한 모금 마시고 계속하자 💧',
+    '눈 잠깐 감았다 떠 봐. 눈도 쉬어야지 👀',
+    '여기까지 온 거 진짜 대단해 👏',
+    '어깨 한 번 돌리고 다시 집중! 💪'
+  ];
   function renderCheck() {
     const check = state.me && state.me.check;
     $('#check').hidden = !check;
@@ -590,6 +598,9 @@
     tickCheck();
     if (state.alertedCheck !== check.at) {
       state.alertedCheck = check.at;
+      $('#check-title').textContent = `${state.me.name}, 아직 같이 공부 중이지?`;
+      $('#check-msg').textContent = `오늘 벌써 ${fmtShort(liveMs(state.me))} 했어! ${CHECK_MSGS[Math.floor(Math.random() * CHECK_MSGS.length)]}`;
+      $('#check-avatar').innerHTML = Avatar.svg(state.me.avatar, { pose: 'rest' }).replace('viewBox="0 0 200 200"', 'viewBox="30 18 140 140"');
       ding('check');
       try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch { /* 무시 */ }
     }
@@ -598,7 +609,7 @@
   function tickCheck() {
     const check = state.me && state.me.check;
     if (!check) return;
-    const left = Math.max(0, Math.ceil((check.deadline - serverNow()) / 1000));
+    const left = Math.max(0, Math.min(Math.floor((check.deadline - check.at) / 1000), Math.ceil((check.deadline - serverNow()) / 1000)));
     $('#check-left').textContent = `${Math.floor(left / 60)}:${pad(left % 60)}`;
   }
 
@@ -773,7 +784,7 @@
           ${s.top.length ? s.top.map((r, i) => `<div class="rank-row"><span class="medal">${medals[i]}</span><span class="f">${Avatar.face(r.avatar)}</span><span>${esc(r.name)}</span><span class="t">${fmtShort(r.ms)}</span></div>`).join('') : '<p class="rank-me">아직 기록이 없어요. 1등 자리가 비어 있어요!</p>'}
           <p class="rank-me">나는 ${s.classSize}명 중 <b>${s.myRank}등</b> · 오늘 받은 응원 ♥ ${s.hearts}</p>
         </div>
-        <p class="rank-me">하루 30분 이상 공부하면 연속 기록이 이어져요. 공부 중엔 30~50분마다 집중 확인이 떠요.</p>
+        <p class="rank-me">하루 30분 이상 공부하면 연속 기록이 이어져요. 카메라를 안 켜면 가끔(45~75분마다) 쉬어 가자는 확인 창이 떠요.</p>
         <button class="btn" data-close style="margin-top:12px;background:#f6f3f8">닫기</button>`;
     } catch (err) {
       body.innerHTML = `<p class="sheet-title">내 기록</p><p>${esc(err.message)}</p><button class="btn" data-close>닫기</button>`;

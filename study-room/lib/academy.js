@@ -11,9 +11,9 @@ const BUBBLES_PER_DAY = 20;
 const CHEER_GAP_MS = 1500;
 const STREAK_MIN_MS = 30 * 60 * 1000; // 하루 30분 이상 공부해야 연속 기록으로 친다
 const MAX_TOKENS = 5;
-// 켜두기만 하는 걸 막기 위한 집중 확인: 30~50분마다 한 번, 3분 안에 눌러야 한다
-const CHECK_EVERY_MS = [30 * 60 * 1000, 50 * 60 * 1000];
-const CHECK_WINDOW_MS = 3 * 60 * 1000;
+// 켜두기만 하는 걸 막기 위한 집중 확인: 45~75분마다 한 번, 5분 안에 누르면 된다 (감시 느낌이 덜 나게 드물게)
+const CHECK_EVERY_MS = [45 * 60 * 1000, 75 * 60 * 1000];
+const CHECK_WINDOW_MS = 5 * 60 * 1000;
 // 카메라를 켠 학생: 얼굴이 5분 넘게 안 보이면 자리를 뜬 시점까지만 기록하고 멈춘다
 const CAM_GONE_MS = 5 * 60 * 1000;
 const CAM_POSES = ['down', 'up', 'yawn', 'sleep', 'gone'];

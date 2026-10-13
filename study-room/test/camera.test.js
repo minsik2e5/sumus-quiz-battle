@@ -100,7 +100,7 @@ test('camera: no focus check popups while the camera sees you', () => {
 test('camera: turning it on answers a pending focus check', () => {
   const { clock, academy, s } = setup();
   academy.setStudy(s.id, true);
-  clock.t += 30 * MIN;
+  clock.t += 45 * MIN;
   academy.tick();
   assert.ok(academy.me(s.id).check);
   academy.setCam(s.id, true, 'down');
