@@ -15,7 +15,11 @@
     offset: 0,
     tab: 'today',
     cards: new Map(),
-    timer: null
+    timer: null,
+    celebrated: new Set(),
+    cheerQueue: [],
+    cheering: false,
+    started: false
   };
   const POLL_MS = 5000;
   const TAB_MS = 12000;
@@ -88,6 +92,43 @@
     renderGrid();
     renderRank();
     tick();
+    // 새로 목표를 달성한 학생은 TV에 크게 축하한다 (TV를 처음 켰을 때 이미 지난 건 건너뜀)
+    for (const g of d.goals || []) {
+      const key = `${g.id}|${g.at}`;
+      if (state.celebrated.has(key)) continue;
+      state.celebrated.add(key);
+      if (state.started) state.cheerQueue.push(g);
+    }
+    state.started = true;
+    nextCheer();
+  }
+
+  function nextCheer() {
+    if (state.cheering || !state.cheerQueue.length) return;
+    const g = state.cheerQueue.shift();
+    state.cheering = true;
+    const h = g.goalMin % 60 ? `${Math.floor(g.goalMin / 60)}시간 ${g.goalMin % 60}분` : `${g.goalMin / 60}시간`;
+    const el = $('#cheer');
+    el.innerHTML = `<div class="big">🎉 ${esc(g.name)} 목표 달성!</div><div class="small">오늘 목표 ${h} 완료 · 다 같이 박수 👏</div>`;
+    el.hidden = false;
+    const colors = ['#ff4f6d', '#ffd36a', '#2fc48d', '#6fa6ff', '#b69dff', '#ff9a5a'];
+    for (let i = 0; i < 140; i += 1) {
+      const c = document.createElement('i');
+      c.className = 'confetti';
+      c.style.left = `${Math.random() * 100}%`;
+      c.style.background = colors[i % colors.length];
+      c.style.setProperty('--x', `${(Math.random() - 0.5) * 30}vw`);
+      c.style.setProperty('--r', `${360 + Math.random() * 900}deg`);
+      c.style.setProperty('--d', `${2.5 + Math.random() * 2}s`);
+      c.style.animationDelay = `${Math.random() * 0.8}s`;
+      document.body.appendChild(c);
+      setTimeout(() => c.remove(), 6000);
+    }
+    setTimeout(() => {
+      el.hidden = true;
+      state.cheering = false;
+      nextCheer();
+    }, 6000);
   }
 
   // 인원 수에 맞춰 칸 수를 정해서 남는 공간 없이 꽉 차게 배치한다
@@ -137,6 +178,9 @@
       const badge = (m.status === 'study' && m.cam === 'sleep' && '💤 조는 중') || (m.status === 'study' && m.cam === 'gone' && '잠깐 자리 비움') || BADGE[m.status];
       if (badge) el.insertAdjacentHTML('beforeend', `<span class="badge">${badge}</span>`);
       if (pose === 'sleep') el.insertAdjacentHTML('beforeend', '<span class="zzz">💤</span>');
+      el.querySelectorAll('.goal-bar').forEach((x) => x.remove());
+      el.classList.toggle('goal-hit', !!m.goalHit);
+      if (m.goalMs) el.insertAdjacentHTML('beforeend', `<i class="goal-bar"><b style="width:${Math.min(100, Math.floor((liveMs(m) / m.goalMs) * 100))}%"></b></i>`);
       if (grid.children[i] !== el) grid.insertBefore(el, grid.children[i] || null);
     });
     layout(list.length);

@@ -244,3 +244,30 @@ test('TV board lists online students and today/week rankings', () => {
   assert.equal(board.week[0].ms, 60 * MIN);
   assert.equal(board.totalTodayMs, 70 * MIN);
 });
+
+test('daily goal is celebrated once and history feeds the calendar', () => {
+  const goals = [];
+  const clock = { t: Date.parse('2026-10-13T10:00:00+09:00') };
+  const academy = new Academy(new Store(), { now: () => clock.t, onGoal: (e) => goals.push(e) });
+  const cls = academy.createClass('A');
+  const s = academy.register({ name: '감자', classCode: cls.code, pin: '1234' }).student;
+  assert.throws(() => academy.setGoal(s.id, 45), /30분 단위/);
+  academy.setGoal(s.id, 60);
+  academy.attach(s.id);
+  academy.setStudy(s.id, true);
+  clock.t += 59 * MIN;
+  academy.tick();
+  assert.equal(goals.length, 0);
+  clock.t += 2 * MIN;
+  academy.tick();
+  academy.tick();
+  assert.equal(goals.length, 1);
+  assert.equal(goals[0].goalMin, 60);
+  assert.equal(academy.me(s.id).goalHit, true);
+  const st = academy.stats(s.id);
+  assert.equal(st.history.length, 126);
+  assert.equal(st.history[st.history.length - 1].g, true);
+  assert.equal(st.goalDays, 1);
+  assert.equal(academy.board(cls.code).goals.length, 1);
+  assert.equal(academy.overview(cls.code).students[0].goalMin, 60);
+});

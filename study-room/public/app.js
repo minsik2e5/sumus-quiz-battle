@@ -66,6 +66,7 @@
 
   function show(id) {
     for (const el of $$('.screen')) el.hidden = el.id !== id;
+    document.body.classList.toggle('solo-on', id === 'screen-solo');
     window.scrollTo(0, 0);
   }
 
@@ -405,6 +406,17 @@
       case 'cam_stopped':
         toast('5분 넘게 자리에 없어서 공부를 멈췄어요. 자리를 뜬 때까지만 기록됐어요.', 6000);
         break;
+      case 'goal':
+        if (state.me && msg.id === state.me.id) {
+          confetti(null, 120);
+          ding('start');
+          toast(`🎉 오늘 목표 ${hoursLabel(msg.goalMin)} 달성! 정말 대단해요`, 4000);
+        } else {
+          const card = state.cards.get(msg.id);
+          if (card) confetti(card, 28);
+          toast(`🎉 ${msg.name}님이 오늘 목표 ${hoursLabel(msg.goalMin)}를 달성했어요!`, 3500);
+        }
+        break;
       case 'check_missed':
         toast('3분 동안 확인이 없어서 공부를 멈췄어요. 확인 창이 뜬 때까지만 기록됐어요.', 6000);
         break;
@@ -489,7 +501,16 @@
     }
     el.className = `card s-${m.status}${state.me && m.id === state.me.id ? ' me' : ''}`;
     $('.timer', el).textContent = fmt(liveMs(m));
-    $('.name', el).innerHTML = `${esc(m.name)}${m.cam ? '<span class="cam-chip" title="카메라로 확인 중">📷</span>' : ''}`;
+    $('.name', el).innerHTML = `${esc(m.name)}${m.goalHit ? '<span class="goal-chip" title="오늘 목표 달성">🎯</span>' : ''}${m.cam ? '<span class="cam-chip" title="카메라로 확인 중">📷</span>' : ''}`;
+    el.classList.toggle('goal-hit', !!m.goalHit);
+    let bar = $('.goal-bar', el);
+    if (m.goalMs) {
+      if (!bar) {
+        el.insertAdjacentHTML('beforeend', '<i class="goal-bar"><b></b></i>');
+        bar = $('.goal-bar', el);
+      }
+      $('b', bar).style.width = `${goalPct(m)}%`;
+    } else if (bar) bar.remove();
     const badge = $('.badge', el);
     const badgeText = (m.status === 'study' && m.cam && CAM_BADGE[m.cam]) || BADGE[m.status];
     badge.textContent = badgeText;
@@ -589,7 +610,11 @@
   function tickTimers() {
     for (const [id, el] of state.cards) {
       const m = state.members.get(id);
-      if (m && m.since) $('.timer', el).textContent = fmt(liveMs(m));
+      if (m && m.since) {
+        $('.timer', el).textContent = fmt(liveMs(m));
+        const b = m.goalMs && $('.goal-bar b', el);
+        if (b) b.style.width = `${goalPct(m)}%`;
+      }
     }
     if (!$('#screen-solo').hidden && state.me) $('#solo-time').textContent = fmt(liveMs(state.me));
     tickCheck();
@@ -608,6 +633,7 @@
     const m = state.me;
     $('#solo-time').textContent = fmt(liveMs(m));
     $('#solo-label').textContent = m.status === 'study' ? '집중하는 중 · 오늘 공부한 시간' : '▶ 눌러서 집중 시작';
+    renderSoloGoal();
     const pose = poseOf(m);
     const key = JSON.stringify(m.avatar) + pose;
     const box = $('#solo-avatar');
@@ -617,6 +643,73 @@
       box.dataset.art = key;
     }
     renderSoloFriends();
+  }
+
+  function goalPct(m) {
+    return m.goalMs ? Math.min(100, Math.floor((liveMs(m) / m.goalMs) * 100)) : 0;
+  }
+
+  function hoursLabel(min) {
+    return min % 60 ? `${Math.floor(min / 60)}시간 ${min % 60}분` : `${min / 60}시간`;
+  }
+
+  function renderSoloGoal() {
+    const m = state.me;
+    const el = $('#solo-goal');
+    el.classList.toggle('hit', !!m.goalHit);
+    if (!m.goalMs) {
+      el.innerHTML = '🎯 오늘 목표 정하기';
+      return;
+    }
+    const pct = goalPct(m);
+    const left = Math.max(0, m.goalMs - liveMs(m));
+    el.innerHTML = m.goalHit
+      ? `🎉 오늘 목표 ${hoursLabel(m.goalMs / 60000)} 달성!<span class="track"><b style="width:100%"></b></span>`
+      : `🎯 목표 ${hoursLabel(m.goalMs / 60000)} · ${pct}% · ${fmtShort(left)} 남음<span class="track"><b style="width:${pct}%"></b></span>`;
+  }
+
+  // ---------- 오늘 목표 ----------
+
+  const GOAL_OPTIONS = [60, 90, 120, 180, 240, 300, 360, 420, 480, 600, 720, 840];
+
+  function openGoal() {
+    const cur = state.me && state.me.goalMs ? state.me.goalMs / 60000 : 0;
+    $('#goal-chips').innerHTML = GOAL_OPTIONS.map((min) => `<button type="button" data-min="${min}" class="${min === cur ? 'on' : ''}">${min % 60 ? `${min / 60}h` : `${min / 60}시간`}</button>`).join('')
+      + `<button type="button" data-min="0" class="none${cur ? '' : ' on'}">목표 없음</button>`;
+    closeSheets();
+    openSheet('#sheet-goal');
+  }
+
+  async function chooseGoal(min) {
+    try {
+      const data = await api('/api/me/goal', { method: 'POST', body: { minutes: min } });
+      state.me = { ...state.me, ...data.me };
+      closeSheets();
+      renderMe();
+      renderGrid();
+      toast(min ? `오늘 목표 ${hoursLabel(min)}! 화이팅 💪` : '목표를 지웠어요');
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  // 축하 꽃가루: 카드 위(작게) 또는 화면 전체
+  function confetti(target, count) {
+    const colors = ['#ff4f6d', '#ffd36a', '#2fc48d', '#6fa6ff', '#b69dff', '#ff9a5a'];
+    const host = target || document.body;
+    for (let i = 0; i < count; i += 1) {
+      const c = document.createElement('i');
+      c.className = 'confetti';
+      c.style.left = `${Math.random() * 100}%`;
+      c.style.background = colors[i % colors.length];
+      c.style.setProperty('--x', `${(Math.random() - 0.5) * 160}px`);
+      c.style.setProperty('--y', target ? `${120 + Math.random() * 80}px` : '105vh');
+      c.style.setProperty('--r', `${360 + Math.random() * 720}deg`);
+      c.style.setProperty('--d', `${(target ? 1.2 : 2) + Math.random() * 1.4}s`);
+      c.style.animationDelay = `${Math.random() * 0.5}s`;
+      host.appendChild(c);
+      setTimeout(() => c.remove(), 4500);
+    }
   }
 
   function renderSoloFriends() {
@@ -668,8 +761,13 @@
           <div class="stat-tile"><div class="k">최근 7일</div><div class="v">${fmtShort(s.weekMs)}</div></div>
           <div class="stat-tile"><div class="k">연속 공부</div><div class="v">🔥 ${s.streak}일</div></div>
         </div>
+        <div class="goal-row">
+          <span class="txt">${s.goalMs ? `🎯 오늘 목표 ${hoursLabel(s.goalMs / 60000)} · ${s.goalHit ? '달성! 🎉' : `${Math.min(100, Math.floor((s.todayMs / s.goalMs) * 100))}%`}` : '🎯 아직 오늘 목표가 없어요'}<small>최근 30일 동안 목표 달성 ${s.goalDays}일</small></span>
+          <button type="button" data-goal>${s.goalMs ? '바꾸기' : '정하기'}</button>
+        </div>
         <div class="bars">${s.days.map((d) => `<div class="bar${d.day === s.today ? ' today' : ''}"><em>${d.ms ? fmtShort(d.ms) : ''}</em><i style="height:${Math.round((d.ms / max) * 100)}%"></i></div>`).join('')}</div>
         <div class="bar-labels">${s.days.map((d) => `<span>${d.day === s.today ? '오늘' : weekday[new Date(`${d.day}T00:00:00Z`).getUTCDay()]}</span>`).join('')}</div>
+        ${heatmap(s)}
         <div class="rank">
           <h4>우리 반 최근 7일 TOP 3</h4>
           ${s.top.length ? s.top.map((r, i) => `<div class="rank-row"><span class="medal">${medals[i]}</span><span class="f">${Avatar.face(r.avatar)}</span><span>${esc(r.name)}</span><span class="t">${fmtShort(r.ms)}</span></div>`).join('') : '<p class="rank-me">아직 기록이 없어요. 1등 자리가 비어 있어요!</p>'}
@@ -680,6 +778,45 @@
     } catch (err) {
       body.innerHTML = `<p class="sheet-title">내 기록</p><p>${esc(err.message)}</p><button class="btn" data-close>닫기</button>`;
     }
+  }
+
+  // 공부 잔디: 세로 7칸(요일) × 가로 주 단위, 많이 할수록 진한 초록, 목표 달성한 날은 노란 점
+  function heatLevel(ms) {
+    const m = ms / 60000;
+    if (m <= 0) return 0;
+    if (m < 30) return 1;
+    if (m < 60) return 2;
+    if (m < 120) return 3;
+    if (m < 180) return 4;
+    return 5;
+  }
+
+  function heatmap(s) {
+    const first = new Date(`${s.history[0].day}T00:00:00Z`).getUTCDay();
+    const cells = Array.from({ length: first }, () => '<i class="pad"></i>')
+      .concat(s.history.map((d) => `<i class="l${heatLevel(d.ms)}${d.g ? ' g' : ''}${d.day === s.today ? ' today' : ''}" data-day="${d.day}" data-ms="${d.ms}" data-g="${d.g ? 1 : 0}"></i>`));
+    const weeks = Math.ceil(cells.length / 7);
+    const months = [];
+    let last = '';
+    for (let w = 0; w < weeks; w += 1) {
+      const d = s.history[Math.max(0, w * 7 - first)];
+      const mon = d ? Number(d.day.slice(5, 7)) : '';
+      months.push(mon !== last ? `<span>${mon}월</span>` : '<span></span>');
+      last = mon;
+    }
+    const studied = s.history.filter((d) => d.ms > 0).length;
+    return `<div class="heat">
+      <h4>공부 잔디 <small>최근 ${Math.round(s.history.length / 7)}주 중 ${studied}일 공부</small></h4>
+      <div class="heat-scroll" id="heat-scroll">
+        <div class="heat-months">${months.join('')}</div>
+        <div class="heat-wrap">
+          <div class="heat-days"><span></span><span>월</span><span></span><span>수</span><span></span><span>금</span><span></span></div>
+          <div class="heat-grid" id="heat-grid">${cells.join('')}</div>
+        </div>
+      </div>
+      <p class="heat-info" id="heat-info">칸을 누르면 그날 공부한 시간이 보여요</p>
+      <div class="heat-legend">적게 <i style="background:#ebedf0"></i><i style="background:#c6e9a6"></i><i style="background:#8fd17b"></i><i style="background:#4fb15f"></i><i style="background:#2e8b44"></i><i style="background:#1b6331"></i> 많이 · <i style="background:#ffd36a;border-radius:50%"></i> 목표 달성</div>
+    </div>`;
   }
 
   function openMenu() {
@@ -752,6 +889,19 @@
     });
     $('#solo-back').addEventListener('click', () => show('screen-room'));
     $('#btn-stats').addEventListener('click', openStats);
+    $('#solo-goal').addEventListener('click', openGoal);
+    $('#goal-chips').addEventListener('click', (e) => {
+      const b = e.target.closest('[data-min]');
+      if (b) chooseGoal(Number(b.dataset.min));
+    });
+    $('#stats-body').addEventListener('click', (e) => {
+      if (e.target.closest('[data-goal]')) return openGoal();
+      const cell = e.target.closest('#heat-grid i[data-day]');
+      if (!cell) return;
+      const [, mm, dd] = cell.dataset.day.split('-');
+      const ms = Number(cell.dataset.ms);
+      $('#heat-info').textContent = `${Number(mm)}월 ${Number(dd)}일 · ${ms ? fmtShort(ms) : '공부 안 함'}${cell.dataset.g === '1' ? ' · 🎯 목표 달성' : ''}`;
+    });
     $('#btn-bubble').addEventListener('click', openBubble);
     $('#btn-menu').addEventListener('click', openMenu);
     $('#bubble-form').addEventListener('submit', submitBubble);

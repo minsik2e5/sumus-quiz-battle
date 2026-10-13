@@ -17,6 +17,10 @@ const CHECK_WINDOW_MS = 3 * 60 * 1000;
 // 카메라를 켠 학생: 얼굴이 5분 넘게 안 보이면 자리를 뜬 시점까지만 기록하고 멈춘다
 const CAM_GONE_MS = 5 * 60 * 1000;
 const CAM_POSES = ['down', 'up', 'yawn', 'sleep', 'gone'];
+// 오늘 목표: 30분 단위, 최대 16시간
+const GOAL_STEP_MIN = 30;
+const GOAL_MAX_MIN = 16 * 60;
+const HISTORY_DAYS = 18 * 7; // 잔디 달력: 18주
 const STATUS_ORDER = { study: 0, away: 1, rest: 2, offline: 3 };
 
 function sha(value) {
@@ -43,6 +47,7 @@ class Academy {
     onNotice = () => {},
     onCheckMissed = () => {},
     onCamStopped = () => {},
+    onGoal = () => {},
     checkEveryMs = CHECK_EVERY_MS,
     checkWindowMs = CHECK_WINDOW_MS,
     random = Math.random
@@ -51,6 +56,8 @@ class Academy {
     this.now = now;
     this.onCheckMissed = onCheckMissed;
     this.onCamStopped = onCamStopped;
+    this.onGoal = onGoal;
+    this.recentGoals = [];
     this.checkEveryMs = checkEveryMs;
     this.checkWindowMs = checkWindowMs;
     this.random = random;
@@ -419,7 +426,44 @@ class Academy {
     l.awayAt = null;
     l.check = null;
     l.nextCheckAt = null;
+    this.checkGoal(id);
     this.emit(id);
+  }
+
+  // ---------- 오늘 목표 ----------
+
+  setGoal(id, minutes) {
+    const s = this.mustStudent(id);
+    const m = Number(minutes) || 0;
+    if (m !== 0 && (!Number.isInteger(m) || m % GOAL_STEP_MIN !== 0 || m < GOAL_STEP_MIN || m > GOAL_MAX_MIN)) {
+      throw new AcademyError('목표는 30분 단위로 16시간까지 정할 수 있어요.');
+    }
+    s.goalMin = m || null;
+    this.dirty();
+    this.checkGoal(id);
+    this.emit(id);
+  }
+
+  goalMs(id) {
+    const s = this.data.students[id];
+    return s && s.goalMin ? s.goalMin * 60000 : null;
+  }
+
+  // 오늘 목표를 처음 넘기면 한 번만 축하한다
+  checkGoal(id) {
+    const goal = this.goalMs(id);
+    if (!goal) return false;
+    const rec = this.peek(id, this.today());
+    if (rec && rec.g) return false;
+    if (this.todayMs(id) < goal) return false;
+    const r = this.record(id, this.today());
+    r.g = this.data.students[id].goalMin;
+    this.dirty();
+    const event = { id, name: this.data.students[id].name, classCode: this.data.students[id].classCode, goalMin: r.g, at: this.now() };
+    this.recentGoals = [event, ...this.recentGoals.filter((e) => this.now() - e.at < 10 * 60 * 1000)].slice(0, 20);
+    this.emit(id);
+    this.onGoal(event);
+    return true;
   }
 
   confirmCheck(id) {
@@ -494,6 +538,7 @@ class Academy {
         this.onCamStopped(id);
       } else {
         this.commit(id, this.cap(l, now));
+        this.checkGoal(id);
         if (l.cam && l.nextCheckAt != null && now >= l.nextCheckAt) this.scheduleCheck(l);
         if (!l.check && l.nextCheckAt != null && now >= l.nextCheckAt) {
           l.check = { at: now, deadline: now + this.checkWindowMs };
@@ -554,7 +599,9 @@ class Academy {
       since: status === 'study' ? Math.max(l.since, this.startOfToday()) : null,
       bubble: (l && l.bubble) || null,
       hearts: rec ? rec.h : 0,
-      cam: (l && l.cam) || null
+      cam: (l && l.cam) || null,
+      goalMs: this.goalMs(id),
+      goalHit: !!(rec && rec.g)
     };
   }
 
@@ -647,6 +694,13 @@ class Academy {
       streak: this.streak(id),
       hearts: rec ? rec.h : 0,
       camMs: rec ? rec.cms || 0 : 0,
+      goalMs: this.goalMs(id),
+      goalHit: !!(rec && rec.g),
+      history: this.daysMs(id, this.today(), HISTORY_DAYS).map((d) => {
+        const r = this.peek(id, d.day);
+        return { day: d.day, ms: d.ms, g: !!(r && r.g) };
+      }),
+      goalDays: this.daysMs(id, this.today(), 30).filter((d) => { const r = this.peek(id, d.day); return r && r.g; }).length,
       top: ranking.slice(0, 3).filter((r) => r.ms > 0),
       myRank,
       classSize: ranking.length
@@ -675,6 +729,7 @@ class Academy {
       serverNow: this.now(),
       studying: members.filter((m) => m.status === 'study').length,
       totalTodayMs: students.reduce((sum, s) => sum + this.todayMs(s.id), 0),
+      goals: this.recentGoals.filter((e) => this.now() - e.at < 3 * 60 * 1000 && (target === ALL || e.classCode === target)),
       notice: this.data.notices[target] || this.data.notices[ALL] || null,
       members,
       today,
@@ -707,6 +762,8 @@ class Academy {
         checksMissed: rec ? rec.miss || 0 : 0,
         camMs: rec ? rec.cms || 0 : 0,
         cam: (l && l.cam) || null,
+        goalMin: rec && rec.g ? rec.g : (day === this.today() ? s.goalMin || null : null),
+        goalHit: !!(rec && rec.g),
         hearts: rec ? rec.h : 0,
         lastSeen: s.lastSeen || null
       };

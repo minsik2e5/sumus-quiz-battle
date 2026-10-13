@@ -127,7 +127,7 @@
       </div>
       <div class="table-wrap">
         ${d.students.length ? `<table>
-          <thead><tr><th>상태</th><th>이름</th>${isAll ? '<th>반</th>' : ''}<th>${isToday ? '오늘' : esc(d.day.slice(5))}</th><th>최근 7일</th><th>7일 추이</th><th title="카메라에 얼굴이 보인 상태로 공부한 시간">카메라 인증</th><th>연속</th><th title="공부 중 30~50분마다 뜨는 확인. ✖는 3분 안에 안 눌러서 자동으로 멈춘 횟수">집중 확인</th><th>말풍선</th><th>♥</th><th>마지막 접속</th><th></th></tr></thead>
+          <thead><tr><th>상태</th><th>이름</th>${isAll ? '<th>반</th>' : ''}<th>${isToday ? '오늘' : esc(d.day.slice(5))}</th><th>최근 7일</th><th>7일 추이</th><th>목표</th><th title="카메라에 얼굴이 보인 상태로 공부한 시간">카메라 인증</th><th>연속</th><th title="공부 중 30~50분마다 뜨는 확인. ✖는 3분 안에 안 눌러서 자동으로 멈춘 횟수">집중 확인</th><th>말풍선</th><th>♥</th><th>마지막 접속</th><th></th></tr></thead>
           <tbody>${d.students.map((s) => row(s, isAll)).join('')}</tbody>
         </table>` : `<p class="empty">아직 학생이 없어요.${cls ? ` 반 코드 <b>${cls.code}</b>를 알려주세요.` : ''}</p>`}
       </div>`;
@@ -147,6 +147,7 @@
       <td class="num">${fmtShort(s.dayMs)}</td>
       <td class="num">${fmtShort(s.weekMs)}</td>
       <td><span class="spark">${spark}</span></td>
+      <td>${s.goalMin ? `${s.goalMin % 60 ? `${Math.floor(s.goalMin / 60)}h${s.goalMin % 60}m` : `${s.goalMin / 60}시간`} ${s.goalHit ? '✅' : `<small class="muted">(${Math.min(100, Math.floor((s.dayMs / (s.goalMin * 60000)) * 100))}%)</small>`}` : '-'}</td>
       <td>${s.camMs ? `${fmtShort(s.camMs)} <small class="muted">(${Math.round((s.camMs / Math.max(1, s.dayMs)) * 100)}%)</small>` : '-'}</td>
       <td>${s.streak ? `🔥${s.streak}` : '-'}</td>
       <td>${s.checksOk || s.checksMissed ? `<span class="ok">✔${s.checksOk}</span> ${s.checksMissed ? `<span class="miss">✖${s.checksMissed}</span>` : ''}` : '-'}</td>

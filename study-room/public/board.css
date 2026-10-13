@@ -75,6 +75,16 @@ body.idle { cursor: none; }
 @keyframes blink { 50% { opacity: .3; } }
 .rank-empty { color: var(--muted); font-size: 1.2vw; text-align: center; padding: 2vw 0; }
 
+.card .goal-bar { position: absolute; left: 7%; right: 7%; bottom: 2.5%; height: 3.5%; border-radius: 99px; background: rgba(0,0,0,.08); overflow: hidden; z-index: 2; }
+.card .goal-bar b { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #ffb547, #ff7b6b); }
+.card.goal-hit { box-shadow: 0 0 0 .3vw var(--gold); }
+.card.goal-hit .goal-bar b { background: var(--gold); }
+.cheer { position: fixed; left: 50%; top: 42%; transform: translate(-50%, -50%); z-index: 50; background: rgba(23,21,29,.92); border: .3vw solid var(--gold); border-radius: 2vw; padding: 2vw 4vw; text-align: center; animation: pop .4s ease; }
+.cheer .big { font-size: 3.6vw; font-weight: 900; }
+.cheer .small { font-size: 1.6vw; color: var(--gold); margin-top: .6vw; font-weight: 800; }
+@keyframes pop { from { transform: translate(-50%, -50%) scale(.7); opacity: 0; } }
+.confetti { position: fixed; top: -2vh; z-index: 60; width: .6vw; height: 1vw; border-radius: .15vw; pointer-events: none; animation: fall var(--d, 3s) linear forwards; }
+@keyframes fall { to { transform: translate(var(--x, 0), 110vh) rotate(var(--r, 540deg)); } }
 .fs { position: fixed; right: 1.2vw; bottom: 1.2vw; border: 0; border-radius: 99px; padding: .6vw 1.2vw; background: rgba(255,255,255,.12); color: #fff; font-size: 1vw; cursor: pointer; }
 body.idle .fs { opacity: 0; }
 .offline { position: fixed; left: 50%; bottom: 1.5vw; transform: translateX(-50%); background: #3a3020; color: var(--gold); padding: .6vw 1.4vw; border-radius: 99px; font-size: 1.1vw; margin: 0; }

@@ -247,6 +247,50 @@ input { font: inherit; }
 .cam-pose:empty { display: none; }
 .cam-tips { margin: 0 0 14px; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 13px; color: #5d5566; line-height: 1.45; }
 
+.goal-bar { position: absolute; left: 8px; right: 8px; bottom: 4px; height: 4px; border-radius: 99px; background: rgba(0,0,0,.08); overflow: hidden; z-index: 2; }
+.goal-bar b { display: block; height: 100%; width: 0; border-radius: 99px; background: linear-gradient(90deg, #ffb547, #ff7b6b); transition: width .6s ease; }
+.card.goal-hit .goal-bar b { background: linear-gradient(90deg, #ffd36a, #ffb547); }
+.goal-chip { font-size: 11px; margin-left: 2px; }
+
+.solo-goal { position: relative; z-index: 2; display: block; margin: -6px auto 16px; border: 0; background: rgba(255,255,255,.75); border-radius: 99px; padding: 7px 14px; font-size: 13px; font-weight: 800; color: #6d6577; min-width: 220px; box-shadow: 0 2px 8px rgba(80,50,30,.08); }
+.solo-goal .track { display: block; height: 7px; margin-top: 6px; border-radius: 99px; background: #eadfd8; overflow: hidden; }
+.solo-goal .track b { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #ffb547, #ff7b6b); transition: width .6s ease; }
+.solo-goal.hit { background: #fff4cf; color: #a06d00; }
+.solo-goal.hit .track b { background: linear-gradient(90deg, #ffd36a, #ffb547); }
+
+.goal-help { margin: -4px 0 14px; font-size: 13px; color: #8b8494; }
+.goal-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.goal-chips button { border: 1.5px solid var(--line); background: #fff; border-radius: 12px; padding: 12px 0; font-weight: 800; font-size: 15px; }
+.goal-chips button.on { border-color: var(--accent); background: #fff0f3; color: #d72e4c; }
+.goal-chips button.none { grid-column: span 4; font-weight: 600; font-size: 13px; color: #8b8494; }
+.goal-row { display: flex; align-items: center; gap: 10px; background: #fff7e0; border-radius: 14px; padding: 12px 14px; margin: 4px 0 12px; }
+.goal-row .txt { flex: 1; font-size: 14px; font-weight: 700; }
+.goal-row .txt small { display: block; font-weight: 500; color: #8b7a3a; margin-top: 2px; }
+.goal-row button { border: 0; background: #fff; border-radius: 10px; padding: 7px 12px; font-weight: 700; font-size: 13px; }
+
+.heat { margin-top: 18px; }
+.heat h4 { margin: 0 0 8px; font-size: 15px; display: flex; justify-content: space-between; align-items: baseline; }
+.heat h4 small { font-size: 12px; color: #8b8494; font-weight: 600; }
+.heat-scroll { overflow-x: auto; padding-bottom: 4px; }
+.heat-months { display: grid; grid-auto-flow: column; grid-auto-columns: 14px; gap: 3px; font-size: 10px; color: #8b8494; height: 14px; margin-left: 19px; }
+.heat-months span { white-space: nowrap; overflow: visible; }
+.heat-wrap { display: flex; gap: 3px; }
+.heat-days { display: grid; grid-template-rows: repeat(7, 14px); gap: 3px; font-size: 10px; line-height: 14px; color: #8b8494; width: 16px; flex: none; }
+.heat-grid { display: grid; grid-template-rows: repeat(7, 14px); grid-auto-flow: column; grid-auto-columns: 14px; gap: 3px; }
+.heat-grid i { border-radius: 4px; background: #ebedf0; position: relative; }
+.heat-grid i.l1 { background: #c6e9a6; } .heat-grid i.l2 { background: #8fd17b; } .heat-grid i.l3 { background: #4fb15f; } .heat-grid i.l4 { background: #2e8b44; } .heat-grid i.l5 { background: #1b6331; }
+.heat-grid i.g::after { content: ""; position: absolute; inset: 3.5px; border-radius: 50%; background: #ffd36a; box-shadow: 0 0 0 1px rgba(255,255,255,.8); }
+.heat-grid i.today { outline: 2px solid var(--accent); outline-offset: 1px; }
+.heat-grid i.pad { background: transparent; }
+.heat-legend { display: flex; align-items: center; gap: 4px; justify-content: flex-end; margin-top: 8px; font-size: 11px; color: #8b8494; }
+.heat-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+.heat-info { min-height: 18px; margin: 6px 0 0; font-size: 13px; font-weight: 700; color: #4b4450; }
+
+body.solo-on .toast { top: auto; bottom: calc(110px + var(--safe-b)); }
+.confetti { position: fixed; top: -12px; z-index: 60; width: 9px; height: 14px; border-radius: 2px; pointer-events: none; animation: fall var(--d, 2.4s) linear forwards; }
+.card .confetti { position: absolute; top: -8px; width: 6px; height: 9px; }
+@keyframes fall { to { transform: translate(var(--x, 0), var(--y, 105vh)) rotate(var(--r, 540deg)); opacity: .9; } }
+
 .check { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 24px; background: rgba(18,16,24,.72); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
 .check-box { width: min(100%, 360px); background: #fff; color: #2c2730; border-radius: 24px; padding: 26px 22px 20px; text-align: center; animation: pop .25s ease-out; }
 .check-emoji { font-size: 52px; animation: wiggle 1.2s ease-in-out infinite; }

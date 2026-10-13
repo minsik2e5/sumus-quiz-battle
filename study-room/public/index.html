@@ -72,6 +72,7 @@
     <div class="solo-top">
       <div class="solo-timer" id="solo-time">00:00:00</div>
       <p class="solo-label" id="solo-label">오늘 공부한 시간</p>
+      <button class="solo-goal" id="solo-goal" type="button"></button>
       <div class="solo-friends" id="solo-friends"></div>
       <p class="solo-room" id="solo-room"></p>
     </div>
@@ -91,6 +92,17 @@
         <button type="submit" class="btn small primary">올리기</button>
       </div>
     </form>
+  </div>
+
+  <!-- 목표 시트 -->
+  <div id="sheet-goal" class="sheet" hidden>
+    <div class="sheet-backdrop" data-close></div>
+    <div class="sheet-body goal-sheet">
+      <p class="sheet-title">🎯 오늘 목표 시간</p>
+      <p class="goal-help">정한 목표는 매일 이어져요. 달성하면 친구들 화면과 학원 TV에도 축하가 떠요!</p>
+      <div class="goal-chips" id="goal-chips"></div>
+      <button class="btn" data-close style="margin-top:14px;background:#f6f3f8">닫기</button>
+    </div>
   </div>
 
   <!-- 기록 시트 -->

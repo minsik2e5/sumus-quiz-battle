@@ -93,6 +93,12 @@ function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), 
     onCamStopped(id) {
       each((conn) => { if (conn.meta.studentId === id) send(conn, { t: 'cam_stopped' }); });
     },
+    onGoal(event) {
+      const target = academy.data.students[event.id];
+      each((conn) => {
+        if (conn.meta.studentId === event.id || (target && sees(conn, target))) send(conn, { t: 'goal', ...event });
+      });
+    },
     onCheckMissed(id) {
       each((conn) => { if (conn.meta.studentId === id) send(conn, { t: 'check_missed' }); });
     },
@@ -275,6 +281,10 @@ function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), 
       if (p === '/api/me/stats' && method === 'GET') return json(200, academy.stats(student.id));
       if (p === '/api/me/avatar' && method === 'POST') {
         academy.setAvatar(student.id, parseBody(req).avatar);
+        return json(200, { me: academy.me(student.id) });
+      }
+      if (p === '/api/me/goal' && method === 'POST') {
+        academy.setGoal(student.id, parseBody(req).minutes);
         return json(200, { me: academy.me(student.id) });
       }
       if (p === '/api/me/logout' && method === 'POST') {
