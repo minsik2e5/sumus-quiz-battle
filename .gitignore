@@ -9,3 +9,6 @@ public/styles.css
 .env.*
 !.env.example
 public/app.bundle.css
+
+# V13.144 server/write-sim.mjs가 잠깐 꺼내 두는 옛 코드
+cloudflare-v13143/

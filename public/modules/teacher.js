@@ -233,6 +233,12 @@ function examPanel(d) {
   if (!rows.length) return '';
   return `<section class="panel exam-now-v1375"><div class="panel-head"><div><h2>진행 중인 실전시험</h2><span>마감 전 시험의 제출 현황</span></div></div>${rows.slice(0, 4).map(r => `<div class="exam-now-row"><b>${esc(r.exam.title)}</b><span class="exam-submit-state"><span class="done">완료 ${r.submitted.length}</span><span class="doing">응시 ${r.active.length}</span><span class="wait">미응시 ${r.missing.length}</span></span><small>${date(r.exam.due_at)} 마감</small></div>`).join('')}</section>`;
 }
+// V13.144: 오늘 서버 저장량(Cloudflare 무료 한도)이 70%를 넘으면 서버가 경고를 보낸다(90%면 급하지 않은 정리를 미룬다).
+export function serverWriteWarning(d) {
+  const w = d?.server_write_warning;
+  if (!w?.text) return '';
+  return `<div class="server-write-warning-v13144${w.defer ? ' defer' : ''}" role="status"><b>${esc(w.text)}</b><small>${w.defer ? '급하지 않은 정리는 내일로 미뤄요. 한국 시간 오전 9시에 다시 풀려요.' : '학생들의 저장은 그대로 돼요. 한국 시간 오전 9시에 다시 0부터 세요.'}</small></div>`;
+}
 function dashboard(A) {
   const d = A.data;
   const care = careGroups(d);
@@ -246,6 +252,7 @@ function dashboard(A) {
   // class race, then what students sent. Grammar analysis folds away until there is data.
   const joined = newSignups(d);
   return `
+    ${serverWriteWarning(d)}
     ${rewardEventEntry()}
     ${kpiCards(A, care)}
     <button type="button" class="new-signup-banner-v13141 ${joined.length ? '' : 'zero'}" data-go="students" data-student-quick="new">${icon('user')}<span><b>새로 가입한 학생 ${num(joined.length)}명</b><small>최근 7일 · ${joined.length ? '눌러서 이름과 반을 바로 고쳐요' : '반별 가입 코드는 학생 관리에 있어요'}</small></span>${icon('chevron')}</button>

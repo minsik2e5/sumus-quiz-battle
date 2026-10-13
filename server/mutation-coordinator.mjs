@@ -15,6 +15,11 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   const retryDelay = Math.max(1000, Number(options.retryDelay || 2000));
   const onError = options.onError || (error => console.error('[checkpoint]', error.message));
   const rollbackOnFailure = Boolean(options.rollbackOnFailure);
+  // V13.144 쓰기 모으기: 저장이 연달아 오면 앞 저장이 시작된 뒤 groupMs가 지날 때까지 기다렸다가, 그동안 온 변경을
+  // 한 번에 저장한다(쉬고 있다가 온 저장은 바로). durable()은 그대로 저장이 끝난 뒤에 답한다: 줄이는 것은 "몇 번 쓰느냐"뿐.
+  // 숫자 또는 함수(오늘 쓴 양에 따라 늘린다).
+  const groupMs = () => Math.max(0, Number(typeof options.groupMs === 'function' ? options.groupMs() : options.groupMs || 0) || 0);
+  let lastCommitAt = 0;
 
   let snapshot = {
     state: initialSnapshot.state,
@@ -73,8 +78,12 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
     return recoveryPromise;
   }
 
-  function persistOnce() {
+  function persistOnce(target = Infinity) {
     const run = persistTail.then(async () => {
+      // Already saved by the write this one waited behind: do not wait for another window.
+      if (persistedVersion >= target && !needsRecovery) return;
+      const wait = lastCommitAt + groupMs() - Date.now();
+      if (wait > 0 && lastCommitAt) await new Promise(resolve => setTimeout(resolve, wait));
       const checkpoint = await queueApply(() => ({
         // V13.129: 복사하지 않는다. 변경은 늘 새 상태 객체로 바꾸고(applyMutation) 이 객체는 고치지 않으며,
         // 저장소는 저장하자마자 직렬화한다. 2.4MB 상태에서 저장마다 약 30ms · 20MB를 아낀다.
@@ -87,8 +96,10 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
       if (checkpoint.generation !== generation) return;
       if (checkpoint.version <= persistedVersion) return;
 
+      let stored;
       try {
-        await repo.commit(checkpoint.state, checkpoint.revision);
+        lastCommitAt = Date.now();
+        stored = await repo.commit(checkpoint.state, checkpoint.revision);
       } catch (error) {
         if (rollbackOnFailure) {
           lastFailure = error;
@@ -104,7 +115,8 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
         throw error;
       }
 
-      persistedRevision = checkpoint.revision + 1;
+      // V13.144: a repository that skips a write when nothing changed returns the revision it kept.
+      persistedRevision = Number.isFinite(stored) ? Number(stored) : checkpoint.revision + 1;
       persistedVersion = checkpoint.version;
       snapshot = { state: snapshot.state, revision: persistedRevision };
     });
@@ -115,7 +127,7 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   async function persistThrough(targetVersion, expectedGeneration = generation) {
     while (persistedVersion < targetVersion) {
       if (generation !== expectedGeneration || needsRecovery) throw unavailable();
-      await persistOnce();
+      await persistOnce(targetVersion);
     }
     if (generation !== expectedGeneration || needsRecovery) throw unavailable();
   }
