@@ -58,7 +58,8 @@ function closeAll() {
   if (!D) return;
   D.closing = true;
   (D.timers || []).forEach(clearTimeout);
-  cancelAnimationFrame(D.raf);
+  clearInterval(D.clock);
+  cancelAnimationFrame(D.flushRaf); clearTimeout(D.flushT); D.flushRaf = 0; D.inbox = [];
   leaveStage();
   clearInterval(D.pinger);
   try { D.ws?.close(); } catch {}
@@ -75,6 +76,9 @@ async function leaveScreen() {
 const setHTML = (el, html) => { if (el && el._h !== html) { el._h = html; el.innerHTML = html; } };
 const setText = (el, text) => { text = String(text); if (el && el._t !== text) { el._t = text; el.textContent = text; } };
 const setStyle = (el, key, value) => { if (el && el.style[key] !== value) el.style[key] = value; };
+const toggle = (el, cls, on) => { if (el && el.classList.contains(cls) !== on) el.classList.toggle(cls, on); };
+// V13.146: 막대는 폭 대신 transform으로(폭 transition은 매 프레임 화면 배치를 다시 한다, v13146.css). share: 0~1.
+const scaleBar = (el, share, axis = 'X') => setStyle(el, 'transform', `scale${axis}(${Math.max(0, Math.min(1, share)).toFixed(4)})`);
 const main = html => { const m = document.getElementById('dg-main'); if (m) m.innerHTML = html; };
 const note = text => { const n = document.getElementById('dg-note'); if (n) n.textContent = text; };
 
@@ -203,29 +207,55 @@ function openSocket() {
   D.pinger = setInterval(() => { if (ws.readyState === 1) ws.send('{"type":"ping"}'); }, 20000);
 }
 function send(msg) { if (D?.ws?.readyState === 1) D.ws.send(JSON.stringify(msg)); }
+// V13.146 렉 줄이기 3: 방 메시지(view · events)는 받은 즉시 그리지 않고 모아 두었다가 다음 프레임(requestAnimationFrame)에
+// 한 번에 처리한다. 동료 2명이 답하고 글자를 누르면 메시지가 한 프레임에 여러 개 오는데, 그때마다 화면 전체를 다시 그리면
+// 폰에서 프레임이 끊긴다. 이벤트는 온 순서대로 그때의 view로 재생하고, 화면은 마지막 view로 한 번만 그린다.
+// 탭이 가려져 프레임이 멈추면 0.25초 타이머가 대신 처리한다(쌓이지 않게).
 function onMessage(msg) {
   // 방 시계와 폰 시계의 차이(가장 늦게 온 메시지가 아니라 가장 빠른 쪽에 맞춘다).
   if (Number.isFinite(msg.now)) { const off = msg.now - Date.now(); D.offset = D.offsetSet ? Math.max(D.offset - 50, Math.min(D.offset + 50, off)) : off; D.offsetSet = true; }
-  if (msg.type === 'view') return draw(msg.view);
-  if (msg.type === 'events') return msg.events.forEach(play);
+  if (msg.type === 'view' || msg.type === 'events') {
+    (D.inbox ||= []).push(msg);
+    if (!D.flushRaf) { D.flushRaf = requestAnimationFrame(flushInbox); D.flushT = setTimeout(flushInbox, 250); }
+    return;
+  }
   if (msg.type === 'expired' || msg.type === 'closed') {
+    flushInbox();
     D.ended = true;
     const why = msg.reason === 'host-left' ? '방장이 방을 닫았어요.' : msg.reason === 'lobby-expired' ? '15분 동안 시작하지 않아 방이 닫혔어요.' : '방이 닫혔어요.';
     main(`<section class="dg-card dg-center"><h2>${why}</h2><button type="button" class="btn primary" data-dg="again">던전 입구로</button></section>`);
   }
 }
 
+function flushInbox() {
+  if (!D) return;
+  cancelAnimationFrame(D.flushRaf); clearTimeout(D.flushT); D.flushRaf = 0;
+  const box = D.inbox || [];
+  D.inbox = [];
+  let dirty = false;
+  for (const msg of box) {
+    if (!D || D.closing) return;
+    if (msg.type === 'events') { msg.events.forEach(play); continue; }
+    // 로비 · 결과 · 전투 무대를 처음 여는 view는 바로 그린다(화면이 바뀐다). 나머지는 데이터만 바꾸고 끝에 한 번 그린다.
+    const v = msg.view;
+    if (v.phase === 'lobby' || v.phase === 'finished' || D.phase !== 'battle' || (v.phase === 'intro' && D.view?.phase !== 'intro')) { draw(v); dirty = false; }
+    else { setView(v); dirty = true; }
+  }
+  if (dirty && D?.view && D.phase === 'battle') updateBattle(D.view);
+}
+
 /* ---------- 그리기 ---------- */
-function draw(v) {
-  const prev = D.view;
+function setView(v) {
   D.view = v;
-  const me = v.players.find(p => p.id === D.A.data.profile.id);
-  D.me = me;
+  D.me = v.players.find(p => p.id === D.A.data.profile.id);
+}
+function draw(v) {
+  setView(v);
   if (v.phase === 'lobby') return lobbyScreen(v);
   if (v.phase === 'finished') return resultScreen(v);
   if (D.phase !== 'battle') battleScreen(v);
   if (v.phase === 'intro') introOverlay(v);
-  updateBattle(v, prev);
+  updateBattle(v);
 }
 function slot(p, me) {
   if (!p) return '<div class="dg-slot empty"><i>빈자리</i></div>';
@@ -278,9 +308,11 @@ async function addBot(b) {
    세로는 위 전투 · 가운데 파티 게이지 · 아래 문제 칸, 가로는 왼쪽 파티 · 오른쪽 몬스터 · 아래 메이플식 칸
    (내 상태 · 문제 · 보기 단축키 · 파티 게이지)이다. 가로에만 파티 창 · 층 지도 · 채점/핵 막대가 있다. */
 const STAGE = {
-  land: { w: 844, h: 390, foot: 252, pets: [[26, 106], [118, 112], [214, 124]], mon: { cx: 655, foot: 262, boss: 430, S: 200, M: 230, L: 260 }, cols: [540, 620, 700], base: 184 },
+  land: { w: 844, h: 390, fxH: 274, foot: 252, pets: [[26, 106], [118, 112], [214, 124]], mon: { cx: 655, foot: 262, boss: 430, S: 200, M: 230, L: 260 }, cols: [540, 620, 700], base: 184 },
   port: { w: 390, h: 844, foot: 474, pets: [[0, 138], [106, 128], [212, 128]], mon: { cx: 245, foot: 380, boss: 430, S: 230, M: 260, L: 290 }, cols: [150, 240, 320], base: 236 }
 };
+// V13.146 fxH: 효과 캔버스 높이. 가로 무대 아래 116px은 불투명한 문제 칸(.dgs-hud)이 덮어서 그 아래 효과는 보이지 않는다.
+// 캔버스를 보이는 곳(844×274)만큼만 만들어 매 프레임 올리는 픽셀을 30% 줄인다(보이는 효과는 같다).
 // 그림 안에서 발이 닿는 높이와 맞는 자리(그림 크기에 대한 비율). 보스 그림은 위아래 여백이 크다.
 const FOOT = { boss: .96, mon: .93 }, HIT_AT = { boss: .68, mon: .48 };
 const RANK_ICON = { c3: 'dungeon-rank3', c2: 'dungeon-rank2', c1: 'dungeon-rank1', max: 'dungeon-perfect' };
@@ -317,7 +349,25 @@ function swapSrc(img, src) {
   const pre = new Image(); pre.src = src;
   (pre.decode ? pre.decode() : Promise.resolve()).catch(() => {}).then(() => { if (img._want === src) img.src = src; });
 }
-const retrig = (el, cls) => { if (!el) return; el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+// 애니메이션 다시 시작. V13.146: 예전에는 offsetWidth를 읽어 화면 배치를 그 자리에서 다시 계산하게 했다(효과마다
+// 강제 배치 → 긴 작업). 이제 클래스가 없으면 붙이기만 하고, 이미 있으면 그 애니메이션을 처음으로 돌린다.
+// 끝난 애니메이션(채우기 없음)은 클래스를 뗐다가 두 프레임 뒤에 다시 붙인다. 다시 돌리는 것은 그 요소와 바로 아래 자식의
+// 끝나는 애니메이션뿐이다(펫 돌진은 .art에 걸린다). 더 깊은 것(무대 흔들림 안의 피해 숫자 등)은 건드리지 않는다.
+function retrig(el, cls) {
+  if (!el) return;
+  if (!el.classList.contains(cls)) { el.classList.add(cls); return; }
+  let again = false;
+  try {
+    for (const a of el.getAnimations({ subtree: true })) {
+      const target = a.effect?.target;
+      if (a.effect?.getTiming().iterations === Infinity || (target !== el && target?.parentElement !== el)) continue;
+      a.currentTime = 0; a.play(); again = true;
+    }
+  } catch {}
+  if (again) return;
+  el.classList.remove(cls);
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add(cls)));
+}
 
 function battleScreen(v) {
   D.phase = 'battle';
@@ -384,8 +434,8 @@ function fitStage() {
   holder.style.width = `${L().w * s}px`; holder.style.height = `${L().h * s}px`;
   stage.style.transform = `scale(${s})`;
   D.scale = s;
-  D.fx?.resize(L().w, L().h, s);
-  if (D.view) updateBattle(D.view, null);
+  D.fx?.resize(L().w, L().h, s, L().fxH || L().h);
+  if (D.view) updateBattle(D.view);
 }
 
 /* 몬스터 */
@@ -479,21 +529,27 @@ function drawParty(v) {
     const el = host.querySelector(`.dgs-pet[data-pid="${CSS.escape(String(p.id))}"]`);
     if (!el) continue;
     const marked = v.monster?.boss && v.monster.mark === p.id;
-    el.classList.toggle('down', !!p.down); el.classList.toggle('out', !!p.out); el.classList.toggle('off', !p.connected && !p.bot); el.classList.toggle('marked', !!marked);
-    const hp = Math.max(0, p.hp / p.max_hp * 100);
-    el.querySelector('.dgs-card u').style.width = `${hp}%`;
-    el.querySelector('.dgs-card u').className = hp < 35 ? 'low' : '';
-    el.querySelector('.dgs-card em').textContent = p.down ? '기절' : p.out ? '포기' : !p.connected && !p.bot ? '연결 끊김' : marked ? '표적' : p.combo >= 2 ? `${p.combo}연속` : '';
+    toggle(el, 'down', !!p.down); toggle(el, 'out', !!p.out); toggle(el, 'off', !p.connected && !p.bot); toggle(el, 'marked', !!marked);
+    const hp = Math.max(0, p.hp / p.max_hp * 100), bar = el._bar ||= el.querySelector('.dgs-card u');
+    scaleBar(bar, hp / 100);
+    toggle(bar, 'low', hp < 35);
+    setText(el._em ||= el.querySelector('.dgs-card em'), p.down ? '기절' : p.out ? '포기' : !p.connected && !p.bot ? '연결 끊김' : marked ? '표적' : p.combo >= 2 ? `${p.combo}연속` : '');
   }
   // 가로: 파티 창(층 지도 · 이름 · 체력 · 이번 문제 상태).
   const panel = $id('dgs-party');
   if (panel && D.mode === 'land') {
     const last = v.last_floor || v.floor || 1;
     const rooms = Array.from({ length: Math.min(6, last) }, (_, i) => `<span class="${i + 1 < v.floor ? 'done' : i + 1 === v.floor ? 'now' : ''}${i + 1 === last && last <= 6 ? ' boss' : ''}"></span>`).join('<em></em>');
-    setHTML(panel, `<div class="dgs-phead"><b>${v.monster?.boss ? '보스층' : v.floor ? `${v.floor}층` : ''} · ${esc(v.cut_name)}</b><div class="dgs-rooms" aria-hidden="true">${rooms}</div></div>${v.players.map(p => {
-      const st = p.down ? '<i class="chip down">기절</i>' : p.out ? '<i class="chip down">포기</i>' : !p.connected && !p.bot ? '<i class="chip off">끊김</i>' : p.combo >= 3 ? `<i class="chip hot">${p.combo}</i>` : '';
-      return `<div class="dgs-prow${p.id === myId ? ' me' : ''}"><span>${esc(p.id === myId ? '나' : p.name)}${p.bot ? ' · 봇' : ''}</span>${st}<i class="mini"><u style="width:${Math.max(0, p.hp / p.max_hp * 100)}%"></u></i></div>`;
-    }).join('')}`);
+    // V13.146: 틀(층 지도 · 이름)은 바뀔 때만 만들고, 상태 칩과 체력 막대는 그 자리에서 바꾼다(정답마다 창 전체를 다시 만들지 않게).
+    setHTML(panel, `<div class="dgs-phead"><b>${v.monster?.boss ? '보스층' : v.floor ? `${v.floor}층` : ''} · ${esc(v.cut_name)}</b><div class="dgs-rooms" aria-hidden="true">${rooms}</div></div>${v.players.map(p =>
+      `<div class="dgs-prow${p.id === myId ? ' me' : ''}"><span>${esc(p.id === myId ? '나' : p.name)}${p.bot ? ' · 봇' : ''}</span><span class="st" style="display:contents"></span><i class="mini"><u></u></i></div>`).join('')}`);
+    const rows = panel.querySelectorAll('.dgs-prow');
+    v.players.forEach((p, i) => {
+      const row = rows[i];
+      if (!row) return;
+      setHTML(row.querySelector('.st'), p.down ? '<i class="chip down">기절</i>' : p.out ? '<i class="chip down">포기</i>' : !p.connected && !p.bot ? '<i class="chip off">끊김</i>' : p.combo >= 3 ? `<i class="chip hot">${p.combo}</i>` : '');
+      scaleBar(row.querySelector('.mini u'), p.hp / p.max_hp);
+    });
   }
 }
 
@@ -504,14 +560,15 @@ function drawTop(v) {
   setHTML(title, `<img src="/assets/ui/${RANK_ICON[v.cut] || 'dungeon-rank3'}.webp" alt="${esc(v.cut_name)}" draggable="false"><div><b>${m?.boss ? '보스 · 킬러 골렘' : v.floor ? `${v.floor}층 · ${esc(m?.name || '')}` : '기말고사 지옥'}</b><span>기말고사 지옥 · ${esc(v.cut_name)} · ${v.players.length}명</span></div>`);
   if (m) {
     const share = Math.max(0, m.hp / m.max_hp);
-    $id('dgs-mon-name').textContent = m.name;
-    $id('dgs-mon-tag').textContent = m.boss ? ['', '1페이즈', '2페이즈 · 빨간펜 채점', '3페이즈 · 핵 노출'][m.stage] || '' : m.trait ? m.trait.name : '';
-    $id('dgs-mon-tag').title = m.trait?.desc || '';
-    $id('dgs-mon-hp').textContent = `${Math.ceil(share * 100)}% · ${num(Math.max(0, m.hp))}`;
-    $id('dgs-hp-fill').style.width = `${share * 100}%`; $id('dgs-hp-lag').style.width = `${share * 100}%`;
-    $id('dgs-tick2').hidden = $id('dgs-tick3').hidden = !m.boss;
+    setText($id('dgs-mon-name'), m.name);
+    const tag = $id('dgs-mon-tag');
+    setText(tag, m.boss ? ['', '1페이즈', '2페이즈 · 빨간펜 채점', '3페이즈 · 핵 노출'][m.stage] || '' : m.trait ? m.trait.name : '');
+    if (tag.title !== (m.trait?.desc || '')) tag.title = m.trait?.desc || '';
+    setText($id('dgs-mon-hp'), `${Math.ceil(share * 100)}% · ${num(Math.max(0, m.hp))}`);
+    scaleBar($id('dgs-hp-fill'), share); scaleBar($id('dgs-hp-lag'), share);
+    for (const id of ['dgs-tick2', 'dgs-tick3']) if ($id(id).hidden !== !m.boss) $id(id).hidden = !m.boss;
     setHTML($id('dgs-phases'), m.boss ? [['1페이즈', 1], ['2 채점', 2], ['3 핵', 3]].map(([t, s]) => `<span class="${m.stage === s ? 'on' : ''}">${m.stage === s ? ['', '1페이즈', '2페이즈 · 빨간펜 채점', '3페이즈 · 핵 노출'][s] : t}</span>`).join('') : '');
-    $id('dgs-world').classList.toggle('p2', !!(m.boss && m.stage === 2)); $id('dgs-world').classList.toggle('p3', !!(m.boss && m.stage === 3));
+    toggle($id('dgs-world'), 'p2', !!(m.boss && m.stage === 2)); toggle($id('dgs-world'), 'p3', !!(m.boss && m.stage === 3));
   }
   // 채점 표적 · 핵 (세로는 카드, 가로는 보스 체력 아래 막대).
   const alert = $id('dgs-alert');
@@ -520,14 +577,18 @@ function drawTop(v) {
     const core = m?.boss && m.core?.open_until ? m.core : null;
     let html = '';
     if (target) {
-      const mine = target.id === myId, done = 3 - (target.mark_left || 0);
-      html = `<div class="dgs-al mark${mine ? ' mine' : ''}"><img src="/assets/ui/dungeon-mark.webp" alt="" draggable="false"><div><b>빨간펜 채점!</b><span>${mine ? '내가 표적! 다음 3문제를 연속으로 맞혀 막아요' : `${esc(target.name)} 표적 · 3문제 연속 정답이면 막아요`}</span><p>${[0, 1, 2].map(i => `<i class="${i < done ? 'on' : ''}">${i < done ? i + 1 : ''}</i>`).join('')}</p></div></div>`;
+      const mine = target.id === myId;
+      html = `<div class="dgs-al mark${mine ? ' mine' : ''}"><img src="/assets/ui/dungeon-mark.webp" alt="" draggable="false"><div><b>빨간펜 채점!</b><span>${mine ? '내가 표적! 다음 3문제를 연속으로 맞혀 막아요' : `${esc(target.name)} 표적 · 3문제 연속 정답이면 막아요`}</span><p></p></div></div>`;
     } else if (core) {
-      html = `<div class="dgs-al core"><img src="/assets/ui/dungeon-core.webp" alt="" draggable="false"><div><b>핵이 드러났다!</b><span>파티가 정답 ${core.goal}개를 채우면 브레이크!</span><p class="bar"><i style="width:${Math.min(100, core.count / core.goal * 100)}%"></i><em>${core.count}/${core.goal}</em></p></div><strong id="dgs-core-left"></strong></div>`;
+      html = `<div class="dgs-al core"><img src="/assets/ui/dungeon-core.webp" alt="" draggable="false"><div><b>핵이 드러났다!</b><span>파티가 정답 ${core.goal}개를 채우면 브레이크!</span><p class="bar"><i style="width:100%;transform-origin:left center"></i><em></em></p></div><strong id="dgs-core-left"></strong></div>`;
     }
+    // V13.146: 틀은 표적 · 핵이 바뀔 때만, 채운 칸과 막대는 그 자리에서.
     setHTML(alert, html);
-    alert.classList.toggle('on', !!html);
-    $id('dgs-feed')?.classList.toggle('hide', !!html);
+    const done = 3 - (target?.mark_left || 0);
+    if (target) setHTML(alert.querySelector('p'), [0, 1, 2].map(i => `<i class="${i < done ? 'on' : ''}">${i < done ? i + 1 : ''}</i>`).join(''));
+    else if (core) { scaleBar(alert.querySelector('p.bar i'), core.count / core.goal); setText(alert.querySelector('p.bar em'), `${core.count}/${core.goal}`); }
+    toggle(alert, 'on', !!html);
+    toggle($id('dgs-feed'), 'hide', !!html);
   }
 }
 
@@ -537,8 +598,9 @@ function drawGauge(v) {
   const fill = $id('dgs-gauge-fill'), txt = $id('dgs-gauge-txt'), ico = $id('dgs-gauge-ico'), box = $id('dgs-gauge');
   if (!fill) return;
   const share = core ? core.count / core.goal : v.gauge_max ? v.gauge / v.gauge_max : 0;
-  box.style.setProperty('--g', `${Math.min(100, share * 100)}%`);
-  box.classList.toggle('core', !!core); box.classList.toggle('ready', !core && share >= .85);
+  const g = Math.min(1, share).toFixed(4);
+  if (box._g !== g) { box._g = g; box.style.setProperty('--gs', g); }
+  toggle(box, 'core', !!core); toggle(box, 'ready', !core && share >= .85);
   const icoSrc = `/assets/ui/${core ? 'dungeon-break' : 'dungeon-ultimate'}.webp`;
   if (!ico.src.endsWith(icoSrc)) ico.src = icoSrc;
   setHTML(txt, core ? `<span>브레이크까지 · 파티 정답</span><b>${core.count}/${core.goal}</b>` : `<span>${D.mode === 'land' ? '합동 필살' : `파티 게이지${v.element_bonus > 1 ? ' · 서로 다른 속성 3마리 +30%' : ''}`}</span><b>${Math.round(share * 100)}%</b>`);
@@ -546,32 +608,37 @@ function drawGauge(v) {
 function drawMe(v) {
   const me = D.me, box = $id('dgs-me');
   if (box && me && D.mode === 'land') {
+    // V13.146: 틀은 한 번, 체력 · 콤보 막대와 글은 그 자리에서 바꾼다.
     setHTML(box, `<div class="hd"><img src="${petArt(me)}" alt="" draggable="false"><div><b>${esc(me.name)}</b><span>${esc(v.grade)} · ${esc(v.cut_name)}</span></div></div>
-      <div class="bar hp"><span>HP</span><i><u style="width:${Math.max(0, me.hp / me.max_hp * 100)}%"></u><em>${num(Math.max(0, me.hp))}/${num(me.max_hp)}</em></i></div>
-      <div class="bar sp"><span>콤보</span><i><u style="width:${Math.min(100, (me.combo % 5) / 5 * 100 + (me.combo >= 25 ? 100 : 0))}%"></u><em>${me.combo}연속 · ×${Math.min(1.5, 1 + .1 * Math.floor(me.combo / 5)).toFixed(1)}</em></i></div>`);
+      <div class="bar hp"><span>HP</span><i><u></u><em></em></i></div>
+      <div class="bar sp"><span>콤보</span><i><u></u><em></em></i></div>`);
+    const [hp, sp] = box.querySelectorAll('.bar');
+    scaleBar(hp.querySelector('u'), me.hp / me.max_hp);
+    setText(hp.querySelector('em'), `${num(Math.max(0, me.hp))}/${num(me.max_hp)}`);
+    scaleBar(sp.querySelector('u'), Math.min(100, (me.combo % 5) / 5 * 100 + (me.combo >= 25 ? 100 : 0)) / 100);
+    setText(sp.querySelector('em'), `${me.combo}연속 · ×${Math.min(1.5, 1 + .1 * Math.floor(me.combo / 5)).toFixed(1)}`);
   }
   const combo = $id('dgs-combo');
   if (combo && me) {
-    const c = me.combo || 0, was = Number(combo.dataset.n || 0);
-    combo.dataset.n = c;
-    combo.classList.toggle('on', c >= 3);
-    combo.querySelector('b').textContent = c;
-    combo.querySelector('span').textContent = c >= 5 ? `COMBO ×${Math.min(1.5, 1 + .1 * Math.floor(c / 5)).toFixed(1)}` : 'COMBO';
+    const c = me.combo || 0, was = combo._n || 0;
+    combo._n = c;
+    toggle(combo, 'on', c >= 3);
+    setText(combo._b ||= combo.querySelector('b'), c);
+    setText(combo._s ||= combo.querySelector('span'), c >= 5 ? `COMBO ×${Math.min(1.5, 1 + .1 * Math.floor(c / 5)).toFixed(1)}` : 'COMBO');
     if (c > was && c >= 3) retrig(combo, 'pop');
     if (c > was && c > 0 && c % 10 === 0) { sfx('combo-10'); say(D.mode === 'land' ? 300 : 300, D.mode === 'land' ? 60 : 380, `${c} 콤보!`, '#fde68a'); }
   }
 }
 
-function updateBattle(v, prev) {
+function updateBattle(v) {
   if (!$id('dgs')) return;
   drawMonster(v);
   drawParty(v);
   drawTop(v);
   drawGauge(v);
   drawMe(v);
-  $id('dgs-world')?.classList.toggle('low', !!D.me && !D.me.down && D.me.hp <= 30);
+  toggle($id('dgs-world'), 'low', !!D.me && !D.me.down && D.me.hp <= 30);
   drawAsk(v);
-  void prev;
 }
 
 /* ---------- 문제 칸 ---------- */
@@ -670,18 +737,33 @@ function toggleSound(b) {
 }
 
 // 시계: 경과 시간, 내 문제의 남은 시간(마지막 3초 째깍), 핵 남은 시간, 휴식 · 입장 남은 시간, 몬스터 숨쉬기 자세.
+// V13.146: 매 프레임(초당 60번) 돌던 것을 0.1초마다로 바꿨다(글은 0.1초 · 1초 단위로만 바뀐다). 시간 막대는 문제가 열릴 때
+// 끝까지 줄어드는 애니메이션을 한 번 걸어 두고(화면 합성기가 움직인다), 답하거나 문제가 바뀌면 멈춘다.
+export const CLOCK_MS = 100;
+function timeBar(bar, q, now) {
+  if (bar._n === q.n && bar._anim) return;
+  bar._anim?.cancel();
+  bar._n = q.n;
+  const leftMs = Math.max(0, q.deadline - now), left = leftMs / (q.deadline - q.started_at);
+  setStyle(bar, 'transform', `scaleX(${left.toFixed(3)})`);
+  try { bar._anim = bar.animate([{ transform: `scaleX(${left.toFixed(3)})` }, { transform: 'scaleX(0)' }], { duration: leftMs, fill: 'forwards' }); }
+  catch { bar._anim = null; }
+}
 function tickLoop() {
-  cancelAnimationFrame(D.raf);
+  clearInterval(D.clock);
   let flipAt = 0;
   const step = () => {
-    if (!D || D.closing || D.phase !== 'battle') return;
+    if (!D || D.closing || D.phase !== 'battle') return clearInterval(D?.clock);
     const v = D.view, now = serverNow();
     const c = $id('dg-clock');
     if (c && v) setText(c, clock(v.started_at ? now - v.started_at : 0));
     const bar = $id('dg-time'), q = v?.question;
+    if (bar && !(q && q.n === D.qn) && bar._anim?.playState === 'running') bar._anim.pause();
     if (bar && q && q.n === D.qn) {
       const leftMs = Math.max(0, q.deadline - now), left = leftMs / (q.deadline - q.started_at);
-      setStyle(bar, 'transform', `scaleX(${left.toFixed(3)})`); if (bar.classList.contains('hurry') !== left < .3) bar.classList.toggle('hurry', left < .3);
+      timeBar(bar, q, now);
+      if (!bar._anim) setStyle(bar, 'transform', `scaleX(${left.toFixed(3)})`);
+      toggle(bar, 'hurry', left < .3);
       setText($id('dgs-time-left'), `${(leftMs / 1000).toFixed(1)}초`);
       const sec = Math.ceil(leftMs / 1000);
       if (sec < D.tick && sec > 0 && sec <= 3 && D.picked === null && !D.spell?.done) { D.tick = sec; sfx('tick', { gain: .7 }); }
@@ -697,9 +779,9 @@ function tickLoop() {
       const img = $id('dgs-mon-img'), m = v?.monster;
       if (img && m && !(D.posing > now) && v.phase !== 'finished') swapSrc(img, monSrc(m.key, idlePose(m)));
     }
-    D.raf = requestAnimationFrame(step);
   };
-  D.raf = requestAnimationFrame(step);
+  D.clock = setInterval(step, CLOCK_MS);
+  step();
 }
 function introOverlay(v) {
   const world = $id('dgs-world');
@@ -767,13 +849,32 @@ function petFace(pid, face, ms) {
   if (ms) el._faceT = setTimeout(() => { if (!p.down) swapSrc(img, petArt(playerOf(pid) || p)); }, ms);
 }
 function colOf(pid) { const s = slotOf(pid); return L().cols[s ? s.i : 1] ?? L().cols[1]; }
+// V13.146 동료 연출: 동료 정답 · 펫 자동 공격 · 동료가 맞는 연출은 PEER_GAP_MS 간격으로 줄을 세워 하나씩 보여 준다
+// (피해 숫자 · 피드 · 펫 돌진이 한 프레임에 몰리지 않게). 너무 밀리면(가려진 탭이 돌아올 때) 지난 연출은 건너뛴다.
+// 동료 공격은 내 공격보다 가볍게: 조각 절반 · 짧은 꼬리 · 화면 흔들림과 몬스터 번쩍(히트스톱)은 내 공격에만.
+// PEER_MERGE_MS 안에 동료 공격이 또 오면 발사체 · 맞는 효과를 하나로 합친다(피해 숫자는 각자 그대로).
+export const PEER_GAP_MS = 120, PEER_MERGE_MS = 220, PEER_LATE_MS = 1500;
+function peerQueue(fn) {
+  const now = performance.now(), at = Math.max(now, D.peerAt || 0);
+  if (at - now > PEER_LATE_MS) return;
+  D.peerAt = at + PEER_GAP_MS;
+  if (at <= now) fn(); else later(fn, at - now);
+}
 function hitShow(e, myId) {
+  const mine = e.pid === myId, big = e.kind === 'special' || e.kind === 'break';
+  if (!mine && !big) return peerQueue(() => { if ($id('dgs')) hitShowNow(e, myId); });
+  hitShowNow(e, myId);
+}
+function hitShowNow(e, myId) {
   const p = playerOf(e.pid), el = p?.element || 'star', snd = EL_SOUND[el] || 'star', mine = e.pid === myId;
-  const big = e.kind === 'special' || e.kind === 'break';
+  const big = e.kind === 'special' || e.kind === 'break', lite = !mine && !big;
   const to = monHit(!big);
+  // 동료 공격 합치기: 바로 앞 동료 공격과 PEER_MERGE_MS 안이면 발사체 · 맞는 효과를 다시 그리지 않는다.
+  const t = performance.now(), merged = lite && t < (D.peerMergeUntil || 0);
+  if (lite) D.peerMergeUntil = t + PEER_MERGE_MS;
   const land = () => {
     if (!$id('dgs')) return;
-    D.fx?.impact(big ? 'star' : el, to.x, to.y, big);
+    if (!merged) D.fx?.impact(big ? 'star' : el, to.x, to.y, big, true, { lite });
     if (big) { D.fx?.impact('flame', to.x - 18, to.y + 8, true, false); D.fx?.impact('water', to.x + 18, to.y - 8, true, false); }
     let lines, opt = {};
     if (e.kind === 'special') { lines = split(e.damage, 6).map((d, i) => ({ text: num(d), cls: i % 2 ? 'crit' : '' })); opt = { big: true, step: 34, gap: 90, tag: '합동 필살', tagCls: 'ult' }; }
@@ -783,13 +884,13 @@ function hitShow(e, myId) {
     else { lines = [{ text: num(e.damage), cls: mine ? 'mine' : '' }]; if (p?.combo >= 5) opt.tag = `${p.combo}콤보`; }
     const x = big ? (D.mode === 'land' ? 640 : 250) : colOf(e.pid);
     stack(x, big ? (D.mode === 'land' ? 232 : 300) : L().base - (slotOf(e.pid)?.i || 0) * 6, lines, opt);
-    $id('dgs-mon') && retrig($id('dgs-mon'), 'hit');
+    if (!lite) retrig($id('dgs-mon'), 'hit');
     const m = D.view?.monster;
-    if (m && !(D.posing > serverNow() && D.poseName === 'roar')) pose(m.boss && m.stage === 3 ? 'corehurt' : 'hurt', 220);
+    if (m && !merged && !(D.posing > serverNow() && D.poseName === 'roar')) pose(m.boss && m.stage === 3 ? 'corehurt' : 'hurt', 220);
     if (big) { sfx('ult-impact', { gain: e.kind === 'break' ? .8 : 1 }); flash('white'); shake(true); }
     else sfx(e.kind === 'spell' ? 'crit' : `hit-${snd}`, { gain: mine ? 1 : .7, vary: .04 });
     lines.forEach((_, k) => { if (k) sfx('dmg-tick', { gain: .55, at: k * (big ? .09 : .07), rate: 1 + k * .07 }); });
-    if (!big) shake(false);
+    if (mine) shake(false);
     if (!mine && e.pid && (e.kind === 'answer' || e.kind === 'spell')) feed(p, e.damage, e.kind === 'spell');
   };
   if (big) { const wait = Math.max(0, (D.cutinUntil || 0) - Date.now()); return later(land, wait); }
@@ -798,18 +899,20 @@ function hitShow(e, myId) {
   retrig(pet, 'lunge'); petFace(e.pid, 'attack', 520);
   sfx(`atk-${snd}`, { gain: mine ? .9 : .55, vary: .04 });
   const from = petCenter(e.pid);
-  if (EL_SOUND[el] === 'leaf') { for (let k = 0; k < 4; k++) later(() => D.fx?.shoot(from, { x: to.x + (Math.random() - .5) * 36, y: to.y + (Math.random() - .5) * 36 }, el, 420, k ? () => D.fx?.impact(el, to.x, to.y) : land), k * 70); }
-  else D.fx ? D.fx.shoot({ x: from.x + 24, y: from.y - 10 }, to, el, 340, land) : land();
-  if (e.kind === 'spell' && D.fx) later(() => D.fx?.shoot({ x: from.x + 24, y: from.y - 30 }, { x: to.x - 20, y: to.y - 20 }, el, 340, () => D.fx?.impact(el, to.x - 20, to.y - 20)), 110);
+  // 합쳐진 동료 공격: 발사체 없이 같은 시간 뒤에 숫자만.
+  if (merged || !D.fx) return later(land, 340);
+  if (EL_SOUND[el] === 'leaf') { for (let k = 0; k < (lite ? 2 : 4); k++) later(() => D.fx?.shoot(from, { x: to.x + (Math.random() - .5) * 36, y: to.y + (Math.random() - .5) * 36 }, el, 420, k ? () => D.fx?.impact(el, to.x, to.y, false, true, { lite }) : land, null, { lite }), k * 70); }
+  else D.fx.shoot({ x: from.x + 24, y: from.y - 10 }, to, el, 340, land, null, { lite });
+  if (e.kind === 'spell' && !lite) later(() => D.fx?.shoot({ x: from.x + 24, y: from.y - 30 }, { x: to.x - 20, y: to.y - 20 }, el, 340, () => D.fx?.impact(el, to.x - 20, to.y - 20)), 110);
 }
 // 세로 화면 왼쪽 위: 동료 정답 알림(최근 두 개).
 function feed(p, damage, spell) {
   const box = $id('dgs-feed');
   if (!box || !p) return;
   D.feed = [{ name: p.name, damage, spell, at: Date.now() }, ...(D.feed || [])].slice(0, 2);
-  box.innerHTML = D.feed.map((f, i) => `<span class="${i ? 'old' : ''}"><b>${esc(f.name)}</b> ${f.spell ? '쓰기 정답' : '정답'} · ${num(f.damage)} 피해</span>`).join('');
+  setHTML(box, D.feed.map((f, i) => `<span class="${i ? 'old' : ''}"><b>${esc(f.name)}</b> ${f.spell ? '쓰기 정답' : '정답'} · ${num(f.damage)} 피해</span>`).join(''));
   clearTimeout(D.feedT);
-  D.feedT = setTimeout(() => { if ($id('dgs-feed')) { D.feed = []; $id('dgs-feed').innerHTML = ''; } }, 3200);
+  D.feedT = setTimeout(() => { if ($id('dgs-feed')) { D.feed = []; setHTML($id('dgs-feed'), ''); } }, 3200);
 }
 function cutin(v) {
   const box = $id('dgs-cutin');
@@ -873,25 +976,11 @@ function play(e) {
       later(() => { const b = $id('dgs-break'); if (b) { const at = monHit(false); Object.assign(b.style, { left: `${at.x + 30}px`, top: `${at.y + 10}px` }); retrig(b, 'go'); } sfx('crit'); }, 120);
       break;
     case 'struck': {
-      const el = petEl(e.pid), m = v?.monster;
-      pose('windup', 180);
-      later(() => {
-        pose(D.markFail === e.pid ? 'attack2' : 'attack', 520);
-        retrig($id('dgs-mon'), 'slam');
-        later(() => {
-          if (!$id('dgs')) return;
-          const at = petCenter(e.pid);
-          D.fx?.slash(at.x, at.y);
-          if (m?.boss || D.markFail === e.pid) D.fx?.dust(at.x - 70, at.x + 70, L().foot);
-          retrig(el, 'hurt'); petFace(e.pid, 'hurt', 1000);
-          stack(at.x - 6, at.y - 40, [{ text: `-${num(e.damage)}`, cls: 'hurt' }]);
-          sfx(m?.boss ? 'boss-slam' : 'smash', { gain: m?.boss ? .9 : .8, vary: .05 });
-          sfx('hurt', { gain: .45, at: .1 });
-          shake(!!m?.boss || D.markFail === e.pid);
-          if (e.pid === myId) flash('red');
-          D.markFail = null;
-        }, 160);
-      }, 180);
+      // 동료가 맞는 연출도 줄을 세운다(시간 초과가 한꺼번에 오면 한 프레임에 몰리지 않게). 화면 흔들림은 내가 맞을 때만.
+      const fail = D.markFail === e.pid;
+      D.markFail = null;
+      if (e.pid !== myId) { peerQueue(() => { if ($id('dgs')) struckShow(e, myId, fail); }); break; }
+      struckShow(e, myId, fail);
       break;
     }
     case 'down': say(petCenter(e.pid).x - 30, L().foot - 150, '기절', '#e9d5ff'); sfx('faint'); break;
@@ -935,6 +1024,26 @@ function play(e) {
     case 'emote': { const el = petEl(e.pid); if (el) { const bubble = document.createElement('i'); bubble.className = 'dg-bubble'; bubble.textContent = EMOTES[e.emote] || ''; el.appendChild(bubble); setTimeout(() => bubble.remove(), 1800); } break; }
   }
 }
+// 몬스터가 학생을 때린다: 준비 → 내려찍기 → 베기 · 숫자. 채점 실패(fail)면 더 크게.
+function struckShow(e, myId, fail) {
+  const el = petEl(e.pid), m = D.view?.monster, mine = e.pid === myId;
+  pose('windup', 180);
+  later(() => {
+    pose(fail ? 'attack2' : 'attack', 520);
+    retrig($id('dgs-mon'), 'slam');
+    later(() => {
+      if (!$id('dgs')) return;
+      const at = petCenter(e.pid);
+      D.fx?.slash(at.x, at.y);
+      if (m?.boss || fail) D.fx?.dust(at.x - 70, at.x + 70, L().foot, { lite: !mine });
+      retrig(el, 'hurt'); petFace(e.pid, 'hurt', 1000);
+      stack(at.x - 6, at.y - 40, [{ text: `-${num(e.damage)}`, cls: 'hurt' }]);
+      sfx(m?.boss ? 'boss-slam' : 'smash', { gain: m?.boss ? .9 : .8, vary: .05 });
+      sfx('hurt', { gain: .45, at: .1 });
+      if (mine) { shake(!!m?.boss || fail); flash('red'); }
+    }, 160);
+  }, 180);
+}
 const nameOf = pid => { const p = D.view?.players.find(x => x.id === pid); return p ? (p.id === D.A.data.profile.id ? '나' : p.name) : ''; };
 
 // 무대를 떠날 때: 효과 캔버스를 멈추고 창 크기 · 키보드 듣기를 뗀다.
@@ -950,7 +1059,7 @@ function leaveStage() {
 function resultScreen(v) {
   if (D.phase === 'result') return;
   D.phase = 'result';
-  cancelAnimationFrame(D.raf);
+  clearInterval(D.clock);
   leaveStage();
   if (!v.result?.cleared) playSound('fail');
   const r = v.result, myId = D.A.data.profile.id;

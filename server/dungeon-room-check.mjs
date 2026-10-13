@@ -283,8 +283,40 @@ export async function runDungeonRoomChecks() {
       assert(legacy.store.has('q:a') && !JSON.stringify(legacy.store.get('room')).includes('"questions"'), "예전 방은 다음 저장 때 문제 목록을 'q:' 키로 옮긴다");
     });
 
+    /* ---------- 12. V13.146 렉 줄이기 3: 동료의 쓰기 글자 · 새 문제는 그 학생에게만, 같은 view는 다시 보내지 않는다 ---------- */
+    await check('12 동료 메시지 줄이기', async () => {
+      const spellWords = Array.from({ length: 130 }, (_, i) => ({ word_id: 's' + i, prompt: 'abcdefghij'.slice(0, 4 + (i % 4)) + 'xyz'[i % 3], meaning: '뜻' + i, wrong: [1, 2, 3, 4, 5].map(k => `오답${i}-${k}`), wrong_en: [1, 2, 3, 4, 5].map(k => `word${i}${k}`) }));
+      const { room, sockets } = await openRoom({ bots: 1, guests: ['b'], words: spellWords });
+      await send(room, sockets.a, { type: 'ready' }); await send(room, sockets.b, { type: 'ready' });
+      clock += DUNGEON.INTRO_MS; await room.alarm();
+      const s = room.room.state;
+      for (let i = 0; i < 12 && s.players.a.q?.kind !== 'spell'; i++) {
+        const q = s.players.a.q;
+        if (q) await send(room, sockets.a, { type: 'answer', choice: q.answer, n: q.n });
+        clock += DUNGEON.REVEAL_MS + 10; await room.alarm();
+      }
+      const q = s.players.a.q;
+      assert(q?.kind === 'spell', 'a에게 쓰기 문제');
+      sockets.a.sent.length = 0; sockets.b.sent.length = 0;
+      await send(room, sockets.a, { type: 'letter', ch: q.word[0], n: q.n });
+      await send(room, sockets.a, { type: 'letter', ch: q.word[0] === 'z' ? 'y' : 'z', n: q.n });
+      assert.equal(sockets.b.sent.length, 0, `동료가 글자를 누르면(맞든 틀리든) 나에게는 아무것도 오지 않는다: ${JSON.stringify(sockets.b.sent).slice(0, 200)}`);
+      const mine = sockets.a.sent.filter(m => m.type === 'events').flatMap(m => m.events);
+      assert(mine.filter(e => e.type === 'letter').length === 2 && sockets.a.sent.filter(m => m.type === 'view').length === 2, '글자를 누른 학생은 글자 이벤트와 자기 view(채운 칸 · 실수)를 받는다');
+      for (const ch of q.word.slice(1)) await send(room, sockets.a, { type: 'letter', ch, n: q.n });
+      const toB = sockets.b.sent.filter(m => m.type === 'events').flatMap(m => m.events);
+      assert(toB.some(e => e.type === 'answered' && e.pid === 'a') && toB.some(e => e.type === 'hit' && e.pid === 'a') && !toB.some(e => e.type === 'letter') && sockets.b.sent.filter(m => m.type === 'view').length === 1, '동료가 다 쓰면 나는 정답 · 피해 이벤트와 view 하나만 받는다(글자 이벤트는 없다)');
+      clock += DUNGEON.REVEAL_MS + 10; sockets.b.sent.length = 0; await room.alarm();
+      assert(!sockets.b.sent.some(m => m.type === 'events' && m.events.some(e => e.type === 'question' && e.pid !== 'b')), '동료의 새 문제 이벤트는 나에게 오지 않는다');
+      sockets.a.sent.length = 0; sockets.b.sent.length = 0;
+      room.pushViews();
+      assert(sockets.a.sent.length === 0 && sockets.b.sent.length === 0, '바뀐 것이 없으면 view를 다시 보내지 않는다');
+      await send(room, sockets.b, { type: 'sync' });
+      assert(sockets.b.sent.filter(m => m.type === 'view').length === 1, "'sync'를 보내면 같은 view라도 다시 받는다");
+    });
+
     if (failures.length) throw Error(`[dungeon-room-check] FAIL\n  - ${failures.join('\n  - ')}`);
-    console.log('[dungeon-room-check] PASS lobby/ready · full run with bot · one report · lobby close · join refused · messages · reconnect · report backoff · bot plan · spelling letters · questions stored once');
+    console.log('[dungeon-room-check] PASS lobby/ready · full run with bot · one report · lobby close · join refused · messages · reconnect · report backoff · bot plan · spelling letters · questions stored once · peer letters only to the typer · same view not resent');
   } finally {
     Date.now = realNow;
     globalThis.Response = RealResponse;

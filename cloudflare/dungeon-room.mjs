@@ -33,11 +33,20 @@ export function planBot(q, random = Math.random, level = DUNGEON_BOT) {
 }
 
 export const questionKey = pid => `q:${pid}`;
+// V13.146 렉 줄이기 3: 남의 화면에 아무것도 바꾸지 않는 이벤트는 그 학생에게만 보낸다. 쓰기 문제의 글자 하나(letter)와
+// 새 문제(question)는 그 학생의 문제 칸만 바꾼다(남의 view에는 남의 문제가 없다). 예전에는 동료가 글자를 누를 때마다
+// 파티 전원이 이벤트 + view를 받아 화면을 다시 그렸다.
+export const OWN_EVENTS = new Set(['letter', 'question']);
+export const eventsFor = (events, pid) => events.filter(e => !OWN_EVENTS.has(e.type) || e.pid === pid);
+// view에서 시간만 바뀌는 칸(elapsed_ms)을 빼고 비교한다. 같으면 그 폰에 다시 보내지 않는다.
+export const viewKey = v => JSON.stringify({ ...v, elapsed_ms: 0 });
 
 export class DungeonRoom {
   constructor(ctx, env) {
     this.ctx = ctx;
     this.env = env;
+    // 소켓마다 마지막으로 보낸 view(비교용). 메모리에만 둔다: 방이 잠들었다 깨면 비어서 한 번 더 보낼 뿐이다.
+    this.sentViews = new WeakMap();
     this.random = Math.random;
     this.ready = ctx.blockConcurrencyWhile(() => this.load());
   }
@@ -92,12 +101,22 @@ export class DungeonRoom {
   send(ws, message) { try { ws.send(JSON.stringify({ ...message, now: Date.now() })); } catch {} }
   broadcast(events, except = null) {
     if (!events.length) return;
-    for (const ws of this.ctx.getWebSockets()) if (ws !== except) this.send(ws, { type: 'events', events });
+    for (const ws of this.ctx.getWebSockets()) {
+      if (ws === except) continue;
+      const mine = eventsFor(events, this.ctx.getTags(ws)[0]);
+      if (mine.length) this.send(ws, { type: 'events', events: mine });
+    }
   }
-  // 이벤트 뒤에는 각자 자기 화면(내 문제 포함)을 받는다. 정답 번호와 남의 문제는 view에 없다.
+  // 이벤트 뒤에는 각자 자기 화면(내 문제 포함)을 받는다. 정답 번호와 남의 문제는 view에 없다. 바뀐 것이 없으면 보내지 않는다.
   pushViews(except = null) {
     const now = Date.now();
-    for (const ws of this.ctx.getWebSockets()) if (ws !== except) { const pid = this.ctx.getTags(ws)[0]; if (pid) this.send(ws, { type: 'view', view: view(this.room.state, pid, now) }); }
+    for (const ws of this.ctx.getWebSockets()) if (ws !== except) { const pid = this.ctx.getTags(ws)[0]; if (pid) this.sendView(ws, pid, now); }
+  }
+  sendView(ws, pid, now = Date.now(), force = false) {
+    const v = view(this.room.state, pid, now), key = viewKey(v);
+    if (!force && this.sentViews.get(ws) === key) return;
+    this.sentViews.set(ws, key);
+    this.send(ws, { type: 'view', view: v });
   }
 
   async fetch(request) {
@@ -183,7 +202,7 @@ export class DungeonRoom {
     if (r.state.phase !== 'finished') events.push(...reconnect(r.state, pid, now));
     this.planBots();
     await this.save();
-    this.send(server, { type: 'view', view: view(r.state, pid, now) });
+    this.sendView(server, pid, now, true);
     this.broadcast(events, server);
     if (events.length) this.pushViews(server);
     await this.afterChange();
@@ -199,7 +218,7 @@ export class DungeonRoom {
     let msg; try { msg = JSON.parse(data); } catch { return; }
     if (!msg || typeof msg !== 'object' || Array.isArray(msg) || !MESSAGE_TYPES.has(msg.type)) return;
     const now = Date.now();
-    if (msg.type === 'sync') return this.send(ws, { type: 'view', view: view(r.state, pid, now) });
+    if (msg.type === 'sync') return this.sendView(ws, pid, now, true);
     if (msg.type === 'ping') return this.send(ws, { type: 'pong' });
     if (msg.type === 'emote') return this.emote(pid, String(msg.emote), now);
     // 방이 잠든 사이 지난 시계를 먼저: 늦은 답은 세지 않고 이벤트 순서가 지켜진다.

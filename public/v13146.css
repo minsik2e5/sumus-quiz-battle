@@ -1,0 +1,29 @@
+/* V13.146 던전 렉 줄이기 3 (사람 2~3명일 때 끊김)
+   1) 체력 · 게이지 막대는 폭(width · height) 대신 transform으로 줄인다. 폭이 바뀌는 transition은 0.3~0.85초 동안 매 프레임
+      화면 배치를 다시 하게 해서, 사람 3명이 번갈아 때리면 거의 쉬지 않고 배치를 했다. 그라디언트는 막대 상자에 맞춰 그려지므로
+      예전(폭을 줄일 때)과 같아 보인다.
+   2) 불티(보스방 · 층 배경의 작은 불씨)는 효과 캔버스 대신 CSS로 띄운다: 맞는 효과가 없을 때 캔버스를 다시 그리지 않는다.
+   3) 내가 채점 표적일 때 반짝임은 그림자(box-shadow) 애니메이션 대신 미리 그린 그림자의 투명도만 바꾼다. */
+.dgs-hp i { width: 100%; transform-origin: left center; will-change: transform; }
+.dgs-hp .lag { transition: transform .6s .25s ease-out; }
+.dgs-hp .fill { transition: transform .12s; }
+.dgs-prow .mini u { width: 100%; transform-origin: left center; transition: transform .3s; }
+.dgs-me .bar u { width: 100%; right: auto; transform-origin: left center; transition: transform .3s; }
+.dgs-card u { width: 100%; transform-origin: left center; transition: transform .3s; }
+.dgs-gauge i b { width: 100%; transform: scaleX(var(--gs, 0)); transform-origin: left center; transition: transform .3s; }
+.dgs.land .dgs-gauge i b { height: 100%; transform: scaleY(var(--gs, 0)); transform-origin: center bottom; transition: transform .3s; }
+
+/* 불티: 바깥(i)이 아래에서 위로 오르고, 안쪽 점(::before)이 좌우로 흔들리며 깜빡인다. 캔버스와 같은 색 · 크기 · 속도. */
+.dgs-embers { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.dgs-embers i { position: absolute; top: -10px; animation: dgs-ember-rise linear infinite; will-change: transform; }
+.dgs-embers i::before { content: ''; position: absolute; left: 0; bottom: 0; width: var(--d); height: var(--d); border-radius: 50%; background: #ff9a5a; animation: dgs-ember-sway 3.14s ease-in-out infinite alternate; animation-delay: var(--ph, 0s); }
+@keyframes dgs-ember-rise { from { transform: translateY(0); } to { transform: translateY(-100%); } }
+@keyframes dgs-ember-sway { from { transform: translateX(-6px); opacity: .05; } to { transform: translateX(6px); opacity: .65; } }
+
+.dgs-al.mark.mine { animation: none; position: relative; }
+.dgs-al.mark.mine::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 18px rgba(251, 113, 133, .9); opacity: 0; pointer-events: none; animation: dgs-glow 1s ease-in-out infinite alternate; }
+@keyframes dgs-glow { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .dgs-embers { display: none; }
+  .dgs-al.mark.mine::after { animation: none; opacity: .5; }
+}
