@@ -162,6 +162,17 @@
     $('#cam-toggle').textContent = state.camStarting ? '준비 중…' : on ? '카메라 끄기' : '카메라 켜기';
     $('#cam-toggle').disabled = state.camStarting;
     $('#cam-pose').textContent = status || (on && state.camPose ? Cam.LABEL[state.camPose] : on ? '얼굴 찾는 중…' : '');
+    $('#cam-peek').hidden = !on;
+    if (!on) $('.cam-preview').classList.remove('peek');
+    // 내 화면에서도 얼굴 대신 캐릭터가 따라 움직이게 보여 준다
+    const pose = on && state.camPose ? CAM_POSE[state.camPose] : 'study';
+    const box = $('#cam-avatar');
+    const key = state.me ? JSON.stringify(state.me.avatar) + pose : '';
+    box.hidden = !on;
+    if (on && state.me && box.dataset.art !== key) {
+      box.innerHTML = Avatar.svg(state.me.avatar, { pose });
+      box.dataset.art = key;
+    }
   }
 
   // ---------- 화면 꺼짐 방지 ----------
@@ -728,6 +739,13 @@
     $('#btn-solo').addEventListener('click', openSolo);
     $('#btn-cam').addEventListener('click', () => { renderCam(); openSheet('#sheet-cam'); });
     $('#cam-toggle').addEventListener('click', () => (state.cam ? stopCam() : startCam()));
+    // 각도 맞추기: 누르면 내 카메라 화면을 보여 주고, 다시 누르거나 5초 지나면 캐릭터로 돌아간다
+    let peekTimer = null;
+    $('#cam-peek').addEventListener('click', () => {
+      const preview = $('.cam-preview');
+      clearTimeout(peekTimer);
+      if (preview.classList.toggle('peek')) peekTimer = setTimeout(() => preview.classList.remove('peek'), 5000);
+    });
     $('#solo-back').addEventListener('click', () => show('screen-room'));
     $('#btn-stats').addEventListener('click', openStats);
     $('#btn-bubble').addEventListener('click', openBubble);
