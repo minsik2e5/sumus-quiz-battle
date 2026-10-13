@@ -71,7 +71,7 @@ export const MONSTER_LEVEL_KEYS = ['easy', 'normal', 'hard'];
    몬스터전은 레벨 1, 2, 3 … 끝없이 이어진다. 레벨마다 이지 · 노말 · 하드가 있고, 한 레벨의 셋을
    모두 깨야 다음 레벨이 열린다. 레벨 1은 셋 다 쉽고, 레벨 10에서 V13.94의 이지 · 노말 · 하드
    세기가 되고, 그 뒤로는 점점 상한(STAGE_CAP)에 가까워진다. 보상(처음 깰 때)은 레벨이 오를수록
-   늘고(STAGE_REWARD_MAX배까지), 5레벨마다 보스(보상 1.5배, 몬스터 HP 1.08배).
+   늘고(STAGE_REWARD_MAX배까지), 5레벨마다 보스(보상 1.5배, 몬스터 HP 1.02배 · 정답률 0.97배, V13.147).
    레벨 N의 단어는 학생이 고른 범위(야차전과 같은 범위)라서, 레벨은 단어장과 상관없이 이어진다. */
 // The fight at stage 1 and at stage 10 (= V13.94 MONSTER_LEVELS), and the limit far beyond.
 const STAGE_START = {
@@ -91,7 +91,10 @@ export const STAGE_BOSS_EVERY = 5;
 // STAGE_REWARD_MAX times. A cleared fight played again pays STAGE_AGAIN_SHARE of it (V13.106: 20% -> 50%,
 // but at least STAGE_AGAIN_MIN and at most STAGE_AGAIN_MAX coins a fight; at 20% level 1 paid 1/2/3 coins).
 export const STAGE_REWARD = { easy: { coins: 5, xp: 60 }, normal: { coins: 10, xp: 120 }, hard: { coins: 15, xp: 240 } };
-export const STAGE_REWARD_STEP = 0.12, STAGE_REWARD_MAX = 4, STAGE_BOSS_REWARD = 1.5, STAGE_BOSS_HP = 1.08;
+export const STAGE_REWARD_STEP = 0.12, STAGE_REWARD_MAX = 4, STAGE_BOSS_REWARD = 1.5;
+// V13.147 보스가 너무 어렵다(선생님): 보스 몬스터 HP 1.08배 → 1.02배, 정답률은 0.97배. 레벨 10 하드 보스를 단어 90%를 아는
+// 학생이 이길 확률 21% → 약 35%(레벨 9 하드 47% · 레벨 11 하드 28% 사이). 보스 보상(1.5배)은 그대로.
+export const STAGE_BOSS_HP = 1.02, STAGE_BOSS_ACCURACY = 0.97;
 // V13.106 첫 처치 코인은 1.5배(다시 잡기는 1.5배 하기 전 값에서 계산한다). 그 위에 몬스터 코인 전반을 STAGE_COIN_MULT배
 // (첫 처치 · 다시 잡기와 그 최소·최대 · 져도 받는 코인). 경험치는 그대로.
 export const STAGE_FIRST_COIN_BOOST = 1.5;
@@ -114,7 +117,7 @@ export function stageLevel(stage, level) {
   const first = { coins: Math.round(base * STAGE_FIRST_COIN_BOOST * STAGE_COIN_MULT), xp: Math.round(STAGE_REWARD[level].xp * grow) };
   return {
     ...L, stage: s, boss,
-    accuracy: Math.round(pick('accuracy') * 1000) / 1000,
+    accuracy: Math.round(pick('accuracy') * (boss ? STAGE_BOSS_ACCURACY : 1) * 1000) / 1000,
     min: Math.round(pick('min')), max: Math.round(pick('max')),
     monsterHp: Math.round(pick('monsterHp') * (boss ? STAGE_BOSS_HP : 1)),
     need: Math.round(pick('need')),

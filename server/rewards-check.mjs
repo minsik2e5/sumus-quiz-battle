@@ -611,14 +611,18 @@ export async function runRewardsChecks(assert, expectStatus) {
       && ['easy', 'normal', 'hard'].every(k => lv(29, k).again.coins === Math.min(STAGE_AGAIN_MAX * STAGE_COIN_MULT, Math.max(STAGE_AGAIN_MIN[k] * STAGE_COIN_MULT, Math.round(Math.round(STAGE_REWARD[k].coins * Math.min(STAGE_REWARD_MAX, 1 + 0.12 * 28)) * STAGE_AGAIN_SHARE * STAGE_COIN_MULT))) && lv(29, k).again.coins * MONSTER_DAILY <= 250)
       && ['easy', 'normal', 'hard'].map(k => lv(1, k).again.coins).join() === '6,10,16' && ['easy', 'normal', 'hard'].map(k => lv(10, k).again.coins).join() === '16,31,47' && lv(100, 'hard').again.coins === 50 && MONSTER_TRY.coins === 4 && ['easy', 'normal', 'hard'].every(k => [1, 5, 10, 30, 100].every(n => lv(n, k).again.coins < lv(n, k).first.coins)),
       'V13.106 보상: 첫 처치는 레벨 1에서 이지/노말/하드 15/30/45코인으로 시작해 레벨마다 오르고(최대 4배), 보스(5레벨마다)는 1.5배, 다시 잡기는 6/10/16코인부터(최대 50코인, 하루 5번), 져도 4코인(몬스터 코인은 처음 값의 2배)');
-    assert(['easy', 'normal', 'hard'].every(k => ['accuracy', 'min', 'max', 'need', 'hp', 'mode', 'skill'].every(key => lv(10, k)[key] === MONSTER_LEVELS[k][key]) && lv(10, k).monsterHp === Math.round(MONSTER_LEVELS[k].monsterHp * 1.08))
+    assert(['easy', 'normal', 'hard'].every(k => ['min', 'max', 'need', 'hp', 'mode', 'skill'].every(key => lv(10, k)[key] === MONSTER_LEVELS[k][key]) && lv(10, k).monsterHp === Math.round(MONSTER_LEVELS[k].monsterHp * 1.02) && lv(10, k).accuracy === Math.round(MONSTER_LEVELS[k].accuracy * 0.97 * 1000) / 1000 && lv(9, k).accuracy < lv(10, k).accuracy / 0.97 && !lv(11, k).boss)
       && ['easy', 'normal', 'hard'].every(k => lv(1, k).accuracy < lv(5, k).accuracy && lv(5, k).accuracy < lv(10, k).accuracy && lv(10, k).accuracy < lv(30, k).accuracy && lv(30, k).accuracy < lv(200, k).accuracy && lv(1, k).min > lv(30, k).min)
       && lv(1, 'hard').mode === 'skill' && lv(1, 'easy').mode === 'speed' && isBossStage(5) && isBossStage(10) && !isBossStage(11) && lv(5, 'hard').boss && lv(15, 'normal').monsterHp > lv(14, 'normal').monsterHp,
       'V13.105 난이도: 레벨이 오를수록 몬스터가 정확하고 빨라지고(레벨 10이 V13.94의 이지·노말·하드), 하드는 실력전, 5레벨마다 보스');
     // The curve, from fights simulated on the real engine (server/monster-sim.mjs, fixed seed).
     const winRate = (stage, k, know) => simulateMonster(stage, k, know, 160);
     const w1 = winRate(1, 'hard', .98), w5e = winRate(5, 'easy', .75), w10 = winRate(10, 'hard', .98), w30 = winRate(30, 'hard', .98), w60n = winRate(60, 'normal', .9);
-    assert(w1 >= .9 && w5e >= .85 && w10 >= .2 && w10 <= .6 && w30 <= .2 && w60n <= .2, `V13.105 시뮬레이션: 레벨 1 하드는 거의 다 아는 학생이 거의 이기고(${Math.round(w1 * 100)}%), 레벨 10 하드는 지금 하드 수준(${Math.round(w10 * 100)}%), 레벨 30 하드·레벨 60 노말은 아주 어렵다(${Math.round(w30 * 100)}%, ${Math.round(w60n * 100)}%)`);
+    // V13.147 보스 완화: 단어 90%를 아는 학생이 레벨 10 하드 보스를 이길 확률이 레벨 11(보스 아님)보다 높고 레벨 9보다는 낮다.
+    const b9 = winRate(9, 'hard', .9), b10 = winRate(10, 'hard', .9), b11 = winRate(11, 'hard', .9);
+    assert(b10 >= .25 && b10 <= b9 && b10 >= b11, `V13.147 레벨 10 하드 보스(${Math.round(b10 * 100)}%)는 레벨 9 하드(${Math.round(b9 * 100)}%)보다 어렵고 너무 어렵지 않다(25% 이상, 레벨 11 ${Math.round(b11 * 100)}%)`);
+    // V13.147: 레벨 30 · 60은 보스 레벨이라 보스 완화로 조금 쉬워졌다(20% → 25% 이하).
+    assert(w1 >= .9 && w5e >= .85 && w10 >= .2 && w10 <= .6 && w30 <= .25 && w60n <= .25, `V13.105 시뮬레이션: 레벨 1 하드는 거의 다 아는 학생이 거의 이기고(${Math.round(w1 * 100)}%), 레벨 10 하드는 지금 하드 수준(${Math.round(w10 * 100)}%), 레벨 30 하드·레벨 60 노말은 아주 어렵다(${Math.round(w30 * 100)}%, ${Math.round(w60n * 100)}%)`);
     assert(MONSTER_ORDER.length === 18 && new Set(MONSTER_ORDER).size === 18 && MONSTER_ORDER.every(k => MONSTERS.some(m => m.key === k && m.temp?.pet && m.temp.filter)) && stageMonster(1).key === 'mochi' && stageMonster(18).key === 'finalking' && stageMonster(19).key === 'mochi' && stageMonster(19).round === 1 && stageMonster(19).title === '암기 모찌 +1' && stageMonster(37).round === 2,
       'V13.105 몬스터 18종(새 9종 포함)이 작은 것부터 큰 것 순서로 레벨을 지키고, 18레벨 뒤에는 "+1"로 더 세게 다시 나온다(그림이 오기 전에는 펫 그림 색 바꾸기)');
     const kid = { id: 'qa-mh', pets: [{ key: 'dog' }], bonus: {} };
