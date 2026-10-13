@@ -653,6 +653,35 @@ class Academy {
     };
   }
 
+  // 학원 TV 화면: 지금 접속한 학생들과 오늘/최근 7일 순위
+  board(target) {
+    if (target !== ALL && !this.getClass(target)) throw new AcademyError('없는 반이에요.', 'not_found');
+    const cls = target === ALL ? null : this.getClass(target);
+    const students = this.studentsOf(target);
+    const members = students.filter((s) => this.isOnline(s.id)).map((s) => this.member(s.id)).sort(compareMembers);
+    const today = students
+      .map((s) => this.member(s.id))
+      .filter((m) => m.baseMs > 0 || m.since)
+      .sort((a, b) => this.todayMs(b.id) - this.todayMs(a.id))
+      .slice(0, 10);
+    const week = students
+      .map((s) => ({ id: s.id, name: s.name, className: this.member(s.id).className, avatar: s.avatar, ms: this.weekMs(s.id) }))
+      .filter((r) => r.ms > 0)
+      .sort((a, b) => b.ms - a.ms)
+      .slice(0, 10);
+    return {
+      target,
+      title: cls ? cls.name : '학원 전체',
+      serverNow: this.now(),
+      studying: members.filter((m) => m.status === 'study').length,
+      totalTodayMs: students.reduce((sum, s) => sum + this.todayMs(s.id), 0),
+      notice: this.data.notices[target] || this.data.notices[ALL] || null,
+      members,
+      today,
+      week
+    };
+  }
+
   overview(target, day = this.today()) {
     if (target !== ALL && !this.getClass(target)) throw new AcademyError('없는 반이에요.', 'not_found');
     if (!isDayKey(day)) throw new AcademyError('날짜 형식이 올바르지 않아요.');

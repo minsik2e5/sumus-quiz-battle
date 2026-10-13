@@ -80,6 +80,7 @@
 
   function renderMain() {
     const d = state.data;
+    $('#open-board').href = `/board?target=${encodeURIComponent(d.target)}`;
     const cls = state.classes.find((c) => c.code === d.target);
     const isAll = d.target === 'ALL';
     const link = cls ? `${location.origin}/?code=${cls.code}` : location.origin;

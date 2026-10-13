@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>SUMUS 공부방 · TV</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/board.css">
+</head>
+<body>
+  <form class="login" id="login" hidden>
+    <h1>📺 학원 TV 화면</h1>
+    <p>선생님 키를 한 번만 입력하면 이 기기에 기억돼요.</p>
+    <input id="key" type="password" placeholder="선생님 키" autocomplete="current-password">
+    <p class="err" id="login-err"></p>
+    <button type="submit">시작하기</button>
+  </form>
+
+  <div class="board" id="board" hidden>
+    <header class="head">
+      <div class="title"><span class="logo">📚</span><span id="title">학원 전체</span> 공부방</div>
+      <div class="stats">
+        <div class="stat"><span class="k">지금 공부 중</span><span class="v" id="studying">0명</span></div>
+        <div class="stat"><span class="k">오늘 다 같이</span><span class="v" id="total">0분</span></div>
+      </div>
+      <div class="clock"><span id="time">--:--</span><span id="date"></span></div>
+    </header>
+    <div class="notice" id="notice" hidden></div>
+    <main class="body">
+      <section class="room">
+        <div class="grid" id="grid"></div>
+        <p class="empty" id="empty" hidden>아직 공부방에 아무도 없어요.<br>첫 번째로 공부를 시작해 볼까요? ✏️</p>
+      </section>
+      <aside class="rank">
+        <div class="rank-tabs"><span data-tab="today" class="on">오늘 순위</span><span data-tab="week">최근 7일 순위</span></div>
+        <ol class="rank-list" id="rank"></ol>
+      </aside>
+    </main>
+    <button class="fs" id="fs" title="전체 화면">⛶ 전체 화면</button>
+    <p class="offline" id="offline" hidden>연결이 끊겼어요. 다시 연결하는 중…</p>
+  </div>
+
+  <script src="/avatar.js"></script>
+  <script src="/board.js"></script>
+</body>
+</html>

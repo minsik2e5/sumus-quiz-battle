@@ -297,6 +297,7 @@ function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), 
       }
       m = /^\/api\/teacher\/classes\/(\d+)\/students$/.exec(p);
       if (m && method === 'POST') return json(200, { results: academy.addStudents(m[1], parseBody(req).names) });
+      if (p === '/api/teacher/board' && method === 'GET') return json(200, academy.board(q.get('target') || ALL));
       if (p === '/api/teacher/overview' && method === 'GET') {
         return json(200, academy.overview(q.get('target') || ALL, q.get('day') || academy.today()));
       }

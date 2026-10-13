@@ -225,3 +225,22 @@ test('live study sessions survive a server restart', async () => {
   assert.equal(academy2.status(s.id), 'study');
   assert.equal(academy2.todayMs(s.id), 25 * MIN);
 });
+
+test('TV board lists online students and today/week rankings', () => {
+  const { clock, academy, cls, join } = setup();
+  const a = join('감자');
+  const b = join('밍지');
+  join('채원');
+  academy.attach(a.id);
+  academy.setStudy(a.id, true);
+  clock.t += 50 * MIN;
+  academy.attach(b.id);
+  academy.setStudy(b.id, true);
+  clock.t += 10 * MIN;
+  const board = academy.board(cls.code);
+  assert.equal(board.studying, 2);
+  assert.deepEqual(board.members.map((m) => m.name), ['감자', '밍지']);
+  assert.deepEqual(board.today.map((m) => m.name), ['감자', '밍지']);
+  assert.equal(board.week[0].ms, 60 * MIN);
+  assert.equal(board.totalTodayMs, 70 * MIN);
+});

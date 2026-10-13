@@ -1,0 +1,89 @@
+/* 학원 TV(16:9)에 띄워 두는 화면. 멀리서도 보이게 vw 단위로 크게 만든다. */
+:root {
+  --bg: #17151d;
+  --panel: #221f2b;
+  --text: #f6f3f8;
+  --muted: #a7a1b3;
+  --card: #faf6f1;
+  --accent: #ff4f6d;
+  --gold: #ffd36a;
+  --go: #2fc48d;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body { background: var(--bg); color: var(--text); font-family: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif; }
+[hidden] { display: none !important; }
+body.idle { cursor: none; }
+
+.login { max-width: 420px; margin: 18vh auto; background: var(--panel); border-radius: 20px; padding: 32px; display: grid; gap: 12px; }
+.login h1 { margin: 0; font-size: 26px; }
+.login p { margin: 0; color: var(--muted); }
+.login input { padding: 14px; font-size: 18px; border-radius: 12px; border: 1.5px solid #3a3644; background: #17151d; color: var(--text); }
+.login button { padding: 14px; font-size: 17px; font-weight: 800; border: 0; border-radius: 12px; background: var(--accent); color: #fff; cursor: pointer; }
+.login .err { color: #ff8fa3; min-height: 1.2em; }
+
+.board { height: 100vh; display: flex; flex-direction: column; padding: 1.6vw 2vw; gap: 1.2vw; }
+.head { display: flex; align-items: center; gap: 2vw; }
+.title { font-size: 2.4vw; font-weight: 900; letter-spacing: -.03em; white-space: nowrap; }
+.title .logo { margin-right: .6vw; }
+.title #title { color: var(--gold); }
+.stats { display: flex; gap: 1vw; margin-left: auto; }
+.stat { background: var(--panel); border-radius: 1vw; padding: .6vw 1.3vw; display: flex; flex-direction: column; min-width: 11vw; }
+.stat .k { font-size: .95vw; color: var(--muted); }
+.stat .v { font-size: 2vw; font-weight: 900; font-variant-numeric: tabular-nums; }
+.clock { text-align: right; display: flex; flex-direction: column; }
+.clock #time { font-size: 2.6vw; font-weight: 900; font-variant-numeric: tabular-nums; }
+.clock #date { font-size: 1vw; color: var(--muted); }
+
+.notice { background: #2f2b3a; border-left: .4vw solid var(--gold); border-radius: .8vw; padding: .8vw 1.2vw; font-size: 1.4vw; font-weight: 700; }
+
+.body { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 27vw; gap: 1.4vw; }
+.room { min-height: 0; position: relative; }
+.grid { height: 100%; display: grid; gap: .9vw; align-content: start; }
+.empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; font-size: 2vw; color: var(--muted); line-height: 1.6; margin: 0; }
+
+.card { position: relative; border-radius: 1.2vw; overflow: hidden; background: var(--card); color: #3b3436; aspect-ratio: 1 / 1; }
+.card .art { position: absolute; inset: 0; }
+.card .art svg { width: 100%; height: 100%; display: block; }
+.card .top { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; align-items: center; padding: 5% 6% 0; font-size: var(--fs); z-index: 2; }
+.card .timer { font-weight: 800; font-variant-numeric: tabular-nums; }
+.card .name { font-weight: 800; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .bubble { position: absolute; z-index: 3; left: 8%; right: 8%; top: 15%; margin: 0 auto; width: fit-content; max-width: 84%; background: #fff; border-radius: .8vw; padding: 3% 6%; font-size: calc(var(--fs) * .9); font-weight: 800; text-align: center; box-shadow: 0 .3vw .8vw rgba(0,0,0,.15); word-break: keep-all; }
+.card .badge { position: absolute; z-index: 2; left: 50%; bottom: 5%; transform: translateX(-50%); background: rgba(0,0,0,.55); color: #fff; border-radius: 99px; padding: 1.5% 6%; font-size: calc(var(--fs) * .8); font-weight: 800; white-space: nowrap; }
+.card.s-rest .badge { background: var(--go); }
+.card.s-away { opacity: .7; }
+.card .zzz { position: absolute; right: 12%; top: 25%; font-size: calc(var(--fs) * 1.6); z-index: 3; }
+
+.rank { background: var(--panel); border-radius: 1.4vw; padding: 1.4vw; display: flex; flex-direction: column; min-height: 0; }
+.rank-tabs { display: flex; gap: .6vw; margin-bottom: 1vw; }
+.rank-tabs span { flex: 1; text-align: center; padding: .6vw; border-radius: .8vw; font-size: 1.15vw; font-weight: 800; color: var(--muted); background: #2b2836; }
+.rank-tabs span.on { background: var(--gold); color: #2c2730; }
+.rank-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .55vw; overflow: hidden; animation: fade .5s ease; flex: 1; min-height: 0; }
+@keyframes fade { from { opacity: 0; transform: translateY(.6vw); } }
+.rank-row { display: flex; align-items: center; gap: .8vw; background: #2b2836; border-radius: .9vw; padding: 0 .8vw; flex: 1 1 0; min-height: 0; max-height: 4.6vw; overflow: hidden; }
+.rank-row.r1 { background: linear-gradient(90deg, #5a4a1c, #2b2836); }
+.rank-row.r2 { background: linear-gradient(90deg, #4a4d58, #2b2836); }
+.rank-row.r3 { background: linear-gradient(90deg, #5a3a2a, #2b2836); }
+.rank-row .no { width: 2.4vw; text-align: center; font-size: 1.5vw; font-weight: 900; color: var(--muted); }
+.rank-row .face { width: 2.8vw; height: 2.8vw; border-radius: 50%; overflow: hidden; background: var(--card); flex: none; }
+.rank-row .face svg { width: 100%; height: 100%; display: block; }
+.rank-row .who { min-width: 0; flex: 1; }
+.rank-row .nm { font-size: 1.35vw; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rank-row .cl { font-size: .85vw; color: var(--muted); }
+.rank-row .ms { font-size: 1.35vw; font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rank-row .live { display: inline-block; width: .6vw; height: .6vw; border-radius: 50%; background: var(--go); margin-right: .4vw; vertical-align: .15vw; animation: blink 1.4s infinite; }
+@keyframes blink { 50% { opacity: .3; } }
+.rank-empty { color: var(--muted); font-size: 1.2vw; text-align: center; padding: 2vw 0; }
+
+.fs { position: fixed; right: 1.2vw; bottom: 1.2vw; border: 0; border-radius: 99px; padding: .6vw 1.2vw; background: rgba(255,255,255,.12); color: #fff; font-size: 1vw; cursor: pointer; }
+body.idle .fs { opacity: 0; }
+.offline { position: fixed; left: 50%; bottom: 1.5vw; transform: translateX(-50%); background: #3a3020; color: var(--gold); padding: .6vw 1.4vw; border-radius: 99px; font-size: 1.1vw; margin: 0; }
+
+/* 세로 화면이나 작은 화면에서도 대충 보이게 */
+@media (max-aspect-ratio: 1/1) {
+  .board { overflow: auto; height: auto; min-height: 100vh; }
+  html, body { overflow: auto; }
+  .body { grid-template-columns: 1fr; }
+  .title { font-size: 5vw; } .stat .v { font-size: 4vw; } .stat .k { font-size: 2vw; } .clock #time { font-size: 5vw; } .clock #date { font-size: 2vw; }
+  .rank-tabs span, .rank-row .nm, .rank-row .ms { font-size: 3vw; } .rank-row .face { width: 7vw; height: 7vw; } .rank-row .no { font-size: 3.5vw; width: 5vw; }
+}

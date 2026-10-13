@@ -104,6 +104,7 @@ async function createApp({
     let pathname = decodeURIComponent(url.pathname);
     if (pathname === '/') pathname = '/index.html';
     if (pathname === '/teacher') pathname = '/teacher.html';
+    if (pathname === '/board') pathname = '/board.html';
     const filePath = path.normalize(path.join(PUBLIC_DIR, pathname));
     if (!filePath.startsWith(PUBLIC_DIR + path.sep)) {
       res.writeHead(403);
