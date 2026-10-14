@@ -13,25 +13,29 @@ export const REEL = {
   EGG: 600, EGG_DAILY: 1,
   EPIC_EGG: 2000, EPIC_WEEKLY: 1,
   SEA_PET: 4000,
+  SEA_READY: false,       // 바다 펫 그림(주문서 28)이 들어와 core.js CHARACTERS에 등록되면 true(그 전에는 교환소에서 잠김)
   GOLDEN_EGG: 3,          // 황금 알 물고기 3마리 → 랜덤 알 선물
   LIVE_MS: 10 * 60000     // 던진 뒤 이 시간 안에 끝내지 않으면 놓친 것으로
 };
-// 교환소 한정 바다 펫(그림 주문서 28). 그림이 들어와 펫으로 등록되기 전에는 '곧 만나요'로 잠겨 있다.
+// 교환소 한정 바다 펫(그림 주문서 28). 영웅급 · 물 속성 · 야차전 특기 있음(battle-engine.js PET_SKILLS, pet-sim 승률 49~53%).
+// 그림이 들어오면 아래 char를 core.js CHARACTERS에 { ...char, sea: true }로 넣고 REEL.SEA_READY를 true로 바꾼다.
 export const SEA_PETS = [
-  { key: 'dolphin', ko: '퐁당', kind: '돌고래' },
-  { key: 'seahorse', ko: '살랑', kind: '해마' },
-  { key: 'hermitcrab', ko: '집게', kind: '소라게' }
+  { key: 'dolphin', ko: '퐁당', kind: '돌고래', char: { name: 'PONGDANG', ko: '퐁당', type: '아기 돌고래', color: '#3B9BD8', light: '#B8E1F7', soft: '#EEF8FE' } },
+  { key: 'seahorse', ko: '살랑', kind: '해마', char: { name: 'SALLANG', ko: '살랑', type: '아기 해마', color: '#E58BB0', light: '#F8CFE0', soft: '#FFF2F7' } },
+  { key: 'hermitcrab', ko: '집게', kind: '소라게', char: { name: 'JIPGE', ko: '집게', type: '소라게', color: '#E07A4F', light: '#F6C6AE', soft: '#FFF3EC' } }
 ];
 export const CAST_TIERS = ['ok', 'good', 'perfect'];
 // 파이팅 세기(등급마다): 체력(hp, 예전 판 호환) · 당기는 힘 · 행동 간격(ms) · 최소 파이팅 시간(서버가 확인) · 그림자 크기
-// V13.150 1인칭 손맛: 처음 거리(m) · 행동 가중치(돌진 run · 날뜀 thrash · 잠수 dive) · 돌진을 막는 스와이프 수.
+// V13.150 1인칭 손맛: 처음 거리(m) · 행동 간격(dash, ms) · 행동 가중치.
+//   탈출 연타(mash): 좌우 버튼을 번갈아 taps번(2.6초 안). 리듬(rhythm): 내려오는 노트 notes개를 beat(ms) 박자로 맞춰 누르기.
+//   날뜀(thrash): 손 떼기. 잠수(dive): 꾹 버티기.
 export const FIGHT = {
-  common: { hp: 100, pull: .55, dash: [3600, 5600], min: 4000, size: 1, dist: 14, moves: { run: 3, thrash: 1, dive: 1 }, swipes: 2 },
-  uncommon: { hp: 140, pull: .75, dash: [3100, 5000], min: 5500, size: 1.25, dist: 18, moves: { run: 3, thrash: 2, dive: 1 }, swipes: 2 },
-  rare: { hp: 190, pull: .95, dash: [2700, 4400], min: 7000, size: 1.55, dist: 24, moves: { run: 3, thrash: 2, dive: 2 }, swipes: 3 },
-  epic: { hp: 250, pull: 1.2, dash: [2300, 3800], min: 9000, size: 1.9, dist: 30, moves: { run: 3, thrash: 3, dive: 2 }, swipes: 3 },
-  legend: { hp: 320, pull: 1.45, dash: [2000, 3300], min: 11000, size: 2.3, dist: 38, moves: { run: 3, thrash: 3, dive: 3 }, swipes: 4 },
-  golden: { hp: 190, pull: 1, dash: [2600, 4200], min: 7000, size: 1.5, dist: 24, moves: { run: 2, thrash: 4, dive: 1 }, swipes: 3 }
+  common: { hp: 100, pull: .55, dash: [2400, 3800], min: 4000, size: 1, dist: 14, moves: { mash: 3, rhythm: 2, thrash: 1, dive: 1 }, taps: 10, notes: 6, beat: 520 },
+  uncommon: { hp: 140, pull: .75, dash: [2200, 3500], min: 5500, size: 1.25, dist: 18, moves: { mash: 3, rhythm: 3, thrash: 2, dive: 1 }, taps: 12, notes: 7, beat: 480 },
+  rare: { hp: 190, pull: .95, dash: [2000, 3200], min: 7000, size: 1.55, dist: 24, moves: { mash: 3, rhythm: 3, thrash: 2, dive: 2 }, taps: 14, notes: 8, beat: 440 },
+  epic: { hp: 250, pull: 1.2, dash: [1800, 2900], min: 9000, size: 1.9, dist: 30, moves: { mash: 3, rhythm: 3, thrash: 2, dive: 2 }, taps: 16, notes: 9, beat: 400 },
+  legend: { hp: 320, pull: 1.45, dash: [1600, 2600], min: 11000, size: 2.3, dist: 38, moves: { mash: 3, rhythm: 4, thrash: 3, dive: 2 }, taps: 18, notes: 10, beat: 360 },
+  golden: { hp: 190, pull: 1, dash: [2000, 3200], min: 7000, size: 1.5, dist: 24, moves: { mash: 3, rhythm: 3, thrash: 2, dive: 1 }, taps: 14, notes: 8, beat: 420 }
 };
 // 마무리: 물고기가 물 위로 뛰어오를 때 맞춰 탭하면 퍼펙트(무게 +8%, 기록용). 무게는 서버가 곱한다.
 export const FINISH = { PERFECT_KG: 1.08, KINDS: ['perfect', 'good', 'miss'] };

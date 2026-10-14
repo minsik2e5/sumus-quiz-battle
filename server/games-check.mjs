@@ -29,9 +29,11 @@ export async function runGamesChecks(assert) {
     const names = [...reelSrc.match(/FISHING_ART = new Set\(\[([\s\S]*?)\]\)/)[1].matchAll(/'([a-z0-9-]+)'/g)].map(m => m[1]);
     assert(names.length >= 30 && names.every(n => existsSync(new URL(`assets/fishing/${n}.webp`, pub))), 'V13.149 낚시 그림(27) 파일이 모두 있다');
     assert(!existsSync(new URL('assets/fishing/preview-27.png', pub)), 'V13.149 미리보기 시트는 앱에 싣지 않는다');
-    // 알을 받을 때 아기 모습까지 보여 준다: 영웅 · 한정 · 전설(lucky.js) 2곳, 일반 알(pet-moments.js) 1곳.
+    // V13.150 알을 받을 때: 알을 톡톡 세 번 두드리면 아기 모습(1단계)이 나온다. 영웅 · 한정 · 전설(lucky.js) 2곳, 일반 알(pet-moments.js) 1곳.
     const lucky = readFileSync(new URL('modules/lucky.js', pub), 'utf8'), moments = readFileSync(new URL('modules/pet-moments.js', pub), 'utf8'), growth = readFileSync(new URL('modules/pet-growth.js', pub), 'utf8');
-    assert((lucky.match(/\$\{growthStrip\(key, name\)\}/g) || []).length === 2 && moments.includes('${growthStrip(key, name)}') && growth.includes("form === 1 ? ' baby'") && !lucky.includes('뒤에 비치는 모습으로'), 'V13.149 알 공개에 알 → 아기 → 성장 → 최종');
+    assert((lucky.match(/\$\{eggTapHtml\(key, name, 'in-lgx'\)\}/g) || []).length === 2 && (lucky.match(/bindEggTap\(box, /g) || []).length === 2 && moments.includes("eggTapHtml(key, name, 'shop')") && moments.includes('bindEggTap(body)')
+      && growth.includes('export const EGG_TAPS = 3') && growth.includes('-1.webp') && growth.includes('톡톡 터치해 보세요!') && !lucky.includes('growthStrip') && !lucky.includes('lgx-future') && !readFileSync(new URL('v13149.css', pub), 'utf8').includes('pgx-'),
+      'V13.150 알 공개: 톡톡 세 번 → 아기 모습(네 단계 줄 · 흰 실루엣은 없앴다)');
   }
   const now = Date.now(), DAY = DAY_MS;
   const at = d => now - d * DAY;
@@ -173,7 +175,7 @@ export async function runGamesChecks(assert) {
       const epic = await call('qa-gm-b', 'POST', '/reel/exchange', { item: 'epic_egg' });
       assert(egg.key && epic.key && b.pets.length === pets0 + 2 && b.reel.pearls === 5000 - 60 - REEL.EGG - REEL.EPIC_EGG
         && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'egg' }), 409) && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'epic_egg' }), 409)
-        && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'sea_pet' }), 409),
+        && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'sea_pet', key: 'dolphin' }), 409),
         `V13.150 진주 ${REEL.EGG} = 랜덤 알(하루 1), ${REEL.EPIC_EGG} = 영웅 알(일주일 1), 바다 펫은 그림이 올 때까지 잠김`);
       const att = b.attendance = { card: 0, last: dayKey(clock - DAY), streak: 1 };
       b.reel.bait_today = 0;
@@ -203,25 +205,49 @@ export async function runGamesChecks(assert) {
     assert(done.egg && p.gift_box.log.some(g => g.kind === 'egg' && g.from_name === '낚시터') && !p.reel.net?.goldenegg, 'V13.150 황금 알 물고기는 팔지 않고 모아 3마리면 알 선물');
     // V13.150 1인칭 손맛: 등급마다 처음 거리 · 성격(돌진 · 날뜀 · 잠수) · 돌진을 막는 스와이프 수. 던질 때 받지만 어떤 물고기인지는 모른다.
     const R2 = ['common', 'uncommon', 'rare', 'epic', 'legend', 'golden'];
-    assert(R2.every(r => FIGHT[r].dist > 0 && ['run', 'thrash', 'dive'].every(k => FIGHT[r].moves[k] > 0) && FIGHT[r].swipes >= 2) && FIGHT.legend.dist > FIGHT.common.dist && FIGHT.legend.swipes > FIGHT.common.swipes,
-      'V13.150 손맛 파이팅: 귀할수록 멀리서 시작하고 돌진을 막기 어렵다');
+    assert(R2.every(r => FIGHT[r].dist > 0 && ['mash', 'rhythm', 'thrash', 'dive'].every(k => FIGHT[r].moves[k] > 0) && FIGHT[r].taps >= 10 && FIGHT[r].notes >= 6 && FIGHT[r].beat >= 300) && FIGHT.legend.dist > FIGHT.common.dist && FIGHT.legend.taps > FIGHT.common.taps && FIGHT.legend.notes > FIGHT.common.notes && FIGHT.legend.beat < FIGHT.common.beat,
+      'V13.150 손맛 파이팅: 귀할수록 멀리서 시작하고, 탈출 연타는 더 많이 · 리듬은 더 빠르고 길게');
     {
       const q = { id: 'fin-test', pets: [{ key: 'dog' }], reel: { bait: 3 } };
       let sd = 1; while (reelRoll(sd, 'ok').key === 'goldenegg') sd++;
       const c = reelCast(q, { id: 'f1', cast: 'ok', now, seed: sd });
       const base = q.reel.live.kg, rar = q.reel.live.rarity;
-      assert(c.fight.dist === FIGHT[rar].dist && c.fight.swipes === FIGHT[rar].swipes && JSON.stringify(c.fight.moves) === JSON.stringify(FIGHT[rar].moves) && !JSON.stringify(c).includes(q.reel.live.key), 'V13.150 던지기: 파이팅 성격만 보내고 물고기는 숨긴다');
+      assert(c.fight.dist === FIGHT[rar].dist && c.fight.taps === FIGHT[rar].taps && c.fight.notes === FIGHT[rar].notes && c.fight.beat === FIGHT[rar].beat && JSON.stringify(c.fight.moves) === JSON.stringify(FIGHT[rar].moves) && !JSON.stringify(c).includes(q.reel.live.key), 'V13.150 던지기: 파이팅 성격만 보내고 물고기는 숨긴다');
       const won = reelLand(q, { id: 'f1', result: 'caught', finish: 'perfect', now: now + FIGHT[rar].min + 10 });
       assert(won.perfect && won.kg === Math.round(base * FINISH.PERFECT_KG * 100) / 100 && q.games.fish.book[won.key].kg === won.kg, 'V13.150 마무리 퍼펙트: 무게 +8%는 서버가 곱해 도감에 남긴다');
       reelCast(q, { id: 'f2', cast: 'ok', now: now + 60000, seed: sd });
       const plain = reelLand(q, { id: 'f2', result: 'caught', finish: 'good', now: now + 60000 + FIGHT[rar].min + 10 });
       assert(!plain.perfect && plain.kg === base && reelLand(q, { id: 'f2', result: 'caught', finish: 'perfect' }).kg === base, 'V13.150 마무리 좋음 · 다시 보낸 끝내기는 무게를 바꾸지 않는다');
     }
+    // V13.150 바다 펫: 그림 전에는 잠김. 열리면 진주 4000 · 영웅급 · 한 마리씩 · 알 확률표에는 없다. 특기 승률은 pet-sim으로 맞췄다(49~53%).
+    {
+      const { reelSeaPet } = await import('./reel.mjs');
+      const { SEA_PETS, REEL: RR } = await import('../public/modules/reel-rules.js');
+      const { PET_SKILLS } = await import('../public/modules/battle-engine.js');
+      const core = await import('../public/modules/core.js');
+      const q = { id: 'sea-test', pets: [{ key: 'dog' }], reel: { pearls: RR.SEA_PET + 10 } };
+      assert(await fails(() => reelSeaPet(q, 'dolphin', now, false), 409) && q.reel.pearls === RR.SEA_PET + 10, 'V13.150 바다 펫은 그림 전에는 잠겨 있다');
+      const got = reelSeaPet(q, 'dolphin', now, true);
+      assert(got.sea && q.reel.pearls === 10 && q.pets.some(x => x.key === 'dolphin' && x.sea && x.epic) && await fails(() => reelSeaPet(q, 'dolphin', now, true), 409) && await fails(() => reelSeaPet(q, 'seahorse', now, true)) && await fails(() => reelSeaPet(q, 'shark', now, true)),
+        'V13.150 바다 펫: 진주 4000 · 같은 펫은 한 번 · 진주가 모자라면 안 된다');
+      assert(SEA_PETS.length === 3 && SEA_PETS.every(x => PET_SKILLS[x.key]?.desc && x.char?.ko === x.ko) && SEA_PETS.every(x => !core.EPIC_PET_KEYS.includes(x.key) && !core.STANDARD_PET_KEYS.includes(x.key))
+        && (!RR.SEA_READY || SEA_PETS.every(x => core.CHARACTERS[x.key]?.sea && [0, 1, 2, 3].every(f => existsSync(new URL(`../public/assets/pets/${x.key}-${f}.webp`, import.meta.url))))),
+        'V13.150 바다 펫 3종: 야차전 특기 있음, 알 확률표 밖, 열 때는 CHARACTERS(sea) 등록과 그림이 있어야 한다');
+    }
+    // V13.150 첫 손맛 연습: 첫 판(또는 안내의 연습 판)은 7단계 안내, 줄이 끊기지 않고, 연습 판은 서버에 보내지 않는다. 마치면 tut 기록.
+    {
+      const { reelView } = await import('./reel.mjs');
+      const reelJs = source('../public/modules/reel.js'), svc = source('./service.mjs');
+      assert(reelView({ reel: { tut: true } }).tut === true && reelView({}).tut === false && svc.includes('if (body.tutorial) r.tut = true')
+        && ["id: 'hold'", "id: 'red'", "id: 'mash'", "id: 'rhythm'", "id: 'thrash'", "id: 'skill'", "id: 'free'"].every(k => reelJs.includes(k))
+        && reelJs.includes("f.tension = Math.min(f.tension, 96); f.slackFor = 0;") && reelJs.includes("if (R.live.id === 'practice') { R.live = null; return { practice: true, result }; }") && reelJs.includes("data-rl=\"practice\""),
+        'V13.150 첫 손맛 연습: 7단계 안내 · 연습 중에는 줄이 끊기지 않음 · 연습 판은 기록 없음 · 마치면 tut');
+    }
     // 1인칭 화면: 코드로 그린 낚싯대가 휘고, 돌진 · 날뜀 · 잠수 · 특기 · 점프 마무리, 수조 어망. 그림 29 이름이 들어오면 갈아 끼운다.
     {
-      const reelJs = source('../public/modules/reel.js'), reelCss = source('../public/reel.css');
-      assert(['function rodGeom', 'function springTo', "kind === 'run'", "kind === 'thrash'", "kind === 'dive'", 'function swipe(', 'function finish(', "finish: finishKind", 'function tank(', "data-rl=\"sell-all\"", "'bait-open'", "'bg-pov'", "'bg-reveal'", "'bg-tank'", "'fx-jump'", "'fx-halo'", "'stamp-new'", "'ribbon-record'", "'icon-net'", "'gauge-distance'", 'navigator.vibrate']
-        .every(k => reelJs.includes(k)) && ['.rl-pov', '.rl-rod-body', '.rl-tring', '.rl-leap', '.rl-rev', '.rl-swim', 'prefers-reduced-motion'].every(k => reelCss.includes(k)) && !source('../public/v13149.css').includes('.rl-under{'),
+      const reelJs = source('../public/modules/reel.js'), reelCss = source('../public/v13150.css');
+      assert(['function rodGeom', 'function springTo', "kind === 'mash'", "kind === 'rhythm'", "kind === 'thrash'", 'function side(', 'function judge(', "addEventListener('contextmenu'", 'function finish(', "finish: finishKind", 'function tank(', "data-rl=\"sell-all\"", "'bait-open'", "'bg-pov'", "'bg-reveal'", "'bg-tank'", "'fx-jump'", "'fx-halo'", "'stamp-new'", "'ribbon-record'", "'icon-net'", "'gauge-distance'", 'navigator.vibrate']
+        .every(k => reelJs.includes(k)) && ['.rl-pov', '.rl-rod-body', '.rl-tring', '.rl-leap', '.rl-rev', '.rl-swim', '.rl-lanes', '.rl-note', '-webkit-touch-callout:none', 'prefers-reduced-motion'].every(k => reelCss.includes(k)) && !source('../public/v13149.css').includes('.rl-under{'),
         'V13.150 1인칭 낚시 화면: 휘는 낚싯대 · 물고기 성격 · 점프 마무리 · 수조 어망, 그림 29 자리, 동작 줄이기');
     }
     const art = source('../docs/asset-requests/runner/26-fishing.txt'), codex = source('../docs/asset-requests/runner/CODEX_PROMPT_26.md'), map = source('../docs/asset-requests/runner/slice-map.csv');
@@ -360,7 +386,7 @@ export async function runGamesChecks(assert) {
     assert(worker.includes('export { PartyRoom };') && worker.includes("url.pathname.match(/^\\/api\\/party\\/ws\\/([0-9a-f-]{36})$/)") && worker.includes("'X-Party-Key'") && worker.includes('delete result._parties') && worker.includes('undoParty(state, message)') && worker.includes('settlePartyReport(state, body)'),
       'V13.149 worker: 교실 게임 소켓은 방으로, 방 준비 메시지는 브라우저로 안 가고, 결과 보고는 키로 확인');
     assert(local.includes('delete result._parties;') && local.includes('delete result._dungeon;'), 'V13.149 로컬 서버도 방 준비 메시지(문제 · 입장표)를 브라우저로 보내지 않는다');
-    assert(/"v13146\.css",\s*"v13149\.css",\s*"reel\.css"\s*\]/.test(build) && ['match-game.js', 'reel.js', 'reel-rules.js', 'fishing-art.js', 'fishing-rules.js', 'party.js', 'party-tv.js', 'streak-guard.js', 'streak-guard-ui.js', 'match-rules.js'].every(f => sw.includes(`modules/${f}`)),
+    assert(/"v13146\.css",\s*"v13149\.css",\s*"v13150\.css"\s*\]/.test(build) && ['match-game.js', 'reel.js', 'reel-rules.js', 'fishing-art.js', 'fishing-rules.js', 'party.js', 'party-tv.js', 'streak-guard.js', 'streak-guard-ui.js', 'match-rules.js'].every(f => sw.includes(`modules/${f}`)),
       'V13.149 새 화면 CSS는 묶음 끝에, 새 모듈은 오프라인 캐시에');
     assert(battle.includes("['games', '게임', 'arcade']") && battle.includes("act === 'game-match'") && !battle.includes('game-fish') && source('../public/modules/arcade.js').includes('data-action="reel-open"') && app.includes("d.action === 'reel-open'")
       && source('../public/modules/reel.js').includes('진주 1개 = 1코인') && source('../public/modules/sessions.js').includes('낚시 미끼 +1') && battle.includes("act === 'game-party'") && app.includes("d.action === 'party-new'") && teacher.includes('data-action="party-new"'),

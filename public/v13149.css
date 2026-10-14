@@ -626,18 +626,3 @@ img.rl-art.rl-art-pearl{position:static;inset:auto;translate:none;z-index:auto;d
 /* V13.149 그림 26: 물고기 그림은 코드 그림(.fish-svg) 자리에 같은 크기로 */
 .fish-img{display:block;width:100%;height:auto;aspect-ratio:1;object-fit:contain}
 .ptv-feed-fish .fish-img,.ptv-award-fish .fish-img{width:100%;height:auto}
-/* V13.149 알 받을 때 자라는 모습(pet-growth.js): 알 → 아기(강조) → 성장 → 최종 */
-.pgx-strip{display:flex;align-items:flex-end;justify-content:center;gap:2px;margin:10px auto 6px;padding:8px 6px 6px;max-width:330px;border-radius:18px;background:color-mix(in srgb,currentColor 7%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,currentColor 12%,transparent)}
-.pgx-step{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;flex:0 0 auto;width:56px;opacity:0;animation:pgxIn .45s cubic-bezier(.3,1.5,.5,1) calc(.5s + var(--d) * .14s) both}
-.pgx-step img{width:52px;height:52px;object-fit:contain;filter:drop-shadow(0 3px 5px rgba(0,0,0,.25))}
-.pgx-step small{font-size:10px;font-weight:800;line-height:1.2;opacity:.75;white-space:nowrap}
-.pgx-step.baby{width:92px}
-.pgx-step.baby::before{content:'';position:absolute;left:50%;top:44px;width:88px;height:88px;translate:-50% -50%;border-radius:50%;background:radial-gradient(circle,rgba(255,236,160,.85),rgba(255,214,102,.25) 55%,transparent 72%);z-index:-1;animation:pgxGlow 2.2s ease-in-out 1s infinite alternate}
-.pgx-step.baby img{width:88px;height:88px;animation:pgxBounce 1.6s ease-in-out 1.2s infinite}
-.pgx-step.baby small{font-size:12px;font-weight:900;opacity:1;padding:2px 9px;border-radius:999px;background:#f59e0b;color:#fff;box-shadow:0 2px 6px rgba(245,158,11,.45)}
-.pgx-arrow{flex:0 0 10px;align-self:center;margin-bottom:18px;width:10px;height:10px;border-top:2.5px solid currentColor;border-right:2.5px solid currentColor;rotate:45deg;opacity:.35;scale:.8}
-@keyframes pgxIn{from{opacity:0;transform:translateY(10px) scale(.7)}to{opacity:1;transform:none}}
-@keyframes pgxBounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
-@keyframes pgxGlow{from{opacity:.6;scale:.92}to{opacity:1;scale:1.06}}
-.lgx-card .pgx-strip{color:#fff;background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
-@media(prefers-reduced-motion:reduce){.pgx-step,.pgx-step.baby img,.pgx-step.baby::before{animation:none!important;opacity:1}}

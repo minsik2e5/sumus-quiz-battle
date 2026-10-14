@@ -33,7 +33,7 @@ export function reelView(p, now = Date.now()) {
     egg_left: r.egg_day === today ? 0 : 1, epic_left: r.epic_week === weekNum(now) ? 0 : 1,
     book: f.book || {}, kinds: Object.keys(f.book || {}).length, all: FISH_KEYS.length, golden: Number(f.golden || 0) % REEL.GOLDEN_EGG,
     sea: SEA_PETS.map(x => ({ ...x, owned: (p.pets || []).some(pet => pet.key === x.key) })),
-    guide: !!r.guide, live: r.live && now - r.live.at < REEL.LIVE_MS ? { id: r.live.id } : null
+    guide: !!r.guide, tut: !!r.tut, live: r.live && now - r.live.at < REEL.LIVE_MS ? { id: r.live.id } : null
   };
 }
 
@@ -48,7 +48,7 @@ export function reelCast(p, { id, cast, water = false, now = Date.now(), seed = 
   r.live = { id, at: now, cast: tier, ...fish };
   const F = FIGHT[fish.rarity];
   // 어떤 물고기인지는 보내지 않는다: 등급마다 같은 세기 · 성격만.
-  return { id, fight: { hp: F.hp, pull: F.pull, dash: F.dash, size: F.size, min: F.min, dist: F.dist, moves: F.moves, swipes: F.swipes }, bait: r.bait };
+  return { id, fight: { hp: F.hp, pull: F.pull, dash: F.dash, size: F.size, min: F.min, dist: F.dist, moves: F.moves, taps: F.taps, notes: F.notes, beat: F.beat }, bait: r.bait };
 }
 // 끌어올리기(또는 놓침). 놓치면 미끼는 사라진다. 같은 끝내기를 다시 보내면 같은 답.
 export function reelLand(p, { id, result, finish = null, now = Date.now(), giftId }) {
@@ -119,4 +119,18 @@ export function reelSpend(p, item, now = Date.now()) {
   if (item === 'epic_egg' && r.epic_week === weekNum(now)) fail('영웅 알은 일주일에 하나만 바꿀 수 있어요.', 409);
   if (Number(r.pearls || 0) < price) fail(`진주가 ${price - Number(r.pearls || 0)}개 부족해요.`);
   return () => { r.pearls -= price; if (item === 'egg') r.egg_day = dayKey(now); else r.epic_week = weekNum(now); };
+}
+// 바다 펫: 교환소에서만, 진주 REEL.SEA_PET개. 그림이 들어오기 전(REEL.SEA_READY가 false)에는 잠겨 있다.
+// 영웅급 펫으로 들어오고(알 상점 · 뽑기 · 선생님 알에서는 나오지 않는다), 이미 함께하는 바다 펫은 다시 못 바꾼다.
+export function reelSeaPet(p, key, now = Date.now(), ready = REEL.SEA_READY) {
+  const sea = SEA_PETS.find(x => x.key === key);
+  if (!sea) fail('바다 펫을 골라 주세요.');
+  if (!ready) fail('바다 펫은 그림이 완성되면 만날 수 있어요. 진주를 모아 두세요!', 409);
+  if ((p.pets || []).some(x => x.key === key)) fail(`이미 ${sea.ko}와 함께하고 있어요.`, 409);
+  const r = reel(p);
+  if (Number(r.pearls || 0) < REEL.SEA_PET) fail(`진주가 ${REEL.SEA_PET - Number(r.pearls || 0)}개 부족해요.`);
+  r.pearls -= REEL.SEA_PET;
+  (p.pets ||= []).push({ key, acquired_at: now, epic: true, sea: true });
+  (p.purchases ||= []).push({ item: 'sea_pet', key, price: 0, pearls: REEL.SEA_PET, at: now });
+  return { key, epic: true, sea: true };
 }

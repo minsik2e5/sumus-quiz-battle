@@ -1,4 +1,4 @@
-/* V13.150 손맛 낚시(놀이터) 1인칭 판: reel.js. 교환소 · 도감 · 안내 창은 예전 그대로 옮겨 왔다. */
+/* V13.150 손맛 낚시(놀이터) 1인칭 판(reel.js) · 알 톡톡 공개(pet-growth.js). 교환소 · 도감 · 안내 창은 예전 그대로 옮겨 왔다. */
 .rl-app{min-height:100svh;background:#0c4a6e;color:#fff;position:relative;overflow:hidden;touch-action:manipulation;user-select:none;-webkit-user-select:none}
 .rl-top{position:absolute;left:0;right:0;top:0;z-index:8;display:flex;align-items:center;gap:8px;padding:12px 14px;background:linear-gradient(180deg,rgba(12,74,110,.6),transparent)}
 .rl-top .yb-back{background:rgba(255,255,255,.18);box-shadow:inset 0 0 0 1px rgba(255,255,255,.25);color:#fff}
@@ -411,3 +411,128 @@
 .rl-rev-fish,.rl-rev-halo,.rl-rev-rays{top:34%}
 .rl-dist{top:auto;bottom:calc(330px + env(safe-area-inset-bottom))}
 .rl-pov:not([data-phase="dock"]):not([data-phase="result"]):not([data-phase="reveal"]) .rl-side-menu{opacity:0;pointer-events:none}
+button.rl-sea-pet{appearance:none;border:0;color:#fff;font:inherit;cursor:pointer}
+button.rl-sea-pet img{width:56px;height:56px;object-fit:contain}
+button.rl-sea-pet.confirm{box-shadow:0 0 0 3px #fde047}
+button.rl-sea-pet:disabled{opacity:.55}
+button.rl-sea-pet.owned em{background:#16a34a}
+/* 첫 손맛 연습: 안내 카드 · 손가락 */
+.rl-cue-tut{display:inline-flex;flex-direction:column;align-items:center;gap:4px;max-width:300px;padding:12px 18px;border-radius:20px;background:rgba(255,255,255,.95);color:#0f172a;font-size:16px;font-weight:800;line-height:1.45;box-shadow:0 10px 28px rgba(0,0,0,.3);word-break:keep-all}
+.rl-cue-tut small{font-size:11px;font-weight:900;color:#0e7490;letter-spacing:.04em}
+.rl-cue-tut b{color:#ea580c}
+.rl-tuthand{position:absolute;z-index:9;width:52px;height:60px;pointer-events:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 52'%3E%3Cpath d='M16 4a5 5 0 0 1 10 0v18l4-1a5 5 0 0 1 6 5l1 10c1 8-5 14-13 14h-2c-6 0-10-3-13-8L3 33a4 4 0 0 1 6-5l7 6z' fill='%23fff' stroke='%230f172a' stroke-width='2.5' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;filter:drop-shadow(0 4px 8px rgba(0,0,0,.4))}
+.rl-tuthand.hold,.rl-tuthand.off{left:calc(50% + 8px);bottom:calc(36px + env(safe-area-inset-bottom))}
+.rl-tuthand.hold{animation:rl-hhold 1.2s ease-in-out infinite}
+.rl-tuthand.off{animation:rl-hoff 1s ease-in-out infinite}
+.rl-tuthand.up{left:calc(50% - 26px);top:56%;animation:rl-hup 1.2s ease-in-out infinite}
+.rl-tuthand.swipe{left:calc(50% - 26px);top:52%}
+.rl-tuthand.swipe.to-r{animation:rl-hsr 1s ease-in-out infinite}
+.rl-tuthand.swipe.to-l{animation:rl-hsl 1s ease-in-out infinite}
+@keyframes rl-hhold{0%,100%{transform:translateY(0)}30%,70%{transform:translateY(10px) scale(.92)}}
+@keyframes rl-hoff{0%{transform:translateY(8px) scale(.92)}60%,100%{transform:translateY(-30px);opacity:.3}}
+@keyframes rl-hup{from{transform:translateY(40px);opacity:0}30%{opacity:1}to{transform:translateY(-90px);opacity:0}}
+@keyframes rl-hsr{from{transform:translateX(-70px);opacity:0}25%{opacity:1}to{transform:translateX(70px);opacity:0}}
+@keyframes rl-hsl{from{transform:translateX(70px);opacity:0}25%{opacity:1}to{transform:translateX(-70px);opacity:0}}
+.rl-practice-btn{margin-top:4px;background:rgba(255,255,255,.14)!important;color:#fff!important}
+.rl-pov[data-phase="fight"] .rl-cue{top:22%}
+@media(prefers-reduced-motion:reduce){.rl-tuthand{animation:none!important}}
+.rl-cue-tut>span{display:block;text-align:center}
+
+/* ---------- 알 톡톡 공개(pet-growth.js): 세 번 두드리면 금 → 빛 → 아기 모습 ---------- */
+.etp{position:relative;width:100%;aspect-ratio:1;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;outline:none}
+.lgx-art .etp{position:absolute;inset:0}
+.etp img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}
+.etp-eggwrap{position:absolute;inset:6%;display:block;transform-origin:50% 80%;filter:drop-shadow(0 14px 18px rgba(0,0,0,.35))}
+.etp-eggwrap .etp-egg{inset:0}
+.etp:not(.open) .etp-eggwrap{animation:etp-idle 1.8s ease-in-out infinite}
+.etp.hit .etp-eggwrap{animation:etp-hit .42s cubic-bezier(.3,1.6,.5,1)}
+@keyframes etp-idle{0%,100%{transform:rotate(0)}8%{transform:rotate(-4deg)}16%{transform:rotate(4deg)}24%{transform:rotate(0)}}
+@keyframes etp-hit{0%{transform:scale(1)}25%{transform:scale(.9,1.08) rotate(-7deg)}55%{transform:scale(1.06,.95) rotate(6deg)}100%{transform:none}}
+.etp-cracks{position:absolute;inset:18% 18% 26%;width:64%;height:56%;overflow:visible}
+.etp-cracks path{fill:none;stroke:#fff;stroke-width:3.2;stroke-linecap:round;stroke-linejoin:round;filter:drop-shadow(0 0 3px rgba(255,236,170,.95)) drop-shadow(0 0 1px #000);stroke-dasharray:60;stroke-dashoffset:60;transition:stroke-dashoffset .25s ease-out}
+.etp[data-tap="1"] .c0,.etp[data-tap="2"] .c0,.etp[data-tap="2"] .c1,.etp[data-tap="3"] path,.etp.open path{stroke-dashoffset:0}
+.etp[data-tap="2"] .c2{stroke-dashoffset:0}
+.etp-glow{position:absolute;inset:-10%;border-radius:50%;background:radial-gradient(circle,rgba(255,244,200,.9),rgba(255,214,102,.35) 40%,transparent 68%);opacity:.35;transition:opacity .3s,transform .3s}
+.etp[data-tap="1"] .etp-glow{opacity:.55}.etp[data-tap="2"] .etp-glow{opacity:.8;transform:scale(1.08)}
+.etp-baby{opacity:0;transform:scale(.3) translateY(20%);filter:drop-shadow(0 14px 18px rgba(0,0,0,.35))}
+.etp.open .etp-baby{opacity:1;animation:etp-baby .8s cubic-bezier(.25,1.6,.45,1) .12s both,etp-babybob 2.4s ease-in-out 1s infinite}
+@keyframes etp-baby{from{opacity:0;transform:scale(.3) translateY(25%)}to{opacity:1;transform:none}}
+@keyframes etp-babybob{50%{transform:translateY(-6px)}}
+.etp.open .etp-eggwrap{animation:etp-break .45s ease-in forwards}
+@keyframes etp-break{30%{transform:scale(1.12)}100%{transform:scale(1.3);opacity:0;filter:brightness(2.2) blur(4px)}}
+.etp-burst{position:absolute;left:50%;top:50%;width:10px;height:10px;margin:-5px;border-radius:50%;background:#fff;box-shadow:0 0 0 0 rgba(255,244,200,.9);opacity:0}
+.etp.open .etp-burst{animation:etp-burst .7s ease-out forwards}
+@keyframes etp-burst{0%{opacity:1;box-shadow:0 0 0 0 rgba(255,244,200,.95)}100%{opacity:0;box-shadow:0 0 0 140px rgba(255,244,200,0)}}
+.etp-bits{position:absolute;left:50%;top:48%;width:0;height:0}
+.etp-bits b{position:absolute;left:-5px;top:-7px;width:10px;height:14px;border-radius:50% 50% 40% 40%;background:linear-gradient(#fff7ed,#fde68a);opacity:0}
+.etp.open .etp-bits b{animation:etp-bit .8s cubic-bezier(.2,.7,.4,1) var(--d) forwards}
+@keyframes etp-bit{0%{opacity:1;transform:rotate(var(--a)) translateY(0)}100%{opacity:0;transform:rotate(var(--a)) translateY(-110px) rotate(200deg)}}
+.etp-hint{position:absolute;left:50%;bottom:-2%;translate:-50% 0;display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:99px;background:rgba(255,255,255,.95);color:#0f172a;font-size:13px;font-weight:900;white-space:nowrap;box-shadow:0 6px 16px rgba(0,0,0,.25);animation:etp-hint 1.2s ease-in-out infinite;transition:opacity .25s;pointer-events:none;z-index:2}
+.etp-hint b{font-weight:900}
+.etp-hand{display:block;width:22px;height:26px;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 52'%3E%3Cpath d='M16 4a5 5 0 0 1 10 0v18l4-1a5 5 0 0 1 6 5l1 10c1 8-5 14-13 14h-2c-6 0-10-3-13-8L3 33a4 4 0 0 1 6-5l7 6z' fill='%23fde68a' stroke='%230f172a' stroke-width='3' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;animation:rl-handtap .6s ease-in-out infinite}
+@keyframes etp-hint{50%{transform:translateY(-4px)}}
+.etp.open .etp-hint,.etp.open .etp-dots{opacity:0}
+.etp-dots{position:absolute;left:50%;top:-4%;translate:-50% 0;display:flex;gap:6px;transition:opacity .25s}
+.etp-dots i{width:10px;height:10px;border-radius:50%;background:rgba(255,255,255,.45);box-shadow:inset 0 0 0 2px rgba(255,255,255,.8)}
+.etp-dots i.on{background:#fde047;box-shadow:0 0 8px #fde047}
+.etp-note{margin:6px 0 0;font-size:13px;font-weight:700;text-align:center;opacity:.95;word-break:keep-all}
+.etp-note b{color:#f59e0b}
+.lgx-art .etp-note{position:absolute;left:-20%;right:-20%;bottom:-30px;margin:0;color:#fff;text-shadow:0 2px 6px rgba(0,0,0,.5)}
+.lgx-art .etp-note b{color:#fde047}
+.pet-shop-reveal.etp-host{width:190px;height:auto;margin:6px auto 30px;animation:petPop .8s cubic-bezier(.2,1.6,.4,1)}
+.pet-shop-reveal.etp-host .etp-note{position:absolute;left:-40px;right:-40px;bottom:-30px}
+.pet-shop-reveal.etp-host{position:relative}
+@media(prefers-reduced-motion:reduce){.etp *,.etp{animation:none!important;transition:none!important}.etp.open .etp-eggwrap{opacity:0}.etp.open .etp-baby{opacity:1;transform:none}}
+.lgx-art .etp-note{display:none}
+
+/* ---------- 탈출 연타 · 리듬(낚시 파이팅 이벤트) ---------- */
+.rl-app,.rl-app img,.rl-app button{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.rl-app button img,.rl-hud img{pointer-events:none}
+.rl-sidebtn{position:absolute;bottom:calc(34px + env(safe-area-inset-bottom));width:92px;height:92px;padding:0;appearance:none;border:0;border-radius:50%;background:none;cursor:pointer;touch-action:none;-webkit-tap-highlight-color:transparent;filter:drop-shadow(0 8px 12px rgba(0,0,0,.4));opacity:0;pointer-events:none;transform:scale(.6);transition:opacity .2s,transform .25s cubic-bezier(.3,1.6,.5,1);z-index:2}
+.rl-sidebtn.l{left:14px}.rl-sidebtn.r{right:14px}
+.rl-sidebtn>.rl-art{position:static;width:100%;height:100%;object-fit:contain}
+.rl-sidebtn-code{display:grid;place-items:center;width:100%;height:100%;border-radius:50%;background:radial-gradient(circle at 35% 30%,#99f6e4,#14b8a6 55%,#0f766e);box-shadow:inset 0 -6px 0 rgba(0,0,0,.15),inset 0 0 0 5px rgba(255,255,255,.45)}
+.rl-sidebtn-code i{width:0;height:0;border-top:18px solid transparent;border-bottom:18px solid transparent;border-right:26px solid #fff;margin-right:6px}
+.rl-sidebtn.r .rl-sidebtn-code i{border-right:0;border-left:26px solid #fff;margin:0 0 0 6px}
+.rl-pov[data-move="mash"] .rl-sidebtn,.rl-pov[data-move="rhythm"] .rl-sidebtn{opacity:1;pointer-events:auto;transform:none}
+.rl-sidebtn.tap{animation:rl-sidetap .14s ease-out}
+@keyframes rl-sidetap{50%{transform:scale(.86)}}
+.rl-pov[data-move="mash"] .rl-sidebtn{animation:rl-sideglow .32s ease-in-out infinite alternate}
+.rl-pov[data-move="mash"] .rl-sidebtn.r{animation-delay:.16s}
+@keyframes rl-sideglow{to{filter:drop-shadow(0 0 14px #fde047) drop-shadow(0 8px 12px rgba(0,0,0,.4))}}
+.rl-pov[data-move="mash"] .rl-skill,.rl-pov[data-move="rhythm"] .rl-skill{opacity:0;pointer-events:none}
+.rl-pov[data-move="rhythm"] .rl-pet,.rl-pov[data-move="mash"] .rl-pet{opacity:.35}
+.rl-pov[data-move="mash"] .rl-reelwrap,.rl-pov[data-move="rhythm"] .rl-reelwrap{opacity:.55}
+.rl-cue-big.mash{background:linear-gradient(180deg,#ef4444,#991b1b);box-shadow:0 8px 24px rgba(153,27,27,.5);animation:rl-wobble .2s ease-in-out infinite}
+.rl-cue-big.rhythm{background:linear-gradient(180deg,#8b5cf6,#5b21b6);box-shadow:0 8px 24px rgba(91,33,182,.5)}
+.rl-qte{position:absolute;left:0;right:0;top:0;bottom:0;pointer-events:none;z-index:1}
+.rl-mash{position:absolute;left:50%;translate:-50% 0;width:240px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.rl-qte .rl-mash{top:auto;bottom:calc(64svh - 20px)}
+.rl-mash span{display:block;width:100%;height:20px;border-radius:99px;background:rgba(3,22,40,.6);box-shadow:inset 0 0 0 2px rgba(255,255,255,.7);overflow:hidden}
+.rl-mash i{display:block;height:100%;background:linear-gradient(90deg,#fde047,#f97316,#ef4444);transform-origin:left;transform:scaleX(0);transition:transform .08s}
+.rl-mash b{font-size:15px;font-weight:900;text-shadow:0 2px 6px rgba(0,0,0,.5)}
+.rl-qte.hot .rl-mash span{animation:rl-throb .15s infinite alternate}
+.rl-lanes{position:absolute;left:0;right:0;bottom:calc(126px + env(safe-area-inset-bottom));height:200px}
+.rl-lane{position:absolute;bottom:0;width:80px;height:100%;border-radius:40px 40px 0 0;background:linear-gradient(180deg,transparent,rgba(139,92,246,.28));box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.18)}
+.rl-lane.l{left:20px}.rl-lane.r{right:20px}
+.rl-hitring{position:absolute;left:50%;bottom:-6px;width:62px;height:62px;margin-left:-31px;border-radius:50%;border:4px solid rgba(255,255,255,.9);box-shadow:0 0 14px rgba(196,181,253,.9),inset 0 0 10px rgba(196,181,253,.6)}
+.rl-notes{position:absolute;inset:0}
+.rl-note{position:absolute;top:-56px;width:52px;height:52px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff,#fde047 45%,#f59e0b);box-shadow:0 0 0 3px #fff,0 0 16px rgba(253,224,71,.9);will-change:transform}
+.rl-note.l{left:34px}.rl-note.r{right:34px}
+.rl-note::after{content:'';position:absolute;left:50%;top:50%;width:0;height:0;margin:-9px 0 0 -6px;border-top:9px solid transparent;border-bottom:9px solid transparent;border-right:13px solid #92400e}
+.rl-note.r::after{border-right:0;border-left:13px solid #92400e;margin-left:-6px}
+.rl-note.hit{animation:rl-notehit .3s ease-out forwards}
+.rl-note.hit.perfect{box-shadow:0 0 0 3px #fff,0 0 30px #fde047}
+.rl-note.gone{opacity:0!important;transition:opacity .2s}
+@keyframes rl-notehit{to{scale:1.8;opacity:0}}
+.rl-combo{position:absolute;left:50%;bottom:220px;translate:-50% 0;font-size:26px;font-weight:900;color:#fde047;text-shadow:0 3px 0 #92400e,0 6px 14px rgba(0,0,0,.4);white-space:nowrap}
+.rl-combo.bump{animation:rl-throb .14s ease-out 2 alternate}
+.rl-judge{position:absolute;bottom:70px;font-style:normal;font-size:20px;font-weight:900;opacity:0;white-space:nowrap;text-shadow:0 2px 8px rgba(0,0,0,.5)}
+.rl-judge.l{left:24px}.rl-judge.r{right:24px}
+.rl-judge.perfect{color:#fde047}.rl-judge.good{color:#86efac}.rl-judge.miss{color:#fca5a5}
+.rl-judge.show{animation:rl-judge .5s ease-out forwards}
+@keyframes rl-judge{0%{opacity:0;transform:translateY(10px) scale(.7)}25%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-24px)}}
+.rl-tuthand.mash{left:30px;bottom:calc(40px + env(safe-area-inset-bottom));animation:rl-hmash .64s steps(1) infinite}
+@keyframes rl-hmash{0%{transform:translateX(0)}50%{transform:translateX(calc(100vw - 120px))}}
+@media(prefers-reduced-motion:reduce){.rl-cue-big.mash,.rl-pov[data-move="mash"] .rl-sidebtn{animation:none!important}}
+.rl-guide-moves{grid-template-columns:repeat(2,1fr)}
