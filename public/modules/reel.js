@@ -10,7 +10,11 @@ import { fishPic, fishShadow } from './fishing-art.js';
 
 // V13.150 손맛 낚시(놀이터): 단어 없이 던지기 · 입질 · 파이팅. 미끼는 공부로 번다(server/reel.mjs).
 // 그림(주문서 26 · 27)이 들어오면 FISHING_ART에 이름을 넣어 코드 그림 대신 쓴다.
-export const FISHING_ART = new Set(); // 예: 'bg-sea', 'bg-under', 'rod', 'btn-left' …
+// V13.149 그림 27(public/assets/fishing · fish/<key>-hang.webp)이 들어왔다.
+export const FISHING_ART = new Set([
+  'bait-can', 'bg-entry', 'bg-sea', 'bg-under', 'bobber', 'bobber-bite', 'btn-cast', 'btn-left', 'btn-reel', 'btn-right', 'fx-perfect', 'fx-ripple', 'fx-splash', 'fx-star', 'hook', 'line-snap', 'lure-gold', 'lure-shrimp', 'lure-spinner', 'lure-worm', 'net', 'pearl', 'power', 'reel', 'rod', 'rod-bend1', 'rod-bend2', 'shop', 'skill-empty', 'skill-full', 'tension',
+  ...FISH_KEYS.map(k => `hang-${k}`)
+]);
 const art = (name, fallback) => FISHING_ART.has(name) ? `<img class="rl-art rl-art-${name}" src="/assets/fishing/${name}.webp" alt="" draggable="false">` : fallback;
 
 let R = null;

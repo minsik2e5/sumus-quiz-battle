@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createStorageMock } from './storage-mock.mjs';
-import { TEST_APP } from './test-seed.mjs';
+import { TEST_APP, applyTestSeed } from './test-seed.mjs';
+import { LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS } from '../public/modules/core.js';
 import { VocaStateObject } from '../cloudflare/worker.mjs';
 
 // V13.149 테스트 앱 검사: 운영 Worker · 운영 Supabase · 운영 비밀값에 닿지 않는지, Supabase 없이 켜지고 저장이 남는지.
@@ -73,7 +74,11 @@ export async function runTestAppChecks() {
     const s1 = await api('/api/login', { method: 'POST', body: { username: TEST_APP.STUDENTS[0][0], password: TEST_APP.PASSWORD, role: 'student' } });
     assert.equal(s1.status, 200, '테스트 학생 로그인');
     const view = await api('/api/bootstrap', { cookie: s1.cookie });
-    assert.equal(view.payload.rewards.reel.bait, 5, '테스트 학생은 미끼 5개로 시작');
+    assert.equal(view.payload.rewards.reel.bait, TEST_APP.BAIT, '테스트 학생은 미끼 10개로 시작');
+    const pets = object.mutations.current().state.profiles.find(p => p.username === 'ts1').pets.map(p => p.key);
+    assert(LEGENDARY_PET_KEYS.length && MYTHIC_PET_KEYS.length && [...LEGENDARY_PET_KEYS, ...MYTHIC_PET_KEYS].every(k => pets.includes(k)), '테스트 학생은 전설 · 신화 펫을 모두 가진다');
+    const t2 = await api('/api/login', { method: 'POST', body: { username: 'tteacher2', password: TEST_APP.PASSWORD, role: 'teacher' } });
+    assert.equal(t2.status, 200, '테스트 선생님 2 로그인');
     const sold = await api('/api/reel/sell', { method: 'POST', cookie: s1.cookie, body: { key: 'minnow', n: 1 } });
     assert.equal(sold.status, 200, JSON.stringify(sold.payload));
     assert.equal(sold.payload.reel.net.minnow, 4);
@@ -86,7 +91,25 @@ export async function runTestAppChecks() {
     const again = await api('/api/login', { method: 'POST', body: { username: TEST_APP.STUDENTS[0][0], password: TEST_APP.PASSWORD, role: 'student' } });
     const after = await api('/api/bootstrap', { cookie: again.cookie });
     assert.equal(after.payload.rewards.reel.net.minnow, 4, '다시 켜도 처음 데이터로 돌아가지 않는다');
+    // 미끼를 쓰고 다시 켜도 덧붙이기(applyTestSeed)는 한 번만: 미끼가 10개로 다시 차지 않는다.
+    const cast = await api('/api/reel/cast', { method: 'POST', cookie: again.cookie, body: { id: 'chk-cast-1', cast: 'ok' } });
+    assert.equal(cast.status, 200, JSON.stringify(cast.payload));
+    await object.sync.run();
     object.sync.close();
+    object = boot();
+    await object.ready;
+    assert.equal(object.mutations.current().state.profiles.find(p => p.username === 'ts1').reel.bait, TEST_APP.BAIT - 1, '테스트 덧붙이기는 판마다 한 번만');
+    object.sync.close();
+
+    // 예전 판(1)으로 켜져 있던 테스트 앱: 새 판에서 선생님 2 · 전설 · 신화 펫 · 미끼 10을 덧붙인다(쓰던 기록은 그대로).
+    const prev = structuredClone(object.mutations.current().state);
+    delete prev.test_seed;
+    prev.profiles = prev.profiles.filter(p => p.username !== 'tteacher2');
+    const ts2 = prev.profiles.find(p => p.username === 'ts2'); ts2.pets = [{ key: 'cat', first: true }]; ts2.reel.bait = 3;
+    assert.equal(await applyTestSeed(prev), true);
+    assert(prev.profiles.some(p => p.username === 'tteacher2') && ts2.pets.length === 1 + LEGENDARY_PET_KEYS.length + MYTHIC_PET_KEYS.length && ts2.reel.bait === TEST_APP.BAIT && ts2.pets[0].first, '예전 판에 덧붙이기');
+    assert.equal(prev.profiles.find(p => p.username === 'ts1').reel.net.minnow, 4, '덧붙여도 쓰던 기록은 그대로');
+    assert.equal(await applyTestSeed(prev), false, '같은 판은 다시 덧붙이지 않는다');
   } finally {
     globalThis.fetch = nativeFetch;
   }

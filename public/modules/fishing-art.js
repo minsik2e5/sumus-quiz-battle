@@ -3,7 +3,7 @@ import { FISH } from './fishing-rules.js';
 // V13.149 물고기 그림(코드 그림). 그림 주문서 26(docs/asset-requests/runner/26-fishing.txt)의 그림이 들어오면
 // /assets/fish/<key>.webp(256px 정사각형)를 먼저 쓰고(FISH_ART), 없으면 아래 SVG를 그린다.
 // 모든 물고기는 오른쪽을 본다. viewBox 0 0 120 72.
-export const FISH_ART = new Set(); // 그림이 들어온 물고기 키(그림이 오면 여기에 넣는다)
+export const FISH_ART = new Set(Object.keys(FISH)); // V13.149 그림 26: 24종 모두 그림이 들어왔다
 
 let uid = 0;
 const BODY = {

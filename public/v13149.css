@@ -817,3 +817,15 @@
 .rl-sea-silhouette::after{content:'?'!important;filter:none!important;color:rgba(255,255,255,.75);font-weight:900;font-size:28px}
 /* V13.149 테스트 앱 표시 */
 .is-test-app body::before{content:'🧪 테스트 앱 · 운영 데이터 아님';position:fixed;top:calc(env(safe-area-inset-top) + 4px);left:50%;transform:translateX(-50%);z-index:2147483000;pointer-events:none;padding:3px 10px;border-radius:999px;background:#f97316;color:#fff;font:800 11px/1.4 system-ui,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.25);opacity:.92}
+/* V13.149 그림 27: 진주는 어디서나 글자 크기 아이콘 */
+img.rl-art.rl-art-pearl{position:static;inset:auto;translate:none;z-index:auto;display:inline-block;width:1.25em;height:1.25em;margin:0 3px 0 0;vertical-align:-.28em;border-radius:0;background:none;box-shadow:none;object-fit:contain;pointer-events:none}
+.rl-chip.pearl img.rl-art-pearl{width:20px;height:20px}
+/* V13.149 그림 26: 물고기 그림은 코드 그림(.fish-svg) 자리에 같은 크기로 */
+.fish-img{display:block;width:100%;height:auto;aspect-ratio:1;object-fit:contain}
+.rl-net-pic .fish-img,.ptv-feed-fish .fish-img,.ptv-award-fish .fish-img{width:100%;height:auto}
+/* 그림 27 텐션 틀: 막대를 감싸는 틀로만(가운데에 따로 뜨지 않게) */
+.rl-tension>img.rl-art-tension{position:absolute;left:-8px;right:-8px;top:12px;bottom:-8px;inset:auto;width:calc(100% + 16px);height:38px;translate:none;z-index:2;object-fit:fill;pointer-events:none}
+.rl-tension small{position:relative;z-index:3}
+.rl-reel small{position:absolute;bottom:-18px;left:50%;translate:-50% 0;white-space:nowrap;color:#fff;text-shadow:0 1px 3px #000}
+.rl-reel{position:relative}
+.rl-net-pic{display:block;width:64px;min-width:0}

@@ -18,7 +18,7 @@ import { createMutationCoordinator, NO_MUTATION } from '../server/mutation-coord
 import { createLocalRepository, createSupabaseSync } from './local-first.mjs';
 import { partitionState, assembleState, hashText } from './state-parts.mjs';
 import { WRITE_WARN_PCT } from './cf-limits.mjs';
-import { testSeedState } from '../server/test-seed.mjs';
+import { testSeedState, applyTestSeed } from '../server/test-seed.mjs';
 
 // V13.144 쓰기 모으기: 저장이 연달아 오면 이 시간(ms) 안에 온 변경을 한 번에 쓴다. 오늘 쓴 양이 70%를 넘으면 2배,
 // 90%를 넘으면 4배로 늘린다. 쉬고 있다가 온 저장은 기다리지 않는다. env.VOCA_COMMIT_GROUP_MS로 바꿀 수 있다.
@@ -217,10 +217,12 @@ export class VocaStateObject {
       try {
         const working = structuredClone(initial.state);
         const migrated = migrateState(working);
+        // 테스트 앱: 새 판의 테스트 계정 · 펫 · 미끼를 덧붙인다(운영에서는 부르지 않는다).
+        const seeded = env.VOCA_STANDALONE === '1' && await applyTestSeed(working);
         // 90%를 넘은 날은 급하지 않은 정리를 다음 날로 미룬다.
         const swept = this.writeLevel() === 'defer' ? false : sweep(working);
         initial.state = working;
-        if (migrated || swept) {
+        if (migrated || swept || seeded) {
           try {
             initial.revision = await this.local.commit(working, initial.revision);
           } catch (error) {

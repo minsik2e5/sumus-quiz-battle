@@ -1,6 +1,6 @@
 // V13.149 연속 학습 보호권 · 짝 맞추기 타임어택 · 단어 낚시 · 교실 게임(보물 사냥 · 반 전체 낚시) 검사. release-check가 부른다.
 // 방(cloudflare/party-room.mjs) 자체는 server/party-room-check.mjs(cloudflare-check)가 본다.
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { emptyState } from './state.mjs';
 import { passwordHash } from './auth.mjs';
@@ -12,7 +12,7 @@ import { MATCH, matchPick, matchStars, cardMeaning } from '../public/modules/mat
 import { FISH, FISH_KEYS, LURES, rollCast } from '../public/modules/fishing-rules.js';
 import { REEL, FIGHT, reelRoll, pearlsOf } from '../public/modules/reel-rules.js';
 import { grantBait, reelCast, reelLand } from './reel.mjs';
-import { fishSvg } from '../public/modules/fishing-art.js';
+import { fishSvg, FISH_ART } from '../public/modules/fishing-art.js';
 import { addBonus } from './rewards.mjs';
 import { PARTY, CHESTS, createParty, joinParty, startParty, answer, pick, target, tick, tvView, playerView, awards, partyCoins, partyReport, ranked } from './party-engine.mjs';
 import { settleParty } from './party.mjs';
@@ -21,6 +21,15 @@ const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)
 const lcg = seed => () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
 
 export async function runGamesChecks(assert) {
+  // V13.149 그림 26 · 27: 코드가 쓰는 그림 파일이 모두 있어야 한다(없으면 빈 그림).
+  {
+    const pub = new URL('../public/', import.meta.url);
+    assert(FISH_KEYS.every(k => FISH_ART.has(k) && existsSync(new URL(`assets/fish/${k}.webp`, pub)) && existsSync(new URL(`assets/fish/${k}-hang.webp`, pub))), 'V13.149 물고기 그림(26) · 매달린 그림(27) 24종');
+    const reelSrc = readFileSync(new URL('modules/reel.js', pub), 'utf8');
+    const names = [...reelSrc.match(/FISHING_ART = new Set\(\[([\s\S]*?)\]\)/)[1].matchAll(/'([a-z0-9-]+)'/g)].map(m => m[1]);
+    assert(names.length >= 30 && names.every(n => existsSync(new URL(`assets/fishing/${n}.webp`, pub))), 'V13.149 낚시 그림(27) 파일이 모두 있다');
+    assert(!existsSync(new URL('assets/fishing/preview-27.png', pub)), 'V13.149 미리보기 시트는 앱에 싣지 않는다');
+  }
   const now = Date.now(), DAY = DAY_MS;
   const at = d => now - d * DAY;
   const studied = days => days.map(d => ({ id: `s${d}`, created_at: at(d), total: 10, answered_count: 10, correct: 10, xp: 10 }));
