@@ -53,6 +53,7 @@
 | `revive` | 던전: 펫 부활 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `revive`) | |
 | `combo-10` | 던전: 10콤보마다 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `combo-10`) | |
 | `boss-down` | 던전: 보스가 쓰러짐 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `boss-down`) | |
+| `card-flip` | 짝 맞추기: 카드가 뒤집힘(GO에 물결처럼) | 우리가 합성(`docs/sound/match-synth.mjs`의 `card-flip`) | || `swoosh` | 짝 맞추기: 맞힌 두 카드 · +1초 · 코인이 날아감 | 우리가 합성(`docs/sound/match-synth.mjs`의 `swoosh`) | || `stamp` | 짝 맞추기: 결과의 별 · 신기록 도장이 쾅 찍힘 | 우리가 합성(`docs/sound/match-synth.mjs`의 `stamp`) | |
 
 ## 출처와 라이선스
 - **우리가 합성한 소리**: `docs/sound/synth.mjs`로 만든다(종소리 배음 · 마림바 · 쓸어올리는 바람 소리 · 저음 울림 · 반짝이 · 리버브를 겹침). 다시 만들 때: `npm i --no-save @breezystack/lamejs` 후 `node docs/sound/synth.mjs <출력 폴더>` → 원하는 파일을 `public/assets/sfx/<key>.mp3`로 복사. 우리가 만든 것이라 제약이 없다.
