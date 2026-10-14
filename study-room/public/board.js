@@ -259,6 +259,10 @@
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') lock(); });
   }
 
+  Avatar.onReady(() => {
+    for (const el of state.cards.values()) delete el.dataset.art;
+    if (state.data) render();
+  });
   if (state.key) start();
   else showLogin();
 })();

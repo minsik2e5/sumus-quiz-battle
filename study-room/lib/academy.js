@@ -264,9 +264,24 @@ class Academy {
 
   setAvatar(id, avatar) {
     const s = this.mustStudent(id);
-    s.avatar = Avatar.normalize(avatar);
+    const next = Avatar.normalize(avatar);
+    const c = next.kind && Avatar.character(next.kind);
+    // 이미 쓰던 캐릭터는 그대로 둘 수 있게, 새로 고를 때만 누적 시간을 확인한다
+    if (c && c.unlock && next.kind !== (s.avatar && s.avatar.kind) && this.totalMs(id) < c.unlock * 3600000) {
+      throw new AcademyError(`${c.name}은(는) 누적 ${c.unlock}시간을 공부하면 열려요.`, 'limit');
+    }
+    s.avatar = next;
     this.dirty();
     this.emit(id);
+  }
+
+  // 지금까지 공부한 전체 시간 (캐릭터 해금에 쓴다)
+  totalMs(id) {
+    const byDay = this.data.daily[id] || {};
+    const today = this.today();
+    let ms = 0;
+    for (const [day, rec] of Object.entries(byDay)) if (day !== today) ms += rec.ms || 0;
+    return ms + this.todayMs(id);
   }
 
   resetPin(id, pin) {
@@ -615,7 +630,8 @@ class Academy {
       bubblesLeft: BUBBLES_PER_DAY - (rec ? rec.b : 0),
       check: (l && l.check) || null,
       camGoneAt: (l && l.cam === 'gone' && l.since != null && l.camGoneAt) || null,
-      camStopMs: CAM_GONE_MS
+      camStopMs: CAM_GONE_MS,
+      totalMs: this.totalMs(id)
     };
   }
 

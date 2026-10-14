@@ -281,12 +281,24 @@
     $('#avatar-preview-card').innerHTML = `<div class="art">${Avatar.svg(d)}</div>`;
     const chips = (key, list) => list.map((o) => `<button class="chip${d[key] === o.id ? ' on' : ''}" data-key="${key}" data-val="${o.id}">${o.label}</button>`).join('');
     const swatches = (key, colors) => colors.map((c, i) => `<button class="swatch${d[key] === i ? ' on' : ''}" style="background:${c}" data-key="${key}" data-val="${i}" aria-label="색 ${i + 1}"></button>`).join('');
-    $('#avatar-options').innerHTML = `
+    // 이미지 캐릭터: 올라온 것만 보여 주고, 누적 시간이 모자라면 잠금으로 표시
+    const hours = Math.floor(((state.me && state.me.totalMs) || 0) / 3600000);
+    const chars = Avatar.CHARACTERS.filter((c) => Avatar.isAvailable(c.id));
+    const charGroup = chars.length ? `<div class="opt-group"><h4>캐릭터 고르기</h4><div class="char-grid">
+        <button class="char${d.kind ? '' : ' on'}" data-key="kind" data-val=""><span class="char-face human">${Avatar.face({ ...d, kind: null })}</span><b>사람</b></button>
+        ${chars.map((c) => {
+          const locked = c.unlock > hours && (state.me && state.me.avatar && state.me.avatar.kind) !== c.id;
+          return `<button class="char${d.kind === c.id ? ' on' : ''}${locked ? ' locked' : ''}" data-key="kind" data-val="${c.id}" ${locked ? `data-locked="${c.unlock}"` : ''}>
+            <span class="char-face">${Avatar.face({ kind: c.id })}</span><b>${c.name}</b>${locked ? `<small>🔒 ${c.unlock}시간</small>` : ''}</button>`;
+        }).join('')}
+      </div><p class="char-help">누적 공부 시간이 쌓이면 새 친구가 열려요 · 지금 ${hours}시간</p></div>` : '';
+    $('#avatar-options').innerHTML = charGroup + (d.kind ? `
+      <div class="opt-group"><h4>책상 소품</h4><div class="opt-row">${chips('item', Avatar.ITEMS)}</div></div>` : `
       <div class="opt-group"><h4>머리 모양</h4><div class="opt-row">${chips('hair', Avatar.HAIR)}</div></div>
       <div class="opt-group"><h4>머리 색</h4><div class="opt-row">${swatches('hc', Avatar.HAIR_COLORS)}</div></div>
       <div class="opt-group"><h4>옷 색</h4><div class="opt-row">${swatches('top', Avatar.TOPS)}</div></div>
       <div class="opt-group"><h4>안경</h4><div class="opt-row">${chips('glasses', [{ id: false, label: '없음' }, { id: true, label: '있음' }])}</div></div>
-      <div class="opt-group"><h4>책상 소품</h4><div class="opt-row">${chips('item', Avatar.ITEMS)}</div></div>`;
+      <div class="opt-group"><h4>책상 소품</h4><div class="opt-row">${chips('item', Avatar.ITEMS)}</div></div>`);
   }
 
   function onAvatarOption(e) {
@@ -296,6 +308,11 @@
     let val = btn.dataset.val;
     if (key === 'hc' || key === 'top') val = Number(val);
     if (key === 'glasses') val = val === 'true';
+    if (key === 'kind' && btn.dataset.locked) {
+      toast(`누적 ${btn.dataset.locked}시간을 공부하면 열려요. 조금만 더 힘내요! 💪`);
+      return;
+    }
+    if (key === 'kind') val = val || null;
     state.draft = Avatar.normalize({ ...state.draft, [key]: val });
     renderAvatarEditor();
   }
@@ -600,7 +617,7 @@
       state.alertedCheck = check.at;
       $('#check-title').textContent = `${state.me.name}, 아직 같이 공부 중이지?`;
       $('#check-msg').textContent = `오늘 벌써 ${fmtShort(liveMs(state.me))} 했어! ${CHECK_MSGS[Math.floor(Math.random() * CHECK_MSGS.length)]}`;
-      $('#check-avatar').innerHTML = Avatar.svg(state.me.avatar, { pose: 'rest' }).replace('viewBox="0 0 200 200"', 'viewBox="30 18 140 140"');
+      $('#check-avatar').innerHTML = Avatar.svg(state.me.avatar, { pose: 'cheer' }).replace('viewBox="0 0 200 200"', 'viewBox="30 18 140 140"');
       ding('check');
       try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch { /* 무시 */ }
     }
@@ -945,6 +962,14 @@
 
   async function start() {
     bind();
+    // 캐릭터 이미지가 확인되면 이미 그린 카드들을 이미지 캐릭터로 다시 그린다
+    Avatar.onReady(() => {
+      for (const el of state.cards.values()) delete el.dataset.art;
+      $('#solo-avatar').dataset.art = '';
+      if (state.me) renderGrid();
+      if (!$('#screen-avatar').hidden) renderAvatarEditor();
+      if (!$('#screen-solo').hidden) renderSolo();
+    });
     if (!state.token) return openEntry();
     try {
       const data = await api('/api/me');

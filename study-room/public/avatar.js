@@ -27,7 +27,55 @@
   const SKIN = '#f7d9c6';
   const SKIN_SHADE = '#eabfa8';
 
-  const DEFAULT = { hair: 'short', hc: 0, top: 0, glasses: false, item: 'plant' };
+  const DEFAULT = { hair: 'short', hc: 0, top: 0, glasses: false, item: 'plant', kind: null };
+
+  // 이미지 에셋 캐릭터 (public/characters/<id>.png, 3×2 칸 스프라이트 시트, 칸당 512px)
+  // unlock: 누적 공부 시간(시간)이 이만큼 되어야 고를 수 있다
+  const CHARACTERS = [
+    { id: 'bear', name: '콩떡곰', unlock: 0 },
+    { id: 'bunny', name: '말랑토끼', unlock: 0 },
+    { id: 'cat', name: '치즈냥', unlock: 0 },
+    { id: 'penguin', name: '펭펭', unlock: 0 },
+    { id: 'puppy', name: '누렁멍', unlock: 0 },
+    { id: 'owl', name: '부엉박사', unlock: 0 },
+    { id: 'squirrel', name: '도토리', unlock: 0 },
+    { id: 'otter', name: '해달이', unlock: 0 },
+    { id: 'seal', name: '물범떡', unlock: 5 },
+    { id: 'octopus', name: '문어쌤', unlock: 10 },
+    { id: 'mochi', name: '찰떡이', unlock: 15 },
+    { id: 'potato', name: '감자꾼', unlock: 20 },
+    { id: 'riceball', name: '주먹밥', unlock: 30 },
+    { id: 'tofu', name: '두부', unlock: 40 },
+    { id: 'ghost', name: '꼬마유령', unlock: 50 },
+    { id: 'dino', name: '아기공룡', unlock: 70 },
+    { id: 'cloud', name: '구름이', unlock: 85 },
+    { id: 'star', name: '별똥이', unlock: 100 }
+  ];
+  const SPRITE_CELL = { study: 0, look: 1, rest: 2, yawn: 3, sleep: 4, cheer: 5 };
+  const available = new Set();
+  const readyCallbacks = [];
+  let detecting = null;
+
+  // 브라우저에서 어떤 캐릭터 이미지가 실제로 올라와 있는지 확인한다 (없는 캐릭터는 고를 수 없음)
+  function detect() {
+    if (detecting || typeof Image === 'undefined') return detecting;
+    detecting = Promise.all(CHARACTERS.map((c) => new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => { available.add(c.id); resolve(); };
+      img.onerror = () => resolve();
+      img.src = `/characters/${c.id}.png`;
+    }))).then(() => { for (const cb of readyCallbacks) cb(); });
+    return detecting;
+  }
+
+  function onReady(cb) {
+    readyCallbacks.push(cb);
+    detect();
+  }
+
+  function character(id) {
+    return CHARACTERS.find((c) => c.id === id) || null;
+  }
 
   function pickIndex(value, length, fallback) {
     const n = Number(value);
@@ -41,7 +89,8 @@
       hc: pickIndex(a.hc, HAIR_COLORS.length, DEFAULT.hc),
       top: pickIndex(a.top, TOPS.length, DEFAULT.top),
       glasses: a.glasses === true,
-      item: ITEMS.some((i) => i.id === a.item) ? a.item : DEFAULT.item
+      item: ITEMS.some((i) => i.id === a.item) ? a.item : DEFAULT.item,
+      kind: CHARACTERS.some((c) => c.id === a.kind) ? a.kind : null
     };
   }
 
@@ -52,7 +101,8 @@
       hc: r(HAIR_COLORS.length),
       top: r(TOPS.length),
       glasses: Math.random() < 0.3,
-      item: ITEMS[1 + r(ITEMS.length - 1)].id
+      item: ITEMS[1 + r(ITEMS.length - 1)].id,
+      kind: null
     };
   }
 
@@ -87,6 +137,7 @@
   const POSES = {
     study: { up: false, eyes: 'down', mouth: null, book: 'open' }, // 고개 숙이고 책 보기
     rest: { up: true, eyes: 'open', mouth: 'smile', book: 'closed' }, // 쉬는 중
+    cheer: { up: true, eyes: 'open', mouth: 'smile', book: 'open' }, // 화이팅 (확인 창, 목표 달성)
     look: { up: true, eyes: 'open', mouth: null, book: 'open' }, // 공부 중 고개 듦 (카메라)
     yawn: { up: true, eyes: 'closed', mouth: 'open', book: 'open' }, // 하품 (카메라)
     sleep: { up: false, eyes: 'closed', mouth: null, book: 'open' }, // 조는 중 (카메라)
@@ -96,6 +147,7 @@
   function svg(input, opts) {
     const a = normalize(input);
     const pose = POSES[opts && opts.pose] ? opts.pose : 'study';
+    if (a.kind && available.has(a.kind) && pose !== 'empty') return spriteSvg(a, pose, opts);
     const P = POSES[pose];
     const person = P.person !== false;
     const study = !P.up;
@@ -239,17 +291,41 @@
       p.push(`<rect x="70" y="160" width="60" height="13" rx="3" fill="#ff8b7b"/><rect x="70" y="160" width="60" height="4" rx="2" fill="#fff" opacity=".55"/><rect x="74" y="164" width="52" height="2" fill="#fff" opacity=".5"/>`);
     }
 
-    // 책상 소품
-    if (a.item === 'plant') {
+    p.push(itemSvg(a.item));
+
+    return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="avatar-svg" aria-hidden="true">${p.join('')}</svg>`;
+  }
+
+  // 책상 소품
+  function itemSvg(item) {
+    const p = [];
+    if (item === 'plant') {
       p.push(`<ellipse cx="172" cy="172" rx="13" ry="3" fill="#7a4a2a" opacity=".18"/><path d="M162 153 L182 153 L179 171 L165 171 Z" fill="#e48a62"/><rect x="161" y="151" width="22" height="5" rx="2" fill="#ef9d77"/><path d="M172 151 Q160 140 162 132 Q172 136 172 151 Q174 138 184 134 Q186 144 172 151" fill="#62b56d"/><path d="M172 151 Q170 136 172 128 Q178 138 172 151" fill="#78c983"/>`);
-    } else if (a.item === 'books') {
+    } else if (item === 'books') {
       p.push(`<ellipse cx="173" cy="172" rx="17" ry="3" fill="#7a4a2a" opacity=".18"/><rect x="156" y="160" width="34" height="11" rx="2" fill="#4f7fd9"/><rect x="158" y="162" width="30" height="2.5" fill="#fff" opacity=".6"/><rect x="160" y="150" width="28" height="10" rx="2" fill="#5fbf8a"/><rect x="162" y="152" width="24" height="2.5" fill="#fff" opacity=".6"/>`);
-    } else if (a.item === 'pencil') {
+    } else if (item === 'pencil') {
       p.push(`<g transform="rotate(-20 170 164)"><rect x="150" y="161" width="36" height="6.5" rx="2" fill="#ffcf4a"/><rect x="150" y="161" width="36" height="2.2" fill="#fff" opacity=".45"/><path d="M186 161 L195 164.2 L186 167.5 Z" fill="#f2c9a0"/><path d="M192 163.2 L195 164.2 L192 165.3 Z" fill="#3a302d"/><rect x="146" y="161" width="5" height="6.5" rx="1.5" fill="#ff8fa3"/></g>`);
-    } else if (a.item === 'cup') {
+    } else if (item === 'cup') {
       p.push(`<ellipse cx="172" cy="172" rx="14" ry="3" fill="#7a4a2a" opacity=".18"/><path d="M181 154 Q192 156 181 166" fill="none" stroke="#efe6da" stroke-width="3.5"/><rect x="161" y="148" width="22" height="24" rx="5" fill="#fffdf9"/><ellipse cx="172" cy="149" rx="10" ry="2.6" fill="#8a5a3b"/><rect x="163" y="150" width="3" height="18" rx="1.5" fill="#fff" opacity=".8"/>`);
     }
 
+    return p.join('');
+  }
+
+  // 이미지 캐릭터: 벽·책상·소품은 SVG로 그리고, 그 위에 스프라이트 시트의 해당 칸을 얹는다
+  function spriteSvg(a, pose, opts) {
+    const cell = SPRITE_CELL[pose] != null ? SPRITE_CELL[pose] : 0;
+    const col = cell % 3;
+    const row = Math.floor(cell / 3);
+    const id = 'sp' + (++uid);
+    const p = [];
+    p.push(`<defs><linearGradient id="${id}w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fcf8f3"/><stop offset="1" stop-color="#f2e9df"/></linearGradient><linearGradient id="${id}d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2d2ac"/><stop offset="1" stop-color="#e2b385"/></linearGradient></defs>`);
+    if (!(opts && opts.bare)) p.push(`<rect width="200" height="200" fill="url(#${id}w)"/>`);
+    // 칸 안에서 책상 윗면은 y≈420/512 → 200 기준 약 164
+    p.push(`<rect x="0" y="162" width="200" height="38" fill="url(#${id}d)"/><rect x="0" y="162" width="200" height="3" fill="#fbe3c6"/>`);
+    p.push(`<ellipse cx="100" cy="178" rx="62" ry="8" fill="#8a5530" opacity=".12"/>`);
+    p.push(`<svg x="0" y="0" width="200" height="200" style="width:200px;height:200px" viewBox="${col * 512} ${row * 512} 512 512"><image href="/characters/${a.kind}.png" width="1536" height="1024"/></svg>`);
+    p.push(`<g transform="translate(0 10)">${itemSvg(a.item)}</g>`);
     return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="avatar-svg" aria-hidden="true">${p.join('')}</svg>`;
   }
 
@@ -258,5 +334,5 @@
     return svg(input, { pose: 'rest' }).replace('viewBox="0 0 200 200"', 'viewBox="46 20 108 108"');
   }
 
-  return { HAIR, HAIR_COLORS, TOPS, ITEMS, DEFAULT, POSES: Object.keys(POSES), normalize, random, svg, face };
+  return { HAIR, HAIR_COLORS, TOPS, ITEMS, DEFAULT, CHARACTERS, POSES: Object.keys(POSES), normalize, random, svg, face, detect, onReady, character, isAvailable: (id) => available.has(id) };
 });

@@ -271,3 +271,18 @@ test('daily goal is celebrated once and history feeds the calendar', () => {
   assert.equal(academy.board(cls.code).goals.length, 1);
   assert.equal(academy.overview(cls.code).students[0].goalMin, 60);
 });
+
+test('image characters unlock with total study time', () => {
+  const { clock, academy, join } = setup();
+  const s = join('감자');
+  academy.setAvatar(s.id, { kind: 'bear' });
+  assert.equal(academy.member(s.id).avatar.kind, 'bear');
+  assert.throws(() => academy.setAvatar(s.id, { kind: 'seal' }), /누적 5시간/);
+  academy.record(s.id, '2026-10-01').ms = 4 * 3600000;
+  academy.setStudy(s.id, true);
+  clock.t += 61 * MIN;
+  assert.ok(academy.totalMs(s.id) >= 5 * 3600000);
+  academy.setAvatar(s.id, { kind: 'seal', item: 'cup' });
+  assert.equal(academy.member(s.id).avatar.kind, 'seal');
+  assert.equal(academy.me(s.id).totalMs, academy.totalMs(s.id));
+});
