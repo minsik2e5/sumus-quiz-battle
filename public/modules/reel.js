@@ -47,6 +47,8 @@ export function openReel(A, exit) {
     <button type="button" class="rl-chip bait" id="rl-bait" data-rl="bait" aria-label="미끼">${art('bait-can', '<i class="rl-can-ico"></i>')}<b>0</b></button><span class="rl-chip pearl" id="rl-pearl" aria-label="진주">${pearlIco()}<b>0</b></span><button type="button" class="rl-q" data-rl="guide" aria-label="낚시터 안내">?</button></header>
     <main id="rl-main" class="rl-main"></main></div>`;
   root().onclick = onClick;
+  // 길게 눌러도 사진 저장 · 복사 메뉴가 뜨지 않게(아이폰 · 안드로이드).
+  root().querySelector('.rl-app').addEventListener('contextmenu', e => e.preventDefault());
   window.scrollTo(0, 0);
   preloadSound(['fanfare-basic', 'fanfare-epic', 'fanfare-legend', 'crit', 'coins', 'fail', 'wiggle', 'crack', 'burst', 'ult-impact', 'ult-riser']);
   scene();
@@ -419,12 +421,16 @@ function fight() {
       <button type="button" class="rl-reelbtn" id="rl-reel" aria-label="꾹 눌러 감기">${art('btn-reel', '<span class="rl-reelbtn-code"><i id="rl-reel-crank"></i></span>')}</button>
       <small class="rl-reel-tip" id="rl-reel-tip">꾹 눌러 감기</small>
     </div>
+    <button type="button" class="rl-sidebtn l" id="rl-sl" data-side="-1" aria-label="왼쪽">${art('btn-left', '<span class="rl-sidebtn-code"><i></i></span>')}</button>
+    <button type="button" class="rl-sidebtn r" id="rl-sr" data-side="1" aria-label="오른쪽">${art('btn-right', '<span class="rl-sidebtn-code"><i></i></span>')}</button>
+    <div class="rl-qte" id="rl-qte" aria-live="polite"></div>
     <button type="button" class="rl-skill" id="rl-skill" data-rl="skill" disabled aria-label="펫 특기">${pet ? avatar(pet.key, { form: Math.max(1, pet.form ?? 1), size: 'mini' }) : ''}<svg viewBox="0 0 40 40"><circle cx="20" cy="20" r="18"/><circle class="v" id="rl-skill-ring" cx="20" cy="20" r="18"/></svg><em>위로 쓸기!</em></button>`, 'fighthud');
   const reel = $('rl-reel'), pov = $('rl-pov');
   const down = e => { e.preventDefault(); R.f.holding = true; reel.classList.add('hold'); R.f.swipeX = e.clientX; R.f.swipeY = e.clientY; R.f.swipeAt = performance.now(); };
   const up = e => { e?.preventDefault?.(); if (R?.f) R.f.holding = false; reel.classList.remove('hold'); };
   reel.onpointerdown = down; reel.onpointerup = up; reel.onpointercancel = up;
   reel.onpointerleave = e => { if (e.pointerType === 'mouse') up(e); };
+  for (const b of [$('rl-sl'), $('rl-sr')]) b.onpointerdown = e => { e.preventDefault(); e.stopPropagation(); side(Number(b.dataset.side), b); };
   // 스와이프: 누른 채 끌거나, 화면 어디서든 쓸기. 좌우 = 반대로 당기기, 위 = 펫 특기.
   R.swipe = { down: e => { if (e.target.closest('.rl-reelbtn')) return; R.f && Object.assign(R.f, { gx: e.clientX, gy: e.clientY, gAt: performance.now() }); },
     move: e => {
@@ -444,9 +450,9 @@ function fight() {
 const TUT = [
   { id: 'hold', cue: '릴 버튼을 <b>꾹</b> 눌러 감아요', hand: 'hold' },
   { id: 'red', cue: '계속 감으면 고리가 <b>빨개져요</b>.<br>빨간색이 되면 <b>손을 떼요!</b>', hand: 'hold' },
-  { id: 'run', cue: '', hand: 'swipe' },
+  { id: 'mash', cue: '', hand: 'mash' },
+  { id: 'rhythm', cue: '', hand: '' },
   { id: 'thrash', cue: '', hand: 'off' },
-  { id: 'dive', cue: '', hand: 'hold' },
   { id: 'skill', cue: '펫 특기 구슬이 가득!<br>화면을 <b>위로 쓸어 올려요</b>', hand: 'up' },
   { id: 'free', cue: '좋아요! 이제 <b>끝까지</b> 감아요', hand: '' }
 ];
@@ -458,7 +464,7 @@ function tutNext() {
   if (!S) return;
   const hand = $('rl-tuthand');
   if (hand) { hand.hidden = !S.hand; hand.className = `rl-tuthand ${S.hand}`; }
-  if (S.id === 'run' || S.id === 'thrash' || S.id === 'dive') startMove(performance.now(), S.id);
+  if (S.id === 'mash' || S.id === 'rhythm' || S.id === 'thrash') startMove(performance.now(), S.id);
   else cue(`<span class="rl-cue-tut"><small>손맛 연습 ${t.step + 1} / ${TUT.length}</small><span>${S.cue}</span></span>`, 'tut', S.id === 'free' ? 2200 : 0);
   if (S.id === 'skill') f.skill = 100;
   if (S.id === 'free') { later(() => { if ($('rl-tuthand')) $('rl-tuthand').hidden = true; }, 200); f.next = performance.now() + 2500; }
@@ -474,25 +480,34 @@ function tutStep(dt, zone) {
     if (zone === 'red' && !t.sawRed) { t.sawRed = true; cue('<span class="rl-cue-big thrash">지금! <b>손 떼기!</b></span>', 'thrash'); const h = $('rl-tuthand'); if (h) h.className = 'rl-tuthand off'; }
     if (t.sawRed === true && !f.holding && f.tension < 72) { cue('<span class="rl-cue-big ok">잘했어요!</span>', 'ok', 700); later(tutNext, 800); t.sawRed = 'done'; }
   } else if (S.id === 'thrash' && m?.kind === 'thrash' && !f.holding && (m.free = (m.free || 0) + dt) > 1) endMove(true);
-  else if (S.id === 'dive' && m?.kind === 'dive' && f.holding && (m.hold = (m.hold || 0) + dt) > 1.6) endMove(true);
 }
 function offSwipe() {
   const pov = $('rl-pov');
   if (R?.swipe) { pov?.removeEventListener('pointerdown', R.swipe.down); pov?.removeEventListener('pointermove', R.swipe.move); removeEventListener('pointerup', R.swipe.up); R.swipe = null; }
 }
 function pickMove() {
-  const m = R.live.fight.moves || { run: 1 }, total = Object.values(m).reduce((a, b) => a + b, 0);
+  const m = R.live.fight.moves || { mash: 1 }, total = Object.values(m).reduce((a, b) => a + b, 0);
   let r = Math.random() * total;
   for (const [k, w] of Object.entries(m)) if ((r -= w) <= 0) return k;
-  return 'run';
+  return 'mash';
 }
 function startMove(t, forced = null) {
   const f = R.f, kind = forced || pickMove(), F = R.live.fight;
-  if (kind === 'run') {
-    const dir = f.x < R.W * .35 ? 1 : f.x > R.W * .65 ? -1 : Math.random() < .5 ? -1 : 1;
-    f.move = { kind, dir, until: t + 2100, need: F.swipes || 2, done: 0 };
-    cue(`<span class="rl-cue-big run ${dir < 0 ? 'to-r' : 'to-l'}"><i class="rl-arrow"></i>반대로 당겨!<small>${dir < 0 ? '오른쪽' : '왼쪽'}으로 쓸기 · ${f.move.need}번</small></span>`, 'run');
-    sfx('slash', { rate: .75, gain: .8 }); buzz([60, 40, 60]); say(dir < 0 ? '왼쪽으로 도망가!' : '오른쪽으로 도망가!', 1500);
+  if (kind === 'mash') {
+    // 탈출 시도: 좌우 버튼을 번갈아 연타(같은 쪽을 두 번은 안 쳐요).
+    f.move = { kind, until: t + 2600, need: F.taps || 10, got: 0, last: 0 };
+    cue(`<span class="rl-cue-big mash">탈출 시도!<small>◀ ▶ 번갈아 연타!</small></span>`, 'mash');
+    qte(`<div class="rl-mash"><span><i id="rl-mash-fill"></i></span><b id="rl-mash-n">0 / ${f.move.need}</b></div>`);
+    sfx('slash', { rate: .75, gain: .8 }); sfx('boss-roar', { gain: .35, rate: 1.6 }); buzz([60, 40, 60]); say('도망가려고 해! 연타!', 1500);
+  } else if (kind === 'rhythm') {
+    // 리듬: 위에서 내려오는 노트가 동그라미에 닿을 때 그쪽 버튼.
+    const n = F.notes || 6, beat = F.beat || 500, t0 = t + 1100;
+    const notes = []; let at = t0;
+    for (let k = 0; k < n; k++) { notes.push({ side: Math.random() < .5 ? -1 : 1, at, done: '' }); at += beat * (k % 4 === 3 ? 1.5 : 1); }
+    f.move = { kind, until: at + 600, notes, hit: 0, perfect: 0, combo: 0 };
+    cue(`<span class="rl-cue-big rhythm">리듬을 타요!<small>노트가 동그라미에 닿을 때 톡!</small></span>`, 'rhythm', 1100);
+    qte(`<div class="rl-lanes"><div class="rl-lane l"><i class="rl-hitring"></i></div><div class="rl-lane r"><i class="rl-hitring"></i></div><div class="rl-notes" id="rl-notes">${notes.map((x, k) => `<i class="rl-note ${x.side < 0 ? 'l' : 'r'}" data-k="${k}" data-at="${x.at.toFixed(0)}"></i>`).join('')}</div><b class="rl-combo" id="rl-combo"></b><em class="rl-judge" id="rl-judge"></em></div>`);
+    sfx('ult-riser', { gain: .45, rate: 1.2 }); buzz([20, 60, 20]); say('리듬 타자!', 1200);
   } else if (kind === 'thrash') {
     f.move = { kind, until: t + 1300, held: 0 };
     cue('<span class="rl-cue-big thrash">날뛴다! <b>손 떼기!</b></span>', 'thrash');
@@ -502,46 +517,89 @@ function startMove(t, forced = null) {
     cue('<span class="rl-cue-big dive">잠수! <b>꾹 버티기!</b></span>', 'dive');
     sfx('boss-charge', { gain: .5, rate: 1.3 }); buzz(120); say('꽉 잡아!', 1200);
   }
-  if (forced) f.move.until = t + 1e9; // 연습: 해낼 때까지 기다린다
-  if (forced === 'run') { const h = $('rl-tuthand'); if (h) h.className = `rl-tuthand swipe ${f.move.dir < 0 ? 'to-r' : 'to-l'}`; }
+  if (forced && kind !== 'rhythm') f.move.until = t + 1e9; // 연습: 해낼 때까지 기다린다(리듬은 노트가 끝나면)
   $('rl-pov').dataset.move = kind;
 }
+const qte = html => { const el = $('rl-qte'); if (el) { el.innerHTML = html; el.classList.toggle('on', !!html); } };
+const MOVE_OK = { mash: '빠져나가지 못했어요!', rhythm: '리듬 성공!', thrash: '잘 풀어 줬어요!', dive: '버텼다!' };
+const MOVE_BAD = { mash: '끌려갔어요…', rhythm: '박자를 놓쳤어요…', thrash: '줄이 출렁!', dive: '깊이 들어갔어요…' };
 function endMove(ok) {
   const f = R.f, m = f.move;
   if (!m) return;
   f.move = null;
   $('rl-pov').dataset.move = '';
+  qte('');
+  if (R.tut && m.kind === 'rhythm') ok = true; // 연습에서는 끝까지 하면 성공
   if (ok) {
-    f.skill = Math.min(100, f.skill + (m.kind === 'run' ? 22 : 16)); f.dist = Math.max(0, f.dist - 1.5);
-    cue(`<span class="rl-cue-big ok">${m.kind === 'run' ? '버텼다!' : m.kind === 'thrash' ? '잘 풀어 줬어요!' : '버텼다!'}</span>`, 'ok', 700);
-    sfx('shield-block', { gain: .6 }); buzz(20);
+    const big = m.kind === 'mash' || m.kind === 'rhythm';
+    f.skill = Math.min(100, f.skill + (big ? 24 : 16)); f.dist = Math.max(0, f.dist - (big ? 3 : 1.5));
+    const extra = m.kind === 'rhythm' && m.perfect ? `<small>퍼펙트 ${m.perfect} · 콤보 최대 ${m.best || m.combo}</small>` : '';
+    cue(`<span class="rl-cue-big ok">${MOVE_OK[m.kind]}${extra}</span>`, 'ok', 900);
+    sfx('shield-block', { gain: .6 }); if (big) { sfx('combo', { gain: .6 }); flash(); R.rig.vb = 6; } buzz(big ? [20, 30, 60] : 20);
   } else {
     f.dist = Math.min(f.max * 1.2, f.dist + (m.kind === 'dive' ? 2 : 3)); f.tension = Math.min(100, f.tension + 12);
-    cue(`<span class="rl-cue-big bad">${m.kind === 'run' ? '끌려갔어요…' : m.kind === 'thrash' ? '줄이 출렁!' : '깊이 들어갔어요…'}</span>`, 'bad', 700);
+    cue(`<span class="rl-cue-big bad">${MOVE_BAD[m.kind]}</span>`, 'bad', 800);
     sfx('type-wrong', { gain: .5 });
   }
   f.next = performance.now() + rnd(R.live.fight.dash);
-  if (ok && R.tut && ['run', 'thrash', 'dive'].includes(TUT[R.tut.step]?.id)) later(tutNext, 800);
+  if (ok && R.tut && ['mash', 'rhythm', 'thrash'].includes(TUT[R.tut.step]?.id)) later(tutNext, 900);
+}
+// 좌우 버튼(또는 좌우 쓸기): 탈출 연타 · 리듬 노트.
+function side(dir, b = null) {
+  const f = R?.f, m = f?.move;
+  if (!f || R.phase !== 'fight') return;
+  b = b || $(dir < 0 ? 'rl-sl' : 'rl-sr');
+  b?.classList.remove('tap'); void b?.offsetWidth; b?.classList.add('tap');
+  R.rig.vd += dir * 5;
+  if (m?.kind === 'mash') {
+    if (dir === m.last) { pop('번갈아!', 'warn'); sfx('type-wrong', { gain: .35 }); return; }
+    m.last = dir; m.got++;
+    f.tension = Math.max(25, f.tension - 3);
+    sfx('type-ok', { rate: .9 + Math.min(1, m.got / m.need) * .9, gain: .6 }); buzz(10);
+    fx('pull', R.fishPx?.[0] ?? R.W / 2, R.fishPx?.[1] ?? R.H * .55);
+    const k = Math.min(1, m.got / m.need);
+    const fill = $('rl-mash-fill'); if (fill) fill.style.transform = `scaleX(${k.toFixed(3)})`;
+    const n = $('rl-mash-n'); if (n) n.textContent = `${Math.min(m.got, m.need)} / ${m.need}`;
+    $('rl-qte')?.classList.toggle('hot', k > .7);
+    if (m.got >= m.need) endMove(true);
+    return;
+  }
+  if (m?.kind === 'rhythm') {
+    const now = performance.now();
+    const note = m.notes.find(x => !x.done && x.side === dir && Math.abs(x.at - now) <= 190);
+    if (!note) { f.tension = Math.min(100, f.tension + 3); judge('빗나감', 'miss', dir); m.combo = 0; return; }
+    const d = Math.abs(note.at - now), kind = d <= 85 ? 'perfect' : 'good';
+    note.done = kind; m.hit++; m.combo++; m.best = Math.max(m.best || 0, m.combo); if (kind === 'perfect') m.perfect++;
+    f.dist = Math.max(f.max * (R.tut ? .35 : 0), f.dist - (kind === 'perfect' ? 1 : .6)); f.skill = Math.min(100, f.skill + 3);
+    sfx(kind === 'perfect' ? 'type-ok' : 'tick', { rate: 1 + Math.min(8, m.combo) * .08, gain: .7 }); buzz(kind === 'perfect' ? 18 : 8);
+    judge(kind === 'perfect' ? 'PERFECT' : 'GOOD', kind, dir);
+    document.querySelector(`.rl-note[data-k="${m.notes.indexOf(note)}"]`)?.classList.add('hit', kind);
+    return;
+  }
+  f.tension = Math.max(0, f.tension - 1.5);
+}
+function judge(text, kind, dir) {
+  const el = $('rl-judge'), c = $('rl-combo'), m = R.f?.move;
+  if (el) { el.textContent = text; el.className = `rl-judge ${kind} ${dir < 0 ? 'l' : 'r'}`; void el.offsetWidth; el.classList.add('show'); }
+  if (c && m) { c.textContent = m.combo > 1 ? `${m.combo} 콤보` : ''; c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump'); }
 }
 function swipe(dir) {
   const f = R?.f;
   if (!f || R.phase !== 'fight') return;
+  if (f.move && (f.move.kind === 'mash' || f.move.kind === 'rhythm')) return side(dir);
   R.rig.vd += dir * 4;
-  if (!f.move || f.move.kind !== 'run') { f.tension = Math.max(0, f.tension - 2); return; }
-  if (dir === -f.move.dir) {
-    f.move.done++; f.tension = Math.max(0, f.tension - 13);
-    fx('pull', R.W * (dir < 0 ? .3 : .7), R.H * .55);
-    sfx('type-ok', { rate: 1 + f.move.done * .12, gain: .6 }); buzz(14);
-    if (f.move.done >= f.move.need) endMove(true);
-  } else { f.tension += 8; sfx('type-wrong', { gain: .4 }); buzz(30); }
+  f.tension = Math.max(0, f.tension - 2);
 }
 function fightStep(t, dt) {
   const f = R.f, F = R.live.fight, pull = F.pull || 1;
   const m = f.move;
   // 텐션: 감으면 오르고 풀면 내린다. 물고기 힘이 출렁인다.
-  f.tension += f.holding ? (40 + pull * 22) * dt : -48 * dt;
-  f.tension += pull * (Math.sin(t / 330) * 8 + Math.sin(t / 97) * 4) * dt;
-  if (m?.kind === 'run') f.tension += pull * 42 * dt;
+  // 탈출 연타 · 리듬 중에는 감기보다 버튼이 중요: 텐션은 가운데로 모인다.
+  if (m?.kind === 'mash' || m?.kind === 'rhythm') f.tension += (58 - f.tension) * Math.min(1, dt * 2.5);
+  else {
+    f.tension += f.holding ? (40 + pull * 22) * dt : -48 * dt;
+    f.tension += pull * (Math.sin(t / 330) * 8 + Math.sin(t / 97) * 4) * dt;
+  }
   if (m?.kind === 'thrash' && f.holding) { f.tension += 95 * dt; m.held += dt; }
   if (m?.kind === 'dive') f.tension += (f.holding ? 26 : 8) * pull * dt;
   f.tension = clamp(f.tension, 0, 100);
@@ -551,7 +609,14 @@ function fightStep(t, dt) {
   if (f.holding) f.dist -= (zone === 'green' ? 2.5 : zone === 'blue' ? 1 : .55) / Math.pow(pull, .35) * dt;
   else f.dist += .55 * pull * dt;
   if (m?.kind === 'dive' && !f.holding) f.dist += 2.2 * dt;
-  if (m?.kind === 'run') f.dist += .8 * dt;
+  if (m?.kind === 'mash') f.dist += 1.4 * pull * dt;
+  if (m?.kind === 'rhythm') {
+    // 지나간 노트는 놓침
+    for (const [k, x] of m.notes.entries()) if (!x.done && t - x.at > 190) { x.done = 'miss'; m.combo = 0; f.dist = Math.min(f.max * 1.2, f.dist + .8); f.tension = Math.min(100, f.tension + 5); judge('MISS', 'miss', x.side); document.querySelector(`.rl-note[data-k="${k}"]`)?.classList.add('gone'); sfx('type-wrong', { gain: .35 }); }
+    const lane = $('rl-notes'), H = lane?.clientHeight || 220;
+    if (lane) for (const el of lane.children) { const at = Number(el.dataset.at), k = 1 - (at - t) / 1100; el.style.transform = `translateY(${(clamp(k, -.1, 1.2) * H).toFixed(1)}px)`; el.style.opacity = k < -.05 ? 0 : 1; }
+    if (m.notes.every(x => x.done)) { endMove(m.hit / m.notes.length >= .6); }
+  }
   f.dist = clamp(f.dist, 0, f.max * 1.25);
   if (zone === 'green' && f.holding) f.skill = Math.min(100, f.skill + 7 * dt);
   // 연습: 줄이 끊기거나 빠지지 않고, 마지막 단계 전에는 끝까지 오지 않는다.
@@ -565,21 +630,21 @@ function fightStep(t, dt) {
   f.slackFor = f.tension <= 2 ? f.slackFor + dt : 0;
   if (f.redFor > .75) return lose('줄이 끊어졌어요! 빨간색이면 손을 떼요', 'snap');
   if (f.slackFor > 3.5) return lose('줄이 느슨해져서 물고기가 빠져나갔어요', 'slack');
-  if (m && t > m.until) endMove(m.kind === 'thrash' ? m.held < .35 : m.kind === 'dive' ? f.dist < f.max * 1.2 && f.redFor === 0 : false);
+  if (f.move && t > f.move.until) endMove(m.kind === 'thrash' ? m.held < .35 : m.kind === 'dive' ? f.dist < f.max * 1.2 && f.redFor === 0 : m.kind === 'rhythm' ? m.hit / m.notes.length >= .6 : false);
   else if (!m && t > f.next && (!R.tut || R.tut.step >= TUT.length - 1)) startMove(t);
   if (f.dist <= 0) return finish();
   // 물고기 위치: 멀면 수평선 가까이(작게), 가까우면 아래로(크게).
   const near = 1 - f.dist / f.max;
-  const tx = m?.kind === 'run' ? R.W * (m.dir < 0 ? .12 : .88) : R.W * (.5 + Math.sin(t / 1100) * .22);
-  f.x += (tx - f.x) * Math.min(1, dt * (m?.kind === 'run' ? 2.6 : 1.1));
+  const tx = m?.kind === 'mash' ? R.W * (.5 + Math.sin(t / 160) * .3) : R.W * (.5 + Math.sin(t / 1100) * .22);
+  f.x += (tx - f.x) * Math.min(1, dt * (m?.kind === 'mash' ? 6 : 1.1));
   f.depth = m?.kind === 'dive' ? Math.min(1, (f.depth || 0) + dt * 2) : Math.max(0, (f.depth || 0) - dt * 2);
   const y = R.H * lerp(.47, .7, clamp(near, 0, 1)) + Math.sin(t / 380) * 4;
   R.fishPx = [f.x, y];
   const sh = $('rl-shadow');
   sh.style.transform = `translate(${f.x.toFixed(1)}px,${y.toFixed(1)}px) scale(${(lerp(.55, 1.25, clamp(near, 0, 1)) * (1 - f.depth * .35)).toFixed(3)})`;
-  sh.classList.toggle('flip', (m?.kind === 'run' ? m.dir : Math.cos(t / 1100)) < 0);
+  sh.classList.toggle('flip', (m?.kind === 'mash' ? Math.cos(t / 160) : Math.cos(t / 1100)) < 0);
   sh.classList.toggle('deep', f.depth > .3);
-  sh.classList.toggle('thrash', m?.kind === 'thrash');
+  sh.classList.toggle('thrash', m?.kind === 'thrash' || m?.kind === 'mash');
   // 낚싯대: 텐션만큼 휘고 물고기 쪽으로 기운다.
   R.rig.tBend = .18 + f.tension / 100 * .85 + (m?.kind === 'thrash' ? Math.sin(t / 45) * .08 : 0);
   R.rig.tDir = clamp((f.x - R.W * .62) / (R.W * .45), -1, 1);
@@ -613,7 +678,7 @@ function useSkill() {
   if (R.tut && TUT[R.tut.step]?.id === 'skill') later(tutNext, 1000);
 }
 async function lose(msg, why) {
-  offSwipe();
+  offSwipe(); qte('');
   $('rl-tuthand')?.remove(); R.tut = null;
   setPhase('lost');
   R.rig.spin = 0;
@@ -640,7 +705,7 @@ function practice() {
 
 /* ---------- ④ 마무리: 물고기가 뛰어오른다(슬로모션) → 고리가 맞을 때 탭 ---------- */
 function finish() {
-  offSwipe();
+  offSwipe(); qte('');
   setPhase('finish');
   R.rig.spin = 0; R.rig.tBend = .9;
   const f = R.f, [x, y] = R.fishPx;
@@ -931,7 +996,7 @@ function guide(first) {
       <li><b>미끼로 낚아요</b><p>공부하면 미끼를 받아요 <em>(하루 최대 ${REEL.BAIT_DAILY}개)</em>. 연습을 끝까지 풀면(10문제 이상) 1개, 짝 맞추기 별 3개면 1개, 출석하면 1개. 미끼 1개로 한 번 던져요. 놓치면 미끼는 사라져요.</p></li>
       <li><b>던지고 · 챔질</b><p>아래 버튼을 <b>꾹</b> 눌러 반원 게이지가 <b>금색</b>일 때 떼면 퍼펙트(귀한 물고기가 더 잘 와요). 찌가 <b>톡톡</b>하는 건 가짜! <b>쑥</b> 들어가면 바로 탭!</p></li>
       <li><b>손맛 파이팅</b><p>릴 버튼을 <b>꾹</b> 누르면 감겨요. 고리가 <b>빨간색</b>이면 손을 떼요(줄이 끊어져요).
-        <span class="rl-guide-moves"><span><b>돌진</b>반대쪽으로 쓸기</span><span><b>날뜀</b>손 떼기</span><span><b>잠수</b>꾹 버티기</span></span>
+        <span class="rl-guide-moves"><span><b>탈출 시도</b>◀ ▶ 번갈아 연타</span><span><b>리듬</b>노트 맞춰 톡</span><span><b>날뜀</b>손 떼기</span><span><b>잠수</b>꾹 버티기</span></span>
         펫 특기 구슬이 차면 <b>위로 쓸어 올려</b> 한 번에 끌어와요. 물고기가 뛰어오르면 고리가 맞을 때 탭 → 퍼펙트(무게 +8%)!</p></li>
       <li><b>물고기를 진주로</b><p>낚은 물고기는 <b>수조</b>에서 헤엄쳐요. 팔면 진주가 돼요. 팔아도 도감 기록은 남아요.</p>
         <div class="rl-guide-table">${['common', 'uncommon', 'rare', 'epic', 'legend'].map(r => `<span>${STAR(stars(r))}<b>${esc(RARITY[r].name)}</b><em>${num(REEL.PEARLS[r])}</em></span>`).join('')}</div></li>

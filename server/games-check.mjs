@@ -205,14 +205,14 @@ export async function runGamesChecks(assert) {
     assert(done.egg && p.gift_box.log.some(g => g.kind === 'egg' && g.from_name === '낚시터') && !p.reel.net?.goldenegg, 'V13.150 황금 알 물고기는 팔지 않고 모아 3마리면 알 선물');
     // V13.150 1인칭 손맛: 등급마다 처음 거리 · 성격(돌진 · 날뜀 · 잠수) · 돌진을 막는 스와이프 수. 던질 때 받지만 어떤 물고기인지는 모른다.
     const R2 = ['common', 'uncommon', 'rare', 'epic', 'legend', 'golden'];
-    assert(R2.every(r => FIGHT[r].dist > 0 && ['run', 'thrash', 'dive'].every(k => FIGHT[r].moves[k] > 0) && FIGHT[r].swipes >= 2) && FIGHT.legend.dist > FIGHT.common.dist && FIGHT.legend.swipes > FIGHT.common.swipes,
-      'V13.150 손맛 파이팅: 귀할수록 멀리서 시작하고 돌진을 막기 어렵다');
+    assert(R2.every(r => FIGHT[r].dist > 0 && ['mash', 'rhythm', 'thrash', 'dive'].every(k => FIGHT[r].moves[k] > 0) && FIGHT[r].taps >= 10 && FIGHT[r].notes >= 6 && FIGHT[r].beat >= 300) && FIGHT.legend.dist > FIGHT.common.dist && FIGHT.legend.taps > FIGHT.common.taps && FIGHT.legend.notes > FIGHT.common.notes && FIGHT.legend.beat < FIGHT.common.beat,
+      'V13.150 손맛 파이팅: 귀할수록 멀리서 시작하고, 탈출 연타는 더 많이 · 리듬은 더 빠르고 길게');
     {
       const q = { id: 'fin-test', pets: [{ key: 'dog' }], reel: { bait: 3 } };
       let sd = 1; while (reelRoll(sd, 'ok').key === 'goldenegg') sd++;
       const c = reelCast(q, { id: 'f1', cast: 'ok', now, seed: sd });
       const base = q.reel.live.kg, rar = q.reel.live.rarity;
-      assert(c.fight.dist === FIGHT[rar].dist && c.fight.swipes === FIGHT[rar].swipes && JSON.stringify(c.fight.moves) === JSON.stringify(FIGHT[rar].moves) && !JSON.stringify(c).includes(q.reel.live.key), 'V13.150 던지기: 파이팅 성격만 보내고 물고기는 숨긴다');
+      assert(c.fight.dist === FIGHT[rar].dist && c.fight.taps === FIGHT[rar].taps && c.fight.notes === FIGHT[rar].notes && c.fight.beat === FIGHT[rar].beat && JSON.stringify(c.fight.moves) === JSON.stringify(FIGHT[rar].moves) && !JSON.stringify(c).includes(q.reel.live.key), 'V13.150 던지기: 파이팅 성격만 보내고 물고기는 숨긴다');
       const won = reelLand(q, { id: 'f1', result: 'caught', finish: 'perfect', now: now + FIGHT[rar].min + 10 });
       assert(won.perfect && won.kg === Math.round(base * FINISH.PERFECT_KG * 100) / 100 && q.games.fish.book[won.key].kg === won.kg, 'V13.150 마무리 퍼펙트: 무게 +8%는 서버가 곱해 도감에 남긴다');
       reelCast(q, { id: 'f2', cast: 'ok', now: now + 60000, seed: sd });
@@ -239,15 +239,15 @@ export async function runGamesChecks(assert) {
       const { reelView } = await import('./reel.mjs');
       const reelJs = source('../public/modules/reel.js'), svc = source('./service.mjs');
       assert(reelView({ reel: { tut: true } }).tut === true && reelView({}).tut === false && svc.includes('if (body.tutorial) r.tut = true')
-        && ["id: 'hold'", "id: 'red'", "id: 'run'", "id: 'thrash'", "id: 'dive'", "id: 'skill'", "id: 'free'"].every(k => reelJs.includes(k))
+        && ["id: 'hold'", "id: 'red'", "id: 'mash'", "id: 'rhythm'", "id: 'thrash'", "id: 'skill'", "id: 'free'"].every(k => reelJs.includes(k))
         && reelJs.includes("f.tension = Math.min(f.tension, 96); f.slackFor = 0;") && reelJs.includes("if (R.live.id === 'practice') { R.live = null; return { practice: true, result }; }") && reelJs.includes("data-rl=\"practice\""),
         'V13.150 첫 손맛 연습: 7단계 안내 · 연습 중에는 줄이 끊기지 않음 · 연습 판은 기록 없음 · 마치면 tut');
     }
     // 1인칭 화면: 코드로 그린 낚싯대가 휘고, 돌진 · 날뜀 · 잠수 · 특기 · 점프 마무리, 수조 어망. 그림 29 이름이 들어오면 갈아 끼운다.
     {
       const reelJs = source('../public/modules/reel.js'), reelCss = source('../public/v13150.css');
-      assert(['function rodGeom', 'function springTo', "kind === 'run'", "kind === 'thrash'", "kind === 'dive'", 'function swipe(', 'function finish(', "finish: finishKind", 'function tank(', "data-rl=\"sell-all\"", "'bait-open'", "'bg-pov'", "'bg-reveal'", "'bg-tank'", "'fx-jump'", "'fx-halo'", "'stamp-new'", "'ribbon-record'", "'icon-net'", "'gauge-distance'", 'navigator.vibrate']
-        .every(k => reelJs.includes(k)) && ['.rl-pov', '.rl-rod-body', '.rl-tring', '.rl-leap', '.rl-rev', '.rl-swim', 'prefers-reduced-motion'].every(k => reelCss.includes(k)) && !source('../public/v13149.css').includes('.rl-under{'),
+      assert(['function rodGeom', 'function springTo', "kind === 'mash'", "kind === 'rhythm'", "kind === 'thrash'", 'function side(', 'function judge(', "addEventListener('contextmenu'", 'function finish(', "finish: finishKind", 'function tank(', "data-rl=\"sell-all\"", "'bait-open'", "'bg-pov'", "'bg-reveal'", "'bg-tank'", "'fx-jump'", "'fx-halo'", "'stamp-new'", "'ribbon-record'", "'icon-net'", "'gauge-distance'", 'navigator.vibrate']
+        .every(k => reelJs.includes(k)) && ['.rl-pov', '.rl-rod-body', '.rl-tring', '.rl-leap', '.rl-rev', '.rl-swim', '.rl-lanes', '.rl-note', '-webkit-touch-callout:none', 'prefers-reduced-motion'].every(k => reelCss.includes(k)) && !source('../public/v13149.css').includes('.rl-under{'),
         'V13.150 1인칭 낚시 화면: 휘는 낚싯대 · 물고기 성격 · 점프 마무리 · 수조 어망, 그림 29 자리, 동작 줄이기');
     }
     const art = source('../docs/asset-requests/runner/26-fishing.txt'), codex = source('../docs/asset-requests/runner/CODEX_PROMPT_26.md'), map = source('../docs/asset-requests/runner/slice-map.csv');

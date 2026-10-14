@@ -48,7 +48,7 @@ export function reelCast(p, { id, cast, water = false, now = Date.now(), seed = 
   r.live = { id, at: now, cast: tier, ...fish };
   const F = FIGHT[fish.rarity];
   // 어떤 물고기인지는 보내지 않는다: 등급마다 같은 세기 · 성격만.
-  return { id, fight: { hp: F.hp, pull: F.pull, dash: F.dash, size: F.size, min: F.min, dist: F.dist, moves: F.moves, swipes: F.swipes }, bait: r.bait };
+  return { id, fight: { hp: F.hp, pull: F.pull, dash: F.dash, size: F.size, min: F.min, dist: F.dist, moves: F.moves, taps: F.taps, notes: F.notes, beat: F.beat }, bait: r.bait };
 }
 // 끌어올리기(또는 놓침). 놓치면 미끼는 사라진다. 같은 끝내기를 다시 보내면 같은 답.
 export function reelLand(p, { id, result, finish = null, now = Date.now(), giftId }) {
