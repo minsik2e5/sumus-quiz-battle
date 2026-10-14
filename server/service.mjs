@@ -1811,7 +1811,9 @@ export async function service(state, method, path, body, token, options = {}) {
   }
   if (path === '/reel/guide' && method === 'POST') {
     requireRole(p, 'student');
-    (p.reel ||= {}).guide = true;
+    // 안내를 봤다(guide) · 첫 손맛 연습을 마쳤다(tutorial). 한 번 true가 되면 그대로.
+    const r = p.reel ||= {};
+    if (body.tutorial) r.tut = true; else r.guide = true;
     return { reel: reelView(p) };
   }
   if (path === '/reel/exchange' && method === 'POST') {

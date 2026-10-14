@@ -232,6 +232,15 @@ export async function runGamesChecks(assert) {
         && (!RR.SEA_READY || SEA_PETS.every(x => core.CHARACTERS[x.key]?.sea && [0, 1, 2, 3].every(f => existsSync(new URL(`../public/assets/pets/${x.key}-${f}.webp`, import.meta.url))))),
         'V13.150 바다 펫 3종: 야차전 특기 있음, 알 확률표 밖, 열 때는 CHARACTERS(sea) 등록과 그림이 있어야 한다');
     }
+    // V13.150 첫 손맛 연습: 첫 판(또는 안내의 연습 판)은 7단계 안내, 줄이 끊기지 않고, 연습 판은 서버에 보내지 않는다. 마치면 tut 기록.
+    {
+      const { reelView } = await import('./reel.mjs');
+      const reelJs = source('../public/modules/reel.js'), svc = source('./service.mjs');
+      assert(reelView({ reel: { tut: true } }).tut === true && reelView({}).tut === false && svc.includes('if (body.tutorial) r.tut = true')
+        && ["id: 'hold'", "id: 'red'", "id: 'run'", "id: 'thrash'", "id: 'dive'", "id: 'skill'", "id: 'free'"].every(k => reelJs.includes(k))
+        && reelJs.includes("f.tension = Math.min(f.tension, 96); f.slackFor = 0;") && reelJs.includes("if (R.live.id === 'practice') { R.live = null; return { practice: true, result }; }") && reelJs.includes("data-rl=\"practice\""),
+        'V13.150 첫 손맛 연습: 7단계 안내 · 연습 중에는 줄이 끊기지 않음 · 연습 판은 기록 없음 · 마치면 tut');
+    }
     // 1인칭 화면: 코드로 그린 낚싯대가 휘고, 돌진 · 날뜀 · 잠수 · 특기 · 점프 마무리, 수조 어망. 그림 29 이름이 들어오면 갈아 끼운다.
     {
       const reelJs = source('../public/modules/reel.js'), reelCss = source('../public/reel.css');

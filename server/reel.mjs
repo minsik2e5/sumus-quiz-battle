@@ -33,7 +33,7 @@ export function reelView(p, now = Date.now()) {
     egg_left: r.egg_day === today ? 0 : 1, epic_left: r.epic_week === weekNum(now) ? 0 : 1,
     book: f.book || {}, kinds: Object.keys(f.book || {}).length, all: FISH_KEYS.length, golden: Number(f.golden || 0) % REEL.GOLDEN_EGG,
     sea: SEA_PETS.map(x => ({ ...x, owned: (p.pets || []).some(pet => pet.key === x.key) })),
-    guide: !!r.guide, live: r.live && now - r.live.at < REEL.LIVE_MS ? { id: r.live.id } : null
+    guide: !!r.guide, tut: !!r.tut, live: r.live && now - r.live.at < REEL.LIVE_MS ? { id: r.live.id } : null
   };
 }
 

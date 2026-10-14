@@ -5,7 +5,7 @@ import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
 import { coinShower } from './celebrate.js';
 import { buyEgg } from './pet-moments.js';
 import { FISH, FISH_KEYS, RARITY, kgText } from './fishing-rules.js';
-import { REEL, SEA_PETS, stars, pearlsOf } from './reel-rules.js';
+import { REEL, SEA_PETS, FIGHT, stars, pearlsOf } from './reel-rules.js';
 import { fishPic, fishShadow } from './fishing-art.js';
 
 // V13.150 손맛 낚시(놀이터), 1인칭 판. 단어 없이 던지기 · 입질 · 파이팅 · 마무리 점프. 미끼는 공부로 번다(server/reel.mjs).
@@ -96,6 +96,7 @@ function onClick(event) {
   if (act === 'egg') return exchangeEgg(b.dataset.item, b);
   if (act === 'sea') return exchangeSea(b.dataset.key, b);
   if (act === 'skill') return useSkill();
+  if (act === 'practice') { closeSheet(); return practice(); }
 }
 
 /* ---------- 1인칭 장면: 배경 · 펫 · 찌 · 물고기 그림자 · 낚싯대(코드 그림) · 줄 ---------- */
@@ -258,7 +259,7 @@ function dock() {
   $('rl-world')?.classList.remove('zoom');
   petFace('idle');
   cue('');
-  const v = R.v || {}, can = Number(v.bait || 0) > 0;
+  const v = R.v || {}, can = R.practice || Number(v.bait || 0) > 0;
   hud(`<div class="rl-bait-can" data-rl="bait" role="button" tabindex="0" aria-label="미끼 ${num(v.bait || 0)}개">${art('bait-open', art('bait-can', '<i class="rl-can-ico big"></i>'))}<b>${num(v.bait || 0)}</b><small>오늘 ${num(v.bait_today || 0)}/${num(v.bait_daily || REEL.BAIT_DAILY)}</small></div>
     <div class="rl-castbox">
       <svg class="rl-arc" id="rl-arc" viewBox="0 0 200 110" aria-hidden="true">
@@ -269,7 +270,7 @@ function dock() {
         <g id="rl-needle"><line x1="100" y1="100" x2="100" y2="24"/><circle cx="100" cy="100" r="7"/></g>
       </svg>
       <button type="button" class="rl-castbtn" id="rl-cast" ${can ? '' : 'disabled'} aria-label="꾹 눌러 던지기">${art('btn-cast', '<span class="rl-castbtn-code"><i></i></span>')}</button>
-      <p class="rl-cast-tip">${can ? '<b>꾹</b> 누르고 <b>금색</b>에서 떼기' : '미끼가 없어요'}</p>
+      <p class="rl-cast-tip">${R.practice ? '<b>연습 판</b> · 미끼를 쓰지 않아요' : can ? '<b>꾹</b> 누르고 <b>금색</b>에서 떼기' : '미끼가 없어요'}</p>
     </div>`, 'dockhud');
   if (!can) say('미끼는 공부하면 받아요!', 3000);
   else if (!R.greeted) { R.greeted = true; later(() => say(['오늘은 큰 게 올 것 같아!', '준비됐어? 던져 보자!', '반짝이는 물결을 노려 봐!'][Math.floor(Math.random() * 3)]), 500); }
@@ -321,10 +322,13 @@ async function cast(k) {
   later(() => { R.rig.tBack = 0; }, 260);
   sfx('slash', { rate: 1.25, gain: .7 }); buzz(18);
   let res;
-  try { res = await api('/reel/cast', { cast: tier }); }
-  catch (err) { toast(err.message); if (R) dock(); return; }
-  if (!R) return;
-  setView(res.reel);
+  if (R.practice) res = { id: 'practice', fight: { ...FIGHT.uncommon, min: 0 } };
+  else {
+    try { res = await api('/reel/cast', { cast: tier }); }
+    catch (err) { toast(err.message); if (R) dock(); return; }
+    if (!R) return;
+    setView(res.reel);
+  }
   R.live = { id: res.id, fight: res.fight, tier, at: performance.now(), minMs: Number(res.fight.min || 0) };
   hud('', 'empty');
   if (tier === 'perfect') { pop('퍼펙트 캐스팅!', 'perfect'); sfx('crit', { rate: 1.2 }); buzz([20, 30, 40]); say('완벽해!'); }
@@ -396,7 +400,7 @@ async function missed(msg) {
   await land('lost');
   if (!R) return;
   $('rl-bob')?.classList.remove('on'); R.bob = null;
-  result(`<div class="rl-miss-art">${fishShadow('carp')}</div><h2>놓쳤어요!</h2><p>${esc(msg)}</p><small>미끼는 사라졌어요.</small>`, 'miss');
+  result(`<div class="rl-miss-art">${fishShadow('carp')}</div><h2>놓쳤어요!</h2><p>${esc(msg)}</p><small>${R.practice ? '연습이라 미끼는 그대로예요. 다시 해 봐요!' : '미끼는 사라졌어요.'}</small>`, 'miss');
 }
 
 /* ---------- ③ 파이팅 ---------- */
@@ -433,7 +437,44 @@ function fight() {
     },
     up: () => { if (R?.f) { R.f.gx = null; R.f.gy = null; } } };
   pov.addEventListener('pointerdown', R.swipe.down); pov.addEventListener('pointermove', R.swipe.move); addEventListener('pointerup', R.swipe.up);
-  if (!R.v?.fought) cue('<span class="rl-cue-soft"><b>꾹</b> 눌러 감고, 빨간색이면 <b>손 떼기</b>!</span>', '', 2600);
+  // V13.150 첫 손맛 연습: 처음 한 판(또는 안내의 '연습 판')은 단계마다 손가락 안내가 나오고 줄이 끊기거나 빠지지 않는다.
+  R.tut = R.practice || !R.v?.tut ? { step: -1, t: 0 } : null;
+  if (R.tut) { $('rl-pov').insertAdjacentHTML('beforeend', '<i class="rl-tuthand" id="rl-tuthand" hidden></i>'); later(tutNext, 700); }
+}
+const TUT = [
+  { id: 'hold', cue: '릴 버튼을 <b>꾹</b> 눌러 감아요', hand: 'hold' },
+  { id: 'red', cue: '계속 감으면 고리가 <b>빨개져요</b>.<br>빨간색이 되면 <b>손을 떼요!</b>', hand: 'hold' },
+  { id: 'run', cue: '', hand: 'swipe' },
+  { id: 'thrash', cue: '', hand: 'off' },
+  { id: 'dive', cue: '', hand: 'hold' },
+  { id: 'skill', cue: '펫 특기 구슬이 가득!<br>화면을 <b>위로 쓸어 올려요</b>', hand: 'up' },
+  { id: 'free', cue: '좋아요! 이제 <b>끝까지</b> 감아요', hand: '' }
+];
+function tutNext() {
+  const t = R.tut, f = R.f;
+  if (!t || !f) return;
+  t.step++; t.t = 0; t.sawRed = false;
+  const S = TUT[t.step];
+  if (!S) return;
+  const hand = $('rl-tuthand');
+  if (hand) { hand.hidden = !S.hand; hand.className = `rl-tuthand ${S.hand}`; }
+  if (S.id === 'run' || S.id === 'thrash' || S.id === 'dive') startMove(performance.now(), S.id);
+  else cue(`<span class="rl-cue-tut"><small>손맛 연습 ${t.step + 1} / ${TUT.length}</small><span>${S.cue}</span></span>`, 'tut', S.id === 'free' ? 2200 : 0);
+  if (S.id === 'skill') f.skill = 100;
+  if (S.id === 'free') { later(() => { if ($('rl-tuthand')) $('rl-tuthand').hidden = true; }, 200); f.next = performance.now() + 2500; }
+  sfx('tick', { rate: 1.3, gain: .5 });
+}
+// 연습 판의 단계 진행(fightStep에서 매 프레임).
+function tutStep(dt, zone) {
+  const t = R.tut, f = R.f, S = TUT[t.step], m = f.move;
+  if (!S) return;
+  if (S.id === 'hold' && f.holding && (t.t += dt) > 1.2) tutNext();
+  else if (S.id === 'red') {
+    if (f.holding) f.tension += 40 * dt;
+    if (zone === 'red' && !t.sawRed) { t.sawRed = true; cue('<span class="rl-cue-big thrash">지금! <b>손 떼기!</b></span>', 'thrash'); const h = $('rl-tuthand'); if (h) h.className = 'rl-tuthand off'; }
+    if (t.sawRed === true && !f.holding && f.tension < 72) { cue('<span class="rl-cue-big ok">잘했어요!</span>', 'ok', 700); later(tutNext, 800); t.sawRed = 'done'; }
+  } else if (S.id === 'thrash' && m?.kind === 'thrash' && !f.holding && (m.free = (m.free || 0) + dt) > 1) endMove(true);
+  else if (S.id === 'dive' && m?.kind === 'dive' && f.holding && (m.hold = (m.hold || 0) + dt) > 1.6) endMove(true);
 }
 function offSwipe() {
   const pov = $('rl-pov');
@@ -445,8 +486,8 @@ function pickMove() {
   for (const [k, w] of Object.entries(m)) if ((r -= w) <= 0) return k;
   return 'run';
 }
-function startMove(t) {
-  const f = R.f, kind = pickMove(), F = R.live.fight;
+function startMove(t, forced = null) {
+  const f = R.f, kind = forced || pickMove(), F = R.live.fight;
   if (kind === 'run') {
     const dir = f.x < R.W * .35 ? 1 : f.x > R.W * .65 ? -1 : Math.random() < .5 ? -1 : 1;
     f.move = { kind, dir, until: t + 2100, need: F.swipes || 2, done: 0 };
@@ -461,6 +502,8 @@ function startMove(t) {
     cue('<span class="rl-cue-big dive">잠수! <b>꾹 버티기!</b></span>', 'dive');
     sfx('boss-charge', { gain: .5, rate: 1.3 }); buzz(120); say('꽉 잡아!', 1200);
   }
+  if (forced) f.move.until = t + 1e9; // 연습: 해낼 때까지 기다린다
+  if (forced === 'run') { const h = $('rl-tuthand'); if (h) h.className = `rl-tuthand swipe ${f.move.dir < 0 ? 'to-r' : 'to-l'}`; }
   $('rl-pov').dataset.move = kind;
 }
 function endMove(ok) {
@@ -478,6 +521,7 @@ function endMove(ok) {
     sfx('type-wrong', { gain: .5 });
   }
   f.next = performance.now() + rnd(R.live.fight.dash);
+  if (ok && R.tut && ['run', 'thrash', 'dive'].includes(TUT[R.tut.step]?.id)) later(tutNext, 800);
 }
 function swipe(dir) {
   const f = R?.f;
@@ -510,13 +554,19 @@ function fightStep(t, dt) {
   if (m?.kind === 'run') f.dist += .8 * dt;
   f.dist = clamp(f.dist, 0, f.max * 1.25);
   if (zone === 'green' && f.holding) f.skill = Math.min(100, f.skill + 7 * dt);
+  // 연습: 줄이 끊기거나 빠지지 않고, 마지막 단계 전에는 끝까지 오지 않는다.
+  if (R.tut) {
+    f.tension = Math.min(f.tension, 96); f.slackFor = 0;
+    if (R.tut.step < TUT.length - 1) f.dist = Math.max(f.dist, f.max * .35);
+    tutStep(dt, zone);
+  }
   // 끝나는 조건
   f.redFor = f.tension >= 98 ? f.redFor + dt : 0;
   f.slackFor = f.tension <= 2 ? f.slackFor + dt : 0;
   if (f.redFor > .75) return lose('줄이 끊어졌어요! 빨간색이면 손을 떼요', 'snap');
   if (f.slackFor > 3.5) return lose('줄이 느슨해져서 물고기가 빠져나갔어요', 'slack');
   if (m && t > m.until) endMove(m.kind === 'thrash' ? m.held < .35 : m.kind === 'dive' ? f.dist < f.max * 1.2 && f.redFor === 0 : false);
-  else if (!m && t > f.next) startMove(t);
+  else if (!m && t > f.next && (!R.tut || R.tut.step >= TUT.length - 1)) startMove(t);
   if (f.dist <= 0) return finish();
   // 물고기 위치: 멀면 수평선 가까이(작게), 가까우면 아래로(크게).
   const near = 1 - f.dist / f.max;
@@ -560,9 +610,11 @@ function useSkill() {
   later(() => document.querySelector('.rl-cutin')?.remove(), 1200);
   Object.assign(R.rig, { tBack: .5 }); R.rig.vb = 10; later(() => { R.rig.tBack = 0; }, 300);
   flash(); sfx('ult-impact'); buzz([30, 30, 140]);
+  if (R.tut && TUT[R.tut.step]?.id === 'skill') later(tutNext, 1000);
 }
 async function lose(msg, why) {
   offSwipe();
+  $('rl-tuthand')?.remove(); R.tut = null;
   setPhase('lost');
   R.rig.spin = 0;
   if (why === 'snap') { Object.assign(R.rig, { tBend: 0, tDir: 0 }); R.rig.vbe = -14; fx('snap', ...rodGeom().tip); sfx('crack'); }
@@ -574,8 +626,16 @@ async function lose(msg, why) {
   if (!R) return;
   later(() => {
     $('rl-shadow').hidden = true; $('rl-shadow').classList.remove('flee'); $('rl-world').classList.remove('zoom', 'shake');
-    result(`<div class="rl-miss-art">${fishShadow('tuna')}</div><h2>${why === 'snap' ? '줄이 끊어졌어요!' : '놓쳤어요!'}</h2><p>${esc(msg)}</p><small>미끼는 사라졌어요. 다음엔 꼭!</small>`, 'miss');
+    result(`<div class="rl-miss-art">${fishShadow('tuna')}</div><h2>${why === 'snap' ? '줄이 끊어졌어요!' : '놓쳤어요!'}</h2><p>${esc(msg)}</p><small>${R.practice ? '연습이라 미끼는 그대로예요. 다시 해 봐요!' : '미끼는 사라졌어요. 다음엔 꼭!'}</small>`, 'miss');
   }, 700);
+}
+
+// 안내의 '연습 판': 미끼를 쓰지 않고 서버에도 기록하지 않는다(물고기도 받지 않는다).
+function practice() {
+  closeTank();
+  R.practice = true;
+  dock();
+  cue('<span class="rl-cue-tut"><small>연습 판</small><span>미끼를 쓰지 않아요. 아래 버튼을 <b>꾹</b> 눌렀다 떼서 던져요!</span></span>', 'tut', 3500);
 }
 
 /* ---------- ④ 마무리: 물고기가 뛰어오른다(슬로모션) → 고리가 맞을 때 탭 ---------- */
@@ -594,8 +654,11 @@ function finish() {
   pov.insertAdjacentHTML('beforeend', `<div class="rl-leap" id="rl-leap" style="--x:${x}px;--y:${y}px;--s:${R.live.fight.size || 1}"><div class="rl-leap-fish">${fishShadow('salmon')}</div><i class="rl-ring" id="rl-ring"></i></div>${reduced() ? '' : '<i class="rl-speed"></i>'}`);
   pov.classList.add('slowmo');
   sfx('ult-riser', { gain: .5 });
-  cue('<span class="rl-cue-big now">고리가 맞을 때 <b>탭!</b></span>', 'now');
-  const t0 = performance.now(), dur = reduced() ? 1400 : 1250;
+  $('rl-tuthand')?.remove();
+  cue(R.tut ? '<span class="rl-cue-tut"><small>마지막!</small><span>노란 고리가 작아져 <b>물고기에 딱 맞을 때 탭!</b></span></span>' : '<span class="rl-cue-big now">고리가 맞을 때 <b>탭!</b></span>', R.tut ? 'tut' : 'now');
+  const t0 = performance.now(), dur = R.tut ? 2000 : reduced() ? 1400 : 1250;
+  if (R.tut && !R.practice && !R.v?.tut) { api('/reel/guide', { tutorial: true }).then(res => setView(res.reel)).catch(() => {}); }
+  R.tut = null;
   let done = false;
   const end = kind => {
     if (done) return; done = true;
@@ -625,10 +688,12 @@ async function landFish(kind) {
   if (left) await wait(left);
   const res = await land('caught', kind);
   if (!R) return;
+  if (res?.practice) return later(() => { document.querySelector('.rl-leap')?.remove(); R.practice = false; result(`<h2>연습 끝! ${kind === 'perfect' ? '퍼펙트까지 완벽해요' : '잘했어요'}</h2><p>이제 진짜 미끼로 낚아 봐요. 첫 판은 이렇게 안내가 함께해요.</p>`, 'practice'); petFace('happy'); }, 500);
   later(() => { document.querySelector('.rl-leap')?.remove(); reveal(res, kind); }, reduced() ? 60 : 650);
 }
 async function land(result, finishKind = null, quiet = false) {
   if (!R?.live) return null;
+  if (R.live.id === 'practice') { R.live = null; return { practice: true, result }; }
   const id = R.live.id;
   for (let i = 0; i < 3; i++) {
     try {
@@ -873,6 +938,7 @@ function guide(first) {
       <li><b>진주로 바꿀 수 있는 것</b>
         <ul><li>${coin()} <b>코인</b>: 진주 1개 = 1코인 (하루 ${num(REEL.COIN_DAILY)}코인까지)</li><li><b>랜덤 알</b>: 진주 ${num(REEL.EGG)}개 (하루 1개)</li><li><b>영웅 알</b>: 진주 ${num(REEL.EPIC_EGG)}개 (일주일 1개)</li><li><b>바다 펫</b>: 진주 ${num(REEL.SEA_PET)}개 · 교환소에서만 만나요!</li><li><b>황금 알 물고기</b>는 팔지 않고 모아요. ${REEL.GOLDEN_EGG}마리면 알 선물!</li></ul></li>
     </ol>
-    <button type="button" class="yl-cta" data-rl="close-sheet">알겠어요!</button>`, 'guide');
+    <button type="button" class="yl-cta" data-rl="close-sheet">알겠어요!</button>
+    <button type="button" class="btn full rl-practice-btn" data-rl="practice">미끼 없이 연습 판 해 보기</button>`, 'guide');
   if (first) api('/reel/guide', {}).then(res => setView(res.reel)).catch(() => {});
 }

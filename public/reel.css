@@ -416,3 +416,24 @@ button.rl-sea-pet img{width:56px;height:56px;object-fit:contain}
 button.rl-sea-pet.confirm{box-shadow:0 0 0 3px #fde047}
 button.rl-sea-pet:disabled{opacity:.55}
 button.rl-sea-pet.owned em{background:#16a34a}
+/* 첫 손맛 연습: 안내 카드 · 손가락 */
+.rl-cue-tut{display:inline-flex;flex-direction:column;align-items:center;gap:4px;max-width:300px;padding:12px 18px;border-radius:20px;background:rgba(255,255,255,.95);color:#0f172a;font-size:16px;font-weight:800;line-height:1.45;box-shadow:0 10px 28px rgba(0,0,0,.3);word-break:keep-all}
+.rl-cue-tut small{font-size:11px;font-weight:900;color:#0e7490;letter-spacing:.04em}
+.rl-cue-tut b{color:#ea580c}
+.rl-tuthand{position:absolute;z-index:9;width:52px;height:60px;pointer-events:none;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 52'%3E%3Cpath d='M16 4a5 5 0 0 1 10 0v18l4-1a5 5 0 0 1 6 5l1 10c1 8-5 14-13 14h-2c-6 0-10-3-13-8L3 33a4 4 0 0 1 6-5l7 6z' fill='%23fff' stroke='%230f172a' stroke-width='2.5' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;filter:drop-shadow(0 4px 8px rgba(0,0,0,.4))}
+.rl-tuthand.hold,.rl-tuthand.off{left:calc(50% + 8px);bottom:calc(36px + env(safe-area-inset-bottom))}
+.rl-tuthand.hold{animation:rl-hhold 1.2s ease-in-out infinite}
+.rl-tuthand.off{animation:rl-hoff 1s ease-in-out infinite}
+.rl-tuthand.up{left:calc(50% - 26px);top:56%;animation:rl-hup 1.2s ease-in-out infinite}
+.rl-tuthand.swipe{left:calc(50% - 26px);top:52%}
+.rl-tuthand.swipe.to-r{animation:rl-hsr 1s ease-in-out infinite}
+.rl-tuthand.swipe.to-l{animation:rl-hsl 1s ease-in-out infinite}
+@keyframes rl-hhold{0%,100%{transform:translateY(0)}30%,70%{transform:translateY(10px) scale(.92)}}
+@keyframes rl-hoff{0%{transform:translateY(8px) scale(.92)}60%,100%{transform:translateY(-30px);opacity:.3}}
+@keyframes rl-hup{from{transform:translateY(40px);opacity:0}30%{opacity:1}to{transform:translateY(-90px);opacity:0}}
+@keyframes rl-hsr{from{transform:translateX(-70px);opacity:0}25%{opacity:1}to{transform:translateX(70px);opacity:0}}
+@keyframes rl-hsl{from{transform:translateX(70px);opacity:0}25%{opacity:1}to{transform:translateX(-70px);opacity:0}}
+.rl-practice-btn{margin-top:4px;background:rgba(255,255,255,.14)!important;color:#fff!important}
+.rl-pov[data-phase="fight"] .rl-cue{top:22%}
+@media(prefers-reduced-motion:reduce){.rl-tuthand{animation:none!important}}
+.rl-cue-tut>span{display:block;text-align:center}
