@@ -536,3 +536,14 @@ button.rl-sea-pet.owned em{background:#16a34a}
 @keyframes rl-hmash{0%{transform:translateX(0)}50%{transform:translateX(calc(100vw - 120px))}}
 @media(prefers-reduced-motion:reduce){.rl-cue-big.mash,.rl-pov[data-move="mash"] .rl-sidebtn{animation:none!important}}
 .rl-guide-moves{grid-template-columns:repeat(2,1fr)}
+/* 그림 29 연결 */
+.rl-speed.art{background:none;mask:none;-webkit-mask:none;display:grid;place-items:center}
+.rl-speed.art>.rl-art{width:140%;height:140%;object-fit:cover;opacity:.75}
+.rl-bob>.rl-art.nib{left:-20px;top:-18px;width:64px;height:64px;opacity:0}
+.rl-bob.nibble>.rl-art.nib{opacity:1}.rl-bob.nibble>:not(.nib){opacity:0}
+.rl-fly-pearl img{width:30px!important;height:30px!important}
+.rl-ico>.rl-art-icon-net,.rl-ico>.rl-art-icon-shop,.rl-ico>.rl-art-icon-book{width:40px;height:40px}
+.rl-bait-can>.rl-art-bait-open{width:64px;height:64px}
+.rl-rev-rays>.rl-art{position:absolute;inset:0;width:100%;height:100%;opacity:.85;filter:drop-shadow(0 0 20px var(--glow))}
+.rl-rev-halo>.rl-art{position:absolute;inset:0;width:100%;height:100%;filter:drop-shadow(0 0 16px var(--glow))}
+.rl-stamp>.rl-art+span{color:#fff;text-shadow:0 1px 2px #7f1d1d}

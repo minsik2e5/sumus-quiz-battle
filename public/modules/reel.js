@@ -16,8 +16,15 @@ import { fishPic, fishShadow } from './fishing-art.js';
 //     텐션이 빨간 칸 끝에 오래 있으면 줄이 끊기고, 오래 느슨하면 빠져나간다. 펫 특기 구슬이 차면 위로 쓸어 올려 한 번에 끌어온다.
 //   마무리: 거리가 0이 되면 물고기가 뛰어오른다(슬로모션). 고리가 맞을 때 탭하면 퍼펙트(무게 +8%, 서버가 곱한다).
 // 낚싯대는 코드로 그린다(휘는 정도 · 방향이 매 프레임 바뀐다). 그림(주문서 26 · 27 · 29)은 FISHING_ART에 이름이 있으면 쓴다.
+// V13.150 그림 29(1인칭 배경 · 수조 · 공개 · 효과 · 아이콘)가 들어왔다. 1인칭 낚싯대 그림(pov-rod*)은 휘는 코드 낚싯대가 손맛에 더 좋아 쓰지 않는다.
 export const FISHING_ART = new Set([
-  'bait-can', 'bg-entry', 'bg-sea', 'bg-under', 'bobber', 'bobber-bite', 'btn-cast', 'btn-left', 'btn-reel', 'btn-right', 'fx-perfect', 'fx-ripple', 'fx-splash', 'fx-star', 'hook', 'line-snap', 'lure-gold', 'lure-shrimp', 'lure-spinner', 'lure-worm', 'net', 'pearl', 'power', 'reel', 'rod', 'rod-bend1', 'rod-bend2', 'shop', 'skill-empty', 'skill-full', 'tension',
+  'bait-can', 'bait-open', 'bg-entry', 'bg-pov', 'bg-reveal', 'bg-sea', 'bg-tank', 'bg-under', 'bobber', 'bobber-bite',
+  'bobber-nibble', 'bobber-sink', 'btn-cast', 'btn-left', 'btn-reel', 'btn-right', 'btn-special', 'fx-bubbles', 'fx-drops', 'fx-halo',
+  'fx-impact', 'fx-jump', 'fx-perfect', 'fx-rays', 'fx-ripple', 'fx-speed', 'fx-splash', 'fx-star', 'fx-strike', 'gauge-cast',
+  'gauge-distance', 'hint-hand', 'hook', 'icon-book', 'icon-net', 'icon-shop', 'line-snap', 'lure-gold', 'lure-shrimp', 'lure-spinner',
+  'lure-worm', 'net', 'pearl', 'pearl-burst', 'pearl-clam', 'pearl-pile', 'pearl-trail', 'pov-crank', 'pov-reel', 'pov-reel-gold',
+  'pov-reel-hot', 'pov-rod', 'pov-rod-deep', 'pov-rod-left', 'pov-rod-right', 'power', 'reel', 'ribbon-record', 'rod', 'rod-bend1',
+  'rod-bend2', 'shop', 'skill-empty', 'skill-full', 'stamp-new', 'tank-chest', 'tank-coral', 'tank-rock', 'tank-weed', 'tension',
   ...FISH_KEYS.map(k => `hang-${k}`)
 ]);
 const has = name => FISHING_ART.has(name);
@@ -110,7 +117,7 @@ function scene() {
       <div class="rl-bg">${bg || '<div class="rl-sky"><i class="rl-sun"></i><i class="rl-cloud a"></i><i class="rl-cloud b"></i><i class="rl-isle"></i></div><div class="rl-water"><i class="rl-wave w1"></i><i class="rl-wave w2"></i><i class="rl-wave w3"></i></div>'}</div>
       <i class="rl-glint a"></i><i class="rl-glint b"></i><i class="rl-glint c"></i>
       <div class="rl-shadow" id="rl-shadow" hidden><i></i></div>
-      <div class="rl-bob" id="rl-bob">${art('bobber', '<i class="rl-bob-code"></i>')}${has('bobber-bite') ? art('bobber-bite', '', 'bite') : ''}</div>
+      <div class="rl-bob" id="rl-bob">${art('bobber', '<i class="rl-bob-code"></i>')}${has('bobber-sink') ? art('bobber-sink', '', 'bite') : has('bobber-bite') ? art('bobber-bite', '', 'bite') : ''}${has('bobber-nibble') ? art('bobber-nibble', '', 'nib') : ''}</div>
       <div class="rl-fxl" id="rl-fx"></div>
     </div>
     <svg class="rl-rig" id="rl-rig" aria-hidden="true">
@@ -716,7 +723,7 @@ function finish() {
   const pov = $('rl-pov');
   fx('jump', x, y); sfx('burst', { gain: .7 }); buzz([40, 30, 40]);
   // 아직 어떤 물고기인지 모른다: 큰 실루엣이 뛰어오른다.
-  pov.insertAdjacentHTML('beforeend', `<div class="rl-leap" id="rl-leap" style="--x:${x}px;--y:${y}px;--s:${R.live.fight.size || 1}"><div class="rl-leap-fish">${fishShadow('salmon')}</div><i class="rl-ring" id="rl-ring"></i></div>${reduced() ? '' : '<i class="rl-speed"></i>'}`);
+  pov.insertAdjacentHTML('beforeend', `<div class="rl-leap" id="rl-leap" style="--x:${x}px;--y:${y}px;--s:${R.live.fight.size || 1}"><div class="rl-leap-fish">${fishShadow('salmon')}</div><i class="rl-ring" id="rl-ring"></i></div>${reduced() ? '' : has('fx-speed') ? `<i class="rl-speed art">${art('fx-speed', '')}</i>` : '<i class="rl-speed"></i>'}`);
   pov.classList.add('slowmo');
   sfx('ult-riser', { gain: .5 });
   $('rl-tuthand')?.remove();
@@ -902,7 +909,7 @@ async function sell(key, b) {
       const to = $('rl-tank-pearl')?.getBoundingClientRect();
       from.forEach((el, i) => {
         const r = el.getBoundingClientRect(), p = document.createElement('i');
-        p.className = 'rl-fly-pearl'; p.innerHTML = pearlIco();
+        p.className = 'rl-fly-pearl'; p.innerHTML = has('pearl-trail') ? art('pearl-trail', '') : pearlIco();
         p.style.left = `${r.left + r.width / 2}px`; p.style.top = `${r.top + r.height / 2}px`;
         p.style.setProperty('--dx', `${(to?.left ?? 0) + 12 - (r.left + r.width / 2)}px`); p.style.setProperty('--dy', `${(to?.top ?? 0) + 10 - (r.top + r.height / 2)}px`); p.style.animationDelay = `${i * 60}ms`;
         el.classList.add('gone');
