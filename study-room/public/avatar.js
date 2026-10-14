@@ -52,19 +52,25 @@
     { id: 'star', name: '별똥이', unlock: 100 }
   ];
   const SPRITE_CELL = { study: 0, look: 1, rest: 2, yawn: 3, sleep: 4, cheer: 5 };
-  const available = new Set();
+  const available = new Map(); // id → 이미지 주소 (.webp 우선, 없으면 .png)
   const readyCallbacks = [];
   let detecting = null;
 
   // 브라우저에서 어떤 캐릭터 이미지가 실제로 올라와 있는지 확인한다 (없는 캐릭터는 고를 수 없음)
   function detect() {
     if (detecting || typeof Image === 'undefined') return detecting;
-    detecting = Promise.all(CHARACTERS.map((c) => new Promise((resolve) => {
+    const tryLoad = (url) => new Promise((resolve) => {
       const img = new Image();
-      img.onload = () => { available.add(c.id); resolve(); };
-      img.onerror = () => resolve();
-      img.src = `/characters/${c.id}.png`;
-    }))).then(() => { for (const cb of readyCallbacks) cb(); });
+      img.onload = () => resolve(true);
+      img.onerror = () => resolve(false);
+      img.src = url;
+    });
+    detecting = Promise.all(CHARACTERS.map(async (c) => {
+      for (const ext of ['webp', 'png']) {
+        const url = `/characters/${c.id}.${ext}`;
+        if (await tryLoad(url)) { available.set(c.id, url); return; }
+      }
+    })).then(() => { for (const cb of readyCallbacks) cb(); });
     return detecting;
   }
 
@@ -324,7 +330,7 @@
     // 칸 안에서 책상 윗면은 y≈420/512 → 200 기준 약 164
     p.push(`<rect x="0" y="162" width="200" height="38" fill="url(#${id}d)"/><rect x="0" y="162" width="200" height="3" fill="#fbe3c6"/>`);
     p.push(`<ellipse cx="100" cy="178" rx="62" ry="8" fill="#8a5530" opacity=".12"/>`);
-    p.push(`<svg x="0" y="0" width="200" height="200" style="width:200px;height:200px" viewBox="${col * 512} ${row * 512} 512 512"><image href="/characters/${a.kind}.png" width="1536" height="1024"/></svg>`);
+    p.push(`<svg x="0" y="0" width="200" height="200" style="width:200px;height:200px" viewBox="${col * 512} ${row * 512} 512 512"><image href="${available.get(a.kind)}" width="1536" height="1024"/></svg>`);
     p.push(`<g transform="translate(0 10)">${itemSvg(a.item)}</g>`);
     return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="avatar-svg" aria-hidden="true">${p.join('')}</svg>`;
   }

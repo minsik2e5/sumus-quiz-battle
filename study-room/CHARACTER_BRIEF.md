@@ -23,7 +23,7 @@
 - **배경 투명** (책상, 벽 없음 — 앱이 따로 그림)
 - 모든 칸에서 캐릭터의 **크기와 위치가 똑같아야 함**. 자세만 바뀜
 - 칸 안 배치: 캐릭터는 가운데, **아래쪽 20%(y 410~512px)에 펼친 책과 두 손**이 오게. 책상 윗면이 y≈420px 높이라고 생각하고 그 위에 책이 놓인 모습. 캐릭터 몸 아래는 칸 아래 끝에서 잘려도 됨
-- 파일 이름: `characters/<영문id>.png` (예: `characters/bear.png`)
+- 파일 이름: `characters/<영문id>.webp` (권장, 용량이 작음) 또는 `.png` (예: `characters/bear.webp`)
 
 ### 칸 순서 (왼쪽 위부터)
 
@@ -91,6 +91,6 @@ No text, no logo, no background.
 
 ## 5. 받은 뒤 앱 연결
 
-- `study-room/public/characters/<id>.png` 에 넣으면 앱이 칸을 잘라 자세별로 쓴다.
+- `study-room/public/characters/<id>.webp`(또는 `.png`)에 넣으면 앱이 칸을 잘라 자세별로 쓴다.
 - 얼굴 아이콘(순위, 친구 목록)은 3번 칸(rest)의 위쪽을 잘라 쓴다.
 - 빈자리(자리 비움)는 앱이 빈 의자로 그린다.
