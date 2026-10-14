@@ -102,6 +102,9 @@
 
   function random() {
     const r = (n) => Math.floor(Math.random() * n);
+    // 캐릭터 이미지가 있으면 처음부터 열려 있는 동물 중 하나를 고른다
+    const open = CHARACTERS.filter((c) => !c.unlock && available.has(c.id));
+    if (open.length) return { ...DEFAULT, item: ITEMS[1 + r(ITEMS.length - 1)].id, kind: open[r(open.length)].id };
     return {
       hair: HAIR[r(HAIR.length)].id,
       hc: r(HAIR_COLORS.length),
@@ -327,17 +330,19 @@
     const p = [];
     p.push(`<defs><linearGradient id="${id}w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fcf8f3"/><stop offset="1" stop-color="#f2e9df"/></linearGradient><linearGradient id="${id}d" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2d2ac"/><stop offset="1" stop-color="#e2b385"/></linearGradient></defs>`);
     if (!(opts && opts.bare)) p.push(`<rect width="200" height="200" fill="url(#${id}w)"/>`);
-    // 칸 안에서 책상 윗면은 y≈420/512 → 200 기준 약 164
+    // 위쪽에 타이머·이름 자리를 남기려고 85%로 줄여서 아래쪽에 앉힌다 (칸 안 책상 높이 y≈420/512 → 약 165)
     p.push(`<rect x="0" y="162" width="200" height="38" fill="url(#${id}d)"/><rect x="0" y="162" width="200" height="3" fill="#fbe3c6"/>`);
     p.push(`<ellipse cx="100" cy="178" rx="62" ry="8" fill="#8a5530" opacity=".12"/>`);
-    p.push(`<svg x="0" y="0" width="200" height="200" style="width:200px;height:200px" viewBox="${col * 512} ${row * 512} 512 512"><image href="${available.get(a.kind)}" width="1536" height="1024"/></svg>`);
+    p.push(`<svg x="15" y="26" width="170" height="170" style="width:170px;height:170px" viewBox="${col * 512} ${row * 512} 512 512"><image href="${available.get(a.kind)}" width="1536" height="1024"/></svg>`);
     p.push(`<g transform="translate(0 10)">${itemSvg(a.item)}</g>`);
     return `<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" class="avatar-svg" aria-hidden="true">${p.join('')}</svg>`;
   }
 
   // 혼자 모드 등에서 쓰는 얼굴만 있는 동그란 아이콘
   function face(input) {
-    return svg(input, { pose: 'rest' }).replace('viewBox="0 0 200 200"', 'viewBox="46 20 108 108"');
+    const a = normalize(input);
+    const crop = a.kind && available.has(a.kind) ? '36 28 128 128' : '46 20 108 108';
+    return svg(a, { pose: 'rest' }).replace('viewBox="0 0 200 200"', `viewBox="${crop}"`);
   }
 
   return { HAIR, HAIR_COLORS, TOPS, ITEMS, DEFAULT, CHARACTERS, POSES: Object.keys(POSES), normalize, random, svg, face, detect, onReady, character, isAvailable: (id) => available.has(id) };
