@@ -815,3 +815,5 @@
 @media(prefers-reduced-motion:reduce){.rl-hang,.rl-rays-out,.rl-bubbles i,.rl-rays,.rl-cloud,.rl-wave,.rl-entry-sea i{animation:none!important}}
 .rl-hang-svg{width:170px;margin:-40px 0 -30px}
 .rl-sea-silhouette::after{content:'?'!important;filter:none!important;color:rgba(255,255,255,.75);font-weight:900;font-size:28px}
+/* V13.149 테스트 앱 표시 */
+.is-test-app body::before{content:'🧪 테스트 앱 · 운영 데이터 아님';position:fixed;top:calc(env(safe-area-inset-top) + 4px);left:50%;transform:translateX(-50%);z-index:2147483000;pointer-events:none;padding:3px 10px;border-radius:999px;background:#f97316;color:#fff;font:800 11px/1.4 system-ui,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.25);opacity:.92}

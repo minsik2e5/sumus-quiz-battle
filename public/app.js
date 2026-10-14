@@ -22,6 +22,8 @@ import { EGG_PRICE } from './modules/core.js';
 import { openGuardSheet, maybeGuardMoment } from './modules/streak-guard-ui.js';
 import { partyCreateModal, openPartyTv } from './modules/party-tv.js';
 import { openReel } from './modules/reel.js';
+// V13.149 테스트 앱(sumus-voca-test)에서는 화면 위에 '테스트 앱' 표시를 띄워 운영과 헷갈리지 않게 한다.
+if (/^sumus-voca-test\./.test(location.hostname)) document.documentElement.classList.add('is-test-app');
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;

@@ -18,6 +18,7 @@ import { createMutationCoordinator, NO_MUTATION } from '../server/mutation-coord
 import { createLocalRepository, createSupabaseSync } from './local-first.mjs';
 import { partitionState, assembleState, hashText } from './state-parts.mjs';
 import { WRITE_WARN_PCT } from './cf-limits.mjs';
+import { testSeedState } from '../server/test-seed.mjs';
 
 // V13.144 쓰기 모으기: 저장이 연달아 오면 이 시간(ms) 안에 온 변경을 한 번에 쓴다. 오늘 쓴 양이 70%를 넘으면 2배,
 // 90%를 넘으면 4배로 늘린다. 쉬고 있다가 온 저장은 기다리지 않는다. env.VOCA_COMMIT_GROUP_MS로 바꿀 수 있다.
@@ -154,6 +155,29 @@ function createSupabaseRepository(env) {
   };
 }
 
+// V13.149 테스트 앱(env.test, VOCA_STANDALONE=1): Supabase 없이 이 Durable Object 안에만 저장한다.
+// 운영 Supabase 주소 · 키 · 비밀값을 쓰지 않는다. 처음 켤 때만 테스트 계정 데이터(server/test-seed.mjs)를 준다.
+// 백업 번호만 저장해 두어, 한 번 저장한 뒤에는 처음 데이터로 되돌아가지 않는다(번호가 있으면 read가 실패 → 로컬 사본으로 시작).
+const STANDALONE_REV = 'standalone:rev';
+export function createStandaloneRepository(storage) {
+  const revision = async () => Number(await storage.get(STANDALONE_REV)) || 0;
+  const bump = async from => { const next = Math.max(await revision(), Number(from) || 0) + 1; await storage.put(STANDALONE_REV, next); return next; };
+  const none = () => Object.assign(Error('테스트 앱은 외부 백업을 쓰지 않습니다.'), { status: 404 });
+  return {
+    standalone: true,
+    async read() {
+      if (await revision()) throw Object.assign(Error('테스트 앱: 로컬 사본으로 시작합니다.'), { status: 503 });
+      return { revision: 0, state: await testSeedState() };
+    },
+    readRevision: revision,
+    commitSerialized: (json, rev) => bump(rev),
+    // 파트 백업은 없다(404): 동기화는 commitSerialized 하나만 쓴다.
+    async partsRevision() { throw none(); },
+    async readParts() { return { revision: 0, parts: {} }; },
+    async patchParts() { throw none(); }
+  };
+}
+
 // V13.131: 시작(blockConcurrencyWhile, Cloudflare 제한 30초) 안에서 Supabase를 기다리는 시간은 모두 합쳐
 // BOOT_BUDGET_MS까지. 예전에는 파트 번호(12초) + 파트 읽기(20초)처럼 이어지면 32초가 되어 시작이 끊길 수 있었다.
 // 시간이 모자라면 로컬 사본으로 시작한다. 로컬 사본이 없을 때만 남은 시간이 적어도 v12 사본을 5초 더 기다린다.
@@ -179,7 +203,7 @@ export class VocaStateObject {
     this.rates = new Map();
     this.bootWarning = null;
     this.ready = ctx.blockConcurrencyWhile(async () => {
-      this.supabase = createSupabaseRepository(env);
+      this.supabase = env.VOCA_STANDALONE === '1' ? createStandaloneRepository(ctx.storage) : createSupabaseRepository(env);
       this.local = createLocalRepository(ctx.storage);
       if (this.local.migrationError()) this.bootWarning = `옛 저장 방식으로 읽었어요(옮기기 실패): ${this.local.migrationError()}`.slice(0, 300);
       const syncInterval = Number(env.SUPABASE_SYNC_MIN_INTERVAL_MS ?? SYNC_MIN_INTERVAL_MS);
