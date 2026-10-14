@@ -13,14 +13,16 @@ export const REEL = {
   EGG: 600, EGG_DAILY: 1,
   EPIC_EGG: 2000, EPIC_WEEKLY: 1,
   SEA_PET: 4000,
+  SEA_READY: false,       // 바다 펫 그림(주문서 28)이 들어와 core.js CHARACTERS에 등록되면 true(그 전에는 교환소에서 잠김)
   GOLDEN_EGG: 3,          // 황금 알 물고기 3마리 → 랜덤 알 선물
   LIVE_MS: 10 * 60000     // 던진 뒤 이 시간 안에 끝내지 않으면 놓친 것으로
 };
-// 교환소 한정 바다 펫(그림 주문서 28). 그림이 들어와 펫으로 등록되기 전에는 '곧 만나요'로 잠겨 있다.
+// 교환소 한정 바다 펫(그림 주문서 28). 영웅급 · 물 속성 · 야차전 특기 있음(battle-engine.js PET_SKILLS, pet-sim 승률 49~53%).
+// 그림이 들어오면 아래 char를 core.js CHARACTERS에 { ...char, sea: true }로 넣고 REEL.SEA_READY를 true로 바꾼다.
 export const SEA_PETS = [
-  { key: 'dolphin', ko: '퐁당', kind: '돌고래' },
-  { key: 'seahorse', ko: '살랑', kind: '해마' },
-  { key: 'hermitcrab', ko: '집게', kind: '소라게' }
+  { key: 'dolphin', ko: '퐁당', kind: '돌고래', char: { name: 'PONGDANG', ko: '퐁당', type: '아기 돌고래', color: '#3B9BD8', light: '#B8E1F7', soft: '#EEF8FE' } },
+  { key: 'seahorse', ko: '살랑', kind: '해마', char: { name: 'SALLANG', ko: '살랑', type: '아기 해마', color: '#E58BB0', light: '#F8CFE0', soft: '#FFF2F7' } },
+  { key: 'hermitcrab', ko: '집게', kind: '소라게', char: { name: 'JIPGE', ko: '집게', type: '소라게', color: '#E07A4F', light: '#F6C6AE', soft: '#FFF3EC' } }
 ];
 export const CAST_TIERS = ['ok', 'good', 'perfect'];
 // 파이팅 세기(등급마다): 체력(hp, 예전 판 호환) · 당기는 힘 · 행동 간격(ms) · 최소 파이팅 시간(서버가 확인) · 그림자 크기

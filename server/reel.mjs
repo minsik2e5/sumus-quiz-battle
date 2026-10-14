@@ -120,3 +120,17 @@ export function reelSpend(p, item, now = Date.now()) {
   if (Number(r.pearls || 0) < price) fail(`진주가 ${price - Number(r.pearls || 0)}개 부족해요.`);
   return () => { r.pearls -= price; if (item === 'egg') r.egg_day = dayKey(now); else r.epic_week = weekNum(now); };
 }
+// 바다 펫: 교환소에서만, 진주 REEL.SEA_PET개. 그림이 들어오기 전(REEL.SEA_READY가 false)에는 잠겨 있다.
+// 영웅급 펫으로 들어오고(알 상점 · 뽑기 · 선생님 알에서는 나오지 않는다), 이미 함께하는 바다 펫은 다시 못 바꾼다.
+export function reelSeaPet(p, key, now = Date.now(), ready = REEL.SEA_READY) {
+  const sea = SEA_PETS.find(x => x.key === key);
+  if (!sea) fail('바다 펫을 골라 주세요.');
+  if (!ready) fail('바다 펫은 그림이 완성되면 만날 수 있어요. 진주를 모아 두세요!', 409);
+  if ((p.pets || []).some(x => x.key === key)) fail(`이미 ${sea.ko}와 함께하고 있어요.`, 409);
+  const r = reel(p);
+  if (Number(r.pearls || 0) < REEL.SEA_PET) fail(`진주가 ${REEL.SEA_PET - Number(r.pearls || 0)}개 부족해요.`);
+  r.pearls -= REEL.SEA_PET;
+  (p.pets ||= []).push({ key, acquired_at: now, epic: true, sea: true });
+  (p.purchases ||= []).push({ item: 'sea_pet', key, price: 0, pearls: REEL.SEA_PET, at: now });
+  return { key, epic: true, sea: true };
+}

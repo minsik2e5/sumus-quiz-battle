@@ -411,3 +411,8 @@
 .rl-rev-fish,.rl-rev-halo,.rl-rev-rays{top:34%}
 .rl-dist{top:auto;bottom:calc(330px + env(safe-area-inset-bottom))}
 .rl-pov:not([data-phase="dock"]):not([data-phase="result"]):not([data-phase="reveal"]) .rl-side-menu{opacity:0;pointer-events:none}
+button.rl-sea-pet{appearance:none;border:0;color:#fff;font:inherit;cursor:pointer}
+button.rl-sea-pet img{width:56px;height:56px;object-fit:contain}
+button.rl-sea-pet.confirm{box-shadow:0 0 0 3px #fde047}
+button.rl-sea-pet:disabled{opacity:.55}
+button.rl-sea-pet.owned em{background:#16a34a}

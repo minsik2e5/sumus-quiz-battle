@@ -106,9 +106,10 @@ export const LEGENDARY_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTE
 // The pets a student can ever meet (a retired pet such as 불새 is left out of every count and list).
 export const ACTIVE_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].retired);
 export const MYTHIC_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].mythic);
-export const EPIC_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].epic);
+// V13.150 바다 펫(sea)은 낚시 교환소에서만: 영웅 알 · 뽑기 확률표에는 넣지 않는다.
+export const EPIC_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].epic && !CHARACTERS[key].sea);
 export const LIMITED_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].limited);
-export const STANDARD_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].legendary && !CHARACTERS[key].mythic && !CHARACTERS[key].epic && !CHARACTERS[key].limited);
+export const STANDARD_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].legendary && !CHARACTERS[key].mythic && !CHARACTERS[key].epic && !CHARACTERS[key].limited && !CHARACTERS[key].sea);
 // The pet tiers, lowest first: 기본 (the shop egg), 영웅, 전설, 신화 (V13.118). 한정 sits beside them (a season's pets).
 export const petTier = key => CHARACTERS[key]?.mythic ? 'mythic' : CHARACTERS[key]?.legendary ? 'legendary' : CHARACTERS[key]?.epic ? 'epic' : CHARACTERS[key]?.limited ? 'limited' : 'basic';
 // V13.109 시즌 한정: the season's egg is sold from `start` to `end` (Korea time, `end` included).

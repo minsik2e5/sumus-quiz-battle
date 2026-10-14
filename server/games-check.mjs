@@ -173,7 +173,7 @@ export async function runGamesChecks(assert) {
       const epic = await call('qa-gm-b', 'POST', '/reel/exchange', { item: 'epic_egg' });
       assert(egg.key && epic.key && b.pets.length === pets0 + 2 && b.reel.pearls === 5000 - 60 - REEL.EGG - REEL.EPIC_EGG
         && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'egg' }), 409) && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'epic_egg' }), 409)
-        && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'sea_pet' }), 409),
+        && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'sea_pet', key: 'dolphin' }), 409),
         `V13.150 진주 ${REEL.EGG} = 랜덤 알(하루 1), ${REEL.EPIC_EGG} = 영웅 알(일주일 1), 바다 펫은 그림이 올 때까지 잠김`);
       const att = b.attendance = { card: 0, last: dayKey(clock - DAY), streak: 1 };
       b.reel.bait_today = 0;
@@ -216,6 +216,21 @@ export async function runGamesChecks(assert) {
       reelCast(q, { id: 'f2', cast: 'ok', now: now + 60000, seed: sd });
       const plain = reelLand(q, { id: 'f2', result: 'caught', finish: 'good', now: now + 60000 + FIGHT[rar].min + 10 });
       assert(!plain.perfect && plain.kg === base && reelLand(q, { id: 'f2', result: 'caught', finish: 'perfect' }).kg === base, 'V13.150 마무리 좋음 · 다시 보낸 끝내기는 무게를 바꾸지 않는다');
+    }
+    // V13.150 바다 펫: 그림 전에는 잠김. 열리면 진주 4000 · 영웅급 · 한 마리씩 · 알 확률표에는 없다. 특기 승률은 pet-sim으로 맞췄다(49~53%).
+    {
+      const { reelSeaPet } = await import('./reel.mjs');
+      const { SEA_PETS, REEL: RR } = await import('../public/modules/reel-rules.js');
+      const { PET_SKILLS } = await import('../public/modules/battle-engine.js');
+      const core = await import('../public/modules/core.js');
+      const q = { id: 'sea-test', pets: [{ key: 'dog' }], reel: { pearls: RR.SEA_PET + 10 } };
+      assert(await fails(() => reelSeaPet(q, 'dolphin', now, false), 409) && q.reel.pearls === RR.SEA_PET + 10, 'V13.150 바다 펫은 그림 전에는 잠겨 있다');
+      const got = reelSeaPet(q, 'dolphin', now, true);
+      assert(got.sea && q.reel.pearls === 10 && q.pets.some(x => x.key === 'dolphin' && x.sea && x.epic) && await fails(() => reelSeaPet(q, 'dolphin', now, true), 409) && await fails(() => reelSeaPet(q, 'seahorse', now, true)) && await fails(() => reelSeaPet(q, 'shark', now, true)),
+        'V13.150 바다 펫: 진주 4000 · 같은 펫은 한 번 · 진주가 모자라면 안 된다');
+      assert(SEA_PETS.length === 3 && SEA_PETS.every(x => PET_SKILLS[x.key]?.desc && x.char?.ko === x.ko) && SEA_PETS.every(x => !core.EPIC_PET_KEYS.includes(x.key) && !core.STANDARD_PET_KEYS.includes(x.key))
+        && (!RR.SEA_READY || SEA_PETS.every(x => core.CHARACTERS[x.key]?.sea && [0, 1, 2, 3].every(f => existsSync(new URL(`../public/assets/pets/${x.key}-${f}.webp`, import.meta.url))))),
+        'V13.150 바다 펫 3종: 야차전 특기 있음, 알 확률표 밖, 열 때는 CHARACTERS(sea) 등록과 그림이 있어야 한다');
     }
     // 1인칭 화면: 코드로 그린 낚싯대가 휘고, 돌진 · 날뜀 · 잠수 · 특기 · 점프 마무리, 수조 어망. 그림 29 이름이 들어오면 갈아 끼운다.
     {

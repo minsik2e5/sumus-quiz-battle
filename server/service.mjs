@@ -31,7 +31,7 @@ import { activeEventFor, studentEventView, teacherEventView, teacherOwns, keptEv
 import { dungeonQuestions } from './dungeon-words.mjs';
 import { settleDungeonRecords, dungeonBoardsView, dungeonLastView } from './dungeon-records.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
-import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend } from './reel.mjs';
+import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend, reelSeaPet } from './reel.mjs';
 import { REEL } from '../public/modules/reel-rules.js';
 import { matchStart, matchFinish, matchView, matchBoard } from './games.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
@@ -1818,7 +1818,11 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const now = Date.now(), item = str(body.item, 20);
     if (item === 'coins') { const res = reelCoins(p, body.amount, now); return { ...res, reel: reelView(p, now), points_balance: coinBalance(state, p) }; }
-    if (item === 'sea_pet') fail('바다 펫은 그림이 완성되면 만날 수 있어요. 진주를 모아 두세요!', 409);
+    if (item === 'sea_pet') {
+      if (openBattleFor(state, p.id, now)) fail('대결이 끝난 뒤에 바꿀 수 있어요.', 409);
+      const res = reelSeaPet(p, str(body.key, 20), now);
+      return { ...res, profile: publicProfile(p), stats: stats(state, p), reel: reelView(p, now) };
+    }
     const epic = item === 'epic_egg';
     const missing = (epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter(key => !p.pets.some(x => x.key === key));
     if (!missing.length) fail(epic ? '영웅 펫을 모두 모았어요!' : '모든 펫을 모았어요!', 409);

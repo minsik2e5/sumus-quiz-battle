@@ -94,6 +94,7 @@ function onClick(event) {
   if (act === 'sell') return sell(b.dataset.key, b);
   if (act === 'coins') return exchangeCoins(Number(b.dataset.n), b);
   if (act === 'egg') return exchangeEgg(b.dataset.item, b);
+  if (act === 'sea') return exchangeSea(b.dataset.key, b);
   if (act === 'skill') return useSkill();
 }
 
@@ -810,8 +811,10 @@ function shop() {
         <button type="button" class="rl-egg epic" data-rl="egg" data-item="epic_egg" ${v.epic_left && p >= REEL.EPIC_EGG ? '' : 'disabled'}><span class="rl-epic-egg"></span><b>영웅 알</b><small>${pearlIco()}${num(REEL.EPIC_EGG)} · ${v.epic_left ? '이번 주 1개' : '다음 주에'}</small></button>
       </div></div>
     <div class="rl-shop-block sea"><h3>바다 펫 <small>교환소에서만 만나요</small></h3>
-      <div class="rl-sea-pets">${(v.sea || SEA_PETS).map(x => `<div class="rl-sea-pet locked"><span class="rl-sea-silhouette ${x.key}"></span><b>${esc(x.ko)}</b><small>${esc(x.kind)} · ${pearlIco()}${num(REEL.SEA_PET)}</small><em>곧 만나요</em></div>`).join('')}</div>
-      <p class="rl-sheet-note">바다 펫은 그림이 완성되면 열려요. 그때까지 진주를 모아 두세요!</p></div>`, 'shop');
+      <div class="rl-sea-pets">${(v.sea || SEA_PETS).map(x => !REEL.SEA_READY
+        ? `<div class="rl-sea-pet locked"><span class="rl-sea-silhouette ${x.key}"></span><b>${esc(x.ko)}</b><small>${esc(x.kind)} · ${pearlIco()}${num(REEL.SEA_PET)}</small><em>곧 만나요</em></div>`
+        : `<button type="button" class="rl-sea-pet${x.owned ? ' owned' : ''}" data-rl="sea" data-key="${x.key}" ${x.owned || p < REEL.SEA_PET ? 'disabled' : ''}><img src="/assets/pets/${x.key}-1.webp" alt="" width="56" height="56"><b>${esc(x.ko)}</b><small>${esc(x.kind)} · ${pearlIco()}${num(REEL.SEA_PET)}</small>${x.owned ? '<em>함께하는 중</em>' : ''}</button>`).join('')}</div>
+      <p class="rl-sheet-note">${REEL.SEA_READY ? '바다 펫은 교환소에서만 만날 수 있어요. 야차전 특기도 있어요!' : '바다 펫은 그림이 완성되면 열려요. 그때까지 진주를 모아 두세요!'}</p></div>`, 'shop');
 }
 async function exchangeCoins(n, b) {
   buttonBusy(b);
@@ -830,6 +833,17 @@ async function exchangeEgg(item, b) {
   closeSheet();
   try {
     const res = await buyEgg(R.A, null, item === 'epic_egg' ? 'epic' : 'basic', { path: '/reel/exchange', body: { item } });
+    if (res?.reel) setView(res.reel);
+    if (!res) toast('잠시 후 다시 눌러 주세요.');
+  } catch (err) { toast(err.message); }
+}
+// 바다 펫(REEL.SEA_READY일 때만 버튼이 열린다): 두 번 눌러 확인, 영웅 펫과 같은 공개 연출.
+async function exchangeSea(key, b) {
+  if (!b.classList.contains('confirm')) { b.classList.add('confirm'); later(() => b.classList.remove('confirm'), 3000); return toast('한 번 더 누르면 바꿔요!'); }
+  buttonBusy(b);
+  closeSheet();
+  try {
+    const res = await buyEgg(R.A, null, 'epic', { path: '/reel/exchange', body: { item: 'sea_pet', key } });
     if (res?.reel) setView(res.reel);
     if (!res) toast('잠시 후 다시 눌러 주세요.');
   } catch (err) { toast(err.message); }
