@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto';
 import { dayKey } from '../public/modules/core.js';
 import { FISH, FISH_KEYS } from '../public/modules/fishing-rules.js';
-import { REEL, FIGHT, CAST_TIERS, SEA_PETS, reelRoll, pearlsOf, weekNum } from '../public/modules/reel-rules.js';
+import { REEL, FIGHT, FINISH, CAST_TIERS, SEA_PETS, reelRoll, pearlsOf, weekNum } from '../public/modules/reel-rules.js';
 import { findReceipt, keepReceipt, giveGift } from './rewards.mjs';
 
 // V13.150 손맛 낚시(놀이터) 서버 쪽. 학생 기록 p.reel:
@@ -47,10 +47,11 @@ export function reelCast(p, { id, cast, water = false, now = Date.now(), seed = 
   const fish = reelRoll(seed, tier, { water });
   r.live = { id, at: now, cast: tier, ...fish };
   const F = FIGHT[fish.rarity];
-  return { id, fight: { hp: F.hp, pull: F.pull, dash: F.dash, size: F.size, min: F.min }, bait: r.bait };
+  // 어떤 물고기인지는 보내지 않는다: 등급마다 같은 세기 · 성격만.
+  return { id, fight: { hp: F.hp, pull: F.pull, dash: F.dash, size: F.size, min: F.min, dist: F.dist, moves: F.moves, swipes: F.swipes }, bait: r.bait };
 }
 // 끌어올리기(또는 놓침). 놓치면 미끼는 사라진다. 같은 끝내기를 다시 보내면 같은 답.
-export function reelLand(p, { id, result, now = Date.now(), giftId }) {
+export function reelLand(p, { id, result, finish = null, now = Date.now(), giftId }) {
   const r = reel(p);
   const seen = findReceipt(r, 'reel', id);
   if (seen) return { ...seen.r, again: true };
@@ -62,11 +63,14 @@ export function reelLand(p, { id, result, now = Date.now(), giftId }) {
   else if (now - live.at + SLACK_MS < FIGHT[live.rarity].min) out = { caught: false, reason: 'short' };
   else {
     const g = p.games ||= {}, f = g.fish ||= {}, book = f.book ||= {};
+    // V13.150 마무리 퍼펙트: 무게 +8%(기록 · 자랑용, 진주 값은 그대로). 물고기의 무게 범위를 넘을 수 있다(그래서 '최고 무게').
+    const perfect = finish === 'perfect' && live.key !== 'goldenegg';
+    if (perfect) live.kg = Math.round(live.kg * FINISH.PERFECT_KG * 100) / 100;
     const fresh = !book[live.key]?.n;
     const b = book[live.key] ||= { n: 0, kg: 0 };
     const record = !fresh && live.kg > Number(b.kg || 0);
     b.n += 1; b.kg = Math.max(Number(b.kg || 0), live.kg);
-    out = { caught: true, key: live.key, kg: live.kg, rarity: live.rarity, fresh, pearls: pearlsOf(live.key), record };
+    out = { caught: true, key: live.key, kg: live.kg, rarity: live.rarity, fresh, pearls: pearlsOf(live.key), record, perfect };
     if (live.key === 'goldenegg') {
       // 황금 알 물고기는 팔지 않고 모은다: 3마리마다 랜덤 알(선생님 알과 같은 선물 상자).
       const before = Math.floor(Number(f.golden || 0) / REEL.GOLDEN_EGG);

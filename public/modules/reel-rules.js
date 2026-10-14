@@ -23,15 +23,18 @@ export const SEA_PETS = [
   { key: 'hermitcrab', ko: '집게', kind: '소라게' }
 ];
 export const CAST_TIERS = ['ok', 'good', 'perfect'];
-// 파이팅 세기(등급마다): 체력 · 당기는 힘 · 돌진 간격(ms) · 최소 파이팅 시간(서버가 확인) · 그림자 크기.
+// 파이팅 세기(등급마다): 체력(hp, 예전 판 호환) · 당기는 힘 · 행동 간격(ms) · 최소 파이팅 시간(서버가 확인) · 그림자 크기
+// V13.150 1인칭 손맛: 처음 거리(m) · 행동 가중치(돌진 run · 날뜀 thrash · 잠수 dive) · 돌진을 막는 스와이프 수.
 export const FIGHT = {
-  common: { hp: 100, pull: .55, dash: [5200, 8000], min: 4000, size: 1 },
-  uncommon: { hp: 140, pull: .75, dash: [4200, 6600], min: 5500, size: 1.25 },
-  rare: { hp: 190, pull: .95, dash: [3400, 5400], min: 7000, size: 1.55 },
-  epic: { hp: 250, pull: 1.2, dash: [2800, 4400], min: 9000, size: 1.9 },
-  legend: { hp: 320, pull: 1.45, dash: [2300, 3700], min: 11000, size: 2.3 },
-  golden: { hp: 190, pull: 1, dash: [3200, 5200], min: 7000, size: 1.5 }
+  common: { hp: 100, pull: .55, dash: [3600, 5600], min: 4000, size: 1, dist: 14, moves: { run: 3, thrash: 1, dive: 1 }, swipes: 2 },
+  uncommon: { hp: 140, pull: .75, dash: [3100, 5000], min: 5500, size: 1.25, dist: 18, moves: { run: 3, thrash: 2, dive: 1 }, swipes: 2 },
+  rare: { hp: 190, pull: .95, dash: [2700, 4400], min: 7000, size: 1.55, dist: 24, moves: { run: 3, thrash: 2, dive: 2 }, swipes: 3 },
+  epic: { hp: 250, pull: 1.2, dash: [2300, 3800], min: 9000, size: 1.9, dist: 30, moves: { run: 3, thrash: 3, dive: 2 }, swipes: 3 },
+  legend: { hp: 320, pull: 1.45, dash: [2000, 3300], min: 11000, size: 2.3, dist: 38, moves: { run: 3, thrash: 3, dive: 3 }, swipes: 4 },
+  golden: { hp: 190, pull: 1, dash: [2600, 4200], min: 7000, size: 1.5, dist: 24, moves: { run: 2, thrash: 4, dive: 1 }, swipes: 3 }
 };
+// 마무리: 물고기가 물 위로 뛰어오를 때 맞춰 탭하면 퍼펙트(무게 +8%, 기록용). 무게는 서버가 곱한다.
+export const FINISH = { PERFECT_KG: 1.08, KINDS: ['perfect', 'good', 'miss'] };
 export const stars = rarity => ({ common: 1, uncommon: 2, rare: 3, epic: 4, legend: 5, golden: 5 })[rarity] || 1;
 export const pearlsOf = key => REEL.PEARLS[FISH[key]?.rarity] || 0;
 

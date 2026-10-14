@@ -10,7 +10,7 @@ import { growthFor, dayKey } from '../public/modules/core.js';
 import { STREAK_GUARD, guardPlan, guardView, guardDayKeys, dayNum } from '../public/modules/streak-guard.js';
 import { MATCH, matchPick, matchStars, cardMeaning } from '../public/modules/match-rules.js';
 import { FISH, FISH_KEYS, LURES, rollCast } from '../public/modules/fishing-rules.js';
-import { REEL, FIGHT, reelRoll, pearlsOf } from '../public/modules/reel-rules.js';
+import { REEL, FIGHT, FINISH, reelRoll, pearlsOf } from '../public/modules/reel-rules.js';
 import { grantBait, reelCast, reelLand } from './reel.mjs';
 import { fishSvg, FISH_ART } from '../public/modules/fishing-art.js';
 import { addBonus } from './rewards.mjs';
@@ -201,6 +201,29 @@ export async function runGamesChecks(assert) {
     reelCast(p, { id: 'g1', cast: 'perfect', now, seed });
     const done = reelLand(p, { id: 'g1', result: 'caught', now: now + FIGHT.golden.min + 10, giftId: 'gift-1' });
     assert(done.egg && p.gift_box.log.some(g => g.kind === 'egg' && g.from_name === '낚시터') && !p.reel.net?.goldenegg, 'V13.150 황금 알 물고기는 팔지 않고 모아 3마리면 알 선물');
+    // V13.150 1인칭 손맛: 등급마다 처음 거리 · 성격(돌진 · 날뜀 · 잠수) · 돌진을 막는 스와이프 수. 던질 때 받지만 어떤 물고기인지는 모른다.
+    const R2 = ['common', 'uncommon', 'rare', 'epic', 'legend', 'golden'];
+    assert(R2.every(r => FIGHT[r].dist > 0 && ['run', 'thrash', 'dive'].every(k => FIGHT[r].moves[k] > 0) && FIGHT[r].swipes >= 2) && FIGHT.legend.dist > FIGHT.common.dist && FIGHT.legend.swipes > FIGHT.common.swipes,
+      'V13.150 손맛 파이팅: 귀할수록 멀리서 시작하고 돌진을 막기 어렵다');
+    {
+      const q = { id: 'fin-test', pets: [{ key: 'dog' }], reel: { bait: 3 } };
+      let sd = 1; while (reelRoll(sd, 'ok').key === 'goldenegg') sd++;
+      const c = reelCast(q, { id: 'f1', cast: 'ok', now, seed: sd });
+      const base = q.reel.live.kg, rar = q.reel.live.rarity;
+      assert(c.fight.dist === FIGHT[rar].dist && c.fight.swipes === FIGHT[rar].swipes && JSON.stringify(c.fight.moves) === JSON.stringify(FIGHT[rar].moves) && !JSON.stringify(c).includes(q.reel.live.key), 'V13.150 던지기: 파이팅 성격만 보내고 물고기는 숨긴다');
+      const won = reelLand(q, { id: 'f1', result: 'caught', finish: 'perfect', now: now + FIGHT[rar].min + 10 });
+      assert(won.perfect && won.kg === Math.round(base * FINISH.PERFECT_KG * 100) / 100 && q.games.fish.book[won.key].kg === won.kg, 'V13.150 마무리 퍼펙트: 무게 +8%는 서버가 곱해 도감에 남긴다');
+      reelCast(q, { id: 'f2', cast: 'ok', now: now + 60000, seed: sd });
+      const plain = reelLand(q, { id: 'f2', result: 'caught', finish: 'good', now: now + 60000 + FIGHT[rar].min + 10 });
+      assert(!plain.perfect && plain.kg === base && reelLand(q, { id: 'f2', result: 'caught', finish: 'perfect' }).kg === base, 'V13.150 마무리 좋음 · 다시 보낸 끝내기는 무게를 바꾸지 않는다');
+    }
+    // 1인칭 화면: 코드로 그린 낚싯대가 휘고, 돌진 · 날뜀 · 잠수 · 특기 · 점프 마무리, 수조 어망. 그림 29 이름이 들어오면 갈아 끼운다.
+    {
+      const reelJs = source('../public/modules/reel.js'), reelCss = source('../public/reel.css');
+      assert(['function rodGeom', 'function springTo', "kind === 'run'", "kind === 'thrash'", "kind === 'dive'", 'function swipe(', 'function finish(', "finish: finishKind", 'function tank(', "data-rl=\"sell-all\"", "'bait-open'", "'bg-pov'", "'bg-reveal'", "'bg-tank'", "'fx-jump'", "'fx-halo'", "'stamp-new'", "'ribbon-record'", "'icon-net'", "'gauge-distance'", 'navigator.vibrate']
+        .every(k => reelJs.includes(k)) && ['.rl-pov', '.rl-rod-body', '.rl-tring', '.rl-leap', '.rl-rev', '.rl-swim', 'prefers-reduced-motion'].every(k => reelCss.includes(k)) && !source('../public/v13149.css').includes('.rl-under{'),
+        'V13.150 1인칭 낚시 화면: 휘는 낚싯대 · 물고기 성격 · 점프 마무리 · 수조 어망, 그림 29 자리, 동작 줄이기');
+    }
     const art = source('../docs/asset-requests/runner/26-fishing.txt'), codex = source('../docs/asset-requests/runner/CODEX_PROMPT_26.md'), map = source('../docs/asset-requests/runner/slice-map.csv');
     assert(art.split('\n---\n').length === 6 && art.split('\n---\n').every((t, i) => t.includes('STYLE REFERENCE — before drawing, open "06-3.png"') && t.includes(`named exactly "26-${i + 1}.png"`) && t.includes('"SUMUS 낚시 26 (Runner용)"'))
       && codex.includes('Drive의 기존 그림을 열어 그림체를 맞춘다') && codex.includes('정해진 Drive 폴더 "SUMUS 낚시 26 (Runner용)"에 정확한 파일 이름') && FISH_KEYS.every(k => map.includes(`public/assets/fish/${k}.webp`)),
@@ -337,7 +360,7 @@ export async function runGamesChecks(assert) {
     assert(worker.includes('export { PartyRoom };') && worker.includes("url.pathname.match(/^\\/api\\/party\\/ws\\/([0-9a-f-]{36})$/)") && worker.includes("'X-Party-Key'") && worker.includes('delete result._parties') && worker.includes('undoParty(state, message)') && worker.includes('settlePartyReport(state, body)'),
       'V13.149 worker: 교실 게임 소켓은 방으로, 방 준비 메시지는 브라우저로 안 가고, 결과 보고는 키로 확인');
     assert(local.includes('delete result._parties;') && local.includes('delete result._dungeon;'), 'V13.149 로컬 서버도 방 준비 메시지(문제 · 입장표)를 브라우저로 보내지 않는다');
-    assert(/"v13146\.css",\s*"v13149\.css"\s*\]/.test(build) && ['match-game.js', 'reel.js', 'reel-rules.js', 'fishing-art.js', 'fishing-rules.js', 'party.js', 'party-tv.js', 'streak-guard.js', 'streak-guard-ui.js', 'match-rules.js'].every(f => sw.includes(`modules/${f}`)),
+    assert(/"v13146\.css",\s*"v13149\.css",\s*"reel\.css"\s*\]/.test(build) && ['match-game.js', 'reel.js', 'reel-rules.js', 'fishing-art.js', 'fishing-rules.js', 'party.js', 'party-tv.js', 'streak-guard.js', 'streak-guard-ui.js', 'match-rules.js'].every(f => sw.includes(`modules/${f}`)),
       'V13.149 새 화면 CSS는 묶음 끝에, 새 모듈은 오프라인 캐시에');
     assert(battle.includes("['games', '게임', 'arcade']") && battle.includes("act === 'game-match'") && !battle.includes('game-fish') && source('../public/modules/arcade.js').includes('data-action="reel-open"') && app.includes("d.action === 'reel-open'")
       && source('../public/modules/reel.js').includes('진주 1개 = 1코인') && source('../public/modules/sessions.js').includes('낚시 미끼 +1') && battle.includes("act === 'game-party'") && app.includes("d.action === 'party-new'") && teacher.includes('data-action="party-new"'),

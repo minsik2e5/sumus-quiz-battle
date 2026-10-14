@@ -1801,7 +1801,7 @@ export async function service(state, method, path, body, token, options = {}) {
   }
   if (path === '/reel/land' && method === 'POST') {
     requireRole(p, 'student');
-    const now = Date.now(), res = reelLand(p, { id: str(body.id, 80), result: str(body.result, 10), now, giftId: id() });
+    const now = Date.now(), res = reelLand(p, { id: str(body.id, 80), result: str(body.result, 10), finish: body.finish ? str(body.finish, 10) : null, now, giftId: id() });
     return { ...res, reel: reelView(p, now), ...(res.egg ? { gifts: giftsWaiting(p) } : {}) };
   }
   if (path === '/reel/sell' && method === 'POST') {
