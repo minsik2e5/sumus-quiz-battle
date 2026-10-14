@@ -4,17 +4,17 @@
 
 ## 1. 그림체
 
-말랑하고 동글동글한 일본/한국풍 손그림 귀요미 스타일.
+**치이카와 같은 손그림 귀요미 그림체**를 기준으로 한다. 그림체(선, 비율, 표정 느낌)는 최대한 비슷하게, **캐릭터 자체는 새로 만든 오리지널**로.
 
-- **선**: 굵기 일정한 부드러운 갈색 손그림 선 (#5a3b2b 근처), 끝이 둥근 선
-- **색**: 그림자 거의 없는 평면 파스텔 채색, 아주 옅은 음영 한 단계까지만
-- **몸**: 머리와 몸이 하나로 이어진 찹쌀떡 같은 둥근 덩어리, 2~2.5등신, 짧고 뭉툭한 팔
-- **얼굴**: 작은 점 눈(하이라이트 한 점), 아주 작은 입(ω, ㅅ 모양), **볼에 분홍 동그라미 + 빗금 3줄**
-- **느낌**: 순하고 약간 어리바리한 표정, 귀엽지만 유치하지 않게 (고등학생이 써도 괜찮게)
+- **선**: 진한 갈색(#5a3b2b 근처)의 부드럽고 살짝 떨리는 손그림 선, 굵기 거의 일정, 끝이 둥글다
+- **색**: 그림자 없는 평면 파스텔 채색. 몸은 흰색/크림/연한 색 위주, 포인트 색은 1~2개만
+- **몸**: 머리와 몸이 하나로 이어진 작고 동글한 찹쌀떡 모양. **머리가 몸의 절반 이상**, 약 1.5~2등신. 팔다리는 아주 짧고 뭉툭한 동그라미
+- **얼굴**: 얼굴 아래쪽에 작게 모인 이목구비. **작은 점 눈 + 흰 하이라이트 한 점**, 눈 사이가 조금 넓게. 아주 작은 입(ω, ㅅ, 동그란 o). **볼에 분홍 타원 + 빗금 3~4줄**
+- **표정**: 순하고 약간 어리바리, 쉽게 울먹이거나 놀라는 느낌. 웃을 땐 입을 크게 벌려 활짝
+- **동작**: 손발을 쫙 펴거나 몸을 작게 웅크리는 등 과장되고 귀여운 몸짓
 
 ### 하면 안 되는 것
-- 기존 캐릭터(치이카와, 하치와레, 우사기, 산리오, 포켓몬, 카카오프렌즈, 라인프렌즈, 잔망루피 등)를 따라 그리거나 닮게 만들지 말 것. **완전히 새 캐릭터**여야 함.
-- 특히 "흰 몸 + 작은 곰귀", "흰 고양이 + 파란 머리 무늬", "노란 몸 + 긴 귀 토끼" 조합은 피할 것.
+- 치이카와·하치와레·우사기 등 **기존 캐릭터 그 자체를 그리거나 똑같이 만들지 말 것**. 그림체만 참고하고 캐릭터는 새로.
 - 글자, 로고, 워터마크 넣지 말 것.
 
 ## 2. 파일 규격
@@ -43,15 +43,18 @@
 ```
 A character sprite sheet, 3 columns x 2 rows, each cell 512x512, transparent background.
 The SAME original character in every cell, identical size and position, only the pose changes.
-Style: soft hand-drawn kawaii doodle, consistent rounded brown outline, flat pastel colors,
-round mochi-shaped body where head and body are one blob, tiny dot eyes with one highlight,
-tiny mouth, pink round blush with three small diagonal hatch lines, short stubby arms.
+Art style: Chiikawa-like hand-drawn kawaii doodle — soft slightly wobbly dark-brown outline,
+flat pastel colors with no shading, tiny round mochi body where the head is bigger than the body
+(about 1.5 heads tall), very short stubby round arms, small dot eyes with one white highlight set
+a little far apart low on the face, tiny mouth, pink oval blush with 3 small diagonal hatch lines,
+innocent slightly clumsy expression.
 Upper body only, sitting behind an open book at the bottom of each cell, front view.
 Character: {설명}.
 Cells: 1) head down reading the book, eyes looking down  2) looking up at the viewer, book open, neutral
-3) happy big smile, resting  4) yawning, eyes closed, mouth wide open
-5) dozing off with head down, eyes closed  6) raising one paw, cheering "you can do it"
-Original character, not resembling any existing franchise character. No text, no logo, no background.
+3) happy wide open-mouth smile, resting  4) yawning, eyes closed, mouth wide open, little tear
+5) dozing off with head down, eyes closed  6) raising both stubby arms, cheering "you can do it!"
+A brand-new original character (do not draw Chiikawa, Hachiware, Usagi or any existing character).
+No text, no logo, no background.
 ```
 
 `{설명}` 자리에 아래 캐릭터 설명을 넣는다.
