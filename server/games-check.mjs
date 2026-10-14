@@ -168,6 +168,12 @@ export async function runGamesChecks(assert) {
       && sheets27.slice(3, 9).every((t, i) => t.includes(`open "26-${i + 1}.png"`)) && FISH_KEYS.every(k => map.includes(`public/assets/fish/${k}-hang.webp`))
       && codex27.includes('Drive의 기존 그림을 열어 그림체를 맞춘다') && codex27.includes('정해진 Drive 폴더 "SUMUS 낚시 27 (Runner용)"에 정확한 파일 이름'),
       'V13.149 그림 주문서 27: 배경 3 · 낚인 물고기 24(26을 열어 같은 물고기) · 도구 · 조작 7시트, Drive 그림체 맞추기와 정해진 폴더 · 정확한 이름 저장');
+    const sheets28 = ['28a-sea-pets-design.txt', '28b-sea-pets-expressions.txt', '28c-sea-pets-battle-poses.txt'].flatMap(f => source(`../docs/asset-requests/runner/${f}`).trim().split('\n---\n'));
+    const codex28 = source('../docs/asset-requests/runner/CODEX_PROMPT_28.md');
+    assert(sheets28.length === 19 && sheets28.every(t => /(STYLE|CHARACTER) REFERENCE — before drawing, open/.test(t) && /named exactly "28[abc]-\d+\.png"/.test(t) && t.includes('"SUMUS 바다 펫 28 (Runner용)"'))
+      && sheets28.slice(3).every(t => /open "28a-\d\.png"/.test(t)) && ['dolphin', 'seahorse', 'hermitcrab'].every(k => [0, 1, 2, 3].every(f => map.includes(`public/assets/pets/${k}-${f}.webp`)) && map.includes(`public/assets/pets/${k}-3-attack.webp`))
+      && codex28.includes('Drive의 기존 그림을 열어 그림체를 맞춘다') && codex28.includes('정해진 Drive 폴더 "SUMUS 바다 펫 28 (Runner용)"에 정확한 파일 이름'),
+      'V13.149 그림 주문서 28(바다 펫 3종): 설정 시트를 먼저, 표정 · 전투 자세는 설정 시트를 열어 맞추고, 정해진 폴더에 정확한 이름으로 저장');
   }
 
   /* ---------- 교실 게임 규칙 ---------- */
