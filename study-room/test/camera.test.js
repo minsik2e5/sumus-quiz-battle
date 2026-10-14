@@ -198,3 +198,12 @@ test('camera: moving again answers the still check; switching apps for 2+ minute
   assert.equal(academy.todayMs(s.id), 11 * MIN);
   assert.equal(academy.overview('ALL').students[0].offTask, 2);
 });
+
+test('classifier: staring at the screen for 3 minutes is screen, short glances are fine', () => {
+  const c = Cam.createClassifier();
+  feed(c, 0, 2000, face());
+  assert.equal(feed(c, 2500, 60000, face()), 'up');
+  assert.equal(feed(c, 60500, 70000, face({ pitch: 0.56 })), 'down');
+  assert.equal(feed(c, 70500, 130000, face()), 'up', 'timer restarts after looking at the book');
+  assert.equal(feed(c, 130500, 260000, face()), 'screen');
+});

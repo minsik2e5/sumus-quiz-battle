@@ -461,7 +461,8 @@
       case 'check_missed':
         toast({
           still: '한참 동안 움직임이 없어서 타이머를 멈춰 뒀어요. 졸았다면 기지개 켜고 ▶ 눌러요 😴',
-          side: '한참 딴 데를 보고 있어서 타이머를 멈춰 뒀어요. 다시 집중할 땐 ▶ 눌러요 👀'
+          side: '한참 딴 데를 보고 있어서 타이머를 멈춰 뒀어요. 다시 집중할 땐 ▶ 눌러요 👀',
+          screen: '책 대신 화면을 한참 보고 있어서 타이머를 멈춰 뒀어요. 다시 책 펴고 ▶ 눌러요 📖'
         }[msg.reason] || '잠깐 자리를 비운 것 같아서 타이머를 멈춰 뒀어요. ▶ 누르면 바로 이어서 할 수 있어요 🙂', 7000);
         break;
       case 'pong':
@@ -492,7 +493,7 @@
 
   const STATUS_ORDER = { study: 0, away: 1, rest: 2, offline: 3 };
   const BADGE = { study: '', away: '자리 비움', rest: '쉬는 중', offline: '오프라인' };
-  const CAM_POSE = { down: 'study', up: 'look', yawn: 'yawn', sleep: 'sleep', still: 'study', side: 'look', gone: 'empty' };
+  const CAM_POSE = { down: 'study', up: 'look', yawn: 'yawn', sleep: 'sleep', still: 'study', side: 'look', screen: 'look', gone: 'empty' };
   const CAM_BADGE = { sleep: '💤 조는 중', gone: '잠깐 자리 비움' };
 
   function poseOf(m) {
@@ -647,6 +648,8 @@
         ? '10분 동안 움직임이 거의 없었어. 혹시 졸고 있었어? 😴'
         : check.reason === 'side'
           ? '한참 딴 데를 보고 있었지? 다시 같이 집중해 볼까? 👀'
+          : check.reason === 'screen'
+            ? '한참 화면만 보고 있었지? 지금은 자습 시간! 다시 책으로 📖'
           : `오늘 벌써 ${fmtShort(liveMs(state.me))} 했어! ${CHECK_MSGS[Math.floor(Math.random() * CHECK_MSGS.length)]}`;
       $('#check-avatar').innerHTML = Avatar.svg(state.me.avatar, { pose: 'cheer' }).replace('viewBox="0 0 200 200"', 'viewBox="30 18 140 140"');
       ding('check');

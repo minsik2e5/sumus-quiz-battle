@@ -16,7 +16,7 @@ const CHECK_EVERY_MS = [45 * 60 * 1000, 75 * 60 * 1000];
 const CHECK_WINDOW_MS = 5 * 60 * 1000;
 // 카메라를 켠 학생: 얼굴이 5분 넘게 안 보이면 자리를 뜬 시점까지만 기록하고 멈춘다
 const CAM_GONE_MS = 5 * 60 * 1000;
-const CAM_POSES = ['down', 'up', 'yawn', 'sleep', 'still', 'side', 'gone'];
+const CAM_POSES = ['down', 'up', 'yawn', 'sleep', 'still', 'side', 'screen', 'gone'];
 // 조는 중(눈 감김·꾸벅꾸벅)이 5분 넘게 이어지면 졸기 시작한 때까지만 기록하고 멈춘다
 const SLEEP_STOP_MS = 5 * 60 * 1000;
 // 카메라를 켠 채 다른 앱으로 나가서 2분 안에 안 돌아오면 나간 때까지만 기록하고 멈춘다
@@ -464,7 +464,7 @@ class Academy {
       l.camSleepEntered = now;
       this.record(id, this.today()).dz = (this.record(id, this.today()).dz || 0) + 1;
     }
-    if ((next === 'still' || next === 'side') && studying) {
+    if ((next === 'still' || next === 'side' || next === 'screen') && studying) {
       const rec = this.record(id, this.today());
       if (next === 'still') rec.dz = (rec.dz || 0) + 1;
       else rec.off = (rec.off || 0) + 1;

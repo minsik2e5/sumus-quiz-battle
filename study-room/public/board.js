@@ -24,7 +24,7 @@
   const POLL_MS = 5000;
   const TAB_MS = 12000;
   const MAX_CARDS = 30;
-  const CAM_POSE = { down: 'study', up: 'look', yawn: 'yawn', sleep: 'sleep', still: 'study', side: 'look', gone: 'empty' };
+  const CAM_POSE = { down: 'study', up: 'look', yawn: 'yawn', sleep: 'sleep', still: 'study', side: 'look', screen: 'look', gone: 'empty' };
   const BADGE = { away: '자리 비움', rest: '쉬는 중' };
   const STATUS_ORDER = { study: 0, away: 1, rest: 2, offline: 3 };
 

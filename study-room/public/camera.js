@@ -28,6 +28,8 @@
   // 고개를 옆으로 돌린 채(친구와 얘기 등) 3분
   const SIDE_YAW = 0.25;
   const SIDE_AFTER_MS = 3 * 60 * 1000;
+  // 자습 앱이라 책을 안 보고 화면(정면)만 3분 넘게 보면 딴짓으로 본다 (잠깐 생각하며 고개 드는 건 괜찮음)
+  const SCREEN_AFTER_MS = 3 * 60 * 1000;
 
   function median(list) {
     const s = list.slice().sort((x, y) => x - y);
@@ -38,7 +40,7 @@
   // sample: { t, face, pitch, lookDown, blink, jaw, yaw, nx, gaze }
   //   pitch: 눈-코-턱 비율 (고개를 숙일수록 커짐), lookDown: 눈동자 아래 보기 0~1, blink: 눈 감김 0~1, jaw: 입 벌림 0~1
   //   yaw: 고개 좌우 돌림, nx: 코 가로 위치, gaze: 눈동자 좌우
-  // 자세: down(공부) up(고개 듦) yawn sleep(졸음) still(숙인 채 안 움직임) side(옆 보기) gone(자리 비움)
+  // 자세: down(공부) up(고개 듦) yawn sleep(졸음) still(숙인 채 안 움직임) side(옆 보기) screen(화면만 봄) gone(자리 비움)
   function createClassifier() {
     let baseline = null;
     let yawBase = null;
@@ -48,6 +50,7 @@
     let last = null;
     let stillSince = null;
     let sideSince = null;
+    let upSince = null;
     const nods = [];
     let nodStart = null;
     let nodSleepUntil = 0;
@@ -122,6 +125,14 @@
         sideSince = null;
       }
 
+      // 책 대신 화면(정면)만 오래 봄
+      if (!down) {
+        if (upSince == null) upSince = s.t;
+        if (s.t - upSince >= SCREEN_AFTER_MS) return 'screen';
+      } else {
+        upSince = null;
+      }
+
       // 고개 숙인 채 거의 안 움직임
       if (down && moves.length > 20 && perMin < STILL_MOVE_PER_MIN) {
         if (stillSince == null) stillSince = s.t - 60000;
@@ -137,6 +148,7 @@
       if (pose === 'sleep') return sleepSince;
       if (pose === 'still') return stillSince;
       if (pose === 'side') return sideSince;
+      if (pose === 'screen') return upSince;
       return null;
     }
 
@@ -144,7 +156,7 @@
       push(s) {
         const r = raw(s);
         if (r == null) return this.pose;
-        if (r === 'gone' || r === 'yawn' || r === 'sleep' || r === 'still' || r === 'side') {
+        if (r === 'gone' || r === 'yawn' || r === 'sleep' || r === 'still' || r === 'side' || r === 'screen') {
           recent.length = 0;
           this.pose = r;
           return r;
@@ -258,7 +270,7 @@
     };
   }
 
-  const LABEL = { down: '공부 중 (고개 숙임)', up: '고개 듦', yawn: '하품 중', sleep: '조는 중 💤', still: '움직임 없음 (확인 중)', side: '옆 보는 중', gone: '자리 비움' };
+  const LABEL = { down: '공부 중 (고개 숙임)', up: '고개 듦', yawn: '하품 중', sleep: '조는 중 💤', still: '움직임 없음 (확인 중)', side: '옆 보는 중', screen: '화면 보는 중', gone: '자리 비움' };
 
   return { createClassifier, toSample, start, loadLandmarker, LABEL, MODEL_URL };
 });
