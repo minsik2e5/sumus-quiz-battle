@@ -129,10 +129,10 @@
     try {
       state.cam = await Cam.start({
         video: $('#cam-video'),
-        onPose(pose) {
+        onPose(pose, sample, ago) {
           if (!pose) return;
           state.camPose = pose;
-          sendWs({ t: 'cam', on: true, pose }, true);
+          sendWs({ t: 'cam', on: true, pose, ago: Math.round(ago || 0) }, true);
           renderCam();
         }
       });
@@ -442,7 +442,10 @@
         renderNotices();
         break;
       case 'cam_stopped':
-        toast('자리를 오래 비워서 타이머를 멈춰 뒀어요. 돌아오면 ▶ 눌러서 이어 가요 🙂', 6000);
+        toast({
+          sleep: '꾸벅꾸벅 졸고 있는 것 같아서 타이머를 멈춰 뒀어요. 세수 한 번 하고 ▶ 눌러서 다시 해요 😴',
+          app: '다른 앱에 오래 있어서 타이머를 멈춰 뒀어요. 돌아왔으면 ▶ 눌러서 이어 가요 📱'
+        }[msg.reason] || '자리를 오래 비워서 타이머를 멈춰 뒀어요. 돌아오면 ▶ 눌러서 이어 가요 🙂', 7000);
         break;
       case 'goal':
         if (state.me && msg.id === state.me.id) {
@@ -456,7 +459,10 @@
         }
         break;
       case 'check_missed':
-        toast('잠깐 자리를 비운 것 같아서 타이머를 멈춰 뒀어요. ▶ 누르면 바로 이어서 할 수 있어요 🙂', 6000);
+        toast({
+          still: '한참 동안 움직임이 없어서 타이머를 멈춰 뒀어요. 졸았다면 기지개 켜고 ▶ 눌러요 😴',
+          side: '한참 딴 데를 보고 있어서 타이머를 멈춰 뒀어요. 다시 집중할 땐 ▶ 눌러요 👀'
+        }[msg.reason] || '잠깐 자리를 비운 것 같아서 타이머를 멈춰 뒀어요. ▶ 누르면 바로 이어서 할 수 있어요 🙂', 7000);
         break;
       case 'pong':
         state.offset = msg.serverNow - Date.now();
@@ -486,7 +492,7 @@
 
   const STATUS_ORDER = { study: 0, away: 1, rest: 2, offline: 3 };
   const BADGE = { study: '', away: '자리 비움', rest: '쉬는 중', offline: '오프라인' };
-  const CAM_POSE = { down: 'study', up: 'look', yawn: 'yawn', sleep: 'sleep', gone: 'empty' };
+  const CAM_POSE = { down: 'study', up: 'look', yawn: 'yawn', sleep: 'sleep', still: 'study', side: 'look', gone: 'empty' };
   const CAM_BADGE = { sleep: '💤 조는 중', gone: '잠깐 자리 비움' };
 
   function poseOf(m) {
@@ -637,7 +643,11 @@
     if (state.alertedCheck !== check.at) {
       state.alertedCheck = check.at;
       $('#check-title').textContent = `${state.me.name}, 아직 같이 공부 중이지?`;
-      $('#check-msg').textContent = `오늘 벌써 ${fmtShort(liveMs(state.me))} 했어! ${CHECK_MSGS[Math.floor(Math.random() * CHECK_MSGS.length)]}`;
+      $('#check-msg').textContent = check.reason === 'still'
+        ? '10분 동안 움직임이 거의 없었어. 혹시 졸고 있었어? 😴'
+        : check.reason === 'side'
+          ? '한참 딴 데를 보고 있었지? 다시 같이 집중해 볼까? 👀'
+          : `오늘 벌써 ${fmtShort(liveMs(state.me))} 했어! ${CHECK_MSGS[Math.floor(Math.random() * CHECK_MSGS.length)]}`;
       $('#check-avatar').innerHTML = Avatar.svg(state.me.avatar, { pose: 'cheer' }).replace('viewBox="0 0 200 200"', 'viewBox="30 18 140 140"');
       ding('check');
       try { if (navigator.vibrate) navigator.vibrate([200, 100, 200]); } catch { /* 무시 */ }
@@ -965,6 +975,8 @@
     document.addEventListener('click', (e) => { if (e.target.closest('[data-close]')) closeSheets(); });
 
     document.addEventListener('visibilitychange', () => {
+      // 카메라를 켜고 공부하다 다른 앱으로 나가면 서버에 알린다 (2분 안에 돌아오면 괜찮음)
+      if (state.cam && state.me && state.me.status === 'study') sendWs({ t: document.visibilityState === 'visible' ? 'visible' : 'hidden' }, true);
       if (document.visibilityState !== 'visible') return;
       syncWakeLock();
       if (state.token && !state.ws && !$('#screen-room').hidden) connect();

@@ -106,3 +106,95 @@ test('camera: turning it on answers a pending focus check', () => {
   academy.setCam(s.id, true, 'down');
   assert.equal(academy.me(s.id).check, null);
 });
+
+test('classifier: nodding off while sitting counts as sleep', () => {
+  const c = Cam.createClassifier();
+  let t = feed(c, 0, 2000, face());
+  let now = 2500;
+  for (let i = 0; i < 3; i += 1) {
+    c.push({ t: now, ...face({ pitch: 0.66 }) });
+    now += 500;
+    c.push({ t: now, ...face() });
+    now += 5000;
+    feed(c, now, now + 2000, face());
+    now += 2500;
+  }
+  assert.equal(c.pose, 'sleep');
+  assert.ok(c.since() != null);
+  assert.equal(feed(c, now, now + 25000, face({ gaze: 0 })), 'up', 'wakes up after the hold');
+});
+
+test('classifier: head down without moving for 10 minutes is still, reading is not', () => {
+  const reading = Cam.createClassifier();
+  feed(reading, 0, 2000, face());
+  let g = 0;
+  let pose;
+  for (let t = 2500; t <= 11 * 60000; t += 500) {
+    g = g ? 0 : 0.1; // 줄을 따라 눈동자가 계속 움직임
+    pose = reading.push({ t, ...face({ pitch: 0.56, gaze: g }) });
+  }
+  assert.equal(pose, 'down');
+
+  const frozen = Cam.createClassifier();
+  feed(frozen, 0, 2000, face());
+  assert.equal(feed(frozen, 2500, 11 * 60000, face({ pitch: 0.56 })), 'still');
+  assert.ok(frozen.since() < 2 * 60000);
+});
+
+test('classifier: looking sideways for 3 minutes is side', () => {
+  const c = Cam.createClassifier();
+  feed(c, 0, 2000, face({ yaw: 0 }));
+  assert.equal(feed(c, 2500, 60000, face({ yaw: 0.4 })), 'up');
+  assert.equal(feed(c, 60500, 4 * 60000, face({ yaw: 0.4 })), 'side');
+});
+
+test('camera: dozing for over 5 minutes stops at the moment it started', () => {
+  const { clock, academy, s, stopped } = setup();
+  academy.setStudy(s.id, true);
+  academy.setCam(s.id, true, 'down');
+  clock.t += 30 * MIN;
+  academy.tick();
+  academy.setCam(s.id, true, 'sleep', 20000); // 20초 전부터 눈 감음
+  clock.t += 3 * MIN;
+  academy.tick();
+  assert.equal(academy.status(s.id), 'study', 'short doze keeps studying');
+  clock.t += 3 * MIN;
+  academy.tick();
+  assert.deepEqual(stopped, [s.id]);
+  assert.equal(academy.todayMs(s.id), 30 * MIN - 20000);
+  assert.equal(academy.overview('ALL').students[0].dozes, 1);
+});
+
+test('camera: frozen head-down raises a check, missing it rolls back to when it started', () => {
+  const { clock, academy, s } = setup();
+  academy.setStudy(s.id, true);
+  academy.setCam(s.id, true, 'down');
+  for (let i = 0; i < 4; i += 1) { clock.t += 10 * MIN; academy.tick(); }
+  academy.setCam(s.id, true, 'still', 10 * MIN);
+  assert.ok(academy.me(s.id).check, 'check shows up');
+  clock.t += 6 * MIN;
+  academy.tick();
+  assert.equal(academy.status(s.id), 'rest');
+  assert.equal(academy.todayMs(s.id), 30 * MIN, 'only time before going still counts');
+});
+
+test('camera: moving again answers the still check; switching apps for 2+ minutes stops', () => {
+  const { clock, academy, s, stopped } = setup();
+  academy.setStudy(s.id, true);
+  academy.setCam(s.id, true, 'side', 3 * MIN);
+  assert.ok(academy.me(s.id).check);
+  academy.setCam(s.id, true, 'down');
+  assert.equal(academy.me(s.id).check, null);
+  clock.t += 10 * MIN;
+  academy.setHidden(s.id, true);
+  clock.t += 1 * MIN;
+  academy.setHidden(s.id, false);
+  academy.tick();
+  assert.equal(academy.status(s.id), 'study', 'quick app switch is fine');
+  academy.setHidden(s.id, true);
+  clock.t += 3 * MIN;
+  academy.tick();
+  assert.deepEqual(stopped, [s.id]);
+  assert.equal(academy.todayMs(s.id), 11 * MIN);
+  assert.equal(academy.overview('ALL').students[0].offTask, 2);
+});

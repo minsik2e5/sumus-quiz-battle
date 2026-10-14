@@ -90,8 +90,8 @@ function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), 
         if (conn.meta.studentId === event.to || (target && sees(conn, target))) send(conn, { t: 'cheer', ...event });
       });
     },
-    onCamStopped(id) {
-      each((conn) => { if (conn.meta.studentId === id) send(conn, { t: 'cam_stopped' }); });
+    onCamStopped(id, reason) {
+      each((conn) => { if (conn.meta.studentId === id) send(conn, { t: 'cam_stopped', reason }); });
     },
     onGoal(event) {
       const target = academy.data.students[event.id];
@@ -99,8 +99,8 @@ function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), 
         if (conn.meta.studentId === event.id || (target && sees(conn, target))) send(conn, { t: 'goal', ...event });
       });
     },
-    onCheckMissed(id) {
-      each((conn) => { if (conn.meta.studentId === id) send(conn, { t: 'check_missed' }); });
+    onCheckMissed(id, reason) {
+      each((conn) => { if (conn.meta.studentId === id) send(conn, { t: 'check_missed', reason }); });
     },
     onNotice() {
       each((conn) => send(conn, { t: 'notices', notices: academy.noticesFor(conn.meta.classCode) }));
@@ -177,7 +177,9 @@ function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), 
     if (msg.t === 'cheer') return academy.cheer(id, String(msg.to || ''));
     if (msg.t === 'avatar') return academy.setAvatar(id, msg.avatar);
     if (msg.t === 'check_ok') return academy.confirmCheck(id);
-    if (msg.t === 'cam') return academy.setCam(id, msg.on === true, String(msg.pose || ''));
+    if (msg.t === 'cam') return academy.setCam(id, msg.on === true, String(msg.pose || ''), Number(msg.ago) || 0);
+    if (msg.t === 'hidden') return academy.setHidden(id, true);
+    if (msg.t === 'visible') return academy.setHidden(id, false);
   }
 
   // 주기적으로 호출: 공부 시간 저장, 확인/자리비움 처리, 응답 없는 연결 정리

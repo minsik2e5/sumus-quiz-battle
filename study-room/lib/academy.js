@@ -16,7 +16,12 @@ const CHECK_EVERY_MS = [45 * 60 * 1000, 75 * 60 * 1000];
 const CHECK_WINDOW_MS = 5 * 60 * 1000;
 // 카메라를 켠 학생: 얼굴이 5분 넘게 안 보이면 자리를 뜬 시점까지만 기록하고 멈춘다
 const CAM_GONE_MS = 5 * 60 * 1000;
-const CAM_POSES = ['down', 'up', 'yawn', 'sleep', 'gone'];
+const CAM_POSES = ['down', 'up', 'yawn', 'sleep', 'still', 'side', 'gone'];
+// 조는 중(눈 감김·꾸벅꾸벅)이 5분 넘게 이어지면 졸기 시작한 때까지만 기록하고 멈춘다
+const SLEEP_STOP_MS = 5 * 60 * 1000;
+// 카메라를 켠 채 다른 앱으로 나가서 2분 안에 안 돌아오면 나간 때까지만 기록하고 멈춘다
+const APP_AWAY_MS = 2 * 60 * 1000;
+const MAX_BACKDATE_MS = 20 * 60 * 1000;
 // 오늘 목표: 30분 단위, 최대 16시간
 const GOAL_STEP_MIN = 30;
 const GOAL_MAX_MIN = 16 * 60;
@@ -344,7 +349,7 @@ class Academy {
   liveOf(id) {
     let l = this.live.get(id);
     if (!l) {
-      l = { sockets: 0, since: null, awayAt: null, bubble: null, lastCheer: 0, check: null, nextCheckAt: null, cam: null, camGoneAt: null };
+      l = { sockets: 0, since: null, awayAt: null, bubble: null, lastCheer: 0, check: null, nextCheckAt: null, cam: null, camGoneAt: null, camSleepAt: null, camSleepEntered: null, hiddenAt: null };
       this.live.set(id, l);
     }
     return l;
@@ -407,29 +412,75 @@ class Academy {
     if (l.awayAt != null) t = Math.min(t, l.awayAt);
     if (l.check) t = Math.min(t, l.check.at);
     if (l.cam === 'gone' && l.camGoneAt != null) t = Math.min(t, l.camGoneAt);
+    if (l.cam === 'sleep' && l.camSleepAt != null) t = Math.min(t, l.camSleepAt);
+    if (l.hiddenAt != null) t = Math.min(t, l.hiddenAt);
     return t;
   }
 
+  // 이미 기록한 [from, to) 시간을 되돌린다 (나중에 졸았거나 딴짓한 걸로 판정된 구간)
+  rollback(id, from, to) {
+    if (!(to > from)) return;
+    for (const [day, ms] of splitByDay(from, to)) {
+      const rec = this.peek(id, day);
+      if (!rec) continue;
+      rec.ms = Math.max(0, rec.ms - ms);
+      if (rec.cms) rec.cms = Math.max(0, rec.cms - ms);
+    }
+    this.dirty();
+  }
+
+  // 카메라를 켠 학생이 다른 앱으로 나갔다/돌아왔다
+  setHidden(id, hidden) {
+    const l = this.live.get(id);
+    if (!l || l.since == null) return;
+    if (hidden) {
+      if (!l.cam || l.hiddenAt != null) return;
+      this.commit(id, this.cap(l, this.now()));
+      l.hiddenAt = this.now();
+    } else if (l.hiddenAt != null) {
+      l.hiddenAt = null;
+    }
+  }
+
   // 카메라 상태 변경 (on=false면 카메라 끔)
-  setCam(id, on, pose) {
+  // agoMs: 졸음/정지/옆 보기가 실제로 시작된 건 지금보다 얼마 전인지 (카메라가 알려 줌)
+  setCam(id, on, pose, agoMs = 0) {
     this.mustStudent(id);
     const l = this.liveOf(id);
     const next = on ? (CAM_POSES.includes(pose) ? pose : 'up') : null;
     if (next === l.cam) return;
+    const now = this.now();
+    const ago = Math.max(0, Math.min(MAX_BACKDATE_MS, Number(agoMs) || 0));
     if (l.since != null && l.awayAt == null) {
-      // 자리를 비웠다 5분 안에 돌아오면 그 사이도 공부 시간으로 치되 '카메라 인증'에서는 뺀다
+      // 자리를 비웠거나 잠깐 졸다가 5분 안에 돌아오면 그 사이도 공부 시간으로 치되 '카메라 인증'에서는 뺀다
       if (l.cam === 'gone') l.camGoneAt = null;
-      this.commit(id, this.cap(l, this.now()));
+      if (l.cam === 'sleep') l.camSleepAt = null;
+      this.commit(id, this.cap(l, now));
     }
     l.cam = next;
+    const studying = l.since != null && l.awayAt == null;
+    if (next === 'sleep' && studying) {
+      l.camSleepAt = Math.max(l.startedAt || l.since, now - Math.min(ago, 2 * 60 * 1000));
+      l.camSleepEntered = now;
+      this.record(id, this.today()).dz = (this.record(id, this.today()).dz || 0) + 1;
+    }
+    if ((next === 'still' || next === 'side') && studying) {
+      const rec = this.record(id, this.today());
+      if (next === 'still') rec.dz = (rec.dz || 0) + 1;
+      else rec.off = (rec.off || 0) + 1;
+      if (!l.check) {
+        l.check = { at: Math.max(l.startedAt || l.since, now - ago), created: now, deadline: now + this.checkWindowMs, reason: next };
+      }
+      this.dirty();
+    }
     if (next === 'gone') {
       if (l.camGoneAt == null) l.camGoneAt = this.now();
     } else {
       // 5분 안에 돌아오면 비운 시간도 이어서 인정한다
       l.camGoneAt = null;
     }
-    // 카메라에 얼굴이 보이면 집중 확인은 필요 없다
-    if (next && next !== 'gone' && l.check) this.confirmCheck(id);
+    // 카메라에 깨어 있는 얼굴이 보이면 집중 확인은 필요 없다
+    if (['down', 'up', 'yawn'].includes(next) && l.check) this.confirmCheck(id);
     this.emit(id);
   }
 
@@ -444,6 +495,7 @@ class Academy {
     if (l.since != null && l.awayAt == null) return;
     if (l.since != null) this.commit(id, this.cap(l, this.now()));
     l.since = this.now();
+    l.startedAt = l.since; // 이번 공부 시작 시각 (되돌리기는 이보다 앞으로 가지 않는다)
     l.awayAt = null;
     l.check = null;
     this.scheduleCheck(l);
@@ -459,6 +511,8 @@ class Academy {
     l.awayAt = null;
     l.check = null;
     l.nextCheckAt = null;
+    l.camSleepAt = null;
+    l.hiddenAt = null;
     this.checkGoal(id);
     this.emit(id);
   }
@@ -560,15 +614,27 @@ class Academy {
     for (const [id, l] of this.live) {
       if (l.since == null) continue;
       if (l.check && now > l.check.deadline) {
-        const at = l.check.at;
+        const { at, created, reason } = l.check;
         this.record(id, dayKey(at)).miss += 1;
+        // 카메라가 늦게 알아챈 경우(움직임 없음·옆 보기) 이미 기록한 시간까지 되돌린다
+        if (created) this.rollback(id, at, created);
         this.stopStudy(id, Math.min(at, l.awayAt != null ? l.awayAt : at));
-        this.onCheckMissed(id);
+        this.onCheckMissed(id, reason || 'check');
+      } else if (l.hiddenAt != null && now - l.hiddenAt > APP_AWAY_MS) {
+        const r = this.record(id, dayKey(l.hiddenAt));
+        r.off = (r.off || 0) + 1;
+        this.stopStudy(id, l.hiddenAt);
+        this.onCamStopped(id, 'app');
+      } else if (l.cam === 'sleep' && l.camSleepAt != null && now - l.camSleepAt > SLEEP_STOP_MS) {
+        const at = l.camSleepAt;
+        if (l.camSleepEntered > at) this.rollback(id, at, l.camSleepEntered);
+        this.stopStudy(id, at);
+        this.onCamStopped(id, 'sleep');
       } else if (l.awayAt != null) {
         if (now - l.awayAt > AWAY_GRACE_MS) this.stopStudy(id);
       } else if (l.cam === 'gone' && l.camGoneAt != null && now - l.camGoneAt > CAM_GONE_MS) {
         this.stopStudy(id, l.camGoneAt);
-        this.onCamStopped(id);
+        this.onCamStopped(id, 'gone');
       } else {
         this.commit(id, this.cap(l, now));
         this.checkGoal(id);
@@ -794,6 +860,8 @@ class Academy {
         bubblesUsed: rec ? rec.b : 0,
         checksOk: rec ? rec.ok || 0 : 0,
         checksMissed: rec ? rec.miss || 0 : 0,
+        dozes: rec ? rec.dz || 0 : 0,
+        offTask: rec ? rec.off || 0 : 0,
         camMs: rec ? rec.cms || 0 : 0,
         cam: (l && l.cam) || null,
         goalMin: rec && rec.g ? rec.g : (day === this.today() ? s.goalMin || null : null),
