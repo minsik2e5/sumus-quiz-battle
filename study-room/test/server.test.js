@@ -71,3 +71,58 @@ test('teacher key can be checked against a SHA-256 hash', async () => {
   assert.equal((await call('wrong')).status, 401);
   assert.equal((await call('')).status, 401);
 });
+
+test('photo mode: relays face-covered photos only when the class allows it', async () => {
+  const app = await createApp({ port: 0, host: '127.0.0.1', teacherKey: 'secret', dataFile: '', quiet: true });
+  const base = `http://127.0.0.1:${app.port}`;
+  const post = (path, body, headers = {}) => fetch(base + path, { method: 'POST', headers: { 'Content-Type': 'application/json', ...headers }, body: JSON.stringify(body) }).then(async (r) => ({ status: r.status, body: await r.json() }));
+  const T = { 'X-Teacher-Key': 'secret' };
+  const open = async (token) => {
+    const ws = new WebSocket(`ws://127.0.0.1:${app.port}/ws`);
+    await new Promise((r) => ws.on('open', r));
+    const welcome = nextMessage(ws, (m) => m.t === 'welcome');
+    ws.send(JSON.stringify({ t: 'auth', token }));
+    return { ws, welcome: await welcome };
+  };
+  const photo = 'data:image/jpeg;base64,' + 'A'.repeat(20000);
+  try {
+    const { body: { class: cls } } = await post('/api/teacher/classes', { name: 'P반' }, T);
+    const a = (await post('/api/register', { name: '감자', classCode: cls.code, pin: '1111' })).body;
+    const b = (await post('/api/register', { name: '밍지', classCode: cls.code, pin: '2222' })).body;
+    const A = await open(a.token);
+    const B = await open(b.token);
+    assert.equal(A.welcome.me.photoAllowed, false);
+    let got = [];
+    A.ws.on('message', (raw) => { const m = JSON.parse(raw.toString()); if (m.t === 'photo') got.push(m); });
+
+    B.ws.send(JSON.stringify({ t: 'study', on: true }));
+    B.ws.send(JSON.stringify({ t: 'cam', on: true, pose: 'down' }));
+    B.ws.send(JSON.stringify({ t: 'photo', d: photo }));
+    await new Promise((r) => setTimeout(r, 200));
+    assert.equal(got.length, 0, 'class has not allowed photos');
+
+    const allowed = nextMessage(B.ws, (m) => m.t === 'me' && m.me.photoAllowed);
+    assert.equal((await post(`/api/teacher/classes/${cls.code}/photo`, { on: true }, T)).body.class.photo, true);
+    await allowed;
+    B.ws.send(JSON.stringify({ t: 'photo', d: 'data:image/png;base64,AAAA' }));
+    B.ws.send(JSON.stringify({ t: 'photo', d: photo }));
+    const relayed = await nextMessage(A.ws, (m) => m.t === 'photo' && m.d);
+    assert.equal(relayed.id, b.me.id);
+    assert.equal(relayed.d, photo);
+
+    const board = await fetch(`${base}/api/teacher/board?target=${cls.code}`, { headers: T }).then((r) => r.json());
+    assert.equal(board.photos[b.me.id], photo);
+    const C = await open(a.token);
+    assert.equal(C.welcome.photos[b.me.id], photo, 'late joiners get the current photo');
+    C.ws.close();
+
+    // 카메라를 끄면 사진은 바로 사라진다
+    const dropped = nextMessage(A.ws, (m) => m.t === 'photo' && m.id === b.me.id && m.d === null);
+    B.ws.send(JSON.stringify({ t: 'cam', on: false }));
+    await dropped;
+    A.ws.close();
+    B.ws.close();
+  } finally {
+    await app.close();
+  }
+});

@@ -207,3 +207,22 @@ test('classifier: staring at the screen for 3 minutes is screen, short glances a
   assert.equal(feed(c, 70500, 130000, face()), 'up', 'timer restarts after looking at the book');
   assert.equal(feed(c, 130500, 260000, face()), 'screen');
 });
+
+test('photo: the cover circle hides every face point, mirrored like a selfie', () => {
+  const Photo = require('../public/photo');
+  // 320x240 영상에서 오른쪽 위에 있는 얼굴
+  const lm = [];
+  for (let i = 0; i <= 20; i += 1) for (let j = 0; j <= 20; j += 1) lm.push({ x: 0.55 + 0.2 * (i / 20), y: 0.2 + 0.3 * (j / 20) });
+  const c = Photo.headCircle(lm, 320, 240);
+  assert.equal(c.side, 240);
+  assert.equal(c.sx, 40);
+  const k = Photo.SIZE / 240;
+  for (const p of lm) {
+    const x = Photo.SIZE - (p.x * 320 - 40) * k;
+    const y = (p.y * 240) * k;
+    assert.ok(Math.hypot(x - c.cx, y - c.cy) < c.r, 'point is covered');
+  }
+  assert.ok(c.cx < Photo.SIZE / 2, 'mirrored to the left side');
+  assert.equal(Photo.headCircle([], 320, 240), null);
+  assert.equal(Photo.headCircle(null, 320, 240), null);
+});

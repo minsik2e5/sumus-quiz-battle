@@ -320,3 +320,12 @@ body.solo-on .toast { top: auto; bottom: calc(110px + var(--safe-b)); }
   background: #fff; color: #2c2730; padding: 10px 16px; border-radius: 99px; font-weight: 700; font-size: 14px;
   box-shadow: 0 6px 20px rgba(0,0,0,.25); max-width: 90vw; text-align: center; animation: up .2s ease-out;
 }
+
+/* 실사 모드: 얼굴만 캐릭터로 가린 사진 */
+.photo-art { width: 100%; height: 100%; object-fit: cover; display: block; }
+.card.has-photo .art { background: #2d2a33; }
+.cam-avatar .photo-art { border-radius: inherit; }
+.photo-opt { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 10px; padding: 10px 12px; border-radius: 12px; background: #fff4e8; font-size: 13px; line-height: 1.45; color: #5d5566; cursor: pointer; }
+.photo-opt[hidden] { display: none; }
+.photo-opt input { width: 20px; height: 20px; margin: 1px 0 0; flex: none; accent-color: #ff8fab; }
+.photo-opt b { color: #2d2a33; }

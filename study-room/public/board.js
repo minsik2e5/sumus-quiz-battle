@@ -164,14 +164,16 @@
         el.innerHTML = '<div class="art"></div><div class="top"><span class="timer"></span><span class="name"></span></div>';
         state.cards.set(m.id, el);
       }
-      el.className = `card s-${m.status}`;
-      el.dataset.id = m.id;
       const pose = poseOf(m);
-      const key = JSON.stringify(m.avatar) + pose;
+      const photo = m.status === 'study' && state.data.photos ? state.data.photos[m.id] : null;
+      el.className = `card s-${m.status}${photo ? ' has-photo' : ''}`;
+      el.dataset.id = m.id;
+      const key = photo ? 'photo' : JSON.stringify(m.avatar) + pose;
       if (el.dataset.art !== key) {
-        el.querySelector('.art').innerHTML = Avatar.svg(m.avatar, { pose });
+        el.querySelector('.art').innerHTML = photo ? '<img class="photo-art" alt="">' : Avatar.svg(m.avatar, { pose });
         el.dataset.art = key;
       }
+      if (photo && el.querySelector('.art img').src !== photo) el.querySelector('.art img').src = photo;
       el.querySelector('.name').textContent = m.name;
       el.querySelectorAll('.bubble, .badge, .zzz').forEach((x) => x.remove());
       if (m.bubble) el.insertAdjacentHTML('beforeend', `<div class="bubble">${esc(m.bubble.text)}</div>`);

@@ -11,6 +11,11 @@ const LOGIN_MAX_FAILS = 8;
 const MAX_BODY_CHARS = 16 * 1024;
 const MAX_MESSAGE_CHARS = 4096;
 const IDLE_CONN_MS = 90 * 1000; // 학생 화면은 30초마다 ping을 보낸다
+// 실사 모드 사진: 얼굴을 캐릭터로 가린 작은 JPEG. 메모리에만 두고 저장하지 않는다.
+const PHOTO_MAX_CHARS = 60 * 1024;
+const PHOTO_MIN_GAP_MS = 4000;
+const PHOTO_TTL_MS = 40 * 1000;
+const PHOTO_RE = /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/;
 const STATUS = { bad_request: 400, unauthorized: 401, not_found: 404, conflict: 409, limit: 429 };
 
 function safeEqual(a, b) {
@@ -41,6 +46,7 @@ function teacherKeyMatches(given, teacherKey, teacherKeyHash) {
 function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), log = () => {} }) {
   const conns = new Set();
   const loginFails = new Map();
+  const photos = new Map(); // 학생 id → { d, at }
 
   function send(conn, msg) {
     try {
@@ -63,6 +69,7 @@ function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), 
   const academy = new Academy(store, {
     now,
     onMember(member) {
+      if (photos.has(member.id) && !academy.photoAllowed(member.id)) dropPhoto(member.id);
       each((conn) => {
         if (conn.meta.studentId === member.id) send(conn, { t: 'me', me: academy.me(member.id) });
         if (conn.meta.view === 'all' && member.status === 'offline') send(conn, { t: 'remove', id: member.id });
@@ -70,6 +77,7 @@ function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), 
       });
     },
     onRemove(id, classCode, deleted) {
+      photos.delete(id);
       each((conn) => {
         if (conn.meta.studentId === id) {
           if (deleted) {
@@ -107,17 +115,45 @@ function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), 
     }
   });
 
+  function dropPhoto(id) {
+    if (!photos.delete(id)) return;
+    const s = academy.data.students[id];
+    each((conn) => { if (conn.meta.studentId !== id && (!s || sees(conn, s))) send(conn, { t: 'photo', id, d: null }); });
+  }
+
+  function postPhoto(id, d) {
+    if (d == null) return dropPhoto(id);
+    if (typeof d !== 'string' || d.length > PHOTO_MAX_CHARS || !PHOTO_RE.test(d)) return;
+    if (!academy.photoAllowed(id)) return dropPhoto(id);
+    const prev = photos.get(id);
+    if (prev && now() - prev.at < PHOTO_MIN_GAP_MS) return;
+    photos.set(id, { d, at: now() });
+    const s = academy.data.students[id];
+    each((conn) => { if (conn.meta.studentId !== id && sees(conn, s)) send(conn, { t: 'photo', id, d }); });
+  }
+
+  function photosFor(members, exceptId) {
+    const out = {};
+    for (const m of members) {
+      const p = photos.get(m.id);
+      if (p && m.id !== exceptId) out[m.id] = p.d;
+    }
+    return out;
+  }
+
   function sendWelcome(conn) {
     const id = conn.meta.studentId;
     const s = academy.data.students[id];
     const cls = academy.getClass(s.classCode);
+    const members = academy.roomMembers(conn.meta.view, s.classCode);
     send(conn, {
       t: 'welcome',
       serverNow: now(),
       view: conn.meta.view,
       me: academy.me(id),
       className: cls ? cls.name : '',
-      members: academy.roomMembers(conn.meta.view, s.classCode),
+      members,
+      photos: photosFor(members, id),
       notices: academy.noticesFor(s.classCode)
     });
   }
@@ -136,13 +172,14 @@ function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), 
 
   function message(conn, text) {
     conn.meta.lastMsg = now();
-    if (typeof text !== 'string' || text.length > MAX_MESSAGE_CHARS) return;
+    if (typeof text !== 'string' || text.length > PHOTO_MAX_CHARS + 64) return;
     let msg;
     try {
       msg = JSON.parse(text);
     } catch {
       return;
     }
+    if (!msg || (msg.t !== 'photo' && text.length > MAX_MESSAGE_CHARS)) return;
     try {
       handle(conn, msg);
     } catch (err) {
@@ -180,12 +217,16 @@ function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), 
     if (msg.t === 'cam') return academy.setCam(id, msg.on === true, String(msg.pose || ''), Number(msg.ago) || 0);
     if (msg.t === 'hidden') return academy.setHidden(id, true);
     if (msg.t === 'visible') return academy.setHidden(id, false);
+    if (msg.t === 'photo') return postPhoto(id, msg.d);
   }
 
   // 주기적으로 호출: 공부 시간 저장, 확인/자리비움 처리, 응답 없는 연결 정리
   function tick() {
     academy.tick();
     const t = now();
+    for (const [id, p] of Array.from(photos)) {
+      if (t - p.at > PHOTO_TTL_MS || !academy.photoAllowed(id)) dropPhoto(id);
+    }
     for (const conn of Array.from(conns)) {
       if (t - conn.meta.lastMsg > IDLE_CONN_MS) {
         try { conn.close(4000, 'idle'); } catch { /* 무시 */ }
@@ -308,9 +349,15 @@ function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), 
         academy.deleteClass(m[1]);
         return json(200, { ok: true });
       }
+      m = /^\/api\/teacher\/classes\/(\d+)\/photo$/.exec(p);
+      if (m && method === 'POST') return json(200, { class: academy.setClassPhoto(m[1], parseBody(req).on === true) });
       m = /^\/api\/teacher\/classes\/(\d+)\/students$/.exec(p);
       if (m && method === 'POST') return json(200, { results: academy.addStudents(m[1], parseBody(req).names) });
-      if (p === '/api/teacher/board' && method === 'GET') return json(200, academy.board(q.get('target') || ALL));
+      if (p === '/api/teacher/board' && method === 'GET') {
+        const board = academy.board(q.get('target') || ALL);
+        board.photos = photosFor(board.members);
+        return json(200, board);
+      }
       if (p === '/api/teacher/overview' && method === 'GET') {
         return json(200, academy.overview(q.get('target') || ALL, q.get('day') || academy.today()));
       }

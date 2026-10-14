@@ -124,9 +124,13 @@
         <span class="cam-pose" id="cam-pose"></span>
         <button type="button" class="cam-peek" id="cam-peek" hidden>📹 각도 맞추기</button>
       </div>
-      <p class="cam-note">친구들에게는 <b>캐릭터만</b> 보여요. 내 얼굴 화면은 각도를 맞출 때만 잠깐 켜 보세요.</p>
+      <label class="photo-opt" id="photo-opt" hidden>
+        <input type="checkbox" id="photo-toggle">
+        <span><b>📸 실사 모드</b> 얼굴만 캐릭터로 가리고, 책·손·책상은 진짜 내 모습으로 보여 줘요.</span>
+      </label>
+      <p class="cam-note" id="cam-note">친구들에게는 <b>캐릭터만</b> 보여요. 내 얼굴 화면은 각도를 맞출 때만 잠깐 켜 보세요.</p>
       <ul class="cam-tips">
-        <li>🔒 영상은 <b>이 폰 밖으로 절대 나가지 않아요.</b> 얼굴 방향만 읽어서 캐릭터를 움직여요.</li>
+        <li id="cam-tip-private">🔒 영상은 <b>이 폰 밖으로 절대 나가지 않아요.</b> 얼굴 방향만 읽어서 캐릭터를 움직여요.</li>
         <li>👀 "📹 각도 맞추기"를 누르는 동안만 내 카메라 화면이 보여요(나만 보여요).</li>
         <li>📐 폰을 세워서 얼굴이 화면 안에 들어오게 두세요. 켤 때 <b>화면을 잠깐 바라보면</b> 기준이 잡혀요.</li>
         <li>📖 책을 보면 공부, 잠깐 고개 드는 건 괜찮아요. 화면이나 옆을 3분 넘게 보거나, 졸거나, 자리를 5분 넘게 비우면 확인 창이 뜨거나 멈춰요.</li>
@@ -165,6 +169,7 @@
 
   <script src="/avatar.js"></script>
   <script src="/camera.js"></script>
+  <script src="/photo.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

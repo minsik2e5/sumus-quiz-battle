@@ -365,5 +365,5 @@
     return svg(a, { pose: 'rest' }).replace('viewBox="0 0 200 200"', `viewBox="${crop}"`);
   }
 
-  return { HAIR, HAIR_COLORS, TOPS, ITEMS, DEFAULT, CHARACTERS, POSES: Object.keys(POSES), normalize, random, svg, face, detect, onReady, character, isAvailable: (id) => available.has(id) };
+  return { HAIR, HAIR_COLORS, TOPS, ITEMS, DEFAULT, CHARACTERS, POSES: Object.keys(POSES), normalize, random, svg, face, detect, onReady, character, isAvailable: (id) => available.has(id), spriteUrl: (id) => available.get(id) || null, SPRITE_CELL };
 });

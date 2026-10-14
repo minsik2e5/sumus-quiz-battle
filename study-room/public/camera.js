@@ -243,10 +243,13 @@
     const classifier = createClassifier();
     let stopped = false;
     let lastPose = null;
+    let lastT = 0;
+    // detectForVideo는 시간이 계속 늘어나야 한다
+    const stamp = () => { lastT = Math.max(lastT + 1, performance.now()); return lastT; };
     const timer = setInterval(() => {
       if (stopped || video.readyState < 2) return;
       try {
-        const t = performance.now();
+        const t = stamp();
         const sample = toSample(landmarker.detectForVideo(video, t), t);
         const pose = classifier.push(sample);
         if (pose && pose !== lastPose) {
@@ -261,6 +264,16 @@
     const track = stream.getVideoTracks()[0];
     return {
       get alive() { return !stopped && track && track.readyState === 'live'; },
+      // 지금 화면 한 장의 얼굴 위치 (실사 모드에서 얼굴을 가릴 때 씀). 얼굴이 없으면 null
+      landmarks() {
+        if (stopped || video.readyState < 2) return null;
+        try {
+          const r = landmarker.detectForVideo(video, stamp());
+          return (r && r.faceLandmarks && r.faceLandmarks[0]) || null;
+        } catch {
+          return null;
+        }
+      },
       stop() {
         stopped = true;
         clearInterval(timer);

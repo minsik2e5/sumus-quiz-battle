@@ -155,7 +155,7 @@ async function createApp({
 
   // ---------- WebSocket ----------
 
-  const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096, verifyClient: ({ req }) => sameOrigin(req.headers.origin, req.headers.host) });
+  const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024, verifyClient: ({ req }) => sameOrigin(req.headers.origin, req.headers.host) });
 
   wss.on('connection', (ws) => {
     const conn = {

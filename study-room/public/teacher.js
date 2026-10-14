@@ -96,7 +96,7 @@
         <h2>${isAll ? '학원 전체' : esc(cls.name)}</h2>
         ${cls ? `<span class="code-pill">${cls.code}</span>` : ''}
         <span class="sp"></span>
-        ${cls ? `<button class="btn small primary" data-act="bulk">학생 추가</button><button class="btn small" data-act="rename">이름 바꾸기</button><button class="btn small danger" data-act="delete-class">반 삭제</button>` : ''}
+        ${cls ? `<button class="btn small${cls.photo ? ' primary' : ''}" data-act="photo" title="얼굴만 캐릭터로 가린 사진을 학생이 직접 켜서 친구들에게 보여 줄 수 있어요">📸 실사 모드 ${cls.photo ? '켜짐' : '꺼짐'}</button><button class="btn small primary" data-act="bulk">학생 추가</button><button class="btn small" data-act="rename">이름 바꾸기</button><button class="btn small danger" data-act="delete-class">반 삭제</button>` : ''}
       </div>
       ${cls && state.bulkOpen ? `<form class="bulk" id="bulk-form">
         <p><b>학생 한꺼번에 추가</b> · 이름을 한 줄에 하나씩 적거나 엑셀에서 이름 칸을 복사해 붙여 넣으세요. 학생마다 처음 PIN(숫자 4자리)이 만들어져요.</p>
@@ -203,7 +203,12 @@
         if (!confirm(`${btn.dataset.name} 학생과 공부 기록을 모두 삭제할까요? 되돌릴 수 없어요.`)) return;
         await api(`/api/teacher/students/${id}`, { method: 'DELETE' });
         await loadClasses();
-      } else if (a === 'rename') {
+      } else if (a === 'photo') {
+        const cls = state.classes.find((c) => c.code === state.target);
+        const on = !cls.photo;
+        if (on && !confirm('실사 모드를 켤까요?\n\n• 보호자 동의를 받은 반만 켜 주세요.\n• 학생이 직접 켠 경우에만, 공부 중 8초마다 얼굴을 캐릭터로 가린 사진이 같은 반 친구들, 학원 전체 방, TV 화면에 보여요.\n• 사진은 서버에 저장되지 않아요. 얼굴을 못 찾으면 사진을 보내지 않아요.')) return;
+        await api(`/api/teacher/classes/${state.target}/photo`, { method: 'POST', body: { on } });
+        await loadClasses();
         const name = prompt('새 반 이름');
         if (!name) return;
         await api(`/api/teacher/classes/${state.target}`, { method: 'PATCH', body: { name } });

@@ -29,7 +29,13 @@
     alertedCheck: null,
     cam: null,
     camPose: null,
-    camStarting: false
+    camStarting: false,
+    // 실사 모드: 얼굴만 캐릭터로 가린 사진
+    photoOn: saved.get('study.photo') === '1',
+    photos: new Map(), // 친구 id → 사진
+    myPhoto: null,
+    photoAt: 0,
+    photoBusy: false
   };
 
   // ---------- 유틸 ----------
@@ -156,6 +162,60 @@
     renderCam();
   }
 
+  // ---------- 실사 모드 (얼굴만 캐릭터, 나머지는 진짜 내 모습) ----------
+
+  const PHOTO_EVERY_MS = 8000;
+
+  function photoActive() {
+    return !!(state.photoOn && state.cam && state.cam.alive && state.me && state.me.photoAllowed &&
+      state.me.status === 'study' && state.ws && state.ws.readyState === WebSocket.OPEN);
+  }
+
+  async function tickPhoto() {
+    if (!photoActive()) {
+      if (state.myPhoto) {
+        state.myPhoto = null;
+        sendWs({ t: 'photo', d: null }, true);
+        refreshMyPhoto();
+      }
+      return;
+    }
+    if (state.photoBusy || Date.now() - state.photoAt < PHOTO_EVERY_MS) return;
+    state.photoBusy = true;
+    state.photoAt = Date.now();
+    try {
+      // 얼굴을 못 찾으면 사진을 만들지 않는다 (가리지 못한 얼굴이 나가면 안 되니까)
+      const lm = state.cam.landmarks();
+      const d = lm && await Photo.compose({ video: $('#cam-video'), lm, Avatar, avatar: state.me.avatar, pose: CAM_POSE[state.camPose] || 'study' });
+      if (d && photoActive()) {
+        state.myPhoto = d;
+        sendWs({ t: 'photo', d }, true);
+        refreshMyPhoto();
+      }
+    } catch {
+      // 다음 차례에 다시
+    } finally {
+      state.photoBusy = false;
+    }
+  }
+
+  function refreshMyPhoto() {
+    const m = state.me && state.members.get(state.me.id);
+    if (m) cardFor(m);
+    renderCam();
+  }
+
+  function setPhoto(on) {
+    state.photoOn = on;
+    state.photoAt = 0;
+    if (on) saved.set('study.photo', '1');
+    else saved.del('study.photo');
+    if (on && !state.cam) startCam();
+    if (on) toast(state.me && state.me.status === 'study' ? '실사 모드 켰어요. 얼굴은 캐릭터로 가려져요 📸' : '실사 모드 켰어요. ▶ 공부를 시작하면 사진이 보여요 📸', 3000);
+    tickPhoto();
+    renderCam();
+  }
+
   function renderCam(status) {
     const on = !!state.cam;
     $('#btn-cam').classList.toggle('cam-on', on);
@@ -168,9 +228,25 @@
     // 내 화면에서도 얼굴 대신 캐릭터가 따라 움직이게 보여 준다
     const pose = on && state.camPose ? CAM_POSE[state.camPose] : 'study';
     const box = $('#cam-avatar');
-    const key = state.me ? JSON.stringify(state.me.avatar) + pose : '';
+    const allowed = !!(state.me && state.me.photoAllowed);
+    const photoMode = allowed && state.photoOn;
+    $('#photo-opt').hidden = !allowed;
+    $('#photo-toggle').checked = photoMode;
+    $('#cam-note').innerHTML = photoMode
+      ? '공부 중에는 <b>얼굴만 캐릭터로 가린 사진</b>이 8초마다 친구들에게 보여요. 위 화면이 친구들이 보는 모습이에요.'
+      : '친구들에게는 <b>캐릭터만</b> 보여요. 내 얼굴 화면은 각도를 맞출 때만 잠깐 켜 보세요.';
+    $('#cam-tip-private').innerHTML = photoMode
+      ? '🔒 사진은 <b>저장되지 않고</b> 지금 보는 친구들에게만 보여요. 얼굴을 못 찾으면 사진을 안 보내요.'
+      : '🔒 영상은 <b>이 폰 밖으로 절대 나가지 않아요.</b> 얼굴 방향만 읽어서 캐릭터를 움직여요.';
+    // 내 화면에서도 얼굴 대신 캐릭터가 따라 움직이게 보여 준다 (실사 모드면 친구들이 보는 사진)
+    const photo = on && photoMode ? state.myPhoto : null;
+    const key = photo ? 'photo' : state.me ? JSON.stringify(state.me.avatar) + pose : '';
     box.hidden = !on;
-    if (on && state.me && box.dataset.art !== key) {
+    if (photo) {
+      if (box.dataset.art !== 'photo') box.innerHTML = '<img class="photo-art" alt="">';
+      if ($('img', box).src !== photo) $('img', box).src = photo;
+      box.dataset.art = 'photo';
+    } else if (on && state.me && box.dataset.art !== key) {
       box.innerHTML = Avatar.svg(state.me.avatar, { pose });
       box.dataset.art = key;
     }
@@ -405,6 +481,8 @@
         state.view = msg.view;
         state.notices = msg.notices || [];
         state.members = new Map(msg.members.map((m) => [m.id, m]));
+        state.photos = new Map(Object.entries(msg.photos || {}));
+        state.photoAt = 0;
         state.cards.clear();
         $('#grid').innerHTML = '';
         renderTabs();
@@ -428,8 +506,16 @@
       }
       case 'remove':
         state.members.delete(msg.id);
+        state.photos.delete(msg.id);
         renderGrid();
         break;
+      case 'photo': {
+        if (msg.d) state.photos.set(msg.id, msg.d);
+        else state.photos.delete(msg.id);
+        const m = state.members.get(msg.id);
+        if (m) cardFor(m);
+        break;
+      }
       case 'cheer':
         floatHearts(msg.to);
         if (state.me && msg.to === state.me.id) {
@@ -539,12 +625,15 @@
       state.cards.set(m.id, el);
     }
     const pose = poseOf(m);
-    const artKey = JSON.stringify(m.avatar) + pose;
+    const isMe = state.me && m.id === state.me.id;
+    const photo = m.status === 'study' ? (isMe ? state.myPhoto : state.photos.get(m.id)) : null;
+    const artKey = photo ? 'photo' : JSON.stringify(m.avatar) + pose;
     if (el.dataset.art !== artKey) {
-      $('.art', el).innerHTML = Avatar.svg(m.avatar, { pose });
+      $('.art', el).innerHTML = photo ? '<img class="photo-art" alt="">' : Avatar.svg(m.avatar, { pose });
       el.dataset.art = artKey;
     }
-    el.className = `card s-${m.status}${state.me && m.id === state.me.id ? ' me' : ''}`;
+    if (photo && $('.art img', el).src !== photo) $('.art img', el).src = photo;
+    el.className = `card s-${m.status}${isMe ? ' me' : ''}${photo ? ' has-photo' : ''}`;
     $('.timer', el).textContent = fmt(liveMs(m));
     $('.name', el).innerHTML = `${esc(m.name)}${m.goalHit ? '<span class="goal-chip" title="오늘 목표 달성">🎯</span>' : ''}${m.cam ? '<span class="cam-chip" title="카메라로 확인 중">📷</span>' : ''}`;
     el.classList.toggle('goal-hit', !!m.goalHit);
@@ -615,6 +704,7 @@
     if (!$('#screen-solo').hidden) renderSolo();
     renderCheck();
     renderGone();
+    renderCam();
     syncWakeLock();
   }
 
@@ -682,6 +772,7 @@
     tickCheck();
     renderGone();
     if (state.cam && !state.cam.alive) stopCam(false);
+    tickPhoto();
   }
 
   // ---------- 혼자 모드 ----------
@@ -896,6 +987,8 @@
     state.me = null;
     state.members.clear();
     state.cards.clear();
+    state.photos.clear();
+    state.myPhoto = null;
     $('#grid').innerHTML = '';
     closeSheets();
     if (token && !message) {
@@ -942,6 +1035,7 @@
     $('#btn-solo').addEventListener('click', openSolo);
     $('#btn-cam').addEventListener('click', () => { renderCam(); openSheet('#sheet-cam'); });
     $('#cam-toggle').addEventListener('click', () => (state.cam ? stopCam() : startCam()));
+    $('#photo-toggle').addEventListener('change', (e) => setPhoto(e.target.checked));
     // 각도 맞추기: 누르면 내 카메라 화면을 보여 주고, 다시 누르거나 5초 지나면 캐릭터로 돌아간다
     let peekTimer = null;
     $('#cam-peek').addEventListener('click', () => {

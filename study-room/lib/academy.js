@@ -124,7 +124,7 @@ class Academy {
     const counts = {};
     for (const s of Object.values(this.data.students)) counts[s.classCode] = (counts[s.classCode] || 0) + 1;
     return Object.values(this.data.classes)
-      .map((c) => ({ code: c.code, name: c.name, count: counts[c.code] || 0 }))
+      .map((c) => ({ code: c.code, name: c.name, count: counts[c.code] || 0, photo: !!c.photo }))
       .sort((a, b) => a.name.localeCompare(b.name, 'ko'));
   }
 
@@ -154,6 +154,24 @@ class Academy {
     this.dirty();
     for (const s of this.studentsOf(code)) this.emit(s.id);
     return cls;
+  }
+
+  // 실사 모드(얼굴만 캐릭터로 가린 사진)를 이 반에서 쓸 수 있는지. 보호자 동의를 받은 반만 켠다.
+  setClassPhoto(code, on) {
+    const cls = this.getClass(code);
+    if (!cls) throw new AcademyError('없는 반이에요.', 'not_found');
+    cls.photo = on === true;
+    this.dirty();
+    for (const s of this.studentsOf(code)) this.emit(s.id);
+    return cls;
+  }
+
+  // 지금 이 학생의 사진을 친구들에게 보여 줘도 되는지: 반에서 허용 + 카메라 켜고 공부 중
+  photoAllowed(id) {
+    const s = this.data.students[id];
+    const cls = s && this.getClass(s.classCode);
+    const l = this.live.get(id);
+    return !!(cls && cls.photo && l && l.sockets > 0 && l.since != null && l.awayAt == null && l.cam && l.cam !== 'gone');
   }
 
   deleteClass(code) {
@@ -715,6 +733,7 @@ class Academy {
       check: (l && l.check) || null,
       camGoneAt: (l && l.cam === 'gone' && l.since != null && l.camGoneAt) || null,
       camStopMs: CAM_GONE_MS,
+      photoAllowed: !!(this.getClass(m.classCode) || {}).photo,
       totalMs: this.totalMs(id)
     };
   }
