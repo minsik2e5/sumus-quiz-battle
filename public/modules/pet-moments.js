@@ -187,11 +187,12 @@ function eggRevealHtml(body, key, done) {
 }
 // V13.107 놀이터 알 상점: buy an egg straight from the egg stand (no shop window first), then the
 // same reveal as the shop window: a basic egg's name card, the 영웅 or the legendary show.
-export async function buyEgg(A, onChanged, kind) {
+// V13.150 `via`: 같은 알 깨기 연출을 다른 곳에서(낚시터 진주 교환소: { path: '/reel/exchange', body: { item } }).
+export async function buyEgg(A, onChanged, kind, via = null) {
   if (momentOpen || !A.data?.stats?.pet) return null;
   momentOpen = true;
   let res;
-  try { res = await api('/shop/egg', { kind: kind === 'epic' || kind === 'season' ? kind : 'basic' }); }
+  try { res = await api(via?.path || '/shop/egg', via?.body || { kind: kind === 'epic' || kind === 'season' ? kind : 'basic' }); }
   finally { momentOpen = false; }
   if (res.mythic || res.legendary || res.epic || res.limited) { onChanged?.(); await eggShow(res, kind); return res; }
   momentOpen = true;

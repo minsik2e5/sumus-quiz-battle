@@ -1,18 +1,9 @@
-// V13.149 단어 낚시(Blooket 낚시 대소동 방식). 줄을 던지면 입질 → 뜻 4지선다 → 맞히면 낚고 틀리면 놓친다.
-// 빨리 맞힐수록 큰 물고기, 3연속 정답이면 미끼가 한 단계 좋아지고 틀리면 한 단계 내려간다.
-// 어떤 물고기가 나오는지는 판마다 서버가 준 seed로 정해진다(rollCast): 화면과 서버가 같은 답으로 같은 물고기를 얻는다.
-// 그래서 서버는 '맞힘 · 걸린 시간' 목록만 받아 다시 굴려 보고 보상한다(server/games.mjs fishFinish).
+// V13.149 물고기 · 미끼 · 등급 규칙. 물고기 24종과 낚는 확률(rollCast)은 반 전체 낚시(server/party-engine.mjs)와
+// V13.150 놀이터 손맛 낚시(reel-rules.js reelRoll)가 같이 쓴다. 같은 seed면 화면과 서버가 같은 물고기를 얻는다.
 
 export const FISHING = {
-  CASTS: 12,              // 혼자 낚시 한 판
-  ANSWER_MS: 10000,       // 입질 뒤 답할 시간
-  FAST_MS: 3000,          // 이 안에 맞히면 '빠름'(큰 물고기)
-  OK_MS: 6000,            // 이 안이면 '보통'
-  LURE_UP: 3,             // 연속 정답 수
-  MIN_CAST_MS: 1600,      // 던지기 + 입질 기다림(서버가 시간 확인에 쓴다)
-  DAILY: 4,               // 하루에 코인을 받는 판
-  XP_PER_RIGHT: 1,
-  GOLDEN_EGG: 3           // 황금 알 물고기 3마리 → 랜덤 알 하나
+  FAST_MS: 3000,          // 반 전체 낚시: 이 안에 맞히면 '빠름'(큰 물고기)
+  OK_MS: 6000             // 이 안이면 '보통'
 };
 export const RARITY = {
   common: { name: '흔함', color: '#64748b' },
@@ -83,30 +74,4 @@ export function rollCast(seed, i, lure, ms, { water = false } = {}) {
   return { key, kg, rarity };
 }
 
-// 한 판 다시 보기: answers [{ ok, ms }] → 던질 때마다 미끼 · 낚은 것.
-export function replayFishing(seed, answers, opts = {}) {
-  let lure = 0, run = 0;
-  const casts = [];
-  for (let i = 0; i < Math.min(answers.length, FISHING.CASTS); i++) {
-    const a = answers[i] || {}, ms = Math.max(0, Math.min(FISHING.ANSWER_MS, Number(a.ms) || FISHING.ANSWER_MS));
-    const ok = a.ok === true && ms < FISHING.ANSWER_MS;
-    const used = lure;
-    if (ok) {
-      casts.push({ ok: true, lure: used, ms, ...rollCast(seed, i, used, ms, opts) });
-      run++;
-      if (run >= FISHING.LURE_UP) { run = 0; lure = Math.min(LURES.length - 1, lure + 1); }
-    } else {
-      casts.push({ ok: false, lure: used, ms });
-      run = 0; lure = Math.max(0, lure - 1);
-    }
-  }
-  const caught = casts.filter(c => c.ok);
-  return { casts, lure, right: caught.length, kg: Math.round(caught.reduce((n, c) => n + c.kg, 0) * 100) / 100 };
-}
-// 낚시 코인: 기본 2 + 맞힌 수 절반(최대 8) + 영웅 1마리마다 2 · 전설 5 · 황금 알 3.
-export function fishingCoins(casts) {
-  const right = casts.filter(c => c.ok).length;
-  const extra = casts.reduce((n, c) => n + (c.rarity === 'epic' ? 2 : c.rarity === 'legend' ? 5 : c.rarity === 'golden' ? 3 : 0), 0);
-  return right ? 2 + Math.min(8, Math.floor(right / 2)) + extra : 0;
-}
 export const kgText = kg => kg >= 100 ? `${Math.round(kg).toLocaleString('ko-KR')}kg` : kg >= 10 ? `${kg.toFixed(1)}kg` : `${kg.toFixed(2)}kg`;

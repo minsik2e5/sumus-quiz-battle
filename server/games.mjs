@@ -1,12 +1,12 @@
-import { randomBytes } from 'node:crypto';
 import { dayKey } from '../public/modules/core.js';
 import { MATCH, matchStars } from '../public/modules/match-rules.js';
-import { FISHING, FISH, FISH_KEYS, replayFishing, fishingCoins } from '../public/modules/fishing-rules.js';
-import { addBonus, findReceipt, keepReceipt, giveGift } from './rewards.mjs';
+import { FISH } from '../public/modules/fishing-rules.js';
+import { addBonus, findReceipt, keepReceipt } from './rewards.mjs';
+import { grantBait } from './reel.mjs';
 
-// V13.149 혼자 하는 단어 게임: 짝 맞추기 타임어택 · 단어 낚시. 모두 학생 기록 p.games에 산다.
+// V13.149 혼자 하는 단어 게임: 짝 맞추기 타임어택(학생 기록 p.games). V13.150: 혼자 단어 낚시는 놀이터 손맛 낚시(server/reel.mjs)로 바뀌었다.
 //   games.match { live{id, at, codes}, best, week{key, best}, day, plays, record_day }
-//   games.fish  { live{id, at, seed, water}, day, plays, best_kg, book{key: {n, kg}}, golden, total }
+//   games.fish  { book{key: {n, kg}}, golden }  물고기 도감(손맛 낚시 · 반 전체 낚시가 함께 쓴다)
 // 시작할 때 서버에 등록하고(live) 끝날 때 서버가 시간을 보고 보상한다(몬스터전과 같다). 같은 끝내기를 다시 보내면
 // 영수증(keepReceipt)으로 같은 답을 준다.
 
@@ -46,13 +46,15 @@ function matchSettle(p, m, live, { ms, misses, pet, now, weekKey }) {
   const today = dayKey(now);
   if (m.day !== today) { m.day = today; m.plays = 0; }
   const base = { ms: time, stars, record, week_record: weekRecord };
-  if (Number(m.plays || 0) >= MATCH.DAILY) return { ...base, paid: false, reason: 'daily' };
+  if (Number(m.plays || 0) >= MATCH.DAILY) return { ...base, paid: false, reason: 'daily', bait: stars === 3 && grantBait(p, now) };
   m.plays = Number(m.plays || 0) + 1;
   const recordCoins = record && m.record_day !== today ? MATCH.RECORD_COINS : 0;
   if (recordCoins) m.record_day = today;
   const coins = MATCH.COINS[stars] + recordCoins;
   addBonus(p, { xp: MATCH.XP, coins, pet, now });
-  return { ...base, paid: true, coins, record_coins: recordCoins, xp: MATCH.XP };
+  // V13.150: 별 3개면 낚시 미끼 1개(하루 미끼 한도 안에서).
+  const bait = stars === 3 && grantBait(p, now);
+  return { ...base, paid: true, coins, record_coins: recordCoins, xp: MATCH.XP, bait };
 }
 // 이번 주 같은 반 짝 맞추기 순위(가장 빠른 기록).
 export function matchBoard(profiles, p, weekKey, { hidden = () => false } = {}) {
@@ -65,63 +67,4 @@ export function matchBoard(profiles, p, weekKey, { hidden = () => false } = {}) 
   return { rows: mine && !top.includes(mine) ? [...top, mine] : top, total: rows.length };
 }
 
-/* ---------- 단어 낚시 ---------- */
-export function fishView(p, now = Date.now()) {
-  const f = p.games?.fish || {};
-  const plays = f.day === dayKey(now) ? Number(f.plays || 0) : 0;
-  return {
-    left: Math.max(0, FISHING.DAILY - plays), daily: FISHING.DAILY, best_kg: Number(f.best_kg || 0),
-    book: f.book || {}, kinds: Object.keys(f.book || {}).length, all: FISH_KEYS.length,
-    golden: Number(f.golden || 0) % FISHING.GOLDEN_EGG, total: Number(f.total || 0)
-  };
-}
-export function fishStart(p, { id, water = false, now = Date.now(), seed = randomBytes(4).readUInt32BE(0) }) {
-  const f = games(p).fish ||= {};
-  f.live = { id, at: now, seed, water: !!water };
-  return { id, seed, water: !!water, ...fishView(p, now) };
-}
-export function fishFinish(p, { id, answers, pet = null, now = Date.now(), giftId }) {
-  const g = games(p), f = g.fish ||= {};
-  const seen = findReceipt(g, 'fish', id);
-  if (seen) return { ...seen.r, again: true, ...fishView(p, now) };
-  const live = f.live;
-  if (!id || !live || live.id !== id) fail('낚시 판을 찾지 못했어요.', 404);
-  delete f.live;
-  const list = (Array.isArray(answers) ? answers : []).slice(0, FISHING.CASTS).map(a => ({ ok: a?.ok === true, ms: Number(a?.ms) }));
-  const run = replayFishing(live.seed, list, { water: live.water });
-  return { ...keepReceipt(g, 'fish', id, fishSettle(p, f, live, run, { pet, now, giftId }), now), ...fishView(p, now) };
-}
-function fishSettle(p, f, live, run, { pet, now, giftId }) {
-  const used = run.casts.reduce((n, c) => n + c.ms, 0) + run.casts.length * FISHING.MIN_CAST_MS;
-  const base = { casts: run.casts, kg: run.kg, right: run.right };
-  if (!run.casts.length) return { ...base, paid: false, reason: 'few' };
-  if (now - live.at + SLACK_MS < used) return { ...base, paid: false, reason: 'short' };
-  // 도감 · 최고 무게는 보상 횟수와 상관없이 남는다.
-  const book = f.book ||= {}, fresh = [];
-  let golden = 0;
-  for (const c of run.casts.filter(c => c.ok)) {
-    const b = book[c.key] ||= { n: 0, kg: 0 };
-    if (!b.n) fresh.push(c.key);
-    b.n += 1; b.kg = Math.max(Number(b.kg || 0), c.kg);
-    if (c.key === 'goldenegg') golden++;
-  }
-  f.total = Number(f.total || 0) + run.right;
-  const record = run.kg > Number(f.best_kg || 0);
-  if (record) f.best_kg = run.kg;
-  // 황금 알 물고기 3마리마다 랜덤 알 하나(선생님 알 선물과 같은 선물 상자로 온다).
-  let egg = false;
-  if (golden) {
-    const before = Math.floor(Number(f.golden || 0) / FISHING.GOLDEN_EGG);
-    f.golden = Number(f.golden || 0) + golden;
-    if (Math.floor(f.golden / FISHING.GOLDEN_EGG) > before && giftId) { giveGift(p, { kind: 'egg', note: `황금 알 물고기 ${FISHING.GOLDEN_EGG}마리를 모았어요!`, from: 'fishing', fromName: '단어 낚시', now, id: giftId }); egg = true; }
-  }
-  const out = { ...base, fresh, record, egg };
-  const today = dayKey(now);
-  if (f.day !== today) { f.day = today; f.plays = 0; }
-  if (Number(f.plays || 0) >= FISHING.DAILY) return { ...out, paid: false, reason: 'daily' };
-  f.plays = Number(f.plays || 0) + 1;
-  const coins = fishingCoins(run.casts), xp = run.right * FISHING.XP_PER_RIGHT;
-  addBonus(p, { xp, coins, pet, now });
-  return { ...out, paid: coins > 0 || xp > 0, coins, xp };
-}
 export const fishName = key => FISH[key]?.name || '';

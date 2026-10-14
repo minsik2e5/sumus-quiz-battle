@@ -915,6 +915,7 @@ function finishPracticeView() {
     ${x.left_out ? `<div class="result-note test-left-out-v1376">시험 중에 화면을 ${Number(x.leaves || TEST_LEAVE_LIMIT)}번 나가서 지금까지 푼 답으로 자동 제출됐어요.</div>` : ''}
     <div class="result-reward-card result-reward-top"><div><span>코인</span><strong><i class="coin-ico" aria-hidden="true"></i>+${Number(x.reward_points || 0)}</strong></div><div><span>경험치</span><strong>+${Number(x.xp || 0)}</strong></div></div>
     ${x.reward_note ? `<p class="result-reward-note-v1373">${esc(x.reward_note)}</p>` : ''}
+    ${x.bait ? '<p class="result-bait-v13150">🪱 낚시 미끼 +1 · 놀이터 낚시터에서 써요!</p>' : ''}
     ${rewardEventResult(x)}
     <p class="result-next-copy">${esc(statusText)}</p>
     ${primaryCta}

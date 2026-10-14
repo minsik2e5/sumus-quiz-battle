@@ -9,10 +9,11 @@ import { DAY_MS, createCompetition } from './competition.mjs';
 import { growthFor, dayKey } from '../public/modules/core.js';
 import { STREAK_GUARD, guardPlan, guardView, guardDayKeys, dayNum } from '../public/modules/streak-guard.js';
 import { MATCH, matchPick, matchStars, cardMeaning } from '../public/modules/match-rules.js';
-import { FISHING, FISH, FISH_KEYS, LURES, rollCast, replayFishing, fishingCoins, seeded } from '../public/modules/fishing-rules.js';
+import { FISH, FISH_KEYS, LURES, rollCast } from '../public/modules/fishing-rules.js';
+import { REEL, FIGHT, reelRoll, pearlsOf } from '../public/modules/reel-rules.js';
+import { grantBait, reelCast, reelLand } from './reel.mjs';
 import { fishSvg } from '../public/modules/fishing-art.js';
 import { addBonus } from './rewards.mjs';
-import { fishStart, fishFinish } from './games.mjs';
 import { PARTY, CHESTS, createParty, joinParty, startParty, answer, pick, target, tick, tvView, playerView, awards, partyCoins, partyReport, ranked } from './party-engine.mjs';
 import { settleParty } from './party.mjs';
 
@@ -76,7 +77,7 @@ export async function runGamesChecks(assert) {
   {
     const before = JSON.stringify(prof('qa-gm-a'));
     const boot = await call('qa-gm-a', 'GET', '/bootstrap');
-    assert(boot.stats.streak_guard?.held === 0 && boot.rewards.match && boot.rewards.fish && JSON.stringify(prof('qa-gm-a')) === before, 'V13.149 홈 데이터에 보호권 · 짝 맞추기 · 낚시가 오고, 읽기만으로 학생 기록이 바뀌지 않는다');
+    assert(boot.stats.streak_guard?.held === 0 && boot.rewards.match && boot.rewards.reel && JSON.stringify(prof('qa-gm-a')) === before, 'V13.149 홈 데이터에 보호권 · 짝 맞추기 · 낚시가 오고, 읽기만으로 학생 기록이 바뀌지 않는다');
     assert(await fails(() => call('qa-gm-a', 'POST', '/shop/streak-guard'), 400), 'V13.149 코인이 모자라면 보호권을 살 수 없다');
     addBonus(prof('qa-gm-a'), { coins: 1000, now });
     const spentBefore = Number(prof('qa-gm-a').points_spent || 0);
@@ -123,40 +124,71 @@ export async function runGamesChecks(assert) {
       assert(!capped.paid && capped.reason === 'daily' && capped.left === 0, `V13.149 짝 맞추기 코인은 하루 ${MATCH.DAILY}판까지(기록은 남는다)`);
       const board = await call('qa-gm-a', 'GET', '/games/match/board');
       assert(board.rows[0]?.id === 'qa-gm-c' && board.rows[0].ms === 12000 && !board.rows.some(r => r.id === 'qa-gm-d'), 'V13.149 이번 주 우리 반 짝 맞추기 순위(다른 반은 안 보인다)');
-      // 낚시: 서버가 준 seed로 다시 굴린다.
-      const fs = await call('qa-gm-b', 'POST', '/games/fish/start', { range_codes: ['24'] });
-      const answers = [3000, 2000, 2500, 9000, 1500, 1500, 1500, 1500, 1500, 1500, 4000, 2000].map((ms, i) => ({ ok: i !== 3, ms }));
-      const run = replayFishing(fs.seed, answers);
-      clock += 12 * (FISHING.MIN_CAST_MS + 3000);
-      const ff = await call('qa-gm-b', 'POST', '/games/fish/finish', { id: fs.id, answers });
-      assert(ff.paid && ff.kg === run.kg && ff.right === 11 && ff.coins === fishingCoins(run.casts) && Object.keys(prof('qa-gm-b').games.fish.book).length === new Set(run.casts.filter(c => c.ok).map(c => c.key)).size && ff.best_kg === run.kg,
-        'V13.149 낚시: 서버가 같은 seed로 다시 굴려 무게 · 코인을 정하고, 어항 도감과 최고 무게가 남는다');
-      const fs2 = await call('qa-gm-b', 'POST', '/games/fish/start', { range_codes: ['24'] });
-      clock += 2000;
-      const quick = await call('qa-gm-b', 'POST', '/games/fish/finish', { id: fs2.id, answers });
-      assert(!quick.paid && quick.reason === 'short', 'V13.149 낚시: 던지기 시간보다 빨리 끝난 판은 받지 않는다');
+      // V13.150 손맛 낚시(놀이터): 미끼 → 던지기(서버가 물고기를 정함) → 끌어올리기(최소 파이팅 시간) → 어망 → 진주 → 코인 · 알.
+      const b = prof('qa-gm-b');
+      b.reel = {}; // 앞의 출석 검사에서 받은 미끼는 지우고 시작
+      assert(await fails(() => call('qa-gm-b', 'POST', '/reel/cast', { cast: 'perfect' }), 409), 'V13.150 미끼가 없으면 던질 수 없다');
+      const given = Array.from({ length: 7 }, () => grantBait(b, clock));
+      assert(given.filter(Boolean).length === REEL.BAIT_DAILY && b.reel.bait === REEL.BAIT_DAILY, `V13.150 미끼는 하루 ${REEL.BAIT_DAILY}개까지 받는다`);
+      const c1 = await call('qa-gm-b', 'POST', '/reel/cast', { cast: 'perfect' });
+      const live1 = b.reel.live;
+      assert(c1.fight.hp === FIGHT[live1.rarity].hp && !('key' in c1) && !JSON.stringify(c1.fight).includes(live1.key) && c1.reel.bait === REEL.BAIT_DAILY - 1 && await fails(() => call('qa-gm-b', 'POST', '/reel/cast', {}), 409),
+        'V13.150 던지면 미끼 1개를 쓰고, 화면에는 파이팅 세기만(어떤 물고기인지는 끌어올린 뒤), 끌어올리기 전에 또 던질 수 없다');
+      clock += 1000;
+      const tooSoon = await call('qa-gm-b', 'POST', '/reel/land', { id: c1.id, result: 'caught' });
+      assert(!tooSoon.caught && tooSoon.reason === 'short' && !b.reel.live, 'V13.150 최소 파이팅 시간보다 빨리 끌어올렸다고 하면 놓친 것');
+      const c2 = await call('qa-gm-b', 'POST', '/reel/cast', { cast: 'ok' });
+      const live2 = b.reel.live;
+      clock += FIGHT.legend.min + 100;
+      const got = await call('qa-gm-b', 'POST', '/reel/land', { id: c2.id, result: 'caught' });
+      const twice = await call('qa-gm-b', 'POST', '/reel/land', { id: c2.id, result: 'caught' });
+      assert(got.caught && got.key === live2.key && got.kg === live2.kg && twice.again && b.games.fish.book[live2.key].n >= 1 && (live2.key === 'goldenegg' || got.reel.net[live2.key] === 1),
+        'V13.150 끌어올리면 던질 때 정해진 물고기가 어망 · 도감에(같은 끝내기는 한 번만)');
+      const c3 = await call('qa-gm-b', 'POST', '/reel/cast', { cast: 'good' });
+      const lost = await call('qa-gm-b', 'POST', '/reel/land', { id: c3.id, result: 'lost' });
+      assert(!lost.caught && lost.reel.bait === REEL.BAIT_DAILY - 3, 'V13.150 놓치면 미끼는 사라진다');
+      // 팔기 · 교환.
+      b.reel.net = { tuna: 2, carp: 1 };
+      const sold = await call('qa-gm-b', 'POST', '/reel/sell', {});
+      assert(sold.pearls === 2 * REEL.PEARLS.rare + REEL.PEARLS.uncommon && !Object.keys(sold.reel.net).length && b.games.fish.book[live2.key], 'V13.150 어망 물고기를 팔면 등급만큼 진주(도감은 그대로)');
+      b.reel.pearls = 5000;
+      const bal0 = (await call('qa-gm-b', 'GET', '/rewards')).points_balance;
+      const coins = await call('qa-gm-b', 'POST', '/reel/exchange', { item: 'coins', amount: 60 });
+      assert(coins.coins === 60 && coins.points_balance - bal0 === 60 && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'coins', amount: 50 }), 409),
+        `V13.150 진주 → 코인 1:1, 하루 ${REEL.COIN_DAILY}코인까지`);
+      const pets0 = b.pets.length;
+      const egg = await call('qa-gm-b', 'POST', '/reel/exchange', { item: 'egg' });
+      const epic = await call('qa-gm-b', 'POST', '/reel/exchange', { item: 'epic_egg' });
+      assert(egg.key && epic.key && b.pets.length === pets0 + 2 && b.reel.pearls === 5000 - 60 - REEL.EGG - REEL.EPIC_EGG
+        && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'egg' }), 409) && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'epic_egg' }), 409)
+        && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'sea_pet' }), 409),
+        `V13.150 진주 ${REEL.EGG} = 랜덤 알(하루 1), ${REEL.EPIC_EGG} = 영웅 알(일주일 1), 바다 펫은 그림이 올 때까지 잠김`);
+      const att = b.attendance = { card: 0, last: dayKey(clock - DAY), streak: 1 };
+      b.reel.bait_today = 0;
+      const checkin = await call('qa-gm-b', 'POST', '/attendance/check');
+      assert(checkin.bait === true && checkin.reel.bait === b.reel.bait && att, 'V13.150 출석하면 미끼 1개');
     } finally { Date.now = realNow; }
   }
 
   {
-    // 낚시 규칙: 3연속이면 미끼 업, 틀리면 한 단계 다운, 빠르면 더 무겁다, 같은 seed는 같은 물고기.
-    const r = replayFishing(42, [1, 1, 1, 1, 1, 1, 0, 1].map((ok, i) => ({ ok: !!ok, ms: 2000 + i })));
-    assert(r.casts.map(c => c.lure).join('') === '00011121' && JSON.stringify(replayFishing(42, [{ ok: true, ms: 2000 }])) === JSON.stringify(replayFishing(42, [{ ok: true, ms: 2000 }])),
-      'V13.149 낚시 미끼: 3연속 정답마다 한 단계 위, 틀리면 한 단계 아래, 같은 seed면 같은 물고기');
+    // 물고기 규칙(반 전체 낚시 · 손맛 낚시가 같이 쓴다).
     let fast = 0, slow = 0;
     for (let i = 0; i < 400; i++) { fast += rollCast(i * 7919, 0, 0, 1000).kg; slow += rollCast(i * 7919, 0, 0, 9000).kg; }
     const rare = k => { let n = 0; for (let i = 0; i < 2000; i++) if (['rare', 'epic', 'legend'].includes(rollCast(i * 104729, 1, k, 5000).rarity)) n++; return n; };
-    assert(fast > slow * 1.5 && rare(3) > rare(0) * 3, 'V13.149 낚시: 빨리 맞힐수록 큰 물고기, 좋은 미끼일수록 귀한 물고기');
+    assert(fast > slow * 1.5 && rare(3) > rare(0) * 3, 'V13.149 반 전체 낚시: 빨리 맞힐수록 큰 물고기, 좋은 미끼일수록 귀한 물고기');
     assert(FISH_KEYS.length === 24 && FISH_KEYS.every(k => fishSvg(k).startsWith('<svg') && fishSvg(k).includes(FISH[k].name)) && LURES.length === 4 && FISH.goldenegg.rarity === 'golden',
       'V13.149 물고기 24종(황금 알 물고기 포함)은 모두 코드 그림이 있다');
+    // 손맛 낚시: 퍼펙트로 던질수록 귀한 물고기, 같은 seed는 같은 물고기, 등급마다 진주 · 파이팅 세기.
+    const rareCast = c => { let n = 0; for (let i = 0; i < 3000; i++) if (['rare', 'epic', 'legend'].includes(reelRoll(i * 2654435761, c).rarity)) n++; return n; };
+    assert(rareCast('perfect') > rareCast('ok') * 2 && JSON.stringify(reelRoll(99, 'good')) === JSON.stringify(reelRoll(99, 'good')) && pearlsOf('whaleshark') === 400 && pearlsOf('minnow') === 10
+      && FIGHT.legend.hp > FIGHT.common.hp && FIGHT.legend.min > FIGHT.common.min, 'V13.150 손맛 낚시: 퍼펙트일수록 귀한 물고기, 진주 10 · 25 · 60 · 150 · 400, 귀할수록 오래 버틴다');
     // 황금 알 물고기 3마리 → 선생님 알과 같은 선물 상자.
+    const p = { id: 'egg-test', pets: [{ key: 'dog' }], reel: { bait: 1 }, games: { fish: { golden: 2 } } };
     let seed = 0;
-    const allFast = Array.from({ length: 12 }, () => ({ ok: true, ms: 1200 }));
-    while (!replayFishing(seed, allFast).casts.some(c => c.key === 'goldenegg')) seed++;
-    const p = { id: 'egg-test', pets: [{ key: 'dog' }], games: { fish: { golden: 2 } } };
-    fishStart(p, { id: 'f1', now, seed });
-    const done = fishFinish(p, { id: 'f1', answers: allFast, now: now + 60000, giftId: 'gift-1' });
-    assert(done.egg && p.gift_box.log.some(g => g.kind === 'egg' && g.from_name === '단어 낚시'), 'V13.149 황금 알 물고기 3마리를 모으면 알 선물(선물 상자)이 온다');
+    while (reelRoll(seed, 'perfect').key !== 'goldenegg') seed++;
+    reelCast(p, { id: 'g1', cast: 'perfect', now, seed });
+    const done = reelLand(p, { id: 'g1', result: 'caught', now: now + FIGHT.golden.min + 10, giftId: 'gift-1' });
+    assert(done.egg && p.gift_box.log.some(g => g.kind === 'egg' && g.from_name === '낚시터') && !p.reel.net?.goldenegg, 'V13.150 황금 알 물고기는 팔지 않고 모아 3마리면 알 선물');
     const art = source('../docs/asset-requests/runner/26-fishing.txt'), codex = source('../docs/asset-requests/runner/CODEX_PROMPT_26.md'), map = source('../docs/asset-requests/runner/slice-map.csv');
     assert(art.split('\n---\n').length === 6 && art.split('\n---\n').every((t, i) => t.includes('STYLE REFERENCE — before drawing, open "06-3.png"') && t.includes(`named exactly "26-${i + 1}.png"`) && t.includes('"SUMUS 낚시 26 (Runner용)"'))
       && codex.includes('Drive의 기존 그림을 열어 그림체를 맞춘다') && codex.includes('정해진 Drive 폴더 "SUMUS 낚시 26 (Runner용)"에 정확한 파일 이름') && FISH_KEYS.every(k => map.includes(`public/assets/fish/${k}.webp`)),
@@ -286,9 +318,10 @@ export async function runGamesChecks(assert) {
     assert(worker.includes('export { PartyRoom };') && worker.includes("url.pathname.match(/^\\/api\\/party\\/ws\\/([0-9a-f-]{36})$/)") && worker.includes("'X-Party-Key'") && worker.includes('delete result._parties') && worker.includes('undoParty(state, message)') && worker.includes('settlePartyReport(state, body)'),
       'V13.149 worker: 교실 게임 소켓은 방으로, 방 준비 메시지는 브라우저로 안 가고, 결과 보고는 키로 확인');
     assert(local.includes('delete result._parties;') && local.includes('delete result._dungeon;'), 'V13.149 로컬 서버도 방 준비 메시지(문제 · 입장표)를 브라우저로 보내지 않는다');
-    assert(/"v13146\.css",\s*"v13149\.css"\s*\]/.test(build) && ['match-game.js', 'fishing.js', 'fishing-art.js', 'fishing-rules.js', 'party.js', 'party-tv.js', 'streak-guard.js', 'streak-guard-ui.js', 'match-rules.js'].every(f => sw.includes(`modules/${f}`)),
+    assert(/"v13146\.css",\s*"v13149\.css"\s*\]/.test(build) && ['match-game.js', 'reel.js', 'reel-rules.js', 'fishing-art.js', 'fishing-rules.js', 'party.js', 'party-tv.js', 'streak-guard.js', 'streak-guard-ui.js', 'match-rules.js'].every(f => sw.includes(`modules/${f}`)),
       'V13.149 새 화면 CSS는 묶음 끝에, 새 모듈은 오프라인 캐시에');
-    assert(battle.includes("['games', '게임', 'arcade']") && battle.includes("act === 'game-match' || act === 'game-fish'") && battle.includes("act === 'game-party'") && app.includes("d.action === 'party-new'") && teacher.includes('data-action="party-new"'),
+    assert(battle.includes("['games', '게임', 'arcade']") && battle.includes("act === 'game-match'") && !battle.includes('game-fish') && source('../public/modules/arcade.js').includes('data-action="reel-open"') && app.includes("d.action === 'reel-open'")
+      && source('../public/modules/reel.js').includes('진주 1개 = 1코인') && source('../public/modules/sessions.js').includes('낚시 미끼 +1') && battle.includes("act === 'game-party'") && app.includes("d.action === 'party-new'") && teacher.includes('data-action="party-new"'),
       'V13.149 야차전 게임 탭(짝 맞추기 · 단어 낚시 · 교실 게임 참가)과 선생님 대시보드의 교실 게임 버튼');
   }
 }

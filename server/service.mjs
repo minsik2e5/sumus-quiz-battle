@@ -31,7 +31,9 @@ import { activeEventFor, studentEventView, teacherEventView, teacherOwns, keptEv
 import { dungeonQuestions } from './dungeon-words.mjs';
 import { settleDungeonRecords, dungeonBoardsView, dungeonLastView } from './dungeon-records.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
-import { matchStart, matchFinish, matchView, matchBoard, fishStart, fishFinish, fishView } from './games.mjs';
+import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend } from './reel.mjs';
+import { REEL } from '../public/modules/reel-rules.js';
+import { matchStart, matchFinish, matchView, matchBoard } from './games.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
 import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, settleParty, partyReportPending, undoParty } from './party.mjs';
 import { PARTY } from './party-engine.mjs';
@@ -797,6 +799,14 @@ export function undoDungeon(state, message) {
 }
 const dungeonTicket = () => randomBytes(18).toString('hex');
 const gameWeekKey = now => String(rankingWeek(now).start);
+// 알 깨기(상점 알 · V13.150 진주 교환 알): 신화 · 한정 · 전설이면 소식과 새 상태까지.
+function hatchEgg(state, p, { epic, season, missing, price }) {
+  const { key, legendary, limited, mythic } = openEgg(p, { epic, season: season?.id || null, missing, price });
+  if (mythic) return { key, epic: false, mythic: { key, egg: true, epic }, ...announceLegend(state, p, key, epic ? '영웅 알' : '랜덤 알', '신화'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
+  if (limited) return { key, epic: false, limited: true, season: season?.id || CHARACTERS[key]?.limited, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
+  if (legendary) return { key, epic: false, legendary: { key, egg: true }, ...announceLegend(state, p, key, '영웅 알'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
+  return { key, epic, profile: publicProfile(p) };
+}
 // 선생님 TV가 쓰는 것(입장표 포함: 선생님만 받는다).
 const partyHostView = x => ({ id: x.id, code: x.code, kind: x.kind, minutes: x.minutes, steal: x.steal, class_name: x.class_name, label: x.label || x.class_name, tv_ticket: x.tv_ticket, created_at: x.created_at });
 // 방이 보낸 결과(cloudflare/worker.mjs /api/internal/party-result).
@@ -1175,7 +1185,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } else if (process.env.AUTH_PROVIDER === 'supabase') {
       const result = await supabaseLogin(username, password); p = result.profile; supabaseAccessToken = result.accessToken;
       const old = state.profiles.find(x => x.id === p.id);
-      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live', 'bonus', 'streak_guard', 'games'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
+      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live', 'bonus', 'streak_guard', 'games', 'reel'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
       else state.profiles.push(p);
     } else {
       p = localProfile;
@@ -1277,7 +1287,7 @@ export async function service(state, method, path, body, token, options = {}) {
       class_league: teacher && selectedSchool ? classLeague(state, competition, selectedSchool, now) : null,
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), fish: fishView(p, now) },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now) },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -1608,7 +1618,9 @@ export async function service(state, method, path, body, token, options = {}) {
     const now = Date.now(), done = checkIn(p, now);
     // V13.149: 7번째 도장에는 연속 학습 보호권 1장(이미 2장이면 없음).
     const guard = done.tickets > 0 ? giveStreakGuard(state, p, 'attend', now) : null;
-    return { ...done, streak_guard: guard, points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
+    // V13.150: 출석하면 낚시 미끼 1개.
+    const bait = grantBait(p, now);
+    return { ...done, streak_guard: guard, bait, reel: reelView(p, now), points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
   }
   // V13.149 연속 학습 보호권 사기(최대 STREAK_GUARD.MAX장).
   if (path === '/shop/streak-guard' && method === 'POST') {
@@ -1692,8 +1704,8 @@ export async function service(state, method, path, body, token, options = {}) {
     const result = monsterFinish(p, { id: str(body.id, 80), result: str(body.result, 10), right: Number(body.right), pet: activePetKey(state, p.id), scope: ctx.scope, parts: ctx.parts, now: Date.now() });
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
-  // V13.149 짝 맞추기 · 단어 낚시(server/games.mjs). 단어는 몬스터전처럼 내 학교 · 학년의 범위에서.
-  if ((path === '/games/match/start' || path === '/games/fish/start') && method === 'POST') {
+  // V13.149 짝 맞추기(server/games.mjs). 단어는 몬스터전처럼 내 학교 · 학년의 범위에서. (V13.150: 혼자 단어 낚시는 놀이터 손맛 낚시로 바뀌었다)
+  if (path === '/games/match/start' && method === 'POST') {
     requireRole(p, 'student');
     if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
     const ctx = monsterContext(state, p);
@@ -1702,8 +1714,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!asked.length) fail('단어 범위를 골라주세요.');
     if (scopedWords(state, ctx.school.id, asked, p.class_name).length < 8) fail('단어가 8개 이상 되게 범위를 골라주세요.', 409);
     const now = Date.now();
-    if (path === '/games/match/start') return matchStart(p, { id: id(), codes: asked, now, weekKey: gameWeekKey(now) });
-    return fishStart(p, { id: id(), water: elementOf(activePetKey(state, p.id)) === 'water', now });
+    return matchStart(p, { id: id(), codes: asked, now, weekKey: gameWeekKey(now) });
   }
   if (path === '/games/match/finish' && method === 'POST') {
     requireRole(p, 'student');
@@ -1714,11 +1725,6 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/games/match/board' && method === 'GET') {
     requireRole(p, 'student');
     return matchBoard(state.profiles, p, gameWeekKey(Date.now()), { hidden: isPrivate });
-  }
-  if (path === '/games/fish/finish' && method === 'POST') {
-    requireRole(p, 'student');
-    const result = fishFinish(p, { id: str(body.id, 80), answers: Array.isArray(body.answers) ? body.answers.slice(0, 30) : [], pet: activePetKey(state, p.id), now: Date.now(), giftId: id() });
-    return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p), ...(result.egg ? { gifts: giftsWaiting(p) } : {}) };
   }
   // V13.149 교실 게임: 선생님이 TV에 방을 열고(보물 사냥 · 반 전체 낚시), 학생은 4자리 번호로 들어온다.
   if (path === '/teacher/party' && method === 'GET') {
@@ -1783,11 +1789,43 @@ export async function service(state, method, path, body, token, options = {}) {
     if (openBattleFor(state, p.id, Date.now())) fail('대결이 끝난 뒤에 알을 살 수 있어요.', 409);
     const balance = pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance;
     if (balance < price) fail(`코인이 ${price - balance}개 부족해요.`);
-    const { key, legendary, limited, mythic } = openEgg(p, { epic, season: season?.id || null, missing, price });
-    if (mythic) return { key, epic: false, mythic: { key, egg: true, epic }, ...announceLegend(state, p, key, epic ? '영웅 알' : '랜덤 알', '신화'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
-    if (limited) return { key, epic: false, limited: true, season: season?.id || CHARACTERS[key]?.limited, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
-    if (legendary) return { key, epic: false, legendary: { key, egg: true }, ...announceLegend(state, p, key, '영웅 알'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
-    return { key, epic, profile: publicProfile(p) };
+    return hatchEgg(state, p, { epic, season, missing, price });
+  }
+  // V13.150 손맛 낚시(놀이터): 던지기 · 끌어올리기 · 어망 팔기 · 진주 교환소(server/reel.mjs).
+  if (path === '/reel/cast' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
+    const now = Date.now();
+    const res = reelCast(p, { id: id(), cast: str(body.cast, 10), water: elementOf(activePetKey(state, p.id)) === 'water', now });
+    return { ...res, reel: reelView(p, now) };
+  }
+  if (path === '/reel/land' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now(), res = reelLand(p, { id: str(body.id, 80), result: str(body.result, 10), now, giftId: id() });
+    return { ...res, reel: reelView(p, now), ...(res.egg ? { gifts: giftsWaiting(p) } : {}) };
+  }
+  if (path === '/reel/sell' && method === 'POST') {
+    requireRole(p, 'student');
+    const res = reelSell(p, { key: body.key ? str(body.key, 20) : null, n: body.n ?? null });
+    return { ...res, reel: reelView(p) };
+  }
+  if (path === '/reel/guide' && method === 'POST') {
+    requireRole(p, 'student');
+    (p.reel ||= {}).guide = true;
+    return { reel: reelView(p) };
+  }
+  if (path === '/reel/exchange' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now(), item = str(body.item, 20);
+    if (item === 'coins') { const res = reelCoins(p, body.amount, now); return { ...res, reel: reelView(p, now), points_balance: coinBalance(state, p) }; }
+    if (item === 'sea_pet') fail('바다 펫은 그림이 완성되면 만날 수 있어요. 진주를 모아 두세요!', 409);
+    const epic = item === 'epic_egg';
+    const missing = (epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter(key => !p.pets.some(x => x.key === key));
+    if (!missing.length) fail(epic ? '영웅 펫을 모두 모았어요!' : '모든 펫을 모았어요!', 409);
+    if (openBattleFor(state, p.id, now)) fail('대결이 끝난 뒤에 알을 바꿀 수 있어요.', 409);
+    const spend = reelSpend(p, item, now);
+    spend();
+    return { ...hatchEgg(state, p, { epic, season: null, missing, price: 0 }), reel: reelView(p, now) };
   }
   if (path === '/profile/pet-name' && method === 'POST') {
     requireRole(p, 'student');
@@ -2983,6 +3021,8 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false } = {
   compactSession(rec);
   if (!state.sessions.some(s => s.id === rec.id)) state.sessions.push(rec);
   if (complete && student) repairStreak(state, student, endedAt);
+  // V13.150: 끝까지 푼 연습(10문제 이상)은 낚시 미끼 1개.
+  if (complete && student && answerRecords.length >= REEL.BAIT_MIN_PRACTICE && grantBait(student, endedAt)) x.bait = true;
 }
 // V13.149 되살리기: 연속이 어제 끊겼으면(보호권이 없어서) 오늘 끝까지 푼 연습이 모두 REPAIR_NEED문제를 넘을 때 어제를 잇는다.
 function repairStreak(state, p, now) {
@@ -3020,7 +3060,7 @@ function practiceView(x, state) {
     range_codes: x.range_codes || [], cover_all: !!x.cover_all, daily_quest: !!x.daily_quest, assignment_id: x.assignment_id || null,
     manual_selection: !!x.manual_selection, exam_style: !!x.exam_style, quest_mix: x.quest_mix || null, word_ids: [...(x.words || [])],
     covered: x.seen?.length || 0, total: x.total, correct: hideTestScore ? null : x.correct, score_total: x.finished ? scoreTotal : (x.score_total || 0), score_correct: hideTestScore ? null : scoreCorrect, score: hideTestScore ? null : score,
-    xp: hideTestScore ? null : x.xp, reward_points: x.finished ? Number(x.reward_points || 0) : undefined, reward_breakdown: x.finished ? (x.reward_breakdown || []) : undefined, reward_note: x.finished ? (x.reward_note || null) : undefined, reward_event: x.finished ? (x.reward_event || null) : undefined, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
+    xp: hideTestScore ? null : x.xp, reward_points: x.finished ? Number(x.reward_points || 0) : undefined, reward_breakdown: x.finished ? (x.reward_breakdown || []) : undefined, reward_note: x.finished ? (x.reward_note || null) : undefined, reward_event: x.finished ? (x.reward_event || null) : undefined, bait: x.finished ? !!x.bait : undefined, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
     started_at: x.started_at, finished_at: x.finished_at || null, ended_at: x.ended_at || null, finalized_at: x.finalized_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
     timer_mode: x.timer_mode || 'session', question_duration_sec: Number(x.question_duration_sec || 0), question_started_at: x.question_started_at || null, question_deadline: x.question_deadline || null,
     auto_submitted: !!x.auto_submitted,

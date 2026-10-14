@@ -21,10 +21,7 @@ import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAIL
 import { playSound, unlockSound, preloadSound } from './sound.js';
 import { openDungeon } from './dungeon.js';
 import { openMatchGame } from './match-game.js';
-import { openFishing } from './fishing.js';
 import { openPartyJoin } from './party.js';
-import { fishPic } from './fishing-art.js';
-import { FISH_KEYS } from './fishing-rules.js';
 import { matchTime } from './match-rules.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
@@ -273,7 +270,7 @@ function bindRoot() {
     // V13.128 던전: 탭에서 던전 화면(dungeon.js, 전체 화면)으로 넘어간다. 나오면 야차전 던전 탭으로 돌아온다.
     if (act === 'dungeon') { const { A, exit } = B; clearInterval(B.offerTimer); closeSocket(); root().onclick = null; root().oninput = null; B = null; host = null; A.yachaTab = 'dungeon'; return openDungeon(A, exit); }
     // V13.149 게임 탭: 짝 맞추기 · 단어 낚시(전체 화면), 교실 게임(선생님 TV의 보물 사냥 · 반 낚시) 참가.
-    if (act === 'game-match' || act === 'game-fish') return openGame(act === 'game-fish' ? 'fish' : 'match');
+    if (act === 'game-match') return openGame();
     if (act === 'game-party') return joinParty(b);
     if (act === 'monster-list') { B.A.tab = 'yacha'; B.A.yachaTab = 'monster'; return leaveScreen(); }
     if (act === 'title') return openTitleDetail(B.A, b.dataset.key);
@@ -924,8 +921,7 @@ function gameWords() {
   return { ...w, list: words.filter(x => w.picked.includes(String(x.range_code))) };
 }
 function gamesTab() {
-  const w = monsterWords(), r = B.A.data.rewards || {}, m = r.match || {}, f = r.fish || {};
-  const show = ['goldcarp', 'tuna', 'puffer'];
+  const w = monsterWords(), r = B.A.data.rewards || {}, m = r.match || {};
   return `<section class="ya-panel ms-words gm-words" aria-label="게임 단어">
       <div class="ms-words-row"><span class="ms-words-k">게임 단어</span><b class="${w.ok ? 'ok' : 'need'}">${w.picked.length ? `${esc(rangesText(w.picked))} · ${num(w.n)}단어` : '아직 안 골랐어요'}</b><button type="button" class="btn small" data-yb="range-sheet">바꾸기</button></div>
     </section>
@@ -935,23 +931,20 @@ function gamesTab() {
         <div class="gm-facts"><span>내 최고 <b>${m.best ? matchTime(m.best) : '—'}</b></span><span>오늘 코인 판 <b>${num(m.left ?? 5)}</b></span></div></div>
       <button type="button" class="yl-cta gm-go" data-yb="game-match" ${w.ok ? '' : 'disabled'}>시작</button>
     </article>
-    <article class="gm-card gm-fish">
-      <div class="gm-art gm-pond" aria-hidden="true">${show.map((k, i) => `<span class="gm-pfish f${i}">${fishPic(k)}</span>`).join('')}<i class="gm-bob"></i></div>
-      <div class="gm-copy"><span class="gm-kicker">혼자 · 12번 던지기</span><h3>단어 낚시</h3><p>입질이 오면 뜻을 골라요. 빨리 맞힐수록 큰 물고기! 3연속이면 미끼가 좋아져요.</p>
-        <div class="gm-facts"><span>어항 도감 <b>${num(f.kinds || 0)}/${num(FISH_KEYS.length)}</b></span><span>최고 <b>${f.best_kg ? `${num(Math.round(f.best_kg))}kg` : '—'}</b></span><span>오늘 코인 판 <b>${num(f.left ?? 4)}</b></span></div></div>
-      <button type="button" class="yl-cta gm-go" data-yb="game-fish" ${w.ok ? '' : 'disabled'}>낚으러 가기</button>
+    <article class="gm-card gm-fish gm-moved">
+      <div class="gm-copy"><span class="gm-kicker">놀이터로 이사했어요</span><h3>🎣 손맛 낚시</h3><p>낚시는 이제 <b>놀이터 → 낚시터</b>에서 해요. 공부로 받은 미끼로 던지고, 텐션 게이지와 좌우 연타로 끌어올려요!</p></div>
     </article>
     <article class="gm-card gm-party">
       <div class="gm-copy"><span class="gm-kicker">교실 TV · 반 전체</span><h3>교실 게임 참가</h3><p>선생님이 TV에 연 <b>보물 사냥</b>이나 <b>반 전체 낚시</b>에 들어가요. TV에 나온 번호 4자리를 넣어요.</p></div>
       <form class="gm-join" onsubmit="return false"><input id="gm-code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000" aria-label="방 번호 4자리"><button type="button" class="yl-cta" data-yb="game-party">들어가기</button></form>
     </article>`;
 }
-function openGame(kind) {
+function openGame() {
   const w = gameWords();
   if (!w.ok) return toast('단어를 8개 이상 골라 주세요.');
   const { A, exit } = B, opts = { words: w.list, codes: w.picked, label: rangesText(w.picked) };
   clearInterval(B.offerTimer); closeSocket(); root().onclick = null; root().oninput = null; B = null; host = null; A.yachaTab = 'games';
-  return kind === 'fish' ? openFishing(A, exit, opts) : openMatchGame(A, exit, opts);
+  return openMatchGame(A, exit, opts);
 }
 function joinParty(button) {
   const code = (document.getElementById('gm-code')?.value || '').replace(/\D/g, '').slice(0, 4);

@@ -1,0 +1,118 @@
+import { randomBytes } from 'node:crypto';
+import { dayKey } from '../public/modules/core.js';
+import { FISH, FISH_KEYS } from '../public/modules/fishing-rules.js';
+import { REEL, FIGHT, CAST_TIERS, SEA_PETS, reelRoll, pearlsOf, weekNum } from '../public/modules/reel-rules.js';
+import { findReceipt, keepReceipt, giveGift } from './rewards.mjs';
+
+// V13.150 손맛 낚시(놀이터) 서버 쪽. 학생 기록 p.reel:
+//   { bait, bait_day, bait_today, pearls, net{key: n}, coin_day, coin_today, coins (받은 코인 합), egg_day, epic_week, live{…}, guide, done[] }
+// 도감 · 황금 알 수는 예전 단어 낚시와 같은 p.games.fish.book · golden에 쌓는다.
+// 물고기는 던질 때(reelCast) 서버가 정하고, 끌어올렸다고 보내면(reelLand) 최소 파이팅 시간을 확인한 뒤 어망에 넣는다.
+
+const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
+const SLACK_MS = 1500;
+const reel = p => p.reel ||= {};
+
+// 미끼 받기(연습 끝 · 짝 맞추기 별 3 · 출석). 하루 REEL.BAIT_DAILY개, 들고 있는 것은 REEL.BAIT_MAX개까지. 받았으면 true.
+export function grantBait(p, now = Date.now()) {
+  const r = reel(p), today = dayKey(now);
+  if (r.bait_day !== today) { r.bait_day = today; r.bait_today = 0; }
+  if (r.bait_today >= REEL.BAIT_DAILY || Number(r.bait || 0) >= REEL.BAIT_MAX) return false;
+  r.bait_today += 1;
+  r.bait = Number(r.bait || 0) + 1;
+  return true;
+}
+
+export function reelView(p, now = Date.now()) {
+  const r = p.reel || {}, f = p.games?.fish || {}, today = dayKey(now);
+  const net = Object.fromEntries(Object.entries(r.net || {}).filter(([k, n]) => FISH[k] && n > 0));
+  return {
+    bait: Number(r.bait || 0), bait_today: r.bait_day === today ? Number(r.bait_today || 0) : 0, bait_daily: REEL.BAIT_DAILY, bait_max: REEL.BAIT_MAX,
+    pearls: Number(r.pearls || 0), net, net_pearls: Object.entries(net).reduce((s, [k, n]) => s + pearlsOf(k) * n, 0),
+    coin_left: Math.max(0, REEL.COIN_DAILY - (r.coin_day === today ? Number(r.coin_today || 0) : 0)),
+    egg_left: r.egg_day === today ? 0 : 1, epic_left: r.epic_week === weekNum(now) ? 0 : 1,
+    book: f.book || {}, kinds: Object.keys(f.book || {}).length, all: FISH_KEYS.length, golden: Number(f.golden || 0) % REEL.GOLDEN_EGG,
+    sea: SEA_PETS.map(x => ({ ...x, owned: (p.pets || []).some(pet => pet.key === x.key) })),
+    guide: !!r.guide, live: r.live && now - r.live.at < REEL.LIVE_MS ? { id: r.live.id } : null
+  };
+}
+
+// 던지기: 미끼 1개를 쓰고 물고기를 정한다. 화면에는 파이팅 세기와 그림자 크기만(어떤 물고기인지는 끌어올린 뒤에).
+export function reelCast(p, { id, cast, water = false, now = Date.now(), seed = randomBytes(4).readUInt32BE(0) }) {
+  const r = reel(p);
+  if (r.live && now - r.live.at < REEL.LIVE_MS) fail('던진 낚싯대를 먼저 끌어올려 주세요.', 409);
+  if (Number(r.bait || 0) < 1) fail('미끼가 없어요. 공부하면 미끼를 받아요!', 409);
+  r.bait -= 1;
+  const tier = CAST_TIERS.includes(cast) ? cast : 'ok';
+  const fish = reelRoll(seed, tier, { water });
+  r.live = { id, at: now, cast: tier, ...fish };
+  const F = FIGHT[fish.rarity];
+  return { id, fight: { hp: F.hp, pull: F.pull, dash: F.dash, size: F.size, min: F.min }, bait: r.bait };
+}
+// 끌어올리기(또는 놓침). 놓치면 미끼는 사라진다. 같은 끝내기를 다시 보내면 같은 답.
+export function reelLand(p, { id, result, now = Date.now(), giftId }) {
+  const r = reel(p);
+  const seen = findReceipt(r, 'reel', id);
+  if (seen) return { ...seen.r, again: true };
+  const live = r.live;
+  if (!id || !live || live.id !== id) fail('던진 낚싯대를 찾지 못했어요.', 404);
+  delete r.live;
+  let out;
+  if (result !== 'caught') out = { caught: false };
+  else if (now - live.at + SLACK_MS < FIGHT[live.rarity].min) out = { caught: false, reason: 'short' };
+  else {
+    const g = p.games ||= {}, f = g.fish ||= {}, book = f.book ||= {};
+    const fresh = !book[live.key]?.n;
+    const b = book[live.key] ||= { n: 0, kg: 0 };
+    const record = !fresh && live.kg > Number(b.kg || 0);
+    b.n += 1; b.kg = Math.max(Number(b.kg || 0), live.kg);
+    out = { caught: true, key: live.key, kg: live.kg, rarity: live.rarity, fresh, pearls: pearlsOf(live.key), record };
+    if (live.key === 'goldenegg') {
+      // 황금 알 물고기는 팔지 않고 모은다: 3마리마다 랜덤 알(선생님 알과 같은 선물 상자).
+      const before = Math.floor(Number(f.golden || 0) / REEL.GOLDEN_EGG);
+      f.golden = Number(f.golden || 0) + 1;
+      out.golden = f.golden % REEL.GOLDEN_EGG;
+      if (Math.floor(f.golden / REEL.GOLDEN_EGG) > before && giftId) { giveGift(p, { kind: 'egg', note: `황금 알 물고기 ${REEL.GOLDEN_EGG}마리를 모았어요!`, from: 'fishing', fromName: '낚시터', now, id: giftId }); out.egg = true; }
+    } else {
+      r.net ||= {};
+      r.net[live.key] = Number(r.net[live.key] || 0) + 1;
+    }
+  }
+  return keepReceipt(r, 'reel', id, out, now);
+}
+// 어망 물고기 팔기(진주로). key가 없으면 모두.
+export function reelSell(p, { key = null, n = null } = {}) {
+  const r = reel(p), net = r.net ||= {};
+  const keys = key ? [key] : Object.keys(net);
+  let pearls = 0, sold = 0;
+  for (const k of keys) {
+    const have = Number(net[k] || 0), take = Math.min(have, n === null || n === undefined ? have : Math.max(0, Math.floor(Number(n) || 0)));
+    if (!FISH[k] || take <= 0) continue;
+    net[k] = have - take;
+    if (!net[k]) delete net[k];
+    pearls += take * pearlsOf(k); sold += take;
+  }
+  if (!sold) fail('팔 물고기가 없어요.', 409);
+  r.pearls = Number(r.pearls || 0) + pearls;
+  return { sold, pearls };
+}
+// 진주로 코인(1:1, 하루 REEL.COIN_DAILY). 알 · 바다 펫은 service.mjs가 알을 깨는 함수와 함께 부른다(reelSpend).
+export function reelCoins(p, amount, now = Date.now()) {
+  const r = reel(p), today = dayKey(now);
+  if (r.coin_day !== today) { r.coin_day = today; r.coin_today = 0; }
+  const want = Math.floor(Number(amount) || 0), left = REEL.COIN_DAILY - r.coin_today;
+  if (want < 1) fail('바꿀 진주 수를 골라 주세요.');
+  if (want > left) fail(left ? `오늘은 ${left}코인까지 바꿀 수 있어요.` : '오늘 코인 교환을 다 했어요. 내일 또 와요!', 409);
+  if (want > Number(r.pearls || 0)) fail(`진주가 ${want - Number(r.pearls || 0)}개 부족해요.`);
+  r.pearls -= want; r.coin_today += want; r.coins = Number(r.coins || 0) + want;
+  return { coins: want };
+}
+// 알 · 영웅 알: 한도와 진주를 확인하고 진주를 쓴다(알은 부른 쪽이 깬다).
+export function reelSpend(p, item, now = Date.now()) {
+  const r = reel(p), price = item === 'epic_egg' ? REEL.EPIC_EGG : item === 'egg' ? REEL.EGG : null;
+  if (!price) fail('바꿀 것을 골라 주세요.');
+  if (item === 'egg' && r.egg_day === dayKey(now)) fail('랜덤 알은 하루에 하나만 바꿀 수 있어요.', 409);
+  if (item === 'epic_egg' && r.epic_week === weekNum(now)) fail('영웅 알은 일주일에 하나만 바꿀 수 있어요.', 409);
+  if (Number(r.pearls || 0) < price) fail(`진주가 ${price - Number(r.pearls || 0)}개 부족해요.`);
+  return () => { r.pearls -= price; if (item === 'egg') r.egg_day = dayKey(now); else r.epic_week = weekNum(now); };
+}

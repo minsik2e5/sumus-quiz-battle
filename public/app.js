@@ -21,6 +21,7 @@ import { rewardEventModal } from './modules/reward-events-ui.js';
 import { EGG_PRICE } from './modules/core.js';
 import { openGuardSheet, maybeGuardMoment } from './modules/streak-guard-ui.js';
 import { partyCreateModal, openPartyTv } from './modules/party-tv.js';
+import { openReel } from './modules/reel.js';
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -956,6 +957,8 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'coins') return walletModal();
     if (d.action === 'attend') return attend(b);
     if (d.action === 'streak-guard') return openGuardSheet(A, () => renderKeepScroll());
+    // V13.150 놀이터 낚시터(손맛 낚시).
+    if (d.action === 'reel-open') { window.scrollTo(0, 0); return openReel(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     // V13.91 나 메뉴판: 어려운 단어 opens 단어 학습 on the ★ words; 알림 scrolls to its settings.
     if (d.action === 'me-stars') { A.tab = 'practice'; A.studyView = 'vocab'; A.memorizeFilter = 'starred'; savePreferences(); render(); window.scrollTo(0, 0); return; }
     if (d.action === 'me-notify') { const box = document.getElementById('me-notify'); box?.scrollIntoView({ behavior: 'smooth', block: 'center' }); box?.classList.add('flash-v1391'); setTimeout(() => box?.classList.remove('flash-v1391'), 1200); return; }
