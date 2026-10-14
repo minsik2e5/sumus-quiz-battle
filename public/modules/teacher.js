@@ -154,7 +154,7 @@ function classLeaguePanel(league) {
   return `<section class="panel cl-panel-v1374">
     <div class="panel-head"><div><h2>반 대항전</h2><span>이번 주 반별 경험치 합계 · 일요일 밤 마감</span></div></div>
     <div class="cl-bars">${league.classes.length ? league.classes.map((c, i) => `<div class="cl-bar ${i === 0 && c.xp ? 'lead' : ''}"><b>${i + 1}</b><span class="cl-name">${esc(c.name)}</span><span class="cl-track"><i style="width:${Math.max(3, Math.round(c.xp / max * 100))}%"></i></span><strong>${num(c.xp)}</strong><small>${num(c.active)}/${num(c.students)}명</small></div>`).join('') : '<div class="v136-empty-line">반에 배정된 학생이 없어요.</div>'}</div>
-    <div class="cl-actions"><button type="button" class="btn" data-action="class-tv">${icon('tv')} TV로 크게 보기</button><button type="button" class="btn" data-action="class-tv-link">TV 링크</button></div>
+    <div class="cl-actions"><button type="button" class="btn" data-action="class-tv">${icon('tv')} TV로 크게 보기</button><button type="button" class="btn" data-action="class-tv-link">TV 링크</button><button type="button" class="btn primary" data-action="party-new">🎮 교실 게임</button></div>
   </section>`;
 }
 // V13.75 teacher overview helpers: when each student last did anything, this week's work.

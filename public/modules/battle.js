@@ -20,6 +20,12 @@ import { elementOf, paletteOf, tierOf, fxCap, fxShot, fxImpact, fxSpeedLines, fx
 import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterOpen, stageLevel, stageMonster, isBossStage } from './monsters.js';
 import { playSound, unlockSound, preloadSound } from './sound.js';
 import { openDungeon } from './dungeon.js';
+import { openMatchGame } from './match-game.js';
+import { openFishing } from './fishing.js';
+import { openPartyJoin } from './party.js';
+import { fishPic } from './fishing-art.js';
+import { FISH_KEYS } from './fishing-rules.js';
+import { matchTime } from './match-rules.js';
 
 // Yacha battle screens: lobby (create / join / practice, league, my record), waiting room,
 // the match, and the result. A match runs in a battle room on the server (or, for a practice
@@ -266,6 +272,9 @@ function bindRoot() {
     if (act === 'monster-words') { B.monsterWordsOpen = !(B.monsterWordsOpen || !monsterWords().ok); lobby(); return; }
     // V13.128 던전: 탭에서 던전 화면(dungeon.js, 전체 화면)으로 넘어간다. 나오면 야차전 던전 탭으로 돌아온다.
     if (act === 'dungeon') { const { A, exit } = B; clearInterval(B.offerTimer); closeSocket(); root().onclick = null; root().oninput = null; B = null; host = null; A.yachaTab = 'dungeon'; return openDungeon(A, exit); }
+    // V13.149 게임 탭: 짝 맞추기 · 단어 낚시(전체 화면), 교실 게임(선생님 TV의 보물 사냥 · 반 낚시) 참가.
+    if (act === 'game-match' || act === 'game-fish') return openGame(act === 'game-fish' ? 'fish' : 'match');
+    if (act === 'game-party') return joinParty(b);
     if (act === 'monster-list') { B.A.tab = 'yacha'; B.A.yachaTab = 'monster'; return leaveScreen(); }
     if (act === 'title') return openTitleDetail(B.A, b.dataset.key);
     if (act === 'create') return createRoom(b);
@@ -311,7 +320,7 @@ function rangeDeal(room) {
 
 // V13.132 야차전 탭 (Design A안): 대결 · 몬스터 · 던전 · 기록 한 줄. 기록 안에 [리그 | 내 전적].
 // 이전 탭 이름(league · me)은 기록으로 열린다. 설명 문장은 작은 ? 안에 들어 있다.
-const LOBBY_TABS = [['play', '대결', 'nav-yacha'], ['monster', '몬스터', 'monster-tab'], ['dungeon', '던전', 'dungeon-tab'], ['record', '기록', 'trophy-s']];
+const LOBBY_TABS = [['play', '대결', 'nav-yacha'], ['monster', '몬스터', 'monster-tab'], ['dungeon', '던전', 'dungeon-tab'], ['games', '게임', 'arcade'], ['record', '기록', 'trophy-s']];
 const tabOf = key => key === 'league' || key === 'me' ? 'record' : LOBBY_TABS.some(([k]) => k === key) ? key : 'play';
 const tierLabel = name => /리그$/.test(name) ? name : `${name} 리그`;
 const helpButton = key => `<button type="button" class="yl-q${B.help[key] ? ' on' : ''}" data-yb="help" data-key="${key}" aria-expanded="${!!B.help[key]}" aria-label="설명 ${B.help[key] ? '닫기' : '보기'}">?</button>`;
@@ -333,7 +342,7 @@ function lobby() {
     </section>
     ${pet && B.help.skill ? petSkillChip(pet) : ''}
     <div class="yl-tabs" role="group" aria-label="야차전 메뉴">${LOBBY_TABS.map(([key, label, art]) => `<button type="button" data-yb="tab" data-tab="${key}" class="${tab === key ? 'on' : ''}" aria-pressed="${tab === key}">${uiArt(art, 'yl-tab-art')}<span>${label}</span></button>`).join('')}</div>
-    ${tab === 'record' ? recordTab(h, sub) : tab === 'dungeon' ? dungeonCard() : tab === 'monster' ? monsterTab() : playTab(h)}`);
+    ${tab === 'record' ? recordTab(h, sub) : tab === 'dungeon' ? dungeonCard() : tab === 'monster' ? monsterTab() : tab === 'games' ? gamesTab() : playTab(h)}`);
   if (tab === 'record' && sub === 'league') mountLeagueBoard(document.querySelector('#yb-main [data-league-board]'), period => { B.leaguePeriod = period; });
 }
 // V13.72: what my pet does in a match, and what every pet does (the other player's too).
@@ -908,6 +917,49 @@ function showBracket(tid) {
 }
 
 // V13.128 던전 탭: 입구 카드(킬러 골렘 그림, 규칙 요약). 방 만들기 · 초대는 던전 화면에서.
+// V13.149 게임 탭.
+function gameWords() {
+  const w = monsterWords(), A = B.A;
+  const { words } = getRanges(A, A.school, A.data.profile.class_name);
+  return { ...w, list: words.filter(x => w.picked.includes(String(x.range_code))) };
+}
+function gamesTab() {
+  const w = monsterWords(), r = B.A.data.rewards || {}, m = r.match || {}, f = r.fish || {};
+  const show = ['goldcarp', 'tuna', 'puffer'];
+  return `<section class="ya-panel ms-words gm-words" aria-label="게임 단어">
+      <div class="ms-words-row"><span class="ms-words-k">게임 단어</span><b class="${w.ok ? 'ok' : 'need'}">${w.picked.length ? `${esc(rangesText(w.picked))} · ${num(w.n)}단어` : '아직 안 골랐어요'}</b><button type="button" class="btn small" data-yb="range-sheet">바꾸기</button></div>
+    </section>
+    <article class="gm-card gm-match">
+      <div class="gm-art" aria-hidden="true"><span class="gm-mini en">brave</span><span class="gm-mini ko">용감한</span><span class="gm-mini en">calm</span><span class="gm-mini ko">차분한</span></div>
+      <div class="gm-copy"><span class="gm-kicker">혼자 · 30초</span><h3>짝 맞추기 타임어택</h3><p>영어와 뜻 카드 12장을 가장 빨리 지워요. 이번 주 우리 반 1등에 도전!</p>
+        <div class="gm-facts"><span>내 최고 <b>${m.best ? matchTime(m.best) : '—'}</b></span><span>오늘 코인 판 <b>${num(m.left ?? 5)}</b></span></div></div>
+      <button type="button" class="yl-cta gm-go" data-yb="game-match" ${w.ok ? '' : 'disabled'}>시작</button>
+    </article>
+    <article class="gm-card gm-fish">
+      <div class="gm-art gm-pond" aria-hidden="true">${show.map((k, i) => `<span class="gm-pfish f${i}">${fishPic(k)}</span>`).join('')}<i class="gm-bob"></i></div>
+      <div class="gm-copy"><span class="gm-kicker">혼자 · 12번 던지기</span><h3>단어 낚시</h3><p>입질이 오면 뜻을 골라요. 빨리 맞힐수록 큰 물고기! 3연속이면 미끼가 좋아져요.</p>
+        <div class="gm-facts"><span>어항 도감 <b>${num(f.kinds || 0)}/${num(FISH_KEYS.length)}</b></span><span>최고 <b>${f.best_kg ? `${num(Math.round(f.best_kg))}kg` : '—'}</b></span><span>오늘 코인 판 <b>${num(f.left ?? 4)}</b></span></div></div>
+      <button type="button" class="yl-cta gm-go" data-yb="game-fish" ${w.ok ? '' : 'disabled'}>낚으러 가기</button>
+    </article>
+    <article class="gm-card gm-party">
+      <div class="gm-copy"><span class="gm-kicker">교실 TV · 반 전체</span><h3>교실 게임 참가</h3><p>선생님이 TV에 연 <b>보물 사냥</b>이나 <b>반 전체 낚시</b>에 들어가요. TV에 나온 번호 4자리를 넣어요.</p></div>
+      <form class="gm-join" onsubmit="return false"><input id="gm-code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000" aria-label="방 번호 4자리"><button type="button" class="yl-cta" data-yb="game-party">들어가기</button></form>
+    </article>`;
+}
+function openGame(kind) {
+  const w = gameWords();
+  if (!w.ok) return toast('단어를 8개 이상 골라 주세요.');
+  const { A, exit } = B, opts = { words: w.list, codes: w.picked, label: rangesText(w.picked) };
+  clearInterval(B.offerTimer); closeSocket(); root().onclick = null; root().oninput = null; B = null; host = null; A.yachaTab = 'games';
+  return kind === 'fish' ? openFishing(A, exit, opts) : openMatchGame(A, exit, opts);
+}
+function joinParty(button) {
+  const code = (document.getElementById('gm-code')?.value || '').replace(/\D/g, '').slice(0, 4);
+  if (code.length !== 4) return toast('TV에 나온 번호 4자리를 넣어 주세요.');
+  const { A, exit } = B;
+  clearInterval(B.offerTimer); closeSocket(); root().onclick = null; root().oninput = null; B = null; host = null; A.yachaTab = 'games';
+  return openPartyJoin(A, exit, { code });
+}
 function dungeonCard() {
   return `<section class="yb-card dg-tab-card"><img src="/assets/monsters/killergolem.webp" alt="" width="512" height="512" decoding="async" draggable="false"><div><span class="dg-kicker">2~3명 실시간 파티 · 같은 학년</span><h2>기말고사 지옥 던전</h2><p>친구와 함께 1층부터 보스 킬러 골렘까지! 맞히면 공격, 동료가 기절하면 3연속 정답으로 살려요. 빈자리는 봇 동료로 채울 수 있어요.</p><button type="button" class="btn primary full" data-yb="dungeon">던전 입장</button></div></section>`;
 }

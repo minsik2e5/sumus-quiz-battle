@@ -425,10 +425,11 @@ export function choosePracticeWord(words, mastery, state, random = Math.random) 
 }
 const dayFormatter = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' });
 export const dayKey = ts => dayFormatter.format(new Date(ts));
-export function growthFor(sessions) {
+// V13.149 `extraDays`: days kept by a 연속 학습 보호권 or 되살리기 ('YYYY-MM-DD', streak-guard.js guardDayKeys).
+export function growthFor(sessions, extraDays = []) {
   const points = sessions.reduce((n, s) => n + (s.xp || 0), 0);
   // answered_count is absent on older records; only an explicit 0 is skipped.
-  const days = new Set(sessions.filter(s => s.total > 0 && s.answered_count !== 0).map(s => dayKey(s.created_at)));
+  const days = new Set([...sessions.filter(s => s.total > 0 && s.answered_count !== 0).map(s => dayKey(s.created_at)), ...extraDays]);
   let streak = 0, day = Date.now();
   if (!days.has(dayKey(day))) day -= 86400000;
   while (days.has(dayKey(day))) { streak++; day -= 86400000; }

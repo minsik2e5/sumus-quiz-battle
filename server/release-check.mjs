@@ -14,6 +14,7 @@ import { runCoinsChecks } from './coins-check.mjs';
 import { runFinalWordsChecks } from './final-words-check.mjs';
 import { runPetOrderChecks } from './pet-order-check.mjs';
 import { runPetsTitlesChecks } from './pets-titles-check.mjs';
+import { runGamesChecks } from './games-check.mjs';
 import { runBattleFxChecks } from './battle-fx-check.mjs';
 import { runDungeonChecks } from './dungeon-check.mjs';
 import { runSoundChecks } from './sound-check.mjs';
@@ -1472,6 +1473,7 @@ export async function runReleaseCheck() {
     await runSignupCodeChecks(assert, expectStatus);
     await runRewardEventChecks(assert, expectStatus);
     await runDungeonRewardChecks(assert, expectStatus);
+    await runGamesChecks(assert);
 
     console.log(`[release-check] PASS ${checks.length}/${checks.length}`);
     return { ok: true, count: checks.length };

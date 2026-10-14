@@ -466,8 +466,8 @@ function trimReceipts(list, now) {
   const cut = now - RECEIPT_DAYS * DAY_MS;
   return list.filter(x => x?.id && Number(x.at || 0) >= cut).slice(-RECEIPT_KEEP);
 }
-const findReceipt = (b, kind, id) => (id && Array.isArray(b?.done) ? b.done.find(x => x.id === id && x.k === kind) : null) || null;
-function keepReceipt(b, kind, id, result, now) {
+export const findReceipt = (b, kind, id) => (id && Array.isArray(b?.done) ? b.done.find(x => x.id === id && x.k === kind) : null) || null;
+export function keepReceipt(b, kind, id, result, now) {
   b.done = trimReceipts([...(Array.isArray(b.done) ? b.done : []).filter(x => !(x?.id === id && x.k === kind)), { id, k: kind, at: now, r: result }], now);
   return result;
 }
