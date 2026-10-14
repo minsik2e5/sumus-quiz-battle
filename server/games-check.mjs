@@ -29,9 +29,11 @@ export async function runGamesChecks(assert) {
     const names = [...reelSrc.match(/FISHING_ART = new Set\(\[([\s\S]*?)\]\)/)[1].matchAll(/'([a-z0-9-]+)'/g)].map(m => m[1]);
     assert(names.length >= 30 && names.every(n => existsSync(new URL(`assets/fishing/${n}.webp`, pub))), 'V13.149 낚시 그림(27) 파일이 모두 있다');
     assert(!existsSync(new URL('assets/fishing/preview-27.png', pub)), 'V13.149 미리보기 시트는 앱에 싣지 않는다');
-    // 알을 받을 때 아기 모습까지 보여 준다: 영웅 · 한정 · 전설(lucky.js) 2곳, 일반 알(pet-moments.js) 1곳.
+    // V13.150 알을 받을 때: 알을 톡톡 세 번 두드리면 아기 모습(1단계)이 나온다. 영웅 · 한정 · 전설(lucky.js) 2곳, 일반 알(pet-moments.js) 1곳.
     const lucky = readFileSync(new URL('modules/lucky.js', pub), 'utf8'), moments = readFileSync(new URL('modules/pet-moments.js', pub), 'utf8'), growth = readFileSync(new URL('modules/pet-growth.js', pub), 'utf8');
-    assert((lucky.match(/\$\{growthStrip\(key, name\)\}/g) || []).length === 2 && moments.includes('${growthStrip(key, name)}') && growth.includes("form === 1 ? ' baby'") && !lucky.includes('뒤에 비치는 모습으로'), 'V13.149 알 공개에 알 → 아기 → 성장 → 최종');
+    assert((lucky.match(/\$\{eggTapHtml\(key, name, 'in-lgx'\)\}/g) || []).length === 2 && (lucky.match(/bindEggTap\(box, /g) || []).length === 2 && moments.includes("eggTapHtml(key, name, 'shop')") && moments.includes('bindEggTap(body)')
+      && growth.includes('export const EGG_TAPS = 3') && growth.includes('-1.webp') && growth.includes('톡톡 터치해 보세요!') && !lucky.includes('growthStrip') && !lucky.includes('lgx-future') && !readFileSync(new URL('v13149.css', pub), 'utf8').includes('pgx-'),
+      'V13.150 알 공개: 톡톡 세 번 → 아기 모습(네 단계 줄 · 흰 실루엣은 없앴다)');
   }
   const now = Date.now(), DAY = DAY_MS;
   const at = d => now - d * DAY;
@@ -243,7 +245,7 @@ export async function runGamesChecks(assert) {
     }
     // 1인칭 화면: 코드로 그린 낚싯대가 휘고, 돌진 · 날뜀 · 잠수 · 특기 · 점프 마무리, 수조 어망. 그림 29 이름이 들어오면 갈아 끼운다.
     {
-      const reelJs = source('../public/modules/reel.js'), reelCss = source('../public/reel.css');
+      const reelJs = source('../public/modules/reel.js'), reelCss = source('../public/v13150.css');
       assert(['function rodGeom', 'function springTo', "kind === 'run'", "kind === 'thrash'", "kind === 'dive'", 'function swipe(', 'function finish(', "finish: finishKind", 'function tank(', "data-rl=\"sell-all\"", "'bait-open'", "'bg-pov'", "'bg-reveal'", "'bg-tank'", "'fx-jump'", "'fx-halo'", "'stamp-new'", "'ribbon-record'", "'icon-net'", "'gauge-distance'", 'navigator.vibrate']
         .every(k => reelJs.includes(k)) && ['.rl-pov', '.rl-rod-body', '.rl-tring', '.rl-leap', '.rl-rev', '.rl-swim', 'prefers-reduced-motion'].every(k => reelCss.includes(k)) && !source('../public/v13149.css').includes('.rl-under{'),
         'V13.150 1인칭 낚시 화면: 휘는 낚싯대 · 물고기 성격 · 점프 마무리 · 수조 어망, 그림 29 자리, 동작 줄이기');
@@ -384,7 +386,7 @@ export async function runGamesChecks(assert) {
     assert(worker.includes('export { PartyRoom };') && worker.includes("url.pathname.match(/^\\/api\\/party\\/ws\\/([0-9a-f-]{36})$/)") && worker.includes("'X-Party-Key'") && worker.includes('delete result._parties') && worker.includes('undoParty(state, message)') && worker.includes('settlePartyReport(state, body)'),
       'V13.149 worker: 교실 게임 소켓은 방으로, 방 준비 메시지는 브라우저로 안 가고, 결과 보고는 키로 확인');
     assert(local.includes('delete result._parties;') && local.includes('delete result._dungeon;'), 'V13.149 로컬 서버도 방 준비 메시지(문제 · 입장표)를 브라우저로 보내지 않는다');
-    assert(/"v13146\.css",\s*"v13149\.css",\s*"reel\.css"\s*\]/.test(build) && ['match-game.js', 'reel.js', 'reel-rules.js', 'fishing-art.js', 'fishing-rules.js', 'party.js', 'party-tv.js', 'streak-guard.js', 'streak-guard-ui.js', 'match-rules.js'].every(f => sw.includes(`modules/${f}`)),
+    assert(/"v13146\.css",\s*"v13149\.css",\s*"v13150\.css"\s*\]/.test(build) && ['match-game.js', 'reel.js', 'reel-rules.js', 'fishing-art.js', 'fishing-rules.js', 'party.js', 'party-tv.js', 'streak-guard.js', 'streak-guard-ui.js', 'match-rules.js'].every(f => sw.includes(`modules/${f}`)),
       'V13.149 새 화면 CSS는 묶음 끝에, 새 모듈은 오프라인 캐시에');
     assert(battle.includes("['games', '게임', 'arcade']") && battle.includes("act === 'game-match'") && !battle.includes('game-fish') && source('../public/modules/arcade.js').includes('data-action="reel-open"') && app.includes("d.action === 'reel-open'")
       && source('../public/modules/reel.js').includes('진주 1개 = 1코인') && source('../public/modules/sessions.js').includes('낚시 미끼 +1') && battle.includes("act === 'game-party'") && app.includes("d.action === 'party-new'") && teacher.includes('data-action="party-new"'),

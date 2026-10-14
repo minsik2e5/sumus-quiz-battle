@@ -1,7 +1,7 @@
 import { esc, num } from './ui.js';
 import { coin, artOr } from './emblems.js';
 import { CHARACTERS, EPIC_EGG_LEGENDARY_RATE, SEASONS } from './core.js';
-import { growthStrip } from './pet-growth.js';
+import { eggTapHtml, bindEggTap } from './pet-growth.js';
 import { LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, MYTHIC_RATE } from './rewards.js';
 import { playSound, unlockSound as unlockSoundFiles, preloadSound } from './sound.js';
 
@@ -166,14 +166,12 @@ export function legendaryShow(res, { again = false, againLabel = '' } = {}) {
       <div class="lgx-reveal" id="lgx-reveal" hidden>
         <div class="lgx-word" aria-hidden="true">${[...'LEGENDARY'].map((ch, i) => `<b style="--i:${i}">${ch}</b>`).join('')}</div>
         <div class="lgx-art">
-          <img class="lgx-future" src="/assets/pets/${key}-3.webp" alt="" aria-hidden="true">
-          <img class="lgx-pet" src="/assets/pets/${key}-0.webp" alt="${esc(name)}의 알">
+          ${eggTapHtml(key, name, 'in-lgx')}
           <img class="lgx-badge" src="/assets/lucky/legend-badge.webp" alt="전설">
         </div>
         <div class="lgx-card">
           <span class="lk-legend-kicker">LEGENDARY PET · ${esc(c.type || '')}</span><h2>전설 펫을 만났어요!</h2><h3>${esc(name)}의 알</h3>
-          <p>${res.legendary.egg ? `영웅 알에서 ${EPIC_EGG_LEGENDARY_RATE}%의 행운으로 전설 펫이 나왔어요!` : res.legendary.guaranteed ? `${num(res.legendary.pull)}번째 뽑기 확정 보상이에요.` : `${LEGENDARY_RATE}%의 행운이 찾아왔어요!`} 알에서 아기로 태어나 아래처럼 자라요. 학교 친구들에게도 소식이 전해져요.</p>
-          ${growthStrip(key, name)}
+          <p>${res.legendary.egg ? `영웅 알에서 ${EPIC_EGG_LEGENDARY_RATE}%의 행운으로 전설 펫이 나왔어요!` : res.legendary.guaranteed ? `${num(res.legendary.pull)}번째 뽑기 확정 보상이에요.` : `${LEGENDARY_RATE}%의 행운이 찾아왔어요!`} 알을 톡톡 두드리면 아기 모습을 볼 수 있어요. 학교 친구들에게도 소식이 전해져요.</p>
           <small>${res.legendary.egg ? '알 상점 · 영웅 알' : `코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}`}</small>
           <div class="lk-actions">${again ? `<button type="button" class="lk-again" data-lk="again">한 번 더 <em>${againLabel}</em></button>` : ''}<button type="button" class="lk-ok" data-lk="ok">확인</button></div>
         </div>
@@ -181,6 +179,7 @@ export function legendaryShow(res, { again = false, againLabel = '' } = {}) {
       <div class="lgx-rain" aria-hidden="true"></div>
       <button type="button" class="lk-skip" data-lk="skip">건너뛰기</button>`;
     document.body.appendChild(box);
+    bindEggTap(box, { onOpen: () => { const h = box.querySelector('.lgx-card h3'); if (h) h.textContent = `${name}의 아기 모습이에요!`; } });
     const reveal = box.querySelector('#lgx-reveal');
     let shown = false, ready = false;
     const close = go => { box.classList.add('bye'); setTimeout(() => box.remove(), 180); resolve(!!go); };
@@ -336,14 +335,12 @@ export function epicShow({ key, res = null, again = false, againLabel = '', from
       <div class="lgx-reveal" id="lgx-reveal" hidden>
         <div class="lgx-word" aria-hidden="true">${[...(season ? 'LIMITED' : 'EPIC')].map((ch, i) => `<b style="--i:${i}">${ch}</b>`).join('')}</div>
         <div class="lgx-art">
-          <img class="lgx-future" src="/assets/pets/${key}-3.webp" alt="" aria-hidden="true">
-          <img class="lgx-pet" src="/assets/pets/${key}-0.webp" alt="${esc(name)}의 알">
+          ${eggTapHtml(key, name, 'in-lgx')}
           ${season ? `<img class="ui-art lgx-epic-badge-art" src="/assets/ui/limited-badge.webp" alt="" aria-hidden="true">` : artOr('epic-badge', '<span class="lgx-epic-badge" aria-hidden="true">★<small>영웅</small></span>', 'lgx-epic-badge-art')}
         </div>
         <div class="lgx-card">
           <span class="lk-legend-kicker">${season ? `${esc(season.name)} LIMITED` : 'EPIC'} PET · ${esc(c.type || '')}</span><h2>${season ? `${esc(season.name)} 한정 펫을 만났어요!` : '영웅 펫을 만났어요!'}</h2><h3>${esc(name)}의 알</h3>
-          <p>${season ? `${from === 'season' ? `${esc(season.egg)}에서 나온 친구예요!` : `영웅 알에서 ${season.after_rate}%의 행운으로 ${esc(season.name)} 한정 펫이 나왔어요!`} 알에서 아기로 태어나 아래처럼 자라요. 한정 펫은 야차전 특기 대신 특별한 모습을 가졌어요.` : `${res ? `${EPIC_RATE}%의 행운으로 영웅 알이 나왔어요!` : '영웅 알에서 나온 친구예요!'} 알에서 아기로 태어나 아래처럼 자라고, 야차전에서 새 특기를 써요.`}</p>
-          ${growthStrip(key, name)}
+          <p>${season ? `${from === 'season' ? `${esc(season.egg)}에서 나온 친구예요!` : `영웅 알에서 ${season.after_rate}%의 행운으로 ${esc(season.name)} 한정 펫이 나왔어요!`} 알을 톡톡 두드리면 아기 모습을 볼 수 있어요. 한정 펫은 야차전 특기 대신 특별한 모습을 가졌어요.` : `${res ? `${EPIC_RATE}%의 행운으로 영웅 알이 나왔어요!` : '영웅 알에서 나온 친구예요!'} 알을 톡톡 두드리면 아기 모습을 볼 수 있고, 야차전에서 새 특기를 써요.`}</p>
           ${res ? `<small>코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}</small>` : ''}
           <div class="lk-actions">${again ? `<button type="button" class="lk-again" data-lk="again">한 번 더 <em>${againLabel}</em></button>` : ''}<button type="button" class="lk-ok" data-lk="ok">확인</button></div>
         </div>
@@ -351,6 +348,7 @@ export function epicShow({ key, res = null, again = false, againLabel = '', from
       <div class="lgx-rain" aria-hidden="true"></div>
       <button type="button" class="lk-skip" data-lk="skip">건너뛰기</button>`;
     document.body.appendChild(box);
+    bindEggTap(box, { onOpen: () => { const h = box.querySelector('.lgx-card h3'); if (h) h.textContent = `${name}의 아기 모습이에요!`; } });
     const reveal = box.querySelector('#lgx-reveal');
     let shown = false, ready = false;
     const close = go => { box.classList.add('bye'); setTimeout(() => box.remove(), 180); resolve(!!go); };
