@@ -1,4 +1,5 @@
 import { $, api, esc, num, toast } from './ui.js';
+import { growthStrip } from './pet-growth.js';
 import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, STANDARD_PET_KEYS, EPIC_PET_KEYS, seasonOnSale, cleanPetName } from './core.js';
 import { epicShow, legendaryShow, mythicShow } from './lucky.js';
 import { uiArt, ART_READY } from './emblems.js';
@@ -179,7 +180,8 @@ function eggRevealHtml(body, key, done) {
   body.innerHTML = `<div class="pet-shop">
     <div class="pet-shop-reveal">${avatar(key, { form: 0 })}</div>
     <p class="pet-moment-msg"><b>${esc(petJosa(name, '이', ''))}</b>의 알이에요!</p>
-    <p class="pet-shop-copy">지금부터 ${esc(petJosa(name, '과', '와'))} 함께 공부해요.<br>Lv.3이 되면 알이 깨져요.</p>
+    ${growthStrip(key, name)}
+    <p class="pet-shop-copy">지금부터 ${esc(petJosa(name, '과', '와'))} 함께 공부해요.<br>Lv.3이 되면 알이 깨지고 아기 모습으로 나와요.</p>
     <div class="pet-moment-actions"><button type="button" class="btn primary" data-pet-done>좋아요!</button></div>
   </div>`;
   body.querySelector('[data-pet-done]').onclick = done;

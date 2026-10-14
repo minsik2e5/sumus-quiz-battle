@@ -29,6 +29,9 @@ export async function runGamesChecks(assert) {
     const names = [...reelSrc.match(/FISHING_ART = new Set\(\[([\s\S]*?)\]\)/)[1].matchAll(/'([a-z0-9-]+)'/g)].map(m => m[1]);
     assert(names.length >= 30 && names.every(n => existsSync(new URL(`assets/fishing/${n}.webp`, pub))), 'V13.149 낚시 그림(27) 파일이 모두 있다');
     assert(!existsSync(new URL('assets/fishing/preview-27.png', pub)), 'V13.149 미리보기 시트는 앱에 싣지 않는다');
+    // 알을 받을 때 아기 모습까지 보여 준다: 영웅 · 한정 · 전설(lucky.js) 2곳, 일반 알(pet-moments.js) 1곳.
+    const lucky = readFileSync(new URL('modules/lucky.js', pub), 'utf8'), moments = readFileSync(new URL('modules/pet-moments.js', pub), 'utf8'), growth = readFileSync(new URL('modules/pet-growth.js', pub), 'utf8');
+    assert((lucky.match(/\$\{growthStrip\(key, name\)\}/g) || []).length === 2 && moments.includes('${growthStrip(key, name)}') && growth.includes("form === 1 ? ' baby'") && !lucky.includes('뒤에 비치는 모습으로'), 'V13.149 알 공개에 알 → 아기 → 성장 → 최종');
   }
   const now = Date.now(), DAY = DAY_MS;
   const at = d => now - d * DAY;
