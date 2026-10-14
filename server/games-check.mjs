@@ -218,6 +218,13 @@ export async function runGamesChecks(assert) {
       && sheets28.slice(3).every(t => /open "28a-\d\.png"/.test(t)) && ['dolphin', 'seahorse', 'hermitcrab'].every(k => [0, 1, 2, 3].every(f => map.includes(`public/assets/pets/${k}-${f}.webp`)) && map.includes(`public/assets/pets/${k}-3-attack.webp`))
       && codex28.includes('Drive의 기존 그림을 열어 그림체를 맞춘다') && codex28.includes('정해진 Drive 폴더 "SUMUS 바다 펫 28 (Runner용)"에 정확한 파일 이름'),
       'V13.149 그림 주문서 28(바다 펫 3종): 설정 시트를 먼저, 표정 · 전투 자세는 설정 시트를 열어 맞추고, 정해진 폴더에 정확한 이름으로 저장');
+    // 그림 주문서 29(낚시 화면 새 단장): 27 그림을 열어 맞추고, "SUMUS 낚시 29" 폴더에 정확한 이름으로 저장.
+    const sheets29 = ['29a-fishing-pov-backgrounds.txt', '29b-fishing-pov-rod.txt', '29c-fishing-juice-fx.txt', '29d-fishing-tank.txt', '29e-fishing-hud.txt'].flatMap(f => source(`../docs/asset-requests/runner/${f}`).trim().split('\n---\n'));
+    const codex29 = source('../docs/asset-requests/runner/CODEX_PROMPT_29.md');
+    assert(sheets29.length === 12 && sheets29.every(t => /STYLE REFERENCE — before drawing, open/.test(t) && t.includes('"SUMUS 낚시 27 (Runner용)"') && /named exactly "29[a-e]-\d\.png"/.test(t) && t.includes('"SUMUS 낚시 29 (Runner용)"'))
+      && sheets29.slice(3, 5).every(t => t.includes('keep') && t.includes('27c-1.png')) && ['bg-pov', 'pov-rod-left', 'pov-crank', 'fx-jump', 'bobber-sink', 'hint-hand'].every(k => map.includes(`public/assets/fishing/${k}.webp`))
+      && codex29.includes('Drive의 기존 그림을 열어 그림체를 맞춘다') && codex29.includes('정해진 Drive 폴더 "SUMUS 낚시 29 (Runner용)"에 정확한 파일 이름') && codex29.includes('`sumus-voca-prod-deploy`로 PR을 만들지 않는다'),
+      'V13.149 그림 주문서 29: 1인칭 낚시 12시트, 27 그림체 맞추기와 정해진 폴더 · 정확한 이름 저장, 운영 브랜치로 PR 금지');
   }
 
   /* ---------- 교실 게임 규칙 ---------- */
