@@ -34,6 +34,7 @@ export async function openPartyJoin(A, exit, { code }) {
     if (!P) return;
     P.room = r.room;
     document.getElementById('pt-title').textContent = r.room.kind === 'fish' ? '반 전체 낚시' : '보물 사냥';
+    root().querySelector('.pt-app')?.classList.add(r.room.kind === 'fish' ? 'fish' : 'treasure');
     connect();
   } catch (err) {
     if (!P) return;
@@ -122,11 +123,11 @@ function headHtml(v) {
   const me = v.me, fish = v.kind === 'fish';
   return `<section class="pt-score${fish ? ' fish' : ''}">
     <div class="pt-me">${petMini()}<div><small>${fish ? '총 무게' : '내 금화'}</small><b id="pt-num">${fish ? kgText(me.kg) : num(me.gold)}</b></div></div>
-    <div class="pt-rank"><small>순위</small><b>${num(me.rank)}<small>/${num(me.of)}</small></b></div>
+    <div class="pt-rank"><small>순위</small><b>${me.rank ? `${num(me.rank)}<small>/${num(me.of)}</small>` : '?'}</b></div>
     ${fish ? `<div class="pt-lure l${me.lure}"><small>미끼</small><b>${esc(LURES[me.lure].name)}</b></div>` : `<div class="pt-shield${me.shield ? ' on' : ''}" aria-label="방패 ${me.shield}개">${guardShield(me.shield ? 'on' : 'used', 'pt-sh')}<b>${num(me.shield)}</b></div>`}
   </section>
   ${v.frenzy_until > serverNow() ? '<div class="pt-frenzy">🐟 물고기 떼 등장! 큰 물고기가 몰려와요</div>' : ''}
-  <div class="pt-top3">${v.top.map((x, i) => `<span class="${x.id === me.id ? 'me' : ''}"><i>${['🥇', '🥈', '🥉'][i]}</i>${esc(x.name)} <b>${fish ? kgText(x.score) : num(x.score)}</b></span>`).join('')}</div>`;
+  ${v.hidden ? '<div class="pt-top3 hidden"><span>🤫 마지막 1분! 순위는 끝나고 공개해요</span></div>' : ''}<div class="pt-top3">${v.top.map((x, i) => `<span class="${x.id === me.id ? 'me' : ''}"><i>${['🥇', '🥈', '🥉'][i]}</i>${esc(x.name)} <b>${fish ? kgText(x.score) : num(x.score)}</b></span>`).join('')}</div>`;
 }
 const petMini = () => { const pet = P.A.data.stats?.pet; return pet ? `<span class="pt-pet">${avatar(pet.key, { form: Math.max(1, pet.form ?? 1), size: 'mini' })}</span>` : ''; };
 function lobby(v) {

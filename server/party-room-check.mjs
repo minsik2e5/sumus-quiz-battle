@@ -10,11 +10,11 @@ function fakeSocket() {
 function fakeCtx() {
   const store = new Map(), sockets = [];
   const ctx = {
-    alarm: null, store, writes: 0,
+    alarm: null, store, writes: 0, alarms: 0,
     storage: {
       async get(key) { return store.has(key) ? structuredClone(store.get(key)) : undefined; },
       async put(key, value) { ctx.writes++; store.set(key, structuredClone(value)); },
-      async setAlarm(time) { ctx.alarm = time; },
+      async setAlarm(time) { ctx.alarm = time; ctx.alarms = (ctx.alarms || 0) + 1; },
       async deleteAll() { store.clear(); ctx.alarm = null; }
     },
     blockConcurrencyWhile: fn => fn(),
@@ -60,14 +60,14 @@ export async function runPartyRoomChecks() {
     await send('tv', { type: 'start' });
     assert(room.room.state.phase === 'play' && lastView('a').q && !('answer' in lastView('a').q), 'V13.149 TV가 시작하면 학생에게 문제가 간다(정답 번호 없이)');
     // 답할 때마다 저장하지 않는다: 메모리에 두고 5초마다 한 번.
-    const writes0 = ctx.writes;
+    const writes0 = ctx.writes, alarms0 = ctx.alarms;
     const answerRight = async who => { const pl = room.room.state.players[who], q = questions[pl.qi % questions.length]; await send(who, { type: 'answer', choice: q.answer }); };
     await answerRight('a');
     const chestsTo = who => ws[who].sent.some(m => m.type === 'events' && m.events.some(e => e.kind === 'chests'));
     assert(chestsTo('a') && !chestsTo('b') && !chestsTo('tv') && lastView('a').offer && !lastView('a').q, 'V13.149 맞히면 상자 3개는 그 학생에게만');
     await send('a', { type: 'pick', i: 1 });
     for (let k = 0; k < 6; k++) { await answerRight('b'); await send('b', { type: 'pick', i: 0 }); clock += 300; }
-    assert.equal(ctx.writes, writes0, 'V13.149 판 도중 답 · 상자는 저장하지 않는다(쓰기 한도)');
+    assert(ctx.writes === writes0 && ctx.alarms === alarms0, 'V13.149 판 도중 답 · 상자는 저장도 알람도 하지 않는다(쓰기 한도)');
     clock += PARTY_SAVE_EVERY_MS;
     await room.pulse(clock);
     assert(ctx.writes === writes0 + 1 && ctx.store.get('room').state.players.b.right === 6, 'V13.149 5초마다 한 번 저장한다(바뀐 것이 있을 때)');

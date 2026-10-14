@@ -376,7 +376,7 @@
 
 /* ---------- 교실 게임: 학생 폰 ---------- */
 .pt-app{min-height:100svh;background:radial-gradient(circle at 50% -10%,#fbbf24 0,transparent 40%),linear-gradient(180deg,#7c2d12,#431407);color:#fff;position:relative}
-.pt-app:has(.pt-score.fish),.pt-app:has(.pt-lobby.fish){background:radial-gradient(circle at 50% -10%,#38bdf8 0,transparent 45%),linear-gradient(180deg,#0c4a6e,#082f49)}
+.pt-app.fish{background:radial-gradient(circle at 50% -10%,#38bdf8 0,transparent 45%),linear-gradient(180deg,#0c4a6e,#082f49)}
 .pt-top{display:flex;align-items:center;gap:10px;padding:14px 16px}
 .pt-top .yb-back{color:inherit}
 .pt-clock{margin-left:auto;font-size:20px;font-weight:900;font-variant-numeric:tabular-nums;padding:3px 10px;border-radius:12px;background:rgba(0,0,0,.25)}
@@ -576,3 +576,29 @@
 /* 야차전 탭 다섯 개(게임 탭) */
 .yl-tabs{grid-template-columns:repeat(5,minmax(0,1fr))}
 .yl-tabs button span{font-size:12px}
+
+/* 어두운 게임 화면의 뒤로 가기 버튼, 펫 그림 크기(펫 그림은 담는 칸에 맞춘다) */
+.mg-top .yb-back,.fs-top .yb-back,.pt-top .yb-back{background:rgba(255,255,255,.16);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22);color:#fff}
+.mg-top .yb-back svg,.fs-top .yb-back svg,.pt-top .yb-back svg{stroke:currentColor}
+:is(.mg-intro-pet,.pt-pet,.pt-lobby-pet,.pt-end-pet,.fs-pet,.ptv-pet,.ptv-step-pet) .avatar-art{width:100%;height:100%;min-width:0;margin:0}
+:is(.mg-intro-pet,.pt-pet,.pt-lobby-pet,.pt-end-pet,.fs-pet,.ptv-pet,.ptv-step-pet) .avatar-art img{width:100%;height:100%;object-fit:contain}
+.mg-intro-pet{position:relative;z-index:1}
+.mg-board li .avatar-art,.pt-target .avatar-art,.ptv-kid .avatar-art{width:32px;height:32px;min-width:0;margin:0}
+.pt-target .avatar-art{width:40px;height:40px}
+.ptv-kid .avatar-art{width:2.2em;height:2.2em}
+.mg-board li .avatar-art img,.pt-target .avatar-art img,.ptv-kid .avatar-art img{width:100%;height:100%;object-fit:contain}
+/* V13.149 교실 게임 화면 손질 */
+.ptv{isolation:isolate;background:#451a03}
+.ptv.fish{background:#082f49}
+.ptv-clock:empty,.pt-clock:empty{display:none}
+.ptv-rest{list-style:none;padding:0}
+.ptv-rest li{display:flex;align-items:center;gap:.4em;padding:.3em .8em;border-radius:99px;background:rgba(0,0,0,.25)}
+.ptv-rest li i{font-style:normal;font-weight:900;opacity:.7}
+.pt-chest svg{overflow:visible}
+.pt-chest-row{margin-top:46px}
+.pt-loot{top:-38%;z-index:2}
+.pt-loot b{font-size:15px}
+.pt-top3.hidden span{flex:1;text-align:center;background:rgba(0,0,0,.35);font-weight:800}
+.ptv-step-pet{display:block;width:6em;height:6em}
+.ptv-step.s1 .ptv-step-pet{width:8em;height:8em}
+.ptv-pet{display:block;width:2.6em;height:2.6em}

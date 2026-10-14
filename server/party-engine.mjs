@@ -17,6 +17,7 @@ export const PARTY = {
   REVENGE_MS: 30000,
   HIDE_LAST_MS: 60000,        // 마지막 1분은 TV 순위를 가린다
   FEED_KEEP: 8,
+  LEAD_NEWS_MS: 10000,        // '1등 탈환' 소식은 10초에 한 번까지
   FRENZY_EVERY: 40,           // 반 정답 40개마다 물고기 떼
   FRENZY_MS: 20000,
   FRENZY_LURE: 2,
@@ -193,7 +194,10 @@ function leaderCheck(room, now) {
   if (!top || top.id === room.leader || !(room.kind === 'fish' ? top.kg : top.gold)) return [];
   const was = room.leader;
   room.leader = top.id;
-  return was ? [feed(room, { kind: 'lead', pid: top.id, name: top.name }, now)] : [];
+  // 1등이 자주 바뀌어도 소식은 10초에 한 번만(TV가 '1등 탈환'으로 가득 차지 않게).
+  if (!was || now - (room.lead_at || 0) < PARTY.LEAD_NEWS_MS) return [];
+  room.lead_at = now;
+  return [feed(room, { kind: 'lead', pid: top.id, name: top.name }, now)];
 }
 
 /* ---------- 반 전체 낚시 ---------- */
@@ -254,7 +258,9 @@ export function tvView(room, now = Date.now()) {
     start_at: room.start_at, end_at: room.end_at, now, hidden: hide, players: list.length, right_total: room.right_total,
     frenzy_until: room.frenzy_until > now ? room.frenzy_until : 0, feed: room.feed,
     lobby: room.phase === 'lobby' ? list.map(x => ({ id: x.id, name: x.name, pet: petOf(x) })) : undefined,
-    top: list.slice(0, 10).map((x, i) => ({ id: x.id, rank: i + 1, name: x.name, pet: petOf(x), score: room.kind === 'fish' ? x.kg : x.gold, right: x.right, shield: x.shield })),
+    // 마지막 1분: 점수 · 순위 대신 이름 순서(줄 순서로도 순위가 새지 않게).
+    top: hide ? [...list].sort((a, b) => a.name.localeCompare(b.name, 'ko')).slice(0, 10).map(x => ({ id: x.id, rank: null, name: x.name, pet: petOf(x), score: null, right: null, shield: 0 }))
+      : list.slice(0, 10).map((x, i) => ({ id: x.id, rank: i + 1, name: x.name, pet: petOf(x), score: room.kind === 'fish' ? x.kg : x.gold, right: x.right, shield: x.shield })),
     ...(room.phase === 'ended' ? { awards: awards(room) } : {})
   };
 }
@@ -263,14 +269,17 @@ export function playerView(room, pid, now = Date.now()) {
   if (!pl) return null;
   const list = ranked(room), rank = list.findIndex(x => x.id === pid) + 1;
   const q = room.phase === 'play' && !pl.offer && !pl.pending ? currentQ(room, pl) : null;
+  // 마지막 1분은 TV처럼 폰에서도 순위 · 1~3등을 가린다(끝나고 한꺼번에 공개).
+  const hide = room.phase === 'play' && room.end_at - now < PARTY.HIDE_LAST_MS;
   return {
     kind: room.kind, phase: room.phase, label: room.label, end_at: room.end_at, start_at: room.start_at, now, steal: room.steal,
-    me: { id: pl.id, name: pl.name, gold: pl.gold, kg: pl.kg, right: pl.right, wrong: pl.wrong, streak: pl.streak, shield: pl.shield, lure: pl.lure, run: pl.run, rank, of: list.length },
+    hidden: hide,
+    me: { id: pl.id, name: pl.name, gold: pl.gold, kg: pl.kg, right: pl.right, wrong: pl.wrong, streak: pl.streak, shield: pl.shield, lure: pl.lure, run: pl.run, rank: hide ? null : rank, of: list.length },
     q: q ? { n: pl.right + pl.wrong, prompt: q.prompt, options: q.options, wait_until: pl.wait_until > now ? pl.wait_until : 0 } : null,
     offer: pl.offer ? { n: pl.right } : null,
     pending: pl.pending ? { kind: pl.pending.kind, pct: pl.pending.pct, until: pl.pending.until, targets: targets(room, pl, now, pl.pending.kind).filter(x => pl.pending.list.includes(x.id)) } : null,
     frenzy_until: room.frenzy_until > now ? room.frenzy_until : 0,
-    top: list.slice(0, 3).map(x => ({ id: x.id, name: x.name, score: room.kind === 'fish' ? x.kg : x.gold })),
+    top: hide ? [] : list.slice(0, 3).map(x => ({ id: x.id, name: x.name, score: room.kind === 'fish' ? x.kg : x.gold })),
     players: room.phase === 'lobby' ? list.length : undefined,
     ...(room.phase === 'ended' ? { awards: awards(room), result: partyResultFor(room, pid) } : {})
   };

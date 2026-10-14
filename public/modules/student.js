@@ -413,7 +413,7 @@ function attendanceCard(A) {
   return `<section class="att-card${a.done ? ' done' : ''}" aria-label="출석 체크">
     <div class="att-head">${uiArt('attendance', 'att-art')}<div>${lead}</div>${a.done ? `<span class="att-streak">${a.streak >= 2 ? `${a.streak}일 연속` : '오늘 도장 쾅!'}</span>` : '<button type="button" class="btn primary att-btn" data-action="attend">출석하기</button>'}</div>
     <ol class="att-stamps">${stamps}</ol>
-    ${a.done ? '' : `<p class="att-foot">7번째 도장은 <b>${coin()}${ATTENDANCE_REWARDS[last]}</b> + <b>뽑기권 ${ATTENDANCE_TICKETS}장</b> + <b>연속 보호권 1장</b>! 하루에 한 번 찍어요.</p>`}
+    ${a.done ? '' : `<p class="att-foot">7번째 도장 선물 <b>${coin()}${ATTENDANCE_REWARDS[last]}</b> · <b>뽑기권 ${ATTENDANCE_TICKETS}장</b> · <b>연속 보호권 1장</b></p>`}
   </section>`;
 }
 // V13.68: this week's ranking of my grade on the home (the whole ranking opens from it).

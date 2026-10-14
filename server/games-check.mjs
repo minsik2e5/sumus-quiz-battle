@@ -211,7 +211,13 @@ export async function runGamesChecks(assert) {
     assert(!kinds.has('steal') && !kinds.has('swap') && !kinds.has('shield') && kinds.has('gold') && kinds.has('monster'), 'V13.149 훔치기를 끄면 금화 · 배수 · 꽝 · 몬스터만');
     assert(Object.values(CHESTS).reduce((n, c) => n + c.w, 0) === 99 && CHESTS.steal.w === 12 && CHESTS.jackpot.w === 2, 'V13.149 상자 확률: 금화 45 · 2배 6 · 3배 3 · 꽝 10 · 훔치기 12 · 방패 8 · 바꾸기 3 · 몬스터 10 · 대박 2');
     // 마지막 1분은 TV 순위를 가린다, 끝나면 재미 상.
-    assert(!tvView(room, now + 3 * 60000).hidden && tvView(room, room.end_at - 30000).hidden, 'V13.149 마지막 1분은 TV 순위를 가린다');
+    const lastTv = tvView(room, room.end_at - 30000), lastMe = playerView(room, 'a', room.end_at - 30000);
+    const names = lastTv.top.map(x => x.name);
+    assert(!tvView(room, now + 3 * 60000).hidden && lastTv.hidden && lastTv.top.every(x => x.score === null && x.rank === null) && names.join() === [...names].sort((a, b) => a.localeCompare(b, 'ko')).join()
+      && lastMe.hidden && lastMe.me.rank === null && !lastMe.top.length,
+      'V13.149 마지막 1분은 TV와 폰 모두 순위를 가린다(TV 줄은 이름 순, 점수 없음)');
+    const leads = room.feed.filter(f => f.kind === 'lead');
+    assert(leads.every((f, i) => !i || f.at - leads[i - 1].at >= PARTY.LEAD_NEWS_MS), "V13.149 '1등 탈환' 소식은 10초에 한 번까지");
     tick(room, room.end_at + 1);
     const tv = tvView(room, room.end_at + 2);
     assert(room.phase === 'ended' && tv.awards.some(a => a.key === 'thief') && tv.awards.some(a => a.key === 'smart') && tv.awards.some(a => a.key === 'wall'), 'V13.149 시간이 다 되면 끝나고 정답왕 · 대도 · 철벽 방패 상');

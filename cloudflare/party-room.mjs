@@ -4,7 +4,7 @@
 // 5초마다 한 번 저장한다(SAVE_EVERY_MS). 판 도중 방이 꺼지면 마지막 저장(최대 5초 전)부터 이어진다. 10분 판 ≈ 120번 저장.
 // 화면도 답할 때마다 모두에게 보내지 않는다: 답한 학생(과 훔침을 당한 학생)에게 바로, 나머지 학생과 TV는 0.8초마다 바뀐 것만.
 // 끝나면 메인 상태 객체에 결과를 한 번 보고한다(던전과 같다: 실패하면 다시, 메인은 같은 판을 두 번 처리하지 않는다).
-import { createParty, joinParty, startParty, endParty, answer, pick, target, tick, nextWake, tvView, playerView, partyReport, PARTY } from '../server/party-engine.mjs';
+import { createParty, joinParty, startParty, endParty, answer, pick, target, tick, tvView, playerView, partyReport, PARTY } from '../server/party-engine.mjs';
 import { reportRetryMs } from './battle-room.mjs';
 
 const MESSAGE_TYPES = new Set(['sync', 'ping', 'answer', 'pick', 'target', 'start', 'end']);
@@ -58,14 +58,19 @@ export class PartyRoom {
     else if (!this.ctx.getWebSockets().length) this.stopPulse(); // 아무도 없으면 쉰다(알람이 시간을 지킨다)
   }
 
+  // 알람도 쓰기 한도에 들어간다: 로비 마감 · 판 끝 · 보고 재시도 · 방 지우기만 걸고, 같은 시각이면 다시 걸지 않는다.
+  // (표적 고르기 12초 같은 짧은 시간은 판 도중 맥박이 지킨다.)
   async schedule() {
     const r = this.room;
     if (!r) return;
-    const times = [];
-    const wake = nextWake(r.state); if (wake !== null && !r.ended) times.push(wake);
+    const s = r.state, times = [];
+    if (!r.ended) times.push(s.phase === 'lobby' ? s.created_at + PARTY.LOBBY_MS : s.end_at);
     if (r.ended && !r.reported) times.push(r.report_retry_at || Date.now() + 5000);
     if (r.ended && r.reported) times.push((r.closed_at || Date.now()) + CLOSE_AFTER_MS);
-    if (times.length) await this.ctx.storage.setAlarm(Math.max(Date.now() + 10, Math.min(...times)));
+    const at = times.filter(Number.isFinite).length ? Math.max(Date.now() + 10, Math.min(...times.filter(Number.isFinite))) : null;
+    if (at === null || at === this.alarmAt) return;
+    this.alarmAt = at;
+    await this.ctx.storage.setAlarm(at);
   }
 
   send(ws, message) { try { ws.send(JSON.stringify({ ...message, now: Date.now() })); } catch {} }
@@ -184,7 +189,6 @@ export class PartyRoom {
     const touched = new Set([tag, ...res.events.map(e => e.vid).filter(Boolean)]);
     this.pushViews(now, touched);
     this.touch();
-    await this.schedule();
   }
 
   async webSocketClose() { /* 학생이 나가도 점수는 남는다(다시 들어오면 이어서) */ }

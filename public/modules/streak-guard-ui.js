@@ -41,7 +41,7 @@ export function streakCard(A) {
   const line = repair
     ? `<strong>${num(repair.run)}일 연속이 어제 끊겼어요!</strong><small>오늘 연습을 끝까지 풀어 <b>${num(repair.need)}문제</b>를 채우면 어제를 이어요 · 한 달에 한 번</small>`
     : v.saved_yesterday
-      ? `<strong>보호권이 어제를 지켰어요 🛡️</strong><small>오늘 공부하면 ${num(days + 1)}일 연속!</small>`
+      ? `<strong>보호권이 어제를 지켰어요</strong><small>오늘 공부하면 ${num(days + 1)}일 연속!</small>`
       : days > 0
         ? `<strong>${num(days)}일 연속 학습 중</strong><small>${next ? `${num(next)}일까지 ${num(next - days)}일 남았어요` : '전설의 연속 기록!'}${v.held ? ' · 빠지는 날은 보호권이 막아 줘요' : ''}</small>`
         : `<strong>오늘부터 연속 학습 시작!</strong><small>하루 한 번 연습을 끝까지 풀면 불꽃이 켜져요</small>`;
@@ -106,7 +106,9 @@ function once(A, kind) {
 }
 export function maybeGuardMoment(A) {
   const v = view(A);
-  if (!v || A.tab !== 'home' || document.querySelector('#modal-root .modal, .sg-moment, .att-moment')) return;
+  // 다른 순간(칭호 · 펫 · 선물 상자)이 떠 있으면 다음 화면 때 다시 본다. 이 순간도 #modal-root에 넣어 다른 순간이 겹쳐 뜨지 않게 한다.
+  const host = document.getElementById('modal-root');
+  if (!v || A.tab !== 'home' || A.screen || !host || host.children.length || document.querySelector('.sg-moment, .att-moment')) return;
   const kind = v.repaired_today ? 'repair' : v.saved_yesterday ? 'saved' : null;
   if (!kind || !once(A, kind)) return;
   const days = Number(A.data.stats?.streak || 0);
@@ -119,7 +121,7 @@ export function maybeGuardMoment(A) {
     <button type="button" class="btn primary full" data-sg-close>좋아요!</button>
   </div>`;
   box.onclick = event => { if (event.target === box || event.target.closest('[data-sg-close]')) { box.classList.remove('open'); setTimeout(() => box.remove(), 220); } };
-  document.body.appendChild(box);
+  host.appendChild(box);
   requestAnimationFrame(() => box.classList.add('open'));
   box.querySelector('[data-sg-close]').focus({ preventScroll: true });
   navigator.vibrate?.(kind === 'repair' ? [40, 60, 90] : 60);

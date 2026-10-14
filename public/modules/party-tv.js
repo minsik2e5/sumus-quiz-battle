@@ -166,7 +166,7 @@ function play(v, before) {
   board.classList.toggle('masked', !!v.hidden);
   if (v.hidden && !before?.hidden) sfx('warn-beep');
   // 순위 막대: 학생마다 한 줄을 두고 위치(translateY) · 길이만 바꾼다(줄이 미끄러지며 순위가 바뀐다).
-  const max = Math.max(1, ...v.top.map(x => x.score));
+  const max = Math.max(1, ...v.top.map(x => x.score || 0));
   const ROW = 58;
   board.style.height = `${v.top.length * ROW}px`;
   const seen = new Set();
@@ -181,7 +181,7 @@ function play(v, before) {
       T.bars.set(x.id, row);
     }
     row.style.transform = `translateY(${i * ROW}px)`;
-    row.className = `ptv-row${i < 3 ? ` top${i + 1}` : ''}`;
+    row.className = `ptv-row${!v.hidden && i < 3 ? ` top${i + 1}` : ''}`;
     row.querySelector('.ptv-rank').textContent = v.hidden ? '?' : i + 1;
     row.querySelector('.ptv-bar u').style.transform = `scaleX(${v.hidden ? .5 : Math.max(.02, x.score / max)})`;
     const score = v.hidden ? '???' : fish ? kgText(x.score) : num(x.score);
@@ -224,7 +224,7 @@ function ended(v, before) {
   main(`<section class="ptv-end">
     <h1>${fish ? '🎣 오늘의 낚시왕' : '💰 오늘의 보물왕'}</h1>
     <div class="ptv-podium">${podium}</div>
-    ${rest.length ? `<ol class="ptv-rest" start="4">${rest.map(x => `<li><b>${esc(x.name)}</b><em>${fish ? kgText(x.score) : num(x.score)}</em></li>`).join('')}</ol>` : ''}
+    ${rest.length ? `<ol class="ptv-rest">${rest.map((x, k) => `<li><i>${k + 4}</i><b>${esc(x.name)}</b><em>${fish ? kgText(x.score) : num(x.score)}</em></li>`).join('')}</ol>` : ''}
     ${v.awards?.length ? `<div class="ptv-awards">${v.awards.map(a => `<div class="ptv-award ${a.key}">${a.fish ? `<span class="ptv-award-fish">${fishPic(a.fish)}</span>` : ''}<small>${esc(a.title)}</small><b>${esc(a.name)}</b><span>${esc(a.value)}</span></div>`).join('')}</div>` : ''}
     <p class="ptv-foot">진짜 코인은 <b>맞힌 문제 수</b>대로 받고, 1~3등은 보너스! (5문제 이상 · 하루 3판까지)</p>
     <button type="button" class="ptv-start" data-tv="exit">닫기</button>
