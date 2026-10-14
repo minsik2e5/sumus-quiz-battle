@@ -37,6 +37,20 @@ function log(...args) {
   console.log(new Date().toISOString(), ...args);
 }
 
+// public/characters 안의 스프라이트 시트 목록 (같은 캐릭터면 .webp를 .png보다 먼저)
+function characterManifest(dir) {
+  const files = {};
+  let names = [];
+  try { names = fs.readdirSync(dir); } catch { /* 폴더 없음 */ }
+  for (const ext of ['png', 'webp']) {
+    for (const name of names) {
+      const m = new RegExp(`^([a-z0-9]+)\\.${ext}$`).exec(name);
+      if (m) files[m[1]] = name;
+    }
+  }
+  return { files };
+}
+
 function clientIp(req) {
   return String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
 }
@@ -100,6 +114,9 @@ async function createApp({
   }
 
   function serveStatic(req, res, url) {
+    if (url.pathname === '/characters/manifest.json') {
+      return reply(res, { status: 200, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-cache' }, body: JSON.stringify(characterManifest(path.join(PUBLIC_DIR, 'characters'))) });
+    }
     const vendor = VENDOR_FILES.get(url.pathname);
     if (vendor) return serveFile(res, path.join(MEDIAPIPE_DIR, vendor), 'public, max-age=604800');
     let pathname = decodeURIComponent(url.pathname);
@@ -197,4 +214,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { createApp };
+module.exports = { createApp, characterManifest };

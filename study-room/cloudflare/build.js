@@ -16,4 +16,7 @@ fs.copyFileSync(path.join(mediapipe, 'vision_bundle.mjs'), path.join(vendor, 'vi
 for (const f of ['vision_wasm_internal.js', 'vision_wasm_internal.wasm', 'vision_wasm_nosimd_internal.js', 'vision_wasm_nosimd_internal.wasm']) {
   fs.copyFileSync(path.join(mediapipe, 'wasm', f), path.join(vendor, 'wasm', f));
 }
+// 올라와 있는 캐릭터 시트 목록 (브라우저가 없는 캐릭터를 찾느라 요청을 낭비하지 않게)
+const { characterManifest } = require('../server.js');
+fs.writeFileSync(path.join(dist, 'characters', 'manifest.json'), JSON.stringify(characterManifest(path.join(dist, 'characters'))));
 console.log('cloudflare/dist ready');

@@ -286,3 +286,21 @@ test('image characters unlock with total study time', () => {
   assert.equal(academy.member(s.id).avatar.kind, 'seal');
   assert.equal(academy.me(s.id).totalMs, academy.totalMs(s.id));
 });
+
+test('characters do not overlap within a class', () => {
+  const { academy, cls, join } = setup();
+  const a = join('감자');
+  const b = join('밍지');
+  academy.setAvatar(a.id, { kind: 'bear' });
+  assert.throws(() => academy.setAvatar(b.id, { kind: 'bear' }), /이미 감자 친구가/);
+  academy.setAvatar(b.id, { kind: 'cat' });
+  academy.setAvatar(a.id, { kind: 'bear', item: 'cup' }); // 자기 캐릭터는 그대로 둘 수 있다
+  const c = academy.register({ name: '채원', classCode: cls.code, pin: '1111', avatar: { kind: 'bear' } }).student;
+  assert.equal(c.avatar.kind, null);
+  assert.deepEqual(academy.takenKinds(cls.code, a.id).map((t) => t.kind), ['cat']);
+  const other = academy.createClass('B');
+  const d = academy.register({ name: '또기', classCode: other.code, pin: '1111', avatar: { kind: 'bear' } }).student;
+  assert.equal(d.avatar.kind, 'bear', 'other classes can use the same character');
+  academy.moveStudent(d.id, cls.code);
+  assert.equal(academy.data.students[d.id].avatar.kind, null);
+});

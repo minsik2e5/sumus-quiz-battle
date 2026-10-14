@@ -182,9 +182,24 @@ class Academy {
     if (!clean) throw new AcademyError('이름을 입력해 주세요.');
     if (!/^\d{4}$/.test(String(pin || ''))) throw new AcademyError('PIN은 숫자 4자리예요.');
     if (this.findStudent(code, clean)) throw new AcademyError('이미 같은 이름이 있어요. "다시 들어가기"로 로그인하거나 다른 이름을 써 주세요.', 'conflict');
-    const student = this.createStudent(code, clean, pin, avatar);
+    const wanted = Avatar.normalize(avatar || Avatar.random());
+    // 같은 반에서 이미 누가 쓰는 캐릭터면 일단 사람 캐릭터로 시작하고 나중에 고르게 한다
+    if (wanted.kind && (this.kindOwner(code, wanted.kind) || (Avatar.character(wanted.kind) || {}).unlock)) wanted.kind = null;
+    const student = this.createStudent(code, clean, pin, wanted);
     const token = this.issueToken(student);
     return { student, token };
+  }
+
+  // 같은 반에서 이 캐릭터를 쓰고 있는 학생 (한 반에서는 캐릭터가 겹치지 않게 한다)
+  kindOwner(classCode, kind, exceptId) {
+    if (!kind) return null;
+    return this.studentsOf(classCode).find((s) => s.id !== exceptId && s.avatar && s.avatar.kind === kind) || null;
+  }
+
+  takenKinds(classCode, exceptId) {
+    return this.studentsOf(classCode)
+      .filter((s) => s.id !== exceptId && s.avatar && s.avatar.kind)
+      .map((s) => ({ kind: s.avatar.kind, name: s.name }));
   }
 
   createStudent(code, name, pin, avatar, lastSeen = this.now()) {
@@ -270,6 +285,8 @@ class Academy {
     if (c && c.unlock && next.kind !== (s.avatar && s.avatar.kind) && this.totalMs(id) < c.unlock * 3600000) {
       throw new AcademyError(`${c.name}은(는) 누적 ${c.unlock}시간을 공부하면 열려요.`, 'limit');
     }
+    const owner = c && this.kindOwner(s.classCode, next.kind, id);
+    if (owner) throw new AcademyError(`${c.name}은(는) 이미 ${owner.name} 친구가 쓰고 있어요. 다른 친구를 골라 주세요.`, 'conflict');
     s.avatar = next;
     this.dirty();
     this.emit(id);
@@ -299,6 +316,7 @@ class Academy {
     if (this.findStudent(classCode, s.name)) throw new AcademyError('옮길 반에 같은 이름이 있어요.', 'conflict');
     const from = s.classCode;
     s.classCode = classCode;
+    if (s.avatar && this.kindOwner(classCode, s.avatar.kind, id)) s.avatar = { ...s.avatar, kind: null };
     this.dirty();
     this.onRemove(id, from);
     this.emit(id);

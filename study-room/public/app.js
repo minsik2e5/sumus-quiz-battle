@@ -212,7 +212,10 @@
     const seq = ++classLookup;
     try {
       const cls = await api(`/api/class?code=${encodeURIComponent(code)}`);
-      if (seq === classLookup) el.textContent = `✔ ${cls.name}`;
+      if (seq === classLookup) {
+        el.textContent = `✔ ${cls.name}`;
+        state.classTaken = cls.takenKinds || [];
+      }
     } catch (err) {
       if (seq === classLookup) el.textContent = err.message;
     }
@@ -242,13 +245,14 @@
     const buttons = $$('#entry-form button');
     buttons.forEach((b) => { b.disabled = true; });
     try {
-      const body = mode === 'register' ? { ...v, avatar: Avatar.random() } : v;
+      const body = mode === 'register' ? { ...v, avatar: Avatar.random(state.classTaken) } : v;
       const data = await api(mode === 'register' ? '/api/register' : '/api/login', { method: 'POST', body });
       state.token = data.token;
       state.me = data.me;
       saved.set('study.token', data.token);
       saved.set('study.code', v.classCode);
       if (mode === 'register') openAvatarEditor('room-first');
+      else if (needsCharacter()) openAvatarEditor('room-first');
       else openRoom();
     } catch (err) {
       errorEl.textContent = err.message;
@@ -268,12 +272,23 @@
 
   // ---------- 캐릭터 꾸미기 ----------
 
-  function openAvatarEditor(returnTo) {
+  // 선생님이 등록한 학생은 사람 캐릭터로 시작하니, 동물 캐릭터가 있으면 처음 한 번 고르게 한다
+  function needsCharacter() {
+    if (!state.me || state.me.avatar.kind || !Avatar.CHARACTERS.some((c) => Avatar.isAvailable(c.id))) return false;
+    return saved.get(`study.picked.${state.me.id}`) !== '1';
+  }
+
+  async function openAvatarEditor(returnTo) {
     state.avatarReturn = returnTo;
     state.draft = Avatar.normalize(state.me && state.me.avatar);
+    state.taken = [];
     $('#avatar-back').hidden = returnTo === 'room-first';
     renderAvatarEditor();
     show('screen-avatar');
+    try {
+      state.taken = (await api('/api/me/taken')).taken;
+      renderAvatarEditor();
+    } catch { /* 못 불러와도 고를 때 서버가 확인한다 */ }
   }
 
   function renderAvatarEditor() {
@@ -288,10 +303,11 @@
         <button class="char${d.kind ? '' : ' on'}" data-key="kind" data-val=""><span class="char-face human">${Avatar.face({ ...d, kind: null })}</span><b>사람</b></button>
         ${chars.map((c) => {
           const locked = c.unlock > hours && (state.me && state.me.avatar && state.me.avatar.kind) !== c.id;
-          return `<button class="char${d.kind === c.id ? ' on' : ''}${locked ? ' locked' : ''}" data-key="kind" data-val="${c.id}" ${locked ? `data-locked="${c.unlock}"` : ''}>
-            <span class="char-face">${Avatar.face({ kind: c.id })}</span><b>${c.name}</b>${locked ? `<small>🔒 ${c.unlock}시간</small>` : ''}</button>`;
+          const owner = (state.taken || []).find((t) => t.kind === c.id);
+          return `<button class="char${d.kind === c.id ? ' on' : ''}${locked ? ' locked' : ''}${owner ? ' taken' : ''}" data-key="kind" data-val="${c.id}" ${locked ? `data-locked="${c.unlock}"` : ''} ${owner ? `data-owner="${esc(owner.name)}"` : ''}>
+            <span class="char-face">${Avatar.face({ kind: c.id })}</span><b>${c.name}</b>${owner ? `<small>${esc(owner.name)} 사용 중</small>` : locked ? `<small>🔒 ${c.unlock}시간</small>` : ''}</button>`;
         }).join('')}
-      </div><p class="char-help">누적 공부 시간이 쌓이면 새 친구가 열려요 · 지금 ${hours}시간</p></div>` : '';
+      </div><p class="char-help">한 반에서는 캐릭터가 겹치지 않아요 · 누적 공부 시간이 쌓이면 새 친구가 열려요 (지금 ${hours}시간)</p></div>` : '';
     $('#avatar-options').innerHTML = charGroup + (d.kind ? `
       <div class="opt-group"><h4>책상 소품</h4><div class="opt-row">${chips('item', Avatar.ITEMS)}</div></div>` : `
       <div class="opt-group"><h4>머리 모양</h4><div class="opt-row">${chips('hair', Avatar.HAIR)}</div></div>
@@ -308,6 +324,10 @@
     let val = btn.dataset.val;
     if (key === 'hc' || key === 'top') val = Number(val);
     if (key === 'glasses') val = val === 'true';
+    if (key === 'kind' && btn.dataset.owner) {
+      toast(`${btn.dataset.owner} 친구가 이미 쓰고 있어요. 다른 친구를 골라 봐요!`);
+      return;
+    }
     if (key === 'kind' && btn.dataset.locked) {
       toast(`누적 ${btn.dataset.locked}시간을 공부하면 열려요. 조금만 더 힘내요! 💪`);
       return;
@@ -323,6 +343,7 @@
     try {
       const data = await api('/api/me/avatar', { method: 'POST', body: { avatar: state.draft } });
       state.me = { ...state.me, ...data.me };
+      saved.set(`study.picked.${state.me.id}`, '1');
       openRoom();
       if (state.avatarReturn === 'room-first') toast('환영해요! ▶ 버튼을 누르면 공부 시간이 흘러가요');
     } catch (err) {
@@ -878,7 +899,7 @@
     $('#btn-register').addEventListener('click', () => enter('register'));
 
     $('#avatar-options').addEventListener('click', onAvatarOption);
-    $('#avatar-dice').addEventListener('click', () => { state.draft = Avatar.random(); renderAvatarEditor(); });
+    $('#avatar-dice').addEventListener('click', () => { state.draft = Avatar.random((state.taken || []).map((t) => t.kind)); renderAvatarEditor(); });
     $('#avatar-save').addEventListener('click', saveAvatar);
     $('#avatar-back').addEventListener('click', () => openRoom());
 
@@ -969,6 +990,7 @@
       if (state.me) renderGrid();
       if (!$('#screen-avatar').hidden) renderAvatarEditor();
       if (!$('#screen-solo').hidden) renderSolo();
+      if (!$('#screen-room').hidden && needsCharacter()) openAvatarEditor('room-first');
     });
     if (!state.token) return openEntry();
     try {

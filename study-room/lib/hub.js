@@ -255,7 +255,7 @@ function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), 
     if (p === '/api/class' && method === 'GET') {
       const cls = academy.getClass(q.get('code'));
       if (!cls) throw new AcademyError('반 코드를 다시 확인해 주세요.', 'not_found');
-      return json(200, { code: cls.code, name: cls.name });
+      return json(200, { code: cls.code, name: cls.name, takenKinds: academy.takenKinds(cls.code).map((t) => t.kind) });
     }
     if (p === '/api/register' && method === 'POST') {
       const { student, token } = academy.register(parseBody(req));
@@ -278,6 +278,7 @@ function createHub({ store, teacherKey, teacherKeyHash, now = () => Date.now(), 
       const student = academy.auth(bearer(req));
       if (!student) throw new AcademyError('다시 로그인해 주세요.', 'unauthorized');
       if (p === '/api/me' && method === 'GET') return json(200, { me: academy.me(student.id) });
+      if (p === '/api/me/taken' && method === 'GET') return json(200, { taken: academy.takenKinds(student.classCode, student.id) });
       if (p === '/api/me/stats' && method === 'GET') return json(200, academy.stats(student.id));
       if (p === '/api/me/avatar' && method === 'POST') {
         academy.setAvatar(student.id, parseBody(req).avatar);

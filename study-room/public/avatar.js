@@ -40,6 +40,22 @@
     { id: 'owl', name: '부엉박사', unlock: 0 },
     { id: 'squirrel', name: '도토리', unlock: 0 },
     { id: 'otter', name: '해달이', unlock: 0 },
+    { id: 'hamster', name: '볼빵빵', unlock: 0 },
+    { id: 'fox', name: '여우비', unlock: 0 },
+    { id: 'panda', name: '판다곰', unlock: 0 },
+    { id: 'koala', name: '코코알라', unlock: 0 },
+    { id: 'pig', name: '꿀꿀이', unlock: 0 },
+    { id: 'sheep', name: '몽글양', unlock: 0 },
+    { id: 'duck', name: '꽥꽥이', unlock: 0 },
+    { id: 'frog', name: '개굴이', unlock: 0 },
+    { id: 'lion', name: '사자후', unlock: 0 },
+    { id: 'tiger', name: '호랭이', unlock: 0 },
+    { id: 'hedgehog', name: '고슴', unlock: 0 },
+    { id: 'raccoon', name: '너굴', unlock: 0 },
+    { id: 'redpanda', name: '레서', unlock: 0 },
+    { id: 'alpaca', name: '파카', unlock: 0 },
+    { id: 'chick', name: '삐약이', unlock: 0 },
+    { id: 'turtle', name: '거북선', unlock: 0 },
     { id: 'seal', name: '물범떡', unlock: 5 },
     { id: 'octopus', name: '문어쌤', unlock: 10 },
     { id: 'mochi', name: '찰떡이', unlock: 15 },
@@ -65,12 +81,15 @@
       img.onerror = () => resolve(false);
       img.src = url;
     });
-    detecting = Promise.all(CHARACTERS.map(async (c) => {
-      for (const ext of ['webp', 'png']) {
-        const url = `/characters/${c.id}.${ext}`;
-        if (await tryLoad(url)) { available.set(c.id, url); return; }
-      }
-    })).then(() => { for (const cb of readyCallbacks) cb(); });
+    // 서버(또는 배포 빌드)가 만들어 주는 목록에 있는 캐릭터만 불러 본다
+    detecting = fetch('/characters/manifest.json', { cache: 'no-cache' })
+      .then((res) => (res.ok ? res.json() : { files: {} }))
+      .catch(() => ({ files: {} }))
+      .then((manifest) => Promise.all(CHARACTERS.filter((c) => manifest.files && manifest.files[c.id]).map(async (c) => {
+        const url = `/characters/${manifest.files[c.id]}`;
+        if (await tryLoad(url)) available.set(c.id, url);
+      })))
+      .then(() => { for (const cb of readyCallbacks) cb(); });
     return detecting;
   }
 
@@ -100,10 +119,11 @@
     };
   }
 
-  function random() {
+  function random(exclude) {
     const r = (n) => Math.floor(Math.random() * n);
-    // 캐릭터 이미지가 있으면 처음부터 열려 있는 동물 중 하나를 고른다
-    const open = CHARACTERS.filter((c) => !c.unlock && available.has(c.id));
+    // 캐릭터 이미지가 있으면 처음부터 열려 있고 반 친구가 안 쓰는 동물 중 하나를 고른다
+    const skip = new Set(exclude || []);
+    const open = CHARACTERS.filter((c) => !c.unlock && available.has(c.id) && !skip.has(c.id));
     if (open.length) return { ...DEFAULT, item: ITEMS[1 + r(ITEMS.length - 1)].id, kind: open[r(open.length)].id };
     return {
       hair: HAIR[r(HAIR.length)].id,

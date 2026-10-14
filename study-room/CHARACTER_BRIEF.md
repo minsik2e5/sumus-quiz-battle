@@ -74,6 +74,27 @@ No text, no logo, no background.
 | squirrel | 도토리 | an orange squirrel with a big fluffy tail behind it and an acorn-shaped hairpin | 벼락치기 장인 |
 | otter | 해달이 | a sea otter, grayish brown, holding a small clam like a notebook | 문제집 수집가 |
 
+**1-2차 (기본 캐릭터 추가 16종)** — 한 반에서 캐릭터가 겹치지 않게 하려면 기본 캐릭터가 반 인원보다 많아야 해서 추가한다. 1차 8종과 같은 크기·위치·그림체로, **책 색은 캐릭터마다 다르게**, 귀·꼬리가 칸 밖으로 나가지 않게 좌우 여백을 둔다. 결과는 `.webp`로.
+
+| id | 이름 | {설명} | 공부 성격 |
+|---|---|---|---|
+| hamster | 볼빵빵 | a round golden hamster with stuffed puffy cheeks and a sunflower seed hairpin | 간식 먹으며 공부 |
+| fox | 여우비 | a small orange fox with a white-tipped fluffy tail and big pointy ears | 요령 좋은 정리왕 |
+| panda | 판다곰 | a chubby panda with black eye patches shaped like teardrops and a bamboo pencil | 느긋하지만 꾸준 |
+| koala | 코코알라 | a gray koala with big fluffy round ears and a leaf on its head | 졸음과 싸우는 중 |
+| pig | 꿀꿀이 | a pink piglet with a round snout and a tiny curly tail, wearing a yellow headband | 먹고 공부하고 반복 |
+| sheep | 몽글양 | a fluffy cream sheep with cloud-like wool and small curled horns | 포근한 모범생 |
+| duck | 꽥꽥이 | a yellow duckling with an orange bill and a small blue sailor hat | 시끄럽지만 열정적 |
+| frog | 개굴이 | a green frog with big round eyes on top and a tiny lily pad hat | 점프하듯 진도 빠름 |
+| lion | 사자후 | a little lion cub with a soft fluffy orange mane like a flower | 기세로 밀어붙임 |
+| tiger | 호랭이 | a baby tiger with orange and dark stripes and a white muzzle | 한국의 기상 |
+| hedgehog | 고슴 | a small hedgehog with soft brown spikes and a cream face, holding a highlighter | 예민한 완벽주의 |
+| raccoon | 너굴 | a gray raccoon with a black eye mask and a striped ringed tail | 밤에 몰래 공부 |
+| redpanda | 레서 | a red panda with reddish fur, white cheek marks and a ringed fluffy tail | 귀여움으로 버팀 |
+| alpaca | 파카 | a cream alpaca with a fluffy wool top-knot and a long neck scarf | 침착한 멘탈갑 |
+| chick | 삐약이 | a tiny fluffy yellow chick with a bit of eggshell on its head | 이제 막 시작한 신입 |
+| turtle | 거북선 | a green baby turtle with a hexagon-patterned shell | 느려도 끝까지 |
+
 **2차 (나중에 레벨업 보상으로 해금할 캐릭터)** — 다양하게
 
 | id | 이름 | {설명} | 테마 |
