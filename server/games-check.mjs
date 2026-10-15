@@ -16,6 +16,7 @@ import { fishSvg, FISH_ART } from '../public/modules/fishing-art.js';
 import { addBonus } from './rewards.mjs';
 import { PARTY, CHESTS, createParty, joinParty, startParty, answer, pick, target, tick, tvView, playerView, awards, partyCoins, partyReport, ranked } from './party-engine.mjs';
 import { settleParty } from './party.mjs';
+import { matchSplits } from './games.mjs';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 const lcg = seed => () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
@@ -138,6 +139,31 @@ export async function runGamesChecks(assert) {
       assert(!capped.paid && capped.reason === 'daily' && capped.left === 0, `V13.149 짝 맞추기 코인은 하루 ${MATCH.DAILY}판까지(기록은 남는다)`);
       const board = await call('qa-gm-a', 'GET', '/games/match/board');
       assert(board.rows[0]?.id === 'qa-gm-c' && board.rows[0].ms === 12000 && !board.rows.some(r => r.id === 'qa-gm-d'), 'V13.149 이번 주 우리 반 짝 맞추기 순위(다른 반은 안 보인다)');
+      // V13.149 반 친구 고스트: 끝낼 때 짝마다의 시간을 같이 보내고(쓰기 횟수는 그대로), 시작할 때 바로 위 친구의 시간을 받는다.
+      const even = ms => Array.from({ length: MATCH.PAIRS }, (_, k) => Math.round(ms * (k + 1) / MATCH.PAIRS));
+      assert(matchSplits(even(12000), 12000)?.length === MATCH.PAIRS && !matchSplits([100, 200, 300, 400, 500, 12000], 12000) && !matchSplits(even(12000), 15000) && !matchSplits(even(12000).slice(1), 12000) && !matchSplits('x', 12000),
+        'V13.149 고스트용 짝마다 시간: 6개, 한 쌍 0.45초 이상, 마지막이 기록과 같아야 한다');
+      const sa = await call('qa-gm-a', 'POST', '/games/match/start', { range_codes: ['24'] });
+      assert(sa.ghost?.name === '다솜' && !sa.ghost.self && sa.ghost.rank === 1 && sa.ghost.ms === 12000 && JSON.stringify(sa.ghost.splits) === JSON.stringify(even(12000)),
+        'V13.149 고스트: 이번 주 기록이 없으면 반에서 가장 느린 기록, 짝마다 시간이 없는 옛 기록은 고르게 나눈다');
+      const splitsA = [2000, 5000, 8000, 12000, 16000, 20000];
+      clock += MATCH.COUNTDOWN_MS + 20000;
+      const fa = await call('qa-gm-a', 'POST', '/games/match/finish', { id: sa.id, ms: 20000, misses: 0, splits: splitsA });
+      const fa2 = await call('qa-gm-a', 'POST', '/games/match/finish', { id: sa.id, ms: 20000, misses: 0, splits: [1, 2, 3, 4, 5, 20000] });
+      assert(fa.paid && fa.stars === 2 && JSON.stringify(prof('qa-gm-a').games.match.week.splits) === JSON.stringify(splitsA) && fa2.again && fa2.coins === fa.coins && JSON.stringify(prof('qa-gm-a').games.match.week.splits) === JSON.stringify(splitsA),
+        'V13.149 고스트: 이번 주 기록이면 짝마다 시간을 남기고, 같은 끝내기를 다시 보내도 한 번만 처리한다');
+      const sb = await call('qa-gm-b', 'POST', '/games/match/start', { range_codes: ['24'] });
+      assert(sb.ghost?.name === '가람' && JSON.stringify(sb.ghost.splits) === JSON.stringify(splitsA), 'V13.149 고스트: 다른 친구는 그 친구가 남긴 짝마다 시간대로 달린다');
+      clock += MATCH.COUNTDOWN_MS + 19000;
+      const fb = await call('qa-gm-b', 'POST', '/games/match/finish', { id: sb.id, ms: 19000, misses: 0, splits: [100, 200, 300, 400, 500, 19000] });
+      assert(fb.paid && fb.record && prof('qa-gm-b').games.match.week.best === 19000 && prof('qa-gm-b').games.match.week.splits === null, 'V13.149 고스트: 이상한 짝마다 시간은 버리고 기록은 그대로 받는다');
+      const sa3 = await call('qa-gm-a', 'POST', '/games/match/start', { range_codes: ['24'] }), sc = await call('qa-gm-c', 'POST', '/games/match/start', { range_codes: ['24'] });
+      assert(sa3.ghost?.name === '나무' && sa3.ghost.rank === 2 && JSON.stringify(sa3.ghost.splits) === JSON.stringify(even(19000)) && sc.ghost?.self && sc.ghost.name === '이번 주의 나' && sc.ghost.ms === 12000,
+        'V13.149 고스트: 바로 위 순위 친구, 1등이면 이번 주의 나');
+      const snap = JSON.stringify(state.profiles);
+      const board2 = await call('qa-gm-a', 'GET', '/games/match/board');
+      assert(JSON.stringify(state.profiles) === snap && board2.rows.map(r => r.id).join() === 'qa-gm-c,qa-gm-b,qa-gm-a' && board2.rows.every(r => !('splits' in r)) && board2.rows[2].me,
+        'V13.149 순위(시상대) 보기는 기록을 바꾸지 않고, 짝마다 시간은 순위에 싣지 않는다');
       // V13.150 손맛 낚시(놀이터): 미끼 → 던지기(서버가 물고기를 정함) → 끌어올리기(최소 파이팅 시간) → 어망 → 진주 → 코인 · 알.
       const b = prof('qa-gm-b');
       b.reel = {}; // 앞의 출석 검사에서 받은 미끼는 지우고 시작
@@ -391,5 +417,44 @@ export async function runGamesChecks(assert) {
     assert(battle.includes("['games', '게임', 'arcade']") && battle.includes("act === 'game-match'") && !battle.includes('game-fish') && source('../public/modules/arcade.js').includes('data-action="reel-open"') && app.includes("d.action === 'reel-open'")
       && source('../public/modules/reel.js').includes('진주 1개 = 1코인') && source('../public/modules/sessions.js').includes('낚시 미끼 +1') && battle.includes("act === 'game-party'") && app.includes("d.action === 'party-new'") && teacher.includes('data-action="party-new"'),
       'V13.149 야차전 게임 탭(짝 맞추기 · 단어 낚시 · 교실 게임 참가)과 선생님 대시보드의 교실 게임 버튼');
+  }
+
+  /* ---------- V13.149 짝 맞추기 고퀄 화면 ---------- */
+  {
+    const mg = source('../public/modules/match-game.js'), css = source('../public/v13149.css'), svc = source('./service.mjs');
+    const { SOUND_GAIN } = await import('../public/modules/sound.js');
+    assert(svc.includes('ghost: matchGhost(state.profiles, p, weekKey, { hidden: isPrivate })') && svc.includes('splits: Array.isArray(body.splits) ? body.splits.slice(0, 12) : null'),
+      'V13.149 고스트는 시작(이미 쓰는 요청)에 실려 오고, 끝내기에 짝마다 시간이 실린다(쓰기 횟수는 그대로)');
+    assert(mg.includes("api('/games/match/finish', { id: M.id, ms, misses: M.misses, splits: M.splits })") && mg.includes('function ghostRun(t)') && mg.includes('function ghostGap(split)') && mg.includes("tag.textContent = '추월!'") && mg.includes('고스트를 이겼어요!'),
+      'V13.149 짝 맞추기 고스트: 친구가 짝마다 시간대로 달리고, 앞섬 · 뒤짐 · 추월이 보이고, 결과에 고스트를 이겼는지 나온다');
+    assert(mg.includes("grid.classList.add('deal')") && mg.includes("grid.classList.add('reveal')") && mg.includes("ringEl.querySelector(lost === 1 ? '.s3' : '.s2')?.classList.add('lost')") && mg.includes("sfx('warn-beep'") && mg.includes('const WARN_MS = 3000'),
+      'V13.149 짝 맞추기: 카운트다운에 카드 딜링 · GO에 물결 뒤집기, 시간 링의 별 기준선이 지나면 별이 떨어지고 3초 전부터 삑삑');
+    assert(mg.includes('export const FEVER_AT = 3') && mg.includes('function feverOn()') && mg.includes('function feverOff()') && mg.includes("const CHEERS = ['', '', '좋아!', '멋져!', '대단해!'") && mg.includes('2 ** (SCALE[') && !/MATCH\.(PENALTY_MS|STARS)[^;\n]*fever/i.test(mg),
+      'V13.149 짝 맞추기: 콤보 단계 문구 · 음이 올라가는 정답음, 연속 3쌍 피버 타임은 연출만(시간 규칙은 그대로)');
+    assert(mg.includes('function finale(mx, my, ms)') && mg.includes("el.classList.add('slow')") && css.includes('.mt-card.hit.slow{animation-duration:.66s') && mg.includes("plus.textContent = '+1초'") && mg.includes("restart($('mt-flash'), 'on')"),
+      'V13.149 짝 맞추기: 마지막 한 쌍 슬로모션, 틀리면 빨간 번쩍 · +1초가 시계로 날아간다');
+    assert(mg.includes("matchPick(M.words, { missed: loadMissed() })") && mg.includes('sumus-match-missed:') && mg.includes('헷갈린 단어') && mg.includes("$('mt-stamp')?.classList.add('in')") && mg.includes('function flyCoins(from, coins)') && mg.includes("box.querySelector('.mt-rewards .coin b i')") && mg.includes('<div class="mt-res-ghost') && mg.includes('낚시 미끼'),
+      'V13.149 짝 맞추기 결과: 별 도장 · 신기록 도장 · 코인이 지갑으로 날아감 · 미끼, 틀린 단어는 복습 카드로 보이고 다음 판에 먼저 나온다');
+    assert(mg.includes('<div class="mt-podium">${pod(2)}${pod(1)}${pod(3)}</div>') && mg.includes("mine.scrollIntoView(") && mg.includes('까지 <em>') && css.includes('@keyframes mt-pod-rise'),
+      'V13.149 짝 맞추기 순위: 1 · 2 · 3등 시상대가 올라오고, 내 줄을 강조해 보여 주고, 바로 위 친구와의 차이를 보여 준다');
+    assert(["petSay('sad'", "petSay('happy'", "'cheer'"].every(t => mg.includes(t)) && mg.includes("avatar(p.key, { form: Math.max(1, p.form ?? 1), expression, size })"),
+      'V13.149 짝 맞추기: 펫이 콤보 · 피버 · 틀림 · 결과에 맞춰 응원 · 기쁨 · 시무룩 표정과 말풍선');
+    assert(['card-flip', 'swoosh', 'stamp', 'correct', 'wrong', 'combo', 'pop', 'crit', 'clear', 'ult-riser', 'warn-beep', 'dmg-tick', 'fanfare-epic', 'fanfare-basic', 'coin', 'coins'].every(k => SOUND_GAIN[k] && mg.includes(`'${k}'`))
+      && mg.includes('const sfx = (key, opts) => { if (soundOn()) playSound(key, opts); };') && mg.includes('const buzz = p => { try { if (soundOn()) navigator.vibrate?.(p); } catch {} };') && mg.includes('const VIBE = { hit: 15, miss: [30, 40, 30], fever: [20, 30, 60]'),
+      'V13.149 짝 맞추기 소리 · 진동: 순간마다 효과음(새 소리 3개 포함), 진동 패턴, 소리 끄기 설정을 지킨다');
+    assert(css.includes('@media (prefers-reduced-motion:reduce)') && css.includes('.mt-app *,.mt-app *::before,.mt-app *::after') && mg.includes('const LITE = (navigator.hardwareConcurrency || 8) <= 4') && mg.includes('function fitText()') && css.includes('-webkit-line-clamp:2') && mg.includes("root().onpointerdown = onPointer") && css.includes('.mt-vs{position:fixed;left:50%;top:calc(50% + 70px);z-index:6;pointer-events:none;') && css.includes('.mt-starnow i.lost,.mt-mark.lost i{opacity:.15}'),
+      'V13.149 짝 맞추기: 동작 줄이기, 저사양 폰은 조각을 줄이고, 긴 뜻은 2줄 · 넘치면 더 작게, 카드는 손가락이 닿는 순간 고른다');
+    assert(!/transition:[^;}]*\b(left|top|width|height|margin)\b/.test(css.slice(css.indexOf('/* ---------- 짝 맞추기'), css.indexOf('/* 낚시 화면이 같이 쓰던'))) && !/\.mg-(card|clock|count|go|top)\b/.test(css),
+      'V13.149 짝 맞추기 움직임은 transform · opacity 위주(자리 · 크기 transition 없음), 단어 미니게임의 mg- 클래스와 겹치지 않는다');
+    const art30 = ['30a-match-background.txt', '30b-match-ui.txt'].flatMap(f => source(`../docs/asset-requests/runner/${f}`).trim().split('\n---\n'));
+    const codex30 = source('../docs/asset-requests/runner/CODEX_PROMPT_30.md'), map = source('../docs/asset-requests/runner/slice-map.csv');
+    const names = ['bg', 'card-en', 'card-ko', 'card-back', 'star', 'ribbon', 'stamp', 'podium', 'fever'];
+    assert(art30.length === 3 && art30.every(t => t.includes('STYLE REFERENCE — before drawing, open') && /named exactly "30[ab]-\d\.png"/.test(t) && t.includes('"SUMUS 짝 맞추기 30 (Runner용)"') && t.includes('showing the picture in the chat is not enough'))
+      && codex30.includes('Drive의 기존 그림을 열어 그림체를 맞춘다') && codex30.includes('정해진 Drive 폴더 "SUMUS 짝 맞추기 30 (Runner용)"에 정확한 파일 이름') && names.every(n => map.includes(`public/assets/match/${n}.webp`) && mg.includes(`'${n}'`) && css.includes(`--art-${n}`))
+      && mg.includes('export const MATCH_ART = new Set([') && mg.includes('--art-${n}:url(/assets/match/${n}.webp)'),
+      'V13.149 그림 주문서 30(짝 맞추기, 29는 낚시): Drive의 기존 그림을 열어 그림체를 맞추고 정해진 폴더에 정확한 이름으로 저장, 그림이 오면 MATCH_ART에 이름만 넣어 갈아 끼운다');
+    const pub = new URL('../public/', import.meta.url);
+    const matchArt = (mg.match(/MATCH_ART = new Set\(\[([^\]]*)\]\)/)?.[1] || '').match(/'([a-z-]+)'/g)?.map(x => x.slice(1, -1)) || [];
+    assert(matchArt.every(n => existsSync(new URL(`assets/match/${n}.webp`, pub))), 'V13.149 MATCH_ART에 적힌 그림은 파일이 있어야 한다');
   }
 }

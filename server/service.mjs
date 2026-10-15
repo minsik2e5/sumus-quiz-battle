@@ -33,7 +33,7 @@ import { settleDungeonRecords, dungeonBoardsView, dungeonLastView } from './dung
 import packageInfo from '../package.json' with { type: 'json' };
 import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend, reelSeaPet } from './reel.mjs';
 import { REEL } from '../public/modules/reel-rules.js';
-import { matchStart, matchFinish, matchView, matchBoard } from './games.mjs';
+import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './games.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
 import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, settleParty, partyReportPending, undoParty } from './party.mjs';
 import { PARTY } from './party-engine.mjs';
@@ -1714,12 +1714,13 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!asked.length) fail('단어 범위를 골라주세요.');
     if (scopedWords(state, ctx.school.id, asked, p.class_name).length < 8) fail('단어가 8개 이상 되게 범위를 골라주세요.', 409);
     const now = Date.now();
-    return matchStart(p, { id: id(), codes: asked, now, weekKey: gameWeekKey(now) });
+    const weekKey = gameWeekKey(now);
+    return { ...matchStart(p, { id: id(), codes: asked, now, weekKey }), ghost: matchGhost(state.profiles, p, weekKey, { hidden: isPrivate }) };
   }
   if (path === '/games/match/finish' && method === 'POST') {
     requireRole(p, 'student');
     const now = Date.now();
-    const result = matchFinish(p, { id: str(body.id, 80), ms: Number(body.ms), misses: Number(body.misses), pet: activePetKey(state, p.id), now, weekKey: gameWeekKey(now) });
+    const result = matchFinish(p, { id: str(body.id, 80), ms: Number(body.ms), misses: Number(body.misses), splits: Array.isArray(body.splits) ? body.splits.slice(0, 12) : null, pet: activePetKey(state, p.id), now, weekKey: gameWeekKey(now) });
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
   if (path === '/games/match/board' && method === 'GET') {
