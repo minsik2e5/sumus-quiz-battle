@@ -9,6 +9,7 @@ import { luckyCard, luckyShow, machineSpin, machineDrop, unlockSound } from './l
 import { rpsCard, rpsMatch } from './rps.js';
 import { stocksCard, loadMarket, openStock, startStockClock } from './stocks.js';
 import { RPS_BETS } from './rewards.js';
+import { gamesSection } from './arcade-games.js';
 
 // 놀이터: the coin capsule (코인 뽑기, V13.68) and the egg shop, plus the decorations kept from the retired V13.67 capsule machine (모은 꾸미기, under 나). The server
 // decides everything (server/rewards.mjs); this module draws `[data-arcade]` and keeps it up to
@@ -43,9 +44,9 @@ const tierTag = tier => `<span class="ga-tier t-${tier}">${GACHA_TIERS[tier].nam
 
 /* ---------- page ---------- */
 export function arcadePage(A) {
-  return `<div class="page-heading arcade-head">${uiArt('arcade', 'arcade-head-art')}<span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>모은 코인으로 코인 뽑기, 가위바위보, 알 상점을 즐겨요.</p></div>
+  return `<div class="page-heading arcade-head">${uiArt('arcade', 'arcade-head-art')}<span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>낚시 · 짝 맞추기 · 교실 게임, 그리고 모은 코인으로 뽑기와 알 상점.</p></div>
     <button type="button" class="arcade-wallet" data-action="coins" aria-label="코인 지갑 열기"><span>${coin()}<b id="ga-balance">${num(A.data.stats?.points_balance || 0)}</b> 코인</span><small>코인 지갑 ${icon('chevron')}</small></button>
-    ${reelEntry(A)}
+    ${gamesSection(A, reelEntry(A))}
     <div data-arcade></div>`;
 }
 // V13.150 놀이터 낚시터 입구(손맛 낚시, reel.js).

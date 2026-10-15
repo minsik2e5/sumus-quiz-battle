@@ -1,0 +1,10 @@
+/* V13.151 메뉴 정리: 야차전은 겨루기 4탭(대결 · 몬스터 · 던전 · 기록), 놀이터는 '게임'과 '상점 · 뽑기' 두 묶음. */
+.yl-tabs{grid-template-columns:repeat(4,minmax(0,1fr))}
+.ag-group{display:grid;gap:12px;margin-bottom:6px}
+.ag-head{margin:18px 2px 8px;font-size:15px;font-weight:900;letter-spacing:.02em;color:var(--muted,#5d6b75)}
+.ag-group .ag-head{margin:6px 2px 0}
+.ag-words{grid-column:1/-1;display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.16);color:#fff;font-size:13px}
+.ag-words span{opacity:.85}
+.ag-words b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ag-words b.need{color:#fde68a}
+.ag-words .btn.small{flex:none}

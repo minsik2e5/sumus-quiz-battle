@@ -30,7 +30,8 @@ export function runYachaTabChecks(assert) {
 
   /* ---------- 탭 4개 한 줄 · 기록 안에 [리그 | 내 전적] ---------- */
   // V13.149: 게임 탭(짝 맞추기 · 단어 낚시 · 교실 게임 참가)이 던전 다음에 들어와 다섯 개가 됐다(server/games-check.mjs).
-  assert(battle.includes("const LOBBY_TABS = [['play', '대결', 'nav-yacha'], ['monster', '몬스터', 'monster-tab'], ['dungeon', '던전', 'dungeon-tab'], ['games', '게임', 'arcade'], ['record', '기록', 'trophy-s']];"), 'V13.132 · V13.149 야차전 탭은 대결 · 몬스터 · 던전 · 게임 · 기록이고, 탭마다 앱 그림(nav-yacha · monster-tab · dungeon-tab · arcade · trophy-s)');
+  // V13.151: 게임 탭은 놀이터로 옮겨서 다시 네 개(대결 · 몬스터 · 던전 · 기록)다.
+  assert(battle.includes("const LOBBY_TABS = [['play', '대결', 'nav-yacha'], ['monster', '몬스터', 'monster-tab'], ['dungeon', '던전', 'dungeon-tab'], ['record', '기록', 'trophy-s']];"), 'V13.132 · V13.151 야차전 탭은 대결 · 몬스터 · 던전 · 기록이고, 탭마다 앱 그림(nav-yacha · monster-tab · dungeon-tab · trophy-s)');
   assert(['nav-yacha', 'monster-tab', 'dungeon-tab', 'trophy-s', 'mode-speed', 'mode-skill', 'coin', 'stopwatch', 'study-vocab'].every(key => existsSync(path(`../public/assets/ui/${key}.webp`))), 'V13.132 새 화면이 쓰는 앱 그림 파일이 모두 있다');
   assert(css.includes('.yl-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))') && /\.yl-tab-art\{width:26px;height:26px/.test(css) && source('../public/v13149.css').includes('.yl-tabs{grid-template-columns:repeat(5,minmax(0,1fr))'), 'V13.132 탭은 한 줄 격자(V13.149부터 5칸), 그림은 26px');
   assert(battle.includes("key === 'league' || key === 'me' ? 'record'") && battle.includes("recordSub: startTab === 'me' ? 'me' : 'league'"), 'V13.132 이전 탭 이름(league · me)은 기록 탭으로 열린다');
@@ -81,5 +82,5 @@ export function runYachaTabChecks(assert) {
   assert(!/\.dg-friend/.test(source('../public/v13128.css')) && !/\.yb-friend/.test(source('../public/v1361.css') + source('../public/v1366.css')), 'V13.132 던전 초대 창에서 펫 그림을 가로로 늘리던 규칙(.dg-friend > div { flex: 1 })이 없다');
 
   /* ---------- 묶음 CSS ---------- */
-  assert(/"v13130\.css",\s*"v13132\.css"(,\s*"v13133\.css")?(,\s*"v1314\d\.css")*(,\s*"v13150\.css")?\s*]/.test(build), 'V13.132 v13132.css는 야차전 화면 CSS 중 맨 끝(앞 화면 CSS를 덮어쓰는 자리). V13.133 v13133.css는 던전 가로 안내 전용, V13.14x CSS(가입 코드 등) · V13.150 낚시(v13150.css)는 야차전과 겹치지 않아 그 뒤에 와도 된다');
+  assert(/"v13130\.css",\s*"v13132\.css"(,\s*"v13133\.css")?(,\s*"v1314\d\.css")*(,\s*"v13150\.css")?(,\s*"v13151\.css")?\s*]/.test(build), 'V13.132 v13132.css는 야차전 화면 CSS 중 맨 끝(앞 화면 CSS를 덮어쓰는 자리). V13.133 v13133.css는 던전 가로 안내 전용, V13.14x CSS(가입 코드 등) · V13.150 낚시(v13150.css)는 야차전과 겹치지 않아 그 뒤에 와도 된다');
 }
