@@ -45,7 +45,17 @@ const tierTag = tier => `<span class="ga-tier t-${tier}">${GACHA_TIERS[tier].nam
 export function arcadePage(A) {
   return `<div class="page-heading arcade-head">${uiArt('arcade', 'arcade-head-art')}<span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>모은 코인으로 코인 뽑기, 가위바위보, 알 상점을 즐겨요.</p></div>
     <button type="button" class="arcade-wallet" data-action="coins" aria-label="코인 지갑 열기"><span>${coin()}<b id="ga-balance">${num(A.data.stats?.points_balance || 0)}</b> 코인</span><small>코인 지갑 ${icon('chevron')}</small></button>
+    ${reelEntry(A)}
     <div data-arcade></div>`;
+}
+// V13.150 놀이터 낚시터 입구(손맛 낚시, reel.js).
+function reelEntry(A) {
+  const v = A.data.rewards?.reel || {};
+  return `<button type="button" class="rl-entry" data-action="reel-open" aria-label="낚시터 들어가기">
+    <span class="rl-entry-sea" aria-hidden="true"><i class="w1"></i><i class="w2"></i><i class="rl-entry-bob"></i></span>
+    <span class="rl-entry-copy"><small>NEW · 손맛 낚시</small><strong>낚시터</strong><em>공부로 받은 미끼로 낚고, 물고기를 진주로 바꿔요</em></span>
+    <span class="rl-entry-stat"><b>🪱 ${num(v.bait || 0)}</b><small>미끼</small></span>
+  </button>`;
 }
 // V13.68: decorations pulled from the retired capsule machine, under 나 (only for their owners).
 export function gachaBookPage() {
@@ -247,7 +257,7 @@ export function attendanceMoment(res, onArcade) {
     <div class="att-moment-stamp" aria-hidden="true"><span>출석</span><b>${res.stamp}</b></div>
     <h2>출석 완료!</h2>
     <p class="att-moment-coins">${coin()}+${num(res.coins)}</p>
-    ${res.tickets ? `<p class="att-moment-ticket">7번째 도장 보너스 · <b>뽑기권 ${res.tickets}장</b>을 받았어요!</p>` : `<p>${res.attendance.streak >= 2 ? `${res.attendance.streak}일 연속 출석 중!` : '내일 또 도장을 찍어요.'} 내일은 ${coin()}${num(res.attendance.next)}</p>`}
+    ${res.tickets ? `<p class="att-moment-ticket">7번째 도장 보너스 · <b>뽑기권 ${res.tickets}장</b>${res.streak_guard ? ' + <b>연속 보호권 1장</b>' : ''}을 받았어요!</p>` : `<p>${res.attendance.streak >= 2 ? `${res.attendance.streak}일 연속 출석 중!` : '내일 또 도장을 찍어요.'} 내일은 ${coin()}${num(res.attendance.next)}</p>`}
     <div class="att-moment-actions">${res.tickets ? '<button type="button" class="btn primary full" data-att="arcade">뽑으러 가기</button>' : ''}<button type="button" class="btn full${res.tickets ? '' : ' primary'}" data-att="close">확인</button></div>
   </div>`;
   box.onclick = e => {

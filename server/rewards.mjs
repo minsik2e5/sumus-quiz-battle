@@ -45,7 +45,9 @@ export function rewardIncome(p) {
   return Number(p?.attendance?.coins || 0) + Number(p?.gacha?.refund || 0) + Number(p?.chance?.paid || 0) + Number(p?.lucky?.paid || 0) + chanceRefund(p)
     + Number(p?.title_reward?.total || 0) + Number(p?.gift_box?.total || 0)
     // V13.82: 가위바위보 pay-outs and shares sold in 문법 증권거래소 (bets and buys are points_spent).
-    + Number(p?.rps?.paid || 0) + Number(p?.stocks?.paid || 0);
+    + Number(p?.rps?.paid || 0) + Number(p?.stocks?.paid || 0)
+    // V13.150: 낚시터 진주로 바꾼 코인.
+    + Number(p?.reel?.coins || 0);
 }
 
 /* ---------- V13.73 title coins ---------- */
@@ -466,8 +468,8 @@ function trimReceipts(list, now) {
   const cut = now - RECEIPT_DAYS * DAY_MS;
   return list.filter(x => x?.id && Number(x.at || 0) >= cut).slice(-RECEIPT_KEEP);
 }
-const findReceipt = (b, kind, id) => (id && Array.isArray(b?.done) ? b.done.find(x => x.id === id && x.k === kind) : null) || null;
-function keepReceipt(b, kind, id, result, now) {
+export const findReceipt = (b, kind, id) => (id && Array.isArray(b?.done) ? b.done.find(x => x.id === id && x.k === kind) : null) || null;
+export function keepReceipt(b, kind, id, result, now) {
   b.done = trimReceipts([...(Array.isArray(b.done) ? b.done : []).filter(x => !(x?.id === id && x.k === kind)), { id, k: kind, at: now, r: result }], now);
   return result;
 }

@@ -915,6 +915,7 @@ function finishPracticeView() {
     ${x.left_out ? `<div class="result-note test-left-out-v1376">시험 중에 화면을 ${Number(x.leaves || TEST_LEAVE_LIMIT)}번 나가서 지금까지 푼 답으로 자동 제출됐어요.</div>` : ''}
     <div class="result-reward-card result-reward-top"><div><span>코인</span><strong><i class="coin-ico" aria-hidden="true"></i>+${Number(x.reward_points || 0)}</strong></div><div><span>경험치</span><strong>+${Number(x.xp || 0)}</strong></div></div>
     ${x.reward_note ? `<p class="result-reward-note-v1373">${esc(x.reward_note)}</p>` : ''}
+    ${x.bait ? '<p class="result-bait-v13150">🪱 낚시 미끼 +1 · 놀이터 낚시터에서 써요!</p>' : ''}
     ${rewardEventResult(x)}
     <p class="result-next-copy">${esc(statusText)}</p>
     ${primaryCta}
@@ -949,7 +950,7 @@ function finishPracticeView() {
       leaveSession();
       A.studyView = 'vocab'; A.tab = 'practice'; A.mode = x.mode || 'write_meaning'; A.practiceRunMode = 'practice';
       if (A.data.profile.division === 'middle') {
-        // V13.149 중학생도 단어 학습의 '오늘 외울 단어'로 그 판의 단어를 고른다.
+        // V13.150 중학생도 단어 학습의 '오늘 외울 단어'로 그 판의 단어를 고른다.
         const code = String(x.range_codes?.[0] || A.middleRange || ''), ids = new Set((x.word_ids || []).filter(Boolean));
         const lessonWords = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === code);
         A.middleRange = code; A.memorizeRange = code;

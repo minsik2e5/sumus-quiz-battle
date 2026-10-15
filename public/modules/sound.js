@@ -15,7 +15,9 @@ export const SOUND_GAIN = {
   // 보스 기 모으기 · 경고 · 내려찍기 · 포효 · 쓰러짐, 방패, 합동 필살, 영어 쓰기 글자 칸, 기절 · 부활, 10콤보.
   'atk-star': .6, 'atk-leaf': .65, 'atk-wind': .6, 'hit-star': .75, 'hit-leaf': .75, 'hit-wind': .75, 'dmg-tick': .4, crit: .85,
   'boss-charge': .75, 'warn-beep': .45, 'boss-slam': .9, 'shield-block': .8, 'ult-riser': .8, 'ult-impact': .95, 'boss-roar': .9,
-  'type-key': .5, 'type-ok': .55, 'type-wrong': .4, 'spell-done': .7, faint: .6, revive: .7, 'combo-10': .7, 'boss-down': .9
+  'type-key': .5, 'type-ok': .55, 'type-wrong': .4, 'spell-done': .7, faint: .6, revive: .7, 'combo-10': .7, 'boss-down': .9,
+  // V13.149 짝 맞추기 고퀄(docs/sound/match-synth.mjs): 카드 뒤집기 · 날아가기 · 도장.
+  'card-flip': .5, swoosh: .55, stamp: .85
 };
 export const SOUND_KEYS = Object.keys(SOUND_GAIN);
 // 첫 터치 때 미리 받아 두는 작은 소리(자주 쓰이는 것). 큰 팡파르는 연출이 시작될 때 preloadSound로 받는다.

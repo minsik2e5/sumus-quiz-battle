@@ -12,6 +12,7 @@ import { arcadePage, gachaBookPage, capsuleArt } from './arcade.js';
 import { petBookPage } from './petbook.js';
 import { ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, GACHA_ITEMS, GACHA_TIERS } from './rewards.js';
 import { rewardEventBanner } from './reward-events-ui.js';
+import { streakCard } from './streak-guard-ui.js';
 // V13.68 menu: what students do. 학습 holds word study, tests and records; 나 holds what they
 // collect. Pages without their own button light up the one they belong to.
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['yacha', '야차전', 'battle'], ['arcade', '놀이터', 'arcade'], ['me', '나', 'user']];
@@ -412,7 +413,7 @@ function attendanceCard(A) {
   return `<section class="att-card${a.done ? ' done' : ''}" aria-label="출석 체크">
     <div class="att-head">${uiArt('attendance', 'att-art')}<div>${lead}</div>${a.done ? `<span class="att-streak">${a.streak >= 2 ? `${a.streak}일 연속` : '오늘 도장 쾅!'}</span>` : '<button type="button" class="btn primary att-btn" data-action="attend">출석하기</button>'}</div>
     <ol class="att-stamps">${stamps}</ol>
-    ${a.done ? '' : `<p class="att-foot">7번째 도장은 <b>${coin()}${ATTENDANCE_REWARDS[last]}</b> + <b>뽑기권 ${ATTENDANCE_TICKETS}장</b>! 하루에 한 번 찍어요.</p>`}
+    ${a.done ? '' : `<p class="att-foot">7번째 도장 선물 <b>${coin()}${ATTENDANCE_REWARDS[last]}</b> · <b>뽑기권 ${ATTENDANCE_TICKETS}장</b> · <b>연속 보호권 1장</b></p>`}
   </section>`;
 }
 // V13.68: this week's ranking of my grade on the home (the whole ranking opens from it).
@@ -440,6 +441,7 @@ function compactGrowth(A) {
   ${yachaAlerts(A)}
   ${resumeBar(A)}
   ${attendanceCard(A)}
+  ${streakCard(A)}
   ${rankingCard(A)}
   <section class="home-week-card home-week-v1358" aria-label="이번 주 출석">
     <span>이번 주 <b>${week.filter(day => day.active).length}일</b> · 오늘 <b>+${num(g.today_xp || 0)} 경험치</b> · <b class="home-week-coin">${coin()}+${num(g.today_reward_points || 0)}</b></span>
@@ -654,7 +656,7 @@ function grammarStudy(A) {
 }
 
 // V13.124 고등 단어 고르기: 과마다 고른 단어 id (단어 학습 A.highWordIds, 시험 A.highExamWordIds).
-// V13.149 중학생도 같은 고르기와 저장을 쓴다(학생은 중학생 · 고등학생 중 하나라 과 코드가 섞이지 않는다).
+// V13.150 중학생도 같은 고르기와 저장을 쓴다(학생은 중학생 · 고등학생 중 하나라 과 코드가 섞이지 않는다).
 // 폰에 저장한다(중학교 middleWordIds와 같은 방식). 처음 여는 과는 앞 20개, 시험은 단어 학습에서 고른 단어를 한 번 복사.
 export const HIGH_PICK_DEFAULT = 20, HIGH_PICK_CHUNK = 20, HIGH_EXAM_MAX = 200;
 export const HIGH_PICK_STORES = { memo: 'highWordIds', exam: 'highExamWordIds' };
@@ -665,7 +667,7 @@ export function highLessonPick(A, scope, code, lessonWords) {
   const valid = new Set(lessonWords.map(word => word.id));
   let ids = A[store][key];
   if (!Array.isArray(ids)) {
-    // V13.149 중학생이 예전 시험 화면에서 고른 단어(middleWordIds, 그 과)를 먼저 이어받는다.
+    // V13.150 중학생이 예전 시험 화면에서 고른 단어(middleWordIds, 그 과)를 먼저 이어받는다.
     const legacy = scope === 'exam' && String(A.middleRange || '') === key ? (A.middleWordIds || []).filter(id => valid.has(id)) : [];
     const seed = scope === 'exam' ? (legacy.length ? legacy : (A.highWordIds?.[key] || []).filter(id => valid.has(id))) : [];
     ids = seed.length ? [...seed] : lessonWords.slice(0, HIGH_PICK_DEFAULT).map(word => word.id);
@@ -686,7 +688,7 @@ function highSchoolMemorizeState(A) {
   const { words, codes, selected } = getRanges(A);
   const normalized = codes.map(code => String(code));
   const selectedFirst = selected.map(code => String(code)).find(code => normalized.includes(code));
-  // V13.149 중학생도 같은 고르기를 쓴다. 처음에는 마지막으로 본 과(middleRange)부터.
+  // V13.150 중학생도 같은 고르기를 쓴다. 처음에는 마지막으로 본 과(middleRange)부터.
   const middleFirst = A.data.profile.division === 'middle' && normalized.includes(String(A.middleRange || '')) ? String(A.middleRange) : '';
   if (!normalized.includes(String(A.memorizeRange || ''))) A.memorizeRange = middleFirst || selectedFirst || normalized[0] || '';
   const code = String(A.memorizeRange || '');
@@ -700,7 +702,7 @@ function highSchoolMemorizeState(A) {
     pickedWords: lessonWords.filter(word => chosen.has(word.id))
   };
 }
-// V13.124: 고등은 고른 단어만 목록·카드에 나온다(★ 어려운 단어 보기는 그 과의 별표 전체). V13.149 중학생도 같다.
+// V13.124: 고등은 고른 단어만 목록·카드에 나온다(★ 어려운 단어 보기는 그 과의 별표 전체). V13.150 중학생도 같다.
 function memorizationScope(A) {
   const state = highSchoolMemorizeState(A);
   return { words: state.pickedWords, starPool: state.lessonWords };
@@ -721,7 +723,7 @@ export function toggleHighChunk(lessonWords, ids, from) {
   chunk.forEach(id => full ? set.delete(id) : set.add(id));
   return lessonWords.filter(word => set.has(word.id)).map(word => word.id);
 }
-// V13.149 과 이름: 중학생은 'N과'(고등 rangeLabel은 '5번'이 된다).
+// V13.150 과 이름: 중학생은 'N과'(고등 rangeLabel은 '5번'이 된다).
 const lessonLabel = (A, code) => A.data.profile.division === 'middle' ? `${code}과` : rangeLabel(A.school, code);
 // V13.127 과 칩: 고른 개수와 얇은 진행 막대.
 function highLessonChip(A, { code, total, picked, on, attr }) {
@@ -780,7 +782,7 @@ function memorizationPanel(A) {
   const allShown = A.memorizeShowAll === true;
   const rangeUi = middle
     ? (() => {
-        // V13.149 중학생도 고등학생과 같은 과 칩(고른 개수 · 진행 막대)과 고르기 카드.
+        // V13.150 중학생도 고등학생과 같은 과 칩(고른 개수 · 진행 막대)과 고르기 카드.
         const state = highSchoolMemorizeState(A);
         return `<div class="memorize-range-strip hp-strip-v13127" role="tablist" aria-label="학습 범위">${state.codes.map(range => {
           const code = String(range), lessonWords = state.words.filter(word => String(word.range_code) === code);
@@ -913,7 +915,7 @@ function mePage(A) {
     ${meNotify(A)}`;
 }
 // V13.124 고등 시험: 보이는 과(시험·교과서/모의고사 탭)에서 고른 단어를 합친다. 개수 = 고른 단어 수.
-// V13.149 중학생도 같다(시험 구분 · 모의고사/교과서 탭 없이 모든 과).
+// V13.150 중학생도 같다(시험 구분 · 모의고사/교과서 탭 없이 모든 과).
 export function highExamSelection(A) {
   const state = getRanges(A), middle = A.data.profile.division === 'middle';
   const period = middle ? null : activePeriod(A, state.codes), periodCodes = state.codes.filter(code => inPeriod(A, period, code));
@@ -954,7 +956,7 @@ function exam(A) {
   let scopeUi = '', count = 0, scopeLabel = '', over = false;
   {
     // V13.124: 과 칩을 누르면 그 과의 빠른 버튼과 체크 목록이 열리고, 여러 과에서 고른 단어가 합쳐진다.
-    // V13.149 중학생도 같은 화면(처음 여는 과는 마지막으로 본 과).
+    // V13.150 중학생도 같은 화면(처음 여는 과는 마지막으로 본 과).
     let sel = highExamSelection(A);
     if (!sel.lessons.some(lesson => lesson.code === String(A.highExamOpen || ''))) A.highExamOpen = (middle && sel.lessons.some(lesson => lesson.code === String(A.middleRange || '')) ? String(A.middleRange) : sel.lessons[0]?.code) || '';
     const openLesson = sel.lessons.find(lesson => lesson.code === String(A.highExamOpen));

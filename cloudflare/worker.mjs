@@ -1,4 +1,4 @@
-import { service, sweep, preauthenticateLogin, settleBattle, battleReportPending, undoDungeon, runEveningReminders } from '../server/service.mjs';
+import { service, sweep, preauthenticateLogin, settleBattle, battleReportPending, undoDungeon, runEveningReminders, settlePartyReport, partyReportPending, undoParty } from '../server/service.mjs';
 import { createDungeonReporter } from '../server/dungeon-reports.mjs';
 import { sendPush } from '../server/push.mjs';
 import { dropEndpoints } from '../server/notify.mjs';
@@ -7,6 +7,9 @@ export { BattleRoom };
 // V13.128 던전 방: 파티 하나에 방 하나.
 import { DungeonRoom, dungeonReportKey } from './dungeon-room.mjs';
 export { DungeonRoom };
+// V13.149 교실 게임 방(보물 사냥 · 반 전체 낚시): 판 하나에 방 하나.
+import { PartyRoom, partyReportKey } from './party-room.mjs';
+export { PartyRoom };
 import { selfSignup, checkSignupCode, signupCodeGuard } from '../server/signup.mjs';
 import { examAdmin } from '../server/exam-admin.mjs';
 import { migrateState, stateSizeReport } from '../server/state.mjs';
@@ -15,6 +18,7 @@ import { createMutationCoordinator, NO_MUTATION } from '../server/mutation-coord
 import { createLocalRepository, createSupabaseSync } from './local-first.mjs';
 import { partitionState, assembleState, hashText } from './state-parts.mjs';
 import { WRITE_WARN_PCT } from './cf-limits.mjs';
+import { testSeedState, applyTestSeed } from '../server/test-seed.mjs';
 
 // V13.144 쓰기 모으기: 저장이 연달아 오면 이 시간(ms) 안에 온 변경을 한 번에 쓴다. 오늘 쓴 양이 70%를 넘으면 2배,
 // 90%를 넘으면 4배로 늘린다. 쉬고 있다가 온 저장은 기다리지 않는다. env.VOCA_COMMIT_GROUP_MS로 바꿀 수 있다.
@@ -151,6 +155,29 @@ function createSupabaseRepository(env) {
   };
 }
 
+// V13.149 테스트 앱(env.test, VOCA_STANDALONE=1): Supabase 없이 이 Durable Object 안에만 저장한다.
+// 운영 Supabase 주소 · 키 · 비밀값을 쓰지 않는다. 처음 켤 때만 테스트 계정 데이터(server/test-seed.mjs)를 준다.
+// 백업 번호만 저장해 두어, 한 번 저장한 뒤에는 처음 데이터로 되돌아가지 않는다(번호가 있으면 read가 실패 → 로컬 사본으로 시작).
+const STANDALONE_REV = 'standalone:rev';
+export function createStandaloneRepository(storage) {
+  const revision = async () => Number(await storage.get(STANDALONE_REV)) || 0;
+  const bump = async from => { const next = Math.max(await revision(), Number(from) || 0) + 1; await storage.put(STANDALONE_REV, next); return next; };
+  const none = () => Object.assign(Error('테스트 앱은 외부 백업을 쓰지 않습니다.'), { status: 404 });
+  return {
+    standalone: true,
+    async read() {
+      if (await revision()) throw Object.assign(Error('테스트 앱: 로컬 사본으로 시작합니다.'), { status: 503 });
+      return { revision: 0, state: await testSeedState() };
+    },
+    readRevision: revision,
+    commitSerialized: (json, rev) => bump(rev),
+    // 파트 백업은 없다(404): 동기화는 commitSerialized 하나만 쓴다.
+    async partsRevision() { throw none(); },
+    async readParts() { return { revision: 0, parts: {} }; },
+    async patchParts() { throw none(); }
+  };
+}
+
 // V13.131: 시작(blockConcurrencyWhile, Cloudflare 제한 30초) 안에서 Supabase를 기다리는 시간은 모두 합쳐
 // BOOT_BUDGET_MS까지. 예전에는 파트 번호(12초) + 파트 읽기(20초)처럼 이어지면 32초가 되어 시작이 끊길 수 있었다.
 // 시간이 모자라면 로컬 사본으로 시작한다. 로컬 사본이 없을 때만 남은 시간이 적어도 v12 사본을 5초 더 기다린다.
@@ -176,7 +203,7 @@ export class VocaStateObject {
     this.rates = new Map();
     this.bootWarning = null;
     this.ready = ctx.blockConcurrencyWhile(async () => {
-      this.supabase = createSupabaseRepository(env);
+      this.supabase = env.VOCA_STANDALONE === '1' ? createStandaloneRepository(ctx.storage) : createSupabaseRepository(env);
       this.local = createLocalRepository(ctx.storage);
       if (this.local.migrationError()) this.bootWarning = `옛 저장 방식으로 읽었어요(옮기기 실패): ${this.local.migrationError()}`.slice(0, 300);
       const syncInterval = Number(env.SUPABASE_SYNC_MIN_INTERVAL_MS ?? SYNC_MIN_INTERVAL_MS);
@@ -190,10 +217,12 @@ export class VocaStateObject {
       try {
         const working = structuredClone(initial.state);
         const migrated = migrateState(working);
+        // 테스트 앱: 새 판의 테스트 계정 · 펫 · 미끼를 덧붙인다(운영에서는 부르지 않는다).
+        const seeded = env.VOCA_STANDALONE === '1' && await applyTestSeed(working);
         // 90%를 넘은 날은 급하지 않은 정리를 다음 날로 미룬다.
         const swept = this.writeLevel() === 'defer' ? false : sweep(working);
         initial.state = working;
-        if (migrated || swept) {
+        if (migrated || swept || seeded) {
           try {
             initial.revision = await this.local.commit(working, initial.revision);
           } catch (error) {
@@ -393,6 +422,13 @@ export class VocaStateObject {
         await this.dungeonReporter(body);
         return json({ ok: true });
       }
+      // V13.149: 교실 게임 방이 끝난 판을 한 번 보고한다(같은 판은 한 번만 정산).
+      if (url.pathname === '/api/internal/party-result') {
+        if (request.headers.get('X-Party-Key') !== await partyReportKey(this.env)) throw Object.assign(Error('허용되지 않은 요청입니다.'), { status: 403 });
+        if (!partyReportPending(this.mutations.current().state, body)) return json({ ok: true });
+        await this.mutations.durable(state => settlePartyReport(state, body) ? { ok: true } : NO_MUTATION);
+        return json({ ok: true });
+      }
       const address = request.headers.get('CF-Connecting-IP') || 'unknown';
       const cookie = request.headers.get('cookie') || '';
       const token = cookie.split(';').map(value => value.trim()).find(value => value.startsWith('sumus_session='))?.slice(14) || '';
@@ -476,7 +512,9 @@ export class VocaStateObject {
       const pushMessages = Array.isArray(result?._push) ? result._push : [];
       // V13.128 던전 방 준비(문제와 입장표는 방에만 간다).
       const dungeonMessages = result?._dungeon ? [result._dungeon] : [];
-      if (result && typeof result === 'object') { delete result._battle; delete result._battles; delete result._push; delete result._dungeon; }
+      // V13.149 교실 게임 방 준비(문제와 입장표는 방에만 간다).
+      const partyMessages = Array.isArray(result?._parties) ? result._parties : [];
+      if (result && typeof result === 'object') { delete result._battle; delete result._battles; delete result._push; delete result._dungeon; delete result._parties; }
       for (const message of roomMessages) {
         const room = this.env.BATTLE_ROOM.get(this.env.BATTLE_ROOM.idFromName(message.id));
         const reply = await room.fetch('https://battle/admin', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(message) }).catch(() => null);
@@ -493,6 +531,15 @@ export class VocaStateObject {
           const why = await reply?.json().catch(() => null);
           await this.mutations.durable(state => undoDungeon(state, message) ? true : NO_MUTATION);
           throw Object.assign(Error(why?.error || '던전 방을 준비하지 못했어요. 잠시 후 다시 시도해주세요.'), { status: reply && reply.status < 500 ? 409 : 503 });
+        }
+      }
+      for (const message of partyMessages) {
+        const room = this.env.PARTY_ROOM.get(this.env.PARTY_ROOM.idFromName(message.id));
+        const reply = await room.fetch('https://party/admin', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(message) }).catch(() => null);
+        if (!reply?.ok && message.action !== 'close') {
+          const why = await reply?.json().catch(() => null);
+          await this.mutations.durable(state => undoParty(state, message) ? true : NO_MUTATION);
+          throw Object.assign(Error(why?.error || '교실 게임 방을 준비하지 못했어요. 잠시 후 다시 시도해주세요.'), { status: reply && reply.status < 500 ? 409 : 503 });
         }
       }
       // After the rooms are ready: a 도전장 for a room that failed to open is never sent.
@@ -585,6 +632,14 @@ export default {
       const origin = request.headers.get('origin');
       if (origin && new URL(origin).host !== url.host) return securityHeaders(json({ error: '허용되지 않은 요청입니다.' }, 403), url.pathname);
       return env.DUNGEON_ROOM.get(env.DUNGEON_ROOM.idFromName(dungeonSocket[1])).fetch(request);
+    }
+    // V13.149 교실 게임 방 소켓(선생님 TV · 학생 폰)도 방으로 바로 간다.
+    const partySocket = url.pathname.match(/^\/api\/party\/ws\/([0-9a-f-]{36})$/);
+    if (partySocket) {
+      if (request.headers.get('Upgrade') !== 'websocket') return securityHeaders(json({ error: 'WebSocket 연결이 필요해요.' }, 426), url.pathname);
+      const origin = request.headers.get('origin');
+      if (origin && new URL(origin).host !== url.host) return securityHeaders(json({ error: '허용되지 않은 요청입니다.' }, 403), url.pathname);
+      return env.PARTY_ROOM.get(env.PARTY_ROOM.idFromName(partySocket[1])).fetch(request);
     }
     if (url.pathname.startsWith('/api/')) {
       const id = env.VOCA_STATE.idFromName('main');

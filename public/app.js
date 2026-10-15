@@ -19,6 +19,11 @@ import { LUCKY_BETS, ATTENDANCE_REWARDS, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DA
 import { TITLE_COINS } from './modules/titles.js';
 import { rewardEventModal } from './modules/reward-events-ui.js';
 import { EGG_PRICE } from './modules/core.js';
+import { openGuardSheet, maybeGuardMoment } from './modules/streak-guard-ui.js';
+import { partyCreateModal, openPartyTv } from './modules/party-tv.js';
+import { openReel } from './modules/reel.js';
+// V13.149 테스트 앱(sumus-voca-test)에서는 화면 위에 '테스트 앱' 표시를 띄워 운영과 헷갈리지 않게 한다.
+if (/^sumus-voca-test\./.test(location.hostname)) document.documentElement.classList.add('is-test-app');
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -222,6 +227,7 @@ function render() {
     $$('#yacha-host').forEach(el => { const opts = A.yachaOpts; A.yachaOpts = null; mountYacha(el, A, leaveBattle, opts); });
     queueMicrotask(() => maybePetMoment(A, petChanged));
     queueMicrotask(maybeMissedYou);
+    queueMicrotask(() => setTimeout(() => maybeGuardMoment(A), 700));
     queueMicrotask(() => maybeCardLevelUp(A));
     queueMicrotask(() => maybeTitleMoment(A, moved => { if (moved) { render(); window.scrollTo(0, 0); } else renderKeepScroll(); }));
   }
@@ -864,7 +870,7 @@ $('#app').addEventListener('click', async event => {
       A.practiceRunMode = session.run_mode === 'test' && ['write_meaning','spell'].includes(A.mode) ? 'test' : 'practice';
       A.assignmentId = null;
       if (A.data.profile.division === 'middle') {
-        // V13.149 중학생도 단어 학습의 '오늘 외울 단어'로 그 기록의 단어를 고른다.
+        // V13.150 중학생도 단어 학습의 '오늘 외울 단어'로 그 기록의 단어를 고른다.
         const code = String(session.range_codes?.[0] || A.middleRange || '');
         const recordedIds = new Set((session.answer_records || []).map(item => item.word_id).filter(Boolean));
         A.middleRange = code; A.memorizeRange = code;
@@ -892,7 +898,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'start-exam-run') {
       const runMode = A.examKind === 'test' ? 'test' : 'practice';
       A.practiceRunMode = runMode; savePreferences(); buttonBusy(b);
-      // V13.124: 고른 단어만 출제한다(개수 = 고른 단어 수, 서버 한도 200개). V13.149 중학생도 같다.
+      // V13.124: 고른 단어만 출제한다(개수 = 고른 단어 수, 서버 한도 200개). V13.150 중학생도 같다.
       const { wordIds } = highExamSelection(A);
       if (!wordIds.length) { buttonBusy(b, false); return toast('시험 볼 단어를 먼저 선택해주세요.'); }
       if (wordIds.length > HIGH_EXAM_MAX) { buttonBusy(b, false); return toast(`한 번에 최대 ${HIGH_EXAM_MAX}개까지 시험 볼 수 있어요.`); }
@@ -936,6 +942,9 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'battle') return navigate('yacha');
     if (d.action === 'coins') return walletModal();
     if (d.action === 'attend') return attend(b);
+    if (d.action === 'streak-guard') return openGuardSheet(A, () => renderKeepScroll());
+    // V13.150 놀이터 낚시터(손맛 낚시).
+    if (d.action === 'reel-open') { window.scrollTo(0, 0); return openReel(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     // V13.91 나 메뉴판: 어려운 단어 opens 단어 학습 on the ★ words; 알림 scrolls to its settings.
     if (d.action === 'me-stars') { A.tab = 'practice'; A.studyView = 'vocab'; A.memorizeFilter = 'starred'; savePreferences(); render(); window.scrollTo(0, 0); return; }
     if (d.action === 'me-notify') { const box = document.getElementById('me-notify'); box?.scrollIntoView({ behavior: 'smooth', block: 'center' }); box?.classList.add('flash-v1391'); setTimeout(() => box?.classList.remove('flash-v1391'), 1200); return; }
@@ -947,6 +956,8 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'gift') return giftModal(d.student ? [d.student] : []);
     if (d.action === 'class-tv') { A.screen = 'class-tv'; window.scrollTo(0, 0); return openClassTv(A, async () => { A.screen = null; try { await refresh(); } catch {} render(); }); }
     if (d.action === 'class-tv-link') return classTvLink();
+    // V13.149 교실 게임(보물 사냥 · 반 전체 낚시): 만들면 바로 TV 화면.
+    if (d.action === 'party-new') return partyCreateModal(A, party => { window.scrollTo(0, 0); openPartyTv(A, party, async () => { A.screen = null; try { await refresh(); } catch {} render(); }); });
     if (d.action === 'tournament-cancel') return cancelTournament(d.id, b);
     if (d.action === 'battle-cross-school') return toggleCrossSchool(b);
     if (d.action === 'trim-check') return trimCheck(b);
@@ -1386,6 +1397,7 @@ async function attend(button) {
     A.data.rewards.attendance = res.attendance;
     if (A.data.rewards.gacha) A.data.rewards.gacha.tickets = res.tickets;
     A.data.stats.points_balance = res.points_balance;
+    if (res.streak_guard) A.data.stats.streak_guard = res.streak_guard;
     renderKeepScroll();
     attendanceMoment(res, () => navigate('arcade'));
   } catch (err) { toast(err.message); if (button) button.disabled = false; }

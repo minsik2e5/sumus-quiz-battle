@@ -422,8 +422,10 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
       if (at > lastOkAt) { lastOkAt = at; lastOkMode = saved.get('supabase_last_ok_mode') || null; }
     })
     .catch(() => {});
-  function markOk(how) {
-    lastOkAt = Date.now();
+  // 이번 동기화가 로컬 meta에 적은 성공 시각을 그대로 쓴다(따로 Date.now()를 다시 읽으면 1ms 어긋날 수 있었다).
+  function markOk(how, started = 0) {
+    const noted = Number(local.status().okAt) || 0;
+    lastOkAt = noted && noted >= started ? noted : Date.now();
     lastOkMode = how;
   }
 
@@ -565,6 +567,7 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
   function run() {
     if (running) return running;
     running = (async () => {
+      const started = Date.now();
       try {
         const how = await resolveMode();
         if (how === 'parts') {
@@ -575,7 +578,7 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
           // a newer snapshot waits for the next scheduled upload.
           while (await pushFull() && interval() <= 0) { /* next snapshot */ }
         }
-        markOk(how);
+        markOk(how, started);
         failures = 0;
         lastError = null;
         pendingSince = 0;

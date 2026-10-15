@@ -29,6 +29,10 @@
       {
         "name": "DUNGEON_ROOM",
         "class_name": "DungeonRoom"
+      },
+      {
+        "name": "PARTY_ROOM",
+        "class_name": "PartyRoom"
       }
     ]
   },
@@ -50,6 +54,12 @@
       "new_sqlite_classes": [
         "DungeonRoom"
       ]
+    },
+    {
+      "tag": "v4",
+      "new_sqlite_classes": [
+        "PartyRoom"
+      ]
     }
   ],
   // V13.77 저녁 공부 알림: 10:00 UTC = 19:00 KST.
@@ -62,5 +72,29 @@
   "vars": {
     "SUPABASE_URL": "https://mrlrrzpppmdkivbozato.supabase.co",
     "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ybHJyenBwcG1ka2l2Ym96YXRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3Mjc1NjksImV4cCI6MjEwMzMwMzU2OX0.1QQtLUvNOTo5n4NRXLUV_4CxsTMqB6LCuPP60D4a2d8"
+  },
+  // V13.149 테스트 앱: `wrangler deploy --env test` → sumus-voca-test.minsik2e5.workers.dev (.github/workflows/deploy-test.yml).
+  // 운영과 다른 Worker라 저장 공간(Durable Object)도 따로다. 운영 Supabase 주소 · 키는 비우고 Supabase 없이 돈다(VOCA_STANDALONE).
+  // 저녁 알림(cron)도 끈다. vars · durable_objects는 위에서 물려받지 않으므로 여기 다시 적는다.
+  "env": {
+    "test": {
+      "name": "sumus-voca-test",
+      "triggers": {
+        "crons": []
+      },
+      "vars": {
+        "SUPABASE_URL": "",
+        "SUPABASE_ANON_KEY": "",
+        "VOCA_STANDALONE": "1"
+      },
+      "durable_objects": {
+        "bindings": [
+          { "name": "VOCA_STATE", "class_name": "VocaStateObject" },
+          { "name": "BATTLE_ROOM", "class_name": "BattleRoom" },
+          { "name": "DUNGEON_ROOM", "class_name": "DungeonRoom" },
+          { "name": "PARTY_ROOM", "class_name": "PartyRoom" }
+        ]
+      }
+    }
   }
 }
