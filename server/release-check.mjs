@@ -22,6 +22,7 @@ import { setMythicRandom } from './rewards.mjs';
 import { runMinigameChecks } from './minigame-check.mjs';
 import { runPushChecks } from './push-check.mjs';
 import { runHighPickChecks } from './high-pick-check.mjs';
+import { runMiddlePickChecks } from './middle-pick-check.mjs';
 import { runCrossSchoolChecks } from './cross-school-check.mjs';
 import { runDungeonLobbyChecks } from './dungeon-lobby-check.mjs';
 import { runYachaTabChecks } from './yacha-tab-check.mjs';
@@ -87,9 +88,9 @@ export async function runReleaseCheck() {
     assert(sessionUiSource.includes(String.fromCharCode(36, 36) + "('[data-practice-choice],#practice-confirm').forEach"), 'practice answer controls disable through the multi-node selector');
     assert(sessionUiSource.includes('practiceAdvanceTimer = setTimeout'), 'practice correct-answer auto advance is wired');
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
-    assert(studentUiSource.includes('data-middle-word=') && studentUiSource.includes('시험 볼 단어 직접 선택'), 'middle-school test setup uses direct word selection');
+    assert(!studentUiSource.includes('data-middle-word=') && studentUiSource.includes('data-high-word='), 'V13.149 middle-school test setup uses the same word picker as high school');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.148.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.149.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -1142,7 +1143,7 @@ export async function runReleaseCheck() {
     const sessionsModule = readFileSync(publicRoot + 'modules/sessions.js', 'utf8');
     const practiceEnhancements = readFileSync(publicRoot + 'practice-enhancements.js', 'utf8');
     const appJs = readFileSync(publicRoot + 'app.js', 'utf8');
-    assert(appJs.includes('if (d.middleWordAll)') && appJs.includes("input.dataset.middleWord !== undefined"), 'middle-school direct selection supports individual and all/clear controls');
+    assert(!appJs.includes('if (d.middleWordAll)') && !appJs.includes("input.dataset.middleWord !== undefined") && appJs.includes('if (d.highAll && d.highScope)') && appJs.includes('input.dataset.highWord !== undefined'), 'V13.149 middle-school selection uses the shared pick card (individual, chunk and all/clear controls)');
     assert(!appJs.includes('if (d.middleStartPicker)') && !appJs.includes('if (d.middleChunkSize)') && !appJs.includes('if (d.middleRangeMove)'), 'legacy middle-school range handlers are removed');
     const bootSource = readFileSync(fileURLToPath(new URL('./boot.mjs', import.meta.url)), 'utf8');
     const buildAssetsSource = readFileSync(fileURLToPath(new URL('./build-assets.mjs', import.meta.url)), 'utf8');
@@ -1210,7 +1211,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.148.0') && indexHtml.includes('/app.bundle.css?v=13.148.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.149.0') && indexHtml.includes('/app.bundle.css?v=13.149.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1231,7 +1232,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.148.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.149.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -1464,6 +1465,7 @@ export async function runReleaseCheck() {
     await runMinigameChecks(assert);
     await runPushChecks(assert, expectStatus);
     await runHighPickChecks(assert);
+    await runMiddlePickChecks(assert);
     await runCrossSchoolChecks(assert, expectStatus);
     await runDungeonLobbyChecks(assert, expectStatus);
     runYachaTabChecks(assert);
