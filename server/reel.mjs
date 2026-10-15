@@ -40,15 +40,19 @@ export function reelView(p, now = Date.now()) {
 // 던지기: 미끼 1개를 쓰고 물고기를 정한다. 화면에는 파이팅 세기와 그림자 크기만(어떤 물고기인지는 끌어올린 뒤에).
 export function reelCast(p, { id, cast, water = false, now = Date.now(), seed = randomBytes(4).readUInt32BE(0) }) {
   const r = reel(p);
-  if (r.live && now - r.live.at < REEL.LIVE_MS) fail('던진 낚싯대를 먼저 끌어올려 주세요.', 409);
+  // V13.150.1 같은 던지기(id)를 다시 보내면(연결이 끊겨 다시 보냄 · 화면을 다시 열어 이어 하기) 미끼를 또 쓰지 않고 같은 답.
+  const fightOf = live => { const F = FIGHT[live.rarity]; return { hp: F.hp, pull: F.pull, dash: F.dash, size: F.size, min: F.min, dist: F.dist, moves: F.moves, taps: F.taps, notes: F.notes, beat: F.beat }; };
+  if (r.live && now - r.live.at < REEL.LIVE_MS) {
+    if (id && r.live.id === id) return { id, fight: fightOf(r.live), bait: Number(r.bait || 0), again: true, at: r.live.at };
+    fail('던진 낚싯대를 먼저 끌어올려 주세요.', 409);
+  }
   if (Number(r.bait || 0) < 1) fail('미끼가 없어요. 공부하면 미끼를 받아요!', 409);
   r.bait -= 1;
   const tier = CAST_TIERS.includes(cast) ? cast : 'ok';
   const fish = reelRoll(seed, tier, { water });
   r.live = { id, at: now, cast: tier, ...fish };
-  const F = FIGHT[fish.rarity];
   // 어떤 물고기인지는 보내지 않는다: 등급마다 같은 세기 · 성격만.
-  return { id, fight: { hp: F.hp, pull: F.pull, dash: F.dash, size: F.size, min: F.min, dist: F.dist, moves: F.moves, taps: F.taps, notes: F.notes, beat: F.beat }, bait: r.bait };
+  return { id, fight: fightOf(r.live), bait: r.bait };
 }
 // 끌어올리기(또는 놓침). 놓치면 미끼는 사라진다. 같은 끝내기를 다시 보내면 같은 답.
 export function reelLand(p, { id, result, finish = null, now = Date.now(), giftId }) {
