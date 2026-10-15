@@ -260,6 +260,19 @@ export async function runGamesChecks(assert) {
         && (!RR.SEA_READY || SEA_PETS.every(x => core.CHARACTERS[x.key]?.sea && [0, 1, 2, 3].every(f => existsSync(new URL(`../public/assets/pets/${x.key}-${f}.webp`, import.meta.url))))),
         'V13.150 바다 펫 3종: 야차전 특기 있음, 알 확률표 밖, 열 때는 CHARACTERS(sea) 등록과 그림이 있어야 한다');
     }
+    // V13.150.1 끊김에 강하게: 같은 던지기 번호를 다시 보내면 미끼를 또 쓰지 않고 같은 답, 다른 번호는 409.
+    {
+      const q = { id: 'retry-test', pets: [{ key: 'dog' }], reel: { bait: 3 } };
+      const first = reelCast(q, { id: 'cast-retry-1', cast: 'good', now, seed: 7 });
+      const again = reelCast(q, { id: 'cast-retry-1', cast: 'perfect', now: now + 5000, seed: 99 });
+      assert(first.bait === 2 && again.again && again.bait === 2 && q.reel.bait === 2 && JSON.stringify(again.fight) === JSON.stringify(first.fight) && again.at === now
+        && await fails(() => reelCast(q, { id: 'cast-retry-2', cast: 'ok', now: now + 6000 }), 409),
+        'V13.150.1 같은 던지기를 다시 보내면 미끼 한 번 · 같은 물고기, 다른 던지기는 먼저 끌어올려야');
+      const reelJs = source('../public/modules/reel.js'), ui = source('../public/modules/ui.js'), svc = source('./service.mjs');
+      assert(reelJs.includes('const newCastId') && reelJs.includes('async function sendCast(id, tier)') && reelJs.includes('btn.dataset.resume') && reelJs.includes("maximum-scale=1,user-scalable=no") && reelJs.includes("addEventListener('touchend'") && reelJs.includes('visualViewport') && reelJs.includes('unlockZoom();')
+        && ui.includes('연결이 느려요. 잠시 후 다시 해 주세요.') && svc.includes("/^[a-z0-9-]{8,40}$/i.test(String(body.id || ''))"),
+        'V13.150.1 낚시: 던지기 다시 보내기 · 이어 하기, 연타 확대 막기 · 되돌리기, 끊김 문구는 한국어');
+    }
     // V13.150 첫 손맛 연습: 첫 판(또는 안내의 연습 판)은 7단계 안내, 줄이 끊기지 않고, 연습 판은 서버에 보내지 않는다. 마치면 tut 기록.
     {
       const { reelView } = await import('./reel.mjs');

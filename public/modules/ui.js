@@ -59,7 +59,9 @@ export async function api(path, body, method) {
       return data;
     } catch (error) {
       const transient = error?.name === 'AbortError' || error instanceof TypeError || error?.status >= 500;
-      lastError = Object.assign(error instanceof Error ? error : new Error('연결을 확인해주세요.'), { status: Number(error?.status || 0), transient });
+      // V13.150.1 끊김 · 시간 초과는 브라우저의 영어 문구(Fetch is aborted 등) 대신 한국어로.
+      const offline = error?.name === 'AbortError' || error instanceof TypeError;
+      lastError = Object.assign(offline ? new Error(error?.name === 'AbortError' ? '연결이 느려요. 잠시 후 다시 해 주세요.' : '연결이 끊겼어요. 인터넷을 확인해 주세요.') : error instanceof Error ? error : new Error('연결을 확인해주세요.'), { status: Number(error?.status || 0), transient });
       if (requestMethod === 'GET' && transient && attempt + 1 < attempts) { await new Promise(resolve => setTimeout(resolve, 220)); continue; }
       throw lastError;
     } finally { clearTimeout(timer); }

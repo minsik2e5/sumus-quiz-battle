@@ -56,6 +56,7 @@ export function openReel(A, exit) {
   root().onclick = onClick;
   // 길게 눌러도 사진 저장 · 복사 메뉴가 뜨지 않게(아이폰 · 안드로이드).
   root().querySelector('.rl-app').addEventListener('contextmenu', e => e.preventDefault());
+  lockZoom(root().querySelector('.rl-app'));
   window.scrollTo(0, 0);
   preloadSound(['fanfare-basic', 'fanfare-epic', 'fanfare-legend', 'crit', 'coins', 'fail', 'wiggle', 'crack', 'burst', 'ult-impact', 'ult-riser']);
   scene();
@@ -66,8 +67,39 @@ export function openReel(A, exit) {
   addEventListener('resize', R.onResize);
   if (R.v && !R.v.guide) later(() => guide(true), 400);
 }
+// V13.150.1 빠르게 연타하면 아이폰이 '두 번 탭 = 확대'로 알아듣고 화면을 키웠다(손으로도 안 돌아옴: 낚시 화면은 손가락 확대를 막아 두어서).
+// 낚시터에 있는 동안은 확대를 막고(viewport maximum-scale=1 · 두 번 탭 · 두 손가락), 이미 확대돼 있으면 원래 크기로 되돌린다.
+let viewportBefore = null;
+function lockZoom(app) {
+  const meta = document.querySelector('meta[name="viewport"]');
+  if (meta && viewportBefore === null) { viewportBefore = meta.content; meta.content = `${viewportBefore.replace(/,\s*(maximum-scale|user-scalable)=[^,]*/g, '')},maximum-scale=1,user-scalable=no`; }
+  let lastEnd = 0;
+  app.addEventListener('touchend', e => { const now = e.timeStamp || Date.now(); if (now - lastEnd < 350 && e.cancelable) e.preventDefault(); lastEnd = now; }, { passive: false });
+  app.addEventListener('dblclick', e => e.preventDefault());
+  for (const g of ['gesturestart', 'gesturechange']) app.addEventListener(g, e => e.preventDefault(), { passive: false });
+  const vv = window.visualViewport;
+  if (vv && R) {
+    R.onZoom = () => { if (vv.scale > 1.01) resetZoom(); };
+    vv.addEventListener('resize', R.onZoom);
+    R.onZoom();
+  }
+}
+function resetZoom() {
+  const meta = document.querySelector('meta[name="viewport"]');
+  if (!meta) return;
+  const c = meta.content;
+  meta.content = `${c.replace(/,\s*initial-scale=[^,]*/g, '')},initial-scale=1`;
+  setTimeout(() => { meta.content = c; window.scrollTo(0, 0); }, 60);
+}
+function unlockZoom() {
+  const meta = document.querySelector('meta[name="viewport"]');
+  if (meta && viewportBefore !== null) meta.content = viewportBefore;
+  viewportBefore = null;
+  if (R?.onZoom) window.visualViewport?.removeEventListener('resize', R.onZoom);
+}
 function closeAll() {
   if (!R) return;
+  unlockZoom();
   R.closing = true; R.timers.forEach(clearTimeout); cancelAnimationFrame(R.raf);
   if (R.onResize) removeEventListener('resize', R.onResize);
 }
@@ -281,7 +313,10 @@ function dock() {
       <button type="button" class="rl-castbtn" id="rl-cast" ${can ? '' : 'disabled'} aria-label="꾹 눌러 던지기">${art('btn-cast', '<span class="rl-castbtn-code"><i></i></span>')}</button>
       <p class="rl-cast-tip">${R.practice ? '<b>연습 판</b> · 미끼를 쓰지 않아요' : can ? '<b>꾹</b> 누르고 <b>금색</b>에서 떼기' : '미끼가 없어요'}</p>
     </div>`, 'dockhud');
-  if (!can) say('미끼는 공부하면 받아요!', 3000);
+  // 이어 하기: 끊긴 던지기(pendingCast)나 서버에 남아 있는 던지기(live)가 있으면 버튼이 '이어서 던지기'.
+  const resume = !R.practice && (R.pendingCast?.id || R.v?.live?.id);
+  if (resume) { const b = $('rl-cast'); if (b) { b.disabled = false; b.dataset.resume = resume; } const tip = document.querySelector('.rl-cast-tip'); if (tip) tip.innerHTML = '<b>던져 둔 낚싯대</b>가 있어요 · 눌러서 이어 하기'; say('아까 던진 낚싯대가 있어! 이어서 하자', 2600); }
+  else if (!can) say('미끼는 공부하면 받아요!', 3000);
   else if (!R.greeted) { R.greeted = true; later(() => say(['오늘은 큰 게 올 것 같아!', '준비됐어? 던져 보자!', '반짝이는 물결을 노려 봐!'][Math.floor(Math.random() * 3)]), 500); }
   bindCast();
 }
@@ -304,6 +339,7 @@ const zoneOf = k => k >= .86 && k <= .97 ? 'perfect' : k >= .62 ? 'good' : 'ok';
 function bindCast() {
   const btn = $('rl-cast'), arc = $('rl-arc');
   if (!btn || btn.disabled) return;
+  if (btn.dataset.resume) { btn.onpointerdown = e => { e.preventDefault(); btn.onpointerdown = null; unlockSound(); cast(.7, btn.dataset.resume); }; return; }
   let t0 = 0, holding = false, raf = 0, lastZone = '';
   const level = () => (1 - Math.cos((performance.now() - t0) / 1150 * Math.PI * 2)) / 2;
   const loop = () => {
@@ -321,8 +357,22 @@ function bindCast() {
   const release = e => { if (!holding) return; e?.preventDefault?.(); holding = false; cancelAnimationFrame(raf); btn.classList.remove('hold'); cast(level()); };
   btn.onpointerup = release; btn.onpointerleave = release; btn.onpointercancel = release;
 }
-async function cast(k) {
-  const tier = zoneOf(k);
+// V13.150.1 던지기 번호: 연결이 끊겨 다시 보내도 서버가 한 번만 처리한다(미끼가 두 번 빠지지 않는다).
+const newCastId = () => `c${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+// 서버에 던지기를 보낸다. 느리면 같은 번호로 두 번 더(그동안 '연결이 느려요'). 끝내 안 되면 null(번호는 남겨 두어 이어 하기).
+async function sendCast(id, tier) {
+  for (let i = 0; i < 3; i++) {
+    try { return await api('/reel/cast', { id, cast: tier }); }
+    catch (err) {
+      if (!R) return null;
+      if (!err.transient) { R.pendingCast = null; toast(err.message); return null; }
+      if (i < 2) { cue('<span class="rl-cue-soft">연결이 느려요… <b>다시 보내는 중</b></span>'); await new Promise(r => setTimeout(r, 900 + i * 900)); }
+    }
+  }
+  return null;
+}
+async function cast(k, resumeId = null) {
+  const tier = resumeId ? 'ok' : zoneOf(k);
   $('rl-cast') && ($('rl-cast').disabled = true);
   setPhase('cast');
   // 휙: 젖혔던 낚싯대가 앞으로(용수철이 넘어가며 출렁인다).
@@ -333,12 +383,22 @@ async function cast(k) {
   let res;
   if (R.practice) res = { id: 'practice', fight: { ...FIGHT.uncommon, min: 0 } };
   else {
-    try { res = await api('/reel/cast', { cast: tier }); }
-    catch (err) { toast(err.message); if (R) dock(); return; }
+    const id = resumeId || newCastId();
+    R.pendingCast = { id };
+    res = await sendCast(id, tier);
     if (!R) return;
+    if (!res) {
+      // 끝내 답이 없으면: 미끼가 쓰였는지 모르니 번호를 남겨 두고, 다음 던지기에서 같은 번호로 이어 한다.
+      if (R.pendingCast) toast('연결이 불안정해요. 다시 던지면 방금 던진 낚싯대를 그대로 이어서 해요(미끼는 한 번만 써요).');
+      return dock();
+    }
+    R.pendingCast = null;
     setView(res.reel);
+    if (res.again) cue('<span class="rl-cue-soft">아까 던진 낚싯대예요. <b>이어서 해요!</b></span>', '', 1800);
   }
-  R.live = { id: res.id, fight: res.fight, tier, at: performance.now(), minMs: Number(res.fight.min || 0) };
+  // 이어 하기: 서버가 던진 시각부터 센다(최소 파이팅 시간).
+  const ago = res.again && res.at ? Math.max(0, Date.now() - res.at) : 0;
+  R.live = { id: res.id, fight: res.fight, tier, at: performance.now() - ago, minMs: Number(res.fight.min || 0) };
   hud('', 'empty');
   if (tier === 'perfect') { pop('퍼펙트 캐스팅!', 'perfect'); sfx('crit', { rate: 1.2 }); buzz([20, 30, 40]); say('완벽해!'); }
   else if (tier === 'good') pop('좋은 캐스팅!', 'good');
@@ -691,6 +751,7 @@ async function lose(msg, why) {
   R.rig.spin = 0;
   if (why === 'snap') { Object.assign(R.rig, { tBend: 0, tDir: 0 }); R.rig.vbe = -14; fx('snap', ...rodGeom().tip); sfx('crack'); }
   sfx('fail'); buzz([80, 40, 80]); petFace('sad');
+  $('rl-world')?.classList.remove('zoom', 'shake');
   $('rl-shadow').classList.add('flee');
   cue('');
   R.fishPx = null;

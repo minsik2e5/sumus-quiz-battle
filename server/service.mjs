@@ -1797,7 +1797,9 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
     const now = Date.now();
-    const res = reelCast(p, { id: id(), cast: str(body.cast, 10), water: elementOf(activePetKey(state, p.id)) === 'water', now });
+    // 화면이 만든 던지기 번호(다시 보내도 한 번만). 없거나 모양이 이상하면 서버가 만든다.
+    const castId = /^[a-z0-9-]{8,40}$/i.test(String(body.id || '')) ? String(body.id) : id();
+    const res = reelCast(p, { id: castId, cast: str(body.cast, 10), water: elementOf(activePetKey(state, p.id)) === 'water', now });
     return { ...res, reel: reelView(p, now) };
   }
   if (path === '/reel/land' && method === 'POST') {
