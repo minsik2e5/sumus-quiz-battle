@@ -730,7 +730,7 @@ $('#app').addEventListener('click', async event => {
       if (!A.ranges[info.key].length) A.ranges[info.key] = codes.slice(0, 2);
       A.memRevealed = []; A.memorizeFilter = 'all'; A.target = 20; savePreferences(); renderKeepScroll(); return;
     }
-    if (d.memorizeRange) { A.memorizeRange = d.memorizeRange; A.memRevealed = []; A.memorizeFilter = 'all'; savePreferences(); renderKeepScroll(); return; }
+    if (d.memorizeRange) { A.memorizeRange = d.memorizeRange; if (A.data.profile.division === 'middle') A.middleRange = d.memorizeRange; A.memRevealed = []; A.memorizeFilter = 'all'; savePreferences(); renderKeepScroll(); return; }
     if (d.memorizeFilter) { A.memorizeFilter = d.memorizeFilter === 'starred' ? 'starred' : 'all'; savePreferences(); render(); return; }
     if (d.memorizeRevealAll) { A.memorizeShowAll = d.memorizeRevealAll === 'show'; render(); return; }
     if (d.memorizeWord) {
@@ -798,16 +798,7 @@ $('#app').addEventListener('click', async event => {
       if (d.highPickToggle === 'exam') A.highExamPickOpen = A.highExamPickOpen === false; else A.highPickOpen = A.highPickOpen !== true;
       renderKeepScroll(); return;
     }
-    if (d.highExamLesson) { A.highExamOpen = d.highExamLesson; A.highExamPickOpen = true; savePreferences(); renderKeepScroll(); return; }
-    if (d.middleWordAll) {
-      const words = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
-      A.middleWordIds = d.middleWordAll === 'true' ? words.map(word => word.id) : [];
-      A.target = 'all';
-      savePreferences();
-      renderKeepScroll();
-      return;
-    }
-    if (d.middleLesson) { A.middleRange = d.middleLesson; A.middleStartIndex = 0; A.middleWordIds = []; A.middleWordsOpen = false; A.target = 'all'; savePreferences(); renderKeepScroll(); return; }
+    if (d.highExamLesson) { A.highExamOpen = d.highExamLesson; if (A.data.profile.division === 'middle') A.middleRange = d.highExamLesson; A.highExamPickOpen = true; savePreferences(); renderKeepScroll(); return; }
     if (d.middleGrammarLesson) { A.middleGrammarLesson = Number(d.middleGrammarLesson); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (d.rankMode) { A.rankMode = d.rankMode; savePreferences(); render(); return; }
     if (d.rankView) { A.rankView = d.rankView === 'league' ? 'league' : 'study'; savePreferences(); render(); return; }
@@ -879,10 +870,12 @@ $('#app').addEventListener('click', async event => {
       A.practiceRunMode = session.run_mode === 'test' && ['write_meaning','spell'].includes(A.mode) ? 'test' : 'practice';
       A.assignmentId = null;
       if (A.data.profile.division === 'middle') {
-        A.middleRange = String(session.range_codes?.[0] || A.middleRange || '');
-        const recordedIds = [...new Set((session.answer_records || []).map(item => item.word_id).filter(Boolean))];
-        A.middleWordIds = recordedIds;
-        A.middleWordsOpen = false;
+        // V13.150 중학생도 단어 학습의 '오늘 외울 단어'로 그 기록의 단어를 고른다.
+        const code = String(session.range_codes?.[0] || A.middleRange || '');
+        const recordedIds = new Set((session.answer_records || []).map(item => item.word_id).filter(Boolean));
+        A.middleRange = code; A.memorizeRange = code;
+        A.highWordIds = { ...(A.highWordIds || {}), [code]: highPickWords(code).filter(word => recordedIds.has(word.id)).map(word => word.id) };
+        A.memorizeFilter = 'all'; A.memRevealed = [];
       } else {
         A.ranges[A.school] = [...(session.range_codes || [])];
         A.memorizeRange = String(session.range_codes?.[0] || A.memorizeRange || '');
@@ -905,20 +898,11 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'start-exam-run') {
       const runMode = A.examKind === 'test' ? 'test' : 'practice';
       A.practiceRunMode = runMode; savePreferences(); buttonBusy(b);
-      if (A.data.profile.division === 'middle') {
-        const lessonWords = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === String(A.middleRange || ''));
-        const selected = new Set(A.middleWordIds || []);
-        const words = lessonWords.filter(word => selected.has(word.id));
-        if (!words.length) { buttonBusy(b, false); return toast('시험 볼 단어를 먼저 선택해주세요.'); }
-        const target = A.target === 'all' ? 'all' : Math.min(words.length, Number(A.target || words.length));
-        await startPractice({ wordIds: words.map(word => word.id), target, mode: A.mode, runMode, examStyle: true, confirmed: true });
-      } else {
-        // V13.124: 고른 단어만 출제한다(개수 = 고른 단어 수, 서버 한도 200개).
-        const { wordIds } = highExamSelection(A);
-        if (!wordIds.length) { buttonBusy(b, false); return toast('시험 볼 단어를 먼저 선택해주세요.'); }
-        if (wordIds.length > HIGH_EXAM_MAX) { buttonBusy(b, false); return toast(`한 번에 최대 ${HIGH_EXAM_MAX}개까지 시험 볼 수 있어요.`); }
-        await startPractice({ wordIds, target: 'all', mode: A.mode, runMode, examStyle: true, confirmed: true });
-      }
+      // V13.124: 고른 단어만 출제한다(개수 = 고른 단어 수, 서버 한도 200개). V13.150 중학생도 같다.
+      const { wordIds } = highExamSelection(A);
+      if (!wordIds.length) { buttonBusy(b, false); return toast('시험 볼 단어를 먼저 선택해주세요.'); }
+      if (wordIds.length > HIGH_EXAM_MAX) { buttonBusy(b, false); return toast(`한 번에 최대 ${HIGH_EXAM_MAX}개까지 시험 볼 수 있어요.`); }
+      await startPractice({ wordIds, target: 'all', mode: A.mode, runMode, examStyle: true, confirmed: true });
       return;
     }
     if (d.action === 'grammar-choice-sample' || d.action === 'grammar-choice') {
@@ -1000,22 +984,6 @@ $('#app').addEventListener('change', event => {
     input.checked ? set.add(input.dataset.highWord) : set.delete(input.dataset.highWord);
     setHighPick(input.dataset.highScope, code, highPickWords(code).filter(word => set.has(word.id)).map(word => word.id));
     renderKeepPick();
-    return;
-  }
-  if (input.dataset.middleWord !== undefined) {
-    const set = new Set(A.middleWordIds || []);
-    input.checked ? set.add(input.dataset.middleWord) : set.delete(input.dataset.middleWord);
-    A.middleWordIds = [...set];
-    A.target = 'all';
-    input.closest('.middle-direct-word-v1343')?.classList.toggle('selected', input.checked);
-    const count = set.size;
-    const countEl = $('#middle-direct-count');
-    if (countEl) countEl.textContent = count + '개 선택';
-    const startButton = $('[data-action="start-exam-run"]');
-    if (startButton) startButton.disabled = count === 0;
-    const summary = $('.exam-start-inline p');
-    if (summary) summary.textContent = `${A.middleRange || ''}과 · 직접 선택 ${count}개 · ${count}문제 · ${PRACTICE_TYPES[A.mode] || '뜻쓰기'}`;
-    savePreferences();
     return;
   }
     if (input.dataset.rankScopeSelect !== undefined) { A.rankScope = input.value; savePreferences(); render(); return; }

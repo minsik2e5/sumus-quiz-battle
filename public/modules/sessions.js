@@ -950,9 +950,12 @@ function finishPracticeView() {
       leaveSession();
       A.studyView = 'vocab'; A.tab = 'practice'; A.mode = x.mode || 'write_meaning'; A.practiceRunMode = 'practice';
       if (A.data.profile.division === 'middle') {
-        A.middleRange = String(x.range_codes?.[0] || A.middleRange || '');
-        A.middleWordIds = [...new Set((x.word_ids || []).filter(Boolean))];
-        A.middleWordsOpen = false;
+        // V13.150 중학생도 단어 학습의 '오늘 외울 단어'로 그 판의 단어를 고른다.
+        const code = String(x.range_codes?.[0] || A.middleRange || ''), ids = new Set((x.word_ids || []).filter(Boolean));
+        const lessonWords = A.data.books.flatMap(book => book.words || []).filter(word => String(word.range_code) === code);
+        A.middleRange = code; A.memorizeRange = code;
+        A.highWordIds = { ...(A.highWordIds || {}), [code]: lessonWords.filter(word => ids.has(word.id)).map(word => word.id) };
+        A.memorizeFilter = 'all'; A.memRevealed = [];
       } else {
         A.school = x.school || A.school;
         A.ranges[A.school] = [...(x.range_codes || [])];
