@@ -4,7 +4,7 @@ import { createStorageMock } from './storage-mock.mjs';
 import { passwordHash } from './auth.mjs';
 import { emptyState } from './state.mjs';
 import { builtinBooks } from './service.mjs';
-import { VocaStateObject } from '../cloudflare/worker.mjs';
+import { VocaStateObject, uploadTimeoutMs } from '../cloudflare/worker.mjs';
 import { createLocalRepository, createSupabaseSync } from '../cloudflare/local-first.mjs';
 import { assembleState } from '../cloudflare/state-parts.mjs';
 import { runBattleRoomChecks } from './battle-room-check.mjs';
@@ -348,6 +348,10 @@ export async function runCloudflareCheck() {
       assert.equal(canonical(object.mutations.current().state), beforeRestart, '파트 백업 중에는 오래된 v12 사본으로 되돌아가면 안 됩니다.');
       object.sync.close();
     }
+    // V13.150.2 큰 백업은 크기만큼 시간을 더 준다(8.8MB 통째 백업이 45초에 끊기던 문제).
+    assert.equal(uploadTimeoutMs(1000), 45000, '작은 업로드는 45초');
+    assert(uploadTimeoutMs(8851 * 1024) >= 170000, '8.8MB 업로드는 3분 가까이 기다린다');
+    assert.equal(uploadTimeoutMs(50 * 1048576), 180000, '아무리 커도 3분까지');
     console.log(`[cloudflare-check] PASS local-first storage + ${concurrent.length} concurrent reads (${commits} Supabase commits)`);
   } finally {
     globalThis.fetch = nativeFetch;

@@ -100,6 +100,7 @@ function createSupabaseRepository(env) {
   // background, so they get a long timeout instead of being cut off mid-transfer.
   async function rpc(name, body, timeoutMs) {
     const text = typeof body === 'string' ? body : JSON.stringify(body);
+    if (timeoutMs === 'upload') timeoutMs = uploadTimeoutMs(text.length);
     let response;
     try {
       response = await fetch(base + name, { method: 'POST', headers, body: text, signal: AbortSignal.timeout(timeoutMs) });
@@ -137,7 +138,7 @@ function createSupabaseRepository(env) {
     // background upload does not stringify the whole state a second time.
     async commitSerialized(json, revision) {
       const payload = `{"p_secret":${JSON.stringify(secret)},"p_revision":${Number(revision)},"p_data":${json}}`;
-      return Number(await rpc('voca_v12_state_commit', payload, 45000));
+      return Number(await rpc('voca_v12_state_commit', payload, 'upload'));
     },
     // Parts backup (supabase/voca_v13_parts.sql).
     async partsRevision(timeoutMs = 12000) { return Number(await rpc('voca_v13_state_revision', { p_secret: secret }, timeoutMs)); },
@@ -150,9 +151,15 @@ function createSupabaseRepository(env) {
     async patchParts(entries, removed, revision) {
       const parts = entries.map(([key, text]) => `${JSON.stringify(key)}:${text}`).join(',');
       const payload = `{"p_secret":${JSON.stringify(secret)},"p_revision":${Number(revision)},"p_parts":{${parts}},"p_removed":${JSON.stringify(removed)}}`;
-      return Number(await rpc('voca_v13_state_patch', payload, 45000));
+      return Number(await rpc('voca_v13_state_patch', payload, 'upload'));
     }
   };
+}
+
+// V13.150.2 큰 업로드의 시간 제한: 운영 데이터가 8.8MB까지 커져 45초 안에 통째 백업을 다 못 올렸다.
+// 1MB를 넘는 만큼 1MB마다 20초를 더 주고(최소 45초, 최대 3분), 업로드는 알람(최대 15분) 안에서 돈다.
+export function uploadTimeoutMs(bytes) {
+  return Math.min(180000, Math.max(45000, Math.round(45000 + Math.max(0, (Number(bytes) || 0) - 1048576) / 1048576 * 20000)));
 }
 
 // V13.149 테스트 앱(env.test, VOCA_STANDALONE=1): Supabase 없이 이 Durable Object 안에만 저장한다.
