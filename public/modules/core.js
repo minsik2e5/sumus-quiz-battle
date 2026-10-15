@@ -106,9 +106,10 @@ export const LEGENDARY_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTE
 // The pets a student can ever meet (a retired pet such as 불새 is left out of every count and list).
 export const ACTIVE_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].retired);
 export const MYTHIC_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].mythic);
-export const EPIC_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].epic);
+// V13.150 바다 펫(sea)은 낚시 교환소에서만: 영웅 알 · 뽑기 확률표에는 넣지 않는다.
+export const EPIC_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].epic && !CHARACTERS[key].sea);
 export const LIMITED_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].limited);
-export const STANDARD_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].legendary && !CHARACTERS[key].mythic && !CHARACTERS[key].epic && !CHARACTERS[key].limited);
+export const STANDARD_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].legendary && !CHARACTERS[key].mythic && !CHARACTERS[key].epic && !CHARACTERS[key].limited && !CHARACTERS[key].sea);
 // The pet tiers, lowest first: 기본 (the shop egg), 영웅, 전설, 신화 (V13.118). 한정 sits beside them (a season's pets).
 export const petTier = key => CHARACTERS[key]?.mythic ? 'mythic' : CHARACTERS[key]?.legendary ? 'legendary' : CHARACTERS[key]?.epic ? 'epic' : CHARACTERS[key]?.limited ? 'limited' : 'basic';
 // V13.109 시즌 한정: the season's egg is sold from `start` to `end` (Korea time, `end` included).
@@ -425,10 +426,11 @@ export function choosePracticeWord(words, mastery, state, random = Math.random) 
 }
 const dayFormatter = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' });
 export const dayKey = ts => dayFormatter.format(new Date(ts));
-export function growthFor(sessions) {
+// V13.149 `extraDays`: days kept by a 연속 학습 보호권 or 되살리기 ('YYYY-MM-DD', streak-guard.js guardDayKeys).
+export function growthFor(sessions, extraDays = []) {
   const points = sessions.reduce((n, s) => n + (s.xp || 0), 0);
   // answered_count is absent on older records; only an explicit 0 is skipped.
-  const days = new Set(sessions.filter(s => s.total > 0 && s.answered_count !== 0).map(s => dayKey(s.created_at)));
+  const days = new Set([...sessions.filter(s => s.total > 0 && s.answered_count !== 0).map(s => dayKey(s.created_at)), ...extraDays]);
   let streak = 0, day = Date.now();
   if (!days.has(dayKey(day))) day -= 86400000;
   while (days.has(dayKey(day))) { streak++; day -= 86400000; }

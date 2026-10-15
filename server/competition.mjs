@@ -5,6 +5,7 @@ import { levelInfo, petProgress, CHARACTERS } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked, LEAGUE_POINTS, LEAGUE_PAIR_DAY_CAP, leagueTier, leagueTierIndex } from '../public/modules/titles.js';
 import { GACHA_ITEMS, GACHA_KEYS } from '../public/modules/rewards.js';
 import { bonusRecords } from './rewards.mjs';
+import { guardDayNums } from '../public/modules/streak-guard.js';
 import { dungeonTitleStats, dungeonKings } from './dungeon-records.mjs';
 
 export const DAY_MS = 86400000;
@@ -94,8 +95,9 @@ export function leagueSummary(rows, pid) {
   const played = wins + losses + draws;
   return { points, wins, losses, draws, played, win_rate: played ? Math.round(wins / played * 100) : null, tier: leagueTier(points) };
 }
-function longestDayRun(sessions) {
-  const days = [...new Set(sessions.filter(s => s.total > 0 && s.answered_count !== 0).map(s => kstDay(s.created_at)))].sort((a, b) => a - b);
+// V13.149 `extra`: days kept by a 연속 학습 보호권 or 되살리기 (they count in a run, like Duolingo's streak freeze).
+function longestDayRun(sessions, extra = []) {
+  const days = [...new Set([...sessions.filter(s => s.total > 0 && s.answered_count !== 0).map(s => kstDay(s.created_at)), ...extra])].sort((a, b) => a - b);
   let best = 0, run = 0, prev = null;
   for (const day of days) { run = prev !== null && day === prev + 1 ? run + 1 : 1; best = Math.max(best, run); prev = day; }
   return best;
@@ -137,7 +139,7 @@ export function createCompetition(state, now = Date.now()) {
     level: (p, pid) => levelInfo(ctx.sessionsOf(pid).reduce((n, s) => n + Number(s.xp || 0), 0)).level,
     combo: (p, pid) => Math.max(0, ...ctx.sessionsOf(pid).map(s => Number(s.best_combo || 0))),
     correct: (p, pid) => ctx.sessionsOf(pid).reduce((n, s) => n + Number(s.correct || 0), 0),
-    best_days: (p, pid) => longestDayRun(ctx.sessionsOf(pid)),
+    best_days: (p, pid) => longestDayRun(ctx.sessionsOf(pid), guardDayNums(ctx.sessionsOf(pid), p?.streak_guard, now)),
     perfect: (p, pid) => ctx.sessionsOf(pid).filter(s => s.perfect === true && Number(s.total || 0) >= 10).length,
     pets: p => Array.isArray(p?.pets) ? p.pets.length : 0,
     wins: (p, pid) => winsOf(pid).length,

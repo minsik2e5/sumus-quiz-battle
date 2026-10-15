@@ -1,0 +1,63 @@
+# V13.149 테스트 앱 배포: 작업 브랜치(claude/*, test/*)에 올리면 테스트 앱(sumus-voca-test)에만 배포한다.
+# 운영 Worker(sumus-voca) · 운영 Supabase · 운영 비밀값(VOCA_STATE_SECRET)은 쓰지 않는다.
+# 테스트 앱은 Supabase 없이 자기 Durable Object에만 저장하고, 처음 켤 때 테스트 계정(server/test-seed.mjs)으로 시작한다.
+name: Deploy test app
+
+on:
+  push:
+    branches: ['claude/**', 'test/**']
+  workflow_dispatch:
+
+concurrency:
+  group: sumus-voca-cloudflare-test
+  cancel-in-progress: false
+
+jobs:
+  deploy-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: npm run build:assets
+      - run: npm run check
+      - run: npm run check:cloudflare
+      - name: Check Cloudflare credentials
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || (echo "Missing CLOUDFLARE_API_TOKEN repository secret" && exit 1)
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || (echo "Missing CLOUDFLARE_ACCOUNT_ID repository secret" && exit 1)
+      # 배포 직전에 한 번 더: 테스트 설정이 운영 Worker 이름이나 운영 Supabase를 가리키면 멈춘다.
+      - name: Guard test environment
+        run: npx wrangler deploy --env test --dry-run 2>&1 | tee /tmp/dry.txt && node server/test-app-guard.mjs /tmp/dry.txt
+      # 방 결과 서명용 비밀값은 테스트 앱 전용으로 배포마다 새로 만든다(운영 값과 무관).
+      - name: Deploy test Worker
+        shell: bash
+        run: |
+          umask 077
+          printf '{"VOCA_STATE_SECRET":"%s"}' "$(openssl rand -hex 32)" > /tmp/test-secrets.json
+          npx wrangler deploy --env test --secrets-file /tmp/test-secrets.json
+          rm -f /tmp/test-secrets.json
+      - name: Smoke test test app
+        shell: bash
+        run: |
+          base="https://sumus-voca-test.minsik2e5.workers.dev"
+          for i in $(seq 1 18); do
+            code="$(curl -sS -o /tmp/health.json -w "%{http_code}" "$base/api/health" || true)"
+            echo "health attempt $i -> HTTP $code"; cat /tmp/health.json || true; echo
+            if [ "$code" = "200" ] && node -e "process.exit(require('/tmp/health.json').ok === true ? 0 : 1)"; then
+              echo "### 테스트 앱 배포 완료: $base" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::Test app did not report ok:true within 3 minutes"
+          exit 1

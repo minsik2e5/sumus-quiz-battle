@@ -1,4 +1,5 @@
 import { $, api, esc, num, toast } from './ui.js';
+import { eggTapHtml, bindEggTap } from './pet-growth.js';
 import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, STANDARD_PET_KEYS, EPIC_PET_KEYS, seasonOnSale, cleanPetName } from './core.js';
 import { epicShow, legendaryShow, mythicShow } from './lucky.js';
 import { uiArt, ART_READY } from './emblems.js';
@@ -177,21 +178,23 @@ function closeOverlay(changed, onChanged) {
 function eggRevealHtml(body, key, done) {
   const name = CHARACTERS[key].ko;
   body.innerHTML = `<div class="pet-shop">
-    <div class="pet-shop-reveal">${avatar(key, { form: 0 })}</div>
     <p class="pet-moment-msg"><b>${esc(petJosa(name, '이', ''))}</b>의 알이에요!</p>
+    <div class="pet-shop-reveal etp-host">${eggTapHtml(key, name, 'shop')}</div>
     <p class="pet-shop-copy">지금부터 ${esc(petJosa(name, '과', '와'))} 함께 공부해요.<br>Lv.3이 되면 알이 깨져요.</p>
     <div class="pet-moment-actions"><button type="button" class="btn primary" data-pet-done>좋아요!</button></div>
   </div>`;
   body.querySelector('[data-pet-done]').onclick = done;
   $('[data-pet-close]').onclick = done;
+  bindEggTap(body);
 }
 // V13.107 놀이터 알 상점: buy an egg straight from the egg stand (no shop window first), then the
 // same reveal as the shop window: a basic egg's name card, the 영웅 or the legendary show.
-export async function buyEgg(A, onChanged, kind) {
+// V13.150 `via`: 같은 알 깨기 연출을 다른 곳에서(낚시터 진주 교환소: { path: '/reel/exchange', body: { item } }).
+export async function buyEgg(A, onChanged, kind, via = null) {
   if (momentOpen || !A.data?.stats?.pet) return null;
   momentOpen = true;
   let res;
-  try { res = await api('/shop/egg', { kind: kind === 'epic' || kind === 'season' ? kind : 'basic' }); }
+  try { res = await api(via?.path || '/shop/egg', via?.body || { kind: kind === 'epic' || kind === 'season' ? kind : 'basic' }); }
   finally { momentOpen = false; }
   if (res.mythic || res.legendary || res.epic || res.limited) { onChanged?.(); await eggShow(res, kind); return res; }
   momentOpen = true;

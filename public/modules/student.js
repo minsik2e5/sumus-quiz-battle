@@ -12,6 +12,7 @@ import { arcadePage, gachaBookPage, capsuleArt } from './arcade.js';
 import { petBookPage } from './petbook.js';
 import { ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, GACHA_ITEMS, GACHA_TIERS } from './rewards.js';
 import { rewardEventBanner } from './reward-events-ui.js';
+import { streakCard } from './streak-guard-ui.js';
 // V13.68 menu: what students do. 학습 holds word study, tests and records; 나 holds what they
 // collect. Pages without their own button light up the one they belong to.
 export const studentTabs = [['home', '홈', 'home'], ['practice', '학습', 'practice'], ['yacha', '야차전', 'battle'], ['arcade', '놀이터', 'arcade'], ['me', '나', 'user']];
@@ -412,7 +413,7 @@ function attendanceCard(A) {
   return `<section class="att-card${a.done ? ' done' : ''}" aria-label="출석 체크">
     <div class="att-head">${uiArt('attendance', 'att-art')}<div>${lead}</div>${a.done ? `<span class="att-streak">${a.streak >= 2 ? `${a.streak}일 연속` : '오늘 도장 쾅!'}</span>` : '<button type="button" class="btn primary att-btn" data-action="attend">출석하기</button>'}</div>
     <ol class="att-stamps">${stamps}</ol>
-    ${a.done ? '' : `<p class="att-foot">7번째 도장은 <b>${coin()}${ATTENDANCE_REWARDS[last]}</b> + <b>뽑기권 ${ATTENDANCE_TICKETS}장</b>! 하루에 한 번 찍어요.</p>`}
+    ${a.done ? '' : `<p class="att-foot">7번째 도장 선물 <b>${coin()}${ATTENDANCE_REWARDS[last]}</b> · <b>뽑기권 ${ATTENDANCE_TICKETS}장</b> · <b>연속 보호권 1장</b></p>`}
   </section>`;
 }
 // V13.68: this week's ranking of my grade on the home (the whole ranking opens from it).
@@ -440,6 +441,7 @@ function compactGrowth(A) {
   ${yachaAlerts(A)}
   ${resumeBar(A)}
   ${attendanceCard(A)}
+  ${streakCard(A)}
   ${rankingCard(A)}
   <section class="home-week-card home-week-v1358" aria-label="이번 주 출석">
     <span>이번 주 <b>${week.filter(day => day.active).length}일</b> · 오늘 <b>+${num(g.today_xp || 0)} 경험치</b> · <b class="home-week-coin">${coin()}+${num(g.today_reward_points || 0)}</b></span>

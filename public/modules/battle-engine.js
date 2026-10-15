@@ -98,7 +98,11 @@ export const PET_SKILLS = {
   axolotl: { name: '재생의 물방울', desc: 'HP +6, 3문제 동안 3씩 피해', heal: 6, poison: 3, turns: 3 },
   chinchilla: { name: '별가루 마법', desc: '바로 7 피해, 다음 공격 +8', burst: 7, boost: [8] },
   sloth: { name: '느긋한 낮잠', desc: 'HP +8, 다음 공격 +7', heal: 8, boost: [7] },
-  platypus: { name: '꼬리 철썩', desc: '바로 7 피해, 2문제 동안 4씩 피해', burst: 7, poison: 4, turns: 2 }
+  platypus: { name: '꼬리 철썩', desc: '바로 7 피해, 2문제 동안 4씩 피해', burst: 7, poison: 4, turns: 2 },
+  // V13.150 바다 펫 3종(낚시 진주 교환소 한정, 그림 주문서 28). 그림이 들어오기 전에는 교환소에서 잠겨 있다.
+  dolphin: { name: '퐁당 음파', desc: '바로 7 피해, 다음 공격 +8', burst: 7, boost: [8] },
+  seahorse: { name: '살랑 물결', desc: 'HP +7, 다음에 받는 공격 −8', heal: 7, guard: [8] },
+  hermitcrab: { name: '단단 소라집', desc: '다음에 받는 공격 −9, 2문제 동안 3씩 피해', guard: [9], poison: 3, turns: 2 }
 };
 // V13.94 몬스터 잡기: a monster's own skill (its `pet.skill`), stronger at harder levels.
 export const MONSTER_SKILLS = {
