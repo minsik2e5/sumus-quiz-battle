@@ -469,5 +469,14 @@ export async function runGamesChecks(assert) {
     const pub = new URL('../public/', import.meta.url);
     const matchArt = (mg.match(/MATCH_ART = new Set\(\[([^\]]*)\]\)/)?.[1] || '').match(/'([a-z-]+)'/g)?.map(x => x.slice(1, -1)) || [];
     assert(matchArt.every(n => existsSync(new URL(`assets/match/${n}.webp`, pub))), 'V13.149 MATCH_ART에 적힌 그림은 파일이 있어야 한다');
+    // 그림 주문서 31(낚싯대 강화 1~5단계): 29b 낚싯대 · 릴을 열어 모양 · 손잡이 위치를 그대로 두고, "SUMUS 낚시 31" 폴더에 정확한 이름으로 저장.
+    const art31 = ['31a-fishing-rod-tiers.txt', '31b-fishing-reel-tiers.txt', '31c-fishing-rod-icons.txt', '31d-fishing-forge-background.txt'].flatMap(f => source(`../docs/asset-requests/runner/${f}`).trim().split('\n---\n'));
+    const codex31 = source('../docs/asset-requests/runner/CODEX_PROMPT_31.md');
+    const files31 = [2, 3, 4, 5].flatMap(t => [`pov-rod-t${t}`, `pov-rod-left-t${t}`, `pov-rod-right-t${t}`, `pov-rod-deep-t${t}`, `pov-reel-t${t}`]).concat([1, 2, 3, 4, 5].map(t => `icon-rod-${t}`), ['fx-upgrade', 'fx-hammer', 'stamp-tier', 'bg-forge']);
+    assert(art31.length === 8 && art31.every(t => t.includes('STYLE REFERENCE — before drawing, open') && /named exactly "31[a-d]-\d\.png"/.test(t) && t.includes('"SUMUS 낚시 31 (Runner용)"') && t.includes('showing the picture in the chat is not enough'))
+      && art31.slice(0, 4).every(t => t.includes('keep EXACTLY the rod of "29b-1.png"') && t.includes('at EXACTLY the same position and size in every cell'))
+      && codex31.includes('Drive의 기존 그림을 열어 그림체를 맞춘다') && codex31.includes('정해진 Drive 폴더 "SUMUS 낚시 31 (Runner용)"에 정확한 파일 이름') && codex31.includes('PR 대상도 `claude/rod-upgrade`')
+      && files31.length === 29 && files31.every(n => map.includes(`public/assets/fishing/${n}.webp`)),
+      '그림 주문서 31(낚싯대 강화): Drive의 기존 그림(29b 낚싯대 · 릴)을 열어 그림체 · 손잡이 위치를 맞추고, 정해진 폴더에 정확한 이름으로 저장, 그림 29장');
   }
 }
