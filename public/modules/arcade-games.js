@@ -34,7 +34,7 @@ export function gamesSection(A, reelEntry) {
     ${reelEntry}
     <article class="gm-card gm-match">
       <div class="gm-art" aria-hidden="true"><span class="gm-mini en">brave</span><span class="gm-mini ko">용감한</span><span class="gm-mini en">calm</span><span class="gm-mini ko">차분한</span></div>
-      <div class="gm-copy"><span class="gm-kicker">혼자 · 타임어택</span><h3>짝 맞추기 타임어택</h3><p>영어와 뜻 카드를 가장 빨리 지워요. 이번 주 1등에 도전!</p>
+      <div class="gm-copy"><span class="gm-kicker">혼자 · 타임어택</span><h3>짝 맞추기 타임어택</h3><p>영어와 뜻 카드를 3라운드 동안 가장 빨리 지워요. 이번 주 전체 1등에 도전!</p>
         <div class="gm-facts"><span>내 최고 <b>${m.best ? matchTime(m.best) : '—'}</b></span><span>오늘 코인 판 <b>${num(m.left ?? 5)}</b></span></div></div>
       <div class="ag-words"><span>게임 단어</span><b class="${w.ok ? 'ok' : 'need'}">${w.picked.length ? `${esc(wordsLabel(A, w.picked))} · ${num(w.n)}단어` : '아직 안 골랐어요'}</b><button type="button" class="btn small" data-action="arcade-words">바꾸기</button></div>
       <button type="button" class="yl-cta gm-go" data-action="arcade-match" ${w.ok ? '' : 'disabled'}>시작</button>

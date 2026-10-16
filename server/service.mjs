@@ -1720,12 +1720,13 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/games/match/finish' && method === 'POST') {
     requireRole(p, 'student');
     const now = Date.now();
-    const result = matchFinish(p, { id: str(body.id, 80), ms: Number(body.ms), misses: Number(body.misses), splits: Array.isArray(body.splits) ? body.splits.slice(0, 12) : null, pet: activePetKey(state, p.id), now, weekKey: gameWeekKey(now) });
+    const result = matchFinish(p, { id: str(body.id, 80), ms: Number(body.ms), misses: Number(body.misses), splits: Array.isArray(body.splits) ? body.splits.slice(0, 24) : null, pet: activePetKey(state, p.id), now, weekKey: gameWeekKey(now) });
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
   if (path === '/games/match/board' && method === 'GET') {
     requireRole(p, 'student');
-    return matchBoard(state.profiles, p, gameWeekKey(Date.now()), { hidden: isPrivate });
+    // V13.152 범위(all · school · class)와 기간(week · all). 처음은 전체 학생 · 이번 주.
+    return matchBoard(state.profiles, p, gameWeekKey(Date.now()), { hidden: isPrivate, scope: str(body.scope, 10), period: str(body.period, 10) });
   }
   // V13.149 교실 게임: 선생님이 TV에 방을 열고(보물 사냥 · 반 전체 낚시), 학생은 4자리 번호로 들어온다.
   if (path === '/teacher/party' && method === 'GET') {

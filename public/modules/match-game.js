@@ -8,7 +8,7 @@ import { MATCH, matchPick, matchStars, matchTime } from './match-rules.js';
 // V13.149 짝 맞추기 타임어택: 전체 화면. 영어 6장 + 뜻 6장, 짝을 맞히면 두 장이 날아가 부딪히며 터지고,
 // 틀리면 흔들리며 1초가 시계로 날아간다. 시작 · 끝은 서버에 등록(server/games.mjs)해 기록과 코인을 남긴다.
 // 고퀄 업그레이드: 카드 딜링 · 물결 뒤집기, 시간 링(별 기준선이 지나면 별이 떨어짐), 콤보 단계 · 피버 타임,
-// 반 친구 고스트(시작할 때 서버가 바로 위 순위 친구의 짝마다 시간을 줌), 마지막 한 쌍 슬로모션,
+// 고스트(시작할 때 서버가 이번 주 전체 학생 중 바로 위 학생의 짝마다 시간을 줌), 마지막 한 쌍 슬로모션,
 // 결과(별 도장 · 신기록 도장 · 코인이 지갑으로 날아감 · 틀린 단어 복습), 이번 주 반 시상대, 펫 반응.
 // 클래스는 mt-(단어 미니게임의 mg-와 겹치지 않게).
 
@@ -88,7 +88,7 @@ function onClick(event) {
   if (act === 'exit') return M.playing ? confirmQuit() : leave();
   if (act === 'start') return start(b);
   if (act === 'again') return intro(true);
-  if (act === 'board') return board();
+  if (act === 'board') return board(b.dataset.scope || M.boardScope || 'all', b.dataset.period || M.boardPeriod || 'week');
   if (act === 'quit-yes') return leave();
   if (act === 'quit-no') { document.querySelector('.mt-quit')?.remove(); return; }
 }
@@ -116,14 +116,14 @@ function intro(again = false) {
     </div>
     <div class="mt-intro-pet">${petArt('cheer')}<span class="mt-bubble show">같이 달려요!</span></div>
     <h1>짝 맞추기 <em>타임어택</em></h1>
-    <p>영어 카드와 뜻 카드를 짝지어 <b>모두 지우는 시간</b>을 재요. 틀리면 <b>+1초</b>! 연속 ${FEVER_AT}쌍이면 <b>피버 타임</b>.</p>
+    <p><b>${MATCH.ROUNDS}라운드</b> 동안 영어 카드와 뜻 카드를 짝지어 <b>모두 지우는 시간</b>을 재요. 틀리면 <b>+1초</b>! 연속 ${FEVER_AT}쌍이면 <b>피버 타임</b>.</p>
     <div class="mt-rule-ring">
       <div class="mt-ring mini">${ringSvg(v.best)}<div class="mt-clock"><b>${v.best ? (v.best / 1000).toFixed(2) : '—'}</b><small>내 최고</small></div></div>
       <div class="mt-stars-rule"><span>${starRow(3)}<small>${sec(MATCH.STARS[0])} 안</small></span><span>${starRow(2)}<small>${sec(MATCH.STARS[1])} 안</small></span><span>${starRow(1)}<small>다 지우면</small></span></div>
     </div>
-    <div class="mt-records"><div><small>이번 주 기록</small><b>${v.week_best ? matchTime(v.week_best) : '—'}</b></div><div><small>오늘 코인 판</small><b>${num(v.left ?? MATCH.DAILY)}<small> / ${num(MATCH.DAILY)}</small></b></div><div><small>함께 달리기</small><b class="g">반 친구 고스트</b></div></div>
+    <div class="mt-records"><div><small>이번 주 기록</small><b>${v.week_best ? matchTime(v.week_best) : '—'}</b></div><div><small>오늘 코인 판</small><b>${num(v.left ?? MATCH.DAILY)}<small> / ${num(MATCH.DAILY)}</small></b></div><div><small>함께 달리기</small><b class="g">바로 위 친구 고스트</b></div></div>${v.old_best ? `<p class="mt-old">예전 6쌍 기록 ${matchTime(v.old_best)} · ${MATCH.ROUNDS}라운드로 바뀌어 새로 시작해요</p>` : ''}
     <button type="button" class="yl-cta mt-go" data-mt="start" ${ok ? '' : 'disabled'}>${ok ? '시작!' : '뜻이 서로 다른 단어가 부족해요'}</button>
-    <button type="button" class="btn full mt-board-btn" data-mt="board">🏆 이번 주 우리 반 순위</button>
+    <button type="button" class="btn full mt-board-btn" data-mt="board">🏆 짝 맞추기 순위</button>
   </section>`);
 }
 // 시간 링: 한 바퀴 = 2별 기준(28초). 3별 기준선(18초)과 2별 기준선(맨 위)에 별 눈금.
@@ -140,7 +140,7 @@ async function start(button) {
     const { ghost, ...r } = await api('/games/match/start', { range_codes: M.codes });
     if (!M) return;
     M.id = r.id;
-    M.ghost = ghost?.splits?.length === MATCH.PAIRS ? ghost : null;
+    M.ghost = ghost?.splits?.length === MATCH.TOTAL_PAIRS ? ghost : null;
     M.view = { ...M.view, ...r };
   } catch (err) {
     if (!M) return;
@@ -157,13 +157,14 @@ async function start(button) {
 /* ---------- 게임 ---------- */
 function play(pairs) {
   M.playing = true;
-  Object.assign(M, { pairs, left: pairs.length, misses: 0, combo: 0, best: 0, sel: null, lock: false, start: 0, done: false, fever: false, splits: [], missed: new Set(), lost: 0, warned: -1, gapPrev: null, laneW: 0, race: true });
+  Object.assign(M, { pairs, round: 1, cleared: 0, used: pairs.map(x => String(x.id)), left: pairs.length, misses: 0, combo: 0, best: 0, sel: null, lock: false, start: 0, done: false, fever: false, splits: [], missed: new Set(), lost: 0, warned: -1, gapPrev: null, laneW: 0, race: true });
   const cards = shuffleCards(pairs), g = M.ghost, pet = myPet();
   main(`<section class="mt-play" id="mt-play">
     <div class="mt-hud">
       <div class="mt-ring gold" id="mt-ring">${ringSvg()}<div class="mt-clock" id="mt-clock"><b>0.00</b><small>초</small></div></div>
       <div class="mt-hud-side">
         <div class="mt-starnow" id="mt-starnow" aria-label="지금 별"><i>★</i><i>★</i><i>★</i></div>
+        <div class="mt-round" id="mt-round" aria-label="라운드"><b>1</b>/${MATCH.ROUNDS} 라운드</div>
         <div class="mt-dots" aria-label="남은 짝">${pairs.map(() => '<i></i>').join('')}</div>
         <div class="mt-miss" id="mt-miss" aria-label="틀린 수">✕ <b>0</b></div>
       </div>
@@ -174,7 +175,7 @@ function play(pairs) {
       <b class="mt-gap" id="mt-gap"></b>
     </div>` : ''}
     <div class="mt-combo" id="mt-combo" aria-live="polite"></div>
-    <div class="mt-grid back" id="mt-grid">${cards.map((c, i) => `<button type="button" class="mt-card ${c.side}" data-mt="card" data-pair="${c.pair}" data-side="${c.side}" style="--i:${i};--r:${((i * 37) % 9) - 4}deg" aria-label="${esc(c.text)}"><span class="mt-back" aria-hidden="true"></span><span class="mt-face"><b class="${len(c)}">${esc(c.text)}</b></span></button>`).join('')}</div>
+    <div class="mt-grid back" id="mt-grid">${cardsHtml(cards)}</div>
     <div class="mt-count" id="mt-count" aria-live="assertive"></div>
     ${g ? `<div class="mt-vs" id="mt-vs">${avatar(g.pet, { size: 'mini', form: 1 })}<b>VS ${esc(g.name)}</b><small>${g.self ? '이번 주 내 기록을 넘어 봐요' : `${num(g.rank)}등 · ${matchTime(g.ms)}`}</small></div>` : ''}
     <div class="mt-pet" id="mt-pet"><div class="mt-pet-art" data-expr="normal">${petArt()}</div><span class="mt-bubble" id="mt-bubble"></span></div>
@@ -203,6 +204,7 @@ const len = c => { const n = c.text.length, k = c.side === 'ko' ? [6, 9, 12] : [
 function fitText() {
   for (const b of document.querySelectorAll('.mt-face b')) if (b.scrollHeight > b.clientHeight + 1 || b.scrollWidth > b.clientWidth + 1) b.classList.add('fit');
 }
+const cardsHtml = cards => cards.map((c, i) => `<button type="button" class="mt-card ${c.side}" data-mt="card" data-pair="${c.pair}" data-side="${c.side}" style="--i:${i};--r:${((i * 37) % 9) - 4}deg" aria-label="${esc(c.text)}"><span class="mt-back" aria-hidden="true"></span><span class="mt-face"><b class="${len(c)}">${esc(c.text)}</b></span></button>`).join('');
 function shuffleCards(pairs) {
   const list = pairs.flatMap((p, i) => [{ pair: i, side: 'en', text: p.en }, { pair: i, side: 'ko', text: p.ko }]);
   for (let i = list.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [list[i], list[j]] = [list[j], list[i]]; }
@@ -252,7 +254,7 @@ function meRun() {
   const el = $('mt-me'), lane = el?.parentElement;
   if (!lane) return;
   const w = lane.clientWidth - el.offsetWidth - 22;
-  el.style.transform = `translateX(${((M.pairs.length - M.left) / M.pairs.length * w).toFixed(1)}px)`;
+  el.style.transform = `translateX(${(M.cleared / MATCH.TOTAL_PAIRS * w).toFixed(1)}px)`;
 }
 
 function pick(card) {
@@ -272,8 +274,9 @@ function pick(card) {
 function hit(a, b) {
   const split = Math.round(elapsed());
   M.splits.push(split);
-  M.left--; M.combo++; M.best = Math.max(M.best, M.combo);
-  const last = !M.left;
+  M.left--; M.cleared++; M.combo++; M.best = Math.max(M.best, M.combo);
+  // V13.152 라운드의 마지막 짝이면 다음 라운드로, 3라운드의 마지막 짝이면 끝.
+  const roundEnd = !M.left, last = roundEnd && M.round >= MATCH.ROUNDS;
   if (last) {
     M.done = true; M.playing = false; cancelAnimationFrame(M.raf);
     const el = document.querySelector('#mt-clock b'); if (el) el.textContent = (split / 1000).toFixed(2);
@@ -303,6 +306,7 @@ function hit(a, b) {
   else if (M.combo >= 2) petSay(M.fever ? 'happy' : 'cheer', CHEERS[Math.min(M.combo, CHEERS.length - 1)]);
   meRun(); ghostGap(split);
   if (last) finale(mx, my, split);
+  else if (roundEnd) nextRound();
 }
 function comboText() {
   const combo = $('mt-combo');
@@ -395,6 +399,24 @@ function petSay(expression, text) {
 }
 
 /* ---------- 마지막 한 쌍 · 끝 ---------- */
+// V13.152 다음 라운드: 시간은 그대로 흐르고, 남은 카드가 사라진 뒤 새 카드 12장이 깔린다(앞 라운드 단어는 되도록 빼고).
+function nextRound() {
+  M.lock = true;
+  const pairs = matchPick(M.words, { missed: [...M.missed], skip: M.used });
+  later(() => {
+    const grid = $('mt-grid'); if (!grid || M.done) return;
+    M.round++; M.pairs = pairs; M.left = pairs.length; M.sel = null; M.used.push(...pairs.map(x => String(x.id)));
+    const r = $('mt-round'); if (r) r.innerHTML = `<b>${M.round}</b>/${MATCH.ROUNDS} 라운드`;
+    document.querySelectorAll('.mt-dots i').forEach(d => d.classList.remove('on'));
+    const count = $('mt-count'); if (count) count.innerHTML = `<b class="go round">${M.round === MATCH.ROUNDS ? '마지막 라운드!' : `${M.round}라운드`}</b>`;
+    grid.classList.remove('reveal'); grid.innerHTML = cardsHtml(shuffleCards(pairs)); fitText();
+    void grid.offsetWidth; grid.classList.add('reveal');
+    sfx('combo', { rate: 1.1, gain: .6 });
+    if (!reduced()) [0, 1, 2].forEach(k => sfx('card-flip', { at: k * .06, rate: 1 + k * .05, gain: .5 }));
+    later(() => { if (count) count.innerHTML = ''; }, 600);
+    M.lock = false;
+  }, reduced() ? 120 : MATCH.ROUND_GAP_MS);
+}
 function finale(mx, my, ms) {
   const playEl = $('mt-play'), grid = $('mt-grid');
   // 카드판만 확대한다(고정 위치인 카운트 · 펫 · 조각이 따라 움직이지 않게).
@@ -445,7 +467,7 @@ function result(ms, stars, res) {
     ${missed.length ? `<div class="mt-review"><h3>헷갈린 단어 <small>다음 판에 먼저 나와요</small></h3><div>${missed.map((p, i) => `<span class="mt-rcard" style="--i:${i}"><b>${esc(p.en)}</b><em>${esc(p.ko)}</em></span>`).join('')}</div></div>` : ''}
     <div class="mt-words">${M.pairs.map(p => `<span class="${M.missed.has(String(p.id)) ? 'x' : ''}"><b>${esc(p.en)}</b>${esc(p.ko)}</span>`).join('')}</div>
     <div class="mt-res-pet">${petArt(stars === 3 ? 'happy' : stars === 2 ? 'cheer' : 'sad')}<span class="mt-bubble show">${petLine}</span></div>
-    <div class="mt-result-actions"><button type="button" class="yl-cta" data-mt="again">한 판 더!</button><button type="button" class="btn full" data-mt="board">🏆 우리 반 순위</button><button type="button" class="btn full" data-mt="exit">나가기</button></div>
+    <div class="mt-result-actions"><button type="button" class="yl-cta" data-mt="again">한 판 더!</button><button type="button" class="btn full" data-mt="board">🏆 순위</button><button type="button" class="btn full" data-mt="exit">나가기</button></div>
   </section>`);
   const box = document.querySelector('.mt-result'), final = $('mt-final'), R = reduced();
   if (R) { final.textContent = (ms / 1000).toFixed(2); box.classList.add('calm'); }
@@ -487,23 +509,31 @@ function flyCoins(from, coins) {
   later(() => { restart(wallet, 'bump'); b.textContent = num(to); sfx('coins', { gain: .7 }); }, 600 + n * 60);
 }
 
-/* ---------- 이번 주 우리 반 순위(시상대) ---------- */
-async function board() {
+/* ---------- 순위(시상대) ---------- */
+// V13.152 순위: 범위(전체 학생 · 우리 학교 · 우리 반) × 기간(이번 주 · 통합). 처음은 전체 학생 · 이번 주.
+const BOARD_SCOPES = [['all', '전체 학생'], ['school', '우리 학교'], ['class', '우리 반']];
+const BOARD_PERIODS = [['week', '이번 주'], ['all', '통합']];
+async function board(scope = M?.boardScope || 'all', period = M?.boardPeriod || 'week') {
+  M.boardScope = scope; M.boardPeriod = period;
   main('<div class="yb-loading">순위를 불러오는 중…</div>');
   let r;
-  try { r = await api('/games/match/board'); }
+  try { r = await api(`/games/match/board?scope=${scope}&period=${period}`); }
   catch (err) { if (M) { toast(err.message); intro(); } return; }
   if (!M) return;
   const rows = r.rows || [], top = rows.filter(x => x.rank <= 3), rest = rows.filter(x => x.rank > 3);
   const me = rows.find(x => x.me), above = me && me.rank > 1 ? rows.find(x => x.rank === me.rank - 1) : null;
-  const pod = rank => { const x = top.find(t => t.rank === rank); return x ? `<div class="mt-pod p${rank}${x.me ? ' me' : ''}"><div class="who">${rank === 1 ? '<i class="crown">👑</i>' : ''}${avatar(x.pet, { size: 'mini', form: 1 })}<b>${esc(x.name)}</b><em>${matchTime(x.ms)}</em></div><div class="step"><span>${rank}</span></div></div>` : `<div class="mt-pod p${rank} empty"><div class="who"><b>?</b></div><div class="step"><span>${rank}</span></div></div>`; };
+  const where = x => scope === 'class' || !x.school ? '' : `<small class="mt-where">${esc(scope === 'school' ? x.class_name : `${x.school} ${x.class_name}`)}</small>`;
+  const scopeName = BOARD_SCOPES.find(([k]) => k === scope)[1], periodName = BOARD_PERIODS.find(([k]) => k === period)[1];
+  const pod = rank => { const x = top.find(t => t.rank === rank); return x ? `<div class="mt-pod p${rank}${x.me ? ' me' : ''}"><div class="who">${rank === 1 ? '<i class="crown">👑</i>' : ''}${avatar(x.pet, { size: 'mini', form: 1 })}<b>${esc(x.name)}</b>${where(x)}<em>${matchTime(x.ms)}</em></div><div class="step"><span>${rank}</span></div></div>` : '<div class="mt-pod empty"></div>'; };
+  const seg = (list, cur, attr) => `<div class="mt-seg" role="group">${list.map(([k, label]) => `<button type="button" data-mt="board" data-${attr}="${k}" class="${k === cur ? 'on' : ''}" aria-pressed="${k === cur}">${label}</button>`).join('')}</div>`;
   main(`<section class="mt-board">
-    <h2>🏆 이번 주 짝 맞추기 · 우리 반</h2>
-    <p class="mt-board-note">가장 빠른 기록 순서예요. 월요일에 새로 시작해요.</p>
+    <h2>🏆 짝 맞추기 순위</h2>
+    ${seg(BOARD_SCOPES, scope, 'scope')}${seg(BOARD_PERIODS, period, 'period')}
+    <p class="mt-board-note">${scopeName} · ${periodName} · ${MATCH.ROUNDS}라운드 가장 빠른 기록 순서예요.${period === 'week' ? ' 월요일에 새로 시작해요.' : ''}${r.total ? ` 모두 ${num(r.total)}명` : ''}</p>
     ${rows.length ? `<div class="mt-podium">${pod(2)}${pod(1)}${pod(3)}</div>
-      ${above ? `<p class="mt-chase"><b>${esc(above.name)}</b>까지 <em>${((me.ms - above.ms) / 1000).toFixed(2)}초</em>! 한 판 더?</p>` : me?.rank === 1 ? '<p class="mt-chase top">우리 반 1등이에요! 👑</p>' : ''}
-      ${rest.length ? `<ol class="mt-list">${rest.map((x, i) => `<li class="${x.me ? 'me' : ''}" style="--i:${i}"><i>${num(x.rank)}</i>${avatar(x.pet, { size: 'mini', form: 1 })}<b>${esc(x.name)}</b><em>${matchTime(x.ms)}</em></li>`).join('')}</ol>` : ''}`
-      : '<p class="yb-muted">아직 이번 주 기록이 없어요. 첫 기록의 주인공이 되어 봐요!</p>'}
+      ${above ? `<p class="mt-chase"><b>${esc(above.name)}</b>까지 <em>${((me.ms - above.ms) / 1000).toFixed(2)}초</em>! 한 판 더?</p>` : me?.rank === 1 ? `<p class="mt-chase top">${scopeName} 1등이에요! 👑</p>` : ''}
+      ${rest.length ? `<ol class="mt-list">${rest.map((x, i) => `<li class="${x.me ? 'me' : ''}" style="--i:${i}"><i>${num(x.rank)}</i>${avatar(x.pet, { size: 'mini', form: 1 })}<b>${esc(x.name)}${where(x)}</b><em>${matchTime(x.ms)}</em></li>`).join('')}</ol>` : ''}`
+      : `<p class="yb-muted">${period === 'week' ? '아직 이번 주 기록이 없어요.' : '아직 기록이 없어요.'} 첫 기록의 주인공이 되어 봐요!</p>`}
     <button type="button" class="yl-cta" data-mt="again">도전하기</button>
   </section>`);
   if (!rows.length) return;
