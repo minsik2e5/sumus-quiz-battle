@@ -12,7 +12,8 @@ import { MATCH, matchPick, matchStars, matchTime } from './match-rules.js';
 // 결과(별 도장 · 신기록 도장 · 코인이 지갑으로 날아감 · 틀린 단어 복습), 이번 주 반 시상대, 펫 반응.
 // 클래스는 mt-(단어 미니게임의 mg-와 겹치지 않게).
 
-// 그림(주문서 29)이 들어오면 이름을 넣는다. 없으면 코드 그림(CSS)으로 나온다.
+// 그림(주문서 30)이 들어오면 이름을 넣는다. 없으면 코드 그림(CSS)으로 나온다.
+// 'entry'(주문서 32)는 놀이터 짝 맞추기 카드 그림(public/assets/match/entry.webp, arcade-games.js matchCard).
 export const MATCH_ART = new Set([]);
 const ART_NAMES = ['bg', 'card-en', 'card-ko', 'card-back', 'star', 'ribbon', 'stamp', 'podium', 'fever'];
 const artStyle = () => ART_NAMES.filter(n => MATCH_ART.has(n)).map(n => `--art-${n}:url(/assets/match/${n}.webp)`).join(';');
@@ -25,8 +26,9 @@ const WARN_MS = 3000;                      // 별 기준선 3초 전부터 링�
 
 let M = null;
 const root = () => document.getElementById('app');
-const REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
-const reduced = () => REDUCED.matches;
+// V13.158 놀이터(arcade.js)가 MATCH_ART를 부르므로 불러올 때 브라우저 기능을 쓰지 않는다.
+let REDUCED = null;
+const reduced = () => (REDUCED ||= matchMedia('(prefers-reduced-motion: reduce)')).matches;
 const LITE = (navigator.hardwareConcurrency || 8) <= 4; // 저사양 폰은 조각을 줄인다
 const sfx = (key, opts) => { if (soundOn()) playSound(key, opts); };
 const buzz = p => { try { if (soundOn()) navigator.vibrate?.(p); } catch {} };

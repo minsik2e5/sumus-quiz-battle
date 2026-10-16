@@ -1941,3 +1941,4 @@
 "31c-fishing-rod-icons.txt","505","낚싯대 아이콘 5단계 · 강화 연출","왼쪽 아래","fishing-fx-hammer","강화 망치 반짝","public/assets/fishing/fx-hammer.webp"
 "31c-fishing-rod-icons.txt","505","낚싯대 아이콘 5단계 · 강화 연출","오른쪽 아래","fishing-stamp-tier","강화 단계 도장 틀","public/assets/fishing/stamp-tier.webp"
 "31d-fishing-forge-background.txt","506","강화 작업대 배경","한 장","fishing-bg-forge","강화 작업대 배경","public/assets/fishing/bg-forge.webp"
+"32-match-entry.txt","507","놀이터 짝 맞추기 입구 그림","한 장","match-entry","놀이터 짝 맞추기 입구 카드 그림(가로)","public/assets/match/entry.webp"

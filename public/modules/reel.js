@@ -36,8 +36,9 @@ const pearlIco = () => art('pearl', '<i class="rl-pearl-ico"></i>');
 
 let R = null;
 const root = () => document.getElementById('app');
-const REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
-const reduced = () => REDUCED.matches;
+// V13.158 놀이터(arcade.js)가 FISHING_ART를 부르므로 불러올 때 브라우저 기능을 쓰지 않는다(서버 검사도 이 파일을 부른다).
+let REDUCED = null;
+const reduced = () => (REDUCED ||= matchMedia('(prefers-reduced-motion: reduce)')).matches;
 const sfx = (key, opts) => { if (soundOn()) playSound(key, opts); };
 const buzz = p => { try { if (soundOn()) navigator.vibrate?.(p); } catch {} };
 function later(fn, ms) { const cur = R; const t = setTimeout(() => { if (R === cur && !cur.closing) fn(); }, ms); cur.timers.push(t); return t; }
