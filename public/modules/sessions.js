@@ -46,7 +46,7 @@ function disarmTestGuard() {
   window.removeEventListener('popstate', testBackGuard);
   practiceGuardId = null;
 }
-export function leaveSession() { clearInterval(timer); clearTimeout(debounce); clearTimeout(practiceAdvanceTimer); timer = null; practiceAdvanceTimer = null; prefetchedPractice = null; practiceOffset = 0; practiceAutoFinishing = false; practiceQuestionTimingOut = false; pendingPracticeSave = false; serverNext.clear(); lastServerAnswer = null; disarmTestGuard(); A.screen = null; }
+export function leaveSession() { clearInterval(timer); clearTimeout(debounce); clearTimeout(practiceAdvanceTimer); timer = null; practiceAdvanceTimer = null; prefetchedPractice = null; practiceOffset = 0; practiceAutoFinishing = false; practiceQuestionTimingOut = false; pendingPracticeSave = false; serverNext.clear(); lastServerAnswer = null; brokenSession = null; disarmTestGuard(); A.screen = null; }
 export async function openExam(eid) {
   const e = A.data.exams.find(e => e.id === eid); if (!e) return;
   const close = modal(`<span class="pill">실전시험</span><h2>${esc(e.title)}</h2><p>${e.school} · ${esc(scope(e))}</p><div class="detail-grid"><div><b>${EXAM_TYPES[e.exam_type].label}</b><small>한 가지 유형으로 출제</small></div><div><b>${e.question_count}문제</b><small>제한시간 ${Math.round(e.duration_sec / 60)}분</small></div><div><b>${e.max_attempts}회</b><small>응시 가능 횟수</small></div><div><b>${e.passing_score}점</b><small>통과 기준</small></div></div><div class="exam-info">${icon('clock')}<p>시작하면 시간이 흐릅니다.<br>시간이 끝나면 저장된 답안이 자동 제출돼요.</p></div><button class="btn ink full" id="begin-exam">${A.data.attempts.some(a => a.exam_id === eid && a.status === 'active') ? '이어서 응시하기' : '시험 시작하기'}</button>`, '실전시험 시작');
@@ -1024,7 +1024,7 @@ document.addEventListener('visibilitychange', () => {
     else if (practiceState.timer_mode === 'question' && questionLeftMs(practiceState) <= 0) timeoutPracticeQuestion();
     // Only a practice that has a time limit can run out of time (ordinary practice has none:
     // without this check a quick app switch used to end it early).
-    else if (practiceState.timer_mode !== 'question' && Number(practiceState.deadline || 0) > 0 && Number(practiceState.deadline) <= Date.now() + practiceOffset) finishPracticeByTimer();
+    else if (practiceState.timer_mode !== 'question' && Number(practiceState.deadline || 0) > 0 && Number(practiceState.deadline) <= Date.now() + practiceOffset && !answering) finishPracticeByTimer();
   }
 });
 window.addEventListener('pagehide', () => { if (A?.screen === 'exam') localSave(); });

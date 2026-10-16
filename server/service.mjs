@@ -1827,7 +1827,7 @@ export async function service(state, method, path, body, token, options = {}) {
   // V13.154 낚싯대 강화(진주로 1~5단계).
   if (path === '/reel/rod' && method === 'POST') {
     requireRole(p, 'student');
-    const res = reelRodUp(p);
+    const res = reelRodUp(p, body.from ?? null);
     return { ...res, reel: reelView(p) };
   }
   if (path === '/reel/exchange' && method === 'POST') {
@@ -2728,6 +2728,14 @@ export async function service(state, method, path, body, token, options = {}) {
       const timedOut = x.timer_mode === 'question' && Number(x.question_deadline || 0) > 0 && (Date.now() >= Number(x.question_deadline) + (x.run_mode === 'test' ? TEST_ANSWER_GRACE_MS : 0) || (body.timed_out === true && Date.now() + 150 >= Number(x.question_deadline)));
       const submittedAnswer = timedOut ? '' : body.answer;
       const word = findWord(state, x.question.word_id);
+      // V13.157 풀던 단어가 단어장에서 빠졌으면(선생님이 철자를 고침 · 단어장 다시 가져오기) 채점하지 않고 그 문제를 건너뛴다.
+      // 예전: 답마다 500이라 "연결을 확인하고 있어요"가 이어지고 연습 · 시험이 막혔다.
+      if (!word) {
+        if (x.next_preview && !findWord(state, x.next_preview.question?.word_id)) x.next_preview = null;
+        x.feedback = null;
+        nextPractice(x, state);
+        return { ...practiceView(x, state), skipped_missing_word: true };
+      }
       const ok = timedOut ? false : grade(x.question.type, submittedAnswer, wordForGrade(state, word));
       x.total++; x.last = word.id;
       const scoredAttempt = !x.question_is_retry && Number(x.score_total || 0) < Number(x.target || 0);
@@ -2854,6 +2862,8 @@ function nextPractice(x, state, preparePreview = true) {
     word = words.find(w => w.id === retry.id);
     isRetry = true;
   } else word = choosePracticeWord(words, state.mastery[x.student_id] || {}, x);
+  // V13.157 다시 낼 단어 · 넘긴 단어가 단어장에서 빠졌으면 다른 단어로.
+  if (!word) { x.retry = x.retry.filter(r => words.some(w => w.id === r.id)); word = choosePracticeWord(words, state.mastery[x.student_id] || {}, { ...x, retry: [] }); isRetry = false; }
   if (!x.seen.includes(word.id)) x.seen.push(word.id);
   const mode = x.mode === 'mixed' ? shuffle(Object.keys(PRACTICE_TYPES).filter(k => k !== 'mixed'))[0] : x.mode;
   x.question = buildQuestion(word, mode, words); x.question_id = id(); x.question_is_retry = isRetry; x.feedback = null;

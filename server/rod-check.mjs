@@ -29,7 +29,7 @@ export function runRodChecks(assert) {
   assert(landed.caught, 'V13.154 5단계 낚싯대는 최소 파이팅 시간을 감는 속도(1.25배)만큼 줄여서 본다');
   // 화면: 파이팅에 낚싯대 값을 쓰고, 코드 낚싯대 · 릴 색이 단계마다 바뀌며, 그림 31을 쓴다. 반 전체 낚시는 쓰지 않는다.
   const ui = source('../public/modules/reel.js');
-  assert(['(40 + pull * 22) * rod.tension * dt', '/ Math.pow(pull, .35) * rod.reel * dt', 'f.skill + 7 * rod.skill * dt', 'if (f.redFor > rod.snap) return lose('].every(x => ui.includes(x)) && ui.includes('function paintRod()') && ui.includes('data-rl="rod"') && ui.includes("api('/reel/rod', {})"),
+  assert(['(40 + pull * 22) * rod.tension * dt', '/ Math.pow(pull, .35) * rod.reel * dt', 'f.skill + 7 * rod.skill * dt', 'if (f.redFor > rod.snap) return lose('].every(x => ui.includes(x)) && ui.includes('function paintRod()') && ui.includes('data-rl="rod"') && ui.includes("api('/reel/rod', { from: myRod().level })"),
     'V13.154 파이팅에 낚싯대 값(텐션 · 감기 · 특기 · 빨간 칸)을 쓰고, 강화하면 낚싯대 색이 바로 바뀐다');
   const pub = new URL('../public/assets/fishing/', import.meta.url);
   const art = [2, 3, 4, 5].flatMap(t => [`pov-rod-t${t}`, `pov-reel-t${t}`]).concat([1, 2, 3, 4, 5].map(t => `icon-rod-${t}`), ['fx-upgrade', 'fx-hammer', 'stamp-tier', 'bg-forge']);

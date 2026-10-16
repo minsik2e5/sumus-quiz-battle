@@ -1053,7 +1053,7 @@ function rodSheet() {
 async function rodUp(b) {
   buttonBusy(b);
   try {
-    const res = await api('/reel/rod', {});
+    const res = await api('/reel/rod', { from: myRod().level });
     setView(res.reel);
     paintRod();
     const ico = $('rl-rod-ico'); if (ico) ico.innerHTML = art(`icon-rod-${res.rod}`, '<i class="rl-ico-rod"></i>');
@@ -1065,7 +1065,11 @@ async function rodUp(b) {
     sfx('smash'); buzz(25);
     later(() => { sfx('levelup'); box.classList.add('lit'); }, reduced() ? 0 : 520);
     later(() => { box.remove(); rodSheet(); }, reduced() ? 900 : 2600);
-  } catch (err) { toast(err.message); buttonBusy(b, false); }
+  } catch (err) {
+    toast(err.message); buttonBusy(b, false);
+    // V13.157 이미 강화됐으면(응답을 못 받고 다시 누름) 지금 단계로 창을 다시 그린다.
+    if (err.status === 409) api('/reel/guide', {}).then(res => { setView(res.reel); paintRod(); const ico = $('rl-rod-ico'); if (ico) ico.innerHTML = art(`icon-rod-${myRod().level}`, '<i class="rl-ico-rod"></i>'); rodSheet(); }).catch(() => {});
+  }
 }
 async function exchangeCoins(n, b) {
   buttonBusy(b);

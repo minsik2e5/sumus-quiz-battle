@@ -107,8 +107,10 @@ export function reelSell(p, { key = null, n = null } = {}) {
   return { sold, pearls };
 }
 // V13.154 낚싯대 강화: 진주 ROD.COST[다음 단계]를 쓰고 한 단계 올린다(5단계까지).
-export function reelRodUp(p) {
+// V13.157 from: 화면이 본 지금 단계. 응답을 못 받고 다시 누르면 다음 단계까지 두 번 올리지 않게 막는다.
+export function reelRodUp(p, from = null) {
   const r = reel(p), now = rodLevel(r.rod);
+  if (from != null && Number(from) !== now) fail('낚싯대가 이미 강화됐어요. 화면을 다시 확인해 주세요.', 409);
   if (now >= ROD.MAX) fail('낚싯대가 이미 최고 단계예요!', 409);
   const cost = ROD.COST[now + 1];
   if (Number(r.pearls || 0) < cost) fail(`진주가 ${cost - Number(r.pearls || 0)}개 부족해요.`);
