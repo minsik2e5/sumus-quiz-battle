@@ -7,8 +7,10 @@ import { service, settleBattle } from './service.mjs';
 import { createCompetition } from './competition.mjs';
 import { EGG_PRICE, meaningAccepted } from '../public/modules/core.js';
 import { TITLES, TITLE_COINS, titleCoins, titleUnlocked } from '../public/modules/titles.js';
-import { STUDY_COINS, BOT_WIN_REWARDS, BOT_TRY_REWARD, GIFT_AMOUNTS } from '../public/modules/rewards.js';
-import { botStart, botFinish } from './rewards.mjs';
+import { STUDY_COINS, BOT_WIN_REWARDS, BOT_TRY_REWARD, GIFT_AMOUNTS, GIFT_MAX, giftAmountOk } from '../public/modules/rewards.js';
+import { botStart, botFinish, giveGift } from './rewards.mjs';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 export async function runCoinsChecks(assert, expectStatus) {
   const state = emptyState();
@@ -100,7 +102,12 @@ export async function runCoinsChecks(assert, expectStatus) {
 
   /* ---------- teacher gifts ---------- */
   await expectStatus(403, () => service(state, 'POST', '/teacher/gifts', { amount: 30, all: true }, tokens['qa-co-a']), 'V13.73 students cannot send gifts');
-  await expectStatus(400, () => service(state, 'POST', '/teacher/gifts', { amount: 7, all: true }, tokens['qa_co_teacher']), 'V13.73 a gift is one of the set amounts');
+  // V13.159 코인 수는 선생님이 직접 넣는다: 1 ~ GIFT_MAX 사이의 정수만(0 · 음수 · 소수 · 너무 큰 수는 막는다).
+  for (const amount of [0, -5, 2.5, GIFT_MAX + 1, 'abc']) await expectStatus(400, () => service(state, 'POST', '/teacher/gifts', { amount, all: true }, tokens['qa_co_teacher']), `V13.159 선물 코인 ${amount}은 막는다`);
+  assert(giftAmountOk(7) && giftAmountOk(1) && giftAmountOk(GIFT_MAX) && !giftAmountOk(0) && !giftAmountOk(GIFT_MAX + 1) && !giftAmountOk(2.5) && GIFT_MAX === 1000, 'V13.159 선물 코인은 1~1000 사이 정수면 아무 수나 된다');
+  { const dummy = {}; giveGift(dummy, { amount: 7, id: 'g7', from: 't', fromName: '선생님' }); assert(dummy.gift_box.total === 7 && dummy.gift_box.log[0].amount === 7, 'V13.159 버튼에 없는 수(7코인)도 선물할 수 있다'); }
+  const appSrc = readFileSync(fileURLToPath(new URL('../public/app.js', import.meta.url)), 'utf8');
+  assert(appSrc.includes('<input id="gift-amount" type="text" inputmode="numeric"') && appSrc.includes("$('#gift-amount').oninput") && appSrc.includes("$('#gift-amount').value = st.amount;") && appSrc.includes('button.disabled = !n || !ok;'), 'V13.159 선생님 선물 창: 빠른 버튼 + 코인 수 직접 입력, 범위 밖이면 보내기 버튼이 꺼진다');
   const beforeGift = await balance('qa-co-a');
   const toClass = await service(state, 'POST', '/teacher/gifts', { amount: GIFT_AMOUNTS[1], class_name: '고1A', note: '이번 주 최고!' }, tokens['qa_co_teacher']);
   assert(toClass.sent === 2 && toClass.total === 2 * GIFT_AMOUNTS[1] && toClass.gifts_sent[0].label === '고1A', 'V13.73 a teacher gifts a whole class (only active students of the school)');

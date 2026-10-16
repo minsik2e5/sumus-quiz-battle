@@ -5,7 +5,7 @@ import { TITLES, TITLE_KEYS, titleUnlocked, weeklyTitle } from '../public/module
 import { battleQuestions, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
 import { monsterParts } from '../public/modules/monsters.js';
-import { STUDY_COINS, GIFT_AMOUNTS, RPS_MAX_WINS } from '../public/modules/rewards.js';
+import { STUDY_COINS, GIFT_MAX, giftAmountOk, RPS_MAX_WINS } from '../public/modules/rewards.js';
 import { marketView, trade as stockTrade, rebaseMarket, newMarket } from './market.mjs';
 import { MARKET_OPEN } from '../public/modules/market.js';
 // V13.82 문법 증권거래소 is on hold: closed unless switched on.
@@ -1523,7 +1523,7 @@ export async function service(state, method, path, body, token, options = {}) {
     // V13.111: `kind: 'egg'` sends a 선생님 알 (기본 84% · 영웅 15% · 전설 1%) instead of coins.
     const egg = body.kind === 'egg';
     const amount = egg ? 0 : Number(body.amount);
-    if (!egg && !GIFT_AMOUNTS.includes(amount)) fail('선물할 코인을 골라주세요.');
+    if (!egg && !giftAmountOk(amount)) fail(`선물할 코인은 1~${GIFT_MAX}개 사이로 넣어 주세요.`);
     const pool = state.profiles.filter(x => isRankedStudent(x) && schoolForProfile(state, x)?.id === school.id);
     const className = str(body.class_name, 20);
     const ids = new Set((Array.isArray(body.student_ids) ? body.student_ids : []).map(value => str(value, 80)).filter(Boolean));
