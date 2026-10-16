@@ -425,6 +425,15 @@ export async function runRewardsChecks(assert, expectStatus) {
   const tT = tokens['qa_rw_teacher'];
   const previewLogin = await service(state, 'POST', '/teacher/student-preview', { school_id: 'danwon-high', grade: '고1A' }, tT);
   const previewId = previewLogin.profile.id;
+  {
+    const pv = state.profiles.find(x => x.id === previewId);
+    assert(pv.reel.bait === 99 && pv.reel.pearls === 50000, 'V13.156 교사 미리보기 계정은 들어올 때 미끼 99 · 진주 50,000을 채운다');
+    pv.reel.bait = 3; pv.reel.pearls = 80000;
+    await service(state, 'POST', '/teacher/student-preview', { school_id: 'danwon-high', grade: '고1A' }, tT);
+    assert(pv.reel.bait === 99 && pv.reel.pearls === 80000, 'V13.156 다시 들어오면 모자란 것만 채우고 더 많은 진주는 줄이지 않는다');
+    const real = state.profiles.find(x => x.role === 'student' && !x.preview_owner_id);
+    assert(!(Number(real?.reel?.bait || 0) >= 99), 'V13.156 진짜 학생 계정은 채우지 않는다');
+  }
   assert(!(await service(state, 'GET', '/battle/friends', {}, tF)).friends.some(f => f.id === previewId), 'V13.81 a preview account is not in the 도전장 list');
   await expectStatus(404, () => service(state, 'PATCH', `/students/${encodeURIComponent(previewId)}`, { password: 'Changed1!' }, tT), 'V13.81 a preview account cannot be edited as a student');
   const fakeToken = 'qa-preview-fake-token-81';

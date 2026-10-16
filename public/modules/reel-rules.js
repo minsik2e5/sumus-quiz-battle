@@ -8,6 +8,7 @@ export const REEL = {
   BAIT_DAILY: 5,          // 하루에 벌 수 있는 미끼
   BAIT_MAX: 10,           // 들고 있을 수 있는 미끼
   BAIT_MIN_PRACTICE: 10,  // 이만큼 끝까지 푼 연습이 미끼 1개
+  PREVIEW: { BAIT: 99, PEARLS: 50000 }, // V13.156 교사 미리보기 계정: 들어올 때마다 이만큼 채운다(순위 · 대결에서 빠진 계정)
   PEARLS: { common: 10, uncommon: 25, rare: 60, epic: 150, legend: 400, golden: 0 },
   COIN_DAILY: 100,        // 진주 → 코인(1:1) 하루 한도
   EGG: 600, EGG_DAILY: 1,
