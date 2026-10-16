@@ -78,10 +78,11 @@ export const MATCH_PERIODS = ['week', 'all'];
 const inScope = (x, p, scope) => scope === 'class' ? x.school_id === p.school_id && x.class_name === p.class_name : scope === 'school' ? x.school_id === p.school_id : true;
 const recordOf = (x, period, weekKey) => { const r3 = r3Of(x.games?.match); if (!r3) return null; return period === 'all' ? (r3.best ? r3 : null) : (r3.week?.key === weekKey && r3.week.best ? r3.week : null); };
 function boardRows(profiles, p, weekKey, { hidden = () => false, scope = 'all', period = 'week' } = {}) {
-  const rows = profiles.filter(x => x.role === 'student' && x.active !== false && inScope(x, p, scope) && recordOf(x, period, weekKey))
+  // V13.157 교사 미리보기 계정은 순위 · 고스트에서 뺀다(자기 줄만 보인다).
+  const rows = profiles.filter(x => x.role === 'student' && x.active !== false && (!x.preview_owner_id || x.id === p.id) && inScope(x, p, scope) && recordOf(x, period, weekKey))
     .map(x => {
       const rec = recordOf(x, period, weekKey), veil = x.id !== p.id && hidden(x);
-      return { id: x.id, me: x.id === p.id, name: veil ? '비공개 학생' : x.display_name, pet: veil ? 'lumi' : (x.avatar_key || 'lumi'), school: veil ? '' : (x.school || ''), class_name: veil ? '' : (x.class_name || ''), ms: rec.best, splits: rec.splits || null };
+      return { id: veil ? null : x.id, me: x.id === p.id, name: veil ? '비공개 학생' : x.display_name, pet: veil ? 'lumi' : (x.avatar_key || 'lumi'), school: veil ? '' : (x.school || ''), class_name: veil ? '' : (x.class_name || ''), ms: rec.best, splits: rec.splits || null };
     })
     .sort((a, b) => a.ms - b.ms);
   rows.forEach((r, i) => { r.rank = i + 1; });

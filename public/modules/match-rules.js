@@ -26,18 +26,22 @@ export const cardMeaning = meaning => String(meaning || '').split(/[,;·/]|\s\(/
 export function matchPick(words, { missed = [], random = Math.random, pairs = MATCH.PAIRS, skip = [] } = {}) {
   const miss = new Set(missed.map(String)), used = new Set(skip.map(String));
   // V13.152 skip: 앞 라운드에 나온 단어는 단어가 넉넉하면 다시 내지 않는다.
-  const fresh = (words || []).filter(w => !used.has(String(w.id))), list = fresh.length >= pairs ? fresh : (words || []);
-  const pool = [...shuffle(list.filter(w => miss.has(String(w.id))), random), ...shuffle(list.filter(w => !miss.has(String(w.id))), random)];
-  const out = [], seenEn = new Set(), seenKo = new Set();
-  for (const w of pool) {
-    const en = displayEnglish(w.word || '').trim(), ko = cardMeaning(w.meaning);
-    if (!en || !ko || en.length > 22 || ko.length > 16) continue;
-    if (seenEn.has(en.toLowerCase()) || seenKo.has(ko)) continue;
-    seenEn.add(en.toLowerCase()); seenKo.add(ko);
-    out.push({ id: w.id, en, ko });
-    if (out.length >= pairs) break;
-  }
-  return out;
+  // V13.157: 남은 단어가 카드에 안 들어가는 긴 말이라 6쌍이 안 되면 전체에서 다시 고른다(예전: 빈 라운드에서 게임이 멈췄다).
+  const pickFrom = list => {
+    const pool = [...shuffle(list.filter(w => miss.has(String(w.id))), random), ...shuffle(list.filter(w => !miss.has(String(w.id))), random)];
+    const out = [], seenEn = new Set(), seenKo = new Set();
+    for (const w of pool) {
+      const en = displayEnglish(w.word || '').trim(), ko = cardMeaning(w.meaning);
+      if (!en || !ko || en.length > 22 || ko.length > 16) continue;
+      if (seenEn.has(en.toLowerCase()) || seenKo.has(ko)) continue;
+      seenEn.add(en.toLowerCase()); seenKo.add(ko);
+      out.push({ id: w.id, en, ko });
+      if (out.length >= pairs) break;
+    }
+    return out;
+  };
+  const fresh = pickFrom((words || []).filter(w => !used.has(String(w.id))));
+  return fresh.length >= pairs || !used.size ? fresh : pickFrom(words || []);
 }
 // 시간 글: 12.34초
 export const matchTime = ms => `${(Math.max(0, ms) / 1000).toFixed(2)}초`;

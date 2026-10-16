@@ -32,7 +32,8 @@ export async function runPracticeLoad({ students = 40, rounds = 6, targetKB = 90
   // 워커와 같은 길: 연습 답 · 다음 · 패스는 빠른 길(있으면), 나머지는 저장까지 기다린다.
   const quick = coord.isQuickWrite || (() => false);
   const call = (who, method, path, body = {}) => method === 'GET' ? service(c.current().state, method, path, body, tokens[who])
-    : (quick(method, '/api' + path) ? c.fast : c.durable)(s => service(s, method, path, body, tokens[who]));
+    : quick(method, '/api' + path) ? c.fast(s => service(s, method, path, body, tokens[who]), coord.quickOwn?.('/api' + path), coord.quickSettle)
+      : c.durable(s => service(s, method, path, body, tokens[who]));
 
   const range = [...new Set(allBooks(state).filter(b => b.school_id === 'gangseo-high').flatMap(b => b.words || []).map(w => String(w.range_code)))][0];
   const practices = [];
