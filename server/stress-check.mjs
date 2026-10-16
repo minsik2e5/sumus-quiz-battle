@@ -5,6 +5,7 @@ import { passwordHash } from './auth.mjs';
 import { allBooks, service } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
 import { runDungeonLoadCheck } from './dungeon-load.mjs';
+import { runPracticeLoad } from './practice-load.mjs';
 
 const STUDENTS = 20;
 const QUESTIONS = 30;
@@ -143,7 +144,12 @@ export async function runStressCheck() {
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   // V13.128 던전: 한 반(10파티)과 여러 반(40파티)이 한꺼번에 방을 열고 결과를 보고할 때.
-  runStressCheck().then(() => runDungeonLoadCheck({ parties: 10 })).then(() => runDungeonLoadCheck({ parties: 40 })).catch(error => {
+  // V13.155 반 전체 연습(40명 · 9MB · 저장 1.5초 모으기): 답 하나가 저장 모으기를 기다리지 않는다(예전 p50 약 2.6초).
+  const practiceLoad = () => runPracticeLoad().then(r => {
+    assert(r.stateKB > 8500 && r.answers === 240 && r.answer.p95 < 500 && r.writes < 120, `반 전체 연습 답 p95 ${r.answer.p95}ms (500ms 아래여야), 저장 ${r.writes}번`);
+    console.log(`[practice-load] PASS · ${r.stateKB}KB · 학생 40명 답 ${r.answers}개 · 답 p50 ${r.answer.p50}ms · p95 ${r.answer.p95}ms · max ${r.answer.max}ms · 저장 ${r.writes}번`);
+  });
+  runStressCheck().then(practiceLoad).then(() => runDungeonLoadCheck({ parties: 10 })).then(() => runDungeonLoadCheck({ parties: 40 })).catch(error => {
     console.error(error);
     process.exitCode = 1;
   });
