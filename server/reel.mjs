@@ -1,11 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import { dayKey } from '../public/modules/core.js';
 import { FISH, FISH_KEYS } from '../public/modules/fishing-rules.js';
-import { REEL, FIGHT, FINISH, CAST_TIERS, SEA_PETS, reelRoll, pearlsOf, weekNum } from '../public/modules/reel-rules.js';
+import { REEL, FIGHT, FINISH, CAST_TIERS, SEA_PETS, ROD, rodLevel, rodOf, reelRoll, pearlsOf, weekNum } from '../public/modules/reel-rules.js';
 import { findReceipt, keepReceipt, giveGift } from './rewards.mjs';
 
 // V13.150 손맛 낚시(놀이터) 서버 쪽. 학생 기록 p.reel:
-//   { bait, bait_day, bait_today, pearls, net{key: n}, coin_day, coin_today, coins (받은 코인 합), egg_day, epic_week, live{…}, guide, done[] }
+//   { bait, bait_day, bait_today, pearls, net{key: n}, coin_day, coin_today, coins (받은 코인 합), egg_day, epic_week, live{…}, guide, done[], rod (V13.154 낚싯대 단계 1~5) }
 // 도감 · 황금 알 수는 예전 단어 낚시와 같은 p.games.fish.book · golden에 쌓는다.
 // 물고기는 던질 때(reelCast) 서버가 정하고, 끌어올렸다고 보내면(reelLand) 최소 파이팅 시간을 확인한 뒤 어망에 넣는다.
 
@@ -33,6 +33,7 @@ export function reelView(p, now = Date.now()) {
     egg_left: r.egg_day === today ? 0 : 1, epic_left: r.epic_week === weekNum(now) ? 0 : 1,
     book: f.book || {}, kinds: Object.keys(f.book || {}).length, all: FISH_KEYS.length, golden: Number(f.golden || 0) % REEL.GOLDEN_EGG,
     sea: SEA_PETS.map(x => ({ ...x, owned: (p.pets || []).some(pet => pet.key === x.key) })),
+    rod: rodLevel(r.rod), rod_next: rodLevel(r.rod) < ROD.MAX ? ROD.COST[rodLevel(r.rod) + 1] : null,
     guide: !!r.guide, tut: !!r.tut, live: r.live && now - r.live.at < REEL.LIVE_MS ? { id: r.live.id } : null
   };
 }
@@ -50,7 +51,8 @@ export function reelCast(p, { id, cast, water = false, now = Date.now(), seed = 
   r.bait -= 1;
   const tier = CAST_TIERS.includes(cast) ? cast : 'ok';
   const fish = reelRoll(seed, tier, { water });
-  r.live = { id, at: now, cast: tier, ...fish };
+  // V13.154 던질 때의 낚싯대 단계를 남긴다(끌어올릴 때 최소 파이팅 시간을 그만큼 줄여서 본다).
+  r.live = { id, at: now, cast: tier, rod: rodLevel(r.rod), ...fish };
   // 어떤 물고기인지는 보내지 않는다: 등급마다 같은 세기 · 성격만.
   return { id, fight: fightOf(r.live), bait: r.bait };
 }
@@ -64,7 +66,7 @@ export function reelLand(p, { id, result, finish = null, now = Date.now(), giftI
   delete r.live;
   let out;
   if (result !== 'caught') out = { caught: false };
-  else if (now - live.at + SLACK_MS < FIGHT[live.rarity].min) out = { caught: false, reason: 'short' };
+  else if (now - live.at + SLACK_MS < FIGHT[live.rarity].min / rodOf(live.rod).reel) out = { caught: false, reason: 'short' };
   else {
     const g = p.games ||= {}, f = g.fish ||= {}, book = f.book ||= {};
     // V13.150 마무리 퍼펙트: 무게 +8%(기록 · 자랑용, 진주 값은 그대로). 물고기의 무게 범위를 넘을 수 있다(그래서 '최고 무게').
@@ -103,6 +105,16 @@ export function reelSell(p, { key = null, n = null } = {}) {
   if (!sold) fail('팔 물고기가 없어요.', 409);
   r.pearls = Number(r.pearls || 0) + pearls;
   return { sold, pearls };
+}
+// V13.154 낚싯대 강화: 진주 ROD.COST[다음 단계]를 쓰고 한 단계 올린다(5단계까지).
+export function reelRodUp(p) {
+  const r = reel(p), now = rodLevel(r.rod);
+  if (now >= ROD.MAX) fail('낚싯대가 이미 최고 단계예요!', 409);
+  const cost = ROD.COST[now + 1];
+  if (Number(r.pearls || 0) < cost) fail(`진주가 ${cost - Number(r.pearls || 0)}개 부족해요.`);
+  r.pearls -= cost;
+  r.rod = now + 1;
+  return { rod: r.rod, cost, name: rodOf(r.rod).name };
 }
 // 진주로 코인(1:1, 하루 REEL.COIN_DAILY). 알 · 바다 펫은 service.mjs가 알을 깨는 함수와 함께 부른다(reelSpend).
 export function reelCoins(p, amount, now = Date.now()) {

@@ -31,7 +31,7 @@ import { activeEventFor, studentEventView, teacherEventView, teacherOwns, keptEv
 import { dungeonQuestions } from './dungeon-words.mjs';
 import { settleDungeonRecords, dungeonBoardsView, dungeonLastView } from './dungeon-records.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
-import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend, reelSeaPet } from './reel.mjs';
+import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend, reelSeaPet, reelRodUp } from './reel.mjs';
 import { REEL } from '../public/modules/reel-rules.js';
 import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './games.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
@@ -1819,6 +1819,12 @@ export async function service(state, method, path, body, token, options = {}) {
     const r = p.reel ||= {};
     if (body.tutorial) r.tut = true; else r.guide = true;
     return { reel: reelView(p) };
+  }
+  // V13.154 낚싯대 강화(진주로 1~5단계).
+  if (path === '/reel/rod' && method === 'POST') {
+    requireRole(p, 'student');
+    const res = reelRodUp(p);
+    return { ...res, reel: reelView(p) };
   }
   if (path === '/reel/exchange' && method === 'POST') {
     requireRole(p, 'student');

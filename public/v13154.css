@@ -1,0 +1,47 @@
+/* V13.154 낚싯대 강화: 강화 창(작업대 배경 · 큰 낚싯대 · 단계 도장 · 5단계 줄 · 좋아지는 것)과 강화 순간. 4 · 5단계 코드 낚싯대는 은은하게 빛난다. */
+.rl-ico-rod{display:block;width:34px;height:34px;border-radius:12px;background:linear-gradient(135deg,#5eead4,#0f766e)}
+.rl-rod-card{position:relative;display:grid;justify-items:center;gap:8px;padding:16px 12px 14px;border-radius:20px;background:linear-gradient(180deg,#fde7c4,#f4c98d);color:#4a2c0f;overflow:hidden}
+.rl-rod-card.art{background:url(/assets/fishing/bg-forge.webp) center 40%/cover}
+.rl-rod-card.art::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,rgba(255,247,237,.85));pointer-events:none}
+.rl-rod-card>*{position:relative;z-index:1}
+.rl-rod-card h3{margin:0;font-size:18px;font-weight:900;text-shadow:0 1px 0 rgba(255,255,255,.7)}
+.rl-rod-card h3 small{font-size:12px;font-weight:800;opacity:.75}
+.rl-rod-show{position:relative;width:min(56vw,220px);aspect-ratio:1;display:grid;place-items:center}
+.rl-rod-show .rl-rod-big{width:100%;height:100%;object-fit:contain;filter:drop-shadow(0 10px 14px rgba(0,0,0,.25))}
+.rl-rod-stamp{position:absolute;right:-6px;top:6px;width:64px;height:64px;display:grid;place-items:center}
+.rl-rod-stamp img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.rl-rod-stamp b{position:relative;font-size:24px;font-weight:900;color:#7c2d12}
+.rl-rod-steps{display:flex;gap:6px;margin:0;padding:0;list-style:none}
+.rl-rod-steps li{display:grid;justify-items:center;gap:2px;width:48px;padding:4px 0;border-radius:12px;background:rgba(255,255,255,.55);opacity:.55}
+.rl-rod-steps li img{width:36px;height:36px;object-fit:contain}
+.rl-rod-steps li small{font-size:11px;font-weight:900}
+.rl-rod-steps li.done{opacity:.85}
+.rl-rod-steps li.now{opacity:1;background:#fff;box-shadow:0 0 0 2px #f59e0b}
+.rl-perks{display:grid;gap:6px;margin:6px 0 8px;padding:0;list-style:none}
+.rl-perks li{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:rgba(255,255,255,.08);font-size:14px}
+.rl-perks li b{font-variant-numeric:tabular-nums}
+.rl-perks li i{font-style:normal;opacity:.6}
+.rl-perks li em{font-style:normal;font-weight:900;color:#34d399;font-variant-numeric:tabular-nums}
+.rl-rod-up{width:100%}
+.rl-rod-max{text-align:center;font-weight:900;color:#fbbf24}
+.rl-rodup{position:absolute;inset:0;z-index:30;display:grid;place-items:center;background:rgba(10,15,30,.72);animation:rl-rodup-in .25s ease-out}
+.rl-rodup-in{position:relative;display:grid;justify-items:center;gap:6px;color:#fff;text-align:center}
+.rl-rodup-in .rays{position:absolute;top:-70px;width:280px;height:280px;opacity:0;transform:scale(.4);transition:opacity .4s,transform .6s cubic-bezier(.2,1.4,.4,1)}
+.rl-rodup-rays{position:absolute;top:-70px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(253,230,138,.9),transparent 65%);opacity:0;transition:opacity .4s}
+.rl-rodup-in .rod{position:relative;width:150px;height:150px;object-fit:contain;transform:scale(.7);transition:transform .5s cubic-bezier(.2,1.6,.4,1)}
+.rl-rodup-hammer{position:absolute;top:-10px;right:-40px;width:90px;height:90px;transform-origin:80% 80%;animation:rl-hammer .52s cubic-bezier(.5,0,.7,1) both}
+.rl-rodup-hammer img{width:100%;height:100%;object-fit:contain}
+.rl-rodup-stamp{position:relative;width:58px;height:58px;display:grid;place-items:center;opacity:0;transform:scale(2);transition:opacity .2s .35s,transform .35s .35s cubic-bezier(.3,1.6,.5,1)}
+.rl-rodup-stamp img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.rl-rodup-stamp b{position:relative;font-size:22px;font-weight:900;color:#7c2d12}
+.rl-rodup-in strong{font-size:22px;font-weight:900;opacity:0;transition:opacity .3s .3s}
+.rl-rodup-in small{font-size:13px;opacity:0;transition:opacity .3s .45s}
+.rl-rodup.lit .rays,.rl-rodup.lit .rl-rodup-rays{opacity:1;transform:scale(1)}
+.rl-rodup.lit .rod{transform:scale(1)}
+.rl-rodup.lit .rl-rodup-hammer{opacity:0;transition:opacity .2s}
+.rl-rodup.lit .rl-rodup-stamp,.rl-rodup.lit strong,.rl-rodup.lit small{opacity:1;transform:none}
+@keyframes rl-rodup-in{from{opacity:0}}
+@keyframes rl-hammer{0%{transform:rotate(-55deg)}70%{transform:rotate(12deg)}100%{transform:rotate(0)}}
+.rl-rig[data-rod="4"] .rl-rod-body,.rl-rig[data-rod="5"] .rl-rod-body{filter:drop-shadow(0 6px 8px rgba(0,0,0,.35)) drop-shadow(0 0 6px rgba(167,139,250,.75))}
+.rl-rig[data-rod="5"] .rl-rod-body{filter:drop-shadow(0 6px 8px rgba(0,0,0,.35)) drop-shadow(0 0 8px rgba(253,230,138,.9))}
+@media (prefers-reduced-motion:reduce){.rl-rodup,.rl-rodup-hammer{animation:none}.rl-rodup *{transition:none!important}}
