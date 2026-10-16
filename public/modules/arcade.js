@@ -9,7 +9,9 @@ import { luckyCard, luckyShow, machineSpin, machineDrop, unlockSound } from './l
 import { rpsCard, rpsMatch } from './rps.js';
 import { stocksCard, loadMarket, openStock, startStockClock } from './stocks.js';
 import { RPS_BETS } from './rewards.js';
-import { gamesSection } from './arcade-games.js';
+import { gamesSection, partyRow } from './arcade-games.js';
+import { FISHING_ART } from './reel.js';
+import { MATCH_ART } from './match-game.js';
 
 // 놀이터: the coin capsule (코인 뽑기, V13.68) and the egg shop, plus the decorations kept from the retired V13.67 capsule machine (모은 꾸미기, under 나). The server
 // decides everything (server/rewards.mjs); this module draws `[data-arcade]` and keeps it up to
@@ -44,19 +46,11 @@ const tierTag = tier => `<span class="ga-tier t-${tier}">${GACHA_TIERS[tier].nam
 
 /* ---------- page ---------- */
 export function arcadePage(A) {
-  return `<div class="page-heading arcade-head">${uiArt('arcade', 'arcade-head-art')}<span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>낚시 · 짝 맞추기 · 교실 게임, 그리고 모은 코인으로 뽑기와 알 상점.</p></div>
+  return `<div class="page-heading arcade-head">${uiArt('arcade', 'arcade-head-art')}<span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>낚시 · 짝 맞추기, 모은 코인으로 뽑기와 알 상점, 그리고 교실 게임.</p></div>
     <button type="button" class="arcade-wallet" data-action="coins" aria-label="코인 지갑 열기"><span>${coin()}<b id="ga-balance">${num(A.data.stats?.points_balance || 0)}</b> 코인</span><small>코인 지갑 ${icon('chevron')}</small></button>
-    ${gamesSection(A, reelEntry(A))}
-    <div data-arcade></div>`;
-}
-// V13.150 놀이터 낚시터 입구(손맛 낚시, reel.js).
-function reelEntry(A) {
-  const v = A.data.rewards?.reel || {};
-  return `<button type="button" class="rl-entry" data-action="reel-open" aria-label="낚시터 들어가기">
-    <span class="rl-entry-sea" aria-hidden="true"><i class="w1"></i><i class="w2"></i><i class="rl-entry-bob"></i></span>
-    <span class="rl-entry-copy"><small>NEW · 손맛 낚시</small><strong>낚시터</strong><em>공부로 받은 미끼로 낚고, 물고기를 진주로 바꿔요</em></span>
-    <span class="rl-entry-stat"><b>🪱 ${num(v.bait || 0)}</b><small>미끼</small></span>
-  </button>`;
+    ${gamesSection(A, { fishing: FISHING_ART, match: MATCH_ART })}
+    <div data-arcade></div>
+    ${partyRow()}`;
 }
 // V13.68: decorations pulled from the retired capsule machine, under 나 (only for their owners).
 export function gachaBookPage() {

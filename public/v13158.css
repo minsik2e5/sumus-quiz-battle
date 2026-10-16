@@ -1,0 +1,46 @@
+/* V13.158 놀이터 게임 카드: 낚시터 · 짝 맞추기를 그림이 크게 들어간 카드로(뽑기 · 알 상점처럼), 교실 게임 참가는 맨 아래 한 줄. */
+.ag-group{gap:14px}
+.ag-big{position:relative;overflow:hidden;border-radius:24px;color:#fff;box-shadow:0 16px 34px rgba(15,23,42,.28)}
+.ag-reel{background:linear-gradient(180deg,#0c4a6e,#082f49)}
+.ag-match{background:linear-gradient(180deg,#312e81,#1e1b4b)}
+.ag-big-art{position:relative;display:block;aspect-ratio:16/9;overflow:hidden}
+.ag-big-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.ag-big-art::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(0,0,0,0) 38%,rgba(0,0,0,.55) 100%)}
+.ag-reel .ag-big-art::after{background:linear-gradient(180deg,rgba(8,47,73,0) 40%,rgba(8,47,73,.92) 100%)}
+.ag-match .ag-big-art::after{background:linear-gradient(180deg,rgba(30,27,75,0) 40%,rgba(30,27,75,.92) 100%)}
+.ag-big-title{position:absolute;z-index:1;left:16px;right:16px;bottom:10px;display:flex;flex-direction:column;gap:2px;text-shadow:0 2px 8px rgba(0,0,0,.45)}
+.ag-big-title small{align-self:flex-start;font-size:11px;font-weight:900;letter-spacing:.04em;padding:3px 9px;border-radius:99px;background:rgba(255,255,255,.22);color:#fde68a;text-shadow:none}
+.ag-big-title strong{font-size:26px;line-height:1.15;letter-spacing:-.03em}
+.ag-big-title em{font-style:normal;font-size:12.5px;opacity:.92;word-break:keep-all}
+.ag-big-body{position:relative;display:grid;gap:10px;padding:4px 14px 14px}
+.ag-stats{list-style:none;margin:0;padding:0;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:8px}
+.ag-stats li{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;column-gap:6px;align-items:center;padding:7px 10px;border-radius:14px;background:rgba(255,255,255,.13)}
+.ag-stats li:not(:has(.ag-ico)){grid-template-columns:1fr;text-align:center}
+.ag-stats .ag-ico{grid-row:1/3;width:30px;height:30px;object-fit:contain;font-style:normal;font-size:22px;line-height:30px;text-align:center}
+.ag-stats b{font-size:16px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ag-stats small{font-size:11px;opacity:.8}
+.ag-big .ag-words{margin:0}
+.ag-big .ag-go{margin:0;width:100%}
+/* 그림이 오기 전 모습: 낚시터는 코드 바다, 짝 맞추기는 밤 무대 위 단어 카드(brave · 용감한). */
+.ag-sea{background:linear-gradient(180deg,#7dd3fc 0,#38bdf8 45%,#0369a1 100%)}
+.ag-sea i{position:absolute;left:-50%;width:200%;height:24px;background:radial-gradient(ellipse at 50% 0,rgba(255,255,255,.45),transparent 60%) 0 0/56px 24px repeat-x;animation:fs-wave 8s linear infinite}
+.ag-sea .w1{bottom:42%}.ag-sea .w2{bottom:22%;opacity:.5;animation-duration:12s;animation-direction:reverse}
+.ag-stage{background:radial-gradient(60% 70% at 78% 30%,rgba(219,39,119,.55),transparent 70%),radial-gradient(40% 50% at 95% 90%,rgba(56,189,248,.35),transparent 70%),radial-gradient(1.6px 1.6px at 12% 20%,#fff 60%,transparent 62%),radial-gradient(1.4px 1.4px at 40% 12%,#fffb 60%,transparent 62%),radial-gradient(2px 2px at 62% 8%,#fde68a 60%,transparent 62%),radial-gradient(1.4px 1.4px at 30% 40%,#fff9 60%,transparent 62%),linear-gradient(160deg,#4c1d95,#312e81 55%,#1e1b4b)}
+.ag-stage .gm-mini{width:82px;padding:11px 4px;border-radius:12px;font-size:15px;box-shadow:0 8px 18px rgba(0,0,0,.3);border-bottom:4px solid rgba(0,0,0,.12)}
+.ag-stage .gm-mini.en{border-color:#a5b4fc}.ag-stage .gm-mini.ko{border-color:#fdba74}
+.ag-stage .gm-mini:nth-child(1){left:auto;right:150px;top:14%}
+.ag-stage .gm-mini:nth-child(2){left:auto;right:64px;top:20%}
+.ag-stage .gm-mini:nth-child(3){left:auto;right:132px;top:44%}
+.ag-stage .gm-mini:nth-child(4){left:auto;right:30px;top:48%}
+.ag-spark{position:absolute;right:136px;top:30%;width:34px;height:34px;background:radial-gradient(circle,#fff 0 18%,#fde68a 30%,rgba(253,230,138,0) 70%);border-radius:50%;animation:ag-spark 2.4s ease-in-out infinite}
+@keyframes ag-spark{0%,60%,100%{transform:scale(.6);opacity:.4}75%{transform:scale(1.3);opacity:1}}
+/* 교실 게임 참가: 맨 아래 작은 한 줄 */
+.ag-party{display:flex;align-items:center;gap:10px;margin:18px 0 8px;padding:10px 12px;border-radius:18px;background:linear-gradient(135deg,#f59e0b,#ea580c);color:#fff;box-shadow:0 8px 18px rgba(234,88,12,.22)}
+.ag-party-copy{flex:1;min-width:0;display:flex;flex-direction:column}
+.ag-party-copy b{font-size:15px;white-space:nowrap}
+.ag-party-copy small{font-size:11px;opacity:.9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ag-join{display:flex;gap:6px;flex:none}
+.ag-join input{width:84px;border:0;border-radius:12px;padding:8px 6px;font-size:18px;font-weight:900;letter-spacing:.2em;text-align:center;color:#7c2d12}
+.ag-join .yl-cta{width:auto;margin:0;padding:8px 14px;font-size:14px}
+@media(max-width:360px){.ag-party-copy small{display:none}.ag-stage .gm-mini{width:70px;font-size:13px}}
+@media(prefers-reduced-motion:reduce){.ag-sea i,.ag-spark,.ag-stage .gm-mini{animation:none!important}}
