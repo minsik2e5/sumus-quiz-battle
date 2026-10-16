@@ -1,0 +1,10 @@
+/* V13.152 짝 맞추기 3라운드 · 순위 범위(전체 학생 · 우리 학교 · 우리 반) × 기간(이번 주 · 통합). */
+.mt-round{font-size:12px;font-weight:800;opacity:.85}
+.mt-round b{font-size:15px}
+.mt-count b.round{font-size:clamp(26px,8vw,40px);white-space:nowrap}
+.mt-old{margin:6px 0 0;font-size:12px;opacity:.75;text-align:center}
+.mt-seg{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin:6px 0}
+.mt-seg button{border:0;border-radius:999px;padding:7px 13px;font-weight:800;font-size:13px;background:rgba(255,255,255,.12);color:inherit}
+.mt-seg button.on{background:#fff;color:#4c1d95}
+.mt-where{display:block;font-size:11px;font-weight:600;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mt-list li b{min-width:0}

@@ -120,50 +120,70 @@ export async function runGamesChecks(assert) {
     const pairs = matchPick(words, { random: lcg(3) });
     assert(pairs.length === MATCH.PAIRS && new Set(pairs.map(p => p.ko)).size === MATCH.PAIRS && new Set(pairs.map(p => p.en)).size === MATCH.PAIRS && cardMeaning('~을 포기하다, 버리다') === '~을 포기하다' && matchPick(words, { missed: ['w7'], random: lcg(1) }).some(p => p.id === 'w7'),
       'V13.149 짝 맞추기: 영어 · 뜻이 겹치지 않는 6쌍, 틀린 단어를 먼저 넣는다');
-    assert(matchStars(15000) === 3 && matchStars(25000) === 2 && matchStars(40000) === 1, 'V13.149 짝 맞추기 별: 18초 · 28초 안');
+    // V13.152 3라운드(라운드마다 6쌍, 모두 18쌍). 별 기준은 56초 · 86초, 다음 라운드는 앞 라운드 단어를 되도록 뺀다.
+    assert(MATCH.ROUNDS === 3 && MATCH.TOTAL_PAIRS === MATCH.PAIRS * MATCH.ROUNDS && matchStars(50000) === 3 && matchStars(80000) === 2 && matchStars(90000) === 1, 'V13.152 짝 맞추기 3라운드 18쌍, 별: 56초 · 86초 안');
+    const round2 = matchPick(words, { random: lcg(5), skip: pairs.map(x => x.id) });
+    assert(round2.length === MATCH.PAIRS && round2.every(x => !pairs.some(y => y.id === x.id)), 'V13.152 다음 라운드는 앞 라운드에 나온 단어를 빼고 고른다(단어가 넉넉하면)');
     const realNow = Date.now;
     let clock = now;
     Date.now = () => clock;
     try {
-      const play = async (ms, misses = 0, wait = MATCH.COUNTDOWN_MS + ms) => { const s = await call('qa-gm-c', 'POST', '/games/match/start', { range_codes: ['24'] }); clock += wait; return [s, await call('qa-gm-c', 'POST', '/games/match/finish', { id: s.id, ms, misses })]; };
-      const [, fast] = await play(2000);
-      const [, early] = await play(15000, 0, 4000);
-      const [s1, r1] = await play(16000);
-      const again = await call('qa-gm-c', 'POST', '/games/match/finish', { id: s1.id, ms: 16000, misses: 0 });
-      const [, r2] = await play(12000, 1);
-      assert(!fast.paid && fast.reason === 'bad' && !early.paid && early.reason === 'short', 'V13.149 짝 맞추기: 사람 손보다 빠르거나 서버가 잰 시간보다 긴 기록은 받지 않는다');
-      assert(r1.paid && r1.stars === 3 && r1.record && r1.coins === MATCH.COINS[3] + MATCH.RECORD_COINS && again.again && again.coins === r1.coins && r2.record && r2.coins === MATCH.COINS[3] && prof('qa-gm-c').games.match.best === 12000,
-        'V13.149 짝 맞추기: 별만큼 코인 + 신기록 보너스(하루 한 번), 같은 끝내기는 한 번만 받는다');
-      for (let i = 0; i < 5; i++) await play(20000);
-      const [, capped] = await play(20000);
+      const play = async (ms, misses = 0, wait = MATCH.COUNTDOWN_MS + ms, who = 'qa-gm-c') => { const s = await call(who, 'POST', '/games/match/start', { range_codes: ['24'] }); clock += wait; return [s, await call(who, 'POST', '/games/match/finish', { id: s.id, ms, misses })]; };
+      const [, fast] = await play(9000);
+      const [, early] = await play(45000, 0, 4000);
+      const [s1, r1] = await play(50000);
+      const again = await call('qa-gm-c', 'POST', '/games/match/finish', { id: s1.id, ms: 50000, misses: 0 });
+      const [, r2] = await play(40000, 1);
+      assert(!fast.paid && fast.reason === 'bad' && !early.paid && early.reason === 'short', 'V13.152 짝 맞추기: 18쌍을 사람 손보다 빨리(0.45초 × 18 + 라운드 연출) 끝내거나 서버가 잰 시간보다 긴 기록은 받지 않는다');
+      assert(r1.paid && r1.stars === 3 && r1.record && r1.coins === MATCH.COINS[3] + MATCH.RECORD_COINS && again.again && again.coins === r1.coins && r2.record && r2.coins === MATCH.COINS[3] && prof('qa-gm-c').games.match.r3.best === 40000,
+        'V13.149 짝 맞추기: 별만큼 코인 + 신기록 보너스(하루 한 번), 같은 끝내기는 한 번만 받는다 (V13.152 기록은 r3 칸)');
+      for (let i = 0; i < 5; i++) await play(60000);
+      const [, capped] = await play(60000);
       assert(!capped.paid && capped.reason === 'daily' && capped.left === 0, `V13.149 짝 맞추기 코인은 하루 ${MATCH.DAILY}판까지(기록은 남는다)`);
+      // V13.152 예전 6쌍 기록은 순위에 넣지 않고 old_best로만 보여 준다.
+      prof('qa-gm-b').games ||= {}; prof('qa-gm-b').games.match = { best: 9000, week: { key: 'old', best: 9000 } };
       const board = await call('qa-gm-a', 'GET', '/games/match/board');
-      assert(board.rows[0]?.id === 'qa-gm-c' && board.rows[0].ms === 12000 && !board.rows.some(r => r.id === 'qa-gm-d'), 'V13.149 이번 주 우리 반 짝 맞추기 순위(다른 반은 안 보인다)');
-      // V13.149 반 친구 고스트: 끝낼 때 짝마다의 시간을 같이 보내고(쓰기 횟수는 그대로), 시작할 때 바로 위 친구의 시간을 받는다.
-      const even = ms => Array.from({ length: MATCH.PAIRS }, (_, k) => Math.round(ms * (k + 1) / MATCH.PAIRS));
-      assert(matchSplits(even(12000), 12000)?.length === MATCH.PAIRS && !matchSplits([100, 200, 300, 400, 500, 12000], 12000) && !matchSplits(even(12000), 15000) && !matchSplits(even(12000).slice(1), 12000) && !matchSplits('x', 12000),
-        'V13.149 고스트용 짝마다 시간: 6개, 한 쌍 0.45초 이상, 마지막이 기록과 같아야 한다');
+      const bView = (await call('qa-gm-b', 'POST', '/games/match/start', { range_codes: ['24'] }));
+      assert(board.scope === 'all' && board.period === 'week' && board.rows[0]?.id === 'qa-gm-c' && board.rows[0].ms === 40000 && board.rows.length === 1 && bView.old_best === 9000 && bView.best === null,
+        'V13.152 순위 처음은 전체 학생 · 이번 주, 예전 6쌍 기록은 순위에 없고 old_best로 보인다');
+      delete prof('qa-gm-b').games.match.live;
+      // 고스트: 끝낼 때 짝마다의 시간(18개)을 같이 보내고(쓰기 횟수는 그대로), 시작할 때 바로 위 학생의 시간을 받는다.
+      const even = ms => Array.from({ length: MATCH.TOTAL_PAIRS }, (_, k) => Math.round(ms * (k + 1) / MATCH.TOTAL_PAIRS));
+      const tiny = end => [...Array.from({ length: MATCH.TOTAL_PAIRS - 1 }, (_, k) => (k + 1) * 100), end];
+      assert(matchSplits(even(40000), 40000)?.length === MATCH.TOTAL_PAIRS && !matchSplits(tiny(40000), 40000) && !matchSplits(even(40000), 45000) && !matchSplits(even(40000).slice(1), 40000) && !matchSplits('x', 40000),
+        'V13.152 고스트용 짝마다 시간: 18개, 한 쌍 0.45초 이상, 마지막이 기록과 같아야 한다');
       const sa = await call('qa-gm-a', 'POST', '/games/match/start', { range_codes: ['24'] });
-      assert(sa.ghost?.name === '다솜' && !sa.ghost.self && sa.ghost.rank === 1 && sa.ghost.ms === 12000 && JSON.stringify(sa.ghost.splits) === JSON.stringify(even(12000)),
-        'V13.149 고스트: 이번 주 기록이 없으면 반에서 가장 느린 기록, 짝마다 시간이 없는 옛 기록은 고르게 나눈다');
-      const splitsA = [2000, 5000, 8000, 12000, 16000, 20000];
-      clock += MATCH.COUNTDOWN_MS + 20000;
-      const fa = await call('qa-gm-a', 'POST', '/games/match/finish', { id: sa.id, ms: 20000, misses: 0, splits: splitsA });
-      const fa2 = await call('qa-gm-a', 'POST', '/games/match/finish', { id: sa.id, ms: 20000, misses: 0, splits: [1, 2, 3, 4, 5, 20000] });
-      assert(fa.paid && fa.stars === 2 && JSON.stringify(prof('qa-gm-a').games.match.week.splits) === JSON.stringify(splitsA) && fa2.again && fa2.coins === fa.coins && JSON.stringify(prof('qa-gm-a').games.match.week.splits) === JSON.stringify(splitsA),
+      assert(sa.ghost?.name === '다솜' && !sa.ghost.self && sa.ghost.rank === 1 && sa.ghost.ms === 40000 && JSON.stringify(sa.ghost.splits) === JSON.stringify(even(40000)),
+        'V13.149 고스트: 이번 주 기록이 없으면 가장 느린 기록, 짝마다 시간이 없는 기록은 고르게 나눈다');
+      const splitsA = Array.from({ length: MATCH.TOTAL_PAIRS }, (_, k) => k === MATCH.TOTAL_PAIRS - 1 ? 60000 : (k + 1) * 3200);
+      clock += MATCH.COUNTDOWN_MS + 60000;
+      const fa = await call('qa-gm-a', 'POST', '/games/match/finish', { id: sa.id, ms: 60000, misses: 0, splits: splitsA });
+      const fa2 = await call('qa-gm-a', 'POST', '/games/match/finish', { id: sa.id, ms: 60000, misses: 0, splits: tiny(60000) });
+      assert(fa.paid && fa.stars === 2 && JSON.stringify(prof('qa-gm-a').games.match.r3.week.splits) === JSON.stringify(splitsA) && fa2.again && fa2.coins === fa.coins && JSON.stringify(prof('qa-gm-a').games.match.r3.week.splits) === JSON.stringify(splitsA),
         'V13.149 고스트: 이번 주 기록이면 짝마다 시간을 남기고, 같은 끝내기를 다시 보내도 한 번만 처리한다');
       const sb = await call('qa-gm-b', 'POST', '/games/match/start', { range_codes: ['24'] });
-      assert(sb.ghost?.name === '가람' && JSON.stringify(sb.ghost.splits) === JSON.stringify(splitsA), 'V13.149 고스트: 다른 친구는 그 친구가 남긴 짝마다 시간대로 달린다');
-      clock += MATCH.COUNTDOWN_MS + 19000;
-      const fb = await call('qa-gm-b', 'POST', '/games/match/finish', { id: sb.id, ms: 19000, misses: 0, splits: [100, 200, 300, 400, 500, 19000] });
-      assert(fb.paid && fb.record && prof('qa-gm-b').games.match.week.best === 19000 && prof('qa-gm-b').games.match.week.splits === null, 'V13.149 고스트: 이상한 짝마다 시간은 버리고 기록은 그대로 받는다');
+      assert(sb.ghost?.name === '가람' && JSON.stringify(sb.ghost.splits) === JSON.stringify(splitsA), 'V13.149 고스트: 다른 학생은 그 학생이 남긴 짝마다 시간대로 달린다');
+      clock += MATCH.COUNTDOWN_MS + 57000;
+      const fb = await call('qa-gm-b', 'POST', '/games/match/finish', { id: sb.id, ms: 57000, misses: 0, splits: tiny(57000) });
+      assert(fb.paid && fb.record && prof('qa-gm-b').games.match.r3.week.best === 57000 && prof('qa-gm-b').games.match.r3.week.splits === null, 'V13.149 고스트: 이상한 짝마다 시간은 버리고 기록은 그대로 받는다');
       const sa3 = await call('qa-gm-a', 'POST', '/games/match/start', { range_codes: ['24'] }), sc = await call('qa-gm-c', 'POST', '/games/match/start', { range_codes: ['24'] });
-      assert(sa3.ghost?.name === '나무' && sa3.ghost.rank === 2 && JSON.stringify(sa3.ghost.splits) === JSON.stringify(even(19000)) && sc.ghost?.self && sc.ghost.name === '이번 주의 나' && sc.ghost.ms === 12000,
-        'V13.149 고스트: 바로 위 순위 친구, 1등이면 이번 주의 나');
+      assert(sa3.ghost?.name === '나무' && sa3.ghost.rank === 2 && JSON.stringify(sa3.ghost.splits) === JSON.stringify(even(57000)) && sc.ghost?.self && sc.ghost.name === '이번 주의 나' && sc.ghost.ms === 40000,
+        'V13.149 고스트: 바로 위 순위 학생, 1등이면 이번 주의 나');
       const snap = JSON.stringify(state.profiles);
       const board2 = await call('qa-gm-a', 'GET', '/games/match/board');
       assert(JSON.stringify(state.profiles) === snap && board2.rows.map(r => r.id).join() === 'qa-gm-c,qa-gm-b,qa-gm-a' && board2.rows.every(r => !('splits' in r)) && board2.rows[2].me,
         'V13.149 순위(시상대) 보기는 기록을 바꾸지 않고, 짝마다 시간은 순위에 싣지 않는다');
+      // V13.152 범위: 다른 반 학생(라온, 고1B)도 전체 학생 · 우리 학교에는 보이고, 우리 반에는 안 보인다. 통합 기간은 지금까지 가장 빠른 기록.
+      const [, rd] = await play(45000, 0, MATCH.COUNTDOWN_MS + 45000, 'qa-gm-d');
+      const all = await call('qa-gm-a', 'GET', '/games/match/board', { scope: 'all' }), school = await call('qa-gm-a', 'GET', '/games/match/board', { scope: 'school' }), cls = await call('qa-gm-a', 'GET', '/games/match/board', { scope: 'class' });
+      const ever = await call('qa-gm-a', 'GET', '/games/match/board', { scope: 'all', period: 'all' }), odd = await call('qa-gm-a', 'GET', '/games/match/board', { scope: 'zzz', period: 'zzz' });
+      assert(rd.paid && all.rows.some(r => r.id === 'qa-gm-d' && r.class_name === '고1B') && school.rows.some(r => r.id === 'qa-gm-d') && !cls.rows.some(r => r.id === 'qa-gm-d') && cls.rows.length === 3
+        && ever.period === 'all' && ever.rows[0].id === 'qa-gm-c' && ever.rows[0].ms === 40000 && odd.scope === 'all' && odd.period === 'week',
+        'V13.152 순위 범위: 전체 학생 · 우리 학교에는 다른 반도, 우리 반에는 같은 반만. 통합은 지금까지 기록, 모르는 값은 전체 · 이번 주');
+      const mg152 = source('../public/modules/match-game.js');
+      assert(mg152.includes('else if (roundEnd) nextRound();') && mg152.includes('const roundEnd = !M.left, last = roundEnd && M.round >= MATCH.ROUNDS;') && mg152.includes('ghost?.splits?.length === MATCH.TOTAL_PAIRS')
+        && mg152.includes("const BOARD_SCOPES = [['all', '전체 학생'], ['school', '우리 학교'], ['class', '우리 반']];") && mg152.includes("async function board(scope = M?.boardScope || 'all', period = M?.boardPeriod || 'week')") && mg152.includes('/games/match/board?scope=${scope}&period=${period}'),
+        'V13.152 화면: 라운드가 끝나면 다음 라운드, 마지막 라운드의 마지막 짝에서 끝, 고스트는 18쌍, 순위는 전체 학생 · 이번 주부터 범위 · 기간을 고른다');
       // V13.150 손맛 낚시(놀이터): 미끼 → 던지기(서버가 물고기를 정함) → 끌어올리기(최소 파이팅 시간) → 어망 → 진주 → 코인 · 알.
       const b = prof('qa-gm-b');
       b.reel = {}; // 앞의 출석 검사에서 받은 미끼는 지우고 시작
@@ -425,7 +445,7 @@ export async function runGamesChecks(assert) {
     assert(worker.includes('export { PartyRoom };') && worker.includes("url.pathname.match(/^\\/api\\/party\\/ws\\/([0-9a-f-]{36})$/)") && worker.includes("'X-Party-Key'") && worker.includes('delete result._parties') && worker.includes('undoParty(state, message)') && worker.includes('settlePartyReport(state, body)'),
       'V13.149 worker: 교실 게임 소켓은 방으로, 방 준비 메시지는 브라우저로 안 가고, 결과 보고는 키로 확인');
     assert(local.includes('delete result._parties;') && local.includes('delete result._dungeon;'), 'V13.149 로컬 서버도 방 준비 메시지(문제 · 입장표)를 브라우저로 보내지 않는다');
-    assert(/"v13146\.css",\s*"v13149\.css",\s*"v13150\.css"(,\s*"v13151\.css")?\s*\]/.test(build) && ['match-game.js', 'reel.js', 'reel-rules.js', 'fishing-art.js', 'fishing-rules.js', 'party.js', 'party-tv.js', 'streak-guard.js', 'streak-guard-ui.js', 'match-rules.js'].every(f => sw.includes(`modules/${f}`)),
+    assert(/"v13146\.css",\s*"v13149\.css",\s*"v13150\.css"(,\s*"v13151\.css")?(,\s*"v13152\.css")?\s*\]/.test(build) && ['match-game.js', 'reel.js', 'reel-rules.js', 'fishing-art.js', 'fishing-rules.js', 'party.js', 'party-tv.js', 'streak-guard.js', 'streak-guard-ui.js', 'match-rules.js'].every(f => sw.includes(`modules/${f}`)),
       'V13.149 새 화면 CSS는 묶음 끝에, 새 모듈은 오프라인 캐시에');
     // V13.151 짝 맞추기 · 교실 게임 참가는 야차전 게임 탭에서 놀이터 '게임' 묶음으로 옮겼다(server/menu-check.mjs).
     assert(!battle.includes("['games', '게임', 'arcade']") && app.includes("d.action === 'arcade-match'") && !battle.includes('game-fish') && source('../public/modules/arcade.js').includes('data-action="reel-open"') && app.includes("d.action === 'reel-open'")
@@ -437,7 +457,7 @@ export async function runGamesChecks(assert) {
   {
     const mg = source('../public/modules/match-game.js'), css = source('../public/v13149.css'), svc = source('./service.mjs');
     const { SOUND_GAIN } = await import('../public/modules/sound.js');
-    assert(svc.includes('ghost: matchGhost(state.profiles, p, weekKey, { hidden: isPrivate })') && svc.includes('splits: Array.isArray(body.splits) ? body.splits.slice(0, 12) : null'),
+    assert(svc.includes('ghost: matchGhost(state.profiles, p, weekKey, { hidden: isPrivate })') && svc.includes('splits: Array.isArray(body.splits) ? body.splits.slice(0, 24) : null'),
       'V13.149 고스트는 시작(이미 쓰는 요청)에 실려 오고, 끝내기에 짝마다 시간이 실린다(쓰기 횟수는 그대로)');
     assert(mg.includes("api('/games/match/finish', { id: M.id, ms, misses: M.misses, splits: M.splits })") && mg.includes('function ghostRun(t)') && mg.includes('function ghostGap(split)') && mg.includes("tag.textContent = '추월!'") && mg.includes('고스트를 이겼어요!'),
       'V13.149 짝 맞추기 고스트: 친구가 짝마다 시간대로 달리고, 앞섬 · 뒤짐 · 추월이 보이고, 결과에 고스트를 이겼는지 나온다');
