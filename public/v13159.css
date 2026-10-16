@@ -1,0 +1,9 @@
+/* V13.159 선생님 선물: 코인 수 직접 입력(빠른 버튼 아래 한 줄). */
+.gift-custom{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 12px;border-radius:12px;background:#fff;box-shadow:0 0 0 1.5px #e3e9e6 inset}
+.gift-custom[hidden]{display:none}
+.gift-custom span{font-size:13px;font-weight:800;color:var(--muted,#5d6b75);white-space:nowrap}
+.gift-custom input{flex:1;min-width:0;border:0;background:transparent;font:inherit;font-size:20px;font-weight:900;text-align:right;color:#7a4b00;padding:4px 0}
+.gift-custom input:focus{outline:none}
+.gift-custom:focus-within{box-shadow:0 0 0 2px #f2b233 inset;background:#fff6d6}
+.gift-custom b{font-size:14px;color:#7a4b00}
+.gift-custom small{font-size:11px;color:var(--muted,#5d6b75);white-space:nowrap}

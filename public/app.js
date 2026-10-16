@@ -15,7 +15,7 @@ import { openBracket } from './modules/tournament-ui.js';
 import { openBracketTv } from './modules/bracket-tv.js';
 import { openClassTv } from './modules/class-tv.js';
 import { mountArcade, attendanceMoment } from './modules/arcade.js';
-import { LUCKY_BETS, ATTENDANCE_REWARDS, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_COINS, STUDY_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX, GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS } from './modules/rewards.js';
+import { LUCKY_BETS, ATTENDANCE_REWARDS, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_COINS, STUDY_COINS, GIFT_AMOUNTS, GIFT_MAX, giftAmountOk, GIFT_NOTE_MAX, GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS } from './modules/rewards.js';
 import { TITLE_COINS } from './modules/titles.js';
 import { rewardEventModal } from './modules/reward-events-ui.js';
 import { EGG_PRICE } from './modules/core.js';
@@ -1483,6 +1483,7 @@ function giftModal(preset = []) {
     </div>
     <div class="gift-label gift-coins-only">얼마나</div>
     <div class="gift-amounts gift-coins-only">${GIFT_AMOUNTS.map(n => `<button type="button" class="gift-amount" data-ga="${n}">${coin()}${n}</button>`).join('')}</div>
+    <label class="gift-custom gift-coins-only"><span>직접 입력</span><input id="gift-amount" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="${String(GIFT_MAX).length}" autocomplete="off" value="${st.amount}" aria-label="선물할 코인 수 (1~${GIFT_MAX})"><b>코인</b><small>1~${num(GIFT_MAX)}</small></label>
     <label class="field gift-note"><span>한마디 (선택)</span><input id="gift-note" maxlength="${GIFT_NOTE_MAX}" placeholder="예: 이번 주 정말 열심히 했어요!" autocomplete="off"></label>
     <button type="button" class="btn primary full" id="gift-send"></button>
     ${sent.length ? `<details class="gift-sent"><summary>최근 보낸 선물 ${sent.length}건</summary><ul>${sent.map(g => `<li><span><b>${esc(g.label)}</b>${g.note ? `<small>“${esc(g.note)}”</small>` : ''}</span><span>${g.kind === 'egg' ? '🥚 선생님 알' : `${coin()}${num(g.amount)}`} × ${num(g.count)}명<small>${date(g.at)}</small></span></li>`).join('')}</ul></details>` : ''}
@@ -1509,9 +1510,9 @@ function giftModal(preset = []) {
     $('#gift-egg-odds').hidden = !egg;
     $('#gift-kind-copy').innerHTML = egg ? '학생이 다음에 앱을 열면 <b>선물 상자</b>가 나타나요. 상자 안의 <b>선생님 알</b>에서 펫이 나와요!' : '학생이 다음에 앱을 열면 <b>선물 상자</b>가 나타나요. 상자를 열면 코인이 쏟아져요!';
     $$('[data-ga]').forEach(b => b.classList.toggle('on', Number(b.dataset.ga) === st.amount));
-    const n = count(), button = $('#gift-send');
-    button.disabled = !n;
-    button.innerHTML = !n ? '받을 학생을 골라주세요' : egg ? `${num(n)}명에게 선생님 알 1개씩 보내기` : `${num(n)}명에게 ${num(st.amount)}코인씩 보내기 <small>(모두 ${num(n * st.amount)}코인)</small>`;
+    const n = count(), button = $('#gift-send'), ok = egg || giftAmountOk(st.amount);
+    button.disabled = !n || !ok;
+    button.innerHTML = !n ? '받을 학생을 골라주세요' : !ok ? `코인은 1~${num(GIFT_MAX)}개 사이로 넣어 주세요` : egg ? `${num(n)}명에게 선생님 알 1개씩 보내기` : `${num(n)}명에게 ${num(st.amount)}코인씩 보내기 <small>(모두 ${num(n * st.amount)}코인)</small>`;
   };
   const root = $('.gift-modal-v1373');
   root.onclick = event => {
@@ -1520,7 +1521,14 @@ function giftModal(preset = []) {
     if (b.dataset.gk) { st.kind = b.dataset.gk; drawSend(); }
     else if (b.dataset.gt) { st.target = b.dataset.gt; drawTarget(); }
     else if (b.dataset.gc) { st.cls = b.dataset.gc; drawTarget(); }
-    else if (b.dataset.ga) { st.amount = Number(b.dataset.ga); drawSend(); }
+    else if (b.dataset.ga) { st.amount = Number(b.dataset.ga); $('#gift-amount').value = st.amount; drawSend(); }
+  };
+  // V13.159 코인 수 직접 입력: 숫자만 남기고, 빠른 버튼과 같은 값이면 그 버튼도 켜진다.
+  $('#gift-amount').oninput = event => {
+    const input = event.target, digits = input.value.replace(/\D/g, '').slice(0, String(GIFT_MAX).length);
+    if (input.value !== digits) input.value = digits;
+    st.amount = digits ? Number(digits) : 0;
+    drawSend();
   };
   root.onchange = event => {
     const id = event.target.dataset?.gs;

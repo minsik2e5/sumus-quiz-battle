@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, EPIC_PET_KEYS, STANDARD_PET_KEYS, EPIC_EGG_LEGENDARY_RATE, SEASONS, seasonKeys, seasonsOver } from '../public/modules/core.js';
 import {
   ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, MYTHIC_RATE, drawLucky,
-  BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_NOTE_MAX, GIFT_LOG_KEEP, GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS,
+  BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_MAX, giftAmountOk, GIFT_NOTE_MAX, GIFT_LOG_KEEP, GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS,
   RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome
 } from '../public/modules/rewards.js';
 import { titleCoins } from '../public/modules/titles.js';
@@ -73,7 +73,7 @@ export function payTitles(p, keys, payKey, weekKey) {
 // V13.111: `kind: 'egg'` is a pet egg (no coins now; which pet is decided when it is opened).
 export function giveGift(p, { kind = 'coins', amount, note = '', from, fromName, now = Date.now(), id }) {
   const egg = kind === 'egg';
-  if (!egg && !GIFT_AMOUNTS.includes(amount)) fail('선물할 코인을 골라주세요.');
+  if (!egg && !giftAmountOk(amount)) fail(`선물할 코인은 1~${GIFT_MAX}개 사이로 넣어 주세요.`);
   const box = p.gift_box ||= { total: 0, count: 0, log: [] };
   if (!egg) box.total = Number(box.total || 0) + amount;
   box.count = Number(box.count || 0) + 1;

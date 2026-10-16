@@ -57,6 +57,9 @@ export const ownedDecorations = items => GACHA_KEYS.filter(key => Number(items?.
 
 // V13.73 teacher coin gifts: to one student, a class or the whole school, with a short note.
 export const GIFT_AMOUNTS = [10, 30, 50, 100];
+// V13.159 선생님이 코인 수를 직접 넣을 수 있다(위 버튼은 빠른 선택). 1 ~ GIFT_MAX 사이의 정수만.
+export const GIFT_MAX = 1000;
+export const giftAmountOk = n => Number.isInteger(n) && n >= 1 && n <= GIFT_MAX;
 export const GIFT_NOTE_MAX = 40;
 export const GIFT_LOG_KEEP = 20;
 // V13.111 선생님 알 선물: a pet egg instead of coins. Opened in the gift box; never a pet the
