@@ -163,12 +163,14 @@ export const FRAMES = { basic: { name: '기본', level: 1 }, silver: { name: '�
 export const TITLES = { rookie: { name: '첫걸음', level: 1 }, focus: { name: '집중의 힘', level: 5 }, combo: { name: '10연속의 주인공', combo: 10 }, streak: { name: '7일의 기록', streak: 7 }, master: { name: '단어 마스터', level: 15 }, legend: { name: '한계를 넘어서', level: 20 }, yacha3: { name: '야차 3연승', battle_streak: 3 }, yachaking: { name: '야차왕', battle_streak: 5 } };
 export const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 // V13.78: the level cap went from 50 to 60.
+// V13.153 펫 레벨만 60에서 멈춘다. 학생 레벨(본렙)은 끝없이 오른다(같은 공식: 한 레벨마다 필요한 경험치가 70씩 는다).
 export const MAX_LEVEL = 60;
-export function levelInfo(points = 0) {
+export const PLAYER_MAX_LEVEL = Infinity;
+export function levelInfo(points = 0, cap = MAX_LEVEL) {
   let level = 1, base = 0, need = 180;
   points = Math.max(0, Number(points) || 0);
-  while (level < MAX_LEVEL && points >= base + need) { base += need; level++; need = 180 + (level - 1) * 70; }
-  const current = level === MAX_LEVEL ? need : points - base;
+  while (level < cap && points >= base + need) { base += need; level++; need = 180 + (level - 1) * 70; }
+  const current = level === cap ? need : points - base;
   // `stage` (1..5) is kept for app versions still installed on phones; new screens use `form`.
   return { level, current, need, percent: clamp(current / need * 100, 0, 100), remaining: Math.max(0, need - current), stage: level >= 20 ? 5 : level >= 15 ? 4 : level >= 10 ? 3 : level >= 5 ? 2 : 1, form: petForm(level) };
 }
@@ -434,5 +436,5 @@ export function growthFor(sessions, extraDays = []) {
   let streak = 0, day = Date.now();
   if (!days.has(dayKey(day))) day -= 86400000;
   while (days.has(dayKey(day))) { streak++; day -= 86400000; }
-  return { ...levelInfo(points), points, streak, best_combo: Math.max(0, ...sessions.map(s => s.best_combo || 0)) };
+  return { ...levelInfo(points, PLAYER_MAX_LEVEL), points, streak, best_combo: Math.max(0, ...sessions.map(s => s.best_combo || 0)) };
 }

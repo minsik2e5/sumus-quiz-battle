@@ -100,7 +100,7 @@ export const TITLES = {
   level30: { name: '울트라 레어', tier: 'legendary', group: 'study', stat: 'level', goal: 30, icon: 'gem', how: 'Lv.30 달성', desc: '레벨 30, 이제 진짜 고수예요.' },
   level40: { name: '샤이니', tier: 'legendary', group: 'study', stat: 'level', goal: 40, icon: 'star', how: 'Lv.40 달성', desc: '레벨 40, 무지갯빛으로 반짝이는 실력.' },
   level50: { name: '살아있는 전설', tier: 'legendary', group: 'study', stat: 'level', goal: 50, icon: 'wing', how: 'Lv.50 달성', desc: '레벨 50에 오른 사람은 많지 않아요.' },
-  level60: { name: 'MAX', tier: 'legendary', group: 'study', stat: 'level', goal: 60, icon: 'crown', how: 'Lv.60 달성(최고 레벨)', desc: '더 오를 곳이 없는 최고 레벨.' },
+  level60: { name: 'MAX', tier: 'legendary', group: 'study', stat: 'level', goal: 60, icon: 'crown', how: 'Lv.60 달성', desc: 'Lv.60에 오른 학생. 레벨은 60 넘어서도 계속 올라가요.' },
   study50: { name: '성실한 학생', tier: 'rare', group: 'study', stat: 'studies', goal: 50, icon: 'book', how: '10문제 이상 학습 50번', desc: '꾸준함이 최고의 재능이에요.' },
   attend30: { name: '개근상', tier: 'rare', group: 'study', stat: 'attendance', goal: 30, icon: 'calendar', how: '출석 체크 30번', desc: '빠짐없이 출석하는 모범생.' },
   // V13.94 몬스터 잡기

@@ -1,7 +1,7 @@
 // V13.66 competition: titles, the weekly yacha league and weekly awards, computed from the
 // state on each request (nothing here is stored). One context per request groups sessions
 // and battles by student once, so ranking lists stay O(sessions + battles).
-import { levelInfo, petProgress, CHARACTERS } from '../public/modules/core.js';
+import { levelInfo, petProgress, CHARACTERS, PLAYER_MAX_LEVEL } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked, LEAGUE_POINTS, LEAGUE_PAIR_DAY_CAP, leagueTier, leagueTierIndex } from '../public/modules/titles.js';
 import { GACHA_ITEMS, GACHA_KEYS } from '../public/modules/rewards.js';
 import { bonusRecords } from './rewards.mjs';
@@ -136,7 +136,7 @@ export function createCompetition(state, now = Date.now()) {
   const inWindow = window => b => b.finished_at >= window.start && b.finished_at < window.end;
   const winsOf = pid => ctx.countedOf(pid).filter(b => b.winner === pid);
   const STATS = {
-    level: (p, pid) => levelInfo(ctx.sessionsOf(pid).reduce((n, s) => n + Number(s.xp || 0), 0)).level,
+    level: (p, pid) => levelInfo(ctx.sessionsOf(pid).reduce((n, s) => n + Number(s.xp || 0), 0), PLAYER_MAX_LEVEL).level, // V13.153 본렙은 60 넘어서도 오른다
     combo: (p, pid) => Math.max(0, ...ctx.sessionsOf(pid).map(s => Number(s.best_combo || 0))),
     correct: (p, pid) => ctx.sessionsOf(pid).reduce((n, s) => n + Number(s.correct || 0), 0),
     best_days: (p, pid) => longestDayRun(ctx.sessionsOf(pid), guardDayNums(ctx.sessionsOf(pid), p?.streak_guard, now)),

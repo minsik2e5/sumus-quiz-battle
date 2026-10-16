@@ -121,6 +121,7 @@ export async function runGamesChecks(assert) {
     assert(pairs.length === MATCH.PAIRS && new Set(pairs.map(p => p.ko)).size === MATCH.PAIRS && new Set(pairs.map(p => p.en)).size === MATCH.PAIRS && cardMeaning('~을 포기하다, 버리다') === '~을 포기하다' && matchPick(words, { missed: ['w7'], random: lcg(1) }).some(p => p.id === 'w7'),
       'V13.149 짝 맞추기: 영어 · 뜻이 겹치지 않는 6쌍, 틀린 단어를 먼저 넣는다');
     // V13.152 3라운드(라운드마다 6쌍, 모두 18쌍). 별 기준은 56초 · 86초, 다음 라운드는 앞 라운드 단어를 되도록 뺀다.
+    assert(MATCH.COINS[3] === 12 && MATCH.COINS[2] === 8 && MATCH.COINS[1] === 4 && MATCH.RECORD_COINS === 5, 'V13.154 짝 맞추기 코인 2배(별 3 · 2 · 1 = 12 · 8 · 4), 신기록 보너스는 그대로 5');
     assert(MATCH.ROUNDS === 3 && MATCH.TOTAL_PAIRS === MATCH.PAIRS * MATCH.ROUNDS && matchStars(50000) === 3 && matchStars(80000) === 2 && matchStars(90000) === 1, 'V13.152 짝 맞추기 3라운드 18쌍, 별: 56초 · 86초 안');
     const round2 = matchPick(words, { random: lcg(5), skip: pairs.map(x => x.id) });
     assert(round2.length === MATCH.PAIRS && round2.every(x => !pairs.some(y => y.id === x.id)), 'V13.152 다음 라운드는 앞 라운드에 나온 단어를 빼고 고른다(단어가 넉넉하면)');
