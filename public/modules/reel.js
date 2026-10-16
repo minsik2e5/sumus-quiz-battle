@@ -5,7 +5,7 @@ import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
 import { coinShower } from './celebrate.js';
 import { buyEgg } from './pet-moments.js';
 import { FISH, FISH_KEYS, RARITY, kgText } from './fishing-rules.js';
-import { REEL, SEA_PETS, FIGHT, stars, pearlsOf } from './reel-rules.js';
+import { REEL, SEA_PETS, FIGHT, ROD, stars, pearlsOf, rodLevel, rodOf, rodPerks } from './reel-rules.js';
 import { fishPic, fishShadow } from './fishing-art.js';
 
 // V13.150 손맛 낚시(놀이터), 1인칭 판. 단어 없이 던지기 · 입질 · 파이팅 · 마무리 점프. 미끼는 공부로 번다(server/reel.mjs).
@@ -25,6 +25,9 @@ export const FISHING_ART = new Set([
   'lure-worm', 'net', 'pearl', 'pearl-burst', 'pearl-clam', 'pearl-pile', 'pearl-trail', 'pov-crank', 'pov-reel', 'pov-reel-gold',
   'pov-reel-hot', 'pov-rod', 'pov-rod-deep', 'pov-rod-left', 'pov-rod-right', 'power', 'reel', 'ribbon-record', 'rod', 'rod-bend1',
   'rod-bend2', 'shop', 'skill-empty', 'skill-full', 'stamp-new', 'tank-chest', 'tank-coral', 'tank-rock', 'tank-weed', 'tension',
+  // V13.154 그림 31(낚싯대 강화): 단계별 낚싯대 · 릴(강화 창에서 크게), 아이콘 1~5, 강화 연출, 작업대 배경.
+  ...[2, 3, 4, 5].flatMap(t => [`pov-rod-t${t}`, `pov-rod-left-t${t}`, `pov-rod-right-t${t}`, `pov-rod-deep-t${t}`, `pov-reel-t${t}`]),
+  ...[1, 2, 3, 4, 5].map(t => `icon-rod-${t}`), 'fx-upgrade', 'fx-hammer', 'stamp-tier', 'bg-forge',
   ...FISH_KEYS.map(k => `hang-${k}`)
 ]);
 const has = name => FISHING_ART.has(name);
@@ -137,6 +140,8 @@ function onClick(event) {
   if (act === 'egg') return exchangeEgg(b.dataset.item, b);
   if (act === 'sea') return exchangeSea(b.dataset.key, b);
   if (act === 'skill') return useSkill();
+  if (act === 'rod') return rodSheet();
+  if (act === 'rod-up') return rodUp(b);
   if (act === 'practice') { closeSheet(); return practice(); }
 }
 
@@ -152,11 +157,10 @@ function scene() {
       <div class="rl-bob" id="rl-bob">${art('bobber', '<i class="rl-bob-code"></i>')}${has('bobber-sink') ? art('bobber-sink', '', 'bite') : has('bobber-bite') ? art('bobber-bite', '', 'bite') : ''}${has('bobber-nibble') ? art('bobber-nibble', '', 'nib') : ''}</div>
       <div class="rl-fxl" id="rl-fx"></div>
     </div>
-    <svg class="rl-rig" id="rl-rig" aria-hidden="true">
+    <svg class="rl-rig" id="rl-rig" data-rod="${myRod().level}" aria-hidden="true">
       <defs>
-        <linearGradient id="rl-rodg" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#0f766e"/><stop offset=".45" stop-color="#5eead4"/><stop offset=".6" stop-color="#ecfeff"/><stop offset="1" stop-color="#14b8a6"/></linearGradient>
+        ${rodGradients()}
         <linearGradient id="rl-corkg" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#92400e"/><stop offset=".5" stop-color="#d6a46a"/><stop offset="1" stop-color="#a16207"/></linearGradient>
-        <radialGradient id="rl-reelgrad" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="#ecfdf5"/><stop offset=".5" stop-color="#34d399"/><stop offset="1" stop-color="#047857"/></radialGradient>
       </defs>
       <path class="rl-line2" id="rl-line2" d=""/>
       <path class="rl-rod-body" id="rl-rod" d=""/>
@@ -166,6 +170,7 @@ function scene() {
     </svg>
     <div class="rl-pet" id="rl-pet">${pet ? avatar(pet.key, { form: Math.max(1, pet.form ?? 1) }) : ''}<span class="rl-say" id="rl-say" hidden></span></div>
     <nav class="rl-side-menu" aria-label="낚시터 메뉴">
+      <button type="button" class="rl-ico" data-rl="rod" aria-label="낚싯대 강화"><span id="rl-rod-ico">${art(`icon-rod-${myRod().level}`, '<i class="rl-ico-rod"></i>')}</span><small>낚싯대</small></button>
       <button type="button" class="rl-ico" data-rl="net" aria-label="수조(어망)">${art('icon-net', art('net', '<i class="rl-ico-net"></i>'))}<i class="rl-badge" id="rl-net-n" hidden></i><small>수조</small></button>
       <button type="button" class="rl-ico" data-rl="shop" aria-label="교환소">${art('icon-shop', art('shop', '<i class="rl-ico-shop"></i>'))}<small>교환소</small></button>
       <button type="button" class="rl-ico" data-rl="book" aria-label="도감">${art('icon-book', '<i class="rl-ico-book"></i>')}<small>도감</small></button>
@@ -174,6 +179,20 @@ function scene() {
     <div class="rl-hud" id="rl-hud"></div>
   </div>`;
   sizeRig();
+}
+// V13.154 낚싯대 단계: 코드로 그리는 1인칭 낚싯대 · 릴 색이 단계마다 바뀐다(4 · 5단계는 은은하게 빛난다).
+const myRod = () => rodOf(R?.v?.rod);
+function rodGradients() {
+  const r = myRod(), [a, b, c, d] = r.colors, [e, f, g] = r.reelc;
+  return `<linearGradient id="rl-rodg" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="${a}"/><stop offset=".45" stop-color="${b}"/><stop offset=".6" stop-color="${c}"/><stop offset="1" stop-color="${d}"/></linearGradient>
+        <radialGradient id="rl-reelgrad" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="${e}"/><stop offset=".5" stop-color="${f}"/><stop offset="1" stop-color="${g}"/></radialGradient>`;
+}
+function paintRod() {
+  const svg = $('rl-rig'), defs = svg?.querySelector('defs');
+  if (!defs) return;
+  defs.querySelector('#rl-rodg')?.remove(); defs.querySelector('#rl-reelgrad')?.remove();
+  defs.insertAdjacentHTML('afterbegin', rodGradients());
+  svg.dataset.rod = myRod().level;
 }
 function sizeRig() {
   const pov = $('rl-pov'), svg = $('rl-rig');
@@ -658,13 +677,13 @@ function swipe(dir) {
   f.tension = Math.max(0, f.tension - 2);
 }
 function fightStep(t, dt) {
-  const f = R.f, F = R.live.fight, pull = F.pull || 1;
+  const f = R.f, F = R.live.fight, pull = F.pull || 1, rod = myRod();
   const m = f.move;
   // 텐션: 감으면 오르고 풀면 내린다. 물고기 힘이 출렁인다.
   // 탈출 연타 · 리듬 중에는 감기보다 버튼이 중요: 텐션은 가운데로 모인다.
   if (m?.kind === 'mash' || m?.kind === 'rhythm') f.tension += (58 - f.tension) * Math.min(1, dt * 2.5);
   else {
-    f.tension += f.holding ? (40 + pull * 22) * dt : -48 * dt;
+    f.tension += f.holding ? (40 + pull * 22) * rod.tension * dt : -48 * dt;
     f.tension += pull * (Math.sin(t / 330) * 8 + Math.sin(t / 97) * 4) * dt;
   }
   if (m?.kind === 'thrash' && f.holding) { f.tension += 95 * dt; m.held += dt; }
@@ -673,7 +692,7 @@ function fightStep(t, dt) {
   const zone = f.tension >= 80 ? 'red' : f.tension >= 22 ? 'green' : 'blue';
   f.zone = zone;
   // 거리: 초록 칸에서 감을 때 가장 빨리 줄어든다. 손을 떼면 물고기가 조금 끌고 간다.
-  if (f.holding) f.dist -= (zone === 'green' ? 2.5 : zone === 'blue' ? 1 : .55) / Math.pow(pull, .35) * dt;
+  if (f.holding) f.dist -= (zone === 'green' ? 2.5 : zone === 'blue' ? 1 : .55) / Math.pow(pull, .35) * rod.reel * dt;
   else f.dist += .55 * pull * dt;
   if (m?.kind === 'dive' && !f.holding) f.dist += 2.2 * dt;
   if (m?.kind === 'mash') f.dist += 1.4 * pull * dt;
@@ -685,7 +704,7 @@ function fightStep(t, dt) {
     if (m.notes.every(x => x.done)) { endMove(m.hit / m.notes.length >= .6); }
   }
   f.dist = clamp(f.dist, 0, f.max * 1.25);
-  if (zone === 'green' && f.holding) f.skill = Math.min(100, f.skill + 7 * dt);
+  if (zone === 'green' && f.holding) f.skill = Math.min(100, f.skill + 7 * rod.skill * dt);
   // 연습: 줄이 끊기거나 빠지지 않고, 마지막 단계 전에는 끝까지 오지 않는다.
   if (R.tut) {
     f.tension = Math.min(f.tension, 96); f.slackFor = 0;
@@ -695,7 +714,7 @@ function fightStep(t, dt) {
   // 끝나는 조건
   f.redFor = f.tension >= 98 ? f.redFor + dt : 0;
   f.slackFor = f.tension <= 2 ? f.slackFor + dt : 0;
-  if (f.redFor > .75) return lose('줄이 끊어졌어요! 빨간색이면 손을 떼요', 'snap');
+  if (f.redFor > rod.snap) return lose('줄이 끊어졌어요! 빨간색이면 손을 떼요', 'snap');
   if (f.slackFor > 3.5) return lose('줄이 느슨해져서 물고기가 빠져나갔어요', 'slack');
   if (f.move && t > f.move.until) endMove(m.kind === 'thrash' ? m.held < .35 : m.kind === 'dive' ? f.dist < f.max * 1.2 && f.redFor === 0 : m.kind === 'rhythm' ? m.hit / m.notes.length >= .6 : false);
   else if (!m && t > f.next && (!R.tut || R.tut.step >= TUT.length - 1)) startMove(t);
@@ -1013,6 +1032,40 @@ function shop() {
         ? `<div class="rl-sea-pet locked"><span class="rl-sea-silhouette ${x.key}"></span><b>${esc(x.ko)}</b><small>${esc(x.kind)} · ${pearlIco()}${num(REEL.SEA_PET)}</small><em>곧 만나요</em></div>`
         : `<button type="button" class="rl-sea-pet${x.owned ? ' owned' : ''}" data-rl="sea" data-key="${x.key}" ${x.owned || p < REEL.SEA_PET ? 'disabled' : ''}><img src="/assets/pets/${x.key}-1.webp" alt="" width="56" height="56"><b>${esc(x.ko)}</b><small>${esc(x.kind)} · ${pearlIco()}${num(REEL.SEA_PET)}</small>${x.owned ? '<em>함께하는 중</em>' : ''}</button>`).join('')}</div>
       <p class="rl-sheet-note">${REEL.SEA_READY ? '바다 펫은 교환소에서만 만날 수 있어요. 야차전 특기도 있어요!' : '바다 펫은 그림이 완성되면 열려요. 그때까지 진주를 모아 두세요!'}</p></div>`, 'shop');
+}
+// V13.154 낚싯대 강화 창: 지금 단계의 낚싯대 그림 · 5단계 줄 · 강화하면 좋아지는 것(지금 → 다음) · 진주로 강화.
+function rodSheet() {
+  closeTank();
+  const v = R.v || {}, lv = rodLevel(v.rod), r = rodOf(lv), p = Number(v.pearls || 0), max = lv >= ROD.MAX, cost = ROD.COST[lv + 1], next = max ? null : rodOf(lv + 1);
+  const show = art(lv > 1 ? `pov-rod-t${lv}` : 'pov-rod', art(`icon-rod-${lv}`, '<i class="rl-ico-rod big"></i>'), 'rl-rod-big');
+  sheet(`${sheetHead(`${art(`icon-rod-${lv}`, '')} 낚싯대 강화`, `<span class="rl-sheet-pearl">${pearlIco()}${num(p)}</span>`)}
+    <div class="rl-rod-card${has('bg-forge') ? ' art' : ''}" data-rod="${lv}">
+      <div class="rl-rod-show">${show}<span class="rl-rod-stamp">${art('stamp-tier', '')}<b>${lv}</b></span></div>
+      <h3>${esc(r.name)} <small>${lv} / ${ROD.MAX}단계</small></h3>
+      <ol class="rl-rod-steps" aria-label="낚싯대 단계">${ROD.LEVELS.map(x => `<li class="${x.level < lv ? 'done' : x.level === lv ? 'now' : ''}">${art(`icon-rod-${x.level}`, `<i class="rl-ico-rod t${x.level}"></i>`)}<small>${x.level}</small></li>`).join('')}</ol>
+    </div>
+    <div class="rl-shop-block"><h3>강화하면 좋아지는 것 <small>${max ? '모두 최고예요' : `${esc(next.name)}이 되면`}</small></h3>
+      <ul class="rl-perks">${rodPerks(lv).map(x => `<li><span>${x.label}</span><b>${x.now}</b>${x.next ? `<i aria-hidden="true">→</i><em>${x.next}</em>` : ''}</li>`).join('')}</ul>
+      <p class="rl-sheet-note">손맛은 그대로, 물고기를 끌어올리기가 조금씩 쉬워져요. 잡히는 물고기 등급은 바뀌지 않아요. 반 전체 낚시(교실 게임)는 모두 같은 낚싯대로 해요.</p>
+      ${max ? '<p class="rl-rod-max">최고 단계 낚싯대예요! ✨</p>' : `<button type="button" class="yl-cta rl-rod-up" data-rl="rod-up" ${p >= cost ? '' : 'disabled'}>${pearlIco()} ${num(cost)} 진주로 강화하기</button>${p < cost ? `<p class="rl-sheet-note">진주 ${num(cost - p)}개를 더 모아요. 어망 물고기를 팔면 진주가 생겨요.</p>` : ''}`}
+    </div>`, 'rod');
+}
+async function rodUp(b) {
+  buttonBusy(b);
+  try {
+    const res = await api('/reel/rod', {});
+    setView(res.reel);
+    paintRod();
+    const ico = $('rl-rod-ico'); if (ico) ico.innerHTML = art(`icon-rod-${res.rod}`, '<i class="rl-ico-rod"></i>');
+    // 강화 순간: 망치가 내려치고 → 빛이 터지며 새 낚싯대 · 단계 도장.
+    const box = document.createElement('div');
+    box.className = 'rl-rodup';
+    box.innerHTML = `<div class="rl-rodup-in">${art('fx-upgrade', '<i class="rl-rodup-rays"></i>', 'rays')}${art(`icon-rod-${res.rod}`, '', 'rod')}<span class="rl-rodup-hammer">${art('fx-hammer', '🔨')}</span><span class="rl-rodup-stamp">${art('stamp-tier', '')}<b>${res.rod}</b></span><strong>${esc(res.name)}!</strong><small>${rodPerks(res.rod).slice(0, 2).map(x => `${x.label} ${x.now}`).join(' · ')}</small></div>`;
+    (document.querySelector('.rl-sheet') || $('rl-pov'))?.appendChild(box);
+    sfx('smash'); buzz(25);
+    later(() => { sfx('levelup'); box.classList.add('lit'); }, reduced() ? 0 : 520);
+    later(() => { box.remove(); rodSheet(); }, reduced() ? 900 : 2600);
+  } catch (err) { toast(err.message); buttonBusy(b, false); }
 }
 async function exchangeCoins(n, b) {
   buttonBusy(b);

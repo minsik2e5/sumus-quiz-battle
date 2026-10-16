@@ -121,6 +121,7 @@ export async function runGamesChecks(assert) {
     assert(pairs.length === MATCH.PAIRS && new Set(pairs.map(p => p.ko)).size === MATCH.PAIRS && new Set(pairs.map(p => p.en)).size === MATCH.PAIRS && cardMeaning('~을 포기하다, 버리다') === '~을 포기하다' && matchPick(words, { missed: ['w7'], random: lcg(1) }).some(p => p.id === 'w7'),
       'V13.149 짝 맞추기: 영어 · 뜻이 겹치지 않는 6쌍, 틀린 단어를 먼저 넣는다');
     // V13.152 3라운드(라운드마다 6쌍, 모두 18쌍). 별 기준은 56초 · 86초, 다음 라운드는 앞 라운드 단어를 되도록 뺀다.
+    assert(MATCH.COINS[3] === 12 && MATCH.COINS[2] === 8 && MATCH.COINS[1] === 4 && MATCH.RECORD_COINS === 5, 'V13.154 짝 맞추기 코인 2배(별 3 · 2 · 1 = 12 · 8 · 4), 신기록 보너스는 그대로 5');
     assert(MATCH.ROUNDS === 3 && MATCH.TOTAL_PAIRS === MATCH.PAIRS * MATCH.ROUNDS && matchStars(50000) === 3 && matchStars(80000) === 2 && matchStars(90000) === 1, 'V13.152 짝 맞추기 3라운드 18쌍, 별: 56초 · 86초 안');
     const round2 = matchPick(words, { random: lcg(5), skip: pairs.map(x => x.id) });
     assert(round2.length === MATCH.PAIRS && round2.every(x => !pairs.some(y => y.id === x.id)), 'V13.152 다음 라운드는 앞 라운드에 나온 단어를 빼고 고른다(단어가 넉넉하면)');
@@ -445,7 +446,7 @@ export async function runGamesChecks(assert) {
     assert(worker.includes('export { PartyRoom };') && worker.includes("url.pathname.match(/^\\/api\\/party\\/ws\\/([0-9a-f-]{36})$/)") && worker.includes("'X-Party-Key'") && worker.includes('delete result._parties') && worker.includes('undoParty(state, message)') && worker.includes('settlePartyReport(state, body)'),
       'V13.149 worker: 교실 게임 소켓은 방으로, 방 준비 메시지는 브라우저로 안 가고, 결과 보고는 키로 확인');
     assert(local.includes('delete result._parties;') && local.includes('delete result._dungeon;'), 'V13.149 로컬 서버도 방 준비 메시지(문제 · 입장표)를 브라우저로 보내지 않는다');
-    assert(/"v13146\.css",\s*"v13149\.css",\s*"v13150\.css"(,\s*"v13151\.css")?(,\s*"v13152\.css")?\s*\]/.test(build) && ['match-game.js', 'reel.js', 'reel-rules.js', 'fishing-art.js', 'fishing-rules.js', 'party.js', 'party-tv.js', 'streak-guard.js', 'streak-guard-ui.js', 'match-rules.js'].every(f => sw.includes(`modules/${f}`)),
+    assert(/"v13146\.css",\s*"v13149\.css",\s*"v13150\.css"(,\s*"v13151\.css")?(,\s*"v13152\.css")?(,\s*"v13154\.css")?\s*\]/.test(build) && ['match-game.js', 'reel.js', 'reel-rules.js', 'fishing-art.js', 'fishing-rules.js', 'party.js', 'party-tv.js', 'streak-guard.js', 'streak-guard-ui.js', 'match-rules.js'].every(f => sw.includes(`modules/${f}`)),
       'V13.149 새 화면 CSS는 묶음 끝에, 새 모듈은 오프라인 캐시에');
     // V13.151 짝 맞추기 · 교실 게임 참가는 야차전 게임 탭에서 놀이터 '게임' 묶음으로 옮겼다(server/menu-check.mjs).
     assert(!battle.includes("['games', '게임', 'arcade']") && app.includes("d.action === 'arcade-match'") && !battle.includes('game-fish') && source('../public/modules/arcade.js').includes('data-action="reel-open"') && app.includes("d.action === 'reel-open'")
@@ -490,5 +491,14 @@ export async function runGamesChecks(assert) {
     const pub = new URL('../public/', import.meta.url);
     const matchArt = (mg.match(/MATCH_ART = new Set\(\[([^\]]*)\]\)/)?.[1] || '').match(/'([a-z-]+)'/g)?.map(x => x.slice(1, -1)) || [];
     assert(matchArt.every(n => existsSync(new URL(`assets/match/${n}.webp`, pub))), 'V13.149 MATCH_ART에 적힌 그림은 파일이 있어야 한다');
+    // 그림 주문서 31(낚싯대 강화 1~5단계): 29b 낚싯대 · 릴을 열어 모양 · 손잡이 위치를 그대로 두고, "SUMUS 낚시 31" 폴더에 정확한 이름으로 저장.
+    const art31 = ['31a-fishing-rod-tiers.txt', '31b-fishing-reel-tiers.txt', '31c-fishing-rod-icons.txt', '31d-fishing-forge-background.txt'].flatMap(f => source(`../docs/asset-requests/runner/${f}`).trim().split('\n---\n'));
+    const codex31 = source('../docs/asset-requests/runner/CODEX_PROMPT_31.md');
+    const files31 = [2, 3, 4, 5].flatMap(t => [`pov-rod-t${t}`, `pov-rod-left-t${t}`, `pov-rod-right-t${t}`, `pov-rod-deep-t${t}`, `pov-reel-t${t}`]).concat([1, 2, 3, 4, 5].map(t => `icon-rod-${t}`), ['fx-upgrade', 'fx-hammer', 'stamp-tier', 'bg-forge']);
+    assert(art31.length === 8 && art31.every(t => t.includes('STYLE REFERENCE — before drawing, open') && /named exactly "31[a-d]-\d\.png"/.test(t) && t.includes('"SUMUS 낚시 31 (Runner용)"') && t.includes('showing the picture in the chat is not enough'))
+      && art31.slice(0, 4).every(t => t.includes('keep EXACTLY the rod of "29b-1.png"') && t.includes('at EXACTLY the same position and size in every cell'))
+      && codex31.includes('Drive의 기존 그림을 열어 그림체를 맞춘다') && codex31.includes('정해진 Drive 폴더 "SUMUS 낚시 31 (Runner용)"에 정확한 파일 이름') && codex31.includes('PR 대상도 `claude/rod-upgrade`')
+      && files31.length === 29 && files31.every(n => map.includes(`public/assets/fishing/${n}.webp`)),
+      '그림 주문서 31(낚싯대 강화): Drive의 기존 그림(29b 낚싯대 · 릴)을 열어 그림체 · 손잡이 위치를 맞추고, 정해진 폴더에 정확한 이름으로 저장, 그림 29장');
   }
 }

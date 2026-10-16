@@ -28,6 +28,7 @@ import { runCrossSchoolChecks } from './cross-school-check.mjs';
 import { runDungeonLobbyChecks } from './dungeon-lobby-check.mjs';
 import { runYachaTabChecks } from './yacha-tab-check.mjs';
 import { runMenuChecks } from './menu-check.mjs';
+import { runRodChecks } from './rod-check.mjs';
 import { runLevelChecks } from './level-check.mjs';
 import { runPracticeSpeedChecks } from './practice-speed-check.mjs';
 import { runStabilityChecks } from './stability-check.mjs';
@@ -1474,6 +1475,7 @@ export async function runReleaseCheck() {
     await runDungeonLobbyChecks(assert, expectStatus);
     runYachaTabChecks(assert);
     runMenuChecks(assert);
+    runRodChecks(assert);
     runLevelChecks(assert);
     await runPracticeSpeedChecks(assert);
     await runStabilityChecks(assert);

@@ -37,6 +37,33 @@ export const FIGHT = {
   legend: { hp: 320, pull: 1.45, dash: [1600, 2600], min: 11000, size: 2.3, dist: 38, moves: { mash: 3, rhythm: 4, thrash: 3, dive: 2 }, taps: 18, notes: 10, beat: 360 },
   golden: { hp: 190, pull: 1, dash: [2000, 3200], min: 7000, size: 1.5, dist: 24, moves: { mash: 3, rhythm: 3, thrash: 2, dive: 1 }, taps: 14, notes: 8, beat: 420 }
 };
+// V13.154 낚싯대 강화(1~5단계, 진주로). 손맛은 그대로 두고 조금씩 쉬워진다. 물고기 등급 확률은 바꾸지 않는다.
+//   reel: 감는 속도 · tension: 감을 때 텐션 오르는 속도 · snap: 빨간 칸(98 이상)에서 줄이 버티는 시간(초) · skill: 특기 게이지 차는 속도
+//   반 전체 낚시(교실 게임)에는 쓰지 않는다(모두 같은 조건). 서버는 감는 속도만큼 최소 파이팅 시간을 줄여서 본다.
+export const ROD = {
+  MAX: 5,
+  COST: { 2: 200, 3: 500, 4: 1200, 5: 2400 },   // 그 단계로 올리는 진주(합계 4,300 · 미끼 하루 5개로 약 한 달)
+  LEVELS: [
+    { level: 1, name: '새싹 낚싯대', reel: 1, tension: 1, snap: .75, skill: 1, colors: ['#0f766e', '#5eead4', '#ecfeff', '#14b8a6'], reelc: ['#ecfdf5', '#34d399', '#047857'] },
+    { level: 2, name: '은빛 낚싯대', reel: 1.06, tension: .96, snap: .85, skill: 1.07, colors: ['#475569', '#cbd5e1', '#f8fafc', '#94a3b8'], reelc: ['#f8fafc', '#cbd5e1', '#64748b'] },
+    { level: 3, name: '황금 낚싯대', reel: 1.12, tension: .92, snap: .95, skill: 1.15, colors: ['#92400e', '#fbbf24', '#fffbeb', '#d97706'], reelc: ['#fffbeb', '#fbbf24', '#b45309'] },
+    { level: 4, name: '보석 낚싯대', reel: 1.18, tension: .88, snap: 1.05, skill: 1.22, colors: ['#312e81', '#818cf8', '#e0e7ff', '#7c3aed'], reelc: ['#eef2ff', '#818cf8', '#4338ca'] },
+    { level: 5, name: '전설 낚싯대', reel: 1.25, tension: .85, snap: 1.2, skill: 1.3, colors: ['#be185d', '#fde68a', '#ffffff', '#38bdf8'], reelc: ['#fff7ed', '#fbcfe8', '#a855f7'] }
+  ]
+};
+export const rodLevel = lv => Math.max(1, Math.min(ROD.MAX, Math.floor(Number(lv) || 1)));
+export const rodOf = lv => ROD.LEVELS[rodLevel(lv) - 1];
+// 강화하면 좋아지는 것(지금 → 다음). 화면의 설명 줄.
+export function rodPerks(lv) {
+  const a = rodOf(lv), b = lv < ROD.MAX ? rodOf(lv + 1) : null;
+  const up = x => x === 1 ? '기본' : `+${Math.round((x - 1) * 100)}%`, down = x => x === 1 ? '기본' : `-${Math.round((1 - x) * 100)}%`;
+  return [
+    { key: 'reel', label: '감는 속도', now: up(a.reel), next: b && up(b.reel) },
+    { key: 'snap', label: '빨간 칸 버티기', now: `${a.snap.toFixed(2)}초`, next: b && `${b.snap.toFixed(2)}초` },
+    { key: 'tension', label: '텐션 오르는 속도', now: down(a.tension), next: b && down(b.tension) },
+    { key: 'skill', label: '특기 게이지', now: up(a.skill), next: b && up(b.skill) }
+  ];
+}
 // 마무리: 물고기가 물 위로 뛰어오를 때 맞춰 탭하면 퍼펙트(무게 +8%, 기록용). 무게는 서버가 곱한다.
 export const FINISH = { PERFECT_KG: 1.08, KINDS: ['perfect', 'good', 'miss'] };
 export const stars = rarity => ({ common: 1, uncommon: 2, rare: 3, epic: 4, legend: 5, golden: 5 })[rarity] || 1;
