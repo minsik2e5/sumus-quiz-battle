@@ -14,7 +14,7 @@ import { MATCH, matchPick, matchStars, matchTime } from './match-rules.js';
 
 // 그림(주문서 30)이 들어오면 이름을 넣는다. 없으면 코드 그림(CSS)으로 나온다.
 // 'entry'(주문서 32)는 놀이터 짝 맞추기 카드 그림(public/assets/match/entry.webp, arcade-games.js matchCard).
-export const MATCH_ART = new Set([]);
+export const MATCH_ART = new Set(['entry']);
 const ART_NAMES = ['bg', 'card-en', 'card-ko', 'card-back', 'star', 'ribbon', 'stamp', 'podium', 'fever'];
 const artStyle = () => ART_NAMES.filter(n => MATCH_ART.has(n)).map(n => `--art-${n}:url(/assets/match/${n}.webp)`).join(';');
 const artClass = () => ART_NAMES.filter(n => MATCH_ART.has(n)).map(n => ` mt-art-${n}`).join('');
