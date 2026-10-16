@@ -22,6 +22,9 @@ import { EGG_PRICE } from './modules/core.js';
 import { openGuardSheet, maybeGuardMoment } from './modules/streak-guard-ui.js';
 import { partyCreateModal, openPartyTv } from './modules/party-tv.js';
 import { openReel } from './modules/reel.js';
+import { arcadeWords, wordsLabel, openWordsSheet, partyCode } from './modules/arcade-games.js';
+import { openMatchGame } from './modules/match-game.js';
+import { openPartyJoin } from './modules/party.js';
 // V13.149 테스트 앱(sumus-voca-test)에서는 화면 위에 '테스트 앱' 표시를 띄워 운영과 헷갈리지 않게 한다.
 if (/^sumus-voca-test\./.test(location.hostname)) document.documentElement.classList.add('is-test-app');
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
@@ -944,6 +947,16 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'attend') return attend(b);
     if (d.action === 'streak-guard') return openGuardSheet(A, () => renderKeepScroll());
     // V13.150 놀이터 낚시터(손맛 낚시).
+    // V13.151 놀이터 '게임': 짝 맞추기 · 교실 게임 참가(야차전에서 옮겨 옴). 끝나면 놀이터로 돌아온다.
+    if (d.action === 'arcade-words') return openWordsSheet(A, () => renderKeepScroll());
+    if (d.action === 'arcade-match' || d.action === 'arcade-party') {
+      const back = async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); };
+      if (d.action === 'arcade-party') { const code = partyCode(); if (!code) return; window.scrollTo(0, 0); return openPartyJoin(A, back, { code }); }
+      const w = arcadeWords(A);
+      if (!w.ok) return toast('단어를 8개 이상 골라 주세요.');
+      window.scrollTo(0, 0);
+      return openMatchGame(A, back, { words: w.list, codes: w.picked, label: wordsLabel(A, w.picked) });
+    }
     if (d.action === 'reel-open') { window.scrollTo(0, 0); return openReel(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     // V13.91 나 메뉴판: 어려운 단어 opens 단어 학습 on the ★ words; 알림 scrolls to its settings.
     if (d.action === 'me-stars') { A.tab = 'practice'; A.studyView = 'vocab'; A.memorizeFilter = 'starred'; savePreferences(); render(); window.scrollTo(0, 0); return; }

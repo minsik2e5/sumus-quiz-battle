@@ -425,11 +425,12 @@ export async function runGamesChecks(assert) {
     assert(worker.includes('export { PartyRoom };') && worker.includes("url.pathname.match(/^\\/api\\/party\\/ws\\/([0-9a-f-]{36})$/)") && worker.includes("'X-Party-Key'") && worker.includes('delete result._parties') && worker.includes('undoParty(state, message)') && worker.includes('settlePartyReport(state, body)'),
       'V13.149 worker: 교실 게임 소켓은 방으로, 방 준비 메시지는 브라우저로 안 가고, 결과 보고는 키로 확인');
     assert(local.includes('delete result._parties;') && local.includes('delete result._dungeon;'), 'V13.149 로컬 서버도 방 준비 메시지(문제 · 입장표)를 브라우저로 보내지 않는다');
-    assert(/"v13146\.css",\s*"v13149\.css",\s*"v13150\.css"\s*\]/.test(build) && ['match-game.js', 'reel.js', 'reel-rules.js', 'fishing-art.js', 'fishing-rules.js', 'party.js', 'party-tv.js', 'streak-guard.js', 'streak-guard-ui.js', 'match-rules.js'].every(f => sw.includes(`modules/${f}`)),
+    assert(/"v13146\.css",\s*"v13149\.css",\s*"v13150\.css"(,\s*"v13151\.css")?\s*\]/.test(build) && ['match-game.js', 'reel.js', 'reel-rules.js', 'fishing-art.js', 'fishing-rules.js', 'party.js', 'party-tv.js', 'streak-guard.js', 'streak-guard-ui.js', 'match-rules.js'].every(f => sw.includes(`modules/${f}`)),
       'V13.149 새 화면 CSS는 묶음 끝에, 새 모듈은 오프라인 캐시에');
-    assert(battle.includes("['games', '게임', 'arcade']") && battle.includes("act === 'game-match'") && !battle.includes('game-fish') && source('../public/modules/arcade.js').includes('data-action="reel-open"') && app.includes("d.action === 'reel-open'")
-      && source('../public/modules/reel.js').includes('진주 1개 = 1코인') && source('../public/modules/sessions.js').includes('낚시 미끼 +1') && battle.includes("act === 'game-party'") && app.includes("d.action === 'party-new'") && teacher.includes('data-action="party-new"'),
-      'V13.149 야차전 게임 탭(짝 맞추기 · 단어 낚시 · 교실 게임 참가)과 선생님 대시보드의 교실 게임 버튼');
+    // V13.151 짝 맞추기 · 교실 게임 참가는 야차전 게임 탭에서 놀이터 '게임' 묶음으로 옮겼다(server/menu-check.mjs).
+    assert(!battle.includes("['games', '게임', 'arcade']") && app.includes("d.action === 'arcade-match'") && !battle.includes('game-fish') && source('../public/modules/arcade.js').includes('data-action="reel-open"') && app.includes("d.action === 'reel-open'")
+      && source('../public/modules/reel.js').includes('진주 1개 = 1코인') && source('../public/modules/sessions.js').includes('낚시 미끼 +1') && app.includes("d.action === 'arcade-party'") && app.includes("d.action === 'party-new'") && teacher.includes('data-action="party-new"'),
+      'V13.149 · V13.151 놀이터 게임(낚시터 · 짝 맞추기 · 교실 게임 참가)과 선생님 대시보드의 교실 게임 버튼');
   }
 
   /* ---------- V13.149 짝 맞추기 고퀄 화면 ---------- */
