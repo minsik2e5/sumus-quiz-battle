@@ -14,7 +14,7 @@ import { selfSignup, checkSignupCode, signupCodeGuard } from '../server/signup.m
 import { examAdmin } from '../server/exam-admin.mjs';
 import { migrateState, stateSizeReport } from '../server/state.mjs';
 import { hashToken } from '../server/auth.mjs';
-import { createMutationCoordinator, NO_MUTATION } from '../server/mutation-coordinator.mjs';
+import { createMutationCoordinator, NO_MUTATION, isQuickWrite } from '../server/mutation-coordinator.mjs';
 import { createLocalRepository, createSupabaseSync } from './local-first.mjs';
 import { partitionState, assembleState, hashText } from './state-parts.mjs';
 import { WRITE_WARN_PCT } from './cf-limits.mjs';
@@ -512,7 +512,7 @@ export class VocaStateObject {
       const startedAt = Date.now();
       const result = request.method === 'GET'
         ? await execute(this.mutations.current().state)
-        : await this.mutations.durable(execute);
+        : isQuickWrite(request.method, url.pathname) ? await this.mutations.fast(execute) : await this.mutations.durable(execute);
       // Room set-up for yacha battles: the questions (with answers) go to the room only.
       // `_battles` (V13.66) carries several room messages, e.g. when a tournament is called off.
       const roomMessages = [...(result?._battle ? [result._battle] : []), ...(Array.isArray(result?._battles) ? result._battles : [])];

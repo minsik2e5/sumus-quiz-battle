@@ -10,6 +10,25 @@ function compactState(state) {
   return state;
 }
 
+// V13.155 렉 줄이기: 변경마다 상태 전체를 깊게 복사하면(운영 9MB, 한 번에 약 100ms) 반 전체가 연습할 때 줄이 밀린다.
+// 가장 큰 두 덩어리는 얕게 복사한다: 지난 연습 기록(sessions, 약 70%)은 배열만 새로 만들고 기록 하나하나는 같이 쓰고,
+// 숙련도(mastery)는 학생별 묶음을 같이 쓴다. 변경은 성공하면 새 상태로 바뀌니 문제없고, 변경 도중 실패했을 때만
+// 그 두 덩어리 안을 이미 고친 부분이 남을 수 있다(서비스는 검사를 먼저 하고 고치므로 드물다). 저장은 조각을 글자로
+// 비교하므로(cloudflare/local-first.mjs) 같이 쓰는 객체여도 바뀐 것은 그대로 저장된다.
+export const SHALLOW_KEYS = ['sessions', 'mastery'];
+export function cloneState(state) {
+  if (!state || typeof state !== 'object') return structuredClone(state);
+  const rest = {}, shallow = {};
+  for (const [key, value] of Object.entries(state)) (SHALLOW_KEYS.includes(key) ? shallow : rest)[key] = value;
+  const next = structuredClone(rest);
+  for (const [key, value] of Object.entries(shallow)) next[key] = Array.isArray(value) ? value.slice() : value && typeof value === 'object' ? { ...value } : value;
+  return next;
+}
+// V13.155 연습 중 답 · 다음 문제 · 패스는 메모리에 반영하자마자 답한다(저장은 바로 뒤에 모아서). 저장 모으기(1.5초~)를
+// 답마다 기다리면 쓰기 문제 · 실전시험에서 "답안을 저장하고 있어요"가 매번 1~6초 떠 있었다.
+export const QUICK_WRITE = /^\/api\/practice\/[^/]+\/(answer|next|pass)$/;
+export const isQuickWrite = (method, pathname) => method === 'POST' && QUICK_WRITE.test(pathname);
+
 export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   const flushDelay = Math.max(50, Number(options.flushDelay || 500));
   const retryDelay = Math.max(1000, Number(options.retryDelay || 2000));
@@ -48,7 +67,7 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   async function applyMutation(fn) {
     return queueApply(async () => {
       if (needsRecovery) throw unavailable();
-      const nextState = structuredClone(snapshot.state);
+      const nextState = cloneState(snapshot.state);
       const output = await fn(nextState);
       compactState(nextState);
       if (output === NO_MUTATION) {
