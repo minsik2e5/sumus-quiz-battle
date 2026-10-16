@@ -34,5 +34,6 @@ export function runRodChecks(assert) {
   const pub = new URL('../public/assets/fishing/', import.meta.url);
   const art = [2, 3, 4, 5].flatMap(t => [`pov-rod-t${t}`, `pov-reel-t${t}`]).concat([1, 2, 3, 4, 5].map(t => `icon-rod-${t}`), ['fx-upgrade', 'fx-hammer', 'stamp-tier', 'bg-forge']);
   assert(art.every(n => existsSync(new URL(`${n}.webp`, pub))) && ui.includes("...[1, 2, 3, 4, 5].map(t => `icon-rod-${t}`), 'fx-upgrade', 'fx-hammer', 'stamp-tier', 'bg-forge',"), 'V13.154 그림 31(단계별 낚싯대 · 아이콘 · 강화 연출 · 작업대 배경)이 있고 화면이 쓴다');
+  assert(/#rl-rod-ico>\.rl-art\{position:static;display:block;width:38px;height:38px/.test(source('../public/v13154.css')) && ui.includes('<span id="rl-rod-ico">'), 'V13.156 옆 메뉴 낚싯대 아이콘 그림은 38px(span 안이라 .rl-ico>.rl-art가 안 먹던 것)');
   assert(!/ROD|rodOf/.test(source('../public/modules/party.js')) && source('./service.mjs').includes("if (path === '/reel/rod' && method === 'POST')"), 'V13.154 반 전체 낚시(교실 게임)는 낚싯대 강화를 쓰지 않는다, 강화는 /reel/rod');
 }

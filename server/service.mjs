@@ -1338,6 +1338,10 @@ export async function service(state, method, path, body, token, options = {}) {
     } else {
       Object.assign(preview, { class_name: grade, division: school.division, school_id: school.id, school: school.name, active: true, preview_owner_id: p.id });
     }
+    // V13.156 미리보기 계정은 순위 · 대결 · 던전에서 빠지므로, 선생님이 낚시 · 낚싯대 강화 · 교환소를 끝까지 둘러볼 수 있게 들어올 때마다 미끼 · 진주를 채운다.
+    preview.reel ||= {};
+    preview.reel.bait = Math.max(Number(preview.reel.bait || 0), REEL.PREVIEW.BAIT);
+    preview.reel.pearls = Math.max(Number(preview.reel.pearls || 0), REEL.PREVIEW.PEARLS);
     const raw = randomBytes(32).toString('base64url');
     state.tokens.push({ hash: hashToken(raw), user_id: preview.id, expires_at: Date.now() + 2 * 3600000, preview_owner_id: p.id });
     return { ok: true, profile: publicProfile(preview), _cookie: raw };
