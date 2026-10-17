@@ -46,9 +46,25 @@ export async function openPartyJoin(A, exit, { code }) {
     main(`<div class="yb-loading"><p>${esc(err.message)}</p><button type="button" class="btn primary" data-pt="exit">돌아가기</button></div>`);
   }
 }
+// V13.150 혼자 보물 사냥: 방(소켓) 대신 폰 안의 엔진(solo: treasure-solo.js)에 이어 같은 화면을 쓴다.
+//   solo { attach(onMessage), send(msg), ended(view), stop() }
+export function openPartySolo(A, exit, solo) {
+  closeAll();
+  P = { A, exit, timers: [], offset: 0, view: null, busy: false, solo };
+  A.screen = 'party';
+  root().innerHTML = `<div class="session-app pt-app treasure solo${treasureArt('bg-phone') ? ' art-bg' : ''}"><header class="pt-top"><button type="button" class="yb-back" data-pt="exit" aria-label="나가기">${icon('back')}</button><strong id="pt-title">혼자 보물 사냥</strong><span class="pt-clock" id="pt-clock"></span></header><main id="pt-main" class="pt-main"></main><div class="pt-toasts" id="pt-toasts" aria-live="polite"></div></div>`;
+  root().onclick = onClick;
+  window.scrollTo(0, 0);
+  preloadSound(['coins', 'fanfare-basic', 'crack', 'shield-block', 'boss-roar', 'warn-beep', 'boss-charge', 'crit']);
+  clearInterval(P.ticker);
+  P.ticker = setInterval(tickClock, 250);
+  solo.attach(onMessage);
+}
+export const partyMain = html => main(html);
 function closeAll() {
   if (!P) return;
   P.closing = true;
+  P.solo?.stop?.();
   P.timers.forEach(clearTimeout);
   clearInterval(P.ticker); clearInterval(P.pinger);
   try { P.ws?.close(); } catch {}
@@ -75,7 +91,7 @@ function connect() {
   clearInterval(P.ticker);
   P.ticker = setInterval(tickClock, 250);
 }
-const send = msg => { try { if (P?.ws?.readyState === 1) P.ws.send(JSON.stringify(msg)); } catch {} };
+const send = msg => { if (P?.solo) return P.solo.send(msg); try { if (P?.ws?.readyState === 1) P.ws.send(JSON.stringify(msg)); } catch {} };
 
 function onClick(event) {
   const b = event.target.closest('[data-pt]');
@@ -123,7 +139,7 @@ function draw() {
   const v = P.view;
   if (!v) return;
   if (v.phase === 'lobby') { P.bodyKey = null; return lobby(v); }
-  if (v.phase === 'ended') { P.bodyKey = null; return ended(v); }
+  if (v.phase === 'ended') { P.bodyKey = null; return P.solo ? P.solo.ended(v) : ended(v); }
   if (P.anim) return; // 상자 여는 연출 · 물고기 연출 중에는 끝난 뒤에 그린다
   if (!document.getElementById('pt-head')) { main('<div id="pt-head"></div><div id="pt-body"></div>'); P.bodyKey = null; }
   // 점수 · 순위 · 1~3등은 맥박마다 바뀐다: 위 칸만 다시 쓴다. 문제 · 상자 · 표적 칸은 바뀔 때만(누르는 중인 버튼이 사라지지 않게).

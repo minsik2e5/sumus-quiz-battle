@@ -1409,3 +1409,49 @@ img.rl-art.rl-art-pearl{position:static;inset:auto;translate:none;z-index:auto;d
 .mt-app.mt-art-star .mt-res-stars i.on{color:transparent;text-shadow:none;background:var(--art-star) center/contain no-repeat}
 .mt-app.mt-art-ribbon .mt-res-head span{background:var(--art-ribbon) center/100% 100% no-repeat;clip-path:none;filter:none;padding:12px 52px 20px;text-shadow:0 2px 0 rgba(43,29,18,.6)}
 .mt-app.mt-art-stamp .mt-stamp{border:0;background:var(--art-stamp) center/contain no-repeat;box-shadow:none;padding:18px 16px;color:#a5352a}
+
+/* ---------- V13.150 혼자 보물 사냥(반 친구 금고): 시작 · 끝 · 게임 탭 카드(손그림 테마) ---------- */
+.pt-app.solo-intro{--hd-ink:#2b1d12;--hd-paper:#f4e7c9;--hd-paper2:#ead8b0;--hd-cream:#fff6e3;--hd-gold:#e8a930;--hd-gold2:#f3c75a;--hd-red:#c4473a;--hd-blue:#3b78b5;--hd-green:#4e9a57;--hd-orange:#d9783a;--hd-line:2.5px solid var(--hd-ink);--hd-drop:0 4px 0 var(--hd-ink);--hd-drop-s:0 3px 0 var(--hd-ink);--hd-outline:0 2px 0 var(--hd-ink),1.5px 0 0 var(--hd-ink),-1.5px 0 0 var(--hd-ink),0 -1.5px 0 var(--hd-ink)}
+.pt-app .ts-label{font-size:12px;font-weight:700;max-width:42%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ts-intro{display:grid;gap:12px;padding-top:4px}
+.pt-app.treasure :is(.ts-vault,.ts-robbed,.ts-board,.ts-hits,.ts-left){background:var(--hd-paper);color:var(--hd-ink);border:var(--hd-line);box-shadow:var(--hd-drop);border-radius:14px;padding:12px}
+.ts-vault{position:relative;display:flex;align-items:center;gap:12px}
+.ts-vault .ts-vault-ico{width:58px;height:58px;flex:none}
+.ts-vault small{display:block;font-size:12px;font-weight:800;opacity:.7}
+.ts-vault b{display:flex;align-items:center;gap:4px;font-size:30px;font-weight:900;font-variant-numeric:tabular-nums;line-height:1.1}
+.ts-vault b .coin-ico{width:24px;height:24px}
+.ts-vault span{font-size:12px;opacity:.8}
+.ts-vault.record{background:#fbe6b0}
+.ts-stamp{position:absolute;right:10px;top:-12px;transform:rotate(10deg)}
+.ts-robbed h3,.ts-board h3,.ts-hits h3{margin:0 0 8px;font-size:15px;display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.ts-robbed h3 small,.ts-hits h3 small{font-weight:700;font-size:11.5px;color:var(--hd-red)}
+.ts-robbed ul,.ts-hits ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.ts-robbed li,.ts-hits li{display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:13px;padding:7px 10px;border-radius:10px;background:#fffaf0;border:2px solid var(--hd-ink);box-shadow:inset 5px 0 0 var(--hd-red)}
+.ts-robbed li.block,.ts-hits li.block{box-shadow:inset 5px 0 0 var(--hd-blue)}
+.ts-hits li{box-shadow:inset 5px 0 0 var(--hd-green)}
+.ts-robbed li em,.ts-hits li em{font-style:normal;font-weight:900;display:inline-flex;align-items:center;gap:2px}
+.ts-robbed li small,.ts-hits li small{margin-left:auto;font-size:11px;opacity:.6}
+.ts-robbed .coin-ico,.ts-hits .coin-ico{width:14px;height:14px}
+.ts-note{margin:6px 0 0;font-size:12px;opacity:.75}
+.pt-app.treasure .ts-rules{margin:0}
+.ts-left{display:flex;align-items:baseline;gap:6px;font-size:13px;padding:8px 12px!important}
+.ts-left b{font-size:18px}.ts-left small{margin-left:auto;font-size:11px;opacity:.7}
+.pt-app.treasure .ts-go{font-size:18px;background:var(--hd-green);border:3px solid var(--hd-ink);box-shadow:var(--hd-drop);color:var(--hd-cream);text-shadow:0 2px 0 rgba(43,29,18,.45)}
+.pt-app.treasure .ts-go:active{transform:translateY(3px);box-shadow:0 1px 0 var(--hd-ink)}
+.ts-board ol{list-style:none;margin:0;padding:0;display:grid;gap:5px}
+.ts-board li{display:grid;grid-template-columns:28px 30px 1fr auto;align-items:center;gap:8px;padding:6px 10px;border-radius:10px;background:#fffaf0;border:2px solid var(--hd-ink)}
+.ts-board li.me{background:var(--hd-gold2)}
+.ts-board li i{font-style:normal;font-weight:900;text-align:center}.ts-board li i .gi{width:22px;height:22px}
+.ts-board li b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ts-board li em{font-style:normal;font-weight:900;display:flex;align-items:center;gap:2px}.ts-board .coin-ico{width:14px;height:14px}
+.ts-board li .avatar-art{width:30px;height:30px;min-width:0;margin:0}.ts-board li .avatar-art img{width:100%;height:100%;object-fit:contain}
+.ts-end{display:grid;gap:12px}
+.ts-end-head{display:flex;align-items:center;justify-content:center;gap:12px}
+.ts-end-head .ts-end-ico{width:84px;height:84px}
+.ts-end-head small{display:block;font-weight:800;opacity:.85}.ts-end-head b{font-size:52px;font-weight:900;text-shadow:var(--hd-outline,0 2px 0 #2b1d12);font-variant-numeric:tabular-nums}
+.ts-actions .yl-cta{background:var(--hd-green);border:3px solid var(--hd-ink);box-shadow:var(--hd-drop)}
+/* 게임 탭 카드 */
+.gm-treasure{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60'%3E%3Cpath d='M0 20c10-7 20-7 30 0s20 7 30 0 20-7 30 0 20 7 30 0M-30 50c10-7 20-7 30 0s20 7 30 0 20-7 30 0 20 7 30 0 20-7 30 0' fill='none' stroke='%23fff6e3' stroke-opacity='.16' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E"),#1f4a52;border:3px solid #2b1d12;box-shadow:0 5px 0 #2b1d12}
+.gm-treasure .gm-vault{position:absolute;inset:6px;background:url(/assets/treasure/vault.webp) center/contain no-repeat}
+.gm-treasure .gm-facts .hot b{color:#f2c4bc}
+.ts-robbed li span{font-weight:700}.ts-robbed li span b{font-weight:900}

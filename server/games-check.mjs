@@ -17,6 +17,7 @@ import { addBonus } from './rewards.mjs';
 import { PARTY, CHESTS, ITEMS, bountyId, teamWinner, alarmAnswer, peek, useItem, nextWake, partyResultFor, createParty, joinParty, startParty, answer, pick, target, tick, tvView, playerView, awards, partyCoins, partyReport, ranked } from './party-engine.mjs';
 import { settleParty } from './party.mjs';
 import { matchSplits } from './games.mjs';
+import { SOLO, soloRoom, soloStep, soloRng } from '../public/modules/treasure-solo-rules.js';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 const lcg = seed => () => { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296; };
@@ -162,6 +163,76 @@ export async function runGamesChecks(assert) {
       const board2 = await call('qa-gm-a', 'GET', '/games/match/board');
       assert(JSON.stringify(state.profiles) === snap && board2.rows.map(r => r.id).join() === 'qa-gm-c,qa-gm-b,qa-gm-a' && board2.rows.every(r => !('splits' in r)) && board2.rows[2].me,
         'V13.149 순위(시상대) 보기는 기록을 바꾸지 않고, 짝마다 시간은 순위에 싣지 않는다');
+      // V13.150 혼자 보물 사냥(반 친구 금고): 폰처럼 판을 돌려 기록을 만들고, 서버가 같은 기록으로 다시 돌린 결과와 같아야 한다.
+      const soloSim = (start, { steal = null } = {}) => {
+        const t0 = 1e12, rng = soloRng(start.seed), room = soloRoom(start, t0), me = start.me.id, log = [];
+        const step = e => { log.push(e); soloStep(room, me, e, t0, rng); };
+        for (let t = 600; t < SOLO.MS - 200; t += 650) {
+          const pl = room.players[me];
+          if (room.phase !== 'play') break;
+          if (pl.pending) { const ids = pl.pending.list; step([t, 'g', steal && ids.includes(steal) ? steal : ids[0]]); continue; }
+          if (pl.offer) { const k = pl.offer.chests.findIndex(c => c.kind === 'steal'); step([t, 'p', k >= 0 ? k : 0]); continue; }
+          if (t0 + t < (pl.wait_until || 0)) continue;
+          step([t, 'a', room.questions[pl.qi % room.questions.length].answer]);
+        }
+        tick(room, t0 + SOLO.MS + 1);
+        return { log, me: room.players[me] };
+      };
+      const sStart = await call('qa-gm-c', 'POST', '/games/treasure/start', { range_codes: ['24'] });
+      assert(sStart.start.vaults.length >= SOLO.MIN_VAULTS && sStart.start.vaults.every(v => v.bot) && sStart.start.qs.length >= 8 && sStart.start.me.id === 'qa-gm-c' && sStart.start.duration_ms === SOLO.MS,
+        'V13.150 혼자 보물 사냥: 시작하면 문제 · 시드 · 털 수 있는 금고(이번 주 반 친구 금고가 없으면 해적 봇 3개)');
+      const simC = soloSim(sStart.start);
+      assert(await fails(() => call('qa-gm-c', 'POST', '/games/treasure/finish', { id: 'nope', log: simC.log }), 404), 'V13.150 모르는 판은 끝낼 수 없다');
+      const cBefore = Number(prof('qa-gm-c').games?.party?.plays || 0) * (prof('qa-gm-c').games?.party?.day === dayKey(clock) ? 1 : 0);
+      const tEarly = await call('qa-gm-c', 'POST', '/games/treasure/finish', { id: sStart.start.id, log: simC.log });
+      assert(!tEarly.paid && tEarly.reason === 'short', 'V13.150 혼자 보물 사냥은 3분이 지나기 전에 끝낼 수 없다(서버 시간)');
+      const sStart2 = await call('qa-gm-c', 'POST', '/games/treasure/start', { range_codes: ['24'] });
+      const simC2 = soloSim(sStart2.start);
+      clock += SOLO.MS;
+      const fin = await call('qa-gm-c', 'POST', '/games/treasure/finish', { id: sStart2.start.id, log: simC2.log });
+      const finAgain = await call('qa-gm-c', 'POST', '/games/treasure/finish', { id: sStart2.start.id, log: [] });
+      assert(fin.paid && fin.gold === simC2.me.gold && fin.right === simC2.me.right && fin.record && fin.best === simC2.me.gold && prof('qa-gm-c').games.vault.best === simC2.me.gold && prof('qa-gm-c').games.vault.shield === simC2.me.shield
+        && fin.coins === Math.min(15, Math.floor(simC2.me.right / 2)) + SOLO.RECORD_COINS && finAgain.again && finAgain.gold === fin.gold && !prof('qa-gm-c').games.vault.live,
+        'V13.150 혼자 보물 사냥: 서버가 기록으로 다시 돌린 금화 · 맞힌 수가 폰과 같고, 금고(이번 주 최고)가 되고, 코인은 맞힌 수 절반(최대 15) + 금고 기록 +3, 같은 끝내기는 한 번만');
+      // 다른 친구(b)가 c의 금고를 턴다: c의 금고는 줄지 않고 알림만 남는다.
+      prof('qa-gm-c').games.vault.shield = 0;
+      const cBest = prof('qa-gm-c').games.vault.best;
+      const sB = await call('qa-gm-b', 'POST', '/games/treasure/start', { range_codes: ['24'] });
+      assert(sB.start.vaults.some(v => v.id === 'qa-gm-c' && v.gold === cBest && !v.bot) && sB.start.vaults.filter(v => !v.bot).every(v => v.id !== 'qa-gm-b') && !sB.start.vaults.some(v => v.id === 'qa-gm-d'),
+        'V13.150 털 수 있는 금고: 이번 주 같은 반 친구의 금고(금화 = 그 친구의 최고 판), 나 · 다른 반은 없다');
+      const simB = soloSim(sB.start, { steal: 'qa-gm-c' });
+      clock += SOLO.MS;
+      const finB = await call('qa-gm-b', 'POST', '/games/treasure/finish', { id: sB.start.id, log: simB.log });
+      const robbed = prof('qa-gm-c').games.vault.robbed || [];
+      assert(finB.paid && finB.gold === simB.me.gold && finB.hits.some(h => h.name === '다솜' && h.kind === 'steal' && h.amount > 0) && robbed.some(r => r.by === 'qa-gm-b' && r.kind === 'steal' && r.amount > 0) && prof('qa-gm-c').games.vault.best === cBest,
+        'V13.150 친구 금고를 털면 그 친구에게 알림이 남고(누가 · 얼마), 친구 금고 · 순위는 줄지 않는다');
+      // 되갚기: c가 다시 시작하면 b가 '되갚기' 표적으로 나온다. 되갚으면 알림이 지워진다.
+      const sC3 = await call('qa-gm-c', 'POST', '/games/treasure/start', { range_codes: ['24'] });
+      assert(sC3.start.revenge.includes('qa-gm-b') && sC3.start.vaults.some(v => v.id === 'qa-gm-b') && sC3.robbed.some(r => r.by === 'qa-gm-b'), 'V13.150 나를 턴 친구는 다음 판에 되갚기 표적으로 나온다(알림도 보인다)');
+      const roomC3 = soloRoom(sC3.start, 1e12);
+      roomC3.players['qa-gm-c'].offer = { chests: [{ kind: 'steal', pct: 25 }, { kind: 'nothing' }, { kind: 'nothing' }], at: 1e12 + 30000, peeked: false, caught: false };
+      pick(roomC3, 'qa-gm-c', 0, 1e12 + 30000);
+      assert(playerView(roomC3, 'qa-gm-c', 1e12 + 30001).pending.targets.some(x => x.id === 'qa-gm-b' && x.revenge), 'V13.150 되갚기 친구는 표적 목록에 "되갚기!"로 나온다');
+      const simC3 = soloSim(sC3.start, { steal: 'qa-gm-b' });
+      clock += SOLO.MS;
+      const finC3 = await call('qa-gm-c', 'POST', '/games/treasure/finish', { id: sC3.start.id, log: simC3.log });
+      assert(finC3.hits.some(h => h.kind === 'steal' && h.name === '나무') ? !(prof('qa-gm-c').games.vault.robbed || []).some(r => r.by === 'qa-gm-b') : true, 'V13.150 되갚으면 내 털린 알림에서 그 친구가 지워진다');
+      // 부정 기록: 사람 손보다 빠른 답, 순서가 뒤바뀐 기록, 판 시간 밖 기록은 받지 않는다(금화는 서버가 계산한다).
+      const bad = async log => { const s = await call('qa-gm-a', 'POST', '/games/treasure/start', { range_codes: ['24'] }); clock += SOLO.MS; return call('qa-gm-a', 'POST', '/games/treasure/finish', { id: s.start.id, log }); };
+      const qs0 = sStart.start.qs;
+      const tooFast = await bad(Array.from({ length: 40 }, (_, i) => [1000 + i * 100, 'a', 0])), backwards = await bad([[5000, 'a', 0], [3000, 'a', 0]]), late = await bad([[SOLO.MS + 5000, 'a', 0]]), junk = await bad([[1000, 'x', 0]]);
+      assert([tooFast, backwards, late, junk].every(r => !r.paid && r.reason === 'bad') && !prof('qa-gm-a').games.vault?.best && qs0.length,
+        'V13.150 혼자 보물 사냥: 사람 손보다 빠른 답 · 뒤바뀐 순서 · 판 시간 밖 · 모르는 행동이 있으면 받지 않는다');
+      const snapT = JSON.stringify(state.profiles);
+      const tBoard = await call('qa-gm-a', 'GET', '/games/treasure/board');
+      assert(JSON.stringify(state.profiles) === snapT && tBoard.rows.map(r => r.id).join() === [['qa-gm-b', prof('qa-gm-b').games.vault.best], ['qa-gm-c', prof('qa-gm-c').games.vault.best]].sort((x, y) => y[1] - x[1]).map(x => x[0]).join() && tBoard.view && tBoard.view.daily === PARTY.DAILY,
+        'V13.150 이번 주 반 금고 순위(금화 많은 순, 보기는 저장하지 않는다)');
+      // 코인 판은 교실 게임과 함께 하루 3판.
+      for (let k = 0; k < 3; k++) { const s = await call('qa-gm-c', 'POST', '/games/treasure/start', { range_codes: ['24'] }); const sim = soloSim(s.start); clock += SOLO.MS; await call('qa-gm-c', 'POST', '/games/treasure/finish', { id: s.start.id, log: sim.log }); }
+      const s4 = await call('qa-gm-c', 'POST', '/games/treasure/start', { range_codes: ['24'] }); const sim4 = soloSim(s4.start); clock += SOLO.MS;
+      const capped4 = await call('qa-gm-c', 'POST', '/games/treasure/finish', { id: s4.start.id, log: sim4.log });
+      assert(!capped4.paid && capped4.reason === 'daily' && capped4.left === 0 && cBefore >= 0, `V13.150 혼자 보물 사냥 코인은 교실 게임과 함께 하루 ${PARTY.DAILY}판까지(기록 · 금고는 남는다)`);
+      delete prof('qa-gm-b').games.party; delete prof('qa-gm-c').games.party; // 아래 교실 게임 검사는 오늘 판 수 0에서 시작한다
       // V13.150 손맛 낚시(놀이터): 미끼 → 던지기(서버가 물고기를 정함) → 끌어올리기(최소 파이팅 시간) → 어망 → 진주 → 코인 · 알.
       const b = prof('qa-gm-b');
       b.reel = {}; // 앞의 출석 검사에서 받은 미끼는 지우고 시작
@@ -563,6 +634,24 @@ export async function runGamesChecks(assert) {
     const orders = ['29a-match-background.txt', '29b-match-ui.txt', '30a-treasure-backgrounds.txt', '30b-treasure-ui.txt'].map(f => source(`../docs/asset-requests/runner/${f}`)).join('\n');
     assert(!/Style: glossy|glossy 3D toy-like|3D-painted|nebula clouds|bokeh light circles|shiny/.test(orders) && (orders.match(/hand-drawn/g) || []).length >= 15 && orders.includes('it must NOT look like AI art') && ['29', '30'].every(n => source(`../docs/asset-requests/runner/CODEX_PROMPT_${n}.md`).includes('## 그림체 (선생님 지정, 2026-10-17)')),
       'V13.150 그림 주문서 29 · 30은 손그림 게임 일러스트(잉크 외곽선 · 평면 색 · 종이 질감, 광택 3D · 빛 번짐 금지)로');
+  }
+
+  /* ---------- V13.150 혼자 보물 사냥: 배수 상한 · 화면 · 연결 ---------- */
+  {
+    const qsM = Array.from({ length: 12 }, (_, i) => ({ word_id: 'w' + i, prompt: 'w' + i, options: ['a', 'b', 'c', 'd'], answer: 0 }));
+    const mk = cap => { const r = createParty({ id: 'mc', code: '1', kind: 'treasure', minutes: 5, steal: true, questions: qsM, seed: 0, host: { id: 't' }, mult_cap: cap, now }); joinParty(r, { id: 'a', name: 'A' }, now); startParty(r, now); r.ev = []; return r; };
+    const open = (r, kind, gold) => { r.players.a.gold = gold; r.players.a.offer = { chests: [{ kind }, { kind: 'nothing' }, { kind: 'nothing' }], at: now, peeked: false, caught: false }; pick(r, 'a', 0, now); return r.players.a.gold; };
+    const capped = mk(SOLO.MULT_CAP), free = mk(0);
+    assert(open(capped, 'double', 1000) === 1000 + SOLO.MULT_CAP && open(capped, 'triple', 1000) === 1000 + SOLO.MULT_CAP * 2 && open(capped, 'double', 100) === 200 && open(capped, 'triple', 100) === 300 && open(capped, 'double', 0) === 20
+      && open(free, 'double', 1000) === 2000 && open(free, 'triple', 1000) === 3000,
+      'V13.150 혼자 보물 사냥은 2배 상자 +300 · 3배 +600까지(금고가 운으로만 커지지 않게), 교실 게임은 그대로');
+    const ts = source('../public/modules/treasure-solo.js'), pj = source('../public/modules/party.js'), bt = source('../public/modules/battle.js'), svc = source('./service.mjs'), css = source('../public/v13149.css');
+    assert(ts.includes('function soloLink(start, ctx)') && ts.includes("api('/games/treasure/finish', { id: start.id, log })") && ts.includes('if (m[0] === \'a\' && t - lastA < SOLO.MIN_GAP_MS + 30)') && ts.includes('function robbedHtml(robbed)') && ts.includes("api('/games/treasure/board')")
+      && pj.includes('export function openPartySolo(A, exit, solo)') && pj.includes('return P.solo ? P.solo.ended(v) : ended(v);') && pj.includes('if (P?.solo) return P.solo.send(msg);')
+      && bt.includes("if (act === 'game-treasure') return openGame('treasure');") && bt.includes('data-yb="game-treasure"') && bt.includes("kind === 'treasure' ? openTreasureSolo(A, exit, opts)")
+      && svc.includes("path === '/games/treasure/start'") && svc.includes("path === '/games/treasure/finish'") && svc.includes("path === '/games/treasure/board' && method === 'GET'") && svc.includes('treasure: treasureView(p, now, gameWeekKey(now))')
+      && css.includes('.gm-treasure{') && css.includes('.ts-robbed li'),
+      'V13.150 혼자 보물 사냥: 게임 탭 카드 → 시작 화면(내 금고 · 털린 알림 · 반 금고) → 교실 게임 화면을 폰 안의 엔진에 이어 3분 판 → 행동 기록으로 끝내기(너무 빠른 두 번째 답은 폰이 먼저 거른다)');
   }
 
   /* ---------- V13.149 짝 맞추기 고퀄 화면 ---------- */

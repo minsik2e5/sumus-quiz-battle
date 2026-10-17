@@ -21,6 +21,7 @@ import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAIL
 import { playSound, unlockSound, preloadSound } from './sound.js';
 import { openDungeon } from './dungeon.js';
 import { openMatchGame } from './match-game.js';
+import { openTreasureSolo } from './treasure-solo.js';
 import { openPartyJoin } from './party.js';
 import { matchTime } from './match-rules.js';
 
@@ -271,6 +272,7 @@ function bindRoot() {
     if (act === 'dungeon') { const { A, exit } = B; clearInterval(B.offerTimer); closeSocket(); root().onclick = null; root().oninput = null; B = null; host = null; A.yachaTab = 'dungeon'; return openDungeon(A, exit); }
     // V13.149 게임 탭: 짝 맞추기 · 단어 낚시(전체 화면), 교실 게임(선생님 TV의 보물 사냥 · 반 낚시) 참가.
     if (act === 'game-match') return openGame();
+    if (act === 'game-treasure') return openGame('treasure');
     if (act === 'game-party') return joinParty(b);
     if (act === 'monster-list') { B.A.tab = 'yacha'; B.A.yachaTab = 'monster'; return leaveScreen(); }
     if (act === 'title') return openTitleDetail(B.A, b.dataset.key);
@@ -921,7 +923,7 @@ function gameWords() {
   return { ...w, list: words.filter(x => w.picked.includes(String(x.range_code))) };
 }
 function gamesTab() {
-  const w = monsterWords(), r = B.A.data.rewards || {}, m = r.match || {};
+  const w = monsterWords(), r = B.A.data.rewards || {}, m = r.match || {}, t = r.treasure || {};
   return `<section class="ya-panel ms-words gm-words" aria-label="게임 단어">
       <div class="ms-words-row"><span class="ms-words-k">게임 단어</span><b class="${w.ok ? 'ok' : 'need'}">${w.picked.length ? `${esc(rangesText(w.picked))} · ${num(w.n)}단어` : '아직 안 골랐어요'}</b><button type="button" class="btn small" data-yb="range-sheet">바꾸기</button></div>
     </section>
@@ -931,6 +933,12 @@ function gamesTab() {
         <div class="gm-facts"><span>내 최고 <b>${m.best ? matchTime(m.best) : '—'}</b></span><span>오늘 코인 판 <b>${num(m.left ?? 5)}</b></span></div></div>
       <button type="button" class="yl-cta gm-go" data-yb="game-match" ${w.ok ? '' : 'disabled'}>시작</button>
     </article>
+    <article class="gm-card gm-treasure">
+      <div class="gm-art" aria-hidden="true"><span class="gm-vault"></span></div>
+      <div class="gm-copy"><span class="gm-kicker">혼자 · 3분 · 반 친구 금고</span><h3>혼자 보물 사냥</h3><p>반 친구들의 금고를 털고 내 금고를 채워요. 친구 금고는 줄지 않고, 털리면 다음 판에 되갚기!</p>
+        <div class="gm-facts"><span>내 금고 <b>${num(t.best || 0)}</b></span>${t.robbed?.length ? `<span class="hot">털림 알림 <b>${num(t.robbed.length)}</b></span>` : ''}<span>오늘 코인 판 <b>${num(t.left ?? 3)}</b></span></div></div>
+      <button type="button" class="yl-cta gm-go" data-yb="game-treasure" ${w.ok ? '' : 'disabled'}>시작</button>
+    </article>
     <article class="gm-card gm-fish gm-moved">
       <div class="gm-copy"><span class="gm-kicker">놀이터로 이사했어요</span><h3>🎣 손맛 낚시</h3><p>낚시는 이제 <b>놀이터 → 낚시터</b>에서 해요. 공부로 받은 미끼로 던지고, 텐션 게이지와 좌우 연타로 끌어올려요!</p></div>
     </article>
@@ -939,12 +947,12 @@ function gamesTab() {
       <form class="gm-join" onsubmit="return false"><input id="gm-code" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="0000" aria-label="방 번호 4자리"><button type="button" class="yl-cta" data-yb="game-party">들어가기</button></form>
     </article>`;
 }
-function openGame() {
+function openGame(kind = 'match') {
   const w = gameWords();
   if (!w.ok) return toast('단어를 8개 이상 골라 주세요.');
   const { A, exit } = B, opts = { words: w.list, codes: w.picked, label: rangesText(w.picked) };
   clearInterval(B.offerTimer); closeSocket(); root().onclick = null; root().oninput = null; B = null; host = null; A.yachaTab = 'games';
-  return openMatchGame(A, exit, opts);
+  return kind === 'treasure' ? openTreasureSolo(A, exit, opts) : openMatchGame(A, exit, opts);
 }
 function joinParty(button) {
   const code = (document.getElementById('gm-code')?.value || '').replace(/\D/g, '').slice(0, 4);

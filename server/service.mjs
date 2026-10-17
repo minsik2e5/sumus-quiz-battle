@@ -37,6 +37,8 @@ import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './ga
 import { elementOf } from '../public/modules/battle-fx.js';
 import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, settleParty, partyReportPending, undoParty } from './party.mjs';
 import { PARTY } from './party-engine.mjs';
+import { treasureView, treasureStart, treasureFinish, treasureBoard } from './treasure-solo.mjs';
+import { SOLO } from '../public/modules/treasure-solo-rules.js';
 import { STREAK_GUARD, guardDayKeys, guardView, guardPlan, studyDayNums } from '../public/modules/streak-guard.js';
 export const APP_VERSION = packageInfo.version;
 export const builtinBooks = builtinBooksData;
@@ -1287,7 +1289,7 @@ export async function service(state, method, path, body, token, options = {}) {
       class_league: teacher && selectedSchool ? classLeague(state, competition, selectedSchool, now) : null,
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now) },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now), treasure: treasureView(p, now, gameWeekKey(now)) },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -1726,6 +1728,30 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/games/match/board' && method === 'GET') {
     requireRole(p, 'student');
     return matchBoard(state.profiles, p, gameWeekKey(Date.now()), { hidden: isPrivate });
+  }
+  // V13.150 혼자 보물 사냥(반 친구 금고, server/treasure-solo.mjs): 시작에 문제 · 시드 · 금고 목록, 끝에 행동 기록을 다시 돌려 확인.
+  if (path === '/games/treasure/start' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
+    const ctx = monsterContext(state, p);
+    if (!ctx.school) fail('학생 학교 설정을 확인해주세요.', 409);
+    const asked = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : [];
+    if (!asked.length) fail('단어 범위를 골라주세요.');
+    const questions = battleQuestions(scopedWords(state, ctx.school.id, asked, p.class_name), 'speed', SOLO.QUESTIONS);
+    if (questions.length < 8) fail('뜻이 서로 다른 단어가 8개 이상인 범위를 골라주세요.', 409);
+    const now = Date.now(), pet = petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key).find(x => x.active) || null;
+    return treasureStart(state, p, { id: id(), me: partyPlayer(p, pet), questions, seed: randomBytes(4).readUInt32BE(0), now, weekKey: gameWeekKey(now), hidden: isPrivate, petOf: x => ({ key: x.avatar_key || 'lumi', form: 1 }) });
+  }
+  if (path === '/games/treasure/finish' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    const result = treasureFinish(state, p, { id: str(body.id, 80), log: Array.isArray(body.log) ? body.log.slice(0, SOLO.LOG_MAX + 1) : null, now, weekKey: gameWeekKey(now), pet: activePetKey(state, p.id) });
+    return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
+  }
+  if (path === '/games/treasure/board' && method === 'GET') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    return { ...treasureBoard(state.profiles, p, gameWeekKey(now), { hidden: isPrivate }), view: treasureView(p, now, gameWeekKey(now)) };
   }
   // V13.149 교실 게임: 선생님이 TV에 방을 열고(보물 사냥 · 반 전체 낚시), 학생은 4자리 번호로 들어온다.
   if (path === '/teacher/party' && method === 'GET') {
