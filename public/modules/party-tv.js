@@ -5,6 +5,7 @@ import { getRanges, periodFolders } from './student.js';
 import { playSound, unlockSound, preloadSound } from './sound.js';
 import { FISH, RARITY, kgText } from './fishing-rules.js';
 import { fishPic } from './fishing-art.js';
+import { iconize } from './game-icons.js';
 
 // V13.149 교실 게임 — 선생님: 만들기 창과 교실 TV 화면(전체 화면). TV는 방에 선생님 입장표로 WebSocket 연결한다.
 // TV에는 번호 · 들어온 학생 · 실시간 순위 막대 · 소식(훔치기 · 막기 · 대박 · 큰 물고기)이 나오고, 마지막 1분은 순위를 가렸다가 끝에 공개한다.
@@ -72,10 +73,10 @@ export function openPartyTv(A, party, exit) {
   closeAll();
   T = { A, party, exit, timers: [], offset: 0, view: null, feedSeen: 0, bars: new Map() };
   A.screen = 'party-tv';
-  root().innerHTML = `<div class="ptv ${party.kind}"><div class="ptv-bg" aria-hidden="true"></div>
+  root().innerHTML = iconize(`<div class="ptv ${party.kind}"><div class="ptv-bg" aria-hidden="true"></div>
     <header class="ptv-top"><button type="button" class="ptv-x" data-tv="exit" aria-label="나가기">${icon('back')}</button><strong>${party.kind === 'fish' ? '🎣 반 전체 낚시' : '💰 보물 사냥'}</strong><span class="ptv-label">${esc(party.label || '')}</span><span class="ptv-clock" id="ptv-clock"></span><button type="button" class="ptv-full" data-tv="full">전체 화면</button></header>
     <main class="ptv-main" id="ptv-main"><div class="ptv-loading">게임 방에 연결하는 중…</div></main>
-    <div class="ptv-feed" id="ptv-feed" aria-live="polite"></div></div>`;
+    <div class="ptv-feed" id="ptv-feed" aria-live="polite"></div></div>`);
   root().onclick = onClick;
   window.scrollTo(0, 0);
   preloadSound(['fanfare-epic', 'fanfare-legend', 'coins', 'shield-block', 'boss-roar', 'clear']);
@@ -83,7 +84,7 @@ export function openPartyTv(A, party, exit) {
 }
 function closeAll() { if (!T) return; T.closing = true; T.timers.forEach(clearTimeout); clearInterval(T.ticker); clearInterval(T.pinger); try { T.ws?.close(); } catch {} }
 async function leave() { const exit = T?.exit; closeAll(); root().onclick = null; T = null; if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); await exit?.(); }
-const main = html => { const el = document.getElementById('ptv-main'); if (el) el.innerHTML = html; };
+const main = html => { const el = document.getElementById('ptv-main'); if (el) el.innerHTML = iconize(html); };
 
 function connect() {
   const ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/party/ws/${T.party.id}?ticket=${encodeURIComponent(T.party.tv_ticket)}`);
@@ -169,7 +170,7 @@ function play(v, before) {
   if (evEl) {
     const info = v.event && EVENT[v.event.kind];
     evEl.hidden = !info;
-    if (info && evEl.dataset.kind !== v.event.kind) { evEl.dataset.kind = v.event.kind; evEl.className = `ptv-event ${v.event.kind}`; evEl.innerHTML = `<b>${info[0]}</b><span>${info[1]}</span>`; }
+    if (info && evEl.dataset.kind !== v.event.kind) { evEl.dataset.kind = v.event.kind; evEl.className = `ptv-event ${v.event.kind}`; evEl.innerHTML = iconize(`<b>${info[0]}</b><span>${info[1]}</span>`); }
     if (!info) evEl.dataset.kind = '';
   }
   const tmEl = document.getElementById('ptv-teams');
@@ -177,7 +178,7 @@ function play(v, before) {
     tmEl.hidden = !v.teams;
     if (v.teams) {
       const t = v.team_gold, total = t ? Math.max(1, t[0].gold + t[1].gold) : 1;
-      tmEl.innerHTML = t ? `<span class="tA"><b>🔴 A팀</b><em>${num(t[0].gold)}</em></span><i class="bar"><u style="--p:${(t[0].gold / total * 100).toFixed(1)}%"></u></i><span class="tB"><em>${num(t[1].gold)}</em><b>🔵 B팀</b></span>` : '<span class="tA"><b>🔴 A팀</b></span><i class="hid">마지막 1분! 점수는 끝나고 공개해요 🤫</i><span class="tB"><b>🔵 B팀</b></span>';
+      tmEl.innerHTML = iconize(t ? `<span class="tA"><b>🔴 A팀</b><em>${num(t[0].gold)}</em></span><i class="bar"><u style="--p:${(t[0].gold / total * 100).toFixed(1)}%"></u></i><span class="tB"><em>${num(t[1].gold)}</em><b>🔵 B팀</b></span>` : '<span class="tA"><b>🔴 A팀</b></span><i class="hid">마지막 1분! 점수는 끝나고 공개해요 🤫</i><span class="tB"><b>🔵 B팀</b></span>');
     }
   }
   const hid = document.getElementById('ptv-hidden'), board = document.getElementById('ptv-board');
@@ -206,7 +207,9 @@ function play(v, before) {
     const score = v.hidden ? '???' : fish ? kgText(x.score) : num(x.score);
     const s = row.querySelector('.ptv-score');
     if (s.textContent !== score) { s.textContent = score; s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump'); }
-    row.querySelector('.ptv-sh').textContent = !fish && !v.hidden ? `${v.bounty === x.id ? '💰' : ''}${x.shield ? '🛡️'.repeat(x.shield) : ''}` : '';
+    const sh = !fish && !v.hidden ? `${v.bounty === x.id ? '💰' : ''}${x.shield ? '🛡️'.repeat(x.shield) : ''}` : '';
+    const shEl = row.querySelector('.ptv-sh');
+    if (shEl.dataset.v !== sh) { shEl.dataset.v = sh; shEl.innerHTML = iconize(sh); }
   });
   for (const [id, row] of T.bars) if (!seen.has(id)) { row.remove(); T.bars.delete(id); }
   for (const f of v.feed || []) if (f.n > T.feedSeen) { T.feedSeen = f.n; if (before) feedPop(f); }
@@ -232,7 +235,7 @@ function feedPop(f) {
   else return;
   const el = document.createElement('div');
   el.className = `ptv-news ${cls}${big ? ' big' : ''}`;
-  el.innerHTML = html;
+  el.innerHTML = iconize(html);
   host.appendChild(el);
   while (host.children.length > 4) host.firstElementChild.remove();
   sfx(f.kind === 'heist' ? 'warn-beep' : f.kind === 'heistfail' ? 'fail' : f.kind === 'event' ? (f.event === 'raid' ? 'boss-roar' : f.event === 'storm' ? 'ult-riser' : 'fanfare-basic') : f.kind === 'steal' || f.kind === 'swap' ? 'slash' : f.kind === 'block' ? 'shield-block' : f.kind === 'jackpot' ? 'fanfare-epic' : f.kind === 'lead' ? 'combo' : f.kind === 'frenzy' ? 'boss-roar' : f.kind === 'fish' ? (big ? 'fanfare-legend' : 'pop') : 'pop', { gain: .8 });

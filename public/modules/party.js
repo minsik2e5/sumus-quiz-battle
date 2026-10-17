@@ -6,6 +6,7 @@ import { coinShower } from './celebrate.js';
 import { FISH, LURES, RARITY, kgText } from './fishing-rules.js';
 import { fishPic } from './fishing-art.js';
 import { guardShield } from './streak-guard-ui.js';
+import { iconize } from './game-icons.js';
 
 // V13.149 교실 게임(학생 폰): 선생님 TV의 보물 사냥 · 반 전체 낚시에 4자리 번호로 들어간다.
 // 판정은 방(cloudflare/party-room.mjs → server/party-engine.mjs)이 한다. 폰은 고른 번호만 보낸다.
@@ -52,7 +53,7 @@ function closeAll() {
   try { P.ws?.close(); } catch {}
 }
 async function leave() { const exit = P?.exit; closeAll(); root().onclick = null; P = null; await exit?.(); }
-const main = html => { const el = document.getElementById('pt-main'); if (el) el.innerHTML = html; };
+const main = html => { const el = document.getElementById('pt-main'); if (el) el.innerHTML = iconize(html); };
 
 function connect() {
   const url = `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/api/party/ws/${P.room.id}?ticket=${encodeURIComponent(P.room.ticket)}`;
@@ -126,14 +127,14 @@ function draw() {
   if (!document.getElementById('pt-head')) { main('<div id="pt-head"></div><div id="pt-body"></div>'); P.bodyKey = null; }
   // 점수 · 순위 · 1~3등은 맥박마다 바뀐다: 위 칸만 다시 쓴다. 문제 · 상자 · 표적 칸은 바뀔 때만(누르는 중인 버튼이 사라지지 않게).
   const head = headHtml(v);
-  if (P.headHtml !== head) { document.getElementById('pt-head').innerHTML = head; P.headHtml = head; }
+  if (P.headHtml !== head) { document.getElementById('pt-head').innerHTML = iconize(head); P.headHtml = head; }
   const wait = !!(v.q?.wait_until && v.q.wait_until > serverNow());
   if (v.alarm && !P.alarmSpan) P.alarmSpan = v.alarm.until - serverNow(); else if (!v.alarm) P.alarmSpan = 0;
   if (v.alarm) v.alarm.span = P.alarmSpan;
   const key = JSON.stringify({ a: v.alarm ? [v.alarm.by, v.alarm.until, v.alarm.prompt] : null, h: v.heist ? [v.heist.got, v.heist.vname] : null, p: v.pending ? [v.pending.kind, v.pending.until, v.pending.targets.map(x => x.id + x.gold + (x.bounty ? 'b' : ''))] : null, o: v.offer ? [v.offer.n, v.offer.count, v.offer.peeked, v.offer.caught, v.offer.kinds] : null, q: v.q ? [v.q.n, v.q.prompt, v.q.hide, v.me.inv?.fifty || 0] : null, wait });
   if (key === P.bodyKey) return;
   P.bodyKey = key;
-  document.getElementById('pt-body').innerHTML = v.alarm ? alarmCard(v) : v.pending ? targetPick(v) : v.offer ? chests(v) : v.q ? question(v) : '<div class="pt-wait-card">잠시만요…</div>';
+  document.getElementById('pt-body').innerHTML = iconize(v.alarm ? alarmCard(v) : v.pending ? targetPick(v) : v.offer ? chests(v) : v.q ? question(v) : '<div class="pt-wait-card">잠시만요…</div>');
 }
 function headHtml(v) {
   const me = v.me, fish = v.kind === 'fish';
@@ -192,11 +193,15 @@ function chests(v) {
     : o.caught ? '<p class="pt-peek-msg bad">😱 들켰어요! 아무것도 못 봤어요</p>' : '<p class="pt-peek-msg good">👀 살짝 봤어요!</p>';
   return `<section class="pt-chests${n > 3 ? ' storm' : ''}"><h2>${n > 3 ? '🌪️ 보물 폭풍! 상자가 5개예요' : '정답! 상자를 골라요'}</h2><div class="pt-chest-row n${n}">${Array.from({ length: n }, (_, i) => `<button type="button" class="pt-chest c${i % 3}" data-pt="chest" data-i="${i}" aria-label="${i + 1}번 상자">${chestSvg(i)}${k ? `<span class="pt-peek-tag k-${k[i]}">${CHEST_ART[k[i]] || ''}</span>` : ''}</button>`).join('')}</div>${peek}</section>`;
 }
+// V13.150 손그림 상자: 잉크 외곽선 · 평면 색 · 쇠 띠 · 나뭇결(그라데이션 · 흐린 그림자 없이).
 function chestSvg(i) {
-  const tones = [['#b45309', '#f59e0b'], ['#6d28d9', '#a78bfa'], ['#047857', '#34d399']][i % 3];
-  return `<svg viewBox="0 0 100 86" aria-hidden="true"><defs><linearGradient id="pc${i}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${tones[1]}"/><stop offset="1" stop-color="${tones[0]}"/></linearGradient></defs>
-    <g class="lid"><path d="M8 34 Q8 8 50 8 Q92 8 92 34Z" fill="url(#pc${i})" stroke="#3b2106" stroke-width="3"/><path d="M8 34h84" stroke="#fcd34d" stroke-width="5"/><path d="M50 8v26" stroke="#fcd34d" stroke-width="5"/></g>
-    <rect x="8" y="34" width="84" height="44" rx="5" fill="url(#pc${i})" stroke="#3b2106" stroke-width="3"/><path d="M50 34v44M8 50h84" stroke="#fcd34d" stroke-width="5"/><rect x="42" y="42" width="16" height="16" rx="3" fill="#fde68a" stroke="#92400e" stroke-width="2"/></svg>`;
+  const [body, dark] = [['#c0763a', '#8a4f22'], ['#7a5aa6', '#563d7c'], ['#4e9a57', '#346b3b']][i % 3], ink = '#2b1d12';
+  return `<svg viewBox="0 0 100 86" aria-hidden="true">
+    <ellipse cx="50" cy="82" rx="40" ry="4" fill="${ink}" opacity=".35"/>
+    <g class="lid"><path d="M8 34 Q8 8 50 8 Q92 8 92 34Z" fill="${dark}" stroke="${ink}" stroke-width="3.5" stroke-linejoin="round"/><path d="M18 20 Q50 12 82 20" fill="none" stroke="${ink}" stroke-width="1.6" opacity=".45"/><path d="M8 34h84" stroke="${ink}" stroke-width="3.5"/><path d="M26 11v23M74 11v23" stroke="#e8a930" stroke-width="6"/><path d="M26 11v23M74 11v23" stroke="${ink}" stroke-width="1.6" opacity=".6"/></g>
+    <rect x="8" y="34" width="84" height="44" rx="4" fill="${body}" stroke="${ink}" stroke-width="3.5"/><path d="M12 50h76M12 64h76" stroke="${ink}" stroke-width="1.6" opacity=".35"/>
+    <path d="M26 34v44M74 34v44" stroke="#e8a930" stroke-width="6"/><path d="M26 34v44M74 34v44" stroke="${ink}" stroke-width="1.6" opacity=".6"/>
+    <rect x="41" y="38" width="18" height="20" rx="3" fill="#e8a930" stroke="${ink}" stroke-width="3"/><circle cx="50" cy="46" r="2.6" fill="${ink}"/><path d="M50 47v6" stroke="${ink}" stroke-width="2.6" stroke-linecap="round"/></svg>`;
 }
 function openChest(i, b) {
   if (P.busy || P.anim) return;
@@ -271,7 +276,7 @@ function chestReveal(e) {
     const c = e.chests[k];
     b.classList.add('open', `k-${c.kind}`);
     if (k !== e.idx) b.classList.add('other');
-    b.insertAdjacentHTML('beforeend', `<span class="pt-loot">${lootArt(c)}<b>${lootText(c, e, k === e.idx)}</b></span>`);
+    b.insertAdjacentHTML('beforeend', iconize(`<span class="pt-loot">${lootArt(c)}<b>${lootText(c, e, k === e.idx)}</b></span>`));
   });
   const c = e.chest;
   const good = ['gold', 'double', 'triple', 'jackpot', 'shield', 'steal', 'swap'].includes(c.kind);
@@ -314,7 +319,7 @@ function pop(html, cls = '', ms = 2600) {
   if (!host) return;
   const el = document.createElement('div');
   el.className = `pt-pop ${cls}`;
-  el.innerHTML = html;
+  el.innerHTML = iconize(html);
   host.appendChild(el);
   while (host.children.length > 3) host.firstElementChild.remove();
   later(() => { el.classList.add('out'); later(() => el.remove(), 300); }, ms);

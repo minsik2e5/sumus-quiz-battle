@@ -4,6 +4,7 @@ import { coin } from './emblems.js';
 import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
 import { coinShower, countUp } from './celebrate.js';
 import { MATCH, matchPick, matchStars, matchTime } from './match-rules.js';
+import { iconize } from './game-icons.js';
 
 // V13.149 짝 맞추기 타임어택: 전체 화면. 영어 6장 + 뜻 6장, 짝을 맞히면 두 장이 날아가 부딪히며 터지고,
 // 틀리면 흔들리며 1초가 시계로 날아간다. 시작 · 끝은 서버에 등록(server/games.mjs)해 기록과 코인을 남긴다.
@@ -69,7 +70,7 @@ async function leave() {
   M = null;
   await exit?.();
 }
-const main = html => { const el = $('mt-main'); if (el) el.innerHTML = html; };
+const main = html => { const el = $('mt-main'); if (el) el.innerHTML = iconize(html); };
 const app = () => root().querySelector('.mt-app');
 
 // 카드는 손가락이 닿는 순간(pointerdown) 고른다. 키보드(Enter · Space)는 click으로 온다(detail 0).

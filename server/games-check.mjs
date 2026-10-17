@@ -546,6 +546,25 @@ export async function runGamesChecks(assert) {
       'V13.150 그림 주문서 30(보물 사냥 2.0): Drive의 기존 그림을 열어 그림체를 맞추고 정해진 폴더에 정확한 이름으로 저장(18장 모두 자르기 표에)');
   }
 
+  /* ---------- V13.150 손그림 게임 테마(보물 사냥 · 짝 맞추기, 선생님 지정 "AI 느낌 빼기") ---------- */
+  {
+    const css = source('../public/v13149.css'), icons = await import('../public/modules/game-icons.js');
+    const pj = source('../public/modules/party.js'), tv = source('../public/modules/party-tv.js'), mg = source('../public/modules/match-game.js');
+    const theme = css.slice(css.indexOf('/* ---------- V13.150 손그림 게임 테마'));
+    assert(theme.includes('--hd-ink:#2b1d12') && theme.includes('.pt-app.treasure{background:var(--hd-noise)') && theme.includes('.ptv.treasure .ptv-bg{background:var(--hd-noise)') && theme.includes('.mt-app{background:var(--hd-noise)') && theme.includes('.mt-app .mt-bg{display:none}')
+      && !/radial-gradient/.test(theme) && !/blur\(/.test(theme) && !/box-shadow:[^;}]*\d+px \d+px \d+px rgba/.test(theme) && theme.includes(':not(.pt-toasts)') && theme.includes('button.ptv-end'),
+      'V13.150 손그림 테마: 흐린 빛 덩어리 · 번진 그림자 없이 잉크 외곽선 · 단단한 그림자 · 평면 색 · 종이 질감(보물 사냥 폰 · TV, 짝 맞추기). 낚시 모드는 그대로');
+    const all = icons.ICON_NAMES.map(n => icons.gi(n)).join('');
+    assert(icons.ICON_NAMES.length >= 30 && icons.ICON_NAMES.every(n => icons.gi(n).startsWith('<svg class="gi gi-')) && !/(stroke="[^"]*")[^>]*stroke="/.test(all.replace(/></g, '>\n<'))
+      && !/[\u{1F300}-\u{1FAFF}]/u.test(icons.iconize('🦹🔄🛡️🚨👀💰🌟☠️🌪️⏱️🔗🥇🥈🥉🔴🔵🎁💨🏆💎👹👑🚀🏁🪱😱😵😮‍💨😅🤝🤫')) && icons.iconize('🐟').includes('🐟'),
+      'V13.150 손그림 아이콘 세트(SVG, 같은 외곽선): 이모지를 그리기 직전에 아이콘으로 바꾸고 얼굴 이모지는 지운다(낚시 🐟은 그대로)');
+    assert(pj.includes('innerHTML = iconize(html)') && pj.includes('el.innerHTML = iconize(html)') && pj.includes('innerHTML = iconize(head)') && tv.includes('el.innerHTML = iconize(html)') && tv.includes('root().innerHTML = iconize(') && mg.includes('el.innerHTML = iconize(html)') && pj.includes('// V13.150 손그림 상자') && !pj.includes('linearGradient id="pc'),
+      'V13.150 보물 사냥 · 짝 맞추기 화면은 이모지 대신 손그림 아이콘, 상자는 잉크 외곽선 평면 그림(그라데이션 없이)');
+    const orders = ['29a-match-background.txt', '29b-match-ui.txt', '30a-treasure-backgrounds.txt', '30b-treasure-ui.txt'].map(f => source(`../docs/asset-requests/runner/${f}`)).join('\n');
+    assert(!/Style: glossy|glossy 3D toy-like|3D-painted|nebula clouds|bokeh light circles|shiny/.test(orders) && (orders.match(/hand-drawn/g) || []).length >= 15 && orders.includes('it must NOT look like AI art') && ['29', '30'].every(n => source(`../docs/asset-requests/runner/CODEX_PROMPT_${n}.md`).includes('## 그림체 (선생님 지정, 2026-10-17)')),
+      'V13.150 그림 주문서 29 · 30은 손그림 게임 일러스트(잉크 외곽선 · 평면 색 · 종이 질감, 광택 3D · 빛 번짐 금지)로');
+  }
+
   /* ---------- V13.149 짝 맞추기 고퀄 화면 ---------- */
   {
     const mg = source('../public/modules/match-game.js'), css = source('../public/v13149.css'), svc = source('./service.mjs');
