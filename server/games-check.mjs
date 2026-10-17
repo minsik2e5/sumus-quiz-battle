@@ -8,7 +8,7 @@ import { service } from './service.mjs';
 import { DAY_MS, createCompetition } from './competition.mjs';
 import { growthFor, dayKey } from '../public/modules/core.js';
 import { STREAK_GUARD, guardPlan, guardView, guardDayKeys, dayNum } from '../public/modules/streak-guard.js';
-import { MATCH, matchPick, matchStars, cardMeaning } from '../public/modules/match-rules.js';
+import { MATCH, matchPick, matchStars, cardMeaning, RUSH, rushGain, rushBounds, rushHitMs, rushCoins, rushNext } from '../public/modules/match-rules.js';
 import { FISH, FISH_KEYS, LURES, rollCast } from '../public/modules/fishing-rules.js';
 import { REEL, FIGHT, reelRoll, pearlsOf } from '../public/modules/reel-rules.js';
 import { grantBait, reelCast, reelLand } from './reel.mjs';
@@ -162,6 +162,27 @@ export async function runGamesChecks(assert) {
       const board2 = await call('qa-gm-a', 'GET', '/games/match/board');
       assert(JSON.stringify(state.profiles) === snap && board2.rows.map(r => r.id).join() === 'qa-gm-c,qa-gm-b,qa-gm-a' && board2.rows.every(r => !('splits' in r)) && board2.rows[2].me,
         'V13.149 순위(시상대) 보기는 기록을 바꾸지 않고, 짝마다 시간은 순위에 싣지 않는다');
+      // V13.150 러시: 60초에서 시작, 짝마다 +시간(줄어듦) · 콤보 보너스 · 틀리면 −3초. 서버는 짝 수 · 틀린 수로 시간 범위를 확인한다.
+      assert(rushGain(0) === RUSH.HIT_MS && rushGain(1000) === RUSH.MIN_HIT_MS && rushBounds(0, 0).min === RUSH.START_MS && rushBounds(5, 1).max - rushBounds(5, 1).min === 3 * RUSH.COMBO_MS
+        && rushBounds(5, 1).min === RUSH.START_MS + [0, 1, 2, 3, 4].reduce((n, i) => n + rushGain(i), 0) - RUSH.MISS_MS && rushHitMs(2, 3) === rushGain(2) + RUSH.COMBO_MS && rushHitMs(2, 2) === rushGain(2)
+        && rushCoins(9) === 0 && rushCoins(10) === 2 && rushCoins(45) === 8 && rushNext(10) === 20 && rushNext(40) === null,
+        'V13.150 러시 규칙: 60초 시작, 짝마다 보너스(줄어들다 최소 0.8초), 연속 3쌍부터 +0.7초, 틀리면 −3초, 10 · 20 · 30 · 40쌍 체크포인트');
+      const rush = async (pairs, misses, ms, wait = MATCH.COUNTDOWN_MS + ms) => { const s = await call('qa-gm-d', 'POST', '/games/match/start', { range_codes: ['24'], mode: 'rush' }); clock += wait; return [s, await call('qa-gm-d', 'POST', '/games/match/finish', { id: s.id, ms, misses, pairs })]; };
+      const okMs = rushBounds(12, 1).min + 300;
+      const [rs, rr] = await rush(12, 1, okMs);
+      const rAgain = await call('qa-gm-d', 'POST', '/games/match/finish', { id: rs.id, ms: okMs, misses: 1, pairs: 40 });
+      assert(rs.mode === 'rush' && rs.ghost === null && rr.paid && rr.mode === 'rush' && rr.pairs === 12 && rr.record && rr.coins === rushCoins(12) + RUSH.RECORD_COINS && rr.rush_best === 12 && prof('qa-gm-d').games.match.rush.best === 12
+        && rAgain.again && rAgain.pairs === 12 && rAgain.coins === rr.coins && !prof('qa-gm-d').games.match.best,
+        'V13.150 러시: 시작 · 끝내기로 짝 수 기록과 체크포인트 코인(+첫 기록 보너스), 같은 끝내기는 한 번만, 빠른 한 판 기록과 따로');
+      const [, rFast] = await rush(30, 0, 5000), [, rOut] = await rush(12, 0, rushBounds(12, 0).max + 5000), [, rEarly] = await rush(12, 1, okMs, 3000);
+      assert(rFast.reason === 'bad' && !rFast.paid && rOut.reason === 'bad' && rEarly.reason === 'short' && prof('qa-gm-d').games.match.rush.best === 12,
+        'V13.150 러시: 사람 손보다 빠르거나, 짝 수 · 틀린 수로 나올 수 없는 시간이거나, 서버가 잰 시간보다 길면 받지 않는다');
+      const [, rLow] = await rush(8, 0, rushBounds(8, 0).min);
+      assert(rLow.paid && rLow.coins === 0 && !rLow.record && rLow.left === MATCH.DAILY - 2, 'V13.150 러시: 10쌍 미만은 코인 없이 한 판으로 센다(하루 코인 판은 빠른 한 판과 함께)');
+      const snapR = JSON.stringify(state.profiles);
+      const rBoard = await call('qa-gm-d', 'GET', '/games/match/board/rush');
+      assert(JSON.stringify(state.profiles) === snapR && rBoard.mode === 'rush' && rBoard.rows[0]?.id === 'qa-gm-d' && rBoard.rows[0].pairs === 12 && rBoard.rows[0].me,
+        'V13.150 러시 순위: 이번 주 같은 반, 지운 짝이 많은 순서(보기는 저장하지 않는다)');
       // V13.150 손맛 낚시(놀이터): 미끼 → 던지기(서버가 물고기를 정함) → 끌어올리기(최소 파이팅 시간) → 어망 → 진주 → 코인 · 알.
       const b = prof('qa-gm-b');
       b.reel = {}; // 앞의 출석 검사에서 받은 미끼는 지우고 시작
@@ -569,7 +590,7 @@ export async function runGamesChecks(assert) {
   {
     const mg = source('../public/modules/match-game.js'), css = source('../public/v13149.css'), svc = source('./service.mjs');
     const { SOUND_GAIN } = await import('../public/modules/sound.js');
-    assert(svc.includes('ghost: matchGhost(state.profiles, p, weekKey, { hidden: isPrivate })') && svc.includes('splits: Array.isArray(body.splits) ? body.splits.slice(0, 12) : null'),
+    assert(svc.includes("ghost: mode === 'rush' ? null : matchGhost(state.profiles, p, weekKey, { hidden: isPrivate })") && svc.includes('splits: Array.isArray(body.splits) ? body.splits.slice(0, 12) : null'),
       'V13.149 고스트는 시작(이미 쓰는 요청)에 실려 오고, 끝내기에 짝마다 시간이 실린다(쓰기 횟수는 그대로)');
     assert(mg.includes("api('/games/match/finish', { id: M.id, ms, misses: M.misses, splits: M.splits })") && mg.includes('function ghostRun(t)') && mg.includes('function ghostGap(split)') && mg.includes("tag.textContent = '추월!'") && mg.includes('고스트를 이겼어요!'),
       'V13.149 짝 맞추기 고스트: 친구가 짝마다 시간대로 달리고, 앞섬 · 뒤짐 · 추월이 보이고, 결과에 고스트를 이겼는지 나온다');
@@ -592,6 +613,10 @@ export async function runGamesChecks(assert) {
       'V13.149 짝 맞추기: 동작 줄이기, 저사양 폰은 조각을 줄이고, 긴 뜻은 2줄 · 넘치면 더 작게, 카드는 손가락이 닿는 순간 고른다');
     assert(!/transition:[^;}]*\b(left|top|width|height|margin)\b/.test(css.slice(css.indexOf('/* ---------- 짝 맞추기'), css.indexOf('/* 낚시 화면이 같이 쓰던'))) && !/\.mg-(card|clock|count|go|top)\b/.test(css),
       'V13.149 짝 맞추기 움직임은 transform · opacity 위주(자리 · 크기 transition 없음), 단어 미니게임의 mg- 클래스와 겹치지 않는다');
+    assert(mg.includes('function playRush(pool)') && mg.includes("api('/games/match/start', { range_codes: M.codes, mode: 'rush' })") && mg.includes('const add = rushHitMs(i, M.combo);') && mg.includes('R.budget -= RUSH.MISS_MS;') && mg.includes("{ id: M.id, ms, misses: M.misses, pairs: R.got }")
+      && mg.includes('function rushRefill(a, b, old)') && mg.includes('function rushProgress()') && mg.includes("'/games/match/board/rush'") && mg.includes('const modeTabs = () =>') && mg.includes("if (M.mode === 'rush') return a.dataset.pair === b.dataset.pair ? rushHit(a, b) : rushMiss(a, b);")
+      && css.includes('.mt-grid.rush{grid-template-columns:repeat(2,1fr)') && css.includes('.mt-card.enter{animation:mt-enter'),
+      'V13.150 러시 화면: 모드 고르기, 보드 5쌍(2줄), 지우면 새 단어, 맞히면 +시간 · 틀리면 −3초가 시계로 날아가고, 체크포인트 · TIME UP · 러시 순위');
     const art29 = ['29a-match-background.txt', '29b-match-ui.txt'].flatMap(f => source(`../docs/asset-requests/runner/${f}`).trim().split('\n---\n'));
     const codex29 = source('../docs/asset-requests/runner/CODEX_PROMPT_29.md'), map = source('../docs/asset-requests/runner/slice-map.csv');
     const names = ['bg', 'card-en', 'card-ko', 'card-back', 'star', 'ribbon', 'stamp', 'podium', 'fever'];

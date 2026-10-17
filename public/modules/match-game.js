@@ -3,7 +3,7 @@ import { avatar } from './character.js';
 import { coin } from './emblems.js';
 import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
 import { coinShower, countUp } from './celebrate.js';
-import { MATCH, matchPick, matchStars, matchTime } from './match-rules.js';
+import { MATCH, matchPick, matchStars, matchTime, RUSH, rushHitMs, rushCoins, rushNext } from './match-rules.js';
 import { iconize } from './game-icons.js';
 
 // V13.149 짝 맞추기 타임어택: 전체 화면. 영어 6장 + 뜻 6장, 짝을 맞히면 두 장이 날아가 부딪히며 터지고,
@@ -46,7 +46,7 @@ const saveMissed = ids => { try { localStorage.setItem(MISS_KEY(), JSON.stringif
 // opts: { words: 고른 범위의 단어들, codes: 범위 번호, label: '24~25번' }
 export function openMatchGame(A, exit, opts = {}) {
   closeAll();
-  M = { A, exit, timers: [], words: opts.words || [], codes: opts.codes || [], label: opts.label || '', view: A.data.rewards?.match || null };
+  M = { A, exit, timers: [], mode: 'classic', words: opts.words || [], codes: opts.codes || [], label: opts.label || '', view: A.data.rewards?.match || null };
   A.screen = 'match';
   root().innerHTML = `<div class="session-app mt-app${artClass()}" style="${artStyle()}"><div class="mt-bg" aria-hidden="true"><i></i><i></i><i></i></div><div class="mt-fever-edge" aria-hidden="true"></div><div class="mt-flash" id="mt-flash" aria-hidden="true"></div>
     <header class="mt-top"><button type="button" class="yb-back" data-mt="exit" aria-label="나가기">${icon('back')}</button><strong>짝 맞추기</strong><span class="mt-top-note">${esc(M.label)}</span><span class="mt-wallet" id="mt-wallet">${coin()}<b>${num(A.data.stats?.points_balance || 0)}</b></span></header><main id="mt-main" class="mt-main"></main></div>`;
@@ -88,9 +88,10 @@ function onClick(event) {
   const act = b.dataset.mt;
   if (act === 'card') { if (event.detail === 0) pick(b); return; }
   if (act === 'exit') return M.playing ? confirmQuit() : leave();
-  if (act === 'start') return start(b);
+  if (act === 'start') return M.mode === 'rush' ? startRush(b) : start(b);
+  if (act === 'mode') { M.mode = b.dataset.rmode === 'rush' ? 'rush' : 'classic'; sfx('tap'); return intro(); }
   if (act === 'again') return intro(true);
-  if (act === 'board') return board();
+  if (act === 'board') return board(M.mode);
   if (act === 'quit-yes') return leave();
   if (act === 'quit-no') { document.querySelector('.mt-quit')?.remove(); return; }
 }
@@ -108,11 +109,13 @@ const sec = ms => matchTime(ms).replace('.00', '');
 
 /* ---------- 시작 화면 ---------- */
 function intro(again = false) {
+  if (M.mode === 'rush') return introRush(again);
   M.playing = false;
   app()?.classList.remove('fever');
   const v = M.view || {};
   const ok = matchPick(M.words).length >= MATCH.PAIRS;
   main(`<section class="mt-intro${again ? ' again' : ''}">
+    ${modeTabs()}
     <div class="mt-demo" aria-hidden="true">
       <span class="c en d1">apple</span><span class="c ko d2">사과</span><span class="c en d3">brave</span><span class="c ko d4">용감한</span><i class="boom"></i>
     </div>
@@ -268,6 +271,7 @@ function pick(card) {
   }
   const a = M.sel, b = card;
   M.sel = null;
+  if (M.mode === 'rush') return a.dataset.pair === b.dataset.pair ? rushHit(a, b) : rushMiss(a, b);
   if (a.dataset.pair === b.dataset.pair) return hit(a, b);
   miss(a, b);
 }
@@ -490,21 +494,22 @@ function flyCoins(from, coins) {
 }
 
 /* ---------- 이번 주 우리 반 순위(시상대) ---------- */
-async function board() {
+async function board(mode = 'classic') {
   main('<div class="yb-loading">순위를 불러오는 중…</div>');
+  const rush = mode === 'rush', score = x => rush ? `${num(x.pairs)}쌍` : matchTime(x.ms);
   let r;
-  try { r = await api('/games/match/board'); }
+  try { r = await api(rush ? '/games/match/board/rush' : '/games/match/board'); }
   catch (err) { if (M) { toast(err.message); intro(); } return; }
   if (!M) return;
   const rows = r.rows || [], top = rows.filter(x => x.rank <= 3), rest = rows.filter(x => x.rank > 3);
   const me = rows.find(x => x.me), above = me && me.rank > 1 ? rows.find(x => x.rank === me.rank - 1) : null;
-  const pod = rank => { const x = top.find(t => t.rank === rank); return x ? `<div class="mt-pod p${rank}${x.me ? ' me' : ''}"><div class="who">${rank === 1 ? '<i class="crown">👑</i>' : ''}${avatar(x.pet, { size: 'mini', form: 1 })}<b>${esc(x.name)}</b><em>${matchTime(x.ms)}</em></div><div class="step"><span>${rank}</span></div></div>` : `<div class="mt-pod p${rank} empty"><div class="who"><b>?</b></div><div class="step"><span>${rank}</span></div></div>`; };
+  const pod = rank => { const x = top.find(t => t.rank === rank); return x ? `<div class="mt-pod p${rank}${x.me ? ' me' : ''}"><div class="who">${rank === 1 ? '<i class="crown">👑</i>' : ''}${avatar(x.pet, { size: 'mini', form: 1 })}<b>${esc(x.name)}</b><em>${score(x)}</em></div><div class="step"><span>${rank}</span></div></div>` : `<div class="mt-pod p${rank} empty"><div class="who"><b>?</b></div><div class="step"><span>${rank}</span></div></div>`; };
   main(`<section class="mt-board">
-    <h2>🏆 이번 주 짝 맞추기 · 우리 반</h2>
-    <p class="mt-board-note">가장 빠른 기록 순서예요. 월요일에 새로 시작해요.</p>
+    <h2>🏆 이번 주 ${rush ? '러시' : '짝 맞추기'} · 우리 반</h2>
+    <p class="mt-board-note">${rush ? '가장 많이 지운 짝 순서예요.' : '가장 빠른 기록 순서예요.'} 월요일에 새로 시작해요.</p>
     ${rows.length ? `<div class="mt-podium">${pod(2)}${pod(1)}${pod(3)}</div>
-      ${above ? `<p class="mt-chase"><b>${esc(above.name)}</b>까지 <em>${((me.ms - above.ms) / 1000).toFixed(2)}초</em>! 한 판 더?</p>` : me?.rank === 1 ? '<p class="mt-chase top">우리 반 1등이에요! 👑</p>' : ''}
-      ${rest.length ? `<ol class="mt-list">${rest.map((x, i) => `<li class="${x.me ? 'me' : ''}" style="--i:${i}"><i>${num(x.rank)}</i>${avatar(x.pet, { size: 'mini', form: 1 })}<b>${esc(x.name)}</b><em>${matchTime(x.ms)}</em></li>`).join('')}</ol>` : ''}`
+      ${above ? `<p class="mt-chase"><b>${esc(above.name)}</b>까지 <em>${rush ? `${num(above.pairs - me.pairs + 1)}쌍` : `${((me.ms - above.ms) / 1000).toFixed(2)}초`}</em>! 한 판 더?</p>` : me?.rank === 1 ? '<p class="mt-chase top">우리 반 1등이에요! 👑</p>' : ''}
+      ${rest.length ? `<ol class="mt-list">${rest.map((x, i) => `<li class="${x.me ? 'me' : ''}" style="--i:${i}"><i>${num(x.rank)}</i>${avatar(x.pet, { size: 'mini', form: 1 })}<b>${esc(x.name)}</b><em>${score(x)}</em></li>`).join('')}</ol>` : ''}`
       : '<p class="yb-muted">아직 이번 주 기록이 없어요. 첫 기록의 주인공이 되어 봐요!</p>'}
     <button type="button" class="yl-cta" data-mt="again">도전하기</button>
   </section>`);
@@ -516,4 +521,251 @@ async function board() {
   later(() => sfx('fanfare-basic', { gain: .8 }), R ? 0 : 1300);
   const mine = document.querySelector('.mt-list li.me');
   if (mine) later(() => mine.scrollIntoView({ behavior: R ? 'auto' : 'smooth', block: 'center' }), R ? 0 : 1500);
+}
+
+/* ---------- V13.150 러시 모드 ---------- */
+// 60초에서 시작해 짝을 지울 때마다 시간이 늘고(짝이 쌓일수록 조금씩 덜), 틀리면 −3초. 보드에는 늘 5쌍, 지우면 새 단어가 채워진다.
+// 시간이 0이 되면 끝. 점수는 지운 짝 수, 10 · 20 · 30 · 40쌍 체크포인트마다 코인. 서버는 rushBounds로 시간 범위를 확인한다.
+const modeTabs = () => `<div class="mt-modes" role="tablist" aria-label="모드"><button type="button" role="tab" data-mt="mode" data-rmode="classic" class="${M.mode === 'rush' ? '' : 'on'}" aria-selected="${M.mode !== 'rush'}">⏱ 빠른 한 판<small>6쌍 · 가장 빨리</small></button><button type="button" role="tab" data-mt="mode" data-rmode="rush" class="${M.mode === 'rush' ? 'on' : ''}" aria-selected="${M.mode === 'rush'}">⚡ 러시<small>시간이 다할 때까지</small></button></div>`;
+function introRush(again = false) {
+  M.playing = false;
+  app()?.classList.remove('fever');
+  const v = M.view || {};
+  const ok = matchPick(M.words, { pairs: 99 }).length >= RUSH.BOARD + 1;
+  main(`<section class="mt-intro rush${again ? ' again' : ''}">
+    ${modeTabs()}
+    <div class="mt-intro-pet">${petArt('cheer')}<span class="mt-bubble show">끝까지 가 보자!</span></div>
+    <h1>짝 맞추기 <em>러시</em></h1>
+    <p><b>${RUSH.START_MS / 1000}초</b>에서 시작해요. 맞히면 <b>+${RUSH.HIT_MS / 1000}초</b>(짝이 쌓일수록 조금씩 줄어요), 연속 ${RUSH.COMBO_AT}쌍부터 <b>+${RUSH.COMBO_MS / 1000}초</b> 더, 틀리면 <b>−${RUSH.MISS_MS / 1000}초</b>. 시간이 다할 때까지 몇 쌍을 지울까요?</p>
+    <div class="mt-checks">${RUSH.CHECKS.map(([n, c]) => `<span><b>${n}쌍</b><small>${coin()}${c}</small></span>`).join('')}</div>
+    <div class="mt-records"><div><small>내 최고</small><b>${v.rush_best ? `${num(v.rush_best)}쌍` : '—'}</b></div><div><small>이번 주 기록</small><b>${v.rush_week_best ? `${num(v.rush_week_best)}쌍` : '—'}</b></div><div><small>오늘 코인 판</small><b>${num(v.left ?? MATCH.DAILY)}<small> / ${num(MATCH.DAILY)}</small></b></div></div>
+    <button type="button" class="yl-cta mt-go" data-mt="start" ${ok ? '' : 'disabled'}>${ok ? '러시 시작!' : '뜻이 서로 다른 단어가 부족해요'}</button>
+    <button type="button" class="btn full mt-board-btn" data-mt="board">🏆 이번 주 우리 반 러시 순위</button>
+  </section>`);
+}
+async function startRush(button) {
+  const pool = matchPick(M.words, { missed: loadMissed(), pairs: 200 });
+  if (pool.length < RUSH.BOARD + 1) return toast('뜻이 서로 다른 단어가 부족해요. 범위를 더 골라 주세요.');
+  buttonBusy(button);
+  M.ghost = null;
+  try {
+    const { ghost, ...r } = await api('/games/match/start', { range_codes: M.codes, mode: 'rush' });
+    if (!M) return;
+    M.id = r.id; M.view = { ...M.view, ...r };
+  } catch (err) {
+    if (!M) return;
+    buttonBusy(button, false);
+    if (!err.transient) return toast(err.message);
+    M.id = null;
+    toast('연결이 불안정해서 이번 판은 기록 없이 해요.');
+  }
+  M.prevBest = M.view?.rush_best || null;
+  M.balance0 = Number(M.A.data.stats?.points_balance || 0);
+  playRush(pool);
+}
+function rushDraw() {
+  const R = M.rush, on = new Set(R.board.flatMap(p => [p.en.toLowerCase(), p.ko]));
+  if (!R.queue.length) R.queue = shuffleList(R.pool);
+  let k = R.queue.findIndex(p => !on.has(p.en.toLowerCase()) && !on.has(p.ko));
+  if (k < 0) { R.queue = shuffleList(R.pool); k = Math.max(0, R.queue.findIndex(p => !on.has(p.en.toLowerCase()) && !on.has(p.ko))); }
+  const p = { ...R.queue.splice(k, 1)[0], uid: ++R.uid };
+  R.board.push(p); R.byId[p.uid] = p;
+  return p;
+}
+function shuffleList(list) { const a = [...list]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const rushCard = (p, side, i, enter = false) => { const text = side === 'en' ? p.en : p.ko; return `<button type="button" class="mt-card ${side}${enter ? ' enter' : ''}" data-mt="card" data-pair="${p.uid}" data-side="${side}" style="--i:${i};--r:${((i * 37) % 9) - 4}deg" aria-label="${esc(text)}"><span class="mt-back" aria-hidden="true"></span><span class="mt-face"><b class="${len({ text, side })}">${esc(text)}</b></span></button>`; };
+function playRush(pool) {
+  M.playing = true;
+  Object.assign(M, { mode: 'rush', pairs: [], left: Infinity, misses: 0, combo: 0, best: 0, sel: null, lock: false, start: 0, done: false, fever: false, missed: new Set(), splits: [], warned: -1 });
+  const R = M.rush = { pool, queue: shuffleList(pool), board: [], byId: {}, uid: 0, got: 0, budget: RUSH.START_MS, next: rushNext(0), seen: [] };
+  const first = Array.from({ length: RUSH.BOARD }, () => rushDraw());
+  R.seen.push(...first);
+  const cards = shuffleList(first.flatMap(p => [[p, 'en'], [p, 'ko']]));
+  const pet = myPet();
+  main(`<section class="mt-play rush" id="mt-play">
+    <div class="mt-hud">
+      <div class="mt-ring gold" id="mt-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="track" cx="50" cy="50" r="44"/><circle class="fill" cx="50" cy="50" r="44" pathLength="1000" stroke-dasharray="1000" stroke-dashoffset="0"/></svg><div class="mt-clock" id="mt-clock"><b>${(RUSH.START_MS / 1000).toFixed(1)}</b><small>초 남음</small></div></div>
+      <div class="mt-hud-side">
+        <div class="mt-rush-score"><b id="mt-got">0</b><small>쌍</small></div>
+        <div class="mt-rush-next"><span id="mt-next-label">다음 ${R.next}쌍 · ${coin()}${rushCoins(R.next)}</span><i><u id="mt-next-bar"></u></i></div>
+        <div class="mt-miss" id="mt-miss" aria-label="틀린 수">✕ <b>0</b></div>
+      </div>
+    </div>
+    <div class="mt-combo" id="mt-combo" aria-live="polite"></div>
+    <div class="mt-grid rush back" id="mt-grid">${cards.map(([p, side], i) => rushCard(p, side, i)).join('')}</div>
+    <div class="mt-count" id="mt-count" aria-live="assertive"></div>
+    <div class="mt-pet" id="mt-pet"><div class="mt-pet-art" data-expr="normal">${petArt()}</div><span class="mt-bubble" id="mt-bubble"></span></div>
+  </section>`);
+  fitText();
+  const count = $('mt-count'), grid = $('mt-grid');
+  if (!reduced()) { grid.classList.add('deal'); [0, 1, 2, 3].forEach(k => sfx('card-flip', { at: .05 + k * .12, rate: .75 + k * .05, gain: .6 })); }
+  const step = reduced() ? 600 : 750;
+  ['3', '2', '1', 'GO!'].forEach((t, i) => later(() => {
+    count.innerHTML = `<b class="${i === 3 ? 'go' : ''}">${t}</b>`;
+    sfx(i === 3 ? 'combo' : 'tick', { rate: i === 3 ? 1.2 : 1 + i * .06 });
+    if (i < 3) buzz(10);
+    if (i === 3) {
+      grid.classList.remove('back', 'deal'); grid.classList.add('reveal');
+      if (!reduced()) [0, 1, 2, 3, 4].forEach(k => sfx('card-flip', { at: k * .06, rate: 1 + k * .05, gain: .55 }));
+      M.start = performance.now();
+      rushTick();
+      later(() => { count.innerHTML = ''; }, 500);
+    }
+  }, i * step));
+}
+const rushLeft = () => M.rush.budget - (performance.now() - M.start);
+function rushTick() {
+  if (!M || M.done || M.closing || M.mode !== 'rush') return;
+  const left = rushLeft();
+  if (left <= 0) return rushEnd();
+  const el = document.querySelector('#mt-clock b');
+  if (el) el.textContent = (left / 1000).toFixed(1);
+  const ring = $('mt-ring');
+  ring?.querySelector('.fill')?.setAttribute('stroke-dashoffset', String(Math.round(1000 * (1 - Math.min(1, left / RUSH.START_MS)))));
+  if (ring) {
+    ring.classList.toggle('bronze', left < 10000); ring.classList.toggle('gold', left >= 10000);
+    if (left < 10000) { const s = Math.ceil(left / 1000); if (s !== M.warned) { M.warned = s; sfx('warn-beep', { gain: .6 }); ring.classList.add('warn'); } }
+    else if (M.warned !== -1) { M.warned = -1; ring.classList.remove('warn'); }
+  }
+  M.raf = requestAnimationFrame(rushTick);
+}
+// 시계로 날아가는 시간 글자(+2.0초 초록 / −3초 빨강).
+function flyTime(from, text, good) {
+  const clock = $('mt-clock');
+  if (!clock || !from) return;
+  const [x, y] = center(from), [cx, cy] = center(clock);
+  const el = document.createElement('span');
+  el.className = `mt-fly mt-plus${good ? ' good' : ''}`; el.textContent = text;
+  el.style.left = `${x}px`; el.style.top = `${y}px`;
+  el.style.setProperty('--tx', `${cx - x}px`); el.style.setProperty('--ty', `${cy - y}px`);
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 700);
+  later(() => restart(clock, good ? 'gain' : 'pen'), reduced() ? 0 : 450);
+}
+function rushHit(a, b) {
+  const R = M.rush, i = R.got;
+  R.got++; M.combo++; M.best = Math.max(M.best, M.combo);
+  const add = rushHitMs(i, M.combo);
+  R.budget += add;
+  const p = R.byId[a.dataset.pair];
+  const [ax, ay] = center(a), [bx, by] = center(b), mx = (ax + bx) / 2, my = (ay + by) / 2;
+  for (const [el, x, y] of [[a, ax, ay], [b, bx, by]]) { el.style.setProperty('--tx', `${mx - x}px`); el.style.setProperty('--ty', `${my - y}px`); el.classList.remove('sel'); el.classList.add('hit'); }
+  sfx('correct', { rate: 2 ** (SCALE[Math.min(M.combo - 1, SCALE.length - 1)] / 12) });
+  if (!reduced()) sfx('swoosh', { gain: .4, rate: 1.1 });
+  buzz(VIBE.hit);
+  flyTime(a, `+${(add / 1000).toFixed(1)}초`, true);
+  const got = $('mt-got'); if (got) { got.textContent = R.got; restart(got.parentElement, 'bump'); }
+  const fever = M.fever, combo = M.combo;
+  later(() => {
+    burst(mx, my, combo, { fever, chip: `${p.en} = ${p.ko}` });
+    sfx('pop', { rate: 1 + Math.min(.5, combo * .07), gain: .7 });
+    rushRefill(a, b, p);
+  }, reduced() ? 40 : 230);
+  comboText();
+  if (M.combo === FEVER_AT) feverOn();
+  else if (M.combo >= 2 && M.combo % 2 === 0) petSay(M.fever ? 'happy' : 'cheer', CHEERS[Math.min(M.combo, CHEERS.length - 1)]);
+  rushProgress();
+}
+// 지운 두 자리에 새 짝을 채운다(영어 · 뜻 자리는 섞는다).
+function rushRefill(a, b, old) {
+  const R = M.rush;
+  if (!a.isConnected || !b.isConnected || M.done) return;
+  R.board = R.board.filter(x => x.uid !== old.uid);
+  const p = rushDraw();
+  R.seen.push(p); if (R.seen.length > 60) R.seen.shift();
+  const slots = Math.random() < .5 ? [a, b] : [b, a];
+  [['en', slots[0]], ['ko', slots[1]]].forEach(([side, el]) => {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = rushCard(p, side, Number(el.style.getPropertyValue('--i')) || 0, !reduced());
+    const card = tmp.firstElementChild;
+    el.replaceWith(card);
+    const t = card.querySelector('.mt-face b');
+    if (t && (t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1)) t.classList.add('fit');
+  });
+  if (!reduced()) sfx('card-flip', { gain: .4, rate: 1.1 });
+}
+function rushProgress() {
+  const R = M.rush;
+  if (R.next && R.got >= R.next) {
+    const reached = R.next, c = rushCoins(reached);
+    R.next = rushNext(R.got);
+    sfx('fanfare-basic', { gain: .7 }); buzz(VIBE.fever);
+    const playEl = $('mt-play');
+    if (playEl && !reduced()) { const f = document.createElement('div'); f.className = 'mt-fever-banner mt-check-banner'; f.innerHTML = `<b>${reached}쌍!</b><small>체크포인트 · 코인 ${c}</small>`; playEl.appendChild(f); later(() => f.remove(), 1300); }
+    petSay('happy', `${reached}쌍 돌파!`);
+  }
+  const label = $('mt-next-label'), bar = $('mt-next-bar');
+  const prev = [...RUSH.CHECKS].reverse().find(([n]) => n <= R.got)?.[0] || 0;
+  if (label) label.innerHTML = R.next ? `다음 ${R.next}쌍 · ${coin()}${rushCoins(R.next)}` : '체크포인트 모두 통과!';
+  if (bar) bar.style.transform = `scaleX(${R.next ? Math.min(1, (R.got - prev) / (R.next - prev)) : 1})`;
+}
+function rushMiss(a, b) {
+  const R = M.rush, wasFever = M.fever;
+  M.misses++; M.combo = 0; M.lock = true;
+  R.budget -= RUSH.MISS_MS;
+  for (const el of [a, b]) { M.missed.add(String(R.byId[el.dataset.pair].id)); el.classList.remove('sel'); el.classList.add('wrong'); }
+  sfx('wrong'); sfx('type-wrong', { gain: .6 }); buzz(VIBE.miss);
+  restart($('mt-flash'), 'on');
+  if (!reduced()) restart($('mt-grid'), 'shake');
+  if (wasFever) feverOff();
+  flyTime(a, `−${RUSH.MISS_MS / 1000}초`, false);
+  const m = document.querySelector('#mt-miss b'); if (m) m.textContent = M.misses;
+  const combo = $('mt-combo'); if (combo) combo.innerHTML = '';
+  petSay('sad', ['앗!', '괜찮아!', '다시!'][M.misses % 3]);
+  later(() => { a.classList.remove('wrong'); b.classList.remove('wrong'); M.lock = false; }, 420);
+}
+function rushEnd() {
+  const R = M.rush;
+  M.done = true; M.playing = false; cancelAnimationFrame(M.raf);
+  const el = document.querySelector('#mt-clock b'); if (el) el.textContent = '0.0';
+  app()?.classList.remove('fever');
+  const ms = Math.round(R.budget), playEl = $('mt-play');
+  sfx('crit'); sfx('clear', { at: .25 }); buzz(VIBE.finale);
+  const t = document.createElement('div'); t.className = 'mt-clear'; t.innerHTML = `<b>TIME UP!</b>`;
+  playEl?.appendChild(t);
+  document.querySelectorAll('.mt-card').forEach(c => { c.disabled = true; });
+  const send = saveRush(ms);
+  later(async () => { const res = await send; if (M) rushResult(ms, res); }, reduced() ? 600 : 1600);
+}
+async function saveRush(ms) {
+  const R = M.rush, shown = new Set(R.seen.map(p => String(p.id)));
+  saveMissed([...M.missed, ...loadMissed().filter(id => !shown.has(id))]);
+  if (!M.id) return null;
+  let res;
+  try { res = await api('/games/match/finish', { id: M.id, ms, misses: M.misses, pairs: R.got }); }
+  catch (err) { res = { paid: false, reason: 'error', error: err.message }; }
+  if (!M) return res;
+  if (res?.stats) Object.assign(M.A.data.stats, res.stats);
+  if (typeof res?.points_balance === 'number') M.A.data.stats.points_balance = res.points_balance;
+  M.view = { ...M.view, rush_best: res?.rush_best ?? M.view?.rush_best, rush_week_best: res?.rush_week_best ?? M.view?.rush_week_best, left: res?.left ?? M.view?.left };
+  M.A.data.rewards ||= {}; M.A.data.rewards.match = M.view;
+  return res;
+}
+function rushResult(ms, res) {
+  const R = M.rush, n = R.got, record = !!res?.record, coins = Number(res?.coins || 0), xp = Number(res?.xp || 0), bait = !!res?.bait;
+  const why = !M.id ? '연결이 안 돼서 기록 없이 했어요.' : res?.reason === 'daily' ? `오늘 코인 판(${MATCH.DAILY}판)을 다 썼어요. 기록은 남아요!` : res?.reason === 'error' ? esc(res.error || '저장하지 못했어요.') : res?.reason ? '이번 판은 기록하지 못했어요.' : '';
+  const prev = M.prevBest;
+  const diffLine = record && prev ? `내 최고보다 <b>${n - prev}쌍</b> 더!` : record ? '첫 러시 기록이에요!' : prev ? `내 최고(${prev}쌍)까지 <b>${prev - n}쌍</b>` : '';
+  const missed = R.seen.filter(p => M.missed.has(String(p.id))).filter((p, i, a) => a.findIndex(x => x.id === p.id) === i).slice(0, 8);
+  main(`<section class="mt-result rush${record ? ' record' : ''}">
+    <div class="mt-res-head"><span>TIME UP</span></div>
+    <div class="mt-res-time"><b id="mt-final">0</b><small>쌍</small>${record ? '<span class="mt-stamp" id="mt-stamp">신기록</span>' : ''}</div>
+    <p class="mt-res-diff">${num(Math.round(ms / 1000))}초 버텼어요${diffLine ? ` · ${diffLine}` : ''}</p>
+    <div class="mt-checks done">${RUSH.CHECKS.map(([c, v]) => `<span class="${n >= c ? 'on' : ''}"><b>${c}쌍</b><small>${coin()}${v}</small></span>`).join('')}</div>
+    <div class="mt-res-facts"><span>틀림 <b>${num(M.misses)}</b></span><span>최고 콤보 <b>${num(M.best)}</b></span>${M.view?.rush_best ? `<span>내 최고 <b>${num(M.view.rush_best)}쌍</b></span>` : ''}</div>
+    ${coins ? `<div class="mt-rewards"><span class="r coin">${coin()}<b>+<i>0</i></b><small>${res.record_coins ? `신기록 +${num(res.record_coins)} 포함` : '코인'}</small></span><span class="r xp"><b>+${num(xp)}</b><small>경험치</small></span>${bait ? '<span class="r bait"><b>🪱 +1</b><small>낚시 미끼</small></span>' : ''}</div>`
+      : `${bait ? '<div class="mt-rewards"><span class="r bait"><b>🪱 +1</b><small>낚시 미끼</small></span></div>' : ''}${why ? `<p class="mt-res-why">${why}</p>` : n < RUSH.CHECKS[0][0] ? `<p class="mt-res-why">${RUSH.CHECKS[0][0]}쌍부터 코인을 받아요. 한 번 더!</p>` : ''}`}
+    ${missed.length ? `<div class="mt-review"><h3>헷갈린 단어 <small>다음 판에 먼저 나와요</small></h3><div>${missed.map((p, i) => `<span class="mt-rcard" style="--i:${i}"><b>${esc(p.en)}</b><em>${esc(p.ko)}</em></span>`).join('')}</div></div>` : ''}
+    <div class="mt-res-pet">${petArt(n >= 30 ? 'happy' : n >= 10 ? 'cheer' : 'sad')}<span class="mt-bubble show">${n >= 30 ? '대단해! 끝까지 달렸어!' : n >= 10 ? '좋았어! 다음 체크포인트까지!' : '다음엔 10쌍 넘자!'}</span></div>
+    <div class="mt-result-actions"><button type="button" class="yl-cta" data-mt="again">한 판 더!</button><button type="button" class="btn full" data-mt="board">🏆 우리 반 러시 순위</button><button type="button" class="btn full" data-mt="exit">나가기</button></div>
+  </section>`);
+  const box = document.querySelector('.mt-result'), final = $('mt-final'), Rd = reduced();
+  if (Rd) { final.textContent = num(n); box.classList.add('calm'); }
+  else { countUp(final, n, 900); [...box.querySelectorAll('.mt-checks span.on')].forEach((el, i) => later(() => { el.classList.add('in'); sfx('stamp', { rate: 1 + i * .1, gain: .7 }); buzz(VIBE.star); }, 700 + i * 260)); }
+  const t1 = Rd ? 0 : 1500;
+  if (record) later(() => { $('mt-stamp')?.classList.add('in'); sfx('stamp', { rate: .8 }); sfx('fanfare-epic', { at: .15 }); buzz([40, 50, 80]); coinShower(box, LITE ? 10 : 20); }, t1);
+  later(() => box.querySelector('.mt-rewards')?.classList.add('in'), t1 + (record ? 500 : 0));
+  const coinsEl = box.querySelector('.mt-rewards .coin b i');
+  if (coinsEl && coins) later(() => { countUp(coinsEl, coins, 600); flyCoins(box.querySelector('.mt-rewards .coin'), coins); }, t1 + (record ? 700 : 200));
+  later(() => box.querySelector('.mt-review')?.classList.add('in'), t1 + 1300);
 }

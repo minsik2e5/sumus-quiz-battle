@@ -1409,3 +1409,32 @@ img.rl-art.rl-art-pearl{position:static;inset:auto;translate:none;z-index:auto;d
 .mt-app.mt-art-star .mt-res-stars i.on{color:transparent;text-shadow:none;background:var(--art-star) center/contain no-repeat}
 .mt-app.mt-art-ribbon .mt-res-head span{background:var(--art-ribbon) center/100% 100% no-repeat;clip-path:none;filter:none;padding:12px 52px 20px;text-shadow:0 2px 0 rgba(43,29,18,.6)}
 .mt-app.mt-art-stamp .mt-stamp{border:0;background:var(--art-stamp) center/contain no-repeat;box-shadow:none;padding:18px 16px;color:#a5352a}
+
+/* ---------- V13.150 짝 맞추기 러시 ---------- */
+.mt-modes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 10px}
+.mt-modes button{appearance:none;border:var(--hd-line);border-radius:12px;padding:8px 6px;background:rgba(244,231,201,.14);color:var(--hd-cream);font:inherit;font-weight:900;font-size:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px}
+.mt-modes button small{font-weight:600;font-size:11px;opacity:.8}
+.mt-modes button.on{background:var(--hd-paper);color:var(--hd-ink);box-shadow:var(--hd-drop-s)}
+.mt-intro.rush .mt-intro-pet{margin-top:4px}
+.mt-checks{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 0 12px}
+.mt-checks span{display:flex;flex-direction:column;align-items:center;padding:6px 4px;border-radius:10px;background:var(--hd-paper);color:var(--hd-ink);border:2px solid var(--hd-ink);box-shadow:var(--hd-drop-s);font-size:13px}
+.mt-checks small{display:flex;align-items:center;gap:2px;font-weight:800}.mt-checks .coin-ico{width:14px;height:14px}
+.mt-checks.done span{opacity:.45}.mt-checks.done span.on{opacity:1;background:var(--hd-gold2)}
+.mt-checks.done span.on.in{animation:mt-star-stamp .35s cubic-bezier(.4,0,.6,1.4) both}
+.mt-rush-score{display:flex;align-items:baseline;gap:3px}.mt-rush-score b{font-size:34px;font-weight:900;line-height:1;text-shadow:var(--hd-outline);font-variant-numeric:tabular-nums}.mt-rush-score small{font-weight:800;opacity:.85}
+.mt-rush-score.bump{animation:mt-bump .3s cubic-bezier(.3,1.8,.5,1)}
+.mt-rush-next{display:grid;gap:3px;font-size:11.5px;font-weight:800;max-width:180px}
+.mt-rush-next span{display:flex;align-items:center;gap:3px}.mt-rush-next .coin-ico{width:13px;height:13px}
+.mt-rush-next i{display:block;height:9px;border-radius:99px;background:rgba(244,231,201,.18);border:2px solid var(--hd-ink);overflow:hidden}
+.mt-rush-next u{display:block;height:100%;background:var(--hd-gold);transform-origin:left;transform:scaleX(0);transition:transform .3s}
+.mt-grid.rush{grid-template-columns:repeat(2,1fr);gap:8px}
+.mt-grid.rush .mt-card{height:clamp(58px,calc((100svh - 330px) / 5),92px)}
+.mt-card.enter{animation:mt-enter .4s cubic-bezier(.3,1.5,.5,1) both}
+@keyframes mt-enter{from{transform:translateY(-14px) scale(.6) rotate(var(--r));opacity:0}}
+.mt-plus.good{color:#9be08f}
+.mt-app .mt-plus{text-shadow:var(--hd-outline)}
+.mt-clock.gain b{animation:mt-gain .45s}
+@keyframes mt-gain{30%{color:#9be08f;transform:scale(1.2)}}
+.mt-check-banner b{font-size:46px}
+.mt-result.rush .mt-res-time b{font-size:72px}
+@media (prefers-reduced-motion:reduce){.mt-card.enter,.mt-rush-score.bump,.mt-clock.gain b{animation:none!important}}
