@@ -14,7 +14,7 @@ import { REEL, FIGHT, reelRoll, pearlsOf } from '../public/modules/reel-rules.js
 import { grantBait, reelCast, reelLand } from './reel.mjs';
 import { fishSvg, FISH_ART } from '../public/modules/fishing-art.js';
 import { addBonus } from './rewards.mjs';
-import { PARTY, CHESTS, createParty, joinParty, startParty, answer, pick, target, tick, tvView, playerView, awards, partyCoins, partyReport, ranked } from './party-engine.mjs';
+import { PARTY, CHESTS, ITEMS, bountyId, teamWinner, alarmAnswer, peek, useItem, nextWake, partyResultFor, createParty, joinParty, startParty, answer, pick, target, tick, tvView, playerView, awards, partyCoins, partyReport, ranked } from './party-engine.mjs';
 import { settleParty } from './party.mjs';
 import { matchSplits } from './games.mjs';
 
@@ -265,22 +265,29 @@ export async function runGamesChecks(assert) {
     // 훔치기: 위 5명 중에서, 같은 친구 2번까지, 방패가 막는다, 되갚기.
     const T0 = now + PARTY.NO_STEAL_MS + 1000;
     Object.assign(room.players.a, { gold: 100 }); Object.assign(room.players.c, { gold: 500, shield: 1 }); Object.assign(room.players.b, { gold: 300 });
-    const steal = (pid, vid, t, pct = 25) => { room.players[pid].offer = { chests: [{ kind: 'steal', pct }, { kind: 'gold', amount: 5 }, { kind: 'nothing' }], at: t }; const opened = pick(room, pid, 0, t); return { opened, res: target(room, pid, vid, t) }; };
+    // V13.150 훔치기는 금고 털이: 표적을 고르면 연속 3문제를 맞혀야 훔친다(방패는 그 자리에서 막는다).
+    const steal = (pid, vid, t, pct = 25, finish = true) => {
+      room.players[pid].offer = { chests: [{ kind: 'steal', pct }, { kind: 'gold', amount: 5 }, { kind: 'nothing' }], at: t, peeked: false, caught: false };
+      const opened = pick(room, pid, 0, t), res = target(room, pid, vid, t);
+      if (finish && room.players[pid].heist) { let last; for (let k = 1; k <= PARTY.HEIST_NEED; k++) last = ans(pid, true, t + k * 50); return { opened, res: last }; }
+      return { opened, res };
+    };
     const blocked = steal('a', 'c', T0);
-    assert(blocked.opened.me.targets && blocked.res.me.kind === 'blocked' && room.players.c.shield === 0 && room.players.c.gold === 500 && blocked.res.events.some(e => e.kind === 'block'), 'V13.149 방패가 있으면 훔치기를 막는다(방패는 사라진다)');
+    assert(blocked.opened.me.targets && blocked.res.me.kind === 'blocked' && room.players.c.shield === 0 && room.players.c.gold === 500 && blocked.res.events.some(e => e.kind === 'block') && !room.players.a.heist, 'V13.149 방패가 있으면 훔치기를 막는다(방패는 사라지고, 금고 털이도 시작하지 않는다)');
     const took = steal('a', 'c', T0 + 10);
-    assert(took.res.me.kind === 'stole' && took.res.me.amount === 125 && room.players.c.gold === 375 && room.players.a.gold === 225, 'V13.149 훔치기 25%: 친구 금화의 25%를 가져온다');
-    const third = steal('a', 'c', T0 + 20, 10);
+    assert(took.res.me.kind === 'stole' && took.res.me.amount === 125 && room.players.c.gold === 375 && room.players.a.gold === 225 + PARTY.BOUNTY && took.res.me.bounty === PARTY.BOUNTY, 'V13.149 훔치기 25%: 금고 털이(연속 3문제)를 마치면 친구 금화의 25%를 가져온다(1등이면 현상금 +50)');
+    const third = steal('a', 'c', T0 + 20, 10, false);
     assert(!third.res.me && room.players.a.pending && !room.players.a.pending.list.includes('c') && !playerView(room, 'a', T0 + 21).pending.targets.some(x => x.id === 'c') && room.players.c.gold === 375,
       'V13.149 같은 친구는 한 판에 2번까지(세 번째는 표적에 없고, 골라도 훔쳐지지 않는다)');
     target(room, 'a', room.players.a.pending.list[0], T0 + 26);
+    room.players.a.heist = null; room.players.a.alarm = null; Object.values(room.players).forEach(x => { x.alarm = null; });
     const revenge = playerView(room, 'c', T0 + 30);
     room.players.c.offer = { chests: [{ kind: 'steal', pct: 10 }, { kind: 'nothing' }, { kind: 'nothing' }], at: T0 + 30 };
     pick(room, 'c', 0, T0 + 30);
     const list = playerView(room, 'c', T0 + 31).pending.targets;
     assert(list.some(x => x.id === 'a' && x.revenge) && revenge.me.gold < 500, 'V13.149 30초 안에 나에게서 훔쳐 간 친구는 되갚기 표시와 함께 표적에 나온다');
     const auto = tick(room, T0 + 31 + PARTY.TARGET_MS);
-    assert(!room.players.c.pending && auto.events.some(e => e.kind === 'steal' || e.kind === 'block'), 'V13.149 12초 안에 고르지 않으면 1등 쪽에서 자동으로');
+    assert(!room.players.c.pending && auto.events.some(e => e.kind === 'heist' || e.kind === 'block'), 'V13.149 12초 안에 고르지 않으면 1등 쪽에서 자동으로(금고 털이 시작)');
     // 바꾸기는 나보다 많은 친구만.
     room.players.f.offer = { chests: [{ kind: 'swap' }, { kind: 'nothing' }, { kind: 'nothing' }], at: T0 + 50 };
     room.players.f.gold = 0;
@@ -292,7 +299,7 @@ export async function runGamesChecks(assert) {
     const kinds = new Set();
     for (let i = 0; i < 200; i++) { const q = qs[calm.players.a.qi % qs.length]; answer(calm, 'a', q.answer, now + 70000 + i, lcg(i + 1)); calm.players.a.offer.chests.forEach(c => kinds.add(c.kind)); pick(calm, 'a', 0, now + 70000 + i); }
     assert(!kinds.has('steal') && !kinds.has('swap') && !kinds.has('shield') && kinds.has('gold') && kinds.has('monster'), 'V13.149 훔치기를 끄면 금화 · 배수 · 꽝 · 몬스터만');
-    assert(Object.values(CHESTS).reduce((n, c) => n + c.w, 0) === 99 && CHESTS.steal.w === 12 && CHESTS.jackpot.w === 2, 'V13.149 상자 확률: 금화 45 · 2배 6 · 3배 3 · 꽝 10 · 훔치기 12 · 방패 8 · 바꾸기 3 · 몬스터 10 · 대박 2');
+    assert(Object.values(CHESTS).reduce((n, c) => n + c.w, 0) === 99 && CHESTS.steal.w === 12 && CHESTS.jackpot.w === 2 && CHESTS.item.w === 8 && CHESTS.gold.w === 42 && CHESTS.shield.w === 6 && CHESTS.monster.w === 9, 'V13.150 상자 확률: 금화 42 · 2배 6 · 3배 3 · 꽝 8 · 훔치기 12 · 방패 6 · 바꾸기 3 · 몬스터 9 · 대박 2 · 아이템 8');
     // 마지막 1분은 TV 순위를 가린다, 끝나면 재미 상.
     const lastTv = tvView(room, room.end_at - 30000), lastMe = playerView(room, 'a', room.end_at - 30000);
     const names = lastTv.top.map(x => x.name);
@@ -314,6 +321,159 @@ export async function runGamesChecks(assert) {
     assert(frenzy && pond.right_total === PARTY.FRENZY_EVERY && pond.frenzy_until === frenzy.until && ranked(pond)[0].kg > 0 && pond.players.k0.fish.length > 0, 'V13.149 반 전체 낚시: 반 정답 40개면 물고기 떼(20초)');
     const report = partyReport(pond);
     assert(report.players.length === 8 && report.players[0].fish && report.kind === 'fish', 'V13.149 끝난 판 보고에는 순위 · 맞힌 수 · 잡은 물고기');
+  }
+
+  /* ---------- V13.150 보물 사냥 2.0 ---------- */
+  {
+    const qs = Array.from({ length: 24 }, (_, i) => ({ word_id: 'w' + i, prompt: 'word' + i, options: ['a', 'b', 'c', 'd'], answer: i % 4 }));
+    const T = now + 5 * 60000; // 처음 1분이 지난 뒤(훔치기 가능), 이벤트 라운드(30% 지점)보다 이른 때
+    const build = (opts = {}) => {
+      const r = createParty({ id: 'h1', code: '1111', kind: 'treasure', minutes: 10, steal: true, questions: qs, seed: 0, host: { id: 't' }, now, ...opts });
+      for (const id of ['a', 'b', 'c', 'd']) joinParty(r, { id, name: id.toUpperCase() }, now);
+      startParty(r, now);
+      r.ev = []; // 이벤트는 따로 본다
+      return r;
+    };
+    const good = (r, pid, t, ok = true) => { const q = qs[r.players[pid].qi % qs.length]; return answer(r, pid, ok ? q.answer : (q.answer + 1) % 4, t, lcg(7 + (t % 997))); };
+    const open = (r, pid, kind, t, extra = {}) => { r.players[pid].offer = { chests: [{ kind, pct: 25, ...extra }, { kind: 'nothing' }, { kind: 'nothing' }], at: t, peeked: false, caught: false }; return pick(r, pid, 0, t); };
+    const heist = (r, pid, vid, t, kind = 'steal') => { open(r, pid, kind, t); return target(r, pid, vid, t); };
+
+    // 금고 털이: 표적을 고르면 훔치지 않고 시작한다. 연속 3문제를 맞히면 훔친다. 틀리면 실패(벌점 없음).
+    let r = build(); Object.assign(r.players.b, { gold: 120 }); Object.assign(r.players.a, { gold: 50 });
+    const started = heist(r, 'a', 'b', T);
+    assert(started.me.kind === 'heist' && r.players.a.heist.need === 3 && r.players.b.gold === 120 && r.players.a.gold === 50 && started.events.some(e => e.kind === 'heist' && e.vid === 'b') && !r.players.a.offer,
+      'V13.150 훔치기: 표적을 고르면 바로 훔치지 않고 금고 털이(연속 3문제)가 시작된다');
+    const view = playerView(r, 'a', T + 10), vv = playerView(r, 'b', T + 10);
+    assert(view.heist.got === 0 && view.heist.need === 3 && view.heist.vname === 'B' && view.q && vv.alarm?.by === 'A' && vv.alarm.options.length === 4 && !vv.q && !JSON.stringify(vv).includes('"answer"') && vv.alarm.until === T + PARTY.ALARM_MS,
+      'V13.150 도난 경보: 당하는 친구 폰에 5초 경보와 문제가 나가고(정답 번호 없이) 보통 문제는 잠깐 멈춘다');
+    assert(!good(r, 'b', T + 20).me, 'V13.150 경보가 켜진 동안 당하는 친구는 보통 문제에 답할 수 없다');
+    const step1 = good(r, 'a', T + 100);
+    assert(step1.me.kind === 'heist-step' && step1.me.got === 1 && r.players.b.gold === 120, 'V13.150 금고 털이: 한 문제 맞힐 때마다 한 칸');
+    good(r, 'a', T + 200); const fin = good(r, 'a', T + 300);
+    assert(fin.me.kind === 'stole' && fin.me.amount === 30 && r.players.b.gold === 90 && r.players.a.gold === 80 && fin.events.some(e => e.kind === 'steal') && !r.players.a.heist && !r.players.b.alarm, 'V13.150 연속 3문제를 맞히면 훔친다(경보에 답하지 못했으면)');
+    // 실패: 틀리면(벌점 없음), 시간이 지나면.
+    r.players.c.gold = 100; heist(r, 'a', 'c', T + 400);
+    const fail = good(r, 'a', T + 450, false);
+    assert(fail.events.some(e => e.kind === 'heistfail') && !r.players.a.heist && !r.players.c.alarm && r.players.a.gold === 80 && r.players.c.gold === 100, 'V13.150 금고 털이 중에 틀리면 실패(금화를 잃지 않는다)');
+    r.players.a.wait_until = 0; r.players.d.gold = 100; heist(r, 'a', 'd', T + 500);
+    const late = tick(r, T + 500 + PARTY.HEIST_MS);
+    assert(late.events.some(e => e.kind === 'heistfail') && !r.players.a.heist, 'V13.150 금고 털이는 25초가 지나면 실패');
+
+    // 막기: 경보 문제를 5초 안에 맞히면 막고 10금화를 받는다. 틀리거나 늦으면 못 막는다.
+    r = build(); Object.assign(r.players.b, { gold: 200 }); Object.assign(r.players.a, { gold: 50 });
+    heist(r, 'a', 'b', T);
+    const aq = r.players.b.alarm, qq = qs[aq.qi % qs.length];
+    const wrongAlarm = alarmAnswer(r, 'b', (qq.answer + 1) % 4, T + 1000);
+    assert(wrongAlarm.me.kind === 'alarmed' && !wrongAlarm.me.defended && !alarmAnswer(r, 'b', qq.answer, T + 1100).me, 'V13.150 경보에 틀리면 못 막고 다시 답할 수 없다');
+    r = build(); Object.assign(r.players.b, { gold: 200 }); Object.assign(r.players.a, { gold: 50 });
+    heist(r, 'a', 'b', T);
+    const okAlarm = alarmAnswer(r, 'b', qs[r.players.b.alarm.qi % qs.length].answer, T + 2000);
+    assert(okAlarm.me.defended && alarmAnswer(r, 'b', 0, T + 2100).events.length === 0, 'V13.150 경보에 맞히면 막는다');
+    good(r, 'a', T + 3000); good(r, 'a', T + 3100); const blockedRes = good(r, 'a', T + 3200);
+    assert(blockedRes.me.kind === 'blocked' && blockedRes.me.defended && r.players.b.gold === 210 && r.players.a.gold === 50 && r.players.b.stat.blocked === 1 && blockedRes.events.some(e => e.kind === 'block' && e.defended), 'V13.150 막으면 털이범은 빈손, 막은 친구는 +10금화(철벽 방패 기록)');
+    r = build(); Object.assign(r.players.b, { gold: 200 });
+    heist(r, 'a', 'b', T);
+    assert(!alarmAnswer(r, 'b', 0, T + PARTY.ALARM_MS + 1).events.length && playerView(r, 'b', T + PARTY.ALARM_MS + 1).alarm === null && playerView(r, 'b', T + PARTY.ALARM_MS + 1).q, 'V13.150 5초가 지나면 경보가 꺼지고 보통 문제로 돌아온다');
+    // 시간 정지 아이템: 경보가 10초
+    r = build(); Object.assign(r.players.b, { gold: 200 }); r.players.b.inv.freeze = 1;
+    heist(r, 'a', 'b', T);
+    assert(r.players.b.alarm.until === T + PARTY.ALARM_FREEZE_MS && r.players.b.inv.freeze === 0, 'V13.150 시간 정지 아이템은 경보 시간을 10초로 늘린다(알아서 쓰인다)');
+
+    // 현상금: 1등(금화 150 이상)을 털면 하우스가 50을 더 준다.
+    r = build(); Object.assign(r.players.b, { gold: 400 }); Object.assign(r.players.a, { gold: 50 });
+    assert(bountyId(r) === 'b' && playerView(r, 'a', T).q && (() => { open(r, 'a', 'steal', T); return playerView(r, 'a', T).pending.targets.find(x => x.id === 'b').bounty === true; })(), 'V13.150 금화 150 이상인 1등에게 현상금이 걸리고 표적 목록에 표시된다');
+    target(r, 'a', 'b', T); good(r, 'a', T + 10); good(r, 'a', T + 20);
+    const bounty = good(r, 'a', T + 30);
+    assert(bounty.me.bounty === PARTY.BOUNTY && bounty.me.amount === 100 && r.players.b.gold === 300 && r.players.a.gold === 50 + 100 + PARTY.BOUNTY, 'V13.150 현상금: 훔친 만큼 + 하우스가 주는 50금화(1등은 그만큼 더 잃지 않는다)');
+    r = build(); Object.assign(r.players.b, { gold: 100 });
+    assert(bountyId(r) === null, 'V13.150 금화가 150보다 적으면 현상금이 없다');
+
+    // 엿보기: 상자 하나에 한 번, 30%는 들켜서 금화 20%를 잃고 아무것도 못 본다.
+    r = build(); Object.assign(r.players.a, { gold: 200 });
+    good(r, 'a', T);
+    const unseen = playerView(r, 'a', T);
+    assert(unseen.offer.count === 3 && unseen.offer.kinds === null && !JSON.stringify(unseen).includes('amount'), 'V13.150 엿보기 전에는 상자 속을 모른다(상자 종류도 폰에 오지 않는다)');
+    const seen = peek(r, 'a', T + 10, () => .9);
+    const seenView = playerView(r, 'a', T + 11);
+    assert(seen.me.kind === 'peeked' && !seen.me.caught && seenView.offer.kinds.length === 3 && seenView.offer.kinds.every((k, i) => k === r.players.a.offer.chests[i].kind) && r.players.a.gold === 200 && !peek(r, 'a', T + 20, () => .9).me, 'V13.150 엿보기에 성공하면 상자 종류를 보고, 한 상자에 한 번만 된다');
+    r.players.a.offer = null; r.players.a.qi = 0; good(r, 'a', T + 30);
+    const caught = peek(r, 'a', T + 40, () => .1), caughtView = playerView(r, 'a', T + 41);
+    assert(caught.me.caught && caught.me.lost === 40 && r.players.a.gold === 160 && caughtView.offer.kinds === null && caughtView.offer.caught && caught.events.some(e => e.kind === 'peekcaught'), 'V13.150 엿보다 들키면(30%) 금화 20%를 잃고 아무것도 못 본다');
+
+    // 아이템: 상자에서 나오고(최대 2개), 50:50 · 콤보 보호가 쓰인다.
+    r = build();
+    const take = (item, t) => { good(r, 'a', t); r.players.a.offer = { chests: [{ kind: 'item', item }, { kind: 'nothing' }, { kind: 'nothing' }], at: t, peeked: false, caught: false }; return pick(r, 'a', 0, t); };
+    const i1 = take('fifty', T), i2 = take('saver', T + 10), i3 = take('freeze', T + 20);
+    assert(i1.me.item === 'fifty' && i2.me.item === 'saver' && i3.me.fallback === 20 && r.players.a.inv.fifty === 1 && r.players.a.inv.saver === 1 && r.players.a.inv.freeze === 0 && ITEMS.fifty === '50:50',
+      'V13.150 아이템은 2개까지 들고, 가득 차면 20금화로 바뀐다');
+    const q50 = qs[r.players.a.qi % qs.length];
+    assert(useItem(r, 'a', 'fifty', T + 30).me.kind === 'itemused' && playerView(r, 'a', T + 31).q.hide.length === 2 && !playerView(r, 'a', T + 31).q.hide.includes(q50.answer) && new Set(playerView(r, 'a', T + 31).q.hide).size === 2 && !useItem(r, 'a', 'fifty', T + 32).me && r.players.a.inv.fifty === 0,
+      'V13.150 50:50은 틀린 보기 둘만 지운다(정답은 남는다)');
+    const before = r.players.a.streak;
+    good(r, 'a', T + 40, false);
+    assert(r.players.a.inv.saver === 0 && r.players.a.streak === before && r.players.a.wrong === 1, 'V13.150 콤보 보호는 틀려도 연속 정답이 이어지게 한 번 막아 준다');
+    assert(!useItem(r, 'a', 'freeze', T + 50).me && !useItem(r, 'a', 'hack', T + 50).me, 'V13.150 폰이 쓸 수 있는 아이템은 50:50뿐(나머지는 서버가 알아서)');
+    // 훔치기를 끈 방은 시간 정지 아이템이 나오지 않는다.
+    const calm = build({ steal: false });
+    const got = new Set();
+    for (let k = 0; k < 400; k++) { calm.players.a.qi = 0; const res = good(calm, 'a', T + k); calm.players.a.offer?.chests.forEach(c => c.item && got.add(c.item)); if (calm.players.a.offer) pick(calm, 'a', 0, T + k); calm.players.a.wait_until = 0; }
+    assert(got.size === 2 && !got.has('freeze'), 'V13.150 훔치기를 끄면 시간 정지 아이템은 나오지 않는다');
+
+    // 이벤트 라운드: 판 길이의 30% · 55% · 80%에 하나씩(황금 시간 · 해적선 습격 · 보물 폭풍).
+    r = createParty({ id: 'e1', code: '2222', kind: 'treasure', minutes: 10, steal: true, questions: qs, seed: 0, host: { id: 't' }, now });
+    for (const id of ['a', 'b', 'c']) joinParty(r, { id, name: id.toUpperCase() }, now);
+    startParty(r, now);
+    assert(r.ev.map(e => e.kind).sort().join() === 'golden,raid,storm' && r.ev.map(e => e.at - now).join() === [180000, 330000, 480000].join() && nextWake(r) === now + 180000,
+      'V13.150 이벤트 라운드 3개(황금 시간 · 해적선 습격 · 보물 폭풍)가 판 길이의 30% · 55% · 80%에 온다');
+    const kindAt = [...r.ev];
+    const golden = kindAt.find(e => e.kind === 'golden'), raid = kindAt.find(e => e.kind === 'raid'), storm = kindAt.find(e => e.kind === 'storm');
+    // 황금 시간: 금화 상자 금액이 두 배
+    const plain = (() => { const x = createParty({ id: 'g0', code: '1', kind: 'treasure', minutes: 10, steal: true, questions: qs, seed: 0, host: { id: 't' }, now }); joinParty(x, { id: 'z', name: 'Z' }, now); startParty(x, now); x.ev = []; const q = qs[x.players.z.qi % qs.length]; answer(x, 'z', q.answer, now + 180100, lcg(3)); return x.players.z.offer.chests.filter(c => c.kind === 'gold').map(c => c.amount); })();
+    tick(r, golden.at);
+    const gq = qs[r.players.a.qi % qs.length]; answer(r, 'a', gq.answer, golden.at + 100, lcg(3));
+    const goldenAmounts = r.players.a.offer.chests.filter(c => c.kind === 'gold').map(c => c.amount);
+    assert(r.event?.kind === 'golden' && tvView(r, golden.at + 100).event.kind === 'golden' && playerView(r, 'a', golden.at + 100).event.kind === 'golden' && plain.length === goldenAmounts.length && goldenAmounts.every((v, i) => v >= plain[i] * 1.8) && r.feed.some(f => f.kind === 'event' && f.event === 'golden'),
+      'V13.150 황금 시간(45초): 금화 상자가 두 배, TV와 폰에 이벤트가 보인다');
+    tick(r, golden.at + PARTY.GOLDEN_MS + 1);
+    assert(!r.event && !tvView(r, golden.at + PARTY.GOLDEN_MS + 2).event, 'V13.150 황금 시간은 45초 뒤에 끝난다');
+    // 해적선 습격: 방패 없는 모두 금화 −10%
+    Object.assign(r.players.a, { gold: 200, shield: 0 }); Object.assign(r.players.b, { gold: 100, shield: 1 }); Object.assign(r.players.c, { gold: 0, shield: 0 });
+    const rr = tick(r, raid.at);
+    assert(r.players.a.gold === 180 && r.players.b.gold === 100 && r.players.b.shield === 1 && rr.events.some(e => e.kind === 'event' && e.event === 'raid' && e.total === 20 && e.hit === 1), 'V13.150 해적선 습격: 방패 없는 친구는 금화 10%를 잃고, 방패가 있으면 그대로(방패는 안 닳는다)');
+    // 보물 폭풍: 상자 5개
+    tick(r, storm.at);
+    r.players.c.wait_until = 0; r.players.c.qi = 0; const sq = qs[0]; answer(r, 'c', sq.answer, storm.at + 50, lcg(4));
+    assert(r.players.c.offer.chests.length === PARTY.STORM_CHESTS && playerView(r, 'c', storm.at + 60).offer.count === 5 && pick(r, 'c', 4, storm.at + 70).me.chest, 'V13.150 보물 폭풍(45초): 상자가 5개로 늘어난다');
+    const fishRoom = createParty({ id: 'f2', code: '3', kind: 'fish', minutes: 10, questions: qs, seed: 0, host: { id: 't' }, now }); joinParty(fishRoom, { id: 'k', name: 'K' }, now); startParty(fishRoom, now);
+    assert(!fishRoom.ev.length && !tvView(fishRoom, now).teams && fishRoom.teams === false, 'V13.150 반 전체 낚시에는 이벤트 라운드 · 팀전이 없다');
+
+    // 팀전: 번갈아 나뉘고, 훔치기 · 바꾸기는 상대 팀만, 금화 합계가 더 큰 팀이 이긴다(코인 +3).
+    r = createParty({ id: 't1', code: '4', kind: 'treasure', minutes: 10, steal: true, teams: true, questions: qs, seed: 0, host: { id: 't' }, now });
+    for (const id of ['a', 'b', 'c', 'd', 'e']) joinParty(r, { id, name: id.toUpperCase() }, now);
+    startParty(r, now); r.ev = [];
+    const teamOf = id => r.players[id].team;
+    assert(['a', 'b', 'c', 'd', 'e'].map(teamOf).join('') === 'ABABA' && tvView(r, now).teams && tvView(r, now).top.every(x => x.team) && playerView(r, 'a', now).me.team === 'A', 'V13.150 팀전: 들어온 순서대로 A · B 팀으로 나뉜다');
+    Object.assign(r.players.a, { gold: 100 }); Object.assign(r.players.b, { gold: 300 }); Object.assign(r.players.c, { gold: 500 }); Object.assign(r.players.d, { gold: 50 }); Object.assign(r.players.e, { gold: 20 });
+    open(r, 'a', 'steal', T);
+    const foes = playerView(r, 'a', T).pending.targets.map(x => x.id).sort().join();
+    assert(foes === 'b,d' && !foes.includes('c') && !foes.includes('e'), 'V13.150 팀전: 훔치기는 상대 팀 친구만(우리 팀 1등 c는 표적이 아니다)');
+    const t = tvView(r, T), me = playerView(r, 'a', T);
+    assert(t.team_gold.find(x => x.team === 'A').gold === 620 && t.team_gold.find(x => x.team === 'B').gold === 350 && teamWinner(r) === 'A' && me.team_gold.length === 2,
+      'V13.150 팀전: TV와 폰에 팀 금화 합계, 합계가 큰 팀이 이긴다');
+    r.players.a.right = 8; r.players.b.right = 8;
+    const win = partyResultFor(r, 'a'), lose = partyResultFor(r, 'b');
+    assert(win.team_win && win.coins === partyCoins(8, win.rank, 5) + PARTY.TEAM_WIN_COINS && !lose.team_win && lose.coins === partyCoins(8, lose.rank, 5), 'V13.150 팀전: 이긴 팀 학생은 코인 +3(5문제 이상 맞힌 경우)');
+    r.players.a.right = 3;
+    assert(partyResultFor(r, 'a').coins === 0 && partyReport(r).players.find(x => x.id === 'a').team_win, 'V13.150 팀전 보너스도 5문제 미만이면 없다');
+    Object.assign(r.players.a, { gold: 1 }); Object.assign(r.players.b, { gold: 1 }); Object.assign(r.players.c, { gold: 1 }); Object.assign(r.players.d, { gold: 1 }); Object.assign(r.players.e, { gold: 1 });
+    assert(teamWinner(r) === 'A' && (Object.assign(r.players.e, { gold: 0 }), teamWinner(r) === null), 'V13.150 팀 금화가 같으면 이긴 팀이 없다');
+    // 마지막 1분은 팀 합계 · 현상금도 가린다
+    Object.assign(r.players.c, { gold: 500 });
+    const hid = tvView(r, r.end_at - 20000);
+    assert(hid.hidden && hid.team_gold === null && hid.bounty === null && playerView(r, 'a', r.end_at - 20000).team_gold === null, 'V13.150 마지막 1분은 팀 합계 · 현상금도 가린다');
+    // 학생 화면에는 정답이 없다(경보 · 금고 털이 · 50:50 포함)
+    r.players.d.alarm = { by: 'a', until: T + 5000, done: false, defended: false, qi: 3 };
+    assert(!JSON.stringify(playerView(r, 'd', T)).includes('"answer"') && !JSON.stringify(tvView(r, T)).includes('"answer"'), 'V13.150 폰 · TV 어디에도 정답 번호가 가지 않는다');
   }
 
   /* ---------- 교실 게임: 서버(만들기 · 참가 · 정산) ---------- */
@@ -361,6 +521,29 @@ export async function runGamesChecks(assert) {
     assert(battle.includes("['games', '게임', 'arcade']") && battle.includes("act === 'game-match'") && !battle.includes('game-fish') && source('../public/modules/arcade.js').includes('data-action="reel-open"') && app.includes("d.action === 'reel-open'")
       && source('../public/modules/reel.js').includes('진주 1개 = 1코인') && source('../public/modules/sessions.js').includes('낚시 미끼 +1') && battle.includes("act === 'game-party'") && app.includes("d.action === 'party-new'") && teacher.includes('data-action="party-new"'),
       'V13.149 야차전 게임 탭(짝 맞추기 · 단어 낚시 · 교실 게임 참가)과 선생님 대시보드의 교실 게임 버튼');
+  }
+
+  /* ---------- V13.150 보물 사냥 2.0 화면 · 방 · 그림 주문서 30 ---------- */
+  {
+    const pj = source('../public/modules/party.js'), tv = source('../public/modules/party-tv.js'), room = source('../cloudflare/party-room.mjs'), css = source('../public/v13149.css'), svc = source('./service.mjs'), settle = source('./party.mjs');
+    assert(room.includes("new Set(['sync', 'ping', 'answer', 'pick', 'target', 'alarm', 'peek', 'item', 'start', 'end'])") && room.includes("msg.type === 'alarm') res = alarmAnswer(") && room.includes("msg.type === 'peek') res = peek(") && room.includes("msg.type === 'item') res = useItem(") && room.includes("e.kind === 'event'"),
+      'V13.150 방: 경보 답 · 엿보기 · 아이템 메시지를 받고(그 밖의 type은 무시), 이벤트 라운드는 모두에게 알린다');
+    assert(svc.includes("teams: kind === 'treasure' && body.teams === true") && svc.includes('teams: party.teams') && svc.includes('teams: !!x.teams') && settle.includes('row.team_win && right >= PARTY.MIN_RIGHT ? PARTY.TEAM_WIN_COINS : 0'),
+      'V13.150 선생님이 팀전으로 열 수 있고(보물 사냥만), 이긴 팀 학생은 코인 +3(5문제 이상, 하루 3판 한도 안에서)');
+    assert(pj.includes("act === 'alarm') return answerAlarm(") && pj.includes("act === 'peek'") && pj.includes("send({ type: 'item', item: b.dataset.item })") && pj.includes('function alarmCard(v)') && pj.includes('class="pt-heist"') && pj.includes("v.alarm ? alarmCard(v)") && pj.includes('pt-peek-tag') && pj.includes('hide.includes(i)') && pj.includes('현상금 +50'),
+      'V13.150 폰: 도난 경보 카드 · 금고 털이 띠(3칸) · 엿보기 · 50:50(지운 보기) · 현상금 표시');
+    assert(pj.includes("e.kind === 'event'") && pj.includes("e.kind === 'peeked'") && pj.includes("e.kind === 'alarmed'") && pj.includes("e.kind === 'heistfail'") && pj.includes('const EVENT = {') && pj.includes('pt-team-end') && pj.includes('const teamBar = v =>'),
+      'V13.150 폰: 이벤트 라운드 · 엿보기 · 경보 · 털이 실패 소식과 팀 합계 · 팀 결과');
+    assert(tv.includes('name="teams"') && tv.includes("teams: !!values.teams && values.kind === 'treasure'") && tv.includes('id="ptv-teams"') && tv.includes('id="ptv-event"') && tv.includes("f.kind === 'heist'") && tv.includes("f.kind === 'peekcaught'") && tv.includes('v.bounty === x.id') && tv.includes('ptv-team-end'),
+      'V13.150 TV: 팀전 켜기 · 팀 금화 막대 · 이벤트 띠 · 금고 털이 소식 · 현상금 표시 · 팀 결과');
+    assert(css.includes('.pt-alarm{') && css.includes('.pt-heist{') && css.includes('.pt-chest-row.n5{display:flex') && css.includes('.ptv-teams{') && css.includes('@media (prefers-reduced-motion:reduce){.pt-event,.ptv-event,.pt-alarm'),
+      'V13.150 보물 사냥 2.0 스타일(경보 · 금고 털이 띠 · 상자 5개 · 팀 막대)과 동작 줄이기');
+    const art30 = ['30a-treasure-backgrounds.txt', '30b-treasure-ui.txt'].flatMap(f => source(`../docs/asset-requests/runner/${f}`).trim().split('\n---\n'));
+    const codex30 = source('../docs/asset-requests/runner/CODEX_PROMPT_30.md'), map30 = source('../docs/asset-requests/runner/slice-map.csv');
+    const names30 = ['bg-phone', 'bg-tv', 'chest-gold', 'chest-violet', 'chest-green', 'chest-open', 'item-fifty', 'item-freeze', 'item-saver', 'item-peek', 'vault', 'siren', 'bounty', 'ship', 'ev-golden', 'ev-raid', 'ev-storm', 'flags'];
+    assert(art30.length === 6 && art30.every(t => t.includes('STYLE REFERENCE — before drawing, open') && /named exactly "30[ab]-\d\.png"/.test(t) && t.includes('"SUMUS 보물 사냥 30 (Runner용)"') && t.includes('showing the picture in the chat is not enough'))
+      && codex30.includes('Drive의 기존 그림을 열어 그림체를 맞춘다') && codex30.includes('정해진 Drive 폴더 "SUMUS 보물 사냥 30 (Runner용)"에 정확한 파일 이름') && names30.every(n => map30.includes(`public/assets/treasure/${n}.webp`)),
+      'V13.150 그림 주문서 30(보물 사냥 2.0): Drive의 기존 그림을 열어 그림체를 맞추고 정해진 폴더에 정확한 이름으로 저장(18장 모두 자르기 표에)');
   }
 
   /* ---------- V13.149 짝 맞추기 고퀄 화면 ---------- */

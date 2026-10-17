@@ -10,6 +10,7 @@ import { fishPic } from './fishing-art.js';
 // TV에는 번호 · 들어온 학생 · 실시간 순위 막대 · 소식(훔치기 · 막기 · 대박 · 큰 물고기)이 나오고, 마지막 1분은 순위를 가렸다가 끝에 공개한다.
 
 let T = null;
+const EVENT = { golden: ['🌟 황금 시간!', '45초 동안 금화 상자가 두 배'], raid: ['☠️ 해적선 습격!', '방패 없는 친구는 금화 10%를 뺏겨요'], storm: ['🌪️ 보물 폭풍!', '45초 동안 상자가 5개'] };
 const root = () => document.getElementById('app');
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)');
 const reduced = () => REDUCED.matches;
@@ -37,6 +38,7 @@ export async function partyCreateModal(A, onOpen) {
       <label class="field"><span>게임 시간</span><select name="minutes"><option value="5">5분</option><option value="8" selected>8분</option><option value="10">10분</option></select></label>
     </div>
     <label class="pg-steal"><input type="checkbox" name="steal" checked><span><b>훔치기 · 바꾸기 켜기</b><small>끄면 금화 · 배수 · 꽝 · 몬스터만 나와요(보물 사냥만). 같은 친구는 한 판에 2번까지만 훔칠 수 있어요.</small></span></label>
+    <label class="pg-steal pg-teams"><input type="checkbox" name="teams"><span><b>팀전으로 하기 (보물 사냥만)</b><small>반을 A · B 팀으로 나눠요. 훔치기 · 바꾸기는 상대 팀만 노릴 수 있고, 팀 금화 합계가 큰 팀이 이겨요(코인 +3). 같은 반 친구끼리 뺏는 게 부담스러울 때 좋아요.</small></span></label>
     <div class="step-label">단어 범위</div>
     <div class="teacher-range" id="pg-ranges"></div>
     <div id="pg-error" class="form-error" role="alert"></div>
@@ -48,7 +50,7 @@ export async function partyCreateModal(A, onOpen) {
     $('#pg-ranges').innerHTML = periodFolders(A, info.codes, { wrap: 'teacher-range', bare: true, selected: info.codes.slice(0, 2), count: code => info.words.filter(w => w.range_code === code).length, option: code => `<label class="range-option"><input type="checkbox" name="range" value="${esc(code)}" ${info.codes.indexOf(code) < 2 ? 'checked' : ''}><span>${esc(middle ? `${code}과` : rangeLabel(A.school, code))}<small>${info.words.filter(w => w.range_code === code).length}개 단어</small></span></label>` }) || '<p class="tiny muted">단어 범위가 없어요.</p>';
   };
   $('#pg-target').onchange = fill;
-  form.addEventListener('change', e => { if (e.target.name === 'kind') form.querySelector('.pg-steal').classList.toggle('off', e.target.value === 'fish'); });
+  form.addEventListener('change', e => { if (e.target.name === 'kind') form.querySelectorAll('.pg-steal').forEach(x => x.classList.toggle('off', e.target.value === 'fish')); });
   fill();
   form.querySelector('[data-pg-reopen]')?.addEventListener('click', () => { close(); onOpen(open); });
   form.onsubmit = async event => {
@@ -58,7 +60,7 @@ export async function partyCreateModal(A, onOpen) {
     if (!ranges.length) return $('#pg-error').textContent = '단어 범위를 골라주세요.';
     buttonBusy(button);
     try {
-      const r = await api('/teacher/party', { kind: values.kind, class_name: values.class_name, minutes: Number(values.minutes), steal: !!values.steal, range_codes: ranges });
+      const r = await api('/teacher/party', { kind: values.kind, class_name: values.class_name, minutes: Number(values.minutes), steal: !!values.steal, teams: !!values.teams && values.kind === 'treasure', range_codes: ranges });
       close();
       onOpen(r.party);
     } catch (err) { $('#pg-error').textContent = err.message; buttonBusy(button, false); }
@@ -139,7 +141,7 @@ function lobby(v, before) {
     <div class="ptv-join">
       <p>폰에서 <b>야차전 → 게임 → 교실 게임 참가</b></p>
       <div class="ptv-code" aria-label="방 번호 ${esc(v.code)}">${[...String(v.code)].map(d => `<span>${esc(d)}</span>`).join('')}</div>
-      <p class="ptv-sub">${v.kind === 'fish' ? '맞히면 물고기! 빨리 맞힐수록 큰 물고기 · 반 정답 40개마다 물고기 떼' : `맞히면 보물 상자! ${v.steal ? '훔치기 · 방패 · 바꾸기까지' : '금화 · 배수 · 대박'} · ${v.minutes}분`}</p>
+      <p class="ptv-sub">${v.kind === 'fish' ? '맞히면 물고기! 빨리 맞힐수록 큰 물고기 · 반 정답 40개마다 물고기 떼' : `맞히면 보물 상자! ${v.teams ? '팀전! ' : ''}${v.steal ? '금고 털이 · 도난 경보 · 방패까지' : '금화 · 배수 · 대박'} · ${v.minutes}분`}</p>
     </div>
     <div class="ptv-crowd">${(v.lobby || []).map(x => `<span class="ptv-kid${fresh.has(x.id) ? ' new' : ''}">${x.pet ? avatar(x.pet.key, { form: x.pet.form, size: 'mini' }) : ''}<b>${esc(x.name)}</b></span>`).join('') || '<p class="ptv-empty">학생을 기다리는 중…</p>'}</div>
     <div class="ptv-actions"><span><b>${num(v.players)}</b>명 들어왔어요</span><button type="button" class="ptv-start" data-tv="start" ${v.players ? '' : 'disabled'}>게임 시작!</button></div>
@@ -153,6 +155,8 @@ function play(v, before) {
       <div class="ptv-timebar"><i id="ptv-timebar"></i></div>
       <div class="ptv-stats"><span>참가 <b id="ptv-n">${num(v.players)}</b>명</span><span>반 전체 정답 <b id="ptv-right">${num(v.right_total)}</b></span><span class="ptv-code-mini">번호 <b>${esc(v.code)}</b></span><button type="button" class="ptv-end" data-tv="end">끝내기</button></div>
       <div class="ptv-frenzy" id="ptv-frenzy" hidden>🐟🐟🐟 물고기 떼! 🐟🐟🐟</div>
+      <div class="ptv-event" id="ptv-event" hidden></div>
+      <div class="ptv-teams" id="ptv-teams" hidden></div>
       <div class="ptv-board" id="ptv-board"></div>
       <div class="ptv-hidden" id="ptv-hidden" hidden><b>마지막 1분!</b><span>순위는 끝나고 공개해요 🤫</span></div>
     </section>`);
@@ -161,6 +165,21 @@ function play(v, before) {
   const n = document.getElementById('ptv-n'); if (n) n.textContent = num(v.players);
   const r = document.getElementById('ptv-right'); if (r) r.textContent = num(v.right_total);
   const fz = document.getElementById('ptv-frenzy'); if (fz) fz.hidden = !(v.frenzy_until > serverNow());
+  const evEl = document.getElementById('ptv-event');
+  if (evEl) {
+    const info = v.event && EVENT[v.event.kind];
+    evEl.hidden = !info;
+    if (info && evEl.dataset.kind !== v.event.kind) { evEl.dataset.kind = v.event.kind; evEl.className = `ptv-event ${v.event.kind}`; evEl.innerHTML = `<b>${info[0]}</b><span>${info[1]}</span>`; }
+    if (!info) evEl.dataset.kind = '';
+  }
+  const tmEl = document.getElementById('ptv-teams');
+  if (tmEl) {
+    tmEl.hidden = !v.teams;
+    if (v.teams) {
+      const t = v.team_gold, total = t ? Math.max(1, t[0].gold + t[1].gold) : 1;
+      tmEl.innerHTML = t ? `<span class="tA"><b>🔴 A팀</b><em>${num(t[0].gold)}</em></span><i class="bar"><u style="--p:${(t[0].gold / total * 100).toFixed(1)}%"></u></i><span class="tB"><em>${num(t[1].gold)}</em><b>🔵 B팀</b></span>` : '<span class="tA"><b>🔴 A팀</b></span><i class="hid">마지막 1분! 점수는 끝나고 공개해요 🤫</i><span class="tB"><b>🔵 B팀</b></span>';
+    }
+  }
   const hid = document.getElementById('ptv-hidden'), board = document.getElementById('ptv-board');
   if (hid) hid.hidden = !v.hidden;
   board.classList.toggle('masked', !!v.hidden);
@@ -181,13 +200,13 @@ function play(v, before) {
       T.bars.set(x.id, row);
     }
     row.style.transform = `translateY(${i * ROW}px)`;
-    row.className = `ptv-row${!v.hidden && i < 3 ? ` top${i + 1}` : ''}`;
+    row.className = `ptv-row${!v.hidden && i < 3 ? ` top${i + 1}` : ''}${x.team ? ` team-${x.team}` : ''}${v.bounty === x.id ? ' bounty' : ''}`;
     row.querySelector('.ptv-rank').textContent = v.hidden ? '?' : i + 1;
     row.querySelector('.ptv-bar u').style.transform = `scaleX(${v.hidden ? .5 : Math.max(.02, x.score / max)})`;
     const score = v.hidden ? '???' : fish ? kgText(x.score) : num(x.score);
     const s = row.querySelector('.ptv-score');
     if (s.textContent !== score) { s.textContent = score; s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump'); }
-    row.querySelector('.ptv-sh').textContent = !fish && x.shield && !v.hidden ? '🛡️'.repeat(x.shield) : '';
+    row.querySelector('.ptv-sh').textContent = !fish && !v.hidden ? `${v.bounty === x.id ? '💰' : ''}${x.shield ? '🛡️'.repeat(x.shield) : ''}` : '';
   });
   for (const [id, row] of T.bars) if (!seen.has(id)) { row.remove(); T.bars.delete(id); }
   for (const f of v.feed || []) if (f.n > T.feedSeen) { T.feedSeen = f.n; if (before) feedPop(f); }
@@ -197,8 +216,12 @@ function feedPop(f) {
   const host = document.getElementById('ptv-feed');
   if (!host) return;
   let html = '', big = false, cls = f.kind;
-  if (f.kind === 'steal') html = `🦹 <b>${esc(f.name)}</b>가 <b>${esc(f.vname)}</b>의 금화 ${f.pct}%를 가져갔어요! <em>${coin()}${num(f.amount)}</em>`;
-  else if (f.kind === 'block') html = `🛡️ <b>${esc(f.vname)}</b>가 <b>${esc(f.name)}</b>의 훔치기를 막았어요!`;
+  if (f.kind === 'heist') { html = `🚨 <b>${esc(f.name)}</b>가 <b>${esc(f.vname)}</b>의 금고를 노려요!${f.bounty ? ' <em>💰 현상금 1등!</em>' : ''}`; big = !!f.bounty; }
+  else if (f.kind === 'heistfail') html = `😅 <b>${esc(f.name)}</b>의 금고 털이 실패!`;
+  else if (f.kind === 'peekcaught') html = `👀 <b>${esc(f.name)}</b>가 상자를 엿보다 들켰어요! <em>−${num(f.amount)}</em>`;
+  else if (f.kind === 'event') { const info = EVENT[f.event]; if (!info) return; html = f.event === 'raid' ? `☠️ <b>해적선 습격!</b> 방패 없는 ${num(f.hit)}명이 금화 ${num(f.total)}를 뺏겼어요` : `<b>${info[0]}</b> ${info[1]}`; big = true; }
+  else if (f.kind === 'steal') html = `🦹 <b>${esc(f.name)}</b>가 <b>${esc(f.vname)}</b>의 금고를 털었어요! ${f.pct}% <em>${coin()}${num(f.amount)}${f.bounty ? ` +현상금 ${num(f.bounty)}` : ''}</em>`;
+  else if (f.kind === 'block') html = f.defended ? `🚨 <b>${esc(f.vname)}</b>가 경보에 맞혀 <b>${esc(f.name)}</b>의 금고 털이를 막았어요!` : `🛡️ <b>${esc(f.vname)}</b>가 <b>${esc(f.name)}</b>의 훔치기를 막았어요!`;
   else if (f.kind === 'swap') html = `🔄 <b>${esc(f.name)}</b>가 <b>${esc(f.vname)}</b>와 금화를 통째로 바꿨어요!`;
   else if (f.kind === 'jackpot') { html = `💎 <b>${esc(f.name)}</b> 대박 상자! <em>+${num(f.amount)}</em>`; big = true; }
   else if (f.kind === 'monster') html = `👹 <b>${esc(f.name)}</b>가 몬스터에게 금화 ${num(f.amount)}를 빼앗겼어요`;
@@ -212,7 +235,7 @@ function feedPop(f) {
   el.innerHTML = html;
   host.appendChild(el);
   while (host.children.length > 4) host.firstElementChild.remove();
-  sfx(f.kind === 'steal' || f.kind === 'swap' ? 'slash' : f.kind === 'block' ? 'shield-block' : f.kind === 'jackpot' ? 'fanfare-epic' : f.kind === 'lead' ? 'combo' : f.kind === 'frenzy' ? 'boss-roar' : f.kind === 'fish' ? (big ? 'fanfare-legend' : 'pop') : 'pop', { gain: .8 });
+  sfx(f.kind === 'heist' ? 'warn-beep' : f.kind === 'heistfail' ? 'fail' : f.kind === 'event' ? (f.event === 'raid' ? 'boss-roar' : f.event === 'storm' ? 'ult-riser' : 'fanfare-basic') : f.kind === 'steal' || f.kind === 'swap' ? 'slash' : f.kind === 'block' ? 'shield-block' : f.kind === 'jackpot' ? 'fanfare-epic' : f.kind === 'lead' ? 'combo' : f.kind === 'frenzy' ? 'boss-roar' : f.kind === 'fish' ? (big ? 'fanfare-legend' : 'pop') : 'pop', { gain: .8 });
   later(() => { el.classList.add('out'); later(() => el.remove(), 400); }, big ? 4200 : 3200);
 }
 function onEvent(e) { if (e.kind === 'end') sfx('clear'); }
@@ -223,6 +246,7 @@ function ended(v, before) {
   const podium = [top[1], top[0], top[2]].map((x, k) => x ? `<div class="ptv-step s${[2, 1, 3][k]}" style="--d:${[1, 2, 0][k] * 700 + 600}ms"><span class="ptv-step-pet">${x.pet ? avatar(x.pet.key, { form: x.pet.form, expression: 'cheer' }) : ''}</span><b>${esc(x.name)}</b><em>${fish ? kgText(x.score) : `${coin()}${num(x.score)}`}</em><i>${[2, 1, 3][k]}</i></div>` : '<div class="ptv-step empty"></div>').join('');
   main(`<section class="ptv-end">
     <h1>${fish ? '🎣 오늘의 낚시왕' : '💰 오늘의 보물왕'}</h1>
+    ${v.teams && v.team_gold ? `<div class="ptv-team-end"><span class="tA${v.team_gold[0].gold > v.team_gold[1].gold ? ' win' : ''}">🔴 A팀 <b>${num(v.team_gold[0].gold)}</b></span><i>${v.team_gold[0].gold === v.team_gold[1].gold ? '무승부' : v.team_gold[0].gold > v.team_gold[1].gold ? 'A팀 승리!' : 'B팀 승리!'}</i><span class="tB${v.team_gold[1].gold > v.team_gold[0].gold ? ' win' : ''}">🔵 B팀 <b>${num(v.team_gold[1].gold)}</b></span></div>` : ''}
     <div class="ptv-podium">${podium}</div>
     ${rest.length ? `<ol class="ptv-rest">${rest.map((x, k) => `<li><i>${k + 4}</i><b>${esc(x.name)}</b><em>${fish ? kgText(x.score) : num(x.score)}</em></li>`).join('')}</ol>` : ''}
     ${v.awards?.length ? `<div class="ptv-awards">${v.awards.map(a => `<div class="ptv-award ${a.key}">${a.fish ? `<span class="ptv-award-fish">${fishPic(a.fish)}</span>` : ''}<small>${esc(a.title)}</small><b>${esc(a.name)}</b><span>${esc(a.value)}</span></div>`).join('')}</div>` : ''}
