@@ -1438,3 +1438,67 @@ img.rl-art.rl-art-pearl{position:static;inset:auto;translate:none;z-index:auto;d
 .mt-check-banner b{font-size:46px}
 .mt-result.rush .mt-res-time b{font-size:72px}
 @media (prefers-reduced-motion:reduce){.mt-card.enter,.mt-rush-score.bump,.mt-clock.gain b{animation:none!important}}
+
+/* ---------- V13.150 손그림 테마: 낚시터(화면 틀) · 놀이터 카드 ----------
+   낚시는 다른 작업과 겹치지 않게 CSS만 덧입힌다(그림 · 동작은 그대로). 배경 그림은 주문서 31(손그림)로 바꾼다. */
+:is(.rl-app,.rl-sheetwrap,.rl-entry,.lk-card,.egg-stand,.rps-card,.ga-card,.arcade-wallet){
+  --hd-ink:#2b1d12;--hd-paper:#f4e7c9;--hd-paper2:#ead8b0;--hd-cream:#fff6e3;--hd-gold:#e8a930;--hd-gold2:#f3c75a;--hd-red:#c4473a;--hd-blue:#3b78b5;--hd-green:#4e9a57;--hd-violet:#7a5aa6;--hd-orange:#d9783a;--hd-teal:#2f7f86;
+  --hd-line:2.5px solid var(--hd-ink);--hd-drop:0 4px 0 var(--hd-ink);--hd-drop-s:0 3px 0 var(--hd-ink);
+  --hd-outline:0 2px 0 var(--hd-ink),1.5px 0 0 var(--hd-ink),-1.5px 0 0 var(--hd-ink),0 -1.5px 0 var(--hd-ink);
+  --hd-waves:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60'%3E%3Cpath d='M0 20c10-7 20-7 30 0s20 7 30 0 20-7 30 0 20 7 30 0M-30 50c10-7 20-7 30 0s20 7 30 0 20-7 30 0 20 7 30 0 20-7 30 0' fill='none' stroke='%23fff6e3' stroke-opacity='.16' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+/* 낚시터: 머리줄 · 칩 */
+.rl-app .rl-top{background:none}
+.rl-app .rl-top strong{text-shadow:var(--hd-outline)}
+.rl-app .rl-top .yb-back,.rl-app .rl-chip{background:var(--hd-paper);color:var(--hd-ink);border:var(--hd-line);box-shadow:var(--hd-drop-s)}
+.rl-app .rl-pearl-ico{background:#eef0ff;border:1.5px solid var(--hd-ink);box-shadow:none}
+/* 아래 판(미끼 · 던지기 · 어망 · 교환소 · 도감) */
+.rl-app .rl-panel{background:var(--hd-paper);color:var(--hd-ink);border:3px solid var(--hd-ink);box-shadow:0 5px 0 var(--hd-ink);backdrop-filter:none;-webkit-backdrop-filter:none;border-radius:18px}
+.rl-app .rl-hint b{color:var(--hd-orange)}
+.rl-app .rl-dock-bait small{opacity:.7}
+.rl-app .rl-cast{background:var(--hd-orange);color:var(--hd-cream);border:3px solid var(--hd-ink);box-shadow:0 5px 0 var(--hd-ink);text-shadow:0 2px 0 rgba(43,29,18,.45);border-radius:16px}
+.rl-app .rl-cast.hold{transform:translateY(4px);box-shadow:0 1px 0 var(--hd-ink)}
+.rl-app .rl-cast:disabled{filter:grayscale(.5);box-shadow:var(--hd-drop-s)}
+.rl-app .rl-power{border:2.5px solid var(--hd-ink);background:linear-gradient(0deg,var(--hd-green) 0 55%,var(--hd-gold2) 55% 86%,var(--hd-red) 86%);box-shadow:none}
+.rl-app .rl-power .perfect{background:var(--hd-gold);box-shadow:inset 0 0 0 2px var(--hd-ink)}
+.rl-app .rl-power .needle::before{background:var(--hd-ink);box-shadow:0 0 0 2px var(--hd-cream)}
+.rl-app .rl-power[data-zone="perfect"]{box-shadow:0 0 0 3px var(--hd-gold2)}
+.rl-app .rl-tile{background:var(--hd-paper2);color:var(--hd-ink);border:2px solid var(--hd-ink);box-shadow:var(--hd-drop-s);border-radius:12px}
+.rl-app .rl-tile:active{transform:translateY(2px);box-shadow:0 1px 0 var(--hd-ink)}
+.rl-app :is(.rl-wait-msg,.rl-bite-msg){text-shadow:var(--hd-outline)}
+/* 물속 파이팅: 게이지 · 버튼 */
+.rl-app :is(.rl-hp span,.rl-tension span){border:2.5px solid var(--hd-ink);box-shadow:var(--hd-drop-s)}
+.rl-app .rl-hp i{background:var(--hd-red)}
+.rl-app .rl-side{background:var(--hd-teal);border:3px solid var(--hd-ink);box-shadow:0 5px 0 var(--hd-ink)}
+.rl-app .rl-reel{background:var(--hd-gold);border:3px solid var(--hd-ink);box-shadow:0 6px 0 var(--hd-ink)}
+.rl-app :is(.rl-side,.rl-reel).hold,.rl-app :is(.rl-side,.rl-reel):active{transform:translateY(3px);box-shadow:0 2px 0 var(--hd-ink)}
+/* 시트(어망 · 교환소 · 도감 · 안내) */
+.rl-sheetwrap{background:rgba(43,29,18,.55)}
+.rl-sheetwrap .rl-sheet{background:var(--hd-paper);color:var(--hd-ink);border:3px solid var(--hd-ink);border-bottom:0;box-shadow:0 -4px 0 var(--hd-ink)}
+.rl-sheetwrap .rl-sheet-head .icon-button{background:var(--hd-paper2);color:var(--hd-ink);border:2px solid var(--hd-ink)}
+.rl-sheetwrap :is(.rl-sheet-pearl,.rl-net-row,.rl-shop-block,.rl-egg,.rl-sea-pet,.rl-guide-table span){background:#fffaf0;color:var(--hd-ink);border:2px solid var(--hd-ink);box-shadow:var(--hd-drop-s)}
+.rl-sheetwrap .rl-shop-block{border-radius:14px}
+.rl-sheetwrap .rl-net-row.r-epic{box-shadow:inset 5px 0 0 var(--hd-violet),var(--hd-drop-s)}.rl-sheetwrap .rl-net-row.r-legend{box-shadow:inset 5px 0 0 var(--hd-gold),var(--hd-drop-s)}
+.rl-sheetwrap .rl-coin-btn{background:var(--hd-gold2);color:var(--hd-ink);border:2px solid var(--hd-ink);box-shadow:var(--hd-drop-s)}
+.rl-sheetwrap .rl-epic-egg{background:var(--hd-violet);border:2.5px solid var(--hd-ink);box-shadow:none}
+.rl-sheetwrap .rl-sea-pet em{background:var(--hd-teal);color:var(--hd-cream);border:1.5px solid var(--hd-ink)}
+.rl-sheetwrap .rl-sea-silhouette{background:var(--hd-paper2);border:2px dashed var(--hd-ink)}
+.rl-sheetwrap .rl-empty{color:rgba(43,29,18,.6)}
+.rl-sheetwrap .rl-guide em{color:var(--hd-orange)}
+.rl-sheetwrap .fs-tank .fs-slot{background:#fffaf0;border:2px solid var(--hd-ink);box-shadow:var(--hd-drop-s)}
+.rl-sheetwrap .btn:not(.primary){background:var(--hd-paper2);color:var(--hd-ink);border:2px solid var(--hd-ink)}
+.rl-sheetwrap .yl-cta{background:var(--hd-green);border:3px solid var(--hd-ink);box-shadow:var(--hd-drop)}
+/* 놀이터 카드: 그라데이션 · 번진 그림자 대신 평면 색 + 잉크 외곽선 + 단단한 그림자 */
+:is(.rl-entry,.lk-card,.egg-stand,.rps-card){border:3px solid var(--hd-ink);box-shadow:0 5px 0 var(--hd-ink)}
+.rl-entry{background:var(--hd-waves),var(--hd-teal);color:var(--hd-cream)}
+.rl-entry .rl-entry-sea{display:none}
+.rl-entry .rl-entry-copy strong{text-shadow:var(--hd-outline)}.rl-entry .rl-entry-copy small{color:var(--hd-gold2)}
+.rl-entry .rl-entry-stat{background:var(--hd-paper);color:var(--hd-ink);border:2px solid var(--hd-ink);box-shadow:var(--hd-drop-s)}
+.lk-card{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Ccircle cx='11' cy='11' r='1.4' fill='%23fff6e3' fill-opacity='.14'/%3E%3C/svg%3E"),var(--hd-violet)}
+.egg-stand{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Ccircle cx='11' cy='11' r='1.4' fill='%23fff6e3' fill-opacity='.14'/%3E%3C/svg%3E"),#3f7f57}
+.rps-card{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='22'%3E%3Ccircle cx='11' cy='11' r='1.4' fill='%23fff6e3' fill-opacity='.14'/%3E%3C/svg%3E"),#b4573f}
+:is(.lk-card,.egg-stand,.rps-card) :is(h2,h3){text-shadow:var(--hd-outline)}
+.ga-card{background:var(--hd-paper);border:var(--hd-line);box-shadow:var(--hd-drop)}
+.arcade-wallet{background:var(--hd-gold2);border:var(--hd-line);box-shadow:var(--hd-drop-s);color:var(--hd-ink)}
+.arcade-wallet span,.arcade-wallet small{color:var(--hd-ink)}
+@media (prefers-reduced-motion:reduce){.rl-app .rl-cast,.rl-app .rl-tile{transition:none}}

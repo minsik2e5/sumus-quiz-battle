@@ -586,6 +586,19 @@ export async function runGamesChecks(assert) {
       'V13.150 그림 주문서 29 · 30은 손그림 게임 일러스트(잉크 외곽선 · 평면 색 · 종이 질감, 광택 3D · 빛 번짐 금지)로');
   }
 
+  /* ---------- V13.150 손그림 테마: 낚시터 화면 틀 · 놀이터 카드, 그림 주문서 31 ---------- */
+  {
+    const css = source('../public/v13149.css');
+    const layer = css.slice(css.indexOf('/* ---------- V13.150 손그림 테마: 낚시터(화면 틀) · 놀이터 카드'));
+    assert(layer.includes('.rl-app .rl-panel{background:var(--hd-paper)') && layer.includes('backdrop-filter:none') && layer.includes('.rl-sheetwrap .rl-sheet{background:var(--hd-paper)') && layer.includes(':is(.rl-entry,.lk-card,.egg-stand,.rps-card){border:3px solid var(--hd-ink)')
+      && layer.includes('.rl-entry .rl-entry-sea{display:none}') && !/radial-gradient|blur\(/.test(layer),
+      'V13.150 낚시터 패널 · 시트 · 버튼과 놀이터 카드도 손그림 테마(유리 흐림 · 형광 그라데이션 대신 종이 · 잉크 외곽선 · 평면 색). 낚시 동작 · 그림 코드는 그대로');
+    const art31 = source('../docs/asset-requests/runner/31a-fishing-backgrounds-handdrawn.txt').trim().split('\n---\n'), codex31 = source('../docs/asset-requests/runner/CODEX_PROMPT_31.md'), map31 = source('../docs/asset-requests/runner/slice-map.csv');
+    assert(art31.length === 3 && art31.every((t, i) => t.includes('STYLE REFERENCE — before drawing, open') && t.includes(`named exactly "31a-${i + 1}.png"`) && t.includes('"SUMUS 낚시 손그림 31 (Runner용)"') && t.includes('it must NOT look like AI art or a photo') && t.includes('showing the picture in the chat is not enough'))
+      && codex31.includes('Drive의 기존 그림을 열어 그림체를 맞춘다') && codex31.includes('정해진 Drive 폴더 "SUMUS 낚시 손그림 31 (Runner용)"에 정확한 파일 이름') && ['bg-sea', 'bg-under', 'bg-entry'].every(n => map31.includes(`"31a-fishing-backgrounds-handdrawn.txt","49`) && map31.includes(`public/assets/fishing/${n}.webp`)),
+      'V13.150 그림 주문서 31(낚시 배경 손그림): Drive의 기존 손그림 배경을 열어 그림체를 맞추고, 27a는 구도만, 정해진 폴더에 정확한 이름으로 저장');
+  }
+
   /* ---------- V13.149 짝 맞추기 고퀄 화면 ---------- */
   {
     const mg = source('../public/modules/match-game.js'), css = source('../public/v13149.css'), svc = source('./service.mjs');
