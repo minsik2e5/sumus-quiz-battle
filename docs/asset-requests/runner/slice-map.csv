@@ -1891,3 +1891,6 @@
 "30b-treasure-ui.txt","492","이벤트 · 팀 깃발","오른쪽 위","treasure-ev-raid","해적선 습격","public/assets/treasure/ev-raid.webp"
 "30b-treasure-ui.txt","492","이벤트 · 팀 깃발","왼쪽 아래","treasure-ev-storm","보물 폭풍","public/assets/treasure/ev-storm.webp"
 "30b-treasure-ui.txt","492","이벤트 · 팀 깃발","오른쪽 아래","treasure-flags","팀 깃발","public/assets/treasure/flags.webp"
+"31a-fishing-backgrounds-handdrawn.txt","493","낚시터 바다 위 배경(손그림)","한 장","fishing-bg-sea","낚시터 바다 위 배경(손그림, 27a-1 바꿈)","public/assets/fishing/bg-sea.webp"
+"31a-fishing-backgrounds-handdrawn.txt","494","낚시 물속 배경(손그림)","한 장","fishing-bg-under","낚시 물속 배경(손그림, 27a-2 바꿈)","public/assets/fishing/bg-under.webp"
+"31a-fishing-backgrounds-handdrawn.txt","495","놀이터 낚시터 입구 배경(손그림)","한 장","fishing-bg-entry","놀이터 낚시터 입구 배경(손그림, 27a-3 바꿈)","public/assets/fishing/bg-entry.webp"

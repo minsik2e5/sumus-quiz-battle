@@ -34,3 +34,34 @@ export function matchPick(words, { missed = [], random = Math.random, pairs = MA
 }
 // 시간 글: 12.34초
 export const matchTime = ms => `${(Math.max(0, ms) / 1000).toFixed(2)}초`;
+
+// V13.150 러시 모드: 60초에서 시작해 짝을 지울 때마다 시간이 늘고(짝이 쌓일수록 조금씩 덜), 틀리면 줄어든다.
+// 보드에는 늘 5쌍, 지우면 새 단어가 채워진다. 시간이 0이 되면 끝, 점수는 지운 짝 수.
+// 서버는 짝 수 · 틀린 수로 판이 가질 수 있는 시간 범위(rushBounds)를 정확히 계산해 부정 기록을 거른다.
+export const RUSH = {
+  START_MS: 60000,
+  BOARD: 5,                // 늘 보이는 짝
+  HIT_MS: 2000,            // 첫 짝의 보너스 시간
+  DECAY_MS: 40,            // 짝마다 보너스가 이만큼 준다
+  MIN_HIT_MS: 800,         // 보너스는 이보다 작아지지 않는다
+  COMBO_AT: 3,             // 연속 3쌍부터 콤보 보너스
+  COMBO_MS: 700,
+  MISS_MS: 3000,
+  CHECKS: [[10, 2], [20, 4], [30, 6], [40, 8]], // 체크포인트(짝 수, 코인)
+  RECORD_COINS: 5,
+  BAIT_AT: 30,             // 30쌍 이상이면 낚시 미끼
+  XP: 6
+};
+// i번째(0부터) 짝을 지웠을 때 늘어나는 기본 시간.
+export const rushGain = i => Math.max(RUSH.MIN_HIT_MS, RUSH.HIT_MS - i * RUSH.DECAY_MS);
+// 콤보까지 계산한 보너스(combo는 이 짝을 지운 뒤의 연속 수).
+export const rushHitMs = (i, combo) => rushGain(i) + (combo >= RUSH.COMBO_AT ? RUSH.COMBO_MS : 0);
+// 짝 수 · 틀린 수로 끝날 때의 시간(판 길이)이 될 수 있는 범위: 콤보가 하나도 없을 때 ~ 모두 콤보일 때.
+export function rushBounds(pairs, misses) {
+  let base = 0;
+  for (let i = 0; i < pairs; i++) base += rushGain(i);
+  const combo = Math.max(0, pairs - (RUSH.COMBO_AT - 1)) * RUSH.COMBO_MS;
+  return { min: RUSH.START_MS + base - misses * RUSH.MISS_MS, max: RUSH.START_MS + base + combo - misses * RUSH.MISS_MS };
+}
+export const rushCoins = pairs => RUSH.CHECKS.reduce((c, [n, v]) => pairs >= n ? v : c, 0);
+export const rushNext = pairs => RUSH.CHECKS.find(([n]) => pairs < n)?.[0] || null;
