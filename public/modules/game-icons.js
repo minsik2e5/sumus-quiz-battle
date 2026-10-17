@@ -46,11 +46,17 @@ const ICONS = {
   cross: `<circle ${f(C.red)} cx="16" cy="16" r="11"/><path ${st(C.white, 3)} d="M12 12l8 8M20 12l-8 8"/>`
 };
 export const ICON_NAMES = Object.keys(ICONS);
-export const gi = (name, cls = '') => ICONS[name] ? `<svg class="gi gi-${name}${cls ? ' ' + cls : ''}" viewBox="0 0 32 32" aria-hidden="true" focusable="false">${ICONS[name]}</svg>` : '';
+ICONS.raid = ICONS.ship;
+ICONS.bounty = ICONS.coins;
+// V13.150 그림 30(public/assets/treasure)이 들어왔다: 이름이 있으면 그 아이콘은 그림으로 나온다(없으면 위 SVG).
+export const TREASURE_ART = new Set(['bg-phone', 'bg-tv', 'chest-gold', 'chest-violet', 'chest-green', 'chest-open', 'item-fifty', 'item-freeze', 'item-saver', 'item-peek', 'vault', 'siren', 'bounty', 'ship', 'ev-golden', 'ev-raid', 'ev-storm', 'flags']);
+const ART_ICON = { siren: 'siren', vault: 'vault', ship: 'ship', raid: 'ev-raid', sun: 'ev-golden', storm: 'ev-storm', eye: 'item-peek', half: 'item-fifty', freeze: 'item-freeze', chain: 'item-saver', bounty: 'bounty' };
+export const treasureArt = name => TREASURE_ART.has(name) ? `/assets/treasure/${name}.webp` : '';
+export const gi = (name, cls = '') => ART_ICON[name] && TREASURE_ART.has(ART_ICON[name]) ? `<img class="gi gi-${name} gi-art${cls ? ' ' + cls : ''}" src="${treasureArt(ART_ICON[name])}" alt="" draggable="false">` : ICONS[name] ? `<svg class="gi gi-${name}${cls ? ' ' + cls : ''}" viewBox="0 0 32 32" aria-hidden="true" focusable="false">${ICONS[name]}</svg>` : '';
 // 화면 글에 남은 이모지를 같은 그림체 아이콘으로 바꾼다(그리기 직전에 한 번). 표에 없는 이모지(낚시 🐟 등)는 그대로.
 // 얼굴 이모지는 지운다(글로 충분하다).
 const EMOJI = {
-  '🦹': 'thief', '🔄': 'swap', '🛡️': 'shield', '🛡': 'shield', '🚨': 'siren', '👀': 'eye', '💰': 'coins', '🌟': 'sun', '☠️': 'ship', '☠': 'ship',
+  '🦹': 'thief', '🔄': 'swap', '🛡️': 'shield', '🛡': 'shield', '🚨': 'siren', '👀': 'eye', '💰': 'coins', '🌟': 'sun', '☠️': 'raid', '☠': 'raid', '📜': 'bounty',
   '🌪️': 'storm', '🌪': 'storm', '⏱️': 'freeze', '⏱': 'freeze', '🔗': 'chain', '½': 'half', '🥇': 'medal1', '🥈': 'medal2', '🥉': 'medal3',
   '🔴': 'flagA', '🔵': 'flagB', '🎁': 'gift', '💨': 'puff', '🏆': 'trophy', '💎': 'jackpot', '👹': 'monster', '👑': 'crown', '🚀': 'bolt',
   '🏁': 'finish', '🪱': 'worm'
