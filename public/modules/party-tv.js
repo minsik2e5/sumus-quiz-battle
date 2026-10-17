@@ -5,7 +5,7 @@ import { getRanges, periodFolders } from './student.js';
 import { playSound, unlockSound, preloadSound } from './sound.js';
 import { FISH, RARITY, kgText } from './fishing-rules.js';
 import { fishPic } from './fishing-art.js';
-import { iconize } from './game-icons.js';
+import { iconize, treasureArt } from './game-icons.js';
 
 // V13.149 교실 게임 — 선생님: 만들기 창과 교실 TV 화면(전체 화면). TV는 방에 선생님 입장표로 WebSocket 연결한다.
 // TV에는 번호 · 들어온 학생 · 실시간 순위 막대 · 소식(훔치기 · 막기 · 대박 · 큰 물고기)이 나오고, 마지막 1분은 순위를 가렸다가 끝에 공개한다.
@@ -73,7 +73,7 @@ export function openPartyTv(A, party, exit) {
   closeAll();
   T = { A, party, exit, timers: [], offset: 0, view: null, feedSeen: 0, bars: new Map() };
   A.screen = 'party-tv';
-  root().innerHTML = iconize(`<div class="ptv ${party.kind}"><div class="ptv-bg" aria-hidden="true"></div>
+  root().innerHTML = iconize(`<div class="ptv ${party.kind}${party.kind !== 'fish' && treasureArt('bg-tv') ? ' art-bg' : ''}"><div class="ptv-bg" aria-hidden="true"></div>
     <header class="ptv-top"><button type="button" class="ptv-x" data-tv="exit" aria-label="나가기">${icon('back')}</button><strong>${party.kind === 'fish' ? '🎣 반 전체 낚시' : '💰 보물 사냥'}</strong><span class="ptv-label">${esc(party.label || '')}</span><span class="ptv-clock" id="ptv-clock"></span><button type="button" class="ptv-full" data-tv="full">전체 화면</button></header>
     <main class="ptv-main" id="ptv-main"><div class="ptv-loading">게임 방에 연결하는 중…</div></main>
     <div class="ptv-feed" id="ptv-feed" aria-live="polite"></div></div>`);
@@ -207,7 +207,7 @@ function play(v, before) {
     const score = v.hidden ? '???' : fish ? kgText(x.score) : num(x.score);
     const s = row.querySelector('.ptv-score');
     if (s.textContent !== score) { s.textContent = score; s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump'); }
-    const sh = !fish && !v.hidden ? `${v.bounty === x.id ? '💰' : ''}${x.shield ? '🛡️'.repeat(x.shield) : ''}` : '';
+    const sh = !fish && !v.hidden ? `${v.bounty === x.id ? '📜' : ''}${x.shield ? '🛡️'.repeat(x.shield) : ''}` : '';
     const shEl = row.querySelector('.ptv-sh');
     if (shEl.dataset.v !== sh) { shEl.dataset.v = sh; shEl.innerHTML = iconize(sh); }
   });
@@ -219,7 +219,7 @@ function feedPop(f) {
   const host = document.getElementById('ptv-feed');
   if (!host) return;
   let html = '', big = false, cls = f.kind;
-  if (f.kind === 'heist') { html = `🚨 <b>${esc(f.name)}</b>가 <b>${esc(f.vname)}</b>의 금고를 노려요!${f.bounty ? ' <em>💰 현상금 1등!</em>' : ''}`; big = !!f.bounty; }
+  if (f.kind === 'heist') { html = `🚨 <b>${esc(f.name)}</b>가 <b>${esc(f.vname)}</b>의 금고를 노려요!${f.bounty ? ' <em>📜 현상금 1등!</em>' : ''}`; big = !!f.bounty; }
   else if (f.kind === 'heistfail') html = `😅 <b>${esc(f.name)}</b>의 금고 털이 실패!`;
   else if (f.kind === 'peekcaught') html = `👀 <b>${esc(f.name)}</b>가 상자를 엿보다 들켰어요! <em>−${num(f.amount)}</em>`;
   else if (f.kind === 'event') { const info = EVENT[f.event]; if (!info) return; html = f.event === 'raid' ? `☠️ <b>해적선 습격!</b> 방패 없는 ${num(f.hit)}명이 금화 ${num(f.total)}를 뺏겼어요` : `<b>${info[0]}</b> ${info[1]}`; big = true; }

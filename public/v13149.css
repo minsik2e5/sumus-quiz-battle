@@ -1378,3 +1378,34 @@ img.rl-art.rl-art-pearl{position:static;inset:auto;translate:none;z-index:auto;d
 .mt-app .mt-chase em{color:var(--hd-red)}
 @media (prefers-reduced-motion:reduce){.pt-app.treasure .pt-alarm,.pt-app.treasure .pt-siren,.mt-app.fever .mt-fever-edge{animation:none!important}}
 .ptv :is(.ptv-event,.ptv-teams,.ptv-frenzy,.ptv-hidden)[hidden]{display:none!important}
+
+/* ---------- V13.150 그림 29 · 30 연결(손그림 테마 위에 그림을 얹는다) ---------- */
+.gi-art{object-fit:contain}
+/* 보물 사냥: 배경 · 상자 */
+.pt-app.treasure.art-bg{background:#1f4a52}
+.pt-app.treasure.art-bg::before{inset:0;right:0;bottom:0;width:auto;height:auto;opacity:1;background:url(/assets/treasure/bg-phone.webp) center top/cover no-repeat}
+.pt-app.treasure.art-bg::after{display:none}
+.ptv.treasure.art-bg .ptv-bg{background:url(/assets/treasure/bg-tv.webp) center/cover no-repeat,#1f4a52}
+.ptv.treasure.art-bg .ptv-bg::after{display:none}
+.pt-chest .pt-chest-img{display:block;width:100%;height:auto}
+.pt-chest .pt-chest-img.opened,.pt-chest.open .pt-chest-img{display:none}
+.pt-chest.open .pt-chest-img.opened{display:block;animation:pt-loot .4s cubic-bezier(.3,1.7,.5,1)}
+.pt-chest:not(:disabled) .pt-chest-img{animation:pt-chest-idle 1.6s ease-in-out infinite}
+.pt-chest:nth-child(2):not(:disabled) .pt-chest-img{animation-delay:-.5s}.pt-chest:nth-child(3):not(:disabled) .pt-chest-img{animation-delay:-1s}
+.pt-chest.chosen:not(.open) .pt-chest-img{animation:pt-shake .35s 2}
+.ptv.treasure .ptv-event .gi{width:1.9em;height:1.9em}
+.pt-app.treasure .pt-event .gi{width:1.6em;height:1.6em}
+.pt-app.treasure .pt-inv .gi,.pt-app.treasure .pt-item-btn .gi,.pt-app.treasure .pt-peek-btn .gi{width:1.6em;height:1.6em}
+/* 짝 맞추기: 그림이 손그림 테마의 종이 카드보다 앞에 온다 */
+.mt-app.mt-art-bg{background:var(--art-bg) center top/cover no-repeat,#24324e}
+.mt-app.mt-art-card-en .mt-card.en .mt-face{background:var(--art-card-en) center/100% 100% no-repeat;border:0;box-shadow:none;padding:12px 12px 16px}
+.mt-app.mt-art-card-ko .mt-card.ko .mt-face{background:var(--art-card-ko) center/100% 100% no-repeat;border:0;box-shadow:none;padding:12px 12px 16px}
+.mt-app.mt-art-card-en .mt-card.en .mt-face::before,.mt-app.mt-art-card-ko .mt-card.ko .mt-face::before{left:15px;top:13px}
+.mt-app:is(.mt-art-card-en,.mt-art-card-ko) .mt-card.sel .mt-face{background-color:transparent;filter:brightness(1.06)}
+.mt-app:is(.mt-art-card-en,.mt-art-card-ko) .mt-card.wrong .mt-face{filter:sepia(.5) saturate(2.2) hue-rotate(-25deg)}
+.mt-app:is(.mt-art-card-en,.mt-art-card-ko) .mt-face::after{inset:-2px;border-radius:16px}
+.mt-app.mt-art-card-back .mt-back{background:var(--art-card-back) center/100% 100% no-repeat;border:0;box-shadow:none}
+.mt-app.mt-art-card-back .mt-back::after{content:none}
+.mt-app.mt-art-star .mt-res-stars i.on{color:transparent;text-shadow:none;background:var(--art-star) center/contain no-repeat}
+.mt-app.mt-art-ribbon .mt-res-head span{background:var(--art-ribbon) center/100% 100% no-repeat;clip-path:none;filter:none;padding:12px 52px 20px;text-shadow:0 2px 0 rgba(43,29,18,.6)}
+.mt-app.mt-art-stamp .mt-stamp{border:0;background:var(--art-stamp) center/contain no-repeat;box-shadow:none;padding:18px 16px;color:#a5352a}

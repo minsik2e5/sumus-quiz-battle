@@ -6,7 +6,7 @@ import { coinShower } from './celebrate.js';
 import { FISH, LURES, RARITY, kgText } from './fishing-rules.js';
 import { fishPic } from './fishing-art.js';
 import { guardShield } from './streak-guard-ui.js';
-import { iconize } from './game-icons.js';
+import { iconize, treasureArt } from './game-icons.js';
 
 // V13.149 교실 게임(학생 폰): 선생님 TV의 보물 사냥 · 반 전체 낚시에 4자리 번호로 들어간다.
 // 판정은 방(cloudflare/party-room.mjs → server/party-engine.mjs)이 한다. 폰은 고른 번호만 보낸다.
@@ -39,6 +39,7 @@ export async function openPartyJoin(A, exit, { code }) {
     P.room = r.room;
     document.getElementById('pt-title').textContent = r.room.kind === 'fish' ? '반 전체 낚시' : '보물 사냥';
     root().querySelector('.pt-app')?.classList.add(r.room.kind === 'fish' ? 'fish' : 'treasure');
+    if (r.room.kind !== 'fish' && treasureArt('bg-phone')) root().querySelector('.pt-app')?.classList.add('art-bg');
     connect();
   } catch (err) {
     if (!P) return;
@@ -195,6 +196,9 @@ function chests(v) {
 }
 // V13.150 손그림 상자: 잉크 외곽선 · 평면 색 · 쇠 띠 · 나뭇결(그라데이션 · 흐린 그림자 없이).
 function chestSvg(i) {
+  // 그림 30이 있으면 그림 상자(닫힘 3색 · 열림), 없으면 아래 손그림 SVG.
+  const art = treasureArt(['chest-gold', 'chest-violet', 'chest-green'][i % 3]);
+  if (art && treasureArt('chest-open')) return `<img class="pt-chest-img" src="${art}" alt="" draggable="false"><img class="pt-chest-img opened" src="${treasureArt('chest-open')}" alt="" draggable="false">`;
   const [body, dark] = [['#c0763a', '#8a4f22'], ['#7a5aa6', '#563d7c'], ['#4e9a57', '#346b3b']][i % 3], ink = '#2b1d12';
   return `<svg viewBox="0 0 100 86" aria-hidden="true">
     <ellipse cx="50" cy="82" rx="40" ry="4" fill="${ink}" opacity=".35"/>
@@ -215,7 +219,7 @@ function targetPick(v) {
   const p = v.pending, swap = p.kind === 'swap';
   return `<section class="pt-targets"><h2>${swap ? '🔄 누구와 금화를 바꿀까요?' : `🦹 누구의 금화 ${p.pct}%를 가져올까요?`}</h2>
     <p>${swap ? '나보다 금화가 많은 친구와 통째로 바꿔요.' : '방패가 있으면 막혀요. 뽑으면 <b>금고 털이(연속 3문제)</b>!'} <b id="pt-target-time">${Math.max(0, Math.ceil((p.until - serverNow()) / 1000))}</b>초</p>
-    <div class="pt-target-list">${p.targets.map(x => `<button type="button" class="pt-target${x.revenge ? ' revenge' : ''}${x.bounty ? ' bounty' : ''}" data-pt="target" data-pid="${esc(x.id)}">${x.pet ? avatar(x.pet.key, { form: x.pet.form, size: 'mini' }) : ''}<b>${esc(x.name)}</b><span>${coin()}${num(x.gold)}</span>${x.bounty ? '<em class="bty">💰 현상금 +50</em>' : ''}${x.revenge ? '<em>되갚기!</em>' : ''}</button>`).join('')}</div>
+    <div class="pt-target-list">${p.targets.map(x => `<button type="button" class="pt-target${x.revenge ? ' revenge' : ''}${x.bounty ? ' bounty' : ''}" data-pt="target" data-pid="${esc(x.id)}">${x.pet ? avatar(x.pet.key, { form: x.pet.form, size: 'mini' }) : ''}<b>${esc(x.name)}</b><span>${coin()}${num(x.gold)}</span>${x.bounty ? '<em class="bty">📜 현상금 +50</em>' : ''}${x.revenge ? '<em>되갚기!</em>' : ''}</button>`).join('')}</div>
   </section>`;
 }
 function alarmCard(v) {

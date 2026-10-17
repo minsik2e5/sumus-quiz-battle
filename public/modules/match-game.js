@@ -14,7 +14,8 @@ import { iconize } from './game-icons.js';
 // 클래스는 mt-(단어 미니게임의 mg-와 겹치지 않게).
 
 // 그림(주문서 29)이 들어오면 이름을 넣는다. 없으면 코드 그림(CSS)으로 나온다.
-export const MATCH_ART = new Set([]);
+// 시상대(podium)는 한 장을 세 칸으로 자르면 폭이 어긋나서 쓰지 않는다(손그림 테마 단상이 나온다).
+export const MATCH_ART = new Set(['bg', 'card-en', 'card-ko', 'card-back', 'star', 'ribbon', 'stamp', 'fever']);
 const ART_NAMES = ['bg', 'card-en', 'card-ko', 'card-back', 'star', 'ribbon', 'stamp', 'podium', 'fever'];
 const artStyle = () => ART_NAMES.filter(n => MATCH_ART.has(n)).map(n => `--art-${n}:url(/assets/match/${n}.webp)`).join(';');
 const artClass = () => ART_NAMES.filter(n => MATCH_ART.has(n)).map(n => ` mt-art-${n}`).join('');

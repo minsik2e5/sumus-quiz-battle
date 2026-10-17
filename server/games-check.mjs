@@ -555,7 +555,7 @@ export async function runGamesChecks(assert) {
       && !/radial-gradient/.test(theme) && !/blur\(/.test(theme) && !/box-shadow:[^;}]*\d+px \d+px \d+px rgba/.test(theme) && theme.includes(':not(.pt-toasts)') && theme.includes('button.ptv-end'),
       'V13.150 손그림 테마: 흐린 빛 덩어리 · 번진 그림자 없이 잉크 외곽선 · 단단한 그림자 · 평면 색 · 종이 질감(보물 사냥 폰 · TV, 짝 맞추기). 낚시 모드는 그대로');
     const all = icons.ICON_NAMES.map(n => icons.gi(n)).join('');
-    assert(icons.ICON_NAMES.length >= 30 && icons.ICON_NAMES.every(n => icons.gi(n).startsWith('<svg class="gi gi-')) && !/(stroke="[^"]*")[^>]*stroke="/.test(all.replace(/></g, '>\n<'))
+    assert(icons.ICON_NAMES.length >= 30 && icons.ICON_NAMES.every(n => /^<(svg|img) class="gi gi-/.test(icons.gi(n))) && [...icons.TREASURE_ART].every(n => existsSync(new URL(`../public/assets/treasure/${n}.webp`, import.meta.url))) && !/(stroke="[^"]*")[^>]*stroke="/.test(all.replace(/></g, '>\n<'))
       && !/[\u{1F300}-\u{1FAFF}]/u.test(icons.iconize('🦹🔄🛡️🚨👀💰🌟☠️🌪️⏱️🔗🥇🥈🥉🔴🔵🎁💨🏆💎👹👑🚀🏁🪱😱😵😮‍💨😅🤝🤫')) && icons.iconize('🐟').includes('🐟'),
       'V13.150 손그림 아이콘 세트(SVG, 같은 외곽선): 이모지를 그리기 직전에 아이콘으로 바꾸고 얼굴 이모지는 지운다(낚시 🐟은 그대로)');
     assert(pj.includes('innerHTML = iconize(html)') && pj.includes('el.innerHTML = iconize(html)') && pj.includes('innerHTML = iconize(head)') && tv.includes('el.innerHTML = iconize(html)') && tv.includes('root().innerHTML = iconize(') && mg.includes('el.innerHTML = iconize(html)') && pj.includes('// V13.150 손그림 상자') && !pj.includes('linearGradient id="pc'),
