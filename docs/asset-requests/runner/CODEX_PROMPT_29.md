@@ -23,7 +23,7 @@
   - 29b-2는 같은 폴더의 `29b-1.png`를 열어 마감 · 외곽선 · 색을 맞춘다.
 - **결과는 정해진 Drive 폴더 "SUMUS 짝 맞추기 29 (Runner용)"에 정확한 파일 이름(`29a-1.png`, `29b-1.png`, `29b-2.png`)으로 저장한다.** 채팅에 보여 주는 것만으로는 안 된다(같은 이름이 있으면 바꿔 넣는다).
 - 카드 · 리본 · 도장 · 배지에는 **글자를 넣지 않는다**(앱이 단어와 글자를 위에 쓴다).
-- 브랜치는 `claude/zen-knuth-m0c31z`에서 새로 만든다. 예: `codex/art-29`. 짝 맞추기는 아직 운영에 없으니 **PR 대상도 `claude/zen-knuth-m0c31z`**로 한다(`sumus-voca-prod-deploy`로 PR을 만들지 않는다).
+- 브랜치는 `claude/treasure-v2`에서 새로 만든다(손그림 그림체로 고친 주문서와 화면이 이 브랜치에 있다). 예: `codex/art-29`. 짝 맞추기는 아직 운영에 없으니 **PR 대상도 `claude/treasure-v2`**로 한다(`sumus-voca-prod-deploy`로 PR을 만들지 않는다).
 - **PR까지만 만든다. 머지하지 않는다.** **운영 Supabase에 연결하지 않는다.** Codex 내장 그림 생성 기능으로 만들고 유료 API를 쓰지 않는다.
 - `public/assets/match/` 아래 새 그림, `public/modules/match-game.js`의 `MATCH_ART` 한 줄, `DONE_29.md`, 빌드가 바꾸는 `public/sw.js` 말고는 고치지 않는다. 원본 시트 PNG는 커밋하지 않는다(`/tmp/art/`).
 
@@ -47,4 +47,4 @@ node $R/fit-assets.mjs <29b-2> match/ribbon match/stamp match/podium match/fever
 ## 3. 마무리
 - `docs/asset-requests/runner/DONE_29.md`(한국어): 넣은 그림 표, 넣지 못한 것과 이유, 다시 만든 횟수, "눈으로 확인 필요".
 - `npm ci && npm run build:assets && npm run check && npm run check:cloudflare`.
-- PR 대상 `claude/zen-knuth-m0c31z`, 제목 `그림 29: 짝 맞추기 고퀄`, 본문 한국어, 미리보기를 한 장으로 합쳐 코멘트. **머지하지 않는다.**
+- PR 대상 `claude/treasure-v2`, 제목 `그림 29: 짝 맞추기 고퀄`, 본문 한국어, 미리보기를 한 장으로 합쳐 코멘트. **머지하지 않는다.**
