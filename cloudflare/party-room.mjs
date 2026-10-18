@@ -169,7 +169,7 @@ export class PartyRoom {
     let res = null;
     // 선생님 TV: 시작 · 끝내기.
     if (tag === TV) {
-      if (msg.type === 'start') res = startParty(s, now);
+      if (msg.type === 'start') res = startParty(s, now + PARTY.GO_MS); // 3 · 2 · 1 카운트다운 뒤에 시작
       else if (msg.type === 'end') res = endParty(s, now);
       if (!res) return;
       if (res.error) return this.send(ws, { type: 'error', error: res.error });

@@ -565,6 +565,36 @@ export async function runGamesChecks(assert) {
       'V13.150 그림 주문서 29 · 30은 손그림 게임 일러스트(잉크 외곽선 · 평면 색 · 종이 질감, 광택 3D · 빛 번짐 금지)로');
   }
 
+  /* ---------- V13.150 교실 보물 사냥 손맛: 카운트다운 · 실시간 금고 털이 대결 · 연속 불꽃 ---------- */
+  {
+    const qsL = Array.from({ length: 12 }, (_, i) => ({ word_id: 'w' + i, prompt: 'w' + i, options: ['a', 'b', 'c', 'd'], answer: i % 4 }));
+    const r = createParty({ id: 'lv', code: '1', kind: 'treasure', minutes: 5, steal: true, questions: qsL, seed: 0, host: { id: 't' }, now });
+    for (const id of ['a', 'b', 'c']) joinParty(r, { id, name: id.toUpperCase() }, now);
+    const go = now + PARTY.GO_MS;
+    startParty(r, go); r.ev = [];
+    const q = pl => qsL[r.players[pl].qi % qsL.length];
+    assert(!answer(r, 'a', q('a').answer, now + 1000, lcg(1)).me && r.players.a.right === 0 && playerView(r, 'a', now + 1000).start_at === go && tvView(r, now + 1000).start_at === go && r.end_at === go + 5 * 60000,
+      'V13.150 시작 3 · 2 · 1: 카운트다운 동안은 답을 받지 않고, 판은 GO부터 정한 시간만큼');
+    for (let k = 0; k < 4; k++) { answer(r, 'a', q('a').answer, go + 100 + k * 10, lcg(k + 2)); pick(r, 'a', 0, go + 100 + k * 10); }
+    assert(tvView(r, go + 200).top.find(x => x.id === 'a').streak === 4 && !('streak' in (tvView(r, r.end_at - 1000).top[0] || {}) && tvView(r, r.end_at - 1000).top[0].streak),
+      'V13.150 TV 순위 줄에 연속 정답 수(마지막 1분 가림 때는 없음)');
+    Object.assign(r.players.b, { gold: 120, shield: 0 });
+    r.players.a.offer = { chests: [{ kind: 'steal', pct: 25 }, { kind: 'nothing' }, { kind: 'nothing' }], at: go + 61000, peeked: false, caught: false };
+    pick(r, 'a', 0, go + 61000); target(r, 'a', 'b', go + 61000);
+    const h0 = tvView(r, go + 61100).heists[0];
+    assert(h0 && h0.pid === 'a' && h0.vid === 'b' && h0.got === 0 && h0.need === PARTY.HEIST_NEED && h0.alarm === 'wait' && h0.alarm_until === go + 61000 + PARTY.ALARM_MS && !JSON.stringify(tvView(r, go + 61100).heists).includes('answer'),
+      'V13.150 TV 실시간 금고 털이 대결: 털이범 · 피해자 · 진행 칸 · 경보 남은 시간(정답은 보내지 않는다)');
+    alarmAnswer(r, 'b', qsL[r.players.b.alarm.qi % qsL.length].answer, go + 62000);
+    answer(r, 'a', q('a').answer, go + 62500, lcg(9));
+    const h1 = tvView(r, go + 62600).heists[0];
+    assert(h1.got === 1 && h1.alarm === 'defended' && tvView(r, go + 61000 + PARTY.HEIST_MS + 1).heists.length === 0, 'V13.150 대결 카드: 한 칸씩 차고, 막으면 "막는 중", 시간이 지나면 사라진다');
+    const tv = source('../public/modules/party-tv.js'), pj = source('../public/modules/party.js'), room = source('../cloudflare/party-room.mjs'), css = source('../public/v13149.css');
+    assert(room.includes("if (msg.type === 'start') res = startParty(s, now + PARTY.GO_MS);") && tv.includes('function heistsTv(v)') && tv.includes("id=\"ptv-heists\"") && tv.includes("fin.innerHTML = `<b class=\"${s <= 3 ? 'red' : ''}\">${s}</b>`") && tv.includes('function rollNumber(el, from, to)') && tv.includes("row.dataset.up = '1'") && tv.includes("style=\"--d:${[2000, 3600, 800][k]}ms\"")
+      && pj.includes("go.innerHTML = `<b class=\"${n ? '' : 'go'}\">${n || 'GO!'}</b>`") && pj.includes('if (v.alarm && !P.siren)') && pj.includes("row.querySelector('.pt-chest.chosen')?.classList.add('suspense')") && pj.includes('function rollGold(el, from, to)') && pj.includes('연속 정답!')
+      && css.includes('.ptv-heist{') && css.includes('.ptv-final b{') && css.includes('.pt-go b{'),
+      'V13.150 TV: 3 · 2 · 1 GO · 대결 카드 · 마지막 10초 큰 숫자 · 금화 숫자 · 추월 ▲ · 시상대 북소리 / 폰: 카운트다운 · 경보 사이렌 반복 · 상자 뜸 · 내 금화 숫자 · 연속 불꽃');
+  }
+
   /* ---------- V13.149 짝 맞추기 고퀄 화면 ---------- */
   {
     const mg = source('../public/modules/match-game.js'), css = source('../public/v13149.css'), svc = source('./service.mjs');

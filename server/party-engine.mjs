@@ -36,7 +36,8 @@ export const PARTY = {
   STORM_CHESTS: 5,
   EVENT_AT: [.3, .55, .8],    // 이벤트 라운드가 오는 때(판 길이의 몇 %)
   GOLDEN_MS: 45000, STORM_MS: 45000, RAID_PCT: 10, RAID_SHOW_MS: 5000,
-  TEAM_WIN_COINS: 3
+  TEAM_WIN_COINS: 3,
+  GO_MS: 3000                 // 시작 3 · 2 · 1 카운트다운(이 동안은 답을 받지 않는다). 방이 startParty에 '지금 + 3초'를 넘긴다
 };
 export const ITEMS = { fifty: '50:50', freeze: '시간 정지', saver: '콤보 보호' };
 const EVENT_ORDERS = [['golden', 'raid', 'storm'], ['raid', 'storm', 'golden'], ['storm', 'golden', 'raid'], ['golden', 'storm', 'raid'], ['storm', 'raid', 'golden'], ['raid', 'golden', 'storm']];
@@ -119,7 +120,7 @@ export function answer(room, pid, choice, now = Date.now(), random = Math.random
   const pl = room.players[pid];
   if (room.phase !== 'play' || !pl) return { events: [] };
   if (pl.offer || pl.pending || alarmLive(pl, now)) return { events: [] }; // 상자 · 표적 · 경보를 먼저
-  if (now < (pl.wait_until || 0)) return { events: [] };
+  if (now < (pl.wait_until || 0) || now < (room.start_at || 0)) return { events: [] }; // 카운트다운 중에는 받지 않는다
   const q = currentQ(room, pl);
   if (!q) return { events: [] };
   const ok = Number(choice) === q.answer, ms = Math.max(0, now - (pl.q_at || now));
@@ -390,19 +391,27 @@ export function nextWake(room) {
 
 /* ---------- 화면에 보내는 것 ---------- */
 const petOf = pl => pl.pet ? { key: pl.pet.key, form: pl.pet.form } : null;
+// TV 실시간 금고 털이 대결: 털이범 진행(●●○)과 피해자 경보(기다림 · 막는 중 · 놓침). 반 전체가 같이 본다(금화는 보이지 않는다).
+function liveHeists(room, now) {
+  return room.order.map(id => room.players[id]).filter(p => p.heist && now < p.heist.until).slice(0, 3).map(p => {
+    const v = room.players[p.heist.vid], a = v?.alarm?.by === p.id ? v.alarm : null;
+    return { pid: p.id, name: p.name, pet: petOf(p), vid: v?.id || '', vname: v?.name || '', vpet: v ? petOf(v) : null, got: p.heist.got, need: p.heist.need, until: p.heist.until, pct: p.heist.pct, swap: p.heist.kind === 'swap',
+      alarm: !a ? 'missed' : !a.done && now < a.until ? 'wait' : a.defended ? 'defended' : 'missed', alarm_until: a?.until || 0 };
+  });
+}
 const teamTotals = room => room.teams ? ['A', 'B'].map(t => ({ team: t, gold: room.order.reduce((n, id) => n + (room.players[id].team === t ? room.players[id].gold : 0), 0), players: room.order.filter(id => room.players[id].team === t).length })) : null;
 const eventView = (room, now) => room.event && now < room.event.until ? { kind: room.event.kind, until: room.event.until } : null;
 export function tvView(room, now = Date.now()) {
   const list = ranked(room), hide = room.phase === 'play' && room.end_at - now < PARTY.HIDE_LAST_MS;
   return {
     id: room.id, code: room.code, kind: room.kind, phase: room.phase, minutes: room.minutes, steal: room.steal, teams: room.teams, label: room.label,
-    event: eventView(room, now), bounty: hide ? null : bountyId(room), team_gold: hide ? null : teamTotals(room),
+    event: eventView(room, now), bounty: hide ? null : bountyId(room), team_gold: hide ? null : teamTotals(room), heists: liveHeists(room, now),
     start_at: room.start_at, end_at: room.end_at, now, hidden: hide, players: list.length, right_total: room.right_total,
     frenzy_until: room.frenzy_until > now ? room.frenzy_until : 0, feed: room.feed,
     lobby: room.phase === 'lobby' ? list.map(x => ({ id: x.id, name: x.name, pet: petOf(x) })) : undefined,
     // 마지막 1분: 점수 · 순위 대신 이름 순서(줄 순서로도 순위가 새지 않게).
     top: hide ? [...list].sort((a, b) => a.name.localeCompare(b.name, 'ko')).slice(0, 10).map(x => ({ id: x.id, rank: null, name: x.name, pet: petOf(x), score: null, right: null, shield: 0, team: x.team }))
-      : list.slice(0, 10).map((x, i) => ({ id: x.id, rank: i + 1, name: x.name, pet: petOf(x), score: room.kind === 'fish' ? x.kg : x.gold, right: x.right, shield: x.shield, team: x.team })),
+      : list.slice(0, 10).map((x, i) => ({ id: x.id, rank: i + 1, name: x.name, pet: petOf(x), score: room.kind === 'fish' ? x.kg : x.gold, right: x.right, shield: x.shield, team: x.team, streak: x.streak })),
     ...(room.phase === 'ended' ? { awards: awards(room) } : {})
   };
 }

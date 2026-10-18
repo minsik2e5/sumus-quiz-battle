@@ -42,6 +42,7 @@ const ICONS = {
   ghost: `<path ${f(C.white)} d="M7 27V14a9 9 0 0 1 18 0v13l-3-2.5-3 2.5-3-2.5-3 2.5-3-2.5z"/><circle fill="${INK}" cx="13" cy="14" r="1.6"/><circle fill="${INK}" cx="19" cy="14" r="1.6"/>`,
   bolt: `<path ${f(C.gold)} d="M18 3 6 18h8l-2 11 12-15h-8z"/>`,
   hourglass: `<path ${f(C.paper)} d="M8 4h16M8 28h16M10 4c0 7 12 7 12 12S10 21 10 28h12c0-7-12-7-12-12s12-5 12-12"/><path fill="${C.gold}" d="M12 26h8c-1-3-3-4-4-4s-3 1-4 4z"/>`,
+  flame: `<path ${f(C.orange || '#d9783a')} d="M16 3c1 5 7 7 7 15a7 7 0 0 1-14 0c0-4 2-6 3-8 1 3 2 4 4 4-1-4-1-8 0-11z"/><path ${f(C.gold)} d="M16 15c1 2 3 3 3 6a3 3 0 0 1-6 0c0-2 1-3 3-6z"/>`,
   check: `<circle ${f(C.green)} cx="16" cy="16" r="11"/><path ${st(C.white, 3)} d="M11 16l3.5 3.5L21 13"/>`,
   cross: `<circle ${f(C.red)} cx="16" cy="16" r="11"/><path ${st(C.white, 3)} d="M12 12l8 8M20 12l-8 8"/>`
 };
@@ -59,7 +60,7 @@ const EMOJI = {
   '🦹': 'thief', '🔄': 'swap', '🛡️': 'shield', '🛡': 'shield', '🚨': 'siren', '👀': 'eye', '💰': 'coins', '🌟': 'sun', '☠️': 'raid', '☠': 'raid', '📜': 'bounty',
   '🌪️': 'storm', '🌪': 'storm', '⏱️': 'freeze', '⏱': 'freeze', '🔗': 'chain', '½': 'half', '🥇': 'medal1', '🥈': 'medal2', '🥉': 'medal3',
   '🔴': 'flagA', '🔵': 'flagB', '🎁': 'gift', '💨': 'puff', '🏆': 'trophy', '💎': 'jackpot', '👹': 'monster', '👑': 'crown', '🚀': 'bolt',
-  '🏁': 'finish', '🪱': 'worm'
+  '🏁': 'finish', '🪱': 'worm', '🔥': 'flame'
 };
 const FACES = ['😮‍💨', '😱', '😵', '😅', '🤝', '🤫'];
 const RE = new RegExp(`${FACES.join('|')}|${Object.keys(EMOJI).sort((a, b) => b.length - a.length).join('|')}`, 'gu');

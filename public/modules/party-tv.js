@@ -121,9 +121,25 @@ function onMessage(msg) {
 function tickClock() {
   const v = T?.view, el = document.getElementById('ptv-clock');
   if (!v || !el) return;
-  if (v.phase !== 'play') { el.textContent = ''; return; }
-  const left = v.end_at - serverNow();
-  el.textContent = clock(left);
+  const go = document.getElementById('ptv-go'), fin = document.getElementById('ptv-final');
+  if (v.phase !== 'play') { el.textContent = ''; if (go) go.hidden = true; if (fin) fin.hidden = true; return; }
+  // 시작 3 · 2 · 1 GO!
+  const toGo = (v.start_at || 0) - serverNow();
+  if (go) {
+    const n = toGo > 0 ? Math.ceil(toGo / 1000) : toGo > -800 ? 0 : null;
+    if (n === null) go.hidden = true;
+    else if (go.dataset.n !== String(n)) { go.hidden = false; go.dataset.n = String(n); go.innerHTML = `<b class="${n ? '' : 'go'}">${n || 'GO!'}</b>`; sfx(n ? 'tick' : 'combo', { rate: n ? 1 + (3 - n) * .08 : 1.2, gain: 1 }); }
+  }
+  // 진행 중인 금고 털이 · 경보 남은 초
+  document.querySelectorAll('[data-until]').forEach(x => { x.textContent = Math.max(0, Math.ceil((Number(x.dataset.until) - serverNow()) / 1000)); });
+  const left = Math.min(v.end_at - serverNow(), v.end_at - (v.start_at || 0)); // 카운트다운 중에도 판 길이를 넘지 않게
+  // 마지막 10초: 큰 숫자 + 째깍
+  if (fin) {
+    const s = left > 0 && left <= 10000 ? Math.ceil(left / 1000) : null;
+    if (s === null) fin.hidden = true;
+    else if (fin.dataset.n !== String(s)) { fin.hidden = false; fin.dataset.n = String(s); fin.innerHTML = `<b class="${s <= 3 ? 'red' : ''}">${s}</b>`; sfx(s <= 3 ? 'warn-beep' : 'tick', { gain: s <= 3 ? 1 : .8 }); }
+  }
+  el.textContent = clock(left + 999); // 남은 초는 올림(카운트다운 숫자와 맞춘다)
   el.classList.toggle('hurry', left < 60000);
   const bar = document.getElementById('ptv-timebar');
   if (bar) bar.style.transform = `scaleX(${Math.max(0, Math.min(1, left / (v.minutes * 60000)))})`;
@@ -158,10 +174,13 @@ function play(v, before) {
       <div class="ptv-frenzy" id="ptv-frenzy" hidden>🐟🐟🐟 물고기 떼! 🐟🐟🐟</div>
       <div class="ptv-event" id="ptv-event" hidden></div>
       <div class="ptv-teams" id="ptv-teams" hidden></div>
+      <div class="ptv-heists" id="ptv-heists" aria-live="polite"></div>
       <div class="ptv-board" id="ptv-board"></div>
       <div class="ptv-hidden" id="ptv-hidden" hidden><b>마지막 1분!</b><span>순위는 끝나고 공개해요 🤫</span></div>
     </section>`);
-    T.bars = new Map();
+    T.bars = new Map(); T.rankOf = new Map(); T.heistCards = new Map();
+    const tvRoot = document.querySelector('.ptv');
+    if (tvRoot && !document.getElementById('ptv-go')) tvRoot.insertAdjacentHTML('beforeend', '<div class="ptv-go" id="ptv-go" hidden></div><div class="ptv-final" id="ptv-final" hidden></div>');
   }
   const n = document.getElementById('ptv-n'); if (n) n.textContent = num(v.players);
   const r = document.getElementById('ptv-right'); if (r) r.textContent = num(v.right_total);
@@ -196,22 +215,34 @@ function play(v, before) {
     if (!row) {
       row = document.createElement('div');
       row.className = 'ptv-row';
-      row.innerHTML = `<i class="ptv-rank"></i><span class="ptv-pet">${x.pet ? avatar(x.pet.key, { form: x.pet.form, size: 'mini' }) : ''}</span><b class="ptv-name">${esc(x.name)}</b><span class="ptv-bar"><u></u></span><em class="ptv-score"></em><span class="ptv-sh"></span>`;
+      row.innerHTML = `<i class="ptv-rank"></i><span class="ptv-pet">${x.pet ? avatar(x.pet.key, { form: x.pet.form, size: 'mini' }) : ''}</span><b class="ptv-name">${esc(x.name)}</b><span class="ptv-bar"><u></u></span><em class="ptv-score"></em><span class="ptv-sh"></span><span class="ptv-fire"></span>`;
       board.appendChild(row);
       T.bars.set(x.id, row);
     }
     row.style.transform = `translateY(${i * ROW}px)`;
-    row.className = `ptv-row${!v.hidden && i < 3 ? ` top${i + 1}` : ''}${x.team ? ` team-${x.team}` : ''}${v.bounty === x.id ? ' bounty' : ''}`;
+    // 추월: 순위가 오르면 ▲가 잠깐 빛난다.
+    const was = T.rankOf.get(x.id);
+    if (!v.hidden && was !== undefined && i < was) { row.classList.remove('up'); void row.offsetWidth; row.dataset.up = '1'; later(() => { if (row.dataset.up) { delete row.dataset.up; row.classList.remove('up'); } }, 1400); }
+    T.rankOf.set(x.id, i);
+    row.className = `ptv-row${!v.hidden && i < 3 ? ` top${i + 1}` : ''}${x.team ? ` team-${x.team}` : ''}${v.bounty === x.id ? ' bounty' : ''}${row.dataset.up ? ' up' : ''}`;
     row.querySelector('.ptv-rank').textContent = v.hidden ? '?' : i + 1;
     row.querySelector('.ptv-bar u').style.transform = `scaleX(${v.hidden ? .5 : Math.max(.02, x.score / max)})`;
     const score = v.hidden ? '???' : fish ? kgText(x.score) : num(x.score);
     const s = row.querySelector('.ptv-score');
-    if (s.textContent !== score) { s.textContent = score; s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump'); }
+    if (s.dataset.v !== score) {
+      const from = Number(s.dataset.n || 0), to = Number(x.score || 0);
+      s.dataset.v = score; s.dataset.n = String(to);
+      if (!v.hidden && !fish && to > from && !reduced()) rollNumber(s, from, to); else s.textContent = score;
+      s.classList.remove('bump'); void s.offsetWidth; s.classList.add('bump');
+    }
+    const fire = !v.hidden && x.streak >= 3 ? `🔥${x.streak}` : '', fEl = row.querySelector('.ptv-fire');
+    if (fEl.dataset.v !== fire) { fEl.dataset.v = fire; fEl.innerHTML = iconize(fire); if (fire && x.streak === 3) { fEl.classList.remove('lit'); void fEl.offsetWidth; fEl.classList.add('lit'); } }
     const sh = !fish && !v.hidden ? `${v.bounty === x.id ? '📜' : ''}${x.shield ? '🛡️'.repeat(x.shield) : ''}` : '';
     const shEl = row.querySelector('.ptv-sh');
     if (shEl.dataset.v !== sh) { shEl.dataset.v = sh; shEl.innerHTML = iconize(sh); }
   });
   for (const [id, row] of T.bars) if (!seen.has(id)) { row.remove(); T.bars.delete(id); }
+  heistsTv(v);
   for (const f of v.feed || []) if (f.n > T.feedSeen) { T.feedSeen = f.n; if (before) feedPop(f); }
 }
 // 소식 한 줄(아래에서 올라와 몇 초 뒤 사라진다). 큰 소식은 화면 가운데에 크게.
@@ -219,7 +250,7 @@ function feedPop(f) {
   const host = document.getElementById('ptv-feed');
   if (!host) return;
   let html = '', big = false, cls = f.kind;
-  if (f.kind === 'heist') { html = `🚨 <b>${esc(f.name)}</b>가 <b>${esc(f.vname)}</b>의 금고를 노려요!${f.bounty ? ' <em>📜 현상금 1등!</em>' : ''}`; big = !!f.bounty; }
+  if (f.kind === 'heist') { html = `🚨 <b>${esc(f.name)}</b>가 <b>${esc(f.vname)}</b>의 금고를 노려요!${f.bounty ? ' <em>📜 현상금 1등!</em>' : ''}`; } // 대결 카드(위)가 주인공이라 가운데에 크게 띄우지 않는다
   else if (f.kind === 'heistfail') html = `😅 <b>${esc(f.name)}</b>의 금고 털이 실패!`;
   else if (f.kind === 'peekcaught') html = `👀 <b>${esc(f.name)}</b>가 상자를 엿보다 들켰어요! <em>−${num(f.amount)}</em>`;
   else if (f.kind === 'event') { const info = EVENT[f.event]; if (!info) return; html = f.event === 'raid' ? `☠️ <b>해적선 습격!</b> 방패 없는 ${num(f.hit)}명이 금화 ${num(f.total)}를 뺏겼어요` : `<b>${info[0]}</b> ${info[1]}`; big = true; }
@@ -246,7 +277,7 @@ function onEvent(e) { if (e.kind === 'end') sfx('clear'); }
 /* ---------- 끝: 시상대 ---------- */
 function ended(v, before) {
   const fish = v.kind === 'fish', top = v.top.slice(0, 3), rest = v.top.slice(3, 10);
-  const podium = [top[1], top[0], top[2]].map((x, k) => x ? `<div class="ptv-step s${[2, 1, 3][k]}" style="--d:${[1, 2, 0][k] * 700 + 600}ms"><span class="ptv-step-pet">${x.pet ? avatar(x.pet.key, { form: x.pet.form, expression: 'cheer' }) : ''}</span><b>${esc(x.name)}</b><em>${fish ? kgText(x.score) : `${coin()}${num(x.score)}`}</em><i>${[2, 1, 3][k]}</i></div>` : '<div class="ptv-step empty"></div>').join('');
+  const podium = [top[1], top[0], top[2]].map((x, k) => x ? `<div class="ptv-step s${[2, 1, 3][k]}" style="--d:${[2000, 3600, 800][k]}ms"><span class="ptv-step-pet">${x.pet ? avatar(x.pet.key, { form: x.pet.form, expression: 'cheer' }) : ''}</span><b>${esc(x.name)}</b><em>${fish ? kgText(x.score) : `${coin()}${num(x.score)}`}</em><i>${[2, 1, 3][k]}</i></div>` : '<div class="ptv-step empty"></div>').join('');
   main(`<section class="ptv-end">
     <h1>${fish ? '🎣 오늘의 낚시왕' : '💰 오늘의 보물왕'}</h1>
     ${v.teams && v.team_gold ? `<div class="ptv-team-end"><span class="tA${v.team_gold[0].gold > v.team_gold[1].gold ? ' win' : ''}">🔴 A팀 <b>${num(v.team_gold[0].gold)}</b></span><i>${v.team_gold[0].gold === v.team_gold[1].gold ? '무승부' : v.team_gold[0].gold > v.team_gold[1].gold ? 'A팀 승리!' : 'B팀 승리!'}</i><span class="tB${v.team_gold[1].gold > v.team_gold[0].gold ? ' win' : ''}">🔵 B팀 <b>${num(v.team_gold[1].gold)}</b></span></div>` : ''}
@@ -256,7 +287,48 @@ function ended(v, before) {
     <p class="ptv-foot">진짜 코인은 <b>맞힌 문제 수</b>대로 받고, 1~3등은 보너스! (5문제 이상 · 하루 3판까지)</p>
     <button type="button" class="ptv-start" data-tv="exit">닫기</button>
   </section>`);
-  if (before?.phase !== 'ended') { later(() => sfx('fanfare-epic'), 1900); confetti(); }
+  // 3등 → 2등 → (북소리) → 1등: 뜸을 들여 교실이 같이 숨죽이게.
+  if (before?.phase !== 'ended') {
+    [800, 2000].forEach(t => later(() => sfx('stamp', { gain: .9 }), t));
+    [2500, 2750, 2950, 3100, 3220, 3320, 3400, 3470, 3530].forEach((t, i) => later(() => sfx('tick', { rate: 1 + i * .05, gain: .9 }), t));
+    later(() => { sfx('fanfare-epic'); document.querySelector('.ptv-step.s1')?.classList.add('spot'); }, 3600);
+    later(confetti, 1900);
+  }
+}
+// 순위 줄 금화가 올라가는 숫자.
+function rollNumber(el, from, to) {
+  const t0 = performance.now(), dur = 600;
+  const step = t => { const k = Math.min(1, (t - t0) / dur); el.textContent = num(Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3)))); if (k < 1 && el.isConnected) requestAnimationFrame(step); };
+  requestAnimationFrame(step);
+}
+// 실시간 금고 털이 대결: 털이범 → 피해자, 진행 칸, 피해자 경보(기다림 · 막는 중 · 놓침). 반 전체가 같이 본다.
+function heistsTv(v) {
+  const host = document.getElementById('ptv-heists');
+  if (!host) return;
+  const list = v.heists || [], seen = new Set();
+  for (const h of list) {
+    seen.add(h.pid);
+    let card = T.heistCards.get(h.pid);
+    if (!card) {
+      card = document.createElement('div');
+      card.className = 'ptv-heist';
+      host.appendChild(card);
+      T.heistCards.set(h.pid, card);
+      sfx('boss-charge', { gain: .55, dur: 1.2 });
+    }
+    const key = `${h.got}/${h.need}/${h.alarm}`;
+    if (card.dataset.k === key) continue;
+    const before = card.dataset.k ? card.dataset.k.split('/') : null;
+    card.dataset.k = key;
+    if (before && Number(before[0]) < h.got) sfx('crit', { gain: .45, rate: 1 + h.got * .12 });
+    if (before && before[2] !== 'defended' && h.alarm === 'defended') sfx('shield-block', { gain: .8 });
+    const pet = p => p ? avatar(p.key, { form: p.form, size: 'mini' }) : '';
+    card.className = `ptv-heist a-${h.alarm}`;
+    card.innerHTML = iconize(`<div class="who thief">${pet(h.pet)}<b>${esc(h.name)}</b><small>🦹 금고 털이</small></div>
+      <div class="mid"><div class="steps">${Array.from({ length: h.need }, (_, k) => `<i class="${k < h.got ? 'on' : ''}"></i>`).join('')}</div><small>${h.swap ? '금고 바꾸기' : `${num(h.pct)}%`} · <b data-until="${h.until}">${Math.max(0, Math.ceil((h.until - serverNow()) / 1000))}</b>초</small></div>
+      <div class="who victim">${pet(h.vpet)}<b>${esc(h.vname)}</b><small>${h.alarm === 'wait' ? `🚨 경보 <b data-until="${h.alarm_until}">${Math.max(0, Math.ceil((h.alarm_until - serverNow()) / 1000))}</b>초` : h.alarm === 'defended' ? '🛡️ 막는 중!' : '😱 경보 놓침'}</small></div>`);
+  }
+  for (const [pid, card] of T.heistCards) if (!seen.has(pid)) { card.classList.add('out'); later(() => card.remove(), 350); T.heistCards.delete(pid); }
 }
 function confetti() {
   if (reduced()) return;

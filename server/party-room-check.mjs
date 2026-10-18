@@ -58,6 +58,11 @@ export async function runPartyRoomChecks() {
     await send('a', { type: 'start' });
     assert.equal(room.room.state.phase, 'lobby', 'V13.149 학생은 게임을 시작할 수 없다(선생님 TV만)');
     await send('tv', { type: 'start' });
+    assert(room.room.state.start_at === clock + PARTY.GO_MS && room.room.state.end_at === clock + PARTY.GO_MS + 5 * 60000, 'V13.150 TV가 시작하면 3 · 2 · 1 카운트다운 뒤에 판이 시작된다');
+    const early = room.room.state.players.a, eq = questions[early.qi % questions.length];
+    await send('a', { type: 'answer', choice: eq.answer });
+    assert(early.right === 0, 'V13.150 카운트다운 중에는 답을 받지 않는다');
+    clock += PARTY.GO_MS;
     assert(room.room.state.phase === 'play' && lastView('a').q && !('answer' in lastView('a').q), 'V13.149 TV가 시작하면 학생에게 문제가 간다(정답 번호 없이)');
     // 답할 때마다 저장하지 않는다: 메모리에 두고 5초마다 한 번.
     const writes0 = ctx.writes, alarms0 = ctx.alarms;
@@ -119,6 +124,7 @@ export async function runPartyRoomChecks() {
     const view3 = who => w3[who].sent.filter(m => m.type === 'view').at(-1)?.view;
     const events3 = who => w3[who].sent.filter(m => m.type === 'events').flatMap(m => m.events);
     await send3('tv', { type: 'start' });
+    clock += PARTY.GO_MS;
     const st = heist.room.state;
     assert(['a', 'b', 'c', 'd'].map(x => st.players[x].team).join('') === 'ABAB' && view3('tv').teams && view3('a').me.team === 'A', 'V13.150 팀전 방: 들어온 순서대로 A · B 팀');
     clock += 90_000; // 처음 1분이 지난 뒤

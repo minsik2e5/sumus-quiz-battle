@@ -423,7 +423,9 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
     })
     .catch(() => {});
   function markOk(how) {
-    lastOkAt = Date.now();
+    // 이번 백업이 meta에 남긴 성공 시각을 그대로 쓴다(따로 재면 1ms 어긋날 수 있다). 이번에 올린 게 없으면 지금.
+    const saved = Number(local.status().okAt) || 0;
+    lastOkAt = saved > lastOkAt ? saved : Date.now();
     lastOkMode = how;
   }
 

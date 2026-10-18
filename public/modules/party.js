@@ -31,8 +31,9 @@ export async function openPartyJoin(A, exit, { code }) {
   A.screen = 'party';
   root().innerHTML = `<div class="session-app pt-app"><header class="pt-top"><button type="button" class="yb-back" data-pt="exit" aria-label="나가기">${icon('back')}</button><strong id="pt-title">교실 게임</strong><span class="pt-clock" id="pt-clock"></span></header><main id="pt-main" class="pt-main"><div class="yb-loading">교실 게임에 들어가는 중…</div></main><div class="pt-toasts" id="pt-toasts" aria-live="polite"></div></div>`;
   root().onclick = onClick;
+  root().querySelector('.pt-app')?.insertAdjacentHTML('beforeend', '<div class="pt-go" id="pt-go" hidden></div>');
   window.scrollTo(0, 0);
-  preloadSound(['coins', 'fanfare-basic', 'crack', 'shield-block', 'boss-roar']);
+  preloadSound(['coins', 'fanfare-basic', 'crack', 'shield-block', 'boss-roar', 'warn-beep', 'wiggle', 'tick', 'combo']);
   try {
     const r = await api('/party/join', { code });
     if (!P) return;
@@ -50,7 +51,7 @@ function closeAll() {
   if (!P) return;
   P.closing = true;
   P.timers.forEach(clearTimeout);
-  clearInterval(P.ticker); clearInterval(P.pinger);
+  clearInterval(P.ticker); clearInterval(P.pinger); clearInterval(P.siren);
   try { P.ws?.close(); } catch {}
 }
 async function leave() { const exit = P?.exit; closeAll(); root().onclick = null; P = null; await exit?.(); }
@@ -100,9 +101,16 @@ function onMessage(msg) {
 function tickClock() {
   const v = P?.view, el = document.getElementById('pt-clock');
   if (!v || !el) return;
+  // 시작 3 · 2 · 1 GO!(이 동안은 답을 받지 않는다)
+  const go = document.getElementById('pt-go'), toGo = v.phase === 'play' ? (v.start_at || 0) - serverNow() : -9999;
+  if (go) {
+    const n = toGo > 0 ? Math.ceil(toGo / 1000) : toGo > -700 ? 0 : null;
+    if (n === null) go.hidden = true;
+    else if (go.dataset.n !== String(n)) { go.hidden = false; go.dataset.n = String(n); go.innerHTML = `<b class="${n ? '' : 'go'}">${n || 'GO!'}</b>`; sfx(n ? 'tick' : 'combo', { rate: n ? 1 : 1.2 }); buzz(n ? 15 : 40); }
+  }
   if (v.phase !== 'play') { el.textContent = ''; return; }
-  const left = v.end_at - serverNow();
-  el.textContent = clock(left);
+  const left = Math.min(v.end_at - serverNow(), v.end_at - (v.start_at || 0));
+  el.textContent = clock(left + 999); // 남은 초는 올림(카운트다운 숫자와 맞춘다)
   el.classList.toggle('hurry', left < 60000);
   const bar = document.getElementById('pt-wait');
   if (bar && v.q?.wait_until) { const w = v.q.wait_until - serverNow(); if (w <= 0) { P.view.q.wait_until = 0; draw(); } }
@@ -128,7 +136,16 @@ function draw() {
   if (!document.getElementById('pt-head')) { main('<div id="pt-head"></div><div id="pt-body"></div>'); P.bodyKey = null; }
   // 점수 · 순위 · 1~3등은 맥박마다 바뀐다: 위 칸만 다시 쓴다. 문제 · 상자 · 표적 칸은 바뀔 때만(누르는 중인 버튼이 사라지지 않게).
   const head = headHtml(v);
-  if (P.headHtml !== head) { document.getElementById('pt-head').innerHTML = iconize(head); P.headHtml = head; }
+  if (P.headHtml !== head) {
+    document.getElementById('pt-head').innerHTML = iconize(head); P.headHtml = head;
+    // 내 금화가 늘면 숫자가 올라간다.
+    const n = document.getElementById('pt-num'), to = Number(v.me.gold || 0), from = P.lastGold ?? to;
+    if (n && v.kind !== 'fish' && to > from && !reduced()) rollGold(n, from, to);
+    P.lastGold = to;
+  }
+  // 털릴 때: 경보가 꺼질 때까지 사이렌 · 진동이 계속 울린다.
+  if (v.alarm && !P.siren) { P.siren = setInterval(() => { sfx('warn-beep', { gain: .9 }); buzz([90, 60, 90]); }, 700); }
+  else if (!v.alarm && P.siren) { clearInterval(P.siren); P.siren = null; }
   const wait = !!(v.q?.wait_until && v.q.wait_until > serverNow());
   if (v.alarm && !P.alarmSpan) P.alarmSpan = v.alarm.until - serverNow(); else if (!v.alarm) P.alarmSpan = 0;
   if (v.alarm) v.alarm.span = P.alarmSpan;
@@ -145,6 +162,7 @@ function headHtml(v) {
     ${fish ? `<div class="pt-lure l${me.lure}"><small>미끼</small><b>${esc(LURES[me.lure].name)}</b></div>` : `<div class="pt-shield${me.shield ? ' on' : ''}" aria-label="방패 ${me.shield}개">${guardShield(me.shield ? 'on' : 'used', 'pt-sh')}<b>${num(me.shield)}</b></div>`}
   </section>
   ${me.team ? teamBar(v) : ''}${eventBar(v)}${invBar(me)}
+  ${!fish && me.streak >= 3 ? `<div class="pt-streak${me.streak >= 5 ? ' hot' : ''}">🔥 <b>${num(me.streak)}</b>연속 정답! <small>금화 +${num(Math.min(10, me.streak) * 10)}%</small></div>` : ''}
   ${v.frenzy_until > serverNow() ? '<div class="pt-frenzy">🐟 물고기 떼 등장! 큰 물고기가 몰려와요</div>' : ''}
   ${v.hidden ? '<div class="pt-top3 hidden"><span>🤫 마지막 1분! 순위는 끝나고 공개해요</span></div>' : ''}<div class="pt-top3">${v.top.map((x, i) => `<span class="${x.id === me.id ? 'me' : ''}"><i>${['🥇', '🥈', '🥉'][i]}</i>${esc(x.name)} <b>${fish ? kgText(x.score) : num(x.score)}</b></span>`).join('')}</div>`;
 }
@@ -276,6 +294,8 @@ function chestReveal(e) {
   P.anim = { ...(P.anim || {}), result: e };
   const row = document.querySelector('.pt-chest-row');
   if (!row) { P.anim = null; P.busy = false; P.bodyKey = null; return draw(); }
+  // 뜸 들이기: 고른 상자가 크게 흔들리다가 열린다.
+  if (!reduced() && !e.suspended) { row.querySelector('.pt-chest.chosen')?.classList.add('suspense'); sfx('wiggle', { rate: 1.1 }); sfx('wiggle', { rate: 1.3, at: .25 }); buzz([20, 60, 20, 60, 40]); return later(() => chestReveal({ ...e, suspended: true }), 520); }
   [...row.children].forEach((b, k) => {
     const c = e.chests[k];
     b.classList.add('open', `k-${c.kind}`);
@@ -290,6 +310,12 @@ function chestReveal(e) {
     if (c.kind === 'jackpot' || c.kind === 'triple') coinShower(document.querySelector('.pt-chests'), 22);
   }, reduced() ? 0 : 380);
   later(() => { P.anim = null; P.busy = false; draw(); }, reduced() ? 600 : (c.kind === 'steal' || c.kind === 'swap' ? 1200 : 1700));
+}
+function rollGold(el, from, to) {
+  const t0 = performance.now(), dur = 650;
+  const step = t => { const k = Math.min(1, (t - t0) / dur); el.textContent = num(Math.round(from + (to - from) * (1 - Math.pow(1 - k, 3)))); if (k < 1 && el.isConnected) requestAnimationFrame(step); };
+  el.classList.remove('gain'); void el.offsetWidth; el.classList.add('gain');
+  requestAnimationFrame(step);
 }
 function lootArt(c) {
   if (c.kind === 'gold' || c.kind === 'jackpot') return `<span class="pt-coins">${coin()}${c.kind === 'jackpot' ? coin() + coin() : ''}</span>`;
