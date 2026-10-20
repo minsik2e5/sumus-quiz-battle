@@ -1,6 +1,7 @@
 import { $, api, esc, num, icon, toast } from './ui.js';
 import { coin } from './emblems.js';
 import { CHARACTERS, petTier } from './core.js';
+import { giftEggShow } from './pet-moments.js';
 
 // V13.73 celebrations shared by the title moment and the teacher's coin gift: coins raining
 // over a pop-up, a number counting up, and the gift box a student opens.
@@ -104,20 +105,24 @@ export function giftMoment(A, gifts, done) {
     if (res?.stats && A.data) A.data.stats = res.stats;
     if (res?.profile && A.data) A.data.profile = { ...A.data.profile, ...res.profile };
     $('.cel-gift-title').textContent = !eggs.length ? '코인 선물 받았어요!' : openedGifts.some(g => g.kind !== 'egg') ? '선물을 받았어요!' : '선생님 알을 받았어요!';
-    if (eggs.length) {
+    // V13.160 알은 상자에서 바로 보여 주지 않고, 알 상점과 같은 알 깨기 연출로 하나씩 깬다(펫을 다 모아 코인으로 바뀐 알만 카드로).
+    const hatch = eggs.filter(g => g.egg?.key && CHARACTERS[g.egg.key]);
+    if (eggs.length > hatch.length) {
       const box = $('.cel-gift-eggs');
-      box.innerHTML = eggCards(openedGifts);
+      box.innerHTML = eggCards(openedGifts.filter(g => !hatch.includes(g)));
       box.hidden = false;
-      if (eggs.some(g => g.egg?.tier === 'mythic')) $('.cel-gift').classList.add('legend', 'mythic');
-      else if (eggs.some(g => g.egg?.tier === 'legendary')) $('.cel-gift').classList.add('legend');
-      else if (eggs.some(g => g.egg?.tier === 'epic')) $('.cel-gift').classList.add('epic');
     }
+    if (hatch.length) $('.cel-gift-title').textContent = hatch.length > 1 ? `선생님 알 ${hatch.length}개가 왔어요!` : '선생님 알이 왔어요!';
     $('.cel-gift-reward').hidden = !(coinsNow > 0);
     coinShower($('.cel-gift'), 26, 2);
     playReward($('.cel-gift'), 420);
-    button.innerHTML = '고마워요!';
+    button.innerHTML = hatch.length ? `${icon('sparkle')}알 깨 보기${hatch.length > 1 ? ` (${hatch.length}개)` : ''}` : '고마워요!';
     button.disabled = false;
-    button.onclick = () => { $('#modal-root').innerHTML = ''; done?.(); };
+    button.onclick = async () => {
+      $('#modal-root').innerHTML = '';
+      for (const g of hatch) await giftEggShow(g.egg);
+      done?.();
+    };
     button.focus({ preventScroll: true });
   };
   button.onclick = open;

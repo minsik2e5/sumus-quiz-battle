@@ -12,7 +12,7 @@ export const REEL = {
   PEARLS: { common: 10, uncommon: 25, rare: 60, epic: 150, legend: 400, golden: 0 },
   COIN_DAILY: 100,        // 진주 → 코인(1:1) 하루 한도
   EGG: 600, EGG_DAILY: 1,
-  EPIC_EGG: 2000, EPIC_WEEKLY: 1,
+  EPIC_EGG: 800, EPIC_DAILY: 1, // V13.160 영웅 알: 진주 2,000 · 주 1개 → 800 · 하루 1개(선생님 결정)
   SEA_PET: 4000,
   SEA_READY: false,       // 바다 펫 그림(주문서 28)이 들어와 core.js CHARACTERS에 등록되면 true(그 전에는 교환소에서 잠김)
   GOLDEN_EGG: 3,          // 황금 알 물고기 3마리 → 랜덤 알 선물
