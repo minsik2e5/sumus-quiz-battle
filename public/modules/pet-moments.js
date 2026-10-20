@@ -175,10 +175,11 @@ function closeOverlay(changed, onChanged) {
 }
 
 // The basic egg just bought: whose egg it is (shared by the shop window and the 놀이터 egg stand).
-function eggRevealHtml(body, key, done) {
+// V13.162 lead: 맨 위 한 줄을 바꿀 때(펫 사냥: "○○이 새 친구가 됐어요!").
+function eggRevealHtml(body, key, done, lead = null) {
   const name = CHARACTERS[key].ko;
   body.innerHTML = `<div class="pet-shop">
-    <p class="pet-moment-msg"><b>${esc(petJosa(name, '이', ''))}</b>의 알이에요!</p>
+    <p class="pet-moment-msg">${lead || `<b>${esc(petJosa(name, '이', ''))}</b>의 알이에요!`}</p>
     <div class="pet-shop-reveal etp-host">${eggTapHtml(key, name, 'shop')}</div>
     <p class="pet-shop-copy">지금부터 ${esc(petJosa(name, '과', '와'))} 함께 공부해요.<br>Lv.3이 되면 알이 깨져요.</p>
     <div class="pet-moment-actions"><button type="button" class="btn primary" data-pet-done>좋아요!</button></div>
@@ -269,6 +270,16 @@ export async function giftEggShow(egg) {
   await new Promise(resolve => {
     momentOpen = true;
     eggRevealHtml(openOverlay('선생님 알'), egg.key, () => { closeOverlay(false); resolve(); });
+  });
+}
+// V13.162 펫 사냥에서 잡은 새 친구: 알 상점과 같은 공개 연출(기본은 알 이름 카드, 영웅은 영웅 연출).
+export async function huntPetShow(key, tier) {
+  if (!key || !CHARACTERS[key]) return;
+  if (tier === 'epic') { await epicShow({ key, from: 'hunt' }); return; }
+  await new Promise(resolve => {
+    momentOpen = true;
+    const name = CHARACTERS[key].ko;
+    eggRevealHtml(openOverlay('새 친구'), key, () => { closeOverlay(false); resolve(); }, `<b>${esc(petJosa(name, '이', '가'))}</b> 새 친구가 됐어요! 공 안에서 알로 쉬고 있어요`);
   });
 }
 async function eggShow(res, kind) {

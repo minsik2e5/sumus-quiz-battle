@@ -450,6 +450,8 @@ async function save(ms) {
 function result(ms, stars, res) {
   app()?.classList.remove('fever');
   const record = !!res?.record, coins = Number(res?.coins || 0), xp = Number(res?.xp || 0), bait = !!res?.bait;
+  // V13.162 별 3개면 펫 사냥 공(가끔 좋은 공).
+  const extras = `${bait ? '<span class="r bait"><b>🪱 +1</b><small>낚시 미끼</small></span>' : ''}${res?.ball ? `<span class="r ball"><b>${res.ball === 'good' ? '🔵' : '🟢'} +1</b><small>${res.ball === 'good' ? '좋은 공' : '사냥 공'}</small></span>` : ''}`;
   const why = !M.id ? '연결이 안 돼서 기록 없이 했어요.' : res?.reason === 'daily' ? `오늘 코인 판(${MATCH.DAILY}판)을 다 썼어요. 기록은 남아요!` : res?.reason === 'error' ? esc(res.error || '저장하지 못했어요.') : res?.reason ? '이번 판은 기록하지 못했어요.' : '';
   const prev = M.prevBest;
   const diffLine = record && prev ? `내 최고보다 <b>${((prev - ms) / 1000).toFixed(2)}초</b> 빨라요!` : record ? '첫 기록이에요!' : prev ? `내 최고(${matchTime(prev)})까지 <b>${((ms - prev) / 1000).toFixed(2)}초</b>` : '';
@@ -464,8 +466,8 @@ function result(ms, stars, res) {
     ${diffLine ? `<p class="mt-res-diff">${diffLine}</p>` : ''}
     ${ghostLine ? `<div class="mt-res-ghost${beat ? ' beat' : ''}">${avatar(g.pet, { size: 'mini', form: 1 })}<span>${ghostLine}</span></div>` : ''}
     <div class="mt-res-facts"><span>틀림 <b>${num(M.misses)}</b></span><span>최고 콤보 <b>${num(M.best)}</b></span>${M.view?.best ? `<span>내 최고 <b>${matchTime(M.view.best)}</b></span>` : ''}</div>
-    ${coins ? `<div class="mt-rewards"><span class="r coin">${coin()}<b>+<i>0</i></b><small>${res.record_coins ? `신기록 +${num(res.record_coins)} 포함` : '코인'}</small></span><span class="r xp"><b>+${num(xp)}</b><small>경험치</small></span>${bait ? '<span class="r bait"><b>🪱 +1</b><small>낚시 미끼</small></span>' : ''}</div>`
-      : `${bait ? '<div class="mt-rewards"><span class="r bait"><b>🪱 +1</b><small>낚시 미끼</small></span></div>' : ''}${why ? `<p class="mt-res-why">${why}</p>` : ''}`}
+    ${coins ? `<div class="mt-rewards"><span class="r coin">${coin()}<b>+<i>0</i></b><small>${res.record_coins ? `신기록 +${num(res.record_coins)} 포함` : '코인'}</small></span><span class="r xp"><b>+${num(xp)}</b><small>경험치</small></span>${extras}</div>`
+      : `${extras ? `<div class="mt-rewards">${extras}</div>` : ''}${why ? `<p class="mt-res-why">${why}</p>` : ''}`}
     ${missed.length ? `<div class="mt-review"><h3>헷갈린 단어 <small>다음 판에 먼저 나와요</small></h3><div>${missed.map((p, i) => `<span class="mt-rcard" style="--i:${i}"><b>${esc(p.en)}</b><em>${esc(p.ko)}</em></span>`).join('')}</div></div>` : ''}
     <div class="mt-words">${M.pairs.map(p => `<span class="${M.missed.has(String(p.id)) ? 'x' : ''}"><b>${esc(p.en)}</b>${esc(p.ko)}</span>`).join('')}</div>
     <div class="mt-res-pet">${petArt(stars === 3 ? 'happy' : stars === 2 ? 'cheer' : 'sad')}<span class="mt-bubble show">${petLine}</span></div>

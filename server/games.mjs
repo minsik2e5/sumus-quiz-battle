@@ -3,6 +3,7 @@ import { MATCH, matchStars } from '../public/modules/match-rules.js';
 import { FISH } from '../public/modules/fishing-rules.js';
 import { addBonus, findReceipt, keepReceipt } from './rewards.mjs';
 import { grantBait } from './reel.mjs';
+import { grantBall } from './hunt.mjs';
 
 // V13.149 혼자 하는 단어 게임: 짝 맞추기 타임어택(학생 기록 p.games). V13.150: 혼자 단어 낚시는 놀이터 손맛 낚시(server/reel.mjs)로 바뀌었다.
 //   games.match { live{id, at, codes}, r3{best, at, splits, week{key, best, at, splits}}, day, plays, record_day } (best · week는 예전 6쌍 기록)
@@ -62,7 +63,9 @@ function matchSettle(p, m, live, { ms, misses, splits, pet, now, weekKey }) {
   const today = dayKey(now);
   if (m.day !== today) { m.day = today; m.plays = 0; }
   const base = { ms: time, stars, record, week_record: weekRecord };
-  if (Number(m.plays || 0) >= MATCH.DAILY) return { ...base, paid: false, reason: 'daily', bait: stars === 3 && grantBait(p, now) };
+  // V13.162: 별 3개면 펫 사냥 공 1개(하루 1번, 가끔 좋은 공). 코인 판을 다 써도 받는다(미끼와 같다).
+  const ball = stars === 3 ? grantBall(p, 'match', { lucky: true, now }) : null;
+  if (Number(m.plays || 0) >= MATCH.DAILY) return { ...base, paid: false, reason: 'daily', bait: stars === 3 && grantBait(p, now), ball };
   m.plays = Number(m.plays || 0) + 1;
   const recordCoins = record && m.record_day !== today ? MATCH.RECORD_COINS : 0;
   if (recordCoins) m.record_day = today;
@@ -70,7 +73,7 @@ function matchSettle(p, m, live, { ms, misses, splits, pet, now, weekKey }) {
   addBonus(p, { xp: MATCH.XP, coins, pet, now });
   // V13.150: 별 3개면 낚시 미끼 1개(하루 미끼 한도 안에서).
   const bait = stars === 3 && grantBait(p, now);
-  return { ...base, paid: true, coins, record_coins: recordCoins, xp: MATCH.XP, bait };
+  return { ...base, paid: true, coins, record_coins: recordCoins, xp: MATCH.XP, bait, ball };
 }
 // V13.152 순위 범위 · 기간. 처음 화면은 전체 학생 · 이번 주(선생님 결정). 반만 보이던 것을 넓혔다.
 export const MATCH_SCOPES = ['all', 'school', 'class'];

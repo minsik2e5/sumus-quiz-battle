@@ -32,6 +32,8 @@ import { dungeonQuestions } from './dungeon-words.mjs';
 import { settleDungeonRecords, dungeonBoardsView, dungeonLastView } from './dungeon-records.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
 import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend, reelSeaPet, reelRodUp } from './reel.mjs';
+import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow } from './hunt.mjs';
+import { HUNT } from '../public/modules/hunt-rules.js';
 import { REEL } from '../public/modules/reel-rules.js';
 import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './games.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
@@ -1185,7 +1187,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } else if (process.env.AUTH_PROVIDER === 'supabase') {
       const result = await supabaseLogin(username, password); p = result.profile; supabaseAccessToken = result.accessToken;
       const old = state.profiles.find(x => x.id === p.id);
-      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live', 'bonus', 'streak_guard', 'games', 'reel'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
+      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live', 'bonus', 'streak_guard', 'games', 'reel', 'hunt'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
       else state.profiles.push(p);
     } else {
       p = localProfile;
@@ -1287,7 +1289,7 @@ export async function service(state, method, path, body, token, options = {}) {
       class_league: teacher && selectedSchool ? classLeague(state, competition, selectedSchool, now) : null,
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now) },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now), hunt: huntView(p, now) },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -1342,6 +1344,11 @@ export async function service(state, method, path, body, token, options = {}) {
     preview.reel ||= {};
     preview.reel.bait = Math.max(Number(preview.reel.bait || 0), REEL.PREVIEW.BAIT);
     preview.reel.pearls = Math.max(Number(preview.reel.pearls || 0), REEL.PREVIEW.PEARLS);
+    // V13.162 펫 사냥도 둘러볼 수 있게 공을 채운다.
+    preview.hunt ||= {};
+    preview.hunt.basic = Math.max(Number(preview.hunt.basic || 0), HUNT.PREVIEW.BALLS);
+    preview.hunt.good = Math.max(Number(preview.hunt.good || 0), HUNT.PREVIEW.GOOD);
+    preview.hunt.gold = Math.max(Number(preview.hunt.gold || 0), HUNT.PREVIEW.GOLD);
     const raw = randomBytes(32).toString('base64url');
     state.tokens.push({ hash: hashToken(raw), user_id: preview.id, expires_at: Date.now() + 2 * 3600000, preview_owner_id: p.id });
     return { ok: true, profile: publicProfile(preview), _cookie: raw };
@@ -1624,7 +1631,10 @@ export async function service(state, method, path, body, token, options = {}) {
     const guard = done.tickets > 0 ? giveStreakGuard(state, p, 'attend', now) : null;
     // V13.150: 출석하면 낚시 미끼 1개.
     const bait = grantBait(p, now);
-    return { ...done, streak_guard: guard, bait, reel: reelView(p, now), points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
+    // V13.162: 출석하면 펫 사냥 공 1개, 도장판(7칸)을 HUNT.GOLD_CARDS장 채우면 황금 공 1개.
+    const ball = grantBall(p, 'attend', { now });
+    const goldBall = done.tickets > 0 && huntCard(p);
+    return { ...done, streak_guard: guard, bait, ball, gold_ball: goldBall, reel: reelView(p, now), hunt: huntView(p, now), points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
   }
   // V13.149 연속 학습 보호권 사기(최대 STREAK_GUARD.MAX장).
   if (path === '/shop/streak-guard' && method === 'POST') {
@@ -1846,6 +1856,34 @@ export async function service(state, method, path, body, token, options = {}) {
     const spend = reelSpend(p, item, now);
     spend();
     return { ...hatchEgg(state, p, { epic, season: null, missing, price: 0 }), reel: reelView(p, now) };
+  }
+  // V13.162 펫 사냥(놀이터): 지도 · 만나기 · 던지기(server/hunt.mjs). 지도는 열 때 서버가 만든다(몇 시간마다 바뀜).
+  if (path === '/hunt/home' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
+    const now = Date.now();
+    huntMap(p, now);
+    return { hunt: huntView(p, now) };
+  }
+  if (path === '/hunt/meet' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
+    const now = Date.now(), res = huntMeet(p, str(body.spot, 40), now);
+    return { ...res, hunt: huntView(p, now) };
+  }
+  if (path === '/hunt/throw' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    // 화면이 만든 던지기 번호(다시 보내도 한 번만).
+    const throwId = /^[a-z0-9-]{8,40}$/i.test(String(body.id || '')) ? String(body.id) : null;
+    if (!throwId) fail('던지기 번호를 확인해 주세요.');
+    const res = huntThrow(p, { id: throwId, spot: str(body.spot, 40), ball: str(body.ball, 10), quality: body.quality ? str(body.quality, 12) : null, berry: body.berry ? str(body.berry, 10) : null, now });
+    return { ...res, hunt: huntView(p, now), ...(res.new_pet ? { profile: publicProfile(p), stats: stats(state, p) } : {}), ...(res.coins ? { points_balance: coinBalance(state, p) } : {}) };
+  }
+  if (path === '/hunt/guide' && method === 'POST') {
+    requireRole(p, 'student');
+    (p.hunt ||= {}).guide = true;
+    return { hunt: huntView(p) };
   }
   if (path === '/profile/pet-name' && method === 'POST') {
     requireRole(p, 'student');
@@ -3053,6 +3091,8 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false } = {
   if (complete && student) repairStreak(state, student, endedAt);
   // V13.150: 끝까지 푼 연습(10문제 이상)은 낚시 미끼 1개.
   if (complete && student && answerRecords.length >= REEL.BAIT_MIN_PRACTICE && grantBait(student, endedAt)) x.bait = true;
+  // V13.162: 같은 조건으로 펫 사냥 공 1개(하루 1번). 만점이면 가끔 좋은 공.
+  if (complete && student && answerRecords.length >= HUNT.MIN_PRACTICE) { const ball = grantBall(student, 'practice', { lucky: perfect, now: endedAt }); if (ball) x.ball = ball; }
 }
 // V13.149 되살리기: 연속이 어제 끊겼으면(보호권이 없어서) 오늘 끝까지 푼 연습이 모두 REPAIR_NEED문제를 넘을 때 어제를 잇는다.
 function repairStreak(state, p, now) {
@@ -3090,7 +3130,7 @@ function practiceView(x, state) {
     range_codes: x.range_codes || [], cover_all: !!x.cover_all, daily_quest: !!x.daily_quest, assignment_id: x.assignment_id || null,
     manual_selection: !!x.manual_selection, exam_style: !!x.exam_style, quest_mix: x.quest_mix || null, word_ids: [...(x.words || [])],
     covered: x.seen?.length || 0, total: x.total, correct: hideTestScore ? null : x.correct, score_total: x.finished ? scoreTotal : (x.score_total || 0), score_correct: hideTestScore ? null : scoreCorrect, score: hideTestScore ? null : score,
-    xp: hideTestScore ? null : x.xp, reward_points: x.finished ? Number(x.reward_points || 0) : undefined, reward_breakdown: x.finished ? (x.reward_breakdown || []) : undefined, reward_note: x.finished ? (x.reward_note || null) : undefined, reward_event: x.finished ? (x.reward_event || null) : undefined, bait: x.finished ? !!x.bait : undefined, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
+    xp: hideTestScore ? null : x.xp, reward_points: x.finished ? Number(x.reward_points || 0) : undefined, reward_breakdown: x.finished ? (x.reward_breakdown || []) : undefined, reward_note: x.finished ? (x.reward_note || null) : undefined, reward_event: x.finished ? (x.reward_event || null) : undefined, bait: x.finished ? !!x.bait : undefined, ball: x.finished ? (x.ball || null) : undefined, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
     started_at: x.started_at, finished_at: x.finished_at || null, ended_at: x.ended_at || null, finalized_at: x.finalized_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
     timer_mode: x.timer_mode || 'session', question_duration_sec: Number(x.question_duration_sec || 0), question_started_at: x.question_started_at || null, question_deadline: x.question_deadline || null,
     auto_submitted: !!x.auto_submitted,
