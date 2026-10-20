@@ -808,7 +808,7 @@ function hatchEgg(state, p, { epic, season, missing, price }) {
   return { key, epic, profile: publicProfile(p) };
 }
 // 선생님 TV가 쓰는 것(입장표 포함: 선생님만 받는다).
-const partyHostView = x => ({ id: x.id, code: x.code, kind: x.kind, minutes: x.minutes, steal: x.steal, class_name: x.class_name, label: x.label || x.class_name, tv_ticket: x.tv_ticket, created_at: x.created_at });
+const partyHostView = x => ({ id: x.id, code: x.code, kind: x.kind, minutes: x.minutes, steal: x.steal, teams: !!x.teams, class_name: x.class_name, label: x.label || x.class_name, tv_ticket: x.tv_ticket, created_at: x.created_at });
 // 방이 보낸 결과(cloudflare/worker.mjs /api/internal/party-result).
 export function settlePartyReport(state, body) { return settleParty(state, body, { petKey: pid => activePetKey(state, pid) }); }
 export { partyReportPending, undoParty };
@@ -1755,13 +1755,13 @@ export async function service(state, method, path, body, token, options = {}) {
     for (const x of closing) x.status = 'closed';
     const minutes = PARTY.MINUTES.includes(Number(body.minutes)) ? Number(body.minutes) : 8;
     state.parties ||= [];
-    const party = { id: id(), code: newPartyCode(state, now), kind, school_id: school.id, teacher_id: p.id, class_name: className, grade, minutes, steal: kind === 'treasure' && body.steal !== false, status: 'open', created_at: now, tickets: {}, tv_ticket: partyTicket(), range_codes: rangeCodes };
+    const party = { id: id(), code: newPartyCode(state, now), kind, school_id: school.id, teacher_id: p.id, class_name: className, grade, minutes, steal: kind === 'treasure' && body.steal !== false, teams: kind === 'treasure' && body.teams === true, status: 'open', created_at: now, tickets: {}, tv_ticket: partyTicket(), range_codes: rangeCodes };
     state.parties.push(party);
     const label = `${className} · ${rangeCodes.length}개 범위 · ${questions.length}단어`;
     party.label = label;
     return {
       party: partyHostView(party),
-      _parties: [...closing.map(x => ({ action: 'close', id: x.id })), { action: 'init', id: party.id, tv_ticket: party.tv_ticket, party: { code: party.code, kind, minutes, steal: party.steal, questions, host: { id: p.id, name: p.display_name }, seed: randomBytes(4).readUInt32BE(0), school_id: school.id, class_name: className, label } }]
+      _parties: [...closing.map(x => ({ action: 'close', id: x.id })), { action: 'init', id: party.id, tv_ticket: party.tv_ticket, party: { code: party.code, kind, minutes, steal: party.steal, teams: party.teams, questions, host: { id: p.id, name: p.display_name }, seed: randomBytes(4).readUInt32BE(0), school_id: school.id, class_name: className, label } }]
     };
   }
   if (path === '/teacher/party/close' && method === 'POST') {
