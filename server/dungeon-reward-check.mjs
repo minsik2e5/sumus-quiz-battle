@@ -57,7 +57,8 @@ export async function runDungeonRewardChecks(assert, expectStatus) {
     const result = { cleared, cut, size: players.length, floor: reached, reached, time_ms: time, record: (cleared || cut === 'max') && !bots, no_down: noDown, report_id: `dungeon:${id}:1`, players };
     return { d, report: { id, report_id: result.report_id, result }, ok: settleDungeon(state, { id, report_id: result.report_id, result }, now) };
   };
-  const now = Date.now();
+  // 이번 주 화요일 새벽(한국 시간)에 시작한다: 실제 오늘이 일요일이면 "다음 날"이 다음 주가 되어 주간 1위 검사가 어긋났다.
+  const now = rankingWeek(Date.now()).start + DAY + 3 * 3600000;
   const first = play({ now, noDown: true });
   const ra = first.d.result.rewards['qa-rw-a'];
   assert(first.ok && ra.coins === 150 && ra.first && coinsOf('qa-rw-a') === 150 && P('qa-rw-a').dungeon_cleared.join() === 'c3' && P('qa-rw-c').dungeon_cleared.join() === 'c3', 'V13.143 처음 클리어: 파티원마다 150코인, 다음 등급컷이 열린다');
