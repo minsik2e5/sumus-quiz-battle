@@ -33,6 +33,25 @@ assert(second.status === 200 && second.body.updatedAt > first.body.updatedAt, 'u
 assert((await call(s, 'GET', '/api/widget', null, c)).body.state.a === 3, 'the widget reads the same document');
 const imp = await call(s, 'POST', '/api/planner/import', { state: { a: 9 } }, c);
 assert(imp.status === 200 && (await s.get('previous')).at(-1).state.a === 3, 'an imported backup keeps the replaced document');
+
+// automatic daily copies: the first save of each day keeps the document as it was just before
+const DAY = 86_400_000, t0 = Date.parse('2026-10-20T03:00:00Z');
+const bs = mem(); const bc = (await call(bs, 'POST', '/api/auth', { pin: '482915' }, null, t0)).cookie;
+let up = (await call(bs, 'PUT', '/api/planner', { state: { v: 'day0' }, baseUpdatedAt: 0 }, bc, t0)).body.updatedAt;
+assert((await call(bs, 'GET', '/api/planner/backups', null, bc, t0)).body.backups.length === 0, 'nothing to copy on the very first save');
+up = (await call(bs, 'PUT', '/api/planner', { state: { v: 'day0b' }, baseUpdatedAt: up }, bc, t0 + 1000)).body.updatedAt;
+assert((await call(bs, 'GET', '/api/planner/backups', null, bc, t0)).body.backups.length === 1, 'the first save of a day makes one copy');
+up = (await call(bs, 'PUT', '/api/planner', { state: { v: 'day0c' }, baseUpdatedAt: up }, bc, t0 + 2000)).body.updatedAt;
+assert((await call(bs, 'GET', '/api/planner/backups', null, bc, t0)).body.backups.length === 1, 'later saves the same day make no more');
+for (let d = 1; d <= 35; d++) up = (await call(bs, 'PUT', '/api/planner', { state: { v: 'day' + d }, baseUpdatedAt: up }, bc, t0 + d * DAY)).body.updatedAt;
+const list = (await call(bs, 'GET', '/api/planner/backups', null, bc, t0 + 35 * DAY)).body.backups;
+assert(list.length === 30 && list[0].date === '2026-11-24' && list[0].bytes > 0 && !(await bs.get('snap:2026-10-20')), 'only the last 30 days are kept, newest first, older ones are deleted');
+const one = await call(bs, 'GET', '/api/planner/backups/' + list[2].date, null, bc, t0);
+assert(one.status === 200 && one.body.state.v === 'day32' && (await call(bs, 'GET', '/api/planner/backups/2020-01-01', null, bc, t0)).status === 404, 'one copy can be read, an unknown day is 404');
+const back = await call(bs, 'POST', '/api/planner/restore', { date: list[2].date }, bc, t0 + 36 * DAY);
+assert(back.status === 200 && (await call(bs, 'GET', '/api/planner', null, bc, t0)).body.state.v === 'day32' && (await bs.get('previous')).at(-1).state.v === 'day35', 'restoring puts the day back and keeps what it replaced');
+assert((await call(bs, 'POST', '/api/planner/restore', { date: '../x' }, bc, t0)).status === 404 && (await call(bs, 'GET', '/api/planner/backups', null)).status === 401, 'bad dates are refused and backups need a sign-in');
+
 await call(s, 'DELETE', '/api/auth', null, c);
 assert((await call(s, 'GET', '/api/planner', null, c)).status === 401, 'signing out ends the session');
 

@@ -23,21 +23,29 @@ async function boot() {
     try { await store.load(); break; }
     catch (err) { if (err.status === 401) { location.reload(); return; } root.innerHTML = pinChecking('연결을 기다리는 중이에요…'); shown = ''; await new Promise(r => setTimeout(r, Math.min(30000, 2000 * (a + 1)))); }
   }
+  housekeeping();
   draw();
   requestAnimationFrame(() => syncSize(true));
   setInterval(refresh, 30000);
   addEventListener('focus', refresh);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') refresh(); });
 }
+// 끝난 시험은 다음 시험(기말)으로 넘어가고, 정해 둔 기말 날짜가 들어감 — 플래너 화면과 같은 규칙 (위젯만 켜 둬도 반영됨)
+function housekeeping() {
+  const probe = JSON.parse(JSON.stringify(S()));
+  C.applyMigrations(probe); C.autoRollExams(probe, today);
+  if (JSON.stringify(probe) !== JSON.stringify(S())) change(s => { C.applyMigrations(s); C.autoRollExams(s, today); });
+}
 async function refresh() {
   today = C.todayKst();
   if (!(await store.refresh())) draw();
+  housekeeping();
 }
 
 // Which widget this page is: /widget.html?w=all (the whole card, as before) or one piece for the
 // desktop widget windows: classes, work, quick, checklist, notes (?n=<note id>), clock.
 const Q = new URLSearchParams(location.search), KIND = Q.get('w') || 'all';
-const TITLES = { classes: '오늘 수업', work: '출퇴근 · 생활', quick: '일정 메모', checklist: '오늘 체크리스트', notes: '메모장', clock: '시계' };
+const TITLES = { classes: '오늘 수업', work: '출퇴근 · 생활', quick: '일정 메모', checklist: '오늘 체크리스트', notes: '메모장', clock: '시계', exams: '시험 D-day' };
 document.body.dataset.widget = KIND;
 // 작게 접기: 제목줄만 남김. 이 위젯 종류별로 기억 (EXE 창 높이도 같이 줄이고 펼칠 때 원래 높이로 되돌림).
 const FOLD_KEY = `sumus-fold-${KIND}`, HEIGHT_KEY = `sumus-open-h-${KIND}`;
@@ -92,11 +100,28 @@ function draw() {
       };
       return sec('list-checks', '오늘 체크리스트', `<em>${doneTasks + doneRoutines}/${tasks.length + routines.length}</em>`, `<div class="desktop-check-list" id="w-checks">${items.map(row).join('')}${!items.length ? '<p>체크할 항목이 없어요.</p>' : ''}</div>`);
     },
+    exams: () => {
+      // 시험 D-day: 가까운 시험부터. 범위 진행(체크한 번호/전체), 시험 전 남은 수업, 진도 상태.
+      const all = C.sortExams(C.examsOf(s)).filter(x => C.examUpcoming(x, today)), list = KIND === 'all' ? all.slice(0, 3) : all;
+      if (!list.length) return KIND === 'all' ? '' : sec('graduation-cap', '시험 D-day', '', '<p>예정된 시험이 없어요.</p>');
+      const rank = { 지연: 4, 주의: 3, 여유: 2, 완료: 1 };
+      const row = x => {
+        const undated = C.examUndated(x), cs = C.COHORTS.filter(c => (x.cohortIds || []).includes(c.id));
+        let items = 0, checked = 0, lessons = 0, worst = '준비';
+        for (const c of cs) { const st = C.rangeStats(s, c.id), p = C.pace(s, c.id, today); items += st.items.length; checked += st.checked; lessons += p.lessons; if ((rank[p.state] || 0) > (rank[worst] || 0)) worst = p.state; }
+        const label = C.examStatus(x, today), days = /^D-(\d+)$/.exec(label)?.[1], tone = label === '시험 중' ? 'now' : days != null && +days <= 7 ? 'soon' : undated ? 'none' : '';
+        const when = undated ? '날짜 미정' : x.start === x.end ? C.fmtMd(x.start) : `${C.fmtMd(x.start)} – ${C.fmtMd(x.end)}`;
+        const pct = items ? Math.round(checked / items * 100) : 0;
+        return `<div class="dday-row"><div class="dday-top"><span class="exam-dot ${esc(x.color || 'blue')}"></span><div><strong>${esc(x.school)} ${esc(x.label)}</strong><small>${when}</small></div><b class="dday-badge ${tone}">${label}</b></div>${items ? `<div class="dday-meter"><span><i style="width:${pct}%"></i></span><small>범위 ${checked}/${items}${undated ? '' : ` · 시험 전 수업 ${lessons}회`} · <em class="pace-${worst}">${worst}</em></small></div>` : ''}</div>`;
+      };
+      return sec('graduation-cap', '시험 D-day', all.length > list.length ? `<em>외 ${all.length - list.length}개</em>` : '', `<div class="dday-list">${list.map(row).join('')}</div>`);
+    },
     notes: () => {
-      const list = s.notes, cur = list.find(n => n.id === Q.get('n')) || list[0];
+      if (trashOpen) return sec('file-text', '휴지통', '', `<div class="trash-head"><small>지운 메모는 30일 동안 여기서 되살릴 수 있어요.</small><button type="button" data-act="trash-close">돌아가기</button></div><div class="trash-list">${(s.trash || []).slice().reverse().map(n => `<div class="trash-row"><div><strong>${esc(n.title || '제목 없음')}</strong><small>${esc(String(n.text || '').split('\n').find(l => l.trim()) || '내용 없음').slice(0, 40)} · ${C.fmtMd(new Date(n.deletedAt + 9 * 3600000).toISOString().slice(0, 10))} 삭제</small></div><button type="button" data-act="trash-restore" data-id="${esc(n.id)}">되살리기</button><button type="button" class="purge" data-act="trash-purge" data-id="${esc(n.id)}" aria-label="완전히 삭제">×</button></div>`).join('') || '<p>휴지통이 비었어요.</p>'}</div>`);
+      const list = s.notes, cur = list.find(n => n.id === Q.get('n')) || list[0], trashBtn = (s.trash || []).length ? `<button type="button" class="trash-open" data-act="trash-open">휴지통 (${s.trash.length})</button>` : '';
       return sec('file-text', '메모장', '', `<div class="note-tabs">${list.map(n => `<button type="button" class="${n.id === cur?.id ? 'on' : ''}" data-note-open="${esc(n.id)}">${esc(n.title || '제목 없음')}</button>`).join('')}<button type="button" data-act="note-new" aria-label="새 메모">${icon('plus')}</button></div>${cur
-        ? `<input id="w-note-title" class="note-title" maxlength="40" value="${esc(cur.title || '')}" placeholder="제목" data-note="${esc(cur.id)}"><div class="note-bar" aria-label="글 서식"><button type="button" data-act="note-ck" title="체크박스 줄 넣기·빼기" aria-label="체크박스">${icon('list-checks')}<span>체크</span></button><i></i>${NOTE_COLORS.map(([name, hex]) => `<button type="button" class="note-color${hex === NOTE_BASE ? ' base' : ''}" data-color="${hex}" style="--c:${hex}" title="글씨색 ${name}" aria-label="글씨색 ${name}"></button>`).join('')}</div><div id="w-note-text" class="note-text${cur.text ? '' : ' is-empty'}" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" data-note="${esc(cur.id)}" data-placeholder="쓰고 싶은 걸 적으세요. 자동으로 저장돼요.">${noteHtml(cur)}</div><div class="note-foot"><button type="button" data-act="note-del" data-note="${esc(cur.id)}">이 메모 지우기</button></div>`
-        : '<p>아직 메모가 없어요. + 를 눌러 새로 만드세요.</p>'}`);
+        ? `<input id="w-note-title" class="note-title" maxlength="40" value="${esc(cur.title || '')}" placeholder="제목" data-note="${esc(cur.id)}"><div class="note-bar" aria-label="글 서식"><button type="button" data-act="note-ck" title="체크박스 줄 넣기·빼기" aria-label="체크박스">${icon('list-checks')}<span>체크</span></button><button type="button" data-act="note-b" title="굵게 (Ctrl+B)" aria-label="굵게"><b>B</b></button><button type="button" data-act="note-h" title="제목 줄" aria-label="제목 줄"><span>제목</span></button><i></i>${NOTE_COLORS.map(([name, hex]) => `<button type="button" class="note-color${hex === NOTE_BASE ? ' base' : ''}" data-color="${hex}" style="--c:${hex}" title="글씨색 ${name}" aria-label="글씨색 ${name}"></button>`).join('')}</div><div id="w-note-text" class="note-text${cur.text ? '' : ' is-empty'}" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" data-note="${esc(cur.id)}" data-placeholder="쓰고 싶은 걸 적으세요. 자동으로 저장돼요.">${noteHtml(cur)}</div><div class="note-foot">${trashBtn}<button type="button" data-act="note-del" data-note="${esc(cur.id)}">이 메모 지우기</button></div>`
+        : `<p>아직 메모가 없어요. + 를 눌러 새로 만드세요.</p><div class="note-foot">${trashBtn}</div>`}`);
     },
     clock: () => `<div class="w-clock"><b id="w-clock-t"></b><span id="w-clock-d"></span></div>`
   };
@@ -105,7 +130,7 @@ function draw() {
     ? `<header class="desktop-widget-head"><div class="desktop-widget-logo">S</div><div><strong>SUMUS TODAY</strong><span>${C.fmtLong(today)}</span></div><i id="w-dot"></i><button type="button" data-act="refresh" aria-label="새로고침">${icon('refresh-cw')}</button>${foldBtn}${inExe ? `<button type="button" class="w-plus" data-act="add-widget" aria-label="위젯 추가·메뉴" title="위젯 추가 · 메뉴">+</button>` : ''}</header>
     <div class="desktop-widget-progress"><div>${icon('sparkles')}<strong>오늘 ${p.completed}/${p.total || 0} 완료</strong></div><span><b style="width: ${p.total ? Math.round(p.completed / p.total * 100) : 0}%;"></b></span></div>`
     : `<header class="desktop-widget-head slim"><div class="desktop-widget-logo">S</div><div><strong>${TITLES[KIND] || 'SUMUS'}</strong><span>${C.fmtLong(today)}</span></div><i id="w-dot"></i>${foldBtn}${inExe ? `<button type="button" class="w-plus" data-act="add-widget" aria-label="위젯 추가·메뉴" title="위젯 추가 · 메뉴">+</button><button type="button" class="w-close" data-act="close-widget" aria-label="이 위젯 닫기" title="이 위젯 닫기">×</button>` : ''}</header>`;
-  const body = KIND === 'all' ? ['work', 'classes', 'quick', 'checklist'].map(k => parts[k]()).join('') : (parts[KIND] || parts.classes)();
+  const body = KIND === 'all' ? ['work', 'classes', 'exams', 'quick', 'checklist'].map(k => parts[k]()).join('') : (parts[KIND] || parts.classes)();
   const foot = KIND === 'all' ? `<footer><div>${inExe ? '' : '<a href="/SUMUS_Widget_Installer.zip" download>Windows 설치</a>'}<button type="button" data-act="planner">${icon('external-link')} 전체 플래너</button></div><span id="w-status"></span></footer>` : '<footer class="slim"><span id="w-status"></span></footer>';
   // Same markup as what is on screen: leave the page alone (no flash, no scroll jump).
   // The 30-second check, window focus and the refresh button all land here with nothing new.
@@ -117,7 +142,7 @@ function draw() {
   drawStatus(); tickClock();
   if (folded) requestAnimationFrame(() => syncSize());
 }
-let shown = '', editingTitle = false;
+let shown = '', editingTitle = false, trashOpen = false;
 function tickClock() {
   const t = document.getElementById('w-clock-t'); if (!t) return;
   const n = new Date(Date.now() + 9 * 3600000), iso = n.toISOString();
@@ -168,12 +193,18 @@ root.addEventListener('click', e => {
   if (d.act === 'chk-edit') { startTitleEdit(d.key); return; }
   if (d.act === 'chk-del') { deleteCheck(d.key); return; }
   if (d.act === 'note-ck') { toggleCheckLines(); return; }
+  if (d.act === 'note-b') { boldText(); return; }
+  if (d.act === 'note-h') { toggleHeading(); return; }
+  if (d.act === 'trash-open') { trashOpen = true; draw(); return; }
+  if (d.act === 'trash-close') { trashOpen = false; draw(); return; }
+  if (d.act === 'trash-restore') { restoreNote(d.id); return; }
+  if (d.act === 'trash-purge') { if (confirm('완전히 지울까요? 이건 되살릴 수 없어요.')) change(s => { s.trash = (s.trash || []).filter(n => n.id !== d.id); }); return; }
   if (d.color) { applyColor(d.color); return; }
   if (d.act === 'add-widget') { window.chrome?.webview?.postMessage('menu'); return; }
   if (d.act === 'close-widget') { window.chrome?.webview?.postMessage('close'); return; }
   if (d.noteOpen) { Q.set('n', d.noteOpen); window.chrome?.webview?.postMessage('n:' + d.noteOpen); history.replaceState(null, '', '?' + Q); draw(); return; }
   if (d.act === 'note-new') { const id = `n${Date.now()}`; change(s => { s.notes.push({ id, title: '', text: '', updatedAt: Date.now() }); }); Q.set('n', id); history.replaceState(null, '', '?' + Q); draw(); setTimeout(() => document.getElementById('w-note-title')?.focus(), 30); return; }
-  if (d.act === 'note-del') { if (!confirm('이 메모를 지울까요?')) return; change(s => { s.notes = s.notes.filter(n => n.id !== d.note); }); Q.delete('n'); history.replaceState(null, '', '?' + Q); draw(); return; }
+  if (d.act === 'note-del') { if (!confirm('이 메모를 지울까요?\n(휴지통에서 30일 동안 되살릴 수 있어요)')) return; change(s => { const gone = s.notes.find(n => n.id === d.note); if (gone) s.trash = pruneTrash([...(s.trash || []), { ...gone, deletedAt: Date.now() }]); s.notes = s.notes.filter(n => n.id !== d.note); }); Q.delete('n'); history.replaceState(null, '', '?' + Q); draw(); return; }
   if (d.act === 'refresh') store.refresh().then(ch => ch || draw());
   if (d.act === 'memo') addMemo();
   if (d.act === 'planner') window.open('/', '_blank');
@@ -256,7 +287,7 @@ function saveNote(ed) {
 function fixEditor(ed, e) {
   if (!ed.firstChild) { ed.innerHTML = '<div><br></div>'; const r = document.createRange(); r.setStart(ed.firstChild, 0); r.collapse(true); const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r); }
   else if (ed.firstChild.nodeType !== 1 || ed.firstChild.tagName !== 'DIV') document.execCommand('formatBlock', false, 'div');
-  if (e?.inputType === 'insertParagraph' || e?.inputType === 'insertLineBreak') { const sel = getSelection(), ln = sel.anchorNode && lineOf(ed, sel.anchorNode); if (ln) ln.classList.remove('on'); }
+  if (e?.inputType === 'insertParagraph' || e?.inputType === 'insertLineBreak') { const sel = getSelection(), ln = sel.anchorNode && lineOf(ed, sel.anchorNode); if (ln) ln.classList.remove('on', 'h'); }
 }
 function selectedLines(ed) {
   const sel = getSelection(); if (!sel.rangeCount) return [];
@@ -279,7 +310,7 @@ function toggleCheckLines() {
   if (!lines.length) lines = [ed.lastElementChild].filter(Boolean);   // 커서가 아직 없으면 맨 아래 줄
   if (!lines.length) return;
   const on = !lines.every(l => l.classList.contains('ck'));
-  for (const l of lines) { l.classList.toggle('ck', on); if (!on) l.classList.remove('on'); }
+  for (const l of lines) { l.classList.toggle('ck', on); if (on) l.classList.remove('h'); else l.classList.remove('on'); }
   saveNote(ed);
 }
 function applyColor(hex) {
@@ -287,6 +318,34 @@ function applyColor(hex) {
   focusEditor(ed);
   document.execCommand('styleWithCSS', false, true);
   document.execCommand('foreColor', false, hex);
+  saveNote(ed);
+}
+const TRASH_MS = 30 * 86400000;
+const pruneTrash = list => list.filter(n => Date.now() - n.deletedAt < TRASH_MS).slice(-50);
+function restoreNote(id) {
+  change(s => {
+    const n = (s.trash || []).find(t => t.id === id); if (!n) return;
+    const { deletedAt, ...note } = n;
+    if (s.notes.some(x => x.id === note.id)) note.id = `n${Date.now()}`;
+    s.notes.push(note); s.trash = s.trash.filter(t => t !== n);
+    Q.set('n', note.id);
+  });
+  trashOpen = false; history.replaceState(null, '', '?' + Q); shown = ''; draw();
+}
+function boldText() {
+  const ed = editor(); if (!ed) return;
+  focusEditor(ed);
+  document.execCommand('bold');
+  saveNote(ed);
+}
+function toggleHeading() {
+  const ed = editor(); if (!ed) return;
+  focusEditor(ed); fixEditor(ed);
+  let lines = selectedLines(ed);
+  if (!lines.length) lines = [ed.lastElementChild].filter(Boolean);
+  if (!lines.length) return;
+  const on = !lines.every(l => l.classList.contains('h'));
+  for (const l of lines) { l.classList.toggle('h', on); if (on) l.classList.remove('ck', 'on'); }
   saveNote(ed);
 }
 // 박스 자리(줄 왼쪽)를 누르면 체크 · 해제

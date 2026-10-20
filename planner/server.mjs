@@ -8,12 +8,27 @@
 //   PUT  /api/planner {state, baseUpdatedAt} -> { updatedAt } | 409 { error, state, updatedAt }
 //   POST /api/planner/import {state} -> replaces the document (a backup file), keeps the old one
 //   GET  /api/widget             -> same as GET /api/planner (the widget page)
+//   GET  /api/planner/backups        -> { backups: [{ date, updatedAt, takenAt, bytes }] } the automatic daily copies
+//   GET  /api/planner/backups/<date> -> { date, state, updatedAt }
+//   POST /api/planner/restore {date} -> puts that day's copy back (the replaced document is kept)
 const COOKIE = 'sp_session';
 const SESSION_MS = 180 * 86400000;
 const LOCK_AFTER = 5, LOCK_MS = 5 * 60000;
 const MAX_DOC = 2_000_000; // bytes of JSON
+const SNAP_KEEP = 30;      // automatic daily copies kept
 
 const json = (body, status = 200, headers = {}) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers } });
+const kstDay = now => new Date(now + 9 * 3600000).toISOString().slice(0, 10);
+// The first save of each day (Korea time) keeps the document as it was just before — one copy a day, 30 days.
+async function snapshotBeforeSave(store, doc, now) {
+  if (!doc?.state) return;
+  const day = kstDay(now), index = (await store.get('snaps')) || [];
+  if (index.includes(day)) return;
+  await store.put('snap:' + day, { state: doc.state, updatedAt: doc.updatedAt, takenAt: now });
+  const next = [...index, day].sort().slice(-SNAP_KEEP);
+  for (const d of index) if (!next.includes(d)) await store.delete('snap:' + d);
+  await store.put('snaps', next);
+}
 const hex = buf => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
 const randomHex = n => hex(crypto.getRandomValues(new Uint8Array(n)));
 async function sha256(text) { return hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))); }
@@ -54,7 +69,33 @@ export async function handleApi(request, store, now = Date.now()) {
       const size = JSON.stringify(body.state).length;
       if (size > MAX_DOC) return json({ error: '저장할 내용이 너무 커요.' }, 413);
       const updatedAt = Math.max(now, Number(doc.updatedAt || 0) + 1);
+      try { await snapshotBeforeSave(store, doc, now); } catch {}   // a failed copy never blocks saving
       await store.put('doc', { state: body.state, updatedAt });
+      return json({ updatedAt });
+    }
+    if (path === '/api/planner/backups' && method === 'GET') {
+      const out = [];
+      for (const date of [...((await store.get('snaps')) || [])].reverse()) {
+        const snap = await store.get('snap:' + date);
+        if (snap) out.push({ date, updatedAt: snap.updatedAt, takenAt: snap.takenAt, bytes: JSON.stringify(snap.state).length });
+      }
+      return json({ backups: out });
+    }
+    const one = /^\/api\/planner\/backups\/(\d{4}-\d{2}-\d{2})$/.exec(path);
+    if (one && method === 'GET') {
+      const snap = await store.get('snap:' + one[1]);
+      return snap ? json({ date: one[1], state: snap.state, updatedAt: snap.updatedAt }) : json({ error: '그날의 백업이 없어요.' }, 404);
+    }
+    if (path === '/api/planner/restore' && method === 'POST') {
+      const body = await readJson(request), snap = /^\d{4}-\d{2}-\d{2}$/.test(String(body?.date ?? '')) ? await store.get('snap:' + body.date) : null;
+      if (!snap) return json({ error: '그날의 백업이 없어요.' }, 404);
+      const doc = (await store.get('doc')) || { state: null, updatedAt: 0 };
+      if (doc.state) {   // what is being replaced is kept too (the last 5), like an imported file
+        const old = (await store.get('previous')) || [];
+        await store.put('previous', [...old, { state: doc.state, updatedAt: doc.updatedAt, replacedAt: now }].slice(-5));
+      }
+      const updatedAt = Math.max(now, Number(doc.updatedAt || 0) + 1);
+      await store.put('doc', { state: snap.state, updatedAt });
       return json({ updatedAt });
     }
     if (path === '/api/planner/import' && method === 'POST') {
@@ -62,6 +103,7 @@ export async function handleApi(request, store, now = Date.now()) {
       if (!body || typeof body.state !== 'object' || body.state === null) return json({ error: '백업 파일을 확인해 주세요.' }, 400);
       const doc = (await store.get('doc')) || { state: null, updatedAt: 0 };
       // The replaced document is kept (the last 5), never thrown away.
+      try { await snapshotBeforeSave(store, doc, now); } catch {}
       if (doc.state) {
         const old = (await store.get('previous')) || [];
         await store.put('previous', [...old, { state: doc.state, updatedAt: doc.updatedAt, replacedAt: now }].slice(-5));

@@ -342,3 +342,53 @@ div.note-text.is-empty { position: relative; }
 .note-text .ck.on::before { background: #3182f6 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E") center/11px no-repeat; border-color: #3182f6; }
 .note-text .ck.on { color: #a0aab5; text-decoration: line-through; }
 .note-text .ck.on span { color: inherit !important; }
+
+/* 자동 백업 목록 */
+.backup-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; max-height: 50vh; overflow: auto; }
+.backup-row { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border: 1px solid #e7ecf2; border-radius: 12px; background: #fff; }
+.backup-row > div { flex: 1; min-width: 0; }
+.backup-row strong { display: block; font-size: 13px; }
+.backup-row small { color: #8b95a1; font-size: 11px; }
+.backup-row button { color: #4e5968; background: #f2f4f6; border: 0; border-radius: 8px; height: 28px; padding: 0 10px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.backup-row button:hover { background: #e7f0ff; color: #3182f6; }
+.backup-row button.restore { color: #fff; background: #3182f6; }
+.backup-row button.restore:hover { background: #1b64da; color: #fff; }
+
+/* 시험 D-day 위젯 */
+.dday-list { display: flex; flex-direction: column; gap: 12px; }
+.dday-row { display: flex; flex-direction: column; gap: 7px; }
+.dday-top { display: flex; align-items: center; gap: 8px; }
+.dday-top > div { flex: 1; min-width: 0; }
+.dday-top strong { display: block; font-size: 13px; }
+.dday-top small, .dday-meter small { color: #8b95a1; font-size: 11px; }
+.dday-badge { flex: none; color: #3182f6; background: #e7f0ff; border-radius: 999px; padding: 3px 10px; font-size: 13px; font-weight: 800; }
+.dday-badge.soon { color: #e5484d; background: #fdecec; }
+.dday-badge.now { color: #fff; background: #e5484d; }
+.dday-badge.none { color: #8b95a1; background: #f2f4f6; font-weight: 700; }
+.dday-meter > span { display: block; height: 5px; background: #eef1f4; border-radius: 99px; overflow: hidden; margin-bottom: 4px; }
+.dday-meter > span > i { display: block; height: 100%; background: #3182f6; border-radius: 99px; }
+.dday-meter em { font-style: normal; font-weight: 800; }
+.pace-지연 { color: #e5484d; } .pace-주의 { color: #f08c00; } .pace-여유, .pace-완료 { color: #0ca678; } .pace-준비 { color: #8b95a1; }
+body[data-widget="exams"] .desktop-widget-section { overflow: auto; }
+
+/* 메모 휴지통 · 굵게/제목 */
+.note-foot { align-items: center; justify-content: space-between; }
+.note-foot .trash-open { color: #8b95a1; margin-right: auto; }
+.note-foot .trash-open:hover { color: #3182f6; }
+.trash-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.trash-head small { color: #8b95a1; font-size: 11px; }
+.trash-head button { color: #3182f6; background: #e7f0ff; border: 0; border-radius: 8px; height: 24px; padding: 0 10px; font-size: 11px; font-weight: 700; cursor: pointer; flex: none; }
+.trash-list { display: flex; flex-direction: column; gap: 6px; overflow: auto; }
+.trash-row { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid #e7ecf2; border-radius: 10px; }
+.trash-row > div { flex: 1; min-width: 0; }
+.trash-row strong { display: block; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trash-row small { color: #8b95a1; font-size: 10px; }
+.trash-row button { color: #3182f6; background: #e7f0ff; border: 0; border-radius: 8px; height: 24px; padding: 0 9px; font-size: 11px; font-weight: 700; cursor: pointer; flex: none; }
+.trash-row button.purge { color: #8b95a1; background: #f2f4f6; width: 24px; padding: 0; }
+.trash-row button.purge:hover { color: #e5484d; background: #fdecec; }
+.note-text .h { font-size: 15px; font-weight: 800; color: #191f28; margin-top: 4px; }
+.note-text b { font-weight: 800; }
+.note-bar button b { font-size: 12px; }
+
+/* 터치 화면(폰·태블릿)에는 마우스 올림이 없으니 수정·삭제를 항상 보이게 */
+@media (hover: none) { .chk-acts { opacity: 1; } }

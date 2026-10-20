@@ -16,7 +16,7 @@ using Microsoft.Web.WebView2.WinForms;
 
 namespace SumusWidget
 {
-    // id = 종류 또는 종류#번호.  all(전체 카드) classes(오늘 수업) work(출퇴근·생활) quick(일정 메모) checklist notes clock
+    // id = 종류 또는 종류#번호.  all(전체 카드) classes(오늘 수업) work(출퇴근·생활) quick(일정 메모) checklist notes clock exams(시험 D-day)
     class Kinds
     {
         public static readonly string[][] All = {
@@ -24,6 +24,7 @@ namespace SumusWidget
             new[] { "classes", "오늘 수업", "320", "270" },
             new[] { "checklist", "오늘 체크리스트", "340", "460" },
             new[] { "notes", "메모장", "360", "420" },
+            new[] { "exams", "시험 D-day", "340", "300" },
             new[] { "work", "출퇴근 · 생활", "340", "170" },
             new[] { "quick", "일정 메모", "320", "130" },
             new[] { "clock", "시계", "250", "170" }

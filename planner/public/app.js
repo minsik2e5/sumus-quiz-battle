@@ -77,6 +77,7 @@ function render() {
         <div class="top-actions"><div id="save-badge" class="save-badge"></div>
           <button type="button" data-act="widget" title="바탕화면 위젯">${icon('monitor-up')}</button>
           <button type="button" data-act="save-now" title="지금 저장">${icon('save')}</button>
+          <button type="button" data-act="snaps" title="자동 백업 (30일)">${icon('archive')}</button>
           <button type="button" data-act="backup" title="백업 받기">${icon('download')}</button>
           <button type="button" data-act="restore" title="백업 복원">${icon('upload')}</button>
           <button type="button" data-act="lock" title="잠금">${icon('log-out')}</button>
@@ -484,6 +485,7 @@ root.addEventListener('click', async e => {
     case 'pin-change': changePin(); break;
     case 'widget': window.open('/widget', 'sumus-widget', 'width=410,height=780,resizable=yes'); break;
     case 'save-now': store.save(); break;
+    case 'snaps': backupsDialog(); break;
     case 'backup': backup(); break;
     case 'restore': $('#restore-file', root)?.click(); break;
     case 'lock': await store.save(); signOut(); break;
@@ -529,6 +531,30 @@ async function changePin() {
     await api('/api/auth', { method: 'PATCH', body: JSON.stringify({ currentPin: field('pin-cur').value, newPin: field('pin-new').value }) });
     alert('PIN이 변경됐어요. 새 PIN으로 다시 들어와 주세요.'); location.reload();
   } catch (err) { showPinMsg(err.status ? err.message || 'PIN을 변경하지 못했어요.' : '연결을 확인하고 다시 시도해주세요.'); }
+}
+// 자동 백업: 서버가 하루에 한 번, 그날 처음 저장하기 직전의 데이터를 30일 동안 보관함
+const saveFile = (state, name) => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+async function backupsDialog() {
+  let list;
+  try { list = (await api('/api/planner/backups')).backups; } catch { alert('자동 백업 목록을 불러오지 못했어요. 연결을 확인해 주세요.'); return; }
+  const rows = list.map(b => `<div class="backup-row"><div><strong>${C.fmtLong(b.date)}</strong><small>그날 처음 저장하기 전 상태 · ${Math.max(1, Math.round(b.bytes / 1024))}KB</small></div><button type="button" data-snap-dl="${b.date}">파일로 받기</button><button type="button" class="restore" data-snap-restore="${b.date}">이날로 복원</button></div>`).join('');
+  const { el } = dialog('자동 백업', `<p class="exam-note">하루에 한 번, 그날 처음 저장하기 직전의 데이터를 30일 동안 자동으로 보관해요. 복원하면 지금 데이터는 따로 5번째까지 남아요.</p><div class="backup-list">${rows || '<p class="exam-note">아직 자동 백업이 없어요. 내일부터 쌓여요.</p>'}</div>`, { cls: 'task-dialog' });
+  el.addEventListener('click', async e => {
+    const dl = e.target.closest('[data-snap-dl]'), rs = e.target.closest('[data-snap-restore]');
+    try {
+      if (dl) saveFile((await api('/api/planner/backups/' + dl.dataset.snapDl)).state, `SUMUS_Planner_${dl.dataset.snapDl}.json`);
+      else if (rs) {
+        if (!confirm(`${C.fmtLong(rs.dataset.snapRestore)}로 되돌릴까요?\n지금 데이터는 따로 보관되지만, 화면은 그날 상태로 바뀌어요.`)) return;
+        await store.save();
+        await api('/api/planner/restore', { method: 'POST', body: JSON.stringify({ date: rs.dataset.snapRestore }) });
+        location.reload();
+      }
+    } catch (err) { alert(err.message || '처리하지 못했어요.'); }
+  });
 }
 function backup() {
   const blob = new Blob([JSON.stringify(S(), null, 2)], { type: 'application/json' });

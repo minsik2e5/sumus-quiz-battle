@@ -86,6 +86,7 @@ export function createDefaultState(today) {
     exams: DEFAULT_EXAMS.map(x => ({ ...x })),
     examHistory: {},
     notes: [],
+    trash: [],
     checkOrder: {}
   };
 }
@@ -107,6 +108,7 @@ export function normalizeState(st, today) {
     exams: st.exams?.length ? st.exams : n.exams,
     examHistory: st.examHistory ?? {},
     notes: Array.isArray(st.notes) ? st.notes : [],
+    trash: Array.isArray(st.trash) ? st.trash : [],
     checkOrder: st.checkOrder && typeof st.checkOrder === 'object' ? st.checkOrder : {}
   };
 }

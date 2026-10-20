@@ -1,0 +1,12 @@
+{
+  "name": "SUMUS 수업관리 플래너",
+  "short_name": "SUMUS",
+  "description": "수업, 시험 준비, 메모를 한 곳에서 관리하는 선생님용 플래너",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#3182f6",
+  "lang": "ko",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

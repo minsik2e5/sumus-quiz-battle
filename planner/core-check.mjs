@@ -41,6 +41,10 @@ export async function runCoreChecks(assert) {
   const colored = linesToHtml([{ ck: false, on: false, runs: [{ t: '중요', c: '#e5484d' }, { t: ' 일반 & 끝', c: '' }] }]);
   ok(noteHtml({ html: colored, text: '중요 일반 & 끝' }) === colored, 'a saved memo with a palette color is shown as saved');
   ok(noteHtml({ html: '<div onclick="x()">a</div>', text: 'a\n☐ b' }) === '<div>a</div><div class="ck">b</div>' && noteHtml({ html: '<div><span style="color:#123456">a</span></div>', text: 'a' }) === '<div>a</div>' && noteHtml({ html: '<script>1</script>', text: '' }) === '<div><br></div>', 'foreign html and colors outside the palette are rebuilt from the text');
+  // 굵게 · 제목 줄
+  const bl = [{ ck: false, on: false, h: true, runs: [{ t: '제목', c: '', b: false }] }, { ck: false, on: false, h: false, runs: [{ t: '보통 ', c: '', b: false }, { t: '굵게', c: '#0ca678', b: true }, { t: '끝', c: '', b: true }] }];
+  ok(linesToText(bl) === '# 제목\n보통 굵게끝' && linesToHtml(bl) === '<div class="h">제목</div><div>보통 <span style="color:#0ca678"><b>굵게</b></span><b>끝</b></div>', 'heading and bold: plain text keeps "# ", html is exact');
+  ok(noteHtml({ html: linesToHtml(bl), text: '' }) === linesToHtml(bl) && noteHtml({ html: '<div><b onclick="x">a</b></div>', text: '# t' }) === '<div class="h">t</div>' && textToLines('# t')[0].h === true, 'bold/heading html is accepted only in the exact shape');
   ok(workDuration('09:10', '18:15') === '9시간 5분' && workDuration('22:00', '01:00') === '3시간', 'work time');
   ok(sleepDay(Date.parse('2026-10-01T15:40:00Z')) === '2026-10-01' && sleepDay(Date.parse('2026-10-01T13:00:00Z')) === '2026-10-01', 'sleep after midnight counts for the night before');
   const r = normalizeState({ tasks: [], cohortLessonRecords: { '2026-09-29-2-gangseo': { plan: 'p', actual: '본문 1과' } } }, '2026-10-01');
