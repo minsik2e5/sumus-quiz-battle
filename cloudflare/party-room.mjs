@@ -4,10 +4,10 @@
 // 5초마다 한 번 저장한다(SAVE_EVERY_MS). 판 도중 방이 꺼지면 마지막 저장(최대 5초 전)부터 이어진다. 10분 판 ≈ 120번 저장.
 // 화면도 답할 때마다 모두에게 보내지 않는다: 답한 학생(과 훔침을 당한 학생)에게 바로, 나머지 학생과 TV는 0.8초마다 바뀐 것만.
 // 끝나면 메인 상태 객체에 결과를 한 번 보고한다(던전과 같다: 실패하면 다시, 메인은 같은 판을 두 번 처리하지 않는다).
-import { createParty, joinParty, startParty, endParty, answer, pick, target, tick, tvView, playerView, partyReport, PARTY } from '../server/party-engine.mjs';
+import { createParty, joinParty, startParty, endParty, answer, pick, target, alarmAnswer, peek, useItem, tick, tvView, playerView, partyReport, PARTY } from '../server/party-engine.mjs';
 import { reportRetryMs } from './battle-room.mjs';
 
-const MESSAGE_TYPES = new Set(['sync', 'ping', 'answer', 'pick', 'target', 'start', 'end']);
+const MESSAGE_TYPES = new Set(['sync', 'ping', 'answer', 'pick', 'target', 'alarm', 'peek', 'item', 'start', 'end']);
 const MESSAGE_MAX = 512;
 export const PARTY_SAVE_EVERY_MS = 5000;
 export const PARTY_PULSE_MS = 800;
@@ -96,7 +96,7 @@ export class PartyRoom {
     if (!events.length && !me) return;
     for (const ws of this.ctx.getWebSockets()) {
       const tag = this.ctx.getTags(ws)[0];
-      const mine = tag === TV ? events : events.filter(e => e.pid === tag || e.vid === tag || e.kind === 'frenzy' || e.kind === 'end' || e.kind === 'start');
+      const mine = tag === TV ? events : events.filter(e => e.pid === tag || e.vid === tag || e.kind === 'frenzy' || e.kind === 'event' || e.kind === 'end' || e.kind === 'start');
       const out = me && me.pid === tag ? [...mine, me] : mine;
       if (out.length) this.send(ws, { type: 'events', events: out });
     }
@@ -183,6 +183,9 @@ export class PartyRoom {
     if (msg.type === 'answer') res = answer(s, tag, Number.isInteger(msg.choice) ? msg.choice : -1, now, this.random);
     else if (msg.type === 'pick') res = pick(s, tag, Number.isInteger(msg.i) ? msg.i : 0, now);
     else if (msg.type === 'target') res = target(s, tag, typeof msg.pid === 'string' ? msg.pid.slice(0, 80) : '', now);
+    else if (msg.type === 'alarm') res = alarmAnswer(s, tag, Number.isInteger(msg.choice) ? msg.choice : -1, now);
+    else if (msg.type === 'peek') res = peek(s, tag, now, this.random);
+    else if (msg.type === 'item') res = useItem(s, tag, typeof msg.item === 'string' ? msg.item.slice(0, 20) : '', now);
     if (!res || (!res.events.length && !res.me)) return this.sendView(ws, now, true);
     this.notify(res.events, res.me);
     // 답한 학생과 훔침을 당한 학생은 바로, 나머지는 다음 맥박에.
