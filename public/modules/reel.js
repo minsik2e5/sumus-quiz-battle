@@ -1026,7 +1026,7 @@ function shop() {
     <div class="rl-shop-block"><h3>알로 바꾸기</h3>
       <div class="rl-egg-row">
         <button type="button" class="rl-egg" data-rl="egg" data-item="egg" ${v.egg_left && p >= REEL.EGG ? '' : 'disabled'}><img src="/assets/pets/dog-0.webp" alt="" width="64" height="64"><b>랜덤 알</b><small>${pearlIco()}${num(REEL.EGG)} · ${v.egg_left ? '오늘 1개' : '내일 또'}</small></button>
-        <button type="button" class="rl-egg epic" data-rl="egg" data-item="epic_egg" ${v.epic_left && p >= REEL.EPIC_EGG ? '' : 'disabled'}><span class="rl-epic-egg"></span><b>영웅 알</b><small>${pearlIco()}${num(REEL.EPIC_EGG)} · ${v.epic_left ? '이번 주 1개' : '다음 주에'}</small></button>
+        <button type="button" class="rl-egg epic" data-rl="egg" data-item="epic_egg" ${v.epic_left && p >= REEL.EPIC_EGG ? '' : 'disabled'}><span class="rl-epic-egg"></span><b>영웅 알</b><small>${pearlIco()}${num(REEL.EPIC_EGG)} · ${v.epic_left ? '오늘 1개' : '내일 또'}</small></button>
       </div></div>
     <div class="rl-shop-block sea"><h3>바다 펫 <small>교환소에서만 만나요</small></h3>
       <div class="rl-sea-pets">${(v.sea || SEA_PETS).map(x => !REEL.SEA_READY
@@ -1127,7 +1127,7 @@ function guide(first) {
       <li><b>물고기를 진주로</b><p>낚은 물고기는 <b>수조</b>에서 헤엄쳐요. 팔면 진주가 돼요. 팔아도 도감 기록은 남아요.</p>
         <div class="rl-guide-table">${['common', 'uncommon', 'rare', 'epic', 'legend'].map(r => `<span>${STAR(stars(r))}<b>${esc(RARITY[r].name)}</b><em>${num(REEL.PEARLS[r])}</em></span>`).join('')}</div></li>
       <li><b>진주로 바꿀 수 있는 것</b>
-        <ul><li>${coin()} <b>코인</b>: 진주 1개 = 1코인 (하루 ${num(REEL.COIN_DAILY)}코인까지)</li><li><b>랜덤 알</b>: 진주 ${num(REEL.EGG)}개 (하루 1개)</li><li><b>영웅 알</b>: 진주 ${num(REEL.EPIC_EGG)}개 (일주일 1개)</li><li><b>바다 펫</b>: 진주 ${num(REEL.SEA_PET)}개 · 교환소에서만 만나요!</li><li><b>황금 알 물고기</b>는 팔지 않고 모아요. ${REEL.GOLDEN_EGG}마리면 알 선물!</li></ul></li>
+        <ul><li>${coin()} <b>코인</b>: 진주 1개 = 1코인 (하루 ${num(REEL.COIN_DAILY)}코인까지)</li><li><b>랜덤 알</b>: 진주 ${num(REEL.EGG)}개 (하루 1개)</li><li><b>영웅 알</b>: 진주 ${num(REEL.EPIC_EGG)}개 (하루 1개)</li><li><b>바다 펫</b>: 진주 ${num(REEL.SEA_PET)}개 · 교환소에서만 만나요!</li><li><b>황금 알 물고기</b>는 팔지 않고 모아요. ${REEL.GOLDEN_EGG}마리면 알 선물!</li></ul></li>
     </ol>
     <button type="button" class="yl-cta" data-rl="close-sheet">알겠어요!</button>
     <button type="button" class="btn full rl-practice-btn" data-rl="practice">미끼 없이 연습 판 해 보기</button>`, 'guide');

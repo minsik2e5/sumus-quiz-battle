@@ -1,11 +1,11 @@
 import { randomBytes } from 'node:crypto';
 import { dayKey } from '../public/modules/core.js';
 import { FISH, FISH_KEYS } from '../public/modules/fishing-rules.js';
-import { REEL, FIGHT, FINISH, CAST_TIERS, SEA_PETS, ROD, rodLevel, rodOf, reelRoll, pearlsOf, weekNum } from '../public/modules/reel-rules.js';
+import { REEL, FIGHT, FINISH, CAST_TIERS, SEA_PETS, ROD, rodLevel, rodOf, reelRoll, pearlsOf } from '../public/modules/reel-rules.js';
 import { findReceipt, keepReceipt, giveGift } from './rewards.mjs';
 
 // V13.150 손맛 낚시(놀이터) 서버 쪽. 학생 기록 p.reel:
-//   { bait, bait_day, bait_today, pearls, net{key: n}, coin_day, coin_today, coins (받은 코인 합), egg_day, epic_week, live{…}, guide, done[], rod (V13.154 낚싯대 단계 1~5) }
+//   { bait, bait_day, bait_today, pearls, net{key: n}, coin_day, coin_today, coins (받은 코인 합), egg_day, epic_day(V13.160, 예전 epic_week), live{…}, guide, done[], rod (V13.154 낚싯대 단계 1~5) }
 // 도감 · 황금 알 수는 예전 단어 낚시와 같은 p.games.fish.book · golden에 쌓는다.
 // 물고기는 던질 때(reelCast) 서버가 정하고, 끌어올렸다고 보내면(reelLand) 최소 파이팅 시간을 확인한 뒤 어망에 넣는다.
 
@@ -30,7 +30,7 @@ export function reelView(p, now = Date.now()) {
     bait: Number(r.bait || 0), bait_today: r.bait_day === today ? Number(r.bait_today || 0) : 0, bait_daily: REEL.BAIT_DAILY, bait_max: REEL.BAIT_MAX,
     pearls: Number(r.pearls || 0), net, net_pearls: Object.entries(net).reduce((s, [k, n]) => s + pearlsOf(k) * n, 0),
     coin_left: Math.max(0, REEL.COIN_DAILY - (r.coin_day === today ? Number(r.coin_today || 0) : 0)),
-    egg_left: r.egg_day === today ? 0 : 1, epic_left: r.epic_week === weekNum(now) ? 0 : 1,
+    egg_left: r.egg_day === today ? 0 : 1, epic_left: r.epic_day === today ? 0 : 1,
     book: f.book || {}, kinds: Object.keys(f.book || {}).length, all: FISH_KEYS.length, golden: Number(f.golden || 0) % REEL.GOLDEN_EGG,
     sea: SEA_PETS.map(x => ({ ...x, owned: (p.pets || []).some(pet => pet.key === x.key) })),
     rod: rodLevel(r.rod), rod_next: rodLevel(r.rod) < ROD.MAX ? ROD.COST[rodLevel(r.rod) + 1] : null,
@@ -134,9 +134,9 @@ export function reelSpend(p, item, now = Date.now()) {
   const r = reel(p), price = item === 'epic_egg' ? REEL.EPIC_EGG : item === 'egg' ? REEL.EGG : null;
   if (!price) fail('바꿀 것을 골라 주세요.');
   if (item === 'egg' && r.egg_day === dayKey(now)) fail('랜덤 알은 하루에 하나만 바꿀 수 있어요.', 409);
-  if (item === 'epic_egg' && r.epic_week === weekNum(now)) fail('영웅 알은 일주일에 하나만 바꿀 수 있어요.', 409);
+  if (item === 'epic_egg' && r.epic_day === dayKey(now)) fail('영웅 알은 하루에 하나만 바꿀 수 있어요.', 409);
   if (Number(r.pearls || 0) < price) fail(`진주가 ${price - Number(r.pearls || 0)}개 부족해요.`);
-  return () => { r.pearls -= price; if (item === 'egg') r.egg_day = dayKey(now); else r.epic_week = weekNum(now); };
+  return () => { r.pearls -= price; if (item === 'egg') r.egg_day = dayKey(now); else r.epic_day = dayKey(now); };
 }
 // 바다 펫: 교환소에서만, 진주 REEL.SEA_PET개. 그림이 들어오기 전(REEL.SEA_READY가 false)에는 잠겨 있다.
 // 영웅급 펫으로 들어오고(알 상점 · 뽑기 · 선생님 알에서는 나오지 않는다), 이미 함께하는 바다 펫은 다시 못 바꾼다.

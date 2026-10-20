@@ -223,7 +223,7 @@ export async function runGamesChecks(assert) {
       assert(egg.key && epic.key && b.pets.length === pets0 + 2 && b.reel.pearls === 5000 - 60 - REEL.EGG - REEL.EPIC_EGG
         && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'egg' }), 409) && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'epic_egg' }), 409)
         && await fails(() => call('qa-gm-b', 'POST', '/reel/exchange', { item: 'sea_pet', key: 'dolphin' }), 409),
-        `V13.150 진주 ${REEL.EGG} = 랜덤 알(하루 1), ${REEL.EPIC_EGG} = 영웅 알(일주일 1), 바다 펫은 그림이 올 때까지 잠김`);
+        `V13.150 진주 ${REEL.EGG} = 랜덤 알(하루 1), ${REEL.EPIC_EGG} = 영웅 알(하루 1), 바다 펫은 그림이 올 때까지 잠김`);
       const att = b.attendance = { card: 0, last: dayKey(clock - DAY), streak: 1 };
       b.reel.bait_today = 0;
       const checkin = await call('qa-gm-b', 'POST', '/attendance/check');

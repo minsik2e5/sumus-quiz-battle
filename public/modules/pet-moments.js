@@ -260,6 +260,17 @@ const EGGS = {
 // V13.109: the season's egg joins the shop while its season is on.
 const eggsNow = () => { const s = seasonOnSale(); return s ? { ...EGGS, season: { name: s.egg, price: s.price, keys: s.keys, all: `${s.name} 한정 펫을 모두 모았어요!`, until: s.until } } : EGGS; };
 // After a purchase: the legendary, 영웅 or limited show, or the basic egg's name card (null).
+// V13.160 선생님이 보낸 알도 알 상점과 같은 알 깨기 연출로(예전: 선물 상자 안에 펫 카드만). egg = { key, tier }.
+export async function giftEggShow(egg) {
+  if (!egg?.key || !CHARACTERS[egg.key]) return;
+  if (egg.tier === 'mythic') { await mythicShow({ mythic: { key: egg.key, gift: true } }); return; }
+  if (egg.tier === 'legendary') { await legendaryShow({ legendary: { key: egg.key, gift: true } }); return; }
+  if (egg.tier === 'epic' || egg.tier === 'limited') { await epicShow({ key: egg.key, from: 'gift' }); return; }
+  await new Promise(resolve => {
+    momentOpen = true;
+    eggRevealHtml(openOverlay('선생님 알'), egg.key, () => { closeOverlay(false); resolve(); });
+  });
+}
 async function eggShow(res, kind) {
   if (res.mythic) { await mythicShow(res); return true; }
   if (res.legendary) { await legendaryShow(res); return true; }
