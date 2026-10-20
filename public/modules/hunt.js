@@ -3,14 +3,15 @@ import { CHARACTERS, shuffle, displayEnglish } from './core.js';
 import { coin } from './emblems.js';
 import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
 import { coinShower, countUp } from './celebrate.js';
-import { huntPetShow, petJosa } from './pet-moments.js';
+import { huntPetShow, petJosa, buyEgg } from './pet-moments.js';
 import { arcadeWords } from './arcade-games.js';
 import { cardMeaning } from './match-rules.js';
-import { HUNT, BERRIES, BALL_NAMES, THROW_NAMES, TIER_NAMES, catchChance, huntSlot } from './hunt-rules.js';
+import { HUNT, BERRIES, BALL_NAMES, THROW_NAMES, TIER_NAMES, HUNT_MONSTERS, MONSTER_KEYS, MONSTER_TIERS, catchChance, huntSlot } from './hunt-rules.js';
 
-// V13.162 펫 사냥(놀이터). 포켓몬 고처럼: 그림 지도 위 야생 펫을 눌러 만나고(하얀 번쩍임 → "야생의 ○○이 나타났다!"),
+// V13.162 몬스터 사냥(놀이터, 처음 이름 펫 사냥). 포켓몬 고처럼: 그림 지도 위 야생 몬스터를 눌러 만나고(하얀 번쩍임 → "야생의 ○○이 나타났다!"),
 // 잡기 화면에서 공을 위로 밀어 던진다. 줄어드는 원이 작을 때 원 안에 맞히면 나이스 · 그레이트 · 엑설런트.
-// 흔들림 1~3번 → 딸깍 + 별(잡았다) / 빠져나옴 / 도망 연기. 새 친구는 알 상점과 같은 펫 공개 연출(pet-moments.js huntPetShow).
+// 흔들림 1~3번 → 딸깍 + 별(잡았다) / 빠져나옴 / 도망 연기. 잡은 몬스터는 가방 · 도감 → 팔아서 별조각 → 교환소(코인 · 알).
+// 가끔 나오는 펫(아직 못 만난)은 알 상점과 같은 펫 공개 연출(pet-moments.js huntPetShow).
 // 만남 · 잡힘 · 도망은 서버가 정한다(server/hunt.mjs). 빗나간 공(펫에 안 닿음)은 서버에 보내지 않고 손에 돌아온다.
 // 그림(주문서 34)은 HUNT_ART에 이름이 있으면 쓰고, 없으면 코드 그림 · 이모지로 그린다(reel.js FISHING_ART와 같은 방식).
 export const HUNT_ART = new Set(['bg-forest-day', 'bg-forest-night', 'bg-field-day', 'bg-field-night', 'bg-beach-day', 'bg-beach-night', 'bg-catch', 'entry', 'ball-basic', 'ball-good', 'ball-gold', 'ball-open', 'ball-spin', 'ball-tilt-l', 'ball-tilt-r', 'ball-lock', 'fx-sparkle', 'fx-star', 'fx-burst', 'fx-smoke', 'ring-green', 'ring-yellow', 'ring-red', 'fx-mystery', 'berry-razz', 'berry-pinap', 'berry-nanab', 'bag']);
@@ -19,7 +20,12 @@ const art = (name, fallback, cls = '') => has(name) ? `<img class="hn-art hn-art
 const ballPic = (kind, cls = '') => art(`ball-${kind}`, `<i class="hn-ball k-${kind} ${cls}"><b></b></i>`, cls);
 const berryPic = key => art(`berry-${key}`, `<i class="hn-emoji">${BERRIES[key].emoji}</i>`);
 const petSrc = (key, form, small = false) => `/assets/pets/${key}-${form}${small ? '-s' : ''}.webp`;
-const petName = key => CHARACTERS[key]?.ko || '친구';
+// V13.162 몬스터 위주(선생님 결정): 몬스터 그림은 몬스터전 · 던전 그림을 그대로(기본 · attack · hurt · down).
+const monSrc = (key, pose = '') => `/assets/monsters/${key}${pose ? `-${pose}` : ''}.webp`;
+const isPet = m => m?.kind === 'pet';
+const spriteOf = (m, pose = '') => isPet(m) ? petSrc(m.key, m.form || 1) : monSrc(m.key, pose);
+const petName = key => HUNT_MONSTERS[key]?.ko || CHARACTERS[key]?.ko || '친구';
+const STAR = '<i class="hn-star-ico" aria-hidden="true">✦</i>';
 
 let H = null;
 const root = () => document.getElementById('app');
@@ -37,8 +43,8 @@ export function openHunt(A, exit) {
   closeAll();
   H = { A, exit, timers: [], v: A.data.rewards?.hunt || null, phase: 'map', meet: null, ball: 'basic', berry: null, berryTried: false };
   A.screen = 'hunt';
-  root().innerHTML = `<div class="session-app hn-app"><header class="hn-top"><button type="button" class="yb-back" data-hn="exit" aria-label="나가기">${icon('back')}</button><strong>펫 사냥</strong>
-    <span class="hn-chips" id="hn-chips" aria-label="내 공"></span><button type="button" class="hn-q" data-hn="guide" aria-label="펫 사냥 안내">?</button></header>
+  root().innerHTML = `<div class="session-app hn-app"><header class="hn-top"><button type="button" class="yb-back" data-hn="exit" aria-label="나가기">${icon('back')}</button><strong>몬스터 사냥</strong>
+    <span class="hn-chips" id="hn-chips" aria-label="내 공"></span><button type="button" class="hn-q" data-hn="guide" aria-label="몬스터 사냥 안내">?</button></header>
     <main id="hn-main" class="hn-main"></main><div id="hn-layer" class="hn-layer"></div></div>`;
   root().onclick = onClick;
   root().querySelector('.hn-app').addEventListener('contextmenu', e => e.preventDefault());
@@ -75,6 +81,12 @@ function onClick(event) {
   if (act === 'spot') return meet(b.dataset.spot);
   if (act === 'run') return runAway();
   if (act === 'phone') return togglePhone();
+  if (act === 'bagmon') return monsterBag();
+  if (act === 'book') return monsterBook();
+  if (act === 'shop') return shop();
+  if (act === 'sell') return sell(b.dataset.key || null, b);
+  if (act === 'coins') return exchangeCoins(Number(b.dataset.n), b);
+  if (act === 'egg') return exchangeEgg(b.dataset.item, b);
   if (act === 'bag') return bag();
   if (act === 'berry') return berries();
   if (act === 'pick-ball') return pickBall(b.dataset.ball);
@@ -107,8 +119,8 @@ function mapBg(v) {
 }
 function spotHtml(s, i) {
   const style = `left:${s.x}%;top:${s.y}%;--i:${i};--dx:${(i % 2 ? -1 : 1) * (14 + (i * 7) % 12)}px;--wt:${6 + (i * 1.3) % 3}s`;
-  if (s.fresh) return `<button type="button" class="hn-spot fresh" data-hn="spot" data-spot="${esc(s.id)}" style="${style}" aria-label="새 친구 만나기"><span class="hn-walk"><span class="hn-shadow"></span><span class="hn-mystery">${art('fx-mystery', '<i class="hn-sparks"><i></i><i></i><i></i><i></i></i>')}<b>?</b></span></span><em>새 친구</em></button>`;
-  return `<button type="button" class="hn-spot t-${s.tier}" data-hn="spot" data-spot="${esc(s.id)}" style="${style}" aria-label="${esc(petName(s.key))} 만나기"><span class="hn-walk"><span class="hn-shadow"></span><span class="hn-face"><img src="${petSrc(s.key, s.form || 1, true)}" alt="" draggable="false"></span></span>${s.tier === 'epic' ? '<em class="epic">★</em>' : ''}</button>`;
+  if (s.kind === 'pet') return `<button type="button" class="hn-spot fresh" data-hn="spot" data-spot="${esc(s.id)}" style="${style}" aria-label="반짝이는 펫 만나기"><span class="hn-walk"><span class="hn-shadow"></span><span class="hn-mystery">${art('fx-mystery', '<i class="hn-sparks"><i></i><i></i><i></i><i></i></i>')}<b>?</b></span></span><em>펫?!</em></button>`;
+  return `<button type="button" class="hn-spot mon t-${s.tier}" data-hn="spot" data-spot="${esc(s.id)}" style="${style}" aria-label="${esc(petName(s.key))}(${TIER_NAMES[s.tier]}) 만나기"><span class="hn-walk"><span class="hn-shadow"></span><span class="hn-face"><img src="${monSrc(s.key)}" alt="" draggable="false" loading="lazy"></span></span>${['rare', 'epic', 'legend'].includes(s.tier) ? `<em class="tier t-${s.tier}">${TIER_NAMES[s.tier]}</em>` : ''}</button>`;
 }
 function nextChange() {
   const ms = (huntSlot(Date.now()) + 1) * HUNT.SLOT_HOURS * 3600000 - 9 * 3600000 - Date.now();
@@ -134,7 +146,8 @@ function mapScreen(loading = false) {
     ${!loading && !spots.length ? '<p class="hn-quiet">지금은 조용해요. 조금 뒤에 다시 와요!</p>' : ''}
   </section>
   <section class="hn-dock${empty ? ' empty' : ''}">
-    ${empty ? '<p class="hn-dock-lead"><b>공이 없어요.</b> 공부하면 공을 받아요!</p>' : '<p class="hn-dock-lead">펫을 눌러 만나요. <b>반짝이는 ?</b>는 아직 못 만난 새 친구!</p>'}
+    <div class="hn-dock-btns"><button type="button" data-hn="bagmon">🎒<b>가방</b><small>${num(Object.values(v.bag || {}).reduce((a, n) => a + n, 0))}마리</small></button><button type="button" data-hn="book">📖<b>도감</b><small>${num(v.kinds || 0)} / ${num(v.all || MONSTER_KEYS.length)}</small></button><button type="button" data-hn="shop">${STAR}<b>교환소</b><small>${num(v.stars || 0)}</small></button></div>
+    ${empty ? '<p class="hn-dock-lead"><b>공이 없어요.</b> 공부하면 공을 받아요!</p>' : '<p class="hn-dock-lead">몬스터를 눌러 잡아요. 가끔 <b>반짝이는 ?</b>는 아직 못 만난 펫!</p>'}
     <ul class="hn-today" aria-label="오늘 받은 공">
       ${[['practice', '연습 끝내기', '10문제 이상'], ['attend', '출석', '하루 한 번'], ['match', '짝 맞추기', '별 3개']].map(([k, t, s]) => `<li class="${got[k] ? 'on' : ''}"><i>${got[k] ? '✓' : ''}</i><b>${t}</b><small>${s}</small></li>`).join('')}
     </ul>
@@ -158,6 +171,7 @@ async function meet(spotId) {
   setView(res.hunt);
   H.meet = res; H.throws = 0;
   H.ball = Number(H.v.basic || 0) ? 'basic' : Number(H.v.good || 0) ? 'good' : 'basic';
+  if (!isPet(res)) for (const pz of ['attack', 'hurt']) new Image().src = monSrc(res.key, pz);
   H.phase = 'intro';
   await zoom;
   // 하얀 번쩍임 → "야생의 ○○이(가) 나타났다!"
@@ -166,10 +180,10 @@ async function meet(spotId) {
   await wait(260);
   catchScreen(true);
   const name = petName(res.key);
-  const banner = document.createElement('div'); banner.className = `hn-appear${res.fresh ? ' fresh' : ''}`;
-  banner.innerHTML = `<span>${res.fresh ? '✨ 새 친구! ' : ''}야생의 <b>${esc(petJosa(name, '이', '가'))}</b> 나타났다!</span>`;
+  const banner = document.createElement('div'); banner.className = `hn-appear t-${res.tier}${isPet(res) ? ' fresh' : ''}`;
+  banner.innerHTML = `<span>${isPet(res) ? '✨ 펫이다! ' : ['epic', 'legend'].includes(res.tier) ? `⚡ ${TIER_NAMES[res.tier]} 몬스터! ` : ''}야생의 <b>${esc(petJosa(name, '이', '가'))}</b> 나타났다!</span>`;
   $('hn-main').appendChild(banner);
-  later(() => { sfx(res.fresh ? 'fanfare-basic' : 'pop', { gain: res.fresh ? .6 : .7 }); buzz(25); }, 520);
+  later(() => { sfx(isPet(res) ? 'fanfare-basic' : res.tier === 'legend' ? 'boss' : ['epic', 'rare'].includes(res.tier) ? 'boss-roar' : 'pop', { gain: .6 }); buzz(isPet(res) || res.tier === 'legend' ? [30, 40, 60] : 25); }, 520);
   await wait(1700);
   banner.classList.add('bye');
   later(() => banner.remove(), 400);
@@ -198,12 +212,12 @@ function catchScreen(intro = false) {
   const bg = has('bg-catch') ? '<img class="hn-catch-bg" src="/assets/hunt/bg-catch.webp" alt="" draggable="false">' : '<div class="hn-catch-bg code"><i class="hill h1"></i><i class="hill h2"></i><i class="grass"></i><i class="tuft t1">🌿</i><i class="tuft t2">🌼</i><i class="tuft t3">🌿</i></div>';
   $('hn-main').innerHTML = `<section class="hn-catch${intro ? ' intro' : ''}" id="hn-catch">
     <div class="hn-scene" id="hn-scene">${bg}<div class="hn-leaves" aria-hidden="true">${'<i></i>'.repeat(6)}</div></div>
-    <div class="hn-petbox" id="hn-petbox"><span class="hn-pet-shadow" id="hn-pshadow"></span><img class="hn-pet" id="hn-pet" src="${petSrc(m.key, m.form || 1)}" alt="${esc(name)}" draggable="false"></div>
+    <div class="hn-petbox${isPet(m) ? ' pet' : ' mon'}" id="hn-petbox"><span class="hn-pet-shadow" id="hn-pshadow"></span><img class="hn-pet" id="hn-pet" src="${spriteOf(m)}" alt="${esc(name)}" draggable="false"></div>
     <svg class="hn-rings" id="hn-rings" viewBox="-100 -100 200 200" aria-hidden="true"><circle class="o" r="92"/><circle class="i" id="hn-ring-i" r="92"/></svg>
     <div class="hn-fx" id="hn-fx"></div>
     <button type="button" class="hn-run" data-hn="run" aria-label="도망가기">🏃<small>도망</small></button>
     <button type="button" class="hn-phone${H.phoneOn ? ' on' : ''}" data-hn="phone" aria-pressed="${!!H.phoneOn}" aria-label="폰으로 던지기">📱<small>${H.phoneOn ? '폰 던지기 켬' : '폰 던지기'}</small></button>
-    <div class="hn-name"><b>${esc(name)}</b><span class="hn-tier t-${m.tier}${m.fresh ? ' fresh' : ''}">${m.fresh ? '★ 새 친구 · ' : ''}${TIER_NAMES[m.tier]}</span></div>
+    <div class="hn-name"><b>${esc(name)}</b><span class="hn-tier t-${m.tier}${isPet(m) ? ' fresh' : ''}">${isPet(m) ? '★ 아직 못 만난 ' : ''}${TIER_NAMES[m.tier]}</span></div>
     <p class="hn-say" id="hn-say" aria-live="polite"></p>
     <div class="hn-hud" id="hn-hud"></div>
     <div class="hn-flyer" id="hn-flyer" hidden></div>
@@ -253,8 +267,14 @@ function ringScale(t) {
   const k = (t % period) / period;
   return .3 + .7 * (1 - Math.sin(k * Math.PI));
 }
+// 몬스터 자세 그림 바꾸기(공격 · 맞음). 펫은 자세 그림이 없어서 그대로.
+function pose(name, ms) {
+  const img = $('hn-pet'); if (!img || isPet(H.meet)) return;
+  img.src = monSrc(H.meet.key, name);
+  clearTimeout(H.poseT); H.poseT = later(() => { const i = $('hn-pet'); if (i && !i.classList.contains('lit')) i.src = monSrc(H.meet.key); }, ms);
+}
 function petSway(t) {
-  const amp = H.meet?.tier === 'epic' ? 26 : 10, w = H.berry === 'nanab' ? .0011 : .0021;
+  const amp = ['epic', 'legend', 'petEpic'].includes(H.meet?.tier) ? 26 : 10, w = H.berry === 'nanab' ? .0011 : .0021;
   return amp * Math.sin(t * w);
 }
 // 펫 행동: 가끔 덤비기(attack) · 폴짝 피하기(dodge) · 콩 뛰기(hop). 덤비거나 피하는 동안에는 원이 사라지고 공이 튕겨 나간다.
@@ -262,11 +282,11 @@ function petAct(now) {
   const c = H.c, slow = H.berry === 'nanab' ? 1.9 : 1;
   if (c.act && now > c.act.end) { c.act = null; c.nextAct = now + (2400 + Math.random() * 2600) * slow; }
   if (!c.act && now > c.nextAct && H.phase === 'catch' && !c.flight) {
-    const r = Math.random(), epic = H.meet?.tier === 'epic';
+    const r = Math.random(), epic = ['epic', 'legend', 'pet', 'petEpic'].includes(H.meet?.tier);
     const kind = r < (epic ? .4 : .28) ? 'attack' : r < (epic ? .75 : .45) ? 'dodge' : 'hop';
     const dur = (kind === 'attack' ? 900 : kind === 'dodge' ? 760 : 520) * (slow > 1 ? 1.3 : 1);
     c.act = { kind, start: now, end: now + dur, dir: Math.random() < .5 ? -1 : 1 };
-    if (kind === 'attack') { sfx('swoosh', { rate: 1.4, gain: .5 }); later(() => buzz(30), dur * .45); }
+    if (kind === 'attack') { sfx(isPet(H.meet) ? 'swoosh' : 'hit', { rate: 1.3, gain: .5 }); later(() => buzz(30), dur * .45); pose('attack', dur); }
     if (kind === 'dodge') sfx('step', { gain: .5 });
   }
   if (!c.act) return { dx: 0, dy: 0, sc: 1, busy: false };
@@ -512,7 +532,7 @@ async function hit(x, y, s, quality) {
   fx.insertAdjacentHTML('beforeend', `<span class="hn-burst" style="left:${bx}px;top:${gy}px">${art('fx-burst', '<i></i><i></i><i></i><i></i><i></i><i></i>')}</span>`);
   sfx('burst'); buzz([30, 30, 30]);
   pb.style.transition = 'transform .42s cubic-bezier(.3,1.6,.5,1), opacity .2s'; pb.style.opacity = '1'; pb.style.transform = `translate(${sway}px, 0) scale(1)`;
-  pet.classList.remove('lit'); pet.classList.add('angry');
+  pet.classList.remove('lit'); pet.classList.add('angry'); pose('hurt', 1100);
   later(() => ball.remove(), 260);
   later(() => fx.querySelector('.hn-burst')?.remove(), 700);
   await wait(500);
@@ -521,10 +541,10 @@ async function hit(x, y, s, quality) {
     say('앗, 빠져나왔어요!', 'miss');
     await wait(700);
     fx.insertAdjacentHTML('beforeend', `<span class="hn-smoke" style="left:${bx}px;top:${c.groundY - c.size * .4}px">${art('fx-smoke', '<i></i><i></i><i></i><i></i><i></i>')}</span>`);
-    pet.classList.add('fled'); sfx('fail');
+    pet.classList.add('fled'); sfx('fail'); clearTimeout(H.poseT);
     say(`${esc(petJosa(petName(m.key), '이', '가'))} 도망쳤어요…`, 'miss');
     await wait(1500);
-    return result({ title: '도망쳤어요', key: m.key, form: m.form, fled: true });
+    return result({ title: '도망쳤어요', key: m.key, tier: m.tier, fled: true });
   }
   say('앗, 빠져나왔어요! 한 번 더!', 'miss');
   await wait(600);
@@ -553,29 +573,30 @@ async function caught(res, ball, bx, gy) {
   say('<b>잡았다!</b>', 'got');
   await wait(1500);
   if (res.new_pet) {
-    // 새 친구: 알 상점과 같은 공개 연출(영웅은 영웅 연출).
-    await huntPetShow(res.key, res.tier);
-    return result({ title: '새 친구가 됐어요!', key: res.key, form: 1, fresh: true, tier: res.tier });
+    // 펫: 알 상점과 같은 공개 연출(영웅은 영웅 연출).
+    await huntPetShow(res.key, res.tier === 'petEpic' ? 'epic' : 'basic');
+    return result({ title: '새 친구가 됐어요!', key: res.key, pet: true, tier: res.tier });
   }
-  return result({ title: `${esc(petJosa(petName(res.key), '을', '를'))} 잡았어요!`, key: res.key, form: H.meet?.form || 1, coins: res.coins, xp: res.xp, double: res.berry === 'pinap' });
+  return result({ title: `${esc(petJosa(petName(res.key), '을', '를'))} 잡았어요!`, key: res.key, tier: res.tier, n: res.n || 1, stars: res.stars || 0, xp: res.xp || 0, isNew: !!res.fresh, double: res.berry === 'pinap' });
 }
-function result({ title, key, form, fled = false, fresh = false, tier, coins = 0, xp = 0, double = false }) {
+function result({ title, key, fled = false, pet = false, tier, n = 1, stars = 0, xp = 0, isNew = false, double = false }) {
   H.phase = 'result';
-  const name = petName(key);
-  const lines = fled ? `<p>공 ${num(H.throws || 0)}개를 던졌어요. 지도에는 다른 친구가 기다려요!</p>`
-    : fresh ? `<p><b>${esc(petJosa(name, '이', '가'))}</b> 내 펫이 됐어요${tier === 'epic' ? ' (영웅)' : ''}. 함께 공부해 Lv.3이 되면 알에서 깨어나요.</p>`
-    : `<div class="hn-rewards"><span>${coin()}<b>+<i data-count="${coins}">0</i></b><small>코인</small></span><span><b>+<i data-count="${xp}">0</i></b><small>${esc(name)} 경험치</small></span></div>${double ? '<p class="hn-double">🍍 파인애플 덕분에 두 배!</p>' : ''}`;
+  const name = petName(key), m = H.meet || {};
+  const lines = fled ? `<p>공 ${num(H.throws || 0)}개를 던졌어요. 지도에는 다른 몬스터가 기다려요!</p>`
+    : pet ? `<p><b>${esc(petJosa(name, '이', '가'))}</b> 내 펫이 됐어요${tier === 'petEpic' ? ' (영웅)' : ''}. 함께 공부해 Lv.3이 되면 알에서 깨어나요.</p>`
+    : `${isNew ? '<p class="hn-new">📖 도감에 새로 올랐어요!</p>' : ''}<div class="hn-rewards"><span>🎒<b>+<i data-count="${n}">0</i></b><small>가방(${TIER_NAMES[tier]})</small></span><span>${STAR}<b><i data-count="${stars}">0</i></b><small>팔면 별조각</small></span><span><b>+<i data-count="${xp}">0</i></b><small>파트너 경험치</small></span></div>${double ? '<p class="hn-double">🍍 파인애플 덕분에 2마리!</p>' : ''}`;
+  const pic = pet ? petSrc(key, 0) : isPet(m) ? petSrc(key, m.form || 1) : monSrc(key, fled ? 'hurt' : '');
   layer(`<div class="hn-result${fled ? ' fled' : ' got'}" role="dialog" aria-modal="true" aria-label="${fled ? '도망' : '잡음'}">
     <div class="hn-result-card">
       ${fled ? '' : '<i class="hn-rays" aria-hidden="true"></i>'}
-      <div class="hn-result-pet"><img src="${petSrc(key, fresh ? 0 : form)}" alt="" draggable="false"${fled ? ' class="gone"' : ''}>${fled ? art('fx-smoke', '<span class="hn-res-smoke">💨</span>') : art('fx-sparkle', '<span class="hn-res-spark">✨</span>')}</div>
+      <div class="hn-result-pet t-${tier || m.tier}"><img src="${pic}" alt="" draggable="false"${fled ? ' class="gone"' : ''}>${fled ? art('fx-smoke', '<span class="hn-res-smoke">💨</span>') : art('fx-sparkle', '<span class="hn-res-spark">✨</span>')}</div>
       <h2>${title}</h2>
       ${lines}
       <button type="button" class="yl-cta" data-hn="to-map">지도로 돌아가기</button>
     </div>
   </div>`);
   document.querySelectorAll('.hn-rewards [data-count]').forEach((el, i) => later(() => countUp(el, Number(el.dataset.count), 800), 250 + i * 200));
-  if (coins && !reduced()) { const card = document.querySelector('.hn-result-card'); if (card) coinShower(card, 16); sfx('coins'); }
+  if (stars && !reduced()) { const card = document.querySelector('.hn-result-card'); if (card && ['rare', 'epic', 'legend'].includes(tier)) coinShower(card, 16); sfx('coins', { gain: .6 }); }
   H.throws = 0;
 }
 async function runAway() {
@@ -662,7 +683,7 @@ function bag() {
 function pickBall(kind) {
   if (kind === 'gold') {
     return layer(`<div class="hn-sheet" role="dialog" aria-modal="true" aria-label="황금 공 확인"><div class="hn-sheet-box hn-confirm">${ballPic('gold', 'big')}<h3>정말 쓸까요?</h3>
-      <p>황금 공은 <b>무조건 잡혀요.</b> 한 달에 하나만 받는 귀한 공이에요.${H.meet?.fresh ? '' : '<br>이 친구는 <b>이미 가진 펫</b>이에요.'}</p>
+      <p>황금 공은 <b>무조건 잡혀요.</b> 한 달에 하나만 받는 귀한 공이에요.${isPet(H.meet) ? '<br>아직 못 만난 <b>펫</b>이에요!' : `<br>이 몬스터는 <b>${TIER_NAMES[H.meet?.tier] || ''}</b> 등급이에요.`}</p>
       <div class="hn-confirm-row"><button type="button" class="btn" data-hn="close-layer">아껴 둘래요</button><button type="button" class="yl-cta" data-hn="gold-yes">황금 공 쓰기</button></div></div></div>`);
   }
   H.ball = kind; closeLayer(); catchHud(); sfx('tap');
@@ -699,17 +720,83 @@ function answer(b) {
   later(() => { closeLayer(); catchHud(); say(ok ? `${BERRIES[q.berry].emoji} ${BERRIES[q.berry].name} 열매를 줬어요! ${BERRIES[q.berry].note}` : `아쉬워요! <b>${esc(q.en)}</b> = ${esc(q.answer)}`, ok ? 'good' : 'miss'); }, 700);
 }
 
+/* ---------- 몬스터 가방 · 도감 · 교환소 ---------- */
+// 잡은 몬스터는 가방에 모였다가 팔면 별조각(등급마다 값). 별조각은 교환소에서 코인(하루 한도) · 랜덤 알 · 영웅 알로.
+const tierRank = k => MONSTER_TIERS.indexOf(HUNT_MONSTERS[k]?.tier);
+function sheetBox(title, body, cls = '') {
+  return `<div class="hn-sheet" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="hn-sheet-box ${cls}"><h3>${title}</h3>${body}<button type="button" class="btn full" data-hn="close-layer">닫기</button></div></div>`;
+}
+function monsterBag() {
+  const v = H.v || {}, bag = v.bag || {};
+  const keys = Object.keys(bag).sort((a, b) => tierRank(b) - tierRank(a) || a.localeCompare(b));
+  const body = keys.length ? `<p class="hn-sheet-note">가방 몬스터 ${num(keys.reduce((n, k) => n + bag[k], 0))}마리 · 모두 팔면 ${STAR}<b>${num(v.bag_stars || 0)}</b></p>
+    <div class="hn-monlist">${keys.map(k => { const m = HUNT_MONSTERS[k]; return `<div class="hn-monrow t-${m.tier}"><img src="${monSrc(k)}" alt="" loading="lazy"><span><b>${esc(m.ko)}</b><small class="t-${m.tier}">${TIER_NAMES[m.tier]} · ${STAR}${num(HUNT.STARS[m.tier])}</small></span><em>×${num(bag[k])}</em><button type="button" class="btn small" data-hn="sell" data-key="${k}">팔기</button></div>`; }).join('')}</div>
+    <button type="button" class="yl-cta hn-sellall" data-hn="sell">모두 팔기 · ${STAR}${num(v.bag_stars || 0)}</button>`
+    : '<p class="hn-empty">아직 잡은 몬스터가 없어요. 지도에서 몬스터를 잡아 보세요!</p>';
+  layer(sheetBox('🎒 몬스터 가방', body, 'hn-bagsheet'));
+}
+async function sell(key, b) {
+  if (b) b.disabled = true;
+  try {
+    const res = await api('/hunt/sell', key ? { key } : {});
+    setView(res.hunt); sfx('coins'); buzz(15);
+    toast(`${num(res.sold)}마리를 팔아 별조각 ${num(res.stars)}개를 받았어요!`);
+    monsterBag(); if (H.phase === 'map') redrawDock();
+  } catch (err) { toast(err.message); if (b) b.disabled = false; }
+}
+function monsterBook() {
+  const v = H.v || {}, book = v.book || {};
+  const body = `<p class="hn-sheet-note">잡은 몬스터 ${num(v.kinds || 0)} / ${num(v.all || MONSTER_KEYS.length)}종. 아직 못 잡은 몬스터는 그림자로 보여요.</p>
+    ${MONSTER_TIERS.map(t => `<h4 class="hn-book-tier t-${t}">${TIER_NAMES[t]}</h4><div class="hn-book">${MONSTER_KEYS.filter(k => HUNT_MONSTERS[k].tier === t).map(k => book[k]?.n
+      ? `<div class="hn-book-cell on t-${t}"><img src="${monSrc(k)}" alt="" loading="lazy"><b>${esc(HUNT_MONSTERS[k].ko)}</b><small>${num(book[k].n)}마리</small></div>`
+      : `<div class="hn-book-cell t-${t}"><img class="shadow" src="${monSrc(k)}" alt="" loading="lazy"><b>???</b><small>&nbsp;</small></div>`).join('')}</div>`).join('')}`;
+  layer(sheetBox('📖 몬스터 도감', body, 'hn-booksheet'));
+}
+function shop() {
+  const v = H.v || {}, stars = Number(v.stars || 0), left = Number(v.coin_left ?? HUNT.COIN_DAILY);
+  const coinBtn = n => `<button type="button" class="hn-shop-coin" data-hn="coins" data-n="${n}" ${stars >= n && left >= n ? '' : 'disabled'}>${coin()}<b>${num(n)}</b><small>${STAR}${num(n)}</small></button>`;
+  const egg = (item, name, price, ok) => `<div class="hn-shop-egg ${item}"><span class="hn-shop-egg-art">${item === 'epic_egg' ? '★' : '?'}</span><b>${name}</b><small>${STAR}${num(price)} · 하루 1개</small>
+    <button type="button" class="yl-cta" data-hn="egg" data-item="${item}" ${ok && stars >= price ? '' : 'disabled'}>${!ok ? '내일 또' : stars >= price ? '바꾸기' : `${num(price - stars)}개 부족`}</button></div>`;
+  const body = `<div class="hn-shop-top">${STAR}<b>${num(stars)}</b><small>별조각</small>${v.bag_stars ? `<button type="button" class="btn small" data-hn="bagmon">가방 몬스터 팔기 (${STAR}${num(v.bag_stars)})</button>` : ''}</div>
+    <h4>코인으로 바꾸기 <small>오늘 ${num(left)}코인 남음 (1:1, 하루 ${num(HUNT.COIN_DAILY)})</small></h4>
+    <div class="hn-shop-coins">${[10, 30, HUNT.COIN_DAILY].map(coinBtn).join('')}</div>
+    <h4>알로 바꾸기 <small>아직 못 만난 펫의 알이 나와요</small></h4>
+    <div class="hn-shop-eggs">${egg('egg', '랜덤 알', HUNT.EGG, v.egg_left !== 0)}${egg('epic_egg', '영웅 알', HUNT.EPIC_EGG, v.epic_left !== 0)}</div>`;
+  layer(sheetBox(`${STAR} 별조각 교환소`, body, 'hn-shopsheet'));
+}
+async function exchangeCoins(n, b) {
+  if (b) b.disabled = true;
+  try {
+    const res = await api('/hunt/exchange', { item: 'coins', amount: n });
+    setView(res.hunt);
+    if (typeof res.points_balance === 'number') H.A.data.stats.points_balance = res.points_balance;
+    sfx('coins'); toast(`${num(res.coins)}코인으로 바꿨어요!`);
+    shop(); if (H.phase === 'map') redrawDock();
+  } catch (err) { toast(err.message); if (b) b.disabled = false; }
+}
+async function exchangeEgg(item, b) {
+  if (b) b.disabled = true;
+  closeLayer();
+  try {
+    const res = await buyEgg(H.A, null, item === 'epic_egg' ? 'epic' : 'basic', { path: '/hunt/exchange', body: { item } });
+    if (res?.hunt) setView(res.hunt);
+    if (res?.profile) H.A.data.profile = res.profile;
+    if (res?.stats) H.A.data.stats = res.stats;
+    if (H.phase === 'map') redrawDock();
+  } catch (err) { toast(err.message); }
+}
+function redrawDock() { if (H.phase === 'map') mapScreen(); }
+
 /* ---------- 안내 ---------- */
 function guide(first) {
-  layer(`<div class="hn-sheet" role="dialog" aria-modal="true" aria-label="펫 사냥 안내"><div class="hn-sheet-box hn-guide"><h3>펫 사냥 안내</h3>
+  layer(`<div class="hn-sheet" role="dialog" aria-modal="true" aria-label="몬스터 사냥 안내"><div class="hn-sheet-box hn-guide"><h3>몬스터 사냥 안내</h3>
     <ol>
-      <li><b>지도</b>에서 돌아다니는 펫을 눌러 만나요. <b>반짝이는 ?</b>는 아직 못 만난 새 친구예요(기본 · 영웅).</li>
+      <li><b>지도</b>에서 돌아다니는 몬스터를 눌러 만나요. 흔함 · 보통 · 희귀 · 영웅 · 전설, 높을수록 잘 도망쳐요. 가끔 <b>반짝이는 ?</b>는 아직 못 만난 <b>펫</b>(잘 도망쳐요!)이에요.</li>
       <li>공을 <b>위로 휙 밀어</b> 던져요. 약하면 앞에 떨어지고 세면 넘어가요. 줄어드는 원이 <b>작을 때</b> 원 안에 맞히면 나이스 · 그레이트 · 엑설런트로 더 잘 잡혀요. 공을 빙글빙글 돌리면 커브볼!</li>
-      <li>펫이 <b>덤비거나 폴짝 피할 때</b>(원이 사라질 때)는 공이 튕겨 나가요. 원이 다시 보일 때 던져요.</li>
+      <li>몬스터가 <b>덤비거나 폴짝 피할 때</b>(원이 사라질 때)는 공이 튕겨 나가요. 원이 다시 보일 때 던져요.</li>
       <li><b>📱 폰 던지기</b>를 켜면 공을 누르고 폰을 앞으로 휙 털어서 던져요(폰은 두 손으로 꼭!).</li>
-      <li>원 색이 초록이면 쉽고, 노랑 · 빨강일수록 어려워요. 빠져나온 펫은 도망칠 수도 있어요.</li>
-      <li><b>열매</b>: 단어 문제를 맞히면 🍓 잡기 ×1.5 · 🍍 보상 ×2 · 🍌 원과 펫이 천천히.</li>
-      <li>가진 펫을 잡으면 <b>+${HUNT.DUP_COINS}코인</b>과 그 펫 경험치, 새 친구를 잡으면 <b>내 펫</b>이 돼요.</li>
+      <li><b>열매</b>: 단어 문제를 맞히면 🍓 잡기 ×1.5 · 🍍 몬스터 2마리 · 🍌 원과 몬스터가 천천히.</li>
+      <li>잡은 몬스터는 <b>가방</b>에 모이고 <b>도감</b>에 올라요. 팔면 <b>별조각</b>, 교환소에서 코인 · 랜덤 알 · 영웅 알로 바꿔요. 잡을 때마다 파트너 펫이 경험치를 받아요.</li>
       <li><b>공은 공부로만</b>: 연습 끝내기(10문제 이상) · 출석 · 짝 맞추기 별 3, 곳마다 하루 1개. 만점 · 별 3이면 가끔 좋은 공, 출석 도장판 ${HUNT.GOLD_CARDS}장이면 황금 공!</li>
     </ol>
     <button type="button" class="yl-cta" data-hn="close-layer">${first ? '사냥 시작!' : '알겠어요'}</button></div></div>`);

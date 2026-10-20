@@ -32,7 +32,7 @@ import { dungeonQuestions } from './dungeon-words.mjs';
 import { settleDungeonRecords, dungeonBoardsView, dungeonLastView } from './dungeon-records.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
 import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend, reelSeaPet, reelRodUp } from './reel.mjs';
-import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow } from './hunt.mjs';
+import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow, huntSell, huntCoins, huntSpend } from './hunt.mjs';
 import { HUNT } from '../public/modules/hunt-rules.js';
 import { REEL } from '../public/modules/reel-rules.js';
 import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './games.mjs';
@@ -1877,8 +1877,26 @@ export async function service(state, method, path, body, token, options = {}) {
     // 화면이 만든 던지기 번호(다시 보내도 한 번만).
     const throwId = /^[a-z0-9-]{8,40}$/i.test(String(body.id || '')) ? String(body.id) : null;
     if (!throwId) fail('던지기 번호를 확인해 주세요.');
-    const res = huntThrow(p, { id: throwId, spot: str(body.spot, 40), ball: str(body.ball, 10), quality: body.quality ? str(body.quality, 12) : null, berry: body.berry ? str(body.berry, 10) : null, now });
-    return { ...res, hunt: huntView(p, now), ...(res.new_pet ? { profile: publicProfile(p), stats: stats(state, p) } : {}), ...(res.coins ? { points_balance: coinBalance(state, p) } : {}) };
+    const res = huntThrow(p, { id: throwId, spot: str(body.spot, 40), ball: str(body.ball, 10), quality: body.quality ? str(body.quality, 12) : null, berry: body.berry ? str(body.berry, 10) : null, pet: activePetKey(state, p.id), now });
+    return { ...res, hunt: huntView(p, now), ...(res.new_pet ? { profile: publicProfile(p), stats: stats(state, p) } : {}) };
+  }
+  // 가방 몬스터 팔기(별조각) · 교환소(코인 · 랜덤 알 · 영웅 알). 알은 알 상점과 같은 hatchEgg로 깬다.
+  if (path === '/hunt/sell' && method === 'POST') {
+    requireRole(p, 'student');
+    const res = huntSell(p, { key: body.key ? str(body.key, 20) : null, n: body.n ?? null });
+    return { ...res, hunt: huntView(p) };
+  }
+  if (path === '/hunt/exchange' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now(), item = str(body.item, 20);
+    if (item === 'coins') { const res = huntCoins(p, body.amount, now); return { ...res, hunt: huntView(p, now), points_balance: coinBalance(state, p) }; }
+    const epic = item === 'epic_egg';
+    const missing = (epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter(key => !p.pets.some(x => x.key === key));
+    if (!missing.length) fail(epic ? '영웅 펫을 모두 모았어요!' : '모든 펫을 모았어요!', 409);
+    if (openBattleFor(state, p.id, now)) fail('대결이 끝난 뒤에 알을 바꿀 수 있어요.', 409);
+    const spend = huntSpend(p, item, now);
+    spend();
+    return { ...hatchEgg(state, p, { epic, season: null, missing, price: 0 }), hunt: huntView(p, now) };
   }
   if (path === '/hunt/guide' && method === 'POST') {
     requireRole(p, 'student');

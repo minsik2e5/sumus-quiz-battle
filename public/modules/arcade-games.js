@@ -1,4 +1,4 @@
-// V13.151 놀이터 '게임' 묶음: 낚시터 · 짝 맞추기 타임어택 · 펫 사냥(V13.162) · 교실 게임 참가(V13.158부터 맨 아래 한 줄).
+// V13.151 놀이터 '게임' 묶음: 낚시터 · 짝 맞추기 타임어택 · 몬스터 사냥(V13.162) · 교실 게임 참가(V13.158부터 맨 아래 한 줄).
 // 짝 맞추기와 교실 게임은 야차전 '게임' 탭에 있다가 놀이터로 옮겨 왔다(야차전은 겨루기만: 대결 · 몬스터 · 던전 · 기록).
 // 게임 단어는 야차전 '단어 범위'와 같은 저장값(sumus-yacha-ranges:<학생>)을 쓴다. 한쪽에서 바꾸면 다른 쪽도 같다.
 import { esc, num, toast, rangeLabel } from './ui.js';
@@ -64,21 +64,21 @@ export function matchCard(A, art) {
     </div>
   </article>`;
 }
-// V13.162 펫 사냥: 낚시터 · 짝 맞추기처럼 그림 카드. 그림은 HUNT_ART(hunt.js)의 'entry'(주문서 34)가 있으면 쓴다.
+// V13.162 몬스터 사냥(처음 이름 펫 사냥): 낚시터 · 짝 맞추기처럼 그림 카드. 그림은 HUNT_ART(hunt.js)의 'entry'(주문서 34)가 있으면 쓴다.
 const huntArt = (art, name, fallback) => art?.hunt?.has(name) ? `<img class="ag-ico" src="/assets/hunt/${name}.webp" alt="" draggable="false">` : fallback;
 export function huntCard(A, art) {
   const v = A.data.rewards?.hunt || {};
   const pic = art?.hunt?.has('entry') ? '<img class="ag-big-bg" src="/assets/hunt/entry.webp" alt="" draggable="false" decoding="async">'
     : '<span class="ag-big-bg ag-meadow"><i class="ag-hunt-sun"></i><i class="ag-hunt-hill"></i><i class="ag-hunt-pet"></i><i class="ag-hunt-ring"></i><i class="ag-hunt-ball"><b></b></i><i class="ag-hunt-grass"></i></span>';
   return `<article class="ag-big ag-hunt">
-    <div class="ag-big-art" aria-hidden="true">${pic}<span class="ag-big-title"><small>공 던져 잡기</small><strong>펫 사냥</strong><em>지도 위 야생 펫에게 공을 던져 새 친구를 만나요</em></span></div>
+    <div class="ag-big-art" aria-hidden="true">${pic}<span class="ag-big-title"><small>공 던져 잡기</small><strong>몬스터 사냥</strong><em>지도 위 야생 몬스터를 잡아 별조각으로 바꾸고, 가끔 펫도 만나요</em></span></div>
     <div class="ag-big-body">
       <ul class="ag-stats" aria-label="내 공">
-        <li>${huntArt(art, 'ball-basic', '<i class="ag-ico">🟢</i>')}<b>${num(v.basic || 0)}</b><small>기본 공</small></li>
-        <li>${huntArt(art, 'ball-good', '<i class="ag-ico">🔵</i>')}<b>${num(v.good || 0)}</b><small>좋은 공</small></li>
-        <li>${huntArt(art, 'ball-gold', '<i class="ag-ico">🌟</i>')}<b>${num(v.gold || 0)}</b><small>황금 공</small></li>
+        <li>${huntArt(art, 'ball-basic', '<i class="ag-ico">🟢</i>')}<b>${num(Number(v.basic || 0) + Number(v.good || 0) + Number(v.gold || 0))}</b><small>공</small></li>
+        <li><i class="ag-ico">✦</i><b>${num(v.stars || 0)}</b><small>별조각</small></li>
+        <li><i class="ag-ico">📖</i><b>${num(v.kinds || 0)}/${num(v.all || 34)}</b><small>도감</small></li>
       </ul>
-      <button type="button" class="yl-cta ag-go" data-action="hunt-open" aria-label="펫 사냥 들어가기">들어가기</button>
+      <button type="button" class="yl-cta ag-go" data-action="hunt-open" aria-label="몬스터 사냥 들어가기">들어가기</button>
     </div>
   </article>`;
 }

@@ -450,7 +450,7 @@ async function save(ms) {
 function result(ms, stars, res) {
   app()?.classList.remove('fever');
   const record = !!res?.record, coins = Number(res?.coins || 0), xp = Number(res?.xp || 0), bait = !!res?.bait;
-  // V13.162 별 3개면 펫 사냥 공(가끔 좋은 공).
+  // V13.162 별 3개면 몬스터 사냥 공(가끔 좋은 공).
   const extras = `${bait ? '<span class="r bait"><b>🪱 +1</b><small>낚시 미끼</small></span>' : ''}${res?.ball ? `<span class="r ball"><b>${res.ball === 'good' ? '🔵' : '🟢'} +1</b><small>${res.ball === 'good' ? '좋은 공' : '사냥 공'}</small></span>` : ''}`;
   const why = !M.id ? '연결이 안 돼서 기록 없이 했어요.' : res?.reason === 'daily' ? `오늘 코인 판(${MATCH.DAILY}판)을 다 썼어요. 기록은 남아요!` : res?.reason === 'error' ? esc(res.error || '저장하지 못했어요.') : res?.reason ? '이번 판은 기록하지 못했어요.' : '';
   const prev = M.prevBest;

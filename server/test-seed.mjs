@@ -11,7 +11,7 @@ export const TEST_APP = {
   PASSWORD: 'test1234',
   TEACHER: 'tteacher',
   // 판이 바뀔 때마다 SEED를 올린다: 이미 켜진 테스트 앱에도 시작할 때 한 번 덧붙인다(applyTestSeed).
-  SEED: 4,
+  SEED: 5,
   TEACHERS: [['tteacher', '테스트 선생님'], ['tteacher2', '테스트 선생님 2']],
   BAIT: 10,
   // V13.162 판 3 · 4(손맛 고퀄 뒤 다시 채움): 펫 사냥을 바로 해 볼 수 있게 공(기본 · 좋은 · 황금)과 지도에 새 친구 '?' 하나.
@@ -69,7 +69,7 @@ export async function applyTestSeed(state, now = Date.now(), hash = null) {
     for (const [k, n] of Object.entries(TEST_APP.HUNT)) h[k] = Math.max(Number(h[k] || 0), n);
     const fresh = STANDARD_PET_KEYS.find(k => !p.pets.some(pet => pet.key === k));
     h.map ||= { slot: null, spots: [] };
-    if (fresh && !h.map.spots.some(s => s.fresh)) h.map.spots.push({ id: `seed-${username}`, key: fresh, tier: 'basic', fresh: true, form: 1, x: 50, y: 44, cell: 4 });
+    if (fresh && !h.map.spots.some(s => s.kind === 'pet')) h.map.spots.push({ id: `seed-${username}`, kind: 'pet', key: fresh, tier: 'pet', form: 1, x: 50, y: 44, cell: 4 });
   }
   state.test_seed = TEST_APP.SEED;
   return true;

@@ -916,7 +916,7 @@ function finishPracticeView() {
     <div class="result-reward-card result-reward-top"><div><span>코인</span><strong><i class="coin-ico" aria-hidden="true"></i>+${Number(x.reward_points || 0)}</strong></div><div><span>경험치</span><strong>+${Number(x.xp || 0)}</strong></div></div>
     ${x.reward_note ? `<p class="result-reward-note-v1373">${esc(x.reward_note)}</p>` : ''}
     ${x.bait ? '<p class="result-bait-v13150">🪱 낚시 미끼 +1 · 놀이터 낚시터에서 써요!</p>' : ''}
-    ${x.ball ? `<p class="result-bait-v13150">${x.ball === 'good' ? '🔵 좋은 공' : '🟢 사냥 공'} +1 · 놀이터 펫 사냥에서 써요!</p>` : ''}
+    ${x.ball ? `<p class="result-bait-v13150">${x.ball === 'good' ? '🔵 좋은 공' : '🟢 사냥 공'} +1 · 놀이터 몬스터 사냥에서 써요!</p>` : ''}
     ${rewardEventResult(x)}
     <p class="result-next-copy">${esc(statusText)}</p>
     ${primaryCta}

@@ -175,7 +175,7 @@ function closeOverlay(changed, onChanged) {
 }
 
 // The basic egg just bought: whose egg it is (shared by the shop window and the 놀이터 egg stand).
-// V13.162 lead: 맨 위 한 줄을 바꿀 때(펫 사냥: "○○이 새 친구가 됐어요!").
+// V13.162 lead: 맨 위 한 줄을 바꿀 때(몬스터 사냥: "○○이 새 친구가 됐어요!").
 function eggRevealHtml(body, key, done, lead = null) {
   const name = CHARACTERS[key].ko;
   body.innerHTML = `<div class="pet-shop">
@@ -272,7 +272,7 @@ export async function giftEggShow(egg) {
     eggRevealHtml(openOverlay('선생님 알'), egg.key, () => { closeOverlay(false); resolve(); });
   });
 }
-// V13.162 펫 사냥에서 잡은 새 친구: 알 상점과 같은 공개 연출(기본은 알 이름 카드, 영웅은 영웅 연출).
+// V13.162 몬스터 사냥에서 잡은 펫: 알 상점과 같은 공개 연출(기본은 알 이름 카드, 영웅은 영웅 연출).
 export async function huntPetShow(key, tier) {
   if (!key || !CHARACTERS[key]) return;
   if (tier === 'epic') { await epicShow({ key, from: 'hunt' }); return; }
