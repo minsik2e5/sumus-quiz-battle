@@ -75,6 +75,10 @@ export async function runTestAppChecks() {
     assert.equal(s1.status, 200, '테스트 학생 로그인');
     const view = await api('/api/bootstrap', { cookie: s1.cookie });
     assert.equal(view.payload.rewards.reel.bait, TEST_APP.BAIT, '테스트 학생은 미끼 10개로 시작');
+    // V13.162 펫 사냥: 공(기본 6 · 좋은 3 · 황금 1)과 지도에 새 친구 '?' 하나.
+    assert(view.payload.rewards.hunt.basic === TEST_APP.HUNT.basic && view.payload.rewards.hunt.good === TEST_APP.HUNT.good && view.payload.rewards.hunt.gold === TEST_APP.HUNT.gold, '테스트 학생은 펫 사냥 공을 들고 시작');
+    const hunt = await api('/api/hunt/home', { method: 'POST', cookie: s1.cookie, body: {} });
+    assert(hunt.status === 200 && hunt.payload.hunt.spots.some(s => s.fresh) && hunt.payload.hunt.spots.length >= 3, '테스트 학생 지도에는 새 친구 ? 하나와 가진 펫이 있다');
     const pets = object.mutations.current().state.profiles.find(p => p.username === 'ts1').pets.map(p => p.key);
     assert(LEGENDARY_PET_KEYS.length && MYTHIC_PET_KEYS.length && [...LEGENDARY_PET_KEYS, ...MYTHIC_PET_KEYS].every(k => pets.includes(k)), '테스트 학생은 전설 · 신화 펫을 모두 가진다');
     const t2 = await api('/api/login', { method: 'POST', body: { username: 'tteacher2', password: TEST_APP.PASSWORD, role: 'teacher' } });

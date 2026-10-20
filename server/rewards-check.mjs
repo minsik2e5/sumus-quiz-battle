@@ -453,7 +453,8 @@ export async function runRewardsChecks(assert, expectStatus) {
   const g82 = { id: 'qa-rw-g82', role: 'student' };
   const fixed = v => () => v; // 0 → 로보 내는 손 rock, 0.4 → scissors, 0.7 → paper
   assert(rpsOutcome('paper', 'rock') === 'win' && rpsOutcome('rock', 'paper') === 'lose' && rpsOutcome('scissors', 'scissors') === 'draw' && RPS_BETS.join() === '10,20,30' && RPS_DAILY === 5 && RPS_MAX_WINS === 3, 'V13.82 가위바위보 rules: 10·20·30 coins, five a day, up to three wins in a row');
-  const t82 = Date.now();
+  // 오늘(한국 시간) 정오: 지금 + 10분이 자정을 넘으면 '하루 5판'이 다음 날로 넘어가 실패하던 것(23:50 이후)을 막는다.
+  const t82 = Math.floor((Date.now() + 9 * 3600000) / 86400000) * 86400000 + 3 * 3600000;
   const rw1 = rpsPlay(g82, { bet: 10, pick: 'paper' }, 1000, { random: fixed(0), now: t82 });
   assert(rw1.result === 'win' && rw1.robot === 'rock' && rw1.pot === 20 && !rw1.done && g82.points_spent === 10 && rw1.rps.live.await === 'choice', 'V13.82 a win doubles the pot and asks: take it or double');
   await expectStatus(409, async () => rpsPlay(g82, { bet: 10, pick: 'rock' }, 1000, { random: fixed(0), now: t82 }), 'V13.82 after a win the student must take the pot or double it');
