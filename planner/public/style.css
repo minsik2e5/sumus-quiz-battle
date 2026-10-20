@@ -295,3 +295,50 @@ input, textarea, button, select, a, [role=checkbox], label, .chk-row, .desktop-c
 .w-plus { color: #3182f6; background: #e7f0ff; border: 0; border-radius: 8px; width: 24px; height: 24px; margin-left: 4px; font-size: 18px; line-height: 1; font-weight: 700; cursor: pointer; }
 .w-plus:hover { background: #d3e5ff; }
 .desktop-widget-head .w-close { margin-left: 4px; }
+
+/* 위젯 제목줄: 한 줄로 (접기 · 새로고침 · + · × 가 줄바꿈 없이) */
+.desktop-widget-head { display: flex; align-items: center; gap: 6px; }
+.desktop-widget-head > div:nth-child(2) { flex: 1 1 auto; min-width: 0; }
+.desktop-widget-head > div:nth-child(2) strong, .desktop-widget-head > div:nth-child(2) span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.desktop-widget-head > i { flex: none; }
+.desktop-widget-head > button { flex: none; width: 28px; height: 28px; margin-left: 0 !important; }
+.desktop-widget-head .w-plus, .desktop-widget-head .w-close { font-size: 18px; }
+.desktop-widget-head .w-fold svg { width: 15px; }
+
+/* 작게 접기: 제목줄(과 오늘 진행률)만 남김 */
+body.folded .desktop-widget-section, body.folded .desktop-widget-card > footer { display: none !important; }
+body.folded .desktop-widget-head { padding-bottom: 2px; }
+body.folded .desktop-widget-progress { margin-bottom: 0; }
+body.folded[data-widget]:not([data-widget="all"]) .desktop-widget-page,
+body.folded[data-widget]:not([data-widget="all"]) .desktop-widget-card { height: auto; min-height: 0; }
+body.folded[data-widget]:not([data-widget="all"]) .desktop-widget-card { padding-bottom: 8px; }
+body.folded .w-clock { padding: 4px 0 2px; }
+body.folded .w-clock b { font-size: 26px; }
+body.folded[data-widget="clock"] .w-clock span { display: none; }
+
+/* 체크리스트: 줄 오른쪽 수정 · 삭제 (줄에 마우스를 올리면 보임) */
+.chk-acts { display: flex; flex: none; gap: 1px; opacity: 0; transition: opacity .12s; }
+.chk-row:hover .chk-acts, .chk-row:focus-within .chk-acts { opacity: 1; }
+.chk-acts button { color: #a0aab5; background: 0 0; border: 0; border-radius: 6px; width: 22px; height: 22px; padding: 0; display: grid; place-items: center; cursor: pointer; }
+.chk-acts button svg { width: 13px; height: 13px; }
+.chk-acts button:hover { color: #3182f6; background: #eaf2ff; }
+.chk-acts button[data-act="chk-del"]:hover { color: #e5484d; background: #fdecec; }
+.title-edit { color: #191f28; background: #fff; border: 1px solid #3182f6; border-radius: 6px; outline: 0; width: 100%; padding: 2px 6px; font: inherit; font-size: 13px; font-weight: 700; }
+
+/* 메모장: 서식 줄 · 체크박스 줄 · 글씨색 */
+.note-bar { align-items: center; gap: 5px; margin-top: 6px; display: flex; flex-wrap: wrap; }
+.note-bar > i { background: #e5e8eb; width: 1px; height: 14px; margin: 0 2px; }
+.note-bar button { color: #4e5968; background: #f2f4f6; border: 0; border-radius: 8px; height: 24px; padding: 0 8px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+.note-bar button svg { width: 13px; height: 13px; }
+.note-bar button:hover { background: #e7f0ff; color: #3182f6; }
+.note-bar .note-color { background: var(--c); border: 2px solid #fff; box-shadow: 0 0 0 1px #d5dbe2; border-radius: 50%; width: 18px; height: 18px; padding: 0; }
+.note-bar .note-color:hover { background: var(--c); transform: scale(1.15); }
+div.note-text { overflow-y: auto; white-space: pre-wrap; word-break: break-word; cursor: text; outline: 0; }
+div.note-text > div { min-height: 1.5em; }
+div.note-text.is-empty::before { content: attr(data-placeholder); color: #b3bcc8; position: absolute; pointer-events: none; }
+div.note-text.is-empty { position: relative; }
+.note-text .ck { position: relative; padding-left: 24px; }
+.note-text .ck::before { content: ''; position: absolute; left: 2px; top: .3em; width: 14px; height: 14px; border: 1.6px solid #b0b8c1; border-radius: 4px; background: #fff; cursor: pointer; box-sizing: border-box; }
+.note-text .ck.on::before { background: #3182f6 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 12 5 5 9-10'/%3E%3C/svg%3E") center/11px no-repeat; border-color: #3182f6; }
+.note-text .ck.on { color: #a0aab5; text-decoration: line-through; }
+.note-text .ck.on span { color: inherit !important; }

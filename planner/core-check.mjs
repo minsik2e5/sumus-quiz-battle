@@ -1,4 +1,5 @@
-// Checks of the planner rules (public/core.js).
+// Checks of the planner rules (public/core.js) and the memo text format (public/memo.js).
+import { textToLines, linesToText, linesToHtml, noteHtml } from './public/memo.js';
 import { createDefaultState, normalizeState, classesOn, rangeStats, pace, remainingClasses, examForCohort, examStatus, rollExam, autoRollExams, applyMigrations, applyFinalDates, workDuration, sleepDay, findPrevCohortLesson, addDays, fmtLong, dayProgress } from './public/core.js';
 
 export async function runCoreChecks(assert) {
@@ -33,6 +34,13 @@ export async function runCoreChecks(assert) {
   fx('danwon').start = '2026-11-27'; applyMigrations(f); autoRollExams(f, '2026-10-16');
   ok(fx('danwon').start === '2026-11-27' && applyFinalDates(f) === false, 'an edited date is not overwritten');
   ok(examStatus(fx('danwon'), '2026-10-12') === 'D-46' && examForCohort('danwon-a', f, '2026-10-12').id === 'danwon', 'the 기말 exam counts down');
+  // 메모장: 체크박스 줄(☐ ☑)과 글씨색 — 저장 모양과 걸러내기
+  const ml = textToLines('할 일\n☐ 단어장\n☑ 듣기 <b>x</b>');
+  ok(ml.length === 3 && !ml[0].ck && ml[1].ck && !ml[1].on && ml[2].ck && ml[2].on && linesToText(ml) === '할 일\n☐ 단어장\n☑ 듣기 <b>x</b>', 'memo text keeps ☐/☑ lines');
+  ok(linesToHtml(ml) === '<div>할 일</div><div class="ck">단어장</div><div class="ck on">듣기 &lt;b&gt;x&lt;/b&gt;</div>', 'memo html is escaped');
+  const colored = linesToHtml([{ ck: false, on: false, runs: [{ t: '중요', c: '#e5484d' }, { t: ' 일반 & 끝', c: '' }] }]);
+  ok(noteHtml({ html: colored, text: '중요 일반 & 끝' }) === colored, 'a saved memo with a palette color is shown as saved');
+  ok(noteHtml({ html: '<div onclick="x()">a</div>', text: 'a\n☐ b' }) === '<div>a</div><div class="ck">b</div>' && noteHtml({ html: '<div><span style="color:#123456">a</span></div>', text: 'a' }) === '<div>a</div>' && noteHtml({ html: '<script>1</script>', text: '' }) === '<div><br></div>', 'foreign html and colors outside the palette are rebuilt from the text');
   ok(workDuration('09:10', '18:15') === '9시간 5분' && workDuration('22:00', '01:00') === '3시간', 'work time');
   ok(sleepDay(Date.parse('2026-10-01T15:40:00Z')) === '2026-10-01' && sleepDay(Date.parse('2026-10-01T13:00:00Z')) === '2026-10-01', 'sleep after midnight counts for the night before');
   const r = normalizeState({ tasks: [], cohortLessonRecords: { '2026-09-29-2-gangseo': { plan: 'p', actual: '본문 1과' } } }, '2026-10-01');

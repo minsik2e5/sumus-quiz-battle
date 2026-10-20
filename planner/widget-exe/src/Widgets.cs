@@ -165,6 +165,7 @@ namespace SumusWidget
                     else if (msg == "close") host.RemoveWidget(Id);
                     else if (msg == "menu") host.ShowWidgetMenu(Id);
                     else if (msg != null && msg.StartsWith("n:")) host.SetNote(Id, msg.Substring(2));
+                    else if (msg != null && msg.StartsWith("h:")) SetViewHeight(msg);
                 };
                 web.CoreWebView2.Navigate(host.UrlFor(Id));
             }
@@ -198,6 +199,17 @@ namespace SumusWidget
             web.CoreWebView2.NavigateToString(OfflineHtml);
         }
         public void Reload() { if (web.CoreWebView2 != null) web.CoreWebView2.Navigate(host.UrlFor(Id)); }
+        // 작게 접기 · 펴기: 웹 화면이 "h:높이:fold" 또는 "h:높이:open" (높이는 CSS px) 으로 알려 주면 창 높이를 맞춤.
+        // 접을 때는 최소 높이도 낮추고, 펼치면 원래 최소 높이로 되돌림.
+        void SetViewHeight(string msg)
+        {
+            string[] p = msg.Split(':'); int css;
+            if (p.Length < 3 || !int.TryParse(p[1], out css) || css < 20 || css > 4000) return;
+            bool fold = p[2] == "fold";
+            MinimumSize = host.Scale(new Size(200, fold ? 20 : 110));
+            int h = host.Scale(new Size(0, css)).Height + Padding.Vertical;
+            if (Height != h) Height = h;
+        }
         public async Task<string> Eval(string script)
         {
             if (web.CoreWebView2 == null || offline) return null;
