@@ -50,7 +50,7 @@ export function settleParty(state, body, { petKey = () => undefined, now = Date.
     const today = dayKey(now);
     if (day.day !== today) { day.day = today; day.plays = 0; }
     let coins = 0;
-    if (day.plays < PARTY.DAILY) { coins = partyCoins(right, rank, n); if (coins) day.plays++; }
+    if (day.plays < PARTY.DAILY) { coins = partyCoins(right, rank, n) + (row.team_win && right >= PARTY.MIN_RIGHT ? PARTY.TEAM_WIN_COINS : 0); if (coins) day.plays++; }
     day.total = Number(day.total || 0) + 1;
     if (rank === 1 && n >= 3) day.wins = Number(day.wins || 0) + 1;
     const xp = Math.min(60, right);

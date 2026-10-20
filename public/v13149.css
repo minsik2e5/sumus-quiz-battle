@@ -845,3 +845,256 @@ img.rl-art.rl-art-pearl{position:static;inset:auto;translate:none;z-index:auto;d
 /* V13.149 그림 26: 물고기 그림은 코드 그림(.fish-svg) 자리에 같은 크기로 */
 .fish-img{display:block;width:100%;height:auto;aspect-ratio:1;object-fit:contain}
 .ptv-feed-fish .fish-img,.ptv-award-fish .fish-img{width:100%;height:auto}
+
+/* ---------- V13.150 보물 사냥 2.0: 금고 털이 · 도난 경보 · 엿보기 · 아이템 · 이벤트 라운드 · 팀전 ---------- */
+.pt-team{display:flex;align-items:center;gap:6px;margin:8px 0 0;padding:6px 10px;border-radius:12px;font-size:12px;background:rgba(255,255,255,.1)}
+.pt-team b{font-weight:900;margin-right:auto}.pt-team span{padding:2px 8px;border-radius:99px;background:rgba(255,255,255,.14);font-variant-numeric:tabular-nums}.pt-team span.mine{background:#fde68a;color:#78350f;font-weight:900}
+.pt-team.tA{box-shadow:inset 3px 0 0 #f43f5e}.pt-team.tB{box-shadow:inset 3px 0 0 #38bdf8}
+.pt-event{margin:8px 0 0;padding:8px 10px;border-radius:14px;display:flex;flex-direction:column;align-items:center;text-align:center;font-size:12px;animation:pt-event 1.4s ease-in-out infinite alternate}
+.pt-event b{font-size:15px;font-weight:900}
+.pt-event.golden{background:linear-gradient(90deg,#d97706,#fbbf24,#d97706);background-size:200% 100%;color:#451a03}
+.pt-event.storm{background:linear-gradient(90deg,#4338ca,#7c3aed,#4338ca);background-size:200% 100%}
+.pt-event.raid{background:linear-gradient(90deg,#7f1d1d,#dc2626,#7f1d1d);background-size:200% 100%}
+@keyframes pt-event{to{background-position:100% 0;transform:scale(1.02)}}
+.pt-inv{display:flex;gap:6px;margin:8px 0 0;flex-wrap:wrap}
+.pt-inv span{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:99px;font-size:12px;font-weight:800;background:rgba(15,23,42,.55);box-shadow:0 0 0 1.5px rgba(255,255,255,.25) inset}
+.pt-inv i{font-style:normal;font-size:14px}
+.pt-heist{display:flex;align-items:center;gap:8px;margin:-4px -2px 10px;padding:8px 10px;border-radius:14px;background:linear-gradient(90deg,#7f1d1d,#b91c1c);color:#fff;font-size:13px;flex-wrap:wrap}
+.pt-heist b{margin-right:auto}.pt-heist small{font-size:11.5px;opacity:.9;flex-basis:100%}
+.pt-steps{display:flex;gap:5px}.pt-steps i{width:18px;height:18px;border-radius:50%;background:rgba(255,255,255,.25);box-shadow:0 0 0 2px rgba(255,255,255,.4) inset;transition:transform .25s cubic-bezier(.3,1.8,.5,1),background .2s}
+.pt-steps i.on{background:#fde047;transform:scale(1.2);box-shadow:0 0 10px #fde047}
+.pt-q.heist{box-shadow:0 0 0 3px #dc2626,0 0 24px rgba(220,38,38,.6)}
+.pt-opt.gone{opacity:.25;text-align:center;border-style:dashed}
+.pt-item-btn{display:block;width:100%;margin-top:10px;padding:10px;border:0;border-radius:14px;background:linear-gradient(90deg,#7c3aed,#db2777);color:#fff;font:inherit;font-weight:900;cursor:pointer}
+.pt-item-btn b{margin-left:4px;color:#fde68a}
+.pt-alarm{margin-top:10px;padding:16px 14px;border-radius:24px;background:#fff;color:var(--ink);text-align:center;box-shadow:0 0 0 4px #dc2626,0 0 34px rgba(220,38,38,.7);animation:pt-alarm .5s ease-in-out infinite alternate}
+@keyframes pt-alarm{to{box-shadow:0 0 0 4px #fca5a5,0 0 12px rgba(220,38,38,.3)}}
+.pt-alarm h2{margin:0;color:#dc2626;font-size:24px}.pt-alarm p{margin:4px 0 8px;font-size:13.5px}.pt-alarm h3{margin:10px 0;font-size:26px;word-break:break-word}
+.pt-siren{font-size:34px;animation:pt-siren .35s linear infinite alternate}
+@keyframes pt-siren{to{transform:scale(1.25) rotate(8deg)}}
+.pt-alarm-bar{height:8px;border-radius:99px;background:#fee2e2;overflow:hidden}.pt-alarm-bar i{display:block;height:100%;background:#dc2626;transform-origin:left;transform:scaleX(1);transition:transform .25s linear}
+.pt-alarm .pt-opts{text-align:left}
+.pt-peek-btn{display:block;width:100%;margin-top:14px;padding:10px;border:2px dashed rgba(255,255,255,.55);border-radius:14px;background:rgba(15,23,42,.35);color:#fff;font:inherit;font-weight:800;cursor:pointer}
+.pt-peek-btn small{display:block;font-weight:600;opacity:.85;font-size:11.5px}
+.pt-peek-msg{text-align:center;font-weight:900;margin:14px 0 0}.pt-peek-msg.bad{color:#fca5a5}.pt-peek-msg.good{color:#bbf7d0}
+.pt-peek-tag{position:absolute;left:50%;top:-34px;translate:-50% 0;padding:2px 9px;border-radius:99px;font-size:11.5px;font-weight:900;white-space:nowrap;background:#fff;color:#334155;box-shadow:0 3px 8px rgba(0,0,0,.3)}
+.pt-peek-tag.k-steal,.pt-peek-tag.k-swap,.pt-peek-tag.k-monster,.pt-peek-tag.k-nothing{background:#fecaca;color:#7f1d1d}
+.pt-peek-tag.k-jackpot,.pt-peek-tag.k-triple,.pt-peek-tag.k-double,.pt-peek-tag.k-item,.pt-peek-tag.k-shield{background:#fde68a;color:#78350f}
+.pt-chest-row.n5{display:flex;flex-wrap:wrap;justify-content:center;gap:56px 10px}
+.pt-chest-row.n5 .pt-chest{width:calc((100% - 20px) / 3)}
+.pt-chests.storm h2{color:#c4b5fd;text-shadow:0 0 12px rgba(167,139,250,.9)}
+.pt-target.bounty{box-shadow:0 0 0 3px #f59e0b}
+.pt-target em.bty{background:#f59e0b;color:#451a03;right:auto;left:10px}
+.pt-team-end{margin:0 0 10px;padding:10px 14px;border-radius:16px;font-weight:900;font-size:17px;text-align:center;background:rgba(255,255,255,.14)}
+.pt-team-end small{display:block;font-weight:600;font-size:12px;opacity:.9;margin-top:2px}
+.pt-team-end.tA{box-shadow:0 0 0 2px #f43f5e inset}.pt-team-end.tB{box-shadow:0 0 0 2px #38bdf8 inset}
+/* 선생님 TV */
+.ptv-event{text-align:center;font-weight:900;padding:.4em;border-radius:.6em;margin-bottom:.6em;font-size:1.4em;display:flex;align-items:center;justify-content:center;gap:.8em;animation:pt-event 1.4s ease-in-out infinite alternate}
+.ptv-event span{font-size:.7em;font-weight:700;opacity:.9}
+.ptv-event.golden{background:linear-gradient(90deg,#d97706,#fbbf24,#d97706);background-size:200% 100%;color:#451a03}
+.ptv-event.storm{background:linear-gradient(90deg,#4338ca,#7c3aed,#4338ca);background-size:200% 100%}
+.ptv-event.raid{background:linear-gradient(90deg,#7f1d1d,#dc2626,#7f1d1d);background-size:200% 100%}
+.ptv-teams{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:.8em;margin-bottom:.6em;padding:.4em .8em;border-radius:.7em;background:rgba(0,0,0,.25);font-weight:900;font-size:1.3em}
+.ptv-teams .tA,.ptv-teams .tB{display:flex;align-items:center;gap:.5em}.ptv-teams em{font-style:normal;font-variant-numeric:tabular-nums;font-size:1.2em}
+.ptv-teams .bar{display:block;height:.9em;border-radius:99px;background:#0ea5e9;overflow:hidden}.ptv-teams .bar u{display:block;height:100%;width:var(--p);background:#f43f5e;transition:width .6s}
+.ptv-teams .hid{font-style:normal;font-size:.7em;text-align:center;opacity:.85}
+.ptv-row.team-A{box-shadow:inset .3em 0 0 #f43f5e}.ptv-row.team-B{box-shadow:inset .3em 0 0 #38bdf8}
+.ptv-row.bounty{outline:2px solid #fbbf24;outline-offset:-2px}
+.ptv-news.heist{background:linear-gradient(90deg,#7f1d1d,#dc2626);animation:ptv-news .45s cubic-bezier(.2,1.4,.4,1),pt-event .6s .45s ease-in-out 3 alternate}
+.ptv-news.heistfail{background:linear-gradient(90deg,#334155,#475569)}.ptv-news.peekcaught{background:linear-gradient(90deg,#9a3412,#c2410c)}
+.ptv-news.event{background:linear-gradient(90deg,#4338ca,#7c3aed)}
+.ptv-team-end{display:flex;justify-content:center;align-items:center;gap:1em;margin:-.2em 0 .6em;font-weight:900;font-size:1.3em}
+.ptv-team-end i{font-style:normal;color:#fde68a}.ptv-team-end .win{text-shadow:0 0 .6em #fde68a}
+@media (prefers-reduced-motion:reduce){.pt-event,.ptv-event,.pt-alarm,.pt-siren,.ptv-news.heist{animation:none!important}.pt-steps i,.pt-alarm-bar i,.ptv-teams .bar u{transition:none!important}}
+
+/* ---------- V13.150 손그림 게임 테마: 보물 사냥(폰 · TV) ----------
+   흐린 빛 덩어리 · 번진 그림자 · 무지개 그라데이션 대신: 잉크 외곽선 + 단단한 그림자 + 평면 색 + 종이 · 물결 무늬.
+   색은 아래 변수만 쓴다. 그림(주문서 33)이 오면 배경만 바꿔 끼운다. 낚시 모드(.fish)는 건드리지 않는다. */
+:is(.pt-app.treasure,.ptv.treasure){
+  --hd-ink:#2b1d12;--hd-paper:#f4e7c9;--hd-paper2:#ead8b0;--hd-cream:#fff6e3;--hd-gold:#e8a930;--hd-gold2:#f3c75a;--hd-red:#c4473a;--hd-blue:#3b78b5;--hd-green:#4e9a57;--hd-violet:#7a5aa6;--hd-orange:#d9783a;
+  --hd-line:2.5px solid var(--hd-ink);--hd-drop:0 4px 0 var(--hd-ink);--hd-drop-s:0 3px 0 var(--hd-ink);
+  --hd-outline:0 2px 0 var(--hd-ink),1.5px 0 0 var(--hd-ink),-1.5px 0 0 var(--hd-ink),0 -1.5px 0 var(--hd-ink),1.5px 1.5px 0 var(--hd-ink),-1.5px 1.5px 0 var(--hd-ink);
+  --hd-noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .96 0 0 0 0 .9 0 0 0 0 .78 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+.gi{display:inline-block;width:1.25em;height:1.25em;vertical-align:-.28em;flex:none;overflow:visible}
+
+/* ===== 보물 사냥: 바탕(바다 지도) ===== */
+.pt-app.treasure{background:var(--hd-noise),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='70'%3E%3Cpath d='M0 22c12-8 23-8 35 0s23 8 35 0 23-8 35 0 23 8 35 0M-35 57c12-8 23-8 35 0s23 8 35 0 23-8 35 0 23 8 35 0 23-8 35 0' fill='none' stroke='%23f4e7c9' stroke-opacity='.08' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E"),#1f4a52;color:var(--hd-cream)}
+.pt-app.treasure::before{content:"";position:fixed;right:-34px;bottom:-34px;width:190px;height:190px;pointer-events:none;opacity:.13;z-index:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23f4e7c9' stroke-width='2.4' stroke-linejoin='round'%3E%3Ccircle cx='50' cy='50' r='44'/%3E%3Ccircle cx='50' cy='50' r='33' stroke-dasharray='3 5'/%3E%3Cpath d='M50 4 58 42 96 50 58 58 50 96 42 58 4 50 42 42Z'/%3E%3Cpath d='M50 20 54 46 80 50 54 54 50 80 46 54 20 50 46 46Z' fill='%23f4e7c9'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat}
+.pt-app.treasure::after{content:"";position:fixed;left:-20px;top:120px;width:150px;height:260px;pointer-events:none;opacity:.12;z-index:0;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 110'%3E%3Cpath d='M8 4c30 10 40 30 20 50S30 96 52 104' fill='none' stroke='%23f4e7c9' stroke-width='2.4' stroke-dasharray='5 6' stroke-linecap='round'/%3E%3Cpath d='M44 96l12 12M56 96 44 108' stroke='%23e8a930' stroke-width='3.5' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat}
+.pt-app.treasure>:not(.pt-toasts){position:relative;z-index:1}
+.pt-app.treasure .pt-top strong{text-shadow:var(--hd-outline);font-size:17px}
+.pt-app.treasure .pt-top .yb-back{background:var(--hd-paper);color:var(--hd-ink);box-shadow:var(--hd-drop-s);border:var(--hd-line)}
+.pt-app.treasure .pt-clock{background:var(--hd-paper);color:var(--hd-ink);border:var(--hd-line);box-shadow:var(--hd-drop-s);border-radius:10px}
+.pt-app.treasure .pt-clock.hurry{background:var(--hd-red);color:var(--hd-cream);animation:none}
+
+/* 종이 카드 */
+.pt-app.treasure :is(.pt-score>div,.pt-rules,.pt-q,.pt-target,.pt-alarm,.pt-award,.pt-team,.pt-team-end){background:var(--hd-paper);color:var(--hd-ink);border:var(--hd-line);box-shadow:var(--hd-drop)}
+.pt-app.treasure .pt-score>div{border-radius:14px;padding:7px 10px}
+.pt-app.treasure .pt-score small{opacity:.7;font-weight:700}
+.pt-app.treasure .pt-score b{color:var(--hd-ink)}
+.pt-app.treasure .pt-shield .pt-sh{filter:none}
+.pt-app.treasure .pt-top3 span{background:var(--hd-paper2);color:var(--hd-ink);border:2px solid var(--hd-ink);border-radius:9px;font-weight:700;display:flex;align-items:center;gap:3px}
+.pt-app.treasure .pt-top3 span.me{background:var(--hd-gold2)}
+.pt-app.treasure .pt-top3 .gi{width:1.35em;height:1.35em}
+.pt-app.treasure .pt-top3.hidden span{background:var(--hd-ink);color:var(--hd-paper)}
+.pt-app.treasure .pt-rules{border-radius:14px}
+.pt-app.treasure .pt-rules li::before{content:'';display:inline-block;width:7px;height:7px;margin:0 7px 2px 0;border-radius:2px;background:var(--hd-gold);border:1.5px solid var(--hd-ink);transform:rotate(45deg)}
+.pt-app.treasure .pt-lobby h1{text-shadow:var(--hd-outline);letter-spacing:-.01em}
+.pt-app.treasure .pt-lobby-count b{color:var(--hd-gold2);text-shadow:var(--hd-outline)}
+.pt-app.treasure .pt-lobby-wait i{background:var(--hd-gold2)}
+.pt-app.treasure .pt-label{opacity:.85}
+
+/* 문제 · 보기 */
+.pt-app.treasure .pt-q{border-radius:18px;border-width:3px;box-shadow:0 5px 0 var(--hd-ink);animation:fs-up .22s ease-out}
+.pt-app.treasure .pt-q h2{color:var(--hd-ink)}
+.pt-app.treasure .pt-opt{background:#fffaf0;border:var(--hd-line);border-radius:12px;box-shadow:var(--hd-drop-s);color:var(--hd-ink);transition:transform .08s,box-shadow .08s}
+.pt-app.treasure .pt-opt:active,.pt-app.treasure .pt-opt.picked{transform:translateY(2px);box-shadow:0 1px 0 var(--hd-ink);background:var(--hd-gold2);border-color:var(--hd-ink)}
+.pt-app.treasure .pt-opt.gone{background:transparent;box-shadow:none;border-style:dashed;opacity:.35}
+.pt-app.treasure .pt-wait{background:var(--hd-paper2);color:var(--hd-red);border:2px solid var(--hd-ink)}
+.pt-app.treasure .pt-wait i{background:var(--hd-red)}
+
+/* 상자 */
+.pt-app.treasure .pt-chests h2{color:var(--hd-cream);text-shadow:var(--hd-outline)}
+.pt-app.treasure .pt-chest svg{filter:none}
+.pt-app.treasure .pt-chest.other.open{opacity:.6;filter:grayscale(.5)}
+.pt-app.treasure .pt-loot b{background:var(--hd-ink);color:var(--hd-paper);border-radius:8px}
+.pt-app.treasure .pt-chest.k-monster.chosen .pt-loot b,.pt-app.treasure .pt-chest.k-nothing.chosen .pt-loot b{background:var(--hd-red)}
+.pt-app.treasure .pt-chest.k-jackpot.chosen .pt-loot b,.pt-app.treasure .pt-chest.k-triple.chosen .pt-loot b{background:var(--hd-gold);color:var(--hd-ink)}
+.pt-app.treasure .pt-loot-ico{color:var(--hd-gold2);text-shadow:var(--hd-outline);font-size:30px}
+.pt-app.treasure .pt-loot-ico .gi{width:44px;height:44px}
+.pt-app.treasure .pt-peek-btn{background:rgba(43,29,18,.35);border:2.5px dashed var(--hd-paper);border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap}
+.pt-app.treasure .pt-peek-btn small{flex-basis:100%}
+.pt-app.treasure .pt-peek-tag{background:var(--hd-paper);color:var(--hd-ink);border:2px solid var(--hd-ink);box-shadow:var(--hd-drop-s)}
+.pt-app.treasure .pt-peek-tag:is(.k-steal,.k-swap,.k-monster,.k-nothing){background:#f2c4bc}
+.pt-app.treasure .pt-peek-tag:is(.k-jackpot,.k-triple,.k-double,.k-item,.k-shield){background:var(--hd-gold2)}
+.pt-app.treasure .pt-peek-msg.bad{color:#f2c4bc;text-shadow:var(--hd-outline)}.pt-app.treasure .pt-peek-msg.good{color:#cfe9c9;text-shadow:var(--hd-outline)}
+.pt-app.treasure .pt-chests.storm h2{color:#e2d5f5;text-shadow:var(--hd-outline)}
+
+/* 표적 · 현상금 */
+.pt-app.treasure .pt-targets h2{text-shadow:var(--hd-outline)}
+.pt-app.treasure .pt-targets p b{color:var(--hd-gold2)}
+.pt-app.treasure .pt-target{border-radius:12px}
+.pt-app.treasure .pt-target.revenge{box-shadow:0 0 0 3px var(--hd-red),var(--hd-drop)}
+.pt-app.treasure .pt-target.bounty{background:#fbe6b0;box-shadow:var(--hd-drop)}
+.pt-app.treasure .pt-target em{background:var(--hd-red);color:var(--hd-cream);border:2px solid var(--hd-ink);top:-11px}
+.pt-app.treasure .pt-target em.bty{background:var(--hd-gold);color:var(--hd-ink);display:flex;align-items:center;gap:3px}
+.pt-app.treasure .pt-target.picked{transform:translateY(2px);box-shadow:0 1px 0 var(--hd-ink)}
+
+/* 띠: 팀 · 이벤트 · 아이템 · 금고 털이 */
+.pt-app.treasure .pt-team{border-radius:12px;padding:5px 10px}
+.pt-app.treasure .pt-team b{display:flex;align-items:center;gap:4px}
+.pt-app.treasure .pt-team span{background:var(--hd-paper2);border:1.5px solid var(--hd-ink)}
+.pt-app.treasure .pt-team span.mine{background:var(--hd-gold2);color:var(--hd-ink)}
+.pt-app.treasure .pt-team.tA{box-shadow:inset 6px 0 0 var(--hd-red),var(--hd-drop-s)}.pt-app.treasure .pt-team.tB{box-shadow:inset 6px 0 0 var(--hd-blue),var(--hd-drop-s)}
+.pt-app.treasure .pt-event{animation:none;border:var(--hd-line);box-shadow:var(--hd-drop-s);border-radius:12px;flex-direction:row;justify-content:center;gap:8px;color:var(--hd-ink)}
+.pt-app.treasure .pt-event b{display:flex;align-items:center;gap:4px}
+.pt-app.treasure .pt-event.golden{background:var(--hd-gold2)}
+.pt-app.treasure .pt-event.storm{background:#c9b8e6}
+.pt-app.treasure .pt-event.raid{background:#f2c4bc}
+.pt-app.treasure .pt-inv span{background:var(--hd-paper);color:var(--hd-ink);border:2px solid var(--hd-ink);box-shadow:var(--hd-drop-s)}
+.pt-app.treasure .pt-inv i{display:flex}
+.pt-app.treasure .pt-heist{background:var(--hd-ink);color:var(--hd-paper);border-radius:12px}
+.pt-app.treasure .pt-steps i{background:transparent;box-shadow:0 0 0 2px var(--hd-paper) inset;border-radius:4px;transform:rotate(45deg) scale(.8)}
+.pt-app.treasure .pt-steps i.on{background:var(--hd-gold);box-shadow:0 0 0 2px var(--hd-paper) inset;transform:rotate(45deg) scale(1)}
+.pt-app.treasure .pt-q.heist{box-shadow:0 0 0 3px var(--hd-red),0 5px 0 var(--hd-ink)}
+.pt-app.treasure .pt-item-btn{background:var(--hd-violet);border:var(--hd-line);box-shadow:var(--hd-drop-s);display:flex;align-items:center;justify-content:center;gap:6px}
+.pt-app.treasure .pt-item-btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--hd-ink)}
+
+/* 도난 경보 */
+.pt-app.treasure .pt-alarm{border:4px solid var(--hd-red);box-shadow:0 5px 0 var(--hd-ink);animation:pt-alarm-hd .45s steps(2) infinite}
+@keyframes pt-alarm-hd{50%{border-color:var(--hd-ink)}}
+.pt-app.treasure .pt-alarm h2{color:var(--hd-red)}
+.pt-app.treasure .pt-siren{font-size:0;animation:pt-siren-hd .3s steps(2) infinite}
+.pt-app.treasure .pt-siren .gi{width:48px;height:48px}
+@keyframes pt-siren-hd{50%{transform:rotate(-8deg)}}
+.pt-app.treasure .pt-alarm-bar{background:var(--hd-paper2);border:2px solid var(--hd-ink);height:12px}
+.pt-app.treasure .pt-alarm-bar i{background:var(--hd-red)}
+
+/* 알림 */
+.pt-app.treasure .pt-pop{background:var(--hd-paper);color:var(--hd-ink);border:var(--hd-line);box-shadow:var(--hd-drop);border-radius:12px;padding-left:16px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pt-app.treasure .pt-pop.good{background:var(--hd-paper);box-shadow:inset 7px 0 0 var(--hd-green),var(--hd-drop)}
+.pt-app.treasure .pt-pop.bad{background:var(--hd-paper);box-shadow:inset 7px 0 0 var(--hd-red),var(--hd-drop)}
+.pt-app.treasure .pt-pop.gold{background:var(--hd-gold2);box-shadow:inset 7px 0 0 var(--hd-ink),var(--hd-drop)}
+.pt-app.treasure .pt-pop .gi{width:1.4em;height:1.4em}
+
+/* 끝 */
+.pt-app.treasure .pt-end-rank b{text-shadow:var(--hd-outline)}
+.pt-app.treasure .pt-end-rank i .gi{width:64px;height:64px}
+.pt-app.treasure .pt-award{border-radius:12px}
+.pt-app.treasure .pt-award small{color:var(--hd-orange)}
+.pt-app.treasure .pt-team-end{border-radius:12px;display:flex;flex-direction:column;align-items:center}
+.pt-app.treasure .pt-team-end.tA{box-shadow:inset 0 6px 0 var(--hd-red),var(--hd-drop)}.pt-app.treasure .pt-team-end.tB{box-shadow:inset 0 6px 0 var(--hd-blue),var(--hd-drop)}
+.pt-app.treasure :is(.mg-result-facts span,.mg-result-coins){background:var(--hd-paper);color:var(--hd-ink);border:2px solid var(--hd-ink);box-shadow:var(--hd-drop-s)}
+.pt-app.treasure .mg-result-coins b{color:var(--hd-ink)}
+
+/* ===== 보물 사냥 TV ===== */
+.ptv.treasure{background:#1f4a52}
+.ptv.treasure .ptv-bg{background:var(--hd-noise),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='100'%3E%3Cpath d='M0 30c17-11 33-11 50 0s33 11 50 0 33-11 50 0 33 11 50 0M-50 80c17-11 33-11 50 0s33 11 50 0 33-11 50 0 33 11 50 0 33-11 50 0' fill='none' stroke='%23f4e7c9' stroke-opacity='.07' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E"),#1f4a52}
+.ptv.treasure .ptv-bg::after{content:"";position:absolute;right:-4vw;bottom:-6vw;width:28vw;height:28vw;opacity:.12;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='none' stroke='%23f4e7c9' stroke-width='2' stroke-linejoin='round'%3E%3Ccircle cx='50' cy='50' r='44'/%3E%3Ccircle cx='50' cy='50' r='33' stroke-dasharray='3 5'/%3E%3Cpath d='M50 4 58 42 96 50 58 58 50 96 42 58 4 50 42 42Z'/%3E%3Cpath d='M50 20 54 46 80 50 54 54 50 80 46 54 20 50 46 46Z' fill='%23f4e7c9'/%3E%3C/g%3E%3C/svg%3E") center/contain no-repeat}
+.ptv.treasure .ptv-top strong{text-shadow:var(--hd-outline);display:flex;align-items:center;gap:.3em}
+.ptv.treasure :is(.ptv-x,.ptv-full,button.ptv-end){background:var(--hd-paper);color:var(--hd-ink);border:var(--hd-line);box-shadow:var(--hd-drop-s)}
+.ptv.treasure .ptv-clock{background:var(--hd-paper);color:var(--hd-ink);border:3px solid var(--hd-ink);box-shadow:var(--hd-drop)}
+.ptv.treasure .ptv-clock.hurry{background:var(--hd-red);color:var(--hd-cream);animation:none}
+.ptv.treasure :is(.ptv-join,.ptv-crowd){background:rgba(43,29,18,.4);border:2.5px solid rgba(244,231,201,.35)}
+.ptv.treasure .ptv-code span{background:var(--hd-paper);color:var(--hd-ink);border:3px solid var(--hd-ink);box-shadow:0 .12em 0 var(--hd-ink)}
+.ptv.treasure .ptv-kid{background:var(--hd-paper);color:var(--hd-ink);border:2px solid var(--hd-ink)}
+.ptv.treasure .ptv-start{background:var(--hd-gold);color:var(--hd-ink);border:3px solid var(--hd-ink);box-shadow:0 .22em 0 var(--hd-ink)}
+.ptv.treasure .ptv-actions b,.ptv.treasure .ptv-stats b{color:var(--hd-gold2)}
+.ptv.treasure .ptv-timebar{background:rgba(43,29,18,.5);border:2px solid var(--hd-ink);height:.8em}
+.ptv.treasure .ptv-timebar i{background:var(--hd-gold)}
+.ptv.treasure .ptv-row{background:var(--hd-paper);color:var(--hd-ink);border:2.5px solid var(--hd-ink);box-shadow:0 3px 0 var(--hd-ink)}
+.ptv.treasure .ptv-row.top1{background:var(--hd-gold2)}.ptv.treasure .ptv-row.top2{background:#dfe3e6}.ptv.treasure .ptv-row.top3{background:#e9c39d}
+.ptv.treasure .ptv-row.team-A{box-shadow:inset .45em 0 0 var(--hd-red),0 3px 0 var(--hd-ink)}.ptv.treasure .ptv-row.team-B{box-shadow:inset .45em 0 0 var(--hd-blue),0 3px 0 var(--hd-ink)}
+.ptv.treasure .ptv-row.bounty{outline:3px dashed var(--hd-ink);outline-offset:3px}
+.ptv.treasure .ptv-bar{background:rgba(43,29,18,.12);border:2px solid var(--hd-ink);height:1em}
+.ptv.treasure .ptv-bar u{background:var(--hd-orange)}
+.ptv.treasure .ptv-row.top1 .ptv-bar u{background:var(--hd-ink)}
+.ptv.treasure .ptv-sh{display:flex;gap:.1em}.ptv.treasure .ptv-sh .gi{width:1.3em;height:1.3em}
+.ptv.treasure .ptv-hidden{background:var(--hd-paper);color:var(--hd-ink);border:3px solid var(--hd-ink);box-shadow:var(--hd-drop)}
+.ptv.treasure .ptv-hidden b{color:var(--hd-red)}
+.ptv.treasure .ptv-news{background:var(--hd-paper);color:var(--hd-ink);border:2.5px solid var(--hd-ink);box-shadow:inset .45em 0 0 var(--hd-ink),0 4px 0 var(--hd-ink);padding-left:1.2em}
+.ptv.treasure .ptv-news em{color:var(--hd-orange)}
+.ptv.treasure .ptv-news:is(.steal,.heist){box-shadow:inset .45em 0 0 var(--hd-red),0 4px 0 var(--hd-ink);animation:ptv-news .45s cubic-bezier(.2,1.4,.4,1)}
+.ptv.treasure .ptv-news.block{box-shadow:inset .45em 0 0 var(--hd-blue),0 4px 0 var(--hd-ink)}
+.ptv.treasure .ptv-news:is(.swap,.event){box-shadow:inset .45em 0 0 var(--hd-violet),0 4px 0 var(--hd-ink)}
+.ptv.treasure .ptv-news.lead{box-shadow:inset .45em 0 0 var(--hd-gold),0 4px 0 var(--hd-ink)}
+.ptv.treasure .ptv-news.big{background:var(--hd-paper);color:var(--hd-ink);border:4px solid var(--hd-ink);box-shadow:0 .3em 0 var(--hd-ink);padding:.9em 1.2em}
+.ptv.treasure .ptv-news.big.heist{background:#f2c4bc}.ptv.treasure .ptv-news.big.event{background:var(--hd-gold2)}
+.ptv.treasure .ptv-news .gi{width:1.4em;height:1.4em}
+.ptv.treasure .ptv-event{animation:none;color:var(--hd-ink);border:3px solid var(--hd-ink);box-shadow:var(--hd-drop)}
+.ptv.treasure .ptv-event b{display:flex;align-items:center;gap:.3em}
+.ptv.treasure .ptv-event.golden{background:var(--hd-gold2)}.ptv.treasure .ptv-event.storm{background:#c9b8e6}.ptv.treasure .ptv-event.raid{background:#f2c4bc}
+.ptv.treasure .ptv-teams{background:var(--hd-paper);color:var(--hd-ink);border:3px solid var(--hd-ink);box-shadow:var(--hd-drop)}
+.ptv.treasure .ptv-teams b{display:flex;align-items:center;gap:.2em}
+.ptv.treasure .ptv-teams .bar{background:var(--hd-blue);border:2.5px solid var(--hd-ink);height:1.1em}.ptv.treasure .ptv-teams .bar u{background:var(--hd-red);box-shadow:2.5px 0 0 var(--hd-ink)}
+.ptv.treasure .ptv-end h1{text-shadow:var(--hd-outline);display:flex;align-items:center;justify-content:center;gap:.3em}
+.ptv.treasure .ptv-step{background:var(--hd-paper);color:var(--hd-ink);border:3px solid var(--hd-ink);border-bottom:0}
+.ptv.treasure .ptv-step.s1{background:var(--hd-gold2)}.ptv.treasure .ptv-step.s2{background:#dfe3e6}.ptv.treasure .ptv-step.s3{background:#e9c39d}
+.ptv.treasure .ptv-step em{color:var(--hd-ink)}.ptv.treasure .ptv-step i{opacity:.35}
+.ptv.treasure :is(.ptv-rest li,.ptv-award){background:var(--hd-paper);color:var(--hd-ink);border:2.5px solid var(--hd-ink);box-shadow:0 3px 0 var(--hd-ink)}
+.ptv.treasure .ptv-award small{color:var(--hd-orange)}
+.ptv.treasure .ptv-team-end span{display:flex;align-items:center;gap:.3em;padding:.2em .7em;border-radius:.5em;background:var(--hd-paper);color:var(--hd-ink);border:2.5px solid var(--hd-ink)}
+.ptv.treasure .ptv-team-end .win{background:var(--hd-gold2);text-shadow:none}
+.ptv.treasure .ptv-team-end i{color:var(--hd-gold2);text-shadow:var(--hd-outline)}
+
+@media (prefers-reduced-motion:reduce){.pt-app.treasure .pt-alarm,.pt-app.treasure .pt-siren{animation:none!important}}
+.ptv :is(.ptv-event,.ptv-teams,.ptv-frenzy,.ptv-hidden)[hidden]{display:none!important}
+
+/* ---------- V13.150 그림 33(처음 번호 30) 연결(손그림 테마 위에 그림을 얹는다) ---------- */
+.gi-art{object-fit:contain}
+/* 보물 사냥: 배경 · 상자 */
+.pt-app.treasure.art-bg{background:#1f4a52}
+.pt-app.treasure.art-bg::before{inset:0;right:0;bottom:0;width:auto;height:auto;opacity:1;background:url(/assets/treasure/bg-phone.webp) center top/cover no-repeat}
+.pt-app.treasure.art-bg::after{display:none}
+.ptv.treasure.art-bg .ptv-bg{background:url(/assets/treasure/bg-tv.webp) center/cover no-repeat,#1f4a52}
+.ptv.treasure.art-bg .ptv-bg::after{display:none}
+.pt-chest .pt-chest-img{display:block;width:100%;height:auto}
+.pt-chest .pt-chest-img.opened,.pt-chest.open .pt-chest-img{display:none}
+.pt-chest.open .pt-chest-img.opened{display:block;animation:pt-loot .4s cubic-bezier(.3,1.7,.5,1)}
+.pt-chest:not(:disabled) .pt-chest-img{animation:pt-chest-idle 1.6s ease-in-out infinite}
+.pt-chest:nth-child(2):not(:disabled) .pt-chest-img{animation-delay:-.5s}.pt-chest:nth-child(3):not(:disabled) .pt-chest-img{animation-delay:-1s}
+.pt-chest.chosen:not(.open) .pt-chest-img{animation:pt-shake .35s 2}
+.ptv.treasure .ptv-event .gi{width:1.9em;height:1.9em}
+.pt-app.treasure .pt-event .gi{width:1.6em;height:1.6em}
+.pt-app.treasure .pt-inv .gi,.pt-app.treasure .pt-item-btn .gi,.pt-app.treasure .pt-peek-btn .gi{width:1.6em;height:1.6em}
