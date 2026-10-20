@@ -180,6 +180,15 @@ export async function runHuntChecks(assert) {
       'V13.162 화면: 하얀 번쩍임 → "야생의 ○○이 나타났다!", 줄어드는 원(나이스 · 그레이트 · 엑설런트), 도망 · 가방 · 열매, 황금 공 "정말 쓸까요?"');
     assert(ui.includes('wob-l') && ui.includes("ball-lock") && ui.includes('잡았다!') && ui.includes('빠져나왔어요') && ui.includes('도망쳤어요') && ui.includes('huntPetShow(res.key, res.tier)'),
       'V13.162 결과: 흔들림 → 딸깍 + 별 "잡았다!" / 빠져나옴 / 도망 연기, 새 친구는 알 상점과 같은 펫 공개 연출');
+    // 고퀄 손맛(선생님 요청: 실제로 던지는 느낌 · 포켓몬 고처럼 생동감).
+    assert(ui.includes('const reachOf = power =>') && ui.includes("'short'") && ui.includes("'over'") && ui.includes('function flightStep(now)') && ui.includes('hn-bshadow') && ui.includes('scaleAt(z)'),
+      'V13.162 공은 원근 포물선으로 날아가 작아지고(그림자도 따라감), 약하면 앞에 떨어지고 세면 넘어간다(이때는 서버에 안 보내 공을 안 쓴다)');
+    assert(ui.includes('drag.spin') && ui.includes('커브볼!') && ui.includes('function petAct(now)') && ui.includes("kind === 'attack'") && ui.includes('function deflect(') && ui.includes('hn-beam') && ui.includes("classList.add('lit')"),
+      'V13.162 커브볼(손가락으로 원 그리기, 잡힐 확률은 그대로) · 펫이 덤비거나 피할 때 맞히면 튕겨 나감 · 맞으면 펫이 빛이 되어 공에 빨려 들어감');
+    assert(ui.includes("addEventListener('devicemotion', onMotion)") && ui.includes('DeviceMotionEvent.requestPermission') && ui.includes("addEventListener('deviceorientation', onTilt)") && ui.includes('두 손으로 꼭') && ui.includes('stopMotion(); stopTilt();'),
+      'V13.162 📱 폰으로 던지기(가속도계, 아이폰 허락, 두 손으로 꼭 안내) · 기울이면 배경이 움직임(자이로), 나가면 센서를 끈다');
+    assert(ui.includes('function zoomTo(btn)') && ui.includes('hn-radar') && ui.includes('hn-rustles') && css.includes('@keyframes hn-petdrop') && css.includes('@keyframes hn-rustle'),
+      'V13.162 지도: 내 파트너 레이더 · 바스락 풀숲 · 누르면 카메라 줌, 펫이 위에서 떨어지며 등장');
     assert(ui.includes('arcadeWords(H.A)') && ui.includes('function quiz(berry)') && ui.includes('H.berryTried = true'), 'V13.162 열매는 게임 단어(학습 범위)에서 단어 문제를 맞혀야 받는다(한 공에 한 번)');
     assert(moments.includes('export async function huntPetShow(key, tier)') && moments.includes("epicShow({ key, from: 'hunt' })") && moments.includes("eggRevealHtml(openOverlay('새 친구'), key") && lucky.includes("from === 'hunt' ? '펫 사냥에서 영웅 펫을 잡았어요!'"),
       'V13.162 새 친구 공개: 기본은 알 이름 카드(eggRevealHtml), 영웅은 영웅 연출(epicShow)');
