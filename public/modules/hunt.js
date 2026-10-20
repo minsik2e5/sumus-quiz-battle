@@ -13,7 +13,7 @@ import { HUNT, BERRIES, BALL_NAMES, THROW_NAMES, TIER_NAMES, catchChance, huntSl
 // 흔들림 1~3번 → 딸깍 + 별(잡았다) / 빠져나옴 / 도망 연기. 새 친구는 알 상점과 같은 펫 공개 연출(pet-moments.js huntPetShow).
 // 만남 · 잡힘 · 도망은 서버가 정한다(server/hunt.mjs). 빗나간 공(펫에 안 닿음)은 서버에 보내지 않고 손에 돌아온다.
 // 그림(주문서 34)은 HUNT_ART에 이름이 있으면 쓰고, 없으면 코드 그림 · 이모지로 그린다(reel.js FISHING_ART와 같은 방식).
-export const HUNT_ART = new Set([]);
+export const HUNT_ART = new Set(['bg-forest-day', 'bg-forest-night', 'bg-field-day', 'bg-field-night', 'bg-beach-day', 'bg-beach-night', 'bg-catch', 'entry', 'ball-basic', 'ball-good', 'ball-gold', 'ball-open', 'ball-spin', 'ball-tilt-l', 'ball-tilt-r', 'ball-lock', 'fx-sparkle', 'fx-star', 'fx-burst', 'fx-smoke', 'ring-green', 'ring-yellow', 'ring-red', 'fx-mystery', 'berry-razz', 'berry-pinap', 'berry-nanab', 'bag']);
 const has = name => HUNT_ART.has(name);
 const art = (name, fallback, cls = '') => has(name) ? `<img class="hn-art hn-art-${name} ${cls}" src="/assets/hunt/${name}.webp" alt="" draggable="false">` : fallback;
 const ballPic = (kind, cls = '') => art(`ball-${kind}`, `<i class="hn-ball k-${kind} ${cls}"><b></b></i>`, cls);
