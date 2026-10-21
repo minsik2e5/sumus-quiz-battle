@@ -84,7 +84,8 @@ function attemptForExam(state, exam, attemptId) {
 function roster(state, exam) {
   const archived = Array.isArray(state.examAttemptArchive) ? state.examAttemptArchive : [];
   const school = schoolByRef(state, exam.school_id || exam.school);
-  const candidates = state.profiles.filter(p => p.role === 'student' && p.division === exam.division && targetMatches(exam, p) && sameSchool(p, school) && (p.active || state.examAttempts.some(a => a.exam_id === exam.id && a.student_id === p.id)));
+  // V13.168 선생님의 미리보기 계정은 시험 명단(미응시 수)에 넣지 않는다.
+  const candidates = state.profiles.filter(p => p.role === 'student' && !p.preview_owner_id && p.division === exam.division && targetMatches(exam, p) && sameSchool(p, school) && (p.active || state.examAttempts.some(a => a.exam_id === exam.id && a.student_id === p.id)));
   const students = candidates.map(student => {
     const attempts = state.examAttempts.filter(a => a.exam_id === exam.id && a.student_id === student.id).sort((a, b) => (b.submitted_at || b.started_at || 0) - (a.submitted_at || a.started_at || 0));
     const active = attempts.find(a => a.status === 'active');

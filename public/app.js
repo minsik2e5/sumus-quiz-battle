@@ -1017,6 +1017,8 @@ async function performTeacherContextSwitch(kind, value) {
     await api(endpoint, payload, 'PATCH');
     if (generation !== contextGeneration) return;
     A.examForm = null; A.examFormDirty = false; A.ranges = {}; A.search = ''; A.classFilter = '';
+    // V13.168 학교 · 부서를 바꾸면 결과 분석의 반 거르기와 단어 데이터의 범위 거르기도 처음으로(예전 반 · 범위가 남아 빈 표가 보였다).
+    A.resultsClass = ''; A.resultsLimit = 30; A.vocabRange = ''; A.vocabLimit = 0;
     await refresh();
     if (generation !== contextGeneration) return;
     preferences();
