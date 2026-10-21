@@ -37,7 +37,7 @@ import { HUNT } from '../public/modules/hunt-rules.js';
 import { REEL } from '../public/modules/reel-rules.js';
 import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './games.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
-import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, settleParty, partyReportPending, undoParty } from './party.mjs';
+import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, partyPlaysLeft, settleParty, partyReportPending, undoParty } from './party.mjs';
 import { PARTY } from './party-engine.mjs';
 import { STREAK_GUARD, guardDayKeys, guardView, guardPlan, studyDayNums } from '../public/modules/streak-guard.js';
 export const APP_VERSION = packageInfo.version;
@@ -1804,7 +1804,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const fresh = !party.tickets[p.id];
     const ticket = party.tickets[p.id] ||= partyTicket();
     const pet = petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key).find(x => x.active) || null;
-    return { room: { id: party.id, ticket, kind: party.kind, code: party.code, label: party.label }, _parties: [{ action: 'join', id: party.id, ticket, fresh, player: partyPlayer(p, pet) }] };
+    return { room: { id: party.id, ticket, kind: party.kind, code: party.code, label: party.label, plays_left: partyPlaysLeft(p) }, _parties: [{ action: 'join', id: party.id, ticket, fresh, player: partyPlayer(p, pet) }] };
   }
   if (path === '/shop/egg' && method === 'POST') {
     requireRole(p, 'student');
@@ -1949,7 +1949,8 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const now = Date.now(), cleared = dungeonCleared(p), open = openCuts(cleared);
     const d = openDungeonFor(state, p.id, now);
-    const recent = (state.dungeons || []).filter(x => x.status === 'finished' && (x.members || []).includes(p.id)).sort((a, b) => b.finished_at - a.finished_at).slice(0, 5)
+    // V13.168 로비에서 나가 판에 없던 방은 최근 던전에 넣지 않는다(결과의 파티원에 내가 있는 판만).
+    const recent = (state.dungeons || []).filter(x => x.status === 'finished' && (x.members || []).includes(p.id) && (x.result?.players || []).some(y => y.id === p.id)).sort((a, b) => b.finished_at - a.finished_at).slice(0, 5)
       .map(x => ({ id: x.id, cut: x.result.cut, cut_name: CUTS[x.result.cut]?.name || '', cleared: x.result.cleared, reached: x.result.reached, time_ms: x.result.time_ms, size: x.result.size, finished_at: x.finished_at }));
     // V13.143 오늘 남은 보상 판(반복 · 위로 · 만점 한 판이 같이 쓴다)과 처음 클리어 코인.
     const plays = p.dungeon?.day === dayKey(now) ? Number(p.dungeon.plays || 0) : 0;
@@ -1963,7 +1964,7 @@ export async function service(state, method, path, body, token, options = {}) {
   }
   if (path === '/dungeon/last' && method === 'GET') {
     requireRole(p, 'student');
-    return dungeonLastView(state, p);
+    return dungeonLastView(state, p, str(body.id, 64));
   }
   if (path === '/dungeon/rooms' && method === 'POST') {
     requireRole(p, 'student');

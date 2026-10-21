@@ -32,6 +32,9 @@ export function tidyParties(state, now = Date.now()) {
   }
   return changed;
 }
+// V13.168 오늘 코인을 받을 수 있는 교실 게임 판 수(settleParty와 같은 셈). 방의 결과 화면은 하루 3판을 모르므로
+// 참가할 때 알려 준다(3판을 다 받은 학생에게 '+코인'이 보였는데 실제로는 0코인이었다).
+export const partyPlaysLeft = (p, now = Date.now()) => { const day = p?.games?.party; return Math.max(0, PARTY.DAILY - (day?.day === dayKey(now) ? Number(day.plays || 0) : 0)); };
 // 학생 한 명의 화면 표시용 펫.
 export const partyPlayer = (p, pet) => ({ id: p.id, name: p.display_name || '학생', pet: pet ? { key: pet.key, form: Math.max(1, pet.form ?? 1) } : null });
 

@@ -331,14 +331,15 @@ function pop(html, cls = '', ms = 2600) {
 
 /* ---------- 끝 ---------- */
 function ended(v) {
-  const r = v.result || {}, fish = v.kind === 'fish';
+  // V13.168 방은 하루 3판을 모른다: 들어올 때 오늘 코인 판이 남지 않았으면 '+코인' 대신 그렇다고 알려 준다(서버는 0코인).
+  const r = v.result || {}, fish = v.kind === 'fish', capped = P.room?.plays_left === 0;
   const medal = ['🥇', '🥈', '🥉'][r.rank - 1] || '';
   main(`<section class="pt-end">
     <div class="pt-end-rank${r.rank <= 3 ? ` top${r.rank}` : ''}">${medal ? `<i>${medal}</i>` : ''}<b>${num(r.rank || 0)}등</b><small>/ ${num(r.of || 0)}명</small></div>
     <div class="pt-end-pet">${(() => { const pet = P.A.data.stats?.pet; return pet ? avatar(pet.key, { form: Math.max(1, pet.form ?? 1), expression: r.rank <= 3 ? 'cheer' : 'happy' }) : ''; })()}</div>
-    ${r.team ? `<div class="pt-team-end t${r.team}">${r.team_win ? '🏆 우리 팀 승리!' : r.team_gold && r.team_gold[0].gold === r.team_gold[1].gold ? '🤝 무승부' : '아쉬워요'} <small>${(r.team_gold || []).map(t => `${t.team}팀 ${num(t.gold)}`).join(' : ')}${r.team_win ? ` · 코인 +${3}` : ''}</small></div>` : ''}
+    ${r.team ? `<div class="pt-team-end t${r.team}">${r.team_win ? '🏆 우리 팀 승리!' : r.team_gold && r.team_gold[0].gold === r.team_gold[1].gold ? '🤝 무승부' : '아쉬워요'} <small>${(r.team_gold || []).map(t => `${t.team}팀 ${num(t.gold)}`).join(' : ')}${r.team_win && !capped ? ` · 코인 +${3}` : ''}</small></div>` : ''}
     <div class="mg-result-facts"><span>${fish ? '총 무게' : '금화'} <b>${fish ? kgText(r.score || 0) : num(r.score || 0)}</b></span><span>맞힌 문제 <b>${num(r.right || 0)}</b></span></div>
-    ${r.coins ? `<div class="mg-result-coins">${coin()}<b>+${num(r.coins)}</b><small>경험치 +${num(r.xp || 0)} · 하루 ${3}판까지 받아요</small></div>` : `<p class="mg-result-why">${(r.right || 0) < 5 ? '5문제 이상 맞히면 코인을 받아요.' : ''}</p>`}
+    ${r.coins && capped ? `<p class="mg-result-why">오늘 교실 게임 코인 ${3}판을 다 받았어요. 내일 다시 받을 수 있어요.</p>` : r.coins ? `<div class="mg-result-coins">${coin()}<b>+${num(r.coins)}</b><small>경험치 +${num(r.xp || 0)} · 하루 ${3}판까지 받아요</small></div>` : `<p class="mg-result-why">${(r.right || 0) < 5 ? '5문제 이상 맞히면 코인을 받아요.' : ''}</p>`}
     ${v.awards?.length ? `<div class="pt-awards">${v.awards.map(a => `<div class="pt-award ${a.key}"><small>${esc(a.title)}</small><b>${esc(a.name)}</b><span>${esc(a.value)}</span></div>`).join('')}</div>` : ''}
     <button type="button" class="yl-cta" data-pt="exit">나가기</button>
   </section>`);
