@@ -85,6 +85,26 @@ export async function runSweepLearnChecks(assert, expectStatus) {
     const moved = await call('qa_sl_t', 'PATCH', `/exams/${exam.id}`, { available_at: now + DAY / 4, due_at: now + DAY / 2 });
     const toggled = await call('qa_sl_t', 'PATCH', `/exams/${exam.id}`, { active: false });
     assert(moved.due_at === now + DAY / 2 && moved.available_at === now + DAY / 4 && toggled.active === false, 'V13.168 시작과 마감을 함께 앞당기기 · 배정만 바꾸기는 그대로 된다');
+
+    /* ---------- 4. 자정 전 마감 실전시험을 자정 뒤에 닫아도 미끼 · 공 하루 한도는 오늘 기준 ---------- */
+    {
+      state.profiles.push(student('qa-sl-d'));
+      tokens['qa-sl-d'] = (await service(state, 'POST', '/login', { username: 'qa-sl-d', password: 'QaSweepLearn1!', division: 'high' }, null))._cookie;
+      const D = state.profiles.find(p => p.id === 'qa-sl-d');
+      const night = Date.parse('2026-10-06T14:40:00Z'); // 화요일 23:40 KST
+      now = night;
+      // 화요일 미끼 · 공은 벌써 받았다.
+      D.reel = { bait: 1, bait_day: dayKey(night), bait_today: 9 };
+      await call('qa-sl-d', 'POST', '/practice/start', { mode: 'eng2mean', run_mode: 'test', range_codes: ['24'], target: 20 });
+      const tx = state.practices.find(p => p.student_id === 'qa-sl-d' && !p.finished);
+      for (let i = 0; i < 12 && !tx.finished; i++) { now += 2000; await call('qa-sl-d', 'POST', `/practice/${tx.id}/answer`, { question_id: tx.question_id, choice: 0, answer: '' }); if (tx.answer_records?.length > i && !tx.finished) await call('qa-sl-d', 'POST', `/practice/${tx.id}/next`, {}).catch(() => {}); }
+      tx.deadline = Date.parse('2026-10-06T14:59:00Z'); // 화요일 23:59 KST 마감
+      const before = D.reel.bait_today;
+      now = Date.parse('2026-10-06T15:05:00Z'); // 수요일 00:05 KST에 정리
+      sweep(state, now);
+      assert(tx.finished && (tx.answer_records || []).length >= 10 && dayKey(tx.ended_at) === dayKey(night) && before === 9, `V13.168 (준비) 자정 전 마감 시험이 자정 뒤에 닫히고 기록은 마감 날짜 (${(tx.answer_records || []).length})`);
+      assert(D.reel.bait_day === dayKey(now) && D.hunt?.got?.day === dayKey(now), 'V13.168 자정 전 마감 실전시험을 자정 뒤에 닫으면 미끼 · 공은 오늘(받는 날) 한도로 센다(어제 한도를 다시 풀지 않는다)');
+    }
   } finally {
     Date.now = realNow;
   }

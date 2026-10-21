@@ -3149,9 +3149,10 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false, stal
   if (!state.sessions.some(s => s.id === rec.id)) state.sessions.push(rec);
   if (complete && student) repairStreak(state, student, endedAt);
   // V13.150: 끝까지 푼 연습(10문제 이상)은 낚시 미끼 1개.
-  if (complete && student && answerRecords.length >= REEL.BAIT_MIN_PRACTICE && grantBait(student, endedAt)) x.bait = true;
+  // V13.168 미끼 · 공의 하루 한도는 받는 지금(한국 날짜)으로 센다. 자정 전 마감 시험을 자정 뒤에 닫으면 어제로 되돌아가 하루 한도가 한 번 더 풀렸다.
+  if (complete && student && answerRecords.length >= REEL.BAIT_MIN_PRACTICE && grantBait(student, finalizedAt)) x.bait = true;
   // V13.162: 같은 조건으로 펫 사냥 공 1개(하루 1번). 만점이면 가끔 좋은 공.
-  if (complete && student && answerRecords.length >= HUNT.MIN_PRACTICE) { const ball = grantBall(student, 'practice', { lucky: perfect, now: endedAt }); if (ball) x.ball = ball; }
+  if (complete && student && answerRecords.length >= HUNT.MIN_PRACTICE) { const ball = grantBall(student, 'practice', { lucky: perfect, now: finalizedAt }); if (ball) x.ball = ball; }
 }
 // V13.149 되살리기: 연속이 어제 끊겼으면(보호권이 없어서) 오늘 끝까지 푼 연습이 모두 REPAIR_NEED문제를 넘을 때 어제를 잇는다.
 function repairStreak(state, p, now) {
