@@ -464,6 +464,7 @@ function result(ms, stars, res) {
     <div class="mt-res-stars" aria-label="별 ${stars}개">${[1, 2, 3].map(i => `<i class="${i <= stars ? 'on' : 'off'}">★</i>`).join('')}</div>
     <div class="mt-res-time"><b id="mt-final">0.00</b><small>초</small>${record ? '<span class="mt-stamp" id="mt-stamp">신기록</span>' : ''}</div>
     ${diffLine ? `<p class="mt-res-diff">${diffLine}</p>` : ''}
+    ${res?.unranked ? '<p class="mt-res-why mt-res-unranked">이 기록은 내 화면에만 남아요. 순위에는 확인된 기록만 올라가요.</p>' : ''}
     ${ghostLine ? `<div class="mt-res-ghost${beat ? ' beat' : ''}">${avatar(g.pet, { size: 'mini', form: 1 })}<span>${ghostLine}</span></div>` : ''}
     <div class="mt-res-facts"><span>틀림 <b>${num(M.misses)}</b></span><span>최고 콤보 <b>${num(M.best)}</b></span>${M.view?.best ? `<span>내 최고 <b>${matchTime(M.view.best)}</b></span>` : ''}</div>
     ${coins ? `<div class="mt-rewards"><span class="r coin">${coin()}<b>+<i>0</i></b><small>${res.record_coins ? `신기록 +${num(res.record_coins)} 포함` : '코인'}</small></span><span class="r xp"><b>+${num(xp)}</b><small>경험치</small></span>${extras}</div>`

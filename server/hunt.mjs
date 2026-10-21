@@ -1,5 +1,7 @@
 import { dayKey, STANDARD_PET_KEYS, EPIC_PET_KEYS } from '../public/modules/core.js';
-import { HUNT, BALL_KINDS, BERRIES, HUNT_MONSTERS, MONSTER_KEYS, spawnPool, monsterReady, rollThrow, spawnTier, petTier, huntSlot } from '../public/modules/hunt-rules.js';
+import { HUNT, BALL_KINDS, BERRIES, HUNT_MONSTERS, MONSTER_KEYS, spawnPool, monsterReady, rollThrow, spawnTier, petTier, huntSlot, guardQuality } from '../public/modules/hunt-rules.js';
+import { displayEnglish } from '../public/modules/core.js';
+import { cardMeaning } from '../public/modules/match-rules.js';
 import { findReceipt, keepReceipt, addBonus, secureRandom } from './rewards.mjs';
 
 // V13.162 몬스터 사냥(놀이터) 서버 쪽. 학생 기록 p.hunt:
@@ -10,6 +12,8 @@ import { findReceipt, keepReceipt, addBonus, secureRandom } from './rewards.mjs'
 //   몬스터를 건너뛰거나 지도가 바뀔 때까지 기다려도 펫이 더 나오지 않는다(공을 써야 생긴다).
 // 잡힘 · 도망도 서버가 정하고, 던지기마다 영수증(id)을 남겨 같은 던지기를 다시 보내도 공을 또 쓰지 않는다(낚시 cast/land와 같다).
 // 던지기 품질 · 열매는 화면이 보내지만 정해진 값만 받는다(나이스 ×1.1 · 그레이트 ×1.25 · 엑설런트 ×1.6이 상한, 열매는 한 번에 하나).
+// V13.167 열매는 서버가 낸 단어 문제(huntBerryQuiz)를 서버가 채점해 준 열매 표(h.berry)가 있어야 붙는다(한 공에 한 번, 재사용 · 위조 안 됨).
+//   던지기 품질은 guardQuality(최근 비율 상한 · 너무 빠른 던지기)로 대략 확인한다(p.hunt.qlog: 최근 화면이 보낸 품질, h.last: 앞 일 시각).
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const hunt = p => p.hunt ||= {};
@@ -120,12 +124,13 @@ export function huntMeet(p, spotIdIn, now = Date.now(), random = secureRandom) {
   const h = hunt(p), map = huntMap(p, now, random);
   const spot = map.spots.find(s => s.id === spotIdIn);
   if (!spot) fail('벌써 다른 곳으로 갔어요. 지도를 다시 볼게요.', 404);
-  if (h.live?.spot !== spot.id) h.live = { spot: spot.id, kind: spot.kind, key: spot.key, tier: spot.tier, at: now, throws: 0 };
+  if (h.live?.spot !== spot.id) { h.live = { spot: spot.id, kind: spot.kind, key: spot.key, tier: spot.tier, at: now, throws: 0 }; delete h.berry; delete h.quiz; }
+  h.last = now;
   return { spot: spot.id, kind: spot.kind, key: spot.key, tier: spot.tier, form: spot.form || 1, throws: h.live.throws };
 }
 
 // 던지기. 같은 던지기(id)를 다시 보내면 같은 답(공을 또 쓰지 않는다). pet: 경험치를 받을 파트너 펫 키.
-export function huntThrow(p, { id, spot, ball: kind, quality = null, berry = null, pet = null, now = Date.now(), random = secureRandom }) {
+export function huntThrow(p, { id, spot, ball: kind, quality = null, ticket = null, pet = null, now = Date.now(), random = secureRandom }) {
   const h = hunt(p);
   const seen = findReceipt(h, 'hunt', id);
   if (seen) return { ...seen.r, again: true };
@@ -134,12 +139,17 @@ export function huntThrow(p, { id, spot, ball: kind, quality = null, berry = nul
   if (!live || live.spot !== spot) fail('만나는 중인 몬스터가 없어요. 지도에서 다시 눌러 주세요.', 404);
   const b = BALL_KINDS.includes(kind) ? kind : 'basic';
   if (ball(h, b) < 1) fail(b === 'gold' ? '황금 공이 없어요.' : b === 'good' ? '좋은 공이 없어요.' : '공이 없어요. 공부하면 공을 받아요!', 409);
-  const q = Object.hasOwn(HUNT.THROWS, quality) ? quality : null;
-  const fruit = Object.hasOwn(BERRIES, berry) ? berry : null;
+  const claimed = Object.hasOwn(HUNT.THROWS, quality) ? quality : null;
+  const q = guardQuality(claimed, h.qlog || [], now - Number(h.last || 0));
+  h.qlog = [...(h.qlog || []), claimed].slice(-HUNT.QUALITY_GUARD.WINDOW);
+  h.last = now;
+  // 열매: 이 만남 · 이 공에 서버가 준 열매 표가 있을 때만. 던지면(잡히든 아니든) 표를 쓴다.
+  const card = h.berry, fruit = card && ticket && card.ticket === ticket && card.spot === live.spot && card.throws === Number(live.throws || 0) && Object.hasOwn(BERRIES, card.berry) ? card.berry : null;
+  delete h.berry; delete h.quiz;
   h[b] = ball(h, b) - 1;
   live.throws = Number(live.throws || 0) + 1;
   const roll = rollThrow(live.tier, { ball: b, quality: q, berry: fruit }, random(), random());
-  const out = { caught: roll.caught, fled: roll.fled, shakes: roll.shakes, kind: live.kind, key: live.key, tier: live.tier, ball: b, quality: q, berry: fruit, throws: live.throws };
+  const out = { caught: roll.caught, fled: roll.fled, shakes: roll.shakes, kind: live.kind, key: live.key, tier: live.tier, ball: b, quality: q, berry: fruit, throws: live.throws, ...(claimed && q !== claimed ? { claimed } : {}) };
   if (roll.caught) {
     h.caught = Number(h.caught || 0) + 1;
     if (live.kind === 'pet') {
@@ -165,11 +175,56 @@ export function huntThrow(p, { id, spot, ball: kind, quality = null, berry = nul
   if (roll.caught || roll.fled) endMeet(p, h, now, random);
   return keepReceipt(h, 'hunt', id, out, now);
 }
+// V13.167 열매 문제: 만나는 중인 몬스터에게, 공 하나에 한 번. 단어는 부른 쪽(service.mjs)이 내 학교 · 학년 범위에서 준다.
+// 정답은 보내지 않는다. 같은 공에서 다시 부르면 같은 문제(다시 뽑아 쉬운 단어를 고르지 못하게).
+const quizId = random => `q${Math.floor(random() * 36 ** 6).toString(36)}${Math.floor(random() * 36 ** 6).toString(36)}`;
+export function huntBerryQuiz(p, { spot, berry, words = [], now = Date.now(), random = secureRandom }) {
+  const h = hunt(p), live = h.live;
+  if (!live || live.spot !== spot) fail('만나는 중인 몬스터가 없어요. 지도에서 다시 눌러 주세요.', 404);
+  if (!Object.hasOwn(BERRIES, berry)) fail('열매를 골라 주세요.');
+  const throws = Number(live.throws || 0);
+  if (h.berry?.spot === spot && h.berry.throws === throws) fail('이 공에는 벌써 열매를 줬어요.', 409);
+  if (h.quiz?.spot === spot && h.quiz.throws === throws) {
+    if (h.quiz.done) fail('이 공에는 벌써 문제를 풀었어요. 다음 공에 다시 해요.', 409);
+    return { id: h.quiz.id, berry: h.quiz.berry, en: h.quiz.en, choices: h.quiz.choices };
+  }
+  const seenEn = new Set(), seenKo = new Set(), pool = [];
+  // 범위 단어가 많아도 앞에서부터 섞어 4개만 고른다(전체를 섞지 않는다).
+  const list = [...words];
+  for (let i = 0; i < list.length && pool.length < 4; i++) {
+    const j = i + Math.floor(random() * (list.length - i));
+    [list[i], list[j]] = [list[j], list[i]];
+    const w = list[i], en = displayEnglish(w.word || '').trim(), ko = cardMeaning(w.meaning);
+    if (!en || !ko || seenEn.has(en.toLowerCase()) || seenKo.has(ko)) continue;
+    seenEn.add(en.toLowerCase()); seenKo.add(ko); pool.push({ en, ko });
+  }
+  if (pool.length < HUNT.BERRY_QUIZ_MIN) fail('단어가 모자라요. 놀이터에서 게임 단어 범위를 더 골라 주세요.', 409);
+  const choices = pool.map(w => w.ko).sort(() => random() - .5);
+  h.quiz = { id: quizId(random), spot, throws, berry, en: pool[0].en, answer: pool[0].ko, choices, at: now };
+  return { id: h.quiz.id, berry, en: h.quiz.en, choices };
+}
+// 채점: 맞히면 열매 표(ticket)를 준다. 같은 문제를 다시 보내면 같은 답(표도 같다).
+export function huntBerryAnswer(p, { id, choice, random = secureRandom }) {
+  const h = hunt(p), q = h.quiz;
+  if (!q || q.id !== id) fail('열매 문제가 끝났어요. 다시 골라 주세요.', 404);
+  if (q.done) return q.done;
+  const live = h.live;
+  if (!live || live.spot !== q.spot || Number(live.throws || 0) !== q.throws) fail('열매 문제가 끝났어요. 다시 골라 주세요.', 404);
+  const ok = String(choice || '') === q.answer;
+  q.done = { ok, answer: q.answer, en: q.en, berry: q.berry };
+  if (ok) {
+    const ticket = `b${quizId(random)}`;
+    h.berry = { ticket, berry: q.berry, spot: q.spot, throws: q.throws };
+    q.done.ticket = ticket;
+  }
+  return q.done;
+}
+
 // 만남이 끝나면(잡거나 도망) 그 자리를 지우고, HUNT.PET% 확률로 펫 자리를 하나 만든다(이미 있으면 그대로).
 function endMeet(p, h, now, random) {
   const map = h.map ||= { slot: huntSlot(now), spots: [] };
   map.spots = (map.spots || []).filter(s => s.id !== h.live.spot);
-  delete h.live;
+  delete h.live; delete h.berry; delete h.quiz;
   h.met = Number(h.met || 0) + 1;
   if (!map.spots.some(s => s.kind === 'pet') && random() * 100 < HUNT.PET) {
     const left = missing(p), tier = petTier(random(), { basic: left.basic.length, epic: left.epic.length });

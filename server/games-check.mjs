@@ -129,11 +129,13 @@ export async function runGamesChecks(assert) {
     let clock = now;
     Date.now = () => clock;
     try {
-      const play = async (ms, misses = 0, wait = MATCH.COUNTDOWN_MS + ms, who = 'qa-gm-c') => { const s = await call(who, 'POST', '/games/match/start', { range_codes: ['24'] }); clock += wait; return [s, await call(who, 'POST', '/games/match/finish', { id: s.id, ms, misses })]; };
+      // V13.167 화면은 늘 짝마다 시간(splits)을 보낸다: 사람 모양(고르지 않은 간격)으로 만든다. 없으면 의심 기록(순위 · 신기록에서 빠짐).
+      const humanSplits = ms => { const w = Array.from({ length: MATCH.TOTAL_PAIRS }, (_, i) => 1 + ((i * 37) % 11) / 10 + (i === 6 || i === 12 ? 1 : 0)), sum = w.reduce((a, b) => a + b, 0); let at = 0; return w.map((x, i) => i === w.length - 1 ? ms : (at += Math.round(x / sum * ms))); };
+      const play = async (ms, misses = 0, wait = MATCH.COUNTDOWN_MS + ms, who = 'qa-gm-c') => { const s = await call(who, 'POST', '/games/match/start', { range_codes: ['24'] }); clock += wait; return [s, await call(who, 'POST', '/games/match/finish', { id: s.id, ms, misses, splits: humanSplits(ms) })]; };
       const [, fast] = await play(9000);
       const [, early] = await play(45000, 0, 4000);
       const [s1, r1] = await play(50000);
-      const again = await call('qa-gm-c', 'POST', '/games/match/finish', { id: s1.id, ms: 50000, misses: 0 });
+      const again = await call('qa-gm-c', 'POST', '/games/match/finish', { id: s1.id, ms: 50000, misses: 0, splits: humanSplits(50000) });
       const [, r2] = await play(40000, 1);
       assert(!fast.paid && fast.reason === 'bad' && !early.paid && early.reason === 'short', 'V13.152 짝 맞추기: 18쌍을 사람 손보다 빨리(0.45초 × 18 + 라운드 연출) 끝내거나 서버가 잰 시간보다 긴 기록은 받지 않는다');
       assert(r1.paid && r1.stars === 3 && r1.record && r1.coins === MATCH.COINS[3] + MATCH.RECORD_COINS && again.again && again.coins === r1.coins && r2.record && r2.coins === MATCH.COINS[3] && prof('qa-gm-c').games.match.r3.best === 40000,
@@ -153,10 +155,12 @@ export async function runGamesChecks(assert) {
       const tiny = end => [...Array.from({ length: MATCH.TOTAL_PAIRS - 1 }, (_, k) => (k + 1) * 100), end];
       assert(matchSplits(even(40000), 40000)?.length === MATCH.TOTAL_PAIRS && !matchSplits(tiny(40000), 40000) && !matchSplits(even(40000), 45000) && !matchSplits(even(40000).slice(1), 40000) && !matchSplits('x', 40000),
         'V13.152 고스트용 짝마다 시간: 18개, 한 쌍 0.45초 이상, 마지막이 기록과 같아야 한다');
+      // V13.167 지금은 짝마다 시간이 없으면 의심 기록이라 순위에 안 들어간다. 그 전에 남은 기록(시간 없음)은 그대로 고르게 나눈다.
+      prof('qa-gm-c').games.match.r3.week.splits = null;
       const sa = await call('qa-gm-a', 'POST', '/games/match/start', { range_codes: ['24'] });
       assert(sa.ghost?.name === '다솜' && !sa.ghost.self && sa.ghost.rank === 1 && sa.ghost.ms === 40000 && JSON.stringify(sa.ghost.splits) === JSON.stringify(even(40000)),
         'V13.149 고스트: 이번 주 기록이 없으면 가장 느린 기록, 짝마다 시간이 없는 기록은 고르게 나눈다');
-      const splitsA = Array.from({ length: MATCH.TOTAL_PAIRS }, (_, k) => k === MATCH.TOTAL_PAIRS - 1 ? 60000 : (k + 1) * 3200);
+      const splitsA = humanSplits(60000); // V13.167 고른 간격(3.2초씩)은 스크립트 모양이라 사람 모양으로
       clock += MATCH.COUNTDOWN_MS + 60000;
       const fa = await call('qa-gm-a', 'POST', '/games/match/finish', { id: sa.id, ms: 60000, misses: 0, splits: splitsA });
       const fa2 = await call('qa-gm-a', 'POST', '/games/match/finish', { id: sa.id, ms: 60000, misses: 0, splits: tiny(60000) });
@@ -165,8 +169,10 @@ export async function runGamesChecks(assert) {
       const sb = await call('qa-gm-b', 'POST', '/games/match/start', { range_codes: ['24'] });
       assert(sb.ghost?.name === '가람' && JSON.stringify(sb.ghost.splits) === JSON.stringify(splitsA), 'V13.149 고스트: 다른 학생은 그 학생이 남긴 짝마다 시간대로 달린다');
       clock += MATCH.COUNTDOWN_MS + 57000;
-      const fb = await call('qa-gm-b', 'POST', '/games/match/finish', { id: sb.id, ms: 57000, misses: 0, splits: tiny(57000) });
-      assert(fb.paid && fb.record && prof('qa-gm-b').games.match.r3.week.best === 57000 && prof('qa-gm-b').games.match.r3.week.splits === null, 'V13.149 고스트: 이상한 짝마다 시간은 버리고 기록은 그대로 받는다');
+      // V13.167 사람 모양이지만 한 쌍만 0.3초(가끔 있을 수 있음): 기록은 받고 고스트용 시간만 버린다. 전부 0.1초씩(tiny)은 의심 기록(guard-167-check).
+      const oneQuick = humanSplits(57000).map((v, i, a) => i === 3 ? a[2] + 300 : v);
+      const fb = await call('qa-gm-b', 'POST', '/games/match/finish', { id: sb.id, ms: 57000, misses: 0, splits: oneQuick });
+      assert(fb.paid && fb.record && !fb.unranked && prof('qa-gm-b').games.match.r3.week.best === 57000 && prof('qa-gm-b').games.match.r3.week.splits === null, 'V13.149 고스트: 이상한 짝마다 시간은 버리고 기록은 그대로 받는다');
       const sa3 = await call('qa-gm-a', 'POST', '/games/match/start', { range_codes: ['24'] }), sc = await call('qa-gm-c', 'POST', '/games/match/start', { range_codes: ['24'] });
       assert(sa3.ghost?.name === '나무' && sa3.ghost.rank === 2 && JSON.stringify(sa3.ghost.splits) === JSON.stringify(even(57000)) && sc.ghost?.self && sc.ghost.name === '이번 주의 나' && sc.ghost.ms === 40000,
         'V13.149 고스트: 바로 위 순위 학생, 1등이면 이번 주의 나');

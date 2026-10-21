@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { dayKey, STANDARD_PET_KEYS, EPIC_PET_KEYS, CHARACTERS } from '../public/modules/core.js';
 import { seeded } from '../public/modules/fishing-rules.js';
 import { HUNT, HUNT_MONSTERS, MONSTER_KEYS, MONSTER_TIERS, TIER_NAMES, tierLabel, catchChance, rollThrow, spawnTier, petTier, huntSim, huntSimAverage, huntSlot, dayValue } from '../public/modules/hunt-rules.js';
-import { grantBall, huntCard, huntMap, huntView, huntMeet, huntThrow, huntSell, huntCoins, huntSpend } from './hunt.mjs';
+import { grantBall, huntCard, huntMap, huntView, huntMeet, huntThrow, huntSell, huntCoins, huntSpend, huntBerryQuiz, huntBerryAnswer } from './hunt.mjs';
 import { rewardIncome } from './rewards.mjs';
 import { emptyState } from './state.mjs';
 import { passwordHash } from './auth.mjs';
@@ -97,7 +97,11 @@ export async function runHuntChecks(assert) {
     assert(!miss.caught && !miss.fled && miss.quality === null && miss.berry === null && again.again && again.caught === false && p.hunt.basic === 5, 'V13.162 같은 던지기(id)를 다시 보내면 공을 또 쓰지 않고 같은 답, 정해진 품질 · 열매만 받는다');
     assert(throws(() => huntThrow(p, { id: 'throw-0002', spot: 'other', ball: 'basic', now })) === 404, 'V13.162 만나는 중인 몬스터에게만 던진다');
     // 몬스터를 🍍로 잡으면 가방에 2마리 · 도감 · 파트너 펫 경험치.
-    const got = huntThrow(p, { id: 'throw-0004', spot, ball: 'basic', berry: 'pinap', quality: 'great', pet: 'dog', now, random: () => 0 });
+    // V13.167 열매는 서버가 낸 문제를 맞혀 받은 표로만.
+    const words = ['apple:사과', 'river:강', 'brave:용감한', 'quiet:조용한'].map((x, i) => ({ id: `w${i}`, word: x.split(':')[0], meaning: x.split(':')[1] }));
+    huntBerryQuiz(p, { spot, berry: 'pinap', words, now });
+    const card = huntBerryAnswer(p, { id: p.hunt.quiz.id, choice: p.hunt.quiz.answer });
+    const got = huntThrow(p, { id: 'throw-0004', spot, ball: 'basic', berry: 'pinap', ticket: card.ticket, quality: 'great', pet: 'dog', now, random: () => 0 });
     const xpRow = p.bonus?.log?.find(x => x.k === 'dog');
     assert(got.caught && got.kind === 'monster' && got.n === 2 && got.fresh && p.hunt.bag[first.key] === 2 && p.hunt.book[first.key].n === 2 && got.stars === HUNT.STARS[first.tier] * 2 && xpRow?.xp === HUNT.XP[first.tier] && !xpRow.c
       && !p.hunt.live && !p.hunt.map.spots.some(s => s.id === spot), 'V13.162 몬스터를 잡으면 가방 · 도감에 넣고(🍍면 2마리) 파트너 펫이 경험치(코인은 안 줌), 만남이 끝나면 자리가 사라진다');
@@ -173,7 +177,7 @@ export async function runHuntChecks(assert) {
     let failed = false; try { await call('POST', '/hunt/throw', { spot: met.spot, ball: 'basic' }); } catch (e) { failed = e.status === 400; }
     const thr = await call('POST', '/hunt/throw', { id: 'qa-throw-0001', spot: met.spot, ball: 'basic', quality: 'excellent' });
     const thr2 = await call('POST', '/hunt/throw', { id: 'qa-throw-0001', spot: met.spot, ball: 'basic' });
-    assert(failed && thr.hunt.basic === 0 && thr2.again && thr2.hunt.basic === 0 && thr.quality === 'excellent', 'V13.162 던지기는 번호가 있어야 하고, 같은 번호는 한 번만(공 하나)');
+    assert(failed && thr.hunt.basic === 0 && thr2.again && thr2.hunt.basic === 0 && (thr.quality === 'excellent' || thr.claimed === 'excellent'), 'V13.162 던지기는 번호가 있어야 하고, 같은 번호는 한 번만(공 하나)');
     me.hunt.bag = { slime: 3 }; me.hunt.stars = 0;
     const sold = await call('POST', '/hunt/sell', { key: 'slime', n: 2 });
     me.hunt.stars = 1000;
