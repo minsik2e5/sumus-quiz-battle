@@ -14,6 +14,28 @@ const BY_STUDENT_LISTS = new Set(['sessions', 'practices', 'examAttempts']);
 const BY_STUDENT_MAPS = new Set(['mastery', 'grammarProgress']);
 const isMap = value => !!value && typeof value === 'object' && !Array.isArray(value);
 
+// V13.168 얼린(Object.freeze) 기록은 바뀌지 않는다(server/mutation-coordinator.mjs가 지난 연습 기록을 얼린다). 학생 한 명의
+// 기록 묶음이 지난번과 같은 얼린 기록들이면 그때 만든 글(JSON)을 그대로 쓴다. 저장마다 상태 전체를 다시 글로 바꾸던 비용
+// (9MB에서 약 0.1초)이 바뀐 학생 묶음만큼으로 준다. 같은 글 객체라서 local-first.mjs의 "바뀌었나" 비교도 바로 끝난다.
+// 기록 하나하나의 글은 따로 들고 있지 않는다(메모리에 사본이 한 벌 더 생기지 않게): 묶음이 바뀌면 그 학생 묶음만 다시 만든다.
+// 얼리지 않은 묶음은 언제든 바뀔 수 있어서 늘 새로 만든다.
+const groupText = new WeakMap();
+const listText = list => {
+  const last = list.at(-1);
+  const seen = last && typeof last === 'object' ? groupText.get(last) : null;
+  if (seen && seen.items.length === list.length && seen.items.every((item, i) => item === list[i])) return seen.text;
+  const text = JSON.stringify(list);
+  if (last && typeof last === 'object' && list.every(item => item && typeof item === 'object' && Object.isFrozen(item))) {
+    // 지난번 묶음 글은 그때의 마지막 기록에 붙어 있다(그 기록은 아직 상태에 있어서 저절로 지워지지 않는다): 같이 지운다.
+    for (const item of list) if (item !== last) groupText.delete(item);
+    groupText.set(last, { items: list.slice(), text });
+  }
+  return text;
+};
+
+// 검사용(server/stability-168-check.mjs): 이 기록에 붙은 묶음 글이 있는지.
+export const groupTextCached = item => groupText.has(item);
+
 // Returns Map<part key, JSON text>.
 export function partitionState(state) {
   const parts = new Map();
@@ -31,7 +53,7 @@ export function partitionState(state) {
         groups.get(sid).push(item);
       }
       put(`o:${key}`, { ids, seq });
-      for (const [sid, items] of groups) put(`a:${key}:${sid}`, items);
+      for (const [sid, items] of groups) parts.set(`a:${key}:${sid}`, listText(items));
     } else if (BY_STUDENT_MAPS.has(key) && isMap(value)) {
       put(`o:${key}`, Object.keys(value));
       for (const [sid, entry] of Object.entries(value)) put(`m:${key}:${sid}`, entry);

@@ -10,7 +10,7 @@
 //   (처리 안 된 이의 신청 제외 · 오답/미응답 수를 칸으로 남김)으로 answer_records · wrong_details · word_ids를 지운다
 //   (autoTrimSessions). 한 번에 학생 AUTO_TRIM_STUDENTS명까지만 바꾸고, 남으면 다음 정리(한 시간 뒤)에 이어서 한다.
 //   결과 분석 · 성장 · 순위 · 칭호 · 통계 · 경험치 · 코인은 모두 요약 칸(total · correct · score · xp · reward_points ·
-//   answered_count · perfect · best_combo …)에서 계산해서 그대로다(server/auto-trim-check.mjs가 전후를 비교한다).
+//   answered_count · perfect · best_combo …)에서 계산해서 그대로다(server/stability-168-check.mjs가 전후를 비교한다).
 //   시험 응시(examAttempts)는 저절로 지우지 않는다(수동 정리만).
 import { createHash } from 'node:crypto';
 import { meaningReviewCandidate } from './meaning-review.mjs';

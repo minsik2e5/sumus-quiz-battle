@@ -75,7 +75,7 @@ export async function runStabilityChecks(assert) {
   const broken = state.examAttempts[0];
   assert(!threw && broken.status === 'submitted' && broken.auto_error === true, 'V13.129 기록이 망가진 시험 응시 하나는 제출로 닫고 정리는 계속한다(예전: 모든 요청 500)');
   assert(!sweep(state), 'V13.129 닫힌 응시는 다음 정리에서 다시 손대지 않는다');
-  assert(/try \{ await this\.mutations\.durable\(state => sweep\(state\)/.test(worker) && worker.includes("console.error('[sweep]'"), 'V13.129 워커: 정리가 실패해도 학생 요청은 계속 처리한다');
+  assert(/try \{ await this\.mutations\.durable\(state => sweep\(state[,)]/.test(worker) && worker.includes("console.error('[sweep]'"), 'V13.129 워커: 정리가 실패해도 학생 요청은 계속 처리한다');
 
   /* ---------- 푸시 시간 제한 · 학생별 요청 제한 · 대결 보고 ---------- */
   assert(source('./push.mjs').includes('signal: AbortSignal.timeout(8000)'), 'V13.129 푸시 보내기는 8초에서 끊는다');
