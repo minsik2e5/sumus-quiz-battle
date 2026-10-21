@@ -1121,7 +1121,8 @@ function boardScreen() {
 async function loadResultReward(id, tries = 0) {
   const cur = D;
   let res = null;
-  try { res = await api('/dungeon/last'); } catch {}
+  // V13.168 방금 판의 방 번호를 같이 보낸다(그사이 다른 방을 만들었다 닫았어도 이 판의 보상을 받아 온다).
+  try { res = await (id ? api(`/dungeon/last?id=${encodeURIComponent(id)}`) : api('/dungeon/last')); } catch {}
   if (D !== cur || cur.closing) return;
   if (!res || res.pending || (id && res.id !== id)) {
     if (tries < 12) return later(() => loadResultReward(id, tries + 1), Math.min(3000, 600 + tries * 300));
