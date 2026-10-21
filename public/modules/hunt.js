@@ -1,11 +1,10 @@
 import { api, esc, num, icon, toast } from './ui.js';
-import { CHARACTERS, shuffle, displayEnglish } from './core.js';
+import { CHARACTERS } from './core.js';
 import { coin } from './emblems.js';
 import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
 import { coinShower, countUp } from './celebrate.js';
 import { huntPetShow, petJosa, buyEgg } from './pet-moments.js';
 import { arcadeWords } from './arcade-games.js';
-import { cardMeaning } from './match-rules.js';
 import { HUNT, BERRIES, BALL_NAMES, THROW_NAMES, TIER_NAMES, HUNT_MONSTERS, MONSTER_KEYS, MONSTER_TIERS, catchChance, huntSlot, tierLabel, tierStars } from './hunt-rules.js';
 
 // V13.162 몬스터 사냥(놀이터, 처음 이름 펫 사냥). 포켓몬 고처럼: 그림 지도 위 야생 몬스터를 눌러 만나고(하얀 번쩍임 → "야생의 ○○이 나타났다!"),
@@ -133,7 +132,7 @@ function myPet() {
 }
 function mapScreen(loading = false) {
   stopCatch();
-  H.phase = 'map'; H.meet = null; H.berry = null; H.berryTried = false;
+  H.phase = 'map'; H.meet = null; H.berry = null; H.berryTicket = null; H.berryTried = false;
   const v = H.v || {}, spots = v.spots || [], got = v.got || {};
   const empty = !balls(), me = myPet();
   $('hn-main').innerHTML = `<section class="hn-map${v.night ? ' night' : ''}" id="hn-map">
@@ -466,7 +465,7 @@ async function hit(x, y, s, quality) {
   H.phase = 'shaking';
   $('hn-bshadow')?.remove();
   const sway = c.sx;
-  const id = throwId(), body = { id, spot: m.spot, ball: H.ball, quality, berry: H.berry };
+  const id = throwId(), body = { id, spot: m.spot, ball: H.ball, quality, berry: H.berry, berry_ticket: H.berry ? H.berryTicket : null };
   const req = sendThrow(body);
   if (quality) { say(`<b class="q-${quality}">${THROW_NAMES[quality]}!</b>`, 'quality'); sfx(quality === 'excellent' ? 'crit' : 'combo', { rate: quality === 'excellent' ? 1 : quality === 'great' ? 1.15 : 1 }); }
   sfx('hit', { gain: .6 }); buzz(25);
@@ -508,7 +507,7 @@ async function hit(x, y, s, quality) {
   if (res.profile) H.A.data.profile = res.profile;
   if (res.stats) H.A.data.stats = res.stats;
   H.throws = (H.throws || 0) + 1;
-  H.berry = null; H.berryTried = false;
+  H.berry = null; H.berryTicket = null; H.berryTried = false;
   catchHud();
   $('hn-hand').style.visibility = 'hidden';
   // 4) 흔들림(서버가 정한 수). 흔들 때마다 단추가 빨갛게.
@@ -698,27 +697,36 @@ function berries() {
     <button type="button" class="btn full" data-hn="close-layer">닫기</button></div></div>`);
 }
 // 열매 문제: 게임 단어(학습 범위)에서 영어 → 뜻 4지선다. 한 공에 한 번.
-function quiz(berry) {
-  const list = arcadeWords(H.A).list.map(w => ({ id: w.id, en: displayEnglish(w.word || '').trim(), ko: cardMeaning(w.meaning) })).filter(w => w.en && w.ko);
-  const pool = shuffle([...list]);
-  const q = pool[0];
-  if (!q) return closeLayer();
-  const wrong = [...new Set(pool.slice(1).map(w => w.ko).filter(ko => ko !== q.ko))].slice(0, 3);
-  const choices = shuffle([q.ko, ...wrong]);
-  H.quiz = { berry, answer: q.ko, en: q.en };
-  layer(`<div class="hn-sheet" role="dialog" aria-modal="true" aria-label="열매 문제"><div class="hn-sheet-box hn-quiz">${berryPic(berry)}<small>뜻을 골라요</small><h3 class="hn-q-word">${esc(q.en)}</h3>
-    <div class="hn-choices">${choices.map(c => `<button type="button" class="hn-choice" data-hn="answer" data-ko="${esc(c)}">${esc(c)}</button>`).join('')}</div></div></div>`);
+// V13.167 문제는 서버가 내고(정답은 안 옴) 서버가 채점한다. 맞히면 받은 열매 표(ticket)를 던질 때 보낸다.
+async function quiz(berry) {
+  if (H.quizBusy || !H.meet) return;
+  H.quizBusy = true;
+  let q = null;
+  try { q = await api('/hunt/berry', { spot: H.meet.spot, berry, range_codes: arcadeWords(H.A).picked }); }
+  catch (err) { toast(err.message); if (err.status === 409) { H.berryTried = true; closeLayer(); catchHud(); } }
+  finally { H.quizBusy = false; }
+  if (!q || H.phase !== 'catch') return q || closeLayer();
+  H.quiz = { id: q.id, berry: q.berry || berry, en: q.en };
+  layer(`<div class="hn-sheet" role="dialog" aria-modal="true" aria-label="열매 문제"><div class="hn-sheet-box hn-quiz">${berryPic(H.quiz.berry)}<small>뜻을 골라요</small><h3 class="hn-q-word">${esc(q.en)}</h3>
+    <div class="hn-choices">${q.choices.map(c => `<button type="button" class="hn-choice" data-hn="answer" data-ko="${esc(c)}">${esc(c)}</button>`).join('')}</div></div></div>`);
 }
-function answer(b) {
+async function answer(b) {
   const q = H.quiz; if (!q) return;
   H.quiz = null;
-  const ok = b.dataset.ko === q.answer;
-  document.querySelectorAll('.hn-choice').forEach(x => { x.disabled = true; if (x.dataset.ko === q.answer) x.classList.add('right'); });
+  document.querySelectorAll('.hn-choice').forEach(x => { x.disabled = true; });
+  let res = null;
+  for (let i = 0; i < 2 && !res; i++) {
+    try { res = await api('/hunt/berry/answer', { id: q.id, choice: b.dataset.ko }); }
+    catch (err) { if (err.status && err.status < 500) { toast(err.message); break; } await new Promise(r => setTimeout(r, 400)); }
+  }
+  if (!res) { H.berryTried = true; return later(() => { closeLayer(); catchHud(); }, 300); }
+  const ok = !!res.ok;
+  document.querySelectorAll('.hn-choice').forEach(x => { if (x.dataset.ko === res.answer) x.classList.add('right'); });
   if (!ok) b.classList.add('wrong');
   sfx(ok ? 'correct' : 'wrong'); buzz(ok ? 15 : [20, 40, 20]);
   H.berryTried = true;
-  if (ok) H.berry = q.berry;
-  later(() => { closeLayer(); catchHud(); say(ok ? `${BERRIES[q.berry].emoji} ${BERRIES[q.berry].name} 열매를 줬어요! ${BERRIES[q.berry].note}` : `아쉬워요! <b>${esc(q.en)}</b> = ${esc(q.answer)}`, ok ? 'good' : 'miss'); }, 700);
+  if (ok) { H.berry = q.berry; H.berryTicket = res.ticket; }
+  later(() => { closeLayer(); catchHud(); say(ok ? `${BERRIES[q.berry].emoji} ${BERRIES[q.berry].name} 열매를 줬어요! ${BERRIES[q.berry].note}` : `아쉬워요! <b>${esc(q.en)}</b> = ${esc(res.answer)}`, ok ? 'good' : 'miss'); }, 700);
 }
 
 /* ---------- 몬스터 가방 · 도감 · 교환소 ---------- */

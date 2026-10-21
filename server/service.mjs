@@ -32,7 +32,7 @@ import { dungeonQuestions } from './dungeon-words.mjs';
 import { settleDungeonRecords, dungeonBoardsView, dungeonLastView } from './dungeon-records.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
 import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend, reelSeaPet, reelRodUp } from './reel.mjs';
-import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow, huntSell, huntCoins, huntSpend } from './hunt.mjs';
+import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow, huntSell, huntCoins, huntSpend, huntBerryQuiz, huntBerryAnswer } from './hunt.mjs';
 import { HUNT } from '../public/modules/hunt-rules.js';
 import { REEL } from '../public/modules/reel-rules.js';
 import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './games.mjs';
@@ -1891,8 +1891,22 @@ export async function service(state, method, path, body, token, options = {}) {
     // 화면이 만든 던지기 번호(다시 보내도 한 번만).
     const throwId = /^[a-z0-9-]{8,40}$/i.test(String(body.id || '')) ? String(body.id) : null;
     if (!throwId) fail('던지기 번호를 확인해 주세요.');
-    const res = huntThrow(p, { id: throwId, spot: str(body.spot, 40), ball: str(body.ball, 10), quality: body.quality ? str(body.quality, 12) : null, berry: body.berry ? str(body.berry, 10) : null, pet: activePetKey(state, p.id), now });
+    // V13.167 열매는 서버가 준 열매 표(berry_ticket)로만(화면이 보낸 berry 이름은 믿지 않는다).
+    const res = huntThrow(p, { id: throwId, spot: str(body.spot, 40), ball: str(body.ball, 10), quality: body.quality ? str(body.quality, 12) : null, ticket: body.berry_ticket ? str(body.berry_ticket, 40) : null, pet: activePetKey(state, p.id), now });
     return { ...res, hunt: huntView(p, now), ...(res.new_pet ? { profile: publicProfile(p), stats: stats(state, p) } : {}) };
+  }
+  // V13.167 열매 문제: 서버가 내 학교 · 학년 범위(놀이터에서 고른 게임 단어)에서 내고, 서버가 채점해 열매 표를 준다.
+  if (path === '/hunt/berry' && method === 'POST') {
+    requireRole(p, 'student');
+    const ctx = monsterContext(state, p);
+    if (!ctx.school) fail('학생 학교 설정을 확인해주세요.', 409);
+    const asked = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : [];
+    if (!asked.length) fail('놀이터에서 게임 단어를 골라 주세요.');
+    return huntBerryQuiz(p, { spot: str(body.spot, 40), berry: str(body.berry, 10), words: scopedWords(state, ctx.school.id, asked, p.class_name), now: Date.now() });
+  }
+  if (path === '/hunt/berry/answer' && method === 'POST') {
+    requireRole(p, 'student');
+    return huntBerryAnswer(p, { id: str(body.id, 40), choice: str(body.choice, 200) });
   }
   // 가방 몬스터 팔기(별조각) · 교환소(코인 · 랜덤 알 · 영웅 알). 알은 알 상점과 같은 hatchEgg로 깬다.
   if (path === '/hunt/sell' && method === 'POST') {

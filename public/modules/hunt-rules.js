@@ -32,7 +32,14 @@ export const HUNT = {
   EGG: 600, EPIC_EGG: 800,     // 교환소 알(각각 하루 1개, 낚시 진주 교환소와 같은 값)
   SPOTS: [3, 5],               // 지도 위 몬스터 수
   SLOT_HOURS: 4,               // 이 시간마다 지도의 몬스터가 바뀐다(만나는 중 · 펫 자리는 그대로)
-  PREVIEW: { BALLS: 6, GOOD: 3, GOLD: 1 } // 교사 미리보기 계정: 들어올 때마다 채운다
+  PREVIEW: { BALLS: 6, GOOD: 3, GOLD: 1 }, // 교사 미리보기 계정: 들어올 때마다 채운다
+  // V13.167 던지기 품질은 화면이 재므로 서버가 대략 확인한다(진짜 손맛은 그대로):
+  //   최근 WINDOW번(공을 쓴 던지기) 중 엑설런트가 EXCELLENT 비율 이상이면 이번 엑설런트는 그레이트로,
+  //   그레이트 이상이 TOP 비율 이상이면 이번 그레이트 · 엑설런트는 나이스로. MIN번 던지기 전에는 보지 않는다.
+  //   만나거나 앞 던지기 뒤 GAP_MS보다 빨리 온 던지기는 품질 없이(공이 날아가는 데만 0.8초 넘게 걸린다).
+  //   보통 학생(엑설런트 약 10% · 그레이트 이상 약 30%)과 아주 잘하는 학생(엑설런트 25%)은 거의 걸리지 않는다(검사).
+  QUALITY_GUARD: { WINDOW: 20, MIN: 8, EXCELLENT: .55, TOP: .85, GAP_MS: 800 },
+  BERRY_QUIZ_MIN: 4             // 열매 문제는 서버가 낸다: 범위에서 뜻이 다른 단어가 이만큼은 있어야 4지선다
 };
 export const MONSTER_TIERS = ['common', 'uncommon', 'rare', 'epic', 'legend'];
 // 몬스터 등급은 별(★1~5)과 이름(꼬마 · 보통 · 희귀 · 대장 · 보스)으로 쓴다: 펫 등급(기본 · 영웅 · 전설)과 헷갈리지 않게(선생님 결정).
@@ -81,6 +88,19 @@ export function rollThrow(tier, opts, r1, r2) {
   const close = p > 0 ? Math.min(1, p / Math.max(r1, 1e-9)) : 0;
   const shakes = close > .7 ? 3 : close > .35 ? 2 : 1;
   return { caught: false, fled: r2 < (HUNT.FLEE[tier] ?? HUNT.FLEE.common) / 100, shakes };
+}
+// V13.167 던지기 품질 확인. log: 최근 던지기에서 화면이 보낸 품질(null · 'nice' · 'great' · 'excellent'), gap: 앞 일(만나기 · 던지기) 뒤 ms.
+export function guardQuality(quality, log = [], gap = Infinity) {
+  const G = HUNT.QUALITY_GUARD;
+  if (!quality) return null;
+  if (gap < G.GAP_MS) return null;
+  const recent = log.slice(-G.WINDOW);
+  if (recent.length < G.MIN) return quality;
+  const share = test => recent.filter(test).length / recent.length;
+  let q = quality;
+  if (q === 'excellent' && share(x => x === 'excellent') >= G.EXCELLENT) q = 'great';
+  if ((q === 'great' || q === 'excellent') && share(x => x === 'great' || x === 'excellent') >= G.TOP) q = 'nice';
+  return q;
 }
 // 몬스터 등급 뽑기(r: 0~1).
 export function spawnTier(r) {
