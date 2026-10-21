@@ -19,6 +19,7 @@ import { runSweepPlayChecks } from './sweep-play-check.mjs';
 import { runSweepHomeChecks } from './sweep-home-check.mjs';
 import { runSweepLearnChecks } from './sweep-learn-check.mjs';
 import { runSweepDungeonChecks } from './sweep-dungeon-check.mjs';
+import { runSweepBattleChecks } from './sweep-battle-check.mjs';
 import { runBattleFxChecks } from './battle-fx-check.mjs';
 import { runDungeonChecks } from './dungeon-check.mjs';
 import { runSoundChecks } from './sound-check.mjs';
@@ -1510,6 +1511,7 @@ export async function runReleaseCheck() {
     await runSweepHomeChecks(assert, expectStatus);
     await runSweepLearnChecks(assert, expectStatus);
     await runSweepDungeonChecks(assert, expectStatus);
+    await runSweepBattleChecks(assert, expectStatus);
 
     console.log(`[release-check] PASS ${checks.length}/${checks.length}`);
     return { ok: true, count: checks.length };
