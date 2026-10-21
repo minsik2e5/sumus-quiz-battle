@@ -1,7 +1,7 @@
 import { api, esc, num, icon, toast, buttonBusy } from './ui.js';
 import { avatar } from './character.js';
 import { coin } from './emblems.js';
-import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
+import { playSound, unlockSound, soundOn, preloadSound, loopSound } from './sound.js';
 import { coinShower } from './celebrate.js';
 import { buyEgg } from './pet-moments.js';
 import { FISH, FISH_KEYS, RARITY, kgText } from './fishing-rules.js';
@@ -41,6 +41,54 @@ let REDUCED = null;
 const reduced = () => (REDUCED ||= matchMedia('(prefers-reduced-motion: reduce)')).matches;
 const sfx = (key, opts) => { if (soundOn()) playSound(key, opts); };
 const buzz = p => { try { if (soundOn()) navigator.vibrate?.(p); } catch {} };
+// V13.164 낚시 전용 소리(docs/sound/reel-synth.mjs). 들어올 때 미리 받는다.
+const REEL_SFX = ['reel-cast', 'reel-plop', 'reel-nibble', 'reel-bite', 'reel-hook', 'reel-click', 'reel-strain', 'reel-creak', 'reel-snap', 'reel-run', 'reel-jump', 'reel-splash', 'reel-sparkle'];
+// V13.164 손맛 진동(안드로이드): 진동 세기는 정할 수 없어서 켜는 길이 · 간격으로 세기를 낸다.
+//   입질은 짧게 톡, 챔질은 길고 묵직하게, 돌진 · 잠수는 길게 드르륵, 파이팅 중에는 텐션만큼 길고 잦게(tensionFeel).
+// 아이폰(사파리)은 진동이 없다(navigator.vibrate 없음): 같은 순간 화면을 흔들고(KICK px), 텐션이 높으면 화면이 떨리고,
+//   손맛 소리(릴 딸깍 · 입질 · 줄 텐션)를 조금 크게 내서 대신한다.
+// 진동은 소리 설정을 따른다(소리를 끄면 진동도 꺼진다). 화면 흔들림은 보이는 연출이라 '동작 줄이기'만 따른다.
+const canBuzz = () => typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function';
+const HAPTIC = {
+  tick: [8], cast: [18], plop: [12], nibble: [9, 75, 6], early: [30], bite: [18, 40, 34],
+  hook: [150, 40, 70], hookFast: [190, 30, 90], run: [260, 30, 200, 30, 160, 30, 120], dive: [420, 60, 260],
+  thrash: [30, 25, 45, 25, 30, 25, 45], rhythm: [20, 60, 20], tap: [10], tap2: [18], ok: [20, 30, 60], bad: [50, 30, 50],
+  ready: [30], skill: [30, 30, 140], snap: [25, 30, 220, 60, 50], slack: [60, 50, 30], jump: [70, 40, 40],
+  perfect: [20, 20, 120], good: [60], caught: [30, 30, 60], big: [40, 40, 40, 40, 160]
+};
+const KICK = { cast: 2, plop: 1.5, nibble: 1.5, early: 2, bite: 4, hook: 9, hookFast: 11, run: 6, dive: 7, thrash: 5, bad: 4, ok: 3, skill: 8, snap: 12, slack: 3, jump: 6, perfect: 6, good: 4, big: 6 };
+const LONG = { run: 900, dive: 800, thrash: 650 };
+const FEEL = () => canBuzz() ? 1 : 1.2;
+let hapticUntil = 0;
+function feel(kind) {
+  const p = HAPTIC[kind];
+  if (!p || !R) return;
+  if (canBuzz()) {
+    if (!soundOn()) return;
+    try { navigator.vibrate(p); hapticUntil = performance.now() + p.reduce((a, b) => a + b, 0); } catch {}
+  } else if (KICK[kind]) R.kick = { px: KICK[kind], ms: LONG[kind] || 280, until: performance.now() + (LONG[kind] || 280) };
+}
+// 파이팅 진동(안드로이드): 감는 동안 · 빨간 칸에서 텐션만큼 길고 잦게. 빨간 칸은 거의 쉬지 않고 드르르.
+function tensionFeel(t, f, zone) {
+  if (!canBuzz() || !soundOn() || performance.now() < hapticUntil || (!f.holding && zone !== 'red')) return;
+  const k = f.tension / 100, every = zone === 'red' ? 110 : lerp(300, 130, k);
+  if (t - f.buzzAt < every) return;
+  f.buzzAt = t;
+  try { navigator.vibrate(zone === 'red' ? 95 : Math.round(lerp(4, 38, k ** 1.6))); } catch {}
+}
+// 화면 흔들림(아이폰 진동 대신): 한 번 흔들림(R.kick)은 점점 잦아들고, 텐션이 55를 넘으면 텐션만큼 떨린다.
+function quake(t) {
+  const w = $('rl-world');
+  if (!w) return;
+  let a = 0;
+  if (R.kick && t < R.kick.until) a += R.kick.px * ((R.kick.until - t) / R.kick.ms) ** 1.5;
+  if (R.phase === 'fight' && R.f && !canBuzz()) a += Math.max(0, R.f.tension - 55) / 45 * 2.4;
+  if (reduced()) a = 0;
+  if (a < .1) { if (R.quaking) { w.style.translate = ''; R.quaking = false; } return; }
+  R.quaking = true;
+  w.style.translate = `${((Math.random() * 2 - 1) * a).toFixed(1)}px ${((Math.random() * 2 - 1) * a).toFixed(1)}px`;
+}
+const stopStrain = () => { R?.strain?.stop(); if (R) R.strain = null; };
 function later(fn, ms) { const cur = R; const t = setTimeout(() => { if (R === cur && !cur.closing) fn(); }, ms); cur.timers.push(t); return t; }
 const wait = ms => new Promise(r => later(r, ms));
 const STAR = n => `<span class="rl-stars" aria-label="별 ${n}개">${'★'.repeat(n)}<s>${'★'.repeat(5 - n)}</s></span>`;
@@ -62,7 +110,7 @@ export function openReel(A, exit) {
   root().querySelector('.rl-app').addEventListener('contextmenu', e => e.preventDefault());
   lockZoom(root().querySelector('.rl-app'));
   window.scrollTo(0, 0);
-  preloadSound(['fanfare-basic', 'fanfare-epic', 'fanfare-legend', 'crit', 'coins', 'fail', 'wiggle', 'crack', 'burst', 'ult-impact', 'ult-riser']);
+  preloadSound(['fanfare-basic', 'fanfare-epic', 'fanfare-legend', 'coins', 'fail', 'stamp', ...REEL_SFX]);
   scene();
   chips();
   dock();
@@ -104,7 +152,7 @@ function unlockZoom() {
 function closeAll() {
   if (!R) return;
   unlockZoom();
-  R.closing = true; R.timers.forEach(clearTimeout); cancelAnimationFrame(R.raf);
+  R.closing = true; R.timers.forEach(clearTimeout); cancelAnimationFrame(R.raf); stopStrain();
   if (R.onResize) removeEventListener('resize', R.onResize);
 }
 async function leave() {
@@ -287,6 +335,7 @@ function frame(t) {
   const dt = Math.min(.05, (t - (lastT || t)) / 1000); lastT = t;
   springTo(R.rig, dt);
   if (R.phase === 'fight') fightStep(t, dt);
+  quake(t);
   let target = null;
   const bob = $('rl-bob');
   if (R.phase === 'fight' || R.phase === 'finish') target = R.fishPx ? { p: R.fishPx, sag: R.f ? (1 - R.f.tension / 100) * 70 : 20, zone: R.f?.zone } : null;
@@ -369,11 +418,11 @@ function bindCast() {
     const fill = $('rl-arcfill'); if (fill) fill.style.strokeDasharray = `${k.toFixed(3)} 1`;
     arc.dataset.zone = z;
     R.rig.tBack = .35 + k * .65; R.rig.tBend = .12 + k * .1;
-    if (z === 'perfect' && lastZone !== 'perfect') { sfx('tick', { rate: 1.6, gain: .5 }); buzz(8); }
+    if (z === 'perfect' && lastZone !== 'perfect') { sfx('reel-click', { rate: 1.5, gain: .9 }); feel('tick'); }
     lastZone = z;
     raf = requestAnimationFrame(loop);
   };
-  btn.onpointerdown = e => { e.preventDefault(); if (holding) return; holding = true; t0 = performance.now(); arc.classList.add('on'); btn.classList.add('hold'); sfx('ult-riser', { gain: .35, rate: 1.4 }); loop(); };
+  btn.onpointerdown = e => { e.preventDefault(); if (holding) return; holding = true; t0 = performance.now(); arc.classList.add('on'); btn.classList.add('hold'); sfx('reel-creak', { gain: .45, rate: .8 }); loop(); };
   const release = e => { if (!holding) return; e?.preventDefault?.(); holding = false; cancelAnimationFrame(raf); btn.classList.remove('hold'); cast(level()); };
   btn.onpointerup = release; btn.onpointerleave = release; btn.onpointercancel = release;
 }
@@ -399,7 +448,7 @@ async function cast(k, resumeId = null) {
   Object.assign(R.rig, { tBack: -.12, tBend: .02 });
   R.rig.vb = -6;
   later(() => { R.rig.tBack = 0; }, 260);
-  sfx('slash', { rate: 1.25, gain: .7 }); buzz(18);
+  sfx('reel-cast', { rate: lerp(.92, 1.08, k), gain: lerp(.75, 1, k) }); feel('cast');
   let res;
   if (R.practice) res = { id: 'practice', fight: { ...FIGHT.uncommon, min: 0 } };
   else {
@@ -420,11 +469,11 @@ async function cast(k, resumeId = null) {
   const ago = res.again && res.at ? Math.max(0, Date.now() - res.at) : 0;
   R.live = { id: res.id, fight: res.fight, tier, at: performance.now() - ago, minMs: Number(res.fight.min || 0) };
   hud('', 'empty');
-  if (tier === 'perfect') { pop('퍼펙트 캐스팅!', 'perfect'); sfx('crit', { rate: 1.2 }); buzz([20, 30, 40]); say('완벽해!'); }
+  if (tier === 'perfect') { pop('퍼펙트 캐스팅!', 'perfect'); sfx('reel-sparkle', { at: .3 }); feel('perfect'); say('완벽해!'); }
   else if (tier === 'good') pop('좋은 캐스팅!', 'good');
   const g = rodGeom();
   R.bob = { x: R.W * (.42 + Math.random() * .22), y: R.H * lerp(.66, .45, k), state: 'fly', fly: { t0: performance.now(), ms: reduced() ? 80 : 640, x0: g.tip[0], y0: g.tip[1] } };
-  R.bob.landed = () => { const b = $('rl-bob'); b?.classList.add('on'); fx('splash', R.bob.x, R.bob.y, 'small'); fx('ripple', R.bob.x, R.bob.y); sfx('pop', { rate: .7, gain: .55 }); R.bob.state = 'float'; waitBite(); };
+  R.bob.landed = () => { const b = $('rl-bob'); b?.classList.add('on'); fx('splash', R.bob.x, R.bob.y, 'small'); fx('ripple', R.bob.x, R.bob.y); sfx('reel-plop', { vary: .05 }); feel('plop'); R.bob.state = 'float'; waitBite(); };
 }
 
 /* ---------- ② 입질: 톡톡(가짜) … 쑥(진짜) → 탭(챔질) ---------- */
@@ -439,7 +488,7 @@ function waitBite() {
     later(() => {
       if (R.phase !== 'wait') return;
       R.bob.state = 'nibble'; const b = $('rl-bob'); b?.classList.add('nibble');
-      fx('ripple', R.bob.x, R.bob.y, 'tiny'); sfx('tick', { gain: .3, rate: 1.5 }); buzz(6);
+      fx('ripple', R.bob.x, R.bob.y, 'tiny'); sfx('reel-nibble', { vary: .08, gain: FEEL() }); feel('nibble');
       R.rig.tBend = .1;
       later(() => { if (R.phase !== 'wait') return; R.bob.state = 'float'; b?.classList.remove('nibble'); R.rig.tBend = .04; }, 300);
     }, at);
@@ -454,7 +503,7 @@ function waitBite() {
     if (R.phase !== 'wait') return;
     R.early++;
     if (R.early >= 2) return missed('너무 일찍 당겨서 물고기가 놀라 도망갔어요');
-    pop('아직이에요!', 'warn'); sfx('warn-beep', { gain: .45 }); buzz(30); say('톡톡은 가짜야! 쑥 들어갈 때!');
+    pop('아직이에요!', 'warn'); sfx('wrong', { gain: .35 }); feel('early'); say('톡톡은 가짜야! 쑥 들어갈 때!');
   };
   pov.addEventListener('pointerdown', R.tap);
 }
@@ -465,7 +514,7 @@ function bite() {
   R.bob.state = 'sink'; $('rl-bob')?.classList.add('sink');
   fx('splash', R.bob.x, R.bob.y, 'big'); fx('ripple', R.bob.x, R.bob.y); fx('strike', R.bob.x, R.bob.y - R.H * .08);
   R.rig.tBend = .32; R.rig.tDir = (Math.random() - .5) * .4;
-  sfx('warn-beep', { rate: 1.6 }); sfx('wiggle', { gain: .6 }); buzz([70, 30, 90]);
+  sfx('reel-bite'); feel('bite');
   cue('<span class="rl-cue-big now">지금! <b>탭!</b></span><i class="rl-hand"></i>', 'now');
   R.biteAt = performance.now();
   later(() => { if (R.phase === 'bite') missed('입질을 놓쳤어요. 쑥 들어가면 바로!'); }, 850);
@@ -476,7 +525,7 @@ function hooked() {
   const fast = performance.now() - R.biteAt < 330;
   Object.assign(R.rig, { tBack: .45, tBend: .5 }); R.rig.vb = 8;
   later(() => { R.rig.tBack = 0; }, 220);
-  flash(); pop(fast ? '번개 챔질!' : '챔질 성공!', 'strike'); sfx('hit', { rate: 1.05 }); sfx('crack', { gain: .5 }); buzz(fast ? [40, 30, 110] : [80]);
+  flash(); pop(fast ? '번개 챔질!' : '챔질 성공!', 'strike'); sfx('reel-hook', { rate: fast ? 1.06 : 1 }); feel(fast ? 'hookFast' : 'hook');
   petFace('cheer'); say(fast ? '빠르다! 걸렸어!' : '걸렸어! 감아!');
   cue('');
   later(fight, reduced() ? 80 : 520);
@@ -501,6 +550,7 @@ function fight() {
   $('rl-bob')?.classList.remove('on', 'sink'); R.bob = null;
   const sh = $('rl-shadow'); sh.hidden = false; sh.style.setProperty('--s', F.size || 1);
   $('rl-world').classList.add('zoom');
+  stopStrain(); R.strain = loopSound('reel-strain');
   const pet = R.A.data.stats?.pet;
   hud(`<div class="rl-dist" aria-label="남은 거리"><span><i id="rl-dist-fill"></i>${art('gauge-distance', '')}</span><b id="rl-dist-n">${Math.ceil(dist)}m</b></div>
     <div class="rl-reelwrap">
@@ -585,7 +635,7 @@ function startMove(t, forced = null) {
     f.move = { kind, until: t + 2600, need: F.taps || 10, got: 0, last: 0 };
     cue(`<span class="rl-cue-big mash">탈출 시도!<small>◀ ▶ 번갈아 연타!</small></span>`, 'mash');
     qte(`<div class="rl-mash"><span><i id="rl-mash-fill"></i></span><b id="rl-mash-n">0 / ${f.move.need}</b></div>`);
-    sfx('slash', { rate: .75, gain: .8 }); sfx('boss-roar', { gain: .35, rate: 1.6 }); buzz([60, 40, 60]); say('도망가려고 해! 연타!', 1500);
+    sfx('reel-run'); sfx('reel-creak', { gain: .6, rate: 1.1, at: .1 }); feel('run'); say('도망가려고 해! 연타!', 1500);
   } else if (kind === 'rhythm') {
     // 리듬: 위에서 내려오는 노트가 동그라미에 닿을 때 그쪽 버튼.
     const n = F.notes || 6, beat = F.beat || 500, t0 = t + 1100;
@@ -594,15 +644,15 @@ function startMove(t, forced = null) {
     f.move = { kind, until: at + 600, notes, hit: 0, perfect: 0, combo: 0 };
     cue(`<span class="rl-cue-big rhythm">리듬을 타요!<small>노트가 동그라미에 닿을 때 톡!</small></span>`, 'rhythm', 1100);
     qte(`<div class="rl-lanes"><div class="rl-lane l"><i class="rl-hitring"></i></div><div class="rl-lane r"><i class="rl-hitring"></i></div><div class="rl-notes" id="rl-notes">${notes.map((x, k) => `<i class="rl-note ${x.side < 0 ? 'l' : 'r'}" data-k="${k}" data-at="${x.at.toFixed(0)}"></i>`).join('')}</div><b class="rl-combo" id="rl-combo"></b><em class="rl-judge" id="rl-judge"></em></div>`);
-    sfx('ult-riser', { gain: .45, rate: 1.2 }); buzz([20, 60, 20]); say('리듬 타자!', 1200);
+    sfx('reel-run', { dur: .6, rate: 1.15, gain: .6 }); feel('rhythm'); say('리듬 타자!', 1200);
   } else if (kind === 'thrash') {
     f.move = { kind, until: t + 1300, held: 0 };
     cue('<span class="rl-cue-big thrash">날뛴다! <b>손 떼기!</b></span>', 'thrash');
-    fx('splash', f.x, R.H * .5 + f.depth, 'big'); sfx('wiggle', { gain: .8, rate: 1.2 }); buzz([30, 20, 30, 20, 30]); say('놓아! 놓아!', 1200);
+    fx('splash', f.x, R.H * .5 + f.depth, 'big'); sfx('reel-jump', { gain: .75, rate: 1.1 }); sfx('reel-creak', { gain: .5, rate: 1.25 }); feel('thrash'); say('놓아! 놓아!', 1200);
   } else {
     f.move = { kind, until: t + 1900 };
     cue('<span class="rl-cue-big dive">잠수! <b>꾹 버티기!</b></span>', 'dive');
-    sfx('boss-charge', { gain: .5, rate: 1.3 }); buzz(120); say('꽉 잡아!', 1200);
+    sfx('reel-run', { rate: .8, gain: .85 }); feel('dive'); say('꽉 잡아!', 1200);
   }
   if (forced && kind !== 'rhythm') f.move.until = t + 1e9; // 연습: 해낼 때까지 기다린다(리듬은 노트가 끝나면)
   $('rl-pov').dataset.move = kind;
@@ -622,11 +672,11 @@ function endMove(ok) {
     f.skill = Math.min(100, f.skill + (big ? 24 : 16)); f.dist = Math.max(0, f.dist - (big ? 3 : 1.5));
     const extra = m.kind === 'rhythm' && m.perfect ? `<small>퍼펙트 ${m.perfect} · 콤보 최대 ${m.best || m.combo}</small>` : '';
     cue(`<span class="rl-cue-big ok">${MOVE_OK[m.kind]}${extra}</span>`, 'ok', 900);
-    sfx('shield-block', { gain: .6 }); if (big) { sfx('combo', { gain: .6 }); flash(); R.rig.vb = 6; } buzz(big ? [20, 30, 60] : 20);
+    sfx('reel-sparkle', { gain: big ? .85 : .55 }); if (big) { sfx('reel-splash', { gain: .5, dur: 1 }); flash(); R.rig.vb = 6; } feel(big ? 'ok' : 'tap2');
   } else {
     f.dist = Math.min(f.max * 1.2, f.dist + (m.kind === 'dive' ? 2 : 3)); f.tension = Math.min(100, f.tension + 12);
     cue(`<span class="rl-cue-big bad">${MOVE_BAD[m.kind]}</span>`, 'bad', 800);
-    sfx('type-wrong', { gain: .5 });
+    sfx('reel-creak', { rate: .85, gain: .8 }); feel('bad');
   }
   f.next = performance.now() + rnd(R.live.fight.dash);
   if (ok && R.tut && ['mash', 'rhythm', 'thrash'].includes(TUT[R.tut.step]?.id)) later(tutNext, 900);
@@ -639,10 +689,10 @@ function side(dir, b = null) {
   b?.classList.remove('tap'); void b?.offsetWidth; b?.classList.add('tap');
   R.rig.vd += dir * 5;
   if (m?.kind === 'mash') {
-    if (dir === m.last) { pop('번갈아!', 'warn'); sfx('type-wrong', { gain: .35 }); return; }
+    if (dir === m.last) { pop('번갈아!', 'warn'); sfx('wrong', { gain: .25 }); return; }
     m.last = dir; m.got++;
     f.tension = Math.max(25, f.tension - 3);
-    sfx('type-ok', { rate: .9 + Math.min(1, m.got / m.need) * .9, gain: .6 }); buzz(10);
+    sfx('reel-click', { rate: .9 + Math.min(1, m.got / m.need) * .8, gain: 1.1 * FEEL(), vary: .03 }); feel('tap');
     fx('pull', R.fishPx?.[0] ?? R.W / 2, R.fishPx?.[1] ?? R.H * .55);
     const k = Math.min(1, m.got / m.need);
     const fill = $('rl-mash-fill'); if (fill) fill.style.transform = `scaleX(${k.toFixed(3)})`;
@@ -658,7 +708,7 @@ function side(dir, b = null) {
     const d = Math.abs(note.at - now), kind = d <= 85 ? 'perfect' : 'good';
     note.done = kind; m.hit++; m.combo++; m.best = Math.max(m.best || 0, m.combo); if (kind === 'perfect') m.perfect++;
     f.dist = Math.max(f.max * (R.tut ? .35 : 0), f.dist - (kind === 'perfect' ? 1 : .6)); f.skill = Math.min(100, f.skill + 3);
-    sfx(kind === 'perfect' ? 'type-ok' : 'tick', { rate: 1 + Math.min(8, m.combo) * .08, gain: .7 }); buzz(kind === 'perfect' ? 18 : 8);
+    sfx('reel-click', { rate: (kind === 'perfect' ? 1.3 : 1) + Math.min(8, m.combo) * .06, gain: 1.1 * FEEL() }); if (kind === 'perfect') sfx('reel-nibble', { rate: 1.1 + Math.min(8, m.combo) * .05, gain: .5 }); feel(kind === 'perfect' ? 'tap2' : 'tap');
     judge(kind === 'perfect' ? 'PERFECT' : 'GOOD', kind, dir);
     document.querySelector(`.rl-note[data-k="${m.notes.indexOf(note)}"]`)?.classList.add('hit', kind);
     return;
@@ -693,13 +743,14 @@ function fightStep(t, dt) {
   const zone = f.tension >= 80 ? 'red' : f.tension >= 22 ? 'green' : 'blue';
   f.zone = zone;
   // 거리: 초록 칸에서 감을 때 가장 빨리 줄어든다. 손을 떼면 물고기가 조금 끌고 간다.
-  if (f.holding) f.dist -= (zone === 'green' ? 2.5 : zone === 'blue' ? 1 : .55) / Math.pow(pull, .35) * rod.reel * dt;
+  f.reelV = f.holding ? (zone === 'green' ? 2.5 : zone === 'blue' ? 1 : .55) / Math.pow(pull, .35) * rod.reel : 0; // 감는 속도(m/초)
+  if (f.holding) f.dist -= f.reelV * dt;
   else f.dist += .55 * pull * dt;
   if (m?.kind === 'dive' && !f.holding) f.dist += 2.2 * dt;
   if (m?.kind === 'mash') f.dist += 1.4 * pull * dt;
   if (m?.kind === 'rhythm') {
     // 지나간 노트는 놓침
-    for (const [k, x] of m.notes.entries()) if (!x.done && t - x.at > 190) { x.done = 'miss'; m.combo = 0; f.dist = Math.min(f.max * 1.2, f.dist + .8); f.tension = Math.min(100, f.tension + 5); judge('MISS', 'miss', x.side); document.querySelector(`.rl-note[data-k="${k}"]`)?.classList.add('gone'); sfx('type-wrong', { gain: .35 }); }
+    for (const [k, x] of m.notes.entries()) if (!x.done && t - x.at > 190) { x.done = 'miss'; m.combo = 0; f.dist = Math.min(f.max * 1.2, f.dist + .8); f.tension = Math.min(100, f.tension + 5); judge('MISS', 'miss', x.side); document.querySelector(`.rl-note[data-k="${k}"]`)?.classList.add('gone'); sfx('wrong', { gain: .25 }); }
     const lane = $('rl-notes'), H = lane?.clientHeight || 220;
     if (lane) for (const el of lane.children) { const at = Number(el.dataset.at), k = 1 - (at - t) / 1100; el.style.transform = `translateY(${(clamp(k, -.1, 1.2) * H).toFixed(1)}px)`; el.style.opacity = k < -.05 ? 0 : 1; }
     if (m.notes.every(x => x.done)) { endMove(m.hit / m.notes.length >= .6); }
@@ -744,12 +795,17 @@ function fightStep(t, dt) {
   const crank = $('rl-reel-crank'); if (crank) crank.style.transform = `rotate(${(R.rig.crank % 360).toFixed(0)}deg)`;
   const skill = $('rl-skill');
   $('rl-skill-ring').style.strokeDashoffset = `${(113 * (1 - f.skill / 100)).toFixed(1)}`;
-  if (f.skill >= 100 && skill.disabled) { skill.disabled = false; skill.classList.add('full'); sfx('skill'); buzz(30); say('특기 준비! 위로 쓸어!', 1600); }
+  if (f.skill >= 100 && skill.disabled) { skill.disabled = false; skill.classList.add('full'); sfx('skill'); feel('ready'); say('특기 준비! 위로 쓸어!', 1600); }
   $('rl-world').classList.toggle('shake', zone === 'red' && !reduced());
-  // 손맛: 감는 소리 · 진동
-  if (f.holding && t - f.clickAt > 120 - Math.min(70, f.tension * .6)) { f.clickAt = t; sfx('type-key', { rate: .75 + f.tension / 110, gain: .3 }); }
-  const every = zone === 'red' ? 160 : f.holding ? 260 : 0;
-  if (every && t - f.buzzAt > every) { f.buzzAt = t; buzz(zone === 'red' ? 28 : 7); }
+  // V13.164 손맛: 릴 딸깍은 감는 속도만큼 잦고 높게(초록 칸에서 빨리 감으면 촤르르), 줄 텐션 끼익은 텐션만큼 크고 높게,
+  // 빨간 칸에 들어가면(그 뒤로 0.9초마다) 낚싯대가 끼익, 낚싯대는 텐션만큼 부르르 떨고, 진동은 텐션만큼 길고 잦게.
+  const speed = clamp(f.reelV / (2.5 * rod.reel), 0, 1);
+  if (speed > 0 && t - f.clickAt > lerp(210, 55, speed)) { f.clickAt = t; sfx('reel-click', { rate: .75 + speed * .35 + f.tension / 500, gain: (.55 + speed * .5) * FEEL(), vary: .04 }); }
+  const strain = clamp((f.tension - 30) / 60, 0, 1);
+  R.strain?.set(strain ** 1.4 * (f.holding ? 1 : .6) * FEEL(), .8 + f.tension / 100 * .55 + (zone === 'red' ? Math.sin(t / 60) * .03 : 0));
+  if (zone === 'red' && t - (f.creakAt || 0) > 900) { f.creakAt = t; sfx('reel-creak', { rate: 1 + Math.random() * .15, gain: .85 }); }
+  if (strain > 0 && !reduced()) R.rig.vbe += (Math.random() - .5) * strain * (canBuzz() ? 3 : 7);
+  tensionFeel(t, f, zone);
 }
 function useSkill() {
   const f = R?.f;
@@ -761,16 +817,17 @@ function useSkill() {
   $('rl-pov').insertAdjacentHTML('beforeend', `<div class="rl-cutin">${pet ? avatar(pet.key, { form: Math.max(1, pet.form ?? 1), expression: 'cheer' }) : ''}<b>펫 특기!</b><span>한 번에 끌어오기</span></div>`);
   later(() => document.querySelector('.rl-cutin')?.remove(), 1200);
   Object.assign(R.rig, { tBack: .5 }); R.rig.vb = 10; later(() => { R.rig.tBack = 0; }, 300);
-  flash(); sfx('ult-impact'); buzz([30, 30, 140]);
+  flash(); sfx('reel-hook', { rate: .9 }); sfx('reel-splash', { gain: .6, dur: 1.2, at: .15 }); feel('skill');
   if (R.tut && TUT[R.tut.step]?.id === 'skill') later(tutNext, 1000);
 }
 async function lose(msg, why) {
   offSwipe(); qte('');
   $('rl-tuthand')?.remove(); R.tut = null;
   setPhase('lost');
-  R.rig.spin = 0;
-  if (why === 'snap') { Object.assign(R.rig, { tBend: 0, tDir: 0 }); R.rig.vbe = -14; fx('snap', ...rodGeom().tip); sfx('crack'); }
-  sfx('fail'); buzz([80, 40, 80]); petFace('sad');
+  R.rig.spin = 0; stopStrain();
+  if (why === 'snap') { Object.assign(R.rig, { tBend: 0, tDir: 0 }); R.rig.vbe = -14; fx('snap', ...rodGeom().tip); sfx('reel-snap'); }
+  else sfx('reel-plop', { rate: .75, gain: .6 });
+  sfx('fail', { gain: .6, at: .35 }); feel(why === 'snap' ? 'snap' : 'slack'); petFace('sad');
   $('rl-world')?.classList.remove('zoom', 'shake');
   $('rl-shadow').classList.add('flee');
   cue('');
@@ -795,18 +852,18 @@ function practice() {
 function finish() {
   offSwipe(); qte('');
   setPhase('finish');
-  R.rig.spin = 0; R.rig.tBend = .9;
+  R.rig.spin = 0; R.rig.tBend = .9; stopStrain();
   const f = R.f, [x, y] = R.fishPx;
   $('rl-shadow').hidden = true;
   $('rl-world').classList.remove('shake');
   hud('', 'empty');
   cue('');
   const pov = $('rl-pov');
-  fx('jump', x, y); sfx('burst', { gain: .7 }); buzz([40, 30, 40]);
+  fx('jump', x, y); sfx('reel-jump'); feel('jump');
   // 아직 어떤 물고기인지 모른다: 큰 실루엣이 뛰어오른다.
   pov.insertAdjacentHTML('beforeend', `<div class="rl-leap" id="rl-leap" style="--x:${x}px;--y:${y}px;--s:${R.live.fight.size || 1}"><div class="rl-leap-fish">${fishShadow('salmon')}</div><i class="rl-ring" id="rl-ring"></i></div>${reduced() ? '' : has('fx-speed') ? `<i class="rl-speed art">${art('fx-speed', '')}</i>` : '<i class="rl-speed"></i>'}`);
   pov.classList.add('slowmo');
-  sfx('ult-riser', { gain: .5 });
+  sfx('reel-creak', { rate: .7, gain: .5, at: .15 });
   $('rl-tuthand')?.remove();
   cue(R.tut ? '<span class="rl-cue-tut"><small>마지막!</small><span>노란 고리가 작아져 <b>물고기에 딱 맞을 때 탭!</b></span></span>' : '<span class="rl-cue-big now">고리가 맞을 때 <b>탭!</b></span>', R.tut ? 'tut' : 'now');
   const t0 = performance.now(), dur = R.tut ? 2000 : reduced() ? 1400 : 1250;
@@ -820,9 +877,9 @@ function finish() {
     document.querySelector('.rl-speed')?.remove();
     cue('');
     const leap = $('rl-leap'); leap?.classList.add(kind);
-    if (kind === 'perfect') { pop('퍼펙트!', 'perfect'); flash(); sfx('crit', { rate: 1.1 }); buzz([20, 20, 120]); }
-    else if (kind === 'good') { pop('좋아요!', 'good'); sfx('hit'); buzz(60); }
-    else sfx('pop');
+    if (kind === 'perfect') { pop('퍼펙트!', 'perfect'); flash(); sfx('reel-hook', { gain: .7, rate: 1.1 }); sfx('reel-sparkle', { at: .05 }); feel('perfect'); }
+    else if (kind === 'good') { pop('좋아요!', 'good'); sfx('reel-hook', { gain: .75 }); feel('good'); }
+    else sfx('reel-plop', { rate: .85 });
     landFish(kind);
   };
   const tap = e => {
@@ -885,13 +942,14 @@ function reveal(res, kind) {
     </section>`;
   $('rl-pov').appendChild(box);
   hud('', 'empty');
-  sfx(res.rarity === 'legend' || res.rarity === 'golden' ? 'fanfare-legend' : res.rarity === 'epic' ? 'fanfare-epic' : res.rarity === 'rare' ? 'fanfare-basic' : 'correct');
-  buzz(n >= 4 ? [40, 40, 40, 40, 160] : [30, 30, 60]);
+  sfx('reel-splash', { rate: big ? .9 : 1 });
+  sfx(res.rarity === 'legend' || res.rarity === 'golden' ? 'fanfare-legend' : res.rarity === 'epic' ? 'fanfare-epic' : res.rarity === 'rare' ? 'fanfare-basic' : 'correct', { at: .12 });
+  feel(n >= 4 ? 'big' : 'caught');
   // 무게: 0에서 올라간다.
   const kgEl = box.querySelector('#rl-kg'), t0 = performance.now(), dur = reduced() ? 1 : 900;
   const tick = t => { if (!R || !kgEl.isConnected) return; const k = Math.min(1, (t - t0) / dur); kgEl.textContent = kgText(res.kg * (1 - (1 - k) ** 3)); if (k < 1) requestAnimationFrame(tick); else { kgEl.classList.add('done'); if (res.record) sfx('levelup', { gain: .5 }); } };
   later(() => requestAnimationFrame(tick), reduced() ? 0 : 700);
-  if (res.fresh) later(() => { sfx('smash', { gain: .5 }); buzz(50); }, reduced() ? 0 : 1300);
+  if (res.fresh) later(() => { sfx('stamp', { gain: .8 }); feel('good'); }, reduced() ? 0 : 1300);
   if (n >= 4) later(() => coinShower(box, n >= 5 ? 26 : 14), 600);
   say(n >= 4 ? '우와!! 대박이다!' : n >= 3 ? '귀한 물고기야!' : res.fresh ? '처음 보는 물고기야!' : '잡았다!', 2400);
 }
