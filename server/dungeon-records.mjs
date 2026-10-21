@@ -65,6 +65,8 @@ function recordRun(state, d, result, humans, now) {
   if (!result.record || !humans.length || humans.length !== result.size || !BOARD_SIZES.includes(result.size)) return null;
   if (result.cut !== 'max' && !result.cleared) return null;
   if (result.cut === 'max' && result.reached < 1) return null;
+  // V13.168 교사 미리보기 계정이 낀 판은 보드에 올리지 않는다(학생 순위에 '미리보기 · 학교'가 올랐다). 보상 · 내 기록은 그대로.
+  if (humans.some(x => state.profiles.find(y => y.id === x.id)?.preview_owner_id)) return null;
   const boards = state.dungeon_boards ||= {};
   const key = boardKey(d.grade, result.cut, result.size);
   const b = boards[key] ||= { all: [], week: null, prev: null };

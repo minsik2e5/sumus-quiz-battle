@@ -76,4 +76,17 @@ export async function runSweepDungeonChecks(assert, expectStatus) {
   assert(typeof joined.room.plays_left === 'number' && joined.room.plays_left === partyPlaysLeft(P('qa-sw-a')), `V13.168 교실 게임 참가 응답에 오늘 남은 코인 판 (${joined.room.plays_left})`);
   const pui = source('../public/modules/party.js');
   assert(/capped = P\.room\?\.plays_left === 0/.test(pui) && pui.includes('r.coins && capped ?') && pui.includes('r.team_win && !capped'), 'V13.168 교실 게임 결과 화면: 오늘 코인 판이 없으면 \'+코인\'을 보이지 않는다');
+
+  /* ---------- 4) 교사 미리보기 계정이 낀 판은 기록 보드에 오르지 않는다 ---------- */
+  {
+    state.profiles.push(student('teacher-preview:qa:gangseo-high:고1', '미리보기 · 강서고', '고1', { preview_owner_id: 'qa-teacher' }));
+    const boardRows = () => JSON.stringify(state.dungeon_boards || {});
+    const before = boardRows();
+    state.dungeons.push(room('qa-sw-pv', T + 900000, ['teacher-preview:qa:gangseo-high:고1', 'qa-sw-c']));
+    const pvPlayers = ['teacher-preview:qa:gangseo-high:고1', 'qa-sw-c'].map(id => ({ id, name: P(id).display_name, right: 60, answered: 70, reward: true, bot: false, out: false }));
+    const pvResult = { cleared: true, cut: 'c3', size: 2, floor: 6, reached: 6, time_ms: 300000, record: true, no_down: false, report_id: 'dungeon:qa-sw-pv:1', players: pvPlayers };
+    assert(settleDungeon(state, { id: 'qa-sw-pv', report_id: pvResult.report_id, result: pvResult }, T + 1500000), 'V13.168 검사 준비: 미리보기 계정과 함께 끝난 판');
+    const pvLast = dungeonLastView(state, P('qa-sw-c'), 'qa-sw-pv');
+    assert(boardRows() === before && !pvLast.board && pvLast.reward?.coins > 0, 'V13.168 교사 미리보기 계정이 낀 던전 판은 기록 보드에 오르지 않고, 함께 한 학생의 보상은 그대로다');
+  }
 }
