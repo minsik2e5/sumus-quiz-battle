@@ -1244,7 +1244,8 @@ export async function service(state, method, path, body, token, options = {}) {
     const competition = createCompetition(state, now);
     const visibleExams = state.exams.filter(e => e.division === selectedDivision && (teacher ? sameSchool(e, selectedSchool) : (examTargetMatches(e, p) && sameSchool(e, studentSchool) && e.active)));
     const visibleExamIds = new Set(visibleExams.map(e => e.id));
-    const studentProfiles = state.profiles.filter(x => x.role === 'student' && x.division === selectedDivision && (!teacher || sameSchool(x, selectedSchool)));
+    // V13.168 선생님 화면(학생 관리 · 결과 분석 · 시험 현황 · 내보내기)에는 미리보기 계정과 그 기록을 넣지 않는다.
+    const studentProfiles = state.profiles.filter(x => x.role === 'student' && x.division === selectedDivision && (!teacher || (sameSchool(x, selectedSchool) && !x.preview_owner_id)));
     const studentIds = new Set(studentProfiles.map(s => s.id));
     const sessions = state.sessions.filter(s => s.division === selectedDivision && sameSchool(s, selectedSchool) && (teacher ? studentIds.has(s.student_id) : s.student_id === p.id)).sort((a, b) => b.created_at - a.created_at);
     const sessionsByStudent = new Map();
@@ -1252,7 +1253,8 @@ export async function service(state, method, path, body, token, options = {}) {
       if (!sessionsByStudent.has(session.student_id)) sessionsByStudent.set(session.student_id, []);
       sessionsByStudent.get(session.student_id).push(session);
     }
-    const attempts = state.examAttempts.filter(a => teacher ? visibleExamIds.has(a.exam_id) : a.student_id === p.id);
+    const previewIds = teacher ? new Set(state.profiles.filter(x => x.preview_owner_id).map(x => x.id)) : null;
+    const attempts = state.examAttempts.filter(a => teacher ? visibleExamIds.has(a.exam_id) && !previewIds.has(a.student_id) : a.student_id === p.id);
     // V13.131: 학생마다 대결 목록 전체를 다시 훑지 않게 한 번 나눠 둔다.
     const battlesByStudent = teacher ? battleIndex(state) : null;
     const books = allBooks(state).filter(b => sameSchool(b, selectedSchool) && (teacher || !b.grade || b.grade === p.class_name));
