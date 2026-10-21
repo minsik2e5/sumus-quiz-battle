@@ -1032,7 +1032,9 @@ function closeStalePractices(state, now) {
     if (lastActivity > now - STALE_PRACTICE_MS) continue;
     // Answers given: close it the way a finish does (the existing path used when a
     // student changes school), so the answers become a record. No answers: nothing to keep.
-    if (Number(x.total || 0) > 0) finishPractice(x, state);
+    // V13.168 방치로 닫힌 연습은 마지막으로 푼 때의 기록으로 남기고 코인 · 미끼 · 공은 없다(v13.73 "3일 방치 코인 0").
+    // 예전: 정해진 문제를 다 풀고 오답 다시 풀기에서 멈췄으면 닫는 날 코인 · 오늘 첫 학습 · 미끼 · 공을 받고 그날 공부한 날이 됐다.
+    if (Number(x.total || 0) > 0) finishPractice(x, state, false, { staleAt: lastActivity });
     else x.discarded = true;
     changed = true;
   }
@@ -2534,6 +2536,8 @@ export async function service(state, method, path, body, token, options = {}) {
       const session = state.sessions.find(item => item.id === sourceId && item.student_id === p.id);
       const source = session || practice;
       if (!source || source.school_id !== school.id) fail('연습 답안을 찾을 수 없습니다.', 404);
+      // V13.168 실전시험은 끝나기 전에 정답 여부를 보여 주지 않는다. 풀던 중 이의제기로 맞고 틀림을 알 수 있었다.
+      if (!session && practice.run_mode === 'test' && !practice.finished) fail('실전시험이 끝난 뒤에 이의제기할 수 있어요.', 409);
       questionId = str(body.question_id, 100);
       const durable = (source.answer_records || []).find(item => item.question_id === questionId);
       if (durable) {
@@ -2543,7 +2547,8 @@ export async function service(state, method, path, body, token, options = {}) {
       } else {
         const response = practice?.responses?.[questionId];
         const feedback = response?.feedback;
-        if (!feedback || feedback.ok || feedback.type !== 'write_meaning' || !feedback.word_id || !feedback.answer) fail('오답으로 채점된 뜻쓰기 답안만 이의제기할 수 있어요.', 409);
+        // V13.168 점수에 들어가지 않는 오답 다시 풀기(can_dispute false)는 이의제기할 수 없다. 예전: 받아 주면 맞힌 수가 문제 수를 넘고 경험치가 또 올랐다.
+        if (!feedback || feedback.ok || feedback.can_dispute === false || feedback.type !== 'write_meaning' || !feedback.word_id || !feedback.answer) fail('오답으로 채점된 뜻쓰기 답안만 이의제기할 수 있어요.', 409);
         word = findWord(state, feedback.word_id);
         submittedAnswer = feedback.answer;
       }
@@ -2653,6 +2658,8 @@ export async function service(state, method, path, body, token, options = {}) {
       if (body.passing_score !== undefined) e.passing_score = integer(body.passing_score, 0, 100, '통과 점수');
       if (body.max_attempts !== undefined) e.max_attempts = integer(body.max_attempts, 1, 10, '응시 횟수');
     }
+    // V13.168 마감만 바꿔도(응시 기록이 있으면 마감만 바꿀 수 있다) 시작 시간보다 앞이면 아무도 응시할 수 없었다.
+    if ((body.due_at !== undefined || body.available_at !== undefined) && Number(e.available_at || 0) >= Number(e.due_at)) fail('시작 시간은 마감 시간보다 빨라야 합니다.');
     e.updated_at = Date.now();
     return { ...e, edit_locked: locked };
   }
@@ -3063,9 +3070,10 @@ function practiceReward(x, state, endedAt, answeredCount, perfect, { complete = 
 
 // `natural`: the practice ended by itself (every word done). A practice closed by the
 // student midway, by the 3-day clean-up or by a school change pays no coins.
-function finishPractice(x, state, autoSubmitted = false, { natural = false } = {}) {
+// `staleAt`: closed by the 3-day clean-up; the record is dated at the last answer.
+function finishPractice(x, state, autoSubmitted = false, { natural = false, staleAt = 0 } = {}) {
   const finalizedAt = Date.now();
-  const endedAt = autoSubmitted && Number(x.deadline || 0) ? Math.min(finalizedAt, Number(x.deadline)) : finalizedAt;
+  const endedAt = staleAt ? Math.min(finalizedAt, Math.max(Number(x.started_at || 0), Number(staleAt))) : autoSubmitted && Number(x.deadline || 0) ? Math.min(finalizedAt, Number(x.deadline)) : finalizedAt;
   x.finished = true;
   x.ended_at = endedAt;
   x.finalized_at = finalizedAt;
@@ -3080,7 +3088,7 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false } = {
   const unansweredCount = Math.max(0, scoreTotal - answerRecords.length) + timedOutCount;
   const perfect = score === 100 && wrongCount === 0 && unansweredCount === 0;
   // A timer that ran out counts as finished only with at least half of the words answered.
-  const complete = natural || answerRecords.length >= scoreTotal || (autoSubmitted && answerRecords.length * 2 >= scoreTotal);
+  const complete = !staleAt && (natural || answerRecords.length >= scoreTotal || (autoSubmitted && answerRecords.length * 2 >= scoreTotal));
   // V13.142: the event in effect when the practice ended (server time). Coins: see practiceReward.
   // 경험치 goes up only for a practice finished to its end (a practice left midway keeps its own 경험치).
   const student = state.profiles.find(item => item.id === x.student_id);
