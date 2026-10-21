@@ -6,7 +6,7 @@ import { coinShower, countUp } from './celebrate.js';
 import { huntPetShow, petJosa, buyEgg } from './pet-moments.js';
 import { arcadeWords } from './arcade-games.js';
 import { cardMeaning } from './match-rules.js';
-import { HUNT, BERRIES, BALL_NAMES, THROW_NAMES, TIER_NAMES, HUNT_MONSTERS, MONSTER_KEYS, MONSTER_TIERS, catchChance, huntSlot, tierLabel, tierStars } from './hunt-rules.js';
+import { HUNT, BERRIES, BALL_NAMES, THROW_NAMES, TIER_NAMES, HUNT_MONSTERS, MONSTER_KEYS, MONSTER_TIERS, HUNT_PLACES, PLACE_EMOJI, monsterReady, placeHint, catchChance, huntSlot, tierLabel, tierStars } from './hunt-rules.js';
 
 // V13.162 몬스터 사냥(놀이터, 처음 이름 펫 사냥). 포켓몬 고처럼: 그림 지도 위 야생 몬스터를 눌러 만나고(하얀 번쩍임 → "야생의 ○○이 나타났다!"),
 // 잡기 화면에서 공을 위로 밀어 던진다. 줄어드는 원이 작을 때 원 안에 맞히면 나이스 · 그레이트 · 엑설런트.
@@ -83,6 +83,7 @@ function onClick(event) {
   if (act === 'phone') return togglePhone();
   if (act === 'bagmon') return monsterBag();
   if (act === 'book') return monsterBook();
+  if (act === 'book-tab') return monsterBook(b.dataset.tab);
   if (act === 'shop') return shop();
   if (act === 'sell') return sell(b.dataset.key || null, b);
   if (act === 'coins') return exchangeCoins(Number(b.dataset.n), b);
@@ -745,12 +746,24 @@ async function sell(key, b) {
     monsterBag(); if (H.phase === 'map') redrawDock();
   } catch (err) { toast(err.message); if (b) b.disabled = false; }
 }
-function monsterBook() {
+// V13.166 도감 70칸 + 장소 탭(전체 · 숲 · 들판 · 바닷가 · 밤). 못 잡은 몬스터는 그림자 + "○○에서 나와요", 그림이 아직 없으면 "?" + "곧 나와요".
+const BOOK_TABS = ['all', ...Object.keys(HUNT_PLACES)];
+function monsterBook(tab = H.bookTab || 'all') {
   const v = H.v || {}, book = v.book || {};
-  const body = `<p class="hn-sheet-note">잡은 몬스터 ${num(v.kinds || 0)} / ${num(v.all || MONSTER_KEYS.length)}종. 아직 못 잡은 몬스터는 그림자로 보여요.</p>
-    ${MONSTER_TIERS.map(t => `<h4 class="hn-book-tier t-${t}">${tierLabel(t)}</h4><div class="hn-book">${MONSTER_KEYS.filter(k => HUNT_MONSTERS[k].tier === t).map(k => book[k]?.n
-      ? `<div class="hn-book-cell on t-${t}"><img src="${monSrc(k)}" alt="" loading="lazy"><b>${esc(HUNT_MONSTERS[k].ko)}</b><small>${num(book[k].n)}마리</small></div>`
-      : `<div class="hn-book-cell t-${t}"><img class="shadow" src="${monSrc(k)}" alt="" loading="lazy"><b>???</b><small>&nbsp;</small></div>`).join('')}</div>`).join('')}`;
+  H.bookTab = BOOK_TABS.includes(tab) ? tab : 'all';
+  const inTab = k => H.bookTab === 'all' || HUNT_MONSTERS[k].place === H.bookTab;
+  const keys = MONSTER_KEYS.filter(inTab), got = keys.filter(k => book[k]?.n).length;
+  const cell = (k, t) => {
+    const m = HUNT_MONSTERS[k], at = m.place ? `<i class="hn-book-place" aria-hidden="true">${PLACE_EMOJI[m.place]}</i>` : '';
+    if (book[k]?.n) return `<div class="hn-book-cell on t-${t}">${at}<img src="${monSrc(k)}" alt="" loading="lazy"><b>${esc(m.ko)}</b><small>${num(book[k].n)}마리</small></div>`;
+    const pic = monsterReady(k) ? `<img class="shadow" src="${monSrc(k)}" alt="" loading="lazy">` : '<span class="hn-book-soon" aria-hidden="true">?</span>';
+    return `<div class="hn-book-cell t-${t}">${at}${pic}<b>???</b><small class="hn-book-hint">${monsterReady(k) ? placeHint(k) : '곧 나와요'}</small></div>`;
+  };
+  const tabs = `<div class="hn-book-tabs" role="tablist">${BOOK_TABS.map(t => `<button type="button" role="tab" class="hn-book-tab${t === H.bookTab ? ' on' : ''}" data-hn="book-tab" data-tab="${t}" aria-selected="${t === H.bookTab}">${t === 'all' ? '전체' : `${PLACE_EMOJI[t]} ${HUNT_PLACES[t]}`}</button>`).join('')}</div>`;
+  const note = H.bookTab === 'all' ? `잡은 몬스터 ${num(v.kinds || 0)} / ${num(v.all || MONSTER_KEYS.length)}종. 아직 못 잡은 몬스터는 그림자로 보여요.`
+    : `${HUNT_PLACES[H.bookTab]} 몬스터 ${num(got)} / ${num(keys.length)}종. ${H.bookTab === 'night' ? '밤(저녁 7시 ~ 아침 6시)에 어느 지도에서나' : `${HUNT_PLACES[H.bookTab]} 지도에서만(낮 · 밤)`} 나와요.`;
+  const body = `${tabs}<p class="hn-sheet-note">${note}</p>
+    ${MONSTER_TIERS.map(t => { const list = keys.filter(k => HUNT_MONSTERS[k].tier === t); return list.length ? `<h4 class="hn-book-tier t-${t}">${tierLabel(t)}</h4><div class="hn-book">${list.map(k => cell(k, t)).join('')}</div>` : ''; }).join('')}`;
   layer(sheetBox('📖 몬스터 도감', body, 'hn-booksheet'));
 }
 function shop() {
