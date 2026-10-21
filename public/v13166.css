@@ -1,0 +1,8 @@
+/* V13.166 몬스터 사냥 도감: 장소 탭 · 장소 표시 · 못 잡은 몬스터 힌트 */
+.hn-book-tabs{display:flex;gap:6px;overflow-x:auto;margin:0 0 8px;padding:2px 0 4px;scrollbar-width:none}
+.hn-book-tabs::-webkit-scrollbar{display:none}
+.hn-book-tab{flex:0 0 auto;border:0;border-radius:999px;padding:7px 12px;font:inherit;font-size:12.5px;font-weight:800;color:#475569;background:#f1f5f9;box-shadow:inset 0 0 0 1.5px #e2e8f0;cursor:pointer}
+.hn-book-tab.on{color:#fff;background:linear-gradient(180deg,#34d399,#059669);box-shadow:0 2px 6px rgba(5,150,105,.35)}
+.hn-book-cell .hn-book-place{position:absolute;top:4px;left:5px;font-size:11px;font-style:normal;line-height:1}
+.hn-book-cell .hn-book-hint{font-size:9.5px;line-height:1.25;color:#64748b;word-break:keep-all}
+.hn-book-soon{display:grid;place-items:center;width:54px;height:54px;border-radius:50%;font-size:24px;font-weight:900;color:#94a3b8;background:radial-gradient(circle at 40% 35%,#fff,#e2e8f0)}

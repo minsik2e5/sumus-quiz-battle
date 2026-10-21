@@ -109,7 +109,8 @@ const cssSources = [
   "v13154.css",
   "v13158.css",
   "v13159.css",
-  "v13162.css"
+  "v13162.css",
+  "v13166.css"
 ];
 const cssBundlePath = resolve(root, 'public/app.bundle.css');
 
@@ -143,6 +144,19 @@ const cssBundle = cssSources
   .map(name => readFileSync(resolve(root, 'public', name), 'utf8'))
   .join('\n');
 writeFileSync(cssBundlePath, cssBundle);
+
+// V13.166 몬스터 사냥 장소 몬스터는 그림(기본 · 공격 · 맞음)이 다 들어온 것만 지도에 나온다.
+// 그림 폴더를 보고 public/modules/monster-art.js를 만든다: 그림을 넣고 build:assets를 돌리면 자동으로 나온다.
+{
+  const dir = resolve(root, 'public/assets/monsters');
+  const files = new Set(readdirSync(dir));
+  const keys = [...files].map(f => f.match(/^([a-z0-9]+)\.webp$/)?.[1]).filter(Boolean)
+    .filter(k => files.has(`${k}-attack.webp`) && files.has(`${k}-hurt.webp`)).sort();
+  const out = resolve(root, 'public/modules/monster-art.js');
+  const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 기본 · 공격 · 맞음 그림이 다 있는 몬스터.\nexport const MONSTER_ART = new Set(${JSON.stringify(keys)});\n`;
+  if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
+  console.log(`[monster-art] ${keys.length} monsters with art`);
+}
 
 // Service worker: precache list + a hash of every served file. Any change to
 // the app changes sw.js, so installed apps pick up each deploy even when no

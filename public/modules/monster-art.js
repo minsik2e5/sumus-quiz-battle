@@ -1,0 +1,2 @@
+// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 기본 · 공격 · 맞음 그림이 다 있는 몬스터.
+export const MONSTER_ART = new Set(["alarmwolf","bagturtle","blinkjelly","chalkangler","cheatninja","clock","cramwizard","dictdragon","finalking","forgetghost","gatehound","golem","homeworkogre","killergolem","labskeleton","mimic","mochi","mockhydra","nightbat","nightzombie","omrreaper","owlnight","pencilworm","phone","pianofang","pirate","proctor","redpenghost","sandwitch","scrollgoblin","sleepcloud","slime","testspider","wrongmummy"]);
