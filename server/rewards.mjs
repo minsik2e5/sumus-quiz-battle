@@ -46,8 +46,8 @@ export function rewardIncome(p) {
     + Number(p?.title_reward?.total || 0) + Number(p?.gift_box?.total || 0)
     // V13.82: 가위바위보 pay-outs and shares sold in 문법 증권거래소 (bets and buys are points_spent).
     + Number(p?.rps?.paid || 0) + Number(p?.stocks?.paid || 0)
-    // V13.150: 낚시터 진주로 바꾼 코인.
-    + Number(p?.reel?.coins || 0);
+    // V13.150: 낚시터 진주로 바꾼 코인. V13.162: 몬스터 사냥 별조각으로 바꾼 코인.
+    + Number(p?.reel?.coins || 0) + Number(p?.hunt?.coins || 0);
 }
 
 /* ---------- V13.73 title coins ---------- */
