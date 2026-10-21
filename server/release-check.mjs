@@ -460,8 +460,11 @@ export async function runReleaseCheck() {
       assert(third.rematch && third.id, 'V13.68 rematches between the same two students have no daily limit');
       state.battles = state.battles.filter(b => b.id !== third.id);
       const expiredRow = state.battles.find(b => b.id === again.id);
+      const endedAt = expiredRow.finished_at;
       expiredRow.finished_at = Date.now() - 3 * 60000;
       await expectStatus(409, () => service(state, 'POST', '/battle/rematch', { battle_id: again.id }, studentToken), 'V13.56 a rematch can only be asked within two minutes of the end');
+      // V13.168: put the end time back, or the streak check below fails just after midnight (the win moves to yesterday).
+      expiredRow.finished_at = endedAt;
 
       // V13.94 각자 내 범위: a friend of the same grade who studies another range.
       {
