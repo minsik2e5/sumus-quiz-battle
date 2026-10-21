@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { migrateState, repository } from './repository.mjs';
 import { passwordHash } from './auth.mjs';
-import { service, sweep } from './service.mjs';
+import { service, sweep, examAttemptExpired } from './service.mjs';
 import { selfSignup, checkSignupCode, signupCodeGuard } from './signup.mjs';
 import { examAdmin } from './exam-admin.mjs';
 import { createMutationCoordinator, NO_MUTATION } from './mutation-coordinator.mjs';
@@ -160,7 +160,7 @@ const server = http.createServer(async (req, res) => {
 const deadlineTimer = setInterval(() => {
   const current = mutations.current().state;
   const now = Date.now();
-  const hasExpiredExam = (current.examAttempts || []).some(attempt => attempt.status === 'active' && Number(attempt.deadline || 0) <= now);
+  const hasExpiredExam = (current.examAttempts || []).some(attempt => examAttemptExpired(attempt, now));
   if (!hasExpiredExam) return;
   mutations.durable(state => sweep(state) ? true : NO_MUTATION).catch(e => console.error('[deadline]', e.message));
 }, 5000);

@@ -709,6 +709,9 @@ export async function runReleaseCheck() {
     const autoInternal = state.examAttempts.find(item => item.id === autoStarted.attempt.id);
     autoInternal.deadline = Date.now() - 1;
     sweep(state);
+    assert(autoInternal.status === 'active', 'V13.163 마감 유예 안에서는 정리가 시험을 닫지 않는다');
+    autoInternal.deadline = Date.now() - 5001;
+    sweep(state);
     assert(autoInternal.status === 'submitted' && autoInternal.auto_submitted === true, 'expired exam auto-submits');
 
     for (const practiceType of practiceTypes) {

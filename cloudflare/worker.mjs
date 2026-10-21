@@ -1,4 +1,4 @@
-import { service, sweep, preauthenticateLogin, settleBattle, battleReportPending, undoDungeon, runEveningReminders, settlePartyReport, partyReportPending, undoParty } from '../server/service.mjs';
+import { service, sweep, examAttemptExpired, preauthenticateLogin, settleBattle, battleReportPending, undoDungeon, runEveningReminders, settlePartyReport, partyReportPending, undoParty } from '../server/service.mjs';
 import { createDungeonReporter } from '../server/dungeon-reports.mjs';
 import { sendPush } from '../server/push.mjs';
 import { dropEndpoints } from '../server/notify.mjs';
@@ -483,7 +483,7 @@ export class VocaStateObject {
       }
 
       const currentState = this.mutations.current().state;
-      const hasExpiredAttempt = currentState.examAttempts.some(attempt => attempt.status === 'active' && attempt.deadline <= Date.now());
+      const hasExpiredAttempt = currentState.examAttempts.some(attempt => examAttemptExpired(attempt));
       // Housekeeping (stale practices, old record compaction) also runs hourly, not only at start-up.
       // V13.144: 오늘 쓴 양이 90%를 넘으면 시간마다 하는 정리는 다음 날로 미룬다(끝난 시험 마감은 그대로 한다).
       const sweepDue = Date.now() - this.sweptAt > 3600000 && this.writeLevel() !== 'defer';

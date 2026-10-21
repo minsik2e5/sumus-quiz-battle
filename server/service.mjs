@@ -1004,7 +1004,9 @@ function finishExam(a, state, auto = false) {
   a.submitted_at = Date.now(); a.auto_submitted = auto; a.lease = null;
   // V13.70 the first submitted attempt of an exam gives 경험치 per answered question and coins.
   const student = state.profiles.find(x => x.id === a.student_id);
-  const first = !state.examAttempts.some(x => x !== a && x.exam_id === a.exam_id && x.student_id === a.student_id && x.status === 'submitted');
+  // V13.163 재응시는 앞 제출을 examAttemptArchive로 옮긴다. 거기도 봐야 재응시마다 보상을 다시 주지 않는다.
+  const same = x => x !== a && x.exam_id === a.exam_id && x.student_id === a.student_id && x.status === 'submitted';
+  const first = !state.examAttempts.some(same) && !(state.examAttemptArchive || []).some(same);
   if (student && first) {
     const answered = a.questions.filter((q, i) => String(a.answers[i] ?? '').trim()).length;
     const reward = examReward(answered, a.questions.length);
@@ -1108,9 +1110,13 @@ function rpsHall(state, p, now = Date.now()) {
     .map(row => ({ name: row.x.display_name, count: row.n, me: row.x.id === p.id }));
 }
 const rpsFor = (state, p, now = Date.now()) => ({ ...rpsView(p, now), hall: rpsHall(state, p, now) });
+// V13.163 선생님 시험 마감 유예: 화면은 마감 시각이 지나야 자동 제출을 보내서 늘 조금 늦게 온다. 그 전에 정리가
+// 먼저 닫으면 마지막 답(쓰기 220ms 모으기 · 왕복 시간)이 버려졌다. 유예 안에 온 답은 받고, 유예가 지나면 정리가 닫는다.
+export const EXAM_SUBMIT_GRACE_MS = 5000;
+export const examAttemptExpired = (a, now = Date.now()) => a?.status === 'active' && Number(a.deadline || 0) + EXAM_SUBMIT_GRACE_MS <= now;
 export function sweep(state, now = Date.now()) {
   let changed = false;
-  for (const a of state.examAttempts) if (a.status === 'active' && a.deadline <= Date.now()) {
+  for (const a of state.examAttempts) if (examAttemptExpired(a)) {
     // V13.129: 기록이 망가진 응시 하나 때문에 정리가 매번 실패하면 모든 요청이 막힌다. 그 응시만 제출로 닫는다.
     try { finishExam(a, state, true); }
     catch (error) { console.error('[sweep] exam attempt', a.id, error?.message); Object.assign(a, { status: 'submitted', submitted_at: Date.now(), auto_submitted: true, auto_error: true, lease: null }); }
@@ -1849,6 +1855,8 @@ export async function service(state, method, path, body, token, options = {}) {
       const res = reelSeaPet(p, str(body.key, 20), now);
       return { ...res, profile: publicProfile(p), stats: stats(state, p), reel: reelView(p, now) };
     }
+    // V13.163 첫 펫이 없는 학생이 알을 바꾸면 500이 났다(사냥 교환소와 같이 먼저 막는다).
+    if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
     const epic = item === 'epic_egg';
     const missing = (epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter(key => !p.pets.some(x => x.key === key));
     if (!missing.length) fail(epic ? '영웅 펫을 모두 모았어요!' : '모든 펫을 모았어요!', 409);
@@ -1890,6 +1898,8 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const now = Date.now(), item = str(body.item, 20);
     if (item === 'coins') { const res = huntCoins(p, body.amount, now); return { ...res, hunt: huntView(p, now), points_balance: coinBalance(state, p) }; }
+    // V13.163 첫 펫이 없는 학생이 알을 바꾸면 500이 났다(펫 집 · 만나기처럼 먼저 막는다).
+    if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
     const epic = item === 'epic_egg';
     const missing = (epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter(key => !p.pets.some(x => x.key === key));
     if (!missing.length) fail(epic ? '영웅 펫을 모두 모았어요!' : '모든 펫을 모았어요!', 409);
@@ -2669,6 +2679,8 @@ export async function service(state, method, path, body, token, options = {}) {
   if (/^\/attempts\/[^/]+(?:\/(?:draft|submit))?$/.test(path)) {
     const a = state.examAttempts.find(a => a.id === path.split('/')[2] && (teacher || a.student_id === p.id)); if (!a) fail('응시 기록을 찾을 수 없습니다.', 404);
     if (teacher && !sameSchool(state.exams.find(e => e.id === a.exam_id), activeTeacherSchool(state, p))) fail('현재 관리 중인 학교의 응시 기록이 아닙니다.', 403);
+    // V13.163 유예까지 지난 답은 받지 않고 저장된 답으로 닫는다(예전: 정리가 아직 안 돌았으면 마감 10분 뒤 답도 받았다).
+    if (examAttemptExpired(a) && method !== 'GET' && !teacher) finishExam(a, state, true);
     if (a.status === 'active' && method !== 'GET') {
       requireRole(p, 'student');
       if (body.lease !== a.lease) fail('다른 탭이나 기기에서 시험을 열었습니다. 시험 목록에서 다시 이어주세요.', 409);
@@ -3169,7 +3181,9 @@ function practiceView(x, state) {
       : undefined,
     feedback: hideTestScore ? null : x.feedback,
     finished: x.finished, retry_count: x.retry.length,
-    stats: growthFor(xpSessions(state, x.student_id)), server_time: Date.now()
+    // V13.163 성장 값은 끝났을 때만 계산한다. 답마다(답 결과 + 미리 받은 다음 문제로 두 번) 지난 기록 전체를 훑었는데
+    // (8만 개에서 답 하나 약 15ms) 연습 중 화면은 이 값을 쓰지 않는다(홈 데이터의 stats를 쓴다).
+    stats: x.finished ? growthFor(xpSessions(state, x.student_id)) : undefined, server_time: Date.now()
   };
 }
 
