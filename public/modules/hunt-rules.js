@@ -35,7 +35,11 @@ export const HUNT = {
   PREVIEW: { BALLS: 6, GOOD: 3, GOLD: 1 } // 교사 미리보기 계정: 들어올 때마다 채운다
 };
 export const MONSTER_TIERS = ['common', 'uncommon', 'rare', 'epic', 'legend'];
-export const TIER_NAMES = { common: '흔함', uncommon: '보통', rare: '희귀', epic: '영웅', legend: '전설', pet: '펫', petEpic: '영웅 펫' };
+// 몬스터 등급은 별(★1~5)과 이름(꼬마 · 보통 · 희귀 · 대장 · 보스)으로 쓴다: 펫 등급(기본 · 영웅 · 전설)과 헷갈리지 않게(선생님 결정).
+export const TIER_NAMES = { common: '꼬마', uncommon: '보통', rare: '희귀', epic: '대장', legend: '보스', pet: '기본 펫', petEpic: '영웅 펫' };
+export const TIER_STARS = { common: 1, uncommon: 2, rare: 3, epic: 4, legend: 5 };
+export const tierStars = t => '★'.repeat(TIER_STARS[t] || 0);
+export const tierLabel = t => TIER_STARS[t] ? `${tierStars(t)} ${TIER_NAMES[t]}` : TIER_NAMES[t];
 // 사냥 몬스터(그림은 몬스터전 · 던전 그림 public/assets/monsters/{key}{,-attack,-hurt,-down}.webp를 그대로 쓴다).
 export const HUNT_MONSTERS = {
   slime: { ko: '스펠링 슬라임', tier: 'common' }, mochi: { ko: '암기 모찌', tier: 'common' }, pencilworm: { ko: '샤프 벌레', tier: 'common' },

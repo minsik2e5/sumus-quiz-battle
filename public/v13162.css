@@ -369,3 +369,100 @@
 .hn-rewards span{min-width:0;flex:1}
 @keyframes hn-tierglow{from{opacity:.4}to{opacity:.95}}
 @keyframes hn-legendpulse{50%{transform:scale(1.06)}}
+
+/* ===== V13.162 디자인 다듬기(선생님 요청: 전체 화면 퀄리티 높이기) ===== */
+.hn-app{--glass:rgba(8,30,20,.62);--glass-b:rgba(255,255,255,.18);--ink:#0b2a1b;font-feature-settings:'tnum'}
+/* 위 막대: 진한 숲색 유리 + 아래 빛 */
+.hn-top{background:linear-gradient(180deg,#0a3a24 0%,#0e4a2e 100%);box-shadow:0 1px 0 rgba(255,255,255,.12) inset,0 6px 18px rgba(0,0,0,.25);padding:9px 12px}
+.hn-top strong{font-size:16px;letter-spacing:-.02em;text-shadow:0 1px 0 rgba(0,0,0,.3)}
+.hn-chip{gap:4px;padding:4px 9px 4px 5px;background:linear-gradient(180deg,rgba(255,255,255,.2),rgba(255,255,255,.08));box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 2px 4px rgba(0,0,0,.2);font-size:13.5px}
+.hn-chip.k-gold{background:linear-gradient(180deg,rgba(253,224,71,.35),rgba(234,179,8,.15));box-shadow:inset 0 0 0 1px rgba(253,224,71,.45)}
+.hn-chip .hn-art.sm{width:20px;height:20px}
+.hn-q{background:linear-gradient(180deg,rgba(255,255,255,.24),rgba(255,255,255,.1));box-shadow:inset 0 0 0 1px rgba(255,255,255,.2)}
+
+/* 지도: 가장자리 어둡게 + 위 · 아래 그라데이션 */
+.hn-map::after{content:'';position:absolute;inset:0;pointer-events:none;z-index:2;background:radial-gradient(130% 90% at 50% 45%,transparent 58%,rgba(0,0,0,.35)),linear-gradient(180deg,rgba(0,0,0,.28),transparent 14%,transparent 70%,rgba(0,0,0,.35))}
+.hn-map-tag{z-index:4;display:grid;grid-template-columns:auto auto;column-gap:7px;align-items:center;padding:7px 13px 7px 9px;border-radius:16px;background:var(--glass);box-shadow:inset 0 0 0 1px var(--glass-b),0 6px 14px rgba(0,0,0,.25)}
+.hn-map-tag i{grid-row:span 2;font-style:normal;font-size:22px}
+.hn-map-tag b{font-size:14px;letter-spacing:-.01em}.hn-map-tag small{font-size:11px;opacity:.82}
+.hn-spot em.tier{top:-12px;padding:1px 7px;font-size:10px;letter-spacing:-1px;color:#fff;background:linear-gradient(180deg,color-mix(in srgb,var(--tc) 80%,#fff),var(--tc));box-shadow:0 2px 6px rgba(0,0,0,.35),inset 0 0 0 1px rgba(255,255,255,.35);text-shadow:0 1px 0 rgba(0,0,0,.25)}
+.hn-spot.t-common em.tier{color:#334155;background:linear-gradient(180deg,#fff,#e2e8f0)}
+.hn-spot:active .hn-walk{transform:scale(.92)}
+/* 아래 판: 어두운 유리 */
+.hn-dock{left:10px;right:10px;padding:12px 12px 10px;border-radius:24px;background:linear-gradient(180deg,rgba(9,36,24,.86),rgba(6,26,17,.92));backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#ecfdf5;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12),0 14px 34px rgba(0,0,0,.45)}
+.hn-dock-btns{gap:8px;margin-bottom:9px}
+.hn-dock-btns button{grid-template-columns:40px 1fr;padding:8px 9px;border-radius:18px;color:#fff;background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.05));box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 4px 10px rgba(0,0,0,.25);font-size:22px}
+.hn-dock-ico{grid-row:span 2;display:grid;place-items:center;width:38px;height:38px;border-radius:12px;font-style:normal;font-size:21px;background:radial-gradient(circle at 35% 30%,#bbf7d0,#16a34a);box-shadow:inset 0 -2px 0 rgba(0,0,0,.15)}
+.hn-dock-btns button:nth-child(3) .hn-dock-ico{background:radial-gradient(circle at 35% 30%,#fef08a,#d97706);color:#fff;font-weight:900;text-shadow:0 1px 2px rgba(146,64,14,.6)}
+.hn-dock-btns b{font-size:13.5px;color:#fff}.hn-dock-btns small{font-size:11.5px;color:#a7f3d0;font-weight:800}
+.hn-dock-lead{color:#d1fae5;font-size:12.5px;margin:0 0 8px;text-align:center}
+.hn-dock-lead b{color:#fde68a}
+.hn-dock.empty .hn-dock-lead b{color:#fca5a5}
+.hn-today{gap:6px}
+.hn-today li{padding:6px 8px;border-radius:14px;background:rgba(255,255,255,.06);border:1.5px dashed rgba(167,243,208,.35)}
+.hn-today li.on{background:linear-gradient(180deg,rgba(34,197,94,.35),rgba(22,163,74,.22));border:1.5px solid rgba(134,239,172,.7)}
+.hn-today li i{border-color:rgba(167,243,208,.6)}
+.hn-today b{color:#fff}.hn-today small{color:#86efac}
+.hn-gold-line{justify-content:center;color:#fde68a;margin-top:8px}
+.hn-gold-line b{color:#fff}
+
+/* 잡기 화면: 이름판 · 둥근 유리 버튼 · 공 개수 뱃지 */
+.hn-name{top:12px;left:74px;right:74px;gap:3px}
+.hn-name b{font-size:23px;padding:0 4px;text-shadow:0 2px 0 rgba(0,0,0,.25),0 0 18px rgba(0,0,0,.45)}
+.hn-tier{display:inline-flex;align-items:center;gap:5px;padding:4px 12px!important;border-radius:999px;font-size:12px!important;box-shadow:0 3px 8px rgba(0,0,0,.3),inset 0 0 0 1.5px rgba(255,255,255,.4)!important;text-shadow:0 1px 0 rgba(0,0,0,.25)}
+.hn-tier i{font-style:normal;color:#fde68a;letter-spacing:-1px;text-shadow:0 0 6px rgba(253,224,71,.8)}
+.hn-tier.t-common i{color:#f59e0b;text-shadow:none}
+.hn-tier.fresh{background:linear-gradient(135deg,#f472b6,#a855f7)!important}
+.hn-run,.hn-phone{top:10px;width:54px;min-width:54px;height:54px;padding:0;justify-content:center;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.95),rgba(236,253,245,.85));box-shadow:0 6px 14px rgba(0,0,0,.28),inset 0 -3px 0 rgba(0,0,0,.08);font-size:20px}
+.hn-run small,.hn-phone small{position:absolute;bottom:-17px;left:50%;transform:translateX(-50%);padding:1px 7px;border-radius:99px;background:rgba(0,0,0,.45);color:#fff;font-size:10px}
+.hn-phone.on{background:linear-gradient(180deg,#fef9c3,#fde68a)}
+.hn-phone.on small{color:#fef08a}
+.hn-side{position:relative;width:60px;height:60px;padding:0;justify-content:center;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.96),rgba(236,253,245,.86));box-shadow:0 6px 14px rgba(0,0,0,.3),inset 0 -3px 0 rgba(0,0,0,.08)}
+.hn-side .hn-art{width:38px;height:38px}
+.hn-side .hn-emoji{font-size:30px}
+.hn-side small{position:absolute;bottom:-18px;left:50%;transform:translateX(-50%);padding:1px 8px;border-radius:99px;background:rgba(0,0,0,.5);color:#fff;font-size:10.5px}
+.hn-side.on{background:linear-gradient(180deg,#fef9c3,#fde68a);box-shadow:0 0 0 3px #facc15,0 0 18px rgba(250,204,21,.8)}
+.hn-hud{bottom:max(26px,env(safe-area-inset-bottom));align-items:center}
+.hn-hud>.hn-side{justify-self:center}
+.hn-ball-badge{position:absolute;right:6px;top:6px;min-width:26px;height:26px;padding:0 6px;display:grid;place-items:center;border-radius:99px;font-style:normal;font-size:12.5px;font-weight:900;color:#fff;background:linear-gradient(180deg,#ef4444,#b91c1c);box-shadow:0 2px 6px rgba(0,0,0,.35),inset 0 0 0 2px #fff}
+.hn-ball-n{padding:3px 12px;font-size:12px;background:rgba(0,0,0,.5);box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.hn-ball-n.k-good{background:linear-gradient(180deg,rgba(37,99,235,.85),rgba(30,64,175,.85))}
+.hn-ball-n.k-gold{background:linear-gradient(180deg,rgba(234,179,8,.9),rgba(161,98,7,.9))}
+.hn-hint{padding:2px 10px;border-radius:99px;background:rgba(0,0,0,.35);font-size:11px}
+.hn-hint:empty{display:none}
+.hn-appear span{padding:13px 20px;border-radius:20px;font-size:17px;background:linear-gradient(180deg,rgba(15,23,42,.9),rgba(2,6,23,.9));box-shadow:0 14px 30px rgba(0,0,0,.4),inset 0 0 0 1.5px rgba(255,255,255,.2)}
+
+/* 아래에서 올라오는 판: 종이 느낌 + 위 손잡이 */
+.hn-sheet{background:rgba(2,6,23,.55);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.hn-sheet-box{position:relative;padding:22px 16px max(16px,env(safe-area-inset-bottom));border-radius:28px 28px 0 0;background:linear-gradient(180deg,#f7fee7 0,#fff 90px);box-shadow:0 -10px 30px rgba(0,0,0,.25)}
+.hn-sheet-box::before{content:'';position:absolute;left:50%;top:8px;width:44px;height:5px;margin-left:-22px;border-radius:99px;background:#cbd5e1}
+.hn-sheet-box h3{font-size:19px;letter-spacing:-.02em;color:#052e16}
+.hn-sheet-box .btn.full{border-radius:16px}
+.hn-monrow{grid-template-columns:52px 1fr auto auto;padding:7px 10px;border-radius:16px;background:linear-gradient(90deg,color-mix(in srgb,var(--tc) 16%,#fff),#fff 60%);box-shadow:inset 4px 0 0 var(--tc),0 2px 6px rgba(15,23,42,.06)}
+.hn-monrow img{width:52px;height:52px;filter:drop-shadow(0 3px 2px rgba(0,0,0,.2))}
+.hn-monrow em{padding:2px 8px;border-radius:99px;background:#fff;box-shadow:inset 0 0 0 1.5px #e2e8f0}
+.hn-monrow .btn.small{border-radius:12px}
+.hn-book{gap:7px}
+.hn-book-cell{position:relative;padding:8px 3px 6px;border-radius:14px;background:linear-gradient(180deg,#f1f5f9,#e2e8f0)}
+.hn-book-cell.on{background:linear-gradient(180deg,#fff,color-mix(in srgb,var(--tc) 14%,#fff));box-shadow:inset 0 0 0 2px var(--tc),0 4px 10px color-mix(in srgb,var(--tc) 25%,transparent)}
+.hn-book-cell img{width:58px;height:58px;filter:drop-shadow(0 3px 2px rgba(0,0,0,.18))}
+.hn-book-cell img.shadow{filter:brightness(0) opacity(.22)}
+.hn-book-tier{display:flex;align-items:center;gap:6px;margin:14px 0 7px;font-size:13.5px}
+.hn-book-tier::after{content:'';flex:1;height:2px;border-radius:2px;background:linear-gradient(90deg,var(--tc),transparent)}
+.hn-shop-top{border-radius:20px;box-shadow:inset 0 0 0 1.5px #fde68a}
+.hn-shop-coin{border-radius:16px;background:linear-gradient(180deg,#fffbeb,#fef3c7);box-shadow:inset 0 0 0 1.5px #fcd34d,0 3px 0 #f59e0b}
+.hn-shop-coin:not(:disabled):active{transform:translateY(2px);box-shadow:inset 0 0 0 1.5px #fcd34d,0 1px 0 #f59e0b}
+.hn-shop-egg{border-radius:22px;box-shadow:inset 0 0 0 1.5px #bbf7d0,0 6px 14px rgba(22,101,52,.12)}
+.hn-shop-egg.epic_egg{box-shadow:inset 0 0 0 1.5px #ddd6fe,0 6px 14px rgba(91,33,182,.14)}
+.hn-shop-egg-art{animation:hn-eggwobble 2.6s ease-in-out infinite}
+
+/* 결과 카드: 등급 리본 */
+.hn-result-card{padding-top:16px;border-radius:30px;background:linear-gradient(180deg,#ffffff,#f0fdf4 70%,#dcfce7);box-shadow:0 24px 50px rgba(0,0,0,.45),inset 0 0 0 1.5px rgba(255,255,255,.8)}
+.hn-res-ribbon{position:relative;display:inline-block;margin:0 auto 6px;padding:5px 18px;border-radius:999px;font-size:13px;font-weight:900;color:#fff;letter-spacing:-.01em;background:linear-gradient(180deg,color-mix(in srgb,var(--tc,#22c55e) 75%,#fff),var(--tc,#22c55e));box-shadow:0 4px 10px color-mix(in srgb,var(--tc,#22c55e) 45%,transparent),inset 0 0 0 1.5px rgba(255,255,255,.5);text-shadow:0 1px 0 rgba(0,0,0,.25)}
+.hn-res-ribbon.t-common{color:#334155;background:linear-gradient(180deg,#fff,#e2e8f0)}
+.hn-result.fled .hn-res-ribbon{background:linear-gradient(180deg,#94a3b8,#64748b)}
+.hn-result-pet{width:170px;height:170px}
+.hn-rewards{gap:8px}
+.hn-rewards span{padding:9px 6px;border-radius:18px;background:linear-gradient(180deg,#fffbeb,#fef3c7);border:0;box-shadow:inset 0 0 0 1.5px #fde68a,0 3px 0 #fbbf24}
+.hn-rewards b{font-size:20px}
+@keyframes hn-eggwobble{0%,100%{transform:rotate(0)}10%{transform:rotate(-6deg)}20%{transform:rotate(5deg)}30%{transform:rotate(0)}}

@@ -6,7 +6,7 @@ import { coinShower, countUp } from './celebrate.js';
 import { huntPetShow, petJosa, buyEgg } from './pet-moments.js';
 import { arcadeWords } from './arcade-games.js';
 import { cardMeaning } from './match-rules.js';
-import { HUNT, BERRIES, BALL_NAMES, THROW_NAMES, TIER_NAMES, HUNT_MONSTERS, MONSTER_KEYS, MONSTER_TIERS, catchChance, huntSlot } from './hunt-rules.js';
+import { HUNT, BERRIES, BALL_NAMES, THROW_NAMES, TIER_NAMES, HUNT_MONSTERS, MONSTER_KEYS, MONSTER_TIERS, catchChance, huntSlot, tierLabel, tierStars } from './hunt-rules.js';
 
 // V13.162 몬스터 사냥(놀이터, 처음 이름 펫 사냥). 포켓몬 고처럼: 그림 지도 위 야생 몬스터를 눌러 만나고(하얀 번쩍임 → "야생의 ○○이 나타났다!"),
 // 잡기 화면에서 공을 위로 밀어 던진다. 줄어드는 원이 작을 때 원 안에 맞히면 나이스 · 그레이트 · 엑설런트.
@@ -120,7 +120,7 @@ function mapBg(v) {
 function spotHtml(s, i) {
   const style = `left:${s.x}%;top:${s.y}%;--i:${i};--dx:${(i % 2 ? -1 : 1) * (14 + (i * 7) % 12)}px;--wt:${6 + (i * 1.3) % 3}s`;
   if (s.kind === 'pet') return `<button type="button" class="hn-spot fresh" data-hn="spot" data-spot="${esc(s.id)}" style="${style}" aria-label="반짝이는 펫 만나기"><span class="hn-walk"><span class="hn-shadow"></span><span class="hn-mystery">${art('fx-mystery', '<i class="hn-sparks"><i></i><i></i><i></i><i></i></i>')}<b>?</b></span></span><em>펫?!</em></button>`;
-  return `<button type="button" class="hn-spot mon t-${s.tier}" data-hn="spot" data-spot="${esc(s.id)}" style="${style}" aria-label="${esc(petName(s.key))}(${TIER_NAMES[s.tier]}) 만나기"><span class="hn-walk"><span class="hn-shadow"></span><span class="hn-face"><img src="${monSrc(s.key)}" alt="" draggable="false" loading="lazy"></span></span>${['rare', 'epic', 'legend'].includes(s.tier) ? `<em class="tier t-${s.tier}">${TIER_NAMES[s.tier]}</em>` : ''}</button>`;
+  return `<button type="button" class="hn-spot mon t-${s.tier}" data-hn="spot" data-spot="${esc(s.id)}" style="${style}" aria-label="${esc(petName(s.key))}(${tierLabel(s.tier)}) 만나기"><span class="hn-walk"><span class="hn-shadow"></span><span class="hn-face"><img src="${monSrc(s.key)}" alt="" draggable="false" loading="lazy"></span></span><em class="tier t-${s.tier}">${tierStars(s.tier)}</em></button>`;
 }
 function nextChange() {
   const ms = (huntSlot(Date.now()) + 1) * HUNT.SLOT_HOURS * 3600000 - 9 * 3600000 - Date.now();
@@ -142,11 +142,11 @@ function mapScreen(loading = false) {
       <div class="hn-me" aria-hidden="true"><i class="hn-radar"></i><i class="hn-radar r2"></i><span class="hn-me-shadow"></span><img src="${petSrc(me.key, me.form, true)}" alt="" draggable="false"></div>
       <div class="hn-spots">${spots.map(spotHtml).join('')}</div>
     </div>
-    <div class="hn-map-tag"><b>${AREAS[v.area] || '숲'}${v.night ? ' · 밤' : ''}</b><small>${loading && !v.spots ? '사냥터를 둘러보는 중…' : `${nextChange()} 뒤에 펫이 바뀌어요`}</small></div>
+    <div class="hn-map-tag"><i aria-hidden="true">${v.night ? '🌙' : '☀️'}</i><b>${AREAS[v.area] || '숲'}${v.night ? ' · 밤' : ''}</b><small>${loading && !v.spots ? '사냥터를 둘러보는 중…' : `${nextChange()} 뒤에 펫이 바뀌어요`}</small></div>
     ${!loading && !spots.length ? '<p class="hn-quiet">지금은 조용해요. 조금 뒤에 다시 와요!</p>' : ''}
   </section>
   <section class="hn-dock${empty ? ' empty' : ''}">
-    <div class="hn-dock-btns"><button type="button" data-hn="bagmon">🎒<b>가방</b><small>${num(Object.values(v.bag || {}).reduce((a, n) => a + n, 0))}마리</small></button><button type="button" data-hn="book">📖<b>도감</b><small>${num(v.kinds || 0)} / ${num(v.all || MONSTER_KEYS.length)}</small></button><button type="button" data-hn="shop">${STAR}<b>교환소</b><small>${num(v.stars || 0)}</small></button></div>
+    <div class="hn-dock-btns"><button type="button" data-hn="bagmon"><i class="hn-dock-ico">🎒</i><b>가방</b><small>${num(Object.values(v.bag || {}).reduce((a, n) => a + n, 0))}마리</small></button><button type="button" data-hn="book"><i class="hn-dock-ico">📖</i><b>도감</b><small>${num(v.kinds || 0)} / ${num(v.all || MONSTER_KEYS.length)}</small></button><button type="button" data-hn="shop"><i class="hn-dock-ico">✦</i><b>교환소</b><small>${num(v.stars || 0)}</small></button></div>
     ${empty ? '<p class="hn-dock-lead"><b>공이 없어요.</b> 공부하면 공을 받아요!</p>' : '<p class="hn-dock-lead">몬스터를 눌러 잡아요. 가끔 <b>반짝이는 ?</b>는 아직 못 만난 펫!</p>'}
     <ul class="hn-today" aria-label="오늘 받은 공">
       ${[['practice', '연습 끝내기', '10문제 이상'], ['attend', '출석', '하루 한 번'], ['match', '짝 맞추기', '별 3개']].map(([k, t, s]) => `<li class="${got[k] ? 'on' : ''}"><i>${got[k] ? '✓' : ''}</i><b>${t}</b><small>${s}</small></li>`).join('')}
@@ -181,7 +181,7 @@ async function meet(spotId) {
   catchScreen(true);
   const name = petName(res.key);
   const banner = document.createElement('div'); banner.className = `hn-appear t-${res.tier}${isPet(res) ? ' fresh' : ''}`;
-  banner.innerHTML = `<span>${isPet(res) ? '✨ 펫이다! ' : ['epic', 'legend'].includes(res.tier) ? `⚡ ${TIER_NAMES[res.tier]} 몬스터! ` : ''}야생의 <b>${esc(petJosa(name, '이', '가'))}</b> 나타났다!</span>`;
+  banner.innerHTML = `<span>${isPet(res) ? '✨ 펫이다! ' : ['epic', 'legend'].includes(res.tier) ? `⚡ ${tierLabel(res.tier)} 몬스터! ` : ''}야생의 <b>${esc(petJosa(name, '이', '가'))}</b> 나타났다!</span>`;
   $('hn-main').appendChild(banner);
   later(() => { sfx(isPet(res) ? 'fanfare-basic' : res.tier === 'legend' ? 'boss' : ['epic', 'rare'].includes(res.tier) ? 'boss-roar' : 'pop', { gain: .6 }); buzz(isPet(res) || res.tier === 'legend' ? [30, 40, 60] : 25); }, 520);
   await wait(1700);
@@ -217,7 +217,7 @@ function catchScreen(intro = false) {
     <div class="hn-fx" id="hn-fx"></div>
     <button type="button" class="hn-run" data-hn="run" aria-label="도망가기">🏃<small>도망</small></button>
     <button type="button" class="hn-phone${H.phoneOn ? ' on' : ''}" data-hn="phone" aria-pressed="${!!H.phoneOn}" aria-label="폰으로 던지기">📱<small>${H.phoneOn ? '폰 던지기 켬' : '폰 던지기'}</small></button>
-    <div class="hn-name"><b>${esc(name)}</b><span class="hn-tier t-${m.tier}${isPet(m) ? ' fresh' : ''}">${isPet(m) ? '★ 아직 못 만난 ' : ''}${TIER_NAMES[m.tier]}</span></div>
+    <div class="hn-name t-${m.tier}"><span class="hn-tier t-${m.tier}${isPet(m) ? ' fresh' : ''}">${isPet(m) ? `✨ 아직 못 만난 ${TIER_NAMES[m.tier]}` : `<i>${tierStars(m.tier)}</i>${TIER_NAMES[m.tier]}`}</span><b>${esc(name)}</b></div>
     <p class="hn-say" id="hn-say" aria-live="polite"></p>
     <div class="hn-hud" id="hn-hud"></div>
     <div class="hn-flyer" id="hn-flyer" hidden></div>
@@ -253,8 +253,8 @@ function catchHud() {
   const hint = !n ? '이 공이 없어요' : H.phoneOn ? '공을 누르고 폰을 앞으로 휙!' : H.throws ? '' : '위로 쓱 밀어 던져요 · 빙글빙글 돌리면 커브볼!';
   hud.innerHTML = `<button type="button" class="hn-side berry${H.berry ? ' on' : ''}" data-hn="berry" ${H.berryTried && !H.berry ? 'disabled' : ''} aria-label="열매">${H.berry ? berryPic(H.berry) : art('berry-razz', '<i class="hn-emoji">🍓</i>')}<small>${H.berry ? `${BERRIES[H.berry].name} 사용 중` : H.berryTried ? '다음 공에' : words ? '열매' : '단어 필요'}</small></button>
     <div class="hn-ball-slot${n ? '' : ' none'}" id="hn-slot">
-      <span class="hn-ball-hand" id="hn-hand" role="button" tabindex="0" aria-label="${BALL_NAMES[H.ball]} 위로 밀어 던지기"><span class="hn-hand-in" id="hn-hand-in">${ballPic(H.ball, 'big')}</span></span>
-      <b class="hn-ball-n">${BALL_NAMES[H.ball]} ×${num(n)}</b>
+      <span class="hn-ball-hand" id="hn-hand" role="button" tabindex="0" aria-label="${BALL_NAMES[H.ball]} 위로 밀어 던지기"><span class="hn-hand-in" id="hn-hand-in">${ballPic(H.ball, 'big')}</span>${n ? `<em class="hn-ball-badge">×${num(n)}</em>` : ''}</span>
+      <b class="hn-ball-n k-${H.ball}">${BALL_NAMES[H.ball]}</b>
       <small class="hn-hint">${hint}</small>
     </div>
     <button type="button" class="hn-side bag" data-hn="bag" aria-label="가방">${art('bag', '<i class="hn-emoji">🎒</i>')}<small>가방</small></button>`;
@@ -584,11 +584,12 @@ function result({ title, key, fled = false, pet = false, tier, n = 1, stars = 0,
   const name = petName(key), m = H.meet || {};
   const lines = fled ? `<p>공 ${num(H.throws || 0)}개를 던졌어요. 지도에는 다른 몬스터가 기다려요!</p>`
     : pet ? `<p><b>${esc(petJosa(name, '이', '가'))}</b> 내 펫이 됐어요${tier === 'petEpic' ? ' (영웅)' : ''}. 함께 공부해 Lv.3이 되면 알에서 깨어나요.</p>`
-    : `${isNew ? '<p class="hn-new">📖 도감에 새로 올랐어요!</p>' : ''}<div class="hn-rewards"><span>🎒<b>+<i data-count="${n}">0</i></b><small>가방(${TIER_NAMES[tier]})</small></span><span>${STAR}<b><i data-count="${stars}">0</i></b><small>팔면 별조각</small></span><span><b>+<i data-count="${xp}">0</i></b><small>파트너 경험치</small></span></div>${double ? '<p class="hn-double">🍍 파인애플 덕분에 2마리!</p>' : ''}`;
+    : `${isNew ? '<p class="hn-new">📖 도감에 새로 올랐어요!</p>' : ''}<div class="hn-rewards"><span>🎒<b>+<i data-count="${n}">0</i></b><small>가방</small></span><span>${STAR}<b><i data-count="${stars}">0</i></b><small>팔면 별조각</small></span><span><b>+<i data-count="${xp}">0</i></b><small>파트너 경험치</small></span></div>${double ? '<p class="hn-double">🍍 파인애플 덕분에 2마리!</p>' : ''}`;
   const pic = pet ? petSrc(key, 0) : isPet(m) ? petSrc(key, m.form || 1) : monSrc(key, fled ? 'hurt' : '');
   layer(`<div class="hn-result${fled ? ' fled' : ' got'}" role="dialog" aria-modal="true" aria-label="${fled ? '도망' : '잡음'}">
     <div class="hn-result-card">
       ${fled ? '' : '<i class="hn-rays" aria-hidden="true"></i>'}
+      <div class="hn-res-ribbon t-${tier || m.tier}">${fled ? '도망' : pet ? `✨ ${TIER_NAMES[tier]}` : tierLabel(tier || m.tier)}</div>
       <div class="hn-result-pet t-${tier || m.tier}"><img src="${pic}" alt="" draggable="false"${fled ? ' class="gone"' : ''}>${fled ? art('fx-smoke', '<span class="hn-res-smoke">💨</span>') : art('fx-sparkle', '<span class="hn-res-spark">✨</span>')}</div>
       <h2>${title}</h2>
       ${lines}
@@ -683,7 +684,7 @@ function bag() {
 function pickBall(kind) {
   if (kind === 'gold') {
     return layer(`<div class="hn-sheet" role="dialog" aria-modal="true" aria-label="황금 공 확인"><div class="hn-sheet-box hn-confirm">${ballPic('gold', 'big')}<h3>정말 쓸까요?</h3>
-      <p>황금 공은 <b>무조건 잡혀요.</b> 한 달에 하나만 받는 귀한 공이에요.${isPet(H.meet) ? '<br>아직 못 만난 <b>펫</b>이에요!' : `<br>이 몬스터는 <b>${TIER_NAMES[H.meet?.tier] || ''}</b> 등급이에요.`}</p>
+      <p>황금 공은 <b>무조건 잡혀요.</b> 한 달에 하나만 받는 귀한 공이에요.${isPet(H.meet) ? '<br>아직 못 만난 <b>펫</b>이에요!' : `<br>이 몬스터는 <b>${tierLabel(H.meet?.tier) || ''}</b> 등급이에요.`}</p>
       <div class="hn-confirm-row"><button type="button" class="btn" data-hn="close-layer">아껴 둘래요</button><button type="button" class="yl-cta" data-hn="gold-yes">황금 공 쓰기</button></div></div></div>`);
   }
   H.ball = kind; closeLayer(); catchHud(); sfx('tap');
@@ -730,7 +731,7 @@ function monsterBag() {
   const v = H.v || {}, bag = v.bag || {};
   const keys = Object.keys(bag).sort((a, b) => tierRank(b) - tierRank(a) || a.localeCompare(b));
   const body = keys.length ? `<p class="hn-sheet-note">가방 몬스터 ${num(keys.reduce((n, k) => n + bag[k], 0))}마리 · 모두 팔면 ${STAR}<b>${num(v.bag_stars || 0)}</b></p>
-    <div class="hn-monlist">${keys.map(k => { const m = HUNT_MONSTERS[k]; return `<div class="hn-monrow t-${m.tier}"><img src="${monSrc(k)}" alt="" loading="lazy"><span><b>${esc(m.ko)}</b><small class="t-${m.tier}">${TIER_NAMES[m.tier]} · ${STAR}${num(HUNT.STARS[m.tier])}</small></span><em>×${num(bag[k])}</em><button type="button" class="btn small" data-hn="sell" data-key="${k}">팔기</button></div>`; }).join('')}</div>
+    <div class="hn-monlist">${keys.map(k => { const m = HUNT_MONSTERS[k]; return `<div class="hn-monrow t-${m.tier}"><img src="${monSrc(k)}" alt="" loading="lazy"><span><b>${esc(m.ko)}</b><small class="t-${m.tier}">${tierLabel(m.tier)} · ${STAR}${num(HUNT.STARS[m.tier])}</small></span><em>×${num(bag[k])}</em><button type="button" class="btn small" data-hn="sell" data-key="${k}">팔기</button></div>`; }).join('')}</div>
     <button type="button" class="yl-cta hn-sellall" data-hn="sell">모두 팔기 · ${STAR}${num(v.bag_stars || 0)}</button>`
     : '<p class="hn-empty">아직 잡은 몬스터가 없어요. 지도에서 몬스터를 잡아 보세요!</p>';
   layer(sheetBox('🎒 몬스터 가방', body, 'hn-bagsheet'));
@@ -747,7 +748,7 @@ async function sell(key, b) {
 function monsterBook() {
   const v = H.v || {}, book = v.book || {};
   const body = `<p class="hn-sheet-note">잡은 몬스터 ${num(v.kinds || 0)} / ${num(v.all || MONSTER_KEYS.length)}종. 아직 못 잡은 몬스터는 그림자로 보여요.</p>
-    ${MONSTER_TIERS.map(t => `<h4 class="hn-book-tier t-${t}">${TIER_NAMES[t]}</h4><div class="hn-book">${MONSTER_KEYS.filter(k => HUNT_MONSTERS[k].tier === t).map(k => book[k]?.n
+    ${MONSTER_TIERS.map(t => `<h4 class="hn-book-tier t-${t}">${tierLabel(t)}</h4><div class="hn-book">${MONSTER_KEYS.filter(k => HUNT_MONSTERS[k].tier === t).map(k => book[k]?.n
       ? `<div class="hn-book-cell on t-${t}"><img src="${monSrc(k)}" alt="" loading="lazy"><b>${esc(HUNT_MONSTERS[k].ko)}</b><small>${num(book[k].n)}마리</small></div>`
       : `<div class="hn-book-cell t-${t}"><img class="shadow" src="${monSrc(k)}" alt="" loading="lazy"><b>???</b><small>&nbsp;</small></div>`).join('')}</div>`).join('')}`;
   layer(sheetBox('📖 몬스터 도감', body, 'hn-booksheet'));
@@ -791,7 +792,7 @@ function redrawDock() { if (H.phase === 'map') mapScreen(); }
 function guide(first) {
   layer(`<div class="hn-sheet" role="dialog" aria-modal="true" aria-label="몬스터 사냥 안내"><div class="hn-sheet-box hn-guide"><h3>몬스터 사냥 안내</h3>
     <ol>
-      <li><b>지도</b>에서 돌아다니는 몬스터를 눌러 만나요. 흔함 · 보통 · 희귀 · 영웅 · 전설, 높을수록 잘 도망쳐요. 가끔 <b>반짝이는 ?</b>는 아직 못 만난 <b>펫</b>(잘 도망쳐요!)이에요.</li>
+      <li><b>지도</b>에서 돌아다니는 몬스터를 눌러 만나요. ★ 꼬마 · ★★ 보통 · ★★★ 희귀 · ★★★★ 대장 · ★★★★★ 보스, 별이 많을수록 잘 도망치고 비싸요. 가끔 <b>반짝이는 ?</b>는 아직 못 만난 <b>펫</b>(잘 도망쳐요!)이에요.</li>
       <li>공을 <b>위로 휙 밀어</b> 던져요. 약하면 앞에 떨어지고 세면 넘어가요. 줄어드는 원이 <b>작을 때</b> 원 안에 맞히면 나이스 · 그레이트 · 엑설런트로 더 잘 잡혀요. 공을 빙글빙글 돌리면 커브볼!</li>
       <li>몬스터가 <b>덤비거나 폴짝 피할 때</b>(원이 사라질 때)는 공이 튕겨 나가요. 원이 다시 보일 때 던져요.</li>
       <li><b>📱 폰 던지기</b>를 켜면 공을 누르고 폰을 앞으로 휙 털어서 던져요(폰은 두 손으로 꼭!).</li>

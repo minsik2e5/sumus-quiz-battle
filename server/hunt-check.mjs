@@ -6,7 +6,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dayKey, STANDARD_PET_KEYS, EPIC_PET_KEYS, CHARACTERS } from '../public/modules/core.js';
 import { seeded } from '../public/modules/fishing-rules.js';
-import { HUNT, HUNT_MONSTERS, MONSTER_KEYS, MONSTER_TIERS, catchChance, rollThrow, spawnTier, petTier, huntSim, huntSimAverage, huntSlot, dayValue } from '../public/modules/hunt-rules.js';
+import { HUNT, HUNT_MONSTERS, MONSTER_KEYS, MONSTER_TIERS, TIER_NAMES, tierLabel, catchChance, rollThrow, spawnTier, petTier, huntSim, huntSimAverage, huntSlot, dayValue } from '../public/modules/hunt-rules.js';
 import { grantBall, huntCard, huntMap, huntView, huntMeet, huntThrow, huntSell, huntCoins, huntSpend } from './hunt.mjs';
 import { rewardIncome } from './rewards.mjs';
 import { emptyState } from './state.mjs';
@@ -27,7 +27,9 @@ export async function runHuntChecks(assert) {
     'V13.162 공은 공부로만: 연습 끝내기(10문제 이상) · 출석 · 짝 맞추기 별 3, 곳마다 하루 1개(하루 최대 3개), 6개까지 보관, 황금 공은 출석 도장판 4장마다');
   assert(MONSTER_TIERS.join() === 'common,uncommon,rare,epic,legend' && MONSTER_TIERS.reduce((n, t) => n + HUNT.SPAWN[t], 0) === 100 && MONSTER_KEYS.length >= 30
     && MONSTER_TIERS.every(t => MONSTER_KEYS.some(k => HUNT_MONSTERS[k].tier === t)),
-    `V13.162 몬스터 5등급(낚시처럼, 흔함 · 보통 · 희귀 · 영웅 · 전설) ${MONSTER_KEYS.length}종, 등급 확률 합 100%`);
+    `V13.162 몬스터 5등급(낚시처럼, ★1~★5) ${MONSTER_KEYS.length}종, 등급 확률 합 100%`);
+  assert(MONSTER_TIERS.map(tierLabel).join() === '★ 꼬마,★★ 보통,★★★ 희귀,★★★★ 대장,★★★★★ 보스' && TIER_NAMES.pet === '기본 펫' && TIER_NAMES.petEpic === '영웅 펫'
+    && !MONSTER_TIERS.some(t => ['기본', '영웅', '전설'].includes(TIER_NAMES[t])), 'V13.162 몬스터 등급은 별 + 이름(★ 꼬마 ~ ★★★★★ 보스): 펫 등급(기본 · 영웅 · 전설)과 헷갈리지 않게(선생님 결정)');
   const root = fileURLToPath(new URL('../public/assets/monsters/', import.meta.url));
   assert(MONSTER_KEYS.every(k => ['', '-attack', '-hurt'].every(s => existsSync(`${root}${k}${s}.webp`))), 'V13.162 사냥 몬스터는 모두 기존 몬스터 그림(기본 · 공격 · 맞음)이 있다');
   assert(HUNT.PET === 7 && HUNT.PET_EPIC === 15 && HUNT.CATCH.pet < HUNT.CATCH.common && HUNT.CATCH.petEpic < HUNT.CATCH.legend && HUNT.FLEE.pet >= HUNT.FLEE.epic,
