@@ -72,10 +72,12 @@ export function settleParty(state, body, { petKey = () => undefined, now = Date.
 }
 export const partyReportPending = (state, body) => !!(state.parties || []).find(x => x.id === body?.id && !x.settled);
 // 방이 받지 못했으면(가득 참 · 끝남) 참가표를 되돌린다.
+// V13.163 이번 요청이 새로 만든 참가표만(fresh). 이미 놀던 학생이 끝난 방에 다시 들어오면 방은 거절하지만,
+// 그 표를 지우면 아직 정산 전인 판에서 그 학생 보상이 빠지고 참가 수(n)도 줄었다.
 export function undoParty(state, message) {
   const party = (state.parties || []).find(x => x.id === message?.id);
   if (!party) return false;
   if (message.action === 'init') { party.status = 'failed'; return true; }
-  if (message.action === 'join' && party.tickets?.[message.player?.id]) { delete party.tickets[message.player.id]; return true; }
+  if (message.action === 'join' && message.fresh && party.tickets?.[message.player?.id]) { delete party.tickets[message.player.id]; return true; }
   return false;
 }

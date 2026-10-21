@@ -167,7 +167,10 @@ export function createLocalRepository(storage, { log = console, now = () => Date
       for (const key of removed) dropPart(key);
       extra?.();
     });
-    latest = makeLatest(nextMeta.version, parts, state);
+    // V13.163 바뀌지 않은 조각은 이미 디스크에 있는 글(texts)을 같이 쓴다. 예전에는 방금 만든 조각 전체(운영 약 13MB)와
+    // 저장한 상태 객체까지 붙잡아서, 9MB 상태에서 같은 내용을 한 벌 더 들고 있었다. 지도(Map)는 따로 만든다: 올리기가
+    // 기다리는 동안 다음 저장이 texts를 바꾸기 때문이다. 통째 사본(json)은 조각에서 다시 만든다(6시간에 한 번 · 약 0.1초).
+    latest = makeLatest(nextMeta.version, new Map([...texts].filter(([key]) => !key.startsWith('#'))));
     return { rows, bytes, changed: changed.length, removed: removed.length };
   };
 

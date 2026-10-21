@@ -69,7 +69,7 @@ export async function runStabilityChecks(assert) {
 
   /* ---------- 정리(sweep)가 실패해도 요청이 막히지 않는다 ---------- */
   const state = emptyState();
-  state.examAttempts.push({ id: 'broken', status: 'active', deadline: Date.now() - 1000, student_id: 'nobody', exam_id: 'e' });
+  state.examAttempts.push({ id: 'broken', status: 'active', deadline: Date.now() - 6000, student_id: 'nobody', exam_id: 'e' });
   let threw = false;
   try { sweep(state); } catch { threw = true; }
   const broken = state.examAttempts[0];

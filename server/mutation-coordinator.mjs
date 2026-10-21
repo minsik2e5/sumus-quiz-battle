@@ -150,6 +150,9 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
       persistedRevision = Number.isFinite(stored) ? Number(stored) : checkpoint.revision + 1;
       persistedVersion = checkpoint.version;
       snapshot = { state: snapshot.state, revision: persistedRevision };
+      // V13.163 저장이 다시 되면 빠른 길을 다시 쓴다. 운영(rollbackOnFailure)에서는 실패 뒤 recover()가 버전을 0으로
+      // 되돌려 다시 시도할 저장이 없어서, 이 표시가 DO가 다시 시작할 때까지 남아 답마다 1~6초 기다렸다.
+      flushFailing = false;
     });
     persistTail = run.catch(() => undefined);
     return run;
@@ -216,6 +219,8 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
       persistedRevision = Number(revision);
       stateVersion = 0;
       persistedVersion = 0;
+      // V13.163 앞 상태를 기다리던 durable()이 끝없이 돌지 않게(버전이 0으로 돌아가 다시 오지 않음) 세대를 바꾼다.
+      generation += 1;
     });
   }
 
