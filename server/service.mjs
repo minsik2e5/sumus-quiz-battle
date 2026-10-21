@@ -2076,6 +2076,8 @@ export async function service(state, method, path, body, token, options = {}) {
     tidyBattles(state, now);
     const previous = (state.battles || []).find(b => b.id === str(body.battle_id, 64) && b.status === 'finished' && (b.host_id === p.id || b.guest_id === p.id));
     if (!previous) fail('설욕전을 신청할 대결을 찾지 못했어요.', 404);
+    // V13.168: 대회 경기는 판돈이 없어 설욕전을 하면 판돈 0인 일반 대결이 생겼다(화면에도 버튼이 없다).
+    if (previous.tournament_id) fail('대회 경기는 설욕전을 할 수 없어요. 대진표에서 다음 경기를 확인해 주세요.', 409);
     if (now - previous.finished_at > BATTLE_REMATCH_WINDOW_MS || !previous.range_codes?.length) fail('설욕전은 대결이 끝나고 2분 안에만 신청할 수 있어요.', 409);
     const opponentId = previous.host_id === p.id ? previous.guest_id : previous.host_id;
     const existing = (state.battles || []).find(b => b.rematch_of === previous.id && battleIsOpen(b, now));
