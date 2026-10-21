@@ -83,6 +83,8 @@ export function huntMap(p, now = Date.now(), random = secureRandom) {
     const left = missing(p)[s.tier === 'petEpic' ? 'epic' : 'basic'];
     return left.length ? [{ ...s, key: pick(left, random) }] : [];
   });
+  // V13.168 만나는 중인 펫 자리가 위에서 다른 펫으로 바뀌었으면 만남(live)도 같은 펫으로(화면은 새 펫, 던지기는 이미 있는 펫을 잡아 공만 썼다).
+  if (h.live?.kind === 'pet') { const s = map.spots.find(x => x.id === h.live.spot); if (s) h.live.key = s.key; }
   // V13.166 아침 6시가 되면 밤 몬스터는 떠난다(만나는 중인 자리는 그대로). 장소 몬스터는 지도가 바뀔 때(슬롯) 같이 바뀐다.
   const where = huntPlace(now);
   map.spots = map.spots.filter(s => s.kind !== 'monster' || s.id === h.live?.spot || HUNT_MONSTERS[s.key].place !== 'night' || where.night);
@@ -139,6 +141,15 @@ export function huntThrow(p, { id, spot, ball: kind, quality = null, ticket = nu
   if (!live || live.spot !== spot) fail('만나는 중인 몬스터가 없어요. 지도에서 다시 눌러 주세요.', 404);
   const b = BALL_KINDS.includes(kind) ? kind : 'basic';
   if (ball(h, b) < 1) fail(b === 'gold' ? '황금 공이 없어요.' : b === 'good' ? '좋은 공이 없어요.' : '공이 없어요. 공부하면 공을 받아요!', 409);
+  // V13.168 만나는 동안 그 펫이 다른 곳(알 상점 · 교환소 알 · 선물)에서 먼저 생겼으면 같은 등급의 못 만난 펫으로 바꾼다
+  //   (그대로 던지면 잡아도 아무것도 안 생기고 공 · 황금 공만 사라졌다). 그 등급을 다 모았으면 공을 쓰지 않고 지도로.
+  if (live.kind === 'pet' && has(p, live.key)) {
+    const left = missing(p)[live.tier === 'petEpic' ? 'epic' : 'basic'];
+    if (!left.length) fail('이 친구는 벌써 함께하고 있어요. 지도에서 다른 친구를 만나요.', 409);
+    live.key = pick(left, random);
+    const s = h.map?.spots?.find(x => x.id === live.spot);
+    if (s) s.key = live.key;
+  }
   const claimed = Object.hasOwn(HUNT.THROWS, quality) ? quality : null;
   const q = guardQuality(claimed, h.qlog || [], now - Number(h.last || 0));
   h.qlog = [...(h.qlog || []), claimed].slice(-HUNT.QUALITY_GUARD.WINDOW);
@@ -173,6 +184,8 @@ export function huntThrow(p, { id, spot, ball: kind, quality = null, ticket = nu
     }
   }
   if (roll.caught || roll.fled) endMeet(p, h, now, random);
+  // V13.168 지도를 지금 시간(슬롯)에 맞춘다. 만나는 동안 4시간 슬롯이 바뀌면 던진 뒤 지도가 비어(spots: null) '조용해요'만 보였다.
+  huntMap(p, now, random);
   return keepReceipt(h, 'hunt', id, out, now);
 }
 // V13.167 열매 문제: 만나는 중인 몬스터에게, 공 하나에 한 번. 단어는 부른 쪽(service.mjs)이 내 학교 · 학년 범위에서 준다.
@@ -230,7 +243,6 @@ function endMeet(p, h, now, random) {
     const left = missing(p), tier = petTier(random(), { basic: left.basic.length, epic: left.epic.length });
     if (tier) map.spots.push(petSpot(p, map.spots, now, random, tier));
   }
-  refill(map, now, random);
 }
 
 // 가방 몬스터 팔기(별조각으로). key가 없으면 모두.
