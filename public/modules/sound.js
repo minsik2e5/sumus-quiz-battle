@@ -17,8 +17,14 @@ export const SOUND_GAIN = {
   'boss-charge': .75, 'warn-beep': .45, 'boss-slam': .9, 'shield-block': .8, 'ult-riser': .8, 'ult-impact': .95, 'boss-roar': .9,
   'type-key': .5, 'type-ok': .55, 'type-wrong': .4, 'spell-done': .7, faint: .6, revive: .7, 'combo-10': .7, 'boss-down': .9,
   // V13.149 짝 맞추기 고퀄(docs/sound/match-synth.mjs): 카드 뒤집기 · 날아가기 · 도장.
-  'card-flip': .5, swoosh: .55, stamp: .85
+  'card-flip': .5, swoosh: .55, stamp: .85,
+  // V13.164 낚시 전용(docs/sound/reel-synth.mjs): 던지기 휙 · 퐁당 · 입질 톡톡 · 쑥 · 챔질 · 릴 딸깍 · 줄 텐션(이어지는 소리) · 끼익 ·
+  // 줄 끊김 · 돌진 · 점프 첨벙 · 끌어올림 물보라 · 퍼펙트 물빛.
+  'reel-cast': .7, 'reel-plop': .65, 'reel-nibble': .55, 'reel-bite': .8, 'reel-hook': .9, 'reel-click': .4, 'reel-strain': .5,
+  'reel-creak': .6, 'reel-snap': .9, 'reel-run': .6, 'reel-jump': .8, 'reel-splash': .75, 'reel-sparkle': .6
 };
+// 이어지는 소리: key -> 한 주기(초). 파일은 같은 주기가 세 번 이어져 있고, 가운데 주기만 되풀이한다(reel-synth.mjs의 LOOP).
+export const SOUND_LOOP = { 'reel-strain': .8 };
 export const SOUND_KEYS = Object.keys(SOUND_GAIN);
 // 첫 터치 때 미리 받아 두는 작은 소리(자주 쓰이는 것). 큰 팡파르는 연출이 시작될 때 preloadSound로 받는다.
 const CORE = ['tap', 'correct', 'wrong', 'combo', 'coin', 'tick', 'wiggle', 'crack', 'pop', 'hit', 'hurt', 'skill'];
@@ -81,4 +87,36 @@ export function playSound(key, { rate = 1, gain = 1, at = 0, dur = 0, vary = 0, 
     if (dur) src.start(t, 0, dur); else src.start(t);
     return true;
   } catch { return false; }
+}
+
+// V13.164 이어지는 소리(낚시 줄 텐션): loopSound(key)는 손잡이를 돌려준다. 매 프레임 set(크기 0~1, 높낮이)을 부르면
+// 부드럽게 따라가고, stop()으로 끈다. 소리가 꺼져 있으면 크기 0으로 둔다(켜는 순간부터 다시 난다). 받지 못했으면 받을 때까지 조용하다.
+export function loopSound(key) {
+  const period = SOUND_LOOP[key];
+  let src = null, g = null, dead = false;
+  const start = () => {
+    const c = context(), b = buffers.get(key);
+    if (!c || !b || c.state !== 'running') { load(key); return; }
+    try {
+      src = c.createBufferSource(); g = c.createGain();
+      src.buffer = b; src.loop = true; src.loopStart = period; src.loopEnd = period * 2;
+      g.gain.value = 0; src.connect(g); g.connect(master); src.start(0, period);
+    } catch { src = null; }
+  };
+  return {
+    set(level, rate = 1) {
+      if (dead || !period) return;
+      const want = soundOn() ? Math.max(0, Math.min(1, level)) : 0;
+      if (!src) { if (want < .01) return; start(); if (!src) return; }
+      const t = ctx.currentTime;
+      g.gain.setTargetAtTime(want * (SOUND_GAIN[key] || .5), t, .06);
+      src.playbackRate.setTargetAtTime(Math.max(.25, rate), t, .08);
+    },
+    stop() {
+      dead = true;
+      if (!src) return;
+      try { g.gain.setTargetAtTime(0, ctx.currentTime, .04); src.stop(ctx.currentTime + .3); } catch {}
+      const s = src, gg = g; src = null; s.onended = () => { try { s.disconnect(); gg.disconnect(); } catch {} };
+    }
+  };
 }

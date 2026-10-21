@@ -54,9 +54,23 @@
 | `combo-10` | 던전: 10콤보마다 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `combo-10`) | |
 | `boss-down` | 던전: 보스가 쓰러짐 | 우리가 합성(`docs/sound/battle-synth.mjs`의 `boss-down`) | |
 | `card-flip` | 짝 맞추기: 카드가 뒤집힘(GO에 물결처럼) | 우리가 합성(`docs/sound/match-synth.mjs`의 `card-flip`) | || `swoosh` | 짝 맞추기: 맞힌 두 카드 · +1초 · 코인이 날아감 | 우리가 합성(`docs/sound/match-synth.mjs`의 `swoosh`) | || `stamp` | 짝 맞추기: 결과의 별 · 신기록 도장이 쾅 찍힘 | 우리가 합성(`docs/sound/match-synth.mjs`의 `stamp`) | |
+| `reel-cast` | 낚시: 던지기 휙(낚싯대 바람 + 줄 풀림 + 스풀 촤르르) | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-cast`) | |
+| `reel-plop` | 낚시: 찌가 물에 퐁당, 놓친 마무리 | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-plop`) | |
+| `reel-nibble` | 낚시: 가짜 입질 톡톡, 리듬 퍼펙트 | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-nibble`) | |
+| `reel-bite` | 낚시: 진짜 입질 쑥 | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-bite`) | |
+| `reel-hook` | 낚시: 챔질(묵직한 쿵 + 줄 팅), 특기 · 마무리 성공 | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-hook`) | |
+| `reel-click` | 낚시: 릴 딸깍(감는 속도만큼 잦고 높게), 탈출 연타 · 리듬 버튼 | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-click`) | |
+| `reel-strain` | 낚시: 줄 텐션 끼익(이어지는 소리, 0.8초 주기를 되풀이, 텐션만큼 크고 높게) | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-strain`) | |
+| `reel-creak` | 낚시: 빨간 칸 끼익, 던지기 젖힘, 날뜀 · 실패 | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-creak`) | |
+| `reel-snap` | 낚시: 줄 끊김 | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-snap`) | |
+| `reel-run` | 낚시: 돌진 · 잠수 · 리듬 시작(드래그가 끼이이잉) | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-run`) | |
+| `reel-jump` | 낚시: 마무리 점프 첨벙, 날뜀 | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-jump`) | |
+| `reel-splash` | 낚시: 끌어올림 물보라(공개), 특기 · 큰 성공 | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-splash`) | |
+| `reel-sparkle` | 낚시: 퍼펙트 캐스팅 · 마무리, 기술 성공 | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-sparkle`) | |
 
 ## 출처와 라이선스
 - **우리가 합성한 소리**: `docs/sound/synth.mjs`로 만든다(종소리 배음 · 마림바 · 쓸어올리는 바람 소리 · 저음 울림 · 반짝이 · 리버브를 겹침). 다시 만들 때: `npm i --no-save @breezystack/lamejs` 후 `node docs/sound/synth.mjs <출력 폴더>` → 원하는 파일을 `public/assets/sfx/<key>.mp3`로 복사. 우리가 만든 것이라 제약이 없다.
+- **낚시 소리(V13.164)**: `docs/sound/reel-synth.mjs`. 물소리는 크고 작은 물방울(민나르트 공명: 울리며 높아지는 사인)을 촘촘히 흩뿌리고, 끼익은 마찰이 붙었다 미끄러지는 톡을 낚싯대 · 줄 공명으로 거른다. `reel-strain`은 같은 0.8초를 세 번 이어 붙인 파일이고, 앱은 가운데 0.8초만 되풀이한다(`sound.js`의 `SOUND_LOOP`와 주기를 같게 둔다).
 - **Kenney**(kenney.nl, CC0): 출처 표기 없이 써도 된다.
 - **Mixkit**(mixkit.co): 시청 페이지에 후보로 들어 있다. 앱·게임·교육·상업용은 무료이고 출처 표기도 필요 없지만, **파일 자체를 따로 재배포하면 안 된다.** 이 저장소는 공개(PUBLIC)라서 Mixkit 원본 파일은 저장소에 넣지 않는다. 쓰려면 저장소를 비공개로 바꾸거나, 배포 단계에서만 넣는 방법을 먼저 정한다.
 
