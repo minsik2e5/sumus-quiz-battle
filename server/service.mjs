@@ -896,7 +896,8 @@ function classLeague(state, ctx, school, now = Date.now()) {
     const xp = ctx.sessionsOf(x.id).filter(s => s.created_at >= week.start && s.created_at < week.end).reduce((n, s) => n + Number(s.xp || 0), 0);
     const c = classes.get(x.class_name) || { name: x.class_name, xp: 0, students: 0, active: 0, top: [] };
     c.xp += xp; c.students++;
-    if (xp > 0) { c.active++; c.top.push({ name: x.display_name, xp }); }
+    // V13.163 순위를 비공개로 한 학생은 TV(로그인 없음) top 3에서도 이름을 숨긴다(주간 순위와 같게).
+    if (xp > 0) { c.active++; c.top.push({ name: isPrivate(x) ? '비공개 학생' : x.display_name, xp }); }
     classes.set(x.class_name, c);
   }
   const rows = [...classes.values()]
@@ -1107,7 +1108,8 @@ function rpsHall(state, p, now = Date.now()) {
     .filter(row => row.n > 0)
     .sort((a, b) => b.n - a.n || b.at - a.at)
     .slice(0, 5)
-    .map(row => ({ name: row.x.display_name, count: row.n, me: row.x.id === p.id }));
+    // V13.163 비공개 학생은 명예의 전당에서도 이름을 숨긴다(자기 줄은 그대로).
+    .map(row => ({ name: row.x.id !== p.id && isPrivate(row.x) ? '비공개 학생' : row.x.display_name, count: row.n, me: row.x.id === p.id }));
 }
 const rpsFor = (state, p, now = Date.now()) => ({ ...rpsView(p, now), hall: rpsHall(state, p, now) });
 // V13.163 선생님 시험 마감 유예: 화면은 마감 시각이 지나야 자동 제출을 보내서 늘 조금 늦게 온다. 그 전에 정리가
@@ -1794,9 +1796,13 @@ export async function service(state, method, path, body, token, options = {}) {
     const party = openParties(state).find(x => x.code === code && x.school_id === school?.id);
     if (!party) fail('그 번호의 교실 게임을 찾지 못했어요. TV의 번호를 다시 확인해 주세요.', 404);
     if (gradeOf(p.class_name) !== party.grade || (party.class_name !== party.grade && p.class_name !== party.class_name)) fail(`${party.class_name} 학생만 들어갈 수 있어요.`, 409);
+    // V13.163 교사 미리보기 계정은 반 게임에 들어가지 않는다(순위 · 코인을 진짜 학생에게서 가져갔다). 대결 · 던전과 같다.
+    if (p.preview_owner_id) fail('미리보기 계정은 교실 게임에 들어갈 수 없어요.', 409);
+    // V13.163 이미 참가한 학생이 다시 들어올 때는 방이 거절해도 참가표를 지우지 않는다(끝난 판 보상을 잃었다).
+    const fresh = !party.tickets[p.id];
     const ticket = party.tickets[p.id] ||= partyTicket();
     const pet = petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key).find(x => x.active) || null;
-    return { room: { id: party.id, ticket, kind: party.kind, code: party.code, label: party.label }, _parties: [{ action: 'join', id: party.id, ticket, player: partyPlayer(p, pet) }] };
+    return { room: { id: party.id, ticket, kind: party.kind, code: party.code, label: party.label }, _parties: [{ action: 'join', id: party.id, ticket, fresh, player: partyPlayer(p, pet) }] };
   }
   if (path === '/shop/egg' && method === 'POST') {
     requireRole(p, 'student');
