@@ -1,6 +1,6 @@
 import { api, esc, num, toast, modal, buttonBusy } from './ui.js';
 import { coin } from './emblems.js';
-import { STREAK_GUARD } from './streak-guard.js';
+import { STREAK_GUARD, dayNum } from './streak-guard.js';
 
 // V13.149 연속 학습 보호권 화면: 홈의 불꽃 카드, 설명 · 사기 창, '보호권이 연속을 지켰어요' · '되살리기 성공' 순간.
 // 규칙과 계산은 streak-guard.js(서버와 같다).
@@ -29,6 +29,8 @@ export function streakFlame(days) {
   const tier = days >= 30 ? 'blue' : days >= 7 ? 'hot' : days >= 1 ? 'warm' : 'out';
   return `<span class="sg-flame ${tier}" aria-hidden="true"><i class="f1"></i><i class="f2"></i><i class="f3"></i><b class="sg-spark s1"></b><b class="sg-spark s2"></b><b class="sg-spark s3"></b></span>`;
 }
+// 오늘(한국 날짜) 연속에 드는 공부를 했는지: 서버 studyDayNums와 같은 기준.
+const studiedToday = A => (A.data.sessions || []).some(s => Number(s.total) > 0 && s.answered_count !== 0 && !s.bonus && dayNum(s.created_at) === dayNum(Date.now()));
 const slots = held => Array.from({ length: STREAK_GUARD.MAX }, (_, i) => i < held ? guardShield('on', 'sg-slot') : emptySlot()).join('');
 
 // 홈 카드: 연속 일수 · 보호권 자리 · 되살리기 안내.
@@ -41,7 +43,8 @@ export function streakCard(A) {
   const line = repair
     ? `<strong>${num(repair.run)}일 연속이 어제 끊겼어요!</strong><small>오늘 연습을 끝까지 풀어 <b>${num(repair.need)}문제</b>를 채우면 어제를 이어요 · 한 달에 한 번</small>`
     : v.saved_yesterday
-      ? `<strong>보호권이 어제를 지켰어요</strong><small>오늘 공부하면 ${num(days + 1)}일 연속!</small>`
+      // V13.168: 오늘 이미 공부했으면 연속 일수에 오늘이 들어 있다('오늘 공부하면 +1'이 하루 더 많게 보였다).
+      ? `<strong>보호권이 어제를 지켰어요</strong><small>${studiedToday(A) ? `오늘도 공부해서 ${num(days)}일 연속!` : `오늘 공부하면 ${num(days + 1)}일 연속!`}</small>`
       : days > 0
         ? `<strong>${num(days)}일 연속 학습 중</strong><small>${next ? `${num(next)}일까지 ${num(next - days)}일 남았어요` : '전설의 연속 기록!'}${v.held ? ' · 빠지는 날은 보호권이 막아 줘요' : ''}</small>`
         : `<strong>오늘부터 연속 학습 시작!</strong><small>하루 한 번 연습을 끝까지 풀면 불꽃이 켜져요</small>`;
