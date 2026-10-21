@@ -1,5 +1,5 @@
 import { api, esc, icon, toast, num, rangeLabel, modal, dialogOpen, buttonBusy } from './ui.js';
-import { CHARACTERS, PET_FORMS, seasonStage } from './core.js';
+import { CHARACTERS, PET_FORMS, seasonStage, petReady } from './core.js';
 import { avatar, petKey, showPose, holdPose } from './character.js';
 import { getRanges, periodFolders, periodGroups } from './student.js';
 import { openSheet } from './sheet.js';
@@ -343,7 +343,7 @@ function petSkillChip(pet) {
   const s = petSkill(pet);
   if (s.key === 'none') return `<div class="yl-note-card"><b>전설 펫</b><p>펫 특기 없이 실력으로 겨뤄요.</p></div>`;
   return `<div class="yl-note-card"><b>${esc(s.name)}</b><p>${skillWhen(s)} 저절로 · ${esc(s.desc)}<br>버튼을 누르지 않아도 돼요. 틀리거나 시간이 지나면 게이지가 처음부터 다시 차요. 펫 레벨과 상관없이 세기는 같아요.</p>
-    <details><summary>모든 펫의 특기</summary><ul>${Object.entries(PET_SKILLS).filter(([key]) => CHARACTERS[key]).map(([key, x]) => `<li class="${key === s.key ? 'mine' : ''}"><span class="yl-skill-pet">${avatar(key, { size: 'mini', form: 1 })}</span><span><b>${esc(CHARACTERS[key]?.ko || '')} · ${esc(x.name)}</b><small>${x.need || PET_SKILL_NEED}번 연속 · ${esc(x.desc)}</small></span></li>`).join('')}</ul></details>
+    <details><summary>모든 펫의 특기</summary><ul>${Object.entries(PET_SKILLS).filter(([key]) => petReady(key)).map(([key, x]) => `<li class="${key === s.key ? 'mine' : ''}"><span class="yl-skill-pet">${avatar(key, { size: 'mini', form: 1 })}</span><span><b>${esc(CHARACTERS[key]?.ko || '')} · ${esc(x.name)}</b><small>${x.need || PET_SKILL_NEED}번 연속 · ${esc(x.desc)}</small></span></li>`).join('')}</ul></details>
   </div>`;
 }
 const MODE_FACTS = {

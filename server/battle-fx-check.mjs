@@ -67,7 +67,7 @@ export function runBattleFxChecks(assert) {
     assert(arena.children.length === 1 && arena.children[0].className.includes(' t0'), 'V13.115 기본 펫의 컷인에는 별도 장식이 없다');
     const sig = {};
     for (const key of SIGNATURE_KEYS) { arena.children.length = 0; fxCap(3); fxSignature(arena, at, to, key); sig[key] = arena.children.length; }
-    assert(SIGNATURE_KEYS.join() === 'gumiho,cheongryong,baekho,jujak,hyeonmu' && Object.values(sig).every(n => n >= 2 && n <= 14) && sig.gumiho === 9 && sig.baekho === 3 && sig.jujak === 5, 'V13.115 신화 5종은 필살 연출을 가진다: 구미호 여우불 9개 · 청룡 번개 · 백호 발톱 3줄 · 주작 불기둥 5개 · 현무 파문과 별');
+    assert(SIGNATURE_KEYS.join() === 'gumiho,cheongryong,baekho,jujak,hyeonmu,hwangryong,samjogo' && Object.values(sig).every(n => n >= 2 && n <= 14) && sig.gumiho === 9 && sig.baekho === 3 && sig.jujak === 5 && sig.hwangryong === 6 && sig.samjogo === 4, 'V13.115 신화 5종은 필살 연출을 가진다: 구미호 여우불 9개 · 청룡 번개 · 백호 발톱 3줄 · 주작 불기둥 5개 · 현무 파문과 별 (V13.168: 황룡 오방색 구슬 5개 + 금빛 고리, 삼족오 태양 고리 + 불꽃 세 줄기)');
     arena.children.length = 0; fxSignature(arena, at, to, 'nobody');
     assert(arena.children.length === 1 && arena.children[0].className.includes('fx2-prism'), 'V13.115 필살이 없는 펫은 무지개 고리로 대신한다');
     arena.children.length = 0; fxCap(0);

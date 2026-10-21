@@ -99,6 +99,19 @@ export const PET_SKILLS = {
   chinchilla: { name: '별가루 마법', desc: '바로 7 피해, 다음 공격 +8', burst: 7, boost: [8] },
   sloth: { name: '느긋한 낮잠', desc: 'HP +8, 다음 공격 +7', heal: 8, boost: [7] },
   platypus: { name: '꼬리 철썩', desc: '바로 7 피해, 2문제 동안 4씩 피해', burst: 7, poison: 4, turns: 2 },
+  // V13.168 새 펫 14종(그림 36 · 37): 12지 기본 6 · 영웅 6. 신화 2종(황룡 · 삼족오)은 특기가 없다. server/pet-sim.mjs로 맞춘 세기.
+  mouse: { name: '쪼르르 앞니', desc: '2번 연속 맞히면 바로 5 피해, 다음 공격 +4', burst: 5, boost: [4], need: 2 },
+  calf: { name: '따뜻한 우유', desc: 'HP +7, 다음에 받는 공격 −8', heal: 7, guard: [8] },
+  tiger: { name: '어흥 포효', desc: '바로 6 피해, 다음 공격 +9', burst: 6, boost: [9] },
+  pony: { name: '다그닥 질주', desc: '다음 공격 2번 +8씩', boost: [8, 8] },
+  monkey: { name: '바나나 던지기', desc: '바로 6 피해, 3문제 동안 3씩 피해', burst: 6, poison: 3, turns: 3 },
+  rooster: { name: '새벽 기상 나팔', desc: 'HP +6, 다음 공격 +8', heal: 6, boost: [8] },
+  flamingo: { name: '한 발 균형', desc: '다음에 받는 공격 −9, 다음 공격 +6', guard: [9], boost: [6] },
+  quokka: { name: '방긋 미소', desc: 'HP +5, 다음에 받는 공격 2번 −5씩', heal: 5, guard: [5, 5] },
+  chameleon: { name: '감쪽같은 변신', desc: '다음에 받는 공격 −9, 2문제 동안 3씩 피해', guard: [9], poison: 3, turns: 2 },
+  polarbear: { name: '얼음 앞발', desc: '바로 8 피해, 다음에 받는 공격 −7', burst: 8, guard: [7] },
+  snowleopard: { name: '설산 기습', desc: '바로 5 피해, 다음 공격 2번 +5씩', burst: 5, boost: [5, 5] },
+  hummingbird: { name: '윙윙 날갯짓', desc: '다음 공격 3번 +6 · +6 · +5', boost: [6, 6, 5] },
   // V13.150 바다 펫 3종(낚시 진주 교환소 한정, 그림 주문서 28). 그림이 들어오기 전에는 교환소에서 잠겨 있다.
   dolphin: { name: '퐁당 음파', desc: '바로 7 피해, 다음 공격 +8', burst: 7, boost: [8] },
   seahorse: { name: '살랑 물결', desc: 'HP +7, 다음에 받는 공격 −8', heal: 7, guard: [8] },
@@ -113,7 +126,7 @@ export const MONSTER_SKILLS = {
 // V13.109: the season's limited pets (호박냥 · 부우; V13.117: 주먹이 · 술술이 · 찰싹이) have no yacha skill either.
 const LIMITED_SKILLESS = new Set(['pumpkincat', 'ghost', 'riceball', 'tissue', 'glue']);
 // V13.118: 천마 (legendary) and the five mythic pets have no yacha skill either (their show is the reveal).
-const MYTHIC_SKILLESS = new Set(['gumiho', 'cheongryong', 'baekho', 'jujak', 'hyeonmu']);
+const MYTHIC_SKILLESS = new Set(['gumiho', 'cheongryong', 'baekho', 'jujak', 'hyeonmu', 'hwangryong', 'samjogo']);
 const NO_SKILL_PETS = new Set(['haechi', 'phoenix', 'whale', 'qilin', 'cheonma', ...MYTHIC_SKILLESS, ...LIMITED_SKILLESS]);
 // The practice robot (or no pet) uses 몽이's. Legendary pets deliberately have no battle skill.
 export const petSkillKey = pet => NO_SKILL_PETS.has(pet?.key) ? 'none' : PET_SKILLS[pet?.key] ? pet.key : 'dog';
