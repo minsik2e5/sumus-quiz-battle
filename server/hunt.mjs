@@ -1,5 +1,5 @@
 import { dayKey, STANDARD_PET_KEYS, EPIC_PET_KEYS } from '../public/modules/core.js';
-import { HUNT, BALL_KINDS, BERRIES, HUNT_MONSTERS, MONSTER_KEYS, monstersOf, rollThrow, spawnTier, petTier, huntSlot, guardQuality } from '../public/modules/hunt-rules.js';
+import { HUNT, BALL_KINDS, BERRIES, HUNT_MONSTERS, MONSTER_KEYS, spawnPool, monsterReady, rollThrow, spawnTier, petTier, huntSlot, guardQuality } from '../public/modules/hunt-rules.js';
 import { displayEnglish } from '../public/modules/core.js';
 import { cardMeaning } from '../public/modules/match-rules.js';
 import { findReceipt, keepReceipt, addBonus, secureRandom } from './rewards.mjs';
@@ -61,9 +61,10 @@ function place(spots, random) {
 }
 let spotSeq = 0;
 const spotId = (now, random) => `s${(now % 1e8).toString(36)}${(spotSeq++ % 1296).toString(36)}${Math.floor(random() * 1296).toString(36)}`;
+// V13.166 등급(HUNT.SPAWN)은 그대로 뽑고, 그 등급에서 지금 지도 · 시간에 맞고 그림이 있는 몬스터 중 하나.
 function monsterSpot(spots, now, random) {
   const tier = spawnTier(random());
-  return { id: spotId(now, random), kind: 'monster', key: pick(monstersOf(tier), random), tier, ...place(spots, random) };
+  return { id: spotId(now, random), kind: 'monster', key: pick(spawnPool(tier, huntPlace(now)), random), tier, ...place(spots, random) };
 }
 function petSpot(p, spots, now, random, tier) {
   const key = pick(missing(p)[tier === 'petEpic' ? 'epic' : 'basic'], random);
@@ -76,12 +77,15 @@ export function huntMap(p, now = Date.now(), random = secureRandom) {
   const map = h.map ||= { slot: null, spots: [] };
   // 예전 판(펫 사냥) 자리 · 모르는 몬스터는 지운다. 펫이 그 사이 다른 곳(알 상점 · 선물)에서 생겼으면 못 만난 다른 펫으로, 없으면 지운다.
   map.spots = (map.spots || []).flatMap(s => {
-    if (s.kind === 'monster') return HUNT_MONSTERS[s.key] ? [s] : [];
+    if (s.kind === 'monster') return HUNT_MONSTERS[s.key] && monsterReady(s.key) ? [s] : [];
     if (s.kind !== 'pet') return [];
     if (!has(p, s.key)) return [s];
     const left = missing(p)[s.tier === 'petEpic' ? 'epic' : 'basic'];
     return left.length ? [{ ...s, key: pick(left, random) }] : [];
   });
+  // V13.166 아침 6시가 되면 밤 몬스터는 떠난다(만나는 중인 자리는 그대로). 장소 몬스터는 지도가 바뀔 때(슬롯) 같이 바뀐다.
+  const where = huntPlace(now);
+  map.spots = map.spots.filter(s => s.kind !== 'monster' || s.id === h.live?.spot || HUNT_MONSTERS[s.key].place !== 'night' || where.night);
   if (h.live && !map.spots.some(s => s.id === h.live.spot)) delete h.live;
   if (map.slot !== slot) {
     map.slot = slot;

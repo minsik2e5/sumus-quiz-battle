@@ -36,6 +36,7 @@ import { runStability163Checks } from './stability-163-check.mjs';
 import { runEggMomentChecks } from './egg-moment-check.mjs';
 import { runHuntChecks } from './hunt-check.mjs';
 import { runGuard167Checks } from './guard-167-check.mjs';
+import { runHuntPlacesChecks } from './hunt-places-check.mjs';
 import { runStabilityChecks } from './stability-check.mjs';
 import { runStorageTrimChecks } from './storage-trim-check.mjs';
 import { runSignupCodeChecks } from './signup-code-check.mjs';
@@ -1491,6 +1492,7 @@ export async function runReleaseCheck() {
     runEggMomentChecks(assert);
     await runHuntChecks(assert);
     await runGuard167Checks(assert);
+    await runHuntPlacesChecks(assert);
     await runStabilityChecks(assert);
     await runStorageTrimChecks(assert, expectStatus);
     await runSignupCodeChecks(assert, expectStatus);

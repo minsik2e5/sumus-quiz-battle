@@ -31,7 +31,7 @@ export async function runHuntChecks(assert) {
   assert(MONSTER_TIERS.map(tierLabel).join() === '★ 꼬마,★★ 보통,★★★ 희귀,★★★★ 대장,★★★★★ 보스' && TIER_NAMES.pet === '기본 펫' && TIER_NAMES.petEpic === '영웅 펫'
     && !MONSTER_TIERS.some(t => ['기본', '영웅', '전설'].includes(TIER_NAMES[t])), 'V13.162 몬스터 등급은 별 + 이름(★ 꼬마 ~ ★★★★★ 보스): 펫 등급(기본 · 영웅 · 전설)과 헷갈리지 않게(선생님 결정)');
   const root = fileURLToPath(new URL('../public/assets/monsters/', import.meta.url));
-  assert(MONSTER_KEYS.every(k => ['', '-attack', '-hurt'].every(s => existsSync(`${root}${k}${s}.webp`))), 'V13.162 사냥 몬스터는 모두 기존 몬스터 그림(기본 · 공격 · 맞음)이 있다');
+  assert(MONSTER_KEYS.filter(k => !HUNT_MONSTERS[k].place).every(k => ['', '-attack', '-hurt'].every(s => existsSync(`${root}${k}${s}.webp`))), 'V13.162 사냥 몬스터(어디서나 나오는 34종)는 모두 기존 몬스터 그림(기본 · 공격 · 맞음)이 있다');
   assert(HUNT.PET === 7 && HUNT.PET_EPIC === 15 && HUNT.CATCH.pet < HUNT.CATCH.common && HUNT.CATCH.petEpic < HUNT.CATCH.legend && HUNT.FLEE.pet >= HUNT.FLEE.epic,
     'V13.162 펫은 낮은 확률(만남을 끝낼 때 7%, 기본 85 · 영웅 15)로만, 몬스터보다 잘 안 잡히고 잘 도망친다(선생님 결정)');
   assert(MONSTER_TIERS.every((t, i) => !i || (HUNT.CATCH[t] < HUNT.CATCH[MONSTER_TIERS[i - 1]] && HUNT.FLEE[t] > HUNT.FLEE[MONSTER_TIERS[i - 1]] && HUNT.STARS[t] > HUNT.STARS[MONSTER_TIERS[i - 1]])),
@@ -205,7 +205,7 @@ export async function runHuntChecks(assert) {
       'V13.162 화면: 하얀 번쩍임 → "야생의 ○○이 나타났다!", 줄어드는 원(나이스 · 그레이트 · 엑설런트), 도망 · 가방 · 열매, 황금 공 "정말 쓸까요?"');
     assert(ui.includes('wob-l') && ui.includes("ball-lock") && ui.includes('잡았다!') && ui.includes('빠져나왔어요') && ui.includes('도망쳤어요') && ui.includes("huntPetShow(res.key, res.tier === 'petEpic' ? 'epic' : 'basic')"),
       'V13.162 결과: 흔들림 → 딸깍 + 별 "잡았다!" / 빠져나옴 / 도망 연기, 펫은 알 상점과 같은 펫 공개 연출');
-    assert(ui.includes('function monsterBag()') && ui.includes('function monsterBook()') && ui.includes('function shop()') && ui.includes("api('/hunt/sell'") && ui.includes("api('/hunt/exchange'") && ui.includes("path: '/hunt/exchange'") && ui.includes("class=\"shadow\""),
+    assert(ui.includes('function monsterBag()') && ui.includes('function monsterBook(') && ui.includes('function shop()') && ui.includes("api('/hunt/sell'") && ui.includes("api('/hunt/exchange'") && ui.includes("path: '/hunt/exchange'") && ui.includes("class=\"shadow\""),
       'V13.162 지도 아래 가방(팔기 · 모두 팔기) · 도감(못 잡은 몬스터는 그림자) · 별조각 교환소(코인 · 랜덤 알 · 영웅 알)');
     assert(ui.includes('const reachOf = power =>') && ui.includes("'short'") && ui.includes("'over'") && ui.includes('function flightStep(now)') && ui.includes('hn-bshadow') && ui.includes('scaleAt(z)'),
       'V13.162 공은 원근 포물선으로 날아가 작아지고(그림자도 따라감), 약하면 앞에 떨어지고 세면 넘어간다(이때는 서버에 안 보내 공을 안 쓴다)');

@@ -1,4 +1,5 @@
 import { seeded } from './fishing-rules.js';
+import { MONSTER_ART } from './monster-art.js';
 
 // V13.162 몬스터 사냥(놀이터, 처음 이름 '펫 사냥'): 포켓몬 고처럼 그림 지도 위의 야생 몬스터를 눌러 만나고, 공을 위로 밀어 던져 잡는다.
 // 선생님 결정(V13.162 테스트 뒤): 펫을 사냥으로 많이 얻으면 알을 안 사므로 '몬스터 위주'. 잡은 몬스터는 가방에 모아
@@ -62,10 +63,36 @@ export const HUNT_MONSTERS = {
   omrreaper: { ko: 'OMR 사신', tier: 'epic' }, pianofang: { ko: '피아노 마귀', tier: 'epic' }, homeworkogre: { ko: '수행평가 오거', tier: 'epic' },
   gatehound: { ko: '교문 불독', tier: 'epic' },
   mockhydra: { ko: '모의고사 히드라', tier: 'legend' }, dictdragon: { ko: '딕셔너리 드래곤', tier: 'legend' }, finalking: { ko: '수능 대마왕', tier: 'legend' },
-  killergolem: { ko: '킬러 골렘', tier: 'legend' }
+  killergolem: { ko: '킬러 골렘', tier: 'legend' },
+  // V13.166 장소 몬스터 36종(선생님 확정): 숲 · 들판 · 바닷가 · 밤마다 9종(★1 3 · ★2 2 · ★3 2 · ★4 1 · ★5 1). 그 지도 · 시간에만 나온다.
+  //   그림(주문서 35)이 들어오기 전에는 나오지 않는다(MONSTER_ART: build:assets가 그림 폴더를 보고 만든다).
+  wordsquirrel: { ko: '단어 다람쥐', tier: 'common', place: 'forest' }, spellshroom: { ko: '철자 버섯', tier: 'common', place: 'forest' }, markerfly: { ko: '형광펜 반딧불', tier: 'common', place: 'forest' },
+  dictpecker: { ko: '받아쓰기 딱따구리', tier: 'uncommon', place: 'forest' }, vocabvine: { ko: '영단어 덩굴', tier: 'uncommon', place: 'forest' },
+  verbbeetle: { ko: '동사 사슴벌레', tier: 'rare', place: 'forest' }, sentdryad: { ko: '문장 나무정령', tier: 'rare', place: 'forest' },
+  bearprincipal: { ko: '숲속 교장 곰', tier: 'epic', place: 'forest' }, lexitreant: { ko: '고대 사전 트렌트', tier: 'legend', place: 'forest' },
+  eraserbunny: { ko: '지우개 토끼', tier: 'common', place: 'field' }, cliphopper: { ko: '클립 메뚜기', tier: 'common', place: 'field' }, postitfly: { ko: '포스트잇 나비', tier: 'common', place: 'field' },
+  scarecrow: { ko: '숙제 허수아비', tier: 'uncommon', place: 'field' }, wordgoose: { ko: '단어장 거위', tier: 'uncommon', place: 'field' },
+  millgolem: { ko: '복습 풍차 골렘', tier: 'rare', place: 'field' }, busbull: { ko: '학원버스 황소', tier: 'rare', place: 'field' },
+  sportsrhino: { ko: '체육대회 코뿔소', tier: 'epic', place: 'field' }, stormbird: { ko: '방학 끝 폭풍새', tier: 'legend', place: 'field' },
+  commacrab: { ko: '쉼표 꽃게', tier: 'common', place: 'beach' }, quizconch: { ko: '물음표 고둥', tier: 'common', place: 'beach' }, pencilgull: { ko: '연필 갈매기', tier: 'common', place: 'beach' },
+  dotocto: { ko: '마침표 먹물문어', tier: 'uncommon', place: 'beach' }, adjstar: { ko: '형용사 불가사리', tier: 'uncommon', place: 'beach' },
+  tripshark: { ko: '수학여행 상어', tier: 'rare', place: 'beach' }, bookray: { ko: '교과서 가오리', tier: 'rare', place: 'beach' },
+  testkraken: { ko: '시험지 크라켄', tier: 'epic', place: 'beach' }, leviathan: { ko: '문법 리바이어던', tier: 'legend', place: 'beach' },
+  snackcoon: { ko: '야식 너구리', tier: 'common', place: 'night' }, sleeppillow: { ko: '잠꼬대 베개', tier: 'common', place: 'night' }, tutorsquito: { ko: '과외 모기', tier: 'common', place: 'night' },
+  wolf2am: { ko: '새벽 두 시 늑대인간', tier: 'uncommon', place: 'night' }, mutecat: { ko: '알림 끈 유령고양이', tier: 'uncommon', place: 'night' },
+  nightmare: { ko: '시험 전날 악몽', tier: 'rare', place: 'night' }, batking: { ko: '졸음 박쥐왕', tier: 'rare', place: 'night' },
+  moongrader: { ko: '달빛 채점관', tier: 'epic', place: 'night' }, reportdragon: { ko: '한밤의 성적표 드래곤', tier: 'legend', place: 'night' }
 };
 export const MONSTER_KEYS = Object.keys(HUNT_MONSTERS);
 export const monstersOf = tier => MONSTER_KEYS.filter(k => HUNT_MONSTERS[k].tier === tier);
+// V13.166 장소: 숲 · 들판 · 바닷가는 그 지도(낮 · 밤 모두), 밤 몬스터는 어느 지도든 밤(19시 ~ 6시)에만. place가 없으면 어디서나.
+export const HUNT_PLACES = { forest: '숲', field: '들판', beach: '바닷가', night: '밤' };
+export const PLACE_EMOJI = { forest: '🌲', field: '🌾', beach: '🏖️', night: '🌙' };
+export const monsterReady = k => !HUNT_MONSTERS[k]?.place || MONSTER_ART.has(k);
+export const fitsPlace = (k, { area, night } = {}) => { const at = HUNT_MONSTERS[k]?.place; return !at || at === area || (at === 'night' && !!night); };
+// 지금 지도에 나올 수 있는 그 등급 몬스터(그림이 있고 장소가 맞는 것). 기존 34종이 늘 있어서 비지 않는다.
+export const spawnPool = (tier, where, ready = monsterReady) => monstersOf(tier).filter(k => ready(k) && fitsPlace(k, where));
+export const placeHint = k => { const at = HUNT_MONSTERS[k]?.place; return at === 'night' ? '밤(저녁 7시 ~ 아침 6시)에 나와요' : at ? `${HUNT_PLACES[at]}에서 나와요` : '어디서나 나와요'; };
 export const BALL_KINDS = ['basic', 'good', 'gold'];
 export const BERRIES = {
   razz: { emoji: '🍓', name: '딸기', note: '잡기 ×1.5' },
