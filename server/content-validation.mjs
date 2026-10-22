@@ -1,5 +1,6 @@
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
 import { seonbu44Correction } from './seonbu44-correction.mjs';
+import { seonbuExternalFinalBook } from './seonbu-external-final.mjs';
 import { DANWONGO_PASSAGES } from '../public/danwongo-grammar-data.js';
 import { DANWONGO_TEXTBOOK_PASSAGES } from '../public/danwongo-textbook-grammar-data.js';
 import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from '../public/seonbu-grammar-data.js';
@@ -12,7 +13,7 @@ const runtimeBooks = () => {
     if (!isSeonbu || !Array.isArray(book.words)) return book;
     return { ...book, words: book.words.filter(word => String(word.range_code) !== '44') };
   });
-  return [...books, seonbu44Correction];
+  return [...books, seonbu44Correction, seonbuExternalFinalBook];
 };
 const assert = (condition, message) => { if (!condition) fail(message); };
 
@@ -56,7 +57,8 @@ function validateVocabulary() {
   }
 
   const seonbu = bySchool('선부고');
-  const seonbuCurrent = { 44:49 };
+  // 44: 중간고사 외부 44(3월 32번) · 45~60: 기말고사 외부지문 16지문(3월 33 · 34 · 37 · 40번, 6월 21 · 23 · 24 · 29 · 30 · 32 · 33 · 34 · 37 · 39 · 40 · 41~42번)
+  const seonbuCurrent = { 44:49, 45:28, 46:33, 47:41, 48:31, 49:21, 50:22, 51:41, 52:31, 53:26, 54:22, 55:27, 56:22, 57:25, 58:19, 59:37, 60:35 };
   for (const [range, count] of Object.entries(seonbuCurrent)) {
     const actual = seonbu.filter(word => String(word.range_code) === range).length;
     assert(actual === count, `선부고 외부 ${range} 단어 수 불일치 (${actual} != ${count})`);

@@ -19,6 +19,7 @@ import { signupCodeRows, updateSignupCode } from './signup.mjs';
 import { createVapidKeys } from './push.mjs';
 import { pushState, pushView, addSubscription, removeSubscription, postNotice, noticeFor, postLegend, legendFor, eveningReminders } from './notify.mjs';
 import { seonbu44Correction } from './seonbu44-correction.mjs';
+import { seonbuExternalFinalBook } from './seonbu-external-final.mjs';
 import { middleGrade3Books } from './middle-vocab.mjs';
 import { middleGrade2Books } from './middle-vocab-grade2.mjs';
 import { ybmKimHighBooks, ybmKimRetiredWords } from './high-vocab-ybm-kim.mjs';
@@ -409,7 +410,7 @@ export function dailyQuestProgress(sessions, activePractice, target, now = Date.
 // V13.112 시험 구분: every book is of 'midterm' (중간고사) or 'final' (기말고사). The books that were there before
 // the final exam words came are all 중간고사; the final ones carry exam_period: 'final' themselves.
 const withExamPeriod = book => book.exam_period === 'final' || book.exam_period === 'midterm' ? book : { ...book, exam_period: 'midterm' };
-export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, ...middleGrade2Books, ...middleGrade3Books, ...ybmKimHighBooks, ...ybmKimFinalBooks, ...ybmParkSeonbuBooks, ...state.extraBooks].map(withExamPeriod); }
+export function allBooks(state) { return [...builtinBooks.map(withoutLegacySeonbu44), seonbu44Correction, seonbuExternalFinalBook, ...middleGrade2Books, ...middleGrade3Books, ...ybmKimHighBooks, ...ybmKimFinalBooks, ...ybmParkSeonbuBooks, ...state.extraBooks].map(withExamPeriod); }
 export function scopedWords(state, schoolRef, ranges, grade = null) {
   const school = schoolByRef(state, schoolRef);
   if (!school || !Array.isArray(ranges) || !ranges.length) fail('학교와 범위를 선택해주세요.');
