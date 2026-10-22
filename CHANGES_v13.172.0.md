@@ -23,6 +23,6 @@
 
 ## 검사
 - `server/release-check.mjs`: 9월 책 단어 329개 · 지문별 단어 수 · 출처 · 문항 번호, 강서고 단어 총합(354 + 180 + 268 + 329).
-- `server/final-words-check.mjs`: 기말고사 책 7권, 강서고 학생의 기말고사 범위에 9월 9지문이 포함됨(단원고 · 선부고 학생은 그대로).
+- `server/final-words-check.mjs`: 기말고사 책 8권(선부고 외부지문 45~60 포함), 강서고 학생의 기말고사 범위에 9월 9지문이 포함됨(단원고 · 선부고 학생은 그대로).
 - `server/content-validation.mjs`: 6월 부산 학평 강서고 354단어 검사는 그대로 두고 9월 단어는 따로 셈.
 - `npm run check` · `npm run check:cloudflare` · `check:load` · `check:sql` 통과.

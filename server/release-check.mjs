@@ -151,6 +151,12 @@ export async function runReleaseCheck() {
       assert(sep && sep.school_id === 'gangseo-high' && sep.school === '강서고' && sep.division === 'high' && sep.exam_period === 'final' && sep.words.length === 329, 'V13.172 강서고 9월 모의고사 단어장: 강서고 기말고사 329단어');
       assert(Object.entries(expected).every(([q, n]) => sep.words.filter(word => word.range_code === `9월 ${q}`).length === n) && new Set(sep.words.map(word => word.range_code)).size === 9, 'V13.172 강서고 9월 모의고사 9지문(29·30·31·32·33·34·37·38·40번) 단어 수가 PDF와 같다');
       assert(sep.words.every(word => word.word && word.meaning && word.source && word.source_question && word.id.startsWith('gs_sep_')) && sep.words.some(word => word.word === "by the skin of one's teeth" && word.meaning === '간신히, 가까스로'), 'V13.172 9월 단어는 모두 단어 · 뜻 · 출처 · 문항 번호를 가진다');
+      // V13.171 선부고 기말고사 외부지문 45 ~ 60(16지문 461단어, 2026년 3월 서울 · 6월 부산 학평): 기말고사 묶음, 범위마다 단어 수, 중간고사 35~44와 id가 겹치지 않음
+      const finalSb = runtimeBooks.find(book => book.id === 'seonbu:final:external-45-60-2026');
+      const counts = { 45: 28, 46: 33, 47: 41, 48: 31, 49: 21, 50: 22, 51: 41, 52: 31, 53: 26, 54: 22, 55: 27, 56: 22, 57: 25, 58: 19, 59: 37, 60: 35 };
+      assert(finalSb && finalSb.exam_period === 'final' && finalSb.school === '선부고' && finalSb.words.length === 461, 'V13.171 선부고 기말고사 외부지문 45~60 단어장(461단어)이 기말고사 묶음으로 들어 있다');
+      assert(Object.entries(counts).every(([code, n]) => finalSb.words.filter(word => String(word.range_code) === code).length === n) && Object.keys(counts).length === 16, 'V13.171 선부고 외부 45 ~ 60은 16지문이고 지문마다 단어 수가 단어장 PDF와 같다');
+      assert(finalSb.words.every(word => word.word && word.meaning && word.source && word.source_question), 'V13.171 선부고 외부 45~60 단어는 모두 뜻과 출처(학평 시험 · 문항)가 있다');
     }
     assert(new Set(allWords.map(word => word.id)).size === allWords.length, 'vocabulary ids are unique');
     assert(Object.keys(EXAM_TYPES).join(',') === 'write_meaning,write_en,eng2mean_mc,mean2eng_mc', 'exactly four exam types with writing modes first');
