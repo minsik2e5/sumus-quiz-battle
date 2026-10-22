@@ -186,7 +186,7 @@ export async function runHuntChecks(assert) {
     assert(sold.sold === 2 && sold.hunt.bag.slime === 1 && coins.coins === 30 && typeof coins.points_balance === 'number' && egg.key && STANDARD_PET_KEYS.includes(egg.key) && egg.hunt.stars === 1000 - 30 - HUNT.EGG && egg.hunt.egg_left === 0,
       'V13.162 경로: 가방 팔기 · 교환소 코인 · 랜덤 알(알 상점과 같은 알 깨기)');
     const svc = source('./service.mjs'), games = source('./games.mjs');
-    assert(svc.includes("if (complete && student && answerRecords.length >= HUNT.MIN_PRACTICE) { const ball = grantBall(student, 'practice', { lucky: perfect, now: endedAt });")
+    assert(svc.includes("if (complete && student && answerRecords.length >= HUNT.MIN_PRACTICE) { const ball = grantBall(student, 'practice', { lucky: perfect, now: finalizedAt });") /* V13.168 하루 한도는 받는 지금 */
       && games.includes("const ball = stars === 3 ? grantBall(p, 'match', { lucky: true, now }) : null;") && svc.includes("ball: x.finished ? (x.ball || null) : undefined") && svc.includes('pet: activePetKey(state, p.id), now });'),
       'V13.162 끝까지 푼 연습(10문제 이상)과 짝 맞추기 별 3도 공 1개(만점 · 별 3은 가끔 좋은 공), 잡으면 파트너 펫 경험치');
     assert(svc.includes("'reel', 'hunt'].filter(k => old[k])") && svc.includes('preview.hunt.basic = Math.max('), 'V13.162 사냥 기록도 로그인 때 지키고, 교사 미리보기 계정은 공을 채운다');

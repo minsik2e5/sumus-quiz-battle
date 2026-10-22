@@ -87,6 +87,8 @@ export function huntMap(p, now = Date.now(), random = secureRandom) {
     if (h.live?.spot === s.id) h.live.key = key;
     return [{ ...s, key }];
   });
+  // V13.168 만나는 중인 펫 자리가 위에서 다른 펫으로 바뀌었으면 만남(live)도 같은 펫으로(화면은 새 펫, 던지기는 이미 있는 펫을 잡아 공만 썼다).
+  if (h.live?.kind === 'pet') { const s = map.spots.find(x => x.id === h.live.spot); if (s) h.live.key = s.key; }
   // V13.166 아침 6시가 되면 밤 몬스터는 떠난다(만나는 중인 자리는 그대로). 장소 몬스터는 지도가 바뀔 때(슬롯) 같이 바뀐다.
   const where = huntPlace(now);
   map.spots = map.spots.filter(s => s.kind !== 'monster' || s.id === h.live?.spot || HUNT_MONSTERS[s.key].place !== 'night' || where.night);
@@ -186,6 +188,8 @@ export function huntThrow(p, { id, spot, ball: kind, quality = null, ticket = nu
     }
   }
   if (roll.caught || roll.fled) endMeet(p, h, now, random);
+  // V13.168 지도를 지금 시간(슬롯)에 맞춘다. 만나는 동안 4시간 슬롯이 바뀌면 던진 뒤 지도가 비어(spots: null) '조용해요'만 보였다.
+  huntMap(p, now, random);
   return keepReceipt(h, 'hunt', id, out, now);
 }
 // V13.167 열매 문제: 만나는 중인 몬스터에게, 공 하나에 한 번. 단어는 부른 쪽(service.mjs)이 내 학교 · 학년 범위에서 준다.
@@ -247,7 +251,6 @@ function endMeet(p, h, now, random) {
     const left = missing(p), tier = petTier(random(), { basic: left.basic.length, epic: left.epic.length });
     if (tier) map.spots.push(petSpot(p, map.spots, now, random, tier));
   }
-  refill(map, now, random);
 }
 
 // 가방 몬스터 팔기(별조각으로). key가 없으면 모두.

@@ -454,7 +454,8 @@ function result(ms, stars, res) {
   const extras = `${bait ? '<span class="r bait"><b>🪱 +1</b><small>낚시 미끼</small></span>' : ''}${res?.ball ? `<span class="r ball"><b>${res.ball === 'good' ? '🔵' : '🟢'} +1</b><small>${res.ball === 'good' ? '좋은 공' : '사냥 공'}</small></span>` : ''}`;
   const why = !M.id ? '연결이 안 돼서 기록 없이 했어요.' : res?.reason === 'daily' ? `오늘 코인 판(${MATCH.DAILY}판)을 다 썼어요. 기록은 남아요!` : res?.reason === 'error' ? esc(res.error || '저장하지 못했어요.') : res?.reason ? '이번 판은 기록하지 못했어요.' : '';
   const prev = M.prevBest;
-  const diffLine = record && prev ? `내 최고보다 <b>${((prev - ms) / 1000).toFixed(2)}초</b> 빨라요!` : record ? '첫 기록이에요!' : prev ? `내 최고(${matchTime(prev)})까지 <b>${((ms - prev) / 1000).toFixed(2)}초</b>` : '';
+  // V13.168 내 최고(prev)는 의심 기록(순위 밖)까지 본 값이라, 순위 신기록이어도 prev보다 느릴 수 있다('-0.50초 빨라요'가 나왔다).
+  const diffLine = record && prev && ms < prev ? `내 최고보다 <b>${((prev - ms) / 1000).toFixed(2)}초</b> 빨라요!` : record && !prev ? '첫 기록이에요!' : prev ? `내 최고(${matchTime(prev)})까지 <b>${((ms - prev) / 1000).toFixed(2)}초</b>` : '';
   const g = M.ghost, beat = g && ms < g.ms;
   const ghostLine = !g ? '' : g.self ? (beat ? '이번 주의 나를 넘었어요!' : `이번 주의 나까지 <b>${((ms - g.ms) / 1000).toFixed(2)}초</b>`) : beat ? `<b>${esc(g.name)}</b> 고스트를 이겼어요!` : `<b>${esc(g.name)}</b>까지 <b>${((ms - g.ms) / 1000).toFixed(2)}초</b>`;
   const missed = M.pairs.filter(p => M.missed.has(String(p.id)));

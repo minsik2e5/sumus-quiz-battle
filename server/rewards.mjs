@@ -82,7 +82,10 @@ export function giveGift(p, { kind = 'coins', amount, note = '', from, fromName,
   box.log = [...opened.slice(-Math.max(0, GIFT_LOG_KEEP - closed.length)), ...closed].sort((a, b) => a.at - b.at);
   return box;
 }
-export const giftsWaiting = p => (p?.gift_box?.log || []).filter(g => !g.opened).map(g => ({ id: g.id, ...(g.kind === 'egg' ? { kind: 'egg' } : {}), amount: g.amount, note: g.note, from_name: g.from_name, at: g.at }));
+// V13.168: 첫 펫을 고르기 전 학생의 알 선물은 열지 않고 기다리게 둔다(보이지도 않는다). 전에는 그 알이 첫 펫 자리를
+// 차지해 첫 펫을 고를 수 없고, 지금까지 쌓은 경험치(첫 펫 몫)가 어느 펫에게도 가지 않았다. 첫 펫을 고르면 열 수 있다.
+const eggWaits = (p, g) => g.kind === 'egg' && !(p?.pets || []).length;
+export const giftsWaiting = p => (p?.gift_box?.log || []).filter(g => !g.opened && !eggWaits(p, g)).map(g => ({ id: g.id, ...(g.kind === 'egg' ? { kind: 'egg' } : {}), amount: g.amount, note: g.note, from_name: g.from_name, at: g.at }));
 // V13.111 선생님 알: 기본 84% · 영웅 15% · 전설 1% (a student has at most one legendary pet; then
 // it is 영웅). Always a pet the student does not have yet: a full tier moves to the other one, and
 // a student with every pet gets GIFT_EGG_FULL_COINS instead. Limited pets never come from it.
@@ -106,7 +109,7 @@ export function giftEggPick(p, random = secureRandom) {
 export function openGifts(p, now = Date.now(), random = secureRandom) {
   const out = [];
   for (const g of p?.gift_box?.log || []) {
-    if (g.opened) continue;
+    if (g.opened || eggWaits(p, g)) continue;
     g.opened = true; g.opened_at = now;
     const item = { id: g.id, amount: g.amount, note: g.note, from_name: g.from_name, at: g.at };
     if (g.kind === 'egg') {
