@@ -8,7 +8,7 @@ import { passwordHash } from './auth.mjs';
 import { service, sweep, examAttemptExpired } from './service.mjs';
 import { selfSignup, checkSignupCode, signupCodeGuard } from './signup.mjs';
 import { examAdmin } from './exam-admin.mjs';
-import { createMutationCoordinator, NO_MUTATION } from './mutation-coordinator.mjs';
+import { createMutationCoordinator, NO_MUTATION, readState } from './mutation-coordinator.mjs';
 const root = resolve(fileURLToPath(new URL('../public/', import.meta.url)));
 const dbPath = process.env.DATA_PATH || fileURLToPath(new URL('../var/sumus.sqlite', import.meta.url));
 const repo = await repository(dbPath);
@@ -123,7 +123,7 @@ const server = http.createServer(async (req, res) => {
       const result = url.pathname === '/api/signup/check'
         ? await withCodeCount(() => checkSignupCode(mutations.current().state, body))
         : req.method === 'GET'
-        ? await execute(mutations.current().state)
+        ? await readState(mutations.current().state, execute)
         : fastPracticeAnswer
           ? await mutations.fast(execute)
           : await mutations.durable(execute);

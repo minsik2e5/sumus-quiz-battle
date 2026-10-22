@@ -25,7 +25,7 @@ import { ybmKimHighBooks, ybmKimRetiredWords } from './high-vocab-ybm-kim.mjs';
 import { ybmKimFinalBooks } from './high-vocab-ybm-kim-final.mjs';
 import { ybmParkSeonbuBooks } from './high-vocab-ybm-park-seonbu.mjs';
 import { compactSession } from './state.mjs';
-import { trimSummary, trimArchive, trimRecords, attemptTotal } from './storage-trim.mjs';
+import { trimSummary, trimArchive, trimRecords, attemptTotal, autoTrimSessions } from './storage-trim.mjs';
 import { DUNGEON, CUTS, CUT_KEYS, openCuts, DUNGEON_COINS } from './dungeon-engine.mjs';
 import { activeEventFor, studentEventView, teacherEventView, teacherOwns, keptEvents, createRewardEvent, endRewardEvent, deleteRewardEvent, eventCoins, eventXp } from './reward-events.mjs';
 import { dungeonQuestions } from './dungeon-words.mjs';
@@ -225,7 +225,9 @@ function regradeMeaningDispute(state, dispute) {
       const retryIndex = practice.retry?.findIndex(item => item.id === dispute.word_id) ?? -1;
       if (retryIndex >= 0) practice.retry.splice(retryIndex, 1);
     }
-    const session = state.sessions.find(item => item.id === dispute.source_id && item.student_id === dispute.student_id);
+    // V13.168 지난 기록은 얼려 두고 같이 쓴다: 고칠 기록은 사본으로 바꾼 뒤 고친다.
+    const sessionIndex = state.sessions.findIndex(item => item.id === dispute.source_id && item.student_id === dispute.student_id);
+    const session = sessionIndex >= 0 ? (state.sessions[sessionIndex] = structuredClone(state.sessions[sessionIndex])) : null;
     if (session) {
       const answerRecord = (session.answer_records || []).find(item => item.question_id === dispute.question_id || (item.word_id === dispute.word_id && !item.regraded && item.correct === false));
       const currentWrongCount = Number.isFinite(Number(session.wrong_count))
@@ -1067,19 +1069,21 @@ function compactRecord(record, words) {
   }
   return changed;
 }
+// V13.168 지난 기록은 얼려 두고 다음 상태와 같이 쓴다(server/mutation-coordinator.mjs): 고칠 기록만 사본으로 바꾼다.
 function compactOldSessions(state, now) {
   let changed = false, words = null;
-  for (const session of state.sessions) {
-    if (Number(session.created_at || 0) > now - COMPACT_SESSION_AFTER_MS) continue;
-    for (const list of [session.answer_records, session.wrong_details]) {
-      if (!Array.isArray(list)) continue;
-      for (const record of list) {
-        if (!record || (!('word' in record) && record.timed_out !== false && record.regraded !== false)) continue;
-        words ??= builtinWords();
-        if (compactRecord(record, words)) changed = true;
-      }
+  state.sessions.forEach((session, index) => {
+    if (!session || Number(session.created_at || 0) > now - COMPACT_SESSION_AFTER_MS) return;
+    const lists = [session.answer_records, session.wrong_details].filter(Array.isArray);
+    if (!lists.some(list => list.some(record => record && ('word' in record || record.timed_out === false || record.regraded === false)))) return;
+    words ??= builtinWords();
+    const copy = structuredClone(session);
+    let touched = false;
+    for (const list of [copy.answer_records, copy.wrong_details]) {
+      if (Array.isArray(list)) for (const record of list) if (compactRecord(record, words)) touched = true;
     }
-  }
+    if (touched) { state.sessions[index] = copy; changed = true; }
+  });
   return changed;
 }
 function hydrateRecord(record, words) {
@@ -1118,7 +1122,8 @@ const rpsFor = (state, p, now = Date.now()) => ({ ...rpsView(p, now), hall: rpsH
 // 먼저 닫으면 마지막 답(쓰기 220ms 모으기 · 왕복 시간)이 버려졌다. 유예 안에 온 답은 받고, 유예가 지나면 정리가 닫는다.
 export const EXAM_SUBMIT_GRACE_MS = 5000;
 export const examAttemptExpired = (a, now = Date.now()) => a?.status === 'active' && Number(a.deadline || 0) + EXAM_SUBMIT_GRACE_MS <= now;
-export function sweep(state, now = Date.now()) {
+// V13.168 autoTrim: 한 달 지난 연습 기록 자동 정리(server/storage-trim.mjs). 워커는 쓰기 한도가 넉넉한 날만 켠다.
+export function sweep(state, now = Date.now(), { autoTrim = true } = {}) {
   let changed = false;
   for (const a of state.examAttempts) if (examAttemptExpired(a)) {
     // V13.129: 기록이 망가진 응시 하나 때문에 정리가 매번 실패하면 모든 요청이 막힌다. 그 응시만 제출로 닫는다.
@@ -1128,6 +1133,7 @@ export function sweep(state, now = Date.now()) {
   }
   if (closeStalePractices(state, now)) changed = true;
   if (compactOldSessions(state, now)) changed = true;
+  if (autoTrim && autoTrimSessions(state, now)) changed = true;
   if (autoResolveMeaningDisputes(state) > 0) changed = true;
   if (tidyBattles(state)) changed = true;
   if (tidyDungeons(state, now)) changed = true;
@@ -2813,8 +2819,9 @@ export async function service(state, method, path, body, token, options = {}) {
       if (!x.finished || x.run_mode !== 'test') fail('완료한 실전모드 결과만 선생님께 보낼 수 있어요.', 409);
       const sharedAt = x.shared_to_teacher_at || Date.now();
       x.shared_to_teacher_at = sharedAt;
-      const session = state.sessions.find(item => item.id === x.id && item.student_id === p.id);
-      if (session) session.shared_to_teacher_at = sharedAt;
+      // V13.168 지난 기록은 얼려 두고 같이 쓴다: 사본으로 바꾼다.
+      const sessionIndex = state.sessions.findIndex(item => item.id === x.id && item.student_id === p.id);
+      if (sessionIndex >= 0) state.sessions[sessionIndex] = { ...structuredClone(state.sessions[sessionIndex]), shared_to_teacher_at: sharedAt };
       // V13.65: the phone only needs the time; the whole result view made this slow.
       return { id: x.id, shared_to_teacher_at: sharedAt };
     }

@@ -39,6 +39,7 @@ import { runLevelChecks } from './level-check.mjs';
 import { runPracticeSpeedChecks } from './practice-speed-check.mjs';
 import { runReviewFixChecks } from './review-fix-check.mjs';
 import { runStability163Checks } from './stability-163-check.mjs';
+import { runStability168Checks } from './stability-168-check.mjs';
 import { runEggMomentChecks } from './egg-moment-check.mjs';
 import { runHuntChecks } from './hunt-check.mjs';
 import { runGuard167Checks } from './guard-167-check.mjs';
@@ -107,7 +108,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(!studentUiSource.includes('data-middle-word=') && studentUiSource.includes('data-high-word='), 'V13.150 middle-school test setup uses the same word picker as high school');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.168.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.169.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -945,7 +946,9 @@ export async function runReleaseCheck() {
       const before = structuredClone(await service(old, 'GET', '/bootstrap', {}, studentToken));
       const sizeBefore = JSON.stringify(old.sessions).length;
       assert(sweep(old, now) === true && JSON.stringify(old.sessions).length < sizeBefore, 'old session answer records are compacted');
-      assert(mine.every(session => session.answer_records.every(record => !('regraded' in record && record.regraded === false))), 'false flags are dropped from old records');
+      // V13.168 정리는 기록을 사본으로 바꿔 넣는다(지난 기록은 얼려 두고 같이 쓴다): 지금 상태에서 다시 찾는다.
+      const mineIds = new Set(mine.map(session => session.id));
+      assert(old.sessions.filter(session => mineIds.has(session.id)).every(session => session.answer_records.every(record => !('regraded' in record && record.regraded === false))), 'false flags are dropped from old records');
       const compacted = JSON.stringify(old.sessions);
       sweep(old, now);
       assert(JSON.stringify(old.sessions) === compacted, 'record compaction is idempotent');
@@ -961,7 +964,7 @@ export async function runReleaseCheck() {
         const studentTests = list => list.filter(item => item.student_id === student.id);
         assert(pick(studentTests(teacherAfterCompact.sessions)) === pick(studentTests(state.sessions)) && studentTests(teacherAfterCompact.sessions).some(item => item.run_mode === 'test'), 'V13.123 old 실전시험 keep score, time, leaves, PASS and correct count for the teacher after compaction');
       }
-      const recent = old.sessions.find(item => item.student_id === student.id && !mine.includes(item) && Array.isArray(item.answer_records) && item.answer_records.length);
+      const recent = old.sessions.find(item => item.student_id === student.id && !mineIds.has(item.id) && Array.isArray(item.answer_records) && item.answer_records.length);
       assert(!recent || recent.answer_records.every(record => 'word' in record), 'recent records are left as stored');
 
       const stale = structuredClone(state);
@@ -1234,7 +1237,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.168.0') && indexHtml.includes('/app.bundle.css?v=13.168.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.169.0') && indexHtml.includes('/app.bundle.css?v=13.169.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1255,7 +1258,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.168.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.169.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -1498,6 +1501,7 @@ export async function runReleaseCheck() {
     await runPracticeSpeedChecks(assert);
     runReviewFixChecks(assert);
     await runStability163Checks(assert);
+    await runStability168Checks(assert);
     runEggMomentChecks(assert);
     await runHuntChecks(assert);
     await runGuard167Checks(assert);

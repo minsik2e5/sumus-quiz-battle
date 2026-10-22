@@ -412,6 +412,7 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
   let mode = forceFull || !supabase.partsRevision ? 'full' : 'unknown';
   let modeCheckedAt = 0;
   let fullError = null;
+  const hashCache = new Map();
   const interval = () => Number(typeof minIntervalMs === 'function' ? minIntervalMs() : minIntervalMs) || 0;
   // V13.99: when an upload last succeeded (and how), so /api/health still shows it after a
   // restart. V13.144: kept in the local meta row that the upload writes anyway (no extra
@@ -500,7 +501,15 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
     const started = Date.now();
     // V13.144: the local copy is stored as these same parts, so they are reused as they are.
     const parts = snapshot.parts || partitionState(JSON.parse(snapshot.json));
-    const hashes = new Map(await Promise.all([...parts].map(async ([key, text]) => [key, await hashText(text)])));
+    // V13.168 바뀌지 않은 조각(같은 글)은 지난번 해시를 쓴다(1분마다 9MB 전체를 다시 해시하지 않게).
+    const hashes = new Map(await Promise.all([...parts].map(async ([key, text]) => {
+      const seen = hashCache.get(key);
+      if (seen && seen[0] === text) return [key, seen[1]];
+      const hash = await hashText(text);
+      hashCache.set(key, [text, hash]);
+      return [key, hash];
+    })));
+    for (const key of hashCache.keys()) if (!parts.has(key)) hashCache.delete(key);
     const previous = local.partHashes();
     const changed = [...parts].filter(([key]) => previous.get(key) !== hashes.get(key));
     let removed = [...previous.keys()].filter(key => !parts.has(key));

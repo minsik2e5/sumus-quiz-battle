@@ -81,7 +81,11 @@ export function huntMap(p, now = Date.now(), random = secureRandom) {
     if (s.kind !== 'pet') return [];
     if (!has(p, s.key)) return [s];
     const left = missing(p)[s.tier === 'petEpic' ? 'epic' : 'basic'];
-    return left.length ? [{ ...s, key: pick(left, random) }] : [];
+    if (!left.length) return [];
+    // V13.168 만나는 중인 펫도 같이 바꾼다(예전: 만남은 옛 펫 그대로라 잡아도 공만 쓰고 펫이 안 나왔다).
+    const key = pick(left, random);
+    if (h.live?.spot === s.id) h.live.key = key;
+    return [{ ...s, key }];
   });
   // V13.168 만나는 중인 펫 자리가 위에서 다른 펫으로 바뀌었으면 만남(live)도 같은 펫으로(화면은 새 펫, 던지기는 이미 있는 펫을 잡아 공만 썼다).
   if (h.live?.kind === 'pet') { const s = map.spots.find(x => x.id === h.live.spot); if (s) h.live.key = s.key; }
@@ -126,7 +130,14 @@ export function huntMeet(p, spotIdIn, now = Date.now(), random = secureRandom) {
   const h = hunt(p), map = huntMap(p, now, random);
   const spot = map.spots.find(s => s.id === spotIdIn);
   if (!spot) fail('벌써 다른 곳으로 갔어요. 지도를 다시 볼게요.', 404);
-  if (h.live?.spot !== spot.id) { h.live = { spot: spot.id, kind: spot.kind, key: spot.key, tier: spot.tier, at: now, throws: 0 }; delete h.berry; delete h.quiz; }
+  if (h.live?.spot !== spot.id) {
+    // V13.168 떠나는 자리에 던진 수를 남기고, 돌아오면 이어서 센다. 예전에는 다른 몬스터에 갔다 오면 0으로 돌아가서,
+    // 틀린 열매 문제를 같은 공으로 다시 풀 수 있었다(한 공에 한 번 규칙이 풀림).
+    const prev = h.live && map.spots.find(s => s.id === h.live.spot);
+    if (prev) prev.throws = Number(h.live.throws || 0);
+    h.live = { spot: spot.id, kind: spot.kind, key: spot.key, tier: spot.tier, at: now, throws: Number(spot.throws || 0) };
+    delete h.berry; delete h.quiz;
+  }
   h.last = now;
   return { spot: spot.id, kind: spot.kind, key: spot.key, tier: spot.tier, form: spot.form || 1, throws: h.live.throws };
 }
@@ -137,19 +148,12 @@ export function huntThrow(p, { id, spot, ball: kind, quality = null, ticket = nu
   const seen = findReceipt(h, 'hunt', id);
   if (seen) return { ...seen.r, again: true };
   if (!id) fail('던지기 번호가 없어요.');
+  // V13.168 만나는 중에 그 펫이 알(상점 · 선물 · 교환소)에서 나왔으면 지도를 다시 맞춘다(못 만난 다른 펫으로, 없으면 떠남).
+  if (h.live?.kind === 'pet' && has(p, h.live.key)) huntMap(p, now, random);
   const live = h.live;
   if (!live || live.spot !== spot) fail('만나는 중인 몬스터가 없어요. 지도에서 다시 눌러 주세요.', 404);
   const b = BALL_KINDS.includes(kind) ? kind : 'basic';
   if (ball(h, b) < 1) fail(b === 'gold' ? '황금 공이 없어요.' : b === 'good' ? '좋은 공이 없어요.' : '공이 없어요. 공부하면 공을 받아요!', 409);
-  // V13.168 만나는 동안 그 펫이 다른 곳(알 상점 · 교환소 알 · 선물)에서 먼저 생겼으면 같은 등급의 못 만난 펫으로 바꾼다
-  //   (그대로 던지면 잡아도 아무것도 안 생기고 공 · 황금 공만 사라졌다). 그 등급을 다 모았으면 공을 쓰지 않고 지도로.
-  if (live.kind === 'pet' && has(p, live.key)) {
-    const left = missing(p)[live.tier === 'petEpic' ? 'epic' : 'basic'];
-    if (!left.length) fail('이 친구는 벌써 함께하고 있어요. 지도에서 다른 친구를 만나요.', 409);
-    live.key = pick(left, random);
-    const s = h.map?.spots?.find(x => x.id === live.spot);
-    if (s) s.key = live.key;
-  }
   const claimed = Object.hasOwn(HUNT.THROWS, quality) ? quality : null;
   const q = guardQuality(claimed, h.qlog || [], now - Number(h.last || 0));
   h.qlog = [...(h.qlog || []), claimed].slice(-HUNT.QUALITY_GUARD.WINDOW);
@@ -201,6 +205,9 @@ export function huntBerryQuiz(p, { spot, berry, words = [], now = Date.now(), ra
     if (h.quiz.done) fail('이 공에는 벌써 문제를 풀었어요. 다음 공에 다시 해요.', 409);
     return { id: h.quiz.id, berry: h.quiz.berry, en: h.quiz.en, choices: h.quiz.choices };
   }
+  // V13.168 다른 몬스터에 갔다 와도 이 자리 · 이 공에는 문제를 한 번만 낸다(자리에 남긴 표시).
+  const here = h.map?.spots?.find(s => s.id === spot);
+  if (here && here.quizzed === throws) fail('이 공에는 벌써 문제를 풀었어요. 다음 공에 다시 해요.', 409);
   const seenEn = new Set(), seenKo = new Set(), pool = [];
   // 범위 단어가 많아도 앞에서부터 섞어 4개만 고른다(전체를 섞지 않는다).
   const list = [...words];
@@ -214,6 +221,7 @@ export function huntBerryQuiz(p, { spot, berry, words = [], now = Date.now(), ra
   if (pool.length < HUNT.BERRY_QUIZ_MIN) fail('단어가 모자라요. 놀이터에서 게임 단어 범위를 더 골라 주세요.', 409);
   const choices = pool.map(w => w.ko).sort(() => random() - .5);
   h.quiz = { id: quizId(random), spot, throws, berry, en: pool[0].en, answer: pool[0].ko, choices, at: now };
+  if (here) here.quizzed = throws;
   return { id: h.quiz.id, berry, en: h.quiz.en, choices };
 }
 // 채점: 맞히면 열매 표(ticket)를 준다. 같은 문제를 다시 보내면 같은 답(표도 같다).

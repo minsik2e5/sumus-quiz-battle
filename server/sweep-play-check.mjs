@@ -43,7 +43,8 @@ export async function runSweepPlayChecks(assert, expectStatus) {
     huntMap(p, t0, half);
     p.hunt.map.spots.push(petSpot('dog'));
     p.hunt.live = { spot: 'petspot', kind: 'pet', key: 'dog', tier: 'pet', at: t0, throws: 0 };
-    await expectStatus(409, async () => huntThrow(p, { id: 'sweep-throw-3', spot: 'petspot', ball: 'basic', now: t0 + 9000, random: half }), 'V13.168 사냥: 기본 펫을 다 모았는데 펫 자리에 던지면 409');
+    // v13.169 합치기: 서버 안정화 2차(#190)가 던지기 전에 지도를 다시 맞춰 그 자리를 없앤다 → 만남 없음(404), 공은 그대로.
+    await expectStatus(404, async () => huntThrow(p, { id: 'sweep-throw-3', spot: 'petspot', ball: 'basic', now: t0 + 9000, random: half }), 'V13.168 사냥: 기본 펫을 다 모았는데 펫 자리에 던지면 막고(공을 쓰지 않음) 그 자리는 떠난다');
     assert(p.hunt.basic === 2 && !(p.hunt.done || []).length, 'V13.168 사냥: 그때 공은 그대로(영수증도 없음)');
     huntMap(p, t0 + 10000, half);
     assert(!p.hunt.map.spots.some(s => s.id === 'petspot') && !p.hunt.live, 'V13.168 사냥: 지도를 다시 열면 그 펫 자리와 만남은 사라진다');
