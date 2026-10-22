@@ -109,7 +109,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(!studentUiSource.includes('data-middle-word=') && studentUiSource.includes('data-high-word='), 'V13.150 middle-school test setup uses the same word picker as high school');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.170.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.171.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -145,6 +145,14 @@ export async function runReleaseCheck() {
     assert(bySchool('단원고').some(word => word.id.startsWith('high:ybm-kim:common2:lesson2:')), 'YBM Kim lesson 2 vocabulary is loaded');
     assert(studentUiSource.includes("['eng2mean','뜻 4지선다'") && studentUiSource.includes("['mean2eng','영어 4지선다'"), 'middle/high self-test exposes both four-choice modes');
     assert(bySchool('선부고').filter(word => String(word.range_code) === '44').length === 49, '선부고 외부 44 vocabulary = 49');
+    {
+      // V13.171 선부고 기말고사 외부지문 45 ~ 60(16지문 461단어, 2026년 3월 서울 · 6월 부산 학평): 기말고사 묶음, 범위마다 단어 수, 중간고사 35~44와 id가 겹치지 않음
+      const finalSb = runtimeBooks.find(book => book.id === 'seonbu:final:external-45-60-2026');
+      const counts = { 45: 28, 46: 33, 47: 41, 48: 31, 49: 21, 50: 22, 51: 41, 52: 31, 53: 26, 54: 22, 55: 27, 56: 22, 57: 25, 58: 19, 59: 37, 60: 35 };
+      assert(finalSb && finalSb.exam_period === 'final' && finalSb.school === '선부고' && finalSb.words.length === 461, 'V13.171 선부고 기말고사 외부지문 45~60 단어장(461단어)이 기말고사 묶음으로 들어 있다');
+      assert(Object.entries(counts).every(([code, n]) => finalSb.words.filter(word => String(word.range_code) === code).length === n) && Object.keys(counts).length === 16, 'V13.171 선부고 외부 45 ~ 60은 16지문이고 지문마다 단어 수가 단어장 PDF와 같다');
+      assert(finalSb.words.every(word => word.word && word.meaning && word.source && word.source_question), 'V13.171 선부고 외부 45~60 단어는 모두 뜻과 출처(학평 시험 · 문항)가 있다');
+    }
     assert(new Set(allWords.map(word => word.id)).size === allWords.length, 'vocabulary ids are unique');
     assert(Object.keys(EXAM_TYPES).join(',') === 'write_meaning,write_en,eng2mean_mc,mean2eng_mc', 'exactly four exam types with writing modes first');
     const practiceTypes = ['write_meaning', 'eng2mean', 'mean2eng', 'spell', 'listen', 'scramble', 'vowelblank', 'initial'];
@@ -1238,7 +1246,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.170.0') && indexHtml.includes('/app.bundle.css?v=13.170.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.171.0') && indexHtml.includes('/app.bundle.css?v=13.171.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1259,7 +1267,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.170.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.171.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
