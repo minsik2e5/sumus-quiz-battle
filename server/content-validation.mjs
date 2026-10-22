@@ -1,5 +1,6 @@
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
 import { seonbu44Correction } from './seonbu44-correction.mjs';
+import { gangseoSepMockBook } from './gangseo-sep-mock.mjs';
 import { seonbuExternalFinalBook } from './seonbu-external-final.mjs';
 import { DANWONGO_PASSAGES } from '../public/danwongo-grammar-data.js';
 import { DANWONGO_TEXTBOOK_PASSAGES } from '../public/danwongo-textbook-grammar-data.js';
@@ -13,7 +14,7 @@ const runtimeBooks = () => {
     if (!isSeonbu || !Array.isArray(book.words)) return book;
     return { ...book, words: book.words.filter(word => String(word.range_code) !== '44') };
   });
-  return [...books, seonbu44Correction, seonbuExternalFinalBook];
+  return [...books, seonbu44Correction, seonbuExternalFinalBook, gangseoSepMockBook];
 };
 const assert = (condition, message) => { if (!condition) fail(message); };
 
@@ -48,7 +49,7 @@ function validateVocabulary() {
   assert(new Set(words.map(word => word.id)).size === words.length, '단어 id 중복');
   const bySchool = school => books.filter(book => book.school === school).flatMap(book => book.words || []);
 
-  const gangseo = bySchool('강서고');
+  const gangseo = bySchool('강서고').filter(word => !String(word.range_code).startsWith('9월 '));
   const gangseoExpected = { 21:31, 23:21, 29:41, 30:31, 31:32, 32:26, 33:22, 34:27, 36:32, 37:22, 38:25, 39:25, 40:19 };
   assert(gangseo.length === 354, `강서고 단어 총합 불일치 (${gangseo.length} != 354)`);
   for (const [range, count] of Object.entries(gangseoExpected)) {
