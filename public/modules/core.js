@@ -1,4 +1,5 @@
 import { GACHA_ITEMS } from './rewards.js';
+import { PET_ART, PET_REVEAL } from './pet-art.js';
 export const EXAM_TYPES = {
   write_meaning: { label: '뜻쓰기', help: '영어를 보고 뜻 직접 쓰기', input: true },
   write_en: { label: '영어쓰기', help: '뜻을 보고 영어 직접 쓰기', input: true },
@@ -94,6 +95,22 @@ export const CHARACTERS = {
   chinchilla: { name: 'CHINCHIN', ko: '친친', type: '친칠라', color: '#8E8FA8', light: '#D7D8E6', soft: '#F6F6FB', epic: true },
   sloth: { name: 'NEULBO', ko: '늘보', type: '나무늘보', color: '#8F7A5A', light: '#D9C9A6', soft: '#F8F3E8', epic: true },
   platypus: { name: 'NAPJAK', ko: '납작', type: '오리너구리', color: '#3E8E8A', light: '#A8DAD4', soft: '#EEF9F7', epic: true },
+  // V13.168 새 펫 14종(그림 주문서 36 · 37 · 38): 12지를 채우는 기본 6 · 영웅 6 · 신화 2.
+  // `artOrder`가 있는 펫은 그림이 들어올 때까지(public/modules/pet-art.js, build:assets가 만든다) 알 · 선물 · 사냥 · 도감 목록에 없다(petReady).
+  mouse: { name: 'JJIKJJIK', ko: '찍찍이', type: '아기 쥐', color: '#8F8FA3', light: '#D9D9E6', soft: '#F5F5FA', artOrder: 36 },
+  calf: { name: 'EUMMAE', ko: '음매', type: '송아지', color: '#C38B3C', light: '#F0D19A', soft: '#FDF6E8', artOrder: 36 },
+  tiger: { name: 'EOHEUNG', ko: '어흥', type: '아기 호랑이', color: '#E5862A', light: '#FFCB85', soft: '#FFF4E6', artOrder: 36 },
+  pony: { name: 'DAGEUDAK', ko: '다그닥', type: '조랑말', color: '#B06A3B', light: '#EBC39A', soft: '#FBF1E8', artOrder: 36 },
+  monkey: { name: 'KKIKKI', ko: '끼끼', type: '꼬마 원숭이', color: '#B57B4A', light: '#F1C9A0', soft: '#FCF3EA', artOrder: 36 },
+  rooster: { name: 'KKOKKO', ko: '꼬꼬', type: '꼬마 닭', color: '#E2A92A', light: '#FFE38A', soft: '#FFFAE6', artOrder: 36 },
+  flamingo: { name: 'MINGO', ko: '밍고', type: '플라밍고', color: '#E9799B', light: '#FFC6D5', soft: '#FFF1F5', epic: true, artOrder: 37 },
+  quokka: { name: 'BANGGEUT', ko: '방긋', type: '쿼카', color: '#A8754A', light: '#E9C59D', soft: '#FBF3EA', epic: true, artOrder: 37 },
+  chameleon: { name: 'KAMEL', ko: '카멜', type: '카멜레온', color: '#36A98F', light: '#B5EBD9', soft: '#EEFAF6', epic: true, artOrder: 37 },
+  polarbear: { name: 'NUNGOM', ko: '눈곰', type: '아기 북극곰', color: '#6FA9CF', light: '#D6EBF7', soft: '#F3F9FD', epic: true, artOrder: 37 },
+  snowleopard: { name: 'SEOLPYO', ko: '설표', type: '아기 눈표범', color: '#868D9C', light: '#DADDE4', soft: '#F5F6F8', epic: true, artOrder: 37 },
+  hummingbird: { name: 'WINGWING', ko: '윙윙', type: '벌새', color: '#2A9F86', light: '#A9EAD6', soft: '#EDFAF6', epic: true, artOrder: 37 },
+  hwangryong: { name: 'HWANGRYONG', ko: '황룡', type: '오방신 · 중앙', color: '#D29B17', light: '#FFE38A', soft: '#FFF9E6', mythic: true, artOrder: 38 },
+  samjogo: { name: 'SAMJOGO', ko: '삼족오', type: '세 발 까마귀', color: '#4A3F6B', light: '#F2C14E', soft: '#FFF8E5', mythic: true, artOrder: 38 },
   // V13.109 한정 펫: sold for one season only (its own egg), then found only in 영웅 eggs. No yacha skill.
   // V13.117: the 가을 이벤트 알 holds all five: the Halloween pair and the exam-cheering three.
   pumpkincat: { name: 'HOBAK', ko: '호박냥', type: '호박 고양이', color: '#E8842C', light: '#FFC98A', soft: '#FFF3E6', limited: 'autumn' },
@@ -102,14 +119,22 @@ export const CHARACTERS = {
   tissue: { name: 'SULSUL', ko: '술술이', type: '두루마리 휴지', color: '#D9A441', light: '#FBE7B0', soft: '#FFFBEF', limited: 'autumn' },
   glue: { name: 'CHALSSAK', ko: '찰싹이', type: '딱풀', color: '#6FA8DC', light: '#CFE6F8', soft: '#F1F8FE', limited: 'autumn' }
 };
-export const LEGENDARY_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].legendary && !CHARACTERS[key].retired);
+// V13.168 그림이 다 들어온 펫만 준비됨: `artOrder` 펫은 기본 · 작은 그림 · 표정 · 알 반응(신화는 등장 포즈 · 등장 배경까지)이 있어야 한다.
+// 아래 목록(알 · 선물 · 사냥 · 낚시 교환소 · 뽑기 · 도감 · 펫 수)은 모두 준비된 펫만 담는다. 그림을 넣고 build:assets를 돌리면 자동으로 나온다.
+export const petReady = key => !!CHARACTERS[key] && (!CHARACTERS[key].artOrder || (PET_ART.has(key) && (!CHARACTERS[key].mythic || PET_REVEAL.has(key))));
+const readyKeys = test => Object.keys(CHARACTERS).filter(key => test(CHARACTERS[key]) && petReady(key));
+export const LEGENDARY_PET_KEYS = readyKeys(c => c.legendary && !c.retired);
 // The pets a student can ever meet (a retired pet such as 불새 is left out of every count and list).
-export const ACTIVE_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].retired);
-export const MYTHIC_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].mythic);
+export const ACTIVE_PET_KEYS = readyKeys(c => !c.retired);
+export const MYTHIC_PET_KEYS = readyKeys(c => c.mythic);
 // V13.150 바다 펫(sea)은 낚시 교환소에서만: 영웅 알 · 뽑기 확률표에는 넣지 않는다.
-export const EPIC_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].epic && !CHARACTERS[key].sea);
-export const LIMITED_PET_KEYS = Object.keys(CHARACTERS).filter(key => CHARACTERS[key].limited);
-export const STANDARD_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].legendary && !CHARACTERS[key].mythic && !CHARACTERS[key].epic && !CHARACTERS[key].limited && !CHARACTERS[key].sea);
+export const EPIC_PET_KEYS = readyKeys(c => c.epic && !c.sea);
+export const LIMITED_PET_KEYS = readyKeys(c => c.limited);
+export const STANDARD_PET_KEYS = readyKeys(c => !c.legendary && !c.mythic && !c.epic && !c.limited && !c.sea);
+// V13.168 그림을 기다리는 펫(도감의 '곧 만나요' 그림자).
+export const SOON_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].retired && !petReady(key));
+// V13.168 12지(쥐 · 소 · 호랑이 · 토끼 · 용 · 뱀 · 말 · 양 · 원숭이 · 닭 · 개 · 돼지): 다 모으면 칭호 '12지 수호자'.
+export const ZODIAC_PET_KEYS = ['mouse', 'calf', 'tiger', 'rabbit', 'dragon', 'snake', 'pony', 'sheep', 'monkey', 'rooster', 'dog', 'pig'];
 // The pet tiers, lowest first: 기본 (the shop egg), 영웅, 전설, 신화 (V13.118). 한정 sits beside them (a season's pets).
 export const petTier = key => CHARACTERS[key]?.mythic ? 'mythic' : CHARACTERS[key]?.legendary ? 'legendary' : CHARACTERS[key]?.epic ? 'epic' : CHARACTERS[key]?.limited ? 'limited' : 'basic';
 // V13.109 시즌 한정: the season's egg is sold from `start` to `end` (Korea time, `end` included).

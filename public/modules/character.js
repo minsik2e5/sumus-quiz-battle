@@ -1,4 +1,5 @@
 import { CHARACTERS, PET_FORMS } from './core.js';
+import { PET_FIGHT } from './pet-art.js';
 // Illustrated pets: /assets/pets/<pet>-<form>.webp (512px, transparent, feet on a shared
 // baseline) plus a 160px `-s` copy for small avatars. `form` is 0 (egg) .. 3 (final).
 const LEGACY = { lumi:'dog', nox:'cat', blaze:'dog', tide:'cat', zeph:'dragon', terra:'panda' };
@@ -72,6 +73,11 @@ const EXPRESSIONS = {
   glue: { 0: EGG, 1: ALL, 2: ALL, 3: ALL },
   robot: { 1: ROBOT, 2: ROBOT, 3: ROBOT }
 };
+// V13.168 새 펫 14종(그림 36 · 37 · 38): 표정은 다 있고(없으면 알 · 도감에 나오지 않는다), 공격 · 맞음은 그림이 다 있을 때만(PET_FIGHT) 쓴다.
+for (const key of Object.keys(CHARACTERS).filter(k => CHARACTERS[k].artOrder)) {
+  const poses = PET_FIGHT.has(key) ? FIGHT : ALL;
+  EXPRESSIONS[key] = { 0: EGG, 1: poses, 2: poses, 3: poses };
+}
 const EXPR_ALIAS = { win: 'happy', hurt: 'sad', lose: 'sad', feed: 'eat', pet: 'happy', attack: 'cheer' };
 // The pose drawn for this pet: its own picture first (로보's attack), else the shared one.
 const drawnPose = (key, form, expression) => {

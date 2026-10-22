@@ -22,7 +22,10 @@ export const PET_ELEMENT = {
   panda: 'leaf', koala: 'leaf', deer: 'leaf', squirrel: 'leaf', rabbit: 'leaf', alpaca: 'leaf',
   bear: 'earth', hedgehog: 'earth', hamster: 'earth', pig: 'earth', hyeonmu: 'earth',
   wolf: 'wind', owl: 'wind', parrot: 'wind', cat: 'wind', sapsaree: 'wind', cheonma: 'wind', dog: 'wind',
-  snake: 'toxic', crocodile: 'toxic', ghost: 'toxic', gumiho: 'toxic'
+  snake: 'toxic', crocodile: 'toxic', ghost: 'toxic', gumiho: 'toxic',
+  // V13.168 새 펫 14종(별빛: 윙윙 · 황룡)
+  mouse: 'earth', calf: 'earth', tiger: 'flame', pony: 'wind', monkey: 'leaf', rooster: 'flame',
+  flamingo: 'wind', quokka: 'leaf', chameleon: 'toxic', polarbear: 'ice', snowleopard: 'ice', samjogo: 'flame'
 };
 export const elementOf = key => PET_ELEMENT[key] || 'star';
 export const paletteOf = key => ELEMENTS[elementOf(key)];
@@ -140,9 +143,10 @@ export function fxWash(arena, el) {
 }
 
 /* ---------- 신화 필살 연출 (펫마다 하나) ---------- */
-export const SIGNATURE_KEYS = ['gumiho', 'cheongryong', 'baekho', 'jujak', 'hyeonmu'];
+export const SIGNATURE_KEYS = ['gumiho', 'cheongryong', 'baekho', 'jujak', 'hyeonmu', 'hwangryong', 'samjogo'];
 // A mythic pet's own move on a skill or a critical hit: nine fox-fires, a lightning bolt, three
 // silver claw marks, columns of fire, a star map in a tide (from and to are arena pixels).
+// V13.168 황룡: 오방색 구슬 다섯 개가 소용돌이치며 날아가 금빛 고리로 터진다. 삼족오: 태양 고리와 금빛 불꽃 세 줄기(세 발).
 export function fxSignature(arena, from, to, key) {
   const bit = (kind, c1, c2, size, x0, y0, frames, ms, delay = 0) => run(piece(arena, 'fx2-bit', { left: x0 + 'px', top: y0 + 'px' }, ms + delay + 100, svgc(kind, c1, c2, size)), frames, { duration: ms, delay, easing: 'cubic-bezier(.3,.1,.6,1)' });
   const dx = to.x - from.x, dy = to.y - from.y;
@@ -162,6 +166,15 @@ export function fxSignature(arena, from, to, key) {
   } else if (key === 'hyeonmu') {
     [150, 110, 70].forEach((size, i) => run(piece(arena, 'fx2-ring', { left: to.x + 'px', top: to.y + 18 + 'px', width: size + 'px', height: size * .4 + 'px', borderColor: '#7fe8ff', boxShadow: '0 0 14px #34c6d8' }, 800), [{ transform: 'translate(-50%,-50%) scale(.2)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1.3)', opacity: 0 }], { duration: 640, delay: i * 110, easing: 'ease-out' }));
     for (let i = 0; i < 7; i++) { const a = rand(0, 6.28), d = rand(30, 82); bit('star', '#bff6ff', '#ffffff', Math.round(rand(11, 18)), to.x, to.y - 10, [{ transform: tr(0, 0, 'scale(.2)'), opacity: 0 }, { transform: tr(Math.cos(a) * d, Math.sin(a) * d - 20, 'scale(1)'), opacity: 1, offset: .4 }, { transform: tr(Math.cos(a) * d, Math.sin(a) * d - 30, 'scale(.4)'), opacity: 0 }], 700, i * 50); }
+  } else if (key === 'hwangryong') {
+    ['#4fb6ff', '#ff4a2a', '#ffd23f', '#ffffff', '#3b3f6b'].forEach((c, i) => {
+      const a = i / 5 * 6.28, r = 46;
+      bit('star', c, '#fff6c8', 30, from.x, from.y, [{ transform: tr(0, 0, 'scale(.3)'), opacity: 0 }, { transform: tr(Math.cos(a) * r + dx * .4, Math.sin(a) * r + dy * .4, 'scale(1.1) rotate(120deg)'), opacity: 1, offset: .45 }, { transform: tr(dx, dy, 'scale(1.3) rotate(260deg)'), opacity: 1, offset: .85 }, { transform: tr(dx, dy, 'scale(.4)'), opacity: 0 }], 760, i * 40);
+    });
+    run(piece(arena, 'fx2-ring', { left: to.x + 'px', top: to.y + 'px', width: '190px', height: '190px', borderColor: '#ffd23f', boxShadow: '0 0 24px #f29a1f' }, 1100), [{ transform: 'translate(-50%,-50%) scale(.2)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 0 }], { duration: 520, delay: 620 });
+  } else if (key === 'samjogo') {
+    run(piece(arena, 'fx2-ring', { left: to.x + 'px', top: to.y + 'px', width: '150px', height: '150px', borderColor: '#ffd23f', boxShadow: '0 0 30px #ff7a1a, inset 0 0 22px #ffd23f' }, 900), [{ transform: 'translate(-50%,-50%) scale(.3)', opacity: 0 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 1, offset: .35 }, { transform: 'translate(-50%,-50%) scale(1.25)', opacity: 0 }], { duration: 760 });
+    [-26, 0, 26].forEach((off, i) => bit('flame', '#ffd23f', '#e5172f', 44, from.x, from.y + off, [{ transform: tr(0, 0, 'rotate(90deg) scale(.4)'), opacity: 0 }, { transform: tr(dx * .5, dy * .5 - off * .5, 'rotate(90deg) scale(1.1)'), opacity: 1, offset: .4 }, { transform: tr(dx, dy - off, 'rotate(90deg) scale(1.2)'), opacity: 1, offset: .8 }, { transform: tr(dx, dy - off, 'scale(.4)'), opacity: 0 }], 620, 120 + i * 70));
   } else fxPrism(arena, to);
 }
 

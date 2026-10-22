@@ -1,4 +1,5 @@
 import { esc } from './ui.js';
+import { PET_TITLE_ART } from './pet-art.js';
 import { TITLES, TITLE_TIERS, LEAGUE_TIERS } from './titles.js';
 
 // V13.66 drawn emblems: title medals (a shape per tier), title chips, league tier shields and
@@ -92,7 +93,9 @@ export const TITLE_ART = new Set([
   'unit1', 'unit3', 'exam10', 'finalclear', 'fix50', 'fix200', 'fix500', 'weekend10', 'morning30', 'streak60',
   'streak100', 'attend200', 'attend365', 'study300', 'words5000', 'combo50', 'perfect100', 'event10', 'eventlover', 'away1',
   'away10', 'rematch10', 'comeback5', 'win200', 'skill100', 'legend1', 'mythic1', 'pets12', 'pets20', 'pets30',
-  'seasonall', 'egg10', 'egg50', 'gift5', 'petcare30', 'lucky2', 'rps50', 'monster50', 'monster100', 'boss10'
+  'seasonall', 'egg10', 'egg50', 'gift5', 'petcare30', 'lucky2', 'rps50', 'monster50', 'monster100', 'boss10',
+  // V13.168 12지 수호자(그림 36d): 메달 그림이 들어오면(build:assets → pet-art.js) 자동으로 쓴다.
+  ...PET_TITLE_ART
 ]);
 export function titleEmblem(key, opts = {}) {
   const k = TITLES[key] ? key : 'rookie', t = TITLES[k];

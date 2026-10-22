@@ -1,0 +1,8 @@
+/* V13.168 펫 도감 '곧 만나요': 그림을 그리고 있는 새 펫 14종(그림 주문서 36 · 37 · 38). */
+.pb-section.soon{color:#64748b}
+.pb-card.pb-soon{border-style:dashed;background:linear-gradient(160deg,var(--ps),#fff 60%)}
+.pb-card.pb-soon .pb-soon-art{display:grid;place-items:center;min-height:108px;margin:6px 0;border-radius:16px;background:radial-gradient(circle at 50% 60%,color-mix(in srgb,var(--pl) 55%,#fff),#fff 74%)}
+.pb-card.pb-soon .pb-soon-art img{width:84px;height:84px;object-fit:contain;filter:grayscale(.2) opacity(.85);animation:pb-soon-bob 2.6s ease-in-out infinite}
+.pb-card.pb-soon .pb-soon-tag{margin-left:auto;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:900;color:#fff;background:var(--pc)}
+@keyframes pb-soon-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+@media (prefers-reduced-motion:reduce){.pb-card.pb-soon .pb-soon-art img{animation:none}}

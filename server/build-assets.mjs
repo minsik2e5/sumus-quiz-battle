@@ -110,7 +110,8 @@ const cssSources = [
   "v13158.css",
   "v13159.css",
   "v13162.css",
-  "v13166.css"
+  "v13166.css",
+  "v13168.css"
 ];
 const cssBundlePath = resolve(root, 'public/app.bundle.css');
 
@@ -156,6 +157,25 @@ writeFileSync(cssBundlePath, cssBundle);
   const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 기본 · 공격 · 맞음 그림이 다 있는 몬스터.\nexport const MONSTER_ART = new Set(${JSON.stringify(keys)});\n`;
   if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
   console.log(`[monster-art] ${keys.length} monsters with art`);
+}
+
+// V13.168 그림 폴더를 보고 public/modules/pet-art.js를 만든다(새 펫은 그림이 다 들어와야 알 · 도감 등에 나온다, core.js petReady).
+// PET_ART: 단계 0~3 기본 · 작은 그림(-s), 알 반응(happy · eat), 단계 1~3 표정(happy · eat · sad · cheer)이 다 있는 펫.
+// PET_FIGHT: 단계 1~3 야차전 공격 · 맞음(attack · hurt)이 다 있는 펫. PET_REVEAL: 신화 등장 포즈(pets/<key>-reveal)와 등장 배경(reveal/bg-<key>)이 있는 펫.
+{
+  const files = new Set(readdirSync(resolve(root, 'public/assets/pets')));
+  const reveal = new Set(readdirSync(resolve(root, 'public/assets/reveal')));
+  const has = name => files.has(`${name}.webp`);
+  const all = [...new Set([...files].map(f => f.match(/^([a-z]+)-0\.webp$/)?.[1]).filter(Boolean))].sort();
+  const art = all.filter(k => [0, 1, 2, 3].every(f => has(`${k}-${f}`) && has(`${k}-${f}-s`) && (f ? ['happy', 'eat', 'sad', 'cheer'] : ['happy', 'eat']).every(e => has(`${k}-${f}-${e}`))));
+  const fight = all.filter(k => [1, 2, 3].every(f => has(`${k}-${f}-attack`) && has(`${k}-${f}-hurt`)));
+  const shows = all.filter(k => has(`${k}-reveal`) && reveal.has(`bg-${k}.webp`));
+  const titles = readdirSync(resolve(root, 'public/assets/titles'));
+  const medals = ['zodiac12'].filter(k => titles.includes(`${k}.webp`) && titles.includes(`${k}-s.webp`));
+  const out = resolve(root, 'public/modules/pet-art.js');
+  const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/pets · reveal)에 그림이 다 있는 펫.\nexport const PET_ART = new Set(${JSON.stringify(art)});\nexport const PET_FIGHT = new Set(${JSON.stringify(fight)});\nexport const PET_REVEAL = new Set(${JSON.stringify(shows)});\n// V13.168 칭호 '12지 수호자' 메달(titles/zodiac12 · -s).\nexport const PET_TITLE_ART = new Set(${JSON.stringify(medals)});\n`;
+  if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
+  console.log(`[pet-art] ${art.length} pets with art, ${fight.length} with battle poses, ${shows.length} with a reveal`);
 }
 
 // Service worker: precache list + a hash of every served file. Any change to

@@ -2,7 +2,7 @@
 // every kind of egg (no pity), the school news, the reveal show and the dex.
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { CHARACTERS, ACTIVE_PET_KEYS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, LIMITED_PET_KEYS, petTier } from '../public/modules/core.js';
+import { CHARACTERS, ACTIVE_PET_KEYS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, LIMITED_PET_KEYS, petTier, petReady } from '../public/modules/core.js';
 import { MYTHIC_RATE } from '../public/modules/rewards.js';
 import { petSkill } from '../public/modules/battle-engine.js';
 import { mythicRoll, setMythicRandom, openEgg, pullLucky, giftEggPick, openGifts } from './rewards.mjs';
@@ -12,12 +12,12 @@ const source = path => readFileSync(here(path), 'utf8');
 
 export function runMythicChecks(assert) {
   const MYTHIC = ['gumiho', 'cheongryong', 'baekho', 'jujak', 'hyeonmu'];
-  assert(MYTHIC_PET_KEYS.join() === MYTHIC.join() && MYTHIC.every(key => petTier(key) === 'mythic' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && !LEGENDARY_PET_KEYS.includes(key) && !LIMITED_PET_KEYS.includes(key)),
+  assert(MYTHIC_PET_KEYS.filter(key => !CHARACTERS[key].artOrder).join() === MYTHIC.join() && MYTHIC_PET_KEYS.every(key => MYTHIC.includes(key) || ['hwangryong', 'samjogo'].includes(key)) && MYTHIC.every(key => petTier(key) === 'mythic' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && !LEGENDARY_PET_KEYS.includes(key) && !LIMITED_PET_KEYS.includes(key)),
     'V13.118 신화 펫은 구미호·청룡·백호·주작·현무 5종이고 기본·영웅·전설·한정과 섞이지 않는다');
   assert(LEGENDARY_PET_KEYS.join() === 'haechi,whale,qilin,cheonma' && petTier('cheonma') === 'legendary' && CHARACTERS.phoenix.retired && ![...STANDARD_PET_KEYS, ...EPIC_PET_KEYS, ...LEGENDARY_PET_KEYS, ...MYTHIC_PET_KEYS, ...LIMITED_PET_KEYS].includes('phoenix') && !ACTIVE_PET_KEYS.includes('phoenix'),
     'V13.118 천마는 전설이고 불새는 숨겨져서 알·뽑기·도감·개수에 나오지 않는다(옛 기록이 있어도 그림은 그려진다)');
-  assert(ACTIVE_PET_KEYS.length === STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length + LEGENDARY_PET_KEYS.length + MYTHIC_PET_KEYS.length + LIMITED_PET_KEYS.length && ACTIVE_PET_KEYS.length === Object.keys(CHARACTERS).length - 1,
-    'V13.118 학생이 만날 수 있는 펫은 기본 16 · 영웅 16 · 전설 4 · 신화 5 · 한정 5 = 46종이다');
+  assert(ACTIVE_PET_KEYS.length === STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length + LEGENDARY_PET_KEYS.length + MYTHIC_PET_KEYS.length + LIMITED_PET_KEYS.length && ACTIVE_PET_KEYS.length === Object.keys(CHARACTERS).filter(petReady).length - 1,
+    'V13.118 학생이 만날 수 있는 펫은 기본 16 · 영웅 16 · 전설 4 · 신화 5 · 한정 5 = 46종이다(V13.168: 그림을 기다리는 새 펫은 빼고 센다)');
   assert([...MYTHIC, 'cheonma'].every(key => petSkill({ key }).key === 'none') && petSkill({ key: 'jujak' }).desc.includes('신화'), 'V13.118 신화 펫과 천마에는 야차전 특기가 없다');
 
   const rate = MYTHIC_RATE, sources = Object.keys(rate);
@@ -26,7 +26,7 @@ export function runMythicChecks(assert) {
   assert(!/MYTHIC_PITY|mythic_pulls|mythic_pity/.test(src), 'V13.118 신화에는 천장(확정)이 없다');
 
   // ---- the roll
-  const none = { pets: [{ key: 'dog' }] }, all = { pets: MYTHIC.map(key => ({ key })) };
+  const none = { pets: [{ key: 'dog' }] }, all = { pets: MYTHIC_PET_KEYS.map(key => ({ key })) }; // V13.168 그림이 들어온 새 신화 펫(황룡 · 삼족오)까지 다 가진 학생
   try {
     setMythicRandom(() => 0); assert(mythicRoll(none, 'basic') === 'gumiho' && mythicRoll({ pets: [{ key: 'gumiho' }] }, 'basic') === 'cheongryong' && mythicRoll(all, 'basic') === null, 'V13.118 신화는 아직 없는 신화 펫 중에서 나오고, 다 가진 학생에게는 안 나온다');
     setMythicRandom(() => .999); assert(sources.every(key => mythicRoll(none, key) === null), 'V13.118 보통의 운에서는 신화가 나오지 않는다');
@@ -42,7 +42,7 @@ export function runMythicChecks(assert) {
     assert(opened2.mythic && egg2.purchases[0].item === 'epic_egg' && egg2.points_spent === 800, 'V13.118 영웅 알도 신화로 열릴 수 있다');
     const egg3 = { pets: [{ key: 'dog' }] }, opened3 = openEgg(egg3, { season: 'autumn', missing: ['ghost'], price: 600, random: () => 0, now: Date.parse('2026-10-20T12:00:00+09:00') });
     assert(!opened3.mythic && opened3.key === 'ghost' && opened3.limited, 'V13.118 가을 이벤트 알(한정 알)에서는 신화가 나오지 않는다');
-    const four = { pets: [{ key: 'dog' }, ...MYTHIC.slice(0, 4).map(key => ({ key }))] }, last = openEgg(four, { epic: false, missing: ['pig'], price: 400, random: () => .5 });
+    const four = { pets: [{ key: 'dog' }, ...MYTHIC_PET_KEYS.filter(key => key !== 'hyeonmu').map(key => ({ key })) /* V13.168 그림이 들어온 새 신화 펫 포함 */] }, last = openEgg(four, { epic: false, missing: ['pig'], price: 400, random: () => .5 });
     assert(last.key === 'hyeonmu' && openEgg({ pets: [...four.pets, { key: 'hyeonmu' }] }, { epic: false, missing: ['pig'], price: 400, random: () => .5 }).mythic === undefined, 'V13.118 신화를 다 모으면 더는 신화가 나오지 않고 평소 알로 열린다');
 
     // ---- coin capsule

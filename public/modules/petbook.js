@@ -1,4 +1,4 @@
-import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, LIMITED_PET_KEYS, SEASONS, seasonOnSale, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE } from './core.js';
+import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, LIMITED_PET_KEYS, SOON_PET_KEYS, ZODIAC_PET_KEYS, SEASONS, seasonOnSale, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE } from './core.js';
 import { icon, esc, num } from './ui.js';
 import { PET_SKILLS } from './battle-engine.js';
 import { petDisplayName } from './pet-moments.js';
@@ -32,6 +32,19 @@ function card(key, no, pet, teacher = null) {
   </article>`;
 }
 
+// V13.168 곧 만나요: 그림을 그리고 있는 새 펫(core.js SOON_PET_KEYS)은 이름 없이 그림자 칸만. 그림이 들어오면 위 칸으로 옮겨 간다.
+function soonCard(key) {
+  const c = CHARACTERS[key], tier = c.mythic ? '신화' : c.epic ? '영웅' : ZODIAC_PET_KEYS.includes(key) ? '12지' : '기본';
+  const lock = c.mythic ? 'pet-legend-locked' : c.epic ? 'pet-epic-locked' : 'pet-locked';
+  return `<article class="pb-card pb-soon ${c.mythic ? 'mythic' : c.epic ? 'epic' : ''} unmet" style="--pc:${c.color};--pl:${c.light};--ps:${c.soft}" aria-label="곧 만나는 펫">
+    <header><span class="pb-no">NEW</span><b>???</b><span class="pb-type">${esc(c.type)}</span><span class="pb-soon-tag">${tier}</span></header>
+    <div class="pb-soon-art"><img src="/assets/ui/${lock}.webp" alt="" width="96" height="96" loading="lazy" decoding="async" draggable="false"></div>
+    <footer><span class="pb-skill lock">${icon('lock')}곧 만나요</span><small>그림을 그리고 있어요. 그림이 오면 ${c.mythic ? '모든 알에서 아주 낮은 확률로' : c.epic ? '영웅 알에서' : '랜덤 알에서'} 만날 수 있어요</small></footer>
+  </article>`;
+}
+const soonSection = () => SOON_PET_KEYS.length ? `<h2 class="pb-section soon">곧 만나요 <small>새 펫 ${num(SOON_PET_KEYS.length)}마리를 그리고 있어요</small></h2>
+    <div class="pb-grid">${SOON_PET_KEYS.map(soonCard).join('')}</div>` : '';
+
 export function petBookPage(A) {
   const owned = A.data.stats?.pets || [], mine = key => owned.find(pet => pet.key === key);
   const all = [...STANDARD_PET_KEYS, ...EPIC_PET_KEYS, ...LEGENDARY_PET_KEYS, ...MYTHIC_PET_KEYS, ...LIMITED_PET_KEYS], met = all.filter(mine).length;
@@ -53,7 +66,8 @@ export function petBookPage(A) {
     <h2 class="pb-section mythic">신화 펫 <small>전설보다 위 · 모든 알에서 아주 낮은 확률</small></h2>
     <div class="pb-grid">${MYTHIC_PET_KEYS.map((key, i) => card(key, STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length + LEGENDARY_PET_KEYS.length + i + 1, mine(key))).join('')}</div>
     <h2 class="pb-section limited">한정 펫 <small>시즌에만 파는 알</small></h2>
-    <div class="pb-grid">${LIMITED_PET_KEYS.map((key, i) => card(key, STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length + LEGENDARY_PET_KEYS.length + MYTHIC_PET_KEYS.length + i + 1, mine(key))).join('')}</div>`;
+    <div class="pb-grid">${LIMITED_PET_KEYS.map((key, i) => card(key, STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length + LEGENDARY_PET_KEYS.length + MYTHIC_PET_KEYS.length + i + 1, mine(key))).join('')}</div>
+    ${soonSection()}`;
 }
 
 // V13.112 선생님 화면의 펫 도감: all pets with every form, the yacha skill, how a student meets it and
@@ -73,5 +87,6 @@ export function teacherPetDex(A) {
       <small>${sections.map(([name, , keys]) => `${name.replace(' 펫', '')} ${num(keys.length)}`).join(' · ')}${sale ? ` · <b>${esc(sale.name)} 한정 알 판매 중(${esc(sale.until)}까지)</b>` : ''}</small>
     </section>
     ${sections.map(([name, how, keys, cls]) => `<h2 class="pb-section${cls}">${name} <small>${how}</small></h2>
-      <div class="pb-grid">${keys.map(key => card(key, ++no, { form: 3 }, ownersOf(key))).join('')}</div>`).join('')}`;
+      <div class="pb-grid">${keys.map(key => card(key, ++no, { form: 3 }, ownersOf(key))).join('')}</div>`).join('')}
+    ${soonSection()}`;
 }

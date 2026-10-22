@@ -1,7 +1,7 @@
 // V13.66 competition: titles, the weekly yacha league and weekly awards, computed from the
 // state on each request (nothing here is stored). One context per request groups sessions
 // and battles by student once, so ranking lists stay O(sessions + battles).
-import { levelInfo, petProgress, CHARACTERS, PLAYER_MAX_LEVEL } from '../public/modules/core.js';
+import { levelInfo, petProgress, CHARACTERS, PLAYER_MAX_LEVEL, ZODIAC_PET_KEYS } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked, LEAGUE_POINTS, LEAGUE_PAIR_DAY_CAP, leagueTier, leagueTierIndex } from '../public/modules/titles.js';
 import { GACHA_ITEMS, GACHA_KEYS } from '../public/modules/rewards.js';
 import { bonusRecords } from './rewards.mjs';
@@ -194,6 +194,7 @@ export function createCompetition(state, now = Date.now()) {
     legend_pets: p => petCount(p, 'legendary'),
     mythic_pets: p => petCount(p, 'mythic'),
     season_pets: p => petCount(p, 'limited'),
+    zodiac_pets: p => ZODIAC_PET_KEYS.filter(key => (Array.isArray(p?.pets) ? p.pets : []).some(pet => pet?.key === key)).length,
     eggs: p => (Array.isArray(p?.purchases) ? p.purchases : []).filter(x => /egg$/.test(String(x?.item || ''))).length,
     care: p => Number(p?.care?.total || 0),
     lucky_best_day: p => Number(p?.lucky?.big_best || 0),

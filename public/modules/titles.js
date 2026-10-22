@@ -33,6 +33,7 @@
 //                event_studies 보상 이벤트 중 학습, away_wins 다른 학교 친구에게 이긴 야차전, rematches 같은 친구와 10분 안에
 //                다시 한 판, legend_pets · mythic_pets · season_pets 전설 · 신화 · 한정 펫 수, eggs 상점 알을 연 수,
 //                care 펫 교감(쓰다듬기 · 밥) 수, lucky_best_day 코인 뽑기 3배가 하루에 가장 많이 나온 수, boss_wins 보스 몬스터 처치
+//   V13.168 zodiac_pets 만난 12지 펫 수(core.js ZODIAC_PET_KEYS)
 // Limited titles belong to one week: they are held only while last week's result stands.
 // V13.148 `once`: 한정 테두리지만 주간 칭호가 아닌 것(신화의 주인): 한 번 받으면 계속 갖고, 코인도 한 번만.
 
@@ -171,6 +172,8 @@ Object.assign(TITLES, {
   pets12: { name: '펫 대가족', tier: 'epic', group: 'collect', stat: 'pets', goal: 12, icon: 'paw', how: '펫 12마리 만나기', desc: '펫 가족이 북적북적해요.' },
   pets20: { name: '펫 박물관', tier: 'legendary', group: 'collect', stat: 'pets', goal: 20, icon: 'paw', how: '펫 20마리 만나기', desc: '펫 박물관을 열어도 되겠어요.' },
   pets30: { name: '살아있는 도감', tier: 'legendary', group: 'collect', stat: 'pets', goal: 30, icon: 'book', how: '펫 30마리 만나기', desc: '펫 도감이 살아 움직여요.' },
+  // V13.168 12지 수호자: 12지 펫(core.js ZODIAC_PET_KEYS) 12마리를 모두 만나면. 새 12지 펫 6종은 그림이 들어온 뒤에 만날 수 있다.
+  zodiac12: { name: '12지 수호자', tier: 'legendary', group: 'collect', stat: 'zodiac_pets', goal: 12, icon: 'crown', how: '12지 펫 12마리 모두 만나기(쥐 · 소 · 호랑이 · 토끼 · 용 · 뱀 · 말 · 양 · 원숭이 · 닭 · 개 · 돼지)', desc: '열두 띠 친구들이 모두 모였어요.' },
   seasonall: { name: '시즌 컬렉터', tier: 'epic', group: 'collect', stat: 'season_pets', goal: 3, icon: 'gem', how: '한정 펫 3마리 만나기', desc: '시즌마다 한정 펫을 놓치지 않아요.' },
   egg10: { name: '알 콜렉터', tier: 'common', group: 'collect', stat: 'eggs', goal: 5, icon: 'heart', how: '상점에서 알 5개 열기', desc: '알을 모으는 재미에 빠졌어요.' },
   egg50: { name: '알 부화 장인', tier: 'epic', group: 'collect', stat: 'eggs', goal: 20, icon: 'gem', how: '상점에서 알 20개 열기', desc: '알을 깨우는 손길이 장인급.' },
