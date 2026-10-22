@@ -89,9 +89,10 @@ async function trimChecks(assert, expectStatus) {
   state.sessions.push(session('s-late', 'qa-tr-a', 91));
   await expectStatus(409, () => service(state, 'POST', '/teacher/storage-trim', { fingerprint: archive.fingerprint, archived_at: archive.created_at }, teacher), 'V13.131 보관 파일을 받은 뒤 대상이 바뀌면 다시 받게 한다');
   state.sessions.pop();
-  // 저절로 지우지 않는다: 매시간 정리(sweep)는 답 기록을 그대로 둔다.
-  sweep(state, now);
-  assert(state.sessions.find(s => s.id === 's-old').answer_records?.length === 12, 'V13.131 정리는 보관 파일을 받은 뒤 버튼으로만 한다(sweep이 저절로 지우지 않는다)');
+  // V13.168 자동 정리(한 달 지난 연습 기록)가 꺼진 정리(쓰기 한도가 넉넉하지 않은 날)는 답 기록을 그대로 둔다.
+  // 자동 정리 자체는 server/auto-trim-check.mjs가 본다.
+  sweep(state, now, { autoTrim: false });
+  assert(state.sessions.find(s => s.id === 's-old').answer_records?.length === 12, 'V13.131 자동 정리가 꺼진 sweep은 답 기록을 지우지 않는다(수동 정리는 보관 파일을 받은 뒤 버튼으로)');
 
   const result = await service(state, 'POST', '/teacher/storage-trim', { fingerprint: archive.fingerprint, archived_at: archive.created_at }, teacher);
   assert(result.trimmed.sessions === 2 && result.trimmed.attempts === 1 && result.trim.sessions === 0 && result.trim.attempts === 0, 'V13.131 받은 파일과 같으면 정리하고, 다시 보면 남은 대상이 없다');
