@@ -109,7 +109,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(!studentUiSource.includes('data-middle-word=') && studentUiSource.includes('data-high-word='), 'V13.150 middle-school test setup uses the same word picker as high school');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.170.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.172.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -128,7 +128,7 @@ export async function runReleaseCheck() {
       assert(displayEnglish(charged.word) === 'be charged with' && grade('write_en', 'be charged with', charged), 'grammar note (+동명사) is not part of the expected English answer');
     }
     const gangseoWords = bySchool('강서고');
-    assert(gangseoWords.length === 354 + 180 + 268, '강서고 vocabulary = 354 mock-exam words + 180 YBM textbook words + 268 기말고사 words (same textbook as 단원고)');
+    assert(gangseoWords.length === 354 + 180 + 268 + 329, '강서고 vocabulary = 354 mock-exam words + 180 YBM textbook words + 268 기말고사 words (same textbook as 단원고) + 329 9월 모의고사 words');
     {
       const danwonYbm = bySchool('단원고').filter(word => word.id.startsWith('high:ybm-kim:common2:'));
       const gangseoYbm = gangseoWords.filter(word => word.id.startsWith('high:ybm-kim:gangseo:common2:'));
@@ -145,6 +145,13 @@ export async function runReleaseCheck() {
     assert(bySchool('단원고').some(word => word.id.startsWith('high:ybm-kim:common2:lesson2:')), 'YBM Kim lesson 2 vocabulary is loaded');
     assert(studentUiSource.includes("['eng2mean','뜻 4지선다'") && studentUiSource.includes("['mean2eng','영어 4지선다'"), 'middle/high self-test exposes both four-choice modes');
     assert(bySchool('선부고').filter(word => String(word.range_code) === '44').length === 49, '선부고 외부 44 vocabulary = 49');
+    {
+      const sep = runtimeBooks.find(book => book.id === 'gangseo:final:mock-sep-2026');
+      const expected = { 29: 33, 30: 31, 31: 23, 32: 35, 33: 35, 34: 25, 37: 49, 38: 50, 40: 48 };
+      assert(sep && sep.school_id === 'gangseo-high' && sep.school === '강서고' && sep.division === 'high' && sep.exam_period === 'final' && sep.words.length === 329, 'V13.172 강서고 9월 모의고사 단어장: 강서고 기말고사 329단어');
+      assert(Object.entries(expected).every(([q, n]) => sep.words.filter(word => word.range_code === `9월 ${q}`).length === n) && new Set(sep.words.map(word => word.range_code)).size === 9, 'V13.172 강서고 9월 모의고사 9지문(29·30·31·32·33·34·37·38·40번) 단어 수가 PDF와 같다');
+      assert(sep.words.every(word => word.word && word.meaning && word.source && word.source_question && word.id.startsWith('gs_sep_')) && sep.words.some(word => word.word === "by the skin of one's teeth" && word.meaning === '간신히, 가까스로'), 'V13.172 9월 단어는 모두 단어 · 뜻 · 출처 · 문항 번호를 가진다');
+    }
     assert(new Set(allWords.map(word => word.id)).size === allWords.length, 'vocabulary ids are unique');
     assert(Object.keys(EXAM_TYPES).join(',') === 'write_meaning,write_en,eng2mean_mc,mean2eng_mc', 'exactly four exam types with writing modes first');
     const practiceTypes = ['write_meaning', 'eng2mean', 'mean2eng', 'spell', 'listen', 'scramble', 'vowelblank', 'initial'];
@@ -1238,7 +1245,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.170.0') && indexHtml.includes('/app.bundle.css?v=13.170.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.172.0') && indexHtml.includes('/app.bundle.css?v=13.172.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1259,7 +1266,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.170.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.172.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
