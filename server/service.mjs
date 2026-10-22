@@ -25,7 +25,7 @@ import { ybmKimHighBooks, ybmKimRetiredWords } from './high-vocab-ybm-kim.mjs';
 import { ybmKimFinalBooks } from './high-vocab-ybm-kim-final.mjs';
 import { ybmParkSeonbuBooks } from './high-vocab-ybm-park-seonbu.mjs';
 import { compactSession } from './state.mjs';
-import { trimSummary, trimArchive, trimRecords, attemptTotal } from './storage-trim.mjs';
+import { trimSummary, trimArchive, trimRecords, attemptTotal, autoTrimSessions } from './storage-trim.mjs';
 import { DUNGEON, CUTS, CUT_KEYS, openCuts, DUNGEON_COINS } from './dungeon-engine.mjs';
 import { activeEventFor, studentEventView, teacherEventView, teacherOwns, keptEvents, createRewardEvent, endRewardEvent, deleteRewardEvent, eventCoins, eventXp } from './reward-events.mjs';
 import { dungeonQuestions } from './dungeon-words.mjs';
@@ -37,7 +37,7 @@ import { HUNT } from '../public/modules/hunt-rules.js';
 import { REEL } from '../public/modules/reel-rules.js';
 import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './games.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
-import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, settleParty, partyReportPending, undoParty } from './party.mjs';
+import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, partyPlaysLeft, settleParty, partyReportPending, undoParty } from './party.mjs';
 import { PARTY } from './party-engine.mjs';
 import { STREAK_GUARD, guardDayKeys, guardView, guardPlan, studyDayNums } from '../public/modules/streak-guard.js';
 export const APP_VERSION = packageInfo.version;
@@ -225,7 +225,9 @@ function regradeMeaningDispute(state, dispute) {
       const retryIndex = practice.retry?.findIndex(item => item.id === dispute.word_id) ?? -1;
       if (retryIndex >= 0) practice.retry.splice(retryIndex, 1);
     }
-    const session = state.sessions.find(item => item.id === dispute.source_id && item.student_id === dispute.student_id);
+    // V13.168 지난 기록은 얼려 두고 같이 쓴다: 고칠 기록은 사본으로 바꾼 뒤 고친다.
+    const sessionIndex = state.sessions.findIndex(item => item.id === dispute.source_id && item.student_id === dispute.student_id);
+    const session = sessionIndex >= 0 ? (state.sessions[sessionIndex] = structuredClone(state.sessions[sessionIndex])) : null;
     if (session) {
       const answerRecord = (session.answer_records || []).find(item => item.question_id === dispute.question_id || (item.word_id === dispute.word_id && !item.regraded && item.correct === false));
       const currentWrongCount = Number.isFinite(Number(session.wrong_count))
@@ -1032,7 +1034,9 @@ function closeStalePractices(state, now) {
     if (lastActivity > now - STALE_PRACTICE_MS) continue;
     // Answers given: close it the way a finish does (the existing path used when a
     // student changes school), so the answers become a record. No answers: nothing to keep.
-    if (Number(x.total || 0) > 0) finishPractice(x, state);
+    // V13.168 방치로 닫힌 연습은 마지막으로 푼 때의 기록으로 남기고 코인 · 미끼 · 공은 없다(v13.73 "3일 방치 코인 0").
+    // 예전: 정해진 문제를 다 풀고 오답 다시 풀기에서 멈췄으면 닫는 날 코인 · 오늘 첫 학습 · 미끼 · 공을 받고 그날 공부한 날이 됐다.
+    if (Number(x.total || 0) > 0) finishPractice(x, state, false, { staleAt: lastActivity });
     else x.discarded = true;
     changed = true;
   }
@@ -1065,19 +1069,21 @@ function compactRecord(record, words) {
   }
   return changed;
 }
+// V13.168 지난 기록은 얼려 두고 다음 상태와 같이 쓴다(server/mutation-coordinator.mjs): 고칠 기록만 사본으로 바꾼다.
 function compactOldSessions(state, now) {
   let changed = false, words = null;
-  for (const session of state.sessions) {
-    if (Number(session.created_at || 0) > now - COMPACT_SESSION_AFTER_MS) continue;
-    for (const list of [session.answer_records, session.wrong_details]) {
-      if (!Array.isArray(list)) continue;
-      for (const record of list) {
-        if (!record || (!('word' in record) && record.timed_out !== false && record.regraded !== false)) continue;
-        words ??= builtinWords();
-        if (compactRecord(record, words)) changed = true;
-      }
+  state.sessions.forEach((session, index) => {
+    if (!session || Number(session.created_at || 0) > now - COMPACT_SESSION_AFTER_MS) return;
+    const lists = [session.answer_records, session.wrong_details].filter(Array.isArray);
+    if (!lists.some(list => list.some(record => record && ('word' in record || record.timed_out === false || record.regraded === false)))) return;
+    words ??= builtinWords();
+    const copy = structuredClone(session);
+    let touched = false;
+    for (const list of [copy.answer_records, copy.wrong_details]) {
+      if (Array.isArray(list)) for (const record of list) if (compactRecord(record, words)) touched = true;
     }
-  }
+    if (touched) { state.sessions[index] = copy; changed = true; }
+  });
   return changed;
 }
 function hydrateRecord(record, words) {
@@ -1116,7 +1122,8 @@ const rpsFor = (state, p, now = Date.now()) => ({ ...rpsView(p, now), hall: rpsH
 // 먼저 닫으면 마지막 답(쓰기 220ms 모으기 · 왕복 시간)이 버려졌다. 유예 안에 온 답은 받고, 유예가 지나면 정리가 닫는다.
 export const EXAM_SUBMIT_GRACE_MS = 5000;
 export const examAttemptExpired = (a, now = Date.now()) => a?.status === 'active' && Number(a.deadline || 0) + EXAM_SUBMIT_GRACE_MS <= now;
-export function sweep(state, now = Date.now()) {
+// V13.168 autoTrim: 한 달 지난 연습 기록 자동 정리(server/storage-trim.mjs). 워커는 쓰기 한도가 넉넉한 날만 켠다.
+export function sweep(state, now = Date.now(), { autoTrim = true } = {}) {
   let changed = false;
   for (const a of state.examAttempts) if (examAttemptExpired(a)) {
     // V13.129: 기록이 망가진 응시 하나 때문에 정리가 매번 실패하면 모든 요청이 막힌다. 그 응시만 제출로 닫는다.
@@ -1126,6 +1133,7 @@ export function sweep(state, now = Date.now()) {
   }
   if (closeStalePractices(state, now)) changed = true;
   if (compactOldSessions(state, now)) changed = true;
+  if (autoTrim && autoTrimSessions(state, now)) changed = true;
   if (autoResolveMeaningDisputes(state) > 0) changed = true;
   if (tidyBattles(state)) changed = true;
   if (tidyDungeons(state, now)) changed = true;
@@ -1242,7 +1250,8 @@ export async function service(state, method, path, body, token, options = {}) {
     const competition = createCompetition(state, now);
     const visibleExams = state.exams.filter(e => e.division === selectedDivision && (teacher ? sameSchool(e, selectedSchool) : (examTargetMatches(e, p) && sameSchool(e, studentSchool) && e.active)));
     const visibleExamIds = new Set(visibleExams.map(e => e.id));
-    const studentProfiles = state.profiles.filter(x => x.role === 'student' && x.division === selectedDivision && (!teacher || sameSchool(x, selectedSchool)));
+    // V13.168 선생님 화면(학생 관리 · 결과 분석 · 시험 현황 · 내보내기)에는 미리보기 계정과 그 기록을 넣지 않는다.
+    const studentProfiles = state.profiles.filter(x => x.role === 'student' && x.division === selectedDivision && (!teacher || (sameSchool(x, selectedSchool) && !x.preview_owner_id)));
     const studentIds = new Set(studentProfiles.map(s => s.id));
     const sessions = state.sessions.filter(s => s.division === selectedDivision && sameSchool(s, selectedSchool) && (teacher ? studentIds.has(s.student_id) : s.student_id === p.id)).sort((a, b) => b.created_at - a.created_at);
     const sessionsByStudent = new Map();
@@ -1250,7 +1259,8 @@ export async function service(state, method, path, body, token, options = {}) {
       if (!sessionsByStudent.has(session.student_id)) sessionsByStudent.set(session.student_id, []);
       sessionsByStudent.get(session.student_id).push(session);
     }
-    const attempts = state.examAttempts.filter(a => teacher ? visibleExamIds.has(a.exam_id) : a.student_id === p.id);
+    const previewIds = teacher ? new Set(state.profiles.filter(x => x.preview_owner_id).map(x => x.id)) : null;
+    const attempts = state.examAttempts.filter(a => teacher ? visibleExamIds.has(a.exam_id) && !previewIds.has(a.student_id) : a.student_id === p.id);
     // V13.131: 학생마다 대결 목록 전체를 다시 훑지 않게 한 번 나눠 둔다.
     const battlesByStudent = teacher ? battleIndex(state) : null;
     const books = allBooks(state).filter(b => sameSchool(b, selectedSchool) && (teacher || !b.grade || b.grade === p.class_name));
@@ -1802,7 +1812,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const fresh = !party.tickets[p.id];
     const ticket = party.tickets[p.id] ||= partyTicket();
     const pet = petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key).find(x => x.active) || null;
-    return { room: { id: party.id, ticket, kind: party.kind, code: party.code, label: party.label }, _parties: [{ action: 'join', id: party.id, ticket, fresh, player: partyPlayer(p, pet) }] };
+    return { room: { id: party.id, ticket, kind: party.kind, code: party.code, label: party.label, plays_left: partyPlaysLeft(p) }, _parties: [{ action: 'join', id: party.id, ticket, fresh, player: partyPlayer(p, pet) }] };
   }
   if (path === '/shop/egg' && method === 'POST') {
     requireRole(p, 'student');
@@ -1947,7 +1957,8 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const now = Date.now(), cleared = dungeonCleared(p), open = openCuts(cleared);
     const d = openDungeonFor(state, p.id, now);
-    const recent = (state.dungeons || []).filter(x => x.status === 'finished' && (x.members || []).includes(p.id)).sort((a, b) => b.finished_at - a.finished_at).slice(0, 5)
+    // V13.168 로비에서 나가 판에 없던 방은 최근 던전에 넣지 않는다(결과의 파티원에 내가 있는 판만).
+    const recent = (state.dungeons || []).filter(x => x.status === 'finished' && (x.members || []).includes(p.id) && (x.result?.players || []).some(y => y.id === p.id)).sort((a, b) => b.finished_at - a.finished_at).slice(0, 5)
       .map(x => ({ id: x.id, cut: x.result.cut, cut_name: CUTS[x.result.cut]?.name || '', cleared: x.result.cleared, reached: x.result.reached, time_ms: x.result.time_ms, size: x.result.size, finished_at: x.finished_at }));
     // V13.143 오늘 남은 보상 판(반복 · 위로 · 만점 한 판이 같이 쓴다)과 처음 클리어 코인.
     const plays = p.dungeon?.day === dayKey(now) ? Number(p.dungeon.plays || 0) : 0;
@@ -1961,7 +1972,7 @@ export async function service(state, method, path, body, token, options = {}) {
   }
   if (path === '/dungeon/last' && method === 'GET') {
     requireRole(p, 'student');
-    return dungeonLastView(state, p);
+    return dungeonLastView(state, p, str(body.id, 64));
   }
   if (path === '/dungeon/rooms' && method === 'POST') {
     requireRole(p, 'student');
@@ -2076,6 +2087,8 @@ export async function service(state, method, path, body, token, options = {}) {
     tidyBattles(state, now);
     const previous = (state.battles || []).find(b => b.id === str(body.battle_id, 64) && b.status === 'finished' && (b.host_id === p.id || b.guest_id === p.id));
     if (!previous) fail('설욕전을 신청할 대결을 찾지 못했어요.', 404);
+    // V13.168: 대회 경기는 판돈이 없어 설욕전을 하면 판돈 0인 일반 대결이 생겼다(화면에도 버튼이 없다).
+    if (previous.tournament_id) fail('대회 경기는 설욕전을 할 수 없어요. 대진표에서 다음 경기를 확인해 주세요.', 409);
     if (now - previous.finished_at > BATTLE_REMATCH_WINDOW_MS || !previous.range_codes?.length) fail('설욕전은 대결이 끝나고 2분 안에만 신청할 수 있어요.', 409);
     const opponentId = previous.host_id === p.id ? previous.guest_id : previous.host_id;
     const existing = (state.battles || []).find(b => b.rematch_of === previous.id && battleIsOpen(b, now));
@@ -2534,6 +2547,8 @@ export async function service(state, method, path, body, token, options = {}) {
       const session = state.sessions.find(item => item.id === sourceId && item.student_id === p.id);
       const source = session || practice;
       if (!source || source.school_id !== school.id) fail('연습 답안을 찾을 수 없습니다.', 404);
+      // V13.168 실전시험은 끝나기 전에 정답 여부를 보여 주지 않는다. 풀던 중 이의제기로 맞고 틀림을 알 수 있었다.
+      if (!session && practice.run_mode === 'test' && !practice.finished) fail('실전시험이 끝난 뒤에 이의제기할 수 있어요.', 409);
       questionId = str(body.question_id, 100);
       const durable = (source.answer_records || []).find(item => item.question_id === questionId);
       if (durable) {
@@ -2543,7 +2558,8 @@ export async function service(state, method, path, body, token, options = {}) {
       } else {
         const response = practice?.responses?.[questionId];
         const feedback = response?.feedback;
-        if (!feedback || feedback.ok || feedback.type !== 'write_meaning' || !feedback.word_id || !feedback.answer) fail('오답으로 채점된 뜻쓰기 답안만 이의제기할 수 있어요.', 409);
+        // V13.168 점수에 들어가지 않는 오답 다시 풀기(can_dispute false)는 이의제기할 수 없다. 예전: 받아 주면 맞힌 수가 문제 수를 넘고 경험치가 또 올랐다.
+        if (!feedback || feedback.ok || feedback.can_dispute === false || feedback.type !== 'write_meaning' || !feedback.word_id || !feedback.answer) fail('오답으로 채점된 뜻쓰기 답안만 이의제기할 수 있어요.', 409);
         word = findWord(state, feedback.word_id);
         submittedAnswer = feedback.answer;
       }
@@ -2653,6 +2669,8 @@ export async function service(state, method, path, body, token, options = {}) {
       if (body.passing_score !== undefined) e.passing_score = integer(body.passing_score, 0, 100, '통과 점수');
       if (body.max_attempts !== undefined) e.max_attempts = integer(body.max_attempts, 1, 10, '응시 횟수');
     }
+    // V13.168 마감만 바꿔도(응시 기록이 있으면 마감만 바꿀 수 있다) 시작 시간보다 앞이면 아무도 응시할 수 없었다.
+    if ((body.due_at !== undefined || body.available_at !== undefined) && Number(e.available_at || 0) >= Number(e.due_at)) fail('시작 시간은 마감 시간보다 빨라야 합니다.');
     e.updated_at = Date.now();
     return { ...e, edit_locked: locked };
   }
@@ -2801,8 +2819,9 @@ export async function service(state, method, path, body, token, options = {}) {
       if (!x.finished || x.run_mode !== 'test') fail('완료한 실전모드 결과만 선생님께 보낼 수 있어요.', 409);
       const sharedAt = x.shared_to_teacher_at || Date.now();
       x.shared_to_teacher_at = sharedAt;
-      const session = state.sessions.find(item => item.id === x.id && item.student_id === p.id);
-      if (session) session.shared_to_teacher_at = sharedAt;
+      // V13.168 지난 기록은 얼려 두고 같이 쓴다: 사본으로 바꾼다.
+      const sessionIndex = state.sessions.findIndex(item => item.id === x.id && item.student_id === p.id);
+      if (sessionIndex >= 0) state.sessions[sessionIndex] = { ...structuredClone(state.sessions[sessionIndex]), shared_to_teacher_at: sharedAt };
       // V13.65: the phone only needs the time; the whole result view made this slow.
       return { id: x.id, shared_to_teacher_at: sharedAt };
     }
@@ -3063,9 +3082,10 @@ function practiceReward(x, state, endedAt, answeredCount, perfect, { complete = 
 
 // `natural`: the practice ended by itself (every word done). A practice closed by the
 // student midway, by the 3-day clean-up or by a school change pays no coins.
-function finishPractice(x, state, autoSubmitted = false, { natural = false } = {}) {
+// `staleAt`: closed by the 3-day clean-up; the record is dated at the last answer.
+function finishPractice(x, state, autoSubmitted = false, { natural = false, staleAt = 0 } = {}) {
   const finalizedAt = Date.now();
-  const endedAt = autoSubmitted && Number(x.deadline || 0) ? Math.min(finalizedAt, Number(x.deadline)) : finalizedAt;
+  const endedAt = staleAt ? Math.min(finalizedAt, Math.max(Number(x.started_at || 0), Number(staleAt))) : autoSubmitted && Number(x.deadline || 0) ? Math.min(finalizedAt, Number(x.deadline)) : finalizedAt;
   x.finished = true;
   x.ended_at = endedAt;
   x.finalized_at = finalizedAt;
@@ -3080,7 +3100,7 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false } = {
   const unansweredCount = Math.max(0, scoreTotal - answerRecords.length) + timedOutCount;
   const perfect = score === 100 && wrongCount === 0 && unansweredCount === 0;
   // A timer that ran out counts as finished only with at least half of the words answered.
-  const complete = natural || answerRecords.length >= scoreTotal || (autoSubmitted && answerRecords.length * 2 >= scoreTotal);
+  const complete = !staleAt && (natural || answerRecords.length >= scoreTotal || (autoSubmitted && answerRecords.length * 2 >= scoreTotal));
   // V13.142: the event in effect when the practice ended (server time). Coins: see practiceReward.
   // 경험치 goes up only for a practice finished to its end (a practice left midway keeps its own 경험치).
   const student = state.profiles.find(item => item.id === x.student_id);
@@ -3140,9 +3160,10 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false } = {
   if (!state.sessions.some(s => s.id === rec.id)) state.sessions.push(rec);
   if (complete && student) repairStreak(state, student, endedAt);
   // V13.150: 끝까지 푼 연습(10문제 이상)은 낚시 미끼 1개.
-  if (complete && student && answerRecords.length >= REEL.BAIT_MIN_PRACTICE && grantBait(student, endedAt)) x.bait = true;
+  // V13.168 미끼 · 공의 하루 한도는 받는 지금(한국 날짜)으로 센다. 자정 전 마감 시험을 자정 뒤에 닫으면 어제로 되돌아가 하루 한도가 한 번 더 풀렸다.
+  if (complete && student && answerRecords.length >= REEL.BAIT_MIN_PRACTICE && grantBait(student, finalizedAt)) x.bait = true;
   // V13.162: 같은 조건으로 펫 사냥 공 1개(하루 1번). 만점이면 가끔 좋은 공.
-  if (complete && student && answerRecords.length >= HUNT.MIN_PRACTICE) { const ball = grantBall(student, 'practice', { lucky: perfect, now: endedAt }); if (ball) x.ball = ball; }
+  if (complete && student && answerRecords.length >= HUNT.MIN_PRACTICE) { const ball = grantBall(student, 'practice', { lucky: perfect, now: finalizedAt }); if (ball) x.ball = ball; }
 }
 // V13.149 되살리기: 연속이 어제 끊겼으면(보호권이 없어서) 오늘 끝까지 푼 연습이 모두 REPAIR_NEED문제를 넘을 때 어제를 잇는다.
 function repairStreak(state, p, now) {

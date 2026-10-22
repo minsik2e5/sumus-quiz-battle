@@ -18,14 +18,43 @@ function compactState(state) {
 // 고친 것이 이전 상태에 남지 않아야 하고(같이 쓰는 객체를 고치면 실패해도 남아서 다음 저장에 섞였다), 저장 중인 상태를
 // 다음 변경이 건드리면 안 되기 때문이다.
 export const SHALLOW_KEYS = ['sessions', 'mastery'];
+// V13.168 나머지 변경도 지난 연습 기록(sessions, 운영 상태의 약 70%)은 깊게 복사하지 않는다(9MB에서 한 번에 약 0.3초).
+// 기록 하나하나를 얼려(Object.freeze, 안쪽까지) 두고 배열만 새로 만든다. 기록을 고치는 변경은 사본으로 바꿔 넣는다
+// (storage-trim · 이의 재채점 · 정리). 얼린 기록을 고치려 하면 TypeError가 나고, 그때는 그 변경을 예전처럼 전체를 깊게
+// 복사한 상태에서 처음부터 다시 한다(applyMutation). 그래서 놓친 곳이 있어도 결과는 같고 조금 느릴 뿐이다.
+// 얼린 기록은 바뀌지 않으므로 저장할 때 그 글(JSON)을 다시 만들지 않는다(cloudflare/state-parts.mjs).
+export const FROZEN_KEYS = ['sessions'];
+export function deepFreeze(value) {
+  if (!value || typeof value !== 'object' || Object.isFrozen(value)) return value;
+  for (const key of Object.keys(value)) deepFreeze(value[key]);
+  return Object.freeze(value);
+}
+// 상태의 지난 연습 기록을 얼린다(이미 얼린 기록은 건너뛴다: 새 기록만 일한다).
+export function sealState(state) {
+  for (const key of FROZEN_KEYS) if (Array.isArray(state?.[key])) for (const item of state[key]) deepFreeze(item);
+  return state;
+}
+// 얼린 객체를 고치려 해서 난 오류인지.
+export const isFrozenWrite = error => error instanceof TypeError && /read[- ]only|not extensible|Cannot delete property|Cannot define property|frozen/i.test(String(error.message));
+
 export function cloneState(state, own = null) {
-  if (!own || !state || typeof state !== 'object') return structuredClone(state);
+  if (!state || typeof state !== 'object') return structuredClone(state);
+  const shared = own ? SHALLOW_KEYS : FROZEN_KEYS;
   const rest = {}, shallow = {};
-  for (const [key, value] of Object.entries(state)) (SHALLOW_KEYS.includes(key) ? shallow : rest)[key] = value;
+  for (const [key, value] of Object.entries(state)) (shared.includes(key) ? shallow : rest)[key] = value;
   const next = structuredClone(rest);
   for (const [key, value] of Object.entries(shallow)) next[key] = Array.isArray(value) ? value.slice() : value && typeof value === 'object' ? { ...value } : value;
-  for (const id of own.mastery || []) if (next.mastery && next.mastery[id]) next.mastery[id] = structuredClone(next.mastery[id]);
+  for (const id of own?.mastery || []) if (next.mastery && next.mastery[id]) next.mastery[id] = structuredClone(next.mastery[id]);
   return next;
+}
+// GET은 지금 상태를 그대로 읽는다. 얼린 기록을 고치려는 읽기(있으면 안 되지만)는 사본에서 다시 한다.
+export async function readState(state, fn, log = console) {
+  try { return await fn(state); }
+  catch (error) {
+    if (!isFrozenWrite(error)) throw error;
+    log.warn?.('[frozen-read] a read tried to change a stored record; retried on a copy', error.message);
+    return fn(structuredClone(state));
+  }
 }
 // V13.155 연습 중 답 · 다음 문제 · 패스는 메모리에 반영하자마자 답한다(저장은 바로 뒤에 모아서). 저장 모으기(1.5초~)를
 // 답마다 기다리면 쓰기 문제 · 실전시험에서 "답안을 저장하고 있어요"가 매번 1~6초 떠 있었다.
@@ -41,7 +70,8 @@ export const quickOwn = pathname => state => {
 };
 
 export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
-  const flushDelay = Math.max(50, Number(options.flushDelay || 500));
+  // V13.168 숫자 또는 함수(쓰기 한도가 넉넉한 날은 짧게: cloudflare/worker.mjs).
+  const flushDelay = () => Math.max(20, Number(typeof options.flushDelay === 'function' ? options.flushDelay() : options.flushDelay || 500) || 500);
   const retryDelay = Math.max(1000, Number(options.retryDelay || 2000));
   const onError = options.onError || (error => console.error('[checkpoint]', error.message));
   const rollbackOnFailure = Boolean(options.rollbackOnFailure);
@@ -52,7 +82,7 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   let lastCommitAt = 0;
 
   let snapshot = {
-    state: initialSnapshot.state,
+    state: sealState(initialSnapshot.state),
     revision: Number(initialSnapshot.revision)
   };
   let stateVersion = 0;
@@ -67,6 +97,7 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   let recoveryPromise = null;
   let lastFailure = null;
   let flushFailing = false;
+  let frozenRetries = 0;
 
   const unavailable = () => lastFailure || Object.assign(Error('저장 서버에 연결하지 못했습니다.'), { status: 503 });
 
@@ -79,9 +110,19 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   async function applyMutation(fn, own = null) {
     return queueApply(async () => {
       if (needsRecovery) throw unavailable();
-      const nextState = cloneState(snapshot.state, typeof own === 'function' ? own(snapshot.state) : own);
-      const output = await fn(nextState);
+      let nextState = cloneState(snapshot.state, typeof own === 'function' ? own(snapshot.state) : own);
+      let output;
+      try {
+        output = await fn(nextState);
+      } catch (error) {
+        if (!isFrozenWrite(error)) throw error;
+        // V13.168 얼린 기록을 고치려 했다: 전체를 깊게 복사한 상태에서 처음부터 다시 한다(예전과 같은 결과).
+        frozenRetries += 1;
+        nextState = structuredClone(snapshot.state);
+        output = await fn(nextState);
+      }
       compactState(nextState);
+      sealState(nextState);
       if (output === NO_MUTATION) {
         return { output: undefined, version: stateVersion, generation, changed: false };
       }
@@ -97,7 +138,7 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
       recoveryPromise = (async () => {
         const current = await (repo.refresh ? repo.refresh() : repo.read());
         await queueApply(() => {
-          snapshot = { state: current.state, revision: Number(current.revision) };
+          snapshot = { state: sealState(current.state), revision: Number(current.revision) };
           persistedRevision = Number(current.revision);
           stateVersion = 0;
           persistedVersion = 0;
@@ -166,7 +207,7 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
     if (generation !== expectedGeneration || needsRecovery) throw unavailable();
   }
 
-  function scheduleFlush(delay = flushDelay) {
+  function scheduleFlush(delay = flushDelay()) {
     if (closed || flushTimer || stateVersion <= persistedVersion) return;
     flushTimer = setTimeout(async () => {
       flushTimer = null;
@@ -215,7 +256,7 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   async function replace(state, revision) {
     await flush();
     await queueApply(() => {
-      snapshot = { state: structuredClone(state), revision: Number(revision) };
+      snapshot = { state: sealState(structuredClone(state)), revision: Number(revision) };
       persistedRevision = Number(revision);
       stateVersion = 0;
       persistedVersion = 0;
@@ -236,6 +277,8 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
     replace,
     close,
     recover,
+    // V13.168 얼린 기록을 고치려 해서 처음부터 다시 한 변경 수(/api/health).
+    stats: () => ({ frozen_retries: frozenRetries }),
     current: () => {
       if (needsRecovery) throw unavailable();
       return snapshot;

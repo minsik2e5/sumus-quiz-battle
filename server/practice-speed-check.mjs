@@ -17,7 +17,8 @@ export async function runPracticeSpeedChecks(assert) {
   assert(SHALLOW_KEYS.join() === 'sessions,mastery' && s.sessions.length === 1 && !s.mastery.p3 && s.mastery.p1.w1.n === 1 && s.profiles[0].coins === 1 && !s.practices.length && c.sessions[0] === s.sessions[0] && c.mastery.p2 === s.mastery.p2,
     'V13.157 빠른 길 복사: 지난 연습 기록 · 다른 학생 숙련도는 얕게, 그 학생 숙련도와 나머지는 깊게 복사해서 새 변경이 이전 상태를 바꾸지 않는다');
   const full = cloneState(s);
-  assert(full.sessions[0] !== s.sessions[0] && full.mastery.p2 !== s.mastery.p2, 'V13.157 빠른 길이 아닌 변경은 전체를 깊게 복사한다');
+  // V13.168 지난 연습 기록(얼려 둔 기록)만 같이 쓰고 배열은 새로, 나머지는 전체를 깊게 복사한다.
+  assert(full.sessions !== s.sessions && full.sessions[0] === s.sessions[0] && full.mastery !== s.mastery && full.mastery.p2 !== s.mastery.p2 && full.profiles[0] !== s.profiles[0], 'V13.157 빠른 길이 아닌 변경은 지난 연습 기록(얼림) 말고는 전체를 깊게 복사한다');
   // 실패한 변경은 이전 상태에 아무것도 남기지 않는다(예전: 같이 쓰는 숙련도를 고친 뒤 던지면 남았다).
   {
     const co = createMutationCoordinator({ async read() { return { state: {}, revision: 0 }; }, async commit() {} }, { state: structuredClone(s), revision: 0 }, { flushDelay: 50, groupMs: () => 0 });
@@ -113,6 +114,6 @@ export async function runPracticeSpeedChecks(assert) {
   await co.flush(); await co.close();
   assert(out === 'ok' && committed === '{"n":7}', 'V13.155 빠른 길로 받은 답도 곧 저장된다');
   const worker = source('../cloudflare/worker.mjs');
-  assert(worker.includes('isQuickWrite(request.method, url.pathname) ? await this.mutations.fast(execute, quickOwn(url.pathname), quickSettle) : await this.mutations.durable(execute)') && source('./mutation-coordinator.mjs').includes("const nextState = cloneState(snapshot.state, typeof own === 'function' ? own(snapshot.state) : own);"),
+  assert(worker.includes('isQuickWrite(request.method, url.pathname) ? await this.mutations.fast(execute, quickOwn(url.pathname), quickSettle) : await this.mutations.durable(execute)') && source('./mutation-coordinator.mjs').includes("let nextState = cloneState(snapshot.state, typeof own === 'function' ? own(snapshot.state) : own);"),
     'V13.157 워커: 연습 답 · 다음 · 패스는 빠른 길(그 학생 숙련도만 깊게), 나머지는 전체 깊은 복사');
 }

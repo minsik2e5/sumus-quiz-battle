@@ -14,15 +14,25 @@ import { selfSignup, checkSignupCode, signupCodeGuard } from '../server/signup.m
 import { examAdmin } from '../server/exam-admin.mjs';
 import { migrateState, stateSizeReport } from '../server/state.mjs';
 import { hashToken } from '../server/auth.mjs';
-import { createMutationCoordinator, NO_MUTATION, isQuickWrite, quickOwn, quickSettle } from '../server/mutation-coordinator.mjs';
+import { createMutationCoordinator, NO_MUTATION, isQuickWrite, quickOwn, quickSettle, readState } from '../server/mutation-coordinator.mjs';
 import { createLocalRepository, createSupabaseSync } from './local-first.mjs';
 import { partitionState, assembleState, hashText } from './state-parts.mjs';
 import { WRITE_WARN_PCT } from './cf-limits.mjs';
 import { testSeedState, applyTestSeed } from '../server/test-seed.mjs';
 
-// V13.144 쓰기 모으기: 저장이 연달아 오면 이 시간(ms) 안에 온 변경을 한 번에 쓴다. 오늘 쓴 양이 70%를 넘으면 2배,
-// 90%를 넘으면 4배로 늘린다. 쉬고 있다가 온 저장은 기다리지 않는다. env.VOCA_COMMIT_GROUP_MS로 바꿀 수 있다.
+// V13.144 쓰기 모으기: 저장이 연달아 오면 이 시간(ms) 안에 온 변경을 한 번에 쓴다. V13.168: 70%를 넘으면 이 값,
+// 90%를 넘으면 4배(70% 아래는 OK_GROUP_MS). 쉬고 있다가 온 저장은 기다리지 않는다. env.VOCA_COMMIT_GROUP_MS로 바꿀 수 있다.
 export const COMMIT_GROUP_MS = 1500;
+// V13.168 배포 · 재시작 순간 잃을 수 있는 연습 답 줄이기: 연습 답 · 다음 · 패스는 메모리에 반영하자마자 답하고 저장은 뒤에서
+// 한다(v13.155). 그 사이(저장 대기 0.5초 + 모으기 1.5초, 쓰기가 많은 날 6초)에 상태 객체가 다시 시작하면 그 답이 사라졌다.
+// 오늘 쓴 양이 70% 아래('ok')면 저장 대기 0.1초 · 모으기 0.25초로 줄인다(답 하나 약 3줄, 하루 시뮬레이션 기준 한도의 약 13%).
+// 70%를 넘으면 예전처럼 1.5초(90%는 6초)로 모아 줄 수를 아낀다.
+export const OK_GROUP_MS = 250;
+export const OK_FLUSH_DELAY_MS = 100;
+export function commitPacing(level, base = COMMIT_GROUP_MS) {
+  if (level === 'ok') return { groupMs: Math.min(base, OK_GROUP_MS), flushDelay: OK_FLUSH_DELAY_MS };
+  return { groupMs: level === 'defer' ? base * 4 : base, flushDelay: 500 };
+}
 const SYNC_MIN_INTERVAL_MS = 60000;
 // 시작하지 못했을 때(1101 대신) 보내는 답. /api/health에는 원인(앞 300자)과 시작 경고도 붙인다.
 export const BOOT_FAIL_MESSAGE = '서버를 시작하지 못했어요. 잠시 후 다시 시도해 주세요.';
@@ -227,7 +237,8 @@ export class VocaStateObject {
         // 테스트 앱: 새 판의 테스트 계정 · 펫 · 미끼를 덧붙인다(운영에서는 부르지 않는다).
         const seeded = env.VOCA_STANDALONE === '1' && await applyTestSeed(working);
         // 90%를 넘은 날은 급하지 않은 정리를 다음 날로 미룬다.
-        const swept = this.writeLevel() === 'defer' ? false : sweep(working);
+        // V13.168 오래된 연습 기록 자동 정리는 쓰기 한도가 넉넉한 날('ok')만 한다.
+        const swept = this.writeLevel() === 'defer' ? false : sweep(working, Date.now(), { autoTrim: this.writeLevel() === 'ok' });
         initial.state = working;
         if (migrated || swept || seeded) {
           try {
@@ -244,10 +255,10 @@ export class VocaStateObject {
       this.local.onCommit = () => this.sync.schedule();
       const groupBase = Math.max(0, Number(env.VOCA_COMMIT_GROUP_MS ?? COMMIT_GROUP_MS) || 0);
       this.mutations = createMutationCoordinator(this.local, initial, {
-        flushDelay: 500,
+        flushDelay: () => commitPacing(this.writeLevel(), groupBase).flushDelay,
         retryDelay: 2000,
         rollbackOnFailure: true,
-        groupMs: () => groupBase * ({ ok: 1, warn: 2, defer: 4 }[this.writeLevel()] || 1),
+        groupMs: () => commitPacing(this.writeLevel(), groupBase).groupMs,
         onError: error => console.error('[checkpoint]', error.message)
       });
       if (this.sync.pending()) this.sync.schedule(0);
@@ -490,7 +501,8 @@ export class VocaStateObject {
       if (hasExpiredAttempt || sweepDue) {
         if (sweepDue) this.sweptAt = Date.now();
         // V13.129: 정리가 실패해도 학생의 요청은 그대로 처리한다(실패는 로그로 남긴다).
-        try { await this.mutations.durable(state => sweep(state) ? true : NO_MUTATION); }
+        const autoTrim = sweepDue && this.writeLevel() === 'ok';
+        try { await this.mutations.durable(state => sweep(state, Date.now(), { autoTrim }) ? true : NO_MUTATION); }
         catch (error) { console.error('[sweep]', error?.message); }
       }
 
@@ -511,7 +523,7 @@ export class VocaStateObject {
 
       const startedAt = Date.now();
       const result = request.method === 'GET'
-        ? await execute(this.mutations.current().state)
+        ? await readState(this.mutations.current().state, execute)
         : isQuickWrite(request.method, url.pathname) ? await this.mutations.fast(execute, quickOwn(url.pathname), quickSettle) : await this.mutations.durable(execute);
       // Room set-up for yacha battles: the questions (with answers) go to the room only.
       // `_battles` (V13.66) carries several room messages, e.g. when a tournament is called off.
@@ -568,7 +580,7 @@ export class VocaStateObject {
       if (url.pathname === '/api/bootstrap' && result?.profile?.role === 'teacher' && writeStats.pct >= WRITE_WARN_PCT) {
         result.server_write_warning = { pct: Math.round(writeStats.pct), defer: writeStats.level === 'defer', text: `오늘 서버 저장량이 많아요(${Math.round(writeStats.pct)}%)` };
       }
-      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', storage_format: this.local.format(), last_commit_rows: this.local.metrics.commitRows, supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.size || 0) / 1024), state_breakdown: this.sizeReport() };
+      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', storage_format: this.local.format(), last_commit_rows: this.local.metrics.commitRows, supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.size || 0) / 1024), state_breakdown: this.sizeReport(), auto_trim: this.mutations.current().state.storageAutoTrim || null, frozen_retries: this.mutations.stats?.().frozen_retries ?? 0 };
       const responseHeaders = {
         // Visible in DevTools > Network > Timing, so slow saves can be measured on a real phone.
         // commit = local durable write; supabase = last background upload.

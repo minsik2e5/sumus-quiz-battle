@@ -65,6 +65,8 @@ function recordRun(state, d, result, humans, now) {
   if (!result.record || !humans.length || humans.length !== result.size || !BOARD_SIZES.includes(result.size)) return null;
   if (result.cut !== 'max' && !result.cleared) return null;
   if (result.cut === 'max' && result.reached < 1) return null;
+  // V13.168 교사 미리보기 계정이 낀 판은 보드에 올리지 않는다(학생 순위에 '미리보기 · 학교'가 올랐다). 보상 · 내 기록은 그대로.
+  if (humans.some(x => state.profiles.find(y => y.id === x.id)?.preview_owner_id)) return null;
   const boards = state.dungeon_boards ||= {};
   const key = boardKey(d.grade, result.cut, result.size);
   const b = boards[key] ||= { all: [], week: null, prev: null };
@@ -143,8 +145,11 @@ export function dungeonBoardsView(state, p, grade, now = Date.now()) {
   return { grade, top: BOARD_TOP, week_end: end, boards: list };
 }
 // 내가 들어간 가장 최근 던전의 결과(결과 화면이 방의 보고를 기다렸다가 받아 간다).
-export function dungeonLastView(state, p) {
-  const d = (state.dungeons || []).filter(x => (x.members || []).includes(p.id)).sort((a, b) => b.created_at - a.created_at)[0];
+// V13.168 화면이 방금 판의 방 번호(id)를 보내면 그 방을, 없으면 내가 끝까지 남아 있던 방(로비에서 나간 방 제외) 중 가장 최근 것을 본다.
+// 예전에는 만든 시각만 봐서, 내 방을 만들었다가 닫고 먼저 열린 친구 방에서 끝까지 하면 닫힌 내 방을 돌려줬다(보상 · 신기록이 안 보였다).
+export function dungeonLastView(state, p, wantId = '') {
+  const mine = (state.dungeons || []).filter(x => (x.members || []).includes(p.id)).sort((a, b) => b.created_at - a.created_at);
+  const d = (wantId && mine.find(x => x.id === wantId)) || mine.find(x => !(x.left || []).includes(p.id)) || mine[0];
   if (!d) return { none: true };
   if (d.status === 'open') return { id: d.id, pending: true };
   if (d.status !== 'finished' || !d.result) return { id: d.id, cancelled: true };

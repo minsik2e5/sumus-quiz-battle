@@ -6,6 +6,7 @@ import { allBooks, service } from './service.mjs';
 import { createMutationCoordinator } from './mutation-coordinator.mjs';
 import { runDungeonLoadCheck } from './dungeon-load.mjs';
 import { runPracticeLoad } from './practice-load.mjs';
+import { runSaveLoad } from './save-load.mjs';
 
 const STUDENTS = 20;
 const QUESTIONS = 30;
@@ -149,7 +150,18 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     assert(r.stateKB > 8500 && r.answers === 240 && r.answer.p95 < 500 && r.writes < 120, `반 전체 연습 답 p95 ${r.answer.p95}ms (500ms 아래여야), 저장 ${r.writes}번`);
     console.log(`[practice-load] PASS · ${r.stateKB}KB · 학생 40명 답 ${r.answers}개 · 답 p50 ${r.answer.p50}ms · p95 ${r.answer.p95}ms · max ${r.answer.max}ms · 저장 ${r.writes}번`);
   });
-  runStressCheck().then(practiceLoad).then(() => runDungeonLoadCheck({ parties: 10 })).then(() => runDungeonLoadCheck({ parties: 40 })).catch(error => {
+  // V13.168 실제 로컬 저장소(9MB)에서 연습 20명 · 몬스터 사냥 10명 · 낚시 10명이 함께, 그리고 한 달 지난 연습 기록 자동 정리 전후.
+  // 예전(v13.167, 같은 컴퓨터): 사냥 p95 약 4.6초 · 낚시 p95 약 4.7초 · 저장 한 번 p50 약 104ms.
+  const saveLoad = () => runSaveLoad().then(r => {
+    const line = x => `${x.kb}KB · 연습 답 p95 ${x.answer.p95}ms · 사냥 p95 ${x.hunt.p95}ms · 낚시 p95 ${x.reel.p95}ms · 저장 한 번 p50 ${x.commit.p50}ms · p95 ${x.commit.p95}ms (${x.commits}번)`;
+    for (const x of [r.before, r.after]) {
+      assert(x.errors === 0 && x.answer.p95 < 500 && x.hunt.p95 < 1500 && x.reel.p95 < 1500 && x.answer.n > 50 && x.hunt.n > 50 && x.reel.n > 50, `저장 부하: ${line(x)} (연습 답 0.5초 · 사냥 · 낚시 1.5초 아래, 500 없음)`);
+    }
+    assert(r.after.kb < r.before.kb * 0.8 && r.trim.sessions > 0 && r.frozenRetries === 0, `자동 정리 뒤 상태가 줄어야 한다(${r.before.kb}KB → ${r.after.kb}KB), 얼린 기록 다시 하기 ${r.frozenRetries}번`);
+    console.log(`[save-load] PASS · 정리 전 ${line(r.before)}`);
+    console.log(`[save-load] PASS · 정리 후 ${line(r.after)} · 자동 정리 ${r.trim.runs}번 ${r.trim.ms}ms · 기록 ${r.trim.sessions}개 · ${r.trim.kb}KB`);
+  });
+  runStressCheck().then(practiceLoad).then(saveLoad).then(() => runDungeonLoadCheck({ parties: 10 })).then(() => runDungeonLoadCheck({ parties: 40 })).catch(error => {
     console.error(error);
     process.exitCode = 1;
   });

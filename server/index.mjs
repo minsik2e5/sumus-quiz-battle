@@ -8,7 +8,7 @@ import { passwordHash } from './auth.mjs';
 import { service, sweep, examAttemptExpired } from './service.mjs';
 import { selfSignup, checkSignupCode, signupCodeGuard } from './signup.mjs';
 import { examAdmin } from './exam-admin.mjs';
-import { createMutationCoordinator, NO_MUTATION } from './mutation-coordinator.mjs';
+import { createMutationCoordinator, NO_MUTATION, readState } from './mutation-coordinator.mjs';
 const root = resolve(fileURLToPath(new URL('../public/', import.meta.url)));
 const dbPath = process.env.DATA_PATH || fileURLToPath(new URL('../var/sumus.sqlite', import.meta.url));
 const repo = await repository(dbPath);
@@ -83,13 +83,14 @@ const server = http.createServer(async (req, res) => {
     }
     if (url.pathname.startsWith('/api/')) {
       res.setHeader('Cache-Control', 'no-store');
-      if (!['GET', 'POST', 'PATCH'].includes(req.method)) throw Object.assign(Error('지원하지 않는 요청입니다.'), { status: 405 });
+      // V13.168 Cloudflare(worker.mjs)와 같게: 학생 계정 삭제(DELETE)와 GET 주소의 ?token= 같은 값을 받는다(교실 TV 링크).
+      if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(req.method)) throw Object.assign(Error('지원하지 않는 요청입니다.'), { status: 405 });
       if (req.method !== 'GET') {
         if (req.headers['sec-fetch-site'] === 'cross-site') throw Object.assign(Error('허용되지 않은 요청입니다.'), { status: 403 });
         if (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) throw Object.assign(Error('허용되지 않은 요청입니다.'), { status: 403 });
         if (!String(req.headers['content-type']).startsWith('application/json')) throw Object.assign(Error('요청 형식을 확인해주세요.'), { status: 415 });
       }
-      const body = await readJson(req);
+      const body = req.method === 'GET' ? Object.fromEntries(url.searchParams) : await readJson(req, url.pathname.startsWith('/api/vocab-import/') ? 1000000 : 100000);
       const address = req.socket.remoteAddress || 'unknown';
       // V13.136: 틀린 로그인만 센다(맞게 로그인하면 기록을 지운다). 5분에 10번 틀리면 5분 쉰다.
       const loginKey = url.pathname === '/api/login' ? address + ':' + String(body.username || '').trim().toLowerCase() : '';
@@ -122,7 +123,7 @@ const server = http.createServer(async (req, res) => {
       const result = url.pathname === '/api/signup/check'
         ? await withCodeCount(() => checkSignupCode(mutations.current().state, body))
         : req.method === 'GET'
-        ? await execute(mutations.current().state)
+        ? await readState(mutations.current().state, execute)
         : fastPracticeAnswer
           ? await mutations.fast(execute)
           : await mutations.durable(execute);

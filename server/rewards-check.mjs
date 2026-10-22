@@ -824,7 +824,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(luckyEgg.legendary && LEGENDARY_PET_KEYS.includes(luckyEgg.key) && lucky.pets.some(pet => pet.key === luckyEgg.key && pet.legendary) && lucky.avatar_key === luckyEgg.key && lucky.points_spent === 800 && lucky.lucky.legend_key === luckyEgg.key && lucky.purchases[0].item === 'epic_egg' && lucky.purchases[0].legendary, 'V13.98 영웅 알의 1% 행운이면 전설 펫이 나오고(코인 800 사용), 전설 기록이 남는다');
     const plain = fresh(), plainEgg = openEgg(plain, { epic: true, missing: EPIC_PET_KEYS, price: EPIC_EGG_PRICE, random: values([.01, .5]), now });
     assert(!plainEgg.legendary && EPIC_PET_KEYS.includes(plainEgg.key) && plain.pets.some(pet => pet.key === plainEgg.key && pet.epic), 'V13.98 1%를 넘으면 영웅 알은 영웅 펫이다');
-    const owner = { pets: [{ key: 'dog' }, { key: 'haechi', legendary: true }], points_spent: 0 }, ownerEgg = openEgg(owner, { epic: true, missing: EPIC_PET_KEYS, price: EPIC_EGG_PRICE, random: values([0, .5]), now });
+    const owner = { pets: [{ key: 'dog' }, { key: 'haechi', legendary: true }], points_spent: 0 }, ownerEgg = openEgg(owner, { epic: true, missing: EPIC_PET_KEYS, price: EPIC_EGG_PRICE, random: values([0, .5]), now: Date.parse('2026-10-22T03:00:00Z') }); // V13.168: 시즌 중 시각으로(시즌이 끝나면 영웅 알에서 한정 펫이 나올 수 있어 12월부터 실패하던 검사)
     assert(!ownerEgg.legendary && EPIC_PET_KEYS.includes(ownerEgg.key) && owner.pets.filter(pet => LEGENDARY_PET_KEYS.includes(pet.key)).length === 1, 'V13.98 전설 펫이 이미 있으면 영웅 알에서 전설이 다시 나오지 않는다(전설은 한 마리까지)');
     const basic = fresh(), basicEgg = openEgg(basic, { epic: false, missing: ['cat'], price: EGG_PRICE, random: values([0, 0]), now });
     assert(!basicEgg.legendary && basicEgg.key === 'cat' && basic.points_spent === 400, 'V13.98 랜덤 알에서는 전설이 나오지 않는다');
