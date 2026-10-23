@@ -85,7 +85,7 @@ function draw() {
   window.sumusClasses = classes.map((c, i) => c ? { start: C.SLOT_TIMES[i]?.[0] || '', label: c } : null).filter(x => x && x.start);
   const rowActs = k => `<span class="chk-acts"><button type="button" data-act="chk-edit" data-key="${esc(k)}" aria-label="수정" title="수정">${icon('pencil')}</button><button type="button" data-act="chk-del" data-key="${esc(k)}" aria-label="삭제" title="삭제">${icon('x')}</button></span>`;
   const parts = {
-    work: () => sec('clock-3', '출퇴근 · 생활', mins != null ? `<em>${C.fmtDuration(mins)} 근무</em>` : '', `<div class="desktop-time-list">${ATT.map(([k, l]) => `<div><span>${l}</span>${at[k] ? input(`type="time" value="${esc(at[k])}" data-time="${k}" aria-label="${l} 시간"`) : `<button type="button" data-now="${k}">지금</button>`}</div>`).join('')}</div>`),
+    work: () => sec('clock-3', '출퇴근 · 생활', mins != null ? `<em>${C.fmtDuration(mins)} 근무</em>` : '', `<div class="desktop-time-list">${ATT.map(([k, l]) => `<div><span class="tl"><b>${l}</b>${at[k] ? '' : `<button type="button" class="now-mini" data-now="${k}" title="지금 시각으로">지금</button>`}</span>${input(`type="time" value="${esc(at[k] || '')}" data-time="${k}" aria-label="${l} 시간"`)}</div>`).join('')}</div>`),
     classes: () => sec('book-open-check', '오늘 수업', ov ? `<em>${esc(ov.label)}</em>` : '', `<div class="desktop-class-list">${classes.length ? classes.map((c, i) => { if (!c) return ''; const key = `${today}-${i}`, done = !!s.classDone[key], [st, en] = C.SLOT_TIMES[i] || ['보강', '']; return `<label class="${done ? 'done' : ''}">${checkbox(done, `data-class="${key}"`)}<span><b>${i + 1}</b><strong>${esc(c)}</strong><small>${st}–${en}</small></span></label>`; }).join('') : '<p>오늘은 수업이 없어요.</p>'}</div>`),
     quick: () => sec('plus', '일정 메모', '', `<div class="desktop-memo-add">${input('id="w-memo" maxlength="80" placeholder="할 일을 빠르게 적어보세요" autocomplete="off"')}<button type="button" data-act="memo" disabled aria-label="메모 추가">${icon('plus')}</button></div>`),
     checklist: () => {
@@ -102,7 +102,7 @@ function draw() {
     },
     exams: () => {
       // 시험 D-day: 가까운 시험부터. 범위 진행(체크한 번호/전체), 시험 전 남은 수업, 진도 상태.
-      const all = C.sortExams(C.examsOf(s)).filter(x => C.examUpcoming(x, today)), list = KIND === 'all' ? all.slice(0, 3) : all;
+      const list = C.sortExams(C.examsOf(s)).filter(x => C.examUpcoming(x, today));   // 모든 학교, 가까운 시험부터
       if (!list.length) return KIND === 'all' ? '' : sec('graduation-cap', '시험 D-day', '', '<p>예정된 시험이 없어요.</p>');
       const rank = { 지연: 4, 주의: 3, 여유: 2, 완료: 1 };
       const row = x => {
@@ -114,7 +114,7 @@ function draw() {
         const pct = items ? Math.round(checked / items * 100) : 0;
         return `<div class="dday-row"><div class="dday-top"><span class="exam-dot ${esc(x.color || 'blue')}"></span><div><strong>${esc(x.school)} ${esc(x.label)}</strong><small>${when}</small></div><b class="dday-badge ${tone}">${label}</b></div>${items ? `<div class="dday-meter"><span><i style="width:${pct}%"></i></span><small>범위 ${checked}/${items}${undated ? '' : ` · 시험 전 수업 ${lessons}회`} · <em class="pace-${worst}">${worst}</em></small></div>` : ''}</div>`;
       };
-      return sec('graduation-cap', '시험 D-day', all.length > list.length ? `<em>외 ${all.length - list.length}개</em>` : '', `<div class="dday-list">${list.map(row).join('')}</div>`);
+      return sec('graduation-cap', '시험 D-day', '', `<div class="dday-list">${list.map(row).join('')}</div>`);
     },
     notes: () => {
       if (trashOpen) return sec('file-text', '휴지통', '', `<div class="trash-head"><small>지운 메모는 30일 동안 여기서 되살릴 수 있어요.</small><button type="button" data-act="trash-close">돌아가기</button></div><div class="trash-list">${(s.trash || []).slice().reverse().map(n => `<div class="trash-row"><div><strong>${esc(n.title || '제목 없음')}</strong><small>${esc(String(n.text || '').split('\n').find(l => l.trim()) || '내용 없음').slice(0, 40)} · ${C.fmtMd(new Date(n.deletedAt + 9 * 3600000).toISOString().slice(0, 10))} 삭제</small></div><button type="button" data-act="trash-restore" data-id="${esc(n.id)}">되살리기</button><button type="button" class="purge" data-act="trash-purge" data-id="${esc(n.id)}" aria-label="완전히 삭제">×</button></div>`).join('') || '<p>휴지통이 비었어요.</p>'}</div>`);
@@ -130,7 +130,7 @@ function draw() {
     ? `<header class="desktop-widget-head"><div class="desktop-widget-logo">S</div><div><strong>SUMUS TODAY</strong><span>${C.fmtLong(today)}</span></div><i id="w-dot"></i><button type="button" data-act="refresh" aria-label="새로고침">${icon('refresh-cw')}</button>${foldBtn}${inExe ? `<button type="button" class="w-plus" data-act="add-widget" aria-label="위젯 추가·메뉴" title="위젯 추가 · 메뉴">+</button>` : ''}</header>
     <div class="desktop-widget-progress"><div>${icon('sparkles')}<strong>오늘 ${p.completed}/${p.total || 0} 완료</strong></div><span><b style="width: ${p.total ? Math.round(p.completed / p.total * 100) : 0}%;"></b></span></div>`
     : `<header class="desktop-widget-head slim"><div class="desktop-widget-logo">S</div><div><strong>${TITLES[KIND] || 'SUMUS'}</strong><span>${C.fmtLong(today)}</span></div><i id="w-dot"></i>${foldBtn}${inExe ? `<button type="button" class="w-plus" data-act="add-widget" aria-label="위젯 추가·메뉴" title="위젯 추가 · 메뉴">+</button><button type="button" class="w-close" data-act="close-widget" aria-label="이 위젯 닫기" title="이 위젯 닫기">×</button>` : ''}</header>`;
-  const body = KIND === 'all' ? ['work', 'classes', 'exams', 'quick', 'checklist'].map(k => parts[k]()).join('') : (parts[KIND] || parts.classes)();
+  const body = KIND === 'all' ? ['work', 'exams', 'quick', 'checklist'].map(k => parts[k]()).join('') : (parts[KIND] || parts.classes)();
   const foot = KIND === 'all' ? `<footer><div>${inExe ? '' : '<a href="/SUMUS_Widget_Installer.zip" download>Windows 설치</a>'}<button type="button" data-act="planner">${icon('external-link')} 전체 플래너</button></div><span id="w-status"></span></footer>` : '<footer class="slim"><span id="w-status"></span></footer>';
   // Same markup as what is on screen: leave the page alone (no flash, no scroll jump).
   // The 30-second check, window focus and the refresh button all land here with nothing new.
@@ -211,7 +211,12 @@ root.addEventListener('click', e => {
 });
 root.addEventListener('change', e => {
   const t = e.target;
-  if (t.dataset.time) { change(s => { (s.attendance[today] ||= { clockIn: '', clockOut: '' })[t.dataset.time] = t.value; }, { render: false }); patchWork(); }
+  if (t.dataset.time) {
+    const key = t.dataset.time;
+    change(s => { (s.attendance[today] ||= { clockIn: '', clockOut: '' })[key] = t.value; if (key === 'wake' && t.value) s.routineChecks[`${today}-wake`] = true; }, { render: false });
+    if (t.value) t.closest('div')?.querySelector('.now-mini')?.remove();
+    patchWork();
+  }
 });
 // 위젯 어디서나 오른쪽 클릭 → 위젯 추가·닫기 메뉴 (입력칸 안은 제외)
 document.addEventListener('contextmenu', e => { if (!inExe || e.target.closest('textarea, input')) return; e.preventDefault(); window.chrome?.webview?.postMessage('menu'); });

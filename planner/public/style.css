@@ -392,3 +392,10 @@ body[data-widget="exams"] .desktop-widget-section { overflow: auto; }
 
 /* 터치 화면(폰·태블릿)에는 마우스 올림이 없으니 수정·삭제를 항상 보이게 */
 @media (hover: none) { .chk-acts { opacity: 1; } }
+
+/* 출퇴근 · 생활: 시간을 직접 고칠 수 있게 (비어 있으면 칸이 비고, 오른쪽 위 '지금' 으로 현재 시각) */
+.desktop-time-list .tl { display: flex; align-items: center; justify-content: space-between; gap: 4px; min-height: 16px; }
+.desktop-time-list .tl b { font: inherit; }
+.desktop-time-list .now-mini { width: auto; height: 16px; padding: 0 6px; border-radius: 5px; font-size: 9px; }
+.desktop-time-list input[type="time"] { width: 100%; }
+.desktop-time-list input[type="time"]:invalid, .desktop-time-list input[type="time"]:not([value]), .desktop-time-list input[value=""] { color: #b3bcc8; }
