@@ -114,6 +114,14 @@ export async function runTestAppChecks() {
     assert(prev.profiles.some(p => p.username === 'tteacher2') && ts2.pets.length === 1 + LEGENDARY_PET_KEYS.length + MYTHIC_PET_KEYS.length && ts2.reel.bait === TEST_APP.BAIT && ts2.pets[0].first, '예전 판에 덧붙이기');
     assert.equal(prev.profiles.find(p => p.username === 'ts1').reel.net.minnow, 4, '덧붙여도 쓰던 기록은 그대로');
     assert.equal(await applyTestSeed(prev), false, '같은 판은 다시 덧붙이지 않는다');
+    // 테스트 선물(이름표마다 한 번): 그림 36 · 37 새 펫 12종을 나래(ts2)에게. 판 번호가 이미 최신이어도 들어간다.
+    const gift = TEST_APP.GIFTS['art36-37-ts2'].ts2;
+    assert(gift.length === 12 && gift.every(k => ts2.pets.some(p => p.key === k) === false), '선물 전 확인');
+    delete prev.test_gifts;
+    assert.equal(await applyTestSeed(prev), true, '판은 그대로여도 새 선물은 넣는다');
+    assert(gift.every(k => ts2.pets.filter(p => p.key === k).length === 1) && ts2.pets[0].first && !prev.profiles.find(p => p.username === 'ts1').pets.some(p => p.key === 'mouse'), '나래에게만 12종 한 마리씩');
+    assert.equal(await applyTestSeed(prev), false, '같은 선물은 다시 넣지 않는다');
+    assert(gift.every(k => object.mutations.current().state.profiles.find(p => p.username === 'ts2').pets.some(p => p.key === k)), '새로 켠 테스트 앱의 나래도 12종을 가진다');
   } finally {
     globalThis.fetch = nativeFetch;
   }
