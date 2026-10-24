@@ -10,15 +10,15 @@
 
 | 시트 | 등급 | 몬스터 key | 이름 |
 |---|---|---|---|
-| `39a-1` | ★1 | `bookmarkbat` | 책갈피 박쥐 |
-| `39a-2` | ★1 | `dustbookworm` | 먼지 책벌레 |
-| `39a-3` | ★1 | `postitghost` | 포스트잇 유령 |
-| `39a-4` | ★2 | `librarianowl` | 대출 사서 올빼미 |
-| `39a-5` | ★2 | `dictspider` | 사전 거미 |
-| `39a-6` | ★3 | `forbiddenmimic` | 금서 미믹 |
-| `39a-7` | ★3 | `indexgolem` | 색인 골렘 |
-| `39a-8` | ★4 | `libshadow` | 도서관장 그림자 |
-| `39a-9` | ★5 | `shelfdragon` | 끝없는 서고의 용 |
+| `39a-1` | ★1 | `bookmarkbat` | 읽다 만 박쥐 |
+| `39a-2` | ★1 | `dustbookworm` | 책먹방 애벌레 |
+| `39a-3` | ★1 | `postitghost` | 깜빡잇 유령 |
+| `39a-4` | ★2 | `librarianowl` | 연체료 올빼미 |
+| `39a-5` | ★2 | `dictspider` | 뜻 뭐더라 거미 |
+| `39a-6` | ★3 | `forbiddenmimic` | 열지 마 미믹 |
+| `39a-7` | ★3 | `indexgolem` | 찾아보기 골렘 |
+| `39a-8` | ★4 | `libshadow` | 쉿 관장님 |
+| `39a-9` | ★5 | `shelfdragon` | 안 읽은 책탑 용 |
 
 - 시트와 칸마다 넣을 파일(키)은 `slice-map.csv`에서 `list` 열이 `39a-`로 시작하는 줄을 본다. 앱은 `public/assets/monsters/<key>.webp` · `<key>-attack.webp` · `<key>-hurt.webp` · `<key>-down.webp`를 그대로 읽는다.
 - 기존 몬스터(10 · 12 · 22 · 35)와 key가 겹치지 않게 새로 지은 이름이다. **key를 바꾸지 않는다.**

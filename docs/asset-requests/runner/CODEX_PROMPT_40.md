@@ -10,15 +10,15 @@
 
 | 시트 | 등급 | 몬스터 key | 이름 |
 |---|---|---|---|
-| `40a-1` | ★1 | `latebell` | 지각 종소리 |
-| `40a-2` | ★1 | `lunchslime` | 급식 슬라임 |
-| `40a-3` | ★1 | `timetablefairy` | 시간표 요정 |
-| `40a-4` | ★2 | `staffroomguard` | 교무실 문지기 |
-| `40a-5` | ★2 | `classrobot` | 반장 로봇 |
-| `40a-6` | ★3 | `examoctopus` | 시험지 문어 |
-| `40a-7` | ★3 | `barbargiant` | 체육관 철봉 거인 |
-| `40a-8` | ★4 | `examsetter` | 출제 위원 마법사 |
-| `40a-9` | ★5 | `yearendlord` | 학년 말 대마왕 |
+| `40a-1` | ★1 | `latebell` | 헐레벌떡 종 |
+| `40a-2` | ★1 | `lunchslime` | 잔반 슬라임 |
+| `40a-3` | ★1 | `timetablefairy` | 체육 실종 요정 |
+| `40a-4` | ★2 | `staffroomguard` | 노크 문지기 |
+| `40a-5` | ★2 | `classrobot` | 떠든애 로봇 |
+| `40a-6` | ★3 | `examoctopus` | 찍신 문어 |
+| `40a-7` | ★3 | `barbargiant` | 턱걸이 거인 |
+| `40a-8` | ★4 | `examsetter` | 교과서 밖 마법사 |
+| `40a-9` | ★5 | `yearendlord` | 생기부 대마왕 |
 
 - 시트와 칸마다 넣을 파일(키)은 `slice-map.csv`에서 `list` 열이 `40a-`로 시작하는 줄을 본다. 앱은 `public/assets/monsters/<key>.webp` · `<key>-attack.webp` · `<key>-hurt.webp` · `<key>-down.webp`를 그대로 읽는다.
 - 기존 몬스터(10 · 12 · 22 · 35)와 key가 겹치지 않게 새로 지은 이름이다. **key를 바꾸지 않는다.**

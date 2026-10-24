@@ -6,6 +6,7 @@ import { rangePicker, selectedCount, getRanges, periodGroups } from './student.j
 import { bracketHtml } from './tournament-ui.js';
 import { coin, trophy } from './emblems.js';
 import { teacherPetDex } from './petbook.js';
+import { activityFold } from './teacher-activity.js';
 // V13.76 실전시험: how often the student left the test screen (the third time hands it in).
 function leaveNote(s) {
   const n = Number(s.leave_count || 0);
@@ -260,6 +261,7 @@ function dashboard(A) {
       ${carePanel(A, care)}
       <div class="dash-side-v1375">${classLeaguePanel(d.class_league)}${examPanel(d)}</div>
     </div>
+    ${activityFold(d)}
     ${selfTests.length ? `<section class="panel">
       <div class="panel-head"><div><h2>실전시험 결과</h2><span>학생이 끝낸 실전시험 · 최근 끝난 순서</span></div><button class="text-button" data-go="results" data-results-view="sent">전체 결과</button></div>
       <div class="v136-exam-list">${selfTests.slice(0,6).map(item => {
