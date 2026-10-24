@@ -75,11 +75,13 @@ export async function runActivityChecks(assert) {
   await call('qa-ac-a', 'POST', '/lucky/pull', { bet: 10 });
   assert(last('qa-ac-a')?.k === 'lucky', 'V13.173 행운 뽑기를 하면 한 줄');
   {
-    const g = await call('qa-ac-a', 'POST', '/rps/play', { bet: 10, pick: 'rock' });
+    // 가위바위보는 결과가 무작위다: 비기면 같은 판에서 다시 내고, 이겨서 고르는 중이면 받는다. 어느 결과여도 끝난 판은 한 줄.
     const rows = () => (prof('qa-ac-a').activity || []).filter(x => x.k === 'rps').length;
-    const mid = rows();
+    let g = await call('qa-ac-a', 'POST', '/rps/play', { bet: 10, pick: 'rock' }), midRows = rows(), tries = 0;
+    while (!g.done && g.result === 'draw' && tries++ < 200) g = await call('qa-ac-a', 'POST', '/rps/play', { bet: 10, pick: 'rock' });
+    midRows = rows();
     if (!g.done) await call('qa-ac-a', 'POST', '/rps/cash');
-    assert(g.done ? mid === 1 : mid === 0 && rows() === 1, 'V13.173 가위바위보는 판이 끝났을 때만 한 줄(이기고 고르는 중에는 남기지 않는다)');
+    assert(g.done ? midRows === 1 : midRows === 0 && rows() === 1, 'V13.173 가위바위보는 판이 끝났을 때만 한 줄(이기고 고르는 중에는 남기지 않는다)');
   }
   const bot = await call('qa-ac-a', 'POST', '/battle/practice/start', { level: 'easy' });
   await call('qa-ac-a', 'POST', '/battle/practice/finish', { id: bot.id, result: 'win', right: 9 });
