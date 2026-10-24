@@ -17,7 +17,7 @@ import { tournamentCard, openBracket } from './tournament-ui.js';
 import { openMiniGame } from './word-minigame-ui.js';
 import { bonusText } from './word-minigame.js';
 import { elementOf, paletteOf, tierOf, fxCap, fxShot, fxImpact, fxSpeedLines, fxPunch, fxSkillCutIn, fxSignature, fxLunge, fxRecoil, fxShield, fxHeal, fxPowerUp, fxToxic, fxEdge, fxRank, comboRank, auraLevel } from './battle-fx.js';
-import { MONSTERS, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterOpen, stageLevel, stageMonster, isBossStage } from './monsters.js';
+import { monsterInfo, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterOpen, stageLevel, stageMonster, isBossStage } from './monsters.js';
 import { playSound, unlockSound, preloadSound } from './sound.js';
 import { openDungeon } from './dungeon.js';
 
@@ -164,7 +164,7 @@ const petName = pet => pet?.name || CHARACTERS[petKey(pet?.key)]?.ko || '';
 // V13.95 the art sits in the same box as a pet picture (avatar-img), so showPose() can swap it.
 // V13.105 a monster coming round again stronger (level 19 and up, `round`) is tinted.
 function monsterPic(m, { size = '', pose = '' } = {}) {
-  const mon = MONSTERS.find(x => x.key === m?.key) || MONSTERS[0], round = Math.min(9, Math.max(0, Number(m?.round) || 0));
+  const mon = monsterInfo(m?.key), round = Math.min(9, Math.max(0, Number(m?.round) || 0));
   const cls = round ? ' mon-round' : '', tint = round ? `;--mon-round:${round * 40}deg` : '';
   if (MONSTER_ART.has(mon.key)) return `<div class="avatar-art avatar-img mon-art ${size}${cls}" style="--pet-grow:1${tint}"><img src="/assets/monsters/${mon.key}${pose ? '-' + pose : ''}.webp" alt="${esc(mon.name)}" width="512" height="512" decoding="async" draggable="false"></div>`;
   return `<div class="mon-temp ${size}${cls}" style="--mon-filter:${mon.temp.filter};--mon-color:${mon.color}${tint}">${avatar(mon.temp.pet, { size, form: mon.temp.form })}</div>`;
@@ -173,7 +173,7 @@ function monsterPic(m, { size = '', pose = '' } = {}) {
 // training room, a match on the rooftop arena; until 11/7 (the Halloween part of the 가을 이벤트) the matches use the Halloween stage.
 const arenaBg = f => f?.monster ? (f.monster.boss ? 'bg-boss' : 'bg-forest') : seasonStage() ? `bg-${seasonStage()}` : B.room?.practice || B.local ? 'bg-practice' : 'bg-arena';
 const petArt = (p, opts = {}) => p?.monster ? monsterPic(p.monster, opts) : avatar(p?.pet?.key, { form: p?.pet?.form ?? 1, ...opts });
-const whoName = p => p?.monster ? (p.name || MONSTERS.find(x => x.key === p.monster.key)?.name) : petName(p?.pet);
+const whoName = p => p?.monster ? (p.name || monsterInfo(p.monster.key).name) : petName(p?.pet);
 
 // opts.accept: a challenge from the home screen ({ code, stake, host }) to confirm right away.
 // opts.tournament: { tid, mid } a tournament match to start or join (V13.66).
@@ -719,13 +719,15 @@ function monsterTab() {
   const cur = stageMonster(st.stage), boss = isBossStage(st.stage);
   const shown = B.monsterAll ? st.stage - 1 : Math.min(st.stage - 1, 5);
   const past = Array.from({ length: shown }, (_, i) => st.stage - 1 - i);
-  return `<section class="mh-hero ms-hero" aria-label="몬스터 레벨">
+  return `<section class="mh-hero ms-hero ms-region-hero" style="--rg:${cur.region.bg}" aria-label="몬스터 레벨">
       <div class="mh-hero-art" aria-hidden="true">${monsterPic(cur)}</div>
       <span class="mh-kicker">MONSTER LEVEL</span>
+      <span class="ms-region-chip" aria-label="지역 ${esc(cur.region.name)}">${cur.region.icon} ${esc(cur.region.name)}<small>${cur.region.slot + 1}/10</small></span>
       <h2>몬스터 레벨 <b class="ms-now">${num(st.stage)}</b></h2>
       <p>레벨마다 <b>이지 → 노말 → 하드</b>를 깨면 다음 레벨이 열려요. 레벨이 오를수록 몬스터가 세지고 <b>처음 잡을 때 보상</b>도 커져요.</p>
       <div class="mh-stats"><div><b>${num(st.best)}</b><span>깬 레벨</span></div><div class="hard"><b>${num(st.hard_wins)}</b><span>하드 처치</span></div><div><b>${num(st.left)}</b><span>/ ${num(st.daily)} 오늘 다시 보상</span></div></div>
     </section>
+    ${newRegionNotice(st.stage, cur)}
     <section class="ya-panel ms-words${B.monsterWordsOpen || !w.ok ? ' open' : ''}" aria-label="싸울 단어">
       <div class="ms-words-row"><span class="ms-words-k">싸울 단어</span><b class="${w.ok ? 'ok' : 'need'}">${w.picked.length ? `${esc(rangesText(w.picked))} · ${num(w.n)}단어` : '아직 안 골랐어요'}</b><button type="button" class="btn small" data-yb="monster-words" aria-expanded="${!!(B.monsterWordsOpen || !w.ok)}">${B.monsterWordsOpen || !w.ok ? '접기' : '바꾸기'}</button></div>
       ${B.monsterWordsOpen || !w.ok ? `<p class="ms-words-tip">야차전·연습 대결과 같은 범위예요. 지금 외우는 번호를 골라요.</p>
@@ -739,18 +741,27 @@ function monsterTab() {
       ${st.stage - 1 > 5 ? `<button type="button" class="btn full ms-more" data-yb="monster-more">${B.monsterAll ? '접기' : `지난 레벨 모두 보기 (${num(st.stage - 1)})`}</button>` : ''}
     </div>`;
 }
+// V13.174 "새 지역!": the first time a student stands on the first level of a new region (not the very first one)
+// the tab says so, once. The region number is kept per phone (a pref), and stays on screen while the tab is open.
+function newRegionNotice(stage, cur) {
+  const r = cur.region;
+  if (!r.first || stage <= 1) return '';
+  if (B.regionNoticeShown !== r.number && String(pref('sumus-region-seen', '')) !== String(r.number)) { B.regionNoticeShown = r.number; setPref('sumus-region-seen', String(r.number)); }
+  if (B.regionNoticeShown !== r.number) return '';
+  return `<div class="ms-newregion" role="status" style="--rg:${r.bg}"><span aria-hidden="true">${r.icon}</span><div><b>새 지역! ${esc(r.name)}</b><small>레벨 ${num(stage)}부터 10레벨, 새 몬스터들이 기다려요</small></div></div>`;
+}
 // A level not open yet: the monster's shadow.
 function stageLocked(stage) {
   const m = stageMonster(stage), boss = isBossStage(stage);
-  return `<article class="ms-stage locked${boss ? ' boss' : ''}" aria-label="레벨 ${stage} 잠김"><div class="ms-head">${stagePlate(stage, 'lock')}<div class="ms-shadow" aria-hidden="true">${monsterPic(m)}</div><div class="ms-info"><h3>${boss ? '<em class="ms-boss">BOSS</em>' : ''}???</h3><p>앞 레벨의 하드를 깨면 열려요</p></div></div></article>`;
+  return `<article class="ms-stage locked${boss ? ' boss' : ''}" aria-label="레벨 ${stage} 잠김"><div class="ms-head">${stagePlate(stage, 'lock')}<div class="ms-shadow" aria-hidden="true">${monsterPic(m)}</div><div class="ms-info"><h3>${boss ? '<em class="ms-boss">BOSS</em>' : ''}???</h3><p>${m.region.first ? `새 지역 · ${esc(m.region.name)}` : '앞 레벨의 하드를 깨면 열려요'}</p></div></div></article>`;
 }
 function stageCard(st, stage, wordsOk, now) {
   const m = stageMonster(stage), boss = isBossStage(stage), done = stage < st.stage;
-  return `<article class="ms-stage ${now ? 'now' : 'done'}${boss ? ' boss' : ''}" style="--mc:${m.color}" aria-label="레벨 ${stage}${done ? ' 깸' : ' 도전 중'}">
+  return `<article class="ms-stage ${now ? 'now' : 'done'}${boss ? ' boss' : ''}" style="--mc:${m.color};--rg:${m.region.bg}" aria-label="레벨 ${stage}${done ? ' 깸' : ' 도전 중'}">
     <div class="ms-head">
       ${stagePlate(stage, done ? 'clear' : boss ? 'boss' : 'open')}
       <div class="ms-mon">${monsterPic(m)}</div>
-      <div class="ms-info"><h3>${boss ? '<em class="ms-boss">BOSS</em>' : ''}${esc(m.title)}</h3>${now ? `<p>${esc(m.line)}</p>` : done ? '<p>처치 완료 · 다시 잡기</p>' : ''}</div>
+      <div class="ms-info"><h3>${boss ? '<em class="ms-boss">BOSS</em>' : ''}${esc(m.title)}</h3>${now ? `<p>${esc(m.line)}</p>` : done ? '<p>처치 완료 · 다시 잡기</p>' : ''}<small class="ms-reg">${m.region.icon} ${esc(m.region.name)}</small></div>
     </div>
     <div class="mh-levels ms-levels">${MONSTER_LEVEL_KEYS.map(k => {
       const L = stageLevel(stage, k), open = stageOpen(st, stage, k), won = stageWon(st, stage, k), go = open && wordsOk;
@@ -842,7 +853,7 @@ function drawMonsterResult() {
 // After a fight: the next level when this one opened it, otherwise the same fight again.
 function monsterNextButton(won) {
   const r = B.monsterReward, setup = B.monsterSetup || { stage: 1, level: 'easy' }, L = stageLevel(setup.stage, setup.level);
-  if (r?.stage_up) return `<div class="ms-up" role="status"><b>레벨 ${num(r.stage_up)} 열림!</b><span>${esc(stageMonster(r.stage_up).title)}이(가) 기다려요</span></div><button type="button" class="btn primary full" data-yb="monster-list">다음 레벨 보러 가기</button>`;
+  if (r?.stage_up) return `<div class="ms-up" role="status"><b>레벨 ${num(r.stage_up)} 열림!</b><span>${stageMonster(r.stage_up).region.first ? `새 지역! ${esc(stageMonster(r.stage_up).region.name)} · ` : ''}${esc(stageMonster(r.stage_up).title)}이(가) 기다려요</span></div><button type="button" class="btn primary full" data-yb="monster-list">다음 레벨 보러 가기</button>`;
   return `<button type="button" class="btn primary full" data-yb="monster-again">${won ? '한 번 더' : '다시 도전'} <small>레벨 ${num(setup.stage)} · ${esc(L?.name || '')}</small></button>`;
 }
 function monsterRewardText() {
@@ -1340,7 +1351,7 @@ const sideOf = pid => pid === B.view.me ? 'me' : 'op';
 // V13.94 attack effects: a shot flies from the attacker to the one hit (a thick beam for a pet
 // skill, claw marks from a monster), then an impact ring, sparks and a shake that grows with
 // the damage. Everything is drawn over the arena and removed by itself.
-function fxColor(p) { return p?.monster ? (MONSTERS.find(x => x.key === p.monster.key)?.color || '#e5484d') : (CHARACTERS[petKey(p?.pet?.key)]?.color || '#f4c64f'); }
+function fxColor(p) { return p?.monster ? (monsterInfo(p.monster.key).color || '#e5484d') : (CHARACTERS[petKey(p?.pet?.key)]?.color || '#f4c64f'); }
 // V13.115 which element a pet's skill is drawn with, and what else it shows (heal, shield, power-up, poison).
 const skillElement = p => p?.monster ? 'flame' : elementOf(p?.pet?.key);
 function skillExtras(side, other, p, e) {
