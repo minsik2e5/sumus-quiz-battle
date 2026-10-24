@@ -11,6 +11,7 @@ import { MARKET_OPEN } from '../public/modules/market.js';
 // V13.82 문법 증권거래소 is on hold: closed unless switched on.
 const marketOpen = state => MARKET_OPEN || state.market?.open === true;
 import { rpsView, rpsPlay, rpsCash, openEgg } from './rewards.mjs';
+import { logActivity, activityOf, activityOverview } from './activity.mjs';
 import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, monsterStart, monsterFinish, monsterView, monsterScope, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate, setUnitCounter } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
@@ -35,7 +36,8 @@ import { settleDungeonRecords, dungeonBoardsView, dungeonLastView } from './dung
 import packageInfo from '../package.json' with { type: 'json' };
 import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend, reelSeaPet, reelRodUp } from './reel.mjs';
 import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow, huntSell, huntCoins, huntSpend, huntBerryQuiz, huntBerryAnswer } from './hunt.mjs';
-import { HUNT } from '../public/modules/hunt-rules.js';
+import { HUNT, HUNT_MONSTERS } from '../public/modules/hunt-rules.js';
+import { FISH } from '../public/modules/fishing-rules.js';
 import { REEL } from '../public/modules/reel-rules.js';
 import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './games.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
@@ -657,6 +659,10 @@ export function settleBattle(state, result) {
   const maxHp = Math.max(1, Math.min(1000, Math.floor(Number(result.max_hp) || 100)));
   Object.assign(b, { status: 'finished', winner, loser: winner ? players.find(id => id !== winner) : null, reason: String(result.reason || 'end').slice(0, 20), hp: result.hp || {}, max_hp: maxHp, ...(Object.keys(skills).length ? { skills } : {}), finished_at: Date.now() });
   if (b.tournament_id) settleTournamentMatch(state, b);
+  for (const id of players) {
+    const me = state.profiles.find(x => x.id === id), other = state.profiles.find(x => x.id === (id === b.host_id ? b.guest_id : b.host_id));
+    logActivity(me, 'yacha', `${b.tournament_id ? '야차 대회' : '야차전'} ${!winner ? '무' : winner === id ? '승' : '패'}${other ? ` · ${String(other.display_name || '').slice(0, 10)}` : ''}`, b.finished_at);
+  }
   return true;
 }
 // V13.66: a finished tournament room decides its match; a draw is played again.
@@ -785,6 +791,7 @@ export function settleDungeon(state, report, now = Date.now()) {
   // V13.143 깬 등급컷 열기 · 코인(서버가 정답 수 · 층 · 등급컷으로 계산) · 기록 보드 · 칭호 숫자(server/dungeon-records.mjs).
   const { board, rewards } = settleDungeonRecords(state, d, now);
   Object.assign(d.result, { board, rewards });
+  for (const x of players) if (!x.bot && members.has(x.id)) logActivity(state.profiles.find(y => y.id === x.id), 'dungeon', `던전 ${d.result.cleared ? '클리어' : '도전'} · ${d.result.reached}층${x.out ? ' · 포기' : ''}`, now);
   return true;
 }
 // 방이 방 준비(_dungeon)를 받지 못했을 때 되돌린다(Cloudflare 래퍼가 부른다).
@@ -1018,6 +1025,7 @@ function finishExam(a, state, auto = false) {
     addBonus(student, { xp: reward.xp, coins: reward.coins, pet: activePetKey(state, student.id), now: a.submitted_at });
     a.reward = reward;
   }
+  logActivity(student, 'exam', `시험 ${correct}/${a.questions.length} · ${a.score}점${auto ? ' · 자동 제출' : ''}`, a.submitted_at);
 }
 // Practices nobody touched for this long are closed: they were kept whole (question
 // cache, answer responses, word list) and were a large share of the backed-up state.
@@ -1329,6 +1337,18 @@ export async function service(state, method, path, body, token, options = {}) {
   }
   // V13.131 오래된 기록 줄이기(server/storage-trim.mjs). 선생님이 맡은 학교의 기록만 본다.
   // 대상 요약 → 보관 파일(지울 내용 전체 JSON) → 그 파일의 지문이 같을 때만 정리.
+  // V13.173 학생 활동 기록 · 인기 집계(선생님 전용 읽기. 저장하지 않는다).
+  if (path === '/teacher/activity' || path.startsWith('/teacher/activity/')) {
+    requireRole(p, 'teacher');
+    if (method !== 'GET') fail('요청 방식을 확인해주세요.', 405);
+    const school = activeTeacherSchool(state, p);
+    if (!school) fail('학교 설정을 확인해주세요.', 409);
+    const mine = state.profiles.filter(x => x.role === 'student' && x.division === school.division && sameSchool(x, school) && !x.preview_owner_id);
+    if (path === '/teacher/activity') return { overview: activityOverview(mine, Date.now()) };
+    const student = mine.find(x => x.id === decodeURIComponent(path.slice('/teacher/activity/'.length)));
+    if (!student) fail('학생을 찾을 수 없어요.', 404);
+    return { student_id: student.id, activity: activityOf(student), server_time: Date.now() };
+  }
   if (path === '/teacher/storage-trim' || path === '/teacher/storage-archive') {
     requireRole(p, 'teacher');
     const schoolIds = new Set(p.school_ids || []), now = Date.now();
@@ -1654,6 +1674,7 @@ export async function service(state, method, path, body, token, options = {}) {
     // V13.162: 출석하면 펫 사냥 공 1개, 도장판(7칸)을 HUNT.GOLD_CARDS장 채우면 황금 공 1개.
     const ball = grantBall(p, 'attend', { now });
     const goldBall = done.tickets > 0 && huntCard(p);
+    logActivity(p, 'attend', `출석 · 연속 ${p.attendance?.streak || 1}일`, now);
     return { ...done, streak_guard: guard, bait, ball, gold_ball: goldBall, reel: reelView(p, now), hunt: huntView(p, now), points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
   }
   // V13.149 연속 학습 보호권 사기(최대 STREAK_GUARD.MAX장).
@@ -1675,6 +1696,7 @@ export async function service(state, method, path, body, token, options = {}) {
     // Like eggs: a stake waiting in a yacha room is not spent elsewhere (a free ticket is fine).
     if (body.ticket !== true && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 코인 뽑기를 할 수 있어요.', 409);
     const result = pullLucky(p, Number(body.bet), coinBalance(state, p), { ticket: body.ticket === true });
+    logActivity(p, 'lucky', body.ticket === true ? '행운 뽑기 · 무료권' : `행운 뽑기 · ${Number(body.bet) || 0}코인`);
     if (result.epic) return { ...result, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     if (result.mythic) return { ...result, ...announceLegend(state, p, result.mythic.key, '행운 뽑기', '신화'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     if (!result.legendary) return { ...result, points_balance: coinBalance(state, p) };
@@ -1687,11 +1709,14 @@ export async function service(state, method, path, body, token, options = {}) {
     const live = p.rps?.live;
     if (!live && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 가위바위보를 할 수 있어요.', 409);
     const result = rpsPlay(p, { bet: Number(body.bet), pick: str(body.pick, 12), double: body.double === true }, coinBalance(state, p));
+    // 판이 끝났을 때만(이기면 받을지 더블할지 고르는 중에는 남기지 않는다). 오래 열려 있던 판을 정리한 답(settled)은 새 판이 아니다.
+    if (result.done && !result.settled) logActivity(p, 'rps', result.result === 'lose' ? `가위바위보 패 · ${result.bet}코인` : `가위바위보 ${result.wins}연승 · ${result.paid}코인`);
     return { ...result, rps: rpsFor(state, p), points_balance: coinBalance(state, p) };
   }
   if (path === '/rps/cash' && method === 'POST') {
     requireRole(p, 'student');
     const result = rpsCash(p);
+    logActivity(p, 'rps', `가위바위보 ${result.wins}연승 · ${result.paid}코인`);
     return { ...result, rps: rpsFor(state, p), points_balance: coinBalance(state, p) };
   }
   // V13.82 문법 증권거래소: prices of this hour, and an order at that price.
@@ -1706,6 +1731,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!state.market?.seed) state.market = { ...newMarket(), ...(state.market || {}) };
     if (body.side === 'buy' && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 주식을 살 수 있어요.', 409);
     const done = stockTrade(state, p, { key: str(body.key, 12), side: str(body.side, 8), qty: body.qty, price: body.price }, coinBalance(state, p));
+    logActivity(p, 'market', `증권거래소 ${str(body.side, 8) === 'buy' ? '매수' : '매도'}`);
     const balance = coinBalance(state, p);
     return { trade: done, points_balance: balance, market: marketView(state, p, balance) };
   }
@@ -1717,6 +1743,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/battle/practice/finish' && method === 'POST') {
     requireRole(p, 'student');
     const result = botFinish(p, { id: str(body.id, 80), result: str(body.result, 10), right: Number(body.right), pet: activePetKey(state, p.id), now: Date.now() });
+    if (!result.again) logActivity(p, 'robot', `로보 연습전 ${{ win: '승', draw: '무' }[str(body.result, 10)] || '패'}`);
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
   // V13.94 몬스터 잡기: the parts come from the student's own word ranges (same school and grade).
@@ -1736,6 +1763,7 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const ctx = monsterContext(state, p);
     const result = monsterFinish(p, { id: str(body.id, 80), result: str(body.result, 10), right: Number(body.right), pet: activePetKey(state, p.id), scope: ctx.scope, parts: ctx.parts, now: Date.now() });
+    if (!result.again) logActivity(p, 'monster', `몬스터전 레벨 ${result.fought ?? '?'} ${{ easy: '이지', normal: '노말', hard: '하드' }[result.level] || ''} ${result.result === 'win' ? '승' : '패'}`.replace(/  +/g, ' '));
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
   // V13.149 짝 맞추기(server/games.mjs). 단어는 몬스터전처럼 내 학교 · 학년의 범위에서. (V13.150: 혼자 단어 낚시는 놀이터 손맛 낚시로 바뀌었다)
@@ -1755,6 +1783,7 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const now = Date.now();
     const result = matchFinish(p, { id: str(body.id, 80), ms: Number(body.ms), misses: Number(body.misses), splits: Array.isArray(body.splits) ? body.splits.slice(0, 24) : null, pet: activePetKey(state, p.id), now, weekKey: gameWeekKey(now) });
+    if (!result.again) logActivity(p, 'match', result.ms ? `짝 맞추기 ${(result.ms / 1000).toFixed(1)}초${result.record ? ' · 신기록' : ''}` : '짝 맞추기', now);
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
   if (path === '/games/match/board' && method === 'GET') {
@@ -1844,6 +1873,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/reel/land' && method === 'POST') {
     requireRole(p, 'student');
     const now = Date.now(), res = reelLand(p, { id: str(body.id, 80), result: str(body.result, 10), finish: body.finish ? str(body.finish, 10) : null, now, giftId: id() });
+    if (!res.again) logActivity(p, 'fish', res.caught ? `낚시 ${FISH[res.key]?.name || '물고기'} ${res.kg}kg` : '낚시 놓침', now);
     return { ...res, reel: reelView(p, now), ...(res.egg ? { gifts: giftsWaiting(p) } : {}) };
   }
   if (path === '/reel/sell' && method === 'POST') {
@@ -1905,6 +1935,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!throwId) fail('던지기 번호를 확인해 주세요.');
     // V13.167 열매는 서버가 준 열매 표(berry_ticket)로만(화면이 보낸 berry 이름은 믿지 않는다).
     const res = huntThrow(p, { id: throwId, spot: str(body.spot, 40), ball: str(body.ball, 10), quality: body.quality ? str(body.quality, 12) : null, ticket: body.berry_ticket ? str(body.berry_ticket, 40) : null, pet: activePetKey(state, p.id), now });
+    if (!res.again && (res.caught || res.fled)) logActivity(p, 'hunt', `몬스터 사냥 ${(res.kind === 'pet' ? CHARACTERS[res.key]?.ko : HUNT_MONSTERS[res.key]?.ko) || '몬스터'} ${res.caught ? '잡음' : '도망'}`, now);
     return { ...res, hunt: huntView(p, now), ...(res.new_pet ? { profile: publicProfile(p), stats: stats(state, p) } : {}) };
   }
   // V13.167 열매 문제: 서버가 내 학교 · 학년 범위(놀이터에서 고른 게임 단어)에서 내고, 서버가 채점해 열매 표를 준다.
@@ -3108,6 +3139,8 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false, stal
   const student = state.profiles.find(item => item.id === x.student_id);
   const event = answerRecords.length ? activeEventFor(state, student, endedAt) : null;
   const reward = practiceReward(x, state, endedAt, answerRecords.length, perfect, { complete, correct: scoreCorrect, event });
+  // V13.173 끝난 연습만 한 줄(답마다 쓰는 빠른 길에는 쓰지 않는다). 정리로 닫는 연습(staleAt)은 남기지 않는다.
+  if (student && !staleAt && answerRecords.length) logActivity(student, x.run_mode === 'test' ? 'test' : 'practice', `${x.run_mode === 'test' ? '실전시험' : '연습'} ${answerRecords.length}문제 · ${score}점`, endedAt);
   const xpBonus = complete ? eventXp(event, Number(x.xp || 0)) : 0;
   const eventCoin = (reward.breakdown || []).find(item => item.event)?.points || 0;
   x.xp = Number(x.xp || 0) + xpBonus;
