@@ -1,3 +1,4 @@
+import { logActivity } from './activity.mjs';
 import { randomBytes } from 'node:crypto';
 import { dayKey } from '../public/modules/core.js';
 import { FISH } from '../public/modules/fishing-rules.js';
@@ -67,6 +68,7 @@ export function settleParty(state, body, { petKey = () => undefined, now = Date.
         b.n += 1; b.kg = Math.max(Number(b.kg || 0), Math.min(FISH[c.key].kg[1], Number(c.kg) || 0));
       }
     }
+    logActivity(p, party.kind === 'fish' ? 'classfish' : 'treasure', `${party.kind === 'fish' ? '반 낚시' : '보물 사냥'} ${rank}등 · ${n}명`, now);
     paid.push({ id: p.id, rank, right, coins, xp });
   }
   party.summary = { players: n, top: paid.filter(x => x.rank <= 3).sort((a, b) => a.rank - b.rank).map(x => ({ id: x.id, rank: x.rank, name: state.profiles.find(y => y.id === x.id)?.display_name || '' })) };
