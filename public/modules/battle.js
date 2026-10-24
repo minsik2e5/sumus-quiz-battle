@@ -722,7 +722,7 @@ function monsterTab() {
   return `<section class="mh-hero ms-hero ms-region-hero" style="--rg:${cur.region.bg}" aria-label="몬스터 레벨">
       <div class="mh-hero-art" aria-hidden="true">${monsterPic(cur)}</div>
       <span class="mh-kicker">MONSTER LEVEL</span>
-      <span class="ms-region-chip" aria-label="지역 ${esc(cur.region.name)}">${cur.region.icon} ${esc(cur.region.name)}<small>${cur.region.slot + 1}/10</small></span>
+      <span class="ms-region-chip" aria-label="지역 ${esc(cur.region.name)}">${cur.region.icon} ${esc(cur.region.name)}<small>${cur.region.slot + 1}/${cur.region.size}</small></span>
       <h2>몬스터 레벨 <b class="ms-now">${num(st.stage)}</b></h2>
       <p>레벨마다 <b>이지 → 노말 → 하드</b>를 깨면 다음 레벨이 열려요. 레벨이 오를수록 몬스터가 세지고 <b>처음 잡을 때 보상</b>도 커져요.</p>
       <div class="mh-stats"><div><b>${num(st.best)}</b><span>깬 레벨</span></div><div class="hard"><b>${num(st.hard_wins)}</b><span>하드 처치</span></div><div><b>${num(st.left)}</b><span>/ ${num(st.daily)} 오늘 다시 보상</span></div></div>
@@ -748,7 +748,7 @@ function newRegionNotice(stage, cur) {
   if (!r.first || stage <= 1) return '';
   if (B.regionNoticeShown !== r.number && String(pref('sumus-region-seen', '')) !== String(r.number)) { B.regionNoticeShown = r.number; setPref('sumus-region-seen', String(r.number)); }
   if (B.regionNoticeShown !== r.number) return '';
-  return `<div class="ms-newregion" role="status" style="--rg:${r.bg}"><span aria-hidden="true">${r.icon}</span><div><b>새 지역! ${esc(r.name)}</b><small>레벨 ${num(stage)}부터 10레벨, 새 몬스터들이 기다려요</small></div></div>`;
+  return `<div class="ms-newregion" role="status" style="--rg:${r.bg}"><span aria-hidden="true">${r.icon}</span><div><b>새 지역! ${esc(r.name)}</b><small>레벨 ${num(stage)}부터 ${cur.region.size}레벨, 새 몬스터들이 기다려요</small></div></div>`;
 }
 // A level not open yet: the monster's shadow.
 function stageLocked(stage) {

@@ -1,21 +1,18 @@
 import { HUNT_MONSTERS } from './hunt-rules.js';
 import { MONSTER_ART } from './monster-art.js';
 
-// V13.174 몬스터전 지역(챕터): 10레벨 = 1지역, 지역 8개(80레벨)가 한 바퀴이고 그 뒤는 처음부터 다시 돈다("+1", "+2").
-// 서버(rewards.mjs의 몬스터 시작)와 화면(battle.js 몬스터 탭)이 같이 쓴다. 학생 기록(stage · best · clear)은 건드리지 않고,
-// 레벨 N에서 만나는 몬스터 · 이름 · 배경만 이 표가 정한다. 설계: docs/monster-level-design.md A · B.
+// V13.174 몬스터전 지역(챕터)과 레벨 줄: 레벨 1, 2, 3 …에 나오는 몬스터를 한 줄(트랙)로 정한다. 서버(rewards.mjs의 몬스터 시작)와
+// 화면(battle.js 몬스터 탭)이 같이 쓴다. 학생 기록(stage · best · clear)은 건드리지 않고 레벨 N에서 만나는 몬스터 · 이름 · 배경만 정한다.
+// 설계: docs/monster-level-design.md A · B + 선생님 결정(몬스터가 한 번도 겹치지 않게, 레벨 1은 암기 모찌).
 //
-// 한 지역의 10칸(등급은 hunt-rules.js HUNT_MONSTERS의 tier): 1~3 ★1 · 4 ★2 · 5 대장(★4) · 6 ★2 · 7~9 ★3 · 10 보스(★5).
-//   (구성안의 "1~4는 ★1~★2, 6~9는 ★2~★3"을 이 칸 수로 정했다: 지역마다 ★1 3 · ★2 2 · ★3 3 · ★4 1 · ★5 1.)
-// 몬스터가 칸에 들어오는 규칙(그림 게이트 포함, 같은 그림 목록이면 늘 같은 표):
-//   1) 그림이 있는 몬스터(MONSTER_ART)만 나온다. 새 몬스터는 그림이 들어오면 코드 변경 없이 자기 지역 칸에 들어간다.
-//   2) 그 지역의 몬스터(REGIONS[].own)를 적힌 차례대로 먼저 쓴다.
-//   3) 모자라거나 그림이 없는 칸은 같은 등급의 그림 있는 몬스터로 채운다: 어느 지역에도 안 묶인 기본 몬스터 → 다른 지역 몬스터 순이고,
-//      지역 번호만큼 시작을 돌려서(지역마다 다르게) 같은 지역에서는 겹치지 않는다.
-//   4) 두 바퀴째부터(레벨 81~)는 같은 지역 · 같은 칸 등급에서 후보 줄을 칸 수만큼 밀어서 한 바퀴째에 못 나온 몬스터가 차례로 나온다
-//      (대장 ★4는 13종인데 지역은 8곳이라 한 바퀴에 다 나올 수 없다).
-export const REGION_SIZE = 10;
-export const REGION_SLOTS = ['common', 'common', 'common', 'uncommon', 'epic', 'uncommon', 'rare', 'rare', 'rare', 'legend'];
+// 트랙: 레벨 1~70은 그림이 있는 70종(기본 34 + 장소 36)이 한 번씩, 새 18종은 그림이 들어오면 레벨 71~88에 한 번씩(합 88레벨).
+//   새 18종 그림이 하나도 없는 동안은 한 바퀴가 70레벨이라 71부터는 1~70이 "+1"로 다시 나온다. 한 바퀴가 끝나면 처음부터 다시 돌고 "+N".
+//   보스는 5레벨마다: 5 · 15 · … · 65는 대장(★4), 10 · 20 · … · 70은 보스(★5), 75 · 85는 새 대장, 80은 새 보스.
+//   남는 대장 4종 · 보스 1종은 51~70의 보스 아닌 후반 자리(6~9번째 칸)에, 새 보스 하나(안 읽은 책탑 용)는 레벨 79에 둔다(보스 자리는 80뿐이라서).
+//   지역 이름 · 배경은 레벨 구간으로 정하고(10레벨씩, 도서관 71~79 · 학교 80~88), 장소 몬스터는 자기 지역 구간에 있다.
+// 새 몬스터 그림 게이트: 새 18종 중 그림(MONSTER_ART)이 하나라도 들어오면 한 바퀴가 88레벨이 되고 그림이 아직 없는 새 칸은
+//   같은 등급의 기본 몬스터로 정해진 차례대로 대신한다(그 사이에는 겹침이 생길 수 있고, 18종 그림이 모두 오면 88레벨이 전부 다르다).
+//   그림이 오면 코드 변경 없이 자리에 들어간다. 1~70레벨의 몬스터는 새 그림이 와도 바뀌지 않는다.
 
 // 새 몬스터 18종(그림 주문서 39 · 40, docs/asset-requests/runner/build-39.mjs NEW_MONSTERS와 key · 이름 · 등급이 같다: 검사가 확인한다).
 // 그림(public/assets/monsters/<key>{,-attack,-hurt,-down}.webp)이 들어와 MONSTER_ART에 키가 생기기 전에는 나오지 않는다.
@@ -73,73 +70,76 @@ export const MONSTER_TEXT = {
   examsetter: ['교과서에 없는 문제만 골라 내는 연필 모자 마법사', '#7a3f9a'], yearendlord: ['생활기록부 도장을 쾅쾅 찍는 학교의 대마왕', '#8f1d2c']
 };
 
-// 지역 8곳. own: 이 지역에 어울리는 몬스터(적힌 차례대로 먼저 쓴다), bg: 그림 배경이 없을 때 쓰는 임시 CSS 배경.
-//   숲 · 들판 · 바닷가 · 밤은 hunt-rules.js의 place 값(36종), 한밤의 도서관 · 기말고사 학교는 새 몬스터, 야자 교실은 학교 · 공부 소재 기본 몬스터.
-//   온 세상 보스 모음은 어느 지역에도 안 묶인 나머지 기본 몬스터가 모이는 마지막 지역이다(own 없음).
-const place = at => Object.keys(HUNT_MONSTERS).filter(k => HUNT_MONSTERS[k].place === at);
-const newOf = at => Object.keys(NEW_MONSTERS).filter(k => NEW_MONSTERS[k].region === at);
-export const REGIONS = [
-  { key: 'yaja', name: '야자 교실', icon: '🏫', bg: 'linear-gradient(180deg,#2c2455 0%,#6a3f7a 46%,#e58a46 100%)',
-    own: ['nightbat', 'cheatninja', 'nightzombie', 'redpenghost', 'wrongmummy', 'testspider', 'bagturtle', 'proctor', 'homeworkogre', 'finalking'] },
-  { key: 'forest', name: '숲', icon: '🌲', bg: 'linear-gradient(180deg,#bfe8c4 0%,#6dbb6f 52%,#2f7a4a 100%)', own: place('forest') },
-  { key: 'field', name: '들판', icon: '🌾', bg: 'linear-gradient(180deg,#bfe3ff 0%,#e7e29a 55%,#a8c85a 100%)', own: place('field') },
-  { key: 'beach', name: '바닷가', icon: '🏖️', bg: 'linear-gradient(180deg,#a9e3ff 0%,#6fc4e8 48%,#f3e2b0 100%)', own: place('beach') },
-  { key: 'night', name: '밤', icon: '🌙', bg: 'linear-gradient(180deg,#0f1840 0%,#2c2f7a 55%,#5a4a9a 100%)', own: place('night') },
-  { key: 'library', name: '한밤의 도서관', icon: '📚', bg: 'linear-gradient(180deg,#1d1740 0%,#4a2f6a 52%,#b0833a 100%)', own: newOf('library') },
-  { key: 'school', name: '기말고사 학교', icon: '📝', bg: 'linear-gradient(180deg,#8fb8e8 0%,#c9d8ea 50%,#e8c46a 100%)', own: newOf('school') },
-  { key: 'world', name: '온 세상 보스 모음', icon: '👑', bg: 'linear-gradient(180deg,#2a0f2f 0%,#8f1d3a 55%,#e0a030 100%)', own: [] }
+// 레벨 줄. 한 지역은 10칸이고 등급은 ★1 ★1 ★1 ★2 ★4 ★2 ★3 ★3 ★3 ★5 (51~70은 남는 대장 · 보스가 6~9번째 칸에 섞인다).
+const BASE_TRACK = [
+  // 1~10 야자 교실 (레벨 1은 암기 모찌)
+  'mochi', 'cheatninja', 'nightzombie', 'redpenghost', 'homeworkogre', 'wrongmummy', 'testspider', 'bagturtle', 'proctor', 'finalking',
+  // 11~20 숲
+  'wordsquirrel', 'spellshroom', 'markerfly', 'pencilworm', 'bearprincipal', 'dictpecker', 'vocabvine', 'verbbeetle', 'sentdryad', 'lexitreant',
+  // 21~30 들판
+  'eraserbunny', 'cliphopper', 'postitfly', 'scarecrow', 'sportsrhino', 'wordgoose', 'alarmwolf', 'millgolem', 'busbull', 'stormbird',
+  // 31~40 바닷가
+  'commacrab', 'quizconch', 'pencilgull', 'dotocto', 'testkraken', 'adjstar', 'tripshark', 'bookray', 'cramwizard', 'leviathan',
+  // 41~50 밤
+  'snackcoon', 'sleeppillow', 'tutorsquito', 'sleepcloud', 'moongrader', 'wolf2am', 'mutecat', 'nightmare', 'batking', 'reportdragon',
+  // 51~60 온 세상 보스 모음 Ⅰ
+  'slime', 'nightbat', 'forgetghost', 'mimic', 'pianofang', 'phone', 'sandwitch', 'golem', 'pirate', 'mockhydra',
+  // 61~70 온 세상 보스 모음 Ⅱ
+  'clock', 'scrollgoblin', 'blinkjelly', 'labskeleton', 'gatehound', 'chalkangler', 'owlnight', 'omrreaper', 'killergolem', 'dictdragon'
 ];
-export const REGION_COUNT = REGIONS.length;
-export const CYCLE_LEVELS = REGION_COUNT * REGION_SIZE;
+// 71~79 한밤의 도서관(75 대장, 79 보스), 80~88 기말고사 학교(80 보스, 85 대장).
+const NEW_TRACK = [
+  'bookmarkbat', 'dustbookworm', 'postitghost', 'librarianowl', 'libshadow', 'dictspider', 'forbiddenmimic', 'indexgolem', 'shelfdragon',
+  'yearendlord', 'latebell', 'lunchslime', 'timetablefairy', 'staffroomguard', 'examsetter', 'classrobot', 'examoctopus', 'barbargiant'
+];
+export const BASE_LEVELS = BASE_TRACK.length, ALL_LEVELS = BASE_TRACK.length + NEW_TRACK.length;
+// 지역: from ~ to는 한 바퀴 안의 레벨(1부터), bg는 그림 배경이 없을 때 쓰는 임시 CSS 배경.
+export const REGIONS = [
+  { key: 'yaja', name: '야자 교실', icon: '🏫', from: 1, to: 10, bg: 'linear-gradient(180deg,#2c2455 0%,#6a3f7a 46%,#e58a46 100%)' },
+  { key: 'forest', name: '숲', icon: '🌲', from: 11, to: 20, bg: 'linear-gradient(180deg,#bfe8c4 0%,#6dbb6f 52%,#2f7a4a 100%)' },
+  { key: 'field', name: '들판', icon: '🌾', from: 21, to: 30, bg: 'linear-gradient(180deg,#bfe3ff 0%,#e7e29a 55%,#a8c85a 100%)' },
+  { key: 'beach', name: '바닷가', icon: '🏖️', from: 31, to: 40, bg: 'linear-gradient(180deg,#a9e3ff 0%,#6fc4e8 48%,#f3e2b0 100%)' },
+  { key: 'night', name: '밤', icon: '🌙', from: 41, to: 50, bg: 'linear-gradient(180deg,#0f1840 0%,#2c2f7a 55%,#5a4a9a 100%)' },
+  { key: 'world1', name: '온 세상 보스 모음 Ⅰ', icon: '👑', from: 51, to: 60, bg: 'linear-gradient(180deg,#2a0f2f 0%,#8f1d3a 55%,#e0a030 100%)' },
+  { key: 'world2', name: '온 세상 보스 모음 Ⅱ', icon: '👑', from: 61, to: 70, bg: 'linear-gradient(180deg,#1b0f2f 0%,#5a1d6a 55%,#d9822b 100%)' },
+  { key: 'library', name: '한밤의 도서관', icon: '📚', from: 71, to: 79, bg: 'linear-gradient(180deg,#1d1740 0%,#4a2f6a 52%,#b0833a 100%)' },
+  { key: 'school', name: '기말고사 학교', icon: '📝', from: 80, to: 88, bg: 'linear-gradient(180deg,#8fb8e8 0%,#c9d8ea 50%,#e8c46a 100%)' }
+];
 
 export const tierOf = key => HUNT_MONSTERS[key]?.tier || NEW_MONSTERS[key]?.tier || null;
 export const koOf = key => HUNT_MONSTERS[key]?.ko || NEW_MONSTERS[key]?.ko || '';
 // 기본 몬스터가 먼저(HUNT_MONSTERS 순서), 새 몬스터가 뒤(NEW_MONSTERS 순서).
 export const ALL_MONSTER_KEYS = [...Object.keys(HUNT_MONSTERS), ...Object.keys(NEW_MONSTERS)];
 
-const SLOT_TIERS = [...new Set(REGION_SLOTS)];
-const slotsOf = tier => REGION_SLOTS.map((t, i) => t === tier ? i : -1).filter(i => i >= 0);
-const owned = new Set(REGIONS.flatMap(r => r.own));
+// 한 바퀴의 몬스터 줄(길이 70 또는 88): 새 몬스터 그림이 하나라도 있으면 88, 아니면 70.
+// 그림이 없는 새 칸은 같은 등급의 기본 몬스터가 대신한다(그 등급 줄에서 새 칸 번호 순서대로).
 const memo = new Map();
-// 그림 목록(art)에서 만든 지역별 후보 줄: plan[지역][등급] = 후보 키(앞에서부터 쓴다).
-function plan(art) {
+export function track(art = MONSTER_ART) {
   const sig = ALL_MONSTER_KEYS.filter(k => art.has(k)).join(',');
   if (memo.has(sig)) return memo.get(sig);
-  const ready = ALL_MONSTER_KEYS.filter(k => art.has(k));
-  const out = REGIONS.map((r, ri) => Object.fromEntries(SLOT_TIERS.map(tier => {
-    const n = slotsOf(tier).length;
-    const own = r.own.filter(k => art.has(k) && tierOf(k) === tier);
-    const pool = ready.filter(k => tierOf(k) === tier && !own.includes(k));
-    const free = pool.filter(k => !owned.has(k)), bound = pool.filter(k => owned.has(k));
-    const turn = (list, by) => list.length ? [...list.slice(by % list.length), ...list.slice(0, by % list.length)] : list;
-    const rest = [...turn(free, ri * n), ...turn(bound, ri * n)];
-    return [tier, [...own, ...rest]];
-  })));
+  const swap = (key, i) => {
+    if (art.has(key)) return key;
+    const same = BASE_TRACK.filter(k => tierOf(k) === tierOf(key) && art.has(k));
+    return same.length ? same[i % same.length] : key;
+  };
+  const base = BASE_TRACK.map((k, i) => swap(k, i));
+  const out = NEW_TRACK.some(k => art.has(k)) ? [...base, ...NEW_TRACK.map((k, i) => swap(k, i))] : base;
   if (memo.size > 8) memo.clear();
   memo.set(sig, out);
   return out;
 }
-// 한 지역(번호 0부터, 몇 바퀴째인지 lap)의 10칸 몬스터 key 줄.
-export function regionKeys(regionIndex, lap = 0, art = MONSTER_ART) {
-  const cand = plan(art)[((regionIndex % REGION_COUNT) + REGION_COUNT) % REGION_COUNT];
-  const keys = [];
-  for (const tier of SLOT_TIERS) {
-    const list = cand[tier], n = slotsOf(tier).length, start = (Math.max(0, lap) * n) % list.length;
-    slotsOf(tier).forEach((slot, j) => { keys[slot] = list[(start + j) % list.length]; });
-  }
-  return keys;
-}
-// 레벨(1~9999) 하나의 위치: 몇 바퀴째(lap) · 몇 번째 지역(region) · 몇 번째 칸(slot, 0~9).
-export function stagePlace(stage) {
-  const i = Math.max(1, Math.min(9999, Math.floor(Number(stage) || 1))) - 1;
-  return { lap: Math.floor(i / CYCLE_LEVELS), region: Math.floor((i % CYCLE_LEVELS) / REGION_SIZE), slot: i % REGION_SIZE, number: Math.floor(i / REGION_SIZE) + 1 };
-}
-// 레벨의 지역 정보: 화면의 지역 이름 · 배경 · 새 지역 안내가 쓴다(first: 이 레벨이 그 지역의 첫 레벨).
-export function stageRegion(stage) {
-  const p = stagePlace(stage), r = REGIONS[p.region];
-  return { key: r.key, name: r.name, icon: r.icon, bg: r.bg, number: p.number, index: p.region, lap: p.lap, slot: p.slot, first: p.slot === 0 };
+export const cycleLength = (art = MONSTER_ART) => track(art).length;
+// 레벨(1~9999)의 위치: 몇 바퀴째(lap) · 한 바퀴 안의 몇 번째 레벨(pos, 0부터).
+export function stagePlace(stage, art = MONSTER_ART) {
+  const i = Math.max(1, Math.min(9999, Math.floor(Number(stage) || 1))) - 1, n = cycleLength(art);
+  return { lap: Math.floor(i / n), pos: i % n };
 }
 export function stageMonsterKey(stage, art = MONSTER_ART) {
-  const p = stagePlace(stage);
-  return regionKeys(p.region, p.lap, art)[p.slot];
+  return track(art)[stagePlace(stage, art).pos];
+}
+// 레벨의 지역 정보: 화면의 지역 이름 · 배경 · 새 지역 안내가 쓴다(first: 이 레벨이 그 지역의 첫 레벨, number: 처음부터 센 지역 번호).
+export function stageRegion(stage, art = MONSTER_ART) {
+  const { lap, pos } = stagePlace(stage, art), n = cycleLength(art), here = REGIONS.filter(r => r.from <= n);
+  const index = here.findIndex(r => pos + 1 >= r.from && pos + 1 <= r.to), r = here[index];
+  return { key: r.key, name: r.name, icon: r.icon, bg: r.bg, number: lap * here.length + index + 1, index, lap, slot: pos + 1 - r.from, size: r.to - r.from + 1, first: pos + 1 === r.from };
 }
