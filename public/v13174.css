@@ -1,0 +1,13 @@
+/* V13.174 몬스터전 지역: 지역 이름 칩 · 새 지역 안내 · 지역 띠. 지역 그림 배경이 오기 전까지는 CSS 그라데이션(--rg). 폰(390px)부터. */
+.ms-region-hero{background-image:linear-gradient(180deg,rgba(23,15,36,.1),rgba(23,15,36,.55)),var(--rg,none);background-size:cover}
+.ms-region-chip{display:inline-flex;align-items:center;gap:6px;margin:0 0 6px 8px;padding:3px 10px;border-radius:999px;font-size:12px;font-weight:800;color:#fff;background:rgba(23,15,36,.5);border:1px solid rgba(255,255,255,.35);backdrop-filter:blur(2px)}
+.ms-region-chip small{font-size:11px;font-weight:700;opacity:.85}
+.ms-newregion{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:18px;color:#fff;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.42)),var(--rg);box-shadow:0 12px 26px -18px rgba(23,15,36,.9);animation:msRegionIn .5s ease-out both}
+.ms-newregion>span{font-size:30px;line-height:1}
+.ms-newregion b{display:block;font-size:17px;font-weight:900;letter-spacing:-.02em}
+.ms-newregion small{display:block;margin-top:2px;font-size:12px;opacity:.92}
+@keyframes msRegionIn{from{opacity:0;transform:translateY(-8px) scale(.98)}to{opacity:1;transform:none}}
+.ms-stage .ms-reg{display:inline-block;margin-top:4px;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:800;color:#fff;background:linear-gradient(180deg,rgba(0,0,0,.18),rgba(0,0,0,.34)),var(--rg,#6b7280)}
+.ms-stage.locked .ms-reg{display:none}
+@media (prefers-reduced-motion:reduce){.ms-newregion{animation:none}}
+.ms-region-hero .mh-kicker{color:#fff3c4;text-shadow:0 1px 2px rgba(0,0,0,.45)}
