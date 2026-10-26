@@ -554,10 +554,61 @@ function starPracticeButton(A, cls = '') {
   if (!n) return '';
   return `<button type="button" class="star-practice-v1376 ${cls}" data-star-practice="true"><span class="star-practice-mark" aria-hidden="true">${uiArt('star-word')}</span><span><small>어려운 단어 모음</small><strong>★ ${n}개 모아서 연습</strong></span><b>${icon('arrow')}</b></button>`;
 }
+// V13.177 빈칸영작은 중등 학생에게만 보인다(고등은 카드를 숨긴다).
+export const blankVisible = A => A.data?.profile?.role === 'student' && A.data.profile.division === 'middle';
+const BLANK_STEP_HINT = { 1: '보기를 눌러 빈칸을 채워요', 2: '빈칸을 직접 써요', 3: '빈칸이 더 많아요', 4: '단어를 순서대로 눌러요', 5: '우리말을 보고 영어로 써요' };
+// 빈칸영작 학습 화면: 과 탭 → 본문 목록 → Step 1 ~ 5 고르기. 연습 화면은 public/blank-writing.js.
+function blankStudy(A) {
+  const head = `<div class="study-subhead"><button class="study-back" data-blank-back="true">${icon('back')} ${A.blankGroup ? '본문 목록' : '학습'}</button><span class="pill">WRITING</span></div>`;
+  const data = A.blankData;
+  if (!data) return `${head}<section class="grammar-empty-school"><div><b>빈칸영작 자료를 불러오고 있어요.</b><p>잠시만 기다려주세요.</p></div></section>`;
+  const done = A.data.rewards?.blank?.done || {}, rate = A.data.rewards?.blank?.rate || {};
+  const lessons = Object.keys(data.BLANK_LESSONS);
+  const lesson = lessons.includes(String(A.blankLesson)) ? String(A.blankLesson) : lessons[0];
+  const lessonData = data.BLANK_LESSONS[lesson];
+  const stepsDone = group => [1, 2, 3, 4, 5].filter(step => done[`${group.id}:${step}`]).length;
+  if (A.blankGroup) {
+    const group = lessonData.groups.find(g => g.id === A.blankGroup) || lessonData.groups[0];
+    const items = data.blankGroupItems(lesson, group);
+    const tile = grammarTile(group.number);
+    return `${head}
+      <div class="page-heading grammar-heading"><h1>빈칸영작</h1></div>
+      <section class="grammar-range-head middle compact-v1339"><div><span class="eyebrow">${esc(lesson)}과 · ${esc(lessonData.title)}</span><h2>${esc(group.title)}</h2><p>${esc(group.number)} · ${items.length}문항 · 단계를 골라 시작해요.</p></div></section>
+      <div class="middle-grammar-summary-v1339"><b>Step 1 ~ 5</b><span>${stepsDone(group)}/5 단계 완료</span></div>
+      <div class="grammar-set-list compact-v1339 blank-steps-v13177">${[1, 2, 3, 4, 5].map(step => {
+        const key = `${group.id}:${step}`, ok = Boolean(done[key]), pct = rate[key];
+        return `<button class="grammar-set-card premium gx-card ${ok ? 'mastered' : ''}" data-blank-step="${step}" aria-label="Step ${step} ${esc(data.BLANK_STEP_NAMES[step])} ${ok ? '다시 풀기' : '시작하기'}">
+          <span class="gx-tile"><small>STEP</small><b>${step}</b></span>
+          <span class="gx-body"><b class="gx-title">${esc(data.BLANK_STEP_NAMES[step].replace(/^Step \d · /, ''))}</b>
+            <span class="gx-meta"><span class="gx-chip">${esc(BLANK_STEP_HINT[step])}</span>${ok ? `<span class="gx-chip state master">완료${pct != null ? ` · 정답률 ${pct}%` : ''}</span>` : ''}</span></span>
+          <span class="gx-go" aria-hidden="true">${ok ? icon('check') : icon('arrow')}</span>
+        </button>`;
+      }).join('')}</div>`;
+  }
+  const completed = lessonData.groups.reduce((n, g) => n + stepsDone(g), 0);
+  return `${head}
+    <div class="page-heading grammar-heading"><h1>빈칸영작</h1></div>
+    <section class="grammar-range-head middle compact-v1339"><div><span class="eyebrow">중3 · 동아(윤정미)</span><h2>교과서 본문 빈칸영작</h2><p>본문을 5단계로 써 보며 외워요.</p></div></section>
+    <div class="middle-grammar-tabs-v1339" style="--tabs:${lessons.length}">${lessons.map(n => {
+      const groups = data.BLANK_LESSONS[n].groups;
+      return `<button data-blank-lesson="${esc(n)}" class="${n === lesson ? 'selected' : ''}"><b>${esc(n)}과</b><small>${groups.reduce((c, g) => c + stepsDone(g), 0)}/${groups.length * 5} 완료</small></button>`;
+    }).join('')}</div>
+    <div class="middle-grammar-summary-v1339"><b>${esc(lesson)}과 · ${esc(lessonData.title)}</b><span>${lessonData.groups.length}개 본문 · ${completed}/${lessonData.groups.length * 5} 단계 완료</span></div>
+    <div class="grammar-set-list compact-v1339">${lessonData.groups.map(group => {
+      const n = stepsDone(group), t = grammarTile(group.number), all = n === 5;
+      return `<button class="grammar-set-card premium gx-card ${all ? 'mastered' : ''}" data-blank-group="${esc(group.id)}" aria-label="${esc(group.number)} ${esc(group.title)}">
+        <span class="gx-tile${t.main.length > 3 ? ' long' : ''}">${t.top ? `<small>${esc(t.top)}</small>` : ''}<b>${esc(t.main)}</b></span>
+        <span class="gx-body"><b class="gx-title">${esc(group.title)}</b>
+          <span class="gx-meta"><span class="gx-chip">${data.blankGroupItems(lesson, group).length}문항</span><span class="gx-chip state ${all ? 'master' : ''}">${all ? 'ALL CLEAR' : `${n}/5 단계`}</span></span>
+          <span class="blank-dots-v13177" aria-hidden="true">${[1, 2, 3, 4, 5].map(step => `<i class="${done[`${group.id}:${step}`] ? 'on' : ''}"></i>`).join('')}</span></span>
+        <span class="gx-go" aria-hidden="true">${all ? icon('check') : icon('arrow')}</span>
+      </button>`;
+    }).join('')}</div>`;
+}
 function studyHub(A) {
   return `<div class="page-heading study-simple-heading premium-page-heading"><span class="premium-eyebrow">LEARNING</span><h1>학습</h1></div>
   ${studyDailyCard(A)}
-  <div class="study-hub-grid study-hub-simple">
+  <div class="study-hub-grid study-hub-simple${blankVisible(A) ? ' three' : ''}">
     <button class="study-hub-card vocab" data-study="vocab">
       <span class="study-hub-icon">${artOr('study-vocab', icon('practice'), 'hub-art')}</span>
       <div><span class="pill green">VOCAB</span><h2>단어 학습</h2></div>
@@ -568,6 +619,11 @@ function studyHub(A) {
       <div><span class="pill">GRAMMAR</span><h2>어법·어휘</h2></div>
       <span class="study-hub-arrow">${icon('arrow')}</span>
     </button>
+    ${blankVisible(A) ? `<button class="study-hub-card blank" data-study="blank">
+      <span class="study-hub-icon">${artOr('study-blank', icon('exam'), 'hub-art')}</span>
+      <div><span class="pill">WRITING</span><h2>빈칸영작</h2></div>
+      <span class="study-hub-arrow">${icon('arrow')}</span>
+    </button>` : ''}
   </div>
   ${starPracticeButton(A, 'in-hub')}`;
 }
@@ -877,6 +933,7 @@ function studyDailyCard(A) {
 function practice(A) {
   if (A.studyView === 'vocab') return vocabPractice(A);
   if (A.studyView === 'grammar') return grammarStudy(A);
+  if (A.studyView === 'blank' && blankVisible(A)) return blankStudy(A);
   return `${studyTabs(A)}${studyHub(A)}`;
 }
 // V13.68 야차전 tab: the lobby is drawn by battle.js inside this box (a match goes full screen).

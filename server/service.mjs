@@ -35,6 +35,7 @@ import { dungeonQuestions } from './dungeon-words.mjs';
 import { settleDungeonRecords, dungeonBoardsView, dungeonLastView } from './dungeon-records.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
 import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend, reelSeaPet, reelRodUp } from './reel.mjs';
+import { blankStart, blankFinish, blankView } from './blank.mjs';
 import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow, huntSell, huntCoins, huntSpend, huntBerryQuiz, huntBerryAnswer } from './hunt.mjs';
 import { HUNT, HUNT_MONSTERS } from '../public/modules/hunt-rules.js';
 import { FISH } from '../public/modules/fishing-rules.js';
@@ -1213,7 +1214,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } else if (process.env.AUTH_PROVIDER === 'supabase') {
       const result = await supabaseLogin(username, password); p = result.profile; supabaseAccessToken = result.accessToken;
       const old = state.profiles.find(x => x.id === p.id);
-      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live', 'bonus', 'streak_guard', 'games', 'reel', 'hunt'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
+      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live', 'bonus', 'streak_guard', 'games', 'reel', 'hunt', 'blank'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
       else state.profiles.push(p);
     } else {
       p = localProfile;
@@ -1317,7 +1318,7 @@ export async function service(state, method, path, body, token, options = {}) {
       class_league: teacher && selectedSchool ? classLeague(state, competition, selectedSchool, now) : null,
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now), hunt: huntView(p, now) },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now), hunt: huntView(p, now), blank: p.role === 'student' ? blankView(p, now) : null },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -1764,6 +1765,21 @@ export async function service(state, method, path, body, token, options = {}) {
     const ctx = monsterContext(state, p);
     const result = monsterFinish(p, { id: str(body.id, 80), result: str(body.result, 10), right: Number(body.right), pet: activePetKey(state, p.id), scope: ctx.scope, parts: ctx.parts, now: Date.now() });
     if (!result.again) logActivity(p, 'monster', `몬스터전 레벨 ${result.fought ?? '?'} ${{ easy: '이지', normal: '노말', hard: '하드' }[result.level] || ''} ${result.result === 'win' ? '승' : '패'}`.replace(/  +/g, ' '));
+    return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
+  }
+  // V13.177 빈칸영작(중등): 시작 신호 → 끝 보고(문항별 최종 답을 서버가 다시 채점) → 보상(본문 × 단계 첫 완료만, server/blank.mjs).
+  if (path === '/blank/start' && method === 'POST') {
+    requireRole(p, 'student');
+    return blankStart(p, { group: str(body.group, 12), step: Number(body.step), id: id(), now: Date.now() });
+  }
+  if (path === '/blank/finish' && method === 'POST') {
+    requireRole(p, 'student');
+    const answers = {};
+    if (body.answers && typeof body.answers === 'object' && !Array.isArray(body.answers)) {
+      for (const [n, value] of Object.entries(body.answers).slice(0, 20)) answers[n] = Array.isArray(value) ? value.slice(0, 40).map(x => str(x, 80)) : str(value, 600);
+    }
+    const result = blankFinish(p, { id: str(body.id, 80), group: str(body.group, 12), step: Number(body.step), answers, rate: body.first_rate, pet: activePetKey(state, p.id), now: Date.now() });
+    if (result.paid) logActivity(p, 'blank', `빈칸영작 ${result.group} Step ${result.step}`);
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
   // V13.149 짝 맞추기(server/games.mjs). 단어는 몬스터전처럼 내 학교 · 학년의 범위에서. (V13.150: 혼자 단어 낚시는 놀이터 손맛 낚시로 바뀌었다)
