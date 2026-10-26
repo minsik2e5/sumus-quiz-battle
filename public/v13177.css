@@ -1,0 +1,8 @@
+/* V13.177 빈칸영작: 학습 허브 세 번째 카드(중등만) + 본문 카드의 단계 점 */
+.study-hub-card.blank:before{background:#e8f8ef}
+.study-hub-card.blank .study-hub-icon{background:#e8f8ef;color:#12805c}
+.study-hub-simple.three .study-hub-card.blank:before{background:linear-gradient(145deg,#eafaf1,#dcf5e8)!important}
+@media(max-width:720px){.study-hub-simple.three .study-hub-card.blank{grid-column:1/-1;min-height:96px}}
+.blank-dots-v13177{display:flex;gap:5px;margin-top:7px}
+.blank-dots-v13177 i{width:22px;height:6px;border-radius:999px;background:#e4e8f0}
+.blank-dots-v13177 i.on{background:linear-gradient(90deg,#12b76a,#32d583)}

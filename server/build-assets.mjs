@@ -112,7 +112,8 @@ const cssSources = [
   "v13162.css",
   "v13166.css",
   "v13168.css",
-  "v13173.css"
+  "v13173.css",
+  "v13177.css"
 ];
 const cssBundlePath = resolve(root, 'public/app.bundle.css');
 
@@ -199,7 +200,7 @@ writeFileSync(cssBundlePath, cssBundle);
   // Loaded on every start; teacher tools, grammar data and pet images are cached on first
   // use. Images still count toward ASSET_HASH, so a redrawn pet reaches installed apps.
   // V13.77: the install guide, its QR code and the PNG icons are also only fetched when used.
-  const onDemand = /^\/(?:(?:teacher-enhancements|exam-ops|grammar-choice-sample|[a-z-]+-grammar-data|install)\.js|install\.html|vendor\/.+|icons\/.+\.png|assets\/.+\.(?:webp|mp3))$/;
+  const onDemand = /^\/(?:(?:teacher-enhancements|exam-ops|grammar-choice-sample|blank-writing|[a-z-]+-grammar-data|[a-z-]+-blank-data|install)\.js|install\.html|vendor\/.+|icons\/.+\.png|assets\/.+\.(?:webp|mp3))$/;
   // The page is cached as "/": Cloudflare answers /index.html with a 307 to /,
   // and a redirected response cannot be used to answer a navigation.
   const precache = served.map(({ url }) => url === '/index.html' ? '/' : url).filter(url => !onDemand.test(url));

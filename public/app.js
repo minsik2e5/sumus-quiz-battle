@@ -201,6 +201,11 @@ async function ensureGrammarData() {
   A.grammarDataKey = key;
   A.grammarData = data;
 }
+// V13.177 빈칸영작(중등): 자료 파일(중3 동아 5 · 6 · 7과)은 이 화면을 열 때 한 번 불러온다.
+async function ensureBlankData() {
+  if (A.blankData) return;
+  A.blankData = await import('./middle-donga-yoon-blank-data.js');
+}
 function renderKeepScroll() {
   const y = window.scrollY;
   render();
@@ -719,7 +724,23 @@ $('#app').addEventListener('click', async event => {
       await refresh(); A.role = 'teacher'; A.tab = 'dashboard'; render(); window.scrollTo(0, 0); return;
     }
     if (d.teacherDivision && A.data.profile.role === 'teacher') { await performTeacherContextSwitch('division', d.teacherDivision); return; }
+    if (d.blankBack) {
+      if (A.blankGroup) A.blankGroup = null; else { A.studyView = 'hub'; }
+      render(); window.scrollTo(0, 0); return;
+    }
+    if (d.blankLesson) { A.blankLesson = d.blankLesson; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+    if (d.blankGroup) { A.blankGroup = d.blankGroup; render(); window.scrollTo(0, 0); return; }
+    if (d.blankStep) {
+      buttonBusy(b);
+      const { openBlankWriting } = await import('./blank-writing.js');
+      window.scrollTo(0, 0);
+      return openBlankWriting(A, { group: A.blankGroup, step: Number(d.blankStep) }, async () => { A.screen = null; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); });
+    }
     if (d.study) {
+      if (d.study === 'blank') {
+        if (A.data.profile.division !== 'middle') return;
+        buttonBusy(b); await ensureBlankData(); A.blankGroup = null;
+      }
       if (d.study === 'grammar') { buttonBusy(b); await ensureGrammarData(); }
       A.studyView = d.study; A.tab = 'practice'; A.practiceRunMode = 'practice'; render(); window.scrollTo(0, 0); return;
     }

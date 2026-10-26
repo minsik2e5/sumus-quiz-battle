@@ -16,6 +16,7 @@ export const ACTIVITY_MODES = {
   robot: { label: '로보 연습전', icon: '🤖' },
   monster: { label: '몬스터전', icon: '👹' },
   hunt: { label: '몬스터 사냥', icon: '🎯' },
+  blank: { label: '빈칸영작', icon: '✍️' },
   fish: { label: '낚시', icon: '🎣' },
   match: { label: '짝 맞추기', icon: '🃏' },
   dungeon: { label: '던전', icon: '🏰' },
