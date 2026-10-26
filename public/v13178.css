@@ -1,0 +1,20 @@
+/* V13.178 목록 화면 민트 통일: 어법(중등 · 고등) 목록과 빈칸영작 목록 · Step 고르기는 같은 카드를 쓴다.
+   남색 배너와 파랑 타일 · 칩 · 화살표를 단어 학습처럼 민트로. 색만 바꾸고 모양 · 크기 · 동작은 그대로.
+   민트 색: 글씨 #087f61 · 연한 바탕 #e8f8f1 · 테두리 #bfe9d6 · 진한 면 #17c487 → #0eb77c(.btn.primary와 같음) */
+.grammar-range-head{background:linear-gradient(135deg,#eaf9f2 0%,#d8f3e6 100%)!important;color:#123a31!important;border:1px solid #bfe9d6!important;box-shadow:0 10px 26px rgba(18,184,134,.1)!important}
+.grammar-range-head::after{background:radial-gradient(circle,rgba(18,184,134,.2),rgba(18,184,134,0) 70%)}
+.grammar-range-head .eyebrow{color:#087f61!important}
+.grammar-range-head h2{color:#123a31}
+.grammar-range-head p{color:#4c6b61}
+.grammar-range-count{background:rgba(18,184,134,.14)!important;color:#087f61!important;box-shadow:inset 0 0 0 1px rgba(18,184,134,.22)!important}
+.grammar-set-card.gx-card:hover{border-color:#9fe0c8!important;box-shadow:0 10px 24px rgba(18,140,105,.1)!important}
+.gx-tile{background:linear-gradient(160deg,#eefaf5,#d6f2e5);color:#087f61;box-shadow:inset 0 0 0 1px rgba(18,184,134,.2)}
+.gx-tile small{color:#3f9d82}
+.gx-chip.state{color:#087f61;background:#e8f8f1}
+.gx-go{background:#e8f8f1;color:#087f61}
+/* 완료(MASTER · 다 푼 단계)는 진한 민트 면으로: 연한 민트(아직 안 함)와 한눈에 구분 */
+.grammar-set-card.gx-card.mastered{border-color:#9fe0c8!important;background:linear-gradient(180deg,#fff,#f1fbf7)}
+.grammar-set-card.gx-card.mastered .gx-tile{background:linear-gradient(135deg,#17c487,#0eb77c);color:#fff;box-shadow:0 6px 14px rgba(18,184,134,.22)}
+.grammar-set-card.gx-card.mastered .gx-tile small{color:rgba(255,255,255,.82)}
+.grammar-set-card.gx-card.mastered .gx-go{background:#12b886;color:#fff}
+.gx-chip.state.master{color:#fff;background:#12b886}
