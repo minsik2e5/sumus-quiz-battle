@@ -4,6 +4,9 @@
 // checks the part, unlocks levels and pays) and the app (which runs the fight on the phone with
 // the yacha engine, like the robot practice match).
 
+import { MONSTER_ART } from './monster-art.js';
+import { MONSTER_TEXT, tierOf, koOf, stageRegion, stageMonsterKey } from './monster-regions.js';
+
 // The nine monsters of the plan (docs/asset-requests 05-bosses). Until their pictures arrive
 // (MONSTER_ART), each borrows a pet picture recoloured with a CSS filter (`temp`).
 export const MONSTERS = [
@@ -31,18 +34,27 @@ export const MONSTERS = [
 // V13.105 the monster of each level: small to big, the first and the second nine mixed. After the
 // 18th level they come round again stronger ("+1", "+2" …).
 export const MONSTER_ORDER = ['mochi', 'slime', 'pencilworm', 'forgetghost', 'mimic', 'clock', 'sleepcloud', 'golem', 'alarmwolf', 'phone', 'scrollgoblin', 'pirate', 'proctor', 'owlnight', 'cramwizard', 'dictdragon', 'mockhydra', 'finalking'];
+// V13.174 지역(10레벨 = 1지역): 레벨 N의 몬스터는 monster-regions.js의 표가 정한다(그림이 있는 몬스터 약 70종 + 새 18종이 들어오는 대로).
+//   MONSTER_ORDER는 예전 순서(18종)로 남겨 둔다: 도감 · 옛 검사용이고 레벨에는 더 쓰지 않는다.
+// 몬스터 한 마리의 정보(key로): 첫 18종은 MONSTERS, 나머지는 hunt-rules.js의 이름 · 등급과 monster-regions.js의 설명 · 색.
+// 그림이 없을 때(temp)는 로봇 그림에 색만 입힌다 — 그림 게이트 때문에 레벨에는 나오지 않고, 화면 안전망일 뿐이다.
+export function monsterInfo(key) {
+  const own = MONSTERS.find(x => x.key === key);
+  if (own) return own;
+  const text = MONSTER_TEXT[key];
+  if (!text) return MONSTERS[0];
+  const tier = tierOf(key);
+  return { key, name: koOf(key), line: text[0], color: text[1], tier, temp: { pet: 'robot', form: TIER_FORM[tier] || 1, filter: 'none' } };
+}
+const TIER_FORM = { common: 1, uncommon: 1, rare: 2, epic: 3, legend: 3 };
 export function stageMonster(stage) {
-  const s = Math.max(1, Math.floor(Number(stage) || 1)), i = (s - 1) % MONSTER_ORDER.length, round = Math.floor((s - 1) / MONSTER_ORDER.length);
-  const m = MONSTERS.find(x => x.key === MONSTER_ORDER[i]) || MONSTERS[0];
-  return { ...m, round, title: round ? `${m.name} +${round}` : m.name };
+  const s = Math.max(1, Math.floor(Number(stage) || 1)), at = stageRegion(s), m = monsterInfo(stageMonsterKey(s, MONSTER_ART)), round = at.lap;
+  return { ...m, round, title: round ? `${m.name} +${round}` : m.name, region: at };
 }
 // Monsters whose own pictures are in public/assets/monsters (<key>.webp, <key>-attack.webp,
-// <key>-hurt.webp, <key>-down.webp). V13.95: the first nine, cut from the sheets 10-1 … 10-9 (the
-// four poses of a sheet at one scale, feet on the floor like the pets). `temp` stays as the
-// fallback for a monster added later without pictures.
-export const MONSTER_ART = new Set(['slime', 'forgetghost', 'clock', 'golem', 'phone', 'pirate', 'owlnight', 'dictdragon', 'finalking',
-  // V13.106: the second nine, cut from the sheets 12-1 … 12-9 the same way (the four poses at one scale)
-  'mochi', 'pencilworm', 'mimic', 'sleepcloud', 'alarmwolf', 'scrollgoblin', 'proctor', 'cramwizard', 'mockhydra']);
+// <key>-hurt.webp, <key>-down.webp). V13.174: the list is made by build:assets (monster-art.js) from
+// the picture folder, so a picture that arrives is used without changing code.
+export { MONSTER_ART };
 export const MONSTER_POSES = ['attack', 'hurt', 'down'];
 // V13.94 parts (kept for moving the old clears) took the first nine in turn.
 export const monsterOf = index => MONSTERS[((index % 9) + 9) % 9];
