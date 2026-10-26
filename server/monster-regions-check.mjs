@@ -106,5 +106,5 @@ export async function runMonsterRegionsChecks(assert) {
     && css.includes('.ms-newregion') && css.includes('.ms-region-chip') && css.includes('prefers-reduced-motion') && build.includes('"v13174.css"') && sw.includes('/modules/monster-regions.js') && rewards.includes('stageMonster(s).key'),
     'V13.174 몬스터 탭: 지역 이름 칩 · "새 지역!" 안내(한 번) · 임시 배경, 서버(rewards.mjs)와 화면이 같은 stageMonster 표를 쓰고 새 파일이 앱 캐시에 있다');
   const guide = source('../docs/monster-level-design.md');
-  assert(guide.includes('세션 2') && source('../CHANGES_v13.174.0.md').includes('지역'), 'V13.174 구성안 문서와 변경 기록(CHANGES_v13.174.0.md)이 있다');
+  assert(guide.includes('세션 2') && source('../CHANGES_v13.178.0.md').includes('지역'), 'V13.174 구성안 문서와 변경 기록(CHANGES_v13.178.0.md)이 있다');
 }
