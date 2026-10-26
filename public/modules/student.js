@@ -168,6 +168,7 @@ const passageNumberLabel = passage => /과/.test(String(passage.number)) ? Strin
 function grammarExamLabel(passage) {
   return passage.id.startsWith('danwon-ybm2') ? `공통영어2 YBM(김은형) · ${passage.lesson}과`
     : passage.id.startsWith('middle-dong-a-yoon') ? '중3 동아(윤정미) · 본문 Part 4'
+    : passage.id.startsWith('middle-ybm-park') ? `중2 YBM(박준언) · ${passage.lesson}과 기말고사`
     : passage.id.startsWith('2026-06-busan') ? '2026년 6월 부산교육청'
     : passage.id.startsWith('2026-03-seoul') ? '2026년 3월 서울교육청'
     : '2025년 9월 인천교육청';
@@ -612,15 +613,20 @@ function grammarStudy(A) {
   <div class="page-heading grammar-heading"><h1>어법·어휘</h1></div>
   <section class="study-school-card locked"><div><span class="tiny muted">현재 학교</span><strong>${esc(school)}</strong></div><span class="school-fixed">${icon('shield')} 선생님 관리</span></section>
   ${middle ? (() => {
-    const lesson = Number(A.middleGrammarLesson || 6);
-    const selectedLesson = [6,7].includes(lesson) ? lesson : 6;
-    const lessonPassages = byLesson[selectedLesson] || [];
+    // 중2 학생은 YBM(박준언) 5 · 6 · 7과(기말고사 범위), 중3 학생은 동아(윤정미) 6 · 7과가 먼저 열리고, 다른 교과서 탭도 눌러 볼 수 있다.
+    const sets = data.sets || [{ key: 'donga-yoon', grade: '중3', name: '동아(윤정미)', eyebrow: '중3 · 동아(윤정미)', lessons: [6, 7], byLesson }];
+    const myGrade = /^(중[1-3])/.exec(String(A.data.profile.class_name || ''))?.[1] || '';
+    const set = sets.find(s => s.key === A.middleGrammarSet) || sets.find(s => s.grade === myGrade) || sets[0];
+    const lesson = Number(A.middleGrammarLesson || 0);
+    const selectedLesson = set.lessons.includes(lesson) ? lesson : set.lessons[0];
+    const lessonPassages = set.byLesson[selectedLesson] || [];
     const completed = lessonPassages.filter(p => savedGrammarProgress(A, p)?.mastered).length;
     return `
-      <section class="grammar-range-head middle compact-v1339"><div><span class="eyebrow">중3 · 동아(윤정미)</span><h2>교과서 본문 어법 선택형</h2><p>문장을 읽고 알맞은 어법을 선택해요.</p></div></section>
-      <div class="middle-grammar-tabs-v1339">
-        ${[6,7].map(n => {
-          const ps = byLesson[n] || [];
+      <section class="grammar-range-head middle compact-v1339"><div><span class="eyebrow">${esc(set.eyebrow)}</span><h2>교과서 본문 어법 선택형</h2><p>문장을 읽고 알맞은 어법을 선택해요.</p></div></section>
+      ${sets.length > 1 ? `<div class="middle-grammar-tabs-v1339 middle-grammar-sets-v13175" style="--tabs:${sets.length}">${sets.map(s => `<button data-middle-grammar-set="${esc(s.key)}" class="${s.key === set.key ? 'selected' : ''}"><b>${esc(s.grade)}</b><small>${esc(s.name)}</small></button>`).join('')}</div>` : ''}
+      <div class="middle-grammar-tabs-v1339" style="--tabs:${set.lessons.length}">
+        ${set.lessons.map(n => {
+          const ps = set.byLesson[n] || [];
           const done = ps.filter(p => savedGrammarProgress(A,p)?.mastered).length;
           return `<button data-middle-grammar-lesson="${n}" class="${selectedLesson === n ? 'selected' : ''}"><b>${n}과</b><small>${done}/${ps.length} 완료</small></button>`;
         }).join('')}

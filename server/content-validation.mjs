@@ -6,6 +6,7 @@ import { DANWONGO_PASSAGES } from '../public/danwongo-grammar-data.js';
 import { DANWONGO_TEXTBOOK_PASSAGES } from '../public/danwongo-textbook-grammar-data.js';
 import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from '../public/seonbu-grammar-data.js';
 import { GANGSEO_PASSAGES } from '../public/gangseo-grammar-data.js';
+import { MIDDLE_YBM_PARK_PASSAGES } from '../public/middle-ybm-park-grammar-data.js';
 
 const fail = message => { throw new Error('[content-validation] ' + message); };
 const runtimeBooks = () => {
@@ -83,6 +84,10 @@ export function runContentValidation() {
   assert(!DANWONGO_TEXTBOOK_PASSAGES.some(p => DANWONGO_PASSAGES.some(q => q.id === p.id)), '단원고 교과서/모의고사 지문 id 중복');
   validateGrammarSet('선부고 2026', SEONBU_2026_PASSAGES, ['20','23','24','32'], 101);
   validateGrammarSet('선부고 2025', SEONBU_2025_PASSAGES, ['31','34','36','38','40','43~45'], 161);
+  validateGrammarSet('중2 YBM(박준언)', MIDDLE_YBM_PARK_PASSAGES, ['5과 · 본문 1','5과 · 본문 2','5과 · 본문 3','6과 · 본문 1','6과 · 본문 2','6과 · 본문 3','6과 · 본문 4','7과 · 본문 1','7과 · 본문 2','7과 · 본문 3'], 100);
+  for (const passage of MIDDLE_YBM_PARK_PASSAGES) for (const sentence of passage.sentences) for (const part of sentence.parts) {
+    if (part[0] === 'c') assert(typeof part[3] === 'string' && part[3] && typeof part[4] === 'string' && part[4].length > 10, `중2 YBM(박준언) ${passage.number}: 설명 누락`);
+  }
   validateGrammarSet('강서고', GANGSEO_PASSAGES, ['21','23','29','30','31','32','33','34','36','37','38','39','40'], 241);
   return { ok: true };
 }
