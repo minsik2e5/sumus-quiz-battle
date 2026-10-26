@@ -171,8 +171,17 @@ async function ensureGrammarData() {
   if (A.grammarDataKey === key && A.grammarData) return;
   let data = { passages: [] };
   if (division === 'middle') {
-    const mod = await import('./middle-donga-yoon-grammar-data.js');
-    data = { passages: mod.MIDDLE_DONGA_YOON_PASSAGES || [], byLesson: mod.MIDDLE_DONGA_YOON_BY_LESSON || {} };
+    // V13.175 중등 어법 선택형은 교과서가 둘이다: 중2 YBM(박준언) 5 · 6 · 7과(기말고사 범위)와 중3 동아(윤정미) 6 · 7과.
+    const [donga, ybm] = await Promise.all([import('./middle-donga-yoon-grammar-data.js'), import('./middle-ybm-park-grammar-data.js')]);
+    const dongaPassages = donga.MIDDLE_DONGA_YOON_PASSAGES || [], ybmPassages = ybm.MIDDLE_YBM_PARK_PASSAGES || [];
+    data = {
+      passages: [...ybmPassages, ...dongaPassages],
+      byLesson: donga.MIDDLE_DONGA_YOON_BY_LESSON || {},
+      sets: [
+        { key: 'ybm-park', grade: '중2', name: 'YBM(박준언)', eyebrow: '중2 · YBM(박준언) · 기말고사 범위', lessons: [5, 6, 7], byLesson: ybm.MIDDLE_YBM_PARK_BY_LESSON || {} },
+        { key: 'donga-yoon', grade: '중3', name: '동아(윤정미)', eyebrow: '중3 · 동아(윤정미)', lessons: [6, 7], byLesson: donga.MIDDLE_DONGA_YOON_BY_LESSON || {} }
+      ]
+    };
   } else if (school === '단원고') {
     const [mock, textbook] = await Promise.all([import('./danwongo-grammar-data.js'), import('./danwongo-textbook-grammar-data.js')]);
     const textbookPassages = textbook.DANWONGO_TEXTBOOK_PASSAGES || [];
@@ -803,6 +812,7 @@ $('#app').addEventListener('click', async event => {
       renderKeepScroll(); return;
     }
     if (d.highExamLesson) { A.highExamOpen = d.highExamLesson; if (A.data.profile.division === 'middle') A.middleRange = d.highExamLesson; A.highExamPickOpen = true; savePreferences(); renderKeepScroll(); return; }
+    if (d.middleGrammarSet) { A.middleGrammarSet = d.middleGrammarSet; A.middleGrammarLesson = 0; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (d.middleGrammarLesson) { A.middleGrammarLesson = Number(d.middleGrammarLesson); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (d.rankMode) { A.rankMode = d.rankMode; savePreferences(); render(); return; }
     if (d.rankView) { A.rankView = d.rankView === 'league' ? 'league' : 'study'; savePreferences(); render(); return; }
