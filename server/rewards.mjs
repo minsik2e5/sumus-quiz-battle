@@ -6,6 +6,7 @@ import {
   RPS_BETS, RPS_DAILY, RPS_MAX_WINS, RPS_KEYS, RPS_STALE_MS, rpsOutcome
 } from '../public/modules/rewards.js';
 import { titleCoins } from '../public/modules/titles.js';
+import { monsterDayWin } from './titles-3.mjs';
 import { MONSTER_LEVELS, MONSTER_DAILY, MONSTER_MIN_MS, MONSTER_MS_PER_RIGHT, MONSTER_TRY, MONSTER_LEVEL_KEYS, monsterOpen, partClears, partKeyCodes, stageLevel, cleanStage, stageMonster, isBossStage } from '../public/modules/monsters.js';
 
 // Coin rewards and games (rules and odds: public/modules/rewards.js). Everything lives on the
@@ -586,7 +587,7 @@ function botSettle(p, b, live, { result, right, pet, now }) {
 /* ---------- V13.94 몬스터 잡기 ---------- */
 //   monster { ranges: { ['<school id>|<grade>|<range code>']: { easy, normal, hard: first clear time } },
 //             cleared_v1: { [V13.94 part key]: { easy, normal, hard } } (moved, kept as it was),
-//             day, count, wins, hard_wins, live: { id, part, level, at, scope, codes, sizes } }
+//             day, count, wins, hard_wins, dw: { d, n, b } (V13.184 오늘 승 · 하루 최다 승, server/titles-3.mjs), live: { id, part, level, at, scope, codes, sizes } }
 // A fight is announced when it starts (the server checks the part and that the level is open)
 // and pays when it ends: the first clear of a part at a level pays MONSTER_LEVELS[level].first,
 // any later fight (won: `again`, lost after answering `need` words: MONSTER_TRY) pays only
@@ -698,7 +699,7 @@ function monsterSettle(p, m, live, { result, right, pet, nowScope, parts, now })
   if (answered < L.need) return { paid: false, reason: 'few', need: L.need, ...base };
   // V13.99: a lost fight is checked for time too: the right answers it claims take MONSTER_MS_PER_RIGHT each.
   if (!won && now - live.at < answered * MONSTER_MS_PER_RIGHT) return { paid: false, reason: 'short', ...base };
-  if (won) { m.wins = Number(m.wins || 0) + 1; if (live.level === 'hard') m.hard_wins = Number(m.hard_wins || 0) + 1; if (!legacy && isBossStage(stage)) m.boss_wins = Number(m.boss_wins || 0) + 1; }
+  if (won) { m.wins = Number(m.wins || 0) + 1; if (live.level === 'hard') m.hard_wins = Number(m.hard_wins || 0) + 1; if (!legacy && isBossStage(stage)) m.boss_wins = Number(m.boss_wins || 0) + 1; monsterDayWin(m, now); }
   const first = won && !legacy && stage === prog.stage && !prog.clear[live.level] && monsterOpen(prog.clear, live.level);
   let reward, up = false;
   if (first) {

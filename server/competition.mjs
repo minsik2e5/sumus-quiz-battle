@@ -8,6 +8,7 @@ import { bonusRecords, epicCount } from './rewards.mjs';
 import { guardDayNums } from '../public/modules/streak-guard.js';
 import { dungeonTitleStats, dungeonKings } from './dungeon-records.mjs';
 import { clawTitleStats } from './claw.mjs';
+import { blankTitleStats, gramTitleStats } from './titles-3.mjs';
 
 export const DAY_MS = 86400000;
 export const KST_OFFSET_MS = 9 * 3600000;
@@ -210,6 +211,12 @@ export function createCompetition(state, now = Date.now()) {
     timing_perfect: p => Number(p?.timing?.pf || 0),
     timing_ten: p => Number(p?.timing?.x10 || 0),
     timing_streak: p => Number(p?.timing?.sb || 0),
+    // V13.184 칭호 3탄(server/titles-3.mjs): 몬스터전 최고 레벨 · 하루 최다 승, 빈칸영작 완료 칸, 어법 완성 지문(최고값).
+    monster_best: p => Number(p?.bonus?.monster?.best || 0),
+    monster_day_best: p => Number(p?.bonus?.monster?.dw?.b || 0),
+    ...Object.fromEntries(Object.keys(blankTitleStats(null)).map(stat => [stat, p => blankTitleStats(p)[stat]])),
+    gram_mastered: (p, pid) => gramTitleStats(p, state.grammarProgress?.[pid]).gram_mastered,
+    gram_clean: (p, pid) => gramTitleStats(p, state.grammarProgress?.[pid]).gram_clean,
     // 보스 처치는 V13.148부터 센다. 그 전에 하드로 깬 레벨(m.best)에 들어 있던 보스 레벨은 깬 것으로 친다.
     boss_wins: p => { const m = p?.bonus?.monster || {}; return Math.max(Number(m.boss_wins || 0), Math.floor(Number(m.best || 0) / 5)); },
     // V13.67 capsule-only titles: owned when the capsule was pulled.

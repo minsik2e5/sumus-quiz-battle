@@ -66,7 +66,7 @@ export async function runLegendEggChecks(assert) {
   assert(!titleUnlocked('epic-collector', s19) && !titleUnlocked('legend-owner', s19) && titleUnlocked('epic-dex', all) && titleUnlocked('legend-owner', all) && titleUnlocked('epic-collector', all), 'V13.182 19마리는 칭호 없음, 영웅 전부면 도감 마스터, 전설 알을 열면 전설의 주인');
   assert(!titleUnlocked('legend-owner', stats({ pets: [...epics(20)], legend_egg: { e20: 1, wait: 'epic' } })), 'V13.182 열지 않은 전설 알만으로는 전설의 주인이 아니다');
   const emblems = source('../public/modules/emblems.js');
-  assert(!/'epic-collector'|'legend-owner'|'epic-dex'/.test(emblems), 'V13.182 칭호 메달 그림은 아직 없어 SVG 메달(그림 없는 대체 표시)');
+  assert(['epic-collector', 'legend-owner', 'epic-dex'].every(key => emblems.includes(`'${key}'`)), 'V13.182 칭호 3개는 V13.184에 메달 그림(51-3 · 52-2)이 와서 TITLE_ART에 있다');
 
   // ---- 상점 15,000코인 · 학생당 1개 · 전설 보유자 거절 · 코인 부족 거절
   const buyer = { pets: [{ key: 'dog' }] };

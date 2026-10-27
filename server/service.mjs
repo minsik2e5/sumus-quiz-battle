@@ -1,7 +1,7 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
 import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, EPIC_EGG_PRICE, seasonOnSale, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
-import { TITLES, TITLE_KEYS, titleUnlocked, weeklyTitle } from '../public/modules/titles.js';
+import { TITLES, TITLE_KEYS, TITLES_3, titleUnlocked, weeklyTitle } from '../public/modules/titles.js';
 import { battleQuestions, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
 import { monsterParts } from '../public/modules/monsters.js';
@@ -36,6 +36,7 @@ import { settleDungeonRecords, dungeonBoardsView, dungeonLastView } from './dung
 import packageInfo from '../package.json' with { type: 'json' };
 import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend, reelSeaPet, reelRodUp } from './reel.mjs';
 import { blankStart, blankFinish, blankView } from './blank.mjs';
+import { rememberGramBest } from './titles-3.mjs';
 import { grantTimingPlay, timingView, timingPing, timingStart, timingFinish, timingBoard, timingLine } from './timing.mjs';
 import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow, huntSell, huntCoins, huntSpend, huntBerryQuiz, huntBerryAnswer } from './hunt.mjs';
 import { grantClaw, clawView, clawStart, clawDrop, clawGuideSeen, clawPreviewFill, clawActivityText } from './claw.mjs';
@@ -942,6 +943,8 @@ function idleStudents(state, ctx, school, now = Date.now()) {
 // The title collection of the signed-in student. `fresh`: titles unlocked since the student
 // last looked (a limited title is new again each week it is won); `intro`: the student has not
 // seen the V13.66 collection yet, so the app shows one summary instead of a pop-up per title.
+// V13.184: 칭호가 150개를 넘어 학생이 본 칭호 기록을 240개까지 남긴다(160이면 거의 다 모은 학생은 본 칭호가 다시 새 칭호로 뜬다).
+export const TITLES_SEEN_MAX = 240;
 const titleSeenKey = (ctx, key) => weeklyTitle(key) ? `${key}@${ctx.lastWeek.key}` : key;
 // V13.73 `unpaid`: held titles whose coins are not paid yet (new ones, and titles won before
 // V13.73); they are paid when the app shows them (/titles/seen).
@@ -952,6 +955,9 @@ function titleView(ctx, p) {
   return {
     equipped: ctx.displayTitle(p), unlocked, stats,
     fresh: seen ? unlocked.filter(key => key !== 'rookie' && !seen.includes(titleSeenKey(ctx, key))) : [],
+    // V13.184 소급 지급: 3탄 칭호를 하나도 본 적 없는 학생이 이미 2개 이상 얻었으면(배포 전부터 조건을 채움) 한 장 묶음 카드로
+    // 한 번만 보여 준다. 본 뒤에는 3탄 key가 titles_seen에 들어가 다시 묶이지 않고, 그 뒤로 얻는 것은 원래대로 팝업이다.
+    batch: seen && !TITLES_3.some(key => seen.includes(key)) ? (list => list.length >= 2 ? list : [])(TITLES_3.filter(key => unlocked.includes(key))) : [],
     intro: !seen,
     unpaid: unpaidTitles(p, unlocked, key => titleSeenKey(ctx, key)),
     week_end: ctx.week.end
@@ -1450,6 +1456,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const passageId = decodeURIComponent(path.split('/')[2] || '');
     if (!/^[a-z0-9~._-]{3,80}$/i.test(passageId) || RESERVED_KEYS.has(passageId)) fail('지문 정보를 확인해주세요.');
     if (body.reset === true) {
+      rememberGramBest(p, state.grammarProgress[p.id]);
       delete state.grammarProgress[p.id][passageId];
       return { ok: true, passage_id: passageId, reset: true };
     }
@@ -1479,6 +1486,7 @@ export async function service(state, method, path, body, token, options = {}) {
       updated_at: Date.now()
     };
     state.grammarProgress[p.id][passageId] = progress;
+    rememberGramBest(p, state.grammarProgress[p.id]); // V13.184 어법 칭호: 완성 지문 수의 최고값(지문 기록을 지워도 칭호 유지)
     return progress;
   }
   if (path === '/profile/school' && method === 'PATCH') {
@@ -1517,7 +1525,7 @@ export async function service(state, method, path, body, token, options = {}) {
     // V13.73: the titles just shown pay their coins, and so do held titles already seen before
     // (titles won before coins were paid for them).
     const seenBefore = TITLE_KEYS.filter(key => titleUnlocked(key, stats) && kept.includes(titleSeenKey(ctx, key)));
-    p.titles_seen = [...new Set([...kept, ...all.map(key => titleSeenKey(ctx, key))])].slice(0, 160);
+    p.titles_seen = [...new Set([...kept, ...all.map(key => titleSeenKey(ctx, key))])].slice(0, TITLES_SEEN_MAX);
     const paid = payTitles(p, [...new Set([...all, ...seenBefore])], key => titleSeenKey(ctx, key), ctx.lastWeek.key);
     return { ok: true, seen: p.titles_seen.length, paid, paid_coins: paid.reduce((n, x) => n + x.coins, 0), points_balance: coinBalance(state, p) };
   }
