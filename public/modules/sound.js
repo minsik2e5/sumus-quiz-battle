@@ -21,7 +21,10 @@ export const SOUND_GAIN = {
   // V13.164 낚시 전용(docs/sound/reel-synth.mjs): 던지기 휙 · 퐁당 · 입질 톡톡 · 쑥 · 챔질 · 릴 딸깍 · 줄 텐션(이어지는 소리) · 끼익 ·
   // 줄 끊김 · 돌진 · 점프 첨벙 · 끌어올림 물보라 · 퍼펙트 물빛.
   'reel-cast': .7, 'reel-plop': .65, 'reel-nibble': .55, 'reel-bite': .8, 'reel-hook': .9, 'reel-click': .4, 'reel-strain': .5,
-  'reel-creak': .6, 'reel-snap': .9, 'reel-run': .6, 'reel-jump': .8, 'reel-splash': .75, 'reel-sparkle': .6
+  'reel-creak': .6, 'reel-snap': .9, 'reel-run': .6, 'reel-jump': .8, 'reel-splash': .75, 'reel-sparkle': .6,
+  // V13.180 10초 맞추기(docs/sound/timing-synth.mjs): 카운트다운 · 시작 · 숨김 · 째깍 · 버튼 · 공개 · 등급 4개 · 기록 갱신.
+  'tm-count': .55, 'tm-go': .7, 'tm-hide': .45, 'tm-tick': .3, 'tm-press': .85, 'tm-reveal': .7,
+  'tm-perfect': .85, 'tm-great': .75, 'tm-good': .7, 'tm-miss': .6, 'tm-record': .85
 };
 // 이어지는 소리: key -> 한 주기(초). 파일은 같은 주기가 세 번 이어져 있고, 가운데 주기만 되풀이한다(reel-synth.mjs의 LOOP).
 export const SOUND_LOOP = { 'reel-strain': .8 };

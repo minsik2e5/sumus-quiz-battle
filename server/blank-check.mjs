@@ -195,7 +195,7 @@ export async function runBlankChecks(assert) {
       'V13.177 입력칸은 자동 대문자 · 맞춤법 끄기, 칸 너비는 정답 단어 길이에 맞추고, 우리말 해석은 항상 보인다');
     assert(screen.includes("@media(max-width:390px)") && screen.includes('min-height:46px') && screen.includes('env(safe-area-inset-bottom)'), 'V13.177 폰 390px: 칩은 46px 이상, 아래 고정 버튼은 안전 영역을 비운다');
     assert(screen.includes('coinShower(') && screen.includes('playReward(') && screen.includes('bw-confetti') && screen.includes('1차 정답률') && screen.includes('걸린 시간'), 'V13.177 완료 연출: 색종이 · 코인 비 · 코인 올라가는 숫자, 1차 정답률 · 걸린 시간');
-    assert(svc.includes("path === '/blank/start'") && svc.includes("path === '/blank/finish'") && svc.includes("requireRole(p, 'student')") && svc.includes("'hunt', 'blank']") && auth.includes('chance_live, bonus, blank,'), 'V13.177 서버 길: 시작 · 끝은 학생만, 로그인 때 기록을 지키고, profile에는 싣지 않는다');
+    assert(svc.includes("path === '/blank/start'") && svc.includes("path === '/blank/finish'") && svc.includes("requireRole(p, 'student')") && svc.includes("'hunt', 'blank'") && auth.includes('chance_live, bonus, blank,'), 'V13.177 서버 길: 시작 · 끝은 학생만, 로그인 때 기록을 지키고, profile에는 싣지 않는다');
     assert(build.includes('blank-writing') && build.includes('[a-z-]+-blank-data') && build.includes('"v13177.css"'), 'V13.177 빈칸영작 화면 · 자료는 앱 설치 때 미리 받지 않고 쓸 때 받고, 스타일은 번들에 들어간다');
     assert(!student.slice(student.indexOf('function grammarStudy(A)'), student.indexOf('// V13.124 고등 단어 고르기')).includes('blank'), 'V13.177 기존 어법 선택형 화면(grammarStudy)은 건드리지 않았다');
     assert(!svc.includes('GRAMMAR_PASSAGES_PER_STUDENT = 80') || svc.includes('const GRAMMAR_PASSAGES_PER_STUDENT = 80;'), 'V13.177 어법 선택형 진행 한도(학생당 80지문)는 그대로, 빈칸영작은 별도 저장');

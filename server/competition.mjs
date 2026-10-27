@@ -198,6 +198,10 @@ export function createCompetition(state, now = Date.now()) {
     eggs: p => (Array.isArray(p?.purchases) ? p.purchases : []).filter(x => /egg$/.test(String(x?.item || ''))).length,
     care: p => Number(p?.care?.total || 0),
     lucky_best_day: p => Number(p?.lucky?.big_best || 0),
+    // V13.180 10초 맞추기(server/timing.mjs): 서버가 시간을 믿은 판의 완벽만.
+    timing_perfect: p => Number(p?.timing?.pf || 0),
+    timing_ten: p => Number(p?.timing?.x10 || 0),
+    timing_streak: p => Number(p?.timing?.sb || 0),
     // 보스 처치는 V13.148부터 센다. 그 전에 하드로 깬 레벨(m.best)에 들어 있던 보스 레벨은 깬 것으로 친다.
     boss_wins: p => { const m = p?.bonus?.monster || {}; return Math.max(Number(m.boss_wins || 0), Math.floor(Number(m.best || 0) / 5)); },
     // V13.67 capsule-only titles: owned when the capsule was pulled.

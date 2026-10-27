@@ -67,10 +67,22 @@
 | `reel-jump` | 낚시: 마무리 점프 첨벙, 날뜀 | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-jump`) | |
 | `reel-splash` | 낚시: 끌어올림 물보라(공개), 특기 · 큰 성공 | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-splash`) | |
 | `reel-sparkle` | 낚시: 퍼펙트 캐스팅 · 마무리, 기술 성공 | 우리가 합성(`docs/sound/reel-synth.mjs`의 `reel-sparkle`) | |
+| `tm-count` | 10초 맞추기: 3 · 2 · 1 카운트다운 삑 | 우리가 합성(`docs/sound/timing-synth.mjs`의 `tm-count`) | |
+| `tm-go` | 10초 맞추기: 시작 | 우리가 합성(`docs/sound/timing-synth.mjs`의 `tm-go`) | |
+| `tm-hide` | 10초 맞추기: 숫자판이 꺼질 때 | 우리가 합성(`docs/sound/timing-synth.mjs`의 `tm-hide`) | |
+| `tm-tick` | 10초 맞추기: 숨김 중 아주 작은 째깍(설정으로 끔) | 우리가 합성(`docs/sound/timing-synth.mjs`의 `tm-tick`) | |
+| `tm-press` | 10초 맞추기: 큰 버튼 누름 딸깍 | 우리가 합성(`docs/sound/timing-synth.mjs`의 `tm-press`) | |
+| `tm-reveal` | 10초 맞추기: 숫자 공개 띠링 | 우리가 합성(`docs/sound/timing-synth.mjs`의 `tm-reveal`) | |
+| `tm-perfect` | 10초 맞추기: 완벽 | 우리가 합성(`docs/sound/timing-synth.mjs`의 `tm-perfect`) | |
+| `tm-great` | 10초 맞추기: 훌륭 | 우리가 합성(`docs/sound/timing-synth.mjs`의 `tm-great`) | |
+| `tm-good` | 10초 맞추기: 좋음 | 우리가 합성(`docs/sound/timing-synth.mjs`의 `tm-good`) | |
+| `tm-miss` | 10초 맞추기: 아쉬움(격려 톤) | 우리가 합성(`docs/sound/timing-synth.mjs`의 `tm-miss`) | |
+| `tm-record` | 10초 맞추기: 내 최고 기록 갱신 팡파르 | 우리가 합성(`docs/sound/timing-synth.mjs`의 `tm-record`) | |
 
 ## 출처와 라이선스
 - **우리가 합성한 소리**: `docs/sound/synth.mjs`로 만든다(종소리 배음 · 마림바 · 쓸어올리는 바람 소리 · 저음 울림 · 반짝이 · 리버브를 겹침). 다시 만들 때: `npm i --no-save @breezystack/lamejs` 후 `node docs/sound/synth.mjs <출력 폴더>` → 원하는 파일을 `public/assets/sfx/<key>.mp3`로 복사. 우리가 만든 것이라 제약이 없다.
 - **낚시 소리(V13.164)**: `docs/sound/reel-synth.mjs`. 물소리는 크고 작은 물방울(민나르트 공명: 울리며 높아지는 사인)을 촘촘히 흩뿌리고, 끼익은 마찰이 붙었다 미끄러지는 톡을 낚싯대 · 줄 공명으로 거른다. `reel-strain`은 같은 0.8초를 세 번 이어 붙인 파일이고, 앱은 가운데 0.8초만 되풀이한다(`sound.js`의 `SOUND_LOOP`와 주기를 같게 둔다).
+- **10초 맞추기 소리(V13.180)**: `docs/sound/timing-synth.mjs`. 전자 시계 삑(사인 + 약한 홀수 배음) · 째깍(좁은 대역 잡음 톡) · 플라스틱 버튼 딸깍(쿵 + 스위치 똑)에 종 · 마림바 · 금관 · 반짝이를 겹쳤다. 모두 2초 이하 · 64~96kbps로 작게(11개 합 약 120KB).
 - **Kenney**(kenney.nl, CC0): 출처 표기 없이 써도 된다.
 - **Mixkit**(mixkit.co): 시청 페이지에 후보로 들어 있다. 앱·게임·교육·상업용은 무료이고 출처 표기도 필요 없지만, **파일 자체를 따로 재배포하면 안 된다.** 이 저장소는 공개(PUBLIC)라서 Mixkit 원본 파일은 저장소에 넣지 않는다. 쓰려면 저장소를 비공개로 바꾸거나, 배포 단계에서만 넣는 방법을 먼저 정한다.
 
