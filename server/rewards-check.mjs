@@ -633,8 +633,8 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(b10 >= .25 && b10 <= b9 && b10 >= b11, `V13.147 레벨 10 하드 보스(${Math.round(b10 * 100)}%)는 레벨 9 하드(${Math.round(b9 * 100)}%)보다 어렵고 너무 어렵지 않다(25% 이상, 레벨 11 ${Math.round(b11 * 100)}%)`);
     // V13.147: 레벨 30 · 60은 보스 레벨이라 보스 완화로 조금 쉬워졌다(20% → 25% 이하).
     assert(w1 >= .9 && w5e >= .85 && w10 >= .2 && w10 <= .6 && w30 <= .25 && w60n <= .25, `V13.105 시뮬레이션: 레벨 1 하드는 거의 다 아는 학생이 거의 이기고(${Math.round(w1 * 100)}%), 레벨 10 하드는 지금 하드 수준(${Math.round(w10 * 100)}%), 레벨 30 하드·레벨 60 노말은 아주 어렵다(${Math.round(w30 * 100)}%, ${Math.round(w60n * 100)}%)`);
-    assert(MONSTER_ORDER.length === 18 && new Set(MONSTER_ORDER).size === 18 && MONSTER_ORDER.every(k => MONSTERS.some(m => m.key === k && m.temp?.pet && m.temp.filter)) && stageMonster(1).key === 'mochi' && stageMonster(18).key === 'finalking' && stageMonster(19).key === 'mochi' && stageMonster(19).round === 1 && stageMonster(19).title === '암기 모찌 +1' && stageMonster(37).round === 2,
-      'V13.105 몬스터 18종(새 9종 포함)이 작은 것부터 큰 것 순서로 레벨을 지키고, 18레벨 뒤에는 "+1"로 더 세게 다시 나온다(그림이 오기 전에는 펫 그림 색 바꾸기)');
+    assert(MONSTER_ORDER.length === 18 && new Set(MONSTER_ORDER).size === 18 && MONSTER_ORDER.every(k => MONSTERS.some(m => m.key === k && m.temp?.pet && m.temp.filter)) && stageMonster(71).round === 1 && stageMonster(71).title === `${stageMonster(1).name} +1` && stageMonster(141).round === 2,
+      'V13.105 · V13.174 몬스터 18종 순서는 옛 기록으로 남고(펫 그림 색 바꾸기 안전망), 레벨의 몬스터는 지역 표가 정하며 한 바퀴(70레벨, 새 몬스터 그림이 오면 88레벨) 뒤에는 "+1"로 처음부터 다시 나온다');
     const kid = { id: 'qa-mh', pets: [{ key: 'dog' }], bonus: {} };
     const t0 = Date.parse('2026-10-03T03:00:00Z');
     const fight = (stage, level, result, right, at) => { const r = monsterStart(kid, { stage, level, codes: ['1'], id: 'f-' + at, now: at }); return monsterFinish(kid, { id: r.id, result, right, now: at + 60000 }); };
