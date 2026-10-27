@@ -1,6 +1,6 @@
 import { esc, num } from './ui.js';
 import { coin, artOr } from './emblems.js';
-import { CHARACTERS, EPIC_EGG_LEGENDARY_RATE, SEASONS } from './core.js';
+import { CHARACTERS, EPIC_EGG_LEGENDARY_RATE, SEASONS, LEGEND_EGG_EPIC_NEED } from './core.js';
 import { eggTapHtml, bindEggTap } from './pet-growth.js';
 import { LUCKY_BETS, LUCKY_DAILY, LUCKY_ODDS, LUCKY_TICKET_BET, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, MYTHIC_RATE } from './rewards.js';
 import { playSound, unlockSound as unlockSoundFiles, preloadSound } from './sound.js';
@@ -144,8 +144,11 @@ export function legendaryShow(res, { again = false, againLabel = '' } = {}) {
   preloadSound(['boss', 'combo', 'wiggle', 'crack', 'burst', 'fanfare-legend']);
   return new Promise(resolve => {
     const key = res.legendary.key, c = CHARACTERS[key] || {}, name = c.ko || '전설 펫';
+    // V13.182 전설 알(legendEgg: 'epic' 영웅 보상 · 'shop' 상점): 같은 전설 연출에 왕관 고리 · 금빛 기둥 · 별가루를 한 겹 더.
+    const legendEgg = res.legendary.legendEgg || '';
     const box = document.createElement('div');
     box.className = 'lk-show lk-legend-show lgx';
+    if (legendEgg) box.classList.add('lgx-plus');
     box.style.setProperty('--lc', c.color || '#e9a23b');
     box.style.setProperty('--ll', c.light || '#ffe08a');
     box.setAttribute('role', 'dialog');
@@ -154,7 +157,8 @@ export function legendaryShow(res, { again = false, againLabel = '' } = {}) {
     box.innerHTML = `<div class="lk-legend-sky" aria-hidden="true"></div>
       <div class="lgx-rays" aria-hidden="true"></div>
       <div class="lgx-omen" aria-hidden="true"><i></i><span>특별한 기운이 느껴져요…</span></div>
-      <div class="lgx-motes" aria-hidden="true">${motes(28)}</div>
+      <div class="lgx-motes" aria-hidden="true">${motes(legendEgg ? 48 : 28)}</div>
+      ${legendEgg ? '<div class="lgx-pillars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div><div class="lgx-crown" aria-hidden="true"><i></i><i></i><i></i></div>' : ''}
       <div class="lgx-stage" aria-hidden="true">
         <div class="lgx-aura"></div>
         <img class="lgx-glow" src="/assets/lucky/legend-egg-glow.webp" alt="">
@@ -171,8 +175,8 @@ export function legendaryShow(res, { again = false, againLabel = '' } = {}) {
         </div>
         <div class="lgx-card">
           <span class="lk-legend-kicker">LEGENDARY PET · ${esc(c.type || '')}</span><h2>전설 펫을 만났어요!</h2><h3>${esc(name)}의 알</h3>
-          <p>${res.legendary.egg ? `영웅 알에서 ${EPIC_EGG_LEGENDARY_RATE}%의 행운으로 전설 펫이 나왔어요!` : res.legendary.gift ? '선생님이 보내 주신 알에서 전설 펫이 나왔어요!' : res.legendary.guaranteed ? `${num(res.legendary.pull)}번째 뽑기 확정 보상이에요.` : `${LEGENDARY_RATE}%의 행운이 찾아왔어요!`} 알을 톡톡 두드리면 아기 모습을 볼 수 있어요. 학교 친구들에게도 소식이 전해져요.</p>
-          <small>${res.legendary.egg ? '알 상점 · 영웅 알' : res.legendary.gift ? '선생님 알 선물' : `코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}`}</small>
+          <p>${legendEgg ? (legendEgg === 'shop' ? '알 상점의 전설 알에서 전설 펫이 깨어났어요!' : `영웅 ${LEGEND_EGG_EPIC_NEED}마리를 모아 받은 전설 알에서 전설 펫이 깨어났어요!`) : res.legendary.egg ? `영웅 알에서 ${EPIC_EGG_LEGENDARY_RATE}%의 행운으로 전설 펫이 나왔어요!` : res.legendary.gift ? '선생님이 보내 주신 알에서 전설 펫이 나왔어요!' : res.legendary.guaranteed ? `${num(res.legendary.pull)}번째 뽑기 확정 보상이에요.` : `${LEGENDARY_RATE}%의 행운이 찾아왔어요!`} 알을 톡톡 두드리면 아기 모습을 볼 수 있어요. 학교 친구들에게도 소식이 전해져요.</p>
+          <small>${legendEgg ? (legendEgg === 'shop' ? '알 상점 · 전설 알' : '영웅 수집 보상 · 전설 알') : res.legendary.egg ? '알 상점 · 영웅 알' : res.legendary.gift ? '선생님 알 선물' : `코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}`}</small>
           <div class="lk-actions">${again ? `<button type="button" class="lk-again" data-lk="again">한 번 더 <em>${againLabel}</em></button>` : ''}<button type="button" class="lk-ok" data-lk="ok">확인</button></div>
         </div>
       </div>
@@ -189,7 +193,7 @@ export function legendaryShow(res, { again = false, againLabel = '' } = {}) {
       box.classList.add('p4', 'p5', 'legend-opened');
       box.querySelector('.lk-skip')?.remove();
       reveal.hidden = false;
-      box.querySelector('.lgx-rain').innerHTML = stars(36);
+      box.querySelector('.lgx-rain').innerHTML = stars(legendEgg ? 60 : 36);
       box.insertAdjacentHTML('beforeend', `<div class="lk-confetti" aria-hidden="true">${confetti()}</div>`);
       SFX.fanfare();
       // The buttons wait a moment, so a tap meant to skip does not close the reveal.

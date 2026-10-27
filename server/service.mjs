@@ -12,7 +12,7 @@ import { MARKET_OPEN } from '../public/modules/market.js';
 const marketOpen = state => MARKET_OPEN || state.market?.open === true;
 import { rpsView, rpsPlay, rpsCash, openEgg } from './rewards.mjs';
 import { logActivity, activityOf, activityOverview } from './activity.mjs';
-import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, monsterStart, monsterFinish, monsterView, monsterScope, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts } from './rewards.mjs';
+import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, monsterStart, monsterFinish, monsterView, monsterScope, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts, legendEggView, grantLegendEgg, legendEggOpen, legendEggBuy } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate, setUnitCounter } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
@@ -820,6 +820,8 @@ const gameWeekKey = now => String(rankingWeek(now).start);
 // 알 깨기(상점 알 · V13.150 진주 교환 알): 신화 · 한정 · 전설이면 소식과 새 상태까지.
 function hatchEgg(state, p, { epic, season, missing, price }) {
   const { key, legendary, limited, mythic } = openEgg(p, { epic, season: season?.id || null, missing, price });
+  // V13.182: 영웅 LEGEND_EGG_EPIC_NEED번째를 얻는 순간 전설 알(또는 대신 코인). 안내는 다음 화면(legend_egg)이 한다.
+  if (epic) grantLegendEgg(p);
   if (mythic) return { key, epic: false, mythic: { key, egg: true, epic }, ...announceLegend(state, p, key, epic ? '영웅 알' : '랜덤 알', '신화'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
   if (limited) return { key, epic: false, limited: true, season: season?.id || CHARACTERS[key]?.limited, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
   if (legendary) return { key, epic: false, legendary: { key, egg: true }, ...announceLegend(state, p, key, '영웅 알'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
@@ -1318,6 +1320,8 @@ export async function service(state, method, path, body, token, options = {}) {
       ranking: teacher ? [] : rankingRows(state, competition, p),
       titles: teacher ? null : titleView(competition, p),
       gifts: teacher ? null : giftsWaiting(p),
+      // V13.182 전설 알: 받을 차례면(due) 화면이 /legend-egg/claim을 한 번 부른다(이 GET은 아무것도 쓰지 않는다).
+      legend_egg: teacher ? null : legendEggView(p),
       gifts_sent: teacher ? (p.gifts_sent || []).slice(-10).reverse() : null,
       class_league: teacher && selectedSchool ? classLeague(state, competition, selectedSchool, now) : null,
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
@@ -1542,11 +1546,27 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/gifts/open' && method === 'POST') {
     requireRole(p, 'student');
     const gifts = openGifts(p, Date.now());
+    if (gifts.some(g => g.egg?.tier === 'epic')) grantLegendEgg(p);
     // V13.111: an egg gift that opened as a legendary pet is told to the school, like the shop's.
     const legend = gifts.find(g => g.egg?.tier === 'legendary'), mythic = gifts.find(g => g.egg?.tier === 'mythic');
     const eggs = gifts.some(g => g.egg);
     return { gifts, coins: gifts.reduce((n, g) => n + Number(g.amount || 0), 0), points_balance: coinBalance(state, p),
       ...(eggs ? { profile: publicProfile(p), stats: stats(state, p) } : {}), ...(mythic ? announceLegend(state, p, mythic.egg.key, '선생님 알 선물', '신화') : legend ? announceLegend(state, p, legend.egg.key, '선생님 알 선물') : {}) };
+  }
+  // V13.182 전설 알(docs/legend-egg-design.md). claim: 영웅 LEGEND_EGG_EPIC_NEED마리 보상을 아직 못 받은 학생(배포 전에 이미
+  // 모은 학생 포함)이 접속했을 때 화면이 한 번 부른다. 받을 것이 없으면 아무것도 바꾸지 않는다.
+  if (path === '/legend-egg/claim' && method === 'POST') {
+    requireRole(p, 'student');
+    const given = grantLegendEgg(p);
+    return { given, legend_egg: legendEggView(p), ...(given?.kind === 'coins' ? { points_balance: coinBalance(state, p) } : {}) };
+  }
+  if ((path === '/legend-egg/open' || path === '/legend-egg/buy') && method === 'POST') {
+    requireRole(p, 'student');
+    const buy = path === '/legend-egg/buy';
+    if (buy && openBattleFor(state, p.id, Date.now())) fail('대결이 끝난 뒤에 알을 살 수 있어요.', 409);
+    const res = buy ? legendEggBuy(p, coinBalance(state, p)) : legendEggOpen(p);
+    const news = res.legendary ? announceLegend(state, p, res.legendary.key, '전설 알') : {};
+    return { ...res, ...news, legend_egg: legendEggView(p), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
   }
   // V13.125: 다른 학교와 야차전 허용 (on by default). One switch for the whole academy.
   if (path === '/teacher/battle-settings' && method === 'POST') {
@@ -1708,6 +1728,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (body.ticket !== true && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 코인 뽑기를 할 수 있어요.', 409);
     const result = pullLucky(p, Number(body.bet), coinBalance(state, p), { ticket: body.ticket === true });
     logActivity(p, 'lucky', body.ticket === true ? '행운 뽑기 · 무료권' : `행운 뽑기 · ${Number(body.bet) || 0}코인`);
+    if (result.epic) grantLegendEgg(p);
     if (result.epic) return { ...result, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     if (result.mythic) return { ...result, ...announceLegend(state, p, result.mythic.key, '행운 뽑기', '신화'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     if (!result.legendary) return { ...result, points_balance: coinBalance(state, p) };
@@ -1986,6 +2007,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!throwId) fail('던지기 번호를 확인해 주세요.');
     // V13.167 열매는 서버가 준 열매 표(berry_ticket)로만(화면이 보낸 berry 이름은 믿지 않는다).
     const res = huntThrow(p, { id: throwId, spot: str(body.spot, 40), ball: str(body.ball, 10), quality: body.quality ? str(body.quality, 12) : null, ticket: body.berry_ticket ? str(body.berry_ticket, 40) : null, pet: activePetKey(state, p.id), now });
+    if (res.new_pet) grantLegendEgg(p);
     if (!res.again && (res.caught || res.fled)) logActivity(p, 'hunt', `몬스터 사냥 ${(res.kind === 'pet' ? CHARACTERS[res.key]?.ko : HUNT_MONSTERS[res.key]?.ko) || '몬스터'} ${res.caught ? '잡음' : '도망'}`, now);
     return { ...res, hunt: huntView(p, now), ...(res.new_pet ? { profile: publicProfile(p), stats: stats(state, p) } : {}) };
   }

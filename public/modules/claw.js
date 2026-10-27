@@ -14,7 +14,7 @@ import { TITLES } from './titles.js';
 const FLOOR = { back: 50, front: 55.5, l0: 26, r0: 74, l1: 17, r1: 83 };
 const CEIL = { back: 23, front: 20.5 };
 const HOME = { x: 0.15, y: 0.56 };            // 배출구 위(집게가 쉬는 곳)
-const DOLL_W = 22;                            // 인형 너비(기계 너비 %, 앞줄 기준). V13.182 16.5 → 22: 유리 안이 비어 보여서
+const DOLL_W = 22;                            // 인형 너비(기계 너비 %, 앞줄 기준). V13.183 16.5 → 22: 유리 안이 비어 보여서
 const CLAW_W = 21;
 const LIFT = 5;                               // 층 하나 높이(기계 높이 %)
 const DOOR = { left: 21, top: 75.5, w: 29, h: 17 }; // 아래 왼쪽 상품 문

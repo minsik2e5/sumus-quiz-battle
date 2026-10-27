@@ -1,6 +1,6 @@
 import { $, api, esc, num, toast } from './ui.js';
 import { eggTapHtml, bindEggTap } from './pet-growth.js';
-import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, STANDARD_PET_KEYS, EPIC_PET_KEYS, seasonOnSale, cleanPetName } from './core.js';
+import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, LEGEND_EGG_PRICE, LEGEND_EGG_EPIC_NEED, seasonOnSale, cleanPetName } from './core.js';
 import { epicShow, legendaryShow, mythicShow } from './lucky.js';
 import { uiArt, ART_READY } from './emblems.js';
 import { avatar, petKey } from './character.js';
@@ -298,21 +298,25 @@ export function openEggShop(A, onChanged, kind = 'basic') {
   let buying = false;
   const close = changed => { if (!buying) closeOverlay(changed, onChanged); };
   const draw = () => {
-    const eggs = eggsNow();
+    // V13.182: 전설 알 탭(맨 뒤). 다른 알의 흐름은 그대로 두고 이 탭만 따로 그린다(drawLegend).
+    const le = A.data.legend_egg || null;
+    const eggs = le ? { ...eggsNow(), legend: { name: '전설 알', price: LEGEND_EGG_PRICE } } : eggsNow();
     if (!eggs[kind]) kind = 'basic';
+    if (kind === 'legend') return drawLegend(eggs, le);
     const egg = eggs[kind], missing = egg.keys.filter(key => !g.pets.some(x => x.key === key));
     const hasLegend = g.pets.some(x => CHARACTERS[x.key]?.legendary);
     const short = Math.max(0, egg.price - Number(g.points_balance || 0));
     body.innerHTML = `<div class="pet-shop egg-shop-v1392 ${kind}">
-      <div class="egg-shop-tabs" role="tablist">${Object.entries(eggs).map(([k, e]) => `<button type="button" role="tab" data-egg-kind="${k}" aria-selected="${k === kind}" class="${k === kind ? 'selected' : ''} ${k}">${k === 'epic' ? '<i aria-hidden="true">★</i>' : k === 'season' ? '<i aria-hidden="true">🎃</i>' : ''}${e.name}<small>${num(e.price)}코인</small></button>`).join('')}</div>
+      ${eggTabs(eggs, kind, le)}
       ${kind === 'season' ? `<div class="pet-shop-egg-art" aria-hidden="true">${uiArt('event-egg')}</div>` : kind === 'epic' && ART_READY.has('epic-egg') ? `<div class="pet-shop-egg-art" aria-hidden="true">${uiArt('epic-egg')}</div>` : `<div class="pet-shop-egg ${kind}" aria-hidden="true"><span>${kind === 'epic' ? '★' : '?'}</span></div>`}
       <p class="pet-moment-msg">${kind === 'season' ? '<b class="egg-shop-tier limited">한정</b> 어떤 친구가 들어 있을까요?' : kind === 'epic' ? '<b class="egg-shop-tier">영웅</b> 어떤 친구가 들어 있을까요?' : '어떤 친구가 들어 있을까요?'}</p>
       <p class="pet-shop-copy">${kind === 'season' ? `가을 이벤트 한정 펫(할로윈 · 수능 응원) ${missing.length}마리 중 한 마리의 알이 나와요.<br><b class="egg-shop-legend">${egg.until}까지만 팔아요!</b> 그 뒤에는 영웅 알에서만 가끔 나와요.` : kind === 'epic' ? `전설 바로 아래 등급, 영웅 펫 ${missing.length}마리 중 한 마리의 알이 나와요.<br>영웅 펫마다 새로운 야차전 특기가 있어요.${hasLegend ? '' : `<br><b class="egg-shop-legend">${EPIC_EGG_LEGENDARY_RATE}% 확률로 전설 펫이 나와요!</b>`}` : `아직 만나지 못한 기본 펫 ${missing.length}마리 중 한 마리의 알이 나와요.`}<br>새 알은 바로 파트너가 되고, 함께 공부하면 Lv.3에 태어나요.</p>
       <div class="pet-shop-price"><span>가격</span><b><i class="coin-ico" aria-hidden="true"></i>${num(egg.price)}</b><span>가진 코인</span><b><i class="coin-ico" aria-hidden="true"></i>${num(g.points_balance || 0)}</b></div>
       <p class="pet-name-error" role="alert">${!missing.length ? egg.all : short ? `코인이 ${num(short)}개 더 필요해요. 공부하면 코인이 쌓여요.` : ''}</p>
       <div class="pet-moment-actions"><button type="button" class="btn" data-pet-later>닫기</button><button type="button" class="btn primary" data-pet-buy ${!missing.length || short ? 'disabled' : ''}>${num(egg.price)}코인으로 ${egg.name} 사기</button></div>
+      ${le ? legendFootHtml(le) : ''}
     </div>`;
-    body.querySelectorAll('[data-egg-kind]').forEach(b => { b.onclick = () => { if (buying) return; kind = b.dataset.eggKind; draw(); }; });
+    bindTabs();
     body.querySelector('[data-pet-later]').onclick = () => close(false);
     body.querySelector('[data-pet-buy]').onclick = async event => {
       const button = event.currentTarget; button.disabled = true;
@@ -330,6 +334,117 @@ export function openEggShop(A, onChanged, kind = 'basic') {
       }
     };
   };
+  const bindTabs = () => {
+    body.querySelectorAll('[data-egg-kind]').forEach(b => { b.onclick = () => { if (buying) return; kind = b.dataset.eggKind; draw(); }; });
+    body.querySelector('[data-legend-tab]')?.addEventListener('click', () => { if (buying) return; kind = 'legend'; draw(); });
+  };
+  // V13.182 전설 알: 받은 알이 있으면 열기, 없으면 15,000코인에 사기(학생당 1개, 전설 펫이 있으면 못 산다).
+  const drawLegend = (eggs, le) => {
+    const left = LEGENDARY_PET_KEYS.filter(key => !g.pets.some(x => x.key === key)).length;
+    const short = Math.max(0, le.price - Number(g.points_balance || 0));
+    const action = le.waiting ? '<button type="button" class="btn primary legend-egg-btn" data-legend-go>전설 알 열기</button>'
+      : le.legend ? '<span class="legend-egg-done">전설 펫을 이미 만났어요</span>'
+      : le.bought ? '<span class="legend-egg-done">전설 알은 한 번만 살 수 있어요</span>'
+      : `<button type="button" class="btn primary legend-egg-btn" data-legend-go ${short ? 'disabled' : ''}>${num(le.price)}코인으로 전설 알 사기</button>`;
+    body.innerHTML = `<div class="pet-shop egg-shop-v1392 legend">
+      ${eggTabs(eggs, 'legend', le)}
+      <div class="pet-shop-egg-art legend-egg-art" aria-hidden="true"><i class="legend-egg-halo"></i><img src="/assets/lucky/legend-egg.webp" alt="" width="132" height="132" decoding="async"></div>
+      <p class="pet-moment-msg"><b class="egg-shop-tier legend">전설</b> ${le.waiting ? '전설 알이 기다리고 있어요!' : '어떤 전설이 깨어날까요?'}</p>
+      <p class="pet-shop-copy">${le.legend ? '전설 펫은 한 마리만 함께할 수 있어요.<br>영웅을 모으면 전설 알 대신 코인과 칭호를 받아요.' : `아직 만나지 못한 전설 펫 ${left}마리 중 한 마리가 랜덤으로 깨어나요.<br><b class="egg-shop-legend">학생마다 딱 1개!</b>`}</p>
+      ${le.waiting || le.legend || le.bought ? '' : `<div class="pet-shop-price"><span>가격</span><b><i class="coin-ico" aria-hidden="true"></i>${num(le.price)}</b><span>가진 코인</span><b><i class="coin-ico" aria-hidden="true"></i>${num(g.points_balance || 0)}</b></div>`}
+      <p class="pet-name-error" role="alert">${!le.waiting && !le.legend && !le.bought && short ? `코인이 ${num(short)}개 더 필요해요.` : ''}</p>
+      <div class="pet-moment-actions"><button type="button" class="btn" data-pet-later>닫기</button>${action}</div>
+      ${legendFootHtml(le)}
+    </div>`;
+    bindTabs();
+    body.querySelector('[data-pet-later]').onclick = () => close(false);
+    const go = body.querySelector('[data-legend-go]');
+    if (go) go.onclick = async () => {
+      go.disabled = true; buying = true;
+      try {
+        const res = await api(le.waiting ? '/legend-egg/open' : '/legend-egg/buy', {});
+        buying = false;
+        close(true);
+        await legendEggResultShow(res);
+      } catch (err) {
+        buying = false;
+        body.querySelector('.pet-name-error').textContent = err.message;
+        go.disabled = false;
+      }
+    };
+  };
   $('[data-pet-close]').onclick = () => close(false);
   draw();
+}
+
+/* ---------- V13.182 전설 알 ---------- */
+// 알 상점 탭(전설 알은 받은 알이 있으면 '열기!').
+function eggTabs(eggs, kind, le) {
+  return `<div class="egg-shop-tabs" role="tablist">${Object.entries(eggs).map(([k, e]) => `<button type="button" role="tab" data-egg-kind="${k}" aria-selected="${k === kind}" class="${k === kind ? 'selected' : ''} ${k}">${k === 'epic' ? '<i aria-hidden="true">★</i>' : k === 'season' ? '<i aria-hidden="true">🎃</i>' : k === 'legend' ? '<i aria-hidden="true">♛</i>' : ''}${e.name}<small>${k === 'legend' && le?.waiting ? '열기!' : `${num(e.price)}코인`}</small></button>`).join('')}</div>`;
+}
+// 상점 하단: 영웅 진행과 선생님 문구.
+function legendFootHtml(le) {
+  const n = Math.min(le.epic, le.need);
+  return `<div class="legend-egg-foot${le.got ? ' got' : ''}">
+    <button type="button" class="legend-egg-progress" data-legend-tab aria-label="전설 알 보기"><span>영웅 ${num(le.epic)} / ${num(le.need)}마리${le.got ? ' · 전설 알 보상 받음' : ''}</span><i style="--p:${Math.round(n / le.need * 100)}%"></i></button>
+    <p>너무 비싸면 영웅 20명 모으면 줍니다^^</p>
+  </div>`;
+}
+// 전설 알을 연 결과: 전설 펫이면 전설 연출(전설 알 판), 이미 전설 펫이 있었으면 코인 안내.
+async function legendEggResultShow(res) {
+  if (res?.legendary?.key) { await legendaryShow({ legendary: { key: res.legendary.key, legendEgg: res.legendary.legend_egg || 'epic' } }); return; }
+  if (res?.coins) await legendNotice('coins', { coins: res.coins });
+}
+const LEGEND_SEEN = id => `sumus:v13:legend-egg:${id}`;
+const readLegendSeen = id => { try { return localStorage.getItem(LEGEND_SEEN(id)); } catch { return null; } };
+const writeLegendSeen = (id, mark) => { try { localStorage.setItem(LEGEND_SEEN(id), mark); } catch {} };
+// 받았다는 안내(전설 알 도착 · 대신 받은 코인과 칭호). 'open'을 고르면 true.
+function legendNotice(kind, { coins = 0, epic = LEGEND_EGG_EPIC_NEED } = {}) {
+  return new Promise(resolve => {
+    momentOpen = true;
+    const body = openOverlay(kind === 'egg' ? '전설 알 도착' : '전설 알 보상');
+    const egg = kind === 'egg';
+    body.innerHTML = `<div class="legend-gift ${kind}">
+      <span class="legend-gift-kicker">영웅 ${num(epic)}마리 달성!</span>
+      <div class="legend-gift-stage" aria-hidden="true"><i class="legend-gift-rays"></i><i class="legend-gift-ring"></i>${egg ? '<img src="/assets/lucky/legend-egg.webp" alt="" width="150" height="150">' : '<b class="legend-gift-coin"><i class="coin-ico"></i></b>'}<div class="pet-bits"></div></div>
+      <h2>${egg ? '전설 알을 받았어요!' : `${num(coins)}코인을 받았어요!`}</h2>
+      <p>${egg ? '알을 열면 아직 만나지 못한 전설 펫 중 한 마리가 깨어나요.<br>나중에 열려면 알 상점 → 전설 알' : "전설 펫을 이미 만나서 전설 알 대신 코인과 칭호 <b>'전설의 주인'</b>을 받았어요."}</p>
+      <div class="pet-moment-actions">${egg ? '<button type="button" class="btn" data-legend-later>나중에 열기</button><button type="button" class="btn primary legend-egg-btn" data-legend-open>지금 열기</button>' : '<button type="button" class="btn primary" data-legend-later>좋아요!</button>'}</div>
+    </div>`;
+    const done = open => { closeOverlay(false); resolve(open); };
+    body.querySelector('[data-legend-later]').onclick = () => done(false);
+    body.querySelector('[data-legend-open]')?.addEventListener('click', () => done(true));
+    $('[data-pet-close]').onclick = () => done(false);
+    if (!reducedMotion()) burst(body.querySelector('.pet-bits'), 28, false);
+    playSound(egg ? 'fanfare-legend' : 'fanfare-epic');
+    setTimeout(() => body.querySelector('.legend-egg-btn, [data-legend-later]')?.focus({ preventScroll: true }), 60);
+  });
+}
+// 홈 화면에서(펫 연출 뒤): 받을 차례면 한 번 받고(/legend-egg/claim, 배포 전에 이미 모은 학생도), 받은 것을 기기마다 한 번 알린다.
+let legendClaiming = false, legendRetry = 0;
+export async function maybeLegendEggMoment(A, onChanged, tries = 0) {
+  const p = A.data?.profile, v = A.data?.legend_egg;
+  if (!v || legendClaiming || A.screen || A.tab !== 'home' || p?.role !== 'student' || !A.data?.stats?.pet) return;
+  // 다른 창(펫 · 칭호 연출)이 떠 있으면 닫힐 때까지 잠깐씩 기다린다.
+  if (momentOpen || $('#modal-root').children.length) {
+    clearTimeout(legendRetry);
+    if (tries < 30 && (v.due || v.waiting || v.reward)) legendRetry = setTimeout(() => maybeLegendEggMoment(A, onChanged, tries + 1), 2000);
+    return;
+  }
+  let changed = false;
+  if (v.due) {
+    legendClaiming = true;
+    try { const res = await api('/legend-egg/claim', {}); A.data.legend_egg = res.legend_egg; changed = !!res.given; }
+    catch { return; }
+    finally { legendClaiming = false; }
+    if (momentOpen || $('#modal-root').children.length) { if (changed) onChanged?.(); return; }
+  }
+  const now = A.data.legend_egg;
+  const mark = now.waiting ? `egg@${now.got}` : now.reward ? `coins@${now.reward.at}` : null;
+  if (!mark || readLegendSeen(p.id) === mark) { if (changed) onChanged?.(); return; }
+  writeLegendSeen(p.id, mark);
+  const open = await legendNotice(now.waiting ? 'egg' : 'coins', { coins: now.reward?.coins, epic: now.epic });
+  if (!open) { if (changed || now.reward) onChanged?.(); return; }
+  try { const res = await api('/legend-egg/open', {}); onChanged?.(); await legendEggResultShow(res); }
+  catch (err) { toast(err.message); onChanged?.(); }
 }
