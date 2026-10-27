@@ -5,7 +5,7 @@ import { studentPage, getRanges, periodFolders, activePeriod, inPeriod, updateRa
 import { openFlashcards } from './modules/flashcards.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel, careIds } from './modules/teacher.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
-import { maybePetMoment, openPetNameModal, openEggShop, buyEgg, petJosa } from './modules/pet-moments.js';
+import { maybePetMoment, maybeLegendEggMoment, openPetNameModal, openEggShop, buyEgg, petJosa } from './modules/pet-moments.js';
 import { maybeCardLevelUp } from './modules/card-levelup.js';
 import { mountYacha, resendUnclaimed } from './modules/battle.js';
 import { maybeTitleMoment, openTitleDetail } from './modules/titles-ui.js';
@@ -246,6 +246,8 @@ function render() {
     $$('[data-arcade]').forEach(el => mountArcade(el, A));
     $$('#yacha-host').forEach(el => { const opts = A.yachaOpts; A.yachaOpts = null; mountYacha(el, A, leaveBattle, opts); });
     queueMicrotask(() => maybePetMoment(A, petChanged));
+    // V13.182 전설 알: 받을 차례면 받고, 받은 것을 한 번 알린다(펫 연출 · 다른 창이 없을 때).
+    queueMicrotask(() => setTimeout(() => maybeLegendEggMoment(A, petChanged), 1200));
     queueMicrotask(maybeMissedYou);
     queueMicrotask(() => setTimeout(() => maybeGuardMoment(A), 700));
     queueMicrotask(() => maybeCardLevelUp(A));

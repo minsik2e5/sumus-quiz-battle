@@ -168,6 +168,12 @@ export const EGG_PRICE = 400; // V13.73: 800 -> 400
 export const EPIC_EGG_PRICE = 800; // V13.92 영웅 알: a random 영웅 pet not met yet (V13.98: 1200 -> 800)
 // V13.98: a 영웅 알 bought by a student without a legendary pet opens as a legendary pet 1% of the time.
 export const EPIC_EGG_LEGENDARY_RATE = 1;
+// V13.182 전설 알(docs/legend-egg-design.md): 영웅 펫(EPIC_PET_KEYS)을 LEGEND_EGG_EPIC_NEED마리 모으면 한 번 받고,
+// 알 상점에서 LEGEND_EGG_PRICE코인에 한 번 살 수 있다. 열면 갖고 있지 않은 전설 펫 하나가 랜덤으로 나온다(신화는 없다).
+// 전설 펫이 이미 있으면(학생당 1마리) 알 대신 LEGEND_EGG_COINS코인과 칭호 '전설의 주인'.
+export const LEGEND_EGG_EPIC_NEED = 20;
+export const LEGEND_EGG_PRICE = 15000;
+export const LEGEND_EGG_COINS = 3000;
 // Student-chosen pet name, checked the same way on the device and on the server.
 // An empty name is allowed and means "use the pet's default name".
 export function cleanPetName(value) {
