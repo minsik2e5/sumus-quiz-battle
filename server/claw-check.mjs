@@ -25,11 +25,11 @@ export async function runClawChecks(assert) {
   const t0 = Date.parse('2026-10-27T03:00:00Z');
 
   /* ---------- 1. 규칙 숫자(선생님 승인 추천안) ---------- */
-  assert(CLAW.TIME === 30 && CLAW.DOLLS === 20 && CLAW.DROPS === 3 && CLAW.GRAB.perfect === 20 && CLAW.GRAB.good === 12 && CLAW.GRAB.edge === 4
-    && CLAW.PITY === 4 && CLAW.PITY_MAX === 16 && CLAW.GOLD_ROUND === 25 && CLAW.GOLD_X === 0.5 && CLAW.JACKPOT === 3,
-    'V13.182 한 판: 30초 · 인형 20개 · 집게 3번, 잡힐 확률 20 · 12 · 4%(선생님: 너무 잘 뽑힌다 → 약 절반), 놓칠 때마다 +4%p(최대 16), 황금 인형 판마다 25%(×0.5), 대박 3%');
-  assert(CLAW.COIN === 8 && CLAW.GOLD_COIN === 20 && CLAW.COIN_DAILY === 30 && CLAW.BOOK_BONUS === 100 && CLAW.SOURCES.join() === 'practice,attend,match' && CLAW.TICKET_MAX === 6 && CLAW.MIN_PRACTICE === 10,
-    'V13.182 보상: 인형 8 · 황금 20 · 하루 30코인 · 도감 완성 100, 집게권은 연습 끝내기 · 출석 · 짝 맞추기 별 3에서 곳마다 하루 1장, 6장까지');
+  assert(CLAW.TIME === 30 && CLAW.DOLLS === 20 && CLAW.DROPS === 3 && CLAW.GRAB.perfect === 38 && CLAW.GRAB.good === 26 && CLAW.GRAB.edge === 10
+    && CLAW.PITY === 5 && CLAW.PITY_MAX === 20 && CLAW.GOLD_ROUND === 25 && CLAW.GOLD_X === 0.5 && CLAW.JACKPOT === 4,
+    'V13.180 한 판: 30초 · 인형 20개 · 집게 3번, 잡힐 확률 38 · 26 · 10%, 놓칠 때마다 +5%p(최대 20), 황금 인형 판마다 25%(×0.5), 대박 4%');
+  assert(CLAW.COIN === 6 && CLAW.GOLD_COIN === 20 && CLAW.COIN_DAILY === 30 && CLAW.BOOK_BONUS === 100 && CLAW.SOURCES.join() === 'practice,attend,match' && CLAW.TICKET_MAX === 6 && CLAW.MIN_PRACTICE === 10,
+    'V13.180 보상: 인형 6 · 황금 20 · 하루 30코인 · 도감 완성 100, 집게권은 연습 끝내기 · 출석 · 짝 맞추기 별 3에서 곳마다 하루 1장, 6장까지');
   assert(DOLL_KEYS.length === 12 && DOLL_KEYS.every(k => DOLLS[k]?.ko) && DOLLS.rat.ko === '쪼꼬 쥐' && DOLLS.pig.ko === '꿀꿀 돼지', 'V13.180 인형 12종 = 12지 동물(이름은 추천안)');
 
   /* ---------- 2. 배치 ---------- */
@@ -55,14 +55,14 @@ export async function runClawChecks(assert) {
     assert(touchAt(one, 0.5 + R * 0.34, 0.5).aim === 'perfect' && touchAt(one, 0.5 + R * 0.36, 0.5).aim === 'good' && touchAt(one, 0.5 + R * 0.69, 0.5).aim === 'good'
       && touchAt(one, 0.5 + R * 0.71, 0.5).aim === 'edge' && touchAt(one, 0.5 + R * 0.99, 0.5).aim === 'edge' && touchAt(one, 0.5 + R * 1.02, 0.5).aim === 'miss',
       'V13.180 조준 경계: 0.35 · 0.7 · 1.0 × 반지름');
-    assert(grabChance('perfect') === 0.2 && grabChance('good') === 0.12 && grabChance('edge') === 0.04 && grabChance('miss') === 0
-      && Math.abs(grabChance('perfect', { pity: 16 }) - 0.36) < 1e-9 && Math.abs(grabChance('edge', { pity: 16 }) - 0.12) < 1e-9 && Math.abs(grabChance('perfect', { gold: true }) - 0.1) < 1e-9,
+    assert(grabChance('perfect') === 0.38 && grabChance('good') === 0.26 && grabChance('edge') === 0.1 && grabChance('miss') === 0
+      && Math.abs(grabChance('perfect', { pity: 20 }) - 0.58) < 1e-9 && Math.abs(grabChance('edge', { pity: 20 }) - 0.2) < 1e-9 && Math.abs(grabChance('perfect', { gold: true }) - 0.19) < 1e-9,
       'V13.180 잡힐 확률 · 보정(edge는 절반) · 황금 ×0.5');
-    assert(rollDrop('perfect', {}, 0.19, 0.5, 0.5).result === 'win' && rollDrop('perfect', {}, 0.21, 0.5, 0.5).result === 'slip' && rollDrop('miss', {}, 0, 0, 0).result === 'miss'
-      && rollDrop('good', {}, 0.1, 0.5, 0.02).jackpot && !rollDrop('good', {}, 0.1, 0.5, 0.04).jackpot
+    assert(rollDrop('perfect', {}, 0.37, 0.5, 0.5).result === 'win' && rollDrop('perfect', {}, 0.39, 0.5, 0.5).result === 'slip' && rollDrop('miss', {}, 0, 0, 0).result === 'miss'
+      && rollDrop('good', {}, 0.1, 0.5, 0.03).jackpot && !rollDrop('good', {}, 0.1, 0.5, 0.05).jackpot
       && rollDrop('good', {}, 0.9, 0.1, 0.5).slip === 'lift' && rollDrop('good', {}, 0.9, 0.7, 0.5).slip === 'chute' && rollDrop('good', {}, 0.9, 0.9, 0.5).slip === 'loose',
-      'V13.180 잡힘 · 놓침(미끄러짐 60 · 배출구 앞 15 · 빠짐 25%) · 대박 3%는 서버 난수로 정한다');
-    assert(nextPity(0, 'slip') === 4 && nextPity(14, 'slip') === 16 && nextPity(16, 'slip') === 16 && nextPity(16, 'win') === 0 && nextPity(8, 'miss') === 8, 'V13.182 연속 실패 보정: 놓칠수록 오르고(최대 16), 뽑으면 0');
+      'V13.180 잡힘 · 놓침(미끄러짐 60 · 배출구 앞 15 · 빠짐 25%) · 대박 4%는 서버 난수로 정한다');
+    assert(nextPity(0, 'slip') === 5 && nextPity(15, 'slip') === 20 && nextPity(20, 'slip') === 20 && nextPity(20, 'win') === 0 && nextPity(10, 'miss') === 10, 'V13.180 연속 실패 보정: 놓칠수록 오르고(최대 20), 뽑으면 0');
   }
 
   /* ---------- 4 · 5. 영수증 · 부정 방지 ---------- */
@@ -119,7 +119,7 @@ export async function runClawChecks(assert) {
       return out;
     };
     const lose = play(seq([0.99, 0.1, 0.5, 0.99, 0.1, 0.5, 0.99, 0.1, 0.5]));
-    assert(lose.every(r => r.result === 'slip') && p.claw.m === 12 && lose[2].summary && lose[2].summary.won.length === 0 && !p.claw.r, 'V13.182 놓칠수록 보정이 오르고(12), 판이 바뀌어도 이어진다');
+    assert(lose.every(r => r.result === 'slip') && p.claw.m === 15 && lose[2].summary && lose[2].summary.won.length === 0 && !p.claw.r, 'V13.180 놓칠수록 보정이 오르고(15), 판이 바뀌어도 이어진다');
     const win = play(() => 0.01);
     assert(win.every(r => r.result === 'win') && p.claw.m === 0 && win[0].coins > 0 && win[2].summary.won.length >= 3, 'V13.180 뽑으면 보정 0, 인형마다 코인');
     assert(p.claw.ct <= CLAW.COIN_DAILY && clawView(p, now).coin_today === p.claw.ct, 'V13.180 하루 코인 30 상한');
@@ -157,8 +157,8 @@ export async function runClawChecks(assert) {
   {
     const hard = clawSimAverage({ rounds: 3, aim: [0.4, 0.35, 0.15] }, 1500), easy = clawSimAverage({ rounds: 1, aim: [0.2, 0.35, 0.25] }, 1500);
     const hv = clawDayValue(hard), ev = clawDayValue(easy);
-    assert(hv >= 18 && hv <= 32 && ev >= 5 && ev <= 11, `V13.182 하루 가치(30일): 열심 ${hv} · 보통 ${ev}코인(목표 열심 18~32 · 보통 5~11, 사냥 · 낚시의 약 ¼)`);
-    assert(hard.complete > 0.6 && hard.dolls / 90 > 0.45 && hard.dolls / 90 < 0.65, `V13.182 열심이면 한 달 안에 도감 완성(${hard.complete}), 판당 인형 약 0.55개(${Math.round(hard.dolls / 90 * 100) / 100})`);
+    assert(hv >= 20 && hv <= 32 && ev >= 5 && ev <= 11, `V13.180 하루 가치(30일): 열심 ${hv} · 보통 ${ev}코인(목표 열심 20~32 · 보통 5~11, 사냥 · 낚시의 약 ¼)`);
+    assert(hard.complete > 0.85 && hard.dolls / 90 > 0.75 && hard.dolls / 90 < 1, `V13.180 열심이면 한 달 안에 도감 완성(${hard.complete}), 판당 인형 약 0.86개(${Math.round(hard.dolls / 90 * 100) / 100})`);
   }
 
   /* ---------- 11. 칭호 · 코인 ---------- */
