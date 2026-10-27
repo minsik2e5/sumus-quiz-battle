@@ -769,7 +769,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     const prompts96 = source('../docs/asset-requests/runner/11-titles.txt').split('\n---\n');
     // V13.148 칭호 2탄 40개는 그림 25(아래 V13.148 검사)라서 11 주문서 목록에서 뺀다.
     const keys25 = new Set(source('../docs/asset-requests/runner/slice-map.csv').split('\n').filter(line => line.startsWith('"25-titles-2.txt"')).map(line => line.match(/titles\/([a-z0-9]+)\.webp"$/)?.[1]).filter(Boolean));
-    const keys96 = Object.keys(TITLES).filter(key => !key.startsWith('dungeon-') && !keys25.has(key) && key !== 'zodiac12'); // V13.143 던전 칭호는 그림 23c(dungeon-reward-check.mjs), V13.168 12지 수호자는 그림 36d(new-pets-168-check.mjs)
+    const keys96 = Object.keys(TITLES).filter(key => !key.startsWith('dungeon-') && !keys25.has(key) && key !== 'zodiac12' && !key.startsWith('claw')); // V13.143 던전 칭호는 그림 23c(dungeon-reward-check.mjs), V13.168 12지 수호자는 그림 36d(new-pets-168-check.mjs), V13.180 인형뽑기 칭호는 아직 메달 그림 없이 아이콘(claw-check.mjs)
     assert(keys96.length === 65 && keys96.every(key => map96.some(line => line.endsWith(`"public/assets/titles/${key}.webp"`))) && map96.length === 68 && prompts96.length === 17, 'V13.96 칭호 65개(옛 뽑기 칭호 포함)마다 메달 그림 주문이 있다: 시트 17장 = 메달 65개 + 칭호 화면 그림 3개');
     assert(prompts96.every(p => p.includes('STYLE REFERENCE — before drawing, open') && p.includes('Google Drive folder') && /named exactly "11-\d+\.png"/.test(p) && p.includes('"SUMUS 칭호 11 (Runner용)"')) && prompts96.slice(1).every(p => p.includes('Also open "11-1.png"')), 'V13.96 칭호 주문서마다 Drive의 기존 그림을 열어 그림체를 맞추고, 정해진 Drive 폴더에 정확한 이름(11-N.png)으로 저장하라고 적혀 있다');
     // One frame per medal, by tier: as many frame lines of a tier as titles of that tier.
@@ -791,7 +791,8 @@ export async function runRewardsChecks(assert, expectStatus) {
     const { TITLE_ART, ART_READY } = await import('../public/modules/emblems.js');
     const asset = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));
     const webpSize = name => { const b = readFileSync(asset(name)); return b.toString('ascii', 12, 16) === 'VP8X' ? `${1 + b.readUIntLE(24, 3)}x${1 + b.readUIntLE(27, 3)}` : ''; };
-    const keys97 = Object.keys(TITLES).filter(key => key !== 'zodiac12' || TITLE_ART.has(key)); // V13.168 12지 수호자 메달(그림 36d)은 그림이 들어오면 TITLE_ART에 들어간다
+    // V13.168 12지 수호자 메달(그림 36d)은 그림이 들어오면 TITLE_ART에 들어간다. V13.180 인형뽑기 칭호 5개는 메달 그림 주문 전이라 아이콘으로 나온다.
+    const keys97 = Object.keys(TITLES).filter(key => (key !== 'zodiac12' && !key.startsWith('claw')) || TITLE_ART.has(key));
     assert(keys97.every(key => TITLE_ART.has(key)) && TITLE_ART.size === keys97.length && keys97.filter(key => !key.startsWith('dungeon-') && key !== 'zodiac12').length === 105 && keys97.every(key => webpSize(`titles/${key}`) === '256x256' && webpSize(`titles/${key}-s`) === '96x96'), 'V13.97 칭호 65개(V13.148: + 2탄 40개 = 105개) 모두 메달 그림이 있다(256px, 작은 그림 96px)');
     assert(['titles-hero', 'title-equipped', 'title-new'].every(key => ART_READY.has(key) && webpSize(`ui/${key}`) === '256x256'), 'V13.97 칭호 도감 그림 3개(진열장 · 장착 중 · 새 칭호)가 있고 등록되어 있다');
     const arms = ['robot-rock', 'robot-scissors', 'robot-paper', 'robot-flag', 'me-rock', 'me-scissors', 'me-paper', 'me-thumb'];

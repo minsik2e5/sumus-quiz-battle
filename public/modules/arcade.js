@@ -13,6 +13,7 @@ import { gamesSection, partyRow } from './arcade-games.js';
 import { FISHING_ART } from './reel.js';
 import { MATCH_ART } from './match-game.js';
 import { HUNT_ART } from './hunt.js';
+import { CLAW_ART } from './claw-art.js';
 
 // 놀이터: the coin capsule (코인 뽑기, V13.68) and the egg shop, plus the decorations kept from the retired V13.67 capsule machine (모은 꾸미기, under 나). The server
 // decides everything (server/rewards.mjs); this module draws `[data-arcade]` and keeps it up to
@@ -47,9 +48,9 @@ const tierTag = tier => `<span class="ga-tier t-${tier}">${GACHA_TIERS[tier].nam
 
 /* ---------- page ---------- */
 export function arcadePage(A) {
-  return `<div class="page-heading arcade-head">${uiArt('arcade', 'arcade-head-art')}<span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>낚시 · 짝 맞추기 · 몬스터 사냥, 모은 코인으로 뽑기와 알 상점, 그리고 교실 게임.</p></div>
+  return `<div class="page-heading arcade-head">${uiArt('arcade', 'arcade-head-art')}<span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>낚시 · 짝 맞추기 · 몬스터 사냥 · 인형뽑기, 모은 코인으로 뽑기와 알 상점, 그리고 교실 게임.</p></div>
     <button type="button" class="arcade-wallet" data-action="coins" aria-label="코인 지갑 열기"><span>${coin()}<b id="ga-balance">${num(A.data.stats?.points_balance || 0)}</b> 코인</span><small>코인 지갑 ${icon('chevron')}</small></button>
-    ${gamesSection(A, { fishing: FISHING_ART, match: MATCH_ART, hunt: HUNT_ART })}
+    ${gamesSection(A, { fishing: FISHING_ART, match: MATCH_ART, hunt: HUNT_ART, claw: CLAW_ART })}
     <div data-arcade></div>
     ${partyRow()}`;
 }

@@ -17,7 +17,8 @@ export const publicProfile = p => {
   // V13.67: chance_live holds the answer of an open double-chance word. V13.70: `bonus` is the
   // 경험치 ledger of robot matches and exams, already counted into the stats sent with it.
   // V13.173: activity · usage는 선생님 전용 기록이라 학생 화면 · 목록에는 싣지 않는다(server/activity.mjs).
-  const { password_hash, password, chance_live, bonus, blank, activity, usage, ...safe } = p;
+  // V13.180: claw(인형뽑기 기록 · 영수증)는 화면이 rewards.claw(clawView)로만 받는다.
+  const { password_hash, password, chance_live, bonus, blank, activity, usage, claw, ...safe } = p;
   return safe;
 };
 // Optional existing Supabase Auth integration. A local password is never substituted

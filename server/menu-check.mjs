@@ -12,11 +12,12 @@ const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)
 export function runMenuChecks(assert) {
   const battle = source('../public/modules/battle.js'), arcade = source('../public/modules/arcade.js'), games = source('../public/modules/arcade-games.js'), app = source('../public/app.js'), css = source('../public/v13151.css');
   assert(!/\['games', '게임'/.test(battle) && !battle.includes('function gamesTab(') && !battle.includes('놀이터로 이사했어요') && !battle.includes("from './match-game.js'"), 'V13.151 야차전에 게임 탭 · 낚시 이사 안내가 없다');
-  // V13.158 순서: 코인 지갑 → 게임(낚시터 → 짝 맞추기 → V13.162 펫 사냥) → 상점 · 뽑기 → 교실 게임 참가(맨 아래).
+  // V13.158 순서: 코인 지갑 → 게임(낚시터 → 짝 맞추기 → V13.162 펫 사냥 → V13.180 인형뽑기) → 상점 · 뽑기 → 교실 게임 참가(맨 아래).
   const page = arcade.slice(arcade.indexOf('export function arcadePage('), arcade.indexOf('export function gachaBookPage('));
   const at = text => page.indexOf(text);
-  assert(at('arcade-wallet') > 0 && at('arcade-wallet') < at('${gamesSection(A, { fishing: FISHING_ART, match: MATCH_ART, hunt: HUNT_ART })}') && at('${gamesSection(') < at('<div data-arcade></div>') && at('<div data-arcade></div>') < at('${partyRow()}'),
+  assert(at('arcade-wallet') > 0 && at('arcade-wallet') < at('${gamesSection(A, { fishing: FISHING_ART, match: MATCH_ART, hunt: HUNT_ART, claw: CLAW_ART })}') && at('${gamesSection(') < at('<div data-arcade></div>') && at('<div data-arcade></div>') < at('${partyRow()}'),
     'V13.158 놀이터 순서: 코인 지갑 → 게임 → 상점 · 뽑기 → 교실 게임 참가(맨 아래)');
+  assert(games.indexOf('${huntCard(A, art)}') > 0 && games.indexOf('${huntCard(A, art)}') < games.indexOf('${clawCard(A, art)}'), 'V13.180 인형뽑기 카드는 몬스터 사냥 다음');
   assert(games.includes('<h2 class="ag-head">게임</h2>') && games.includes('<h2 class="ag-head">상점 · 뽑기</h2>') && games.indexOf('${reelCard(A, art)}') < games.indexOf('${matchCard(A, art)}') && !games.slice(games.indexOf('export function gamesSection('), games.indexOf('export function partyRow(')).includes('arcade-party'),
     'V13.158 게임 묶음은 낚시터 → 짝 맞추기, 교실 게임 참가는 게임 묶음 밖');
   assert(app.includes("if (d.action === 'arcade-words') return openWordsSheet(A,") && app.includes("return openMatchGame(A, back,") && app.includes("return openPartyJoin(A, back, { code });") && app.includes("A.tab = 'arcade';"), 'V13.151 놀이터에서 연 짝 맞추기 · 교실 게임은 끝나면 놀이터로 돌아온다');

@@ -115,6 +115,7 @@ const cssSources = [
   "v13173.css",
   "v13174.css",
   "v13177.css",
+  "v13180.css",
   "v13178.css"
 ];
 const cssBundlePath = resolve(root, 'public/app.bundle.css');
@@ -180,6 +181,21 @@ writeFileSync(cssBundlePath, cssBundle);
   const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/pets · reveal)에 그림이 다 있는 펫.\nexport const PET_ART = new Set(${JSON.stringify(art)});\nexport const PET_FIGHT = new Set(${JSON.stringify(fight)});\nexport const PET_REVEAL = new Set(${JSON.stringify(shows)});\n// V13.168 칭호 '12지 수호자' 메달(titles/zodiac12 · -s).\nexport const PET_TITLE_ART = new Set(${JSON.stringify(medals)});\n`;
   if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
   console.log(`[pet-art] ${art.length} pets with art, ${fight.length} with battle poses, ${shows.length} with a reveal`);
+}
+
+// V13.180 인형뽑기 그림 게이트: 그림 폴더(public/assets/claw)를 보고 public/modules/claw-art.js를 만든다.
+// CLAW_DOLLS: 네 자세(doll-<key> · -grab · -fall · -joy)가 다 있는 인형. CLAW_ART: 그 밖의 그림 이름(기계 · 집게 · UI · 배경 · 도감 · 효과).
+// 인형뽑기는 기계 · 집게 그림과 인형 6종 이상이 있어야 열린다(claw-rules.js clawOpen).
+{
+  const dir = resolve(root, 'public/assets/claw');
+  const files = existsSync(dir) ? new Set(readdirSync(dir).filter(f => f.endsWith('.webp')).map(f => f.slice(0, -5))) : new Set();
+  const dolls = [...new Set([...files].map(f => f.match(/^doll-([a-z]+)$/)?.[1]).filter(Boolean))]
+    .filter(k => ['', '-grab', '-fall', '-joy'].every(p => files.has(`doll-${k}${p}`))).sort();
+  const art = [...files].filter(f => !f.startsWith('doll-') && !f.startsWith('preview')).sort();
+  const out = resolve(root, 'public/modules/claw-art.js');
+  const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/claw)에 있는 인형뽑기 그림.\nexport const CLAW_DOLLS = new Set(${JSON.stringify(dolls)});\nexport const CLAW_ART = new Set(${JSON.stringify(art)});\n`;
+  if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
+  console.log(`[claw-art] ${dolls.length} dolls, ${art.length} pictures`);
 }
 
 // Service worker: precache list + a hash of every served file. Any change to

@@ -7,6 +7,7 @@ import { GACHA_ITEMS, GACHA_KEYS } from '../public/modules/rewards.js';
 import { bonusRecords } from './rewards.mjs';
 import { guardDayNums } from '../public/modules/streak-guard.js';
 import { dungeonTitleStats, dungeonKings } from './dungeon-records.mjs';
+import { clawTitleStats } from './claw.mjs';
 
 export const DAY_MS = 86400000;
 export const KST_OFFSET_MS = 9 * 3600000;
@@ -194,6 +195,10 @@ export function createCompetition(state, now = Date.now()) {
     legend_pets: p => petCount(p, 'legendary'),
     mythic_pets: p => petCount(p, 'mythic'),
     season_pets: p => petCount(p, 'limited'),
+    // V13.180 인형뽑기: 뽑은 인형 수 · 도감 종류 · 황금 인형 수(server/claw.mjs clawTitleStats).
+    claw_dolls: p => clawTitleStats(p).claw_dolls,
+    claw_kinds: p => clawTitleStats(p).claw_kinds,
+    claw_gold: p => clawTitleStats(p).claw_gold,
     zodiac_pets: p => ZODIAC_PET_KEYS.filter(key => (Array.isArray(p?.pets) ? p.pets : []).some(pet => pet?.key === key)).length,
     eggs: p => (Array.isArray(p?.purchases) ? p.purchases : []).filter(x => /egg$/.test(String(x?.item || ''))).length,
     care: p => Number(p?.care?.total || 0),

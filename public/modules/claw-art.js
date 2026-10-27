@@ -1,0 +1,3 @@
+// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/claw)에 있는 인형뽑기 그림.
+export const CLAW_DOLLS = new Set(["dog","dragon","horse","monkey","ox","pig","rabbit","rat","rooster","sheep","snake","tiger"]);
+export const CLAW_ART = new Set(["badge-complete","bg-galaxy","bg-mint","bg-neon","btn-drop","btn-drop-down","card","card-back","card-gold","carriage","chute-front","chute-glow","claw-closed","claw-grip-back","claw-grip-front","claw-open","entry","fx-clack","fx-confetti","fx-jackpot","fx-ribbon","fx-sparkle","fx-star","glass-glare","gold-aura","gold-ribbon","icon-box","icon-ticket","machine","prize-door","rail-x","rail-y","readout","stick-base","stick-knob","timer-ring","trophy"]);

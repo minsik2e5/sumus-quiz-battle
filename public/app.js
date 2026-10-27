@@ -23,6 +23,7 @@ import { openGuardSheet, maybeGuardMoment } from './modules/streak-guard-ui.js';
 import { partyCreateModal, openPartyTv } from './modules/party-tv.js';
 import { openReel } from './modules/reel.js';
 import { openHunt } from './modules/hunt.js';
+import { openClaw } from './modules/claw.js';
 import { arcadeWords, wordsLabel, openWordsSheet, partyCode } from './modules/arcade-games.js';
 import { openMatchGame } from './modules/match-game.js';
 import { openPartyJoin } from './modules/party.js';
@@ -990,6 +991,7 @@ $('#app').addEventListener('click', async event => {
       return openMatchGame(A, back, { words: w.list, codes: w.picked, label: wordsLabel(A, w.picked) });
     }
     // V13.162 놀이터 몬스터 사냥.
+    if (d.action === 'claw-open') { window.scrollTo(0, 0); return openClaw(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     if (d.action === 'hunt-open') { window.scrollTo(0, 0); return openHunt(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     if (d.action === 'reel-open') { window.scrollTo(0, 0); return openReel(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     // V13.91 나 메뉴판: 어려운 단어 opens 단어 학습 on the ★ words; 알림 scrolls to its settings.
@@ -1449,6 +1451,7 @@ async function attend(button) {
     if (res.streak_guard) A.data.stats.streak_guard = res.streak_guard;
     // V13.162 출석하면 몬스터 사냥 공 1개, 도장판 4장마다 황금 공.
     if (res.hunt) A.data.rewards.hunt = res.hunt;
+    if (res.claw) A.data.rewards.claw = res.claw;
     renderKeepScroll();
     attendanceMoment(res, () => navigate('arcade'));
     if (res.gold_ball) toast('🌟 출석 도장판 4장을 채워서 황금 공을 받았어요! 놀이터 몬스터 사냥에서 써요.');

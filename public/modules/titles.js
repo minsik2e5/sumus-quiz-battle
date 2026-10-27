@@ -34,6 +34,7 @@
 //                다시 한 판, legend_pets · mythic_pets · season_pets 전설 · 신화 · 한정 펫 수, eggs 상점 알을 연 수,
 //                care 펫 교감(쓰다듬기 · 밥) 수, lucky_best_day 코인 뽑기 3배가 하루에 가장 많이 나온 수, boss_wins 보스 몬스터 처치
 //   V13.168 zodiac_pets 만난 12지 펫 수(core.js ZODIAC_PET_KEYS)
+//   V13.180 인형뽑기(server/claw.mjs): claw_dolls 뽑은 인형 수, claw_kinds 도감에 모은 인형 종류(12종), claw_gold 뽑은 황금 인형 수
 // Limited titles belong to one week: they are held only while last week's result stands.
 // V13.148 `once`: 한정 테두리지만 주간 칭호가 아닌 것(신화의 주인): 한 번 받으면 계속 갖고, 코인도 한 번만.
 
@@ -181,6 +182,12 @@ Object.assign(TITLES, {
   petcare30: { name: '정성 가득 집사', tier: 'rare', group: 'collect', stat: 'care', goal: 30, icon: 'paw', how: '펫 쓰다듬기 · 밥 주기 30번', desc: '펫을 정성껏 돌보는 집사.' },
   // 놀이터
   lucky2: { name: '오늘은 운수 대통', tier: 'epic', group: 'arcade', stat: 'lucky_best_day', goal: 2, icon: 'star', how: '코인 뽑기에서 하루에 3배 2번', desc: '오늘은 뭘 해도 되는 날!' },
+  // V13.180 인형뽑기(놀이터): 도감 · 황금 인형 · 뽑은 수.
+  claw1: { name: '첫 인형', tier: 'common', group: 'arcade', stat: 'claw_dolls', goal: 1, icon: 'star', how: '인형뽑기에서 인형 1개 뽑기', desc: '집게가 처음으로 꽉 잡았어요!' },
+  claw6: { name: '인형 수집가', tier: 'rare', group: 'arcade', stat: 'claw_kinds', goal: 6, icon: 'heart', how: '인형뽑기 도감 6종 모으기', desc: '띠 인형 친구가 반이나 모였어요.' },
+  claw12: { name: '인형뽑기 장인', tier: 'epic', group: 'arcade', stat: 'claw_kinds', goal: 12, icon: 'trophy', how: '인형뽑기 도감 12종 모두 모으기', desc: '열두 띠 인형을 모두 뽑았어요.' },
+  clawgold: { name: '황금 손', tier: 'rare', group: 'arcade', stat: 'claw_gold', goal: 1, icon: 'gem', how: '인형뽑기에서 황금 인형 1개 뽑기', desc: '반짝이는 황금 인형을 잡았어요!' },
+  claw100: { name: '집게의 전설', tier: 'legendary', group: 'arcade', stat: 'claw_dolls', goal: 100, icon: 'crown', how: '인형뽑기에서 인형 100개 뽑기', desc: '이 동네 인형뽑기 기계가 다 아는 이름.' },
   rps50: { name: '가위바위보 달인', tier: 'rare', group: 'arcade', stat: 'rps_wins', goal: 50, icon: 'bolt', how: '가위바위보 50번 이기기', desc: '로보의 다음 손이 다 보여요.' },
   // 몬스터
   monster50: { name: '몬스터 퇴치 전문가', tier: 'epic', group: 'monster', stat: 'monster_wins', goal: 50, icon: 'target', how: '몬스터 50번 처치', desc: '몬스터 퇴치라면 맡겨 주세요.' },
