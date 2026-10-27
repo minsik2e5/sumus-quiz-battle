@@ -1,13 +1,13 @@
 import { dayKey } from '../public/modules/core.js';
-import { TIMING, LEVEL_NAMES, GRADE_NAMES, gradeOf, errText, levelOk, targetOk, dailyPlays, guardWindow } from '../public/modules/timing-rules.js';
+import { TIMING, GRADE_NAMES, TOP_GRADES, gradeOf, errText, targetOk, dailyPlays, guardWindow } from '../public/modules/timing-rules.js';
 import { addBonus } from './rewards.mjs';
 import { rankingWeek, sameGradeBand } from './competition.mjs';
 
 // V13.180 10초 맞추기(놀이터) 서버 쪽. 학생 기록 p.timing(작은 키 하나, 판이 끝날 때만 쓴다):
-//   { d: 오늘, n: 오늘 쓴 판, b: [오늘 추가 판을 받은 곳], c: 오늘 받은 코인,
-//     live{ id, lv, t: 목표, at: 시작 도착 시각, r: 서버가 잰 RTT }, last{ id, r } (마지막 판 영수증),
-//     best{ 난이도: 가장 작은 오차 }, wk{ k: 주 시작, 난이도: [가장 작은 오차, 판 수, 오차 합] },
-//     pf: 완벽 수, hp: 하드 완벽 수, st: 지금 연속 완벽, sb: 최고 연속 완벽, all: 모든 판 }
+//   { d: 오늘, n: 오늘 쓴 판, b: [오늘 추가 판을 받은 곳], c: 오늘 받은 코인, tn: 오늘 딱 10.00 100코인을 받은 수,
+//     live{ id, t: 목표, at: 시작 도착 시각, r: 서버가 잰 RTT }, last{ id, r } (마지막 판 영수증),
+//     best: 가장 작은 오차, wk{ k: 주 시작, b: 최고, n: 판 수, s: 오차 합 }, q: 최근 믿은 판 등급(완벽 이상 '1' · 그 밖 '0', 운 감시),
+//     pf: 완벽 이상 수, x10: 딱 10.00 수, st: 지금 연속 완벽, sb: 최고 연속 완벽, all: 모든 판 }
 // 판 흐름: /timing/ping(쓰기 없음, 서버 시각) → /timing/start(판을 쓰고 live) → 3 · 2 · 1 → 누름 → /timing/finish.
 // 서버는 시작 도착 ~ 끝 도착을 재서 화면이 보낸 시간과 비교한다(TIMING.GUARD). 벗어나면 서버가 잰 시간으로 판정하고
 // 순위에 넣지 않으며 코인은 '좋음'까지만 준다. 기록 · 보상은 서버만 정한다.
@@ -18,13 +18,12 @@ const weekStart = now => rankingWeek(now).start;
 
 function today(t, now) {
   const d = dayKey(now);
-  if (t.d !== d) { t.d = d; t.n = 0; t.b = []; t.c = 0; }
+  if (t.d !== d) { t.d = d; t.n = 0; t.b = []; t.c = 0; t.tn = 0; }
   return t;
 }
 const playsOf = p => p.preview_owner_id ? TIMING.PREVIEW_PLAYS : dailyPlays((p.timing?.b || []).length);
-const weekOf = (t, now) => t.wk?.k === weekStart(now) ? t.wk : null;
 
-// 공부로 추가 판 받기(연습 끝내기 · 출석, 곳마다 하루 1판). 받았으면 true.
+// 공부로 한 판 더(연습 끝내기 · 출석, 곳마다 하루 1판). 받았으면 true.
 export function grantTimingPlay(p, source, now = Date.now()) {
   if (!TIMING.SOURCES.includes(source)) return false;
   const t = today(tm(p), now);
@@ -34,16 +33,15 @@ export function grantTimingPlay(p, source, now = Date.now()) {
 }
 
 export function timingView(p, now = Date.now()) {
-  const t = p.timing || {}, d = dayKey(now), on = t.d === d; // 읽기만(보기에서 기록을 만들지 않는다)
+  const t = p.timing || {}, on = t.d === dayKey(now); // 읽기만(보기에서 기록을 만들지 않는다)
   const got = on ? t.b || [] : [], plays = p.preview_owner_id ? TIMING.PREVIEW_PLAYS : dailyPlays(got.length);
-  const wk = weekOf(t, now) || {};
+  const wk = t.wk?.k === weekStart(now) && t.wk.n ? t.wk : null;
   return {
-    target: TIMING.TARGET, levels: TIMING.LEVELS, left: Math.max(0, plays - (on ? Number(t.n || 0) : 0)), plays,
+    target: TIMING.TARGET, left: Math.max(0, plays - (on ? Number(t.n || 0) : 0)), plays, max: dailyPlays(TIMING.SOURCES.length),
     got: Object.fromEntries(TIMING.SOURCES.map(s => [s, got.includes(s)])),
-    coin_left: Math.max(0, TIMING.COIN_DAILY - (on ? Number(t.c || 0) : 0)), coin_daily: TIMING.COIN_DAILY,
-    best: Object.fromEntries(TIMING.LEVELS.map(lv => [lv, t.best?.[lv] ?? null])),
-    week: Object.fromEntries(TIMING.LEVELS.map(lv => { const w = wk[lv]; return [lv, w ? { best: w[0], n: w[1], avg: Math.round(w[2] / w[1]) } : null]; })),
-    perfect: Number(t.pf || 0), streak: Number(t.st || 0), streak_best: Number(t.sb || 0), total: Number(t.all || 0)
+    coin_left: Math.max(0, TIMING.COIN_DAILY - (on ? Number(t.c || 0) : 0)), ten_left: Math.max(0, TIMING.TEN_DAILY - (on ? Number(t.tn || 0) : 0)),
+    best: t.best ?? null, week: wk ? { best: wk.b, n: wk.n, avg: Math.round(wk.s / wk.n) } : null,
+    perfect: Number(t.pf || 0), ten: Number(t.x10 || 0), streak: Number(t.st || 0), streak_best: Number(t.sb || 0), total: Number(t.all || 0)
   };
 }
 
@@ -52,19 +50,18 @@ export const timingPing = (now = Date.now()) => ({ echo: now });
 
 // 판 시작: 판을 하나 쓰고 서버 시각을 남긴다. 같은 id를 다시 보내면 판을 또 쓰지 않는다.
 // 응답에는 목표(화면에 '10.00초를 맞춰라'로 보이는 규칙)와 숨김 시간만: 서버 시각 · 끝나야 할 시각 같은 것은 보내지 않는다.
-export function timingStart(p, { id, level, target = TIMING.TARGET, echo = null, now = Date.now() }) {
+export function timingStart(p, { id, target = TIMING.TARGET, echo = null, now = Date.now() }) {
   if (!id) fail('판 번호가 없어요.');
-  if (!levelOk(level)) fail('난이도를 골라 주세요.');
   if (!targetOk(target)) fail('목표 시간을 확인해 주세요.');
   const t = today(tm(p), now);
-  const answer = () => ({ id, level, target: Number(target), countdown_ms: TIMING.COUNTDOWN_MS, show_ms: TIMING.SHOW_MS[level] });
+  const answer = () => ({ id, target: Number(target), countdown_ms: TIMING.COUNTDOWN_MS, show_ms: TIMING.SHOW_MS });
   if (t.live?.id === id && now - t.live.at < TIMING.LIVE_MS) return { ...answer(), again: true };
-  if (Number(t.n || 0) >= playsOf(p)) fail('오늘 판을 다 했어요. 연습을 끝내거나 출석하면 한 판 더!', 409);
+  if (Number(t.n || 0) >= playsOf(p)) fail(t.b.length < TIMING.SOURCES.length ? '오늘 판을 다 했어요. 연습을 끝내거나 출석하면 한 판 더!' : '오늘 판을 다 했어요. 내일 또 만나요!', 409);
   // 끝내지 않은 앞 판(나가기 · 화면 가림)은 무효: 연속 완벽도 끊긴다.
   if (t.live) t.st = 0;
   const e = Number(echo), rtt = Number.isFinite(e) && e <= now ? now - e : TIMING.GUARD.RTT_MAX;
   t.n = Number(t.n || 0) + 1;
-  t.live = { id, lv: level, t: Number(target), at: now, r: Math.min(TIMING.GUARD.RTT_MAX, Math.max(0, rtt)) };
+  t.live = { id, t: Number(target), at: now, r: Math.min(TIMING.GUARD.RTT_MAX, Math.max(0, rtt)) };
   return answer();
 }
 
@@ -80,11 +77,12 @@ export function timingFinish(p, { id, result = 'press', ms, pet = null, now = Da
   t.last = { id, r: out };
   return out;
 }
+const coinCap = g => TOP_GRADES.includes(g) || g === 'great' ? 'good' : g;
 function settle(p, t, live, { result, ms, pet, now }) {
-  const base = { level: live.lv, target: live.t };
-  const server = now - live.at - TIMING.COUNTDOWN_MS; // 서버가 잰 시간(왕복 지연 하나가 더 들어 있다)
+  const base = { target: live.t };
   if (now - live.at > TIMING.LIVE_MS) { t.st = 0; return { ...base, valid: false, reason: 'expired' }; }
   if (result === 'void') { t.st = 0; return { ...base, valid: false, reason: 'void' }; }
+  const server = now - live.at - TIMING.COUNTDOWN_MS; // 서버가 잰 시간(왕복 지연 하나가 더 들어 있다)
   const claimed = Math.round(Number(ms));
   const { lo, hi } = guardWindow(live.r), gap = server - claimed;
   const trusted = Number.isFinite(claimed) && gap >= lo && gap <= hi;
@@ -95,57 +93,64 @@ function settle(p, t, live, { result, ms, pet, now }) {
   const day = today(t, now);
   t.all = Number(t.all || 0) + 1;
   if (shown < TIMING.MIN_MS) { t.st = 0; return { ...base, valid: true, ms: shown, err: shown - live.t, grade: 'early', coins: 0, xp: 0, checked: trusted ? 'client' : 'server' }; }
-  const err = shown - live.t, abs = Math.abs(err), grade = timeout ? 'miss' : gradeOf(err);
-  // 서버 측정으로 판정한 판은 순위 · 칭호에 넣지 않고 코인은 '좋음'까지만.
-  const coinGrade = !trusted && (grade === 'perfect' || grade === 'great') ? 'good' : grade;
-  const coins = Math.max(0, Math.min(TIMING.COINS[live.lv][coinGrade], TIMING.COIN_DAILY - Number(day.c || 0)));
+  const err = shown - live.t, abs = Math.abs(err), grade = timeout ? 'miss' : gradeOf(err), top = TOP_GRADES.includes(grade);
+  // 운 감시: 최근 믿은 판에서 완벽 이상이 너무 잦으면 이번 판은 서버 판정과 같이 다룬다.
+  const recent = String(t.q || '').slice(-(TIMING.LUCK_GUARD.WINDOW - 1));
+  const lucky = trusted && top && [...recent].filter(c => c === '1').length >= TIMING.LUCK_GUARD.MAX;
+  const clean = trusted && !lucky;
+  if (trusted) t.q = (recent + (top ? '1' : '0')).slice(-TIMING.LUCK_GUARD.WINDOW);
+  // 서버 측정 · 운 감시 판은 순위 · 칭호에 넣지 않고 코인은 '좋음'까지만. 딱 10.00의 100코인은 하루 한 번(그 뒤는 완벽 코인).
+  let coinGrade = clean ? grade : coinCap(grade);
+  if (coinGrade === 'ten' && Number(day.tn || 0) >= TIMING.TEN_DAILY) coinGrade = 'perfect';
+  if (coinGrade === 'ten') day.tn = Number(day.tn || 0) + 1;
+  const want = TIMING.COINS[coinGrade], coins = Math.max(0, Math.min(want, TIMING.COIN_DAILY - Number(day.c || 0)));
   const xp = TIMING.XP[grade];
   day.c = Number(day.c || 0) + coins;
   addBonus(p, { xp, coins, pet, now });
   let record = false, weekRecord = false;
-  if (trusted && !timeout) {
-    const best = t.best ||= {};
-    record = best[live.lv] == null || abs < best[live.lv];
-    if (record) best[live.lv] = abs;
+  if (clean && !timeout) {
+    record = t.best == null || abs < t.best;
+    if (record) t.best = abs;
     const k = weekStart(now);
-    if (t.wk?.k !== k) t.wk = { k };
-    const w = t.wk[live.lv] ||= [abs, 0, 0];
-    weekRecord = !w[1] || abs < w[0];
-    w[0] = Math.min(w[0], abs); w[1] += 1; w[2] += abs;
+    if (t.wk?.k !== k) t.wk = { k, b: abs, n: 0, s: 0 };
+    weekRecord = !t.wk.n || abs < t.wk.b;
+    t.wk.b = Math.min(t.wk.b, abs); t.wk.n += 1; t.wk.s += abs;
   }
-  if (trusted && grade === 'perfect') {
+  if (clean && top) {
     t.pf = Number(t.pf || 0) + 1;
-    if (live.lv === 'hard') t.hp = Number(t.hp || 0) + 1;
+    if (grade === 'ten') t.x10 = Number(t.x10 || 0) + 1;
     t.st = Number(t.st || 0) + 1;
     t.sb = Math.max(Number(t.sb || 0), t.st);
   } else t.st = 0;
-  return { ...base, valid: true, ms: shown, err, grade, coins, xp, record, week_record: weekRecord, streak: Number(t.st || 0), checked: trusted ? 'client' : 'server', ...(trusted ? {} : { unranked: true }), ...(coins < TIMING.COINS[live.lv][coinGrade] ? { capped: true } : {}) };
+  return {
+    ...base, valid: true, ms: shown, err, grade, coins, xp, record, week_record: weekRecord, streak: Number(t.st || 0), checked: trusted ? 'client' : 'server',
+    ...(clean ? {} : { unranked: true }), ...(lucky ? { lucky: true } : {}), ...(grade === 'ten' && coinGrade !== 'ten' && clean ? { ten_used: true } : {}), ...(coins < want ? { capped: true } : {})
+  };
 }
 
-// 선생님 활동 기록 한 줄: "10초 맞추기 하드 +0.03초 완벽".
+// 선생님 활동 기록 한 줄: "10초 맞추기 +0.03초 완벽".
 export function timingLine(res) {
-  if (!res?.valid) return `10초 맞추기 ${LEVEL_NAMES[res?.level] || ''} 무효`.replace(/  +/g, ' ');
-  return `10초 맞추기 ${LEVEL_NAMES[res.level]} ${errText(res.err)} ${GRADE_NAMES[res.grade]}${res.unranked ? ' · 서버 판정' : ''}`;
+  if (!res?.valid) return '10초 맞추기 무효';
+  return `10초 맞추기 ${errText(res.err)} ${GRADE_NAMES[res.grade]}${res.unranked ? ' · 서버 판정' : ''}`;
 }
 
-// 순위: 이번 주, 같은 학년대(sameGradeBand: 같은 부 · 같은 학년, 학교는 달라도), 난이도마다.
+// 순위(하나): 이번 주, 같은 학년대(sameGradeBand: 같은 부 · 같은 학년, 학교는 달라도).
 //   kind 'best' 가장 작은 오차, 'avg' 평균 오차(AVG_MIN판 이상). 교사 미리보기 계정은 빼고(자기 줄만),
 //   비공개 학생은 '비공개 학생', 내 줄은 BOARD_TOP 밖이어도 붙인다.
 export const TIMING_KINDS = ['best', 'avg'];
-export function timingBoard(profiles, p, { level = 'normal', kind = 'best', now = Date.now(), ranked = x => x?.role === 'student' && x.active !== false && !x.preview_owner_id, hidden = () => false } = {}) {
-  level = levelOk(level) ? level : 'normal'; kind = TIMING_KINDS.includes(kind) ? kind : 'best';
-  const k = weekStart(now);
-  const rows = [];
+export function timingBoard(profiles, p, { kind = 'best', now = Date.now(), ranked = x => x?.role === 'student' && x.active !== false && !x.preview_owner_id, hidden = () => false } = {}) {
+  kind = TIMING_KINDS.includes(kind) ? kind : 'best';
+  const k = weekStart(now), rows = [];
   for (const x of profiles) {
     const me = x.id === p.id;
     if (!me && (!ranked(x) || !sameGradeBand(x, p))) continue;
-    const w = x.timing?.wk?.k === k ? x.timing.wk[level] : null;
-    if (!w || !w[1] || (kind === 'avg' && w[1] < TIMING.AVG_MIN)) continue;
+    const w = x.timing?.wk?.k === k ? x.timing.wk : null;
+    if (!w?.n || (kind === 'avg' && w.n < TIMING.AVG_MIN)) continue;
     const veil = !me && hidden(x);
-    rows.push({ me, name: veil ? '비공개 학생' : x.display_name, pet: veil ? 'lumi' : (x.avatar_key || 'lumi'), school: veil ? '' : (x.school || ''), private: veil, err: kind === 'avg' ? Math.round(w[2] / w[1]) : w[0], n: w[1] });
+    rows.push({ me, name: veil ? '비공개 학생' : x.display_name, pet: veil ? 'lumi' : (x.avatar_key || 'lumi'), school: veil ? '' : (x.school || ''), private: veil, err: kind === 'avg' ? Math.round(w.s / w.n) : w.b, n: w.n });
   }
   rows.sort((a, b) => a.err - b.err || b.n - a.n);
   rows.forEach((r, i) => { r.rank = i + 1; });
   const top = rows.slice(0, TIMING.BOARD_TOP), mine = rows.find(r => r.me);
-  return { level, kind, avg_min: TIMING.AVG_MIN, rows: mine && !top.includes(mine) ? [...top, mine] : top, total: rows.length };
+  return { kind, avg_min: TIMING.AVG_MIN, rows: mine && !top.includes(mine) ? [...top, mine] : top, total: rows.length };
 }

@@ -84,12 +84,12 @@ export function huntCard(A, art) {
 }
 // V13.180 10초 맞추기: 그림 없이 코드로 그린 카드(빨간 LED 숫자판 + 입체 빨간 버튼). 그림이 오면 바꿀 수 있게 자리만.
 export function timingCard(A) {
-  const v = A.data.rewards?.timing || {}, best = ['hard', 'normal', 'easy'].map(lv => v.best?.[lv]).find(x => x != null);
+  const v = A.data.rewards?.timing || {}, best = v.best ?? null;
   return `<article class="ag-big ag-timing">
-    <div class="ag-big-art" aria-hidden="true"><span class="ag-big-bg ag-tm-bg"><span class="ag-tm-led"><b>10</b><i>:</i><b>00</b></span><span class="ag-tm-btn"><i></i></span></span><span class="ag-big-title"><small>혼자 · 감각 게임</small><strong>10초 맞추기</strong><em>숫자가 사라지면 속으로 세어 딱 10초에 버튼!</em></span></div>
+    <div class="ag-big-art" aria-hidden="true"><span class="ag-big-bg ag-tm-bg"><span class="ag-tm-led"><b>10</b><i>:</i><b>00</b></span><span class="ag-tm-btn"><i></i></span></span><span class="ag-big-title"><small>혼자 · 감각 게임</small><strong>10초 맞추기</strong><em>숫자가 사라지면 속으로 세어 딱 10초에 버튼! 딱 10.00이면 100코인</em></span></div>
     <div class="ag-big-body">
       <ul class="ag-stats" aria-label="내 10초 맞추기">
-        <li><i class="ag-ico">⏱</i><b>${v.left ?? 5}</b><small>오늘 판</small></li>
+        <li><i class="ag-ico">⏱</i><b>${v.left ?? 3}</b><small>오늘 판</small></li>
         <li><i class="ag-ico">🎯</i><b>${best == null ? '—' : `±${(best / 1000).toFixed(2)}`}</b><small>내 최고</small></li>
         <li><i class="ag-ico">🔥</i><b>${v.streak_best || 0}</b><small>연속 완벽</small></li>
       </ul>

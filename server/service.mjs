@@ -1945,7 +1945,7 @@ export async function service(state, method, path, body, token, options = {}) {
     // 화면이 만든 판 번호(다시 보내도 판을 한 번만 쓴다).
     const playId = /^[a-z0-9-]{8,40}$/i.test(String(body.id || '')) ? String(body.id) : null;
     if (!playId) fail('판 번호를 확인해 주세요.');
-    const res = timingStart(p, { id: playId, level: str(body.level, 10), target: Number(body.target ?? TIMING.TARGET), echo: body.echo ?? null, now });
+    const res = timingStart(p, { id: playId, target: Number(body.target ?? TIMING.TARGET), echo: body.echo ?? null, now });
     return { ...res, timing: timingView(p, now) };
   }
   if (path === '/timing/finish' && method === 'POST') {
@@ -1956,7 +1956,7 @@ export async function service(state, method, path, body, token, options = {}) {
   }
   if (path === '/timing/board' && method === 'GET') {
     requireRole(p, 'student');
-    return timingBoard(state.profiles, p, { level: str(body.level, 10), kind: str(body.kind, 10), now: Date.now(), ranked: isRankedStudent, hidden: isPrivate });
+    return timingBoard(state.profiles, p, { kind: str(body.kind, 10), now: Date.now(), ranked: isRankedStudent, hidden: isPrivate });
   }
   // V13.162 펫 사냥(놀이터): 지도 · 만나기 · 던지기(server/hunt.mjs). 지도는 열 때 서버가 만든다(몇 시간마다 바뀜).
   if (path === '/hunt/home' && method === 'POST') {

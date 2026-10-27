@@ -4,7 +4,7 @@ import { avatar } from './character.js';
 import { openSheet } from './sheet.js';
 import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
 import { coinShower, countUp } from './celebrate.js';
-import { TIMING, LEVEL_NAMES, LEVEL_HINTS, GRADE_NAMES, GRADE_MARKS, CHEERS, secText, errText, errWord, ledDigits } from './timing-rules.js';
+import { TIMING, GRADE_KEYS, GRADE_NAMES, GRADE_MARKS, CHEERS, secText, errText, errWord, ledDigits } from './timing-rules.js';
 
 // V13.180 10초 맞추기(놀이터). 선생님: "참고보다 퀄리티를 훨씬 더 높여서".
 // 어두운 무대 · 빨간 7-세그먼트 LED 숫자판(꺼진 세그먼트 잔광 · 켜진 세그먼트 글로우 · 약한 깜빡임 · 콜론 1초 깜빡) ·
@@ -15,7 +15,7 @@ import { TIMING, LEVEL_NAMES, LEVEL_HINTS, GRADE_NAMES, GRADE_MARKS, CHEERS, sec
 // 판정 · 보상 · 기록은 서버(server/timing.mjs)가 한다: 화면이 잰 시간은 서버가 잰 시간과 비교해 믿을 때만 쓴다.
 
 const SFX = ['tm-count', 'tm-go', 'tm-hide', 'tm-tick', 'tm-press', 'tm-reveal', 'tm-perfect', 'tm-great', 'tm-good', 'tm-miss', 'tm-record', 'coins'];
-const LEVEL_KEY = 'sumus-timing-level', TICK_KEY = 'sumus-timing-tick';
+const TICK_KEY = 'sumus-timing-tick';
 const readPref = (key, fallback) => { try { return localStorage.getItem(key) ?? fallback; } catch { return fallback; } };
 const writePref = (key, value) => { try { localStorage.setItem(key, value); } catch {} };
 
@@ -81,8 +81,7 @@ function buttonHtml() {
 /* ---------- 열기 · 닫기 ---------- */
 export function openTiming(A, exit) {
   closeAll();
-  const saved = readPref(LEVEL_KEY, 'normal');
-  T = { A, exit, timers: [], v: A.data.rewards?.timing || null, phase: 'lobby', level: TIMING.LEVELS.includes(saved) ? saved : 'normal', play: null, busy: false };
+  T = { A, exit, timers: [], v: A.data.rewards?.timing || null, phase: 'lobby', play: null, busy: false };
   A.screen = 'timing';
   root().innerHTML = `<div class="session-app tm-app" id="tm-app"><header class="tm-top"><button type="button" class="yb-back" data-tm="exit" aria-label="나가기">${icon('back')}</button><strong>10초 맞추기</strong>
     <span class="tm-chip" id="tm-left" aria-live="polite"></span><button type="button" class="tm-ico" id="tm-tickbtn" data-tm="tick" aria-pressed="${tickOn()}" aria-label="째깍 소리"></button><button type="button" class="tm-ico" data-tm="board" aria-label="순위">🏆</button><button type="button" class="tm-ico" data-tm="guide" aria-label="10초 맞추기 안내">?</button></header>
@@ -146,7 +145,6 @@ function onClick(event) {
   if (act === 'guide') return guide(false);
   if (act === 'board') return board();
   if (act === 'tick') { writePref(TICK_KEY, tickOn() ? 'off' : 'on'); tickButton(); return toast(tickOn() ? '숨김 중 째깍 소리를 켰어요.' : '째깍 소리를 껐어요.'); }
-  if (act === 'level') { if (T.phase !== 'lobby') return; T.level = b.dataset.level; writePref(LEVEL_KEY, T.level); return lobby(); }
   if (act === 'start') return start();
   if (act === 'again') { closeLayer(); return lobby(); }
   if (act === 'close-layer') return closeLayer();
@@ -167,27 +165,30 @@ function idleBlink() {
 function lobby() {
   T.phase = 'lobby'; T.play = null;
   if (!T.idle) { T.idle = true; idleBlink(); }
-  $('tm-stage')?.classList.remove('run', 'veil', 'done', 'slowmo', 'g-perfect', 'g-great', 'g-good', 'g-miss', 'g-early');
-  const v = T.v || {}, left = v.left ?? TIMING.FREE_DAILY, lv = T.level;
-  const wk = v.week?.[lv], best = v.best?.[lv];
+  $('tm-led')?.classList.remove('gold');
+  $('tm-stage')?.classList.remove('run', 'veil', 'done', 'slowmo', ...GRADE_KEYS.map(k => `g-${k}`), 'g-early');
+  const v = T.v || {}, left = v.left ?? TIMING.FREE_DAILY, plays = v.plays ?? TIMING.FREE_DAILY, max = v.max ?? TIMING.FREE_DAILY + TIMING.SOURCES.length;
+  const wk = v.week, best = v.best, got = v.got || {};
   stateText('READY');
-  $('tm-lvtag').textContent = LEVEL_NAMES[lv];
-  hint(left ? `<b>큰 버튼</b>이나 <kbd>스페이스</kbd>를 눌러 시작` : '오늘 판을 다 했어요. 공부하면 한 판 더!');
+  $('tm-lvtag').textContent = `${TIMING.SHOW_MS / 1000}초 보임`;
+  hint(left ? `<b>큰 버튼</b>이나 <kbd>스페이스</kbd>를 눌러 시작` : plays < max ? '오늘 판을 다 했어요. 공부하면 한 판 더!' : '오늘 판을 다 했어요. 내일 또 만나요!');
   $('tm-btn').disabled = !left;
   $('tm-btn').classList.toggle('off', !left);
-  const got = v.got || {};
+  // 오늘 판 램프 5칸: 남은 판(빨강) · 쓴 판(꺼짐) · 아직 못 받은 판(점선).
+  const lamps = Array.from({ length: max }, (_, i) => i < plays - left ? 'used' : i < plays ? 'on' : 'lock');
   $('tm-dock').innerHTML = `
-    <div class="tm-levels" role="radiogroup" aria-label="난이도">${TIMING.LEVELS.map(k => `<button type="button" role="radio" aria-checked="${k === lv}" class="tm-lv l-${k}${k === lv ? ' on' : ''}" data-tm="level" data-level="${k}"><b>${LEVEL_NAMES[k]}</b><small>${LEVEL_HINTS[k]}</small></button>`).join('')}</div>
-    <ul class="tm-stats" aria-label="내 기록 · ${LEVEL_NAMES[lv]}">
+    <div class="tm-plays">
+      <span class="tm-pl-main"><b>오늘 ${num(left)}판 남음</b><small>기본 ${TIMING.FREE_DAILY}판 · 공부하면 최대 ${max}판</small></span>
+      <span class="tm-lamps" role="img" aria-label="오늘 ${num(plays)}판 중 ${num(left)}판 남음">${lamps.map(k => `<i class="${k}"></i>`).join('')}</span>
+      <span class="tm-pl-src${got.practice ? ' ok' : ''}">${got.practice ? '✓' : '+1'} 연습 끝내기</span><span class="tm-pl-src${got.attend ? ' ok' : ''}">${got.attend ? '✓' : '+1'} 출석</span>
+    </div>
+    <ul class="tm-stats" aria-label="내 기록">
       <li><small>내 최고</small><b>${best == null ? '—' : `±${secText(best)}`}</b></li>
       <li><small>이번 주 평균</small><b>${wk ? `±${secText(wk.avg)}` : '—'}</b><em>${wk ? `${num(wk.n)}판` : ''}</em></li>
       <li><small>연속 완벽</small><b>${num(v.streak || 0)}</b><em>최고 ${num(v.streak_best || 0)}</em></li>
     </ul>
-    <div class="tm-plays">
-      <span class="tm-pl-main"><b>오늘 ${num(left)}판 남음</b><small>무료 ${TIMING.FREE_DAILY}판 · 코인 ${num(v.coin_left ?? TIMING.COIN_DAILY)}/${TIMING.COIN_DAILY} 남음</small></span>
-      <span class="tm-pl-src${got.practice ? ' ok' : ''}">${got.practice ? '✓' : '+1'} 연습 끝내기</span><span class="tm-pl-src${got.attend ? ' ok' : ''}">${got.attend ? '✓' : '+1'} 출석</span>
-    </div>
-    <button type="button" class="yl-cta tm-go" data-tm="start" ${left ? '' : 'disabled'}>${left ? `${LEVEL_NAMES[lv]} 시작` : '내일 또 만나요'}</button>`;
+    <p class="tm-prize">${GRADE_MARKS.ten} <b>딱 10.00초</b>면 ${coin()}<b>${TIMING.COINS.ten}</b>${v.ten_left === 0 ? ' <small>(오늘 받았어요)</small>' : ''} · 완벽 ${TIMING.COINS.perfect} · ±1초 안이면 코인!</p>
+    <button type="button" class="yl-cta tm-go" data-tm="start" ${left ? '' : 'disabled'}>${left ? '시작' : plays < max ? '공부하고 한 판 더' : '내일 또 만나요'}</button>`;
 }
 
 /* ---------- 판: 시작 → 카운트다운 → 달리기 ---------- */
@@ -197,20 +198,20 @@ async function start() {
   T.busy = true; T.idle = false;
   // 무대가 보이게 맨 위로(시작 버튼이 아래에 있어 조작판 쪽으로 내려가 있을 수 있다).
   $('tm-main').scrollTop = 0; $('tm-app').scrollTop = 0; window.scrollTo(0, 0);
-  const id = playId(), level = T.level;
+  const id = playId();
   T.phase = 'count';
-  $('tm-dock').innerHTML = `<p class="tm-dock-note">${LEVEL_NAMES[level]} · ${LEVEL_HINTS[level]}</p>`;
+  $('tm-dock').innerHTML = `<p class="tm-dock-note">숫자는 처음 ${TIMING.SHOW_MS / 1000}초만 보여요</p>`;
   hint('준비…');
   stateText('SYNC');
   setLed([' ', ' ', ' ', ' '], { colon: false });
   try {
     // 쓰기 없는 ping으로 서버 시각을 받아 곧바로 돌려보낸다(서버가 그 사이를 왕복 시간으로 잰다).
     const ping = await api('/timing/ping', {});
-    const res = await api('/timing/start', { id, level, target: TIMING.TARGET, echo: ping.echo });
+    const res = await api('/timing/start', { id, target: TIMING.TARGET, echo: ping.echo });
     const at = performance.now();
     if (!T || T.phase !== 'count') return;
     setView(res.timing);
-    T.play = { id, level, target: res.target, show: res.show_ms, at, t0: at + res.countdown_ms, done: false, lastSec: -1, hidden: false };
+    T.play = { id, target: res.target, show: res.show_ms, at, t0: at + res.countdown_ms, done: false, lastSec: -1, hidden: false };
     countdown();
   } catch (err) {
     if (!T) return;
@@ -380,7 +381,7 @@ function ruler(res) {
   const band = (k, cls) => `<i class="tm-band ${cls}" style="left:${pos(res.target - TIMING.GRADES[k])}%;width:${pos(res.target + TIMING.GRADES[k]) - pos(res.target - TIMING.GRADES[k])}%"></i>`;
   const off = Math.abs(res.err) > span;
   return `<div class="tm-ruler" role="img" aria-label="목표 ${secText(res.target)}초, 내 기록 ${secText(res.ms)}초, ${errText(res.err)}">
-    <div class="tm-track">${band('good', 'b-good')}${band('great', 'b-great')}${band('perfect', 'b-perfect')}
+    <div class="tm-track">${band('close', 'b-close')}${band('good', 'b-good')}${band('great', 'b-great')}${band('perfect', 'b-perfect')}
       ${Array.from({ length: 21 }, (_, i) => `<i class="tm-tick${i % 5 ? '' : ' big'}" style="left:${4 + i * 4.6}%"></i>`).join('')}
       <i class="tm-target"><b>${secText(res.target)}</b></i>
       <i class="tm-mark g-${res.grade}${off ? ' off' : ''}" style="--to:${pos(res.ms)}%"><b>${off ? (res.err > 0 ? '▶' : '◀') : ''}${secText(res.ms)}</b></i>
@@ -388,7 +389,7 @@ function ruler(res) {
     <div class="tm-ruler-scale"><span>${secText(res.target - span)}</span><span>빠름 ◀</span><span>▶ 늦음</span><span>${secText(res.target + span)}</span></div>
   </div>`;
 }
-const LED_WORD = { perfect: 'PERFECT', great: 'GREAT', good: 'GOOD', miss: 'MISS', early: 'EARLY' };
+const LED_WORD = { ten: 'JUST 10.00', perfect: 'PERFECT', great: 'GREAT', good: 'GOOD', close: 'CLOSE', miss: 'MISS', early: 'EARLY' };
 function result_(res) {
   T.phase = 'done'; T.busy = false;
   if (res.timing) setView(res.timing);
@@ -398,19 +399,23 @@ function result_(res) {
   const g = res.grade;
   stage.classList.add('done', `g-${g}`);
   stateText(LED_WORD[g]);
-  if (g === 'perfect') perfectShow();
+  if (g === 'ten') { perfectShow(true); later(() => sfx('tm-record', { gain: 1.1 }), 900); }
+  else if (g === 'perfect') perfectShow(false);
   else if (g === 'great') { sfx('tm-great'); buzz([20, 40, 20]); burst(14, false); }
   else if (g === 'good') sfx('tm-good');
+  else if (g === 'close') sfx('tm-good', { rate: .84, gain: .8 });
   else sfx('tm-miss');
-  if (res.record) later(() => { sfx('tm-record'); buzz([30, 30, 60]); }, g === 'perfect' ? 1500 : 700);
+  if (res.record && g !== 'ten') later(() => { sfx('tm-record'); buzz([30, 30, 60]); }, g === 'perfect' ? 1500 : 700);
   const pet = T.A.data.stats?.pet, petKey = pet?.key || T.A.data.profile?.avatar_key || 'dog';
   const streak = Number(res.streak || 0);
   const lines = [];
   if (res.checked === 'server') lines.push(`<p class="tm-note">연결이 흔들려서 <b>서버가 잰 시간</b>으로 판정했어요(순위에는 안 들어가요).</p>`);
+  if (res.lucky) lines.push(`<p class="tm-note">완벽이 아주 자주 나와서 이번 판은 <b>좋음 코인</b>까지만 주고 순위에서 빼요.</p>`);
+  if (res.ten_used) lines.push(`<p class="tm-note">딱 10.00의 ${TIMING.COINS.ten}코인은 하루 한 번! 오늘은 완벽 코인을 받았어요.</p>`);
   if (res.capped) lines.push(`<p class="tm-note">오늘 받을 수 있는 코인(${TIMING.COIN_DAILY})을 다 받았어요. 경험치는 그대로!</p>`);
   const early = g === 'early';
   layer(`<div class="tm-result g-${g}" role="dialog" aria-label="결과">
-    ${res.record ? '<div class="tm-ribbon"><span>NEW BEST</span><b>내 최고 기록 갱신!</b></div>' : res.week_record ? '<div class="tm-ribbon week"><b>이번 주 최고 기록!</b></div>' : ''}
+    ${g === 'ten' ? '<div class="tm-ribbon ten"><span>JACKPOT</span><b>정확히 10.00초!</b></div>' : res.record ? '<div class="tm-ribbon"><span>NEW BEST</span><b>내 최고 기록 갱신!</b></div>' : res.week_record ? '<div class="tm-ribbon week"><b>이번 주 최고 기록!</b></div>' : ''}
     <div class="tm-grade"><i class="tm-gmark" aria-hidden="true">${GRADE_MARKS[g]}</i><b>${GRADE_NAMES[g]}</b></div>
     <p class="tm-err">${early ? `<b>${secText(res.ms)}초</b>에 눌렀어요` : `<b>${errText(res.err)}</b> <span>${errWord(res.err)}</span>`}</p>
     ${early ? '' : ruler(res)}
@@ -421,20 +426,21 @@ function result_(res) {
     <div class="tm-actions"><button type="button" class="btn" data-tm="board">순위</button><button type="button" class="yl-cta" data-tm="again">${T.v?.left ? `한 판 더 (${num(T.v.left)})` : '확인'}</button></div>
   </div>`);
   const c = document.querySelector('.tm-coins [data-count]');
-  if (c) later(() => { countUp(c, res.coins, 700); if (res.coins >= 3) sfx('coins', { gain: .7 }); }, 600);
-  if (res.record && !reduced()) later(() => coinShower(document.querySelector('.tm-result'), 18), 900);
+  if (c) later(() => { countUp(c, res.coins, g === 'ten' ? 1400 : 700); if (res.coins >= 8) sfx('coins', { gain: .7 }); }, 600);
+  if ((res.record || g === 'ten') && !reduced()) later(() => coinShower(document.querySelector('.tm-result'), g === 'ten' ? 30 : 18, g === 'ten' ? 3 : 1), 900);
   // 순위 버튼 · 다시 하기 버튼만 먼저 받는다(스페이스로 다시 시작하지 않게 포커스).
   later(() => document.querySelector('.tm-result [data-tm="again"]')?.focus(), 400);
 }
 // 완벽: 화면 번쩍 + 색종이 · 별 + 흔들림(움직임 줄이기면 번쩍 없이 은은하게).
-function perfectShow() {
-  sfx('tm-perfect'); buzz([40, 30, 40, 30, 90]);
+function perfectShow(ten) {
+  sfx('tm-perfect'); buzz(ten ? [60, 30, 60, 30, 60, 30, 200] : [40, 30, 40, 30, 90]);
+  if (ten) $('tm-led')?.classList.add('gold');
   const app = $('tm-app');
   if (!reduced()) {
     const f = document.createElement('i'); f.className = 'tm-flash'; app.appendChild(f); later(() => f.remove(), 900);
     app.classList.add('tm-shake'); later(() => app.classList.remove('tm-shake'), 500);
   }
-  burst(46, true);
+  burst(ten ? 90 : 46, true);
 }
 function burst(n, stars) {
   if (reduced()) return;
@@ -450,9 +456,8 @@ function burst(n, stars) {
 }
 
 /* ---------- 순위 ---------- */
-async function board(level = T.level, kind = 'best') {
+async function board(kind = 'best') {
   const draw = (r, loading = false) => `<div class="tm-board">
-    <div class="ya-seg" role="group" aria-label="난이도">${TIMING.LEVELS.map(k => `<button type="button" data-tb-level="${k}" class="${k === level ? 'on' : ''}" aria-pressed="${k === level}">${LEVEL_NAMES[k]}</button>`).join('')}</div>
     <div class="ya-seg" role="group" aria-label="순위 기준"><button type="button" data-tb-kind="best" class="${kind === 'best' ? 'on' : ''}" aria-pressed="${kind === 'best'}">최고 기록</button><button type="button" data-tb-kind="avg" class="${kind === 'avg' ? 'on' : ''}" aria-pressed="${kind === 'avg'}">평균 오차</button></div>
     <p class="tm-board-note">이번 주 · 같은 학년 · 오차가 작을수록 위${kind === 'avg' ? ` · ${TIMING.AVG_MIN}판 이상` : ''}</p>
     ${loading ? '<p class="tm-board-empty">불러오는 중…</p>' : !r?.rows?.length ? '<p class="tm-board-empty">아직 기록이 없어요. 첫 기록의 주인공이 되어 보세요!</p>'
@@ -461,12 +466,11 @@ async function board(level = T.level, kind = 'best') {
   const sheet = openSheet(draw(null, true), '10초 맞추기 순위', { className: 'tm-board-sheet' });
   const load = async () => {
     let r = null;
-    try { r = await api(`/timing/board?level=${level}&kind=${kind}`); } catch (err) { toast(err.message); }
+    try { r = await api(`/timing/board?kind=${kind}`); } catch (err) { toast(err.message); }
     sheet.set(draw(r));
   };
   sheet.box.addEventListener('click', e => {
-    const l = e.target.closest('[data-tb-level]'), k = e.target.closest('[data-tb-kind]');
-    if (l) { level = l.dataset.tbLevel; sheet.set(draw(null, true)); load(); }
+    const k = e.target.closest('[data-tb-kind]');
     if (k) { kind = k.dataset.tbKind; sheet.set(draw(null, true)); load(); }
   });
   load();
@@ -478,12 +482,12 @@ function guide(first) {
   const G = TIMING.GRADES;
   const sheet = openSheet(`<div class="tm-guide">
     <h2>⏱ 10초 맞추기</h2>
-    <ol><li>시작하면 3 · 2 · 1 뒤에 숫자판이 <b>0.00</b>부터 올라가요.</li><li>숫자는 잠깐만 보이고 꺼져요(이지 3초 · 노말 1초 · 하드는 처음부터).</li><li>속으로 세다가 <b>딱 10.00초</b>라고 생각할 때 큰 버튼(또는 스페이스)을 눌러요.</li></ol>
-    <table><thead><tr><th>등급</th><th>오차</th><th>코인(이지 · 노말 · 하드)</th></tr></thead><tbody>
-      ${['perfect', 'great', 'good', 'miss'].map(k => `<tr><td>${GRADE_MARKS[k]} ${GRADE_NAMES[k]}</td><td>${k === 'miss' ? `±${secText(G.good)}초 밖` : `±${secText(G[k])}초 안`}</td><td>${TIMING.LEVELS.map(lv => TIMING.COINS[lv][k]).join(' · ')}</td></tr>`).join('')}
+    <ol><li>시작하면 3 · 2 · 1 뒤에 숫자판이 <b>0.00</b>부터 올라가요.</li><li>숫자는 처음 <b>${TIMING.SHOW_MS / 1000}초</b>만 보이고 꺼져요.</li><li>속으로 세다가 <b>딱 10.00초</b>라고 생각할 때 큰 버튼(또는 스페이스)을 눌러요.</li></ol>
+    <table><thead><tr><th>등급</th><th>오차</th><th>코인</th></tr></thead><tbody>
+      ${GRADE_KEYS.map(k => `<tr><td>${GRADE_MARKS[k]} ${GRADE_NAMES[k]}</td><td>${k === 'ten' ? '정확히 10.00' : k === 'miss' ? `±${secText(G.close)}초 밖` : `±${secText(G[k])}초 안`}</td><td>${TIMING.COINS[k]}${k === 'ten' ? '(하루 한 번)' : ''}</td></tr>`).join('')}
     </tbody></table>
-    <p>하루 <b>${TIMING.FREE_DAILY}판</b> 무료, 연습 끝내기(${TIMING.MIN_PRACTICE}문제 이상) · 출석마다 <b>+1판</b>. 코인은 하루 ${TIMING.COIN_DAILY}개까지, 경험치는 판마다.</p>
-    <p>순위는 이번 주 같은 학년끼리, 난이도마다 <b>최고 기록</b>과 <b>평균 오차</b>(${TIMING.AVG_MIN}판 이상)로 봐요.</p>
+    <p>하루 <b>${TIMING.FREE_DAILY}판</b>, 연습 끝내기(${TIMING.MIN_PRACTICE}문제 이상) · 출석마다 <b>+1판</b>(최대 ${TIMING.FREE_DAILY + TIMING.SOURCES.length}판). 코인은 하루 ${TIMING.COIN_DAILY}개까지, 경험치는 판마다.</p>
+    <p>순위는 이번 주 같은 학년끼리 <b>최고 기록</b>과 <b>평균 오차</b>(${TIMING.AVG_MIN}판 이상)로 봐요.</p>
     <p class="tm-small">화면을 내리거나 다른 앱으로 가면 그 판은 무효예요. 시간은 서버도 함께 재서 너무 다르면 서버가 잰 시간으로 판정해요.</p>
     <button type="button" class="yl-cta" data-close>알겠어요!</button></div>`, '10초 맞추기 안내', { className: 'tm-guide-sheet' });
   sheet.box.querySelector('[data-close]')?.addEventListener('click', () => sheet.close());
