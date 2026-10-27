@@ -451,7 +451,7 @@ function result(ms, stars, res) {
   app()?.classList.remove('fever');
   const record = !!res?.record, coins = Number(res?.coins || 0), xp = Number(res?.xp || 0), bait = !!res?.bait;
   // V13.162 별 3개면 몬스터 사냥 공(가끔 좋은 공).
-  const extras = `${bait ? '<span class="r bait"><b>🪱 +1</b><small>낚시 미끼</small></span>' : ''}${res?.ball ? `<span class="r ball"><b>${res.ball === 'good' ? '🔵' : '🟢'} +1</b><small>${res.ball === 'good' ? '좋은 공' : '사냥 공'}</small></span>` : ''}`;
+  const extras = `${bait ? '<span class="r bait"><b>🪱 +1</b><small>낚시 미끼</small></span>' : ''}${res?.ball ? `<span class="r ball"><b>${res.ball === 'good' ? '🔵' : '🟢'} +1</b><small>${res.ball === 'good' ? '좋은 공' : '사냥 공'}</small></span>` : ''}${res?.claw_ticket ? '<span class="r ball"><b>🧸 +1</b><small>집게권</small></span>' : ''}`;
   const why = !M.id ? '연결이 안 돼서 기록 없이 했어요.' : res?.reason === 'daily' ? `오늘 코인 판(${MATCH.DAILY}판)을 다 썼어요. 기록은 남아요!` : res?.reason === 'error' ? esc(res.error || '저장하지 못했어요.') : res?.reason ? '이번 판은 기록하지 못했어요.' : '';
   const prev = M.prevBest;
   // V13.168 내 최고(prev)는 의심 기록(순위 밖)까지 본 값이라, 순위 신기록이어도 prev보다 느릴 수 있다('-0.50초 빨라요'가 나왔다).

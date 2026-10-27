@@ -6,6 +6,8 @@ import { DANWONGO_PASSAGES } from '../public/danwongo-grammar-data.js';
 import { DANWONGO_TEXTBOOK_PASSAGES } from '../public/danwongo-textbook-grammar-data.js';
 import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from '../public/seonbu-grammar-data.js';
 import { GANGSEO_PASSAGES } from '../public/gangseo-grammar-data.js';
+import { MIDDLE_YBM_PARK_PASSAGES } from '../public/middle-ybm-park-grammar-data.js';
+import { BLANK_LESSONS } from '../public/middle-donga-yoon-blank-data.js';
 
 const fail = message => { throw new Error('[content-validation] ' + message); };
 const runtimeBooks = () => {
@@ -43,6 +45,34 @@ function validateGrammarSet(name, passages, expectedNumbers, expectedChoices) {
   assert(choiceCount(passages) === expectedChoices, `${name}: 선택 포인트 수 불일치 (${choiceCount(passages)} != ${expectedChoices})`);
 }
 
+// 중3 동아(윤정미) 빈칸영작(Step 1 ~ 5) 데이터: 칸 번호가 영어 전문 안에 있고, Step 1 보기가 Step 1 빈칸 단어와 같고, Step 4 단어 묶음이 문장 전체와 같다.
+const blankCore = word => String(word).replace(/[’‘]/g, "'").replace(/[“”]/g, '"').toLowerCase().replace(/^[^\w]+|[^\w]+$/g, '');
+function validateBlankData() {
+  const expected = { 5: [29, 4], 6: [28, 4], 7: [24, 4] };
+  assert(Object.keys(BLANK_LESSONS).join(',') === '5,6,7', '빈칸영작: 5 · 6 · 7과');
+  for (const [lesson, [count, groups]] of Object.entries(expected)) {
+    const data = BLANK_LESSONS[lesson];
+    assert(data.items.length === count && data.groups.length === groups, `빈칸영작 ${lesson}과: 문항 ${data.items.length} != ${count}`);
+    assert(data.items.every((item, i) => item.n === i + 1), `빈칸영작 ${lesson}과: 문항 번호가 1부터 이어지지 않음`);
+    assert(data.groups.every((g, i) => g.from === (i ? data.groups[i - 1].to + 1 : 1)) && data.groups.at(-1).to === count, `빈칸영작 ${lesson}과: 본문 나누기가 문항을 빠짐없이 덮지 않음`);
+    for (const item of data.items) {
+      const label = `빈칸영작 ${lesson}과 ${item.n}번`;
+      const tokens = item.en.split(' ');
+      assert(item.ko && item.en && tokens.every(Boolean), `${label}: 영어 · 해석 누락`);
+      for (const step of ['s1', 's2', 's3']) {
+        const list = item[step];
+        assert(Array.isArray(list) && list.length > 0 && list.every((n, i) => Number.isInteger(n) && n >= 0 && n < tokens.length && (!i || n > list[i - 1])), `${label}: ${step} 빈칸 위치가 올바르지 않음`);
+      }
+      assert(item.s3.length >= item.s2.length, `${label}: Step 3 빈칸이 Step 2보다 적음`);
+      const blanked = item.s1.map(n => blankCore(tokens[n])).sort().join('|'), options = item.o1.map(blankCore).sort().join('|');
+      assert(blanked === options, `${label}: Step 1 보기가 빈칸 단어와 다름 (${options} != ${blanked})`);
+      assert(item.s4.length >= 1 && item.s4.every(group => group.length > 1), `${label}: Step 4 묶음 누락`);
+      const scrambled = item.s4.flatMap(group => group.flatMap(chunk => chunk.split(' '))).map(blankCore).sort().join('|');
+      assert(scrambled === tokens.map(blankCore).sort().join('|'), `${label}: Step 4 단어가 영어 문장과 다름`);
+    }
+  }
+}
+
 function validateVocabulary() {
   const books = runtimeBooks();
   const words = books.flatMap(book => book.words || []);
@@ -68,6 +98,7 @@ function validateVocabulary() {
 
 export function runContentValidation() {
   validateVocabulary();
+  validateBlankData();
   validateGrammarSet('단원고', DANWONGO_PASSAGES, ['24','29','31','32','33','34','36','39','40','41~42'], 279);
   validateGrammarSet('단원고 교과서', DANWONGO_TEXTBOOK_PASSAGES, [
     '1과 · 본문 1', '1과 · 본문 2', '1과 · 본문 3', '1과 · 본문 4', '1과 · 본문 외',
@@ -83,6 +114,10 @@ export function runContentValidation() {
   assert(!DANWONGO_TEXTBOOK_PASSAGES.some(p => DANWONGO_PASSAGES.some(q => q.id === p.id)), '단원고 교과서/모의고사 지문 id 중복');
   validateGrammarSet('선부고 2026', SEONBU_2026_PASSAGES, ['20','23','24','32'], 101);
   validateGrammarSet('선부고 2025', SEONBU_2025_PASSAGES, ['31','34','36','38','40','43~45'], 161);
+  validateGrammarSet('중2 YBM(박준언)', MIDDLE_YBM_PARK_PASSAGES, ['5과 · 본문 1','5과 · 본문 2','5과 · 본문 3','6과 · 본문 1','6과 · 본문 2','6과 · 본문 3','6과 · 본문 4','7과 · 본문 1','7과 · 본문 2','7과 · 본문 3'], 100);
+  for (const passage of MIDDLE_YBM_PARK_PASSAGES) for (const sentence of passage.sentences) for (const part of sentence.parts) {
+    if (part[0] === 'c') assert(typeof part[3] === 'string' && part[3] && typeof part[4] === 'string' && part[4].length > 10, `중2 YBM(박준언) ${passage.number}: 설명 누락`);
+  }
   validateGrammarSet('강서고', GANGSEO_PASSAGES, ['21','23','29','30','31','32','33','34','36','37','38','39','40'], 241);
   return { ok: true };
 }

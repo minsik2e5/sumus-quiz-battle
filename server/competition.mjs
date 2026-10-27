@@ -4,9 +4,10 @@
 import { levelInfo, petProgress, CHARACTERS, PLAYER_MAX_LEVEL, ZODIAC_PET_KEYS } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked, LEAGUE_POINTS, LEAGUE_PAIR_DAY_CAP, leagueTier, leagueTierIndex } from '../public/modules/titles.js';
 import { GACHA_ITEMS, GACHA_KEYS } from '../public/modules/rewards.js';
-import { bonusRecords } from './rewards.mjs';
+import { bonusRecords, epicCount } from './rewards.mjs';
 import { guardDayNums } from '../public/modules/streak-guard.js';
 import { dungeonTitleStats, dungeonKings } from './dungeon-records.mjs';
+import { clawTitleStats } from './claw.mjs';
 
 export const DAY_MS = 86400000;
 export const KST_OFFSET_MS = 9 * 3600000;
@@ -192,12 +193,23 @@ export function createCompetition(state, now = Date.now()) {
       return n;
     },
     legend_pets: p => petCount(p, 'legendary'),
+    // V13.182 전설 알: 만난 영웅 펫(EPIC_PET_KEYS) 수, 전설 알 보상(알을 열었거나 대신 코인)을 받았는지.
+    epic_pets: p => epicCount(p),
+    legend_egg: p => p?.legend_egg?.open_at || p?.legend_egg?.coins_at ? 1 : 0,
     mythic_pets: p => petCount(p, 'mythic'),
     season_pets: p => petCount(p, 'limited'),
+    // V13.180 인형뽑기: 뽑은 인형 수 · 도감 종류 · 황금 인형 수(server/claw.mjs clawTitleStats).
+    claw_dolls: p => clawTitleStats(p).claw_dolls,
+    claw_kinds: p => clawTitleStats(p).claw_kinds,
+    claw_gold: p => clawTitleStats(p).claw_gold,
     zodiac_pets: p => ZODIAC_PET_KEYS.filter(key => (Array.isArray(p?.pets) ? p.pets : []).some(pet => pet?.key === key)).length,
     eggs: p => (Array.isArray(p?.purchases) ? p.purchases : []).filter(x => /egg$/.test(String(x?.item || ''))).length,
     care: p => Number(p?.care?.total || 0),
     lucky_best_day: p => Number(p?.lucky?.big_best || 0),
+    // V13.180 10초 맞추기(server/timing.mjs): 서버가 시간을 믿은 판의 완벽만.
+    timing_perfect: p => Number(p?.timing?.pf || 0),
+    timing_ten: p => Number(p?.timing?.x10 || 0),
+    timing_streak: p => Number(p?.timing?.sb || 0),
     // 보스 처치는 V13.148부터 센다. 그 전에 하드로 깬 레벨(m.best)에 들어 있던 보스 레벨은 깬 것으로 친다.
     boss_wins: p => { const m = p?.bonus?.monster || {}; return Math.max(Number(m.boss_wins || 0), Math.floor(Number(m.best || 0) / 5)); },
     // V13.67 capsule-only titles: owned when the capsule was pulled.

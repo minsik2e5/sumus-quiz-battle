@@ -11,7 +11,8 @@ import { MARKET_OPEN } from '../public/modules/market.js';
 // V13.82 문법 증권거래소 is on hold: closed unless switched on.
 const marketOpen = state => MARKET_OPEN || state.market?.open === true;
 import { rpsView, rpsPlay, rpsCash, openEgg } from './rewards.mjs';
-import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, monsterStart, monsterFinish, monsterView, monsterScope, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts } from './rewards.mjs';
+import { logActivity, activityOf, activityOverview } from './activity.mjs';
+import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, monsterStart, monsterFinish, monsterView, monsterScope, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts, legendEggView, grantLegendEgg, legendEggOpen, legendEggBuy } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate, setUnitCounter } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
@@ -34,9 +35,15 @@ import { dungeonQuestions } from './dungeon-words.mjs';
 import { settleDungeonRecords, dungeonBoardsView, dungeonLastView } from './dungeon-records.mjs';
 import packageInfo from '../package.json' with { type: 'json' };
 import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend, reelSeaPet, reelRodUp } from './reel.mjs';
+import { blankStart, blankFinish, blankView } from './blank.mjs';
+import { grantTimingPlay, timingView, timingPing, timingStart, timingFinish, timingBoard, timingLine } from './timing.mjs';
 import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow, huntSell, huntCoins, huntSpend, huntBerryQuiz, huntBerryAnswer } from './hunt.mjs';
-import { HUNT } from '../public/modules/hunt-rules.js';
+import { grantClaw, clawView, clawStart, clawDrop, clawGuideSeen, clawPreviewFill, clawActivityText } from './claw.mjs';
+import { HUNT, HUNT_MONSTERS } from '../public/modules/hunt-rules.js';
+import { CLAW } from '../public/modules/claw-rules.js';
+import { FISH } from '../public/modules/fishing-rules.js';
 import { REEL } from '../public/modules/reel-rules.js';
+import { TIMING } from '../public/modules/timing-rules.js';
 import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './games.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
 import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, partyPlaysLeft, settleParty, partyReportPending, undoParty } from './party.mjs';
@@ -657,6 +664,10 @@ export function settleBattle(state, result) {
   const maxHp = Math.max(1, Math.min(1000, Math.floor(Number(result.max_hp) || 100)));
   Object.assign(b, { status: 'finished', winner, loser: winner ? players.find(id => id !== winner) : null, reason: String(result.reason || 'end').slice(0, 20), hp: result.hp || {}, max_hp: maxHp, ...(Object.keys(skills).length ? { skills } : {}), finished_at: Date.now() });
   if (b.tournament_id) settleTournamentMatch(state, b);
+  for (const id of players) {
+    const me = state.profiles.find(x => x.id === id), other = state.profiles.find(x => x.id === (id === b.host_id ? b.guest_id : b.host_id));
+    logActivity(me, 'yacha', `${b.tournament_id ? '야차 대회' : '야차전'} ${!winner ? '무' : winner === id ? '승' : '패'}${other ? ` · ${String(other.display_name || '').slice(0, 10)}` : ''}`, b.finished_at);
+  }
   return true;
 }
 // V13.66: a finished tournament room decides its match; a draw is played again.
@@ -785,6 +796,7 @@ export function settleDungeon(state, report, now = Date.now()) {
   // V13.143 깬 등급컷 열기 · 코인(서버가 정답 수 · 층 · 등급컷으로 계산) · 기록 보드 · 칭호 숫자(server/dungeon-records.mjs).
   const { board, rewards } = settleDungeonRecords(state, d, now);
   Object.assign(d.result, { board, rewards });
+  for (const x of players) if (!x.bot && members.has(x.id)) logActivity(state.profiles.find(y => y.id === x.id), 'dungeon', `던전 ${d.result.cleared ? '클리어' : '도전'} · ${d.result.reached}층${x.out ? ' · 포기' : ''}`, now);
   return true;
 }
 // 방이 방 준비(_dungeon)를 받지 못했을 때 되돌린다(Cloudflare 래퍼가 부른다).
@@ -808,6 +820,8 @@ const gameWeekKey = now => String(rankingWeek(now).start);
 // 알 깨기(상점 알 · V13.150 진주 교환 알): 신화 · 한정 · 전설이면 소식과 새 상태까지.
 function hatchEgg(state, p, { epic, season, missing, price }) {
   const { key, legendary, limited, mythic } = openEgg(p, { epic, season: season?.id || null, missing, price });
+  // V13.182: 영웅 LEGEND_EGG_EPIC_NEED번째를 얻는 순간 전설 알(또는 대신 코인). 안내는 다음 화면(legend_egg)이 한다.
+  if (epic) grantLegendEgg(p);
   if (mythic) return { key, epic: false, mythic: { key, egg: true, epic }, ...announceLegend(state, p, key, epic ? '영웅 알' : '랜덤 알', '신화'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
   if (limited) return { key, epic: false, limited: true, season: season?.id || CHARACTERS[key]?.limited, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
   if (legendary) return { key, epic: false, legendary: { key, egg: true }, ...announceLegend(state, p, key, '영웅 알'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
@@ -1018,6 +1032,7 @@ function finishExam(a, state, auto = false) {
     addBonus(student, { xp: reward.xp, coins: reward.coins, pet: activePetKey(state, student.id), now: a.submitted_at });
     a.reward = reward;
   }
+  logActivity(student, 'exam', `시험 ${correct}/${a.questions.length} · ${a.score}점${auto ? ' · 자동 제출' : ''}`, a.submitted_at);
 }
 // Practices nobody touched for this long are closed: they were kept whole (question
 // cache, answer responses, word list) and were a large share of the backed-up state.
@@ -1205,7 +1220,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } else if (process.env.AUTH_PROVIDER === 'supabase') {
       const result = await supabaseLogin(username, password); p = result.profile; supabaseAccessToken = result.accessToken;
       const old = state.profiles.find(x => x.id === p.id);
-      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live', 'bonus', 'streak_guard', 'games', 'reel', 'hunt'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
+      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live', 'bonus', 'streak_guard', 'games', 'claw', 'reel', 'hunt', 'blank', 'timing'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
       else state.profiles.push(p);
     } else {
       p = localProfile;
@@ -1305,11 +1320,13 @@ export async function service(state, method, path, body, token, options = {}) {
       ranking: teacher ? [] : rankingRows(state, competition, p),
       titles: teacher ? null : titleView(competition, p),
       gifts: teacher ? null : giftsWaiting(p),
+      // V13.182 전설 알: 받을 차례면(due) 화면이 /legend-egg/claim을 한 번 부른다(이 GET은 아무것도 쓰지 않는다).
+      legend_egg: teacher ? null : legendEggView(p),
       gifts_sent: teacher ? (p.gifts_sent || []).slice(-10).reverse() : null,
       class_league: teacher && selectedSchool ? classLeague(state, competition, selectedSchool, now) : null,
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now), hunt: huntView(p, now) },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now), blank: p.role === 'student' ? blankView(p, now) : null },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -1329,6 +1346,18 @@ export async function service(state, method, path, body, token, options = {}) {
   }
   // V13.131 오래된 기록 줄이기(server/storage-trim.mjs). 선생님이 맡은 학교의 기록만 본다.
   // 대상 요약 → 보관 파일(지울 내용 전체 JSON) → 그 파일의 지문이 같을 때만 정리.
+  // V13.173 학생 활동 기록 · 인기 집계(선생님 전용 읽기. 저장하지 않는다).
+  if (path === '/teacher/activity' || path.startsWith('/teacher/activity/')) {
+    requireRole(p, 'teacher');
+    if (method !== 'GET') fail('요청 방식을 확인해주세요.', 405);
+    const school = activeTeacherSchool(state, p);
+    if (!school) fail('학교 설정을 확인해주세요.', 409);
+    const mine = state.profiles.filter(x => x.role === 'student' && x.division === school.division && sameSchool(x, school) && !x.preview_owner_id);
+    if (path === '/teacher/activity') return { overview: activityOverview(mine, Date.now()) };
+    const student = mine.find(x => x.id === decodeURIComponent(path.slice('/teacher/activity/'.length)));
+    if (!student) fail('학생을 찾을 수 없어요.', 404);
+    return { student_id: student.id, activity: activityOf(student), server_time: Date.now() };
+  }
   if (path === '/teacher/storage-trim' || path === '/teacher/storage-archive') {
     requireRole(p, 'teacher');
     const schoolIds = new Set(p.school_ids || []), now = Date.now();
@@ -1369,6 +1398,8 @@ export async function service(state, method, path, body, token, options = {}) {
     preview.hunt.basic = Math.max(Number(preview.hunt.basic || 0), HUNT.PREVIEW.BALLS);
     preview.hunt.good = Math.max(Number(preview.hunt.good || 0), HUNT.PREVIEW.GOOD);
     preview.hunt.gold = Math.max(Number(preview.hunt.gold || 0), HUNT.PREVIEW.GOLD);
+    // V13.180 인형뽑기도 둘러볼 수 있게 집게권을 채운다.
+    clawPreviewFill(preview);
     const raw = randomBytes(32).toString('base64url');
     state.tokens.push({ hash: hashToken(raw), user_id: preview.id, expires_at: Date.now() + 2 * 3600000, preview_owner_id: p.id });
     return { ok: true, profile: publicProfile(preview), _cookie: raw };
@@ -1515,11 +1546,27 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/gifts/open' && method === 'POST') {
     requireRole(p, 'student');
     const gifts = openGifts(p, Date.now());
+    if (gifts.some(g => g.egg?.tier === 'epic')) grantLegendEgg(p);
     // V13.111: an egg gift that opened as a legendary pet is told to the school, like the shop's.
     const legend = gifts.find(g => g.egg?.tier === 'legendary'), mythic = gifts.find(g => g.egg?.tier === 'mythic');
     const eggs = gifts.some(g => g.egg);
     return { gifts, coins: gifts.reduce((n, g) => n + Number(g.amount || 0), 0), points_balance: coinBalance(state, p),
       ...(eggs ? { profile: publicProfile(p), stats: stats(state, p) } : {}), ...(mythic ? announceLegend(state, p, mythic.egg.key, '선생님 알 선물', '신화') : legend ? announceLegend(state, p, legend.egg.key, '선생님 알 선물') : {}) };
+  }
+  // V13.182 전설 알(docs/legend-egg-design.md). claim: 영웅 LEGEND_EGG_EPIC_NEED마리 보상을 아직 못 받은 학생(배포 전에 이미
+  // 모은 학생 포함)이 접속했을 때 화면이 한 번 부른다. 받을 것이 없으면 아무것도 바꾸지 않는다.
+  if (path === '/legend-egg/claim' && method === 'POST') {
+    requireRole(p, 'student');
+    const given = grantLegendEgg(p);
+    return { given, legend_egg: legendEggView(p), ...(given?.kind === 'coins' ? { points_balance: coinBalance(state, p) } : {}) };
+  }
+  if ((path === '/legend-egg/open' || path === '/legend-egg/buy') && method === 'POST') {
+    requireRole(p, 'student');
+    const buy = path === '/legend-egg/buy';
+    if (buy && openBattleFor(state, p.id, Date.now())) fail('대결이 끝난 뒤에 알을 살 수 있어요.', 409);
+    const res = buy ? legendEggBuy(p, coinBalance(state, p)) : legendEggOpen(p);
+    const news = res.legendary ? announceLegend(state, p, res.legendary.key, '전설 알') : {};
+    return { ...res, ...news, legend_egg: legendEggView(p), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
   }
   // V13.125: 다른 학교와 야차전 허용 (on by default). One switch for the whole academy.
   if (path === '/teacher/battle-settings' && method === 'POST') {
@@ -1654,7 +1701,12 @@ export async function service(state, method, path, body, token, options = {}) {
     // V13.162: 출석하면 펫 사냥 공 1개, 도장판(7칸)을 HUNT.GOLD_CARDS장 채우면 황금 공 1개.
     const ball = grantBall(p, 'attend', { now });
     const goldBall = done.tickets > 0 && huntCard(p);
-    return { ...done, streak_guard: guard, bait, ball, gold_ball: goldBall, reel: reelView(p, now), hunt: huntView(p, now), points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
+    // V13.181: 출석하면 인형뽑기 집게권 1장(하루 1장, 보관 6장).
+    const clawTicket = grantClaw(p, 'attend', { now });
+    // V13.180: 출석하면 10초 맞추기 한 판 더(하루 1번).
+    const timingPlay = grantTimingPlay(p, 'attend', now);
+    logActivity(p, 'attend', `출석 · 연속 ${p.attendance?.streak || 1}일`, now);
+    return { ...done, streak_guard: guard, bait, ball, gold_ball: goldBall, claw_ticket: clawTicket, timing_play: timingPlay, reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now), points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
   }
   // V13.149 연속 학습 보호권 사기(최대 STREAK_GUARD.MAX장).
   if (path === '/shop/streak-guard' && method === 'POST') {
@@ -1675,6 +1727,8 @@ export async function service(state, method, path, body, token, options = {}) {
     // Like eggs: a stake waiting in a yacha room is not spent elsewhere (a free ticket is fine).
     if (body.ticket !== true && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 코인 뽑기를 할 수 있어요.', 409);
     const result = pullLucky(p, Number(body.bet), coinBalance(state, p), { ticket: body.ticket === true });
+    logActivity(p, 'lucky', body.ticket === true ? '행운 뽑기 · 무료권' : `행운 뽑기 · ${Number(body.bet) || 0}코인`);
+    if (result.epic) grantLegendEgg(p);
     if (result.epic) return { ...result, profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     if (result.mythic) return { ...result, ...announceLegend(state, p, result.mythic.key, '행운 뽑기', '신화'), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     if (!result.legendary) return { ...result, points_balance: coinBalance(state, p) };
@@ -1687,11 +1741,14 @@ export async function service(state, method, path, body, token, options = {}) {
     const live = p.rps?.live;
     if (!live && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 가위바위보를 할 수 있어요.', 409);
     const result = rpsPlay(p, { bet: Number(body.bet), pick: str(body.pick, 12), double: body.double === true }, coinBalance(state, p));
+    // 판이 끝났을 때만(이기면 받을지 더블할지 고르는 중에는 남기지 않는다). 오래 열려 있던 판을 정리한 답(settled)은 새 판이 아니다.
+    if (result.done && !result.settled) logActivity(p, 'rps', result.result === 'lose' ? `가위바위보 패 · ${result.bet}코인` : `가위바위보 ${result.wins}연승 · ${result.paid}코인`);
     return { ...result, rps: rpsFor(state, p), points_balance: coinBalance(state, p) };
   }
   if (path === '/rps/cash' && method === 'POST') {
     requireRole(p, 'student');
     const result = rpsCash(p);
+    logActivity(p, 'rps', `가위바위보 ${result.wins}연승 · ${result.paid}코인`);
     return { ...result, rps: rpsFor(state, p), points_balance: coinBalance(state, p) };
   }
   // V13.82 문법 증권거래소: prices of this hour, and an order at that price.
@@ -1706,6 +1763,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!state.market?.seed) state.market = { ...newMarket(), ...(state.market || {}) };
     if (body.side === 'buy' && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 주식을 살 수 있어요.', 409);
     const done = stockTrade(state, p, { key: str(body.key, 12), side: str(body.side, 8), qty: body.qty, price: body.price }, coinBalance(state, p));
+    logActivity(p, 'market', `증권거래소 ${str(body.side, 8) === 'buy' ? '매수' : '매도'}`);
     const balance = coinBalance(state, p);
     return { trade: done, points_balance: balance, market: marketView(state, p, balance) };
   }
@@ -1717,6 +1775,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/battle/practice/finish' && method === 'POST') {
     requireRole(p, 'student');
     const result = botFinish(p, { id: str(body.id, 80), result: str(body.result, 10), right: Number(body.right), pet: activePetKey(state, p.id), now: Date.now() });
+    if (!result.again) logActivity(p, 'robot', `로보 연습전 ${{ win: '승', draw: '무' }[str(body.result, 10)] || '패'}`);
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
   // V13.94 몬스터 잡기: the parts come from the student's own word ranges (same school and grade).
@@ -1736,6 +1795,22 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const ctx = monsterContext(state, p);
     const result = monsterFinish(p, { id: str(body.id, 80), result: str(body.result, 10), right: Number(body.right), pet: activePetKey(state, p.id), scope: ctx.scope, parts: ctx.parts, now: Date.now() });
+    if (!result.again) logActivity(p, 'monster', `몬스터전 레벨 ${result.fought ?? '?'} ${{ easy: '이지', normal: '노말', hard: '하드' }[result.level] || ''} ${result.result === 'win' ? '승' : '패'}`.replace(/  +/g, ' '));
+    return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
+  }
+  // V13.177 빈칸영작(중등): 시작 신호 → 끝 보고(문항별 최종 답을 서버가 다시 채점) → 보상(본문 × 단계 첫 완료만, server/blank.mjs).
+  if (path === '/blank/start' && method === 'POST') {
+    requireRole(p, 'student');
+    return blankStart(p, { group: str(body.group, 12), step: Number(body.step), id: id(), now: Date.now() });
+  }
+  if (path === '/blank/finish' && method === 'POST') {
+    requireRole(p, 'student');
+    const answers = {};
+    if (body.answers && typeof body.answers === 'object' && !Array.isArray(body.answers)) {
+      for (const [n, value] of Object.entries(body.answers).slice(0, 20)) answers[n] = Array.isArray(value) ? value.slice(0, 40).map(x => str(x, 80)) : str(value, 600);
+    }
+    const result = blankFinish(p, { id: str(body.id, 80), group: str(body.group, 12), step: Number(body.step), answers, rate: body.first_rate, pet: activePetKey(state, p.id), now: Date.now() });
+    if (result.paid) logActivity(p, 'blank', `빈칸영작 ${result.group} Step ${result.step}`);
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
   // V13.149 짝 맞추기(server/games.mjs). 단어는 몬스터전처럼 내 학교 · 학년의 범위에서. (V13.150: 혼자 단어 낚시는 놀이터 손맛 낚시로 바뀌었다)
@@ -1755,6 +1830,7 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const now = Date.now();
     const result = matchFinish(p, { id: str(body.id, 80), ms: Number(body.ms), misses: Number(body.misses), splits: Array.isArray(body.splits) ? body.splits.slice(0, 24) : null, pet: activePetKey(state, p.id), now, weekKey: gameWeekKey(now) });
+    if (!result.again) logActivity(p, 'match', result.ms ? `짝 맞추기 ${(result.ms / 1000).toFixed(1)}초${result.record ? ' · 신기록' : ''}` : '짝 맞추기', now);
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
   if (path === '/games/match/board' && method === 'GET') {
@@ -1844,6 +1920,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/reel/land' && method === 'POST') {
     requireRole(p, 'student');
     const now = Date.now(), res = reelLand(p, { id: str(body.id, 80), result: str(body.result, 10), finish: body.finish ? str(body.finish, 10) : null, now, giftId: id() });
+    if (!res.again) logActivity(p, 'fish', res.caught ? `낚시 ${FISH[res.key]?.name || '물고기'} ${res.kg}kg` : '낚시 놓침', now);
     return { ...res, reel: reelView(p, now), ...(res.egg ? { gifts: giftsWaiting(p) } : {}) };
   }
   if (path === '/reel/sell' && method === 'POST') {
@@ -1883,6 +1960,31 @@ export async function service(state, method, path, body, token, options = {}) {
     spend();
     return { ...hatchEgg(state, p, { epic, season: null, missing, price: 0 }), reel: reelView(p, now) };
   }
+  // V13.180 10초 맞추기(놀이터, server/timing.mjs): ping(쓰기 없음) → 시작(판을 쓰고 서버 시각) → 끝(서버가 시간을 확인하고 보상) · 순위.
+  if (path === '/timing/ping' && method === 'POST') {
+    requireRole(p, 'student');
+    return timingPing(Date.now());
+  }
+  if (path === '/timing/start' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
+    const now = Date.now();
+    // 화면이 만든 판 번호(다시 보내도 판을 한 번만 쓴다).
+    const playId = /^[a-z0-9-]{8,40}$/i.test(String(body.id || '')) ? String(body.id) : null;
+    if (!playId) fail('판 번호를 확인해 주세요.');
+    const res = timingStart(p, { id: playId, target: Number(body.target ?? TIMING.TARGET), echo: body.echo ?? null, now });
+    return { ...res, timing: timingView(p, now) };
+  }
+  if (path === '/timing/finish' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now(), res = timingFinish(p, { id: str(body.id, 40), result: str(body.result, 10) || 'press', ms: body.ms, pet: activePetKey(state, p.id), now });
+    if (!res.again) logActivity(p, 'timing', timingLine(res), now);
+    return { ...res, timing: timingView(p, now), ...(res.coins || res.xp ? { points_balance: coinBalance(state, p), stats: stats(state, p) } : {}) };
+  }
+  if (path === '/timing/board' && method === 'GET') {
+    requireRole(p, 'student');
+    return timingBoard(state.profiles, p, { kind: str(body.kind, 10), now: Date.now(), ranked: isRankedStudent, hidden: isPrivate });
+  }
   // V13.162 펫 사냥(놀이터): 지도 · 만나기 · 던지기(server/hunt.mjs). 지도는 열 때 서버가 만든다(몇 시간마다 바뀜).
   if (path === '/hunt/home' && method === 'POST') {
     requireRole(p, 'student');
@@ -1905,7 +2007,29 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!throwId) fail('던지기 번호를 확인해 주세요.');
     // V13.167 열매는 서버가 준 열매 표(berry_ticket)로만(화면이 보낸 berry 이름은 믿지 않는다).
     const res = huntThrow(p, { id: throwId, spot: str(body.spot, 40), ball: str(body.ball, 10), quality: body.quality ? str(body.quality, 12) : null, ticket: body.berry_ticket ? str(body.berry_ticket, 40) : null, pet: activePetKey(state, p.id), now });
+    if (res.new_pet) grantLegendEgg(p);
+    if (!res.again && (res.caught || res.fled)) logActivity(p, 'hunt', `몬스터 사냥 ${(res.kind === 'pet' ? CHARACTERS[res.key]?.ko : HUNT_MONSTERS[res.key]?.ko) || '몬스터'} ${res.caught ? '잡음' : '도망'}`, now);
     return { ...res, hunt: huntView(p, now), ...(res.new_pet ? { profile: publicProfile(p), stats: stats(state, p) } : {}) };
+  }
+  // V13.180 인형뽑기(놀이터): 집게권 넣기 · 집게(server/claw.mjs). 판 배치 · 잡힘은 서버가 정한다.
+  if (path === '/claw/home' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    if (body.guide) clawGuideSeen(p);
+    return { claw: clawView(p, now) };
+  }
+  if (path === '/claw/start' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now(), res = clawStart(p, { id: str(body.id, 40), now });
+    if (res.stale?.drops) logActivity(p, 'claw', clawActivityText(res.stale), now);
+    return { ...res, claw: clawView(p, now) };
+  }
+  if (path === '/claw/drop' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    const res = clawDrop(p, { id: str(body.id, 40), round: str(body.round, 40), n: Number(body.n), x: Number(body.x), y: Number(body.y), now });
+    if (!res.again && res.summary) logActivity(p, 'claw', clawActivityText(res.summary), now);
+    return { ...res, claw: clawView(p, now), ...(res.coins ? { points_balance: coinBalance(state, p) } : {}) };
   }
   // V13.167 열매 문제: 서버가 내 학교 · 학년 범위(놀이터에서 고른 게임 단어)에서 내고, 서버가 채점해 열매 표를 준다.
   if (path === '/hunt/berry' && method === 'POST') {
@@ -3108,6 +3232,8 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false, stal
   const student = state.profiles.find(item => item.id === x.student_id);
   const event = answerRecords.length ? activeEventFor(state, student, endedAt) : null;
   const reward = practiceReward(x, state, endedAt, answerRecords.length, perfect, { complete, correct: scoreCorrect, event });
+  // V13.173 끝난 연습만 한 줄(답마다 쓰는 빠른 길에는 쓰지 않는다). 정리로 닫는 연습(staleAt)은 남기지 않는다.
+  if (student && !staleAt && answerRecords.length) logActivity(student, x.run_mode === 'test' ? 'test' : 'practice', `${x.run_mode === 'test' ? '실전시험' : '연습'} ${answerRecords.length}문제 · ${score}점`, endedAt);
   const xpBonus = complete ? eventXp(event, Number(x.xp || 0)) : 0;
   const eventCoin = (reward.breakdown || []).find(item => item.event)?.points || 0;
   x.xp = Number(x.xp || 0) + xpBonus;
@@ -3166,6 +3292,10 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false, stal
   if (complete && student && answerRecords.length >= REEL.BAIT_MIN_PRACTICE && grantBait(student, finalizedAt)) x.bait = true;
   // V13.162: 같은 조건으로 펫 사냥 공 1개(하루 1번). 만점이면 가끔 좋은 공.
   if (complete && student && answerRecords.length >= HUNT.MIN_PRACTICE) { const ball = grantBall(student, 'practice', { lucky: perfect, now: finalizedAt }); if (ball) x.ball = ball; }
+  // V13.181: 같은 조건으로 인형뽑기 집게권 1장(하루 1장).
+  if (complete && student && answerRecords.length >= CLAW.MIN_PRACTICE && grantClaw(student, 'practice', { now: finalizedAt })) x.claw_ticket = true;
+  // V13.180: 같은 조건으로 10초 맞추기 한 판 더(하루 1번).
+  if (complete && student && answerRecords.length >= TIMING.MIN_PRACTICE) grantTimingPlay(student, 'practice', finalizedAt);
 }
 // V13.149 되살리기: 연속이 어제 끊겼으면(보호권이 없어서) 오늘 끝까지 푼 연습이 모두 REPAIR_NEED문제를 넘을 때 어제를 잇는다.
 function repairStreak(state, p, now) {
@@ -3203,7 +3333,7 @@ function practiceView(x, state) {
     range_codes: x.range_codes || [], cover_all: !!x.cover_all, daily_quest: !!x.daily_quest, assignment_id: x.assignment_id || null,
     manual_selection: !!x.manual_selection, exam_style: !!x.exam_style, quest_mix: x.quest_mix || null, word_ids: [...(x.words || [])],
     covered: x.seen?.length || 0, total: x.total, correct: hideTestScore ? null : x.correct, score_total: x.finished ? scoreTotal : (x.score_total || 0), score_correct: hideTestScore ? null : scoreCorrect, score: hideTestScore ? null : score,
-    xp: hideTestScore ? null : x.xp, reward_points: x.finished ? Number(x.reward_points || 0) : undefined, reward_breakdown: x.finished ? (x.reward_breakdown || []) : undefined, reward_note: x.finished ? (x.reward_note || null) : undefined, reward_event: x.finished ? (x.reward_event || null) : undefined, bait: x.finished ? !!x.bait : undefined, ball: x.finished ? (x.ball || null) : undefined, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
+    xp: hideTestScore ? null : x.xp, reward_points: x.finished ? Number(x.reward_points || 0) : undefined, reward_breakdown: x.finished ? (x.reward_breakdown || []) : undefined, reward_note: x.finished ? (x.reward_note || null) : undefined, reward_event: x.finished ? (x.reward_event || null) : undefined, bait: x.finished ? !!x.bait : undefined, ball: x.finished ? (x.ball || null) : undefined, claw_ticket: x.finished ? !!x.claw_ticket : undefined, combo: hideTestScore ? null : x.combo, best: hideTestScore ? null : x.best,
     started_at: x.started_at, finished_at: x.finished_at || null, ended_at: x.ended_at || null, finalized_at: x.finalized_at || null, duration_sec: x.duration_sec, deadline: x.deadline,
     timer_mode: x.timer_mode || 'session', question_duration_sec: Number(x.question_duration_sec || 0), question_started_at: x.question_started_at || null, question_deadline: x.question_deadline || null,
     auto_submitted: !!x.auto_submitted,

@@ -106,3 +106,12 @@ export function rpsOutcome(mine, robot) {
   if (mine === robot) return 'draw';
   return RPS_HANDS[mine]?.beats === robot ? 'win' : 'lose';
 }
+
+// V13.177 빈칸영작(중등 학습 → 빈칸영작, 중3 동아(윤정미) 본문 암기노트 5단계). 보상은 본문 × 단계마다 첫 완료 때 한 번만.
+// 같은 단계를 다시 풀면 연습만 된다. 하루에 빈칸영작으로 받는 코인은 BLANK_DAILY_COINS까지(그 뒤는 경험치만, 하루 기준은 한국 시간).
+export const BLANK_REWARDS = { 1: { coins: 4, xp: 20 }, 2: { coins: 6, xp: 30 }, 3: { coins: 8, xp: 40 }, 4: { coins: 8, xp: 40 }, 5: { coins: 12, xp: 60 } };
+export const BLANK_DAILY_COINS = 70;
+// 끝 보고가 너무 빠르면 보상을 주지 않는다: 시작 신호 뒤로 (빈칸 수 또는 단어 수) × 이 시간(ms)보다 빨리 끝날 수 없다.
+//   Step 1 ~ 3은 빈칸 수, Step 4는 단어 묶음(칩을 누르는 일이라 조금 짧게), Step 5는 쓴 단어 수.
+export const BLANK_MS_PER = { 1: 1500, 2: 1500, 3: 1500, 4: 1000, 5: 1500 };
+export const BLANK_MIN_FLOOR_MS = 5000;

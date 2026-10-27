@@ -111,7 +111,14 @@ const cssSources = [
   "v13159.css",
   "v13162.css",
   "v13166.css",
-  "v13168.css"
+  "v13168.css",
+  "v13173.css",
+  "v13174.css",
+  "v13177.css",
+  "v13180.css",
+  "v13181.css",
+  "v13182.css",
+  "v13178.css"
 ];
 const cssBundlePath = resolve(root, 'public/app.bundle.css');
 
@@ -178,6 +185,21 @@ writeFileSync(cssBundlePath, cssBundle);
   console.log(`[pet-art] ${art.length} pets with art, ${fight.length} with battle poses, ${shows.length} with a reveal`);
 }
 
+// V13.180 인형뽑기 그림 게이트: 그림 폴더(public/assets/claw)를 보고 public/modules/claw-art.js를 만든다.
+// CLAW_DOLLS: 네 자세(doll-<key> · -grab · -fall · -joy)가 다 있는 인형. CLAW_ART: 그 밖의 그림 이름(기계 · 집게 · UI · 배경 · 도감 · 효과).
+// 인형뽑기는 기계 · 집게 그림과 인형 6종 이상이 있어야 열린다(claw-rules.js clawOpen).
+{
+  const dir = resolve(root, 'public/assets/claw');
+  const files = existsSync(dir) ? new Set(readdirSync(dir).filter(f => f.endsWith('.webp')).map(f => f.slice(0, -5))) : new Set();
+  const dolls = [...new Set([...files].map(f => f.match(/^doll-([a-z]+)$/)?.[1]).filter(Boolean))]
+    .filter(k => ['', '-grab', '-fall', '-joy'].every(p => files.has(`doll-${k}${p}`))).sort();
+  const art = [...files].filter(f => !f.startsWith('doll-') && !f.startsWith('preview')).sort();
+  const out = resolve(root, 'public/modules/claw-art.js');
+  const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/claw)에 있는 인형뽑기 그림.\nexport const CLAW_DOLLS = new Set(${JSON.stringify(dolls)});\nexport const CLAW_ART = new Set(${JSON.stringify(art)});\n`;
+  if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
+  console.log(`[claw-art] ${dolls.length} dolls, ${art.length} pictures`);
+}
+
 // Service worker: precache list + a hash of every served file. Any change to
 // the app changes sw.js, so installed apps pick up each deploy even when no
 // version string was bumped by hand.
@@ -198,7 +220,7 @@ writeFileSync(cssBundlePath, cssBundle);
   // Loaded on every start; teacher tools, grammar data and pet images are cached on first
   // use. Images still count toward ASSET_HASH, so a redrawn pet reaches installed apps.
   // V13.77: the install guide, its QR code and the PNG icons are also only fetched when used.
-  const onDemand = /^\/(?:(?:teacher-enhancements|exam-ops|grammar-choice-sample|[a-z-]+-grammar-data|install)\.js|install\.html|vendor\/.+|icons\/.+\.png|assets\/.+\.(?:webp|mp3))$/;
+  const onDemand = /^\/(?:(?:teacher-enhancements|exam-ops|grammar-choice-sample|blank-writing|[a-z-]+-grammar-data|[a-z-]+-blank-data|install)\.js|install\.html|vendor\/.+|icons\/.+\.png|assets\/.+\.(?:webp|mp3))$/;
   // The page is cached as "/": Cloudflare answers /index.html with a 307 to /,
   // and a redirected response cannot be used to answer a navigation.
   const precache = served.map(({ url }) => url === '/index.html' ? '/' : url).filter(url => !onDemand.test(url));

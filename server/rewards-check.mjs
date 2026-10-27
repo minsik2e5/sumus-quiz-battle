@@ -633,8 +633,8 @@ export async function runRewardsChecks(assert, expectStatus) {
     assert(b10 >= .25 && b10 <= b9 && b10 >= b11, `V13.147 레벨 10 하드 보스(${Math.round(b10 * 100)}%)는 레벨 9 하드(${Math.round(b9 * 100)}%)보다 어렵고 너무 어렵지 않다(25% 이상, 레벨 11 ${Math.round(b11 * 100)}%)`);
     // V13.147: 레벨 30 · 60은 보스 레벨이라 보스 완화로 조금 쉬워졌다(20% → 25% 이하).
     assert(w1 >= .9 && w5e >= .85 && w10 >= .2 && w10 <= .6 && w30 <= .25 && w60n <= .25, `V13.105 시뮬레이션: 레벨 1 하드는 거의 다 아는 학생이 거의 이기고(${Math.round(w1 * 100)}%), 레벨 10 하드는 지금 하드 수준(${Math.round(w10 * 100)}%), 레벨 30 하드·레벨 60 노말은 아주 어렵다(${Math.round(w30 * 100)}%, ${Math.round(w60n * 100)}%)`);
-    assert(MONSTER_ORDER.length === 18 && new Set(MONSTER_ORDER).size === 18 && MONSTER_ORDER.every(k => MONSTERS.some(m => m.key === k && m.temp?.pet && m.temp.filter)) && stageMonster(1).key === 'mochi' && stageMonster(18).key === 'finalking' && stageMonster(19).key === 'mochi' && stageMonster(19).round === 1 && stageMonster(19).title === '암기 모찌 +1' && stageMonster(37).round === 2,
-      'V13.105 몬스터 18종(새 9종 포함)이 작은 것부터 큰 것 순서로 레벨을 지키고, 18레벨 뒤에는 "+1"로 더 세게 다시 나온다(그림이 오기 전에는 펫 그림 색 바꾸기)');
+    assert(MONSTER_ORDER.length === 18 && new Set(MONSTER_ORDER).size === 18 && MONSTER_ORDER.every(k => MONSTERS.some(m => m.key === k && m.temp?.pet && m.temp.filter)) && stageMonster(71).round === 1 && stageMonster(71).title === `${stageMonster(1).name} +1` && stageMonster(141).round === 2,
+      'V13.105 · V13.174 몬스터 18종 순서는 옛 기록으로 남고(펫 그림 색 바꾸기 안전망), 레벨의 몬스터는 지역 표가 정하며 한 바퀴(70레벨, 새 몬스터 그림이 오면 88레벨) 뒤에는 "+1"로 처음부터 다시 나온다');
     const kid = { id: 'qa-mh', pets: [{ key: 'dog' }], bonus: {} };
     const t0 = Date.parse('2026-10-03T03:00:00Z');
     const fight = (stage, level, result, right, at) => { const r = monsterStart(kid, { stage, level, codes: ['1'], id: 'f-' + at, now: at }); return monsterFinish(kid, { id: r.id, result, right, now: at + 60000 }); };
@@ -769,7 +769,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     const prompts96 = source('../docs/asset-requests/runner/11-titles.txt').split('\n---\n');
     // V13.148 칭호 2탄 40개는 그림 25(아래 V13.148 검사)라서 11 주문서 목록에서 뺀다.
     const keys25 = new Set(source('../docs/asset-requests/runner/slice-map.csv').split('\n').filter(line => line.startsWith('"25-titles-2.txt"')).map(line => line.match(/titles\/([a-z0-9]+)\.webp"$/)?.[1]).filter(Boolean));
-    const keys96 = Object.keys(TITLES).filter(key => !key.startsWith('dungeon-') && !keys25.has(key) && key !== 'zodiac12'); // V13.143 던전 칭호는 그림 23c(dungeon-reward-check.mjs), V13.168 12지 수호자는 그림 36d(new-pets-168-check.mjs)
+    const keys96 = Object.keys(TITLES).filter(key => !key.startsWith('dungeon-') && !keys25.has(key) && key !== 'zodiac12' && !key.startsWith('timing-') && !key.startsWith('claw') && !['epic-collector', 'legend-owner', 'epic-dex'].includes(key)); // V13.182 전설 알 칭호 3개도 아직 메달 그림 없이 SVG 메달(legend-egg-check.mjs). V13.180 10초 맞추기 칭호는 그림 없이 SVG 메달(timing-check.mjs). V13.143 던전 칭호는 그림 23c(dungeon-reward-check.mjs), V13.168 12지 수호자는 그림 36d(new-pets-168-check.mjs) V13.181 인형뽑기 칭호는 아직 메달 그림 없이 아이콘(claw-check.mjs).
     assert(keys96.length === 65 && keys96.every(key => map96.some(line => line.endsWith(`"public/assets/titles/${key}.webp"`))) && map96.length === 68 && prompts96.length === 17, 'V13.96 칭호 65개(옛 뽑기 칭호 포함)마다 메달 그림 주문이 있다: 시트 17장 = 메달 65개 + 칭호 화면 그림 3개');
     assert(prompts96.every(p => p.includes('STYLE REFERENCE — before drawing, open') && p.includes('Google Drive folder') && /named exactly "11-\d+\.png"/.test(p) && p.includes('"SUMUS 칭호 11 (Runner용)"')) && prompts96.slice(1).every(p => p.includes('Also open "11-1.png"')), 'V13.96 칭호 주문서마다 Drive의 기존 그림을 열어 그림체를 맞추고, 정해진 Drive 폴더에 정확한 이름(11-N.png)으로 저장하라고 적혀 있다');
     // One frame per medal, by tier: as many frame lines of a tier as titles of that tier.
@@ -791,7 +791,9 @@ export async function runRewardsChecks(assert, expectStatus) {
     const { TITLE_ART, ART_READY } = await import('../public/modules/emblems.js');
     const asset = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));
     const webpSize = name => { const b = readFileSync(asset(name)); return b.toString('ascii', 12, 16) === 'VP8X' ? `${1 + b.readUIntLE(24, 3)}x${1 + b.readUIntLE(27, 3)}` : ''; };
-    const keys97 = Object.keys(TITLES).filter(key => key !== 'zodiac12' || TITLE_ART.has(key)); // V13.168 12지 수호자 메달(그림 36d)은 그림이 들어오면 TITLE_ART에 들어간다
+    // V13.181 인형뽑기 칭호 5개는 메달 그림 주문 전이라 아이콘으로 나온다.
+    // V13.182 전설 알 칭호 3개(epic-collector · legend-owner · epic-dex)도 그림이 오기 전에는 SVG 메달.
+    const keys97 = Object.keys(TITLES).filter(key => (key !== 'zodiac12' && !key.startsWith('timing-') && !key.startsWith('claw') && !['epic-collector', 'legend-owner', 'epic-dex'].includes(key)) || TITLE_ART.has(key)); // V13.168 12지 수호자 메달(그림 36d)은 그림이 들어오면 TITLE_ART에 들어간다
     assert(keys97.every(key => TITLE_ART.has(key)) && TITLE_ART.size === keys97.length && keys97.filter(key => !key.startsWith('dungeon-') && key !== 'zodiac12').length === 105 && keys97.every(key => webpSize(`titles/${key}`) === '256x256' && webpSize(`titles/${key}-s`) === '96x96'), 'V13.97 칭호 65개(V13.148: + 2탄 40개 = 105개) 모두 메달 그림이 있다(256px, 작은 그림 96px)');
     assert(['titles-hero', 'title-equipped', 'title-new'].every(key => ART_READY.has(key) && webpSize(`ui/${key}`) === '256x256'), 'V13.97 칭호 도감 그림 3개(진열장 · 장착 중 · 새 칭호)가 있고 등록되어 있다');
     const arms = ['robot-rock', 'robot-scissors', 'robot-paper', 'robot-flag', 'me-rock', 'me-scissors', 'me-paper', 'me-thumb'];

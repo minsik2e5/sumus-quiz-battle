@@ -917,6 +917,7 @@ function finishPracticeView() {
     ${x.reward_note ? `<p class="result-reward-note-v1373">${esc(x.reward_note)}</p>` : ''}
     ${x.bait ? '<p class="result-bait-v13150">🪱 낚시 미끼 +1 · 놀이터 낚시터에서 써요!</p>' : ''}
     ${x.ball ? `<p class="result-bait-v13150">${x.ball === 'good' ? '🔵 좋은 공' : '🟢 사냥 공'} +1 · 놀이터 몬스터 사냥에서 써요!</p>` : ''}
+    ${x.claw_ticket ? '<p class="result-bait-v13150">🧸 집게권 +1 · 놀이터 인형뽑기에서 써요!</p>' : ''}
     ${rewardEventResult(x)}
     <p class="result-next-copy">${esc(statusText)}</p>
     ${primaryCta}

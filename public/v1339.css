@@ -30,7 +30,7 @@
   .grammar-range-head.middle.compact-v1339{margin:10px 0 14px;padding:20px!important;border-radius:23px!important}
   .grammar-range-head.middle.compact-v1339 h2{font-size:22px!important;line-height:1.2!important}
   .grammar-range-head.middle.compact-v1339 p{margin-top:5px!important;font-size:11px!important}
-  .middle-grammar-tabs-v1339{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 13px;padding:5px;border-radius:18px;background:#edf2f1}
+  .middle-grammar-tabs-v1339{display:grid;grid-template-columns:repeat(var(--tabs,2),minmax(0,1fr));gap:8px;margin:0 0 13px;padding:5px;border-radius:18px;background:#edf2f1}
   .middle-grammar-tabs-v1339 button{min-height:58px;border:0;border-radius:14px;background:transparent;color:#7c8b86;font:inherit}
   .middle-grammar-tabs-v1339 button b{display:block;font-size:16px}
   .middle-grammar-tabs-v1339 button small{display:block;margin-top:2px;font-size:9px}

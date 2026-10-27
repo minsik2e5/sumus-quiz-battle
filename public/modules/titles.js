@@ -34,8 +34,12 @@
 //                다시 한 판, legend_pets · mythic_pets · season_pets 전설 · 신화 · 한정 펫 수, eggs 상점 알을 연 수,
 //                care 펫 교감(쓰다듬기 · 밥) 수, lucky_best_day 코인 뽑기 3배가 하루에 가장 많이 나온 수, boss_wins 보스 몬스터 처치
 //   V13.168 zodiac_pets 만난 12지 펫 수(core.js ZODIAC_PET_KEYS)
+//   V13.180 인형뽑기(server/claw.mjs): claw_dolls 뽑은 인형 수, claw_kinds 도감에 모은 인형 종류(12종), claw_gold 뽑은 황금 인형 수
+//   V13.180 timing_perfect 10초 맞추기 완벽 이상 수, timing_ten 딱 10.00 수, timing_streak 최고 연속 완벽(server/timing.mjs p.timing)
 // Limited titles belong to one week: they are held only while last week's result stands.
 // V13.148 `once`: 한정 테두리지만 주간 칭호가 아닌 것(신화의 주인): 한 번 받으면 계속 갖고, 코인도 한 번만.
+
+import { EPIC_PET_KEYS, LEGEND_EGG_EPIC_NEED } from './core.js';
 
 export const TITLE_TIERS = {
   common: { name: '일반', order: 1 },
@@ -181,11 +185,30 @@ Object.assign(TITLES, {
   petcare30: { name: '정성 가득 집사', tier: 'rare', group: 'collect', stat: 'care', goal: 30, icon: 'paw', how: '펫 쓰다듬기 · 밥 주기 30번', desc: '펫을 정성껏 돌보는 집사.' },
   // 놀이터
   lucky2: { name: '오늘은 운수 대통', tier: 'epic', group: 'arcade', stat: 'lucky_best_day', goal: 2, icon: 'star', how: '코인 뽑기에서 하루에 3배 2번', desc: '오늘은 뭘 해도 되는 날!' },
+  // V13.180 인형뽑기(놀이터): 도감 · 황금 인형 · 뽑은 수.
+  claw1: { name: '첫 인형', tier: 'common', group: 'arcade', stat: 'claw_dolls', goal: 1, icon: 'star', how: '인형뽑기에서 인형 1개 뽑기', desc: '집게가 처음으로 꽉 잡았어요!' },
+  claw6: { name: '인형 수집가', tier: 'rare', group: 'arcade', stat: 'claw_kinds', goal: 6, icon: 'heart', how: '인형뽑기 도감 6종 모으기', desc: '띠 인형 친구가 반이나 모였어요.' },
+  claw12: { name: '인형뽑기 장인', tier: 'epic', group: 'arcade', stat: 'claw_kinds', goal: 12, icon: 'trophy', how: '인형뽑기 도감 12종 모두 모으기', desc: '열두 띠 인형을 모두 뽑았어요.' },
+  clawgold: { name: '황금 손', tier: 'rare', group: 'arcade', stat: 'claw_gold', goal: 1, icon: 'gem', how: '인형뽑기에서 황금 인형 1개 뽑기', desc: '반짝이는 황금 인형을 잡았어요!' },
+  claw100: { name: '집게의 전설', tier: 'legendary', group: 'arcade', stat: 'claw_dolls', goal: 100, icon: 'crown', how: '인형뽑기에서 인형 100개 뽑기', desc: '이 동네 인형뽑기 기계가 다 아는 이름.' },
   rps50: { name: '가위바위보 달인', tier: 'rare', group: 'arcade', stat: 'rps_wins', goal: 50, icon: 'bolt', how: '가위바위보 50번 이기기', desc: '로보의 다음 손이 다 보여요.' },
   // 몬스터
   monster50: { name: '몬스터 퇴치 전문가', tier: 'epic', group: 'monster', stat: 'monster_wins', goal: 50, icon: 'target', how: '몬스터 50번 처치', desc: '몬스터 퇴치라면 맡겨 주세요.' },
   monster100: { name: '몬스터 킬러', tier: 'legendary', group: 'monster', stat: 'monster_wins', goal: 100, icon: 'sword', how: '몬스터 100번 처치', desc: '백 마리의 몬스터를 쓰러뜨렸어요.' },
   boss10: { name: '보스 슬레이어', tier: 'legendary', group: 'monster', stat: 'boss_wins', goal: 10, icon: 'crown', how: '보스 몬스터(5레벨마다) 10번 처치', desc: '보스만 골라 잡는 슬레이어.' }
+});
+// V13.182 전설 알 칭호(docs/legend-egg-design.md). 메달 그림은 아직 없어 SVG 메달(그림이 오면 emblems.js TITLE_ART에 키만 넣는다).
+// 도감 마스터는 영웅 펫 전부(EPIC_PET_KEYS): 영웅 펫이 늘면 기준도 따라 늘어난다.
+Object.assign(TITLES, {
+  'epic-collector': { name: '영웅 수집가', tier: 'epic', group: 'collect', stat: 'epic_pets', goal: LEGEND_EGG_EPIC_NEED, icon: 'shield', how: `영웅 펫 ${LEGEND_EGG_EPIC_NEED}마리 만나기`, desc: '영웅들이 모여 전설 알을 데려왔어요.' },
+  'legend-owner': { name: '전설의 주인', tier: 'legendary', group: 'collect', stat: 'legend_egg', goal: 1, icon: 'wing', how: '전설 알 보상 받기(전설 알을 열거나, 이미 전설 펫이 있어 대신 받는 보상)', desc: '전설 알의 주인이 되었어요.' },
+  'epic-dex': { name: '도감 마스터', tier: 'legendary', group: 'collect', stat: 'epic_pets', goal: EPIC_PET_KEYS.length, icon: 'book', how: '영웅 펫 모두 만나기', desc: '영웅 도감을 빈칸 없이 채웠어요.' }
+});
+// V13.180 10초 맞추기 칭호(놀이터). 서버가 시간을 믿은 판(순위에 들어가는 판)만 센다. 메달 그림은 아직 없어 SVG 메달.
+Object.assign(TITLES, {
+  'timing-clock': { name: '시계 장인', tier: 'rare', group: 'arcade', stat: 'timing_perfect', goal: 10, icon: 'target', how: '10초 맞추기 완벽(±0.05초) 10번', desc: '째깍째깍, 머릿속에 시계가 있어요.' },
+  'timing-ten': { name: '딱 10.00', tier: 'epic', group: 'arcade', stat: 'timing_ten', goal: 1, icon: 'star', how: '10초 맞추기에서 정확히 10.00초', desc: '0.01초도 틀리지 않았어요.' },
+  'timing-human': { name: '인간 초시계', tier: 'legendary', group: 'arcade', stat: 'timing_streak', goal: 3, icon: 'crown', how: '10초 맞추기 완벽 3번 연속', desc: '세 번 연속 0.05초 안. 초시계가 울고 가요.' }
 });
 // V13.67: titles that came out of the capsule machine. V13.68 retired the machine: they stay
 // with the students who have them and are not shown to anyone else (`retired`).
