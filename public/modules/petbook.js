@@ -6,7 +6,7 @@ import { LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, MYTHIC_RATE } from './reward
 
 // V13.91 펫 도감: every pet of the game under 나. A pet the student has met shows its forms
 // (the forms it has reached in colour, the next ones as shadows); a pet not met yet is a shadow
-// with how to meet it. Legendary pets have no yacha skill.
+// with how to meet it. V13.185: every pet (전설 · 신화 · 한정 too) shows its yacha skill.
 const sprite = (key, form, shadow) => `<img class="pb-sprite${shadow ? ' shadow' : ''}" src="/assets/pets/${key}-${form}-s.webp" alt="" width="160" height="160" loading="lazy" decoding="async" draggable="false">`;
 
 // V13.112 `teacher`: { owners: [names], partners: n } shows the pet to a teacher (every form in colour,
@@ -21,7 +21,8 @@ function card(key, no, pet, teacher = null) {
   // V13.109 한정 펫: its season's egg while on sale, then only 영웅 eggs.
   const how = season ? (seasonOnSale()?.id === c.limited ? `${season.egg} ${num(season.price)}코인 · ${season.until}까지 판매` : `${season.name} 한정 · 지금은 영웅 알 · 코인 뽑기 영웅 알에서 ${season.after_rate}%`) : mythic ? `모든 알에서 아주 낮은 확률(랜덤 알 ${MYTHIC_RATE.basic}% · 영웅 알 ${MYTHIC_RATE.epic}% · 코인 뽑기 ${MYTHIC_RATE.capsule}%) · 뽑기 확정은 없어요` : legend ? `코인 뽑기 ${LEGENDARY_RATE}% · 영웅 알 ${EPIC_EGG_LEGENDARY_RATE}% · 뽑기 ${num(LEGENDARY_PITY)}번 안에 확정` : epic ? `영웅 알 ${num(EPIC_EGG_PRICE)}코인 · 코인 뽑기 ${EPIC_RATE}%` : `상점의 랜덤 알 · ${num(EGG_PRICE)}코인`;
   const foot = met
-    ? skill ? `<span class="pb-skill">야차전 특기</span><b>${esc(skill.name)}</b><small>${esc(skill.desc)}</small>` : season ? `<span class="pb-skill limited">${esc(season.name)} 한정</span><small>특기 대신 ${esc(season.name)}에만 만날 수 ${seasonOnSale()?.id === c.limited ? '있는' : '있었던'} 모습을 가졌어요</small>` : mythic ? `<span class="pb-skill mythic">신화 펫</span><small>특기 대신 신화의 빛을 두르고 있어요</small>` : `<span class="pb-skill gold">전설 펫</span><small>특기 대신 전설의 빛을 두르고 있어요</small>`
+    // V13.185 전설 · 신화 · 한정 펫에도 야차전 특기가 있다(등급 색 그대로).
+    ? skill ? `<span class="pb-skill${season ? ' limited' : mythic ? ' mythic' : legend ? ' gold' : ''}">야차전 특기</span><b>${esc(skill.name)}</b><small>${esc(skill.desc)}</small>` : ''
     : `<span class="pb-skill lock">${icon('lock')}만나는 법</span><small>${how}</small>`;
   const name = met ? `<b>${esc(c.ko)}</b>${pet.name ? `<em>${esc(petDisplayName(pet))}</em>` : ''}` : '<b>???</b>';
   return `<article class="pb-card ${mythic ? 'mythic ' : ''}${legend ? 'legend' : ''}${epic ? 'epic' : ''}${season ? 'limited' : ''} ${met ? 'met' : 'unmet'}" style="--pc:${c.color};--pl:${c.light};--ps:${c.soft}" aria-label="${met ? esc(c.ko) : '아직 못 만난 펫'}">

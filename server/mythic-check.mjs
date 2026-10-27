@@ -18,7 +18,7 @@ export function runMythicChecks(assert) {
     'V13.118 천마는 전설이고 불새는 숨겨져서 알·뽑기·도감·개수에 나오지 않는다(옛 기록이 있어도 그림은 그려진다)');
   assert(ACTIVE_PET_KEYS.length === STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length + LEGENDARY_PET_KEYS.length + MYTHIC_PET_KEYS.length + LIMITED_PET_KEYS.length && ACTIVE_PET_KEYS.length === Object.keys(CHARACTERS).filter(petReady).length - 1,
     'V13.118 학생이 만날 수 있는 펫은 기본 16 · 영웅 16 · 전설 4 · 신화 5 · 한정 5 = 46종이다(V13.168: 그림을 기다리는 새 펫은 빼고 센다)');
-  assert([...MYTHIC, 'cheonma'].every(key => petSkill({ key }).key === 'none') && petSkill({ key: 'jujak' }).desc.includes('신화'), 'V13.118 신화 펫과 천마에는 야차전 특기가 없다');
+  assert([...MYTHIC, 'cheonma'].every(key => petSkill({ key }).key === key) && !petSkill({ key: 'jujak' }).desc.includes('사용하지'), 'V13.185 신화 펫과 천마에도 야차전 특기가 있다(V13.118에는 없었다)');
 
   const rate = MYTHIC_RATE, sources = Object.keys(rate);
   assert(sources.join() === 'basic,epic,gift,capsule' && sources.every(key => rate[key] > 0 && rate[key] <= .5) && rate.capsule < rate.basic && rate.basic <= rate.epic, 'V13.118 신화 확률은 랜덤 알 0.1% · 영웅 알 0.2% · 선생님 알 0.1% · 코인 뽑기 0.03%이고 모두 0.5% 이하다(싼 뽑기일수록 낮다)');
