@@ -1,7 +1,8 @@
 import { randomBytes } from 'node:crypto';
 import { dayKey } from '../public/modules/core.js';
 import { FISH, FISH_KEYS } from '../public/modules/fishing-rules.js';
-import { REEL, FIGHT, FINISH, CAST_TIERS, SEA_PETS, ROD, rodLevel, rodOf, reelRoll, pearlsOf } from '../public/modules/reel-rules.js';
+import { FISH_READY } from '../public/modules/fish-art.js';
+import { REEL, FIGHT, FINISH, CAST_TIERS, SEA_PETS, ROD, DEEP, rodLevel, rodOf, reelRoll, pearlsOf, deepReady, deepOpen } from '../public/modules/reel-rules.js';
 import { findReceipt, keepReceipt, giveGift } from './rewards.mjs';
 
 // V13.150 손맛 낚시(놀이터) 서버 쪽. 학생 기록 p.reel:
@@ -23,7 +24,7 @@ export function grantBait(p, now = Date.now()) {
   return true;
 }
 
-export function reelView(p, now = Date.now()) {
+export function reelView(p, now = Date.now(), ready = FISH_READY) {
   const r = p.reel || {}, f = p.games?.fish || {}, today = dayKey(now);
   const net = Object.fromEntries(Object.entries(r.net || {}).filter(([k, n]) => FISH[k] && n > 0));
   return {
@@ -31,15 +32,18 @@ export function reelView(p, now = Date.now()) {
     pearls: Number(r.pearls || 0), net, net_pearls: Object.entries(net).reduce((s, [k, n]) => s + pearlsOf(k) * n, 0),
     coin_left: Math.max(0, REEL.COIN_DAILY - (r.coin_day === today ? Number(r.coin_today || 0) : 0)),
     egg_left: r.egg_day === today ? 0 : 1, epic_left: r.epic_day === today ? 0 : 1,
-    book: f.book || {}, kinds: Object.keys(f.book || {}).length, all: FISH_KEYS.length, golden: Number(f.golden || 0) % REEL.GOLDEN_EGG,
+    book: f.book || {}, kinds: Object.keys(f.book || {}).length, all: FISH_KEYS.length + deepReady(ready).length, golden: Number(f.golden || 0) % REEL.GOLDEN_EGG,
     sea: SEA_PETS.map(x => ({ ...x, owned: (p.pets || []).some(pet => pet.key === x.key) })),
+    // V13.185 깊은 바다: 그림이 있는 심해 물고기가 있을 때만 보인다(ready). open은 낚싯대 DEEP.MIN_ROD단계부터.
+    deep: deepReady(ready).length ? { ready: true, open: deepOpen(r.rod, ready), min_rod: DEEP.MIN_ROD } : null,
     rod: rodLevel(r.rod), rod_next: rodLevel(r.rod) < ROD.MAX ? ROD.COST[rodLevel(r.rod) + 1] : null,
     guide: !!r.guide, tut: !!r.tut, live: r.live && now - r.live.at < REEL.LIVE_MS ? { id: r.live.id } : null
   };
 }
 
 // 던지기: 미끼 1개를 쓰고 물고기를 정한다. 화면에는 파이팅 세기와 그림자 크기만(어떤 물고기인지는 끌어올린 뒤에).
-export function reelCast(p, { id, cast, water = false, now = Date.now(), seed = randomBytes(4).readUInt32BE(0) }) {
+// V13.185 spot: 'deep'이면 깊은 바다(낚싯대 3단계 · 심해 물고기 그림이 있을 때만). 화면에는 어느 물고기인지 보내지 않는다. ready는 검사용.
+export function reelCast(p, { id, cast, water = false, spot = 'shore', now = Date.now(), seed = randomBytes(4).readUInt32BE(0), ready = FISH_READY }) {
   const r = reel(p);
   // V13.150.1 같은 던지기(id)를 다시 보내면(연결이 끊겨 다시 보냄 · 화면을 다시 열어 이어 하기) 미끼를 또 쓰지 않고 같은 답.
   const fightOf = live => { const F = FIGHT[live.rarity]; return { hp: F.hp, pull: F.pull, dash: F.dash, size: F.size, min: F.min, dist: F.dist, moves: F.moves, taps: F.taps, notes: F.notes, beat: F.beat }; };
@@ -48,11 +52,13 @@ export function reelCast(p, { id, cast, water = false, now = Date.now(), seed = 
     fail('던진 낚싯대를 먼저 끌어올려 주세요.', 409);
   }
   if (Number(r.bait || 0) < 1) fail('미끼가 없어요. 공부하면 미끼를 받아요!', 409);
+  const deep = spot === 'deep';
+  if (deep && !deepOpen(r.rod, ready)) fail(deepReady(ready).length ? `깊은 바다는 낚싯대 ${DEEP.MIN_ROD}단계부터 갈 수 있어요.` : '깊은 바다는 아직 준비 중이에요.', 409);
   r.bait -= 1;
   const tier = CAST_TIERS.includes(cast) ? cast : 'ok';
-  const fish = reelRoll(seed, tier, { water });
+  const fish = reelRoll(seed, tier, { water, deep, ready });
   // V13.154 던질 때의 낚싯대 단계를 남긴다(끌어올릴 때 최소 파이팅 시간을 그만큼 줄여서 본다).
-  r.live = { id, at: now, cast: tier, rod: rodLevel(r.rod), ...fish };
+  r.live = { id, at: now, cast: tier, rod: rodLevel(r.rod), ...(deep ? { spot: 'deep' } : {}), ...fish };
   // 어떤 물고기인지는 보내지 않는다: 등급마다 같은 세기 · 성격만.
   return { id, fight: fightOf(r.live), bait: r.bait };
 }
