@@ -1,6 +1,7 @@
 # 칭호 대기 목록 (나중에 한꺼번에 만들기)
 
 선생님 결정(2026-10-15): 칭호는 바로 만들지 않고 목록만 저장해 뒀다가, 메달 그림과 함께 **한꺼번에** 만든다.
+구성안(키 · 조건 · 등급 · 메달 · 코인): `docs/titles-plan.md`, 메달 그림 주문서 50번(`docs/asset-requests/runner/50-titles-level.txt`).
 만들 때는 `public/modules/titles.js`에 넣고, 메달 그림은 그림 주문서(`docs/asset-requests/runner/`)로 낸다.
 주문서에는 **Drive의 기존 칭호 메달(11 · 25번)을 열어 그림체를 맞추라는 말**과 **정해진 Drive 폴더에 정확한 파일 이름으로 저장하라는 말**을 꼭 넣는다.
 
