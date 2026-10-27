@@ -6,7 +6,7 @@
 **그림 파일만 넣는다. 앱 코드는 고치지 않는다.**
 
 > ⚠️ **이 그림만으로는 새 칭호가 앱에 나오지 않는다.** 칭호 등록(`public/modules/titles.js` TITLES · `emblems.js` TITLE_ART)은 다음 세션에서 코드로 한다. 그림만 먼저 들어와도 앱은 바뀌지 않고 깨지지 않는다(아무 곳에서도 이 파일을 부르지 않는다). 선생님 결정: 칭호는 그림이 오면 코드와 **같이 머지**한다.
-> 펫 수집 칭호(`heropets`)는 다른 세션이 코드에 넣는 중이다. 그 세션의 칭호 key가 이 표와 다르면 파일 이름을 그 key로 맞춰 달라고 PR에 적는다(그림은 그대로 쓴다).
+> 펫 수집 칭호(`epic-collector`)는 V13.182에서 이미 코드에 들어간 칭호다. 파일 이름은 이 key 그대로 쓴다(그림이 오면 emblems.js TITLE_ART에 key만 넣는다).
 
 | 시트 | 칸 | 칭호 key | 이름 | 등급 |
 |---|---|---|---|---|
@@ -21,7 +21,7 @@
 | `51-3` | 왼쪽 위 | `blank7` | 7과 빈칸 목수 | 희귀 |
 | `51-3` | 오른쪽 위 | `gram10` | 어법 감별사 | 희귀 |
 | `51-3` | 왼쪽 아래 | `mlv50` | 밤도깨비 퇴치반 | 영웅 |
-| `51-3` | 오른쪽 아래 | `heropets` | 영웅 수집가 | 영웅 |
+| `51-3` | 오른쪽 아래 | `epic-collector` | 영웅 수집가 | 영웅 |
 
 - 시트와 칸마다 넣을 파일은 `slice-map.csv`에서 `list` 열이 `51-titles-3a.txt`인 줄을 본다. 앱은 `public/assets/titles/<key>.webp` · `<key>-s.webp`를 그대로 찾는다. **key를 바꾸지 않는다.**
 - 메달 **테두리(모양 · 테두리 · 법랑 색)는 등급**이다: 일반 민트 동그라미 · 희귀 파란 육각형 · 영웅 보라 방패 · 전설 금빛 햇살 · 한정 무지개. 같은 등급의 기존 메달과 테두리가 **똑같아야** 한다.
@@ -80,7 +80,7 @@
 R=docs/asset-requests/runner
 node $R/fit-assets.mjs /tmp/art/51-1.png titles/mlv10 titles/mday3 titles/blank1 titles/gram1 --fit-each --small 96 --preview /tmp/review/51-1.png
 node $R/fit-assets.mjs /tmp/art/51-2.png titles/mlv30 titles/boss3 titles/blank5 titles/blank6 --fit-each --small 96 --preview /tmp/review/51-2.png
-node $R/fit-assets.mjs /tmp/art/51-3.png titles/blank7 titles/gram10 titles/mlv50 titles/heropets --fit-each --small 96 --preview /tmp/review/51-3.png
+node $R/fit-assets.mjs /tmp/art/51-3.png titles/blank7 titles/gram10 titles/mlv50 titles/epic-collector --fit-each --small 96 --preview /tmp/review/51-3.png
 ```
 - 칸 이름은 `slice-map.csv`의 `app_file`과 같아야 한다(키가 틀리면 앱이 그림을 못 찾는다).
 - 한 칸이 점검을 통과하지 못하면 그 칸 이름을 `-`로 주어 버리고, 그 메달만 다시 만든다.

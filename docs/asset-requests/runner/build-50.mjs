@@ -6,7 +6,8 @@
 //   CODEX_PROMPT_50.md · 51 · 52. (build-runner.mjs는 26번 이후를 모르므로 돌리지 않는다: slice-map.csv 뒤쪽이 지워진다.)
 // 칭호 key는 구성안의 "키(안)"이다. 지금 칭호(titles.js TITLES)와 key나 이름이 겹치면 멈춘다.
 // 앱 코드는 고치지 않는다: 그림이 들어와도 칭호는 코드 등록(다음 세션: TITLES · TITLE_ART) 전까지 앱에 나오지 않는다.
-// 펫 수집 칭호 3개(heropets · legendowner · petdex)는 다른 세션이 코드에 넣는 중이다. 그 세션의 key가 다르면 여기 key를 바꿔 다시 돌린다.
+// 펫 수집 칭호 3개는 V13.182(전설 알)에서 이미 코드에 들어갔다: key는 epic-collector · legend-owner · epic-dex(그림 없이 SVG 메달).
+// 이 셋은 같은 칭호의 메달이라 TITLES에 있어도 멈추지 않는다(PET_KEYS). 그림이 오면 emblems.js TITLE_ART에 key만 넣는다.
 // slice-map.csv의 prompt_no는 "그때 마지막 번호 다음"이라, 앞 번호(46~49) 주문서가 나중에 들어오면 이 파일을 다시 돌려 번호를 맞춘다.
 import { readFileSync, writeFileSync, mkdirSync, readdirSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -70,7 +71,7 @@ export const MEDALS = [
   { set: 51, key: 'blank7', ko: '7과 빈칸 목수', tier: 'rare', center: 'a little hand saw beside wooden blank word tiles that fit together perfectly.' },
   { set: 51, key: 'gram10', ko: '어법 감별사', tier: 'rare', center: "a jeweler's loupe over one sparkling gem lying among plain grey pebbles." },
   { set: 51, key: 'mlv50', ko: '밤도깨비 퇴치반', tier: 'epic', center: 'a crescent moon with a small paper lantern hanging from it and a tiny cracked horned goblin mask below.' },
-  { set: 51, key: 'heropets', ko: '영웅 수집가', tier: 'epic', center: 'three small pet eggs with amethyst purple spots sitting together in a cozy nest.' },
+  { set: 51, key: 'epic-collector', ko: '영웅 수집가', tier: 'epic', center: 'three small pet eggs with amethyst purple spots sitting together in a cozy nest.' },
   // 52: 영웅 4 · 전설 4
   { set: 52, key: 'blankperfect', ko: '한 번에 딱!', tier: 'epic', center: 'an arrow hitting the exact center of a round target whose bullseye is a blank tile.' },
   { set: 52, key: 'blanks5', ko: '영작 폭주족', tier: 'epic', center: 'a speedy pencil shaped like a racing bike with flame trails behind it.' },
@@ -78,14 +79,15 @@ export const MEDALS = [
   { set: 52, key: 'gram30', ko: '문법 명탐정', tier: 'epic', center: 'a detective deerstalker hat with a magnifying glass leaning against it.' },
   { set: 52, key: 'mlv70', ko: '보스 단톡방 방장', tier: 'legendary', center: 'a speech bubble shaped like a crown, surrounded by four tiny cute monster faces.' },
   { set: 52, key: 'blankall', ko: '빈칸 없는 세상', tier: 'legendary', center: 'a small globe wrapped by a ribbon of blank tiles that are all filled, every puzzle piece in place.' },
-  { set: 52, key: 'legendowner', ko: '전설의 주인', tier: 'legendary', center: 'a glowing golden pet egg on a small velvet cushion with a tiny crown on top.' },
-  { set: 52, key: 'petdex', ko: '도감 마스터', tier: 'legendary', center: 'an open pet encyclopedia book with paw prints on its pages and a golden bookmark ribbon.' }
+  { set: 52, key: 'legend-owner', ko: '전설의 주인', tier: 'legendary', center: 'a glowing golden pet egg on a small velvet cushion with a tiny crown on top.' },
+  { set: 52, key: 'epic-dex', ko: '도감 마스터', tier: 'legendary', center: 'an open pet encyclopedia book with paw prints on its pages and a golden bookmark ribbon.' }
 ];
 
-// key · 이름이 지금 칭호와 겹치면 멈춘다(겹치면 앱이 다른 칭호 그림을 덮어쓴다).
+// key · 이름이 지금 칭호와 겹치면 멈춘다(겹치면 앱이 다른 칭호 그림을 덮어쓴다). 이미 등록된 펫 수집 칭호 3개는 같은 key · 이름이어야 한다.
+const PET_KEYS = ['epic-collector', 'legend-owner', 'epic-dex'];
 {
   const names = new Map(Object.entries(TITLES).map(([k, t]) => [t.name, k]));
-  const bad = MEDALS.filter(m => TITLES[m.key] || names.has(m.ko) || !FRAMES[m.tier] || !TITLE_TIERS[m.tier]);
+  const bad = MEDALS.filter(m => (PET_KEYS.includes(m.key) ? TITLES[m.key]?.name !== m.ko || TITLES[m.key]?.tier !== m.tier : TITLES[m.key] || names.has(m.ko)) || !FRAMES[m.tier] || !TITLE_TIERS[m.tier]);
   if (bad.length || new Set(MEDALS.map(m => m.key)).size !== MEDALS.length) throw new Error('칭호 key · 이름 · 등급 확인: ' + bad.map(m => m.key).join(', '));
 }
 
@@ -122,7 +124,7 @@ function codex(set, list) {
   const tiers = [...new Set(medals.map(m => m.tier))];
   const refRows = tiers.map(t => `| ${tierKo(t)} | ${REPO_REF[t].map(x => `\`${x}\``).join(', ')} |`).join('\n');
   const fit = list.map(s => `node $R/fit-assets.mjs /tmp/art/${s.name}.png ${s.medals.map(m => `titles/${m.key}`).join(' ')} --fit-each --small 96 --preview /tmp/review/${s.name}.png`).join('\n');
-  const pets = medals.filter(m => ['heropets', 'legendowner', 'petdex'].includes(m.key));
+  const pets = medals.filter(m => PET_KEYS.includes(m.key));
   return `# Codex 작업 지시: 그림 ${set} (${S.ko} · 메달 ${medals.length}개 · ${list.length}시트)
 
 ## 목표
@@ -131,7 +133,7 @@ function codex(set, list) {
 **그림 파일만 넣는다. 앱 코드는 고치지 않는다.**
 
 > ⚠️ **이 그림만으로는 새 칭호가 앱에 나오지 않는다.** 칭호 등록(\`public/modules/titles.js\` TITLES · \`emblems.js\` TITLE_ART)은 다음 세션에서 코드로 한다. 그림만 먼저 들어와도 앱은 바뀌지 않고 깨지지 않는다(아무 곳에서도 이 파일을 부르지 않는다). 선생님 결정: 칭호는 그림이 오면 코드와 **같이 머지**한다.
-${pets.length ? `> 펫 수집 칭호(${pets.map(m => `\`${m.key}\``).join(' · ')})는 다른 세션이 코드에 넣는 중이다. 그 세션의 칭호 key가 이 표와 다르면 파일 이름을 그 key로 맞춰 달라고 PR에 적는다(그림은 그대로 쓴다).\n` : ''}
+${pets.length ? `> 펫 수집 칭호(${pets.map(m => `\`${m.key}\``).join(' · ')})는 V13.182에서 이미 코드에 들어간 칭호다. 파일 이름은 이 key 그대로 쓴다(그림이 오면 emblems.js TITLE_ART에 key만 넣는다).\n` : ''}
 | 시트 | 칸 | 칭호 key | 이름 | 등급 |
 |---|---|---|---|---|
 ${rows}
