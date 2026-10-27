@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>발명가 인터뷰 수행평가</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #1f3a5f;
+    --navy-soft: #e8eef6;
+    --accent: #c8553d;
+    --accent-soft: #fbece8;
+    --green: #2f7d4f;
+    --green-soft: #e6f3ec;
+    --amber: #a36a00;
+    --amber-soft: #fdf3dc;
+    --ink: #1d2430;
+    --muted: #5b6574;
+    --line: #d9dee6;
+  }
+  @page { size: A4; margin: 12mm 14mm 12mm 14mm; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: 'Noto Sans KR', sans-serif;
+    color: var(--ink);
+    font-size: 10pt;
+    line-height: 1.45;
+    background: #fff;
+    word-break: keep-all;
+  }
+  .header {
+    border-bottom: 3px solid var(--navy);
+    padding-bottom: 6px;
+    margin-bottom: 8px;
+  }
+  .header .course {
+    color: var(--accent);
+    font-weight: 700;
+    font-size: 9.5pt;
+    letter-spacing: 0.02em;
+  }
+  .header h1 {
+    margin: 2px 0 0;
+    font-size: 18pt;
+    font-weight: 900;
+    color: var(--navy);
+    letter-spacing: -0.01em;
+  }
+  .header .sub { color: var(--muted); font-size: 9.5pt; margin-top: 2px; }
+
+  h2 {
+    font-size: 12pt;
+    color: var(--navy);
+    margin: 11px 0 6px;
+    padding-left: 9px;
+    border-left: 5px solid var(--accent);
+    line-height: 1.3;
+  }
+  .info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 7px 12px;
+    break-inside: avoid;
+  }
+  .card .label {
+    font-size: 8.5pt;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+  .card .big { font-size: 13pt; font-weight: 700; color: var(--navy); }
+  .card .note { font-size: 8.8pt; color: var(--muted); margin-top: 3px; }
+
+  .pick { font-weight: 900; color: var(--navy); font-size: 11pt; }
+  .pick .ko { font-weight: 400; margin-left: 6px; }
+  .reason .row {
+    display: grid;
+    grid-template-columns: 64px 1fr;
+    gap: 8px;
+    padding: 5px 0;
+    border-top: 1px dashed var(--line);
+  }
+  .reason .row:first-of-type { border-top: none; }
+  .tag {
+    display: inline-block;
+    font-size: 8pt;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: var(--navy-soft);
+    color: var(--navy);
+    height: fit-content;
+    text-align: center;
+  }
+  .en { font-weight: 700; font-size: 10.8pt; }
+  .ko { color: var(--muted); font-size: 9.2pt; }
+  .wc {
+    font-size: 7.8pt;
+    color: var(--muted);
+    font-weight: 500;
+    white-space: nowrap;
+    margin-left: 4px;
+  }
+
+  .talk {
+    background: #f6f8fb;
+    border-radius: 8px;
+    padding: 6px 12px;
+    margin: 6px 0;
+    break-inside: avoid;
+  }
+  .talk p { margin: 2px 0; }
+  .who { font-weight: 700; color: var(--navy); margin-right: 4px; }
+
+  .qa {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    margin: 6px 0;
+    overflow: hidden;
+    break-inside: avoid;
+  }
+  .qa .q {
+    background: var(--navy);
+    color: #fff;
+    padding: 4px 12px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .qa .q .part {
+    font-size: 7.8pt;
+    background: rgba(255,255,255,0.18);
+    padding: 1px 7px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+  .qa .q.extra { background: var(--accent); }
+  .qa .a { padding: 5px 12px 6px; }
+  .qa .a .en { font-size: 11pt; }
+  .qa .a .en b { color: var(--accent); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.4pt;
+    break-inside: avoid;
+  }
+  th, td {
+    border-bottom: 1px solid var(--line);
+    padding: 4px 8px;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--navy-soft);
+    color: var(--navy);
+    font-weight: 700;
+    font-size: 9pt;
+  }
+  .ok, .check {
+    display: inline-block;
+    font-size: 8.3pt;
+    font-weight: 700;
+    padding: 1px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+  }
+  .ok { background: var(--green-soft); color: var(--green); }
+  .check { background: var(--amber-soft); color: var(--amber); }
+
+  .chunk { margin: 3px 0; font-size: 10pt; }
+  .chunk .slash { color: var(--accent); font-weight: 700; padding: 0 3px; }
+  .chunk .num { font-weight: 700; color: var(--navy); margin-right: 5px; }
+
+  .callout {
+    background: var(--amber-soft);
+    border-left: 4px solid var(--amber);
+    border-radius: 6px;
+    padding: 9px 12px;
+    font-size: 9.6pt;
+    break-inside: avoid;
+  }
+  .callout b { color: var(--amber); }
+  .callout ol { margin: 4px 0 0; padding-left: 18px; }
+
+  .page-break { break-before: page; }
+  .footnote { font-size: 8.3pt; color: var(--muted); margin-top: 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips span { background: var(--navy-soft); border-radius: 12px; padding: 3px 10px; font-size: 9.4pt; }
+  .chips b { color: var(--navy); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="course">2026 2학기 공통영어2 · 발명가 인터뷰 하기 수행평가</div>
+  <h1>Inventor Interview: The Airplane Seat Belt</h1>
+  <div class="sub">발명가가 되었다고 가정하고 쓴 인터뷰 영작 (최종 점검본)</div>
+</div>
+
+<h2>발명품 · 발명가 · 선정 이유</h2>
+<div class="card reason">
+  <div class="row">
+    <span class="tag">발명품</span>
+    <div>
+      <div class="pick">Airplane Seat Belt <span class="ko">비행기 안전벨트</span></div>
+      <div class="en">I chose the airplane seat belt because it is simple but saves many lives.<span class="wc">14 words</span></div>
+      <div class="ko">단순하지만 많은 생명을 구하는 발명품이라서 선택했어요.</div>
+    </div>
+  </div>
+  <div class="row">
+    <span class="tag">발명가</span>
+    <div>
+      <div class="pick">Benjamin Foulois <span class="ko">1910년대 미 육군 조종사. 가죽 끈으로 몸을 좌석에 고정했고, 항공기 안전벨트를 처음 도입한 인물 중 하나로 꼽혀요.</span></div>
+      <div class="en">I chose Benjamin Foulois because he solved a real problem from his own experience.<span class="wc">14 words</span></div>
+      <div class="ko">자신이 직접 겪은 문제를 해결한 사람이라서 선택했어요.</div>
+    </div>
+  </div>
+</div>
+
+<h2>인터뷰 스크립트</h2>
+
+<div class="talk">
+  <p><span class="who">Interviewer:</span> Hello, Mr. Foulois. Thank you for joining us today.</p>
+  <p><span class="who">Foulois:</span> Thank you for having me. I'm happy to be here.</p>
+</div>
+
+<div class="qa">
+  <div class="q"><span class="part">1 · 발명 동기</span> Q1. Why did you invent the airplane seat belt?</div>
+  <div class="a">
+    <div class="en">I invented the airplane seat belt because I didn't <b>want</b> pilots <b>to fall</b> out of planes.<span class="wc">16 words</span></div>
+    <div class="ko">조종사들이 비행기 밖으로 떨어지지 않기를 바라서 비행기 안전벨트를 발명했어요.</div>
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q"><span class="part">2 · 기능</span> Q2. What does your invention do?</div>
+  <div class="a">
+    <div class="en">My seat belt <b>keeps</b> passengers <b>safe</b> in their seats and <b>reduces injuries</b> from sudden turbulence.<span class="wc">15 words</span></div>
+    <div class="ko">제 안전벨트는 승객을 좌석에 안전하게 고정하고 갑작스러운 난기류로 인한 부상을 줄여 줘요.</div>
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q"><span class="part">3 · 어려움 극복</span> Q3. What difficulty did you face, and how did you overcome it?</div>
+  <div class="a">
+    <div class="en">I <b>almost fell</b> out, so I <b>tied</b> myself <b>to</b> the seat with a leather strap.<span class="wc">15 words</span></div>
+    <div class="ko">비행기 밖으로 떨어질 뻔해서 가죽 끈으로 몸을 좌석에 묶었어요.</div>
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q"><span class="part">4 · 미래와 영향</span> Q4. How will your invention change the future?</div>
+  <div class="a">
+    <div class="en">Seat belts <b>make</b> flying <b>safer</b>, and future sensors <b>may</b> check <b>if</b> people wear them correctly.<span class="wc">15 words</span></div>
+    <div class="ko">안전벨트는 비행을 더 안전하게 해 주고, 미래에는 센서가 제대로 맸는지 확인해 줄 수도 있어요.</div>
+  </div>
+</div>
+
+<div class="qa">
+  <div class="q extra"><span class="part">5 · 추가 질문</span> Q5. Why are seat belts so important?</div>
+  <div class="a">
+    <div class="en">Seat belts are necessary <b>because</b> passengers can get badly hurt <b>when</b> turbulence happens.<span class="wc">13 words</span></div>
+    <div class="ko">난기류가 생기면 승객들이 크게 다칠 수 있어서 안전벨트는 꼭 필요해요.</div>
+  </div>
+</div>
+
+<div class="talk">
+  <p><span class="who">Interviewer:</span> Thank you for your time.</p>
+  <p><span class="who">Foulois:</span> My pleasure.</p>
+</div>
+
+<p class="footnote">※ 1~4번 부분 이름은 내용을 보고 붙인 것이에요. 유인물에 있는 항목 이름과 질문 틀(sentence frame)에 맞춰 조정하세요.</p>
+
+<div class="page-break"></div>
+
+<h2>공지문 기준 최종 점검</h2>
+<table>
+  <tr><th style="width:30%">항목</th><th>점검 내용</th><th style="width:15%">결과</th></tr>
+  <tr><td>발명가 입장에서 답변</td><td>발명가가 되었다고 가정하고 답했어요. 발명품 기능을 설명하는 A4·A5도 괜찮아요.</td><td><span class="ok">충족</span></td></tr>
+  <tr><td>다섯 문장 이상</td><td>1~4번 부분에 각 한 문장씩, 5번 추가 질문/답까지 모두 5문장이에요.</td><td><span class="ok">충족</span></td></tr>
+  <tr><td>인터뷰 형식</td><td>인사 → 질문·답변 5개 → 마무리 인사 순서예요.</td><td><span class="ok">충족</span></td></tr>
+  <tr><td>발명품·발명가 선정 이유</td><td>두 가지 이유를 모두 영어 문장으로 썼어요.</td><td><span class="ok">충족</span></td></tr>
+  <tr><td>적절한 어휘</td><td>turbulence, injuries, leather strap, passengers, necessary</td><td><span class="ok">충족</span></td></tr>
+  <tr><td>적절한 언어 형식</td><td>want A to, keep A safe, make A 비교급, may, check if, because/when</td><td><span class="ok">충족</span></td></tr>
+  <tr><td>계획서 양식</td><td>선정 이유는 준비됐어요. 학교 계획서 양식의 다른 칸은 직접 확인해야 해요.</td><td><span class="check">확인 필요</span></td></tr>
+  <tr><td>유인물 sentence frame</td><td>유인물을 보지 못했어요. 질문·답변 틀이 유인물과 맞는지 확인하세요.</td><td><span class="check">확인 필요</span></td></tr>
+</table>
+
+<h2>언어 형식 포인트</h2>
+<table>
+  <tr><th style="width:30%">표현</th><th style="width:30%">뜻</th><th>문장 속 예시</th></tr>
+  <tr><td><b>want A to + 동사원형</b></td><td>A가 ~하기를 원하다</td><td>A1 · didn't want pilots to fall</td></tr>
+  <tr><td><b>keep A + 형용사</b></td><td>A를 ~한 상태로 유지하다</td><td>A2 · keeps passengers safe</td></tr>
+  <tr><td><b>almost + 과거동사</b></td><td>거의 ~할 뻔했다</td><td>A3 · I almost fell out</td></tr>
+  <tr><td><b>tie A to B</b></td><td>A를 B에 묶다</td><td>A3 · tied myself to the seat</td></tr>
+  <tr><td><b>make A + 비교급</b></td><td>A를 더 ~하게 만들다</td><td>A4 · make flying safer</td></tr>
+  <tr><td><b>may / check if ~</b></td><td>~할 수도 있다 / ~인지 확인하다</td><td>A4 · may check if people wear them</td></tr>
+  <tr><td><b>because / when</b></td><td>~ 때문에 / ~할 때</td><td>A1 · A5</td></tr>
+</table>
+
+<h2>말하기 연습: 끊어 읽기</h2>
+<div class="card">
+  <div class="chunk"><span class="num">A1</span>I invented the airplane seat belt <span class="slash">/</span> because I didn't want pilots <span class="slash">/</span> to fall out of planes.</div>
+  <div class="chunk"><span class="num">A2</span>My seat belt keeps passengers safe in their seats <span class="slash">/</span> and reduces injuries <span class="slash">/</span> from sudden turbulence.</div>
+  <div class="chunk"><span class="num">A3</span>I almost fell out, <span class="slash">/</span> so I tied myself to the seat <span class="slash">/</span> with a leather strap.</div>
+  <div class="chunk"><span class="num">A4</span>Seat belts make flying safer, <span class="slash">/</span> and future sensors may check <span class="slash">/</span> if people wear them correctly.</div>
+  <div class="chunk"><span class="num">A5</span>Seat belts are necessary <span class="slash">/</span> because passengers can get badly hurt <span class="slash">/</span> when turbulence happens.</div>
+</div>
+
+<h2>발음 주의 단어</h2>
+<div class="chips">
+  <span><b>turbulence</b> [터뷸런스]</span>
+  <span><b>injuries</b> [인저리즈]</span>
+  <span><b>leather</b> [레더]</span>
+  <span><b>passengers</b> [패신저즈]</span>
+  <span><b>necessary</b> [네서세리]</span>
+</div>
+
+<h2>제출 전 할 일</h2>
+<div class="callout">
+  <ol>
+    <li><b>유인물 sentence frame</b>과 질문·답변 틀 맞추기</li>
+    <li><b>계획서 양식</b>의 빈칸 모두 채우기</li>
+    <li>문장마다 <b>뜻을 이해하고</b> 소리 내어 3번 이상 읽기</li>
+    <li>활동 시간 <b>20분</b> 안에 쓸 수 있게 미리 외우기</li>
+  </ol>
+</div>
+<p class="footnote">※ 공지문: 생성형 AI·번역기 사용은 가능하지만 "인간지능"으로 최종 점검할 것.</p>
+
+</body>
+</html>
