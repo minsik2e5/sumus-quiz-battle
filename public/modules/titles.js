@@ -39,6 +39,8 @@
 // Limited titles belong to one week: they are held only while last week's result stands.
 // V13.148 `once`: 한정 테두리지만 주간 칭호가 아닌 것(신화의 주인): 한 번 받으면 계속 갖고, 코인도 한 번만.
 
+import { EPIC_PET_KEYS, LEGEND_EGG_EPIC_NEED } from './core.js';
+
 export const TITLE_TIERS = {
   common: { name: '일반', order: 1 },
   rare: { name: '희귀', order: 2 },
@@ -194,6 +196,13 @@ Object.assign(TITLES, {
   monster50: { name: '몬스터 퇴치 전문가', tier: 'epic', group: 'monster', stat: 'monster_wins', goal: 50, icon: 'target', how: '몬스터 50번 처치', desc: '몬스터 퇴치라면 맡겨 주세요.' },
   monster100: { name: '몬스터 킬러', tier: 'legendary', group: 'monster', stat: 'monster_wins', goal: 100, icon: 'sword', how: '몬스터 100번 처치', desc: '백 마리의 몬스터를 쓰러뜨렸어요.' },
   boss10: { name: '보스 슬레이어', tier: 'legendary', group: 'monster', stat: 'boss_wins', goal: 10, icon: 'crown', how: '보스 몬스터(5레벨마다) 10번 처치', desc: '보스만 골라 잡는 슬레이어.' }
+});
+// V13.182 전설 알 칭호(docs/legend-egg-design.md). 메달 그림은 아직 없어 SVG 메달(그림이 오면 emblems.js TITLE_ART에 키만 넣는다).
+// 도감 마스터는 영웅 펫 전부(EPIC_PET_KEYS): 영웅 펫이 늘면 기준도 따라 늘어난다.
+Object.assign(TITLES, {
+  'epic-collector': { name: '영웅 수집가', tier: 'epic', group: 'collect', stat: 'epic_pets', goal: LEGEND_EGG_EPIC_NEED, icon: 'shield', how: `영웅 펫 ${LEGEND_EGG_EPIC_NEED}마리 만나기`, desc: '영웅들이 모여 전설 알을 데려왔어요.' },
+  'legend-owner': { name: '전설의 주인', tier: 'legendary', group: 'collect', stat: 'legend_egg', goal: 1, icon: 'wing', how: '전설 알 보상 받기(전설 알을 열거나, 이미 전설 펫이 있어 대신 받는 보상)', desc: '전설 알의 주인이 되었어요.' },
+  'epic-dex': { name: '도감 마스터', tier: 'legendary', group: 'collect', stat: 'epic_pets', goal: EPIC_PET_KEYS.length, icon: 'book', how: '영웅 펫 모두 만나기', desc: '영웅 도감을 빈칸 없이 채웠어요.' }
 });
 // V13.180 10초 맞추기 칭호(놀이터). 서버가 시간을 믿은 판(순위에 들어가는 판)만 센다. 메달 그림은 아직 없어 SVG 메달.
 Object.assign(TITLES, {

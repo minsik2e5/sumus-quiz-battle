@@ -17,7 +17,7 @@ export const CLAW = {
   DROPS: 3,                    // 한 판 집게 수
   R: 0.085,                    // 인형 반지름(바닥 좌표 0~1 기준)
   AIM: { perfect: 0.35, good: 0.7, edge: 1 }, // 집게 중심 ~ 인형 중심 거리 ÷ R
-  GRAB: { perfect: 38, good: 26, edge: 10 },  // 잡힐 확률(%)
+  GRAB: { perfect: 38, good: 26, edge: 10 },  // 잡힐 확률(%). V13.183에서 낮췄다가 선생님 결정으로 그대로 둔다
   PITY: 5, PITY_MAX: 20,       // 닿았는데 놓칠 때마다 다음 집게 +5%p(최대 +20, edge는 절반). 뽑으면 0
   GOLD_ROUND: 25,              // 판마다 황금 인형이 1개 있을 확률(%), 맨 위층
   GOLD_X: 0.5,                 // 황금 인형 잡힐 확률 배수
