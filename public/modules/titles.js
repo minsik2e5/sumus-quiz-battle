@@ -34,6 +34,7 @@
 //                다시 한 판, legend_pets · mythic_pets · season_pets 전설 · 신화 · 한정 펫 수, eggs 상점 알을 연 수,
 //                care 펫 교감(쓰다듬기 · 밥) 수, lucky_best_day 코인 뽑기 3배가 하루에 가장 많이 나온 수, boss_wins 보스 몬스터 처치
 //   V13.168 zodiac_pets 만난 12지 펫 수(core.js ZODIAC_PET_KEYS)
+//   V13.180 timing_perfect 10초 맞추기 완벽 수, timing_hard 하드 완벽 수, timing_streak 최고 연속 완벽(server/timing.mjs p.timing)
 // Limited titles belong to one week: they are held only while last week's result stands.
 // V13.148 `once`: 한정 테두리지만 주간 칭호가 아닌 것(신화의 주인): 한 번 받으면 계속 갖고, 코인도 한 번만.
 
@@ -186,6 +187,12 @@ Object.assign(TITLES, {
   monster50: { name: '몬스터 퇴치 전문가', tier: 'epic', group: 'monster', stat: 'monster_wins', goal: 50, icon: 'target', how: '몬스터 50번 처치', desc: '몬스터 퇴치라면 맡겨 주세요.' },
   monster100: { name: '몬스터 킬러', tier: 'legendary', group: 'monster', stat: 'monster_wins', goal: 100, icon: 'sword', how: '몬스터 100번 처치', desc: '백 마리의 몬스터를 쓰러뜨렸어요.' },
   boss10: { name: '보스 슬레이어', tier: 'legendary', group: 'monster', stat: 'boss_wins', goal: 10, icon: 'crown', how: '보스 몬스터(5레벨마다) 10번 처치', desc: '보스만 골라 잡는 슬레이어.' }
+});
+// V13.180 10초 맞추기 칭호(놀이터). 서버가 시간을 믿은 판(순위에 들어가는 판)의 완벽만 센다. 메달 그림은 아직 없어 SVG 메달.
+Object.assign(TITLES, {
+  'timing-clock': { name: '시계 장인', tier: 'rare', group: 'arcade', stat: 'timing_perfect', goal: 10, icon: 'target', how: '10초 맞추기 완벽(±0.05초) 10번', desc: '째깍째깍, 머릿속에 시계가 있어요.' },
+  'timing-blind': { name: '눈 감고도 10초', tier: 'epic', group: 'arcade', stat: 'timing_hard', goal: 1, icon: 'star', how: '10초 맞추기 하드에서 완벽', desc: '숫자를 안 봐도 시간이 보여요.' },
+  'timing-human': { name: '인간 초시계', tier: 'legendary', group: 'arcade', stat: 'timing_streak', goal: 3, icon: 'crown', how: '10초 맞추기 완벽 3번 연속', desc: '세 번 연속 0.05초 안. 초시계가 울고 가요.' }
 });
 // V13.67: titles that came out of the capsule machine. V13.68 retired the machine: they stay
 // with the students who have them and are not shown to anyone else (`retired`).
