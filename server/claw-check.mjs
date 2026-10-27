@@ -180,7 +180,7 @@ export async function runClawChecks(assert) {
       && !clawOpen(new Set(DOLL_KEYS), new Set(['machine'])), 'V13.180 그림 게이트: 기계 · 집게 그림과 인형 6종 이상이 있어야 열린다');
     assert(CLAW_DOLLS.size === 12 && clawOpen() && CLAW_ART.has('entry') && !CLAW_ART.has('preview-42'), 'V13.180 지금 그림(주문서 42 ~ 45)이 다 들어와 있다(미리보기 그림은 앱에 넣지 않는다)');
     const build = source('./build-assets.mjs'), games = source('../public/modules/arcade-games.js');
-    assert(build.includes("public/modules/claw-art.js") && build.includes("['', '-grab', '-fall', '-joy'].every") && build.includes('"v13180.css"'), 'V13.180 build:assets가 그림 폴더를 보고 claw-art.js를 만든다');
+    assert(build.includes("public/modules/claw-art.js") && build.includes("['', '-grab', '-fall', '-joy'].every") && build.includes('"v13181.css"'), 'V13.180 build:assets가 그림 폴더를 보고 claw-art.js를 만든다');
     const { clawCard } = await import('../public/modules/arcade-games.js');
     const html = clawCard({ data: { rewards: { claw: { open: false, tickets: 2, kinds: 3, all: 12 } } } }, {});
     assert(html.includes('곧 열려요') && html.includes('disabled') && !html.includes('/assets/claw/entry.webp') && games.includes('${clawCard(A, art)}'),
@@ -217,13 +217,13 @@ export async function runClawChecks(assert) {
     assert(JSON.stringify(rest).length <= 600 && !('claw' in publicProfile(me)), `V13.180 저장 크기: p.claw 영수증 빼고 ${JSON.stringify(rest).length}바이트(600 이하), publicProfile에 없음`);
     assert(clawActivityText({ won: [{ k: 'rabbit', g: 0 }, { k: 'dragon', g: 1 }], drops: 3 }) === '인형뽑기 2개 (토끼 · 황금 용)' && clawActivityText({ won: [], drops: 3 }) === '인형뽑기 꽝(집게 3번)', 'V13.180 활동 기록 문구');
     const svc = source('./service.mjs');
-    assert(svc.includes("logActivity(p, 'claw', clawActivityText(res.summary), now)") && svc.includes("'games', 'claw', 'reel', 'hunt', 'blank']") && svc.includes('clawPreviewFill(preview);'),
+    assert(svc.includes("logActivity(p, 'claw', clawActivityText(res.summary), now)") && svc.includes("'games', 'claw', 'reel', 'hunt', 'blank'") && svc.includes('clawPreviewFill(preview);'),
       'V13.180 활동 기록 · 로그인 때 기록 지키기 · 교사 미리보기 집게권');
   }
 
   /* ---------- 화면 ---------- */
   {
-    const ui = source('../public/modules/claw.js'), app = source('../public/app.js'), css = source('../public/v13180.css'), seed = source('./test-seed.mjs');
+    const ui = source('../public/modules/claw.js'), app = source('../public/app.js'), css = source('../public/v13181.css'), seed = source('./test-seed.mjs');
     assert(ui.includes("api('/claw/start'") && ui.includes("api('/claw/drop'") && ui.includes('clawPic(\'grip\', doll)') && ui.includes('function prizeOut(') && ui.includes('function slipLift(')
       && ui.includes('function bindStick()') && ui.includes("e.key === ' ' || e.key === 'Enter'") && ui.includes('function book()') && ui.includes('function toggleZoom()'),
       'V13.180 화면: 서버 판정을 받아 연출(쥠 뒤 · 앞 발톱 층, 상품 문, 놓침), 조이스틱 · 키보드, 도감, 확대');

@@ -24,6 +24,7 @@ import { partyCreateModal, openPartyTv } from './modules/party-tv.js';
 import { openReel } from './modules/reel.js';
 import { openHunt } from './modules/hunt.js';
 import { openClaw } from './modules/claw.js';
+import { openTiming } from './modules/timing.js';
 import { arcadeWords, wordsLabel, openWordsSheet, partyCode } from './modules/arcade-games.js';
 import { openMatchGame } from './modules/match-game.js';
 import { openPartyJoin } from './modules/party.js';
@@ -993,6 +994,7 @@ $('#app').addEventListener('click', async event => {
     // V13.162 놀이터 몬스터 사냥.
     if (d.action === 'claw-open') { window.scrollTo(0, 0); return openClaw(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     if (d.action === 'hunt-open') { window.scrollTo(0, 0); return openHunt(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
+    if (d.action === 'timing-open') { window.scrollTo(0, 0); return openTiming(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     if (d.action === 'reel-open') { window.scrollTo(0, 0); return openReel(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     // V13.91 나 메뉴판: 어려운 단어 opens 단어 학습 on the ★ words; 알림 scrolls to its settings.
     if (d.action === 'me-stars') { A.tab = 'practice'; A.studyView = 'vocab'; A.memorizeFilter = 'starred'; savePreferences(); render(); window.scrollTo(0, 0); return; }

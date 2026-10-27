@@ -20,6 +20,7 @@ export const ACTIVITY_MODES = {
   blank: { label: '빈칸영작', icon: '✍️' },
   fish: { label: '낚시', icon: '🎣' },
   match: { label: '짝 맞추기', icon: '🃏' },
+  timing: { label: '10초 맞추기', icon: '⏱️' },
   dungeon: { label: '던전', icon: '🏰' },
   treasure: { label: '보물 사냥', icon: '💰' },
   classfish: { label: '반 낚시', icon: '🐟' },

@@ -1,6 +1,6 @@
 # 인형뽑기 구성안 (놀이터 새 게임)
 
-> 그림 주문서는 **42 · 43 · 44 · 45**(`docs/asset-requests/runner/build-42.mjs`가 만든다). **V13.180에서 구현했다**(선생님: "추천안으로 가자"): 규칙 `public/modules/claw-rules.js`, 서버 `server/claw.mjs`, 화면 `public/modules/claw.js` · `public/v13180.css`, 검사 `server/claw-check.mjs`. 소리는 기존 효과음으로 먼저 연결했다(전용 합성음은 §10의 다음 작업).
+> 그림 주문서는 **42 · 43 · 44 · 45**(`docs/asset-requests/runner/build-42.mjs`가 만든다). **V13.181에서 구현했다**(선생님: "추천안으로 가자"): 규칙 `public/modules/claw-rules.js`, 서버 `server/claw.mjs`, 화면 `public/modules/claw.js` · `public/v13181.css`, 검사 `server/claw-check.mjs`. 소리는 기존 효과음으로 먼저 연결했다(전용 합성음은 §10의 다음 작업).
 
 선생님이 보여 준 두 게임(민트 등각 "ZOO PARTY" 인형뽑기, 분홍 3D 토이크레인)의 좋은 점을 합친다.
 

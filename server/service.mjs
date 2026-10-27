@@ -36,12 +36,14 @@ import { settleDungeonRecords, dungeonBoardsView, dungeonLastView } from './dung
 import packageInfo from '../package.json' with { type: 'json' };
 import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend, reelSeaPet, reelRodUp } from './reel.mjs';
 import { blankStart, blankFinish, blankView } from './blank.mjs';
+import { grantTimingPlay, timingView, timingPing, timingStart, timingFinish, timingBoard, timingLine } from './timing.mjs';
 import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow, huntSell, huntCoins, huntSpend, huntBerryQuiz, huntBerryAnswer } from './hunt.mjs';
 import { grantClaw, clawView, clawStart, clawDrop, clawGuideSeen, clawPreviewFill, clawActivityText } from './claw.mjs';
 import { HUNT, HUNT_MONSTERS } from '../public/modules/hunt-rules.js';
 import { CLAW } from '../public/modules/claw-rules.js';
 import { FISH } from '../public/modules/fishing-rules.js';
 import { REEL } from '../public/modules/reel-rules.js';
+import { TIMING } from '../public/modules/timing-rules.js';
 import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './games.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
 import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, partyPlaysLeft, settleParty, partyReportPending, undoParty } from './party.mjs';
@@ -1216,7 +1218,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } else if (process.env.AUTH_PROVIDER === 'supabase') {
       const result = await supabaseLogin(username, password); p = result.profile; supabaseAccessToken = result.accessToken;
       const old = state.profiles.find(x => x.id === p.id);
-      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live', 'bonus', 'streak_guard', 'games', 'claw', 'reel', 'hunt', 'blank'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
+      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live', 'bonus', 'streak_guard', 'games', 'claw', 'reel', 'hunt', 'blank', 'timing'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
       else state.profiles.push(p);
     } else {
       p = localProfile;
@@ -1320,7 +1322,7 @@ export async function service(state, method, path, body, token, options = {}) {
       class_league: teacher && selectedSchool ? classLeague(state, competition, selectedSchool, now) : null,
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), blank: p.role === 'student' ? blankView(p, now) : null },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now), blank: p.role === 'student' ? blankView(p, now) : null },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -1679,10 +1681,12 @@ export async function service(state, method, path, body, token, options = {}) {
     // V13.162: 출석하면 펫 사냥 공 1개, 도장판(7칸)을 HUNT.GOLD_CARDS장 채우면 황금 공 1개.
     const ball = grantBall(p, 'attend', { now });
     const goldBall = done.tickets > 0 && huntCard(p);
-    // V13.180: 출석하면 인형뽑기 집게권 1장(하루 1장, 보관 6장).
+    // V13.181: 출석하면 인형뽑기 집게권 1장(하루 1장, 보관 6장).
     const clawTicket = grantClaw(p, 'attend', { now });
+    // V13.180: 출석하면 10초 맞추기 한 판 더(하루 1번).
+    const timingPlay = grantTimingPlay(p, 'attend', now);
     logActivity(p, 'attend', `출석 · 연속 ${p.attendance?.streak || 1}일`, now);
-    return { ...done, streak_guard: guard, bait, ball, gold_ball: goldBall, claw_ticket: clawTicket, reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
+    return { ...done, streak_guard: guard, bait, ball, gold_ball: goldBall, claw_ticket: clawTicket, timing_play: timingPlay, reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now), points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
   }
   // V13.149 연속 학습 보호권 사기(최대 STREAK_GUARD.MAX장).
   if (path === '/shop/streak-guard' && method === 'POST') {
@@ -1934,6 +1938,31 @@ export async function service(state, method, path, body, token, options = {}) {
     const spend = reelSpend(p, item, now);
     spend();
     return { ...hatchEgg(state, p, { epic, season: null, missing, price: 0 }), reel: reelView(p, now) };
+  }
+  // V13.180 10초 맞추기(놀이터, server/timing.mjs): ping(쓰기 없음) → 시작(판을 쓰고 서버 시각) → 끝(서버가 시간을 확인하고 보상) · 순위.
+  if (path === '/timing/ping' && method === 'POST') {
+    requireRole(p, 'student');
+    return timingPing(Date.now());
+  }
+  if (path === '/timing/start' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
+    const now = Date.now();
+    // 화면이 만든 판 번호(다시 보내도 판을 한 번만 쓴다).
+    const playId = /^[a-z0-9-]{8,40}$/i.test(String(body.id || '')) ? String(body.id) : null;
+    if (!playId) fail('판 번호를 확인해 주세요.');
+    const res = timingStart(p, { id: playId, target: Number(body.target ?? TIMING.TARGET), echo: body.echo ?? null, now });
+    return { ...res, timing: timingView(p, now) };
+  }
+  if (path === '/timing/finish' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now(), res = timingFinish(p, { id: str(body.id, 40), result: str(body.result, 10) || 'press', ms: body.ms, pet: activePetKey(state, p.id), now });
+    if (!res.again) logActivity(p, 'timing', timingLine(res), now);
+    return { ...res, timing: timingView(p, now), ...(res.coins || res.xp ? { points_balance: coinBalance(state, p), stats: stats(state, p) } : {}) };
+  }
+  if (path === '/timing/board' && method === 'GET') {
+    requireRole(p, 'student');
+    return timingBoard(state.profiles, p, { kind: str(body.kind, 10), now: Date.now(), ranked: isRankedStudent, hidden: isPrivate });
   }
   // V13.162 펫 사냥(놀이터): 지도 · 만나기 · 던지기(server/hunt.mjs). 지도는 열 때 서버가 만든다(몇 시간마다 바뀜).
   if (path === '/hunt/home' && method === 'POST') {
@@ -3241,8 +3270,10 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false, stal
   if (complete && student && answerRecords.length >= REEL.BAIT_MIN_PRACTICE && grantBait(student, finalizedAt)) x.bait = true;
   // V13.162: 같은 조건으로 펫 사냥 공 1개(하루 1번). 만점이면 가끔 좋은 공.
   if (complete && student && answerRecords.length >= HUNT.MIN_PRACTICE) { const ball = grantBall(student, 'practice', { lucky: perfect, now: finalizedAt }); if (ball) x.ball = ball; }
-  // V13.180: 같은 조건으로 인형뽑기 집게권 1장(하루 1장).
+  // V13.181: 같은 조건으로 인형뽑기 집게권 1장(하루 1장).
   if (complete && student && answerRecords.length >= CLAW.MIN_PRACTICE && grantClaw(student, 'practice', { now: finalizedAt })) x.claw_ticket = true;
+  // V13.180: 같은 조건으로 10초 맞추기 한 판 더(하루 1번).
+  if (complete && student && answerRecords.length >= TIMING.MIN_PRACTICE) grantTimingPlay(student, 'practice', finalizedAt);
 }
 // V13.149 되살리기: 연속이 어제 끊겼으면(보호권이 없어서) 오늘 끝까지 푼 연습이 모두 REPAIR_NEED문제를 넘을 때 어제를 잇는다.
 function repairStreak(state, p, now) {
