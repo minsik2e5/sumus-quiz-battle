@@ -94,6 +94,11 @@ export const TITLE_ART = new Set([
   'streak100', 'attend200', 'attend365', 'study300', 'words5000', 'combo50', 'perfect100', 'event10', 'eventlover', 'away1',
   'away10', 'rematch10', 'comeback5', 'win200', 'skill100', 'legend1', 'mythic1', 'pets12', 'pets20', 'pets30',
   'seasonall', 'egg10', 'egg50', 'gift5', 'petcare30', 'lucky2', 'rps50', 'monster50', 'monster100', 'boss10',
+  // V13.184 칭호 3탄 25개(그림 50 · 51 · 52)와 전설 알 칭호 3개(그림 51-3 · 52-2)
+  'level65', 'level70', 'level75', 'level80', 'level85', 'level90', 'level95', 'level100',
+  'mlv10', 'mday3', 'mlv30', 'boss3', 'mlv50', 'mlv70',
+  'blank1', 'blank5', 'blank6', 'blank7', 'blankperfect', 'blanks5', 'blankall',
+  'gram1', 'gram10', 'gramclean', 'gram30', 'epic-collector', 'legend-owner', 'epic-dex',
   // V13.168 12지 수호자(그림 36d): 메달 그림이 들어오면(build:assets → pet-art.js) 자동으로 쓴다.
   ...PET_TITLE_ART
 ]);
@@ -101,10 +106,13 @@ export function titleEmblem(key, opts = {}) {
   const k = TITLES[key] ? key : 'rookie', t = TITLES[k];
   const locked = !!(opts.locked || opts.preview), size = opts.size || 'md';
   const big = size !== 'sm';
-  const pic = TITLE_ART.has(k)
-    ? `<img class="tt-art" src="/assets/titles/${k}${big ? '' : '-s'}.webp" alt="" width="${big ? 256 : 96}" height="${big ? 256 : 96}" decoding="async" draggable="false">`
+  // V13.184: `art`는 다른 칭호의 메달 그림을 빌려 쓰고(Lv.105부터 level100 메달), `num`은 메달 앞판에 쓰는 숫자다.
+  const a = t.art && TITLE_ART.has(t.art) ? t.art : k;
+  const pic = TITLE_ART.has(a)
+    ? `<img class="tt-art" src="/assets/titles/${a}${big ? '' : '-s'}.webp" alt="" width="${big ? 256 : 96}" height="${big ? 256 : 96}" decoding="async" draggable="false">`
     : `<svg viewBox="0 0 64 64">${medal(t.tier, t.icon)}</svg>`;
-  return `<span class="tt-emblem tt-emblem-${size} tier-${t.tier}${opts.locked ? ' is-locked' : ''}${opts.preview ? ' is-preview' : ''}" aria-hidden="true">${pic}${locked ? `<i class="tt-lock">${LOCK}</i>` : ''}</span>`;
+  const num = t.num && TITLE_ART.has(a) ? `<b class="tt-num">${Number(t.num)}</b>` : '';
+  return `<span class="tt-emblem tt-emblem-${size} tier-${t.tier}${opts.locked ? ' is-locked' : ''}${opts.preview ? ' is-preview' : ''}${num ? ' has-num' : ''}" aria-hidden="true">${pic}${num}${locked ? `<i class="tt-lock">${LOCK}</i>` : ''}</span>`;
 }
 // Title chip next to a name. opts: { size: 'xs'|'sm'|'md' }
 export function titleBadge(key, opts = {}) {

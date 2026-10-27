@@ -36,6 +36,9 @@
 //   V13.168 zodiac_pets 만난 12지 펫 수(core.js ZODIAC_PET_KEYS)
 //   V13.180 인형뽑기(server/claw.mjs): claw_dolls 뽑은 인형 수, claw_kinds 도감에 모은 인형 종류(12종), claw_gold 뽑은 황금 인형 수
 //   V13.180 timing_perfect 10초 맞추기 완벽 이상 수, timing_ten 딱 10.00 수, timing_streak 최고 연속 완벽(server/timing.mjs p.timing)
+//   V13.184 칭호 3탄(docs/titles-plan.md): monster_best 하드까지 깬 가장 높은 몬스터전 레벨(m.best), monster_day_best 하루 최다 승(m.dw.b),
+//                blank_done 빈칸영작 첫 완료 칸(본문 × 단계), blank_l5 · blank_l6 · blank_l7 그 과의 완료 칸(20칸), blank_perfect 1차 정답률 100인 칸,
+//                blank_s5 5단계 완료 칸, gram_mastered 완성한 어법 지문, gram_clean 1차 100점으로 끝낸 어법 지문(둘 다 p.gram_best 최고값)
 // Limited titles belong to one week: they are held only while last week's result stands.
 // V13.148 `once`: 한정 테두리지만 주간 칭호가 아닌 것(신화의 주인): 한 번 받으면 계속 갖고, 코인도 한 번만.
 
@@ -204,6 +207,51 @@ Object.assign(TITLES, {
   'legend-owner': { name: '전설의 주인', tier: 'legendary', group: 'collect', stat: 'legend_egg', goal: 1, icon: 'wing', how: '전설 알 보상 받기(전설 알을 열거나, 이미 전설 펫이 있어 대신 받는 보상)', desc: '전설 알의 주인이 되었어요.' },
   'epic-dex': { name: '도감 마스터', tier: 'legendary', group: 'collect', stat: 'epic_pets', goal: EPIC_PET_KEYS.length, icon: 'book', how: '영웅 펫 모두 만나기', desc: '영웅 도감을 빈칸 없이 채웠어요.' }
 });
+// V13.184 칭호 3탄 25개(그림 50 · 51 · 52: /assets/titles/<key>.webp, docs/titles-plan.md). 전설 알 칭호 3개(위)도 그림이 왔다.
+// `middle`: 빈칸영작은 중등만 해서 고등 학생 칭호 도감에는 보이지 않는다(visibleTitleKeys).
+// `num`: 메달 앞판에 앱이 쓰는 숫자(level100 그림은 앞판이 비어 있다). `art`: 다른 칭호의 메달 그림을 빌려 쓴다.
+export const TITLES_3 = [
+  'level65', 'level70', 'level75', 'level80', 'level85', 'level90', 'level95', 'level100',
+  'mlv10', 'mday3', 'mlv30', 'boss3', 'mlv50', 'mlv70',
+  'blank1', 'blank5', 'blank6', 'blank7', 'blankperfect', 'blanks5', 'blankall',
+  'gram1', 'gram10', 'gramclean', 'gram30'
+];
+Object.assign(TITLES, {
+  // 레벨 Lv.65~100 (backlog: Lv.65부터 5레벨마다)
+  level65: { name: '한계 돌파', tier: 'epic', group: 'study', stat: 'level', goal: 65, icon: 'bolt', how: 'Lv.65 달성', desc: '끊어진 사슬 너머로 별이 튀어 올랐어요.' },
+  level70: { name: '일흔 계단', tier: 'epic', group: 'study', stat: 'level', goal: 70, icon: 'star', how: 'Lv.70 달성', desc: '일흔 칸 계단 꼭대기에 깃발을 꽂았어요.' },
+  level75: { name: '단어 곳간지기', tier: 'epic', group: 'study', stat: 'level', goal: 75, icon: 'book', how: 'Lv.75 달성', desc: '단어 곳간이 가득 찼어요.' },
+  level80: { name: '불꽃 학습자', tier: 'legendary', group: 'study', stat: 'level', goal: 80, icon: 'flame', how: 'Lv.80 달성', desc: '책 위에 불꽃 왕관이 타올라요.' },
+  level85: { name: '별빛 여행자', tier: 'legendary', group: 'study', stat: 'level', goal: 85, icon: 'star', how: 'Lv.85 달성', desc: '별자리를 따라 더 멀리 가요.' },
+  level90: { name: '지식의 탑', tier: 'legendary', group: 'study', stat: 'level', goal: 90, icon: 'book', how: 'Lv.90 달성', desc: '책을 쌓아 빛나는 탑을 세웠어요.' },
+  level95: { name: '전설 직전', tier: 'legendary', group: 'study', stat: 'level', goal: 95, icon: 'wing', how: 'Lv.95 달성', desc: '월계관이 거의 다 닫혔어요. 조금만 더!' },
+  level100: { name: '백 레벨의 전설', tier: 'limited', once: true, coins: 200, num: 100, group: 'study', stat: 'level', goal: 100, icon: 'trophy', how: 'Lv.100 달성', desc: '레벨 100, 진짜 전설이 되었어요.' },
+  // 몬스터전: 지역 첫 클리어(10레벨씩) · 보스 3 · 하루 3승
+  mlv10: { name: '야자 탈출', tier: 'common', group: 'monster', stat: 'monster_best', goal: 10, icon: 'sprout', how: '몬스터전 레벨 10 클리어(야자 교실)', desc: '야자 교실 창문 밖으로 탈출!' },
+  mday3: { name: '몬스터 세 끼', tier: 'common', group: 'monster', stat: 'monster_day_best', goal: 3, icon: 'heart', how: '하루에 몬스터전 3번 이기기', desc: '아침 · 점심 · 저녁, 몬스터로 배불러요.' },
+  mlv30: { name: '들판 무법자', tier: 'rare', group: 'monster', stat: 'monster_best', goal: 30, icon: 'target', how: '몬스터전 레벨 30 클리어(들판)', desc: '들판의 몬스터들이 이름만 들어도 숨어요.' },
+  boss3: { name: '보스 퇴근 도우미', tier: 'rare', group: 'monster', stat: 'boss_wins', goal: 3, icon: 'shield', how: '보스 몬스터(5레벨마다) 3번 처치', desc: '보스들을 일찍 퇴근시켜 줬어요.' },
+  mlv50: { name: '밤도깨비 퇴치반', tier: 'epic', group: 'monster', stat: 'monster_best', goal: 50, icon: 'flame', how: '몬스터전 레벨 50 클리어(밤)', desc: '밤에 나오는 도깨비도 무섭지 않아요.' },
+  mlv70: { name: '보스 단톡방 방장', tier: 'legendary', group: 'monster', stat: 'monster_best', goal: 70, icon: 'crown', how: '몬스터전 레벨 70 클리어(온 세상 보스 모음)', desc: '보스들이 모인 단톡방의 방장이 되었어요.' },
+  // 빈칸영작(중등만)
+  blank1: { name: '빈칸 메우미', tier: 'common', group: 'study', middle: true, stat: 'blank_done', goal: 1, icon: 'sprout', how: '빈칸영작 본문 · 단계 하나 완료', desc: '첫 빈칸을 딱 맞게 메웠어요.' },
+  blank5: { name: '5과 빈칸 땜장이', tier: 'rare', group: 'study', middle: true, stat: 'blank_l5', goal: 20, icon: 'book', how: '빈칸영작 5과 본문 4개 × 5단계 모두 완료', desc: '5과의 빈칸을 하나도 남김없이 메웠어요.' },
+  blank6: { name: '6과 빈칸 미장이', tier: 'rare', group: 'study', middle: true, stat: 'blank_l6', goal: 20, icon: 'book', how: '빈칸영작 6과 본문 4개 × 5단계 모두 완료', desc: '6과 문장 틈을 매끈하게 메웠어요.' },
+  blank7: { name: '7과 빈칸 목수', tier: 'rare', group: 'study', middle: true, stat: 'blank_l7', goal: 20, icon: 'book', how: '빈칸영작 7과 본문 4개 × 5단계 모두 완료', desc: '7과 단어 타일이 딱 맞물렸어요.' },
+  blankperfect: { name: '한 번에 딱!', tier: 'epic', group: 'study', middle: true, stat: 'blank_perfect', goal: 10, icon: 'target', how: '빈칸영작 1차 정답률 100%로 10칸 끝내기', desc: '첫 시도부터 과녁 한가운데!' },
+  blanks5: { name: '영작 폭주족', tier: 'epic', group: 'study', middle: true, stat: 'blank_s5', goal: 6, icon: 'bolt', how: '빈칸영작 가장 어려운 5단계 6번 완료', desc: '5단계도 거침없이 달려요.' },
+  blankall: { name: '빈칸 없는 세상', tier: 'legendary', group: 'study', middle: true, stat: 'blank_done', goal: 60, icon: 'gem', how: '빈칸영작 60칸(5 · 6 · 7과 × 본문 4 × 5단계) 모두 완료', desc: '세상에 빈칸이 하나도 안 남았어요.' },
+  // 어법 선택형
+  gram1: { name: '어법 첫 감별', tier: 'common', group: 'study', stat: 'gram_mastered', goal: 1, icon: 'target', how: '어법 지문 1개 완성', desc: '맞는 어법을 처음으로 골라냈어요.' },
+  gram10: { name: '어법 감별사', tier: 'rare', group: 'study', stat: 'gram_mastered', goal: 10, icon: 'gem', how: '어법 지문 10개 완성', desc: '자갈 속 보석 같은 정답을 찾아요.' },
+  gramclean: { name: '오답 실종 사건', tier: 'epic', group: 'study', stat: 'gram_clean', goal: 5, icon: 'star', how: '어법 지문 5개를 1차 정답률 100%로 끝내기', desc: '오답이 감쪽같이 사라졌어요.' },
+  gram30: { name: '문법 명탐정', tier: 'epic', group: 'study', stat: 'gram_mastered', goal: 30, icon: 'book', how: '어법 지문 30개 완성', desc: '어법 함정은 다 꿰뚫어 봐요.' }
+});
+// Lv.105부터 5레벨마다: 이름을 정하면 여기에 { 105: '이름' }처럼 넣는다(전설, level100 메달 + 레벨 숫자, 새 그림 없음).
+export const LEVEL_TITLES_AFTER_100 = {};
+for (const [lv, name] of Object.entries(LEVEL_TITLES_AFTER_100)) {
+  TITLES[`level${lv}`] = { name, tier: 'legendary', group: 'study', stat: 'level', goal: Number(lv), art: 'level100', num: Number(lv), icon: 'trophy', how: `Lv.${lv} 달성`, desc: `레벨 ${lv}, 전설은 계속돼요.` };
+}
 // V13.180 10초 맞추기 칭호(놀이터). 서버가 시간을 믿은 판(순위에 들어가는 판)만 센다. 메달 그림은 아직 없어 SVG 메달.
 Object.assign(TITLES, {
   'timing-clock': { name: '시계 장인', tier: 'rare', group: 'arcade', stat: 'timing_perfect', goal: 10, icon: 'target', how: '10초 맞추기 완벽(±0.05초) 10번', desc: '째깍째깍, 머릿속에 시계가 있어요.' },
@@ -221,7 +269,8 @@ export const TITLE_KEYS = Object.keys(TITLES);
 // 주마다 다시 정해지는 한정 칭호(지난주 결과로만 갖는다). `once`인 한정 테두리 칭호는 아니다.
 export const weeklyTitle = key => TITLES[key]?.tier === 'limited' && !TITLES[key].once;
 // The titles a student sees in the collection: all but retired ones they do not have.
-export const visibleTitleKeys = unlocked => TITLE_KEYS.filter(key => !TITLES[key].retired || unlocked.includes(key));
+// V13.184: 중등 전용(`middle`) 칭호는 고등 학생에게 보이지 않는다(가지고 있으면 보인다).
+export const visibleTitleKeys = (unlocked, { middle = true } = {}) => TITLE_KEYS.filter(key => (!TITLES[key].retired && (middle || !TITLES[key].middle)) || unlocked.includes(key));
 
 export function titleUnlocked(key, stats = {}) {
   const t = TITLES[key];

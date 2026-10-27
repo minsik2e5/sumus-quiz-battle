@@ -47,6 +47,7 @@ import { runHuntChecks } from './hunt-check.mjs';
 import { runClawChecks } from './claw-check.mjs';
 import { runBlankChecks } from './blank-check.mjs';
 import { runMintChecks } from './mint-check.mjs';
+import { runTitles3Checks } from './titles-3-check.mjs';
 import { runTimingChecks } from './timing-check.mjs';
 import { runGuard167Checks } from './guard-167-check.mjs';
 import { runHuntPlacesChecks } from './hunt-places-check.mjs';
@@ -1540,6 +1541,7 @@ export async function runReleaseCheck() {
     await runClawChecks(assert);
     await runBlankChecks(assert);
     runMintChecks(assert);
+    await runTitles3Checks(assert);
     await runTimingChecks(assert);
     await runActivityChecks(assert);
     await runGuard167Checks(assert);

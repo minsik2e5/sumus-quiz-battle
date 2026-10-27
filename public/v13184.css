@@ -1,0 +1,12 @@
+/* V13.184 칭호 3탄: Lv.100 메달(앞판이 빈 트로피)에 앱이 레벨 숫자를 쓴다. Lv.105부터도 같은 메달 + 숫자. */
+.tt-emblem.has-num{container-type:size}
+.tt-emblem .tt-num{position:absolute;left:50%;top:48.5%;transform:translate(-50%,-50%);font:900 12.5cqw/1 system-ui,-apple-system,"Apple SD Gothic Neo",sans-serif;letter-spacing:-.04em;color:#7a4a00;text-shadow:0 1px 0 #fff6c8,0 0 3px rgba(255,236,150,.9);pointer-events:none;font-variant-numeric:tabular-nums}
+.tt-emblem-sm .tt-num{display:none}
+.tt-emblem.is-locked .tt-num{opacity:.55}
+/* 소급 지급 묶음 카드: 메달을 작게 여러 줄로 나열 */
+.tt-batch-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;max-height:min(38vh,260px);overflow:auto;padding:4px 2px;margin:10px 0 4px}
+.tt-batch-grid>span{display:grid;justify-items:center;gap:2px;width:62px;animation:tt-batch-in .45s cubic-bezier(.2,1.4,.4,1) calc(var(--i) * 60ms) both}
+.tt-batch-grid small{font-size:10px;line-height:1.2;text-align:center;color:var(--muted,#5b6b66);word-break:keep-all}
+.tt-batch-grid .tt-emblem{width:48px;height:48px}
+@keyframes tt-batch-in{from{opacity:0;transform:scale(.4) translateY(10px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.tt-batch-grid>span{animation:none}}
