@@ -48,15 +48,12 @@
 .rl-rig[data-rod="4"] .rl-rod-body,.rl-rig[data-rod="5"] .rl-rod-body{filter:drop-shadow(0 6px 8px rgba(0,0,0,.35)) drop-shadow(0 0 6px rgba(167,139,250,.75))}
 .rl-rig[data-rod="5"] .rl-rod-body{filter:drop-shadow(0 6px 8px rgba(0,0,0,.35)) drop-shadow(0 0 8px rgba(253,230,138,.9))}
 @media (prefers-reduced-motion:reduce){.rl-rodup,.rl-rodup-hammer{animation:none}.rl-rodup *{transition:none!important}}
-/* V13.185 낚싯대 그림: 단계별 그림을 조각내 휘는 곡선에 붙인다(reel.js rodArt). 그림이 있으면 코드 낚싯대 · 고리 · 릴 몸통은 숨기고, 돌아가는 손잡이만 남긴다. */
-.rl-rig.img .rl-rod-body,.rl-rig.img .rl-rod-cork,.rl-rig.img #rl-guides{display:none}
+/* V13.186 낚싯대: 단계마다 모양이 다른 벡터 낚싯대(reel.js rodSvg, 늘 선명) + 단계별 릴 그림. 릴 그림이 있으면 코드 릴 몸통은 숨기고 돌아가는 손잡이만 남긴다. */
+.rl-rodv{filter:drop-shadow(0 6px 7px rgba(0,0,0,.35))}
+.rl-rv-glow{filter:blur(5px)}
 .rl-rig.img-reel .rl-reel-g .spool,.rl-rig.img-reel .rl-reel-g .cap{display:none}
 .rl-rig:not(.img-reel) .rl-reel-art{display:none}
-.rl-rodimg{filter:drop-shadow(0 6px 7px rgba(0,0,0,.38))}
 .rl-reel-art{filter:drop-shadow(0 4px 6px rgba(0,0,0,.35))}
-.rl-rig.img .rl-reel-g .arm{opacity:.92}
-.rl-rig.img[data-rod="4"] .rl-rodimg{filter:drop-shadow(0 6px 7px rgba(0,0,0,.38)) drop-shadow(0 0 6px rgba(167,139,250,.7))}
-.rl-rig.img[data-rod="5"] .rl-rodimg{filter:drop-shadow(0 6px 7px rgba(0,0,0,.38)) drop-shadow(0 0 8px rgba(253,230,138,.85))}
 /* V13.185 깊은 바다: 장소 고르기(부두) · 어두운 바다 · 떠오르는 발광 플랑크톤 · 도감 칸 · 공개 칩 */
 .rl-spotbox{position:absolute;left:10px;top:72px;z-index:6;transition:opacity .3s}
 .rl-pov:not([data-phase="dock"]) .rl-spotbox{opacity:0;pointer-events:none}
