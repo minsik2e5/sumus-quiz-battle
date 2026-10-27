@@ -96,9 +96,9 @@ export async function runActivityChecks(assert) {
     await call('qa-ac-a', 'POST', '/monster/finish', { id: 'mon-1', result: 'win', right: 99 });
     assert(prof('qa-ac-a').activity.length === before, 'V13.173 같은 영수증을 다시 보내도 한 줄만');
   }
-  // 낚시 · 짝 맞추기 · 사냥은 판 하나가 끝나는 곳에서 한 줄(영수증이 있어 다시 보내도 한 줄).
+  // 낚시 · 짝 맞추기 · 사냥 · 인형뽑기(V13.180)는 판 하나가 끝나는 곳에서 한 줄(영수증이 있어 다시 보내도 한 줄).
   const svc = source('./service.mjs'), party = source('./party.mjs');
-  for (const k of ['attend', 'lucky', 'rps', 'market', 'robot', 'monster', 'match', 'fish', 'hunt', 'exam', 'practice', 'yacha', 'dungeon']) {
+  for (const k of ['attend', 'lucky', 'rps', 'market', 'robot', 'monster', 'match', 'fish', 'hunt', 'claw', 'exam', 'practice', 'yacha', 'dungeon']) {
     assert(svc.includes(`logActivity(`) && new RegExp(`logActivity\\([^\\n]*'${k}'`).test(svc.replace("x.run_mode === 'test' ? 'test' : 'practice'", `'practice'`)), `V13.173 ${ACTIVITY_MODES[k].label}: 끝난 결과를 남기는 곳이 있다`);
   }
   assert(/logActivity\([^\n]*'test' : 'practice'/.test(svc) && /logActivity\([^\n]*'classfish'/.test(party) && /logActivity\([^\n]*'treasure'/.test(party), 'V13.173 실전시험 · 보물 사냥 · 반 낚시도 남긴다');

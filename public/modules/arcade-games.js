@@ -4,9 +4,10 @@
 import { esc, num, toast, rangeLabel } from './ui.js';
 import { getRanges, periodGroups } from './student.js';
 import { openSheet } from './sheet.js';
-import { uiArt } from './emblems.js';
+import { uiArt, coin } from './emblems.js';
 import { matchTime } from './match-rules.js';
 import { rodOf } from './reel-rules.js';
+import { CLAW, clawOpen } from './claw-rules.js';
 
 export const GAME_WORDS_MIN = 8;
 const rangesKey = A => `sumus-yacha-ranges:${A.data.profile.id}`;
@@ -82,6 +83,24 @@ export function huntCard(A, art) {
     </div>
   </article>`;
 }
+// V13.180 인형뽑기: 몬스터 사냥 옆 그림 카드. 그림(주문서 44 claw/entry)이 있으면 쓴다. 그림 게이트(clawOpen)가 닫혀 있으면 '곧 열려요'.
+export function clawCard(A, art) {
+  const v = A.data.rewards?.claw || {}, open = v.open ?? clawOpen();
+  const pic = art?.claw?.has('entry') ? '<img class="ag-big-bg" src="/assets/claw/entry.webp" alt="" draggable="false" decoding="async">'
+    : '<span class="ag-big-bg ag-clawbox"><i class="ag-claw-glass"></i><i class="ag-claw-toy">🧸</i></span>';
+  const ticketIco = art?.claw?.has('icon-ticket') ? '<img class="ag-ico" src="/assets/claw/icon-ticket.webp" alt="" draggable="false">' : '<i class="ag-ico">🎟️</i>';
+  return `<article class="ag-big ag-claw${open ? '' : ' soon'}">
+    <div class="ag-big-art" aria-hidden="true">${pic}<span class="ag-big-title"><small>집게로 쏙</small><strong>인형뽑기</strong><em>공부로 받은 집게권으로 열두 띠 인형을 뽑아 도감을 채워요</em></span></div>
+    <div class="ag-big-body">
+      <ul class="ag-stats" aria-label="내 인형뽑기">
+        <li>${ticketIco}<b>${num(v.tickets || 0)}</b><small>집게권</small></li>
+        <li><i class="ag-ico">🧸</i><b>${num(v.kinds || 0)}/${num(v.all || 12)}</b><small>도감</small></li>
+        <li>${coin()}<b>${num(v.coin_today || 0)}/${num(v.coin_daily || CLAW.COIN_DAILY)}</b><small>오늘 코인</small></li>
+      </ul>
+      <button type="button" class="yl-cta ag-go" data-action="claw-open" aria-label="인형뽑기 들어가기" ${open ? '' : 'disabled'}>${open ? '들어가기' : '곧 열려요'}</button>
+    </div>
+  </article>`;
+}
 // V13.180 10초 맞추기: 그림 없이 코드로 그린 카드(빨간 LED 숫자판 + 입체 빨간 버튼). 그림이 오면 바꿀 수 있게 자리만.
 export function timingCard(A) {
   const v = A.data.rewards?.timing || {}, best = v.best ?? null;
@@ -102,6 +121,7 @@ export function gamesSection(A, art) {
     ${reelCard(A, art)}
     ${matchCard(A, art)}
     ${huntCard(A, art)}
+    ${clawCard(A, art)}
     ${timingCard(A)}
   </section>
   <h2 class="ag-head">상점 · 뽑기</h2>`;
