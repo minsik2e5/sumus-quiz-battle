@@ -17,7 +17,8 @@ import { fishPic, fishShadow } from './fishing-art.js';
 //   마무리: 거리가 0이 되면 물고기가 뛰어오른다(슬로모션). 고리가 맞을 때 탭하면 퍼펙트(무게 +8%, 서버가 곱한다).
 // 낚싯대는 코드로 그린다(휘는 정도 · 방향이 매 프레임 바뀐다). 그림(주문서 26 · 27 · 29)은 FISHING_ART에 이름이 있으면 쓴다.
 // V13.150 그림 29(1인칭 배경 · 수조 · 공개 · 효과 · 아이콘)가 들어왔다. 1인칭 낚싯대 그림(pov-rod*)은 휘는 코드 낚싯대가 손맛에 더 좋아 쓰지 않는다.
-// V13.185 낚싯대가 단계마다 똑같아 보여서(선생님 피드백), 단계별 낚싯대 그림을 조각내 휘는 곡선을 따라 붙인다(rodArt · ROD_CUT).
+// V13.185 낚싯대가 단계마다 똑같아 보여서(선생님 피드백), 단계마다 모양이 다른 낚싯대를 그린다(ROD_LOOK). V13.186 그림을 늘여 붙였더니
+//   폰에서 4배로 커져 흐릿해서, 낚싯대 몸통은 다시 코드(벡터, 늘 선명)로 그리고 단계별 그림의 모양(마디 · 고리 · 손잡이 끝 · 빛)을 따라 그린다.
 export const FISHING_ART = new Set([
   'bait-can', 'bait-open', 'bg-entry', 'bg-pov', 'bg-reveal', 'bg-sea', 'bg-tank', 'bg-under', 'bobber', 'bobber-bite',
   'bobber-nibble', 'bobber-sink', 'btn-cast', 'btn-left', 'btn-reel', 'btn-right', 'btn-special', 'fx-bubbles', 'fx-drops', 'fx-halo',
@@ -215,10 +216,7 @@ function scene() {
         <linearGradient id="rl-corkg" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#92400e"/><stop offset=".5" stop-color="#d6a46a"/><stop offset="1" stop-color="#a16207"/></linearGradient>
       </defs>
       <path class="rl-line2" id="rl-line2" d=""/>
-      <path class="rl-rod-body" id="rl-rod" d=""/>
-      <path class="rl-rod-cork" id="rl-cork" d=""/>
-      <g class="rl-rodimg" id="rl-rodimg"></g>
-      <g id="rl-guides"></g>
+      <g class="rl-rodv" id="rl-rodv"></g>
       <g class="rl-reel-g" id="rl-reelg"><image class="rl-reel-art" id="rl-reelimg" width="1" height="1"/><circle class="spool" r="1"/><circle class="cap" r="1"/><g id="rl-crank"><rect class="arm"/><circle class="knob" r="1"/></g></g>
     </svg>
     <div class="rl-pet" id="rl-pet">${pet ? avatar(pet.key, { form: Math.max(1, pet.form ?? 1) }) : ''}<span class="rl-say" id="rl-say" hidden></span></div>
@@ -242,37 +240,40 @@ function rodGradients() {
   return `<linearGradient id="rl-rodg" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="${a}"/><stop offset=".45" stop-color="${b}"/><stop offset=".6" stop-color="${c}"/><stop offset="1" stop-color="${d}"/></linearGradient>
         <radialGradient id="rl-reelgrad" cx=".35" cy=".3" r=".8"><stop offset="0" stop-color="${e}"/><stop offset=".5" stop-color="${f}"/><stop offset="1" stop-color="${g}"/></radialGradient>`;
 }
-// V13.185 단계별 낚싯대 그림(그림 31: pov-rod · pov-rod-t2~t5, 384px 세로 그림 · 손잡이가 아래). 그림을 손잡이 → 끝까지 N조각으로 잘라
-//   조각마다 휘는 곡선(rodGeom)의 그 구간에 맞춰 기울이고 늘인다(drawRig). 그래서 휘는 손맛 · 줄 끝(tip) 위치는 코드 낚싯대와 같고,
-//   모양은 단계마다 그림 그대로(새싹 초록 마디 · 은빛 · 황금 · 보석 손잡이 · 별빛). 릴도 단계별 릴 그림(pov-reel · -t2~t5).
-//   V0 · V1: 그림 속 낚싯대 손잡이 끝 · 낚싯대 끝의 y(px), CX: 낚싯대 가운데 x(단계마다 조금 다르다), T0: 손잡이 끝이 오는 곡선 위치.
-export const ROD_CUT = { N: 14, V0: 350, V1: 24, T0: .05, HALF: 34, CX: [191, 194, 191, 191, 192], W: 1.35, REEL: 92 };
-export function rodArt(lv) {
-  const l = rodLevel(lv), rod = l > 1 ? `pov-rod-t${l}` : 'pov-rod', reel = l > 1 ? `pov-reel-t${l}` : 'pov-reel';
-  return has(rod) ? { level: l, rod, reel: has(reel) ? reel : null, cx: ROD_CUT.CX[l - 1] } : null;
-}
-// 조각 그림: 조각마다 그림 전체를 깔고 자기 띠만 보이게 자른다(이음매가 벌어지지 않게 위아래로 1.2px씩 겹친다).
-function rodSlices(a) {
-  const { N, V0, V1, HALF } = ROD_CUT, href = `/assets/fishing/${a.rod}.webp`;
-  return Array.from({ length: N }, (_, i) => {
-    const vb = lerp(V0, V1, i / N), vt = lerp(V0, V1, (i + 1) / N);
-    return `<clipPath id="rl-rc${i}" clipPathUnits="userSpaceOnUse"><rect x="${a.cx - HALF}" y="${(vt - 1.2).toFixed(1)}" width="${HALF * 2}" height="${(vb - vt + 2.4).toFixed(1)}"/></clipPath><image class="rl-rod-piece" href="${href}" width="384" height="384" clip-path="url(#rl-rc${i})"/>`;
-  }).join('');
+// V13.186 단계별 낚싯대 모양(그림 31 icon-rod · pov-rod를 보고 맞춘 벡터). shaft: 몸통 색(가장자리 · 가운데 · 빛 · 반대 가장자리),
+//   wrap: 마디 감개(색 · 테두리), ring: 고리(밝은 · 진한), guide: 고리 모양(ring 동그라미 · gem 보석 · star 별), butt: 손잡이 끝(ball 구슬 · cap 은 마개 ·
+//   gold 금 마개 + 에메랄드 · gem 큰 보석 · star 별), glow: 낚싯대 둘레 빛, sparkle: 반짝이. 릴은 단계별 릴 그림(pov-reel · -t2~t5)이다.
+export const ROD_LOOK = [
+  { level: 1, shaft: ['#94a3b8', '#ffffff', '#ffffff', '#cbd5e1'], wrap: ['#34d399', '#047857'], ring: ['#fde68a', '#b45309'], guide: 'ring', butt: 'ball', buttc: ['#d1fae5', '#10b981', '#065f46'], wraps: [.3, .4, .5, .6, .7, .8, .89], glow: null },
+  { level: 2, shaft: ['#475569', '#cbd5e1', '#ffffff', '#64748b'], wrap: ['#38bdf8', '#0369a1'], ring: ['#f8fafc', '#475569'], guide: 'ring', butt: 'cap', buttc: ['#ffffff', '#94a3b8', '#334155'], wraps: [.31, .45, .59, .73, .86], glow: null },
+  { level: 3, shaft: ['#92400e', '#f59e0b', '#fef3c7', '#b45309'], wrap: ['#10b981', '#065f46'], ring: ['#fde68a', '#92400e'], guide: 'ring', butt: 'gold', buttc: ['#fef3c7', '#f59e0b', '#92400e'], wraps: [.31, .45, .59, .73, .86], glow: null },
+  { level: 4, shaft: ['#1e1b4b', '#6366f1', '#e0e7ff', '#6d28d9'], wrap: ['#38bdf8', '#1e3a8a'], ring: ['#e9d5ff', '#5b21b6'], guide: 'gem', butt: 'gem', buttc: ['#e0f2fe', '#38bdf8', '#1d4ed8'], wraps: [.31, .43, .55, .67, .79, .9], glow: 'rgba(167,139,250,.55)' },
+  { level: 5, shaft: ['#b7791f', '#fef3c7', '#ffffff', '#f6c453'], wrap: ['#fbbf24', '#92400e'], ring: ['#fef08a', '#a16207'], guide: 'star', butt: 'star', buttc: ['#d1fae5', '#10b981', '#065f46'], wraps: [.31, .45, .59, .73, .86], glow: 'rgba(253,224,71,.6)', sparkle: true }
+];
+export const rodLook = lv => ROD_LOOK[rodLevel(lv) - 1];
+const reelArt = lv => { const l = rodLevel(lv), name = l > 1 ? `pov-reel-t${l}` : 'pov-reel'; return has(name) ? name : null; };
+// 단계 색 정의: 몸통(가로 그라데이션 = 둥근 막대 빛), 금속 띠, 손잡이 끝, 코르크 점무늬.
+function lookDefs(L) {
+  const [a, b, c, d] = L.shaft, [e, f, g] = L.buttc;
+  return `<linearGradient id="rl-rv-shaft" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="${a}"/><stop offset=".32" stop-color="${b}"/><stop offset=".5" stop-color="${c}"/><stop offset="1" stop-color="${d}"/></linearGradient>
+        <linearGradient id="rl-rv-metal" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="${L.ring[1]}"/><stop offset=".45" stop-color="${L.ring[0]}"/><stop offset=".6" stop-color="#ffffff"/><stop offset="1" stop-color="${L.ring[1]}"/></linearGradient>
+        <radialGradient id="rl-rv-butt" cx=".35" cy=".3" r=".75"><stop offset="0" stop-color="${e}"/><stop offset=".55" stop-color="${f}"/><stop offset="1" stop-color="${g}"/></radialGradient>
+        <pattern id="rl-rv-cork" width="7" height="7" patternUnits="userSpaceOnUse"><circle cx="1.5" cy="2" r=".9" fill="#7c4a1e" opacity=".45"/><circle cx="5" cy="5.5" r=".7" fill="#7c4a1e" opacity=".35"/></pattern>`;
 }
 function paintRod() {
   const svg = $('rl-rig'), defs = svg?.querySelector('defs');
   if (!defs) return;
-  defs.querySelector('#rl-rodg')?.remove(); defs.querySelector('#rl-reelgrad')?.remove();
-  defs.insertAdjacentHTML('afterbegin', rodGradients());
-  const a = rodArt(myRod().level), box = $('rl-rodimg'), reel = $('rl-reelimg');
-  svg.dataset.rod = myRod().level;
-  svg.dataset.rodArt = a ? a.rod : '';
-  svg.classList.toggle('img', !!a);
-  svg.classList.toggle('img-reel', !!a?.reel);
-  if (box) box.innerHTML = a ? rodSlices(a) : '';
-  if (reel && a?.reel) reel.setAttribute('href', `/assets/fishing/${a.reel}.webp`); else reel?.removeAttribute('href');
-  R.rodArt = a;
-  R.rodPieces = a && box ? [...box.querySelectorAll('.rl-rod-piece')] : null;
+  const L = rodLook(myRod().level), reel = $('rl-reelimg'), art = reelArt(L.level);
+  for (const id of ['rl-rodg', 'rl-reelgrad', 'rl-rv-shaft', 'rl-rv-metal', 'rl-rv-butt', 'rl-rv-cork']) defs.querySelector(`#${id}`)?.remove();
+  defs.insertAdjacentHTML('afterbegin', rodGradients() + lookDefs(L));
+  svg.dataset.rod = L.level;
+  svg.dataset.look = `${L.guide}-${L.butt}`;
+  svg.classList.toggle('img-reel', !!art);
+  if (reel && art) reel.setAttribute('href', `/assets/fishing/${art}.webp`); else reel?.removeAttribute('href');
+  const arm = svg.querySelector('#rl-crank .arm'), knob = svg.querySelector('#rl-crank .knob');
+  if (arm) { arm.style.fill = L.ring[0]; arm.style.stroke = L.ring[1]; }
+  if (knob) knob.style.stroke = L.ring[1];
+  R.look = L; R.reelArt = art;
 }
 function sizeRig() {
   const pov = $('rl-pov'), svg = $('rl-rig');
@@ -325,37 +326,64 @@ function strip(g, t0, t1, w0, w1, n = 16) {
   }
   return `M${L.join('L')}L${Rr.reverse().join('L')}Z`;
 }
-// 조각 i: 그림 속 띠(vb → vt)의 가운데 아래 점이 곡선 위 at(ta)에, 띠 방향이 at(ta) → at(tb)에 오게 하는 행렬(SVG matrix a~f).
-//   가로(낚싯대 굵기)는 W배로 고정, 세로는 그 구간 길이에 맞춰 늘인다. 마지막 조각의 끝(cx, V1)은 at(1) = 줄 끝(tip)에 온다.
-export function rodPieceMatrix(at, i, cx, s = 1) {
-  const { N, V0, V1, T0, W } = ROD_CUT, kw = W * s;
-  const ta = lerp(T0, 1, i / N), tb = lerp(T0, 1, (i + 1) / N), vb = lerp(V0, V1, i / N), vt = lerp(V0, V1, (i + 1) / N);
-  const [ax, ay] = at(ta), [bx, by] = at(tb), len = Math.hypot(bx - ax, by - ay) || 1, tx = (bx - ax) / len, ty = (by - ay) / len, k = len / (vb - vt);
-  const a = -ty * kw, b = tx * kw, c = -k * tx, d = -k * ty;
-  return [a, b, c, d, ax - cx * a - vb * c, ay - cx * b - vb * d];
-}
-function drawRodArt(g) {
-  const cx = R.rodArt.cx;
-  R.rodPieces.forEach((el, i) => el.setAttribute('transform', `matrix(${rodPieceMatrix(g.at, i, cx, g.s).map(x => x.toFixed(3)).join(',')})`));
+const star = (x, y, r, inner = .42) => `M${Array.from({ length: 10 }, (_, i) => { const a = -Math.PI / 2 + i * Math.PI / 5, k = i % 2 ? r * inner : r; return `${(x + Math.cos(a) * k).toFixed(1)},${(y + Math.sin(a) * k).toFixed(1)}`; }).join('L')}Z`;
+// 몸통 굵기(t: 곡선 위치) · 몸통 옆 점(o > 0이면 고리가 달린 쪽).
+export const ROD_SHAPE = { BUTT: .085, CORK: [.11, .25], FERRULE: [.247, .275], SHAFT: .27, GUIDES: [.36, .5, .62, .73, .83, .91, .97] };
+// 낚싯대 한 장(벡터): 빛 → 손잡이 끝 → 코르크 → 금속 띠 → 몸통 · 빛줄 → 마디 → 고리 → 끝 고리 → 반짝이. 끝 고리 = at(1) = 줄 끝.
+export function rodSvg(g, L, now = 0) {
+  const s = g.s, S = ROD_SHAPE, w = t => lerp(21, 4.4, clamp((t - S.SHAFT) / (1 - S.SHAFT), 0, 1)) * s;
+  const side = (t, o) => { const [x, y] = g.at(t), [tx, ty] = g.tan(t); return [x - ty * o, y + tx * o]; };
+  const f = n => n.toFixed(1), out = [];
+  if (L.glow) out.push(`<path class="rl-rv-glow" d="${strip(g, S.SHAFT, 1, w(S.SHAFT) + 18 * s, w(1) + 12 * s, 20)}" fill="${L.glow}"/>`);
+  // 손잡이 끝
+  const [bx, by] = g.at(S.BUTT), [btx, bty] = g.tan(S.BUTT);
+  if (L.butt === 'ball' || L.butt === 'star') out.push(`<circle cx="${f(bx)}" cy="${f(by)}" r="${f(19 * s)}" fill="url(#rl-rv-butt)" stroke="${L.buttc[2]}" stroke-width="${f(1.4 * s)}"/>`);
+  if (L.butt === 'star') out.push(`<path d="${star(bx, by, 15 * s)}" fill="#fde047" stroke="#a16207" stroke-width="${f(1.4 * s)}"/>`);
+  if (L.butt === 'cap' || L.butt === 'gold') out.push(`<path d="${strip(g, S.BUTT - .03, S.CORK[0] + .006, 37 * s, 35 * s, 3)}" fill="url(#rl-rv-butt)" stroke="${L.buttc[2]}" stroke-width="${f(1.4 * s)}"/>`);
+  if (L.butt === 'gold') out.push(`<circle cx="${f(bx)}" cy="${f(by)}" r="${f(7 * s)}" fill="#10b981" stroke="#fef3c7" stroke-width="${f(2 * s)}"/>`);
+  if (L.butt === 'gem') { const h = 26 * s, r = 17 * s; out.push(`<path d="M${f(bx + btx * h * .5)},${f(by + bty * h * .5)}L${f(bx - bty * r)},${f(by + btx * r)}L${f(bx - btx * h)},${f(by - bty * h)}L${f(bx + bty * r)},${f(by - btx * r)}Z" fill="url(#rl-rv-butt)" stroke="#ffffff" stroke-width="${f(1.6 * s)}"/><path d="M${f(bx)},${f(by)}L${f(bx - bty * r * .9)},${f(by + btx * r * .9)}" stroke="#ffffff" stroke-width="${f(1.2 * s)}" opacity=".7"/>`); }
+  // 코르크 · 금속 띠
+  const cork = strip(g, S.CORK[0], S.CORK[1], 34 * s, 28 * s, 8);
+  out.push(`<path d="${strip(g, S.CORK[0] - .012, S.CORK[0] + .006, 36 * s, 36 * s, 2)}" fill="url(#rl-rv-metal)"/>`);
+  out.push(`<path class="rl-rv-cork" d="${cork}" fill="url(#rl-corkg)"/><path d="${cork}" fill="url(#rl-rv-cork)"/>`);
+  out.push(`<path d="${strip(g, S.FERRULE[0], S.FERRULE[1], 31 * s, 26 * s, 3)}" fill="url(#rl-rv-metal)" stroke="${L.ring[1]}" stroke-width="${f(.8 * s)}"/>`);
+  // 몸통 + 빛줄
+  out.push(`<path class="rl-rv-shaft" d="${strip(g, S.SHAFT, 1, w(S.SHAFT), w(1), 24)}" fill="url(#rl-rv-shaft)" stroke="${L.shaft[0]}" stroke-width="${f(.9 * s)}"/>`);
+  out.push(`<path d="M${Array.from({ length: 14 }, (_, i) => { const t = lerp(S.SHAFT + .02, .985, i / 13); return side(t, -w(t) * .2).map(f).join(','); }).join('L')}" fill="none" stroke="#ffffff" stroke-width="${f(1.6 * s)}" stroke-linecap="round" opacity=".7"/>`);
+  // 마디 감개(가운데 색 + 양쪽 금속 테)
+  for (const t of L.wraps) {
+    const ww = w(t) + 2.6 * s;
+    out.push(`<path class="rl-rv-wrap" d="${strip(g, t, t + .026, ww, ww * .96, 2)}" fill="${L.wrap[0]}" stroke="${L.wrap[1]}" stroke-width="${f(.8 * s)}"/><path d="${strip(g, t - .005, t, ww, ww, 1)}" fill="${L.ring[0]}"/><path d="${strip(g, t + .026, t + .031, ww * .96, ww * .96, 1)}" fill="${L.ring[0]}"/>`);
+  }
+  // 고리: 몸통 옆에 다리로 붙는다.
+  S.GUIDES.forEach((t, i) => {
+    const r = lerp(8.5, 3.4, i / (S.GUIDES.length - 1)) * s, base = side(t, w(t) / 2), c = side(t, w(t) / 2 + r * 1.15), sw = Math.max(1.4 * s, r * .34);
+    out.push(`<path d="M${base.map(f).join(',')}L${c.map(f).join(',')}" stroke="${L.ring[1]}" stroke-width="${f(sw)}" stroke-linecap="round"/>`);
+    if (L.guide === 'star') out.push(`<path d="${star(c[0], c[1], r * 1.55, .5)}" fill="${L.ring[0]}" stroke="${L.ring[1]}" stroke-width="${f(1.1 * s)}"/><circle cx="${f(c[0])}" cy="${f(c[1])}" r="${f(r * .45)}" fill="#fffbeb" stroke="${L.ring[1]}" stroke-width="${f(.9 * s)}"/>`);
+    else out.push(`<circle cx="${f(c[0])}" cy="${f(c[1])}" r="${f(r)}" fill="none" stroke="${L.ring[1]}" stroke-width="${f(sw + 1.4 * s)}"/><circle cx="${f(c[0])}" cy="${f(c[1])}" r="${f(r)}" fill="none" stroke="${L.ring[0]}" stroke-width="${f(sw)}"/>`);
+    if (L.guide === 'gem') out.push(`<path d="M${f(base[0])},${f(base[1] - r * .9)}L${f(base[0] + r * .6)},${f(base[1])}L${f(base[0])},${f(base[1] + r * .9)}L${f(base[0] - r * .6)},${f(base[1])}Z" fill="#a78bfa" stroke="#ffffff" stroke-width="${f(.8 * s)}"/>`);
+  });
+  // 끝 고리(줄이 나오는 곳)
+  out.push(`<circle class="rl-rv-tip" cx="${f(g.tip[0])}" cy="${f(g.tip[1])}" r="${f(2.8 * s)}" fill="${L.ring[0]}" stroke="${L.ring[1]}" stroke-width="${f(1.2 * s)}"/>`);
+  if (L.sparkle) for (let i = 0; i < 5; i++) {
+    const t = .36 + i * .13, k = (Math.sin(now / 320 + i * 1.7) + 1) / 2, [x, y] = side(Math.min(.98, t), (i % 2 ? 1 : -1) * (w(t) + 11 * s));
+    out.push(`<path d="${star(x, y, (2.5 + k * 3.5) * s, .3)}" fill="#fffbeb" opacity="${(.35 + k * .65).toFixed(2)}"/>`);
+  }
+  return out.join('');
 }
 function drawRig(target) {
   if (!R.W) return;
   const g = rodGeom(), s = g.s;
-  if (R.rodPieces) drawRodArt(g);
-  else {
-    $('rl-rod').setAttribute('d', strip(g, .2, 1, 20 * s, 3.4 * s));
-    $('rl-cork').setAttribute('d', strip(g, 0, .25, 32 * s, 24 * s, 6));
-    $('rl-guides').innerHTML = [.42, .6, .75, .88, .97].map(t => { const [x, y] = g.at(t), [tx, ty] = g.tan(t); return `<circle cx="${(x + ty * 5 * s * (1 - t)).toFixed(1)}" cy="${(y - tx * 5 * s * (1 - t)).toFixed(1)}" r="${((5.2 - t * 2.6) * s).toFixed(1)}"/>`; }).join('');
-  }
+  $('rl-rodv').innerHTML = rodSvg(g, R.look || rodLook(1), reduced() ? 0 : performance.now());
   // 릴: 손잡이 위, 낚싯대 오른쪽 아래에 붙는다.
   const [rx, ry] = g.at(.2), [tx, ty] = g.tan(.2), cx = rx - ty * -30 * s, cy = ry + tx * -30 * s;
   const reel = $('rl-reelg');
   reel.setAttribute('transform', `translate(${cx.toFixed(1)},${cy.toFixed(1)})`);
   reel.querySelector('.spool').setAttribute('r', 27 * s);
-  if (R.rodArt?.reel) { const img = $('rl-reelimg'), z = ROD_CUT.REEL * s; img.setAttribute('x', -z / 2); img.setAttribute('y', -z / 2); img.setAttribute('width', z); img.setAttribute('height', z); }
+  if (R.reelArt) { const img = $('rl-reelimg'), z = 92 * s; img.setAttribute('x', -z / 2); img.setAttribute('y', -z / 2); img.setAttribute('width', z); img.setAttribute('height', z); }
   reel.querySelector('.cap').setAttribute('r', 9 * s);
-  const arm = reel.querySelector('.arm'); arm.setAttribute('x', 0); arm.setAttribute('y', -4 * s); arm.setAttribute('width', 34 * s); arm.setAttribute('height', 8 * s); arm.setAttribute('rx', 4 * s);
-  const knob = reel.querySelector('.knob'); knob.setAttribute('cx', 34 * s); knob.setAttribute('r', 8.5 * s);
+  const arm = reel.querySelector('.arm'); arm.setAttribute('x', 0); const thin = R.reelArt ? .7 : 1; arm.setAttribute('y', -4 * s * thin); arm.setAttribute('width', 34 * s * thin); arm.setAttribute('height', 8 * s * thin); arm.setAttribute('rx', 4 * s * thin);
+  const knob = reel.querySelector('.knob'); knob.setAttribute('cx', 34 * s * thin); knob.setAttribute('r', 8.5 * s * thin);
   $('rl-crank').setAttribute('transform', `rotate(${(R.rig.crank % 360).toFixed(1)})`);
   // 줄: 낚싯대 끝 → 찌 또는 물고기. 팽팽할수록 덜 처진다.
   const line = $('rl-line2');

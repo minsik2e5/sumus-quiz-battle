@@ -1,12 +1,12 @@
 // V13.185 낚시 업그레이드 검사(선생님 피드백: "심해 물고기 추가" · "낚싯대를 강화해도 똑같아 보인다").
-//   낚싯대: 단계별 그림(pov-rod · -t2~t5)을 조각내 휘는 곡선에 붙인다. 심해 물고기 8종: 깊은 바다(낚싯대 3단계)에서만, 그림이 다 들어온 것만.
+//   낚싯대: V13.186 단계마다 모양이 다른 벡터 낚싯대(그림을 늘이면 폰에서 흐릿해서) + 단계별 릴 그림. 심해 물고기 8종: 깊은 바다(낚싯대 3단계)에서만, 그림이 다 들어온 것만.
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { FISH, FISH_KEYS, DEEP_KEYS, LURES, RARITY_KEYS, rollCast } from '../public/modules/fishing-rules.js';
 import { FISH_READY } from '../public/modules/fish-art.js';
 import { FISH_ART } from '../public/modules/fishing-art.js';
 import { REEL, ROD, DEEP, CAST_TIERS, reelRoll, deepReady, deepOpen, pearlsOf } from '../public/modules/reel-rules.js';
-import { rodArt, rodPieceMatrix, ROD_CUT } from '../public/modules/reel.js';
+import { ROD_LOOK, ROD_SHAPE, rodLook, rodSvg } from '../public/modules/reel.js';
 import { reelView, reelCast, reelLand, reelSell } from './reel.mjs';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
@@ -16,28 +16,27 @@ const ALL = new Set([...FISH_KEYS, ...DEEP_KEYS]);
 const NONE = new Set(FISH_KEYS);
 
 export function runFishingUpgradeChecks(assert) {
-  // ── 낚싯대: 단계마다 다른 그림 · 같은 곡선 ──
-  const arts = [1, 2, 3, 4, 5].map(rodArt);
-  assert(arts.every(a => a && existsSync(pub(`assets/fishing/${a.rod}.webp`)) && a.reel && existsSync(pub(`assets/fishing/${a.reel}.webp`)))
-    && new Set(arts.map(a => a.rod)).size === 5 && new Set(arts.map(a => a.reel)).size === 5 && arts[0].rod === 'pov-rod' && arts[4].rod === 'pov-rod-t5',
-    'V13.185 낚싯대 1~5단계는 서로 다른 그림(pov-rod · pov-rod-t2~t5)과 릴 그림(pov-reel · -t2~t5)으로 그린다(1단계도 그림: 초록 마디 · 코르크 손잡이 · 릴)');
-  // 곡선을 따라 붙인 조각: 첫 조각의 손잡이 끝은 at(T0), 마지막 조각의 끝(그림 속 낚싯대 끝)은 at(1) = 줄 끝(tip). 이웃 조각은 이어진다.
-  const curve = (B, C, T) => t => [(1 - t) ** 2 * B[0] + 2 * (1 - t) * t * C[0] + t * t * T[0], (1 - t) ** 2 * B[1] + 2 * (1 - t) * t * C[1] + t * t * T[1]];
-  const apply = (m, [u, v]) => [m[0] * u + m[2] * v + m[4], m[1] * u + m[3] * v + m[5]];
-  const near = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < .01;
-  const lerp = (a, b, k) => a + (b - a) * k;
-  const bends = [[[234, 803], [254, 470], [261, 335]], [[234, 803], [256, 455], [370, 470]], [[234, 803], [250, 500], [120, 520]]];
-  const fits = bends.every(([B, C, T]) => {
-    const at = curve(B, C, T), { N, V0, V1, T0 } = ROD_CUT, cx = arts[2].cx;
-    const ms = Array.from({ length: N }, (_, i) => rodPieceMatrix(at, i, cx, 1));
-    return near(apply(ms[0], [cx, V0]), at(T0)) && near(apply(ms[N - 1], [cx, V1]), T)
-      && ms.slice(1).every((m, i) => near(apply(m, [cx, lerp(V0, V1, (i + 1) / N)]), apply(ms[i], [cx, lerp(V0, V1, (i + 1) / N)])));
-  });
-  assert(fits, 'V13.185 낚싯대 그림 조각은 휘는 곡선을 따라 이어지고, 낚싯대 끝이 줄 끝(rodGeom tip)과 같은 자리다(곧게 · 오른쪽 · 왼쪽으로 휠 때 모두)');
+  // ── 낚싯대: 단계마다 다른 모양(벡터) · 같은 곡선 ──
+  const curve = (B, C, T) => {
+    const at = t => [(1 - t) ** 2 * B[0] + 2 * (1 - t) * t * C[0] + t * t * T[0], (1 - t) ** 2 * B[1] + 2 * (1 - t) * t * C[1] + t * t * T[1]];
+    const tan = t => { const x = 2 * (1 - t) * (C[0] - B[0]) + 2 * t * (T[0] - C[0]), y = 2 * (1 - t) * (C[1] - B[1]) + 2 * t * (T[1] - C[1]), l = Math.hypot(x, y) || 1; return [x / l, y / l]; };
+    return { s: 1, B, tip: T, at, tan };
+  };
+  const bends = [curve([234, 803], [254, 470], [261, 335]), curve([234, 803], [256, 455], [370, 470]), curve([234, 803], [250, 500], [120, 520])];
+  const looks = [1, 2, 3, 4, 5].map(rodLook), svgs = looks.map(L => rodSvg(bends[0], L, 0));
+  assert(ROD_LOOK.length === 5 && new Set(looks.map(L => `${L.shaft}|${L.wrap}|${L.guide}|${L.butt}`)).size === 5 && new Set(looks.map(L => L.butt)).size === 5 && new Set(svgs).size === 5
+    && looks[0].wrap[0] === '#34d399' && looks[0].butt === 'ball' && looks[3].guide === 'gem' && looks[3].butt === 'gem' && looks[4].guide === 'star' && looks[4].sparkle && looks[4].glow && !looks[0].glow,
+    'V13.186 낚싯대 1~5단계는 몸통 · 마디 · 고리 · 손잡이 끝이 모두 다르다(1단계 초록 마디 · 초록 구슬, 4단계 보석 고리 · 보석 손잡이, 5단계 별 고리 · 반짝이 · 빛)');
+  // 끝 고리는 줄 끝(rodGeom tip) 자리, 곧게 · 오른쪽 · 왼쪽으로 휠 때 모두. 마디 · 고리 · 손잡이가 다 그려진다.
+  const tipOk = bends.every(g => looks.every(L => rodSvg(g, L, 0).includes(`class="rl-rv-tip" cx="${g.tip[0].toFixed(1)}" cy="${g.tip[1].toFixed(1)}"`)));
+  const count = (str, re) => (str.match(re) || []).length;
+  assert(tipOk && svgs.every((x, i) => count(x, /<circle|<path/g) > 30 && x.includes('url(#rl-rv-shaft)') && x.includes('url(#rl-corkg)') && x.includes('url(#rl-rv-butt)') && count(x, /class="rl-rv-wrap"/g) === looks[i].wraps.length && x.includes(`fill="${looks[i].wrap[0]}"`))
+    && ROD_SHAPE.GUIDES.length === 7 && ROD_SHAPE.BUTT < ROD_SHAPE.CORK[0] && ROD_SHAPE.CORK[1] <= ROD_SHAPE.SHAFT,
+    'V13.186 낚싯대 끝 고리 = 줄 끝, 마디 감개 · 고리 7개 · 코르크 · 손잡이 끝이 단계 색으로 그려진다');
   const ui = source('../public/modules/reel.js'), css = source('../public/v13154.css');
-  assert(ui.includes("svg.dataset.rodArt = a ? a.rod : '';") && ui.includes("svg.classList.toggle('img', !!a);") && ui.includes('if (R.rodPieces) drawRodArt(g);') && ui.includes('paintRod();\n}\n// V13.154 낚싯대 단계')
-    && /\.rl-rig\.img \.rl-rod-body,\.rl-rig\.img \.rl-rod-cork,\.rl-rig\.img #rl-guides\{display:none\}/.test(css),
-    'V13.185 낚시 화면은 단계 그림 낚싯대(data-rod-art)를 그리고 코드 낚싯대는 숨긴다. 장면을 그릴 때 · 강화할 때 바로 바뀐다(그림이 없으면 코드 낚싯대)');
+  assert(ui.includes("$('rl-rodv').innerHTML = rodSvg(g, R.look || rodLook(1), reduced() ? 0 : performance.now());") && ui.includes('svg.dataset.look = `${L.guide}-${L.butt}`;') && ui.includes('paintRod();\n}\n// V13.154 낚싯대 단계')
+    && [1, 2, 3, 4, 5].every(l => existsSync(pub(`assets/fishing/${l > 1 ? `pov-reel-t${l}` : 'pov-reel'}.webp`))) && /\.rl-rig\.img-reel \.rl-reel-g \.spool/.test(css) && !ui.includes('rodPieceMatrix'),
+    'V13.186 낚시 화면은 매 프레임 벡터 낚싯대(data-look)를 그리고, 릴은 단계별 릴 그림. 장면을 그릴 때 · 강화할 때 바로 바뀐다');
   // 손맛 연출(입질 · 끌어당김 · 줄 끊김)은 같은 낚싯대 곡선을 쓴다.
   assert(["R.rig.tBend = .32;", "Object.assign(R.rig, { tBack: .45, tBend: .5 });", "fx('snap', ...rodGeom().tip)", "R.rig.tBend = .18 + f.tension / 100 * .85"].every(x => ui.includes(x)),
     'V13.185 입질 · 챔질 · 파이팅 휨 · 줄 끊김(snap) 연출은 그대로(같은 rodGeom · tBend)');
