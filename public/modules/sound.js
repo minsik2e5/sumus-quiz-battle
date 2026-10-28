@@ -29,7 +29,9 @@ export const SOUND_GAIN = {
   // 줄 풀림 · 반짝이 · 굵은 줄 끊김) · 월척 · 깊은 바다(낮은 울림(이어지는 소리) · 물방울 · 큰 그림자).
   'fish-turn': .7, 'fish-ink': .7, 'fish-glide': .55, 'fish-lure': .5, 'fish-thump': .8,
   'rod-tick': .4, 'rod-ratchet': .45, 'rod-drag': .55, 'rod-shimmer': .45, 'rod-snap-heavy': .9,
-  'trophy-boom': .9, 'deep-hum': .35, 'deep-bubble': .4, 'deep-pass': .6
+  'trophy-boom': .9, 'deep-hum': .35, 'deep-bubble': .4, 'deep-pass': .6,
+  // V13.191 인형뽑기 놓침 연출(docs/sound/claw-synth.mjs): 집게 버팀 · 인형 툭 · 아깝다.
+  'claw-strain': .55, 'claw-slip': .75, 'claw-aww': .6
 };
 // 이어지는 소리: key -> 한 주기(초). 파일은 같은 주기가 세 번 이어져 있고, 가운데 주기만 되풀이한다(reel-synth.mjs의 LOOP).
 export const SOUND_LOOP = { 'reel-strain': .8, 'deep-hum': 1.2 };

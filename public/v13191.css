@@ -1,0 +1,52 @@
+/* V13.191 인형뽑기 퀄리티업(docs/claw-upgrade-design.md): near-miss 놓침 연출 · 반 소식 한 줄. */
+
+/* 반 소식: 위쪽 한 줄(글자 + 📣 + "반 소식" 꼬리표, 색만으로 구분하지 않음). */
+.cw-news{position:relative;z-index:5;display:flex;align-items:center;gap:8px;margin:2px 12px 0;padding:5px 10px;border-radius:14px;background:linear-gradient(90deg,rgba(254,243,199,.95),rgba(253,230,138,.92));color:#78350f;box-shadow:0 4px 14px rgba(46,16,101,.3);min-height:28px;overflow:hidden}
+.cw-news[hidden]{display:none}
+.cw-news-tag{flex:none;display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;background:#7c2d12;color:#fff7ed;font-size:11px;font-weight:900;letter-spacing:-.2px}
+.cw-news-text{flex:1;min-width:0;margin:0;font-size:12.5px;font-weight:800;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:keep-all;animation:cw-news-in .45s cubic-bezier(.2,1.3,.4,1)}
+.cw-news small{flex:none;font-size:10.5px;font-weight:700;opacity:.75}
+@keyframes cw-news-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* 짧고 빨리 사라지는 흔들림(세기 · 길이는 연출 계획이 정한다). */
+.cw-stage.shake{animation:cw-near-shake var(--shake-ms,.4s) cubic-bezier(.25,.7,.35,1)}
+@keyframes cw-near-shake{
+  15%{transform:translate(calc(var(--shake-px,5px) * -1),calc(var(--shake-px,5px) * .4))}
+  35%{transform:translate(var(--shake-px,5px),calc(var(--shake-px,5px) * -.3))}
+  55%{transform:translate(calc(var(--shake-px,5px) * -.5),0)}
+  75%{transform:translate(calc(var(--shake-px,5px) * .25),0)}
+  100%{transform:none}}
+
+/* 멈춤(hit-stop): 화면 전체가 한순간 얼고 살짝 밝아진다. */
+.cw-stage.hitstop .cw-zoom{filter:brightness(1.16) saturate(1.15)}
+.cw-stage.hitstop *{animation-play-state:paused!important}
+/* 슬로모션: 가장자리가 어두워지고 가운데에 시선이 모인다. */
+.cw-stage.slowmo::after{content:"";position:absolute;inset:0;z-index:480;pointer-events:none;background:radial-gradient(ellipse at 50% 45%,transparent 45%,rgba(20,6,50,.42) 100%);animation:cw-slowmo-in .18s ease-out}
+@keyframes cw-slowmo-in{from{opacity:0}to{opacity:1}}
+
+/* 버팀: 집게가 바들바들 + GRIP 숫자가 떨린다. */
+.cw-claw.strain{filter:drop-shadow(0 0 6px rgba(251,191,36,.75))}
+.cw-readout.strain{animation:cw-ro-strain .09s steps(2) infinite}
+@keyframes cw-ro-strain{50%{transform:translateX(1px)}}
+.cw-readout.slip{color:#fda4af;text-shadow:0 0 8px rgba(244,63,94,.8);animation:cw-ro-slip .5s ease-out}
+@keyframes cw-ro-slip{0%{transform:scale(1.35)}100%{transform:none}}
+
+/* 솜털 · 반짝이 · 먼지(빨리 사라진다). */
+.cw-puff{position:absolute;z-index:475;width:2.2%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,#fff 0,#fce7f3 55%,rgba(252,231,243,0) 72%);transform:translate(-50%,-50%);pointer-events:none;animation:cw-puff .7s cubic-bezier(.15,.8,.35,1) forwards}
+.cw-puff.heart{width:2.8%}
+.cw-puff.dust{width:3%;background:radial-gradient(circle,rgba(255,255,255,.7) 0,rgba(221,214,254,.35) 55%,transparent 72%)}
+.cw-puff img{position:absolute;inset:-60%;width:220%}
+@keyframes cw-puff{0%{opacity:1;transform:translate(-50%,-50%) scale(.4)}60%{opacity:.9}100%{opacity:0;transform:translate(calc(-50% + var(--dx)),calc(-50% + var(--dy))) scale(1.1)}}
+
+/* 한 박자 늦은 "아깝다!": 단계마다 모양(꼬리표 · 크기 · 들썩임)이 다르다. */
+.cw-say.near{animation:cw-near-in .42s cubic-bezier(.2,1.6,.4,1)}
+.cw-say.near.heart{font-size:17px;font-weight:900;border:2px solid #f9a8d4;background:linear-gradient(135deg,#fff,#fdf2f8)}
+.cw-say.near.slip{font-weight:800}
+.cw-say.air{font-size:14px;opacity:.92}
+.cw-near-badge{display:inline-block;margin-right:6px;padding:1px 7px;border-radius:999px;background:#be185d;color:#fff;font-size:12px;font-weight:900;transform:rotate(-4deg)}
+@keyframes cw-near-in{0%{opacity:0;transform:translate(-50%,10px) scale(.7)}60%{opacity:1;transform:translate(-50%,-3px) scale(1.06)}100%{transform:translate(-50%,0) scale(1)}}
+
+@media(prefers-reduced-motion:reduce){
+  .cw-stage.shake,.cw-readout.strain,.cw-news-text,.cw-say.near{animation:none!important}
+  .cw-stage.slowmo::after{display:none}
+}

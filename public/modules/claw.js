@@ -5,6 +5,7 @@ import { coinShower, countUp } from './celebrate.js';
 import { CLAW, DOLL_KEYS, DOLLS, dollName, roundLayout } from './claw-rules.js';
 import { CLAW_ART } from './claw-art.js';
 import { TITLES } from './titles.js';
+import { missPlan } from './claw-fx.js';
 
 // V13.180 인형뽑기(놀이터). 구성안 docs/claw-machine-design.md. 그림은 주문서 42 ~ 45(public/assets/claw).
 // 3D 라이브러리 없이 그림 층 + 2.5D: 기계(속 빈 그림) → 인형 더미(깊이 순서) → 집게 뒤 발톱 → 잡힌 인형 → 앞 발톱 · 줄 · 레일 → 유리 반사 → 버튼.
@@ -71,6 +72,7 @@ export function openClaw(A, exit) {
     <div class="cw-bg" id="cw-bg">${img(bg, 'cw-bg-img')}<i class="cw-glitter"></i></div>
     <header class="cw-top"><button type="button" class="yb-back" data-cw="exit" aria-label="나가기">${icon('back')}</button><strong>인형뽑기</strong>
       <span class="cw-chip" id="cw-tickets" aria-label="집게권"></span><button type="button" class="cw-round-btn" data-cw="book" aria-label="인형 도감">📖</button><button type="button" class="cw-round-btn" data-cw="guide" aria-label="인형뽑기 안내">?</button></header>
+    <div class="cw-news" id="cw-news" role="status" aria-live="polite" hidden></div>
     <div class="cw-hud" id="cw-hud" aria-live="polite"></div>
     <main class="cw-main"><div class="cw-stage" id="cw-stage"><div class="cw-zoom" id="cw-zoom">
       ${img('machine', 'cw-machine', '<span class="cw-machine cw-machine-css"></span>')}
@@ -101,10 +103,10 @@ export function openClaw(A, exit) {
   addEventListener('keydown', C.onKey); addEventListener('keyup', C.onKeyUp);
   bindStick();
   window.scrollTo(0, 0);
-  preloadSound(['coin', 'swoosh', 'wiggle', 'pop', 'stamp', 'fanfare-basic', 'fanfare-epic', 'fanfare-legend', 'coins', 'reel-plop', 'reel-click', 'tick', 'tap', 'fail']);
+  preloadSound(['coin', 'swoosh', 'wiggle', 'pop', 'stamp', 'fanfare-basic', 'fanfare-epic', 'fanfare-legend', 'coins', 'reel-plop', 'reel-click', 'tick', 'tap', 'fail', 'claw-strain', 'claw-slip', 'claw-aww']);
   idle();
   api('/claw/home', {}).then(res => {
-    if (!C) return; setView(res.claw);
+    if (!C) return; setView(res.claw); news(res.news);
     if (res.claw?.live) return resume(res.claw.live);
     idle();
     if (!C.v?.guide) later(() => guide(true), 600);
@@ -335,6 +337,7 @@ async function drop(auto = false) {
   const res = got.ok;
   C.dropId = null;
   setView(res.claw);
+  if (res.news) later(() => news(res.news), 2600);
   C.round.n = res.n + 1;
   // 2) 바닥에 닿음: 주변 인형이 출렁, 먼지 반짝.
   bumpAround(k.x, k.y);
@@ -344,9 +347,11 @@ async function drop(auto = false) {
   gripCount(res.grip);
   if (doll && res.result !== 'miss') { clawPic('grip', doll); dollNode(doll.i)?.classList.add('lifted'); } else clawPic('closed');
   await wait(380);
+  // V13.191 놓침 연출은 서버 결과(result · slip · grip · aim)로만 정한다(claw-fx.js). 잡힘이면 plan은 null.
+  const plan = missPlan(res, { reduced: reduced() });
   if (res.result === 'win') await winLift(res, doll);
-  else if (res.result === 'slip' && doll) await slipLift(res, doll);
-  else await tween(1000, t => { k.drop = 1 - t; k.sway = Math.sin(t * 9) * 3 * (1 - t); drawClaw(); });
+  else if (plan.held && doll) await slipLift(res, doll, plan);
+  else await airLift(plan);
   k.bottom = null; k.drop = 0;
   if (!C) return;
   zoomTo(false);
@@ -440,38 +445,86 @@ async function prizeOut(prizes, res) {
   later(() => { if (door.className === 'cw-door') door.innerHTML = ''; }, 500);
 }
 // 놓침: lift(올라가다 미끄러짐) · chute(배출구 쪽으로 가다 떨어짐) · loose(쥐다 빠짐). 인형은 제자리로 굴러 돌아온다.
-async function slipLift(res, doll) {
+// V13.191 near-miss: 버팀(인형이 발톱에서 흔들림 · 끼익) → 미끄러지는 순간 멈춤(hit-stop) · 툭 · 솜털 → 짧은 흔들림 →
+//   슬로모션으로 떨어지기 시작 → 한 박자 늦은 "아깝다!" 문구 · 소리 · 진동. 세기는 plan(claw-fx.js: 조준이 가까울수록 더 아슬아슬).
+async function slipLift(res, doll, plan) {
   const k = C.claw, node = dollNode(doll.i), from = { x: k.x, y: k.y };
   if (res.slip === 'loose') {
-    await tween(300, t => { k.drop = 1 - t * 0.12; drawClaw(); });
-    clawPic('closed'); node?.classList.remove('lifted'); tumbleBack(node, doll, 0.12);
-    await tween(850, t => { k.drop = 0.88 * (1 - t); k.sway = Math.sin(t * 10) * 4 * (1 - t); drawClaw(); });
+    await tween(300, t => { k.drop = 1 - t * plan.lift; drawClaw(); });
+    clawPic('closed'); node?.classList.remove('lifted');
+    await slipMoment(plan, slipPoint(node, plan.lift));
+    tumbleBack(node, doll, plan.lift);
+    await tween(850, t => { k.drop = (1 - plan.lift) * (1 - t); k.sway = Math.sin(t * 10) * 4 * (1 - t); drawClaw(); });
     return;
   }
   if (node) node.style.visibility = 'hidden';
   k.held = true;
-  const upTo = res.slip === 'lift' ? 0.45 : 1;
-  await tween(res.slip === 'lift' ? 620 : 1000, t => { k.drop = 1 - t * upTo; k.sway = Math.sin(t * 9) * (3 + t * 4); drawClaw(); });
+  await tween(res.slip === 'lift' ? 620 : 1000, t => { k.drop = 1 - t * plan.lift; k.sway = Math.sin(t * 9) * (3 + t * 4); drawClaw(); });
   if (res.slip === 'chute') await tween(700, t => { k.x = from.x + (HOME.x - from.x) * t * 0.6; k.y = from.y + (HOME.y - from.y) * t * 0.6; k.sway = Math.sin(t * 12) * 6; drawClaw(); });
+  await strain(plan);
   // 미끄러진다.
   clawPic('closed'); k.held = false; drawClaw();
-  sfx('reel-plop'); buzz([60]);
   if (node) node.style.visibility = '';
   node?.classList.remove('lifted');
-  shake();
-  say(res.slip === 'chute' ? '아깝다! 거의 다 왔는데…' : '앗, 미끄러졌어요!', 'sad');
-  await tumbleBack(node, doll, 1 - k.drop, { x: k.x, y: k.y });
+  await slipMoment(plan, slipPoint(node, 1 - k.drop, { x: k.x, y: k.y }));
+  await tumbleBack(node, doll, 1 - k.drop, { x: k.x, y: k.y }, plan);
   const back = { x: k.x, y: k.y };
   await tween(700, t => { k.drop = Math.max(0, k.drop - t * k.drop); if (res.slip === 'chute') { k.x = back.x; k.y = back.y; } k.sway = Math.sin(t * 8) * 3 * (1 - t); drawClaw(); });
 }
+// 허공: 인형을 들지 않는다. 바닥 먼지가 살짝 일고, 한 박자 뒤 짧은 문구.
+async function airLift(plan) {
+  const k = C.claw, p = floorAt(k.x, k.y);
+  puff(p.left, p.top - 2, plan.particles, 'dust');
+  buzz(plan.buzz);
+  later(() => say(esc(plan.text), 'sad air'), plan.delay);
+  await tween(1000, t => { k.drop = 1 - t; k.sway = Math.sin(t * 9) * 3 * (1 - t); drawClaw(); });
+}
+// 버팀: 들린 인형이 발톱에서 흔들흔들(쥔 힘이 셀수록 오래) · 집게 끼익 · GRIP 숫자가 떨린다.
+async function strain(plan) {
+  if (!plan.strain) return;
+  const k = C.claw, claw = $('cw-claw'), ro = $('cw-readout'), base = k.sway;
+  sfx('claw-strain'); buzz([12, 50, 12]);
+  claw?.classList.add('strain'); ro?.classList.add('strain');
+  const swings = Math.max(1, Math.round(plan.strain / 210));
+  await tween(plan.strain, (e, t) => { k.sway = base * (1 - t) + Math.sin(t * Math.PI * 2 * swings) * (2 + t * 6); drawClaw(); }, t => t);
+  claw?.classList.remove('strain'); ro?.classList.remove('strain');
+}
+// 인형이 빠지는 자리(기계 그림 %): 집게 아래 인형 높이.
+function slipPoint(node, height, at = null) {
+  const doll = node ? { left: parseFloat(node.style.left), top: parseFloat(node.style.top) } : null;
+  const p = at ? floorAt(at.x, at.y) : doll || floorAt(C.claw.x, C.claw.y);
+  return { left: p.left, top: (doll?.top ?? p.top) - height * 22 };
+}
+// 미끄러지는 순간: 멈춤(hit-stop) → 툭 소리 · 진동 · 솜털 · 짧은 흔들림, 그리고 한 박자 늦게 "아깝다!".
+async function slipMoment(plan, at) {
+  const stage = $('cw-stage'), ro = $('cw-readout');
+  if (plan.hitStop) {
+    stage?.classList.add('hitstop');
+    await new Promise(r => later(r, plan.hitStop));
+    stage?.classList.remove('hitstop');
+  }
+  if (plan.sounds.includes('claw-slip')) sfx('claw-slip'); else sfx('reel-plop');
+  buzz(plan.buzz);
+  puff(at.left, at.top, plan.particles, plan.level);
+  if (plan.shake) shake(plan.shake);
+  if (ro && plan.level !== 'graze') { ro.textContent = 'SLIP!'; ro.classList.add('slip'); later(() => ro.classList.remove('slip'), 900); }
+  later(() => {
+    say(`${plan.badge ? `<b class="cw-near-badge">${esc(plan.badge)}</b>` : ''}${esc(plan.text)}`, `sad near ${plan.level}`);
+    if (plan.sounds.includes('claw-aww')) sfx('claw-aww');
+  }, plan.delay);
+}
 // 인형이 집게 높이에서 떨어져 뒹굴며 제자리에 앉는다.
-async function tumbleBack(node, doll, height, at = null) {
+async function tumbleBack(node, doll, height, at = null, plan = null) {
   if (!node) return;
   const img0 = node.querySelector('.cw-doll-img');
   if (img0) img0.src = dollSrc(doll.k, 'fall');
   const home = floorAt(doll.x, doll.y), sp = at ? floorAt(at.x, at.y) : home;
   const fromTop = parseFloat(node.style.top) - height * 22, fromLeft = sp.left;
-  await tween(520, t => { node.style.top = `${fromTop + (parseFloat(placeTop(doll)) - fromTop) * t}%`; node.style.left = `${fromLeft + (home.left - fromLeft) * t}%`; node.style.transform = `rotate(${(1 - t) * 160}deg)`; }, t => t * t);
+  // V13.191 슬로모션: 떨어지기 시작 plan.slowMs(보통 시간)를 plan.slow 배로 느리게, 나머지는 보통 속도.
+  const slow = plan && plan.slow < 1 ? plan : null, fall = 520, real = slow ? fall - slow.slowMs + slow.slowMs / slow.slow : fall;
+  const warp = slow ? t => { const r = t * real, n = r < slow.slowMs / slow.slow ? r * slow.slow : slow.slowMs + r - slow.slowMs / slow.slow, u = n / fall; return u * u; } : t => t * t;
+  if (slow) { $('cw-stage')?.classList.add('slowmo'); later(() => $('cw-stage')?.classList.remove('slowmo'), slow.slowMs / slow.slow); }
+  await tween(real, t => { node.style.top = `${fromTop + (parseFloat(placeTop(doll)) - fromTop) * t}%`; node.style.left = `${fromLeft + (home.left - fromLeft) * t}%`; node.style.transform = `rotate(${(1 - t) * 160}deg)`; }, warp);
   node.style.transform = '';
   if (img0) img0.src = dollSrc(doll.k, '', true);
   node.classList.remove('bump'); void node.offsetWidth; node.classList.add('bump');
@@ -519,6 +572,24 @@ function complete() {
   confetti(50, 40, 28, true);
 }
 
+/* ---------- 반 소식 ---------- */
+// V13.191 같은 학교 · 학년 친구의 황금 인형 · 대박 · 도감 소식 한 줄(server/claw-news.mjs, 최근 하루 3개). 여럿이면 5초마다 넘긴다.
+function news(list) {
+  if (!C || !Array.isArray(list)) return;
+  C.news = list.slice(0, 3); C.newsAt = 0;
+  showNews();
+}
+const ago = at => { const m = Math.max(0, Math.round((Date.now() - at) / 60000)); return m < 1 ? '방금' : m < 60 ? `${m}분 전` : `${Math.floor(m / 60)}시간 전`; };
+function showNews() {
+  const box = $('cw-news'); if (!box || !C) return;
+  clearTimeout(C.newsTimer);
+  const n = C.news?.length ? C.news[C.newsAt % C.news.length] : null;
+  box.hidden = !n;
+  if (!n) { box.innerHTML = ''; return; }
+  box.innerHTML = `<span class="cw-news-tag"><span aria-hidden="true">📣</span>반 소식</span><p class="cw-news-text">${esc(n.text)}</p><small>${ago(n.at)}</small>`;
+  if (C.news.length > 1 && !reduced()) C.newsTimer = later(() => { C.newsAt++; showNews(); }, 5000);
+}
+
 /* ---------- 효과 ---------- */
 function say(html, cls = '') {
   const fx = $('cw-fx'); if (!fx) return;
@@ -554,7 +625,26 @@ function flash(kind) {
   later(() => fx.querySelector('.cw-flash')?.remove(), 1400);
   const app = root().querySelector('.cw-app'); app?.classList.add('party'); later(() => app?.classList.remove('party'), 1600);
 }
-function shake() { const s = $('cw-stage'); s?.classList.remove('shake'); void s?.offsetWidth; s?.classList.add('shake'); }
+function shake(o = null) {
+  const s = $('cw-stage'); if (!s) return;
+  if (o) { s.style.setProperty('--shake-px', `${o.px}px`); s.style.setProperty('--shake-ms', `${o.ms}ms`); }
+  else { s.style.removeProperty('--shake-px'); s.style.removeProperty('--shake-ms'); }
+  s.classList.remove('shake'); void s.offsetWidth; s.classList.add('shake');
+}
+// 놓침 솜털 · 반짝이(heart가 가장 많고 멀리), 허공은 바닥 먼지. 빨리 사라진다.
+function puff(left, top, n, kind) {
+  const fx = $('cw-fx'); if (!fx || !n) return;
+  const far = kind === 'heart' ? 9 : kind === 'slip' ? 7 : 4;
+  for (let i = 0; i < n; i++) {
+    const s = document.createElement('span'); s.className = `cw-puff ${kind}`;
+    const a = (i / n) * Math.PI * 2 + Math.random() * 0.5, r = far * (0.6 + Math.random() * 0.6);
+    s.style.left = `${left}%`; s.style.top = `${top}%`;
+    s.style.setProperty('--dx', `${Math.cos(a) * r}vmin`); s.style.setProperty('--dy', `${Math.sin(a) * r * 0.7 - (kind === 'dust' ? 2 : 0)}vmin`);
+    s.style.animationDelay = `${i * 12}ms`;
+    if (kind !== 'dust' && i % 3 === 0 && has('fx-sparkle')) s.innerHTML = img('fx-sparkle');
+    fx.appendChild(s); later(() => s.remove(), 760);
+  }
+}
 // 확대: 집게 둘레로 부드럽게(조준 중 버튼, 내릴 때 자동).
 function toggleZoom() { C.zoom = !C.zoom; zoomTo(); mid(); }
 function zoomTo(auto = null) {

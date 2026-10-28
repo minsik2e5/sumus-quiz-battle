@@ -92,11 +92,15 @@
 | `deep-hum` | 낚시: 깊은 바다 낮은 울림(이어지는 소리, 1.2초 주기) | 우리가 합성(`docs/sound/feel-synth.mjs`의 `deep-hum`) | 3.60초 · 22KB |
 | `deep-bubble` | 낚시: 깊은 바다 물방울 보글 | 우리가 합성(`docs/sound/feel-synth.mjs`의 `deep-bubble`) | 1.05초 · 7KB |
 | `deep-pass` | 낚시: 깊은 바다 입질 직전 큰 그림자(우우웅) | 우리가 합성(`docs/sound/feel-synth.mjs`의 `deep-pass`) | 2.60초 · 16KB |
+| `claw-strain` | 인형뽑기: 놓치기 직전 집게 버팀(끼익 + 지잉) | 우리가 합성(`docs/sound/claw-synth.mjs`의 `claw-strain`) | 0.61초 · 5KB |
+| `claw-slip` | 인형뽑기: 인형이 발톱에서 툭 빠짐(스륵 + 폭신한 쿵) | 우리가 합성(`docs/sound/claw-synth.mjs`의 `claw-slip`) | 0.70초 · 6KB |
+| `claw-aww` | 인형뽑기: 한 박자 늦은 "아깝다!"(반음씩 내려가는 말렛) | 우리가 합성(`docs/sound/claw-synth.mjs`의 `claw-aww`) | 1.29초 · 10KB |
 
 ## 출처와 라이선스
 - **우리가 합성한 소리**: `docs/sound/synth.mjs`로 만든다(종소리 배음 · 마림바 · 쓸어올리는 바람 소리 · 저음 울림 · 반짝이 · 리버브를 겹침). 다시 만들 때: `npm i --no-save @breezystack/lamejs` 후 `node docs/sound/synth.mjs <출력 폴더>` → 원하는 파일을 `public/assets/sfx/<key>.mp3`로 복사. 우리가 만든 것이라 제약이 없다.
 - **낚시 소리(V13.164)**: `docs/sound/reel-synth.mjs`. 물소리는 크고 작은 물방울(민나르트 공명: 울리며 높아지는 사인)을 촘촘히 흩뿌리고, 끼익은 마찰이 붙었다 미끄러지는 톡을 낚싯대 · 줄 공명으로 거른다. `reel-strain`은 같은 0.8초를 세 번 이어 붙인 파일이고, 앱은 가운데 0.8초만 되풀이한다(`sound.js`의 `SOUND_LOOP`와 주기를 같게 둔다).
 - **10초 맞추기 소리(V13.180)**: `docs/sound/timing-synth.mjs`. 전자 시계 삑(사인 + 약한 홀수 배음) · 째깍(좁은 대역 잡음 톡) · 플라스틱 버튼 딸깍(쿵 + 스위치 똑)에 종 · 마림바 · 금관 · 반짝이를 겹쳤다. 모두 2초 이하 · 64~96kbps로 작게(11개 합 약 120KB).
+- **인형뽑기 놓침 소리(V13.191)**: `docs/sound/claw-synth.mjs`. 낚시 손맛 소리(`feel-synth.mjs`)의 마찰(끼익) · 줄 울림 · 바람 · 쿵 · 말렛 · 종 재료를 그대로 옮겨 짧게 만들었다(64kbps, 합계 21KB).
 - **Kenney**(kenney.nl, CC0): 출처 표기 없이 써도 된다.
 - **Mixkit**(mixkit.co): 시청 페이지에 후보로 들어 있다. 앱·게임·교육·상업용은 무료이고 출처 표기도 필요 없지만, **파일 자체를 따로 재배포하면 안 된다.** 이 저장소는 공개(PUBLIC)라서 Mixkit 원본 파일은 저장소에 넣지 않는다. 쓰려면 저장소를 비공개로 바꾸거나, 배포 단계에서만 넣는 방법을 먼저 정한다.
 
