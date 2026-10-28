@@ -14,7 +14,7 @@
 - 답변, PR 설명, 변경 기록은 한국어로 쓴다. 버전을 올리면 루트에 `CHANGES_v<버전>.md`를 남긴다.
 - 바뀐 규칙마다 `server/*-check.mjs`에 검사를 남긴다. `npm run check`와 `npm run check:cloudflare`가 통과해야 한다.
 - 선생님이 "퀄리티 높게"라고 한 화면·연출·이펙트는 줄이지 않는다.
-- 전설 펫에는 야차전 특기가 없다.
+- 전설 · 신화 · 한정 펫에도 야차전 특기가 있다. 세기는 기본 ≈ 영웅 < 전설(+약 6%) < 신화(+약 6%), 한정은 기본 정도(docs/pet-skills-balance.md, server/pet-sim.mjs로 승률 확인).
 - 그림 주문서(docs/asset-requests/runner)에는 두 가지를 꼭 넣는다.
   - Drive의 기존 그림을 열어 그림체를 맞추라는 말
   - 정해진 Drive 폴더에 정확한 파일 이름으로 저장하라는 말

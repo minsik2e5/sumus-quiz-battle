@@ -9,7 +9,7 @@ import { elementOf } from '../public/modules/battle-fx.js';
 import { expressionSrc } from '../public/modules/character.js';
 import { createCompetition, REMATCH_MS } from './competition.mjs';
 import { openEgg, pullLucky, monsterStart, monsterFinish } from './rewards.mjs';
-import { field as petField } from './pet-sim.mjs';
+import { field as petField, baseSkillPets } from './pet-sim.mjs';
 import './service.mjs'; // '한 과 정복' 수를 세는 함수를 competition.mjs에 걸어 둔다
 
 const here = path => fileURLToPath(new URL(path, import.meta.url));
@@ -31,7 +31,7 @@ export function runPetsTitlesChecks(assert) {
   assert(fresh.every(key => [0, 1, 2, 3].every(f => asset(`${key}-${f}`) && asset(`${key}-${f}-s`) && (f ? ['happy', 'eat', 'sad', 'cheer', 'attack', 'hurt'] : ['happy', 'eat']).every(e => expressionSrc(key, f, e) === `/assets/pets/${key}-${f}-${e}.webp` && asset(`${key}-${f}-${e}`)))),
     'V13.148 새 펫 10종의 그림(단계 · 작은 그림 · 표정 · 알 반응)과 야차전 · 던전 공격 · 맞음 그림이 모두 연결된다');
   assert(fresh.every(key => PET_SKILLS[key]?.name && PET_SKILLS[key].desc && petSkill({ key }).key === key && elementOf(key)), 'V13.148 새 펫마다 야차전 특기와 공격 속성이 있다');
-  const r = petField(Object.keys(PET_SKILLS), { n: 10, seed: 5 });
+  const r = petField(baseSkillPets(), { n: 10, seed: 5 });
   assert(fresh.every(key => ['speed', 'skill'].every(mode => r[mode][key] > .42 && r[mode][key] < .58)), 'V13.148 새 펫 10종은 두 야차전 모드에서 전체 펫 상대 승률 42~58% 안이다(조정은 47~54%로 맞춤)');
 
   /* ---------- 칭호 40개 ---------- */

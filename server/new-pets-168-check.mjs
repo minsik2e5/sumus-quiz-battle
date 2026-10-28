@@ -1,6 +1,6 @@
 // V13.168 검사: 새 펫 14종(12지 기본 6 · 영웅 6 · 신화 2). release-check가 부른다.
 // 그림이 다 들어온 펫만 알 · 선물 · 사냥 · 낚시 교환소 · 뽑기 · 도감에 나온다(public/modules/pet-art.js → core.js petReady).
-// 특기(기본 · 영웅 12종은 기존 계열 안에서, 다른 특기보다 세지 않게), 신화 2종은 특기 없음, 칭호 '12지 수호자', 도감 '곧 만나요',
+// 특기(기본 · 영웅 12종은 기존 계열 안에서, 다른 특기보다 세지 않게), 신화 2종의 특기는 V13.185(server/pet-skills-all-check.mjs), 칭호 '12지 수호자', 도감 '곧 만나요',
 // 그림 주문서 36 · 37 · 38(Drive 그림체 맞추기 · 정해진 폴더와 파일 이름, slice-map, CODEX_PROMPT).
 import { readFileSync, readdirSync, existsSync, mkdtempSync, writeFileSync, copyFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,7 +15,7 @@ import { TITLES, TITLE_COINS, titleCoins, titleUnlocked, titleProgress } from '.
 import { TITLE_ART } from '../public/modules/emblems.js';
 import { createCompetition } from './competition.mjs';
 import { openEgg, giftEggPick, mythicRoll, setMythicRandom } from './rewards.mjs';
-import { field as petField } from './pet-sim.mjs';
+import { field as petField, baseSkillPets } from './pet-sim.mjs';
 import { sheets36, codexPrompt, FILES_36, DRIVE_36, PETS_36, PAIRS_36 } from '../docs/asset-requests/runner/build-36.mjs';
 
 const here = path => fileURLToPath(new URL(path, import.meta.url));
@@ -97,15 +97,15 @@ export async function runNewPets168Checks(assert) {
     'V13.168 새 펫 표정 · 알 반응이 연결되고, 공격 · 맞음 그림은 다 들어왔을 때만 쓴다(없으면 응원 · 시무룩)');
 
   /* ---------- 야차전 특기 ---------- */
-  const old = Object.keys(PET_SKILLS).filter(key => !NEW.includes(key));
+  const old = baseSkillPets().filter(key => !NEW.includes(key));
   const maxBudget = need => Math.max(...old.filter(key => (PET_SKILLS[key].need || 3) === need).map(key => budget(PET_SKILLS[key])));
   const KINDS = ['burst', 'boost', 'guard', 'heal', 'poison', 'turns', 'need', 'name', 'desc'];
   assert(SKILLED.every(key => PET_SKILLS[key]?.name && PET_SKILLS[key].desc && petSkill({ key }).key === key && Object.keys(PET_SKILLS[key]).every(k => KINDS.includes(k)) && budget(PET_SKILLS[key]) <= maxBudget(PET_SKILLS[key].need || 3))
     && new Set(Object.values(PET_SKILLS).map(s => s.name)).size === Object.keys(PET_SKILLS).length,
     'V13.168 새 기본 · 영웅 12종은 특기가 하나씩 있고, 기존 계열(바로 피해 · 공격 보너스 · 막기 · 회복 · 독) 안에서 기존 특기보다 세지 않다(같은 연속 조건의 기존 최대 세기 이하)');
-  assert(MYTHIC_168.every(key => !PET_SKILLS[key] && petSkill({ key }).key === 'none' && petSkill({ key }).desc.includes('신화')) && LEGENDARY_PET_KEYS.every(key => petSkill({ key }).key === 'none' && !PET_SKILLS[key]),
-    'V13.168 신화 황룡 · 삼족오는 특기가 없다(전설 펫도 그대로 특기 없음)');
-  const r = petField(Object.keys(PET_SKILLS), { n: 6, seed: 9 });
+  assert(MYTHIC_168.every(key => petSkill({ key }).key === key) && LEGENDARY_PET_KEYS.every(key => petSkill({ key }).key === key),
+    'V13.185 신화 황룡 · 삼족오와 전설 펫에도 특기가 있다(V13.168에는 없었다. 세기는 server/pet-skills-all-check.mjs)');
+  const r = petField(baseSkillPets(), { n: 6, seed: 9 });
   const top = mode => Math.max(...old.map(key => r[mode][key]));
   const off = SKILLED.filter(key => !['speed', 'skill'].every(mode => r[mode][key] > .42 && r[mode][key] < .58 && r[mode][key] <= top(mode) + .005));
   assert(!off.length, `V13.168 새 12종은 두 야차전 모드에서 전체 펫 상대 승률 42~58% 안이고 기존 가장 센 펫보다 높지 않다(조정은 47~54%로 맞춤)${off.length ? ': ' + off.join(' ') : ''}`);
