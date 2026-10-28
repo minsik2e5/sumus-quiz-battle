@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>인형뽑기 2.5D 물리 시험</title>
+  <!-- V13.191 타당성 시험(docs/claw-3d-feasibility.md). 앱에 연결하지 않은 단독 페이지, 머지 대상 아님.
+       CSP(script-src 'self') 그대로: 인라인 스크립트 없이 같은 곳의 파일만 부른다. -->
+  <link rel="stylesheet" href="/proto/claw-physics.css">
+</head>
+<body>
+  <main class="pp">
+    <header><strong>인형뽑기 2.5D 물리 시험</strong><span id="pp-fps">-- fps</span></header>
+    <div class="pp-stage" id="pp-stage"><img class="pp-machine" src="/assets/claw/machine.webp" alt=""><canvas id="pp-canvas" aria-label="인형 20개가 쌓인 물리 장면"></canvas><img class="pp-glare" src="/assets/claw/glass-glare.webp" alt=""></div>
+    <p class="pp-note" id="pp-note">서버 결과(잡힘 · 놓침)를 흉내 내어 자동으로 집게가 움직입니다. 물리는 연출만, 결과는 늘 서버 값.</p>
+    <div class="pp-btns">
+      <button type="button" id="pp-win">다음: 잡힘</button>
+      <button type="button" id="pp-lift">다음: 올라가다 놓침</button>
+      <button type="button" id="pp-chute">다음: 배출구 앞 놓침</button>
+      <button type="button" id="pp-shake">기계 흔들기</button>
+    </div>
+    <pre class="pp-stats" id="pp-stats"></pre>
+  </main>
+  <script src="/proto/matter.min.js"></script>
+  <script type="module" src="/proto/claw-physics.js"></script>
+</body>
+</html>

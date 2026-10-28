@@ -1,0 +1,13 @@
+*{box-sizing:border-box}
+html,body{margin:0;background:#2e1065;color:#fff;font:14px/1.4 system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+.pp{max-width:560px;margin:0 auto;padding:10px 12px 24px}
+.pp header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.pp header span{font:700 12px ui-monospace,Menlo,monospace;background:rgba(0,0,0,.35);padding:2px 8px;border-radius:999px}
+.pp-stage{position:relative;width:100%;aspect-ratio:2/3;border-radius:16px;overflow:hidden;background:#3b1a73}
+.pp-machine{position:absolute;inset:0;width:100%;height:100%}
+.pp-glare{position:absolute;left:18%;top:20%;width:30%;opacity:.55;pointer-events:none}
+.pp-stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.pp-note{font-size:12.5px;opacity:.85;margin:8px 2px}
+.pp-btns{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pp-btns button{padding:10px 8px;border:0;border-radius:12px;background:#f9a8d4;color:#4c1d95;font-weight:800;font-size:13px}
+.pp-stats{margin:8px 0 0;padding:8px;border-radius:10px;background:rgba(0,0,0,.35);font:11px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap}

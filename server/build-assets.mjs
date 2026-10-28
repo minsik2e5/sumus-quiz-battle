@@ -235,7 +235,8 @@ writeFileSync(cssBundlePath, cssBundle);
   // Loaded on every start; teacher tools, grammar data and pet images are cached on first
   // use. Images still count toward ASSET_HASH, so a redrawn pet reaches installed apps.
   // V13.77: the install guide, its QR code and the PNG icons are also only fetched when used.
-  const onDemand = /^\/(?:(?:teacher-enhancements|exam-ops|grammar-choice-sample|blank-writing|[a-z-]+-grammar-data|[a-z-]+-blank-data|install)\.js|install\.html|vendor\/.+|icons\/.+\.png|assets\/.+\.(?:webp|mp3))$/;
+  // V13.191 (초안 브랜치만): public/proto/ 시험 페이지는 앱이 쓰지 않으니 미리 받지 않는다.
+  const onDemand = /^\/(?:(?:teacher-enhancements|exam-ops|grammar-choice-sample|blank-writing|[a-z-]+-grammar-data|[a-z-]+-blank-data|install)\.js|install\.html|vendor\/.+|icons\/.+\.png|proto\/.+|assets\/.+\.(?:webp|mp3))$/;
   // The page is cached as "/": Cloudflare answers /index.html with a 307 to /,
   // and a redirected response cannot be used to answer a navigation.
   const precache = served.map(({ url }) => url === '/index.html' ? '/' : url).filter(url => !onDemand.test(url));
