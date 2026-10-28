@@ -1275,7 +1275,7 @@ function book() {
   sheet(`${sheetHead(`물고기 도감 <small>${num(got)} / ${keys.length}</small>`)}
     <div class="fs-book-bar"><i style="width:${Math.round(got / keys.length * 100)}%"></i></div>
     <div class="fs-tank">${shore.map(slot).join('')}</div>
-    ${deep.length ? `<h3 class="rl-book-deep">🌊 깊은 바다 <small>${num(deep.filter(k => mine[k]?.n).length)} / ${num(deep.length)} · 낚싯대 ${num(DEEP.MIN_ROD)}단계부터</small></h3><div class="fs-tank deep">${deep.map(slot).join('')}</div>` : ''}`, 'book');
+    ${deep.length ? `<h3 class="rl-book-deep">🌊 깊은 바다 <small>${num(deep.filter(k => mine[k]?.n).length)} / ${num(deep.length)} ${DEEP.MIN_ROD > 1 ? ` · 낚싯대 ${num(DEEP.MIN_ROD)}단계부터` : ''}</small></h3><div class="fs-tank deep">${deep.map(slot).join('')}</div>` : ''}`, 'book');
 }
 // 처음 들어오면 한 번(그 뒤에는 ? 버튼).
 function guide(first) {
@@ -1288,7 +1288,7 @@ function guide(first) {
         펫 특기 구슬이 차면 <b>위로 쓸어 올려</b> 한 번에 끌어와요. 물고기가 뛰어오르면 고리가 맞을 때 탭 → 퍼펙트(무게 +8%)!</p></li>
       <li><b>물고기를 진주로</b><p>낚은 물고기는 <b>수조</b>에서 헤엄쳐요. 팔면 진주가 돼요. 팔아도 도감 기록은 남아요.</p>
         <div class="rl-guide-table">${['common', 'uncommon', 'rare', 'epic', 'legend'].map(r => `<span>${STAR(stars(r))}<b>${esc(RARITY[r].name)}</b><em>${num(REEL.PEARLS[r])}</em></span>`).join('')}</div></li>
-      ${R.v?.deep?.ready ? `<li><b>🌊 깊은 바다</b><p>낚싯대를 <b>${num(DEEP.MIN_ROD)}단계</b>로 강화하면 깊은 바다에서 낚을 수 있어요. 희귀 · 영웅 · 전설 물고기가 <b>심해 물고기</b>로 바뀌어요(진주 값은 같아요).</p></li>` : ''}
+      ${R.v?.deep?.ready ? `<li><b>🌊 깊은 바다</b><p>${DEEP.MIN_ROD > 1 ? `낚싯대를 <b>${num(DEEP.MIN_ROD)}단계</b>로 강화하면 깊은 바다에서 낚을 수 있어요.` : '부두 왼쪽 위에서 <b>깊은 바다</b>를 고르면 처음부터 낚을 수 있어요.'} 희귀 · 영웅 · 전설 물고기가 <b>심해 물고기</b>로 바뀌어요(진주 값은 같아요).</p></li>` : ''}
       <li><b>진주로 바꿀 수 있는 것</b>
         <ul><li>${coin()} <b>코인</b>: 진주 1개 = 1코인 (하루 ${num(REEL.COIN_DAILY)}코인까지)</li><li><b>랜덤 알</b>: 진주 ${num(REEL.EGG)}개 (하루 1개)</li><li><b>영웅 알</b>: 진주 ${num(REEL.EPIC_EGG)}개 (하루 1개)</li><li><b>바다 펫</b>: 진주 ${num(REEL.SEA_PET)}개 · 교환소에서만 만나요!</li><li><b>황금 알 물고기</b>는 팔지 않고 모아요. ${REEL.GOLDEN_EGG}마리면 알 선물!</li></ul></li>
     </ol>
