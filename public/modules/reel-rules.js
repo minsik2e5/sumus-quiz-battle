@@ -1,4 +1,5 @@
-import { FISH, FISH_KEYS, LURES, RARITY_KEYS, seeded } from './fishing-rules.js';
+import { FISH, FISH_KEYS, DEEP_KEYS, LURES, RARITY_KEYS, seeded } from './fishing-rules.js';
+import { FISH_READY } from './fish-art.js';
 
 // V13.150 손맛 낚시(놀이터): 단어 없이 던지기 · 입질 · 파이팅으로 낚는 미니게임. 미끼는 공부로 번다.
 // 물고기는 던질 때 서버가 정하고(reelRoll), 파이팅을 이기면 어망에 들어간다. 어망 물고기는 진주로 팔고, 진주로 코인 · 알 · 바다 펫을 바꾼다.
@@ -70,15 +71,24 @@ export const FINISH = { PERFECT_KG: 1.08, KINDS: ['perfect', 'good', 'miss'] };
 export const stars = rarity => ({ common: 1, uncommon: 2, rare: 3, epic: 4, legend: 5, golden: 5 })[rarity] || 1;
 export const pearlsOf = key => REEL.PEARLS[FISH[key]?.rarity] || 0;
 
+// V13.185 깊은 바다(심해 낚시터): 낚싯대 MIN_ROD단계부터 열린다(진주를 따로 쓰지 않는다). 등급 확률 · 진주 값은 바닷가와 같고,
+//   희귀 · 영웅 · 전설이 나오면 그 등급의 심해 물고기 중에서 고른다(흔함 · 보통 · 황금 알 물고기는 바닷가와 같은 물고기).
+//   그림이 다 들어온 심해 물고기만 나온다(FISH_READY). 한 마리도 없으면 깊은 바다는 열리지 않는다.
+export const DEEP = { MIN_ROD: 3, RARITIES: ['rare', 'epic', 'legend'] };
+export const deepReady = (ready = FISH_READY) => DEEP_KEYS.filter(k => ready.has(k));
+export const deepOpen = (rod, ready = FISH_READY) => rodLevel(rod) >= DEEP.MIN_ROD && deepReady(ready).length > 0;
+
 // 던질 때 정해지는 물고기: 퍼펙트면 미끼 두 단계, 좋음이면 한 단계 좋게 굴린다. 물 속성 펫은 희귀 이상이 조금 더.
-export function reelRoll(seed, cast = 'ok', { water = false } = {}) {
+// V13.185 deep: 깊은 바다에서 던졌으면 true(ready: 그림이 있는 물고기, 검사용). 난수 순서는 바닷가와 같다.
+export function reelRoll(seed, cast = 'ok', { water = false, deep = false, ready = FISH_READY } = {}) {
   const rnd = seeded(Number(seed) >>> 0);
   const L = LURES[Math.max(0, CAST_TIERS.indexOf(cast))];
   if (rnd() * 100 < L.golden) return { key: 'goldenegg', kg: FISH.goldenegg.kg[0], rarity: 'golden' };
   const odds = RARITY_KEYS.map(k => [k, L.odds[k] * (water && !['common', 'uncommon'].includes(k) ? 1.2 : 1)]);
   let roll = rnd() * odds.reduce((n, [, w]) => n + w, 0), rarity = 'common';
   for (const [k, w] of odds) { if ((roll -= w) <= 0) { rarity = k; break; } }
-  const keys = FISH_KEYS.filter(k => FISH[k].rarity === rarity);
+  const sea = deep ? deepReady(ready).filter(k => FISH[k].rarity === rarity) : [];
+  const keys = sea.length ? sea : FISH_KEYS.filter(k => FISH[k].rarity === rarity);
   const key = keys[Math.min(keys.length - 1, Math.floor(rnd() * keys.length))];
   const [lo, hi] = FISH[key].kg, curve = cast === 'perfect' ? .6 : cast === 'good' ? .85 : 1.2;
   return { key, rarity, kg: Math.round((lo + (hi - lo) * Math.pow(rnd(), curve)) * 100) / 100 };

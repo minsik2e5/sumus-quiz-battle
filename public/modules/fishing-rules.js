@@ -1,4 +1,4 @@
-// V13.149 물고기 · 미끼 · 등급 규칙. 물고기 24종과 낚는 확률(rollCast)은 반 전체 낚시(server/party-engine.mjs)와
+// V13.149 물고기 · 미끼 · 등급 규칙. 물고기 24종(V13.185 심해 8종은 따로, DEEP_KEYS)과 낚는 확률(rollCast)은 반 전체 낚시(server/party-engine.mjs)와
 // V13.150 놀이터 손맛 낚시(reel-rules.js reelRoll)가 같이 쓴다. 같은 seed면 화면과 서버가 같은 물고기를 얻는다.
 
 export const FISHING = {
@@ -39,9 +39,22 @@ export const FISH = {
   whaleshark: { name: '고래상어', rarity: 'legend', kg: [500, 2000], art: { body: 'shark', c1: '#3b5b86', c2: '#e8eef6', fin: '#2f4b70', mark: 'stars' } },
   goldcarp: { name: '황금 잉어', rarity: 'legend', kg: [30, 80], art: { body: 'round', c1: '#f2b705', c2: '#fff1b8', fin: '#e08a00', mark: 'scales', whisker: true, shine: true } },
   coelacanth: { name: '실러캔스', rarity: 'legend', kg: [40, 90], art: { body: 'long', c1: '#2f4f7a', c2: '#b9c9de', fin: '#20395c', mark: 'stars', lobed: true } },
-  goldenegg: { name: '황금 알 물고기', rarity: 'golden', kg: [7.7, 7.7], art: { body: 'ball', c1: '#f5c400', c2: '#fff7cc', fin: '#e39b00', mark: 'egg', shine: true } }
+  goldenegg: { name: '황금 알 물고기', rarity: 'golden', kg: [7.7, 7.7], art: { body: 'ball', c1: '#f5c400', c2: '#fff7cc', fin: '#e39b00', mark: 'egg', shine: true } },
+  // V13.185 심해 물고기 8종(deep): 놀이터 손맛 낚시의 '깊은 바다'(낚싯대 3단계부터, reel-rules.js DEEP)에서만 나온다.
+  //   그림(/assets/fish/<key>.webp · -hang · -hang-s, 그림 주문서 53)이 다 들어온 것만 나온다(fish-art.js FISH_READY).
+  //   반 전체 낚시 · 바닷가 낚시(FISH_KEYS)에는 들어가지 않는다. art는 도감 실루엣(fishShadow)용이다.
+  anglerfish: { name: '아귀', rarity: 'rare', deep: true, kg: [2, 15], art: { body: 'round', c1: '#5b4636', c2: '#c9b49a', fin: '#3f3026', mark: 'dots', spiky: true } },
+  blobfish: { name: '블롭피시', rarity: 'rare', deep: true, kg: [1, 4], art: { body: 'ball', c1: '#e8a3b0', c2: '#fbe4e8', fin: '#c97b8a', mark: 'none' } },
+  fireflysquid: { name: '반딧불오징어', rarity: 'rare', deep: true, kg: [0.02, 0.1], art: { body: 'squid', c1: '#3b5bdb', c2: '#a5d8ff', fin: '#1c3faa', mark: 'stars' } },
+  oarfish: { name: '산갈치', rarity: 'epic', deep: true, kg: [50, 270], art: { body: 'needle', c1: '#c0c7d2', c2: '#f4f6f9', fin: '#e03131', mark: 'line' } },
+  toothfish: { name: '이빨고기', rarity: 'epic', deep: true, kg: [10, 100], art: { body: 'long', c1: '#3d4451', c2: '#aeb6c2', fin: '#2b3039', mark: 'dots' } },
+  vampiresquid: { name: '흡혈오징어', rarity: 'epic', deep: true, kg: [0.5, 6], art: { body: 'squid', c1: '#7a1f2b', c2: '#e599a4', fin: '#4a0f18', mark: 'dots' } },
+  manta: { name: '대왕쥐가오리', rarity: 'legend', deep: true, kg: [500, 2000], art: { body: 'ray', c1: '#1f2a44', c2: '#e6ebf5', fin: '#141c30', mark: 'stars' } },
+  frilledshark: { name: '주름상어', rarity: 'legend', deep: true, kg: [20, 60], art: { body: 'shark', c1: '#4a3f35', c2: '#b5a898', fin: '#352c24', mark: 'stars', lobed: true } }
 };
-export const FISH_KEYS = Object.keys(FISH);
+// 바닷가 물고기(24종). 반 전체 낚시(rollCast) · 바닷가 손맛 낚시(reelRoll)는 이것만 굴린다. 심해 물고기는 DEEP_KEYS.
+export const FISH_KEYS = Object.keys(FISH).filter(k => !FISH[k].deep);
+export const DEEP_KEYS = Object.keys(FISH).filter(k => FISH[k].deep);
 export const LURES = [
   { name: '지렁이', odds: { common: 70, uncommon: 24, rare: 5, epic: 0.9, legend: 0.1 }, golden: 0 },
   { name: '새우', odds: { common: 55, uncommon: 32, rare: 10, epic: 2.5, legend: 0.5 }, golden: 0 },
