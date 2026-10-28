@@ -74,13 +74,14 @@ export const pearlsOf = key => REEL.PEARLS[FISH[key]?.rarity] || 0;
 // V13.185 깊은 바다(심해 낚시터): 낚싯대 MIN_ROD단계부터 열린다(V13.189부터 1단계 = 처음부터, 진주를 따로 쓰지 않는다). 등급 확률 · 진주 값은 바닷가와 같고,
 //   희귀 · 영웅 · 전설이 나오면 그 등급의 심해 물고기 중에서 고른다(흔함 · 보통 · 황금 알 물고기는 바닷가와 같은 물고기).
 //   그림이 다 들어온 심해 물고기만 나온다(FISH_READY). 한 마리도 없으면 깊은 바다는 열리지 않는다.
-// V13.189 BOOST: 깊은 바다에서는 희귀 · 영웅 · 전설이 나올 확률(= 심해 물고기가 나올 확률)이 바닷가의 BOOST배. 모자란 만큼은 흔함 · 보통에서 덜어 낸다.
-export const DEEP = { MIN_ROD: 1, BOOST: 2, RARITIES: ['rare', 'epic', 'legend'] };
+// V13.189 BOOST: 깊은 바다에서 희귀 · 영웅 · 전설이 나올 확률(= 심해 물고기가 나올 확률)이 바닷가의 BOOST배(모자란 만큼은 흔함 · 보통에서 덜어 냄).
+// 선생님 결정: 2배는 너무 높아서 1(= 바닷가와 같은 확률, 원래대로). 나중에 올리고 싶으면 이 숫자만 바꾼다.
+export const DEEP = { MIN_ROD: 1, BOOST: 1, RARITIES: ['rare', 'epic', 'legend'] };
 export const deepReady = (ready = FISH_READY) => DEEP_KEYS.filter(k => ready.has(k));
 export const deepOpen = (rod, ready = FISH_READY) => rodLevel(rod) >= DEEP.MIN_ROD && deepReady(ready).length > 0;
 
 // 던질 때 정해지는 물고기: 퍼펙트면 미끼 두 단계, 좋음이면 한 단계 좋게 굴린다. 물 속성 펫은 희귀 이상이 조금 더.
-// V13.185 deep: 깊은 바다에서 던졌으면 true(ready: 그림이 있는 물고기, 검사용). 난수 순서는 바닷가와 같다. V13.189: 깊은 바다는 희귀 이상 확률 BOOST배.
+// V13.185 deep: 깊은 바다에서 던졌으면 true(ready: 그림이 있는 물고기, 검사용). 난수 순서는 바닷가와 같다. V13.189: 깊은 바다는 희귀 이상 확률 BOOST배(지금 1배).
 export function reelRoll(seed, cast = 'ok', { water = false, deep = false, ready = FISH_READY } = {}) {
   const rnd = seeded(Number(seed) >>> 0);
   const L = LURES[Math.max(0, CAST_TIERS.indexOf(cast))];

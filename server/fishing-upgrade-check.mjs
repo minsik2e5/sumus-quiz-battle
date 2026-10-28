@@ -66,8 +66,8 @@ export function runFishingUpgradeChecks(assert) {
     for (const r of RARITY_KEYS) { const deep = DEEP.RARITIES.includes(r), pool = deep ? DEEP_KEYS.filter(k => FISH[k].rarity === r) : FISH_KEYS.filter(k => FISH[k].rarity === r); for (const k of pool) out[k] = (100 - L.golden) * L.odds[r] * (deep ? DEEP.BOOST : f) / total / pool.length; }
     return out;
   };
-  assert(CAST_TIERS.every(c => Math.abs(Object.values(table(c)).reduce((a, b) => a + b, 0) - 100) < 1e-9) && DEEP.BOOST === 2 && Math.abs(table('ok').anglerfish - 10 / 3) < 1e-9,
-    'V13.189 깊은 바다 물고기별 확률의 합은 100%(지렁이 던지기에서 아귀 약 3.33% = 바닷가 기준 1.67%의 2배)');
+  assert(CAST_TIERS.every(c => Math.abs(Object.values(table(c)).reduce((a, b) => a + b, 0) - 100) < 1e-9) && DEEP.BOOST === 1 && Math.abs(table('ok').anglerfish - 5 / 3) < 1e-9,
+    'V13.189 깊은 바다 물고기별 확률의 합은 100%(지렁이 던지기에서 아귀 약 1.67%. 2배는 너무 높아서 원래대로 1배)');
   // 반 전체 낚시(교실 게임)에는 심해 물고기가 나오지 않는다.
   let party = 0;
   for (let i = 0; i < 4000; i++) if (FISH[rollCast(77, i, i % 4, i % 7 * 1000).key].deep) party++;
@@ -105,13 +105,13 @@ export function runFishingUpgradeChecks(assert) {
   // 하루 보상: 미끼 하루 5개 · 진주 → 코인 하루 100은 그대로. 깊은 바다의 한 번 던지기 기대 진주 = 바닷가와 같다.
   const expect = cast => { const L = LURES[CAST_TIERS.indexOf(cast)], total = RARITY_KEYS.reduce((n, r) => n + L.odds[r], 0); return RARITY_KEYS.reduce((n, r) => n + REEL.PEARLS[r] * L.odds[r] / total, 0) * (100 - L.golden) / 100; };
   const deepExpect = cast => Object.entries(table(cast)).reduce((n, [k, pct]) => n + pearlsOf(k) * pct / 100, 0);
-  assert(REEL.BAIT_DAILY === 5 && REEL.COIN_DAILY === 100 && CAST_TIERS.every(c => deepExpect(c) > expect(c) && deepExpect(c) < 2 * expect(c)) && REEL.BAIT_DAILY * deepExpect('perfect') < 330,
-    'V13.189 하루 보상 상한은 그대로(미끼 5개 · 코인 교환 100). 깊은 바다의 기대 진주는 바닷가보다 많지만 2배는 안 된다(퍼펙트 5번 약 312개)');
-  // 심해 물고기가 나올 확률 = 바닷가에서 희귀 이상이 나올 확률의 2배(던지기마다 시뮬레이션).
+  assert(REEL.BAIT_DAILY === 5 && REEL.COIN_DAILY === 100 && CAST_TIERS.every(c => Math.abs(expect(c) - deepExpect(c)) < 1e-9) && REEL.BAIT_DAILY * deepExpect('perfect') < 200,
+    'V13.189 하루 보상 상한은 그대로(미끼 5개 · 코인 교환 100). 깊은 바다의 기대 진주는 바닷가와 같다(BOOST 1)');
+  // 심해 물고기가 나올 확률 = 바닷가에서 희귀 이상이 나올 확률의 DEEP.BOOST배(던지기마다 시뮬레이션).
   for (const cast of CAST_TIERS) {
     let shoreRare = 0, deepFish = 0; const N = 40000;
     for (let seed = 1; seed <= N; seed++) { if (DEEP.RARITIES.includes(reelRoll(seed, cast).rarity)) shoreRare++; if (FISH[reelRoll(seed, cast, { deep: true, ready: ALL }).key].deep) deepFish++; }
-    assert(Math.abs(deepFish / shoreRare - DEEP.BOOST) < 0.06, `V13.189 깊은 바다에서 심해 물고기가 나올 확률은 바닷가의 희귀 이상 확률의 2배(${cast}: ${(deepFish / N * 100).toFixed(1)}%)`);
+    assert(Math.abs(deepFish / shoreRare - DEEP.BOOST) < 0.06, `V13.189 깊은 바다에서 심해 물고기가 나올 확률은 바닷가의 희귀 이상 확률의 BOOST배(${cast}: ${(deepFish / N * 100).toFixed(1)}%)`);
   }
   // 화면 · 서버 연결
   const svc = source('./service.mjs');
