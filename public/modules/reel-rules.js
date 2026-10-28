@@ -71,10 +71,10 @@ export const FINISH = { PERFECT_KG: 1.08, KINDS: ['perfect', 'good', 'miss'] };
 export const stars = rarity => ({ common: 1, uncommon: 2, rare: 3, epic: 4, legend: 5, golden: 5 })[rarity] || 1;
 export const pearlsOf = key => REEL.PEARLS[FISH[key]?.rarity] || 0;
 
-// V13.185 깊은 바다(심해 낚시터): 낚싯대 MIN_ROD단계부터 열린다(진주를 따로 쓰지 않는다). 등급 확률 · 진주 값은 바닷가와 같고,
+// V13.185 깊은 바다(심해 낚시터): 낚싯대 MIN_ROD단계부터 열린다(V13.189부터 1단계 = 처음부터, 진주를 따로 쓰지 않는다). 등급 확률 · 진주 값은 바닷가와 같고,
 //   희귀 · 영웅 · 전설이 나오면 그 등급의 심해 물고기 중에서 고른다(흔함 · 보통 · 황금 알 물고기는 바닷가와 같은 물고기).
 //   그림이 다 들어온 심해 물고기만 나온다(FISH_READY). 한 마리도 없으면 깊은 바다는 열리지 않는다.
-export const DEEP = { MIN_ROD: 3, RARITIES: ['rare', 'epic', 'legend'] };
+export const DEEP = { MIN_ROD: 1, RARITIES: ['rare', 'epic', 'legend'] };
 export const deepReady = (ready = FISH_READY) => DEEP_KEYS.filter(k => ready.has(k));
 export const deepOpen = (rod, ready = FISH_READY) => rodLevel(rod) >= DEEP.MIN_ROD && deepReady(ready).length > 0;
 

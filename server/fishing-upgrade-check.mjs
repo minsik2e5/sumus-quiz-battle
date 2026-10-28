@@ -1,5 +1,5 @@
 // V13.185 낚시 업그레이드 검사(선생님 피드백: "심해 물고기 추가" · "낚싯대를 강화해도 똑같아 보인다").
-//   낚싯대: V13.186 단계마다 모양이 다른 벡터 낚싯대(그림을 늘이면 폰에서 흐릿해서) + 단계별 릴 그림. 심해 물고기 8종: 깊은 바다(낚싯대 3단계)에서만, 그림이 다 들어온 것만.
+//   낚싯대: V13.186 단계마다 모양이 다른 벡터 낚싯대(그림을 늘이면 폰에서 흐릿해서) + 단계별 릴 그림. 심해 물고기 8종: 깊은 바다(V13.189부터 낚싯대 1단계 = 처음부터)에서만, 그림이 다 들어온 것만.
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { FISH, FISH_KEYS, DEEP_KEYS, LURES, RARITY_KEYS, rollCast } from '../public/modules/fishing-rules.js';
@@ -78,8 +78,8 @@ export function runFishingUpgradeChecks(assert) {
   assert([...ALL].every(k => FISH_READY.has(k) === complete(k)) && FISH_KEYS.every(k => FISH_READY.has(k) && FISH_ART.has(k)) && DEEP_KEYS.every(k => FISH_ART.has(k) === complete(k))
     && source('./build-assets.mjs').includes("const out = resolve(root, 'public/modules/fish-art.js');"),
     'V13.185 build:assets가 그림 폴더를 보고 fish-art.js(FISH_READY: 본그림 · -hang · -hang-s가 다 있는 물고기)를 만들고, 그림을 쓰는 목록(FISH_ART)도 이것을 따른다');
-  assert(!deepReady(NONE).length && !deepOpen(5, NONE) && deepReady(ALL).length === 8 && !deepOpen(2, ALL) && deepOpen(3, ALL) && deepReady(new Set([...FISH_KEYS, 'manta'])).join() === 'manta',
-    'V13.185 그림이 없는 심해 물고기는 나오지 않고, 그림이 들어오면 그 물고기만 나온다. 깊은 바다는 낚싯대 3단계부터');
+  assert(!deepReady(NONE).length && !deepOpen(5, NONE) && deepReady(ALL).length === 8 && DEEP.MIN_ROD === 1 && deepOpen(1, ALL) && !deepOpen(1, NONE) && deepReady(new Set([...FISH_KEYS, 'manta'])).join() === 'manta',
+    'V13.185 그림이 없는 심해 물고기는 나오지 않고, 그림이 들어오면 그 물고기만 나온다. 깊은 바다는 낚싯대 1단계(처음)부터(V13.189)');
   let leak = false;
   for (let seed = 1; seed <= 3000; seed++) { const r = reelRoll(seed, 'perfect', { deep: true, ready: NONE }); if (FISH[r.key].deep) leak = true; }
   const onlyManta = new Set([...FISH_KEYS, 'manta']), got = { legend: new Set(), rare: new Set() };
@@ -88,11 +88,11 @@ export function runFishingUpgradeChecks(assert) {
     'V13.185 깊은 바다에서 그림이 있는 등급만 심해 물고기, 그림이 없는 등급은 바닷가 물고기로 나온다');
   // 서버: 그림 · 낚싯대 단계 확인, 응답에 물고기 이름 · 무게 없음.
   const p = { reel: { bait: 3, rod: 2 } };
-  assert(reelView(p, 0, NONE).deep === null && reelView(p, 0, ALL).deep.open === false && reelView(p, 0, ALL).deep.min_rod === 3 && reelView(p, 0, ALL).all === 32 && reelView(p, 0, NONE).all === 24,
-    'V13.185 그림이 없으면 깊은 바다는 화면에 보이지 않고, 그림이 있으면 낚싯대 3단계부터 열린다(도감 수에도 그림이 있는 심해 물고기만)');
-  assert(throws(() => reelCast(p, { id: 'deep-1', cast: 'perfect', spot: 'deep', now: 0, seed: 5, ready: ALL })) === 409 && p.reel.bait === 3
+  assert(reelView(p, 0, NONE).deep === null && reelView(p, 0, ALL).deep.open === true && reelView(p, 0, ALL).deep.min_rod === 1 && reelView(p, 0, ALL).all === 32 && reelView(p, 0, NONE).all === 24,
+    'V13.185 그림이 없으면 깊은 바다는 화면에 보이지 않고, 그림이 있으면 처음(1단계)부터 열린다(도감 수에도 그림이 있는 심해 물고기만)');
+  assert(!throws(() => reelCast({ reel: { bait: 3, rod: 1 }, games: {} }, { id: 'deep-1', cast: 'perfect', spot: 'deep', now: 0, seed: 5, ready: ALL }))
     && throws(() => reelCast({ reel: { bait: 3, rod: 5 } }, { id: 'deep-2', cast: 'ok', spot: 'deep', now: 0, seed: 5, ready: NONE })) === 409,
-    'V13.185 낚싯대 3단계 전이거나 그림이 없으면 깊은 바다로 못 던진다(미끼도 안 쓴다)');
+    'V13.189 낚싯대 1단계도 깊은 바다로 던질 수 있고, 그림이 없으면 못 던진다(미끼도 안 쓴다)');
   let seed = 1; while (!DEEP.RARITIES.includes(reelRoll(seed, 'perfect').rarity)) seed++;
   const q = { reel: { bait: 3, rod: 3 }, games: {} };
   const res = reelCast(q, { id: 'deep-3', cast: 'perfect', spot: 'deep', now: 0, seed, ready: ALL }), text = JSON.stringify(res);
