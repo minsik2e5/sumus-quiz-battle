@@ -3,6 +3,7 @@ import { avatar, expressionSrc, petKey } from './character.js';
 import { getRanges } from './student.js';
 import { comboRank } from './battle-fx.js';
 import { createDungeonFx } from './dungeon-fx.js';
+import { promptFit, optionFit } from './dungeon-fit.js';
 import { playSound, preloadSound, soundOn } from './sound.js';
 import { uiArt, titleEmblem, coin, tierName } from './emblems.js';
 import { TITLES } from './titles.js';
@@ -639,9 +640,18 @@ function updateBattle(v) {
   drawMe(v);
   toggle($id('dgs-world'), 'low', !!D.me && !D.me.down && D.me.hp <= 30);
   drawAsk(v);
+  if (D.growKey !== D.qn) { D.growKey = D.qn; sceneRise(); }
 }
 
 /* ---------- 문제 칸 ---------- */
+// V13.185 긴 글이 나와 아래 칸(HUD)이 자라면 그만큼 장면(펫 · 몬스터)을 위로 올려 발밑이 가리지 않게 한다(최대 SCENE_RISE_MAX).
+// 문제가 바뀔 때만 한 번 잰다(화면 배치를 자주 읽지 않게).
+const HUD_BASE = 116, SCENE_RISE_MAX = 40;
+function sceneRise() {
+  const hud = $id('dgs-hud'), world = $id('dgs-world');
+  if (!hud || !world) return;
+  world.style.setProperty('--rise', `${Math.max(0, Math.min(SCENE_RISE_MAX, hud.offsetHeight - HUD_BASE))}px`);
+}
 // 새 문제 번호가 오면 그린다. 답한 뒤 다음 문제 전까지는 정답 표시를 그대로 둔다. 쓰기 문제는 방이 보낸 진행(채운 글자 · 실수)을 덧그린다.
 function drawAsk(v) {
   const ask = $id('dg-ask');
@@ -659,7 +669,7 @@ function drawAsk(v) {
   const kind = q.kind || 'mean', trait = v.monster?.trait?.key;
   const head = `<div class="dgs-qhead"><span class="dgs-kind ${kind}">${KIND_LABEL[kind]}</span><span class="dgs-left" id="dgs-time-left"></span></div>`;
   const timer = '<div class="dgs-time"><img src="/assets/ui/dungeon-hourglass.webp" alt="" draggable="false"><i><b id="dg-time"></b></i></div>';
-  const prompt = `<h2 class="dgs-prompt ${kind === 'mean' ? 'en' : 'ko'}${trait === 'blink' ? ' blink' : ''}">${esc(q.prompt)}</h2>`;
+  const prompt = `<h2 class="dgs-prompt ${kind === 'mean' ? 'en' : 'ko'} fp${promptFit(q.prompt, kind)}${trait === 'blink' ? ' blink' : ''}">${esc(q.prompt)}</h2>`;
   if (kind === 'spell') {
     // 화면을 다시 그릴 때(방향 바뀜)는 이미 맞힌 글자만큼 칸을 쓴 것으로 되살린다.
     D.spell = { n: q.n, queue: [], used: new Set() };
@@ -672,7 +682,7 @@ function drawAsk(v) {
   D.spell = null;
   const n = q.options.length;
   ask.innerHTML = `<div class="dgs-q ${kind}"><div class="dgs-qbox">${head}${prompt}<p class="dgs-hint">${KIND_HINT[kind]} · ${n}개 중 1개</p>${timer}</div>
-    <div class="dgs-options n${n}${trait === 'web' ? ' web' : ''}">${q.options.map((o, i) => {
+    <div class="dgs-options n${n} ft${optionFit(q.options, kind, n)}${trait === 'web' ? ' web' : ''}">${q.options.map((o, i) => {
       const covered = i === q.covered, marked = i === q.marked;
       return `<button type="button" class="dgs-opt${kind === 'eng' ? ' en' : ''}${covered ? ' covered' : ''}${marked ? ' marked' : ''}" data-dg="answer" data-choice="${i}" ${covered ? 'disabled aria-label="붕대로 가려진 보기"' : ''}><kbd>${i + 1}</kbd><span>${covered ? '붕대' : esc(o)}</span></button>`;
     }).join('')}</div></div>`;

@@ -1,0 +1,33 @@
+/* V13.185 던전 문제 긴 글자 맞춤. 문제 · 보기 글자가 길면 글씨를 줄이고 줄을 바꾼다. 자르기(…) · 가로 스크롤은 쓰지 않는다.
+   글자 수 규칙(fp0~4 · ft0~2)은 public/modules/dungeon-fit.js가 클래스로 붙인다. 아래 칸은 글자에 맞춰 늘어난다(HUD도 위로 자란다). */
+.dgs.land .dgs-hud { height: auto; min-height: 116px; }
+.dgs.land .dgs-q { align-items: stretch; }
+.dgs-qbox { min-width: 0; }
+
+/* 문제(영어 단어 · 한국어 뜻): 한 줄로 안 들어가면 공백에서 줄을 바꾼다 */
+.dgs-prompt { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; word-break: keep-all; min-width: 0; }
+.dgs.land .dgs-prompt.fp1.en { font-size: 24px; }
+.dgs.land .dgs-prompt.fp2.en { font-size: 19px; }
+.dgs.land .dgs-prompt.fp3.en { font-size: 17px; line-height: 1.15; }
+.dgs.land .dgs-prompt.fp4.en { font-size: 16px; line-height: 1.15; }
+.dgs.land .dgs-prompt.fp1.ko { font-size: 20px; }
+.dgs.land .dgs-prompt.fp2.ko { font-size: 18px; }
+.dgs.land .dgs-prompt.fp3.ko { font-size: 17px; line-height: 1.15; }
+.dgs.land .dgs-prompt.fp4.ko { font-size: 16px; line-height: 1.15; }
+.dgs.land .dgs-qbox:has(.fp3, .fp4) .dgs-hint { display: none; }
+
+/* 보기 */
+.dgs.land .dgs-options { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: none; grid-auto-rows: minmax(44px, auto); }
+.dgs.land .dgs-options.n4, .dgs.land .dgs-options.ft1, .dgs.land .dgs-options.ft2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.dgs.land .dgs-options.n4 { grid-auto-rows: minmax(44px, auto); }
+.dgs.land .dgs-options.ft1.n5 .dgs-opt:last-child, .dgs.land .dgs-options.ft2.n5 .dgs-opt:last-child { grid-column: 1 / -1; }
+.dgs-opt { min-height: 0; }
+.dgs-opt span { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; word-break: keep-all; line-height: 1.18; padding: 4px 0; }
+.dgs.land .dgs-options.ft1 .dgs-opt { font-size: 14px; }
+.dgs.land .dgs-options.ft1 .dgs-opt.en span { font-size: 16.5px; }
+.dgs.land .dgs-options.ft2 .dgs-opt { font-size: 13px; }
+.dgs.land .dgs-options.ft2 .dgs-opt.en span { font-size: 15px; }
+.dgs.port .dgs-opt span { white-space: normal; }
+
+/* 아래 칸이 자란 만큼 장면을 올린다(--rise는 dungeon.js sceneRise가 문제마다 정한다). top만 쓰므로 흔들림 애니메이션(transform)과 겹치지 않는다. */
+.dgs.land .dgs-world { top: calc(var(--rise, 0px) * -1); }
