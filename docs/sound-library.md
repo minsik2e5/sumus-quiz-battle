@@ -78,6 +78,20 @@
 | `tm-good` | 10초 맞추기: 좋음 | 우리가 합성(`docs/sound/timing-synth.mjs`의 `tm-good`) | |
 | `tm-miss` | 10초 맞추기: 아쉬움(격려 톤) | 우리가 합성(`docs/sound/timing-synth.mjs`의 `tm-miss`) | |
 | `tm-record` | 10초 맞추기: 내 최고 기록 갱신 팡파르 | 우리가 합성(`docs/sound/timing-synth.mjs`의 `tm-record`) | |
+| `fish-turn` | 낚시: 참치 몸부림 · 긴 돌진 중 방향 한 번 꺾기(촥 + 지잉) | 우리가 합성(`docs/sound/feel-synth.mjs`의 `fish-turn`) | 0.99초 · 8KB |
+| `fish-ink` | 낚시: 대왕오징어 먹물 뿜기(퓨슉 + 꿀렁), 오징어 몸 분사(높게 작게) | 우리가 합성(`docs/sound/feel-synth.mjs`의 `fish-ink`) | 1.34초 · 10KB |
+| `fish-glide` | 낚시: 가오리 · 대왕쥐가오리 좌우 미끄러짐(쉬이익) | 우리가 합성(`docs/sound/feel-synth.mjs`의 `fish-glide`) | 1.35초 · 10KB |
+| `fish-lure` | 낚시: 아귀 발광 미끼 깜빡(띠링) | 우리가 합성(`docs/sound/feel-synth.mjs`의 `fish-lure`) | 1.33초 · 9KB |
+| `fish-thump` | 낚시: 상어 · 고래상어 · 주름상어 치고 빠짐(쿵 + 촥) | 우리가 합성(`docs/sound/feel-synth.mjs`의 `fish-thump`) | 1.10초 · 9KB |
+| `rod-tick` | 낚시: 새싹 · 은빛 낚싯대 릴(가벼운 톡) | 우리가 합성(`docs/sound/feel-synth.mjs`의 `rod-tick`) | 0.05초 · 1KB |
+| `rod-ratchet` | 낚시: 보석 · 전설 낚싯대 릴(묵직한 드르륵) | 우리가 합성(`docs/sound/feel-synth.mjs`의 `rod-ratchet`) | 0.09초 · 1KB |
+| `rod-drag` | 낚시: 줄 풀리는 소리(단계마다 높낮이가 다름), 감촉 미리듣기 | 우리가 합성(`docs/sound/feel-synth.mjs`의 `rod-drag`) | 0.92초 · 8KB |
+| `rod-shimmer` | 낚시: 보석 · 전설 낚싯대 반짝이(감기 · 챔질) | 우리가 합성(`docs/sound/feel-synth.mjs`의 `rod-shimmer`) | 1.12초 · 8KB |
+| `rod-snap-heavy` | 낚시: 보석 · 전설 낚싯대 줄 끊김(쩌억 + 쿵) | 우리가 합성(`docs/sound/feel-synth.mjs`의 `rod-snap-heavy`) | 1.28초 · 10KB |
+| `trophy-boom` | 낚시: 월척 순간(쿠웅 + 물보라 + 금빛 종) | 우리가 합성(`docs/sound/feel-synth.mjs`의 `trophy-boom`) | 2.13초 · 17KB |
+| `deep-hum` | 낚시: 깊은 바다 낮은 울림(이어지는 소리, 1.2초 주기) | 우리가 합성(`docs/sound/feel-synth.mjs`의 `deep-hum`) | 3.60초 · 22KB |
+| `deep-bubble` | 낚시: 깊은 바다 물방울 보글 | 우리가 합성(`docs/sound/feel-synth.mjs`의 `deep-bubble`) | 1.05초 · 7KB |
+| `deep-pass` | 낚시: 깊은 바다 입질 직전 큰 그림자(우우웅) | 우리가 합성(`docs/sound/feel-synth.mjs`의 `deep-pass`) | 2.60초 · 16KB |
 
 ## 출처와 라이선스
 - **우리가 합성한 소리**: `docs/sound/synth.mjs`로 만든다(종소리 배음 · 마림바 · 쓸어올리는 바람 소리 · 저음 울림 · 반짝이 · 리버브를 겹침). 다시 만들 때: `npm i --no-save @breezystack/lamejs` 후 `node docs/sound/synth.mjs <출력 폴더>` → 원하는 파일을 `public/assets/sfx/<key>.mp3`로 복사. 우리가 만든 것이라 제약이 없다.
