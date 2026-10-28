@@ -18,6 +18,7 @@ import { mountArcade, attendanceMoment } from './modules/arcade.js';
 import { LUCKY_BETS, ATTENDANCE_REWARDS, BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, EXAM_COINS, STUDY_COINS, GIFT_AMOUNTS, GIFT_MAX, giftAmountOk, GIFT_NOTE_MAX, GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS } from './modules/rewards.js';
 import { TITLE_COINS } from './modules/titles.js';
 import { rewardEventModal } from './modules/reward-events-ui.js';
+import { timingDailyModal } from './modules/timing-daily-ui.js';
 import { EGG_PRICE } from './modules/core.js';
 import { openGuardSheet, maybeGuardMoment } from './modules/streak-guard-ui.js';
 import { partyCreateModal, openPartyTv } from './modules/party-tv.js';
@@ -959,6 +960,7 @@ $('#app').addEventListener('click', async event => {
     if (d.action === 'legend-close') { try { localStorage.setItem('sumus:legend-closed', d.id); } catch {} return renderKeepScroll(); }
     if (d.action === 'notice') return noticeModal();
     if (d.action === 'reward-events') return rewardEventModal(A);
+    if (d.action === 'timing-daily') return timingDailyModal(A);
     if (d.action === 'install-qr') { window.open('/install?qr=1', '_blank', 'noopener'); return; }
     if (d.starPractice) return openStarPractice();
     if (d.action === 'partner-flip') {
