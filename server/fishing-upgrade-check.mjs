@@ -1,5 +1,5 @@
 // V13.185 낚시 업그레이드 검사(선생님 피드백: "심해 물고기 추가" · "낚싯대를 강화해도 똑같아 보인다").
-//   낚싯대: V13.186 단계마다 모양이 다른 벡터 낚싯대(그림을 늘이면 폰에서 흐릿해서) + 단계별 릴 그림. 심해 물고기 8종: 깊은 바다(낚싯대 3단계)에서만, 그림이 다 들어온 것만.
+//   낚싯대: V13.186 단계마다 모양이 다른 벡터 낚싯대(그림을 늘이면 폰에서 흐릿해서) + 단계별 릴 그림. 심해 물고기 8종: 깊은 바다(V13.189부터 낚싯대 1단계 = 처음부터)에서만, 그림이 다 들어온 것만.
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { FISH, FISH_KEYS, DEEP_KEYS, LURES, RARITY_KEYS, rollCast } from '../public/modules/fishing-rules.js';
@@ -54,19 +54,20 @@ export function runFishingUpgradeChecks(assert) {
   let same = true, deepSeen = new Set(), shoreDeep = 0;
   for (let seed = 1; seed <= 6000; seed++) for (const cast of CAST_TIERS) {
     const a = reelRoll(seed, cast), b = reelRoll(seed, cast, { deep: true, ready: ALL });
-    if (a.rarity !== b.rarity || (DEEP.RARITIES.includes(b.rarity) ? !FISH[b.key].deep : b.key !== a.key)) same = false;
+    if (DEEP.RARITIES.includes(b.rarity) ? !FISH[b.key].deep : FISH[b.key].deep) same = false;
     if (FISH[b.key].deep) deepSeen.add(b.key);
     if (FISH[a.key].deep) shoreDeep++;
   }
-  assert(same && deepSeen.size === 8 && !shoreDeep, 'V13.185 깊은 바다는 등급 확률이 바닷가와 같고, 희귀 이상은 심해 물고기 8종 중에서 나온다(바닷가에서는 안 나온다)');
+  assert(same && deepSeen.size === 8 && !shoreDeep, 'V13.185 깊은 바다에서 희귀 이상은 심해 물고기 8종 중에서 나온다(바닷가에서는 안 나온다)');
   // 물고기마다 확률(%) 합 = 100(던지기 단계마다).
   const table = cast => {
     const L = LURES[CAST_TIERS.indexOf(cast)], total = RARITY_KEYS.reduce((n, r) => n + L.odds[r], 0), out = { goldenegg: L.golden };
-    for (const r of RARITY_KEYS) { const pool = DEEP.RARITIES.includes(r) ? DEEP_KEYS.filter(k => FISH[k].rarity === r) : FISH_KEYS.filter(k => FISH[k].rarity === r); for (const k of pool) out[k] = (100 - L.golden) * L.odds[r] / total / pool.length; }
+    const S = DEEP.RARITIES.reduce((n, r) => n + L.odds[r], 0), f = (total - DEEP.BOOST * S) / (total - S);
+    for (const r of RARITY_KEYS) { const deep = DEEP.RARITIES.includes(r), pool = deep ? DEEP_KEYS.filter(k => FISH[k].rarity === r) : FISH_KEYS.filter(k => FISH[k].rarity === r); for (const k of pool) out[k] = (100 - L.golden) * L.odds[r] * (deep ? DEEP.BOOST : f) / total / pool.length; }
     return out;
   };
-  assert(CAST_TIERS.every(c => Math.abs(Object.values(table(c)).reduce((a, b) => a + b, 0) - 100) < 1e-9) && Math.abs(table('ok').anglerfish - 5 / 3) < 1e-9,
-    'V13.185 깊은 바다 물고기별 확률의 합은 100%(지렁이 던지기에서 아귀 약 1.67%)');
+  assert(CAST_TIERS.every(c => Math.abs(Object.values(table(c)).reduce((a, b) => a + b, 0) - 100) < 1e-9) && DEEP.BOOST === 1 && Math.abs(table('ok').anglerfish - 5 / 3) < 1e-9,
+    'V13.189 깊은 바다 물고기별 확률의 합은 100%(지렁이 던지기에서 아귀 약 1.67%. 2배는 너무 높아서 원래대로 1배)');
   // 반 전체 낚시(교실 게임)에는 심해 물고기가 나오지 않는다.
   let party = 0;
   for (let i = 0; i < 4000; i++) if (FISH[rollCast(77, i, i % 4, i % 7 * 1000).key].deep) party++;
@@ -78,8 +79,8 @@ export function runFishingUpgradeChecks(assert) {
   assert([...ALL].every(k => FISH_READY.has(k) === complete(k)) && FISH_KEYS.every(k => FISH_READY.has(k) && FISH_ART.has(k)) && DEEP_KEYS.every(k => FISH_ART.has(k) === complete(k))
     && source('./build-assets.mjs').includes("const out = resolve(root, 'public/modules/fish-art.js');"),
     'V13.185 build:assets가 그림 폴더를 보고 fish-art.js(FISH_READY: 본그림 · -hang · -hang-s가 다 있는 물고기)를 만들고, 그림을 쓰는 목록(FISH_ART)도 이것을 따른다');
-  assert(!deepReady(NONE).length && !deepOpen(5, NONE) && deepReady(ALL).length === 8 && !deepOpen(2, ALL) && deepOpen(3, ALL) && deepReady(new Set([...FISH_KEYS, 'manta'])).join() === 'manta',
-    'V13.185 그림이 없는 심해 물고기는 나오지 않고, 그림이 들어오면 그 물고기만 나온다. 깊은 바다는 낚싯대 3단계부터');
+  assert(!deepReady(NONE).length && !deepOpen(5, NONE) && deepReady(ALL).length === 8 && DEEP.MIN_ROD === 1 && deepOpen(1, ALL) && !deepOpen(1, NONE) && deepReady(new Set([...FISH_KEYS, 'manta'])).join() === 'manta',
+    'V13.185 그림이 없는 심해 물고기는 나오지 않고, 그림이 들어오면 그 물고기만 나온다. 깊은 바다는 낚싯대 1단계(처음)부터(V13.189)');
   let leak = false;
   for (let seed = 1; seed <= 3000; seed++) { const r = reelRoll(seed, 'perfect', { deep: true, ready: NONE }); if (FISH[r.key].deep) leak = true; }
   const onlyManta = new Set([...FISH_KEYS, 'manta']), got = { legend: new Set(), rare: new Set() };
@@ -88,11 +89,11 @@ export function runFishingUpgradeChecks(assert) {
     'V13.185 깊은 바다에서 그림이 있는 등급만 심해 물고기, 그림이 없는 등급은 바닷가 물고기로 나온다');
   // 서버: 그림 · 낚싯대 단계 확인, 응답에 물고기 이름 · 무게 없음.
   const p = { reel: { bait: 3, rod: 2 } };
-  assert(reelView(p, 0, NONE).deep === null && reelView(p, 0, ALL).deep.open === false && reelView(p, 0, ALL).deep.min_rod === 3 && reelView(p, 0, ALL).all === 32 && reelView(p, 0, NONE).all === 24,
-    'V13.185 그림이 없으면 깊은 바다는 화면에 보이지 않고, 그림이 있으면 낚싯대 3단계부터 열린다(도감 수에도 그림이 있는 심해 물고기만)');
-  assert(throws(() => reelCast(p, { id: 'deep-1', cast: 'perfect', spot: 'deep', now: 0, seed: 5, ready: ALL })) === 409 && p.reel.bait === 3
+  assert(reelView(p, 0, NONE).deep === null && reelView(p, 0, ALL).deep.open === true && reelView(p, 0, ALL).deep.min_rod === 1 && reelView(p, 0, ALL).all === 32 && reelView(p, 0, NONE).all === 24,
+    'V13.185 그림이 없으면 깊은 바다는 화면에 보이지 않고, 그림이 있으면 처음(1단계)부터 열린다(도감 수에도 그림이 있는 심해 물고기만)');
+  assert(!throws(() => reelCast({ reel: { bait: 3, rod: 1 }, games: {} }, { id: 'deep-1', cast: 'perfect', spot: 'deep', now: 0, seed: 5, ready: ALL }))
     && throws(() => reelCast({ reel: { bait: 3, rod: 5 } }, { id: 'deep-2', cast: 'ok', spot: 'deep', now: 0, seed: 5, ready: NONE })) === 409,
-    'V13.185 낚싯대 3단계 전이거나 그림이 없으면 깊은 바다로 못 던진다(미끼도 안 쓴다)');
+    'V13.189 낚싯대 1단계도 깊은 바다로 던질 수 있고, 그림이 없으면 못 던진다(미끼도 안 쓴다)');
   let seed = 1; while (!DEEP.RARITIES.includes(reelRoll(seed, 'perfect').rarity)) seed++;
   const q = { reel: { bait: 3, rod: 3 }, games: {} };
   const res = reelCast(q, { id: 'deep-3', cast: 'perfect', spot: 'deep', now: 0, seed, ready: ALL }), text = JSON.stringify(res);
@@ -105,7 +106,13 @@ export function runFishingUpgradeChecks(assert) {
   const expect = cast => { const L = LURES[CAST_TIERS.indexOf(cast)], total = RARITY_KEYS.reduce((n, r) => n + L.odds[r], 0); return RARITY_KEYS.reduce((n, r) => n + REEL.PEARLS[r] * L.odds[r] / total, 0) * (100 - L.golden) / 100; };
   const deepExpect = cast => Object.entries(table(cast)).reduce((n, [k, pct]) => n + pearlsOf(k) * pct / 100, 0);
   assert(REEL.BAIT_DAILY === 5 && REEL.COIN_DAILY === 100 && CAST_TIERS.every(c => Math.abs(expect(c) - deepExpect(c)) < 1e-9) && REEL.BAIT_DAILY * deepExpect('perfect') < 200,
-    'V13.185 하루 보상 상한은 그대로(미끼 5개 · 코인 교환 100). 깊은 바다의 기대 진주는 바닷가와 같다');
+    'V13.189 하루 보상 상한은 그대로(미끼 5개 · 코인 교환 100). 깊은 바다의 기대 진주는 바닷가와 같다(BOOST 1)');
+  // 심해 물고기가 나올 확률 = 바닷가에서 희귀 이상이 나올 확률의 DEEP.BOOST배(던지기마다 시뮬레이션).
+  for (const cast of CAST_TIERS) {
+    let shoreRare = 0, deepFish = 0; const N = 40000;
+    for (let seed = 1; seed <= N; seed++) { if (DEEP.RARITIES.includes(reelRoll(seed, cast).rarity)) shoreRare++; if (FISH[reelRoll(seed, cast, { deep: true, ready: ALL }).key].deep) deepFish++; }
+    assert(Math.abs(deepFish / shoreRare - DEEP.BOOST) < 0.06, `V13.189 깊은 바다에서 심해 물고기가 나올 확률은 바닷가의 희귀 이상 확률의 BOOST배(${cast}: ${(deepFish / N * 100).toFixed(1)}%)`);
+  }
   // 화면 · 서버 연결
   const svc = source('./service.mjs');
   assert(svc.includes("spot: body.spot === 'deep' ? 'deep' : 'shore'") && svc.includes("logActivity(p, 'fish', res.caught ? `낚시 ${FISH[res.key]?.name || '물고기'} ${res.kg}kg`")

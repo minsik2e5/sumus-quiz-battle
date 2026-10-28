@@ -24,10 +24,15 @@ export const SOUND_GAIN = {
   'reel-creak': .6, 'reel-snap': .9, 'reel-run': .6, 'reel-jump': .8, 'reel-splash': .75, 'reel-sparkle': .6,
   // V13.180 10초 맞추기(docs/sound/timing-synth.mjs): 카운트다운 · 시작 · 숨김 · 째깍 · 버튼 · 공개 · 등급 4개 · 기록 갱신.
   'tm-count': .55, 'tm-go': .7, 'tm-hide': .45, 'tm-tick': .3, 'tm-press': .85, 'tm-reveal': .7,
-  'tm-perfect': .85, 'tm-great': .75, 'tm-good': .7, 'tm-miss': .6, 'tm-record': .85
+  'tm-perfect': .85, 'tm-great': .75, 'tm-good': .7, 'tm-miss': .6, 'tm-record': .85,
+  // V13.190 낚시 손맛 더하기(docs/sound/feel-synth.mjs): 몸부림(참치 꺾기 · 먹물 · 가오리 · 아귀 미끼 · 상어) · 낚싯대 단계(가벼운 톡 · 묵직한 드르륵 ·
+  // 줄 풀림 · 반짝이 · 굵은 줄 끊김) · 월척 · 깊은 바다(낮은 울림(이어지는 소리) · 물방울 · 큰 그림자).
+  'fish-turn': .7, 'fish-ink': .7, 'fish-glide': .55, 'fish-lure': .5, 'fish-thump': .8,
+  'rod-tick': .4, 'rod-ratchet': .45, 'rod-drag': .55, 'rod-shimmer': .45, 'rod-snap-heavy': .9,
+  'trophy-boom': .9, 'deep-hum': .35, 'deep-bubble': .4, 'deep-pass': .6
 };
 // 이어지는 소리: key -> 한 주기(초). 파일은 같은 주기가 세 번 이어져 있고, 가운데 주기만 되풀이한다(reel-synth.mjs의 LOOP).
-export const SOUND_LOOP = { 'reel-strain': .8 };
+export const SOUND_LOOP = { 'reel-strain': .8, 'deep-hum': 1.2 };
 export const SOUND_KEYS = Object.keys(SOUND_GAIN);
 // 첫 터치 때 미리 받아 두는 작은 소리(자주 쓰이는 것). 큰 팡파르는 연출이 시작될 때 preloadSound로 받는다.
 const CORE = ['tap', 'correct', 'wrong', 'combo', 'coin', 'tick', 'wiggle', 'crack', 'pop', 'hit', 'hurt', 'skill'];

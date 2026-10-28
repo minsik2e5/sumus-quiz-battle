@@ -7,6 +7,7 @@ import { buyEgg } from './pet-moments.js';
 import { FISH, FISH_KEYS, RARITY, kgText } from './fishing-rules.js';
 import { REEL, SEA_PETS, FIGHT, ROD, DEEP, stars, pearlsOf, rodLevel, rodOf, rodPerks, deepReady } from './reel-rules.js';
 import { fishPic, fishShadow } from './fishing-art.js';
+import { FEEL_STYLES, FEEL_SFX, feelPath, leanMoves, rodFeel, trophyOf, TROPHY_FX, DEEP_FX, lowEndDevice } from './reel-feel.js';
 
 // V13.150 손맛 낚시(놀이터), 1인칭 판. 단어 없이 던지기 · 입질 · 파이팅 · 마무리 점프. 미끼는 공부로 번다(server/reel.mjs).
 //   던지기: 릴 버튼을 꾹 눌러 반원 게이지의 금색 칸에서 떼기 → 낚싯대가 뒤로 젖혀졌다가 휙.
@@ -56,24 +57,28 @@ const HAPTIC = {
   hook: [150, 40, 70], hookFast: [190, 30, 90], run: [260, 30, 200, 30, 160, 30, 120], dive: [420, 60, 260],
   thrash: [30, 25, 45, 25, 30, 25, 45], rhythm: [20, 60, 20], tap: [10], tap2: [18], ok: [20, 30, 60], bad: [50, 30, 50],
   ready: [30], skill: [30, 30, 140], snap: [25, 30, 220, 60, 50], slack: [60, 50, 30], jump: [70, 40, 40],
-  perfect: [20, 20, 120], good: [60], caught: [30, 30, 60], big: [40, 40, 40, 40, 160]
+  perfect: [20, 20, 120], good: [60], caught: [30, 30, 60], big: [40, 40, 40, 40, 160],
+  pass: [14, 160, 14], trophy: [60, 40, 60, 40, 260], record: [20, 30, 20, 30, 20]
 };
-const KICK = { cast: 2, plop: 1.5, nibble: 1.5, early: 2, bite: 4, hook: 9, hookFast: 11, run: 6, dive: 7, thrash: 5, bad: 4, ok: 3, skill: 8, snap: 12, slack: 3, jump: 6, perfect: 6, good: 4, big: 6 };
-const LONG = { run: 900, dive: 800, thrash: 650 };
+const KICK = { trophy: 10, pass: 1.5, turn: 7, ink: 6, glide: 3, lure: 1.5, strike: 9, jet: 2.5, flap: 2.5, cast: 2, plop: 1.5, nibble: 1.5, early: 2, bite: 4, hook: 9, hookFast: 11, run: 6, dive: 7, thrash: 5, bad: 4, ok: 3, skill: 8, snap: 12, slack: 3, jump: 6, perfect: 6, good: 4, big: 6 };
+const LONG = { run: 900, dive: 800, thrash: 650, ink: 700, glide: 600 };
 const FEEL = () => canBuzz() ? 1 : 1.2;
 let hapticUntil = 0;
+// V13.190 몸부림(R.style)마다 진동 패턴이 다르고(FEEL_STYLES haptic), 낚싯대 단계마다 세기(켜는 길이)가 다르다(ROD_FEEL vib · kick).
+const vibScale = p => { const v = R?.rodFeel?.vib || 1; return v === 1 ? p : p.map((x, i) => i % 2 ? x : Math.min(1000, Math.round(x * v))); };
 function feel(kind) {
-  const p = HAPTIC[kind];
-  if (!p || !R) return;
+  const raw = FEEL_STYLES[R?.style]?.haptic?.[kind] || HAPTIC[kind];
+  if (!raw || !R) return;
+  const p = vibScale(raw);
   if (canBuzz()) {
     if (!soundOn()) return;
     try { navigator.vibrate(p); hapticUntil = performance.now() + p.reduce((a, b) => a + b, 0); } catch {}
-  } else if (KICK[kind]) R.kick = { px: KICK[kind], ms: LONG[kind] || 280, until: performance.now() + (LONG[kind] || 280) };
+  } else if (KICK[kind]) R.kick = { px: KICK[kind] * (R.rodFeel?.kick || 1) * (R.f ? FEEL_STYLES[R.style]?.kick || 1 : 1), ms: LONG[kind] || 280, until: performance.now() + (LONG[kind] || 280) };
 }
 // 파이팅 진동(안드로이드): 감는 동안 · 빨간 칸에서 텐션만큼 길고 잦게. 빨간 칸은 거의 쉬지 않고 드르르.
 function tensionFeel(t, f, zone) {
   if (!canBuzz() || !soundOn() || performance.now() < hapticUntil || (!f.holding && zone !== 'red')) return;
-  const k = f.tension / 100, every = zone === 'red' ? 110 : lerp(300, 130, k);
+  const k = Math.min(1, f.tension / 100 * (R.rodFeel?.vib || 1)), every = zone === 'red' ? 110 : lerp(300, 130, k);
   if (t - f.buzzAt < every) return;
   f.buzzAt = t;
   try { navigator.vibrate(zone === 'red' ? 95 : Math.round(lerp(4, 38, k ** 1.6))); } catch {}
@@ -91,6 +96,28 @@ function quake(t) {
   w.style.translate = `${((Math.random() * 2 - 1) * a).toFixed(1)}px ${((Math.random() * 2 - 1) * a).toFixed(1)}px`;
 }
 const stopStrain = () => { R?.strain?.stop(); if (R) R.strain = null; };
+const stopHum = () => { R?.hum?.stop(); if (R) R.hum = null; };
+// V13.190 깊은 바다 환경음: 낮은 울림(이어지는 소리, 1.2초 주기)과 가끔 물방울. 소리를 끄면 울림 크기 0(loopSound), 물방울도 안 난다(sfx).
+function deepAmbience(t) {
+  if (R.spot !== 'deep') { if (R.hum) stopHum(); return; }
+  R.hum ||= loopSound(DEEP_FX.HUM);
+  R.hum.set(R.phase === 'fight' ? .45 : ['reveal', 'result'].includes(R.phase) ? .25 : .7, R.phase === 'fight' ? 1.06 : 1);
+  if (t < (R.bubbleAt || 0)) return;
+  if (R.bubbleAt && R.phase !== 'reveal') sfx('deep-bubble', { vary: .15, gain: .55 });
+  R.bubbleAt = t + rnd(DEEP_FX.BUBBLE_MS);
+}
+// 입질 직전 큰 그림자가 천천히 지나간다(깊은 바다). 크기 · 방향은 무작위: 어떤 물고기가 물었는지(서버가 정한 것)와 상관없다.
+function deepPass() {
+  if (R.phase !== 'wait' || R.spot !== 'deep') return;
+  const el = $('rl-deeppass');
+  if (!el) return;
+  el.style.setProperty('--s', rnd(DEEP_FX.PASS.SIZE).toFixed(2));
+  el.style.setProperty('--ms', `${DEEP_FX.PASS.MS}ms`);
+  el.dataset.dir = Math.random() < .5 ? 'l' : 'r';
+  el.hidden = false; el.classList.remove('go'); void el.offsetWidth; el.classList.add('go');
+  sfx('deep-pass', { gain: .85, vary: .06 }); feel('pass');
+  later(() => { el.hidden = true; el.classList.remove('go'); }, DEEP_FX.PASS.MS + 100);
+}
 function later(fn, ms) { const cur = R; const t = setTimeout(() => { if (R === cur && !cur.closing) fn(); }, ms); cur.timers.push(t); return t; }
 const wait = ms => new Promise(r => later(r, ms));
 const STAR = n => `<span class="rl-stars" aria-label="별 ${n}개">${'★'.repeat(n)}<s>${'★'.repeat(5 - n)}</s></span>`;
@@ -112,7 +139,7 @@ export function openReel(A, exit) {
   root().querySelector('.rl-app').addEventListener('contextmenu', e => e.preventDefault());
   lockZoom(root().querySelector('.rl-app'));
   window.scrollTo(0, 0);
-  preloadSound(['fanfare-basic', 'fanfare-epic', 'fanfare-legend', 'coins', 'fail', 'stamp', ...REEL_SFX]);
+  preloadSound(['fanfare-basic', 'fanfare-epic', 'fanfare-legend', 'coins', 'fail', 'stamp', 'levelup', ...FEEL_SFX, ...REEL_SFX]);
   scene();
   chips();
   dock();
@@ -154,7 +181,7 @@ function unlockZoom() {
 function closeAll() {
   if (!R) return;
   unlockZoom();
-  R.closing = true; R.timers.forEach(clearTimeout); cancelAnimationFrame(R.raf); stopStrain();
+  R.closing = true; R.timers.forEach(clearTimeout); cancelAnimationFrame(R.raf); stopStrain(); stopHum();
   if (R.onResize) removeEventListener('resize', R.onResize);
 }
 async function leave() {
@@ -194,10 +221,16 @@ function onClick(event) {
   if (act === 'rod') return rodSheet();
   if (act === 'spot') return pickSpot(b.dataset.spot);
   if (act === 'rod-up') return rodUp(b);
+  if (act === 'rod-feel') return rodPreview(Number(b.dataset.lv), b);
   if (act === 'practice') { closeSheet(); return practice(); }
 }
 
 /* ---------- 1인칭 장면: 배경 · 펫 · 찌 · 물고기 그림자 · 낚싯대(코드 그림) · 줄 ---------- */
+// V13.190 깊은 바다 발광 플랑크톤: 위로 천천히 떠오르는 빛 알갱이(CSS 애니메이션만, 저사양 폰은 적게). 자리는 늘 같다(무작위 아님).
+function plankton() {
+  const n = lowEndDevice() ? DEEP_FX.PLANKTON_LOW : DEEP_FX.PLANKTON, c = ['#a5f3fc', '#c4b5fd', '#f0abfc', '#99f6e4', '#bae6fd'];
+  return `<span class="rl-plankton">${Array.from({ length: n }, (_, i) => { const h = (i * 37 + 11) % 100, k = (i * 53 + 29) % 100; return `<b style="--x:${(h * .96 + 2).toFixed(1)}%;--y:${(40 + k * .58).toFixed(1)}%;--z:${(2 + (i * 7) % 5).toFixed(0)}px;--d:${(-(i * 1.37) % 11).toFixed(2)}s;--t:${(8 + (i * 13) % 7).toFixed(0)}s;--c:${c[i % c.length]};--w:${((i % 3) - 1) * 14}px"></b>`; }).join('')}</span>`;
+}
 function scene() {
   const pet = R.A.data.stats?.pet;
   const bg = has('bg-pov') ? art('bg-pov', '') : has('bg-sea') ? art('bg-sea', '') : '';
@@ -205,7 +238,8 @@ function scene() {
     <div class="rl-world" id="rl-world">
       <div class="rl-bg">${bg || '<div class="rl-sky"><i class="rl-sun"></i><i class="rl-cloud a"></i><i class="rl-cloud b"></i><i class="rl-isle"></i></div><div class="rl-water"><i class="rl-wave w1"></i><i class="rl-wave w2"></i><i class="rl-wave w3"></i></div>'}</div>
       <i class="rl-glint a"></i><i class="rl-glint b"></i><i class="rl-glint c"></i>
-      <div class="rl-deep" aria-hidden="true">${'<i></i>'.repeat(9)}</div>
+      <div class="rl-deep" aria-hidden="true">${'<i></i>'.repeat(9)}${plankton()}<i class="rl-deep-ray a"></i><i class="rl-deep-ray b"></i><span class="rl-deep-chip rl-depth">수심 <b>1,200m</b></span></div>
+      <div class="rl-deeppass" id="rl-deeppass" aria-hidden="true" hidden><i></i></div>
       <div class="rl-shadow" id="rl-shadow" hidden><i></i></div>
       <div class="rl-bob" id="rl-bob">${art('bobber', '<i class="rl-bob-code"></i>')}${has('bobber-sink') ? art('bobber-sink', '', 'bite') : has('bobber-bite') ? art('bobber-bite', '', 'bite') : ''}${has('bobber-nibble') ? art('bobber-nibble', '', 'nib') : ''}</div>
       <div class="rl-fxl" id="rl-fx"></div>
@@ -273,7 +307,7 @@ function paintRod() {
   const arm = svg.querySelector('#rl-crank .arm'), knob = svg.querySelector('#rl-crank .knob');
   if (arm) { arm.style.fill = L.ring[0]; arm.style.stroke = L.ring[1]; }
   if (knob) knob.style.stroke = L.ring[1];
-  R.look = L; R.reelArt = art;
+  R.look = L; R.reelArt = art; R.rodFeel = rodFeel(L.level);
 }
 function sizeRig() {
   const pov = $('rl-pov'), svg = $('rl-rig');
@@ -299,7 +333,7 @@ function petFace(expression) {
 /* 낚싯대: 손잡이(아래)에서 끝까지 2차 곡선. back(던지기 전 젖힘) · bend(휨) · dir(휘는 방향)을 용수철처럼 따라간다. */
 const newRig = () => ({ back: 0, bend: 0, dir: 0, vb: 0, vbe: 0, vd: 0, tBack: 0, tBend: .04, tDir: 0, crank: 0, spin: 0 });
 function springTo(rig, dt) {
-  const k = 170, d = 13;
+  const [k, d] = R?.rodFeel?.spring || [170, 13]; // V13.190 낚싯대 단계마다 단단함 · 출렁임이 다르다(새싹은 통통 튀고, 전설은 묵직하게 멈춘다)
   for (const [x, v, t] of [['back', 'vb', 'tBack'], ['bend', 'vbe', 'tBend'], ['dir', 'vd', 'tDir']]) {
     rig[v] += ((rig[t] - rig[x]) * k - rig[v] * d) * dt;
     rig[x] += rig[v] * dt;
@@ -311,7 +345,7 @@ function rodGeom() {
   const B = [W * .6, H * 1.03];
   const rest = [W * .67, H * .43], up = [W * .83, H * .17];
   const straight = [lerp(rest[0], up[0], rig.back), lerp(rest[1], up[1], rig.back)];
-  const bend = clamp(rig.bend, 0, 1.15);
+  const bend = clamp(rig.bend * (R.rodFeel?.bend || 1), 0, 1.15); // V13.190 단계별 휘는 정도(ROD_FEEL bend)
   const tip = [straight[0] + rig.dir * bend * W * .26, straight[1] + bend * H * .19];
   const C = [B[0] + (straight[0] - B[0]) * .64, B[1] + (straight[1] - B[1]) * .64];
   const at = t => [(1 - t) ** 2 * B[0] + 2 * (1 - t) * t * C[0] + t * t * tip[0], (1 - t) ** 2 * B[1] + 2 * (1 - t) * t * C[1] + t * t * tip[1]];
@@ -412,6 +446,7 @@ function frame(t) {
   springTo(R.rig, dt);
   if (R.phase === 'fight') fightStep(t, dt);
   quake(t);
+  deepAmbience(t);
   let target = null;
   const bob = $('rl-bob');
   if (R.phase === 'fight' || R.phase === 'finish') target = R.fishPx ? { p: R.fishPx, sag: R.f ? (1 - R.f.tension / 100) * 70 : 20, zone: R.f?.zone } : null;
@@ -438,7 +473,8 @@ function dock() {
   if (!$('rl-pov')) scene();
   clearOverlays();
   setPhase('dock');
-  R.f = null; R.fishPx = null; R.live = null;
+  R.f = null; R.fishPx = null; R.live = null; R.style = null; R.fs = null;
+  const pv = $('rl-pov'); if (pv) delete pv.dataset.feel;
   Object.assign(R.rig, { tBack: 0, tBend: .04, tDir: 0, spin: 0 });
   R.bob = null; $('rl-bob')?.classList.remove('on', 'nibble', 'sink');
   $('rl-shadow').hidden = true;
@@ -593,6 +629,7 @@ function waitBite() {
   }
   at += 900 + Math.random() * 1500;
   later(bite, at);
+  if (R.spot === 'deep' && Math.random() < DEEP_FX.PASS.CHANCE) later(deepPass, Math.max(400, at - DEEP_FX.PASS.BEFORE));
   const pov = $('rl-pov');
   R.tap = e => {
     if (e.target.closest('button, .rl-hud, .rl-side-menu, .rl-sheetwrap, .rl-tankwrap')) return;
@@ -624,6 +661,7 @@ function hooked() {
   Object.assign(R.rig, { tBack: .45, tBend: .5 }); R.rig.vb = 8;
   later(() => { R.rig.tBack = 0; }, 220);
   flash(); pop(fast ? '번개 챔질!' : '챔질 성공!', 'strike'); sfx('reel-hook', { rate: fast ? 1.06 : 1 }); feel(fast ? 'hookFast' : 'hook');
+  if (R.rodFeel?.shimmer) sfx('rod-shimmer', { gain: R.rodFeel.shimmer, at: .12 });
   petFace('cheer'); say(fast ? '빠르다! 걸렸어!' : '걸렸어! 감아!');
   cue('');
   later(fight, reduced() ? 80 : 520);
@@ -647,6 +685,11 @@ function fight() {
   R.f = { dist, max: dist, tension: 38, x: R.bob?.x ?? R.W * .5, depth: 0, holding: false, move: null, next: now + 1600, redFor: 0, slackFor: 0, skill: 0, zone: 'green', clickAt: 0, buzzAt: 0, start: now, swipeX: null };
   $('rl-bob')?.classList.remove('on', 'sink'); R.bob = null;
   const sh = $('rl-shadow'); sh.hidden = false; sh.style.setProperty('--s', F.size || 1);
+  // V13.190 몸부림(서버가 보낸 feel = 몸 모양 이름): 그림자 실루엣 · 움직임 · 물보라 · 진동 · 소리 높낮이가 다르다(reel-feel.js FEEL_STYLES).
+  R.style = FEEL_STYLES[F.feel] ? F.feel : 'sway'; R.fs = {};
+  sh.dataset.feel = R.style;
+  sh.innerHTML = `<i></i><b class="rl-sil">${fishShadow(FEEL_STYLES[R.style].sil)}</b>${R.style === 'lure' ? '<em class="rl-lure"></em>' : ''}`;
+  $('rl-pov').dataset.feel = R.style;
   $('rl-world').classList.add('zoom');
   stopStrain(); R.strain = loopSound('reel-strain');
   const pet = R.A.data.stats?.pet;
@@ -721,7 +764,7 @@ function offSwipe() {
   if (R?.swipe) { pov?.removeEventListener('pointerdown', R.swipe.down); pov?.removeEventListener('pointermove', R.swipe.move); removeEventListener('pointerup', R.swipe.up); R.swipe = null; }
 }
 function pickMove() {
-  const m = R.live.fight.moves || { mash: 1 }, total = Object.values(m).reduce((a, b) => a + b, 0);
+  const m = leanMoves(R.live.fight.moves || { mash: 1 }, R.live.fight.lean), total = Object.values(m).reduce((a, b) => a + b, 0); // V13.190 몸부림 기울기(같은 등급 평균은 그대로)
   let r = Math.random() * total;
   for (const [k, w] of Object.entries(m)) if ((r -= w) <= 0) return k;
   return 'mash';
@@ -733,7 +776,7 @@ function startMove(t, forced = null) {
     f.move = { kind, until: t + 2600, need: F.taps || 10, got: 0, last: 0 };
     cue(`<span class="rl-cue-big mash">탈출 시도!<small>◀ ▶ 번갈아 연타!</small></span>`, 'mash');
     qte(`<div class="rl-mash"><span><i id="rl-mash-fill"></i></span><b id="rl-mash-n">0 / ${f.move.need}</b></div>`);
-    sfx('reel-run'); sfx('reel-creak', { gain: .6, rate: 1.1, at: .1 }); feel('run'); say('도망가려고 해! 연타!', 1500);
+    sfx('reel-run', { rate: pitch() }); sfx('reel-creak', { gain: .6, rate: 1.1, at: .1 }); drag(); feel('run'); say('도망가려고 해! 연타!', 1500);
   } else if (kind === 'rhythm') {
     // 리듬: 위에서 내려오는 노트가 동그라미에 닿을 때 그쪽 버튼.
     const n = F.notes || 6, beat = F.beat || 500, t0 = t + 1100;
@@ -742,18 +785,41 @@ function startMove(t, forced = null) {
     f.move = { kind, until: at + 600, notes, hit: 0, perfect: 0, combo: 0 };
     cue(`<span class="rl-cue-big rhythm">리듬을 타요!<small>노트가 동그라미에 닿을 때 톡!</small></span>`, 'rhythm', 1100);
     qte(`<div class="rl-lanes"><div class="rl-lane l"><i class="rl-hitring"></i></div><div class="rl-lane r"><i class="rl-hitring"></i></div><div class="rl-notes" id="rl-notes">${notes.map((x, k) => `<i class="rl-note ${x.side < 0 ? 'l' : 'r'}" data-k="${k}" data-at="${x.at.toFixed(0)}"></i>`).join('')}</div><b class="rl-combo" id="rl-combo"></b><em class="rl-judge" id="rl-judge"></em></div>`);
-    sfx('reel-run', { dur: .6, rate: 1.15, gain: .6 }); feel('rhythm'); say('리듬 타자!', 1200);
+    sfx('reel-run', { dur: .6, rate: pitch(1.15), gain: .6 }); feel('rhythm'); say('리듬 타자!', 1200);
   } else if (kind === 'thrash') {
     f.move = { kind, until: t + 1300, held: 0 };
     cue('<span class="rl-cue-big thrash">날뛴다! <b>손 떼기!</b></span>', 'thrash');
-    fx('splash', f.x, R.H * .5 + f.depth, 'big'); sfx('reel-jump', { gain: .75, rate: 1.1 }); sfx('reel-creak', { gain: .5, rate: 1.25 }); feel('thrash'); say('놓아! 놓아!', 1200);
+    fx('splash', f.x, R.H * .5 + f.depth, 'big'); sfx('reel-jump', { gain: .75, rate: pitch(1.1) }); sfx('reel-creak', { gain: .5, rate: 1.25 }); feel('thrash'); say('놓아! 놓아!', 1200);
   } else {
     f.move = { kind, until: t + 1900 };
     cue('<span class="rl-cue-big dive">잠수! <b>꾹 버티기!</b></span>', 'dive');
-    sfx('reel-run', { rate: .8, gain: .85 }); feel('dive'); say('꽉 잡아!', 1200);
+    sfx('reel-run', { rate: pitch(.8), gain: .85 }); drag(); feel('dive'); say('꽉 잡아!', 1200);
   }
   if (forced && kind !== 'rhythm') f.move.until = t + 1e9; // 연습: 해낼 때까지 기다린다(리듬은 노트가 끝나면)
   $('rl-pov').dataset.move = kind;
+}
+// V13.190 몸부림 소리 높낮이(FEEL_STYLES pitch: 작은 물고기는 높고 빠르게, 큰 물고기는 낮고 묵직하게) · 줄 풀리는 소리(낚싯대 단계마다 ROD_FEEL drag).
+const pitch = (k = 1) => (FEEL_STYLES[R?.style]?.pitch || 1) * k;
+const drag = () => { const [rate, gain] = R?.rodFeel?.drag || [1, .9]; sfx('rod-drag', { rate, gain, vary: .04 }); };
+// 몸부림 순간(feelPath ev): 종마다 소리 · 진동 · 작은 효과. 판정(텐션 · 거리)은 건드리지 않는다.
+function feelEvent(ev) {
+  const f = R.f, s = FEEL_STYLES[R.style]?.ev?.[ev], x = f.x, y = R.fishPx?.[1] ?? R.H * .55;
+  if (s) sfx(s[0], { rate: s[1], gain: s[2] * FEEL(), vary: .05 });
+  feel(ev);
+  if (ev === 'ink') inkCloud(x, y);
+  else if (ev === 'strike' || ev === 'turn') { fx('splash', x, y, ev === 'strike' ? 'big' : ''); R.rig.vbe += ev === 'strike' ? 7 : 4; R.rig.vd += (Math.random() < .5 ? -1 : 1) * 4; }
+  else if (ev === 'glide' || ev === 'flap' || ev === 'jet') fx('ripple', x, y, ev === 'glide' ? '' : 'tiny');
+  else if (ev === 'lure') { const l = $('rl-shadow')?.querySelector('.rl-lure'); l?.classList.remove('blink'); void l?.offsetWidth; l?.classList.add('blink'); }
+}
+// 대왕오징어 먹물: 물고기 둘레가 잠깐 어두워진다(버튼 · 리듬 노트는 위에 있어서 가리지 않는다).
+function inkCloud(x, y) {
+  const host = $('rl-fx');
+  if (!host || host.querySelector('.rl-ink')) return;
+  const el = document.createElement('div');
+  el.className = 'rl-ink'; el.style.left = `${x}px`; el.style.top = `${y}px`;
+  el.innerHTML = '<i></i><i></i><i></i>';
+  host.appendChild(el);
+  setTimeout(() => el.remove(), 1900);
 }
 const qte = html => { const el = $('rl-qte'); if (el) { el.innerHTML = html; el.classList.toggle('on', !!html); } };
 const MOVE_OK = { mash: '빠져나가지 못했어요!', rhythm: '리듬 성공!', thrash: '잘 풀어 줬어요!', dive: '버텼다!' };
@@ -871,14 +937,17 @@ function fightStep(t, dt) {
   if (f.dist <= 0) return finish();
   // 물고기 위치: 멀면 수평선 가까이(작게), 가까우면 아래로(크게).
   const near = 1 - f.dist / f.max;
-  const tx = m?.kind === 'mash' ? R.W * (.5 + Math.sin(t / 160) * .3) : R.W * (.5 + Math.sin(t / 1100) * .22);
-  f.x += (tx - f.x) * Math.min(1, dt * (m?.kind === 'mash' ? 6 : 1.1));
+  // V13.190 몸부림마다 다른 움직임(reel-feel.js feelPath): 참치는 곧게 길게 · 가오리는 넓게 미끄러지듯 · 상어는 가끔 확 치고 빠진다.
+  const P = feelPath(R.style, t, m?.kind || '', R.fs), tx = R.W * (.5 + P.x);
+  f.x += (tx - f.x) * Math.min(1, dt * P.follow);
+  if (P.ev) feelEvent(P.ev);
+  if (Math.abs(tx - f.x) > 3) f.face = tx > f.x ? 1 : -1;
   f.depth = m?.kind === 'dive' ? Math.min(1, (f.depth || 0) + dt * 2) : Math.max(0, (f.depth || 0) - dt * 2);
-  const y = R.H * lerp(.47, .7, clamp(near, 0, 1)) + Math.sin(t / 380) * 4;
+  const y = R.H * lerp(.47, .7, clamp(near, 0, 1)) + Math.sin(t / 380) * 4 + P.y;
   R.fishPx = [f.x, y];
   const sh = $('rl-shadow');
-  sh.style.transform = `translate(${f.x.toFixed(1)}px,${y.toFixed(1)}px) scale(${(lerp(.55, 1.25, clamp(near, 0, 1)) * (1 - f.depth * .35)).toFixed(3)})`;
-  sh.classList.toggle('flip', (m?.kind === 'mash' ? Math.cos(t / 160) : Math.cos(t / 1100)) < 0);
+  sh.style.transform = `translate(${f.x.toFixed(1)}px,${y.toFixed(1)}px) scale(${(lerp(.55, 1.25, clamp(near, 0, 1)) * (1 - f.depth * .35)).toFixed(3)}) rotate(${(reduced() ? 0 : P.rot).toFixed(1)}deg)`;
+  sh.classList.toggle('flip', (f.face || 1) < 0);
   sh.classList.toggle('deep', f.depth > .3);
   sh.classList.toggle('thrash', m?.kind === 'thrash' || m?.kind === 'mash');
   // 낚싯대: 텐션만큼 휘고 물고기 쪽으로 기운다.
@@ -898,7 +967,16 @@ function fightStep(t, dt) {
   // V13.164 손맛: 릴 딸깍은 감는 속도만큼 잦고 높게(초록 칸에서 빨리 감으면 촤르르), 줄 텐션 끼익은 텐션만큼 크고 높게,
   // 빨간 칸에 들어가면(그 뒤로 0.9초마다) 낚싯대가 끼익, 낚싯대는 텐션만큼 부르르 떨고, 진동은 텐션만큼 길고 잦게.
   const speed = clamp(f.reelV / (2.5 * rod.reel), 0, 1);
-  if (speed > 0 && t - f.clickAt > lerp(210, 55, speed)) { f.clickAt = t; sfx('reel-click', { rate: .75 + speed * .35 + f.tension / 500, gain: (.55 + speed * .5) * FEEL(), vary: .04 }); }
+  // V13.190 낚싯대 단계마다 릴 소리가 다르다(ROD_FEEL click: 새싹 · 은빛은 가벼운 톡톡, 황금은 원래 찰칵, 보석 · 전설은 묵직한 드르륵 + 반짝이).
+  const rf = R.rodFeel || rodFeel(rod.level);
+  if (speed > 0 && t - f.clickAt > lerp(210, 55, speed) * rf.every) {
+    f.clickAt = t;
+    const [ck, cr, cg] = rf.click;
+    if (ck === 'reel-click') sfx('reel-click', { rate: .75 + speed * .35 + f.tension / 500, gain: (.55 + speed * .5) * FEEL(), vary: .04 });
+    else sfx(ck, { rate: cr * (.75 + speed * .35 + f.tension / 500), gain: cg * (.55 + speed * .5) * FEEL(), vary: .04 });
+    if (rf.shimmer && speed > .5 && t - (f.shimAt || 0) > 1400) { f.shimAt = t; sfx('rod-shimmer', { gain: rf.shimmer * speed, vary: .06 }); }
+  }
+  if (m?.kind === 'dive' && !f.holding && t - (f.dragAt || 0) > 1300) { f.dragAt = t; drag(); }
   const strain = clamp((f.tension - 30) / 60, 0, 1);
   R.strain?.set(strain ** 1.4 * (f.holding ? 1 : .6) * FEEL(), .8 + f.tension / 100 * .55 + (zone === 'red' ? Math.sin(t / 60) * .03 : 0));
   if (zone === 'red' && t - (f.creakAt || 0) > 900) { f.creakAt = t; sfx('reel-creak', { rate: 1 + Math.random() * .15, gain: .85 }); }
@@ -923,7 +1001,7 @@ async function lose(msg, why) {
   $('rl-tuthand')?.remove(); R.tut = null;
   setPhase('lost');
   R.rig.spin = 0; stopStrain();
-  if (why === 'snap') { Object.assign(R.rig, { tBend: 0, tDir: 0 }); R.rig.vbe = -14; fx('snap', ...rodGeom().tip); sfx('reel-snap'); }
+  if (why === 'snap') { Object.assign(R.rig, { tBend: 0, tDir: 0 }); R.rig.vbe = -14; fx('snap', ...rodGeom().tip); const [sk, sr] = R.rodFeel?.snap || ['reel-snap', 1]; sfx(sk, { rate: sr }); if (sk !== 'reel-snap') sfx('reel-snap', { rate: sr * 1.1, gain: .45 }); }
   else sfx('reel-plop', { rate: .75, gain: .6 });
   sfx('fail', { gain: .6, at: .35 }); feel(why === 'snap' ? 'snap' : 'slack'); petFace('sad');
   $('rl-world')?.classList.remove('zoom', 'shake');
@@ -997,7 +1075,23 @@ async function landFish(kind) {
   const res = await land('caught', kind);
   if (!R) return;
   if (res?.practice) return later(() => { document.querySelector('.rl-leap')?.remove(); R.practice = false; result(`<h2>연습 끝! ${kind === 'perfect' ? '퍼펙트까지 완벽해요' : '잘했어요'}</h2><p>이제 진짜 미끼로 낚아 봐요. 첫 판은 이렇게 안내가 함께해요.</p>`, 'practice'); petFace('happy'); }, 500);
+  // V13.190 월척(trophyOf): 끌어올리는 순간 0.5초 멈춘 듯 느려지고(히트 스톱) 번쩍 · 큰 물보라 · 묵직한 울림. 동작 줄이기면 멈춤 · 번쩍 없이 바로.
+  const T = trophyOf(res);
+  if (T.trophy) await trophyMoment(T);
+  if (!R) return;
   later(() => { document.querySelector('.rl-leap')?.remove(); reveal(res, kind); }, reduced() ? 60 : 650);
+}
+async function trophyMoment(T) {
+  const pov = $('rl-pov'), leap = $('rl-leap');
+  sfx('trophy-boom', { gain: T.legend ? 1 : .85 }); feel('trophy');
+  if (reduced()) { leap?.classList.add('trophy'); return; }
+  pov?.classList.add('trophy-moment');
+  leap?.classList.add('trophy');
+  flash();
+  const [x, y] = [R.W * .5, R.H * .58];
+  fx('jump', x, y, 'big'); fx('splash', x - R.W * .22, y + 20, 'big'); fx('splash', x + R.W * .22, y + 20, 'big');
+  await wait(TROPHY_FX.SLOW_MS);
+  pov?.classList.remove('trophy-moment');
 }
 async function land(result, finishKind = null, quiet = false) {
   if (!R?.live) return null;
@@ -1021,9 +1115,9 @@ function reveal(res, kind) {
   Object.assign(R.rig, { tBend: .04, tDir: 0 });
   if (!res?.caught) return result(`<h2>아슬아슬하게 놓쳤어요</h2><p>${res?.reason === 'short' ? '너무 빨리 끌어올려서 줄이 풀렸어요.' : '연결을 확인해 주세요.'}</p>`, 'miss');
   petFace('happy');
-  const f = FISH[res.key], n = stars(res.rarity), big = n >= 3, glow = RARITY_GLOW[res.rarity] || '#fff';
+  const f = FISH[res.key], n = stars(res.rarity), big = n >= 3, glow = RARITY_GLOW[res.rarity] || '#fff', T = trophyOf(res);
   const box = document.createElement('div');
-  box.className = `rl-rev r-${res.rarity}${big ? ' big' : ''}${has('bg-reveal') ? ' art' : ''}`;
+  box.className = `rl-rev r-${res.rarity}${big ? ' big' : ''}${has('bg-reveal') ? ' art' : ''}${T.trophy ? ' trophy' : ''}${T.record ? ' record' : ''}`;
   box.style.setProperty('--glow', glow);
   box.innerHTML = `${art('bg-reveal', '<div class="rl-rev-sky"><i class="sun"></i></div><div class="rl-rev-sea"><i></i><i></i></div>')}
     ${big ? `<i class="rl-rev-rays">${art('fx-rays', '')}</i>` : ''}
@@ -1031,6 +1125,8 @@ function reveal(res, kind) {
     <div class="rl-rev-fish"><div class="rl-rev-jump">${fishPic(res.key)}</div></div>
     <div class="rl-rev-splash">${art('fx-jump', '<i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>')}</div>
     ${res.fresh ? `<div class="rl-stamp">${art('stamp-new', '')}<span>새로<br>발견!</span></div>` : ''}
+    ${T.trophy ? `<div class="rl-trophy-stamp" role="img" aria-label="월척"><span>월척!</span><small>${T.legend ? '전설급' : '상위 15%'}</small></div>` : ''}
+    ${T.record ? `<div class="rl-record-stamp" role="img" aria-label="최고 무게 신기록"><b>NEW</b><span>RECORD</span></div>${reduced() ? '' : `<div class="rl-starburst" aria-hidden="true">${Array.from({ length: lowEndDevice() ? TROPHY_FX.STARS_LOW : TROPHY_FX.STARS }, (_, i) => `<i style="--a:${Math.round(i * 360 / (lowEndDevice() ? TROPHY_FX.STARS_LOW : TROPHY_FX.STARS))}deg;--r:${90 + (i * 29) % 70}px;--d:${1500 + (i % 4) * 70}ms"></i>`).join('')}</div>`}` : ''}
     <section class="rl-rev-card">
       <div class="rl-rev-top">${STAR(n)}<span class="fs-rarity">${esc(RARITY[res.rarity].name)}</span>${f.deep ? '<span class="rl-deep-chip">깊은 바다</span>' : ''}${res.perfect ? '<span class="rl-perfect-chip">퍼펙트 +8%</span>' : ''}</div>
       <h2>${esc(f.name)}</h2>
@@ -1044,12 +1140,15 @@ function reveal(res, kind) {
   sfx(res.rarity === 'legend' || res.rarity === 'golden' ? 'fanfare-legend' : res.rarity === 'epic' ? 'fanfare-epic' : res.rarity === 'rare' ? 'fanfare-basic' : 'correct', { at: .12 });
   feel(n >= 4 ? 'big' : 'caught');
   // 무게: 0에서 올라간다.
-  const kgEl = box.querySelector('#rl-kg'), t0 = performance.now(), dur = reduced() ? 1 : 900;
+  const kgEl = box.querySelector('#rl-kg'), t0 = performance.now(), dur = reduced() ? 1 : T.trophy ? 1500 : 900;
+  if (T.trophy) kgEl.classList.add('trophy');
   const tick = t => { if (!R || !kgEl.isConnected) return; const k = Math.min(1, (t - t0) / dur); kgEl.textContent = kgText(res.kg * (1 - (1 - k) ** 3)); if (k < 1) requestAnimationFrame(tick); else { kgEl.classList.add('done'); if (res.record) sfx('levelup', { gain: .5 }); } };
   later(() => requestAnimationFrame(tick), reduced() ? 0 : 700);
   if (res.fresh) later(() => { sfx('stamp', { gain: .8 }); feel('good'); }, reduced() ? 0 : 1300);
+  if (T.trophy) later(() => { sfx('stamp', { gain: 1, rate: .85 }); sfx('reel-sparkle', { gain: .8, at: .1 }); feel('big'); }, reduced() ? 0 : 1000);
+  if (T.record) later(() => { sfx('stamp', { gain: .7, rate: 1.15 }); sfx('reel-sparkle', { gain: .6, at: .08 }); feel('record'); }, reduced() ? 0 : 1500);
   if (n >= 4) later(() => coinShower(box, n >= 5 ? 26 : 14), 600);
-  say(n >= 4 ? '우와!! 대박이다!' : n >= 3 ? '귀한 물고기야!' : res.fresh ? '처음 보는 물고기야!' : '잡았다!', 2400);
+  say(T.trophy ? (T.legend ? '전설의 월척이다!!' : '월척이야!! 엄청 커!') : T.record ? '최고 기록이야!' : n >= 4 ? '우와!! 대박이다!' : n >= 3 ? '귀한 물고기야!' : res.fresh ? '처음 보는 물고기야!' : '잡았다!', 2400);
 }
 function result(inner, cls) {
   setPhase('result');
@@ -1069,6 +1168,7 @@ function fx(kind, x, y, size = '') {
   const el = document.createElement('div');
   el.className = `rl-fx ${kind} ${size}`;
   el.style.left = `${x}px`; el.style.top = `${y}px`;
+  if ((kind === 'splash' || kind === 'jump') && R?.f) el.style.setProperty('--fs', (FEEL_STYLES[R.style]?.splash || 1).toFixed(2)); // V13.190 몸부림마다 물보라 크기
   const drops = n => Array.from({ length: n }, (_, k) => `<b style="--a:${-170 + k * (160 / (n - 1))}deg;--r:${size === 'small' || size === 'tiny' ? 26 : 52}px;--d:${k % 3 * 40}ms"></b>`).join('');
   el.innerHTML = kind === 'splash' ? art('fx-splash', '<i class="crown"></i>') + drops(size === 'small' ? 6 : 11)
     : kind === 'ripple' ? art('fx-ripple', '<i></i><i></i>')
@@ -1203,9 +1303,21 @@ function rodSheet() {
     </div>
     <div class="rl-shop-block"><h3>강화하면 좋아지는 것 <small>${max ? '모두 최고예요' : `${esc(next.name)}이 되면`}</small></h3>
       <ul class="rl-perks">${rodPerks(lv).map(x => `<li><span>${x.label}</span><b>${x.now}</b>${x.next ? `<i aria-hidden="true">→</i><em>${x.next}</em>` : ''}</li>`).join('')}${v.deep?.ready ? `<li class="deep"><span>🌊 깊은 바다</span><b>${lv >= DEEP.MIN_ROD ? '열림' : `${num(DEEP.MIN_ROD)}단계에서 열려요`}</b></li>` : ''}</ul>
+      <div class="rl-rodfeel"><button type="button" class="rl-feelbtn" data-rl="rod-feel" data-lv="${lv}"><span aria-hidden="true">🎧</span><b>감촉 미리듣기</b><small>${esc(rodFeel(lv).ko)}</small></button>${next ? `<button type="button" class="rl-feelbtn next" data-rl="rod-feel" data-lv="${lv + 1}"><span aria-hidden="true">✨</span><b>${lv + 1}단계 감촉</b><small>${esc(rodFeel(lv + 1).ko)}</small></button>` : ''}</div>
       <p class="rl-sheet-note">손맛은 그대로, 물고기를 끌어올리기가 조금씩 쉬워져요. 잡히는 물고기 등급은 바뀌지 않아요. 반 전체 낚시(교실 게임)는 모두 같은 낚싯대로 해요.</p>
       ${max ? '<p class="rl-rod-max">최고 단계 낚싯대예요! ✨</p>' : `<button type="button" class="yl-cta rl-rod-up" data-rl="rod-up" ${p >= cost ? '' : 'disabled'}>${pearlIco()} ${num(cost)} 진주로 강화하기</button>${p < cost ? `<p class="rl-sheet-note">진주 ${num(cost - p)}개를 더 모아요. 어망 물고기를 팔면 진주가 생겨요.</p>` : ''}`}
     </div>`, 'rod');
+}
+// V13.190 낚싯대 감촉 미리듣기: 짧게 릴을 감는 소리(그 단계 릴 소리 · 줄 풀림 · 반짝이)와 진동. 소리를 끄면 조용히(진동도 소리 설정을 따른다), 버튼만 살짝 움직인다.
+function rodPreview(lv, b) {
+  const F = rodFeel(lv), [ck, cr, cg] = F.click;
+  b?.classList.remove('play'); void b?.offsetWidth; b?.classList.add('play');
+  if (!soundOn()) return;
+  let at = 0;
+  for (let i = 0; i < 10; i++) { const k = i / 9; sfx(ck, { rate: cr * (.8 + k * .35), gain: cg * (.6 + k * .4), at, vary: .03 }); at += lerp(.16, .06, k) * F.every; }
+  sfx('rod-drag', { rate: F.drag[0], gain: F.drag[1], at: at + .05 });
+  if (F.shimmer) sfx('rod-shimmer', { gain: F.shimmer + .2, at: at + .2 });
+  buzz([20, 40, 20, 40, 30, 30, 40, 30, 120].map((x, i) => i % 2 ? x : Math.round(x * F.vib)));
 }
 async function rodUp(b) {
   buttonBusy(b);
@@ -1275,7 +1387,7 @@ function book() {
   sheet(`${sheetHead(`물고기 도감 <small>${num(got)} / ${keys.length}</small>`)}
     <div class="fs-book-bar"><i style="width:${Math.round(got / keys.length * 100)}%"></i></div>
     <div class="fs-tank">${shore.map(slot).join('')}</div>
-    ${deep.length ? `<h3 class="rl-book-deep">🌊 깊은 바다 <small>${num(deep.filter(k => mine[k]?.n).length)} / ${num(deep.length)} · 낚싯대 ${num(DEEP.MIN_ROD)}단계부터</small></h3><div class="fs-tank deep">${deep.map(slot).join('')}</div>` : ''}`, 'book');
+    ${deep.length ? `<h3 class="rl-book-deep">🌊 깊은 바다 <small>${num(deep.filter(k => mine[k]?.n).length)} / ${num(deep.length)} ${DEEP.MIN_ROD > 1 ? ` · 낚싯대 ${num(DEEP.MIN_ROD)}단계부터` : ''}</small></h3><div class="fs-tank deep">${deep.map(slot).join('')}</div>` : ''}`, 'book');
 }
 // 처음 들어오면 한 번(그 뒤에는 ? 버튼).
 function guide(first) {
@@ -1288,7 +1400,7 @@ function guide(first) {
         펫 특기 구슬이 차면 <b>위로 쓸어 올려</b> 한 번에 끌어와요. 물고기가 뛰어오르면 고리가 맞을 때 탭 → 퍼펙트(무게 +8%)!</p></li>
       <li><b>물고기를 진주로</b><p>낚은 물고기는 <b>수조</b>에서 헤엄쳐요. 팔면 진주가 돼요. 팔아도 도감 기록은 남아요.</p>
         <div class="rl-guide-table">${['common', 'uncommon', 'rare', 'epic', 'legend'].map(r => `<span>${STAR(stars(r))}<b>${esc(RARITY[r].name)}</b><em>${num(REEL.PEARLS[r])}</em></span>`).join('')}</div></li>
-      ${R.v?.deep?.ready ? `<li><b>🌊 깊은 바다</b><p>낚싯대를 <b>${num(DEEP.MIN_ROD)}단계</b>로 강화하면 깊은 바다에서 낚을 수 있어요. 희귀 · 영웅 · 전설 물고기가 <b>심해 물고기</b>로 바뀌어요(진주 값은 같아요).</p></li>` : ''}
+      ${R.v?.deep?.ready ? `<li><b>🌊 깊은 바다</b><p>${DEEP.MIN_ROD > 1 ? `낚싯대를 <b>${num(DEEP.MIN_ROD)}단계</b>로 강화하면 깊은 바다에서 낚을 수 있어요.` : '부두 왼쪽 위에서 <b>깊은 바다</b>를 고르면 처음부터 낚을 수 있어요.'} 희귀 · 영웅 · 전설 물고기가 <b>심해 물고기</b>로 바뀌어요(진주 값은 같아요).</p></li>` : ''}
       <li><b>진주로 바꿀 수 있는 것</b>
         <ul><li>${coin()} <b>코인</b>: 진주 1개 = 1코인 (하루 ${num(REEL.COIN_DAILY)}코인까지)</li><li><b>랜덤 알</b>: 진주 ${num(REEL.EGG)}개 (하루 1개)</li><li><b>영웅 알</b>: 진주 ${num(REEL.EPIC_EGG)}개 (하루 1개)</li><li><b>바다 펫</b>: 진주 ${num(REEL.SEA_PET)}개 · 교환소에서만 만나요!</li><li><b>황금 알 물고기</b>는 팔지 않고 모아요. ${REEL.GOLDEN_EGG}마리면 알 선물!</li></ul></li>
     </ol>

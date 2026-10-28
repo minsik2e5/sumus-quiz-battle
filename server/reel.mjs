@@ -4,6 +4,7 @@ import { FISH, FISH_KEYS } from '../public/modules/fishing-rules.js';
 import { FISH_READY } from '../public/modules/fish-art.js';
 import { REEL, FIGHT, FINISH, CAST_TIERS, SEA_PETS, ROD, DEEP, rodLevel, rodOf, reelRoll, pearlsOf, deepReady, deepOpen } from '../public/modules/reel-rules.js';
 import { findReceipt, keepReceipt, giveGift } from './rewards.mjs';
+import { feelOf, leanOf } from '../public/modules/reel-feel.js';
 
 // V13.150 손맛 낚시(놀이터) 서버 쪽. 학생 기록 p.reel:
 //   { bait, bait_day, bait_today, pearls, net{key: n}, coin_day, coin_today, coins (받은 코인 합), egg_day, epic_day(V13.160, 예전 epic_week), live{…}, guide, done[], rod (V13.154 낚싯대 단계 1~5) }
@@ -46,7 +47,8 @@ export function reelView(p, now = Date.now(), ready = FISH_READY) {
 export function reelCast(p, { id, cast, water = false, spot = 'shore', now = Date.now(), seed = randomBytes(4).readUInt32BE(0), ready = FISH_READY }) {
   const r = reel(p);
   // V13.150.1 같은 던지기(id)를 다시 보내면(연결이 끊겨 다시 보냄 · 화면을 다시 열어 이어 하기) 미끼를 또 쓰지 않고 같은 답.
-  const fightOf = live => { const F = FIGHT[live.rarity]; return { hp: F.hp, pull: F.pull, dash: F.dash, size: F.size, min: F.min, dist: F.dist, moves: F.moves, taps: F.taps, notes: F.notes, beat: F.beat }; };
+  // V13.190 feel: 몸부림 모양(여러 물고기가 같이 쓰는 이름), lean: 행동 가중치 기울기(같은 등급끼리 합하면 0, reel-feel.js). 물고기 이름 · 무게는 보내지 않는다.
+  const fightOf = live => { const F = FIGHT[live.rarity]; return { hp: F.hp, pull: F.pull, dash: F.dash, size: F.size, min: F.min, dist: F.dist, moves: F.moves, taps: F.taps, notes: F.notes, beat: F.beat, feel: feelOf(live.key), lean: leanOf(live.key, live.spot === 'deep', ready) }; };
   if (r.live && now - r.live.at < REEL.LIVE_MS) {
     if (id && r.live.id === id) return { id, fight: fightOf(r.live), bait: Number(r.bait || 0), again: true, at: r.live.at };
     fail('던진 낚싯대를 먼저 끌어올려 주세요.', 409);
