@@ -11,7 +11,8 @@ const byTier = keys => [...keys].sort((a, b) => TITLE_TIERS[TITLES[a].tier].orde
 const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 export const titleState = A => A.data?.titles || { equipped: 'rookie', unlocked: ['rookie'], stats: {}, fresh: [], intro: false };
 // V13.184: 빈칸영작 칭호(중등 전용)는 고등 학생 도감에서 숨긴다.
-const visibleFor = (A, unlocked) => visibleTitleKeys(unlocked, { middle: A.data?.profile?.division === 'middle' });
+// V13.191: 모의고사 칭호는 우리 학교 · 학년에 모의고사 책이 있을 때만(서버가 센 stats.mock_books, server/service.mjs titleScope와 같은 기준).
+const visibleFor = (A, unlocked) => visibleTitleKeys(unlocked, { middle: A.data?.profile?.division === 'middle', mock: Number(titleState(A).stats?.mock_books || 0) > 0 });
 export const titleCount = A => { const u = titleState(A).unlocked; return `${u.length}/${visibleFor(A, u).length}`; };
 
 // "333 / 500", or for the league title the best tier so far.
@@ -201,13 +202,15 @@ function unlockMoment(A, keys, onChanged) {
 }
 
 // V13.184 칭호 3탄 소급 지급: 배포 전부터 조건을 채운 3탄 칭호는 팝업을 여러 번 띄우지 않고 한 장 카드로 한 번에(코인도 한 번에).
+// V13.191 4탄도 같은 카드(서버가 몇 탄인지 batch_wave로 알려 준다).
 function batchMoment(A, keys, onChanged) {
+  const wave = Number(A.data?.titles?.batch_wave) || 3;
   const list = byTier(keys).reverse(), total = keys.reduce((n, key) => n + titleCoins(key), 0);
   const top = TITLES[list[0]].tier;
   const body = overlay('새 칭호 묶음', top);
   $('.tt-moment').className = `modal tt-moment tier-${top}`;
   body.innerHTML = `<div class="tt-intro tt-batch">
-    <span class="tt-moment-kicker">${artOr('title-new', '', 'tt-kicker-art')}NEW · 칭호 3탄</span>
+    <span class="tt-moment-kicker">${artOr('title-new', '', 'tt-kicker-art')}NEW · 칭호 ${wave}탄</span>
     <h2>칭호 ${keys.length}개가 한꺼번에 도착!</h2>
     <p>지금까지의 기록으로 새 칭호 <b>${keys.length}개</b>를 얻었어요.</p>
     <div class="tt-batch-grid">${list.map((key, i) => `<span style="--i:${i}">${titleEmblem(key, { size: 'md' })}<small>${esc(TITLES[key].name)}</small></span>`).join('')}</div>

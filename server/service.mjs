@@ -1,7 +1,7 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
 import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, EPIC_EGG_PRICE, seasonOnSale, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
-import { TITLES, TITLE_KEYS, TITLES_3, titleUnlocked, weeklyTitle } from '../public/modules/titles.js';
+import { TITLES, TITLE_KEYS, TITLES_3, TITLES_4, titleUnlocked, weeklyTitle, visibleTitleKeys } from '../public/modules/titles.js';
 import { battleQuestions, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
 import { monsterParts } from '../public/modules/monsters.js';
@@ -13,7 +13,7 @@ const marketOpen = state => MARKET_OPEN || state.market?.open === true;
 import { rpsView, rpsPlay, rpsCash, openEgg } from './rewards.mjs';
 import { logActivity, activityOf, activityOverview } from './activity.mjs';
 import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, monsterStart, monsterFinish, monsterView, monsterScope, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts, legendEggView, grantLegendEgg, legendEggOpen, legendEggBuy } from './rewards.mjs';
-import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate, setUnitCounter } from './competition.mjs';
+import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate, setUnitCounter, setRangeCounter } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
 import { signupCodeRows, updateSignupCode } from './signup.mjs';
@@ -37,6 +37,7 @@ import packageInfo from '../package.json' with { type: 'json' };
 import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend, reelSeaPet, reelRodUp } from './reel.mjs';
 import { blankStart, blankFinish, blankView } from './blank.mjs';
 import { rememberGramBest } from './titles-3.mjs';
+import { rangeCounts, rememberRangeBest, keepTimingLastWeek } from './titles-4.mjs';
 import { grantTimingPlay, timingView, timingPing, timingStart, timingFinish, timingBoard, timingLine } from './timing.mjs';
 import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow, huntSell, huntCoins, huntSpend, huntBerryQuiz, huntBerryAnswer } from './hunt.mjs';
 import { grantClaw, clawView, clawStart, clawDrop, clawGuideSeen, clawPreviewFill, clawActivityText } from './claw.mjs';
@@ -309,6 +310,12 @@ function recentRangeResults(list, mastery, limit = 30) {
 }
 // V13.148 칭호 '한 과 정복' · '교과서 정복자': 학습 화면의 과 정복(정답률 95% 이상으로 모든 단어를 푼 범위) 수.
 setUnitCounter((state, p) => { const school = p?.role === 'student' ? schoolForProfile(state, p) : null; return school ? wordRangeMastery(state, p.id, school, p.class_name).mastered : 0; });
+// V13.191 칭호 4탄 시험 범위: 그 학생 학교 · 학년 책의 범위 상태로 한 바퀴 · 모의고사 책 · 시험 전체를 센다(server/titles-4.mjs rangeCounts).
+function studentRangeCounts(state, p) {
+  const school = p?.role === 'student' ? schoolForProfile(state, p) : null;
+  return school ? rangeCounts(booksForSchoolGrade(state, school, p.class_name), wordRangeMastery(state, p.id, school, p.class_name).ranges) : null;
+}
+setRangeCounter(studentRangeCounts);
 function wordRangeMastery(state, studentId, school, grade = null) {
   if (!school) return { ranges: {}, mastered: 0, perfect: 0, total_ranges: 0, conquest: 0 };
   const words = wordsForSchoolGrade(state, school, grade);
@@ -946,6 +953,18 @@ function idleStudents(state, ctx, school, now = Date.now()) {
 // V13.184: 칭호가 150개를 넘어 학생이 본 칭호 기록을 240개까지 남긴다(160이면 거의 다 모은 학생은 본 칭호가 다시 새 칭호로 뜬다).
 export const TITLES_SEEN_MAX = 240;
 const titleSeenKey = (ctx, key) => weeklyTitle(key) ? `${key}@${ctx.lastWeek.key}` : key;
+// V13.191 칭호 도감에 보이는 칭호(화면 titles-ui.js visibleFor와 같은 기준): 빈칸영작은 중등만, 모의고사 칭호는 모의고사 책이 있는 학교만.
+const titleScope = (p, stats) => ({ middle: p?.division === 'middle', mock: Number(stats?.mock_books || 0) > 0 });
+const TITLE_WAVES = [[3, TITLES_3], [4, TITLES_4]];
+function titleBatch(seen, unlocked, visible) {
+  if (!seen) return { batch: [] };
+  for (const [wave, keys] of TITLE_WAVES) {
+    if (keys.some(key => seen.includes(key))) continue;
+    const list = keys.filter(key => unlocked.includes(key) && visible.includes(key) && !weeklyTitle(key));
+    if (list.length >= 2) return { batch: list, batch_wave: wave };
+  }
+  return { batch: [] };
+}
 // V13.73 `unpaid`: held titles whose coins are not paid yet (new ones, and titles won before
 // V13.73); they are paid when the app shows them (/titles/seen).
 function titleView(ctx, p) {
@@ -957,7 +976,8 @@ function titleView(ctx, p) {
     fresh: seen ? unlocked.filter(key => key !== 'rookie' && !seen.includes(titleSeenKey(ctx, key))) : [],
     // V13.184 소급 지급: 3탄 칭호를 하나도 본 적 없는 학생이 이미 2개 이상 얻었으면(배포 전부터 조건을 채움) 한 장 묶음 카드로
     // 한 번만 보여 준다. 본 뒤에는 3탄 key가 titles_seen에 들어가 다시 묶이지 않고, 그 뒤로 얻는 것은 원래대로 팝업이다.
-    batch: seen && !TITLES_3.some(key => seen.includes(key)) ? (list => list.length >= 2 ? list : [])(TITLES_3.filter(key => unlocked.includes(key))) : [],
+    // V13.191 4탄도 같은 방식: 아직 하나도 안 본 탄을 3탄부터 차례로 본다(3탄을 본 뒤 다음 열기에서 4탄 묶음). 도감에 숨긴 칭호는 묶지 않는다.
+    ...titleBatch(seen, unlocked, visibleTitleKeys(unlocked, titleScope(p, stats))),
     intro: !seen,
     unpaid: unpaidTitles(p, unlocked, key => titleSeenKey(ctx, key)),
     week_end: ctx.week.end
@@ -1985,7 +2005,9 @@ export async function service(state, method, path, body, token, options = {}) {
   }
   if (path === '/timing/finish' && method === 'POST') {
     requireRole(p, 'student');
-    const now = Date.now(), res = timingFinish(p, { id: str(body.id, 40), result: str(body.result, 10) || 'press', ms: body.ms, pet: activePetKey(state, p.id), now });
+    const now = Date.now();
+    keepTimingLastWeek(p, rankingWeek(now).start); // V13.191 주간 초시계왕: 지난주 기록(wk)을 새 주 판 전에 pw로 옮긴다
+    const res = timingFinish(p, { id: str(body.id, 40), result: str(body.result, 10) || 'press', ms: body.ms, pet: activePetKey(state, p.id), now });
     if (!res.again) logActivity(p, 'timing', timingLine(res), now);
     return { ...res, timing: timingView(p, now), ...(res.coins || res.xp ? { points_balance: coinBalance(state, p), stats: stats(state, p) } : {}) };
   }
@@ -3295,6 +3317,8 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false, stal
   compactSession(rec);
   if (!state.sessions.some(s => s.id === rec.id)) state.sessions.push(rec);
   if (complete && student) repairStreak(state, student, endedAt);
+  // V13.191 칭호 4탄 시험 범위: 끝난 연습마다 한 바퀴 · 모의고사 책 · 시험 전체 정복의 최고값을 남긴다(정복이 풀려도 칭호는 그대로).
+  if (student?.role === 'student' && answerRecords.length) rememberRangeBest(student, studentRangeCounts(state, student));
   // V13.150: 끝까지 푼 연습(10문제 이상)은 낚시 미끼 1개.
   // V13.168 미끼 · 공의 하루 한도는 받는 지금(한국 날짜)으로 센다. 자정 전 마감 시험을 자정 뒤에 닫으면 어제로 되돌아가 하루 한도가 한 번 더 풀렸다.
   if (complete && student && answerRecords.length >= REEL.BAIT_MIN_PRACTICE && grantBait(student, finalizedAt)) x.bait = true;

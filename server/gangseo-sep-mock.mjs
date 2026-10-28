@@ -11,6 +11,7 @@ export const gangseoSepMockBook = {
   school: '강서고',
   division: 'high',
   exam_period: 'final',
+  mock: true, // V13.191 모의고사 · 외부지문 책(칭호 '외부지문 완주' · '모의고사 씹어먹기')
   title: '강서고 9월 모의고사 · 2026년 9월 인천 학평 29~40번(9지문)',
   words: [
   {"id": "gs_sep_29_01", "book_id": "gangseo:final:mock-sep-2026", "range_code": "9월 29", "word": "breathing", "meaning": "호흡", "source": "2026년 9월 인천시 학력평가 고1", "source_question": "29번"},

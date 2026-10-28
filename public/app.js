@@ -841,7 +841,8 @@ $('#app').addEventListener('click', async event => {
     if (d.middleGrammarLesson) { A.middleGrammarLesson = Number(d.middleGrammarLesson); render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (d.rankMode) { A.rankMode = d.rankMode; savePreferences(); render(); return; }
     if (d.rankView) { A.rankView = d.rankView === 'league' ? 'league' : 'study'; savePreferences(); render(); return; }
-    if (d.titleFilter) { A.titleFilter = d.titleFilter; renderKeepScroll(); return; }
+    // V13.191 묶음 버튼 줄이 옆으로 밀리므로(낚시 묶음이 생겨 9개), 다시 그려도 버튼 줄의 가로 위치를 지킨다.
+    if (d.titleFilter) { const x = $('.tt-filter')?.scrollLeft || 0; A.titleFilter = d.titleFilter; renderKeepScroll(); const seg = $('.tt-filter'); if (seg) seg.scrollLeft = x; return; }
     if (d.titleOpen) { openTitleDetail(A, d.titleOpen, renderKeepScroll); return; }
     if (d.leaguePeriod) return;
     if (d.rankScope) { A.rankScope = d.rankScope; savePreferences(); render(); return; }

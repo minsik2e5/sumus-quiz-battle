@@ -5,6 +5,7 @@ import { FISH_READY } from '../public/modules/fish-art.js';
 import { REEL, FIGHT, FINISH, CAST_TIERS, SEA_PETS, ROD, DEEP, rodLevel, rodOf, reelRoll, pearlsOf, deepReady, deepOpen } from '../public/modules/reel-rules.js';
 import { findReceipt, keepReceipt, giveGift } from './rewards.mjs';
 import { feelOf, leanOf } from '../public/modules/reel-feel.js';
+import { reelDayCatch } from './titles-4.mjs';
 
 // V13.150 손맛 낚시(놀이터) 서버 쪽. 학생 기록 p.reel:
 //   { bait, bait_day, bait_today, pearls, net{key: n}, coin_day, coin_today, coins (받은 코인 합), egg_day, epic_day(V13.160, 예전 epic_week), live{…}, guide, done[], rod (V13.154 낚싯대 단계 1~5) }
@@ -85,6 +86,7 @@ export function reelLand(p, { id, result, finish = null, now = Date.now(), giftI
     const record = !fresh && live.kg > Number(b.kg || 0);
     b.n += 1; b.kg = Math.max(Number(b.kg || 0), live.kg);
     out = { caught: true, key: live.key, kg: live.kg, rarity: live.rarity, fresh, pearls: pearlsOf(live.key), record, perfect };
+    reelDayCatch(r, now); // V13.191 칭호 '오늘 회식은 나야': 오늘 잡은 수 · 하루 최다(p.reel.dc)
     if (live.key === 'goldenegg') {
       // 황금 알 물고기는 팔지 않고 모은다: 3마리마다 랜덤 알(선생님 알과 같은 선물 상자).
       const before = Math.floor(Number(f.golden || 0) / REEL.GOLDEN_EGG);

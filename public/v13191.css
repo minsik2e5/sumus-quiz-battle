@@ -1,0 +1,4 @@
+/* V13.191 칭호 4탄: 칭호 도감 묶음 버튼이 9개(새 묶음 '낚시')라 폰에서 글자가 두 줄로 꺾이지 않게, 한 줄로 두고 넘치면 옆으로 민다. */
+.tt-filter{max-width:none;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
+.tt-filter::-webkit-scrollbar{display:none}
+.tt-filter button{flex:1 0 auto;white-space:nowrap;padding-inline:9px;scroll-snap-align:start}
