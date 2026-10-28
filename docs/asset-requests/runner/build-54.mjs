@@ -1,5 +1,6 @@
-// 그림 주문서 54 · 55: 곤충 · 공룡 펫 12종(구성안 docs/pets-bug-dino-design.md).
-//   54 = 1차 8종(일반 4 · 영웅 4), 55 = 2차 4종(전설 1 · 신화 1 · 특이 2). 56~59는 비워 둔다(60 이상은 칭호 4탄).
+// 그림 주문서 54 · 55: 곤충 · 공룡 시리즈 펫 12종(구성안 docs/pets-bug-dino-design.md). 기존 전역 등급과 따로인 별도 시리즈(series: 'wild').
+//   54 = 1차 8종(시리즈 일반 4 · 영웅 4) + 시리즈 알 · 배지 아이콘 1시트, 55 = 2차 4종(시리즈 전설 1 · 신화 1 · 특이 2).
+//   등급 이름은 시리즈 안의 희귀도다. 그림 세기(화려함)는 같은 이름의 전역 등급 펫에 맞춘다. 56~59는 비워 둔다(60 이상은 칭호 4탄).
 //   node docs/asset-requests/runner/build-54.mjs
 // 펫은 아직 core.js(CHARACTERS)에 없다(그림이 온 뒤 코드 세션에서 등록). 그래서 키 · 이름 · 종류 · 등급을 여기 둔다.
 //   코드 세션은 이 키 · 이름을 그대로 core.js에 넣는다(이름이 바뀌면 여기 ko만 고치고 다시 돌린다: 그림 파일 이름은 키라서 그대로).
@@ -12,7 +13,7 @@ import { dirname, resolve } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 export const DRIVE_54 = { 54: 'SUMUS 곤충·공룡 펫 54 (Runner용)', 55: 'SUMUS 곤충·공룡 펫 55 (Runner용)' };
 export const FILES_54 = {
-  '54a': '54a-bugdino-pets-design.txt', '54b': '54b-bugdino-pets-expressions.txt', '54c': '54c-bugdino-pets-battle-poses.txt',
+  '54a': '54a-bugdino-pets-design.txt', '54b': '54b-bugdino-pets-expressions.txt', '54c': '54c-bugdino-pets-battle-poses.txt', '54d': '54d-bugdino-series-egg.txt',
   '55a': '55a-bugdino-pets2-design.txt', '55b': '55b-bugdino-pets2-expressions.txt', '55c': '55c-bugdino-pets2-battle-poses.txt',
   '55d': '55d-bugdino-mythic-reveal-poses.txt', '55e': '55e-bugdino-mythic-reveal-scene.txt'
 };
@@ -174,7 +175,8 @@ const SCENE = 'a golden ancient forest of the dinosaur age at dawn: giant ferns 
 const ORDER = Object.keys(PETS_54);
 const sheetOf = key => { const s = pet(key).series; return `${s}a-${ORDER.filter(k => pet(k).series === s).indexOf(key) + 1}`; };
 const designRef = (series, keys) => `CHARACTER REFERENCE — before drawing, open ${keys.map(k => `"${sheetOf(k)}.png"`).join(' and ')} (the design sheet${keys.length > 1 ? 's' : ''}: egg, baby, grown, final) in the Google Drive folder "${DRIVE_54[series]}"`;
-const subjectOf = p => `${p.base}. ${GROUP[p.group]}`;
+const SERIES_LINE = 'It belongs to the insect & dinosaur pet series of this game (its own collection with its own egg).';
+const subjectOf = p => `${p.base}. ${GROUP[p.group]} ${SERIES_LINE}`;
 
 export function sheets54() {
   const out = [], count = {};
@@ -226,6 +228,20 @@ export function sheets54() {
         `Subject: two different pets of the same growth step (the reference pictures show each one). TOP row: ${pa.ko}, ${subjectOf(pa)} This is the ${pa.f[form]}. BOTTOM row: ${pb.ko}, ${subjectOf(pb)} This is the ${pb.f[form]}. Each pet keeps exactly the design, size and accessories of its reference picture of this growth step; only the pose changes. LEFT cell of each row: ATTACK, RIGHT cell: HURT.`, ...cellLines(cells)], cells);
     }
   }
+  // 54d: 시리즈 알(알 상점 새 탭) · 시리즈 배지(도감 · 카드 태그). 왼쪽 열이 기본, 오른쪽 열은 여분.
+  {
+    const EGG = 'a big round pet egg for the insect & dinosaur series: a warm sandy-cream shell with a soft green fern-leaf pattern, one small dinosaur footprint and one tiny ladybug-spot pattern, a thin golden band, resting in a small nest of fern leaves and pebbles, a soft warm glow. Cute, premium and inviting, like the other egg icons of this shop';
+    const BADGE = 'a small round badge emblem for the insect & dinosaur series: a mint-green enamel disc with a golden rim, in the middle a tiny cute dinosaur footprint and a small fern leaf crossed with a tiny ladybug, glossy and readable at 32 pixels';
+    const cells = [
+      ['ui-wild-egg', '곤충·공룡 시리즈 알 (알 상점)', `EGG ICON: ${EGG}. Front view, about 80% of the cell.`, 'public/assets/ui/wild-egg.webp'],
+      ['ui-wild-egg-alt', '시리즈 알 (여분, 고르기용)', `EGG ICON, a second design option of the same idea: ${EGG}, the fern pattern swirling a little differently. Front view, about 80% of the cell.`, '(여분: 왼쪽 위보다 나으면 이 칸을 ui/wild-egg로 넣는다)'],
+      ['ui-wild-badge', '곤충·공룡 시리즈 배지 (도감 · 카드 태그)', `BADGE: ${BADGE}. Front view, about 78% of the cell, no letters.`, 'public/assets/ui/wild-badge.webp'],
+      ['ui-wild-badge-alt', '시리즈 배지 (여분, 고르기용)', `BADGE, a second design option: ${BADGE}, with a small amber gem at the top. Front view, about 78% of the cell, no letters.`, '(여분: 왼쪽 아래보다 나으면 이 칸을 ui/wild-badge로 넣는다)']
+    ];
+    add(54, 'd', '곤충·공룡 시리즈 알 · 배지', [SHEET, 'Style: glossy premium 3D game icon in the same 3D-painted style as the pets of this game, soft pastel colors, clean bold outline, a soft warm rim light, one object per cell, centered.',
+      'STYLE REFERENCE — before drawing, open "21b-8.png" in the Google Drive folder "SUMUS 이벤트 펫 21 (Runner용)" (the autumn event egg icon of this game\'s egg shop). Match its size in the cell, finish and level of detail exactly. ' + KEEP,
+      'Subject: the shop egg icon and the collection badge of a new pet series (cute insects and dinosaurs). LEFT column: the egg, RIGHT column: a second option of the same thing; TOP row: egg, BOTTOM row: badge.', ...cellLines(cells)], cells);
+  }
   // 55d: 신화 등장 포즈(왼쪽 위) + 다른 포즈 여분 3칸(가장 좋은 것을 골라 왼쪽 위 이름으로 넣는다).
   {
     const k = MYTHIC_54, p = pet(k);
@@ -237,11 +253,11 @@ export function sheets54() {
   // 55e: 신화 등장 배경(세로)
   add(55, 'e', `${pet(MYTHIC_54).ko} 등장 배경`, [BGT, BG_STYLE, BG_REF, `Scene: ${SCENE}`, BGT_LAYOUT],
     [[`bg-${MYTHIC_54}`, `${pet(MYTHIC_54).ko} 등장 배경`, '', `public/assets/reveal/bg-${MYTHIC_54}.webp`]], { bg: true });
-  return out;
+  return out.sort((x, y) => x.series - y.series); // 54d가 54 번호 안에 이어지게
 }
 
 // Codex 작업 지시(CODEX_PROMPT_54 · 55.md): 표와 자르기 명령은 위 시트 목록에서 만든다.
-const TITLE_54 = { 54: '곤충 · 공룡 펫 1차 8종(일반 4 · 영웅 4)', 55: '곤충 · 공룡 펫 2차 4종(전설 1 · 신화 1 · 특이 2)' };
+const TITLE_54 = { 54: '곤충 · 공룡 시리즈 1차 8종(일반 4 · 영웅 4) + 시리즈 알', 55: '곤충 · 공룡 시리즈 2차 4종(전설 1 · 신화 1 · 특이 2)' };
 // Codex가 붙일 참고 그림(저장소 public/assets/ 아래, 이미 있는 그림만). 등급마다.
 export const REPO_REF = {
   basic: ['pets/panda-3.webp', 'pets/mouse-2.webp', 'pets/elephant-2.webp'],
@@ -251,6 +267,7 @@ export const REPO_REF = {
   limited: ['pets/panda-3.webp', 'pets/tissue-2.webp', 'pets/glue-2.webp']
 };
 const POSE_REF = ['pets/elephant-2-attack.webp', 'pets/elephant-2-hurt.webp'];
+const UI_REF = ['ui/event-egg.webp', 'ui/epic-egg.webp', 'ui/mythic-egg.webp'];
 const REVEAL_REF = { pose: 'pets/cheongryong-reveal.webp', bg: ['reveal/bg-cheongryong.webp', 'reveal/bg-jujak.webp'] };
 const code = s => `\`${s}\``;
 export function codexPrompt(series, list = sheets54()) {
@@ -263,6 +280,7 @@ export function codexPrompt(series, list = sheets54()) {
   const cmd = s => {
     if (s.file.endsWith('reveal-scene.txt')) return `# ${s.name}: 1024×1536 PNG → 720×1080 webp(150KB 이하): ${s.cells[0].out}`;
     const outs = s.cells.map(c => c.out.startsWith('public/assets/') ? c.out.replace('public/assets/', '').replace(/\.webp$/, '') : '-');
+    if (/series-egg\.txt$/.test(s.file)) return `node $R/fit-assets.mjs /tmp/art/${s.name}.png ${outs.join(' ')} --fit-each --size 256 --preview /tmp/review/${s.name}.png   # 오른쪽 열(여분)이 더 나으면 그 칸을 왼쪽 이름으로`;
     if (/design\.txt$/.test(s.file)) return `node $R/fit-assets.mjs /tmp/art/${s.name}.png ${outs.join(' ')} --stand --preview /tmp/review/${s.name}.png`;
     if (/reveal-poses\.txt$/.test(s.file)) return `node $R/fit-assets.mjs /tmp/art/${s.name}.png ${outs.join(' ')} --fit-each --size 1024 --preview /tmp/review/${s.name}.png   # 여분 칸(-)이 더 나으면 그 칸을 pets/${MYTHIC_54}-reveal로`;
     return `node $R/fit-sheets.mjs /tmp/art/${s.name}.png ${outs.map(o => o.replace(/^pets\//, '')).join(' ')} --preview /tmp/review/${s.name}.png`;
@@ -272,16 +290,16 @@ export function codexPrompt(series, list = sheets54()) {
 
 ## 목표
 SUMUS VOCA(저장소 \`minsik2e5/sumus-quiz-battle\`)의 그림 주문서 ${series}로 곤충 · 공룡 새 펫 그림(설정 · 표정 · 알 반응 · 야차전 공격/맞음${series === 55 ? ' · 신화 등장 포즈 · 등장 배경' : ''})을 만들고, 잘라서 \`public/assets/\`에 넣은 뒤 PR을 만든다.
-**그림 파일만 넣는다. 앱 코드는 고치지 않는다.** 이 펫들은 아직 \`public/modules/core.js\`(CHARACTERS)에 **등록되지 않았다.** 그림 PR이 머지되어도 학생에게는 나오지 않고, 그림이 다 온 뒤 다음 코드 세션에서 등록 · 특기 · 알 연결을 한다(구성안 \`docs/pets-bug-dino-design.md\`). 그래서 파일 이름(펫 key)을 **정확히** 지켜야 한다.
+**그림 파일만 넣는다. 앱 코드는 고치지 않는다.** 이 펫들은 아직 \`public/modules/core.js\`(CHARACTERS)에 **등록되지 않았다.** 곤충 · 공룡은 기존 등급과 따로인 **별도 시리즈**이고(등급 이름은 시리즈 안의 희귀도), 그림 PR이 머지되어도 학생에게는 나오지 않는다. 그림이 다 온 뒤 다음 코드 세션에서 등록 · 특기 · 시리즈 알을 연결한다(구성안 \`docs/pets-bug-dino-design.md\`). 그래서 파일 이름(펫 key)을 **정확히** 지켜야 한다.
 
-| 등급 | 묶음 | 펫 key | 이름(안) | 설정 시트 | 표정 시트 | 알 반응 | 전투 자세 |
+| 시리즈 등급 | 묶음 | 펫 key | 이름(안) | 설정 시트 | 표정 시트 | 알 반응 | 전투 자세 |
 |---|---|---|---|---|---|---|---|
 ${keys.map(k => `| ${TIER_KO[pet(k).tier]} | ${GROUP_KO[pet(k).group]} | \`${k}\` | ${pet(k).ko} · ${pet(k).type} | ${range(of('a', k))} | ${range(of('b', k).filter(n => !l.find(s => s.name === n).title.includes('알 반응')))} | ${range(of('b', k).filter(n => l.find(s => s.name === n).title.includes('알 반응')))} | ${range(of('c', k))} |`).join('\n')}
 
 - 시트는 모두 **${l.length}장**(${parts.map(p => `${p} ${l.filter(s => s.file.startsWith(p)).length}`).join(' · ')}).
 - 한 펫의 그림 = ${perPet}${series === 55 ? `. 신화 ${pet(MYTHIC_54).ko}는 여기에 등장 포즈 1 + 등장 배경 1` : ''}.
 - 앱은 이 파일 이름을 그대로 읽는다(\`<key>-<단계>.webp\`, \`<key>-<단계>-<표정>.webp\`, \`<key>-<단계>-attack.webp\`${series === 55 ? ', `<key>-reveal.webp`, `reveal/bg-<key>.webp`' : ''}). 이름이 다르면 그 펫은 나오지 않는다.
-${series === 55 ? `- \`55d-1\`은 ${pet(MYTHIC_54).ko}의 등장 포즈 네 가지다. 왼쪽 위가 기본이고, 다른 칸이 더 나으면 그 칸을 \`pets/${MYTHIC_54}-reveal\`로 넣는다.\n` : ''}
+${series === 54 ? '- `54d-1`은 곤충·공룡 시리즈 알(알 상점 새 탭)과 시리즈 배지다. 왼쪽 열이 기본, 오른쪽 열은 여분이다. 여분이 더 나으면 그 칸을 `ui/wild-egg` · `ui/wild-badge`로 넣는다.\n' : ''}${series === 55 ? `- \`55d-1\`은 ${pet(MYTHIC_54).ko}의 등장 포즈 네 가지다. 왼쪽 위가 기본이고, 다른 칸이 더 나으면 그 칸을 \`pets/${MYTHIC_54}-reveal\`로 넣는다.\n` : ''}
 ## 그림체 (중요)
 - **기존 펫과 똑같은 그림체**(3D 페인팅, 반짝이는 큰 눈, 볼터치, 금빛 테두리 빛). 곤충 · 공룡도 다른 펫과 한 가족처럼 보여야 한다.
 - 곤충은 **징그럽지 않게**(동글동글한 몸, 짧은 다리 6개, 털 · 집게 · 뾰족한 부분 없음). 공룡은 **무섭지 않게**(뿔 · 가시는 둥글게), **용처럼 보이지 않게**(불 · 깃털 날개 · 갈기 없음).
@@ -317,7 +335,7 @@ ${tiers.map(t => `| ${series}a 설정 · ${TIER_KO[t]} | ${REPO_REF[t].map(code)
 | ${series}b 표정 | 그 펫 · 단계의 새 그림 \`pets/<키>-<단계>.webp\` (예: ${l.find(s => s.file.endsWith('expressions.txt')).name} → \`pets/${keys[0]}-1.webp\`) |
 | ${series}b 알 반응 | 두 펫의 \`pets/<키>-0.webp\` |
 | ${series}c 전투 자세 | 두 펫의 그 단계 새 그림 + 기존 자세 ${POSE_REF.map(code).join(', ')} |
-${series === 55 ? `| 55d 등장 포즈 | 새 \`pets/${MYTHIC_54}-3.webp\` + 기존 ${code(REVEAL_REF.pose)} |\n| 55e 등장 배경 | 기존 ${REVEAL_REF.bg.map(code).join(', ')} |\n` : ''}
+${series === 54 ? '| 54d 시리즈 알 · 배지 | `ui/event-egg.webp`, `ui/epic-egg.webp`, `ui/mythic-egg.webp` |\n' : ''}${series === 55 ? `| 55d 등장 포즈 | 새 \`pets/${MYTHIC_54}-3.webp\` + 기존 ${code(REVEAL_REF.pose)} |\n| 55e 등장 배경 | 기존 ${REVEAL_REF.bg.map(code).join(', ')} |\n` : ''}
 ### 후보 점검 (모두 통과해야 쓴다)
 1. 배경이 진짜 투명이다(네 모서리 alpha 0, 체크무늬 · 흰 상자 · 흰 테두리 없음).${series === 55 ? ' 등장 배경(55e)만 투명이 아니고 가장자리까지 꽉 채운다.' : ''}
 2. 칸마다 그림이 하나씩 따로 있고, 겹치거나 잘리지 않았다. 글자, 숫자, 테두리, 바닥 그림자가 없다.
@@ -369,7 +387,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   const list = sheets54();
   // Codex 참고 그림은 저장소에 이미 있어야 한다.
   const assets = resolve(here, '../../../public/assets');
-  const refs = [...Object.values(REPO_REF).flat(), ...POSE_REF, REVEAL_REF.pose, ...REVEAL_REF.bg];
+  const refs = [...Object.values(REPO_REF).flat(), ...POSE_REF, ...UI_REF, REVEAL_REF.pose, ...REVEAL_REF.bg];
   const missing = refs.filter(f => !existsSync(resolve(assets, f)));
   if (missing.length) throw new Error(`참고 그림이 저장소에 없어요: ${missing.join(', ')}`);
   // 새 키가 기존 펫 그림과 겹치면 안 된다.
