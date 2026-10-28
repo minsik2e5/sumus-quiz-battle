@@ -28,3 +28,6 @@
 .dgs.land .dgs-options.ft2 .dgs-opt { font-size: 13px; }
 .dgs.land .dgs-options.ft2 .dgs-opt.en span { font-size: 15px; }
 .dgs.port .dgs-opt span { white-space: normal; }
+
+/* 아래 칸이 자란 만큼 장면을 올린다(--rise는 dungeon.js sceneRise가 문제마다 정한다). top만 쓰므로 흔들림 애니메이션(transform)과 겹치지 않는다. */
+.dgs.land .dgs-world { top: calc(var(--rise, 0px) * -1); }

@@ -640,9 +640,18 @@ function updateBattle(v) {
   drawMe(v);
   toggle($id('dgs-world'), 'low', !!D.me && !D.me.down && D.me.hp <= 30);
   drawAsk(v);
+  if (D.growKey !== D.qn) { D.growKey = D.qn; sceneRise(); }
 }
 
 /* ---------- 문제 칸 ---------- */
+// V13.185 긴 글이 나와 아래 칸(HUD)이 자라면 그만큼 장면(펫 · 몬스터)을 위로 올려 발밑이 가리지 않게 한다(최대 SCENE_RISE_MAX).
+// 문제가 바뀔 때만 한 번 잰다(화면 배치를 자주 읽지 않게).
+const HUD_BASE = 116, SCENE_RISE_MAX = 40;
+function sceneRise() {
+  const hud = $id('dgs-hud'), world = $id('dgs-world');
+  if (!hud || !world) return;
+  world.style.setProperty('--rise', `${Math.max(0, Math.min(SCENE_RISE_MAX, hud.offsetHeight - HUD_BASE))}px`);
+}
 // 새 문제 번호가 오면 그린다. 답한 뒤 다음 문제 전까지는 정답 표시를 그대로 둔다. 쓰기 문제는 방이 보낸 진행(채운 글자 · 실수)을 덧그린다.
 function drawAsk(v) {
   const ask = $id('dg-ask');

@@ -46,5 +46,6 @@ export function runDungeonFitChecks(assert) {
   const sizes = [...css.matchAll(/\.dgs\.land \.dgs-prompt\.fp\d\.(?:en|ko) \{ font-size: ([\d.]+)px/g)].map(m => Number(m[1]));
   const optSizes = [...css.matchAll(/\.dgs\.land \.dgs-options\.ft\d[^{]*\{ font-size: ([\d.]+)px/g)].map(m => Number(m[1]));
   assert(sizes.length === 8 && Math.min(...sizes) >= 16 && optSizes.length === 4 && Math.min(...optSizes) >= 13, 'V13.185 글씨는 문제 16px · 보기 13px보다 작아지지 않는다');
+  assert(/\.dgs\.land \.dgs-world \{ top: calc\(var\(--rise, 0px\) \* -1\)/.test(css) && /SCENE_RISE_MAX = 40/.test(js) && /setProperty\('--rise'/.test(js) && /D\.growKey !== D\.qn\) \{ D\.growKey = D\.qn; sceneRise\(\)/.test(js), 'V13.185 아래 칸이 자란 만큼(최대 40px) 장면을 위로 올려 펫 · 몬스터가 가리지 않고, 문제가 바뀔 때만 한 번 잰다');
   assert(build.includes('"v13185.css",\n  "v13184.css"') && build.includes('"v13184.css",\n  "v13178.css"'), 'V13.185 던전 글자 맞춤 CSS는 번들에 들어가고, 민트 목록 CSS가 맨 끝');
 }
