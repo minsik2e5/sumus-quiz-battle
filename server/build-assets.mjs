@@ -202,6 +202,18 @@ writeFileSync(cssBundlePath, cssBundle);
   console.log(`[claw-art] ${dolls.length} dolls, ${art.length} pictures`);
 }
 
+// V13.185 물고기 그림 게이트: 그림 폴더(public/assets/fish)를 보고 public/modules/fish-art.js를 만든다.
+// FISH_READY: 세 그림(<key> · <key>-hang · <key>-hang-s)이 다 있는 물고기. 심해 물고기(그림 주문서 53)는 여기 있어야 낚시터에 나온다.
+{
+  const dir = resolve(root, 'public/assets/fish');
+  const files = new Set(readdirSync(dir).filter(f => f.endsWith('.webp')).map(f => f.slice(0, -5)));
+  const keys = [...files].filter(k => /^[a-z]+$/.test(k) && files.has(`${k}-hang`) && files.has(`${k}-hang-s`)).sort();
+  const out = resolve(root, 'public/modules/fish-art.js');
+  const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/fish)에 세 그림(본그림 · -hang · -hang-s)이 다 있는 물고기.\nexport const FISH_READY = new Set(${JSON.stringify(keys)});\n`;
+  if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
+  console.log(`[fish-art] ${keys.length} fish with art`);
+}
+
 // Service worker: precache list + a hash of every served file. Any change to
 // the app changes sw.js, so installed apps pick up each deploy even when no
 // version string was bumped by hand.
