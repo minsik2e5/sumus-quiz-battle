@@ -4,7 +4,7 @@
 // 저장 크기 상한, 선생님 활동 기록 한 줄, 화면 · 소리 · 구성안. 시간은 모두 가짜 시각으로 돌려 빠르다(실제로 10초를 기다리지 않음).
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { TIMING, GRADE_KEYS, gradeOf, errText, secText, ledDigits, dailyPlays, guardWindow } from '../public/modules/timing-rules.js';
+import { TIMING, GRADE_KEYS, gradeOf, errText, secText, ledDigits, dailyPlays, guardWindow, pressStamp, revealAt, REVEAL_STEPS } from '../public/modules/timing-rules.js';
 import { TITLES, titleUnlocked, titleCoins, TITLE_COINS } from '../public/modules/titles.js';
 import { SOUND_KEYS } from '../public/modules/sound.js';
 import { dayKey } from '../public/modules/core.js';
@@ -62,17 +62,54 @@ export async function runTimingChecks(assert) {
       'V13.180 허용 오차 안: 화면이 잰 시간(10.02초)을 믿고 완벽 · 기록 · 보상');
     const edge = play(p, { ms: 10300, real: 10300 + w.hi - 100, at: t0 + 60000 });
     const out = play(p, { ms: 10300, real: 10300 + w.hi - 100 + 1, at: t0 + 120000 });
-    assert(edge.checked === 'client' && edge.grade === 'good' && out.checked === 'server' && out.unranked && out.ms === 10501 && out.grade === 'close',
-      'V13.180 경계: 남는 시간이 허용 오차 끝(+0.3초)이면 믿고, 1ms만 넘어도 서버가 잰 시간(서버 경과 − RTT)으로 판정 · 순위 제외');
+    assert(edge.checked === 'client' && edge.grade === 'good' && edge.coins === TIMING.COINS.good && out.checked === 'server' && out.unranked && out.ms === 10300 && out.grade === 'good' && out.coins === 0 && out.server_err === 501 && out.xp === TIMING.XP.close && !out.record,
+      'V13.191 경계: 남는 시간이 허용 오차 끝(+0.3초)이면 믿고, 1ms만 넘으면 숫자는 누른 값(10.30) 그대로 · 코인 0 · 순위 · 기록 제외, 경험치만 서버 측정(10.50초 → 아쉬움)');
     const cheat = play(p, { ms: 10000, real: 10700, at: t0 + 180000 });
-    assert(cheat.checked === 'server' && cheat.ms === 10700 && cheat.grade === 'close' && cheat.coins === TIMING.COINS.close, 'V13.180 10.70초에 누르고 10.00초라고 보내면 서버가 잰 10.70초로 아쉬움');
+    assert(cheat.checked === 'server' && cheat.ms === 10000 && cheat.coins === 0 && cheat.xp === TIMING.XP.close && cheat.unranked && !cheat.record && cheat.server_err === 700 && !p.timing.x10 && p.timing.tn === 0 && p.timing.best === 20,
+      'V13.191 10.70초에 누르고 10.00초라고 보내도 코인 0 · 칭호 · 기록 · 순위 없음, 경험치는 서버가 잰 10.70초(아쉬움) 기준');
     const lucky = play(p, { ms: 9000, real: 10000, at: t0 + 240000 });
-    assert(lucky.checked === 'server' && lucky.grade === 'ten' && lucky.coins === TIMING.COINS.good && lucky.unranked && !p.timing.x10 && p.timing.tn === 0,
-      'V13.180 서버 판정으로 딱 10.00이어도 코인은 좋음까지(100코인 아님), 순위 · 칭호에 넣지 않는다');
+    assert(lucky.checked === 'server' && lucky.ms === 9000 && lucky.grade === 'close' && lucky.coins === 0 && lucky.xp === TIMING.XP.ten && lucky.unranked && !p.timing.x10 && p.timing.tn === 0,
+      'V13.191 서버 측정으로는 딱 10.00이어도 화면이 보낸 값(9.00)을 보여 주고 코인 0, 경험치만 서버 측정 등급');
     const early = play(p, { ms: 1500, at: t0 + 300000 });
     const late = play(p, { ms: 20000, at: t0 + 360000, result: 'timeout' });
     assert(early.grade === 'early' && early.coins === 0 && early.xp === 0 && late.grade === 'miss' && late.coins === 0 && late.ms === 20000 && !late.record,
       `V13.180 최소 시간: ${TIMING.MIN_MS / 1000}초보다 빨리 누르면 실수(보상 · 기록 없음), 20초가 지나 화면이 멈추면 꽝`);
+  }
+
+  /* ---------- V13.191 멈춤 현상: 화면 숫자 = 누른 시간 ---------- */
+  {
+    // 공개 연출: 모든 프레임(60 · 30 · 20fps, 연출 끝 뒤까지)에서 보이는 숫자가 멈춘 값과 같다(더 커지거나 거꾸로 세지 않는다).
+    const stops = [2001, 2490, 9800, 10000, 10004, 12345, 19999, 20000];
+    const frames = stops.flatMap(ms => [1000 / 60, 1000 / 30, 50].flatMap(dt => Array.from({ length: Math.ceil((TIMING.REVEAL_MS + 200) / dt) }, (_, i) => revealAt(ms, i * dt)).map(v => ({ ms, v }))));
+    assert(frames.length > 500 && frames.every(({ ms, v }) => v.ms === ms && ledDigits(v.ms).join('') === ledDigits(ms).join('')) && revealAt(9800, 0).lit === 1 && revealAt(9800, TIMING.REVEAL_MS).lit === 1,
+      'V13.191 눌린 시간보다 큰 숫자가 공개 중 한 번도 화면에 나오지 않는다(멈춘 값에서 바로 시작해 끝까지 그대로, 거꾸로 세기 없음, 누른 순간부터 켜짐)');
+    assert(REVEAL_STEPS.every(([at, lit], i) => at >= 0 && at < TIMING.REVEAL_MS && lit > 0 && lit <= 1 && (!i || at > REVEAL_STEPS[i - 1][0])) && REVEAL_STEPS.filter(x => x[2]).length >= 4 && REVEAL_STEPS.some(x => x[1] < .5) && TIMING.REVEAL_MS === 1400,
+      'V13.191 슬로모션 느낌은 빛으로: 1.4초 동안 네온처럼 깜빡(째깍 4번 이상, 어두워지는 칸 있음) → 번쩍, 숫자는 0이 되지 않는다');
+    // 누른 순간: 이벤트 시각이 처리 시각보다 1초 안쪽이면 이벤트 시각(폰이 0.4초 버벅인 재현에서 0.37초 늦게 찍히던 것).
+    assert(pressStamp(9620, 10000) === 9620 && pressStamp(9001, 10000) === 9001 && pressStamp(9000, 10000) === 10000 && pressStamp(10001, 10000) === 10000 && pressStamp(1.79e12, 10000) === 10000
+      && pressStamp(0, 10000) === 10000 && pressStamp(undefined, 10000) === 10000 && pressStamp(NaN, 10000) === 10000 && TIMING.STAMP_LAG === 1000,
+      'V13.191 누른 시각: 같은 시계의 이벤트 시각이 1초 안이면 그것(버벅임 무시), 미래 · 다른 시계(1970년 기준 ms) · 없음이면 처리 시각');
+    // 서버 비교 처리 규칙: 믿으면 그대로, 못 믿어도 화면 숫자 = 보낸 값(학생에게 "늦게 찍혔다"가 생기지 않는다).
+    const p = { pets: [{ key: 'dog' }], preview_owner_id: 'qa' }, at = i => t0 + 2 * DAY + i * 60000;
+    const slowEnd = play(p, { ms: 9800, real: 9800 + 100 + 300, rtt: 100, at: at(0) });  // 끝 신호만 0.3초 늦음
+    const slowStart = play(p, { ms: 9800, real: 9800 - 400, rtt: 100, at: at(1) });     // 시작 쪽이 0.4초 늦음(서버 측정이 더 작다)
+    const ok = play(p, { ms: 9800, real: 9800 + 120, rtt: 100, at: at(2) });
+    assert(slowEnd.ms === 9800 && slowEnd.err === -200 && slowEnd.checked === 'server' && slowEnd.coins === 0 && slowEnd.unranked && slowStart.ms === 9800 && slowStart.checked === 'server' && slowStart.coins === 0
+      && ok.ms === 9800 && ok.checked === 'client' && ok.coins === TIMING.COINS.good && timingLine(slowEnd) === '10초 맞추기 −0.20초 좋음 · 인터넷 느림(서버 +0.20초, 기록 제외)',
+      'V13.191 서버 측정과 다를 때: 숫자 · 오차 · 등급은 누른 값 그대로, 코인 · 순위 · 기록에서 빠지고 선생님 기록에 "인터넷 느림(서버 …)"');
+    const bad = play(p, { ms: 'x', real: 10050, rtt: 100, at: at(3) });
+    const earlyNet = play(p, { ms: 1500, real: 2500, rtt: 100, at: at(4) });
+    assert(bad.checked === 'server' && bad.ms === 10050 && bad.coins === 0 && earlyNet.grade === 'early' && earlyNet.coins === 0 && earlyNet.unranked,
+      'V13.191 화면 값이 숫자가 아니면 서버 측정값으로 보여 주고(코인 0), 너무 빠른 판은 그대로 실수');
+    const ui = source('../public/modules/timing.js');
+    const pressFn = ui.slice(ui.indexOf('async function press('), ui.indexOf('// 끝 신호'));
+    const revealFn = ui.slice(ui.indexOf('function reveal(ms)'), ui.indexOf('/* ---------- 결과'));
+    assert(!pressFn.includes('showMs(res.ms)') && !ui.includes('ms - 500') && revealFn.indexOf('showMs(ms);') > 0 && revealFn.indexOf('showMs(ms);') < revealFn.indexOf("classList.add('slowmo'") && (revealFn.match(/showMs\(/g) || []).length === 1
+      && ui.includes('const stampOf = e => pressStamp(e?.timeStamp, performance.now());') && pressFn.indexOf('cancelAnimationFrame(T.raf);') < pressFn.indexOf('const ms ='),
+      'V13.191 화면: 누르면 달리기 프레임을 먼저 멈추고, 공개는 멈춘 숫자를 한 번만 그리며(거꾸로 세기 없음), 서버 응답으로 숫자를 바꾸지 않는다');
+    const css = source('../public/v13180.css');
+    assert(css.includes('.tm-led.ignite .tm-led-on{') && css.includes('@keyframes tmSweep') && css.includes('.tm-stage.hitstop') && ui.includes("'slowmo', 'hitstop'") && css.includes('.tm-led.ignite::after{display:none}') && ui.includes("res.checked !== 'server'") && ui.includes('숫자는 누른 그대로예요'),
+      'V13.191 공개 빛 연출(네온 깜빡 · 빛줄기, 움직임 줄이기면 끔), 서버가 못 믿은 판은 대박 리본 없이 "숫자는 누른 그대로" 안내');
   }
 
   /* ---------- 딱 10.00 하루 한 번 · 운 감시 · 하루 코인 상한 ---------- */
@@ -213,8 +250,8 @@ export async function runTimingChecks(assert) {
       'V13.180 입체 버튼: 받침 · 옆면 · 윗면 · 반사광 · 안쪽 구멍, 누르면 깊이 내려가고 손을 떼면 튕겨 오르며, 아래로 빛이 번진다');
     assert(ui.includes("const DIGIT = { 0: 'abcdef'") && css.includes('.tm-led .sg{fill:var(--tm-off)') && css.includes('.tm-led .sg.on{fill:var(--tm-red)}') && css.includes('@keyframes tmFlicker') && css.includes('.tm-led.hid .hd{') && ui.includes('tm-colon') && css.includes('@keyframes tmReveal') && css.includes('.tm-led.gold .sg.on'),
       'V13.180 LED: 7-세그먼트 SVG(꺼진 세그먼트 잔광 · 켜진 글로우 · 깜빡임), 숨김은 점이 숨 쉬고, 콜론 깜빡, 공개 때 번쩍, 딱 10.00은 금색');
-    assert(ui.includes('function reveal(ms)') && ui.includes('Math.max(0, ms - 500)') && ui.includes('function ruler(res)') && ui.includes('function perfectShow(ten)') && ui.includes('JACKPOT') && ui.includes('NEW BEST') && ui.includes('연속 완벽 ×') && ui.includes('CHEERS[g]') && ui.includes('GRADE_MARKS[g]') && ui.includes('tm-lamps'),
-      'V13.180 결과: 눌린 순간 0.5초를 늘려 공개(슬로모션), 눈금자, 완벽 번쩍 · 파티클, 딱 10.00 대박, 최고 기록 · 연속 완벽, 낮은 등급 격려, 색 + 기호로 등급, 오늘 판 램프');
+    assert(ui.includes('function reveal(ms)') && ui.includes('revealAt(ms, el)') && ui.includes('function ruler(res)') && ui.includes('function perfectShow(ten)') && ui.includes('JACKPOT') && ui.includes('NEW BEST') && ui.includes('연속 완벽 ×') && ui.includes('CHEERS[g]') && ui.includes('GRADE_MARKS[g]') && ui.includes('tm-lamps'),
+      'V13.180 결과: 공개 연출(V13.191 숫자는 멈춘 값, 빛으로 슬로모션), 눈금자, 완벽 번쩍 · 파티클, 딱 10.00 대박, 최고 기록 · 연속 완벽, 낮은 등급 격려, 색 + 기호로 등급, 오늘 판 램프');
     assert(css.includes('@media (prefers-reduced-motion:reduce)') && css.includes('.tm-confetti,.tm-flash{display:none}') && ui.includes('if (reduced()) return;') && css.includes('@media (min-width:760px)') && css.includes('(orientation:landscape)'),
       'V13.180 움직임 줄이기면 파티클 · 번쩍 · 흔들림을 끄고, 가로 · PC 배치가 있다');
     const used = [...ui.matchAll(/sfx\('([a-z-]+)'/g)].map(m => m[1]);

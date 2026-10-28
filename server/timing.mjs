@@ -9,8 +9,8 @@ import { rankingWeek, sameGradeBand } from './competition.mjs';
 //     best: 가장 작은 오차, wk{ k: 주 시작, b: 최고, n: 판 수, s: 오차 합 }, q: 최근 믿은 판 등급(완벽 이상 '1' · 그 밖 '0', 운 감시),
 //     pf: 완벽 이상 수, x10: 딱 10.00 수, st: 지금 연속 완벽, sb: 최고 연속 완벽, all: 모든 판 }
 // 판 흐름: /timing/ping(쓰기 없음, 서버 시각) → /timing/start(판을 쓰고 live) → 3 · 2 · 1 → 누름 → /timing/finish.
-// 서버는 시작 도착 ~ 끝 도착을 재서 화면이 보낸 시간과 비교한다(TIMING.GUARD). 벗어나면 서버가 잰 시간으로 판정하고
-// 순위에 넣지 않으며 코인은 '좋음'까지만 준다. 기록 · 보상은 서버만 정한다.
+// 서버는 시작 도착 ~ 끝 도착을 재서 화면이 보낸 시간과 비교한다(TIMING.GUARD). V13.191 벗어나면 화면 숫자는 누른 값 그대로,
+// 코인 · 순위 · 기록 · 칭호에서 빼고 경험치만 서버가 잰 시간으로 준다. 기록 · 보상은 서버만 정한다.
 
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const tm = p => p.timing ||= {};
@@ -86,25 +86,28 @@ function settle(p, t, live, { result, ms, pet, now }) {
   const claimed = Math.round(Number(ms));
   const { lo, hi } = guardWindow(live.r), gap = server - claimed;
   const trusted = Number.isFinite(claimed) && gap >= lo && gap <= hi;
-  // 벗어나면 서버 측정값(서버가 잰 시간 − RTT)으로 대신한다.
-  const used = trusted ? claimed : Math.round(server - live.r);
+  // V13.191 벗어나도 화면 숫자(누른 값)는 그대로 보여 준다(서버 값으로 바꾸면 "누른 것보다 늦게 찍혔다"로 보인다).
+  //   그 판은 코인 · 순위 · 기록 · 칭호에서 빠지고, 경험치만 서버 측정값(서버가 잰 시간 − RTT) 등급으로 준다.
+  const measured = Math.round(server - live.r);
+  const used = Number.isFinite(claimed) ? claimed : measured;
   const timeout = result === 'timeout' || used >= live.t * TIMING.MAX_FACTOR;
   const shown = timeout ? Math.max(used, live.t * TIMING.MAX_FACTOR) : used;
   const day = today(t, now);
   t.all = Number(t.all || 0) + 1;
-  if (shown < TIMING.MIN_MS) { t.st = 0; return { ...base, valid: true, ms: shown, err: shown - live.t, grade: 'early', coins: 0, xp: 0, checked: trusted ? 'client' : 'server' }; }
+  if (shown < TIMING.MIN_MS) { t.st = 0; return { ...base, valid: true, ms: shown, err: shown - live.t, grade: 'early', coins: 0, xp: 0, checked: trusted ? 'client' : 'server', ...(trusted ? {} : { unranked: true }) }; }
   const err = shown - live.t, abs = Math.abs(err), grade = timeout ? 'miss' : gradeOf(err), top = TOP_GRADES.includes(grade);
   // 운 감시: 최근 믿은 판에서 완벽 이상이 너무 잦으면 이번 판은 서버 판정과 같이 다룬다.
   const recent = String(t.q || '').slice(-(TIMING.LUCK_GUARD.WINDOW - 1));
   const lucky = trusted && top && [...recent].filter(c => c === '1').length >= TIMING.LUCK_GUARD.MAX;
   const clean = trusted && !lucky;
   if (trusted) t.q = (recent + (top ? '1' : '0')).slice(-TIMING.LUCK_GUARD.WINDOW);
-  // 서버 측정 · 운 감시 판은 순위 · 칭호에 넣지 않고 코인은 '좋음'까지만. 딱 10.00의 100코인은 하루 한 번(그 뒤는 완벽 코인).
-  let coinGrade = clean ? grade : coinCap(grade);
+  // 운 감시 판은 순위 · 칭호에 넣지 않고 코인은 '좋음'까지만, 서버가 못 믿은 판은 코인 0. 딱 10.00의 100코인은 하루 한 번(그 뒤는 완벽 코인).
+  let coinGrade = !trusted ? 'miss' : clean ? grade : coinCap(grade);
   if (coinGrade === 'ten' && Number(day.tn || 0) >= TIMING.TEN_DAILY) coinGrade = 'perfect';
   if (coinGrade === 'ten') day.tn = Number(day.tn || 0) + 1;
   const want = TIMING.COINS[coinGrade], coins = Math.max(0, Math.min(want, TIMING.COIN_DAILY - Number(day.c || 0)));
-  const xp = TIMING.XP[grade];
+  const serverGrade = timeout || measured >= live.t * TIMING.MAX_FACTOR ? 'miss' : measured < TIMING.MIN_MS ? null : gradeOf(measured - live.t);
+  const xp = trusted ? TIMING.XP[grade] : serverGrade ? TIMING.XP[serverGrade] : 0;
   day.c = Number(day.c || 0) + coins;
   addBonus(p, { xp, coins, pet, now });
   let record = false, weekRecord = false;
@@ -124,14 +127,16 @@ function settle(p, t, live, { result, ms, pet, now }) {
   } else t.st = 0;
   return {
     ...base, valid: true, ms: shown, err, grade, coins, xp, record, week_record: weekRecord, streak: Number(t.st || 0), checked: trusted ? 'client' : 'server',
-    ...(clean ? {} : { unranked: true }), ...(lucky ? { lucky: true } : {}), ...(grade === 'ten' && coinGrade !== 'ten' && clean ? { ten_used: true } : {}), ...(coins < want ? { capped: true } : {})
+    ...(clean ? {} : { unranked: true }), ...(lucky ? { lucky: true } : {}), ...(grade === 'ten' && coinGrade !== 'ten' && clean ? { ten_used: true } : {}), ...(coins < want ? { capped: true } : {}),
+    ...(trusted ? {} : { server_err: measured - live.t })
   };
 }
 
 // 선생님 활동 기록 한 줄: "10초 맞추기 +0.03초 완벽".
 export function timingLine(res) {
   if (!res?.valid) return '10초 맞추기 무효';
-  return `10초 맞추기 ${errText(res.err)} ${GRADE_NAMES[res.grade]}${res.unranked ? ' · 서버 판정' : ''}`;
+  if (res.checked === 'server') return `10초 맞추기 ${errText(res.err)} ${GRADE_NAMES[res.grade]} · 인터넷 느림(서버 ${res.server_err == null ? '—' : errText(res.server_err)}, 기록 제외)`;
+  return `10초 맞추기 ${errText(res.err)} ${GRADE_NAMES[res.grade]}${res.unranked ? ' · 운 감시(순위 제외)' : ''}`;
 }
 
 // 순위(하나): 이번 주, 같은 학년대(sameGradeBand: 같은 부 · 같은 학년, 학교는 달라도).

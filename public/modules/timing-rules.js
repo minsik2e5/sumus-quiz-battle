@@ -26,6 +26,9 @@ export const TIMING = {
   // 서버 시간 확인: 서버가 잰 경과(시작 도착 ~ 끝 도착) − 카운트다운 − 화면이 잰 시간 = 남는 시간(왕복 지연 하나쯤).
   // 시작 직전 ping으로 서버가 잰 왕복(RTT, RTT_MAX까지)을 기준으로 ±(JITTER + RTT × JITTER_RATE) 안이면 화면 시간을 믿는다.
   GUARD: { RTT_MAX: 800, JITTER: 150, JITTER_RATE: .5, FLOOR: -40 },
+  // V13.191 누른 순간: 이벤트 시각(e.timeStamp)이 처리 시각보다 이만큼 안쪽이면 믿는다(폰이 잠깐 버벅여 처리가 늦어도 누른 때로).
+  STAMP_LAG: 1000,
+  REVEAL_MS: 1400,          // 공개 연출 길이(숫자는 처음부터 멈춘 값 그대로, 빛만 켜진다)
   AVG_MIN: 5,               // 이번 주 평균 오차 순위에 들려면 이만큼 판
   BOARD_TOP: 20,
   PREVIEW_PLAYS: 30         // 교사 미리보기 계정: 하루 판을 이만큼(순위 · 활동 기록에서는 빠진 계정)
@@ -55,6 +58,15 @@ export const dailyPlays = (bonus = 0) => TIMING.FREE_DAILY + Math.max(0, Math.mi
 export function guardWindow(rtt) {
   const G = TIMING.GUARD, r = Math.max(0, Math.min(G.RTT_MAX, Number(rtt) || 0)), tol = G.JITTER + r * G.JITTER_RATE;
   return { rtt: r, lo: Math.max(G.FLOOR, r - tol), hi: r + tol };
+}
+// V13.191 누른 순간의 시각: 이벤트 시각이 같은 시계(0 < ts ≤ now)이고 STAMP_LAG 안이면 그것, 아니면 처리 시각.
+export const pressStamp = (ts, now) => { ts = Number(ts); return Number.isFinite(ts) && ts > 0 && ts <= now && now - ts < TIMING.STAMP_LAG ? ts : now; };
+// V13.191 공개 연출(선생님: "눌렀을 때 몇 초 더 갔다가 멈추는 현상"). 숫자는 누른 순간 그 값으로 바로 멈추고,
+// 슬로모션 느낌은 빛으로만: 네온이 켜지듯 깜빡(켜짐 · 꺼짐 반복) → 점점 밝아짐. t(ms)마다 { ms: 보이는 숫자(언제나 멈춘 값), lit: 밝기 0~1, tick: 이 칸 시작에 째깍 }.
+export const REVEAL_STEPS = [[0, 1, 1], [70, .12, 0], [150, 1, 1], [220, .18, 0], [330, 1, 1], [400, .3, 0], [520, 1, 1], [640, .55, 0], [760, 1, 1]];
+export function revealAt(ms, t) {
+  const step = [...REVEAL_STEPS].reverse().find(([at]) => t >= at) || REVEAL_STEPS[0];
+  return { ms, lit: t >= TIMING.REVEAL_MS ? 1 : step[1], tick: !!step[2] };
 }
 // 낮은 등급도 격려하는 한 줄.
 export const CHEERS = {
