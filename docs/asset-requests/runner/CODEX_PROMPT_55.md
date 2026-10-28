@@ -19,7 +19,7 @@ SUMUS VOCA(저장소 `minsik2e5/sumus-quiz-battle`)의 그림 주문서 55로 �
 ## 그림체 (중요)
 - **기존 펫과 똑같은 그림체**(3D 페인팅, 반짝이는 큰 눈, 볼터치, 금빛 테두리 빛). 곤충 · 공룡도 다른 펫과 한 가족처럼 보여야 한다.
 - 곤충은 **징그럽지 않게**(동글동글한 몸, 짧은 다리 6개, 털 · 집게 · 뾰족한 부분 없음). 공룡은 **무섭지 않게**(뿔 · 가시는 둥글게), **용처럼 보이지 않게**(불 · 깃털 날개 · 갈기 없음).
-- 전설 쿵쾅: 해치 · 별고래처럼 금빛 오라. 신화 태고: 청룡 · 주작만큼 웅장하게(무지개빛 금 테두리 빛). 특이 합격이 · 짱돌: 술술이 · 찰싹이처럼 웃긴 마스코트 느낌.
+- 전설 쿵쾅: 해치 · 별고래처럼 금빛 오라. 신화 태고: 청룡 · 주작만큼 웅장하게(무지개빛 금 테두리 빛). 특이 합격이 · 짱돌: 영웅 펫보다 한 걸음 더 화려한 독특한 컨셉 펫(금빛 테두리 빛 + 반짝이).
 - **만화 · 애니 캐릭터(포켓몬, 공룡 · 곤충 만화 등)를 따라 그리거나 닮게 그리지 않는다.** 모두 새 캐릭터다.
 - 기존 펫 · 몬스터와 헷갈리지 않게 각 주문서의 "must look different" 문장을 지킨다.
 
@@ -49,7 +49,7 @@ SUMUS VOCA(저장소 `minsik2e5/sumus-quiz-battle`)의 그림 주문서 55로 �
 |---|---|
 | 55a 설정 · 전설 | `pets/panda-3.webp`, `pets/haechi-3.webp`, `pets/whale-3.webp` |
 | 55a 설정 · 신화 | `pets/panda-3.webp`, `pets/cheongryong-3.webp`, `pets/jujak-3.webp` |
-| 55a 설정 · 특이 | `pets/panda-3.webp`, `pets/tissue-2.webp`, `pets/glue-2.webp` |
+| 55a 설정 · 특이 | `pets/panda-3.webp`, `pets/flamingo-3.webp`, `pets/snowleopard-3.webp` |
 | 55b 표정 | 그 펫 · 단계의 새 그림 `pets/<키>-<단계>.webp` (예: 55b-1 → `pets/trex-1.webp`) |
 | 55b 알 반응 | 두 펫의 `pets/<키>-0.webp` |
 | 55c 전투 자세 | 두 펫의 그 단계 새 그림 + 기존 자세 `pets/elephant-2-attack.webp`, `pets/elephant-2-hurt.webp` |

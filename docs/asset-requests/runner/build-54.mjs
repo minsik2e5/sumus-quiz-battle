@@ -33,7 +33,7 @@ const TIER_REF = {
   epic: 'Also open "24a-6.png" and "24a-8.png" in the Google Drive folder "SUMUS 새 펫 24 (Runner용)" (영웅 pets of this game) and match their finish, body size in the cell and level of detail exactly.',
   legendary: 'Also open "07a-1.png" (해치) and "07a-3.png" (별고래) in the Google Drive folder "SUMUS 전설 펫 07 (Runner용)" (the legendary pets of this game) and match their grandeur, golden aura and level of detail exactly. Do NOT copy those designs.',
   mythic: 'Also open "19a-2.png" (청룡) and "19a-4.png" (주작) in the Google Drive folder "SUMUS 신화 펫 19 (Runner용)" (the mythic pets of this game, the highest rank) and match their grandeur, prismatic rim light and level of detail exactly. Do NOT copy those designs.',
-  limited: 'Also open "21a-1.png" (술술이) and "21a-2.png" (찰싹이) in the Google Drive folder "SUMUS 이벤트 펫 21 (Runner용)" (the funny event pets of this game) and match their finish, body size in the cell and playful charm exactly. Do NOT copy those designs.'
+  special: 'Also open "24a-6.png" and "24a-8.png" in the Google Drive folder "SUMUS 새 펫 24 (Runner용)" (영웅 pets of this game) and match their finish, body size in the cell and level of detail exactly; this pet is one small step grander than those.'
 };
 const MOOD = 'Extra small, round and soft like a plush toy: a very simple sweet face (small glossy eyes with white highlights, a tiny mouth, big round pink blush), short stubby limbs, often holding one small prop. Keep exactly the 3D-painted art style of the existing pets of this game. Do NOT copy or resemble any existing cartoon, anime or mascot character (for example Pokémon, Digimon or any dinosaur or bug cartoon): this is an original character. ';
 const TIER_D = {
@@ -41,9 +41,9 @@ const TIER_D = {
   epic: 'A 영웅 (epic) pet, one rank below legendary: a little grander and more sparkling than a basic pet, with a soft golden rim light. ',
   legendary: 'A 전설 (legendary) pet, above 영웅 and below 신화: grand and majestic with a warm golden aura and a few floating golden sparkles, but still cute and friendly. Do NOT copy or resemble any existing cartoon, anime or mascot character: this is an original character. ',
   mythic: 'A 신화 (mythic) pet: the HIGHEST rank of this game, above legendary. It must be the most spectacular, richly detailed design of all pets, with a soft prismatic rainbow-gold rim light, a faint holographic shimmer and floating motifs of its own element. Cute and friendly, never scary. ',
-  limited: 'A 특이 (special event) pet: quirky and funny like a cute school mascot, with one clear comic gimmick, in exactly the same art style as the other pets. '
+  special: 'A 특이 (special) pet of the series: a unique concept pet with one clear signature gimmick, a little rarer and a little grander than a 영웅 (epic) pet (between 영웅 and 전설), with a soft golden rim light and a few extra sparkles. '
 };
-const TIER_X = { basic: '', epic: ' A 영웅 (epic) pet: a soft golden rim light.', legendary: ' A 전설 (legendary) pet: a warm golden aura.', mythic: ' A 신화 (mythic) pet: a soft prismatic golden rim light.', limited: '' };
+const TIER_X = { basic: '', epic: ' A 영웅 (epic) pet: a soft golden rim light.', legendary: ' A 전설 (legendary) pet: a warm golden aura.', mythic: ' A 신화 (mythic) pet: a soft prismatic golden rim light.', special: ' A 특이 (special) pet: a soft golden rim light with a few extra sparkles.' };
 // 곤충 · 공룡 묶음(모든 펫 시트에 들어간다).
 const GROUP = {
   bug: 'This is an INSECT pet. Draw it as a cute chibi bug, NEVER creepy: a round soft body, a big head with big glossy eyes, short antennae with tiny round tips, six very short stubby legs (it may stand on its back legs and use the front ones like arms), no realistic bug details (no hairs, no mandibles, no sharp parts).',
@@ -123,14 +123,14 @@ export const PETS_54 = {
       1: 'baby stage: a tiny round baby dragonfly with four small clear wings sitting on a glowing amber stone, no other accessories',
       2: 'grown stage: a longer young dragonfly hovering with four clear wings (NOT a round baby), its body glowing amber and emerald, a small emerald ribbon with a gold star charm, a few amber orbs floating around it',
       3: 'final stage: a majestic ancient dragonfly spirit hovering above a ring of floating amber stones, four huge stained-glass wings with golden veins, its long body shimmering amber, emerald and gold, a small golden crown with an amber gem, glowing spiral fossil shapes in the air, prismatic sparkles (NOT a round baby; graceful and friendly)' } },
-  mantis: { series: 55, ko: '합격이', type: '사마귀', group: 'bug', tier: 'limited', limb: 'both folded front arms',
+  mantis: { series: 55, ko: '합격이', type: '사마귀', group: 'bug', tier: 'special', limb: 'both folded front arms',
     move: 'leaping forward to the right and chopping with both rounded front arms like a karate move, little four-leaf clovers flying',
     base: 'a cute little praying mantis with a soft leaf-green body, a big triangle head with huge round glossy eyes, pink blush, two soft rounded front arms always folded together like praying for good luck (no spikes), thin short legs; a funny exam-luck mascot. It must look different from the monster 클립 메뚜기 (no paper clip, folded praying arms) and the chameleon 카멜',
     egg: 'a pale green egg with a small four-leaf-clover pattern, resting on a little stack of two tiny books (no letters)', f: {
       1: 'baby stage: a tiny round baby mantis sitting with its tiny arms pressed together in a wish, a tiny four-leaf clover beside it, no other accessories',
       2: 'grown stage: a young mantis standing upright (NOT a round baby), arms folded in a wish, a plain white headband (no letters), a mint scarf with a small gold star charm',
       3: 'final stage: a proud lucky-charm mantis master standing on a stack of books (no letters), holding a small golden lucky pouch between its praying arms (no letters), a white headband with a small gold star, a flowing green cape with gold trim fastened by a gold star clasp, floating four-leaf clovers and golden sparkles (NOT a round baby)' } },
-  pachy: { series: 55, ko: '짱돌', type: '파키케팔로사우루스', group: 'dino', tier: 'limited', limb: 'one short arm',
+  pachy: { series: 55, ko: '짱돌', type: '파키케팔로사우루스', group: 'dino', tier: 'special', limb: 'one short arm',
     move: 'running forward to the right head first and head-butting with its shiny dome, cartoon stars and a big bonk burst',
     base: 'a funny chubby baby pachycephalosaurus with soft sky-blue skin, a cream belly, a very big round shiny dome head like a polished stone with small rounded bumps around its rim, big glossy eyes, pink blush, a goofy confident grin, short arms and strong legs; a funny head-butting mascot. It must look different from the triceratops 뿔뿔 (no frill, no horns) and the T-rex 쿵쾅 (a big round dome head)',
     egg: 'a sky-blue egg with a big smooth round dome on top like a helmet, resting on a pile of small round pebbles', f: {
@@ -142,7 +142,7 @@ export const PETS_54 = {
 export const PAIRS_54 = { 54: [['ladybug', 'ant'], ['triceratops', 'brachio'], ['beetle', 'butterfly'], ['stego', 'ptero']], 55: [['trex', 'meganeura'], ['mantis', 'pachy']] };
 export const MYTHIC_54 = 'meganeura';
 const pet = key => PETS_54[key];
-const TIER_KO = { basic: '일반', epic: '영웅', legendary: '전설', mythic: '신화', limited: '특이' };
+const TIER_KO = { basic: '일반', epic: '영웅', legendary: '전설', mythic: '신화', special: '특이' };
 const GROUP_KO = { bug: '곤충', dino: '공룡' };
 
 const FORM_KO = { 1: '아기', 2: '성장', 3: '최종' };
@@ -264,7 +264,7 @@ export const REPO_REF = {
   epic: ['pets/panda-3.webp', 'pets/flamingo-3.webp', 'pets/quokka-2.webp'],
   legendary: ['pets/panda-3.webp', 'pets/haechi-3.webp', 'pets/whale-3.webp'],
   mythic: ['pets/panda-3.webp', 'pets/cheongryong-3.webp', 'pets/jujak-3.webp'],
-  limited: ['pets/panda-3.webp', 'pets/tissue-2.webp', 'pets/glue-2.webp']
+  special: ['pets/panda-3.webp', 'pets/flamingo-3.webp', 'pets/snowleopard-3.webp']
 };
 const POSE_REF = ['pets/elephant-2-attack.webp', 'pets/elephant-2-hurt.webp'];
 const UI_REF = ['ui/event-egg.webp', 'ui/epic-egg.webp', 'ui/mythic-egg.webp'];
@@ -303,7 +303,7 @@ ${series === 54 ? '- `54d-1`은 곤충·공룡 시리즈 알(알 상점 새 탭)
 ## 그림체 (중요)
 - **기존 펫과 똑같은 그림체**(3D 페인팅, 반짝이는 큰 눈, 볼터치, 금빛 테두리 빛). 곤충 · 공룡도 다른 펫과 한 가족처럼 보여야 한다.
 - 곤충은 **징그럽지 않게**(동글동글한 몸, 짧은 다리 6개, 털 · 집게 · 뾰족한 부분 없음). 공룡은 **무섭지 않게**(뿔 · 가시는 둥글게), **용처럼 보이지 않게**(불 · 깃털 날개 · 갈기 없음).
-- ${series === 54 ? '영웅 펫은 일반 펫보다 성장 · 최종이 조금 더 화려하다.' : `전설 ${pet('trex').ko}: 해치 · 별고래처럼 금빛 오라. 신화 ${pet(MYTHIC_54).ko}: 청룡 · 주작만큼 웅장하게(무지개빛 금 테두리 빛). 특이 ${pet('mantis').ko} · ${pet('pachy').ko}: 술술이 · 찰싹이처럼 웃긴 마스코트 느낌.`}
+- ${series === 54 ? '영웅 펫은 일반 펫보다 성장 · 최종이 조금 더 화려하다.' : `전설 ${pet('trex').ko}: 해치 · 별고래처럼 금빛 오라. 신화 ${pet(MYTHIC_54).ko}: 청룡 · 주작만큼 웅장하게(무지개빛 금 테두리 빛). 특이 ${pet('mantis').ko} · ${pet('pachy').ko}: 영웅 펫보다 한 걸음 더 화려한 독특한 컨셉 펫(금빛 테두리 빛 + 반짝이).`}
 - **만화 · 애니 캐릭터(포켓몬, 공룡 · 곤충 만화 등)를 따라 그리거나 닮게 그리지 않는다.** 모두 새 캐릭터다.
 - 기존 펫 · 몬스터와 헷갈리지 않게 각 주문서의 "must look different" 문장을 지킨다.
 
