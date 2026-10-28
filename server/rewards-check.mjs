@@ -21,7 +21,7 @@ import { botStart, botFinish, RECEIPT_KEEP, RECEIPT_DAYS, monsterStart, monsterF
 import { marketPrices } from './market.mjs';
 import { limitedFromEpic, giveGift, openGifts, giftEggPick } from './rewards.mjs';
 import { GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS } from '../public/modules/rewards.js';
-import { field as petField } from './pet-sim.mjs';
+import { field as petField, baseSkillPets } from './pet-sim.mjs';
 import { SEASONS, LIMITED_PET_KEYS, seasonOnSale, seasonsOver, seasonKeys, seasonStage } from '../public/modules/core.js';
 import { STOCKS, MARKET, MARKET_OPEN, tradeFee, newsText } from '../public/modules/market.js';
 
@@ -578,7 +578,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(!beforePity.legendary && beforePity.lucky.legend.remaining === 1 && atPity.legendary?.guaranteed && atPity.legendary.pull === 150 && LEGENDARY_PET_KEYS.includes(atPity.legendary.key) && afterPity.legendary === null && legendProfile.pets.filter(pet => LEGENDARY_PET_KEYS.includes(pet.key)).length === 1, 'V13.89 149번째까지 실패하면 150번째에 확정되고, 한 번 만난 뒤에는 전설 펫이 더 나오지 않는다');
   const legendExpressions = LEGENDARY_PET_KEYS.flatMap(pet => [0, 1, 2, 3].flatMap(form => (form ? ['happy', 'eat', 'sad', 'cheer'] : ['happy', 'eat']).map(expression => expressionSrc(pet, form, expression))));
   assert(legendExpressions.length === 56 && legendExpressions.every(src => src && existsSync(fileURLToPath(new URL('../public' + src, import.meta.url)))), 'V13.89 전설 펫 표정과 알 반응 56장이 등록되어 있고 파일이 있다');
-  assert(LEGENDARY_PET_KEYS.every(key => CHARACTERS[key].legendary && petSkill({ key }).key === 'none'), 'V13.89 전설 펫에는 야차전 펫 특기가 없다');
+  assert(LEGENDARY_PET_KEYS.every(key => CHARACTERS[key].legendary && petSkill({ key }).key === key), 'V13.185 전설 펫에도 야차전 펫 특기가 있다(V13.89에는 없었다)');
   const lucky89 = source('../public/modules/lucky.js'), arcade89 = source('../public/modules/arcade.js'), service89 = source('./service.mjs'), css89 = source('../public/v1389.css'), build89 = source('./build-assets.mjs');
   assert(lucky89.includes('legend-egg-glow.webp') && lucky89.includes('legend-egg-burst.webp') && lucky89.includes('legend-badge.webp') && lucky89.includes('function legendaryShow(') && css89.includes('.lk-legend-show{') && build89.includes('"v1389.css"'), 'V13.89 전설 알의 빛남·깨짐·배지 연출과 전설 결과 화면이 빌드에 들어간다');
   assert(arcade89.includes('LEGENDARY_RATE') && service89.includes('postNotice(state') && service89.includes('(season ? season.keys : epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter') && service89.includes('학생이 ${where}에서 ${rank} 펫') && service89.includes("announceLegend(state, p, result.legendary.key, '행운 뽑기')"), 'V13.89 확률과 천장을 안내하고, 전설 획득은 학교에 알리며, 랜덤 알에서는 일반 펫만 나온다');
@@ -808,7 +808,7 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(EPIC_PET_KEYS.filter(key => !CHARACTERS[key].artOrder).join() === 'capybara,penguin,owl,hamster,shark,alpaca,hedgehog,otter,redpanda,arcticfox,koala,parrot,seal,wolf,crocodile,octopus,guineapig,axolotl,chinchilla,sloth,platypus' && STANDARD_PET_KEYS.filter(key => !CHARACTERS[key].artOrder).length === 21 /* V13.148 새 펫 3탄 기본 5 · 영웅 5 (V13.168 새 펫은 그림이 들어오면 더해진다) */ && EPIC_PET_KEYS.every(key => CHARACTERS[key].epic && !CHARACTERS[key].legendary && petTier(key) === 'epic') && petTier('dog') === 'basic' && petTier('qilin') === 'legendary' && EPIC_RATE === 3, 'V13.92 영웅 펫은 기본과 전설 사이 등급이고, 뽑기 확률은 3%다');
   const epicFiles = EPIC_PET_KEYS.flatMap(key => [0, 1, 2, 3].flatMap(f => [`/assets/pets/${key}-${f}.webp`, `/assets/pets/${key}-${f}-s.webp`, ...(f ? ['happy', 'eat', 'sad', 'cheer'] : ['happy', 'eat']).map(e => expressionSrc(key, f, e))]));
   assert(epicFiles.length === EPIC_PET_KEYS.length * (4 * 2 + 2 + 12) && EPIC_PET_KEYS.filter(key => !CHARACTERS[key].artOrder).length === 21 && epicFiles.every(src => src && existsSync(fileURLToPath(new URL('../public' + src, import.meta.url)))), 'V13.92 영웅 펫의 알·아기·성장·최종 그림, 작은 그림, 표정과 알 반응이 모두 있다');
-  assert(EPIC_PET_KEYS.every(key => PET_SKILLS[key]?.name && PET_SKILLS[key].desc && petSkill({ key }).key === key) && petSkill({ key: 'otter' }).need === 4 && petSkill({ key: 'owl' }).need === 3 && LEGENDARY_PET_KEYS.every(key => petSkill({ key }).key === 'none'), 'V13.92 영웅 펫마다 새 야차전 특기가 있고, 전설 펫에는 여전히 특기가 없다');
+  assert(EPIC_PET_KEYS.every(key => PET_SKILLS[key]?.name && PET_SKILLS[key].desc && petSkill({ key }).key === key) && petSkill({ key: 'otter' }).need === 4 && petSkill({ key: 'owl' }).need === 3 && LEGENDARY_PET_KEYS.every(key => petSkill({ key }).key === key), 'V13.92 영웅 펫마다 새 야차전 특기가 있다(V13.185부터 전설 펫도)');
   const epicProfile = { pets: [{ key: 'dog' }], avatar_key: 'dog', lucky: {}, points_spent: 0 };
   const epicPull = pullLucky(epicProfile, 10, 100, { random: values([.5, .99, .01, .4]), now });
   const allEpic = { pets: [{ key: 'dog' }, ...EPIC_PET_KEYS.map(key => ({ key }))], lucky: {}, points_spent: 0 };
@@ -904,8 +904,8 @@ export async function runRewardsChecks(assert, expectStatus) {
       const teacher112 = source('../public/modules/teacher.js'), petbook112 = source('../public/modules/petbook.js'), css112 = source('../public/v13113.css'), css66 = source('../public/v1366.css');
       assert(teacher112.includes("['petdex', '펫 도감', 'sparkle']") && teacher112.includes('petdex: teacherPetDex') && teacher112.includes("import { teacherPetDex } from './petbook.js';")
         && petbook112.includes('export function teacherPetDex(A)') && petbook112.includes('card(key, ++no, { form: 3 }, ownersOf(key))') && petbook112.includes('<b>얻는 법</b>') && petbook112.includes('<b>보유 학생</b>')
-        && petbook112.includes("seasonOnSale()?.id === c.limited ? '있는' : '있었던'") && /\.teacher-app\.tv2 \.tv2-bottom-nav\{grid-template-columns:repeat\(7,/.test(css66) && css112.includes('.pb-teacher{') && source('./build-assets.mjs').includes('"v13113.css"'),
-        'V13.113 선생님 화면에 "펫 도감" 메뉴가 있어 펫 전체(모든 단계·특기·얻는 법)와 우리 학교 학생 보유 현황을 보고, 한정 펫 문구는 판매 중에는 "있는"이라고 쓴다');
+        && petbook112.includes("seasonOnSale()?.id === c.limited ? `${season.egg}") && /\.teacher-app\.tv2 \.tv2-bottom-nav\{grid-template-columns:repeat\(7,/.test(css66) && css112.includes('.pb-teacher{') && source('./build-assets.mjs').includes('"v13113.css"'),
+        'V13.113 선생님 화면에 "펫 도감" 메뉴가 있어 펫 전체(모든 단계·특기·얻는 법)와 우리 학교 학생 보유 현황을 보고, 한정 펫 얻는 법은 판매 중에는 알 · 가격, 끝나면 영웅 알로 쓴다(V13.185부터 한정 펫 칸에는 특기 줄)');
     }
     /* ---------- V13.111 선생님 알 선물 ---------- */
     {
@@ -943,7 +943,7 @@ export async function runRewardsChecks(assert, expectStatus) {
       assert([...NEW_BASIC, ...NEW_EPIC].every(key => [0, 1, 2, 3].every(f => existsSync(asset(`${key}-${f}`)) && existsSync(asset(`${key}-${f}-s`)) && (f ? ['happy', 'eat', 'sad', 'cheer'] : ['happy', 'eat']).every(e => expressionSrc(key, f, e) && existsSync(asset(`${key}-${f}-${e}`))))),
         'V13.110 새 펫 8종의 알·아기·성장·최종 그림, 작은 그림, 표정 96장, 알 반응 16장이 모두 있다');
       // The real engine, seeded: each new pet wins about as often as the field (V13.72 band, with room for the small sample).
-      const r = petField(Object.keys(PET_SKILLS), { n: 10, seed: 5 });
+      const r = petField(baseSkillPets(), { n: 10, seed: 5 });
       assert([...NEW_BASIC, ...NEW_EPIC].every(key => ['speed', 'skill'].every(m => r[m][key] > .42 && r[m][key] < .58)),
         'V13.110 시뮬레이션(server/pet-sim.mjs)에서 새 펫 8종의 승률이 다른 펫 전체를 상대로 42~58% 안이다(조정은 47~54%로 맞춤)');
     }
@@ -963,7 +963,7 @@ export async function runRewardsChecks(assert, expectStatus) {
       assert([...basic, ...epic].every(key => [0, 1, 2, 3].every(f => existsSync(asset(`${key}-${f}`)) && existsSync(asset(`${key}-${f}-s`))
         && (f ? ['happy', 'eat', 'sad', 'cheer'] : ['happy', 'eat']).every(e => existsSync(asset(`${key}-${f}-${e}`))))),
         'V13.114 새 펫 8종의 그림 176개가 모두 있다');
-      const r = petField(Object.keys(PET_SKILLS), { n: 10, seed: 5 });
+      const r = petField(baseSkillPets(), { n: 10, seed: 5 });
       assert([...basic, ...epic].every(key => ['speed', 'skill'].every(mode => r[mode][key] > .42 && r[mode][key] < .58)),
         'V13.114 새 펫 8종은 두 야차전 모드에서 전체 펫 상대 승률 42~58% 안이다');
     }
@@ -971,9 +971,9 @@ export async function runRewardsChecks(assert, expectStatus) {
     {
       const kst = t => Date.parse(t + '+09:00');
       const H = SEASONS.autumn;
-      assert(LIMITED_PET_KEYS.join() === 'pumpkincat,ghost,riceball,tissue,glue' && LIMITED_PET_KEYS.every(key => petTier(key) === 'limited' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && petSkill({ key }).key === 'none')
+      assert(LIMITED_PET_KEYS.join() === 'pumpkincat,ghost,riceball,tissue,glue' && LIMITED_PET_KEYS.every(key => petTier(key) === 'limited' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && petSkill({ key }).key === key)
         && H.price === 600 && H.end === '2026-11-30' && H.after_rate === 5 && /11월 30일/.test(H.until),
-        'V13.117 가을 이벤트 한정 펫 5종(호박냥·부우·주먹이·술술이·찰싹이)은 기본·영웅 알에 섞이지 않고, 야차전 특기가 없으며, 가을 이벤트 알은 600코인에 11/30까지 판다');
+        'V13.117 가을 이벤트 한정 펫 5종(호박냥·부우·주먹이·술술이·찰싹이)은 기본·영웅 알에 섞이지 않고, 야차전 특기가 있으며(V13.185), 가을 이벤트 알은 600코인에 11/30까지 판다');
       assert(seasonOnSale(kst('2026-10-01T00:00:00'))?.id === 'autumn' && seasonOnSale(kst('2026-11-30T23:59:00'))?.id === 'autumn' && seasonOnSale(kst('2026-12-01T00:00:00')) === null && seasonOnSale(kst('2026-09-30T23:59:00')) === null
         && seasonsOver(kst('2026-11-30T23:59:00')).length === 0 && seasonsOver(kst('2026-12-01T00:00:00')).join() === 'autumn',
         'V13.117 가을 이벤트 알은 한국 시간 11월 30일 밤까지 팔고, 12월 1일부터 판매가 끝난 시즌이 된다');
@@ -1018,8 +1018,8 @@ export async function runRewardsChecks(assert, expectStatus) {
       for (let i = 0; i < 3; i++) { const miss = EVENT5.filter(k => !kid5.pets.some(pet => pet.key === k)); got.push(openEgg(kid5, { season: 'autumn', missing: miss, price: 600, random: () => 0, now: now5 }).key); }
       assert(got.join() === 'riceball,tissue,glue' && new Set(kid5.pets.map(pet => pet.key)).size === kid5.pets.length && kid5.pets.filter(pet => pet.limited).length === 3,
         'V13.117 한 알씩 열수록 겹치지 않게 아직 없는 이벤트 펫이 나온다(5마리 모으기 최대 5알 = 3,000코인)');
-      assert(EVENT5.every(key => petTier(key) === 'limited' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && petSkill({ key }).key === 'none') && ['riceball', 'tissue', 'glue'].every(key => engine117.includes("'" + key + "'") && char117.includes(key + ': { 0: EGG, 1: ALL, 2: ALL, 3: ALL }')),
-        'V13.117 새 한정 펫 3종은 한정 등급이고 야차전 특기가 없으며 그림(알·표정)이 등록돼 있다');
+      assert(EVENT5.every(key => petTier(key) === 'limited' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && petSkill({ key }).key === key) && ['riceball', 'tissue', 'glue'].every(key => engine117.includes("'" + key + "'") && char117.includes(key + ': { 0: EGG, 1: ALL, 2: ALL, 3: ALL }')),
+        'V13.117 새 한정 펫 3종은 한정 등급이고 야차전 특기가 있으며(V13.185) 그림(알·표정)이 등록돼 있다');
       assert(arcade117.includes("uiArt('event-egg')") && arcade117.includes("uiArt('event-badge', 'egg-season-badge')") && arcade117.includes('호박냥 · 부우 · 주먹이 · 술술이 · 찰싹이 중 못 만난 친구') && moments117.includes("uiArt('event-egg')") && moments117.includes('가을 이벤트 한정 펫(할로윈 · 수능 응원)') && !arcade117.includes('halloween-egg') && !moments117.includes('halloween-egg'),
         'V13.117 놀이터 알 상점과 알 가게 창은 가을 이벤트 알 그림·안내 문구를 쓴다');
       assert(battle117.includes('seasonStage() ? `bg-${seasonStage()}`') && !battle117.includes('seasonOnSale') && core117.includes("stage: 'halloween', stage_end: '2026-11-07'"), 'V13.117 야차전 배경은 가을 이벤트(할로윈)를 11/7까지만 쓴다');

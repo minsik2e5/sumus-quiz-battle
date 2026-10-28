@@ -2,7 +2,8 @@
 // virtual clock, two students who know the same share of the words, each with a pet. A pet's skill
 // should win about as often as any other's (V13.72: 47–54% against the field in both modes).
 // `node server/pet-sim.mjs [games per pair]` prints each pet's win rate against all the others.
-import { createBattle, connect, answer, tick, nextWake, BATTLE, SKILL_RULES, PET_SKILLS } from '../public/modules/battle-engine.js';
+import { createBattle, connect, answer, tick, nextWake, BATTLE, SKILL_RULES, PET_SKILLS, PET_SKILL_TIERS } from '../public/modules/battle-engine.js';
+import { STANDARD_PET_KEYS, EPIC_PET_KEYS } from '../public/modules/core.js';
 import { battleQuestions } from '../public/modules/battle-questions.js';
 import { seeded } from './monster-sim.mjs';
 
@@ -60,7 +61,37 @@ export function field(pets = Object.keys(PET_SKILLS), { n = 120, know = .82, mod
   return out;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+// V13.185 등급 사이 승률: 기본(B) · 영웅(H) · 전설(L) · 신화(M) · 한정(X). The pets of the base field are the
+// ones every older check uses (기본 · 영웅 · 바다); 전설 · 신화 · 한정 are measured against the groups.
+export const SKILL_GROUPS = { B: STANDARD_PET_KEYS, H: EPIC_PET_KEYS, L: PET_SKILL_TIERS.legendary, M: PET_SKILL_TIERS.mythic, X: PET_SKILL_TIERS.limited };
+export const baseSkillPets = () => Object.keys(PET_SKILLS).filter(key => !Object.values(PET_SKILL_TIERS).flat().includes(key));
+// Each pet of `pets` against each group (both sides, `n` games per pet pair and mode): { mode: { pet: { B, H, L, M, X } } }.
+export function tierField(pets = Object.values(PET_SKILL_TIERS).flat(), { n = 40, know = .82, modes = ['speed', 'skill'], groups = ['B', 'H', 'L', 'M'], seed = 21 } = {}) {
+  const out = {};
+  for (const mode of modes) {
+    const random = seeded(seed + (mode === 'skill' ? 7 : 0));
+    out[mode] = Object.fromEntries(pets.map(x => [x, Object.fromEntries(groups.map(g => {
+      let score = 0, games = 0;
+      for (const y of SKILL_GROUPS[g]) {
+        if (y === x) continue;
+        for (let i = 0; i < n; i++) { score += i % 2 ? duel(x, y, mode, know, random) : 1 - duel(y, x, mode, know, random); games++; }
+      }
+      return [g, score / games];
+    }))]));
+  }
+  return out;
+}
+// A group's average win rate against another group, per mode (each pet's rate against the group, averaged).
+export const groupRate = (r, mode, pets, g) => pets.reduce((a, x) => a + r[mode][x][g], 0) / pets.length;
+
+if (import.meta.url === `file://${process.argv[1]}` && process.argv[2] === 'tiers') {
+  // `node server/pet-sim.mjs tiers [games per pair]`: the table of docs/pet-skills-balance.md.
+  const n = Number(process.argv[3] || 100), pct = v => (v * 100).toFixed(1).padStart(5);
+  const r = tierField(undefined, { n });
+  console.log('pet          ' + ['speed', 'skill'].map(m => `${m}: vsB   vsH   vsL   vsM`).join('   '));
+  for (const x of Object.values(PET_SKILL_TIERS).flat()) console.log(x.padEnd(12) + ['speed', 'skill'].map(m => ' ' + ['B', 'H', 'L', 'M'].map(g => pct(r[m][x][g])).join(' ')).join('   '));
+  for (const [name, t, g] of [['전설 vs 영웅', 'legendary', 'H'], ['신화 vs 전설', 'mythic', 'L'], ['신화 vs 영웅', 'mythic', 'H'], ['한정 vs 기본', 'limited', 'B'], ['전설 vs 기본', 'legendary', 'B']]) console.log(name.padEnd(10), ['speed', 'skill'].map(m => m + ' ' + pct(groupRate(r, m, PET_SKILL_TIERS[t], g)) + '%').join('  '));
+} else if (import.meta.url === `file://${process.argv[1]}`) {
   const n = Number(process.argv[2] || 60);
   const r = field(Object.keys(PET_SKILLS), { n });
   console.log('pet         speed   skill');

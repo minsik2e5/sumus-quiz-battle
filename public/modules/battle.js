@@ -341,7 +341,6 @@ function lobby() {
 // V13.72: what my pet does in a match, and what every pet does (the other player's too).
 function petSkillChip(pet) {
   const s = petSkill(pet);
-  if (s.key === 'none') return `<div class="yl-note-card"><b>전설 펫</b><p>펫 특기 없이 실력으로 겨뤄요.</p></div>`;
   return `<div class="yl-note-card"><b>${esc(s.name)}</b><p>${skillWhen(s)} 저절로 · ${esc(s.desc)}<br>버튼을 누르지 않아도 돼요. 틀리거나 시간이 지나면 게이지가 처음부터 다시 차요. 펫 레벨과 상관없이 세기는 같아요.</p>
     <details><summary>모든 펫의 특기</summary><ul>${Object.entries(PET_SKILLS).filter(([key]) => petReady(key)).map(([key, x]) => `<li class="${key === s.key ? 'mine' : ''}"><span class="yl-skill-pet">${avatar(key, { size: 'mini', form: 1 })}</span><span><b>${esc(CHARACTERS[key]?.ko || '')} · ${esc(x.name)}</b><small>${x.need || PET_SKILL_NEED}번 연속 · ${esc(x.desc)}</small></span></li>`).join('')}</ul></details>
   </div>`;
@@ -1120,9 +1119,10 @@ function refreshHud() {
     const skill = p.skill || petSkill(p.pet), gauge = skill.need > 0 ? Math.min(p.gauge || 0, skill.need) : 0;
     const box = document.getElementById('yb-gauge-' + side);
     if (box) {
-      box.innerHTML = skill.need > 0 ? '<i>스킬</i>' + Array.from({ length: skill.need }, (_, i) => `<span class="${i < gauge ? 'on' : ''}"></span>`).join('') : '<i>특기 없음</i>';
-      box.classList.toggle('near', skill.need > 0 && gauge === skill.need - 1);
-      box.setAttribute('aria-label', skill.need > 0 ? `${skill.name} 게이지 ${gauge}/${skill.need}` : '전설 펫은 펫 특기가 없어요');
+      // V13.185: every pet (전설 · 신화 · 한정 too) has a skill, so there is always a gauge.
+      box.innerHTML = '<i>스킬</i>' + Array.from({ length: skill.need }, (_, i) => `<span class="${i < gauge ? 'on' : ''}"></span>`).join('');
+      box.classList.toggle('near', gauge === skill.need - 1);
+      box.setAttribute('aria-label', `${skill.name} 게이지 ${gauge}/${skill.need}`);
     }
     const fx = document.getElementById('yb-fx-' + side);
     if (fx) fx.innerHTML = [...effectBadges(p.effects, p.pet), !p.connected && B.view.phase !== 'waiting' && '<b class="off">연결 끊김</b>'].filter(Boolean).join('');
@@ -1135,7 +1135,6 @@ function refreshHud() {
 function drawMySkill() {
   const box = document.getElementById('yb-myskill'); if (!box) return;
   const p = me(), s = p.skill || petSkill(p.pet), gauge = Math.min(p.gauge || 0, s.need), left = s.need - gauge;
-  if (s.key === 'none') { box.innerHTML = '<span class="yb-myskill-name"><span aria-hidden="true">✦</span> 전설 펫</span><span class="yb-myskill-desc">펫 특기 없이 함께 대결해요.</span>'; return; }
   box.innerHTML = `<span class="yb-myskill-name"><span aria-hidden="true">✦</span> ${esc(s.name)}</span><span class="yb-myskill-desc">${esc(s.desc)}</span><span class="yb-myskill-left ${left === 1 ? 'near' : ''}">${left === 1 ? '한 번만 더!' : `${left}번 더 맞히면`}</span>`;
 }
 // A pet skill went off: a banner across the arena for a moment.
