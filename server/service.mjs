@@ -42,6 +42,7 @@ import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow, huntSell, 
 import { grantClaw, clawView, clawStart, clawDrop, clawGuideSeen, clawPreviewFill, clawActivityText } from './claw.mjs';
 import { HUNT, HUNT_MONSTERS } from '../public/modules/hunt-rules.js';
 import { CLAW } from '../public/modules/claw-rules.js';
+import { postClawNews, clawNewsFor } from './claw-news.mjs';
 import { FISH } from '../public/modules/fishing-rules.js';
 import { REEL } from '../public/modules/reel-rules.js';
 import { TIMING } from '../public/modules/timing-rules.js';
@@ -2040,7 +2041,7 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const now = Date.now();
     if (body.guide) clawGuideSeen(p);
-    return { claw: clawView(p, now) };
+    return { claw: clawView(p, now), news: clawNewsFor(state, p, schoolForProfile(state, p), now) };
   }
   if (path === '/claw/start' && method === 'POST') {
     requireRole(p, 'student');
@@ -2053,7 +2054,10 @@ export async function service(state, method, path, body, token, options = {}) {
     const now = Date.now();
     const res = clawDrop(p, { id: str(body.id, 40), round: str(body.round, 40), n: Number(body.n), x: Number(body.x), y: Number(body.y), now });
     if (!res.again && res.summary) logActivity(p, 'claw', clawActivityText(res.summary), now);
-    return { ...res, claw: clawView(p, now), ...(res.coins ? { points_balance: coinBalance(state, p) } : {}) };
+    const view = clawView(p, now), school = schoolForProfile(state, p);
+    // V13.191 반 소식(server/claw-news.mjs): 황금 · 대박 · 도감 완성 · 도감 N번째. 같은 집게를 다시 보내면(again) 남기지 않는다.
+    const posted = res.again ? null : postClawNews(state, p, school, res, { kinds: view.kinds, now, id: randomUUID() });
+    return { ...res, claw: view, ...(res.coins ? { points_balance: coinBalance(state, p) } : {}), ...(posted ? { news: clawNewsFor(state, p, school, now), news_mine: true } : {}) };
   }
   // V13.167 열매 문제: 서버가 내 학교 · 학년 범위(놀이터에서 고른 게임 단어)에서 내고, 서버가 채점해 열매 표를 준다.
   if (path === '/hunt/berry' && method === 'POST') {
