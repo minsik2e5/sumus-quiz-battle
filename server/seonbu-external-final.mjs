@@ -13,6 +13,7 @@ export const seonbuExternalFinalBook = {
   school: '선부고',
   division: 'high',
   exam_period: 'final',
+  mock: true, // V13.191 모의고사 · 외부지문 책(칭호 '외부지문 완주' · '모의고사 씹어먹기')
   title: '선부고 기말고사 외부지문 45~60 · 2026년 3월 서울 · 6월 부산 학평',
   words: [
   {"id": "sb_final_45_01", "book_id": "seonbu:final:external-45-60-2026", "range_code": "45", "word": "around", "meaning": "약, -경", "source": "2026년 3월 서울시 학력평가 고1", "source_question": "33번 · 빈칸"},

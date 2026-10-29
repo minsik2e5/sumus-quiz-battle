@@ -7,6 +7,7 @@ import {
 } from '../public/modules/rewards.js';
 import { titleCoins } from '../public/modules/titles.js';
 import { monsterDayWin } from './titles-3.mjs';
+import { careDayCount } from './titles-4.mjs';
 import { MONSTER_LEVELS, MONSTER_DAILY, MONSTER_MIN_MS, MONSTER_MS_PER_RIGHT, MONSTER_TRY, MONSTER_LEVEL_KEYS, monsterOpen, partClears, partKeyCodes, stageLevel, cleanStage, stageMonster, isBossStage } from '../public/modules/monsters.js';
 
 // Coin rewards and games (rules and odds: public/modules/rewards.js). Everything lives on the
@@ -749,7 +750,7 @@ export function petCare(p, kind, { pet, now = Date.now() }) {
   if (typeof kind !== 'string' || !Object.hasOwn(PET_CARE, kind)) fail('할 수 있는 교감이 아니에요.');
   if (!pet) fail('먼저 펫을 골라주세요.', 409);
   const c = p.care ||= {};
-  const today = dayKey(now);
+  const today = dayKey(now), firstToday = c.day !== today;
   c.done = careToday(c, pet, today);
   c.day = today; delete c.pet; delete c.feed;
   const mine = c.done[pet] ||= { pet: false, feed: false };
@@ -757,6 +758,7 @@ export function petCare(p, kind, { pet, now = Date.now() }) {
   mine[kind] = true;
   c.last_at = now;
   c.total = Number(c.total || 0) + 1;
+  careDayCount(c, firstToday); // V13.191 칭호 '100일 집사': 돌본 날 수(p.care.dn), 그날 첫 교감에만 +1
   const xp = PET_CARE[kind].xp;
   addBonus(p, { xp, pet, now });
   return { kind, xp };

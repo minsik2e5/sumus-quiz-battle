@@ -39,10 +39,19 @@
 //   V13.184 칭호 3탄(docs/titles-plan.md): monster_best 하드까지 깬 가장 높은 몬스터전 레벨(m.best), monster_day_best 하루 최다 승(m.dw.b),
 //                blank_done 빈칸영작 첫 완료 칸(본문 × 단계), blank_l5 · blank_l6 · blank_l7 그 과의 완료 칸(20칸), blank_perfect 1차 정답률 100인 칸,
 //                blank_s5 5단계 완료 칸, gram_mastered 완성한 어법 지문, gram_clean 1차 100점으로 끝낸 어법 지문(둘 다 p.gram_best 최고값)
+//   V13.191 칭호 4탄(docs/titles-plan-4.md, server/titles-4.mjs): fish_trophy 월척(trophyOf) 종 수, fish_kinds · fish_shore · deep_kinds 낚시 도감 종류(전체 · 물가 24 · 심해 8),
+//                fish_legend 전설 물고기 종류, fish_day_best 하루 최다 낚기(p.reel.dc), reel_rod 낚싯대 단계, range_cover 한 바퀴 돈 범위,
+//                mock_cover · mock_clear 한 바퀴 돈 · 정복한 모의고사 책, range_all 범위를 모두 정복한 시험(중간 · 기말)(넷 다 p.range_best 최고값),
+//                coin_earned 번 코인(가위바위보 · 주식 · 뽑기 받은 돈 · 야차전 빼고), coin_spent 쓴 코인(전설 알 빼고), pet_named 이름 지어 준 펫,
+//                pet_best_level 가장 높은 펫 레벨, care_days 펫을 돌본 날(p.care.dn), hunt_place_best · hunt_night · hunt_kinds 몬스터 사냥 도감,
+//                timing_week_king 지난주 10초 맞추기 학년 묶음 1위(한정, p.timing.wk · pw)
 // Limited titles belong to one week: they are held only while last week's result stands.
 // V13.148 `once`: 한정 테두리지만 주간 칭호가 아닌 것(신화의 주인): 한 번 받으면 계속 갖고, 코인도 한 번만.
 
 import { EPIC_PET_KEYS, LEGEND_EGG_EPIC_NEED } from './core.js';
+import { DEEP_KEYS } from './fishing-rules.js';
+import { FISH_READY } from './fish-art.js';
+import { MONSTER_KEYS } from './hunt-rules.js';
 
 export const TITLE_TIERS = {
   common: { name: '일반', order: 1 },
@@ -51,7 +60,7 @@ export const TITLE_TIERS = {
   legendary: { name: '전설', order: 4 },
   limited: { name: '한정', order: 5 }
 };
-export const TITLE_GROUPS = { study: '학습', yacha: '야차전', monster: '몬스터', dungeon: '던전', collect: '수집', gacha: '뽑기', arcade: '놀이터', limited: '한정' };
+export const TITLE_GROUPS = { study: '학습', yacha: '야차전', monster: '몬스터', dungeon: '던전', collect: '수집', gacha: '뽑기', arcade: '놀이터', fishing: '낚시', limited: '한정' };
 // V13.73: coins for a new title, by tier (paid once when the student first sees it; a limited
 // title pays again each week it is won). 첫걸음 and retired capsule titles pay nothing.
 export const TITLE_COINS = { common: 10, rare: 30, epic: 60, legendary: 120, limited: 60 };
@@ -207,6 +216,9 @@ Object.assign(TITLES, {
   'legend-owner': { name: '전설의 주인', tier: 'legendary', group: 'collect', stat: 'legend_egg', goal: 1, icon: 'wing', how: '전설 알 보상 받기(전설 알을 열거나, 이미 전설 펫이 있어 대신 받는 보상)', desc: '전설 알의 주인이 되었어요.' },
   'epic-dex': { name: '도감 마스터', tier: 'legendary', group: 'collect', stat: 'epic_pets', goal: EPIC_PET_KEYS.length, icon: 'book', how: '영웅 펫 모두 만나기', desc: '영웅 도감을 빈칸 없이 채웠어요.' }
 });
+// V13.191 물가 낚시 도감 종 수(황금 알 물고기 포함 24), 심해 칭호를 보여도 되는지(심해 8종 그림이 다 있을 때).
+const FISH_SHORE_ALL = 24;
+export const DEEP_TITLES_READY = DEEP_KEYS.length === 8 && DEEP_KEYS.every(key => FISH_READY.has(key));
 // V13.184 칭호 3탄 25개(그림 50 · 51 · 52: /assets/titles/<key>.webp, docs/titles-plan.md). 전설 알 칭호 3개(위)도 그림이 왔다.
 // `middle`: 빈칸영작은 중등만 해서 고등 학생 칭호 도감에는 보이지 않는다(visibleTitleKeys).
 // `num`: 메달 앞판에 앱이 쓰는 숫자(level100 그림은 앞판이 비어 있다). `art`: 다른 칭호의 메달 그림을 빌려 쓴다.
@@ -258,6 +270,48 @@ Object.assign(TITLES, {
   'timing-ten': { name: '딱 10.00', tier: 'epic', group: 'arcade', stat: 'timing_ten', goal: 1, icon: 'star', how: '10초 맞추기에서 정확히 10.00초', desc: '0.01초도 틀리지 않았어요.' },
   'timing-human': { name: '인간 초시계', tier: 'legendary', group: 'arcade', stat: 'timing_streak', goal: 3, icon: 'crown', how: '10초 맞추기 완벽 3번 연속', desc: '세 번 연속 0.05초 안. 초시계가 울고 가요.' }
 });
+// V13.191 칭호 4탄 24개(그림 60 · 61: /assets/titles/<key>.webp, docs/titles-plan-4.md). 낚시는 새 묶음(fishing).
+// `mock`: 모의고사 · 외부지문 책이 있는 학교 학생에게만 보인다(선생님 결정 5). `deep`: 심해 물고기 8종 그림이 다 있을 때만 보인다(안전장치).
+// 곤충 · 공룡 펫 칭호 2개(곤충 채집왕 · 쥬라기 반장)는 펫 코드가 들어올 때 같이 넣는다.
+export const TITLES_4 = [
+  'fishkg', 'fishbook12', 'fishday10', 'deep1', 'fishlegend', 'rod5', 'fishall', 'deepall',
+  'range1', 'mockcover', 'mockclear', 'rangeall',
+  'coin1k', 'gift20', 'broke', 'coin30k',
+  'petname', 'petfinal', 'care100', 'petmax',
+  'huntplace', 'huntnight', 'huntall', 'timingweek'
+];
+Object.assign(TITLES, {
+  // 낚시(놀이터 손맛 낚시)
+  fishkg: { name: '월척이다!', tier: 'common', group: 'fishing', stat: 'fish_trophy', goal: 1, icon: 'target', how: '낚시에서 월척 한 번(전설 물고기, 또는 보통 이상 물고기가 무게 상위 15%)', desc: '물보라와 함께 통통한 녀석이 튀어 올랐어요!' },
+  fishbook12: { name: '물고기 반장', tier: 'rare', group: 'fishing', stat: 'fish_kinds', goal: 12, icon: 'book', how: '낚시 도감 12종 모으기', desc: '물고기들이 반장을 따라 줄을 서요.' },
+  fishday10: { name: '오늘 회식은 나야', tier: 'rare', group: 'fishing', stat: 'fish_day_best', goal: 10, icon: 'heart', how: '하루에 물고기 10마리 낚기', desc: '양동이가 넘쳐요. 오늘 회식은 내가 쏜다!' },
+  deep1: { name: '심해 첫 손님', tier: 'rare', group: 'fishing', deep: true, stat: 'deep_kinds', goal: 1, icon: 'star', how: '깊은 바다에서 심해 물고기 처음 낚기', desc: '깜깜한 바다 밑에서 아귀 등불이 반겨 줘요.' },
+  fishlegend: { name: '전설을 낚았다', tier: 'epic', group: 'fishing', stat: 'fish_legend', goal: 1, icon: 'crown', how: '전설 물고기 1마리 낚기(고래상어 · 황금 잉어 · 실러캔스 · 대왕쥐가오리 · 주름상어)', desc: '낚싯대가 활처럼 휘었어요. 전설이 걸렸다!' },
+  rod5: { name: '낚싯대 풀강', tier: 'epic', group: 'fishing', stat: 'reel_rod', goal: 5, icon: 'gem', how: '낚싯대 5단계(전설 낚싯대)까지 강화', desc: '보석 고리 다섯 개가 반짝, 더 이상 강화할 데가 없어요.' },
+  fishall: { name: '수산시장 사장님', tier: 'legendary', group: 'fishing', stat: 'fish_shore', goal: FISH_SHORE_ALL, icon: 'trophy', how: `물가 낚시 도감 ${FISH_SHORE_ALL}종 모두 모으기(황금 알 물고기 포함)`, desc: '물가 물고기가 우리 가게에 다 있어요.' },
+  deepall: { name: '심해 탐사대장', tier: 'legendary', group: 'fishing', deep: true, stat: 'deep_kinds', goal: 8, icon: 'crown', how: '심해 도감 8종 모두 모으기', desc: '잠수함 탐조등이 비춘 심해 친구들을 모두 만났어요.' },
+  // 시험 범위(한 번 얻으면 그대로: p.range_best 최고값)
+  range1: { name: '범위 한 바퀴', tier: 'common', group: 'study', stat: 'range_cover', goal: 1, icon: 'sprout', how: '시험 범위 하나의 모든 단어를 한 번씩 풀기', desc: '단어 카드 더미를 한 바퀴 돌았어요.' },
+  mockcover: { name: '외부지문 완주', tier: 'rare', group: 'study', mock: true, stat: 'mock_cover', goal: 1, icon: 'bolt', how: '모의고사 · 외부지문 책 하나의 모든 단어를 한 번씩 풀기', desc: '시험지 더미 위 결승 테이프를 끊었어요.' },
+  mockclear: { name: '모의고사 씹어먹기', tier: 'epic', group: 'study', mock: true, stat: 'mock_clear', goal: 1, icon: 'flame', how: '모의고사 · 외부지문 책 하나의 범위를 모두 정복', desc: '모의고사를 한입에 꿀꺽!' },
+  rangeall: { name: '시험 범위 올킬', tier: 'legendary', group: 'study', stat: 'range_all', goal: 1, icon: 'sword', how: '우리 학교 · 학년의 한 시험(중간 또는 기말) 범위를 모두 정복', desc: '시험 범위에 체크가 빈틈없이 꽂혔어요.' },
+  // 코인 · 선물
+  coin1k: { name: '티끌 모아 천 코인', tier: 'common', group: 'collect', stat: 'coin_earned', goal: 1000, icon: 'gem', how: '지금까지 번 코인 1,000', desc: '티끌 같은 코인이 모여 금화 탑이 됐어요.' },
+  gift20: { name: '선물 자석', tier: 'rare', group: 'collect', stat: 'gifts', goal: 20, icon: 'heart', how: '선물 20번 받기', desc: '선물 상자가 자석처럼 끌려와요.' },
+  broke: { name: '통장 텅장', tier: 'epic', group: 'collect', stat: 'coin_spent', goal: 10000, icon: 'flame', how: '쓴 코인 10,000(전설 알은 빼고)', desc: '지갑을 뒤집었더니 나방 한 마리가 날아갔어요.' },
+  coin30k: { name: '걸어다니는 금고', tier: 'legendary', group: 'collect', stat: 'coin_earned', goal: 30000, icon: 'trophy', how: '지금까지 번 코인 30,000', desc: '짧은 다리로 걷는 금고, 문틈으로 금화가 반짝.' },
+  // 펫 육성
+  petname: { name: '작명소 사장님', tier: 'common', group: 'collect', stat: 'pet_named', goal: 1, icon: 'paw', how: '펫에게 이름 지어 주기', desc: '세상에 하나뿐인 이름을 지어 줬어요.' },
+  petfinal: { name: '다 컸네!', tier: 'rare', group: 'collect', stat: 'pet_best_level', goal: 20, icon: 'star', how: '펫 하나를 최종 진화(Lv.20)까지 키우기', desc: '알 껍데기 옆에서 키를 재 보니 훌쩍 컸어요.' },
+  care100: { name: '100일 집사', tier: 'epic', group: 'collect', stat: 'care_days', goal: 100, icon: 'calendar', how: '펫을 돌본 날 100일(쓰다듬기 · 밥 주기, 하루에 한 번 셈)', desc: '백 일 동안 하루도 빠짐없이 펫을 챙겼어요.' },
+  petmax: { name: '만렙 펫의 보호자', tier: 'legendary', group: 'collect', stat: 'pet_best_level', goal: 60, icon: 'crown', how: '펫 하나를 Lv.60(만렙)까지 키우기', desc: '금관을 쓴 펫이 시상대에 올랐어요.' },
+  // 몬스터 사냥
+  huntplace: { name: '우리 동네 터줏대감', tier: 'rare', group: 'monster', stat: 'hunt_place_best', goal: 9, icon: 'shield', how: '몬스터 사냥에서 숲 · 들판 · 바닷가 중 한 곳의 몬스터 9종 다 잡기', desc: '이 동네 몬스터라면 내가 다 알아요.' },
+  huntnight: { name: '올빼미 포획단', tier: 'epic', group: 'monster', stat: 'hunt_night', goal: 9, icon: 'wing', how: '몬스터 사냥에서 밤 몬스터 9종 다 잡기', desc: '초승달 아래 밤 몬스터를 모두 잡았어요.' },
+  huntall: { name: '몬스터 동사무소장', tier: 'legendary', group: 'monster', stat: 'hunt_kinds', goal: MONSTER_KEYS.length, icon: 'crown', how: `몬스터 사냥 도감 ${MONSTER_KEYS.length}종 모두 잡기`, desc: '몬스터 명부에 쾅! 모두 등록 완료.' },
+  // 10초 맞추기 주간(한정: 이긴 주마다 다시 정해진다)
+  timingweek: { name: '주간 초시계왕', tier: 'limited', group: 'arcade', stat: 'timing_week_king', goal: 1, icon: 'trophy', how: '지난주 10초 맞추기 순위 1위(같은 학년 묶음)', desc: '왕관을 쓴 초시계, 바늘이 딱 꼭대기!' }
+});
 // V13.67: titles that came out of the capsule machine. V13.68 retired the machine: they stay
 // with the students who have them and are not shown to anyone else (`retired`).
 Object.assign(TITLES, {
@@ -270,7 +324,11 @@ export const TITLE_KEYS = Object.keys(TITLES);
 export const weeklyTitle = key => TITLES[key]?.tier === 'limited' && !TITLES[key].once;
 // The titles a student sees in the collection: all but retired ones they do not have.
 // V13.184: 중등 전용(`middle`) 칭호는 고등 학생에게 보이지 않는다(가지고 있으면 보인다).
-export const visibleTitleKeys = (unlocked, { middle = true } = {}) => TITLE_KEYS.filter(key => (!TITLES[key].retired && (middle || !TITLES[key].middle)) || unlocked.includes(key));
+// V13.191: 모의고사 칭호(`mock`)는 그 학교 · 학년에 모의고사 책이 있을 때만, 심해 칭호(`deep`)는 심해 그림이 다 있을 때만.
+export const visibleTitleKeys = (unlocked, { middle = true, mock = true, deep = DEEP_TITLES_READY } = {}) => TITLE_KEYS.filter(key => {
+  const t = TITLES[key];
+  return (!t.retired && (middle || !t.middle) && (mock || !t.mock) && (deep || !t.deep)) || unlocked.includes(key);
+});
 
 export function titleUnlocked(key, stats = {}) {
   const t = TITLES[key];

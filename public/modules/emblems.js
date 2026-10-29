@@ -99,6 +99,10 @@ export const TITLE_ART = new Set([
   'mlv10', 'mday3', 'mlv30', 'boss3', 'mlv50', 'mlv70',
   'blank1', 'blank5', 'blank6', 'blank7', 'blankperfect', 'blanks5', 'blankall',
   'gram1', 'gram10', 'gramclean', 'gram30', 'epic-collector', 'legend-owner', 'epic-dex',
+  // V13.191 칭호 4탄 24개(그림 60 · 61)
+  'fishkg', 'fishbook12', 'fishday10', 'deep1', 'fishlegend', 'rod5', 'fishall', 'deepall',
+  'range1', 'mockcover', 'mockclear', 'rangeall', 'coin1k', 'gift20', 'broke', 'coin30k',
+  'petname', 'petfinal', 'care100', 'petmax', 'huntplace', 'huntnight', 'huntall', 'timingweek',
   // V13.168 12지 수호자(그림 36d): 메달 그림이 들어오면(build:assets → pet-art.js) 자동으로 쓴다.
   ...PET_TITLE_ART
 ]);

@@ -3,7 +3,7 @@
 // 소급 지급은 한 장 묶음 카드로 한 번만(코인 합계 · 푸시 없음), titles_seen 240, 메달 그림 28 × 2 · TITLE_ART 연결, 응답에 정답 힌트 없음.
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { TITLES, TITLES_3, TITLE_KEYS, titleUnlocked, titleProgress, titleCoins, visibleTitleKeys, weeklyTitle, LEVEL_TITLES_AFTER_100 } from '../public/modules/titles.js';
+import { TITLES, TITLES_3, TITLES_4, TITLE_KEYS, titleUnlocked, titleProgress, titleCoins, visibleTitleKeys, weeklyTitle, LEVEL_TITLES_AFTER_100 } from '../public/modules/titles.js';
 import { TITLE_ART, titleEmblem } from '../public/modules/emblems.js';
 import { blankGroup, blankKey } from '../public/modules/blank-rules.js';
 import { monsterDayWin, blankTitleStats, gramTitleStats, rememberGramBest } from './titles-3.mjs';
@@ -52,8 +52,8 @@ export async function runTitles3Checks(assert) {
     'V13.184 칭호 3탄 25개는 문서 표의 키 · 이름 · 등급 · 조건 · 코인 그대로');
   assert(PET3.every(key => TITLES[key] && !TITLES_3.includes(key)) && TITLES['epic-collector'].tier === 'epic' && TITLES['legend-owner'].tier === 'legendary' && TITLES['epic-dex'].tier === 'legendary',
     'V13.184 펫 수집 3개는 새로 만들지 않고 V13.182 칭호(영웅 · 전설 · 전설) 그대로');
-  assert(TITLE_KEYS.length === 151 && new Set(TITLE_KEYS.map(key => TITLES[key].name)).size === TITLE_KEYS.length - 1 /* 옛 뽑기 '황금 손'과 인형뽑기 '황금 손' */,
-    'V13.184 칭호는 모두 151개(지금 126 + 3탄 25), 이름은 겹치지 않는다(Lv.75는 "단어 곳간지기")');
+  assert(TITLE_KEYS.filter(key => !TITLES_4.includes(key)).length === 151 && new Set(TITLE_KEYS.map(key => TITLES[key].name)).size === TITLE_KEYS.length - 1 /* 옛 뽑기 '황금 손'과 인형뽑기 '황금 손' */,
+    'V13.184 칭호는 4탄 전까지 151개(지금 126 + 3탄 25, V13.191 4탄 24개는 titles-4-check.mjs), 이름은 겹치지 않는다(Lv.75는 "단어 곳간지기")');
   assert(TITLES.level75.name !== TITLES.words500.name, 'V13.184 Lv.75 이름은 기존 "단어 수집가"와 다르다');
   // 조건 경계: 직전 미달 / 딱 달성
   assert(TABLE.every(([key, , , stat, goal]) => !titleUnlocked(key, { [stat]: goal - 1 }) && titleUnlocked(key, { [stat]: goal }) && titleProgress(key, { [stat]: goal - 1 })?.join() === `${goal - 1},${goal}`),
@@ -82,7 +82,7 @@ export async function runTitles3Checks(assert) {
   const high = visibleTitleKeys(['rookie'], { middle: false }), middle = visibleTitleKeys(['rookie'], { middle: true });
   assert(BLANK_KEYS.every(key => TITLES[key].middle && !high.includes(key) && middle.includes(key)) && TITLES_3.filter(key => !BLANK_KEYS.includes(key)).every(key => !TITLES[key].middle && high.includes(key)) && high.length === middle.length - 7 && visibleTitleKeys(['rookie', 'blank1'], { middle: false }).includes('blank1'),
     'V13.184 빈칸영작 칭호 7개는 고등 학생 도감에서 숨기고(가지고 있으면 보인다) 중등은 모두 보인다');
-  assert(source('../public/modules/titles-ui.js').includes("visibleTitleKeys(unlocked, { middle: A.data?.profile?.division === 'middle' })") && !/visibleTitleKeys\((t\.unlocked|u|titleState\(A\)\.unlocked)\)/.test(source('../public/modules/titles-ui.js')),
+  assert(source('../public/modules/titles-ui.js').includes("visibleTitleKeys(unlocked, { middle: A.data?.profile?.division === 'middle',") && !/visibleTitleKeys\((t\.unlocked|u|titleState\(A\)\.unlocked)\)/.test(source('../public/modules/titles-ui.js')),
     'V13.184 칭호 도감 · 칭호 수 · 첫 소개가 모두 중등 여부로 거른다');
 
   // ---- 몬스터 세 끼: 하루 3승, 날짜가 바뀌면 0부터

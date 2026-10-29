@@ -9,6 +9,7 @@ import { guardDayNums } from '../public/modules/streak-guard.js';
 import { dungeonTitleStats, dungeonKings } from './dungeon-records.mjs';
 import { clawTitleStats } from './claw.mjs';
 import { blankTitleStats, gramTitleStats } from './titles-3.mjs';
+import { fishTitleStats, huntTitleStats, petTitleStats, rangeTitleStats, coinEarned, coinSpent, timingWeekKings } from './titles-4.mjs';
 
 export const DAY_MS = 86400000;
 export const KST_OFFSET_MS = 9 * 3600000;
@@ -107,6 +108,9 @@ function longestDayRun(sessions, extra = []) {
 // V13.148 '한 과 정복' 칭호: 정복한 과 수는 단어책 · 단어 기록이 있는 server/service.mjs가 센다(여기서 부르면 서로를 불러 버린다).
 let unitCounter = null;
 export const setUnitCounter = fn => { unitCounter = fn; };
+// V13.191 칭호 4탄 시험 범위(server/titles-4.mjs rangeCounts)도 service.mjs가 센다: (state, p) => { c, mc, mm, all, books } 또는 null.
+let rangeCounter = null;
+export const setRangeCounter = fn => { rangeCounter = fn; };
 export const REMATCH_MS = 10 * 60000;
 // 아침 학습: 학습을 시작한 시각이 한국 시간 5시~9시 전.
 export const MORNING_HOURS = [5, 9];
@@ -126,15 +130,22 @@ export function createCompetition(state, now = Date.now()) {
   // V13.70 경험치 and coins from robot matches and exams count like practice (levels, pets, rankings).
   for (const p of profiles.values()) for (const row of bonusRecords(p)) push(sessionsBy, p.id, row);
   const week = rankingWeek(now), lastWeek = rankingWeek(week.start - 1);
-  const champions = new Map();
+  const champions = new Map(), prizes = new Map();
   for (const t of state.tournaments || []) if (t.status === 'finished' && t.champion) champions.set(t.champion, (champions.get(t.champion) || 0) + 1);
+  // V13.191 번 코인(coin_earned)에 넣는 대회 상금: 우승 상금, 준우승은 절반(tournament.mjs tournamentPrizes와 같다).
+  const prize = (pid, n) => { if (pid && n > 0) prizes.set(pid, (prizes.get(pid) || 0) + n); };
+  for (const t of state.tournaments || []) if (t.status === 'finished' && t.prize) { prize(t.champion, t.prize); prize(t.runner_up, Math.floor(t.prize / 2)); }
   const exams = new Map(), examPerfect = new Map();
   for (const a of state.examAttempts || []) if (a.status === 'submitted') {
     exams.set(a.student_id, (exams.get(a.student_id) || 0) + 1);
     if (Number(a.score) === 100) examPerfect.set(a.student_id, (examPerfect.get(a.student_id) || 0) + 1);
   }
   const countedCache = new Map(), statCache = new Map();
-  let awards = null, kings = null;
+  let awards = null, kings = null, timingKings = null;
+  const fishOf = new Map(), huntOf = new Map(), rangeOf = new Map(), petOf = new Map();
+  const once = (map, p, fn) => { const pid = p?.id; if (!map.has(pid)) map.set(pid, fn()); return map.get(pid); };
+  const range4 = p => once(rangeOf, p, () => rangeTitleStats(p, rangeCounter ? rangeCounter(state, p) : null));
+  const pet4 = (p, pid) => once(petOf, p, () => petTitleStats(p, petProgress(p?.pets || [], ctx.sessionsOf(pid), p?.avatar_key)));
   const inWindow = window => b => b.finished_at >= window.start && b.finished_at < window.end;
   const winsOf = pid => ctx.countedOf(pid).filter(b => b.winner === pid);
   const STATS = {
@@ -217,6 +228,14 @@ export function createCompetition(state, now = Date.now()) {
     ...Object.fromEntries(Object.keys(blankTitleStats(null)).map(stat => [stat, p => blankTitleStats(p)[stat]])),
     gram_mastered: (p, pid) => gramTitleStats(p, state.grammarProgress?.[pid]).gram_mastered,
     gram_clean: (p, pid) => gramTitleStats(p, state.grammarProgress?.[pid]).gram_clean,
+    // V13.191 칭호 4탄(server/titles-4.mjs): 낚시 · 몬스터 사냥 도감, 시험 범위 최고값, 코인, 펫 육성, 지난주 10초 맞추기 1위.
+    ...Object.fromEntries(Object.keys(fishTitleStats(null)).map(stat => [stat, p => once(fishOf, p, () => fishTitleStats(p))[stat]])),
+    ...Object.fromEntries(Object.keys(huntTitleStats(null)).map(stat => [stat, p => once(huntOf, p, () => huntTitleStats(p))[stat]])),
+    ...Object.fromEntries(Object.keys(rangeTitleStats(null)).map(stat => [stat, p => range4(p)[stat]])),
+    coin_earned: (p, pid) => coinEarned(p, ctx.sessionsOf(pid), prizes.get(pid) || 0),
+    coin_spent: p => coinSpent(p),
+    ...Object.fromEntries(Object.keys(petTitleStats(null)).map(stat => [stat, (p, pid) => pet4(p, pid)[stat]])),
+    timing_week_king: (p, pid) => (timingKings ??= timingWeekKings(state.profiles, lastWeek.start, { ranked: isRankedStudent, band: x => sameGradeBand(x, x) ? `${x.division}|${gradeOf(x.class_name)}` : null })).has(pid) ? 1 : 0,
     // 보스 처치는 V13.148부터 센다. 그 전에 하드로 깬 레벨(m.best)에 들어 있던 보스 레벨은 깬 것으로 친다.
     boss_wins: p => { const m = p?.bonus?.monster || {}; return Math.max(Number(m.boss_wins || 0), Math.floor(Number(m.best || 0) / 5)); },
     // V13.67 capsule-only titles: owned when the capsule was pulled.
