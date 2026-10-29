@@ -31,7 +31,12 @@ export const TIMING = {
   REVEAL_MS: 1400,          // 공개 연출 길이(숫자는 처음부터 멈춘 값 그대로, 빛만 켜진다)
   AVG_MIN: 5,               // 이번 주 평균 오차 순위에 들려면 이만큼 판
   BOARD_TOP: 20,
-  PREVIEW_PLAYS: 30         // 교사 미리보기 계정: 하루 판을 이만큼(순위 · 활동 기록에서는 빠진 계정)
+  PREVIEW_PLAYS: 30,        // 교사 미리보기 계정: 하루 판을 이만큼(순위 · 활동 기록에서는 빠진 계정)
+  // V13.192 오늘의 챌린지: 하루 하나의 목표 시간으로 같은 학년대가 겨룬다. 선생님이 날짜별로 정하고, 안 정한 날은 자동(날짜 시드).
+  //   목표 0.5 ~ 30초(0.01초 단위), 숫자 보임 0 · 1 · 2 · 3 · 5초(목표보다 짧게), 한 줄 메시지 30자. 오늘부터 13일 뒤까지 정할 수 있고 지난 14일만 남긴다.
+  //   하루 1판(기본 판과 따로), 참여 보너스 8코인(하루 한 번, 하루 코인 상한 밖), 등급 코인은 기존 표 · 기존 하루 상한 안.
+  DAILY: { MIN: 500, MAX: 30000, AUTO_MIN: 5000, AUTO_MAX: 15000, SHOWS: [0, 1000, 2000, 3000, 5000], AUTO_SHOW: 3000, AHEAD: 13, KEEP: 14, MSG: 30, PLAYS: 1, BONUS: 8, CHAMPS: 3 },
+  GHOST_RECENT: 1           // 고스트: 가장 최근 판 하나(어제 기록이 없을 때 비교)
 };
 export const GRADE_KEYS = ['ten', 'perfect', 'great', 'good', 'close', 'miss'];
 export const GRADE_NAMES = { ten: '딱 10.00!', perfect: '완벽', great: '훌륭', good: '좋음', close: '아쉬움', miss: '꽝', early: '너무 빨라요' };
@@ -67,6 +72,34 @@ export const REVEAL_STEPS = [[0, 1, 1], [70, .12, 0], [150, 1, 1], [220, .18, 0]
 export function revealAt(ms, t) {
   const step = [...REVEAL_STEPS].reverse().find(([at]) => t >= at) || REVEAL_STEPS[0];
   return { ms, lit: t >= TIMING.REVEAL_MS ? 1 : step[1], tick: !!step[2] };
+}
+// V13.192 오늘의 챌린지 ---------------------------------------------------------------
+// 안 정한 날의 목표: 날짜 문자열 해시로 5.00 ~ 15.00초(0.01초 단위). 숨긴 값이 아니다(선생님 화면에서 미리 보인다).
+export function autoDailyTarget(day) {
+  let h = 2166136261;
+  for (const ch of `sumus-daily-${day}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+  const D = TIMING.DAILY, steps = (D.AUTO_MAX - D.AUTO_MIN) / 10 + 1;
+  return D.AUTO_MIN + (h % steps) * 10;
+}
+// 선생님이 넣은 값 검사(서버 · 화면 같이 쓴다). 맞으면 { t, s, m }, 아니면 오류 문구.
+export function dailyCheck({ target_ms, show_ms, msg = '' } = {}) {
+  const D = TIMING.DAILY, t = Number(target_ms), sh = Number(show_ms ?? D.AUTO_SHOW), m = String(msg ?? '').replace(/\s+/g, ' ').trim();
+  if (!Number.isInteger(t) || t % 10 || t < D.MIN || t > D.MAX) return { error: `목표 시간은 ${secText(D.MIN)} ~ ${secText(D.MAX)}초, 소수 둘째 자리까지예요.` };
+  if (!D.SHOWS.includes(sh)) return { error: '숫자 보이는 시간을 골라 주세요.' };
+  if (sh && sh >= t) return { error: '숫자는 목표 시간보다 먼저 사라져야 해요.' };
+  if ([...m].length > D.MSG) return { error: `메시지는 ${D.MSG}자까지예요.` };
+  return { t, s: sh, m };
+}
+// 등급 이름: 목표가 10초가 아니면 '딱 7.77!'.
+export const gradeName = (g, target = TIMING.TARGET) => g === 'ten' && Number(target) !== TIMING.TARGET ? `딱 ${secText(target)}!` : GRADE_NAMES[g];
+// 고스트 비교 한 줄. prev: { k: 'yesterday' | 'last' | 'daily' | 'daily_old', e: 그때 오차(ms, 부호) }. 0.01초 단위로 비교한다.
+const GHOST_WHO = { yesterday: ['어제', '어제와'], last: ['지난 판', '지난 판과'], daily: ['어제 챌린지', '어제 챌린지와'], daily_old: ['지난 챌린지', '지난 챌린지와'] };
+export function ghostLine(err, prev) {
+  if (!prev || prev.e == null || err == null || !Number.isFinite(Number(prev.e)) || !Number.isFinite(Number(err))) return '';
+  const [who, withWho] = GHOST_WHO[prev.k] || GHOST_WHO.last, d = Math.abs(centi(prev.e)) - Math.abs(centi(err));
+  if (d > 0) return `${who}보다 ${(d / 100).toFixed(2)}초 가까워졌어요`;
+  if (!d) return `${withWho} 똑같은 오차예요`;
+  return `${who}보다 ${(-d / 100).toFixed(2)}초 멀어졌어요. 다시 해 봐요!`;
 }
 // 낮은 등급도 격려하는 한 줄.
 export const CHEERS = {

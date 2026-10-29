@@ -236,7 +236,8 @@ export async function runTimingChecks(assert) {
     assert(svc.includes("if (complete && student && answerRecords.length >= TIMING.MIN_PRACTICE) grantTimingPlay(student, 'practice', finalizedAt);") && svc.includes("'hunt', 'blank', 'timing'].filter(k => old[k])") && svc.includes("if (!res.again) logActivity(p, 'timing', timingLine(res), now);"),
       'V13.180 끝까지 푼 연습(10문제 이상)도 한 판 더, 로그인 때 기록을 지키고, 끝날 때만 활동 기록');
     const routes = svc.slice(svc.indexOf("if (path === '/timing/ping'"), svc.indexOf("if (path === '/hunt/home'"));
-    assert((routes.match(/requireRole\(p, 'student'\);/g) || []).length === 4 && (routes.match(/if \(path === '\/timing\//g) || []).length === 4, 'V13.180 10초 맞추기 경로 넷(ping · 시작 · 끝 · 순위)은 학생만');
+    assert((routes.match(/requireRole\(p, 'student'\);/g) || []).length === 5 && (routes.match(/if \(path === '\/timing\//g) || []).length === 5 && (routes.match(/requireRole\(p, 'teacher'\);/g) || []).length === 2,
+      'V13.180 10초 맞추기 학생 경로(ping · 시작 · 끝 · 순위 · V13.192 챌린지 순위)는 학생만, 챌린지 설정 두 경로는 선생님만');
   }
 
   /* ---------- 화면 · 소리 · 구성안 ---------- */

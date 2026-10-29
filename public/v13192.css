@@ -1,0 +1,76 @@
+/* V13.192 10초 맞추기: 오늘의 챌린지 카드 · 챌린지 무대 · 고스트 마커 · 챔피언 · 선생님 설정 창 */
+/* 챌린지 카드(어두운 무대 아래 조작판) */
+.tm-daily{position:relative;display:flex;flex-direction:column;gap:6px;padding:12px 12px 10px;border-radius:16px;background:radial-gradient(120% 140% at 0 0,rgba(255,210,63,.16),transparent 55%),linear-gradient(160deg,#1b1408,#0d0b07);box-shadow:inset 0 0 0 1px rgba(255,210,63,.35),0 0 24px rgba(255,210,63,.10);overflow:hidden}
+.tm-daily::after{content:'';position:absolute;inset:0;pointer-events:none;background:linear-gradient(105deg,transparent 40%,rgba(255,236,170,.14) 50%,transparent 60%);background-size:260% 100%;animation:tmdShine 4.2s ease-in-out infinite}
+@keyframes tmdShine{0%,55%{background-position:120% 0}100%{background-position:-30% 0}}
+.tm-dc-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.tm-dc-tag{font-size:12.5px;font-weight:900;color:var(--tm-gold);letter-spacing:-.01em}
+.tm-dc-sub{font-size:11px;font-weight:700;color:#bfb08a}
+.tm-dc-main{display:flex;align-items:baseline;gap:10px;min-width:0}
+.tm-dc-target{flex:none;font-size:15px;font-weight:900;color:#fff2c4}
+.tm-dc-target b{font:900 32px/1 ui-monospace,Menlo,monospace;color:var(--tm-gold);text-shadow:0 0 14px rgba(255,210,63,.6);margin-right:2px}
+.tm-dc-msg{flex:1;min-width:0;margin:0;font-size:13px;font-weight:800;color:#f4e7c0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tm-dc-foot{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.tm-dc-bonus,.tm-dc-mine{font-size:12.5px;font-weight:800;color:#f4e7c0;display:inline-flex;align-items:center;gap:3px}
+.tm-dc-mine b{font-family:ui-monospace,Menlo,monospace;color:#fff}
+.tm-dc-mine small,.tm-dc-prev{font-size:11px;font-weight:700;color:#bfb08a}
+.tm-dc-prev{flex-basis:100%;order:3}
+.tm-dc-rank{margin-left:auto}
+.tm-dc-go{min-width:76px;padding:8px 14px!important;background:linear-gradient(180deg,#ffe27a,#f2b21b)!important;color:#3a2600!important;box-shadow:0 3px 0 #9c6b00,0 0 14px rgba(255,210,63,.45)!important}
+.tm-dc-go:disabled{background:#3a3326!important;color:#968a6c!important;box-shadow:none!important}
+.tm-daily.done{box-shadow:inset 0 0 0 1px rgba(255,210,63,.18)}
+/* 챌린지 판: 목표 위 작은 표 · 금색 테 */
+.tm-goal small{display:block;margin-bottom:2px;font-size:12px;font-weight:900;letter-spacing:.06em;color:var(--tm-gold);text-shadow:0 0 10px rgba(255,210,63,.6)}
+.tm-stage.daily .tm-goal b{color:var(--tm-gold);text-shadow:0 0 12px rgba(255,210,63,.75)}
+.tm-stage.daily .tm-panel{box-shadow:0 0 0 1px rgba(255,210,63,.45),0 0 30px rgba(255,210,63,.18),0 18px 40px rgba(0,0,0,.6)}
+.tm-res-daily{margin:0 0 4px;font-size:12px;font-weight:900;color:var(--tm-gold);text-align:center}
+.tm-note-bonus{color:#f4e7c0}
+/* 고스트: 지난 기록 위치(옅은 점선 마커, 내 마커보다 뒤) */
+.tm-ghost{position:absolute;top:0;bottom:0;width:0;z-index:0;opacity:0;animation:tmGhostIn .6s ease-out 1.2s forwards}
+.tm-ghost::before{content:'';position:absolute;left:-1px;top:6px;bottom:14px;border-left:2px dashed rgba(200,210,255,.55)}
+.tm-ghost b{position:absolute;bottom:1px;left:50%;transform:translateX(-50%);padding:0 4px;border-radius:4px;background:rgba(160,175,255,.18);font:800 9.5px/1.35 system-ui,sans-serif;color:#dfe4ff;white-space:nowrap}
+.tm-ghost.gh-best::before{border-left-color:rgba(255,210,63,.55)}
+.tm-ghost.gh-best b{background:rgba(255,210,63,.18);color:#ffe9a6}
+@keyframes tmGhostIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.tm-ghost-line{margin:6px 0 2px;font-size:13px;font-weight:800;color:#cfd6ff;text-align:center;opacity:0;animation:tmGhostIn .5s ease-out 1.5s forwards}
+.tm-ghost-line.up{color:#7dffcf;text-shadow:0 0 12px rgba(59,232,176,.45)}
+/* 순위: 어제의 챌린지 챔피언(작게) */
+.tm-champs{padding:8px 10px;border-radius:12px;background:linear-gradient(120deg,#fff7df,#ffeec2);box-shadow:inset 0 0 0 1px #f4c96b;color:#5a3b00}
+.tm-champs p{margin:0 0 4px;font-size:12px;font-weight:900}
+.tm-champs ol{display:flex;flex-wrap:wrap;gap:4px 10px;margin:0;padding:0;list-style:none}
+.tm-champs li{display:inline-flex;align-items:center;gap:4px;font-size:12px}
+.tm-champs li b{font-weight:900;max-width:7em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tm-champs li small{font:700 11px ui-monospace,Menlo,monospace;color:#8a6516}
+.tm-champs li.me b{text-decoration:underline}
+/* 선생님: 대시보드 입구(폰) · 설정 창 */
+.tmd-entry-v13192{display:none;align-items:center;gap:10px;width:100%;margin:0 0 12px;padding:11px 14px;border:1px solid #f0b8b2;border-radius:16px;background:linear-gradient(120deg,#fff1ef,#ffe0dc);font:inherit;text-align:left;color:#6b1410;cursor:pointer}
+.tmd-entry-v13192>span{flex:none;font-size:22px}.tmd-entry-v13192>div{flex:1;min-width:0}
+.tmd-entry-v13192 b{display:block;font-size:14.5px;font-weight:900}.tmd-entry-v13192 small{display:block;margin-top:1px;font-size:12px;font-weight:700;color:#a23a32}
+.tmd-entry-v13192>i{flex:none;font-style:normal;font-size:22px;color:#c2302a}
+@media (max-width:720px){.tmd-top-v13192{display:none!important}.tmd-entry-v13192{display:flex}}
+.tmd-modal{display:flex;flex-direction:column;gap:12px}
+.tmd-modal h2{margin:0;font-size:20px}
+.tmd-modal>p{margin:0;font-size:13px;color:#555}
+.tmd-form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tmd-form .field{margin:0}
+.tmd-form .tmd-wide{grid-column:1 / -1}
+.tmd-target-input{font:800 20px ui-monospace,Menlo,monospace!important;letter-spacing:.02em}
+.tmd-quick{display:flex;flex-wrap:wrap;gap:6px;grid-column:1 / -1}
+.tmd-quick button{padding:5px 10px;border:1px solid #e3d6d4;border-radius:99px;background:#fff;font:800 12.5px ui-monospace,Menlo,monospace;color:#7a1d17;cursor:pointer}
+.tmd-quick button:hover{background:#fff1ef}
+.tmd-error{grid-column:1 / -1;margin:0;color:#c0392b;font-size:13px;font-weight:700}
+.tmd-actions{grid-column:1 / -1;display:flex;gap:8px}
+.tmd-actions .btn{flex:1}
+.tmd-days{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.tmd-day{display:grid;grid-template-columns:62px 1fr auto;align-items:center;gap:8px;padding:8px 10px;border:1px solid #ece6e4;border-radius:12px;background:#fff;cursor:pointer;text-align:left;font:inherit;width:100%;color:inherit}
+.tmd-day.on{border-color:#e0605a;box-shadow:0 0 0 2px rgba(224,96,90,.18)}
+.tmd-day .tmd-date{font-size:12px;font-weight:900;color:#555}.tmd-day .tmd-date em{display:block;font-style:normal;font-size:10.5px;color:#c2302a}
+.tmd-day .tmd-val{min-width:0}.tmd-day .tmd-val b{font:900 17px ui-monospace,Menlo,monospace;color:#1b1b1b}.tmd-day .tmd-val small{display:block;font-size:11.5px;color:#777;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tmd-tag{white-space:nowrap;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:900;background:#eef1f6;color:#5b6475}
+.tmd-tag.set{background:#ffe8e5;color:#b3261e}
+.tmd-today{font-size:12.5px;font-weight:800;color:#7a1d17}
+@media (prefers-reduced-motion:reduce){.tm-daily::after,.tm-ghost,.tm-ghost-line{animation:none;opacity:1}}
+/* 놀이터 카드: 오늘의 챌린지 한 줄 */
+.ag-tm-daily{margin:0 0 8px;padding:6px 10px;border-radius:10px;background:linear-gradient(120deg,#fff7df,#ffe9b8);box-shadow:inset 0 0 0 1px #f4c96b;font-size:12.5px;font-weight:800;color:#5a3b00}
+.ag-tm-daily b{font-family:ui-monospace,Menlo,monospace}
+.ag-tm-daily.done{opacity:.7}
