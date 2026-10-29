@@ -8,6 +8,7 @@ import { SEONBU_2025_PASSAGES, SEONBU_2026_PASSAGES } from '../public/seonbu-gra
 import { GANGSEO_PASSAGES } from '../public/gangseo-grammar-data.js';
 import { MIDDLE_YBM_PARK_PASSAGES } from '../public/middle-ybm-park-grammar-data.js';
 import { BLANK_LESSONS } from '../public/middle-donga-yoon-blank-data.js';
+import { BLANK_LESSONS as YBM_BLANK_LESSONS } from '../public/middle-ybm-park-blank-data.js';
 
 const fail = message => { throw new Error('[content-validation] ' + message); };
 const runtimeBooks = () => {
@@ -45,32 +46,65 @@ function validateGrammarSet(name, passages, expectedNumbers, expectedChoices) {
   assert(choiceCount(passages) === expectedChoices, `${name}: 선택 포인트 수 불일치 (${choiceCount(passages)} != ${expectedChoices})`);
 }
 
-// 중3 동아(윤정미) 빈칸영작(Step 1 ~ 5) 데이터: 칸 번호가 영어 전문 안에 있고, Step 1 보기가 Step 1 빈칸 단어와 같고, Step 4 단어 묶음이 문장 전체와 같다.
+// 빈칸영작(Step 1 ~ 5) 데이터: 칸 번호가 영어 전문 안에 있고, Step 1 보기가 Step 1 빈칸 단어와 같고, Step 4 단어 묶음이 문장 전체와 같다.
+// 중3 동아(윤정미) 본문 5-1 … · V13.196 중2 YBM(박준언) 본문 y5-1 …(PDF 100발100중 Reading, 문항 수 32 · 26 · 34).
 const blankCore = word => String(word).replace(/[’‘]/g, "'").replace(/[“”]/g, '"').toLowerCase().replace(/^[^\w]+|[^\w]+$/g, '');
-function validateBlankData() {
-  const expected = { 5: [29, 4], 6: [28, 4], 7: [24, 4] };
-  assert(Object.keys(BLANK_LESSONS).join(',') === '5,6,7', '빈칸영작: 5 · 6 · 7과');
+function validateBlankBook(name, lessons, expected, { idPrefix, moreInStep3 }) {
+  assert(Object.keys(lessons).join(',') === '5,6,7', `${name} 빈칸영작: 5 · 6 · 7과`);
   for (const [lesson, [count, groups]] of Object.entries(expected)) {
-    const data = BLANK_LESSONS[lesson];
-    assert(data.items.length === count && data.groups.length === groups, `빈칸영작 ${lesson}과: 문항 ${data.items.length} != ${count}`);
-    assert(data.items.every((item, i) => item.n === i + 1), `빈칸영작 ${lesson}과: 문항 번호가 1부터 이어지지 않음`);
-    assert(data.groups.every((g, i) => g.from === (i ? data.groups[i - 1].to + 1 : 1)) && data.groups.at(-1).to === count, `빈칸영작 ${lesson}과: 본문 나누기가 문항을 빠짐없이 덮지 않음`);
+    const data = lessons[lesson];
+    assert(data.title && data.ko, `${name} 빈칸영작 ${lesson}과: 제목 누락`);
+    assert(data.items.length === count && data.groups.length === groups, `${name} 빈칸영작 ${lesson}과: 문항 ${data.items.length} != ${count} 또는 본문 ${data.groups.length} != ${groups}`);
+    assert(data.items.every((item, i) => item.n === i + 1), `${name} 빈칸영작 ${lesson}과: 문항 번호가 1부터 이어지지 않음`);
+    assert(data.groups.every((g, i) => g.from === (i ? data.groups[i - 1].to + 1 : 1) && g.to >= g.from) && data.groups.at(-1).to === count, `${name} 빈칸영작 ${lesson}과: 본문 나누기가 문항을 빠짐없이 덮지 않음`);
+    assert(data.groups.every((g, i) => g.id === `${idPrefix}${lesson}-${i + 1}` && g.number === `${lesson}과 · 본문 ${i + 1}` && g.title), `${name} 빈칸영작 ${lesson}과: 본문 id · 번호 · 제목`);
     for (const item of data.items) {
-      const label = `빈칸영작 ${lesson}과 ${item.n}번`;
+      const label = `${name} 빈칸영작 ${lesson}과 ${item.n}번`;
       const tokens = item.en.split(' ');
       assert(item.ko && item.en && tokens.every(Boolean), `${label}: 영어 · 해석 누락`);
+      assert(!/['"]/.test(item.en + item.o1.join('') + item.s4.flat().join('')), `${label}: 곧은 따옴표(' ") 대신 ’ “ ”`);
       for (const step of ['s1', 's2', 's3']) {
         const list = item[step];
         assert(Array.isArray(list) && list.length > 0 && list.every((n, i) => Number.isInteger(n) && n >= 0 && n < tokens.length && (!i || n > list[i - 1])), `${label}: ${step} 빈칸 위치가 올바르지 않음`);
       }
-      assert(item.s3.length >= item.s2.length, `${label}: Step 3 빈칸이 Step 2보다 적음`);
+      if (moreInStep3) assert(item.s3.length >= item.s2.length, `${label}: Step 3 빈칸이 Step 2보다 적음`);
       const blanked = item.s1.map(n => blankCore(tokens[n])).sort().join('|'), options = item.o1.map(blankCore).sort().join('|');
       assert(blanked === options, `${label}: Step 1 보기가 빈칸 단어와 다름 (${options} != ${blanked})`);
       assert(item.s4.length >= 1 && item.s4.every(group => group.length > 1), `${label}: Step 4 묶음 누락`);
-      const scrambled = item.s4.flatMap(group => group.flatMap(chunk => chunk.split(' '))).map(blankCore).sort().join('|');
-      assert(scrambled === tokens.map(blankCore).sort().join('|'), `${label}: Step 4 단어가 영어 문장과 다름`);
+      // Step 4 단어는 영어 전문의 낱말과 구두점 · 대소문자까지 똑같다(이어 붙이면 전문이 된다).
+      const scrambled = item.s4.flatMap(group => group.flatMap(chunk => chunk.split(' '))).sort().join('|');
+      assert(scrambled === tokens.slice().sort().join('|'), `${label}: Step 4 단어가 영어 문장과 다름`);
     }
   }
+}
+// 중2 YBM 빈칸영작 전문은 같은 교과서의 어법 선택형 본문(정답을 넣은 문장)과 글자까지 같고, 본문 묶음도 어법 선택형의 본문 나누기와 같다.
+// 어법 본문에만 있는 것: 일기 날짜(Date & Time: …), 소제목(…?), 글머리표(•) — PDF 빈칸영작에는 없다.
+function validateYbmBlankAgainstGrammar() {
+  const flat = s => s.replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim();
+  for (const lesson of ['5', '6', '7']) {
+    const passages = MIDDLE_YBM_PARK_PASSAGES.filter(p => p.lesson === lesson);
+    const data = YBM_BLANK_LESSONS[lesson];
+    assert(passages.length === data.groups.length, `중2 YBM 빈칸영작 ${lesson}과: 본문 수가 어법 선택형과 다름`);
+    passages.forEach((passage, i) => {
+      const group = data.groups[i];
+      const grammar = flat(passage.sentences.map(s => s.parts.map(x => x[0] === 't' ? x[1] : x[2]).join('')).join(' '));
+      const blank = data.items.filter(item => item.n >= group.from && item.n <= group.to).map(item => flat(item.en));
+      let pos = 0;
+      for (const [k, text] of blank.entries()) {
+        const at = grammar.indexOf(text, pos);
+        assert(at >= 0, `중2 YBM 빈칸영작 ${group.id} ${group.from + k}번: 어법 선택형 본문에 없는 문장 (${text})`);
+        const skipped = grammar.slice(pos, at).trim();
+        assert(!skipped || /^(Date & Time: [^.]+ [ap]\.m\.|[A-Z][^?]*\?|•)$/.test(skipped), `중2 YBM 빈칸영작 ${group.id}: 빠진 문장 (${skipped})`);
+        pos = at + text.length;
+      }
+      assert(!grammar.slice(pos).trim(), `중2 YBM 빈칸영작 ${group.id}: 끝 문장이 빠짐 (${grammar.slice(pos)})`);
+    });
+  }
+}
+function validateBlankData() {
+  validateBlankBook('중3 동아', BLANK_LESSONS, { 5: [29, 4], 6: [28, 4], 7: [24, 4] }, { idPrefix: '', moreInStep3: true });
+  validateBlankBook('중2 YBM', YBM_BLANK_LESSONS, { 5: [32, 3], 6: [26, 4], 7: [34, 3] }, { idPrefix: 'y', moreInStep3: false });
+  validateYbmBlankAgainstGrammar();
 }
 
 function validateVocabulary() {

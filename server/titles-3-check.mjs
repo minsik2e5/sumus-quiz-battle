@@ -37,7 +37,7 @@ const TABLE = [
   ['blank7', '7과 빈칸 목수', 'rare', 'blank_l7', 20, 30],
   ['blankperfect', '한 번에 딱!', 'epic', 'blank_perfect', 10, 60],
   ['blanks5', '영작 폭주족', 'epic', 'blank_s5', 6, 60],
-  ['blankall', '빈칸 없는 세상', 'legendary', 'blank_done', 60, 120],
+  ['blankall', '빈칸 없는 세상', 'legendary', 'blank_book', 60, 120], // V13.196 blank_done → blank_book(한 교과서 전체, 동아는 예전과 같은 값)
   ['gram1', '어법 첫 감별', 'common', 'gram_mastered', 1, 10],
   ['gram10', '어법 감별사', 'rare', 'gram_mastered', 10, 30],
   ['gramclean', '오답 실종 사건', 'epic', 'gram_clean', 5, 60],
@@ -112,6 +112,32 @@ export async function runTitles3Checks(assert) {
       'V13.184 5과 칭호는 5과 20칸 모두(19칸은 아님), 60칸이면 빈칸 없는 세상');
     const rate = Object.fromEntries(Object.keys(all).slice(0, 10).map((k, i) => [k, i ? 100 : 99]));
     assert(blankTitleStats({ blank: { rate } }).blank_perfect === 9 && blankTitleStats(null).blank_done === 0, 'V13.184 한 번에 딱!은 1차 정답률 100인 칸만 센다');
+  }
+
+  // ---- V13.196 빈칸영작 교과서 두 벌: 과 칭호 · 빈칸 없는 세상은 교과서마다 비율로, 이미 받은 학생은 그대로
+  {
+    const cellsOf = ids => Object.fromEntries(ids.flatMap(g => [1, 2, 3, 4, 5].map(st => [blankKey(g, st), 1])));
+    const s = done => blankTitleStats({ blank: { done } });
+    const donga = cellsOf([5, 6, 7].flatMap(l => [1, 2, 3, 4].map(g => `${l}-${g}`)));
+    const ybmIds = ['y5-1', 'y5-2', 'y5-3', 'y6-1', 'y6-2', 'y6-3', 'y6-4', 'y7-1', 'y7-2', 'y7-3'];
+    assert(ybmIds.every(id => blankGroup(id)?.book.key === 'ybm-park') && !blankGroup('y5-4') && !blankGroup('y7-4'), 'V13.196 (검사 준비) YBM 본문은 5과 3 · 6과 4 · 7과 3개');
+    const ybm = cellsOf(ybmIds);
+    // 예전 기록(동아만)은 값이 그대로: 과마다 칸 수, 전체 칸 수.
+    for (let k = 0; k <= 60; k += 7) {
+      const part = Object.fromEntries(Object.entries(donga).slice(0, k)), st = s(part);
+      const old = n => Object.keys(part).filter(key => key.startsWith(`${n}-`)).length;
+      assert(st.blank_l5 === old(5) && st.blank_l6 === old(6) && st.blank_l7 === old(7) && st.blank_book === k && st.blank_done === k, `V13.196 동아 기록 ${k}칸: 과 칭호 · 빈칸 없는 세상 값이 예전과 같다(이미 받은 학생은 잃지 않음)`);
+    }
+    assert(titleUnlocked('blankall', s(donga)) && titleUnlocked('blank5', s(donga)), 'V13.196 동아 60칸을 다 한 학생은 그대로 빈칸 없는 세상 · 과 칭호');
+    const y5 = Object.fromEntries(Object.entries(ybm).filter(([key]) => key.startsWith('y5-'))), y5less = { ...y5 }; delete y5less[blankKey('y5-3', 5)];
+    assert(Object.keys(y5).length === 15 && s(y5).blank_l5 === 20 && titleUnlocked('blank5', s(y5)) && s(y5less).blank_l5 === 18 && !titleUnlocked('blank5', s(y5less)) && s(y5).blank_l6 === 0,
+      'V13.196 YBM 5과는 본문 3개 × 5단계 = 15칸을 다 끝내면 5과 칭호(20으로 환산), 14칸이면 아직 아님');
+    const yless = { ...ybm }; delete yless[blankKey('y7-3', 1)];
+    assert(Object.keys(ybm).length === 50 && s(ybm).blank_book === 60 && titleUnlocked('blankall', s(ybm)) && s(yless).blank_book === 58 && !titleUnlocked('blankall', s(yless)) && s(ybm).blank_l6 === 20,
+      'V13.196 YBM 50칸(본문 10 × 5단계)을 다 끝내면 빈칸 없는 세상(60으로 환산), 49칸이면 아직 아님');
+    const mixed = { ...Object.fromEntries(Object.entries(donga).slice(0, 30)), ...Object.fromEntries(Object.entries(ybm).slice(0, 30)) };
+    assert(s(mixed).blank_done === 60 && !titleUnlocked('blankall', s(mixed)) && titleUnlocked('blank1', s(mixed)), 'V13.196 두 책을 반씩 한 60칸은 빈칸 없는 세상이 아니다(한 책을 다 끝내야), 완료 칸 수(blank_done)는 두 책을 합친다');
+    assert(s({ ...donga, ...ybm }).blank_done === 110 && s({ ...donga, ...ybm }).blank_s5 === 22, 'V13.196 완료 칸 · 5단계 칸은 두 책을 합쳐 센다');
   }
 
   // ---- 어법: 최고값 기억(gram_best), 지문 기록을 지워도 칭호 유지

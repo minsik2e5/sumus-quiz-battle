@@ -1,17 +1,18 @@
 import { dayKey } from '../public/modules/core.js';
 import { BLANK_REWARDS, BLANK_DAILY_COINS } from '../public/modules/rewards.js';
-import { blankGroup, blankKey, blankStepOk, gradeBlankStep, blankMinMs } from '../public/modules/blank-rules.js';
+import { BLANK_BOOKS, blankGroup, blankKey, blankStepOk, gradeBlankStep, blankMinMs } from '../public/modules/blank-rules.js';
 import { addBonus } from './rewards.mjs';
 
 // V13.177 빈칸영작 서버 쪽(중등 학습 → 빈칸영작). 학생 기록 p.blank:
-//   { done: { ['5-1:2']: 첫 완료 시각 } (본문 × 단계, 최대 12 × 5), rate: { ['5-1:2']: 1차 정답률 0 ~ 100 (화면에 보이는 값, 가장 높은 것) }, day: { d: 'YYYY-MM-DD', coins: 오늘 받은 코인 },
+//   { done: { ['5-1:2']: 첫 완료 시각 } (본문 × 단계, 최대 BLANK_DONE_MAX = 두 교과서 본문 수 × 5; YBM 본문은 'y5-1:2'), rate: { ['5-1:2']: 1차 정답률 0 ~ 100 (화면에 보이는 값, 가장 높은 것) }, day: { d: 'YYYY-MM-DD', coins: 오늘 받은 코인 },
 //     live: { id, g: 본문, s: 단계, at }, last: { id, r: 마지막 끝 보고의 답 } }
 // 몬스터전처럼 시작 신호 → 끝 보고 → 보상. 끝 보고는 문항별 최종 답이고, 서버가 같은 데이터 파일로 다시 채점한다.
 // 보상은 본문 × 단계마다 첫 완료 때 한 번(BLANK_REWARDS). 하루 코인은 BLANK_DAILY_COINS까지, 넘으면 경험치만.
 // 정직하게: 정답이 학생 폰에 있는 데이터 파일이라 끝 보고를 꾸밀 수는 있다. 서버 채점은 실수 · 가벼운 조작을 막는 용이고,
 // 한 번뿐인 보상(전체 약 700코인)과 하루 상한으로 최악의 경우를 막는다.
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
-export const BLANK_DONE_MAX = 12 * 5;
+// V13.196 교과서 두 벌(중2 YBM · 중3 동아)의 본문 × 5단계.
+export const BLANK_DONE_MAX = BLANK_BOOKS.reduce((n, book) => n + Object.values(book.lessons).reduce((m, l) => m + l.groups.length, 0), 0) * 5;
 
 export function blankMiddle(p) {
   return (p?.division || (/^중/.test(String(p?.class_name || '')) ? 'middle' : 'high')) === 'middle';

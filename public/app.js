@@ -204,10 +204,12 @@ async function ensureGrammarData() {
   A.grammarDataKey = key;
   A.grammarData = data;
 }
-// V13.177 빈칸영작(중등): 자료 파일(중3 동아 5 · 6 · 7과)은 이 화면을 열 때 한 번 불러온다.
+// V13.177 빈칸영작(중등): 자료 파일은 이 화면을 열 때 한 번 불러온다.
+// V13.196 교과서 두 벌: 중2 YBM(박준언) · 중3 동아(윤정미) 5 · 6 · 7과(BLANK_BOOKS, public/modules/blank-rules.js).
 async function ensureBlankData() {
   if (A.blankData) return;
-  A.blankData = await import('./middle-donga-yoon-blank-data.js');
+  const rules = await import('./modules/blank-rules.js');
+  A.blankData = { sets: rules.BLANK_BOOKS };
 }
 function renderKeepScroll() {
   const y = window.scrollY;
@@ -733,6 +735,7 @@ $('#app').addEventListener('click', async event => {
       if (A.blankGroup) A.blankGroup = null; else { A.studyView = 'hub'; }
       render(); window.scrollTo(0, 0); return;
     }
+    if (d.blankSet) { A.blankSet = d.blankSet; A.blankLesson = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (d.blankLesson) { A.blankLesson = d.blankLesson; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     if (d.blankGroup) { A.blankGroup = d.blankGroup; render(); window.scrollTo(0, 0); return; }
     if (d.blankStep) {
