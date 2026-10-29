@@ -1,12 +1,14 @@
 // V13.177 검사: 빈칸영작(중등 학습 → 빈칸영작, 중3 동아(윤정미) 5 · 6 · 7과 본문 암기노트 Step 1 ~ 5).
 // 서버 채점(대소문자 · 구두점 · 따옴표 무시), 보상은 본문 × 단계마다 첫 완료 때만(두 번째는 0), 하루 70코인 상한(그 뒤 경험치만),
 // 시작 신호 없음 · 너무 빠름 · 틀린 답 · 고등 · 선생님 거절, 저장 크기 상한, 정답이 서버 응답으로 새지 않음, 학습 허브 카드는 중등만.
+// V13.196 교과서 두 벌: 중2 YBM(박준언, 본문 y5-1 …)과 중3 동아(윤정미, 5-1 …). 채점 · 서버는 두 데이터를 모두 찾고, 화면은 학년에 맞는 책이 먼저.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dayKey } from '../public/modules/core.js';
 import { BLANK_LESSONS, blankGroupItems } from '../public/middle-donga-yoon-blank-data.js';
+import { BLANK_LESSONS as YBM_LESSONS, BLANK_STEP_NAMES as YBM_STEP_NAMES } from '../public/middle-ybm-park-blank-data.js';
 import { BLANK_REWARDS, BLANK_DAILY_COINS, BLANK_MS_PER, BLANK_MIN_FLOOR_MS } from '../public/modules/rewards.js';
-import { blankGroup, blankNorm, blankSlots, blankSentences, blankAnswer, gradeBlankItem, gradeBlankStep, blankMinMs, blankDiff, blankKey } from '../public/modules/blank-rules.js';
+import { BLANK_BOOKS, blankGroup, blankNorm, blankSlots, blankSentences, blankAnswer, gradeBlankItem, gradeBlankStep, blankMinMs, blankDiff, blankKey } from '../public/modules/blank-rules.js';
 import { blankStart, blankFinish, blankView, BLANK_DONE_MAX } from './blank.mjs';
 import { bonusRecords } from './rewards.mjs';
 import { emptyState } from './state.mjs';
@@ -34,6 +36,9 @@ export async function runBlankChecks(assert) {
   const total = Object.values(BLANK_LESSONS).flatMap(l => l.groups).length;
   const sum = Object.values(BLANK_REWARDS).reduce((n, r) => n + r.coins, 0) * total;
   assert(total === 12 && sum === 38 * 12 && sum <= 500, `V13.177 전체 한 번뿐인 코인 보상 ${sum}코인(본문 12 × 5단계, 한 본문 38코인)`);
+  const ybmTotal = Object.values(YBM_LESSONS).flatMap(l => l.groups).length;
+  assert(ybmTotal === 10 && BLANK_DONE_MAX === (12 + 10) * 5 && 38 * (12 + ybmTotal) === 836,
+    'V13.196 중2 YBM은 본문 10개(5과 3 · 6과 4 · 7과 3) → 한 책 380코인, 두 책을 다 하면 한 번뿐인 보상은 836코인(하루 70 상한은 그대로)');
 
   /* ---------- 정규화와 채점 ---------- */
   assert(blankNorm('“Hello,”') === 'hello' && blankNorm('don’t') === "don't" && blankNorm("don't") === blankNorm('don’t') && blankNorm('Medal.') === 'medal' && blankNorm('players’') === 'players',
@@ -55,6 +60,35 @@ export async function runBlankChecks(assert) {
   assert(diff.want.filter(w => !w.ok).map(w => w.word).join() === 'only,don’t' && diff.mine.every(w => w.ok), 'V13.177 Step 5 틀리면 어디가 다른지(빠진 낱말)를 알려 준다');
   const allCorrect = Object.keys(BLANK_LESSONS).every(lesson => BLANK_LESSONS[lesson].groups.every(group => [1, 2, 3, 4, 5].every(step => gradeBlankStep(blankGroupItems(lesson, group), step, answersFor(blankGroupItems(lesson, group), step)).ok)));
   assert(allCorrect, 'V13.177 12개 본문 × 5단계 모두 정답 답안이 채점을 통과한다(데이터와 채점이 같은 규칙)');
+
+  /* ---------- V13.196 중2 YBM(박준언): 두 번째 교과서 ---------- */
+  {
+    assert(BLANK_BOOKS.map(b => `${b.key}:${b.grade}`).join() === 'ybm-park:중2,donga-yoon:중3' && BLANK_BOOKS[0].lessons === YBM_LESSONS && BLANK_BOOKS[1].lessons === BLANK_LESSONS,
+      'V13.196 교과서 두 벌: 중2 YBM(박준언) · 중3 동아(윤정미), 채점은 두 데이터를 모두 찾는다');
+    const ids = BLANK_BOOKS.flatMap(b => Object.values(b.lessons).flatMap(l => l.groups.map(g => g.id)));
+    assert(new Set(ids).size === ids.length && ids.length === 22 && Object.values(YBM_LESSONS).flatMap(l => l.groups).every(g => /^y[5-7]-[1-4]$/.test(g.id)),
+      'V13.196 본문 id는 두 교과서에서 겹치지 않는다(YBM y5-1 … · 동아 5-1 …)');
+    const y = blankGroup('y5-1'), d = blankGroup('5-1');
+    assert(y.book.key === 'ybm-park' && y.lesson === '5' && y.items.length === 12 && y.items[0].en === 'Some of you have a dream job in mind, but others do not.' && d.book.key === 'donga-yoon' && d.items[0].en.startsWith('In sports,'),
+      'V13.196 blankGroup은 본문 id로 교과서 · 과 · 문항을 찾는다');
+    const counts = Object.values(YBM_LESSONS).map(l => `${l.items.length}/${l.groups.map(g => g.to - g.from + 1).join('+')}`).join(' ');
+    assert(counts === '32/12+10+10 26/8+6+7+5 34/16+6+12', `V13.196 YBM 문항 수(5과 32 · 6과 26 · 7과 34)와 본문 나누기(어법 선택형과 같음): ${counts}`);
+    const ybmCorrect = Object.entries(YBM_LESSONS).every(([lesson, data]) => data.groups.every(group => [1, 2, 3, 4, 5].every(step => { const found = blankGroup(group.id); return found.lesson === lesson && gradeBlankStep(found.items, step, answersFor(found.items, step)).ok; })));
+    assert(ybmCorrect, 'V13.196 YBM 10개 본문 × 5단계 모두 정답 답안이 채점을 통과한다');
+    // 단계별 빈칸이 모두 같은 영어 전문에서 나온다: Step 1 ~ 3 정답 낱말을 전문 자리에 넣고, Step 4 묶음을 이으면 전문이 된다.
+    const consistent = Object.values(YBM_LESSONS).flatMap(l => l.items).every(item => {
+      const tokens = item.en.split(' ');
+      const filled = [1, 2, 3].every(step => { const out = tokens.map((w, i) => blankSlots(item, step).includes(i) ? null : w); blankSlots(item, step).forEach((i, k) => { out[i] = blankAnswer(item, step)[k]; }); return out.join(' ') === item.en; });
+      return filled && blankSentences(item).join(' ') === item.en && item.s4.flat().join(' ').split(' ').sort().join('|') === tokens.slice().sort().join('|');
+    });
+    assert(consistent, 'V13.196 YBM 모든 문항에서 Step 1 ~ 4가 같은 영어 전문과 맞는다');
+    const fix = (lesson, n) => YBM_LESSONS[lesson].items[n - 1];
+    assert(fix(7, 9).o1.includes('things') && !fix(7, 9).o1.includes('public') && fix(7, 27).o1.includes('by') && fix(7, 20).s4[0].includes('Sales') && fix(7, 21).s4[0].filter(w => w === 'you').length === 2 && fix(7, 32).s4[0].includes('need.') && fix(7, 32).s4[0].includes('that') && !fix(7, 32).s4[0].includes('needed.') && fix(5, 31).en.includes('keeps changing,'),
+      'V13.196 PDF 인쇄 오류는 다른 단계와 맞춰 고쳤다(7과 9 · 27번 보기, 20 · 21 · 32번 순서 배열, 5과 31번)');
+    assert(fix(6, 4).s4.length === 2 && blankSentences(fix(6, 4)).join(' ') === fix(6, 4).en, 'V13.196 PDF가 괄호를 둘로 나눈 문항(6과 4번)은 문장 둘을 따로 배열한다');
+    assert(YBM_STEP_NAMES[2] === 'Step 2 · 빈칸 쓰기 1' && YBM_STEP_NAMES[3] === 'Step 3 · 빈칸 쓰기 2' && BLANK_BOOKS[0].steps === YBM_STEP_NAMES && BLANK_BOOKS[1].steps[3] === 'Step 3 · 빈칸 더 쓰기',
+      'V13.196 YBM은 Step 3 빈칸이 더 많지 않아서 단계 이름이 "빈칸 쓰기 1 · 2"(동아는 "빈칸 더 쓰기" 그대로)');
+  }
   assert(!gradeBlankStep(g1.items, 2, { ...answersFor(g1.items, 2), 1: [] }).ok && gradeBlankStep(g1.items, 2, {}).wrong.length === g1.items.length, 'V13.177 답이 없거나 비어 있으면 틀림');
 
   /* ---------- 서버: 시작 → 끝 보고 → 보상 ---------- */
@@ -82,6 +116,17 @@ export async function runBlankChecks(assert) {
     blankStart(p, { group: '5-1', step: 2, id: 'b5', now: t0 + 20000 });
     const again = blankFinish(p, { id: 'b5', group: '5-1', step: 2, answers: answersFor(g1.items, 2), rate: 100, now: t0 + 20000 + wait + 1 });
     assert(again.paid === false && again.reason === 'again' && coinsOf(p) === 6 && again.rate['5-1:2'] === 100 && again.done['5-1:2'] === t0 + wait + 1000, 'V13.177 같은 본문 · 단계를 다시 풀면 연습만(보상 0), 완료 시각은 처음 그대로 · 정답률은 높은 값');
+  }
+
+  /* ---------- V13.196 서버: YBM 본문도 같은 규칙(시작 → 끝 보고 → 첫 완료 보상) ---------- */
+  {
+    const p = student('y2', { class_name: '중2' }), y = blankGroup('y6-2'), wait = blankMinMs(y.items, 4);
+    blankStart(p, { group: 'y6-2', step: 4, id: 'y1', now: t0 });
+    const wrong = blankFinish(p, { id: 'y1', group: 'y6-2', step: 4, answers: { ...answersFor(y.items, 4), [y.items[1].n]: ['x'] }, now: t0 + wait + 1 });
+    assert(wrong.paid === false && wrong.reason === 'wrong' && wrong.wrong.join() === String(y.items[1].n), 'V13.196 YBM 본문도 서버가 같은 데이터로 다시 채점한다(틀린 문항 번호)');
+    blankStart(p, { group: 'y6-2', step: 4, id: 'y2', now: t0 });
+    const ok = blankFinish(p, { id: 'y2', group: 'y6-2', step: 4, answers: answersFor(y.items, 4), rate: 100, now: t0 + wait + 1 });
+    assert(ok.paid && ok.coins === 8 && ok.xp === 40 && ok.done['y6-2:4'] && ok.rate['y6-2:4'] === 100 && !ok.done['6-2:4'], 'V13.196 YBM 첫 완료: 동아와 같은 보상(Step 4 8코인 · 40xp), 기록 칸은 y6-2:4(동아 6-2와 따로)');
   }
 
   /* ---------- 하루 코인 상한 70 ---------- */
@@ -121,18 +166,18 @@ export async function runBlankChecks(assert) {
   {
     const p = student('size');
     let n = 0, now = t0 + 3 * DAY;
-    for (const group of Object.values(BLANK_LESSONS).flatMap(l => l.groups)) for (const step of [1, 2, 3, 4, 5]) {
+    for (const group of BLANK_BOOKS.flatMap(b => Object.values(b.lessons).flatMap(l => l.groups))) for (const step of [1, 2, 3, 4, 5]) {
       const found = blankGroup(group.id), id = 'z' + n++;
       now += DAY;
       blankStart(p, { group: group.id, step, id, now });
       blankFinish(p, { id, group: group.id, step, answers: answersFor(found.items, step), rate: 100, now: now + blankMinMs(found.items, step) + 1 });
     }
     const size = JSON.stringify(p.blank).length;
-    assert(Object.keys(p.blank.done).length === BLANK_DONE_MAX && BLANK_DONE_MAX === 60 && Object.keys(p.blank.rate).length === 60 && Object.keys(p.blank.done).every(key => /^\d-\d:[1-5]$/.test(key)) && size < 3500 && !p.blank.live,
-      `V13.177 저장은 작다: 12본문 × 5단계 = 60칸이 모두 차도 ${size}바이트(< 3.5KB), 시작 기록은 남지 않음`);
+    assert(Object.keys(p.blank.done).length === BLANK_DONE_MAX && BLANK_DONE_MAX === 110 && Object.keys(p.blank.rate).length === 110 && Object.keys(p.blank.done).every(key => /^y?\d-\d:[1-5]$/.test(key)) && size < 6500 && !p.blank.live,
+      `V13.177 저장은 작다: (V13.196 두 교과서) 22본문 × 5단계 = 110칸이 모두 차도 ${size}바이트(< 6.5KB), 시작 기록은 남지 않음`);
     const coinsBefore = coinsOf(p);
     for (let i = 0; i < 40; i++) { blankStart(p, { group: '5-1', step: 1, id: 'rep' + i, now }); blankFinish(p, { id: 'rep' + i, group: '5-1', step: 1, answers: answersFor(g1.items, 1), rate: 100, now: now + 99999 }); }
-    assert(Math.abs(JSON.stringify(p.blank).length - size) < 40 && coinsOf(p) === coinsBefore && coinsBefore === 38 * 12, 'V13.177 같은 단계를 몇 번을 다시 풀어도 저장은 늘지 않고 보상도 없다(전체 456코인은 정확히 한 번)');
+    assert(Math.abs(JSON.stringify(p.blank).length - size) < 40 && coinsOf(p) === coinsBefore && coinsBefore === 38 * 22, 'V13.177 같은 단계를 몇 번을 다시 풀어도 저장은 늘지 않고 보상도 없다(V13.196 두 교과서 전체 836코인은 정확히 한 번)');
     assert(Object.keys(p.blank).sort().join() === 'day,done,last,rate', 'V13.177 p.blank 키: done · rate · day · last (시작 기록 live는 끝나면 지운다)');
   }
 
@@ -187,7 +232,11 @@ export async function runBlankChecks(assert) {
     assert(student.includes('data-blank-lesson') && student.includes('data-blank-group') && student.includes('data-blank-step') && student.includes('middle-grammar-tabs-v1339') && student.includes('gx-card') && student.includes('Step 1 ~ 5'),
       'V13.177 화면 흐름: 5과 · 6과 · 7과 탭 → 본문 목록(단계 점) → Step 1 ~ 5 고르기(완료 · 정답률), 어법 선택형과 같은 탭 · 카드');
     assert(student.includes('A.data.rewards?.blank?.done') && !student.slice(student.indexOf('function blankStudy(A)'), student.indexOf('function studyHub(A)')).includes('localStorage'), 'V13.177 완료 표시는 서버에 저장된 진행(rewards.blank)을 쓴다');
-    assert(app.includes("A.data.profile.division !== 'middle'") && app.includes("import('./blank-writing.js')") && app.includes("import('./middle-donga-yoon-blank-data.js')"), 'V13.177 빈칸영작 화면과 자료는 눌렀을 때만 불러온다(앱 시작을 무겁게 하지 않음)');
+    assert(app.includes("A.data.profile.division !== 'middle'") && app.includes("import('./blank-writing.js')") && app.includes("import('./modules/blank-rules.js')") && app.includes('A.blankData = { sets: rules.BLANK_BOOKS }'), 'V13.177 빈칸영작 화면과 자료는 눌렀을 때만 불러온다(앱 시작을 무겁게 하지 않음, V13.196 두 교과서 자료는 blank-rules.js가 불러온다)');
+    const study = student.slice(student.indexOf('function blankStudy(A)'), student.indexOf('function studyHub(A)'));
+    assert(study.includes('data-blank-set') && study.includes('sets.find(s => s.key === A.blankSet) || sets.find(s => s.grade === myGrade) || sets[0]') && study.includes('set.steps[step]') && study.includes('set.items(lesson, group)') && app.includes('if (d.blankSet) { A.blankSet = d.blankSet; A.blankLesson = null;'),
+      'V13.196 빈칸영작 화면: 교과서 탭(중2 YBM · 중3 동아), 학년에 맞는 책이 먼저 열리고, 단계 이름 · 문항은 고른 책의 것');
+    assert(screen.includes('found.book.steps[step]') && !screen.includes('middle-donga-yoon-blank-data'), 'V13.196 연습 화면의 단계 이름도 그 본문의 교과서 것');
     assert(screen.includes("api('/blank/start'") && screen.includes("api('/blank/finish'") && screen.includes('first_rate') && screen.includes("reason === 'error'") && screen.includes('연습은 끝났어요'), 'V13.177 화면: 시작 신호 → 끝 보고, 거절돼도 "연습은 끝났어요" 이유가 보인다');
     assert(screen.includes('data-chip') && screen.includes('class="bw-in') && screen.includes('data-pool') && screen.includes('data-undo') && screen.includes('data-reset') && screen.includes('id="bw-area"') && screen.includes('blankDiff(') && screen.includes('정답 보기') && screen.includes('첫 글자 힌트'),
       'V13.177 단계별 방식: 1 보기 칩 · 2/3 입력칸 · 4 순서 쌓기(되돌리기 · 처음부터) · 5 영작(틀린 곳 보기) · 정답 보기 · 첫 글자 힌트');

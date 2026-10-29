@@ -1,4 +1,5 @@
 import { dayKey } from '../public/modules/core.js';
+import { BLANK_BOOKS, blankKey } from '../public/modules/blank-rules.js';
 
 // V13.184 칭호 3탄(docs/titles-plan.md)의 기록. 새로 저장하는 것은 두 가지뿐이고, 둘 다 이미 저장하는 곳에 얹는다:
 //   몬스터전 m.dw = { d: 오늘 날짜, n: 오늘 이긴 판, b: 하루 최다 승 }   (몬스터전 끝 보고 monsterSettle)
@@ -15,11 +16,20 @@ export function monsterDayWin(m, now = Date.now()) {
 }
 
 // 빈칸영작 p.blank.done['5-1:2'](본문 × 단계 첫 완료) · rate(칸마다 1차 정답률 최고값).
+// V13.196 교과서가 두 벌(중2 YBM 본문 'y5-1' · 중3 동아 '5-1')이라 본문 수가 교과서마다 다르다.
+//   blank_done · blank_perfect · blank_s5: 두 교과서를 합쳐 센다(칸이 늘어 값은 줄지 않는다).
+//   blank_l5 · l6 · l7(목표 20) · blank_book(목표 60, '빈칸 없는 세상'): 교과서마다 그 범위의 완료 비율을 20 · 60칸으로 바꾼 값 중 큰 것(내림).
+//   동아는 과마다 본문 4개(20칸) · 전체 60칸이라 예전 값과 똑같다 → 이미 받은 학생은 칭호를 잃지 않는다.
+//   YBM은 과마다 본문 수가 달라(3 · 4 · 3개) 그 과를 다 끝내야 20, 세 과를 다 끝내야 60이 된다.
+const scaled = (count, total, goal) => total ? Math.floor(count * goal / total) : 0;
 export function blankTitleStats(p) {
-  const b = p?.blank || {}, done = Object.keys(b.done || {}), lesson = n => done.filter(key => key.startsWith(`${n}-`)).length;
+  const b = p?.blank || {}, done = Object.keys(b.done || {}), doneSet = new Set(done);
+  const cells = groups => groups.reduce((n, g) => n + [1, 2, 3, 4, 5].filter(s => doneSet.has(blankKey(g.id, s))).length, 0);
+  const lesson = n => Math.max(0, ...BLANK_BOOKS.map(book => { const groups = book.lessons[n]?.groups || []; return scaled(cells(groups), groups.length * 5, 20); }));
   return {
     blank_done: done.length,
     blank_l5: lesson(5), blank_l6: lesson(6), blank_l7: lesson(7),
+    blank_book: Math.max(0, ...BLANK_BOOKS.map(book => { const groups = Object.values(book.lessons).flatMap(l => l.groups); return scaled(cells(groups), groups.length * 5, 60); })),
     blank_perfect: Object.values(b.rate || {}).filter(r => Number(r) === 100).length,
     blank_s5: done.filter(key => key.endsWith(':5')).length
   };

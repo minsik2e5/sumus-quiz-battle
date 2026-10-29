@@ -38,7 +38,7 @@
 //   V13.180 인형뽑기(server/claw.mjs): claw_dolls 뽑은 인형 수, claw_kinds 도감에 모은 인형 종류(12종), claw_gold 뽑은 황금 인형 수
 //   V13.180 timing_perfect 10초 맞추기 완벽 이상 수, timing_ten 딱 10.00 수, timing_streak 최고 연속 완벽(server/timing.mjs p.timing)
 //   V13.184 칭호 3탄(docs/titles-plan.md): monster_best 하드까지 깬 가장 높은 몬스터전 레벨(m.best), monster_day_best 하루 최다 승(m.dw.b),
-//                blank_done 빈칸영작 첫 완료 칸(본문 × 단계), blank_l5 · blank_l6 · blank_l7 그 과의 완료 칸(20칸), blank_perfect 1차 정답률 100인 칸,
+//                blank_done 빈칸영작 첫 완료 칸(본문 × 단계), blank_l5 · blank_l6 · blank_l7 그 과의 완료 칸(20칸, V13.196 교과서마다 비율로), blank_book 한 교과서 전체 완료(60칸, 비율), blank_perfect 1차 정답률 100인 칸,
 //                blank_s5 5단계 완료 칸, gram_mastered 완성한 어법 지문, gram_clean 1차 100점으로 끝낸 어법 지문(둘 다 p.gram_best 최고값)
 //   V13.191 칭호 4탄(docs/titles-plan-4.md, server/titles-4.mjs): fish_trophy 월척(trophyOf) 종 수, fish_kinds · fish_shore · deep_kinds 낚시 도감 종류(전체 · 물가 24 · 심해 8),
 //                fish_legend 전설 물고기 종류, fish_day_best 하루 최다 낚기(p.reel.dc), reel_rod 낚싯대 단계, range_cover 한 바퀴 돈 범위,
@@ -248,12 +248,12 @@ Object.assign(TITLES, {
   mlv70: { name: '보스 단톡방 방장', tier: 'legendary', group: 'monster', stat: 'monster_best', goal: 70, icon: 'crown', how: '몬스터전 레벨 70 클리어(온 세상 보스 모음)', desc: '보스들이 모인 단톡방의 방장이 되었어요.' },
   // 빈칸영작(중등만)
   blank1: { name: '빈칸 메우미', tier: 'common', group: 'study', middle: true, stat: 'blank_done', goal: 1, icon: 'sprout', how: '빈칸영작 본문 · 단계 하나 완료', desc: '첫 빈칸을 딱 맞게 메웠어요.' },
-  blank5: { name: '5과 빈칸 땜장이', tier: 'rare', group: 'study', middle: true, stat: 'blank_l5', goal: 20, icon: 'book', how: '빈칸영작 5과 본문 4개 × 5단계 모두 완료', desc: '5과의 빈칸을 하나도 남김없이 메웠어요.' },
-  blank6: { name: '6과 빈칸 미장이', tier: 'rare', group: 'study', middle: true, stat: 'blank_l6', goal: 20, icon: 'book', how: '빈칸영작 6과 본문 4개 × 5단계 모두 완료', desc: '6과 문장 틈을 매끈하게 메웠어요.' },
-  blank7: { name: '7과 빈칸 목수', tier: 'rare', group: 'study', middle: true, stat: 'blank_l7', goal: 20, icon: 'book', how: '빈칸영작 7과 본문 4개 × 5단계 모두 완료', desc: '7과 단어 타일이 딱 맞물렸어요.' },
+  blank5: { name: '5과 빈칸 땜장이', tier: 'rare', group: 'study', middle: true, stat: 'blank_l5', goal: 20, icon: 'book', how: '빈칸영작 한 교과서의 5과 본문 모두 × 5단계 완료', desc: '5과의 빈칸을 하나도 남김없이 메웠어요.' },
+  blank6: { name: '6과 빈칸 미장이', tier: 'rare', group: 'study', middle: true, stat: 'blank_l6', goal: 20, icon: 'book', how: '빈칸영작 한 교과서의 6과 본문 모두 × 5단계 완료', desc: '6과 문장 틈을 매끈하게 메웠어요.' },
+  blank7: { name: '7과 빈칸 목수', tier: 'rare', group: 'study', middle: true, stat: 'blank_l7', goal: 20, icon: 'book', how: '빈칸영작 한 교과서의 7과 본문 모두 × 5단계 완료', desc: '7과 단어 타일이 딱 맞물렸어요.' },
   blankperfect: { name: '한 번에 딱!', tier: 'epic', group: 'study', middle: true, stat: 'blank_perfect', goal: 10, icon: 'target', how: '빈칸영작 1차 정답률 100%로 10칸 끝내기', desc: '첫 시도부터 과녁 한가운데!' },
   blanks5: { name: '영작 폭주족', tier: 'epic', group: 'study', middle: true, stat: 'blank_s5', goal: 6, icon: 'bolt', how: '빈칸영작 가장 어려운 5단계 6번 완료', desc: '5단계도 거침없이 달려요.' },
-  blankall: { name: '빈칸 없는 세상', tier: 'legendary', group: 'study', middle: true, stat: 'blank_done', goal: 60, icon: 'gem', how: '빈칸영작 60칸(5 · 6 · 7과 × 본문 4 × 5단계) 모두 완료', desc: '세상에 빈칸이 하나도 안 남았어요.' },
+  blankall: { name: '빈칸 없는 세상', tier: 'legendary', group: 'study', middle: true, stat: 'blank_book', goal: 60, icon: 'gem', how: '빈칸영작 한 교과서(5 · 6 · 7과 모든 본문 × 5단계) 모두 완료', desc: '세상에 빈칸이 하나도 안 남았어요.' },
   // 어법 선택형
   gram1: { name: '어법 첫 감별', tier: 'common', group: 'study', stat: 'gram_mastered', goal: 1, icon: 'target', how: '어법 지문 1개 완성', desc: '맞는 어법을 처음으로 골라냈어요.' },
   gram10: { name: '어법 감별사', tier: 'rare', group: 'study', stat: 'gram_mastered', goal: 10, icon: 'gem', how: '어법 지문 10개 완성', desc: '자갈 속 보석 같은 정답을 찾아요.' },

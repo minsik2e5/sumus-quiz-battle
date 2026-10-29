@@ -1,8 +1,8 @@
 // V13.177 빈칸영작 연습 화면(중등 학습 → 빈칸영작, 중3 동아(윤정미) 5 · 6 · 7과 본문 암기노트 Step 1 ~ 5).
+// V13.196 중2 YBM(박준언) 5 · 6 · 7과(100발100중 Reading)도 같은 화면이다. 단계 이름은 교과서마다(found.book.steps).
 // 한 화면 = 본문 하나의 한 단계. 문항 = 영어 전문 + 우리말 해석(항상 보임). 채점과 보상은 서버(server/blank.mjs)가 다시 한다:
 // 시작할 때 /blank/start, 끝나면 문항별 최종 답을 /blank/finish로 보내 보상(본문 × 단계 첫 완료만)을 받는다.
 import { $, $$, esc, icon, toast, api, num } from './modules/ui.js';
-import { BLANK_STEP_NAMES } from './middle-donga-yoon-blank-data.js';
 import { blankGroup, blankSlots, blankSentences, blankAnswer, blankNorm, blankWords, blankDiff, blankTokens } from './modules/blank-rules.js';
 import { BLANK_REWARDS, BLANK_DAILY_COINS } from './modules/rewards.js';
 import { coinShower, coinReward, playReward, reducedMotion } from './modules/celebrate.js';
@@ -140,7 +140,7 @@ export function openBlankWriting(A, { group: groupId, step }, onExit) {
   addStyles();
   A.screen = 'blank-writing';
   const { items, group } = found;
-  const stepName = BLANK_STEP_NAMES[step];
+  const stepName = found.book.steps[step];
   const t0 = Date.now();
   let runId = null;
   const started = api('/blank/start', { group: group.id, step }).then(r => { runId = r.id; }).catch(() => { runId = null; });

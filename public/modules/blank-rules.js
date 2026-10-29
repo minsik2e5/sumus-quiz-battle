@@ -1,19 +1,26 @@
 // V13.177 빈칸영작 규칙: 화면(public/blank-writing.js)과 서버 채점(server/blank.mjs)이 같이 쓴다.
-// 데이터는 public/middle-donga-yoon-blank-data.js (빈칸 위치 · 보기 · 단어 묶음은 PDF 그대로).
-import { BLANK_LESSONS, blankGroupItems } from '../middle-donga-yoon-blank-data.js';
+// 데이터는 교과서마다 한 파일(빈칸 위치 · 보기 · 단어 묶음은 PDF 그대로):
+//   중2 YBM(박준언) public/middle-ybm-park-blank-data.js (본문 id y5-1 …) · 중3 동아(윤정미) public/middle-donga-yoon-blank-data.js (5-1 …).
+import * as ybm from '../middle-ybm-park-blank-data.js';
+import * as donga from '../middle-donga-yoon-blank-data.js';
 import { BLANK_MS_PER, BLANK_MIN_FLOOR_MS } from './rewards.js';
 
 export const BLANK_STEPS = [1, 2, 3, 4, 5];
+// V13.196 교과서 두 벌(어법 선택형처럼). 중2 학생은 YBM, 중3 학생은 동아가 먼저 열린다(화면 public/modules/student.js).
+export const BLANK_BOOKS = [
+  { key: 'ybm-park', grade: '중2', name: 'YBM(박준언)', eyebrow: '중2 · YBM(박준언) · 기말고사 범위', lessons: ybm.BLANK_LESSONS, items: ybm.blankGroupItems, steps: ybm.BLANK_STEP_NAMES },
+  { key: 'donga-yoon', grade: '중3', name: '동아(윤정미)', eyebrow: '중3 · 동아(윤정미)', lessons: donga.BLANK_LESSONS, items: donga.blankGroupItems, steps: donga.BLANK_STEP_NAMES }
+];
 // 정답 비교용 낱말: 대소문자 · 앞뒤 구두점 · 따옴표 모양(’ ‘ “ ” 와 ' ")을 무시한다.
 export const blankNorm = word => String(word ?? '').replace(/[’‘]/g, "'").replace(/[“”]/g, '"').toLowerCase().replace(/^[^\w]+|[^\w]+$/g, '');
 export const blankWords = text => String(text ?? '').split(/\s+/).map(blankNorm).filter(Boolean);
 export const blankTokens = item => item.en.split(' ');
 
-// 본문 찾기: "5-1" → { lesson: '5', group, items }.
+// 본문 찾기: "5-1"(동아) · "y5-1"(YBM) → { book, lesson: '5', group, items }. 두 교과서의 본문 id는 겹치지 않는다.
 export function blankGroup(id) {
-  for (const [lesson, data] of Object.entries(BLANK_LESSONS)) {
+  for (const book of BLANK_BOOKS) for (const [lesson, data] of Object.entries(book.lessons)) {
     const group = data.groups.find(g => g.id === id);
-    if (group) return { lesson, group, items: blankGroupItems(lesson, group) };
+    if (group) return { book, lesson, group, items: book.items(lesson, group) };
   }
   return null;
 }
