@@ -112,6 +112,7 @@ export function timingCard(A) {
         <li><i class="ag-ico">🎯</i><b>${best == null ? '—' : `±${(best / 1000).toFixed(2)}`}</b><small>내 최고</small></li>
         <li><i class="ag-ico">🔥</i><b>${v.streak_best || 0}</b><small>연속 완벽</small></li>
       </ul>
+      ${v.daily ? `<p class="ag-tm-daily${v.daily.left ? '' : ' done'}">🎯 오늘의 챌린지 <b>${(v.daily.target / 1000).toFixed(2)}초</b>${v.daily.left ? ' · 도전 가능' : ' · 완료'}</p>` : ''}
       <button type="button" class="yl-cta ag-go" data-action="timing-open" aria-label="10초 맞추기 들어가기">들어가기</button>
     </div>
   </article>`;
