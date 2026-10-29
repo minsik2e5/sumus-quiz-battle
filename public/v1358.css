@@ -4,6 +4,11 @@
 .partner-card-btn:focus-visible{outline:3px solid #12b886;outline-offset:3px}
 .partner-card{position:relative;display:block;width:100%;aspect-ratio:63/88;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.2,.7,.2,1);transform:rotateX(var(--rx)) rotateY(var(--ry))}
 .partner-card-v1358.flipped .partner-card{transform:rotateY(180deg)}
+/* V13.196.1 아이폰 Safari: 뒷면이 거울처럼 앞에 비치던 것. backface-visibility만 믿지 않고, 반쯤 돌았을 때(.27s) 안 보이는 면을 숨긴다. */
+.partner-card-v1358 .partner-face{transition:visibility 0s .27s}
+.partner-card-v1358 .partner-back{visibility:hidden}
+.partner-card-v1358.flipped .partner-back{visibility:visible}
+.partner-card-v1358.flipped .partner-front{visibility:hidden}
 .partner-face{position:absolute;inset:0;display:block;border-radius:20px;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden}
 .partner-front{padding:10px;background:linear-gradient(160deg,var(--pet-light),var(--pet) 55%,color-mix(in srgb,var(--pet) 70%,#000));box-shadow:0 12px 26px rgba(18,38,30,.25)}
 .partner-inner{position:relative;height:100%;border-radius:12px;background:var(--pet-soft);display:grid;grid-template-rows:auto minmax(0,1fr) auto auto auto auto;gap:7px;padding:10px 11px 11px;overflow:hidden}
