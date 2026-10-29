@@ -38,11 +38,12 @@ import { grantBait, reelView, reelCast, reelLand, reelSell, reelCoins, reelSpend
 import { blankStart, blankFinish, blankView } from './blank.mjs';
 import { rememberGramBest } from './titles-3.mjs';
 import { rangeCounts, rememberRangeBest, keepTimingLastWeek } from './titles-4.mjs';
-import { grantTimingPlay, timingView, timingPing, timingStart, timingFinish, timingBoard, timingLine } from './timing.mjs';
+import { grantTimingPlay, timingView, timingPing, timingStart, timingFinish, timingBoard, timingLine, dailyConfig, dailyTeacherView, setDaily, timingDailyBoard } from './timing.mjs';
 import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow, huntSell, huntCoins, huntSpend, huntBerryQuiz, huntBerryAnswer } from './hunt.mjs';
 import { grantClaw, clawView, clawStart, clawDrop, clawGuideSeen, clawPreviewFill, clawActivityText } from './claw.mjs';
 import { HUNT, HUNT_MONSTERS } from '../public/modules/hunt-rules.js';
 import { CLAW } from '../public/modules/claw-rules.js';
+import { postClawNews, clawNewsFor } from './claw-news.mjs';
 import { FISH } from '../public/modules/fishing-rules.js';
 import { REEL } from '../public/modules/reel-rules.js';
 import { TIMING } from '../public/modules/timing-rules.js';
@@ -1352,7 +1353,7 @@ export async function service(state, method, path, body, token, options = {}) {
       class_league: teacher && selectedSchool ? classLeague(state, competition, selectedSchool, now) : null,
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now), blank: p.role === 'student' ? blankView(p, now) : null },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now, dailyConfig(state, now)), blank: p.role === 'student' ? blankView(p, now) : null },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -1568,7 +1569,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/rewards' && method === 'GET') {
     requireRole(p, 'student');
     const now = Date.now();
-    return { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), points_balance: coinBalance(state, p) };
+    return { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), timing: timingView(p, now, dailyConfig(state, now)), points_balance: coinBalance(state, p) };
   }
   // V13.73 coin gifts from a teacher: the student opens the waiting gift boxes.
   if (path === '/gifts/open' && method === 'POST') {
@@ -1734,7 +1735,7 @@ export async function service(state, method, path, body, token, options = {}) {
     // V13.180: 출석하면 10초 맞추기 한 판 더(하루 1번).
     const timingPlay = grantTimingPlay(p, 'attend', now);
     logActivity(p, 'attend', `출석 · 연속 ${p.attendance?.streak || 1}일`, now);
-    return { ...done, streak_guard: guard, bait, ball, gold_ball: goldBall, claw_ticket: clawTicket, timing_play: timingPlay, reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now), points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
+    return { ...done, streak_guard: guard, bait, ball, gold_ball: goldBall, claw_ticket: clawTicket, timing_play: timingPlay, reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now, dailyConfig(state, now)), points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
   }
   // V13.149 연속 학습 보호권 사기(최대 STREAK_GUARD.MAX장).
   if (path === '/shop/streak-guard' && method === 'POST') {
@@ -2000,8 +2001,10 @@ export async function service(state, method, path, body, token, options = {}) {
     // 화면이 만든 판 번호(다시 보내도 판을 한 번만 쓴다).
     const playId = /^[a-z0-9-]{8,40}$/i.test(String(body.id || '')) ? String(body.id) : null;
     if (!playId) fail('판 번호를 확인해 주세요.');
-    const res = timingStart(p, { id: playId, target: Number(body.target ?? TIMING.TARGET), echo: body.echo ?? null, now });
-    return { ...res, timing: timingView(p, now) };
+    // V13.192 오늘의 챌린지: 목표 · 숫자 보임은 서버 설정(화면이 보낸 target은 쓰지 않는다).
+    const daily = body.mode === 'daily';
+    const res = timingStart(p, { id: playId, target: Number(body.target ?? TIMING.TARGET), mode: daily ? 'daily' : 'normal', daily: daily ? dailyConfig(state, now) : null, echo: body.echo ?? null, now });
+    return { ...res, timing: timingView(p, now, dailyConfig(state, now)) };
   }
   if (path === '/timing/finish' && method === 'POST') {
     requireRole(p, 'student');
@@ -2009,11 +2012,25 @@ export async function service(state, method, path, body, token, options = {}) {
     keepTimingLastWeek(p, rankingWeek(now).start); // V13.191 주간 초시계왕: 지난주 기록(wk)을 새 주 판 전에 pw로 옮긴다
     const res = timingFinish(p, { id: str(body.id, 40), result: str(body.result, 10) || 'press', ms: body.ms, pet: activePetKey(state, p.id), now });
     if (!res.again) logActivity(p, 'timing', timingLine(res), now);
-    return { ...res, timing: timingView(p, now), ...(res.coins || res.xp ? { points_balance: coinBalance(state, p), stats: stats(state, p) } : {}) };
+    return { ...res, timing: timingView(p, now, dailyConfig(state, now)), ...(res.coins || res.xp ? { points_balance: coinBalance(state, p), stats: stats(state, p) } : {}) };
   }
   if (path === '/timing/board' && method === 'GET') {
     requireRole(p, 'student');
     return timingBoard(state.profiles, p, { kind: str(body.kind, 10), now: Date.now(), ranked: isRankedStudent, hidden: isPrivate });
+  }
+  if (path === '/timing/daily-board' && method === 'GET') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    return timingDailyBoard(state.profiles, p, { now, ranked: isRankedStudent, hidden: isPrivate, target: dailyConfig(state, now).target, yesterdayTarget: dailyConfig(state, now - 86400000).target });
+  }
+  // V13.192 오늘의 챌린지 선생님 설정(오늘부터 13일 뒤까지, 안 정한 날은 자동).
+  if (path === '/teacher/timing-daily' && method === 'GET') {
+    requireRole(p, 'teacher');
+    return dailyTeacherView(state, Date.now());
+  }
+  if (path === '/teacher/timing-daily' && method === 'POST') {
+    requireRole(p, 'teacher');
+    return setDaily(state, { day: str(body.day, 10), target_ms: body.target_ms, show_ms: body.show_ms, msg: str(body.msg ?? '', 60), clear: body.clear === true }, { now: Date.now(), by: p.id });
   }
   // V13.162 펫 사냥(놀이터): 지도 · 만나기 · 던지기(server/hunt.mjs). 지도는 열 때 서버가 만든다(몇 시간마다 바뀜).
   if (path === '/hunt/home' && method === 'POST') {
@@ -2046,7 +2063,7 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     const now = Date.now();
     if (body.guide) clawGuideSeen(p);
-    return { claw: clawView(p, now) };
+    return { claw: clawView(p, now), news: clawNewsFor(state, p, schoolForProfile(state, p), now) };
   }
   if (path === '/claw/start' && method === 'POST') {
     requireRole(p, 'student');
@@ -2059,7 +2076,10 @@ export async function service(state, method, path, body, token, options = {}) {
     const now = Date.now();
     const res = clawDrop(p, { id: str(body.id, 40), round: str(body.round, 40), n: Number(body.n), x: Number(body.x), y: Number(body.y), now });
     if (!res.again && res.summary) logActivity(p, 'claw', clawActivityText(res.summary), now);
-    return { ...res, claw: clawView(p, now), ...(res.coins ? { points_balance: coinBalance(state, p) } : {}) };
+    const view = clawView(p, now), school = schoolForProfile(state, p);
+    // V13.191 반 소식(server/claw-news.mjs): 황금 · 대박 · 도감 완성 · 도감 N번째. 같은 집게를 다시 보내면(again) 남기지 않는다.
+    const posted = res.again ? null : postClawNews(state, p, school, res, { kinds: view.kinds, now, id: randomUUID() });
+    return { ...res, claw: view, ...(res.coins ? { points_balance: coinBalance(state, p) } : {}), ...(posted ? { news: clawNewsFor(state, p, school, now), news_mine: true } : {}) };
   }
   // V13.167 열매 문제: 서버가 내 학교 · 학년 범위(놀이터에서 고른 게임 단어)에서 내고, 서버가 채점해 열매 표를 준다.
   if (path === '/hunt/berry' && method === 'POST') {

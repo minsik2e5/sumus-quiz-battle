@@ -289,9 +289,9 @@ export async function runTitles4Checks(assert) {
   {
     const ui = source('../public/modules/titles-ui.js');
     assert(ui.includes('const wave = Number(A.data?.titles?.batch_wave) || 3;') && ui.includes('NEW · 칭호 ${wave}탄</span>') && !ui.includes('NEW · 칭호 3탄</span>'), 'V13.191 묶음 카드 머리말은 서버가 알려 준 탄(3탄 · 4탄)');
-    const css = source('../public/v13191.css'), list = JSON.parse(source('./build-assets.mjs').match(/const cssSources = (\[[\s\S]*?\]);/)?.[1] || '[]');
-    assert(css.includes('.tt-filter{max-width:none;overflow-x:auto') && css.includes('.tt-filter button{flex:1 0 auto;white-space:nowrap') && list.includes('v13191.css') && list.indexOf('v13191.css') < list.indexOf('v13184.css') && list.at(-1) === 'v13178.css' && source('../public/app.bundle.css').includes('.tt-filter{max-width:none'),
-      'V13.191 칭호 도감 묶음 버튼 9개는 폰(390px)에서 한 줄로, 넘치면 옆으로 민다(번들에 들어가고 v13178.css가 맨 끝)');
+    const css = source('../public/v13194.css'), list = JSON.parse(source('./build-assets.mjs').match(/const cssSources = (\[[\s\S]*?\]);/)?.[1] || '[]');
+    assert(css.includes('.tt-filter{max-width:none;overflow-x:auto') && css.includes('.tt-filter button{flex:1 0 auto;white-space:nowrap') && list.includes('v13194.css') && list.indexOf('v13194.css') < list.indexOf('v13184.css') && list.at(-1) === 'v13178.css' && source('../public/app.bundle.css').includes('.tt-filter{max-width:none'),
+      'V13.191 칭호 도감 묶음 버튼 9개는 폰(390px)에서 한 줄로, 넘치면 옆으로 민다(v13194.css가 번들에 들어가고 v13178.css가 맨 끝)');
     assert(source('../public/app.js').includes("if (d.titleFilter) { const x = $('.tt-filter')?.scrollLeft || 0; A.titleFilter = d.titleFilter; renderKeepScroll(); const seg = $('.tt-filter'); if (seg) seg.scrollLeft = x; return; }"),
       'V13.191 묶음 버튼을 눌러 다시 그려도 버튼 줄의 가로 위치를 지킨다(낚시 · 한정 버튼이 화면 밖으로 사라지지 않게)');
   }
