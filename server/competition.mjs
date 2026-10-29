@@ -1,7 +1,7 @@
 // V13.66 competition: titles, the weekly yacha league and weekly awards, computed from the
 // state on each request (nothing here is stored). One context per request groups sessions
 // and battles by student once, so ranking lists stay O(sessions + battles).
-import { levelInfo, petProgress, CHARACTERS, PLAYER_MAX_LEVEL, ZODIAC_PET_KEYS } from '../public/modules/core.js';
+import { levelInfo, petProgress, CHARACTERS, PLAYER_MAX_LEVEL, ZODIAC_PET_KEYS, seriesGroupKeys } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, titleUnlocked, LEAGUE_POINTS, LEAGUE_PAIR_DAY_CAP, leagueTier, leagueTierIndex } from '../public/modules/titles.js';
 import { GACHA_ITEMS, GACHA_KEYS } from '../public/modules/rewards.js';
 import { bonusRecords, epicCount } from './rewards.mjs';
@@ -214,6 +214,9 @@ export function createCompetition(state, now = Date.now()) {
     claw_dolls: p => clawTitleStats(p).claw_dolls,
     claw_kinds: p => clawTitleStats(p).claw_kinds,
     claw_gold: p => clawTitleStats(p).claw_gold,
+    // V13.195 곤충 · 공룡 시리즈(시리즈 알): 만난 곤충 · 공룡 수.
+    series_bug: p => seriesGroupKeys('bug').filter(key => (Array.isArray(p?.pets) ? p.pets : []).some(pet => pet?.key === key)).length,
+    series_dino: p => seriesGroupKeys('dino').filter(key => (Array.isArray(p?.pets) ? p.pets : []).some(pet => pet?.key === key)).length,
     zodiac_pets: p => ZODIAC_PET_KEYS.filter(key => (Array.isArray(p?.pets) ? p.pets : []).some(pet => pet?.key === key)).length,
     eggs: p => (Array.isArray(p?.purchases) ? p.purchases : []).filter(x => /egg$/.test(String(x?.item || ''))).length,
     care: p => Number(p?.care?.total || 0),

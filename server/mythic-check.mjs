@@ -2,7 +2,7 @@
 // every kind of egg (no pity), the school news, the reveal show and the dex.
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { CHARACTERS, ACTIVE_PET_KEYS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, LIMITED_PET_KEYS, petTier, petReady } from '../public/modules/core.js';
+import { CHARACTERS, ACTIVE_PET_KEYS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, LIMITED_PET_KEYS, SERIES_PET_KEYS, petTier, petReady } from '../public/modules/core.js';
 import { MYTHIC_RATE } from '../public/modules/rewards.js';
 import { petSkill } from '../public/modules/battle-engine.js';
 import { mythicRoll, setMythicRandom, openEgg, pullLucky, giftEggPick, openGifts } from './rewards.mjs';
@@ -16,8 +16,8 @@ export function runMythicChecks(assert) {
     'V13.118 신화 펫은 구미호·청룡·백호·주작·현무 5종이고 기본·영웅·전설·한정과 섞이지 않는다');
   assert(LEGENDARY_PET_KEYS.join() === 'haechi,whale,qilin,cheonma' && petTier('cheonma') === 'legendary' && CHARACTERS.phoenix.retired && ![...STANDARD_PET_KEYS, ...EPIC_PET_KEYS, ...LEGENDARY_PET_KEYS, ...MYTHIC_PET_KEYS, ...LIMITED_PET_KEYS].includes('phoenix') && !ACTIVE_PET_KEYS.includes('phoenix'),
     'V13.118 천마는 전설이고 불새는 숨겨져서 알·뽑기·도감·개수에 나오지 않는다(옛 기록이 있어도 그림은 그려진다)');
-  assert(ACTIVE_PET_KEYS.length === STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length + LEGENDARY_PET_KEYS.length + MYTHIC_PET_KEYS.length + LIMITED_PET_KEYS.length && ACTIVE_PET_KEYS.length === Object.keys(CHARACTERS).filter(petReady).length - 1,
-    'V13.118 학생이 만날 수 있는 펫은 기본 16 · 영웅 16 · 전설 4 · 신화 5 · 한정 5 = 46종이다(V13.168: 그림을 기다리는 새 펫은 빼고 센다)');
+  assert(ACTIVE_PET_KEYS.length === STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length + LEGENDARY_PET_KEYS.length + MYTHIC_PET_KEYS.length + LIMITED_PET_KEYS.length + SERIES_PET_KEYS.length && ACTIVE_PET_KEYS.length === Object.keys(CHARACTERS).filter(petReady).length - 1,
+    'V13.118 학생이 만날 수 있는 펫은 기본 16 · 영웅 16 · 전설 4 · 신화 5 · 한정 5 = 46종이다(V13.168: 그림을 기다리는 새 펫은 빼고 센다, V13.195: + 곤충 · 공룡 시리즈)');
   assert([...MYTHIC, 'cheonma'].every(key => petSkill({ key }).key === key) && !petSkill({ key: 'jujak' }).desc.includes('사용하지'), 'V13.185 신화 펫과 천마에도 야차전 특기가 있다(V13.118에는 없었다)');
 
   const rate = MYTHIC_RATE, sources = Object.keys(rate);

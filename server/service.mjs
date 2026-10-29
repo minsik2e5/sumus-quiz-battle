@@ -1,6 +1,6 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
-import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, EPIC_EGG_PRICE, seasonOnSale, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, EPIC_EGG_PRICE, SERIES_EGG, SERIES_RANKS, seasonOnSale, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, TITLES_3, TITLES_4, titleUnlocked, weeklyTitle, visibleTitleKeys } from '../public/modules/titles.js';
 import { battleQuestions, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
@@ -12,7 +12,7 @@ import { MARKET_OPEN } from '../public/modules/market.js';
 const marketOpen = state => MARKET_OPEN || state.market?.open === true;
 import { rpsView, rpsPlay, rpsCash, openEgg } from './rewards.mjs';
 import { logActivity, activityOf, activityOverview } from './activity.mjs';
-import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, monsterStart, monsterFinish, monsterView, monsterScope, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts, legendEggView, grantLegendEgg, legendEggOpen, legendEggBuy } from './rewards.mjs';
+import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, monsterStart, monsterFinish, monsterView, monsterScope, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts, legendEggView, grantLegendEgg, legendEggOpen, legendEggBuy, seriesEggView, seriesEggBuy } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate, setUnitCounter, setRangeCounter } from './competition.mjs';
 import { createTournament, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
@@ -1349,6 +1349,8 @@ export async function service(state, method, path, body, token, options = {}) {
       gifts: teacher ? null : giftsWaiting(p),
       // V13.182 전설 알: 받을 차례면(due) 화면이 /legend-egg/claim을 한 번 부른다(이 GET은 아무것도 쓰지 않는다).
       legend_egg: teacher ? null : legendEggView(p),
+      // V13.195 곤충 · 공룡 시리즈 알(알 상점 탭). 그림이 하나도 없으면 ready: false(탭을 숨긴다).
+      series_egg: teacher ? null : seriesEggView(p),
       gifts_sent: teacher ? (p.gifts_sent || []).slice(-10).reverse() : null,
       class_league: teacher && selectedSchool ? classLeague(state, competition, selectedSchool, now) : null,
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
@@ -1926,6 +1928,13 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
     // V13.92: `kind: 'epic'` is the 영웅 알 (a 영웅 pet not met yet); otherwise the basic egg.
     // V13.109: `kind: 'season'` is the season egg, sold only while its season is on (seasonOnSale).
+    // V13.195 `kind: 'series'`는 곤충 · 공룡 시리즈 알(아직 없는 시리즈 펫 하나, 서버가 열 때 정한다).
+    if (body.kind === 'series') {
+      if (openBattleFor(state, p.id, Date.now())) fail('대결이 끝난 뒤에 알을 살 수 있어요.', 409);
+      const res = seriesEggBuy(p, pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance);
+      logActivity(p, 'egg', `${SERIES_EGG.name} · ${CHARACTERS[res.key].ko}${res.rank === 'basic' ? '' : `(${SERIES_RANKS[res.rank]})`}`);
+      return { ...res, series_egg: seriesEggView(p), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
+    }
     const season = body.kind === 'season' ? seasonOnSale(Date.now()) : null;
     if (body.kind === 'season' && !season) fail('한정 알 판매 기간이 끝났어요. 이제 영웅 알에서 가끔 나와요!', 409);
     const epic = body.kind === 'epic', price = season ? season.price : epic ? EPIC_EGG_PRICE : EGG_PRICE;

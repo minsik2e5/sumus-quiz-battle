@@ -3,7 +3,7 @@
 // 소급 지급은 한 장 묶음 카드로 한 번만(코인 합계 · 푸시 없음), titles_seen 240, 메달 그림 28 × 2 · TITLE_ART 연결, 응답에 정답 힌트 없음.
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { TITLES, TITLES_3, TITLES_4, TITLE_KEYS, titleUnlocked, titleProgress, titleCoins, visibleTitleKeys, weeklyTitle, LEVEL_TITLES_AFTER_100 } from '../public/modules/titles.js';
+import { TITLES, TITLES_3, TITLES_4, TITLES_SERIES, TITLE_KEYS, titleUnlocked, titleProgress, titleCoins, visibleTitleKeys, weeklyTitle, LEVEL_TITLES_AFTER_100 } from '../public/modules/titles.js';
 import { TITLE_ART, titleEmblem } from '../public/modules/emblems.js';
 import { blankGroup, blankKey } from '../public/modules/blank-rules.js';
 import { monsterDayWin, blankTitleStats, gramTitleStats, rememberGramBest } from './titles-3.mjs';
@@ -52,8 +52,8 @@ export async function runTitles3Checks(assert) {
     'V13.184 칭호 3탄 25개는 문서 표의 키 · 이름 · 등급 · 조건 · 코인 그대로');
   assert(PET3.every(key => TITLES[key] && !TITLES_3.includes(key)) && TITLES['epic-collector'].tier === 'epic' && TITLES['legend-owner'].tier === 'legendary' && TITLES['epic-dex'].tier === 'legendary',
     'V13.184 펫 수집 3개는 새로 만들지 않고 V13.182 칭호(영웅 · 전설 · 전설) 그대로');
-  assert(TITLE_KEYS.filter(key => !TITLES_4.includes(key)).length === 151 && new Set(TITLE_KEYS.map(key => TITLES[key].name)).size === TITLE_KEYS.length - 1 /* 옛 뽑기 '황금 손'과 인형뽑기 '황금 손' */,
-    'V13.184 칭호는 4탄 전까지 151개(지금 126 + 3탄 25, V13.191 4탄 24개는 titles-4-check.mjs), 이름은 겹치지 않는다(Lv.75는 "단어 곳간지기")');
+  assert(TITLE_KEYS.filter(key => !TITLES_4.includes(key) && !TITLES_SERIES.includes(key)).length === 151 && new Set(TITLE_KEYS.map(key => TITLES[key].name)).size === TITLE_KEYS.length - 1 /* 옛 뽑기 '황금 손'과 인형뽑기 '황금 손' */,
+    'V13.184 칭호는 4탄 전까지 151개(지금 126 + 3탄 25, V13.191 4탄 24개는 titles-4-check.mjs, V13.195 곤충 · 공룡 2개는 bug-dino-pets-check.mjs), 이름은 겹치지 않는다(Lv.75는 "단어 곳간지기")');
   assert(TITLES.level75.name !== TITLES.words500.name, 'V13.184 Lv.75 이름은 기존 "단어 수집가"와 다르다');
   // 조건 경계: 직전 미달 / 딱 달성
   assert(TABLE.every(([key, , , stat, goal]) => !titleUnlocked(key, { [stat]: goal - 1 }) && titleUnlocked(key, { [stat]: goal }) && titleProgress(key, { [stat]: goal - 1 })?.join() === `${goal - 1},${goal}`),

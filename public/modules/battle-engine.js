@@ -135,13 +135,29 @@ export const PET_SKILLS = {
   ghost: { name: '깜짝 놀래기', desc: '다음에 받는 공격 −17', guard: [17] },
   riceball: { name: '든든한 한 입', desc: 'HP +14', heal: 14 },
   tissue: { name: '술술 뽑기', desc: '다음 공격 3번 +6 · +6 · +5', boost: [6, 6, 5] },
-  glue: { name: '찰싹 붙기', desc: '바로 6 피해, 3문제 동안 3씩 피해', burst: 6, poison: 3, turns: 3 }
+  glue: { name: '찰싹 붙기', desc: '바로 6 피해, 3문제 동안 3씩 피해', burst: 6, poison: 3, turns: 3 },
+  // V13.195 곤충 · 공룡 시리즈(시리즈 알에서만): 시리즈 기본 ≈ 기본 펫, 영웅 ≈ 영웅 펫, 전설 렉스 = 영웅 +약 6%(전설 규칙).
+  // 숫자는 승률이 검증된 지금 펫의 조합(docs/bug-dino-pets-design.md 표), 렉스만 새 조합. 승률: docs/pet-skills-balance.md
+  ladybug: { name: '점박이 방패', desc: '다음에 받는 공격 2번 −8씩', guard: [8, 8] },
+  bee: { name: '꿀 한 스푼', desc: 'HP +8, 다음 공격 +6', heal: 8, boost: [6] },
+  ant: { name: '영차 영차', desc: '다음 공격 +6, 이후 2번 +5씩', boost: [6, 5, 5] },
+  firefly: { name: '반딧불 신호', desc: '바로 7 피해, 다음에 받는 공격 −8', burst: 7, guard: [8] },
+  tricera: { name: '세 뿔 돌진', desc: '바로 6 피해, 다음 공격 +9', burst: 6, boost: [9] },
+  stego: { name: '가시 꼬리', desc: '바로 6 피해, 3문제 동안 3씩 피해', burst: 6, poison: 3, turns: 3 },
+  brachio: { name: '긴 목 간식', desc: 'HP +7, 다음에 받는 공격 −8', heal: 7, guard: [8] },
+  rhinobeetle: { name: '장수 뿔치기', desc: '바로 7 피해, 다음 공격 +8', burst: 7, boost: [8] },
+  butterfly: { name: '반짝 날개가루', desc: '다음에 받는 공격 −9, 2문제 동안 3씩 피해', guard: [9], poison: 3, turns: 2 },
+  ptera: { name: '하늘 급강하', desc: '바로 5 피해, 다음 공격 2번 +5씩', burst: 5, boost: [5, 5] },
+  ankylo: { name: '곤봉 꼬리', desc: '다음에 받는 공격 −9, 다음 공격 +6', guard: [9], boost: [6] },
+  tyranno: { name: '왕의 포효', desc: '바로 10 피해, 다음 공격 +6', burst: 10, boost: [6] }
 };
 // V13.185 등급별로 새로 생긴 특기(검사 · 시뮬레이션이 쓴다). 은퇴한 불새도 가진 학생이 있어 넣는다.
 export const PET_SKILL_TIERS = {
   legendary: ['haechi', 'phoenix', 'whale', 'qilin', 'cheonma'],
   mythic: ['gumiho', 'cheongryong', 'baekho', 'jujak', 'hyeonmu', 'hwangryong', 'samjogo'],
-  limited: ['pumpkincat', 'ghost', 'riceball', 'tissue', 'glue']
+  limited: ['pumpkincat', 'ghost', 'riceball', 'tissue', 'glue'],
+  // V13.195 곤충 · 공룡 시리즈(시리즈 등급 기본 7 · 영웅 4 · 전설 1, core.js CHARACTERS의 `rank`).
+  series: ['ladybug', 'bee', 'ant', 'firefly', 'tricera', 'stego', 'brachio', 'rhinobeetle', 'butterfly', 'ptera', 'ankylo', 'tyranno']
 };
 // V13.94 몬스터 잡기: a monster's own skill (its `pet.skill`), stronger at harder levels.
 export const MONSTER_SKILLS = {

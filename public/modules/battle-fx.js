@@ -25,7 +25,10 @@ export const PET_ELEMENT = {
   snake: 'toxic', crocodile: 'toxic', ghost: 'toxic', gumiho: 'toxic',
   // V13.168 새 펫 14종(별빛: 윙윙 · 황룡)
   mouse: 'earth', calf: 'earth', tiger: 'flame', pony: 'wind', monkey: 'leaf', rooster: 'flame',
-  flamingo: 'wind', quokka: 'leaf', chameleon: 'toxic', polarbear: 'ice', snowleopard: 'ice', samjogo: 'flame'
+  flamingo: 'wind', quokka: 'leaf', chameleon: 'toxic', polarbear: 'ice', snowleopard: 'ice', samjogo: 'flame',
+  // V13.195 곤충 · 공룡 시리즈(별빛: 반짝이). 물은 낚시 혜택이 있어 넣지 않았다.
+  ladybug: 'leaf', bee: 'toxic', ant: 'earth', rhinobeetle: 'toxic', butterfly: 'wind',
+  tricera: 'flame', stego: 'toxic', brachio: 'ice', ptera: 'ice', ankylo: 'toxic', tyranno: 'flame'
 };
 export const elementOf = key => PET_ELEMENT[key] || 'star';
 export const paletteOf = key => ELEMENTS[elementOf(key)];

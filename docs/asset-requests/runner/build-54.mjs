@@ -132,10 +132,12 @@ export const MEDALS_56 = [
 const FRAME_EPIC = 'a SHIELD-shaped crest with a polished lavender-silver rim, a rich AMETHYST PURPLE enamel face and a small violet gem at the top.';
 
 // 겹침 검사: 지금 펫 key · 이름, 칭호 key · 이름과 겹치면 멈춘다(그림 파일 이름은 key 그대로라 겹치면 기존 펫 그림을 덮는다).
+// V13.195 코드 등록 뒤에는 같은 key · 같은 이름으로 등록된 자기 자신(시리즈 펫 · 테마 칭호)은 겹침이 아니다.
 {
-  const petNames = new Set(Object.values(CHARACTERS).map(c => c.ko)), titleNames = new Set(Object.values(TITLES).map(t => t.name));
-  const bad = [...Object.entries(PETS_54).filter(([k, p]) => CHARACTERS[k] || petNames.has(p.ko) || !/^[a-z]+$/.test(k)).map(([k]) => k),
-    ...MEDALS_56.filter(m => TITLES[m.key] || titleNames.has(m.ko)).map(m => m.key)];
+  const mine = (k, ko) => CHARACTERS[k]?.series && CHARACTERS[k].ko === ko, mineTitle = (k, ko) => TITLES[k]?.name === ko;
+  const petNames = new Set(Object.entries(CHARACTERS).filter(([k]) => !PETS_54[k]).map(([, c]) => c.ko)), titleNames = new Set(Object.entries(TITLES).filter(([k]) => !MEDALS_56.some(m => m.key === k)).map(([, t]) => t.name));
+  const bad = [...Object.entries(PETS_54).filter(([k, p]) => (CHARACTERS[k] && !mine(k, p.ko)) || petNames.has(p.ko) || !/^[a-z]+$/.test(k)).map(([k]) => k),
+    ...MEDALS_56.filter(m => (TITLES[m.key] && !mineTitle(m.key, m.ko)) || titleNames.has(m.ko)).map(m => m.key)];
   if (bad.length || new Set(Object.values(PETS_54).map(p => p.ko)).size !== Object.keys(PETS_54).length) throw new Error('펫 · 칭호 key · 이름 확인: ' + bad.join(', '));
 }
 

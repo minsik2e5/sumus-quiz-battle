@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, EPIC_PET_KEYS, STANDARD_PET_KEYS, EPIC_EGG_LEGENDARY_RATE, SEASONS, seasonKeys, seasonsOver, LEGEND_EGG_EPIC_NEED, LEGEND_EGG_PRICE, LEGEND_EGG_COINS } from '../public/modules/core.js';
+import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, EPIC_PET_KEYS, STANDARD_PET_KEYS, EPIC_EGG_LEGENDARY_RATE, SEASONS, seasonKeys, seasonsOver, LEGEND_EGG_EPIC_NEED, LEGEND_EGG_PRICE, LEGEND_EGG_COINS, CHARACTERS, SERIES_EGG, SERIES_PET_KEYS, seriesGroupKeys } from '../public/modules/core.js';
 import {
   ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, MYTHIC_RATE, drawLucky,
   BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_MAX, giftAmountOk, GIFT_NOTE_MAX, GIFT_LOG_KEEP, GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS,
@@ -416,6 +416,47 @@ export function legendEggBuy(p, balance, { random = secureRandom, now = Date.now
   const res = legendEggHatch(p, e, 'shop', now, random);
   (p.purchases ||= []).push({ item: 'legend_egg', key: res.legendary?.key, price: LEGEND_EGG_PRICE, at: now, legendary: true });
   return res;
+}
+
+/* ---------- V13.195 곤충 · 공룡 시리즈 알 ---------- */
+// 알 상점 탭 하나(SERIES_EGG.price코인). 아직 없는 시리즈 펫 하나: 남은 펫이 있는 등급끼리 SERIES_EGG.weights로 등급을 고르고
+// 그 등급의 남은 펫 중 랜덤(중복 없음). 다 모으면 409. 신화를 굴리지 않고, 전역 등급 셈(영웅 수 · 전설 1마리)에 들어가지 않는다.
+// 펫 기록은 { key, acquired_at, series }, 구입 기록은 { item: SERIES_EGG.item, key, price, at, rank? }(알 칭호 · 펫 수 칭호에 들어간다).
+export const seriesLeft = p => SERIES_PET_KEYS.filter(key => !ownsPet(p, key));
+// 남은 펫으로 본 등급 확률(%). 어떤 펫이 나올지는 없다(열 때 정한다).
+export function seriesEggOdds(left) {
+  const w = SERIES_EGG.weights, ranks = Object.keys(w).filter(rank => left.some(key => CHARACTERS[key].rank === rank));
+  const total = ranks.reduce((n, rank) => n + w[rank], 0);
+  return Object.fromEntries(ranks.map(rank => [rank, Math.round(w[rank] / total * 1000) / 10]));
+}
+export function seriesEggPick(left, random = secureRandom) {
+  const w = SERIES_EGG.weights, ranks = Object.keys(w).filter(rank => left.some(key => CHARACTERS[key].rank === rank));
+  let x = random() * ranks.reduce((n, rank) => n + w[rank], 0);
+  const rank = ranks.find(r => (x -= w[r]) < 0) || ranks[ranks.length - 1];
+  const pool = left.filter(key => CHARACTERS[key].rank === rank);
+  return pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
+}
+// 화면용(부트스트랩 · 알 상점). ready: 그림이 다 온 시리즈 펫이 있다(없으면 탭을 숨긴다).
+export function seriesEggView(p) {
+  const left = seriesLeft(p), total = SERIES_PET_KEYS.length;
+  const group = g => { const keys = seriesGroupKeys(g); return { owned: keys.filter(key => ownsPet(p, key)).length, total: keys.length }; };
+  return {
+    ready: total > 0, name: SERIES_EGG.name, price: SERIES_EGG.price, total, owned: total - left.length, left: left.length, done: total > 0 && !left.length,
+    odds: seriesEggOdds(left), bug: group('bug'), dino: group('dino')
+  };
+}
+export function seriesEggBuy(p, balance, { random = secureRandom, now = Date.now() } = {}) {
+  if (!(p.pets || []).length) fail('먼저 첫 펫을 골라주세요.', 409);
+  if (!SERIES_PET_KEYS.length) fail(`${SERIES_EGG.name}은 아직 준비 중이에요.`, 409);
+  const left = seriesLeft(p);
+  if (!left.length) fail('곤충 · 공룡 친구를 모두 모았어요!', 409);
+  if (balance < SERIES_EGG.price) fail(`코인이 ${SERIES_EGG.price - balance}개 부족해요.`);
+  const key = seriesEggPick(left, random), rank = CHARACTERS[key].rank;
+  (p.pets ||= []).push({ key, acquired_at: now, series: SERIES_EGG.id });
+  p.points_spent = Number(p.points_spent || 0) + SERIES_EGG.price;
+  (p.purchases ||= []).push({ item: SERIES_EGG.item, key, price: SERIES_EGG.price, at: now, ...(rank !== 'basic' ? { rank } : {}) });
+  p.avatar_key = key;
+  return { key, rank, series: SERIES_EGG.id };
 }
 
 /* ---------- V13.82 가위바위보 ---------- */

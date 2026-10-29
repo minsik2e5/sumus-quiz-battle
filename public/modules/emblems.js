@@ -103,6 +103,8 @@ export const TITLE_ART = new Set([
   'fishkg', 'fishbook12', 'fishday10', 'deep1', 'fishlegend', 'rod5', 'fishall', 'deepall',
   'range1', 'mockcover', 'mockclear', 'rangeall', 'coin1k', 'gift20', 'broke', 'coin30k',
   'petname', 'petfinal', 'care100', 'petmax', 'huntplace', 'huntnight', 'huntall', 'timingweek',
+  // V13.195 곤충 · 공룡 시리즈 칭호(그림 56b)
+  'bugall', 'dinoall',
   // V13.168 12지 수호자(그림 36d): 메달 그림이 들어오면(build:assets → pet-art.js) 자동으로 쓴다.
   ...PET_TITLE_ART
 ]);

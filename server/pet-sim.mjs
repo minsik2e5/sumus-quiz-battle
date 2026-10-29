@@ -3,7 +3,7 @@
 // should win about as often as any other's (V13.72: 47–54% against the field in both modes).
 // `node server/pet-sim.mjs [games per pair]` prints each pet's win rate against all the others.
 import { createBattle, connect, answer, tick, nextWake, BATTLE, SKILL_RULES, PET_SKILLS, PET_SKILL_TIERS } from '../public/modules/battle-engine.js';
-import { STANDARD_PET_KEYS, EPIC_PET_KEYS } from '../public/modules/core.js';
+import { STANDARD_PET_KEYS, EPIC_PET_KEYS, CHARACTERS } from '../public/modules/core.js';
 import { battleQuestions } from '../public/modules/battle-questions.js';
 import { seeded } from './monster-sim.mjs';
 
@@ -63,6 +63,8 @@ export function field(pets = Object.keys(PET_SKILLS), { n = 120, know = .82, mod
 
 // V13.185 등급 사이 승률: 기본(B) · 영웅(H) · 전설(L) · 신화(M) · 한정(X). The pets of the base field are the
 // ones every older check uses (기본 · 영웅 · 바다); 전설 · 신화 · 한정 are measured against the groups.
+// V13.195 곤충 · 공룡 시리즈(PET_SKILL_TIERS.series)를 시리즈 등급으로 나눈 것(tiers 표).
+export const SERIES_SPLIT = Object.fromEntries([['seriesBasic', 'basic'], ['seriesEpic', 'epic'], ['seriesLegend', 'legendary']].map(([k, rank]) => [k, PET_SKILL_TIERS.series.filter(key => CHARACTERS[key]?.rank === rank)]));
 export const SKILL_GROUPS = { B: STANDARD_PET_KEYS, H: EPIC_PET_KEYS, L: PET_SKILL_TIERS.legendary, M: PET_SKILL_TIERS.mythic, X: PET_SKILL_TIERS.limited };
 export const baseSkillPets = () => Object.keys(PET_SKILLS).filter(key => !Object.values(PET_SKILL_TIERS).flat().includes(key));
 // Each pet of `pets` against each group (both sides, `n` games per pet pair and mode): { mode: { pet: { B, H, L, M, X } } }.
@@ -90,7 +92,7 @@ if (import.meta.url === `file://${process.argv[1]}` && process.argv[2] === 'tier
   const r = tierField(undefined, { n });
   console.log('pet          ' + ['speed', 'skill'].map(m => `${m}: vsB   vsH   vsL   vsM`).join('   '));
   for (const x of Object.values(PET_SKILL_TIERS).flat()) console.log(x.padEnd(12) + ['speed', 'skill'].map(m => ' ' + ['B', 'H', 'L', 'M'].map(g => pct(r[m][x][g])).join(' ')).join('   '));
-  for (const [name, t, g] of [['전설 vs 영웅', 'legendary', 'H'], ['신화 vs 전설', 'mythic', 'L'], ['신화 vs 영웅', 'mythic', 'H'], ['한정 vs 기본', 'limited', 'B'], ['전설 vs 기본', 'legendary', 'B']]) console.log(name.padEnd(10), ['speed', 'skill'].map(m => m + ' ' + pct(groupRate(r, m, PET_SKILL_TIERS[t], g)) + '%').join('  '));
+  for (const [name, t, g] of [['전설 vs 영웅', 'legendary', 'H'], ['신화 vs 전설', 'mythic', 'L'], ['신화 vs 영웅', 'mythic', 'H'], ['한정 vs 기본', 'limited', 'B'], ['전설 vs 기본', 'legendary', 'B'], ['시리즈 기본 vs 기본', 'seriesBasic', 'B'], ['시리즈 영웅 vs 영웅', 'seriesEpic', 'H'], ['렉스 vs 영웅', 'seriesLegend', 'H']]) console.log(name.padEnd(10), ['speed', 'skill'].map(m => m + ' ' + pct(groupRate(r, m, SERIES_SPLIT[t] || PET_SKILL_TIERS[t], g)) + '%').join('  '));
 } else if (import.meta.url === `file://${process.argv[1]}`) {
   const n = Number(process.argv[2] || 60);
   const r = field(Object.keys(PET_SKILLS), { n });
