@@ -1,6 +1,6 @@
 import { $, api, esc, num, toast } from './ui.js';
 import { eggTapHtml, bindEggTap } from './pet-growth.js';
-import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, LEGEND_EGG_PRICE, LEGEND_EGG_EPIC_NEED, seasonOnSale, cleanPetName } from './core.js';
+import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, LEGEND_EGG_PRICE, LEGEND_EGG_EPIC_NEED, SERIES_RANKS, seasonOnSale, cleanPetName } from './core.js';
 import { epicShow, legendaryShow, mythicShow } from './lucky.js';
 import { uiArt, ART_READY } from './emblems.js';
 import { avatar, petKey } from './character.js';
@@ -283,6 +283,12 @@ export async function huntPetShow(key, tier) {
   });
 }
 async function eggShow(res, kind) {
+  // V13.195 시리즈 알: 시리즈 전설은 전설 연출, 시리즈 영웅은 영웅 연출(시리즈 문구). 기본은 알 이름 카드(false).
+  if (res.series) {
+    if (res.rank === 'legendary') { await legendaryShow({ legendary: { key: res.key, series: true } }); return true; }
+    if (res.rank === 'epic') { await epicShow({ key: res.key, from: 'series' }); return true; }
+    return false;
+  }
   if (res.mythic) { await mythicShow(res); return true; }
   if (res.legendary) { await legendaryShow(res); return true; }
   if (res.limited) { await epicShow({ key: res.key, from: kind === 'season' ? 'season' : 'shop' }); return true; }
@@ -300,9 +306,12 @@ export function openEggShop(A, onChanged, kind = 'basic') {
   const draw = () => {
     // V13.182: 전설 알 탭(맨 뒤). 다른 알의 흐름은 그대로 두고 이 탭만 따로 그린다(drawLegend).
     const le = A.data.legend_egg || null;
-    const eggs = le ? { ...eggsNow(), legend: { name: '전설 알', price: LEGEND_EGG_PRICE } } : eggsNow();
+    // V13.195 곤충 · 공룡 시리즈 알 탭(전설 알 앞). 그림이 온 시리즈 펫이 없으면 탭이 없다.
+    const se = A.data.series_egg?.ready ? A.data.series_egg : null;
+    const eggs = { ...eggsNow(), ...(se ? { series: { name: '곤충 · 공룡 알', price: se.price } } : {}), ...(le ? { legend: { name: '전설 알', price: LEGEND_EGG_PRICE } } : {}) };
     if (!eggs[kind]) kind = 'basic';
     if (kind === 'legend') return drawLegend(eggs, le);
+    if (kind === 'series') return drawSeries(eggs, se, le);
     const egg = eggs[kind], missing = egg.keys.filter(key => !g.pets.some(x => x.key === key));
     const hasLegend = g.pets.some(x => CHARACTERS[x.key]?.legendary);
     const short = Math.max(0, egg.price - Number(g.points_balance || 0));
@@ -337,6 +346,42 @@ export function openEggShop(A, onChanged, kind = 'basic') {
   const bindTabs = () => {
     body.querySelectorAll('[data-egg-kind]').forEach(b => { b.onclick = () => { if (buying) return; kind = b.dataset.eggKind; draw(); }; });
     body.querySelector('[data-legend-tab]')?.addEventListener('click', () => { if (buying) return; kind = 'legend'; draw(); });
+  };
+  // V13.195 곤충 · 공룡 시리즈 알: 아직 없는 시리즈 펫 하나(중복 없음), 다 모으면 안 판다. 등급 확률은 남은 펫으로 서버가 계산한다.
+  const drawSeries = (eggs, se, le) => {
+    const short = Math.max(0, se.price - Number(g.points_balance || 0));
+    const odds = Object.entries(se.odds || {}).map(([rank, pct]) => `<span class="series-odd ${rank}"><b>${SERIES_RANKS[rank]}</b>${pct}%</span>`).join('');
+    body.innerHTML = `<div class="pet-shop egg-shop-v1392 series">
+      ${eggTabs(eggs, 'series', le)}
+      <div class="pet-shop-egg-art series-egg-art" aria-hidden="true"><i class="series-egg-halo"></i>${uiArt('bugdino-egg')}</div>
+      <p class="pet-moment-msg"><b class="egg-shop-tier series">곤충 · 공룡</b> ${se.done ? '시리즈 친구를 모두 모았어요!' : '곤충일까, 공룡일까?'}</p>
+      <p class="pet-shop-copy">${se.done ? `곤충 ${num(se.bug.total)}마리 · 공룡 ${num(se.dino.total)}마리를 모두 만났어요.<br>더는 팔지 않아요. 도감에서 친구들을 만나 보세요!` : `곤충 · 공룡 친구 중 아직 만나지 못한 <b>${num(se.left)}마리</b>에서 한 마리의 알이 나와요.<br><b class="egg-shop-legend">이미 만난 친구는 다시 나오지 않아요!</b> 전설 공룡 렉스도 이 알에서만 만나요.`}</p>
+      <div class="series-egg-meta">
+        <div class="series-prog"><span class="bug">곤충 <b>${num(se.bug.owned)}</b>/${num(se.bug.total)}</span><span class="dino">공룡 <b>${num(se.dino.owned)}</b>/${num(se.dino.total)}</span></div>
+        ${se.done ? '' : `<div class="series-odds" aria-label="이번 알의 등급 확률">${odds}</div>`}
+      </div>
+      ${se.done ? '' : `<div class="pet-shop-price"><span>가격</span><b><i class="coin-ico" aria-hidden="true"></i>${num(se.price)}</b><span>가진 코인</span><b><i class="coin-ico" aria-hidden="true"></i>${num(g.points_balance || 0)}</b></div>`}
+      <p class="pet-name-error" role="alert">${!se.done && short ? `코인이 ${num(short)}개 더 필요해요. 공부하면 코인이 쌓여요.` : ''}</p>
+      <div class="pet-moment-actions"><button type="button" class="btn" data-pet-later>닫기</button>${se.done ? '<span class="legend-egg-done">다 모았어요</span>' : `<button type="button" class="btn primary series-egg-btn" data-pet-buy ${short ? 'disabled' : ''}>${num(se.price)}코인으로 알 사기</button>`}</div>
+      ${le ? legendFootHtml(le) : ''}
+    </div>`;
+    bindTabs();
+    body.querySelector('[data-pet-later]').onclick = () => close(false);
+    const buy = body.querySelector('[data-pet-buy]');
+    if (buy) buy.onclick = async () => {
+      buy.disabled = true; buying = true;
+      try {
+        const res = await api('/shop/egg', { kind: 'series' });
+        buying = false;
+        if (res.series_egg) A.data.series_egg = res.series_egg;
+        if (res.rank !== 'basic') { close(true); await eggShow(res, 'series'); return; }
+        eggRevealHtml(body, res.key, () => close(true));
+      } catch (err) {
+        buying = false;
+        body.querySelector('.pet-name-error').textContent = err.message;
+        buy.disabled = false;
+      }
+    };
   };
   // V13.182 전설 알: 받은 알이 있으면 열기, 없으면 15,000코인에 사기(학생당 1개, 전설 펫이 있으면 못 산다).
   const drawLegend = (eggs, le) => {
@@ -380,7 +425,7 @@ export function openEggShop(A, onChanged, kind = 'basic') {
 /* ---------- V13.182 전설 알 ---------- */
 // 알 상점 탭(전설 알은 받은 알이 있으면 '열기!').
 function eggTabs(eggs, kind, le) {
-  return `<div class="egg-shop-tabs" role="tablist">${Object.entries(eggs).map(([k, e]) => `<button type="button" role="tab" data-egg-kind="${k}" aria-selected="${k === kind}" class="${k === kind ? 'selected' : ''} ${k}">${k === 'epic' ? '<i aria-hidden="true">★</i>' : k === 'season' ? '<i aria-hidden="true">🎃</i>' : k === 'legend' ? '<i aria-hidden="true">♛</i>' : ''}${e.name}<small>${k === 'legend' && le?.waiting ? '열기!' : `${num(e.price)}코인`}</small></button>`).join('')}</div>`;
+  return `<div class="egg-shop-tabs" role="tablist">${Object.entries(eggs).map(([k, e]) => `<button type="button" role="tab" data-egg-kind="${k}" aria-selected="${k === kind}" class="${k === kind ? 'selected' : ''} ${k}">${k === 'epic' ? '<i aria-hidden="true">★</i>' : k === 'season' ? '<i aria-hidden="true">🎃</i>' : k === 'series' ? '<i aria-hidden="true">🦕</i>' : k === 'legend' ? '<i aria-hidden="true">♛</i>' : ''}${e.name}<small>${k === 'legend' && le?.waiting ? '열기!' : `${num(e.price)}코인`}</small></button>`).join('')}</div>`;
 }
 // 상점 하단: 영웅 진행과 선생님 문구.
 function legendFootHtml(le) {

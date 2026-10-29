@@ -117,20 +117,36 @@ export const CHARACTERS = {
   ghost: { name: 'BOO', ko: '부우', type: '꼬마 유령', color: '#8E7CC3', light: '#DCD3F5', soft: '#F7F4FE', limited: 'autumn' },
   riceball: { name: 'JUMEOKI', ko: '주먹이', type: '주먹밥 병아리', color: '#8C7B6B', light: '#F3E9D8', soft: '#FFFAF1', limited: 'autumn' },
   tissue: { name: 'SULSUL', ko: '술술이', type: '두루마리 휴지', color: '#D9A441', light: '#FBE7B0', soft: '#FFFBEF', limited: 'autumn' },
-  glue: { name: 'CHALSSAK', ko: '찰싹이', type: '딱풀', color: '#6FA8DC', light: '#CFE6F8', soft: '#F1F8FE', limited: 'autumn' }
+  glue: { name: 'CHALSSAK', ko: '찰싹이', type: '딱풀', color: '#6FA8DC', light: '#CFE6F8', soft: '#F1F8FE', limited: 'autumn' },
+  // V13.195 곤충 · 공룡 시리즈(docs/bug-dino-pets-design.md, 그림 54 · 55): 알 상점의 시리즈 알(SERIES_EGG)에서만 나온다.
+  // 전역 등급 표시(epic · legendary)는 넣지 않는다: 기본 · 영웅 · 전설 알, 선물 알, 사냥, 코인 뽑기, 영웅 수 · 전설 1마리 제한에 안 섞인다.
+  // `rank`는 시리즈 안 등급(기본 · 영웅 · 전설: 알 확률 무게 · 특기 세기 · 도감 테두리), `group`은 곤충(bug) · 공룡(dino).
+  ladybug: { name: 'JEOMSUNI', ko: '점순이', type: '무당벌레', color: '#D9443F', light: '#FFB8AD', soft: '#FFF1EE', series: 'bugdino', rank: 'basic', group: 'bug', artOrder: 54 },
+  bee: { name: 'BUNGBUNG', ko: '붕붕이', type: '꿀벌', color: '#D9A21F', light: '#FFE08A', soft: '#FFF9E3', series: 'bugdino', rank: 'basic', group: 'bug', artOrder: 54 },
+  ant: { name: 'YEONGCHA', ko: '영차', type: '일개미', color: '#8A5A3C', light: '#E3BFA0', soft: '#FAF1EA', series: 'bugdino', rank: 'basic', group: 'bug', artOrder: 54 },
+  firefly: { name: 'BANJJAK', ko: '반짝이', type: '반딧불이', color: '#3D4F8C', light: '#FFE680', soft: '#F1F3FB', series: 'bugdino', rank: 'basic', group: 'bug', artOrder: 54 },
+  rhinobeetle: { name: 'JANGSU', ko: '장수', type: '장수풍뎅이', color: '#7A4A2A', light: '#D9B08C', soft: '#F8EFE6', series: 'bugdino', rank: 'epic', group: 'bug', artOrder: 54 },
+  butterfly: { name: 'NAPUL', ko: '나풀', type: '호랑나비', color: '#E88A2E', light: '#FFD08A', soft: '#FFF5E6', series: 'bugdino', rank: 'epic', group: 'bug', artOrder: 54 },
+  tricera: { name: 'PPULPPUL', ko: '뿔뿔이', type: '아기 트리케라톱스', color: '#3FA98B', light: '#B8EBDB', soft: '#EEFAF6', series: 'bugdino', rank: 'basic', group: 'dino', artOrder: 55 },
+  stego: { name: 'PPIJUK', ko: '삐죽이', type: '아기 스테고사우루스', color: '#8E72C9', light: '#DCCFF5', soft: '#F6F2FD', series: 'bugdino', rank: 'basic', group: 'dino', artOrder: 55 },
+  brachio: { name: 'LONGLONG', ko: '롱롱이', type: '아기 브라키오사우루스', color: '#4F9BCF', light: '#C6E4F7', soft: '#F0F8FD', series: 'bugdino', rank: 'basic', group: 'dino', artOrder: 55 },
+  ptera: { name: 'HWIIK', ko: '휘익', type: '아기 프테라노돈', color: '#E57C63', light: '#FFCDBF', soft: '#FFF2EE', series: 'bugdino', rank: 'epic', group: 'dino', artOrder: 55 },
+  ankylo: { name: 'DANDAN', ko: '단단이', type: '아기 안킬로사우루스', color: '#8F7F4E', light: '#E3D8A8', soft: '#FAF7EA', series: 'bugdino', rank: 'epic', group: 'dino', artOrder: 55 },
+  tyranno: { name: 'REX', ko: '렉스', type: '아기 티라노사우루스', color: '#C8463A', light: '#FFC0A8', soft: '#FFF0EA', series: 'bugdino', rank: 'legendary', group: 'dino', artOrder: 55 }
 };
 // V13.168 그림이 다 들어온 펫만 준비됨: `artOrder` 펫은 기본 · 작은 그림 · 표정 · 알 반응(신화는 등장 포즈 · 등장 배경까지)이 있어야 한다.
 // 아래 목록(알 · 선물 · 사냥 · 낚시 교환소 · 뽑기 · 도감 · 펫 수)은 모두 준비된 펫만 담는다. 그림을 넣고 build:assets를 돌리면 자동으로 나온다.
 export const petReady = key => !!CHARACTERS[key] && (!CHARACTERS[key].artOrder || (PET_ART.has(key) && (!CHARACTERS[key].mythic || PET_REVEAL.has(key))));
 const readyKeys = test => Object.keys(CHARACTERS).filter(key => test(CHARACTERS[key]) && petReady(key));
-export const LEGENDARY_PET_KEYS = readyKeys(c => c.legendary && !c.retired);
+// V13.195 시리즈 펫(`series`)은 아래 전역 등급 목록에 하나도 들어가지 않는다(SERIES_PET_KEYS만). 펫 수(ACTIVE)에는 들어간다.
+export const LEGENDARY_PET_KEYS = readyKeys(c => c.legendary && !c.retired && !c.series);
 // The pets a student can ever meet (a retired pet such as 불새 is left out of every count and list).
 export const ACTIVE_PET_KEYS = readyKeys(c => !c.retired);
-export const MYTHIC_PET_KEYS = readyKeys(c => c.mythic);
+export const MYTHIC_PET_KEYS = readyKeys(c => c.mythic && !c.series);
 // V13.150 바다 펫(sea)은 낚시 교환소에서만: 영웅 알 · 뽑기 확률표에는 넣지 않는다.
-export const EPIC_PET_KEYS = readyKeys(c => c.epic && !c.sea);
-export const LIMITED_PET_KEYS = readyKeys(c => c.limited);
-export const STANDARD_PET_KEYS = readyKeys(c => !c.legendary && !c.mythic && !c.epic && !c.limited && !c.sea);
+export const EPIC_PET_KEYS = readyKeys(c => c.epic && !c.sea && !c.series);
+export const LIMITED_PET_KEYS = readyKeys(c => c.limited && !c.series);
+export const STANDARD_PET_KEYS = readyKeys(c => !c.legendary && !c.mythic && !c.epic && !c.limited && !c.sea && !c.series);
 // V13.168 그림을 기다리는 펫(도감의 '곧 만나요' 그림자).
 export const SOON_PET_KEYS = Object.keys(CHARACTERS).filter(key => !CHARACTERS[key].retired && !petReady(key));
 // V13.168 12지(쥐 · 소 · 호랑이 · 토끼 · 용 · 뱀 · 말 · 양 · 원숭이 · 닭 · 개 · 돼지): 다 모으면 칭호 '12지 수호자'.
@@ -174,6 +190,14 @@ export const EPIC_EGG_LEGENDARY_RATE = 1;
 export const LEGEND_EGG_EPIC_NEED = 20;
 export const LEGEND_EGG_PRICE = 15000;
 export const LEGEND_EGG_COINS = 3000;
+// V13.195 곤충 · 공룡 시리즈 알(docs/bug-dino-pets-design.md): 알 상점 탭 하나, SERIES_EGG.price코인.
+// 열면 아직 없는 시리즈 펫 하나(중복 없음): 남은 펫이 있는 시리즈 등급끼리 `weights`로 등급을 고르고, 그 등급의 남은 펫 중 랜덤.
+// 다 모으면 더 팔지 않는다. 신화를 굴리지 않는다(전역 알이 아니다). 어떤 펫이 나올지는 열 때 서버가 정한다.
+export const SERIES_EGG = { id: 'bugdino', item: 'bugdino_egg', name: '곤충 · 공룡 알', price: 1000, weights: { basic: 60, epic: 30, legendary: 2 } };
+export const SERIES_PET_KEYS = readyKeys(c => c.series === SERIES_EGG.id);
+export const SERIES_RANKS = { basic: '기본', epic: '영웅', legendary: '전설' };
+export const seriesRank = key => CHARACTERS[key]?.series ? CHARACTERS[key].rank : null;
+export const seriesGroupKeys = group => SERIES_PET_KEYS.filter(key => CHARACTERS[key].group === group);
 // Student-chosen pet name, checked the same way on the device and on the server.
 // An empty name is allowed and means "use the pet's default name".
 export function cleanPetName(value) {

@@ -4,7 +4,7 @@
 // 소급 지급 묶음 카드(3탄 다음 4탄, 한 번만 · 코인 합계 · 푸시 없음), 메달 그림 24 × 2 · TITLE_ART 연결, titles_seen 240.
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { TITLES, TITLES_3, TITLES_4, TITLE_KEYS, TITLE_GROUPS, titleUnlocked, titleProgress, titleCoins, visibleTitleKeys, weeklyTitle, DEEP_TITLES_READY } from '../public/modules/titles.js';
+import { TITLES, TITLES_3, TITLES_4, TITLES_SERIES, TITLE_KEYS, TITLE_GROUPS, titleUnlocked, titleProgress, titleCoins, visibleTitleKeys, weeklyTitle, DEEP_TITLES_READY } from '../public/modules/titles.js';
 import { TITLE_ART } from '../public/modules/emblems.js';
 import { FISH, FISH_KEYS, DEEP_KEYS } from '../public/modules/fishing-rules.js';
 import { FISH_READY } from '../public/modules/fish-art.js';
@@ -55,10 +55,10 @@ export async function runTitles4Checks(assert) {
   // ---- 24개 표: 키 · 이름 · 등급 · 묶음 · 조건 · 코인
   assert(TITLES_4.length === 24 && TITLES_4.join() === TABLE.map(r => r[0]).join() && TABLE.every(([key, name, tier, group, stat, goal, coins]) => TITLES[key] && TITLES[key].name === name && TITLES[key].tier === tier && TITLES[key].group === group && TITLES[key].stat === stat && TITLES[key].goal === goal && titleCoins(key) === coins && !TITLES[key].coins),
     'V13.191 칭호 4탄 24개는 문서 표의 키 · 이름 · 등급 · 묶음 · 조건 · 코인 그대로(따로 coins를 주는 칭호 없음)');
-  assert(TITLE_KEYS.length === 175 && new Set(TITLE_KEYS.map(key => TITLES[key].name)).size === TITLE_KEYS.length - 1 /* 옛 뽑기 '황금 손'과 인형뽑기 '황금 손' */ && TITLES_4.every(key => !TITLES_3.includes(key)),
-    'V13.191 칭호는 모두 175개(151 + 4탄 24), 4탄 이름은 기존 칭호와 겹치지 않는다');
-  assert(!TITLES.bugall && !TITLES.dinoall && !Object.values(TITLES).some(t => /곤충 채집왕|쥬라기 반장/.test(t.name)),
-    'V13.191 곤충 · 공룡 펫 칭호 2개(곤충 채집왕 · 쥬라기 반장)는 펫 코드와 같이 넣으므로 이번에는 없다');
+  assert(TITLE_KEYS.length === 177 && TITLES_SERIES.join() === 'bugall,dinoall' && new Set(TITLE_KEYS.map(key => TITLES[key].name)).size === TITLE_KEYS.length - 1 /* 옛 뽑기 '황금 손'과 인형뽑기 '황금 손' */ && TITLES_4.every(key => !TITLES_3.includes(key)),
+    'V13.191 칭호는 모두 175개(151 + 4탄 24, V13.195: + 곤충 · 공룡 2개 = 177개), 4탄 이름은 기존 칭호와 겹치지 않는다');
+  assert(TITLES.bugall?.name === '곤충 채집왕' && TITLES.dinoall?.name === '쥬라기 반장' && !TITLES_4.includes('bugall') && !TITLES_4.includes('dinoall'),
+    'V13.191 곤충 · 공룡 펫 칭호 2개(곤충 채집왕 · 쥬라기 반장)는 4탄 24개에 넣지 않고 펫 코드와 같이 넣는다(V13.195, bug-dino-pets-check.mjs)');
   assert(TABLE.every(([key, , , , stat, goal]) => !titleUnlocked(key, { [stat]: goal - 1 }) && titleUnlocked(key, { [stat]: goal }) && titleUnlocked(key, { [stat]: goal + 1 })),
     'V13.191 4탄 칭호마다 조건 직전에는 없고 딱 달성하면 얻는다');
   assert(TABLE.filter(r => r[0] !== 'timingweek').every(([key, , , , stat, goal]) => titleProgress(key, { [stat]: goal - 1 })?.join() === `${goal - 1},${goal}`) && titleProgress('timingweek', { timing_week_king: 0 }) === null,
@@ -240,8 +240,8 @@ export async function runTitles4Checks(assert) {
   // ---- titles_seen 240: 칭호 175 + 지난주 한정 칭호(key@주) 6개
   {
     const weekly = TITLE_KEYS.filter(weeklyTitle);
-    assert(TITLES_SEEN_MAX === 240 && weekly.length === 6 && weekly.includes('timingweek') && TITLE_KEYS.length + weekly.length <= 181 && TITLE_KEYS.length + weekly.length < TITLES_SEEN_MAX,
-      'V13.191 학생이 본 칭호 기록 240칸은 모자라지 않는다(칭호 175 + 지난주 한정 6 = 최대 181)');
+    assert(TITLES_SEEN_MAX === 240 && weekly.length === 6 && weekly.includes('timingweek') && TITLE_KEYS.length + weekly.length <= 183 && TITLE_KEYS.length + weekly.length < TITLES_SEEN_MAX,
+      'V13.191 학생이 본 칭호 기록 240칸은 모자라지 않는다(칭호 177 + 지난주 한정 6 = 최대 183)');
   }
 
   // ---- 서버 경로: 3탄 묶음 다음 4탄 묶음, 한 번만, 코인 합계, 푸시 없음, 모의고사 칭호 범위, 응답에 정답 힌트 없음

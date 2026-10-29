@@ -34,6 +34,7 @@
 //                다시 한 판, legend_pets · mythic_pets · season_pets 전설 · 신화 · 한정 펫 수, eggs 상점 알을 연 수,
 //                care 펫 교감(쓰다듬기 · 밥) 수, lucky_best_day 코인 뽑기 3배가 하루에 가장 많이 나온 수, boss_wins 보스 몬스터 처치
 //   V13.168 zodiac_pets 만난 12지 펫 수(core.js ZODIAC_PET_KEYS)
+//   V13.195 series_bug · series_dino 만난 곤충 · 공룡 시리즈 펫 수(core.js seriesGroupKeys)
 //   V13.180 인형뽑기(server/claw.mjs): claw_dolls 뽑은 인형 수, claw_kinds 도감에 모은 인형 종류(12종), claw_gold 뽑은 황금 인형 수
 //   V13.180 timing_perfect 10초 맞추기 완벽 이상 수, timing_ten 딱 10.00 수, timing_streak 최고 연속 완벽(server/timing.mjs p.timing)
 //   V13.184 칭호 3탄(docs/titles-plan.md): monster_best 하드까지 깬 가장 높은 몬스터전 레벨(m.best), monster_day_best 하루 최다 승(m.dw.b),
@@ -48,7 +49,7 @@
 // Limited titles belong to one week: they are held only while last week's result stands.
 // V13.148 `once`: 한정 테두리지만 주간 칭호가 아닌 것(신화의 주인): 한 번 받으면 계속 갖고, 코인도 한 번만.
 
-import { EPIC_PET_KEYS, LEGEND_EGG_EPIC_NEED } from './core.js';
+import { EPIC_PET_KEYS, LEGEND_EGG_EPIC_NEED, seriesGroupKeys } from './core.js';
 import { DEEP_KEYS } from './fishing-rules.js';
 import { FISH_READY } from './fish-art.js';
 import { MONSTER_KEYS } from './hunt-rules.js';
@@ -272,7 +273,6 @@ Object.assign(TITLES, {
 });
 // V13.191 칭호 4탄 24개(그림 60 · 61: /assets/titles/<key>.webp, docs/titles-plan-4.md). 낚시는 새 묶음(fishing).
 // `mock`: 모의고사 · 외부지문 책이 있는 학교 학생에게만 보인다(선생님 결정 5). `deep`: 심해 물고기 8종 그림이 다 있을 때만 보인다(안전장치).
-// 곤충 · 공룡 펫 칭호 2개(곤충 채집왕 · 쥬라기 반장)는 펫 코드가 들어올 때 같이 넣는다.
 export const TITLES_4 = [
   'fishkg', 'fishbook12', 'fishday10', 'deep1', 'fishlegend', 'rod5', 'fishall', 'deepall',
   'range1', 'mockcover', 'mockclear', 'rangeall',
@@ -311,6 +311,12 @@ Object.assign(TITLES, {
   huntall: { name: '몬스터 동사무소장', tier: 'legendary', group: 'monster', stat: 'hunt_kinds', goal: MONSTER_KEYS.length, icon: 'crown', how: `몬스터 사냥 도감 ${MONSTER_KEYS.length}종 모두 잡기`, desc: '몬스터 명부에 쾅! 모두 등록 완료.' },
   // 10초 맞추기 주간(한정: 이긴 주마다 다시 정해진다)
   timingweek: { name: '주간 초시계왕', tier: 'limited', group: 'arcade', stat: 'timing_week_king', goal: 1, icon: 'trophy', how: '지난주 10초 맞추기 순위 1위(같은 학년 묶음)', desc: '왕관을 쓴 초시계, 바늘이 딱 꼭대기!' }
+});
+// V13.195 곤충 · 공룡 시리즈 칭호 2개(메달 그림 56b: /assets/titles/bugall · dinoall). 시리즈 알에서 곤충 · 공룡을 다 모으면.
+export const TITLES_SERIES = ['bugall', 'dinoall'];
+Object.assign(TITLES, {
+  bugall: { name: '곤충 채집왕', tier: 'epic', group: 'collect', stat: 'series_bug', goal: seriesGroupKeys('bug').length || 6, icon: 'paw', how: '곤충 · 공룡 알에서 곤충 6종 다 모으기(점순이 · 붕붕이 · 영차 · 반짝이 · 장수 · 나풀)', desc: '곤충채 안이 반짝반짝, 숲속 친구들이 다 모였어요.' },
+  dinoall: { name: '쥬라기 반장', tier: 'epic', group: 'collect', stat: 'series_dino', goal: seriesGroupKeys('dino').length || 6, icon: 'crown', how: '곤충 · 공룡 알에서 공룡 6종 다 모으기(뿔뿔이 · 삐죽이 · 롱롱이 · 휘익 · 단단이 · 렉스)', desc: '반장 완장을 찬 공룡 알, 쥬라기 친구들이 줄을 서요.' }
 });
 // V13.67: titles that came out of the capsule machine. V13.68 retired the machine: they stay
 // with the students who have them and are not shown to anyone else (`retired`).

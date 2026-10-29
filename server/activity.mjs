@@ -27,7 +27,9 @@ export const ACTIVITY_MODES = {
   attend: { label: '출석', icon: '📅' },
   rps: { label: '가위바위보', icon: '✌️' },
   lucky: { label: '행운 뽑기', icon: '🎰' },
-  market: { label: '증권거래소', icon: '📈' }
+  market: { label: '증권거래소', icon: '📈' },
+  // V13.195 알 상점의 곤충 · 공룡 시리즈 알(어떤 펫이 나왔는지).
+  egg: { label: '곤충 · 공룡 알', icon: '🥚' }
 };
 
 // 끝난 결과 한 줄을 남긴다. 학생만(선생님 · 미리보기 계정은 남기지 않는다).
