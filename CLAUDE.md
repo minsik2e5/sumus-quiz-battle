@@ -18,8 +18,13 @@
 - PART 4 바나나킥 `/bk` · `/b` — 서버 `bk.js`, 공용 계산 `public/bk-common.js`(서버·폰이 같은 골키퍼 계산), 규약 `docs/bk-protocol.md`
 - 공용: `public/common.js`(IQ.makeClock 서버 시계, 스냅샷 보간, drawChar), `public/session-bar.js`(게임 전환 막대), `public/ceremony.js`(공용 시상식 CEREMONY.show)
 - 오늘의 리그: server.js `setupLeague` + `public/league.js`(선생님) + `public/league-phone.js`(학생). 순위 점수 10/8/6/상위30% 4/참가 2, 중간에 멈춘 판은 기본 미반영
-- SUMUS RECORD: 게임별 역대 최고 기록, **선생님 PC 브라우저 localStorage `sumus-records`** 에 저장(학원 전체 하나). 다른 PC/브라우저로 옮기면 기록은 이어지지 않음
+- SUMUS RECORD: 게임별 역대 최고 기록, **선생님 PC 브라우저 localStorage `sumus-records`** 에 저장(학원 전체 하나). 다른 PC/브라우저로 옮길 때는 리그 창의 「💾 기록 백업」(JSON 파일) → 새 PC에서 「📂 불러오기」(기록은 더 좋은 쪽만 남김, 리그는 선택해서 덮어씀)
 - 이동 방식: 내 캐릭터는 폰에서 직접 움직이고 위치만 보고(서버는 속도 제한), 서버 40Hz 계산·20Hz 전송, 화면은 서버 시각 기준 보간
+
+## 자동 테스트
+- `npm test` (약 1분) — `tests/run.js` 가 빈 포트에 서버를 띄우고 `tests/*.test.js` 실행. 일부만: `npm test -- bk`
+- 서버 흐름(수업 방·4게임·봇·리그·기록 알림)과 `bk-common.js`/`jr-common.js` 계산을 점검. 화면은 브라우저로 따로 확인
+- 고친 뒤 push 전에 꼭 돌릴 것
 
 ## 새 게임/큰 화면 작업 방식
 서버 모듈(`jr.js`·`bk.js` 패턴) + `docs/*-protocol.md` 작성 → 선생님 화면/폰 화면을 서브에이전트 2개로 병렬 제작 → 통합·테스트. 테스트는 socket.io-client 스크립트로 서버 흐름 확인 + 브라우저 확인.

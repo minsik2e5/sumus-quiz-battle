@@ -412,7 +412,7 @@ function setup(socket, on) {
     r.touched = Date.now(); return r;
   };
   on('host:next', () => { const r = hostRoom(); if (r) next(r); });
-  on('host:finish', () => { const r = hostRoom(); if (r && r.phase !== 'lobby') finish(r, 'stop'); });
+  on('host:finish', () => { const r = hostRoom(); if (r && r.phase !== 'lobby' && r.phase !== 'end') finish(r, 'stop'); }); // 끝난 판을 또 끝내면 리그에 두 번 쌓임
   on('host:reset', () => { const r = hostRoom(); if (r) resetRoom(r); });
   on('host:config', (cfg) => {
     const r = hostRoom(); if (!r || r.phase !== 'lobby') return;

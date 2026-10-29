@@ -74,7 +74,7 @@
   ov.innerHTML = `<div class="box"><header><h2>🏆 오늘의 리그</h2><small id="lgSub"></small><span class="sp"></span><button class="x" id="lgX">✕</button></header>
     <div class="body"><div class="col"><h3>누적 순위 <span style="font-weight:700;font-size:12px;color:#8a99ad">1등 10 · 2등 8 · 3등 6 · 상위 30% 4 · 참가 2점</span></h3><div class="scroll" id="lgSt"></div></div>
     <div class="col"><h3>지금까지 한 판</h3><div class="scroll" id="lgRd" style="flex:1.3"></div><h3 style="margin-top:12px">🏅 SUMUS RECORD <span style="font-weight:700;font-size:12px;color:#8a99ad">이 PC에 저장된 역대 최고 기록</span></h3><div class="scroll" id="lgRec"></div></div></div>
-    <footer><button class="final" id="lgFinal">🎉 최종 정산</button><button id="lgCsv">CSV 저장</button><span class="sp"></span><button class="warn" id="lgReset">리그 새로 시작</button><button class="warn" id="lgRecReset">기록 초기화</button></footer></div>`;
+    <footer><button class="final" id="lgFinal">🎉 최종 정산</button><button id="lgCsv">CSV 저장</button><button id="lgExp" title="SUMUS RECORD·오늘의 리그를 파일로 저장 (PC를 바꿀 때 옮기기용)">💾 기록 백업</button><button id="lgImp" title="백업 파일에서 기록 불러오기">📂 불러오기</button><input type="file" id="lgFile" accept=".json,application/json" hidden><span class="sp"></span><button class="warn" id="lgReset">리그 새로 시작</button><button class="warn" id="lgRecReset">기록 초기화</button></footer></div>`;
   document.body.appendChild(ov);
   const $ = (id) => document.getElementById(id);
   btn.onclick = () => { render(); ov.classList.add('on'); };
@@ -105,6 +105,33 @@
     const csv = '﻿' + [head, ...rows].map(r => r.map(q).join(',')).join('\r\n');
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const d = new Date(); a.download = `수업리그_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}_방${sess.pin}.csv`; a.click();
+  };
+  // 백업: SUMUS RECORD(학원 전체) + 지금 방의 리그 사본을 파일 하나로. 불러올 때 기록은 더 좋은 쪽만 남김
+  const ymd = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  $('lgExp').onclick = () => {
+    const data = { app: 'sumus-island', v: 1, at: Date.now(), records: load(RKEY, {}), league: { rounds: league.rounds } };
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' }));
+    a.download = `SUMUS기록백업_${ymd()}.json`; a.click();
+  };
+  $('lgImp').onclick = () => $('lgFile').click();
+  $('lgFile').onchange = async (e) => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    let data; try { data = JSON.parse(await f.text()); } catch (x) { return alert('백업 파일을 읽을 수 없어요.'); }
+    if (!data || data.app !== 'sumus-island' || typeof data.records !== 'object') return alert('SUMUS 기록 백업 파일이 아니에요.');
+    const recs = load(RKEY, {}); let n = 0;
+    for (const [k, r] of Object.entries(data.records || {})) {
+      if (!r || typeof r.v !== 'number') continue;
+      const old = recs[k], low = k.startsWith('mg:');
+      if (!old || (low ? r.v < old.v : r.v > old.v)) { recs[k] = r; n++; }
+    }
+    store(RKEY, recs);
+    let msg = `SUMUS RECORD ${n}개를 불러왔어요.`;
+    const rds = data.league && Array.isArray(data.league.rounds) ? data.league.rounds : [];
+    if (rds.length && confirm(`${msg}\n\n백업에 리그 ${rds.length}판도 있어요. 지금 방의 리그를 이걸로 바꿀까요?\n(취소하면 기록만 불러와요)`)) {
+      socket.emit('league:reset');
+      socket.emit('league:restore', { rounds: rds }, (x) => { if (x && x.ok) { league = x; store(LKEY, league); render(); } }); // 소켓 메시지는 순서대로 처리됨
+    } else if (!rds.length) alert(msg);
+    render(); pill();
   };
   $('lgFinal').onclick = () => {
     const st = (league.standings || []).filter(s => !s.bot || true);
