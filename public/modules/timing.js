@@ -4,7 +4,7 @@ import { avatar } from './character.js';
 import { openSheet } from './sheet.js';
 import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
 import { coinShower, countUp } from './celebrate.js';
-import { TIMING, GRADE_KEYS, GRADE_NAMES, GRADE_MARKS, CHEERS, secText, errText, errWord, ledDigits } from './timing-rules.js';
+import { TIMING, GRADE_KEYS, GRADE_NAMES, GRADE_MARKS, CHEERS, secText, errText, errWord, ledDigits, pressStamp, revealAt, REVEAL_STEPS } from './timing-rules.js';
 
 // V13.180 10초 맞추기(놀이터). 선생님: "참고보다 퀄리티를 훨씬 더 높여서".
 // 어두운 무대 · 빨간 7-세그먼트 LED 숫자판(꺼진 세그먼트 잔광 · 켜진 세그먼트 글로우 · 약한 깜빡임 · 콜론 1초 깜빡) ·
@@ -265,8 +265,8 @@ function hide() {
 }
 
 /* ---------- 누르기(터치 · 마우스 · 스페이스) ---------- */
-// 누른 순간은 이벤트의 timeStamp(같은 시계, 손가락이 닿은 때)로 잰다.
-const stampOf = e => { const now = performance.now(), ts = Number(e?.timeStamp); return Number.isFinite(ts) && ts > 0 && ts <= now && now - ts < 250 ? ts : now; };
+// 누른 순간은 이벤트의 timeStamp(같은 시계, 손가락이 닿은 때)로 잰다. V13.191 폰이 잠깐 버벅여 처리가 늦어도(1초 안) 누른 때로.
+const stampOf = e => pressStamp(e?.timeStamp, performance.now());
 function onPointerDown(e) {
   if (!T || e.button > 0) return;
   e.preventDefault();
@@ -322,7 +322,7 @@ async function press(stamp, result) {
   try { res = await send; } catch (err) { toast(err.message); res = null; }
   if (!T || T.play !== P) return;
   if (!res) { T.busy = false; $('tm-btn').disabled = false; return lobby(); }
-  if (res.ms != null && res.ms !== ms) showMs(res.ms);
+  // V13.191 화면 숫자는 누른 값 그대로 둔다(서버가 못 믿은 판도 코인 · 순위만 빠지고 숫자는 그대로).
   result_(res);
 }
 // 끝 신호: 끊기면 같은 id로 한 번 더(서버는 영수증으로 같은 답).
@@ -348,23 +348,26 @@ function voidPlay(message) {
 }
 
 /* ---------- 공개(슬로모션) ---------- */
-// 눌린 순간 앞 0.5초를 1.4초로 늘려서 숫자가 굴러가다 멈춘다(움직임 줄이기면 바로).
+// V13.191 누른 순간 그 숫자로 바로 멈춘다(예전에는 0.5초 앞에서 1.4초 동안 숫자가 올라가 "더 갔다가 멈추는" 것처럼 보였다).
+// 슬로모션 느낌은 정지 · 빛으로: 0.12초 얼림 → 어두워지고 숫자판이 커진 채, 네온이 켜지듯 깜빡이며(째깍) 빛줄기가 훑고 → 번쩍 + 공개 소리.
 function reveal(ms) {
   return new Promise(done => {
-    const stage = $('tm-stage');
-    if (reduced()) { showMs(ms); sfx('tm-reveal'); return done(); }
-    stage.classList.add('slowmo');
-    const from = Math.max(0, ms - 500), dur = 1400, t0 = performance.now();
-    let lastC = -1;
+    const stage = $('tm-stage'), led = $('tm-led');
+    showMs(ms);
+    if (reduced()) { sfx('tm-reveal'); return done(); }
+    // 정지(hit-stop): 누른 순간 무대의 움직임(빛줄기 · 격자 · 깜빡임)을 0.12초 얼린 뒤 슬로모션으로.
+    stage.classList.add('slowmo', 'hitstop'); led.classList.add('ignite');
+    later(() => $('tm-stage')?.classList.remove('hitstop'), 120);
+    const t0 = performance.now();
+    let last = -1;
     const step = t => {
       if (!T) return done();
-      const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 2.4), cur = from + (ms - from) * e;
-      showMs(cur);
-      const c = Math.floor(cur / 50);
-      if (c !== lastC && k < 1) { lastC = c; sfx('tm-tick', { gain: .25, rate: 1.4 + k * .6 }); }
-      if (k < 1) { T.raf = requestAnimationFrame(step); return; }
-      showMs(ms);
-      $('tm-led').classList.add('flash');
+      const el = t - t0, v = revealAt(ms, el), i = REVEAL_STEPS.findLastIndex(([at]) => el >= at);
+      led.style.setProperty('--lit', String(v.lit));
+      if (i !== last) { last = i; if (v.tick) sfx('tm-tick', { gain: .25, rate: 1.4 + i * .08 }); }
+      if (el < TIMING.REVEAL_MS) { T.raf = requestAnimationFrame(step); return; }
+      led.classList.remove('ignite'); led.style.removeProperty('--lit');
+      led.classList.add('flash');
       later(() => $('tm-led')?.classList.remove('flash'), 700);
       stage.classList.remove('slowmo');
       sfx('tm-reveal');
@@ -409,13 +412,13 @@ function result_(res) {
   const pet = T.A.data.stats?.pet, petKey = pet?.key || T.A.data.profile?.avatar_key || 'dog';
   const streak = Number(res.streak || 0);
   const lines = [];
-  if (res.checked === 'server') lines.push(`<p class="tm-note">연결이 흔들려서 <b>서버가 잰 시간</b>으로 판정했어요(순위에는 안 들어가요).</p>`);
+  if (res.checked === 'server') lines.push(`<p class="tm-note">인터넷이 느려서 이번 판은 <b>코인 · 순위 · 기록</b>에서 빠졌어요. 숫자는 누른 그대로예요.</p>`);
   if (res.lucky) lines.push(`<p class="tm-note">완벽이 아주 자주 나와서 이번 판은 <b>좋음 코인</b>까지만 주고 순위에서 빼요.</p>`);
   if (res.ten_used) lines.push(`<p class="tm-note">딱 10.00의 ${TIMING.COINS.ten}코인은 하루 한 번! 오늘은 완벽 코인을 받았어요.</p>`);
   if (res.capped) lines.push(`<p class="tm-note">오늘 받을 수 있는 코인(${TIMING.COIN_DAILY})을 다 받았어요. 경험치는 그대로!</p>`);
   const early = g === 'early';
   layer(`<div class="tm-result g-${g}" role="dialog" aria-label="결과">
-    ${g === 'ten' ? '<div class="tm-ribbon ten"><span>JACKPOT</span><b>정확히 10.00초!</b></div>' : res.record ? '<div class="tm-ribbon"><span>NEW BEST</span><b>내 최고 기록 갱신!</b></div>' : res.week_record ? '<div class="tm-ribbon week"><b>이번 주 최고 기록!</b></div>' : ''}
+    ${g === 'ten' && res.checked !== 'server' ? '<div class="tm-ribbon ten"><span>JACKPOT</span><b>정확히 10.00초!</b></div>' : res.record ? '<div class="tm-ribbon"><span>NEW BEST</span><b>내 최고 기록 갱신!</b></div>' : res.week_record ? '<div class="tm-ribbon week"><b>이번 주 최고 기록!</b></div>' : ''}
     <div class="tm-grade"><i class="tm-gmark" aria-hidden="true">${GRADE_MARKS[g]}</i><b>${GRADE_NAMES[g]}</b></div>
     <p class="tm-err">${early ? `<b>${secText(res.ms)}초</b>에 눌렀어요` : `<b>${errText(res.err)}</b> <span>${errWord(res.err)}</span>`}</p>
     ${early ? '' : ruler(res)}
@@ -427,7 +430,7 @@ function result_(res) {
   </div>`);
   const c = document.querySelector('.tm-coins [data-count]');
   if (c) later(() => { countUp(c, res.coins, g === 'ten' ? 1400 : 700); if (res.coins >= 8) sfx('coins', { gain: .7 }); }, 600);
-  if ((res.record || g === 'ten') && !reduced()) later(() => coinShower(document.querySelector('.tm-result'), g === 'ten' ? 30 : 18, g === 'ten' ? 3 : 1), 900);
+  if ((res.record || (g === 'ten' && res.checked !== 'server')) && !reduced()) later(() => coinShower(document.querySelector('.tm-result'), g === 'ten' ? 30 : 18, g === 'ten' ? 3 : 1), 900);
   // 순위 버튼 · 다시 하기 버튼만 먼저 받는다(스페이스로 다시 시작하지 않게 포커스).
   later(() => document.querySelector('.tm-result [data-tm="again"]')?.focus(), 400);
 }
@@ -488,7 +491,7 @@ function guide(first) {
     </tbody></table>
     <p>하루 <b>${TIMING.FREE_DAILY}판</b>, 연습 끝내기(${TIMING.MIN_PRACTICE}문제 이상) · 출석마다 <b>+1판</b>(최대 ${TIMING.FREE_DAILY + TIMING.SOURCES.length}판). 코인은 하루 ${TIMING.COIN_DAILY}개까지, 경험치는 판마다.</p>
     <p>순위는 이번 주 같은 학년끼리 <b>최고 기록</b>과 <b>평균 오차</b>(${TIMING.AVG_MIN}판 이상)로 봐요.</p>
-    <p class="tm-small">화면을 내리거나 다른 앱으로 가면 그 판은 무효예요. 시간은 서버도 함께 재서 너무 다르면 서버가 잰 시간으로 판정해요.</p>
+    <p class="tm-small">화면을 내리거나 다른 앱으로 가면 그 판은 무효예요. 시간은 서버도 함께 재요. 인터넷이 느려 두 시간이 너무 다르면 숫자는 누른 그대로 보여 주고, 그 판은 코인 · 순위 · 기록에서 빠져요.</p>
     <button type="button" class="yl-cta" data-close>알겠어요!</button></div>`, '10초 맞추기 안내', { className: 'tm-guide-sheet' });
   sheet.box.querySelector('[data-close]')?.addEventListener('click', () => sheet.close());
 }
