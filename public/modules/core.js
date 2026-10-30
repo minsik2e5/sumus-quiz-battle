@@ -197,6 +197,8 @@ export const SERIES_EGG = { id: 'bugdino', item: 'bugdino_egg', name: '곤충 ·
 export const SERIES_PET_KEYS = readyKeys(c => c.series === SERIES_EGG.id);
 export const SERIES_RANKS = { basic: '기본', epic: '영웅', legendary: '전설' };
 export const seriesRank = key => CHARACTERS[key]?.series ? CHARACTERS[key].rank : null;
+// V13.200 보이는 등급(테두리 · 잠긴 그림 · 야차전 특기 연출): 시리즈 펫은 시리즈 등급을 빌린다. 전역 셈(알 · 영웅 수 · 전설 수)에는 쓰지 않는다.
+export const lookTier = key => CHARACTERS[key]?.series ? CHARACTERS[key].rank : petTier(key);
 export const seriesGroupKeys = group => SERIES_PET_KEYS.filter(key => CHARACTERS[key].group === group);
 // Student-chosen pet name, checked the same way on the device and on the server.
 // An empty name is allowed and means "use the pet's default name".

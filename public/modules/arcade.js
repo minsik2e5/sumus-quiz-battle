@@ -10,6 +10,7 @@ import { rpsCard, rpsMatch } from './rps.js';
 import { stocksCard, loadMarket, openStock, startStockClock } from './stocks.js';
 import { RPS_BETS } from './rewards.js';
 import { gamesSection, partyRow } from './arcade-games.js';
+import { SERIES_EGG_ART } from './pet-art.js';
 import { FISHING_ART } from './reel.js';
 import { MATCH_ART } from './match-game.js';
 import { HUNT_ART } from './hunt.js';
@@ -108,7 +109,7 @@ function seriesSlot(A) {
   const label = se.done ? '모두 모았어요' : short ? `<span>${coin()}${num(se.price)}</span><small>${num(short)}코인 부족</small>` : `<span>${coin()}${num(se.price)}</span><small>사기</small>`;
   const legend = se.odds?.legendary;
   return `<div class="egg-slot series${se.done ? ' done' : ''}">
-    <div class="egg-slot-art" aria-hidden="true">${uiArt('bugdino-egg')}</div>
+    <div class="egg-slot-art" aria-hidden="true">${uiArt(SERIES_EGG_ART)}</div>
     <div class="egg-season-text">
       <span class="egg-slot-tag">🦕 곤충 · 공룡 시리즈</span>
       <b class="egg-slot-name">곤충 · 공룡 알</b>

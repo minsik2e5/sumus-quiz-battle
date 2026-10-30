@@ -3003,3 +3003,7 @@
 "56b-theme-title-medals.txt","788","곤충 채집왕 · 쥬라기 반장 칭호 메달","오른쪽 위","title-dinoall","쥬라기 반장 (영웅)","public/assets/titles/dinoall.webp"
 "56b-theme-title-medals.txt","788","곤충 채집왕 · 쥬라기 반장 칭호 메달","왼쪽 아래","title-bugall-alt","곤충 채집왕 (여분, 고르기용)","(여분: 위 칸보다 나으면 이 칸을 titles/bugall로 넣는다)"
 "56b-theme-title-medals.txt","788","곤충 채집왕 · 쥬라기 반장 칭호 메달","오른쪽 아래","title-dinoall-alt","쥬라기 반장 (여분, 고르기용)","(여분: 위 칸보다 나으면 이 칸을 titles/dinoall로 넣는다)"
+"62-series-egg.txt","789","곤충 · 공룡 시리즈 알 상점 아이콘","왼쪽 위","ui-series-egg","곤충 · 공룡 알 (알 상점 · 도감)","public/assets/ui/series-egg.webp"
+"62-series-egg.txt","789","곤충 · 공룡 시리즈 알 상점 아이콘","오른쪽 위","ui-series-egg-alt1","곤충 · 공룡 알 (여분 1, 고르기용)","(여분: 왼쪽 위보다 나으면 이 칸을 ui/series-egg로 넣는다)"
+"62-series-egg.txt","789","곤충 · 공룡 시리즈 알 상점 아이콘","왼쪽 아래","ui-series-egg-alt2","곤충 · 공룡 알 (여분 2, 고르기용)","(여분: 왼쪽 위보다 나으면 이 칸을 ui/series-egg로 넣는다)"
+"62-series-egg.txt","789","곤충 · 공룡 시리즈 알 상점 아이콘","오른쪽 아래","ui-series-egg-alt3","곤충 · 공룡 알 (여분 3, 고르기용)","(여분: 왼쪽 위보다 나으면 이 칸을 ui/series-egg로 넣는다)"

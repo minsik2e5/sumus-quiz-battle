@@ -4,3 +4,5 @@ export const PET_FIGHT = new Set(["ankylo","ant","axolotl","bee","brachio","butt
 export const PET_REVEAL = new Set(["baekho","cheongryong","gumiho","hyeonmu","jujak"]);
 // V13.168 칭호 '12지 수호자' 메달(titles/zodiac12 · -s).
 export const PET_TITLE_ART = new Set(["zodiac12"]);
+// V13.200 곤충 · 공룡 알 전용 그림(그림 62, ui/series-egg)이 들어오면 그것을, 없으면 그림 56 두 알을 합친 ui/bugdino-egg.
+export const SERIES_EGG_ART = "bugdino-egg";
