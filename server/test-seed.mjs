@@ -16,6 +16,8 @@ export const TEST_APP = {
   BAIT: 10,
   // V13.162 판 3 · 4(손맛 고퀄 뒤 다시 채움): 펫 사냥을 바로 해 볼 수 있게 공(기본 · 좋은 · 황금)과 지도에 새 친구 '?' 하나.
   HUNT: { basic: 6, good: 3, gold: 1 },
+  // 테스트 선물: 이름표마다 한 번만 넣는다(판 번호와 따로라 다른 판과 겹치지 않는다). 곤충 · 공룡 시리즈 12종을 나래(ts2)에게.
+  GIFTS: { 'bugdino-ts2': { ts2: ['ladybug', 'bee', 'ant', 'firefly', 'rhinobeetle', 'butterfly', 'tricera', 'stego', 'brachio', 'ptera', 'ankylo', 'tyranno'] } },
   // V13.180 판 6: 인형뽑기를 바로 해 볼 수 있게 집게권(보관 상한까지).
   CLAW: 6,
   STUDENTS: [
@@ -52,7 +54,8 @@ export async function testSeedState(now = Date.now()) {
 // 판 2: 선생님 계정 하나 더 · 학생 모두 전설 · 신화 펫 · 미끼 10개. 이미 쓰던 테스트 데이터는 그대로 두고 덧붙인다.
 // 바꿨으면 true(시작 저장). 테스트 앱(VOCA_STANDALONE)에서만 부른다.
 export async function applyTestSeed(state, now = Date.now(), hash = null) {
-  if (Number(state.test_seed || 0) >= TEST_APP.SEED) return false;
+  const gifted = giftTestPets(state, now);
+  if (Number(state.test_seed || 0) >= TEST_APP.SEED) return gifted;
   hash ||= await passwordHash(TEST_APP.PASSWORD);
   const school = state.schools.find(s => s.id === 'danwon-high');
   TEST_APP.TEACHERS.forEach(([username, name], i) => {
@@ -76,5 +79,21 @@ export async function applyTestSeed(state, now = Date.now(), hash = null) {
     if (fresh && !h.map.spots.some(s => s.kind === 'pet')) h.map.spots.push({ id: `seed-${username}`, kind: 'pet', key: fresh, tier: 'pet', form: 1, x: 50, y: 44, cell: 4 });
   }
   state.test_seed = TEST_APP.SEED;
+  return true;
+}
+
+// 테스트 선물(TEST_APP.GIFTS): 아직 안 넣은 이름표만 넣는다. 이미 가진 펫은 건너뛴다. 바꿨으면 true.
+function giftTestPets(state, now) {
+  const todo = Object.keys(TEST_APP.GIFTS).filter(tag => !(state.test_gifts || []).includes(tag));
+  if (!todo.length) return false;
+  for (const tag of todo) {
+    for (const [username, keys] of Object.entries(TEST_APP.GIFTS[tag])) {
+      const p = state.profiles.find(x => x.username === username && x.role === 'student');
+      if (!p) continue;
+      p.pets ||= [];
+      for (const key of keys) if (!p.pets.some(pet => pet.key === key)) p.pets.push({ key, acquired_at: now });
+    }
+  }
+  state.test_gifts = [...(state.test_gifts || []), ...todo];
   return true;
 }

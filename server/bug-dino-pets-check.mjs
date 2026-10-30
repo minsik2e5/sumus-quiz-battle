@@ -64,7 +64,7 @@ export async function runBugDinoPetsChecks(assert) {
     assert(!hit, 'V13.195 선생님 선물 알 · 기본 알 · 영웅 알(전설 1% · 신화 포함)에서는 시리즈 펫이 나오지 않는다');
   }
   const hunt = source('./hunt.mjs'), lucky = source('./rewards.mjs'), svc = source('./service.mjs');
-  assert(/const missing = p => \(\{ basic: STANDARD_PET_KEYS\.filter[^\n]*epic: EPIC_PET_KEYS\.filter/.test(hunt) && lucky.includes('LEGENDARY_PET_KEYS[Math.min(LEGENDARY_PET_KEYS.length - 1') && lucky.includes("const epicLeft = EPIC_PET_KEYS")
+  assert(/const missing = p => \(\{ basic: STANDARD_PET_KEYS\.filter[^\n]*epic: EPIC_PET_KEYS\.filter/.test(hunt) && lucky.includes('export const legendLeft = p => LEGENDARY_PET_KEYS.filter(') && lucky.includes('legends[Math.min(legends.length - 1') && lucky.includes("const epicLeft = EPIC_PET_KEYS")
     && (svc.match(/\(epic \? EPIC_PET_KEYS : STANDARD_PET_KEYS\)/g) || []).length >= 2,
     'V13.195 몬스터 사냥 · 코인 뽑기 · 낚시/사냥 교환소 알은 기본 · 영웅 목록만 쓴다(시리즈 펫 없음)');
 

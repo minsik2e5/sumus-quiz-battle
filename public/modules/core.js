@@ -119,7 +119,7 @@ export const CHARACTERS = {
   tissue: { name: 'SULSUL', ko: '술술이', type: '두루마리 휴지', color: '#D9A441', light: '#FBE7B0', soft: '#FFFBEF', limited: 'autumn' },
   glue: { name: 'CHALSSAK', ko: '찰싹이', type: '딱풀', color: '#6FA8DC', light: '#CFE6F8', soft: '#F1F8FE', limited: 'autumn' },
   // V13.195 곤충 · 공룡 시리즈(docs/bug-dino-pets-design.md, 그림 54 · 55): 알 상점의 시리즈 알(SERIES_EGG)에서만 나온다.
-  // 전역 등급 표시(epic · legendary)는 넣지 않는다: 기본 · 영웅 · 전설 알, 선물 알, 사냥, 코인 뽑기, 영웅 수 · 전설 1마리 제한에 안 섞인다.
+  // 전역 등급 표시(epic · legendary)는 넣지 않는다: 기본 · 영웅 · 전설 알, 선물 알, 사냥, 코인 뽑기, 영웅 수 · 전역 전설 셈에 안 섞인다.
   // `rank`는 시리즈 안 등급(기본 · 영웅 · 전설: 알 확률 무게 · 특기 세기 · 도감 테두리), `group`은 곤충(bug) · 공룡(dino).
   ladybug: { name: 'JEOMSUNI', ko: '점순이', type: '무당벌레', color: '#D9443F', light: '#FFB8AD', soft: '#FFF1EE', series: 'bugdino', rank: 'basic', group: 'bug', artOrder: 54 },
   bee: { name: 'BUNGBUNG', ko: '붕붕이', type: '꿀벌', color: '#D9A21F', light: '#FFE08A', soft: '#FFF9E3', series: 'bugdino', rank: 'basic', group: 'bug', artOrder: 54 },
@@ -185,8 +185,8 @@ export const EPIC_EGG_PRICE = 800; // V13.92 영웅 알: a random 영웅 pet not
 // V13.98: a 영웅 알 bought by a student without a legendary pet opens as a legendary pet 1% of the time.
 export const EPIC_EGG_LEGENDARY_RATE = 1;
 // V13.182 전설 알(docs/legend-egg-design.md): 영웅 펫(EPIC_PET_KEYS)을 LEGEND_EGG_EPIC_NEED마리 모으면 한 번 받고,
-// 알 상점에서 LEGEND_EGG_PRICE코인에 한 번 살 수 있다. 열면 갖고 있지 않은 전설 펫 하나가 랜덤으로 나온다(신화는 없다).
-// 전설 펫이 이미 있으면(학생당 1마리) 알 대신 LEGEND_EGG_COINS코인과 칭호 '전설의 주인'.
+// 알 상점에서 LEGEND_EGG_PRICE코인에 살 수 있다. 열면 갖고 있지 않은 전설 펫 하나가 랜덤으로 나온다(신화는 없다).
+// V13.197: 학생당 1마리 제한 없음. 상점 알은 못 만난 전설이 남은 만큼 살 수 있고, 다 만났으면 알 대신 LEGEND_EGG_COINS코인과 칭호 '전설의 주인'.
 export const LEGEND_EGG_EPIC_NEED = 20;
 export const LEGEND_EGG_PRICE = 15000;
 export const LEGEND_EGG_COINS = 3000;

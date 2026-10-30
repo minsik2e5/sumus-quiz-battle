@@ -1,5 +1,5 @@
-// V13.182 검사: 전설 알(docs/legend-egg-design.md). 영웅 20마리 보상(한 번 · 소급), 전설 보유자는 코인 + 칭호,
-// 열면 갖고 있지 않은 전설 하나(신화 없음), 상점 15,000코인(학생당 1개), 하단 문구, 응답에 미리보기 없음.
+// V13.182 검사: 전설 알(docs/legend-egg-design.md). 영웅 20마리 보상(한 번 · 소급), 전설을 모두 만난 학생은 코인 + 칭호(V13.197 전설 여러 마리),
+// 열면 갖고 있지 않은 전설 하나(신화 없음), 상점 15,000코인(V13.197: 남은 전설만큼 여러 번), 하단 문구, 응답에 미리보기 없음.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { EPIC_PET_KEYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, CHARACTERS, LEGEND_EGG_EPIC_NEED, LEGEND_EGG_PRICE, LEGEND_EGG_COINS, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE } from '../public/modules/core.js';
@@ -44,16 +44,21 @@ export async function runLegendEggChecks(assert) {
       const r = legendEggOpen(q, { random: () => i / 40, now: t0 });
       assert(LEGENDARY_PET_KEYS.includes(r.legendary.key) && !MYTHIC_PET_KEYS.includes(r.legendary.key) && r.legendary.key !== 'phoenix', 'V13.182 전설 알에서는 전설 4종 중 하나만(신화 · 불새 없음)');
     }
-    // 그사이 다른 곳에서 전설을 만났다면 알 대신 코인(전설은 학생당 1마리).
+    // V13.197 전설 여러 마리: 전설이 있어도 알을 열면 못 만난 다른 전설. 전설을 다 만났으면 알 대신 코인.
     const q = { pets: [{ key: 'dog' }, ...epics(20), { key: 'whale', legendary: true }], legend_egg: { wait: 'epic', e20: 1 } };
     const r = legendEggOpen(q, { random: () => 0, now: t0 });
-    assert(r.coins === LEGEND_EGG_COINS && !r.legendary && q.pets.filter(x => LEGENDARY_PET_KEYS.includes(x.key)).length === 1 && rewardIncome(q) === LEGEND_EGG_COINS, 'V13.182 이미 전설이 있으면 알을 열어도 전설은 늘지 않고 코인');
+    assert(r.legendary && r.legendary.key !== 'whale' && q.pets.filter(x => LEGENDARY_PET_KEYS.includes(x.key)).length === 2 && !rewardIncome(q), 'V13.197 전설이 있어도 전설 알을 열면 못 만난 다른 전설이 나온다');
+    const qa = { pets: [{ key: 'dog' }, ...epics(20), ...LEGENDARY_PET_KEYS.map(key => ({ key, legendary: true }))], legend_egg: { wait: 'epic', e20: 1 } };
+    const ra = legendEggOpen(qa, { random: () => 0, now: t0 });
+    assert(ra.coins === LEGEND_EGG_COINS && !ra.legendary && qa.pets.filter(x => LEGENDARY_PET_KEYS.includes(x.key)).length === LEGENDARY_PET_KEYS.length && rewardIncome(qa) === LEGEND_EGG_COINS, 'V13.197 전설을 모두 만났으면 알을 열어도 코인');
   } finally { setMythicRandom(null); }
 
-  // ---- 전설 보유자: 알 대신 코인 + 칭호, 소급(이미 20마리 넘는 학생)
-  const holder = { id: 's2', role: 'student', pets: [{ key: 'dog' }, ...epics(20), { key: 'qilin', legendary: true }] };
+  // ---- V13.197: 전설이 하나 있어도 영웅 20마리 보상은 알. 전설을 모두 만난 학생만 알 대신 코인 + 칭호(한 번)
+  const one = { id: 's1b', role: 'student', pets: [{ key: 'dog' }, ...epics(20), { key: 'qilin', legendary: true }] };
+  assert(grantLegendEgg(one, t0)?.kind === 'egg' && one.legend_egg.wait === 'epic' && !rewardIncome(one), 'V13.197 전설 1마리가 있어도 영웅 20마리 보상은 전설 알');
+  const holder = { id: 's2', role: 'student', pets: [{ key: 'dog' }, ...epics(20), ...LEGENDARY_PET_KEYS.map(key => ({ key, legendary: true }))] };
   const g = grantLegendEgg(holder, t0);
-  assert(g?.kind === 'coins' && g.coins === LEGEND_EGG_COINS && !holder.legend_egg.wait && rewardIncome(holder) === LEGEND_EGG_COINS && grantLegendEgg(holder, t0 + 1) === null && rewardIncome(holder) === LEGEND_EGG_COINS, 'V13.182 전설 보유자는 알 대신 3,000코인(한 번)');
+  assert(g?.kind === 'coins' && g.coins === LEGEND_EGG_COINS && !holder.legend_egg.wait && rewardIncome(holder) === LEGEND_EGG_COINS && grantLegendEgg(holder, t0 + 1) === null && rewardIncome(holder) === LEGEND_EGG_COINS, 'V13.197 전설을 모두 만난 학생은 알 대신 3,000코인(한 번)');
 
   // ---- 칭호 3개
   let sid = 0;
@@ -68,7 +73,7 @@ export async function runLegendEggChecks(assert) {
   const emblems = source('../public/modules/emblems.js');
   assert(['epic-collector', 'legend-owner', 'epic-dex'].every(key => emblems.includes(`'${key}'`)), 'V13.182 칭호 3개는 V13.184에 메달 그림(51-3 · 52-2)이 와서 TITLE_ART에 있다');
 
-  // ---- 상점 15,000코인 · 학생당 1개 · 전설 보유자 거절 · 코인 부족 거절
+  // ---- 상점 15,000코인 · V13.197 못 만난 전설이 남은 만큼 여러 번 · 다 만나면 거절 · 코인 부족 거절
   const buyer = { pets: [{ key: 'dog' }] };
   assert(throws(() => legendEggBuy(buyer, LEGEND_EGG_PRICE - 1, { now: t0 })) === 400 && !buyer.points_spent, 'V13.182 코인이 부족하면 못 산다');
   setMythicRandom(() => 0);
@@ -76,14 +81,20 @@ export async function runLegendEggChecks(assert) {
     const bought = legendEggBuy(buyer, LEGEND_EGG_PRICE, { random: () => .99, now: t0 });
     assert(bought.legendary?.key === LEGENDARY_PET_KEYS.at(-1) && buyer.points_spent === LEGEND_EGG_PRICE && buyer.purchases[0].item === 'legend_egg' && buyer.purchases[0].price === LEGEND_EGG_PRICE && !buyer.pets.some(x => x.mythic), 'V13.182 상점 전설 알은 15,000코인, 사면 바로 전설 펫(신화 없음)');
   } finally { setMythicRandom(null); }
-  assert(throws(() => legendEggBuy(buyer, 99999, { now: t0 })) === 409 && buyer.points_spent === LEGEND_EGG_PRICE, 'V13.182 전설 펫이 이미 있으면 못 산다');
-  const once = { pets: [{ key: 'dog' }], legend_egg: { buy: 1, coins: 3000, coins_at: 1 } };
-  assert(throws(() => legendEggBuy(once, 99999, { now: t0 })) === 409, 'V13.182 학생당 1개');
+  {
+    const keys = [buyer.pets.find(x => x.legendary).key];
+    for (let i = 1; i < LEGENDARY_PET_KEYS.length; i++) keys.push(legendEggBuy(buyer, 99999, { random: () => 0, now: t0 + i }).legendary?.key);
+    assert(new Set(keys).size === LEGENDARY_PET_KEYS.length && keys.every(key => LEGENDARY_PET_KEYS.includes(key)) && buyer.points_spent === LEGEND_EGG_PRICE * LEGENDARY_PET_KEYS.length && buyer.legend_egg.buys === LEGENDARY_PET_KEYS.length && legendEggView(buyer).all,
+      'V13.197 상점 전설 알은 못 만난 전설이 남은 만큼 여러 번 살 수 있고, 같은 전설은 다시 안 나온다');
+  }
+  assert(throws(() => legendEggBuy(buyer, 99999, { now: t0 })) === 409 && buyer.points_spent === LEGEND_EGG_PRICE * LEGENDARY_PET_KEYS.length && legendEggView(buyer).can_buy === false, 'V13.197 전설을 모두 만나면 더 못 산다');
+  const once = { pets: [{ key: 'dog' }, { key: 'haechi', legendary: true }], legend_egg: { buy: 1, coins: 3000, coins_at: 1 } };
+  assert(legendEggView(once).can_buy && legendEggView(once).left === LEGENDARY_PET_KEYS.length - 1 && legendEggBuy(once, 99999, { random: () => 0, now: t0 }).legendary?.key !== 'haechi', 'V13.197 예전에 한 번 산 학생도 남은 전설이 있으면 또 살 수 있다');
   const waiting = { pets: [{ key: 'dog' }, ...epics(20)], legend_egg: { e20: 1, wait: 'epic' } };
   assert(throws(() => legendEggBuy(waiting, 99999, { now: t0 })) === 409 && legendEggView(waiting).can_buy === false, 'V13.182 열지 않은 전설 알이 있으면 사지 않고 먼저 연다');
-  // 전설 알을 산 뒤 영웅 20마리를 모으면 알 대신 코인.
+  // 전설 알로 전설을 모두 만난 뒤 영웅 20마리를 모으면 알 대신 코인.
   buyer.pets.push(...epics(20));
-  assert(grantLegendEgg(buyer, t0 + DAY)?.kind === 'coins' && !buyer.legend_egg.wait, 'V13.182 전설 알을 사서 전설이 있는 학생이 영웅 20마리를 모으면 코인 + 칭호');
+  assert(grantLegendEgg(buyer, t0 + DAY)?.kind === 'coins' && !buyer.legend_egg.wait, 'V13.197 전설을 모두 만난 학생이 영웅 20마리를 모으면 코인 + 칭호');
 
   // ---- 서버 경로: 접속할 때 한 번(소급), 응답에 미리보기 없음, 학교 소식
   {
@@ -103,15 +114,15 @@ export async function runLegendEggChecks(assert) {
     assert(!LEGENDARY_PET_KEYS.some(key => text.includes(`"${key}"`)), 'V13.182 응답 어디에도 나올 전설이 미리 들어 있지 않다');
     const opened = await call('POST', '/legend-egg/open');
     assert(LEGENDARY_PET_KEYS.includes(opened.legendary?.key) && opened.legend_news && opened.legend_egg.legend && !opened.legend_egg.waiting && opened.stats && opened.profile, 'V13.182 열면 전설 펫 + 학교 소식(announceLegend)');
-    assert(await call('POST', '/legend-egg/buy').then(() => false, e => e.status === 409), 'V13.182 전설을 만난 뒤에는 상점에서 못 산다(서버)');
+    assert(await call('POST', '/legend-egg/buy').then(() => false, e => e.status === 400), 'V13.197 전설을 만난 뒤에도 상점에서 살 수 있다(서버: 이 학생은 코인이 부족해 400)');
     const shop = (await call('GET', '/bootstrap')).legend_egg;
-    assert(shop.can_buy === false && shop.legend === true && shop.price === LEGEND_EGG_PRICE, 'V13.182 알 상점 보기: 전설 보유자는 살 수 없음');
+    assert(shop.can_buy === true && shop.legend === true && shop.left === LEGENDARY_PET_KEYS.length - 1 && shop.total === LEGENDARY_PET_KEYS.length && !shop.all && shop.price === LEGEND_EGG_PRICE, 'V13.197 알 상점 보기: 전설이 있어도 남은 전설이 있으면 살 수 있음');
   }
 
   // ---- 화면: 전설 알 탭 · 하단 문구 · 진행 표시 · 연출
   const ui = source('../public/modules/pet-moments.js'), lucky = source('../public/modules/lucky.js'), app = source('../public/app.js'), svc = source('./service.mjs'), rw = source('./rewards.mjs');
   assert(ui.includes('너무 비싸면 영웅 20명 모으면 줍니다^^') && ui.includes('영웅 ${num(le.epic)} / ${num(le.need)}마리'), 'V13.182 상점 하단 문구와 "영웅 N / 20마리"');
-  assert(ui.includes("'<span class=\"legend-egg-done\">전설 펫을 이미 만났어요</span>'") && ui.includes("legend: { name: '전설 알', price: LEGEND_EGG_PRICE }"), 'V13.182 전설이 있으면 버튼 대신 "전설 펫을 이미 만났어요"');
+  assert(ui.includes("'<span class=\"legend-egg-done\">전설 펫을 모두 만났어요</span>'") && ui.includes('전설은 여러 마리 함께할 수 있어요!') && !ui.includes('학생마다 딱 1개') && ui.includes("legend: { name: '전설 알', price: LEGEND_EGG_PRICE }"), 'V13.182 전설이 있으면 버튼 대신 "전설 펫을 이미 만났어요"');
   assert(ui.includes("api(le.waiting ? '/legend-egg/open' : '/legend-egg/buy', {})") && ui.includes("api('/legend-egg/claim', {})") && app.includes('maybeLegendEggMoment(A, petChanged)'), 'V13.182 화면은 열기 · 사기 · 접속 때 한 번 받기만 부른다(서버가 정한다)');
   assert(ui.includes("legendaryShow({ legendary: { key: res.legendary.key, legendEgg:") && lucky.includes("if (legendEgg) box.classList.add('lgx-plus');") && lucky.includes('lgx-pillars') && lucky.includes('lgx-crown'), 'V13.182 전설 알은 전설 연출을 재사용하고 한 겹 더(lgx-plus)');
   // 신화는 운으로만: 전설 알 코드는 mythicRoll을 부르지 않는다.
