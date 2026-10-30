@@ -188,8 +188,9 @@ writeFileSync(cssBundlePath, cssBundle);
   const shows = all.filter(k => has(`${k}-reveal`) && reveal.has(`bg-${k}.webp`));
   const titles = readdirSync(resolve(root, 'public/assets/titles'));
   const medals = ['zodiac12'].filter(k => titles.includes(`${k}.webp`) && titles.includes(`${k}-s.webp`));
+  const seriesEgg = existsSync(resolve(root, 'public/assets/ui/series-egg.webp')) ? 'series-egg' : 'bugdino-egg';
   const out = resolve(root, 'public/modules/pet-art.js');
-  const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/pets · reveal)에 그림이 다 있는 펫.\nexport const PET_ART = new Set(${JSON.stringify(art)});\nexport const PET_FIGHT = new Set(${JSON.stringify(fight)});\nexport const PET_REVEAL = new Set(${JSON.stringify(shows)});\n// V13.168 칭호 '12지 수호자' 메달(titles/zodiac12 · -s).\nexport const PET_TITLE_ART = new Set(${JSON.stringify(medals)});\n`;
+  const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/pets · reveal)에 그림이 다 있는 펫.\nexport const PET_ART = new Set(${JSON.stringify(art)});\nexport const PET_FIGHT = new Set(${JSON.stringify(fight)});\nexport const PET_REVEAL = new Set(${JSON.stringify(shows)});\n// V13.168 칭호 '12지 수호자' 메달(titles/zodiac12 · -s).\nexport const PET_TITLE_ART = new Set(${JSON.stringify(medals)});\n// V13.200 곤충 · 공룡 알 전용 그림(그림 62, ui/series-egg)이 들어오면 그것을, 없으면 그림 56 두 알을 합친 ui/bugdino-egg.\nexport const SERIES_EGG_ART = ${JSON.stringify(seriesEgg)};\n`;
   if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
   console.log(`[pet-art] ${art.length} pets with art, ${fight.length} with battle poses, ${shows.length} with a reveal`);
 }

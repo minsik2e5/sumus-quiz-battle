@@ -1,5 +1,6 @@
 import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, LIMITED_PET_KEYS, SOON_PET_KEYS, ZODIAC_PET_KEYS, SERIES_PET_KEYS, SERIES_EGG, SERIES_RANKS, seriesGroupKeys, SEASONS, seasonOnSale, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE } from './core.js';
 import { icon, esc, num } from './ui.js';
+import { SERIES_EGG_ART } from './pet-art.js';
 import { PET_SKILLS } from './battle-engine.js';
 import { petDisplayName } from './pet-moments.js';
 import { LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, MYTHIC_RATE } from './rewards.js';
@@ -20,7 +21,7 @@ function card(key, no, pet, teacher = null) {
     return `<figure class="pb-form ${seen ? 'seen' : ''}">${sprite(key, f, !seen)}<figcaption>${seen ? label : f ? `Lv.${PET_FORM_LEVELS[f]}` : '알'}</figcaption></figure>`;
   }).join('');
   // V13.109 한정 펫: its season's egg while on sale, then only 영웅 eggs.
-  const how = series ? `알 상점의 ${SERIES_EGG.name} ${num(SERIES_EGG.price)}코인 · 시리즈 ${SERIES_RANKS[series]}(이미 만난 친구는 다시 안 나와요)` : season ? (seasonOnSale()?.id === c.limited ? `${season.egg} ${num(season.price)}코인 · ${season.until}까지 판매` : `${season.name} 한정 · 지금은 영웅 알 · 코인 뽑기 영웅 알에서 ${season.after_rate}%`) : mythic ? `모든 알에서 아주 낮은 확률(랜덤 알 ${MYTHIC_RATE.basic}% · 영웅 알 ${MYTHIC_RATE.epic}% · 코인 뽑기 ${MYTHIC_RATE.capsule}%) · 뽑기 확정은 없어요` : legend ? `코인 뽑기 ${LEGENDARY_RATE}% · 영웅 알 ${EPIC_EGG_LEGENDARY_RATE}% · 뽑기 ${num(LEGENDARY_PITY)}번 안에 확정` : epic ? `영웅 알 ${num(EPIC_EGG_PRICE)}코인 · 코인 뽑기 ${EPIC_RATE}%` : `상점의 랜덤 알 · ${num(EGG_PRICE)}코인`;
+  const how = series ? `알 상점의 ${SERIES_EGG.name} ${num(SERIES_EGG.price)}코인 · 시리즈 ${SERIES_RANKS[series]}(이미 만난 친구는 다시 안 나와요)` : season ? (seasonOnSale()?.id === c.limited ? `${season.egg} ${num(season.price)}코인 · ${season.until}까지 판매` : `${season.name} 한정 · 지금은 영웅 알 · 코인 뽑기 영웅 알에서 ${season.after_rate}%`) : mythic ? `모든 알에서 아주 낮은 확률(랜덤 알 ${MYTHIC_RATE.basic}% · 영웅 알 ${MYTHIC_RATE.epic}% · 코인 뽑기 ${MYTHIC_RATE.capsule}%) · 뽑기 확정은 없어요 · 학생마다 1마리` : legend ? `코인 뽑기 ${LEGENDARY_RATE}% · 영웅 알 ${EPIC_EGG_LEGENDARY_RATE}% · 뽑기 ${num(LEGENDARY_PITY)}번 안에 확정` : epic ? `영웅 알 ${num(EPIC_EGG_PRICE)}코인 · 코인 뽑기 ${EPIC_RATE}%` : `상점의 랜덤 알 · ${num(EGG_PRICE)}코인`;
   const foot = met
     // V13.185 전설 · 신화 · 한정 펫에도 야차전 특기가 있다(등급 색 그대로).
     ? skill ? `<span class="pb-skill${season ? ' limited' : mythic ? ' mythic' : legend ? ' gold' : ''}">야차전 특기</span><b>${esc(skill.name)}</b><small>${esc(skill.desc)}</small>` : ''
@@ -65,7 +66,7 @@ export function petBookPage(A) {
     <div class="pb-grid">${EPIC_PET_KEYS.map((key, i) => card(key, STANDARD_PET_KEYS.length + i + 1, mine(key))).join('')}</div>
     <h2 class="pb-section legend">전설 펫</h2>
     <div class="pb-grid">${LEGENDARY_PET_KEYS.map((key, i) => card(key, STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length + i + 1, mine(key))).join('')}</div>
-    <h2 class="pb-section mythic">신화 펫 <small>전설보다 위 · 모든 알에서 아주 낮은 확률</small></h2>
+    <h2 class="pb-section mythic">신화 펫 <small>전설보다 위 · 모든 알에서 아주 낮은 확률 · 학생마다 1마리</small></h2>
     <div class="pb-grid">${MYTHIC_PET_KEYS.map((key, i) => card(key, STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length + LEGENDARY_PET_KEYS.length + i + 1, mine(key))).join('')}</div>
     <h2 class="pb-section limited">한정 펫 <small>시즌에만 파는 알</small></h2>
     <div class="pb-grid">${LIMITED_PET_KEYS.map((key, i) => card(key, STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length + LEGENDARY_PET_KEYS.length + MYTHIC_PET_KEYS.length + i + 1, mine(key))).join('')}</div>
@@ -78,7 +79,7 @@ const seriesKeys = () => [...SERIES_PET_KEYS].sort((a, b) => SERIES_ORDER.indexO
 function seriesSection(cardOf, metOf = null) {
   if (!SERIES_PET_KEYS.length) return '';
   const bug = seriesGroupKeys('bug'), dino = seriesGroupKeys('dino');
-  return `<h2 class="pb-section series"><img src="/assets/ui/bugdino-egg.webp" alt="" width="34" height="34" loading="lazy" decoding="async">곤충 · 공룡 시리즈 <small>${esc(SERIES_EGG.name)}에서만 · 이미 만난 친구는 다시 안 나와요</small></h2>
+  return `<h2 class="pb-section series"><img src="/assets/ui/${SERIES_EGG_ART}.webp" alt="" width="34" height="34" loading="lazy" decoding="async">곤충 · 공룡 시리즈 <small>${esc(SERIES_EGG.name)}에서만 · 이미 만난 친구는 다시 안 나와요</small></h2>
     ${metOf ? `<p class="pb-series-prog">곤충 ${num(metOf(bug))}/${num(bug.length)} · 공룡 ${num(metOf(dino))}/${num(dino.length)}</p>` : ''}
     <div class="pb-grid">${seriesKeys().map(cardOf).join('')}</div>`;
 }
@@ -91,7 +92,7 @@ export function teacherPetDex(A) {
     owners: students.filter(p => (p.pets || []).some(pet => pet.key === key)).map(p => p.display_name),
     partners: students.filter(p => p.avatar_key === key).length
   });
-  const sections = [['기본 펫', '랜덤 알', STANDARD_PET_KEYS, ''], ['영웅 펫', '영웅 알 · 코인 뽑기', EPIC_PET_KEYS, ' epic'], ['전설 펫', '코인 뽑기 · 영웅 알 1%', LEGENDARY_PET_KEYS, ' legend'], ['신화 펫', '모든 알에서 아주 낮은 확률', MYTHIC_PET_KEYS, ' mythic'], ['한정 펫', '시즌에만 파는 알', LIMITED_PET_KEYS, ' limited']];
+  const sections = [['기본 펫', '랜덤 알', STANDARD_PET_KEYS, ''], ['영웅 펫', '영웅 알 · 코인 뽑기', EPIC_PET_KEYS, ' epic'], ['전설 펫', '코인 뽑기 · 영웅 알 1%', LEGENDARY_PET_KEYS, ' legend'], ['신화 펫', '모든 알에서 아주 낮은 확률 · 학생마다 1마리', MYTHIC_PET_KEYS, ' mythic'], ['한정 펫', '시즌에만 파는 알', LIMITED_PET_KEYS, ' limited']];
   let no = 0;
   const withPet = students.filter(p => (p.pets || []).length).length;
   const sale = seasonOnSale();

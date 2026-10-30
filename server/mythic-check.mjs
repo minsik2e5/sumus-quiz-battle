@@ -28,7 +28,7 @@ export function runMythicChecks(assert) {
   // ---- the roll
   const none = { pets: [{ key: 'dog' }] }, all = { pets: MYTHIC_PET_KEYS.map(key => ({ key })) }; // V13.168 그림이 들어온 새 신화 펫(황룡 · 삼족오)까지 다 가진 학생
   try {
-    setMythicRandom(() => 0); assert(mythicRoll(none, 'basic') === 'gumiho' && mythicRoll({ pets: [{ key: 'gumiho' }] }, 'basic') === 'cheongryong' && mythicRoll(all, 'basic') === null, 'V13.118 신화는 아직 없는 신화 펫 중에서 나오고, 다 가진 학생에게는 안 나온다');
+    setMythicRandom(() => 0); assert(mythicRoll(none, 'basic') === 'gumiho' && mythicRoll({ pets: [{ key: 'gumiho' }] }, 'basic') === null && mythicRoll(all, 'basic') === null, 'V13.118 신화는 아직 없는 신화 펫 중에서 나온다(V13.200: 학생당 1마리, 신화가 있으면 더 안 나온다)');
     setMythicRandom(() => .999); assert(sources.every(key => mythicRoll(none, key) === null), 'V13.118 보통의 운에서는 신화가 나오지 않는다');
     setMythicRandom(() => .0015); // 0.15%: above basic 0.1 and gift 0.1 and capsule 0.03, below epic 0.2
     assert(mythicRoll(none, 'epic') !== null && mythicRoll(none, 'basic') === null && mythicRoll(none, 'gift') === null && mythicRoll(none, 'capsule') === null, 'V13.118 같은 운이어도 영웅 알이 랜덤 알·선물·코인 뽑기보다 신화가 잘 나온다');
@@ -42,8 +42,11 @@ export function runMythicChecks(assert) {
     assert(opened2.mythic && egg2.purchases[0].item === 'epic_egg' && egg2.points_spent === 800, 'V13.118 영웅 알도 신화로 열릴 수 있다');
     const egg3 = { pets: [{ key: 'dog' }] }, opened3 = openEgg(egg3, { season: 'autumn', missing: ['ghost'], price: 600, random: () => 0, now: Date.parse('2026-10-20T12:00:00+09:00') });
     assert(!opened3.mythic && opened3.key === 'ghost' && opened3.limited, 'V13.118 가을 이벤트 알(한정 알)에서는 신화가 나오지 않는다');
-    const four = { pets: [{ key: 'dog' }, ...MYTHIC_PET_KEYS.filter(key => key !== 'hyeonmu').map(key => ({ key })) /* V13.168 그림이 들어온 새 신화 펫 포함 */] }, last = openEgg(four, { epic: false, missing: ['pig'], price: 400, random: () => .5 });
-    assert(last.key === 'hyeonmu' && openEgg({ pets: [...four.pets, { key: 'hyeonmu' }] }, { epic: false, missing: ['pig'], price: 400, random: () => .5 }).mythic === undefined, 'V13.118 신화를 다 모으면 더는 신화가 나오지 않고 평소 알로 열린다');
+    // V13.200 신화는 학생당 1마리: 신화가 하나라도 있으면 알 · 뽑기 · 선물 어디서도 신화를 굴리지 않고 평소 알로 열린다(예전에 여러 마리 받은 학생도 더 안 나온다).
+    const one = { pets: [{ key: 'dog' }, { key: 'gumiho', mythic: true }] }, after = openEgg(one, { epic: false, missing: ['pig'], price: 400, random: () => .5 });
+    const many = { pets: [{ key: 'dog' }, ...MYTHIC_PET_KEYS.slice(0, 3).map(key => ({ key, mythic: true }))] };
+    assert(!after.mythic && after.key === 'pig' && one.pets.filter(x => MYTHIC_PET_KEYS.includes(x.key)).length === 1 && openEgg(many, { epic: true, missing: ['capybara'], price: 800, random: () => .5 }).mythic === undefined && many.pets.filter(x => MYTHIC_PET_KEYS.includes(x.key)).length === 3,
+      'V13.118 신화가 이미 있으면(V13.200: 학생당 1마리) 더는 신화가 나오지 않고 평소 알로 열린다, 예전에 받은 신화는 그대로');
 
     // ---- coin capsule
     const cap = { pets: [{ key: 'dog' }], lucky: {} }, pulled = pullLucky(cap, 10, 1000, { random: () => .5, now: Date.now() });
@@ -71,7 +74,7 @@ export function runMythicChecks(assert) {
     'V13.118 신화 연출은 움직임 줄이기를 지키고(바로 결과), 눌러서 건너뛸 수 있고, 신화 팡파르 소리가 난다');
   assert(moments.includes('if (res.mythic) { await mythicShow(res); return true; }') && moments.includes('if (res.mythic || res.legendary || res.epic || res.limited || (res.series && res.rank !== \'basic\')) { onChanged?.()') && arcade.includes('if (res.mythic || res.legendary || res.epic) {') && celebrate.includes('await giftEggShow(g.egg)') && moments.includes("if (egg.tier === 'mythic') { await mythicShow(") && celebrate.includes("mythic: '신화'"),
     'V13.118 알 상점·코인 뽑기·선생님 알 선물이 신화 결과를 연출로 보여 준다(V13.160: 선물 알도 신화 연출)');
-  assert(petbook.includes('MYTHIC_PET_KEYS.map') && petbook.includes('pb-section mythic') && petbook.includes('MYTHIC_RATE.basic') && petbook.includes("['신화 펫', '모든 알에서 아주 낮은 확률', MYTHIC_PET_KEYS, ' mythic']") && student.includes('ACTIVE_PET_KEYS') && !student.includes('Object.keys(CHARACTERS)') && student.includes('CHARACTERS[key].legendary || CHARACTERS[key].mythic'),
+  assert(petbook.includes('MYTHIC_PET_KEYS.map') && petbook.includes('pb-section mythic') && petbook.includes('MYTHIC_RATE.basic') && petbook.includes("['신화 펫', '모든 알에서 아주 낮은 확률 · 학생마다 1마리', MYTHIC_PET_KEYS, ' mythic']") && student.includes('ACTIVE_PET_KEYS') && !student.includes('Object.keys(CHARACTERS)') && student.includes("['legendary', 'mythic'].includes(lookTier(key))") /* V13.200 시리즈 등급도 보는 lookTier */,
     'V13.118 도감(학생·선생님)에 신화 펫 칸과 얻는 법이 있고, 내 펫 개수는 숨긴 불새를 빼고 센다');
   assert(css.includes('.mx-bg{') && css.includes('.mx.p4 .mx-flash') && css.includes('.pb-card.mythic') && build.includes('"v13118.css"'), 'V13.118 신화 연출·도감 CSS(v13118.css)가 빌드에 들어간다');
   const asset = (dir, name, ext = 'webp') => existsSync(here(`../public/assets/${dir}/${name}.${ext}`));

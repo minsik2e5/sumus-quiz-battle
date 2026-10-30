@@ -3,6 +3,7 @@ import { eggTapHtml, bindEggTap } from './pet-growth.js';
 import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, LEGEND_EGG_PRICE, LEGEND_EGG_EPIC_NEED, SERIES_RANKS, seasonOnSale, cleanPetName } from './core.js';
 import { epicShow, legendaryShow, mythicShow } from './lucky.js';
 import { uiArt, ART_READY } from './emblems.js';
+import { SERIES_EGG_ART } from './pet-art.js';
 import { avatar, petKey } from './character.js';
 import { playSound, preloadSound } from './sound.js';
 
@@ -364,7 +365,7 @@ export function openEggShop(A, onChanged, kind = 'basic') {
     const odds = Object.entries(se.odds || {}).map(([rank, pct]) => `<span class="series-odd ${rank}"><b>${SERIES_RANKS[rank]}</b>${pct}%</span>`).join('');
     body.innerHTML = `<div class="pet-shop egg-shop-v1392 series">
       ${eggTabs(eggs, 'series', le)}
-      <div class="pet-shop-egg-art series-egg-art" aria-hidden="true"><i class="series-egg-halo"></i>${uiArt('bugdino-egg')}</div>
+      <div class="pet-shop-egg-art series-egg-art" aria-hidden="true"><i class="series-egg-halo"></i>${uiArt(SERIES_EGG_ART)}</div>
       <p class="pet-moment-msg"><b class="egg-shop-tier series">곤충 · 공룡</b> ${se.done ? '시리즈 친구를 모두 모았어요!' : '곤충일까, 공룡일까?'}</p>
       <p class="pet-shop-copy">${se.done ? `곤충 ${num(se.bug.total)}마리 · 공룡 ${num(se.dino.total)}마리를 모두 만났어요.<br>더는 팔지 않아요. 도감에서 친구들을 만나 보세요!` : `곤충 · 공룡 친구 중 아직 만나지 못한 <b>${num(se.left)}마리</b>에서 한 마리의 알이 나와요.<br><b class="egg-shop-legend">이미 만난 친구는 다시 나오지 않아요!</b> 전설 공룡 렉스도 이 알에서만 만나요.`}</p>
       <div class="series-egg-meta">

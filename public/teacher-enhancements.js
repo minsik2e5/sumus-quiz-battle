@@ -105,10 +105,7 @@ async function openStudentDetail(id) {
       <div><b>${p.stats.practice_count}회</b><small>누적 연습</small></div>
       <div><b>${attempts.length}회</b><small>실전시험 제출</small></div>
     </div>
-    <div class="sumus-detail-section"><h3>시험범위 정복</h3><div class="detail-grid"><div><b>${wordMastery.mastered || 0}/${wordMastery.total_ranges || 0}</b><small>단어 MASTER</small></div><div><b>${wordMastery.conquest || 0}%</b><small>단어 정복도</small></div><div><b>${grammarMastered}지문</b><small>어법 MASTER</small></div><div><b>${grammarItems.length}지문</b><small>어법 학습</small></div></div><p class="sumus-account-note">${grammarRecent ? '최근 어법 학습 ' + esc(shortActivity(grammarRecent.updated_at)) : '아직 어법·어휘 학습 기록이 없어요.'}</p></div>
-    <div class="sumus-detail-section"><h3>오늘 뭘 했나</h3><div id="student-activity-box" class="act-box"></div></div>
-    <div class="sumus-detail-section"><h3>최근 연습 기록</h3><div class="sumus-activity-list">${activityRows(data, id)}</div></div>
-    <div class="sumus-detail-section"><h3>최근 시험 결과</h3><div class="sumus-activity-list">${examRows(data, id)}</div></div>
+    <!-- V13.200 계정 관리(이름 · 반 · 비밀번호)를 위로: 활동 기록이 길어 맨 아래 칸을 찾기 어려웠다 -->
     <div class="sumus-detail-section">
       <h3>계정 관리</h3>
       <form id="student-enhanced-update">
@@ -123,7 +120,12 @@ async function openStudentDetail(id) {
         <button class="btn primary full" type="submit">학생 정보 저장</button><div class="sumus-account-actions"><button class="btn" type="button" id="student-reset-password">비밀번호 12345678로 재설정</button><button class="btn sumus-danger" type="button" id="student-delete-account">학생 계정 삭제</button></div>
         <p class="sumus-account-note">학교를 변경하면 다음 로그인부터 새 학교의 단어·과제·시험만 표시됩니다. 비밀번호 재설정 시 기존 로그인은 모두 해제됩니다. 계정 삭제는 해당 학생의 연습·시험 기록도 함께 삭제합니다.</p>
       </form>
-    </div>`, '학생 관리');
+    </div>
+    <div class="sumus-detail-section"><h3>시험범위 정복</h3><div class="detail-grid"><div><b>${wordMastery.mastered || 0}/${wordMastery.total_ranges || 0}</b><small>단어 MASTER</small></div><div><b>${wordMastery.conquest || 0}%</b><small>단어 정복도</small></div><div><b>${grammarMastered}지문</b><small>어법 MASTER</small></div><div><b>${grammarItems.length}지문</b><small>어법 학습</small></div></div><p class="sumus-account-note">${grammarRecent ? '최근 어법 학습 ' + esc(shortActivity(grammarRecent.updated_at)) : '아직 어법·어휘 학습 기록이 없어요.'}</p></div>
+    <div class="sumus-detail-section"><h3>오늘 뭘 했나</h3><div id="student-activity-box" class="act-box"></div></div>
+    <div class="sumus-detail-section"><h3>최근 연습 기록</h3><div class="sumus-activity-list">${activityRows(data, id)}</div></div>
+    <div class="sumus-detail-section"><h3>최근 시험 결과</h3><div class="sumus-activity-list">${examRows(data, id)}</div></div>
+`, '학생 관리');
 
   loadStudentActivity(id, $('#student-activity-box'));
   $('#student-enhanced-update').onsubmit = async event => {

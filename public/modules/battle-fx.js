@@ -52,7 +52,8 @@ export const FX2_MAX = 44;
 // A rarer pet gets a grander show: the cap grows with the pet's rank (0 basic · 1 epic · 2 legendary · 3 mythic).
 export const FX2_CAP = [44, 52, 60, 66];
 let capNow = FX2_MAX;
-export const tierOf = c => c?.mythic ? 3 : c?.legendary ? 2 : c?.epic ? 1 : 0;
+// V13.200 시리즈 펫(곤충 · 공룡)은 시리즈 등급(rank)으로: 렉스는 전설, 장수 · 나풀 · 휘익 · 단단이는 영웅 연출.
+export const tierOf = c => c?.mythic ? 3 : c?.legendary || c?.rank === 'legendary' ? 2 : c?.epic || c?.rank === 'epic' ? 1 : 0;
 export const fxCap = rank => { capNow = FX2_CAP[Math.max(0, Math.min(3, rank | 0))]; };
 const live = arena => arena.querySelectorAll('[data-fx]').length;
 function piece(arena, className, css, ms, html = '') {

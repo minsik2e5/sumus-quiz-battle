@@ -38,7 +38,10 @@ export const secureRandom = () => randomBytes(4).readUInt32BE(0) / 2 ** 32;
 // set it (setMythicRandom) and a tiny real chance never flips one of them.
 let mythicRandom = secureRandom;
 export const setMythicRandom = fn => { mythicRandom = fn || secureRandom; };
+// V13.200 신화는 학생당 1마리(선생님 결정): 신화가 이미 있으면 어디서도 굴리지 않는다. 예전에 2마리 이상 받은 학생은 그대로 둔다.
+export const hasMythicPet = p => (p?.pets || []).some(pet => MYTHIC_PET_KEYS.includes(pet.key));
 export function mythicRoll(p, source) {
+  if (hasMythicPet(p)) return null;
   const left = MYTHIC_PET_KEYS.filter(key => !(p.pets || []).some(pet => pet.key === key));
   if (!left.length || !(mythicRandom() * 100 < (MYTHIC_RATE[source] || 0))) return null;
   return left[Math.min(left.length - 1, Math.floor(mythicRandom() * left.length))];
