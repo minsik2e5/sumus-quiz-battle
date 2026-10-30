@@ -575,7 +575,13 @@ export async function runRewardsChecks(assert, expectStatus) {
   const beforePity = pullLucky(legendProfile, 10, 100, { random: values([.5, .99]), now });
   const atPity = pullLucky(legendProfile, 10, 100, { random: values([.5, .6]), now });
   const afterPity = pullLucky(legendProfile, 10, 100, { random: values([.5, 0, 0]), now });
-  assert(!beforePity.legendary && beforePity.lucky.legend.remaining === 1 && atPity.legendary?.guaranteed && atPity.legendary.pull === 150 && LEGENDARY_PET_KEYS.includes(atPity.legendary.key) && afterPity.legendary === null && legendProfile.pets.filter(pet => LEGENDARY_PET_KEYS.includes(pet.key)).length === 1, 'V13.89 149번째까지 실패하면 150번째에 확정되고, 한 번 만난 뒤에는 전설 펫이 더 나오지 않는다');
+  assert(!beforePity.legendary && beforePity.lucky.legend.remaining === 1 && atPity.legendary?.guaranteed && atPity.legendary.pull === 150 && LEGENDARY_PET_KEYS.includes(atPity.legendary.key), 'V13.89 149번째까지 실패하면 150번째에 확정된다');
+  // V13.197 전설 여러 마리: 만난 뒤에도 못 만난 전설이 남아 있으면 같은 확률로 또 나온다(다른 전설, 천장 없음). 다 만나면 더 안 나온다.
+  assert(afterPity.legendary && !afterPity.legendary.guaranteed && afterPity.legendary.key !== atPity.legendary.key && legendProfile.lucky.legend_pulls === 150 && new Set(legendProfile.pets.filter(pet => LEGENDARY_PET_KEYS.includes(pet.key)).map(pet => pet.key)).size === 2 && afterPity.lucky.legend.left === LEGENDARY_PET_KEYS.length - 2,
+    'V13.197 전설을 만난 뒤에도 못 만난 다른 전설이 같은 확률로 나오고, 150회 확정은 첫 전설까지만이다');
+  const allLegends = { pets: [{ key: 'dog' }, ...LEGENDARY_PET_KEYS.map(key => ({ key }))], avatar_key: 'dog', lucky: {}, points_spent: 0 };
+  const noMore = pullLucky(allLegends, 10, 100, { random: values([.5, 0, 0]), now });
+  assert(noMore.legendary === null && allLegends.pets.filter(pet => LEGENDARY_PET_KEYS.includes(pet.key)).length === LEGENDARY_PET_KEYS.length && noMore.lucky.legend.left === 0, 'V13.197 전설을 모두 만나면 코인 뽑기에서 전설이 더 나오지 않는다');
   const legendExpressions = LEGENDARY_PET_KEYS.flatMap(pet => [0, 1, 2, 3].flatMap(form => (form ? ['happy', 'eat', 'sad', 'cheer'] : ['happy', 'eat']).map(expression => expressionSrc(pet, form, expression))));
   assert(legendExpressions.length === 56 && legendExpressions.every(src => src && existsSync(fileURLToPath(new URL('../public' + src, import.meta.url)))), 'V13.89 전설 펫 표정과 알 반응 56장이 등록되어 있고 파일이 있다');
   assert(LEGENDARY_PET_KEYS.every(key => CHARACTERS[key].legendary && petSkill({ key }).key === key), 'V13.185 전설 펫에도 야차전 펫 특기가 있다(V13.89에는 없었다)');
@@ -827,7 +833,10 @@ export async function runRewardsChecks(assert, expectStatus) {
     const plain = fresh(), plainEgg = openEgg(plain, { epic: true, missing: EPIC_PET_KEYS, price: EPIC_EGG_PRICE, random: values([.01, .5]), now });
     assert(!plainEgg.legendary && EPIC_PET_KEYS.includes(plainEgg.key) && plain.pets.some(pet => pet.key === plainEgg.key && pet.epic), 'V13.98 1%를 넘으면 영웅 알은 영웅 펫이다');
     const owner = { pets: [{ key: 'dog' }, { key: 'haechi', legendary: true }], points_spent: 0 }, ownerEgg = openEgg(owner, { epic: true, missing: EPIC_PET_KEYS, price: EPIC_EGG_PRICE, random: values([0, .5]), now: Date.parse('2026-10-22T03:00:00Z') }); // V13.168: 시즌 중 시각으로(시즌이 끝나면 영웅 알에서 한정 펫이 나올 수 있어 12월부터 실패하던 검사)
-    assert(!ownerEgg.legendary && EPIC_PET_KEYS.includes(ownerEgg.key) && owner.pets.filter(pet => LEGENDARY_PET_KEYS.includes(pet.key)).length === 1, 'V13.98 전설 펫이 이미 있으면 영웅 알에서 전설이 다시 나오지 않는다(전설은 한 마리까지)');
+    // V13.197 전설 여러 마리: 해치가 있어도 1% 행운이면 못 만난 다른 전설이 나온다. 전설을 다 만났으면 영웅.
+    assert(ownerEgg.legendary && ownerEgg.key !== 'haechi' && LEGENDARY_PET_KEYS.includes(ownerEgg.key) && owner.pets.filter(pet => LEGENDARY_PET_KEYS.includes(pet.key)).length === 2, 'V13.197 전설 펫이 있어도 영웅 알 1%에서 못 만난 다른 전설이 나온다');
+    const fullL = { pets: [{ key: 'dog' }, ...LEGENDARY_PET_KEYS.map(key => ({ key, legendary: true }))], points_spent: 0 }, fullEgg = openEgg(fullL, { epic: true, missing: EPIC_PET_KEYS, price: EPIC_EGG_PRICE, random: values([0, .5]), now: Date.parse('2026-10-22T03:00:00Z') });
+    assert(!fullEgg.legendary && EPIC_PET_KEYS.includes(fullEgg.key) && fullL.pets.filter(pet => LEGENDARY_PET_KEYS.includes(pet.key)).length === LEGENDARY_PET_KEYS.length, 'V13.197 전설을 모두 만났으면 영웅 알은 영웅 펫이다(같은 전설은 다시 안 나온다)');
     const basic = fresh(), basicEgg = openEgg(basic, { epic: false, missing: ['cat'], price: EGG_PRICE, random: values([0, 0]), now });
     assert(!basicEgg.legendary && basicEgg.key === 'cat' && basic.points_spent === 400, 'V13.98 랜덤 알에서는 전설이 나오지 않는다');
     const service98 = source('./service.mjs'), shop98 = source('../public/modules/pet-moments.js'), lucky98 = source('../public/modules/lucky.js');
@@ -912,8 +921,9 @@ export async function runRewardsChecks(assert, expectStatus) {
       const seq = list => { const v = [...list]; return () => v.length ? v.shift() : 0; };
       assert(GIFT_EGG_ODDS.basic === 84 && GIFT_EGG_ODDS.epic === 15 && GIFT_EGG_ODDS.legendary === 1 && GIFT_EGG_FULL_COINS === 400
         && giftEggPick({ pets: [{ key: 'dog' }] }, seq([0.005, 0])).tier === 'legendary' && giftEggPick({ pets: [{ key: 'dog' }] }, seq([0.10, 0])).tier === 'epic' && giftEggPick({ pets: [{ key: 'dog' }] }, seq([0.5, 0])).tier === 'basic'
-        && giftEggPick({ pets: [{ key: 'dog' }, { key: 'haechi' }] }, seq([0.005, 0])).tier === 'epic',
-        'V13.111 선생님 알은 기본 84% · 영웅 15% · 전설 1%이고, 전설이 이미 있으면 그 1%는 영웅이 된다');
+        && (g => g.tier === 'legendary' && g.key !== 'haechi' && LEGENDARY_PET_KEYS.includes(g.key))(giftEggPick({ pets: [{ key: 'dog' }, { key: 'haechi' }] }, seq([0.005, 0])))
+        && giftEggPick({ pets: [{ key: 'dog' }, ...LEGENDARY_PET_KEYS.map(key => ({ key }))] }, seq([0.005, 0])).tier === 'epic',
+        'V13.111 선생님 알은 기본 84% · 영웅 15% · 전설 1%이고, V13.197 전설이 있어도 그 1%는 못 만난 다른 전설, 전설을 다 만났으면 영웅이 된다');
       const allBasic = { pets: STANDARD_PET_KEYS.map(key => ({ key })) }, allEpic = { pets: [{ key: 'dog' }, ...EPIC_PET_KEYS.map(key => ({ key }))] };
       const everyPet = { pets: [...STANDARD_PET_KEYS, ...EPIC_PET_KEYS, 'haechi'].map(key => ({ key })) };
       assert(giftEggPick(allBasic, seq([0.5, 0])).tier === 'epic' && giftEggPick(allEpic, seq([0.10, 0])).tier === 'basic' && giftEggPick(everyPet, seq([0.5, 0])) === null
@@ -989,7 +999,7 @@ export async function runRewardsChecks(assert, expectStatus) {
         'V13.109 기간이 끝난 뒤 영웅 알을 사면 5% 확률로 한정 펫 알이 나온다(전설 1%가 먼저)');
       const egg2 = kidL(); const opened2 = openEgg(egg2, { season: 'autumn', missing: ['ghost'], price: 600, random: () => 0, now: during });
       assert(opened2.key === 'ghost' && opened2.limited && egg2.purchases[0].item === 'autumn_egg' && egg2.purchases[0].price === 600, 'V13.117 가을 이벤트 알은 아직 없는 이벤트 펫을 준다');
-      const cap = { pets: [{ key: 'dog' }, { key: 'haechi' }], lucky: {} };
+      const cap = { pets: [{ key: 'dog' }, ...LEGENDARY_PET_KEYS.map(key => ({ key }))], lucky: {} }; // V13.197: 전설을 다 만나야 전설 굴림을 건너뛴다
       seq = [0.01, 0.0, 0.0, 0.0, 0.0];
       const pulled = pullLucky(cap, LUCKY_BETS[0], 1000, { random: rnd, now: after });
       assert(pulled.epic?.limited && LIMITED_PET_KEYS.includes(pulled.epic.key) && cap.pets.some(pet => pet.key === pulled.epic.key && pet.limited),

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createStorageMock } from './storage-mock.mjs';
 import { TEST_APP, applyTestSeed } from './test-seed.mjs';
-import { LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS } from '../public/modules/core.js';
+import { CHARACTERS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS } from '../public/modules/core.js';
 import { VocaStateObject } from '../cloudflare/worker.mjs';
 
 // V13.149 테스트 앱 검사: 운영 Worker · 운영 Supabase · 운영 비밀값에 닿지 않는지, Supabase 없이 켜지고 저장이 남는지.
@@ -114,6 +114,13 @@ export async function runTestAppChecks() {
     assert(prev.profiles.some(p => p.username === 'tteacher2') && ts2.pets.length === 1 + LEGENDARY_PET_KEYS.length + MYTHIC_PET_KEYS.length && ts2.reel.bait === TEST_APP.BAIT && ts2.pets[0].first, '예전 판에 덧붙이기');
     assert.equal(prev.profiles.find(p => p.username === 'ts1').reel.net.minnow, 4, '덧붙여도 쓰던 기록은 그대로');
     assert.equal(await applyTestSeed(prev), false, '같은 판은 다시 덧붙이지 않는다');
+    // 테스트 선물(이름표마다 한 번): 곤충 · 공룡 12종을 나래(ts2)에게. 판 번호가 이미 최신이어도 들어간다.
+    const gift = TEST_APP.GIFTS['bugdino-ts2'].ts2;
+    assert(gift.length === 12 && gift.every(k => CHARACTERS[k]?.series === 'bugdino'), '선물은 곤충 · 공룡 12종');
+    delete prev.test_gifts;
+    assert.equal(await applyTestSeed(prev), true, '판은 그대로여도 새 선물은 넣는다');
+    assert(gift.every(k => ts2.pets.filter(p => p.key === k).length === 1) && ts2.pets[0].first && !prev.profiles.find(p => p.username === 'ts1').pets.some(p => p.key === 'tyranno'), '나래에게만 12종 한 마리씩');
+    assert.equal(await applyTestSeed(prev), false, '같은 선물은 다시 넣지 않는다');
   } finally {
     globalThis.fetch = nativeFetch;
   }

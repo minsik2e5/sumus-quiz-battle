@@ -93,8 +93,10 @@ export function giveGift(p, { kind = 'coins', amount, note = '', from, fromName,
 // 차지해 첫 펫을 고를 수 없고, 지금까지 쌓은 경험치(첫 펫 몫)가 어느 펫에게도 가지 않았다. 첫 펫을 고르면 열 수 있다.
 const eggWaits = (p, g) => g.kind === 'egg' && !(p?.pets || []).length;
 export const giftsWaiting = p => (p?.gift_box?.log || []).filter(g => !g.opened && !eggWaits(p, g)).map(g => ({ id: g.id, ...(g.kind === 'egg' ? { kind: 'egg' } : {}), amount: g.amount, note: g.note, from_name: g.from_name, at: g.at }));
-// V13.111 선생님 알: 기본 84% · 영웅 15% · 전설 1% (a student has at most one legendary pet; then
-// it is 영웅). Always a pet the student does not have yet: a full tier moves to the other one, and
+// V13.197 전설 여러 마리: 학생당 1마리 제한을 없앴다. 어디서든 아직 못 만난 전설만 나오고(중복 없음), 다 만나면 더 안 나온다.
+export const legendLeft = p => LEGENDARY_PET_KEYS.filter(key => !(p?.pets || []).some(pet => pet.key === key));
+// V13.111 선생님 알: 기본 84% · 영웅 15% · 전설 1% (V13.197: 못 만난 전설 중 하나, 전설을 다 만났으면
+// 영웅). Always a pet the student does not have yet: a full tier moves to the other one, and
 // a student with every pet gets GIFT_EGG_FULL_COINS instead. Limited pets never come from it.
 export function giftEggPick(p, random = secureRandom) {
   const mythicKey = mythicRoll(p, 'gift');
@@ -102,11 +104,11 @@ export function giftEggPick(p, random = secureRandom) {
   const has = key => (p.pets || []).some(pet => pet.key === key);
   const pick = list => list[Math.min(list.length - 1, Math.floor(random() * list.length))];
   const left = { basic: STANDARD_PET_KEYS.filter(k => !has(k)), epic: EPIC_PET_KEYS.filter(k => !has(k)) };
-  const hasLegend = LEGENDARY_PET_KEYS.some(has);
+  const legends = legendLeft(p);
   const r = random() * 100;
   let tier = r < GIFT_EGG_ODDS.legendary ? 'legendary' : r < GIFT_EGG_ODDS.legendary + GIFT_EGG_ODDS.epic ? 'epic' : 'basic';
-  if (tier === 'legendary' && hasLegend) tier = 'epic';
-  if (tier === 'legendary') return { key: pick(LEGENDARY_PET_KEYS), tier };
+  if (tier === 'legendary' && !legends.length) tier = 'epic';
+  if (tier === 'legendary') return { key: pick(legends), tier };
   if (!left[tier].length) tier = tier === 'basic' ? 'epic' : 'basic';
   if (!left[tier].length) return null;
   return { key: pick(left[tier]), tier };
@@ -241,13 +243,13 @@ export function luckyView(p, now = Date.now()) {
   const l = p.lucky || {}, today = dayKey(now);
   const plays = l.day === today ? Number(l.plays || 0) : 0;
   const legendary = (p.pets || []).find(pet => LEGENDARY_PET_KEYS.includes(pet.key));
-  const legendPulls = Math.max(0, Number(l.legend_pulls || 0));
+  const legendPulls = Math.max(0, Number(l.legend_pulls || 0)), legendsLeft = legendLeft(p).length;
   return {
     bets: LUCKY_BETS, daily: LUCKY_DAILY, left: Math.max(0, LUCKY_DAILY - plays), odds: LUCKY_ODDS,
     ticket_bet: LUCKY_TICKET_BET, tickets: Number(p.gacha?.tickets || 0),
     recent: (l.log || []).slice(-6).reverse(),
     today_net: l.net_day === today ? Number(l.net || 0) : null,
-    legend: { rate: LEGENDARY_RATE, pity: LEGENDARY_PITY, pulls: legendPulls, remaining: legendary ? 0 : Math.max(0, LEGENDARY_PITY - legendPulls), owned: !!legendary, key: legendary?.key || null },
+    legend: { rate: LEGENDARY_RATE, pity: LEGENDARY_PITY, pulls: legendPulls, remaining: legendary ? 0 : Math.max(0, LEGENDARY_PITY - legendPulls), owned: !!legendary, key: legendary?.key || null, left: legendsLeft, total: LEGENDARY_PET_KEYS.length },
     epic: { rate: EPIC_RATE, left: EPIC_PET_KEYS.filter(key => !(p.pets || []).some(pet => pet.key === key)).length, total: EPIC_PET_KEYS.length }
   };
 }
@@ -282,12 +284,13 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
   let mythic = null;
   if (mythicKey) { (p.pets ||= []).push({ key: mythicKey, acquired_at: now, mythic: true }); p.avatar_key = mythicKey; mythic = { key: mythicKey }; }
   let legendary = null;
-  const hasLegend = (p.pets || []).some(pet => LEGENDARY_PET_KEYS.includes(pet.key));
-  if (!mythic && !hasLegend) {
-    l.legend_pulls = Number(l.legend_pulls || 0) + 1;
-    const guaranteed = l.legend_pulls >= LEGENDARY_PITY;
+  // V13.197: 못 만난 전설이 남아 있으면 계속 굴린다. 150번 확정(천장)은 첫 전설까지만.
+  const hasLegend = (p.pets || []).some(pet => LEGENDARY_PET_KEYS.includes(pet.key)), legends = legendLeft(p);
+  if (!mythic && legends.length) {
+    if (!hasLegend) l.legend_pulls = Number(l.legend_pulls || 0) + 1;
+    const guaranteed = !hasLegend && l.legend_pulls >= LEGENDARY_PITY;
     if (guaranteed || random() * 100 < LEGENDARY_RATE) {
-      const key = LEGENDARY_PET_KEYS[Math.min(LEGENDARY_PET_KEYS.length - 1, Math.floor(random() * LEGENDARY_PET_KEYS.length))];
+      const key = legends[Math.min(legends.length - 1, Math.floor(random() * legends.length))];
       (p.pets ||= []).push({ key, acquired_at: now, legendary: true });
       p.avatar_key = key;
       l.legend_key = key;
@@ -327,7 +330,7 @@ export function limitedFromEpic(p, random = secureRandom, now = Date.now()) {
 /* ---------- 알 상점 ---------- */
 // Opens a bought egg (the price is paid by the caller). `missing` are the pets of that egg the
 // student has not met yet. V13.98: a 영웅 알 opens as a legendary pet EPIC_EGG_LEGENDARY_RATE% of
-// the time for a student who has none yet (a student owns at most one legendary pet).
+// the time (V13.197: one the student has not met yet, while any is left).
 // V13.109: `season` is a season egg (its limited pets not met yet are `missing`); after a season,
 // a 영웅 알 may hold one of its limited pets instead (limitedFromEpic).
 export function openEgg(p, { epic, season = null, missing, price, random = secureRandom, now = Date.now() }) {
@@ -340,10 +343,10 @@ export function openEgg(p, { epic, season = null, missing, price, random = secur
     p.avatar_key = mythicKey;
     return { key: mythicKey, legendary: false, limited: false, mythic: true };
   }
-  const hasLegend = (p.pets || []).some(pet => LEGENDARY_PET_KEYS.includes(pet.key));
-  const legendary = !!epic && !hasLegend && random() * 100 < EPIC_EGG_LEGENDARY_RATE;
+  const legends = legendLeft(p);
+  const legendary = !!epic && legends.length > 0 && random() * 100 < EPIC_EGG_LEGENDARY_RATE;
   const fromEpic = epic && !legendary ? limitedFromEpic(p, random, now) : null;
-  const pool = legendary ? LEGENDARY_PET_KEYS : missing;
+  const pool = legendary ? legends : missing;
   const key = fromEpic || pool[Math.min(pool.length - 1, Math.floor(random() * pool.length))];
   const limited = !!season || !!fromEpic;
   (p.pets ||= []).push({ key, acquired_at: now, ...(legendary ? { legendary: true } : limited ? { limited: true } : epic ? { epic: true } : {}) });
@@ -357,37 +360,40 @@ export function openEgg(p, { epic, season = null, missing, price, random = secur
 /* ---------- V13.182 전설 알 ---------- */
 //   legend_egg { e20: 영웅 LEGEND_EGG_EPIC_NEED마리 보상을 준 때(한 번), buy: 상점에서 산 때(한 번),
 //                wait: 'epic' 열지 않은 전설 알(영웅 보상), key · open_at: 알에서 나온 전설 펫,
-//                coins · coins_at: 전설 펫이 이미 있어 알 대신 받은 코인 }
+//                coins · coins_at: 전설 펫을 다 만나 알 대신 받은 코인 }
+// V13.197: 전설 여러 마리. 영웅 보상 · 상점 알은 못 만난 전설이 남아 있으면 알, 다 만났으면 코인. 상점 알은 남은 만큼 여러 번 살 수 있다.
 // 어떤 전설이 나올지는 열 때(legendEggOpen) 정한다: 열기 전 기록에도 응답에도 미리 정해진 펫은 없다.
 const ownsPet = (p, key) => (p?.pets || []).some(pet => pet.key === key);
 export const epicCount = p => EPIC_PET_KEYS.filter(key => ownsPet(p, key)).length;
 export const hasLegendPet = p => LEGENDARY_PET_KEYS.some(key => ownsPet(p, key));
+export const allLegendPets = p => !legendLeft(p).length;
 // 화면용(부트스트랩 · 알 상점). due: 영웅 보상을 받을 수 있는데 아직 안 받았다(화면이 /legend-egg/claim을 한 번 부른다).
 export function legendEggView(p) {
-  const e = p?.legend_egg || {}, epic = epicCount(p), legend = hasLegendPet(p);
+  const e = p?.legend_egg || {}, epic = epicCount(p), legend = hasLegendPet(p), left = legendLeft(p).length;
   return {
     need: LEGEND_EGG_EPIC_NEED, epic, price: LEGEND_EGG_PRICE, coins: LEGEND_EGG_COINS,
     due: !e.e20 && epic >= LEGEND_EGG_EPIC_NEED, waiting: !!e.wait, legend, bought: !!e.buy,
-    can_buy: !legend && !e.wait && !e.buy,
+    left, total: LEGENDARY_PET_KEYS.length, all: !left,
+    can_buy: !!left && !e.wait,
     reward: e.coins_at ? { coins: Number(e.coins || 0), at: e.coins_at } : null,
     got: e.e20 ? Number(e.e20) : null
   };
 }
 function legendEggCoins(e, now) { e.coins = Number(e.coins || 0) + LEGEND_EGG_COINS; e.coins_at = now; }
 // 영웅 LEGEND_EGG_EPIC_NEED마리 보상(한 번). 영웅 펫을 얻은 자리와 접속할 때(/legend-egg/claim) 부른다.
-// 이미 전설 펫이 있거나 열지 않은 전설 알이 있으면 알 대신 코인. 준 것이 없으면 null.
+// 전설 펫을 다 만났거나 열지 않은 전설 알이 있으면 알 대신 코인. 준 것이 없으면 null.
 export function grantLegendEgg(p, now = Date.now()) {
   if (p?.role === 'teacher' || p?.legend_egg?.e20 || epicCount(p) < LEGEND_EGG_EPIC_NEED) return null;
   const e = p.legend_egg ||= {};
   e.e20 = now;
-  if (hasLegendPet(p) || e.wait) { legendEggCoins(e, now); return { kind: 'coins', coins: LEGEND_EGG_COINS }; }
+  if (allLegendPets(p) || e.wait) { legendEggCoins(e, now); return { kind: 'coins', coins: LEGEND_EGG_COINS }; }
   e.wait = 'epic';
   return { kind: 'egg' };
 }
 function legendEggHatch(p, e, from, now, random) {
   const left = LEGENDARY_PET_KEYS.filter(key => !ownsPet(p, key));
-  // 그사이 다른 곳(코인 뽑기 · 영웅 알 · 선생님 알)에서 전설을 만났으면 알 대신 코인.
-  if (hasLegendPet(p) || !left.length) { legendEggCoins(e, now); e.open_at = now; return { coins: LEGEND_EGG_COINS }; }
+  // 그사이 다른 곳(코인 뽑기 · 영웅 알 · 선생님 알)에서 남은 전설을 다 만났으면 알 대신 코인.
+  if (!left.length) { legendEggCoins(e, now); e.open_at = now; return { coins: LEGEND_EGG_COINS }; }
   // 신화는 다른 알의 운으로만 나온다(전설 알은 신화를 굴리지 않는다).
   const key = left[Math.min(left.length - 1, Math.floor(random() * left.length))];
   (p.pets ||= []).push({ key, acquired_at: now, legendary: true, legend_egg: from });
@@ -403,16 +409,15 @@ export function legendEggOpen(p, { random = secureRandom, now = Date.now() } = {
   delete e.wait;
   return legendEggHatch(p, e, from, now, random);
 }
-// 알 상점의 전설 알(학생당 1개). 사면 바로 연다(다른 상점 알과 같다).
+// 알 상점의 전설 알. 사면 바로 연다(다른 상점 알과 같다). V13.197: 못 만난 전설이 남아 있는 만큼 여러 번 살 수 있다.
 export function legendEggBuy(p, balance, { random = secureRandom, now = Date.now() } = {}) {
   if (!(p.pets || []).length) fail('먼저 첫 펫을 골라주세요.', 409);
-  if (hasLegendPet(p)) fail('전설 펫을 이미 만났어요.', 409);
+  if (allLegendPets(p)) fail('전설 펫을 모두 만났어요.', 409);
   const e = p.legend_egg ||= {};
   if (e.wait) fail('열지 않은 전설 알이 있어요. 먼저 열어 보세요!', 409);
-  if (e.buy) fail('전설 알은 한 번만 살 수 있어요.', 409);
   if (balance < LEGEND_EGG_PRICE) fail(`코인이 ${LEGEND_EGG_PRICE - balance}개 부족해요.`);
   p.points_spent = Number(p.points_spent || 0) + LEGEND_EGG_PRICE;
-  e.buy = now;
+  e.buy = now; e.buys = Number(e.buys || 0) + 1;
   const res = legendEggHatch(p, e, 'shop', now, random);
   (p.purchases ||= []).push({ item: 'legend_egg', key: res.legendary?.key, price: LEGEND_EGG_PRICE, at: now, legendary: true });
   return res;
