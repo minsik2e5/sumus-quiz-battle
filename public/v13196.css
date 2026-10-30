@@ -1,4 +1,4 @@
-/* V13.196.2 놀이터 알 상점: 곤충 · 공룡 알(가을 알과 같은 가로 칸, 숲 초록). 파일 이름은 검사 규칙(v131NN.css)에 맞춰 v13196 */
+/* V13.197.1 놀이터 알 상점: 곤충 · 공룡 알(가을 알과 같은 가로 칸, 숲 초록). 파일 이름은 검사 규칙(v131NN.css)에 맞춰 v13196 */
 .egg-slot.series{flex-direction:row;align-items:center;gap:12px;padding:14px 14px 14px 10px;overflow:hidden;text-align:left;color:#fff;
   background:radial-gradient(120% 140% at 0% 0%,#4f9a3a 0%,#245b2a 55%,#16391c 100%);box-shadow:0 10px 22px rgba(15,50,20,.4),inset 0 0 0 1.5px rgba(255,214,120,.55)}
 .egg-slot.series .egg-slot-art{flex:none;width:38%;max-width:150px;margin:0;position:relative;z-index:1}
@@ -10,7 +10,7 @@
 .egg-slot.series .egg-slot-buy{margin-top:6px;background:linear-gradient(180deg,#6cc24a,#3f9a2b);box-shadow:0 4px 0 #276b18}
 .egg-slot.series .egg-slot-buy:active:not(:disabled){box-shadow:0 1px 0 #276b18}
 @media (prefers-reduced-motion:reduce){.egg-slot.series .egg-slot-art img{animation:none}}
-/* V13.196.2 놀이터 알 상점: 전설 알(금빛 가로 칸) */
+/* V13.197.1 놀이터 알 상점: 전설 알(금빛 가로 칸) */
 .egg-slot.legend{flex-direction:row;align-items:center;gap:12px;padding:14px 14px 14px 10px;overflow:hidden;text-align:left;color:#fff;
   background:radial-gradient(120% 140% at 0% 0%,#7a5410 0%,#3d2a06 58%,#241802 100%);box-shadow:0 10px 22px rgba(60,40,0,.45),inset 0 0 0 1.5px rgba(255,214,90,.7)}
 .egg-slot.legend .egg-slot-art{flex:none;width:38%;max-width:150px;margin:0;position:relative;z-index:1;display:grid;place-items:center}

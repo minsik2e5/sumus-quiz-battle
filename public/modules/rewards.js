@@ -14,7 +14,8 @@ export const LUCKY_BETS = [10, 20, 30];
 export const LUCKY_DAILY = 5; // V13.82: 3 → 5 a day
 export const LUCKY_TICKET_BET = 10;
 // V13.89 전설 펫: every coin capsule (including a ticket) has a 0.5% chance. A student who
-// has not met one gets one on the 150th pull at the latest, and can own only one legendary pet.
+// has not met one gets one on the 150th pull at the latest. V13.197: no one-per-student limit; while a
+// legendary pet the student has not met is left, the same chance gives one of those (never a repeat).
 export const LEGENDARY_RATE = 0.5;
 export const LEGENDARY_PITY = 150;
 // V13.92 영웅 펫: a capsule that is not legendary has a 3% chance of a 영웅 egg (one not met yet).

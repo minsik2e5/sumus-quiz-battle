@@ -125,7 +125,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(!studentUiSource.includes('data-middle-word=') && studentUiSource.includes('data-high-word='), 'V13.150 middle-school test setup uses the same word picker as high school');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.196.2') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.197.1') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -1278,7 +1278,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.196.2') && indexHtml.includes('/app.bundle.css?v=13.196.2') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.197.1') && indexHtml.includes('/app.bundle.css?v=13.197.1') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1299,7 +1299,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.196.2'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.197.1'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -1338,8 +1338,8 @@ export async function runReleaseCheck() {
     assert(sessionsModule.includes('이미 진행 중인 학습이 있어요') && sessionsModule.includes('기존 연습 저장 후 새 설정 시작'), 'active session mismatch still warns before reuse');
     assert(appJs.includes('examFormDirty') && appJs.includes('contextGeneration') && appJs.includes('작성 취소 후 전환'), 'teacher context switch still protects dirty forms and stale responses');
     assert(studentModule.includes('partner-card-v1358') && studentModule.includes('partner-shop') && studentModule.includes('home-week-card'), 'student home centers pet, points, and weekly attendance');
-    assert(bundleCss.includes('.partner-card-v1358 .partner-back{visibility:hidden}') && bundleCss.includes('.partner-card-v1358.flipped .partner-front{visibility:hidden}') && bundleCss.includes('.partner-card-v1358 .partner-face{transition:visibility 0s .27s}'), 'V13.196.2 아이폰 Safari: 펫 카드는 반쯤 돌았을 때 안 보이는 면을 숨겨 뒷면이 거울처럼 비치지 않는다');
-    assert(!existsSync(fileURLToPath(new URL('../public/assets/review', import.meta.url))) && !existsSync(fileURLToPath(new URL('../public/assets/reviews', import.meta.url))), 'V13.196.2 PR 확인용 미리보기 그림은 앱 폴더(public/assets/review · reviews)에 두지 않는다');
+    assert(bundleCss.includes('.partner-card-v1358 .partner-back{visibility:hidden}') && bundleCss.includes('.partner-card-v1358.flipped .partner-front{visibility:hidden}') && bundleCss.includes('.partner-card-v1358 .partner-face{transition:visibility 0s .27s}'), 'V13.197.1 아이폰 Safari: 펫 카드는 반쯤 돌았을 때 안 보이는 면을 숨겨 뒷면이 거울처럼 비치지 않는다');
+    assert(!existsSync(fileURLToPath(new URL('../public/assets/review', import.meta.url))) && !existsSync(fileURLToPath(new URL('../public/assets/reviews', import.meta.url))), 'V13.197.1 PR 확인용 미리보기 그림은 앱 폴더(public/assets/review · reviews)에 두지 않는다');
     {
       const home = studentModule.slice(studentModule.indexOf('function cardFx('), studentModule.indexOf('function homeSchedule('));
       const appSource = readFileSync(fileURLToPath(new URL('../public/app.js', import.meta.url)), 'utf8');

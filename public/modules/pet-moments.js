@@ -193,7 +193,7 @@ function eggRevealHtml(body, key, done, lead = null) {
 // V13.150 `via`: 같은 알 깨기 연출을 다른 곳에서(낚시터 진주 교환소: { path: '/reel/exchange', body: { item } }).
 export async function buyEgg(A, onChanged, kind, via = null) {
   if (momentOpen || !A.data?.stats?.pet) return null;
-  // V13.196.2 놀이터 전설 알: 받은 알이 있으면 열고, 아니면 산다(알 상점 창의 전설 알 탭과 같은 경로 · 연출).
+  // V13.197.1 놀이터 전설 알: 받은 알이 있으면 열고, 아니면 산다(알 상점 창의 전설 알 탭과 같은 경로 · 연출).
   if (kind === 'legend') {
     momentOpen = true;
     let res;
@@ -207,7 +207,7 @@ export async function buyEgg(A, onChanged, kind, via = null) {
   let res;
   try { res = await api(via?.path || '/shop/egg', via?.body || { kind: ['epic', 'season', 'series'].includes(kind) ? kind : 'basic' }); }
   finally { momentOpen = false; }
-  // V13.196.2 곤충 · 공룡 알: 시리즈 영웅 · 렉스는 연출, 시리즈 기본은 아래 알 이름 카드.
+  // V13.197.1 곤충 · 공룡 알: 시리즈 영웅 · 렉스는 연출, 시리즈 기본은 아래 알 이름 카드.
   if (res.mythic || res.legendary || res.epic || res.limited || (res.series && res.rank !== 'basic')) { onChanged?.(); await eggShow(res, kind); return res; }
   momentOpen = true;
   eggRevealHtml(openOverlay('새 알'), res.key, () => closeOverlay(true, onChanged));
@@ -394,21 +394,20 @@ export function openEggShop(A, onChanged, kind = 'basic') {
       }
     };
   };
-  // V13.182 전설 알: 받은 알이 있으면 열기, 없으면 15,000코인에 사기(학생당 1개, 전설 펫이 있으면 못 산다).
+  // V13.182 전설 알: 받은 알이 있으면 열기, 없으면 15,000코인에 사기. V13.197: 못 만난 전설이 남은 만큼 여러 번 살 수 있다.
   const drawLegend = (eggs, le) => {
     const left = LEGENDARY_PET_KEYS.filter(key => !g.pets.some(x => x.key === key)).length;
     const short = Math.max(0, le.price - Number(g.points_balance || 0));
     const action = le.waiting ? '<button type="button" class="btn primary legend-egg-btn" data-legend-go>전설 알 열기</button>'
-      : le.legend ? '<span class="legend-egg-done">전설 펫을 이미 만났어요</span>'
-      : le.bought ? '<span class="legend-egg-done">전설 알은 한 번만 살 수 있어요</span>'
+      : !left ? '<span class="legend-egg-done">전설 펫을 모두 만났어요</span>'
       : `<button type="button" class="btn primary legend-egg-btn" data-legend-go ${short ? 'disabled' : ''}>${num(le.price)}코인으로 전설 알 사기</button>`;
     body.innerHTML = `<div class="pet-shop egg-shop-v1392 legend">
       ${eggTabs(eggs, 'legend', le)}
       <div class="pet-shop-egg-art legend-egg-art" aria-hidden="true"><i class="legend-egg-halo"></i><img src="/assets/lucky/legend-egg.webp" alt="" width="132" height="132" decoding="async"></div>
       <p class="pet-moment-msg"><b class="egg-shop-tier legend">전설</b> ${le.waiting ? '전설 알이 기다리고 있어요!' : '어떤 전설이 깨어날까요?'}</p>
-      <p class="pet-shop-copy">${le.legend ? '전설 펫은 한 마리만 함께할 수 있어요.<br>영웅을 모으면 전설 알 대신 코인과 칭호를 받아요.' : `아직 만나지 못한 전설 펫 ${left}마리 중 한 마리가 랜덤으로 깨어나요.<br><b class="egg-shop-legend">학생마다 딱 1개!</b>`}</p>
-      ${le.waiting || le.legend || le.bought ? '' : `<div class="pet-shop-price"><span>가격</span><b><i class="coin-ico" aria-hidden="true"></i>${num(le.price)}</b><span>가진 코인</span><b><i class="coin-ico" aria-hidden="true"></i>${num(g.points_balance || 0)}</b></div>`}
-      <p class="pet-name-error" role="alert">${!le.waiting && !le.legend && !le.bought && short ? `코인이 ${num(short)}개 더 필요해요.` : ''}</p>
+      <p class="pet-shop-copy">${!left ? '전설 펫을 모두 만났어요!<br>영웅을 모으면 전설 알 대신 코인과 칭호를 받아요.' : `아직 만나지 못한 전설 펫 ${left}마리 중 한 마리가 랜덤으로 깨어나요.<br><b class="egg-shop-legend">전설은 여러 마리 함께할 수 있어요! 같은 전설은 다시 안 나와요.</b>`}</p>
+      ${le.waiting || !left ? '' : `<div class="pet-shop-price"><span>가격</span><b><i class="coin-ico" aria-hidden="true"></i>${num(le.price)}</b><span>가진 코인</span><b><i class="coin-ico" aria-hidden="true"></i>${num(g.points_balance || 0)}</b></div>`}
+      <p class="pet-name-error" role="alert">${!le.waiting && left && short ? `코인이 ${num(short)}개 더 필요해요.` : ''}</p>
       <div class="pet-moment-actions"><button type="button" class="btn" data-pet-later>닫기</button>${action}</div>
       ${legendFootHtml(le)}
     </div>`;
@@ -446,7 +445,7 @@ function legendFootHtml(le) {
     <p>너무 비싸면 영웅 20명 모으면 줍니다^^</p>
   </div>`;
 }
-// 전설 알을 연 결과: 전설 펫이면 전설 연출(전설 알 판), 이미 전설 펫이 있었으면 코인 안내.
+// 전설 알을 연 결과: 전설 펫이면 전설 연출(전설 알 판), 전설을 다 만났으면 코인 안내.
 async function legendEggResultShow(res) {
   if (res?.legendary?.key) { await legendaryShow({ legendary: { key: res.legendary.key, legendEgg: res.legendary.legend_egg || 'epic' } }); return; }
   if (res?.coins) await legendNotice('coins', { coins: res.coins });

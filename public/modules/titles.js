@@ -214,7 +214,7 @@ Object.assign(TITLES, {
 // 도감 마스터는 영웅 펫 전부(EPIC_PET_KEYS): 영웅 펫이 늘면 기준도 따라 늘어난다.
 Object.assign(TITLES, {
   'epic-collector': { name: '영웅 수집가', tier: 'epic', group: 'collect', stat: 'epic_pets', goal: LEGEND_EGG_EPIC_NEED, icon: 'shield', how: `영웅 펫 ${LEGEND_EGG_EPIC_NEED}마리 만나기`, desc: '영웅들이 모여 전설 알을 데려왔어요.' },
-  'legend-owner': { name: '전설의 주인', tier: 'legendary', group: 'collect', stat: 'legend_egg', goal: 1, icon: 'wing', how: '전설 알 보상 받기(전설 알을 열거나, 이미 전설 펫이 있어 대신 받는 보상)', desc: '전설 알의 주인이 되었어요.' },
+  'legend-owner': { name: '전설의 주인', tier: 'legendary', group: 'collect', stat: 'legend_egg', goal: 1, icon: 'wing', how: '전설 알 보상 받기(전설 알을 열거나, 전설 펫을 모두 만나 대신 받는 보상)', desc: '전설 알의 주인이 되었어요.' },
   'epic-dex': { name: '도감 마스터', tier: 'legendary', group: 'collect', stat: 'epic_pets', goal: EPIC_PET_KEYS.length, icon: 'book', how: '영웅 펫 모두 만나기', desc: '영웅 도감을 빈칸 없이 채웠어요.' }
 });
 // V13.191 물가 낚시 도감 종 수(황금 알 물고기 포함 24), 심해 칭호를 보여도 되는지(심해 8종 그림이 다 있을 때).

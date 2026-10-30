@@ -4,7 +4,7 @@ import { GACHA_ITEMS, GACHA_KEYS, GACHA_TIERS, GACHA_TIER_KEYS, GACHA_KINDS, own
 import { titleEmblem, coin, uiArt, artOr, ART_READY } from './emblems.js';
 import { TITLES } from './titles.js';
 import { titleState } from './titles-ui.js';
-import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, EGG_PRICE, EPIC_EGG_PRICE, seasonOnSale } from './core.js';
+import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, EGG_PRICE, EPIC_EGG_PRICE, seasonOnSale } from './core.js';
 import { luckyCard, luckyShow, machineSpin, machineDrop, unlockSound } from './lucky.js';
 import { rpsCard, rpsMatch } from './rps.js';
 import { stocksCard, loadMarket, openStock, startStockClock } from './stocks.js';
@@ -66,7 +66,8 @@ function eggSlot(A, kind) {
   const g = A.data.stats || {}, has = key => (g.pets || []).some(pet => pet.key === key);
   const epic = kind === 'epic', price = epic ? EPIC_EGG_PRICE : EGG_PRICE;
   const missing = (epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter(key => !has(key)).length;
-  const hasLegend = (g.pets || []).some(pet => CHARACTERS[pet.key]?.legendary);
+  // V13.197: 못 만난 전설이 남아 있으면 영웅 알의 1% 전설 찬스가 있다(학생당 1마리 제한 없음).
+  const legendsLeft = LEGENDARY_PET_KEYS.some(key => !has(key));
   const short = Math.max(0, price - Number(g.points_balance || 0));
   const art = epic ? artOr('epic-egg', '<span class="egg-slot-plain epic">★</span>') : uiArt('egg-shop');
   const label = !missing ? '모두 모았어요' : short ? `<span>${coin()}${num(price)}</span><small>${num(short)}코인 부족</small>` : `<span>${coin()}${num(price)}</span><small>사기</small>`;
@@ -75,7 +76,7 @@ function eggSlot(A, kind) {
     <div class="egg-slot-art" aria-hidden="true">${art}</div>
     <b class="egg-slot-name">${epic ? '영웅 알' : '랜덤 알'}</b>
     <small class="egg-slot-sub">${missing ? `못 만난 친구 ${missing}마리` : (epic ? '영웅 펫을 다 모았어요' : '기본 펫을 다 모았어요')}</small>
-    ${epic && missing && !hasLegend ? '<em class="egg-slot-legend">1% 전설 찬스</em>' : ''}
+    ${epic && missing && legendsLeft ? '<em class="egg-slot-legend">1% 전설 찬스</em>' : ''}
     <button type="button" class="egg-slot-buy" data-action="egg-buy" data-egg="${kind}" ${!missing || short ? 'disabled' : ''} aria-label="${epic ? '영웅 알' : '랜덤 알'} ${num(price)}코인${short ? `, ${num(short)}코인 부족` : ''}">${label}</button>
   </div>`;
 }
@@ -100,7 +101,7 @@ function seasonSlot(A) {
     </div>
   </div>`;
 }
-// V13.196.2 곤충 · 공룡 알(시리즈 알): 가을 알 아래 가로 칸. 남은 수 · 진행만 보이고 어떤 펫이 나올지는 서버가 정한다.
+// V13.197.1 곤충 · 공룡 알(시리즈 알): 가을 알 아래 가로 칸. 남은 수 · 진행만 보이고 어떤 펫이 나올지는 서버가 정한다.
 function seriesSlot(A) {
   const se = A.data.series_egg; if (!se?.ready) return '';
   const short = Math.max(0, se.price - Number(A.data.stats?.points_balance || 0));
@@ -117,13 +118,13 @@ function seriesSlot(A) {
     </div>
   </div>`;
 }
-// V13.196.2 전설 알: 곤충 · 공룡 알 아래 금빛 가로 칸. 받은 알이 있으면 '열기', 아니면 상점 값(서버 /legend-egg/buy · open이 정한다).
+// V13.197.1 전설 알: 곤충 · 공룡 알 아래 금빛 가로 칸. 받은 알이 있으면 '열기', 아니면 상점 값(서버 /legend-egg/buy · open이 정한다).
 function legendSlot(A) {
   const le = A.data.legend_egg; if (!le) return '';
   const short = Math.max(0, le.price - Number(A.data.stats?.points_balance || 0));
   const can = le.waiting || le.can_buy;
   const label = le.waiting ? '<span>전설 알</span><small>열기!</small>'
-    : !le.can_buy ? (le.legend ? '전설을 이미 만났어요' : le.bought ? '한 번만 살 수 있어요' : '지금은 살 수 없어요')
+    : !le.can_buy ? (le.all ? '전설을 모두 만났어요' : '지금은 살 수 없어요')
     : short ? `<span>${coin()}${num(le.price)}</span><small>${num(short)}코인 부족</small>` : `<span>${coin()}${num(le.price)}</span><small>사기</small>`;
   const n = Math.min(le.epic, le.need);
   return `<div class="egg-slot legend${can ? '' : ' done'}">
@@ -131,7 +132,7 @@ function legendSlot(A) {
     <div class="egg-season-text">
       <span class="egg-slot-tag">♛ 전설</span>
       <b class="egg-slot-name">전설 알</b>
-      <small class="egg-slot-sub">${le.waiting ? '받은 전설 알이 기다리고 있어요!' : '아직 만나지 못한 전설 펫 중 한 마리'}</small>
+      <small class="egg-slot-sub">${le.waiting ? '받은 전설 알이 기다리고 있어요!' : le.all ? '전설 펫을 모두 만났어요' : `못 만난 전설 ${num(le.left)}마리 중 한 마리 · 여러 마리 함께해요`}</small>
       <em class="egg-legend-prog">영웅 ${num(le.epic)}/${num(le.need)}마리 모으면 한 개 선물<i style="--p:${Math.round(n / le.need * 100)}%"></i></em>
       <button type="button" class="egg-slot-buy" data-action="egg-buy" data-egg="legend" ${!can || (!le.waiting && short) ? 'disabled' : ''} aria-label="전설 알 ${le.waiting ? '열기' : `${num(le.price)}코인${short ? `, ${num(short)}코인 부족` : ''}`}">${label}</button>
     </div>
@@ -271,7 +272,7 @@ function oddsModal() {
   const avg = LUCKY_ODDS.reduce((n, o) => n + o.mult * o.rate, 0);
   modal(`<h2>코인 뽑기 확률</h2><p>뽑을 때마다 아래 확률로 나와요. 앞에 뽑은 결과와 상관없이 매번 같아요.</p>
     <ul class="ga-odds-list">${LUCKY_ODDS.map(o => `<li><span>${o.mult === 1 ? '본전 (1배)' : o.mult ? `${o.mult}배` : '꽝'} <small>${o.mult ? `건 코인의 ${o.mult}배를 받아요` : '건 코인을 잃어요'}</small></span><b>${o.rate}%</b></li>`).join('')}</ul>
-    <p class="ga-note"><b>전설 펫은 별도로 ${LEGENDARY_RATE}%</b> 확률로 나타나요. 아직 전설 펫이 없다면 ${LEGENDARY_PITY}번째 뽑기에는 반드시 만나며, 학생 한 명당 한 마리만 가질 수 있어요.</p>
+    <p class="ga-note"><b>전설 펫은 별도로 ${LEGENDARY_RATE}%</b> 확률로 나타나요. 아직 전설 펫이 없다면 ${LEGENDARY_PITY}번째 뽑기에는 반드시 만나요. 그 뒤에도 아직 못 만난 전설이 남아 있으면 같은 확률로 또 만날 수 있어요(같은 전설은 다시 안 나와요).</p>
     <p class="ga-note">100코인을 걸면 평균 ${num(avg)}코인이 돌아와요. 코인은 공부로 모으는 게 가장 좋아요! 하루 ${LUCKY_DAILY}번까지 뽑을 수 있어요.</p>`, '코인 뽑기 확률');
 }
 function itemModal(A, key) {
