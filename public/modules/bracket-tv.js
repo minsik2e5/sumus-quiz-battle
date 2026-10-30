@@ -99,7 +99,7 @@ function draw(just = []) {
   if (!t || !board) return;
   const players = t.players, rounds = t.rounds;
   document.getElementById('btv-name').textContent = t.name;
-  document.getElementById('btv-meta').innerHTML = `${esc(t.class_name || t.grade || '')} · ${num(players)}명 · ${t.mode === 'skill' ? '실력전' : '스피드전'} · 판돈 없는 대결${t.prize ? ` · ${coin()} 우승 ${num(t.prize)} · 준우승 ${num(Math.floor(t.prize / 2))}` : ''}`;
+  document.getElementById('btv-meta').innerHTML = `${esc(t.class_name || t.grade || '')}${t.schools ? ` · ${esc(t.schools.join(' · '))}` : ''} · ${num(players)}명 · ${t.mode === 'skill' ? '실력전' : '스피드전'} · 판돈 없는 대결${t.prize ? ` · ${coin()} 우승 ${num(t.prize)} · 준우승 ${num(Math.floor(t.prize / 2))}` : ''}`;
   const R = rounds.length, final = rounds[R - 1].matches[0];
   const column = (round, r, side) => {
     const half = round.matches.length / 2;

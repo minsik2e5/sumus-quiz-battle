@@ -13,7 +13,7 @@ function slot(m, side, meId) {
   const p = m[side];
   if (!p) return `<div class="tn-slot empty"><span>${m.winner && m.by === 'bye' ? '—' : '?'}</span></div>`;
   const win = !!m.winner && m.winner === p.id, lose = !!m.winner && m.winner !== p.id;
-  return `<div class="tn-slot${win ? ' win' : ''}${lose ? ' lose' : ''}${p.id === meId ? ' me' : ''}"><span>${esc(p.name)}</span>${win ? '<b>승</b>' : ''}</div>`;
+  return `<div class="tn-slot${win ? ' win' : ''}${lose ? ' lose' : ''}${p.id === meId ? ' me' : ''}"><span>${esc(p.name)}${p.school ? `<small class="tn-school">${esc(p.school)}</small>` : ''}</span>${win ? '<b>승</b>' : ''}</div>`;
 }
 export function bracketHtml(t, { teacher = false, meId = null } = {}) {
   const rounds = t.rounds.map(round => `<div class="tn-round"><h4>${esc(round.label)}</h4><div class="tn-matches">${round.matches.map(m => `
@@ -42,7 +42,7 @@ export function tournamentCard(t, { compact = false } = {}) {
     action = `<button type="button" class="btn primary full tn-play" data-action="tournament-play" data-tournament="${esc(t.id)}" data-match="${esc(m.id)}">${m.room?.host ? '대기실로 가기' : waitingForMe ? '상대가 기다려요 · 입장하기' : '경기 시작'} ${icon('arrow')}</button>`;
   }
   return `<section class="tn-card${t.status === 'finished' ? ' finished' : ''}${compact ? ' compact' : ''}">
-    <div class="tn-card-head">${trophy('md')}<div><small>학원 야차 대회 · ${esc(t.class_name || t.grade || '')}</small><strong>${esc(t.name)}</strong></div><button type="button" class="tn-bracket-open" data-action="tournament-bracket" data-tournament="${esc(t.id)}">대진표</button></div>
+    <div class="tn-card-head">${trophy('md')}<div><small>학원 야차 대회 · ${esc(t.class_name || t.grade || '')}${t.schools ? ' · 학교별 단어' : ''}</small><strong>${esc(t.name)}</strong></div><button type="button" class="tn-bracket-open" data-action="tournament-bracket" data-tournament="${esc(t.id)}">대진표</button></div>
     <div class="tn-line">${line}</div>
     ${action}
     <p class="tn-foot">${t.mode === 'skill' ? '실력전' : '스피드전'} · 판돈 없는 대결 · ${prizeLine(t)}</p>
