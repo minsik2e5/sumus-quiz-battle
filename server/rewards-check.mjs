@@ -891,7 +891,7 @@ export async function runRewardsChecks(assert, expectStatus) {
       assert(st107.includes('function grammarTile(number)') && st107.includes('class="gx-tile') && css107.includes('.grammar-set-card.gx-card{display:flex') && css107.includes('-webkit-line-clamp:2'),
         'V13.107 어법·어휘 지문 카드: 번호 타일(“1과 본문” 위에 큰 번호) · 두 줄 제목 · 칩 · 화살표의 한 줄 카드');
       assert(arcade107.includes('<section class="egg-stand" id="egg-stand">') && arcade107.includes('${machineHtml(current.A)}${shopHtml(current.A)}${rpsCard(') && arcade107.includes('data-action="egg-buy"') && !arcade107.includes('ga-shop-row')
-        && app107.includes("if (d.action === 'egg-buy') return eggBuy(") && app107.includes("if (!b.classList.contains('confirm'))") && pm107.includes('export async function buyEgg(A, onChanged, kind, via = null)') && pm107.includes("api(via?.path || '/shop/egg', via?.body || { kind: kind === 'epic' || kind === 'season' ? kind : 'basic' })")
+        && app107.includes("if (d.action === 'egg-buy') return eggBuy(") && app107.includes("if (!b.classList.contains('confirm'))") && pm107.includes('export async function buyEgg(A, onChanged, kind, via = null)') && pm107.includes("api(via?.path || '/shop/egg', via?.body || { kind: ['epic', 'season', 'series'].includes(kind) ? kind : 'basic' })") /* V13.196.2 + 곤충 · 공룡 알 */
         && css107.includes('.egg-stand{position:relative'),
         'V13.107 놀이터 알 상점은 코인 뽑기 바로 아래 큰 판으로 바로 보이고(랜덤 알 · 영웅 알 나란히), 사기 버튼을 두 번 눌러야 산다(서버 /shop/egg 그대로)');
     }
