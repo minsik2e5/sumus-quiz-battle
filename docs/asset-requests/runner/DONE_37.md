@@ -16,7 +16,7 @@
 
 - 앱 이미지: `public/assets/pets/<key>-<단계>[-<표정 또는 자세>].webp`, 작은 그림은 `-s.webp`.
 - 기본·표정·알 반응·전투는 512×512 RGBA WebP, 작은 그림은 160×160 투명 contain.
-- PR 코멘트용 합본 미리보기 1개: `public/assets/review/art-37-preview.webp`. 앱에서 읽는 그림 168개와 별도이며 원본 시트가 아니다.
+- PR 코멘트용 합본 미리보기 1개: PR 코멘트에만 둔다(v13.196.1에서 `public/assets/review/art-37-preview.webp`를 앱 폴더에서 뺐다).
 - 기존 그림의 수정·삭제 없음. 앱 코드·펫 등록·특기·알·도감·버전 수정 없음.
 - 빌드가 갱신한 `public/modules/pet-art.js`, `public/sw.js`만 포함한다.
 

@@ -20,7 +20,7 @@
 
 - 펫 168개 + `titles/zodiac12.webp` 및 `titles/zodiac12-s.webp` 2개 = 앱용 170개.
 - 메달은 36d-1 왼쪽 위 시안을 선택했다.
-- PR 검토용 합본: `public/assets/reviews/art-36.webp` (원본 시트가 아닌 분할 결과 미리보기).
+- PR 검토용 합본: PR 코멘트에만 둔다(v13.196.1에서 `public/assets/reviews/art-36.webp`를 앱 폴더에서 뺐다).
 - 기본·표정·알 반응·전투: 512×512. 펫 작은 그림: 160×160. 메달: 256×256 및 96×96.
 - 모든 파일은 저장소 fit-assets.mjs / fit-sheets.mjs로 분할·정렬했다.
 
