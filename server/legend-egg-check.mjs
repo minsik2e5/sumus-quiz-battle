@@ -113,6 +113,14 @@ export async function runLegendEggChecks(assert) {
   assert(ui.includes('너무 비싸면 영웅 20명 모으면 줍니다^^') && ui.includes('영웅 ${num(le.epic)} / ${num(le.need)}마리'), 'V13.182 상점 하단 문구와 "영웅 N / 20마리"');
   assert(ui.includes("'<span class=\"legend-egg-done\">전설 펫을 이미 만났어요</span>'") && ui.includes("legend: { name: '전설 알', price: LEGEND_EGG_PRICE }"), 'V13.182 전설이 있으면 버튼 대신 "전설 펫을 이미 만났어요"');
   assert(ui.includes("api(le.waiting ? '/legend-egg/open' : '/legend-egg/buy', {})") && ui.includes("api('/legend-egg/claim', {})") && app.includes('maybeLegendEggMoment(A, petChanged)'), 'V13.182 화면은 열기 · 사기 · 접속 때 한 번 받기만 부른다(서버가 정한다)');
+  // V13.196.2 놀이터 알 상점에도 전설 알 칸: 같은 서버 경로(/legend-egg/buy · open) · 같은 전설 연출, 살 수 없을 때는 이유를 보인다.
+  {
+    const arcade = source('../public/modules/arcade.js');
+    assert(arcade.includes('function legendSlot(A)') && arcade.includes('${legendSlot(A)}') && arcade.includes('data-egg="legend"') && arcade.includes("const le = A.data.legend_egg; if (!le) return '';")
+      && arcade.includes("'전설을 이미 만났어요'") && app.includes("['epic', 'season', 'series', 'legend'].includes(d.egg)")
+      && ui.includes("res = await api(A.data.legend_egg?.waiting ? '/legend-egg/open' : '/legend-egg/buy', {});") && ui.includes('await legendEggResultShow(res);'),
+      'V13.196.2 놀이터 알 상점의 전설 알 칸: 받은 알은 열기, 아니면 상점 값으로 사기(서버가 정함), 연출은 알 상점 창과 같다');
+  }
   assert(ui.includes("legendaryShow({ legendary: { key: res.legendary.key, legendEgg:") && lucky.includes("if (legendEgg) box.classList.add('lgx-plus');") && lucky.includes('lgx-pillars') && lucky.includes('lgx-crown'), 'V13.182 전설 알은 전설 연출을 재사용하고 한 겹 더(lgx-plus)');
   // 신화는 운으로만: 전설 알 코드는 mythicRoll을 부르지 않는다.
   const legendCode = rw.slice(rw.indexOf('/* ---------- V13.182 전설 알'), rw.indexOf('/* ---------- V13.82 가위바위보'));

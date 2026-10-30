@@ -185,7 +185,7 @@ export async function runBugDinoPetsChecks(assert) {
   {
     const arcade = source('../public/modules/arcade.js'), app = source('../public/app.js');
     assert(arcade.includes('function seriesSlot(A)') && arcade.includes('${seriesSlot(A)}') && arcade.includes('data-egg="series"') && arcade.includes("if (!se?.ready) return '';")
-      && app.includes("['epic', 'season', 'series'].includes(d.egg)") && ui.includes("{ kind: ['epic', 'season', 'series'].includes(kind) ? kind : 'basic' }") && ui.includes("(res.series && res.rank !== 'basic')")
+      && app.includes("['epic', 'season', 'series', 'legend'].includes(d.egg)") && ui.includes("{ kind: ['epic', 'season', 'series'].includes(kind) ? kind : 'basic' }") && ui.includes("(res.series && res.rank !== 'basic')")
       && list.includes('v13196.css') && list.at(-1) === 'v13178.css',
       'V13.196.2 놀이터 알 상점에도 곤충 · 공룡 알 칸(그림이 없으면 숨김, 같은 사기 경로 · 연출)');
   }

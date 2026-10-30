@@ -117,12 +117,33 @@ function seriesSlot(A) {
     </div>
   </div>`;
 }
+// V13.196.2 전설 알: 곤충 · 공룡 알 아래 금빛 가로 칸. 받은 알이 있으면 '열기', 아니면 상점 값(서버 /legend-egg/buy · open이 정한다).
+function legendSlot(A) {
+  const le = A.data.legend_egg; if (!le) return '';
+  const short = Math.max(0, le.price - Number(A.data.stats?.points_balance || 0));
+  const can = le.waiting || le.can_buy;
+  const label = le.waiting ? '<span>전설 알</span><small>열기!</small>'
+    : !le.can_buy ? (le.legend ? '전설을 이미 만났어요' : le.bought ? '한 번만 살 수 있어요' : '지금은 살 수 없어요')
+    : short ? `<span>${coin()}${num(le.price)}</span><small>${num(short)}코인 부족</small>` : `<span>${coin()}${num(le.price)}</span><small>사기</small>`;
+  const n = Math.min(le.epic, le.need);
+  return `<div class="egg-slot legend${can ? '' : ' done'}">
+    <div class="egg-slot-art" aria-hidden="true"><i class="legend-egg-halo"></i><img src="/assets/lucky/legend-egg.webp" alt="" width="132" height="132" decoding="async"></div>
+    <div class="egg-season-text">
+      <span class="egg-slot-tag">♛ 전설</span>
+      <b class="egg-slot-name">전설 알</b>
+      <small class="egg-slot-sub">${le.waiting ? '받은 전설 알이 기다리고 있어요!' : '아직 만나지 못한 전설 펫 중 한 마리'}</small>
+      <em class="egg-legend-prog">영웅 ${num(le.epic)}/${num(le.need)}마리 모으면 한 개 선물<i style="--p:${Math.round(n / le.need * 100)}%"></i></em>
+      <button type="button" class="egg-slot-buy" data-action="egg-buy" data-egg="legend" ${!can || (!le.waiting && short) ? 'disabled' : ''} aria-label="전설 알 ${le.waiting ? '열기' : `${num(le.price)}코인${short ? `, ${num(short)}코인 부족` : ''}`}">${label}</button>
+    </div>
+  </div>`;
+}
 function shopHtml(A) {
   return `<section class="egg-stand" id="egg-stand">
     <div class="egg-stand-head"><div><small>PET EGG SHOP</small><h2>알 상점</h2></div><span class="egg-stand-wallet">${coin()}<b>${num(A.data.stats?.points_balance || 0)}</b></span></div>
     <p class="egg-stand-lead">새 알은 바로 파트너가 되고, 함께 공부하면 <b>Lv.3</b>에 태어나요.</p>
     ${seasonSlot(A)}
     ${seriesSlot(A)}
+    ${legendSlot(A)}
     <div class="egg-stand-grid">${eggSlot(A, 'basic')}${eggSlot(A, 'epic')}</div>
     <p class="lk-note">랜덤 알은 아직 못 만난 기본 펫, 영웅 알은 아직 못 만난 영웅 펫${A.data.series_egg?.ready ? ', 곤충 · 공룡 알은 아직 못 만난 곤충 · 공룡 펫' : ''}이 나와요 · 사기 버튼을 한 번 더 누르면 사요</p>
   </section>`;

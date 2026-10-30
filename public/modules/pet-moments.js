@@ -193,6 +193,16 @@ function eggRevealHtml(body, key, done, lead = null) {
 // V13.150 `via`: 같은 알 깨기 연출을 다른 곳에서(낚시터 진주 교환소: { path: '/reel/exchange', body: { item } }).
 export async function buyEgg(A, onChanged, kind, via = null) {
   if (momentOpen || !A.data?.stats?.pet) return null;
+  // V13.196.2 놀이터 전설 알: 받은 알이 있으면 열고, 아니면 산다(알 상점 창의 전설 알 탭과 같은 경로 · 연출).
+  if (kind === 'legend') {
+    momentOpen = true;
+    let res;
+    try { res = await api(A.data.legend_egg?.waiting ? '/legend-egg/open' : '/legend-egg/buy', {}); }
+    finally { momentOpen = false; }
+    onChanged?.();
+    await legendEggResultShow(res);
+    return res;
+  }
   momentOpen = true;
   let res;
   try { res = await api(via?.path || '/shop/egg', via?.body || { kind: ['epic', 'season', 'series'].includes(kind) ? kind : 'basic' }); }
