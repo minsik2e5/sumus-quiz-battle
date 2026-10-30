@@ -55,10 +55,13 @@ export const CHESTS = {
 };
 const THEFT = new Set(['steal', 'swap', 'shield']);
 
-export function createParty({ id, code, kind, minutes, steal = true, teams = false, questions, host, seed, school_id, class_name = '', label = '', now = Date.now() }) {
+// V13.199 학교별 단어(보물 사냥 · 반 낚시): `qsets` { 학교 id: 문제[] }이 있으면 학생마다 자기 학교(`qs`) 문제를 받는다.
+// 없거나 그 학교 묶음이 없으면 방의 `questions`(선생님 학교). 도난 경보 문제는 막는 학생 자기 묶음에서 나온다.
+const qsOf = (room, pl) => (pl?.qs && room.qsets?.[pl.qs]?.length ? room.qsets[pl.qs] : room.questions);
+export function createParty({ id, code, kind, minutes, steal = true, teams = false, questions, qsets = null, host, seed, school_id, class_name = '', label = '', now = Date.now() }) {
   return {
     id, code, kind: kind === 'fish' ? 'fish' : 'treasure', minutes: PARTY.MINUTES.includes(Number(minutes)) ? Number(minutes) : 8,
-    steal: kind === 'fish' ? false : steal !== false, teams: kind !== 'fish' && !!teams, ev: [], event: null, questions: (questions || []).slice(0, 120), host, seed: Number(seed) >>> 0, school_id, class_name, label,
+    steal: kind === 'fish' ? false : steal !== false, teams: kind !== 'fish' && !!teams, ev: [], event: null, questions: (questions || []).slice(0, 120), ...(qsets ? { qsets: Object.fromEntries(Object.entries(qsets).slice(0, 4).map(([k, v]) => [k, (v || []).slice(0, 120)])) } : {}), host, seed: Number(seed) >>> 0, school_id, class_name, label,
     phase: 'lobby', created_at: now, start_at: null, end_at: null, players: {}, order: [], feed: [], seq: 0,
     right_total: 0, frenzy_until: 0, frenzy_n: 0, leader: null, reported: false
   };
@@ -68,9 +71,10 @@ export function joinParty(room, p, now = Date.now()) {
   if (room.players[p.id]) { room.players[p.id].name = p.name; return { ok: true, again: true }; }
   if (room.order.length >= PARTY.MAX_PLAYERS) return { error: `${PARTY.MAX_PLAYERS}명까지 들어올 수 있어요.` };
   const n = room.order.length;
+  const qs = p.qs && room.qsets?.[p.qs]?.length ? String(p.qs) : null;
   room.players[p.id] = {
-    id: p.id, name: String(p.name || '학생').slice(0, 20), pet: p.pet || null, joined_at: now,
-    gold: 0, kg: 0, right: 0, wrong: 0, streak: 0, shield: 0, qi: (n * 7) % Math.max(1, room.questions.length), q_at: 0, wait_until: 0,
+    id: p.id, name: String(p.name || '학생').slice(0, 20), pet: p.pet || null, joined_at: now, ...(qs ? { qs } : {}),
+    gold: 0, kg: 0, right: 0, wrong: 0, streak: 0, shield: 0, qi: (n * 7) % Math.max(1, qsOf(room, { qs }).length), q_at: 0, wait_until: 0,
     offer: null, pending: null, steals: {}, stolen_by: null, lure: 0, run: 0, casts: 0, fish: [],
     team: room.teams ? (room.order.filter(id => room.players[id].team === 'A').length <= room.order.filter(id => room.players[id].team === 'B').length ? 'A' : 'B') : null,
     inv: { fifty: 0, freeze: 0, saver: 0 }, heist: null, alarm: null, fifty: null,
@@ -99,11 +103,11 @@ export function endParty(room, now = Date.now()) {
   return { events: [{ kind: 'end' }] };
 }
 function nextQuestion(room, pl, now) {
-  const qs = room.questions;
+  const qs = qsOf(room, pl);
   pl.qi = (pl.qi + 1) % Math.max(1, qs.length);
   pl.q_at = Math.max(now, pl.wait_until || 0);
 }
-const currentQ = (room, pl) => room.questions[pl.qi % Math.max(1, room.questions.length)];
+const currentQ = (room, pl) => { const qs = qsOf(room, pl); return qs[pl.qi % Math.max(1, qs.length)]; };
 function feed(room, item, now) {
   const row = { n: ++room.seq, at: now, ...item };
   room.feed = [...room.feed, row].slice(-PARTY.FEED_KEEP);
@@ -223,7 +227,7 @@ export function target(room, pid, tid, now = Date.now()) {
   pl.heist = { vid: victim.id, kind: p.kind, pct: p.pct || 0, need: PARTY.HEIST_NEED, got: 0, until: now + PARTY.HEIST_MS };
   let ms = PARTY.ALARM_MS;
   if (victim.inv.freeze > 0) { victim.inv.freeze--; ms = PARTY.ALARM_FREEZE_MS; } // 시간 정지
-  victim.alarm = { by: pl.id, until: now + ms, done: false, defended: false, qi: hash(`${victim.id}:${pl.id}:${now}`) % Math.max(1, room.questions.length) };
+  victim.alarm = { by: pl.id, until: now + ms, done: false, defended: false, qi: hash(`${victim.id}:${pl.id}:${now}`) % Math.max(1, qsOf(room, victim).length) };
   const bounty = bountyId(room) === victim.id;
   return { events: [feed(room, { kind: 'heist', pid, name: pl.name, vid: victim.id, vname: victim.name, swap: p.kind === 'swap', bounty }, now)], me: { kind: 'heist', pid, vid: victim.id, vname: victim.name, need: PARTY.HEIST_NEED } };
 }
@@ -276,7 +280,7 @@ function resolveHeist(room, pl, now) {
 export function alarmAnswer(room, pid, choice, now = Date.now()) {
   const pl = room.players[pid], a = pl?.alarm;
   if (room.phase !== 'play' || !a || !alarmLive(pl, now)) return { events: [] };
-  const q = room.questions[a.qi % Math.max(1, room.questions.length)];
+  const qs = qsOf(room, pl), q = qs[a.qi % Math.max(1, qs.length)];
   a.done = true; a.defended = Number(choice) === q.answer;
   return { events: [], me: { kind: 'alarmed', pid, defended: a.defended, word: q.prompt, answer: q.options[q.answer] } };
 }
@@ -419,7 +423,7 @@ export function playerView(room, pid, now = Date.now()) {
     me: { id: pl.id, name: pl.name, gold: pl.gold, kg: pl.kg, right: pl.right, wrong: pl.wrong, streak: pl.streak, shield: pl.shield, lure: pl.lure, run: pl.run, rank: hide ? null : rank, of: list.length, team: pl.team, inv: pl.inv },
     q: q ? { n: pl.right + pl.wrong, prompt: q.prompt, options: q.options, wait_until: pl.wait_until > now ? pl.wait_until : 0, hide: pl.fifty && pl.fifty.qi === pl.qi ? pl.fifty.hide : [] } : null,
     heist: pl.heist ? { kind: pl.heist.kind, pct: pl.heist.pct, got: pl.heist.got, need: pl.heist.need, until: pl.heist.until, vname: room.players[pl.heist.vid]?.name || '' } : null,
-    alarm: alarmLive(pl, now) ? (() => { const a = pl.alarm, aq = room.questions[a.qi % Math.max(1, room.questions.length)]; return { until: a.until, by: room.players[a.by]?.name || '', prompt: aq.prompt, options: aq.options }; })() : null,
+    alarm: alarmLive(pl, now) ? (() => { const a = pl.alarm, aqs = qsOf(room, pl), aq = aqs[a.qi % Math.max(1, aqs.length)]; return { until: a.until, by: room.players[a.by]?.name || '', prompt: aq.prompt, options: aq.options }; })() : null,
     offer: pl.offer ? { n: pl.right, count: pl.offer.chests.length, peeked: pl.offer.peeked, caught: pl.offer.caught, kinds: pl.offer.peeked && !pl.offer.caught ? pl.offer.chests.map(c => c.kind) : null } : null,
     pending: pl.pending ? { kind: pl.pending.kind, pct: pl.pending.pct, until: pl.pending.until, targets: targets(room, pl, now, pl.pending.kind).filter(x => pl.pending.list.includes(x.id)) } : null,
     frenzy_until: room.frenzy_until > now ? room.frenzy_until : 0,

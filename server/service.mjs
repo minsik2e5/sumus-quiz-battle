@@ -1892,18 +1892,29 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!rangeCodes.length) fail('단어 범위를 골라주세요.');
     const questions = battleQuestions(scopedWords(state, school.id, rangeCodes, className), 'speed', 100);
     if (questions.length < 8) fail('뜻이 서로 다른 단어가 8개 이상인 범위를 골라주세요.', 409);
+    // V13.199 학교별 단어: `schools: [{ school_id, range_codes }]`로 맡은 다른 학교(같은 부, 4곳까지)도 함께. 학생은 자기 학교 범위 문제를 받는다.
+    const extra = (Array.isArray(body.schools) ? body.schools : []).slice(0, 4).map(x => ({ school: teacherSchools(state, p).find(s => s.id === str(x?.school_id, 80)), ranges: [...new Set((Array.isArray(x?.range_codes) ? x.range_codes : []).map(String))].slice(0, 60) }));
+    if (extra.some(x => !x.school)) fail('함께할 학교를 확인해주세요.', 403);
+    const others = extra.filter(x => x.school.id !== school.id);
+    if (others.length && className !== grade) fail('여러 학교 게임은 학년 전체로 열어요.');
+    const qsets = {};
+    for (const x of others) {
+      if (!x.ranges.length) fail(`${x.school.name} 단어 범위를 골라주세요.`);
+      qsets[x.school.id] = battleQuestions(scopedWords(state, x.school.id, x.ranges, grade), 'speed', 100);
+      if (qsets[x.school.id].length < 8) fail(`${x.school.name} 범위에 뜻이 서로 다른 단어가 8개 이상 있어야 해요.`, 409);
+    }
     // 선생님 한 명에 열린 방 하나: 예전 방은 닫는다.
     const closing = openParties(state, now).filter(x => x.teacher_id === p.id);
     for (const x of closing) x.status = 'closed';
     const minutes = PARTY.MINUTES.includes(Number(body.minutes)) ? Number(body.minutes) : 8;
     state.parties ||= [];
-    const party = { id: id(), code: newPartyCode(state, now), kind, school_id: school.id, teacher_id: p.id, class_name: className, grade, minutes, steal: kind === 'treasure' && body.steal !== false, teams: kind === 'treasure' && body.teams === true, status: 'open', created_at: now, tickets: {}, tv_ticket: partyTicket(), range_codes: rangeCodes };
+    const party = { id: id(), code: newPartyCode(state, now), kind, school_id: school.id, teacher_id: p.id, class_name: className, grade, minutes, steal: kind === 'treasure' && body.steal !== false, teams: kind === 'treasure' && body.teams === true, status: 'open', created_at: now, tickets: {}, tv_ticket: partyTicket(), range_codes: rangeCodes, ...(others.length ? { school_ids: [school.id, ...others.map(x => x.school.id)], school_ranges: Object.fromEntries([[school.id, rangeCodes], ...others.map(x => [x.school.id, x.ranges])]) } : {}) };
     state.parties.push(party);
-    const label = `${className} · ${rangeCodes.length}개 범위 · ${questions.length}단어`;
+    const label = others.length ? `${[school, ...others.map(x => x.school)].map(x => x.name).join(' · ')} ${className} · 학교별 단어` : `${className} · ${rangeCodes.length}개 범위 · ${questions.length}단어`;
     party.label = label;
     return {
       party: partyHostView(party),
-      _parties: [...closing.map(x => ({ action: 'close', id: x.id })), { action: 'init', id: party.id, tv_ticket: party.tv_ticket, party: { code: party.code, kind, minutes, steal: party.steal, teams: party.teams, questions, host: { id: p.id, name: p.display_name }, seed: randomBytes(4).readUInt32BE(0), school_id: school.id, class_name: className, label } }]
+      _parties: [...closing.map(x => ({ action: 'close', id: x.id })), { action: 'init', id: party.id, tv_ticket: party.tv_ticket, party: { code: party.code, kind, minutes, steal: party.steal, teams: party.teams, questions, ...(others.length ? { qsets } : {}), host: { id: p.id, name: p.display_name }, seed: randomBytes(4).readUInt32BE(0), school_id: school.id, class_name: className, label } }]
     };
   }
   if (path === '/teacher/party/close' && method === 'POST') {
@@ -1917,7 +1928,8 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
     const code = str(body.code, 4), school = schoolForProfile(state, p);
-    const party = openParties(state).find(x => x.code === code && x.school_id === school?.id);
+    // V13.199 학교별 단어 게임은 함께한 학교 학생도 들어온다(자기 학교 문제).
+    const party = openParties(state).find(x => x.code === code && (x.school_id === school?.id || (!!school && x.school_ids?.includes(school.id))));
     if (!party) fail('그 번호의 교실 게임을 찾지 못했어요. TV의 번호를 다시 확인해 주세요.', 404);
     if (gradeOf(p.class_name) !== party.grade || (party.class_name !== party.grade && p.class_name !== party.class_name)) fail(`${party.class_name} 학생만 들어갈 수 있어요.`, 409);
     // V13.163 교사 미리보기 계정은 반 게임에 들어가지 않는다(순위 · 코인을 진짜 학생에게서 가져갔다). 대결 · 던전과 같다.
@@ -1926,7 +1938,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const fresh = !party.tickets[p.id];
     const ticket = party.tickets[p.id] ||= partyTicket();
     const pet = petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key).find(x => x.active) || null;
-    return { room: { id: party.id, ticket, kind: party.kind, code: party.code, label: party.label, plays_left: partyPlaysLeft(p) }, _parties: [{ action: 'join', id: party.id, ticket, fresh, player: partyPlayer(p, pet) }] };
+    return { room: { id: party.id, ticket, kind: party.kind, code: party.code, label: party.label, plays_left: partyPlaysLeft(p) }, _parties: [{ action: 'join', id: party.id, ticket, fresh, player: { ...partyPlayer(p, pet), ...(party.school_ids && school.id !== party.school_id ? { qs: school.id } : {}) } }] };
   }
   if (path === '/shop/egg' && method === 'POST') {
     requireRole(p, 'student');

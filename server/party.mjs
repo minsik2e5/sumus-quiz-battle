@@ -8,6 +8,7 @@ import { addBonus } from './rewards.mjs';
 // V13.149 교실 게임(보물 사냥 · 반 전체 낚시)의 메인 상태 쪽: 방 목록(state.parties), 참가, 끝난 판 정산.
 // 판 자체는 방(cloudflare/party-room.mjs)이 돌린다. 방 준비 메시지(_party: 문제 · 입장표)는 브라우저로 가지 않는다.
 //   state.parties [{ id, code, kind, school_id, teacher_id, class_name, grade, minutes, steal, status, created_at, tickets{pid}, tv_ticket, settled, summary }]
+//   V13.199 학교별 단어: school_ids [함께한 학교], school_ranges { 학교 id: [범위] } (학교가 둘 이상일 때만)
 
 export const PARTY_OPEN_MS = 3 * 3600000;
 export const PARTY_KEEP = 30;

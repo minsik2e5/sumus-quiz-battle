@@ -28,7 +28,7 @@ export async function partyCreateModal(A, onOpen) {
   const targets = middle ? [['중2', '중2'], ['중3', '중3']] : [['고1', '고1 전체'], ['고1A', '고1A'], ['고1B', '고1B']];
   const close = modal(`<form id="pg-form" class="pg-form">
     <h2>🎮 교실 게임 열기</h2>
-    <p class="tiny muted">교실 TV에 띄우고, 학생은 폰의 <b>야차전 → 게임 → 교실 게임 참가</b>에 번호 4자리를 넣어요.</p>
+    <p class="tiny muted">교실 TV에 띄우고, 학생은 폰의 <b>놀이터 맨 아래 → 교실 게임 참가</b>에 번호 4자리를 넣어요.</p>
     ${open ? `<div class="pg-open"><span>열려 있는 게임 · 번호 <b>${esc(open.code)}</b> · ${open.kind === 'fish' ? '반 전체 낚시' : '보물 사냥'}</span><button type="button" class="btn small primary" data-pg-reopen>TV 다시 열기</button></div>` : ''}
     <div class="pg-kinds">
       <label class="pg-kind"><input type="radio" name="kind" value="treasure" checked><span><b>💰 보물 사냥</b><small>맞히면 상자 3개 중 하나! 금화 · 2배 · 훔치기 · 방패 · 몬스터… 역전이 잘 나는 시끌벅적 모드</small></span></label>
@@ -40,8 +40,10 @@ export async function partyCreateModal(A, onOpen) {
     </div>
     <label class="pg-steal"><input type="checkbox" name="steal" checked><span><b>훔치기 · 바꾸기 켜기</b><small>끄면 금화 · 배수 · 꽝 · 몬스터만 나와요(보물 사냥만). 같은 친구는 한 판에 2번까지만 훔칠 수 있어요.</small></span></label>
     <label class="pg-steal pg-teams"><input type="checkbox" name="teams"><span><b>팀전으로 하기 (보물 사냥만)</b><small>반을 A · B 팀으로 나눠요. 훔치기 · 바꾸기는 상대 팀만 노릴 수 있고, 팀 금화 합계가 큰 팀이 이겨요(코인 +3). 같은 반 친구끼리 뺏는 게 부담스러울 때 좋아요.</small></span></label>
-    <div class="step-label">단어 범위</div>
+    <div class="tn-schools-box" id="pg-schools-box" hidden><div class="step-label">함께할 학교 <small>학생마다 자기 학교 단어로 풀어요</small></div><div class="tn-schools" id="pg-schools"></div></div>
+    <div class="step-label">단어 범위 <small id="pg-range-school"></small></div>
     <div class="teacher-range" id="pg-ranges"></div>
+    <div id="pg-other-ranges"></div>
     <div id="pg-error" class="form-error" role="alert"></div>
     <button class="btn primary full" type="submit">TV에 게임 열기</button>
   </form>`, '교실 게임 열기');
@@ -50,18 +52,39 @@ export async function partyCreateModal(A, onOpen) {
     const target = $('#pg-target').value, info = getRanges(A, A.school, middle ? target : null);
     $('#pg-ranges').innerHTML = periodFolders(A, info.codes, { wrap: 'teacher-range', bare: true, selected: info.codes.slice(0, 2), count: code => info.words.filter(w => w.range_code === code).length, option: code => `<label class="range-option"><input type="checkbox" name="range" value="${esc(code)}" ${info.codes.indexOf(code) < 2 ? 'checked' : ''}><span>${esc(middle ? `${code}과` : rangeLabel(A.school, code))}<small>${info.words.filter(w => w.range_code === code).length}개 단어</small></span></label>` }) || '<p class="tiny muted">단어 범위가 없어요.</p>';
   };
-  $('#pg-target').onchange = fill;
-  form.addEventListener('change', e => { if (e.target.name === 'kind') form.querySelectorAll('.pg-steal').forEach(x => x.classList.toggle('off', e.target.value === 'fish')); });
+  // V13.199 학교별 단어: 학년 전체 게임이면 맡은 다른 학교(같은 부)도 함께, 학교마다 범위(/teacher/tournament-pool).
+  const pools = new Map(), others = new Set();
+  const poolOf = grade => { if (!pools.has(grade)) pools.set(grade, api('/teacher/tournament-pool?grade=' + encodeURIComponent(grade)).then(r => r.schools || []).catch(() => [])); return pools.get(grade); };
+  const otherRanges = (x, grade) => { const list = [...x.ranges].sort((a, b) => (b.period === 'final') - (a.period === 'final')), pick = new Set(list.slice(0, 2).map(r => r.code));
+    return `<div class="tn-other-range"><div class="step-label">${esc(x.name)} 단어 범위</div><div class="teacher-range">${list.map(r => `<label class="range-option"><input type="checkbox" name="range-${esc(x.id)}" value="${esc(r.code)}" ${pick.has(r.code) ? 'checked' : ''}><span>${esc(/^중/.test(grade) ? `${r.code}과` : rangeLabel(x.name, r.code))}<small>${r.period === 'final' ? '기말 · ' : ''}${num(r.count)}개 단어</small></span></label>`).join('')}</div></div>`; };
+  const fillOthers = async () => {
+    const target = $('#pg-target').value, grade = (target.match(/^(중[1-3]|고[1-3])/) || [])[1] || target, whole = target === grade;
+    if (!whole) others.clear();
+    const list = whole ? (await poolOf(grade)).filter(x => x.name !== A.school).slice(0, 4) : [];
+    if ($('#pg-target').value !== target) return;
+    $('#pg-schools-box').hidden = !list.length;
+    $('#pg-range-school').textContent = list.length ? A.school : '';
+    $('#pg-schools').innerHTML = `<label class="tn-school-pick on"><input type="checkbox" checked disabled><span>${esc(A.school)}</span></label>${list.map(x => `<label class="tn-school-pick${others.has(x.id) ? ' on' : ''}"><input type="checkbox" name="pg-school" value="${esc(x.id)}" ${others.has(x.id) ? 'checked' : ''}><span>${esc(x.name)}<small>${num(x.students.length)}명</small></span></label>`).join('')}`;
+    $('#pg-other-ranges').innerHTML = list.filter(x => others.has(x.id)).map(x => otherRanges(x, grade)).join('');
+  };
+  $('#pg-target').onchange = () => { fill(); fillOthers(); };
+  form.addEventListener('change', e => {
+    if (e.target.name === 'kind') form.querySelectorAll('.pg-steal').forEach(x => x.classList.toggle('off', e.target.value === 'fish'));
+    if (e.target.name === 'pg-school') { e.target.checked ? others.add(e.target.value) : others.delete(e.target.value); fillOthers(); }
+  });
   fill();
+  fillOthers();
   form.querySelector('[data-pg-reopen]')?.addEventListener('click', () => { close(); onOpen(open); });
   form.onsubmit = async event => {
     event.preventDefault();
     const button = $('[type="submit"]', form), values = Object.fromEntries(new FormData(form));
     const ranges = $$('input[name="range"]:checked', form).map(x => x.value);
     if (!ranges.length) return $('#pg-error').textContent = '단어 범위를 골라주세요.';
+    const schools = [...others].map(id => ({ school_id: id, range_codes: $$(`input[name="range-${CSS.escape(id)}"]:checked`, form).map(x => x.value) }));
+    if (schools.some(x => !x.range_codes.length)) return $('#pg-error').textContent = '함께할 학교마다 단어 범위를 골라주세요.';
     buttonBusy(button);
     try {
-      const r = await api('/teacher/party', { kind: values.kind, class_name: values.class_name, minutes: Number(values.minutes), steal: !!values.steal, teams: !!values.teams && values.kind === 'treasure', range_codes: ranges });
+      const r = await api('/teacher/party', { kind: values.kind, class_name: values.class_name, minutes: Number(values.minutes), steal: !!values.steal, teams: !!values.teams && values.kind === 'treasure', range_codes: ranges, ...(schools.length ? { schools } : {}) });
       close();
       onOpen(r.party);
     } catch (err) { $('#pg-error').textContent = err.message; buttonBusy(button, false); }
@@ -140,7 +163,7 @@ function lobby(v, before) {
   const fresh = new Set((v.lobby || []).map(x => x.id).filter(id => !(before?.lobby || []).some(y => y.id === id)));
   main(`<section class="ptv-lobby">
     <div class="ptv-join">
-      <p>폰에서 <b>야차전 → 게임 → 교실 게임 참가</b></p>
+      <p>폰에서 <b>놀이터 맨 아래 → 교실 게임 참가</b></p>
       <div class="ptv-code" aria-label="방 번호 ${esc(v.code)}">${[...String(v.code)].map(d => `<span>${esc(d)}</span>`).join('')}</div>
       <p class="ptv-sub">${v.kind === 'fish' ? '맞히면 물고기! 빨리 맞힐수록 큰 물고기 · 반 정답 40개마다 물고기 떼' : `맞히면 보물 상자! ${v.teams ? '팀전! ' : ''}${v.steal ? '금고 털이 · 도난 경보 · 방패까지' : '금화 · 배수 · 대박'} · ${v.minutes}분`}</p>
     </div>
