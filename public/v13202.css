@@ -1,0 +1,25 @@
+/* V13.202 학교 대항전(학생 홈): 중2 · 중3 · 단원고 · 선부고 · 강서고 이번 주 1인 평균 */
+.school-league-card{margin:12px 0;padding:14px 14px 10px;border-radius:20px;background:linear-gradient(160deg,#fffaf0,#f1f6ff);box-shadow:0 6px 20px rgba(40,60,120,.10),inset 0 0 0 1.5px #e3e9f7}
+.sl-head{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.sl-head b{font-size:17px;font-weight:900;color:#24304f}
+.sl-head span{font-size:12px;font-weight:800;color:#6b7896;background:#fff;padding:2px 9px;border-radius:99px}
+.sl-lead{margin:4px 0 10px;font-size:13px;font-weight:800;color:#c05a12}
+.sl-rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.sl-rows li{display:grid;grid-template-columns:28px minmax(0,88px) 1fr auto;align-items:center;gap:8px;padding:7px 9px;border-radius:14px;background:rgba(255,255,255,.75)}
+.sl-rows li.mine{background:#fff;box-shadow:0 0 0 2px #ffb54a,0 4px 14px rgba(255,160,40,.25)}
+.sl-rank{font-size:18px;text-align:center}
+.sl-rank i{font-style:normal;font-size:14px;font-weight:900;color:#8a94ab}
+.sl-name{display:flex;flex-direction:column;line-height:1.15;min-width:0}
+.sl-name b{font-size:14.5px;font-weight:900;color:#24304f;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sl-name small{font-size:11px;color:#8a94ab;font-weight:700}
+.sl-name em{font-style:normal;font-size:10.5px;font-weight:900;color:#b86200}
+.sl-bar{height:10px;border-radius:99px;background:#e8edf7;overflow:hidden}
+.sl-bar i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#7fa8ff,#4d74e6);transform-origin:left;animation:slGrow .9s cubic-bezier(.2,.8,.2,1) both}
+.sl-rows li.first .sl-bar i{background:linear-gradient(90deg,#ffd36b,#ff9f1c)}
+.sl-rows li.mine .sl-bar i{box-shadow:0 0 8px rgba(255,160,40,.6)}
+.sl-score{text-align:right;font-size:12px;font-weight:800;color:#55607a;line-height:1.15}
+.sl-score b{font-size:16px;font-weight:900;color:#24304f}
+.sl-score small{display:block;font-size:10.5px;color:#8a94ab}
+.sl-foot{margin:9px 2px 0;font-size:11px;line-height:1.45;color:#8a94ab}
+@keyframes slGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@media (prefers-reduced-motion:reduce){.sl-bar i{animation:none}}
