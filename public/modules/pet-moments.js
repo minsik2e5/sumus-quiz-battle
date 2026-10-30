@@ -195,9 +195,10 @@ export async function buyEgg(A, onChanged, kind, via = null) {
   if (momentOpen || !A.data?.stats?.pet) return null;
   momentOpen = true;
   let res;
-  try { res = await api(via?.path || '/shop/egg', via?.body || { kind: kind === 'epic' || kind === 'season' ? kind : 'basic' }); }
+  try { res = await api(via?.path || '/shop/egg', via?.body || { kind: ['epic', 'season', 'series'].includes(kind) ? kind : 'basic' }); }
   finally { momentOpen = false; }
-  if (res.mythic || res.legendary || res.epic || res.limited) { onChanged?.(); await eggShow(res, kind); return res; }
+  // V13.196.2 곤충 · 공룡 알: 시리즈 영웅 · 렉스는 연출, 시리즈 기본은 아래 알 이름 카드.
+  if (res.mythic || res.legendary || res.epic || res.limited || (res.series && res.rank !== 'basic')) { onChanged?.(); await eggShow(res, kind); return res; }
   momentOpen = true;
   eggRevealHtml(openOverlay('새 알'), res.key, () => closeOverlay(true, onChanged));
   return res;

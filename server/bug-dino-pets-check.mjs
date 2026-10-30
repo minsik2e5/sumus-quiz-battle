@@ -181,6 +181,14 @@ export async function runBugDinoPetsChecks(assert) {
   assert(existsSync(pub('v13195.css')) && list.includes('v13195.css') && list.at(-1) === 'v13178.css' && existsSync(pub('assets/ui/bugdino-egg.webp')) && existsSync(pub('assets/ui/bug-egg.webp')) && existsSync(pub('assets/ui/dino-egg.webp')),
     'V13.195 시리즈 알 CSS는 번들에 들어가고(민트 CSS가 맨 끝), 알 그림은 그림 56의 두 알을 합친 bugdino-egg');
   assert(!existsSync(pub('assets/previews')) && !existsSync(pub('assets/ui/preview-56.webp')), 'V13.195 확인용 미리보기 그림(그림 54 · 55 · 56)은 앱에 넣지 않았다');
+  // V13.196.2 놀이터 알 상점(arcade.js)에도 곤충 · 공룡 알 칸: 같은 서버 경로(/shop/egg kind series) · 같은 연출.
+  {
+    const arcade = source('../public/modules/arcade.js'), app = source('../public/app.js');
+    assert(arcade.includes('function seriesSlot(A)') && arcade.includes('${seriesSlot(A)}') && arcade.includes('data-egg="series"') && arcade.includes("if (!se?.ready) return '';")
+      && app.includes("['epic', 'season', 'series'].includes(d.egg)") && ui.includes("{ kind: ['epic', 'season', 'series'].includes(kind) ? kind : 'basic' }") && ui.includes("(res.series && res.rank !== 'basic')")
+      && list.includes('v13196.css') && list.at(-1) === 'v13178.css',
+      'V13.196.2 놀이터 알 상점에도 곤충 · 공룡 알 칸(그림이 없으면 숨김, 같은 사기 경로 · 연출)');
+  }
   const doc = source('../docs/bug-dino-pets-design.md');
   assert(doc.includes('시리즈 알') && doc.includes('1,000코인') && doc.includes('60 · 30 · 2'), 'V13.195 구성안 문서는 시리즈 알 결정으로 고쳤다');
 }

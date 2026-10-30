@@ -100,13 +100,31 @@ function seasonSlot(A) {
     </div>
   </div>`;
 }
+// V13.196.2 곤충 · 공룡 알(시리즈 알): 가을 알 아래 가로 칸. 남은 수 · 진행만 보이고 어떤 펫이 나올지는 서버가 정한다.
+function seriesSlot(A) {
+  const se = A.data.series_egg; if (!se?.ready) return '';
+  const short = Math.max(0, se.price - Number(A.data.stats?.points_balance || 0));
+  const label = se.done ? '모두 모았어요' : short ? `<span>${coin()}${num(se.price)}</span><small>${num(short)}코인 부족</small>` : `<span>${coin()}${num(se.price)}</span><small>사기</small>`;
+  const legend = se.odds?.legendary;
+  return `<div class="egg-slot series${se.done ? ' done' : ''}">
+    <div class="egg-slot-art" aria-hidden="true">${uiArt('bugdino-egg')}</div>
+    <div class="egg-season-text">
+      <span class="egg-slot-tag">🦕 곤충 · 공룡 시리즈</span>
+      <b class="egg-slot-name">곤충 · 공룡 알</b>
+      <small class="egg-slot-sub">${se.done ? '곤충 · 공룡 친구를 다 모았어요' : `못 만난 친구 ${num(se.left)}마리 · 중복 없음`}</small>
+      <em class="egg-series-prog">곤충 ${num(se.bug.owned)}/${num(se.bug.total)} · 공룡 ${num(se.dino.owned)}/${num(se.dino.total)}${legend && !se.done ? ` · 전설 렉스 ${legend}%` : ''}</em>
+      <button type="button" class="egg-slot-buy" data-action="egg-buy" data-egg="series" ${se.done || short ? 'disabled' : ''} aria-label="곤충 · 공룡 알 ${num(se.price)}코인${short ? `, ${num(short)}코인 부족` : ''}">${label}</button>
+    </div>
+  </div>`;
+}
 function shopHtml(A) {
   return `<section class="egg-stand" id="egg-stand">
     <div class="egg-stand-head"><div><small>PET EGG SHOP</small><h2>알 상점</h2></div><span class="egg-stand-wallet">${coin()}<b>${num(A.data.stats?.points_balance || 0)}</b></span></div>
     <p class="egg-stand-lead">새 알은 바로 파트너가 되고, 함께 공부하면 <b>Lv.3</b>에 태어나요.</p>
     ${seasonSlot(A)}
+    ${seriesSlot(A)}
     <div class="egg-stand-grid">${eggSlot(A, 'basic')}${eggSlot(A, 'epic')}</div>
-    <p class="lk-note">랜덤 알은 아직 못 만난 기본 펫, 영웅 알은 아직 못 만난 영웅 펫이 나와요 · 사기 버튼을 한 번 더 누르면 사요</p>
+    <p class="lk-note">랜덤 알은 아직 못 만난 기본 펫, 영웅 알은 아직 못 만난 영웅 펫${A.data.series_egg?.ready ? ', 곤충 · 공룡 알은 아직 못 만난 곤충 · 공룡 펫' : ''}이 나와요 · 사기 버튼을 한 번 더 누르면 사요</p>
   </section>`;
 }
 // V13.68 coin capsule: the machine and its show live in lucky.js.
