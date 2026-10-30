@@ -112,6 +112,7 @@ async function openStudentDetail(id) {
     <div class="sumus-detail-section">
       <h3>계정 관리</h3>
       <form id="student-enhanced-update">
+        <label class="field"><span>이름 (친구들에게 보이는 이름)</span><input name="display_name" value="${esc(p.display_name)}" required minlength="2" maxlength="40" autocomplete="off"></label>
         <div class="form-columns">
           <label class="field"><span>반</span><select name="class_name" required>${classOptions}</select></label>
           <label class="field"><span>학교 변경</span><select name="school_id" required>${schoolOptions}</select></label>
@@ -134,6 +135,9 @@ async function openStudentDetail(id) {
     buttonBusy(button);
     const values = Object.fromEntries(new FormData(form));
     const payload = { class_name: values.class_name, school_id: values.school_id, active: values.active === 'on' };
+    // V13.199.1 이름 바꾸기(닉네임 요청 등): 바뀐 때만 보낸다(서버가 2자 이상을 확인한다).
+    const name = String(values.display_name || '').trim();
+    if (name && name !== p.display_name) payload.display_name = name;
     if (values.password) payload.password = values.password;
     try {
       await api('/students/' + id, payload, 'PATCH');
