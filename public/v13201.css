@@ -1,0 +1,20 @@
+/* V13.201 곤충 · 공룡 알 NEW 배지 · 다 모은 보상(특별 테두리 '곤충 · 공룡 탐험대') */
+.egg-tab-new{display:inline-block;margin-left:4px;padding:0 6px;border-radius:999px;font-style:normal;font-size:10px;font-weight:900;line-height:16px;letter-spacing:.02em;color:#fff;background:linear-gradient(90deg,#ff5a5f,#ff9f2e);box-shadow:0 1px 4px rgba(255,90,95,.35);vertical-align:2px;animation:eggNewPulse 1.8s ease-in-out infinite}
+.egg-shop-tabs button .egg-tab-new{position:absolute;top:-6px;right:-4px;margin:0}
+.egg-shop-tabs button.series{position:relative}
+.partner-shop{position:relative}
+.partner-shop .egg-tab-new{position:absolute;top:-8px;right:-6px;margin:0}
+@keyframes eggNewPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+/* 테두리: 잎 초록 + 호박 화석 빛 고리, 작은 점 두 개(무당벌레 · 공룡 발자국 느낌) */
+.frame-bugdino img{filter:drop-shadow(0 0 6px #8fd16a) drop-shadow(0 0 2px #e0a84a)}
+.avatar-art.frame-bugdino::before{inset:0;border-radius:50%;background:conic-gradient(from 210deg,#8fd16a,#e0a84a,#ff7a6b,#8fd16a);-webkit-mask:radial-gradient(closest-side,transparent 60%,#000 63%,#000 76%,transparent 80%);mask:radial-gradient(closest-side,transparent 60%,#000 63%,#000 76%,transparent 80%);animation:v67-prism 9s linear infinite}
+.avatar-art.frame-bugdino::before,.avatar-art.frame-bugdino::after{content:'';position:absolute;pointer-events:none;z-index:-1}
+.avatar-art.frame-bugdino::after{inset:6% 4% 2%;border-radius:50%;filter:blur(7px);background:radial-gradient(closest-side,#e9f8d8 0%,#b9e59a 45%,rgba(255,200,120,.5) 70%,transparent 100%)}
+.series-done{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:6px 4px}
+.series-done-kicker{font-size:12.5px;font-weight:900;color:#3f7a26;background:#eaf7df;border-radius:999px;padding:3px 12px}
+.series-done-stage{position:relative;width:180px;height:180px;display:grid;place-items:center}
+.series-done-stage .avatar-art{width:150px;height:150px}
+.series-done-rays{position:absolute;inset:-10px;border-radius:50%;background:repeating-conic-gradient(from 0deg,rgba(143,209,106,.45) 0 10deg,transparent 10deg 24deg);-webkit-mask:radial-gradient(circle,#000 32%,transparent 70%);mask:radial-gradient(circle,#000 32%,transparent 70%);animation:lgxSpin 14s linear infinite}
+.series-done h2{margin:0;font-size:21px}
+.series-done p{margin:0;font-size:14px;line-height:1.5;color:#4d5b55}
+@media (prefers-reduced-motion:reduce){.egg-tab-new,.series-done-rays,.frame-bugdino::before{animation:none!important}}
