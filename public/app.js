@@ -1645,15 +1645,38 @@ function tournamentCreateModal() {
         <label class="field"><span>대진 방식</span><select name="seeding"><option value="random">랜덤 대진</option><option value="league">이번 주 리그 승점순</option></select></label>
         <label class="field"><span>우승 상금 (준우승 절반)</span><select name="prize"><option value="0">없음</option><option value="50">50코인</option><option value="100" selected>100코인</option><option value="200">200코인</option></select></label>
       </div>
+      <div class="tn-schools-box" id="tn-schools-box" hidden><div class="step-label">함께할 학교 <small>경기마다 각자 자기 학교 단어로 겨뤄요</small></div><div class="tn-schools" id="tn-schools"></div></div>
       <div class="step-label">참가 학생 <small id="tn-count"></small></div>
       <div class="tn-pick-tools"><button type="button" class="text-button" data-tn-all="1">전체 선택</button><button type="button" class="text-button" data-tn-all="0">전체 해제</button></div>
       <div class="tn-pick" id="tn-players"></div>
-      <div class="step-label">대결 단어 범위</div>
+      <div class="step-label">대결 단어 범위 <small id="tn-range-school"></small></div>
       <div class="teacher-range" id="tn-ranges"></div>
+      <div id="tn-other-ranges"></div>
       <div id="tn-error" class="form-error" role="alert"></div>
       <button class="btn primary full" type="submit">대회 시작하기</button>
     </form>`, '야차 대회 만들기');
   const form = $('#tn-form');
+  // V13.198 학교별 단어 대회: 맡은 다른 학교(같은 부)의 같은 학년 학생 · 범위(/teacher/tournament-pool, 학년마다 한 번).
+  const pools = new Map(), others = new Set();
+  const poolOf = grade => { if (!pools.has(grade)) pools.set(grade, api('/teacher/tournament-pool?grade=' + encodeURIComponent(grade)).then(r => r.schools || []).catch(() => [])); return pools.get(grade); };
+  const otherSchools = list => list.filter(x => x.name !== A.school);
+  const otherItem = (x, p) => { const ok = p.pet && !p.busy; return `<label class="tn-pick-item ${ok ? '' : 'off'}"><input type="checkbox" name="student" value="${esc(p.id)}" ${ok ? 'checked' : 'disabled'}><span><b>${esc(p.name)}</b><small>${esc(x.name)} ${esc(p.class_name)} · ${p.busy ? '다른 대회 참가 중' : !p.pet ? '아직 펫을 고르지 않았어요' : '다른 학교'}</small></span></label>`; };
+  const otherRanges = x => { const finals = x.ranges.filter(r => r.period === 'final'), pick = new Set((finals.length ? finals : x.ranges).slice(0, 2).map(r => r.code));
+    return `<div class="tn-other-range"><div class="step-label">${esc(x.name)} 단어 범위</div><div class="teacher-range">${[...x.ranges].sort((a, b) => (b.period === 'final') - (a.period === 'final')).map(r => `<label class="range-option"><input type="checkbox" name="range-${esc(x.id)}" value="${esc(r.code)}" ${pick.has(r.code) ? 'checked' : ''}><span>${esc(/^중/.test(x.grade || '') ? `${r.code}과` : rangeLabel(x.name, r.code))}<small>${r.period === 'final' ? '기말 · ' : ''}${num(r.count)}개 단어</small></span></label>`).join('')}</div></div>`; };
+  const fillOthers = async target => {
+    const grade = gradeOfClass(target), whole = target === grade && target.length === 2;
+    if (!whole) others.clear();
+    const list = whole ? otherSchools(await poolOf(grade)).map(x => ({ ...x, grade })) : [];
+    if ($('#tn-target').value !== target) return;
+    $('#tn-schools-box').hidden = !list.length;
+    $('#tn-range-school').textContent = list.length ? A.school : '';
+    $('#tn-schools').innerHTML = `<label class="tn-school-pick on"><input type="checkbox" checked disabled><span>${esc(A.school)}</span></label>${list.map(x => `<label class="tn-school-pick${others.has(x.id) ? ' on' : ''}"><input type="checkbox" name="tn-school" value="${esc(x.id)}" ${others.has(x.id) ? 'checked' : ''}><span>${esc(x.name)}<small>${num(x.students.length)}명</small></span></label>`).join('')}`;
+    const chosen = list.filter(x => others.has(x.id));
+    $$('.tn-pick-item.other', form).forEach(el => el.remove());
+    $('#tn-players').insertAdjacentHTML('beforeend', chosen.flatMap(x => x.students.map(p => otherItem(x, p).replace('class="tn-pick-item', 'class="tn-pick-item other'))).join(''));
+    $('#tn-other-ranges').innerHTML = chosen.map(otherRanges).join('');
+    count();
+  };
   const count = () => {
     const n = $$('input[name="student"]:checked', form).length;
     $('#tn-count').textContent = n > MAX_PLAYERS ? `${n}명 · 한 대회는 ${MAX_PLAYERS}명까지예요` : n >= 2 ? `${n}명 · ${roundName(n)}부터` : `${n}명 · 2명 이상 골라주세요`;
@@ -1669,10 +1692,14 @@ function tournamentCreateModal() {
     $('#tn-ranges').innerHTML = periodFolders(A, info.codes, { wrap: 'teacher-range', bare: true, selected: info.codes.slice(0, 2), count: code => info.words.filter(word => word.range_code === code).length, option: code => `<label class="range-option"><input type="checkbox" name="range" value="${esc(code)}" ${info.codes.indexOf(code) < 2 ? 'checked' : ''}><span>${esc(middle ? `${code}과` : rangeLabel(A.school, code))}<small>${info.words.filter(word => word.range_code === code).length}개 단어</small></span></label>` }) || '<p class="tiny muted">단어 범위가 없어요.</p>';
     count();
   };
-  $('#tn-target').onchange = fill;
-  form.addEventListener('change', event => { if (event.target.name === 'student') count(); });
+  $('#tn-target').onchange = () => { fill(); fillOthers($('#tn-target').value); };
+  form.addEventListener('change', event => {
+    if (event.target.name === 'student') count();
+    if (event.target.name === 'tn-school') { event.target.checked ? others.add(event.target.value) : others.delete(event.target.value); fillOthers($('#tn-target').value); }
+  });
   $$('[data-tn-all]', form).forEach(button => button.onclick = () => { $$('input[name="student"]:not(:disabled)', form).forEach(input => { input.checked = button.dataset.tnAll === '1'; }); count(); });
   fill();
+  fillOthers($('#tn-target').value);
   form.onsubmit = async event => {
     event.preventDefault();
     const button = $('[type="submit"]', form), values = Object.fromEntries(new FormData(form));
@@ -1681,9 +1708,11 @@ function tournamentCreateModal() {
     if (ids.length < 2) return $('#tn-error').textContent = '참가 학생을 2명 이상 골라주세요.';
     if (ids.length > MAX_PLAYERS) return $('#tn-error').textContent = `한 대회에는 ${MAX_PLAYERS}명까지 참가할 수 있어요.`;
     if (!ranges.length) return $('#tn-error').textContent = '단어 범위를 하나 이상 골라주세요.';
+    const schools = [...others].map(id => ({ school_id: id, range_codes: $$(`input[name="range-${CSS.escape(id)}"]:checked`, form).map(input => input.value) }));
+    if (schools.some(x => !x.range_codes.length)) return $('#tn-error').textContent = '함께할 학교마다 단어 범위를 하나 이상 골라주세요.';
     buttonBusy(button); $('#tn-error').textContent = '';
     try {
-      await api('/teacher/tournaments', { name: values.name, class_name: values.class_name, seeding: values.seeding, mode: values.mode, prize: Number(values.prize), student_ids: ids, range_codes: ranges });
+      await api('/teacher/tournaments', { name: values.name, class_name: values.class_name, seeding: values.seeding, mode: values.mode, prize: Number(values.prize), student_ids: ids, range_codes: ranges, ...(schools.length ? { schools } : {}) });
       close(); await refresh(); A.tab = 'tournaments'; render(); toast('대회를 열었어요! 학생 홈 화면에 첫 경기가 떠요.');
     } catch (err) { $('#tn-error').textContent = err.message; buttonBusy(button, false); }
   };

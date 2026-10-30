@@ -1,0 +1,9 @@
+/* V13.198 학교별 단어 야차 대회: 함께할 학교 고르기 · 학교별 범위 · 대진표의 학교 이름 */
+.tn-schools{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 10px}
+.tn-school-pick{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;border:1.5px solid #d9e2df;background:#fff;font-weight:800;cursor:pointer}
+.tn-school-pick.on{border-color:#12a37f;background:#ecfaf5;color:#0d6b53}
+.tn-school-pick small{margin-left:4px;font-weight:700;color:#7a8a85}
+.tn-school-pick input{accent-color:#12a37f}
+.tn-other-range{margin-top:10px}
+.tn-pick-item.other small{color:#0d6b53}
+.tn-slot .tn-school{display:block;font-size:10.5px;font-weight:700;color:#7a8a85;line-height:1.2}

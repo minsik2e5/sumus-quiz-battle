@@ -6,7 +6,9 @@
 // state.tournaments[]: { id, name, teacher_id, school_id, school, division, grade, class_name,
 //   range_codes, prize, status: 'active'|'finished'|'cancelled', created_at, finished_at,
 //   players: [student ids in seed order], rounds: [[{ id, a, b, winner, loser, by, draws }]],
-//   champion, runner_up }
+//   champion, runner_up
+//   V13.198 학교별 단어 대회: school_ids [학교들], school_ranges { 학교 id: [범위] } (학교가 둘 이상일 때만).
+//   경기마다 두 학생이 각자 자기 학교 범위의 단어를 받는다(같은 학교끼리는 같은 단어). }
 
 export const TOURNAMENT_MIN_PLAYERS = 2;
 export const TOURNAMENT_MAX_PLAYERS = 32;
@@ -66,8 +68,13 @@ export function resolveByes(t, now = Date.now()) {
     else if (!match.a && match.b) decideMatch(t, match.id, match.b, 'bye', now);
   }
 }
-export function createTournament({ id, name, teacher, school, grade, className, players, rangeCodes, prize, mode = 'speed', now = Date.now() }) {
+// V13.198 그 학교 학생이 받는 범위(학교별 단어 대회는 학교마다, 아니면 대회 범위). 대회에 없는 학교면 null.
+export const tournamentRanges = (t, schoolId) => t?.school_ranges ? t.school_ranges[schoolId] || null : schoolId === t?.school_id ? t.range_codes : null;
+export const tournamentHasSchool = (t, schoolId) => !!schoolId && (t?.school_id === schoolId || !!t?.school_ids?.includes(schoolId));
+export function createTournament({ id, name, teacher, school, grade, className, players, rangeCodes, prize, mode = 'speed', schoolRanges = null, now = Date.now() }) {
+  const multi = schoolRanges && Object.keys(schoolRanges).length > 1;
   const t = {
+    ...(multi ? { school_ids: Object.keys(schoolRanges), school_ranges: schoolRanges } : {}),
     id, name, teacher_id: teacher.id, school_id: school.id, school: school.name, division: school.division,
     grade, class_name: className || null, range_codes: rangeCodes, prize, mode: mode === 'skill' ? 'skill' : 'speed', status: 'active', created_at: now,
     players: [...players], rounds: buildBracket(players), champion: null, runner_up: null
