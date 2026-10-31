@@ -50,3 +50,7 @@
   .cw-stage.shake,.cw-readout.strain,.cw-news-text,.cw-say.near{animation:none!important}
   .cw-stage.slowmo::after{display:none}
 }
+/* V13.204 물리(테스트 앱): 배출구 턱 흔들흔들 때 심장 박동마다 가장자리가 붉게 두근. 동작 줄이기면 물리가 꺼져 나오지 않는다. */
+.cw-stage.beat::before{content:"";position:absolute;inset:0;z-index:481;pointer-events:none;background:radial-gradient(ellipse at 50% 50%,transparent 52%,rgba(255,60,110,.34) 100%);animation:cw-beat .42s ease-out forwards}
+@keyframes cw-beat{0%{opacity:0}18%{opacity:1}36%{opacity:.35}52%{opacity:.8}100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.cw-stage.beat::before{display:none}}

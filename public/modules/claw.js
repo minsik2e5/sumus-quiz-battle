@@ -6,7 +6,7 @@ import { CLAW, DOLL_KEYS, DOLLS, dollName, roundLayout } from './claw-rules.js';
 import { CLAW_ART } from './claw-art.js';
 import { TITLES } from './titles.js';
 import { missPlan } from './claw-fx.js';
-import { loadMatter, makePile, physicsOn, W, H, STEP } from './claw-physics.js';
+import { loadMatter, makePile, makePendulum, makeTeeter, physicsOn, W, H, STEP } from './claw-physics.js';
 
 // V13.180 인형뽑기(놀이터). 구성안 docs/claw-machine-design.md. 그림은 주문서 42 ~ 45(public/assets/claw).
 // 3D 라이브러리 없이 그림 층 + 2.5D: 기계(속 빈 그림) → 인형 더미(깊이 순서) → 집게 뒤 발톱 → 잡힌 인형 → 앞 발톱 · 줄 · 레일 → 유리 반사 → 버튼.
@@ -20,6 +20,9 @@ const DOLL_W = 22;                            // 인형 너비(기계 너비 %, 
 const CLAW_W = 21;
 const LIFT = 5;                               // 층 하나 높이(기계 높이 %)
 const DOOR = { left: 21, top: 75.5, w: 29, h: 17 }; // 아래 왼쪽 상품 문
+// V13.204 배출구 오른쪽 턱(기계 그림 %, 배출구 구멍 그림의 오른쪽 끝을 화면에서 재서 정함): 심쿵 놓침에서 인형이 걸쳐 흔들리는 자리.
+const LIP = { left: 31, top: 49.6 };
+const SWING_HOLD_MS = 320;                    // V13.204 배출구 위에서 놓기 전 대롱대롱 기다림(물리 켬일 때만)
 
 const has = name => CLAW_ART.has(name);
 const src = name => `/assets/claw/${name}.webp`;
@@ -107,7 +110,8 @@ export function openClaw(A, exit) {
   preloadSound(['coin', 'swoosh', 'wiggle', 'pop', 'stamp', 'fanfare-basic', 'fanfare-epic', 'fanfare-legend', 'coins', 'reel-plop', 'reel-click', 'tick', 'tap', 'fail', 'claw-strain', 'claw-slip', 'claw-aww']);
   idle();
   // V13.203 물리(claw-physics.js): 테스트 앱에서만 켠다(운영은 예전 연출 그대로). 받아지면 더미를 물리로 바꾼다. 동작 줄이기면 받지 않는다.
-  if (physicsOn() && !reduced()) loadMatter().then(M => { if (!C || !M) return; C.P = makePile(M); syncPile(); });
+  if (physicsOn() && !reduced()) loadMatter().then(M => { if (!C || !M) return; C.P = makePile(M); C.P.onBump = chainBump; syncPile(); });
+  if (physicsOn()) preloadSound(['fish-thump']); // V13.204 배출구 턱 심장 소리(테스트 앱에서만)
   api('/claw/home', {}).then(res => {
     if (!C) return; setView(res.claw); news(res.news);
     if (res.claw?.live) return resume(res.claw.live);
@@ -216,8 +220,8 @@ function physFrame(now) {
   let n = 0;
   while (C.physAcc >= STEP && n < 4) { if (scale > 0) { C.P.engine.timing.timeScale = scale; C.P.step(); } C.physAcc -= STEP; n++; }
   if (n === 4) C.physAcc = 0;
-  for (const [i, b] of C.P.bodies) if (!b.isSleeping) dollAt(i, b);
-  if (scale > 0 && C.P.still()) { for (const [i, b] of C.P.bodies) dollAt(i, b); C.physOn = false; return; }
+  for (const [i, b] of C.P.bodies) if (!b.isSleeping && i !== C.pin) dollAt(i, b);
+  if (scale > 0 && C.P.still()) { for (const [i, b] of C.P.bodies) if (i !== C.pin) dollAt(i, b); C.physOn = false; return; }
   C.physRaf = requestAnimationFrame(physFrame);
 }
 // 물리 몸 → 인형 자리: 발끝 = 가운데 + 회전된 (0, 0.46 높이), 기울기는 발끝을 축으로.
@@ -228,10 +232,27 @@ function dollAt(i, b) {
   n.style.top = `${(b.position.y + Math.cos(a) * h) / H * 100}%`;
   n.style.transform = Math.abs(a) > 0.002 ? `translate(-50%, -96%) rotate(${a.toFixed(3)}rad)` : '';
 }
+// V13.204 도미노: 떨어진 인형에 맞은 인형 · 그 둘레로 번질 때마다 눌림 + 톡(번질수록 높고 작게, 너무 잦으면 소리는 건너뜀).
+function chainBump(i, power, hop) {
+  if (!C) return;
+  squash(i);
+  const now = performance.now();
+  if (now - (C.bumpAt || 0) > 70) { C.bumpAt = now; sfx('reel-plop', { gain: Math.min(0.35, 0.12 + power * 0.06), rate: 1.15 + hop * 0.12 }); }
+}
+// V13.204 잡힌 인형 진자(claw-physics.js makePendulum): 물리가 켜졌을 때만. 켜져 있으면 집게 기울기(k.sway)를 진자가 정한다.
+//   k.wob: 버팀(strain)의 덜덜 떨림을 진자 위에 더한다.
+function pendOn(grip) { if (!C?.P) return; C.pend = makePendulum(grip); C.pendAt = null; C.claw.wob = 0; C.pend.kick(Math.random() < 0.5 ? -1 : 1); }
+function pendOff() { if (!C) return; C.pend = null; C.claw.wob = 0; }
+function swingStep() {
+  const k = C.claw, now = performance.now(), dt = C.pendAt == null ? 0 : now - C.pendAt;
+  C.pendAt = now;
+  if (dt > 0) k.sway = C.pend.step(dt, floorAt(k.x, k.y).left * W / 100) + (k.wob || 0);
+}
 const physPause = ms => { if (!C?.P) return; C.physScale = 0; physRun(); later(() => { C.physScale = 1; }, ms); };
 // 집게 · 줄 · 받침 · 레일 · 그림자를 지금 상태로.
 function drawClaw() {
   if (!C) return;
+  if (C.pend) swingStep();
   const k = C.claw, p = floorAt(k.x, k.y), rt = railTop(k.y);
   const restTop = rt + 3.2, bottom = k.bottom ?? (p.top - 7 * p.s);
   const top = restTop + (bottom - restTop) * k.drop;
@@ -322,6 +343,7 @@ function refill() {
 const squash = i => { const n = dollNode(i); if (n) { n.classList.remove('bump'); void n.offsetWidth; n.classList.add('bump'); } };
 function aim() {
   if (!C) return;
+  pendOff();
   C.phase = 'aim'; C.dropId ||= newId('d');
   hud(); mid();
   clawPic('closed');
@@ -465,11 +487,13 @@ function pressMini() {
 async function winLift(res, doll) {
   const k = C.claw;
   dollNode(doll.i)?.remove(); C.P?.remove(doll.i);
-  k.held = true;
+  k.held = true; pendOn(res.grip);
   await tween(1050, t => { k.drop = 1 - t; k.sway = Math.sin(t * 7) * 4 * (1 - t * 0.6); drawClaw(); });
   const from = { x: k.x, y: k.y };
   sfx('reel-click', { gain: 0.3, rate: 0.6 });
   await tween(900, t => { k.x = from.x + (HOME.x - from.x) * t; k.y = from.y + (HOME.y - from.y) * t; k.sway = Math.sin(t * 6) * 3; drawClaw(); });
+  // V13.204 물리: 멈춘 뒤 인형이 대롱대롱 흔들리는 걸 잠깐 보여 주고 놓는다.
+  if (C.pend) await tween(SWING_HOLD_MS, () => drawClaw(), t => t);
   // 놓는다.
   clawPic('open'); k.held = false; drawClaw();
   await fallIntoChute(doll);
@@ -530,16 +554,21 @@ async function slipLift(res, doll, plan) {
     return;
   }
   if (node) node.style.visibility = 'hidden';
-  k.held = true;
+  k.held = true; pendOn(res.grip);
+  // V13.204 물리: 배출구 쪽 놓침은 배출구 턱 위까지 가서(0.6 → 0.9) 턱에 걸쳐 흔들리다 넘어간다.
+  const teeter = res.slip === 'chute' && !!C.P && !!node, reach = teeter ? 0.9 : 0.6;
   await tween(res.slip === 'lift' ? 620 : 1000, t => { k.drop = 1 - t * plan.lift; k.sway = Math.sin(t * 9) * (3 + t * 4); drawClaw(); });
-  if (res.slip === 'chute') await tween(700, t => { k.x = from.x + (HOME.x - from.x) * t * 0.6; k.y = from.y + (HOME.y - from.y) * t * 0.6; k.sway = Math.sin(t * 12) * 6; drawClaw(); });
+  if (res.slip === 'chute') await tween(700, t => { k.x = from.x + (HOME.x - from.x) * t * reach; k.y = from.y + (HOME.y - from.y) * t * reach; k.sway = Math.sin(t * 12) * 6; drawClaw(); });
   await strain(plan);
   // 미끄러진다.
   clawPic('closed'); k.held = false; drawClaw();
   if (node) node.style.visibility = '';
   node?.classList.remove('lifted');
-  await slipMoment(plan, slipPoint(node, 1 - k.drop, { x: k.x, y: k.y }));
-  await tumbleBack(node, doll, 1 - k.drop, { x: k.x, y: k.y }, plan);
+  if (teeter) await chuteTeeter(node, doll, plan);
+  else {
+    await slipMoment(plan, slipPoint(node, 1 - k.drop, { x: k.x, y: k.y }));
+    await tumbleBack(node, doll, 1 - k.drop, { x: k.x, y: k.y }, plan);
+  }
   const back = { x: k.x, y: k.y };
   await tween(700, t => { k.drop = Math.max(0, k.drop - t * k.drop); if (res.slip === 'chute') { k.x = back.x; k.y = back.y; } k.sway = Math.sin(t * 8) * 3 * (1 - t); drawClaw(); });
 }
@@ -558,7 +587,8 @@ async function strain(plan) {
   sfx('claw-strain'); buzz([12, 50, 12]);
   claw?.classList.add('strain'); ro?.classList.add('strain');
   const swings = Math.max(1, Math.round(plan.strain / 210));
-  await tween(plan.strain, (e, t) => { k.sway = base * (1 - t) + Math.sin(t * Math.PI * 2 * swings) * (2 + t * 6); drawClaw(); }, t => t);
+  await tween(plan.strain, (e, t) => { const w = Math.sin(t * Math.PI * 2 * swings) * (2 + t * 6); if (C.pend) k.wob = w; else k.sway = base * (1 - t) + w; drawClaw(); }, t => t);
+  k.wob = 0;
   claw?.classList.remove('strain'); ro?.classList.remove('strain');
 }
 // 인형이 빠지는 자리(기계 그림 %): 집게 아래 인형 높이.
@@ -584,6 +614,43 @@ async function slipMoment(plan, at) {
     say(`${plan.badge ? `<b class="cw-near-badge">${esc(plan.badge)}</b>` : ''}${esc(plan.text)}`, `sad near ${plan.level}`);
     if (plan.sounds.includes('claw-aww')) sfx('claw-aww');
   }, plan.delay);
+}
+// V13.204 배출구 턱 흔들흔들(물리 켬 · 서버가 chute 놓침으로 정한 판만): 인형이 턱에 툭 걸침 → 심장 소리와 함께 안 · 밖으로 흔들흔들
+//   (느리게) → 늘 바깥(더미 쪽)으로 넘어감 → 멈칫 · SLIP! · "아깝다!!" → 물리로 굴러 제자리. 결과(놓침)는 바뀌지 않는다.
+async function chuteTeeter(node, doll, plan) {
+  const k = C.claw, img0 = node.querySelector('.cw-doll-img'), z0 = node.style.zIndex, stage = $('cw-stage'), ro = $('cw-readout');
+  const from = slipPoint(node, 1 - k.drop, { x: k.x, y: k.y });
+  C.pin = doll.i;
+  if (img0) img0.src = dollSrc(doll.k, 'fall');
+  node.style.zIndex = 999; node.classList.add('teeter');
+  await tween(220, t => { node.style.left = `${from.left + (LIP.left - from.left) * t}%`; node.style.top = `${from.top + (LIP.top - from.top) * t}%`; node.style.transform = `translate(-50%, -96%) rotate(${(-14 * t).toFixed(1)}deg)`; }, t => t * t);
+  sfx('reel-plop', { gain: 0.5, rate: 0.8 }); buzz([30]);
+  stage?.classList.add('slowmo');
+  if (ro) { ro.textContent = '!!'; ro.classList.add('strain'); }
+  const tt = makeTeeter(doll.i), t0 = performance.now();
+  let last = t0, beats = 0;
+  await new Promise(res => {
+    const f = now => {
+      if (C?.pin !== doll.i || C.closing) return res();
+      const r = tt.step(now - last); last = now;
+      node.style.transform = `translate(-50%, -96%) rotate(${r.deg.toFixed(2)}deg)`;
+      if (now - t0 >= beats * 430) { heartbeat(); beats++; }
+      if (r.done) res(); else requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
+  stage?.classList.remove('slowmo'); ro?.classList.remove('strain');
+  if (!C) return;
+  C.pin = null;
+  await slipMoment(plan, { left: LIP.left, top: LIP.top - 6 });
+  node.classList.remove('teeter'); node.style.zIndex = z0;
+  return physTumble(doll, img0, { x: LIP.left * W / 100 + 6, y: LIP.top * H / 100 - dollSize(doll) * 0.46 }, null);
+}
+// 쿵쿵(심장): 낮은 쿵 두 번 · 진동 · 화면이 살짝 두근.
+function heartbeat() {
+  sfx('fish-thump', { gain: 0.5, rate: 0.62 }); later(() => sfx('fish-thump', { gain: 0.35, rate: 0.7 }), 150);
+  buzz([35, 110, 25]);
+  const s = $('cw-stage'); if (s) { s.classList.remove('beat'); void s.offsetWidth; s.classList.add('beat'); }
 }
 // 인형이 집게 높이에서 떨어져 뒹굴며 제자리에 앉는다.
 async function tumbleBack(node, doll, height, at = null, plan = null) {
