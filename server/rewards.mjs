@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, EPIC_PET_KEYS, STANDARD_PET_KEYS, EPIC_EGG_LEGENDARY_RATE, SEASONS, seasonKeys, seasonsOver, LEGEND_EGG_EPIC_NEED, LEGEND_EGG_PRICE, LEGEND_EGG_COINS, CHARACTERS, SERIES_EGG, SERIES_PET_KEYS, seriesGroupKeys } from '../public/modules/core.js';
+import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, EPIC_PET_KEYS, STANDARD_PET_KEYS, EPIC_EGG_LEGENDARY_RATE, SEASONS, seasonKeys, seasonsOver, LEGEND_EGG_EPIC_NEED, LEGEND_EGG_PRICE, LEGEND_EGG_COINS, CHARACTERS, SERIES_EGG, SERIES_PET_KEYS, seriesGroupKeys, SERIES_DONE_COINS } from '../public/modules/core.js';
 import {
   ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, MYTHIC_RATE, drawLucky,
   BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_MAX, giftAmountOk, GIFT_NOTE_MAX, GIFT_LOG_KEEP, GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS,
@@ -57,7 +57,9 @@ export function rewardIncome(p) {
     // V13.180: 인형뽑기 인형 코인 · 도감 완성 보너스.
     + Number(p?.claw?.coins || 0)
     // V13.182: 전설 펫이 이미 있어 전설 알 대신 받은 코인.
-    + Number(p?.legend_egg?.coins || 0);
+    + Number(p?.legend_egg?.coins || 0)
+    // V13.201: 곤충 · 공룡 시리즈를 다 모은 보상(한 번).
+    + Number(p?.series_done?.coins || 0);
 }
 
 /* ---------- V13.73 title coins ---------- */
@@ -450,7 +452,9 @@ export function seriesEggView(p) {
   const group = g => { const keys = seriesGroupKeys(g); return { owned: keys.filter(key => ownsPet(p, key)).length, total: keys.length }; };
   return {
     ready: total > 0, name: SERIES_EGG.name, price: SERIES_EGG.price, total, owned: total - left.length, left: left.length, done: total > 0 && !left.length,
-    odds: seriesEggOdds(left), bug: group('bug'), dino: group('dino')
+    odds: seriesEggOdds(left), bug: group('bug'), dino: group('dino'),
+    // V13.201 다 모은 보상: 특별 테두리(core.js FRAMES.bugdino) + SERIES_DONE_COINS코인(한 번).
+    reward: { coins: SERIES_DONE_COINS, frame: 'bugdino', got: p?.series_done?.at || null }
   };
 }
 export function seriesEggBuy(p, balance, { random = secureRandom, now = Date.now() } = {}) {
@@ -464,7 +468,9 @@ export function seriesEggBuy(p, balance, { random = secureRandom, now = Date.now
   p.points_spent = Number(p.points_spent || 0) + SERIES_EGG.price;
   (p.purchases ||= []).push({ item: SERIES_EGG.item, key, price: SERIES_EGG.price, at: now, ...(rank !== 'basic' ? { rank } : {}) });
   p.avatar_key = key;
-  return { key, rank, series: SERIES_EGG.id };
+  // V13.201 마지막 한 마리로 다 모으면 보상(한 번): 코인은 rewardIncome으로 잔액에 들어가고, 테두리는 다 모은 학생만 쓸 수 있다.
+  const done = left.length === 1 && !p.series_done ? (p.series_done = { at: now, coins: SERIES_DONE_COINS }) : null;
+  return { key, rank, series: SERIES_EGG.id, ...(done ? { done: { coins: SERIES_DONE_COINS, frame: 'bugdino' } } : {}) };
 }
 
 /* ---------- V13.82 가위바위보 ---------- */

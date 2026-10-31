@@ -4,7 +4,7 @@ import { GACHA_ITEMS, GACHA_KEYS, GACHA_TIERS, GACHA_TIER_KEYS, GACHA_KINDS, own
 import { titleEmblem, coin, uiArt, artOr, ART_READY } from './emblems.js';
 import { TITLES } from './titles.js';
 import { titleState } from './titles-ui.js';
-import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, EGG_PRICE, EPIC_EGG_PRICE, seasonOnSale } from './core.js';
+import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, EGG_PRICE, EPIC_EGG_PRICE, seasonOnSale, seriesEggNew } from './core.js';
 import { luckyCard, luckyShow, machineSpin, machineDrop, unlockSound } from './lucky.js';
 import { rpsCard, rpsMatch } from './rps.js';
 import { stocksCard, loadMarket, openStock, startStockClock } from './stocks.js';
@@ -111,10 +111,10 @@ function seriesSlot(A) {
   return `<div class="egg-slot series${se.done ? ' done' : ''}">
     <div class="egg-slot-art" aria-hidden="true">${uiArt(SERIES_EGG_ART)}</div>
     <div class="egg-season-text">
-      <span class="egg-slot-tag">🦕 곤충 · 공룡 시리즈</span>
+      <span class="egg-slot-tag">🦕 곤충 · 공룡 시리즈${seriesEggNew(se) ? '<em class="egg-tab-new">NEW</em>' : ''}</span>
       <b class="egg-slot-name">곤충 · 공룡 알</b>
       <small class="egg-slot-sub">${se.done ? '곤충 · 공룡 친구를 다 모았어요' : `못 만난 친구 ${num(se.left)}마리 · 중복 없음`}</small>
-      <em class="egg-series-prog">곤충 ${num(se.bug.owned)}/${num(se.bug.total)} · 공룡 ${num(se.dino.owned)}/${num(se.dino.total)}${legend && !se.done ? ` · 전설 렉스 ${legend}%` : ''}</em>
+      <em class="egg-series-prog">곤충 ${num(se.bug.owned)}/${num(se.bug.total)} · 공룡 ${num(se.dino.owned)}/${num(se.dino.total)}${legend && !se.done ? ` · 전설 렉스 ${legend}%` : ''}${se.done ? '' : ` · 다 모으면 특별 테두리 + ${num(se.reward?.coins || 0)}코인`}</em>
       <button type="button" class="egg-slot-buy" data-action="egg-buy" data-egg="series" ${se.done || short ? 'disabled' : ''} aria-label="곤충 · 공룡 알 ${num(se.price)}코인${short ? `, ${num(short)}코인 부족` : ''}">${label}</button>
     </div>
   </div>`;
