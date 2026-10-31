@@ -479,7 +479,26 @@ function home(A) {
   const p = A.data.profile;
   return `<div class="home-context home-context-v1327"><div><span>SUMUS VOCA</span><b>${esc(p.school || A.school || '학교 미설정')} · ${esc(p.class_name || '')}</b></div></div>
     ${rewardEventBanner(A)}${noticeBanner(A)}${legendBanner(A)}${pushPrompt(A)}
-    ${compactGrowth(A)}`;
+    ${compactGrowth(A)}${schoolLeagueCard(A)}`;
+}
+// V13.202 학교 대항전: 중2 · 중3 · 단원고 · 선부고 · 강서고가 이번 주 1인 평균 점수로 겨룬다(계산은 server/school-league.mjs).
+function schoolLeagueCard(A) {
+  const league = A.data.school_league, teams = league?.teams || [];
+  if (teams.length < 2) return '';
+  const top = Math.max(1, ...teams.map(t => t.score)), mine = teams.find(t => t.mine);
+  const medal = r => r <= 3 ? ['🥇', '🥈', '🥉'][r - 1] : `<i>${r}</i>`;
+  const lead = mine ? (mine.rank === 1 ? '우리 팀이 1등이에요! 지켜 봐요 🔥' : `1등까지 ${num(teams[0].score - mine.score + 1)}점! 공부 한 판이 팀 점수가 돼요`) : '이번 주 가장 열심히 한 학교는?';
+  return `<section class="school-league-card" aria-label="학교 대항전">
+    <div class="sl-head"><b>🏫 학교 대항전</b><span>이번 주 · 1인 평균</span></div>
+    <p class="sl-lead">${esc(lead)}</p>
+    <ol class="sl-rows">${teams.map(t => `<li class="${t.mine ? 'mine' : ''} ${t.rank === 1 ? 'first' : ''}">
+      <span class="sl-rank">${medal(t.rank)}</span>
+      <span class="sl-name"><b>${esc(t.name)}</b>${t.school ? `<small>${esc(t.school)}</small>` : ''}${t.mine ? '<em>우리 팀</em>' : ''}</span>
+      <span class="sl-bar"><i style="width:${Math.max(4, Math.round(t.score / top * 100))}%"></i></span>
+      <span class="sl-score"><b>${num(t.score)}</b>점<small>${num(t.students)}명${t.bonus ? ` · 보너스 ${num(t.bonus)}` : ''}</small></span>
+    </li>`).join('')}</ol>
+    <p class="sl-foot">점수 = (팀 경험치 + 보너스) ÷ 학생 수 · 대회 우승 +300 · 준우승 +150 · 교실 게임 1~3등 +50 · +30 · +20 · 월요일에 새로 시작</p>
+  </section>`;
 }
 // V13.77 선생님 공지 (shown for a few days, until the student closes it) and 알림.
 function noticeBanner(A) {

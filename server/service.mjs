@@ -14,6 +14,7 @@ import { rpsView, rpsPlay, rpsCash, openEgg } from './rewards.mjs';
 import { logActivity, activityOf, activityOverview } from './activity.mjs';
 import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, monsterStart, monsterFinish, monsterView, monsterScope, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts, legendEggView, grantLegendEgg, legendEggOpen, legendEggBuy, seriesEggView, seriesEggBuy } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate, setUnitCounter, setRangeCounter } from './competition.mjs';
+import { schoolLeague, myTeamKey } from './school-league.mjs';
 import { createTournament, tournamentRanges, tournamentHasSchool, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
 import { signupCodeRows, updateSignupCode } from './signup.mjs';
@@ -917,6 +918,13 @@ function rankingRows(state, ctx, p) {
 }
 // V13.74 반 대항전: this week's 경험치 of each class of a school (study, robot matches, exams),
 // for the teacher dashboard and the classroom TV. Ranked by the class total, as 원장님 asked.
+// V13.202 학교 대항전(홈 화면 · 학생과 선생님 모두): 계산은 school-league.mjs. 학생에게는 내 팀 표시.
+function leagueFor(state, ctx, p, now) {
+  const league = schoolLeague(state, ctx, schoolForProfile, now);
+  if (!league.teams.length) return null;
+  const mine = p?.role === 'student' ? myTeamKey(state, p, schoolForProfile) : null;
+  return { ...league, teams: league.teams.map(t => ({ ...t, mine: t.key === mine })) };
+}
 function classLeague(state, ctx, school, now = Date.now()) {
   const week = rankingWeek(now);
   const classes = new Map();
@@ -1358,6 +1366,7 @@ export async function service(state, method, path, body, token, options = {}) {
       series_egg: teacher ? null : seriesEggView(p),
       gifts_sent: teacher ? (p.gifts_sent || []).slice(-10).reverse() : null,
       class_league: teacher && selectedSchool ? classLeague(state, competition, selectedSchool, now) : null,
+      school_league: leagueFor(state, competition, p, now),
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
       rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now, dailyConfig(state, now)), blank: p.role === 'student' ? blankView(p, now) : null },
