@@ -6,7 +6,7 @@ import { CLAW, DOLL_KEYS, DOLLS, dollName, roundLayout } from './claw-rules.js';
 import { CLAW_ART } from './claw-art.js';
 import { TITLES } from './titles.js';
 import { missPlan } from './claw-fx.js';
-import { loadMatter, makePile, W, H, STEP } from './claw-physics.js';
+import { loadMatter, makePile, physicsOn, W, H, STEP } from './claw-physics.js';
 
 // V13.180 인형뽑기(놀이터). 구성안 docs/claw-machine-design.md. 그림은 주문서 42 ~ 45(public/assets/claw).
 // 3D 라이브러리 없이 그림 층 + 2.5D: 기계(속 빈 그림) → 인형 더미(깊이 순서) → 집게 뒤 발톱 → 잡힌 인형 → 앞 발톱 · 줄 · 레일 → 유리 반사 → 버튼.
@@ -106,8 +106,8 @@ export function openClaw(A, exit) {
   window.scrollTo(0, 0);
   preloadSound(['coin', 'swoosh', 'wiggle', 'pop', 'stamp', 'fanfare-basic', 'fanfare-epic', 'fanfare-legend', 'coins', 'reel-plop', 'reel-click', 'tick', 'tap', 'fail', 'claw-strain', 'claw-slip', 'claw-aww']);
   idle();
-  // V13.203 물리(claw-physics.js): 받아지면 더미를 물리로 바꾼다. 동작 줄이기면 받지 않고 예전 연출 그대로.
-  if (!reduced()) loadMatter().then(M => { if (!C || !M) return; C.P = makePile(M); syncPile(); });
+  // V13.203 물리(claw-physics.js): 테스트 앱에서만 켠다(운영은 예전 연출 그대로). 받아지면 더미를 물리로 바꾼다. 동작 줄이기면 받지 않는다.
+  if (physicsOn() && !reduced()) loadMatter().then(M => { if (!C || !M) return; C.P = makePile(M); syncPile(); });
   api('/claw/home', {}).then(res => {
     if (!C) return; setView(res.claw); news(res.news);
     if (res.claw?.live) return resume(res.claw.live);

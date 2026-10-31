@@ -48,7 +48,12 @@ export async function runClawPhysicsChecks(assert) {
 
   // 4) 화면 연결: 연출만, 판정은 그대로.
   const claw = source('../public/modules/claw.js'), phys = source('../public/modules/claw-physics.js');
-  assert(claw.includes("if (!reduced()) loadMatter().then(M => { if (!C || !M) return; C.P = makePile(M); syncPile(); });"), 'V13.203 물리는 인형뽑기를 열 때만 받고, 동작 줄이기면 받지 않는다(예전 연출 그대로)');
+  assert(claw.includes("if (physicsOn() && !reduced()) loadMatter().then(M => { if (!C || !M) return; C.P = makePile(M); syncPile(); });") && (claw.match(/loadMatter\(\)/g) || []).length === 1, 'V13.203 물리는 스위치가 켜졌을 때 인형뽑기를 열 때만 받고, 동작 줄이기면 받지 않는다(예전 연출 그대로)');
+  // 스위치: 테스트 앱에서만 켜지고 운영은 꺼짐.
+  const { physicsOn } = await import('../public/modules/claw-physics.js');
+  const at = (hostname, search = '') => physicsOn({ hostname, search });
+  assert(at('sumus-voca-test.minsik2e5.workers.dev') && at('localhost', '?claw-physics=1') && at('127.0.0.1', '?x=1&claw-physics=1'), 'V13.203 물리 스위치: 테스트 앱(sumus-voca-test)에서 켜짐, 로컬은 ?claw-physics=1일 때만');
+  assert(!at('sumus-voca.minsik2e5.workers.dev') && !at('sumus-voca.minsik2e5.workers.dev', '?claw-physics=1') && !at('localhost') && !at('evil.sumus-voca-test.example') && !at('') && !physicsOn(undefined), 'V13.203 물리 스위치: 운영(sumus-voca)은 주소에 무엇을 붙여도 꺼짐(예전 연출 그대로)');
   assert(claw.includes('function homeOf(d) { const p = floorAt(d.x, d.y);') && claw.includes('C.P.home(d.i, homeOf(d))'), 'V13.203 물리 자리는 서버 판 배치(d.x · d.y · d.z)와 서버 nudge에서만 온다');
   assert(claw.includes('body = { id: C.dropId, round: C.round.id, n: C.round.n, x: Math.round(k.x * 1000) / 1000, y: Math.round(k.y * 1000) / 1000 };'), 'V13.203 서버로 보내는 값은 집게 위치뿐(물리 상태를 보내지 않는다)');
   assert(!source('./claw.mjs').includes('physics') && !source('../public/modules/claw-rules.js').includes('physics'), 'V13.203 서버 판정(claw.mjs · claw-rules.js)은 물리를 보지 않는다');

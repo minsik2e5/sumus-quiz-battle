@@ -11,6 +11,15 @@ const SPIN = { k: 0.035, c: 0.16 };       // 기울기를 되돌리는 힘
 const FREE = 0x10, BAND = [0x2, 0x4, 0x8];
 const bandOf = y => y < 0.33 ? 0 : y < 0.66 ? 1 : 2;
 
+// 스위치: 테스트 앱(sumus-voca-test.*)에서만 켠다. 운영(sumus-voca)은 꺼짐 = 예전 연출 그대로(matter-js도 받지 않음).
+//   로컬(localhost)에서 볼 때만 주소 뒤 ?claw-physics=1로 켤 수 있다. 운영에서 다 켜려면 이 함수만 바꾼다.
+export const TEST_HOST = /^sumus-voca-test\./;
+export function physicsOn(loc = globalThis.location) {
+  const host = String(loc?.hostname || '');
+  if (TEST_HOST.test(host)) return true;
+  return /^(localhost|127\.0\.0\.1)$/.test(host) && new URLSearchParams(loc?.search || '').get('claw-physics') === '1';
+}
+
 let matter = null;
 export const loadMatter = () => matter ||= import('/vendor/matter.js').then(m => m.default).catch(() => { matter = null; return null; });
 
