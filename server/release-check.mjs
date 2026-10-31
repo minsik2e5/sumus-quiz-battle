@@ -65,6 +65,7 @@ import { runTournamentSchoolsChecks } from './tournament-schools-check.mjs';
 import { runPartySchoolsChecks } from './party-schools-check.mjs';
 import { runStudentRenameChecks } from './student-rename-check.mjs';
 import { runPolish200Checks } from './polish-200-check.mjs';
+import { runSeriesRewardChecks } from './series-reward-check.mjs';
 import { runSchoolLeagueChecks } from './school-league-check.mjs';
 import { runStabilityChecks } from './stability-check.mjs';
 import { runStorageTrimChecks } from './storage-trim-check.mjs';
@@ -1343,8 +1344,8 @@ export async function runReleaseCheck() {
     assert(sessionsModule.includes('이미 진행 중인 학습이 있어요') && sessionsModule.includes('기존 연습 저장 후 새 설정 시작'), 'active session mismatch still warns before reuse');
     assert(appJs.includes('examFormDirty') && appJs.includes('contextGeneration') && appJs.includes('작성 취소 후 전환'), 'teacher context switch still protects dirty forms and stale responses');
     assert(studentModule.includes('partner-card-v1358') && studentModule.includes('partner-shop') && studentModule.includes('home-week-card'), 'student home centers pet, points, and weekly attendance');
-    assert(bundleCss.includes('.partner-card-v1358 .partner-back{visibility:hidden}') && bundleCss.includes('.partner-card-v1358.flipped .partner-front{visibility:hidden}') && bundleCss.includes('.partner-card-v1358 .partner-face{transition:visibility 0s .27s}'), 'V13.200.0 아이폰 Safari: 펫 카드는 반쯤 돌았을 때 안 보이는 면을 숨겨 뒷면이 거울처럼 비치지 않는다');
-    assert(!existsSync(fileURLToPath(new URL('../public/assets/review', import.meta.url))) && !existsSync(fileURLToPath(new URL('../public/assets/reviews', import.meta.url))), 'V13.200.0 PR 확인용 미리보기 그림은 앱 폴더(public/assets/review · reviews)에 두지 않는다');
+    assert(bundleCss.includes('.partner-card-v1358 .partner-back{visibility:hidden}') && bundleCss.includes('.partner-card-v1358.flipped .partner-front{visibility:hidden}') && bundleCss.includes('.partner-card-v1358 .partner-face{transition:visibility 0s .27s}'), 'V13.201.0 아이폰 Safari: 펫 카드는 반쯤 돌았을 때 안 보이는 면을 숨겨 뒷면이 거울처럼 비치지 않는다');
+    assert(!existsSync(fileURLToPath(new URL('../public/assets/review', import.meta.url))) && !existsSync(fileURLToPath(new URL('../public/assets/reviews', import.meta.url))), 'V13.201.0 PR 확인용 미리보기 그림은 앱 폴더(public/assets/review · reviews)에 두지 않는다');
     {
       const home = studentModule.slice(studentModule.indexOf('function cardFx('), studentModule.indexOf('function homeSchedule('));
       const appSource = readFileSync(fileURLToPath(new URL('../public/app.js', import.meta.url)), 'utf8');
@@ -1575,6 +1576,7 @@ export async function runReleaseCheck() {
     await runPartySchoolsChecks(assert);
     await runStudentRenameChecks(assert);
     await runPolish200Checks(assert);
+    await runSeriesRewardChecks(assert);
     await runSchoolLeagueChecks(assert);
     await runStabilityChecks(assert);
     await runStorageTrimChecks(assert, expectStatus);

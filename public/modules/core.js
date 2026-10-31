@@ -199,6 +199,12 @@ export const SERIES_RANKS = { basic: '기본', epic: '영웅', legendary: '전�
 export const seriesRank = key => CHARACTERS[key]?.series ? CHARACTERS[key].rank : null;
 // V13.200 보이는 등급(테두리 · 잠긴 그림 · 야차전 특기 연출): 시리즈 펫은 시리즈 등급을 빌린다. 전역 셈(알 · 영웅 수 · 전설 수)에는 쓰지 않는다.
 export const lookTier = key => CHARACTERS[key]?.series ? CHARACTERS[key].rank : petTier(key);
+// V13.201 시리즈를 다 모았는지(그림이 다 온 시리즈 펫 전부, 하나라도 준비돼 있을 때만).
+export const seriesComplete = pets => SERIES_PET_KEYS.length > 0 && SERIES_PET_KEYS.every(key => (pets || []).some(pet => pet?.key === key));
+// V13.201 곤충 · 공룡 알 NEW 표시: 이 날까지(한국 날짜, 포함), 시리즈 펫을 아직 하나도 안 가진 학생에게.
+export const SERIES_NEW_UNTIL = '2026-11-30';
+export const SERIES_DONE_COINS = 500;
+export const seriesEggNew = (se, now = Date.now()) => !!se?.ready && !se.owned && kstDay(now) <= SERIES_NEW_UNTIL;
 export const seriesGroupKeys = group => SERIES_PET_KEYS.filter(key => CHARACTERS[key].group === group);
 // Student-chosen pet name, checked the same way on the device and on the server.
 // An empty name is allowed and means "use the pet's default name".
@@ -216,7 +222,8 @@ export const ACCESSORIES = {
   none: { name: '기본', level: 1 }, headset: { name: '헤드셋', level: 3 }, glasses: { name: '포커스 글래스', level: 6 },
   starpin: { name: '스타 핀', level: 9 }, visor: { name: '바이저', level: 13 }, crown: { name: '크라운', level: 18 }
 };
-export const FRAMES = { basic: { name: '기본', level: 1 }, silver: { name: '실버', level: 5 }, neon: { name: '블루 라인', level: 10 }, aurora: { name: '오로라', level: 15 }, legend: { name: '골드', level: 20 }, ...gachaWear('aura') };
+// V13.201 `series`: 곤충 · 공룡 시리즈 12마리를 다 모은 학생만 쓰는 테두리(다 모은 보상).
+export const FRAMES = { basic: { name: '기본', level: 1 }, silver: { name: '실버', level: 5 }, neon: { name: '블루 라인', level: 10 }, aurora: { name: '오로라', level: 15 }, legend: { name: '골드', level: 20 }, ...gachaWear('aura'), bugdino: { name: '곤충 · 공룡 탐험대', series: 'bugdino' } };
 export const TITLES = { rookie: { name: '첫걸음', level: 1 }, focus: { name: '집중의 힘', level: 5 }, combo: { name: '10연속의 주인공', combo: 10 }, streak: { name: '7일의 기록', streak: 7 }, master: { name: '단어 마스터', level: 15 }, legend: { name: '한계를 넘어서', level: 20 }, yacha3: { name: '야차 3연승', battle_streak: 3 }, yachaking: { name: '야차왕', battle_streak: 5 } };
 export const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 // V13.78: the level cap went from 50 to 60.
@@ -259,7 +266,7 @@ export function petProgress(pets = [], sessions = [], activeKey) {
     return { key: pet.key, name: pet.name || '', first: !!pet.first, acquired_at: pet.acquired_at || 0, xp, level: info.level, form: info.form, percent: info.percent, remaining: info.remaining, active: pet.key === activeKey };
   });
 }
-export const unlocked = (item, growth) => !!item && (!item.gacha || Number(growth?.gacha?.[item.gacha] || 0) > 0) && (!item.level || growth.level >= item.level) && (!item.combo || growth.best_combo >= item.combo) && (!item.streak || growth.streak >= item.streak) && (!item.battle_streak || Number(growth.battle?.best_streak || 0) >= item.battle_streak);
+export const unlocked = (item, growth) => !!item && (!item.series || seriesComplete(growth?.pets)) && (!item.gacha || Number(growth?.gacha?.[item.gacha] || 0) > 0) && (!item.level || growth.level >= item.level) && (!item.combo || growth.best_combo >= item.combo) && (!item.streak || growth.streak >= item.streak) && (!item.battle_streak || Number(growth.battle?.best_streak || 0) >= item.battle_streak);
 export function displayEnglish(raw) {
   return String(raw ?? '').normalize('NFKC').replace(/\([^)]*\)|\[[^\]]*\]/g, '').replace(/[*~～]/g, '').replace(/\s+/g, ' ').trim();
 }

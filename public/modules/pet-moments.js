@@ -1,6 +1,6 @@
 import { $, api, esc, num, toast } from './ui.js';
 import { eggTapHtml, bindEggTap } from './pet-growth.js';
-import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, LEGEND_EGG_PRICE, LEGEND_EGG_EPIC_NEED, SERIES_RANKS, seasonOnSale, cleanPetName } from './core.js';
+import { CHARACTERS, PET_FORMS, PET_NAME_MAX, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, LEGEND_EGG_PRICE, LEGEND_EGG_EPIC_NEED, SERIES_RANKS, seriesEggNew, seasonOnSale, cleanPetName } from './core.js';
 import { epicShow, legendaryShow, mythicShow } from './lucky.js';
 import { uiArt, ART_READY } from './emblems.js';
 import { SERIES_EGG_ART } from './pet-art.js';
@@ -209,9 +209,9 @@ export async function buyEgg(A, onChanged, kind, via = null) {
   try { res = await api(via?.path || '/shop/egg', via?.body || { kind: ['epic', 'season', 'series'].includes(kind) ? kind : 'basic' }); }
   finally { momentOpen = false; }
   // V13.197.1 곤충 · 공룡 알: 시리즈 영웅 · 렉스는 연출, 시리즈 기본은 아래 알 이름 카드.
-  if (res.mythic || res.legendary || res.epic || res.limited || (res.series && res.rank !== 'basic')) { onChanged?.(); await eggShow(res, kind); return res; }
+  if (res.mythic || res.legendary || res.epic || res.limited || (res.series && res.rank !== 'basic')) { onChanged?.(); await eggShow(res, kind); if (res.done) await seriesDoneShow(A, res); return res; }
   momentOpen = true;
-  eggRevealHtml(openOverlay('새 알'), res.key, () => closeOverlay(true, onChanged));
+  eggRevealHtml(openOverlay('새 알'), res.key, () => { closeOverlay(true, onChanged); if (res.done) seriesDoneShow(A, res); });
   return res;
 }
 
@@ -320,6 +320,7 @@ export function openEggShop(A, onChanged, kind = 'basic') {
     const le = A.data.legend_egg || null;
     // V13.195 곤충 · 공룡 시리즈 알 탭(전설 알 앞). 그림이 온 시리즈 펫이 없으면 탭이 없다.
     const se = A.data.series_egg?.ready ? A.data.series_egg : null;
+    seriesNewNow = seriesEggNew(se);
     const eggs = { ...eggsNow(), ...(se ? { series: { name: '곤충 · 공룡 알', price: se.price } } : {}), ...(le ? { legend: { name: '전설 알', price: LEGEND_EGG_PRICE } } : {}) };
     if (!eggs[kind]) kind = 'basic';
     if (kind === 'legend') return drawLegend(eggs, le);
@@ -386,8 +387,8 @@ export function openEggShop(A, onChanged, kind = 'basic') {
         const res = await api('/shop/egg', { kind: 'series' });
         buying = false;
         if (res.series_egg) A.data.series_egg = res.series_egg;
-        if (res.rank !== 'basic') { close(true); await eggShow(res, 'series'); return; }
-        eggRevealHtml(body, res.key, () => close(true));
+        if (res.rank !== 'basic') { close(true); await eggShow(res, 'series'); if (res.done) await seriesDoneShow(A, res); return; }
+        eggRevealHtml(body, res.key, async () => { close(true); if (res.done) await seriesDoneShow(A, res); });
       } catch (err) {
         buying = false;
         body.querySelector('.pet-name-error').textContent = err.message;
@@ -433,10 +434,33 @@ export function openEggShop(A, onChanged, kind = 'basic') {
   draw();
 }
 
+/* ---------- V13.201 곤충 · 공룡 시리즈 다 모은 보상 ---------- */
+// 12마리를 다 모은 순간 한 번: 특별 테두리(곤충 · 공룡 탐험대)를 두른 내 펫과 +코인. 테두리는 내 펫 → 테두리에서 고른다.
+export function seriesDoneShow(A, res) {
+  return new Promise(resolve => {
+    momentOpen = true;
+    const body = openOverlay('곤충 · 공룡 탐험대 완성');
+    body.innerHTML = `<div class="series-done">
+      <span class="series-done-kicker">곤충 6 · 공룡 6 다 모았어요!</span>
+      <div class="series-done-stage" aria-hidden="true"><i class="series-done-rays"></i>${avatar(res.key, { form: 1, frame: res.done.frame, expression: 'happy' })}<div class="pet-bits"></div></div>
+      <h2>곤충 · 공룡 탐험대 완성!</h2>
+      <p>특별 테두리 <b>'곤충 · 공룡 탐험대'</b>와 <b>${num(res.done.coins)}코인</b>을 받았어요.<br>내 펫 → 테두리에서 끼울 수 있어요. 다 모은 친구만 쓸 수 있는 테두리예요!</p>
+      <div class="pet-moment-actions"><button type="button" class="btn primary series-egg-btn" data-series-done>좋아요!</button></div>
+    </div>`;
+    const done = () => { closeOverlay(true); resolve(); };
+    body.querySelector('[data-series-done]').onclick = done;
+    $('[data-pet-close]').onclick = done;
+    if (!reducedMotion()) burst(body.querySelector('.pet-bits'), 28, false);
+    playSound('fanfare-legend');
+  });
+}
+
 /* ---------- V13.182 전설 알 ---------- */
 // 알 상점 탭(전설 알은 받은 알이 있으면 '열기!').
+// V13.201 곤충 · 공룡 알 NEW: 시리즈 펫이 하나도 없는 학생에게 정해진 날까지(core.js seriesEggNew).
+let seriesNewNow = false;
 function eggTabs(eggs, kind, le) {
-  return `<div class="egg-shop-tabs" role="tablist">${Object.entries(eggs).map(([k, e]) => `<button type="button" role="tab" data-egg-kind="${k}" aria-selected="${k === kind}" class="${k === kind ? 'selected' : ''} ${k}">${k === 'epic' ? '<i aria-hidden="true">★</i>' : k === 'season' ? '<i aria-hidden="true">🎃</i>' : k === 'series' ? '<i aria-hidden="true">🦕</i>' : k === 'legend' ? '<i aria-hidden="true">♛</i>' : ''}${e.name}<small>${k === 'legend' && le?.waiting ? '열기!' : `${num(e.price)}코인`}</small></button>`).join('')}</div>`;
+  return `<div class="egg-shop-tabs" role="tablist">${Object.entries(eggs).map(([k, e]) => `<button type="button" role="tab" data-egg-kind="${k}" aria-selected="${k === kind}" class="${k === kind ? 'selected' : ''} ${k}">${k === 'epic' ? '<i aria-hidden="true">★</i>' : k === 'season' ? '<i aria-hidden="true">🎃</i>' : k === 'series' ? '<i aria-hidden="true">🦕</i>' : k === 'legend' ? '<i aria-hidden="true">♛</i>' : ''}${e.name}${k === 'series' && seriesNewNow ? '<em class="egg-tab-new">NEW</em>' : ''}<small>${k === 'legend' && le?.waiting ? '열기!' : `${num(e.price)}코인`}</small></button>`).join('')}</div>`;
 }
 // 상점 하단: 영웅 진행과 선생님 문구.
 function legendFootHtml(le) {

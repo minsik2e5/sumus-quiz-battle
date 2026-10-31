@@ -1958,7 +1958,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (body.kind === 'series') {
       if (openBattleFor(state, p.id, Date.now())) fail('대결이 끝난 뒤에 알을 살 수 있어요.', 409);
       const res = seriesEggBuy(p, pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance);
-      logActivity(p, 'egg', `${SERIES_EGG.name} · ${CHARACTERS[res.key].ko}${res.rank === 'basic' ? '' : `(${SERIES_RANKS[res.rank]})`}`);
+      logActivity(p, 'egg', `${SERIES_EGG.name} · ${CHARACTERS[res.key].ko}${res.rank === 'basic' ? '' : `(${SERIES_RANKS[res.rank]})`}${res.done ? ' · 시리즈 완성!' : ''}`);
       return { ...res, series_egg: seriesEggView(p), profile: publicProfile(p), stats: stats(state, p), points_balance: coinBalance(state, p) };
     }
     const season = body.kind === 'season' ? seasonOnSale(Date.now()) : null;
