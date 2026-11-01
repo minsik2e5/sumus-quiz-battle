@@ -6,6 +6,7 @@ import { CLAW, DOLL_KEYS, DOLLS, dollName, roundLayout } from './claw-rules.js';
 import { CLAW_ART } from './claw-art.js';
 import { TITLES } from './titles.js';
 import { missPlan } from './claw-fx.js';
+import { loadMatter, makePile, makePendulum, makeTeeter, physicsOn, W, H, STEP } from './claw-physics.js';
 
 // V13.180 인형뽑기(놀이터). 구성안 docs/claw-machine-design.md. 그림은 주문서 42 ~ 45(public/assets/claw).
 // 3D 라이브러리 없이 그림 층 + 2.5D: 기계(속 빈 그림) → 인형 더미(깊이 순서) → 집게 뒤 발톱 → 잡힌 인형 → 앞 발톱 · 줄 · 레일 → 유리 반사 → 버튼.
@@ -19,6 +20,9 @@ const DOLL_W = 22;                            // 인형 너비(기계 너비 %, 
 const CLAW_W = 21;
 const LIFT = 5;                               // 층 하나 높이(기계 높이 %)
 const DOOR = { left: 21, top: 75.5, w: 29, h: 17 }; // 아래 왼쪽 상품 문
+// V13.204 배출구 오른쪽 턱(기계 그림 %, 배출구 구멍 그림의 오른쪽 끝을 화면에서 재서 정함): 심쿵 놓침에서 인형이 걸쳐 흔들리는 자리.
+const LIP = { left: 31, top: 49.6 };
+const SWING_HOLD_MS = 320;                    // V13.204 배출구 위에서 놓기 전 대롱대롱 기다림(물리 켬일 때만)
 
 const has = name => CLAW_ART.has(name);
 const src = name => `/assets/claw/${name}.webp`;
@@ -105,6 +109,9 @@ export function openClaw(A, exit) {
   window.scrollTo(0, 0);
   preloadSound(['coin', 'swoosh', 'wiggle', 'pop', 'stamp', 'fanfare-basic', 'fanfare-epic', 'fanfare-legend', 'coins', 'reel-plop', 'reel-click', 'tick', 'tap', 'fail', 'claw-strain', 'claw-slip', 'claw-aww']);
   idle();
+  // V13.203 물리(claw-physics.js): 테스트 앱에서만 켠다(운영은 예전 연출 그대로). 받아지면 더미를 물리로 바꾼다. 동작 줄이기면 받지 않는다.
+  if (physicsOn() && !reduced()) loadMatter().then(M => { if (!C || !M) return; C.P = makePile(M); C.P.onBump = chainBump; syncPile(); });
+  if (physicsOn()) preloadSound(['fish-thump']); // V13.204 배출구 턱 심장 소리(테스트 앱에서만)
   api('/claw/home', {}).then(res => {
     if (!C) return; setView(res.claw); news(res.news);
     if (res.claw?.live) return resume(res.claw.live);
@@ -114,7 +121,7 @@ export function openClaw(A, exit) {
 }
 function closeAll() {
   if (!C) return;
-  C.closing = true; C.timers.forEach(clearTimeout); cancelAnimationFrame(C.raf);
+  C.closing = true; C.timers.forEach(clearTimeout); cancelAnimationFrame(C.raf); cancelAnimationFrame(C.physRaf);
   removeEventListener('keydown', C.onKey); removeEventListener('keyup', C.onKeyUp);
 }
 async function leave() { const exit = C?.exit; closeAll(); root().onclick = null; C = null; await exit?.(); }
@@ -182,11 +189,70 @@ function drawPile() {
   const pile = $('cw-pile'); if (!pile || !C) return;
   pile.innerHTML = '';
   for (const d of C.dolls) if (!((C.won >> d.i) & 1)) pile.appendChild(dollEl(d));
+  syncPile();
 }
 const dollNode = i => $('cw-pile')?.querySelector(`.cw-doll[data-i="${i}"]`);
+
+/* ---------- 물리(V13.203) ---------- */
+// 인형 그림은 정사각: 너비(px) = 높이. 물리 몸 가운데 = 발끝(.cw-doll의 left · top) 위로 그림 높이의 0.46.
+const dollSize = d => DOLL_W * floorAt(d.x, d.y).s * d.s * W / 100;
+function homeOf(d) { const p = floorAt(d.x, d.y); return { x: p.left * W / 100, y: (p.top - d.z * LIFT * p.s) * H / 100 - dollSize(d) * 0.46 }; }
+function syncPile() {
+  if (!C?.P) return;
+  C.P.clear();
+  for (const d of C.dolls) {
+    if ((C.won >> d.i) & 1) continue;
+    C.P.add(d.i, homeOf(d), dollSize(d) * 0.34, d.y);
+    const n = dollNode(d.i); if (n) n.style.transformOrigin = '50% 96%';
+  }
+  physRun();
+}
+// 움직이는 인형이 있을 때만 돈다(다 멈추면 쉰다). physScale: 0 멈춤(hit-stop) · 1 보통 · 0.5 슬로모션.
+function physRun() {
+  if (!C?.P || C.physOn) return;
+  C.physOn = true; C.physLast = performance.now(); C.physAcc = 0;
+  C.physRaf = requestAnimationFrame(physFrame);
+}
+function physFrame(now) {
+  if (!C?.P || C.closing) return;
+  C.physAcc += Math.min(100, now - C.physLast); C.physLast = now;
+  const scale = C.physScale ?? 1;
+  let n = 0;
+  while (C.physAcc >= STEP && n < 4) { if (scale > 0) { C.P.engine.timing.timeScale = scale; C.P.step(); } C.physAcc -= STEP; n++; }
+  if (n === 4) C.physAcc = 0;
+  for (const [i, b] of C.P.bodies) if (!b.isSleeping && i !== C.pin) dollAt(i, b);
+  if (scale > 0 && C.P.still()) { for (const [i, b] of C.P.bodies) if (i !== C.pin) dollAt(i, b); C.physOn = false; return; }
+  C.physRaf = requestAnimationFrame(physFrame);
+}
+// 물리 몸 → 인형 자리: 발끝 = 가운데 + 회전된 (0, 0.46 높이), 기울기는 발끝을 축으로.
+function dollAt(i, b) {
+  const n = dollNode(i), d = C.dolls.find(x => x.i === i); if (!n || !d) return;
+  const h = dollSize(d) * 0.46, a = b.angle;
+  n.style.left = `${(b.position.x - Math.sin(a) * h) / W * 100}%`;
+  n.style.top = `${(b.position.y + Math.cos(a) * h) / H * 100}%`;
+  n.style.transform = Math.abs(a) > 0.002 ? `translate(-50%, -96%) rotate(${a.toFixed(3)}rad)` : '';
+}
+// V13.204 도미노: 떨어진 인형에 맞은 인형 · 그 둘레로 번질 때마다 눌림 + 톡(번질수록 높고 작게, 너무 잦으면 소리는 건너뜀).
+function chainBump(i, power, hop) {
+  if (!C) return;
+  squash(i);
+  const now = performance.now();
+  if (now - (C.bumpAt || 0) > 70) { C.bumpAt = now; sfx('reel-plop', { gain: Math.min(0.35, 0.12 + power * 0.06), rate: 1.15 + hop * 0.12 }); }
+}
+// V13.204 잡힌 인형 진자(claw-physics.js makePendulum): 물리가 켜졌을 때만. 켜져 있으면 집게 기울기(k.sway)를 진자가 정한다.
+//   k.wob: 버팀(strain)의 덜덜 떨림을 진자 위에 더한다.
+function pendOn(grip) { if (!C?.P) return; C.pend = makePendulum(grip); C.pendAt = null; C.claw.wob = 0; C.pend.kick(Math.random() < 0.5 ? -1 : 1); }
+function pendOff() { if (!C) return; C.pend = null; C.claw.wob = 0; }
+function swingStep() {
+  const k = C.claw, now = performance.now(), dt = C.pendAt == null ? 0 : now - C.pendAt;
+  C.pendAt = now;
+  if (dt > 0) k.sway = C.pend.step(dt, floorAt(k.x, k.y).left * W / 100) + (k.wob || 0);
+}
+const physPause = ms => { if (!C?.P) return; C.physScale = 0; physRun(); later(() => { C.physScale = 1; }, ms); };
 // 집게 · 줄 · 받침 · 레일 · 그림자를 지금 상태로.
 function drawClaw() {
   if (!C) return;
+  if (C.pend) swingStep();
   const k = C.claw, p = floorAt(k.x, k.y), rt = railTop(k.y);
   const restTop = rt + 3.2, bottom = k.bottom ?? (p.top - 7 * p.s);
   const top = restTop + (bottom - restTop) * k.drop;
@@ -239,6 +305,7 @@ async function start() {
   if (fx && has('icon-ticket')) { fx.insertAdjacentHTML('beforeend', `<img class="cw-ticket-fly" src="${src('icon-ticket')}" alt="">`); later(() => fx.querySelector('.cw-ticket-fly')?.remove(), 900); }
   root().querySelector('.cw-app')?.classList.add('flash');
   later(() => root().querySelector('.cw-app')?.classList.remove('flash'), 900);
+  if (C.P) later(() => { C.P?.jolt(2.6); physRun(); }, 260); // 집게권이 들어가면 기계가 덜컹: 더미가 들썩
   await wait(650);
   begin(res.round);
 }
@@ -252,11 +319,31 @@ function begin(round, resumed = false) {
   C.time = resumed ? Math.max(5, Number(round.aim_left || 0)) : CLAW.TIME;
   C.startAt = performance.now(); C.lastSend = resumed ? performance.now() - CLAW.GAP_MS : 0;
   drawPile();
+  if (!resumed) refill();
   root().querySelector('.cw-app')?.classList.add('live');
   aim();
 }
+// V13.203 새 판: 인형들이 위에서 쏟아져 제자리에 쌓인다(위층일수록 높이서). 첫 집게까지 1.2초 안에 거의 끝난다.
+function refill() {
+  if (!C?.P) return;
+  let last = 0;
+  for (const d of C.dolls) {
+    if ((C.won >> d.i) & 1) continue;
+    // 유리 안(천장 아래)에서만 떨어진다: 간판 위로 삐져나오지 않게.
+    const home = homeOf(d), up = 70 + d.z * 70 + ((d.i * 37) % 11) * 9, top = (CEIL.back + 6) * H / 100 + dollSize(d) * 0.5;
+    C.P.drop(d.i, { x: home.x + ((d.i * 53) % 9 - 4) * 3, y: Math.max(top, home.y - up) }, { x: 0, y: 0 }, ((d.i * 29) % 7 - 3) * 0.01, kind => {
+      if (kind !== 'touch') return;
+      const now = performance.now();
+      if (now - last > 90) { last = now; sfx('reel-plop', { gain: 0.16, rate: 1.1 + (d.i % 5) * 0.08 }); }
+      squash(d.i);
+    });
+  }
+  physRun();
+}
+const squash = i => { const n = dollNode(i); if (n) { n.classList.remove('bump'); void n.offsetWidth; n.classList.add('bump'); } };
 function aim() {
   if (!C) return;
+  pendOff();
   C.phase = 'aim'; C.dropId ||= newId('d');
   hud(); mid();
   clawPic('closed');
@@ -376,8 +463,13 @@ function pickVisual(x, y) {
 function bumpAround(x, y) {
   for (const d of C.dolls) {
     if ((C.won >> d.i) & 1) continue;
-    if (Math.hypot(x - d.x, y - d.y) <= CLAW.R * 2.2) { const n = dollNode(d.i); if (n) { n.classList.remove('bump'); void n.offsetWidth; n.classList.add('bump'); } }
+    const dist = Math.hypot(x - d.x, y - d.y), reach = CLAW.R * 2.2;
+    if (dist > reach) continue;
+    // V13.203 물리: 집게가 닿은 자리에서 둘레 인형이 눌렸다가 바깥으로 출렁(가까울수록 세게).
+    if (C.P) { const f = 1 - dist / reach, side = Math.sign(d.x - x) || (d.i % 2 ? 1 : -1); C.P.kick(d.i, side * 2.2 * f, 1.8 * f, side * 0.03 * f); }
+    squash(d.i);
   }
+  physRun();
   const p = floorAt(x, y);
   spark(p.left, p.top - 4, 3);
 }
@@ -394,19 +486,23 @@ function pressMini() {
 // 뽑힘: 들어 올려(진자) → 배출구 위로 → 놓으면 인형이 굴러 구멍으로 → 아래 상품 문이 열리며 튀어나옴.
 async function winLift(res, doll) {
   const k = C.claw;
-  dollNode(doll.i)?.remove();
-  k.held = true;
+  dollNode(doll.i)?.remove(); C.P?.remove(doll.i);
+  k.held = true; pendOn(res.grip);
   await tween(1050, t => { k.drop = 1 - t; k.sway = Math.sin(t * 7) * 4 * (1 - t * 0.6); drawClaw(); });
   const from = { x: k.x, y: k.y };
   sfx('reel-click', { gain: 0.3, rate: 0.6 });
   await tween(900, t => { k.x = from.x + (HOME.x - from.x) * t; k.y = from.y + (HOME.y - from.y) * t; k.sway = Math.sin(t * 6) * 3; drawClaw(); });
+  // V13.204 물리: 멈춘 뒤 인형이 대롱대롱 흔들리는 걸 잠깐 보여 주고 놓는다.
+  if (C.pend) await tween(SWING_HOLD_MS, () => drawClaw(), t => t);
   // 놓는다.
   clawPic('open'); k.held = false; drawClaw();
   await fallIntoChute(doll);
-  if (res.extra) { const b = C.dolls.find(d => d.i === res.extra.i); dollNode(res.extra.i)?.remove(); if (b) await fallIntoChute(b, true); }
+  if (res.extra) { const b = C.dolls.find(d => d.i === res.extra.i); dollNode(res.extra.i)?.remove(); C.P?.remove(res.extra.i); if (b) await fallIntoChute(b, true); }
   C.won |= 1 << doll.i; if (res.extra) C.won |= 1 << res.extra.i;
   // 둘레 인형이 빈자리로 살짝 내려앉는다.
-  for (const n of res.nudge || []) { const d = C.dolls.find(x => x.i === n.i); if (!d) continue; d.x += n.dx; d.y += n.dy; const el = dollNode(d.i); if (el) { el.classList.add('settle'); placeDoll(el, d); } }
+  // 물리면 집을 옮겨 스프링이 데려간다(살짝 넘쳤다 앉는다). 아니면 예전처럼 CSS로 미끄러진다.
+  for (const n of res.nudge || []) { const d = C.dolls.find(x => x.i === n.i); if (!d) continue; d.x += n.dx; d.y += n.dy; const el = dollNode(d.i); if (C.P?.bodies.has(d.i)) { C.P.home(d.i, homeOf(d)); C.P.kick(d.i, 0, -1.2); } else if (el) { el.classList.add('settle'); placeDoll(el, d); } }
+  physRun();
   const prizes = [{ k: doll.k, g: doll.g }, ...(res.extra ? [{ k: res.extra.k, g: res.extra.g }] : [])];
   C.got.push(...prizes);
   await prizeOut(prizes, res);
@@ -458,16 +554,21 @@ async function slipLift(res, doll, plan) {
     return;
   }
   if (node) node.style.visibility = 'hidden';
-  k.held = true;
+  k.held = true; pendOn(res.grip);
+  // V13.204 물리: 배출구 쪽 놓침은 배출구 턱 위까지 가서(0.6 → 0.9) 턱에 걸쳐 흔들리다 넘어간다.
+  const teeter = res.slip === 'chute' && !!C.P && !!node, reach = teeter ? 0.9 : 0.6;
   await tween(res.slip === 'lift' ? 620 : 1000, t => { k.drop = 1 - t * plan.lift; k.sway = Math.sin(t * 9) * (3 + t * 4); drawClaw(); });
-  if (res.slip === 'chute') await tween(700, t => { k.x = from.x + (HOME.x - from.x) * t * 0.6; k.y = from.y + (HOME.y - from.y) * t * 0.6; k.sway = Math.sin(t * 12) * 6; drawClaw(); });
+  if (res.slip === 'chute') await tween(700, t => { k.x = from.x + (HOME.x - from.x) * t * reach; k.y = from.y + (HOME.y - from.y) * t * reach; k.sway = Math.sin(t * 12) * 6; drawClaw(); });
   await strain(plan);
   // 미끄러진다.
   clawPic('closed'); k.held = false; drawClaw();
   if (node) node.style.visibility = '';
   node?.classList.remove('lifted');
-  await slipMoment(plan, slipPoint(node, 1 - k.drop, { x: k.x, y: k.y }));
-  await tumbleBack(node, doll, 1 - k.drop, { x: k.x, y: k.y }, plan);
+  if (teeter) await chuteTeeter(node, doll, plan);
+  else {
+    await slipMoment(plan, slipPoint(node, 1 - k.drop, { x: k.x, y: k.y }));
+    await tumbleBack(node, doll, 1 - k.drop, { x: k.x, y: k.y }, plan);
+  }
   const back = { x: k.x, y: k.y };
   await tween(700, t => { k.drop = Math.max(0, k.drop - t * k.drop); if (res.slip === 'chute') { k.x = back.x; k.y = back.y; } k.sway = Math.sin(t * 8) * 3 * (1 - t); drawClaw(); });
 }
@@ -486,7 +587,8 @@ async function strain(plan) {
   sfx('claw-strain'); buzz([12, 50, 12]);
   claw?.classList.add('strain'); ro?.classList.add('strain');
   const swings = Math.max(1, Math.round(plan.strain / 210));
-  await tween(plan.strain, (e, t) => { k.sway = base * (1 - t) + Math.sin(t * Math.PI * 2 * swings) * (2 + t * 6); drawClaw(); }, t => t);
+  await tween(plan.strain, (e, t) => { const w = Math.sin(t * Math.PI * 2 * swings) * (2 + t * 6); if (C.pend) k.wob = w; else k.sway = base * (1 - t) + w; drawClaw(); }, t => t);
+  k.wob = 0;
   claw?.classList.remove('strain'); ro?.classList.remove('strain');
 }
 // 인형이 빠지는 자리(기계 그림 %): 집게 아래 인형 높이.
@@ -499,7 +601,7 @@ function slipPoint(node, height, at = null) {
 async function slipMoment(plan, at) {
   const stage = $('cw-stage'), ro = $('cw-readout');
   if (plan.hitStop) {
-    stage?.classList.add('hitstop');
+    stage?.classList.add('hitstop'); physPause(plan.hitStop);
     await new Promise(r => later(r, plan.hitStop));
     stage?.classList.remove('hitstop');
   }
@@ -513,13 +615,51 @@ async function slipMoment(plan, at) {
     if (plan.sounds.includes('claw-aww')) sfx('claw-aww');
   }, plan.delay);
 }
+// V13.204 배출구 턱 흔들흔들(물리 켬 · 서버가 chute 놓침으로 정한 판만): 인형이 턱에 툭 걸침 → 심장 소리와 함께 안 · 밖으로 흔들흔들
+//   (느리게) → 늘 바깥(더미 쪽)으로 넘어감 → 멈칫 · SLIP! · "아깝다!!" → 물리로 굴러 제자리. 결과(놓침)는 바뀌지 않는다.
+async function chuteTeeter(node, doll, plan) {
+  const k = C.claw, img0 = node.querySelector('.cw-doll-img'), z0 = node.style.zIndex, stage = $('cw-stage'), ro = $('cw-readout');
+  const from = slipPoint(node, 1 - k.drop, { x: k.x, y: k.y });
+  C.pin = doll.i;
+  if (img0) img0.src = dollSrc(doll.k, 'fall');
+  node.style.zIndex = 999; node.classList.add('teeter');
+  await tween(220, t => { node.style.left = `${from.left + (LIP.left - from.left) * t}%`; node.style.top = `${from.top + (LIP.top - from.top) * t}%`; node.style.transform = `translate(-50%, -96%) rotate(${(-14 * t).toFixed(1)}deg)`; }, t => t * t);
+  sfx('reel-plop', { gain: 0.5, rate: 0.8 }); buzz([30]);
+  stage?.classList.add('slowmo');
+  if (ro) { ro.textContent = '!!'; ro.classList.add('strain'); }
+  const tt = makeTeeter(doll.i), t0 = performance.now();
+  let last = t0, beats = 0;
+  await new Promise(res => {
+    const f = now => {
+      if (C?.pin !== doll.i || C.closing) return res();
+      const r = tt.step(now - last); last = now;
+      node.style.transform = `translate(-50%, -96%) rotate(${r.deg.toFixed(2)}deg)`;
+      if (now - t0 >= beats * 430) { heartbeat(); beats++; }
+      if (r.done) res(); else requestAnimationFrame(f);
+    };
+    requestAnimationFrame(f);
+  });
+  stage?.classList.remove('slowmo'); ro?.classList.remove('strain');
+  if (!C) return;
+  C.pin = null;
+  await slipMoment(plan, { left: LIP.left, top: LIP.top - 6 });
+  node.classList.remove('teeter'); node.style.zIndex = z0;
+  return physTumble(doll, img0, { x: LIP.left * W / 100 + 6, y: LIP.top * H / 100 - dollSize(doll) * 0.46 }, null);
+}
+// 쿵쿵(심장): 낮은 쿵 두 번 · 진동 · 화면이 살짝 두근.
+function heartbeat() {
+  sfx('fish-thump', { gain: 0.5, rate: 0.62 }); later(() => sfx('fish-thump', { gain: 0.35, rate: 0.7 }), 150);
+  buzz([35, 110, 25]);
+  const s = $('cw-stage'); if (s) { s.classList.remove('beat'); void s.offsetWidth; s.classList.add('beat'); }
+}
 // 인형이 집게 높이에서 떨어져 뒹굴며 제자리에 앉는다.
 async function tumbleBack(node, doll, height, at = null, plan = null) {
   if (!node) return;
   const img0 = node.querySelector('.cw-doll-img');
   if (img0) img0.src = dollSrc(doll.k, 'fall');
   const home = floorAt(doll.x, doll.y), sp = at ? floorAt(at.x, at.y) : home;
-  const fromTop = parseFloat(node.style.top) - height * 22, fromLeft = sp.left;
+  const fromTop = parseFloat(placeTop(doll)) - height * 22, fromLeft = sp.left;
+  if (C.P?.bodies.has(doll.i)) return physTumble(doll, img0, { x: fromLeft * W / 100, y: fromTop * H / 100 - dollSize(doll) * 0.46 }, plan);
   // V13.191 슬로모션: 떨어지기 시작 plan.slowMs(보통 시간)를 plan.slow 배로 느리게, 나머지는 보통 속도.
   const slow = plan && plan.slow < 1 ? plan : null, fall = 520, real = slow ? fall - slow.slowMs + slow.slowMs / slow.slow : fall;
   const warp = slow ? t => { const r = t * real, n = r < slow.slowMs / slow.slow ? r * slow.slow : slow.slowMs + r - slow.slowMs / slow.slow, u = n / fall; return u * u; } : t => t * t;
@@ -528,6 +668,28 @@ async function tumbleBack(node, doll, height, at = null, plan = null) {
   node.style.transform = '';
   if (img0) img0.src = dollSrc(doll.k, '', true);
   node.classList.remove('bump'); void node.offsetWidth; node.classList.add('bump');
+}
+// V13.203 물리로 떨어지기: 집으로 가는 가로 속도를 주고 놓으면, 같은 줄 인형에 부딪고 튀고 굴러 제자리에 앉는다.
+//   슬로모션은 물리 시간 자체를 늦춘다. 첫 닿음에서 다음 연출로 넘어가고(늦어도 1.6초), 튀기 · 구르기는 그 뒤로도 이어진다.
+function physTumble(doll, img0, from, plan) {
+  const home = homeOf(doll), steps = Math.sqrt(2 * Math.max(20, home.y - from.y) / 0.36);
+  const slow = plan && plan.slow < 1 ? plan : null;
+  if (slow) {
+    C.physScale = slow.slow; $('cw-stage')?.classList.add('slowmo');
+    later(() => { C.physScale = 1; $('cw-stage')?.classList.remove('slowmo'); }, slow.slowMs / slow.slow);
+  }
+  const sway = (C.claw.sway || 0) * 0.12, spin = (Math.sign(home.x - from.x) || 1) * (0.06 + Math.random() * 0.08);
+  return new Promise(res => {
+    let done = false;
+    const fin = () => { if (!done) { done = true; res(); } };
+    C.P.drop(doll.i, from, { x: (home.x - from.x) / steps + sway + (Math.random() - 0.5) * 0.8, y: -0.4 }, spin, (kind, v) => {
+      if (kind === 'touch') { squash(doll.i); if (v > 4) sfx('reel-plop', { gain: 0.4 }); fin(); }
+      if (kind === 'rest' && img0) img0.src = dollSrc(doll.k, '', true);
+    });
+    physRun();
+    later(fin, 1600);
+    later(() => { if (img0) img0.src = dollSrc(doll.k, '', true); }, 2400);
+  });
 }
 // 내려간 집게 위치(집게 그림 윗변 %): 인형이 있으면 발톱이 인형 위쪽 1/3을 감싸게, 없으면 바닥까지.
 function clawBottom(target, p) {
@@ -630,6 +792,7 @@ function shake(o = null) {
   if (o) { s.style.setProperty('--shake-px', `${o.px}px`); s.style.setProperty('--shake-ms', `${o.ms}ms`); }
   else { s.style.removeProperty('--shake-px'); s.style.removeProperty('--shake-ms'); }
   s.classList.remove('shake'); void s.offsetWidth; s.classList.add('shake');
+  if (C?.P && o) { C.P.jolt(o.px * 0.45); physRun(); }
 }
 // 놓침 솜털 · 반짝이(heart가 가장 많고 멀리), 허공은 바닥 먼지. 빨리 사라진다.
 function puff(left, top, n, kind) {
