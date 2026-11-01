@@ -139,6 +139,9 @@ export async function runYabawiChecks(assert) {
     assert(build.includes("public/assets/yabawi") && art.startsWith('// 만든 곳: server/build-assets.mjs') && ui.includes("import { YABAWI_ART } from './yabawi-art.js'")
       && ui.includes("POSES.every(p => YABAWI_ART.has(`dealer-${p}`))") && ui.includes('그림은 야바위를 열 때만 받는다'),
       'V13.205 그림 게이트: 에셋 폴더에 있는 그림만 바꿔 끼우고(곽 사장은 8포즈가 다 있어야), 없으면 SVG · CSS. 그림은 야바위를 열 때만 받는다');
+    const { YABAWI_ART } = await import('../public/modules/yabawi-art.js');
+    assert(['idle', 'point', 'shuffle', 'sneak', 'grin', 'shock', 'hammer', 'sweep'].every(p => YABAWI_ART.has(`dealer-${p}`)) && ['cup', 'cup-shadow', 'ball', 'table', 'bg-room', 'card-hero'].every(n => YABAWI_ART.has(n)),
+      `V13.205 에셋 v2: 곽 사장 8포즈 · 컵 · 공 · 테이블 · 배경 · 카드 그림이 들어왔다(${YABAWI_ART.size}장)`);
     for (const line of ['확실하지 않으면 승부를 걸지 마라.', '어이 젊은 친구, 신사답게 행동해.', '동작 그만', '첫 판부터 장난질이냐?', '묻고 더블로 가', '오함마']) assert(ui.includes(line), `V13.205 곽 사장 대사: ${line}`);
   }
 }

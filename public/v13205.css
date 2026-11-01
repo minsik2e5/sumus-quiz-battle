@@ -168,7 +168,8 @@
   linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(0,0,0,.55) 55%,#050505 82%),
   repeating-linear-gradient(90deg,#1b120c 0 46px,#140d08 46px 48px,#1e140d 48px 94px,#120b07 94px 96px)}
 .has-bg-room .yw-room{background:linear-gradient(180deg,transparent 60%,#050505 92%),var(--yw-bg-room) center top/cover no-repeat}
-.has-lamp .yw-lamp{background:var(--yw-lamp) center 2%/min(260px,60vw) auto no-repeat}
+.has-lamp .yw-lamp{background:var(--yw-lamp) center 6px/min(200px,46vw) auto no-repeat;opacity:.85}
+.yw-show .yw-top .yw-step,.yw-show .yw-pot{background:rgba(14,10,8,.82);backdrop-filter:blur(3px)}
 .has-smoke .yw-smoke{background:var(--yw-smoke) center/contain no-repeat;filter:none;opacity:.5}
 
 /* 테이블: 펠트 결 · 나무 테두리 · 전등 빛 */
@@ -184,6 +185,7 @@
 .yw-prop svg,.yw-prop img{width:100%;height:auto}
 .yw-prop.hwatu{left:3%;bottom:3%;width:17%;transform:rotate(-10deg)}
 .yw-prop.chips{right:3%;bottom:4%;width:13%}
+.has-table .yw-prop.hwatu{left:11%;bottom:14%;width:15%}.has-table .yw-prop.chips{right:11%;bottom:14%;width:14%}
 
 /* 컵: 바닥 그림자(들면 작아지고 흐려짐) · 광택 */
 .yw-cup{filter:drop-shadow(0 3px 2px rgba(0,0,0,.45))}
