@@ -1,22 +1,16 @@
-/* V13.206 놀이터 메뉴(테스트 앱 · 로컬): 학습 탭 카드(study-hub-card · study-tabs-v1368 · study-daily-v1371)를 그대로 쓰고 색과 그림 자리만 더한다. */
-.pg-hub .study-hub-card{min-height:150px!important}
-.pg-hub .study-hub-card:before{content:"";position:absolute;border-radius:999px}
-.pg-hub .pg-arcade:before{background:linear-gradient(145deg,#ecfdf3,#dcfae6)!important}
-.pg-hub .pg-tajja:before{background:linear-gradient(145deg,#fff1f0,#ffe4e1)!important}
-.pg-hub .pg-market:before{background:linear-gradient(145deg,#eff8ff,#e0f0fe)!important}
-.pg-hub .pg-arcade .study-hub-icon{background:#ecfdf3}
-.pg-hub .pg-tajja .study-hub-icon{background:#fff1f0}
-.pg-hub .pg-market .study-hub-icon{background:#eff8ff}
-.pg-hub .pg-tajja .pill{background:#fee4e2;color:#b42318}
-.pg-hub .pg-market .pill{background:#d1e9ff;color:#175cd3}
-.pg-hub .study-hub-card>div{position:relative;z-index:1;min-width:0}
-.pg-card-sub{display:block;margin-top:4px;color:#667085;font-size:13px;line-height:1.5;word-break:keep-all}
-.pg-emoji{font-style:normal;font-size:32px;line-height:1}
+/* V13.206 놀이터 메뉴 · V13.208 위쪽 탭 4개(미니게임 · 코인 승부 · 상점 · 기록): 학습 탭 틀(study-tabs-v1368 · study-daily-v1371)을 그대로 쓰고 탭 수 · 남은 판 · 그림 자리만 더한다. */
+.pg-tabs{grid-template-columns:repeat(4,1fr)!important}
+.pg-tabs button{display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;padding-inline:4px}
+.pg-tab-left{font-style:normal;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#dcfae6;color:#067647;font-size:11.5px;font-weight:900;line-height:20px;font-variant-numeric:tabular-nums}
+.pg-tabs button.selected .pg-tab-left{background:#12b886;color:#fff}
+.pg-today{width:100%;cursor:default!important;grid-template-columns:52px minmax(0,1fr)!important;gap:12px!important}
+.pg-today-ico{width:52px;height:52px;border-radius:16px;background:rgba(255,255,255,.2);display:grid;place-items:center;overflow:hidden}
+.pg-today-ico .pg-ico{width:46px;height:46px}
+.pg-today-tajja{background:linear-gradient(135deg,#e5484d,#a8101a)!important}
+.pg-today-shop{background:linear-gradient(135deg,#7a5af8,#5925dc)!important}
+.pg-emoji{font-style:normal;font-size:30px;line-height:1}
 .pg-ico{width:100%;height:100%;object-fit:contain;border-radius:inherit}
-.pg-today{width:100%}
 .pg-games{margin-top:6px}
-.pg-shop-art{display:grid;place-items:center;margin:4px 0 10px}
-.pg-shop-art .pg-ico{width:96px;height:96px}
 .pg-best ul{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:8px}
 .pg-best li{display:grid;grid-template-columns:36px 1fr auto;align-items:center;gap:10px;padding:10px 12px;border:1px solid #eef0f4;border-radius:16px;background:#fbfcfe}
 .pg-best li>i{font-style:normal;font-size:22px;text-align:center}
@@ -25,8 +19,11 @@
 .pg-best li small{color:#667085;font-size:12px}
 .pg-best li strong{font-size:17px;font-variant-numeric:tabular-nums}
 @media(max-width:720px){
-  .pg-hub .study-hub-card{min-height:118px!important;padding:18px!important;grid-template-columns:54px 1fr 34px!important;gap:14px!important}
-  .pg-hub .study-hub-icon{width:54px!important;height:54px!important}
-  .pg-emoji{font-size:26px}
-  .pg-card-sub{font-size:12px}
+  .pg-tabs button{font-size:13px;gap:3px}
+  .pg-tab-left{min-width:17px;height:17px;padding:0 4px;font-size:10.5px;line-height:17px}
+  .pg-today{grid-template-columns:44px minmax(0,1fr)!important;gap:10px!important}
+  .pg-today-ico{width:44px;height:44px;border-radius:13px}
+  .pg-today-ico .pg-ico{width:40px;height:40px}
+  .pg-emoji{font-size:24px}
 }
+@media(max-width:360px){.pg-tab-left{display:none}}
