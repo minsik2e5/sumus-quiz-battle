@@ -1,6 +1,6 @@
 // V13.206 놀이터 메뉴: 게임이 많아져서 학습 탭처럼 위쪽 탭(게임 · 상점 · 기록) + 큰 카드(미니게임 · 코인 승부 · 증권거래소)로 묶는다.
 // 큰 카드를 누르면 지금 쓰는 게임 카드가 그대로 나오고(카드 · 로직은 그대로) '놀이터'로 돌아가는 버튼이 있다.
-// 지금은 테스트 앱(sumus-voca-test.*)과 로컬에서만 켠다(pgMenuOn). 운영 놀이터는 arcade.js의 예전 화면 그대로.
+// V13.207: 운영에도 켰다(PG_MENU_LIVE). 끄면 테스트 앱(sumus-voca-test.*) · 로컬에서만 켜지고 운영은 arcade.js의 예전 화면.
 // 마지막 탭 · 하위 화면은 localStorage(sumus-pg-menu)에 기억한다. 저장이 막혀 있으면 게임 탭 첫 화면.
 import { esc, num, icon } from './ui.js';
 import { coin } from './emblems.js';
@@ -9,7 +9,9 @@ import { YABAWI_ART } from './yabawi-art.js';
 import { matchTime } from './match-rules.js';
 import { rodOf } from './reel-rules.js';
 
+export const PG_MENU_LIVE = true;
 export function pgMenuOn(loc = globalThis.location) {
+  if (PG_MENU_LIVE) return true;
   const host = String(loc?.hostname || '');
   return TEST_HOST.test(host) || /^(localhost|127\.0\.0\.1)$/.test(host);
 }

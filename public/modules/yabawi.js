@@ -3,7 +3,7 @@
 // - 등장: 조명 아래 곽 사장이 들어와 손가락을 든다("어이 젊은 친구, 신사답게 행동해.")
 // - 공 보여 주기 → 섞기(판마다 컵 3 · 4 · 6개, 점점 빠르게) → 밑장빼기(가끔, 눈썰미가 좋으면 보인다) → '동작 그만!'
 // - 고르기("확실하지 않으면 승부를 걸지 마라.") → 공개 → 받기 또는 '묻고 더블로 가!'(게임 단어 한 문제를 맞혀야 간다)
-// 지금은 테스트 앱(sumus-voca-test.*)과 로컬에서만 놀이터에 나온다(yabawiOn). 운영에 켜려면 yabawiOn만 바꾼다.
+// V13.207: 운영에도 켰다(YABAWI_LIVE). 끄면 테스트 앱(sumus-voca-test.*) · 로컬에서만 놀이터에 나온다.
 import { api, esc, num, toast } from './ui.js';
 import { coin } from './emblems.js';
 import { sfxTone as tone, sfxBuzz as buzz, unlockSound } from './lucky.js';
@@ -12,7 +12,9 @@ import { arcadeWords } from './arcade-games.js';
 import { YABAWI, ballAt, caughtCheat, isFake, slotXY, stepPairs } from './yabawi-rules.js';
 import { YABAWI_ART } from './yabawi-art.js';
 
+export const YABAWI_LIVE = true;
 export function yabawiOn(loc = globalThis.location) {
+  if (YABAWI_LIVE) return true;
   const host = String(loc?.hostname || '');
   return TEST_HOST.test(host) || /^(localhost|127\.0\.0\.1)$/.test(host);
 }
