@@ -11,7 +11,9 @@ import { yabawiCard, yabawiGame, yabawiOn } from './yabawi.js';
 import { YABAWI } from './yabawi-rules.js';
 import { stocksCard, loadMarket, openStock, startStockClock } from './stocks.js';
 import { RPS_BETS } from './rewards.js';
-import { gamesSection, partyRow } from './arcade-games.js';
+import { gamesSection, partyRow, reelCard, matchCard, huntCard, clawCard, timingCard } from './arcade-games.js';
+import { pgMenuOn, pgRead, pgWrite, playgroundHtml } from './playground-menu.js';
+import { YABAWI_ART } from './yabawi-art.js';
 import { SERIES_EGG_ART } from './pet-art.js';
 import { FISHING_ART } from './reel.js';
 import { MATCH_ART } from './match-game.js';
@@ -51,6 +53,8 @@ const tierTag = tier => `<span class="ga-tier t-${tier}">${GACHA_TIERS[tier].nam
 
 /* ---------- page ---------- */
 export function arcadePage(A) {
+  // V13.206 테스트 앱 · 로컬은 학습 탭 같은 메뉴(playground-menu.js). 화면 전체를 draw()가 그린다.
+  if (pgMenuOn()) return '<div data-arcade data-arcade-view="menu" data-arcade-menu="1"></div>';
   return `<div class="page-heading arcade-head">${uiArt('arcade', 'arcade-head-art')}<span class="premium-eyebrow">COIN ARCADE</span><h1>놀이터</h1><p>낚시 · 짝 맞추기 · 몬스터 사냥 · 인형뽑기 · 10초 맞추기, 모은 코인으로 뽑기와 알 상점, 그리고 교실 게임.</p></div>
     <button type="button" class="arcade-wallet" data-action="coins" aria-label="코인 지갑 열기"><span>${coin()}<b id="ga-balance">${num(A.data.stats?.points_balance || 0)}</b> 코인</span><small>코인 지갑 ${icon('chevron')}</small></button>
     ${gamesSection(A, { fishing: FISHING_ART, match: MATCH_ART, hunt: HUNT_ART, claw: CLAW_ART })}
@@ -214,6 +218,16 @@ export function mountArcade(el, A) {
       if (y.dataset.yw === 'bet') { ybBet = Number(y.dataset.bet); return draw(); }
       return playYabawi(A, y.dataset.yw === 'resume');
     }
+    // V13.206 놀이터 메뉴: 위쪽 탭과 큰 카드 · 뒤로 가기.
+    const t = event.target.closest('[data-pg-tab], [data-pg]');
+    if (t && !current?.busy) {
+      pg = t.dataset.pgTab ? { tab: t.dataset.pgTab, sub: 'hub' } : { tab: 'game', sub: t.dataset.pg };
+      pgWrite(pg);
+      draw();
+      window.scrollTo(0, 0);
+      if (pg.sub === 'market' && rewards(A).market_open) loadMarket().then(() => { quietDraw(); startStockClock(quietDraw); }).catch(() => {});
+      return;
+    }
     const k = event.target.closest('[data-stk]');
     if (k) return openStock(k.dataset.key, { onBalance: value => setBalance(A, value), onChange: draw });
   });
@@ -237,8 +251,22 @@ async function playYabawi(A, resume) {
   current.busy = false;
   draw();
 }
+let pg = pgRead();
+function menuHtml(A) {
+  const balance = Number(A.data.stats?.points_balance || 0), r = rewards(A), art = { fishing: FISHING_ART, match: MATCH_ART, hunt: HUNT_ART, claw: CLAW_ART };
+  return playgroundHtml(A, pg, {
+    balance, yabawi: yabawiOn(), art: YABAWI_ART,
+    games: () => `${reelCard(A, art)}${matchCard(A, art)}${huntCard(A, art)}${clawCard(A, art)}${timingCard(A)}`,
+    party: partyRow,
+    tajja: () => `${rpsCard(r.rps, rpsBet, balance)}${yabawiOn() ? yabawiCard(r.yabawi, ybBet, balance) : ''}`,
+    market: stocksCard,
+    shop: () => `${machineHtml(A)}${shopHtml(A)}`,
+    collection: () => collectionHtml(A),
+  });
+}
 function draw() {
   if (!current?.el.isConnected) return;
+  if (current.el.dataset.arcadeMenu) { current.el.innerHTML = menuHtml(current.A); return; }
   current.el.innerHTML = current.el.dataset.arcadeView === 'book' ? collectionHtml(current.A) : `${machineHtml(current.A)}${shopHtml(current.A)}${rpsCard(rewards(current.A).rps, rpsBet, Number(current.A.data.stats?.points_balance || 0))}${yabawiOn() ? yabawiCard(rewards(current.A).yabawi, ybBet, Number(current.A.data.stats?.points_balance || 0)) : ''}${rewards(current.A).market_open ? stocksCard() : ''}`;
 }
 
