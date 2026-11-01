@@ -111,8 +111,8 @@
 .yw-ball,.yw-streak{position:absolute;width:7%;max-width:30px;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-20%);z-index:1;opacity:0;transition:opacity .15s;
   background:radial-gradient(circle at 35% 30%,#ffd9a0,#ff8a1f 55%,#c55a00);box-shadow:0 3px 4px rgba(0,0,0,.5)}
 .yw-ball.on{opacity:1}
-.yw-streak{box-shadow:0 0 10px 3px rgba(255,150,40,.7),-14px 0 10px -2px rgba(255,150,40,.45)}
-.yw-streak.on{opacity:1}
+.yw-streak{box-shadow:0 0 6px 1px rgba(255,150,40,.4)}
+.yw-streak.on{opacity:.5}
 
 .yw-stop{position:absolute;right:0;bottom:10px;z-index:4;appearance:none;border:3px solid #fff;border-radius:16px;background:linear-gradient(180deg,#ff3b3b,#b30d0d);color:#fff;font:inherit;font-size:18px;font-weight:900;padding:8px 14px;display:flex;flex-direction:column;align-items:center;line-height:1.1;cursor:pointer;
   box-shadow:0 5px 0 #6e0a10,0 0 18px rgba(255,59,59,.5);animation:yw-stop-pulse 1.1s ease-in-out infinite}
@@ -161,3 +161,74 @@
   .yw-dealer .head,.yw-dealer .hand,.yw-mini-cup,.yw-mini-ball,.yw-lamp,.yw-smoke,.yw-stop,.yw-start,.yw-show.tense .yw-vignette{animation:none}
   .yw-mini-ball{opacity:1}
 }
+
+/* ---------- V13.205 2차: 디자인 다듬기(그림 없이도) + 그림이 오면 바꿔 끼우기 ---------- */
+/* 방 · 전등 */
+.yw-room{position:absolute;inset:0;background:
+  linear-gradient(180deg,rgba(0,0,0,0) 0%,rgba(0,0,0,.55) 55%,#050505 82%),
+  repeating-linear-gradient(90deg,#1b120c 0 46px,#140d08 46px 48px,#1e140d 48px 94px,#120b07 94px 96px)}
+.has-bg-room .yw-room{background:linear-gradient(180deg,transparent 60%,#050505 92%),var(--yw-bg-room) center top/cover no-repeat}
+.has-lamp .yw-lamp{background:var(--yw-lamp) center 2%/min(260px,60vw) auto no-repeat}
+.has-smoke .yw-smoke{background:var(--yw-smoke) center/contain no-repeat;filter:none;opacity:.5}
+
+/* 테이블: 펠트 결 · 나무 테두리 · 전등 빛 */
+.yw-felt{background:
+  radial-gradient(ellipse at 50% 32%,rgba(120,220,140,.22),transparent 55%),
+  repeating-linear-gradient(35deg,rgba(255,255,255,.018) 0 2px,transparent 2px 5px),
+  repeating-linear-gradient(-35deg,rgba(0,0,0,.05) 0 2px,transparent 2px 6px),
+  radial-gradient(ellipse at 50% 30%,#2a7a45 0%,#174d2b 55%,#0b2616 100%);
+  box-shadow:inset 0 0 50px rgba(0,0,0,.65),inset 0 0 0 2px rgba(0,0,0,.4),0 0 0 4px #8a5a2a,0 0 0 9px #5a3317,0 0 0 11px #a8743c,0 0 0 13px #2a160a,0 18px 40px rgba(0,0,0,.8)}
+.yw-cone{position:absolute;left:50%;top:-30%;width:100%;height:130%;transform:translateX(-50%);pointer-events:none;z-index:1;background:radial-gradient(ellipse 55% 45% at 50% 62%,rgba(255,240,190,.16),transparent 70%)}
+.has-table .yw-felt{background:var(--yw-table) center/100% 100% no-repeat;box-shadow:none;border-radius:0;inset:0 -4% -6%}
+.yw-prop{position:absolute;z-index:1;pointer-events:none;line-height:0;filter:drop-shadow(0 4px 4px rgba(0,0,0,.5))}
+.yw-prop svg,.yw-prop img{width:100%;height:auto}
+.yw-prop.hwatu{left:3%;bottom:3%;width:17%;transform:rotate(-10deg)}
+.yw-prop.chips{right:3%;bottom:4%;width:13%}
+
+/* 컵: 바닥 그림자(들면 작아지고 흐려짐) · 광택 */
+.yw-cup{filter:drop-shadow(0 3px 2px rgba(0,0,0,.45))}
+.yw-cup img{width:100%;height:auto;pointer-events:none}
+.yw-cup-shadow{position:absolute;left:50%;top:86%;width:100%;height:18%;transform:translateX(-50%);border-radius:50%;z-index:-1;pointer-events:none;
+  background:radial-gradient(closest-side,rgba(0,0,0,.6),transparent);transition:top .3s cubic-bezier(.3,1.4,.5,1),transform .3s,opacity .3s}
+.yw-cup.up .yw-cup-shadow{top:128%;transform:translateX(-50%) scale(.65);opacity:.3}
+.yw-cup.peek .yw-cup-shadow{top:96%;transform:translateX(-50%) scale(.9)}
+.has-cup-shadow .yw-cup-shadow{background:var(--yw-cup-shadow) center/100% 100% no-repeat}
+.yw-ball{background:radial-gradient(circle at 32% 28%,#fff6e0 0 8%,#ffd9a0 14%,#ff8a1f 55%,#b84f00);box-shadow:0 4px 5px rgba(0,0,0,.55),inset -2px -3px 4px rgba(120,40,0,.35)}
+.has-ball .yw-ball{background:var(--yw-ball) center/contain no-repeat;box-shadow:none}
+
+/* 곽 사장 그림 */
+.yw-dealer.art img{display:block;width:100%;height:auto;pointer-events:none}
+.yw-host .yw-dealer.art{width:min(190px,42vw)}
+.yw-dealer.art.p-shock{animation:yw-shake .35s ease-in-out 2}
+.yw-dealer.art.p-idle,.yw-dealer.art.p-point{animation:yw-breathe 3.2s ease-in-out infinite}
+.yw-card-stage .yw-dealer.mini.art{width:130px;bottom:-12px}
+
+/* 네온 제목 */
+.yw-title b{color:#d8ff4a;text-shadow:0 0 6px #c6f23a,0 0 18px rgba(198,242,58,.8),0 0 40px rgba(198,242,58,.45),0 4px 0 #3c4a00;animation:yw-neon 3.4s steps(1) infinite}
+.yw-title span{text-shadow:0 0 8px rgba(255,255,255,.6),0 3px 0 #333}
+@keyframes yw-neon{0%,100%{opacity:1}31%{opacity:.55}33%{opacity:1}35%{opacity:.7}36%{opacity:1}}
+
+/* 칩 터짐 · 쓸어 가기 · 지폐 비 */
+.yw-p.chip{width:18px;height:18px;background:radial-gradient(circle,#c81d25 0 42%,transparent 43%),repeating-conic-gradient(#c81d25 0 30deg,#fff 30deg 45deg);box-shadow:0 2px 3px rgba(0,0,0,.5)}
+.yw-p.chip:nth-child(3n+1){background:radial-gradient(circle,#d9a520 0 42%,transparent 43%),repeating-conic-gradient(#d9a520 0 30deg,#fff 30deg 45deg)}
+.yw-p.chip:nth-child(3n+2){background:radial-gradient(circle,#1a1a1a 0 42%,transparent 43%),repeating-conic-gradient(#1a1a1a 0 30deg,#fff 30deg 45deg)}
+.has-chip-red .yw-p.chip{background:var(--yw-chip-red) center/contain no-repeat}
+.has-chip-gold .yw-p.chip:nth-child(3n+1){background:var(--yw-chip-gold) center/contain no-repeat}
+.has-chip-black .yw-p.chip:nth-child(3n+2){background:var(--yw-chip-black) center/contain no-repeat}
+.yw-sweep{position:absolute;left:50%;top:50%;z-index:3;pointer-events:none;opacity:0}
+.yw-sweep.go{animation:yw-sweep 1.1s cubic-bezier(.5,0,.8,.4) forwards}
+.yw-chip{position:absolute;left:var(--x);top:var(--y);width:26px;height:12px;margin:-6px 0 0 -13px;border-radius:50%;background:#c81d25;border:2px dashed #fff;box-shadow:0 3px 0 #7a0d12}
+.yw-chip.c1{background:#d9a520;box-shadow:0 3px 0 #7a5a10}.yw-chip.c2{background:#1a1a1a;box-shadow:0 3px 0 #000}
+@keyframes yw-sweep{0%{opacity:1;transform:none}25%{opacity:1;transform:translateY(4px)}100%{opacity:0;transform:translateY(-190px) scale(.55)}}
+.yw-rain{position:absolute;inset:0;z-index:6;pointer-events:none;overflow:hidden}
+.yw-rain i{position:absolute;top:-8%;left:var(--l);width:38px;height:19px;border-radius:3px;background:linear-gradient(135deg,#6fbf7c,#2f7a3e);border:1.5px solid #d6efcc;box-shadow:0 2px 4px rgba(0,0,0,.4);animation:yw-fall var(--d) linear var(--s) both}
+.has-bill .yw-rain i{background:var(--yw-bill) center/100% 100% no-repeat;border:0}
+@keyframes yw-fall{0%{transform:translateY(0) rotate(0)}50%{transform:translate(18px,60vh) rotate(var(--w))}100%{transform:translate(-12px,118vh) rotate(calc(var(--w) * 2))}}
+
+/* 놀이터 카드 */
+.yw-card-stage{background:radial-gradient(ellipse at 50% 100%,#1f5a34 0%,#0e2b19 60%,#080d0a 100%),repeating-linear-gradient(90deg,#1b120c 0 30px,#140d08 30px 31px)}
+.has-card-hero .yw-card-stage{background:var(--yw-card-hero) center/cover no-repeat}
+.has-card-hero .yw-card-stage .yw-dealer,.has-card-hero .yw-card-cups,.has-card-hero .yw-spot{display:none}
+.has-card-hero .yw-card-bubble{left:auto;right:10px;width:44%}.has-card-hero .yw-card-bubble::before{display:none}
+
+@media (prefers-reduced-motion:reduce){.yw-title b,.yw-dealer.art{animation:none}.yw-rain,.yw-sweep{display:none}}

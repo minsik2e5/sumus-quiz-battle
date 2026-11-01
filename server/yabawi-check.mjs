@@ -3,7 +3,7 @@
 //   '동작 그만'은 밑장빼기 뒤 맞바꾸기 2번 안에만 통한다. 놀이터 카드는 테스트 앱 · 로컬에서만 보인다.
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { YABAWI, ballAt, caughtCheat, cheatMs, roundMs, slotXY } from '../public/modules/yabawi-rules.js';
+import { YABAWI, ballAt, caughtCheat, cheatMs, isFake, roundMs, slotXY, stepPairs } from '../public/modules/yabawi-rules.js';
 import { dealRound, yabawiDeal, yabawiPick, yabawiCash, yabawiView, yabawiLine } from './yabawi.mjs';
 import { rewardIncome } from './rewards.mjs';
 
@@ -13,37 +13,46 @@ const seeded = seed => () => { seed = (seed * 1103515245 + 12345) % 2147483648; 
 const fails = (fn, word) => { try { fn(); return false; } catch (err) { return !word || String(err.message).includes(word); } };
 
 export async function runYabawiChecks(assert) {
-  // 1) 판 모양: 이긴 수에 따라 컵 3 → 4 → 6, 같은 두 컵을 연달아 바꾸지 않는다. 첫 판엔 밑장빼기 없음.
+  // 1) 판 모양: 이긴 수에 따라 컵 3 → 4 → 6, 둘째 판부터 두 · 세 쌍이 한꺼번에, 페이크 걸음. 첫 판엔 밑장빼기 없음.
   {
-    let ok = true, cheats = [0, 0, 0], catchRoom = true;
+    let ok = true, multi = [0, 0, 0], cheats = [0, 0, 0], catchRoom = true;
     for (let s = 1; s <= 600; s++) {
       for (const stage of [0, 1, 2]) {
         const r = dealRound(stage, seeded(s * 7 + stage)), R = YABAWI.ROUNDS[stage];
-        ok &&= r.cups === R.cups && r.swaps.length === R.swaps && r.start >= 0 && r.start < r.cups
-          && r.swaps.every(([a, b], i) => a !== b && a >= 0 && b < r.cups && !(i && Math.min(a, b) === Math.min(...r.swaps[i - 1]) && Math.max(a, b) === Math.max(...r.swaps[i - 1])));
+        const steps = r.swaps.map(stepPairs);
+        ok &&= r.cups === R.cups && r.swaps.length === R.swaps && r.ms === R.ms && r.start >= 0 && r.start < r.cups
+          && steps.every(st => st.length >= 1 && st.length <= R.pairs && new Set(st.flat()).size === st.length * 2 && st.flat().every(c => c >= 0 && c < r.cups))
+          && r.fakes.length === R.fakes && r.fakes.every(i => i > 0 && i < R.swaps - 1) && new Set(r.fakes).size === r.fakes.length;
+        if (steps.some(st => st.length > 1)) multi[stage]++;
         if (r.cheat) {
           cheats[stage]++;
-          catchRoom &&= r.cheat.at >= 1 && r.cheat.at + YABAWI.CATCH_STEPS <= r.swaps.length - 1 && r.cheat.to !== r.cheat.from
+          catchRoom &&= r.cheat.at >= 1 && r.cheat.at + YABAWI.CATCH_STEPS <= r.swaps.length - 1 && r.cheat.to !== r.cheat.from && !isFake(r, r.cheat.at)
             && r.cheat.from === ballAt({ ...r, cheat: null }, r.cheat.at + 1);
         }
       }
     }
-    assert(ok, 'V13.205 야바위 판: 컵 3 · 4 · 6개, 정한 횟수만큼 맞바꾸고 같은 두 컵을 연달아 바꾸지 않는다');
+    assert(ok, 'V13.205 야바위 판: 컵 3 · 4 · 6개, 정한 걸음 · 속도, 한 걸음의 쌍은 겹치지 않고 페이크는 처음 · 끝 걸음이 아니다');
+    assert(multi[0] === 0 && multi[1] > 500 && multi[2] === 600, `V13.205 첫 판은 한 쌍씩, 둘째 판부터 여러 쌍이 한꺼번에 (${multi.join(' · ')} / 600)`);
+    assert(YABAWI.ROUNDS.map(R => R.ms).join() === '280,215,170' && YABAWI.SHOW_MS === 1000 && YABAWI.CATCH_STEPS === 1, 'V13.205 2차 난이도: 처음보다 2배 빠르게(280 · 215 · 170ms), 공 보여 주기 1초, 동작 그만은 한 걸음 안');
     assert(cheats[0] === 0 && cheats[1] > 600 * 0.25 && cheats[1] < 600 * 0.45 && cheats[2] > 600 * 0.45 && cheats[2] < 600 * 0.65,
       `V13.205 밑장빼기는 첫 판 0%, 둘째 판 약 35%, 셋째 판 약 55% (${cheats.join(' · ')} / 600)`);
-    assert(catchRoom, 'V13.205 밑장빼기는 공이 있던 컵에서 다른 컵으로, 뒤에 \'동작 그만\'을 누를 맞바꾸기가 2번 남는다');
+    assert(catchRoom, 'V13.205 밑장빼기는 페이크가 아닌 걸음 뒤, 공이 있던 컵에서 다른 컵으로, 뒤에 "동작 그만" 걸음이 남는다');
   }
 
-  // 2) 공 따라가기 · 밑장빼기 · 동작 그만 판정 · 시간.
+  // 2) 공 따라가기(여러 쌍 · 페이크 · 예전 판 모양) · 밑장빼기 · 동작 그만 판정 · 시간.
   {
     const round = { cups: 3, start: 0, swaps: [[0, 1], [1, 2], [0, 2], [0, 1]], ms: 500, cheat: null };
-    assert(ballAt(round, 0) === 0 && ballAt(round, 1) === 1 && ballAt(round, 2) === 2 && ballAt(round, 3) === 0 && ballAt(round) === 1, 'V13.205 공은 맞바꾸기를 따라 움직인다');
+    assert(ballAt(round, 0) === 0 && ballAt(round, 1) === 1 && ballAt(round, 2) === 2 && ballAt(round, 3) === 0 && ballAt(round) === 1, 'V13.205 예전 판 모양([a, b])도 공을 따라간다');
+    const multi = { cups: 6, start: 0, swaps: [[[0, 1], [2, 3]], [[1, 4], [0, 5]], [[4, 2]]], ms: 200, fakes: [], cheat: null };
+    assert(ballAt(multi, 1) === 1 && ballAt(multi, 2) === 4 && ballAt(multi) === 2, 'V13.205 한 걸음에 여러 쌍이 바뀌어도 공은 한 번만 움직인다');
+    const fake = { ...multi, fakes: [1] };
+    assert(ballAt(fake, 2) === 1 && ballAt(fake) === 1 && isFake(fake, 1) && !isFake(fake, 0), 'V13.205 페이크 걸음에서는 공이 그대로다');
     const cheat = { ...round, cheat: { at: 1, from: 2, to: 0 } };
-    assert(ballAt(cheat, 1) === 1 && ballAt(cheat, 2) === 0 && ballAt(cheat) === 2, 'V13.205 밑장빼기는 그 맞바꾸기 바로 뒤에 공을 옮긴다');
-    assert(!caughtCheat(cheat, 1) && caughtCheat(cheat, 2) && caughtCheat(cheat, 3) && !caughtCheat(cheat, 4) && !caughtCheat(round, 2) && !caughtCheat(cheat, null),
-      'V13.205 \'동작 그만\'은 밑장빼기 뒤 맞바꾸기 2번 안에만 통한다');
+    assert(ballAt(cheat, 1) === 1 && ballAt(cheat, 2) === 0 && ballAt(cheat) === 2, 'V13.205 밑장빼기는 그 걸음 바로 뒤에 공을 옮긴다');
+    assert(!caughtCheat(cheat, 1) && caughtCheat(cheat, 2) && !caughtCheat(cheat, 3) && !caughtCheat(round, 2) && !caughtCheat(cheat, null),
+      'V13.205 "동작 그만"은 밑장빼기부터 다음 한 걸음 안에만 통한다');
     assert(roundMs(round) === YABAWI.SHOW_MS + 2000 && roundMs(cheat) === YABAWI.SHOW_MS + 2000 + YABAWI.CHEAT_MS && cheatMs(cheat) === YABAWI.SHOW_MS + 1000 && cheatMs(round) === Infinity,
-      'V13.205 섞는 시간 = 공 보여 주기 + 맞바꾸기 (+ 밑장빼기 장면)');
+      'V13.205 섞는 시간 = 공 보여 주기 + 걸음 (+ 밑장빼기 장면)');
     const six = Array.from({ length: 6 }, (_, i) => slotXY(6, i));
     assert(slotXY(3, 1).x === 50 && six.filter(p => p.y < 50).length === 3 && six.filter(p => p.y > 50).length === 3, 'V13.205 컵 6개는 보낸 그림처럼 2 × 3');
   }
@@ -126,6 +135,10 @@ export async function runYabawiChecks(assert) {
     assert(rewards.includes('Number(p?.yabawi?.paid || 0)') && activity.includes("yabawi: { label: '야바위'") && build.includes('"v13205.css"'), 'V13.205 받은 코인은 잔액에, 활동 기록 이름, CSS 묶음');
     assert(ui.includes('TEST_HOST') && /yabawiOn\(\)\s*\?\s*yabawiCard/.test(arcade), 'V13.205 야바위 카드는 테스트 앱 · 로컬에서만 보인다');
     assert(!/\.yb-/.test(css) && !/class="yb-|'yb-|data-yb/.test(ui) && css.includes('.yw-stop[hidden]{display:none}'), 'V13.205 야바위 클래스는 yw-(야차전 yb-와 겹치지 않음), 숨긴 \'동작 그만\'은 안 보인다');
+    const art = source('../public/modules/yabawi-art.js');
+    assert(build.includes("public/assets/yabawi") && art.startsWith('// 만든 곳: server/build-assets.mjs') && ui.includes("import { YABAWI_ART } from './yabawi-art.js'")
+      && ui.includes("POSES.every(p => YABAWI_ART.has(`dealer-${p}`))") && ui.includes('그림은 야바위를 열 때만 받는다'),
+      'V13.205 그림 게이트: 에셋 폴더에 있는 그림만 바꿔 끼우고(곽 사장은 8포즈가 다 있어야), 없으면 SVG · CSS. 그림은 야바위를 열 때만 받는다');
     for (const line of ['확실하지 않으면 승부를 걸지 마라.', '어이 젊은 친구, 신사답게 행동해.', '동작 그만', '첫 판부터 장난질이냐?', '묻고 더블로 가', '오함마']) assert(ui.includes(line), `V13.205 곽 사장 대사: ${line}`);
   }
 }

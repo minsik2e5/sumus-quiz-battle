@@ -21,22 +21,36 @@ export function yabawiView(p, now = Date.now()) {
   };
 }
 
-// 판 하나: 이긴 수(stage)에 맞는 컵 수 · 맞바꾸기, 가끔 밑장빼기. 같은 두 컵을 연달아 바꾸지 않는다(제자리로 돌아가 보이지 않게).
+// 판 하나: 이긴 수(stage)에 맞는 컵 수 · 걸음. 한 걸음에 겹치지 않는 쌍 1 ~ R.pairs개가 한꺼번에 바뀌고(둘째 판부터),
+// 페이크 걸음(가다 되돌아옴) R.fakes번, 가끔 밑장빼기. 한 쌍만 바뀌는 걸음은 바로 앞 걸음과 같은 쌍을 피한다.
 export function dealRound(stage, random = secureRandom) {
   const R = YABAWI.ROUNDS[Math.min(stage, YABAWI.ROUNDS.length - 1)], n = R.cups;
   const pick = k => Math.min(k - 1, Math.floor(random() * k));
   const start = pick(n), swaps = [];
+  const same = (x, y) => x.length === 1 && y?.length === 1 && Math.min(...x[0]) === Math.min(...y[0]) && Math.max(...x[0]) === Math.max(...y[0]);
   while (swaps.length < R.swaps) {
-    const a = pick(n), b = (a + 1 + pick(n - 1)) % n, last = swaps.at(-1);
-    if (last && Math.min(a, b) === Math.min(...last) && Math.max(a, b) === Math.max(...last)) continue;
-    swaps.push([a, b]);
+    const k = Math.min(Math.floor(n / 2), Math.max(1, R.pairs - pick(2)));
+    const free = Array.from({ length: n }, (_, i) => i), step = [];
+    for (let j = 0; j < k; j++) {
+      const a = free.splice(pick(free.length), 1)[0], b = free.splice(pick(free.length), 1)[0];
+      step.push([a, b]);
+    }
+    if (same(step, swaps.at(-1))) continue;
+    swaps.push(step);
   }
-  const round = { stage, cups: n, start, swaps, ms: R.ms, cheat: null };
+  // 페이크는 첫 · 마지막 걸음이 아닌 곳에.
+  const fakes = [];
+  while (fakes.length < Math.min(R.fakes, R.swaps - 2)) { const i = 1 + pick(R.swaps - 2); if (!fakes.includes(i)) fakes.push(i); }
+  fakes.sort((x, y) => x - y);
+  const round = { stage, cups: n, start, swaps, ms: R.ms, fakes, cheat: null };
   if (random() < R.cheat) {
-    // 밑장빼기 뒤로 '동작 그만'을 누를 맞바꾸기가 CATCH_STEPS번 남게.
-    const at = 1 + pick(R.swaps - 1 - YABAWI.CATCH_STEPS);
-    const from = ballAt({ ...round, swaps: swaps.slice(0, at + 1) });
-    round.cheat = { at, from, to: (from + 1 + pick(n - 1)) % n };
+    // 밑장빼기 뒤로 '동작 그만'을 누를 걸음이 CATCH_STEPS번 남게, 페이크가 아닌 걸음 뒤에.
+    const spots = Array.from({ length: R.swaps - 1 - YABAWI.CATCH_STEPS }, (_, i) => i + 1).filter(i => !fakes.includes(i));
+    if (spots.length) {
+      const at = spots[pick(spots.length)];
+      const from = ballAt({ ...round, swaps: swaps.slice(0, at + 1) });
+      round.cheat = { at, from, to: (from + 1 + pick(n - 1)) % n };
+    }
   }
   return round;
 }
@@ -57,7 +71,7 @@ function settleStale(y, now) {
   const stale = y.live;
   return { ...stale, paid: settle(y, now, stale.wins > 0 ? stale.pot : stale.bet) };
 }
-const roundOut = r => ({ stage: r.stage, cups: r.cups, start: r.start, swaps: r.swaps, ms: r.ms, cheat: r.cheat });
+const roundOut = r => ({ stage: r.stage, cups: r.cups, start: r.start, swaps: r.swaps, ms: r.ms, fakes: r.fakes || [], cheat: r.cheat });
 
 // 판 받기: 새 판(bet), 이긴 뒤 더블(double), 또는 섞다가 닫은 판 이어 보기(아무것도 없이 → 같은 판을 처음부터).
 export function yabawiDeal(p, { bet, double = false }, balance, { random = secureRandom, now = Date.now() } = {}) {

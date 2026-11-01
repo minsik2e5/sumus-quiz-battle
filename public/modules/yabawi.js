@@ -9,7 +9,8 @@ import { coin } from './emblems.js';
 import { sfxTone as tone, sfxBuzz as buzz, unlockSound } from './lucky.js';
 import { TEST_HOST } from './claw-physics.js';
 import { arcadeWords } from './arcade-games.js';
-import { YABAWI, ballAt, caughtCheat, slotXY } from './yabawi-rules.js';
+import { YABAWI, ballAt, caughtCheat, isFake, slotXY, stepPairs } from './yabawi-rules.js';
+import { YABAWI_ART } from './yabawi-art.js';
 
 export function yabawiOn(loc = globalThis.location) {
   const host = String(loc?.hostname || '');
@@ -50,7 +51,26 @@ const TALK = {
   jackpot: ['내가… 졌다. 오늘은 니가 타짜다.']
 };
 
-/* ---------- 그림: 곽 사장 · 컵 · 공 ---------- */
+/* ---------- 그림: 에셋이 있으면 그림, 없으면 직접 그린 SVG · CSS ---------- */
+// 에셋 요청서(public/assets/yabawi): 곽 사장 8포즈 · 컵 · 공 · 테이블 · 배경 · 전등 · 연기 · 칩 · 지폐 · 카드 그림.
+const ART = name => YABAWI_ART.has(name) ? `/assets/yabawi/${name}.webp` : '';
+export const POSES = ['idle', 'point', 'shuffle', 'sneak', 'grin', 'shock', 'hammer', 'sweep'];
+const dealerArt = () => POSES.every(p => YABAWI_ART.has(`dealer-${p}`));
+// SVG 곽 사장에 없는 포즈는 가까운 것으로.
+const SVG_POSE = { shuffle: 'deal', sneak: 'deal', hammer: 'point', sweep: 'grin' };
+// 배경 · 테이블 같은 큰 그림은 CSS 변수로 넘기고 has-<이름> 클래스로 켠다.
+const SCENE = ['bg-room', 'lamp', 'smoke', 'table', 'ball', 'cup-shadow', 'chip-red', 'chip-gold', 'chip-black', 'bill', 'spark', 'chips-stack', 'hwatu-fan', 'money-bundle', 'hammer', 'card-hero'];
+const sceneArt = () => {
+  const on = SCENE.filter(n => YABAWI_ART.has(n));
+  return { cls: on.map(n => ` has-${n}`).join(''), style: on.map(n => `--yw-${n}:url(${ART(n)})`).join(';') };
+};
+export function dealerHtml(pose = 'idle', cls = '') {
+  if (!dealerArt()) return dealerSvg(SVG_POSE[pose] || pose, cls).replace('class="yw-dealer', `data-pose="${pose}" class="yw-dealer`);
+  return `<span class="yw-dealer art p-${pose}${cls ? ` ${cls}` : ''}" data-pose="${pose}" aria-hidden="true"><img src="${ART(`dealer-${pose}`)}" alt="" draggable="false"></span>`;
+}
+const cupHtml = () => ART('cup') ? `<img src="${ART('cup')}" alt="" draggable="false">` : cupSvg();
+
+/* ---------- 직접 그린 그림: 곽 사장 · 컵 · 공 ---------- */
 // 직접 그린 타짜풍 딜러(배우 얼굴이 아니다): 올백 머리, 파란 셔츠, 금목걸이. 표정 · 팔은 .p-<pose> 클래스로 바꾼다.
 export function dealerSvg(pose = 'idle', cls = '') {
   return `<span class="yw-dealer p-${pose}${cls ? ` ${cls}` : ''}" aria-hidden="true"><svg viewBox="0 0 220 260" role="presentation">
@@ -99,6 +119,10 @@ const cupSvg = () => `<svg viewBox="0 0 100 112" aria-hidden="true"><defs><linea
   <path d="M15 40 L85 40 M12 62 L88 62" stroke="#8e0b14" stroke-width="2" opacity=".55"/>
   <path d="M30 10 L24 92" stroke="#ff8a8a" stroke-width="5" stroke-linecap="round" opacity=".45"/>
   <path d="M4 94 Q50 102 96 94 L97 104 Q50 113 3 104 Z" fill="#f4f1ea"/><path d="M4 94 Q50 102 96 94" stroke="#cfcac0" stroke-width="1.5" fill="none"/></svg>`;
+// 테이블 소품: 왼쪽 위 화투 세 장, 오른쪽 위 칩 더미(그림이 오면 그림).
+const hwatuSvg = () => `<svg viewBox="0 0 120 90" aria-hidden="true">${[-18, 0, 18].map((r, i) => `<g transform="rotate(${r} 60 88)"><rect x="44" y="${12 - i}" width="32" height="50" rx="4" fill="#b3121b" stroke="#3a0408" stroke-width="2"/><rect x="48" y="${16 - i}" width="24" height="42" rx="2" fill="none" stroke="#f3c64a" stroke-width="1.5" opacity=".8"/><circle cx="60" cy="${37 - i}" r="6" fill="#f3c64a" opacity=".85"/></g>`).join('')}</svg>`;
+const chipsSvg = () => `<svg viewBox="0 0 90 90" aria-hidden="true">${[['#c81d25', 62], ['#151515', 52], ['#d9a520', 42], ['#c81d25', 32]].map(([c, y], i) => `<g><ellipse cx="${36 + (i % 2) * 4}" cy="${y + 8}" rx="24" ry="9" fill="#000" opacity=".25"/><ellipse cx="${36 + (i % 2) * 4}" cy="${y + 4}" rx="24" ry="9" fill="${c}"/><ellipse cx="${36 + (i % 2) * 4}" cy="${y}" rx="24" ry="9" fill="${c}" stroke="#fff" stroke-width="2.5" stroke-dasharray="6 5"/></g>`).join('')}<ellipse cx="70" cy="76" rx="14" ry="6" fill="#d9a520" stroke="#fff" stroke-width="2" stroke-dasharray="5 4"/></svg>`;
+const PROPS = `<i class="yw-prop hwatu">${ART('hwatu-fan') ? `<img src="${ART('hwatu-fan')}" alt="">` : hwatuSvg()}</i><i class="yw-prop chips">${ART('chips-stack') ? `<img src="${ART('chips-stack')}" alt="">` : chipsSvg()}</i>`;
 const ladder = (wins, bet) => Array.from({ length: YABAWI.MAX_WINS }, (_, i) => `<span class="yw-step${wins > i ? ' on' : ''}${wins === i ? ' next' : ''}"><b>×${2 ** (i + 1)}</b><small>${num(bet * 2 ** (i + 1))}</small></span>`).join('');
 
 /* ---------- 놀이터 카드 ---------- */
@@ -108,13 +132,14 @@ export function yabawiCard(state, bet, balance) {
   const can = live || (left > 0 && balance >= bet);
   const played = Number(st.wins || 0) + Number(st.losses || 0);
   const recent = (s.recent || []).slice(0, 5);
-  return `<section class="yw-card" id="yw-card">
+  const sc = sceneArt();
+  return `<section class="yw-card${sc.cls}" id="yw-card" style="${sc.style}">
     <div class="yw-card-head"><div><small>TAJJA SHELL GAME</small><h2>야바위</h2></div><span class="lk-left" aria-label="오늘 남은 판 ${left}번">${Array.from({ length: s.daily || YABAWI.DAILY }, (_, i) => `<i class="${i < left ? 'on' : ''}"></i>`).join('')}</span></div>
     <div class="yw-card-stage" aria-hidden="true">
       <i class="yw-spot"></i>
-      ${dealerSvg('point', 'mini')}
+      ${dealerHtml('point', 'mini')}
       <span class="yw-card-bubble">확실하지 않으면 승부를 걸지 마라.</span>
-      <span class="yw-card-cups">${[0, 1, 2].map(i => `<i class="yw-mini-cup" style="--i:${i}">${cupSvg()}</i>`).join('')}<i class="yw-mini-ball"></i></span>
+      <span class="yw-card-cups">${[0, 1, 2].map(i => `<i class="yw-mini-cup" style="--i:${i}">${cupHtml()}</i>`).join('')}<i class="yw-mini-ball"></i></span>
     </div>
     <div class="yw-card-ladder">${ladder(-1, bet)}</div>
     ${live ? '' : `<div class="lk-bets" role="group" aria-label="걸 코인">${(s.bets || YABAWI.BETS).map(b => `<button type="button" class="lk-bet ${bet === b ? 'on' : ''}" data-yw="bet" data-bet="${b}" aria-pressed="${bet === b}"><span>${coin()}${b}</span></button>`).join('')}</div>`}
@@ -134,18 +159,22 @@ export function yabawiGame(A, { bet, live = null, onBalance }) {
     const g = { bet: live?.bet || bet, pot: live?.pot || bet, wins: live?.wins || 0, phase: live?.await === 'choice' ? 'choice' : live ? 'resume' : 'ready',
       balance: Number(A.data.stats?.points_balance || 0), left: Number(state.left ?? YABAWI.DAILY), busy: false, round: null, cups: [], done: 0, stopUsed: false, aborted: false, picked: null, heart: null };
     const box = document.createElement('div');
-    box.className = 'yw-show';
+    const sc = sceneArt();
+    box.className = `yw-show${sc.cls}`;
+    if (sc.style) box.setAttribute('style', sc.style);
+    // 그림은 야바위를 열 때만 받는다(첫 화면 로딩에는 안 들어감).
+    [...YABAWI_ART].forEach(n => { const img = new Image(); img.src = ART(n); });
     box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-label', '야바위');
-    box.innerHTML = `<div class="yw-bg" aria-hidden="true"><i class="yw-lamp"></i><i class="yw-smoke s1"></i><i class="yw-smoke s2"></i></div><div class="yw-vignette" aria-hidden="true"></div>
+    box.innerHTML = `<div class="yw-bg" aria-hidden="true"><i class="yw-room"></i><i class="yw-lamp"></i><i class="yw-smoke s1"></i><i class="yw-smoke s2"></i></div><div class="yw-vignette" aria-hidden="true"></div>
       <div class="yw-top">
         <div class="yw-pot"><small>판돈</small><b>${coin()}<span id="yw-pot">${num(g.pot)}</span></b></div>
         <div class="yw-ladder" id="yw-ladder">${ladder(g.wins, g.bet)}</div>
         <button type="button" class="yw-x" data-y="close" aria-label="닫기">✕</button>
       </div>
       <div class="yw-stage intro" id="yw-stage">
-        <div class="yw-host">${dealerSvg('point')}<span class="yw-name">곽 사장</span><span class="yw-talk" id="yw-talk" aria-live="polite"></span></div>
+        <div class="yw-host">${dealerHtml('point')}<span class="yw-name">곽 사장</span><span class="yw-talk" id="yw-talk" aria-live="polite"></span></div>
         <div class="yw-title" aria-hidden="true"><b>야바위</b><span>게임</span></div>
-        <div class="yw-table" id="yw-table"><i class="yw-felt" aria-hidden="true"></i><div class="yw-cups" id="yw-cups"></div></div>
+        <div class="yw-table" id="yw-table"><i class="yw-felt" aria-hidden="true"></i><i class="yw-cone" aria-hidden="true"></i>${PROPS}<div class="yw-cups" id="yw-cups"></div><div class="yw-sweep" id="yw-sweep" aria-hidden="true"></div></div>
         <button type="button" class="yw-stop" id="yw-stop" data-y="stop" hidden>동작 그만!<small>밑장 빼기냐?</small></button>
         <div class="yw-burst" id="yw-burst"></div>
         <div class="yw-stamp" id="yw-stamp"></div>
@@ -157,7 +186,12 @@ export function yabawiGame(A, { bet, live = null, onBalance }) {
     requestAnimationFrame(() => box.classList.add('open'));
 
     const setBalance = value => { if (typeof value === 'number') { g.balance = value; onBalance?.(value); } };
-    const pose = name => { const d = $('.yw-host .yw-dealer'); if (d) d.className = `yw-dealer p-${name}`; };
+    const pose = name => {
+      const d = $('.yw-host .yw-dealer'); if (!d || d.dataset.pose === name) return;
+      d.dataset.pose = name;
+      if (d.classList.contains('art')) { d.className = `yw-dealer art p-${name}`; d.querySelector('img').src = ART(`dealer-${name}`); }
+      else d.className = `yw-dealer p-${SVG_POSE[name] || name}`;
+    };
     let talkTimer = null;
     const talk = (text, hold = 2800) => {
       const t = $('#yw-talk'); if (!t) return;
@@ -170,6 +204,19 @@ export function yabawiGame(A, { bet, live = null, onBalance }) {
     const burst = (kind, n) => {
       if (reduced()) return;
       $('#yw-burst').innerHTML = Array.from({ length: n }, (_, i) => { const a = i / n * Math.PI * 2, r = 70 + (i * 41) % 120; return `<i class="yw-p ${kind}" style="--dx:${Math.round(Math.cos(a) * r)}px;--dy:${Math.round(Math.sin(a) * r - 40)}px;--d:${(.6 + (i % 5) * .09).toFixed(2)}s"></i>`; }).join('');
+    };
+    // 진 판: 판돈 칩 더미가 곽 사장 쪽으로 쓸려 간다.
+    const sweep = () => {
+      if (reduced()) return;
+      const el = $('#yw-sweep'); el.innerHTML = Array.from({ length: Math.min(9, 3 + g.wins * 2) }, (_, i) => `<i class="yw-chip c${i % 3}" style="--x:${(i % 3 - 1) * 14}px;--y:${-Math.floor(i / 3) * 6}px"></i>`).join('');
+      el.className = 'yw-sweep'; void el.offsetWidth; el.classList.add('go');
+    };
+    // ×8: 지폐가 위에서 흩날린다.
+    const rain = () => {
+      if (reduced()) return;
+      const r = document.createElement('div'); r.className = 'yw-rain'; r.setAttribute('aria-hidden', 'true');
+      r.innerHTML = Array.from({ length: 26 }, (_, i) => `<i style="--l:${(i * 37) % 100}%;--d:${1.6 + (i % 5) * .25}s;--w:${(i * 53) % 360}deg;--s:${(i % 7) * .12}s"></i>`).join('');
+      box.appendChild(r); setTimeout(() => r.remove(), 3200);
     };
     const potTo = value => {
       const el = $('#yw-pot'), from = g.pot;
@@ -190,7 +237,7 @@ export function yabawiGame(A, { bet, live = null, onBalance }) {
     function layCups(n) {
       const wrap = $('#yw-cups');
       wrap.className = `yw-cups n${n}`;
-      wrap.innerHTML = `<i class="yw-ball" id="yw-ball"></i><i class="yw-streak" id="yw-streak"></i>${Array.from({ length: n }, (_, i) => `<button type="button" class="yw-cup" data-y="cup" disabled aria-label="${i + 1}번 컵">${cupSvg()}</button>`).join('')}`;
+      wrap.innerHTML = `<i class="yw-ball" id="yw-ball"></i><i class="yw-streak" id="yw-streak"></i>${Array.from({ length: n }, (_, i) => `<button type="button" class="yw-cup" data-y="cup" disabled aria-label="${i + 1}번 컵"><i class="yw-cup-shadow"></i>${cupHtml()}</button>`).join('')}`;
       g.cups = [...wrap.querySelectorAll('.yw-cup')];
       g.cups.forEach((el, i) => place(el, i, n));
     }
@@ -198,31 +245,40 @@ export function yabawiGame(A, { bet, live = null, onBalance }) {
     const lift = (slot, up = true) => { const el = g.cups[slot]; if (el) el.classList.toggle('up', up); };
     // 시작 전 판: 컵 3개, 가운데 컵을 들어 공을 보여 둔다.
     const idleTable = () => { const n = YABAWI.ROUNDS[0].cups, mid = Math.floor(n / 2); layCups(n); ballTo(mid, n, true); lift(mid); };
-    // 두 컵이 자리를 바꾼다: 하나는 위로, 하나는 아래로 둥글게.
-    function swapAnim(a, b, n, ms) {
-      const A1 = g.cups[a], B1 = g.cups[b], pa = slotXY(n, a), pb = slotXY(n, b);
-      const mid = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
-      const dx = pb.x - pa.x, dy = pb.y - pa.y, len = Math.hypot(dx, dy) || 1, bend = Math.min(26, 10 + len * .18);
-      const off = { x: -dy / len * bend, y: dx / len * bend * .55 };
-      const opts = { duration: ms, easing: 'cubic-bezier(.45,.05,.35,1)' };
-      const run = (el, from, to, s) => el.animate([{ left: `${from.x}%`, top: `${from.y}%` }, { left: `${mid.x + off.x * s}%`, top: `${mid.y + off.y * s}%`, offset: .5 }, { left: `${to.x}%`, top: `${to.y}%` }], opts).finished.catch(() => {});
-      const done = Promise.all([run(A1, pa, pb, 1), run(B1, pb, pa, -1)]);
-      g.cups[a] = B1; g.cups[b] = A1;
-      place(A1, b, n); place(B1, a, n);
-      return done;
+    // 한 걸음: 겹치지 않는 쌍들이 한꺼번에 자리를 바꾼다(하나는 위로, 하나는 아래로 둥글게).
+    // 페이크면 가다 멈칫하고 제자리로 돌아온다(공은 그대로).
+    function stepAnim(step, n, ms, fake) {
+      const opts = { duration: ms, easing: fake ? 'ease-in-out' : 'cubic-bezier(.45,.05,.35,1)' };
+      const runs = [], moved = [];
+      stepPairs(step).forEach(([a, b], k) => {
+        const A1 = g.cups[a], B1 = g.cups[b], pa = slotXY(n, a), pb = slotXY(n, b);
+        const dx = pb.x - pa.x, dy = pb.y - pa.y, len = Math.hypot(dx, dy) || 1, bend = Math.min(26, 10 + len * .18) * (k % 2 ? -1 : 1);
+        const off = { x: -dy / len * bend, y: dx / len * bend * .55 };
+        const at = (from, to, t, s) => ({ x: from.x + (to.x - from.x) * t + off.x * s * Math.sin(Math.PI * t), y: from.y + (to.y - from.y) * t + off.y * s * Math.sin(Math.PI * t) });
+        const run = (el, from, to, s) => {
+          const frames = fake
+            ? [0, .42, .5, 0].map((t, i) => { const p = at(from, to, t, s); return { left: `${p.x}%`, top: `${p.y}%`, offset: [0, .45, .6, 1][i] }; })
+            : [0, .5, 1].map(t => { const p = at(from, to, t, s); return { left: `${p.x}%`, top: `${p.y}%` }; });
+          return el.animate(frames, opts).finished.catch(() => {});
+        };
+        runs.push(run(A1, pa, pb, 1), run(B1, pb, pa, -1));
+        if (!fake) moved.push([a, b, A1, B1]);
+      });
+      for (const [a, b, A1, B1] of moved) { g.cups[a] = B1; g.cups[b] = A1; place(A1, b, n); place(B1, a, n); }
+      return Promise.all(runs);
     }
     // 밑장빼기: 두 컵이 살짝 들리고, 공이 바닥으로 휙 미끄러진다(빠르지만 보인다).
     async function cheatAnim(cheat, n) {
-      pose('deal'); SFX.sneak();
+      pose('sneak'); SFX.sneak();
       const s = $('#yw-streak'), pa = slotXY(n, cheat.from), pb = slotXY(n, cheat.to);
       g.cups[cheat.from]?.classList.add('peek'); g.cups[cheat.to]?.classList.add('peek');
       s.style.left = `${pa.x}%`; s.style.top = `${pa.y}%`;
       s.classList.add('on');
-      await s.animate([{ left: `${pa.x}%`, top: `${pa.y}%`, opacity: 1 }, { left: `${pb.x}%`, top: `${pb.y}%`, opacity: 1 }], { duration: YABAWI.CHEAT_MS * .55, easing: 'ease-in-out' }).finished.catch(() => {});
+      await s.animate([{ left: `${pa.x}%`, top: `${pa.y}%`, opacity: 1 }, { left: `${pb.x}%`, top: `${pb.y}%`, opacity: 1 }], { duration: YABAWI.CHEAT_MS * .6, easing: 'ease-in' }).finished.catch(() => {});
       s.classList.remove('on');
-      await wait(YABAWI.CHEAT_MS * .45);
+      await wait(YABAWI.CHEAT_MS * .4);
       g.cups[cheat.from]?.classList.remove('peek'); g.cups[cheat.to]?.classList.remove('peek');
-      pose('idle');
+      pose('shuffle');
     }
 
     /* 판 돌리기 */
@@ -252,7 +308,7 @@ export function yabawiGame(A, { bet, live = null, onBalance }) {
       tension(true);
       banner(g.wins >= YABAWI.MAX_WINS - 1 ? '운명의 한 판' : `ROUND ${g.wins + 1} · 컵 ${n}개`, g.wins >= YABAWI.MAX_WINS - 1 ? 'final' : 'call');
       talk(g.wins >= YABAWI.MAX_WINS - 1 ? pickOne(TALK.final) : g.wins ? pickOne(TALK.streak) : pickOne(TALK.show), 0);
-      pose('deal');
+      pose(g.wins >= YABAWI.MAX_WINS - 1 ? 'hammer' : 'point');
       // 공 보여 주기: 컵을 들어 공을 보이고 덮는다.
       ballTo(round.start, n, true);
       await wait(250); lift(round.start); SFX.lift();
@@ -260,13 +316,12 @@ export function yabawiGame(A, { bet, live = null, onBalance }) {
       lift(round.start, false); await wait(260); SFX.thud();
       $('#yw-ball').classList.remove('on');
       await wait(140);
-      pose('idle');
+      pose('shuffle');
       const stop = $('#yw-stop'); stop.hidden = false; stop.disabled = false;
       for (let i = 0; i < round.swaps.length; i++) {
         if (g.aborted || !box.isConnected) return;
-        const [a, b] = round.swaps[i];
         SFX.swish(i);
-        await swapAnim(a, b, n, round.ms);
+        await stepAnim(round.swaps[i], n, round.ms, isFake(round, i));
         g.done = i + 1;
         if (g.aborted || !box.isConnected) return;
         if (round.cheat && i === round.cheat.at) await cheatAnim(round.cheat, n);
@@ -312,18 +367,20 @@ export function yabawiGame(A, { bet, live = null, onBalance }) {
         if (res.result === 'lose') { ballTo(ballSlot, n, true); lift(ballSlot); g.cups[ballSlot]?.classList.add('answer'); await wait(reduced() ? 0 : 450); }
       }
       if (res.result === 'lose') {
-        stamp('LOSE', 'lose'); pose('grin'); talk(pickOne(TALK.lose)); SFX.lose();
+        stamp('LOSE', 'lose'); pose('sweep'); talk(pickOne(TALK.lose)); SFX.lose();
         banner(g.wins ? `${g.wins}연승에서 멈췄어요…` : '곽 사장 승!', 'lose');
-        potTo(0); burst('puff', 14);
+        sweep(); potTo(0); burst('puff', 14);
+        setTimeout(() => pose('grin'), reduced() ? 0 : 1100);
         g.wins = 0; g.phase = 'end';
       } else {
         g.wins = res.wins;
         $('#yw-ladder').innerHTML = ladder(g.wins, g.bet);
         potTo(res.pot);
-        burst('coin', 10 + g.wins * 8);
+        burst('chip', 10 + g.wins * 8);
         if (res.done) {
           stamp('×8!', 'jackpot'); SFX.jackpot(); pose('shock'); talk(pickOne(TALK.jackpot), 0);
           banner(`${YABAWI.MAX_WINS}연승! 오늘은 니가 타짜다`, 'jackpot'); box.classList.add('gold');
+          rain();
           toast(`${num(res.paid)}코인을 받았어요!`);
           g.phase = 'end';
         } else {
@@ -345,7 +402,7 @@ export function yabawiGame(A, { bet, live = null, onBalance }) {
         g.left = Number(res.yabawi?.left ?? g.left);
         setBalance(res.points_balance);
         banner(`+${num(res.paid)}코인 챙겼다!`, 'win'); SFX.cash(); pose('point'); talk(pickOne(TALK.cash));
-        burst('coin', 26);
+        burst('chip', 26);
         g.phase = 'end'; g.wins = 0;
       } catch (err) { toast(err.message); }
       g.busy = false;

@@ -7,19 +7,25 @@ export const YABAWI = {
   DAILY: 5,
   MAX_WINS: 3,
   STALE_MS: 10 * 60000,
-  // 판마다(이긴 수 0 · 1 · 2): 컵 수, 맞바꾸는 횟수, 한 번 맞바꾸는 시간(ms), 밑장빼기 확률.
+  // 판마다(이긴 수 0 · 1 · 2): 컵 수, 섞는 걸음 수, 한 걸음 시간(ms), 한 걸음에 같이 바뀌는 쌍(최대), 페이크 수, 밑장빼기 확률.
+  // V13.205 2차: 처음보다 2배 빠르게(560 · 430 · 340 → 280 · 215 · 170ms), 둘째 판부터 두 · 세 쌍이 한꺼번에, 가다 멈칫 되돌아오는 페이크.
   ROUNDS: [
-    { cups: 3, swaps: 6, ms: 560, cheat: 0 },
-    { cups: 4, swaps: 9, ms: 430, cheat: 0.35 },
-    { cups: 6, swaps: 13, ms: 340, cheat: 0.55 }
+    { cups: 3, swaps: 8, ms: 280, pairs: 1, fakes: 1, cheat: 0 },
+    { cups: 4, swaps: 11, ms: 215, pairs: 2, fakes: 2, cheat: 0.35 },
+    { cups: 6, swaps: 14, ms: 170, pairs: 3, fakes: 2, cheat: 0.55 }
   ],
-  SHOW_MS: 1600,       // 섞기 전에 공을 보여 주고 덮는 시간
-  CHEAT_MS: 420,       // 밑장빼기 장면(맞바꾸기 사이에 끼어든다)
-  CATCH_STEPS: 2,      // 밑장빼기 뒤 맞바꾸기 2번이 끝나기 전까지 '동작 그만'이 통한다
+  SHOW_MS: 1000,       // 섞기 전에 공을 보여 주고 덮는 시간
+  CHEAT_MS: 260,       // 밑장빼기 장면(걸음 사이에 끼어든다, 짧고 흐리게)
+  CATCH_STEPS: 1,      // 밑장빼기 장면부터 다음 한 걸음이 끝나기 전까지만 '동작 그만'이 통한다
   MIN_SHARE: 0.6       // 섞는 시간의 이 비율보다 빨리 고르면 받지 않는다(화면을 건너뛴 요청)
 };
 
-// 판 하나의 섞는 시간(공 보여 주기 + 맞바꾸기 + 밑장빼기 장면).
+// 한 걸음에서 바뀌는 쌍들. 예전 판(한 걸음 = [a, b])도 읽는다.
+export const stepPairs = step => typeof step?.[0] === 'number' ? [step] : (step || []);
+// 페이크 걸음: 컵이 가다 멈칫 되돌아온다(공은 그대로).
+export const isFake = (round, i) => Array.isArray(round.fakes) && round.fakes.includes(i);
+
+// 판 하나의 섞는 시간(공 보여 주기 + 걸음 + 밑장빼기 장면).
 export function roundMs(round) {
   return YABAWI.SHOW_MS + round.swaps.length * round.ms + (round.cheat ? YABAWI.CHEAT_MS : 0);
 }
@@ -27,17 +33,16 @@ export function roundMs(round) {
 export function cheatMs(round) {
   return round.cheat ? YABAWI.SHOW_MS + (round.cheat.at + 1) * round.ms : Infinity;
 }
-// 맞바꾸기가 `done`번 끝났을 때 공이 있는 자리. 밑장빼기는 맞바꾸기 cheat.at이 끝난 바로 뒤에 공을 cheat.to로 옮긴다.
+// 걸음이 `done`번 끝났을 때 공이 있는 자리. 밑장빼기는 걸음 cheat.at이 끝난 바로 뒤에 공을 cheat.to로 옮긴다.
 export function ballAt(round, done = round.swaps.length) {
   let b = round.start;
   for (let i = 0; i < Math.min(done, round.swaps.length); i++) {
-    const [x, y] = round.swaps[i];
-    if (b === x) b = y; else if (b === y) b = x;
+    if (!isFake(round, i)) for (const [x, y] of stepPairs(round.swaps[i])) { if (b === x) { b = y; break; } if (b === y) { b = x; break; } }
     if (round.cheat && i === round.cheat.at) b = round.cheat.to;
   }
   return b;
 }
-// '동작 그만'이 밑장빼기를 잡았는지: 맞바꾸기가 `stop`번 끝났을 때 눌렀다.
+// '동작 그만'이 밑장빼기를 잡았는지: 걸음이 `stop`번 끝났을 때 눌렀다.
 export function caughtCheat(round, stop) {
   if (!round?.cheat || !Number.isInteger(stop)) return false;
   return stop >= round.cheat.at + 1 && stop <= round.cheat.at + YABAWI.CATCH_STEPS;
