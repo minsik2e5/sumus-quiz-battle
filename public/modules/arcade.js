@@ -218,14 +218,14 @@ export function mountArcade(el, A) {
       if (y.dataset.yw === 'bet') { ybBet = Number(y.dataset.bet); return draw(); }
       return playYabawi(A, y.dataset.yw === 'resume');
     }
-    // V13.206 놀이터 메뉴: 위쪽 탭과 큰 카드 · 뒤로 가기.
-    const t = event.target.closest('[data-pg-tab], [data-pg]');
+    // V13.208 놀이터 메뉴: 위쪽 탭(미니게임 · 코인 승부 · 상점 · 기록).
+    const t = event.target.closest('[data-pg-tab]');
     if (t && !current?.busy) {
-      pg = t.dataset.pgTab ? { tab: t.dataset.pgTab, sub: 'hub' } : { tab: 'game', sub: t.dataset.pg };
+      pg = { tab: t.dataset.pgTab };
       pgWrite(pg);
       draw();
       window.scrollTo(0, 0);
-      if (pg.sub === 'market' && rewards(A).market_open) loadMarket().then(() => { quietDraw(); startStockClock(quietDraw); }).catch(() => {});
+      if (pg.tab === 'tajja' && rewards(A).market_open) loadMarket().then(() => { quietDraw(); startStockClock(quietDraw); }).catch(() => {});
       return;
     }
     const k = event.target.closest('[data-stk]');
