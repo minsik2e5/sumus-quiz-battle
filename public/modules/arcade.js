@@ -7,6 +7,8 @@ import { titleState } from './titles-ui.js';
 import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, EGG_PRICE, EPIC_EGG_PRICE, seasonOnSale, seriesEggNew } from './core.js';
 import { luckyCard, luckyShow, machineSpin, machineDrop, unlockSound } from './lucky.js';
 import { rpsCard, rpsMatch } from './rps.js';
+import { yabawiCard, yabawiGame, yabawiOn } from './yabawi.js';
+import { YABAWI } from './yabawi-rules.js';
 import { stocksCard, loadMarket, openStock, startStockClock } from './stocks.js';
 import { RPS_BETS } from './rewards.js';
 import { gamesSection, partyRow } from './arcade-games.js';
@@ -186,7 +188,7 @@ export function mountArcade(el, A) {
   api('/rewards').then(res => {
     if (current?.el !== el || current.busy) return;
     const r = rewards(A);
-    r.attendance = res.attendance; r.gacha = res.gacha; r.lucky = res.lucky; r.rps = res.rps; r.market_open = res.market_open; r.bot = res.bot;
+    r.attendance = res.attendance; r.gacha = res.gacha; r.lucky = res.lucky; r.rps = res.rps; r.yabawi = res.yabawi; r.market_open = res.market_open; r.bot = res.bot;
     A.data.stats.gacha = res.gacha.items;
     setBalance(A, res.points_balance);
     draw();
@@ -206,6 +208,12 @@ export function mountArcade(el, A) {
       if (r.dataset.rps === 'bet') { rpsBet = Number(r.dataset.bet); return draw(); }
       return playRps(A, r.dataset.rps === 'resume');
     }
+    // V13.205 야바위(테스트 앱 · 로컬에서만 카드가 나온다).
+    const y = event.target.closest('[data-yw]');
+    if (y && !y.disabled && !current?.busy) {
+      if (y.dataset.yw === 'bet') { ybBet = Number(y.dataset.bet); return draw(); }
+      return playYabawi(A, y.dataset.yw === 'resume');
+    }
     const k = event.target.closest('[data-stk]');
     if (k) return openStock(k.dataset.key, { onBalance: value => setBalance(A, value), onChange: draw });
   });
@@ -221,9 +229,17 @@ async function playRps(A, resume) {
   current.busy = false;
   draw();
 }
+let ybBet = YABAWI.BETS[0];
+async function playYabawi(A, resume) {
+  current.busy = true;
+  const live = resume ? rewards(A).yabawi?.live : null;
+  await yabawiGame(A, { bet: ybBet, live, onBalance: value => setBalance(A, value) });
+  current.busy = false;
+  draw();
+}
 function draw() {
   if (!current?.el.isConnected) return;
-  current.el.innerHTML = current.el.dataset.arcadeView === 'book' ? collectionHtml(current.A) : `${machineHtml(current.A)}${shopHtml(current.A)}${rpsCard(rewards(current.A).rps, rpsBet, Number(current.A.data.stats?.points_balance || 0))}${rewards(current.A).market_open ? stocksCard() : ''}`;
+  current.el.innerHTML = current.el.dataset.arcadeView === 'book' ? collectionHtml(current.A) : `${machineHtml(current.A)}${shopHtml(current.A)}${rpsCard(rewards(current.A).rps, rpsBet, Number(current.A.data.stats?.points_balance || 0))}${yabawiOn() ? yabawiCard(rewards(current.A).yabawi, ybBet, Number(current.A.data.stats?.points_balance || 0)) : ''}${rewards(current.A).market_open ? stocksCard() : ''}`;
 }
 
 /* coin capsule */

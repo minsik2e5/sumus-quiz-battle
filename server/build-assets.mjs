@@ -127,6 +127,7 @@ const cssSources = [
   "v13198.css",
   "v13201.css",
   "v13202.css",
+  "v13205.css",
   "v13185.css",
   "v13184.css",
   "v13178.css"
@@ -222,6 +223,19 @@ writeFileSync(cssBundlePath, cssBundle);
   const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/fish)에 세 그림(본그림 · -hang · -hang-s)이 다 있는 물고기.\nexport const FISH_READY = new Set(${JSON.stringify(keys)});\n`;
   if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
   console.log(`[fish-art] ${keys.length} fish with art`);
+}
+
+// V13.205 야바위 그림 게이트: 그림 폴더(public/assets/yabawi, 에셋 요청서)를 보고 public/modules/yabawi-art.js를 만든다.
+// 있는 그림만 바꿔 끼우고, 없으면 직접 그린 SVG · CSS 그대로. 곽 사장은 8포즈가 다 있어야 그림으로 바뀐다(포즈마다 얼굴이 같아야 해서).
+{
+  const dir = resolve(root, 'public/assets/yabawi');
+  const art = existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.webp')).map(f => f.slice(0, -5)).sort() : [];
+  const out = resolve(root, 'public/modules/yabawi-art.js');
+  const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/yabawi)에 있는 야바위 그림.
+export const YABAWI_ART = new Set(${JSON.stringify(art)});
+`;
+  if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
+  console.log(`[yabawi-art] ${art.length} pictures`);
 }
 
 // Service worker: precache list + a hash of every served file. Any change to
