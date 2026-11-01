@@ -133,7 +133,7 @@ export async function runYabawiChecks(assert) {
     assert(['/yabawi/deal', '/yabawi/pick', '/yabawi/cash'].every(path => service.includes(`path === '${path}' && method === 'POST'`)) && service.includes("yabawi: yabawiView(p, now)") && service.includes("logActivity(p, 'yabawi'") && service.includes("'timing', 'yabawi'].filter(k => old[k])"),
       'V13.205 야바위 API 3개 · 보상 화면 상태 · 활동 기록 · 로그인 때 기록(받은 코인)을 지킨다');
     assert(rewards.includes('Number(p?.yabawi?.paid || 0)') && activity.includes("yabawi: { label: '야바위'") && build.includes('"v13205.css"'), 'V13.205 받은 코인은 잔액에, 활동 기록 이름, CSS 묶음');
-    assert(ui.includes('TEST_HOST') && /yabawiOn\(\)\s*\?\s*yabawiCard/.test(arcade), 'V13.205 야바위 카드는 테스트 앱 · 로컬에서만 보인다');
+    assert(ui.includes('export const YABAWI_LIVE = true;') && ui.includes('if (YABAWI_LIVE) return true;') && ui.includes('TEST_HOST') && /yabawiOn\(\)\s*\?\s*yabawiCard/.test(arcade), 'V13.207 야바위 카드는 운영에도 보인다(YABAWI_LIVE, 끄면 테스트 앱 · 로컬만)');
     assert(!/\.yb-/.test(css) && !/class="yb-|'yb-|data-yb/.test(ui) && css.includes('.yw-stop[hidden]{display:none}'), 'V13.205 야바위 클래스는 yw-(야차전 yb-와 겹치지 않음), 숨긴 \'동작 그만\'은 안 보인다');
     const art = source('../public/modules/yabawi-art.js');
     assert(build.includes("public/assets/yabawi") && art.startsWith('// 만든 곳: server/build-assets.mjs') && ui.includes("import { YABAWI_ART } from './yabawi-art.js'")

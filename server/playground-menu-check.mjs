@@ -3,17 +3,17 @@
 //   테스트 앱 · 로컬에서만 켜고 운영 놀이터는 예전 화면 그대로. 마지막 탭 · 하위 화면은 localStorage에 기억(막혀 있어도 안 깨진다).
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { pgMenuOn, pgRead, pgWrite, playgroundHtml, menuIcon, todayLeft, bestRows, PG_TABS } from '../public/modules/playground-menu.js';
+import { PG_MENU_LIVE, pgMenuOn, pgRead, pgWrite, playgroundHtml, menuIcon, todayLeft, bestRows, PG_TABS } from '../public/modules/playground-menu.js';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 const memStore = () => { const m = new Map(); return { getItem: k => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)) }; };
 const brokenStore = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
 
 export async function runPlaygroundMenuChecks(assert) {
-  // 1) 켜지는 곳: 테스트 앱 · 로컬만. 운영(sumus-voca.*) · 다른 곳은 예전 놀이터.
-  assert(pgMenuOn({ hostname: 'sumus-voca-test.minsik2e5.workers.dev' }) && pgMenuOn({ hostname: 'localhost' }) && pgMenuOn({ hostname: '127.0.0.1' })
-    && !pgMenuOn({ hostname: 'sumus-voca.minsik2e5.workers.dev' }) && !pgMenuOn({ hostname: 'sumus.example.com' }) && !pgMenuOn(undefined),
-    'V13.206 놀이터 메뉴는 테스트 앱 · 로컬에서만 켠다');
+  // 1) 켜지는 곳: V13.207부터 운영에도(PG_MENU_LIVE). 스위치를 끄면 테스트 앱 · 로컬만(코드에 그대로 남아 있다).
+  assert(PG_MENU_LIVE === true && pgMenuOn({ hostname: 'sumus-voca.minsik2e5.workers.dev' }) && pgMenuOn({ hostname: 'sumus-voca-test.minsik2e5.workers.dev' }) && pgMenuOn(undefined)
+    && source('../public/modules/playground-menu.js').includes('if (PG_MENU_LIVE) return true;') && source('../public/modules/playground-menu.js').includes('TEST_HOST.test(host)'),
+    'V13.207 놀이터 메뉴는 운영에도 켠다(PG_MENU_LIVE, 끄면 테스트 앱 · 로컬만)');
 
   // 2) 기억: 탭 · 하위 화면을 저장하고 다시 읽는다. 이상한 값 · 막힌 저장소는 게임 탭 첫 화면.
   {
@@ -69,6 +69,6 @@ export async function runPlaygroundMenuChecks(assert) {
       && arcade.includes('${machineHtml(current.A)}${shopHtml(current.A)}${rpsCard(') && arcade.includes('${gamesSection(A, { fishing: FISHING_ART, match: MATCH_ART, hunt: HUNT_ART, claw: CLAW_ART })}')
       && arcade.includes('pgWrite(pg);') && arcade.includes("event.target.closest('[data-pg-tab], [data-pg]')"),
       'V13.206 운영 놀이터(예전 화면)는 그대로, 테스트 호스트만 메뉴');
-    assert(build.includes('"v13206.css"') && css.includes('.pg-hub') && css.includes('.pg-best') && pkg.version === '13.206.0', 'V13.206 CSS 묶음과 버전');
+    assert(build.includes('"v13206.css"') && css.includes('.pg-hub') && css.includes('.pg-best') && Number(pkg.version.split('.')[1]) >= 206, 'V13.206 CSS 묶음과 버전');
   }
 }
