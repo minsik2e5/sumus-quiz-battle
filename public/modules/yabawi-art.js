@@ -1,2 +1,2 @@
 // 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/yabawi)에 있는 야바위 그림.
-export const YABAWI_ART = new Set([]);
+export const YABAWI_ART = new Set(["ball","bg-room","bill","card-hero","chip-black","chip-gold","chip-red","chips-stack","cup","cup-shadow","dealer-grin","dealer-hammer","dealer-idle","dealer-point","dealer-shock","dealer-shuffle","dealer-sneak","dealer-sweep","hammer","hwatu-fan","lamp","menu-arcade","menu-shop","menu-tajja","money-bundle","smoke","spark","table"]);
