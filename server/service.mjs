@@ -11,6 +11,7 @@ import { MARKET_OPEN } from '../public/modules/market.js';
 // V13.82 문법 증권거래소 is on hold: closed unless switched on.
 const marketOpen = state => MARKET_OPEN || state.market?.open === true;
 import { rpsView, rpsPlay, rpsCash, openEgg } from './rewards.mjs';
+import { yabawiView, yabawiDeal, yabawiPick, yabawiCash, yabawiLine } from './yabawi.mjs';
 import { logActivity, activityOf, activityOverview } from './activity.mjs';
 import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, monsterStart, monsterFinish, monsterView, monsterScope, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts, legendEggView, grantLegendEgg, legendEggOpen, legendEggBuy, seriesEggView, seriesEggBuy } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate, setUnitCounter, setRangeCounter } from './competition.mjs';
@@ -1260,7 +1261,7 @@ export async function service(state, method, path, body, token, options = {}) {
     } else if (process.env.AUTH_PROVIDER === 'supabase') {
       const result = await supabaseLogin(username, password); p = result.profile; supabaseAccessToken = result.accessToken;
       const old = state.profiles.find(x => x.id === p.id);
-      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live', 'bonus', 'streak_guard', 'games', 'claw', 'reel', 'hunt', 'blank', 'timing'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
+      if (old) { const style = Object.fromEntries(['avatar_key', 'avatar_accessory', 'avatar_frame', 'avatar_title', 'titles_seen', 'pets', 'points_spent', 'purchases', 'attendance', 'gacha', 'lucky', 'chance', 'chance_live', 'bonus', 'streak_guard', 'games', 'claw', 'reel', 'hunt', 'blank', 'timing', 'yabawi'].filter(k => old[k]).map(k => [k, old[k]])); Object.assign(old, p, style); p = old; }
       else state.profiles.push(p);
     } else {
       p = localProfile;
@@ -1369,7 +1370,7 @@ export async function service(state, method, path, body, token, options = {}) {
       school_league: leagueFor(state, competition, p, now),
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now, dailyConfig(state, now)), blank: p.role === 'student' ? blankView(p, now) : null },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), yabawi: yabawiView(p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now, dailyConfig(state, now)), blank: p.role === 'student' ? blankView(p, now) : null },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -1585,7 +1586,7 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/rewards' && method === 'GET') {
     requireRole(p, 'student');
     const now = Date.now();
-    return { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), market_open: marketOpen(state), bot: botView(p, now), timing: timingView(p, now, dailyConfig(state, now)), points_balance: coinBalance(state, p) };
+    return { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), yabawi: yabawiView(p, now), market_open: marketOpen(state), bot: botView(p, now), timing: timingView(p, now, dailyConfig(state, now)), points_balance: coinBalance(state, p) };
   }
   // V13.73 coin gifts from a teacher: the student opens the waiting gift boxes.
   if (path === '/gifts/open' && method === 'POST') {
@@ -1795,6 +1796,26 @@ export async function service(state, method, path, body, token, options = {}) {
     const result = rpsCash(p);
     logActivity(p, 'rps', `가위바위보 ${result.wins}연승 · ${result.paid}코인`);
     return { ...result, rps: rpsFor(state, p), points_balance: coinBalance(state, p) };
+  }
+  // V13.205 야바위(server/yabawi.mjs): 판 받기(새 판 bet · 더블 double · 하던 판 이어 보기) → 컵 고르기 또는 '동작 그만'(stop) → 받기.
+  if (path === '/yabawi/deal' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!p.yabawi?.live && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 야바위를 할 수 있어요.', 409);
+    const result = yabawiDeal(p, { bet: Number(body.bet), double: body.double === true }, coinBalance(state, p));
+    return { ...result, points_balance: coinBalance(state, p) };
+  }
+  if (path === '/yabawi/pick' && method === 'POST') {
+    requireRole(p, 'student');
+    const stop = body.stop == null ? null : Number(body.stop);
+    const result = yabawiPick(p, { slot: body.slot == null ? null : Number(body.slot), stop: Number.isInteger(stop) ? stop : null });
+    if (result.done) logActivity(p, 'yabawi', yabawiLine(result));
+    return { ...result, points_balance: coinBalance(state, p) };
+  }
+  if (path === '/yabawi/cash' && method === 'POST') {
+    requireRole(p, 'student');
+    const result = yabawiCash(p);
+    logActivity(p, 'yabawi', yabawiLine({ ...result, result: 'win' }));
+    return { ...result, points_balance: coinBalance(state, p) };
   }
   // V13.82 문법 증권거래소: prices of this hour, and an order at that price.
   if (path === '/market' && method === 'GET') {

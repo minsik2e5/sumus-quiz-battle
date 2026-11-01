@@ -56,6 +56,8 @@ export function rewardIncome(p) {
     + Number(p?.reel?.coins || 0) + Number(p?.hunt?.coins || 0)
     // V13.180: 인형뽑기 인형 코인 · 도감 완성 보너스.
     + Number(p?.claw?.coins || 0)
+    // V13.205: 야바위 받은 판돈(건 코인은 points_spent).
+    + Number(p?.yabawi?.paid || 0)
     // V13.182: 전설 펫이 이미 있어 전설 알 대신 받은 코인.
     + Number(p?.legend_egg?.coins || 0)
     // V13.201: 곤충 · 공룡 시리즈를 다 모은 보상(한 번).

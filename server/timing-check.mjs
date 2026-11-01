@@ -233,7 +233,7 @@ export async function runTimingChecks(assert) {
     assert(att.timing_play === true && att.timing.got.attend && att.timing.left === 3, 'V13.180 출석하면 10초 맞추기 한 판 더');
     assert(publicProfile(me).timing && !('live' in publicProfile(me).timing), 'V13.180 학생 기록은 작은 키 하나로 프로필에 실린다(진행 중인 판 없음)');
     const svc = source('./service.mjs');
-    assert(svc.includes("if (complete && student && answerRecords.length >= TIMING.MIN_PRACTICE) grantTimingPlay(student, 'practice', finalizedAt);") && svc.includes("'hunt', 'blank', 'timing'].filter(k => old[k])") && svc.includes("if (!res.again) logActivity(p, 'timing', timingLine(res), now);"),
+    assert(svc.includes("if (complete && student && answerRecords.length >= TIMING.MIN_PRACTICE) grantTimingPlay(student, 'practice', finalizedAt);") && /'hunt', 'blank', 'timing'(, '[a-z_]+')*\]\.filter\(k => old\[k\]\)/.test(svc) && svc.includes("if (!res.again) logActivity(p, 'timing', timingLine(res), now);"),
       'V13.180 끝까지 푼 연습(10문제 이상)도 한 판 더, 로그인 때 기록을 지키고, 끝날 때만 활동 기록');
     const routes = svc.slice(svc.indexOf("if (path === '/timing/ping'"), svc.indexOf("if (path === '/hunt/home'"));
     assert((routes.match(/requireRole\(p, 'student'\);/g) || []).length === 5 && (routes.match(/if \(path === '\/timing\//g) || []).length === 5 && (routes.match(/requireRole\(p, 'teacher'\);/g) || []).length === 2,

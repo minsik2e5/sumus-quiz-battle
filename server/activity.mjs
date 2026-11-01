@@ -26,6 +26,7 @@ export const ACTIVITY_MODES = {
   classfish: { label: '반 낚시', icon: '🐟' },
   attend: { label: '출석', icon: '📅' },
   rps: { label: '가위바위보', icon: '✌️' },
+  yabawi: { label: '야바위', icon: '🥤' },
   lucky: { label: '행운 뽑기', icon: '🎰' },
   market: { label: '증권거래소', icon: '📈' },
   // V13.195 알 상점의 곤충 · 공룡 시리즈 알(어떤 펫이 나왔는지).
