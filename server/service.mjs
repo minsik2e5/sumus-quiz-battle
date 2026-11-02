@@ -1828,8 +1828,8 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!marketOpen(state)) fail('문법 증권거래소는 준비 중이에요.', 404);
     if (!state.market?.seed) state.market = { ...newMarket(), ...(state.market || {}) };
     if (body.side === 'buy' && openBattleFor(state, p.id, Date.now())?.stake > 0) fail('대결이 끝난 뒤에 주식을 살 수 있어요.', 409);
-    const done = stockTrade(state, p, { key: str(body.key, 12), side: str(body.side, 8), qty: body.qty, price: body.price }, coinBalance(state, p));
-    logActivity(p, 'market', `증권거래소 ${str(body.side, 8) === 'buy' ? '매수' : '매도'}`);
+    const done = stockTrade(state, p, { key: str(body.key, 12), side: str(body.side, 8), coins: body.coins, all: body.all === true, price: body.price }, coinBalance(state, p));
+    logActivity(p, 'market', `증권거래소 ${done.side === 'buy' ? '넣기' : '빼기'} ${done.coins}코인`);
     const balance = coinBalance(state, p);
     return { trade: done, points_balance: balance, market: marketView(state, p, balance) };
   }
