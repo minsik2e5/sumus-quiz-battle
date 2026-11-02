@@ -1,12 +1,9 @@
-/* V13.206 놀이터 메뉴 · V13.208 위쪽 탭 4개(미니게임 · 코인 승부 · 상점 · 기록): 학습 탭 틀(study-tabs-v1368 · study-daily-v1371)을 그대로 쓰고 탭 수 · 남은 판 · 그림 자리만 더한다. */
-.pg-tabs{grid-template-columns:repeat(4,1fr)!important}
-.pg-tabs button{display:inline-flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;padding-inline:4px}
-.pg-tab-left{font-style:normal;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#dcfae6;color:#067647;font-size:11.5px;font-weight:900;line-height:20px;font-variant-numeric:tabular-nums}
-.pg-tabs button.selected .pg-tab-left{background:#12b886;color:#fff}
+/* V13.206 놀이터 메뉴: 학습 탭 틀(study-daily-v1371)을 그대로 쓰고 남은 판 · 그림 자리만 더한다. 큰 카드는 v13209.css. */
 .pg-today{width:100%;cursor:default!important;grid-template-columns:52px minmax(0,1fr)!important;gap:12px!important}
 .pg-today-ico{width:52px;height:52px;border-radius:16px;background:rgba(255,255,255,.2);display:grid;place-items:center;overflow:hidden}
 .pg-today-ico .pg-ico{width:46px;height:46px}
 .pg-today-tajja{background:linear-gradient(135deg,#e5484d,#a8101a)!important}
+.pg-today-all{background:linear-gradient(135deg,#12b886,#087f5b)!important}
 .pg-today-shop{background:linear-gradient(135deg,#7a5af8,#5925dc)!important}
 .pg-emoji{font-style:normal;font-size:30px;line-height:1}
 .pg-ico{width:100%;height:100%;object-fit:contain;border-radius:inherit}
@@ -19,11 +16,8 @@
 .pg-best li small{color:#667085;font-size:12px}
 .pg-best li strong{font-size:17px;font-variant-numeric:tabular-nums}
 @media(max-width:720px){
-  .pg-tabs button{font-size:13px;gap:3px}
-  .pg-tab-left{min-width:17px;height:17px;padding:0 4px;font-size:10.5px;line-height:17px}
   .pg-today{grid-template-columns:44px minmax(0,1fr)!important;gap:10px!important}
   .pg-today-ico{width:44px;height:44px;border-radius:13px}
   .pg-today-ico .pg-ico{width:40px;height:40px}
   .pg-emoji{font-size:24px}
 }
-@media(max-width:360px){.pg-tab-left{display:none}}

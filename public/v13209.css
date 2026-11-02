@@ -1,0 +1,32 @@
+/* V13.209 놀이터 큰 카드 4개(학습 탭 단어 학습 · 어법·어휘 카드와 같은 모양): 미니게임 초록 · 코인 승부 빨강 · 상점 주황 · 기록 보라, 증권거래소(열릴 때)는 가로 한 줄 파랑. */
+.pg-hub{margin-top:14px}
+.pg-hub .study-hub-card{min-height:150px!important}
+.pg-hub .study-hub-card:before{content:"";position:absolute;border-radius:999px}
+.pg-hub .pg-arcade:before{background:linear-gradient(145deg,#ecfdf3,#dcfae6)!important}
+.pg-hub .pg-tajja:before{background:linear-gradient(145deg,#fff1f0,#ffe4e1)!important}
+.pg-hub .pg-shop:before{background:linear-gradient(145deg,#fff6ed,#ffead5)!important}
+.pg-hub .pg-records:before{background:linear-gradient(145deg,#f4f3ff,#ebe9fe)!important}
+.pg-hub .pg-market:before{background:linear-gradient(145deg,#eff8ff,#e0f0fe)!important}
+.pg-hub .pg-arcade .study-hub-icon{background:#ecfdf3}
+.pg-hub .pg-tajja .study-hub-icon{background:#fff1f0}
+.pg-hub .pg-shop .study-hub-icon{background:#fff6ed}
+.pg-hub .pg-records .study-hub-icon{background:#f4f3ff}
+.pg-hub .pg-market .study-hub-icon{background:#eff8ff}
+.pg-hub .study-hub-icon{overflow:hidden}
+.pg-hub .pg-arcade .pill{background:#dcfae6;color:#067647}
+.pg-hub .pg-tajja .pill{background:#fee4e2;color:#b42318}
+.pg-hub .pg-shop .pill{background:#ffead5;color:#b93815}
+.pg-hub .pg-records .pill{background:#ebe9fe;color:#5925dc}
+.pg-hub .pg-market .pill{background:#d1e9ff;color:#175cd3}
+.pg-hub .pg-market{grid-column:1/-1;min-height:110px!important}
+.pg-hub .study-hub-card>div{position:relative;z-index:1;min-width:0}
+.pg-card-sub{display:block;margin-top:4px;color:#667085;font-size:13px;line-height:1.5;word-break:keep-all}
+.pg-card-left{display:inline-block;margin-top:6px;padding:2px 9px;border-radius:999px;background:#ecfdf3;color:#067647;font-style:normal;font-size:12px;font-weight:900}
+.pg-tajja .pg-card-left{background:#fee4e2;color:#b42318}
+.pg-shop .pg-card-left{background:#ffead5;color:#b93815}
+@media(max-width:720px){
+  .pg-hub .study-hub-card{min-height:112px!important;padding:16px!important;grid-template-columns:54px 1fr 34px!important;gap:14px!important}
+  .pg-hub .study-hub-icon{width:54px!important;height:54px!important;margin:0!important}
+  .pg-hub .pg-market{min-height:96px!important}
+  .pg-card-sub{font-size:12px}
+}
