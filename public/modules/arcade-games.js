@@ -8,7 +8,6 @@ import { uiArt, coin } from './emblems.js';
 import { matchTime } from './match-rules.js';
 import { rodOf } from './reel-rules.js';
 import { CLAW, clawOpen } from './claw-rules.js';
-import { ENTRY_ART } from './entry-art.js';
 
 export const GAME_WORDS_MIN = 8;
 const rangesKey = A => `sumus-yacha-ranges:${A.data.profile.id}`;
@@ -103,10 +102,10 @@ export function clawCard(A, art) {
   </article>`;
 }
 // V13.180 10초 맞추기: 그림 없이 코드로 그린 카드(빨간 LED 숫자판 + 입체 빨간 버튼). V13.210: 그림 63(timing/entry)이 들어오면 그 그림.
-export function timingCard(A) {
+export function timingCard(A, art) {
   const v = A.data.rewards?.timing || {}, best = v.best ?? null;
   return `<article class="ag-big ag-timing">
-    <div class="ag-big-art" aria-hidden="true">${ENTRY_ART.has('timing') ? '<img class="ag-big-bg" src="/assets/timing/entry.webp" alt="" draggable="false" decoding="async">' : '<span class="ag-big-bg ag-tm-bg"><span class="ag-tm-led"><b>10</b><i>:</i><b>00</b></span><span class="ag-tm-btn"><i></i></span></span>'}<span class="ag-big-title"><small>혼자 · 감각 게임</small><strong>10초 맞추기</strong><em>숫자가 사라지면 속으로 세어 딱 10초에 버튼! 딱 10.00이면 100코인</em></span></div>
+    <div class="ag-big-art" aria-hidden="true">${art?.entry?.has('timing') ? '<img class="ag-big-bg" src="/assets/timing/entry.webp" alt="" draggable="false" decoding="async">' : '<span class="ag-big-bg ag-tm-bg"><span class="ag-tm-led"><b>10</b><i>:</i><b>00</b></span><span class="ag-tm-btn"><i></i></span></span>'}<span class="ag-big-title"><small>혼자 · 감각 게임</small><strong>10초 맞추기</strong><em>숫자가 사라지면 속으로 세어 딱 10초에 버튼! 딱 10.00이면 100코인</em></span></div>
     <div class="ag-big-body">
       <ul class="ag-stats" aria-label="내 10초 맞추기">
         <li><i class="ag-ico">⏱</i><b>${v.left ?? 3}</b><small>오늘 판</small></li>
@@ -124,7 +123,7 @@ export function gamesSection(A, art) {
     ${matchCard(A, art)}
     ${huntCard(A, art)}
     ${clawCard(A, art)}
-    ${timingCard(A)}
+    ${timingCard(A, art)}
   </section>
   <h2 class="ag-head">상점 · 뽑기</h2>`;
 }

@@ -258,8 +258,8 @@ export async function runTimingChecks(assert) {
     const used = [...ui.matchAll(/sfx\('([a-z-]+)'/g)].map(m => m[1]);
     assert(used.every(k => SOUND_KEYS.includes(k)) && ['tm-count', 'tm-go', 'tm-hide', 'tm-tick', 'tm-press', 'tm-reveal', 'tm-perfect', 'tm-great', 'tm-good', 'tm-miss', 'tm-record'].every(k => SOUND_KEYS.includes(k) && used.includes(k) && source('../docs/sound/timing-synth.mjs').includes(`def('${k}'`))
       && ui.includes("const tickOn = () => readPref(TICK_KEY, 'on') === 'on';") && ui.includes('if (tickOn() && sec > 0)'), 'V13.180 소리 11개(docs/sound/timing-synth.mjs로 합성): 카운트다운 · 시작 · 숨김 · 째깍(설정으로 끔) · 버튼 · 공개 · 등급 · 기록 갱신');
-    assert(!/\.webp|\.png/.test(ui) && !/url\(\/assets/.test(css) && games.includes('export function timingCard(A)') && games.includes('${timingCard(A)}') && games.includes('data-action="timing-open"') && app.includes("if (d.action === 'timing-open')") && build.includes('"v13180.css"'),
-      'V13.180 그림 파일 없이 코드로 그리고, 놀이터 게임 카드 → 게임 화면으로 들어간다');
+    assert(!/\.webp|\.png/.test(ui) && !/url\(\/assets/.test(css) && games.includes('export function timingCard(A, art)') && games.includes('${timingCard(A, art)}') && games.includes('data-action="timing-open"') && app.includes("if (d.action === 'timing-open')") && build.includes('"v13180.css"'),
+      'V13.180 그림 파일 없이 코드로 그리고(V13.210부터 카드 입구 그림만 그림 63이 있으면 art.entry로), 놀이터 게임 카드 → 게임 화면으로 들어간다');
     const doc = source('../docs/timing-design.md');
     assert(['## 규칙', '## 등급과 보상', '## 하루 가치', '## 순위', '## 서버 판정', '## 연출 · 소리', '## 저장 키', '## 부정 방지와 한계'].every(h => doc.includes(h)) && doc.includes('100'), 'V13.180 docs/timing-design.md 구성안');
   }
