@@ -1,0 +1,21 @@
+/* V13.210 코인 승부 입구 카드(미니게임 카드와 같은 틀: 그림 + 제목 + 내 기록 3칸 + 들어가기) · 10초 맞추기 카드 배경 · 야바위 그림 안 잘리게 */
+.ag-timing{background:linear-gradient(180deg,#1a1d24,#07080b)}
+.ag-timing .ag-big-art::after{background:linear-gradient(180deg,rgba(7,8,11,0) 40%,rgba(7,8,11,.94) 100%)}
+.ag-rps{background:linear-gradient(180deg,#be185d,#581c87)}
+.ag-rps .ag-big-art::after{background:linear-gradient(180deg,rgba(88,28,135,0) 42%,rgba(88,28,135,.94) 100%)}
+.ag-yabawi{background:linear-gradient(180deg,#14532d,#0a0f0c)}
+.ag-yabawi .ag-big-art::after{background:linear-gradient(180deg,rgba(10,15,12,0) 45%,rgba(10,15,12,.94) 100%)}
+.ag-dots{position:absolute;z-index:2;top:12px;right:12px;background:rgba(0,0,0,.35)!important;backdrop-filter:blur(4px)}
+/* 가위바위보 그림(63-2)이 오기 전: 로봇 + 손 세 개를 코드로 놓는다 */
+.ag-rps-bg{background:radial-gradient(55% 75% at 72% 35%,rgba(255,214,90,.45),transparent 70%),linear-gradient(150deg,#ff7a59 0%,#e0457b 45%,#6d28d9 100%);overflow:hidden}
+.ag-rps-robot{position:absolute;right:6%;bottom:6%;height:78%;width:auto;object-fit:contain;filter:drop-shadow(0 12px 20px rgba(40,0,60,.45));animation:agRobot 3s ease-in-out infinite}
+.ag-rps-hand{position:absolute;top:calc(12% + var(--i) * 4%);right:calc(46% - var(--i) * 13%);width:15%;height:auto;object-fit:contain;filter:drop-shadow(0 8px 12px rgba(40,0,60,.4));animation:agHand 2.4s ease-in-out infinite;animation-delay:calc(var(--i) * -.8s)}
+@keyframes agRobot{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes agHand{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-8px) rotate(6deg)}}
+/* 야바위 카드 그림(card-hero 720×400): 얼굴이 위쪽에 있어 위를 기준으로 맞춘다 */
+.ag-yw-pic{object-position:center 22%}
+.ag-yw-bg{display:grid;place-items:center;background:radial-gradient(ellipse at 50% 100%,#1f5a34,#080d0a);font-size:54px}
+.ag-yw-bg i{font-style:normal}
+/* 야바위 게임 화면: 고정 높이 150px에 꽉 채우던 그림이 얼굴이 잘려서, 그림 비율(9:5)대로 보여 준다(넓은 화면은 360px까지, 얼굴 쪽 기준) */
+.has-card-hero .yw-card-stage{height:auto;aspect-ratio:9/5;max-height:360px;background-position:center 22%!important}
+@media (prefers-reduced-motion:reduce){.ag-rps-robot,.ag-rps-hand{animation:none}}
