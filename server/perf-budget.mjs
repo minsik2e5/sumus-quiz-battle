@@ -1,4 +1,4 @@
-// V13.211 렉 방지 예산(docs/performance-rules.md). 메인 상태 객체는 하나뿐이고 요청을 한 줄로 처리한다. 상태가 커지거나 요청마다
+// V13.212 렉 방지 예산(docs/performance-rules.md). 메인 상태 객체는 하나뿐이고 요청을 한 줄로 처리한다. 상태가 커지거나 요청마다
 // 하는 일이 늘면 모든 학생이 함께 느려진다. 그래서 상태의 묶음(맨 위 키)마다 크기 예산을 두고, /api/health가 넘은 묶음을 알려 준다
 // (state_budget). 새 묶음을 만들면 여기에 예산과 정리 방법을 적어야 검사(server/perf-rules-check.mjs)를 통과한다.
 //
@@ -64,7 +64,7 @@ export const VIEW_LIKE_POST_EXCEPTIONS = {
 // 화면이 서버에 자동으로 묻는 간격(setInterval 안에서 api 호출)의 하한(ms).
 export const POLL_MIN_MS = 3000;
 
-// V13.211 업그레이드 · 정리 알림(/api/health storage.upgrade). 선생님이나 AI가 health 하나만 보고 판단할 수 있게.
+// V13.212 업그레이드 · 정리 알림(/api/health storage.upgrade). 선생님이나 AI가 health 하나만 보고 판단할 수 있게.
 //   paid_upgrade: Cloudflare 유료(Workers Paid, 최소 월 5달러)를 검토할 때. 무료 쓰기 한도(하루 10만 줄)의 70%를 넘었다.
 //   fix_data: 업그레이드로는 안 풀리고 데이터 정리 규칙을 손봐야 할 때(상태 예산 초과 · 예산표에 없는 묶음).
 // Durable Objects 요청 수(하루 10만 건 무료 한도)는 이 객체 안에서 셀 수 없다: Cloudflare 대시보드에서 본다(docs/performance-rules.md).

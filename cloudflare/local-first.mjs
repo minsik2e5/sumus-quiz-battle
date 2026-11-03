@@ -399,7 +399,7 @@ export function createLocalRepository(storage, { log = console, now = () => Date
 //   voca_v12_state_commit, as before.
 // The mode is found by asking for the parts revision; a missing function (404) means
 // "full", checked again every 10 minutes so running the SQL needs no deploy.
-// V13.211 isBusy(): 학생 요청을 처리하는 중이면 true. 백업(조각 해시 · 업로드, 6시간마다 통째 사본 만들기)은 요청이 잠잠해질
+// V13.212 isBusy(): 학생 요청을 처리하는 중이면 true. 백업(조각 해시 · 업로드, 6시간마다 통째 사본 만들기)은 요청이 잠잠해질
 // 때까지 BUSY_RETRY_MS씩 미룬다. 다만 BUSY_DEFER_MAX_MS를 넘게는 미루지 않는다(대회처럼 요청이 끊이지 않아도 백업은 된다).
 export const SYNC_BUSY_RETRY_MS = 2000, SYNC_BUSY_DEFER_MAX_MS = 20000;
 export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, minIntervalMs = 0, fullEveryMs = 6 * 3600000, forceFull = false, isBusy = null, log = console }) {
@@ -638,7 +638,7 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
       last_sync_at: lastSyncAt || null,
       last_upload_kb: lastUploadKb,
       last_error: lastError,
-      // V13.211 요청이 몰려서 백업을 미룬 횟수(이 객체가 켜진 뒤).
+      // V13.212 요청이 몰려서 백업을 미룬 횟수(이 객체가 켜진 뒤).
       deferred_busy: deferred,
       full_copy_at: local.status().fullAt || null,
       // V13.99: last successful run (nothing left to upload) and the way the backup is stored:

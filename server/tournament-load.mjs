@@ -1,4 +1,4 @@
-// V13.211 야차 대회 렉 시험(check:load): 운영 크기(약 9MB) 상태를 실제 로컬 저장소(cloudflare/local-first.mjs, SQLite 모의 객체)에
+// V13.212 야차 대회 렉 시험(check:load): 운영 크기(약 9MB) 상태를 실제 로컬 저장소(cloudflare/local-first.mjs, SQLite 모의 객체)에
 // 두고, 대회 날처럼 한꺼번에 일어나는 일을 메인 상태 객체 하나에서 돌려 경로별 걸린 시간(p50 · p95 · max)을 잰다.
 //   - 대회 학생 32명: 16판을 열고(주인 · 손님 /tournament/play) 판이 끝나면 방이 결과를 보고한다(settleBattle).
 //     경기를 기다리는 동안은 놀이터를 한다(10초 맞추기 ping, 인형뽑기 · 사냥 · 낚시 첫 화면 = '보기'인 POST).

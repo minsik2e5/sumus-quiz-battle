@@ -162,7 +162,7 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     console.log(`[save-load] PASS · 정리 전 ${line(r.before)}`);
     console.log(`[save-load] PASS · 정리 후 ${line(r.after)} · 자동 정리 ${r.trim.runs}번 ${r.trim.ms}ms · 기록 ${r.trim.sessions}개 · ${r.trim.kb}KB`);
   });
-  // V13.211 야차 대회 날(운영 13.5MB 구성): 대회 32명 16판 + 기다리는 동안 놀이터 + 연습 8명 + 대진표 · 초대 확인.
+  // V13.212 야차 대회 날(운영 13.5MB 구성): 대회 32명 16판 + 기다리는 동안 놀이터 + 연습 8명 + 대진표 · 초대 확인.
   // 예전(v13.210, 같은 컴퓨터): 놀이터 보기 p95 약 0.9~1.2초 · ping p95 약 1.1초 · 대회 판 열기 p95 약 1.2초 · 결과 보고 p95 약 1.0초.
   const tournamentLoad = () => runTournamentLoad({ level: 'ok' }).then(r => {
     const p95 = key => r[key]?.p95 ?? Infinity;

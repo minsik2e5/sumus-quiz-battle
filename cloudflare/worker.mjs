@@ -395,7 +395,7 @@ export class VocaStateObject {
     return this.sizeCache.report;
   }
 
-  // V13.211 학생 요청을 처리하는 중(또는 1초 안에 끝남)이면 백업을 조금 미룬다(createSupabaseSync isBusy).
+  // V13.212 학생 요청을 처리하는 중(또는 1초 안에 끝남)이면 백업을 조금 미룬다(createSupabaseSync isBusy).
   busy() { return (this.inflight || 0) > 0 || Date.now() - (this.lastRequestAt || 0) < 1000; }
 
   rateLimit(bucket, max, windowMs, message) {
@@ -532,7 +532,7 @@ export class VocaStateObject {
       };
 
       const startedAt = Date.now();
-      // V13.211: 나머지 변경은 요청한 학생의 숙련도만 깊게 복사한다(tokenOwner). 바꾸는 것이 없는 POST는 GET처럼 읽는다.
+      // V13.212: 나머지 변경은 요청한 학생의 숙련도만 깊게 복사한다(tokenOwner). 바꾸는 것이 없는 POST는 GET처럼 읽는다.
       const result = request.method === 'GET' || isReadPost(request.method, url.pathname)
         ? await readState(this.mutations.current().state, execute)
         : isQuickWrite(request.method, url.pathname) ? await this.mutations.fast(execute, quickOwn(url.pathname), quickSettle)
@@ -594,7 +594,7 @@ export class VocaStateObject {
         result.server_write_warning = { pct: Math.round(writeStats.pct), defer: writeStats.level === 'defer', text: `오늘 서버 저장량이 많아요(${Math.round(writeStats.pct)}%)` };
       }
       if (url.pathname === '/api/health') result.storage = { mode: 'local-first', storage_format: this.local.format(), last_commit_rows: this.local.metrics.commitRows, supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.size || 0) / 1024), state_breakdown: this.sizeReport(), auto_trim: this.mutations.current().state.storageAutoTrim || null, frozen_retries: this.mutations.stats?.().frozen_retries ?? 0, mastery_retries: this.mutations.stats?.().mastery_retries ?? 0, views_kept: this.mutations.stats?.().views_kept ?? 0, supabase_deferred_busy: sync.deferred_busy ?? 0, state_budget: stateBudgetReport(this.sizeReport().keys_kb, Math.round((this.local.latest()?.size || 0) / 1024)) };
-      // V13.211 유료 업그레이드 · 데이터 정리가 필요한지 한 줄로(docs/performance-rules.md).
+      // V13.212 유료 업그레이드 · 데이터 정리가 필요한지 한 줄로(docs/performance-rules.md).
       if (url.pathname === '/api/health') result.storage.upgrade = upgradeAdvice({ writePct: writeStats.pct, budget: result.storage.state_budget });
       const responseHeaders = {
         // Visible in DevTools > Network > Timing, so slow saves can be measured on a real phone.

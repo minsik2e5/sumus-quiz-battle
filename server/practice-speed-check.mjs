@@ -18,7 +18,7 @@ export async function runPracticeSpeedChecks(assert) {
     'V13.157 빠른 길 복사: 지난 연습 기록 · 다른 학생 숙련도는 얕게, 그 학생 숙련도와 나머지는 깊게 복사해서 새 변경이 이전 상태를 바꾸지 않는다');
   const full = cloneState(s);
   // V13.168 지난 연습 기록(얼려 둔 기록)만 같이 쓰고 배열은 새로, 나머지는 전체를 깊게 복사한다.
-  // V13.211 숙련도도 학생 묶음째 얼려 같이 쓴다(묶음 객체만 새로). 얼린 묶음을 고치려 하면 deep(예전 복사)으로 다시 한다.
+  // V13.212 숙련도도 학생 묶음째 얼려 같이 쓴다(묶음 객체만 새로). 얼린 묶음을 고치려 하면 deep(예전 복사)으로 다시 한다.
   const deep = cloneState(s, null, { deep: true });
   assert(full.sessions !== s.sessions && full.sessions[0] === s.sessions[0] && full.mastery !== s.mastery && full.mastery.p2 === s.mastery.p2 && full.profiles[0] !== s.profiles[0]
     && deep.mastery.p2 !== s.mastery.p2 && deep.sessions[0] === s.sessions[0] && deep.profiles[0] !== s.profiles[0], 'V13.157 빠른 길이 아닌 변경은 지난 연습 기록 · 숙련도(얼림) 말고는 전체를 깊게 복사한다(다시 할 때는 숙련도까지)');

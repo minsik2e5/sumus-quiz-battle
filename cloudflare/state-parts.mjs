@@ -33,7 +33,7 @@ const listText = list => {
   return text;
 };
 
-// V13.211 학생 한 명의 숙련도(mastery) 묶음도 얼린다(server/mutation-coordinator.mjs FROZEN_MAPS): 얼린 묶음은 그때 만든 글을
+// V13.212 학생 한 명의 숙련도(mastery) 묶음도 얼린다(server/mutation-coordinator.mjs FROZEN_MAPS): 얼린 묶음은 그때 만든 글을
 // 그대로 쓴다(저장마다 44명 숙련도 2.4MB를 다시 글로 바꾸지 않게). 같은 글 객체를 local-first.mjs가 들고 있어서 사본은 생기지 않는다.
 const entryText = new WeakMap();
 const mapEntryText = entry => {

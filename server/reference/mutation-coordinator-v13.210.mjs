@@ -1,4 +1,4 @@
-// V13.211 검사 기준(server/save-equivalence-check.mjs): v13.210의 저장 줄(mutation-coordinator) 그대로. 고치지 않는다.
+// V13.212 검사 기준(server/save-equivalence-check.mjs): v13.210의 저장 줄(mutation-coordinator) 그대로. 고치지 않는다.
 export const NO_MUTATION = Symbol('no-mutation');
 
 function compactState(state) {

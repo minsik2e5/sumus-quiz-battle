@@ -30,7 +30,7 @@ export function deepFreeze(value) {
   return Object.freeze(value);
 }
 // 상태의 지난 연습 기록을 얼린다(이미 얼린 기록은 건너뛴다: 새 기록만 일한다).
-// V13.211 야차 대회 렉: 숙련도(mastery, 운영 13.5MB 중 2.35MB)도 학생 묶음마다 얼린다. 변경마다 학생 44명 숙련도를 통째로
+// V13.212 야차 대회 렉: 숙련도(mastery, 운영 13.5MB 중 2.35MB)도 학생 묶음마다 얼린다. 변경마다 학생 44명 숙련도를 통째로
 // 깊게 복사하느라(운영 크기에서 POST 하나에 약 80ms 중 대부분) 대회 · 놀이터가 몰리면 한 줄짜리 상태 객체가 밀렸다.
 // 이제 변경은 요청한 학생 묶음(own.mastery)만 복사하고 나머지 학생 묶음은 얼린 채 같이 쓴다. 다른 학생 숙련도를 고치는
 // 변경(선생님의 이의 재채점 등)은 얼린 묶음을 고치려다 TypeError가 나고, 예전처럼 숙련도까지 깊게 복사한 상태에서
@@ -78,17 +78,17 @@ export const quickOwn = pathname => state => {
   return { mastery: practice?.student_id ? [practice.student_id] : [] };
 };
 
-// V13.211 durable()이 깊게 복사할 숙련도 묶음: 로그인 세션(토큰 해시)의 학생 것만. 세션이 없으면(방 결과 보고 등) 빈 묶음.
+// V13.212 durable()이 깊게 복사할 숙련도 묶음: 로그인 세션(토큰 해시)의 학생 것만. 세션이 없으면(방 결과 보고 등) 빈 묶음.
 export const tokenUser = (state, tokenHash) => tokenHash ? (state?.tokens || []).find(item => item?.hash === tokenHash)?.user_id || null : null;
 export const tokenOwner = tokenHash => state => {
   const id = tokenUser(state, tokenHash);
   return { mastery: id ? [id] : [] };
 };
-// V13.211 아무것도 바꾸지 않는 POST(10초 맞추기 시간 맞추기 ping): 복사 · 저장 없이 GET처럼 읽기만 한다. 이 ping은 왕복
+// V13.212 아무것도 바꾸지 않는 POST(10초 맞추기 시간 맞추기 ping): 복사 · 저장 없이 GET처럼 읽기만 한다. 이 ping은 왕복
 // 시간을 재는데, 저장을 기다리면(0.25~6초) 잰 값이 틀어지고 저장 줄도 늘었다.
 export const READ_POSTS = new Set(['/api/timing/ping']);
 export const isReadPost = (method, pathname) => method === 'POST' && READ_POSTS.has(pathname);
-// V13.211 놀이터 첫 화면(인형뽑기 · 사냥)과 안내 확인(낚시 · 사냥): 요청한 학생 프로필만 바꿀 수 있는 POST. 먼저 그 학생 프로필
+// V13.212 놀이터 첫 화면(인형뽑기 · 사냥)과 안내 확인(낚시 · 사냥): 요청한 학생 프로필만 바꿀 수 있는 POST. 먼저 그 학생 프로필
 // 사본 하나로 해 보고(상태 복사 · 저장 없음), 프로필이 그대로면 그 답을 바로 준다. 바뀌었으면(새 사냥 지도, 처음 본 안내)
 // 예전처럼 저장 경로(durable)로 처음부터 다시 한다. 이 길이 다른 곳을 고치지 않는지는 server/yacha-lag-check.mjs가
 // 프로필 말고 모두 얼려서 확인한다.
@@ -143,7 +143,7 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
         output = await fn(nextState);
       } catch (error) {
         if (!isFrozenWrite(error)) throw error;
-        // V13.211 다른 학생의 얼린 숙련도를 고치려 했다: 숙련도까지 깊게 복사한 상태(v13.210과 같은 복사)에서 다시 한다.
+        // V13.212 다른 학생의 얼린 숙련도를 고치려 했다: 숙련도까지 깊게 복사한 상태(v13.210과 같은 복사)에서 다시 한다.
         masteryRetries += 1;
         nextState = cloneState(snapshot.state, null, { deep: true });
         try {
@@ -273,14 +273,14 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
     return result.output;
   }
 
-  // V13.211 own: 이 변경이 고칠 숙련도 묶음(요청한 학생, cloudflare/worker.mjs ownOf). 없으면 숙련도는 모두 얼린 채 같이 쓴다.
+  // V13.212 own: 이 변경이 고칠 숙련도 묶음(요청한 학생, cloudflare/worker.mjs ownOf). 없으면 숙련도는 모두 얼린 채 같이 쓴다.
   async function durable(fn, own = null) {
     const result = await applyMutation(fn, own);
     await persistThrough(result.version, result.generation);
     return result.output;
   }
 
-  // V13.211 보기 POST(VIEW_POSTS): 그 학생 프로필 사본에서 해 보고 그대로면 저장 없이 답한다. 아니면 durable로 다시.
+  // V13.212 보기 POST(VIEW_POSTS): 그 학생 프로필 사본에서 해 보고 그대로면 저장 없이 답한다. 아니면 durable로 다시.
   let viewsKept = 0;
   async function view(fn, userId, own = null) {
     if (needsRecovery || flushFailing || !userId) return durable(fn, own);

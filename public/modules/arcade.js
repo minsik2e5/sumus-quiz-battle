@@ -4,7 +4,7 @@ import { GACHA_ITEMS, GACHA_KEYS, GACHA_TIERS, GACHA_TIER_KEYS, GACHA_KINDS, own
 import { titleEmblem, coin, uiArt, artOr, ART_READY } from './emblems.js';
 import { TITLES } from './titles.js';
 import { titleState } from './titles-ui.js';
-import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, EGG_PRICE, EPIC_EGG_PRICE, seasonOnSale, seriesEggNew } from './core.js';
+import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, EGG_PRICE, EPIC_EGG_PRICE, SEASONS, seasonKeys, seasonOnSale, seasonsInEpic, seriesEggNew } from './core.js';
 import { luckyCard, luckyShow, machineSpin, machineDrop, unlockSound } from './lucky.js';
 import { rpsCard, rpsMatch } from './rps.js';
 import { yabawiCard, yabawiGame, yabawiOn } from './yabawi.js';
@@ -76,6 +76,8 @@ function eggSlot(A, kind) {
   const missing = (epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter(key => !has(key)).length;
   // V13.197: 못 만난 전설이 남아 있으면 영웅 알의 1% 전설 찬스가 있다(학생당 1마리 제한 없음).
   const legendsLeft = LEGENDARY_PET_KEYS.some(key => !has(key));
+  // V13.207 특별(영웅 한정) 기간에는 아직 없는 특별 펫이 영웅 결과에서 `rate`%로 나온다.
+  const special = epic ? seasonsInEpic().find(x => SEASONS[x.id].epic_only && seasonKeys(x.id).some(key => !has(key))) : null;
   const short = Math.max(0, price - Number(g.points_balance || 0));
   const art = epic ? artOr('epic-egg', '<span class="egg-slot-plain epic">★</span>') : uiArt('egg-shop');
   const label = !missing ? '모두 모았어요' : short ? `<span>${coin()}${num(price)}</span><small>${num(short)}코인 부족</small>` : `<span>${coin()}${num(price)}</span><small>사기</small>`;
@@ -85,6 +87,7 @@ function eggSlot(A, kind) {
     <b class="egg-slot-name">${epic ? '영웅 알' : '랜덤 알'}</b>
     <small class="egg-slot-sub">${missing ? `못 만난 친구 ${missing}마리` : (epic ? '영웅 펫을 다 모았어요' : '기본 펫을 다 모았어요')}</small>
     ${epic && missing && legendsLeft ? '<em class="egg-slot-legend">1% 전설 찬스</em>' : ''}
+    ${epic && missing && special ? `<em class="egg-slot-legend special">${SEASONS[special.id].mark || '★'} ${num(special.rate)}% ${esc(SEASONS[special.id].name)} 한정</em>` : ''}
     <button type="button" class="egg-slot-buy" data-action="egg-buy" data-egg="${kind}" ${!missing || short ? 'disabled' : ''} aria-label="${epic ? '영웅 알' : '랜덤 알'} ${num(price)}코인${short ? `, ${num(short)}코인 부족` : ''}">${label}</button>
   </div>`;
 }
