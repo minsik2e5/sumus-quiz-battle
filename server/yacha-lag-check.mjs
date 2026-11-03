@@ -13,6 +13,7 @@ import { createMutationCoordinator, cloneState, sealState, deepFreeze, tokenOwne
 import { partitionState, entryTextCached } from '../cloudflare/state-parts.mjs';
 import { createSupabaseSync, SYNC_BUSY_DEFER_MAX_MS } from '../cloudflare/local-first.mjs';
 import { prodLikeState } from './tournament-load.mjs';
+import { runSaveEquivalence } from './save-equivalence-check.mjs';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -119,6 +120,12 @@ export async function runYachaLagChecks(assert) {
     const partsAfter = time(() => partitionState(st));
     assert(after < before * 0.5, `V13.211 운영 크기(약 12MB) POST 하나의 상태 복사: 예전 ${before.toFixed(0)}ms → ${after.toFixed(0)}ms(절반 아래여야)`);
     assert(partsAfter < 60, `V13.211 저장 조각 만들기(얼린 기록 · 숙련도 글 재사용) ${partsAfter.toFixed(0)}ms`);
+  }
+  /* ---------- 8. 저장 결과가 예전과 같다(대회 중이 아닐 때도): 같은 요청 157개를 v13.210 저장 줄과 새 저장 줄로 ---------- */
+  {
+    const r = await runSaveEquivalence();
+    assert(r.requests > 150 && r.sameAnswers && r.sameSaved && r.sameFinal && r.stats.mastery_retries >= 1 && r.stats.views_kept >= 10 && r.stats.frozen_retries === 0,
+      `V13.211 출석 · 연습 · 이의 신청 · 선생님 재채점(다른 학생 숙련도) · 놀이터 · 대회 · 홈을 예전 저장 줄과 새 저장 줄로 해도 모든 답 · 저장된 상태가 똑같다 ${JSON.stringify(r.firstDiff || r.finalDiff || '')}`);
   }
   await sleep(0);
 }

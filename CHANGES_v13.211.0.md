@@ -20,5 +20,8 @@
 ## 검사
 - `server/yacha-lag-check.mjs`(npm run check): 복사 범위(연습 기록 · 다른 학생 숙련도 없음), 다시 하기 결과 같음, 보기 요청 경로,
   보기 POST가 그 학생 프로필 말고 고치지 않음(나머지 얼려서 실제 서비스로), 백업 미루기, 운영 크기 복사 비용.
+- `server/save-equivalence-check.mjs`(npm run check, yacha-lag-check 8번): 출석 · 연습 · 이의 신청 · 선생님 재채점(다른 학생 숙련도) ·
+  놀이터 · 대회 · 홈 요청 157개를 v13.210 저장 줄(`server/reference/mutation-coordinator-v13.210.mjs`)과 새 저장 줄로 똑같이 돌려
+  모든 답 · 저장된 상태 · 마지막 상태가 한 글자도 같은지 본다(난수 · 시계 고정).
 - `server/tournament-load.mjs`(npm run check:load): 대회 + 놀이터 시뮬레이션 경로별 p95 상한.
 - 바뀐 동작에 맞춰 `practice-speed-check.mjs` · `stability-168-check.mjs` 검사 문구를 고쳤다.
