@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, EPIC_PET_KEYS, STANDARD_PET_KEYS, EPIC_EGG_LEGENDARY_RATE, SEASONS, seasonKeys, seasonsOver, LEGEND_EGG_EPIC_NEED, LEGEND_EGG_PRICE, LEGEND_EGG_COINS, CHARACTERS, SERIES_EGG, SERIES_PET_KEYS, seriesGroupKeys, SERIES_DONE_COINS } from '../public/modules/core.js';
+import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, EPIC_PET_KEYS, STANDARD_PET_KEYS, EPIC_EGG_LEGENDARY_RATE, SEASONS, seasonKeys, seasonsInEpic, LEGEND_EGG_EPIC_NEED, LEGEND_EGG_PRICE, LEGEND_EGG_COINS, CHARACTERS, SERIES_EGG, SERIES_PET_KEYS, seriesGroupKeys, SERIES_DONE_COINS } from '../public/modules/core.js';
 import {
   ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, MYTHIC_RATE, drawLucky,
   BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_MAX, giftAmountOk, GIFT_NOTE_MAX, GIFT_LOG_KEEP, GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS,
@@ -327,11 +327,15 @@ export function pullLucky(p, bet, balance, { ticket = false, random = secureRand
 /* ---------- V13.109 시즌 한정 펫 ---------- */
 // After its season a limited pet hides in 영웅 eggs: a 영웅 result (영웅 알, or the 영웅 egg of a coin
 // capsule) is a limited pet the student does not have yet `after_rate`% of the time.
+// V13.207: 특별(영웅 한정) 시즌은 파는 알 없이 기간 중에도 `rate`%로 나온다(seasonsInEpic). 시즌마다 따로 굴린다(앞 시즌부터).
 export function limitedFromEpic(p, random = secureRandom, now = Date.now()) {
   const has = key => (p.pets || []).some(pet => pet.key === key);
-  const left = seasonsOver(now).flatMap(id => seasonKeys(id).filter(key => !has(key)).map(key => ({ key, rate: SEASONS[id].after_rate })));
-  if (!left.length || !(random() * 100 < left[0].rate)) return null;
-  return left[Math.min(left.length - 1, Math.floor(random() * left.length))].key;
+  for (const { id, rate } of seasonsInEpic(now)) {
+    const left = seasonKeys(id).filter(key => !has(key));
+    if (!left.length) continue;
+    if (random() * 100 < rate) return left[Math.min(left.length - 1, Math.floor(random() * left.length))];
+  }
+  return null;
 }
 
 /* ---------- 알 상점 ---------- */
