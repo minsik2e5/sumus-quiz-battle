@@ -6,7 +6,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { emptyState } from './state.mjs';
-import { STATE_BUDGET_KB, STATE_TOTAL_BUDGET_KB, stateBudgetReport, VIEW_LIKE_POST, VIEW_LIKE_POST_EXCEPTIONS, POLL_MIN_MS } from './perf-budget.mjs';
+import { STATE_BUDGET_KB, STATE_TOTAL_BUDGET_KB, stateBudgetReport, upgradeAdvice, VIEW_LIKE_POST, VIEW_LIKE_POST_EXCEPTIONS, POLL_MIN_MS } from './perf-budget.mjs';
 import { READ_POSTS, VIEW_POSTS } from './mutation-coordinator.mjs';
 import { prodLikeState } from './tournament-load.mjs';
 
@@ -52,7 +52,16 @@ export async function runPerfRulesChecks(assert, finalKeys = []) {
   assert(!fast.length, `V13.211 화면이 서버에 자동으로 묻는 간격은 ${POLL_MIN_MS / 1000}초 이상: ${fast.join(', ')}`);
   assert(pollIntervals('setInterval(async () => { await api("/x"); }, 1000)')[0].ms === 1000 && pollIntervals('setInterval(async () => { await api("/x"); }, 1000)')[0].api, 'V13.211 간격 찾기 자체 시험');
 
-  // 4. 규칙 문서와 작업 메모.
+  // 4. 업그레이드 · 정리 알림.
+  const calm = upgradeAdvice({ writePct: 1.2, budget: report }), busy = upgradeAdvice({ writePct: 72, budget: bad });
+  assert(!calm.paid_upgrade && !calm.fix_data && !calm.reasons.length && busy.paid_upgrade && busy.fix_data && busy.reasons.length === 2 && busy.reasons[0].includes('유료 업그레이드') && busy.reasons[1].includes('업그레이드로는 안 풀려요'),
+    'V13.211 /api/health storage.upgrade: 오늘 저장량 70% 이상이면 유료 업그레이드, 데이터 예산 초과면 정리가 필요하다고 알려 준다(평소에는 조용)');
+  assert(source('../cloudflare/worker.mjs').includes('result.storage.upgrade = upgradeAdvice({ writePct: writeStats.pct, budget: result.storage.state_budget })')
+    && source('../public/modules/teacher.js').includes('일주일에 한 번 넘게 뜨면 Cloudflare 유료 업그레이드'), 'V13.211 health와 선생님 저장량 경고에 업그레이드 안내가 있다');
+
+  // 5. 규칙 문서와 작업 메모.
+  const memoNow = source('../CLAUDE.md');
+  assert(memoNow.includes('렉 방지 · 업그레이드 점검(작업할 때마다 계속)') && memoNow.includes('"렉 방지 점검" 칸') && memoNow.includes('storage.upgrade'), 'V13.211 작업 메모(CLAUDE.md)에 PR마다 렉 방지 점검 · 업그레이드 알림 규칙이 있다');
   const rules = source('../docs/performance-rules.md'), memo = source('../CLAUDE.md');
   assert(rules.includes('렉 방지 규칙') && memo.includes('docs/performance-rules.md'), 'V13.211 렉 방지 규칙 문서가 있고 작업 메모(CLAUDE.md)가 가리킨다');
 }

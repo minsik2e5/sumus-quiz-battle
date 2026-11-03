@@ -63,3 +63,17 @@ export const VIEW_LIKE_POST_EXCEPTIONS = {
 
 // 화면이 서버에 자동으로 묻는 간격(setInterval 안에서 api 호출)의 하한(ms).
 export const POLL_MIN_MS = 3000;
+
+// V13.211 업그레이드 · 정리 알림(/api/health storage.upgrade). 선생님이나 AI가 health 하나만 보고 판단할 수 있게.
+//   paid_upgrade: Cloudflare 유료(Workers Paid, 최소 월 5달러)를 검토할 때. 무료 쓰기 한도(하루 10만 줄)의 70%를 넘었다.
+//   fix_data: 업그레이드로는 안 풀리고 데이터 정리 규칙을 손봐야 할 때(상태 예산 초과 · 예산표에 없는 묶음).
+// Durable Objects 요청 수(하루 10만 건 무료 한도)는 이 객체 안에서 셀 수 없다: Cloudflare 대시보드에서 본다(docs/performance-rules.md).
+export const UPGRADE_WRITE_PCT = 70;
+export function upgradeAdvice({ writePct = 0, budget = null } = {}) {
+  const reasons = [];
+  const paid = Number(writePct) >= UPGRADE_WRITE_PCT;
+  if (paid) reasons.push(`오늘 저장량이 무료 한도의 ${Math.round(Number(writePct))}%예요. 이런 날이 일주일에 한 번 넘게 생기면 Cloudflare 유료 업그레이드(최소 월 5달러)를 하세요.`);
+  const fix = !!budget && !budget.ok;
+  if (fix) reasons.push(`데이터 예산을 넘었어요(${[...(budget.over || []).map(x => `${x.key} ${Math.round(x.kb)}/${x.budget}KB`), ...(budget.unknown || []).map(k => `${k}(예산 없음)`), budget.total_kb > budget.total_budget_kb ? `전체 ${budget.total_kb}/${budget.total_budget_kb}KB` : ''].filter(Boolean).join(', ')}). 업그레이드로는 안 풀려요: 정리 규칙을 손봐야 해요.`);
+  return { paid_upgrade: paid, fix_data: fix, reasons };
+}

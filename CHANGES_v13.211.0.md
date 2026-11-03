@@ -16,6 +16,10 @@
 ## 렉 방지 규칙(앞으로 기능이 늘어도)
 - `docs/performance-rules.md`: 기능 만들 때 지킬 것 8가지, 운영에서 볼 숫자, 업그레이드 시점, 동시 접속 측정표(40 · 80 · 120 · 180명).
 - `CLAUDE.md`에 규칙 요약을 넣었다.
+- 계속 지키기: `CLAUDE.md`에 "렉 방지 · 업그레이드 점검" 규칙. 새 기능 PR마다 "렉 방지 점검" 칸(지킨 규칙 · 새 데이터 묶음 예산 · check:load 숫자),
+  운영 숫자가 나오면 유료 업그레이드 · 데이터 정리가 필요한지 먼저 말한다.
+- `/api/health`의 `storage.upgrade`: `paid_upgrade`(오늘 저장량 70% 이상) · `fix_data`(데이터 예산 초과) · `reasons`(할 일, 한국어).
+- 선생님 화면의 '오늘 서버 저장량이 많아요' 안내에 "일주일에 한 번 넘게 뜨면 유료 업그레이드(월 5달러~)"를 덧붙였다.
 - `server/perf-budget.mjs`: 상태 묶음마다 크기 예산. `/api/health`의 `storage.state_budget`가 넘은 묶음과 예산표에 없는 묶음을 알려 준다.
 - `server/perf-rules-check.mjs`(npm run check): 묶음이 모두 예산표에 있는지, 보기 같은 이름의 POST가 읽기 · 보기 경로에 등록됐는지,
   화면 자동 새로고침 간격이 3초 이상인지 본다.
