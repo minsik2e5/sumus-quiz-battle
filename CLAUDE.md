@@ -14,6 +14,22 @@
 - 답변, PR 설명, 변경 기록은 한국어로 쓴다. 버전을 올리면 루트에 `CHANGES_v<버전>.md`를 남긴다.
 - 바뀐 규칙마다 `server/*-check.mjs`에 검사를 남긴다. `npm run check`와 `npm run check:cloudflare`가 통과해야 한다.
 - 선생님이 "퀄리티 높게"라고 한 화면·연출·이펙트는 줄이지 않는다.
+- **렉 방지 규칙(docs/performance-rules.md)을 지킨다.** 메인 상태 객체는 하나뿐이라 요청 하나가 무거우면 모두 느려진다.
+  - 보기는 GET(꼭 POST면 READ_POSTS · VIEW_POSTS에 등록).
+  - 새 데이터 묶음은 server/perf-budget.mjs에 예산과 정리 방법을 적는다. 끝없이 쌓이는 목록은 만들지 않는다.
+  - 전체 학생을 훑는 계산은 쓰기 요청 안에서 하지 않는다. 자동 새로고침 간격은 3초 이상이다.
+  - `npm run check:load` 상한을 올리지 않는다.
+- **렉 방지 · 업그레이드 점검(작업할 때마다 계속).**
+  - 새 기능 PR 설명에는 "렉 방지 점검" 칸을 꼭 넣는다.
+    - docs/performance-rules.md의 8가지 중 이번 PR에 해당하는 것과 지킨 방법을 적는다.
+    - 새로 만든 데이터 묶음과 그 예산을 적는다.
+    - `npm run check:load`의 대회 + 놀이터 p95 숫자를 적는다.
+  - 규칙을 지키기 어려운 기능이면 만들기 전에 선생님께 먼저 말하고 다른 방법을 제안한다.
+  - 선생님이 `/api/health`를 보내 주거나 운영 숫자가 대화에 나오면 `storage.upgrade`를 본다.
+    - `paid_upgrade`가 true면 유료 업그레이드가 필요할 수 있다고 먼저 말한다.
+    - `fix_data`가 true면 정리 규칙을 손봐야 한다고 먼저 말한다.
+    - 기준은 docs/performance-rules.md의 "언제 업그레이드하나"를 따른다.
+  - 동시에 활동하는 학생이 80명을 넘을 것 같다는 말이 나오면 다시 재 보자고 먼저 제안한다.
 - 전설 · 신화 · 한정 펫에도 야차전 특기가 있다. 세기는 기본 ≈ 영웅 < 전설(+약 6%) < 신화(+약 6%), 한정은 기본 정도(docs/pet-skills-balance.md, server/pet-sim.mjs로 승률 확인).
 - 그림 주문서(docs/asset-requests/runner)에는 두 가지를 꼭 넣는다.
   - Drive의 기존 그림을 열어 그림체를 맞추라는 말

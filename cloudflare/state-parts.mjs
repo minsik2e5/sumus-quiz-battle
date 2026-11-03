@@ -33,6 +33,17 @@ const listText = list => {
   return text;
 };
 
+// V13.212 학생 한 명의 숙련도(mastery) 묶음도 얼린다(server/mutation-coordinator.mjs FROZEN_MAPS): 얼린 묶음은 그때 만든 글을
+// 그대로 쓴다(저장마다 44명 숙련도 2.4MB를 다시 글로 바꾸지 않게). 같은 글 객체를 local-first.mjs가 들고 있어서 사본은 생기지 않는다.
+const entryText = new WeakMap();
+const mapEntryText = entry => {
+  if (!entry || typeof entry !== 'object' || !Object.isFrozen(entry)) return JSON.stringify(entry);
+  let text = entryText.get(entry);
+  if (text === undefined) { text = JSON.stringify(entry); entryText.set(entry, text); }
+  return text;
+};
+export const entryTextCached = entry => entryText.has(entry);
+
 // 검사용(server/stability-168-check.mjs): 이 기록에 붙은 묶음 글이 있는지.
 export const groupTextCached = item => groupText.has(item);
 
@@ -56,7 +67,7 @@ export function partitionState(state) {
       for (const [sid, items] of groups) parts.set(`a:${key}:${sid}`, listText(items));
     } else if (BY_STUDENT_MAPS.has(key) && isMap(value)) {
       put(`o:${key}`, Object.keys(value));
-      for (const [sid, entry] of Object.entries(value)) put(`m:${key}:${sid}`, entry);
+      for (const [sid, entry] of Object.entries(value)) if (entry !== undefined) parts.set(`m:${key}:${sid}`, mapEntryText(entry));
     } else {
       put(`k:${key}`, value);
     }

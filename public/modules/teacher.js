@@ -239,7 +239,7 @@ function examPanel(d) {
 export function serverWriteWarning(d) {
   const w = d?.server_write_warning;
   if (!w?.text) return '';
-  return `<div class="server-write-warning-v13144${w.defer ? ' defer' : ''}" role="status"><b>${esc(w.text)}</b><small>${w.defer ? '급하지 않은 정리는 내일로 미뤄요. 한국 시간 오전 9시에 다시 풀려요.' : '학생들의 저장은 그대로 돼요. 한국 시간 오전 9시에 다시 0부터 세요.'}</small></div>`;
+  return `<div class="server-write-warning-v13144${w.defer ? ' defer' : ''}" role="status"><b>${esc(w.text)}</b><small>${w.defer ? '급하지 않은 정리는 내일로 미뤄요. 한국 시간 오전 9시에 다시 풀려요.' : '학생들의 저장은 그대로 돼요. 한국 시간 오전 9시에 다시 0부터 세요. 이 안내가 일주일에 한 번 넘게 뜨면 Cloudflare 유료 업그레이드(월 5달러~)를 하세요.'}</small></div>`;
 }
 function dashboard(A) {
   const d = A.data;

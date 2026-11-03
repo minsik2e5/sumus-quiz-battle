@@ -30,16 +30,25 @@ export function deepFreeze(value) {
   return Object.freeze(value);
 }
 // 상태의 지난 연습 기록을 얼린다(이미 얼린 기록은 건너뛴다: 새 기록만 일한다).
+// V13.212 야차 대회 렉: 숙련도(mastery, 운영 13.5MB 중 2.35MB)도 학생 묶음마다 얼린다. 변경마다 학생 44명 숙련도를 통째로
+// 깊게 복사하느라(운영 크기에서 POST 하나에 약 80ms 중 대부분) 대회 · 놀이터가 몰리면 한 줄짜리 상태 객체가 밀렸다.
+// 이제 변경은 요청한 학생 묶음(own.mastery)만 복사하고 나머지 학생 묶음은 얼린 채 같이 쓴다. 다른 학생 숙련도를 고치는
+// 변경(선생님의 이의 재채점 등)은 얼린 묶음을 고치려다 TypeError가 나고, 예전처럼 숙련도까지 깊게 복사한 상태에서
+// 처음부터 다시 한다(applyMutation). 그래서 놓친 곳이 있어도 결과는 예전과 같다.
+export const FROZEN_MAPS = ['mastery'];
 export function sealState(state) {
   for (const key of FROZEN_KEYS) if (Array.isArray(state?.[key])) for (const item of state[key]) deepFreeze(item);
+  for (const key of FROZEN_MAPS) { const map = state?.[key]; if (map && typeof map === 'object' && !Array.isArray(map)) for (const id of Object.keys(map)) deepFreeze(map[id]); }
   return state;
 }
 // 얼린 객체를 고치려 해서 난 오류인지.
 export const isFrozenWrite = error => error instanceof TypeError && /read[- ]only|not extensible|Cannot delete property|Cannot define property|frozen/i.test(String(error.message));
 
-export function cloneState(state, own = null) {
+// own: { mastery: [학생 id] } 깊게 복사할 숙련도 묶음. deep: true면 V13.168처럼 숙련도까지 깊게 복사한다(얼린 묶음을 고치려 한
+// 변경을 다시 할 때).
+export function cloneState(state, own = null, { deep = false } = {}) {
   if (!state || typeof state !== 'object') return structuredClone(state);
-  const shared = own ? SHALLOW_KEYS : FROZEN_KEYS;
+  const shared = deep ? FROZEN_KEYS : SHALLOW_KEYS;
   const rest = {}, shallow = {};
   for (const [key, value] of Object.entries(state)) (shared.includes(key) ? shallow : rest)[key] = value;
   const next = structuredClone(rest);
@@ -68,6 +77,23 @@ export const quickOwn = pathname => state => {
   const practice = (state?.practices || []).find(item => item?.id === id);
   return { mastery: practice?.student_id ? [practice.student_id] : [] };
 };
+
+// V13.212 durable()이 깊게 복사할 숙련도 묶음: 로그인 세션(토큰 해시)의 학생 것만. 세션이 없으면(방 결과 보고 등) 빈 묶음.
+export const tokenUser = (state, tokenHash) => tokenHash ? (state?.tokens || []).find(item => item?.hash === tokenHash)?.user_id || null : null;
+export const tokenOwner = tokenHash => state => {
+  const id = tokenUser(state, tokenHash);
+  return { mastery: id ? [id] : [] };
+};
+// V13.212 아무것도 바꾸지 않는 POST(10초 맞추기 시간 맞추기 ping): 복사 · 저장 없이 GET처럼 읽기만 한다. 이 ping은 왕복
+// 시간을 재는데, 저장을 기다리면(0.25~6초) 잰 값이 틀어지고 저장 줄도 늘었다.
+export const READ_POSTS = new Set(['/api/timing/ping']);
+export const isReadPost = (method, pathname) => method === 'POST' && READ_POSTS.has(pathname);
+// V13.212 놀이터 첫 화면(인형뽑기 · 사냥)과 안내 확인(낚시 · 사냥): 요청한 학생 프로필만 바꿀 수 있는 POST. 먼저 그 학생 프로필
+// 사본 하나로 해 보고(상태 복사 · 저장 없음), 프로필이 그대로면 그 답을 바로 준다. 바뀌었으면(새 사냥 지도, 처음 본 안내)
+// 예전처럼 저장 경로(durable)로 처음부터 다시 한다. 이 길이 다른 곳을 고치지 않는지는 server/yacha-lag-check.mjs가
+// 프로필 말고 모두 얼려서 확인한다.
+export const VIEW_POSTS = new Set(['/api/claw/home', '/api/hunt/home', '/api/reel/guide', '/api/hunt/guide']);
+export const isViewPost = (method, pathname) => method === 'POST' && VIEW_POSTS.has(pathname);
 
 export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   // V13.168 숫자 또는 함수(쓰기 한도가 넉넉한 날은 짧게: cloudflare/worker.mjs).
@@ -98,6 +124,7 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   let lastFailure = null;
   let flushFailing = false;
   let frozenRetries = 0;
+  let masteryRetries = 0;
 
   const unavailable = () => lastFailure || Object.assign(Error('저장 서버에 연결하지 못했습니다.'), { status: 503 });
 
@@ -116,10 +143,18 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
         output = await fn(nextState);
       } catch (error) {
         if (!isFrozenWrite(error)) throw error;
-        // V13.168 얼린 기록을 고치려 했다: 전체를 깊게 복사한 상태에서 처음부터 다시 한다(예전과 같은 결과).
-        frozenRetries += 1;
-        nextState = structuredClone(snapshot.state);
-        output = await fn(nextState);
+        // V13.212 다른 학생의 얼린 숙련도를 고치려 했다: 숙련도까지 깊게 복사한 상태(v13.210과 같은 복사)에서 다시 한다.
+        masteryRetries += 1;
+        nextState = cloneState(snapshot.state, null, { deep: true });
+        try {
+          output = await fn(nextState);
+        } catch (again) {
+          if (!isFrozenWrite(again)) throw again;
+          // V13.168 얼린 기록을 고치려 했다: 전체를 깊게 복사한 상태에서 처음부터 다시 한다(예전과 같은 결과).
+          frozenRetries += 1;
+          nextState = structuredClone(snapshot.state);
+          output = await fn(nextState);
+        }
       }
       compactState(nextState);
       sealState(nextState);
@@ -228,7 +263,7 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   // V13.157: 뒤에서 하는 저장이 실패하고 있으면 빠른 길을 쓰지 않는다(저장됐다고 답한 뒤 잃지 않게, 저장이 끝난 뒤 답한다).
   // settle(답)이 true면(연습이 끝나 코인 · 경험치를 줌) 저장이 끝난 뒤 답한다.
   async function fast(fn, own = null, settle = null) {
-    if (flushFailing || needsRecovery) return durable(fn);
+    if (flushFailing || needsRecovery) return durable(fn, own);
     const result = await applyMutation(fn, own);
     if (result.changed && settle?.(result.output)) {
       await persistThrough(result.version, result.generation);
@@ -238,10 +273,32 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
     return result.output;
   }
 
-  async function durable(fn) {
-    const result = await applyMutation(fn);
+  // V13.212 own: 이 변경이 고칠 숙련도 묶음(요청한 학생, cloudflare/worker.mjs ownOf). 없으면 숙련도는 모두 얼린 채 같이 쓴다.
+  async function durable(fn, own = null) {
+    const result = await applyMutation(fn, own);
     await persistThrough(result.version, result.generation);
     return result.output;
+  }
+
+  // V13.212 보기 POST(VIEW_POSTS): 그 학생 프로필 사본에서 해 보고 그대로면 저장 없이 답한다. 아니면 durable로 다시.
+  let viewsKept = 0;
+  async function view(fn, userId, own = null) {
+    if (needsRecovery || flushFailing || !userId) return durable(fn, own);
+    const base = snapshot.state;
+    const index = Array.isArray(base?.profiles) ? base.profiles.findIndex(item => item?.id === userId) : -1;
+    if (index < 0) return durable(fn, own);
+    const before = JSON.stringify(base.profiles[index]);
+    const trial = { ...base, profiles: base.profiles.slice() };
+    trial.profiles[index] = JSON.parse(before);
+    let output;
+    try { output = await fn(trial); }
+    catch (error) { if (isFrozenWrite(error)) return durable(fn, own); throw error; }
+    const same = trial.profiles.length === base.profiles.length && trial.profiles.every((item, i) => i === index || item === base.profiles[i])
+      && Object.keys(trial).length === Object.keys(base).length && Object.keys(base).every(key => key === 'profiles' || trial[key] === base[key])
+      && JSON.stringify(trial.profiles[index]) === before;
+    if (!same || output === NO_MUTATION) return durable(fn, own);
+    viewsKept += 1;
+    return output;
   }
 
   async function flush() {
@@ -273,12 +330,13 @@ export function createMutationCoordinator(repo, initialSnapshot, options = {}) {
   return {
     fast,
     durable,
+    view,
     flush,
     replace,
     close,
     recover,
     // V13.168 얼린 기록을 고치려 해서 처음부터 다시 한 변경 수(/api/health).
-    stats: () => ({ frozen_retries: frozenRetries }),
+    stats: () => ({ frozen_retries: frozenRetries, mastery_retries: masteryRetries, views_kept: viewsKept }),
     current: () => {
       if (needsRecovery) throw unavailable();
       return snapshot;

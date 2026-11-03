@@ -14,10 +14,11 @@ import { selfSignup, checkSignupCode, signupCodeGuard } from '../server/signup.m
 import { examAdmin } from '../server/exam-admin.mjs';
 import { migrateState, stateSizeReport } from '../server/state.mjs';
 import { hashToken } from '../server/auth.mjs';
-import { createMutationCoordinator, NO_MUTATION, isQuickWrite, quickOwn, quickSettle, readState } from '../server/mutation-coordinator.mjs';
+import { createMutationCoordinator, NO_MUTATION, isQuickWrite, quickOwn, quickSettle, readState, isReadPost, isViewPost, tokenUser, tokenOwner } from '../server/mutation-coordinator.mjs';
 import { createLocalRepository, createSupabaseSync } from './local-first.mjs';
 import { partitionState, assembleState, hashText } from './state-parts.mjs';
 import { WRITE_WARN_PCT } from './cf-limits.mjs';
+import { stateBudgetReport, upgradeAdvice } from '../server/perf-budget.mjs';
 import { testSeedState, applyTestSeed } from '../server/test-seed.mjs';
 
 // V13.144 쓰기 모으기: 저장이 연달아 오면 이 시간(ms) 안에 온 변경을 한 번에 쓴다. V13.168: 70%를 넘으면 이 값,
@@ -225,7 +226,7 @@ export class VocaStateObject {
       if (this.local.migrationError()) this.bootWarning = `옛 저장 방식으로 읽었어요(옮기기 실패): ${this.local.migrationError()}`.slice(0, 300);
       const syncInterval = Number(env.SUPABASE_SYNC_MIN_INTERVAL_MS ?? SYNC_MIN_INTERVAL_MS);
       // V13.144: 오늘 쓴 양이 90%를 넘으면 백업 간격을 5배로(백업도 줄을 쓴다).
-      this.sync = createSupabaseSync({ local: this.local, supabase: this.supabase, storage: ctx.storage, minIntervalMs: () => this.writeLevel() === 'defer' ? syncInterval * 5 : syncInterval, forceFull: env.SUPABASE_BACKUP_MODE === 'full' });
+      this.sync = createSupabaseSync({ local: this.local, supabase: this.supabase, storage: ctx.storage, isBusy: () => this.busy(), minIntervalMs: () => this.writeLevel() === 'defer' ? syncInterval * 5 : syncInterval, forceFull: env.SUPABASE_BACKUP_MODE === 'full' });
       const initial = await this.loadInitialState();
       // V13.144: 시작 정리(migrateState · sweep)와 시작 저장이 실패해도 서버는 켠다. 예전에는 여기서 던지면 상태 객체가
       // 리셋되고 다음 요청에서 또 던져 모든 요청이 1101이 됐다(2026-10-12, 쓰기 한도 초과로 시작 저장이 실패).
@@ -394,6 +395,9 @@ export class VocaStateObject {
     return this.sizeCache.report;
   }
 
+  // V13.212 학생 요청을 처리하는 중(또는 1초 안에 끝남)이면 백업을 조금 미룬다(createSupabaseSync isBusy).
+  busy() { return (this.inflight || 0) > 0 || Date.now() - (this.lastRequestAt || 0) < 1000; }
+
   rateLimit(bucket, max, windowMs, message) {
     const list = (this.rates.get(bucket) || []).filter(time => time > Date.now() - windowMs);
     if (list.length >= max) throw Object.assign(Error(message), { status: 429 });
@@ -402,6 +406,12 @@ export class VocaStateObject {
   }
 
   async fetch(request) {
+    this.inflight = (this.inflight || 0) + 1;
+    try { return await this.handle(request); }
+    finally { this.inflight -= 1; this.lastRequestAt = Date.now(); }
+  }
+
+  async handle(request) {
     const url = new URL(request.url);
     try { await this.ready; }
     catch (error) {
@@ -522,9 +532,12 @@ export class VocaStateObject {
       };
 
       const startedAt = Date.now();
-      const result = request.method === 'GET'
+      // V13.212: 나머지 변경은 요청한 학생의 숙련도만 깊게 복사한다(tokenOwner). 바꾸는 것이 없는 POST는 GET처럼 읽는다.
+      const result = request.method === 'GET' || isReadPost(request.method, url.pathname)
         ? await readState(this.mutations.current().state, execute)
-        : isQuickWrite(request.method, url.pathname) ? await this.mutations.fast(execute, quickOwn(url.pathname), quickSettle) : await this.mutations.durable(execute);
+        : isQuickWrite(request.method, url.pathname) ? await this.mutations.fast(execute, quickOwn(url.pathname), quickSettle)
+          : isViewPost(request.method, url.pathname) ? await this.mutations.view(execute, tokenUser(this.mutations.current().state, token ? hashToken(token) : ''), tokenOwner(token ? hashToken(token) : ''))
+            : await this.mutations.durable(execute, tokenOwner(token ? hashToken(token) : ''));
       // Room set-up for yacha battles: the questions (with answers) go to the room only.
       // `_battles` (V13.66) carries several room messages, e.g. when a tournament is called off.
       const roomMessages = [...(result?._battle ? [result._battle] : []), ...(Array.isArray(result?._battles) ? result._battles : [])];
@@ -580,7 +593,9 @@ export class VocaStateObject {
       if (url.pathname === '/api/bootstrap' && result?.profile?.role === 'teacher' && writeStats.pct >= WRITE_WARN_PCT) {
         result.server_write_warning = { pct: Math.round(writeStats.pct), defer: writeStats.level === 'defer', text: `오늘 서버 저장량이 많아요(${Math.round(writeStats.pct)}%)` };
       }
-      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', storage_format: this.local.format(), last_commit_rows: this.local.metrics.commitRows, supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.size || 0) / 1024), state_breakdown: this.sizeReport(), auto_trim: this.mutations.current().state.storageAutoTrim || null, frozen_retries: this.mutations.stats?.().frozen_retries ?? 0 };
+      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', storage_format: this.local.format(), last_commit_rows: this.local.metrics.commitRows, supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.size || 0) / 1024), state_breakdown: this.sizeReport(), auto_trim: this.mutations.current().state.storageAutoTrim || null, frozen_retries: this.mutations.stats?.().frozen_retries ?? 0, mastery_retries: this.mutations.stats?.().mastery_retries ?? 0, views_kept: this.mutations.stats?.().views_kept ?? 0, supabase_deferred_busy: sync.deferred_busy ?? 0, state_budget: stateBudgetReport(this.sizeReport().keys_kb, Math.round((this.local.latest()?.size || 0) / 1024)) };
+      // V13.212 유료 업그레이드 · 데이터 정리가 필요한지 한 줄로(docs/performance-rules.md).
+      if (url.pathname === '/api/health') result.storage.upgrade = upgradeAdvice({ writePct: writeStats.pct, budget: result.storage.state_budget });
       const responseHeaders = {
         // Visible in DevTools > Network > Timing, so slow saves can be measured on a real phone.
         // commit = local durable write; supabase = last background upload.
