@@ -1,6 +1,7 @@
 import { emptyState, migrateState } from './state.mjs';
 import { passwordHash } from './auth.mjs';
 import { LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, STANDARD_PET_KEYS, ACTIVE_PET_KEYS } from '../public/modules/core.js';
+import { newMarket } from './market.mjs';
 
 // V13.149 테스트 앱(sumus-voca-test, wrangler.jsonc env.test)의 처음 데이터. 운영 Supabase와 운영 데이터는 쓰지 않는다.
 // 처음 켤 때 한 번만 만들고, 그 뒤에는 테스트 앱의 Durable Object 안에만 저장된다.
@@ -55,7 +56,7 @@ export async function testSeedState(now = Date.now()) {
 // 판 2: 선생님 계정 하나 더 · 학생 모두 전설 · 신화 펫 · 미끼 10개. 이미 쓰던 테스트 데이터는 그대로 두고 덧붙인다.
 // 바꿨으면 true(시작 저장). 테스트 앱(VOCA_STANDALONE)에서만 부른다.
 export async function applyTestSeed(state, now = Date.now(), hash = null) {
-  const gifted = [giftTestPets(state, now), fillTeacherPreviews(state, now)].some(Boolean);
+  const gifted = [openTestMarket(state, now), giftTestPets(state, now), fillTeacherPreviews(state, now)].some(Boolean);
   if (Number(state.test_seed || 0) >= TEST_APP.SEED) return gifted;
   hash ||= await passwordHash(TEST_APP.PASSWORD);
   const school = state.schools.find(s => s.id === 'danwon-high');
@@ -80,6 +81,14 @@ export async function applyTestSeed(state, now = Date.now(), hash = null) {
     if (fresh && !h.map.spots.some(s => s.kind === 'pet')) h.map.spots.push({ id: `seed-${username}`, kind: 'pet', key: fresh, tier: 'pet', form: 1, x: 50, y: 44, cell: 4 });
   }
   state.test_seed = TEST_APP.SEED;
+  return true;
+}
+
+// V13.212 문법 증권거래소: 운영은 꺼 둔 채(MARKET_OPEN = false) 테스트 앱에서만 켠다(state.market.open).
+// 판 번호와 따로라 이미 켜진 테스트 앱에도 한 번 들어간다. 시세가 없으면 이틀치 기록과 함께 새로 연다. 바꿨으면 true.
+function openTestMarket(state, now) {
+  if (state.market?.open === true) return false;
+  state.market = { ...(state.market?.seed ? state.market : newMarket(now)), open: true };
   return true;
 }
 

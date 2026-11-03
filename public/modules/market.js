@@ -21,10 +21,13 @@ export const STOCKS = [
 ];
 export const STOCK_KEYS = STOCKS.map(s => s.key);
 export const stockOf = key => typeof key === 'string' ? STOCKS.find(s => s.key === key) || null : null;
+// V13.212: 주식 수가 아니라 코인으로 넣고 뺀다(몇 주인지는 서버가 소수점까지 셈). 수수료는 없앴다(10코인을 넣어도 바로 손해가 안 나게).
 export const MARKET = {
-  fee: 0.01,          // 수수료 1% (rounded up, at least 1 coin) on every buy and sell
-  max_qty: 50,        // shares in one order
-  max_hold: 100,      // shares of one stock a student may hold
+  fee: 0,             // 수수료 없음 (V13.82는 1%, 최소 1코인)
+  min_order: 5,       // 한 번에 넣는 코인 최소
+  max_order: 300,     // 한 번에 넣는 코인 최대
+  max_put: 500,       // 한 종목에 넣어 둘 수 있는 코인(넣은 원금 기준)
+  steps: [10, 30, 50, 100],  // 넣기 · 빼기 빠른 버튼
   daily_trades: 30,   // orders a day
   history: 48,        // hourly prices shown on the chart
   revert: 0.06,       // how strongly a price is pulled back toward its base each hour
@@ -32,7 +35,9 @@ export const MARKET = {
   min_x: 0.3,         // a price stays between 0.3× and 3× its base
   max_x: 3
 };
-export const tradeFee = amount => amount > 0 ? Math.max(1, Math.ceil(amount * MARKET.fee)) : 0;
+export const tradeFee = amount => amount > 0 && MARKET.fee > 0 ? Math.max(1, Math.ceil(amount * MARKET.fee)) : 0;
+// 가진 몫(q주, 소수점 6자리)의 지금 가치: 코인은 정수라 내림(소수점 반올림 오차 0.001까지는 봐준다).
+export const shareValue = (q, price) => Math.floor(Number(q) * Number(price) + 1e-3);
 // News lines for an hour with a jump (`pick` chooses the line).
 const NEWS_UP = ['{n}, 이번 학평 출제 1순위 소식!', '“{s}{는} 꼭 나온다” 선생님 발언에 매수세 폭발', '{s} 문제 맞힌 학생 급증!', '{n}, 교과서 비중 확대 발표', '{s} 문제집 품절 대란'];
 const NEWS_DOWN = ['{n}, 헷갈린다는 학생 속출', '{s} 오답률 상승 소식에 약세', '{n}, 이번 시험 범위에서 빠질 듯', '{s} 단원 진도 연기 소식', '“{s} 너무 어려워요” 민원 폭주'];
