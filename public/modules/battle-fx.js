@@ -28,7 +28,9 @@ export const PET_ELEMENT = {
   flamingo: 'wind', quokka: 'leaf', chameleon: 'toxic', polarbear: 'ice', snowleopard: 'ice', samjogo: 'flame',
   // V13.195 곤충 · 공룡 시리즈(별빛: 반짝이). 물은 낚시 혜택이 있어 넣지 않았다.
   ladybug: 'leaf', bee: 'toxic', ant: 'earth', rhinobeetle: 'toxic', butterfly: 'wind',
-  tricera: 'flame', stego: 'toxic', brachio: 'ice', ptera: 'ice', ankylo: 'toxic', tyranno: 'flame'
+  tricera: 'flame', stego: 'toxic', brachio: 'ice', ptera: 'ice', ankylo: 'toxic', tyranno: 'flame',
+  // V13.207 특별 한정(별빛: 치이카와). 별빛이 11마리를 넘지 않게 얼음 · 독에 하나씩.
+  hachiware: 'ice', usagi: 'toxic'
 };
 export const elementOf = key => PET_ELEMENT[key] || 'star';
 export const paletteOf = key => ELEMENTS[elementOf(key)];

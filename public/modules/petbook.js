@@ -1,4 +1,4 @@
-import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, LIMITED_PET_KEYS, SOON_PET_KEYS, ZODIAC_PET_KEYS, SERIES_PET_KEYS, SERIES_EGG, SERIES_RANKS, seriesGroupKeys, SEASONS, seasonOnSale, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE } from './core.js';
+import { CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, LIMITED_PET_KEYS, SOON_PET_KEYS, ZODIAC_PET_KEYS, SERIES_PET_KEYS, SERIES_EGG, SERIES_RANKS, seriesGroupKeys, SEASONS, seasonOnSale, seasonsInEpic, PET_FORMS, PET_FORM_LEVELS, EGG_PRICE, EPIC_EGG_PRICE, EPIC_EGG_LEGENDARY_RATE } from './core.js';
 import { icon, esc, num } from './ui.js';
 import { SERIES_EGG_ART } from './pet-art.js';
 import { PET_SKILLS } from './battle-engine.js';
@@ -21,14 +21,14 @@ function card(key, no, pet, teacher = null) {
     return `<figure class="pb-form ${seen ? 'seen' : ''}">${sprite(key, f, !seen)}<figcaption>${seen ? label : f ? `Lv.${PET_FORM_LEVELS[f]}` : '알'}</figcaption></figure>`;
   }).join('');
   // V13.109 한정 펫: its season's egg while on sale, then only 영웅 eggs.
-  const how = series ? `알 상점의 ${SERIES_EGG.name} ${num(SERIES_EGG.price)}코인 · 시리즈 ${SERIES_RANKS[series]}(이미 만난 친구는 다시 안 나와요)` : season ? (seasonOnSale()?.id === c.limited ? `${season.egg} ${num(season.price)}코인 · ${season.until}까지 판매` : `${season.name} 한정 · 지금은 영웅 알 · 코인 뽑기 영웅 알에서 ${season.after_rate}%`) : mythic ? `모든 알에서 아주 낮은 확률(랜덤 알 ${MYTHIC_RATE.basic}% · 영웅 알 ${MYTHIC_RATE.epic}% · 코인 뽑기 ${MYTHIC_RATE.capsule}%) · 뽑기 확정은 없어요 · 학생마다 1마리` : legend ? `코인 뽑기 ${LEGENDARY_RATE}% · 영웅 알 ${EPIC_EGG_LEGENDARY_RATE}% · 뽑기 ${num(LEGENDARY_PITY)}번 안에 확정` : epic ? `영웅 알 ${num(EPIC_EGG_PRICE)}코인 · 코인 뽑기 ${EPIC_RATE}%` : `상점의 랜덤 알 · ${num(EGG_PRICE)}코인`;
+  const how = series ? `알 상점의 ${SERIES_EGG.name} ${num(SERIES_EGG.price)}코인 · 시리즈 ${SERIES_RANKS[series]}(이미 만난 친구는 다시 안 나와요)` : season ? (seasonOnSale()?.id === c.limited ? `${season.egg} ${num(season.price)}코인 · ${season.until}까지 판매` : seasonsInEpic().find(x => x.id === c.limited && season.epic_only && x.rate === season.rate) ? `${season.name} 한정 · 영웅 알 · 코인 뽑기 영웅 알에서 ${season.rate}% · ${season.until}까지(그 뒤 ${season.after_rate}%)` : `${season.name} 한정 · 지금은 영웅 알 · 코인 뽑기 영웅 알에서 ${season.after_rate}%`) : mythic ? `모든 알에서 아주 낮은 확률(랜덤 알 ${MYTHIC_RATE.basic}% · 영웅 알 ${MYTHIC_RATE.epic}% · 코인 뽑기 ${MYTHIC_RATE.capsule}%) · 뽑기 확정은 없어요 · 학생마다 1마리` : legend ? `코인 뽑기 ${LEGENDARY_RATE}% · 영웅 알 ${EPIC_EGG_LEGENDARY_RATE}% · 뽑기 ${num(LEGENDARY_PITY)}번 안에 확정` : epic ? `영웅 알 ${num(EPIC_EGG_PRICE)}코인 · 코인 뽑기 ${EPIC_RATE}%` : `상점의 랜덤 알 · ${num(EGG_PRICE)}코인`;
   const foot = met
     // V13.185 전설 · 신화 · 한정 펫에도 야차전 특기가 있다(등급 색 그대로).
     ? skill ? `<span class="pb-skill${season ? ' limited' : mythic ? ' mythic' : legend ? ' gold' : ''}">야차전 특기</span><b>${esc(skill.name)}</b><small>${esc(skill.desc)}</small>` : ''
     : `<span class="pb-skill lock">${icon('lock')}만나는 법</span><small>${how}</small>`;
   const name = met ? `<b>${esc(c.ko)}</b>${pet.name ? `<em>${esc(petDisplayName(pet))}</em>` : ''}` : '<b>???</b>';
   return `<article class="pb-card ${mythic ? 'mythic ' : ''}${legend ? 'legend' : ''}${epic ? 'epic' : ''}${season ? 'limited' : ''} ${met ? 'met' : 'unmet'}" style="--pc:${c.color};--pl:${c.light};--ps:${c.soft}" aria-label="${met ? esc(c.ko) : '아직 못 만난 펫'}">
-    <header><span class="pb-no">No.${String(no).padStart(2, '0')}</span>${name}<span class="pb-type">${met || mythic || legend || epic || season ? esc(c.type) : '?'}</span>${season ? `<span class="pb-limited">🎃 ${esc(season.name)} 한정</span>` : mythic ? '<span class="pb-mythic">✦ 신화</span>' : legend ? '<span class="pb-legend">★ 전설</span>' : epic ? '<span class="pb-epic">★ 영웅</span>' : ''}${series ? `<span class="pb-series-tag ${c.group}">${c.group === 'bug' ? '곤충' : '공룡'}</span>` : ''}</header>
+    <header><span class="pb-no">No.${String(no).padStart(2, '0')}</span>${name}<span class="pb-type">${met || mythic || legend || epic || season ? esc(c.type) : '?'}</span>${season ? `<span class="pb-limited">${season.mark || '★'} ${esc(season.name)} 한정</span>` : mythic ? '<span class="pb-mythic">✦ 신화</span>' : legend ? '<span class="pb-legend">★ 전설</span>' : epic ? '<span class="pb-epic">★ 영웅</span>' : ''}${series ? `<span class="pb-series-tag ${c.group}">${c.group === 'bug' ? '곤충' : '공룡'}</span>` : ''}</header>
     <div class="pb-forms">${forms}</div>
     <footer>${foot}${teacher ? `<span class="pb-lv pb-owners${teacher.owners.length ? '' : ' none'}">보유 ${num(teacher.owners.length)}명</span>` : met ? `<span class="pb-lv">Lv.${num(pet.level || 1)}</span>` : ''}</footer>
     ${teacher ? `<div class="pb-teacher"><p><b>얻는 법</b>${how}</p><p class="pb-owner-names"><b>보유 학생</b>${teacher.owners.length ? `${teacher.owners.slice(0, 8).map(n => `<span>${esc(n)}</span>`).join('')}${teacher.owners.length > 8 ? `<em>외 ${num(teacher.owners.length - 8)}명</em>` : ''}${teacher.partners ? `<em class="partner">파트너 ${num(teacher.partners)}명</em>` : ''}` : '<em>아직 없어요</em>'}</p></div>` : ''}
@@ -68,7 +68,7 @@ export function petBookPage(A) {
     <div class="pb-grid">${LEGENDARY_PET_KEYS.map((key, i) => card(key, STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length + i + 1, mine(key))).join('')}</div>
     <h2 class="pb-section mythic">신화 펫 <small>전설보다 위 · 모든 알에서 아주 낮은 확률 · 학생마다 1마리</small></h2>
     <div class="pb-grid">${MYTHIC_PET_KEYS.map((key, i) => card(key, STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length + LEGENDARY_PET_KEYS.length + i + 1, mine(key))).join('')}</div>
-    <h2 class="pb-section limited">한정 펫 <small>시즌에만 파는 알</small></h2>
+    <h2 class="pb-section limited">한정 펫 <small>시즌에만 파는 알 · 영웅 알에서 가끔</small></h2>
     <div class="pb-grid">${LIMITED_PET_KEYS.map((key, i) => card(key, STANDARD_PET_KEYS.length + EPIC_PET_KEYS.length + LEGENDARY_PET_KEYS.length + MYTHIC_PET_KEYS.length + i + 1, mine(key))).join('')}</div>
     ${seriesSection(key => card(key, all.length - SERIES_PET_KEYS.length + seriesKeys().indexOf(key) + 1, mine(key)), metOf)}
     ${soonSection()}`;
@@ -92,7 +92,7 @@ export function teacherPetDex(A) {
     owners: students.filter(p => (p.pets || []).some(pet => pet.key === key)).map(p => p.display_name),
     partners: students.filter(p => p.avatar_key === key).length
   });
-  const sections = [['기본 펫', '랜덤 알', STANDARD_PET_KEYS, ''], ['영웅 펫', '영웅 알 · 코인 뽑기', EPIC_PET_KEYS, ' epic'], ['전설 펫', '코인 뽑기 · 영웅 알 1%', LEGENDARY_PET_KEYS, ' legend'], ['신화 펫', '모든 알에서 아주 낮은 확률 · 학생마다 1마리', MYTHIC_PET_KEYS, ' mythic'], ['한정 펫', '시즌에만 파는 알', LIMITED_PET_KEYS, ' limited']];
+  const sections = [['기본 펫', '랜덤 알', STANDARD_PET_KEYS, ''], ['영웅 펫', '영웅 알 · 코인 뽑기', EPIC_PET_KEYS, ' epic'], ['전설 펫', '코인 뽑기 · 영웅 알 1%', LEGENDARY_PET_KEYS, ' legend'], ['신화 펫', '모든 알에서 아주 낮은 확률 · 학생마다 1마리', MYTHIC_PET_KEYS, ' mythic'], ['한정 펫', '시즌에만 파는 알 · 영웅 알에서 가끔', LIMITED_PET_KEYS, ' limited']];
   let no = 0;
   const withPet = students.filter(p => (p.pets || []).length).length;
   const sale = seasonOnSale();
