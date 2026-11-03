@@ -9,7 +9,7 @@
 // A student's shares live on the profile:
 //   stocks { h: { KEY: { q, cost } }, paid, bought, realized, day, trades, log[] }
 // Buying adds to points_spent; selling adds to stocks.paid (rewardIncome), like other games.
-// V13.211: orders are in coins, not shares. q is a fraction of a share (6 decimals), cost is the coins put in;
+// V13.212: orders are in coins, not shares. q is a fraction of a share (6 decimals), cost is the coins put in;
 // taking coins out pays whole coins (rounded down) and takes the matching part of q and cost.
 import { createHash, randomBytes } from 'node:crypto';
 import { STOCKS, MARKET, stockOf, newsText, shareValue } from '../public/modules/market.js';

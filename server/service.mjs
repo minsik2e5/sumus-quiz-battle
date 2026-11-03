@@ -1,4 +1,5 @@
 import { randomUUID, randomBytes } from 'node:crypto';
+import { fillPreviewPets } from './test-seed.mjs';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
 import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, EPIC_EGG_PRICE, SERIES_EGG, SERIES_RANKS, seasonOnSale, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, TITLES_3, TITLES_4, titleUnlocked, weeklyTitle, visibleTitleKeys } from '../public/modules/titles.js';
@@ -1437,6 +1438,8 @@ export async function service(state, method, path, body, token, options = {}) {
     preview.reel ||= {};
     preview.reel.bait = Math.max(Number(preview.reel.bait || 0), REEL.PREVIEW.BAIT);
     preview.reel.pearls = Math.max(Number(preview.reel.pearls || 0), REEL.PREVIEW.PEARLS);
+    // V13.208 테스트 앱(test_seed가 있는 상태)에서는 미리보기 계정에 모든 펫을 넣는다. 운영에는 test_seed가 없다.
+    if (state.test_seed) fillPreviewPets(preview);
     // V13.162 펫 사냥도 둘러볼 수 있게 공을 채운다.
     preview.hunt ||= {};
     preview.hunt.basic = Math.max(Number(preview.hunt.basic || 0), HUNT.PREVIEW.BALLS);

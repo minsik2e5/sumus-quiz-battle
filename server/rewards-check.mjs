@@ -515,36 +515,36 @@ export async function runRewardsChecks(assert, expectStatus) {
   assert(STOCKS.some(s => other82.prices[s.key] !== smk.stocks.find(x => x.key === s.key).price), 'V13.82 another seed gives other prices');
   const srel = smk.stocks.find(s => s.key === 'REL');
   const cash0 = await balance('qa-rw-h');
-  // V13.211: 몇 주가 아니라 코인으로 넣고 뺀다(수수료 없음). 몇 주인지는 소수점까지 서버가 센다.
+  // V13.212: 몇 주가 아니라 코인으로 넣고 뺀다(수수료 없음). 몇 주인지는 소수점까지 서버가 센다.
   const T = body => service(state, 'POST', '/market/trade', { key: 'REL', price: srel.price, ...body }, tG);
   const sbuy = await T({ side: 'buy', coins: 30 });
   const sq211 = sbuy.market.me.holdings[0];
   assert(sbuy.trade.coins === 30 && sbuy.points_balance === cash0 - 30 && sq211.cost === 30 && Math.abs(sq211.q - 30 / srel.price) < 0.001 && sq211.value === 30 && MARKET.fee === 0 && tradeFee(1000) === 0,
-    'V13.211 넣기: 고른 코인만큼 빠지고, 그만큼의 몫(소수점 주)이 생긴다');
+    'V13.212 넣기: 고른 코인만큼 빠지고, 그만큼의 몫(소수점 주)이 생긴다');
   await expectStatus(409, () => T({ side: 'buy', coins: 30, price: srel.price + 1 }), 'V13.82 an order at a price that is no longer the price is refused');
-  await expectStatus(409, () => T({ side: 'sell', coins: 31 }), 'V13.211 넣어 둔 것보다 많이 뺄 수 없다');
+  await expectStatus(409, () => T({ side: 'sell', coins: 31 }), 'V13.212 넣어 둔 것보다 많이 뺄 수 없다');
   await expectStatus(400, () => service(state, 'POST', '/market/trade', { key: 'constructor', side: 'buy', coins: 10, price: 1 }, tG), 'V13.82 only listed shares');
-  await expectStatus(400, () => T({ side: 'buy', coins: 10.5 }), 'V13.211 코인은 정수로만');
-  await expectStatus(400, () => T({ side: 'buy', coins: MARKET.min_order - 1 }), 'V13.211 한 번에 넣는 최소 코인');
-  await expectStatus(400, () => T({ side: 'buy', coins: MARKET.max_order + 1 }), 'V13.211 한 번에 넣는 최대 코인');
+  await expectStatus(400, () => T({ side: 'buy', coins: 10.5 }), 'V13.212 코인은 정수로만');
+  await expectStatus(400, () => T({ side: 'buy', coins: MARKET.min_order - 1 }), 'V13.212 한 번에 넣는 최소 코인');
+  await expectStatus(400, () => T({ side: 'buy', coins: MARKET.max_order + 1 }), 'V13.212 한 번에 넣는 최대 코인');
   const spart = await T({ side: 'sell', coins: 10 });
   const sleft = spart.market.me.holdings[0];
   assert(spart.trade.coins === 10 && spart.points_balance === cash0 - 20 && sleft.cost === 20 && sleft.value === 20 && spart.market.me.realized === 0,
-    'V13.211 빼기: 고른 코인이 지갑으로 오고, 넣은 코인 · 몫이 그만큼 줄어든다(같은 가격이면 손익 0)');
+    'V13.212 빼기: 고른 코인이 지갑으로 오고, 넣은 코인 · 몫이 그만큼 줄어든다(같은 가격이면 손익 0)');
   const ssell = await T({ side: 'sell', all: true });
-  assert(ssell.trade.coins === 20 && ssell.points_balance === cash0 && !ssell.market.me.holdings.length && ssell.market.me.realized === 0, 'V13.211 전부 빼기: 같은 가격이면 넣은 코인이 그대로 돌아온다');
-  await expectStatus(409, () => T({ side: 'sell', all: true }), 'V13.211 넣어 둔 게 없으면 뺄 수 없다');
+  assert(ssell.trade.coins === 20 && ssell.points_balance === cash0 && !ssell.market.me.holdings.length && ssell.market.me.realized === 0, 'V13.212 전부 빼기: 같은 가격이면 넣은 코인이 그대로 돌아온다');
+  await expectStatus(409, () => T({ side: 'sell', all: true }), 'V13.212 넣어 둔 게 없으면 뺄 수 없다');
   profile('qa-rw-h').stocks.h = { REL: { q: 1, cost: MARKET.max_put - 5 } };
-  await expectStatus(409, () => T({ side: 'buy', coins: 10 }), 'V13.211 한 종목에 넣어 둘 수 있는 코인 한도');
+  await expectStatus(409, () => T({ side: 'buy', coins: 10 }), 'V13.212 한 종목에 넣어 둘 수 있는 코인 한도');
   delete profile('qa-rw-h').stocks.h.REL;
   // 오른 가격에 빼면 번 만큼 실현 손익: 몫 1주를 100코인에 넣은 셈으로 두고, 지금 가격으로 전부 뺀다.
   profile('qa-rw-h').stocks.h = { REL: { q: 1, cost: 100 } };
   const sgain = await T({ side: 'sell', all: true });
-  assert(sgain.trade.coins === srel.price && Math.round(sgain.market.me.realized) === Math.round(srel.price - 100), 'V13.211 지금 가치로 빼고, 넣은 코인과의 차이가 실현 손익');
+  assert(sgain.trade.coins === srel.price && Math.round(sgain.market.me.realized) === Math.round(srel.price - 100), 'V13.212 지금 가치로 빼고, 넣은 코인과의 차이가 실현 손익');
   delete profile('qa-rw-h').stocks.h.REL;
   const stocks211 = source('../public/modules/stocks.js'), css211 = source('../public/v1382.css');
   assert(stocks211.includes("{ all: true } : { coins: amount }") && stocks211.includes('data-mode="buy"') && stocks211.includes('넣은 코인') && !stocks211.includes('최대 매수') && !stocks211.includes('data-q=')
-    && css211.includes('.stk-wallet{') && css211.includes('.stk-go.buy{') && css211.includes('.stk-mode button.on{'), 'V13.211 화면: 넣기 · 빼기와 코인 고르기, 내 투자는 넣은 코인 → 지금');
+    && css211.includes('.stk-wallet{') && css211.includes('.stk-go.buy{') && css211.includes('.stk-mode button.on{'), 'V13.212 화면: 넣기 · 빼기와 코인 고르기, 내 투자는 넣은 코인 → 지금');
   assert(newsText({ key: 'SUBJ', up: true, pick: 1 }).includes('가정법은') && newsText({ key: 'PART', up: true, pick: 1 }).includes('분사는'), 'V13.82 news lines use 은/는 by the last letter');
   const arcade82 = source('../public/modules/arcade.js'), css82 = source('../public/v1382.css'), build82 = source('./build-assets.mjs');
   assert(arcade82.includes('rpsCard(rewards(current.A).rps') && arcade82.includes("rewards(current.A).market_open ? stocksCard() : ''") && arcade82.includes("openStock(k.dataset.key") && build82.includes('"v1382.css"') && css82.includes('.rps-show{') && css82.includes('.stk-card{'), 'V13.82 놀이터 shows 가위바위보 and 문법 증권거래소');
@@ -999,17 +999,17 @@ export async function runRewardsChecks(assert, expectStatus) {
     {
       const kst = t => Date.parse(t + '+09:00');
       const H = SEASONS.autumn;
-      assert(LIMITED_PET_KEYS.join() === 'pumpkincat,ghost,riceball,tissue,glue' && LIMITED_PET_KEYS.every(key => petTier(key) === 'limited' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && petSkill({ key }).key === key)
+      assert(seasonKeys('autumn').join() === 'pumpkincat,ghost,riceball,tissue,glue' && LIMITED_PET_KEYS.every(key => petTier(key) === 'limited' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && petSkill({ key }).key === key)
         && H.price === 600 && H.end === '2026-11-30' && H.after_rate === 5 && /11월 30일/.test(H.until),
         'V13.117 가을 이벤트 한정 펫 5종(호박냥·부우·주먹이·술술이·찰싹이)은 기본·영웅 알에 섞이지 않고, 야차전 특기가 있으며(V13.185), 가을 이벤트 알은 600코인에 11/30까지 판다');
       assert(seasonOnSale(kst('2026-10-01T00:00:00'))?.id === 'autumn' && seasonOnSale(kst('2026-11-30T23:59:00'))?.id === 'autumn' && seasonOnSale(kst('2026-12-01T00:00:00')) === null && seasonOnSale(kst('2026-09-30T23:59:00')) === null
-        && seasonsOver(kst('2026-11-30T23:59:00')).length === 0 && seasonsOver(kst('2026-12-01T00:00:00')).join() === 'autumn',
+        && seasonsOver(kst('2026-11-30T23:59:00')).length === 0 && seasonsOver(kst('2026-12-01T00:00:00')).join() === 'autumn' && seasonsOver(kst('2027-01-01T00:00:00')).join() === 'autumn,special',
         'V13.117 가을 이벤트 알은 한국 시간 11월 30일 밤까지 팔고, 12월 1일부터 판매가 끝난 시즌이 된다');
       const after = kst('2026-12-05T12:00:00'), during = kst('2026-10-20T12:00:00');
       const kidL = () => ({ pets: [{ key: 'dog' }] });
       const always = () => 0, never = () => .99;
       assert(limitedFromEpic(kidL(), always, during) === null && LIMITED_PET_KEYS.includes(limitedFromEpic(kidL(), always, after)) && limitedFromEpic(kidL(), never, after) === null
-        && limitedFromEpic({ pets: [{ key: 'dog' }, { key: 'pumpkincat' }, { key: 'ghost' }, { key: 'riceball' }, { key: 'tissue' }, { key: 'glue' }] }, always, after) === null,
+        && limitedFromEpic({ pets: [{ key: 'dog' }, ...LIMITED_PET_KEYS.map(key => ({ key }))] }, always, after) === null && seasonKeys('autumn').includes(limitedFromEpic(kidL(), always, after)),
         'V13.109 판매 기간에는 영웅 알에서 한정 펫이 나오지 않고, 기간이 끝나면 아직 없는 한정 펫이 5% 확률로 나온다(다 모으면 안 나온다)');
       let seq = [0.5, 0, 0]; const rnd = () => seq.length ? seq.shift() : 0;
       const egg = kidL(); const opened = openEgg(egg, { epic: true, missing: ['capybara'], price: 800, random: rnd, now: after });

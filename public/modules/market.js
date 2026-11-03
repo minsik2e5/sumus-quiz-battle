@@ -21,7 +21,7 @@ export const STOCKS = [
 ];
 export const STOCK_KEYS = STOCKS.map(s => s.key);
 export const stockOf = key => typeof key === 'string' ? STOCKS.find(s => s.key === key) || null : null;
-// V13.211: 주식 수가 아니라 코인으로 넣고 뺀다(몇 주인지는 서버가 소수점까지 셈). 수수료는 없앴다(10코인을 넣어도 바로 손해가 안 나게).
+// V13.212: 주식 수가 아니라 코인으로 넣고 뺀다(몇 주인지는 서버가 소수점까지 셈). 수수료는 없앴다(10코인을 넣어도 바로 손해가 안 나게).
 export const MARKET = {
   fee: 0,             // 수수료 없음 (V13.82는 1%, 최소 1코인)
   min_order: 5,       // 한 번에 넣는 코인 최소

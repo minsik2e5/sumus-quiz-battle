@@ -1,7 +1,7 @@
 // V13.82 문법 증권거래소 (놀이터). Prices come from the server every hour (server/market.mjs);
 // this module draws the board, a share's page with its 48-hour chart, and the order buttons.
 // Korean market colours: a rise is red, a fall is blue.
-// V13.211: 몇 주가 아니라 코인으로 넣고 뺀다. 화면은 '넣은 코인 → 지금' 한 줄과 등락만 크게, 평균가 · 주 수는 숨긴다.
+// V13.212: 몇 주가 아니라 코인으로 넣고 뺀다. 화면은 '넣은 코인 → 지금' 한 줄과 등락만 크게, 평균가 · 주 수는 숨긴다.
 import { api, esc, num, toast, modal } from './ui.js';
 import { coin } from './emblems.js';
 import { MARKET, stockOf } from './market.js';

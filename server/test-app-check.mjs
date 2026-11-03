@@ -122,7 +122,7 @@ export async function runTestAppChecks() {
     assert.equal(await applyTestSeed(prev), true, '판은 그대로여도 새 선물은 넣는다');
     assert(gift.every(k => ts2.pets.filter(p => p.key === k).length === 1) && ts2.pets[0].first && !prev.profiles.find(p => p.username === 'ts1').pets.some(p => p.key === 'tyranno'), '나래에게만 12종 한 마리씩');
     assert.equal(await applyTestSeed(prev), false, '같은 선물은 다시 넣지 않는다');
-    // V13.211 문법 증권거래소는 테스트 앱에서만 켠다(운영 MARKET_OPEN은 false 그대로). 이미 켜진 테스트 앱에도 한 번, 시세는 그대로 둔다.
+    // V13.212 문법 증권거래소는 테스트 앱에서만 켠다(운영 MARKET_OPEN은 false 그대로). 이미 켜진 테스트 앱에도 한 번, 시세는 그대로 둔다.
     assert(MARKET_OPEN === false && after.payload.rewards.market_open === true, '테스트 앱은 증권거래소가 켜져 있고 운영 스위치는 꺼져 있다');
     delete prev.market;
     assert.equal(await applyTestSeed(prev), true, '증권거래소가 꺼진 테스트 앱에 켜기를 덧붙인다');

@@ -112,7 +112,7 @@
 @media (prefers-reduced-motion:reduce){.rps-card::before,.rps-card-hands i,.rps-bg i,.rps-vs,.rps-step.next,.rps-pick.hot{animation:none!important}}
 
 /* ---------- 문법 증권거래소 ---------- */
-/* V13.211 코인으로 넣고 빼기 · 디자인 다시: 밤하늘 거래소 카드(내 투자 한 줄 · 뉴스 띠 · 종목 칩) + 밝은 종목 화면(넣기/빼기 · 코인 고르기). */
+/* V13.212 코인으로 넣고 빼기 · 디자인 다시: 밤하늘 거래소 카드(내 투자 한 줄 · 뉴스 띠 · 종목 칩) + 밝은 종목 화면(넣기/빼기 · 코인 고르기). */
 .stk-card{position:relative;overflow:hidden;isolation:isolate;border-radius:26px;padding:18px 16px 14px;display:flex;flex-direction:column;gap:12px;color:#e9eefc;
   background:radial-gradient(120% 70% at 100% 0%,rgba(255,107,107,.22),transparent 55%),radial-gradient(90% 60% at 0% 100%,rgba(77,171,247,.2),transparent 60%),linear-gradient(165deg,#101c42 0%,#15275a 50%,#0a1330 100%);
   box-shadow:0 18px 40px rgba(15,27,61,.32),inset 0 1px 0 rgba(255,255,255,.08)}
