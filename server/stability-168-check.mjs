@@ -112,12 +112,12 @@ async function autoTrimChecks(assert) {
 /* ---------- B. 얼려 같이 쓰기 ---------- */
 async function frozenChecks(assert) {
   const s = sealState({ sessions: [{ id: 'a', student_id: 'p1', rec: [{ n: 1 }] }, { id: 'b', student_id: 'p2', rec: [] }], mastery: { p1: { w: { n: 1 } } }, profiles: [{ id: 'p1', coins: 1 }] });
-  assert(Object.isFrozen(s.sessions[0]) && Object.isFrozen(s.sessions[0].rec[0]) && !Object.isFrozen(s.sessions) && !Object.isFrozen(s.mastery.p1), 'V13.168 지난 연습 기록만 안쪽까지 얼린다(배열 · 숙련도 · 프로필은 아니다)');
+  assert(Object.isFrozen(s.sessions[0]) && Object.isFrozen(s.sessions[0].rec[0]) && !Object.isFrozen(s.sessions) && Object.isFrozen(s.mastery.p1) && !Object.isFrozen(s.mastery) && !Object.isFrozen(s.profiles[0]), 'V13.168 지난 연습 기록(V13.211: 학생별 숙련도 묶음도)만 안쪽까지 얼린다(배열 · 숙련도 표 · 프로필은 아니다)');
   let error = null;
   try { s.sessions[0].rec[0].n = 2; } catch (e) { error = e; }
   assert(error && isFrozenWrite(error) && !isFrozenWrite(new TypeError("Cannot read properties of undefined (reading 'x')")), 'V13.168 얼린 기록을 고치면 알아볼 수 있는 오류가 난다(다른 오류와 구별)');
   const c = cloneState(s);
-  assert(c.sessions !== s.sessions && c.sessions[0] === s.sessions[0] && c.mastery.p1 !== s.mastery.p1 && c.profiles[0] !== s.profiles[0], 'V13.168 변경은 얼린 기록만 같이 쓰고 나머지는 깊게 복사한다');
+  assert(c.sessions !== s.sessions && c.sessions[0] === s.sessions[0] && c.mastery.p1 === s.mastery.p1 && c.mastery !== s.mastery && c.profiles[0] !== s.profiles[0], 'V13.168 변경은 얼린 기록(V13.211: 숙련도 묶음도)만 같이 쓰고 나머지는 깊게 복사한다');
 
   // 얼린 기록을 고치는 변경: 전체 깊은 복사로 처음부터 다시 해서 같은 결과, 이전 상태는 그대로.
   let commits = [];
@@ -127,7 +127,8 @@ async function frozenChecks(assert) {
   let runs = 0;
   const out = await co.durable(state => { runs += 1; state.profiles[0].coins += 1; state.sessions[0].n = 5; return 'done'; });
   const now = co.current().state;
-  assert(out === 'done' && runs === 2 && now.sessions[0].n === 5 && now.profiles[0].coins === 2 && prev.sessions[0].n === 1 && prev.profiles[0].coins === 1 && co.stats().frozen_retries === 1, 'V13.168 얼린 기록을 고치는 변경은 처음부터 깊은 복사로 다시 해서 한 번만 반영된다(코인이 두 번 오르지 않음)');
+  // V13.211: 얕은 복사 → 숙련도까지 깊게(그래도 얼린 기록) → 전체 깊게, 세 번째에 반영된다.
+  assert(out === 'done' && runs === 3 && co.stats().mastery_retries === 1 && now.sessions[0].n === 5 && now.profiles[0].coins === 2 && prev.sessions[0].n === 1 && prev.profiles[0].coins === 1 && co.stats().frozen_retries === 1, 'V13.168 얼린 기록을 고치는 변경은 처음부터 깊은 복사로 다시 해서 한 번만 반영된다(코인이 두 번 오르지 않음)');
   assert(Object.isFrozen(now.sessions[0]) && commits.at(-1).includes('"n":5'), 'V13.168 다시 한 변경도 얼리고 저장한다');
   // 다른 오류는 그대로 던지고 아무것도 남기지 않는다.
   const err = await co.durable(state => { state.profiles[0].coins = 99; throw Object.assign(Error('no'), { status: 409 }); }).catch(e => e);
