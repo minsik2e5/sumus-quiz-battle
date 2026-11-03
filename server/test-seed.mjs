@@ -1,6 +1,6 @@
 import { emptyState, migrateState } from './state.mjs';
 import { passwordHash } from './auth.mjs';
-import { LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, STANDARD_PET_KEYS } from '../public/modules/core.js';
+import { LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, STANDARD_PET_KEYS, ACTIVE_PET_KEYS } from '../public/modules/core.js';
 
 // V13.149 테스트 앱(sumus-voca-test, wrangler.jsonc env.test)의 처음 데이터. 운영 Supabase와 운영 데이터는 쓰지 않는다.
 // 처음 켤 때 한 번만 만들고, 그 뒤에는 테스트 앱의 Durable Object 안에만 저장된다.
@@ -55,7 +55,7 @@ export async function testSeedState(now = Date.now()) {
 // 판 2: 선생님 계정 하나 더 · 학생 모두 전설 · 신화 펫 · 미끼 10개. 이미 쓰던 테스트 데이터는 그대로 두고 덧붙인다.
 // 바꿨으면 true(시작 저장). 테스트 앱(VOCA_STANDALONE)에서만 부른다.
 export async function applyTestSeed(state, now = Date.now(), hash = null) {
-  const gifted = giftTestPets(state, now);
+  const gifted = [giftTestPets(state, now), fillTeacherPreviews(state, now)].some(Boolean);
   if (Number(state.test_seed || 0) >= TEST_APP.SEED) return gifted;
   hash ||= await passwordHash(TEST_APP.PASSWORD);
   const school = state.schools.find(s => s.id === 'danwon-high');
@@ -97,4 +97,17 @@ function giftTestPets(state, now) {
   }
   state.test_gifts = [...(state.test_gifts || []), ...todo];
   return true;
+}
+
+// V13.208 테스트 앱 선생님의 학생 미리보기 계정에 지금 있는 모든 펫(ACTIVE_PET_KEYS)을 한 마리씩 넣는다(쌤 요청: 펫 다 넣어 보기).
+// 미리보기에 들어올 때(service.mjs, 테스트 앱만)와 테스트 앱이 켜질 때 채운다. 바꿨으면 true.
+export function fillPreviewPets(preview, now = Date.now()) {
+  preview.pets ||= [];
+  const add = ACTIVE_PET_KEYS.filter(key => !preview.pets.some(pet => pet.key === key));
+  for (const key of add) preview.pets.push({ key, acquired_at: now });
+  return add.length > 0;
+}
+function fillTeacherPreviews(state, now) {
+  const teachers = new Set(state.profiles.filter(p => p.role === 'teacher' && TEST_APP.TEACHERS.some(([username]) => username === p.username)).map(p => p.id));
+  return state.profiles.filter(p => p.preview_owner_id && teachers.has(p.preview_owner_id)).map(p => fillPreviewPets(p, now)).some(Boolean);
 }
