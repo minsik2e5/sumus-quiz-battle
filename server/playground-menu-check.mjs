@@ -69,6 +69,6 @@ export async function runPlaygroundMenuChecks(assert) {
       && arcade.includes('${machineHtml(current.A)}${shopHtml(current.A)}${rpsCard(') && arcade.includes('${gamesSection(A, { fishing: FISHING_ART, match: MATCH_ART, hunt: HUNT_ART, claw: CLAW_ART })}')
       && arcade.includes('pgWrite(pg);') && arcade.includes("event.target.closest('[data-pg-tab], [data-pg]')"),
       'V13.206 운영 놀이터(예전 화면)는 그대로, 테스트 호스트만 메뉴');
-    assert(build.includes('"v13206.css"') && css.includes('.pg-hub') && css.includes('.pg-best') && pkg.version === '13.206.0', 'V13.206 CSS 묶음과 버전');
+    assert(build.includes('"v13206.css"') && css.includes('.pg-hub') && css.includes('.pg-best') && pkg.version.split('.').map(Number)[1] >= 206, 'V13.206 CSS 묶음과 버전');
   }
 }

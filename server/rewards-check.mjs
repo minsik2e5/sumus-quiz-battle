@@ -981,17 +981,17 @@ export async function runRewardsChecks(assert, expectStatus) {
     {
       const kst = t => Date.parse(t + '+09:00');
       const H = SEASONS.autumn;
-      assert(LIMITED_PET_KEYS.join() === 'pumpkincat,ghost,riceball,tissue,glue' && LIMITED_PET_KEYS.every(key => petTier(key) === 'limited' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && petSkill({ key }).key === key)
+      assert(seasonKeys('autumn').join() === 'pumpkincat,ghost,riceball,tissue,glue' && LIMITED_PET_KEYS.every(key => petTier(key) === 'limited' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && petSkill({ key }).key === key)
         && H.price === 600 && H.end === '2026-11-30' && H.after_rate === 5 && /11월 30일/.test(H.until),
         'V13.117 가을 이벤트 한정 펫 5종(호박냥·부우·주먹이·술술이·찰싹이)은 기본·영웅 알에 섞이지 않고, 야차전 특기가 있으며(V13.185), 가을 이벤트 알은 600코인에 11/30까지 판다');
       assert(seasonOnSale(kst('2026-10-01T00:00:00'))?.id === 'autumn' && seasonOnSale(kst('2026-11-30T23:59:00'))?.id === 'autumn' && seasonOnSale(kst('2026-12-01T00:00:00')) === null && seasonOnSale(kst('2026-09-30T23:59:00')) === null
-        && seasonsOver(kst('2026-11-30T23:59:00')).length === 0 && seasonsOver(kst('2026-12-01T00:00:00')).join() === 'autumn',
+        && seasonsOver(kst('2026-11-30T23:59:00')).length === 0 && seasonsOver(kst('2026-12-01T00:00:00')).join() === 'autumn' && seasonsOver(kst('2027-01-01T00:00:00')).join() === 'autumn,special',
         'V13.117 가을 이벤트 알은 한국 시간 11월 30일 밤까지 팔고, 12월 1일부터 판매가 끝난 시즌이 된다');
       const after = kst('2026-12-05T12:00:00'), during = kst('2026-10-20T12:00:00');
       const kidL = () => ({ pets: [{ key: 'dog' }] });
       const always = () => 0, never = () => .99;
       assert(limitedFromEpic(kidL(), always, during) === null && LIMITED_PET_KEYS.includes(limitedFromEpic(kidL(), always, after)) && limitedFromEpic(kidL(), never, after) === null
-        && limitedFromEpic({ pets: [{ key: 'dog' }, { key: 'pumpkincat' }, { key: 'ghost' }, { key: 'riceball' }, { key: 'tissue' }, { key: 'glue' }] }, always, after) === null,
+        && limitedFromEpic({ pets: [{ key: 'dog' }, ...LIMITED_PET_KEYS.map(key => ({ key }))] }, always, after) === null && seasonKeys('autumn').includes(limitedFromEpic(kidL(), always, after)),
         'V13.109 판매 기간에는 영웅 알에서 한정 펫이 나오지 않고, 기간이 끝나면 아직 없는 한정 펫이 5% 확률로 나온다(다 모으면 안 나온다)');
       let seq = [0.5, 0, 0]; const rnd = () => seq.length ? seq.shift() : 0;
       const egg = kidL(); const opened = openEgg(egg, { epic: true, missing: ['capybara'], price: 800, random: rnd, now: after });

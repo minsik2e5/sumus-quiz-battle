@@ -17,7 +17,8 @@ export const TEST_APP = {
   // V13.162 판 3 · 4(손맛 고퀄 뒤 다시 채움): 펫 사냥을 바로 해 볼 수 있게 공(기본 · 좋은 · 황금)과 지도에 새 친구 '?' 하나.
   HUNT: { basic: 6, good: 3, gold: 1 },
   // 테스트 선물: 이름표마다 한 번만 넣는다(판 번호와 따로라 다른 판과 겹치지 않는다). 곤충 · 공룡 시리즈 12종을 나래(ts2)에게.
-  GIFTS: { 'bugdino-ts2': { ts2: ['ladybug', 'bee', 'ant', 'firefly', 'rhinobeetle', 'butterfly', 'tricera', 'stego', 'brachio', 'ptera', 'ankylo', 'tyranno'] } },
+  // V13.207 특별 한정 3마리(하치와레 · 우사기 · 치이카와)를 ts3에게(도감 · 펫 화면 · 야차전 확인용).
+  GIFTS: { 'bugdino-ts2': { ts2: ['ladybug', 'bee', 'ant', 'firefly', 'rhinobeetle', 'butterfly', 'tricera', 'stego', 'brachio', 'ptera', 'ankylo', 'tyranno'] }, 'special-ts3': { ts3: ['hachiware', 'usagi', 'chiikawa'] } },
   // V13.180 판 6: 인형뽑기를 바로 해 볼 수 있게 집게권(보관 상한까지).
   CLAW: 6,
   STUDENTS: [
