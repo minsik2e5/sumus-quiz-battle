@@ -42,6 +42,7 @@ import { runClawPhysicsChecks } from './claw-physics-check.mjs';
 import { runLevelChecks } from './level-check.mjs';
 import { runPracticeSpeedChecks } from './practice-speed-check.mjs';
 import { runYachaLagChecks } from './yacha-lag-check.mjs';
+import { runPerfRulesChecks } from './perf-rules-check.mjs';
 import { runActivityChecks } from './activity-check.mjs';
 import { runReviewFixChecks } from './review-fix-check.mjs';
 import { runStability163Checks } from './stability-163-check.mjs';
@@ -1557,6 +1558,7 @@ export async function runReleaseCheck() {
     runLevelChecks(assert);
     await runPracticeSpeedChecks(assert);
     await runYachaLagChecks(assert);
+    await runPerfRulesChecks(assert);
     runReviewFixChecks(assert);
     await runStability163Checks(assert);
     await runStability168Checks(assert);

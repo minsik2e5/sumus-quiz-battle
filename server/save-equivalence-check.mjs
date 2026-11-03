@@ -119,7 +119,7 @@ async function replay(mode, coordinatorModule, start) {
 // (id는 여전히 겹치지 않는다). 그래서 사냥 자리 id만 처음 나온 순서 번호로 바꿔 비교한다.
 function normalizeSpots(...texts) {
   const map = new Map();
-  return texts.map(text => String(text).replace(/\bs[0-9a-z]{6,12}\b/g, id => { if (!map.has(id)) map.set(id, `spot#${map.size}`); return map.get(id); }));
+  return texts.map(text => String(text).replace(/\bs(?=[0-9a-z]*\d)[0-9a-z]{6,12}\b/g, id => { if (!map.has(id)) map.set(id, `spot#${map.size}`); return map.get(id); }));
 }
 
 function firstJsonDiff(a, b, path = '') {
@@ -155,6 +155,7 @@ export async function runSaveEquivalence(oldCoordinatorModule) {
     sameSaved: oldSaved === newSaved,
     sameFinal: oldFinal === newFinal,
     stats: after.stats,
+    finalKeys: Object.keys(JSON.parse(after.finalState)),
     finalDiff: oldFinal === newFinal ? null : firstJsonDiff(JSON.parse(oldFinal), JSON.parse(newFinal))
   };
 }

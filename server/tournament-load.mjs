@@ -38,9 +38,10 @@ export function prodLikeState({ students = 44, sessions = 2991, words = 450, now
   return state;
 }
 
-export async function runTournamentLoad({ level = 'ok', seconds = 20, others = 8, gameEvery = 2500, targetKB = 9000, coordinator = coord } = {}) {
+// extraGamers: 대회 밖에서 놀이터만 하는 학생 수(몇 명까지 버티는지 재기, docs/performance-rules.md).
+export async function runTournamentLoad({ level = 'ok', seconds = 20, others = 8, extraGamers = 0, gameEvery = 2500, targetKB = 9000, coordinator = coord } = {}) {
   const now = Date.now();
-  const state = prodLikeState({ now });
+  const state = prodLikeState({ now, students: Math.max(44, 40 + extraGamers) });
   void targetKB;
   state.profiles.push({ id: 'tl-teacher', username: 'tl-teacher', display_name: '선생님', role: 'teacher', active: true, school_ids: ['gangseo-high'], active_school_id: 'gangseo-high', division: 'high', created_at: now });
   state.tokens.push({ hash: hashToken('sl-token-tl-teacher'), user_id: 'tl-teacher', expires_at: now + DAY });
@@ -110,6 +111,7 @@ export async function runTournamentLoad({ level = 'ok', seconds = 20, others = 8
   await Promise.all([
     ...t.rounds[0].filter(m => m.a && m.b).map(match),
     ...players.map(gamer), ...players.map(inviter),
+    ...Array.from({ length: extraGamers }, (_, i) => gamer(`sl-${40 + i}`)),
     ...Array.from({ length: others }, (_, i) => practice(`sl-${32 + i}`)),
     teacher()
   ]);

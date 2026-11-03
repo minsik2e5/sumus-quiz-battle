@@ -14,6 +14,11 @@
 - 답변, PR 설명, 변경 기록은 한국어로 쓴다. 버전을 올리면 루트에 `CHANGES_v<버전>.md`를 남긴다.
 - 바뀐 규칙마다 `server/*-check.mjs`에 검사를 남긴다. `npm run check`와 `npm run check:cloudflare`가 통과해야 한다.
 - 선생님이 "퀄리티 높게"라고 한 화면·연출·이펙트는 줄이지 않는다.
+- **렉 방지 규칙(docs/performance-rules.md)을 지킨다.** 메인 상태 객체는 하나뿐이라 요청 하나가 무거우면 모두 느려진다.
+  - 보기는 GET(꼭 POST면 READ_POSTS · VIEW_POSTS에 등록).
+  - 새 데이터 묶음은 server/perf-budget.mjs에 예산과 정리 방법을 적는다. 끝없이 쌓이는 목록은 만들지 않는다.
+  - 전체 학생을 훑는 계산은 쓰기 요청 안에서 하지 않는다. 자동 새로고침 간격은 3초 이상이다.
+  - `npm run check:load` 상한을 올리지 않는다.
 - 전설 · 신화 · 한정 펫에도 야차전 특기가 있다. 세기는 기본 ≈ 영웅 < 전설(+약 6%) < 신화(+약 6%), 한정은 기본 정도(docs/pet-skills-balance.md, server/pet-sim.mjs로 승률 확인).
 - 그림 주문서(docs/asset-requests/runner)에는 두 가지를 꼭 넣는다.
   - Drive의 기존 그림을 열어 그림체를 맞추라는 말

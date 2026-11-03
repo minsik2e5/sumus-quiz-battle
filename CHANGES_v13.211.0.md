@@ -13,6 +13,13 @@
 - **Supabase 백업**: 학생 요청을 처리하는 중이면 2초씩, 최대 20초 미룬다. `/api/health`에 `supabase_deferred_busy`, `mastery_retries`, `views_kept`.
 - 규칙 · 보상 · 판정은 그대로.
 
+## 렉 방지 규칙(앞으로 기능이 늘어도)
+- `docs/performance-rules.md`: 기능 만들 때 지킬 것 8가지, 운영에서 볼 숫자, 업그레이드 시점, 동시 접속 측정표(40 · 80 · 120 · 180명).
+- `CLAUDE.md`에 규칙 요약을 넣었다.
+- `server/perf-budget.mjs`: 상태 묶음마다 크기 예산. `/api/health`의 `storage.state_budget`가 넘은 묶음과 예산표에 없는 묶음을 알려 준다.
+- `server/perf-rules-check.mjs`(npm run check): 묶음이 모두 예산표에 있는지, 보기 같은 이름의 POST가 읽기 · 보기 경로에 등록됐는지,
+  화면 자동 새로고침 간격이 3초 이상인지 본다.
+
 ## 측정(운영 구성 약 12MB, 대회 32명 + 놀이터 + 연습 8명, p95)
 - 대회 판 열기 1655 → 251ms, 결과 보고 1181 → 260ms, 인형뽑기 첫 화면 1362 → 1ms, ping 1127 → 0ms, 사냥 첫 화면 1142 → 248ms.
 - POST 하나의 CPU 85 → 29ms.

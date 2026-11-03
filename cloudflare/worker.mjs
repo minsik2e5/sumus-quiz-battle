@@ -18,6 +18,7 @@ import { createMutationCoordinator, NO_MUTATION, isQuickWrite, quickOwn, quickSe
 import { createLocalRepository, createSupabaseSync } from './local-first.mjs';
 import { partitionState, assembleState, hashText } from './state-parts.mjs';
 import { WRITE_WARN_PCT } from './cf-limits.mjs';
+import { stateBudgetReport } from '../server/perf-budget.mjs';
 import { testSeedState, applyTestSeed } from '../server/test-seed.mjs';
 
 // V13.144 쓰기 모으기: 저장이 연달아 오면 이 시간(ms) 안에 온 변경을 한 번에 쓴다. V13.168: 70%를 넘으면 이 값,
@@ -592,7 +593,7 @@ export class VocaStateObject {
       if (url.pathname === '/api/bootstrap' && result?.profile?.role === 'teacher' && writeStats.pct >= WRITE_WARN_PCT) {
         result.server_write_warning = { pct: Math.round(writeStats.pct), defer: writeStats.level === 'defer', text: `오늘 서버 저장량이 많아요(${Math.round(writeStats.pct)}%)` };
       }
-      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', storage_format: this.local.format(), last_commit_rows: this.local.metrics.commitRows, supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.size || 0) / 1024), state_breakdown: this.sizeReport(), auto_trim: this.mutations.current().state.storageAutoTrim || null, frozen_retries: this.mutations.stats?.().frozen_retries ?? 0, mastery_retries: this.mutations.stats?.().mastery_retries ?? 0, views_kept: this.mutations.stats?.().views_kept ?? 0, supabase_deferred_busy: sync.deferred_busy ?? 0 };
+      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', storage_format: this.local.format(), last_commit_rows: this.local.metrics.commitRows, supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.size || 0) / 1024), state_breakdown: this.sizeReport(), auto_trim: this.mutations.current().state.storageAutoTrim || null, frozen_retries: this.mutations.stats?.().frozen_retries ?? 0, mastery_retries: this.mutations.stats?.().mastery_retries ?? 0, views_kept: this.mutations.stats?.().views_kept ?? 0, supabase_deferred_busy: sync.deferred_busy ?? 0, state_budget: stateBudgetReport(this.sizeReport().keys_kb, Math.round((this.local.latest()?.size || 0) / 1024)) };
       const responseHeaders = {
         // Visible in DevTools > Network > Timing, so slow saves can be measured on a real phone.
         // commit = local durable write; supabase = last background upload.
