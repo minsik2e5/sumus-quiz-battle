@@ -118,6 +118,10 @@ export const CHARACTERS = {
   riceball: { name: 'JUMEOKI', ko: '주먹이', type: '주먹밥 병아리', color: '#8C7B6B', light: '#F3E9D8', soft: '#FFFAF1', limited: 'autumn' },
   tissue: { name: 'SULSUL', ko: '술술이', type: '두루마리 휴지', color: '#D9A441', light: '#FBE7B0', soft: '#FFFBEF', limited: 'autumn' },
   glue: { name: 'CHALSSAK', ko: '찰싹이', type: '딱풀', color: '#6FA8DC', light: '#CFE6F8', soft: '#F1F8FE', limited: 'autumn' },
+  // V13.207 특별 한정 펫 3마리(영웅 한정): 파는 알이 없고, 영웅 결과(영웅 알 · 코인 뽑기 영웅 알)에서만 나온다(SEASONS.special).
+  hachiware: { name: 'HACHIWARE', ko: '하치와레', type: '고양이 친구', color: '#4F86C6', light: '#CFE2F7', soft: '#F1F7FE', limited: 'special' },
+  usagi: { name: 'USAGI', ko: '우사기', type: '토끼 친구', color: '#D9A62E', light: '#FBE6A6', soft: '#FFFAEA', limited: 'special' },
+  chiikawa: { name: 'CHIIKAWA', ko: '치이카와', type: '작고 귀여운 친구', color: '#E07FA0', light: '#FAD0DE', soft: '#FFF3F7', limited: 'special' },
   // V13.195 곤충 · 공룡 시리즈(docs/bug-dino-pets-design.md, 그림 54 · 55): 알 상점의 시리즈 알(SERIES_EGG)에서만 나온다.
   // 전역 등급 표시(epic · legendary)는 넣지 않는다: 기본 · 영웅 · 전설 알, 선물 알, 사냥, 코인 뽑기, 영웅 수 · 전역 전설 셈에 안 섞인다.
   // `rank`는 시리즈 안 등급(기본 · 영웅 · 전설: 알 확률 무게 · 특기 세기 · 도감 테두리), `group`은 곤충(bug) · 공룡(dino).
@@ -158,14 +162,17 @@ export const petTier = key => CHARACTERS[key]?.mythic ? 'mythic' : CHARACTERS[ke
 // them `after_rate`% of the time, while the student still misses one.
 export const SEASONS = {
   // V13.117: the Halloween egg became the 가을 이벤트 알 (Halloween + 수능·기말 응원), on sale until 11/30.
-  autumn: { name: '가을 이벤트', egg: '가을 이벤트 알', price: 600, start: '2026-10-01', end: '2026-11-30', until: '11월 30일', after_rate: 5, stage: 'halloween', stage_end: '2026-11-07' }
+  autumn: { name: '가을 이벤트', mark: '🎃', egg: '가을 이벤트 알', price: 600, start: '2026-10-01', end: '2026-11-30', until: '11월 30일', after_rate: 5, stage: 'halloween', stage_end: '2026-11-07' },
+  // V13.207 특별 한정(영웅 한정): 파는 알이 없다(`epic_only`). `start`~`end`(한국 날짜, 포함) 동안 영웅 결과의 `rate`%가
+  // 아직 없는 특별 펫이고, 기간이 끝나면 다른 지난 시즌처럼 `after_rate`%로 영웅 알에 숨는다.
+  special: { name: '특별', mark: '🎁', epic_only: true, start: '2026-11-04', end: '2026-12-31', until: '12월 31일', rate: 10, after_rate: 5 }
 };
 const kstDay = now => new Date(Number(now) + 9 * 3600000).toISOString().slice(0, 10);
 export const seasonKeys = id => LIMITED_PET_KEYS.filter(key => CHARACTERS[key].limited === id);
 // The season whose egg is on sale now (or null).
 export function seasonOnSale(now = Date.now()) {
   const day = kstDay(now);
-  const id = Object.keys(SEASONS).find(k => day >= SEASONS[k].start && day <= SEASONS[k].end);
+  const id = Object.keys(SEASONS).find(k => !SEASONS[k].epic_only && day >= SEASONS[k].start && day <= SEASONS[k].end);
   return id ? { id, ...SEASONS[id], keys: seasonKeys(id) } : null;
 }
 // V13.117: the battle stage of the season (the Halloween one), only until `stage_end` (11/7), though the egg sells until 11/30.
@@ -175,6 +182,15 @@ export function seasonStage(now = Date.now()) {
 }
 // Limited pets of seasons already over: these hide in 영웅 eggs.
 export const seasonsOver = (now = Date.now()) => Object.keys(SEASONS).filter(id => kstDay(now) > SEASONS[id].end);
+// V13.207 지금 영웅 결과에 숨어 있는 한정 시즌과 그 확률: 기간 중인 영웅 한정(`epic_only`)은 `rate`%, 끝난 시즌은 `after_rate`%.
+export const seasonsInEpic = (now = Date.now()) => {
+  const day = kstDay(now);
+  return Object.keys(SEASONS).map(id => {
+    const s = SEASONS[id];
+    if (day > s.end) return { id, rate: s.after_rate };
+    return s.epic_only && day >= s.start ? { id, rate: s.rate } : null;
+  }).filter(Boolean);
+};
 // Pet growth: an egg, then three evolution forms. `form` is 0 (egg) .. 3 (final).
 export const PET_FORMS = ['알', '아기', '성장', '최종'];
 export const PET_FORM_LEVELS = [1, 3, 10, 20];
