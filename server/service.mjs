@@ -1330,7 +1330,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const grammarProgress = teacher
       ? Object.fromEntries([...studentIds].map(studentId => [studentId, state.grammarProgress?.[studentId] || {}]))
       : (state.grammarProgress?.[p.id] || {});
-    // V13.214 선생님 첫 화면에는 학생별 단어 숙련도를 싣지 않는다(학생 기록 창을 열 때 GET /teacher/student-detail/:id).
+    // V13.215 선생님 첫 화면에는 학생별 단어 숙련도를 싣지 않는다(학생 기록 창을 열 때 GET /teacher/student-detail/:id).
     const wordMastery = teacher ? null : wordRangeMastery(state, p.id, selectedSchool, p.class_name);
     const dailyQuest = teacher || selectedDivision === 'middle' ? null : composeDailyQuest(state, p.id, selectedSchool, p.class_name, 20);
     const activePractice = teacher ? null : state.practices.find(x => x.student_id === p.id && !x.finished);
@@ -1352,7 +1352,7 @@ export async function service(state, method, path, body, token, options = {}) {
       daily_quest: !!activePractice.daily_quest
     } : null;
     return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes, ...dailyQuestProgress(sessions, activePractice, dailyQuest.target) } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
-      // V13.214 선생님: 학생 목록은 화면이 쓰는 칸만, 연습 기록은 오늘 것 + 최근 실전시험 6개만(server/teacher-home.mjs).
+      // V13.215 선생님: 학생 목록은 화면이 쓰는 칸만, 연습 기록은 오늘 것 + 최근 실전시험 6개만(server/teacher-home.mjs).
       // 학생별 이번 주 · 지난주 · 마지막 학습은 session_digest, 전체 기록은 결과 분석 탭의 GET /teacher/records.
       profiles: teacher ? studentProfiles.map(s => teacherStudentRow(s, stats(state, s, sessionsByStudent.get(s.id) || [], battlesByStudent))) : [],
       sessions: teacher ? homeSessions(sessions, dayKey, now).map(sessionSummary) : sessions.map(hydrateSession), exams: visibleExams,
@@ -1407,7 +1407,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!student) fail('학생을 찾을 수 없어요.', 404);
     return { student_id: student.id, activity: activityOf(student), server_time: Date.now() };
   }
-  // V13.214 선생님 결과 분석 탭(연습 기록 · 실전시험 결과 30개씩)과 학생 기록 창. 보기 전용 GET, 맡은 학교 · 부서의 진짜 학생만
+  // V13.215 선생님 결과 분석 탭(연습 기록 · 실전시험 결과 30개씩)과 학생 기록 창. 보기 전용 GET, 맡은 학교 · 부서의 진짜 학생만
   // (미리보기 계정 제외, 첫 화면과 같은 거르기).
   if (path === '/teacher/records' || path.startsWith('/teacher/student-detail/')) {
     requireRole(p, 'teacher');

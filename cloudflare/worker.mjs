@@ -15,7 +15,7 @@ import { examAdmin } from '../server/exam-admin.mjs';
 import { migrateState, stateSizeReport } from '../server/state.mjs';
 import { hashToken } from '../server/auth.mjs';
 import { createMutationCoordinator, NO_MUTATION, isQuickWrite, quickOwn, quickSettle, readState, isReadPost, isViewPost, tokenUser, tokenOwner } from '../server/mutation-coordinator.mjs';
-import { createLocalRepository, createSupabaseSync } from './local-first.mjs';
+import { createLocalRepository, createSupabaseSync, backupState } from './local-first.mjs';
 import { partitionState, assembleState, hashText } from './state-parts.mjs';
 import { WRITE_WARN_PCT } from './cf-limits.mjs';
 import { stateBudgetReport, upgradeAdvice } from '../server/perf-budget.mjs';
@@ -117,7 +117,8 @@ function createSupabaseRepository(env) {
       response = await fetch(base + name, { method: 'POST', headers, body: text, signal: AbortSignal.timeout(timeoutMs) });
     } catch (error) {
       // Timeouts and network failures: keep the cause for /api/health and the logs.
-      throw Object.assign(Error('영구 저장 서버에 연결하지 못했습니다.'), { status: 503, detail: `${name}: ${error?.name || 'Error'} ${error?.message || ''} (${Math.round(text.length / 1024)} KB)`.trim() });
+      // V13.214 http 0: 답 자체가 없었다(시간 초과 · 네트워크). 백업 상태(supabase_status)를 가르는 데 쓴다.
+      throw Object.assign(Error('영구 저장 서버에 연결하지 못했습니다.'), { status: 503, http: 0, detail: `${name}: ${error?.name || 'Error'} ${error?.message || ''} (${Math.round(text.length / 1024)} KB)`.trim() });
     }
     const responseText = await response.text();
     let payload = null;
@@ -128,7 +129,7 @@ function createSupabaseRepository(env) {
       const status = payload?.code === '40001' || message.includes('revision_conflict') ? 409 : response.status === 404 ? 404 : 503;
       // Supabase's own reason (never the request body or secret), for diagnosing failed backups.
       const detail = `${name}: HTTP ${response.status}${payload?.code ? ' ' + payload.code : ''} ${String(message).slice(0, 160)} (${Math.round(text.length / 1024)} KB)`;
-      throw Object.assign(Error(status === 409 ? '다른 기기의 변경이 있습니다. 다시 시도해주세요.' : '영구 저장 서버에 연결하지 못했습니다.'), { status, detail });
+      throw Object.assign(Error(status === 409 ? '다른 기기의 변경이 있습니다. 다시 시도해주세요.' : '영구 저장 서버에 연결하지 못했습니다.'), { status, http: response.status, detail });
     }
     return payload;
   }
@@ -593,7 +594,12 @@ export class VocaStateObject {
       if (url.pathname === '/api/bootstrap' && result?.profile?.role === 'teacher' && writeStats.pct >= WRITE_WARN_PCT) {
         result.server_write_warning = { pct: Math.round(writeStats.pct), defer: writeStats.level === 'defer', text: `오늘 서버 저장량이 많아요(${Math.round(writeStats.pct)}%)` };
       }
-      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', storage_format: this.local.format(), last_commit_rows: this.local.metrics.commitRows, supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.size || 0) / 1024), state_breakdown: this.sizeReport(), auto_trim: this.mutations.current().state.storageAutoTrim || null, frozen_retries: this.mutations.stats?.().frozen_retries ?? 0, mastery_retries: this.mutations.stats?.().mastery_retries ?? 0, views_kept: this.mutations.stats?.().views_kept ?? 0, supabase_deferred_busy: sync.deferred_busy ?? 0, state_budget: stateBudgetReport(this.sizeReport().keys_kb, Math.round((this.local.latest()?.size || 0) / 1024)) };
+      // V13.214 Supabase 백업이 6시간 넘게 안 되면 선생님 첫 화면에만 경고 한 줄(학생 화면에는 없다).
+      const backup = (url.pathname === '/api/health' || url.pathname === '/api/bootstrap') ? backupState(sync) : null;
+      if (url.pathname === '/api/bootstrap' && result?.profile?.role === 'teacher' && backup?.warn) {
+        result.server_backup_warning = { hours: backup.warn_hours, status: backup.status, text: `데이터 백업이 ${backup.warn_hours}시간째 안 되고 있어요`, detail: backup.kind_text, guide_url: backup.guide_url };
+      }
+      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', storage_format: this.local.format(), last_commit_rows: this.local.metrics.commitRows, supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.size || 0) / 1024), state_breakdown: this.sizeReport(), auto_trim: this.mutations.current().state.storageAutoTrim || null, frozen_retries: this.mutations.stats?.().frozen_retries ?? 0, mastery_retries: this.mutations.stats?.().mastery_retries ?? 0, views_kept: this.mutations.stats?.().views_kept ?? 0, supabase_deferred_busy: sync.deferred_busy ?? 0, supabase_yielded_busy: sync.yielded_busy ?? 0, supabase_last_batches: sync.last_batches ?? 0, supabase_last_max_batch_kb: sync.last_max_batch_kb ?? 0, supabase_status: backup.status, supabase_status_text: backup.text, supabase_last_ok_text: backup.last_ok_text, supabase_failing_since: backup.failing_since, supabase_failing_hours: backup.failing_hours, supabase_fail_kind: backup.fail_kind, supabase_guide_url: backup.guide_url, state_budget: stateBudgetReport(this.sizeReport().keys_kb, Math.round((this.local.latest()?.size || 0) / 1024)) };
       // V13.212 유료 업그레이드 · 데이터 정리가 필요한지 한 줄로(docs/performance-rules.md).
       if (url.pathname === '/api/health') result.storage.upgrade = upgradeAdvice({ writePct: writeStats.pct, budget: result.storage.state_budget });
       const responseHeaders = {

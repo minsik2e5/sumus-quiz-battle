@@ -38,6 +38,7 @@
 | `write_level` | `ok` | `warn`(70%)이 자주 뜨면 업그레이드를 검토한다(아래) |
 | `storage.mastery_retries` | 재채점할 때만 조금씩 는다 | 계속 늘면 어떤 요청이 다른 학생 숙련도를 고치는지 찾는다 |
 | `storage.supabase_failures` | 0 | Supabase 대시보드(일시정지 · 점검)를 확인한다 |
+| `storage.supabase_status` | `ok` | `paused_suspected` · `failing`이면 `docs/supabase-backup-runbook.md` 순서대로(6시간 넘으면 선생님 화면에도 경고) |
 
 ## 계속 지키는 방법
 - AI 작업 메모(`CLAUDE.md`)에 넣어 두어 매 세션 처음에 읽는다.

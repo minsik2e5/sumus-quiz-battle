@@ -1,4 +1,4 @@
-// V13.214 선생님 결과 분석 탭 기록(GET /api/teacher/records)과 학생 기록 창(GET /api/teacher/student-detail/:id).
+// V13.215 선생님 결과 분석 탭 기록(GET /api/teacher/records)과 학생 기록 창(GET /api/teacher/student-detail/:id).
 // 첫 화면(/bootstrap)에는 오늘 기록과 최근 실전시험만 오므로, 전체 기록은 그 탭 · 창을 열 때 작은 쪽(30개)으로 받는다.
 // 같은 조건은 1분 동안 다시 묻지 않는다(캐시). 새로 받는 동안에는 직전에 보던 표를 그대로 보여 준다(깜빡임 없이).
 import { api } from './ui.js';
