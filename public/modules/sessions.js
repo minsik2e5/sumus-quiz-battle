@@ -1,3 +1,4 @@
+import { findTeacherRecord } from './teacher-records.js';
 import { api, $, $$, icon, esc, time, date, recordRangeLabel, scope, toast, modal, buttonBusy } from './ui.js';
 import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo, grade, displayEnglish, TEST_SECONDS_PER_QUESTION, TEST_LEAVE_LIMIT, testDurationSec } from './core.js';
 import { avatar } from './character.js';
@@ -183,18 +184,29 @@ function showExamResult(data) {
     }));
   });
 }
+// V13.64: the teacher list arrives without per-answer lists; load this one record's details.
+// V13.216 학생 목록도 일주일 지난 기록은 요약만 온다(답 상세는 서버 보관): 기록을 열거나 오답 다시 풀기 · 같은 범위 다시를
+// 누를 때 그 기록 한 개만 받는다. 받은 기록은 목록에 넣어 두어 다시 묻지 않는다. 못 받으면 null(안내는 여기서 띄운다).
+// V13.214 선생님 첫 화면에는 오늘 기록만 있어서, 결과 분석 탭 · 학생 기록 창에서 받은 기록(modules/teacher-records.js)도 찾는다.
+export async function sessionWithDetails(sessionId) {
+  const teacher = A?.data?.profile?.role === 'teacher';
+  let session = A?.data?.sessions?.find(item => item.id === sessionId) || (teacher ? findTeacherRecord(sessionId) : null);
+  if (!session && !teacher) return null;
+  if (session && !session.details_omitted) return session;
+  try {
+    const full = await api(`/sessions/${encodeURIComponent(sessionId)}`);
+    const list = A.data.sessions; const index = list.findIndex(item => item.id === sessionId);
+    session = { ...full, details_omitted: false };
+    if (index >= 0) list[index] = session;
+    return session;
+  } catch (err) { toast(err.message || '답안을 불러오지 못했어요.'); return null; }
+}
 export async function openPracticeRecord(sessionId) {
-  let session = A?.data?.sessions?.find(item => item.id === sessionId);
-  if (!session) return toast('연습 기록을 찾을 수 없어요.');
-  // V13.64: the teacher list arrives without per-answer lists; load this one record's details.
-  if (session.details_omitted) {
-    try {
-      const full = await api(`/sessions/${encodeURIComponent(sessionId)}`);
-      const list = A.data.sessions; const index = list.findIndex(item => item.id === sessionId);
-      session = { ...full, details_omitted: false };
-      if (index >= 0) list[index] = session;
-    } catch (err) { return toast(err.message || '답안을 불러오지 못했어요.'); }
-  }
+  const teacher = A?.data?.profile?.role === 'teacher';
+  const listed = A?.data?.sessions?.find(item => item.id === sessionId) || (teacher ? findTeacherRecord(sessionId) : null);
+  if (!listed && !teacher) return toast('연습 기록을 찾을 수 없어요.');
+  const session = await sessionWithDetails(sessionId);
+  if (!session) return;
   const disputes = (A.data.meaning_disputes || []).filter(item => item.source_type === 'practice' && item.source_id === session.id);
   const runLabel = session.run_mode === 'test' ? '실전시험' : '연습시험';
   const pending = disputes.filter(item => item.status === 'pending').length;

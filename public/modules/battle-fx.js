@@ -56,7 +56,7 @@ export const FX2_CAP = [44, 52, 60, 66];
 let capNow = FX2_MAX;
 // V13.200 시리즈 펫(곤충 · 공룡)은 시리즈 등급(rank)으로: 렉스는 전설, 장수 · 나풀 · 휘익 · 단단이는 영웅 연출.
 export const tierOf = c => c?.mythic ? 3 : c?.legendary || c?.rank === 'legendary' ? 2 : c?.epic || c?.rank === 'epic' ? 1 : 0;
-// V13.214 저사양 단계(lite): a phone that keeps dropping frames in a match (battle.js) draws the same
+// V13.217 저사양 단계(lite): a phone that keeps dropping frames in a match (battle.js) draws the same
 // effects with fewer pieces: a lower cap, fewer afterimages and bits. The default look is unchanged.
 export const FX2_LITE_CAP = 28;
 let lite = false;

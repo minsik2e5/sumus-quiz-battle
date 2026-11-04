@@ -122,12 +122,12 @@ export function showPose(art, pose, ms = 2800) {
     clearTimeout(img._pose);
     img._pose = setTimeout(() => { if (img.isConnected) img.setAttribute('src', still); img._still = null; }, ms);
   };
-  // V13.214: a pose already fetched and decoded swaps at once; the first time it is decoded off the
+  // V13.217: a pose already fetched and decoded swaps at once; the first time it is decoded off the
   // screen first (decode()), so the swap never waits on a 512px picture being unpacked mid-hit.
   const pre = decodedPose(src);
   if (pre.ready) swap(); else pre.wait.then(swap, () => {});
 }
-// V13.214: pose pictures kept decoded (at most POSE_KEEP; the oldest goes first). preloadPoses()
+// V13.217: pose pictures kept decoded (at most POSE_KEEP; the oldest goes first). preloadPoses()
 // fetches a pet's attack and hurt poses before a match so the first hit swaps without a wait.
 const POSE_KEEP = 16, POSES = new Map();
 function decodedPose(src) {

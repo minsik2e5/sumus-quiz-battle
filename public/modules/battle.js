@@ -1073,7 +1073,7 @@ function drawMatch() {
     <div class="yb-emotes" id="yb-emotes"></div>
     <button type="button" class="yb-leave" data-yb="leave">대결 포기하기</button>`);
   watchGeo();
-  // V13.214: the attack · hurt pictures are fetched and decoded now, not on the first hit.
+  // V13.217: the attack · hurt pictures are fetched and decoded now, not on the first hit.
   for (const side of ['me', 'op']) preloadPoses(document.getElementById('yb-pet-' + side));
   refreshHud();
   drawEmotes();
@@ -1112,12 +1112,12 @@ function effectBadges(fx = {}, pet = null) {
   const list = (xs, sign) => xs.length > 1 && xs.every(x => x === xs[0]) ? `${sign}${xs[0]} ×${xs.length}` : xs.map(x => sign + x).join(' ');
   return [fx.boost?.length && `<b class="boost">공격 ${list(fx.boost, '+')}</b>`, fx.guard?.length && `<b class="guard">방어 ${list(fx.guard, '−')}</b>`, fx.poison > 0 && `<b class="poison">${dotName(pet)} ${fx.poison}번</b>`].filter(Boolean);
 }
-// V13.214: only what changed is written (a HUD refresh runs several times per answer); the same
+// V13.217: only what changed is written (a HUD refresh runs several times per answer); the same
 // text or markup again is skipped, so the browser has nothing to lay out again.
 function setHtml(el, html) { if (el && el._html !== html) { el._html = html; el.innerHTML = html; } }
 function setText(el, text) { text = String(text); if (el && el.textContent !== text) el.textContent = text; }
 function setHp(fill, pct) {
-  // The bar shrinks with clip-path (painted, no layout each frame); width stays 100% (v13214.css).
+  // The bar shrinks with clip-path (painted, no layout each frame); width stays 100% (v13217.css).
   const clip = `inset(0 ${(100 - pct).toFixed(2)}% 0 0 round 99px)`, color = pct > 50 ? '#2fbf71' : pct > 20 ? '#f2b233' : '#e5484d';
   if (fill._clip !== clip) { fill._clip = clip; fill.style.clipPath = clip; }
   if (fill._color !== color) { fill._color = color; fill.style.backgroundColor = color; }
@@ -1335,7 +1335,7 @@ function drawQuestion() {
   if (q.answer === undefined && !q.locked) say(q.kind === 'spell' ? '뜻을 보고 <em>영어 철자</em>를 써요!' : '알맞은 <em>뜻</em>을 누르면 바로 공격!', q.kind === 'spell' ? '쓰기 정답은 두 배로 세요.' : '');
 }
 
-// V13.214: the four answer buttons stay; a new word or a hit only changes their words and
+// V13.217: the four answer buttons stay; a new word or a hit only changes their words and
 // classes (before, every answer, hit and reveal rebuilt all four with innerHTML).
 const answerClass = (q, i) => ['yb-answer', q.answer === i && 'right', q.answer !== undefined && q.answer !== i && 'dim', q.picked === i && 'picked', q.picked === i && q.hit && 'hit'].filter(Boolean).join(' ');
 function drawAnswers(q) {
@@ -1362,7 +1362,7 @@ function say(mainHtml, sub = '') {
 }
 function setStatus(side, text) { const el = document.getElementById('yb-status-' + side); if (el) el.textContent = text; }
 function flash(color) { const f = document.getElementById('yb-flash'); if (!f) return; f.style.setProperty('--flash', color); replay(f, 'on', 620, ['ybFlash']); }
-// ---------- V13.214 렉 줄이기(보이는 연출은 그대로, 비용만) ----------
+// ---------- V13.217 렉 줄이기(보이는 연출은 그대로, 비용만) ----------
 // Restarts a CSS animation class without reading layout. Before, reading offsetWidth forced a
 // whole layout on every hit, shake, flash and combo (several times per answer).
 // A class still on (the animation running) restarts by rewinding its own animations (`names`);
@@ -1598,9 +1598,9 @@ function showCountdown(deadline) {
 }
 
 // Clock and word timer, drawn from the room's deadlines.
-// V13.214 저사양 자동 단계: in a match, more than LITE_LONG_COUNT frames over LITE_LONG_MS within
+// V13.217 저사양 자동 단계: in a match, more than LITE_LONG_COUNT frames over LITE_LONG_MS within
 // LITE_WINDOW_MS mean this phone cannot keep up. It switches to a lighter look (fewer effect pieces,
-// no blend · glow filters, see battle-fx.js fxLite and v13214.css .yb-lite) and remembers it for
+// no blend · glow filters, see battle-fx.js fxLite and v13217.css .yb-lite) and remembers it for
 // LITE_DAYS. Phones that keep up keep the full look. 'off' in the pref turns the switch off (for tests).
 const LITE_KEY = 'sumus-yacha-lite', LITE_LONG_MS = 50, LITE_WINDOW_MS = 3000, LITE_LONG_COUNT = 8, LITE_DAYS = 7;
 const liteOn = () => { const at = Number(pref(LITE_KEY, 0)); return at > 0 && Date.now() - at < LITE_DAYS * 86400000; };
@@ -1628,7 +1628,7 @@ function loop() {
     const v = B.view, now = serverNow();
     lagWatch(t);
     const clock = document.getElementById('yb-clock');
-    // V13.214: the clock text and its colour are written only when they change (once a second),
+    // V13.217: the clock text and its colour are written only when they change (once a second),
     // not on every frame (each write made the browser recompute styles and lay the page out again).
     if (clock) { const left = v.ends_at ? Math.max(0, v.ends_at - now) : matchMs(v.mode); setText(clock, clockText(left)); const warn = left <= (v.fever_ms || 15000) && !!v.ends_at; if (clock._warn !== warn) { clock._warn = warn; clock.parentElement.classList.toggle('warn', warn); } }
     // Fever time: the room deals 1.5x damage in the last seconds; show it once it starts.
@@ -1645,7 +1645,7 @@ function loop() {
   };
   B.raf = requestAnimationFrame(frame);
 }
-// V13.214: the word timer bar runs as one animation on the compositor for each word (the same
+// V13.217: the word timer bar runs as one animation on the compositor for each word (the same
 // shrinking bar), instead of a style written on every frame. It is set again only when the word,
 // its deadline or the clock correction changes; it holds while a word game is open (v = null).
 function turnBar(v, now) {
@@ -1935,7 +1935,7 @@ async function reviewWords() {
 function drawEmotes() {
   const bar = document.getElementById('yb-emotes'); if (!bar) return;
   const live = ['countdown', 'question', 'reveal'].includes(B.view?.phase);
-  // V13.214: drawn once, then only switched on and off (it was rebuilt on every word).
+  // V13.217: drawn once, then only switched on and off (it was rebuilt on every word).
   setHtml(bar, `${Object.entries(EMOTES).map(([id, text]) => `<button type="button" class="yb-emote" data-yb="emote" data-emote="${id}" ${live ? '' : 'disabled'}>${esc(text)}</button>`).join('')}<button type="button" class="yb-emote-toggle" data-yb="emotes-toggle" aria-pressed="${!emotesShown()}">${emotesShown() ? '상대 이모트 끄기' : '상대 이모트 켜기'}</button>`);
 }
 function sendEmote(button) {

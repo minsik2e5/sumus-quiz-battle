@@ -109,7 +109,8 @@ export async function runYachaLagChecks(assert) {
     await sync.run();
     assert(deferred === false && sync.status().deferred_busy === 1 && pushes === 1 && SYNC_BUSY_DEFER_MAX_MS <= 30000,
       'V13.212 백업은 요청을 처리하는 동안 미루고(최대 20초), 잠잠해지면 올린다');
-    assert(source('../cloudflare/local-first.mjs').includes('schedule(Math.min(60000, 2000 * 2 ** Math.min(failures - 1, 5)));'), 'V13.212 백업 실패 뒤 다시 하기는 2초부터 두 배씩 최대 1분(그대로)');
+    // V13.214 30분 넘게 실패하면 5분마다(server/supabase-backup-check.mjs), 그 전에는 V13.212 그대로.
+    assert(source('../cloudflare/local-first.mjs').includes('SYNC_FAIL_SLOW_RETRY_MS : Math.min(60000, 2000 * 2 ** Math.min(failures - 1, 5)));'), 'V13.212 백업 실패 뒤 다시 하기는 2초부터 두 배씩 최대 1분(그대로)');
   }
   /* ---------- 7. 운영 크기에서 POST 하나의 복사 · 저장 비용: 숙련도를 빼서 예전보다 확실히 적다 ---------- */
   {

@@ -31,7 +31,10 @@ export async function runSweepTeacherChecks(assert, expectStatus) {
 
   const boot = await service(state, 'GET', '/bootstrap', {}, teacher);
   assert(!boot.profiles.some(x => x.id === pid) && boot.profiles.length === 2, 'V13.168 선생님 학생 목록(대시보드 · 학생 관리 · 결과 분석 · 내보내기)에 미리보기 계정이 나오지 않는다');
-  assert(!boot.sessions.some(s => s.student_id === pid) && boot.sessions.some(s => s.student_id === 'qa-sw-a'), 'V13.168 선생님 결과 분석에 미리보기 계정의 연습 기록이 섞이지 않는다(진짜 학생 기록은 그대로)');
+  // V13.214 결과 분석의 전체 연습 기록은 GET /teacher/records로 받는다(첫 화면에는 오늘 기록 · 학생별 숫자만). 두 곳 모두 미리보기 계정 제외.
+  const records = await service(state, 'GET', '/teacher/records', { view: 'practice' }, teacher);
+  assert(!records.rows.some(s => s.student_id === pid) && records.rows.some(s => s.student_id === 'qa-sw-a') && records.metrics.practices === 1, 'V13.168 선생님 결과 분석에 미리보기 계정의 연습 기록이 섞이지 않는다(진짜 학생 기록은 그대로)');
+  assert(!boot.sessions.some(s => s.student_id === pid) && !(pid in (boot.session_digest?.students || {})) && boot.session_digest.students['qa-sw-a']?.last === T0 - DAY, 'V13.214 선생님 첫 화면의 학생별 숫자(session_digest)에도 미리보기 계정이 없다');
   assert(!boot.attempts.some(a => a.student_id === pid) && boot.attempts.some(a => a.student_id === 'qa-sw-a'), 'V13.168 선생님 시험 현황에 미리보기 계정의 응시 기록이 섞이지 않는다');
   assert(!(pid in (boot.word_mastery || {})) && !(pid in (boot.grammar_progress || {})), 'V13.168 선생님 단어 · 어법 진도표에도 미리보기 계정이 없다');
 

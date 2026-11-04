@@ -1,4 +1,4 @@
-/* V13.214 야차전 렉 줄이기: 보이는 연출은 그대로, 그리는 비용만 줄인다(docs/yacha-perf.mjs로 잼). */
+/* V13.217 야차전 렉 줄이기: 보이는 연출은 그대로, 그리는 비용만 줄인다(docs/yacha-perf.mjs로 잼). */
 
 /* 경기장 안의 효과 조각이 붙고 떨어질 때 배치 · 그리기를 경기장 안에서만 다시 한다(밖은 그대로). */
 .battle-app .yb-arena{contain:layout paint}
