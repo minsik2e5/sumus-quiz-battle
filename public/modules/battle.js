@@ -1,6 +1,6 @@
 import { api, esc, icon, toast, num, rangeLabel, modal, dialogOpen, buttonBusy } from './ui.js';
 import { CHARACTERS, PET_FORMS, seasonStage, petReady } from './core.js';
-import { avatar, petKey, showPose, holdPose } from './character.js';
+import { avatar, petKey, showPose, holdPose, preloadPoses } from './character.js';
 import { getRanges, periodFolders, periodGroups } from './student.js';
 import { openSheet } from './sheet.js';
 import { openFriendSheet } from './friend-sheet.js';
@@ -16,7 +16,7 @@ import { BOT_WIN_REWARDS, BOT_TRY_REWARD, BOT_DAILY, BOT_MIN_RIGHT } from './rew
 import { tournamentCard, openBracket } from './tournament-ui.js';
 import { openMiniGame } from './word-minigame-ui.js';
 import { bonusText } from './word-minigame.js';
-import { elementOf, paletteOf, tierOf, fxCap, fxShot, fxImpact, fxSpeedLines, fxPunch, fxSkillCutIn, fxSignature, fxLunge, fxRecoil, fxShield, fxHeal, fxPowerUp, fxToxic, fxEdge, fxRank, comboRank, auraLevel } from './battle-fx.js';
+import { elementOf, paletteOf, tierOf, fxCap, fxLite, fxShot, fxImpact, fxSpeedLines, fxPunch, fxSkillCutIn, fxSignature, fxLunge, fxRecoil, fxShield, fxHeal, fxPowerUp, fxToxic, fxEdge, fxRank, comboRank, auraLevel } from './battle-fx.js';
 import { monsterInfo, MONSTER_ART, MONSTER_LEVELS, MONSTER_LEVEL_KEYS, MONSTER_DAILY, MONSTER_TRY, monsterOpen, stageLevel, stageMonster, isBossStage } from './monsters.js';
 import { playSound, unlockSound, preloadSound } from './sound.js';
 import { openDungeon } from './dungeon.js';
@@ -1072,6 +1072,9 @@ function drawMatch() {
     <div class="yb-myskill-v1372" id="yb-myskill"></div>
     <div class="yb-emotes" id="yb-emotes"></div>
     <button type="button" class="yb-leave" data-yb="leave">대결 포기하기</button>`);
+  watchGeo();
+  // V13.214: the attack · hurt pictures are fetched and decoded now, not on the first hit.
+  for (const side of ['me', 'op']) preloadPoses(document.getElementById('yb-pet-' + side));
   refreshHud();
   drawEmotes();
   if (v.phase === 'waiting') say('상대가 들어오기를 기다리는 중…', '둘 다 연결되면 3초 뒤에 시작해요.');
@@ -1109,23 +1112,32 @@ function effectBadges(fx = {}, pet = null) {
   const list = (xs, sign) => xs.length > 1 && xs.every(x => x === xs[0]) ? `${sign}${xs[0]} ×${xs.length}` : xs.map(x => sign + x).join(' ');
   return [fx.boost?.length && `<b class="boost">공격 ${list(fx.boost, '+')}</b>`, fx.guard?.length && `<b class="guard">방어 ${list(fx.guard, '−')}</b>`, fx.poison > 0 && `<b class="poison">${dotName(pet)} ${fx.poison}번</b>`].filter(Boolean);
 }
+// V13.214: only what changed is written (a HUD refresh runs several times per answer); the same
+// text or markup again is skipped, so the browser has nothing to lay out again.
+function setHtml(el, html) { if (el && el._html !== html) { el._html = html; el.innerHTML = html; } }
+function setText(el, text) { text = String(text); if (el && el.textContent !== text) el.textContent = text; }
+function setHp(fill, pct) {
+  // The bar shrinks with clip-path (painted, no layout each frame); width stays 100% (v13214.css).
+  const clip = `inset(0 ${(100 - pct).toFixed(2)}% 0 0 round 99px)`, color = pct > 50 ? '#2fbf71' : pct > 20 ? '#f2b233' : '#e5484d';
+  if (fill._clip !== clip) { fill._clip = clip; fill.style.clipPath = clip; }
+  if (fill._color !== color) { fill._color = color; fill.style.backgroundColor = color; }
+}
 function refreshHud() {
   for (const [side, p] of [['me', me()], ['op', foe()]]) {
     const pct = Math.min(100, Math.max(0, p.hp) / (p.max_hp || maxHp()) * 100), fill = document.getElementById('yb-hp-' + side);
-    if (fill) { fill.style.width = pct + '%'; fill.style.backgroundColor = pct > 50 ? '#2fbf71' : pct > 20 ? '#f2b233' : '#e5484d'; }
-    const hpn = document.getElementById('yb-hpn-' + side);
-    if (hpn) hpn.textContent = Math.max(0, p.hp);
+    if (fill) setHp(fill, pct);
+    setText(document.getElementById('yb-hpn-' + side), Math.max(0, p.hp));
     if (side === 'me') fxEdge(document.getElementById('yb-arena'), 'low', p.hp > 0 && pct <= 25 && B.view?.phase !== 'finished');
     const skill = p.skill || petSkill(p.pet), gauge = skill.need > 0 ? Math.min(p.gauge || 0, skill.need) : 0;
     const box = document.getElementById('yb-gauge-' + side);
     if (box) {
       // V13.185: every pet (전설 · 신화 · 한정 too) has a skill, so there is always a gauge.
-      box.innerHTML = '<i>스킬</i>' + Array.from({ length: skill.need }, (_, i) => `<span class="${i < gauge ? 'on' : ''}"></span>`).join('');
+      setHtml(box, '<i>스킬</i>' + Array.from({ length: skill.need }, (_, i) => `<span class="${i < gauge ? 'on' : ''}"></span>`).join(''));
       box.classList.toggle('near', gauge === skill.need - 1);
-      box.setAttribute('aria-label', `${skill.name} 게이지 ${gauge}/${skill.need}`);
+      const label = `${skill.name} 게이지 ${gauge}/${skill.need}`;
+      if (box.getAttribute('aria-label') !== label) box.setAttribute('aria-label', label);
     }
-    const fx = document.getElementById('yb-fx-' + side);
-    if (fx) fx.innerHTML = [...effectBadges(p.effects, p.pet), !p.connected && B.view.phase !== 'waiting' && '<b class="off">연결 끊김</b>'].filter(Boolean).join('');
+    setHtml(document.getElementById('yb-fx-' + side), [...effectBadges(p.effects, p.pet), !p.connected && B.view.phase !== 'waiting' && '<b class="off">연결 끊김</b>'].filter(Boolean).join(''));
     document.getElementById('yb-pet-' + side)?.classList.toggle('buff', !!p.effects?.boost?.length);
     document.getElementById('yb-pet-' + side)?.classList.toggle('guarded', !!p.effects?.guard?.length);
   }
@@ -1135,7 +1147,7 @@ function refreshHud() {
 function drawMySkill() {
   const box = document.getElementById('yb-myskill'); if (!box) return;
   const p = me(), s = p.skill || petSkill(p.pet), gauge = Math.min(p.gauge || 0, s.need), left = s.need - gauge;
-  box.innerHTML = `<span class="yb-myskill-name"><span aria-hidden="true">✦</span> ${esc(s.name)}</span><span class="yb-myskill-desc">${esc(s.desc)}</span><span class="yb-myskill-left ${left === 1 ? 'near' : ''}">${left === 1 ? '한 번만 더!' : `${left}번 더 맞히면`}</span>`;
+  setHtml(box, `<span class="yb-myskill-name"><span aria-hidden="true">✦</span> ${esc(s.name)}</span><span class="yb-myskill-desc">${esc(s.desc)}</span><span class="yb-myskill-left ${left === 1 ? 'near' : ''}">${left === 1 ? '한 번만 더!' : `${left}번 더 맞히면`}</span>`);
 }
 // A pet skill went off: a banner across the arena for a moment.
 function skillBanner(side, name, text) {
@@ -1318,32 +1330,97 @@ function drawQuestion() {
   document.getElementById('yb-q-word').classList.toggle('meaning', q.kind === 'spell');
   document.querySelector('.battle-app')?.classList.toggle('yb-spelling', q.kind === 'spell');
   if (q.kind === 'spell') drawSpell(q);
-  else { B.typing = false; document.querySelector('.battle-app')?.classList.remove('yb-typing'); document.getElementById('yb-answers').innerHTML = q.options.map((o, i) => `<button type="button" class="yb-answer ${q.answer === i ? 'right' : ''} ${q.answer !== undefined && q.answer !== i ? 'dim' : ''} ${q.picked === i ? 'picked' : ''} ${q.picked === i && q.hit ? 'hit' : ''}" data-yb="answer" data-choice="${i}" aria-label="${i + 1}번 ${esc(o)} 공격" ${q.locked || q.answer !== undefined ? 'disabled' : ''}><span class="yb-tag"><b>${i + 1}</b></span><span class="yb-ko">${esc(o)}</span></button>`).join(''); }
+  else { B.typing = false; document.querySelector('.battle-app')?.classList.remove('yb-typing'); drawAnswers(q); }
   // The word itself is in the question card; the line only says what to do.
   if (q.answer === undefined && !q.locked) say(q.kind === 'spell' ? '뜻을 보고 <em>영어 철자</em>를 써요!' : '알맞은 <em>뜻</em>을 누르면 바로 공격!', q.kind === 'spell' ? '쓰기 정답은 두 배로 세요.' : '');
 }
 
+// V13.214: the four answer buttons stay; a new word or a hit only changes their words and
+// classes (before, every answer, hit and reveal rebuilt all four with innerHTML).
+const answerClass = (q, i) => ['yb-answer', q.answer === i && 'right', q.answer !== undefined && q.answer !== i && 'dim', q.picked === i && 'picked', q.picked === i && q.hit && 'hit'].filter(Boolean).join(' ');
+function drawAnswers(q) {
+  const box = document.getElementById('yb-answers'); if (!box) return;
+  const off = !!(q.locked || q.answer !== undefined), buttons = box.querySelectorAll('.yb-answer');
+  if (buttons.length !== q.options.length || box.firstElementChild?.tagName !== 'BUTTON' || box.children.length !== buttons.length) {
+    box._html = null;
+    box._n = q.n;
+    box.innerHTML = q.options.map((o, i) => `<button type="button" class="${answerClass(q, i)}" data-yb="answer" data-choice="${i}" aria-label="${i + 1}번 ${esc(o)} 공격" ${off ? 'disabled' : ''}><span class="yb-tag"><b>${i + 1}</b></span><span class="yb-ko">${esc(o)}</span></button>`).join('');
+    return;
+  }
+  // A new word: a button still focused from the last tap lets go of it (like a freshly drawn one).
+  if (box._n !== q.n) { box._n = q.n; if (box.contains(document.activeElement)) document.activeElement.blur(); }
+  buttons.forEach((b, i) => {
+    const cls = answerClass(q, i), label = `${i + 1}번 ${q.options[i]} 공격`;
+    if (b.className !== cls) b.className = cls;
+    if (b.disabled !== off) b.disabled = off;
+    if (b.getAttribute('aria-label') !== label) b.setAttribute('aria-label', label);
+    setText(b.querySelector('.yb-ko'), q.options[i]);
+  });
+}
 function say(mainHtml, sub = '') {
-  const a = document.getElementById('yb-msg-main'), b = document.getElementById('yb-msg-sub');
-  if (a) a.innerHTML = mainHtml; if (b) b.textContent = sub;
+  setHtml(document.getElementById('yb-msg-main'), mainHtml); setText(document.getElementById('yb-msg-sub'), sub);
 }
 function setStatus(side, text) { const el = document.getElementById('yb-status-' + side); if (el) el.textContent = text; }
-function flash(color) { const f = document.getElementById('yb-flash'); if (!f) return; f.style.setProperty('--flash', color); f.classList.remove('on'); void f.offsetWidth; f.classList.add('on'); }
+function flash(color) { const f = document.getElementById('yb-flash'); if (!f) return; f.style.setProperty('--flash', color); replay(f, 'on', 620, ['ybFlash']); }
+// ---------- V13.214 렉 줄이기(보이는 연출은 그대로, 비용만) ----------
+// Restarts a CSS animation class without reading layout. Before, reading offsetWidth forced a
+// whole layout on every hit, shake, flash and combo (several times per answer).
+// A class still on (the animation running) restarts by rewinding its own animations (`names`);
+// otherwise it is simply added, and a timer takes it off once it has played.
+function replay(el, cls, ms, names, others = []) {
+  if (!el) return;
+  const drop = others.filter(c => c !== cls && el.classList.contains(c));
+  if (drop.length) el.classList.remove(...drop);
+  if (el.classList.contains(cls)) { try { for (const an of el.getAnimations({ subtree: true })) if (names.includes(an.animationName)) { an.currentTime = 0; an.play(); } } catch {} }
+  else el.classList.add(cls);
+  clearTimeout(el['_fx_' + cls]); el['_fx_' + cls] = setTimeout(() => el.classList.remove(cls), ms);
+}
+// Where the arena, both pets and both HUDs are, read once after the browser laid them out
+// (ResizeObserver), not with getBoundingClientRect on every hit (a forced layout each time).
+const GEO_IDS = ['yb-arena', 'yb-pet-me', 'yb-pet-op', 'yb-hud-me', 'yb-hud-op'];
+let geoWatch = null;
+function watchGeo() {
+  geoWatch?.disconnect(); geoWatch = null;
+  if (typeof ResizeObserver !== 'function') return;
+  geoWatch = new ResizeObserver(() => measureGeo());
+  for (const id of GEO_IDS) { const el = document.getElementById(id); if (el) geoWatch.observe(el); }
+}
+function measureGeo() {
+  const arena = document.getElementById('yb-arena'); if (!arena || !B) return null;
+  const a = arena.getBoundingClientRect();
+  const rel = id => { const r = document.getElementById(id)?.getBoundingClientRect(); return r ? { x: r.left - a.left, y: r.top - a.top, w: r.width, h: r.height } : null; };
+  B.geo = { arena, w: a.width, h: a.height, me: rel('yb-pet-me'), op: rel('yb-pet-op'), hudMe: rel('yb-hud-me'), hudOp: rel('yb-hud-op') };
+  return B.geo;
+}
+const geo = () => (B?.geo && B.geo.arena === document.getElementById('yb-arena') && B.geo.arena.isConnected ? B.geo : measureGeo());
+// A big damage number is kept inside the arena once its width is known (after layout, same frame).
+let popWatch = null;
+function fitPop(d, center) {
+  if (typeof ResizeObserver !== 'function') return;
+  popWatch ||= new ResizeObserver(list => {
+    for (const { target } of list) {
+      popWatch.unobserve(target);
+      const g = B?.geo, w = target.offsetWidth; if (!g || !target.isConnected) continue;
+      target.style.left = Math.max(6, Math.min(g.w - w - 6, target._center - w / 2)) + 'px';
+    }
+  });
+  d._center = center; popWatch.observe(d);
+}
 function pop(side, text, kind = '') {
-  const arena = document.getElementById('yb-arena'), pet = document.getElementById('yb-pet-' + side); if (!arena || !pet) return;
-  const a = arena.getBoundingClientRect(), r = pet.getBoundingClientRect(), d = document.createElement('div');
+  const g = geo(), arena = g?.arena, r = g?.[side]; if (!arena || !r) return;
+  const d = document.createElement('div');
   // V13.105 the damage number grows with the damage (t1~t3); fever hits burn red.
   const dmg = /^-(\d+)/.exec(text)?.[1];
   d.className = 'yb-pop ' + kind + (dmg ? ` fx-num t${dmgTier(+dmg)}${B.fever ? ' fever' : ''}` : ''); d.textContent = text;
   if (dmg) d.innerHTML = `<b>-${dmg}</b>${text.length > dmg.length + 1 ? `<small>${esc(text.slice(dmg.length + 1).trim())}</small>` : ''}`;
-  d.style.left = (r.left - a.left + r.width * .22) + 'px'; d.style.top = (r.top - a.top + r.height * .1) + 'px';
-  arena.appendChild(d); setTimeout(() => d.remove(), 1050);
+  d.style.left = (r.x + r.w * .22) + 'px'; d.style.top = (r.y + r.h * .1) + 'px';
   // V13.105 a big number stays inside the arena (centred on the pet, never cut off at the side).
-  if (dmg) { const w = d.offsetWidth; d.style.left = Math.max(6, Math.min(a.width - w - 6, r.left - a.left + r.width / 2 - w / 2)) + 'px'; d.style.top = Math.max(46, r.top - a.top + r.height * .05) + 'px'; }
+  if (dmg) { d.style.top = Math.max(46, r.y + r.h * .05) + 'px'; fitPop(d, r.x + r.w / 2); }
+  arena.appendChild(d); setTimeout(() => d.remove(), 1050);
 }
 // V13.85 the pets act out the hit: the attacker shows its attack (cheer) pose, the one hit its
 // hurt (sad) pose, for a moment (로보 has its own punch and flinch).
-function hit(side) { const el = document.getElementById('yb-pet-' + side); if (!el) return; if (!reduced()) fxRecoil(el, side === 'me' ? -1 : 1); el.classList.remove('hit'); void el.offsetWidth; el.classList.add('hit'); clearTimeout(el.hitTimer); el.hitTimer = setTimeout(() => el.classList.remove('hit'), 560); showPose(el, 'hurt', 900); }
+function hit(side) { const el = document.getElementById('yb-pet-' + side); if (!el) return; if (!reduced()) fxRecoil(el, side === 'me' ? -1 : 1); replay(el, 'hit', 560, ['ybHit']); showPose(el, 'hurt', 900); }
 function lunge(side) { const el = document.getElementById('yb-pet-' + side); if (!el) return; showPose(el, 'attack', 900); if (reduced()) return; fxLunge(el, side === 'me' ? 1 : -1); el.classList.add('lunge'); setTimeout(() => el.classList.remove('lunge'), 240); }
 const sideOf = pid => pid === B.view.me ? 'me' : 'op';
 
@@ -1363,9 +1440,8 @@ function skillExtras(side, other, p, e) {
   if (s.poison) { const foeAt = fxCenter(other, arena); if (foeAt) fxToxic(arena, foeAt); }
 }
 function fxCenter(side, arena) {
-  const pet = document.getElementById('yb-pet-' + side); if (!pet) return null;
-  const a = arena.getBoundingClientRect(), r = pet.getBoundingClientRect();
-  return { x: r.left - a.left + r.width / 2, y: r.top - a.top + r.height * .52 };
+  const r = geo()?.[side]; if (!r || !arena) return null;
+  return { x: r.x + r.w / 2, y: r.y + r.h * .52 };
 }
 // V13.105: at most FX_MAX effect pieces at once; extra sparks are simply not drawn.
 const FX_MAX = 24;
@@ -1382,7 +1458,7 @@ function strike(atk, def, { dmg = 0, crit = false, skill = false, attacker = nul
   if (el) sfxShot(el, big);
   if (skill) {
     const len = Math.hypot(to.x - from.x, to.y - from.y), ang = Math.atan2(to.y - from.y, to.x - from.x);
-    fxAdd(arena, 'fx-beam', { left: from.x + 'px', top: from.y + 'px', width: len + 'px', transform: `rotate(${ang}rad)`, '--fx': color }, 520);
+    fxAdd(arena, 'fx-beam', { left: from.x + 'px', top: from.y + 'px', width: len + 'px', rotate: `${ang}rad`, '--fx': color }, 520);
     if (el) fxShot(arena, from, to, el, { big: true, ms: 180, rank });
   } else if (el) {
     fxShot(arena, from, to, el, { big, rank });
@@ -1411,7 +1487,7 @@ function dmgTier(dmg) { return dmg >= 28 ? 3 : dmg >= 16 ? 2 : 1; }
 const SHAKES = ['fx-shake-s', 'fx-shake-m', 'fx-shake-l', 'fx-shake-xl'];
 function shake(arena, cls) {
   if (reduced()) return;
-  arena.classList.remove(...SHAKES); void arena.offsetWidth; arena.classList.add(cls);
+  replay(arena, cls, 600, SHAKES, SHAKES);
 }
 // Hit-stop: the arena's animations hold for a blink (~90 ms) so the hit lands, then go on.
 function hitStop(arena, ms = 90) {
@@ -1423,7 +1499,7 @@ function impact(arena, def, at, { dmg = 0, crit = false, skill = false } = {}) {
   const tier = Math.max(dmgTier(dmg), skill ? 3 : 1);
   fxAdd(arena, 'fx-impact' + (tier >= 2 ? ' big' : ''), { left: at.x + 'px', top: at.y + 'px' }, 380);
   const pet = document.getElementById('yb-pet-' + def);
-  if (pet) { pet.classList.remove('fx-white'); void pet.offsetWidth; pet.classList.add('fx-white'); setTimeout(() => pet.classList.remove('fx-white'), 260); }
+  if (pet) replay(pet, 'fx-white', 260, ['fx-white']);
   hitStop(arena, tier >= 3 || crit ? 110 : 70);
   shake(arena, crit ? 'fx-shake-xl' : SHAKES[tier - 1]);
 }
@@ -1431,9 +1507,9 @@ function impact(arena, def, at, { dmg = 0, crit = false, skill = false } = {}) {
 function critStamp(def) {
   const arena = document.getElementById('yb-arena'); if (!arena) return;
   // In the free band between the two HUDs, so it covers neither the damage number nor the combo.
-  const a = arena.getBoundingClientRect(), op = document.getElementById('yb-hud-op')?.getBoundingClientRect(), mine = document.getElementById('yb-hud-me')?.getBoundingClientRect();
-  const y = op && mine ? (op.bottom + mine.top) / 2 - a.top : a.height * .45;
-  fxAdd(arena, 'fx-crit' + (def === 'me' ? ' on-me' : ''), { left: a.width * (def === 'me' ? .62 : .4) + 'px', top: y + 'px' }, 900).textContent = 'CRITICAL!';
+  const g = geo(); if (!g) return;
+  const y = g.hudOp && g.hudMe ? (g.hudOp.y + g.hudOp.h + g.hudMe.y) / 2 : g.h * .45;
+  fxAdd(arena, 'fx-crit' + (def === 'me' ? ' on-me' : ''), { left: g.w * (def === 'me' ? .62 : .4) + 'px', top: y + 'px' }, 900).textContent = 'CRITICAL!';
 }
 // Per-match display state: my combo and whether the cut-in played (reset for a new match).
 function fxState() {
@@ -1463,7 +1539,7 @@ function drawCombo(bump) {
   box.innerHTML = `<b>${n}</b><span>COMBO</span>`;
   box.style.setProperty('--heat', String(Math.min(1, (n - 2) / 6)));
   box.className = 'fx-combo' + (n >= 5 ? ' hot' : '') + (n >= 8 ? ' max' : '');
-  if (bump && !reduced()) { box.classList.remove('bump'); void box.offsetWidth; box.classList.add('bump'); }
+  if (bump && !reduced()) replay(box, 'bump', 380, ['fx-combo-bump']);
 }
 // 입장 컷인: who I fight and in what match, once at the countdown. A monster comes in bigger
 // and redder; a boss darker, with a shake. Never blocks taps (pointer-events: none).
@@ -1522,15 +1598,39 @@ function showCountdown(deadline) {
 }
 
 // Clock and word timer, drawn from the room's deadlines.
+// V13.214 저사양 자동 단계: in a match, more than LITE_LONG_COUNT frames over LITE_LONG_MS within
+// LITE_WINDOW_MS mean this phone cannot keep up. It switches to a lighter look (fewer effect pieces,
+// no blend · glow filters, see battle-fx.js fxLite and v13214.css .yb-lite) and remembers it for
+// LITE_DAYS. Phones that keep up keep the full look. 'off' in the pref turns the switch off (for tests).
+const LITE_KEY = 'sumus-yacha-lite', LITE_LONG_MS = 50, LITE_WINDOW_MS = 3000, LITE_LONG_COUNT = 8, LITE_DAYS = 7;
+const liteOn = () => { const at = Number(pref(LITE_KEY, 0)); return at > 0 && Date.now() - at < LITE_DAYS * 86400000; };
+function applyLite() { const on = liteOn(); document.querySelector('.battle-app')?.classList.toggle('yb-lite', on); fxLite(on); }
+function lagWatch(t) {
+  const L = B.lag ||= { last: 0, longs: [] };
+  if (L.last && !document.hidden) {
+    const d = t - L.last;
+    // (A gap over a second is the phone asleep or the tab hidden, not a slow frame.)
+    if (d > LITE_LONG_MS && d < 1000) {
+      L.longs.push(t);
+      while (L.longs[0] < t - LITE_WINDOW_MS) L.longs.shift();
+      if (L.longs.length > LITE_LONG_COUNT && pref(LITE_KEY, '') !== 'off' && !liteOn()) { setPref(LITE_KEY, String(Date.now())); applyLite(); }
+    }
+  }
+  L.last = t;
+}
 function loop() {
   cancelAnimationFrame(B.raf);
-  const frame = () => {
+  applyLite();
+  const frame = t => {
     if (!B?.view || B.view.phase === 'finished') return;
     // V13.104: a word game is open: the match clock stands still behind it.
-    if (B.mini) { B.raf = requestAnimationFrame(frame); return; }
+    if (B.mini) { turnBar(null); B.raf = requestAnimationFrame(frame); return; }
     const v = B.view, now = serverNow();
+    lagWatch(t);
     const clock = document.getElementById('yb-clock');
-    if (clock) { const left = v.ends_at ? Math.max(0, v.ends_at - now) : matchMs(v.mode); clock.textContent = clockText(left); clock.parentElement.classList.toggle('warn', left <= (v.fever_ms || 15000) && !!v.ends_at); }
+    // V13.214: the clock text and its colour are written only when they change (once a second),
+    // not on every frame (each write made the browser recompute styles and lay the page out again).
+    if (clock) { const left = v.ends_at ? Math.max(0, v.ends_at - now) : matchMs(v.mode); setText(clock, clockText(left)); const warn = left <= (v.fever_ms || 15000) && !!v.ends_at; if (clock._warn !== warn) { clock._warn = warn; clock.parentElement.classList.toggle('warn', warn); } }
     // Fever time: the room deals 1.5x damage in the last seconds; show it once it starts.
     const fever = !!v.ends_at && v.ends_at - now <= (v.fever_ms || 15000);
     if (fever !== !!B.fever) {
@@ -1540,11 +1640,27 @@ function loop() {
       clock?.parentElement.classList.toggle('fever', fever);
       if (fever) { flash('rgba(255,90,90,.55)'); sfx('fever', [60, 40, 60]); const banner = document.getElementById('yb-fever'); if (banner) { banner.hidden = false; later(() => { banner.hidden = true; }, 1800); } }
     }
-    const bar = document.getElementById('yb-turnbar');
-    if (bar) bar.style.transform = `scaleX(${v.phase === 'question' && v.deadline ? Math.max(0, Math.min(1, (v.deadline - now) / (v.deadline - v.question.started_at))) : 0})`;
+    turnBar(v, now);
     B.raf = requestAnimationFrame(frame);
   };
   B.raf = requestAnimationFrame(frame);
+}
+// V13.214: the word timer bar runs as one animation on the compositor for each word (the same
+// shrinking bar), instead of a style written on every frame. It is set again only when the word,
+// its deadline or the clock correction changes; it holds while a word game is open (v = null).
+function turnBar(v, now) {
+  const bar = document.getElementById('yb-turnbar'); if (!bar) return;
+  if (!v) { if (bar._anim?.playState === 'running') bar._anim.pause(); return; }
+  const on = v.phase === 'question' && v.deadline && v.question;
+  const key = on ? `${v.question.n}:${v.deadline}:${Math.round((B.clockOffset || 0) / 120)}` : 'off';
+  if (bar._key === key) { if (bar._anim?.playState === 'paused') bar._anim.play(); return; }
+  bar._key = key;
+  bar._anim?.cancel(); bar._anim = null;
+  if (!on) { bar.style.transform = 'scaleX(0)'; return; }
+  const left = Math.max(0, v.deadline - now), from = Math.max(0, Math.min(1, left / Math.max(1, v.deadline - v.question.started_at)));
+  bar.style.transform = `scaleX(${from})`;
+  if (!left) return;
+  try { bar._anim = bar.animate([{ transform: `scaleX(${from})` }, { transform: 'scaleX(0)' }], { duration: left, easing: 'linear', fill: 'forwards' }); } catch { bar._anim = null; }
 }
 
 function applyEvent(e) {
@@ -1819,7 +1935,8 @@ async function reviewWords() {
 function drawEmotes() {
   const bar = document.getElementById('yb-emotes'); if (!bar) return;
   const live = ['countdown', 'question', 'reveal'].includes(B.view?.phase);
-  bar.innerHTML = `${Object.entries(EMOTES).map(([id, text]) => `<button type="button" class="yb-emote" data-yb="emote" data-emote="${id}" ${live ? '' : 'disabled'}>${esc(text)}</button>`).join('')}<button type="button" class="yb-emote-toggle" data-yb="emotes-toggle" aria-pressed="${!emotesShown()}">${emotesShown() ? '상대 이모트 끄기' : '상대 이모트 켜기'}</button>`;
+  // V13.214: drawn once, then only switched on and off (it was rebuilt on every word).
+  setHtml(bar, `${Object.entries(EMOTES).map(([id, text]) => `<button type="button" class="yb-emote" data-yb="emote" data-emote="${id}" ${live ? '' : 'disabled'}>${esc(text)}</button>`).join('')}<button type="button" class="yb-emote-toggle" data-yb="emotes-toggle" aria-pressed="${!emotesShown()}">${emotesShown() ? '상대 이모트 끄기' : '상대 이모트 켜기'}</button>`);
 }
 function sendEmote(button) {
   if (Date.now() - (B.emoteAt || 0) < 3000) return;

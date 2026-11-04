@@ -883,7 +883,7 @@ export async function runRewardsChecks(assert, expectStatus) {
     {
       const css107 = source('../public/v13107.css'), css54 = source('../public/v1354.css'), arcade107 = source('../public/modules/arcade.js'), app107 = source('../public/app.js'), pm107 = source('../public/modules/pet-moments.js'), st107 = source('../public/modules/student.js');
       assert(!css104.includes('.yb-arena.fx-stop *') && !/filter:brightness\(2\.6\)/.test(css104) && /\.yb-pet\.fx-white \.avatar-art\{animation:fx-white \.26s ease-out\}/.test(css104) && /@keyframes fx-white\{0%\{filter:[^}]*\}100%\{filter:none\}\}/.test(css104)
-        && /@keyframes ybHit\{[^@]*\}\}/.test(css54) && !/@keyframes ybHit\{[^\n]*brightness/.test(css54) && battle103.includes("el.hitTimer = setTimeout(() => el.classList.remove('hit'), 560)"),
+        && /@keyframes ybHit\{[^@]*\}\}/.test(css54) && !/@keyframes ybHit\{[^\n]*brightness/.test(css54) && battle103.includes("replay(el, 'hit', 560, ['ybHit'])"),
         'V13.107 맞을 때 하얀 섬광은 끝나면 반드시 원래 색으로 돌아가는 애니메이션이고, 히트스톱은 효과 조각만 멈춰 펫이 하얗게 굳지 않는다(아이폰 Safari)');
       assert(battle103.includes('<div class="mh-reward" id="mh-reward">') && !battle103.includes('yb-result-points mh-reward') && battle103.includes('<div class="mh-stats">') && battle103.includes('<span class="mh-rw-tag">') && battle103.includes('<p class="mh-rw-note">${text}</p>')
         && css107.includes('.mh-reward{position:relative;display:flex') && css107.includes('.mh-rw-note{margin:0;font-size:15px') && css107.includes('.mh-result-stage{position:relative;height:auto;aspect-ratio:16/9'),

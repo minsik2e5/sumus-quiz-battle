@@ -42,6 +42,7 @@ import { runClawPhysicsChecks } from './claw-physics-check.mjs';
 import { runLevelChecks } from './level-check.mjs';
 import { runPracticeSpeedChecks } from './practice-speed-check.mjs';
 import { runYachaLagChecks } from './yacha-lag-check.mjs';
+import { runYachaFpsChecks } from './yacha-fps-check.mjs';
 import { runPerfRulesChecks } from './perf-rules-check.mjs';
 import { runBootstrapGuardChecks } from './bootstrap-guard-check.mjs';
 import { runActivityChecks } from './activity-check.mjs';
@@ -1562,6 +1563,7 @@ export async function runReleaseCheck() {
     runLevelChecks(assert);
     await runPracticeSpeedChecks(assert);
     await runYachaLagChecks(assert);
+    runYachaFpsChecks(assert);
     await runPerfRulesChecks(assert);
     await runBootstrapGuardChecks(assert);
     runReviewFixChecks(assert);
