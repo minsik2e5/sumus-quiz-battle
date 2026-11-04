@@ -21,7 +21,7 @@ function card(key, no, pet, teacher = null) {
     return `<figure class="pb-form ${seen ? 'seen' : ''}">${sprite(key, f, !seen)}<figcaption>${seen ? label : f ? `Lv.${PET_FORM_LEVELS[f]}` : '알'}</figcaption></figure>`;
   }).join('');
   // V13.109 한정 펫: its season's egg while on sale, then only 영웅 eggs.
-  const how = series ? `알 상점의 ${SERIES_EGG.name} ${num(SERIES_EGG.price)}코인 · 시리즈 ${SERIES_RANKS[series]}(이미 만난 친구는 다시 안 나와요)` : season ? (seasonOnSale()?.id === c.limited ? `${season.egg} ${num(season.price)}코인 · ${season.until}까지 판매` : seasonsInEpic().find(x => x.id === c.limited && season.epic_only && x.rate === season.rate) ? `${season.name} 한정 · 영웅 알 · 코인 뽑기 영웅 알에서 ${season.rate}% · ${season.until}까지(그 뒤 ${season.after_rate}%)` : `${season.name} 한정 · 지금은 영웅 알 · 코인 뽑기 영웅 알에서 ${season.after_rate}%`) : mythic ? `모든 알에서 아주 낮은 확률(랜덤 알 ${MYTHIC_RATE.basic}% · 영웅 알 ${MYTHIC_RATE.epic}% · 코인 뽑기 ${MYTHIC_RATE.capsule}%) · 뽑기 확정은 없어요 · 학생마다 1마리` : legend ? `코인 뽑기 ${LEGENDARY_RATE}% · 영웅 알 ${EPIC_EGG_LEGENDARY_RATE}% · 뽑기 ${num(LEGENDARY_PITY)}번 안에 확정` : epic ? `영웅 알 ${num(EPIC_EGG_PRICE)}코인 · 코인 뽑기 ${EPIC_RATE}%` : `상점의 랜덤 알 · ${num(EGG_PRICE)}코인`;
+  const how = series ? `알 상점의 ${SERIES_EGG.name} ${num(SERIES_EGG.price)}코인 · 시리즈 ${SERIES_RANKS[series]}(이미 만난 친구는 다시 안 나와요)` : season ? (seasonOnSale()?.keys.includes(key) ? `${seasonOnSale().egg} ${num(seasonOnSale().price)}코인 · ${seasonOnSale().until}까지 판매` : seasonsInEpic().find(x => x.id === c.limited && season.epic_only && x.rate === season.rate) ? `${season.name} 한정 · 영웅 알 · 코인 뽑기 영웅 알에서 ${season.rate}% · ${season.until}까지(그 뒤 ${season.after_rate}%)` : `${season.name} 한정 · 지금은 영웅 알 · 코인 뽑기 영웅 알에서 ${season.after_rate}%`) : mythic ? `모든 알에서 아주 낮은 확률(랜덤 알 ${MYTHIC_RATE.basic}% · 영웅 알 ${MYTHIC_RATE.epic}% · 코인 뽑기 ${MYTHIC_RATE.capsule}%) · 뽑기 확정은 없어요 · 학생마다 1마리` : legend ? `코인 뽑기 ${LEGENDARY_RATE}% · 영웅 알 ${EPIC_EGG_LEGENDARY_RATE}% · 뽑기 ${num(LEGENDARY_PITY)}번 안에 확정` : epic ? `영웅 알 ${num(EPIC_EGG_PRICE)}코인 · 코인 뽑기 ${EPIC_RATE}%` : `상점의 랜덤 알 · ${num(EGG_PRICE)}코인`;
   const foot = met
     // V13.185 전설 · 신화 · 한정 펫에도 야차전 특기가 있다(등급 색 그대로).
     ? skill ? `<span class="pb-skill${season ? ' limited' : mythic ? ' mythic' : legend ? ' gold' : ''}">야차전 특기</span><b>${esc(skill.name)}</b><small>${esc(skill.desc)}</small>` : ''
@@ -98,7 +98,7 @@ export function teacherPetDex(A) {
   const sale = seasonOnSale();
   return `<section class="pb-progress pb-teacher-sum" aria-label="펫 현황">
       <div><b>${num(sections.reduce((n, x) => n + x[2].length, 0) + SERIES_PET_KEYS.length)}</b><span>종의 펫 · 학생 ${num(withPet)}/${num(students.length)}명이 펫을 키워요</span></div>
-      <small>${sections.map(([name, , keys]) => `${name.replace(' 펫', '')} ${num(keys.length)}`).join(' · ')}${SERIES_PET_KEYS.length ? ` · 곤충 · 공룡 ${num(SERIES_PET_KEYS.length)}` : ''}${sale ? ` · <b>${esc(sale.name)} 한정 알 판매 중(${esc(sale.until)}까지)</b>` : ''}</small>
+      <small>${sections.map(([name, , keys]) => `${name.replace(' 펫', '')} ${num(keys.length)}`).join(' · ')}${SERIES_PET_KEYS.length ? ` · 곤충 · 공룡 ${num(SERIES_PET_KEYS.length)}` : ''}${sale ? ` · <b>${esc(sale.egg)} 판매 중(${esc(sale.until)}까지)</b>` : ''}</small>
     </section>
     ${sections.map(([name, how, keys, cls]) => `<h2 class="pb-section${cls}">${name} <small>${how}</small></h2>
       <div class="pb-grid">${keys.map(key => card(key, ++no, { form: 3 }, ownersOf(key))).join('')}</div>`).join('')}

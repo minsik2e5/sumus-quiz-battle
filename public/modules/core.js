@@ -162,10 +162,13 @@ export const petTier = key => CHARACTERS[key]?.mythic ? 'mythic' : CHARACTERS[ke
 // them `after_rate`% of the time, while the student still misses one.
 export const SEASONS = {
   // V13.117: the Halloween egg became the 가을 이벤트 알 (Halloween + 수능·기말 응원), on sale until 11/30.
-  autumn: { name: '가을 이벤트', mark: '🎃', egg: '가을 이벤트 알', price: 600, start: '2026-10-01', end: '2026-11-30', until: '11월 30일', after_rate: 5, stage: 'halloween', stage_end: '2026-11-07' },
+  // V13.213 이벤트 알: 표시 이름만 '이벤트 알'(내부 키 autumn · 구매 기록 autumn_egg는 그대로). `pool`의 시즌 펫(가을 5 + 특별 3)
+  // 중 아직 없는 친구가 균등하게 나오고, 특별 펫 기간(12/31)까지 판다. `shop_mark`는 알 상점 탭 · 배지 표시.
+  autumn: { name: '가을 이벤트', mark: '🎃', egg: '이벤트 알', badge: '이벤트 한정', shop_mark: '🎁', pool: ['autumn', 'special'], price: 600, start: '2026-10-01', end: '2026-12-31', until: '12월 31일', after_rate: 5, stage: 'halloween', stage_end: '2026-11-07' },
   // V13.207 특별 한정(영웅 한정): 파는 알이 없다(`epic_only`). `start`~`end`(한국 날짜, 포함) 동안 영웅 결과의 `rate`%가
   // 아직 없는 특별 펫이고, 기간이 끝나면 다른 지난 시즌처럼 `after_rate`%로 영웅 알에 숨는다.
-  special: { name: '특별', mark: '🎁', epic_only: true, start: '2026-11-04', end: '2026-12-31', until: '12월 31일', rate: 10, after_rate: 5 }
+  // V13.213 `sold_in`: 그 시즌 알(이벤트 알)이 팔리는 동안에는 영웅 결과 `rate`% 경로를 끈다(알에서 얻는다).
+  special: { name: '특별', mark: '🎁', epic_only: true, sold_in: 'autumn', start: '2026-11-04', end: '2026-12-31', until: '12월 31일', rate: 10, after_rate: 5 }
 };
 const kstDay = now => new Date(Number(now) + 9 * 3600000).toISOString().slice(0, 10);
 export const seasonKeys = id => LIMITED_PET_KEYS.filter(key => CHARACTERS[key].limited === id);
@@ -173,7 +176,7 @@ export const seasonKeys = id => LIMITED_PET_KEYS.filter(key => CHARACTERS[key].l
 export function seasonOnSale(now = Date.now()) {
   const day = kstDay(now);
   const id = Object.keys(SEASONS).find(k => !SEASONS[k].epic_only && day >= SEASONS[k].start && day <= SEASONS[k].end);
-  return id ? { id, ...SEASONS[id], keys: seasonKeys(id) } : null;
+  return id ? { id, ...SEASONS[id], keys: (SEASONS[id].pool || [id]).flatMap(seasonKeys) } : null;
 }
 // V13.117: the battle stage of the season (the Halloween one), only until `stage_end` (11/7), though the egg sells until 11/30.
 export function seasonStage(now = Date.now()) {
@@ -188,7 +191,7 @@ export const seasonsInEpic = (now = Date.now()) => {
   return Object.keys(SEASONS).map(id => {
     const s = SEASONS[id];
     if (day > s.end) return { id, rate: s.after_rate };
-    return s.epic_only && day >= s.start ? { id, rate: s.rate } : null;
+    return s.epic_only && day >= s.start && !(s.sold_in && seasonOnSale(now)?.id === s.sold_in) ? { id, rate: s.rate } : null;
   }).filter(Boolean);
 };
 // Pet growth: an egg, then three evolution forms. `form` is 0 (egg) .. 3 (final).
