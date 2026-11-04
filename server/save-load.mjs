@@ -86,7 +86,7 @@ export async function runSaveLoad({ students = 40, rounds = 5, think = 1500, tar
   const initial = await local.read();
   const c = coord.createMutationCoordinator(local, initial, { flushDelay: 100, retryDelay: 2000, rollbackOnFailure: true, groupMs: () => 250, onError() {} });
   const before = await round(c, local, storage, { students, rounds, think });
-  // V13.215 일주일 지난 연습 기록 답 상세를 보관 표로 옮기기(지우지 않음): 한 번에 300개 · 학생 25명씩, 다 할 때까지
+  // V13.216 일주일 지난 연습 기록 답 상세를 보관 표로 옮기기(지우지 않음): 한 번에 300개 · 학생 25명씩, 다 할 때까지
   // (운영에서는 10분마다 이어서). 시간마다 정리(sweep)도 워커처럼 자동 삭제 없이 같이 한다.
   const archive = createSessionArchive(storage, { countRows: rows => local.countRows(rows) });
   let runs = 0, moved = 0, slowest = 0;

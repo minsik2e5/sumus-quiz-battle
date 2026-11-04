@@ -158,14 +158,14 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
     for (const x of [r.before, r.after]) {
       assert(x.errors === 0 && x.answer.p95 < 500 && x.hunt.p95 < 1500 && x.reel.p95 < 1500 && x.answer.n > 50 && x.hunt.n > 50 && x.reel.n > 50, `저장 부하: ${line(x)} (연습 답 0.5초 · 사냥 · 낚시 1.5초 아래, 500 없음)`);
     }
-    // V13.215 자동 정리(지우기) 대신 보관 표로 옮기기: 한 차례(300개)가 0.5초 아래여야 한다(그동안 다른 학생이 기다린다).
+    // V13.216 자동 정리(지우기) 대신 보관 표로 옮기기: 한 차례(300개)가 0.5초 아래여야 한다(그동안 다른 학생이 기다린다).
     assert(r.after.kb < r.before.kb * 0.8 && r.trim.sessions > 0 && r.frozenRetries === 0 && r.trim.slowest_ms < 500, `보관으로 옮긴 뒤 상태가 줄어야 한다(${r.before.kb}KB → ${r.after.kb}KB), 한 차례 최대 ${r.trim.slowest_ms}ms, 얼린 기록 다시 하기 ${r.frozenRetries}번`);
     console.log(`[save-load] PASS · 옮기기 전 ${line(r.before)}`);
     console.log(`[save-load] PASS · 옮긴 뒤 ${line(r.after)} · 보관으로 옮기기 ${r.trim.runs}번 ${r.trim.ms}ms(한 차례 최대 ${r.trim.slowest_ms}ms) · 기록 ${r.trim.sessions}개 · 보관 ${r.trim.kb}KB`);
   });
   // V13.212 야차 대회 날(운영 13.5MB 구성): 대회 32명 16판 + 기다리는 동안 놀이터 + 연습 8명 + 대진표 · 초대 확인.
   // 예전(v13.210, 같은 컴퓨터): 놀이터 보기 p95 약 0.9~1.2초 · ping p95 약 1.1초 · 대회 판 열기 p95 약 1.2초 · 결과 보고 p95 약 1.0초.
-  // V13.215 같은 부하를 지난 기록 답 상세를 보관으로 다 옮긴 상태에서도 잰다(상한은 같다).
+  // V13.216 같은 부하를 지난 기록 답 상세를 보관으로 다 옮긴 상태에서도 잰다(상한은 같다).
   const tournamentLoad = (archived = false) => runTournamentLoad({ level: 'ok', archived }).then(r => {
     const p95 = key => r[key]?.p95 ?? Infinity;
     const line = `놀이터 보기 p95 ${Math.max(p95('POST /claw/home'), p95('POST /reel/guide'))}ms · 사냥 첫 화면 p95 ${p95('POST /hunt/home')}ms · ping p95 ${p95('POST /timing/ping')}ms · 대회 판 열기 p95 ${p95('대회 판 열기')}ms · 참가 p95 ${p95('대회 판 참가')}ms · 결과 보고 p95 ${p95('결과 보고')}ms · 연습 답 p95 ${p95('연습 답(빠른 길)')}ms · 홈 p95 ${p95('홈 새로고침(GET)')}ms`;

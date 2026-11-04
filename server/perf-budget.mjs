@@ -6,7 +6,7 @@
 // 예산은 학생이 약 두 배(90명)가 돼도 넘지 않을 만큼. 넘으면 정리 규칙을 손보거나 업그레이드를 검토한다.
 export const STATE_TOTAL_BUDGET_KB = 25000;
 export const STATE_BUDGET_KB = {
-  // V13.215 지난 연습 기록: 일주일 지나면 답 상세를 보관 표로 옮긴다(server/session-archive.mjs, 지우지 않음). 남는 것은 요약
+  // V13.216 지난 연습 기록: 일주일 지나면 답 상세를 보관 표로 옮긴다(server/session-archive.mjs, 지우지 않음). 남는 것은 요약
   // (기록 하나 약 0.7KB)과 최근 일주일 답 상세. 운영 9.9MB → 약 4MB 예상. 예산은 옮기기를 다 하기 전(배포 직후 몇 시간)에도 넘지
   // 않게 10MB. 요약은 계속 쌓이므로(하루 약 70KB) 넘으면 요약 보관도 검토한다. 얼려 같이 쓴다(복사 안 함).
   sessions: 10000,
@@ -35,7 +35,7 @@ export const STATE_BUDGET_KB = {
   timingDaily: 30,          // 10초 맞추기 오늘의 챌린지.
   signupCodes: 20,
   storageAutoTrim: 10,
-  sessionArchive: 2,        // V13.215 옮기기 기록(마지막 차례 · 합계만).
+  sessionArchive: 2,        // V13.216 옮기기 기록(마지막 차례 · 합계만).
   storageTrims: 30,
   battleSettings: 5,
   schools: 30,
@@ -44,7 +44,7 @@ export const STATE_BUDGET_KB = {
   test_gifts: 50
 };
 
-// V13.215 보관 표(voca_archive, 메인 상태 밖 · 부팅 때 읽지 않음)의 예산. 기록 하나 약 2.5KB: 학생 90명이 1년 써도 약 90MB.
+// V13.216 보관 표(voca_archive, 메인 상태 밖 · 부팅 때 읽지 않음)의 예산. 기록 하나 약 2.5KB: 학생 90명이 1년 써도 약 90MB.
 // 무료 플랜 저장 한도(5GB)보다 훨씬 작다. 넘으면 오래된 보관을 Supabase로 내보내는 방법을 검토한다(지우지는 않는다).
 export const ARCHIVE_BUDGET_KB = 200000;
 
@@ -70,6 +70,15 @@ export const VIEW_LIKE_POST_EXCEPTIONS = {
   '/teacher/student-preview': '선생님 미리보기 계정을 만든다(쓰기)',
   '/student-preview/exit': '미리보기를 끝내고 세션을 바꾼다(쓰기)',
   '/vocab-import/preview': '선생님 단어장 미리보기(큰 본문, 선생님만, 드묾)'
+};
+
+// V13.215 응답 크기 예산(KB, 운영 크기 상태 = server/tournament-load.mjs prodLikeState, 학생 44명 기준).
+// 선생님 첫 화면은 느린 학교 와이파이(400kbps)에서도 10초 안에 받도록 400KB 아래로(예전 약 1,340KB). 탭을 열 때 받는 GET은 각각 작게.
+// server/teacher-home-check.mjs(npm run check)가 잰다. 넘으면 첫 화면에 새 큰 목록을 싣지 말고 그 탭의 GET으로 옮긴다.
+export const RESPONSE_BUDGET_KB = {
+  teacher_bootstrap: 400,       // GET /api/bootstrap(선생님): 학생 목록(필요한 칸만) · 오늘 기록 · 학생별 숫자 · 단어장
+  teacher_records: 40,          // GET /api/teacher/records: 결과 분석 한 쪽(30개, 최대 100개)
+  teacher_student_detail: 20    // GET /api/teacher/student-detail/:id: 학생 기록 창(최근 연습 5개 · 시험범위 정복)
 };
 
 // 화면이 서버에 자동으로 묻는 간격(setInterval 안에서 api 호출)의 하한(ms).

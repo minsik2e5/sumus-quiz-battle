@@ -41,7 +41,7 @@ export function prodLikeState({ students = 44, sessions = 2991, words = 450, now
 }
 
 // extraGamers: 대회 밖에서 놀이터만 하는 학생 수(몇 명까지 버티는지 재기, docs/performance-rules.md).
-// archived: V13.215 일주일 지난 연습 기록 답 상세를 보관 표로 다 옮긴 상태에서 잰다(server/session-archive.mjs).
+// archived: V13.216 일주일 지난 연습 기록 답 상세를 보관 표로 다 옮긴 상태에서 잰다(server/session-archive.mjs).
 export async function runTournamentLoad({ level = 'ok', seconds = 20, others = 8, extraGamers = 0, gameEvery = 2500, targetKB = 9000, coordinator = coord, archived = false } = {}) {
   const now = Date.now();
   const state = prodLikeState({ now, students: Math.max(44, 40 + extraGamers) });

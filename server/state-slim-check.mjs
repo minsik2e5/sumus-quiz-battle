@@ -1,4 +1,4 @@
-// V13.215 지난 연습 기록 보관(server/session-archive.mjs) 검사. release-check가 부르고, 혼자 돌리면 숫자를 보여 준다.
+// V13.216 지난 연습 기록 보관(server/session-archive.mjs) 검사. release-check가 부르고, 혼자 돌리면 숫자를 보여 준다.
 // A. 같음: 운영 비율(2026-11-03 /api/health: 학생 44명 · 기록 2,991개 · 답 상세 비율)에 맞춘 합성 상태에서, 옮기기 전과 다 옮긴 뒤
 //    학생 44명 모두의 첫 화면(bootstrap: 코인 · 경험치 · 레벨 · 칭호 · 펫 · 순위 · 통계 · 오늘의 학습)과 보상 · 리그 · 대결 기록,
 //    선생님 첫 화면(결과 분석 · 학생 관리 통계 · 기록 목록) · 반 리그 · TV · 보관 파일 내보내기가 한 글자도 같다.
@@ -154,58 +154,58 @@ export async function runStateSlimChecks(assert, { verbose = false } = {}) {
   const cold = archive.stats();
   report.after = { state_kb: kb(slim), sessions_kb: size1.keys_kb.sessions, ...size1.sessions, archive: cold, runs, rows_written: storage.rowsWritten - rows0, frozen_retries: c.stats().frozen_retries };
   report.drop_pct = Math.round((1 - size1.keys_kb.sessions / size0.keys_kb.sessions) * 100);
-  assert(report.drop_pct >= 50, `V13.215 지난 연습 기록(sessions)이 50% 넘게 준다(${size0.keys_kb.sessions}KB → ${size1.keys_kb.sessions}KB, ${report.drop_pct}%)`);
-  assert(maxPlan <= ARCHIVE_PER_RUN && maxStudents <= ARCHIVE_STUDENTS_PER_RUN && runs > 1, `V13.215 한 번에 ${ARCHIVE_PER_RUN}개 · 학생 ${ARCHIVE_STUDENTS_PER_RUN}명까지 조금씩 옮긴다(${runs}번)`);
-  assert(c.stats().frozen_retries === 0, 'V13.215 옮기기는 얼린 기록을 고치지 않는다(새 객체로 바꿔 넣는다)');
+  assert(report.drop_pct >= 50, `V13.216 지난 연습 기록(sessions)이 50% 넘게 준다(${size0.keys_kb.sessions}KB → ${size1.keys_kb.sessions}KB, ${report.drop_pct}%)`);
+  assert(maxPlan <= ARCHIVE_PER_RUN && maxStudents <= ARCHIVE_STUDENTS_PER_RUN && runs > 1, `V13.216 한 번에 ${ARCHIVE_PER_RUN}개 · 학생 ${ARCHIVE_STUDENTS_PER_RUN}명까지 조금씩 옮긴다(${runs}번)`);
+  assert(c.stats().frozen_retries === 0, 'V13.216 옮기기는 얼린 기록을 고치지 않는다(새 객체로 바꿔 넣는다)');
   const expectMoved = JSON.parse(original).sessions.filter(s => s.created_at <= now - ARCHIVE_AFTER_MS).length - 4;
-  assert(moved === expectMoved && slim.sessions.filter(isArchived).length === moved && cold.sessions === moved, `V13.215 일주일 지난 기록 ${expectMoved}개를 옮긴다(옮김 ${moved} · 보관 ${cold.sessions})`);
+  assert(moved === expectMoved && slim.sessions.filter(isArchived).length === moved && cold.sessions === moved, `V13.216 일주일 지난 기록 ${expectMoved}개를 옮긴다(옮김 ${moved} · 보관 ${cold.sessions})`);
   const byId = new Map(slim.sessions.map(s => [s.id, s]));
-  assert(!isArchived(byId.get(pendingId)) && byId.get(pendingId).answer_records, 'V13.215 처리 안 된 이의 신청이 걸린 기록은 옮기지 않는다');
-  assert(!isArchived(byId.get(legacy.id)) && !isArchived(byId.get(huge.id)) && !isArchived(byId.get(trimmed.id)), 'V13.215 요약 없는 옛 기록 · 너무 큰 기록 · 이미 정리된 기록은 그대로');
-  assert(archiveText(huge).length > ARCHIVE_ROW_MAX_CHARS, 'V13.215 (검사 준비) 큰 기록은 보관 줄 상한을 넘는다');
-  assert(slim.sessions.filter(s => s.created_at > now - ARCHIVE_AFTER_MS).every(s => !isArchived(s) && s.answer_records), 'V13.215 일주일 안 기록은 메인 상태에 그대로(오늘 보상 · 바로 다시 풀기)');
-  assert(slim.sessions.filter(isArchived).every(s => ARCHIVE_FIELDS.every(k => s[k] === undefined) && Array.isArray(s.reward_breakdown) && Number.isFinite(s.wrong_count)), 'V13.215 옮긴 기록에는 요약 칸(보상 내역 · 오답 수 포함)이 남는다');
+  assert(!isArchived(byId.get(pendingId)) && byId.get(pendingId).answer_records, 'V13.216 처리 안 된 이의 신청이 걸린 기록은 옮기지 않는다');
+  assert(!isArchived(byId.get(legacy.id)) && !isArchived(byId.get(huge.id)) && !isArchived(byId.get(trimmed.id)), 'V13.216 요약 없는 옛 기록 · 너무 큰 기록 · 이미 정리된 기록은 그대로');
+  assert(archiveText(huge).length > ARCHIVE_ROW_MAX_CHARS, 'V13.216 (검사 준비) 큰 기록은 보관 줄 상한을 넘는다');
+  assert(slim.sessions.filter(s => s.created_at > now - ARCHIVE_AFTER_MS).every(s => !isArchived(s) && s.answer_records), 'V13.216 일주일 안 기록은 메인 상태에 그대로(오늘 보상 · 바로 다시 풀기)');
+  assert(slim.sessions.filter(isArchived).every(s => ARCHIVE_FIELDS.every(k => s[k] === undefined) && Array.isArray(s.reward_breakdown) && Number.isFinite(s.wrong_count)), 'V13.216 옮긴 기록에는 요약 칸(보상 내역 · 오답 수 포함)이 남는다');
 
   const after = await screens(slim, archive, now);
   const diffs = compare(before, after);
   report.compared = { students: Object.keys(before.students).length, teacher_screens: Object.keys(before.teacher).length, records: Object.keys(before.records).length, diffs: diffs.length };
-  assert(!diffs.length, `V13.215 옮기기 전 · 후 학생 · 선생님 화면과 답안 보기가 같다(다른 곳: ${diffs.slice(0, 5).join(', ')})`);
-  assert(Object.keys(before.students).length === 44, 'V13.215 학생 44명 모두 비교한다');
+  assert(!diffs.length, `V13.216 옮기기 전 · 후 학생 · 선생님 화면과 답안 보기가 같다(다른 곳: ${diffs.slice(0, 5).join(', ')})`);
+  assert(Object.keys(before.students).length === 44, 'V13.216 학생 44명 모두 비교한다');
   const sample = slim.sessions.find(isArchived);
   const listed = JSON.parse(after.students[sample.student_id].boot).sessions.find(s => s.id === sample.id);
   const listedRaw = (await call(slim, sample.student_id, 'GET', '/bootstrap', {}, archive, now)).sessions.find(s => s.id === sample.id);
-  assert(listed && listedRaw.details_omitted === true && !listedRaw.answer_records && listedRaw.details_archived_at === undefined, 'V13.215 학생 목록의 옮긴 기록은 요약만(details_omitted: 화면이 열 때 한 개만 받는다) · 보관 표시는 보내지 않는다');
-  assert(Buffer.byteLength(after.records[sample.id]) < 64 * 1024, 'V13.215 답안 보기 한 개는 작다(64KB 아래)');
+  assert(listed && listedRaw.details_omitted === true && !listedRaw.answer_records && listedRaw.details_archived_at === undefined, 'V13.216 학생 목록의 옮긴 기록은 요약만(details_omitted: 화면이 열 때 한 개만 받는다) · 보관 표시는 보내지 않는다');
+  assert(Buffer.byteLength(after.records[sample.id]) < 64 * 1024, 'V13.216 답안 보기 한 개는 작다(64KB 아래)');
 
   /* ---------- B. 다시 해도 같음 · 되돌리기 ---------- */
   const slimText = JSON.stringify(slim);
   const again = await runArchiveStep({ state: slim, archive, mutate: fn => c.durable(fn), now, mode: 'on', noMutation: NO_MUTATION });
-  assert(again.moved === 0 && JSON.stringify(c.current().state) === slimText, 'V13.215 다 옮긴 뒤 다시 해도 아무것도 바뀌지 않는다');
+  assert(again.moved === 0 && JSON.stringify(c.current().state) === slimText, 'V13.216 다 옮긴 뒤 다시 해도 아무것도 바뀌지 않는다');
   const twice = JSON.parse(original);
   const plan = planArchive(twice, now);
-  assert(applyArchive(twice, plan.entries, now) === plan.entries.length && applyArchive(twice, plan.entries, now) === 0, 'V13.215 같은 계획을 두 번 해도 두 번째는 0개');
+  assert(applyArchive(twice, plan.entries, now) === plan.entries.length && applyArchive(twice, plan.entries, now) === 0, 'V13.216 같은 계획을 두 번 해도 두 번째는 0개');
   const changed = JSON.parse(original);
   const p2 = planArchive(changed, now);
   changed.sessions.find(s => s.id === p2.entries[0].id).answer_records[0].correct = !changed.sessions.find(s => s.id === p2.entries[0].id).answer_records[0].correct;
-  assert(applyArchive(changed, p2.entries, now) === p2.entries.length - 1 && !isArchived(changed.sessions.find(s => s.id === p2.entries[0].id)), 'V13.215 보관한 뒤 기록이 바뀌었으면(재채점 등) 그 기록은 빼지 않는다');
+  assert(applyArchive(changed, p2.entries, now) === p2.entries.length - 1 && !isArchived(changed.sessions.find(s => s.id === p2.entries[0].id)), 'V13.216 보관한 뒤 기록이 바뀌었으면(재채점 등) 그 기록은 빼지 않는다');
   // 되돌리기: 처음 상태와 한 글자도 같다(옮기기 기록 sessionArchive만 남는다).
   let back = JSON.parse(slimText);
   for (let i = 0; i < 40; i++) { const r = planRestore(back, archive); if (!r.entries.length) break; applyRestore(back, r.entries, now); }
   const { sessionArchive, ...restored } = back;
   // 맨 위 묶음 순서는 coordinator 복사가 바꾼다(sessions · mastery를 뒤로): 묶음마다 · 묶음 이름 모두 같은지 본다.
   const o = JSON.parse(original), same = Object.keys(o).length === Object.keys(restored).length && Object.keys(o).every(k => JSON.stringify(o[k]) === JSON.stringify(restored[k]));
-  assert(same && sessionArchive.total_restored === moved, 'V13.215 되돌리기(VOCA_SESSION_ARCHIVE=restore)는 처음 상태와 한 글자도 같다');
-  assert(archiveDue({ sessionArchive: { more: true } }, now, now - ARCHIVE_MORE_EVERY_MS) && !archiveDue({ sessionArchive: { more: false } }, now, now - ARCHIVE_MORE_EVERY_MS) && archiveDue({}, now, now - ARCHIVE_EVERY_MS), 'V13.215 남으면 10분 뒤 · 다 옮겼으면 한 시간 뒤에 다시 본다');
+  assert(same && sessionArchive.total_restored === moved, 'V13.216 되돌리기(VOCA_SESSION_ARCHIVE=restore)는 처음 상태와 한 글자도 같다');
+  assert(archiveDue({ sessionArchive: { more: true } }, now, now - ARCHIVE_MORE_EVERY_MS) && !archiveDue({ sessionArchive: { more: false } }, now, now - ARCHIVE_MORE_EVERY_MS) && archiveDue({}, now, now - ARCHIVE_EVERY_MS), 'V13.216 남으면 10분 뒤 · 다 옮겼으면 한 시간 뒤에 다시 본다');
 
   /* ---------- C. 권한 · 이의 신청 ---------- */
   const other = slim.sessions.find(s => isArchived(s) && s.student_id !== sample.student_id);
   const denied = await settle(call(slim, sample.student_id, 'GET', `/sessions/${other.id}`, {}, archive, now));
   const otherTeacher = await settle(call(slim, 'ss-other', 'GET', `/sessions/${sample.id}`, {}, archive, now));
   const teacherView = await settle(call(slim, 'ss-t', 'GET', `/sessions/${sample.id}`, {}, archive, now));
-  assert(denied.status === 404 && otherTeacher.status === 404, 'V13.215 보관한 답안 보기는 다른 학생 · 다른 학교 선생님에게 보이지 않는다');
-  assert(JSON.stringify(teacherView) === before.records[sample.id], 'V13.215 그 학교 선생님은 보관한 답안을 본다(옮기기 전과 같다)');
+  assert(denied.status === 404 && otherTeacher.status === 404, 'V13.216 보관한 답안 보기는 다른 학생 · 다른 학교 선생님에게 보이지 않는다');
+  assert(JSON.stringify(teacherView) === before.records[sample.id], 'V13.216 그 학교 선생님은 보관한 답안을 본다(옮기기 전과 같다)');
   const noStore = await settle(call(slim, sample.student_id, 'GET', `/sessions/${sample.id}`, {}, null, now));
-  assert(noStore.details_missing === true && noStore.score === sample.score, 'V13.215 보관 표가 없으면(로컬 Node 서버) 점수는 그대로 · 답안 없음 표시');
+  assert(noStore.details_missing === true && noStore.score === sample.score, 'V13.216 보관 표가 없으면(로컬 Node 서버) 점수는 그대로 · 답안 없음 표시');
   // 옮긴 기록에 이의 신청: 옮기기 전과 같은 답 · 같은 기록.
   const target = slim.sessions.find(s => isArchived(s) && JSON.parse(original).sessions.find(o => o.id === s.id).answer_records.some(r => !r.correct));
   const wrongQ = JSON.parse(original).sessions.find(o => o.id === target.id).answer_records.find(r => !r.correct).question_id;
@@ -214,29 +214,29 @@ export async function runStateSlimChecks(assert, { verbose = false } = {}) {
   const r1 = JSON.stringify(await settle(call(fresh, target.student_id, 'POST', '/meaning-disputes', body, null, now + 60000)));
   const r2 = JSON.stringify(await settle(call(moved2, target.student_id, 'POST', '/meaning-disputes', body, archive, now + 60000)));
   const s1 = JSON.stringify(fresh.sessions.find(s => s.id === target.id)), s2 = JSON.stringify(moved2.sessions.find(s => s.id === target.id));
-  assert(r1 === r2 && !/"error"/.test(r1) && s1 === s2, `V13.215 옮긴 기록에 이의 신청: 보관에서 되돌린 뒤 옮기기 전과 같은 결과(${r1.slice(0, 120)})`);
+  assert(r1 === r2 && !/"error"/.test(r1) && s1 === s2, `V13.216 옮긴 기록에 이의 신청: 보관에서 되돌린 뒤 옮기기 전과 같은 결과(${r1.slice(0, 120)})`);
   const stranger = JSON.parse(JSON.stringify(slim));
   const strangerId = target.student_id === 'sl-0' ? 'sl-1' : 'sl-0';
   const r3 = await settle(call(stranger, strangerId, 'POST', '/meaning-disputes', { ...body }, archive, now + 60000));
-  assert(r3.status === 404 && isArchived(stranger.sessions.find(s => s.id === target.id)), 'V13.215 남의 기록에는 이의 신청도 되돌리기도 안 된다');
+  assert(r3.status === 404 && isArchived(stranger.sessions.find(s => s.id === target.id)), 'V13.216 남의 기록에는 이의 신청도 되돌리기도 안 된다');
 
   /* ---------- D. 부팅 · 워커 · 크기 · health ---------- */
   const queries = [];
   const spy = { ...storage, sql: { exec: (q, ...b) => { queries.push(q); return storage.sql.exec(q, ...b); } } };
   const booted = createLocalRepository(spy, { log: { warn() {}, error() {} } });
   await booted.read();
-  assert(!queries.some(q => /voca_archive/i.test(q)), 'V13.215 부팅(상태 읽기)은 보관 표를 읽지 않는다');
+  assert(!queries.some(q => /voca_archive/i.test(q)), 'V13.216 부팅(상태 읽기)은 보관 표를 읽지 않는다');
   const worker = source('../cloudflare/worker.mjs');
-  assert(worker.includes("sweep(working, Date.now(), { autoTrim: false })") && worker.includes("sweep(state, Date.now(), { autoTrim: false })") && !/autoTrim: this\.writeLevel\(\)/.test(worker), 'V13.215 워커: 되돌릴 수 없는 30일 자동 정리(답 상세 지우기)는 끈다');
-  assert(/archiveMode !== 'off' && this\.writeLevel\(\) === 'ok' && archiveDue\(/.test(worker), "V13.215 워커: 옮기기는 쓰기 한도가 넉넉한 날('ok')만");
-  assert(worker.includes('archive: this.archive }') && worker.includes('this.archive.stats()'), 'V13.215 워커: 답안 보기 · 이의 신청이 보관 표를 쓰고 health에 보관 크기를 보인다');
+  assert(worker.includes("sweep(working, Date.now(), { autoTrim: false })") && worker.includes("sweep(state, Date.now(), { autoTrim: false })") && !/autoTrim: this\.writeLevel\(\)/.test(worker), 'V13.216 워커: 되돌릴 수 없는 30일 자동 정리(답 상세 지우기)는 끈다');
+  assert(/archiveMode !== 'off' && this\.writeLevel\(\) === 'ok' && archiveDue\(/.test(worker), "V13.216 워커: 옮기기는 쓰기 한도가 넉넉한 날('ok')만");
+  assert(worker.includes('archive: this.archive }') && worker.includes('this.archive.stats()'), 'V13.216 워커: 답안 보기 · 이의 신청이 보관 표를 쓰고 health에 보관 크기를 보인다');
   const bootBlock = worker.slice(worker.indexOf('this.ready = ctx.blockConcurrencyWhile'), worker.indexOf('writeLevel() {'));
-  assert(!/this\.archive\.(get|stats)\(/.test(bootBlock), 'V13.215 워커 시작은 보관 표를 읽지 않는다');
-  assert(archive.put([{ id: 'too-big', student_id: 'x', created_at: 0, text: 'x'.repeat(ARCHIVE_ROW_MAX_CHARS + 1) }]) === 0 && archive.get('too-big') === null, 'V13.215 보관 줄 하나의 크기 상한');
+  assert(!/this\.archive\.(get|stats)\(/.test(bootBlock), 'V13.216 워커 시작은 보관 표를 읽지 않는다');
+  assert(archive.put([{ id: 'too-big', student_id: 'x', created_at: 0, text: 'x'.repeat(ARCHIVE_ROW_MAX_CHARS + 1) }]) === 0 && archive.get('too-big') === null, 'V13.216 보관 줄 하나의 크기 상한');
   const budget = stateBudgetReport(size1.keys_kb, null, cold);
-  assert(budget.archive && budget.archive.sessions === cold.sessions && STATE_BUDGET_KB.sessionArchive && size1.keys_kb.sessions <= STATE_BUDGET_KB.sessions, 'V13.215 health state_budget에 보관 크기 · 예산표에 sessionArchive');
+  assert(budget.archive && budget.archive.sessions === cold.sessions && STATE_BUDGET_KB.sessionArchive && size1.keys_kb.sessions <= STATE_BUDGET_KB.sessions, 'V13.216 health state_budget에 보관 크기 · 예산표에 sessionArchive');
   const client = source('../public/modules/sessions.js') + source('../public/app.js');
-  assert(client.includes('export async function sessionWithDetails') && (client.match(/await sessionWithDetails\(/g) || []).length >= 3, 'V13.215 화면: 답안 보기 · 오답 다시 풀기 · 같은 범위 다시는 요약만 온 기록을 한 개 받아서 쓴다');
+  assert(client.includes('export async function sessionWithDetails') && (client.match(/await sessionWithDetails\(/g) || []).length >= 3, 'V13.216 화면: 답안 보기 · 오답 다시 풀기 · 같은 범위 다시는 요약만 온 기록을 한 개 받아서 쓴다');
 
   report.rows_per_moved = Math.round(report.after.rows_written / Math.max(1, moved) * 10) / 10;
   if (verbose) console.log(JSON.stringify(report, null, 1));

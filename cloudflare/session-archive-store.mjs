@@ -1,4 +1,4 @@
-// V13.215 지난 연습 기록 보관 표(server/session-archive.mjs). 상태 조각(voca_rows)과 따로 둔다:
+// V13.216 지난 연습 기록 보관 표(server/session-archive.mjs). 상태 조각(voca_rows)과 따로 둔다:
 // cloudflare/local-first.mjs는 voca_rows만 읽으므로 부팅 때 이 표는 메모리에 올라오지 않는다. 기록 한 개를 열 때 한 줄만 읽는다.
 //   voca_archive (id, student_id, created_at, data)  data: 보관 글(원래 칸 순서 + 옮긴 칸). 같은 id는 덮어쓴다(같은 글).
 // 쓴 줄 수는 local-first의 오늘 쓴 줄 수에 더한다(countRows, 무료 한도 하루 10만 줄).

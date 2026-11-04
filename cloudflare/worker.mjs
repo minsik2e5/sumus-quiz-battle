@@ -226,7 +226,7 @@ export class VocaStateObject {
     this.ready = ctx.blockConcurrencyWhile(async () => {
       this.supabase = env.VOCA_STANDALONE === '1' ? createStandaloneRepository(ctx.storage) : createSupabaseRepository(env);
       this.local = createLocalRepository(ctx.storage);
-      // V13.215 지난 연습 기록 답 상세 보관 표(부팅 때 읽지 않는다: server/session-archive.mjs).
+      // V13.216 지난 연습 기록 답 상세 보관 표(부팅 때 읽지 않는다: server/session-archive.mjs).
       this.archive = createSessionArchive(ctx.storage, { countRows: rows => this.local.countRows(rows) });
       this.archivedAt = Date.now();
       if (this.local.migrationError()) this.bootWarning = `옛 저장 방식으로 읽었어요(옮기기 실패): ${this.local.migrationError()}`.slice(0, 300);
@@ -244,7 +244,7 @@ export class VocaStateObject {
         // 테스트 앱: 새 판의 테스트 계정 · 펫 · 미끼를 덧붙인다(운영에서는 부르지 않는다).
         const seeded = env.VOCA_STANDALONE === '1' && await applyTestSeed(working);
         // 90%를 넘은 날은 급하지 않은 정리를 다음 날로 미룬다.
-        // V13.215 되돌릴 수 없는 30일 자동 정리(답 상세 지우기)는 끈다: 대신 일주일 지난 답 상세를 보관 표로 옮긴다(시간마다, 아래).
+        // V13.216 되돌릴 수 없는 30일 자동 정리(답 상세 지우기)는 끈다: 대신 일주일 지난 답 상세를 보관 표로 옮긴다(시간마다, 아래).
         const swept = this.writeLevel() === 'defer' ? false : sweep(working, Date.now(), { autoTrim: false });
         initial.state = working;
         if (migrated || swept || seeded) {
@@ -520,7 +520,7 @@ export class VocaStateObject {
         try { await this.mutations.durable(state => sweep(state, Date.now(), { autoTrim: false }) ? true : NO_MUTATION); }
         catch (error) { console.error('[sweep]', error?.message); }
       }
-      // V13.215 지난 연습 기록 옮기기: 쓰기 한도가 넉넉한 날('ok')만, 한 번에 300개 · 학생 10명까지(남으면 10분 뒤 이어서).
+      // V13.216 지난 연습 기록 옮기기: 쓰기 한도가 넉넉한 날('ok')만, 한 번에 300개 · 학생 10명까지(남으면 10분 뒤 이어서).
       // VOCA_SESSION_ARCHIVE=off 멈춤 · restore 보관한 것을 메인 상태로 되돌리기(같은 속도로).
       const archiveMode = ['off', 'restore'].includes(this.env.VOCA_SESSION_ARCHIVE) ? this.env.VOCA_SESSION_ARCHIVE : 'on';
       if (archiveMode !== 'off' && this.writeLevel() === 'ok' && archiveDue(this.mutations.current().state, Date.now(), this.archivedAt)) {

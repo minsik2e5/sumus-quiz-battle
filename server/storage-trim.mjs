@@ -12,7 +12,7 @@
 //   결과 분석 · 성장 · 순위 · 칭호 · 통계 · 경험치 · 코인은 모두 요약 칸(total · correct · score · xp · reward_points ·
 //   answered_count · perfect · best_combo …)에서 계산해서 그대로다(server/stability-168-check.mjs가 전후를 비교한다).
 //   시험 응시(examAttempts)는 저절로 지우지 않는다(수동 정리만).
-// V13.215 워커는 이 자동 정리(되돌릴 수 없는 지우기)를 더 부르지 않는다(sweep autoTrim: false). 대신 일주일 지난 답 상세를
+// V13.216 워커는 이 자동 정리(되돌릴 수 없는 지우기)를 더 부르지 않는다(sweep autoTrim: false). 대신 일주일 지난 답 상세를
 //   보관 표로 옮긴다(server/session-archive.mjs). 옮긴 기록은 지울 칸이 없어서 수동 정리 대상에도 들지 않는다.
 import { createHash } from 'node:crypto';
 import { meaningReviewCandidate } from './meaning-review.mjs';

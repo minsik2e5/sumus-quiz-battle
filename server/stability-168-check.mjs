@@ -104,8 +104,8 @@ async function autoTrimChecks(assert) {
   sweep(off, now, { autoTrim: false });
   assert(off.sessions.every(s => s.answer_records) && !off.storageAutoTrim, 'V13.168 자동 정리가 꺼진 sweep은 지우지 않는다');
   const worker = source('../cloudflare/worker.mjs');
-  // V13.215 워커는 되돌릴 수 없는 자동 정리(답 상세 지우기)를 끄고, 대신 일주일 지난 답 상세를 보관 표로 옮긴다(server/state-slim-check.mjs).
-  assert(worker.includes("sweep(working, Date.now(), { autoTrim: false })") && worker.includes("sweep(state, Date.now(), { autoTrim: false })"), 'V13.215 워커: 30일 자동 정리(지우기)는 끄고 보관으로 옮긴다');
+  // V13.216 워커는 되돌릴 수 없는 자동 정리(답 상세 지우기)를 끄고, 대신 일주일 지난 답 상세를 보관 표로 옮긴다(server/state-slim-check.mjs).
+  assert(worker.includes("sweep(working, Date.now(), { autoTrim: false })") && worker.includes("sweep(state, Date.now(), { autoTrim: false })"), 'V13.216 워커: 30일 자동 정리(지우기)는 끄고 보관으로 옮긴다');
   const ui = source('../public/modules/sessions.js');
   assert(ui.includes('한 달이 지나 답안 목록을 정리한 기록이에요') && !ui.includes('90일이 지나 답안 목록을'), 'V13.168 학생 · 선생님 기록 화면 안내: 한 달이 지나 정리한 기록');
 }

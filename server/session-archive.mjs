@@ -1,4 +1,4 @@
-// V13.215 지난 연습 기록 보관(콜드 저장). 선생님 요청 2026-11-04: 메인 상태(13.5MB)의 73%가 지난 연습 기록(sessions)이고,
+// V13.216 지난 연습 기록 보관(콜드 저장). 선생님 요청 2026-11-04: 메인 상태(13.5MB)의 73%가 지난 연습 기록(sessions)이고,
 // 그중 대부분이 답 상세(answer_records · wrong_details · word_ids)다. 학생에게 보이는 숫자(코인 · 경험치 · 레벨 · 칭호 · 순위 ·
 // 통계 · 결과 분석)는 모두 요약 칸(total · correct · score · xp · reward_points · reward_breakdown · answered_count · wrong_count ·
 // unanswered_count · perfect · best_combo · created_at …)에서 계산한다. 답 상세를 쓰는 곳은 셋뿐이다:

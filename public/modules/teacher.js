@@ -8,6 +8,7 @@ import { bracketHtml } from './tournament-ui.js';
 import { coin, trophy } from './emblems.js';
 import { teacherPetDex } from './petbook.js';
 import { activityFold } from './teacher-activity.js';
+import { teacherRecords, RECORDS_PAGE } from './teacher-records.js';
 // V13.76 실전시험: how often the student left the test screen (the third time hands it in).
 function leaveNote(s) {
   const n = Number(s.leave_count || 0);
@@ -169,6 +170,8 @@ function lastActivityMap(d) {
   const last = new Map();
   const put = (id, t) => { t = Number(t || 0); if (t > (last.get(id) || 0)) last.set(id, t); };
   for (const s of d.sessions) put(s.student_id, s.created_at);
+  // V13.214 첫 화면에는 오늘 기록만 오므로 지난 학습 시각은 서버가 센 session_digest에서 읽는다.
+  for (const [id, r] of Object.entries(d.session_digest?.students || {})) put(id, r.last);
   for (const a of d.attempts) put(a.student_id, a.submitted_at || a.started_at);
   for (const [id, progress] of Object.entries(d.grammar_progress || {})) for (const item of Object.values(progress || {})) put(id, item.updated_at);
   for (const r of d.idle_students || []) if (r.last) put(r.id, r.last);
@@ -184,6 +187,11 @@ export function agoLabel(t, now = Date.now()) {
 function weekWork(d, now = Date.now()) {
   const start = weekStart(now), prev = start - 7 * DAY, rows = new Map();
   const row = id => rows.get(id) || rows.set(id, { count: 0, total: 0, scores: 0, prevTotal: 0 }).get(id);
+  // V13.214 서버가 전체 기록으로 센 이번 주 · 지난주 숫자(session_digest). 첫 화면의 sessions는 오늘 것뿐이다.
+  if (d.session_digest?.students) {
+    for (const [id, r] of Object.entries(d.session_digest.students)) Object.assign(row(id), { count: r.week_count, total: r.week_total, scores: r.week_scores, prevTotal: r.prev_total });
+    return rows;
+  }
   for (const s of d.sessions) {
     const t = Number(s.created_at || 0);
     if (t >= start) { const r = row(s.student_id); r.count++; r.total += Number(s.total || 0); r.scores += Number(s.score ?? (s.total ? Math.round(s.correct / s.total * 100) : 0)); }
@@ -422,34 +430,32 @@ function exams(A) {
   }).join('')}</tbody></table></div>` : empty('exam', '첫 실전시험을 만들어보세요', '영어쓰기와 뜻쓰기도 바로 만들 수 있어요.')}</section>`;
 }
 function results(A) {
-  const allSessions = [...A.data.sessions].sort((a,b) => b.created_at - a.created_at);
-  const selfTests = finishedSelfTests(allSessions);
-  const practices = allSessions.filter(item => item.run_mode !== 'test');
+  // V13.214 전체 기록은 이 탭을 열 때 GET /teacher/records로 30개씩 받는다(modules/teacher-records.js). 숫자 칸은 서버가 전체로 센 값.
+  const views = [['week', '이번 주 요약'], ['practice', '연습 기록'], ['sent', '실전시험 결과']];
+  const view = views.some(([k]) => k === A.resultsView) ? A.resultsView : 'week';
+  const limit = Math.max(RECORDS_PAGE, Number(A.resultsLimit) || RECORDS_PAGE);
+  const rec = teacherRecords({ view, cls: A.resultsClass, q: A.resultsQuery, need: limit });
+  const m = rec.metrics;
   const legacyAttempts = A.data.attempts.filter(a => a.status === 'submitted').sort((a,b) => b.submitted_at - a.submitted_at);
-  const avg = rows => rows.length ? Math.round(rows.reduce((n, item) => n + Number(item.score ?? (item.total ? Math.round(item.correct / item.total * 100) : 0)), 0) / rows.length) : 0;
-  const totalQuestions = allSessions.reduce((n,s)=>n+Number(s.total||0),0);
   const pending = (A.data.meaning_disputes || []).filter(item => item.status === 'pending').length;
   const sec = value => { const n = Math.max(0, Number(value || 0)), m = Math.floor(n/60), s = n%60; return `${m}:${String(s).padStart(2,'0')}`; };
   // V13.64: filter by class / name and show 30 rows at a time (was every record at once).
   const q = (A.resultsQuery || '').trim().toLowerCase();
-  const nameOf = new Map(A.data.profiles.map(profile => [profile.id, profile]));
-  const matches = s => { const p = nameOf.get(s.student_id); return (!A.resultsClass || (p?.class_name || s.grade) === A.resultsClass) && (!q || `${p?.display_name || ''} ${p?.username || ''}`.toLowerCase().includes(q)); };
-  const limit = Math.max(30, Number(A.resultsLimit) || 30);
-  const table = (all, sent = false) => { const rows = all.filter(matches); return rows.length ? `<div class="table-scroll"><table class="tv2-results-table"><thead><tr><th>학생</th><th>범위</th><th>방식</th><th>점수</th><th>정답</th><th>시간</th><th>${sent ? '끝난 시간' : '학습'}</th><th>상세</th></tr></thead><tbody>${rows.slice(0, limit).map(s => {
+  const loadingNote = rec.error ? `<div class="v136-empty-line" role="alert">${esc(rec.error)} 새로고침을 눌러 다시 받아 주세요.</div>` : '';
+  const table = (sent = false) => { const rows = rec.rows; if (!rows.length && rec.loading && !rec.error) return '<div class="v136-empty-line" role="status">기록을 불러오는 중…</div>'; return rows.length ? `<div class="table-scroll"><table class="tv2-results-table"><thead><tr><th>학생</th><th>범위</th><th>방식</th><th>점수</th><th>정답</th><th>시간</th><th>${sent ? '끝난 시간' : '학습'}</th><th>상세</th></tr></thead><tbody>${rows.slice(0, limit).map(s => {
     const p = A.data.profiles.find(profile => profile.id === s.student_id);
     const score = s.score ?? (s.total ? Math.round(s.correct / s.total * 100) : 0);
     const disputes = (A.data.meaning_disputes || []).filter(d => d.source_type === 'practice' && d.source_id === s.id);
     const pendingCount = disputes.filter(d => d.status === 'pending').length;
     const regraded = disputes.some(d => String(d.status || '').startsWith('approved')) || s.regraded_at;
     return `<tr><td class="tv2-cell-name"><strong>${esc(p?.display_name || '학생')}</strong><small>${esc(p?.class_name || s.grade || '')}</small></td><td data-label="범위" class="tv2-cell-range">${(s.range_codes || []).map(code => esc(recordRangeLabel(s, code))).join(' · ') || '선택 범위'}</td><td data-label="방식">${esc(PRACTICE_TYPES[s.mode] || '연습')}<small>${sent ? '실전시험' : '연습 모드'}</small></td><td data-label="점수"><strong class="tv2-score ${score >= 90 ? 'hi' : score < 60 ? 'lo' : ''}">${score}점</strong>${pendingCount ? '<small>임시 · 이의제기 심사중</small>' : regraded ? '<small>재채점 완료</small>' : ''}</td><td data-label="정답">${s.correct} / ${s.total}</td><td data-label="시간">${sec(s.duration_sec)}</td><td data-label="${sent ? '끝난 시간' : '학습'}">${date(sent ? testEndedAt(s) : s.created_at)}${sent && passNote(s) ? `<small>${passNote(s)}</small>` : ''}${s.left_out ? '' : s.auto_submitted ? '<small>시간 종료 자동 제출</small>' : ''}${leaveNote(s) ? `<small class="leave-note-v1376">${leaveNote(s)}</small>` : ''}</td><td class="tv2-cell-action"><button class="text-button" data-practice-record="${s.id}">답안 보기</button></td></tr>`;
-  }).join('')}</tbody></table></div>${rows.length > limit ? `<button class="tv2-more" data-results-more>${rows.length - limit}개 더 보기</button>` : ''}` : empty('records', q || A.resultsClass ? '조건에 맞는 기록이 없어요' : sent ? '실전시험 결과가 아직 없어요' : '완료된 연습 기록이 아직 없어요'); };
+  }).join('')}</tbody></table></div>${rec.total > Math.min(limit, rows.length) ? `<button class="tv2-more" data-results-more ${rec.loading ? 'aria-busy="true"' : ''}>${rec.loading && rows.length < Math.min(limit, rec.total) ? '불러오는 중…' : `${num(rec.total - Math.min(limit, rows.length))}개 더 보기`}</button>` : ''}` : loadingNote || empty('records', q || A.resultsClass ? '조건에 맞는 기록이 없어요' : sent ? '실전시험 결과가 아직 없어요' : '완료된 연습 기록이 아직 없어요'); };
   const classes = [...new Set(A.data.profiles.map(p => p.class_name).filter(Boolean))];
   const filterBar = `<div class="toolbar tv2-results-filter"><div class="search">${icon('search')}<input id="results-search" aria-label="학생 이름으로 기록 찾기" placeholder="학생 이름 또는 아이디" value="${esc(A.resultsQuery || '')}"></div><select id="results-class" aria-label="반으로 기록 거르기"><option value="">전체 반</option>${classes.map(c => `<option ${c === A.resultsClass ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select></div>`;
   const legacyTable = legacyAttempts.length ? `<details class="legacy-results"><summary>이전 선생님 배정시험 기록 ${legacyAttempts.length}회</summary><div class="table-scroll"><table><thead><tr><th>학생</th><th>시험</th><th>점수</th><th>일시</th></tr></thead><tbody>${legacyAttempts.slice(0,100).map(a => { const e=A.data.exams.find(exam=>exam.id===a.exam_id), p=A.data.profiles.find(profile=>profile.id===a.student_id); return `<tr><td>${esc(p?.display_name || '학생')}</td><td>${esc(e?.title || '이전 시험')}</td><td>${a.score}점</td><td>${date(a.submitted_at)}</td></tr>`; }).join('')}</tbody></table></div></details>` : '';
   // V13.75: a weekly summary per student comes first; the full logs sit behind tabs.
-  const views = [['week', '이번 주 요약'], ['practice', `연습 기록 ${num(practices.length)}`], ['sent', `실전시험 결과 ${num(selfTests.length)}`]];
-  const view = views.some(([k]) => k === A.resultsView) ? A.resultsView : 'week';
-  const tabsBar = `<div class="res-tabs-v1375" role="tablist">${views.map(([k, label]) => `<button type="button" role="tab" aria-selected="${k === view}" class="${k === view ? 'on' : ''}" data-results-view="${k}">${label}</button>`).join('')}</div>`;
+  const count = k => m ? ` ${num(k === 'practice' ? m.practices : m.tests)}` : '';
+  const tabsBar = `<div class="res-tabs-v1375" role="tablist">${views.map(([k, label]) => `<button type="button" role="tab" aria-selected="${k === view}" class="${k === view ? 'on' : ''}" data-results-view="${k}">${label}${k === 'week' ? '' : count(k)}</button>`).join('')}</div>`;
   let body;
   if (view === 'week') {
     const work = weekWork(A.data), last = lastActivityMap(A.data);
@@ -459,11 +465,11 @@ function results(A) {
     const trend = w => { const diff = w.total - w.prevTotal; return diff > 0 ? `<span class="up">▲ ${num(diff)}</span>` : diff < 0 ? `<span class="down">▼ ${num(-diff)}</span>` : '<span>-</span>'; };
     body = `<section class="panel"><div class="panel-head"><div><h2>이번 주 학생별 요약</h2><span>월요일부터 오늘까지 · 푼 문제가 많은 순서</span></div><span>${num(rows.filter(r => r.w.count).length)}/${num(rows.length)}명 학습</span></div>${rows.length ? `<div class="table-scroll"><table class="tv2-results-table week-table-v1375"><thead><tr><th>학생</th><th>학습</th><th>푼 문제</th><th>평균 점수</th><th>지난주 대비</th><th>최근 활동</th></tr></thead><tbody>${rows.map(({ p, w, t }) => `<tr class="${w.count ? '' : 'none'}"><td class="tv2-cell-name"><button class="table-name" data-student="${p.id}"><div><strong>${esc(p.display_name)}</strong><small>${esc(p.class_name || '')}</small></div></button></td><td data-label="학습">${w.count ? `${num(w.count)}회` : '<b class="lo">없음</b>'}</td><td data-label="푼 문제"><strong>${num(w.total)}</strong></td><td data-label="평균 점수">${w.count ? `<strong class="tv2-score ${Math.round(w.scores / w.count) >= 90 ? 'hi' : Math.round(w.scores / w.count) < 60 ? 'lo' : ''}">${Math.round(w.scores / w.count)}점</strong>` : '-'}</td><td data-label="지난주 대비" class="trend-v1375">${trend(w)}</td><td data-label="최근 활동">${agoLabel(t)}</td></tr>`).join('')}</tbody></table></div>` : empty('records', '조건에 맞는 학생이 없어요')}</section>`;
   } else if (view === 'sent') {
-    body = `<section class="panel"><div class="panel-head"><div><h2>실전시험 결과</h2><span>학생이 끝낸 실전시험 전부 · 최근 끝난 순서</span></div><span>${selfTests.length}회</span></div>${table(selfTests, true)}</section>`;
+    body = `<section class="panel"><div class="panel-head"><div><h2>실전시험 결과</h2><span>학생이 끝낸 실전시험 전부 · 최근 끝난 순서</span></div><span>${num(rec.total)}회</span></div>${table(true)}</section>`;
   } else {
-    body = `<section class="panel"><div class="panel-head"><div><h2>학생별 연습 기록</h2><span>암기 후 문제 연습 과정에서 저장된 기록</span></div><span>${practices.length}회</span></div>${table(practices, false)}</section>`;
+    body = `<section class="panel"><div class="panel-head"><div><h2>학생별 연습 기록</h2><span>암기 후 문제 연습 과정에서 저장된 기록</span></div><span>${num(rec.total)}회</span></div>${table(false)}</section>`;
   }
-  return `${metrics([['실전시험', selfTests.length, '회'], ['실전 평균', avg(selfTests), '점'], ['연습 평균', avg(practices), '점'], ['누적 문제', totalQuestions, '문제']])}
+  return `${metrics([['실전시험', m?.tests ?? 0, '회'], ['실전 평균', m?.test_avg ?? 0, '점'], ['연습 평균', m?.practice_avg ?? 0, '점'], ['누적 문제', m?.questions ?? 0, '문제']])}
     ${pending ? `<div class="dispute-summary"><div><span>이의제기 검토 대기</span><strong>${pending}<small>건</small></strong></div><p>승인하면 해당 기록 점수가 자동 재계산됩니다.</p></div>` : ''}
     ${tabsBar}
     ${filterBar}
