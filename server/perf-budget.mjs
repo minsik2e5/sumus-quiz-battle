@@ -61,6 +61,15 @@ export const VIEW_LIKE_POST_EXCEPTIONS = {
   '/vocab-import/preview': '선생님 단어장 미리보기(큰 본문, 선생님만, 드묾)'
 };
 
+// V13.215 응답 크기 예산(KB, 운영 크기 상태 = server/tournament-load.mjs prodLikeState, 학생 44명 기준).
+// 선생님 첫 화면은 느린 학교 와이파이(400kbps)에서도 10초 안에 받도록 400KB 아래로(예전 약 1,340KB). 탭을 열 때 받는 GET은 각각 작게.
+// server/teacher-home-check.mjs(npm run check)가 잰다. 넘으면 첫 화면에 새 큰 목록을 싣지 말고 그 탭의 GET으로 옮긴다.
+export const RESPONSE_BUDGET_KB = {
+  teacher_bootstrap: 400,       // GET /api/bootstrap(선생님): 학생 목록(필요한 칸만) · 오늘 기록 · 학생별 숫자 · 단어장
+  teacher_records: 40,          // GET /api/teacher/records: 결과 분석 한 쪽(30개, 최대 100개)
+  teacher_student_detail: 20    // GET /api/teacher/student-detail/:id: 학생 기록 창(최근 연습 5개 · 시험범위 정복)
+};
+
 // 화면이 서버에 자동으로 묻는 간격(setInterval 안에서 api 호출)의 하한(ms).
 export const POLL_MIN_MS = 3000;
 

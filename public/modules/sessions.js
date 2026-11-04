@@ -1,3 +1,4 @@
+import { findTeacherRecord } from './teacher-records.js';
 import { api, $, $$, icon, esc, time, date, recordRangeLabel, scope, toast, modal, buttonBusy } from './ui.js';
 import { EXAM_TYPES, PRACTICE_TYPES, CHARACTERS, practiceDurationSec, levelInfo, grade, displayEnglish, TEST_SECONDS_PER_QUESTION, TEST_LEAVE_LIMIT, testDurationSec } from './core.js';
 import { avatar } from './character.js';
@@ -184,10 +185,12 @@ function showExamResult(data) {
   });
 }
 export async function openPracticeRecord(sessionId) {
-  let session = A?.data?.sessions?.find(item => item.id === sessionId);
-  if (!session) return toast('연습 기록을 찾을 수 없어요.');
+  // V13.214 선생님 첫 화면에는 오늘 기록만 있어서, 결과 분석 탭 · 학생 기록 창에서 받은 기록(modules/teacher-records.js)도 찾는다.
+  const teacher = A?.data?.profile?.role === 'teacher';
+  let session = A?.data?.sessions?.find(item => item.id === sessionId) || (teacher ? findTeacherRecord(sessionId) : null);
+  if (!session && !teacher) return toast('연습 기록을 찾을 수 없어요.');
   // V13.64: the teacher list arrives without per-answer lists; load this one record's details.
-  if (session.details_omitted) {
+  if (!session || session.details_omitted) {
     try {
       const full = await api(`/sessions/${encodeURIComponent(sessionId)}`);
       const list = A.data.sessions; const index = list.findIndex(item => item.id === sessionId);

@@ -19,6 +19,7 @@ import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, 
 import { schoolLeague, myTeamKey } from './school-league.mjs';
 import { createTournament, tournamentRanges, tournamentHasSchool, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
+import { homeSessions, recordsPage, sessionDigest, teacherStudentRow } from './teacher-home.mjs';
 import { signupCodeRows, updateSignupCode } from './signup.mjs';
 import { createVapidKeys } from './push.mjs';
 import { pushState, pushView, addSubscription, removeSubscription, postNotice, noticeFor, postLegend, legendFor, eveningReminders } from './notify.mjs';
@@ -1329,9 +1330,8 @@ export async function service(state, method, path, body, token, options = {}) {
     const grammarProgress = teacher
       ? Object.fromEntries([...studentIds].map(studentId => [studentId, state.grammarProgress?.[studentId] || {}]))
       : (state.grammarProgress?.[p.id] || {});
-    const wordMastery = teacher
-      ? Object.fromEntries(studentProfiles.map(student => [student.id, wordRangeMastery(state, student.id, selectedSchool, student.class_name)]))
-      : wordRangeMastery(state, p.id, selectedSchool, p.class_name);
+    // V13.215 선생님 첫 화면에는 학생별 단어 숙련도를 싣지 않는다(학생 기록 창을 열 때 GET /teacher/student-detail/:id).
+    const wordMastery = teacher ? null : wordRangeMastery(state, p.id, selectedSchool, p.class_name);
     const dailyQuest = teacher || selectedDivision === 'middle' ? null : composeDailyQuest(state, p.id, selectedSchool, p.class_name, 20);
     const activePractice = teacher ? null : state.practices.find(x => x.student_id === p.id && !x.finished);
     const activePracticeSummary = activePractice ? {
@@ -1352,8 +1352,12 @@ export async function service(state, method, path, body, token, options = {}) {
       daily_quest: !!activePractice.daily_quest
     } : null;
     return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes, ...dailyQuestProgress(sessions, activePractice, dailyQuest.target) } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
-      profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stars: undefined, care: undefined, stats: stats(state, s, sessionsByStudent.get(s.id) || [], battlesByStudent) })) : [],
-      sessions: sessions.map(teacher ? sessionSummary : hydrateSession), exams: visibleExams,
+      // V13.215 선생님: 학생 목록은 화면이 쓰는 칸만, 연습 기록은 오늘 것 + 최근 실전시험 6개만(server/teacher-home.mjs).
+      // 학생별 이번 주 · 지난주 · 마지막 학습은 session_digest, 전체 기록은 결과 분석 탭의 GET /teacher/records.
+      profiles: teacher ? studentProfiles.map(s => teacherStudentRow(s, stats(state, s, sessionsByStudent.get(s.id) || [], battlesByStudent))) : [],
+      sessions: teacher ? homeSessions(sessions, dayKey, now).map(sessionSummary) : sessions.map(hydrateSession), exams: visibleExams,
+      session_digest: teacher ? sessionDigest(sessions, now) : null,
+      sessions_scope: teacher ? 'home' : 'all',
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
       attempts: attempts.map(a => attemptSummary(a, state, p)), server_time: Date.now(),
       active_practice: activePractice?.id || null,
@@ -1402,6 +1406,22 @@ export async function service(state, method, path, body, token, options = {}) {
     const student = mine.find(x => x.id === decodeURIComponent(path.slice('/teacher/activity/'.length)));
     if (!student) fail('학생을 찾을 수 없어요.', 404);
     return { student_id: student.id, activity: activityOf(student), server_time: Date.now() };
+  }
+  // V13.215 선생님 결과 분석 탭(연습 기록 · 실전시험 결과 30개씩)과 학생 기록 창. 보기 전용 GET, 맡은 학교 · 부서의 진짜 학생만
+  // (미리보기 계정 제외, 첫 화면과 같은 거르기).
+  if (path === '/teacher/records' || path.startsWith('/teacher/student-detail/')) {
+    requireRole(p, 'teacher');
+    if (method !== 'GET') fail('요청 방식을 확인해주세요.', 405);
+    const division = activeTeacherDivision(p), school = activeTeacherSchool(state, p);
+    if (!school || school.division !== division) fail('학교 설정을 확인해주세요.', 409);
+    const mine = state.profiles.filter(x => x.role === 'student' && x.division === division && sameSchool(x, school) && !x.preview_owner_id);
+    const ids = new Set(mine.map(x => x.id));
+    const sessionsOf = keep => state.sessions.filter(s => s.division === division && sameSchool(s, school) && keep(s.student_id));
+    if (path === '/teacher/records') return { ...recordsPage(sessionsOf(id => ids.has(id)), mine, body || {}, sessionSummary), server_time: Date.now() };
+    const student = mine.find(x => x.id === decodeURIComponent(path.slice('/teacher/student-detail/'.length)));
+    if (!student) fail('학생을 찾을 수 없어요.', 404);
+    const own = sessionsOf(id => id === student.id).sort((a, b) => b.created_at - a.created_at);
+    return { student_id: student.id, recent: own.slice(0, 5).map(sessionSummary), last_session_at: own[0]?.created_at || 0, word_mastery: wordRangeMastery(state, student.id, school, student.class_name), server_time: Date.now() };
   }
   if (path === '/teacher/storage-trim' || path === '/teacher/storage-archive') {
     requireRole(p, 'teacher');
