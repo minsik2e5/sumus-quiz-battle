@@ -39,6 +39,15 @@
 | `storage.mastery_retries` | 재채점할 때만 조금씩 는다 | 계속 늘면 어떤 요청이 다른 학생 숙련도를 고치는지 찾는다 |
 | `storage.supabase_failures` | 0 | Supabase 대시보드(일시정지 · 점검)를 확인한다 |
 | `storage.supabase_status` | `ok` | `paused_suspected` · `failing`이면 `docs/supabase-backup-runbook.md` 순서대로(6시간 넘으면 선생님 화면에도 경고) |
+| `storage.state_budget.archive` (v13.215) | `kb`가 `budget_kb`(200MB) 아래 | 보관 표(지난 연습 기록 답 상세)가 크다: 오래된 보관을 Supabase로 내보내는 방법을 검토한다(지우지 않는다) |
+| `storage.session_archive.more` (v13.215) | 배포 뒤 몇 시간 안에 false | 계속 true면 쓰기 한도가 'ok'가 아닌 날이 많아 옮기기가 밀린 것이다 |
+
+## 지난 연습 기록 보관 (v13.215)
+- 일주일 지난 연습 기록의 답 상세(answer_records · wrong_details · word_ids)는 메인 상태에서 Durable Object 저장소의 따로 된 표(`voca_archive`)로 **옮긴다(지우지 않는다)**. 부팅 때 읽지 않는다.
+- 메인 상태에는 요약 칸만 남아서 코인 · 경험치 · 레벨 · 칭호 · 순위 · 통계 · 결과 분석은 그대로다(`server/state-slim-check.mjs`가 학생 44명 · 기록 2,991개로 전후를 한 글자씩 비교).
+- 기록을 열 때(답안 보기 · 오답 다시 풀기 · 같은 범위 다시)만 `GET /sessions/:id`로 한 줄 읽는다. 이의 신청은 그 기록을 메인 상태로 되돌린 뒤 처리한다.
+- 새 기능이 지난 기록의 답 상세를 쓰려면 목록 전체가 아니라 기록 한 개를 GET으로 받게 만든다.
+- 되돌리기: 워커 변수 `VOCA_SESSION_ARCHIVE=restore`(옮긴 것을 같은 속도로 메인 상태에 되돌림) · `off`(멈춤).
 
 ## 계속 지키는 방법
 - AI 작업 메모(`CLAUDE.md`)에 넣어 두어 매 세션 처음에 읽는다.

@@ -14,6 +14,8 @@ import { createLocalRepository } from '../cloudflare/local-first.mjs';
 import { createStorageMock } from './storage-mock.mjs';
 import { loadState } from './save-load.mjs';
 import { allBooks } from './service.mjs';
+import { createSessionArchive } from '../cloudflare/session-archive-store.mjs';
+import { planArchive, applyArchive } from './session-archive.mjs';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 export const loadStats = list => { const s = list.slice().sort((a, b) => a - b); const at = q => Math.round(s[Math.min(s.length - 1, Math.floor(q * s.length))] || 0); return { p50: at(.5), p95: at(.95), max: Math.round(s.at(-1) || 0), n: s.length }; };
@@ -32,20 +34,25 @@ export function prodLikeState({ students = 44, sessions = 2991, words = 450, now
     activity: Array.from({ length: 50 }, (_, k) => ({ at: now - k * 60000, k: 'study', t: `연습 · 단어 ${k}` }))
   });
   const rec = k => ({ word_id: 'word-' + k, answer: '정답 뜻 ' + k, correct: k % 3 > 0, ms: 2100, mode: 'write_meaning', at: now });
-  for (let i = 0; i < sessions; i++) state.sessions.push({ id: 'ss' + i, student_id: `sl-${i % students}`, division: 'high', school_id: 'gangseo-high', school: '강서고', total: 30, correct: 24, score: 80, xp: 30, created_at: now - DAY * (1 + (i % 29)), answer_records: Array.from({ length: 22 }, (_, k) => rec(k)), wrong_details: Array.from({ length: 4 }, (_, k) => ({ word_id: 'w' + k, word: 'apple', meaning: '사과 뜻', answer: '오답' })), word_ids: Array.from({ length: 30 }, (_, k) => 'word-' + k) });
+  for (let i = 0; i < sessions; i++) state.sessions.push({ id: 'ss' + i, student_id: `sl-${i % students}`, division: 'high', school_id: 'gangseo-high', school: '강서고', total: 30, correct: 24, score: 80, answered_count: 22, wrong_count: 6, unanswered_count: 8, xp: 30, created_at: now - DAY * (1 + (i % 29)), answer_records: Array.from({ length: 22 }, (_, k) => rec(k)), wrong_details: Array.from({ length: 4 }, (_, k) => ({ word_id: 'w' + k, word: 'apple', meaning: '사과 뜻', answer: '오답' })), word_ids: Array.from({ length: 30 }, (_, k) => 'word-' + k) });
   for (let i = 0; i < students; i++) state.mastery[`sl-${i}`] = Object.fromEntries(Array.from({ length: words }, (_, k) => ['word-id-' + k, { mastery: 60, correct: 3, wrong: 1, streak: 1, recent_results: [true, false, true], updated_at: now }]));
   state.meaningDisputes = Array.from({ length: 900 }, (_, k) => ({ id: 'd' + k, word_id: 'w' + k, answer: '학생이 쓴 뜻 ' + k, status: 'done', source_type: 'practice', student_id: 'sl-1', created_at: now }));
   return state;
 }
 
 // extraGamers: 대회 밖에서 놀이터만 하는 학생 수(몇 명까지 버티는지 재기, docs/performance-rules.md).
-export async function runTournamentLoad({ level = 'ok', seconds = 20, others = 8, extraGamers = 0, gameEvery = 2500, targetKB = 9000, coordinator = coord } = {}) {
+// archived: V13.216 일주일 지난 연습 기록 답 상세를 보관 표로 다 옮긴 상태에서 잰다(server/session-archive.mjs).
+export async function runTournamentLoad({ level = 'ok', seconds = 20, others = 8, extraGamers = 0, gameEvery = 2500, targetKB = 9000, coordinator = coord, archived = false } = {}) {
   const now = Date.now();
   const state = prodLikeState({ now, students: Math.max(44, 40 + extraGamers) });
   void targetKB;
   state.profiles.push({ id: 'tl-teacher', username: 'tl-teacher', display_name: '선생님', role: 'teacher', active: true, school_ids: ['gangseo-high'], active_school_id: 'gangseo-high', division: 'high', created_at: now });
   state.tokens.push({ hash: hashToken('sl-token-tl-teacher'), user_id: 'tl-teacher', expires_at: now + DAY });
   const storage = createStorageMock();
+  if (archived) {
+    const archive = createSessionArchive(storage);
+    for (let i = 0; i < 40; i++) { const plan = planArchive(state, now); if (!plan.entries.length) break; archive.put(plan.entries); applyArchive(state, plan.entries, now); }
+  }
   const local = createLocalRepository(storage, { log: { warn() {}, error() {} } });
   local.adoptRemote(state, 1);
   const initial = await local.read();

@@ -35,7 +35,7 @@ export function stateSizeReport(state) {
   const finished = practices.filter(item => item?.finished);
   return {
     keys_kb: keys,
-    sessions: { count: sessions.length, answer_records_kb: field(sessions, 'answer_records'), wrong_details_kb: field(sessions, 'wrong_details'), word_ids_kb: field(sessions, 'word_ids'), reward_breakdown_kb: field(sessions, 'reward_breakdown') },
+    sessions: { count: sessions.length, archived: sessions.filter(item => item?.details_archived_at !== undefined).length, answer_records_kb: field(sessions, 'answer_records'), wrong_details_kb: field(sessions, 'wrong_details'), word_ids_kb: field(sessions, 'word_ids'), reward_breakdown_kb: field(sessions, 'reward_breakdown') },
     practices: { active: active.length, active_kb: kb(active), stale_active: active.filter(item => Number(item?.started_at || 0) < Date.now() - 86400000).length, finished: finished.length, finished_kb: kb(finished), responses_kb: field(practices, 'responses'), words_kb: field(practices, 'words') },
     mastery_students: Object.keys(state?.mastery || {}).length
   };

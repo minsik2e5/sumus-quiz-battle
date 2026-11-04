@@ -19,6 +19,8 @@ import { createLocalRepository, createSupabaseSync, backupState } from './local-
 import { partitionState, assembleState, hashText } from './state-parts.mjs';
 import { WRITE_WARN_PCT } from './cf-limits.mjs';
 import { stateBudgetReport, upgradeAdvice } from '../server/perf-budget.mjs';
+import { runArchiveStep, archiveDue } from '../server/session-archive.mjs';
+import { createSessionArchive } from './session-archive-store.mjs';
 import { testSeedState, applyTestSeed } from '../server/test-seed.mjs';
 
 // V13.144 쓰기 모으기: 저장이 연달아 오면 이 시간(ms) 안에 온 변경을 한 번에 쓴다. V13.168: 70%를 넘으면 이 값,
@@ -224,6 +226,9 @@ export class VocaStateObject {
     this.ready = ctx.blockConcurrencyWhile(async () => {
       this.supabase = env.VOCA_STANDALONE === '1' ? createStandaloneRepository(ctx.storage) : createSupabaseRepository(env);
       this.local = createLocalRepository(ctx.storage);
+      // V13.216 지난 연습 기록 답 상세 보관 표(부팅 때 읽지 않는다: server/session-archive.mjs).
+      this.archive = createSessionArchive(ctx.storage, { countRows: rows => this.local.countRows(rows) });
+      this.archivedAt = Date.now();
       if (this.local.migrationError()) this.bootWarning = `옛 저장 방식으로 읽었어요(옮기기 실패): ${this.local.migrationError()}`.slice(0, 300);
       const syncInterval = Number(env.SUPABASE_SYNC_MIN_INTERVAL_MS ?? SYNC_MIN_INTERVAL_MS);
       // V13.144: 오늘 쓴 양이 90%를 넘으면 백업 간격을 5배로(백업도 줄을 쓴다).
@@ -239,8 +244,8 @@ export class VocaStateObject {
         // 테스트 앱: 새 판의 테스트 계정 · 펫 · 미끼를 덧붙인다(운영에서는 부르지 않는다).
         const seeded = env.VOCA_STANDALONE === '1' && await applyTestSeed(working);
         // 90%를 넘은 날은 급하지 않은 정리를 다음 날로 미룬다.
-        // V13.168 오래된 연습 기록 자동 정리는 쓰기 한도가 넉넉한 날('ok')만 한다.
-        const swept = this.writeLevel() === 'defer' ? false : sweep(working, Date.now(), { autoTrim: this.writeLevel() === 'ok' });
+        // V13.216 되돌릴 수 없는 30일 자동 정리(답 상세 지우기)는 끈다: 대신 일주일 지난 답 상세를 보관 표로 옮긴다(시간마다, 아래).
+        const swept = this.writeLevel() === 'defer' ? false : sweep(working, Date.now(), { autoTrim: false });
         initial.state = working;
         if (migrated || swept || seeded) {
           try {
@@ -512,9 +517,16 @@ export class VocaStateObject {
       if (hasExpiredAttempt || sweepDue) {
         if (sweepDue) this.sweptAt = Date.now();
         // V13.129: 정리가 실패해도 학생의 요청은 그대로 처리한다(실패는 로그로 남긴다).
-        const autoTrim = sweepDue && this.writeLevel() === 'ok';
-        try { await this.mutations.durable(state => sweep(state, Date.now(), { autoTrim }) ? true : NO_MUTATION); }
+        try { await this.mutations.durable(state => sweep(state, Date.now(), { autoTrim: false }) ? true : NO_MUTATION); }
         catch (error) { console.error('[sweep]', error?.message); }
+      }
+      // V13.216 지난 연습 기록 옮기기: 쓰기 한도가 넉넉한 날('ok')만, 한 번에 300개 · 학생 10명까지(남으면 10분 뒤 이어서).
+      // VOCA_SESSION_ARCHIVE=off 멈춤 · restore 보관한 것을 메인 상태로 되돌리기(같은 속도로).
+      const archiveMode = ['off', 'restore'].includes(this.env.VOCA_SESSION_ARCHIVE) ? this.env.VOCA_SESSION_ARCHIVE : 'on';
+      if (archiveMode !== 'off' && this.writeLevel() === 'ok' && archiveDue(this.mutations.current().state, Date.now(), this.archivedAt)) {
+        this.archivedAt = Date.now();
+        try { await runArchiveStep({ state: this.mutations.current().state, archive: this.archive, mutate: fn => this.mutations.durable(fn), now: Date.now(), mode: archiveMode, noMutation: NO_MUTATION }); }
+        catch (error) { console.error('[archive]', error?.message); }
       }
 
       // scrypt takes tens of ms; doing it inside durable() would stall every
@@ -529,7 +541,7 @@ export class VocaStateObject {
           ? adminOutput
           : url.pathname === '/api/signup' && request.method === 'POST'
             ? await withCodeCount(() => selfSignup(state, body))
-            : await service(state, request.method, path, body, token, { preauthenticatedUserId, origin: url.origin });
+            : await service(state, request.method, path, body, token, { preauthenticatedUserId, origin: url.origin, archive: this.archive });
       };
 
       const startedAt = Date.now();
@@ -599,7 +611,7 @@ export class VocaStateObject {
       if (url.pathname === '/api/bootstrap' && result?.profile?.role === 'teacher' && backup?.warn) {
         result.server_backup_warning = { hours: backup.warn_hours, status: backup.status, text: `데이터 백업이 ${backup.warn_hours}시간째 안 되고 있어요`, detail: backup.kind_text, guide_url: backup.guide_url };
       }
-      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', storage_format: this.local.format(), last_commit_rows: this.local.metrics.commitRows, supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.size || 0) / 1024), state_breakdown: this.sizeReport(), auto_trim: this.mutations.current().state.storageAutoTrim || null, frozen_retries: this.mutations.stats?.().frozen_retries ?? 0, mastery_retries: this.mutations.stats?.().mastery_retries ?? 0, views_kept: this.mutations.stats?.().views_kept ?? 0, supabase_deferred_busy: sync.deferred_busy ?? 0, supabase_yielded_busy: sync.yielded_busy ?? 0, supabase_last_batches: sync.last_batches ?? 0, supabase_last_max_batch_kb: sync.last_max_batch_kb ?? 0, supabase_status: backup.status, supabase_status_text: backup.text, supabase_last_ok_text: backup.last_ok_text, supabase_failing_since: backup.failing_since, supabase_failing_hours: backup.failing_hours, supabase_fail_kind: backup.fail_kind, supabase_guide_url: backup.guide_url, state_budget: stateBudgetReport(this.sizeReport().keys_kb, Math.round((this.local.latest()?.size || 0) / 1024)) };
+      if (url.pathname === '/api/health') result.storage = { mode: 'local-first', storage_format: this.local.format(), last_commit_rows: this.local.metrics.commitRows, supabase_last_ok_at: sync.last_ok_at, supabase_last_ok_mode: sync.last_ok_mode, supabase_backup_mode: sync.backup_mode, supabase_backup_forced_full: sync.backup_forced_full, supabase_pending: sync.pending, supabase_lag_sec: sync.lag_sec, supabase_failures: sync.failures, supabase_last_error: sync.last_error, supabase_last_sync_ms: sync.last_sync_ms, supabase_mode: sync.mode, supabase_last_upload_kb: sync.last_upload_kb, supabase_full_copy_at: sync.full_copy_at, supabase_full_copy_error: sync.full_copy_error, state_kb: Math.round((this.local.latest()?.size || 0) / 1024), state_breakdown: this.sizeReport(), auto_trim: this.mutations.current().state.storageAutoTrim || null, frozen_retries: this.mutations.stats?.().frozen_retries ?? 0, mastery_retries: this.mutations.stats?.().mastery_retries ?? 0, views_kept: this.mutations.stats?.().views_kept ?? 0, supabase_deferred_busy: sync.deferred_busy ?? 0, supabase_yielded_busy: sync.yielded_busy ?? 0, supabase_last_batches: sync.last_batches ?? 0, supabase_last_max_batch_kb: sync.last_max_batch_kb ?? 0, supabase_status: backup.status, supabase_status_text: backup.text, supabase_last_ok_text: backup.last_ok_text, supabase_failing_since: backup.failing_since, supabase_failing_hours: backup.failing_hours, supabase_fail_kind: backup.fail_kind, supabase_guide_url: backup.guide_url, state_budget: stateBudgetReport(this.sizeReport().keys_kb, Math.round((this.local.latest()?.size || 0) / 1024), this.archive.stats()), session_archive: this.mutations.current().state.sessionArchive || null };
       // V13.212 유료 업그레이드 · 데이터 정리가 필요한지 한 줄로(docs/performance-rules.md).
       if (url.pathname === '/api/health') result.storage.upgrade = upgradeAdvice({ writePct: writeStats.pct, budget: result.storage.state_budget });
       const responseHeaders = {

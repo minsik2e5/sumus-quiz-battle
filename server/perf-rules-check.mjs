@@ -37,7 +37,7 @@ export async function runPerfRulesChecks(assert, finalKeys = []) {
   const report = stateBudgetReport({ sessions: 9876.7, mastery: 2353.1, profiles: 588.8, meaningDisputes: 325.9, clawNews: 0.5 }, 13477);
   const bad = stateBudgetReport({ sessions: 17000, newThing: 10 });
   assert(report.ok && !bad.ok && bad.over[0]?.key === 'sessions' && bad.unknown[0] === 'newThing', 'V13.212 예산 보고: 2026-11-03 운영 크기는 예산 안, 넘은 묶음과 예산표에 없는 묶음을 알려 준다');
-  assert(source('../cloudflare/worker.mjs').includes('state_budget: stateBudgetReport(this.sizeReport().keys_kb, Math.round((this.local.latest()?.size || 0) / 1024))'), 'V13.212 /api/health에 상태 예산(state_budget)이 나온다');
+  assert(source('../cloudflare/worker.mjs').includes('state_budget: stateBudgetReport(this.sizeReport().keys_kb, Math.round((this.local.latest()?.size || 0) / 1024), this.archive.stats())'), 'V13.212 /api/health에 상태 예산(state_budget)이 나온다(V13.216 보관 크기 포함)');
 
   // 2. 보기처럼 보이는 POST.
   const service = source('./service.mjs');
