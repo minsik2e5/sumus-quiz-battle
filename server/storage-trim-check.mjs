@@ -181,7 +181,7 @@ function lightCountChecks(assert) {
   const svc = source('./service.mjs');
   const friends = name => svc.slice(svc.indexOf(`function ${name}(`), svc.indexOf('\n}\n', svc.indexOf(`function ${name}(`)));
   assert(['battleFriends', 'dungeonFriends'].every(name => friends(name).includes('activePetOf(ctx, x)') && !friends(name).includes('pointsAndPets')), 'V13.131 야차전 · 던전 친구 목록은 친구마다 전체 기록을 훑지 않는다');
-  assert(svc.includes('stats: stats(state, s, sessionsByStudent.get(s.id) || [], battlesByStudent)'), 'V13.131 선생님 bootstrap은 대결 목록을 한 번만 나눈다');
+  assert(svc.includes('teacherStudentRow(s, stats(state, s, sessionsByStudent.get(s.id) || [], battlesByStudent))'), 'V13.131 선생님 bootstrap은 대결 목록을 한 번만 나눈다');
 }
 
 /* ---------- A 화면 · E 배포 확인 ---------- */

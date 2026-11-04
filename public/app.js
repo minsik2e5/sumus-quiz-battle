@@ -4,6 +4,7 @@ import { avatar, showPose } from './modules/character.js';
 import { studentPage, getRanges, periodFolders, activePeriod, inPeriod, updateRangeSummary, starredWords, pushSupport, memorizeDeck, highExamSelection, HIGH_PICK_STORES, HIGH_EXAM_MAX, toggleHighChunk } from './modules/student.js';
 import { openFlashcards } from './modules/flashcards.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel, careIds } from './modules/teacher.js';
+import { onTeacherRecordsLoaded, markTeacherRecordsStale, clearTeacherRecords, teacherStudentDetail, forgetStudentDetail } from './modules/teacher-records.js';
 import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
 import { maybePetMoment, maybeLegendEggMoment, openPetNameModal, openEggShop, buyEgg, petJosa } from './modules/pet-moments.js';
 import { maybeCardLevelUp } from './modules/card-levelup.js';
@@ -156,7 +157,7 @@ async function loadBootstrap() {
   if (!data?.profile) throw Object.assign(new Error('계정 정보를 받지 못했어요. 다시 로그인해 주세요. 계속 그러면 앱을 껐다 켜 주세요.'), { status: 0 });
   return data;
 }
-async function refresh() { A.data = await loadBootstrap(); A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; else { if (Array.isArray(A.data.profile.stars) && !starsSaving) { let pending = []; try { pending = JSON.parse(localStorage.getItem('sumus:stars-pending:' + A.data.profile.id) || '[]'); } catch {} A.memStars = [...new Set([...A.data.profile.stars, ...pending])]; } checkPushHere(); } }
+async function refresh() { A.data = await loadBootstrap(); A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') { A.school = A.data.profile.active_school; markTeacherRecordsStale(); forgetStudentDetail(); } else { if (Array.isArray(A.data.profile.stars) && !starsSaving) { let pending = []; try { pending = JSON.parse(localStorage.getItem('sumus:stars-pending:' + A.data.profile.id) || '[]'); } catch {} A.memStars = [...new Set([...A.data.profile.stars, ...pending])]; } checkPushHere(); } }
 globalThis.__SUMUS_APPLY_BOOTSTRAP__ = data => { A.data = data; A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = data; if (data?.profile?.role === 'teacher') A.school = data.profile.active_school; if (!A.screen) render(); };
 let roleModules = { teacher: null, student: null };
 function ensureRoleEnhancements() {
@@ -244,6 +245,14 @@ function setHighPick(scope, code, ids, chunk = null) {
   savePreferences();
 }
 // Teacher grammar summaries fill in once the school's dataset arrives.
+// V13.214 결과 분석 기록(GET /teacher/records)이 오면 다시 그린다. 검색 칸에 쓰는 중이면 커서 자리를 지킨다.
+onTeacherRecordsLoaded(() => {
+  if (A.data?.profile?.role !== 'teacher' || A.tab !== 'results' || A.screen || document.querySelector('#modal-root .modal')) return;
+  const box = $('#results-search'), typing = box && document.activeElement === box, at = box?.selectionStart ?? 0;
+  if (!typing && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+  renderKeepScroll();
+  if (typing) { const next = $('#results-search'); if (next) { next.focus(); next.setSelectionRange(at, at); } }
+});
 onTeacherGrammarLoaded(() => { if (A.data?.profile?.role === 'teacher' && !A.screen && !document.querySelector('#modal-root .modal') && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) renderKeepScroll(); });
 function render() {
   if (!A.data || A.screen) return;
@@ -1070,6 +1079,7 @@ async function performTeacherContextSwitch(kind, value) {
     A.examForm = null; A.examFormDirty = false; A.ranges = {}; A.search = ''; A.classFilter = '';
     // V13.168 학교 · 부서를 바꾸면 결과 분석의 반 거르기와 단어 데이터의 범위 거르기도 처음으로(예전 반 · 범위가 남아 빈 표가 보였다).
     A.resultsClass = ''; A.resultsLimit = 30; A.vocabRange = ''; A.vocabLimit = 0;
+    clearTeacherRecords();
     await refresh();
     if (generation !== contextGeneration) return;
     preferences();
@@ -1416,12 +1426,15 @@ function addStudent() {
   const close = modal(`<h2>학생 등록</h2><p>${esc(A.school)} 학생 계정을 만듭니다. 아이디와 비밀번호를 학생에게 알려주세요.</p><form id="student-form"><input type="hidden" name="school_id" value="${esc(A.data.profile.active_school_id)}"><div class="form-columns"><label class="field"><span>학생 이름</span><input name="display_name" required maxlength="40"></label><label class="field"><span>반</span><select name="class_name" required>${classOptions}</select></label></div><div class="locked-school">${icon('shield')}<div><b>${esc(A.school)}</b><small>현재 관리 중인 학교</small></div></div><label class="field"><span>아이디</span><input name="username" required pattern="[a-z0-9_.-]{3,40}" placeholder="영문·숫자 3자 이상" autocomplete="off"></label><label class="field"><span>비밀번호</span><input name="password" required minlength="8" maxlength="128" type="password" placeholder="8자 이상" autocomplete="new-password"></label><div id="student-error" class="form-error" role="alert"></div><button class="btn primary full" type="submit">학생 등록하기</button></form>`, '학생 등록');
   $('#student-form').onsubmit = async e => { e.preventDefault(); const b = $('[type="submit"]', e.currentTarget); buttonBusy(b); try { await api('/students', Object.fromEntries(new FormData(e.currentTarget))); close(); await refresh(); render(); toast('학생 계정을 등록했어요.'); } catch (err) { $('#student-error').textContent = err.message; buttonBusy(b, false); } };
 }
-function studentModal(id) {
+// V13.214 시험범위 정복(단어 숙련도)은 첫 화면에 없어서 창을 열 때 GET /teacher/student-detail/:id로 받는다.
+async function studentModal(id) {
+  let detail = null;
+  try { detail = await teacherStudentDetail(id); } catch (err) { return toast(err.message); }
   const p = A.data.profiles.find(p => p.id === id), attempts = A.data.attempts.filter(a => a.student_id === id && a.status === 'submitted');
   const grammarItems = Object.values(A.data.grammar_progress?.[id] || {}).filter(item => !item.school_id || item.school_id === p.school_id);
   const grammarMastered = grammarItems.filter(item => item.mastered).length;
   const grammarRecent = [...grammarItems].sort((a, b) => Number(b.updated_at || 0) - Number(a.updated_at || 0))[0];
-  const wordMastery = A.data.word_mastery?.[id] || {};
+  const wordMastery = detail?.word_mastery || A.data.word_mastery?.[id] || {};
   const schoolOptions = A.data.schools.map(s => `<option value="${esc(s.id)}" ${s.id === p.school_id ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   const classOptions = [...new Set([...activeClassOptions(), p.class_name].filter(Boolean))].map(c => `<option value="${esc(c)}" ${c === p.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('');
   const close = modal(`<h2>${esc(p.display_name)}</h2><p>${esc(p.class_name)} · ${p.school} · ${esc(p.username)}</p><div class="detail-grid"><div><b>${p.stats.today_total}문제</b><small>오늘 학습량</small></div><div><b>${p.stats.accuracy}%</b><small>연습 정답률</small></div><div><b>${p.stats.weak}개</b><small>취약 단어</small></div><div><b>${attempts.length}회</b><small>실전시험 응시</small></div></div><div class="sumus-detail-section"><h3>시험범위 정복</h3><div class="detail-grid"><div><b>${wordMastery.mastered || 0}/${wordMastery.total_ranges || 0}</b><small>단어 MASTER</small></div><div><b>${wordMastery.conquest || 0}%</b><small>단어 정복도</small></div><div><b>${grammarMastered}</b><small>어법 MASTER</small></div><div><b>${grammarItems.length}</b><small>어법 학습 지문</small></div></div><p class="sumus-account-note">${grammarRecent ? `최근 어법 학습 ${date(grammarRecent.updated_at)}` : '어법·어휘 학습 기록 없음'}</p></div><form id="student-update"><label class="field"><span>이름</span><input name="display_name" value="${esc(p.display_name)}" required maxlength="40"></label><label class="field"><span>학교 변경</span><select name="school_id">${schoolOptions}</select></label><label class="field"><span>반 변경</span><select name="class_name" required>${classOptions}</select></label><label class="field"><span>새 비밀번호 (변경할 때만)</span><input name="password" type="password" minlength="8" autocomplete="new-password" placeholder="8자 이상"></label><label class="checkbox-line"><input type="checkbox" name="active" ${p.active ? 'checked' : ''}>계정 활성화</label><div class="form-error" id="update-error" role="alert"></div><button class="btn primary full" type="submit">변경 저장</button><div class="sumus-account-actions"><button class="btn" type="button" id="student-quick-reset">비밀번호 12345678로 재설정</button><button class="btn sumus-danger" type="button" id="student-quick-delete">학생 계정 삭제</button></div></form>`, '학생 정보');
