@@ -1,5 +1,5 @@
 // V13.213 검사: 이벤트 알 — 가을 이벤트 알의 표시 이름을 '이벤트 알'로 바꾸고, 특별 한정 펫 3마리도 함께 넣는다.
-// 내부 키(autumn) · 구매 기록(autumn_egg)은 그대로, 판매는 특별 펫 기간(12/31)까지, 그동안 영웅 결과의 특별 10% 경로는 끈다.
+// 내부 키(autumn) · 구매 기록(autumn_egg)은 그대로, 판매는 특별 펫 기간(12/31)까지, 영웅 결과의 특별 10% 경로도 그대로 둔다.
 import { readFileSync } from 'node:fs';
 import { SEASONS, seasonKeys, seasonOnSale, seasonsInEpic, seasonsOver } from '../public/modules/core.js';
 import { openEgg, limitedFromEpic } from './rewards.mjs';
@@ -39,9 +39,10 @@ export async function runEventEggChecks(assert) {
   assert(miss(old).length === 6 && !miss(old).includes('ghost') && !miss(old).includes('usagi'), 'V13.213 옛 구매 기록 · 이미 가진 특별 펫은 이벤트 알 풀에서 빠진다');
 
   /* ---------- 영웅 결과 경로 ---------- */
-  assert(!seasonsInEpic(kst('2026-11-04T00:00:00')).length && !seasonsInEpic(kst('2026-12-31T23:59:00')).length && limitedFromEpic(kid(), () => 0, now) === null
+  assert(seasonsInEpic(kst('2026-11-04T00:00:00')).map(x => `${x.id}:${x.rate}`).join() === 'special:10' && seasonsInEpic(kst('2026-12-31T23:59:00')).map(x => `${x.id}:${x.rate}`).join() === 'special:10'
+    && SPECIAL.includes(limitedFromEpic(kid(), () => 0, now)) && limitedFromEpic(kid(...SPECIAL), () => 0, now) === null
     && seasonsInEpic(kst('2027-01-01T00:00:00')).map(x => `${x.id}:${x.rate}`).join() === 'autumn:5,special:5',
-    'V13.213 판매 중에는 영웅 결과에서 특별 펫이 안 나오고, 1/1부터는 after_rate 5%로 영웅 알에 숨는다');
+    'V13.213 판매 중에도 특별 펫은 영웅 결과 10%(가을 펫은 안 나옴), 1/1부터는 두 시즌 모두 after_rate 5%로 영웅 알에 숨는다');
 
   /* ---------- 화면 · 서버 문구 ---------- */
   const arcade = source('../public/modules/arcade.js'), moments = source('../public/modules/pet-moments.js'), service = source('./service.mjs'), book = source('../public/modules/petbook.js');

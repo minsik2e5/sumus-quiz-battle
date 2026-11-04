@@ -32,18 +32,18 @@ export async function runSpecialPetsChecks(assert) {
     && seasonOnSale(kst('2026-11-10T12:00:00'))?.id !== 'special' && seasonOnSale(kst('2027-01-10T12:00:00')) === null,
     'V13.207 특별 시즌은 자기 알이 없다(V13.213부터 이벤트 알에 함께 들어 있다)');
   const rateOf = t => seasonsInEpic(kst(t)).find(x => x.id === 'special')?.rate ?? null;
-  // V13.213: 이벤트 알(sold_in)이 팔리는 12/31까지는 영웅 결과 10% 경로가 꺼지고, 그 뒤에는 지난 시즌처럼 5%.
-  assert(S.sold_in === 'autumn' && rateOf('2026-11-03T23:59:00') === null && rateOf('2026-11-04T00:00:00') === null && rateOf('2026-12-31T23:59:00') === null && rateOf('2027-01-01T00:00:00') === 5,
-    'V13.213 특별 펫은 이벤트 알 판매 중(~12/31)에는 영웅 결과에서 나오지 않고, 그 뒤에는 지난 시즌처럼 5%');
+  // V13.213(선생님 결정): 이벤트 알에 들어가도 영웅 결과 10% 경로는 그대로, 그 뒤에는 지난 시즌처럼 5%.
+  assert(!S.sold_in && rateOf('2026-11-03T23:59:00') === null && rateOf('2026-11-04T00:00:00') === 10 && rateOf('2026-12-31T23:59:00') === 10 && rateOf('2027-01-01T00:00:00') === 5,
+    'V13.213 특별 펫은 11/4~12/31 영웅 결과의 10%(이벤트 알 판매 중에도 유지), 그 뒤에는 지난 시즌처럼 5%');
   const during = kst('2026-11-20T12:00:00'), after = kst('2027-01-10T12:00:00');
   const kid = (...keys) => ({ pets: [{ key: 'dog' }, ...keys.map(key => ({ key }))] });
   const seq = list => () => list.length ? list.shift() : 0;
-  assert(limitedFromEpic(kid(), () => 0, during) === null && seasonKeys('autumn').includes(limitedFromEpic(kid(), () => 0, after)) && TRIO.includes(limitedFromEpic(kid(...seasonKeys('autumn')), () => 0, after))
+  assert(TRIO.includes(limitedFromEpic(kid(), () => 0, during)) && limitedFromEpic(kid(), seq([0.0999, 0.99]), during) === 'chiikawa' && limitedFromEpic(kid(), () => 0.1, during) === null && limitedFromEpic(kid(...TRIO), () => 0, during) === null && seasonKeys('autumn').includes(limitedFromEpic(kid(), () => 0, after)) && TRIO.includes(limitedFromEpic(kid(...seasonKeys('autumn')), () => 0, after))
     && TRIO.includes(limitedFromEpic(kid(), seq([0.5, 0.0499, 0]), after)) && limitedFromEpic(kid(), () => 0.05, after) === null && limitedFromEpic(kid(...LIMITED_PET_KEYS), () => 0, after) === null,
-    'V13.213 기간 중 영웅 결과는 한정 펫을 주지 않고, 1/1부터는 시즌마다 5%씩 따로 굴린다(가을 → 특별, 다 모으면 안 나온다)');
-  const egg = kid(); const opened = openEgg(egg, { epic: true, missing: ['capybara'], price: 800, random: seq([0.5, 0, 0]), now: during });
-  assert(opened.key === 'capybara' && !opened.limited && egg.purchases[0].item === 'epic_egg' && !egg.purchases[0].limited,
-    'V13.213 판매 기간 중 영웅 알은 영웅 펫만 준다(특별 펫은 이벤트 알에서)');
+    'V13.213 기간 중 영웅 결과는 10%로 아직 없는 특별 펫(가을 펫은 안 나옴), 1/1부터는 시즌마다 5%씩 따로 굴린다(가을 → 특별, 다 모으면 안 나온다)');
+  const egg = kid(); const opened = openEgg(egg, { epic: true, missing: ['capybara'], price: 800, random: seq([0.5, 0.05, 0.4]), now: during });
+  assert(opened.limited && TRIO.includes(opened.key) && egg.pets.some(p => p.key === opened.key && p.limited) && egg.purchases[0].item === 'epic_egg' && egg.purchases[0].limited,
+    'V13.213 판매 기간 중에도 영웅 알에서 특별 펫이 10%로 나올 수 있다(한정 표시로 저장)');
   const egg3 = kid(); const late = openEgg(egg3, { epic: true, missing: ['capybara'], price: 800, random: seq([0.5, 0.5, 0.01, 0.4]), now: after });
   assert(late.limited && TRIO.includes(late.key) && egg3.pets.some(p => p.key === late.key && p.limited) && egg3.purchases[0].limited,
     'V13.213 판매가 끝난 뒤 영웅 알에서 특별 펫이 5%로 나올 수 있다(한정 표시로 저장)');

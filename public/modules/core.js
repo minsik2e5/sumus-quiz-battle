@@ -167,8 +167,8 @@ export const SEASONS = {
   autumn: { name: '가을 이벤트', mark: '🎃', egg: '이벤트 알', badge: '이벤트 한정', shop_mark: '🎁', pool: ['autumn', 'special'], price: 600, start: '2026-10-01', end: '2026-12-31', until: '12월 31일', after_rate: 5, stage: 'halloween', stage_end: '2026-11-07' },
   // V13.207 특별 한정(영웅 한정): 파는 알이 없다(`epic_only`). `start`~`end`(한국 날짜, 포함) 동안 영웅 결과의 `rate`%가
   // 아직 없는 특별 펫이고, 기간이 끝나면 다른 지난 시즌처럼 `after_rate`%로 영웅 알에 숨는다.
-  // V13.213 `sold_in`: 그 시즌 알(이벤트 알)이 팔리는 동안에는 영웅 결과 `rate`% 경로를 끈다(알에서 얻는다).
-  special: { name: '특별', mark: '🎁', epic_only: true, sold_in: 'autumn', start: '2026-11-04', end: '2026-12-31', until: '12월 31일', rate: 10, after_rate: 5 }
+  // V13.213: 이벤트 알에도 들어 있지만, 기간 중 영웅 결과 `rate`% 경로도 그대로 둔다(선생님 결정).
+  special: { name: '특별', mark: '🎁', epic_only: true, start: '2026-11-04', end: '2026-12-31', until: '12월 31일', rate: 10, after_rate: 5 }
 };
 const kstDay = now => new Date(Number(now) + 9 * 3600000).toISOString().slice(0, 10);
 export const seasonKeys = id => LIMITED_PET_KEYS.filter(key => CHARACTERS[key].limited === id);
@@ -191,7 +191,7 @@ export const seasonsInEpic = (now = Date.now()) => {
   return Object.keys(SEASONS).map(id => {
     const s = SEASONS[id];
     if (day > s.end) return { id, rate: s.after_rate };
-    return s.epic_only && day >= s.start && !(s.sold_in && seasonOnSale(now)?.id === s.sold_in) ? { id, rate: s.rate } : null;
+    return s.epic_only && day >= s.start ? { id, rate: s.rate } : null;
   }).filter(Boolean);
 };
 // Pet growth: an egg, then three evolution forms. `form` is 0 (egg) .. 3 (final).
