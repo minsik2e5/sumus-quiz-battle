@@ -241,6 +241,13 @@ export function serverWriteWarning(d) {
   if (!w?.text) return '';
   return `<div class="server-write-warning-v13144${w.defer ? ' defer' : ''}" role="status"><b>${esc(w.text)}</b><small>${w.defer ? '급하지 않은 정리는 내일로 미뤄요. 한국 시간 오전 9시에 다시 풀려요.' : '학생들의 저장은 그대로 돼요. 한국 시간 오전 9시에 다시 0부터 세요. 이 안내가 일주일에 한 번 넘게 뜨면 Cloudflare 유료 업그레이드(월 5달러~)를 하세요.'}</small></div>`;
 }
+// V13.214: Supabase 백업이 6시간 넘게 안 되면 서버가 경고를 보낸다(학생 데이터는 서버 안에 그대로 저장돼요).
+export function serverBackupWarning(d) {
+  const w = d?.server_backup_warning;
+  if (!w?.text) return '';
+  const guide = /^https:\/\/github\.com\//.test(String(w.guide_url || '')) ? ` <a href="${esc(w.guide_url)}" target="_blank" rel="noopener">안내서 보기</a>` : '';
+  return `<div class="server-write-warning-v13144 defer backup-warning-v13214" role="status"><b>${esc(w.text)} —${guide}</b><small>학생 기록은 서버에 그대로 저장되고 있어요. 바깥 백업 사본(Supabase)만 멈췄어요${w.detail ? `: ${esc(w.detail)}` : ''}.</small></div>`;
+}
 function dashboard(A) {
   const d = A.data;
   const care = careGroups(d);
@@ -255,6 +262,7 @@ function dashboard(A) {
   const joined = newSignups(d);
   return `
     ${serverWriteWarning(d)}
+    ${serverBackupWarning(d)}
     ${rewardEventEntry()}
     ${timingDailyEntry()}
     ${kpiCards(A, care)}

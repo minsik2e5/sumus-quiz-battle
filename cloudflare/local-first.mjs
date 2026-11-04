@@ -45,7 +45,7 @@ function chunks(text) {
 // Same data, whatever the key order of objects (arrays keep their order).
 const canonical = value => JSON.stringify(value, (key, item) => item && typeof item === 'object' && !Array.isArray(item) ? Object.fromEntries(Object.keys(item).sort().map(k => [k, item[k]])) : item);
 
-const emptyMeta = () => ({ version: -1, syncedVersion: -1, supabaseRevision: null, partsRevision: null, fullAt: 0, okAt: 0, okMode: null });
+const emptyMeta = () => ({ version: -1, syncedVersion: -1, supabaseRevision: null, partsRevision: null, fullAt: 0, okAt: 0, okMode: null, failAt: 0, failKind: null });
 const storageError = (message, status = 503) => Object.assign(Error(message), { status });
 
 export function createLocalRepository(storage, { log = console, now = () => Date.now() } = {}) {
@@ -349,6 +349,19 @@ export function createLocalRepository(storage, { log = console, now = () => Date
     },
     // The upload finished: kept with the next meta row (an upload always writes one).
     noteSyncOk(at, how) { meta = { ...meta, okAt: Number(at), okMode: how }; },
+    // V13.214 백업 실패: 실패가 새로 시작될 때만(마지막 성공 뒤 첫 실패) meta 한 줄을 바로 쓴다. 다시 시작해도
+    // "몇 시간째 실패"를 이어서 센다(선생님 경고는 6시간부터). 같은 실패가 이어지면 아무것도 쓰지 않는다.
+    noteSyncFail(at, kind) {
+      const started = meta.failAt && meta.failAt > meta.okAt;
+      meta = { ...meta, failAt: started ? meta.failAt : Number(at), failKind: kind };
+      if (!started && meta.version >= 0) { try { transact({ ...meta }); } catch {} }
+    },
+    // V13.214 실패 뒤 다시 성공했는데 올릴 것이 없었던 경우(성공 시각을 적는 저장이 없었다): meta 한 줄로 실패를 끝낸다.
+    endSyncFail(at, how) {
+      if (!(meta.failAt > meta.okAt)) return;
+      meta = { ...meta, okAt: Number(at), okMode: how };
+      if (meta.version >= 0) { try { transact({ ...meta }); } catch {} }
+    },
     markSynced(version, supabaseRevision) {
       transact({ ...meta, syncedVersion: Math.max(meta.syncedVersion, version), supabaseRevision: Number(supabaseRevision) });
     },
@@ -402,7 +415,70 @@ export function createLocalRepository(storage, { log = console, now = () => Date
 // V13.212 isBusy(): 학생 요청을 처리하는 중이면 true. 백업(조각 해시 · 업로드, 6시간마다 통째 사본 만들기)은 요청이 잠잠해질
 // 때까지 BUSY_RETRY_MS씩 미룬다. 다만 BUSY_DEFER_MAX_MS를 넘게는 미루지 않는다(대회처럼 요청이 끊이지 않아도 백업은 된다).
 export const SYNC_BUSY_RETRY_MS = 2000, SYNC_BUSY_DEFER_MAX_MS = 20000;
-export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, minIntervalMs = 0, fullEveryMs = 6 * 3600000, forceFull = false, isBusy = null, log = console }) {
+
+// ---- V13.214 백업 상태(사람이 읽는 말) ---------------------------------------------------------
+// 2026-11-03 운영: 백업 번호 확인(voca_v13_state_revision, 0KB)도 12초 안에 답이 없어 백업이 쌓이지 않았다
+// (supabase_backup_mode 'checking'에서 멈춤). 학생 데이터는 로컬 저장이 기준이라 잃은 것은 없지만, 선생님이
+// 알 수 있게 /api/health에 supabase_status를, 6시간 넘게 실패하면 선생님 첫 화면에 경고 한 줄을 보인다.
+export const SYNC_DELAY_MS = 5 * 60000;        // 밀린 지 5분: delayed
+export const SYNC_FAILING_MS = 30 * 60000;     // 실패 30분: failing / paused_suspected, 다시 하기 간격도 늘린다
+export const SYNC_WARN_MS = 6 * 3600000;       // 실패 6시간: 선생님 화면 경고
+export const SYNC_FAIL_SLOW_RETRY_MS = 5 * 60000; // 30분 넘게 실패하면 5분마다 다시 해 본다(알람 줄 · 기다림 줄이기)
+export const BACKUP_GUIDE_URL = 'https://github.com/minsik2e5/sumus-quiz-battle/blob/sumus-voca-prod-deploy/docs/supabase-backup-runbook.md';
+
+// 실패 원인 종류. http: worker.mjs rpc가 붙인 HTTP 상태(0 = 답 없음).
+export function backupErrorKind(error) {
+  const detail = String(error?.detail || error?.message || error || '');
+  const http = Number.isFinite(error?.http) ? error.http : Number(detail.match(/HTTP (\d{3})/)?.[1] || -1);
+  if (http === 540 || /paused|일시\s*정지/i.test(detail)) return 'paused';
+  if (http === 404 || error?.status === 404) return 'missing';
+  if (http === 401 || http === 403 || /42501|forbidden|invalid api key|jwt/i.test(detail)) return 'auth';
+  if (/TimeoutError|AbortError|timed? ?out/i.test(detail)) return 'timeout';
+  if (http === 0) return 'network';
+  if (error?.status === 409) return 'conflict';
+  return 'server';
+}
+
+const KIND_TEXT = {
+  paused: 'Supabase 프로젝트가 일시정지 상태예요',
+  timeout: 'Supabase가 답하지 않아요(일시정지 · 점검일 수 있어요)',
+  network: 'Supabase에 연결되지 않아요(일시정지 · 점검일 수 있어요)',
+  missing: '백업 함수가 없어요(supabase/voca_v13_parts.sql을 다시 실행)',
+  auth: '키 또는 비밀값이 맞지 않아요',
+  conflict: '백업 번호가 어긋나 다시 올리는 중이에요',
+  server: 'Supabase가 오류로 답해요(점검 중일 수 있어요)'
+};
+const kstText = at => at ? new Date(at + 9 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' (한국 시간)' : '아직 없음';
+
+// s: createSupabaseSync().status(). 계산은 숫자 몇 개뿐이다(요청 처리 비용 없음).
+export function backupState(s, now = Date.now()) {
+  const failing = !!s.fail_since && (!s.last_ok_at || s.fail_since > s.last_ok_at);
+  const failingMs = failing ? Math.max(0, now - s.fail_since) : 0;
+  let status = 'ok';
+  if (failing) {
+    if (s.fail_kind === 'paused') status = 'paused_suspected';
+    else if (failingMs < SYNC_FAILING_MS) status = 'delayed';
+    else if (s.fail_kind === 'timeout' || s.fail_kind === 'network') status = 'paused_suspected';
+    else status = 'failing';
+  } else if (s.pending && (s.lag_sec || 0) * 1000 >= SYNC_DELAY_MS) status = 'delayed';
+  const hours = Math.floor(failingMs / 3600000);
+  const text = status === 'ok' ? '백업이 잘 되고 있어요'
+    : !failing ? '백업이 조금 밀렸어요(곧 올려요)'
+    : `백업이 ${hours >= 1 ? `${hours}시간째` : `${Math.max(1, Math.round(failingMs / 60000))}분째`} 안 돼요: ${KIND_TEXT[s.fail_kind] || KIND_TEXT.server}`;
+  return {
+    status,
+    text,
+    failing_since: failing ? s.fail_since : null,
+    failing_hours: Math.round(failingMs / 360000) / 10,
+    fail_kind: failing ? s.fail_kind || null : null,
+    kind_text: failing ? KIND_TEXT[s.fail_kind] || KIND_TEXT.server : null,
+    last_ok_text: kstText(s.last_ok_at),
+    warn: failing && failingMs >= SYNC_WARN_MS,
+    warn_hours: hours,
+    guide_url: BACKUP_GUIDE_URL
+  };
+}
+export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, minIntervalMs = 0, fullEveryMs = 6 * 3600000, forceFull = false, isBusy = null, busyRetryMs = SYNC_BUSY_RETRY_MS, log = console }) {
   let timer = null;
   let running = null;
   let failures = 0;
@@ -410,13 +486,23 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
   let lastSyncAt = 0;
   let lastSyncMs = 0;
   let lastUploadKb = 0;
+  let lastBatches = 0, lastMaxBatchKb = 0;
   let pendingSince = 0;
   let closed = false;
   let mode = forceFull || !supabase.partsRevision ? 'full' : 'unknown';
   let modeCheckedAt = 0;
   let fullError = null;
   const hashCache = new Map();
-  let busySince = 0, deferred = 0;
+  let busySince = 0, deferred = 0, yielded = 0;
+  // V13.214 밀린 조각을 여러 묶음으로 올리는 동안에도 학생 요청이 오면 묶음 사이에서 잠깐 쉰다(최대 20초, #262와 같은 결).
+  // 기다림은 타이머라서 CPU를 쓰지 않고 요청 처리를 막지 않는다.
+  const sleep = ms => new Promise(resolve => { const t = setTimeout(resolve, ms); t?.unref?.(); });
+  async function yieldWhileBusy() {
+    if (!isBusy?.()) return;
+    const start = Date.now();
+    yielded += 1;
+    while (isBusy() && Date.now() - start < SYNC_BUSY_DEFER_MAX_MS && !closed) await sleep(busyRetryMs);
+  }
   const interval = () => Number(typeof minIntervalMs === 'function' ? minIntervalMs() : minIntervalMs) || 0;
   // V13.99: when an upload last succeeded (and how), so /api/health still shows it after a
   // restart. V13.144: kept in the local meta row that the upload writes anyway (no extra
@@ -530,8 +616,9 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
     const batches = batchParts(changed);
     if (!batches.length && removed.length) batches.push([]);
     let revision = status.partsRevision ?? await supabase.partsRevision();
-    let bytes = 0;
+    let bytes = 0, maxBatch = 0;
     for (let i = 0; i < batches.length; i += 1) {
+      if (i > 0) await yieldWhileBusy();
       const batch = batches[i];
       const drop = i === batches.length - 1 ? removed : [];
       let next;
@@ -554,12 +641,15 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
       const last = i === batches.length - 1;
       if (last) local.noteSyncOk?.(Date.now(), 'parts');
       local.savePartHashes(batch.map(([key]) => [key, hashes.get(key)]), drop, revision, last ? snapshot.version : null);
-      bytes += batch.reduce((sum, [key, text]) => sum + key.length + text.length, 0);
+      const batchBytes = batch.reduce((sum, [key, text]) => sum + key.length + text.length, 0);
+      bytes += batchBytes;
+      maxBatch = Math.max(maxBatch, batchBytes);
     }
     if (!batches.length) { local.noteSyncOk?.(Date.now(), 'parts'); local.markSyncedParts(snapshot.version); }
     lastSyncAt = Date.now();
     lastSyncMs = lastSyncAt - started;
     lastUploadKb = Math.round(bytes / 1024);
+    lastBatches = batches.length; lastMaxBatchKb = Math.round(maxBatch / 1024);
     return true;
   }
 
@@ -568,6 +658,8 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
   async function maybeFullCopy() {
     const snapshot = local.latest();
     if (!snapshot || !fullEveryMs || Date.now() - local.status().fullAt < fullEveryMs) return;
+    // V13.214 통째 사본은 조각을 합쳐 글로 만든다(13MB에서 수백 ms CPU): 요청이 몰리는 중이면 잠잠해질 때까지 기다린다.
+    await yieldWhileBusy();
     try {
       const next = await commitFull(snapshot.json, local.status().supabaseRevision);
       local.markFullBackup(next, Date.now());
@@ -600,6 +692,7 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
           // a newer snapshot waits for the next scheduled upload.
           while (await pushFull() && interval() <= 0) { /* next snapshot */ }
         }
+        local.endSyncFail?.(Date.now(), how);
         markOk(how, started);
         failures = 0;
         lastError = null;
@@ -607,10 +700,14 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
       } catch (error) {
         failures += 1;
         lastError = error?.detail || error?.message || String(error);
+        local.noteSyncFail?.(Date.now(), backupErrorKind(error));
         // The parts functions went missing (e.g. restored database): find the mode again.
         if (error?.status === 404 && mode === 'parts') mode = 'unknown';
         log.error('[supabase-sync]', lastError);
-        schedule(Math.min(60000, 2000 * 2 ** Math.min(failures - 1, 5)));
+        // V13.214 30분 넘게 실패하면 5분마다(그 전에는 2초부터 두 배씩 최대 1분). 다시 하기 한 번은 답을 기다리는
+        // 시간(타이머 · 네트워크)뿐이라 CPU를 거의 쓰지 않지만, 알람 한 줄씩을 쓰므로 오래 실패하면 간격을 늘린다.
+        const failSince = Number(local.status().failAt) || Date.now();
+        schedule(Date.now() - failSince >= SYNC_FAILING_MS ? SYNC_FAIL_SLOW_RETRY_MS : Math.min(60000, 2000 * 2 ** Math.min(failures - 1, 5)));
         throw error;
       } finally {
         running = null;
@@ -640,6 +737,14 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
       last_error: lastError,
       // V13.212 요청이 몰려서 백업을 미룬 횟수(이 객체가 켜진 뒤).
       deferred_busy: deferred,
+      // V13.214 묶음 사이 · 통째 사본 전에 요청 때문에 쉰 횟수.
+      yielded_busy: yielded,
+      // V13.214 지난 조각 올리기의 묶음 수와 가장 큰 묶음(KB): 묶음 하나는 약 250KB, 그보다 큰 조각 하나만 혼자 간다.
+      last_batches: lastBatches,
+      last_max_batch_kb: lastMaxBatchKb,
+      // V13.214 마지막 성공 뒤 처음 실패한 시각과 원인 종류(backupErrorKind). 다시 시작해도 남는다(로컬 meta).
+      fail_since: (Number(local.status().failAt) || 0) > (Number(local.status().okAt) || 0) ? Number(local.status().failAt) : null,
+      fail_kind: local.status().failKind || null,
       full_copy_at: local.status().fullAt || null,
       // V13.99: last successful run (nothing left to upload) and the way the backup is stored:
       // 'parts', 'full', or 'checking' until the first upload finds out.
