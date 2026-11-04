@@ -179,7 +179,9 @@ async function main() {
   const server = await startServer(H);
   const base = `http://127.0.0.1:${server.address().port}`;
 
-  const browser = await pw.chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
+  // --gpu: 폰처럼 GPU로 합성한다(이 컴퓨터에는 GPU가 없어 SwiftShader가 대신한다). 없으면 애니메이션이 모두 메인 스레드에서 돈다.
+  const gpuArgs = process.argv.includes('--gpu') ? ['--enable-gpu', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-gpu-rasterization'] : [];
+  const browser = await pw.chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required', ...gpuArgs] });
   const peerBrowser = await pw.chromium.launch();
   const meCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
   const me = await meCtx.newPage();
@@ -188,6 +190,9 @@ async function main() {
   await me.addInitScript(PROBE);
   // --lite auto: 저사양 자동 단계를 켠 채로 잰다(기본은 꺼서 '보통 연출' 그대로 잰다).
   const LITE = arg('lite', 'off');
+  // --css '...': 실험용 CSS를 덧붙여 잰다(무엇이 무거운지 하나씩 꺼 볼 때).
+  const EXTRA = arg('css', '');
+  if (EXTRA) await me.addInitScript(css => document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); }), EXTRA);
   await me.addInitScript(mode => { try { if (mode === 'off') localStorage.setItem('sumus-yacha-lite', 'off'); else localStorage.removeItem('sumus-yacha-lite'); } catch {} }, LITE);
   const cdp = await meCtx.newCDPSession(me);
   await cdp.send('Performance.enable');
@@ -204,7 +209,7 @@ async function main() {
   const PROFILE = process.argv.includes('--profile');
   // --trace: 크롬 성능 기록에서 50ms 넘는 작업마다 안에서 무엇이 시간을 썼는지(스타일 · 배치 · 그리기 · 그림 풀기 · JS).
   const TRACE = process.argv.includes('--trace');
-  if (TRACE) await browser.startTracing(me, { categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'blink.user_timing'] });
+  if (TRACE) await browser.startTracing(me, { categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'blink.user_timing', ...(process.argv.includes('--why') ? ['disabled-by-default-devtools.timeline.invalidationTracking'] : [])] });
   if (PROFILE) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); }
   const m0 = Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(m => [m.name, m.value]));
   await peer.goto(`${base}/yacha.html?u=op`);
@@ -237,6 +242,8 @@ async function main() {
     const why = {};
     for (const e of trace.traceEvents) if (e.name === 'ScheduleStyleRecalculation' || e.name === 'InvalidateLayout') { const f = e.args?.data?.stackTrace?.[0]; const k = `${e.name}: ${f ? `${f.functionName || '(anon)'} ${String(f.url).split('/').pop()}:${f.lineNumber + 1}` : '(no js)'}`; why[k] = (why[k] || 0) + 1; }
     console.log(Object.entries(why).sort((a, b) => b[1] - a[1]).slice(0, 14).map(([k, v]) => `${v} ${k}`).join('\n'));
+    if (process.argv.includes('--why')) { const seen = {}; for (const e of trace.traceEvents) if (['InvalidateLayout', 'ScheduleStyleRecalculation', 'StyleRecalcInvalidationTracking', 'LayoutInvalidationTracking', 'StyleInvalidatorInvalidationTracking'].includes(e.name)) { const d = e.args?.data || {}; const k = `${e.name} ${d.nodeName || ''} ${d.reason || d.invalidationList?.[0]?.classes?.join?.('.') || ''}`; seen[k] = (seen[k] || 0) + 1; } console.log(Object.entries(seen).sort((a, b) => b[1] - a[1]).slice(0, 25).map(([k, v]) => `${v} ${k}`).join('\n')); }
+    if (process.argv.includes('--why')) { const fails = {}, names = {}; for (const e of trace.traceEvents) if (e.name === 'Animation' && e.args?.data?.nodeName) names[e.id2?.local || e.id] = e.args.data.nodeName; for (const e of trace.traceEvents) if (e.name === 'Animation' && e.args?.data?.compositeFailed !== undefined) { const name = names[e.id2?.local || e.id] || ''; const k = `compositeFailed=${e.args.data.compositeFailed} ${(e.args.data.unsupportedProperties || []).join(',')} ${name.replace(/ style='[^']*'/, '').slice(0, 50)}`; fails[k] = (fails[k] || 0) + 1; } console.log('animations:', JSON.stringify(fails)); }
     const ult = trace.traceEvents.filter(e => e.name === 'UpdateLayoutTree' && e.ph === 'X');
     console.log('UpdateLayoutTree', ult.length, 'avg ms', (ult.reduce((a, e) => a + e.dur, 0) / ult.length / 1000).toFixed(2), 'elements avg', Math.round(ult.reduce((a, e) => a + (e.args?.elementCount || e.args?.data?.elementCount || 0), 0) / ult.length));
   }
