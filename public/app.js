@@ -4,7 +4,7 @@ import { avatar, showPose } from './modules/character.js';
 import { studentPage, getRanges, periodFolders, activePeriod, inPeriod, updateRangeSummary, starredWords, pushSupport, memorizeDeck, highExamSelection, HIGH_PICK_STORES, HIGH_EXAM_MAX, toggleHighChunk } from './modules/student.js';
 import { openFlashcards } from './modules/flashcards.js';
 import { teacherPage, collectExamForm, updateExamSummary, studentFiltered, vocabTable, moreVocab, onTeacherGrammarLoaded, tournamentPanel, careIds } from './modules/teacher.js';
-import { configureSessions, openExam, openResult, openPracticeRecord, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
+import { configureSessions, openExam, openResult, openPracticeRecord, sessionWithDetails, startPractice, resumeActivePractice, leaveSession } from './modules/sessions.js';
 import { maybePetMoment, maybeLegendEggMoment, openPetNameModal, openEggShop, buyEgg, petJosa } from './modules/pet-moments.js';
 import { maybeCardLevelUp } from './modules/card-levelup.js';
 import { mountYacha, resendUnclaimed } from './modules/battle.js';
@@ -899,8 +899,9 @@ $('#app').addEventListener('click', async event => {
     if (d.resultsView) { A.resultsView = d.resultsView; A.resultsLimit = 30; renderKeepScroll(); return; }
     if (d.vocabRange !== undefined) { A.vocabRange = d.vocabRange; A.vocabLimit = 0; $('#vocab-table').innerHTML = vocabTable(A); return; }
     if (d.reviewPractice) {
-      const session = A.data.sessions.find(item => item.id === d.reviewPractice);
-      if (!session) return toast('복습할 기록을 찾을 수 없어요.');
+      if (!A.data.sessions.some(item => item.id === d.reviewPractice)) return toast('복습할 기록을 찾을 수 없어요.');
+      const session = await sessionWithDetails(d.reviewPractice);
+      if (!session) return;
       const records = Array.isArray(session.answer_records) ? session.answer_records : [];
       const answered = new Set(records.map(item => item.word_id).filter(Boolean));
       const wrongIds = records.length
@@ -915,8 +916,9 @@ $('#app').addEventListener('click', async event => {
       return await startPractice({ wordIds, mode: A.mode, runMode: 'practice' });
     }
     if (d.repeatPractice) {
-      const session = A.data.sessions.find(item => item.id === d.repeatPractice);
-      if (!session) return toast('이전 학습 기록을 찾을 수 없어요.');
+      if (!A.data.sessions.some(item => item.id === d.repeatPractice)) return toast('이전 학습 기록을 찾을 수 없어요.');
+      const session = await sessionWithDetails(d.repeatPractice);
+      if (!session) return;
       A.school = session.school || A.school;
       A.mode = session.mode || 'write_meaning';
       A.practiceRunMode = session.run_mode === 'test' && ['write_meaning','spell'].includes(A.mode) ? 'test' : 'practice';

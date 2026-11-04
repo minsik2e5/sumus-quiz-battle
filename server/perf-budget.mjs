@@ -6,7 +6,10 @@
 // 예산은 학생이 약 두 배(90명)가 돼도 넘지 않을 만큼. 넘으면 정리 규칙을 손보거나 업그레이드를 검토한다.
 export const STATE_TOTAL_BUDGET_KB = 25000;
 export const STATE_BUDGET_KB = {
-  sessions: 16000,          // 지난 연습 기록: 30일 지나면 답안 목록 자동 정리(storage-trim). 얼려 같이 쓴다(복사 안 함).
+  // V13.215 지난 연습 기록: 일주일 지나면 답 상세를 보관 표로 옮긴다(server/session-archive.mjs, 지우지 않음). 남는 것은 요약
+  // (기록 하나 약 0.7KB)과 최근 일주일 답 상세. 운영 9.9MB → 약 4MB 예상. 예산은 옮기기를 다 하기 전(배포 직후 몇 시간)에도 넘지
+  // 않게 10MB. 요약은 계속 쌓이므로(하루 약 70KB) 넘으면 요약 보관도 검토한다. 얼려 같이 쓴다(복사 안 함).
+  sessions: 10000,
   mastery: 6000,            // 학생별 숙련도: 학생 묶음째 얼려 같이 쓴다(요청한 학생 것만 복사).
   profiles: 1500,           // 학생 프로필(펫 · 칭호 · 놀이터 기록): 활동 기록 · 본 칭호 등은 개수 상한을 둔다.
   meaningDisputes: 800,     // 이의 신청: 처리 끝난 것은 정리 대상.
@@ -32,6 +35,7 @@ export const STATE_BUDGET_KB = {
   timingDaily: 30,          // 10초 맞추기 오늘의 챌린지.
   signupCodes: 20,
   storageAutoTrim: 10,
+  sessionArchive: 2,        // V13.215 옮기기 기록(마지막 차례 · 합계만).
   storageTrims: 30,
   battleSettings: 5,
   schools: 30,
@@ -40,8 +44,13 @@ export const STATE_BUDGET_KB = {
   test_gifts: 50
 };
 
+// V13.215 보관 표(voca_archive, 메인 상태 밖 · 부팅 때 읽지 않음)의 예산. 기록 하나 약 2.5KB: 학생 90명이 1년 써도 약 90MB.
+// 무료 플랜 저장 한도(5GB)보다 훨씬 작다. 넘으면 오래된 보관을 Supabase로 내보내는 방법을 검토한다(지우지는 않는다).
+export const ARCHIVE_BUDGET_KB = 200000;
+
 // state_breakdown.keys_kb(server/state.mjs stateSizeReport)를 예산과 비교한다. unknown: 예산표에 없는 묶음(새로 생긴 것).
-export function stateBudgetReport(keysKb = {}, totalKb = null) {
+// archive: 보관 표 크기({ sessions, kb }, cloudflare/session-archive-store.mjs stats).
+export function stateBudgetReport(keysKb = {}, totalKb = null, archive = null) {
   const over = [], unknown = [];
   for (const [key, kb] of Object.entries(keysKb || {})) {
     const budget = STATE_BUDGET_KB[key];
@@ -49,7 +58,9 @@ export function stateBudgetReport(keysKb = {}, totalKb = null) {
     else if (Number(kb) > budget) over.push({ key, kb: Number(kb), budget });
   }
   const total = Number(totalKb ?? Object.values(keysKb || {}).reduce((n, kb) => n + Number(kb || 0), 0));
-  return { ok: !over.length && !unknown.length && total <= STATE_TOTAL_BUDGET_KB, total_kb: Math.round(total), total_budget_kb: STATE_TOTAL_BUDGET_KB, over, unknown };
+  const cold = archive ? { sessions: Number(archive.sessions || 0), kb: Math.round(Number(archive.kb || 0)), budget_kb: ARCHIVE_BUDGET_KB } : null;
+  if (cold && cold.kb > ARCHIVE_BUDGET_KB) over.push({ key: 'archive(보관)', kb: cold.kb, budget: ARCHIVE_BUDGET_KB });
+  return { ok: !over.length && !unknown.length && total <= STATE_TOTAL_BUDGET_KB, total_kb: Math.round(total), total_budget_kb: STATE_TOTAL_BUDGET_KB, over, unknown, archive: cold };
 }
 
 // 보기(아무것도 바꾸지 않거나 그 학생 표시만 바꾸는) 요청처럼 보이는 POST 이름. 이런 POST는 READ_POSTS나 VIEW_POSTS

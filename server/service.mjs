@@ -32,6 +32,7 @@ import { ybmParkSeonbuBooks } from './high-vocab-ybm-park-seonbu.mjs';
 import { gangseoSepMockBook } from './gangseo-sep-mock.mjs';
 import { compactSession } from './state.mjs';
 import { trimSummary, trimArchive, trimRecords, attemptTotal, autoTrimSessions } from './storage-trim.mjs';
+import { isArchived, restoreSession, restoreInState } from './session-archive.mjs';
 import { DUNGEON, CUTS, CUT_KEYS, openCuts, DUNGEON_COINS } from './dungeon-engine.mjs';
 import { activeEventFor, studentEventView, teacherEventView, teacherOwns, keptEvents, createRewardEvent, endRewardEvent, deleteRewardEvent, eventCoins, eventXp } from './reward-events.mjs';
 import { dungeonQuestions } from './dungeon-words.mjs';
@@ -1153,11 +1154,15 @@ function hydrateRecord(record, words) {
 // V13.64: the teacher list only needs each record's scores and counts. The per-answer lists were
 // ~85% of the teacher bootstrap, so they are left out here and loaded one record at a time
 // (GET /sessions/:id) when the teacher opens "답안 보기".
+// V13.215 보관한 기록(server/session-archive.mjs)도 요약은 그대로다: 보관 표시(details_archived_at)는 화면에 보내지 않아서
+// 선생님 목록 · 학생 목록의 기록 한 줄이 옮기기 전과 한 글자도 같다.
 export function sessionSummary(session) {
-  const { answer_records, wrong_details, word_ids, ...rest } = session;
+  const { answer_records, wrong_details, word_ids, details_archived_at, ...rest } = session;
   return { ...rest, details_omitted: true };
 }
 export function hydrateSession(session) {
+  // 답 상세를 보관으로 옮긴 기록은 목록에 요약만 보낸다: 화면이 기록을 열 때 GET /sessions/:id로 한 개만 받는다.
+  if (isArchived(session)) return sessionSummary(session);
   const lists = ['answer_records', 'wrong_details'].filter(key => Array.isArray(session[key]) && session[key].some(record => record && !('word' in record && 'meaning' in record && 'timed_out' in record && 'regraded' in record)));
   if (!lists.length) return session;
   const words = builtinWords();
@@ -2815,6 +2820,8 @@ export async function service(state, method, path, body, token, options = {}) {
       sourceKey = String(questionIndex);
     } else if (sourceType === 'practice') {
       const practice = state.practices.find(item => item.id === sourceId && item.student_id === p.id);
+      // V13.215 답 상세를 보관한 기록에 이의 신청: 먼저 메인 상태로 되돌린다(이 변경이 실패하면 되돌린 것도 같이 취소된다).
+      if (state.sessions.some(item => item.id === sourceId && item.student_id === p.id && isArchived(item))) restoreInState(state, sourceId, options.archive);
       const session = state.sessions.find(item => item.id === sourceId && item.student_id === p.id);
       const source = session || practice;
       if (!source || source.school_id !== school.id) fail('연습 답안을 찾을 수 없습니다.', 404);
@@ -2983,6 +2990,12 @@ export async function service(state, method, path, body, token, options = {}) {
     const session = state.sessions.find(s => s.id === path.split('/')[2]);
     const allowed = session && (session.student_id === p.id || (teacher && teacherSchools(state, p, session.division).some(school => sameSchool(session, school))));
     if (!allowed) fail('학습 기록을 찾을 수 없습니다.', 404);
+    // V13.215 답 상세를 보관한 기록은 보관 표에서 이 한 줄만 읽어 처음 모습으로 되돌려 보낸다(메인 상태는 그대로).
+    if (isArchived(session)) {
+      const text = options.archive?.get?.(session.id);
+      const restored = text ? restoreSession(session, text) : null;
+      return restored ? hydrateSession(restored) : { ...sessionSummary(session), details_omitted: false, details_missing: true };
+    }
     return hydrateSession(session);
   }
   if (/^\/attempts\/[^/]+(?:\/(?:draft|submit))?$/.test(path)) {

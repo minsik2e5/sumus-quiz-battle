@@ -10,6 +10,8 @@ import { service, allBooks, sweep } from './service.mjs';
 import * as coord from './mutation-coordinator.mjs';
 import { createLocalRepository } from '../cloudflare/local-first.mjs';
 import { createStorageMock } from './storage-mock.mjs';
+import { createSessionArchive } from '../cloudflare/session-archive-store.mjs';
+import { runArchiveStep } from './session-archive.mjs';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 const stats = list => { const s = list.slice().sort((a, b) => a - b); const at = q => Math.round(s[Math.min(s.length - 1, Math.floor(q * s.length))] || 0); return { p50: at(.5), p95: at(.95), max: Math.round(s.at(-1) || 0), n: s.length }; };
@@ -24,7 +26,7 @@ export function loadState({ students = 40, targetKB = 9000, now = Date.now() } =
   }
   // 운영처럼: 지난 연습 기록(답 기록 30개씩, 하루~60일 전)과 숙련도.
   const rec = k => ({ word_id: 'w' + k, answer: '정답' + k, correct: k % 3 > 0, ms: 2100, mode: 'write_meaning', at: now });
-  const filler = i => ({ id: 'sf-' + i, student_id: `sl-${i % students}`, division: 'high', school_id: 'gangseo-high', school: '강서고', total: 30, correct: 24, score: 80, xp: 30, reward_points: 3, mode: 'write_meaning', range_codes: ['24'], created_at: now - DAY * (1 + (i % 60)), answer_records: Array.from({ length: 30 }, (_, k) => rec(k)) });
+  const filler = i => ({ id: 'sf-' + i, student_id: `sl-${i % students}`, division: 'high', school_id: 'gangseo-high', school: '강서고', total: 30, correct: 24, score: 80, answered_count: 30, wrong_count: 6, unanswered_count: 0, xp: 30, reward_points: 3, mode: 'write_meaning', range_codes: ['24'], created_at: now - DAY * (1 + (i % 60)), answer_records: Array.from({ length: 30 }, (_, k) => rec(k)) });
   for (let i = 0; i < students; i++) state.mastery[`sl-${i}`] = Object.fromEntries(Array.from({ length: 600 }, (_, k) => ['w' + k, { n: 3, r: 2, at: now }]));
   for (let i = 0; JSON.stringify(state).length < targetKB * 1024; i++) for (let k = 0; k < 100; k++) state.sessions.push(filler(i * 100 + k));
   return state;
@@ -84,16 +86,24 @@ export async function runSaveLoad({ students = 40, rounds = 5, think = 1500, tar
   const initial = await local.read();
   const c = coord.createMutationCoordinator(local, initial, { flushDelay: 100, retryDelay: 2000, rollbackOnFailure: true, groupMs: () => 250, onError() {} });
   const before = await round(c, local, storage, { students, rounds, think });
-  // 한 달 지난 연습 기록 자동 정리: 한 번에 학생 25명씩, 다 할 때까지(운영에서는 한 시간에 한 번씩 이어서).
-  let runs = 0;
+  // V13.215 일주일 지난 연습 기록 답 상세를 보관 표로 옮기기(지우지 않음): 한 번에 300개 · 학생 25명씩, 다 할 때까지
+  // (운영에서는 10분마다 이어서). 시간마다 정리(sweep)도 워커처럼 자동 삭제 없이 같이 한다.
+  const archive = createSessionArchive(storage, { countRows: rows => local.countRows(rows) });
+  let runs = 0, moved = 0, slowest = 0;
   const trimStarted = performance.now();
-  do { await c.durable(s => sweep(s, Date.now(), { autoTrim: true }) ? true : coord.NO_MUTATION); runs += 1; }
-  while (c.current().state.storageAutoTrim?.more && runs < 20);
+  await c.durable(s => sweep(s, Date.now(), { autoTrim: false }) ? true : coord.NO_MUTATION);
+  for (; runs < 40; runs++) {
+    const t = performance.now();
+    const r = await runArchiveStep({ state: c.current().state, archive, mutate: fn => c.durable(fn), now: Date.now(), mode: 'on', noMutation: coord.NO_MUTATION });
+    slowest = Math.max(slowest, performance.now() - t);
+    moved += r.moved;
+    if (!r.moved) break;
+  }
   const trimMs = Math.round(performance.now() - trimStarted);
-  const trimmed = c.current().state.storageAutoTrim;
+  const trimmed = { total_sessions: moved, total_kb: archive.stats().kb, slowest_ms: Math.round(slowest) };
   const after = await round(c, local, storage, { students, rounds, think });
   await c.close();
-  return { before, after, trim: { runs, ms: trimMs, sessions: trimmed?.total_sessions || 0, kb: trimmed?.total_kb || 0 }, frozenRetries: c.stats?.().frozen_retries ?? 0 };
+  return { before, after, trim: { runs, ms: trimMs, sessions: trimmed.total_sessions, kb: Math.round(trimmed.total_kb), slowest_ms: trimmed.slowest_ms }, frozenRetries: c.stats?.().frozen_retries ?? 0 };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) runSaveLoad().then(r => console.log(JSON.stringify(r, null, 1)));
