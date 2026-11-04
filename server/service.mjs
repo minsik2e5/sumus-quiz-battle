@@ -1989,7 +1989,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (body.kind === 'season' && !season) fail('한정 알 판매 기간이 끝났어요. 이제 영웅 알에서 가끔 나와요!', 409);
     const epic = body.kind === 'epic', price = season ? season.price : epic ? EPIC_EGG_PRICE : EGG_PRICE;
     const missing = (season ? season.keys : epic ? EPIC_PET_KEYS : STANDARD_PET_KEYS).filter(key => !p.pets.some(x => x.key === key));
-    if (!missing.length) fail(season ? `${season.name} 한정 펫을 모두 모았어요!` : epic ? '영웅 펫을 모두 모았어요!' : '모든 펫을 모았어요!', 409);
+    if (!missing.length) fail(season ? `${season.egg}의 한정 펫을 모두 모았어요!` : epic ? '영웅 펫을 모두 모았어요!' : '모든 펫을 모았어요!', 409);
     if (openBattleFor(state, p.id, Date.now())) fail('대결이 끝난 뒤에 알을 살 수 있어요.', 409);
     const balance = pointsAndPets(state, p, xpSessions(state, p.id, p)).points_balance;
     if (balance < price) fail(`코인이 ${price - balance}개 부족해요.`);

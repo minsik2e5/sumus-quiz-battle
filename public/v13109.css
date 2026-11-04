@@ -15,7 +15,7 @@
 .egg-slot.season .egg-slot-tag{position:static;display:inline-flex;align-items:center;gap:4px;color:#2d1b5e;background:linear-gradient(90deg,#ffb347,#ffd27a)}
 .egg-season-badge{width:16px;height:16px}
 .egg-slot.season .egg-slot-name{font-size:19px;color:#fff}
-.egg-slot.season .egg-slot-sub{color:#d9cdf5}
+.egg-slot.season .egg-slot-sub{color:#d9cdf5;word-break:keep-all}
 .egg-season-until{font-style:normal;font-size:12px;font-weight:900;color:#ffcf7a}
 .egg-slot.season .egg-slot-buy{margin-top:6px;background:linear-gradient(180deg,#ff9f2e,#e8740c);box-shadow:0 4px 0 #a14f00}
 .egg-slot.season .egg-slot-buy:active:not(:disabled){box-shadow:0 1px 0 #a14f00}
