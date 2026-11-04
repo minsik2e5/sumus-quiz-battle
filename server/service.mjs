@@ -13,7 +13,7 @@ import { MARKET_OPEN } from '../public/modules/market.js';
 const marketOpen = state => MARKET_OPEN || state.market?.open === true;
 import { rpsView, rpsPlay, rpsCash, openEgg } from './rewards.mjs';
 import { yabawiView, yabawiDeal, yabawiPick, yabawiCash, yabawiLine } from './yabawi.mjs';
-import { logActivity, activityOf, activityOverview } from './activity.mjs';
+import { logActivity, activityOf, activityOverview, lastActiveAt } from './activity.mjs';
 import { tidyProfileLogs, rewardIncome, attendanceCoins, attendanceView, checkIn, gachaView, luckyView, pullLucky, addBonus, bonusRecords, careView, petCare, botStart, botFinish, botView, monsterStart, monsterFinish, monsterView, monsterScope, examReward, unpaidTitles, payTitles, giveGift, giftsWaiting, openGifts, legendEggView, grantLegendEgg, legendEggOpen, legendEggBuy, seriesEggView, seriesEggBuy } from './rewards.mjs';
 import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, createCompetition, leagueStandings, isRankedStudent, isPrivate, setUnitCounter, setRangeCounter } from './competition.mjs';
 import { schoolLeague, myTeamKey } from './school-league.mjs';
@@ -954,6 +954,7 @@ function idleStudents(state, ctx, school, now = Date.now()) {
     for (const b of ctx.battlesOf(x.id)) times.push(Number(b.finished_at || 0));
     const day = x.attendance?.last;
     if (day) times.push(Date.parse(`${day}T00:00:00+09:00`) || 0);
+    times.push(Number(lastActiveAt(x) || 0)); // V13.213.1 놀이터 · 출석 · 펫 돌보기도
     const last = Math.max(0, ...times);
     rows.push({ id: x.id, name: x.display_name, class_name: x.class_name || '', last: last || null, week: last < week.start, days: last ? Math.floor((now - last) / DAY_MS) : null });
   }
@@ -1352,7 +1353,7 @@ export async function service(state, method, path, body, token, options = {}) {
       daily_quest: !!activePractice.daily_quest
     } : null;
     return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes, ...dailyQuestProgress(sessions, activePractice, dailyQuest.target) } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
-      profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stars: undefined, care: undefined, stats: stats(state, s, sessionsByStudent.get(s.id) || [], battlesByStudent) })) : [],
+      profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stars: undefined, care: undefined, stats: stats(state, s, sessionsByStudent.get(s.id) || [], battlesByStudent), active_at: lastActiveAt(s) })) : [],
       sessions: sessions.map(teacher ? sessionSummary : hydrateSession), exams: visibleExams,
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
       attempts: attempts.map(a => attemptSummary(a, state, p)), server_time: Date.now(),

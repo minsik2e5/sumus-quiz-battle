@@ -33,6 +33,13 @@ export const ACTIVITY_MODES = {
   egg: { label: '곤충 · 공룡 알', icon: '🥚' }
 };
 
+// V13.213.1 학생이 마지막으로 무엇이든 한 때(활동 기록 · 출석 · 펫 돌보기 중 가장 늦은 것). 각 목록의 마지막 칸만 보므로 가볍다.
+// 선생님 대시보드의 '오늘 안 함' · 'N일 전'이 단어 연습 · 시험 · 문법만 보고 야차전 · 놀이터 · 출석을 빼먹던 것을 고친다.
+export function lastActiveAt(p) {
+  const act = Array.isArray(p?.activity) ? p.activity : [], att = Array.isArray(p?.attendance?.log) ? p.attendance.log : [];
+  const t = Math.max(0, Number(act.at(-1)?.at || 0), Number(att.at(-1)?.at || 0), Number(p?.care?.last_at || 0));
+  return t || null;
+}
 // 끝난 결과 한 줄을 남긴다. 학생만(선생님 · 미리보기 계정은 남기지 않는다).
 export function logActivity(p, k, text, now = Date.now()) {
   if (!p || p.role !== 'student' || p.preview_owner_id || !Object.hasOwn(ACTIVITY_MODES, k)) return false;
