@@ -148,7 +148,15 @@ function savePreferences() {
     }));
   } catch {}
 }
-async function refresh() { A.data = await api('/bootstrap'); A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; else { if (Array.isArray(A.data.profile.stars) && !starsSaving) { let pending = []; try { pending = JSON.parse(localStorage.getItem('sumus:stars-pending:' + A.data.profile.id) || '[]'); } catch {} A.memStars = [...new Set([...A.data.profile.stars, ...pending])]; } checkPushHere(); } }
+// V13.212.1: 홈 데이터에 계정(profile)이 없으면 한 번 더 받아 보고, 그래도 없으면 영어 오류 대신 한국어로 알린다(로그인 화면 그대로).
+const BOOTSTRAP_TIMEOUT_MS = 30000;
+async function loadBootstrap() {
+  let data = await api('/bootstrap', undefined, 'GET', { timeoutMs: BOOTSTRAP_TIMEOUT_MS });
+  if (!data?.profile) data = await api('/bootstrap', undefined, 'GET', { timeoutMs: BOOTSTRAP_TIMEOUT_MS });
+  if (!data?.profile) throw Object.assign(new Error('계정 정보를 받지 못했어요. 다시 로그인해 주세요. 계속 그러면 앱을 껐다 켜 주세요.'), { status: 0 });
+  return data;
+}
+async function refresh() { A.data = await loadBootstrap(); A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = A.data; if (A.data.profile.role === 'teacher') A.school = A.data.profile.active_school; else { if (Array.isArray(A.data.profile.stars) && !starsSaving) { let pending = []; try { pending = JSON.parse(localStorage.getItem('sumus:stars-pending:' + A.data.profile.id) || '[]'); } catch {} A.memStars = [...new Set([...A.data.profile.stars, ...pending])]; } checkPushHere(); } }
 globalThis.__SUMUS_APPLY_BOOTSTRAP__ = data => { A.data = data; A.loadedAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = data; if (data?.profile?.role === 'teacher') A.school = data.profile.active_school; if (!A.screen) render(); };
 let roleModules = { teacher: null, student: null };
 function ensureRoleEnhancements() {

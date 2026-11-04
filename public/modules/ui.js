@@ -38,17 +38,26 @@ const paths = {
 export const icon = (name, cls = '') => `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.star}</svg>`;
 export const empty = (name, title, sub = '') => `<div class="empty-state">${icon(name)}<h3>${title}</h3>${sub ? `<p>${sub}</p>` : ''}</div>`;
 export function toast(message) { const t = $('#toast'); t.textContent = message; t.classList.add('visible'); clearTimeout(toast.timer); toast.timer = setTimeout(() => t.classList.remove('visible'), 3200); }
-export async function api(path, body, method) {
+// opts.timeoutMs: 본문을 다 받을 때까지의 시간 제한(기본 12초). 큰 답(선생님 홈 약 1.3MB)은 느린 와이파이에서 넉넉히.
+export async function api(path, body, method, opts = {}) {
   const requestMethod = method || (body === undefined ? 'GET' : 'POST');
   const attempts = requestMethod === 'GET' ? 2 : 1;
   let lastError;
   for (let attempt = 0; attempt < attempts; attempt++) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12000);
+    const timer = setTimeout(() => controller.abort(), Number(opts.timeoutMs) || 12000);
     try {
       const r = await fetch('/api' + path, { method: requestMethod, headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, credentials: 'same-origin', body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal });
-      let data = {};
-      try { data = await r.json(); } catch {}
+      let data = {}, readable = true;
+      try { data = await r.json(); } catch { readable = false; }
+      // V13.212.1: 200인데 JSON이 아닌 답(Cloudflare 안내 화면 · 캐시된 HTML 등)을 빈 답({})으로 넘기면 화면이 영어 오류
+      // ("Cannot read properties of undefined")로 멈췄다. 형식을 알려 주는 한국어 오류로 바꾸고, GET은 한 번 더 받아 본다.
+      if (r.ok && (!readable || !data || typeof data !== 'object')) {
+        // 본문을 받는 중에 시간 제한이 지났거나(느린 와이파이 · 큰 답) 연결이 끊겨 잘렸으면 그렇게 알린다.
+        const type = (r.headers.get('content-type') || '').split(';')[0] || '형식 없음';
+        const why = controller.signal.aborted ? '받는 데 시간이 너무 걸렸어요' : type.includes('json') ? '답이 중간에 끊겼어요' : `형식이 달라요: ${type}`;
+        throw Object.assign(new Error(`서버 답을 다 받지 못했어요(${why}). 잠시 후 다시 해 주세요.`), { status: 502, transient: true, unreadable: true });
+      }
       if (!r.ok) {
         const error = Object.assign(new Error(data.error || '연결을 확인해주세요.'), { status: r.status, transient: r.status >= 500 });
         // V13.134: 권한이 없다는 답이면 화면이 다른 탭의 로그인 때문에 바뀌었는지 앱이 확인한다(app.js).
