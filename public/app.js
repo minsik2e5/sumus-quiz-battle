@@ -1,5 +1,5 @@
 import { $, $$, api, esc, icon, toast, modal, buttonBusy, date, num, rangeLabel } from './modules/ui.js';
-import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm } from './modules/core.js';
+import { CHARACTERS, EXAM_TYPES, PRACTICE_TYPES, CLASS_OPTIONS, petForm, GIFT_PET_KEYS, GIFT_PET_GROUPS, giftPetGroup, giftPetTier } from './modules/core.js';
 import { avatar, showPose } from './modules/character.js';
 import { studentPage, getRanges, periodFolders, activePeriod, inPeriod, updateRangeSummary, starredWords, pushSupport, memorizeDeck, highExamSelection, HIGH_PICK_STORES, HIGH_EXAM_MAX, toggleHighChunk } from './modules/student.js';
 import { openFlashcards } from './modules/flashcards.js';
@@ -1541,12 +1541,13 @@ async function tournamentTvLink(id) {
 function giftModal(preset = []) {
   const students = A.data.profiles.filter(s => s.active !== false && !s.preview_owner_id).sort((a, b) => String(a.class_name).localeCompare(String(b.class_name), 'ko') || a.display_name.localeCompare(b.display_name, 'ko'));
   const classes = [...new Set(students.map(s => s.class_name).filter(Boolean))];
-  const st = { kind: 'coins', target: preset.length ? 'pick' : 'class', cls: classes[0] || '', picked: new Set(preset), amount: GIFT_AMOUNTS[1], q: '' };
+  // V13.218 `pet`: 선생님이 고른 펫. owners는 그 펫을 이미 가진 학생 id(보기 전용 GET으로 받는다).
+  const st = { kind: 'coins', target: preset.length ? 'pick' : 'class', cls: classes[0] || '', picked: new Set(preset), amount: GIFT_AMOUNTS[1], q: '', pet: '', pq: '', owners: null };
   const count = () => st.target === 'all' ? students.length : st.target === 'class' ? students.filter(s => s.class_name === st.cls).length : st.picked.size;
   const sent = A.data.gifts_sent || [];
   const close = modal(`<div class="gift-modal-v1373">
     <h2>${icon('gift')} 선생님 선물</h2>
-    <div class="segment gift-kind" role="group" aria-label="선물 종류"><button type="button" data-gk="coins">${coin()} 코인</button><button type="button" data-gk="egg">🥚 선생님 알</button></div>
+    <div class="segment gift-kind" role="group" aria-label="선물 종류"><button type="button" data-gk="coins">${coin()} 코인</button><button type="button" data-gk="egg">🥚 선생님 알</button><button type="button" data-gk="pet">🐾 펫 고르기</button></div>
     <p class="gift-kind-copy" id="gift-kind-copy"></p>
     <div class="gift-label">누구에게</div>
     <div class="segment gift-target" role="group" aria-label="선물 받을 학생">${[['pick', '학생 고르기'], ['class', '반 전체'], ['all', `${esc(A.school)} 전체`]].map(([k, l]) => `<button type="button" data-gt="${k}">${l}</button>`).join('')}</div>
@@ -1556,12 +1557,18 @@ function giftModal(preset = []) {
       <ul><li><b>기본 펫</b><span>${GIFT_EGG_ODDS.basic}%</span></li><li class="epic"><b>영웅 펫</b><span>${GIFT_EGG_ODDS.epic}%</span></li><li class="legend"><b>전설 펫</b><span>${GIFT_EGG_ODDS.legendary}%</span></li></ul>
       <small>학생이 아직 없는 펫만 나와요(겹치지 않아요). 받은 알은 <b>내 펫</b>에 들어가요. 펫을 모두 모은 학생은 ${num(GIFT_EGG_FULL_COINS)}코인을 받아요. 전설 펫은 한 학생에 한 마리까지예요.</small>
     </div>
+    <div class="gift-pet-box" id="gift-pet-box" hidden>
+      <div class="gift-label">어떤 펫</div>
+      <div class="gift-pet-picked" id="gift-pet-picked"></div>
+      <div class="search gift-search">${icon('search')}<input id="gift-pq" placeholder="펫 이름 검색" autocomplete="off" aria-label="펫 이름 검색"></div>
+      <div class="gift-pets" id="gift-pets"></div>
+    </div>
     <div class="gift-label gift-coins-only">얼마나</div>
     <div class="gift-amounts gift-coins-only">${GIFT_AMOUNTS.map(n => `<button type="button" class="gift-amount" data-ga="${n}">${coin()}${n}</button>`).join('')}</div>
     <label class="gift-custom gift-coins-only"><span>직접 입력</span><input id="gift-amount" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="${String(GIFT_MAX).length}" autocomplete="off" value="${st.amount}" aria-label="선물할 코인 수 (1~${GIFT_MAX})"><b>코인</b><small>1~${num(GIFT_MAX)}</small></label>
     <label class="field gift-note"><span>한마디 (선택)</span><input id="gift-note" maxlength="${GIFT_NOTE_MAX}" placeholder="예: 이번 주 정말 열심히 했어요!" autocomplete="off"></label>
     <button type="button" class="btn primary full" id="gift-send"></button>
-    ${sent.length ? `<details class="gift-sent"><summary>최근 보낸 선물 ${sent.length}건</summary><ul>${sent.map(g => `<li><span><b>${esc(g.label)}</b>${g.note ? `<small>“${esc(g.note)}”</small>` : ''}</span><span>${g.kind === 'egg' ? '🥚 선생님 알' : `${coin()}${num(g.amount)}`} × ${num(g.count)}명<small>${date(g.at)}</small></span></li>`).join('')}</ul></details>` : ''}
+    ${sent.length ? `<details class="gift-sent"><summary>최근 보낸 선물 ${sent.length}건</summary><ul>${sent.map(g => `<li><span><b>${esc(g.label)}</b>${g.note ? `<small>“${esc(g.note)}”</small>` : ''}</span><span>${g.kind === 'egg' ? '🥚 선생님 알' : g.kind === 'pet' ? `🐾 ${esc(g.pet_name || CHARACTERS[g.pet_key]?.ko || '')} 펫` : `${coin()}${num(g.amount)}`} × ${num(g.count)}명<small>${date(g.at)}</small></span></li>`).join('')}</ul></details>` : ''}
   </div>`, '선생님 선물');
   const drawTarget = () => {
     $$('[data-gt]').forEach(b => b.classList.toggle('selected', b.dataset.gt === st.target));
@@ -1578,22 +1585,51 @@ function giftModal(preset = []) {
     }
     drawSend();
   };
+  // V13.218 받는 사람 중 고른 펫을 이미 가진 학생(그 학생은 펫 대신 코인을 받는다: 알 선물과 같은 규칙).
+  const targetIds = () => st.target === 'all' ? students.map(s => s.id) : st.target === 'class' ? students.filter(s => s.class_name === st.cls).map(s => s.id) : [...st.picked];
+  const hadCount = () => { if (!st.owners) return null; const owners = new Set(st.owners); return targetIds().filter(id => owners.has(id)).length; };
+  const TIER_CHIP = { basic: '기본', epic: '영웅', legendary: '전설', mythic: '신화', limited: '한정' };
+  const petChip = key => { const g = giftPetGroup(key), t = giftPetTier(key); return `<i class="gift-pet-chip ${g === 'series' ? `series ${t}` : g}">${g === 'series' ? `시리즈 ${TIER_CHIP[t] || ''}` : g === 'special' ? '특별' : TIER_CHIP[g] || ''}</i>`; };
+  const drawPets = () => {
+    const q = st.pq.trim().toLowerCase();
+    const match = key => { const c = CHARACTERS[key]; return !q || `${c.ko} ${c.type || ''} ${c.name || ''}`.toLowerCase().includes(q); };
+    const groups = GIFT_PET_GROUPS.map(([g, label]) => [label, GIFT_PET_KEYS.filter(key => giftPetGroup(key) === g && match(key))]).filter(([, keys]) => keys.length);
+    $('#gift-pets').innerHTML = groups.length ? groups.map(([label, keys]) => `<section class="gift-pet-group"><h4>${esc(label)} <small>${keys.length}</small></h4><div class="gift-pet-grid">${keys.map(key => `<button type="button" class="gift-pet ${key === st.pet ? 'on' : ''}" data-gp="${esc(key)}" aria-pressed="${key === st.pet}">${avatar(key, { size: 'mini' })}<b>${esc(CHARACTERS[key].ko)}</b>${petChip(key)}</button>`).join('')}</div></section>`).join('') : '<p class="gift-all-note">검색된 펫이 없어요.</p>';
+  };
+  const drawPicked = () => {
+    const box = $('#gift-pet-picked');
+    if (!st.pet) { box.innerHTML = '<p class="gift-all-note">아래에서 보낼 펫 한 마리를 골라 주세요.</p>'; return; }
+    const c = CHARACTERS[st.pet], had = hadCount(), n = count();
+    box.innerHTML = `<div class="gift-pet-sel">${avatar(st.pet, { size: 'mini' })}<span><b>${esc(c.ko)}</b> ${petChip(st.pet)}<small>${esc(c.type || '')}</small></span><em class="${had ? 'had' : ''}">${had === null ? '확인 중…' : had ? `이미 가진 학생 ${num(had)}명 <small>(펫 대신 ${num(GIFT_EGG_FULL_COINS)}코인)</small>` : n ? '받는 학생 모두 처음 만나요' : ''}</em></div>`;
+  };
+  const choosePet = async key => {
+    st.pet = key; st.owners = null;
+    $$('[data-gp]').forEach(b => { b.classList.toggle('on', b.dataset.gp === key); b.setAttribute('aria-pressed', String(b.dataset.gp === key)); });
+    drawSend();
+    try {
+      const res = await api(`/teacher/gifts/pet-owners?pet_key=${encodeURIComponent(key)}`);
+      if (st.pet === key) { st.owners = res.owners || []; drawSend(); }
+    } catch (err) { if (st.pet === key) { st.owners = []; drawSend(); toast(err.message); } }
+  };
   const drawSend = () => {
-    const egg = st.kind === 'egg';
+    const egg = st.kind === 'egg', pet = st.kind === 'pet';
     $$('[data-gk]').forEach(b => b.classList.toggle('selected', b.dataset.gk === st.kind));
-    $$('.gift-coins-only').forEach(el => { el.hidden = egg; });
+    $$('.gift-coins-only').forEach(el => { el.hidden = egg || pet; });
     $('#gift-egg-odds').hidden = !egg;
-    $('#gift-kind-copy').innerHTML = egg ? '학생이 다음에 앱을 열면 <b>선물 상자</b>가 나타나요. 상자 안의 <b>선생님 알</b>에서 펫이 나와요!' : '학생이 다음에 앱을 열면 <b>선물 상자</b>가 나타나요. 상자를 열면 코인이 쏟아져요!';
+    $('#gift-pet-box').hidden = !pet;
+    if (pet) { if (!$('#gift-pets').innerHTML) drawPets(); drawPicked(); }
+    $('#gift-kind-copy').innerHTML = pet ? '학생이 다음에 앱을 열면 <b>선물 상자</b>가 나타나요. 상자를 열면 선생님이 고른 <b>펫</b>이 알에서 깨어나요! 이미 가진 학생은 선생님 알처럼 <b>코인</b>을 받아요.' : egg ? '학생이 다음에 앱을 열면 <b>선물 상자</b>가 나타나요. 상자 안의 <b>선생님 알</b>에서 펫이 나와요!' : '학생이 다음에 앱을 열면 <b>선물 상자</b>가 나타나요. 상자를 열면 코인이 쏟아져요!';
     $$('[data-ga]').forEach(b => b.classList.toggle('on', Number(b.dataset.ga) === st.amount));
-    const n = count(), button = $('#gift-send'), ok = egg || giftAmountOk(st.amount);
+    const n = count(), button = $('#gift-send'), ok = pet ? !!st.pet : egg || giftAmountOk(st.amount);
     button.disabled = !n || !ok;
-    button.innerHTML = !n ? '받을 학생을 골라주세요' : !ok ? `코인은 1~${num(GIFT_MAX)}개 사이로 넣어 주세요` : egg ? `${num(n)}명에게 선생님 알 1개씩 보내기` : `${num(n)}명에게 ${num(st.amount)}코인씩 보내기 <small>(모두 ${num(n * st.amount)}코인)</small>`;
+    button.innerHTML = !n ? '받을 학생을 골라주세요' : !ok ? (pet ? '보낼 펫을 골라 주세요' : `코인은 1~${num(GIFT_MAX)}개 사이로 넣어 주세요`) : pet ? `${num(n)}명에게 ${esc(CHARACTERS[st.pet].ko)} 펫 보내기` : egg ? `${num(n)}명에게 선생님 알 1개씩 보내기` : `${num(n)}명에게 ${num(st.amount)}코인씩 보내기 <small>(모두 ${num(n * st.amount)}코인)</small>`;
   };
   const root = $('.gift-modal-v1373');
   root.onclick = event => {
     const b = event.target.closest('button');
     if (!b) return;
     if (b.dataset.gk) { st.kind = b.dataset.gk; drawSend(); }
+    else if (b.dataset.gp) choosePet(b.dataset.gp);
     else if (b.dataset.gt) { st.target = b.dataset.gt; drawTarget(); }
     else if (b.dataset.gc) { st.cls = b.dataset.gc; drawTarget(); }
     else if (b.dataset.ga) { st.amount = Number(b.dataset.ga); $('#gift-amount').value = st.amount; drawSend(); }
@@ -1605,6 +1641,7 @@ function giftModal(preset = []) {
     st.amount = digits ? Number(digits) : 0;
     drawSend();
   };
+  $('#gift-pq').oninput = event => { st.pq = event.target.value; drawPets(); };
   root.onchange = event => {
     const id = event.target.dataset?.gs;
     if (!id) return;
@@ -1614,10 +1651,12 @@ function giftModal(preset = []) {
   };
   $('#gift-send').onclick = async event => {
     const button = event.currentTarget, n = count();
-    const egg = st.kind === 'egg';
-    if (!n || !confirm(egg ? `${num(n)}명에게 선생님 알을 1개씩 선물할까요?` : `${num(n)}명에게 ${num(st.amount)}코인씩, 모두 ${num(n * st.amount)}코인을 선물할까요?`)) return;
+    const egg = st.kind === 'egg', pet = st.kind === 'pet' && st.pet;
+    if (st.kind === 'pet' && !pet) return;
+    const had = pet ? hadCount() : 0;
+    if (!n || !confirm(pet ? `${num(n)}명에게 ${CHARACTERS[pet].ko} 펫을 선물할까요?${had ? `\n(이미 가진 ${num(had)}명은 펫 대신 ${num(GIFT_EGG_FULL_COINS)}코인을 받아요)` : ''}` : egg ? `${num(n)}명에게 선생님 알을 1개씩 선물할까요?` : `${num(n)}명에게 ${num(st.amount)}코인씩, 모두 ${num(n * st.amount)}코인을 선물할까요?`)) return;
     buttonBusy(button);
-    const body = egg ? { kind: 'egg', note: $('#gift-note').value.trim() } : { amount: st.amount, note: $('#gift-note').value.trim() };
+    const body = pet ? { kind: 'pet', pet_key: pet, note: $('#gift-note').value.trim() } : egg ? { kind: 'egg', note: $('#gift-note').value.trim() } : { amount: st.amount, note: $('#gift-note').value.trim() };
     if (st.target === 'all') body.all = true;
     else if (st.target === 'class') body.class_name = st.cls;
     else body.student_ids = [...st.picked];
@@ -1625,7 +1664,7 @@ function giftModal(preset = []) {
       const res = await api('/teacher/gifts', body);
       A.data.gifts_sent = res.gifts_sent;
       close();
-      toast(res.kind === 'egg' ? `${num(res.sent)}명에게 선생님 알을 선물했어요! 학생이 앱을 열면 선물 상자가 나타나요.` : `${num(res.sent)}명에게 ${num(res.amount)}코인을 선물했어요! 학생이 앱을 열면 선물 상자가 나타나요.`);
+      toast(res.kind === 'pet' ? `${num(res.sent)}명에게 ${res.pet_name || ''} 펫을 선물했어요! 학생이 앱을 열면 선물 상자가 나타나요.` : res.kind === 'egg' ? `${num(res.sent)}명에게 선생님 알을 선물했어요! 학생이 앱을 열면 선물 상자가 나타나요.` : `${num(res.sent)}명에게 ${num(res.amount)}코인을 선물했어요! 학생이 앱을 열면 선물 상자가 나타나요.`);
     } catch (err) { toast(err.message); buttonBusy(button, false); drawSend(); }
   };
   drawTarget();

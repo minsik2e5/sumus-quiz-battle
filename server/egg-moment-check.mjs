@@ -19,10 +19,10 @@ export function runEggMomentChecks(assert) {
   assert(ui.includes("${v.epic_left ? '오늘 1개' : '내일 또'}") && ui.includes('진주 ${num(REEL.EPIC_EGG)}개 (하루 1개)'), 'V13.160 교환소 안내도 하루 1개');
   // 선생님 선물 알: 상자를 연 뒤 알 상점과 같은 알 깨기 연출(기본 · 영웅 · 전설 · 신화)을 하나씩.
   const moments = source('../public/modules/pet-moments.js'), cel = source('../public/modules/celebrate.js'), lucky = source('../public/modules/lucky.js');
-  assert(moments.includes('export async function giftEggShow(egg)') && moments.includes("mythicShow({ mythic: { key: egg.key, gift: true } })") && moments.includes("legendaryShow({ legendary: { key: egg.key, gift: true } })")
-    && moments.includes("epicShow({ key: egg.key, from: 'gift' })") && moments.includes("eggRevealHtml(openOverlay('선생님 알'), egg.key"),
+  assert(moments.includes("export async function giftEggShow(egg, fromName = '')") && moments.includes("mythicShow({ mythic: { key: egg.key, gift: true, ...(pick ? { pick } : {}) } })") && moments.includes("legendaryShow({ legendary: { key: egg.key, gift: true, ...(pick ? { pick } : {}) } })")
+    && moments.includes("epicShow({ key: egg.key, from: pick ? 'pick' : 'gift', pick })") && moments.includes("eggRevealHtml(openOverlay(pick ? `${pick}의 선물` : '선생님 알'), egg.key"), /* V13.218: 선생님이 고른 펫은 같은 연출 + '○○ 선생님의 선물' */
     'V13.160 선생님 알은 등급마다 알 상점과 같은 알 깨기 연출(신화 · 전설 · 영웅 · 기본)');
-  assert(cel.includes("import { giftEggShow } from './pet-moments.js';") && cel.includes('for (const g of hatch) await giftEggShow(g.egg);') && cel.includes('알 깨 보기'),
+  assert(cel.includes("import { giftEggShow } from './pet-moments.js';") && cel.includes('for (const g of hatch) await giftEggShow(g.egg, g.from_name);') && cel.includes('알 깨 보기'),
     'V13.160 선물 상자를 열면 "알 깨 보기"로 알을 하나씩 깬다');
   assert(lucky.includes("res.legendary.gift ? '선생님이 보내 주신 알에서 전설 펫이 나왔어요!'") && lucky.includes("from === 'gift' ? '선생님이 보내 주신 알에서 영웅 펫이 나왔어요!'"), 'V13.160 등급 연출 문구가 선생님 선물이라고 말한다');
 }

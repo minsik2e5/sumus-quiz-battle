@@ -175,8 +175,8 @@ export function legendaryShow(res, { again = false, againLabel = '' } = {}) {
         </div>
         <div class="lgx-card">
           <span class="lk-legend-kicker">${res.legendary.series ? 'SERIES ' : ''}LEGENDARY PET · ${esc(c.type || '')}</span><h2>${res.legendary.series ? '곤충 · 공룡 시리즈 전설 펫을 만났어요!' : '전설 펫을 만났어요!'}</h2><h3>${esc(name)}의 알</h3>
-          <p>${res.legendary.series ? '곤충 · 공룡 알에서 시리즈의 전설, 공룡 왕이 깨어났어요!' : legendEgg ? (legendEgg === 'shop' ? '알 상점의 전설 알에서 전설 펫이 깨어났어요!' : `영웅 ${LEGEND_EGG_EPIC_NEED}마리를 모아 받은 전설 알에서 전설 펫이 깨어났어요!`) : res.legendary.egg ? `영웅 알에서 ${EPIC_EGG_LEGENDARY_RATE}%의 행운으로 전설 펫이 나왔어요!` : res.legendary.gift ? '선생님이 보내 주신 알에서 전설 펫이 나왔어요!' : res.legendary.guaranteed ? `${num(res.legendary.pull)}번째 뽑기 확정 보상이에요.` : `${LEGENDARY_RATE}%의 행운이 찾아왔어요!`} 알을 톡톡 두드리면 아기 모습을 볼 수 있어요.${res.legendary.series ? '' : ' 학교 친구들에게도 소식이 전해져요.'}</p>
-          <small>${res.legendary.series ? '알 상점 · 곤충 · 공룡 알' : legendEgg ? (legendEgg === 'shop' ? '알 상점 · 전설 알' : '영웅 수집 보상 · 전설 알') : res.legendary.egg ? '알 상점 · 영웅 알' : res.legendary.gift ? '선생님 알 선물' : `코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}`}</small>
+          <p>${res.legendary.pick ? `${esc(res.legendary.pick)}이 골라서 보내 주신 전설 펫이에요!` : res.legendary.series ? '곤충 · 공룡 알에서 시리즈의 전설, 공룡 왕이 깨어났어요!' : legendEgg ? (legendEgg === 'shop' ? '알 상점의 전설 알에서 전설 펫이 깨어났어요!' : `영웅 ${LEGEND_EGG_EPIC_NEED}마리를 모아 받은 전설 알에서 전설 펫이 깨어났어요!`) : res.legendary.egg ? `영웅 알에서 ${EPIC_EGG_LEGENDARY_RATE}%의 행운으로 전설 펫이 나왔어요!` : res.legendary.gift ? '선생님이 보내 주신 알에서 전설 펫이 나왔어요!' : res.legendary.guaranteed ? `${num(res.legendary.pull)}번째 뽑기 확정 보상이에요.` : `${LEGENDARY_RATE}%의 행운이 찾아왔어요!`} 알을 톡톡 두드리면 아기 모습을 볼 수 있어요.${res.legendary.series ? '' : ' 학교 친구들에게도 소식이 전해져요.'}</p>
+          <small>${res.legendary.pick ? `${esc(res.legendary.pick)}의 선물` : res.legendary.series ? '알 상점 · 곤충 · 공룡 알' : legendEgg ? (legendEgg === 'shop' ? '알 상점 · 전설 알' : '영웅 수집 보상 · 전설 알') : res.legendary.egg ? '알 상점 · 영웅 알' : res.legendary.gift ? '선생님 알 선물' : `코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}`}</small>
           <div class="lk-actions">${again ? `<button type="button" class="lk-again" data-lk="again">한 번 더 <em>${againLabel}</em></button>` : ''}<button type="button" class="lk-ok" data-lk="ok">확인</button></div>
         </div>
       </div>
@@ -263,8 +263,8 @@ export function mythicShow(res, { again = false, againLabel = '' } = {}) {
         <div class="mx-card">
           <img class="mx-badge" src="/assets/ui/mythic-badge.webp" alt="신화">
           <span class="mx-kicker">MYTHIC PET · ${esc(c.type || '')}</span><h2>신화 펫을 만났어요!</h2><h3>${esc(name)}</h3>
-          <p>${res.mythic.egg ? `${res.mythic.epic ? '영웅 알' : '랜덤 알'}에서 아주 낮은 확률의 행운으로 신화 펫이 나왔어요!` : res.mythic.gift ? '선생님이 보내 주신 알에서 신화 펫이 나왔어요!' : `코인 뽑기에서 ${MYTHIC_RATE.capsule}%의 행운으로 신화 펫이 나왔어요!`}</p>
-          <small>${res.mythic.egg ? '알 상점' : res.mythic.gift ? '선생님 알 선물' : `코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}`} · 전교에 소식이 전해졌어요</small>
+          <p>${res.mythic.pick ? `${esc(res.mythic.pick)}이 골라서 보내 주신 신화 펫이에요!` : res.mythic.egg ? `${res.mythic.epic ? '영웅 알' : '랜덤 알'}에서 아주 낮은 확률의 행운으로 신화 펫이 나왔어요!` : res.mythic.gift ? '선생님이 보내 주신 알에서 신화 펫이 나왔어요!' : `코인 뽑기에서 ${MYTHIC_RATE.capsule}%의 행운으로 신화 펫이 나왔어요!`}</p>
+          <small>${res.mythic.pick ? `${esc(res.mythic.pick)}의 선물` : res.mythic.egg ? '알 상점' : res.mythic.gift ? '선생님 알 선물' : `코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}`} · 전교에 소식이 전해졌어요</small>
           <div class="lk-actions">${again ? `<button type="button" class="lk-again" data-lk="again">한 번 더 <em>${againLabel}</em></button>` : ''}<button type="button" class="lk-ok" data-lk="ok">확인</button></div>
         </div>
       </div>
@@ -313,7 +313,9 @@ export function mythicShow(res, { again = false, againLabel = '' } = {}) {
 // violet omen, the pet's own egg rises, two heartbeats, one flash and ring, then the EPIC
 // letters and the egg with the shadow of its final form. `res` is the coin capsule (with its
 // "한 번 더"), or nothing when the egg came from the shop.
-export function epicShow({ key, res = null, again = false, againLabel = '', from = '' }) {
+// V13.218 선생님이 고른 펫 선물의 연출 문구('○○ 선생님').
+const pickLead = (pick, what) => `${esc(pick || '선생님')}이 골라서 보내 주신 ${esc(what)}이에요!`;
+export function epicShow({ key, res = null, again = false, againLabel = '', from = '', pick = '' }) {
   preloadSound(['combo', 'wiggle', 'pop', 'fanfare-epic']);
   return new Promise(resolve => {
     const c = CHARACTERS[key] || {}, name = c.ko || '영웅 펫';
@@ -344,7 +346,7 @@ export function epicShow({ key, res = null, again = false, againLabel = '', from
         </div>
         <div class="lgx-card">
           <span class="lk-legend-kicker">${season ? `${esc(season.name)} LIMITED` : 'EPIC'} PET · ${esc(c.type || '')}</span><h2>${season ? `${esc(season.name)} 한정 펫을 만났어요!` : '영웅 펫을 만났어요!'}</h2><h3>${esc(name)}의 알</h3>
-          <p>${season ? `${from === 'season' ? `${esc(season.egg || '이벤트 알')}에서 나온 친구예요!` : from === 'gift' ? `선생님이 보내 주신 알에서 ${esc(season.name)} 한정 펫이 나왔어요!` : `영웅 알에서 ${seasonsInEpic().find(x => x.id === c.limited)?.rate ?? season.after_rate}%의 행운으로 ${esc(season.name)} 한정 펫이 나왔어요!`} 알을 톡톡 두드리면 아기 모습을 볼 수 있어요. 한정 펫은 야차전 특기 대신 특별한 모습을 가졌어요.` : `${res ? `${EPIC_RATE}%의 행운으로 영웅 알이 나왔어요!` : from === 'gift' ? '선생님이 보내 주신 알에서 영웅 펫이 나왔어요!' : from === 'hunt' ? '몬스터 사냥에서 영웅 펫을 잡았어요!' : from === 'series' ? '곤충 · 공룡 알에서 시리즈 영웅 친구가 나왔어요!' : '영웅 알에서 나온 친구예요!'} 알을 톡톡 두드리면 아기 모습을 볼 수 있고, 야차전에서 새 특기를 써요.`}</p>
+          <p>${season ? `${from === 'pick' ? pickLead(pick, `${season.name} 한정 펫`) : from === 'season' ? `${esc(season.egg || '이벤트 알')}에서 나온 친구예요!` : from === 'gift' ? `선생님이 보내 주신 알에서 ${esc(season.name)} 한정 펫이 나왔어요!` : `영웅 알에서 ${seasonsInEpic().find(x => x.id === c.limited)?.rate ?? season.after_rate}%의 행운으로 ${esc(season.name)} 한정 펫이 나왔어요!`} 알을 톡톡 두드리면 아기 모습을 볼 수 있어요. 한정 펫은 야차전 특기 대신 특별한 모습을 가졌어요.` : `${res ? `${EPIC_RATE}%의 행운으로 영웅 알이 나왔어요!` : from === 'pick' ? pickLead(pick, '영웅 펫') : from === 'gift' ? '선생님이 보내 주신 알에서 영웅 펫이 나왔어요!' : from === 'hunt' ? '몬스터 사냥에서 영웅 펫을 잡았어요!' : from === 'series' ? '곤충 · 공룡 알에서 시리즈 영웅 친구가 나왔어요!' : '영웅 알에서 나온 친구예요!'} 알을 톡톡 두드리면 아기 모습을 볼 수 있고, 야차전에서 새 특기를 써요.`}</p>
           ${res ? `<small>코인 뽑기 결과 · ${res.mult ? `${res.mult}배, ${num(res.paid)}코인` : '꽝'}</small>` : ''}
           <div class="lk-actions">${again ? `<button type="button" class="lk-again" data-lk="again">한 번 더 <em>${againLabel}</em></button>` : ''}<button type="button" class="lk-ok" data-lk="ok">확인</button></div>
         </div>
