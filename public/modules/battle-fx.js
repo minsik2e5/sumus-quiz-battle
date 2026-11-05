@@ -30,7 +30,9 @@ export const PET_ELEMENT = {
   ladybug: 'leaf', bee: 'toxic', ant: 'earth', rhinobeetle: 'toxic', butterfly: 'wind',
   tricera: 'flame', stego: 'toxic', brachio: 'ice', ptera: 'ice', ankylo: 'toxic', tyranno: 'flame',
   // V13.207 특별 한정(별빛: 치이카와). 별빛이 11마리를 넘지 않게 얼음 · 독에 하나씩.
-  hachiware: 'ice', usagi: 'toxic'
+  hachiware: 'ice', usagi: 'toxic',
+  // V13.209 특별 한정 5마리 더: 87→92마리라 한 속성 12마리까지(가장 많은 속성과 적은 속성 차이 1 이하).
+  furuhonya: 'wind', kurimanju: 'earth', momonga: 'leaf', rakko: 'ice', shisa: 'flame'
 };
 export const elementOf = key => PET_ELEMENT[key] || 'star';
 export const paletteOf = key => ELEMENTS[elementOf(key)];
