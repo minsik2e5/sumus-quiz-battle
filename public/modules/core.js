@@ -223,6 +223,14 @@ export const seriesComplete = pets => SERIES_PET_KEYS.length > 0 && SERIES_PET_K
 // V13.201 곤충 · 공룡 알 NEW 표시: 이 날까지(한국 날짜, 포함), 시리즈 펫을 아직 하나도 안 가진 학생에게.
 export const SERIES_NEW_UNTIL = '2026-11-30';
 export const SERIES_DONE_COINS = 500;
+// V13.218 선생님 펫 선물: 선생님이 고른 펫 한 마리(기본 · 영웅 · 전설 · 신화 · 한정 · 특별 · 시리즈 · 바다, 판매가 끝난 한정도).
+// 학생이 만날 수 있는 펫(ACTIVE_PET_KEYS: 그림이 다 오고 은퇴하지 않은 펫)만 고를 수 있다.
+// 등급(tier)은 연출 · 학교 소식에 쓴다: 시리즈 펫은 시리즈 등급(rank), 나머지는 petTier. group은 선생님 화면의 묶음.
+export const GIFT_PET_KEYS = ACTIVE_PET_KEYS;
+export const giftPetOk = key => typeof key === 'string' && GIFT_PET_KEYS.includes(key);
+export const giftPetTier = key => CHARACTERS[key]?.series ? (CHARACTERS[key].rank || 'basic') : petTier(key);
+export const GIFT_PET_GROUPS = [['basic', '기본'], ['epic', '영웅'], ['legendary', '전설'], ['mythic', '신화'], ['limited', '한정'], ['special', '특별'], ['series', '시리즈']];
+export const giftPetGroup = key => { const c = CHARACTERS[key] || {}; return c.series ? 'series' : c.limited === 'special' ? 'special' : petTier(key); };
 export const seriesEggNew = (se, now = Date.now()) => !!se?.ready && !se.owned && kstDay(now) <= SERIES_NEW_UNTIL;
 export const seriesGroupKeys = group => SERIES_PET_KEYS.filter(key => CHARACTERS[key].group === group);
 // Student-chosen pet name, checked the same way on the device and on the server.

@@ -54,6 +54,7 @@ import { runStability168Checks } from './stability-168-check.mjs';
 import { runStateSlimChecks } from './state-slim-check.mjs';
 import { runEggMomentChecks } from './egg-moment-check.mjs';
 import { runLegendEggChecks } from './legend-egg-check.mjs';
+import { runPetGiftChecks } from './pet-gift-check.mjs';
 import { runHuntChecks } from './hunt-check.mjs';
 import { runClawChecks } from './claw-check.mjs';
 import { runBlankChecks } from './blank-check.mjs';
@@ -73,6 +74,7 @@ import { runPetSkillsAllChecks } from './pet-skills-all-check.mjs';
 import { runBugDinoPetsChecks } from './bug-dino-pets-check.mjs';
 import { runSpecialPetsChecks } from './special-pets-check.mjs';
 import { runEventEggChecks } from './event-egg-check.mjs';
+import { runLastActiveChecks } from './last-active-check.mjs';
 import { runTeacherPreviewPetsChecks } from './teacher-preview-pets-check.mjs';
 import { runTournamentSchoolsChecks } from './tournament-schools-check.mjs';
 import { runPartySchoolsChecks } from './party-schools-check.mjs';
@@ -128,6 +130,13 @@ function reviewWordIds(session) {
   return [...new Set([...wrongIds, ...missingIds])];
 }
 export async function runReleaseCheck() {
+  // 검사 중 끝나지 않는 약속(unref 타이머만 남음)이 있으면 Node가 조용히 0으로 끝나 버린다. 끝까지 오지 못했으면 실패로 끝낸다.
+  let finished = false;
+  process.once('beforeExit', () => {
+    if (finished) return;
+    console.error('[release-check] FAIL 검사가 끝나기 전에 멈췄어요(끝나지 않는 await). 마지막으로 시작한 검사를 확인하세요.');
+    process.exitCode = 1;
+  });
   const priorAuthProvider = process.env.AUTH_PROVIDER;
   delete process.env.AUTH_PROVIDER;
   // V13.118: a mythic pet is a tiny real chance; the checks never roll it unless they set the source themselves.
@@ -144,7 +153,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(!studentUiSource.includes('data-middle-word=') && studentUiSource.includes('data-high-word='), 'V13.150 middle-school test setup uses the same word picker as high school');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.218.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.219.0') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -1297,7 +1306,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.218.0') && indexHtml.includes('/app.bundle.css?v=13.218.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.219.0') && indexHtml.includes('/app.bundle.css?v=13.219.0') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1318,7 +1327,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.218.0'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.219.0'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -1576,6 +1585,7 @@ export async function runReleaseCheck() {
     await runStateSlimChecks(assert);
     runEggMomentChecks(assert);
     await runLegendEggChecks(assert);
+    await runPetGiftChecks(assert);
     await runHuntChecks(assert);
     await runClawChecks(assert);
     await runBlankChecks(assert);
@@ -1596,6 +1606,7 @@ await runPlaygroundMenuChecks(assert);
     await runBugDinoPetsChecks(assert);
     await runSpecialPetsChecks(assert);
     await runEventEggChecks(assert);
+    await runLastActiveChecks(assert);
     await runTeacherPreviewPetsChecks(assert);
     await runTournamentSchoolsChecks(assert);
     await runPartySchoolsChecks(assert);
@@ -1619,6 +1630,7 @@ await runPlaygroundMenuChecks(assert);
     console.log(`[teacher-home] 선생님 첫 화면 ${teacherHome.bootKb}KB(${teacherHome.bootMs}ms) · 결과 분석 한 쪽 ${teacherHome.pageKb}KB · 학생 기록 창 ${teacherHome.detailKb}KB · 학생 첫 화면 ${teacherHome.studentKb}KB`);
 
     console.log(`[release-check] PASS ${checks.length}/${checks.length}`);
+    finished = true;
     return { ok: true, count: checks.length };
   } finally {
     setMythicRandom(null);

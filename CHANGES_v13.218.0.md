@@ -1,25 +1,28 @@
-# v13.218.0 Supabase 백업을 새 프로젝트로 옮기기
+# v13.218.0 선생님 펫 선물: 선생님이 고른 펫을 학생에게 보내기
 
-## 무엇이 있었나
-- 2026-11-05 선생님 화면: "데이터 백업이 9시간째 안 되고 있어요 — Supabase가 답하지 않아요(일시정지 · 점검일 수 있어요)".
-- 운영 `/api/health`의 실제 오류: `voca_v12_state_commit: HTTP 500 57014 canceling statement due to statement timeout (13867 KB)`, `supabase_backup_mode: full`.
-  - Supabase는 답했다. 조각 백업 함수(`voca_v13_…`)가 404여서 통째(13.9MB) 업로드로 버텼고, 그것이 API 시간 제한에 걸려 취소됐다.
-  - 백업 프로젝트를 만든 계정을 찾지 못해 함수를 다시 만들 수 없었다 → 새 프로젝트로 옮긴다.
+## 무엇이 바뀌었나
+- **선생님 선물 창에 `🐾 펫 고르기`** (코인 · 선생님 알 옆).
+  - 펫 목록: 그림 + 이름 + 등급 칩. 기본 · 영웅 · 전설 · 신화 · 한정 · 특별 · 시리즈 묶음, 이름 검색.
+  - 고를 수 있는 펫: 학생이 만날 수 있는 모든 펫(`ACTIVE_PET_KEYS`: 그림이 다 온 펫, 은퇴한 불새 제외). 판매 기간이 끝난 한정 펫도 된다.
+  - 받는 사람(학생 고르기 · 반 전체 · 학교 전체) · 한마디 · 300명 제한 · 푸시는 코인/알 선물과 같다.
+  - 펫을 고르면 **"이미 가진 학생 n명"** 을 미리 보여 준다(새 보기 전용 GET `/api/teacher/gifts/pet-owners`).
+  - 최근 보낸 선물 기록에 `🐾 ○○ 펫`.
+- **학생**: 선물 상자를 열면 그 펫이 알 선물과 **같은 깨기 연출**(신화 · 전설 · 영웅/한정 · 기본 연출 그대로)로 나온다.
+  - 문구는 "○○ 선생님이 골라서 보내 주신 … 펫이에요!", 상자에는 기존처럼 "○○ 선생님의 선물"과 메모.
+  - 어떤 펫인지는 열기 전(홈 데이터 · 푸시)에 보이지 않는다.
+  - 첫 펫을 고르기 전 학생에게는 알 선물처럼 기다렸다가 보인다.
+- **이미 가진 펫이면**: 선생님 알에서 새 펫이 나올 수 없을 때(펫을 다 모은 학생)와 같은 규칙 — 펫 대신 `GIFT_EGG_FULL_COINS`(400)코인. 카드에 "○○는 이미 내 친구예요! 대신 400코인".
+- **학교 소식**: 선생님이 준 전설 · 신화 펫은 `announceLegend`로 "선생님 선물에서 … 만났어요!".
+- **일반 획득과 같이 계산**: 도감 · 펫 수 칭호(키로 센다), 영웅 20마리 전설 알(`grantLegendEgg`), 전설 기록(`lucky.legend_key`), 곤충 · 공룡 시리즈 완성 보상.
+- 코인 잔액은 보내는 순간 그대로(펫 선물은 코인 0).
 
-## 바뀐 것
-- `supabase/voca_v12_state.sql` (새 파일): 원래 프로젝트에만 있던 통째 사본 표 · 함수를 워커가 부르는 모양 그대로 다시 만든다.
-  - 처음엔 줄이 없다: 빈 사본을 백업으로 읽어 학생 기록을 덮지 않는다(워커는 로컬 사본으로 시작).
-  - 첫 commit은 옛 프로젝트 번호를 들고 와도 받아 1이 된다. 그다음부터는 번호가 어긋나면 40001.
-  - 비밀값은 v13의 `voca_v13_check_secret`으로 확인(지문을 두 곳에 적지 않음).
-  - anon · authenticated 시간 제한 2분: 13MB 통째 사본이 57014로 끊기지 않게.
-- 백업 실패 분류: `57014` · `statement timeout`은 `timeout`(답 없음 → "일시정지 의심")이 아니라 새 종류 `too_big`.
-  선생님 경고 문구도 "백업이 커서 Supabase가 저장 도중 끊어요(시간 제한 · 조각 백업 함수가 있는지 확인)"로.
-- `wrangler.jsonc`: `SUPABASE_URL` · `SUPABASE_ANON_KEY`를 새 프로젝트로.
-- 안내서 `docs/supabase-backup-runbook.md` 6번: 새 프로젝트로 옮기는 순서.
+## 서버
+- `server/rewards.mjs`: `giveGift` `kind:'pet'`(`pet` 키), `giftPetAdd`, `openGifts`가 펫 선물을 연다.
+- `server/service.mjs`: `POST /teacher/gifts` `kind:'pet'` + `pet_key`(없는 펫 400), `GET /teacher/gifts/pet-owners`(선생님만, 이 학교만), `/gifts/open` 소식 문구.
+- `public/modules/core.js`: `GIFT_PET_KEYS` · `giftPetOk` · `giftPetTier` · `giftPetGroup` · `GIFT_PET_GROUPS`.
 
 ## 검사
-- `server/sql-check.mjs`: v12 SQL을 PGlite(진짜 Postgres)에서 두 번 실행, 빈 read는 0줄, 비밀값 거절, 첫 commit 번호 무관, 충돌 40001, anon은 함수로만, 시간 제한 2분.
-- `server/supabase-backup-check.mjs` 6번: 옛 프로젝트에서 조각 백업 → 밀린 기록이 있는 채로 빈 새 프로젝트로 바꿔 다시 시작
-  → 로컬 기록 그대로 시작 → 번호 한 번 어긋남 → 조각 전부 다시 올림 → 새 프로젝트 조각을 합치면 지금 상태와 같음 → 다시 시작해도 같음.
-  밀린 것 없이 바꿔도 빈 새 프로젝트를 받아들이지 않는다.
-- 0번: 운영 오류 문구가 `too_big`으로, "일시정지"라고 하지 않는다.
+- 새 `server/pet-gift-check.mjs`(release-check 등록): 선생님만(학생 403), 다른 학교 제외, 없는 · 은퇴 펫 거부, 학생 고르기 · 반 · 전체,
+  열면 펫이 들어옴, 중복 = 알 중복 규칙, 전설 · 신화 학교 소식, 코인 잔액 그대로, 300명 제한, 미리 보기 GET은 쓰기 없음, 영웅 20마리 · 시리즈 완성.
+- 기존 검사의 소스 문자열을 새 코드 모양에 맞춤(rewards · mythic · egg-moment · sound: `epicShow` 범위 4000 → 4400자).
+- `teacher-home-check`: v13.216에서 바뀐 `sessions.js` 모양을 받아들이도록 고침(기준 브랜치에서 이미 실패하던 검사).

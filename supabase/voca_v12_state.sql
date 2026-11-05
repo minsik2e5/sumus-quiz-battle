@@ -1,4 +1,4 @@
--- SUMUS VOCA v13.218: 새 Supabase 프로젝트에 "통째 사본"(v12) 표와 함수를 만든다.
+-- SUMUS VOCA v13.219: 새 Supabase 프로젝트에 "통째 사본"(v12) 표와 함수를 만든다.
 --
 -- 새 프로젝트에서 한 번: 먼저 supabase/voca_v13_parts.sql을 Run 하고(비밀값 확인 함수가 거기 있다),
 -- 그다음 SQL Editor -> New query -> 이 파일 전체 붙여 넣기 -> Run.

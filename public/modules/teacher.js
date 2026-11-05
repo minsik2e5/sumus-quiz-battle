@@ -94,6 +94,8 @@ function todayStudentIds(d) {
   Object.entries(d.grammar_progress || {}).forEach(([studentId, progress]) => {
     if (Object.values(progress || {}).some(item => dayKey(item.updated_at || 0) === key)) ids.add(studentId);
   });
+  // V13.218.1 야차전 · 놀이터 · 출석 · 펫 돌보기도 '오늘 한 것'(서버 active_at).
+  (d.profiles || []).forEach(p => { if (p.active_at && dayKey(p.active_at) === key) ids.add(p.id); });
   return ids;
 }
 function grammarSummary(d, school) {
@@ -175,6 +177,7 @@ function lastActivityMap(d) {
   for (const a of d.attempts) put(a.student_id, a.submitted_at || a.started_at);
   for (const [id, progress] of Object.entries(d.grammar_progress || {})) for (const item of Object.values(progress || {})) put(id, item.updated_at);
   for (const r of d.idle_students || []) if (r.last) put(r.id, r.last);
+  for (const p of d.profiles || []) put(p.id, p.active_at); // V13.218.1
   return last;
 }
 export function agoLabel(t, now = Date.now()) {

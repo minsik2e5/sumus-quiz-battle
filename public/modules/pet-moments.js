@@ -274,14 +274,16 @@ const EGGS = {
 const eggsNow = () => { const s = seasonOnSale(); return s ? { ...EGGS, season: { name: s.egg, price: s.price, keys: s.keys, all: `${s.egg}의 한정 펫을 모두 모았어요!`, until: s.until, mark: s.shop_mark || s.mark } } : EGGS; };
 // After a purchase: the legendary, 영웅 or limited show, or the basic egg's name card (null).
 // V13.160 선생님이 보낸 알도 알 상점과 같은 알 깨기 연출로(예전: 선물 상자 안에 펫 카드만). egg = { key, tier }.
-export async function giftEggShow(egg) {
+// V13.218 선생님이 고른 펫(egg.pick): 같은 등급 연출, 문구만 '○○ 선생님의 선물'(from_name). 시리즈 전설은 전설 연출.
+export async function giftEggShow(egg, fromName = '') {
   if (!egg?.key || !CHARACTERS[egg.key]) return;
-  if (egg.tier === 'mythic') { await mythicShow({ mythic: { key: egg.key, gift: true } }); return; }
-  if (egg.tier === 'legendary') { await legendaryShow({ legendary: { key: egg.key, gift: true } }); return; }
-  if (egg.tier === 'epic' || egg.tier === 'limited') { await epicShow({ key: egg.key, from: 'gift' }); return; }
+  const pick = egg.pick ? (fromName ? (/선생님$/.test(fromName) ? fromName : `${fromName} 선생님`) : '선생님') : '';
+  if (egg.tier === 'mythic') { await mythicShow({ mythic: { key: egg.key, gift: true, ...(pick ? { pick } : {}) } }); return; }
+  if (egg.tier === 'legendary') { await legendaryShow({ legendary: { key: egg.key, gift: true, ...(pick ? { pick } : {}) } }); return; }
+  if (egg.tier === 'epic' || egg.tier === 'limited') { await epicShow({ key: egg.key, from: pick ? 'pick' : 'gift', pick }); return; }
   await new Promise(resolve => {
     momentOpen = true;
-    eggRevealHtml(openOverlay('선생님 알'), egg.key, () => { closeOverlay(false); resolve(); });
+    eggRevealHtml(openOverlay(pick ? `${pick}의 선물` : '선생님 알'), egg.key, () => { closeOverlay(false); resolve(); }, pick ? `<b>${esc(petJosa(CHARACTERS[egg.key].ko, '이', '가'))}</b> ${esc(pick)}의 선물로 왔어요! 알을 톡톡 두드려 보세요` : undefined);
   });
 }
 // V13.162 몬스터 사냥에서 잡은 펫: 알 상점과 같은 공개 연출(기본은 알 이름 카드, 영웅은 영웅 연출).
