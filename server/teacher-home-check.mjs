@@ -137,7 +137,7 @@ export async function runTeacherHomeChecks(assert, expectStatus) {
     'V13.215 대시보드 · 학생 관리 · 이번 주 요약은 session_digest로 센다');
   assert(enh.includes('await teacherStudentDetail(id)') && enh.includes('detail?.word_mastery') && enh.includes('detail?.recent') && app.includes('await teacherStudentDetail(id)'),
     'V13.215 학생 기록 창은 열 때 GET /teacher/student-detail/:id로 최근 연습 · 시험범위 정복을 받는다');
-  assert(sessions.includes('findTeacherRecord(sessionId)') && /if \(!session \|\| session\.details_omitted\)/.test(sessions), 'V13.215 결과 분석 탭의 기록도 답안 보기가 열린다(없으면 GET /sessions/:id)');
+  assert(sessions.includes('findTeacherRecord(sessionId)') && /if \(!session \|\| session\.details_omitted\)|if \(session && !session\.details_omitted\) return session;/.test(sessions) /* v13.216부터 sessionWithDetails 모양 */, 'V13.215 결과 분석 탭의 기록도 답안 보기가 열린다(없으면 GET /sessions/:id)');
   assert(/markTeacherRecordsStale\(\)/.test(app.slice(app.indexOf('async function refresh()'), app.indexOf('async function refresh()') + 600)) && /clearTeacherRecords\(\);\s*await refresh\(\);/.test(app),
     'V13.215 첫 화면을 다시 받으면(재채점 · 학생 정보 변경) 결과 분석 기록도 다시 받고, 학교 · 부서를 바꾸면 비운다');
 
