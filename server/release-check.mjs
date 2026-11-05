@@ -21,6 +21,7 @@ import { runSweepLearnChecks } from './sweep-learn-check.mjs';
 import { runSweepDungeonChecks } from './sweep-dungeon-check.mjs';
 import { runSweepBattleChecks } from './sweep-battle-check.mjs';
 import { runSweepTeacherChecks } from './sweep-teacher-check.mjs';
+import { runTeacherHomeChecks } from './teacher-home-check.mjs';
 import { runBattleFxChecks } from './battle-fx-check.mjs';
 import { runDungeonChecks } from './dungeon-check.mjs';
 import { runSoundChecks } from './sound-check.mjs';
@@ -42,12 +43,15 @@ import { runClawPhysicsChecks } from './claw-physics-check.mjs';
 import { runLevelChecks } from './level-check.mjs';
 import { runPracticeSpeedChecks } from './practice-speed-check.mjs';
 import { runYachaLagChecks } from './yacha-lag-check.mjs';
+import { runSupabaseBackupChecks } from './supabase-backup-check.mjs';
+import { runYachaFpsChecks } from './yacha-fps-check.mjs';
 import { runPerfRulesChecks } from './perf-rules-check.mjs';
 import { runBootstrapGuardChecks } from './bootstrap-guard-check.mjs';
 import { runActivityChecks } from './activity-check.mjs';
 import { runReviewFixChecks } from './review-fix-check.mjs';
 import { runStability163Checks } from './stability-163-check.mjs';
 import { runStability168Checks } from './stability-168-check.mjs';
+import { runStateSlimChecks } from './state-slim-check.mjs';
 import { runEggMomentChecks } from './egg-moment-check.mjs';
 import { runLegendEggChecks } from './legend-egg-check.mjs';
 import { runHuntChecks } from './hunt-check.mjs';
@@ -141,7 +145,7 @@ export async function runReleaseCheck() {
     assert(studentUiSource.includes('data-memorize-range='), 'vocabulary range numbers are interactive');
     assert(!studentUiSource.includes('data-middle-word=') && studentUiSource.includes('data-high-word='), 'V13.150 middle-school test setup uses the same word picker as high school');
     assert(!studentUiSource.includes('data-middle-start-picker=') && !studentUiSource.includes('data-middle-chunk-size=') && !studentUiSource.includes('data-middle-range-move='), 'middle-school start/chunk/range navigation UI is removed');
-    assert(indexSource.includes('/app.bundle.css?v=13.213.1') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
+    assert(indexSource.includes('/app.bundle.css?v=13.217.1') && bundleCss.includes('--sumus-primary') && bundleCss.includes('.home-focus-v1326') && bundleCss.includes('.practice-saving-v1345'), 'V13.46 production CSS bundle contains feedback styles');
     assert(typeof openGrammarChoiceSample === 'function', 'grammar learning module parses as a browser module');
     const runtimeBooks = allBooks({ extraBooks: [] });
     const allWords = runtimeBooks.flatMap(book => book.words || []);
@@ -1294,7 +1298,7 @@ export async function runReleaseCheck() {
     assert(teacherModule.includes('단어 파일 등록') && teacherModule.includes('meaning_alias_meta') && teacherModule.includes('학생 이의제기'), 'V13.13 teacher vocabulary UI exposes import and alias provenance');
     assert(appJs.includes('/vocab-import/preview') && appJs.includes('/vocab-import/commit') && appJs.includes('data-alias-remove'), 'V13.13 teacher UI supports previewed import and single-alias deletion');
     assert(practiceEnhancements.includes('sumusCalmFeedback') && !practiceEnhancements.includes('floatGain(feedback); celebrateCorrect(session, feedback)'), 'calm practice feedback layer remains active');
-    assert(indexHtml.includes('/app.js?v=13.213.1') && indexHtml.includes('/app.bundle.css?v=13.213.1') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
+    assert(indexHtml.includes('/app.js?v=13.217.1') && indexHtml.includes('/app.bundle.css?v=13.217.1') && sw.includes('"/app.bundle.css"') && /const ASSET_HASH = '[0-9a-f]{16}';/.test(sw), 'V13.50 page version and a build-generated service worker asset hash are active');
     {
       const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
       assert(precache.includes('/') && !precache.includes('/index.html') && sw.includes("caches.match('/', { cacheName: CACHE })") && sw.includes('!cached.redirected'), 'page is precached as / (Cloudflare redirects /index.html; a redirected response cannot answer a navigation)');
@@ -1315,7 +1319,7 @@ export async function runReleaseCheck() {
     }
     assert(!sw.includes('"/danwongo-grammar-data.js"') && !sw.includes('"/teacher-enhancements.js"') && !sw.includes('"/exam-ops.js"'), 'service worker precache excludes teacher tools and grammar data (cached on first use)');
     assert(sessionsModule.includes("prefetch_next: x.run_mode !== 'test'"), 'practice answers prefetch the next question for faster transitions');
-    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.213.1'), 'browser loads one production stylesheet instead of layered CSS requests');
+    assert(indexHtml.match(/rel="stylesheet"/g)?.length === 1 && indexHtml.includes('/app.bundle.css?v=13.217.1'), 'browser loads one production stylesheet instead of layered CSS requests');
     assert(sw.includes('"/app.bundle.css"') && !sw.includes('"/v1341.css"'), 'service worker precaches the CSS bundle instead of legacy style layers');
     assert(uiModule.includes("const attempts = requestMethod === 'GET' ? 2 : 1"), 'transient GET requests retry once for reconnect stability');
     assert(sessionsModule.includes('if (!firstError?.transient) throw firstError') && sessionsModule.includes('await new Promise(resolve => setTimeout(resolve, 260))'), 'practice answer retries once after a transient network failure');
@@ -1439,7 +1443,7 @@ export async function runReleaseCheck() {
     assert(sessionsModule.includes("const modeLabel = testMode ? '실전시험' : '연습시험'") && !sessionsModule.includes('${timerHtml}') && sessionsModule.includes('keyboard-focus'), 'V13.30 practice and real exams share one focused untimed question screen with keyboard handling');
     assert(sessionsModule.includes('answer-impact-compact') && sessionsModule.includes('result-reward-top') && sessionsModule.includes('missingWordIds'), 'V13.30 keeps calm answer feedback and complete result review');
     assert(!teacherModule.match(/const tabs = .*assignments/) && !teacherModule.match(/const tabs = .*exams/), 'teacher navigation keeps assignment and teacher-created exam operations removed');
-    assert(teacherModule.includes('const selfTests = finishedSelfTests(allSessions)') && teacherModule.includes("'실전시험 결과가 아직 없어요'") && teacherModule.includes("sent ? '끝난 시간'") && !teacherModule.includes("'전송'") && teacherModule.includes('passNote(s)'), 'V13.123 teacher results show every finished 실전시험 with its finish time and PASS instead of a send date');
+    assert(teacherModule.includes('teacherRecords({ view, cls: A.resultsClass') && readFileSync(fileURLToPath(new URL('./teacher-home.mjs', import.meta.url)), 'utf8').includes("view === 'sent' ? tests.sort((a, b) => endedAt(b) - endedAt(a))") && teacherModule.includes("'실전시험 결과가 아직 없어요'") && teacherModule.includes("sent ? '끝난 시간'") && !teacherModule.includes("'전송'") && teacherModule.includes('passNote(s)'), 'V13.123 teacher results show every finished 실전시험 with its finish time and PASS instead of a send date');
     assert(sessionsModule.includes('선생님이 이 결과를 바로 확인해요') && sessionsModule.includes('animateTestResult'), 'V13.123 real exam result tells the student the teacher sees it and keeps result impact');
     {
       const rd123 = f => readFileSync(fileURLToPath(new URL(f, import.meta.url)), 'utf8');
@@ -1563,11 +1567,14 @@ export async function runReleaseCheck() {
     runLevelChecks(assert);
     await runPracticeSpeedChecks(assert);
     await runYachaLagChecks(assert);
+    await runSupabaseBackupChecks(assert);
+    runYachaFpsChecks(assert);
     await runPerfRulesChecks(assert);
     await runBootstrapGuardChecks(assert);
     runReviewFixChecks(assert);
     await runStability163Checks(assert);
     await runStability168Checks(assert);
+    await runStateSlimChecks(assert);
     runEggMomentChecks(assert);
     await runLegendEggChecks(assert);
     await runHuntChecks(assert);
@@ -1610,6 +1617,8 @@ await runPlaygroundMenuChecks(assert);
     await runSweepDungeonChecks(assert, expectStatus);
     await runSweepBattleChecks(assert, expectStatus);
     await runSweepTeacherChecks(assert, expectStatus);
+    const teacherHome = await runTeacherHomeChecks(assert, expectStatus);
+    console.log(`[teacher-home] 선생님 첫 화면 ${teacherHome.bootKb}KB(${teacherHome.bootMs}ms) · 결과 분석 한 쪽 ${teacherHome.pageKb}KB · 학생 기록 창 ${teacherHome.detailKb}KB · 학생 첫 화면 ${teacherHome.studentKb}KB`);
 
     console.log(`[release-check] PASS ${checks.length}/${checks.length}`);
     return { ok: true, count: checks.length };

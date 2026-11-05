@@ -19,6 +19,7 @@ import { DAY_MS, rankingWeek, gradeOf, sameGradeBand, rankGrade, battleStreaks, 
 import { schoolLeague, myTeamKey } from './school-league.mjs';
 import { createTournament, tournamentRanges, tournamentHasSchool, decideMatch, findMatch, playerMatch, eliminatedIn, roundLabel, tournamentPrizes, TOURNAMENT_MIN_PLAYERS, TOURNAMENT_MAX_PLAYERS, TOURNAMENT_PRIZES } from './tournament.mjs';
 import { passwordHash, verifyPassword, hashToken, publicProfile, supabaseLogin } from './auth.mjs';
+import { homeSessions, recordsPage, sessionDigest, teacherStudentRow } from './teacher-home.mjs';
 import { signupCodeRows, updateSignupCode } from './signup.mjs';
 import { createVapidKeys } from './push.mjs';
 import { pushState, pushView, addSubscription, removeSubscription, postNotice, noticeFor, postLegend, legendFor, eveningReminders } from './notify.mjs';
@@ -32,6 +33,7 @@ import { ybmParkSeonbuBooks } from './high-vocab-ybm-park-seonbu.mjs';
 import { gangseoSepMockBook } from './gangseo-sep-mock.mjs';
 import { compactSession } from './state.mjs';
 import { trimSummary, trimArchive, trimRecords, attemptTotal, autoTrimSessions } from './storage-trim.mjs';
+import { isArchived, restoreSession, restoreInState } from './session-archive.mjs';
 import { DUNGEON, CUTS, CUT_KEYS, openCuts, DUNGEON_COINS } from './dungeon-engine.mjs';
 import { activeEventFor, studentEventView, teacherEventView, teacherOwns, keptEvents, createRewardEvent, endRewardEvent, deleteRewardEvent, eventCoins, eventXp } from './reward-events.mjs';
 import { dungeonQuestions } from './dungeon-words.mjs';
@@ -954,7 +956,7 @@ function idleStudents(state, ctx, school, now = Date.now()) {
     for (const b of ctx.battlesOf(x.id)) times.push(Number(b.finished_at || 0));
     const day = x.attendance?.last;
     if (day) times.push(Date.parse(`${day}T00:00:00+09:00`) || 0);
-    times.push(Number(lastActiveAt(x) || 0)); // V13.213.1 놀이터 · 출석 · 펫 돌보기도
+    times.push(Number(lastActiveAt(x) || 0)); // V13.217.1 놀이터 · 출석 · 펫 돌보기도
     const last = Math.max(0, ...times);
     rows.push({ id: x.id, name: x.display_name, class_name: x.class_name || '', last: last || null, week: last < week.start, days: last ? Math.floor((now - last) / DAY_MS) : null });
   }
@@ -1154,11 +1156,15 @@ function hydrateRecord(record, words) {
 // V13.64: the teacher list only needs each record's scores and counts. The per-answer lists were
 // ~85% of the teacher bootstrap, so they are left out here and loaded one record at a time
 // (GET /sessions/:id) when the teacher opens "답안 보기".
+// V13.216 보관한 기록(server/session-archive.mjs)도 요약은 그대로다: 보관 표시(details_archived_at)는 화면에 보내지 않아서
+// 선생님 목록 · 학생 목록의 기록 한 줄이 옮기기 전과 한 글자도 같다.
 export function sessionSummary(session) {
-  const { answer_records, wrong_details, word_ids, ...rest } = session;
+  const { answer_records, wrong_details, word_ids, details_archived_at, ...rest } = session;
   return { ...rest, details_omitted: true };
 }
 export function hydrateSession(session) {
+  // 답 상세를 보관으로 옮긴 기록은 목록에 요약만 보낸다: 화면이 기록을 열 때 GET /sessions/:id로 한 개만 받는다.
+  if (isArchived(session)) return sessionSummary(session);
   const lists = ['answer_records', 'wrong_details'].filter(key => Array.isArray(session[key]) && session[key].some(record => record && !('word' in record && 'meaning' in record && 'timed_out' in record && 'regraded' in record)));
   if (!lists.length) return session;
   const words = builtinWords();
@@ -1330,9 +1336,8 @@ export async function service(state, method, path, body, token, options = {}) {
     const grammarProgress = teacher
       ? Object.fromEntries([...studentIds].map(studentId => [studentId, state.grammarProgress?.[studentId] || {}]))
       : (state.grammarProgress?.[p.id] || {});
-    const wordMastery = teacher
-      ? Object.fromEntries(studentProfiles.map(student => [student.id, wordRangeMastery(state, student.id, selectedSchool, student.class_name)]))
-      : wordRangeMastery(state, p.id, selectedSchool, p.class_name);
+    // V13.215 선생님 첫 화면에는 학생별 단어 숙련도를 싣지 않는다(학생 기록 창을 열 때 GET /teacher/student-detail/:id).
+    const wordMastery = teacher ? null : wordRangeMastery(state, p.id, selectedSchool, p.class_name);
     const dailyQuest = teacher || selectedDivision === 'middle' ? null : composeDailyQuest(state, p.id, selectedSchool, p.class_name, 20);
     const activePractice = teacher ? null : state.practices.find(x => x.student_id === p.id && !x.finished);
     const activePracticeSummary = activePractice ? {
@@ -1353,8 +1358,12 @@ export async function service(state, method, path, body, token, options = {}) {
       daily_quest: !!activePractice.daily_quest
     } : null;
     return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes, ...dailyQuestProgress(sessions, activePractice, dailyQuest.target) } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
-      profiles: teacher ? studentProfiles.map(s => ({ ...publicProfile(s), stars: undefined, care: undefined, stats: stats(state, s, sessionsByStudent.get(s.id) || [], battlesByStudent), active_at: lastActiveAt(s) })) : [],
-      sessions: sessions.map(teacher ? sessionSummary : hydrateSession), exams: visibleExams,
+      // V13.215 선생님: 학생 목록은 화면이 쓰는 칸만, 연습 기록은 오늘 것 + 최근 실전시험 6개만(server/teacher-home.mjs).
+      // 학생별 이번 주 · 지난주 · 마지막 학습은 session_digest, 전체 기록은 결과 분석 탭의 GET /teacher/records.
+      profiles: teacher ? studentProfiles.map(s => ({ ...teacherStudentRow(s, stats(state, s, sessionsByStudent.get(s.id) || [], battlesByStudent)), active_at: lastActiveAt(s) })) : [],
+      sessions: teacher ? homeSessions(sessions, dayKey, now).map(sessionSummary) : sessions.map(hydrateSession), exams: visibleExams,
+      session_digest: teacher ? sessionDigest(sessions, now) : null,
+      sessions_scope: teacher ? 'home' : 'all',
       assignments: state.assignments.filter(a => teacher ? sameSchool(a, selectedSchool) : (a.class_name === p.class_name && sameSchool(a, studentSchool) && a.active)),
       attempts: attempts.map(a => attemptSummary(a, state, p)), server_time: Date.now(),
       active_practice: activePractice?.id || null,
@@ -1403,6 +1412,22 @@ export async function service(state, method, path, body, token, options = {}) {
     const student = mine.find(x => x.id === decodeURIComponent(path.slice('/teacher/activity/'.length)));
     if (!student) fail('학생을 찾을 수 없어요.', 404);
     return { student_id: student.id, activity: activityOf(student), server_time: Date.now() };
+  }
+  // V13.215 선생님 결과 분석 탭(연습 기록 · 실전시험 결과 30개씩)과 학생 기록 창. 보기 전용 GET, 맡은 학교 · 부서의 진짜 학생만
+  // (미리보기 계정 제외, 첫 화면과 같은 거르기).
+  if (path === '/teacher/records' || path.startsWith('/teacher/student-detail/')) {
+    requireRole(p, 'teacher');
+    if (method !== 'GET') fail('요청 방식을 확인해주세요.', 405);
+    const division = activeTeacherDivision(p), school = activeTeacherSchool(state, p);
+    if (!school || school.division !== division) fail('학교 설정을 확인해주세요.', 409);
+    const mine = state.profiles.filter(x => x.role === 'student' && x.division === division && sameSchool(x, school) && !x.preview_owner_id);
+    const ids = new Set(mine.map(x => x.id));
+    const sessionsOf = keep => state.sessions.filter(s => s.division === division && sameSchool(s, school) && keep(s.student_id));
+    if (path === '/teacher/records') return { ...recordsPage(sessionsOf(id => ids.has(id)), mine, body || {}, sessionSummary), server_time: Date.now() };
+    const student = mine.find(x => x.id === decodeURIComponent(path.slice('/teacher/student-detail/'.length)));
+    if (!student) fail('학생을 찾을 수 없어요.', 404);
+    const own = sessionsOf(id => id === student.id).sort((a, b) => b.created_at - a.created_at);
+    return { student_id: student.id, recent: own.slice(0, 5).map(sessionSummary), last_session_at: own[0]?.created_at || 0, word_mastery: wordRangeMastery(state, student.id, school, student.class_name), server_time: Date.now() };
   }
   if (path === '/teacher/storage-trim' || path === '/teacher/storage-archive') {
     requireRole(p, 'teacher');
@@ -2816,6 +2841,8 @@ export async function service(state, method, path, body, token, options = {}) {
       sourceKey = String(questionIndex);
     } else if (sourceType === 'practice') {
       const practice = state.practices.find(item => item.id === sourceId && item.student_id === p.id);
+      // V13.216 답 상세를 보관한 기록에 이의 신청: 먼저 메인 상태로 되돌린다(이 변경이 실패하면 되돌린 것도 같이 취소된다).
+      if (state.sessions.some(item => item.id === sourceId && item.student_id === p.id && isArchived(item))) restoreInState(state, sourceId, options.archive);
       const session = state.sessions.find(item => item.id === sourceId && item.student_id === p.id);
       const source = session || practice;
       if (!source || source.school_id !== school.id) fail('연습 답안을 찾을 수 없습니다.', 404);
@@ -2984,6 +3011,12 @@ export async function service(state, method, path, body, token, options = {}) {
     const session = state.sessions.find(s => s.id === path.split('/')[2]);
     const allowed = session && (session.student_id === p.id || (teacher && teacherSchools(state, p, session.division).some(school => sameSchool(session, school))));
     if (!allowed) fail('학습 기록을 찾을 수 없습니다.', 404);
+    // V13.216 답 상세를 보관한 기록은 보관 표에서 이 한 줄만 읽어 처음 모습으로 되돌려 보낸다(메인 상태는 그대로).
+    if (isArchived(session)) {
+      const text = options.archive?.get?.(session.id);
+      const restored = text ? restoreSession(session, text) : null;
+      return restored ? hydrateSession(restored) : { ...sessionSummary(session), details_omitted: false, details_missing: true };
+    }
     return hydrateSession(session);
   }
   if (/^\/attempts\/[^/]+(?:\/(?:draft|submit))?$/.test(path)) {

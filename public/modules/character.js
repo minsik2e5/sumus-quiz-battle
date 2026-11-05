@@ -115,15 +115,38 @@ export function showPose(art, pose, ms = 2800) {
   const still = img._still || img.getAttribute('src');
   const src = poseSrc(still, pose);
   if (!src) return;
-  const pre = new Image();
-  pre.onload = () => {
+  const swap = () => {
     if (!img.isConnected || img._held) return;
     img._still = still;
     img.setAttribute('src', src);
     clearTimeout(img._pose);
     img._pose = setTimeout(() => { if (img.isConnected) img.setAttribute('src', still); img._still = null; }, ms);
   };
-  pre.src = src;
+  // V13.217: a pose already fetched and decoded swaps at once; the first time it is decoded off the
+  // screen first (decode()), so the swap never waits on a 512px picture being unpacked mid-hit.
+  const pre = decodedPose(src);
+  if (pre.ready) swap(); else pre.wait.then(swap, () => {});
+}
+// V13.217: pose pictures kept decoded (at most POSE_KEEP; the oldest goes first). preloadPoses()
+// fetches a pet's attack and hurt poses before a match so the first hit swaps without a wait.
+const POSE_KEEP = 16, POSES = new Map();
+function decodedPose(src) {
+  let hold = POSES.get(src);
+  if (hold) { POSES.delete(src); POSES.set(src, hold); return hold; }
+  const pre = new Image();
+  pre.decoding = 'async';
+  hold = { ready: false, img: pre };
+  hold.wait = new Promise((ok, fail) => { pre.onload = ok; pre.onerror = fail; pre.src = src; })
+    .then(() => pre.decode?.().catch(() => {}))
+    .then(() => { hold.ready = true; });
+  hold.wait.catch(() => POSES.delete(src));
+  POSES.set(src, hold);
+  while (POSES.size > POSE_KEEP) POSES.delete(POSES.keys().next().value);
+  return hold;
+}
+export function preloadPoses(art, poses = ['attack', 'hurt']) {
+  const still = art?.querySelector('.avatar-art img')?.getAttribute('src');
+  for (const pose of poses) { const src = still && poseSrc(still, pose); if (src) decodedPose(src); }
 }
 // Sprites are fitted one by one, so growth is added back gently (feet stay anchored).
 const GROW = [.86, .86, .93, 1];

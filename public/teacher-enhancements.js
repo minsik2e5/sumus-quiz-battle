@@ -2,6 +2,7 @@ import { api, modal, $, $$, esc, date, toast, buttonBusy, icon } from './modules
 import { avatar } from './modules/character.js';
 import { CLASS_OPTIONS } from './modules/core.js';
 import { loadStudentActivity } from './modules/teacher-activity.js';
+import { teacherStudentDetail, forgetStudentDetail } from './modules/teacher-records.js';
 
 const app = document.querySelector('#app');
 let cache = null;
@@ -44,8 +45,9 @@ async function bootstrap(force = false) {
   return cache;
 }
 
-function lastActivity(data, studentId) {
-  const stamps = [];
+// V13.214 첫 화면에는 오늘 연습 기록만 오므로, 지난 학습 시각 · 최근 연습 5개는 학생 기록 창을 열 때 받은 detail에서 읽는다.
+function lastActivity(data, studentId, detail) {
+  const stamps = [Number(detail?.last_session_at || 0), Number(data.session_digest?.students?.[studentId]?.last || 0)];
   const profile = data.profiles.find(p => p.id === studentId);
   if (profile?.created_at) stamps.push(profile.created_at);
   for (const s of data.sessions) if (s.student_id === studentId && s.created_at) stamps.push(s.created_at);
@@ -67,8 +69,8 @@ function shortActivity(ts) {
 // V13.75: the student list itself shows the last activity and filters by status
 // (modules/teacher.js); this file keeps the student detail pop-up.
 
-function activityRows(data, id) {
-  return data.sessions.filter(s => s.student_id === id).slice(0, 5).map(s => {
+function activityRows(data, id, detail) {
+  return (detail?.recent || data.sessions.filter(s => s.student_id === id)).slice(0, 5).map(s => {
     const rate = s.total ? Math.round((s.correct || 0) / s.total * 100) : 0;
     return `<div class="sumus-activity-item"><span class="square-icon">${icon('practice')}</span><div class="grow"><b>${s.total}문제 연습 · 정답률 ${rate}%</b><small>${date(s.created_at)} · 경험치 +${s.xp || 0}</small></div></div>`;
   }).join('') || '<p class="tiny muted">아직 연습 기록이 없어요.</p>';
@@ -85,12 +87,13 @@ async function openStudentDetail(id) {
   const data = await bootstrap();
   const p = data.profiles.find(x => x.id === id);
   if (!p) return toast('학생 정보를 찾을 수 없어요.');
+  const detail = await teacherStudentDetail(id);
   const attempts = data.attempts.filter(a => a.student_id === id && a.status === 'submitted');
   const grammarItems = Object.values(data.grammar_progress?.[id] || {}).filter(item => !item.school_id || item.school_id === p.school_id);
   const grammarMastered = grammarItems.filter(item => item.mastered).length;
-  const wordMastery = data.word_mastery?.[id] || {};
+  const wordMastery = detail?.word_mastery || data.word_mastery?.[id] || {};
   const grammarRecent = [...grammarItems].sort((a, b) => Number(b.updated_at || 0) - Number(a.updated_at || 0))[0];
-  const recent = shortActivity(lastActivity(data, id));
+  const recent = shortActivity(lastActivity(data, id, detail));
   const schoolOptions = data.schools.map(s => `<option value="${esc(s.id)}" ${(s.id === p.school_id || (!p.school_id && s.name === p.school)) ? 'selected' : ''}>${esc(s.name)}</option>`).join('');
   const divisionClasses = data.profile.active_division === 'middle' ? ['중2','중3'] : ['고1A','고1B'];
   const classOptions = [...new Set([...divisionClasses, p.class_name].filter(Boolean))].map(c => `<option value="${esc(c)}" ${c === p.class_name ? 'selected' : ''}>${esc(c)}</option>`).join('');
@@ -123,7 +126,7 @@ async function openStudentDetail(id) {
     </div>
     <div class="sumus-detail-section"><h3>시험범위 정복</h3><div class="detail-grid"><div><b>${wordMastery.mastered || 0}/${wordMastery.total_ranges || 0}</b><small>단어 MASTER</small></div><div><b>${wordMastery.conquest || 0}%</b><small>단어 정복도</small></div><div><b>${grammarMastered}지문</b><small>어법 MASTER</small></div><div><b>${grammarItems.length}지문</b><small>어법 학습</small></div></div><p class="sumus-account-note">${grammarRecent ? '최근 어법 학습 ' + esc(shortActivity(grammarRecent.updated_at)) : '아직 어법·어휘 학습 기록이 없어요.'}</p></div>
     <div class="sumus-detail-section"><h3>오늘 뭘 했나</h3><div id="student-activity-box" class="act-box"></div></div>
-    <div class="sumus-detail-section"><h3>최근 연습 기록</h3><div class="sumus-activity-list">${activityRows(data, id)}</div></div>
+    <div class="sumus-detail-section"><h3>최근 연습 기록</h3><div class="sumus-activity-list">${activityRows(data, id, detail)}</div></div>
     <div class="sumus-detail-section"><h3>최근 시험 결과</h3><div class="sumus-activity-list">${examRows(data, id)}</div></div>
 `, '학생 관리');
 
@@ -143,6 +146,7 @@ async function openStudentDetail(id) {
     if (values.password) payload.password = values.password;
     try {
       await api('/students/' + id, payload, 'PATCH');
+      forgetStudentDetail(id);
       const fresh = await api('/bootstrap');
       cache = fresh; cacheAt = Date.now(); globalThis.__SUMUS_BOOTSTRAP__ = fresh;
       close();

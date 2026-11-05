@@ -1,0 +1,23 @@
+/* V13.217 야차전 렉 줄이기: 보이는 연출은 그대로, 그리는 비용만 줄인다(docs/yacha-perf.mjs로 잼). */
+
+/* 경기장 안의 효과 조각이 붙고 떨어질 때 배치 · 그리기를 경기장 안에서만 다시 한다(밖은 그대로). */
+.battle-app .yb-arena{contain:layout paint}
+
+/* HP 막대: 너비(매 프레임 배치) 대신 오른쪽을 잘라 줄인다(그리기만). 모양 · 색 · 0.6초 줄어드는 것은 같다. */
+.battle-app .yb-fill{width:100%;transition:clip-path .6s cubic-bezier(.3,.8,.3,1),background-color .3s}
+
+/* 맞는 순간 퍼지는 고리: 크기 · 테두리 굵기(매 프레임 배치) 대신 처음부터 다 큰 고리를 작게 줄였다가 키운다(transform). */
+.fx-ring{width:150px;height:150px;border-width:3px;animation:fx-ring-t .55s ease-out forwards}
+.fx-ring.big{width:220px;height:220px;border-width:4px;animation:fx-ring-t .6s ease-out forwards}
+@keyframes fx-ring-t{from{transform:translate(-50%,-50%) scale(.14);opacity:1}to{transform:translate(-50%,-50%) scale(1);opacity:0}}
+
+/* 스킬 광선: 끝에서 가늘어지는 것을 높이(배치) 대신 scale로. 각도는 rotate 속성(battle.js)이라 광선 방향으로 가늘어진다. */
+.fx-beam{animation-name:fx-beam-t}
+@keyframes fx-beam-t{0%{clip-path:inset(0 100% 0 0);opacity:1}35%{clip-path:inset(0 0 0 0);opacity:1}100%{clip-path:inset(0 0 0 0);opacity:0;scale:1 .25}}
+
+/* 저사양 단계(.yb-lite, 긴 프레임이 이어지는 폰만 자동으로): 조각 수는 battle-fx.js가 줄이고,
+   여기서는 섞기(mix-blend) · 빛 번짐(filter)을 끈다. 모양 · 색 · 움직임은 같다. */
+.battle-app.yb-lite .fx2-shot svg,.battle-app.yb-lite .fx2-ghost svg,.battle-app.yb-lite .fx2-bit svg,.battle-app.yb-lite .fx2-bolt,.battle-app.yb-lite .fx-claw{filter:none}
+.battle-app.yb-lite .fx2-ring,.battle-app.yb-lite .fx2-lines,.battle-app.yb-lite .fx2-dome,.battle-app.yb-lite .fx2-prism,.battle-app.yb-lite .fx-impact,.battle-app.yb-lite .fx2-edge.fever{mix-blend-mode:normal}
+.battle-app.yb-lite .yb-pet.fx-aura-1 .avatar-art img,.battle-app.yb-lite .yb-pet.fx-aura-2 .avatar-art img,.battle-app.yb-lite .yb-pet.fx-aura-3 .avatar-art img{animation:none;filter:drop-shadow(0 0 10px rgba(var(--aura),.9))}
+.battle-app.yb-lite .yb-arena.has-bg .yb-pet::before{filter:none;opacity:.6}

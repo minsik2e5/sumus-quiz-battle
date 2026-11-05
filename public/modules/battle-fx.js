@@ -56,7 +56,13 @@ export const FX2_CAP = [44, 52, 60, 66];
 let capNow = FX2_MAX;
 // V13.200 시리즈 펫(곤충 · 공룡)은 시리즈 등급(rank)으로: 렉스는 전설, 장수 · 나풀 · 휘익 · 단단이는 영웅 연출.
 export const tierOf = c => c?.mythic ? 3 : c?.legendary || c?.rank === 'legendary' ? 2 : c?.epic || c?.rank === 'epic' ? 1 : 0;
-export const fxCap = rank => { capNow = FX2_CAP[Math.max(0, Math.min(3, rank | 0))]; };
+// V13.217 저사양 단계(lite): a phone that keeps dropping frames in a match (battle.js) draws the same
+// effects with fewer pieces: a lower cap, fewer afterimages and bits. The default look is unchanged.
+export const FX2_LITE_CAP = 28;
+let lite = false;
+export const fxLite = on => { lite = !!on; };
+export const fxIsLite = () => lite;
+export const fxCap = rank => { capNow = lite ? FX2_LITE_CAP : FX2_CAP[Math.max(0, Math.min(3, rank | 0))]; };
 const live = arena => arena.querySelectorAll('[data-fx]').length;
 function piece(arena, className, css, ms, html = '') {
   if (!arena || live(arena) >= capNow) return null;
@@ -88,7 +94,7 @@ export function fxShot(arena, from, to, el, { big = false, ms = 230, rank = 0 } 
     { transform: tr(dx, dy, `${baseRot} rotate(${spin}deg) scale(${big ? 1.35 : 1})`), opacity: 1 }
   ], { duration: ms, easing: 'cubic-bezier(.3,.05,.7,1)' });
   // A trail of copies behind the shot: 3 small afterimages, 2 more for each rank.
-  const ghosts = 3 + rank * 2, k = .5 / ghosts;
+  const ghosts = lite ? 1 : 3 + rank * 2, k = .5 / ghosts;
   for (let i = 1; i <= ghosts; i++) {
     const ghost = piece(arena, `fx2-ghost ${el}`, { left: from.x + 'px', top: from.y + 'px', opacity: 0 }, ms + 200, svg(kind, el, Math.max(10, Math.round(size * (1 - i * k)))));
     run(ghost, [
@@ -102,7 +108,7 @@ export function fxShot(arena, from, to, el, { big = false, ms = 230, rank = 0 } 
 /* ---------- 맞는 순간 ---------- */
 // The hit: a burst that depends on the element. tier 1 small, 2 medium, 3 big (skill, fever, K.O.).
 export function fxImpact(arena, at, el, tier = 1, rank = 0) {
-  const n = tier >= 3 ? 12 : tier === 2 ? 9 : 6, P = ELEMENTS[el], put = (kind, x, y, size, ms, frames, delay = 0) => run(piece(arena, `fx2-bit ${el}`, { left: at.x + 'px', top: at.y + 'px' }, ms + delay + 80, svg(kind, el, size)), frames, { duration: ms, delay, easing: 'cubic-bezier(.1,.8,.3,1)' });
+  const n = Math.ceil((tier >= 3 ? 12 : tier === 2 ? 9 : 6) * (lite ? .5 : 1)), P = ELEMENTS[el], put = (kind, x, y, size, ms, frames, delay = 0) => run(piece(arena, `fx2-bit ${el}`, { left: at.x + 'px', top: at.y + 'px' }, ms + delay + 80, svg(kind, el, size)), frames, { duration: ms, delay, easing: 'cubic-bezier(.1,.8,.3,1)' });
   const ring = (size, ms, c = P.c1, squash = 1, delay = 0) => run(piece(arena, 'fx2-ring', { left: at.x + 'px', top: at.y + 'px', width: size + 'px', height: size * squash + 'px', borderColor: c, boxShadow: `0 0 14px ${c}` }, ms + delay + 80), [{ transform: 'translate(-50%,-50%) scale(.2)', opacity: 1 }, { transform: 'translate(-50%,-50%) scale(1)', opacity: 0 }], { duration: ms, delay, easing: 'cubic-bezier(.1,.9,.3,1)' });
   for (let i = 0; i < n; i++) {
     const a = Math.PI * 2 * i / n + rand(-.25, .25), d = rand(46, 66) + tier * 14, s = rand(13, 20) + tier * 3, x = Math.cos(a) * d, y = Math.sin(a) * d;
@@ -129,7 +135,7 @@ export function fxImpact(arena, at, el, tier = 1, rank = 0) {
   if (rank >= 1) ring((150 + tier * 36) * 1.2, 620, '#ffd23f', 1, 110);
   if (rank >= 2) {
     fxDome(arena, at, el);
-    for (let i = 0; i < 6; i++) { const a = rand(0, 6.28), d = rand(46, 100); run(piece(arena, 'fx2-bit star', { left: at.x + 'px', top: at.y + 'px' }, 760, svg('star', 'star', Math.round(rand(12, 20)))), [{ transform: tr(0, 0, 'scale(.2)'), opacity: 1 }, { transform: tr(Math.cos(a) * d, Math.sin(a) * d, 'rotate(90deg) scale(1)'), opacity: 1, offset: .5 }, { transform: tr(Math.cos(a) * d * 1.2, Math.sin(a) * d * 1.2 - 16, 'scale(.2)'), opacity: 0 }], { duration: 640, delay: i * 30, easing: 'ease-out' }); }
+    for (let i = 0; i < (lite ? 3 : 6); i++) { const a = rand(0, 6.28), d = rand(46, 100); run(piece(arena, 'fx2-bit star', { left: at.x + 'px', top: at.y + 'px' }, 760, svg('star', 'star', Math.round(rand(12, 20)))), [{ transform: tr(0, 0, 'scale(.2)'), opacity: 1 }, { transform: tr(Math.cos(a) * d, Math.sin(a) * d, 'rotate(90deg) scale(1)'), opacity: 1, offset: .5 }, { transform: tr(Math.cos(a) * d * 1.2, Math.sin(a) * d * 1.2 - 16, 'scale(.2)'), opacity: 0 }], { duration: 640, delay: i * 30, easing: 'ease-out' }); }
   }
   if (rank >= 3) fxPrism(arena, at);
 }
@@ -218,7 +224,7 @@ export function fxSkillCutIn(arena, { side, portrait = '', name = '', desc = '',
   box.setAttribute('aria-hidden', 'true');
   // Rank: epic = glitter around the band and a gold edge; legendary = + the whole arena washes in the element's color.
   if (rank >= 2) fxWash(arena, el);
-  if (rank >= 1) for (let i = 0; i < 5 + rank * 2; i++) run(piece(arena, 'fx2-bit star', { left: rand(8, 92) + '%', top: rand(24, 72) + '%' }, 1000, svg('star', 'star', Math.round(rand(11, 20)))), [{ transform: tr(0, 0, 'scale(.1)'), opacity: 0 }, { transform: tr(0, -8, 'scale(1) rotate(60deg)'), opacity: 1, offset: .4 }, { transform: tr(0, -22, 'scale(.2) rotate(120deg)'), opacity: 0 }], { duration: 760, delay: 120 + i * 70 });
+  if (rank >= 1) for (let i = 0; i < (lite ? 2 : 5 + rank * 2); i++) run(piece(arena, 'fx2-bit star', { left: rand(8, 92) + '%', top: rand(24, 72) + '%' }, 1000, svg('star', 'star', Math.round(rand(11, 20)))), [{ transform: tr(0, 0, 'scale(.1)'), opacity: 0 }, { transform: tr(0, -8, 'scale(1) rotate(60deg)'), opacity: 1, offset: .4 }, { transform: tr(0, -22, 'scale(.2) rotate(120deg)'), opacity: 0 }], { duration: 760, delay: 120 + i * 70 });
   const from = side === 'me' ? '-110%' : '110%';
   const band = box.querySelector('.fx2-cut-band'), dim = box.querySelector('.fx2-cut-dim');
   // (Easing is set per step: the way in is fast, the hold is still, the way out accelerates.)
