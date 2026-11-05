@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, EPIC_PET_KEYS, STANDARD_PET_KEYS, EPIC_EGG_LEGENDARY_RATE, SEASONS, seasonKeys, seasonsInEpic, LEGEND_EGG_EPIC_NEED, LEGEND_EGG_PRICE, LEGEND_EGG_COINS, CHARACTERS, SERIES_EGG, SERIES_PET_KEYS, seriesGroupKeys, SERIES_DONE_COINS } from '../public/modules/core.js';
+import { dayKey, ACCESSORIES, PET_CARE, PET_MISS_DAYS, LEGENDARY_PET_KEYS, MYTHIC_PET_KEYS, EPIC_PET_KEYS, STANDARD_PET_KEYS, EPIC_EGG_LEGENDARY_RATE, SEASONS, seasonKeys, seasonsInEpic, LEGEND_EGG_EPIC_NEED, LEGEND_EGG_PRICE, LEGEND_EGG_COINS, CHARACTERS, SERIES_EGG, SERIES_PET_KEYS, seriesGroupKeys, SERIES_DONE_COINS, giftPetOk, giftPetTier } from '../public/modules/core.js';
 import {
   ATTENDANCE_REWARDS, ATTENDANCE_TICKETS, LUCKY_BETS, LUCKY_DAILY, LUCKY_TICKET_BET, LUCKY_ODDS, LEGENDARY_RATE, LEGENDARY_PITY, EPIC_RATE, MYTHIC_RATE, drawLucky,
   BOT_DAILY, BOT_MIN_RIGHT, BOT_MIN_MS, botReward, EXAM_XP_PER_ANSWER, EXAM_COINS, GIFT_AMOUNTS, GIFT_MAX, giftAmountOk, GIFT_NOTE_MAX, GIFT_LOG_KEEP, GIFT_EGG_ODDS, GIFT_EGG_FULL_COINS,
@@ -85,21 +85,24 @@ export function payTitles(p, keys, payKey, weekKey) {
 // The coins count as soon as a gift is sent (`total`); the box on the student's screen is only
 // the moment of opening it. The log keeps the last GIFT_LOG_KEEP gifts (all unopened ones).
 // V13.111: `kind: 'egg'` is a pet egg (no coins now; which pet is decided when it is opened).
-export function giveGift(p, { kind = 'coins', amount, note = '', from, fromName, now = Date.now(), id }) {
-  const egg = kind === 'egg';
-  if (!egg && !giftAmountOk(amount)) fail(`선물할 코인은 1~${GIFT_MAX}개 사이로 넣어 주세요.`);
+// V13.218 `kind: 'pet'`은 선생님이 고른 펫(`pet` 키). 코인은 없고, 열 때 그 펫이 들어온다(이미 있으면 알 선물과 같은 규칙).
+export function giveGift(p, { kind = 'coins', amount, note = '', from, fromName, now = Date.now(), id, pet = null }) {
+  const egg = kind === 'egg', petGift = kind === 'pet';
+  if (petGift && !giftPetOk(pet)) fail('보낼 펫을 골라 주세요.');
+  if (!egg && !petGift && !giftAmountOk(amount)) fail(`선물할 코인은 1~${GIFT_MAX}개 사이로 넣어 주세요.`);
   const box = p.gift_box ||= { total: 0, count: 0, log: [] };
-  if (!egg) box.total = Number(box.total || 0) + amount;
+  if (!egg && !petGift) box.total = Number(box.total || 0) + amount;
   box.count = Number(box.count || 0) + 1;
-  const log = [...(box.log || []), { id, ...(egg ? { kind: 'egg', amount: 0 } : { amount }), note: String(note || '').trim().slice(0, GIFT_NOTE_MAX), from, from_name: fromName, at: now, opened: false }];
+  const log = [...(box.log || []), { id, ...(egg ? { kind: 'egg', amount: 0 } : petGift ? { kind: 'pet', pet, amount: 0 } : { amount }), note: String(note || '').trim().slice(0, GIFT_NOTE_MAX), from, from_name: fromName, at: now, opened: false }];
   const opened = log.filter(g => g.opened), closed = log.filter(g => !g.opened);
   box.log = [...opened.slice(-Math.max(0, GIFT_LOG_KEEP - closed.length)), ...closed].sort((a, b) => a.at - b.at);
   return box;
 }
 // V13.168: 첫 펫을 고르기 전 학생의 알 선물은 열지 않고 기다리게 둔다(보이지도 않는다). 전에는 그 알이 첫 펫 자리를
 // 차지해 첫 펫을 고를 수 없고, 지금까지 쌓은 경험치(첫 펫 몫)가 어느 펫에게도 가지 않았다. 첫 펫을 고르면 열 수 있다.
-const eggWaits = (p, g) => g.kind === 'egg' && !(p?.pets || []).length;
-export const giftsWaiting = p => (p?.gift_box?.log || []).filter(g => !g.opened && !eggWaits(p, g)).map(g => ({ id: g.id, ...(g.kind === 'egg' ? { kind: 'egg' } : {}), amount: g.amount, note: g.note, from_name: g.from_name, at: g.at }));
+// V13.218 펫 선물도 같다(첫 펫 자리를 차지하지 않게). 열기 전에는 어떤 펫인지 보내지 않는다(상자를 여는 재미).
+const eggWaits = (p, g) => (g.kind === 'egg' || g.kind === 'pet') && !(p?.pets || []).length;
+export const giftsWaiting = p => (p?.gift_box?.log || []).filter(g => !g.opened && !eggWaits(p, g)).map(g => ({ id: g.id, ...(g.kind === 'egg' || g.kind === 'pet' ? { kind: g.kind } : {}), amount: g.amount, note: g.note, from_name: g.from_name, at: g.at }));
 // V13.197 전설 여러 마리: 학생당 1마리 제한을 없앴다. 어디서든 아직 못 만난 전설만 나오고(중복 없음), 다 만나면 더 안 나온다.
 export const legendLeft = p => LEGENDARY_PET_KEYS.filter(key => !(p?.pets || []).some(pet => pet.key === key));
 // V13.111 선생님 알: 기본 84% · 영웅 15% · 전설 1% (V13.197: 못 만난 전설 중 하나, 전설을 다 만났으면
@@ -140,10 +143,32 @@ export function openGifts(p, now = Date.now(), random = secureRandom) {
         g.amount = item.amount = GIFT_EGG_FULL_COINS;
         item.full = true;
       }
+    } else if (g.kind === 'pet') {
+      item.kind = 'pet';
+      const got = giftPetAdd(p, g.pet, now);
+      if (got) g.egg = item.egg = got;
+      else {
+        // 이미 가진 펫: 알 선물에서 새 펫이 나올 수 없을 때(펫을 다 모은 학생)와 같은 규칙 — 펫 대신 GIFT_EGG_FULL_COINS코인.
+        p.gift_box.total = Number(p.gift_box.total || 0) + GIFT_EGG_FULL_COINS;
+        g.amount = item.amount = GIFT_EGG_FULL_COINS;
+        item.full = true; item.had = g.pet;
+      }
     }
     out.push(item);
   }
   return out;
+}
+// V13.218 선생님이 고른 펫을 넣는다. 펫 기록의 표시는 그 펫을 원래 얻는 곳과 같게(시리즈 · 한정 · 바다 · 등급) + gift · pick.
+// 이미 있거나 지금 만날 수 없는 펫이면 null. 전설은 lucky.legend_key(코인 뽑기 · 알과 같다), 시리즈를 다 모으면 시리즈 보상(한 번).
+export function giftPetAdd(p, key, now = Date.now()) {
+  if (!giftPetOk(key) || (p.pets || []).some(pet => pet.key === key)) return null;
+  const c = CHARACTERS[key], tier = giftPetTier(key);
+  const seriesLast = c.series === SERIES_EGG.id && seriesLeft(p).length === 1;
+  const mark = c.series ? { series: c.series } : c.mythic ? { mythic: true } : c.legendary ? { legendary: true } : c.limited ? { limited: true } : c.epic ? { epic: true, ...(c.sea ? { sea: true } : {}) } : {};
+  (p.pets ||= []).push({ key, acquired_at: now, gift: true, pick: true, ...mark });
+  if (tier === 'legendary' && !c.series) { const l = p.lucky ||= {}; l.legend_key = key; l.legend_at = now; }
+  if (seriesLast && !p.series_done) p.series_done = { at: now, coins: SERIES_DONE_COINS };
+  return { key, tier, pick: true, ...(c.series ? { series: c.series } : {}) };
 }
 // V13.70 the double chance is gone; one left open gives back its bet, or the pot a right answer
 // had already reached (the student could have kept it).

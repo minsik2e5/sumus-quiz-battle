@@ -1,0 +1,28 @@
+/* V13.218 선생님 펫 선물: 선물 창의 펫 고르기(그림 + 이름 + 등급 칩, 등급별 묶음, 이름 검색). */
+.gift-pet-box[hidden]{display:none}
+.gift-pet-box{display:grid;gap:8px;margin-top:6px}
+.gift-pet-picked .gift-all-note{margin:0}
+.gift-pet-sel{display:grid;grid-template-columns:44px minmax(0,1fr);gap:4px 10px;align-items:center;padding:10px 12px;border-radius:14px;background:linear-gradient(160deg,#f8f4ff,#fff7ea);box-shadow:inset 0 0 0 1px #eadff9}
+.gift-pet-sel .avatar-art{width:44px;height:44px}
+.gift-pet-sel span{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;min-width:0}
+.gift-pet-sel span b{font-weight:900;color:#1e293b}
+.gift-pet-sel span small{flex-basis:100%;color:#64748b;font-size:12px}
+.gift-pet-sel em{grid-column:1/-1;font-style:normal;font-size:13px;font-weight:800;color:#0f766e}
+.gift-pet-sel em.had{color:#b45309}
+.gift-pet-sel em small{font-weight:700;color:#92400e}
+.gift-pets{max-height:280px;overflow:auto;overscroll-behavior:contain;display:grid;gap:10px;padding:2px 2px 6px}
+.gift-pet-group h4{margin:0 0 6px;font-size:13px;font-weight:900;color:#334155}
+.gift-pet-group h4 small{color:#94a3b8;font-weight:800}
+.gift-pet-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:6px}
+.gift-pet{display:grid;justify-items:center;gap:2px;padding:7px 4px 6px;border:0;border-radius:12px;background:#fff;box-shadow:inset 0 0 0 1px #e2e8f0;cursor:pointer;min-width:0}
+.gift-pet .avatar-art{width:46px;height:46px}
+.gift-pet b{font-size:12.5px;font-weight:900;color:#1e293b;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gift-pet.on{background:#f5f3ff;box-shadow:inset 0 0 0 2px #7c3aed}
+.gift-pet:focus-visible{outline:2px solid #7c3aed;outline-offset:2px}
+.gift-pet-chip{font-style:normal;font-size:10.5px;font-weight:900;line-height:1;padding:3px 6px;border-radius:999px;background:#f1f5f9;color:#475569;white-space:nowrap}
+.gift-pet-chip.epic,.gift-pet-chip.series.epic{background:#ede9fe;color:#6d28d9}
+.gift-pet-chip.legendary,.gift-pet-chip.series.legendary{background:#fef3c7;color:#b45309}
+.gift-pet-chip.mythic{background:linear-gradient(90deg,#fce7f3,#e0e7ff);color:#9d174d}
+.gift-pet-chip.limited{background:#ffedd5;color:#c2410c}
+.gift-pet-chip.special{background:#fee2e2;color:#be123c}
+.gift-pet-chip.series{background:#dcfce7;color:#15803d}

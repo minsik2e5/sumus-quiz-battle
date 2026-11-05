@@ -1,7 +1,7 @@
 import { randomUUID, randomBytes } from 'node:crypto';
 import { fillPreviewPets } from './test-seed.mjs';
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
-import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, STANDARD_PET_KEYS, EPIC_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, EPIC_EGG_PRICE, SERIES_EGG, SERIES_RANKS, seasonOnSale, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
+import { EXAM_TYPES, PRACTICE_TYPES, PRACTICE_SECONDS_PER_QUESTION, TEST_SECONDS_PER_QUESTION, testDurationSec, TEST_LEAVE_LIMIT, PET_CARE, PET_MISS_DAYS, STARS_MAX, CHARACTERS, giftPetOk, STANDARD_PET_KEYS, EPIC_PET_KEYS, ACCESSORIES, FRAMES, EGG_PRICE, EPIC_EGG_PRICE, SERIES_EGG, SERIES_RANKS, seasonOnSale, unlocked, growthFor, petProgress, cleanPetName, buildQuestion, choosePracticeWord, shuffle, grade, clamp, dayKey, displayEnglish, practiceDurationSec } from '../public/modules/core.js';
 import { TITLES, TITLE_KEYS, TITLES_3, TITLES_4, titleUnlocked, weeklyTitle, visibleTitleKeys } from '../public/modules/titles.js';
 import { battleQuestions, pairedBattleQuestions } from '../public/modules/battle-questions.js';
 import { battleMode } from '../public/modules/battle-engine.js';
@@ -1620,12 +1620,15 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/gifts/open' && method === 'POST') {
     requireRole(p, 'student');
     const gifts = openGifts(p, Date.now());
+    // V13.218 펫 선물(kind 'pet')로 영웅이 들어와도 영웅 n마리 전설 알 보상을 똑같이 센다(grantLegendEgg는 받을 것이 없으면 그대로).
     if (gifts.some(g => g.egg?.tier === 'epic')) grantLegendEgg(p);
     // V13.111: an egg gift that opened as a legendary pet is told to the school, like the shop's.
+    // V13.218: 선생님이 고른 전설 · 신화 펫은 '선생님 선물'로 알린다.
     const legend = gifts.find(g => g.egg?.tier === 'legendary'), mythic = gifts.find(g => g.egg?.tier === 'mythic');
-    const eggs = gifts.some(g => g.egg);
+    const where = g => g.kind === 'pet' ? '선생님 선물' : '선생님 알 선물';
+    const eggs = gifts.some(g => g.egg || g.kind === 'pet');
     return { gifts, coins: gifts.reduce((n, g) => n + Number(g.amount || 0), 0), points_balance: coinBalance(state, p),
-      ...(eggs ? { profile: publicProfile(p), stats: stats(state, p) } : {}), ...(mythic ? announceLegend(state, p, mythic.egg.key, '선생님 알 선물', '신화') : legend ? announceLegend(state, p, legend.egg.key, '선생님 알 선물') : {}) };
+      ...(eggs ? { profile: publicProfile(p), stats: stats(state, p) } : {}), ...(mythic ? announceLegend(state, p, mythic.egg.key, where(mythic), '신화') : legend ? announceLegend(state, p, legend.egg.key, where(legend)) : {}) };
   }
   // V13.182 전설 알(docs/legend-egg-design.md). claim: 영웅 LEGEND_EGG_EPIC_NEED마리 보상을 아직 못 받은 학생(배포 전에 이미
   // 모은 학생 포함)이 접속했을 때 화면이 한 번 부른다. 받을 것이 없으면 아무것도 바꾸지 않는다.
@@ -1669,9 +1672,11 @@ export async function service(state, method, path, body, token, options = {}) {
     const school = activeTeacherSchool(state, p);
     if (!school) fail('관리 학교를 확인해주세요.', 409);
     // V13.111: `kind: 'egg'` sends a 선생님 알 (기본 84% · 영웅 15% · 전설 1%) instead of coins.
-    const egg = body.kind === 'egg';
-    const amount = egg ? 0 : Number(body.amount);
-    if (!egg && !giftAmountOk(amount)) fail(`선물할 코인은 1~${GIFT_MAX}개 사이로 넣어 주세요.`);
+    // V13.218: `kind: 'pet'` + `pet_key`는 선생님이 고른 펫(모든 펫, 판매가 끝난 한정도). 없는 펫은 거부.
+    const egg = body.kind === 'egg', pet = body.kind === 'pet' ? str(body.pet_key, 40) : null;
+    if (body.kind === 'pet' && !giftPetOk(pet)) fail('보낼 수 있는 펫이 아니에요. 펫을 다시 골라 주세요.');
+    const amount = egg || pet ? 0 : Number(body.amount);
+    if (!egg && !pet && !giftAmountOk(amount)) fail(`선물할 코인은 1~${GIFT_MAX}개 사이로 넣어 주세요.`);
     const pool = state.profiles.filter(x => isRankedStudent(x) && schoolForProfile(state, x)?.id === school.id);
     const className = str(body.class_name, 20);
     const ids = new Set((Array.isArray(body.student_ids) ? body.student_ids : []).map(value => str(value, 80)).filter(Boolean));
@@ -1679,11 +1684,22 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!targets.length) fail('선물 받을 학생을 골라주세요.');
     if (targets.length > 300) fail('한 번에 300명까지 선물할 수 있어요.');
     const now = Date.now(), note = str(body.note, 60);
-    for (const x of targets) giveGift(x, { id: randomUUID(), kind: egg ? 'egg' : 'coins', amount, note, from: p.id, fromName: p.display_name || '선생님', now });
+    for (const x of targets) giveGift(x, { id: randomUUID(), kind: egg ? 'egg' : pet ? 'pet' : 'coins', amount, note, from: p.id, fromName: p.display_name || '선생님', now, pet });
     const label = body.all === true ? `${school.name} 전체` : className ? className : targets.length === 1 ? targets[0].display_name : `${targets[0].display_name} 외 ${targets.length - 1}명`;
-    p.gifts_sent = [...(p.gifts_sent || []), { at: now, ...(egg ? { kind: 'egg' } : {}), amount, count: targets.length, label, note: note.slice(0, 40), school_id: school.id }].slice(-30);
-    return { sent: targets.length, ...(egg ? { kind: 'egg' } : {}), amount, total: targets.length * amount, gifts_sent: p.gifts_sent.slice(-10).reverse(),
-      _push: [{ to: targets.map(x => x.id), title: `🎁 ${p.display_name || '선생님'}의 선물이 도착했어요`, body: `${egg ? '선생님 알 1개' : `응원 코인 ${amount}개`}${note ? ` · ${note}` : ''}`, url: '/?go=home', tag: 'gift' }] };
+    const kind = egg ? { kind: 'egg' } : pet ? { kind: 'pet', pet_key: pet, pet_name: CHARACTERS[pet].ko } : {};
+    p.gifts_sent = [...(p.gifts_sent || []), { at: now, ...kind, amount, count: targets.length, label, note: note.slice(0, 40), school_id: school.id }].slice(-30);
+    // 푸시에는 펫 이름을 쓰지 않는다(상자를 열 때 알게).
+    return { sent: targets.length, ...kind, amount, total: targets.length * amount, gifts_sent: p.gifts_sent.slice(-10).reverse(),
+      _push: [{ to: targets.map(x => x.id), title: `🎁 ${p.display_name || '선생님'}의 선물이 도착했어요`, body: `${egg ? '선생님 알 1개' : pet ? '선생님이 고른 펫 친구' : `응원 코인 ${amount}개`}${note ? ` · ${note}` : ''}`, url: '/?go=home', tag: 'gift' }] };
+  }
+  // V13.218 펫 선물 미리 보기(보기 전용 GET): 고른 펫을 이미 가진 이 학교 학생 id. 화면이 받는 사람 고르기에 맞춰 센다.
+  if (path === '/teacher/gifts/pet-owners' && method === 'GET') {
+    requireRole(p, 'teacher');
+    const school = activeTeacherSchool(state, p);
+    if (!school) fail('관리 학교를 확인해주세요.', 409);
+    const key = str(body.pet_key, 40);
+    if (!giftPetOk(key)) fail('보낼 수 있는 펫이 아니에요.');
+    return { pet_key: key, owners: state.profiles.filter(x => isRankedStudent(x) && x.pets?.some(pet => pet.key === key) && schoolForProfile(state, x)?.id === school.id).map(x => x.id) };
   }
   // V13.76 펫 교감 (once a day each, V13.90: for each pet) and starred words (어려운 단어 ⭐, kept on the account).
   if (path === '/pet/care' && method === 'POST') {
