@@ -58,3 +58,14 @@
   대시보드 → Usage에서 데이터베이스 크기 · 전송량이 무료 한도를 넘었는지 봐요. 넘었으면 정리하거나 유료(Pro)를 검토해요.
   <https://status.supabase.com> 에서 Supabase 전체 점검 · 장애도 확인해요.
 - 그래도 모르겠으면 `/api/health`의 `storage` 부분을 통째로 복사해서 개발 담당(또는 AI 작업 세션)에 보내 주세요.
+
+## 6. 프로젝트에 들어갈 수 없을 때: 새 프로젝트로 옮기기 (v13.218)
+2026-11에는 백업 프로젝트를 만든 계정을 찾지 못해서 새 프로젝트로 옮겼어요. 학생 기록의 기준은 Cloudflare 서버라서 옮겨도 잃는 것이 없어요.
+1. 로그인되는 계정에서 **New project**를 만들어요(지역은 Seoul 또는 Tokyo). 데이터베이스 비밀번호는 따로 적어 둬요(앱은 쓰지 않아요).
+2. SQL Editor → New query에 저장소의 `supabase/voca_v13_parts.sql` 전체를 붙여 Run 해요.
+3. 새 query에 `supabase/voca_v12_state.sql` 전체를 붙여 Run 해요(순서 중요: 2번이 먼저).
+4. Project Settings → API Keys에서 **Project URL**과 **anon public** 키(Legacy API Keys 탭, `eyJ…`로 시작)를 복사해 개발 담당에게 줘요.
+5. 개발 담당이 `wrangler.jsonc`의 `SUPABASE_URL` · `SUPABASE_ANON_KEY`를 바꿔 배포해요. 비밀값(`VOCA_STATE_SECRET`)은 그대로라 SQL을 고칠 필요가 없어요.
+6. 배포 10~15분 뒤 `/api/health`: `supabase_backup_mode` `parts`, `supabase_status` `ok`. 첫 시도 한 번은 "revision moved … sending every part again"이 보일 수 있어요(옛 프로젝트 번호를 지우고 전부 다시 올리는 정상 과정).
+- 새 프로젝트가 비어 있어도 앱이 빈 사본을 읽어 학생 기록을 덮지 않아요(`server/supabase-backup-check.mjs` 6번이 확인).
+- `supabase_fail_kind`가 `too_big`(오류에 `57014 statement timeout`)이면 Supabase는 답했지만 큰 저장이 시간 제한에 걸린 거예요. 일시정지가 아니에요. 3번 SQL(시간 제한 2분)과 2번 SQL(조각 백업)이 있는지 확인해요.

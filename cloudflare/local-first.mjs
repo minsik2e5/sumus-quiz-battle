@@ -433,6 +433,8 @@ export function backupErrorKind(error) {
   if (http === 540 || /paused|일시\s*정지/i.test(detail)) return 'paused';
   if (http === 404 || error?.status === 404) return 'missing';
   if (http === 401 || http === 403 || /42501|forbidden|invalid api key|jwt/i.test(detail)) return 'auth';
+  // V13.218 57014: Supabase는 답했지만 저장이 그쪽 시간 제한에 걸려 취소됐다(통째 13MB 업로드). 답이 없는 것과 다르다.
+  if (/57014|statement timeout/i.test(detail)) return 'too_big';
   if (/TimeoutError|AbortError|timed? ?out/i.test(detail)) return 'timeout';
   if (http === 0) return 'network';
   if (error?.status === 409) return 'conflict';
@@ -446,6 +448,7 @@ const KIND_TEXT = {
   missing: '백업 함수가 없어요(supabase/voca_v13_parts.sql을 다시 실행)',
   auth: '키 또는 비밀값이 맞지 않아요',
   conflict: '백업 번호가 어긋나 다시 올리는 중이에요',
+  too_big: '백업이 커서 Supabase가 저장 도중 끊어요(시간 제한 · 조각 백업 함수가 있는지 확인)',
   server: 'Supabase가 오류로 답해요(점검 중일 수 있어요)'
 };
 const kstText = at => at ? new Date(at + 9 * 3600000).toISOString().slice(0, 16).replace('T', ' ') + ' (한국 시간)' : '아직 없음';
