@@ -122,6 +122,12 @@ export const CHARACTERS = {
   hachiware: { name: 'HACHIWARE', ko: '하치와레', type: '고양이 친구', color: '#4F86C6', light: '#CFE2F7', soft: '#F1F7FE', limited: 'special' },
   usagi: { name: 'USAGI', ko: '우사기', type: '토끼 친구', color: '#D9A62E', light: '#FBE6A6', soft: '#FFFAEA', limited: 'special' },
   chiikawa: { name: 'CHIIKAWA', ko: '치이카와', type: '작고 귀여운 친구', color: '#E07FA0', light: '#FAD0DE', soft: '#FFF3F7', limited: 'special' },
+  // V13.219 특별 한정 5마리 더(같은 특별 시즌 · 영웅 결과 10%).
+  furuhonya: { name: 'FURUHONYA', ko: '후루혼야', type: '헌책방 친구', color: '#D9707F', light: '#F8CBD2', soft: '#FFF2F4', limited: 'special' },
+  kurimanju: { name: 'KURIMANJU', ko: '쿠리만쥬', type: '밤만쥬 친구', color: '#8C5A33', light: '#E8D2B8', soft: '#FBF5EE', limited: 'special' },
+  momonga: { name: 'MOMONGA', ko: '모몽가', type: '하늘다람쥐 친구', color: '#5E93C8', light: '#CFE1F3', soft: '#F2F7FC', limited: 'special' },
+  rakko: { name: 'RAKKO', ko: '랏코', type: '해달 검객', color: '#A07E52', light: '#E9DAC3', soft: '#FBF7F0', limited: 'special' },
+  shisa: { name: 'SHISA', ko: '시사', type: '사자 수호 친구', color: '#E07A2E', light: '#F9D4B5', soft: '#FFF5EC', limited: 'special' },
   // V13.195 곤충 · 공룡 시리즈(docs/bug-dino-pets-design.md, 그림 54 · 55): 알 상점의 시리즈 알(SERIES_EGG)에서만 나온다.
   // 전역 등급 표시(epic · legendary)는 넣지 않는다: 기본 · 영웅 · 전설 알, 선물 알, 사냥, 코인 뽑기, 영웅 수 · 전역 전설 셈에 안 섞인다.
   // `rank`는 시리즈 안 등급(기본 · 영웅 · 전설: 알 확률 무게 · 특기 세기 · 도감 테두리), `group`은 곤충(bug) · 공룡(dino).

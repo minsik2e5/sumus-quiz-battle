@@ -19,9 +19,9 @@ export async function runPetSkillsAllChecks(assert) {
   const { legendary, mythic, limited } = PET_SKILL_TIERS, ALL = [...legendary, ...mythic, ...limited];
 
   /* ---------- 17종 모두 특기 ---------- */
-  assert(ALL.length === 20 && legendary.every(k => CHARACTERS[k]?.legendary) && mythic.every(k => CHARACTERS[k]?.mythic) && limited.every(k => CHARACTERS[k]?.limited)
+  assert(ALL.length === 25 && legendary.every(k => CHARACTERS[k]?.legendary) && mythic.every(k => CHARACTERS[k]?.mythic) && limited.every(k => CHARACTERS[k]?.limited)
     && LEGENDARY_PET_KEYS.every(k => legendary.includes(k)) && legendary.includes('phoenix') && MYTHIC_PET_KEYS.every(k => mythic.includes(k)) && ['hwangryong', 'samjogo'].every(k => mythic.includes(k)) && LIMITED_PET_KEYS.every(k => limited.includes(k)),
-    'V13.185 전설 5(은퇴한 불새 포함) · 신화 7(그림을 기다리는 황룡 · 삼족오 포함) · 한정 8(V13.207 특별 3 포함), 20종이 특기 등급 표에 있다');
+    'V13.185 전설 5(은퇴한 불새 포함) · 신화 7(그림을 기다리는 황룡 · 삼족오 포함) · 한정 13(V13.207 특별 3 · V13.219 특별 5 포함), 25종이 특기 등급 표에 있다');
   assert(Object.keys(CHARACTERS).filter(k => CHARACTERS[k].legendary || CHARACTERS[k].mythic || CHARACTERS[k].limited || CHARACTERS[k].epic || STANDARD_PET_KEYS.includes(k)).every(k => PET_SKILLS[k] && petSkill({ key: k }).key === k) && ALL.every(k => petSkill({ key: k }).need === 3),
     'V13.185 기본 · 영웅 · 전설 · 신화 · 한정 펫 모두 야차전 특기가 있다(게이지 3칸)');
   assert(ALL.every(k => Object.keys(PET_SKILLS[k]).every(x => KINDS.includes(x)) && PET_SKILLS[k].name && !PET_SKILLS[k].need) && new Set(Object.values(PET_SKILLS).map(s => s.name)).size === Object.keys(PET_SKILLS).length,
