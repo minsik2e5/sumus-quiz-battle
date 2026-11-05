@@ -206,7 +206,10 @@ export async function runSupabaseBackupChecks(_releaseAssert, assert = nodeAsser
         }
       };
       const sync = createSupabaseSync({ local, supabase, storage, isBusy: () => busy, busyRetryMs: 5, fullEveryMs: 0, log: quiet });
-      await sync.run();
+      // 묶음 사이 쉬기는 unref 타이머라서(워커에는 영향 없음) Node에서는 기다리는 동안 붙잡아 둘 타이머가 없으면
+      // 프로세스가 조용히 끝나 버린다(v13.214~v13.217: 이 뒤의 release-check 검사 약 45개가 돌지 않고 끝났다).
+      const keepAlive = setInterval(() => {}, 1000);
+      try { await sync.run(); } finally { clearInterval(keepAlive); }
       sync.close();
       const s = sync.status();
       assert(patches >= 10 && maxBytes <= 260_000 && s.yielded_busy >= 1 && sawBusyBetween && !s.pending && s.last_max_batch_kb <= 254,

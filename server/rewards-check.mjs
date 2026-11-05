@@ -939,7 +939,7 @@ export async function runRewardsChecks(assert, expectStatus) {
         && openedG.filter(g => g.full).length === 60 - (keysG.length - 1) && kidG.gift_box.total === 30 + GIFT_EGG_FULL_COINS * (60 - (keysG.length - 1)) && openGifts(kidG, 2000).length === 0,
         'V13.111 선생님 알을 여러 개 열어도 펫이 겹치지 않고 내 펫에만 들어가며(파트너 그대로), 다 모은 뒤에는 알마다 400코인, 한 번 연 선물은 다시 열리지 않는다');
       const service111 = source('./service.mjs'), app111 = source('../public/app.js'), cel111 = source('../public/modules/celebrate.js');
-      assert(service111.includes("const egg = body.kind === 'egg';") && service111.includes("announceLegend(state, p, legend.egg.key, '선생님 알 선물')") && service111.includes("'선생님 알 1개'")
+      assert(service111.includes("const egg = body.kind === 'egg'") && service111.includes("announceLegend(state, p, legend.egg.key, where(legend))") && service111.includes("'선생님 선물' : '선생님 알 선물'") /* V13.218: 펫 선물은 '선생님 선물' */ && service111.includes("'선생님 알 1개'")
         && app111.includes('data-gk="egg"') && app111.includes("{ kind: 'egg', note:") && cel111.includes('function eggCards(gifts)') && cel111.includes('새 알은 <b>내 펫</b>에 들어갔어요') && cel111.includes('const openedGifts = ') && !/const opened = /.test(cel111) && source('../public/v13111.css').includes('.cel-gift-reward[hidden]{display:none}'),
         'V13.111 선생님 선물 창에 코인 | 선생님 알 탭이 있고, 학생은 선물 상자에서 나온 펫 알을 보며, 전설이면 학교 소식이 전해진다');
     }

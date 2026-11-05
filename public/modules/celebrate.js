@@ -45,11 +45,14 @@ const buzz = pattern => { try { navigator.vibrate?.(pattern); } catch {} };
 // Gifts waiting for the student (bootstrap `gifts`): one box for all of them. Opening it asks
 // the server to mark them opened (the coins were already counted when they were sent).
 // V13.111 선생님 알: what each egg gift became (its egg picture, the pet's name and tier).
-const TIER_KO = { basic: '기본', epic: '영웅', legendary: '전설', mythic: '신화' };
+const TIER_KO = { basic: '기본', epic: '영웅', legendary: '전설', mythic: '신화', limited: '한정' };
+// V13.218 선생님이 고른 펫(kind 'pet')도 알처럼: 펫이 되면 알 깨기 연출, 이미 가진 펫이면 코인 카드.
+const petGift = g => g.kind === 'egg' || g.kind === 'pet';
 function eggCards(gifts) {
-  const eggs = gifts.filter(g => g.kind === 'egg');
+  const eggs = gifts.filter(petGift);
   if (!eggs.length) return '';
   return `<div class="cel-eggs">${eggs.map(g => {
+    if (!g.egg && g.had && CHARACTERS[g.had]) return `<div class="cel-egg full"><span class="cel-egg-art">${coin()}</span><b>${esc(CHARACTERS[g.had].ko)}${/[가-힣]/.test(CHARACTERS[g.had].ko.slice(-1)) && (CHARACTERS[g.had].ko.slice(-1).charCodeAt(0) - 0xAC00) % 28 ? '은' : '는'} 이미 내 친구예요!</b><small>대신 ${num(g.amount)}코인</small></div>`;
     if (!g.egg) return `<div class="cel-egg full"><span class="cel-egg-art">${coin()}</span><b>펫을 모두 모았어요!</b><small>대신 ${num(g.amount)}코인</small></div>`;
     const c = CHARACTERS[g.egg.key] || {}, tier = g.egg.tier || petTier(g.egg.key);
     return `<div class="cel-egg ${tier}" style="--pc:${c.color || '#8b5cf6'}"><span class="cel-egg-art"><img src="/assets/pets/${g.egg.key}-0.webp" alt="" width="96" height="96"></span><i class="cel-egg-tier">${tier === 'basic' ? '' : '★ '}${TIER_KO[tier] || ''}</i><b>${esc(c.ko || '새 친구')}의 알</b><small>${esc(c.type || '')}</small></div>`;
@@ -57,7 +60,7 @@ function eggCards(gifts) {
 }
 export function giftMoment(A, gifts, done) {
   const total = gifts.reduce((n, g) => n + Number(g.amount || 0), 0);
-  const hasEgg = gifts.some(g => g.kind === 'egg');
+  const hasEgg = gifts.some(petGift);
   const from = [...new Set(gifts.map(g => g.from_name).filter(Boolean))];
   // V13.111: the same words sent with several gifts (e.g. three eggs at once) show once.
   const notes = [...new Map(gifts.filter(g => g.note).map(g => [g.note, g])).values()].slice(-3);
@@ -101,10 +104,10 @@ export function giftMoment(A, gifts, done) {
     buzz([30, 50, 30, 50, 120]);
     // V13.111: egg gifts show the pets they became (the pets are in 내 펫 now).
     const openedGifts = Array.isArray(res?.gifts) ? res.gifts : gifts;
-    const eggs = openedGifts.filter(g => g.kind === 'egg'), coinsNow = Number(res?.coins ?? total);
+    const eggs = openedGifts.filter(petGift), coinsNow = Number(res?.coins ?? total);
     if (res?.stats && A.data) A.data.stats = res.stats;
     if (res?.profile && A.data) A.data.profile = { ...A.data.profile, ...res.profile };
-    $('.cel-gift-title').textContent = !eggs.length ? '코인 선물 받았어요!' : openedGifts.some(g => g.kind !== 'egg') ? '선물을 받았어요!' : '선생님 알을 받았어요!';
+    $('.cel-gift-title').textContent = !eggs.length ? '코인 선물 받았어요!' : openedGifts.some(g => !petGift(g)) ? '선물을 받았어요!' : eggs.some(g => g.kind === 'pet') ? '선생님이 고른 펫이 왔어요!' : '선생님 알을 받았어요!';
     // V13.160 알은 상자에서 바로 보여 주지 않고, 알 상점과 같은 알 깨기 연출로 하나씩 깬다(펫을 다 모아 코인으로 바뀐 알만 카드로).
     const hatch = eggs.filter(g => g.egg?.key && CHARACTERS[g.egg.key]);
     if (eggs.length > hatch.length) {
@@ -112,7 +115,7 @@ export function giftMoment(A, gifts, done) {
       box.innerHTML = eggCards(openedGifts.filter(g => !hatch.includes(g)));
       box.hidden = false;
     }
-    if (hatch.length) $('.cel-gift-title').textContent = hatch.length > 1 ? `선생님 알 ${hatch.length}개가 왔어요!` : '선생님 알이 왔어요!';
+    if (hatch.length) $('.cel-gift-title').textContent = hatch.every(g => g.kind === 'pet') ? (hatch.length > 1 ? `선생님이 고른 펫 ${hatch.length}마리가 왔어요!` : '선생님이 고른 펫이 왔어요!') : hatch.length > 1 ? `선생님 알 ${hatch.length}개가 왔어요!` : '선생님 알이 왔어요!';
     $('.cel-gift-reward').hidden = !(coinsNow > 0);
     coinShower($('.cel-gift'), 26, 2);
     playReward($('.cel-gift'), 420);
@@ -120,7 +123,7 @@ export function giftMoment(A, gifts, done) {
     button.disabled = false;
     button.onclick = async () => {
       $('#modal-root').innerHTML = '';
-      for (const g of hatch) await giftEggShow(g.egg);
+      for (const g of hatch) await giftEggShow(g.egg, g.from_name);
       done?.();
     };
     button.focus({ preventScroll: true });
