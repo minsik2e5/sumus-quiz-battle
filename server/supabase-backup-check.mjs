@@ -40,8 +40,10 @@ export function fakeSupabase(state) {
       if (fail === 'paused') return Response.json({ message: 'Project paused. Restore it from the Supabase dashboard.' }, { status: 540 });
       if (fail === '404-all' || (fail === '404-parts' && isParts)) return Response.json({ code: 'PGRST202', message: `Could not find the function public.${name}` }, { status: 404 });
     }
-    if (name === 'voca_v12_state_read') return Response.json([{ revision: remote.revision, data: structuredClone(remote.data) }]);
+    // V13.220 새(빈) 프로젝트: supabase/voca_v12_state.sql처럼 아직 올린 적 없으면 줄이 없고, 첫 commit은 번호와 상관없이 1.
+    if (name === 'voca_v12_state_read') return Response.json(remote.data === null ? [] : [{ revision: remote.revision, data: structuredClone(remote.data) }]);
     if (name === 'voca_v12_state_commit') {
+      if (remote.data === null) { remote.data = body.p_data; remote.revision = 1; return Response.json(1); }
       if (Number(body.p_revision) !== remote.revision) return Response.json({ code: '40001', message: 'revision_conflict' }, { status: 409 });
       remote.data = body.p_data; remote.revision += 1;
       return Response.json(remote.revision);
@@ -82,6 +84,13 @@ export async function runSupabaseBackupChecks(_releaseAssert, assert = nodeAsser
     assert.equal(backupErrorKind({ status: 404, http: 404 }), 'missing');
     assert.equal(backupErrorKind({ status: 503, http: 401, detail: 'x: HTTP 401 Invalid API key' }), 'auth');
     assert.equal(backupErrorKind({ status: 503, http: 503 }), 'server');
+    // V13.220 운영에서 10시간 동안 "Supabase가 답하지 않아요(일시정지)"로 잘못 알렸던 오류: 답은 왔고, 저장이 시간 제한에 걸렸다.
+    const tooBig = { status: 503, http: 500, detail: 'voca_v12_state_commit: HTTP 500 57014 canceling statement due to statement timeout (13867 KB)' };
+    assert.equal(backupErrorKind(tooBig), 'too_big', 'V13.220 57014는 timeout(답 없음)이 아니라 too_big');
+    {
+      const st = backupState({ fail_since: Date.now() - 10 * 3600000, last_ok_at: 0, fail_kind: 'too_big', pending: true });
+      assert(st.status === 'failing' && /시간 제한/.test(st.text) && !/일시정지/.test(st.text), 'V13.220 too_big은 일시정지 의심으로 알리지 않는다');
+    }
     assert.equal(backupErrorKind({ status: 503, http: 0, detail: 'x: TypeError fetch failed' }), 'network');
 
     /* ---------- 1. 경우마다 health에 찍히는 값 ---------- */
@@ -225,6 +234,53 @@ export async function runSupabaseBackupChecks(_releaseAssert, assert = nodeAsser
       failing.close();
       assert(cpuMs < 20, `V13.214 실패한 백업 다시 하기 한 번의 CPU ${cpuMs.toFixed(2)}ms(20ms 아래)`);
       table.retry_cpu_ms = Number(cpuMs.toFixed(2));
+    }
+
+    /* ---------- 6. V13.220 새(빈) Supabase 프로젝트로 옮기기: 학생 기록을 빈 사본으로 덮지 않고 전부 다시 올린다 ---------- */
+    {
+      const state = await sampleState({ students: 20, padKb: 200 });
+      const oldSupa = fakeSupabase(state);
+      globalThis.fetch = oldSupa.fetch;
+      const storage = createStorageMock();
+      let object = new VocaStateObject(ctxFor(storage), env);
+      await object.ready;
+      object.sync.close();
+      await object.mutations.durable(s => { s.profiles[1].display_name = '옛 프로젝트'; return true; });
+      object.lastRequestAt = 0;
+      await object.sync.run();
+      assert(oldSupa.remote.partsRevision >= 1, '옛 프로젝트에 조각 백업이 됐다');
+      const newSupa = fakeSupabase(state);
+      newSupa.remote.data = null; newSupa.remote.revision = null; // 아무것도 없는 새 프로젝트
+      globalThis.fetch = newSupa.fetch;
+      // (가) 밀린 것 없이 주소만 바뀌어 다시 시작: 새 프로젝트 번호(0)가 달라도 빈 조각은 받아들이지 않는다.
+      object = new VocaStateObject(ctxFor(storage), env);
+      await object.ready;
+      object.sync.close();
+      assert.equal(object.mutations.current().state.profiles[1].display_name, '옛 프로젝트', 'V13.220 빈 새 프로젝트로 시작해도 로컬 학생 기록 그대로');
+      // (나) 옛 프로젝트에 못 올린 기록이 밀린 채로 옮긴다(운영 상황).
+      globalThis.fetch = oldSupa.fetch;
+      oldSupa.remote.fail = 'timeout';
+      await object.mutations.durable(s => { s.profiles[2].display_name = '밀린 기록'; return true; });
+      object.lastRequestAt = 0;
+      await object.sync.run().catch(() => {});
+      globalThis.fetch = newSupa.fetch;
+      object = new VocaStateObject(ctxFor(storage), env);
+      await object.ready;
+      object.sync.close();
+      const before = canonical(object.mutations.current().state);
+      assert.equal(object.mutations.current().state.profiles[2].display_name, '밀린 기록', 'V13.220 밀린 기록은 로컬에서 그대로 시작');
+      object.lastRequestAt = 0;
+      // 옛 번호로 올리면 한 번 어긋나고(번호 지움), 다음 번에 조각 전부를 새 프로젝트에 올린다.
+      for (let i = 0; i < 3 && (await healthOf(object)).supabase_pending; i++) { object.lastRequestAt = 0; await object.sync.run().catch(() => {}); }
+      const moved = await healthOf(object);
+      assert(moved.supabase_status === 'ok' && moved.supabase_backup_mode === 'parts' && !moved.supabase_pending, `V13.220 새 프로젝트로 조각 백업 성공: ${JSON.stringify(pick(moved))}`);
+      assert.equal(canonical(assembleState(structuredClone(newSupa.remote.parts))), before, 'V13.220 새 프로젝트 조각을 합치면 지금 학생 기록 전부');
+      // 다시 시작해도 새 프로젝트 사본과 번호가 맞아 그대로.
+      object = new VocaStateObject(ctxFor(storage), env);
+      await object.ready;
+      object.sync.close();
+      assert.equal(canonical(object.mutations.current().state), before, 'V13.220 옮긴 뒤 다시 시작해도 같은 기록');
+      table.moved = pick(moved);
     }
 
     /* ---------- 5. 오래 실패하면 다시 하기 간격 5분 · #262 미루기 그대로 ---------- */

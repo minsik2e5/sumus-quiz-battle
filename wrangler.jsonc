@@ -69,9 +69,10 @@
   "observability": {
     "enabled": true
   },
+  // V13.220 백업 Supabase를 새 프로젝트(sumus-voca-backup)로 옮김: 옛 mrlrrzpppmdkivbozato는 계정을 찾지 못해 함수를 고칠 수 없었다.
   "vars": {
-    "SUPABASE_URL": "https://mrlrrzpppmdkivbozato.supabase.co",
-    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1ybHJyenBwcG1ka2l2Ym96YXRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3Mjc1NjksImV4cCI6MjEwMzMwMzU2OX0.1QQtLUvNOTo5n4NRXLUV_4CxsTMqB6LCuPP60D4a2d8"
+    "SUPABASE_URL": "https://lecgnkoaeucszrtsenqk.supabase.co",
+    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlY2dua29hZXVjc3pydHNlbnFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4ODQ1OTAsImV4cCI6MjEwOTQ2MDU5MH0.ZTPUdng3Dk-8uBaOJMgicg4VMkonEP7edRbssa7Bxa0"
   },
   // V13.149 테스트 앱: `wrangler deploy --env test` → sumus-voca-test.minsik2e5.workers.dev (.github/workflows/deploy-test.yml).
   // 운영과 다른 Worker라 저장 공간(Durable Object)도 따로다. 운영 Supabase 주소 · 키는 비우고 Supabase 없이 돈다(VOCA_STANDALONE).
