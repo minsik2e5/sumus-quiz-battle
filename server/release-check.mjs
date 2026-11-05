@@ -129,6 +129,13 @@ function reviewWordIds(session) {
   return [...new Set([...wrongIds, ...missingIds])];
 }
 export async function runReleaseCheck() {
+  // 검사 중 끝나지 않는 약속(unref 타이머만 남음)이 있으면 Node가 조용히 0으로 끝나 버린다. 끝까지 오지 못했으면 실패로 끝낸다.
+  let finished = false;
+  process.once('beforeExit', () => {
+    if (finished) return;
+    console.error('[release-check] FAIL 검사가 끝나기 전에 멈췄어요(끝나지 않는 await). 마지막으로 시작한 검사를 확인하세요.');
+    process.exitCode = 1;
+  });
   const priorAuthProvider = process.env.AUTH_PROVIDER;
   delete process.env.AUTH_PROVIDER;
   // V13.118: a mythic pet is a tiny real chance; the checks never roll it unless they set the source themselves.
@@ -1621,6 +1628,7 @@ await runPlaygroundMenuChecks(assert);
     console.log(`[teacher-home] 선생님 첫 화면 ${teacherHome.bootKb}KB(${teacherHome.bootMs}ms) · 결과 분석 한 쪽 ${teacherHome.pageKb}KB · 학생 기록 창 ${teacherHome.detailKb}KB · 학생 첫 화면 ${teacherHome.studentKb}KB`);
 
     console.log(`[release-check] PASS ${checks.length}/${checks.length}`);
+    finished = true;
     return { ok: true, count: checks.length };
   } finally {
     setMythicRandom(null);
