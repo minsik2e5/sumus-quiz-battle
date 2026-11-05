@@ -140,6 +140,12 @@ export const PET_SKILLS = {
   hachiware: { name: '찰칵 플래시', desc: '바로 7 피해, 다음에 받는 공격 −8', burst: 7, guard: [8] },
   usagi: { name: '야하 돌진', desc: '다음 공격 2번 +8씩', boost: [8, 8] },
   chiikawa: { name: '토벌봉 한 방', desc: 'HP +7, 다음 공격 +8', heal: 7, boost: [8] },
+  // V13.219 특별 한정 5마리 더(같은 한정 세기).
+  furuhonya: { name: '두꺼운 책 방패', desc: '다음에 받는 공격 2번 −8씩', guard: [8, 8] },
+  kurimanju: { name: '따끈한 녹차', desc: 'HP +6, 다음에 받는 공격 −8', heal: 6, guard: [8] },
+  momonga: { name: '휘익 활공', desc: '바로 5 피해, 다음 공격 2번 +5씩', burst: 5, boost: [5, 5] },
+  rakko: { name: '검객의 일격', desc: '바로 7 피해, 다음 공격 +8', burst: 7, boost: [8] },
+  shisa: { name: '수호 사자', desc: '다음에 받는 공격 −9, 다음 공격 +6', guard: [9], boost: [6] },
   // V13.195 곤충 · 공룡 시리즈(시리즈 알에서만): 시리즈 기본 ≈ 기본 펫, 영웅 ≈ 영웅 펫, 전설 렉스 = 영웅 +약 6%(전설 규칙).
   // 숫자는 승률이 검증된 지금 펫의 조합(docs/bug-dino-pets-design.md 표), 렉스만 새 조합. 승률: docs/pet-skills-balance.md
   ladybug: { name: '점박이 방패', desc: '다음에 받는 공격 2번 −8씩', guard: [8, 8] },
@@ -159,7 +165,7 @@ export const PET_SKILLS = {
 export const PET_SKILL_TIERS = {
   legendary: ['haechi', 'phoenix', 'whale', 'qilin', 'cheonma'],
   mythic: ['gumiho', 'cheongryong', 'baekho', 'jujak', 'hyeonmu', 'hwangryong', 'samjogo'],
-  limited: ['pumpkincat', 'ghost', 'riceball', 'tissue', 'glue', 'hachiware', 'usagi', 'chiikawa'],
+  limited: ['pumpkincat', 'ghost', 'riceball', 'tissue', 'glue', 'hachiware', 'usagi', 'chiikawa', 'furuhonya', 'kurimanju', 'momonga', 'rakko', 'shisa'],
   // V13.195 곤충 · 공룡 시리즈(시리즈 등급 기본 7 · 영웅 4 · 전설 1, core.js CHARACTERS의 `rank`).
   series: ['ladybug', 'bee', 'ant', 'firefly', 'tricera', 'stego', 'brachio', 'rhinobeetle', 'butterfly', 'ptera', 'ankylo', 'tyranno']
 };
