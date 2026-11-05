@@ -69,7 +69,7 @@
   "observability": {
     "enabled": true
   },
-  // V13.219 백업 Supabase를 새 프로젝트(sumus-voca-backup)로 옮김: 옛 mrlrrzpppmdkivbozato는 계정을 찾지 못해 함수를 고칠 수 없었다.
+  // V13.220 백업 Supabase를 새 프로젝트(sumus-voca-backup)로 옮김: 옛 mrlrrzpppmdkivbozato는 계정을 찾지 못해 함수를 고칠 수 없었다.
   "vars": {
     "SUPABASE_URL": "https://lecgnkoaeucszrtsenqk.supabase.co",
     "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxlY2dua29hZXVjc3pydHNlbnFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM4ODQ1OTAsImV4cCI6MjEwOTQ2MDU5MH0.ZTPUdng3Dk-8uBaOJMgicg4VMkonEP7edRbssa7Bxa0"

@@ -106,7 +106,7 @@ function seasonSlot(A) {
     <div class="egg-season-text">
       <span class="egg-slot-tag">${uiArt('event-badge', 'egg-season-badge')}${esc(s.badge || `${s.name} 한정`)}</span>
       <b class="egg-slot-name">${esc(s.egg)}</b>
-      <small class="egg-slot-sub">${missing ? `호박냥 · 부우 · 주먹이 · 술술이 · 찰싹이 · 치이카와 · 하치와레 · 우사기 중 못 만난 친구 ${missing}마리` : '이벤트 펫 8마리를 다 모았어요'}</small>
+      <small class="egg-slot-sub">${missing ? `이벤트 펫 13마리(가을 5 · 특별 8) 중 못 만난 친구 ${missing}마리` : '이벤트 펫 13마리를 다 모았어요'}</small>
       <em class="egg-season-until">${Number(s.end.slice(5, 7))}/${Number(s.end.slice(8))}까지 판매${days >= 0 ? ` · ${days ? `D-${days}` : '오늘 마지막!'}` : ''}</em>
       <button type="button" class="egg-slot-buy" data-action="egg-buy" data-egg="season" ${!missing || short ? 'disabled' : ''} aria-label="${esc(s.egg)} ${num(s.price)}코인${short ? `, ${num(short)}코인 부족` : ''}">${label}</button>
     </div>
