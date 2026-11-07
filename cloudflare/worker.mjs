@@ -19,7 +19,7 @@ import { createLocalRepository, createSupabaseSync, backupState } from './local-
 import { partitionState, assembleState, hashText } from './state-parts.mjs';
 import { WRITE_WARN_PCT } from './cf-limits.mjs';
 import { stateBudgetReport, upgradeAdvice } from '../server/perf-budget.mjs';
-import { runArchiveStep, archiveDue } from '../server/session-archive.mjs';
+import { runArchiveStep, archiveDue, archiveBootAt } from '../server/session-archive.mjs';
 import { createSessionArchive } from './session-archive-store.mjs';
 import { testSeedState, applyTestSeed } from '../server/test-seed.mjs';
 
@@ -233,7 +233,7 @@ export class VocaStateObject {
       this.local = createLocalRepository(ctx.storage);
       // V13.216 지난 연습 기록 답 상세 보관 표(부팅 때 읽지 않는다: server/session-archive.mjs).
       this.archive = createSessionArchive(ctx.storage, { countRows: rows => this.local.countRows(rows) });
-      this.archivedAt = Date.now();
+      this.archivedAt = archiveBootAt();
       if (this.local.migrationError()) this.bootWarning = `옛 저장 방식으로 읽었어요(옮기기 실패): ${this.local.migrationError()}`.slice(0, 300);
       const syncInterval = Number(env.SUPABASE_SYNC_MIN_INTERVAL_MS ?? SYNC_MIN_INTERVAL_MS);
       // V13.144: 오늘 쓴 양이 90%를 넘으면 백업 간격을 5배로(백업도 줄을 쓴다).

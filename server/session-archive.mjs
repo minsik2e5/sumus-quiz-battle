@@ -26,6 +26,11 @@ export const ARCHIVE_ROW_MAX_CHARS = 400_000;
 // 남은 것이 있으면 10분 뒤, 다 옮겼으면 한 시간 뒤에 다시 본다(워커).
 export const ARCHIVE_MORE_EVERY_MS = 10 * 60000;
 export const ARCHIVE_EVERY_MS = 3600000;
+// V13.225 깨어난 뒤 첫 옮기기까지 기다림. 전에는 깨어난 때를 '방금 옮김'으로 쳐서 1시간을 기다렸는데, 운영 서버는 새 버전을 올릴 때
+// (하루 여러 번) · 쉬는 시간마다 다시 시작해 1시간을 채운 적이 없었다(2026-11-08 운영: 옮긴 기록 0개, sessions 11MB로 예산 초과).
+export const ARCHIVE_BOOT_DELAY_MS = 2 * 60000;
+// 깨어날 때 쓰는 '지난 옮기기 시각': 깨어나고 ARCHIVE_BOOT_DELAY_MS 뒤에 첫 차례가 온다(부팅 요청은 늦추지 않는다).
+export const archiveBootAt = (now = Date.now()) => now - ARCHIVE_EVERY_MS + ARCHIVE_BOOT_DELAY_MS;
 
 export const isArchived = session => !!session && session[ARCHIVE_MARK] !== undefined;
 const finite = value => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
