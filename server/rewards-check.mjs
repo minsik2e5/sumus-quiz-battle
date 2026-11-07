@@ -1030,7 +1030,7 @@ export async function runRewardsChecks(assert, expectStatus) {
         'V13.117 한 알씩 열수록 겹치지 않게 아직 없는 이벤트 펫이 나온다(5마리 모으기 최대 5알 = 3,000코인)');
       assert(EVENT5.every(key => petTier(key) === 'limited' && !STANDARD_PET_KEYS.includes(key) && !EPIC_PET_KEYS.includes(key) && petSkill({ key }).key === key) && ['riceball', 'tissue', 'glue'].every(key => engine117.includes("'" + key + "'") && char117.includes(key + ': { 0: EGG, 1: ALL, 2: ALL, 3: ALL }')),
         'V13.117 새 한정 펫 3종은 한정 등급이고 야차전 특기가 있으며(V13.185) 그림(알·표정)이 등록돼 있다');
-      assert(arcade117.includes("uiArt('event-egg')") && arcade117.includes("uiArt('event-badge', 'egg-season-badge')") && arcade117.includes('이벤트 펫 13마리(가을 5 · 특별 8) 중 못 만난 친구') && moments117.includes("uiArt('event-egg')") && moments117.includes('이벤트 한정 펫(호박냥') && !arcade117.includes('halloween-egg') && !moments117.includes('halloween-egg'),
+      assert(arcade117.includes("uiArt('event-egg')") && arcade117.includes("uiArt('event-badge', 'egg-season-badge')") && arcade117.includes('이벤트 펫 19마리(가을 5 · 특별 14) 중 못 만난 친구') && moments117.includes("uiArt('event-egg')") && moments117.includes('이벤트 한정 펫(호박냥') && !arcade117.includes('halloween-egg') && !moments117.includes('halloween-egg'),
         'V13.117 놀이터 알 상점과 알 가게 창은 가을 이벤트 알 그림·안내 문구를 쓴다');
       assert(battle117.includes('seasonStage() ? `bg-${seasonStage()}`') && !battle117.includes('seasonOnSale') && core117.includes("stage: 'halloween', stage_end: '2026-11-07'"), 'V13.117 야차전 배경은 가을 이벤트(할로윈)를 11/7까지만 쓴다');
       const asset5 = name => fileURLToPath(new URL(`../public/assets/${name}.webp`, import.meta.url));

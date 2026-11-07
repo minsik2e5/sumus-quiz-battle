@@ -32,7 +32,9 @@ export const PET_ELEMENT = {
   // V13.207 특별 한정(별빛: 치이카와). 별빛이 11마리를 넘지 않게 얼음 · 독에 하나씩.
   hachiware: 'ice', usagi: 'toxic',
   // V13.219 특별 한정 5마리 더: 87→92마리라 한 속성 12마리까지(가장 많은 속성과 적은 속성 차이 1 이하).
-  furuhonya: 'wind', kurimanju: 'earth', momonga: 'leaf', rakko: 'ice', shisa: 'flame'
+  furuhonya: 'wind', kurimanju: 'earth', momonga: 'leaf', rakko: 'ice', shisa: 'flame',
+  // V13.221 특별 한정 6마리 더: 98마리라 한 속성 13마리까지(차이 1 이하). 세이렌은 인어라 물(낚시 혜택 있음 · 선생님 확인).
+  kani: 'ice', siren: 'water', horned: 'flame', islandman: 'earth', anoko: 'star', beetle: 'toxic'
 };
 export const elementOf = key => PET_ELEMENT[key] || 'star';
 export const paletteOf = key => ELEMENTS[elementOf(key)];
