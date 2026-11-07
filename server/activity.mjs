@@ -22,6 +22,7 @@ export const ACTIVITY_MODES = {
   match: { label: '짝 맞추기', icon: '🃏' },
   timing: { label: '10초 맞추기', icon: '⏱️' },
   wall: { label: '벽 통과', icon: '🧱' },
+  arena: { label: '펫 아레나', icon: '🏟️' },
   dungeon: { label: '던전', icon: '🏰' },
   treasure: { label: '보물 사냥', icon: '💰' },
   classfish: { label: '반 낚시', icon: '🐟' },

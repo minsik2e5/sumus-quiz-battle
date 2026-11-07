@@ -100,7 +100,7 @@ export async function runWallChecks(assert) {
     assert(ACTIVITY_MODES.wall?.label === '벽 통과', 'V13.222 선생님 활동 목록에 벽 통과');
     assert(app.includes("d.action === 'wall-open'") && app.includes('openWallGame(A,') && games.includes('export function wallCard') && games.includes('data-action="wall-open"') && games.includes('${wallCard(A, art)}')
       && arcade.includes('${wallCard(A, art)}') && menu.includes("['벽 통과', r.wall?.left]") && menu.includes("'벽 통과', '최고 점수'"), 'V13.222 놀이터 미니게임 카드 · 오늘 남은 판 · 기록 탭에 벽 통과');
-    assert(build.includes('"v13222.css"') && build.includes("['timing', 'rps', 'yabawi', 'wall']") && css.includes('.wl-app') && css.includes('@media (max-height:640px)'), 'V13.222 CSS · 입구 그림 게이트');
+    assert(build.includes('"v13222.css"') && build.includes("['timing', 'rps', 'yabawi', 'wall'") /* V13.223 'arena' 추가 */ && css.includes('.wl-app') && css.includes('@media (max-height:640px)'), 'V13.222 CSS · 입구 그림 게이트');
     assert(ui.includes("api('/games/wall/start'") && ui.includes("api('/games/wall/finish'") && ui.includes('{ x: 28.96, y: 33.40') && ui.includes('onpointerdown = onPointer')
       && ui.includes('document.hidden') && ui.includes('sumus-wall-missed:') && ui.includes('soundOn()'), 'V13.222 화면: 서버 판 · 벽 구멍 실측 좌표(DONE_64) · 손 닿는 순간 고르기 · 다른 앱이면 멈춤 · 헷갈린 단어 기억 · 소리 설정');
     const need = ['bg-1', 'bg-2', 'bg-3', 'wall-1', 'wall-2', 'wall-3', 'fx-splash', 'fx-ripple', 'water-front', 'tube-back', 'tube-front', 'fx-pass', 'fx-impact', 'heart', 'heart-broken', 'badge-stage', 'ref-ready', 'ref-pass', 'ref-splash', 'ref-fever', 'entry'];

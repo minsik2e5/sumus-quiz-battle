@@ -30,6 +30,7 @@ import { openTiming } from './modules/timing.js';
 import { arcadeWords, wordsLabel, openWordsSheet, partyCode } from './modules/arcade-games.js';
 import { openMatchGame } from './modules/match-game.js';
 import { openWallGame } from './modules/wall.js';
+import { openArena } from './modules/arena.js';
 import { openPartyJoin } from './modules/party.js';
 // V13.149 테스트 앱(sumus-voca-test)에서는 화면 위에 '테스트 앱' 표시를 띄워 운영과 헷갈리지 않게 한다.
 if (/^sumus-voca-test\./.test(location.hostname)) document.documentElement.classList.add('is-test-app');
@@ -1025,6 +1026,13 @@ $('#app').addEventListener('click', async event => {
       if (!w.ok) return toast('단어를 8개 이상 골라 주세요.');
       window.scrollTo(0, 0);
       return openWallGame(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }, { words: w.list, codes: w.picked, label: wordsLabel(A, w.picked) });
+    }
+    // V13.223 놀이터 펫 아레나: 벽 통과와 같은 게임 단어로.
+    if (d.action === 'arena-open') {
+      const w = arcadeWords(A);
+      if (!w.ok) return toast('단어를 8개 이상 골라 주세요.');
+      window.scrollTo(0, 0);
+      return openArena(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }, { words: w.list, codes: w.picked, label: wordsLabel(A, w.picked) });
     }
     // V13.162 놀이터 몬스터 사냥.
     if (d.action === 'claw-open') { window.scrollTo(0, 0); return openClaw(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }

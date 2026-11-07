@@ -54,6 +54,7 @@ import { REEL } from '../public/modules/reel-rules.js';
 import { TIMING } from '../public/modules/timing-rules.js';
 import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './games.mjs';
 import { wallStart, wallFinish, wallView, wallLine } from './wall.mjs';
+import { arenaStart, arenaFinish, arenaView, arenaLine } from './arena.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
 import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, partyPlaysLeft, settleParty, partyReportPending, undoParty } from './party.mjs';
 import { PARTY } from './party-engine.mjs';
@@ -1382,7 +1383,7 @@ export async function service(state, method, path, body, token, options = {}) {
       school_league: leagueFor(state, competition, p, now),
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), yabawi: yabawiView(p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), wall: wallView(p, now), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now, dailyConfig(state, now)), blank: p.role === 'student' ? blankView(p, now) : null },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), yabawi: yabawiView(p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), wall: wallView(p, now), arena: arenaView(p, now), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now, dailyConfig(state, now)), blank: p.role === 'student' ? blankView(p, now) : null },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -1963,6 +1964,31 @@ export async function service(state, method, path, body, token, options = {}) {
     const now = Date.now();
     const result = wallFinish(p, { id: str(body.id, 80), picks: Array.isArray(body.picks) ? body.picks.slice(0, 15) : [], pet: activePetKey(state, p.id), now });
     if (!result.again && result.reason !== 'quit') logActivity(p, 'wall', wallLine(result), now);
+    return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
+  }
+  // V13.223 펫 아레나(server/arena.mjs). 단어는 벽 통과처럼 고른 범위. 상대는 같은 학교 · 학년 친구 팀(없으면 연습 상대).
+  if (path === '/games/arena/start' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
+    const ctx = monsterContext(state, p);
+    if (!ctx.school) fail('학생 학교 설정을 확인해주세요.', 409);
+    const asked = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : [];
+    if (!asked.length) fail('단어 범위를 골라주세요.');
+    const words = scopedWords(state, ctx.school.id, asked, p.class_name);
+    if (words.length < 8) fail('단어가 8개 이상 되게 범위를 골라주세요.', 409);
+    const missed = Array.isArray(body.missed) ? body.missed.slice(0, 12).map(x => str(x, 80)) : [];
+    const team = Array.isArray(body.team) ? body.team.slice(0, 3).map(x => str(x, 40)) : [];
+    // 친구 팀은 그 친구가 아레나를 할 때 남긴 팀(p.games.arena.team)으로. 렉 방지: 쓰기 요청 안에서 다른 학생 기록을 훑지 않는다.
+    const friends = state.profiles
+      .filter(x => x.id !== p.id && x.role === 'student' && x.active !== false && !x.preview_owner_id && x.games?.arena?.team?.length && x.class_name === p.class_name && schoolForProfile(state, x)?.id === ctx.school.id)
+      .map(x => ({ name: x.display_name, team: x.games.arena.team }));
+    return arenaStart(p, { id: id(), words, missed, team, friends, pets: petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), now: Date.now() });
+  }
+  if (path === '/games/arena/finish' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    const result = arenaFinish(p, { id: str(body.id, 80), picks: Array.isArray(body.picks) ? body.picks.slice(0, 120) : [], pet: activePetKey(state, p.id), now });
+    if (!result.again && result.reason !== 'short') logActivity(p, 'arena', arenaLine(result), now);
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
   if (path === '/games/match/board' && method === 'GET') {
