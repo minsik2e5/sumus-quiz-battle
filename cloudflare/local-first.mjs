@@ -424,6 +424,10 @@ export const SYNC_DELAY_MS = 5 * 60000;        // 밀린 지 5분: delayed
 export const SYNC_FAILING_MS = 30 * 60000;     // 실패 30분: failing / paused_suspected, 다시 하기 간격도 늘린다
 export const SYNC_WARN_MS = 6 * 3600000;       // 실패 6시간: 선생님 화면 경고
 export const SYNC_FAIL_SLOW_RETRY_MS = 5 * 60000; // 30분 넘게 실패하면 5분마다 다시 해 본다(알람 줄 · 기다림 줄이기)
+// V13.223 답이 없어서(시간 초과) 실패했으면 적어도 2분 30초 쉬고 다시 한다: 그쪽에 남은 작업이 끝날 시간을 준다(겹쳐 쌓이지 않게).
+export const SYNC_TIMEOUT_RETRY_MS = 150000;
+// V13.223 통째 사본(v12, 14MB 한 줄)은 하루 한 번만(전에는 6시간), 밀린 조각을 많이 올린 직후에는 건너뛴다.
+export const SYNC_FULL_EVERY_MS = 24 * 3600000, SYNC_FULL_SKIP_BATCHES = 10;
 export const BACKUP_GUIDE_URL = 'https://github.com/minsik2e5/sumus-quiz-battle/blob/sumus-voca-prod-deploy/docs/supabase-backup-runbook.md';
 
 // 실패 원인 종류. http: worker.mjs rpc가 붙인 HTTP 상태(0 = 답 없음).
@@ -481,7 +485,7 @@ export function backupState(s, now = Date.now()) {
     guide_url: BACKUP_GUIDE_URL
   };
 }
-export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, minIntervalMs = 0, fullEveryMs = 6 * 3600000, forceFull = false, isBusy = null, busyRetryMs = SYNC_BUSY_RETRY_MS, log = console }) {
+export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, minIntervalMs = 0, fullEveryMs = SYNC_FULL_EVERY_MS, forceFull = false, isBusy = null, busyRetryMs = SYNC_BUSY_RETRY_MS, log = console }) {
   let timer = null;
   let running = null;
   let failures = 0;
@@ -661,6 +665,8 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
   async function maybeFullCopy() {
     const snapshot = local.latest();
     if (!snapshot || !fullEveryMs || Date.now() - local.status().fullAt < fullEveryMs) return;
+    // V13.223 방금 밀린 조각을 많이 올렸으면(다시 시작 · 따라잡기) Supabase가 쉬도록 다음 번으로 미룬다.
+    if (lastBatches > SYNC_FULL_SKIP_BATCHES) return;
     // V13.214 통째 사본은 조각을 합쳐 글로 만든다(13MB에서 수백 ms CPU): 요청이 몰리는 중이면 잠잠해질 때까지 기다린다.
     await yieldWhileBusy();
     try {
@@ -710,7 +716,7 @@ export function createSupabaseSync({ local, supabase, storage, delayMs = 1000, m
         // V13.214 30분 넘게 실패하면 5분마다(그 전에는 2초부터 두 배씩 최대 1분). 다시 하기 한 번은 답을 기다리는
         // 시간(타이머 · 네트워크)뿐이라 CPU를 거의 쓰지 않지만, 알람 한 줄씩을 쓰므로 오래 실패하면 간격을 늘린다.
         const failSince = Number(local.status().failAt) || Date.now();
-        schedule(Date.now() - failSince >= SYNC_FAILING_MS ? SYNC_FAIL_SLOW_RETRY_MS : Math.min(60000, 2000 * 2 ** Math.min(failures - 1, 5)));
+        schedule(Math.max(Date.now() - failSince >= SYNC_FAILING_MS ? SYNC_FAIL_SLOW_RETRY_MS : Math.min(60000, 2000 * 2 ** Math.min(failures - 1, 5)), backupErrorKind(error) === 'timeout' ? SYNC_TIMEOUT_RETRY_MS : 0));
         throw error;
       } finally {
         running = null;

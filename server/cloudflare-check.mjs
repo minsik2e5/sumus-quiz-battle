@@ -349,7 +349,7 @@ export async function runCloudflareCheck() {
       object.sync.close();
     }
     // V13.150.2 큰 백업은 크기만큼 시간을 더 준다(8.8MB 통째 백업이 45초에 끊기던 문제).
-    assert.equal(uploadTimeoutMs(1000), 45000, '작은 업로드는 45초');
+    assert.equal(uploadTimeoutMs(1000), 130000, 'V13.223 작은 업로드도 Supabase 시간 제한(120초)보다 오래 기다린다(남는 쿼리 없게)');
     assert(uploadTimeoutMs(8851 * 1024) >= 170000, '8.8MB 업로드는 3분 가까이 기다린다');
     assert.equal(uploadTimeoutMs(50 * 1048576), 180000, '아무리 커도 3분까지');
     console.log(`[cloudflare-check] PASS local-first storage + ${concurrent.length} concurrent reads (${commits} Supabase commits)`);

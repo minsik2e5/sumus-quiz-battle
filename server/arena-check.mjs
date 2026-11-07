@@ -140,7 +140,7 @@ export async function runArenaChecks(assert) {
   {
     const svc = source('./service.mjs'), games = source('../public/modules/arcade-games.js'), arcade = source('../public/modules/arcade.js'), app = source('../public/app.js'), menu = source('../public/modules/playground-menu.js'), ui = source('../public/modules/arena.js'), build = source('./build-assets.mjs');
     assert(svc.includes("path === '/games/arena/start'") && svc.includes("path === '/games/arena/finish'") && svc.includes('arena: arenaView(p, now)') && !svc.slice(svc.indexOf("path === '/games/arena/start'"), svc.indexOf("path === '/games/arena/finish'")).includes('createCompetition'), 'V13.223 서버 길: 시작 · 끝, 놀이터 화면에 아레나 기록(렉 방지: 시작에서 다른 학생 기록을 훑지 않는다)');
-    assert(games.includes('export function arenaCard') && arcade.includes('${arenaCard(A, art)}') && app.includes("d.action === 'arena-open'") && menu.includes("['펫 아레나', r.arena?.left]") && build.includes('"v13223.css"') && build.includes("'wall', 'arena'"),
+    assert(games.includes('export function arenaCard') && arcade.includes('${arenaCard(A, art)}') && app.includes("d.action === 'arena-open'") && menu.includes("['펫 아레나', r.arena?.left]") && build.includes('"v13224.css"') && build.includes("'wall', 'arena'"),
       'V13.223 놀이터 미니게임에 펫 아레나 카드 · 오늘 남은 판 · 최고 연승, 입구 그림은 주문서 65가 들어오면');
     assert(ui.includes("api('/games/arena/start'") && ui.includes("api('/games/arena/finish'") && ui.includes('createArena(') && ui.includes("'arena/bg-plaza', 'battle/bg-arena'") && ui.includes('fighter({ key: f.key, form: f.form, level: f.level })'),
       'V13.223 화면은 서버 판으로 같은 전투를 돌리고, 경기장 그림이 없으면 지금 전투 광장을 쓴다');
