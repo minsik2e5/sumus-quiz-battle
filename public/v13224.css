@@ -217,3 +217,16 @@
   .ar-body,.ar-mon.stun .ar-body,.ar-result.win .ar-res-team span{animation:none}
   .ar-app.shake{animation:none}
 }
+
+/* 그림 65: 경기장 · VS · 배너 · 필살기 아이콘 · 쓰러짐 */
+.ar-stage.art .ar-bg{object-position:50% 50%}
+.ar-stage.art~.ar-main .ar-ring{display:none}
+.ar-vs-art{position:absolute;inset:0;background:url(/assets/arena/vs.webp) center/cover no-repeat;opacity:.92;mix-blend-mode:normal;animation:ar-vsbg .45s ease-out both}
+.ar-vs-art::after{content:"";position:absolute;inset:0;background:linear-gradient(160deg,rgba(225,29,72,.38) 0 49.6%,rgba(255,255,255,.6) 49.6% 50.4%,rgba(37,99,235,.38) 50.4%)}
+.ar-ult-ico{width:30px;height:30px;flex:none;object-fit:contain;filter:grayscale(.7) brightness(.85);transition:filter .3s,transform .3s}
+.ar-gauge.full .ar-ult-ico{filter:drop-shadow(0 0 8px #fde047);animation:ar-ultico .6s ease-in-out infinite alternate}
+@keyframes ar-ultico{to{transform:scale(1.18) rotate(-8deg)}}
+.ar-res-banner{display:block;width:min(64vw,240px);height:auto;margin:-70px auto -18px;filter:drop-shadow(0 8px 14px rgba(0,0,0,.45));animation:ar-in .55s cubic-bezier(.2,1.6,.4,1) both}
+.ar-faint{position:absolute;z-index:60;width:84px;height:84px;margin:-112px 0 0 -42px;pointer-events:none;animation:ar-faintfx 1.4s ease-out forwards}
+@keyframes ar-faintfx{0%{opacity:0;transform:scale(.4) rotate(-20deg)}20%{opacity:1;transform:scale(1.1) rotate(0)}70%{opacity:1;transform:translateY(-8px) rotate(14deg)}100%{opacity:0;transform:translateY(-20px) rotate(30deg) scale(.8)}}
+@media (prefers-reduced-motion:reduce){.ar-gauge.full .ar-ult-ico,.ar-faint,.ar-res-banner{animation:none}}

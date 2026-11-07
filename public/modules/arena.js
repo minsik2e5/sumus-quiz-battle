@@ -11,7 +11,7 @@ import { WALL_KINDS, dealWalls } from './wall-rules.js';
 // V13.223 펫 아레나(놀이터): 전체 화면. 위에서 비스듬히 내려다보는 경기장에서 내 펫과 상대 펫이 알아서 움직이며 싸운다.
 // 화면 아래 단어 문제를 맞히면 필살기 게이지가 차고(꽉 차면 컷인과 함께 필살기), 틀리면 내 펫이 잠깐 멈칫.
 // 전투 계산은 arena-rules.js(서버와 같은 함수), 판 · 채점 · 보상은 서버(server/arena.mjs). 클래스는 ar-.
-// 그림: 주문서 65(public/assets/arena/)가 들어오면 그 경기장 · VS · 배너, 없으면 지금 있는 전투 광장(battle/bg-arena).
+// 그림: 주문서 65(public/assets/arena/) 경기장 · VS · 승패 배너 · 필살기 아이콘 · 쓰러짐 별. 경기장 그림이 없으면 지금 있는 전투 광장(battle/bg-arena), 작은 그림이 없으면 그 자리를 비운다.
 
 const KEYS = ['1', '2', '3', '4'];
 const SHAPE_KO = { beam: '빔', orb: '구슬', quake: '지진', dash: '돌진' };
@@ -64,9 +64,13 @@ export function openArena(A, exit, opts = {}) {
 function setBg(name) {
   const el = $('ar-bg'); if (!el) return;
   const [want, backup] = BG[name] || BG.plaza;
-  el.onerror = () => { el.onerror = null; el.src = `/assets/${backup}.webp`; };
+  const stage = $('ar-stage');
+  el.onload = () => stage?.classList.toggle('art', el.src.includes('/assets/arena/'));
+  el.onerror = () => { el.onerror = null; stage?.classList.remove('art'); el.src = `/assets/${backup}.webp`; };
   el.src = `/assets/${want}.webp`;
 }
+const artImg = (name, cls) => `<img class="${cls}" data-ar-art src="/assets/arena/${name}.webp" alt="" draggable="false" decoding="async">`;
+function artGuard() { root()?.querySelectorAll('img[data-ar-art]').forEach(img => { img.removeAttribute('data-ar-art'); img.onerror = () => img.remove(); if (img.complete && !img.naturalWidth) img.remove(); }); }
 function closeAll() {
   if (!R) return;
   R.closing = true;
@@ -171,7 +175,7 @@ async function start(button) {
 async function vs(r) {
   setBg(['plaza', 'forest', 'night'][r.seed % 3]);
   const side = (who, name, team) => `<div class="ar-vs-side ${who}"><b>${esc(name)}</b><div>${team.map((f, n) => `<span style="--i:${n}">${petImg(f.key, f.form)}<small>Lv.${f.level}</small>${elTag(f.el)}</span>`).join('')}</div></div>`;
-  main(`<section class="ar-vs" id="ar-vs"><div class="ar-vs-bg"></div>
+  main(`<section class="ar-vs" id="ar-vs"><div class="ar-vs-bg"></div><div class="ar-vs-art"></div>
     ${side('foe', r.foe.name + (r.foe.bot ? '' : '의 팀'), r.foe.team)}
     <div class="ar-vs-mark">VS</div>
     ${side('me', '내 팀', r.me)}
@@ -193,7 +197,7 @@ function field() {
       <div class="ar-mon me" id="ar-me"><span class="ar-shadow"></span><span class="ar-body" id="ar-me-body"></span><span class="ar-hp"><i id="ar-me-hp"></i></span></div>
     </div>
     <div class="ar-quiz" id="ar-quiz">
-      <div class="ar-gauge" id="ar-gauge"><span><i id="ar-gauge-fill"></i></span><b id="ar-gauge-txt">필살기 0%</b><em id="ar-combo"></em></div>
+      <div class="ar-gauge" id="ar-gauge">${artImg('ult-icon', 'ar-ult-ico')}<span><i id="ar-gauge-fill"></i></span><b id="ar-gauge-txt">필살기 0%</b><em id="ar-combo"></em></div>
       <div class="ar-q" id="ar-q"></div>
     </div>
   </section>`;
@@ -209,7 +213,7 @@ function play(r) {
   R.sim = createArena({ seed: r.seed, me: fighters(r.me), foe: fighters(r.foe.team), foeLevel: r.foe_level });
   Object.assign(R, { questions: r.questions, qi: 0, shown: 0, picks: [], asking: false, playing: true, paused: false, pausedMs: 0, okN: 0, badN: 0, missed: [] });
   app()?.classList.add('playing');
-  main(field());
+  main(field()); artGuard();
   R.prev = R.sim.view(); R.cur = R.prev;
   drawMon('me'); drawMon('foe'); drawHud(); drawGauge();
   place(0);
@@ -281,7 +285,7 @@ function tickOnce(show) {
 function onEvent(e, show) {
   if (e.e === 'ok' || e.e === 'bad') { drawGauge(); return; }
   if (e.e === 'enter') { drawMon(e.who); drawHud(); if (show) { const s = R.cur[e.who]; pop(`${petName(e.key)} 등장!`, s.x, s.y - 12, 'enter'); sfx('swoosh'); } return; }
-  if (e.e === 'faint') { const el = $(`ar-${e.who}`); el?.classList.add('down'); drawHud(); if (show) { banner(e.who === 'me' ? `${petName(e.key)} 쓰러짐…` : `${petName(e.key)} 쓰러뜨렸다!`, e.who); sfx('faint'); buzz([40, 30, 40]); } return; }
+  if (e.e === 'faint') { const el = $(`ar-${e.who}`); el?.classList.add('down'); drawHud(); if (show) { faintFx(el); banner(e.who === 'me' ? `${petName(e.key)} 쓰러짐…` : `${petName(e.key)} 쓰러뜨렸다!`, e.who); sfx('faint'); buzz([40, 30, 40]); } return; }
   if (e.e === 'over') return;
   if (!show) { if (e.e === 'dmg') drawHud(); return; }
   if (e.e === 'cutin') return cutin(e);
@@ -357,6 +361,13 @@ function dash(who, from, to) {
 function pop(text, x, y, cls = '') {
   const el = fxEl(`pop ${cls}`, { left: `${x}%`, top: `${y}%` }, cls.includes('count') ? 950 : 1000, esc(text));
   return el;
+}
+function faintFx(mon) {
+  const fieldEl = $('ar-field'); if (!fieldEl || !mon) return;
+  const img = document.createElement('img');
+  img.className = 'ar-faint'; img.src = '/assets/arena/fx-faint.webp'; img.alt = ''; img.onerror = () => img.remove();
+  img.style.left = mon.style.left; img.style.top = mon.style.top;
+  fieldEl.appendChild(img); later(() => img.remove(), 1400);
 }
 function banner(text, who) {
   const el = document.createElement('div');
@@ -437,7 +448,7 @@ function result(local, res) {
   const team = R.r.me;
   main(`<section class="ar-result ${win ? 'win' : 'lose'}">
     <div class="ar-res-card">
-      <div class="ar-res-head"><h2>${win ? '승리!' : winner === 'draw' ? '무승부' : '아쉬운 패배'}</h2><p>vs ${esc(R.r.foe.name)}${res?.streak >= 2 && win ? ` · <b>${res.streak}연승!</b>` : ''}</p></div>
+      <div class="ar-res-head">${winner === 'draw' ? '' : artImg(win ? 'banner-win' : 'banner-lose', 'ar-res-banner')}<h2>${win ? '승리!' : winner === 'draw' ? '무승부' : '아쉬운 패배'}</h2><p>vs ${esc(R.r.foe.name)}${res?.streak >= 2 && win ? ` · <b>${res.streak}연승!</b>` : ''}</p></div>
       <div class="ar-res-team">${team.map((f, n) => `<span style="--i:${n}">${petImg(f.key, f.form)}</span>`).join('')}</div>
       <div class="ar-res-rows"><span><small>맞힘</small><b>${correct}</b></span><span><small>틀림</small><b>${wrong}</b></span><span><small>필살기</small><b>${res?.ults ?? '—'}</b></span></div>
       ${coins || xp ? `<div class="ar-res-gain">${coins ? `<span class="r coin">${coin()}<b>+${num(coins)}</b>${res?.streak_coins ? `<small>3연승 +${res.streak_coins} 포함</small>` : ''}</span>` : ''}${xp ? `<span class="r xp"><b>+${xp}</b><small>경험치</small></span>` : ''}</div>` : ''}
@@ -446,6 +457,7 @@ function result(local, res) {
       <div class="ar-res-btns"><button type="button" class="yl-cta" data-ar="again">한 판 더</button><button type="button" class="btn full" data-ar="exit">놀이터로</button></div>
     </div>
   </section>`);
+  artGuard();
   if (coins) { later(() => { sfx('coins'); coinShower(app(), 22); const b = $('ar-coins'); if (b) countUp(b, Number(R.A.data.stats?.points_balance || 0), 900); }, 500); }
 }
 

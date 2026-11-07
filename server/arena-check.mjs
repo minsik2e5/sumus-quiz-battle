@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs';
 // V13.223 검사: 펫 아레나(public/modules/arena-rules.js · server/arena.mjs · public/modules/arena.js).
 //   전투는 씨앗과 '몇 번째 틱에 맞혔나/틀렸나'만으로 정해지고, 서버가 같은 함수로 다시 돌려 승패 · 보상을 정한다.
 import { readFileSync } from 'node:fs';
@@ -144,5 +145,9 @@ export async function runArenaChecks(assert) {
       'V13.223 놀이터 미니게임에 펫 아레나 카드 · 오늘 남은 판 · 최고 연승, 입구 그림은 주문서 65가 들어오면');
     assert(ui.includes("api('/games/arena/start'") && ui.includes("api('/games/arena/finish'") && ui.includes('createArena(') && ui.includes("'arena/bg-plaza', 'battle/bg-arena'") && ui.includes('fighter({ key: f.key, form: f.form, level: f.level })'),
       'V13.223 화면은 서버 판으로 같은 전투를 돌리고, 경기장 그림이 없으면 지금 전투 광장을 쓴다');
+    const css = source('../public/v13224.css');
+    const art = ['entry', 'bg-plaza', 'bg-forest', 'bg-night', 'vs', 'banner-win', 'banner-lose', 'ult-icon', 'fx-faint'];
+    assert(art.every(n => existsSync(new URL(`../public/assets/arena/${n}.webp`, import.meta.url))) && ui.includes("artImg('ult-icon'") && ui.includes("'banner-win' : 'banner-lose'") && ui.includes('/assets/arena/fx-faint.webp') && ui.includes('artGuard()') && css.includes('url(/assets/arena/vs.webp)') && css.includes('.ar-stage.art~.ar-main .ar-ring{display:none}'),
+      'V13.224 주문서 65 그림 9개: 경기장 · VS · 승패 배너 · 필살기 아이콘 · 쓰러짐 별을 화면에 쓰고, 그림 링이 있으면 CSS 링은 숨긴다');
   }
 }
