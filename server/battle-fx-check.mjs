@@ -33,7 +33,7 @@ export function runBattleFxChecks(assert) {
   const allPets = [...Object.keys(CHARACTERS), 'robot'];
   assert(allPets.every(key => ELEMENTS[elementOf(key)]) && elementOf('nobody') === 'star' && elementOf() === 'star' && paletteOf('dragon') === ELEMENTS.flame && elementOf('penguin') === 'ice' && elementOf('otter') === 'water' && elementOf('snake') === 'toxic' && elementOf('owl') === 'wind' && elementOf('bear') === 'earth' && elementOf('deer') === 'leaf', 'V13.115 지금 있는 모든 펫(과 로보)이 속성을 가지고, 모르는 펫은 별빛이다');
   const counts = Object.fromEntries(keys.map(el => [el, allPets.filter(key => elementOf(key) === el).length]));
-  assert(keys.filter(el => el !== 'star').every(el => counts[el] >= 2) && Math.max(...Object.values(counts)) <= 12 && Math.max(...Object.values(counts)) - Math.min(...Object.values(counts)) <= 1, 'V13.115 불꽃 · 얼음 · 물 · 풀 · 바위 · 바람 · 독이 각각 두 마리 이상의 펫에게 돌아가고 한 속성에 몰리지 않는다(V13.219: 92마리라 12마리까지, 속성 사이 차이 1 이하)');
+  assert(keys.filter(el => el !== 'star').every(el => counts[el] >= 2) && Math.max(...Object.values(counts)) <= 13 && Math.max(...Object.values(counts)) - Math.min(...Object.values(counts)) <= 1, 'V13.115 불꽃 · 얼음 · 물 · 풀 · 바위 · 바람 · 독이 각각 두 마리 이상의 펫에게 돌아가고 한 속성에 몰리지 않는다(V13.219: 92마리라 12마리까지, 속성 사이 차이 1 이하)');
   assert(comboRank(3)?.[1] === 'NICE!' && comboRank(5)?.[1] === 'GREAT!' && comboRank(8)?.[1] === 'AMAZING!' && comboRank(12)?.[1] === 'UNSTOPPABLE!' && !comboRank(4) && !comboRank(2) && COMBO_RANKS.length === 4 && auraLevel(4) === 0 && auraLevel(5) === 1 && auraLevel(8) === 2 && auraLevel(12) === 3 && auraLevel(30) === 3, 'V13.115 콤보 등급 글자는 3 · 5 · 8 · 12번에서 한 번씩, 기운은 5 · 8 · 12에서 커진다');
 
   /* ---------- on a fake DOM ---------- */

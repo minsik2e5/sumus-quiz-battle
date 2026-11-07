@@ -128,6 +128,13 @@ export const CHARACTERS = {
   momonga: { name: 'MOMONGA', ko: '모몽가', type: '하늘다람쥐 친구', color: '#5E93C8', light: '#CFE1F3', soft: '#F2F7FC', limited: 'special' },
   rakko: { name: 'RAKKO', ko: '랏코', type: '해달 검객', color: '#A07E52', light: '#E9DAC3', soft: '#FBF7F0', limited: 'special' },
   shisa: { name: 'SHISA', ko: '시사', type: '사자 수호 친구', color: '#E07A2E', light: '#F9D4B5', soft: '#FFF5EC', limited: 'special' },
+  // V13.221 특별 한정 6마리 더(같은 특별 시즌 · 영웅 결과 10% · 이벤트 알). 한글 이름 · 소개는 임시(선생님 확인).
+  kani: { name: 'KANI', ko: '카니', type: '게 모자 책벌레', color: '#E07F8C', light: '#F9D0D6', soft: '#FFF3F5', limited: 'special' },
+  siren: { name: 'SIREN', ko: '세이렌', type: '노래하는 인어 친구', color: '#C94A55', light: '#F3C6CA', soft: '#FDF1F2', limited: 'special' },
+  horned: { name: 'HORNED', ko: '노랑뿔이', type: '복슬복슬 뿔 친구', color: '#D9A92A', light: '#F8E6A6', soft: '#FFFAEA', limited: 'special' },
+  islandman: { name: 'ISLANDMAN', ko: '섬 아저씨', type: '근육 섬 친구', color: '#A97A4B', light: '#EBD8C0', soft: '#FBF6EF', limited: 'special' },
+  anoko: { name: 'ANOKO', ko: '아노코', type: '쿠키 좋아 친구', color: '#D98A3A', light: '#F6DDBF', soft: '#FFF7EE', limited: 'special' },
+  beetle: { name: 'BEETLE', ko: '풍뎅이', type: '장수풍뎅이 친구', color: '#7A5236', light: '#DCC3AE', soft: '#F8F1EA', limited: 'special' },
   // V13.195 곤충 · 공룡 시리즈(docs/bug-dino-pets-design.md, 그림 54 · 55): 알 상점의 시리즈 알(SERIES_EGG)에서만 나온다.
   // 전역 등급 표시(epic · legendary)는 넣지 않는다: 기본 · 영웅 · 전설 알, 선물 알, 사냥, 코인 뽑기, 영웅 수 · 전역 전설 셈에 안 섞인다.
   // `rank`는 시리즈 안 등급(기본 · 영웅 · 전설: 알 확률 무게 · 특기 세기 · 도감 테두리), `group`은 곤충(bug) · 공룡(dino).

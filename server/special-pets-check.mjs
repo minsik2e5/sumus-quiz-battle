@@ -9,15 +9,16 @@ import { elementOf } from '../public/modules/battle-fx.js';
 import { TEST_APP } from './test-seed.mjs';
 
 // V13.219 같은 특별 시즌에 5마리 더(후루혼야 · 쿠리만쥬 · 모몽가 · 랏코 · 시사).
-const TRIO = ['hachiware', 'usagi', 'chiikawa'], FIVE = ['furuhonya', 'kurimanju', 'momonga', 'rakko', 'shisa'], ALL8 = [...TRIO, ...FIVE];
+// V13.221 6마리 더(카니 · 세이렌 · 노랑뿔이 · 섬 아저씨 · 아노코 · 풍뎅이). ALL8은 이제 특별 14마리 전부.
+const TRIO = ['hachiware', 'usagi', 'chiikawa'], FIVE = ['furuhonya', 'kurimanju', 'momonga', 'rakko', 'shisa'], SIX = ['kani', 'siren', 'horned', 'islandman', 'anoko', 'beetle'], ALL8 = [...TRIO, ...FIVE, ...SIX];
 const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 const asset = name => new URL(`../public/assets/${name}.webp`, import.meta.url);
 
 export async function runSpecialPetsChecks(assert) {
   const S = SEASONS.special, kst = t => Date.parse(t + '+09:00');
   assert(seasonKeys('special').join() === ALL8.join() && ALL8.every(k => CHARACTERS[k].limited === 'special' && petTier(k) === 'limited' && petReady(k) && LIMITED_PET_KEYS.includes(k) && ACTIVE_PET_KEYS.includes(k) && !STANDARD_PET_KEYS.includes(k) && !EPIC_PET_KEYS.includes(k))
-    && ['하치와레', '우사기', '치이카와', '후루혼야', '쿠리만쥬', '모몽가', '랏코', '시사'].join() === ALL8.map(k => CHARACTERS[k].ko).join(),
-    'V13.207 · V13.219 특별 한정 펫 8마리는 한정 등급이고 기본 · 영웅 알 목록에 섞이지 않는다');
+    && ['하치와레', '우사기', '치이카와', '후루혼야', '쿠리만쥬', '모몽가', '랏코', '시사', '카니', '세이렌', '노랑뿔이', '섬 아저씨', '아노코', '풍뎅이'].join() === ALL8.map(k => CHARACTERS[k].ko).join(),
+    'V13.207 · V13.219 · V13.221 특별 한정 펫 14마리는 한정 등급이고 기본 · 영웅 알 목록에 섞이지 않는다');
 
   /* ---------- 그림 ---------- */
   const files = ALL8.flatMap(k => [
@@ -25,8 +26,8 @@ export async function runSpecialPetsChecks(assert) {
     `${k}-0-happy`, `${k}-0-eat`,
     ...[1, 2, 3].flatMap(f => ['happy', 'eat', 'sad', 'cheer', 'attack', 'hurt'].map(e => `${k}-${f}-${e}`))
   ]);
-  assert(files.length === 224 && files.every(f => existsSync(asset(`pets/${f}`))) && ALL8.every(k => PET_ART.has(k) && PET_FIGHT.has(k)),
-    'V13.207 · V13.219 특별 펫 그림 224장(마리마다 28장: 기본 · 작은 그림 · 표정 · 알 반응 · 공격 · 맞음)이 있고 PET_ART · PET_FIGHT에 들어간다');
+  assert(files.length === 392 && files.every(f => existsSync(asset(`pets/${f}`))) && ALL8.every(k => PET_ART.has(k) && PET_FIGHT.has(k)),
+    'V13.207 · V13.219 · V13.221 특별 펫 그림 392장(마리마다 28장: 기본 · 작은 그림 · 표정 · 알 반응 · 공격 · 맞음)이 있고 PET_ART · PET_FIGHT에 들어간다');
 
   /* ---------- 얻는 법 ---------- */
   assert(S.epic_only && !S.egg && !S.price && S.start === '2026-11-04' && S.end === '2026-12-31' && S.rate === 10 && S.after_rate === 5 && /12월 31일/.test(S.until)
@@ -39,7 +40,7 @@ export async function runSpecialPetsChecks(assert) {
   const during = kst('2026-11-20T12:00:00'), after = kst('2027-01-10T12:00:00');
   const kid = (...keys) => ({ pets: [{ key: 'dog' }, ...keys.map(key => ({ key }))] });
   const seq = list => () => list.length ? list.shift() : 0;
-  assert(ALL8.includes(limitedFromEpic(kid(), () => 0, during)) && limitedFromEpic(kid(), seq([0.0999, 0.99]), during) === 'shisa' && limitedFromEpic(kid(), () => 0.1, during) === null && limitedFromEpic(kid(...ALL8), () => 0, during) === null && seasonKeys('autumn').includes(limitedFromEpic(kid(), () => 0, after)) && ALL8.includes(limitedFromEpic(kid(...seasonKeys('autumn')), () => 0, after))
+  assert(ALL8.includes(limitedFromEpic(kid(), () => 0, during)) && limitedFromEpic(kid(), seq([0.0999, 0.99]), during) === 'beetle' && limitedFromEpic(kid(), () => 0.1, during) === null && limitedFromEpic(kid(...ALL8), () => 0, during) === null && seasonKeys('autumn').includes(limitedFromEpic(kid(), () => 0, after)) && ALL8.includes(limitedFromEpic(kid(...seasonKeys('autumn')), () => 0, after))
     && ALL8.includes(limitedFromEpic(kid(), seq([0.5, 0.0499, 0]), after)) && limitedFromEpic(kid(), () => 0.05, after) === null && limitedFromEpic(kid(...LIMITED_PET_KEYS), () => 0, after) === null,
     'V13.213 기간 중 영웅 결과는 10%로 아직 없는 특별 펫(가을 펫은 안 나옴), 1/1부터는 시즌마다 5%씩 따로 굴린다(가을 → 특별, 다 모으면 안 나온다)');
   const egg = kid(); const opened = openEgg(egg, { epic: true, missing: ['capybara'], price: 800, random: seq([0.5, 0.05, 0.4]), now: during });
@@ -60,8 +61,10 @@ export async function runSpecialPetsChecks(assert) {
 
   assert(elementOf('hachiware') === 'ice' && elementOf('usagi') === 'toxic' && elementOf('chiikawa') === 'star', 'V13.207 특별 펫 공격 속성: 하치와레 얼음 · 우사기 독 · 치이카와 별빛');
   assert(FIVE.map(elementOf).join() === 'wind,earth,leaf,ice,flame', 'V13.219 새 특별 펫 속성: 후루혼야 바람 · 쿠리만쥬 바위 · 모몽가 풀 · 랏코 얼음 · 시사 불꽃(물은 낚시 혜택이 있어 안 씀)');
+  assert(SIX.map(elementOf).join() === 'ice,water,flame,earth,star,toxic' && SIX.map(k => PET_SKILLS[k].name).join() === '집게 책갈피,바다의 노래,와앙 깨물기,불끈 근육,쿠키 한 입,뿔 갑옷',
+    'V13.221 새 특별 펫 6마리 속성(카니 얼음 · 세이렌 물 · 노랑뿔이 불꽃 · 섬 아저씨 바위 · 아노코 별빛 · 풍뎅이 독)과 특기 이름');
 
-  assert(TEST_APP.GIFTS['special-ts3']?.ts3?.join() === TRIO.join() && TEST_APP.GIFTS['special5-ts3']?.ts3?.join() === FIVE.join(), 'V13.207 · V13.219 테스트 앱 ts3에게 특별 펫을 한 번씩 선물한다(3마리, 5마리 따로 · 확인용)');
+  assert(TEST_APP.GIFTS['special-ts3']?.ts3?.join() === TRIO.join() && TEST_APP.GIFTS['special5-ts3']?.ts3?.join() === FIVE.join() && TEST_APP.GIFTS['special6-ts3']?.ts3?.join() === SIX.join(), 'V13.207 · V13.219 테스트 앱 ts3에게 특별 펫을 한 번씩 선물한다(3마리, 5마리 따로 · 확인용)');
 
   /* ---------- 화면 ---------- */
   const book = source('../public/modules/petbook.js'), lucky = source('../public/modules/lucky.js'), arcade = source('../public/modules/arcade.js'), css = source('../public/v13107.css');
