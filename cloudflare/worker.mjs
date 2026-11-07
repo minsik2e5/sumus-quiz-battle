@@ -172,8 +172,13 @@ function createSupabaseRepository(env) {
 
 // V13.150.2 큰 업로드의 시간 제한: 운영 데이터가 8.8MB까지 커져 45초 안에 통째 백업을 다 못 올렸다.
 // 1MB를 넘는 만큼 1MB마다 20초를 더 주고(최소 45초, 최대 3분), 업로드는 알람(최대 15분) 안에서 돈다.
+// V13.223 2026-11-08 운영: Supabase(anon)는 쿼리를 120초까지 돌리는데(supabase/voca_v12_state.sql) 우리는 45초에 포기하고
+// 다시 보냈다. 포기한 요청도 Supabase에서는 계속 돌아 같은 작업이 겹겹이 쌓이고(Nano CPU 100%) 백업이 하루 넘게 멈췄다.
+// 그래서 업로드는 그쪽 시간 제한(120초)보다 조금 더 기다린다: 끝나든 그쪽이 취소하든 답을 받고, 남는 쿼리가 없다.
+export const SUPABASE_STATEMENT_TIMEOUT_MS = 120000;
 export function uploadTimeoutMs(bytes) {
-  return Math.min(180000, Math.max(45000, Math.round(45000 + Math.max(0, (Number(bytes) || 0) - 1048576) / 1048576 * 20000)));
+  const wanted = Math.round(45000 + Math.max(0, (Number(bytes) || 0) - 1048576) / 1048576 * 20000);
+  return Math.min(180000, Math.max(SUPABASE_STATEMENT_TIMEOUT_MS + 10000, wanted));
 }
 
 // V13.149 테스트 앱(env.test, VOCA_STANDALONE=1): Supabase 없이 이 Durable Object 안에만 저장한다.

@@ -3,9 +3,10 @@
 // "voca_v13_state_revision: TimeoutError The operation was aborted due to timeout (0 KB)", last_ok_at null.
 //   1. 답 없음(타임아웃) · 503 · 404(조각 함수만 / 전부 없음) · 401 · 일시정지(HTTP 540) 각각 health 상태값
 //   2. 6시간 넘게 실패하면 선생님 첫 화면에만 경고 한 줄(학생 · 5시간에는 없음), 다시 시작해도 실패 시작 시각 유지
-//   3. 복구되면 밀린 조각을 250KB 묶음으로 올리고 상태 ok · failures 0 · lag 0 · 경고 사라짐
+//   3. 복구되면 밀린 조각을 100KB 묶음(V13.223, 전에는 250KB)으로 올리고 상태 ok · failures 0 · lag 0 · 경고 사라짐
 //   4. 묶음 사이에 요청이 오면 쉬었다가 이어 올린다(#262 미루기 유지) · 실패한 다시 하기 한 번은 CPU를 거의 안 쓴다
 //   5. 30분 넘게 실패하면 다시 하기 간격 5분
+//   7. V13.223 업로드는 Supabase 시간 제한(120초)보다 오래 기다림 · 시간 초과 뒤 2분 30초 쉬기 · 통째 사본 하루 한 번
 // release-check.mjs(npm run check)가 부른다. 단독: node server/supabase-backup-check.mjs
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -281,6 +282,32 @@ export async function runSupabaseBackupChecks(_releaseAssert, assert = nodeAsser
       object.sync.close();
       assert.equal(canonical(object.mutations.current().state), before, 'V13.220 옮긴 뒤 다시 시작해도 같은 기록');
       table.moved = pick(moved);
+    }
+
+    /* ---------- 7. V13.223 작은 Supabase(Nano)에서 쌓이지 않게: 그쪽 시간 제한보다 오래 기다리기 · 작은 묶음 · 쉬었다 다시 · 통째 사본 하루 한 번 ---------- */
+    {
+      // 2026-11-08 운영: 45초에 포기하고 다시 보낸 요청이 Supabase에서 120초까지 계속 돌아 쌓였다(CPU 100%, 백업 26시간 멈춤).
+      const { uploadTimeoutMs, SUPABASE_STATEMENT_TIMEOUT_MS } = await import('../cloudflare/worker.mjs');
+      const { batchParts, PART_BATCH_BYTES } = await import('../cloudflare/state-parts.mjs');
+      const lf = await import('../cloudflare/local-first.mjs');
+      const sql = readFileSync(new URL('../supabase/voca_v12_state.sql', import.meta.url), 'utf8');
+      const serverMs = Number(sql.match(/alter role anon set statement_timeout = '(\d+)s'/)?.[1]) * 1000;
+      assert(serverMs === SUPABASE_STATEMENT_TIMEOUT_MS && [1000, 100_000, 300_000, 2_000_000].every(b => uploadTimeoutMs(b) > serverMs) && uploadTimeoutMs(50 * 1048576) === 180000,
+        'V13.223 업로드는 Supabase 시간 제한(anon 120초)보다 오래 기다린다: 포기한 요청이 그쪽에 남아 쌓이지 않는다');
+      const entries = Array.from({ length: 40 }, (_, i) => [`k${i}`, 'x'.repeat(9000)]);
+      const sizes = batchParts(entries).map(b => b.reduce((n, [k, t]) => n + k.length + t.length + 8, 0));
+      assert(PART_BATCH_BYTES === 100_000 && sizes.every(n => n <= PART_BATCH_BYTES) && sizes.length === 4, 'V13.223 조각 묶음 하나는 100KB 이하');
+      assert(lf.SYNC_TIMEOUT_RETRY_MS >= SUPABASE_STATEMENT_TIMEOUT_MS + 30000 && lf.SYNC_FULL_EVERY_MS === 86400000 && lf.SYNC_FULL_SKIP_BATCHES === 10,
+        'V13.223 시간 초과 뒤에는 2분 30초 넘게 쉬고, 통째 사본은 하루 한 번');
+      // 동작: 답이 없으면 다음 시도는 2분 30초 뒤(그 전 규칙은 2초).
+      const storage = createStorageMock(), local = createLocalRepository(storage);
+      let alarmAt = 0; storage.setAlarm = at => { alarmAt = at; };
+      const slow = { partsRevision: async () => { throw Object.assign(Error('x'), { status: 503, http: 0, detail: 'voca_v13_state_revision: TimeoutError The operation was aborted due to timeout (0 KB)' }); } };
+      const sync = createSupabaseSync({ local, supabase: slow, storage, fullEveryMs: 0, log: quiet });
+      const t0 = Date.now();
+      await sync.run().catch(() => {});
+      sync.close();
+      assert(alarmAt - t0 >= lf.SYNC_TIMEOUT_RETRY_MS, 'V13.223 시간 초과로 실패하면 바로 다시 보내지 않고 2분 30초 넘게 기다린다');
     }
 
     /* ---------- 5. 오래 실패하면 다시 하기 간격 5분 · #262 미루기 그대로 ---------- */

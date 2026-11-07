@@ -119,7 +119,9 @@ export async function hashText(text) {
 }
 
 // Groups changed parts into uploads of at most `limit` characters (a bigger part goes alone).
-export function batchParts(entries, limit = 256_000) {
+// V13.223 묶음 하나 약 100KB(전에는 250KB): 작은 Supabase(Nano)에서도 묶음 하나가 금방 끝나게.
+export const PART_BATCH_BYTES = 100_000;
+export function batchParts(entries, limit = PART_BATCH_BYTES) {
   const batches = [];
   let current = [], size = 0;
   for (const entry of entries) {
