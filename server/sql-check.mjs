@@ -19,7 +19,7 @@ let rev = (await db.query(`select public.voca_v13_state_revision($1) r`, [SECRET
 assert.equal(Number(rev), 0);
 rev = (await db.query(`select public.voca_v13_state_patch($1, $2, $3::jsonb, $4::jsonb) r`, [SECRET, 0, JSON.stringify({ 'k:profiles': [{ id: 'a' }], 'a:sessions:s1': [{ id: 1 }] }), '[]'])).rows[0].r;
 assert.equal(Number(rev), 1, 'patch bumps the revision');
-assert.equal(await code(() => db.query(`select public.voca_v13_state_patch($1, $2, $3::jsonb, $4::jsonb)`, [SECRET, 0, '{}', '[]'])), '40001', 'stale revision is a conflict');
+assert.equal(await code(() => db.query(`select public.voca_v13_state_patch($1, $2, $3::jsonb, $4::jsonb)`, [SECRET, 0, '{}', '[]'])), 'PT409', 'V13.224 stale revision is a conflict as PT409 (HTTP 409, PostgREST does not retry it; 40001 made it retry forever)');
 rev = (await db.query(`select public.voca_v13_state_patch($1, $2, $3::jsonb, $4::jsonb) r`, [SECRET, 1, JSON.stringify({ 'a:sessions:s1': [{ id: 1 }, { id: 2 }] }), JSON.stringify(['k:profiles'])])).rows[0].r;
 const read = (await db.query(`select * from public.voca_v13_state_read($1)`, [SECRET])).rows[0];
 assert.equal(Number(read.revision), 2);
@@ -46,7 +46,7 @@ assert.equal(await code(() => db.query(`select public.voca_v12_state_commit($1, 
 const state1 = { profiles: [{ id: 'a', name: '학생' }] };
 let r12 = (await db.query(`select public.voca_v12_state_commit($1, $2, $3::jsonb) r`, [SECRET, 4321, JSON.stringify(state1)])).rows[0].r;
 assert.equal(Number(r12), 1, 'V13.220 첫 commit은 옛 프로젝트 번호를 들고 와도 받아서 1이 된다');
-assert.equal(await code(() => db.query(`select public.voca_v12_state_commit($1, $2, $3::jsonb)`, [SECRET, 4321, '{}'])), '40001', 'V13.220 그다음부터는 번호가 어긋나면 충돌(워커가 번호를 다시 읽고 올린다)');
+assert.equal(await code(() => db.query(`select public.voca_v12_state_commit($1, $2, $3::jsonb)`, [SECRET, 4321, '{}'])), 'PT409', 'V13.220 · V13.224(PT409) 그다음부터는 번호가 어긋나면 충돌(워커가 번호를 다시 읽고 올린다)');
 assert.equal(await code(() => db.query(`select public.voca_v12_state_commit($1, $2, $3::jsonb)`, [SECRET, 1, '[]'])), '22023', 'V13.220 상태가 아닌 값은 받지 않는다');
 r12 = (await db.query(`select public.voca_v12_state_commit($1, $2, $3::jsonb) r`, [SECRET, 1, JSON.stringify({ ...state1, n: 2 })])).rows[0].r;
 assert.equal(Number(r12), 2);
@@ -58,3 +58,12 @@ await db.exec(`reset role`);
 const timeouts = (await db.query(`select r.rolname, s.setconfig from pg_db_role_setting s join pg_roles r on r.oid = s.setrole where r.rolname in ('anon', 'authenticated')`)).rows;
 assert(timeouts.length === 2 && timeouts.every(t => t.setconfig.includes('statement_timeout=120s')), 'V13.220 13MB 통째 사본이 시간 제한(57014)에 끊기지 않게 2분');
 console.log('[sql-check] PASS supabase/voca_v12_state.sql (PGlite)');
+
+// V13.224 2026-11-08 운영: 40001(serialization_failure)은 PostgREST가 저절로 다시 시도한다. 번호가 어긋난 백업이 1초마다
+// 끝없이 돌아 Supabase CPU가 100%가 됐다. 백업 SQL에는 40001을 다시 쓰지 않는다.
+{
+  const { readFileSync } = await import('node:fs');
+  const sqlText = ['voca_v13_parts.sql', 'voca_v12_state.sql'].map(f => readFileSync(new URL(`../supabase/${f}`, import.meta.url), 'utf8').split('\n').filter(l => !l.trim().startsWith('--')).join('\n')).join('\n');
+  assert(!sqlText.includes("'40001'") && (sqlText.match(/errcode = 'PT409'/g) || []).length === 2, 'V13.224 백업 SQL의 번호 어긋남은 PT409(다시 시도 안 함)');
+}
+console.log('[sql-check] V13.224 PT409 PASS');

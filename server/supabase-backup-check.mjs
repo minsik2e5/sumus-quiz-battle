@@ -307,6 +307,10 @@ export async function runSupabaseBackupChecks(_releaseAssert, assert = nodeAsser
       const t0 = Date.now();
       await sync.run().catch(() => {});
       sync.close();
+      // V13.224 번호 어긋남을 40001로 알리면 PostgREST가 스스로 끝없이 다시 시도한다(1초마다, CPU 100%). PT409 = 바로 HTTP 409.
+      const v13sql = readFileSync(new URL('../supabase/voca_v13_parts.sql', import.meta.url), 'utf8'), workerSrc = readFileSync(new URL('../cloudflare/worker.mjs', import.meta.url), 'utf8');
+      assert(v13sql.includes("raise exception 'revision_conflict' using errcode = 'PT409';") && !sql.includes("errcode = '40001'") && !v13sql.includes("errcode = '40001'") && workerSrc.includes("payload?.code === 'PT409'"),
+        'V13.224 백업 함수의 번호 어긋남은 PT409(PostgREST가 다시 시도하지 않음)이고 워커는 409로 알아듣는다');
       assert(alarmAt - t0 >= lf.SYNC_TIMEOUT_RETRY_MS, 'V13.223 시간 초과로 실패하면 바로 다시 보내지 않고 2분 30초 넘게 기다린다');
     }
 

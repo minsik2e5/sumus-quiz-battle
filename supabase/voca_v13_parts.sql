@@ -60,7 +60,9 @@ begin
   perform public.voca_v13_check_secret(p_secret);
   select revision into current_revision from public.voca_v13_meta where id = 1 for update;
   if current_revision is distinct from p_revision then
-    raise exception 'revision_conflict' using errcode = '40001';
+    -- V13.224 번호 어긋남은 PT409(PostgREST가 HTTP 409로 바로 돌려준다). 40001(serialization_failure)은 PostgREST가
+    -- 스스로 계속 다시 시도해서, 어긋난 번호로 1초마다 끝없이 돌며 CPU를 100%로 만들었다(2026-11-08 운영).
+    raise exception 'revision_conflict' using errcode = 'PT409';
   end if;
   if jsonb_typeof(p_parts) = 'object' then
     insert into public.voca_v13_parts (key, data, updated_at)
