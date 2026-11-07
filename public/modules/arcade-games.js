@@ -65,7 +65,7 @@ export function matchCard(A, art) {
     </div>
   </article>`;
 }
-// V13.221 벽 통과: 짝 맞추기처럼 게임 단어(야차전 범위와 같은 저장값)로. 그림은 주문서 64(wall/entry)가 있으면 쓴다.
+// V13.222 벽 통과: 짝 맞추기처럼 게임 단어(야차전 범위와 같은 저장값)로. 그림은 주문서 64(wall/entry)가 있으면 쓴다.
 export function wallCard(A, art) {
   const w = arcadeWords(A), v = A.data.rewards?.wall || {};
   const pic = art?.entry?.has('wall') ? '<img class="ag-big-bg" src="/assets/wall/entry.webp" alt="" draggable="false" decoding="async">'

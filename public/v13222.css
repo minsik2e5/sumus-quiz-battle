@@ -1,4 +1,4 @@
-/* V13.221 벽 통과(놀이터 미니게임, public/modules/wall.js). 그림은 주문서 64(public/assets/wall/). 클래스 wl-. */
+/* V13.222 벽 통과(놀이터 미니게임, public/modules/wall.js). 그림은 주문서 64(public/assets/wall/). 클래스 wl-. */
 .wl-app{position:relative;height:100svh;min-height:520px;max-width:480px;margin:auto;overflow:hidden;background:#0b1430;color:#fff;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .wl-stage{position:absolute;inset:0;overflow:hidden}
 .wl-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center;opacity:0;transition:opacity .7s ease}

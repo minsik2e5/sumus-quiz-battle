@@ -1019,7 +1019,7 @@ $('#app').addEventListener('click', async event => {
       window.scrollTo(0, 0);
       return openMatchGame(A, back, { words: w.list, codes: w.picked, label: wordsLabel(A, w.picked) });
     }
-    // V13.221 놀이터 벽 통과: 짝 맞추기와 같은 게임 단어로.
+    // V13.222 놀이터 벽 통과: 짝 맞추기와 같은 게임 단어로.
     if (d.action === 'wall-open') {
       const w = arcadeWords(A);
       if (!w.ok) return toast('단어를 8개 이상 골라 주세요.');

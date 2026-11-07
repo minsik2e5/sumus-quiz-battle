@@ -5,7 +5,7 @@ import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
 import { coinShower, countUp } from './celebrate.js';
 import { WALL, WALL_KINDS, dealWalls, gradeWalls, passPoints, stageOf, comboMult } from './wall-rules.js';
 
-// V13.221 벽 통과(놀이터 미니게임): 전체 화면. 게임쇼 무대 위 내 펫, 멀리 아치에서 구멍 4개 뚫린 벽이 원근으로 다가온다.
+// V13.222 벽 통과(놀이터 미니게임): 전체 화면. 게임쇼 무대 위 내 펫, 멀리 아치에서 구멍 4개 뚫린 벽이 원근으로 다가온다.
 // 맞는 단어 구멍을 누르면 펫이 그 구멍으로 뛰어들고 벽이 펫을 감싸며 지나간다(통과). 틀리거나 시간이 다 되면 벽에 쾅 →
 // 뒤(화면 아래)의 풀장으로 날아가 풍덩, 오리 튜브를 끼고 둥둥. 5장마다 단계가 올라 무대 조명이 바뀌고 빨라진다.
 // 그림은 주문서 64(public/assets/wall/), 진행자는 '삑삑 심판' 펭귄. 판 · 채점 · 보상은 서버(server/wall.mjs).

@@ -54,7 +54,7 @@ export async function runPlaygroundMenuChecks(assert) {
       && arcade.includes('id="GAMES"') && arcade.includes('오늘의 미니게임') && arcade.includes('짝 맞추기 4 · 10초 맞추기 2') && !arcade.includes('id="TAJJA"') && arcade.includes('id="PARTY"')
       && tajja.includes('class="ag-big ag-rps"') && tajja.includes('class="ag-big ag-yabawi"') && tajja.includes('가위바위보 5 · 야바위 5') && !view('tajja', r, { yabawi: false }).includes('ag-yabawi')
       && shop.includes('id="SHOP"') && shop.includes('코인 뽑기 7') && rec.includes('id="BOOK"') && rec.includes('게임별 최고 기록') && rec.includes('±0.04초')
-      && bestRows(r, true).length === 9 && bestRows({}, false).length === 8 && /* V13.221 벽 통과 줄 추가 */ todayLeft(r, false, 'tajja').length === 1 && todayLeft(r, true).length === 5,
+      && bestRows(r, true).length === 9 && bestRows({}, false).length === 8 && /* V13.222 벽 통과 줄 추가 */ todayLeft(r, false, 'tajja').length === 1 && todayLeft(r, true).length === 5,
       "V13.209 카드를 누르면 '← 놀이터' 화면: 미니게임 · 코인 승부(야바위는 켜졌을 때만) · 상점 · 기록(최고 기록 + 도감)");
     assert(view('hub', r, { art: new Set(['menu-tajja']) }).includes('/assets/yabawi/menu-tajja.webp') && menuIcon('menu-tajja', '🃏', new Set()).includes('🃏') && !menuIcon('menu-arcade', '🎮', new Set()).includes('<img'),
       'V13.209 카드 그림은 있을 때만(없으면 이모지)');

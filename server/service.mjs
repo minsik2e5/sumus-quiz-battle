@@ -1945,7 +1945,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!result.again) logActivity(p, 'match', result.ms ? `짝 맞추기 ${(result.ms / 1000).toFixed(1)}초${result.record ? ' · 신기록' : ''}` : '짝 맞추기', now);
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
-  // V13.221 벽 통과(server/wall.mjs). 짝 맞추기처럼 단어는 내 학교 · 학년의 고른 범위. 판은 서버가 만들고 끝날 때 서버가 채점한다.
+  // V13.222 벽 통과(server/wall.mjs). 짝 맞추기처럼 단어는 내 학교 · 학년의 고른 범위. 판은 서버가 만들고 끝날 때 서버가 채점한다.
   if (path === '/games/wall/start' && method === 'POST') {
     requireRole(p, 'student');
     if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
