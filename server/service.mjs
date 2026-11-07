@@ -53,6 +53,7 @@ import { FISH } from '../public/modules/fishing-rules.js';
 import { REEL } from '../public/modules/reel-rules.js';
 import { TIMING } from '../public/modules/timing-rules.js';
 import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './games.mjs';
+import { wallStart, wallFinish, wallView, wallLine } from './wall.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
 import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, partyPlaysLeft, settleParty, partyReportPending, undoParty } from './party.mjs';
 import { PARTY } from './party-engine.mjs';
@@ -1381,7 +1382,7 @@ export async function service(state, method, path, body, token, options = {}) {
       school_league: leagueFor(state, competition, p, now),
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), yabawi: yabawiView(p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now, dailyConfig(state, now)), blank: p.role === 'student' ? blankView(p, now) : null },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), yabawi: yabawiView(p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), wall: wallView(p, now), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now, dailyConfig(state, now)), blank: p.role === 'student' ? blankView(p, now) : null },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -1942,6 +1943,26 @@ export async function service(state, method, path, body, token, options = {}) {
     const now = Date.now();
     const result = matchFinish(p, { id: str(body.id, 80), ms: Number(body.ms), misses: Number(body.misses), splits: Array.isArray(body.splits) ? body.splits.slice(0, 24) : null, pet: activePetKey(state, p.id), now, weekKey: gameWeekKey(now) });
     if (!result.again) logActivity(p, 'match', result.ms ? `짝 맞추기 ${(result.ms / 1000).toFixed(1)}초${result.record ? ' · 신기록' : ''}` : '짝 맞추기', now);
+    return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
+  }
+  // V13.221 벽 통과(server/wall.mjs). 짝 맞추기처럼 단어는 내 학교 · 학년의 고른 범위. 판은 서버가 만들고 끝날 때 서버가 채점한다.
+  if (path === '/games/wall/start' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
+    const ctx = monsterContext(state, p);
+    if (!ctx.school) fail('학생 학교 설정을 확인해주세요.', 409);
+    const asked = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : [];
+    if (!asked.length) fail('단어 범위를 골라주세요.');
+    const words = scopedWords(state, ctx.school.id, asked, p.class_name);
+    if (words.length < 8) fail('단어가 8개 이상 되게 범위를 골라주세요.', 409);
+    const missed = Array.isArray(body.missed) ? body.missed.slice(0, 12).map(x => str(x, 80)) : [];
+    return wallStart(p, { id: id(), words, missed, now: Date.now() });
+  }
+  if (path === '/games/wall/finish' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now();
+    const result = wallFinish(p, { id: str(body.id, 80), picks: Array.isArray(body.picks) ? body.picks.slice(0, 15) : [], pet: activePetKey(state, p.id), now });
+    if (!result.again && result.reason !== 'quit') logActivity(p, 'wall', wallLine(result), now);
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
   if (path === '/games/match/board' && method === 'GET') {

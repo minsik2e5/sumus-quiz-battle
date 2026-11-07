@@ -54,7 +54,7 @@ export async function runPlaygroundMenuChecks(assert) {
       && arcade.includes('id="GAMES"') && arcade.includes('오늘의 미니게임') && arcade.includes('짝 맞추기 4 · 10초 맞추기 2') && !arcade.includes('id="TAJJA"') && arcade.includes('id="PARTY"')
       && tajja.includes('class="ag-big ag-rps"') && tajja.includes('class="ag-big ag-yabawi"') && tajja.includes('가위바위보 5 · 야바위 5') && !view('tajja', r, { yabawi: false }).includes('ag-yabawi')
       && shop.includes('id="SHOP"') && shop.includes('코인 뽑기 7') && rec.includes('id="BOOK"') && rec.includes('게임별 최고 기록') && rec.includes('±0.04초')
-      && bestRows(r, true).length === 8 && bestRows({}, false).length === 7 && todayLeft(r, false, 'tajja').length === 1 && todayLeft(r, true).length === 5,
+      && bestRows(r, true).length === 9 && bestRows({}, false).length === 8 && /* V13.221 벽 통과 줄 추가 */ todayLeft(r, false, 'tajja').length === 1 && todayLeft(r, true).length === 5,
       "V13.209 카드를 누르면 '← 놀이터' 화면: 미니게임 · 코인 승부(야바위는 켜졌을 때만) · 상점 · 기록(최고 기록 + 도감)");
     assert(view('hub', r, { art: new Set(['menu-tajja']) }).includes('/assets/yabawi/menu-tajja.webp') && menuIcon('menu-tajja', '🃏', new Set()).includes('🃏') && !menuIcon('menu-arcade', '🎮', new Set()).includes('<img'),
       'V13.209 카드 그림은 있을 때만(없으면 이모지)');
@@ -76,7 +76,7 @@ export async function runPlaygroundMenuChecks(assert) {
     assert(rpsEntry({}, new Set(['rps'])).includes('/assets/rps/entry.webp') && yabawiEntry({}, new Set(['yabawi']), new Set()).includes('/assets/yabawi/entry.webp') && !yabawiEntry({}, new Set(), new Set()).includes('<img'),
       'V13.210 그림 63(입구 그림)이 들어오면 그 그림, 없으면 지금 그림(로봇 · 곽 사장 카드 그림)');
     const games = source('../public/modules/arcade-games.js'), build = source('./build-assets.mjs'), css = source('../public/v13210.css'), R = '../docs/asset-requests/runner/';
-    assert(games.includes("art?.entry?.has('timing') ? '<img class=\"ag-big-bg\" src=\"/assets/timing/entry.webp\"") && source('../public/modules/arcade.js').includes('claw: CLAW_ART, entry: ENTRY_ART }') && build.includes("['timing', 'rps', 'yabawi'].filter(g => existsSync(resolve(root, `public/assets/${g}/entry.webp`)))") && build.includes('"v13209.css",\n  "v13210.css"'),
+    assert(games.includes("art?.entry?.has('timing') ? '<img class=\"ag-big-bg\" src=\"/assets/timing/entry.webp\"") && source('../public/modules/arcade.js').includes('claw: CLAW_ART, entry: ENTRY_ART }') && build.includes("['timing', 'rps', 'yabawi', 'wall'].filter(g => existsSync(resolve(root, `public/assets/${g}/entry.webp`)))") && build.includes('"v13209.css",\n  "v13210.css"'),
       'V13.210 입구 그림 게이트(ENTRY_ART): 10초 맞추기 · 가위바위보 · 야바위');
     assert(css.includes('.ag-timing{background:') && css.includes('.has-card-hero .yw-card-stage{height:auto;aspect-ratio:9/5;max-height:360px') && css.includes('.ag-yw-pic{object-position:center 22%}'),
       'V13.210 10초 맞추기 카드 아래가 어두운 배경(흰 글씨가 보이게), 야바위 그림은 그림 비율대로(얼굴이 안 잘리게)');
