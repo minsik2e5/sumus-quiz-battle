@@ -4,18 +4,22 @@ import { petKey, expressionSrc } from './character.js';
 import { coin } from './emblems.js';
 import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
 import { coinShower, countUp } from './celebrate.js';
-import { ELEMENTS, fxImpact, fxSkillCutIn, fxPunch, fxSpeedLines, fxRecoil } from './battle-fx.js';
-import { ARENA, BEATS, INPUT, createArena, fighter, dirCode } from './arena-rules.js';
+import { ELEMENTS, fxImpact, fxSkillCutIn, fxPunch, fxSpeedLines, fxRecoil, fxLite } from './battle-fx.js';
+import { ARENA, BEATS, INPUT, ROLE, createArena, fighter, dirCode } from './arena-rules.js';
 
 // V13.225 펫 아레나 2(놀이터): 전체 화면. 위에서 비스듬히 내려다보는 경기장에서 내 펫을 직접 조종해 상대 펫과 싸운다.
-//   왼쪽 아래 조이스틱으로 움직이고, 오른쪽 버튼: 공격(누르고 있으면 계속) · 스킬(펫마다 다르다) · 필살기(게이지) · 회피 · 교체.
-//   컴퓨터(키보드): 방향키 · WASD 움직이기, J 공격, K 스킬, L 필살기, 스페이스 회피, Q 교체.
+//   왼쪽 아래 조이스틱으로 움직이고, 오른쪽 버튼: 공격(누르고 있으면 계속) · 스킬 1 · 스킬 2(펫마다 다르다) · 필살기(게이지) · 회피 · 교체.
+//   컴퓨터(키보드): 방향키 · WASD 움직이기, J 공격, K 스킬 1, I 스킬 2, L 필살기, 스페이스 회피, Q 교체.
+// V13.226 렉 방지: 기본 공격 맞힘은 가벼운 불꽃 하나(스킬 · 필살기만 큰 효과), 자세 그림은 미리 받아 두고, 긴 프레임이 이어지는 폰은
+//   자동으로 가벼운 연출(.ar-lite, 7일 기억)로 간다. 펫 · 효과는 바뀔 때만 다시 쓴다.
 // 전투 계산은 arena-rules.js(서버와 같은 함수), 판 · 확인 · 보상은 서버(server/arena.mjs). 화면은 조작 기록 [틱, 코드]만 보낸다. 클래스는 ar-.
 // 그림: 주문서 65(public/assets/arena/) 경기장 · VS · 승패 배너 · 필살기 아이콘 · 쓰러짐 별. 경기장 그림이 없으면 지금 있는 전투 광장(battle/bg-arena), 작은 그림이 없으면 그 자리를 비운다.
 
 const BG = { plaza: ['arena/bg-plaza', 'battle/bg-arena'], forest: ['arena/bg-forest', 'battle/bg-forest'], night: ['arena/bg-night', 'battle/bg-boss'] };
 const KIND_KO = { burst: '공격', boost: '강화', poison: '중독', guard: '지키기' };
-const SHOTS_MAX = 14, WARN_MAX = 4;
+const SHOTS_MAX = 14, WARN_MAX = 6, MINE_MAX = 2, FX_MAX = 40;
+const S2_ICON = { blink: '🌀', nova: '💥', barrage: '🎯', trap: '🪤', rain: '☄️', rush: '🐾', pull: '🪝', heal: '💚' };
+const LITE_KEY = 'sumus-arena-lite', LITE_LONG_MS = 50, LITE_WINDOW_MS = 3000, LITE_LONG_COUNT = 8, LITE_DAYS = 7;
 let R = null;
 const root = () => document.getElementById('app');
 const $ = id => document.getElementById(id);
@@ -104,7 +108,7 @@ function onClick(event) {
   if (act === 'quit-no') { document.querySelector('.ar-quit')?.remove(); resume(); return; }
 }
 const KEY_DIR = { ArrowUp: [0, -1], KeyW: [0, -1], ArrowDown: [0, 1], KeyS: [0, 1], ArrowLeft: [-1, 0], KeyA: [-1, 0], ArrowRight: [1, 0], KeyD: [1, 0] };
-const KEY_BTN = { KeyJ: 'atk', KeyK: 'skill', KeyL: 'ult', Space: 'dodge', KeyQ: 'swap' };
+const KEY_BTN = { KeyJ: 'atk', KeyK: 'skill', KeyI: 'skill2', KeyL: 'ult', Space: 'dodge', KeyQ: 'swap' };
 function onKey(event) {
   if (!R?.playing || event.repeat) { if (R?.playing && (KEY_DIR[event.code] || KEY_BTN[event.code])) event.preventDefault(); return; }
   if (KEY_DIR[event.code]) { event.preventDefault(); R.keyDown.add(event.code); keyDir(); }
@@ -126,7 +130,7 @@ function press(btn, down = true) {
   if (!R?.playing || R.paused) return;
   if (btn === 'atk') { R.holdAtk = down; if (down) R.queue.push(INPUT.ATK); return; }
   if (!down) return;
-  R.queue.push({ skill: INPUT.SKILL, ult: INPUT.ULT, dodge: INPUT.DODGE, swap: INPUT.SWAP }[btn]);
+  R.queue.push({ skill: INPUT.SKILL, skill2: INPUT.SKILL2, ult: INPUT.ULT, dodge: INPUT.DODGE, swap: INPUT.SWAP }[btn]);
   if (btn === 'ult' && R.cur.me.gauge < ARENA.GAUGE_MAX) toastOnce('필살기 게이지가 아직 다 안 찼어요');
   buzz(8);
 }
@@ -151,8 +155,8 @@ function togglePet(key) {
   lobby(false, true);
 }
 function skillLine(key, form, level) {
-  const f = fighter({ key, form, level }), k = f.skill;
-  return `<span class="ar-skill" style="--c1:${pal(f.el).c1};--c2:${pal(f.el).c2}"><b>${esc(k.name)}</b><small>${esc(KIND_KO[k.kind])} · ${esc(k.desc)}</small><em>필살기 ${esc(f.ult)}</em></span>`;
+  const f = fighter({ key, form, level }), k = f.skill, k2 = f.skill2, r = ROLE[f.role];
+  return `<span class="ar-skill" style="--c1:${pal(f.el).c1};--c2:${pal(f.el).c2}"><i class="ar-role">${esc(r.name)} · ${f.melee ? '근접' : '원거리'}<small>${esc(r.desc)}</small></i><b>① ${esc(k.name)}</b><small>${esc(KIND_KO[k.kind])} · ${esc(k.desc)}</small><b>② ${esc(k2.name)}</b><small>${esc(k2.desc)}</small><em>필살기 ${esc(f.ult)}</em></span>`;
 }
 function lobby(again = false, keep = false) {
   R.playing = false;
@@ -166,11 +170,11 @@ function lobby(again = false, keep = false) {
     <div class="ar-title"><small>3 대 3 펫 대전</small><h1>펫 아레나</h1></div>
     <div class="ar-card">
       <ul class="ar-rules">
-        <li><b>🕹️</b><span>왼쪽 <em>조이스틱</em>으로 움직이고, 오른쪽 버튼으로 <em>공격 · 스킬</em></span></li>
+        <li><b>🕹️</b><span>왼쪽 <em>조이스틱</em>으로 움직이고, 오른쪽 버튼으로 <em>공격 · 스킬 ① ②</em></span></li>
         <li><b>💨</b><span>날아오는 공격은 <em>회피</em>로 피해요(잠깐 무적). 바닥에 빨간 표시가 뜨면 피하기!</span></li>
         <li><b>🔥</b><span>때리고 맞으면 <em>필살기 게이지</em>가 차요. 꽉 차면 필살기! 위험하면 <em>교체</em></span></li>
       </ul>
-      <h3 class="ar-sub">내 팀 <small>순서대로 나가요 · 펫마다 스킬이 달라요</small></h3>
+      <h3 class="ar-sub">내 팀 <small>순서대로 나가요 · 펫마다 특징 · 스킬 2개가 달라요</small></h3>
       <div class="ar-slots">${[0, 1, 2].map(slot).join('')}</div>
       ${pets.length ? `<div class="ar-pets">${pets.map(p => `<button type="button" class="ar-pet-pick${R.team.includes(p.key) ? ' on' : ''}" data-ar="pet" data-key="${esc(p.key)}" aria-pressed="${R.team.includes(p.key)}">${petImg(p.key, p.form)}<small>Lv.${p.level}</small>${R.team.includes(p.key) ? `<b>${R.team.indexOf(p.key) + 1}</b>` : ''}</button>`).join('')}</div>`
         : '<p class="ar-why">알에서 깬 펫이 없어요. 공부해서 펫을 키우면 싸울 수 있어요!</p>'}
@@ -209,7 +213,7 @@ async function vs(r) {
 /* ---------- 전투 화면 ---------- */
 function field() {
   const shots = Array.from({ length: SHOTS_MAX }, (_, i) => `<i class="ar-shot" id="ar-shot-${i}"></i>`).join('');
-  const warns = Array.from({ length: WARN_MAX }, (_, i) => `<i class="ar-warn" id="ar-warn-${i}"></i>`).join('');
+  const warns = Array.from({ length: WARN_MAX }, (_, i) => `<i class="ar-warn" id="ar-warn-${i}"></i>`).join('') + Array.from({ length: MINE_MAX }, (_, i) => `<i class="ar-mine" id="ar-mine-${i}"></i>`).join('');
   return `<section class="ar-play" id="ar-play">
     <div class="ar-hud">
       <div class="ar-bar foe" id="ar-hud-foe"></div>
@@ -228,7 +232,8 @@ function field() {
         <button type="button" class="ar-btn swap" data-btn="swap" aria-label="교체"><b>🔄</b><small>교체</small><i class="cd" id="ar-cd-swap"></i></button>
         <button type="button" class="ar-btn dodge" data-btn="dodge" aria-label="회피"><b>💨</b><small>회피</small><i class="cd" id="ar-cd-dodge"></i></button>
         <button type="button" class="ar-btn ult" data-btn="ult" id="ar-ult" aria-label="필살기">${artImg('ult-icon', 'ar-ult-ico')}<b class="ar-ult-txt">필살</b><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="16" pathLength="100" id="ar-ult-ring"/></svg></button>
-        <button type="button" class="ar-btn skill" data-btn="skill" id="ar-skill" aria-label="스킬"><b id="ar-skill-ico">✨</b><small id="ar-skill-name">스킬</small><i class="cd" id="ar-cd-skill"></i></button>
+        <button type="button" class="ar-btn skill2" data-btn="skill2" id="ar-skill2" aria-label="스킬 2"><b id="ar-skill2-ico">🌀</b><small id="ar-skill2-name">스킬 2</small><i class="cd" id="ar-cd-skill2"></i></button>
+        <button type="button" class="ar-btn skill" data-btn="skill" id="ar-skill" aria-label="스킬 1"><b id="ar-skill-ico">✨</b><small id="ar-skill-name">스킬</small><i class="cd" id="ar-cd-skill"></i></button>
         <button type="button" class="ar-btn atk" data-btn="atk" aria-label="공격"><b>👊</b><small>공격</small></button>
       </div>
     </div>
@@ -247,6 +252,9 @@ function play(r) {
   Object.assign(R, { inputs: [], queue: [], dir: 0, sentDir: 0, holdAtk: false, keyDown: new Set(), playing: true, paused: false, pausedMs: 0, started: false });
   app()?.classList.add('playing');
   main(field()); artGuard();
+  preloadPoses();
+  applyLite();
+  R.fxN = 0; R.lag = { last: 0, longs: [] };
   R.geo = null;
   R.resize = () => { R.geo = null; };
   window.addEventListener('resize', R.resize);
@@ -261,6 +269,35 @@ async function countIn() {
   pop('FIGHT!', 50, 45, 'count go'); sfx('tm-go'); buzz(40);
   R.t0 = performance.now(); R.started = true;
   R.raf = requestAnimationFrame(loop);
+}
+
+// 공격 · 맞는 자세 그림을 미리 받아 둔다(처음 바뀔 때 끊기지 않게). 없는 자세는 expressionSrc가 null.
+function preloadPoses() {
+  R.poses = new Map();
+  for (const who of ['me', 'foe']) R.teams[who].forEach((f, i) => {
+    for (const pose of ['attack', 'hurt']) {
+      const src = expressionSrc(f.key, R.forms[who][i], pose); if (!src) continue;
+      const img = new Image(); img.decoding = 'async'; img.src = src;
+      img.decode?.().then(() => R?.poses?.set(src, true)).catch(() => {});
+    }
+  });
+}
+const poseReady = src => !!src && R.poses?.get(src) === true;
+// 저사양 자동 단계(야차전과 같은 기준): 3초 안에 50ms 넘는 프레임이 8번을 넘으면 가벼운 연출로, 7일 기억.
+const pref = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
+const liteOn = () => { const at = Number(pref(LITE_KEY, 0)); return at > 0 && Date.now() - at < LITE_DAYS * 86400000; };
+function applyLite() { const on = liteOn(); app()?.classList.toggle('ar-lite', on); fxLite(on); }
+function lagWatch(t) {
+  const L = R.lag;
+  if (L.last && !document.hidden) {
+    const d = t - L.last;
+    if (d > LITE_LONG_MS && d < 1000) {
+      L.longs.push(t);
+      while (L.longs[0] < t - LITE_WINDOW_MS) L.longs.shift();
+      if (L.longs.length > LITE_LONG_COUNT && pref(LITE_KEY, '') !== 'off' && !liteOn()) { try { localStorage.setItem(LITE_KEY, String(Date.now())); } catch {} applyLite(); }
+    }
+  }
+  L.last = t;
 }
 
 /* 조이스틱 · 버튼(누르는 순간 반응하도록 pointerdown) */
@@ -307,6 +344,10 @@ function drawMon(who) {
     if (n) n.textContent = k.name;
     if (ico) ico.textContent = { burst: '✨', boost: '💪', poison: '☠️', guard: '🛡️' }[k.kind] || '✨';
     $('ar-skill')?.style.setProperty('--c1', pal(R.teams.me[s.idx].el).c1);
+    const k2 = R.teams.me[s.idx].skill2, n2 = $('ar-skill2-name'), i2 = $('ar-skill2-ico');
+    if (n2) n2.textContent = k2.name;
+    if (i2) i2.textContent = S2_ICON[k2.kind] || '🌀';
+    $('ar-skill2')?.style.setProperty('--c1', pal(R.teams.me[s.idx].el).c2);
   }
 }
 function drawHud() {
@@ -326,8 +367,10 @@ function drawHp() {
 // 버튼 쿨타임 · 필살기 링(바뀔 때만 쓴다).
 function drawPad() {
   const m = R.cur.me, set = (id, frac) => { const el = $(id); if (!el) return; const v = Math.round(frac * 100); if (el._v !== v) { el._v = v; el.style.transform = `scaleY(${frac})`; el.parentElement?.classList.toggle('wait', frac > 0); } };
-  set('ar-cd-skill', Math.max(0, m.skill) / ARENA.SKILL_TICKS);
-  set('ar-cd-dodge', Math.max(0, m.dodgeCd) / ARENA.DODGE_CD);
+  const f = R.teams.me[m.idx];
+  set('ar-cd-skill', Math.max(0, m.skill) / (f.skillCd || ARENA.SKILL_TICKS));
+  set('ar-cd-skill2', Math.max(0, m.skill2) / (f.skill2Cd || ARENA.SKILL2_TICKS));
+  set('ar-cd-dodge', Math.max(0, m.dodgeCd) / (f.dodgeCd || ARENA.DODGE_CD));
   const alive = m.team.filter((f, i) => f.cur > 0 && i !== m.idx).length;
   set('ar-cd-swap', alive ? Math.max(0, m.swapCd) / ARENA.SWAP_CD : 1);
   const g = Math.floor(m.gauge), ring = $('ar-ult-ring');
@@ -344,15 +387,13 @@ function place(frac) {
     const p = px(x, y);
     el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -80%)`;
     el.style.zIndex = String(10 + Math.round(y));
-    const cls = el.classList;
-    cls.toggle('flip', b.fx < -0.1 || (Math.abs(b.fx) <= 0.1 && R.cur[who === 'me' ? 'foe' : 'me'].x < x));
-    cls.toggle('hidden', b.enter > 0);
-    cls.toggle('stun', b.stun > 0);
-    cls.toggle('slow', b.slow > 0);
-    cls.toggle('boost', b.boost > 0);
-    cls.toggle('shield', b.shield > 0);
-    cls.toggle('poison', b.poison > 0);
-    cls.toggle('inv', b.inv > 0 && b.dash > 0);
+    const flags = [b.fx < -0.1 || (Math.abs(b.fx) <= 0.1 && R.cur[who === 'me' ? 'foe' : 'me'].x < x) ? 'flip' : '', b.enter > 0 ? 'hidden' : '', b.stun > 0 ? 'stun' : '', b.slow > 0 ? 'slow' : '',
+      b.boost > 0 ? 'boost' : '', b.shield > 0 ? 'shield' : '', b.poison > 0 ? 'poison' : '', b.inv > 0 && b.dash > 0 ? 'inv' : '', b.power2 > 0 ? 'charged' : ''].join(' ');
+    if (el._flags !== flags) {
+      el._flags = flags;
+      const cls = el.classList;
+      for (const [k, on] of [['flip', flags.includes('flip')], ['hidden', b.enter > 0], ['stun', b.stun > 0], ['slow', b.slow > 0], ['boost', b.boost > 0], ['shield', b.shield > 0], ['poison', b.poison > 0], ['inv', b.inv > 0 && b.dash > 0], ['charged', b.power2 > 0]]) cls.toggle(k, on);
+    }
   }
   // 날아가는 공격 · 지진 표시(정해진 개수의 칸을 다시 쓴다).
   const shots = R.cur.shots;
@@ -370,13 +411,22 @@ function place(frac) {
     if (!q) { if (el._on) { el._on = false; el.style.opacity = '0'; } continue; }
     const p = px(q.x, q.y), w = q.r * 2 / 100 * geo().w;
     el._on = true; el.style.opacity = '1';
-    el.className = `ar-warn ${q.from}`;
+    if (el._from !== q.from) { el._from = q.from; el.className = `ar-warn ${q.from}`; }
     el.style.width = `${w}px`; el.style.height = `${w * 0.55}px`;
-    el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%) scale(${1.15 - Math.max(0, q.left) / 14 * 0.3})`;
+    el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%) scale(${(1.15 - Math.max(0, q.left) / 14 * 0.3).toFixed(3)})`;
+  }
+  const ms = R.cur.mines || [];
+  for (let i = 0; i < MINE_MAX; i++) {
+    const el = $(`ar-mine-${i}`), m = ms[i]; if (!el) continue;
+    if (!m) { if (el._on) { el._on = false; el.style.opacity = '0'; } continue; }
+    const p = px(m.x, m.y);
+    if (!el._on) { el._on = true; el.style.opacity = '1'; el.className = `ar-mine ${m.from}`; el.style.setProperty('--c1', pal(m.el).c1); }
+    el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)`;
   }
 }
 function loop(now) {
   if (!R?.playing) return;
+  lagWatch(now);
   if (R.paused) { R.raf = requestAnimationFrame(loop); return; }
   const want = Math.floor((now - R.t0 - R.pausedMs) / ARENA.TICK_MS);
   let n = 0;
@@ -416,9 +466,12 @@ function onEvent(e, show) {
   if (e.e === 'cutin') return cutin(e);
   if (e.e === 'ult') return ultFx(e);
   if (e.e === 'skillname') { pop(e.name, R.cur[e.who].x, R.cur[e.who].y - 20, `skill ${e.who}`); sfx('skill'); return; }
-  if (e.e === 'atk' || e.e === 'skill') return attack(e);
-  if (e.e === 'pop') { fxImpact($('ar-field'), px(e.x, e.y), e.el, e.kind === 'skill' ? 2 : 1); return; }
-  if (e.e === 'boom') { quake(px(e.x, e.y), e.el, e.kind === 'skill'); sfx('smash'); if (R.cur.me && Math.abs(R.cur.me.x - e.x) < e.r + 5 && Math.abs(R.cur.me.y - e.y) < e.r + 5) buzz(25); return; }
+  if (e.e === 'atk' || e.e === 'skill' || e.e === 'skill2') return attack(e);
+  if (e.e === 'pop') { if (e.kind === 'atk') spark(px(e.x, e.y), e.el); else fxImpact($('ar-field'), px(e.x, e.y), e.el, 2); return; }
+  if (e.e === 'blink') { afterimage(e.who); sfx('swoosh', { rate: 1.5 }); return; }
+  if (e.e === 'blinked') { R.prev = R.cur; pop('다음 공격 2배!', e.x, e.y - 22, `skill ${e.who}`); return; }
+  if (e.e === 'pull') return void pop('끌려옴!', R.cur[e.who].x, R.cur[e.who].y - 22, 'stun');
+  if (e.e === 'boom') { quake(px(e.x, e.y), e.el, e.kind !== 'atk'); sfx('smash'); if (R.cur.me && Math.abs(R.cur.me.x - e.x) < e.r + 5 && Math.abs(R.cur.me.y - e.y) < e.r + 5) buzz(25); return; }
   if (e.e === 'dodge') { afterimage(e.who); sfx('swoosh', { rate: 1.3 }); return; }
   if (e.e === 'stun') return void pop('기절!', R.cur[e.who].x, R.cur[e.who].y - 22, 'stun');
   if (e.e === 'slow') return void pop('느려짐', R.cur[e.who].x, R.cur[e.who].y - 22, 'stun');
@@ -444,10 +497,13 @@ function ultFx(e) {
 function attack(e) {
   const fieldEl = $('ar-field'), from = px(e.x, e.y);
   const s = R.cur[e.who], f = s.team[s.idx];
-  swapPose($(`ar-${e.who}-body`), expressionSrc(f.key, R.forms[e.who][s.idx], 'attack'), 300);
+  const src = expressionSrc(f.key, R.forms[e.who][s.idx], 'attack');
+  if (poseReady(src)) swapPose($(`ar-${e.who}-body`), src, 300);
   if (e.shape === 'claw') { slash(from, e.nx, e.ny, e.el); sfx(atkSfx(e.el), { rate: 1.15 }); return; }
   if (e.shape === 'dash') { fxSpeedLines(fieldEl, from, e.el); sfx('swoosh'); return; }
-  if (e.shape === 'quake') { sfx('smash', { rate: 1.3 }); return; }
+  if (e.shape === 'quake' || e.shape === 'nova') { sfx('smash', { rate: 1.3 }); return; }
+  if (e.shape === 'trap') { sfx('stamp'); return; }
+  if (e.shape === 'hook') { sfx('swoosh', { rate: .8 }); return; }
   sfx(atkSfx(e.el), { rate: e.e === 'skill' ? .85 : 1.1 });
 }
 const atkSfx = el => el === 'leaf' ? 'atk-leaf' : el === 'wind' ? 'atk-wind' : 'atk-star';
@@ -455,13 +511,17 @@ function hurt(e) {
   if (e.kind !== 'poison') {
     fxRecoil($(`ar-${e.who}-body`), e.who === 'me' ? 1 : -1);
     const s = R.cur[e.who], f = s.team[s.idx];
-    if (f) swapPose($(`ar-${e.who}-body`), expressionSrc(f.key, R.forms[e.who][s.idx], 'hurt'), 300);
+    if (f) { const src = expressionSrc(f.key, R.forms[e.who][s.idx], 'hurt'); if (poseReady(src)) swapPose($(`ar-${e.who}-body`), src, 300); }
   }
   pop(e.blocked && !e.dmg ? '막음!' : String(e.dmg), e.x + (Math.random() * 8 - 4), e.y - 16, `dmg ${e.kind}${e.who === 'me' ? ' me' : ''}`);
   if (e.m > 1 && e.kind !== 'atk' && e.kind !== 'poison') pop('효과가 굉장해!', e.x, e.y - 27, 'eff');
   else if (e.m < 1 && e.kind !== 'atk' && e.kind !== 'poison') pop('효과가 별로…', e.x, e.y - 27, 'eff weak');
   if (e.kind !== 'poison') sfx(e.kind === 'ult' ? 'crit' : 'hit', { rate: e.kind === 'atk' ? 1.1 : .9 });
-  if (e.who === 'me') buzz(e.kind === 'atk' ? 12 : 30);
+  if (e.who === 'me' && e.kind !== 'atk' && e.kind !== 'poison') buzz(30);
+}
+function spark(at, el) {
+  const P = pal(el);
+  fxEl('spark', { left: `${at.x}px`, top: `${at.y}px`, '--c1': P.c1, '--c2': P.c2 }, 320);
 }
 function swapPose(body, src, ms) {
   const img = body?.querySelector('img'); if (!img || !src) return;
@@ -473,13 +533,15 @@ function swapPose(body, src, ms) {
 }
 function fxEl(cls, css, ms, html = '') {
   const f = $('ar-field'); if (!f) return null;
-  if (f.querySelectorAll('.ar-fx').length > 40) return null; // 효과 조각 상한(렉 방지)
+  if (R.fxN >= FX_MAX) return null; // 효과 조각 상한(렉 방지)
+  R.fxN++;
   const el = document.createElement('div');
   el.className = `ar-fx ${cls}`;
   for (const [k, v] of Object.entries(css)) k.startsWith('--') ? el.style.setProperty(k, v) : (el.style[k] = v);
   el.innerHTML = html;
   f.appendChild(el);
-  setTimeout(() => el.remove(), ms);
+  const cur = R;
+  setTimeout(() => { el.remove(); if (cur.fxN > 0) cur.fxN--; }, ms);
   return el;
 }
 function beam(from, to, el, big) {

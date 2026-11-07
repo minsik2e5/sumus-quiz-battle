@@ -2,8 +2,8 @@ import { CHARACTERS } from './core.js';
 import { elementOf } from './battle-fx.js';
 import { PET_SKILLS } from './battle-engine.js';
 
-// V13.225 펫 아레나 2(놀이터): 내가 직접 조종하는 3:3 펫 대전. 한 번에 한 마리씩 나와 1:1로 싸우고, 쓰러지면 다음 펫.
-//   조이스틱으로 움직이고 · 공격 · 스킬(펫마다 다르다) · 필살기(게이지) · 회피(잠깐 무적) · 교체(쿨타임) 버튼을 누른다.
+// V13.225 펫 아레나 2(놀이터): 내가 직접 조종하는 3:3 펫 대전. V13.226: 펫마다 역할(특징) · 스킬 2개, 근접 펫 보강. 한 번에 한 마리씩 나와 1:1로 싸우고, 쓰러지면 다음 펫.
+//   조이스틱으로 움직이고 · 공격 · 스킬 1 · 스킬 2(펫마다 다르다) · 필살기(게이지) · 회피(잠깐 무적) · 교체(쿨타임) 버튼을 누른다.
 //   상대는 친구가 남긴 팀(없으면 연습 상대)을 컴퓨터가 조종한다. 단어 문제는 없다(코인 판 입장권은 단어 연습으로 받는다).
 // 전투는 씨앗(seed)과 '몇 번째 틱에 무엇을 눌렀나'만으로 정해진다: 화면(arena.js)이 그 자리에서 돌리고, 끝나면
 // 서버(server/arena.mjs)가 같은 함수로 다시 돌려 승패 · 보상을 정한다. 그래서 이 파일에는 화면도 무작위 함수도 없고,
@@ -16,7 +16,9 @@ export const ARENA = {
   BODY: 4.5,                 // 펫 몸 반지름(경기장 %)
   SPEED: 1.15,               // 걷는 빠르기(틱마다 %, × 펫 빠르기)
   ATK_TICKS: 10,             // 기본 공격 간격 0.5초(× 1 / 펫 빠르기)
-  SKILL_TICKS: 120,          // 스킬 6초
+  SKILL_TICKS: 120,          // 스킬 1: 6초
+  SKILL2_TICKS: 170,         // 스킬 2: 8.5초
+  MELEE_LUNGE: 5,           // 근접 공격: 닿지 않으면 이만큼 달려들며 친다
   DODGE_TICKS: 7,            // 회피 구르기 0.35초(그동안 무적)
   DODGE_CD: 40,              // 회피 2초
   DODGE_SPEED: 3.2,
@@ -41,8 +43,8 @@ export const ARENA = {
   SLACK_MS: 3000
 };
 
-// 조작 기록 [틱, 코드]: 0 멈춤 · 1~8 방향(위부터 시계 방향) · 10 공격 · 11 스킬 · 12 필살기 · 13 회피 · 14 교체.
-export const INPUT = { STOP: 0, ATK: 10, SKILL: 11, ULT: 12, DODGE: 13, SWAP: 14 };
+// 조작 기록 [틱, 코드]: 0 멈춤 · 1~8 방향(위부터 시계 방향) · 10 공격 · 11 스킬 1 · 12 필살기 · 13 회피 · 14 교체 · 15 스킬 2.
+export const INPUT = { STOP: 0, ATK: 10, SKILL: 11, ULT: 12, DODGE: 13, SWAP: 14, SKILL2: 15 };
 const D = 0.7071;
 export const DIRS = [[0, 0], [0, -1], [D, -D], [1, 0], [D, D], [0, 1], [-D, D], [-1, 0], [-D, -D]];
 // 조이스틱 (dx, dy) → 방향 코드(삼각함수 없이: tan 22.5° ≈ 0.4142).
@@ -99,6 +101,40 @@ export function petSkill(key) {
   return out;
 }
 
+// V13.226 펫마다 역할(특징): 같은 속성이어도 몸집 · 빠르기 · 공격이 다르다. 펫 이름에서 고정으로 정한다(같은 펫은 늘 같다).
+export const ROLE = {
+  tank: { name: '튼튼', desc: '체력 +24% · 조금 느림', hp: 1.24, atk: 0.92, spd: 0.9 },
+  swift: { name: '날쌘', desc: '빠르기 +20% · 회피 자주', hp: 0.95, atk: 1, spd: 1.2, dodge: 0.7 },
+  power: { name: '한방', desc: '공격 +17% · 공격 간격 조금 김', hp: 1, atk: 1.17, spd: 1, atkTicks: 1.15 },
+  rapid: { name: '연타', desc: '공격 간격 −22%', hp: 0.95, atk: 0.9, spd: 1.05, atkTicks: 0.78 },
+  smart: { name: '꾀돌이', desc: '스킬 쿨타임 −20%', hp: 0.95, atk: 1, spd: 1, skill: 0.8 }
+};
+const ROLE_KEYS = Object.keys(ROLE);
+export const petRole = key => ROLE_KEYS[(keyHash(key) >> 2) % ROLE_KEYS.length];
+
+// V13.226 스킬 2(펫마다 하나): 속성 말 + 종류. 근접 펫과 원거리 펫이 고를 수 있는 종류가 다르다.
+//   blink 순간이동(상대 반대쪽으로 비켜서 다음 공격 2배) · nova 내 주변 폭발(밀쳐내기) · barrage 연발(다섯 갈래)
+//   trap 함정(밟으면 기절) · rain 쏟아지기(상대 둘레 세 군데) · rush 긴 돌격(무적) · pull 끌어당기기(느려짐) · heal 치유(상태 이상도 지움)
+export const SKILL2 = {
+  blink: { word: '순간이동', desc: '휙 비켜서고 다음 공격 2배' },
+  nova: { word: '폭발', desc: '내 주변 폭발 · 밀쳐내기' },
+  barrage: { word: '연발', desc: '다섯 갈래로 발사' },
+  trap: { word: '함정', desc: '밟으면 터지고 기절' },
+  rain: { word: '소나기', desc: '상대 둘레 세 군데에 떨어진다' },
+  rush: { word: '돌격', desc: '길게 달려들며 무적' },
+  pull: { word: '갈고리', desc: '맞으면 끌려오고 느려짐' },
+  heal: { word: '치유', desc: '체력 15% 회복 · 상태 이상 지움' }
+};
+const EL_WORD = { flame: '불꽃', water: '물보라', leaf: '꽃잎', earth: '바위', wind: '회오리', ice: '얼음', toxic: '독안개', star: '별빛' };
+const MELEE_S2 = ['rush', 'nova', 'pull', 'blink', 'heal'], RANGED_S2 = ['barrage', 'rain', 'trap', 'blink', 'nova', 'heal'];
+export function petSkill2(key) {
+  const el = elementOf(key), melee = !!SHOT[SHAPE[el] || 'beam'].melee, pool = melee ? MELEE_S2 : RANGED_S2;
+  const first = petSkill(key).kind;
+  let kind = pool[keyHash(key) % pool.length];
+  if (kind === 'heal' && first === 'guard') kind = pool[(keyHash(key) + 1) % pool.length]; // 지키기 펫은 치유를 또 받지 않는다
+  return { kind, name: `${EL_WORD[el] || '별빛'} ${SKILL2[kind].word}`, desc: SKILL2[kind].desc };
+}
+
 // 등급: 일반 0 · 영웅 1 · 전설 · 한정 · 시리즈 2 · 신화 3.
 export function petRank(key) {
   const c = CHARACTERS[key] || {};
@@ -112,12 +148,16 @@ export function fighter(pet) {
   const key = String(pet?.key || 'dog'), form = Math.max(1, Math.min(3, Math.round(Number(pet?.form) || 1)));
   const level = Math.max(1, Math.min(60, Math.round(Number(pet?.level) || 1))), rank = petRank(key), el = elementOf(key);
   const mul = RANK_MUL[rank] * (1 + Math.min(30, level) * 0.01);
-  const spd = 0.9 + (keyHash(key) % 21) / 100;
+  const role = petRole(key), R = ROLE[role], shape = SHAPE[el] || 'beam', melee = !!SHOT[shape].melee;
+  const spd = (0.9 + (keyHash(key) % 21) / 100) * R.spd;
+  // 근접 펫은 다가가야 하니 더 튼튼하고 세고 조금 빠르다(원거리와 승률을 맞춘 값, 검사가 본다).
+  const M = melee ? { hp: 1.07, atk: 1.16, spd: 1.05 } : { hp: 1, atk: 0.92, spd: 1 };
   return {
-    key, form, level, rank, el, shape: SHAPE[el] || 'beam',
-    hp: Math.round(FORM_HP[form] * mul), atk: Math.round(FORM_ATK[form] * mul),
-    spd, atkTicks: Math.round(ARENA.ATK_TICKS / spd), move: ARENA.SPEED * spd,
-    skill: petSkill(key), ult: ULT_NAME[el] || '필살기'
+    key, form, level, rank, el, shape, role, melee,
+    hp: Math.round(FORM_HP[form] * mul * R.hp * M.hp), atk: Math.round(FORM_ATK[form] * mul * R.atk * M.atk),
+    spd, atkTicks: Math.round(ARENA.ATK_TICKS / spd * (R.atkTicks || 1)), move: ARENA.SPEED * spd * M.spd,
+    dodgeCd: Math.round(ARENA.DODGE_CD * (R.dodge || 1)), skillCd: Math.round(ARENA.SKILL_TICKS * (R.skill || 1)), skill2Cd: Math.round(ARENA.SKILL2_TICKS * (R.skill || 1)),
+    skill: petSkill(key), skill2: petSkill2(key), ult: ULT_NAME[el] || '필살기'
   };
 }
 export const teamPower = team => (team || []).reduce((n, f) => n + f.hp / 10 + f.atk * 3, 0);
@@ -141,7 +181,7 @@ export function cleanInputs(raw, maxTick = ARENA.MAX_TICKS + 400) {
   for (const x of Array.isArray(raw) ? raw.slice(0, ARENA.INPUT_MAX) : []) {
     const t = Math.round(Number(x?.[0])), c = Math.round(Number(x?.[1]));
     if (!Number.isFinite(t) || t < last || t > maxTick) break;
-    if (!((c >= 0 && c <= 8) || (c >= 10 && c <= 14))) break;
+    if (!((c >= 0 && c <= 8) || (c >= 10 && c <= 15))) break;
     out.push([t, c]); last = t;
   }
   return out;
@@ -149,11 +189,11 @@ export function cleanInputs(raw, maxTick = ARENA.MAX_TICKS + 400) {
 
 // 컴퓨터 상대의 솜씨(쉬움 · 보통 · 어려움): 날아오는 공격을 피할 확률 · 공격 간격 배수 · 스킬 쓰는 정도 · 공격 누르는 정도.
 const AI = [
-  { dodge: 0.06, slow: 1.7, skill: 0.03, aim: 0.45 },
-  { dodge: 0.22, slow: 1.25, skill: 0.05, aim: 0.7 },
-  { dodge: 0.38, slow: 1.08, skill: 0.09, aim: 0.88 }
+  { dodge: 0.12, slow: 1.4, skill: 0.05, aim: 0.6 },
+  { dodge: 0.3, slow: 1.1, skill: 0.08, aim: 0.85 },
+  { dodge: 0.36, slow: 1.04, skill: 0.1, aim: 0.9 }
 ];
-const wantNone = () => ({ atk: false, skill: false, ult: false, dodge: false, swap: false });
+const wantNone = () => ({ atk: false, skill: false, skill2: false, ult: false, dodge: false, swap: false });
 
 // 전투. me · foe: fighter() 3개씩. 내 조작은 push([틱, 코드])로(틱 순서대로) 넣고 한 틱씩 step()으로 돌린다.
 // 화면은 step()이 돌려주는 사건(ev)으로 그리고, 서버는 끝까지 돌려 결과만 본다.
@@ -163,11 +203,11 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null }) {
   const side = (team, who) => ({
     who, team: team.map(f => ({ ...f, cur: f.hp })), idx: 0, gauge: 0,
     x: 50, y: who === 'me' ? 72 : 28, fx: 0, fy: who === 'me' ? -1 : 1, dir: 0,
-    cd: 14, skill: 50, dodgeCd: 0, swapCd: 60, enter: 0, stun: 0, slow: 0, boost: 0, shield: 0, poison: 0, poisonDmg: 0,
+    cd: 14, skill: 50, skill2: 80, power2: 0, dodgeCd: 0, swapCd: 60, enter: 0, stun: 0, slow: 0, boost: 0, shield: 0, poison: 0, poisonDmg: 0,
     dash: 0, dvx: 0, dvy: 0, dashHit: false, dashPow: 0, dashKind: '', dashExtra: null, inv: 0,
     want: wantNone(), strafe: random() < 0.5 ? 1 : -1, think: 0
   });
-  const S = { t: 0, freeze: 0, over: false, winner: null, me: side(me, 'me'), foe: side(foe, 'foe'), shots: [], quakes: [], inputs: [], ip: 0, ults: { me: 0, foe: 0 }, pendingUlt: null, dealt: { me: 0, foe: 0 }, ko: { me: 0, foe: 0 } };
+  const S = { t: 0, freeze: 0, over: false, winner: null, me: side(me, 'me'), foe: side(foe, 'foe'), shots: [], quakes: [], mines: [], inputs: [], ip: 0, ults: { me: 0, foe: 0 }, pendingUlt: null, dealt: { me: 0, foe: 0 }, ko: { me: 0, foe: 0 } };
   const active = s => s.team[s.idx];
   const other = s => s === S.me ? S.foe : S.me;
   const alive = s => s.team.some(f => f.cur > 0);
@@ -183,7 +223,8 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null }) {
     const a = active(from), d = active(to);
     if (!a || !d || !hittable(to)) return false;
     const m = matchup(a.el, d.el), spread = 0.9 + random() * 0.2;
-    let dmg = Math.max(1, Math.round(a.atk * power * m * spread * (kind === 'atk' && from.boost > 0 ? 1 + a.skill.boost : 1)));
+    const twice = kind === 'atk' && from.power2 > 0 ? (from.power2 = 0, 2) : 1;
+    let dmg = Math.max(1, Math.round(a.atk * power * m * spread * twice * (kind === 'atk' && from.boost > 0 ? 1 + a.skill.boost : 1)));
     let blocked = 0;
     if (to.shield > 0) { blocked = Math.min(to.shield, dmg); to.shield -= blocked; dmg -= blocked; }
     d.cur = Math.max(0, d.cur - dmg);
@@ -195,6 +236,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null }) {
     if (extra === 'slow') { to.slow = ARENA.SLOW_TICKS; ev.push({ e: 'slow', who: to.who }); }
     if (extra === 'stun') { to.stun = Math.max(to.stun, ARENA.STUN_TICKS); ev.push({ e: 'stun', who: to.who }); }
     if (extra === 'knock') { const [nx, ny] = aimAt(from, to); to.x = clampX(to.x + nx * 9); to.y = clampY(to.y + ny * 9); ev.push({ e: 'knock', who: to.who }); }
+    if (extra === 'pull') { const [nx, ny] = aimAt(to, from); to.x = clampX(to.x + nx * 14); to.y = clampY(to.y + ny * 14); to.slow = ARENA.SLOW_TICKS; ev.push({ e: 'pull', who: to.who }); }
     if (extra === 'poison') { to.poison = 80; to.poisonDmg = a.atk * (a.skill.dot || 1.2) / 8; ev.push({ e: 'poison', who: to.who }); }
     return true;
   }
@@ -207,7 +249,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null }) {
   }
   function bringIn(s, next, ev) {
     s.idx = next; s.enter = ARENA.ENTER_TICKS; s.stun = 0; s.slow = 0; s.boost = 0; s.shield = 0; s.poison = 0; s.dash = 0; s.inv = 0; s.want = wantNone();
-    s.x = 50; s.y = s.who === 'me' ? 78 : 22; s.cd = 10; s.skill = Math.max(s.skill, 40);
+    s.x = 50; s.y = s.who === 'me' ? 78 : 22; s.cd = 10; s.skill = Math.max(s.skill, 40); s.skill2 = Math.max(s.skill2, 60); s.power2 = 0;
     ev.push({ e: 'swap', who: s.who, idx: next, key: active(s).key });
   }
 
@@ -224,31 +266,34 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null }) {
     ev.push({ e: kind, who: s.who, shape: dirs.length > 1 ? 'orb3' : 'shot', el: active(s).el, x: s.x, y: s.y, nx, ny });
   }
   function melee(s, power, kind, ev) {
-    const o = other(s), [nx, ny, d] = aimAt(s, o);
+    const o = other(s), [nx, ny, d] = aimAt(s, o), reach = SHOT[active(s).shape].melee + ARENA.BODY;
     s.fx = nx; s.fy = ny;
+    // 조금 멀면 달려들며 친다(근접 펫이 원거리 펫을 따라잡게).
+    if (d > reach && d <= reach + ARENA.MELEE_LUNGE) { const step = d - reach + 2; s.x = clampX(s.x + nx * step); s.y = clampY(s.y + ny * step); ev.push({ e: 'lunge', who: s.who }); }
     ev.push({ e: kind, who: s.who, shape: 'claw', el: active(s).el, x: s.x, y: s.y, nx, ny });
-    if (d <= SHOT[active(s).shape].melee + ARENA.BODY) damage(s, o, power, kind, ev);
+    if (gap(s, o) <= reach) damage(s, o, power, kind, ev);
   }
   function dashAt(s, power, kind, ev, extra = null) {
     const [nx, ny] = aimAt(s, other(s));
     s.fx = nx; s.fy = ny;
-    s.dash = 9; s.dvx = nx * 3.4; s.dvy = ny * 3.4; s.dashHit = false; s.dashPow = power; s.dashKind = kind; s.dashExtra = extra; s.inv = 9;
+    const long = kind === 'skill2';
+    s.dash = long ? 13 : 9; s.dvx = nx * 3.4; s.dvy = ny * 3.4; s.dashHit = false; s.dashPow = power; s.dashKind = kind; s.dashExtra = extra; s.inv = s.dash;
     ev.push({ e: kind, who: s.who, shape: 'dash', el: active(s).el, x: s.x, y: s.y, nx, ny });
   }
-  function quakeAt(s, power, kind, ev, extra = null) {
-    const o = other(s);
-    S.quakes.push({ from: s.who, x: o.x, y: o.y, r: 12, at: S.t + 14, power, kind, extra });
+  function quakeAt(s, power, kind, ev, extra = null, at = null, r = 12) {
+    const o = other(s), x = at ? at[0] : o.x, y = at ? at[1] : o.y;
+    S.quakes.push({ from: s.who, x, y, r, at: S.t + 14, power, kind, extra });
     ev.push({ e: kind, who: s.who, shape: 'quake', el: active(s).el, x: s.x, y: s.y, tx: o.x, ty: o.y, warn: 14 });
   }
   function basic(s, ev) {
     const a = active(s), sh = SHOT[a.shape], b = brain[s.who];
-    s.cd = Math.round(a.atkTicks * (s.boost > 0 ? 0.7 : 1) * (s.slow > 0 ? 1.3 : 1) * (b ? b.slow : 1));
+    s.cd = Math.round(a.atkTicks * (s.boost > 0 ? 0.7 : 1) * (s.slow > 0 ? 1.3 : 1) * (b ? b.slow : 1) * (a.melee ? 1.1 : 1));
     if (sh.melee) return melee(s, 1, 'atk', ev);
     shoot(s, 1, 'atk', ev, sh);
   }
   function skill(s, ev) {
     const a = active(s), k = a.skill;
-    s.skill = ARENA.SKILL_TICKS;
+    s.skill = a.skillCd || ARENA.SKILL_TICKS;
     if (k.kind === 'guard') {
       if (k.heal) a.cur = Math.min(a.hp, a.cur + Math.round(a.hp * k.heal));
       if (k.shield) s.shield = Math.round(a.atk * k.shield * 2.5);
@@ -261,6 +306,28 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null }) {
     if (a.shape === 'orb') return shoot(s, k.power / 1.6, 'skill', ev, { v: 2.8, r: 3.6, life: 22, extra, spread: 0.32 });
     if (a.shape === 'quake') return quakeAt(s, k.power, 'skill', ev, extra);
     return dashAt(s, k.power, 'skill', ev, extra);
+  }
+  function skill2(s, ev) {
+    const a = active(s), k = a.skill2, o = other(s), [nx, ny] = aimAt(s, o);
+    s.skill2 = a.skill2Cd || ARENA.SKILL2_TICKS;
+    ev.push({ e: 'skillname', who: s.who, name: k.name, el: a.el, two: true });
+    if (k.kind === 'blink') {
+      // 상대 반대쪽(조이스틱 방향이 있으면 그쪽)으로 비켜서고, 다음 공격 2배.
+      let [dx, dy] = DIRS[s.dir] || [0, 0];
+      if (!dx && !dy) { dx = -nx; dy = -ny; }
+      ev.push({ e: 'blink', who: s.who, x: s.x, y: s.y });
+      s.x = clampX(s.x + dx * 22); s.y = clampY(s.y + dy * 22); s.inv = 6; s.power2 = 1;
+      return ev.push({ e: 'blinked', who: s.who, x: s.x, y: s.y });
+    }
+    if (k.kind === 'nova') { S.quakes.push({ from: s.who, x: s.x, y: s.y, r: 17, at: S.t + 5, power: 1.9, kind: 'skill2', extra: 'knock', self: true }); return ev.push({ e: 'skill2', who: s.who, shape: 'nova', el: a.el, x: s.x, y: s.y, warn: 5 }); }
+    if (k.kind === 'barrage') { for (const sp of [-0.5, -0.25, 0, 0.25, 0.5]) { const dx = nx - ny * sp, dy = ny + nx * sp, l = Math.sqrt(dx * dx + dy * dy) || 1; S.shots.push({ from: s.who, x: s.x + dx / l * 4, y: s.y + dy / l * 4, vx: dx / l * 3, vy: dy / l * 3, r: 2.6, life: 18, power: 0.7, kind: 'skill2', extra: null, el: a.el }); } return ev.push({ e: 'skill2', who: s.who, shape: 'barrage', el: a.el, x: s.x, y: s.y, nx, ny }); }
+    if (k.kind === 'trap') { S.mines = [...S.mines.filter(m => m.from !== s.who), { from: s.who, x: s.x, y: s.y, until: S.t + 240, el: a.el }]; return ev.push({ e: 'skill2', who: s.who, shape: 'trap', el: a.el, x: s.x, y: s.y }); }
+    if (k.kind === 'rain') { for (const [ox, oy] of [[0, 0], [-10, 5], [10, 5]]) quakeAt(s, 1.25, 'skill2', ev, null, [clampX(o.x + ox), clampY(o.y + oy)], 8); return; }
+    if (k.kind === 'rush') return dashAt(s, 2.1, 'skill2', ev, 'knock');
+    if (k.kind === 'pull') { S.shots.push({ from: s.who, x: s.x + nx * 4, y: s.y + ny * 4, vx: nx * 4.2, vy: ny * 4.2, r: 3.4, life: 12, power: 1, kind: 'skill2', extra: 'pull', el: a.el, hook: true }); return ev.push({ e: 'skill2', who: s.who, shape: 'hook', el: a.el, x: s.x, y: s.y, nx, ny }); }
+    // heal
+    a.cur = Math.min(a.hp, a.cur + Math.round(a.hp * 0.15)); s.slow = 0; s.poison = 0; s.stun = 0;
+    return ev.push({ e: 'buff', who: s.who, kind: 'heal', name: k.name, el: a.el, heal: true, shield: s.shield, hp: a.cur, max: a.hp });
   }
   function ult(s, ev) {
     const a = active(s), o = other(s);
@@ -281,7 +348,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null }) {
     let [dx, dy] = DIRS[s.dir] || [0, 0];
     if (!dx && !dy) { const [nx, ny] = aimAt(s, other(s)); dx = -ny; dy = nx; } // 방향이 없으면 옆으로
     s.dash = ARENA.DODGE_TICKS; s.dvx = dx * ARENA.DODGE_SPEED; s.dvy = dy * ARENA.DODGE_SPEED; s.dashHit = true; s.dashKind = 'dodge';
-    s.inv = ARENA.DODGE_TICKS + 1; s.dodgeCd = ARENA.DODGE_CD;
+    s.inv = ARENA.DODGE_TICKS + 1; s.dodgeCd = active(s).dodgeCd || ARENA.DODGE_CD;
     ev.push({ e: 'dodge', who: s.who, x: s.x, y: s.y, dx, dy });
   }
   function swap(s, ev) {
@@ -313,6 +380,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null }) {
     if (s.enter > 0) { s.enter--; if (!s.enter) ev.push({ e: 'enter', who: s.who, idx: s.idx, key: a.key }); return; }
     if (s.cd > 0) s.cd--;
     if (s.skill > 0) s.skill--;
+    if (s.skill2 > 0) s.skill2--;
     if (s.stun > 0) { s.stun--; return; }
     if (s.dash > 0) {
       s.dash--;
@@ -325,6 +393,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null }) {
     if (w.ult) { w.ult = false; if (s.gauge >= ARENA.GAUGE_MAX && o.enter <= 0) return ult(s, ev); }
     if (w.dodge) { w.dodge = false; if (s.dodgeCd <= 0) return dodge(s, ev); }
     if (w.skill && s.skill <= 0 && o.enter <= 0) { w.skill = false; return skill(s, ev); }
+    if (w.skill2 && s.skill2 <= 0 && o.enter <= 0) { w.skill2 = false; return skill2(s, ev); }
     if (w.atk && s.cd <= 0 && o.enter <= 0) { w.atk = false; basic(s, ev); }
     const [dx, dy] = DIRS[s.dir] || [0, 0];
     if (dx || dy) {
@@ -358,6 +427,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null }) {
     s.dir = dirCode(mx + cx, my + cy, 0.2);
     if (s.gauge >= ARENA.GAUGE_MAX && o.enter <= 0 && o.inv <= 0) w.ult = true;
     if (s.skill <= 0 && d < want + 14 && random() < b.skill) w.skill = true;
+    if (s.skill2 <= 0 && d < want + 18 && random() < b.skill * 0.8) w.skill2 = true;
     if (s.cd <= 0 && d < (melee ? 15 : 44) && random() < b.aim) w.atk = true;
     // 내 펫이 거의 쓰러질 것 같고 교체할 수 있으면 가끔 바꾼다.
     if (s.swapCd <= 0 && a.cur < a.hp * 0.2 && random() < 0.02) w.swap = true;
@@ -372,6 +442,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null }) {
       else if (c === INPUT.ULT) w.ult = true;
       else if (c === INPUT.DODGE) w.dodge = true;
       else if (c === INPUT.SWAP) w.swap = true;
+      else if (c === INPUT.SKILL2) w.skill2 = true;
     }
   }
   // 날아가는 공격 · 지진.
@@ -387,10 +458,17 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null }) {
       if (q.at > S.t) continue;
       q.dead = true;
       const s = S[q.from], o = other(s);
-      ev.push({ e: 'boom', x: q.x, y: q.y, r: q.r, el: active(s)?.el || 'earth', kind: q.kind });
-      if (gap(q, o) <= q.r + ARENA.BODY * 0.5) damage(s, o, q.power, q.kind, ev, q.extra);
+      const at = q.self ? { x: s.x, y: s.y } : q;
+      ev.push({ e: 'boom', x: at.x, y: at.y, r: q.r, el: active(s)?.el || 'earth', kind: q.kind });
+      if (gap(at, o) <= q.r + ARENA.BODY * 0.5) damage(s, o, q.power, q.kind, ev, q.extra);
     }
     S.quakes = S.quakes.filter(q => !q.dead);
+    for (const m of S.mines) {
+      const s = S[m.from], o = other(s);
+      if (S.t > m.until) { m.dead = true; continue; }
+      if (hittable(o) && gap(m, o) <= 8) { m.dead = true; ev.push({ e: 'boom', x: m.x, y: m.y, r: 9, el: m.el, kind: 'skill2' }); damage(s, o, 2.2, 'skill2', ev, 'stun'); }
+    }
+    S.mines = S.mines.filter(m => !m.dead);
   }
   function finish(ev) {
     if (S.over) return;
@@ -404,7 +482,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null }) {
       const a = left(S.me), b = left(S.foe);
       winner = Math.abs(a - b) < 1e-9 ? 'draw' : a > b ? 'me' : 'foe';
     }
-    if (winner) { S.over = true; S.winner = winner; S.shots = []; S.quakes = []; ev.push({ e: 'over', winner }); }
+    if (winner) { S.over = true; S.winner = winner; S.shots = []; S.quakes = []; S.mines = []; ev.push({ e: 'over', winner }); }
   }
   function step() {
     const ev = [];
@@ -421,11 +499,11 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null }) {
     return ev;
   }
   const sideView = s => ({ x: s.x, y: s.y, fx: s.fx, fy: s.fy, idx: s.idx, gauge: s.gauge, enter: s.enter, stun: s.stun, slow: s.slow, boost: s.boost, shield: s.shield, poison: s.poison, inv: s.inv, dash: s.dash,
-    cd: s.cd, skill: s.skill, dodgeCd: s.dodgeCd, swapCd: s.swapCd, team: s.team.map(f => ({ key: f.key, cur: f.cur, hp: f.hp })) });
+    cd: s.cd, skill: s.skill, skill2: s.skill2, power2: s.power2, dodgeCd: s.dodgeCd, swapCd: s.swapCd, team: s.team.map(f => ({ key: f.key, cur: f.cur, hp: f.hp })) });
   return {
     S, step,
     push: x => { S.inputs.push(x); },
-    view: () => ({ t: S.t, freeze: S.freeze, me: sideView(S.me), foe: sideView(S.foe), shots: S.shots.map(x => ({ x: x.x, y: x.y, r: x.r, el: x.el, kind: x.kind, from: x.from })), quakes: S.quakes.map(q => ({ x: q.x, y: q.y, r: q.r, left: q.at - S.t, from: q.from })), over: S.over, winner: S.winner })
+    view: () => ({ t: S.t, freeze: S.freeze, me: sideView(S.me), foe: sideView(S.foe), shots: S.shots.map(x => ({ x: x.x, y: x.y, r: x.r, el: x.el, kind: x.kind, from: x.from })), quakes: S.quakes.map(q => ({ x: q.self ? S[q.from].x : q.x, y: q.self ? S[q.from].y : q.y, r: q.r, left: q.at - S.t, from: q.from })), mines: S.mines.map(m => ({ x: m.x, y: m.y, from: m.from, el: m.el })), over: S.over, winner: S.winner })
   };
 }
 
