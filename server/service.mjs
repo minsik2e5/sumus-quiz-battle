@@ -54,7 +54,8 @@ import { REEL } from '../public/modules/reel-rules.js';
 import { TIMING } from '../public/modules/timing-rules.js';
 import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './games.mjs';
 import { wallStart, wallFinish, wallView, wallLine } from './wall.mjs';
-import { arenaStart, arenaFinish, arenaView, arenaLine } from './arena.mjs';
+import { ARENA } from '../public/modules/arena-rules.js';
+import { arenaStart, arenaFinish, arenaView, arenaLine, arenaPoolFor, arenaPoolPut, grantArenaTicket } from './arena.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
 import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, partyPlaysLeft, settleParty, partyReportPending, undoParty } from './party.mjs';
 import { PARTY } from './party-engine.mjs';
@@ -1798,8 +1799,10 @@ export async function service(state, method, path, body, token, options = {}) {
     const clawTicket = grantClaw(p, 'attend', { now });
     // V13.180: 출석하면 10초 맞추기 한 판 더(하루 1번).
     const timingPlay = grantTimingPlay(p, 'attend', now);
+    // V13.225: 출석하면 펫 아레나 코인 판 입장권 1장.
+    const arenaTicket = grantArenaTicket(p, 'attend', now);
     logActivity(p, 'attend', `출석 · 연속 ${p.attendance?.streak || 1}일`, now);
-    return { ...done, streak_guard: guard, bait, ball, gold_ball: goldBall, claw_ticket: clawTicket, timing_play: timingPlay, reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now, dailyConfig(state, now)), points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
+    return { ...done, streak_guard: guard, bait, ball, gold_ball: goldBall, claw_ticket: clawTicket, timing_play: timingPlay, arena_ticket: arenaTicket, reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now, dailyConfig(state, now)), points_balance: coinBalance(state, p), tickets: gachaView(p).tickets };
   }
   // V13.149 연속 학습 보호권 사기(최대 STREAK_GUARD.MAX장).
   if (path === '/shop/streak-guard' && method === 'POST') {
@@ -1966,28 +1969,24 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!result.again && result.reason !== 'quit') logActivity(p, 'wall', wallLine(result), now);
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
-  // V13.223 펫 아레나(server/arena.mjs). 단어는 벽 통과처럼 고른 범위. 상대는 같은 학교 · 학년 친구 팀(없으면 연습 상대).
+  // V13.225 펫 아레나 2(server/arena.mjs): 직접 조종하는 3:3 펫 대전. 상대는 같은 반 친구 팀(없으면 연습 상대)을 컴퓨터가 조종.
+  // 렉 방지: 친구 팀은 작은 목록 state.arenaTeams(반마다 최근 20팀)에서만 본다. 쓰기 요청 안에서 다른 학생 기록을 훑지 않는다.
   if (path === '/games/arena/start' && method === 'POST') {
     requireRole(p, 'student');
     if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
-    const ctx = monsterContext(state, p);
-    if (!ctx.school) fail('학생 학교 설정을 확인해주세요.', 409);
-    const asked = Array.isArray(body.range_codes) ? [...new Set(body.range_codes.map(String))].slice(0, 60) : [];
-    if (!asked.length) fail('단어 범위를 골라주세요.');
-    const words = scopedWords(state, ctx.school.id, asked, p.class_name);
-    if (words.length < 8) fail('단어가 8개 이상 되게 범위를 골라주세요.', 409);
-    const missed = Array.isArray(body.missed) ? body.missed.slice(0, 12).map(x => str(x, 80)) : [];
-    const team = Array.isArray(body.team) ? body.team.slice(0, 3).map(x => str(x, 40)) : [];
-    // 친구 팀은 그 친구가 아레나를 할 때 남긴 팀(p.games.arena.team)으로. 렉 방지: 쓰기 요청 안에서 다른 학생 기록을 훑지 않는다.
-    const friends = state.profiles
-      .filter(x => x.id !== p.id && x.role === 'student' && x.active !== false && !x.preview_owner_id && x.games?.arena?.team?.length && x.class_name === p.class_name && schoolForProfile(state, x)?.id === ctx.school.id)
-      .map(x => ({ name: x.display_name, team: x.games.arena.team }));
-    return arenaStart(p, { id: id(), words, missed, team, friends, pets: petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), now: Date.now() });
+    const school = schoolForProfile(state, p);
+    if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
+    const now = Date.now(), team = Array.isArray(body.team) ? body.team.slice(0, 3).map(x => str(x, 40)) : [];
+    const friends = p.preview_owner_id ? [] : arenaPoolFor(state, p, school.id, now);
+    const r = arenaStart(p, { id: id(), team, friends, pets: petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), now });
+    if (!p.preview_owner_id) arenaPoolPut(state, p, school.id, r.team, now);
+    delete r.team;
+    return r;
   }
   if (path === '/games/arena/finish' && method === 'POST') {
     requireRole(p, 'student');
     const now = Date.now();
-    const result = arenaFinish(p, { id: str(body.id, 80), picks: Array.isArray(body.picks) ? body.picks.slice(0, 120) : [], pet: activePetKey(state, p.id), now });
+    const result = arenaFinish(p, { id: str(body.id, 80), inputs: Array.isArray(body.inputs) ? body.inputs.slice(0, 4000) : [], pet: activePetKey(state, p.id), now });
     if (!result.again && result.reason !== 'short') logActivity(p, 'arena', arenaLine(result), now);
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
@@ -3540,6 +3539,8 @@ function finishPractice(x, state, autoSubmitted = false, { natural = false, stal
   if (complete && student && answerRecords.length >= CLAW.MIN_PRACTICE && grantClaw(student, 'practice', { now: finalizedAt })) x.claw_ticket = true;
   // V13.180: 같은 조건으로 10초 맞추기 한 판 더(하루 1번).
   if (complete && student && answerRecords.length >= TIMING.MIN_PRACTICE) grantTimingPlay(student, 'practice', finalizedAt);
+  // V13.225: 같은 조건으로 펫 아레나 코인 판 입장권 1장(하루 3장, 보관 5장).
+  if (complete && student && answerRecords.length >= ARENA.TICKET_PRACTICE && grantArenaTicket(student, 'practice', finalizedAt)) x.arena_ticket = true;
 }
 // V13.149 되살리기: 연속이 어제 끊겼으면(보호권이 없어서) 오늘 끝까지 푼 연습이 모두 REPAIR_NEED문제를 넘을 때 어제를 잇는다.
 function repairStreak(state, p, now) {

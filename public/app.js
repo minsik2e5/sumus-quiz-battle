@@ -1027,13 +1027,8 @@ $('#app').addEventListener('click', async event => {
       window.scrollTo(0, 0);
       return openWallGame(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }, { words: w.list, codes: w.picked, label: wordsLabel(A, w.picked) });
     }
-    // V13.223 놀이터 펫 아레나: 벽 통과와 같은 게임 단어로.
-    if (d.action === 'arena-open') {
-      const w = arcadeWords(A);
-      if (!w.ok) return toast('단어를 8개 이상 골라 주세요.');
-      window.scrollTo(0, 0);
-      return openArena(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }, { words: w.list, codes: w.picked, label: wordsLabel(A, w.picked) });
-    }
+    // V13.225 놀이터 펫 아레나 2: 직접 조종하는 펫 대전(단어 없음, 코인 판 입장권은 단어 연습으로).
+    if (d.action === 'arena-open') { window.scrollTo(0, 0); return openArena(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     // V13.162 놀이터 몬스터 사냥.
     if (d.action === 'claw-open') { window.scrollTo(0, 0); return openClaw(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     if (d.action === 'hunt-open') { window.scrollTo(0, 0); return openHunt(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
