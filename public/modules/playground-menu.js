@@ -43,7 +43,7 @@ export function menuIcon(name, fallback, art = YABAWI_ART) {
 // 오늘 남은 판: 탭마다 그 탭 게임만 센다(기록 탭은 없음). tab 'all'은 전체.
 export function todayLeft(r, yabawi, tab = 'all') {
   const rows = {
-    arcade: [['짝 맞추기', r.match?.left ?? 5], ['10초 맞추기', r.timing?.left ?? 3]],
+    arcade: [['짝 맞추기', r.match?.left ?? 5], ['벽 통과', r.wall?.left], ['10초 맞추기', r.timing?.left ?? 3]],
     tajja: [['가위바위보', r.rps?.left], ...(yabawi ? [['야바위', r.yabawi?.left]] : [])],
     shop: [['코인 뽑기', r.lucky?.left]],
     records: []
@@ -70,6 +70,7 @@ export function bestRows(r, yabawi) {
   const m = r.match || {}, t = r.timing || {}, h = r.hunt || {}, c = r.claw || {}, f = r.reel || {};
   const rows = [
     ['🃏', '짝 맞추기', '내 최고', m.best ? matchTime(m.best) : '—'],
+    ['🧱', '벽 통과', '최고 점수', r.wall?.best ? `${num(r.wall.best)}점` : '—'],
     ['🎯', '10초 맞추기', '내 최고', t.best == null ? '—' : `±${(t.best / 1000).toFixed(2)}초`],
     ['🔥', '10초 맞추기', '연속 완벽', `${num(t.streak_best || 0)}번`],
     ['📖', '몬스터 사냥', '도감', `${num(h.kinds || 0)}/${num(h.all || 34)}`],
@@ -101,7 +102,7 @@ function hub(A, o) {
   const r = A.data.rewards || {}, left = tab => total(todayLeft(r, o.yabawi, tab));
   return `${heading('PLAYGROUND', '놀이터')}${wallet(o.balance)}${summary('all', r, o)}
   <div class="study-hub-grid study-hub-simple pg-hub">
-    ${card('arcade', 'ARCADE', '미니게임', '낚시 · 짝 맞추기 · 몬스터 사냥 · 인형뽑기 · 10초 맞추기', menuIcon('menu-arcade', '🎮', o.art), left('arcade'))}
+    ${card('arcade', 'ARCADE', '미니게임', '낚시 · 짝 맞추기 · 벽 통과 · 몬스터 사냥 · 인형뽑기 · 10초 맞추기', menuIcon('menu-arcade', '🎮', o.art), left('arcade'))}
     ${card('tajja', 'TAJJA', '코인 승부', o.yabawi ? '가위바위보 · 야바위' : '가위바위보', menuIcon('menu-tajja', '🃏', o.art), left('tajja'))}
     ${card('shop', 'SHOP', '상점', '코인 뽑기 · 알 상점', menuIcon('menu-shop', '🛍️', o.art), left('shop'))}
     ${card('records', 'RECORD', '기록', '게임별 최고 기록 · 도감', recordIcon(), 0)}

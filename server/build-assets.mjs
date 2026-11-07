@@ -133,6 +133,7 @@ const cssSources = [
   "v13210.css",
   "v13217.css",
   "v13218.css",
+  "v13222.css",
   "v13185.css",
   "v13184.css",
   "v13178.css"
@@ -246,7 +247,7 @@ export const YABAWI_ART = new Set(${JSON.stringify(art)});
 // V13.210 놀이터 입구 그림 게이트(그림 63): 10초 맞추기 · 가위바위보 · 야바위 큰 카드 그림(public/assets/<게임>/entry.webp)이
 // 들어오면 public/modules/entry-art.js에 이름이 적히고 카드가 그 그림으로 바뀐다. 없으면 지금 그림(코드로 그린 그림 · 로봇 · 곽 사장 카드 그림).
 {
-  const games = ['timing', 'rps', 'yabawi'].filter(g => existsSync(resolve(root, `public/assets/${g}/entry.webp`)));
+  const games = ['timing', 'rps', 'yabawi', 'wall'].filter(g => existsSync(resolve(root, `public/assets/${g}/entry.webp`)));
   const out = resolve(root, 'public/modules/entry-art.js');
   const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 입구 그림(public/assets/<게임>/entry.webp)이 있는 놀이터 게임.
 export const ENTRY_ART = new Set(${JSON.stringify(games)});

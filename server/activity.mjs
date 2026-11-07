@@ -21,6 +21,7 @@ export const ACTIVITY_MODES = {
   fish: { label: '낚시', icon: '🎣' },
   match: { label: '짝 맞추기', icon: '🃏' },
   timing: { label: '10초 맞추기', icon: '⏱️' },
+  wall: { label: '벽 통과', icon: '🧱' },
   dungeon: { label: '던전', icon: '🏰' },
   treasure: { label: '보물 사냥', icon: '💰' },
   classfish: { label: '반 낚시', icon: '🐟' },

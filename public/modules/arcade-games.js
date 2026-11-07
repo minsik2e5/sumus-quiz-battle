@@ -65,6 +65,23 @@ export function matchCard(A, art) {
     </div>
   </article>`;
 }
+// V13.222 벽 통과: 짝 맞추기처럼 게임 단어(야차전 범위와 같은 저장값)로. 그림은 주문서 64(wall/entry)가 있으면 쓴다.
+export function wallCard(A, art) {
+  const w = arcadeWords(A), v = A.data.rewards?.wall || {};
+  const pic = art?.entry?.has('wall') ? '<img class="ag-big-bg" src="/assets/wall/entry.webp" alt="" draggable="false" decoding="async">'
+    : '<span class="ag-big-bg ag-wall-bg"><i class="ag-wall-face">🧱</i><i class="ag-wall-pool"></i></span>';
+  return `<article class="ag-big ag-wall">
+    <div class="ag-big-art" aria-hidden="true">${pic}<span class="ag-big-title"><small>혼자 · 단어 게임쇼</small><strong>벽 통과</strong><em>다가오는 벽, 맞는 단어 구멍으로 쏙! 틀리면 풀장에 풍덩</em></span></div>
+    <div class="ag-big-body">
+      <ul class="ag-stats" aria-label="내 벽 통과">
+        <li><i class="ag-ico">🧱</i><b>${v.best ? num(v.best) : '—'}</b><small>최고 점수</small></li>
+        <li><b>${num(v.left ?? 5)}</b><small>오늘 코인 판</small></li>
+      </ul>
+      <div class="ag-words"><span>게임 단어</span><b class="${w.ok ? 'ok' : 'need'}">${w.picked.length ? `${esc(wordsLabel(A, w.picked))} · ${num(w.n)}단어` : '아직 안 골랐어요'}</b><button type="button" class="btn small" data-action="arcade-words">바꾸기</button></div>
+      <button type="button" class="yl-cta ag-go" data-action="wall-open" ${w.ok ? '' : 'disabled'}>시작</button>
+    </div>
+  </article>`;
+}
 // V13.162 몬스터 사냥(처음 이름 펫 사냥): 낚시터 · 짝 맞추기처럼 그림 카드. 그림은 HUNT_ART(hunt.js)의 'entry'(주문서 34)가 있으면 쓴다.
 const huntArt = (art, name, fallback) => art?.hunt?.has(name) ? `<img class="ag-ico" src="/assets/hunt/${name}.webp" alt="" draggable="false">` : fallback;
 export function huntCard(A, art) {
@@ -121,6 +138,7 @@ export function gamesSection(A, art) {
   return `<section class="ag-group" aria-label="게임"><h2 class="ag-head">게임</h2>
     ${reelCard(A, art)}
     ${matchCard(A, art)}
+    ${wallCard(A, art)}
     ${huntCard(A, art)}
     ${clawCard(A, art)}
     ${timingCard(A, art)}
