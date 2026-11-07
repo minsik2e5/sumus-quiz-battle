@@ -69,7 +69,7 @@ async function protectedSupabaseRepository() {
     try { payload = text ? JSON.parse(text) : null; } catch {}
     if (!response.ok) {
       const message = payload?.message || payload?.error || 'Supabase 저장 연결을 확인해주세요.';
-      const status = payload?.code === '40001' || message.includes('revision_conflict') ? 409 : 503;
+      const status = payload?.code === '40001' || payload?.code === 'PT409' || message.includes('revision_conflict') ? 409 : 503;
       throw Object.assign(new Error(status === 409 ? '다른 기기의 변경이 있습니다. 다시 시도해주세요.' : '영구 저장 서버에 연결하지 못했습니다.'), { status });
     }
     return payload;

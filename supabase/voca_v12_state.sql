@@ -7,7 +7,7 @@
 -- 왜: 2026-11 백업 프로젝트 계정을 잃어 새 프로젝트로 옮겼다. 원래 프로젝트의 v12 SQL은 저장소에
 -- 없었으므로, 워커(cloudflare/worker.mjs)가 부르는 모양 그대로 여기서 다시 만든다.
 --   voca_v12_state_read(p_secret)                       -> {revision, data}
---   voca_v12_state_commit(p_secret, p_revision, p_data) -> 새 revision (어긋나면 40001)
+--   voca_v12_state_commit(p_secret, p_revision, p_data) -> 새 revision (어긋나면 PT409 = HTTP 409, V13.224 전에는 40001)
 --
 -- 안전: 처음에는 줄을 넣지 않는다. 빈 사본을 "백업"으로 읽어 학생 기록을 덮지 않도록,
 -- 아직 한 번도 올리지 않았으면 read가 아무것도 돌려주지 않는다(워커는 로컬 사본으로 시작한다).
@@ -55,7 +55,9 @@ begin
     return 1;
   end if;
   if current_revision is distinct from p_revision then
-    raise exception 'revision_conflict' using errcode = '40001';
+    -- V13.224 번호 어긋남은 PT409(PostgREST가 HTTP 409로 바로 돌려준다). 40001(serialization_failure)은 PostgREST가
+    -- 스스로 계속 다시 시도해서, 어긋난 번호로 1초마다 끝없이 돌며 CPU를 100%로 만들었다(2026-11-08 운영).
+    raise exception 'revision_conflict' using errcode = 'PT409';
   end if;
   update public.voca_v12_state set revision = revision + 1, data = p_data, updated_at = now() where id = 1
   returning revision into current_revision;

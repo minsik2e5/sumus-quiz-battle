@@ -128,7 +128,7 @@ function createSupabaseRepository(env) {
     if (!response.ok) {
       const message = payload?.message || payload?.error || 'Supabase 저장 연결을 확인해주세요.';
       // 404: the function does not exist (the parts SQL has not been run yet).
-      const status = payload?.code === '40001' || message.includes('revision_conflict') ? 409 : response.status === 404 ? 404 : 503;
+      const status = payload?.code === '40001' || payload?.code === 'PT409' || message.includes('revision_conflict') ? 409 : response.status === 404 ? 404 : 503;
       // Supabase's own reason (never the request body or secret), for diagnosing failed backups.
       const detail = `${name}: HTTP ${response.status}${payload?.code ? ' ' + payload.code : ''} ${String(message).slice(0, 160)} (${Math.round(text.length / 1024)} KB)`;
       throw Object.assign(Error(status === 409 ? '다른 기기의 변경이 있습니다. 다시 시도해주세요.' : '영구 저장 서버에 연결하지 못했습니다.'), { status, http: response.status, detail });
