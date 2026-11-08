@@ -1,6 +1,7 @@
 // V13.230 검사: 펫 아레나 실시간 친구 대전(cloudflare/arena-room.mjs · public/modules/arena-live-rules.js · server/arena-live.mjs).
 //   party-room-check.mjs처럼 가짜 시계 · 저장소 · 소켓으로, 지연이 다른 폰 두 대(롤백 전투)가 진짜 방 객체와 한 판을 끝까지 한다.
 //   대기실 · 같은 학년 확인 · 롤백 결과 = 서버 판정 · 끊김 대신 조종 · 보상/농사 막기 · 메시지 예산 · 이모트 제한 · 다시 보기 · 방 재시작.
+// V13.232 (④단계) 1:1:1 난투(폰 3대) · 2:2 팀전(폰 3대 + 컴퓨터 · 폰 4대): 롤백 = 방 판정 · 팀원 공격 안 됨 · 막타 점수 · 빈자리 컴퓨터 · 같은 학년 · 보상 · 농사 막기 · 사람 수별 요청 예산(7번).
 // cloudflare-check.mjs가 부른다. 숫자만 보려면: node server/arena-room-check.mjs
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
