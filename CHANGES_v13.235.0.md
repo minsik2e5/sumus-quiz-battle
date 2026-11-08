@@ -16,7 +16,7 @@
 - **판 화면 가운데 옅은 가로 띠 없앰**: 경기장이 야차전 클래스(`yb-arena`)를 같이 써서 야차전 가운데 선(`.yb-arena:before`)이 아레나에도 그려지고 있었다(v13.226부터, 컷인 띠가 아님). 아레나에서만 끔.
 
 ## 2. 그림 주문서 67 (`docs/asset-requests/runner/`)
-- `build-67.mjs` → `67-pet-arena-buttons.txt` · `split/67-1 …` ~ `67-9 …` · `slice-map.csv`(35줄) · `CODEX_PROMPT_67.md` · README 21번.
+- `build-67.mjs` → `67-pet-arena-buttons.txt` · `split/67-1 …` ~ `67-9 …` · `slice-map.csv`(35줄) · `CODEX_PROMPT_67.md` · README 23번(21번은 랭크 69).
 - 시트 9장 · 그림 35장: 버튼 바탕 6(공격 · 필살기 · 회피 · 교체 · 스킬 · 이모트) · 겹침 3(누름 · 쿨타임 · 준비됨 빛) · 조이스틱 2 · 아이콘 4(칼 · 필살기 · 회피 · 교체) · 스킬 ① 아이콘 4(공격 · 강화 · 중독 · 지키기) · 스킬 ② 아이콘 16(8속성 × 2, `EL_SKILLS` id).
 - 시트마다: ① Drive의 "SUMUS 펫 아레나 65 (Runner용)" · "SUMUS 펫 아레나 66 (Runner용)" 그림을 열어 그림체를 맞추라 ② "SUMUS 펫 아레나 67 (Runner용)"에 "67-1.png" … "67-9.png" 정확한 이름으로 저장하라. 글자 · 숫자는 그리지 않는다.
 - **그림 파일만 넣으면 된다**: `build:assets`가 `ARENA_ART`에 적고, `arena.js` uiArt · setIco가 같은 자리를 그림으로 바꾼다(.art-bg · .art-ico). 없으면 CSS 버튼 그대로.

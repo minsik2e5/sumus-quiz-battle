@@ -189,7 +189,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   // slice-map.csv: 67 줄을 지우고 끝에 다시 붙인다(번호는 67을 뺀 마지막 번호 다음).
   const csvPath = resolve(here, 'slice-map.csv');
   const rows = readFileSync(csvPath, 'utf8').split('\n').filter(l => l && !l.startsWith(`"${LIST}"`));
-  let no = Math.max(...rows.slice(1).map(l => Number(l.split('","')[1]) || 0));
+  // 68번(연습장 · 경기장 꾸미기, 다른 PR)이 804~808을 쓰므로 809부터.
+  let no = Math.max(808, ...rows.slice(1).map(l => Number(l.split('","')[1]) || 0));
   const KO_CELL = { 'TOP-LEFT': '왼쪽 위', 'TOP-RIGHT': '오른쪽 위', 'BOTTOM-LEFT': '왼쪽 아래', 'BOTTOM-RIGHT': '오른쪽 아래' };
   const add = SHEETS.map(s => ++no && ITEMS.filter(x => x.sheet === s).map(x => `"${LIST}","${String(no).padStart(3, '0')}","${s.no} ${s.ko}","${KO_CELL[x.cell]}","arena-${x.key}","${x.name} (${x.size})","public/assets/arena/${x.key}.webp"`)).flat();
   writeFileSync(csvPath, [...rows, ...add].join('\n') + '\n');
