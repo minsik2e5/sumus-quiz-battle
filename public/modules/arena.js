@@ -79,7 +79,7 @@ const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } cat
 const readyPets = A => (A.data.stats?.pets || []).filter(x => Number(x.form) >= 1).sort((a, b) => b.level - a.level || (b.active ? 1 : 0) - (a.active ? 1 : 0));
 
 // V13.230 실시간 친구 대전(arena-live.js)이 쓰는 화면 조각. 전투 화면은 그대로, 전투(R.sim)만 롤백 전투로 바뀐다.
-export const arenaUi = { main: html => main(html), pop: (...a) => pop(...a), sfx: (...a) => sfx(...a), petImg: (k, f) => petImg(k, f), cur: () => (R?.playing ? R.cur : null), lobby: () => { if (R) { R.live = null; lobby(); } },
+export const arenaUi = { main: html => main(html), pop: (...a) => pop(...a), sfx: (...a) => sfx(...a), petImg: (k, f, c = '') => petImg(k, f, c), cur: () => (R?.playing ? R.cur : null), lobby: () => { if (R) { R.live = null; lobby(); } },
   // V13.235 연습장 · 꾸미기: 지금 아레나 상태 · 판 멈추기 · 내 펫 칸 다시 그리기 · 스킬트리 가지 / 스킬 ② 저장(대기실과 같은 규칙).
   R: () => R, stop: () => { if (R) { R.playing = false; R.live = null; cancelAnimationFrame(R.raf); app()?.classList.remove('playing'); } },
   bg: name => setBg(name),

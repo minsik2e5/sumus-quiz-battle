@@ -39,7 +39,7 @@ function draw() {
   const saved = cleanTree(R.trees?.[p.key]), savedS2 = R.picks?.[p.key] ?? null;
   const dirty = TREE.LEVELS.some((L, i) => lv >= L && tr[i] !== saved[i]) || (P.s2[p.key] != null && P.s2[p.key] !== savedS2);
   arenaUi.main(`<section class="ar-lobby ar-prac">
-    <div class="ar-title"><small>보상 · 기록 없음 · 마음껏 시험</small><h1>🎯 연습장</h1></div>
+    <div class="ar-title"><small>보상 · 기록 없음 · 마음껏 시험</small><h1>연습장</h1></div>
     <div class="ar-card">
       <h3 class="ar-sub">내 펫 <small>한 마리로 연습해요</small></h3>
       <div class="ar-pets">${pets.map(x => `<button type="button" class="ar-pet-pick${x.key === p.key ? ' on' : ''}" data-ar="pr-pet" data-key="${esc(x.key)}" aria-pressed="${x.key === p.key}">${arenaUi.petImg(x.key, x.form)}<small>Lv.${x.level}</small></button>`).join('')}</div>
@@ -48,7 +48,7 @@ function draw() {
       <h3 class="ar-sub">기본 스킬 ② <small>${esc(ELEMENTS[f.el]?.name || '')} 속성 스킬 2개 중 하나</small></h3>
       <div class="pr-s2" role="group" aria-label="기본 스킬 ②">${picks.map((k, i) => `<button type="button" class="ar-branch b${i}${(s2 ?? f.s2) === i ? ' on' : ''}" data-ar="pr-s2" data-i="${i}" aria-pressed="${(s2 ?? f.s2) === i}"><i>${esc(k.icon)}</i><span><b>${esc(k.name)}</b><small>${esc(k.desc)}</small></span></button>`).join('')}</div>
       <div class="ar-tree pr-tree" style="--c1:${P2.c1};--c2:${P2.c2};--c3:${P2.c3}">
-        <div class="ar-tree-h">${arenaUi.petImg(p.key, p.form)}<div><small>스킬트리 · ${esc(ROLE[f.role].name)}</small><b>${esc(p.name || petName(p.key))} <em>Lv.${lv}</em></b></div></div>
+        <div class="ar-tree-h">${arenaUi.petImg(p.key, p.form, 'ar-tree-pet')}<div><small>스킬트리 · ${esc(ROLE[f.role].name)}</small><b>${esc(p.name || petName(p.key))} <em>Lv.${lv}</em></b></div></div>
         <ol class="ar-floors">${[2, 1, 0].map(i => { const x = t[i], lock = lv < x.lv; return `<li class="ar-floor${lock ? ' pvw' : ''}" style="--i:${i}"><div class="ar-floor-h"><b>${['1층', '2층', '3층'][i]}</b><small>Lv.${x.lv} · ${['스킬 ①', '스킬 ②', '필살기 · 역할'][i]}</small>${lock ? `<em>👀 미리보기 · Lv.${x.lv}에 열려요</em>` : '<em class="open">열림</em>'}</div><div class="ar-branches">${branch(x, i, 0)}<span class="ar-fork" aria-hidden="true"></span>${branch(x, i, 1)}</div></li>`; }).join('')}</ol>
         <div class="ar-preview"><b>지금 설정</b><span><small>① ${esc(f.skill.name)}</small>${(f.skillCd * ARENA.TICK_MS / 1000).toFixed(1)}초</span><span><small>② ${esc(f.skill2.icon)} ${esc(f.skill2.name)}</small>${(f.skill2Cd * ARENA.TICK_MS / 1000).toFixed(1)}초</span><span class="ult"><small>필살기</small>${esc(f.ult)}${f.ult2 ? `<i class="up">${f.ult2 === 'ring' ? '둘레 큰 원' : '긴 일직선'}</i>` : ''}</span></div>
       </div>
