@@ -58,7 +58,7 @@ export async function runArenaChecks(assert) {
     assert(easyGood.w > 0.8 && easyBad.w > 0.15 && midMid.w > 0.25 && midMid.w < 0.75 && hardGood.w > hardBad.w + 0.2 && hardBad.w < 0.35,
       `V13.225 잘 조종할수록 이긴다(쉬움: 대충 ${Math.round(easyBad.w * 100)}% · 잘함 ${Math.round(easyGood.w * 100)}%, 보통끼리 ${Math.round(midMid.w * 100)}%, 어려움: 대충 ${Math.round(hardBad.w * 100)}% · 잘함 ${Math.round(hardGood.w * 100)}%)`);
     assert(easyMid.w >= 0.84 && easyMid.w <= 0.97 && midMid.w >= 0.4 && midMid.w <= 0.6 && hardMid.w >= 0.27 && hardMid.w <= 0.43,
-      `V13.227 조준 규칙에 맞춘 컴퓨터 솜씨: 보통 학생이 쉬움 ${Math.round(easyMid.w * 100)}%(≈90) · 보통 ${Math.round(midMid.w * 100)}%(≈50) · 어려움 ${Math.round(hardMid.w * 100)}%(≈35)를 이긴다`);
+      `V13.228 조준 규칙에 맞춘 컴퓨터 솜씨: 보통 학생이 쉬움 ${Math.round(easyMid.w * 100)}%(≈90) · 보통 ${Math.round(midMid.w * 100)}%(≈50) · 어려움 ${Math.round(hardMid.w * 100)}%(≈35)를 이긴다`);
     assert(midMid.sec > 25 && midMid.sec < 100, `V13.225 한 판은 보통 30초~1분 반(평균 ${Math.round(midMid.sec)}초)`);
     const idle = runArena({ seed: 3, me: T(['dog', 'bear', 'fox']), foe: T(['dog', 'bear', 'fox']), foeLevel: 0, inputs: [] });
     assert(idle.winner === 'foe', 'V13.225 아무것도 안 누르면 진다(상대는 쉬움이어도 공격한다)');
@@ -193,13 +193,13 @@ export async function runArenaChecks(assert) {
     assert(!/@keyframes ar-warnblink\{[^}]*filter/.test(css) && ui.includes('el._flags !== flags'), 'V13.226 렉 방지: 깜빡임은 opacity로, 펫 상태 클래스는 바뀔 때만 쓴다');
   }
 
-  // 9) V13.227 (2탄 ①단계) 조준 직접 조작 · 넉백 · 크리티컬 · 등급 배수 · 렉 방지.
+  // 9) V13.228 (2탄 ①단계) 조준 직접 조작 · 넉백 · 크리티컬 · 등급 배수 · 렉 방지.
   {
     // 16방향 표(삼각함수 없이).
     assert(DIR16.length === 16 && DIR16.every(([x, y]) => Math.abs(x * x + y * y - 1) < 0.001) && DIR16.every(([x, y], i) => aimCode(x, y) === i) && aimCode(0, -1) === 0 && aimCode(1, 0) === 4 && aimCode(0, 1) === 8 && aimCode(-1, 0) === 12 && aimCode(0, 0) === -1,
-      'V13.227 조준 방향 16개(위부터 시계 방향, 미리 적은 표) · 화면 방향 → 가장 가까운 칸');
+      'V13.228 조준 방향 16개(위부터 시계 방향, 미리 적은 표) · 화면 방향 → 가장 가까운 칸');
     assert(cleanInputs([[0, INPUT.SKILL, 5]])[0]?.join() === '0,11,5' && cleanInputs([[0, INPUT.ULT, 15], [1, INPUT.ATK, 0], [2, INPUT.SKILL2, 3]]).length === 3 && cleanInputs([[0, INPUT.DODGE, 5]]).length === 0 && cleanInputs([[0, INPUT.SKILL, 16]]).length === 0 && cleanInputs([[0, INPUT.AIM_EASY], [0, INPUT.AIM_AUTO], [0, INPUT.AIM_FREE]]).length === 3 && cleanInputs([[0, 19]]).length === 0,
-      'V13.227 조작 기록에 조준 방향: [틱, 공격 · 스킬 · 필살기, 0~15]만 받는다(회피 · 교체에는 없다), 조준 방식 16 쉬움 · 17 자동 · 18 직접');
+      'V13.228 조작 기록에 조준 방향: [틱, 공격 · 스킬 · 필살기, 0~15]만 받는다(회피 · 교체에는 없다), 조준 방식 16 쉬움 · 17 자동 · 18 직접');
     // 가만히 있는 상대로 규칙 확인. 내 펫 (50, 72), 상대는 정해 둔 자리.
     const arena = (foeAt, opts = {}) => {
       const A = createArena({ seed: 7, me: T(['dragon'], 2, 10), foe: T(['pig'], 2, 10), foeLevel: 1, foeIdle: true });
@@ -213,14 +213,14 @@ export async function runArenaChecks(assert) {
     const up = shotDir(arena({ x: 50, y: 40 }), [0, INPUT.ATK]), free30 = shotDir(arena(side30), [0, INPUT.ATK]), easy30 = shotDir(arena(side30, { mode: INPUT.AIM_EASY }), [0, INPUT.ATK]), auto30 = shotDir(arena(side30, { mode: INPUT.AIM_AUTO }), [0, INPUT.ATK]);
     const toward = v => v && Math.abs(v[0] / Math.sqrt(v[0] ** 2 + v[1] ** 2) - 0.5) < 0.02;
     assert(up && Math.abs(up[0]) < 1e-9 && up[1] < 0 && free30 && Math.abs(free30[0]) < 1e-9 && toward(easy30) && toward(auto30),
-      'V13.227 톡 = 바라보는 방향: 바라보는 쪽 ±25° 안의 상대만 맞춰 준다(쉬운 조준 ±40° · 자동 조준은 늘 상대 쪽)');
+      'V13.228 톡 = 바라보는 방향: 바라보는 쪽 ±25° 안의 상대만 맞춰 준다(쉬운 조준 ±40° · 자동 조준은 늘 상대 쪽)');
     const dragged = shotDir(arena({ x: 50, y: 40 }), [0, INPUT.ATK, 4]), dragSnap = shotDir(arena({ x: 50 + 30 * 0.17, y: 72 - 30 * 0.985 }), [0, INPUT.SKILL, 0]);
     assert(dragged && dragged[0] > 0 && Math.abs(dragged[1]) < 1e-9 && dragSnap && dragSnap[0] > 0,
-      'V13.227 끌어서 조준: 끈 방향(16방향)으로 나간다. 한 칸 반(≈12°) 안의 상대에게는 맞춰 준다(칸 오차만 메움)');
+      'V13.228 끌어서 조준: 끈 방향(16방향)으로 나간다. 한 칸 반(≈12°) 안의 상대에게는 맞춰 준다(칸 오차만 메움)');
     const M = arena({ x: 50, y: 30 });
     M.push([0, 3]); M.step(); const right = [M.S.me.fx, M.S.me.fy].join();
     M.push([1, INPUT.STOP]); M.step(); M.step();
-    assert(right === '1,0' && M.S.me.fx === 1 && M.S.me.fy === 0, 'V13.227 움직이는 방향 = 바라보는 방향, 서 있으면 마지막 방향을 그대로');
+    assert(right === '1,0' && M.S.me.fx === 1 && M.S.me.fy === 0, 'V13.228 움직이는 방향 = 바라보는 방향, 서 있으면 마지막 방향을 그대로');
     // 넉백 · 크리티컬(무작위 없이 규칙으로).
     const hit = (foeAt, extra = {}) => {
       const A = arena(foeAt); Object.assign(A.S.foe, extra);
@@ -233,16 +233,16 @@ export async function runArenaChecks(assert) {
     const front = hit({ x: 50, y: 40, fx: 0, fy: 1 }), back = hit({ x: 50, y: 40, fx: 0, fy: -1 }), stun = hit({ x: 50, y: 40, fx: 0, fy: 1 }, { stun: 60 }), sideOn = hit({ x: 50, y: 40, fx: 1, fy: 0 });
     const ratio = back.ev && front.ev ? back.ev.dmg / front.ev.dmg : 0;
     assert(front.ev && !front.ev.crit && back.ev?.crit && stun.ev?.crit && !sideOn.ev?.crit && ratio > 1.4 && ratio < 1.6,
-      `V13.227 크리티컬: 등 뒤(±45°)에서 · 기절한 상대는 1.5배(${ratio.toFixed(2)}배), 정면 · 옆은 보통. 무작위가 아니다`);
+      `V13.228 크리티컬: 등 뒤(±45°)에서 · 기절한 상대는 1.5배(${ratio.toFixed(2)}배), 정면 · 옆은 보통. 무작위가 아니다`);
     assert(Math.abs(front.push - ARENA.KNOCK.skill) < 0.01 && ARENA.KNOCK.ult > ARENA.KNOCK.skill && ARENA.KNOCK.skill > ARENA.KNOCK.atk && ARENA.KNOCK.atk > 0,
-      `V13.227 넉백은 규칙 파일에: 맞으면 때린 쪽 반대로 밀린다(스킬 ${front.push.toFixed(1)} · 필살기 > 스킬 > 기본), 서버도 같은 결과`);
+      `V13.228 넉백은 규칙 파일에: 맞으면 때린 쪽 반대로 밀린다(스킬 ${front.push.toFixed(1)} · 필살기 > 스킬 > 기본), 서버도 같은 결과`);
     // 필살기는 조준한 부채꼴(±35°) 안이어야 맞는다.
     const U = (code) => { const A = arena({ x: 50, y: 40 }); A.S.me.gauge = ARENA.GAUGE_MAX; A.push([0, INPUT.ULT, code]); let ev = [], g = 0; while (g++ < ARENA.ULT_FREEZE_TICKS + 3) ev = ev.concat(A.step()); return ev.find(e => e.e === 'ult'); };
-    assert(U(0)?.hit === true && U(4)?.hit === false, 'V13.227 필살기: 조준한 부채꼴(±35°) 안이면 맞고, 다른 쪽으로 쏘면 빗나간다');
+    assert(U(0)?.hit === true && U(4)?.hit === false, 'V13.228 필살기: 조준한 부채꼴(±35°) 안이면 맞고, 다른 쪽으로 쏘면 빗나간다');
     // 컴퓨터도 같은 조준 규칙(버튼을 끌어서 조준, 솜씨만큼 정확히).
     const rules = source('../public/modules/arena-rules.js');
     assert(AI.every(b => b.acc > 0 && b.acc < 1) && AI[0].acc < AI[1].acc && AI[1].acc <= AI[2].acc && rules.includes('w.atkA = aim()') && rules.includes('w.ultA = aim()') && !rules.includes('HITSTOP') && !rules.includes('hitStop'),
-      'V13.227 컴퓨터도 조준 방향을 넣어 공격한다(쉬움 < 보통 ≤ 어려움 정확도). 히트스톱은 규칙 파일에 없다(화면만)');
+      'V13.228 컴퓨터도 조준 방향을 넣어 공격한다(쉬움 < 보통 ≤ 어려움 정확도). 히트스톱은 규칙 파일에 없다(화면만)');
     // 사람처럼 조종한 판(끌어서 조준 포함)도 서버가 다시 돌리면 같은 결과.
     let same = true, aimed = 0;
     for (let k = 1; k <= 12; k++) {
@@ -251,29 +251,29 @@ export async function runArenaChecks(assert) {
       const r = runArena({ seed: k * 53, me, foe, foeLevel: k % 3, inputs });
       same &&= r.winner === A.S.winner && r.ticks === A.S.t && r.dealt.me === A.S.dealt.me;
     }
-    assert(same && aimed > 20, `V13.227 조준 방향이 든 조작 기록도 서버(runArena) = 화면(조준 ${aimed}번)`);
+    assert(same && aimed > 20, `V13.228 조준 방향이 든 조작 기록도 서버(runArena) = 화면(조준 ${aimed}번)`);
   }
-  // 10) V13.227 등급 배수: 기본 ≈ 영웅 < 전설(시리즈) < 신화, 한정 ≈ 기본. 승률로 맞춘다(node server/arena-sim.mjs tiers 4000).
+  // 10) V13.228 등급 배수: 기본 ≈ 영웅 < 전설(시리즈) < 신화, 한정 ≈ 기본. 승률로 맞춘다(node server/arena-sim.mjs tiers 4000).
   {
     assert(petTier('dog') === 'normal' && petTier('penguin') === 'epic' && petTier('phoenix') === 'legend' && petTier('tyranno') === 'legend' && petTier('ladybug') === 'legend' && petTier('pumpkincat') === 'limited' && petTier('gumiho') === 'mythic',
-      'V13.227 아레나 등급: 일반 · 영웅 · 전설(시리즈 포함) · 한정 · 신화');
+      'V13.228 아레나 등급: 일반 · 영웅 · 전설(시리즈 포함) · 한정 · 신화');
     assert(TIER_MUL.normal === 1 && Math.abs(TIER_MUL.epic - 1) <= 0.01 && Math.abs(TIER_MUL.limited - 1) <= 0.025 && TIER_MUL.legend > TIER_MUL.epic && TIER_MUL.mythic > TIER_MUL.legend && TIER_MUL.mythic <= 1.12,
-      `V13.227 등급 배수: 일반 ${TIER_MUL.normal} · 영웅 ${TIER_MUL.epic} · 전설 ${TIER_MUL.legend} · 한정 ${TIER_MUL.limited} · 신화 ${TIER_MUL.mythic}`);
+      `V13.228 등급 배수: 일반 ${TIER_MUL.normal} · 영웅 ${TIER_MUL.epic} · 전설 ${TIER_MUL.legend} · 한정 ${TIER_MUL.limited} · 신화 ${TIER_MUL.mythic}`);
     const got = TIER_PAIRS.map(([a, b, goal, tol]) => ({ a, b, goal, tol, r: tierRate(a, b, 800) }));
-    assert(got.every(x => Math.abs(x.r - x.goal) <= x.tol), `V13.227 등급 승률(800판씩, 양쪽 같은 솜씨): ${got.map(x => `${x.a} 대 ${x.b} ${Math.round(x.r * 1000) / 10}%(목표 ${Math.round(x.goal * 100)} ± ${Math.round(x.tol * 100)})`).join(' · ')}`);
+    assert(got.every(x => Math.abs(x.r - x.goal) <= x.tol), `V13.228 등급 승률(800판씩, 양쪽 같은 솜씨): ${got.map(x => `${x.a} 대 ${x.b} ${Math.round(x.r * 1000) / 10}%(목표 ${Math.round(x.goal * 100)} ± ${Math.round(x.tol * 100)})`).join(' · ')}`);
   }
-  // 11) V13.227 화면: 끌어서 조준 · 타격감 · 렉 방지 금지 패턴.
+  // 11) V13.228 화면: 끌어서 조준 · 타격감 · 렉 방지 금지 패턴.
   {
     const ui = source('../public/modules/arena.js'), css = source('../public/v13228.css'), build = source('./build-assets.mjs');
     assert(build.includes('"v13228.css"') && ['function aimShape(', "addEventListener('pointermove'", 'press(d.btn, true, d.on ? d.code : -1)', 'aimCode(dx / g.w, dy / g.h)', 'id="ar-aim"', 'id="ar-aim-spot"', 'data-ar="aim"', 'INPUT.AIM_EASY', 'INPUT.AIM_AUTO', 'id="ar-face"'].every(x => ui.includes(x)),
-      'V13.227 화면: 스킬 · 필살기 버튼을 끌면 화살표 · 부채꼴 · 원으로 조준하고 놓으면 그 방향, 바라보는 쪽 화살표, 대기실에서 조준 방식(직접 · 쉬움 · 자동)');
+      'V13.228 화면: 스킬 · 필살기 버튼을 끌면 화살표 · 부채꼴 · 원으로 조준하고 놓으면 그 방향, 바라보는 쪽 화살표, 대기실에서 조준 방식(직접 · 쉬움 · 자동)');
     assert(['function hitStop(', 'R.pausedMs += until', 'function flash(', 'DMG_MAX', 'function dmgNum(', "pop('치명타!'", 'function combo(', 'function finale(', 'function shakeField(', 'function zoomAt(', 'now - (sfxAt.get(key)', "e.who === 'me' && e.hit) buzz"].every(x => ui.includes(x)) && css.includes('.ar-lite .ar-flash{filter:none') && ui.includes("if (!big && app()?.classList.contains('ar-lite')) return"),
-      'V13.227 타격감: 히트스톱(화면만) · 피격 섬광 · 큰 숫자(칸 다시 쓰기) · 치명타 · 콤보 · 마지막 한 방 슬로 · 경기장 흔들림 · 줌 · 소리 겹치기(0.05초) · 진동. 저사양은 조각만 줄이고 느낌은 그대로');
+      'V13.228 타격감: 히트스톱(화면만) · 피격 섬광 · 큰 숫자(칸 다시 쓰기) · 치명타 · 콤보 · 마지막 한 방 슬로 · 경기장 흔들림 · 줌 · 소리 겹치기(0.05초) · 진동. 저사양은 조각만 줄이고 느낌은 그대로');
     const drawHud = ui.slice(ui.indexOf('function drawHud()'), ui.indexOf('function drawHp()')), placeFn = ui.slice(ui.indexOf('function place(frac)'), ui.indexOf('function loop(now)'));
     const banned = ["app()?.classList.add('ult')", "classList.add('shake')", 'fxPunch(app()', 'fxSkillCutIn(', 'style.zIndex = String(10 + Math.round(y))', "left: `${x}%`"];
     assert(banned.every(x => !ui.includes(x)) && !drawHud.includes('innerHTML') && !placeFn.includes('style.width') && !placeFn.includes('style.height') && placeFn.includes('if (R.z !== z)') && ui.includes("nextFrame(() => fxImpact(") && ui.includes('id="ar-cut"') && ui.includes("nextFrame(() => banner("),
-      'V13.227 렉 방지: 필살기 컷인은 미리 만든 칸 · 흔들림/멈춤은 경기장만 · 조각은 프레임을 나눠 · 겹침 순서는 바뀔 때만 · 지진 표시는 scale · 글자는 translate · HUD는 클래스만');
+      'V13.228 렉 방지: 필살기 컷인은 미리 만든 칸 · 흔들림/멈춤은 경기장만 · 조각은 프레임을 나눠 · 겹침 순서는 바뀔 때만 · 지진 표시는 scale · 글자는 translate · HUD는 클래스만');
     assert(css.includes('.ar-field.yb-arena{contain:layout style}') && css.includes('.ar-warn::after,.ar-mine::after{animation:none}') && css.includes('.ar-warn.on::after{animation:') && css.includes('.ar-fx.pop,.ar-fx.pop.eff{left:0;top:0}'),
-      'V13.227 렉 방지(CSS): 경기장 contain · 숨은 경고 · 함정 칸은 애니메이션 멈춤');
+      'V13.228 렉 방지(CSS): 경기장 contain · 숨은 경고 · 함정 칸은 애니메이션 멈춤');
   }
 }

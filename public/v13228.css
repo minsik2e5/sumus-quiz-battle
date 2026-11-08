@@ -1,4 +1,4 @@
-/* V13.227 펫 아레나 2탄 ①단계(public/modules/arena.js): 렉 고치기 · 조준 직접 조작 · 타격감. 클래스 ar-. */
+/* V13.228 펫 아레나 2탄 ①단계(public/modules/arena.js): 렉 고치기 · 조준 직접 조작 · 타격감. 클래스 ar-. */
 
 /* 렉: 경기장은 안쪽 배치만 따로(contain). 흔들림 · 필살기 멈춤은 앱 전체가 아니라 경기장에만 붙인다. */
 .ar-field.yb-arena{contain:layout style}

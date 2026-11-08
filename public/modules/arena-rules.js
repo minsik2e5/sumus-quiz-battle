@@ -33,17 +33,17 @@ export const ARENA = {
   SLOW_TICKS: 50,
   FIELD: { minX: 8, maxX: 92, minY: 14, maxY: 86 }, // 경기장 바닥(%)
   INPUT_MAX: 4000,           // 한 판 조작 기록 상한
-  // V13.227 조준: 움직이는 방향 = 바라보는 방향. 톡 누르면 바라보는 쪽 ±25°(쉬운 조준 ±40°) 안의 상대에게 맞춘다(cos 값, 삼각함수 없이).
+  // V13.228 조준: 움직이는 방향 = 바라보는 방향. 톡 누르면 바라보는 쪽 ±25°(쉬운 조준 ±40°) 안의 상대에게 맞춘다(cos 값, 삼각함수 없이).
   AIM_ASSIST: 0.9063,        // cos 25°
   AIM_EASY: 0.766,           // cos 40°
   AIM_DRAG: 0.978,           // 끌어서 조준: 16방향 한 칸의 반(≈12°) 안이면 상대에게 맞춘다(방향 칸 오차만 메운다)
   MELEE_ARC: 0.342,          // 근접 공격은 앞쪽 ±70° 안만 맞는다
   ULT_ARC: 0.8192,           // 필살기 부채꼴 ±35°
   QUAKE_RANGE: 40,           // 지진 · 소나기를 바라보는 쪽으로 놓을 때 가장 먼 거리
-  // V13.227 넉백(맞으면 뒤로 밀림, 3틱에 나눠서): 종류마다 거리(경기장 %).
+  // V13.228 넉백(맞으면 뒤로 밀림, 3틱에 나눠서): 종류마다 거리(경기장 %).
   KNOCK: { atk: 1.2, skill: 4, skill2: 3, ult: 7 },
   KNOCK_TICKS: 3,
-  // V13.227 크리티컬: 상대 뒤에서(상대가 바라보는 쪽의 반대 ±45°) 또는 기절한 상대를 때리면 1.5배. 무작위가 아니라 규칙으로 정한다.
+  // V13.228 크리티컬: 상대 뒤에서(상대가 바라보는 쪽의 반대 ±45°) 또는 기절한 상대를 때리면 1.5배. 무작위가 아니라 규칙으로 정한다.
   CRIT: 1.5,
   BACK: -0.7071,             // cos 135°
   FACE_LOCK: 6,              // 공격 · 스킬을 쓰고 0.3초 동안은 쏜 쪽을 바라본다(그동안 움직여도 몸을 돌리지 않는다)
@@ -58,7 +58,7 @@ export const ARENA = {
 };
 
 // 조작 기록 [틱, 코드]: 0 멈춤 · 1~8 방향(위부터 시계 방향) · 10 공격 · 11 스킬 1 · 12 필살기 · 13 회피 · 14 교체 · 15 스킬 2.
-// V13.227 [틱, 코드, 조준]: 공격 · 스킬 · 필살기에 조준 방향(0~15, 위부터 시계 방향 16방향)을 붙일 수 있다(버튼을 끌어서 조준).
+// V13.228 [틱, 코드, 조준]: 공격 · 스킬 · 필살기에 조준 방향(0~15, 위부터 시계 방향 16방향)을 붙일 수 있다(버튼을 끌어서 조준).
 //   조준이 없으면 바라보는 방향(+ 보정). 16 쉬운 조준(보정 ±40°) · 17 자동 조준(늘 상대 쪽, 예전 방식) · 18 직접 조준(±25°, 처음 값).
 export const INPUT = { STOP: 0, ATK: 10, SKILL: 11, ULT: 12, DODGE: 13, SWAP: 14, SKILL2: 15, AIM_EASY: 16, AIM_AUTO: 17, AIM_FREE: 18 };
 export const AIMABLE = [10, 11, 12, 15];
@@ -167,7 +167,7 @@ export function petRank(key) {
   const c = CHARACTERS[key] || {};
   return c.mythic ? 3 : c.legendary || c.limited || c.series || c.rank === 'legendary' ? 2 : c.epic || c.rank === 'epic' ? 1 : 0;
 }
-// V13.227 등급 배수(펫 등급 세기 규칙: 기본 ≈ 영웅 < 전설(+약 6%) < 신화(+약 6%), 한정 ≈ 기본). 승률은 server/arena-sim.mjs tiers로 본다.
+// V13.228 등급 배수(펫 등급 세기 규칙: 기본 ≈ 영웅 < 전설(+약 6%) < 신화(+약 6%), 한정 ≈ 기본). 승률은 server/arena-sim.mjs tiers로 본다.
 export function petTier(key) {
   const c = CHARACTERS[key] || {};
   return c.mythic ? 'mythic' : c.limited ? 'limited' : c.legendary || c.series || c.rank === 'legendary' ? 'legend' : c.epic || c.rank === 'epic' ? 'epic' : 'normal';
@@ -230,7 +230,7 @@ export function cleanInputs(raw, maxTick = ARENA.MAX_TICKS + 400) {
 }
 
 // 컴퓨터 상대의 솜씨(쉬움 · 보통 · 어려움): 날아오는 공격을 피할 확률 · 공격 간격 배수 · 스킬 쓰는 정도 · 공격 누르는 정도 ·
-//   V13.227 조준 정확도(acc: 정확히 상대 쪽으로 끌 확률, 아니면 16방향 한두 칸 빗나감). 컴퓨터도 사람과 같은 조준 규칙을 따른다.
+//   V13.228 조준 정확도(acc: 정확히 상대 쪽으로 끌 확률, 아니면 16방향 한두 칸 빗나감). 컴퓨터도 사람과 같은 조준 규칙을 따른다.
 export const AI = [
   { dodge: 0.1, slow: 1.56, skill: 0.05, aim: 0.6, acc: 0.4 },
   { dodge: 0.25, slow: 1.36, skill: 0.08, aim: 0.85, acc: 0.5 },
@@ -262,7 +262,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
   // 상대 쪽 단위 벡터(겹쳐 있으면 바라보는 쪽).
   const aimAt = (s, o) => { const dx = o.x - s.x, dy = o.y - s.y, d = Math.sqrt(dx * dx + dy * dy); return d > 0.01 ? [dx / d, dy / d, d] : [s.fx, s.fy, 0]; };
   const face = (s, nx, ny) => { s.fx = nx; s.fy = ny; s.lock = ARENA.FACE_LOCK; };
-  // V13.227 조준: 이번 공격 방향 [x, y, 상대에게 맞췄나]. 자동 조준이면 늘 상대 쪽. 끌어서 조준(code 0~15)이면 그 방향(한 칸 반 안이면 상대 쪽).
+  // V13.228 조준: 이번 공격 방향 [x, y, 상대에게 맞췄나]. 자동 조준이면 늘 상대 쪽. 끌어서 조준(code 0~15)이면 그 방향(한 칸 반 안이면 상대 쪽).
   //   톡 누르면 바라보는 방향, 그 ±25°(쉬운 조준 ±40°) 안에 상대가 있으면 상대 쪽으로 맞춘다.
   function aimVec(s, code = -1) {
     const o = other(s), [tx, ty, d] = aimAt(s, o), seen = active(o)?.cur > 0 && o.enter <= 0 && d > 0.01;
@@ -477,7 +477,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     if (dx || dy) {
       const v = a.move * (s.slow > 0 ? 0.6 : 1);
       s.x = clampX(s.x + dx * v); s.y = clampY(s.y + dy * v);
-      // V13.227 움직이는 방향 = 바라보는 방향(서 있으면 마지막 방향을 그대로). 방금 공격했으면 잠깐 쏜 쪽을 본다.
+      // V13.228 움직이는 방향 = 바라보는 방향(서 있으면 마지막 방향을 그대로). 방금 공격했으면 잠깐 쏜 쪽을 본다.
       if (s.lock <= 0) { s.fx = dx; s.fy = dy; }
     }
     // 두 펫이 겹치지 않게 살짝 밀어낸다.
