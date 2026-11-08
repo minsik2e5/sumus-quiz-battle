@@ -147,6 +147,8 @@ async function main() {
     if (SHOT && !shot && Date.now() - started > 12000) { await me.screenshot({ path: SHOT, scale: 'css' }); shot = true; }
     if (await me.evaluate(() => !!window.__perf.t1)) break;
   }
+  // --probe '식': 끝에 페이지에서 식을 돌려 값을 찍는다(화면 확인용).
+  if (arg('probe', '')) console.log('probe:', JSON.stringify(await me.evaluate(arg('probe', ''))));
   // --anims: 끝에 돌고 있는 애니메이션(무한 반복 포함) 이름과 대상.
   if (process.argv.includes('--anims')) console.log(await me.evaluate(() => { const c = {}; for (const a of document.getAnimations()) { const k = `${a.animationName || a.transitionProperty || 'waapi'} on .${String(a.effect?.target?.className?.baseVal ?? a.effect?.target?.className).split(' ').slice(0, 2).join('.')} x${a.effect?.getTiming?.().iterations}`; c[k] = (c[k] || 0) + 1; } return Object.entries(c).map(([k, v]) => `${v} ${k}`).join('\n'); }));
   const m1 = Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(m => [m.name, m.value]));
