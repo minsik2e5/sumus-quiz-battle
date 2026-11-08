@@ -228,6 +228,14 @@ export async function runStateSlimChecks(assert, { verbose = false } = {}) {
   assert(!queries.some(q => /voca_archive/i.test(q)), 'V13.216 부팅(상태 읽기)은 보관 표를 읽지 않는다');
   const worker = source('../cloudflare/worker.mjs');
   assert(worker.includes("sweep(working, Date.now(), { autoTrim: false })") && worker.includes("sweep(state, Date.now(), { autoTrim: false })") && !/autoTrim: this\.writeLevel\(\)/.test(worker), 'V13.216 워커: 되돌릴 수 없는 30일 자동 정리(답 상세 지우기)는 끈다');
+  {
+    // V13.225 깨어난 뒤 2분이면 첫 옮기기(전에는 1시간 → 자주 다시 시작하는 운영에서 한 번도 안 돌았다).
+    const { archiveBootAt, ARCHIVE_BOOT_DELAY_MS } = await import('./session-archive.mjs');
+    const boot = Date.parse('2026-11-08T06:00:00Z'), st = { sessionArchive: null };
+    assert(ARCHIVE_BOOT_DELAY_MS === 120000 && !archiveDue(st, boot + 60000, archiveBootAt(boot)) && archiveDue(st, boot + ARCHIVE_BOOT_DELAY_MS, archiveBootAt(boot))
+      && worker.includes('this.archivedAt = archiveBootAt();'),
+      'V13.225 서버가 깨어나고 2분 뒤에 첫 옮기기를 한다(1시간을 기다리지 않는다)');
+  }
   assert(/archiveMode !== 'off' && this\.writeLevel\(\) === 'ok' && archiveDue\(/.test(worker), "V13.216 워커: 옮기기는 쓰기 한도가 넉넉한 날('ok')만");
   assert(worker.includes('archive: this.archive }') && worker.includes('this.archive.stats()'), 'V13.216 워커: 답안 보기 · 이의 신청이 보관 표를 쓰고 health에 보관 크기를 보인다');
   const bootBlock = worker.slice(worker.indexOf('this.ready = ctx.blockConcurrencyWhile'), worker.indexOf('writeLevel() {'));
