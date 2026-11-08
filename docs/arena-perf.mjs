@@ -34,8 +34,11 @@ function loadPlaywright() {
 
 // 내 팀: 신화(독 · 구슬) · 전설(불 · 빔) · 일반(바위 · 지진). 상대: 불 빔 · 물 구슬 · 바람 돌진 → 모양이 다 나온다.
 const ME = ['gumiho', 'phoenix', 'bear'], FOE = ['dragon', 'turtle', 'dog'];
-const brief = key => { const f = fighter({ key, form: 3, level: 20 }); return { key, form: 3, level: 20, hp: f.hp, atk: f.atk, el: f.el, shape: f.shape, rank: f.rank, skill: f.skill, ult: f.ult }; };
-const MATCH = { id: 'perf', seed: 12345, foe_level: 1, me: ME.map(brief), foe: { name: '친구', bot: false, team: FOE.map(brief) }, team: ME, left: 5, tickets: 3, coin_play: true, wins: 0, streak: 0, best_streak: 0 };
+// V13.229 스킬 ②: 두 쪽이 서로 다른 새 스킬을 고른다(내 팀 독침 연사 · 불 뿜기 · 지진 장판, 상대 운석 낙하 · 물대포 · 질풍 연속 베기).
+//   --s2 a|b: 모두 A(0) 또는 B(1)로 바꿔 다른 스킬도 잰다.
+const S2 = arg('s2', '') === 'a' ? [0, 0, 0] : arg('s2', '') === 'b' ? [1, 1, 1] : null;
+const brief = (key, i, mine) => { const s2 = S2 ? S2[i] : mine ? [1, 0, 1][i] : [1, 0, 1][i]; const f = fighter({ key, form: 3, level: 20, s2 }); return { key, form: 3, level: 20, s2, hp: f.hp, atk: f.atk, el: f.el, shape: f.shape, rank: f.rank, skill: f.skill, ult: f.ult }; };
+const MATCH = { id: 'perf', seed: 12345, foe_level: 1, me: ME.map((k, i) => brief(k, i, true)), foe: { name: '친구', bot: false, team: FOE.map((k, i) => brief(k, i, false)) }, team: ME, left: 5, tickets: 3, coin_play: true, wins: 0, streak: 0, best_streak: 0 };
 const PETS = ME.map((key, i) => ({ key, form: 3, level: 20 - i, active: i === 0 }));
 
 const MIME = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg', '.json': 'application/json', '.html': 'text/html' };
@@ -144,7 +147,7 @@ async function main() {
   const started = Date.now(); let shot = false;
   while (Date.now() - started < SECONDS * 1000) {
     await new Promise(r => setTimeout(r, 1000));
-    if (SHOT && !shot && Date.now() - started > 12000) { await me.screenshot({ path: SHOT, scale: 'css' }); shot = true; }
+    if (SHOT && !shot && Date.now() - started > Number(arg('shot-at', 12000))) { await me.screenshot({ path: SHOT, scale: 'css' }); shot = true; }
     if (await me.evaluate(() => !!window.__perf.t1)) break;
   }
   // --probe '식': 끝에 페이지에서 식을 돌려 값을 찍는다(화면 확인용).

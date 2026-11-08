@@ -1,25 +1,28 @@
 // V13.225 펫 아레나 2(놀이터): 직접 조종하는 3:3 펫 대전. 판(씨앗 · 두 팀)은 서버가 만들고, 끝나면 서버가 학생의 조작 기록
 // ([틱, 코드])으로 같은 전투(arena-rules.js runArena)를 다시 돌려 승패 · 보상을 정한다. 화면이 보낸 승패는 믿지 않는다.
 //   p.games.arena { day, plays, tk(코인 판 입장권), tk_day, tk_src{오늘 받은 곳: 수}, games, wins, streak, best_streak, lost,
-//                   team[[key, form, level] ×3], live{ id, at, seed, me, foe, fl, foe_name, bot }, done[영수증] }
+//                   team[[key, form, level, s2] ×3], live{ id, at, seed, me, foe, fl, foe_name, bot }, done[영수증],
+//                   s2{ 펫 키: 0 | 1 } V13.229 스킬 ② 고르기(속성 스킬 2개 중 하나, 무료로 바꿈. 내 펫만 · S2_MAX개 상한) }
 //   state.arenaTeams: 친구들이 상대로 만나는 팀 목록(학교 · 반마다 최근 PER_CLASS개, 전체 MAX개, 30일 지나면 뺀다).
 //                   렉 방지: 시작 요청이 전체 학생을 훑지 않고 이 작은 목록만 본다.
 import { dayKey, STANDARD_PET_KEYS } from '../public/modules/core.js';
-import { ARENA, fighter, teamPower, cleanInputs, runArena } from '../public/modules/arena-rules.js';
+import { ARENA, fighter, teamPower, cleanInputs, cleanPicks, runArena } from '../public/modules/arena-rules.js';
 import { addBonus, findReceipt, keepReceipt, secureRandom } from './rewards.mjs';
 
 export const ARENA_POOL = { PER_CLASS: 20, MAX: 600, KEEP_MS: 30 * 86400000 };
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const games = p => p.games ||= {};
-const pack = team => team.map(f => [f.key, f.form, f.level]);
-const unpack = list => (list || []).map(([key, form, level]) => fighter({ key, form, level }));
-const brief = f => ({ key: f.key, form: f.form, level: f.level, hp: f.hp, atk: f.atk, el: f.el, shape: f.shape, rank: f.rank, skill: f.skill, ult: f.ult });
+export const S2_MAX = 40;
+// 판 기록 · 친구 팀: [key, form, level, s2]. 예전 기록(s2 없음)은 스킬 ② A(0).
+const pack = team => team.map(f => [f.key, f.form, f.level, f.s2 ? 1 : 0]);
+const unpack = list => (list || []).map(([key, form, level, s2]) => fighter({ key, form, level, s2 }));
+const brief = f => ({ key: f.key, form: f.form, level: f.level, s2: f.s2, hp: f.hp, atk: f.atk, el: f.el, shape: f.shape, rank: f.rank, skill: f.skill, ult: f.ult });
 const playsToday = (a, now) => a.day === dayKey(now) ? Number(a.plays || 0) : 0;
 
 export function arenaView(p, now = Date.now()) {
   const a = p.games?.arena || {}; // 읽기만
   const left = Math.max(0, ARENA.DAILY - playsToday(a, now)), tickets = Math.min(ARENA.TICKETS_MAX, Number(a.tk || 0));
-  return { left, tickets, coin_play: left > 0 && tickets > 0, daily: ARENA.DAILY, games: Number(a.games || 0), wins: Number(a.wins || 0), streak: Number(a.streak || 0), best_streak: Number(a.best_streak || 0) };
+  return { left, tickets, coin_play: left > 0 && tickets > 0, daily: ARENA.DAILY, s2: cleanPicks(a.s2, S2_MAX), games: Number(a.games || 0), wins: Number(a.wins || 0), streak: Number(a.streak || 0), best_streak: Number(a.best_streak || 0) };
 }
 
 // 코인 판 입장권: 끝까지 푼 연습(ARENA.TICKET_PRACTICE문제 이상)마다 1장(하루 3장), 출석 1장. 보관 TICKETS_MAX장.
@@ -38,13 +41,13 @@ export function grantArenaTicket(p, source, now = Date.now()) {
 // 싸울 수 있는 펫(알이 아닌 펫)을 레벨 순으로. pets: petProgress()의 결과.
 export const readyPets = pets => (pets || []).filter(x => Number(x.form) >= 1).sort((a, b) => b.level - a.level || (b.active ? 1 : 0) - (a.active ? 1 : 0));
 
-// 내 팀: 고른 펫(최대 3, 내 펫이고 알이 아닌 것) → 모자라면 레벨 높은 펫으로 채운다.
-export function pickTeam(pets, keys = []) {
+// 내 팀: 고른 펫(최대 3, 내 펫이고 알이 아닌 것) → 모자라면 레벨 높은 펫으로 채운다. picks: 스킬 ② 고르기 { 키: 0 | 1 }.
+export function pickTeam(pets, keys = [], picks = {}) {
   const ready = readyPets(pets), byKey = new Map(ready.map(x => [x.key, x]));
   const team = [];
   for (const k of (Array.isArray(keys) ? keys : []).map(String)) if (byKey.has(k) && !team.includes(byKey.get(k)) && team.length < ARENA.TEAM) team.push(byKey.get(k));
   for (const x of ready) if (team.length < ARENA.TEAM && !team.includes(x)) team.push(x);
-  return team.map(x => fighter(x));
+  return team.map(x => fighter({ ...x, s2: picks[x.key] === 1 ? 1 : 0 }));
 }
 
 // 친구 팀 목록(state.arenaTeams): { k 학교|반, p 학생, n 이름, t 팀, at }.
@@ -80,11 +83,17 @@ export function pickFoe(mine, friends = [], random = secureRandom) {
 export const foeLevelOf = a => Number(a?.streak || 0) >= 3 ? 2 : Number(a?.games || 0) < 3 || Number(a?.lost || 0) >= 2 ? 0 : 1;
 
 // 판 받기. 하던 판이 있으면 버리고 새로(코인 · 입장권은 끝낼 때만 오가므로 잃을 것이 없다).
-export function arenaStart(p, { id, pets, team: keys, friends = [], now = Date.now(), random = secureRandom }) {
-  const me = pickTeam(pets, keys);
+// V13.229 picks: 대기실에서 고른 스킬 ②({ 키: 0 | 1 }). 내 펫(알이 아닌 것)만 남겨 a.s2에 합친다(새로 고른 것이 이긴다, S2_MAX개 상한).
+export function arenaStart(p, { id, pets, team: keys, picks = null, friends = [], now = Date.now(), random = secureRandom }) {
+  const a = games(p).arena ||= {};
+  const mine = new Set(readyPets(pets).map(x => x.key)), saved = cleanPicks(a.s2, S2_MAX);
+  if (picks) {
+    const merged = { ...saved, ...cleanPicks(picks, S2_MAX) };
+    a.s2 = Object.fromEntries(Object.entries(merged).filter(([k]) => mine.has(k)).slice(-S2_MAX));
+  }
+  const me = pickTeam(pets, keys, a.s2 || {});
   if (!me.length) fail('알에서 깬 펫이 있어야 싸울 수 있어요. 공부해서 펫을 키워 주세요!', 409);
   const foe = pickFoe(me, friends, random);
-  const a = games(p).arena ||= {};
   const seed = Math.floor(random() * 2147483647) + 1, fl = foeLevelOf(a);
   a.team = pack(me);
   a.live = { id, at: now, seed, me: pack(me), foe: pack(foe.team), fl, foe_name: foe.name, bot: foe.bot };

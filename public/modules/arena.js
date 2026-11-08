@@ -5,7 +5,8 @@ import { coin } from './emblems.js';
 import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
 import { coinShower, countUp } from './celebrate.js';
 import { ELEMENTS, fxImpact, fxPunch, fxSpeedLines, fxRecoil, fxLite } from './battle-fx.js';
-import { ARENA, BEATS, INPUT, ROLE, DIR16, createArena, fighter, dirCode, aimCode } from './arena-rules.js';
+import { ARENA, BEATS, INPUT, ROLE, DIR16, SK2, ZONES_MAX, createArena, fighter, dirCode, aimCode, skill2Picks } from './arena-rules.js';
+import { ARENA_ART } from './arena-art.js';
 
 // V13.225 펫 아레나 2(놀이터): 전체 화면. 위에서 비스듬히 내려다보는 경기장에서 내 펫을 직접 조종해 상대 펫과 싸운다.
 //   왼쪽 아래 조이스틱으로 움직이고, 오른쪽 버튼: 공격(누르고 있으면 계속) · 스킬 1 · 스킬 2(펫마다 다르다) · 필살기(게이지) · 회피 · 교체.
@@ -20,12 +21,22 @@ import { ARENA, BEATS, INPUT, ROLE, DIR16, createArena, fighter, dirCode, aimCod
 //   렉 방지: 필살기 컷인 · 물들이기는 미리 만든 칸을 다시 쓰고 흔들림 · 멈춤 표시는 경기장(#ar-field)에만 붙인다. 필살기 조각은 3프레임에 나눠 만든다.
 //   지진 표시는 transform scale로, 펫 겹침 순서(zIndex)는 바뀔 때만, 숨은 칸은 애니메이션을 멈추고, 글자 · 숫자는 translate로 자리 잡는다.
 //   위 막대(HUD) 펫 점은 한 번만 만들고 클래스만 바꾼다.
+// V13.229 (2탄 ②단계) 스킬 다양화: 모양 6가지(부채꼴 지속 · 굵은 줄기 · 원 폭발 · 장판 · 돌진 · 소환)와 속성 스킬 16개.
+//   대기실에서 펫마다 스킬 ②를 속성 스킬 2개 중 하나로 고른다(무료, 서버에 기억). 필살기도 속성마다 새 연출.
+//   렉 예산(구성안 4장): 효과 조각 한 번에 40개(저사양 20) · 스킬 하나 8개(저사양 4) · 장판 칸 4개 · 줄기 칸 2개 · 부채꼴 칸 2개 ·
+//   분신 칸 2개를 미리 만들어 다시 쓴다. 줄기 · 부채꼴 · 장판은 transform(scale)만, 움직임은 transform · opacity만, 빛 번짐 필터는
+//   스킬 · 필살기 칸만(저사양 끔). 그림 66(public/assets/arena/fx-*.webp)이 오면 ARENA_ART로 같은 칸이 그림으로 바뀐다.
 // 그림: 주문서 65(public/assets/arena/) 경기장 · VS · 승패 배너 · 필살기 아이콘 · 쓰러짐 별. 경기장 그림이 없으면 지금 있는 전투 광장(battle/bg-arena), 작은 그림이 없으면 그 자리를 비운다.
 
 const BG = { plaza: ['arena/bg-plaza', 'battle/bg-arena'], forest: ['arena/bg-forest', 'battle/bg-forest'], night: ['arena/bg-night', 'battle/bg-boss'] };
 const KIND_KO = { burst: '공격', boost: '강화', poison: '중독', guard: '지키기' };
-const SHOTS_MAX = 14, WARN_MAX = 6, MINE_MAX = 2, FX_MAX = 40;
-const S2_ICON = { blink: '🌀', nova: '💥', barrage: '🎯', trap: '🪤', rain: '☄️', rush: '🐾', pull: '🪝', heal: '💚' };
+const SHOTS_MAX = 14, WARN_MAX = 6, MINE_MAX = 2, FX_MAX = 40, FX_MAX_LITE = 20, SKILL_FX = 8, SKILL_FX_LITE = 4;
+const LINE_MAX = 3, STREAM_MAX = 2, LINE_BASE = 100, CONE_BASE = 200, ZONE_BASE = 100;
+const PICK_KEY = () => `sumus-arena-s2:${R?.A?.data?.profile?.id || ''}`;
+// 그림 66 이름(있으면 칸에 그림을 깐다). 없으면 CSS 연출 그대로.
+const ART = { breath: 'fx-flame-breath', meteor: 'fx-meteor', jet: 'fx-water-jet', bubble: 'fx-bubble', vine: 'fx-vine', petal: 'fx-petal-field', boulder: 'fx-boulder', crack: 'fx-crack-field',
+  tornado: 'fx-tornado', icefield: 'fx-ice-field', spear: 'fx-ice-spear', cloud: 'fx-poison-cloud', chain: 'fx-lightning', clone: 'fx-clone', crit: 'fx-crit' };
+const artOf = id => ART[id] && ARENA_ART.has(ART[id]) ? `url(/assets/arena/${ART[id]}.webp)` : '';
 const LITE_KEY = 'sumus-arena-lite', LITE_LONG_MS = 50, LITE_WINDOW_MS = 3000, LITE_LONG_COUNT = 8, LITE_DAYS = 7;
 const DMG_MAX = 8, WARN_BASE = 100;
 const HITSTOP = { atk: 40, skill: 70, skill2: 70, ult: 120 };
@@ -64,6 +75,8 @@ export function openArena(A, exit) {
   const saved = load(TEAM_KEY(), []).filter(k => ready.includes(k));
   R.team = (saved.length ? saved : ready).slice(0, ARENA.TEAM);
   R.aim = AIM_MODES.some(m => m[0] === load(AIM_KEY, 'free')) ? load(AIM_KEY, 'free') : 'free';
+  // 스킬 ② 고르기: 서버에 기억한 것(R.view.s2) 위에 이 폰에서 방금 고른 것.
+  R.picks = { ...(R.view?.s2 || {}), ...load(PICK_KEY(), {}) };
   root().innerHTML = `<div class="session-app ar-app" id="ar-app">
     <div class="ar-stage" id="ar-stage"><img class="ar-bg" id="ar-bg" alt="" draggable="false"><div class="ar-shade"></div></div>
     <header class="ar-top"><button type="button" class="yb-back" data-ar="exit" aria-label="나가기">${icon('back')}</button><strong>펫 아레나</strong><span class="ar-wallet">${coin()}<b id="ar-coins">${num(A.data.stats?.points_balance || 0)}</b></span></header>
@@ -117,6 +130,7 @@ function onClick(event) {
   const act = b.dataset.ar;
   if (act === 'exit') return R.playing ? confirmQuit() : leave();
   if (act === 'pet') return togglePet(b.dataset.key);
+  if (act === 'pick2') { R.picks[b.dataset.key] = Number(b.dataset.i) === 1 ? 1 : 0; save(PICK_KEY(), R.picks); sfx('tap'); return lobby(false, true); }
   if (act === 'aim') { R.aim = b.dataset.aim; save(AIM_KEY, R.aim); sfx('tap'); return lobby(false, true); }
   if (act === 'start') return start(b);
   if (act === 'again') return lobby(true);
@@ -172,9 +186,11 @@ function togglePet(key) {
   sfx('tap');
   lobby(false, true);
 }
+// V13.229 스킬 ②: 속성 스킬 2개 중 하나를 고른다(톡 누르면 바뀐다, 무료).
 function skillLine(key, form, level) {
-  const f = fighter({ key, form, level }), k = f.skill, k2 = f.skill2, r = ROLE[f.role];
-  return `<span class="ar-skill" style="--c1:${pal(f.el).c1};--c2:${pal(f.el).c2}"><i class="ar-role">${esc(r.name)} · ${f.melee ? '근접' : '원거리'}<small>${esc(r.desc)}</small></i><b>① ${esc(k.name)}</b><small>${esc(KIND_KO[k.kind])} · ${esc(k.desc)}</small><b>② ${esc(k2.name)}</b><small>${esc(k2.desc)}</small><em>필살기 ${esc(f.ult)}</em></span>`;
+  const pick = R.picks?.[key] === 1 ? 1 : 0, f = fighter({ key, form, level, s2: pick }), k = f.skill, r = ROLE[f.role];
+  const opts = skill2Picks(key).map((k2, i) => `<button type="button" class="ar-pick2${i === pick ? ' on' : ''}" data-ar="pick2" data-key="${esc(key)}" data-i="${i}" aria-pressed="${i === pick}" title="${esc(k2.desc)}"><i>${k2.icon}</i><b>${esc(k2.name)}</b></button>`).join('');
+  return `<span class="ar-skill" style="--c1:${pal(f.el).c1};--c2:${pal(f.el).c2}"><i class="ar-role">${esc(r.name)} · ${f.melee ? '근접' : '원거리'}<small>${esc(r.desc)}</small></i><b>① ${esc(k.name)}</b><small>${esc(KIND_KO[k.kind])} · ${esc(k.desc)}</small><b class="ar-pick-h">② 고르기</b><span class="ar-picks" role="group" aria-label="스킬 2 고르기">${opts}</span><small class="ar-pick-desc">${esc(f.skill2.desc)}</small><em>필살기 ${esc(f.ult)}</em></span>`;
 }
 function lobby(again = false, keep = false) {
   R.playing = false;
@@ -208,10 +224,12 @@ function lobby(again = false, keep = false) {
 async function start(button) {
   buttonBusy(button);
   let r;
-  try { r = await api('/games/arena/start', { team: R.team }); }
+  // 스킬 ② 고르기는 내 팀 펫 것만 보낸다(서버가 기억한다).
+  const picks = Object.fromEntries(R.team.filter(k => R.picks[k] != null).map(k => [k, R.picks[k]]));
+  try { r = await api('/games/arena/start', { team: R.team, picks }); }
   catch (err) { if (!R) return; buttonBusy(button, false); return toast(err.message || '대전을 시작하지 못했어요.'); }
   if (!R) return;
-  R.view = { ...R.view, left: r.left, tickets: r.tickets, wins: r.wins, streak: r.streak, best_streak: r.best_streak };
+  R.view = { ...R.view, left: r.left, tickets: r.tickets, wins: r.wins, streak: r.streak, best_streak: r.best_streak, s2: r.s2 || R.view?.s2 };
   await vs(r);
   if (R) play(r);
 }
@@ -235,6 +253,11 @@ function field() {
   const shots = Array.from({ length: SHOTS_MAX }, (_, i) => `<i class="ar-shot" id="ar-shot-${i}"></i>`).join('');
   const warns = Array.from({ length: WARN_MAX }, (_, i) => `<i class="ar-warn" id="ar-warn-${i}"></i>`).join('') + Array.from({ length: MINE_MAX }, (_, i) => `<i class="ar-mine" id="ar-mine-${i}"></i>`).join('');
   const nums = Array.from({ length: DMG_MAX }, (_, i) => `<b class="ar-num" id="ar-num-${i}"></b>`).join('');
+  // V13.229 미리 만든 칸: 장판 4 · 줄기 표시 3 · 줄기 2 · 부채꼴(쪽마다) · 분신(쪽마다). 다시 쓰기만 하고 새로 만들지 않는다.
+  const zones = Array.from({ length: ZONES_MAX }, (_, i) => `<i class="ar-zone" id="ar-zone-${i}"><b></b><em></em></i>`).join('');
+  const lines = Array.from({ length: LINE_MAX }, (_, i) => `<i class="ar-line" id="ar-line-${i}"></i>`).join('') + Array.from({ length: STREAM_MAX }, (_, i) => `<i class="ar-stream" id="ar-stream-${i}"><b></b><em></em></i>`).join('');
+  const cones = ['me', 'foe'].map(w => `<i class="ar-cone ${w}" id="ar-cone-${w}"><b></b><b></b><b></b></i>`).join('');
+  const clones = ['me', 'foe'].map(w => `<span class="ar-clone ${w}" id="ar-clone-${w}"><span class="ar-clone-body"></span></span>`).join('');
   // 필살기 컷인 · 물들이기 · 반짝이는 미리 만들어 두고 다시 쓴다(필살기 순간에 조각을 새로 만들지 않는다).
   const cut = `<div class="fx2 fx2-cut ar-cut" id="ar-cut" aria-hidden="true"><div class="fx2-cut-dim"></div><div class="fx2-cut-band"><div class="fx2-cut-lines"></div><div class="fx2-cut-pet" id="ar-cut-pet"></div><div class="fx2-cut-text"><small id="ar-cut-who"></small><b id="ar-cut-name"></b><em></em></div></div>${Array.from({ length: 7 }, (_, i) => `<i class="ar-cut-star" style="left:${12 + i * 12}%;top:${26 + (i * 37) % 44}%">✦</i>`).join('')}</div><div class="fx2 fx2-wash ar-wash" id="ar-wash" aria-hidden="true"></div>`;
   return `<section class="ar-play" id="ar-play">
@@ -245,9 +268,9 @@ function field() {
     </div>
     <div class="ar-field yb-arena" id="ar-field">
       <div class="ar-ring" aria-hidden="true"></div>
-      ${warns}<div class="ar-aim" id="ar-aim" aria-hidden="true"><i></i></div><div class="ar-aim-spot" id="ar-aim-spot" aria-hidden="true"></div>${shots}${nums}${cut}
-      <div class="ar-mon foe" id="ar-foe"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-foe-body"></span><span class="ar-hp"><i id="ar-foe-hp"></i><b id="ar-foe-sh"></b></span></div>
-      <div class="ar-mon me" id="ar-me"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-me-body"></span><span class="ar-hp"><i id="ar-me-hp"></i><b id="ar-me-sh"></b></span><span class="ar-face" id="ar-face"><i></i></span></div>
+      ${zones}${warns}${lines}<div class="ar-aim" id="ar-aim" aria-hidden="true"><i></i></div><div class="ar-aim-spot" id="ar-aim-spot" aria-hidden="true"></div>${cones}${clones}${shots}${nums}${cut}
+      <div class="ar-mon foe" id="ar-foe"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-foe-body"></span><span class="ar-status" aria-hidden="true"><i class="bub"></i><i class="vines"></i><i class="burnf"></i></span><span class="ar-hp"><i id="ar-foe-hp"></i><b id="ar-foe-sh"></b></span></div>
+      <div class="ar-mon me" id="ar-me"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-me-body"></span><span class="ar-status" aria-hidden="true"><i class="bub"></i><i class="vines"></i><i class="burnf"></i></span><span class="ar-hp"><i id="ar-me-hp"></i><b id="ar-me-sh"></b></span><span class="ar-face" id="ar-face"><i></i></span></div>
     </div>
     <div class="ar-combo" id="ar-combo" aria-hidden="true"><b id="ar-combo-n"></b><small>콤보!</small></div>
     <div class="ar-pad" id="ar-pad">
@@ -269,7 +292,7 @@ function hudHtml(who, name, team) {
 }
 function play(r) {
   // 서버와 똑같이 key · form · level로 능력치를 다시 만든다(server/arena.mjs unpack과 같다).
-  const fighters = list => list.map(f => fighter({ key: f.key, form: f.form, level: f.level }));
+  const fighters = list => list.map(f => fighter({ key: f.key, form: f.form, level: f.level, s2: f.s2 }));
   R.r = r;
   R.forms = { me: r.me.map(f => f.form), foe: r.foe.team.map(f => f.form) };
   R.teams = { me: fighters(r.me), foe: fighters(r.foe.team) };
@@ -277,6 +300,7 @@ function play(r) {
   Object.assign(R, { inputs: [], queue: [], dir: 0, sentDir: 0, holdAtk: false, keyDown: new Set(), playing: true, paused: false, pausedMs: 0, started: false });
   app()?.classList.add('playing');
   main(field()); artGuard();
+  R.slots = null; R.skillsOn = true;
   preloadPoses();
   applyLite();
   R.fxN = 0; R.lag = { last: 0, longs: [] };
@@ -320,7 +344,7 @@ const poseReady = src => !!src && R.poses?.get(src) === true;
 // 저사양 자동 단계(야차전과 같은 기준): 3초 안에 50ms 넘는 프레임이 8번을 넘으면 가벼운 연출로, 7일 기억.
 const pref = (k, d) => { try { return localStorage.getItem(k) ?? d; } catch { return d; } };
 const liteOn = () => { const at = Number(pref(LITE_KEY, 0)); return at > 0 && Date.now() - at < LITE_DAYS * 86400000; };
-function applyLite() { const on = liteOn(); app()?.classList.toggle('ar-lite', on); fxLite(on); }
+function applyLite() { const on = liteOn(); app()?.classList.toggle('ar-lite', on); fxLite(on); if (R) R.lite = on; }
 function lagWatch(t) {
   const L = R.lag;
   if (L.last && !document.hidden) {
@@ -389,7 +413,7 @@ function aimShape(btn) {
   const f = R?.teams?.me?.[R.cur?.me?.idx]; if (!f) return null;
   if (btn === 'ult') return 'fan';
   if (btn === 'skill') return ['guard', 'boost'].includes(f.skill.kind) ? null : f.shape === 'quake' ? 'circle' : f.shape === 'orb' ? 'fan' : 'arrow';
-  if (btn === 'skill2') return { barrage: 'fan', rain: 'circle', pull: 'arrow', rush: 'arrow' }[f.skill2.kind] || null;
+  if (btn === 'skill2') return { breath: 'fan', spear: 'fan', meteor: 'circle', crack: 'circle', icefield: 'circle', cloud: 'circle', jet: 'arrow', vine: 'arrow', chain: 'arrow', tornado: 'arrow', boulder: 'arrow', gale: 'arrow', darts: 'arrow' }[f.skill2.id] || null;
   return null;
 }
 // 조준 표시: 내 펫 발밑에서 끈 방향으로. 원은 놓일 자리(상대 쪽이면 상대 발밑, 아니면 그 방향으로 상대 거리만큼 12~40).
@@ -424,7 +448,7 @@ function drawMon(who) {
     $('ar-skill')?.style.setProperty('--c1', pal(R.teams.me[s.idx].el).c1);
     const k2 = R.teams.me[s.idx].skill2, n2 = $('ar-skill2-name'), i2 = $('ar-skill2-ico');
     if (n2) n2.textContent = k2.name;
-    if (i2) i2.textContent = S2_ICON[k2.kind] || '🌀';
+    if (i2) i2.textContent = k2.icon || '🌀';
     $('ar-skill2')?.style.setProperty('--c1', pal(R.teams.me[s.idx].el).c2);
   }
 }
@@ -445,14 +469,14 @@ function drawHp() {
 }
 // 버튼 쿨타임 · 필살기 링(바뀔 때만 쓴다).
 function drawPad() {
-  const m = R.cur.me, set = (id, frac) => { const el = $(id); if (!el) return; const v = Math.round(frac * 100); if (el._v !== v) { el._v = v; el.style.transform = `scaleY(${frac})`; el.parentElement?.classList.toggle('wait', frac > 0); } };
+  const m = R.cur.me, set = (id, frac) => { const el = slot(id); if (!el) return; const v = Math.round(frac * 100); if (el._v !== v) { el._v = v; el.style.transform = `scaleY(${frac})`; el.parentElement?.classList.toggle('wait', frac > 0); } };
   const f = R.teams.me[m.idx];
   set('ar-cd-skill', Math.max(0, m.skill) / (f.skillCd || ARENA.SKILL_TICKS));
   set('ar-cd-skill2', Math.max(0, m.skill2) / (f.skill2Cd || ARENA.SKILL2_TICKS));
   set('ar-cd-dodge', Math.max(0, m.dodgeCd) / (f.dodgeCd || ARENA.DODGE_CD));
   const alive = m.team.filter((f, i) => f.cur > 0 && i !== m.idx).length;
   set('ar-cd-swap', alive ? Math.max(0, m.swapCd) / ARENA.SWAP_CD : 1);
-  const g = Math.floor(m.gauge), ring = $('ar-ult-ring');
+  const g = Math.floor(m.gauge), ring = slot('ar-ult-ring');
   if (ring && ring._g !== g) { ring._g = g; ring.style.strokeDashoffset = String(100 - g); $('ar-ult')?.classList.toggle('full', g >= ARENA.GAUGE_MAX); }
 }
 // 경기장 좌표(%) → 픽셀(화면 크기가 바뀔 때만 다시 잰다).
@@ -461,54 +485,112 @@ const px = (x, y) => { const g = geo(); return { x: x / 100 * g.w, y: y / 100 * 
 function place(frac) {
   const at = {};
   for (const who of ['me', 'foe']) {
-    const a = R.prev[who], b = R.cur[who], el = $(`ar-${who}`); if (!el) continue;
+    const a = R.prev[who], b = R.cur[who], el = slot(`ar-${who}`); if (!el) continue;
     const jump = a.idx !== b.idx || Math.abs(b.x - a.x) > 12; // 교체 · 밀쳐내기는 한 번에
     const x = jump ? b.x : a.x + (b.x - a.x) * frac, y = jump ? b.y : a.y + (b.y - a.y) * frac;
     const p = px(x, y);
     el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -80%)`;
     at[who] = { x, y };
     const flags = [b.fx < -0.1 || (Math.abs(b.fx) <= 0.1 && R.cur[who === 'me' ? 'foe' : 'me'].x < x) ? 'flip' : '', b.enter > 0 ? 'hidden' : '', b.stun > 0 ? 'stun' : '', b.slow > 0 ? 'slow' : '',
-      b.boost > 0 ? 'boost' : '', b.shield > 0 ? 'shield' : '', b.poison > 0 ? 'poison' : '', b.inv > 0 && b.dash > 0 ? 'inv' : '', b.power2 > 0 ? 'charged' : ''].join(' ');
+      b.boost > 0 ? 'boost' : '', b.shield > 0 ? 'shield' : '', b.poison > 0 ? 'poison' : '', b.inv > 0 && b.dash > 0 ? 'inv' : '', b.power2 > 0 ? 'charged' : '',
+      b.bubble > 0 ? 'bubble' : '', b.root > 0 ? 'root' : '', b.burn > 0 ? 'burn' : '', b.slide > 0 ? 'slide' : '', b.chan > 0 ? 'casting' : ''].join(' ');
     if (el._flags !== flags) {
       el._flags = flags;
       const cls = el.classList;
-      for (const [k, on] of [['flip', flags.includes('flip')], ['hidden', b.enter > 0], ['stun', b.stun > 0], ['slow', b.slow > 0], ['boost', b.boost > 0], ['shield', b.shield > 0], ['poison', b.poison > 0], ['inv', b.inv > 0 && b.dash > 0], ['charged', b.power2 > 0]]) cls.toggle(k, on);
+      for (const [k, on] of [['flip', flags.includes('flip')], ['hidden', b.enter > 0], ['stun', b.stun > 0], ['slow', b.slow > 0], ['boost', b.boost > 0], ['shield', b.shield > 0], ['poison', b.poison > 0], ['inv', b.inv > 0 && b.dash > 0], ['charged', b.power2 > 0],
+        ['bubble', b.bubble > 0], ['root', b.root > 0], ['burn', b.burn > 0], ['slide', b.slide > 0], ['casting', b.chan > 0]]) cls.toggle(k, on);
     }
   }
   // 겹침 순서: 아래쪽(앞) 펫이 위로. 순서가 바뀔 때만 쓴다(매 프레임 zIndex를 쓰지 않는다).
   const z = at.me && at.foe && at.me.y >= at.foe.y ? 'me' : 'foe';
-  if (R.z !== z) { R.z = z; const m = $('ar-me'), f = $('ar-foe'); if (m) m.style.zIndex = z === 'me' ? '12' : '11'; if (f) f.style.zIndex = z === 'me' ? '11' : '12'; }
+  if (R.z !== z) { R.z = z; const m = slot('ar-me'), f = slot('ar-foe'); if (m) m.style.zIndex = z === 'me' ? '12' : '11'; if (f) f.style.zIndex = z === 'me' ? '11' : '12'; }
   // 내 펫이 바라보는 쪽 화살표(16방향 칸이 바뀔 때만 돌린다).
   const fc = aimCode(R.cur.me.fx, R.cur.me.fy);
-  if (fc !== R.faceCode) { R.faceCode = fc; const f = $('ar-face'), g = geo(); if (f) f.style.transform = `rotate(${(Math.atan2(R.cur.me.fy * g.h, R.cur.me.fx * g.w) * 180 / Math.PI + 90).toFixed(1)}deg)`; }
+  if (fc !== R.faceCode) { R.faceCode = fc; const f = slot('ar-face'), g = geo(); if (f) f.style.transform = `rotate(${(Math.atan2(R.cur.me.fy * g.h, R.cur.me.fx * g.w) * 180 / Math.PI + 90).toFixed(1)}deg)`; }
   if (R.drag?.on) drawAim();
   // 날아가는 공격 · 지진 표시(정해진 개수의 칸을 다시 쓴다).
   const shots = R.cur.shots;
   for (let i = 0; i < SHOTS_MAX; i++) {
-    const el = $(`ar-shot-${i}`), s = shots[i]; if (!el) continue;
+    const el = slot(`ar-shot-${i}`), s = shots[i]; if (!el) continue;
     if (!s) { if (el._on) { el._on = false; el.style.opacity = '0'; } continue; }
-    const p = px(s.x, s.y), P = pal(s.el), key = `${s.el}${s.kind}${s.r}`;
-    if (el._key !== key) { el._key = key; el.style.setProperty('--c1', P.c1); el.style.setProperty('--c2', P.c2); el.style.setProperty('--sz', `${Math.round(s.r * 2 / 100 * geo().w + 6)}px`); el.className = `ar-shot ${s.kind} ${s.from}`; }
+    // V13.229 새 스킬 탄(바위 · 얼음 창 · 독침 · 분신 별): 종류 · 방향이 바뀔 때만 클래스 · 각도를 다시 쓴다.
+    const p = px(s.x, s.y), P = pal(s.el), ang = s.id ? Math.round(angOf(s.vx, s.vy) / 5) * 5 : 0, key = `${s.el}${s.kind}${s.r}${s.id}${ang}`;
+    if (el._key !== key) { el._key = key; el._rot = s.id && s.id !== 'boulder' && s.id !== 'clone' ? ` rotate(${ang}deg)` : ''; el.style.setProperty('--c1', P.c1); el.style.setProperty('--c2', P.c2); el.style.setProperty('--sz', `${Math.round(s.r * 2 / 100 * geo().w + 6)}px`); const art = artOf(s.id); el.style.setProperty('--art', art || 'none'); el.className = `ar-shot ${s.kind} ${s.from}${s.id ? ` sk ${s.id}` : ''}${art ? ' art' : ''}`; }
     el._on = true; el.style.opacity = '1';
-    el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)`;
+    el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)${el._rot}`;
   }
   const qs = R.cur.quakes;
   for (let i = 0; i < WARN_MAX; i++) {
-    const el = $(`ar-warn-${i}`), q = qs[i]; if (!el) continue;
+    const el = slot(`ar-warn-${i}`), q = qs[i]; if (!el) continue;
     if (!q) { if (el._on) { el._on = false; el.style.opacity = '0'; el.className = 'ar-warn'; el._from = null; } continue; }
     // 크기는 transform scale로만(너비 · 높이를 바꾸면 배치를 다시 한다). 기본 칸은 WARN_BASE px 원.
-    const p = px(q.x, q.y), k = q.r * 2 / 100 * geo().w / WARN_BASE * (1.15 - Math.max(0, q.left) / 14 * 0.3);
+    const p = px(q.x, q.y), k = q.r * 2 / 100 * geo().w / WARN_BASE * (1.15 - Math.max(0, q.left) / (q.warn || 14) * 0.3);
     if (!el._on) { el._on = true; el.style.opacity = '1'; el._from = null; }
-    if (el._from !== q.from) { el._from = q.from; el.className = `ar-warn on ${q.from}`; }
+    if (el._from !== q.from + q.id) { el._from = q.from + q.id; el.className = `ar-warn on ${q.from}${q.id ? ` ${q.id}` : ''}`; }
     el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%) scale(${k.toFixed(3)}, ${(k * 0.55).toFixed(3)})`;
   }
   const ms = R.cur.mines || [];
   for (let i = 0; i < MINE_MAX; i++) {
-    const el = $(`ar-mine-${i}`), m = ms[i]; if (!el) continue;
+    const el = slot(`ar-mine-${i}`), m = ms[i]; if (!el) continue;
     if (!m) { if (el._on) { el._on = false; el.style.opacity = '0'; el.className = 'ar-mine'; } continue; }
     const p = px(m.x, m.y);
     if (!el._on) { el._on = true; el.style.opacity = '1'; el.className = `ar-mine on ${m.from}`; el.style.setProperty('--c1', pal(m.el).c1); }
     el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)`;
+  }
+  drawSkills(at);
+}
+// V13.229 새 스킬 칸 그리기(장판 · 줄기 표시 · 부채꼴 · 분신). 크기 · 방향은 transform만, 종류(클래스)는 바뀔 때만 쓴다.
+const angOf = (nx, ny) => { const g = geo(); return Math.atan2(ny * g.h, nx * g.w) * 180 / Math.PI; };
+function slotClass(el, cls, art) {
+  if (el._cls === cls) return;
+  el._cls = cls; el.className = cls;
+  if (el._art !== art) { el._art = art; el.style.setProperty('--art', art || 'none'); }
+}
+// 칸 찾기는 판마다 한 번(매 프레임 getElementById를 하지 않는다).
+const slot = id => (R.slots ||= new Map()).get(id) || (() => { const el = $(id); if (el) R.slots.set(id, el); return el; })();
+function drawSkills(at) {
+  const v = R.cur, g = geo();
+  // 새 스킬 칸이 하나도 없고 지난 프레임에도 없었으면 바로 끝(대부분의 프레임).
+  const busy = (v.zones?.length || 0) + (v.lines?.length || 0) + (v.minions?.length || 0) + (v.me.chan > 0) + (v.foe.chan > 0);
+  if (!busy && !R.skillsOn) return;
+  R.skillsOn = busy > 0;
+  // 장판: 장판 번호(n) % 4 칸. 한 판에 4개까지라 늘 다른 칸이다.
+  const used = new Set();
+  for (const z of v.zones || []) {
+    const i = z.n % ZONES_MAX, el = slot(`ar-zone-${i}`); if (!el) continue;
+    used.add(i);
+    const p = px(z.x, z.y), k = z.r * 2 / 100 * g.w / ZONE_BASE, fade = z.left < 10 ? ' fading' : '', P = pal(z.el);
+    if (el._n !== z.n) { el._n = z.n; el.style.setProperty('--c1', P.c1); el.style.setProperty('--c2', P.c2); try { el.animate([{ opacity: 0, scale: '.3' }, { opacity: 1, scale: '1.08', offset: .6 }, { opacity: 1, scale: '1' }], { duration: 320, easing: 'ease-out' }); } catch {} }
+    slotClass(el, `ar-zone on ${z.id} ${z.from}${fade}${artOf(z.id) ? ' art' : ''}`, artOf(z.id));
+    el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translate(-50%, -50%) scale(${k.toFixed(3)})`;
+  }
+  for (let i = 0; i < ZONES_MAX; i++) if (!used.has(i)) { const el = slot(`ar-zone-${i}`); if (el && el._cls !== 'ar-zone') { el._n = -1; slotClass(el, 'ar-zone', ''); } }
+  // 줄기 표시(모으는 동안): 쏜 펫 자리에서 조준 방향으로 가는 얇은 띠(길이 · 굵기는 scale).
+  const ls = v.lines || [];
+  for (let i = 0; i < LINE_MAX; i++) {
+    const el = slot(`ar-line-${i}`), L = ls[i]; if (!el) continue;
+    if (!L) { if (el._on) { el._on = false; el.className = 'ar-line'; } continue; }
+    const p = px(L.x, L.y), len = L.len / 100 * g.w, wide = Math.max(0.4, L.w * 2 / 100 * g.w / 10);
+    if (!el._on || el._id !== L.id + L.from) { el._on = true; el._id = L.id + L.from; el.className = `ar-line on ${L.id} ${L.from}`; el.style.setProperty('--c1', pal(L.el).c1); }
+    el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) rotate(${angOf(L.nx, L.ny).toFixed(1)}deg) scale(${(len / LINE_BASE).toFixed(3)}, ${wide.toFixed(2)})`;
+  }
+  // 부채꼴 지속(불 뿜기): 쪽마다 칸 하나. 펫 입에서 조준 방향으로.
+  for (const who of ['me', 'foe']) {
+    const el = slot(`ar-cone-${who}`), s = v[who]; if (!el) continue;
+    if (!(s.chan > 0)) { if (el._on) { el._on = false; el.className = `ar-cone ${who}`; } continue; }
+    const p = at[who] ? px(at[who].x, at[who].y) : px(s.x, s.y), len = (SK2.breath.range + ARENA.BODY) / 100 * g.w;
+    if (!el._on) { el._on = true; const art = artOf('breath'); el.style.setProperty('--art', art || 'none'); el.className = `ar-cone ${who} on${art ? ' art' : ''}`; }
+    el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y - 14)}px) rotate(${angOf(s.cnx, s.cny).toFixed(1)}deg) scale(${(len / CONE_BASE).toFixed(3)})`;
+  }
+  // 분신: 쪽마다 칸 하나(반투명 펫 그림 + 별가루 테두리).
+  const ms = v.minions || [];
+  for (const who of ['me', 'foe']) {
+    const el = slot(`ar-clone-${who}`), m = ms.find(q => q.from === who); if (!el) continue;
+    if (!m) { if (el._on) { el._on = false; el.className = `ar-clone ${who}`; } continue; }
+    if (el._key !== m.key) { el._key = m.key; const b = el.querySelector('.ar-clone-body'); if (b) b.innerHTML = petImg(m.key, R.forms[who][R.cur[who].idx] || 2, 'ar-pet-img'); }
+    if (!el._on) { el._on = true; const art = artOf('clone'); el.style.setProperty('--art', art || 'none'); el.style.setProperty('--c1', pal(m.el).c1); el.className = `ar-clone ${who} on${art ? ' art' : ''}`; }
+    const p = px(m.x, m.y);
+    el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translate(-50%, -80%)${m.x > v[who === 'me' ? 'foe' : 'me'].x ? ' scaleX(-1)' : ''}`;
   }
 }
 function loop(now) {
@@ -531,7 +613,7 @@ function loop(now) {
   R.raf = requestAnimationFrame(loop);
 }
 function clock() {
-  const s = Math.max(0, Math.ceil((ARENA.MAX_TICKS - R.sim.S.t) * ARENA.TICK_MS / 1000)), el = $('ar-clock');
+  const s = Math.max(0, Math.ceil((ARENA.MAX_TICKS - R.sim.S.t) * ARENA.TICK_MS / 1000)), el = slot('ar-clock');
   if (el && el._s !== s) { el._s = s; el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; el.classList.toggle('low', s <= 15); }
 }
 // 한 틱: 이번 틱의 조작을 기록 · 전투에 넣고 → 한 걸음 → 사건 그리기.
@@ -554,15 +636,28 @@ function onEvent(e, show) {
   if (e.e === 'over') return;
   if (e.e === 'dmg') { drawHp(); if (show) hurt(e); else if (e.last) R.finale = true; return; }
   if (e.e === 'buff') { drawHp(); if (show) { pop(e.name, R.cur[e.who].x, R.cur[e.who].y - 20, `skill ${e.who}`); sfx('skill'); aura(e.who, e.el); } return; }
+  if (e.e === 'heal') { drawHp(); if (show) healFx(e); return; }
   if (!show) return;
   if (e.e === 'cutin') return cutin(e);
   if (e.e === 'ult') return ultFx(e);
   if (e.e === 'skillname') { pop(e.name, R.cur[e.who].x, R.cur[e.who].y - 20, `skill ${e.who}`); sfx('skill'); return; }
+  if (e.e === 'skill2' && e.id) return skill2Fx(e);
   if (e.e === 'atk' || e.e === 'skill' || e.e === 'skill2') return attack(e);
+  if (e.e === 'stream') return streamFx(e);
+  if (e.e === 'gale') { afterimage(e.who); slash(px(e.x, e.y), e.nx, e.ny, e.el); sfx('swoosh', { rate: 1.2 + e.n * 0.1 }); return; }
+  if (e.e === 'bubble') { if (e.gone) return void pop('방울이 사라졌어요', e.x, e.y - 22, 'stun'); bits('drop', px(e.x, e.y - 8), 3, 26, 420, 'water'); pop(e.left ? `막음! (${e.left})` : '막음!', e.x, e.y - 24, `skill ${e.who}`); sfx('tap', { rate: 1.6 }); return; }
+  if (e.e === 'bubblepop') { ring(px(e.x, e.y), 'water', e.r); bits('drop', px(e.x, e.y - 8), 6, 60, 560, 'water'); sfx('smash', { rate: 1.5 }); buzz(20); return; }
+  if (e.e === 'cloneshot') { sfx('atk-star', { rate: 1.5, volume: .5 }); return; }
+  if (e.e === 'cloneend') { bits('star', px(e.x, e.y - 10), 4, 30, 520, 'star'); return; }
+  if (e.e === 'burn') return void pop('화상!', R.cur[e.who].x, R.cur[e.who].y - 22, 'stun');
+  if (e.e === 'root') return void pop('묶임!', R.cur[e.who].x, R.cur[e.who].y - 22, 'stun');
+  if (e.e === 'freeze') return void pop('얼어붙음!', R.cur[e.who].x, R.cur[e.who].y - 22, 'stun');
+  if (e.e === 'zap') { pop('감전!', R.cur[e.who].x, R.cur[e.who].y - 22, 'stun'); washFlash('star', .45, 160); return; }
   if (e.e === 'pop') { if (e.kind === 'atk') spark(px(e.x, e.y), e.el); else fxImpact($('ar-field'), px(e.x, e.y), e.el, 2); return; }
   if (e.e === 'blink') { afterimage(e.who); sfx('swoosh', { rate: 1.5 }); return; }
   if (e.e === 'blinked') { R.prev = R.cur; pop('다음 공격 2배!', e.x, e.y - 22, `skill ${e.who}`); return; }
   if (e.e === 'pull') return void pop('끌려옴!', R.cur[e.who].x, R.cur[e.who].y - 22, 'stun');
+  if (e.e === 'boom' && e.id === 'meteor') { meteorBoom(e); return; }
   if (e.e === 'boom') { quake(px(e.x, e.y), e.el, e.kind !== 'atk'); sfx('smash'); if (R.cur.me && Math.abs(R.cur.me.x - e.x) < e.r + 5 && Math.abs(R.cur.me.y - e.y) < e.r + 5) buzz(25); return; }
   if (e.e === 'dodge') { afterimage(e.who); sfx('swoosh', { rate: 1.3 }); return; }
   if (e.e === 'stun') return void pop('기절!', R.cur[e.who].x, R.cur[e.who].y - 22, 'stun');
@@ -635,6 +730,7 @@ function ultFx(e) {
   if (e.who === 'me' && e.hit) buzz([30, 20, 60]);
   nextFrame(() => fxImpact(arenaEl(), to, e.el, 3));
   nextFrame(() => quake(to, e.el, true), 2);
+  nextFrame(() => ultExtra(e, from, to), 3);
 }
 function attack(e) {
   const fieldEl = $('ar-field'), from = px(e.x, e.y);
@@ -652,7 +748,8 @@ const atkSfx = el => el === 'leaf' ? 'atk-leaf' : el === 'wind' ? 'atk-wind' : '
 // 맞는 순간: 히트스톱 → 섬광 · 큰 숫자 · 치명타 · 콤보 · 흔들림 · 소리 겹치기 · 진동.
 const HIT_SFX = { leaf: 'hit-leaf', wind: 'hit-wind', star: 'hit-star', ice: 'hit-star', flame: 'hit-star' };
 function hurt(e) {
-  const poison = e.kind === 'poison', body = $(`ar-${e.who}-body`), stop = poison ? 0 : HITSTOP[e.kind] || 40;
+  // V13.229 화상도 중독처럼 섬광 · 멈춤 없이. 여러 번 맞는 스킬(불 뿜기 · 장판)의 한 번은 멈춤을 아주 짧게, 흔들림 없이.
+  const poison = e.kind === 'poison' || e.kind === 'burn', body = $(`ar-${e.who}-body`), stop = poison ? 0 : e.tick ? 18 : HITSTOP[e.kind] || 40;
   if (!poison) {
     hitStop(stop);
     flash(body);
@@ -671,9 +768,10 @@ function hurt(e) {
     sfx(HIT_SFX[e.el] || 'hit-star', { rate: e.kind === 'atk' ? 1.2 : 1 });
     if (e.who === 'me') sfx('hurt', { rate: 1.05 });
     if (e.crit) sfx('crit', { rate: 1.15 });
-    if (e.kind === 'skill' || e.kind === 'skill2') shakeField(false);
+    if ((e.kind === 'skill' || e.kind === 'skill2') && !e.tick) shakeField(false);
   }
-  if (e.who === 'me' && e.kind !== 'atk' && !poison) buzz(30);
+  if (e.who === 'me' && e.kind !== 'atk' && !poison && !e.tick) buzz(30);
+  if (e.crit && !poison) critFx(px(e.x, e.y - 8));
   if (e.who === 'foe' && e.combo >= 2) combo(e.combo);
   if (e.last) finale(e);
 }
@@ -685,7 +783,7 @@ function flash(body) {
 function dmgNum(e) {
   const i = R.numN++ % DMG_MAX, el = $(`ar-num-${i}`); if (!el) return;
   const p = px(e.x + (((R.numN * 37) % 9) - 4), e.y - 16), P = pal(e.el);
-  const big = e.kind === 'ult' ? 'ult' : e.kind === 'atk' ? 'atk' : e.kind === 'poison' ? 'poison' : 'skill';
+  const big = e.kind === 'ult' ? 'ult' : e.kind === 'atk' ? 'atk' : e.kind === 'poison' || e.kind === 'burn' ? 'poison' : e.tick ? 'atk' : 'skill';
   el.className = `ar-num ${big}${e.crit ? ' crit' : ''}${e.who === 'me' ? ' me' : ''}`;
   el.style.setProperty('--c1', P.c1);
   el.textContent = e.blocked && !e.dmg ? '막음!' : `${e.crit ? '💥' : ''}${e.dmg}`;
@@ -723,7 +821,7 @@ function swapPose(body, src, ms) {
 }
 function fxEl(cls, css, ms, html = '') {
   const f = $('ar-field'); if (!f) return null;
-  if (R.fxN >= FX_MAX) return null; // 효과 조각 상한(렉 방지)
+  if (R.fxN >= (R.lite ? FX_MAX_LITE : FX_MAX)) return null; // 효과 조각 상한(렉 방지): 보통 40 · 저사양 20
   R.fxN++;
   const el = document.createElement('div');
   el.className = `ar-fx ${cls}`;
@@ -746,6 +844,93 @@ function quake(at, el, big) {
   const P = pal(el);
   fxEl(`quake${big ? ' big' : ''}`, { left: `${at.x}px`, top: `${at.y}px`, '--c1': P.c1, '--c2': P.c2 }, 700);
   fxEl('crack', { left: `${at.x}px`, top: `${at.y}px` }, 900);
+}
+/* ---------- V13.229 새 스킬 연출(화끈하고 화려하게, 조각 수는 예산 안) ---------- */
+// 스킬 하나가 만드는 조각: 보통 8개 · 저사양 4개까지.
+const skillCap = n => Math.min(n, R.lite ? SKILL_FX_LITE : SKILL_FX);
+// 작은 조각 n개를 둘레로 흩뿌린다(--dx · --dy만 다르고 움직임은 CSS transform · opacity). 방향은 미리 정한 고른 각도.
+const SPREAD = Array.from({ length: 8 }, (_, i) => [Math.cos(i * 2.39996), Math.sin(i * 2.39996)]);
+function bits(cls, at, n, dist, ms, el) {
+  const P = pal(el), k = skillCap(n);
+  for (let i = 0; i < k; i++) {
+    const [cx, cy] = SPREAD[(i + (R.numN || 0)) % 8], d = dist * (0.6 + (i % 3) * 0.2);
+    fxEl(`bit ${cls}`, { left: `${Math.round(at.x)}px`, top: `${Math.round(at.y)}px`, '--dx': `${Math.round(cx * d)}px`, '--dy': `${Math.round(cy * d * 0.7)}px`, '--c1': P.c1, '--c2': P.c2, '--d': `${i * 30}ms` }, ms + i * 30);
+  }
+}
+function ring(at, el, r = 14) {
+  const P = pal(el), k = r * 2 / 100 * geo().w / ZONE_BASE;
+  fxEl('ring', { left: `${Math.round(at.x)}px`, top: `${Math.round(at.y)}px`, '--c1': P.c1, '--c2': P.c2, '--k': k.toFixed(2) }, 600);
+}
+function critFx(at) {
+  const art = artOf('crit');
+  fxEl(`critburst${art ? ' art' : ''}`, { left: `${Math.round(at.x)}px`, top: `${Math.round(at.y)}px`, '--art': art || 'none' }, 520);
+}
+function healFx(e) {
+  const now = performance.now();
+  if (now - (R.healAt || 0) < 400) return; R.healAt = now;
+  bits('leafbit', px(e.x, e.y - 6), 3, 22, 700, 'leaf');
+  pop('+회복', e.x, e.y - 24, 'heal');
+}
+// 경기장을 잠깐 속성 색으로(미리 만든 물들이기 칸을 다시 쓴다).
+function washFlash(el, peak = .5, ms = 220) {
+  const wash = $('ar-wash'); if (!wash || reduced()) return;
+  const P = pal(el); wash.style.setProperty('--c1', P.c1); wash.style.setProperty('--c2', P.c2);
+  try { wash.animate([{ opacity: 0 }, { opacity: peak, offset: .2 }, { opacity: 0 }], { duration: ms }); } catch {}
+}
+function skill2Fx(e) {
+  const at = px(e.x, e.y), s = R.cur[e.who], f = s?.team?.[s.idx];
+  const src = f && expressionSrc(f.key, R.forms[e.who][s.idx], 'attack');
+  if (poseReady(src)) swapPose($(`ar-${e.who}-body`), src, 400);
+  const id = e.id;
+  if (id === 'breath') { sfx('ult-riser', { rate: 1.6, volume: .7 }); sfx('atk-star', { rate: .6 }); later(() => { const t = px(e.x + e.nx * 16, e.y + e.ny * 16); fxEl('scorch', { left: `${Math.round(t.x)}px`, top: `${Math.round(t.y)}px` }, 1600); }, 300); return; }
+  if (id === 'meteor') { const t = px(e.tx, e.ty), art = artOf('meteor'); fxEl(`meteorfall${art ? ' art' : ''}`, { left: `${Math.round(t.x)}px`, top: `${Math.round(t.y)}px`, '--art': art || 'none', '--fall': `${e.warn * ARENA.TICK_MS}ms` }, e.warn * ARENA.TICK_MS + 60); sfx('swoosh', { rate: .6 }); return; }
+  if (id === 'jet' || id === 'vine' || id === 'chain') { bits('charge', at, 4, 14, 260, e.el); sfx(id === 'chain' ? 'hit-star' : 'swoosh', { rate: id === 'jet' ? .7 : 1.3 }); return; }
+  if (id === 'bubble') { aura(e.who, e.el); bits('drop', px(e.x, e.y - 10), 5, 26, 520, 'water'); sfx('skill', { rate: 1.3 }); return; }
+  if (id === 'petal') { bits('petalbit', px(e.x, e.y), 6, 40, 900, 'leaf'); sfx('skill', { rate: 1.1 }); return; }
+  if (id === 'crack' || id === 'icefield' || id === 'cloud') { const t = px(e.tx, e.ty); bits(id === 'crack' ? 'rock' : id === 'icefield' ? 'frost' : 'puff', t, 5, 34, 600, e.el); if (id === 'crack') { shakeField(false); sfx('smash', { rate: .8 }); } else sfx('swoosh', { rate: .9 }); return; }
+  if (id === 'tornado') { bits('leafbit', at, 4, 20, 500, 'wind'); sfx('swoosh', { rate: .55 }); return; }
+  if (id === 'boulder') { sfx('smash', { rate: .6 }); bits('dust', at, 4, 18, 420, 'earth'); return; }
+  if (id === 'gale') { afterimage(e.who); slash(at, e.nx, e.ny, e.el); sfx('swoosh', { rate: 1.2 }); return; }
+  if (id === 'spear' || id === 'darts') { bits('charge', at, 3, 12, 220, e.el); sfx(id === 'spear' ? 'hit-star' : 'swoosh', { rate: 1.5 }); return; }
+  if (id === 'clone') { bits('star', px(e.x - e.ny * 9, e.y + e.nx * 9), 6, 26, 640, 'star'); sfx('skill', { rate: 1.4 }); return; }
+}
+// 굵은 줄기(물대포 · 덩굴 · 번개): 미리 만든 칸 2개를 번갈아 쓴다. 자리 · 방향은 translate · rotate, 길이는 scale.
+function streamFx(e) {
+  const i = (R.streamN = ((R.streamN || 0) + 1) % STREAM_MAX), el = $(`ar-stream-${i}`); if (!el) return;
+  const g = geo(), from = px(e.x, e.y), len = e.len / 100 * g.w, wide = Math.max(0.5, e.w * 2 / 100 * g.w / 20), P = pal(e.el), art = artOf(e.id);
+  el.className = `ar-stream on ${e.id}${art ? ' art' : ''}`;
+  el.style.setProperty('--c1', P.c1); el.style.setProperty('--c2', P.c2); el.style.setProperty('--art', art || 'none');
+  el.style.translate = `${Math.round(from.x)}px ${Math.round(from.y - 12)}px`;
+  el.style.rotate = `${angOf(e.nx, e.ny).toFixed(1)}deg`;
+  el.style.transform = `scale(${(len / LINE_BASE).toFixed(3)}, ${wide.toFixed(2)})`;
+  try { el.animate([{ opacity: 0, scale: '.1 1' }, { opacity: 1, scale: '1 1.2', offset: .18 }, { opacity: 1, scale: '1 1', offset: .65 }, { opacity: 0, scale: '1 .4' }], { duration: e.id === 'chain' ? 300 : 460, easing: 'ease-out' }); } catch {}
+  const end = e.hit ? px(e.tx, e.ty) : px(e.x + e.nx * e.len, e.y + e.ny * e.len);
+  if (e.id === 'jet') { bits('drop', end, 6, 40, 520, 'water'); if (e.hit) fxImpact(arenaEl(), end, 'water', 2); sfx('smash', { rate: 1.2 }); }
+  else if (e.id === 'vine') { bits('leafbit', end, 5, 26, 600, 'leaf'); sfx('atk-leaf', { rate: .8 }); }
+  else { washFlash('star', .35, 140); bits('spark', end, 4, 24, 320, 'star'); sfx('hit-star', { rate: .7 }); }
+  if (e.hit && e.who === 'foe') buzz(25);
+}
+function meteorBoom(e) {
+  const at = px(e.x, e.y);
+  quake(at, 'flame', true);
+  ring(at, 'flame', e.r);
+  nextFrame(() => bits('ember', at, 8, 60, 640, 'flame'));
+  shakeField(true); zoomAt(at, 0.06, 480); sfx('ult-impact', { rate: 1.2 }); sfx('smash');
+  if (R.cur.me && Math.abs(R.cur.me.x - e.x) < e.r + 5 && Math.abs(R.cur.me.y - e.y) < e.r + 5) buzz([30, 20, 40]);
+}
+// 필살기 속성 연출(컷인 뒤 터질 때 덧붙인다, 조각은 8개 · 저사양 4개까지). 예: 화염 폭풍 = 불 뿜기 큰 버전 + 운석 3개.
+function ultExtra(e, from, to) {
+  const el = e.el, P = pal(el);
+  const big = cls => fxEl(`ultfx ${cls}`, { left: `${Math.round(to.x)}px`, top: `${Math.round(to.y)}px`, '--c1': P.c1, '--c2': P.c2, '--c3': P.c3, '--art': artOf({ flame: 'breath', water: 'jet', leaf: 'vine', earth: 'crack', wind: 'tornado', ice: 'icefield', toxic: 'cloud', star: 'chain' }[el]) || 'none' }, 1100);
+  washFlash(el, .55, 700);
+  if (el === 'flame') { big('firestorm'); for (const [dx, dy] of [[-40, -10], [36, -18], [4, 26]].slice(0, R.lite ? 1 : 3)) fxEl('meteorfall mini', { left: `${Math.round(to.x + dx)}px`, top: `${Math.round(to.y + dy)}px`, '--art': artOf('meteor') || 'none', '--fall': '420ms' }, 480); later(() => bits('ember', to, 6, 70, 700, 'flame'), 420); return; }
+  if (el === 'water') { big('wave'); bits('drop', to, 8, 80, 760, 'water'); return; }
+  if (el === 'leaf') { big('vines'); bits('petalbit', to, 8, 70, 900, 'leaf'); return; }
+  if (el === 'earth') { big('cracks'); bits('rock', to, 8, 70, 720, 'earth'); return; }
+  if (el === 'wind') { big('twister'); bits('leafbit', to, 8, 60, 800, 'wind'); return; }
+  if (el === 'ice') { big('frostburst'); bits('frost', to, 8, 70, 760, 'ice'); return; }
+  if (el === 'toxic') { big('miasma'); bits('puff', to, 8, 60, 900, 'toxic'); return; }
+  big('starfall'); bits('star', to, 8, 80, 800, 'star'); washFlash('star', .7, 200);
 }
 function afterimage(who) {
   const mon = $(`ar-${who}`); if (!mon) return;

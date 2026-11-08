@@ -136,6 +136,7 @@ const cssSources = [
   "v13222.css",
   "v13226.css",
   "v13228.css",
+  "v13229.css",
   "v13185.css",
   "v13184.css",
   "v13178.css"
@@ -256,6 +257,19 @@ export const ENTRY_ART = new Set(${JSON.stringify(games)});
 `;
   if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
   console.log(`[entry-art] ${games.length} entry pictures`);
+}
+
+// V13.229 펫 아레나 그림 게이트(그림 66): 스킬 연출 그림(public/assets/arena/<이름>.webp)이 들어오면 public/modules/arena-art.js에
+// 이름이 적히고, 아레나 화면의 같은 자리(지금은 CSS로 그린 불꽃 · 물줄기 · 장판)가 그 그림으로 바뀐다. 없는 그림은 요청하지 않는다(404 없음).
+{
+  const dir = resolve(root, 'public/assets/arena');
+  const art = existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.webp')).map(f => f.slice(0, -5)).sort() : [];
+  const out = resolve(root, 'public/modules/arena-art.js');
+  const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/arena)에 있는 아레나 그림.
+export const ARENA_ART = new Set(${JSON.stringify(art)});
+`;
+  if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
+  console.log(`[arena-art] ${art.length} pictures`);
 }
 
 // Service worker: precache list + a hash of every served file. Any change to
