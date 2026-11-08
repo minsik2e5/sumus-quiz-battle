@@ -49,10 +49,10 @@
 - 경기장 꾸미기(다른 세션)는 `rank.h`(지난 시즌 기록) · `bt` · `dc`를 읽으면 된다(화면 값 `rank.history`).
 
 ## 4. 그림 69(티어 배지)
-- `docs/asset-requests/runner/69-arena-rank-tiers.txt`(시트 2장 · 그림 6장, `build-69.mjs`가 만든다): 티어 배지 5개 + 시즌 보상 상자.
-- 시트마다 ① Drive의 기존 칭호 메달(`SUMUS 칭호 11` · `60`) · 아레나 그림(`SUMUS 펫 아레나 65`)을 열어 그림체를 맞추라 ② Drive 폴더 **"SUMUS 펫 아레나 69 (Runner용)"**에 `69-1.png` · `69-2.png` 정확한 이름으로 저장하라.
+- `docs/asset-requests/runner/69-arena-rank-tiers.txt`(시트 4장 · 그림 11장, `build-69.mjs`가 만든다): 티어 배지 5개 + 시즌 보상 상자(69-1 · 69-2), 랭크 칭호 메달 5개(69-3 · 69-4, 기존 칭호 메달과 같은 등급 테두리).
+- 시트마다 ① Drive의 기존 칭호 메달(`SUMUS 칭호 11` · `60`) · 아레나 그림(`SUMUS 펫 아레나 65`)을 열어 그림체를 맞추라 ② Drive 폴더 **"SUMUS 펫 아레나 69 (Runner용)"**에 `69-1.png` ~ `69-4.png` 정확한 이름으로 저장하라.
 - 그림이 오기 전에도 **CSS 배지**(티어 색 방패 · 보석 · 골드부터 날개 · 반짝임 · 단계 글자)로 완성되어 보인다. `public/assets/arena/tier-*.webp`를 넣고 `npm run build:assets`면 자동으로 그림으로 바뀐다.
-- 아레나 칭호 5개의 메달 그림은 아직 주문 전이라 기존 SVG 메달로 나온다.
+- 아레나 칭호 5개의 메달은 그림이 오기 전까지 기존 SVG 메달로 나온다(그림을 넣으면 `emblems.js` TITLE_ART에 키 5개 추가).
 
 ## 5. 바뀐 파일
 - 새 파일: `public/modules/arena-rank-rules.js` · `public/modules/arena-rank-ui.js` · `public/v13234.css` · `server/arena-rank.mjs` · `server/arena-rank-check.mjs` · 주문서 69

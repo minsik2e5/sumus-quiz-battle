@@ -163,9 +163,9 @@ export async function runArenaRankChecks(assert) {
     assert(/ARENA_ART\.has\(`tier-\$\{k\}`\)/.test(ui) && /ark-shield/.test(ui) && /\.ark-shield\{/.test(css), 'V13.234 그림 69(tier-*.webp)가 오면 그림, 그 전에는 CSS 배지');
     const dir = '../docs/asset-requests/runner/', sheets = source(`${dir}69-arena-rank-tiers.txt`).split(/^### /m).filter(Boolean);
     const map = source(`${dir}slice-map.csv`).split('\n').filter(l => l.startsWith('"69-arena-rank-tiers.txt"'));
-    assert(sheets.length === 2 && sheets.every(t => t.includes('STYLE REFERENCE') && t.includes('Google Drive') && t.includes('"SUMUS 칭호 11 (Runner용)"') && t.includes('"SUMUS 펫 아레나 65 (Runner용)"') && t.includes('"SUMUS 펫 아레나 69 (Runner용)"') && /named exactly "69-\d\.png"/.test(t))
-      && map.length === 6 && ['bronze', 'silver', 'gold', 'platinum', 'diamond'].every(k => map.some(l => l.includes(`public/assets/arena/tier-${k}.webp`))) && source(`${dir}README.md`).includes('펫 아레나 랭크 티어 배지(69)'),
-      'V13.234 그림 주문서 69: 시트마다 Drive의 기존 칭호 메달 · 아레나 그림을 열어 그림체를 맞추고 "SUMUS 펫 아레나 69 (Runner용)"에 정확한 이름(69-1.png · 69-2.png)으로 저장');
+    assert(sheets.length === 4 && sheets.every(t => t.includes('STYLE REFERENCE') && t.includes('Google Drive') && t.includes('"SUMUS 칭호 11 (Runner용)"') && t.includes('"SUMUS 펫 아레나 69 (Runner용)"') && /named exactly "69-\d\.png"/.test(t)) && sheets.slice(0, 2).every(t => t.includes('"SUMUS 펫 아레나 65 (Runner용)"'))
+      && map.length === 11 && TITLES_ARENA_RANK.every(k => map.some(l => l.includes(`public/assets/titles/${k}.webp`))) && ['bronze', 'silver', 'gold', 'platinum', 'diamond'].every(k => map.some(l => l.includes(`public/assets/arena/tier-${k}.webp`))) && source(`${dir}README.md`).includes('펫 아레나 랭크 티어 배지(69)'),
+      'V13.234 그림 주문서 69(티어 배지 5 · 보상 상자 · 랭크 칭호 메달 5): 시트마다 Drive의 기존 칭호 메달 · 아레나 그림을 열어 그림체를 맞추고 "SUMUS 펫 아레나 69 (Runner용)"에 정확한 이름(69-1.png · 69-2.png)으로 저장');
   }
 }
 
