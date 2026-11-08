@@ -82,6 +82,25 @@ export function wallCard(A, art) {
     </div>
   </article>`;
 }
+// V13.225 펫 아레나 2: 내 펫 3마리를 직접 조종하는 팀 대전. 코인 판 입장권은 단어 연습 · 출석으로. 그림은 주문서 65(arena/entry)가 있으면 쓴다.
+export function arenaCard(A, art) {
+  const v = A.data.rewards?.arena || {};
+  const ready = (A.data.stats?.pets || []).filter(x => Number(x.form) >= 1).length;
+  const pic = art?.entry?.has('arena') ? '<img class="ag-big-bg" src="/assets/arena/entry.webp" alt="" draggable="false" decoding="async">'
+    : '<span class="ag-big-bg ag-arena-bg"><i class="ag-arena-face">⚔️</i></span>';
+  return `<article class="ag-big ag-arena">
+    <div class="ag-big-art" aria-hidden="true">${pic}<span class="ag-big-title"><small>3 대 3 · 펫 대전</small><strong>펫 아레나</strong><em>내 펫을 직접 조종! 스킬 · 회피 · 필살기</em></span></div>
+    <div class="ag-big-body">
+      <ul class="ag-stats" aria-label="내 펫 아레나">
+        <li><i class="ag-ico">🏆</i><b>${num(v.wins || 0)}</b><small>승리</small></li>
+        <li><i class="ag-ico">🎟️</i><b>${num(v.tickets || 0)}</b><small>입장권</small></li>
+        <li><b>${num(v.left ?? 5)}</b><small>오늘 코인 판</small></li>
+      </ul>
+      <p class="ag-note">단어 연습을 끝까지 풀면 입장권 1장(하루 3장) · 출석 1장</p>
+      <button type="button" class="yl-cta ag-go" data-action="arena-open" ${ready ? '' : 'disabled'}>${ready ? '시작' : '펫을 먼저 키워 주세요'}</button>
+    </div>
+  </article>`;
+}
 // V13.162 몬스터 사냥(처음 이름 펫 사냥): 낚시터 · 짝 맞추기처럼 그림 카드. 그림은 HUNT_ART(hunt.js)의 'entry'(주문서 34)가 있으면 쓴다.
 const huntArt = (art, name, fallback) => art?.hunt?.has(name) ? `<img class="ag-ico" src="/assets/hunt/${name}.webp" alt="" draggable="false">` : fallback;
 export function huntCard(A, art) {
@@ -139,6 +158,7 @@ export function gamesSection(A, art) {
     ${reelCard(A, art)}
     ${matchCard(A, art)}
     ${wallCard(A, art)}
+    ${arenaCard(A, art)}
     ${huntCard(A, art)}
     ${clawCard(A, art)}
     ${timingCard(A, art)}

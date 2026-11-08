@@ -1,0 +1,30 @@
+### 65-1 입구 카드
+Create ONE wide landscape image, 1536×1024 pixels: the ENTRY CARD picture for a pet battle game called "PET ARENA" in the playground menu of a premium mobile word-study game (players are 10–18 years old). It is shown as a big banner card next to the game's other entry cards. Paint it fully to every edge (no transparency, no border, no frame, no rounded corners). No text, no letters, no numbers, no logos, no UI buttons, no watermark. Do not ask me any questions; just generate the image.
+Style: premium, cinematic, glossy 3D-painted game art: rich saturated colors (not washed out, not hazy), crisp clean shapes, dramatic but friendly lighting with strong rim light, depth of field, epic and exciting but very cute.
+Scene: a round stone-and-gold arena seen from slightly above. On the LEFT-CENTER, a cute chubby baby dragon pet (round, big glossy eyes, pink blush, like the reference pets) breathes a bright orange flame beam. On the RIGHT, a cute chubby penguin pet fires a sparkling icy-blue beam. The two beams CLASH in the middle in a huge bright starburst explosion with sparks, light rays and flying stone chips. Behind each pet, a faint glowing silhouette of two more teammates (team of three). Cherry blossom petals and confetti in the air, colorful banners around the arena edge.
+COMPOSITION: the game writes its title and small labels over the LEFT 45% and the bottom 28%, so keep those areas a bit calmer and darker. Main action in the right 55% and upper 72%. Must read well at 360 px wide and when cropped to 16:9 around the middle.
+
+### 65-2 경기장 1: 벚꽃 광장 (낮)
+Create ONE tall portrait image, 1024×1536 pixels, painted fully to every edge (no transparency, no border). No text, no letters, no numbers, no logos, no people, no characters, no creatures. Do not ask me any questions; just generate the image.
+Style: premium glossy 3D-painted mobile game background, rich clear colors, crisp clean shapes, bright and joyful, same world as the attached arena reference (a school-town rooftop plaza with cherry blossoms).
+Camera: high angle, looking DOWN at about 60 degrees onto a big round battle floor, so the floor fills most of the picture.
+TOP 0–12%: the far edge of the plaza: a low stone railing, cherry blossom tree tops and a soft sky, darker and calm (game UI goes here).
+MIDDLE 12–72%: a wide, flat, polished marble battle floor with a large circular gold-and-mint ring pattern and a subtle star emblem in the center; the floor must stay open, bright and simple (no obstacles, no objects, no strong shadows), with only a few scattered petals.
+BOTTOM 72–100%: the near edge of the arena: a few wide stone steps and flower planters, slightly darker and low in detail (word buttons go here).
+Warm daytime sunlight, soft long shadows at the edges only.
+
+### 65-3 경기장 2: 숲속 공터 (오후)
+Same prompt as 65-2 (attach the finished 65-2 as a reference: SAME camera angle, SAME layout, SAME floor size and ring position), but the place is a magical forest clearing: the battle floor is a round flat mossy stone platform with a soft glowing green rune ring; the top edge shows giant tree trunks and leafy canopy with light shafts; the bottom edge shows ferns, mushrooms and roots. Warm golden afternoon light, fireflies. Floor center stays open and simple.
+
+### 65-4 경기장 3: 밤하늘 별빛 경기장 (밤)
+Same prompt as 65-2 (attach the finished 65-2 as a reference: SAME camera angle, SAME layout), but it is a night arena floating among the stars: the battle floor is a round dark-navy crystal platform with glowing cyan and gold constellation lines and a star emblem in the center; the top edge shows a deep starry sky with a big glowing moon and soft nebula clouds; the bottom edge shows the crystal platform's rim and floating small rocks. Exciting and magical, not scary. Floor center stays open and readable (bright enough to see small characters on it).
+
+### 65-5 VS 화면 배경
+Create ONE tall portrait image, 1024×1536 pixels, painted fully to every edge (no transparency, no border). No text, no letters, no numbers (do NOT write "VS"), no logos, no characters, no creatures. Do not ask me any questions; just generate the image.
+Style: premium glossy 3D-painted game art, high energy, crisp.
+Layout: the picture is split by a bold DIAGONAL from the upper-right to the lower-left. The UPPER-LEFT half is a warm red-orange energy field with speed lines; the LOWER-RIGHT half is a cool blue-cyan energy field with speed lines. Along the diagonal, a bright white-gold crackling lightning seam. In the exact center, an empty bright glowing burst (the game writes "VS" there). In the upper-left half, an empty round glowing pedestal spotlight at about (30%, 30%); in the lower-right half, another at about (70%, 70%) — the game places each team's pets on them. Keep the pedestals empty.
+
+### 65-6 배너 · 아이콘 (2×2 시트)
+Create ONE square image, 1024×1024 pixels, laid out as a 2×2 sprite sheet: four separate illustrations, one centered in each quarter (each quarter is 512×512), with generous empty space so nothing touches the middle lines or the edges. Use a real transparent background (PNG alpha). Do NOT paint a checkerboard, white box, grid lines, frames or borders. No text, no letters, no numbers, no watermark. Do not ask me any questions; just generate the image.
+Style: the game's premium glossy icon style (match the attached ribbons and icons), crisp, readable when small.
+TOP-LEFT: a VICTORY banner: a wide gold-and-red ribbon with a big gold star crest and laurel leaves on both sides, small sparkles and confetti (the ribbon itself left blank for text). TOP-RIGHT: a DEFEAT banner: a wide gray-blue ribbon slightly drooping, a cracked shield crest, a few small rain-drop shapes (gentle and a little funny, not sad or scary; ribbon left blank). BOTTOM-LEFT: a "super move" gauge icon: a round glossy emblem with a bright swirling flame-and-lightning core, gold rim, sparkles. BOTTOM-RIGHT: a cartoon "fainted" effect: a ring of three to five small spinning yellow stars and little swirl lines, seen from the front (it floats above a fainted pet's head).

@@ -30,6 +30,7 @@ import { openTiming } from './modules/timing.js';
 import { arcadeWords, wordsLabel, openWordsSheet, partyCode } from './modules/arcade-games.js';
 import { openMatchGame } from './modules/match-game.js';
 import { openWallGame } from './modules/wall.js';
+import { openArena } from './modules/arena.js';
 import { openPartyJoin } from './modules/party.js';
 // V13.149 테스트 앱(sumus-voca-test)에서는 화면 위에 '테스트 앱' 표시를 띄워 운영과 헷갈리지 않게 한다.
 if (/^sumus-voca-test\./.test(location.hostname)) document.documentElement.classList.add('is-test-app');
@@ -1026,6 +1027,8 @@ $('#app').addEventListener('click', async event => {
       window.scrollTo(0, 0);
       return openWallGame(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }, { words: w.list, codes: w.picked, label: wordsLabel(A, w.picked) });
     }
+    // V13.225 놀이터 펫 아레나 2: 직접 조종하는 펫 대전(단어 없음, 코인 판 입장권은 단어 연습으로).
+    if (d.action === 'arena-open') { window.scrollTo(0, 0); return openArena(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     // V13.162 놀이터 몬스터 사냥.
     if (d.action === 'claw-open') { window.scrollTo(0, 0); return openClaw(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     if (d.action === 'hunt-open') { window.scrollTo(0, 0); return openHunt(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }

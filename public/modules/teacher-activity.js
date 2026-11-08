@@ -5,7 +5,7 @@ import { api, esc, num } from './ui.js';
 export const ACT_NOTE = '이 기능이 켜진 뒤부터 쌓여요';
 export const ACT_MODES = {
   practice: ['📝', '연습'], test: ['🎯', '실전시험'], exam: ['🧪', '선생님 시험'], yacha: ['⚔️', '야차전'], robot: ['🤖', '로보 연습전'],
-  monster: ['👹', '몬스터전'], hunt: ['🐾', '몬스터 사냥'], claw: ['🧸', '인형뽑기'], blank: ['✍️', '빈칸영작'], fish: ['🎣', '낚시'], match: ['🃏', '짝 맞추기'], timing: ['⏱️', '10초 맞추기'], wall: ['🧱', '벽 통과'], dungeon: ['🏰', '던전'],
+  monster: ['👹', '몬스터전'], hunt: ['🐾', '몬스터 사냥'], claw: ['🧸', '인형뽑기'], blank: ['✍️', '빈칸영작'], fish: ['🎣', '낚시'], match: ['🃏', '짝 맞추기'], timing: ['⏱️', '10초 맞추기'], wall: ['🧱', '벽 통과'], arena: ['🏟️', '펫 아레나'], dungeon: ['🏰', '던전'],
   treasure: ['💰', '보물 사냥'], classfish: ['🐟', '반 낚시'], attend: ['📅', '출석'], rps: ['✌️', '가위바위보'], yabawi: ['🥤', '야바위'], lucky: ['🎰', '행운 뽑기'], market: ['📈', '증권거래소'], egg: ['🥚', '곤충 · 공룡 알']
 };
 const KST = 'Asia/Seoul', STALE_MS = 60000;
