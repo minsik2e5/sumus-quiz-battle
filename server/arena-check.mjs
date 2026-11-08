@@ -264,8 +264,8 @@ export async function runArenaChecks(assert) {
   }
   // 11) V13.227 화면: 끌어서 조준 · 타격감 · 렉 방지 금지 패턴.
   {
-    const ui = source('../public/modules/arena.js'), css = source('../public/v13227.css'), build = source('./build-assets.mjs');
-    assert(build.includes('"v13227.css"') && ['function aimShape(', "addEventListener('pointermove'", 'press(d.btn, true, d.on ? d.code : -1)', 'aimCode(dx / g.w, dy / g.h)', 'id="ar-aim"', 'id="ar-aim-spot"', 'data-ar="aim"', 'INPUT.AIM_EASY', 'INPUT.AIM_AUTO', 'id="ar-face"'].every(x => ui.includes(x)),
+    const ui = source('../public/modules/arena.js'), css = source('../public/v13228.css'), build = source('./build-assets.mjs');
+    assert(build.includes('"v13228.css"') && ['function aimShape(', "addEventListener('pointermove'", 'press(d.btn, true, d.on ? d.code : -1)', 'aimCode(dx / g.w, dy / g.h)', 'id="ar-aim"', 'id="ar-aim-spot"', 'data-ar="aim"', 'INPUT.AIM_EASY', 'INPUT.AIM_AUTO', 'id="ar-face"'].every(x => ui.includes(x)),
       'V13.227 화면: 스킬 · 필살기 버튼을 끌면 화살표 · 부채꼴 · 원으로 조준하고 놓으면 그 방향, 바라보는 쪽 화살표, 대기실에서 조준 방식(직접 · 쉬움 · 자동)');
     assert(['function hitStop(', 'R.pausedMs += until', 'function flash(', 'DMG_MAX', 'function dmgNum(', "pop('치명타!'", 'function combo(', 'function finale(', 'function shakeField(', 'function zoomAt(', 'now - (sfxAt.get(key)', "e.who === 'me' && e.hit) buzz"].every(x => ui.includes(x)) && css.includes('.ar-lite .ar-flash{filter:none') && ui.includes("if (!big && app()?.classList.contains('ar-lite')) return"),
       'V13.227 타격감: 히트스톱(화면만) · 피격 섬광 · 큰 숫자(칸 다시 쓰기) · 치명타 · 콤보 · 마지막 한 방 슬로 · 경기장 흔들림 · 줌 · 소리 겹치기(0.05초) · 진동. 저사양은 조각만 줄이고 느낌은 그대로');
