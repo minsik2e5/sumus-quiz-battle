@@ -1,10 +1,12 @@
 // V13.228 펫 아레나 시뮬레이터(검사 · 밸런스 맞추기용, 앱에는 들어가지 않는다).
 //   node server/arena-sim.mjs tiers 300   등급끼리 승률(같은 단계 · 같은 레벨, 양쪽 모두 같은 솜씨의 컴퓨터가 조종)
 //   node server/arena-sim.mjs bots 120    검사용 학생(대충 · 보통 · 잘함) 대 컴퓨터(쉬움 · 보통 · 어려움) 승률
+//   node server/arena-sim.mjs picks 800   V13.229 속성마다 스킬 ② 두 개: A를 고른 팀 · B를 고른 팀이 같은 상대들을 이긴 비율(목표 차이 ±3)
 // 목표(docs/pet-arena-v2-plan.md 2장 · 5장): 일반 대 영웅 50% ± 3, 전설 대 일반 ≈ 55%, 신화 대 전설 ≈ 55%, 한정 대 일반 50% ± 3.
 //   보통 학생 대 컴퓨터: 쉬움 ≈ 90% · 보통 ≈ 50% · 어려움 ≈ 35%.
 import { fileURLToPath } from 'node:url';
-import { ARENA, INPUT, createArena, fighter, petTier, dirCode, aimCode } from '../public/modules/arena-rules.js';
+import { ARENA, INPUT, EL_SKILLS, createArena, fighter, petTier, dirCode, aimCode } from '../public/modules/arena-rules.js';
+import { elementOf } from '../public/modules/battle-fx.js';
 import { CHARACTERS } from '../public/modules/core.js';
 
 export const seeded = seed => () => { seed = (seed * 1103515245 + 12345) % 2147483648; return seed / 2147483648; };
@@ -49,7 +51,7 @@ const BOT_TEAMS = {
 export function botRate(foeLevel, skill, n = 45) {
   let w = 0, ticks = 0;
   for (let s = 1; s <= n; s++) {
-    const me = BOT_TEAMS.me[s % 3].map(key => fighter({ key, form: 2, level: 12 })), foe = BOT_TEAMS.foe[s % 3].map(key => fighter({ key, form: 2, level: 12 }));
+    const me = BOT_TEAMS.me[s % 3].map((key, i) => fighter({ key, form: 2, level: 12, s2: (s >> 1) + i & 1 })), foe = BOT_TEAMS.foe[s % 3].map((key, i) => fighter({ key, form: 2, level: 12, s2: (s >> 2) + i & 1 }));
     const A = createArena({ seed: s * 37, me, foe, foeLevel }); playArena(A, skill, s);
     if (A.S.winner === 'me') w++; else if (A.S.winner === 'draw') w += 0.5;
     ticks += A.S.t;
@@ -62,7 +64,7 @@ export const TIER_POOL = (() => { const out = { normal: [], epic: [], legend: []
 //   능력치는 정수로 반올림되므로 단계(2 · 3)와 레벨(8~16)을 판마다 바꿔 반올림 차이가 한쪽으로 쏠리지 않게 한다(양쪽은 늘 같은 단계 · 레벨).
 export function tierRate(a, b, n = 300) {
   const A = TIER_POOL[a], B = TIER_POOL[b], rnd = seeded(n * 7 + a.length * 31 + b.length);
-  const pick = (list, form, level) => [0, 1, 2].map(() => fighter({ key: list[Math.floor(rnd() * list.length)], form, level }));
+  const pick = (list, form, level) => [0, 1, 2].map(() => fighter({ key: list[Math.floor(rnd() * list.length)], form, level, s2: rnd() < 0.5 ? 0 : 1 }));
   let w = 0;
   for (let i = 0; i < n; i++) {
     const form = 2 + ((i >> 1) % 2), level = 8 + ((i >> 2) % 9), x = pick(A, form, level), y = pick(B, form, level), flip = i % 2 === 1;
@@ -73,6 +75,25 @@ export function tierRate(a, b, n = 300) {
   }
   return w / n;
 }
+// V13.229 스킬 ② 고르기 승률: 속성 el 펫 셋으로 만든 팀이 스킬 pick(0 A · 1 B)을 골랐을 때, 여러 펫이 섞인 상대 팀(스킬 ②도 섞임)을 이긴 비율.
+//   A와 B는 같은 판(같은 씨앗 · 같은 내 펫 · 같은 상대)을 돌려 비교한다(짝지은 비교라 흔들림이 작다). 양쪽 보통 컴퓨터, 절반은 자리를 바꾼다.
+//   목표: |A 승률 − B 승률| ≤ 3%(무엇을 골라도 승률 차이 ±3% 안).
+export const EL_KEYS = (() => { const out = {}; for (const k of Object.keys(CHARACTERS)) (out[elementOf(k)] ||= []).push(k); return out; })();
+const ALL_KEYS = Object.keys(CHARACTERS);
+export function pickRate(el, pick, n = 800) {
+  const keys = EL_KEYS[el] || [], rnd = seeded(n * 11 + el.length * 97 + el.charCodeAt(0));
+  let w = 0;
+  for (let i = 0; i < n; i++) {
+    const form = 2 + ((i >> 1) % 2), level = 8 + ((i >> 2) % 9), flip = i % 2 === 1;
+    const mine = [0, 1, 2].map(() => fighter({ key: keys[Math.floor(rnd() * keys.length)], form, level, s2: pick }));
+    const foe = [0, 1, 2].map(() => fighter({ key: ALL_KEYS[Math.floor(rnd() * ALL_KEYS.length)], form, level, s2: rnd() < 0.5 ? 0 : 1 }));
+    const S = createArena({ seed: 2000 + i * 13, me: flip ? foe : mine, foe: flip ? mine : foe, foeLevel: 1, meAi: 1 });
+    let guard = 0; while (!S.S.over && guard++ < ARENA.MAX_TICKS + 50) S.step();
+    w += S.S.winner === (flip ? 'foe' : 'me') ? 1 : S.S.winner === 'draw' ? 0.5 : 0;
+  }
+  return w / n;
+}
+export const pickGap = (el, n = 800) => { const a = pickRate(el, 0, n), b = pickRate(el, 1, n); return { a, b, gap: a - b }; };
 export const TIER_PAIRS = [['epic', 'normal', 0.5, 0.03], ['legend', 'normal', 0.55, 0.04], ['mythic', 'legend', 0.55, 0.04], ['limited', 'normal', 0.5, 0.03]];
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -82,6 +103,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     console.log(`등급 승률(${n}판씩, 2 · 3단계 Lv.8~16, 양쪽 보통 컴퓨터)`);
     for (const [a, b, goal, tol] of TIER_PAIRS) { const r = tierRate(a, b, n); console.log(`${a} 대 ${b}: ${pc(r)} (목표 ${pc(goal)} ± ${Math.round(tol * 100)}) ${Math.abs(r - goal) <= tol ? 'OK' : '벗어남'}`); }
     console.log('(참고)', ['epic', 'legend', 'limited', 'mythic'].map(t => `${t} 대 normal ${pc(tierRate(t, 'normal', n))}`).join(' · '));
+  } else if (mode === 'picks') {
+    console.log(`스킬 ② 고르기(${n}판씩, 같은 판을 A · B로 돌려 섞인 상대 팀 승률 비교, 목표 차이 ±3)`);
+    for (const el of Object.keys(EL_SKILLS)) { const r = pickGap(el, n), [a, b] = EL_SKILLS[el]; console.log(`${el} ${a.name} ${pc(r.a)} · ${b.name} ${pc(r.b)} → 차이 ${(r.gap * 100).toFixed(1)} ${Math.abs(r.gap) <= 0.03 ? 'OK' : '벗어남'}`); }
   } else if (mode === 'bots') {
     console.log(`검사용 학생 대 컴퓨터(${n}판씩)`);
     for (const [skill, name] of [[0, '대충'], [1, '보통'], [2, '잘함']]) console.log(`${name}: ` + [0, 1, 2].map(fl => { const r = botRate(fl, skill, n); return `${['쉬움', '보통', '어려움'][fl]} ${pc(r.w)}(${Math.round(r.sec)}초)`; }).join(' · '));

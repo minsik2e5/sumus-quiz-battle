@@ -1978,7 +1978,9 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
     const now = Date.now(), team = Array.isArray(body.team) ? body.team.slice(0, 3).map(x => str(x, 40)) : [];
     const friends = p.preview_owner_id ? [] : arenaPoolFor(state, p, school.id, now);
-    const r = arenaStart(p, { id: id(), team, friends, pets: petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), now });
+    // V13.229 스킬 ② 고르기({ 펫 키: 0 | 1 }): 규칙 파일 cleanPicks가 알려진 펫 · 0/1만 남긴다.
+    const picks = body.picks && typeof body.picks === 'object' && !Array.isArray(body.picks) ? body.picks : null;
+    const r = arenaStart(p, { id: id(), team, picks, friends, pets: petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), now });
     if (!p.preview_owner_id) arenaPoolPut(state, p, school.id, r.team, now);
     delete r.team;
     return r;

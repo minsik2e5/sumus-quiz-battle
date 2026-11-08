@@ -1,13 +1,13 @@
 // V13.225 검사: 펫 아레나 2(public/modules/arena-rules.js · server/arena.mjs · public/modules/arena.js).
 //   직접 조종하는 3:3 펫 대전. 전투는 씨앗과 '몇 번째 틱에 무엇을 눌렀나'만으로 정해지고, 서버가 같은 함수로 다시 돌려 승패 · 보상을 정한다.
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { ARENA, BEATS, INPUT, DIRS, DIR16, ROLE, SKILL2, SHAPE, TIER_MUL, AI, matchup, fighter, petRank, petTier, petSkill, petSkill2, petRole, dirCode, aimCode, cleanInputs, createArena, runArena } from '../public/modules/arena-rules.js';
-import { playArena, seeded, botRate, tierRate, TIER_PAIRS } from './arena-sim.mjs';
+import { ARENA, BEATS, INPUT, DIRS, DIR16, ROLE, SHAPE, TIER_MUL, AI, SHAPES6, EL_SKILLS, SK2, ZONES_MAX, matchup, fighter, petRank, petTier, petSkill, petSkill2, skill2Picks, cleanPicks, petRole, dirCode, aimCode, cleanInputs, createArena, runArena } from '../public/modules/arena-rules.js';
+import { playArena, seeded, botRate, tierRate, TIER_PAIRS, pickGap } from './arena-sim.mjs';
 import { CHARACTERS } from '../public/modules/core.js';
 import { elementOf } from '../public/modules/battle-fx.js';
 import { PET_SKILLS } from '../public/modules/battle-engine.js';
-import { arenaStart, arenaFinish, arenaView, pickTeam, pickFoe, foeLevelOf, arenaLine, grantArenaTicket, arenaPoolFor, arenaPoolPut, ARENA_POOL } from './arena.mjs';
+import { arenaStart, arenaFinish, arenaView, pickTeam, pickFoe, foeLevelOf, arenaLine, grantArenaTicket, arenaPoolFor, arenaPoolPut, ARENA_POOL, S2_MAX } from './arena.mjs';
 import { ACTIVITY_MODES } from './activity.mjs';
 import { STATE_BUDGET_KB } from './perf-budget.mjs';
 
@@ -155,7 +155,7 @@ export async function runArenaChecks(assert) {
     assert(svc.includes("grantArenaTicket(p, 'attend', now)") && svc.includes("grantArenaTicket(student, 'practice', finalizedAt)"), 'V13.225 출석 · 끝까지 푼 연습이 입장권을 준다');
     assert(games.includes('export function arenaCard') && arcade.includes('${arenaCard(A, art)}') && app.includes("d.action === 'arena-open'") && !app.slice(app.indexOf("d.action === 'arena-open'"), app.indexOf("d.action === 'arena-open'") + 300).includes('arcadeWords') && menu.includes("['펫 아레나', r.arena?.left]") && build.includes('"v13226.css"') && build.includes("'wall', 'arena'"),
       'V13.225 놀이터 미니게임에 펫 아레나 카드(단어 고르기 없음) · 오늘 남은 판 · 최고 연승');
-    assert(ui.includes("api('/games/arena/start'") && ui.includes("api('/games/arena/finish', { id: R.r.id, inputs: R.inputs })") && ui.includes('createArena(') && ui.includes('fighter({ key: f.key, form: f.form, level: f.level })') && ui.includes("'arena/bg-plaza', 'battle/bg-arena'"),
+    assert(ui.includes("api('/games/arena/start'") && ui.includes("api('/games/arena/finish', { id: R.r.id, inputs: R.inputs })") && ui.includes('createArena(') && ui.includes('fighter({ key: f.key, form: f.form, level: f.level, s2: f.s2 })') && ui.includes("'arena/bg-plaza', 'battle/bg-arena'"),
       'V13.225 화면은 서버 판으로 같은 전투를 돌리고 조작 기록만 보낸다');
     assert(['ar-stick', "data-btn=\"atk\"", "data-btn=\"skill\"", "data-btn=\"ult\"", "data-btn=\"dodge\"", "data-btn=\"swap\"", 'pointerdown', 'KeyJ'].every(x => ui.includes(x)) && !ui.includes('dealWalls') && !ui.includes('questions'),
       'V13.225 조작: 조이스틱 · 공격 · 스킬 · 필살기 · 회피 · 교체 버튼(누르는 순간 반응), 키보드도 된다. 단어 문제 없음');
@@ -163,29 +163,28 @@ export async function runArenaChecks(assert) {
     const art = ['entry', 'bg-plaza', 'bg-forest', 'bg-night', 'vs', 'banner-win', 'banner-lose', 'ult-icon', 'fx-faint'];
     assert(art.every(n => existsSync(new URL(`../public/assets/arena/${n}.webp`, import.meta.url))) && ui.includes("artImg('ult-icon'") && ui.includes("'banner-win' : 'banner-lose'") && ui.includes('/assets/arena/fx-faint.webp') && css.includes('url(/assets/arena/vs.webp)') && css.includes('.ar-stage.art~.ar-main .ar-ring{display:none}'),
       'V13.225 주문서 65 그림 9개: 경기장 · VS · 승패 배너 · 필살기 아이콘 · 쓰러짐 별');
-    assert(ui.includes('R.fxN >= FX_MAX') && ui.includes('SHOTS_MAX') && css.includes('.ar-shot{') && css.includes('will-change:transform') && !/\.ar-shot[^{]*\{[^}]*transition:[^}]*(left|top)/.test(css),
+    assert(ui.includes('R.fxN >= (R.lite ? FX_MAX_LITE : FX_MAX)') && ui.includes('SHOTS_MAX') && css.includes('.ar-shot{') && css.includes('will-change:transform') && !/\.ar-shot[^{]*\{[^}]*transition:[^}]*(left|top)/.test(css),
       'V13.225 렉 방지: 효과 조각 상한, 날아가는 공격은 정해진 칸을 다시 쓰고 transform으로만 움직인다');
   }
   // 8) V13.226 펫마다 역할 · 스킬 2개 · 근접 보강 · 렉 방지.
   {
-    const keys = Object.keys(CHARACTERS), roles = new Set(keys.map(petRole)), kinds = new Set(keys.map(k => petSkill2(k).kind));
-    assert(Object.keys(ROLE).every(r => roles.has(r)) && Object.keys(SKILL2).every(k => kinds.has(k)) && keys.every(k => { const f = fighter({ key: k, form: 2, level: 5 }); return f.role && f.skill2?.name && f.skill2.desc && f.skillCd > 0 && f.skill2Cd > 0; }),
-      `V13.226 펫 ${keys.length}마리 모두 역할(${[...roles].length}가지) · 스킬 2(${[...kinds].length}가지)가 있다`);
-    const combos = new Set(keys.map(k => `${elementOf(k)}|${petRole(k)}|${petSkill(k).name}|${petSkill2(k).kind}`));
-    assert(combos.size >= keys.length * 0.9, `V13.226 펫마다 특징 · 스킬 조합이 거의 다 다르다(${combos.size}/${keys.length})`);
-    assert(keys.every(k => !(petSkill(k).kind === 'guard' && petSkill2(k).kind === 'heal')) && keys.filter(k => fighter({ key: k }).melee).every(k => ['rush', 'nova', 'pull', 'blink', 'heal'].includes(petSkill2(k).kind)),
-      'V13.226 지키기 펫은 치유를 또 받지 않고, 근접 펫은 근접에 맞는 스킬 2(돌격 · 폭발 · 갈고리 · 순간이동 · 치유)');
+    const keys = Object.keys(CHARACTERS), roles = new Set(keys.map(petRole)), kinds = new Set(keys.flatMap(k => skill2Picks(k).map(x => x.kind)));
+    assert(Object.keys(ROLE).every(r => roles.has(r)) && kinds.size === 16 && keys.every(k => { const f = fighter({ key: k, form: 2, level: 5 }); return f.role && f.skill2?.name && f.skill2.desc && f.skillCd > 0 && f.skill2Cd > 0; }),
+      `V13.226 펫 ${keys.length}마리 모두 역할(${[...roles].length}가지) · 스킬 2(V13.229 속성 스킬 ${kinds.size}가지 중 고르기)가 있다`);
+    const combos = new Set(keys.map(k => `${elementOf(k)}|${petRole(k)}|${petSkill(k).name}`));
+    assert(combos.size >= keys.length * 0.9, `V13.226 펫마다 특징 · 스킬 조합이 거의 다 다르다(${combos.size}/${keys.length}, 스킬 ②는 학생이 고른다)`);
+    assert(keys.every(k => skill2Picks(k).length === 2 && skill2Picks(k).every((x, i) => EL_SKILLS[elementOf(k)][i].id === x.id)),
+      'V13.229 스킬 ②는 펫 속성의 새 스킬 2개 중 하나(근접 · 원거리 모두 같은 두 개에서 고른다)');
     // 근접(돌진 · 지진)과 원거리(빔 · 구슬)가 서로 이길 수 있다.
     const melee = keys.filter(k => ['dash', 'quake'].includes(SHAPE[elementOf(k)])), ranged = keys.filter(k => !melee.includes(k));
     const win = (A, B) => { let w = 0; for (let n = 1; n <= 36; n++) { const me = [0, 1, 2].map(i => fighter({ key: A[(n * 3 + i) % A.length], form: 2, level: 10 })), foe = [0, 1, 2].map(i => fighter({ key: B[(n * 5 + i * 7) % B.length], form: 2, level: 10 })); const X = createArena({ seed: n * 31, me, foe, foeLevel: 1 }); playArena(X, 1, n); if (X.S.winner === 'me') w++; } return w / 36; };
     const mr = win(melee, ranged), rm = win(ranged, melee);
     assert(mr > 0.35 && mr < 0.85 && rm > 0.35 && rm < 0.85 && Math.abs(mr - rm) < 0.3, `V13.226 근접 펫도 원거리 펫을 이길 수 있다(근접 → 원거리 ${Math.round(mr * 100)}% · 원거리 → 근접 ${Math.round(rm * 100)}%)`);
-    // 스킬 2 버튼: 쿨타임이 있고, 순간이동은 다음 공격 2배.
+    // 스킬 2 버튼: 쿨타임이 있다(V13.229 방울 보호막: 누르면 방울 2개).
     const me = [fighter({ key: 'dog', form: 2, level: 5 })];
-    const blinker = Object.keys(CHARACTERS).find(k => petSkill2(k).kind === 'blink');
-    const A = createArena({ seed: 3, me: [fighter({ key: blinker, form: 2, level: 5 })], foe: me, foeLevel: 0 });
+    const A = createArena({ seed: 3, me: [fighter({ key: 'turtle', form: 2, level: 5, s2: 1 })], foe: me, foeLevel: 0 });
     A.S.me.skill2 = 0; A.push([0, INPUT.SKILL2]); A.step();
-    assert(A.S.me.skill2 > 0 && A.S.me.power2 === 1 && cleanInputs([[0, INPUT.SKILL2]]).length === 1, 'V13.226 스킬 2: 누르면 쿨타임, 순간이동은 다음 공격 2배, 서버도 스킬 2 조작을 받는다');
+    assert(A.S.me.skill2 > 0 && A.S.me.bubble === SK2.bubble.hits && cleanInputs([[0, INPUT.SKILL2]]).length === 1, 'V13.226 스킬 2: 누르면 쿨타임(방울 보호막은 방울 2개), 서버도 스킬 2 조작을 받는다');
     const ui = source('../public/modules/arena.js'), css = source('../public/v13226.css');
     assert(ui.includes('data-btn="skill2"') && ui.includes("KeyI: 'skill2'") && ui.includes('ar-role') && ui.includes('ar-mine-'), 'V13.226 화면: 스킬 2 버튼(키보드 I) · 대기실에 역할 · 스킬 ① ② · 함정 표시');
     assert(ui.includes('function lagWatch') && ui.includes("classList.toggle('ar-lite', on)") && ui.includes('fxLite(on)') && css.includes('.ar-lite .ar-pet-img') && ui.includes('preloadPoses()') && ui.includes('poseReady(src)') && ui.includes("if (e.kind === 'atk') spark("),
@@ -275,5 +274,121 @@ export async function runArenaChecks(assert) {
       'V13.228 렉 방지: 필살기 컷인은 미리 만든 칸 · 흔들림/멈춤은 경기장만 · 조각은 프레임을 나눠 · 겹침 순서는 바뀔 때만 · 지진 표시는 scale · 글자는 translate · HUD는 클래스만');
     assert(css.includes('.ar-field.yb-arena{contain:layout style}') && css.includes('.ar-warn::after,.ar-mine::after{animation:none}') && css.includes('.ar-warn.on::after{animation:') && css.includes('.ar-fx.pop,.ar-fx.pop.eff{left:0;top:0}'),
       'V13.228 렉 방지(CSS): 경기장 contain · 숨은 경고 · 함정 칸은 애니메이션 멈춤');
+  }
+
+  // 12) V13.229 (2탄 ②단계) 모양 6가지 · 속성 스킬 16개 · 스킬 ② 고르기 · 렉 예산 · 그림 66 주문서.
+  {
+    const ids = Object.values(EL_SKILLS).flat().map(k => k.id), shapes = new Set(Object.values(EL_SKILLS).flat().map(k => k.shape));
+    assert(SHAPES6.length === 6 && SHAPES6.every(x => shapes.has(x)) && ids.length === 16 && new Set(ids).size === 16 && ids.every(id => SK2[id]) && Object.keys(EL_SKILLS).length === 8 && Object.values(EL_SKILLS).every(l => l.length === 2 && l.every(k => k.name && k.desc && k.icon)),
+      `V13.229 모양 6가지(부채꼴 지속 · 굵은 줄기 · 원 폭발 · 장판 · 돌진 · 소환)를 모두 쓰는 속성 스킬 16개(속성마다 2개): ${Object.values(EL_SKILLS).flat().map(k => k.name).join(' · ')}`);
+    // 스킬 판정: 가만히 선 상대(위쪽 22칸)에게 위로 조준하면 맞고, 아래로 조준하면 빗나간다. 펫은 그 속성 펫 하나(스킬 ② = 그 스킬).
+    const elKey = el => Object.keys(CHARACTERS).find(k => elementOf(k) === el && fighter({ key: k }).el === el);
+    const trial = (el, pick, code, setup = null, ticks = 110) => {
+      const A = createArena({ seed: 11, me: [fighter({ key: elKey(el), form: 2, level: 10, s2: pick })], foe: T(['pig'], 2, 10), foeLevel: 1, foeIdle: true });
+      Object.assign(A.S.foe, { x: 50, y: 50, fx: 0, fy: 1 }); A.S.me.skill2 = 0; A.S.me.cd = 999; A.S.me.skill = 999;
+      setup?.(A);
+      A.push([0, INPUT.SKILL2, code]);
+      const ev = [], seen = { zone: 0, line: 0, minion: 0, maxZones: 0 }, foe0 = { x: A.S.foe.x, y: A.S.foe.y };
+      let rootSeen = 0, stunSeen = 0, slowSeen = 0, slideSeen = 0, poisonSeen = 0, burnSeen = 0;
+      for (let t = 0; t < ticks; t++) {
+        ev.push(...A.step());
+        seen.zone += A.S.zones.length > 0; seen.line += A.S.lines.length > 0; seen.minion += A.S.minions.length > 0; seen.maxZones = Math.max(seen.maxZones, A.S.zones.length);
+        rootSeen ||= A.S.foe.root; stunSeen ||= A.S.foe.stun; slowSeen ||= A.S.foe.slow; slideSeen ||= A.S.foe.slide; poisonSeen ||= A.S.foe.poison; burnSeen ||= A.S.foe.burn;
+        if (t === 2 && A.S.foe.x !== 50) { A.S.foe.x = 50; }
+      }
+      const dmg = ev.filter(e => e.e === 'dmg' && e.who === 'foe').reduce((n, e) => n + e.dmg, 0);
+      return { A, ev, dmg, seen, rootSeen, stunSeen, slowSeen, slideSeen, poisonSeen, burnSeen, moved: Math.abs(A.S.foe.y - foe0.y) + Math.abs(A.S.foe.x - foe0.x) };
+    };
+    const results = {}, aimed = [];
+    for (const [el, list] of Object.entries(EL_SKILLS)) list.forEach((k, pick) => {
+      const hit = trial(el, pick, 0), miss = ['bubble', 'petal', 'clone'].includes(k.id) ? null : trial(el, pick, 8);
+      results[k.id] = { hit, miss };
+      if (miss) aimed.push(k.id);
+    });
+    const offensive = ids.filter(id => !['bubble', 'petal'].includes(id));
+    const hits = offensive.filter(id => results[id].hit.dmg > 0), misses = aimed.filter(id => results[id].miss.dmg === 0);
+    assert(hits.length === offensive.length && misses.length === aimed.length,
+      `V13.229 스킬 판정: 조준한 쪽 상대에게 맞고(${hits.length}/${offensive.length}) 반대쪽으로 쏘면 빗나간다(${misses.length}/${aimed.length})${offensive.filter(id => !hits.includes(id)).concat(aimed.filter(id => !misses.includes(id)).map(x => '빗' + x)).join(',')}`);
+    const R = id => results[id].hit;
+    assert(R('breath').burnSeen > 0 && R('breath').ev.filter(e => e.e === 'dmg' && e.who === 'foe' && e.kind === 'skill2').length >= 4 && R('meteor').ev.some(e => e.e === 'boom' && e.id === 'meteor') && R('vine').rootSeen > 0 && R('spear').stunSeen > 0 && R('chain').stunSeen > 0 && R('boulder').stunSeen > 0
+      && R('crack').slowSeen > 0 && R('icefield').slideSeen > 0 && R('cloud').poisonSeen > 0 && R('darts').poisonSeen > 0 && R('jet').moved > ARENA.KNOCK.skill2 + 5 && R('tornado').seen.zone > 0 && R('gale').ev.filter(e => e.e === 'gale').length === SK2.gale.n - 1 && R('clone').seen.minion > 0,
+      'V13.229 스킬 덤: 불 뿜기 여러 번 + 화상 · 운석 폭발 · 덩굴 묶임 · 얼음 창 얼어붙음 · 번개 감전 · 바위 기절 · 지진 느려짐 · 얼음 장판 미끄러짐 · 독구름 · 독침 중독 · 물대포 크게 밀림 · 회오리 · 질풍 세 번 · 분신');
+    // 방울 보호막: 다음 피해 2번을 막고(필살기는 못 막는다) 깨질 때 밀쳐낸다. 꽃잎 회복장: 안에 있으면 회복.
+    {
+      const A = createArena({ seed: 5, me: [fighter({ key: 'turtle', form: 2, level: 10, s2: 1 })], foe: T(['pig'], 2, 10), foeLevel: 1, foeIdle: true });
+      Object.assign(A.S.foe, { x: 50, y: 62 }); A.S.me.skill2 = 0; A.push([0, INPUT.SKILL2]); A.step();
+      const hp0 = A.S.me.team[0].cur, shot = () => { A.S.shots.push({ from: 'foe', x: A.S.me.x, y: A.S.me.y - 7, vx: 0, vy: 2, r: 2.6, life: 6, power: 1, kind: 'atk', extra: null, el: 'star' }); const ev = []; for (let i = 0; i < 4; i++) ev.push(...A.step()); return ev; };
+      const e1 = shot(), e2 = shot(), e3 = shot();
+      assert(A.S.me.team[0].cur < hp0 && e1.some(e => e.e === 'bubble') && e2.some(e => e.e === 'bubblepop') && !e3.some(e => e.e === 'bubble') && A.S.me.bubble === 0 && SK2.bubble.hits === 2,
+        'V13.229 방울 보호막: 피해 2번을 막고, 마지막 방울이 깨질 때 둘레를 밀쳐낸다(세 번째는 맞는다)');
+      const P = createArena({ seed: 5, me: [fighter({ key: Object.keys(CHARACTERS).find(k => elementOf(k) === 'leaf'), form: 2, level: 10, s2: 1 })], foe: T(['pig'], 2, 10), foeLevel: 1, foeIdle: true });
+      Object.assign(P.S.foe, { x: 50, y: 20 }); P.S.me.team[0].cur = 100; P.S.me.skill2 = 0; P.push([0, INPUT.SKILL2]);
+      for (let i = 0; i < 90; i++) P.step();
+      assert(P.S.me.team[0].cur > 100 && P.S.zones.length === 0, 'V13.229 꽃잎 회복장: 4초 동안 안에 있으면 회복하고 사라진다');
+    }
+    // 장판은 한 판에 4개까지(화면 칸 4개를 다시 쓴다). 얼음 장판을 6번 깔아도 4개.
+    {
+      const A = createArena({ seed: 9, me: [fighter({ key: elKey('ice'), form: 2, level: 10, s2: 0 })], foe: T(['pig'], 2, 10), foeLevel: 1, foeIdle: true });
+      Object.assign(A.S.foe, { x: 20, y: 20 }); let most = 0;
+      for (let i = 0; i < 6; i++) { A.S.me.skill2 = 0; A.push([A.S.t, INPUT.SKILL2, i * 2]); A.step(); most = Math.max(most, A.S.zones.length); }
+      assert(ZONES_MAX === 4 && most === ZONES_MAX && new Set(A.S.zones.map(z => z.n % ZONES_MAX)).size === A.S.zones.length, `V13.229 장판은 ${ZONES_MAX}개까지(넘으면 오래된 것부터), 칸 번호가 겹치지 않는다`);
+    }
+    // 서버 다시 돌리기: 새 스킬을 고른 판도 서버(runArena) = 화면. 판마다 스킬 ②를 섞는다.
+    let same = true, s2used = 0;
+    for (let k = 1; k <= 16; k++) {
+      const all = Object.keys(CHARACTERS), me = [0, 1, 2].map(i => fighter({ key: all[(k * 7 + i * 11) % all.length], form: 2, level: 12, s2: (k + i) & 1 })), foe = [0, 1, 2].map(i => fighter({ key: all[(k * 5 + i * 13 + 3) % all.length], form: 2, level: 12, s2: (k >> 1) + i & 1 }));
+      const A = createArena({ seed: k * 71, me, foe, foeLevel: k % 3 });
+      const inputs = cleanInputs(playArena(A, k % 3, k));
+      s2used += inputs.filter(x => x[1] === INPUT.SKILL2).length;
+      const r = runArena({ seed: k * 71, me, foe, foeLevel: k % 3, inputs });
+      same &&= r.winner === A.S.winner && r.ticks === A.S.t && r.dealt.me === A.S.dealt.me && r.dealt.foe === A.S.dealt.foe;
+    }
+    assert(same && s2used > 30, `V13.229 새 스킬을 쓴 판도 서버가 다시 돌리면 같은 결과(스킬 ② ${s2used}번, 16판)`);
+    assert(!source('../public/modules/arena-rules.js').match(/Math\.(random|sin|cos|tan|atan2|exp|log|pow|hypot)\b/), 'V13.229 새 모양 · 스킬도 삼각함수 · 무작위 없이(16방향 표 · sqrt만)');
+    // 스킬 ② 고르기: 규칙 · 서버.
+    assert(fighter({ key: 'turtle', s2: 1 }).skill2.id === 'bubble' && fighter({ key: 'turtle' }).skill2.id === 'jet' && fighter({ key: 'turtle', s2: 7 }).skill2.id === 'jet'
+      && JSON.stringify(cleanPicks({ turtle: 1, dog: 0, nope: 1, cat: 2, bear: '1' })) === '{"turtle":1,"dog":0}' && JSON.stringify(cleanPicks([1])) === '{}',
+      'V13.229 스킬 ② 고르기: 0(A) · 1(B)만, 모르는 펫 · 다른 값은 버린다');
+    {
+      const pets = [{ key: 'turtle', form: 2, level: 10 }, { key: 'dog', form: 2, level: 9 }, { key: 'bear', form: 2, level: 8 }, { key: 'cat', form: 0, level: 1 }];
+      const p = { id: 's2', role: 'student', display_name: '학생', games: {} };
+      const r = arenaStart(p, { id: 'g1', pets, team: ['turtle', 'dog', 'bear'], picks: { turtle: 1, dog: 1, cat: 1, owl: 1 }, now: 1000, random: seeded(3) });
+      const a = p.games.arena;
+      assert(a.s2.turtle === 1 && a.s2.dog === 1 && a.s2.cat === undefined && a.s2.owl === undefined && a.live.me.find(x => x[0] === 'turtle')[3] === 1 && a.live.me.find(x => x[0] === 'bear')[3] === 0 && r.me.find(f => f.key === 'turtle').s2 === 1 && r.s2.turtle === 1,
+        'V13.229 서버: 고른 스킬 ②는 내 펫(알 아님)만 기억하고, 판 기록 [키, 단계, 레벨, 스킬 ②]에 넣어 보낸다');
+      arenaStart(p, { id: 'g2', pets, team: ['turtle'], now: 2000, random: seeded(4) });
+      assert(p.games.arena.live.me.find(x => x[0] === 'turtle')[3] === 1 && arenaView(p, 2000).s2.turtle === 1, 'V13.229 서버: 고르지 않고 시작하면 기억한 스킬 ②로(무료로 바꾼 것이 남는다)');
+      // 끝내기: 서버가 같은 스킬 ②로 다시 돌린다(화면에서 돌린 결과 = 서버).
+      const live = p.games.arena.live, me = live.me.map(([key, form, level, s2]) => fighter({ key, form, level, s2 })), foe = live.foe.map(([key, form, level, s2]) => fighter({ key, form, level, s2 }));
+      const A = createArena({ seed: live.seed, me, foe, foeLevel: live.fl }), inputs = playArena(A, 2, 5);
+      const fin = arenaFinish(p, { id: 'g2', inputs, now: 2000 + ARENA.COUNTDOWN_MS + A.S.t * ARENA.TICK_MS + 1000 });
+      assert(fin.winner === A.S.winner && fin.dealt === A.S.dealt.me && S2_MAX === 40, `V13.229 서버 끝내기도 고른 스킬 ②로 다시 돌린다(화면 = 서버: ${fin.winner})`);
+      const many = {}; for (const k of Object.keys(CHARACTERS)) many[k] = 1;
+      const q = { id: 'q', role: 'student', games: {} }, all = Object.keys(CHARACTERS).map((key, i) => ({ key, form: 2, level: 5 + (i % 9) }));
+      arenaStart(q, { id: 'g', pets: all, team: [], picks: many, now: 1, random: seeded(1) });
+      assert(Object.keys(q.games.arena.s2).length <= S2_MAX, `V13.229 스킬 ② 기억은 ${S2_MAX}개까지(프로필 크기 상한)`);
+    }
+    // 밸런스: 같은 펫이 두 스킬 중 무엇을 골라도 섞인 상대 팀 승률 차이 ±3% 안(node server/arena-sim.mjs picks 1000).
+    const gaps = Object.keys(EL_SKILLS).map(el => ({ el, ...pickGap(el, 600) }));
+    assert(gaps.every(g => Math.abs(g.gap) <= 0.03), `V13.229 스킬 ② 고르기 승률 차이(600판씩): ${gaps.map(g => `${EL_SKILLS[g.el][0].name} ${Math.round(g.a * 1000) / 10} · ${EL_SKILLS[g.el][1].name} ${Math.round(g.b * 1000) / 10}`).join(' / ')}`);
+    // 화면: 스킬 ② 고르기 칸 · 새 칸(장판 4 · 줄기 · 부채꼴 · 분신) · 조각 상한 · 그림 게이트.
+    const ui = source('../public/modules/arena.js'), css = source('../public/v13229.css'), build = source('./build-assets.mjs');
+    assert(['data-ar="pick2"', 'skill2Picks(key)', "api('/games/arena/start', { team: R.team, picks })", 'R.view?.s2', 's2: f.s2', 'id="ar-zone-${i}"', 'id="ar-line-${i}"', 'id="ar-stream-${i}"', 'id="ar-cone-${w}"', 'id="ar-clone-${w}"', 'function drawSkills(', 'function streamFx(', 'function ultExtra(', 'function meteorBoom(', "import { ARENA_ART } from './arena-art.js'"].every(x => ui.includes(x)) && build.includes('"v13229.css"') && build.includes("public/modules/arena-art.js") && source('../public/modules/arena-art.js').includes('export const ARENA_ART'),
+      'V13.229 화면: 대기실에서 펫마다 스킬 ② 고르기(무료) · 미리 만든 장판 · 줄기 · 부채꼴 · 분신 칸 · 속성 필살기 연출 · 그림 66이 오면 칸이 그림으로(ARENA_ART)');
+    assert(ui.includes('FX_MAX = 40, FX_MAX_LITE = 20, SKILL_FX = 8, SKILL_FX_LITE = 4') && ui.includes('R.fxN >= (R.lite ? FX_MAX_LITE : FX_MAX)') && ui.includes('k = skillCap(n)') && ui.includes('STREAM_MAX = 2') && ui.includes('Array.from({ length: ZONES_MAX }'),
+      'V13.229 렉 예산: 효과 조각 한 번에 40개(저사양 20) · 스킬 하나 8개(저사양 4) · 장판 칸 4개 · 줄기 칸 2개');
+    const drawFn = ui.slice(ui.indexOf('function drawSkills('), ui.indexOf('function loop(now)')), fxFns = ui.slice(ui.indexOf('/* ---------- V13.229 새 스킬 연출'), ui.indexOf('function afterimage('));
+    const keyframes = [...css.matchAll(/@keyframes [\w-]+\{([^{}]*\{[^}]*\})+\}/g)].map(m => m[0]);
+    assert(!/style\.(width|height|left|top)\b/.test(drawFn) && !ui.includes('offsetWidth') && !/style\.(width|height)\b/.test(fxFns) && keyframes.length > 10 && keyframes.every(k => !/(width|height|left|top|filter|margin)\s*:/.test(k.replace(/^@keyframes [\w-]+\{/, ''))),
+      'V13.229 렉 방지: 새 칸은 transform(scale) · opacity로만 움직이고(너비 · 높이 · 위치 · 필터 애니메이션 없음), 강제 배치(offsetWidth) 없음');
+    const filters = [...css.matchAll(/([^{}]+)\{[^}]*filter:(?!none)[^;}]*/g)].map(m => m[1].trim());
+    assert(filters.length >= 3 && filters.every(sel => /ar-cone|ar-stream|ultfx/.test(sel)) && css.includes('.ar-lite .ar-cone.on,.ar-lite .ar-stream b,.ar-lite .ar-fx.ultfx{filter:none}'),
+      `V13.229 렉 방지: 빛 번짐 필터는 스킬 · 필살기 칸만(${filters.length}곳), 저사양은 끈다`);
+    // 그림 66 주문서: CLAUDE.md 규칙 두 가지(Drive 65번 그림을 열어 그림체 맞추기 · 정해진 Drive 폴더에 정확한 이름으로 저장) + Codex 지시문.
+    const dir = '../docs/asset-requests/runner/', split = readdirSync(fileURLToPath(new URL(dir + 'split/', import.meta.url))).filter(f => f.startsWith('66-'));
+    const texts = split.map(f => source(`${dir}split/${f}`)), codex = source(`${dir}CODEX_PROMPT_66.md`), map = source(`${dir}slice-map.csv`).split('\n').filter(l => l.startsWith('"66-pet-arena-skills.txt"'));
+    assert(split.length === 7 && texts.every((t, i) => t.includes('STYLE REFERENCE') && t.includes('"SUMUS 펫 아레나 65 (Runner용)"') && t.includes('"SUMUS 펫 아레나 66 (Runner용)"') && /named exactly "66-\d\.png"/.test(t)) && map.length === 19 && map.every(l => l.includes('public/assets/arena/'))
+      && codex.includes('SUMUS 펫 아레나 66 (Runner용)') && codex.includes('REFERENCE IMAGES ARE ATTACHED') && codex.includes('PR까지만') && codex.includes('arena/bg-plaza.webp') && source(`${dir}README.md`).includes('펫 아레나 스킬 연출(66)'),
+      'V13.229 그림 66 주문서: 시트 7장 · 그림 19장, 시트마다 Drive 65번 아레나 그림을 열어 그림체를 맞추고 "SUMUS 펫 아레나 66 (Runner용)"에 정확한 이름으로 저장, Codex 지시문은 저장소 그림 참고');
   }
 }

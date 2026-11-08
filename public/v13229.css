@@ -1,0 +1,155 @@
+/* V13.229 펫 아레나 2탄 ②: 모양 6가지 · 속성 스킬 16개 · 속성 필살기 연출 · 스킬 ② 고르기.
+   렉 예산: 칸은 미리 만들어 다시 쓴다(장판 4 · 줄기 표시 3 · 줄기 2 · 부채꼴 2 · 분신 2). 움직임은 transform · opacity만.
+   빛 번짐 필터(drop-shadow)는 스킬 · 필살기 칸에만, 저사양(.ar-lite)에서는 끈다. 그림 66이 오면 .art + --art(배경 그림)로 칸이 바뀐다. */
+
+/* 대기실: 스킬 ② 고르기 */
+.ar-picks{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:4px 0 6px}
+.ar-pick2{display:flex;flex-direction:column;gap:2px;padding:7px 8px;border-radius:12px;border:2px solid rgba(255,255,255,.18);background:rgba(15,23,42,.55);color:#e2e8f0;text-align:left;font:inherit;cursor:pointer;transition:border-color .15s,background .15s,transform .1s}
+.ar-pick2 b{font-size:13px;font-weight:900;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ar-pick2 small{font-size:11px;line-height:1.3;color:#cbd5e1}
+.ar-pick2.on{border-color:var(--c1,#fde047);background:linear-gradient(160deg,color-mix(in srgb,var(--c1,#fde047) 38%,transparent),rgba(15,23,42,.7));box-shadow:0 0 0 2px rgba(255,255,255,.12) inset}
+.ar-pick2.on b::after{content:" ✓";color:#fde047}
+.ar-pick2:active{transform:scale(.97)}
+.ar-skill > b small{font-weight:700;font-size:11px;color:#cbd5e1;margin-left:4px}
+
+/* 장판(바닥에 남는 칸 4개): 기본 100px 원을 scale로 키우고 세로로 눌러(위에서 비스듬히) 보이게 한다. */
+.ar-zone{position:absolute;left:0;top:0;width:100px;height:100px;margin:0;border-radius:50%;opacity:0;pointer-events:none;z-index:4;will-change:transform}
+.ar-zone.on{opacity:1}
+.ar-zone b,.ar-zone em{position:absolute;inset:0;border-radius:50%;transform:scaleY(.55)}
+.ar-zone.fading{opacity:.45;transition:opacity .4s}
+.ar-zone.on b{background:radial-gradient(ellipse,color-mix(in srgb,var(--c1) 55%,transparent) 0,color-mix(in srgb,var(--c2) 35%,transparent) 55%,transparent 72%);border:3px solid color-mix(in srgb,var(--c1) 80%,#fff)}
+.ar-zone.on em{animation:ar-zspin 3s linear infinite}
+.ar-zone.foe b{box-shadow:0 0 0 2px rgba(244,63,94,.55)}
+.ar-zone.petal b{background:radial-gradient(ellipse,rgba(187,247,208,.55),rgba(74,222,128,.28) 55%,transparent 72%);border-color:#86efac}
+.ar-zone.petal em{background:conic-gradient(from 0deg,transparent 0 8%,#f9a8d4 8% 12%,transparent 12% 33%,#fff 33% 36%,transparent 36% 58%,#f472b6 58% 62%,transparent 62% 83%,#fbcfe8 83% 87%,transparent 87%);-webkit-mask:radial-gradient(ellipse,transparent 55%,#000 58%,#000 70%,transparent 72%);mask:radial-gradient(ellipse,transparent 55%,#000 58%,#000 70%,transparent 72%)}
+.ar-zone.crack b{background:radial-gradient(ellipse,rgba(120,53,15,.75),rgba(146,64,14,.45) 50%,transparent 72%);border-color:#f59e0b}
+.ar-zone.crack em{background:repeating-conic-gradient(from 10deg,rgba(251,191,36,.95) 0 2deg,transparent 2deg 31deg);-webkit-mask:radial-gradient(ellipse,#000 20%,transparent 70%);mask:radial-gradient(ellipse,#000 20%,transparent 70%);animation:ar-zpulse .5s ease-in-out infinite alternate}
+.ar-zone.icefield b{background:radial-gradient(ellipse,rgba(240,249,255,.85),rgba(125,211,252,.55) 50%,rgba(56,189,248,.15) 70%,transparent 72%);border-color:#e0f2fe}
+.ar-zone.icefield em{background:linear-gradient(115deg,transparent 30%,rgba(255,255,255,.9) 45%,transparent 55%);animation:ar-zshine 1.4s ease-in-out infinite}
+.ar-zone.cloud b{background:radial-gradient(ellipse,rgba(192,132,252,.7),rgba(134,239,172,.4) 50%,transparent 72%);border-color:transparent}
+.ar-zone.cloud em{background:radial-gradient(circle at 30% 40%,rgba(216,180,254,.85) 0 14%,transparent 16%),radial-gradient(circle at 65% 35%,rgba(167,243,208,.8) 0 12%,transparent 14%),radial-gradient(circle at 50% 65%,rgba(192,132,252,.85) 0 16%,transparent 18%);animation:ar-zpuff 1.6s ease-in-out infinite alternate}
+.ar-zone.tornado b{background:radial-gradient(ellipse,rgba(236,253,245,.6),rgba(110,231,183,.3) 55%,transparent 72%);border-color:rgba(167,243,208,.9)}
+.ar-zone.tornado em{transform:translateY(-62%) scaleX(.62);border-radius:45% 45% 50% 50% / 30% 30% 70% 70%;background:repeating-linear-gradient(170deg,rgba(255,255,255,.9) 0 6px,rgba(110,231,183,.6) 6px 14px,transparent 14px 22px);-webkit-mask:linear-gradient(180deg,#000 0,#000 70%,transparent);mask:linear-gradient(180deg,#000 0,#000 70%,transparent);animation:ar-ztwist .35s linear infinite}
+.ar-zone.art b{background:var(--art) center/contain no-repeat;border:0;box-shadow:none;transform:none}
+.ar-zone.art em{display:none}
+.ar-zone.art.tornado b{transform:translateY(-55%) scale(.8,1.4)}
+@keyframes ar-zspin{to{transform:scaleY(.55) rotate(360deg)}}
+@keyframes ar-zpulse{from{opacity:.55}to{opacity:1}}
+@keyframes ar-zshine{0%{transform:scaleY(.55) translateX(-30%);opacity:0}50%{opacity:1}100%{transform:scaleY(.55) translateX(30%);opacity:0}}
+@keyframes ar-zpuff{from{transform:scaleY(.55) scale(.92)}to{transform:scaleY(.55) scale(1.06)}}
+@keyframes ar-ztwist{from{transform:translateY(-62%) scaleX(.62)}50%{transform:translateY(-62%) scaleX(.7)}to{transform:translateY(-62%) scaleX(.62)}}
+
+/* 원 폭발(운석) 표시: 기존 빨간 원 + 점점 진해지는 그림자 */
+.ar-warn.meteor{background:radial-gradient(ellipse,rgba(15,23,42,.55),rgba(239,68,68,.35) 55%,rgba(244,63,94,.12) 72%);border-width:4px}
+
+/* 줄기 표시(모으는 동안 얇은 띠 · 기본 100×10px, scale로 길이 · 굵기) */
+.ar-line{position:absolute;left:0;top:0;width:100px;height:10px;margin-top:-5px;transform-origin:0 50%;opacity:0;pointer-events:none;z-index:6;border-radius:6px;will-change:transform}
+.ar-line.on{opacity:1;background:linear-gradient(90deg,color-mix(in srgb,var(--c1) 70%,transparent),color-mix(in srgb,var(--c1) 25%,transparent));border:1px dashed rgba(255,255,255,.75);animation:ar-lineblink .12s linear infinite alternate}
+.ar-line.on.foe{border-color:rgba(254,202,202,.95);background:linear-gradient(90deg,rgba(244,63,94,.55),rgba(244,63,94,.15))}
+@keyframes ar-lineblink{from{opacity:.55}to{opacity:1}}
+
+/* 굵은 줄기(물대포 · 덩굴 · 번개): 칸 2개, 기본 100×20px. 자리 · 방향은 translate · rotate 속성, 길이는 transform scale. */
+.ar-stream{position:absolute;left:0;top:0;width:100px;height:20px;margin-top:-10px;transform-origin:0 50%;opacity:0;pointer-events:none;z-index:108;will-change:transform,opacity}
+.ar-stream b,.ar-stream em{position:absolute;inset:0;border-radius:10px}
+.ar-stream.jet b{background:linear-gradient(180deg,rgba(14,165,233,.2),#38bdf8 25%,#f0f9ff 50%,#38bdf8 75%,rgba(14,165,233,.2));filter:drop-shadow(0 0 6px #7dd3fc)}
+.ar-stream.jet em{inset:22% 0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.95) 0 8px,transparent 8px 18px);animation:ar-flow .18s linear infinite}
+.ar-stream.vine b{inset:25% 0;background:repeating-linear-gradient(90deg,#15803d 0 10px,#22c55e 10px 16px,#14532d 16px 20px);border-radius:6px}
+.ar-stream.vine em{background:radial-gradient(circle,#4ade80 0 30%,transparent 33%) 0 0/18px 100% repeat-x;animation:ar-flow .3s linear infinite}
+.ar-stream.chain b{inset:30% 0;background:linear-gradient(180deg,transparent,#fef9c3 40%,#fff 50%,#fef9c3 60%,transparent);clip-path:polygon(0 50%,8% 0,16% 100%,26% 0,36% 100%,46% 0,56% 100%,66% 0,76% 100%,86% 0,94% 100%,100% 50%,94% 70%,86% 30%,76% 100%,66% 30%,56% 100%,46% 30%,36% 100%,26% 30%,16% 100%,8% 30%);filter:drop-shadow(0 0 5px #c4b5fd)}
+.ar-stream.chain em{background:linear-gradient(90deg,rgba(196,181,253,.0),rgba(196,181,253,.5),rgba(196,181,253,0))}
+.ar-stream.art b{background:var(--art) left center/100% 100% no-repeat;clip-path:none;inset:-40% 0;border-radius:0}
+.ar-stream.art em{display:none}
+@keyframes ar-flow{from{transform:translateX(0)}to{transform:translateX(18px)}}
+
+/* 부채꼴 지속(불 뿜기): 쪽마다 칸 하나, 기본 200px 부채꼴(±30°)을 scale. 불꽃 줄기 3겹이 앞으로 흐른다. */
+.ar-cone{position:absolute;left:0;top:0;width:200px;height:116px;margin-top:-58px;transform-origin:0 50%;opacity:0;pointer-events:none;z-index:105;clip-path:polygon(0 50%,100% 0,100% 100%);will-change:transform}
+.ar-cone.on{opacity:1}
+.ar-cone b{position:absolute;inset:0;transform-origin:0 50%}
+.ar-cone.on b:nth-child(1){background:radial-gradient(ellipse at 0 50%,#fff 0,#fde047 14%,#f97316 38%,rgba(220,38,38,.75) 62%,transparent 80%);animation:ar-flame .22s ease-in-out infinite alternate}
+.ar-cone.on b:nth-child(2){background:radial-gradient(ellipse at 10% 30%,rgba(253,224,71,.9) 0,rgba(249,115,22,.6) 30%,transparent 60%),radial-gradient(ellipse at 20% 70%,rgba(254,240,138,.85) 0,rgba(234,88,12,.55) 30%,transparent 60%);animation:ar-flame2 .3s linear infinite}
+.ar-cone.on b:nth-child(3){background:repeating-radial-gradient(circle at 0 50%,rgba(255,255,255,.0) 0 14px,rgba(255,237,213,.55) 14px 18px,transparent 18px 34px);animation:ar-flame3 .4s linear infinite}
+.ar-cone.on{filter:drop-shadow(0 0 10px rgba(249,115,22,.8))}
+.ar-cone.art b{display:none}
+.ar-cone.art{clip-path:none;background:var(--art) left center/100% 100% no-repeat}
+@keyframes ar-flame{from{transform:scale(.92,.9)}to{transform:scale(1.04,1.06)}}
+@keyframes ar-flame2{from{transform:translateX(-6%)}to{transform:translateX(10%)}}
+@keyframes ar-flame3{from{transform:scale(.8);opacity:.9}to{transform:scale(1.15);opacity:.3}}
+
+/* 분신: 반투명 펫 + 별가루 테두리 */
+.ar-clone{position:absolute;left:0;top:0;width:62px;height:62px;opacity:0;pointer-events:none;z-index:11;will-change:transform}
+.ar-clone.on{opacity:.62}
+.ar-clone-body{position:absolute;inset:0}
+.ar-clone .ar-pet-img{width:100%;height:100%;object-fit:contain}
+.ar-clone.on::after{content:"";position:absolute;inset:-12%;border-radius:50%;background:radial-gradient(circle,transparent 52%,color-mix(in srgb,var(--c1) 70%,#fff) 55%,transparent 62%),conic-gradient(from 0deg,transparent 0 10%,#fde68a 10% 13%,transparent 13% 40%,#c4b5fd 40% 43%,transparent 43% 70%,#fff 70% 73%,transparent 73%);animation:ar-zspin2 1.6s linear infinite}
+.ar-clone.art::after{background:var(--art) center/contain no-repeat}
+@keyframes ar-zspin2{to{transform:rotate(360deg)}}
+
+/* 펫 상태: 방울 · 덩굴 묶임 · 화상 · 미끄러짐 · 불 뿜는 중 */
+.ar-status{position:absolute;inset:0;pointer-events:none}
+.ar-status i{position:absolute;opacity:0;transition:opacity .15s}
+.ar-status .bub{inset:-14% -14% -4%;border-radius:50%;background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.9) 0 7%,transparent 9%),radial-gradient(circle,transparent 58%,rgba(125,211,252,.55) 68%,rgba(240,249,255,.85) 72%,transparent 74%)}
+.ar-mon.bubble .ar-status .bub{opacity:1;animation:ar-bub 1.2s ease-in-out infinite alternate}
+.ar-status .vines{left:-6%;right:-6%;bottom:-4%;height:46%;background:repeating-linear-gradient(75deg,#166534 0 5px,#22c55e 5px 9px,transparent 9px 16px),repeating-linear-gradient(-75deg,#15803d 0 5px,#4ade80 5px 8px,transparent 8px 18px);border-radius:40% 40% 10px 10px;-webkit-mask:linear-gradient(0deg,#000 60%,transparent);mask:linear-gradient(0deg,#000 60%,transparent)}
+.ar-mon.root .ar-status .vines{opacity:1;animation:ar-vine .35s ease-out}
+.ar-status .burnf{left:15%;right:15%;bottom:8%;height:55%;border-radius:50% 50% 30% 30%;background:radial-gradient(ellipse at 50% 90%,rgba(253,224,71,.85),rgba(249,115,22,.6) 40%,transparent 70%)}
+.ar-mon.burn .ar-status .burnf{opacity:.85;animation:ar-flame .2s ease-in-out infinite alternate}
+.ar-mon.slide .ar-shadow{background:radial-gradient(ellipse,rgba(186,230,253,.8),transparent 70%)}
+.ar-mon.casting .ar-body{animation-play-state:paused}
+.ar-mon.bubble .ar-status .bub{background:var(--bub-art,radial-gradient(circle at 32% 28%,rgba(255,255,255,.9) 0 7%,transparent 9%),radial-gradient(circle,transparent 58%,rgba(125,211,252,.55) 68%,rgba(240,249,255,.85) 72%,transparent 74%))}
+@keyframes ar-bub{from{transform:scale(.97)}to{transform:scale(1.04)}}
+@keyframes ar-vine{from{transform:scaleY(.1);opacity:0}to{transform:scaleY(1);opacity:1}}
+
+/* 새 탄: 바위(굴러감) · 얼음 창 · 독침 · 분신 별 */
+.ar-shot.sk.boulder{background:radial-gradient(circle at 35% 30%,#d6d3d1,#78716c 45%,#44403c 70%,transparent 72%);box-shadow:none}
+.ar-shot.sk.boulder::before{content:"";position:absolute;inset:12%;border-radius:50%;border:3px dashed rgba(41,37,36,.55);animation:ar-zspin2 .4s linear infinite}
+.ar-shot.sk.spear{width:calc(var(--sz) * 2.6);border-radius:40% 100% 100% 40% / 50%;background:linear-gradient(90deg,rgba(186,230,253,0),#bae6fd 30%,#f0f9ff 70%,#fff);clip-path:polygon(0 35%,75% 20%,100% 50%,75% 80%,0 65%)}
+.ar-shot.sk.darts{width:calc(var(--sz) * 2.2);height:calc(var(--sz) * .55);border-radius:2px 100% 100% 2px;background:linear-gradient(90deg,rgba(192,132,252,0),#a855f7 40%,#bbf7d0 85%,#fff)}
+.ar-shot.sk.clone{background:radial-gradient(circle,#fff 0 25%,#fde68a 40%,#c4b5fd 65%,transparent 70%);clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.ar-shot.sk.art{background:var(--art) center/contain no-repeat;clip-path:none;border-radius:0}
+.ar-shot.sk.art::before{display:none}
+
+/* 작은 조각(스킬 하나 8개 · 저사양 4개): --dx · --dy로 흩어진다(transform · opacity만). */
+.ar-fx.bit{width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:radial-gradient(circle,#fff,var(--c1) 50%,transparent 72%);animation:ar-bit .6s var(--d,0ms) ease-out both}
+.ar-fx.bit.drop{width:9px;height:12px;border-radius:50% 50% 50% 50% / 60% 60% 40% 40%;background:radial-gradient(circle at 40% 35%,#fff,#7dd3fc 45%,#0284c7)}
+.ar-fx.bit.ember{background:radial-gradient(circle,#fff,#fde047 35%,#f97316 65%,transparent 72%)}
+.ar-fx.bit.rock,.ar-fx.bit.dust{width:11px;height:9px;border-radius:30% 50% 40% 60%;background:linear-gradient(135deg,#d6d3d1,#78716c)}
+.ar-fx.bit.dust{width:18px;height:12px;border-radius:50%;background:radial-gradient(circle,rgba(214,211,209,.8),transparent 70%)}
+.ar-fx.bit.frost{width:12px;height:12px;border-radius:0;background:#e0f2fe;clip-path:polygon(50% 0,60% 40%,100% 50%,60% 60%,50% 100%,40% 60%,0 50%,40% 40%)}
+.ar-fx.bit.puff{width:22px;height:16px;background:radial-gradient(circle,rgba(216,180,254,.85),rgba(134,239,172,.4) 60%,transparent 72%)}
+.ar-fx.bit.leafbit,.ar-fx.bit.petalbit{width:12px;height:8px;border-radius:0 100% 0 100%;background:linear-gradient(135deg,#bbf7d0,#22c55e)}
+.ar-fx.bit.petalbit{background:linear-gradient(135deg,#fff,#f9a8d4)}
+.ar-fx.bit.star,.ar-fx.bit.spark,.ar-fx.bit.charge{width:12px;height:12px;border-radius:0;background:radial-gradient(circle,#fff 0 30%,var(--c1) 60%,transparent 70%);clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.ar-fx.bit.charge{animation-name:ar-charge}
+@keyframes ar-bit{from{transform:translate(0,0) scale(1.1);opacity:1}to{transform:translate(var(--dx),var(--dy)) scale(.3) rotate(160deg);opacity:0}}
+@keyframes ar-charge{from{transform:translate(var(--dx),var(--dy)) scale(.4);opacity:0}60%{opacity:1}to{transform:translate(0,0) scale(1.2);opacity:0}}
+.ar-fx.ring{width:100px;height:100px;margin:-50px 0 0 -50px;border-radius:50%;border:5px solid var(--c1);box-shadow:0 0 18px var(--c1),inset 0 0 14px var(--c2);animation:ar-ring .6s ease-out forwards}
+@keyframes ar-ring{from{transform:scale(calc(var(--k) * .2),calc(var(--k) * .11));opacity:1}to{transform:scale(var(--k),calc(var(--k) * .55));opacity:0}}
+.ar-fx.critburst{width:84px;height:84px;margin:-42px 0 0 -42px;background:radial-gradient(circle,#fff 0 18%,#fde047 32%,transparent 34%),conic-gradient(from 0deg,#fde047 0 4%,transparent 4% 12.5%,#fff 12.5% 16.5%,transparent 16.5% 25%,#fde047 25% 29%,transparent 29% 37.5%,#fff 37.5% 41.5%,transparent 41.5% 50%,#fde047 50% 54%,transparent 54% 62.5%,#fff 62.5% 66.5%,transparent 66.5% 75%,#fde047 75% 79%,transparent 79% 87.5%,#fff 87.5% 91.5%,transparent 91.5%);border-radius:50%;animation:ar-crit .5s ease-out forwards;z-index:150}
+.ar-fx.critburst.art{background:var(--art) center/contain no-repeat}
+@keyframes ar-crit{from{transform:scale(.2) rotate(0);opacity:1}40%{transform:scale(1.15) rotate(20deg);opacity:1}to{transform:scale(1.4) rotate(35deg);opacity:0}}
+.ar-fx.scorch{width:110px;height:44px;margin:-22px 0 0 -55px;border-radius:50%;background:radial-gradient(ellipse,rgba(41,20,5,.6),rgba(120,40,10,.35) 50%,transparent 72%);z-index:3;animation:ar-fade 1.6s ease-out forwards}
+.ar-fx.meteorfall{width:64px;height:64px;margin:-32px 0 0 -32px;z-index:115;animation:ar-meteor var(--fall,800ms) cubic-bezier(.55,0,1,.6) forwards}
+.ar-fx.meteorfall::before{content:"";position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 40% 40%,#fff 0 10%,#fde047 22%,#f97316 45%,#b91c1c 66%,transparent 70%);box-shadow:-10px -18px 26px rgba(249,115,22,.75),-22px -38px 34px rgba(220,38,38,.45)}
+.ar-fx.meteorfall.art::before{background:var(--art) center/contain no-repeat;box-shadow:none}
+.ar-fx.meteorfall.mini{width:40px;height:40px;margin:-20px 0 0 -20px}
+@keyframes ar-meteor{from{transform:translate(90px,-240px) scale(.5);opacity:0}15%{opacity:1}to{transform:translate(0,0) scale(1.1);opacity:1}}
+
+/* 필살기 속성 연출(큰 칸 하나 + 조각) */
+.ar-fx.ultfx{width:200px;height:200px;margin:-100px 0 0 -100px;border-radius:50%;z-index:118;animation:ar-ultfx 1.1s ease-out forwards;filter:drop-shadow(0 0 14px var(--c1))}
+.ar-fx.ultfx.firestorm{background:radial-gradient(circle,#fff 0 8%,#fde047 18%,#f97316 38%,rgba(185,28,28,.7) 58%,transparent 70%),conic-gradient(from 0deg,transparent,rgba(253,224,71,.8),transparent 30%,rgba(249,115,22,.8),transparent 60%,rgba(254,240,138,.8),transparent)}
+.ar-fx.ultfx.wave{border-radius:50% 50% 45% 45%;background:radial-gradient(ellipse at 50% 70%,#f0f9ff 0 12%,#38bdf8 30%,rgba(2,132,199,.7) 55%,transparent 70%),repeating-radial-gradient(circle,rgba(255,255,255,.6) 0 4px,transparent 4px 18px)}
+.ar-fx.ultfx.vines{background:repeating-conic-gradient(from 0deg,#16a34a 0 6deg,transparent 6deg 30deg),radial-gradient(circle,rgba(187,247,208,.9) 0 15%,rgba(34,197,94,.5) 40%,transparent 68%)}
+.ar-fx.ultfx.cracks{border-radius:50%;transform:scaleY(.55);background:repeating-conic-gradient(from 5deg,#fbbf24 0 2deg,transparent 2deg 24deg),radial-gradient(ellipse,rgba(120,53,15,.8),rgba(146,64,14,.4) 55%,transparent 72%)}
+.ar-fx.ultfx.twister{border-radius:45% 45% 50% 50% / 30% 30% 70% 70%;background:repeating-linear-gradient(165deg,rgba(255,255,255,.95) 0 8px,rgba(110,231,183,.7) 8px 18px,transparent 18px 28px)}
+.ar-fx.ultfx.frostburst{background:radial-gradient(circle,#fff 0 12%,#e0f2fe 25%,rgba(125,211,252,.7) 45%,transparent 68%),repeating-conic-gradient(from 0deg,#fff 0 3deg,transparent 3deg 45deg)}
+.ar-fx.ultfx.miasma{background:radial-gradient(circle at 35% 40%,rgba(216,180,254,.95) 0 18%,transparent 20%),radial-gradient(circle at 65% 45%,rgba(167,243,208,.9) 0 16%,transparent 18%),radial-gradient(circle at 50% 65%,rgba(168,85,247,.9) 0 22%,transparent 24%)}
+.ar-fx.ultfx.starfall{background:radial-gradient(circle,#fff 0 10%,#fef08a 22%,rgba(196,181,253,.7) 45%,transparent 68%),repeating-conic-gradient(from 0deg,#fff 0 4deg,transparent 4deg 30deg)}
+.ar-fx.ultfx.art{background:var(--art) center/contain no-repeat}
+@keyframes ar-ultfx{from{transform:scale(.15) rotate(0);opacity:1}35%{transform:scale(1.1) rotate(40deg);opacity:1}to{transform:scale(1.5) rotate(90deg);opacity:0}}
+.ar-fx.pop.heal{font-size:14px;color:#86efac}
+
+/* 저사양: 빛 번짐 필터 끔 · 반복 애니메이션 줄임(조각 수는 화면 코드가 4개로) */
+.ar-lite .ar-cone.on,.ar-lite .ar-stream b,.ar-lite .ar-fx.ultfx{filter:none}
+.ar-lite .ar-zone.on em,.ar-lite .ar-cone.on b:nth-child(2),.ar-lite .ar-cone.on b:nth-child(3),.ar-lite .ar-stream em,.ar-lite .ar-clone.on::after,.ar-lite .ar-mon.bubble .ar-status .bub,.ar-lite .ar-line.on{animation:none}
+.ar-zone:not(.on) em,.ar-cone:not(.on) b,.ar-clone:not(.on)::after,.ar-line:not(.on){animation:none}
+@media (prefers-reduced-motion:reduce){.ar-zone.on em,.ar-cone.on b,.ar-stream em,.ar-line.on,.ar-clone.on::after{animation:none}}
