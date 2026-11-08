@@ -57,6 +57,13 @@ export const ARENA = {
   SLACK_MS: 3000
 };
 
+// V13.232 여러 명 판(1:1:1 난투 · 2:2 팀전) 숫자. 판 규칙(자리 · 시간 · 펫 수)은 arena-live-rules.js LIVE.MODES.
+export const ARENA_N = {
+  MATE_RANGE: 26,            // 팀원 회복 · 보호막이 같이 걸리는 거리(경기장 %)
+  CHAIN_RANGE: 24,           // 번개 연쇄가 옆 상대에게 튀는 거리
+  CHAIN_POWER: 0.6,          // 튄 번개 세기(처음 맞은 것의 60%)
+  GRUDGE: 8                  // 방금 나를 때린 펫을 이만큼(경기장 %) 더 가깝게 보고 노린다
+};
 // 조작 기록 [틱, 코드]: 0 멈춤 · 1~8 방향(위부터 시계 방향) · 10 공격 · 11 스킬 1 · 12 필살기 · 13 회피 · 14 교체 · 15 스킬 2.
 // V13.228 [틱, 코드, 조준]: 공격 · 스킬 · 필살기에 조준 방향(0~15, 위부터 시계 방향 16방향)을 붙일 수 있다(버튼을 끌어서 조준).
 //   조준이 없으면 바라보는 방향(+ 보정). 16 쉬운 조준(보정 ±40°) · 17 자동 조준(늘 상대 쪽, 예전 방식) · 18 직접 조준(±25°, 처음 값).
@@ -298,7 +305,11 @@ const wantNone = () => ({ atk: false, skill: false, skill2: false, ult: false, d
 //   foeIdle: 검사용으로 상대가 가만히 서 있다(조준 · 넉백 · 크리티컬 규칙 확인).
 //   V13.230 foeHuman: 실시간 친구 대전. 상대 쪽도 사람이 조종한다(pushFoe로 조작, 컴퓨터는 19 · 20 조작으로 켜고 끈다).
 //   rollback용 snapshot() · restore() · setQueues(), 상태 요약 hash().
-export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle = false, foeHuman = false }) {
+//   V13.232 players: 여러 명 판(1:1:1 난투 · 2:2 팀전, 구성안 1-1장). [{ who, tm 팀 번호, team: fighter 2마리, x, y 시작 자리, ai: null | 0~2 }].
+//     한 사람당 한 마리씩 경기장에 나오고, 공격은 가장 가까운(또는 조준한) 다른 팀 펫에게. 팀원은 때리지 않고 회복 · 보호막은 팀원에게도.
+//     maxTicks: 판 길이(난투 2분 · 팀전 2분 30초). 조작은 pushAs(who, x). players가 없으면 예전 1:1 그대로(결과가 한 틱도 다르지 않다 — 검사가 본다).
+export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle = false, foeHuman = false, players = null, maxTicks = ARENA.MAX_TICKS, ffa = false }) {
+  const multi = Array.isArray(players) && players.length > 2;
   const lvl = n => Math.max(0, Math.min(2, Math.round(Number(n) || 0)));
   // 씨앗 수(mulberry32, rng()와 같은 수열). 되감기 때 저장 · 되돌리기를 하려고 상태(rs)를 여기 둔다.
   let rs = seed >>> 0;
@@ -309,19 +320,51 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-  const brain = { get me() { return S.ai.me == null ? null : AI[S.ai.me]; }, get foe() { return S.ai.foe == null ? null : AI[S.ai.foe]; } };
-  const side = (team, who) => ({
-    who, team: team.map(f => ({ ...f, cur: f.hp })), idx: 0, gauge: 0,
-    x: 50, y: who === 'me' ? 72 : 28, fx: 0, fy: who === 'me' ? -1 : 1, dir: 0,
+  const brain = new Proxy({}, { get: (_, who) => S.ai[who] == null ? null : AI[S.ai[who]] });
+  // 시작 자리 · 바라보는 쪽(여러 명 판은 가운데 쪽). hx · hy는 다음 펫이 나오는 자리.
+  const home = (who, p) => {
+    if (!p) return { x: 50, y: who === 'me' ? 72 : 28, fx: 0, fy: who === 'me' ? -1 : 1, hx: 50, hy: who === 'me' ? 78 : 22 };
+    const dx = 50 - p.x, dy = 50 - p.y, l = Math.sqrt(dx * dx + dy * dy) || 1;
+    return { x: p.x, y: p.y, fx: dx / l, fy: dy / l, hx: p.x, hy: p.y };
+  };
+  const side = (team, who, tm, p = null) => ({
+    who, tm, team: team.map(f => ({ ...f, cur: f.hp })), idx: 0, gauge: 0,
+    ...home(who, p), dir: 0, lastBy: null, out: -1,
     cd: 14, skill: 50, skill2: 80, power2: 0, dodgeCd: 0, swapCd: 60, enter: 0, stun: 0, slow: 0, boost: 0, shield: 0, poison: 0, poisonDmg: 0,
     dash: 0, dvx: 0, dvy: 0, dashHit: false, dashPow: 0, dashKind: '', dashExtra: null, inv: 0, kb: 0, kbx: 0, kby: 0, lock: 0, aimMode: 0, combo: 0, comboAt: -99,
     chan: 0, cnx: 0, cny: 0, volley: 0, vnx: 0, vny: 0, gale: 0, galeGap: 0, bubble: 0, bubbleT: 0, burn: 0, burnDmg: 0, root: 0, slide: 0, sx: 0, sy: 0,
     want: wantNone(), strafe: random() < 0.5 ? 1 : -1, think: 0
   });
-  const S = { t: 0, freeze: 0, over: false, winner: null, me: side(me, 'me'), foe: side(foe, 'foe'), shots: [], quakes: [], mines: [], zones: [], lines: [], minions: [], zoneN: 0, inputs: [], ip: 0, ults: { me: 0, foe: 0 }, pendingUlt: null, ultAim: null, dealt: { me: 0, foe: 0 }, ko: { me: 0, foe: 0 },
-    inputs2: [], ip2: 0, ai: { me: meAi == null ? null : lvl(meAi), foe: foeIdle || foeHuman ? null : lvl(foeLevel) } };
+  const S = { t: 0, freeze: 0, over: false, winner: null, shots: [], quakes: [], mines: [], zones: [], lines: [], minions: [], zoneN: 0, inputs: [], ip: 0, pendingUlt: null, ultAim: null,
+    inputs2: [], ip2: 0, maxT: maxTicks, multi, ffa: multi && !!ffa };
+  // 여러 명 판의 조작 줄(쪽마다). 되감기 저장(snapshot)에는 넣지 않는다: 확정된 판이 들고 있다. 읽은 자리(qi)만 상태에 있다.
+  const Q = {};
+  if (multi) {
+    S.list = players.map(p => side(p.team, p.who, p.tm, p));
+    for (const s of S.list) { S[s.who] = s; Q[s.who] = []; }
+    S.qi = Object.fromEntries(S.list.map(s => [s.who, 0]));
+    S.ai = Object.fromEntries(players.map(p => [p.who, p.ai == null ? null : lvl(p.ai)]));
+  } else {
+    S.me = side(me, 'me', 0); S.foe = side(foe, 'foe', 1); S.list = [S.me, S.foe];
+    S.ai = { me: meAi == null ? null : lvl(meAi), foe: foeIdle || foeHuman ? null : lvl(foeLevel) };
+  }
+  S.ults = Object.fromEntries(S.list.map(s => [s.who, 0])); S.dealt = { ...S.ults }; S.ko = { ...S.ults };
   const active = s => s.team[s.idx];
   const other = s => s === S.me ? S.foe : S.me;
+  const tmOf = who => S[who]?.tm;
+  // 다른 팀(살아 있는 사람). 1:1은 늘 상대 하나(예전과 같다).
+  const foes = s => multi ? S.list.filter(o => o.tm !== s.tm && alive(o)) : [other(s)];
+  const mates = s => multi ? S.list.filter(o => o !== s && o.tm === s.tm && alive(o)) : [];
+  // 가장 가까운 다른 팀 펫(나오는 중이면 뒤로, 방금 나를 때린 펫은 조금 더 가깝게 친다 — 거리가 같을 때 늘 앞자리만 노리지 않게).
+  //   아무도 없으면 아무 다른 팀.
+  const foeOf = s => {
+    if (!multi) return other(s);
+    let best = null, bv = Infinity;
+    for (const o of foes(s)) { const v = gap(s, o) + (o.enter > 0 ? 1000 : 0) - (o.who === s.lastBy ? ARENA_N.GRUDGE : 0); if (v < bv) { bv = v; best = o; } }
+    return best || S.list.find(o => o.tm !== s.tm) || s;
+  };
+  // 공격 버튼을 받는 조건(예전: 상대가 나오는 중이 아닐 때). 여러 명이면 누구든 나와 있으면.
+  const ready = s => multi ? foes(s).some(o => o.enter <= 0) : other(s).enter <= 0;
   const alive = s => s.team.some(f => f.cur > 0);
   const clampX = x => Math.max(ARENA.FIELD.minX, Math.min(ARENA.FIELD.maxX, x));
   const clampY = y => Math.max(ARENA.FIELD.minY, Math.min(ARENA.FIELD.maxY, y));
@@ -332,21 +375,33 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
   const face = (s, nx, ny) => { s.fx = nx; s.fy = ny; s.lock = ARENA.FACE_LOCK; };
   // V13.228 조준: 이번 공격 방향 [x, y, 상대에게 맞췄나]. 자동 조준이면 늘 상대 쪽. 끌어서 조준(code 0~15)이면 그 방향(한 칸 반 안이면 상대 쪽).
   //   톡 누르면 바라보는 방향, 그 ±25°(쉬운 조준 ±40°) 안에 상대가 있으면 상대 쪽으로 맞춘다.
+  //   V13.232 여러 명: 보정 안에 든 다른 팀 펫 중 조준 방향에 가장 가까운 펫에게(넷째 값 = 맞춘 펫).
   function aimVec(s, code = -1) {
+    if (multi) {
+      const seenOf = o => active(o)?.cur > 0 && o.enter <= 0 && gap(s, o) > 0.01;
+      if (s.aimMode === 2) { const o = foeOf(s), [tx, ty] = aimAt(s, o); return [tx, ty, seenOf(o), o]; }
+      const [ax, ay] = code >= 0 ? DIR16[code] : [s.fx, s.fy];
+      const cone = code >= 0 ? ARENA.AIM_DRAG : s.aimMode === 1 ? ARENA.AIM_EASY : ARENA.AIM_ASSIST;
+      let best = null, bv = -Infinity;
+      for (const o of foes(s)) { if (!seenOf(o)) continue; const [tx, ty] = aimAt(s, o), v = ax * tx + ay * ty; if (v >= cone && v > bv) { bv = v; best = [tx, ty, true, o]; } }
+      if (best) return best;
+      const l = Math.sqrt(ax * ax + ay * ay) || 1;
+      return [ax / l, ay / l, false, null];
+    }
     const o = other(s), [tx, ty, d] = aimAt(s, o), seen = active(o)?.cur > 0 && o.enter <= 0 && d > 0.01;
-    if (s.aimMode === 2) return [tx, ty, seen];
+    if (s.aimMode === 2) return [tx, ty, seen, o];
     const [ax, ay] = code >= 0 ? DIR16[code] : [s.fx, s.fy];
     const cone = code >= 0 ? ARENA.AIM_DRAG : s.aimMode === 1 ? ARENA.AIM_EASY : ARENA.AIM_ASSIST;
-    if (seen && ax * tx + ay * ty >= cone) return [tx, ty, true];
+    if (seen && ax * tx + ay * ty >= cone) return [tx, ty, true, o];
     const l = Math.sqrt(ax * ax + ay * ay) || 1;
-    return [ax / l, ay / l, false];
+    return [ax / l, ay / l, false, null];
   }
 
   // 피해 주기: 상성 · 작은 흔들림 · 보호막 · 게이지 · 덤 효과.
   //   knock: 넉백 거리를 바꿀 때(불 뿜기처럼 여러 번 맞는 스킬은 작게, 물대포는 크게). tick: 여러 번 맞는 스킬의 한 번(화면은 멈춤을 작게).
   function damage(from, to, power, kind, ev, extra = null, knock = null, tick = false) {
     const a = active(from), d = active(to);
-    if (!a || !d || !hittable(to)) return false;
+    if (!a || !d || !hittable(to) || from.tm === to.tm) return false; // 팀원은 때리지 않는다
     // V13.229 방울 보호막: 필살기가 아니면 한 번 막는다(중독 · 화상은 몸에 남은 것이라 막지 못한다). 마지막 방울이 깨질 때 둘레를 밀쳐낸다.
     if (to.bubble > 0 && kind !== 'ult') {
       to.bubble--;
@@ -362,13 +417,13 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     let blocked = 0;
     if (to.shield > 0) { blocked = Math.min(to.shield, dmg); to.shield -= blocked; dmg -= blocked; }
     d.cur = Math.max(0, d.cur - dmg);
-    S.dealt[from.who] += dmg;
+    S.dealt[from.who] += dmg; to.lastBy = from.who;
     if (kind !== 'ult') from.gauge = Math.min(ARENA.GAUGE_MAX, from.gauge + (dmg + blocked) / a.atk * ARENA.GAUGE_DEAL);
     to.gauge = Math.min(ARENA.GAUGE_MAX, to.gauge + dmg / Math.max(1, a.atk) * ARENA.GAUGE_TAKE);
     // 콤보: 2초(40틱) 안에 이어서 맞히면 +1.
     from.combo = S.t - from.comboAt <= 40 ? from.combo + 1 : 1; from.comboAt = S.t;
-    ev.push({ e: 'dmg', who: to.who, dmg, blocked, kind, m, crit, combo: from.combo, hp: d.cur, max: d.hp, x: to.x, y: to.y, el: a.el, tick, last: d.cur <= 0 && !to.team.some(f => f.cur > 0) });
-    if (d.cur <= 0) return faint(to, ev), true;
+    ev.push({ e: 'dmg', who: to.who, by: from.who, dmg, blocked, kind, m, crit, combo: from.combo, hp: d.cur, max: d.hp, x: to.x, y: to.y, el: a.el, tick, last: d.cur <= 0 && !to.team.some(f => f.cur > 0) });
+    if (d.cur <= 0) return faint(to, ev, from.who), true;
     // 넉백: 때린 쪽에서 맞은 쪽으로 밀린다(3틱에 나눠서).
     const kb = knock ?? (ARENA.KNOCK[kind] || 0);
     if (kb > 0) { const [kx, ky] = aimAt(from, to); to.kb = ARENA.KNOCK_TICKS; to.kbx = kx * kb / ARENA.KNOCK_TICKS; to.kby = ky * kb / ARENA.KNOCK_TICKS; }
@@ -387,23 +442,25 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     return true;
   }
   function bubblePop(s, ev) {
-    const o = other(s), k = SK2.bubble;
+    const k = SK2.bubble;
     s.bubbleT = 0;
     ev.push({ e: 'bubblepop', who: s.who, x: s.x, y: s.y, r: k.popR });
-    if (gap(s, o) <= k.popR) damage(s, o, k.pop, 'skill2', ev, null, k.push);
+    for (const o of foes(s)) if (gap(s, o) <= k.popR) damage(s, o, k.pop, 'skill2', ev, null, k.push);
   }
-  function faint(s, ev) {
-    const d = active(s);
-    S.ko[other(s).who]++;
-    ev.push({ e: 'faint', who: s.who, idx: s.idx, key: d.key, x: s.x, y: s.y });
+  // 쓰러짐: 점수는 마지막에 때린 사람에게만(막타 점수 — 중독 · 화상으로 쓰러지면 그것을 건 사람).
+  function faint(s, ev, by = null) {
+    const d = active(s), who = by || s.lastBy || foeOf(s).who;
+    S.ko[who] = (S.ko[who] || 0) + 1;
+    ev.push({ e: 'faint', who: s.who, idx: s.idx, key: d.key, x: s.x, y: s.y, by: who });
     const next = s.team.findIndex(f => f.cur > 0);
     if (next >= 0) bringIn(s, next, ev);
+    else if (multi) { s.out = S.t; S.minions = S.minions.filter(m => m.from !== s.who); ev.push({ e: 'out', who: s.who, by: who }); }
   }
   function bringIn(s, next, ev) {
     s.idx = next; s.enter = ARENA.ENTER_TICKS; s.stun = 0; s.slow = 0; s.boost = 0; s.shield = 0; s.poison = 0; s.dash = 0; s.inv = 0; s.kb = 0; s.want = wantNone();
     s.chan = 0; s.volley = 0; s.gale = 0; s.bubble = 0; s.bubbleT = 0; s.burn = 0; s.root = 0; s.slide = 0;
     S.minions = S.minions.filter(m => m.from !== s.who);
-    s.x = 50; s.y = s.who === 'me' ? 78 : 22; s.cd = 10; s.skill = Math.max(s.skill, 40); s.skill2 = Math.max(s.skill2, 60); s.power2 = 0;
+    s.x = s.hx; s.y = s.hy; s.cd = 10; s.skill = Math.max(s.skill, 40); s.skill2 = Math.max(s.skill2, 60); s.power2 = 0;
     ev.push({ e: 'swap', who: s.who, idx: next, key: active(s).key });
   }
 
@@ -420,15 +477,17 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     ev.push({ e: kind, who: s.who, shape: dirs.length > 1 ? 'orb3' : 'shot', el: active(s).el, x: s.x, y: s.y, nx, ny });
   }
   function melee(s, power, kind, ev, code = -1) {
-    const o = other(s), [nx, ny, locked] = aimVec(s, code), d = gap(s, o), reach = SHOT[active(s).shape].melee + ARENA.BODY;
+    const [nx, ny, locked, o] = aimVec(s, code), reach = SHOT[active(s).shape].melee + ARENA.BODY, d = o ? gap(s, o) : 0;
     face(s, nx, ny);
     // 조금 멀면 달려들며 친다(근접 펫이 원거리 펫을 따라잡게). 상대 쪽을 보고 있을 때만.
     if (locked && d > reach && d <= reach + ARENA.MELEE_LUNGE) { const step = d - reach + 2; s.x = clampX(s.x + nx * step); s.y = clampY(s.y + ny * step); ev.push({ e: 'lunge', who: s.who }); }
     ev.push({ e: kind, who: s.who, shape: 'claw', el: active(s).el, x: s.x, y: s.y, nx, ny });
     hitMinion(s, s.x + nx * reach * 0.6, s.y + ny * reach * 0.6, reach * 0.6);
-    // 앞쪽 ±70° 안(몸이 닿아 있으면 어디든)만 맞는다.
-    const [ux, uy, dd] = aimAt(s, o);
-    if (dd <= reach && (dd <= ARENA.BODY * 1.5 || ux * nx + uy * ny >= ARENA.MELEE_ARC)) damage(s, o, power, kind, ev);
+    // 앞쪽 ±70° 안(몸이 닿아 있으면 어디든)만 맞는다. 여러 명이면 그 안의 다른 팀 모두.
+    for (const e of foes(s)) {
+      const [ux, uy, dd] = aimAt(s, e);
+      if (dd <= reach && (dd <= ARENA.BODY * 1.5 || ux * nx + uy * ny >= ARENA.MELEE_ARC)) damage(s, e, power, kind, ev);
+    }
   }
   function dashAt(s, power, kind, ev, extra = null, code = -1) {
     const [nx, ny] = aimVec(s, code);
@@ -439,10 +498,10 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
   }
   // 지진 · 소나기 자리: 상대에게 맞췄으면 상대 발밑, 아니면 조준 방향으로 상대 거리만큼(12~40).
   function spot(s, code) {
-    const o = other(s), [nx, ny, locked] = aimVec(s, code);
+    const [nx, ny, locked, t] = aimVec(s, code);
     face(s, nx, ny);
-    if (locked) return [o.x, o.y];
-    const d = Math.max(12, Math.min(ARENA.QUAKE_RANGE, gap(s, o)));
+    if (locked) return [t.x, t.y];
+    const d = Math.max(12, Math.min(ARENA.QUAKE_RANGE, gap(s, foeOf(s))));
     return [clampX(s.x + nx * d), clampY(s.y + ny * d)];
   }
   function quakeAt(s, power, kind, ev, extra = null, at = null, r = 12) {
@@ -462,6 +521,14 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     if (k.kind === 'guard') {
       if (k.heal) a.cur = Math.min(a.hp, a.cur + Math.round(a.hp * k.heal));
       if (k.shield) s.shield = Math.round(a.atk * k.shield * 2.5);
+      // V13.232 2:2 팀전: 가까운(MATE_RANGE) 팀원도 같이 회복 · 보호막.
+      for (const m of mates(s)) {
+        const f = active(m);
+        if (!f || f.cur <= 0 || m.enter > 0 || gap(s, m) > ARENA_N.MATE_RANGE) continue;
+        if (k.heal) f.cur = Math.min(f.hp, f.cur + Math.round(f.hp * k.heal));
+        if (k.shield) m.shield = Math.max(m.shield, Math.round(a.atk * k.shield * 2.5));
+        ev.push({ e: 'buff', who: m.who, kind: 'guard', name: k.name, el: a.el, heal: !!k.heal, shield: m.shield, hp: f.cur, max: f.hp, mate: s.who });
+      }
       return ev.push({ e: 'buff', who: s.who, kind: 'guard', name: k.name, el: a.el, heal: !!k.heal, shield: s.shield, hp: a.cur, max: a.hp });
     }
     if (k.kind === 'boost') { s.boost = 120; s.cd = 0; return ev.push({ e: 'buff', who: s.who, kind: 'boost', name: k.name, el: a.el }); }
@@ -474,13 +541,13 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
   }
   // V13.229 스킬 ②: 속성 스킬 2개 중 고른 것(EL_SKILLS · SK2). 모양 6가지 + 방울 · 연발.
   function skill2(s, ev, code = -1) {
-    const a = active(s), k = a.skill2, K = SK2[k.id], o = other(s);
+    const a = active(s), k = a.skill2, K = SK2[k.id];
     s.skill2 = a.skill2Cd || ARENA.SKILL2_TICKS;
     ev.push({ e: 'skillname', who: s.who, name: k.name, el: a.el, two: true, id: k.id });
     const base = { e: 'skill2', who: s.who, id: k.id, shape: k.shape, el: a.el, x: s.x, y: s.y };
     if (k.id === 'bubble') { s.bubble = K.hits; s.bubbleT = K.ticks; return ev.push({ ...base, hits: K.hits }); }
     if (k.id === 'petal') { addZone(s, k.id, s.x, s.y, K); return ev.push({ ...base, r: K.r, ticks: K.ticks }); }
-    const [nx, ny, locked] = aimVec(s, code);
+    const [nx, ny, locked, o] = aimVec(s, code);
     face(s, nx, ny);
     if (k.shape === 'cone') { s.chan = K.ticks; s.cnx = nx; s.cny = ny; return ev.push({ ...base, nx, ny, range: K.range, ticks: K.ticks }); }
     if (k.shape === 'stream') {
@@ -508,7 +575,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     if (S.zones.length > ZONES_MAX) S.zones.shift();
   }
   function galeDash(s, nx, ny, ev) {
-    const K = SK2.gale, o = other(s), [tx, ty] = aimAt(s, o);
+    const K = SK2.gale, o = foeOf(s), [tx, ty] = aimAt(s, o);
     // 두 번째부터는 상대가 앞쪽 ±40° 안이면 상대 쪽으로 다시 달려든다.
     if (s.gale < K.n && tx * nx + ty * ny >= ARENA.AIM_EASY) { nx = tx; ny = ty; }
     s.gale--; s.cnx = nx; s.cny = ny;
@@ -522,7 +589,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     S.shots.push({ from: s.who, x: s.x + nx * 4, y: s.y + ny * 4, vx: nx * K.v, vy: ny * K.v, r: K.r, life: K.life, power: K.power, kind: 'skill2', extra: 'venom', el: active(s).el, id: 'darts' });
   }
   function ult(s, ev, code = -1) {
-    const a = active(s), o = other(s), [nx, ny] = aimVec(s, code);
+    const a = active(s), o = foeOf(s), [nx, ny] = aimVec(s, code);
     s.gauge = 0; S.ults[s.who]++;
     face(s, nx, ny);
     S.freeze = ARENA.ULT_FREEZE_TICKS;
@@ -533,14 +600,15 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
   function ultLand(ev) {
     const s = S[S.pendingUlt], [nx, ny] = S.ultAim || [0, 0]; S.pendingUlt = null; S.ultAim = null;
     if (!s) return;
-    const o = other(s), [tx, ty, d] = aimAt(s, o), inside = d <= ARENA.BODY * 2 || tx * nx + ty * ny >= ARENA.ULT_ARC;
-    const far = Math.max(30, Math.min(60, d));
-    ev.push({ e: 'ult', who: s.who, el: active(s).el, x: s.x, y: s.y, tx: inside ? o.x : clampX(s.x + nx * far), ty: inside ? o.y : clampY(s.y + ny * far), hit: inside, nx, ny });
-    if (inside) damage(s, o, ARENA.ULT_POWER, 'ult', ev, active(s).skill.extra === 'knock' ? 'knock' : null);
+    // 여러 명이면 부채꼴 안의 다른 팀 모두(맨 앞 펫 쪽으로 연출).
+    const inside = o => { const [tx, ty, d] = aimAt(s, o); return d <= ARENA.BODY * 2 || tx * nx + ty * ny >= ARENA.ULT_ARC; };
+    const all = foes(s), hits = all.filter(inside), o = hits[0] || foeOf(s), far = Math.max(30, Math.min(60, gap(s, o)));
+    ev.push({ e: 'ult', who: s.who, el: active(s).el, x: s.x, y: s.y, tx: hits.length ? o.x : clampX(s.x + nx * far), ty: hits.length ? o.y : clampY(s.y + ny * far), hit: hits.length > 0, nx, ny, n: hits.length });
+    for (const h of hits) damage(s, h, ARENA.ULT_POWER, 'ult', ev, active(s).skill.extra === 'knock' ? 'knock' : null);
   }
   function dodge(s, ev) {
     let [dx, dy] = DIRS[s.dir] || [0, 0];
-    if (!dx && !dy) { const [nx, ny] = aimAt(s, other(s)); dx = -ny; dy = nx; } // 방향이 없으면 옆으로
+    if (!dx && !dy) { const [nx, ny] = aimAt(s, foeOf(s)); dx = -ny; dy = nx; } // 방향이 없으면 옆으로
     s.dash = ARENA.DODGE_TICKS; s.dvx = dx * ARENA.DODGE_SPEED; s.dvy = dy * ARENA.DODGE_SPEED; s.dashHit = true; s.dashKind = 'dodge';
     s.inv = ARENA.DODGE_TICKS + 1; s.dodgeCd = active(s).dodgeCd || ARENA.DODGE_CD;
     ev.push({ e: 'dodge', who: s.who, x: s.x, y: s.y, dx, dy });
@@ -555,7 +623,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
 
   // 한 쪽의 한 틱: 상태 시간 줄이기 → 버튼 → 움직이기.
   function tickSide(s, ev) {
-    const a = active(s), o = other(s);
+    const a = active(s), o = foeOf(s);
     if (!a || a.cur <= 0) return;
     if (s.dodgeCd > 0) s.dodgeCd--;
     if (s.swapCd > 0) s.swapCd--;
@@ -568,7 +636,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
         const dmg = Math.max(1, Math.round(s.poisonDmg));
         a.cur = Math.max(0, a.cur - dmg);
         ev.push({ e: 'dmg', who: s.who, dmg, blocked: 0, kind: 'poison', m: 1, hp: a.cur, max: a.hp, x: s.x, y: s.y, el: 'toxic' });
-        if (a.cur <= 0) return faint(s, ev);
+        if (a.cur <= 0) return faint(s, ev, s.lastBy);
       }
     }
     if (s.burn > 0 && s.enter <= 0) {
@@ -577,7 +645,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
         const dmg = Math.max(1, Math.round(s.burnDmg));
         a.cur = Math.max(0, a.cur - dmg);
         ev.push({ e: 'dmg', who: s.who, dmg, blocked: 0, kind: 'burn', m: 1, hp: a.cur, max: a.hp, x: s.x, y: s.y, el: 'flame', tick: true });
-        if (a.cur <= 0) return faint(s, ev);
+        if (a.cur <= 0) return faint(s, ev, s.lastBy);
       }
     }
     if (s.bubbleT > 0 && !--s.bubbleT && s.bubble > 0) { s.bubble = 0; ev.push({ e: 'bubble', who: s.who, left: 0, x: s.x, y: s.y, gone: true }); }
@@ -594,7 +662,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
       s.dash--;
       s.x = clampX(s.x + s.dvx); s.y = clampY(s.y + s.dvy);
       hitMinion(s, s.x, s.y, ARENA.BODY);
-      if (!s.dashHit && gap(s, o) <= ARENA.BODY * 2 + 2) { s.dashHit = true; damage(s, o, s.dashPow, s.dashKind, ev, s.dashExtra); }
+      if (!s.dashHit) { const t = multi ? foes(s).find(e => gap(s, e) <= ARENA.BODY * 2 + 2) : gap(s, o) <= ARENA.BODY * 2 + 2 ? o : null; if (t) { s.dashHit = true; damage(s, t, s.dashPow, s.dashKind, ev, s.dashExtra); } }
       if (!s.dash && s.gale > 0) s.galeGap = SK2.gale.gap;
       return;
     }
@@ -607,8 +675,10 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
       const K = SK2.breath;
       s.chan--;
       if ((K.ticks - s.chan) % K.every === 1) {
-        const [ux, uy, d] = aimAt(s, o);
-        if (d <= K.range + ARENA.BODY && (d <= ARENA.BODY * 1.5 || ux * s.cnx + uy * s.cny >= K.cos)) damage(s, o, K.power, 'skill2', ev, 'burn', 0.7, true);
+        for (const e of foes(s)) {
+          const [ux, uy, d] = aimAt(s, e);
+          if (d <= K.range + ARENA.BODY && (d <= ARENA.BODY * 1.5 || ux * s.cnx + uy * s.cny >= K.cos)) damage(s, e, K.power, 'skill2', ev, 'burn', 0.7, true);
+        }
       }
       if (w.dodge && s.dodgeCd <= 0) { w.dodge = false; s.chan = 0; return dodge(s, ev); }
       const [dx, dy] = s.root > 0 ? [0, 0] : DIRS[s.dir] || [0, 0], v = a.move * 0.45;
@@ -617,11 +687,12 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
       return;
     }
     if (w.swap) { w.swap = false; if (s.swapCd <= 0 && swap(s, ev)) return; }
-    if (w.ult) { w.ult = false; const c = w.ultA; w.ultA = -1; if (s.gauge >= ARENA.GAUGE_MAX && o.enter <= 0) return ult(s, ev, c); }
+    const go = ready(s);
+    if (w.ult) { w.ult = false; const c = w.ultA; w.ultA = -1; if (s.gauge >= ARENA.GAUGE_MAX && go) return ult(s, ev, c); }
     if (w.dodge) { w.dodge = false; if (s.dodgeCd <= 0) return dodge(s, ev); }
-    if (w.skill && s.skill <= 0 && o.enter <= 0) { w.skill = false; const c = w.skillA; w.skillA = -1; return skill(s, ev, c); }
-    if (w.skill2 && s.skill2 <= 0 && o.enter <= 0) { w.skill2 = false; const c = w.skill2A; w.skill2A = -1; return skill2(s, ev, c); }
-    if (w.atk && s.cd <= 0 && o.enter <= 0) { w.atk = false; const c = w.atkA; w.atkA = -1; basic(s, ev, c); }
+    if (w.skill && s.skill <= 0 && go) { w.skill = false; const c = w.skillA; w.skillA = -1; return skill(s, ev, c); }
+    if (w.skill2 && s.skill2 <= 0 && go) { w.skill2 = false; const c = w.skill2A; w.skill2A = -1; return skill2(s, ev, c); }
+    if (w.atk && s.cd <= 0 && go) { w.atk = false; const c = w.atkA; w.atkA = -1; basic(s, ev, c); }
     const [dx, dy] = DIRS[s.dir] || [0, 0], v = a.move * (s.slow > 0 ? 0.6 : 1);
     // V13.229 묶임(덩굴): 제자리(돌아보기 · 공격은 된다). 얼음 장판: 미끄러진다(앞 걸음이 조금씩 남는다).
     let mx = s.root > 0 ? 0 : dx * v, my = s.root > 0 ? 0 : dy * v;
@@ -630,24 +701,26 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     if (mx || my) { s.x = clampX(s.x + mx); s.y = clampY(s.y + my); }
     // V13.228 움직이는 방향 = 바라보는 방향(서 있으면 마지막 방향을 그대로). 방금 공격했으면 잠깐 쏜 쪽을 본다.
     if ((dx || dy) && s.lock <= 0) { s.fx = dx; s.fy = dy; }
-    // 두 펫이 겹치지 않게 살짝 밀어낸다.
-    const d = gap(s, o);
-    if (d < ARENA.BODY * 2 && o.enter <= 0) { const [nx, ny] = aimAt(s, o); const push = (ARENA.BODY * 2 - d) / 2; s.x = clampX(s.x - nx * push); s.y = clampY(s.y - ny * push); }
+    // 두 펫이 겹치지 않게 살짝 밀어낸다(여러 명이면 팀원과도).
+    for (const e of multi ? S.list.filter(x => x !== s && alive(x)) : [o]) {
+      const d = gap(s, e);
+      if (d < ARENA.BODY * 2 && e.enter <= 0) { const [nx, ny] = aimAt(s, e); const push = (ARENA.BODY * 2 - d) / 2; s.x = clampX(s.x - nx * push); s.y = clampY(s.y - ny * push); }
+    }
   }
 
   // 컴퓨터 조종: 사거리에 맞춰 다가가거나 물러나고, 옆으로 돌며 공격 · 스킬. 날아오는 공격은 가끔 피한다.
   function think(s) {
     const b = brain[s.who];
     if (!b) return;
-    const a = active(s), o = other(s), w = s.want;
-    if (!a || s.enter > 0) return;
+    const a = active(s), o = foeOf(s), w = s.want;
+    if (!a || s.enter > 0 || a.cur <= 0) return;
     const [nx, ny, d] = aimAt(s, o);
     const melee = !!SHOT[a.shape].melee, want = melee ? 9 : 30;
     if (s.dodgeCd <= 0 && s.dash <= 0) {
-      const danger = S.shots.some(x => x.from !== s.who && Math.abs(x.x - s.x) < 14 && Math.abs(x.y - s.y) < 14 && (x.vx * (s.x - x.x) + x.vy * (s.y - x.y)) > 0)
-        || S.quakes.some(q => q.from !== s.who && q.at - S.t <= 8 && Math.abs(q.x - s.x) < q.r + 3 && Math.abs(q.y - s.y) < q.r + 3)
-        || S.lines.some(L => { if (L.from === s.who || L.at - S.t > 3) return false; const rx = s.x - L.x, ry = s.y - L.y, al = rx * L.nx + ry * L.ny; return al > -ARENA.BODY && al < L.len + ARENA.BODY && Math.abs(rx * L.ny - ry * L.nx) < L.w + ARENA.BODY + 2; })
-        || S.zones.some(z => z.from !== s.who && z.id !== 'petal' && z.until - S.t > 4 && Math.abs(z.x - s.x) < z.r && Math.abs(z.y - s.y) < z.r);
+      const danger = S.shots.some(x => tmOf(x.from) !== s.tm && Math.abs(x.x - s.x) < 14 && Math.abs(x.y - s.y) < 14 && (x.vx * (s.x - x.x) + x.vy * (s.y - x.y)) > 0)
+        || S.quakes.some(q => tmOf(q.from) !== s.tm && q.at - S.t <= 8 && Math.abs(q.x - s.x) < q.r + 3 && Math.abs(q.y - s.y) < q.r + 3)
+        || S.lines.some(L => { if (tmOf(L.from) === s.tm || L.at - S.t > 3) return false; const rx = s.x - L.x, ry = s.y - L.y, al = rx * L.nx + ry * L.ny; return al > -ARENA.BODY && al < L.len + ARENA.BODY && Math.abs(rx * L.ny - ry * L.nx) < L.w + ARENA.BODY + 2; })
+        || S.zones.some(z => tmOf(z.from) !== s.tm && z.id !== 'petal' && z.until - S.t > 4 && Math.abs(z.x - s.x) < z.r && Math.abs(z.y - s.y) < z.r);
       if (danger && random() < b.dodge) w.dodge = true;
     }
     if (s.think-- <= 0) { s.think = 8 + Math.floor(random() * 10); if (random() < 0.25) s.strafe = -s.strafe; }
@@ -667,6 +740,10 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
   }
 
   function input() {
+    if (multi) {
+      for (const s of S.list) { const q = Q[s.who]; while (S.qi[s.who] < q.length && q[S.qi[s.who]][0] <= S.t) apply(s, q[S.qi[s.who]++]); }
+      return;
+    }
     while (S.ip < S.inputs.length && S.inputs[S.ip][0] <= S.t) apply(S.me, S.inputs[S.ip++]);
     while (S.ip2 < S.inputs2.length && S.inputs2[S.ip2][0] <= S.t) apply(S.foe, S.inputs2[S.ip2++]);
   }
@@ -691,63 +768,75 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
   function fly(ev) {
     for (const x of S.shots) {
       x.x += x.vx; x.y += x.vy; x.life--;
-      const s = S[x.from], o = other(s);
+      const s = S[x.from];
       if (x.life <= 0 || x.x < 2 || x.x > 98 || x.y < 6 || x.y > 94) { x.dead = true; continue; }
       if (hitMinion(s, x.x, x.y, x.r)) { x.dead = true; ev.push({ e: 'pop', x: x.x, y: x.y, el: x.el, kind: x.kind }); continue; }
-      if (hittable(o) && gap(x, o) <= x.r + ARENA.BODY) { x.dead = true; ev.push({ e: 'pop', x: x.x, y: x.y, el: x.el, kind: x.kind }); damage(s, o, x.power, x.kind, ev, x.extra); }
+      const o = foes(s).find(e => hittable(e) && gap(x, e) <= x.r + ARENA.BODY);
+      if (o) { x.dead = true; ev.push({ e: 'pop', x: x.x, y: x.y, el: x.el, kind: x.kind }); damage(s, o, x.power, x.kind, ev, x.extra); }
     }
     S.shots = S.shots.filter(x => !x.dead);
     for (const q of S.quakes) {
       if (q.at > S.t) continue;
       q.dead = true;
-      const s = S[q.from], o = other(s);
+      const s = S[q.from];
       const at = q.self ? { x: s.x, y: s.y } : q;
       ev.push({ e: 'boom', x: at.x, y: at.y, r: q.r, el: active(s)?.el || 'earth', kind: q.kind, id: q.id || '' });
-      if (gap(at, o) <= q.r + ARENA.BODY * 0.5) damage(s, o, q.power, q.kind, ev, q.extra);
+      for (const o of foes(s)) if (gap(at, o) <= q.r + ARENA.BODY * 0.5) damage(s, o, q.power, q.kind, ev, q.extra);
     }
     S.quakes = S.quakes.filter(q => !q.dead);
     for (const m of S.mines) {
-      const s = S[m.from], o = other(s);
+      const s = S[m.from], o = foes(s).find(e => hittable(e) && gap(m, e) <= 8);
       if (S.t > m.until) { m.dead = true; continue; }
-      if (hittable(o) && gap(m, o) <= 8) { m.dead = true; ev.push({ e: 'boom', x: m.x, y: m.y, r: 9, el: m.el, kind: 'skill2' }); damage(s, o, 2.2, 'skill2', ev, 'stun'); }
+      if (o) { m.dead = true; ev.push({ e: 'boom', x: m.x, y: m.y, r: 9, el: m.el, kind: 'skill2' }); damage(s, o, 2.2, 'skill2', ev, 'stun'); }
     }
     S.mines = S.mines.filter(m => !m.dead);
     // V13.229 굵은 줄기(물대포 · 덩굴 · 번개): 표시가 끝나면 그 순간 쏜 펫에서 조준 방향으로 뻗는다(줄기 밖이면 안 맞는다).
     for (const L of S.lines) {
       if (L.at > S.t) continue;
       L.dead = true;
-      const s = S[L.from], o = other(s), K = SK2[L.id];
+      const s = S[L.from], K = SK2[L.id];
       if (s.enter > 0 || !(active(s)?.cur > 0)) continue;
-      const rx = o.x - L.x, ry = o.y - L.y, along = rx * L.nx + ry * L.ny, side = Math.abs(rx * L.ny - ry * L.nx);
-      const hit = hittable(o) && along >= -ARENA.BODY && along <= L.len + ARENA.BODY && side <= L.w + ARENA.BODY;
-      ev.push({ e: 'stream', who: s.who, id: L.id, x: L.x, y: L.y, nx: L.nx, ny: L.ny, len: L.len, w: L.w, el: L.el, hit, tx: o.x, ty: o.y });
-      if (hit) damage(s, o, K.power, 'skill2', ev, L.id === 'vine' ? 'root' : L.id === 'chain' ? 'zap' : null, L.id === 'jet' ? K.knock : null);
+      const on = o => { const rx = o.x - L.x, ry = o.y - L.y, along = rx * L.nx + ry * L.ny, side = Math.abs(rx * L.ny - ry * L.nx); return hittable(o) && along >= -ARENA.BODY && along <= L.len + ARENA.BODY && side <= L.w + ARENA.BODY; };
+      const all = foes(s), hits = all.filter(on), o = hits[0] || foeOf(s);
+      ev.push({ e: 'stream', who: s.who, id: L.id, x: L.x, y: L.y, nx: L.nx, ny: L.ny, len: L.len, w: L.w, el: L.el, hit: hits.length > 0, tx: o.x, ty: o.y });
+      for (const h of hits) damage(s, h, K.power, 'skill2', ev, L.id === 'vine' ? 'root' : L.id === 'chain' ? 'zap' : null, L.id === 'jet' ? K.knock : null);
+      // V13.232 번개 연쇄: 맞은 펫 옆(CHAIN_RANGE 안)의 다른 상대에게 한 번 튄다(1:1에는 옆 상대가 없다).
+      if (L.id === 'chain' && hits.length && multi) {
+        const from = hits[0], next = all.filter(e => !hits.includes(e) && hittable(e) && gap(from, e) <= ARENA_N.CHAIN_RANGE).sort((a, b) => gap(from, a) - gap(from, b))[0];
+        if (next) { ev.push({ e: 'chainjump', who: s.who, x: from.x, y: from.y, tx: next.x, ty: next.y, to: next.who, el: L.el }); damage(s, next, K.power * ARENA_N.CHAIN_POWER, 'skill2', ev, 'zap', 0, true); }
+      }
     }
     S.lines = S.lines.filter(L => !L.dead);
     // V13.229 장판: 바닥에 남아 들어온 상대(꽃잎은 내 펫)에게 효과. 회오리는 앞으로 가며 빨아들인다.
     for (const z of S.zones) {
       if (S.t >= z.until) { z.dead = true; continue; }
       if (z.vx || z.vy) { z.x = clampX(z.x + z.vx); z.y = clampY(z.y + z.vy); }
-      const s = S[z.from], o = other(s), K = SK2[z.id], pulse = (z.until - S.t) % K.every === 0;
+      const s = S[z.from], K = SK2[z.id], pulse = (z.until - S.t) % K.every === 0;
       if (z.id === 'petal') {
-        const f = active(s);
-        if (pulse && f?.cur > 0 && s.enter <= 0 && gap(z, s) <= z.r + ARENA.BODY * 0.5 && f.cur < f.hp) { f.cur = Math.min(f.hp, f.cur + Math.round(f.hp * K.heal)); ev.push({ e: 'heal', who: s.who, hp: f.cur, max: f.hp, x: s.x, y: s.y }); }
+        // 꽃잎 회복장: 내 펫(2:2면 팀원도).
+        for (const m of [s, ...mates(s)]) {
+          const f = active(m);
+          if (pulse && f?.cur > 0 && m.enter <= 0 && gap(z, m) <= z.r + ARENA.BODY * 0.5 && f.cur < f.hp) { f.cur = Math.min(f.hp, f.cur + Math.round(f.hp * K.heal)); ev.push({ e: 'heal', who: m.who, hp: f.cur, max: f.hp, x: m.x, y: m.y }); }
+        }
         continue;
       }
-      if (!hittable(o) || gap(z, o) > z.r + ARENA.BODY * 0.5) continue;
-      if (z.id === 'cloud') { if (pulse) { o.poison = Math.max(o.poison, K.poison + 1); o.poisonDmg = Math.max(o.poisonDmg || 0, active(s).atk * K.dot); } continue; }
-      if (z.id === 'tornado') { const dx = z.x - o.x, dy = z.y - o.y, d = Math.sqrt(dx * dx + dy * dy); if (d > 0.5) { const k = Math.min(K.pull, d) / d; o.x = clampX(o.x + dx * k); o.y = clampY(o.y + dy * k); } }
-      else { o.slow = Math.max(o.slow, K.slow); if (z.id === 'icefield') o.slide = 6; }
-      if (pulse) damage(s, o, K.power, 'skill2', ev, null, 0, true);
+      for (const o of foes(s)) {
+        if (!hittable(o) || gap(z, o) > z.r + ARENA.BODY * 0.5) continue;
+        if (z.id === 'cloud') { if (pulse) { o.poison = Math.max(o.poison, K.poison + 1); o.poisonDmg = Math.max(o.poisonDmg || 0, active(s).atk * K.dot); o.lastBy = s.who; } continue; }
+        if (z.id === 'tornado') { const dx = z.x - o.x, dy = z.y - o.y, d = Math.sqrt(dx * dx + dy * dy); if (d > 0.5) { const k = Math.min(K.pull, d) / d; o.x = clampX(o.x + dx * k); o.y = clampY(o.y + dy * k); } }
+        else { o.slow = Math.max(o.slow, K.slow); if (z.id === 'icefield') o.slide = 6; }
+        if (pulse) damage(s, o, K.power, 'skill2', ev, null, 0, true);
+      }
     }
     S.zones = S.zones.filter(z => !z.dead);
     // V13.229 분신: 주인 옆을 따라다니며 상대에게 작은 별을 쏜다. 상대 공격에 맞으면 사라진다.
     for (const m of S.minions) {
-      const s = S[m.from], o = other(s), K = SK2.clone;
+      const s = S[m.from], K = SK2.clone;
       if (S.t >= m.until || s.enter > 0 || !(active(s)?.cur > 0)) { m.dead = true; ev.push({ e: 'cloneend', who: s.who, x: m.x, y: m.y }); continue; }
       const tx = clampX(s.x - s.fy * 9), ty = clampY(s.y + s.fx * 9), dx = tx - m.x, dy = ty - m.y, d = Math.sqrt(dx * dx + dy * dy);
       if (d > 0.3) { const k = Math.min(1.8, d) / d; m.x += dx * k; m.y += dy * k; }
-      if (--m.cd <= 0 && hittable(o)) {
+      const o = multi ? foes(s).filter(hittable).sort((a, b) => gap(m, a) - gap(m, b))[0] : hittable(other(s)) ? other(s) : null;
+      if (--m.cd <= 0 && o) {
         m.cd = K.every;
         const ax = o.x - m.x, ay = o.y - m.y, l = Math.sqrt(ax * ax + ay * ay) || 1;
         S.shots.push({ from: s.who, x: m.x + ax / l * 3, y: m.y + ay / l * 3, vx: ax / l * K.v, vy: ay / l * K.v, r: K.r, life: K.life, power: K.power, kind: 'skill2', extra: null, el: m.el, id: 'clone' });
@@ -758,13 +847,31 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
   }
   // 상대(other(s)) 분신이 (x, y) 둘레 r 안이면 사라진다.
   function hitMinion(s, x, y, r) {
-    const m = S.minions.find(q => q.from !== s.who && !q.dead && gap(q, { x, y }) <= r + SK2.clone.hitR);
+    const m = S.minions.find(q => tmOf(q.from) !== s.tm && !q.dead && gap(q, { x, y }) <= r + SK2.clone.hitR);
     if (!m) return false;
     m.dead = true; m.until = S.t;
     return true;
   }
+  // V13.232 여러 명 판 끝: 난투는 마지막 한 명 · 시간이 다 되면 쓰러뜨린 수 → 남은 체력. 팀전은 한 팀이 다 쓰러지면 · 시간이 다 되면 남은 체력 → 쓰러뜨린 수.
+  function finishMulti(ev) {
+    const left = s => s.team.reduce((n, f) => n + f.cur / f.hp, 0);
+    const teams = [...new Set(S.list.map(s => s.tm))], up = teams.filter(tm => S.list.some(s => s.tm === tm && alive(s)));
+    let winner = null;
+    if (up.length <= 1) winner = up.length ? (S.ffa ? S.list.find(s => s.tm === up[0]).who : `t${up[0]}`) : 'draw';
+    else if (S.t >= S.maxT) {
+      const score = tm => { const ss = S.list.filter(s => s.tm === tm); const ko = ss.reduce((n, s) => n + S.ko[s.who], 0), hp = ss.reduce((n, s) => n + left(s), 0); return S.ffa ? [ko, hp] : [hp, ko]; };
+      const ranked = up.map(tm => [tm, score(tm)]).sort((a, b) => b[1][0] - a[1][0] || b[1][1] - a[1][1]);
+      const [a, b] = ranked;
+      winner = Math.abs(a[1][0] - b[1][0]) < 1e-9 && Math.abs(a[1][1] - b[1][1]) < 1e-9 ? 'draw' : S.ffa ? S.list.find(s => s.tm === a[0]).who : `t${a[0]}`;
+    }
+    if (!winner) return;
+    // 등수(난투): 살아남은 사람이 먼저(쓰러뜨린 수 → 남은 체력), 그다음 늦게 쓰러진 사람.
+    S.rank = [...S.list].sort((a, b) => (alive(b) - alive(a)) || (alive(a) ? (S.ko[b.who] - S.ko[a.who]) || (left(b) - left(a)) : b.out - a.out) || 0).map(s => s.who);
+    S.over = true; S.winner = winner; S.shots = []; S.quakes = []; S.mines = []; S.zones = []; S.lines = []; S.minions = []; ev.push({ e: 'over', winner, rank: S.rank });
+  }
   function finish(ev) {
     if (S.over) return;
+    if (multi) return finishMulti(ev);
     const meAlive = alive(S.me), foeAlive = alive(S.foe);
     let winner = null;
     if (!foeAlive && meAlive) winner = 'me';
@@ -782,6 +889,16 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     if (S.over) return ev;
     input();
     if (S.freeze > 0) { S.freeze--; if (!S.freeze) ultLand(ev); S.t++; finish(ev); return ev; }
+    if (multi) {
+      // 먼저 움직이는 사람이 늘 같지 않게 틱마다 순서를 돌린다.
+      const n = S.list.length, k = S.t % n, order = [...S.list.slice(k), ...S.list.slice(0, k)];
+      for (const s of order) think(s);
+      for (const s of order) if (!S.freeze) tickSide(s, ev);
+      if (!S.freeze) fly(ev);
+      S.t++;
+      finish(ev);
+      return ev;
+    }
     think(S.me);
     think(S.foe);
     tickSide(S.me, ev);
@@ -791,7 +908,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     finish(ev);
     return ev;
   }
-  const sideView = s => ({ chan: s.chan, cnx: s.cnx, cny: s.cny, bubble: s.bubble, burn: s.burn, root: s.root, slide: s.slide, gale: s.gale, x: s.x, y: s.y, fx: s.fx, fy: s.fy, aimMode: s.aimMode, combo: s.combo, idx: s.idx, gauge: s.gauge, enter: s.enter, stun: s.stun, slow: s.slow, boost: s.boost, shield: s.shield, poison: s.poison, inv: s.inv, dash: s.dash,
+  const sideView = s => ({ who: s.who, tm: s.tm, out: s.out, chan: s.chan, cnx: s.cnx, cny: s.cny, bubble: s.bubble, burn: s.burn, root: s.root, slide: s.slide, gale: s.gale, x: s.x, y: s.y, fx: s.fx, fy: s.fy, aimMode: s.aimMode, combo: s.combo, idx: s.idx, gauge: s.gauge, enter: s.enter, stun: s.stun, slow: s.slow, boost: s.boost, shield: s.shield, poison: s.poison, inv: s.inv, dash: s.dash,
     cd: s.cd, skill: s.skill, skill2: s.skill2, power2: s.power2, dodgeCd: s.dodgeCd, swapCd: s.swapCd, team: s.team.map(f => ({ key: f.key, cur: f.cur, hp: f.hp })) });
   return {
     S, step,
@@ -802,7 +919,11 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     restore: snap => { const keep = { inputs: S.inputs, inputs2: S.inputs2 }; for (const k of Object.keys(S)) delete S[k]; Object.assign(S, structuredClone(snap.s), keep); rs = snap.rs; },
     setQueues: (mine = [], theirs = []) => { S.inputs = mine; S.ip = 0; S.inputs2 = theirs; S.ip2 = 0; },
     hash: () => arenaHash(S),
-    view: () => ({ t: S.t, freeze: S.freeze, me: sideView(S.me), foe: sideView(S.foe), shots: S.shots.map(x => ({ x: x.x, y: x.y, r: x.r, el: x.el, kind: x.kind, from: x.from, id: x.id || '', vx: x.vx, vy: x.vy })), quakes: S.quakes.map(q => ({ x: q.self ? S[q.from].x : q.x, y: q.self ? S[q.from].y : q.y, r: q.r, left: q.at - S.t, warn: q.warn || 14, id: q.id || '', from: q.from })),
+    // V13.232 여러 명: 쪽마다 조작 줄 · 되감기 때 줄 바꾸기 · 아직 안 읽은 조작.
+    pushAs: (who, x) => { (multi ? Q[who] : who === 'me' ? S.inputs : S.inputs2)?.push(x); },
+    setQueuesAll: map => { for (const s of S.list) { Q[s.who] = map?.[s.who] || []; S.qi[s.who] = 0; } },
+    queueAt: who => Q[who],
+    view: () => ({ t: S.t, freeze: S.freeze, ...(multi ? Object.fromEntries(S.list.map(s => [s.who, sideView(s)])) : { me: sideView(S.me), foe: sideView(S.foe) }), order: S.list.map(s => s.who), ko: { ...S.ko }, rank: S.rank || null, maxT: S.maxT, shots: S.shots.map(x => ({ x: x.x, y: x.y, r: x.r, el: x.el, kind: x.kind, from: x.from, id: x.id || '', vx: x.vx, vy: x.vy })), quakes: S.quakes.map(q => ({ x: q.self ? S[q.from].x : q.x, y: q.self ? S[q.from].y : q.y, r: q.r, left: q.at - S.t, warn: q.warn || 14, id: q.id || '', from: q.from })),
       zones: S.zones.map(z => ({ n: z.n, id: z.id, x: z.x, y: z.y, r: z.r, left: z.until - S.t, el: z.el, from: z.from })), lines: S.lines.map(L => ({ id: L.id, x: L.x, y: L.y, nx: L.nx, ny: L.ny, len: L.len, w: L.w, left: L.at - S.t, el: L.el, from: L.from })),
       minions: S.minions.map(m => ({ x: m.x, y: m.y, key: m.key, el: m.el, from: m.from, left: m.until - S.t })), mines: S.mines.map(m => ({ x: m.x, y: m.y, from: m.from, el: m.el })), over: S.over, winner: S.winner })
   };
@@ -820,12 +941,24 @@ export function runArena({ seed, me, foe, foeLevel, inputs, meAi = null, foeInpu
   return { winner: A.S.winner || 'draw', ticks: A.S.t, ults: { ...A.S.ults }, left: { me: left(A.S.me), foe: left(A.S.foe) }, ko: { ...A.S.ko }, dealt: { ...A.S.dealt } };
 }
 
+// V13.232 여러 명 판 끝까지 한 번에(방 판정 · 검사 · 밸런스): players(createArena와 같다) · inputs { who: [[틱, 코드, 조준?], …] }.
+//   결과 { winner(난투: 사람 who · 팀전: 't0' | 't1' · 'draw'), ticks, rank, ko, dealt, ults, left{ who: 남은 펫 수 }, hp{ who: 남은 체력 비율 합 } }.
+export function runArenaN({ seed, players, inputs = {}, maxTicks = ARENA.MAX_TICKS, ffa = false }) {
+  const A = createArena({ seed, players, maxTicks, ffa });
+  for (const p of players) for (const x of inputs[p.who] || []) A.pushAs(p.who, x);
+  let guard = 0;
+  while (!A.S.over && guard++ < maxTicks + 2000) A.step();
+  const left = Object.fromEntries(A.S.list.map(s => [s.who, s.team.filter(f => f.cur > 0).length]));
+  const hp = Object.fromEntries(A.S.list.map(s => [s.who, Math.round(s.team.reduce((n, f) => n + f.cur / f.hp, 0) * 1000) / 1000]));
+  return { winner: A.S.winner || 'draw', ticks: A.S.t, rank: A.S.rank || A.S.list.map(s => s.who), ko: { ...A.S.ko }, dealt: { ...A.S.dealt }, ults: { ...A.S.ults }, left, hp, hash: A.hash() };
+}
+
 // V13.230 상태 요약(1초마다 방과 폰이 비교): 틱 · 두 쪽 자리(0.1 단위) · 체력 · 지금 펫 · 게이지 · 날아가는 공격 수. 같은 조작이면 어디서나 같다.
 export function arenaHash(S) {
   let h = 2166136261 >>> 0;
   const add = n => { h = Math.imul(h ^ (Math.round(n) | 0), 16777619) >>> 0; };
   add(S.t);
-  for (const s of [S.me, S.foe]) { add(s.x * 10); add(s.y * 10); add(s.idx); add(s.gauge * 10); for (const f of s.team) add(f.cur); }
+  for (const s of S.list || [S.me, S.foe]) { add(s.x * 10); add(s.y * 10); add(s.idx); add(s.gauge * 10); for (const f of s.team) add(f.cur); }
   add(S.shots.length); add(S.zones.length);
   return h;
 }

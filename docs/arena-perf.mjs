@@ -8,7 +8,9 @@
 // 잰 것: 프레임 간격(평균 · 95%), 33ms · 50ms 넘은 프레임(분당), 50ms 넘는 긴 작업, 입력 지연(누른 시각 → 다음 프레임이 그려진 직후),
 //   스타일 재계산 · 배치 시간, 효과 조각이 떠 있는 프레임만 따로.
 //
-// 사용: node docs/arena-perf.mjs [--cpu 4] [--seconds 70] [--lite auto|off] [--profile] [--trace] [--css '실험 CSS'] [--shot 파일.png]
+// 사용: node docs/arena-perf.mjs [--cpu 4] [--seconds 70] [--lite auto|off] [--profile] [--trace] [--css '실험 CSS'] [--shot 파일.png] [--mode ffa|2v2]
+// V13.232 --mode ffa | 2v2: 1:1:1 난투(펫 3마리) · 2:2 팀전(펫 4마리)을 잰다. 방은 페이지 안에서 흉내 낸다(0.1초마다 내 조작을 확정해 돌려줌),
+//   다른 자리는 컴퓨터(보통)가 조종하므로 경기장에 펫이 3 · 4마리 동시에 싸운다. 화면 · 전투는 진짜(arena.js · createLiveSimN).
 // playwright가 필요하다(이 저장소 의존성이 아니다). 먼저 npm run build:assets(public/app.bundle.css).
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -42,6 +44,36 @@ const MATCH = { id: 'perf', seed: 12345, foe_level: 1, me: ME.map((k, i) => brie
 const PETS = ME.map((key, i) => ({ key, form: 3, level: 20 - i, active: i === 0 }));
 
 const MIME = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg', '.json': 'application/json', '.html': 'text/html' };
+const MODE = arg('mode', '');
+const MULTI_PETS = [['gumiho', 'bear'], ['dragon', 'turtle'], ['phoenix', 'dog'], ['tiger', 'penguin']];
+const sideOf = (i, tm, x, y) => ({ side: `p${i}`, tm, x, y, bot: i > 0, name: i === 0 ? '나' : `친구 ${i}`, team: MULTI_PETS[i].map((key, j) => ({ key, form: 3, level: 20, s2: (i + j) & 1 })) });
+const MULTI_SIDES = MODE === 'ffa' ? [sideOf(0, 0, 50, 78), sideOf(1, 1, 18, 24), sideOf(2, 2, 82, 24)]
+  : [sideOf(0, 0, 32, 76), sideOf(1, 0, 68, 76), sideOf(2, 1, 32, 24), sideOf(3, 1, 68, 24)];
+const MULTI_PAGE = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="stylesheet" href="/app.bundle.css"></head>
+<body><div id="app"></div><script type="module">
+const { openArena, arenaMatch } = await import('/modules/arena.js');
+const { createLiveSimN } = await import('/modules/arena-live-rules.js');
+const { fighter } = await import('/modules/arena-rules.js');
+const A = { data: { profile: { id: 'me', display_name: '나', role: 'student' }, stats: { pets: ${JSON.stringify(PETS)}, points_balance: 100 }, rewards: {} }, screen: 'arena' };
+openArena(A, () => {});
+const sides = ${JSON.stringify(MULTI_SIDES)}, mode = '${MODE}';
+let pending = [], lastC = -1, start = 0;
+const sim = createLiveSimN({ seed: 4321, mode, sides, side: 'p0', send: l => pending.push(...l) });
+// 방 흉내: 0.1초마다 (지금 틱 − 4)까지 확정해 돌려준다(내 조작만, 나머지는 컴퓨터).
+setInterval(() => {
+  if (!start) return;
+  sim.flush();
+  const c = Math.floor((performance.now() - start) / 50) - 4; if (c <= lastC) return;
+  const l = pending.filter(x => x[0] <= c).map(x => [0, Math.max(x[0], lastC + 1), ...x.slice(1)]);
+  pending = pending.filter(x => x[0] > c); lastC = c;
+  sim.onBatch({ c, l });
+  if (sim.C.S.over && !sim.roomOver) sim.end({ winner: sim.C.S.winner, ticks: sim.C.S.t });
+}, 100);
+const brief = t => t.map(f => ({ ...f, el: fighter(f).el }));
+const info = slot => { const s = sides.find(x => x.side === sim.back[slot]); return { slot, name: slot === 'me' ? '나' : s.name, team: brief(s.team), ally: slot === 'me' || sim.allies.includes(slot), me: slot === 'me' }; };
+const r = { id: 'perf', seed: 4321, live: true, multi: true, mode, me: brief(sides[0].team), foe: { name: info('foe').name, team: info('foe').team }, others: sim.slots.filter(w => w !== 'me' && w !== 'foe').map(info), people: [...sim.slots.filter(w => w !== 'me'), 'me'].map(info), title: mode, foe_level: 1 };
+setTimeout(() => arenaMatch(r, { sim, live: true, want: now => { start ||= now; return (now - start) / 50; }, finish: async () => ({ paid: false, reason: 'replay' }), why: () => '', buttons: () => '', quit: () => {}, mounted: () => {} }), 300);
+</script></body></html>`;
 const PAGE = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="stylesheet" href="/app.bundle.css"></head>
 <body><div id="app"></div><script type="module">
 const { openArena } = await import('/modules/arena.js');
@@ -54,7 +86,7 @@ async function startServer() {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     const json = body => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
-    if (url.pathname === '/arena.html') { res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(PAGE); }
+    if (url.pathname === '/arena.html') { res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(MODE ? MULTI_PAGE : PAGE); }
     if (url.pathname === '/api/games/arena/start') return json(MATCH);
     if (url.pathname === '/api/games/arena/finish') return json({ winner: 'me', paid: false, reason: 'short' });
     if (url.pathname.startsWith('/api/')) return json({});
@@ -140,6 +172,8 @@ async function main() {
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU });
   const PROFILE = process.argv.includes('--profile'), TRACE = process.argv.includes('--trace');
   await me.goto(`${base}/arena.html`);
+  // --vs-shot 파일.png: VS 화면(판 시작 전)을 찍는다.
+  if (arg('vs-shot', '')) { await me.waitForSelector('#ar-vs', { timeout: 30000 }); await new Promise(r => setTimeout(r, 1300)); await me.screenshot({ path: arg('vs-shot', ''), scale: 'css' }); }
   await me.waitForSelector('#ar-pad', { timeout: 30000 });
   if (TRACE) await browser.startTracing(me, { categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline'] });
   if (PROFILE) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); }
@@ -176,7 +210,7 @@ async function main() {
   const secs = P.frames.reduce((a, b) => a + b, 0) / 1000;
   const mins = secs / 60;
   const out = {
-    cpu: CPU, lite: LITE, seconds: r1(secs), frames: P.frames.length, fps: r1(P.frames.length / secs),
+    mode: MODE || '1v1', pets_max: await me.evaluate(() => document.querySelectorAll('.ar-mon').length), cpu: CPU, lite: LITE, seconds: r1(secs), frames: P.frames.length, fps: r1(P.frames.length / secs),
     frame_avg: r1(avg(P.frames)), frame_p95: r1(pct(P.frames, .95)), over33_per_min: r1(P.frames.filter(d => d > 33.4).length / mins), over50_per_min: r1(P.frames.filter(d => d > 50).length / mins),
     fx_frame_avg: r1(avg(P.fxFrames)), fx_frame_p95: r1(pct(P.fxFrames, .95)), fx_max: P.fxMax,
     long_tasks: P.long.length, long_max: Math.max(0, ...P.long),

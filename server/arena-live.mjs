@@ -70,7 +70,7 @@ export function arenaInviteFor(state, p, school, now = Date.now()) {
 // 방 만들기(방장). 하던 대기 방이 있으면 닫는다. 1분에 1번.
 export function liveOpen(state, p, school, pets, { id, now = Date.now(), mode = '1v1' }) {
   if (!school) fail('학생 학교 설정을 확인해주세요.', 409);
-  if (!LIVE.MODES[mode]) fail('지금은 1:1 대전만 할 수 있어요.');
+  if (!LIVE.MODES[mode]) fail('1:1 · 1:1:1 난투 · 2:2 팀전 중에서 골라 주세요.');
   const player = livePlayer(p, pets);
   if (!player.pets.length) fail('알에서 깬 펫이 있어야 싸울 수 있어요. 공부해서 펫을 키워 주세요!', 409);
   const a = games(p).arena ||= {};
@@ -150,7 +150,8 @@ export function settleArenaLive(state, body, { profileOf, schoolOf, activePet = 
   if (!x || x.st !== 'open') return false;
   x.st = 'done';
   state.arenaInvites = list(state).filter(e => e.st !== 'done');
-  const res = body.result || {}, seats = Array.isArray(res.seats) ? res.seats.slice(0, LIVE.MODES[x.mode]?.seats || 2) : [];
+  // V13.232 컴퓨터 자리(bot)는 보상 계산에서 뺀다(방이 bot 표시 · 학생 id가 아닌 'bot:n'을 보낸다).
+  const res = body.result || {}, seats = (Array.isArray(res.seats) ? res.seats.slice(0, LIVE.MODES[x.mode]?.seats || 2) : []).filter(s => !s.bot).map(s => ({ ...s, mode: x.mode }));
   // 자리는 방이 보낸 것(방 열쇠로만 오는 보고)을 믿는다.
   const people = seats.map(s => ({ s, p: typeof s.id === 'string' ? profileOf(s.id) : null }));
   for (const { s, p } of people) {
@@ -159,7 +160,7 @@ export function settleArenaLive(state, body, { profileOf, schoolOf, activePet = 
     // 끝 보고 때도 같은 학년인지 다시 본다(그 사이 반이 바뀌었으면 기록만).
     const peers = others.every(o => arenaPeers(p, schoolOf(p), o.p, schoolOf(o.p)));
     const out = liveSettleOne(p, { id: x.id, seat: s, others: others.map(o => o.p), winner: res.winner, idle: !!res.idle, peers, pet: activePet(p.id), now });
-    log(p, `펫 아레나 친구 대전 ${out.win ? '승리' : res.winner === 'draw' ? '무승부' : '패배'}${others[0] ? ` · ${String(others[0].p.display_name || '').slice(0, 10)}` : ''}${out.paid && out.coins ? ` · ${out.coins}코인` : ''}`, now);
+    log(p, `펫 아레나 ${x.mode === 'ffa' ? '난투' : x.mode === '2v2' ? '팀전' : '친구 대전'} ${out.win ? '승리' : res.winner === 'draw' ? '무승부' : '패배'}${others[0] ? ` · ${String(others[0].p.display_name || '').slice(0, 10)}` : ''}${out.paid && out.coins ? ` · ${out.coins}코인` : ''}`, now);
   }
   return true;
 }
@@ -172,11 +173,12 @@ export function liveSettleOne(p, { id, seat, others, winner, idle, peers = true,
   const today = dayKey(now);
   if (a.day !== today) { a.day = today; a.plays = 0; }
   if (a.pairs?.day !== today) a.pairs = { day: today, m: {} };
-  const win = winner === seat.side, pairKey = others.map(o => o.id).sort().join('+');
+  // V13.232 여러 명 판은 방이 사람마다 이겼는지(seat.win: 난투 1등 · 팀전 이긴 팀)를 보낸다.
+  const win = seat.win != null ? !!seat.win : winner === seat.side, pairKey = others.map(o => o.id).sort().join('+');
   a.live_games = Number(a.live_games || 0) + 1;
   if (win) a.live_wins = Number(a.live_wins || 0) + 1;
-  const base = { live: true, winner: winner === 'draw' ? 'draw' : win ? 'me' : 'foe', win, ko: Number(seat.ko || 0), dealt: Number(seat.dealt || 0), ults: Number(seat.ults || 0), foe_name: others.map(o => String(o.display_name || '')).join(', ').slice(0, 30) };
-  const why = !peers ? 'grade' : idle ? 'idle' : seat.ai_half ? 'ai' : Number(a.pairs.m[pairKey] || 0) >= LIVE.PAIR_DAILY ? 'pair'
+  const base = { live: true, mode: LIVE.MODES[seat.mode] ? seat.mode : '1v1', place: Number(seat.place || 0) || null, winner: winner === 'draw' ? 'draw' : win ? 'me' : 'foe', win, ko: Number(seat.ko || 0), dealt: Number(seat.dealt || 0), ults: Number(seat.ults || 0), foe_name: others.map(o => String(o.display_name || '')).join(', ').slice(0, 30) };
+  const why = !peers ? 'grade' : idle || seat.idle ? 'idle' : seat.ai_half ? 'ai' : Number(a.pairs.m[pairKey] || 0) >= LIVE.PAIR_DAILY ? 'pair'
     : Number(a.plays || 0) >= ARENA.DAILY ? 'daily' : Number(a.tk || 0) <= 0 ? 'ticket' : '';
   let out;
   if (why) out = { ...base, paid: false, reason: why };

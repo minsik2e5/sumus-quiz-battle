@@ -116,6 +116,44 @@ export function aiPickRate(el, pick, n = 1000) {
 export const pickGap = (el, n = 800) => { const a = pickRate(el, 0, n), b = pickRate(el, 1, n); return { a, b, gap: a - b }; };
 export const TIER_PAIRS = [['epic', 'normal', 0.5, 0.03], ['legend', 'normal', 0.55, 0.04], ['mythic', 'legend', 0.55, 0.04], ['limited', 'normal', 0.5, 0.03]];
 
+// V13.232 (④단계) 여러 명 판 밸런스: 1:1:1 난투 · 2:2 팀전. 모두 보통 솜씨 컴퓨터, 등급 섞인 펫 2마리씩(같은 단계 · 레벨).
+//   난투: 같은 세 팀을 자리 세 곳에 돌려 앉혀(3판 한 묶음) 자리마다 1등 비율 · 판 길이 · 막타 분포(1등 · 2등 · 3등이 얻은 쓰러뜨림 몫,
+//         마지막에 때린 사람만 점수라 '가장 약한 사람 몰아치기'로 점수를 뺏기 어려운지) · 시간 끝 비율.
+//   팀전: 같은 네 팀을 파랑 · 빨강 바꿔 2판 한 묶음. 파랑 승률(목표 50 ± 3) · 판 길이 · 팀원끼리 피해 0.
+export function multiStats(mode, n = 300) {
+  const ffa = mode === 'ffa', rnd = seeded(n * 5 + (ffa ? 3 : 4));
+  const SP = ffa ? [[50, 78], [18, 24], [82, 24]] : [[32, 76], [68, 76], [32, 24], [68, 24]];
+  const seats = ffa ? 3 : 4, maxTicks = ffa ? 2400 : 3000;
+  const out = { games: 0, ticks: 0, timeUp: 0, seatWin: Array(seats).fill(0), blue: 0, draws: 0, koByPlace: [0, 0, 0, 0], ko: 0, lowFocus: 0, lowKills: 0 };
+  for (let i = 0; i < n; i++) {
+    const form = 2 + (i % 2), level = 8 + (i % 9);
+    const teams = Array.from({ length: seats }, () => [0, 1].map(() => fighter({ key: ALL_KEYS[Math.floor(rnd() * ALL_KEYS.length)], form, level, s2: rnd() < 0.5 ? 0 : 1 })));
+    const rotations = ffa ? [0, 1, 2] : [0, 2];
+    for (const r of rotations) {
+      // 자리 k에 팀 (k + r) % seats.
+      const players = SP.map((xy, k) => ({ who: `p${k}`, tm: ffa ? k : (k < 2 ? 0 : 1), team: teams[(k + r) % seats], x: xy[0], y: xy[1], ai: 1 }));
+      const A = createArena({ seed: 3000 + i * 29 + r, players, maxTicks, ffa });
+      let guard = 0, lowest = null;
+      while (!A.S.over && guard++ < maxTicks + 50) {
+        const ev = A.step();
+        // 막타 분포: 쓰러진 순간 그 사람이 가장 약한(남은 체력 비율 합이 가장 낮은) 사람이었나.
+        for (const e of ev) if (e.e === 'faint') {
+          const hp = s => s.team.reduce((m, f) => m + f.cur / f.hp, 0);
+          lowest = A.S.list.filter(s => s.who !== e.who).length ? A.S.list.slice().sort((a, b) => hp(a) - hp(b))[0].who : null;
+          out.lowKills += lowest === e.who ? 1 : 0;
+        }
+      }
+      out.games++; out.ticks += A.S.t; if (A.S.t >= maxTicks) out.timeUp++;
+      if (A.S.winner === 'draw') out.draws++;
+      else if (ffa) out.seatWin[Number(A.S.winner.slice(1))]++;
+      else if (A.S.winner === 't0') out.blue++;
+      if (ffa) A.S.rank.forEach((w, place) => { out.koByPlace[place] += A.S.ko[w]; });
+      out.ko += Object.values(A.S.ko).reduce((a, b) => a + b, 0);
+    }
+  }
+  return { ...out, sec: out.ticks / out.games * ARENA.TICK_MS / 1000 };
+}
+
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const [mode = 'tiers', nArg] = process.argv.slice(2), n = Number(nArg) || (mode === 'bots' ? 120 : 300);
   const pc = x => `${(x * 100).toFixed(1)}%`;
@@ -126,6 +164,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   } else if (mode === 'picks') {
     console.log(`스킬 ② 고르기(${n}판씩, 보통 솜씨 검사용 학생이 A · B를 골라 같은 판을 돌린 승률, 목표 차이 ±3)`);
     for (const el of Object.keys(EL_SKILLS)) { const r = pickGap(el, n), [a, b] = EL_SKILLS[el], c = aiPickRate(el, 0, n), d = aiPickRate(el, 1, n); console.log(`${el} ${a.name} ${pc(r.a)} · ${b.name} ${pc(r.b)} → 차이 ${(r.gap * 100).toFixed(1)} ${Math.abs(r.gap) <= 0.03 ? 'OK' : '벗어남'}  (참고: 컴퓨터끼리 ${pc(c)} · ${pc(d)})`); }
+  } else if (mode === 'multi') {
+    const f = multiStats('ffa', n), t = multiStats('2v2', n);
+    console.log(`1:1:1 난투(${f.games}판, 같은 세 팀을 자리 셋에 돌려 앉힘): 평균 ${f.sec.toFixed(0)}초 · 시간 끝 ${pc(f.timeUp / f.games)} · 무승부 ${pc(f.draws / f.games)}`);
+    console.log(`  자리별 1등: ${f.seatWin.map((w, k) => `p${k} ${pc(w / f.games)}`).join(' · ')} (목표 각 33 ± 3)`);
+    console.log(`  막타 분포(쓰러뜨림 몫): 1등 ${pc(f.koByPlace[0] / f.ko)} · 2등 ${pc(f.koByPlace[1] / f.ko)} · 3등 ${pc(f.koByPlace[2] / f.ko)} · 쓰러진 펫이 그때 가장 약한 사람 것 ${pc(f.lowKills / f.ko)}`);
+    console.log(`2:2 팀전(${t.games}판, 같은 네 팀을 파랑 · 빨강 바꿔 2판씩): 평균 ${t.sec.toFixed(0)}초 · 시간 끝 ${pc(t.timeUp / t.games)} · 파랑 승률 ${pc((t.blue + t.draws / 2) / t.games)} (목표 50 ± 3) ${Math.abs((t.blue + t.draws / 2) / t.games - 0.5) <= 0.03 ? 'OK' : '벗어남'}`);
   } else if (mode === 'bots') {
     console.log(`검사용 학생 대 컴퓨터(${n}판씩)`);
     for (const [skill, name] of [[0, '대충'], [1, '보통'], [2, '잘함']]) console.log(`${name}: ` + [0, 1, 2].map(fl => { const r = botRate(fl, skill, n); return `${['쉬움', '보통', '어려움'][fl]} ${pc(r.w)}(${Math.round(r.sec)}초)`; }).join(' · '));

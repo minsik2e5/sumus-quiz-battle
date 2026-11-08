@@ -4,10 +4,18 @@
 //   방은 조작 순서(몇 번째 틱)를 정해 0.1초마다 "이 틱까지 확정"을 보낸다. 늦게 온 친구 조작이면 폰이 그 틱으로 되감아 다시 계산한다.
 //   끝 판정은 늘 방: 확정된 모든 조작으로 runArena를 다시 돌린 결과.
 // 엔진 쪽 이름: 방장 = 'me' 쪽(아래), 손님 = 'foe' 쪽(위). 손님 화면은 경기장을 180° 돌려 보여 준다(mirror*). 경기장이 위아래 · 좌우 대칭이라 같다.
-import { ARENA, INPUT, PLAYER_CODE_MAX, cleanInputs, createArena, runArena, fighter } from './arena-rules.js';
+// V13.232 (④단계) 1:1:1 난투 · 2:2 팀전: 같은 구조(방이 조작 순서를 정하고 폰은 롤백)를 여러 명으로 넓힌 것이 아래 'N' 함수들이다.
+//   엔진 쪽 이름은 자리 순서대로 p0 · p1 · p2 · p3, 팀 번호 tm(난투는 사람마다 다르고, 팀전은 파랑 0 · 빨강 1).
+//   빈자리는 컴퓨터(bot)가 처음부터 조종하고 보상 계산에서 뺀다. 화면은 내 펫을 'me', 나머지를 'foe' · 'o2' · 'o3' 칸으로 본다(slotsFor).
+import { ARENA, INPUT, PLAYER_CODE_MAX, cleanInputs, createArena, runArena, runArenaN, fighter } from './arena-rules.js';
 
 export const LIVE = {
-  MODES: { '1v1': { seats: 2, team: 3, ms: ARENA.MAX_TICKS * ARENA.TICK_MS } }, // ④단계(1:1:1 · 2:2)는 여기에 자리 수 · 펫 수를 더한다
+  MODES: {
+    '1v1': { seats: 2, team: 3, ms: ARENA.MAX_TICKS * ARENA.TICK_MS, name: '1 대 1' },
+    // V13.232 (구성안 1-1장 · 선생님 결정 Q2: 각자 2마리). 난투 2분 · 팀전 2분 30초.
+    ffa: { seats: 3, team: 2, ticks: 2400, ms: 2400 * ARENA.TICK_MS, ffa: true, name: '1:1:1 난투' },
+    '2v2': { seats: 4, team: 2, ticks: 3000, ms: 3000 * ARENA.TICK_MS, teams: 2, name: '2:2 팀전' }
+  },
   CODE_LEN: 4,                 // 방 코드 4자리
   LOBBY_MS: 5 * 60000,         // 대기실은 5분이 지나면 닫힌다
   START_MS: 6000,              // 시작을 누르고 6초 뒤 0틱(VS 화면 2.3초 + 3 · 2 · 1 + 여유). 두 폰이 같은 시각에 시작한다
@@ -65,6 +73,7 @@ function flipObj(o) {
   for (const k of ['nx', 'ny', 'vx', 'vy', 'fx', 'fy', 'cnx', 'cny']) if (k in o) out[k] = -o[k];
   if ('who' in o) out.who = sw(o.who);
   if ('from' in o) out.from = sw(o.from);
+  if ('by' in o) out.by = sw(o.by); // V13.232 피해 사건에 때린 쪽
   if ('winner' in o) out.winner = sw(o.winner);
   return out;
 }
@@ -235,7 +244,241 @@ export function createReplaySim({ seed, teams, inputs, side = 'me', foeLevel = 1
 }
 // 다시 보기 기록 정리(localStorage에서 읽은 것): 최근 REPLAYS판, 판 하나 조작 쪽마다 INPUT_MAX개까지.
 export function cleanReplays(list) {
-  return (Array.isArray(list) ? list : []).filter(r => r && Number.isFinite(r.seed) && Array.isArray(r.teams?.me) && Array.isArray(r.teams?.foe))
+  // V13.232 여러 명 판 기록: { mode: 'ffa' | '2v2', sides: [{ side, tm, team, x, y, bot }], inputs: { p0: […], … } }.
+  return (Array.isArray(list) ? list : []).filter(r => r && Number.isFinite(r.seed) && (multiMode(r.mode) ? Array.isArray(r.sides) && r.sides.length === LIVE.MODES[r.mode].seats && r.sides.every(s => WHOS.includes(s?.side) && Array.isArray(s.team))
+    : Array.isArray(r.teams?.me) && Array.isArray(r.teams?.foe)))
     .slice(-LIVE.REPLAYS)
-    .map(r => ({ ...r, inputs: { me: cleanInputs(r.inputs?.me, ARENA.MAX_TICKS + 400, INPUT.AI_OFF), foe: cleanInputs(r.inputs?.foe, ARENA.MAX_TICKS + 400, INPUT.AI_OFF) } }));
+    .map(r => multiMode(r.mode) ? { ...r, inputs: Object.fromEntries(r.sides.map(x => [x.side, cleanInputs(r.inputs?.[x.side], LIVE.MODES[r.mode].ticks + 400, INPUT.AI_OFF)])) }
+      : ({ ...r, inputs: { me: cleanInputs(r.inputs?.me, ARENA.MAX_TICKS + 400, INPUT.AI_OFF), foe: cleanInputs(r.inputs?.foe, ARENA.MAX_TICKS + 400, INPUT.AI_OFF) } }));
+}
+
+/* ====================================================================================================
+   V13.232 (④단계) 여러 명 판: 1:1:1 난투(3명) · 2:2 팀전(4명). 각자 펫 2마리, 경기장에는 한 사람당 한 마리(화면 펫 최대 4마리).
+   ==================================================================================================== */
+export const multiMode = mode => !!LIVE.MODES[mode] && LIVE.MODES[mode].seats > 2;
+export const WHOS = ['p0', 'p1', 'p2', 'p3'];
+// 시작 자리(경기장 %): 난투는 세모, 팀전은 파랑 아래 · 빨강 위. 경기장이 위아래 · 좌우 대칭이라 위쪽 사람은 180° 돌려 보면 내가 아래.
+export const SPAWN = {
+  ffa: [[50, 78], [18, 24], [82, 24]],
+  '2v2': { 0: [[32, 76], [68, 76]], 1: [[32, 24], [68, 24]] }
+};
+export const TEAM_NAMES = ['파랑', '빨강'];
+export const BOT_NAME = '컴퓨터';
+// 대기실 자리 [{ id, team(펫 목록), tm(팀전 파랑 0 · 빨강 1), bot }] → 엔진 players. 자리 순서 = p0, p1 ….
+//   팀전은 파랑 자리 먼저 · 빨강 자리 다음(같은 팀 안에서는 들어온 순서).
+export function seatSides(mode, seats) {
+  const M = LIVE.MODES[mode];
+  const list = M.ffa ? seats.slice(0, M.seats).map((s, i) => ({ ...s, tm: i }))
+    : [0, 1].flatMap(tm => seats.filter(s => (s.tm === 1 ? 1 : 0) === tm)).slice(0, M.seats);
+  const used = { 0: 0, 1: 0 };
+  return list.map((s, i) => {
+    const [x, y] = M.ffa ? SPAWN.ffa[i] : SPAWN['2v2'][s.tm][used[s.tm]++] || [50, s.tm ? 24 : 76];
+    return { ...s, side: WHOS[i], x, y };
+  });
+}
+export const livePlayers = (mode, sides) => sides.map(s => ({ who: s.side, tm: s.tm, team: liveFighters(s.team), x: s.x, y: s.y, ai: s.bot ? 1 : null }));
+// 팀전 자리 고르기가 맞나: 팀마다 2자리까지.
+export const teamFull = (seats, tm) => seats.filter(s => (s.tm === 1 ? 1 : 0) === tm).length >= 2;
+// 방장 섞기: 씨앗으로 자리를 섞어 팀을 다시 나눈다(파랑 2 · 빨강 2).
+export function shuffleTeams(seats, seed) {
+  let a = seed >>> 0;
+  const r = () => { a = (Math.imul(a, 1664525) + 1013904223) >>> 0; return a / 4294967296; };
+  const order = seats.map((s, i) => [r(), i]).sort((x, y) => x[0] - y[0]).map(x => x[1]);
+  return seats.map((s, i) => ({ ...s, tm: order.indexOf(i) % 2 }));
+}
+
+// 방: 조작 순서 정하기(createTimeline과 같은 규칙, 쪽이 여러 개).
+export function createTimelineN({ seed, mode, sides }) {
+  const M = LIVE.MODES[mode], players = livePlayers(mode, sides), whos = players.map(p => p.who);
+  const E = createArena({ seed, players, maxTicks: M.ticks, ffa: !!M.ffa });
+  const per = v => Object.fromEntries(whos.map(w => [w, typeof v === 'function' ? v(w) : v]));
+  const T = { seed, mode, confirmed: -1, inputs: per(() => []), pending: per(() => []), last: per(0), human: per(0), aiOn: per(w => players.find(p => p.who === w).ai != null), aiTicks: per(0), bots: whos.filter(w => players.find(p => p.who === w).ai != null) };
+  function accept(side, list, roomTick) {
+    if (!T.inputs[side] || T.bots.includes(side)) return 0;
+    const clean = cleanInputs((Array.isArray(list) ? list : []).slice(0, LIVE.IN_MAX).map(x => Array.isArray(x) ? [Math.max(0, Math.round(Number(x[0]) || 0)), ...x.slice(1, 3)] : x).sort((a, b) => a[0] - b[0]), M.ticks + 400, PLAYER_CODE_MAX);
+    let n = 0;
+    for (const x of clean) {
+      if (T.inputs[side].length + T.pending[side].length >= ARENA.INPUT_MAX - 40) break;
+      const t = Math.min(Math.max(x[0], T.confirmed + 1, T.last[side], roomTick - LIVE.ROLLBACK_MAX), Math.max(T.confirmed + 1, roomTick + LIVE.AHEAD_MAX));
+      T.pending[side].push([t, ...x.slice(1)]); T.last[side] = t; n++;
+      if (x[1] !== INPUT.AIM_EASY && x[1] !== INPUT.AIM_AUTO && x[1] !== INPUT.AIM_FREE) T.human[side]++;
+    }
+    return n;
+  }
+  function system(side, on) {
+    if (!T.inputs[side] || T.bots.includes(side) || T.aiOn[side] === on) return false;
+    const t = Math.max(T.confirmed + 1, T.last[side]);
+    T.pending[side].push([t, on ? INPUT.AI_ON : INPUT.AI_OFF]); T.last[side] = t;
+    T.aiOn[side] = on;
+    return true;
+  }
+  function confirm(upTo) {
+    if (upTo <= T.confirmed) return [];
+    const out = [];
+    whos.forEach((side, si) => {
+      const p = T.pending[side];
+      let k = 0;
+      while (k < p.length && p[k][0] <= upTo) { const x = p[k++]; T.inputs[side].push(x); E.pushAs(side, x); out.push([si, ...x]); }
+      if (k) T.pending[side] = p.slice(k);
+    });
+    while (E.S.t <= upTo && !E.S.over) {
+      for (const side of whos) if (E.S.ai[side] != null && !T.bots.includes(side)) T.aiTicks[side]++;
+      E.step();
+    }
+    T.confirmed = upTo;
+    return out.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+  }
+  return { T, E, whos, accept, system, confirm, hash: () => E.hash(), get over() { return E.S.over; }, get tick() { return E.S.t; } };
+}
+
+// 끝 판정(여러 명): 확정 조작 전부로 runArenaN을 처음부터. 사람마다 { win, place, ko, dealt, … }.
+//   막타 점수: 쓰러뜨린 수(ko)는 마지막에 때린 사람에게만(엔진 faint). 등수는 난투면 살아남기 → 쓰러뜨린 수 → 남은 체력.
+//   보상 막기: 컴퓨터 자리(bot)는 보상 계산에서 뺀다. 거의 조작 안 한 사람(조작 20개 미만 · 준 피해 0)은 그 사람만 보상 없음.
+//   제대로 한 사람이 2명 미만이면(혼자 + 컴퓨터) 그 판은 모두 보상 없음(idle).
+export function liveVerdictN({ seed, mode, sides, inputs, aiTicks = {}, human = {} }) {
+  const M = LIVE.MODES[mode], players = livePlayers(mode, sides);
+  const r = runArenaN({ seed, players, inputs, maxTicks: M.ticks, ffa: !!M.ffa });
+  const total = Math.max(1, r.ticks);
+  const out = Object.fromEntries(sides.map(s => {
+    const win = M.ffa ? r.winner === s.side : r.winner === `t${s.tm}`;
+    const idle = !s.bot && ((human[s.side] || 0) < LIVE.MIN_INPUTS || (r.dealt[s.side] || 0) <= 0);
+    return [s.side, { win, place: r.rank.indexOf(s.side) + 1, tm: s.tm, bot: !!s.bot, ko: r.ko[s.side] || 0, dealt: r.dealt[s.side] || 0, ults: r.ults[s.side] || 0, left: r.left[s.side] || 0, hp: r.hp[s.side] || 0,
+      inputs: human[s.side] || 0, ai_ticks: aiTicks[s.side] || 0, ai_half: (aiTicks[s.side] || 0) / total > LIVE.AI_HALF, idle }];
+  }));
+  const active = sides.filter(s => !s.bot && !out[s.side].idle).length;
+  return { winner: r.winner, ticks: r.ticks, rank: r.rank, sides: out, idle: active < 2, hash: r.hash };
+}
+
+// 화면 칸: 내 펫 'me', 다른 팀(자리 순서) 'foe' · 'o2' …, 팀원은 맨 뒤. allies: 같은 팀 칸.
+export function slotsFor(sides, mine) {
+  const me = sides.find(s => s.side === mine), rest = sides.filter(s => s.side !== mine);
+  const order = [...rest.filter(s => s.tm !== me.tm), ...rest.filter(s => s.tm === me.tm)];
+  const names = ['foe', 'o2', 'o3'];
+  const map = { [mine]: 'me' };
+  order.forEach((s, i) => { map[s.side] = names[i]; });
+  const allies = order.filter(s => s.tm === me.tm).map(s => map[s.side]);
+  return { map, back: Object.fromEntries(Object.entries(map).map(([k, v]) => [v, k])), slots: ['me', ...order.map(s => map[s.side])], allies, flip: me.y < 50 };
+}
+// 엔진 화면(view) → 화면 칸 이름 + (위쪽 사람이면) 180° 돌리기.
+function slotObj(o, map, flip) {
+  const out = { ...o };
+  if (flip) {
+    if ('x' in o) out.x = 100 - o.x;
+    if ('y' in o) out.y = 100 - o.y;
+    if ('tx' in o) out.tx = 100 - o.tx;
+    if ('ty' in o) out.ty = 100 - o.ty;
+    for (const k of ['nx', 'ny', 'vx', 'vy', 'fx', 'fy', 'cnx', 'cny']) if (k in o) out[k] = -o[k];
+  }
+  for (const k of ['who', 'from', 'by', 'to', 'mate']) if (k in o && map[o[k]]) out[k] = map[o[k]];
+  return out;
+}
+export const slotEvent = (e, map, flip, myTm) => {
+  const out = slotObj(e, map, flip);
+  if (e.e === 'over') out.winner = e.winner === 'draw' ? 'draw' : e.winner === `t${myTm}` || map[e.winner] === 'me' ? 'me' : 'foe';
+  if (e.e === 'over' && Array.isArray(e.rank)) out.rank = e.rank.map(w => map[w] || w);
+  return out;
+};
+export function slotView(v, map, flip, myTm) {
+  const out = { t: v.t, freeze: v.freeze, maxT: v.maxT, over: v.over, multi: true };
+  for (const w of v.order) out[map[w]] = slotObj(v[w], map, flip);
+  out.ko = Object.fromEntries(Object.entries(v.ko).map(([w, n]) => [map[w] || w, n]));
+  out.rank = v.rank ? v.rank.map(w => map[w] || w) : null;
+  out.winner = !v.winner ? null : v.winner === 'draw' ? 'draw' : v.winner === `t${myTm}` || map[v.winner] === 'me' ? 'me' : 'foe';
+  for (const k of ['shots', 'quakes', 'zones', 'lines', 'minions', 'mines']) out[k] = v[k].map(o => slotObj(o, map, flip));
+  return out;
+}
+
+// 폰: 롤백 전투(여러 명). createLiveSim과 같은 방식 — 확정 전투 C + 보여 주는 전투 P, 늦게 온 남의 조작이면 되감기.
+export function createLiveSimN({ seed, mode, sides, side, send = () => {}, onDesync = () => {} }) {
+  const M = LIVE.MODES[mode], players = livePlayers(mode, sides), whos = players.map(p => p.who), mine = side;
+  const me = sides.find(s => s.side === mine), V = slotsFor(sides, mine), flip = V.flip, myTm = me.tm;
+  const make = () => createArena({ seed, players, maxTicks: M.ticks, ffa: !!M.ffa });
+  const C = make(), P = make();
+  const confirmed = Object.fromEntries(whos.map(w => [w, []]));
+  C.setQueuesAll(confirmed);
+  let pendingMine = [], outbox = [], confirmedTick = -1, roomOver = null, extra = [], hashes = new Map();
+  const stats = { rollbacks: 0, deepest: 0, resim: 0, desync: 0 };
+  const queueAfter = w => confirmed[w].slice(C.S.qi[w]);
+  function advanceC() {
+    const target = Math.min(confirmedTick, P.S.t - 1);
+    while (C.S.t <= target && !C.S.over) {
+      C.step();
+      const h = hashes.get(C.S.t - 1);
+      if (h != null) { hashes.delete(C.S.t - 1); if (h !== C.hash()) { stats.desync++; onDesync(); } }
+    }
+  }
+  function resync() {
+    const before = P.S.t, idx = Object.fromEntries(whos.map(w => [w, P.S[w].idx]));
+    P.restore(C.snapshot());
+    P.setQueuesAll(Object.fromEntries(whos.map(w => [w, w === mine ? [...queueAfter(w), ...pendingMine] : queueAfter(w)])));
+    stats.rollbacks++; stats.deepest = Math.max(stats.deepest, before - P.S.t);
+    while (P.S.t < before && !P.S.over) { P.step(); stats.resim++; }
+    for (const w of whos) if (P.S[w].idx !== idx[w]) extra.push({ e: 'swap', who: w, idx: P.S[w].idx, key: P.S[w].team[P.S[w].idx].key });
+  }
+  function onBatch(b) {
+    let need = false;
+    for (const [si, ...x] of b.l || []) {
+      const who = whos[si];
+      if (!who) continue;
+      confirmed[who].push(x);
+      if (who === mine) {
+        const p = pendingMine.shift();
+        if (!p || p[0] !== x[0] || p[1] !== x[1] || p[2] !== x[2]) need = true;
+      } else if (x[0] < P.S.t) need = true;
+      else P.pushAs(who, x);
+    }
+    if (b.h) hashes.set(b.h[0], b.h[1]);
+    confirmedTick = Math.max(confirmedTick, Number(b.c));
+    advanceC();
+    if (need) resync();
+  }
+  // 다시 들어왔거나 어긋났을 때: 확정 조작 전부로 C를 확정 틱까지 다시 돌리고, P는 C에서 지금 틱까지.
+  //   (여러 명 판은 컴퓨터 자리가 있어서, 조작 없이 P부터 돌리면 판이 일찍 끝나 버릴 수 있다 — 그래서 C 먼저.)
+  function rebuild(all, c) {
+    for (const w of whos) { confirmed[w].length = 0; for (const x of all?.[w] || []) confirmed[w].push([...x]); }
+    const before = P.S.t, fresh = make();
+    C.restore(fresh.snapshot()); C.setQueuesAll(confirmed);
+    confirmedTick = c; pendingMine = []; hashes.clear();
+    while (C.S.t <= c && !C.S.over) C.step();
+    P.restore(C.snapshot()); P.setQueuesAll(Object.fromEntries(whos.map(w => [w, queueAfter(w)])));
+    while (P.S.t < before && !P.S.over) P.step();
+    stats.rollbacks++;
+  }
+  const win = w => !w ? null : w === 'draw' ? 'draw' : w === `t${myTm}` || w === mine ? 'me' : 'foe';
+  const bySlot = obj => Object.fromEntries(Object.entries(obj).map(([w, n]) => [V.map[w] || w, n]));
+  const S = {
+    get t() { return P.S.t; },
+    get over() { return !!roomOver && (P.S.over || P.S.t >= roomOver.ticks); },
+    get winner() { return roomOver ? win(roomOver.winner) : null; },
+    get me() { return P.S[mine]; }, get foe() { return P.S[V.back.foe]; },
+    get ko() { return bySlot(P.S.ko); }, get dealt() { return bySlot(P.S.dealt); }, get ults() { return bySlot(P.S.ults); }
+  };
+  return {
+    S, stats, side, flip, multi: true, slots: V.slots, allies: V.allies, map: V.map, back: V.back, myTm, mode,
+    push(x) { const y = mirrorInput(x, flip); pendingMine.push(y); P.pushAs(mine, y); outbox.push(y); },
+    flush() { if (!outbox.length) return null; const l = outbox.splice(0, LIVE.IN_MAX); send(l); return l; },
+    step() { const ev = P.step(), out = extra.length ? [...extra.splice(0), ...ev] : ev; return out.map(e => slotEvent(e, V.map, flip, myTm)); },
+    view: () => slotView(P.view(), V.map, flip, myTm),
+    onBatch, rebuild,
+    end(res) { roomOver = res; if (res?.all) rebuild(res.all, res.ticks); },
+    get confirmedTick() { return confirmedTick; },
+    get roomOver() { return roomOver; },
+    inputsOf: who => confirmed[who],
+    C, P
+  };
+}
+// 다시 보기(여러 명): 씨앗 + 모든 쪽 조작.
+export function createReplaySimN({ seed, mode, sides, inputs, side = 'p0' }) {
+  const M = LIVE.MODES[mode], players = livePlayers(mode, sides);
+  const P = createArena({ seed, players, maxTicks: M.ticks, ffa: !!M.ffa });
+  for (const p of players) for (const x of inputs?.[p.who] || []) P.pushAs(p.who, x);
+  const me = sides.find(s => s.side === side) || sides[0], V = slotsFor(sides, me.side), myTm = me.tm;
+  const win = w => !w ? null : w === 'draw' ? 'draw' : w === `t${myTm}` || w === me.side ? 'me' : 'foe';
+  const bySlot = obj => Object.fromEntries(Object.entries(obj).map(([w, n]) => [V.map[w] || w, n]));
+  const S = {
+    get t() { return P.S.t; }, get over() { return P.S.over; }, get winner() { return win(P.S.winner); },
+    get me() { return P.S[me.side]; }, get foe() { return P.S[V.back.foe]; },
+    get ko() { return bySlot(P.S.ko); }, get dealt() { return bySlot(P.S.dealt); }, get ults() { return bySlot(P.S.ults); }
+  };
+  return { S, replay: true, multi: true, slots: V.slots, allies: V.allies, map: V.map, back: V.back, mode, push() {}, step: () => P.step().map(e => slotEvent(e, V.map, V.flip, myTm)), view: () => slotView(P.view(), V.map, V.flip, myTm) };
 }

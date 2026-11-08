@@ -2020,7 +2020,7 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     if (p.preview_owner_id) fail('미리 보기에서는 친구 대전을 할 수 없어요.', 409);
     const now = Date.now();
-    return liveOpen(state, p, schoolForProfile(state, p), petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), { id: id(), now });
+    return liveOpen(state, p, schoolForProfile(state, p), petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), { id: id(), now, mode: ['1v1', 'ffa', '2v2'].includes(body.mode) ? body.mode : '1v1' }); // V13.232 1:1:1 · 2:2
   }
   if (path === '/games/arena/live/invite' && method === 'POST') {
     requireRole(p, 'student');
