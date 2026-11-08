@@ -71,7 +71,7 @@ export function runYachaFpsChecks(assert) {
   assert(existsSync(bundlePath) ? source('../public/app.bundle.css').includes('@keyframes fx-ring-t') : true, 'V13.217 번들에 새 고리 애니메이션이 들어간다');
 
   /* ---------- 5. 파티클 상한 · 저사양 단계 ---------- */
-  assert(FX2_CAP.every(n => n <= 66) && FX2_LITE_CAP < FX2_CAP[0] && battle.includes('const FX_MAX = 24;') && fx.includes('if (!arena || live(arena) >= capNow) return null;'),
+  assert(FX2_CAP.every(n => n <= 66) && FX2_LITE_CAP < FX2_CAP[0] && battle.includes('const FX_MAX = 24;') && fx.includes('if (live(arena) >= capNow) { const n = arena.querySelectorAll(\'[data-fx]\').length; counts.set(arena, n); if (n >= capNow) return null; }'),
     'V13.217 효과 조각은 동시에 등급별 44~66개까지(저사양 단계는 28개), 불꽃 튀기는 24개까지');
   assert(/const LITE_KEY = 'sumus-yacha-lite', LITE_LONG_MS = 50, LITE_WINDOW_MS = 3000, LITE_LONG_COUNT = 8, LITE_DAYS = 7;/.test(battle) && fnBody(battle, 'loop').includes('applyLite()') && battle.includes('lagWatch(t);') && fnBody(battle, 'applyLite').includes("classList.toggle('yb-lite', on)") && fnBody(battle, 'applyLite').includes('fxLite(on)') && fnBody(battle, 'lagWatch').includes('d < 1000') && fnBody(battle, 'lagWatch').includes("pref(LITE_KEY, '') !== 'off'"),
     'V13.217 대결 중 3초 안에 50ms 넘는 프레임이 8번 넘게 나오는 폰만 저사양 단계로(7일 기억, 잠깐 꺼진 화면은 세지 않는다). 기본은 그대로');

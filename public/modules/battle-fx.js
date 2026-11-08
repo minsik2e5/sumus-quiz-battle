@@ -50,8 +50,8 @@ const SHAPES = {
   toxic: (a, b) => `<circle cx="12" cy="12" r="9.5" fill="${a}"/><circle cx="12" cy="12" r="9.5" fill="none" stroke="${b}" stroke-width="1.6"/><ellipse cx="8.6" cy="8.4" rx="2.6" ry="1.6" fill="${b}" opacity=".9" transform="rotate(-35 8.6 8.4)"/>`,
   star: (a, b) => `<path d="M12 1l2.9 8.1L23 12l-8.1 2.9L12 23l-2.9-8.1L1 12l8.1-2.9z" fill="${a}" stroke="${b}" stroke-width="1.2" stroke-linejoin="round"/>`
 };
-const svgc = (kind, c1, c2, size) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true" focusable="false">${SHAPES[kind](c1, c2)}</svg>`;
-const svg = (kind, el, size) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" aria-hidden="true" focusable="false">${SHAPES[kind](ELEMENTS[el].c1, ELEMENTS[el].c2)}</svg>`;
+const svgc = (kind, c1, c2, size) => `<svg viewBox="0 0 24 24" width="${Math.round(size)}" height="${Math.round(size)}" aria-hidden="true" focusable="false">${SHAPES[kind](c1, c2)}</svg>`;
+const svg = (kind, el, size) => `<svg viewBox="0 0 24 24" width="${Math.round(size)}" height="${Math.round(size)}" aria-hidden="true" focusable="false">${SHAPES[kind](ELEMENTS[el].c1, ELEMENTS[el].c2)}</svg>`;
 
 /* ---------- 바탕 도구 ---------- */
 export const FX2_MAX = 44;
@@ -67,17 +67,28 @@ let lite = false;
 export const fxLite = on => { lite = !!on; };
 export const fxIsLite = () => lite;
 export const fxCap = rank => { capNow = lite ? FX2_LITE_CAP : FX2_CAP[Math.max(0, Math.min(3, rank | 0))]; };
-const live = arena => arena.querySelectorAll('[data-fx]').length;
+// V13.235 렉 방지: 조각 수는 경기장마다 센다(조각마다 querySelectorAll로 경기장 전체를 훑지 않는다).
+//   같은 그림(SVG 글)은 한 번만 읽어 두고 복사한다(조각마다 innerHTML로 SVG를 새로 읽지 않는다). 보이는 모습은 같다.
+const counts = new WeakMap(), TEMPLATES = new Map();
+const live = arena => counts.get(arena) || 0;
+function fill(el, html) {
+  let t = TEMPLATES.get(html);
+  if (!t) { t = document.createElement('template'); t.innerHTML = html; if (!t.content) { el.innerHTML = html; return; } if (TEMPLATES.size > 400) TEMPLATES.clear(); TEMPLATES.set(html, t); }
+  el.appendChild(t.content.cloneNode(true));
+}
 function piece(arena, className, css, ms, html = '') {
-  if (!arena || live(arena) >= capNow) return null;
+  if (!arena) return null;
+  // 상한에 닿았다고 셀 때만 실제로 다시 센다(밖에서 지운 조각이 있으면 바로잡는다).
+  if (live(arena) >= capNow) { const n = arena.querySelectorAll('[data-fx]').length; counts.set(arena, n); if (n >= capNow) return null; }
   const el = document.createElement('div');
   el.dataset.fx = '';
   el.className = `fx2 ${className}`;
   // (A custom property such as --c1 only takes with setProperty; Object.assign would drop it.)
   for (const [key, value] of Object.entries(css)) key.startsWith('--') ? el.style.setProperty(key, value) : (el.style[key] = value);
-  if (html) el.innerHTML = html;
+  if (html) fill(el, html);
   arena.appendChild(el);
-  setTimeout(() => el.remove(), ms);
+  counts.set(arena, live(arena) + 1);
+  setTimeout(() => { el.remove(); counts.set(arena, Math.max(0, live(arena) - 1)); }, ms);
   return el;
 }
 const run = (el, frames, opts) => { if (!el) return null; try { return el.animate(frames, { fill: 'forwards', ...opts }); } catch { return null; } };
