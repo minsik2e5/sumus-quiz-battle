@@ -8,6 +8,7 @@ import { ELEMENTS, fxImpact, fxPunch, fxSpeedLines, fxRecoil, fxLite } from './b
 import { ARENA, BEATS, INPUT, ROLE, DIR16, SK2, ZONES_MAX, TREE, createArena, fighter, dirCode, aimCode, petTree, cleanTree } from './arena-rules.js';
 import { ARENA_ART } from './arena-art.js';
 import { openLive, liveClick, closeLive, keepReplay } from './arena-live.js';
+import { rankCard, rankGain, playRankGain, rankBoardHtml, rankClaimHtml } from './arena-rank-ui.js';
 
 // V13.225 펫 아레나 2(놀이터): 전체 화면. 위에서 비스듬히 내려다보는 경기장에서 내 펫을 직접 조종해 상대 펫과 싸운다.
 //   왼쪽 아래 조이스틱으로 움직이고, 오른쪽 버튼: 공격(누르고 있으면 계속) · 스킬 1 · 스킬 2(펫마다 다르다) · 필살기(게이지) · 회피 · 교체.
@@ -44,10 +45,14 @@ const artOf = id => ART[id] && ARENA_ART.has(ART[id]) ? `url(/assets/arena/${ART
 const LITE_KEY = 'sumus-arena-lite', LITE_LONG_MS = 50, LITE_WINDOW_MS = 3000, LITE_LONG_COUNT = 8, LITE_DAYS = 7;
 const DMG_MAX = 8, WARN_BASE = 100;
 const HITSTOP = { atk: 40, skill: 70, skill2: 70, ult: 120 };
+const STATUS_POP = new Set(['burn', 'root', 'freeze', 'zap', 'stun', 'slow', 'poison', 'knock', 'pull']);
 const AIM_KEY = 'sumus-arena-aim';
 const AIM_MODES = [['free', '직접 조준', '움직이는 쪽 · 버튼 끌기'], ['easy', '쉬운 조준', '보정이 넓어요'], ['auto', '자동 조준', '늘 상대 쪽']];
 const DRAG_PX = 16;
 let R = null;
+// V13.232 (④단계) 여러 명 판: 화면 칸 'me' · 'foe' · 'o2' · 'o3'(펫 최대 4마리). 1:1은 예전처럼 'me' · 'foe'만.
+const SLOTS = () => R?.slotList || ['me', 'foe'];
+const isAlly = who => who === 'me' || !!R?.allies?.includes(who);
 const root = () => document.getElementById('app');
 const $ = id => document.getElementById(id);
 let REDUCED = null;
@@ -156,6 +161,11 @@ function onClick(event) {
   if (act === 'pick2') { R.picks[b.dataset.key] = Number(b.dataset.i) === 1 ? 1 : 0; save(PICK_KEY(), R.picks); sfx('tap'); return lobby(false, true); }
   if (act === 'aim') { R.aim = b.dataset.aim; save(AIM_KEY, R.aim); sfx('tap'); return lobby(false, true); }
   if (act === 'start') return start(b);
+  // V13.234 랭크 시즌(arena-rank-ui.js): 랭킹 탭 · 시즌 보상 받기.
+  if (act === 'rank') { sfx('tap'); return rankBoard(); }
+  if (act === 'rank-back') { sfx('tap'); return lobby(false, true); }
+  if (act === 'rank-claim') return rankClaim(b);
+  if (act === 'rank-claim-ok') { document.querySelector('.ark-claim-pop')?.remove(); return lobby(false, true); }
   if (act === 'again') return lobby(true);
   if (act === 'quit-yes') { R.live?.quit?.(); return leave(); }
   if (act === 'quit-no') { document.querySelector('.ar-quit')?.remove(); resume(); return; }
@@ -270,6 +280,7 @@ function lobby(again = false, keep = false) {
   const slot = n => { const key = R.team[n], p = pets.find(x => x.key === key); return p ? `<span class="ar-slot on${key === R.focus ? ' focus' : ''}" data-ar="focus" data-key="${esc(key)}"><b>${n + 1}</b>${petImg(p.key, p.form)}<div><small>${esc(p.name || petName(p.key))} · Lv.${p.level}</small>${skillLine(p.key, p.form, p.level)}</div></span>` : `<span class="ar-slot"><b>${n + 1}</b><i>?</i><div><small>비어 있음</small></div></span>`; };
   main(`<section class="ar-lobby${again ? ' again' : ''}${keep ? ' keep' : ''}">
     <div class="ar-title"><small>3 대 3 펫 대전</small><h1>펫 아레나</h1></div>
+    ${rankCard(v.rank)}
     <div class="ar-card">
       <ul class="ar-rules">
         <li><b>🕹️</b><span>왼쪽 <em>조이스틱</em>으로 움직이면 그쪽을 바라봐요. <em>공격</em>은 바라보는 쪽으로!</span></li>
@@ -306,9 +317,40 @@ async function start(button) {
   if (R) play(r);
 }
 
+// V13.234 랭킹 탭: GET 한 번(1분 안에 다시 열면 받아 둔 것). 시즌 보상 받기: POST 한 번 → 겹쳐 띄우는 연출.
+async function rankBoard() {
+  const cached = R.rankBoard && Date.now() - R.rankBoard.at < 60000 ? R.rankBoard.d : null;
+  if (!cached) main('<div class="ar-saving">랭킹을 불러오는 중…</div>');
+  let d = cached;
+  if (!d) {
+    try { d = await api('/games/arena/rank'); } catch (err) { if (!R) return; toast(err.message || '랭킹을 불러오지 못했어요.'); return lobby(false, true); }
+    if (!R) return;
+    R.rankBoard = { at: Date.now(), d };
+    if (d.me) R.view = { ...R.view, rank: d.me };
+  }
+  main(rankBoardHtml(d));
+  artGuard();
+}
+async function rankClaim(button) {
+  buttonBusy(button);
+  let r;
+  try { r = await api('/games/arena/rank/claim', {}); }
+  catch (err) { if (!R) return; buttonBusy(button, false); return toast(err.message || '보상을 받지 못했어요.'); }
+  if (!R) return;
+  if (r.stats) Object.assign(R.A.data.stats, r.stats);
+  if (typeof r.points_balance === 'number') R.A.data.stats.points_balance = r.points_balance;
+  R.view = { ...R.view, rank: r.rank || R.view?.rank };
+  R.A.data.rewards ||= {}; R.A.data.rewards.arena = R.view;
+  R.rankBoard = null;
+  app()?.insertAdjacentHTML('beforeend', rankClaimHtml(r));
+  sfx('fanfare-epic');
+  if (r.coins) later(() => { sfx('coins'); coinShower(app(), 18); const b = $('ar-coins'); if (b) countUp(b, Number(R.A.data.stats?.points_balance || 0), 900); }, 700);
+}
+
 /* ---------- VS ---------- */
 async function vs(r) {
   setBg(['plaza', 'forest', 'night'][r.seed % 3]);
+  if (r.multi) return vsMulti(r);
   const side = (who, name, team) => `<div class="ar-vs-side ${who}"><b>${esc(name)}</b><div>${team.map((f, n) => `<span style="--i:${n}">${petImg(f.key, f.form)}<small>Lv.${f.level}</small>${elTag(f.el)}</span>`).join('')}</div></div>`;
   main(`<section class="ar-vs" id="ar-vs"><div class="ar-vs-bg"></div><div class="ar-vs-art"></div>
     ${side('foe', r.foe.name + (r.foe.bot ? '' : '의 팀'), r.foe.team)}
@@ -320,6 +362,19 @@ async function vs(r) {
   await wait(2300);
 }
 
+// V13.232 3인 · 4인 VS: 그림 vs-2v2(없으면 CSS). 팀전은 파랑 · 빨강 줄, 난투는 세 사람이 차례로 튀어나온다.
+async function vsMulti(r) {
+  const art = ARENA_ART.has('vs-2v2') ? ' art" style="--vs-art:url(/assets/arena/vs-2v2.webp)' : '';
+  const card = (p, n) => `<div class="ar-vs-p ${p.ally ? 'ally' : 'enemy'}${p.me ? ' mine' : ''}" style="--i:${n}"><b>${esc(p.name)}</b><div>${p.team.map(f => `<span>${petImg(f.key, f.form)}<small>Lv.${f.level}</small>${elTag(f.el)}</span>`).join('')}</div></div>`;
+  const people = r.people || [];
+  const body = r.mode === '2v2'
+    ? `<div class="ar-vs-team red">${people.filter(p => !p.ally).map(card).join('')}</div><div class="ar-vs-mark">VS</div><div class="ar-vs-team blue">${people.filter(p => p.ally).map((p, n) => card(p, n + 2)).join('')}</div>`
+    : `<div class="ar-vs-ffa">${people.map(card).join('<i class="ar-vs-mark sm">VS</i>')}</div>`;
+  main(`<section class="ar-vs multi ${r.mode}${art}" id="ar-vs"><div class="ar-vs-bg"></div><div class="ar-vs-art"></div>${body}<p class="ar-vs-lv">${r.replay ? '다시 보기' : r.mode === '2v2' ? '2:2 팀전 · 팀 친구는 못 때려요' : '1:1:1 난투 · 막타를 친 사람만 점수'}</p></section>`);
+  sfx('swoosh'); later(() => { sfx('smash'); buzz(30); }, 450); later(() => sfx('swoosh', { rate: 1.2 }), 700);
+  await wait(2500);
+}
+
 /* ---------- 전투 화면 ---------- */
 function field() {
   const shots = Array.from({ length: SHOTS_MAX }, (_, i) => `<i class="ar-shot" id="ar-shot-${i}"></i>`).join('');
@@ -328,21 +383,23 @@ function field() {
   // V13.229 미리 만든 칸: 장판 4 · 줄기 표시 3 · 줄기 2 · 부채꼴(쪽마다) · 분신(쪽마다). 다시 쓰기만 하고 새로 만들지 않는다.
   const zones = Array.from({ length: ZONES_MAX }, (_, i) => `<i class="ar-zone" id="ar-zone-${i}"><b></b><em></em></i>`).join('');
   const lines = Array.from({ length: LINE_MAX }, (_, i) => `<i class="ar-line" id="ar-line-${i}"></i>`).join('') + Array.from({ length: STREAM_MAX }, (_, i) => `<i class="ar-stream" id="ar-stream-${i}"><b></b><em></em></i>`).join('');
-  const cones = ['me', 'foe'].map(w => `<i class="ar-cone ${w}" id="ar-cone-${w}"><b></b><b></b><b></b></i>`).join('');
-  const clones = ['me', 'foe'].map(w => `<span class="ar-clone ${w}" id="ar-clone-${w}"><span class="ar-clone-body"></span></span>`).join('');
+  const cones = SLOTS().map(w => `<i class="ar-cone ${w}" id="ar-cone-${w}"><b></b><b></b><b></b></i>`).join('');
+  const clones = SLOTS().map(w => `<span class="ar-clone ${w}" id="ar-clone-${w}"><span class="ar-clone-body"></span></span>`).join('');
+  // 펫 칸: 1:1은 상대 · 나, 여러 명은 다른 사람들 · 나(내 펫이 맨 위). 여러 명이면 머리 위 이름표(팀 색).
+  const mon = who => `<div class="ar-mon ${who}${R.multi ? (isAlly(who) ? ' ally' : ' enemy') : ''}" id="ar-${who}"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-${who}-body"></span><span class="ar-status" aria-hidden="true"><i class="bub"></i><i class="vines"></i><i class="burnf"></i></span><span class="ar-hp"><i id="ar-${who}-hp"></i><b id="ar-${who}-sh"></b></span>${who === 'me' ? '<span class="ar-face" id="ar-face"><i></i></span>' : ''}${R.multi ? `<span class="ar-tag">${esc(who === 'me' ? '나' : R.names?.[who] || '')}</span>` : ''}</div>`;
+  const mons = [...SLOTS().filter(w => w !== 'me'), 'me'].map(mon).join('');
+  const bars = R.multi ? [...SLOTS().filter(w => w !== 'me'), 'me'].map(w => `<div class="ar-bar ${w} ${isAlly(w) ? 'ally' : 'enemy'}" id="ar-hud-${w}"></div>`).join('') : '<div class="ar-bar foe" id="ar-hud-foe"></div><div class="ar-bar me" id="ar-hud-me"></div>';
   // 필살기 컷인 · 물들이기 · 반짝이는 미리 만들어 두고 다시 쓴다(필살기 순간에 조각을 새로 만들지 않는다).
   const cut = `<div class="fx2 fx2-cut ar-cut" id="ar-cut" aria-hidden="true"><div class="fx2-cut-dim"></div><div class="fx2-cut-band"><div class="fx2-cut-lines"></div><div class="fx2-cut-pet" id="ar-cut-pet"></div><div class="fx2-cut-text"><small id="ar-cut-who"></small><b id="ar-cut-name"></b><em></em></div></div>${Array.from({ length: 7 }, (_, i) => `<i class="ar-cut-star" style="left:${12 + i * 12}%;top:${26 + (i * 37) % 44}%">✦</i>`).join('')}</div><div class="fx2 fx2-wash ar-wash" id="ar-wash" aria-hidden="true"></div>`;
-  return `<section class="ar-play" id="ar-play">
-    <div class="ar-hud">
-      <div class="ar-bar foe" id="ar-hud-foe"></div>
-      <div class="ar-bar me" id="ar-hud-me"></div>
-      <span class="ar-clock" id="ar-clock">2:00</span>
+  return `<section class="ar-play${R.multi ? ' multi' : ''}" id="ar-play">
+    <div class="ar-hud${R.multi ? ` multi n${SLOTS().length} ${R.r?.mode || ''}` : ''}">
+      ${bars}
+      <span class="ar-clock" id="ar-clock">${R.multi && R.r?.mode === '2v2' ? '2:30' : '2:00'}</span>
     </div>
     <div class="ar-field yb-arena" id="ar-field">
       <div class="ar-ring" aria-hidden="true"></div>
       ${zones}${warns}${lines}<div class="ar-aim" id="ar-aim" aria-hidden="true"><i></i></div><div class="ar-aim-spot" id="ar-aim-spot" aria-hidden="true"></div>${cones}${clones}${shots}${nums}${cut}
-      <div class="ar-mon foe" id="ar-foe"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-foe-body"></span><span class="ar-status" aria-hidden="true"><i class="bub"></i><i class="vines"></i><i class="burnf"></i></span><span class="ar-hp"><i id="ar-foe-hp"></i><b id="ar-foe-sh"></b></span></div>
-      <div class="ar-mon me" id="ar-me"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-me-body"></span><span class="ar-status" aria-hidden="true"><i class="bub"></i><i class="vines"></i><i class="burnf"></i></span><span class="ar-hp"><i id="ar-me-hp"></i><b id="ar-me-sh"></b></span><span class="ar-face" id="ar-face"><i></i></span></div>
+      ${mons}
     </div>
     <div class="ar-combo" id="ar-combo" aria-hidden="true"><b id="ar-combo-n"></b><small>콤보!</small></div>
     <div class="ar-pad" id="ar-pad">
@@ -360,7 +417,8 @@ function field() {
 }
 // 위 막대: 이름 · 펫 점(그림)은 판 시작에 한 번만 만든다. 그 뒤로는 drawHud가 점의 클래스만 바꾼다.
 function hudHtml(who, name, team) {
-  return `<b>${esc(name)}</b><span class="ar-dots">${team.map((f, n) => `<i id="ar-dot-${who}-${n}">${petImg(f.key, R.forms[who][n])}</i>`).join('')}</span>`;
+  // V13.232 여러 명: 쓰러뜨린 수(막타 점수)도 같이.
+  return `<b>${esc(name)}</b><span class="ar-dots">${team.map((f, n) => `<i id="ar-dot-${who}-${n}">${petImg(f.key, R.forms[who][n])}</i>`).join('')}</span>${R.multi ? `<em class="ar-ko" id="ar-ko-${who}" title="쓰러뜨림">0</em>` : ''}`;
 }
 function play(r) {
   // 서버와 똑같이 key · form · level로 능력치를 다시 만든다(server/arena.mjs unpack과 같다).
@@ -368,6 +426,13 @@ function play(r) {
   R.r = r;
   R.forms = { me: r.me.map(f => f.form), foe: r.foe.team.map(f => f.form) };
   R.teams = { me: fighters(r.me), foe: fighters(r.foe.team) };
+  // V13.232 여러 명 판: 칸 이름 · 팀원 칸 · 다른 사람들 펫(o2 · o3).
+  R.multi = !!R.live?.sim?.multi;
+  R.slotList = R.multi ? R.live.sim.slots : null;
+  R.allies = R.multi ? R.live.sim.allies : [];
+  R.names = { me: '나', foe: r.foe.name };
+  for (const o of r.others || []) { R.forms[o.slot] = o.team.map(f => f.form); R.teams[o.slot] = fighters(o.team); R.names[o.slot] = o.name; }
+  R.koShown = {};
   R.sim = R.live?.sim || createArena({ seed: r.seed, me: R.teams.me, foe: R.teams.foe, foeLevel: r.foe_level });
   Object.assign(R, { inputs: [], queue: [], dir: 0, sentDir: 0, holdAtk: false, keyDown: new Set(), playing: true, paused: false, pausedMs: 0, started: false });
   app()?.classList.add('playing');
@@ -385,12 +450,11 @@ function play(r) {
   const mode = { easy: INPUT.AIM_EASY, auto: INPUT.AIM_AUTO }[R.aim];
   if (mode) { const x = [0, mode]; R.inputs.push(x); R.sim.push(x); }
   Object.assign(R, { stopUntil: 0, z: '', faceCode: -9, drag: null, numN: 0, finale: false });
-  const a = $('ar-hud-foe'), b = $('ar-hud-me');
-  if (a) a.innerHTML = hudHtml('foe', R.r.foe.name, R.cur.foe.team);
-  if (b) b.innerHTML = hudHtml('me', '나', R.cur.me.team);
+  for (const who of SLOTS()) { const el = $(`ar-hud-${who}`); if (el) el.innerHTML = hudHtml(who, who === 'me' ? '나' : R.names[who], R.cur[who].team); }
   // 쓰러짐 별 그림도 미리 받아 둔다.
   const star = new Image(); star.decoding = 'async'; star.src = '/assets/arena/fx-faint.webp';
-  drawMon('me'); drawMon('foe'); drawHud(); drawPad();
+  for (const who of SLOTS()) drawMon(who);
+  drawHud(); drawPad();
   place(0);
   R.live?.mounted?.();
   countIn();
@@ -406,7 +470,7 @@ async function countIn() {
 // 공격 · 맞는 자세 그림을 미리 받아 둔다(처음 바뀔 때 끊기지 않게). 없는 자세는 expressionSrc가 null.
 function preloadPoses() {
   R.poses = new Map();
-  for (const who of ['me', 'foe']) R.teams[who].forEach((f, i) => {
+  for (const who of SLOTS()) R.teams[who].forEach((f, i) => {
     for (const pose of ['attack', 'hurt']) {
       const src = expressionSrc(f.key, R.forms[who][i], pose); if (!src) continue;
       const img = new Image(); img.decoding = 'async'; img.src = src;
@@ -528,14 +592,21 @@ function drawMon(who) {
 }
 function drawHud() {
   const v = R.cur;
-  for (const who of ['me', 'foe']) v[who].team.forEach((f, n) => {
+  for (const who of SLOTS()) v[who].team.forEach((f, n) => {
     const el = $(`ar-dot-${who}-${n}`), cls = f.cur <= 0 ? 'down' : n === v[who].idx ? 'now' : '';
     if (el && el.className !== cls) el.className = cls;
   });
+  // V13.232 쓰러뜨린 수 · 탈락(바뀔 때만 쓴다).
+  if (R.multi) for (const who of SLOTS()) {
+    const n = v.ko?.[who] || 0, el = slot(`ar-ko-${who}`);
+    if (el && R.koShown[who] !== n) { R.koShown[who] = n; el.textContent = String(n); el.parentElement?.classList.toggle('scored', n > 0); }
+    const out = v[who].out >= 0, bar = slot(`ar-hud-${who}`);
+    if (bar && bar._out !== out) { bar._out = out; bar.classList.toggle('out', out); slot(`ar-${who}`)?.classList.toggle('gone', out); }
+  }
   drawHp();
 }
 function drawHp() {
-  for (const who of ['me', 'foe']) {
+  for (const who of SLOTS()) {
     const s = R.cur[who], f = s.team[s.idx], el = $(`ar-${who}-hp`), sh = $(`ar-${who}-sh`);
     if (el) { const p = Math.max(0, f.cur / f.hp); el.style.transform = `scaleX(${p})`; el.classList.toggle('low', p < .3); }
     if (sh) sh.style.transform = `scaleX(${Math.min(1, s.shield / f.hp * 2)})`;
@@ -558,7 +629,7 @@ const geo = () => R.geo ||= (() => { const el = $('ar-field'); return el ? { w: 
 const px = (x, y) => { const g = geo(); return { x: x / 100 * g.w, y: y / 100 * g.h }; };
 function place(frac) {
   const at = {};
-  for (const who of ['me', 'foe']) {
+  for (const who of SLOTS()) {
     const a = R.prev[who], b = R.cur[who], el = slot(`ar-${who}`); if (!el) continue;
     const jump = a.idx !== b.idx || Math.abs(b.x - a.x) > 12; // 교체 · 밀쳐내기는 한 번에
     const x = jump ? b.x : a.x + (b.x - a.x) * frac, y = jump ? b.y : a.y + (b.y - a.y) * frac;
@@ -575,9 +646,14 @@ function place(frac) {
         ['bubble', b.bubble > 0], ['root', b.root > 0], ['burn', b.burn > 0], ['slide', b.slide > 0], ['casting', b.chan > 0]]) cls.toggle(k, on);
     }
   }
-  // 겹침 순서: 아래쪽(앞) 펫이 위로. 순서가 바뀔 때만 쓴다(매 프레임 zIndex를 쓰지 않는다).
-  const z = at.me && at.foe && at.me.y >= at.foe.y ? 'me' : 'foe';
-  if (R.z !== z) { R.z = z; const m = slot('ar-me'), f = slot('ar-foe'); if (m) m.style.zIndex = z === 'me' ? '12' : '11'; if (f) f.style.zIndex = z === 'me' ? '11' : '12'; }
+  // 겹침 순서: 아래쪽(앞) 펫이 위로. 순서가 바뀔 때만 쓴다(매 프레임 zIndex를 쓰지 않는다). 여러 명이면 y 순서대로 11, 12, ….
+  if (!R.multi) {
+    const z = at.me && at.foe && at.me.y >= at.foe.y ? 'me' : 'foe';
+    if (R.z !== z) { R.z = z; const m = slot('ar-me'), f = slot('ar-foe'); if (m) m.style.zIndex = z === 'me' ? '12' : '11'; if (f) f.style.zIndex = z === 'me' ? '11' : '12'; }
+  } else {
+    const order = SLOTS().filter(w => at[w]).sort((a, b) => at[a].y - at[b].y || (a === 'me' ? 1 : b === 'me' ? -1 : 0)), z = order.join();
+    if (R.z !== z) { R.z = z; order.forEach((w, i) => { const el = slot(`ar-${w}`); if (el) el.style.zIndex = String(11 + i); }); }
+  }
   // 내 펫이 바라보는 쪽 화살표(16방향 칸이 바뀔 때만 돌린다).
   const fc = aimCode(R.cur.me.fx, R.cur.me.fy);
   if (fc !== R.faceCode) { R.faceCode = fc; const f = slot('ar-face'), g = geo(); if (f) f.style.transform = `rotate(${(Math.atan2(R.cur.me.fy * g.h, R.cur.me.fx * g.w) * 180 / Math.PI + 90).toFixed(1)}deg)`; }
@@ -625,7 +701,7 @@ const slot = id => (R.slots ||= new Map()).get(id) || (() => { const el = $(id);
 function drawSkills(at) {
   const v = R.cur, g = geo();
   // 새 스킬 칸이 하나도 없고 지난 프레임에도 없었으면 바로 끝(대부분의 프레임).
-  const busy = (v.zones?.length || 0) + (v.lines?.length || 0) + (v.minions?.length || 0) + (v.me.chan > 0) + (v.foe.chan > 0);
+  const busy = (v.zones?.length || 0) + (v.lines?.length || 0) + (v.minions?.length || 0) + SLOTS().reduce((n, w) => n + (v[w].chan > 0), 0);
   if (!busy && !R.skillsOn) return;
   R.skillsOn = busy > 0;
   // 장판: 장판 번호(n) % 4 칸. 한 판에 4개까지라 늘 다른 칸이다.
@@ -649,7 +725,7 @@ function drawSkills(at) {
     el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) rotate(${angOf(L.nx, L.ny).toFixed(1)}deg) scale(${(len / LINE_BASE).toFixed(3)}, ${wide.toFixed(2)})`;
   }
   // 부채꼴 지속(불 뿜기): 쪽마다 칸 하나. 펫 입에서 조준 방향으로.
-  for (const who of ['me', 'foe']) {
+  for (const who of SLOTS()) {
     const el = slot(`ar-cone-${who}`), s = v[who]; if (!el) continue;
     if (!(s.chan > 0)) { if (el._on) { el._on = false; el.className = `ar-cone ${who}`; } continue; }
     const p = at[who] ? px(at[who].x, at[who].y) : px(s.x, s.y), len = (SK2.breath.range + ARENA.BODY) / 100 * g.w;
@@ -658,7 +734,7 @@ function drawSkills(at) {
   }
   // 분신: 쪽마다 칸 하나(반투명 펫 그림 + 별가루 테두리).
   const ms = v.minions || [];
-  for (const who of ['me', 'foe']) {
+  for (const who of SLOTS()) {
     const el = slot(`ar-clone-${who}`), m = ms.find(q => q.from === who); if (!el) continue;
     if (!m) { if (el._on) { el._on = false; el.className = `ar-clone ${who}`; } continue; }
     if (el._key !== m.key) { el._key = m.key; const b = el.querySelector('.ar-clone-body'); if (b) b.innerHTML = petImg(m.key, R.forms[who][R.cur[who].idx] || 2, 'ar-pet-img'); }
@@ -688,7 +764,7 @@ function loop(now) {
   R.raf = requestAnimationFrame(loop);
 }
 function clock() {
-  const s = Math.max(0, Math.ceil((ARENA.MAX_TICKS - R.sim.S.t) * ARENA.TICK_MS / 1000)), el = slot('ar-clock');
+  const s = Math.max(0, Math.ceil(((R.cur?.maxT || ARENA.MAX_TICKS) - R.sim.S.t) * ARENA.TICK_MS / 1000)), el = slot('ar-clock');
   if (el && el._s !== s) { el._s = s; el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; el.classList.toggle('low', s <= 15); }
 }
 // 한 틱: 이번 틱의 조작을 기록 · 전투에 넣고 → 한 걸음 → 사건 그리기.
@@ -705,9 +781,12 @@ function tickOnce(show) {
 }
 function onEvent(e, show) {
   if (e.e === 'enter') { if (show) { const s = R.cur[e.who]; pop(`${petName(e.key)} 등장!`, s.x, s.y - 12, 'enter'); sfx('swoosh'); } return; }
-  if (e.e === 'swap') { R.prev = R.cur; drawMon(e.who); drawHud(); if (show && !R.fainted?.[e.who]) { pop('교체!', 50, e.who === 'me' ? 80 : 20, 'enter'); sfx('swoosh'); } if (R.fainted) R.fainted[e.who] = false; return; }
+  if (e.e === 'swap') { R.prev = R.cur; drawMon(e.who); drawHud(); if (show && !R.fainted?.[e.who]) { pop('교체!', R.multi ? R.cur[e.who].x : 50, R.multi ? R.cur[e.who].y + 6 : e.who === 'me' ? 80 : 20, 'enter'); sfx('swoosh'); } if (R.fainted) R.fainted[e.who] = false; return; }
   // 쓰러짐: 유령 · 별은 이번 프레임, 배너는 다음 프레임(한 프레임에 몰리지 않게).
-  if (e.e === 'faint') { const el = $(`ar-${e.who}`); (R.fainted ||= {})[e.who] = true; drawHud(); if (show) { faintFx(e); nextFrame(() => banner(e.who === 'me' ? `${petName(e.key)} 쓰러짐…` : `${petName(e.key)} 쓰러뜨렸다!`, e.who)); sfx('faint'); buzz([40, 30, 40]); } el?.classList.remove('down'); return; }
+  if (e.e === 'faint') { const el = $(`ar-${e.who}`); (R.fainted ||= {})[e.who] = true; drawHud(); if (show) { faintFx(e); nextFrame(() => banner(faintText(e), e.who)); sfx('faint'); buzz([40, 30, 40]); } el?.classList.remove('down'); return; }
+  // V13.232 여러 명: 한 사람이 펫을 다 잃으면 탈락 · 번개 연쇄가 옆 상대에게 튐.
+  if (e.e === 'out') { drawHud(); if (show) nextFrame(() => banner(e.who === 'me' ? '탈락… 친구들을 응원해요!' : `${R.names[e.who] || '친구'} 탈락!${e.by === 'me' ? ' (내 막타)' : ''}`, e.who === 'me' ? 'me' : 'foe'), 2); return; }
+  if (e.e === 'chainjump') { if (show) { beam(px(e.x, e.y - 6), px(e.tx, e.ty - 6), 'star', false); bits('star', px(e.tx, e.ty - 8), 3, 22, 360, 'star'); sfx('atk-star', { rate: 1.6 }); } return; }
   if (e.e === 'over') return;
   if (e.e === 'dmg') { drawHp(); if (show) hurt(e); else if (e.last) R.finale = true; return; }
   if (e.e === 'buff') { drawHp(); if (show) { pop(e.name, R.cur[e.who].x, R.cur[e.who].y - 20, `skill ${e.who}`); sfx('skill'); aura(e.who, e.el); } return; }
@@ -725,6 +804,8 @@ function onEvent(e, show) {
   if (e.e === 'bubblepop') { ring(px(e.x, e.y), 'water', e.r); bits('drop', px(e.x, e.y - 8), 6, 60, 560, 'water'); sfx('smash', { rate: 1.5 }); buzz(20); return; }
   if (e.e === 'cloneshot') { sfx('atk-star', { rate: 1.5, volume: .5 }); return; }
   if (e.e === 'cloneend') { bits('star', px(e.x, e.y - 10), 4, 30, 520, 'star'); return; }
+  // V13.232 여러 명: 상태 글자(화상 · 기절 …)는 나와 관련된 것만(다른 사람끼리는 펫 위 표시 · 색으로 보인다).
+  if (R.multi && STATUS_POP.has(e.e) && e.who !== 'me' && !(R.lastDmg?.who === e.who && R.lastDmg.near)) return;
   if (e.e === 'burn') return void pop('화상!', R.cur[e.who].x, R.cur[e.who].y - 22, 'stun');
   if (e.e === 'root') return void pop('묶임!', R.cur[e.who].x, R.cur[e.who].y - 22, 'stun');
   if (e.e === 'freeze') return void pop('얼어붙음!', R.cur[e.who].x, R.cur[e.who].y - 22, 'stun');
@@ -799,14 +880,16 @@ function cutin(e) {
 // 필살기가 터질 때: 큰 빔 → (다음 프레임) 터짐 조각 → (그다음) 지진 · 금. 흔들림 · 줌은 경기장만.
 function ultFx(e) {
   const fieldEl = arenaEl(), to = px(e.tx, e.ty), from = px(e.x, e.y);
+  // V13.232 여러 명 판에서 다른 사람끼리의 필살기: 컷인 · 빔 · 터짐 · 지진은 그대로, 카메라 줌 · 속성 덤 연출(ultExtra)만 뺀다(필살기가 4배 잦다).
+  const far = R.multi && e.who !== 'me' && !isAlly(e.who);
   beam(from, to, e.el, true);
   shakeField(true);
-  if (e.hit) zoomAt(to, 0.08, 560); else fxPunch(fieldEl, .04);
+  if (e.hit && !far) zoomAt(to, 0.08, 560); else fxPunch(fieldEl, .04);
   sfx('ult-impact');
   if (e.who === 'me' && e.hit) buzz([30, 20, 60]);
   nextFrame(() => fxImpact(arenaEl(), to, e.el, 3));
   nextFrame(() => quake(to, e.el, true), 2);
-  nextFrame(() => ultExtra(e, from, to), 3);
+  if (!far) nextFrame(() => ultExtra(e, from, to), 3);
 }
 // V13.231 스킬트리 3층 A 두 번째 필살기: 원(내 둘레로 퍼지는 충격파 두 겹 + 속성 조각) · 일직선(경기장을 가로지르는 굵은 광선 + 끝 폭발).
 function ult2Fx(e) {
@@ -856,17 +939,22 @@ const atkSfx = el => el === 'leaf' ? 'atk-leaf' : el === 'wind' ? 'atk-wind' : '
 const HIT_SFX = { leaf: 'hit-leaf', wind: 'hit-wind', star: 'hit-star', ice: 'hit-star', flame: 'hit-star' };
 function hurt(e) {
   // V13.229 화상도 중독처럼 섬광 · 멈춤 없이. 여러 번 맞는 스킬(불 뿜기 · 장판)의 한 번은 멈춤을 아주 짧게, 흔들림 없이.
+  // V13.232 여러 명 판: 내가 때렸거나 맞은 것(near)만 히트스톱 · 흔들림 · 글자 · 자세 그림까지 전부. 다른 사람끼리는 섬광 · 움찔 · 숫자 · 소리 하나
+  //   (남끼리 칠 때마다 화면이 멈추면 내 조작이 끊긴다. CPU 6× 4마리에서 잰 렉 대책 — 내 판의 연출은 그대로).
+  const near = !R.multi || e.who === 'me' || e.by === 'me';
+  R.lastDmg = { who: e.who, near };
   const poison = e.kind === 'poison' || e.kind === 'burn', body = $(`ar-${e.who}-body`), stop = poison ? 0 : e.tick ? 18 : HITSTOP[e.kind] || 40;
   if (!poison) {
-    hitStop(stop);
+    if (near) hitStop(stop);
     flash(body);
     const dir = e.who === 'me' ? 1 : -1;
     // 움찔은 멈춤이 끝난 뒤에(멈춤 동안은 섬광만).
-    later(() => fxRecoil($(`ar-${e.who}-body`), dir), stop);
+    later(() => fxRecoil($(`ar-${e.who}-body`), dir), near ? stop : 0);
     const s = R.cur[e.who], f = s.team[s.idx];
-    if (f) { const src = expressionSrc(f.key, R.forms[e.who][s.idx], 'hurt'); if (poseReady(src)) swapPose(body, src, 300); }
+    if (f && near) { const src = expressionSrc(f.key, R.forms[e.who][s.idx], 'hurt'); if (poseReady(src)) swapPose(body, src, 300); }
   }
   dmgNum(e);
+  if (!near) { if (!poison && !e.tick) sfx('hit', { rate: 1.1, volume: .55 }); if (e.last) finale(e); return; }
   if (e.m > 1 && e.kind !== 'atk' && !poison) pop('효과가 굉장해!', e.x, e.y - 27, 'eff');
   else if (e.m < 1 && e.kind !== 'atk' && !poison) pop('효과가 별로…', e.x, e.y - 27, 'eff weak');
   if (!poison) {
@@ -879,7 +967,7 @@ function hurt(e) {
   }
   if (e.who === 'me' && e.kind !== 'atk' && !poison && !e.tick) buzz(30);
   if (e.crit && !poison) critFx(px(e.x, e.y - 8));
-  if (e.who === 'foe' && e.combo >= 2) combo(e.combo);
+  if ((e.by ? e.by === 'me' : e.who === 'foe') && e.who !== 'me' && e.combo >= 2) combo(e.combo);
   if (e.last) finale(e);
 }
 function flash(body) {
@@ -1077,6 +1165,15 @@ function banner(text, who) {
   later(() => el.remove(), 1500);
 }
 
+// 쓰러짐 배너 글: 1:1은 예전 그대로. 여러 명이면 누가 막타를 쳤는지(막타 점수).
+function faintText(e) {
+  if (e.who === 'me') return `${petName(e.key)} 쓰러짐…`;
+  if (!R.multi) return `${petName(e.key)} 쓰러뜨렸다!`;
+  if (e.by === 'me') return `${petName(e.key)} 쓰러뜨렸다! +1`;
+  const by = e.by && e.by !== e.who ? R.names[e.by] || '' : '';
+  return isAlly(e.who) ? `팀 친구 ${petName(e.key)} 쓰러짐…` : `${by ? `${by} 막타! ` : ''}${petName(e.key)} 쓰러짐`;
+}
+
 /* ---------- 잠깐 멈춤 ---------- */
 function pause() { if (!R?.playing || R.paused) return; R.paused = true; R.pauseAt = performance.now(); R.holdAtk = false; R.dir = 0; R.drag = null; hideAim(); drawStick(0, 0); }
 function resume() { if (!R?.paused) return; R.pausedMs += performance.now() - R.pauseAt; R.paused = false; }
@@ -1090,7 +1187,7 @@ async function end() {
   const local = R.sim.S.winner;
   // 마지막 한 방이면 0.6초 느리게 보여 준 뒤 배너.
   if (R.finale && !reduced()) { await wait(650); if (!R) return; }
-  banner(local === 'me' ? '승리!' : local === 'draw' ? '무승부' : '패배…', local === 'me' ? 'me win' : 'foe');
+  banner(local === 'me' ? (R.multi ? (R.r.mode === '2v2' ? '팀 승리!' : '1등!') : '승리!') : local === 'draw' ? '무승부' : '패배…', local === 'me' ? 'me win' : 'foe');
   sfx(local === 'me' ? 'fanfare-epic' : 'fail');
   await wait(1400);
   if (!R) return;
@@ -1103,7 +1200,7 @@ async function end() {
   if (!R.live) keepReplay(R.A, { solo: true, side: 'me', seed: R.r.seed, foeLevel: R.r.foe_level, teams: { me: R.r.me.map(f => ({ key: f.key, form: f.form, level: f.level, s2: f.s2 ? 1 : 0 })), foe: R.r.foe.team.map(f => ({ key: f.key, form: f.form, level: f.level, s2: f.s2 ? 1 : 0 })) }, names: { me: '나', foe: R.r.foe.name }, inputs: { me: R.inputs, foe: [] }, result: local === 'me' ? 'win' : local === 'draw' ? 'draw' : 'lose' });
   if (res?.stats) Object.assign(R.A.data.stats, res.stats);
   if (typeof res?.points_balance === 'number') R.A.data.stats.points_balance = res.points_balance;
-  R.view = { ...R.view, left: res?.left ?? R.view?.left, tickets: res?.tickets ?? R.view?.tickets, wins: res?.wins ?? R.view?.wins, streak: res?.streak ?? R.view?.streak, best_streak: res?.best_streak ?? R.view?.best_streak };
+  R.view = { ...R.view, left: res?.left ?? R.view?.left, tickets: res?.tickets ?? R.view?.tickets, wins: res?.wins ?? R.view?.wins, streak: res?.streak ?? R.view?.streak, best_streak: res?.best_streak ?? R.view?.best_streak, rank: res?.rank ?? R.view?.rank };
   R.A.data.rewards ||= {}; R.A.data.rewards.arena = R.view;
   result(local, res);
 }
@@ -1118,9 +1215,11 @@ function result(local, res) {
   const team = R.r.me;
   main(`<section class="ar-result ${win ? 'win' : 'lose'}">
     <div class="ar-res-card">
-      <div class="ar-res-head">${winner === 'draw' ? '' : artImg(win ? 'banner-win' : 'banner-lose', 'ar-res-banner')}<h2>${win ? '승리!' : winner === 'draw' ? '무승부' : '아쉬운 패배'}</h2><p>vs ${esc(R.r.foe.name)}${res?.streak >= 2 && win ? ` · <b>${res.streak}연승!</b>` : ''}</p></div>
+      <div class="ar-res-head">${winner === 'draw' ? '' : artImg(win ? 'banner-win' : 'banner-lose', 'ar-res-banner')}<h2>${R.multi ? multiTitle(win, winner) : win ? '승리!' : winner === 'draw' ? '무승부' : '아쉬운 패배'}</h2><p>${R.multi ? esc(R.r.title || '') : `vs ${esc(R.r.foe.name)}`}${res?.streak >= 2 && win ? ` · <b>${res.streak}연승!</b>` : ''}</p></div>
+      ${R.multi ? rankRows() : ''}
       <div class="ar-res-team">${team.map((f, n) => `<span style="--i:${n}" class="${R.sim.S.me.team[n].cur <= 0 ? 'down' : ''}">${petImg(f.key, f.form)}</span>`).join('')}</div>
       <div class="ar-res-rows"><span><small>쓰러뜨림</small><b>${num(ko)}</b></span><span><small>준 피해</small><b>${num(dealt)}</b></span><span><small>필살기</small><b>${res?.ults ?? R.sim.S.ults.me}</b></span></div>
+      ${rankGain(res?.rp)}
       ${coins || xp ? `<div class="ar-res-gain">${coins ? `<span class="r coin">${coin()}<b>+${num(coins)}</b>${res?.streak_coins ? `<small>3연승 +${res.streak_coins} 포함</small>` : ''}</span>` : ''}${xp ? `<span class="r xp"><b>+${xp}</b><small>경험치</small></span>` : ''}</div>` : ''}
       ${why ? `<p class="ar-why">${why}</p>` : ''}
       <p class="ar-tip">${win ? '다음 판은 상대가 더 똑똑해질 수 있어요!' : '팁: 빨간 표시가 뜨면 회피! 상성이 좋은 펫으로 교체해 보세요.'}</p>
@@ -1128,7 +1227,20 @@ function result(local, res) {
     </div>
   </section>`);
   artGuard();
+  if (res?.rp) playRankGain(res.rp, { later, sfx, reduced: reduced() });
   if (coins) { later(() => { sfx('coins'); coinShower(app(), 22); const b = $('ar-coins'); if (b) countUp(b, Number(R.A.data.stats?.points_balance || 0), 900); }, 500); }
+}
+
+// V13.232 여러 명 판 결과: 제목 · 등수표(난투: 등수 · 쓰러뜨림 / 팀전: 팀 · 쓰러뜨림).
+function multiTitle(win, winner) {
+  if (winner === 'draw') return '무승부';
+  if (R.r.mode === '2v2') return win ? '팀 승리!' : '아쉬운 팀 패배';
+  const place = (R.cur.rank || []).indexOf('me') + 1;
+  return place === 1 ? '1등!' : place ? `${place}등` : '아쉬운 패배';
+}
+function rankRows() {
+  const order = R.cur.rank || SLOTS();
+  return `<ol class="ar-res-rank ${R.r.mode}">${order.map((w, i) => `<li class="${w === 'me' ? 'mine' : ''} ${isAlly(w) ? 'ally' : 'enemy'}"><i>${R.r.mode === '2v2' ? (isAlly(w) ? '🔵' : '🔴') : `${i + 1}등`}</i><b>${esc(w === 'me' ? '나' : R.names[w] || '')}</b><small>쓰러뜨림 ${num(R.cur.ko?.[w] || 0)}</small></li>`).join('')}</ol>`;
 }
 
 // 상성표(도움말 · 검사용): '불꽃 → 풀 · 얼음'.

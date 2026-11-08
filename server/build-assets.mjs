@@ -139,6 +139,8 @@ const cssSources = [
   "v13229.css",
   "v13230.css",
   "v13231.css",
+  "v13232.css",
+  "v13234.css",
   "v13185.css",
   "v13184.css",
   "v13178.css"

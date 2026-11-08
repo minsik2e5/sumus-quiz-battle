@@ -1,16 +1,18 @@
 // V13.230 검사: 펫 아레나 실시간 친구 대전(cloudflare/arena-room.mjs · public/modules/arena-live-rules.js · server/arena-live.mjs).
 //   party-room-check.mjs처럼 가짜 시계 · 저장소 · 소켓으로, 지연이 다른 폰 두 대(롤백 전투)가 진짜 방 객체와 한 판을 끝까지 한다.
 //   대기실 · 같은 학년 확인 · 롤백 결과 = 서버 판정 · 끊김 대신 조종 · 보상/농사 막기 · 메시지 예산 · 이모트 제한 · 다시 보기 · 방 재시작.
+// V13.232 (④단계) 1:1:1 난투(폰 3대) · 2:2 팀전(폰 3대 + 컴퓨터 · 폰 4대): 롤백 = 방 판정 · 팀원 공격 안 됨 · 막타 점수 · 빈자리 컴퓨터 · 같은 학년 · 보상 · 농사 막기 · 사람 수별 요청 예산(7번).
 // cloudflare-check.mjs가 부른다. 숫자만 보려면: node server/arena-room-check.mjs
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ArenaRoom, arenaReportKey } from '../cloudflare/arena-room.mjs';
-import { ARENA, INPUT, createArena, runArena } from '../public/modules/arena-rules.js';
-import { LIVE, LIVE_EMOTES, createLiveSim, createReplaySim, createTimeline, liveVerdict, liveFighters, liveTeam, mirrorView, mirrorInput, mirrorEvent, cleanReplays, cleanCode } from '../public/modules/arena-live-rules.js';
+import { ARENA, ARENA_N, INPUT, createArena, runArena, runArenaN, fighter } from '../public/modules/arena-rules.js';
+import { LIVE, LIVE_EMOTES, createLiveSim, createReplaySim, createTimeline, liveVerdict, liveFighters, liveTeam, mirrorView, mirrorInput, mirrorEvent, cleanReplays, cleanCode,
+  createLiveSimN, createReplaySimN, createTimelineN, liveVerdictN, seatSides, shuffleTeams, slotsFor, multiMode } from '../public/modules/arena-live-rules.js';
 import { arenaPeers, liveOpen, liveJoin, liveInvite, liveDecline, arenaInviteFor, myLiveRoom, settleArenaLive, liveSettleOne, tidyArenaInvites, undoLiveJoin, arenaReportPending, pairLeft, ARENA_INVITES } from './arena-live.mjs';
 import { STATE_BUDGET_KB } from './perf-budget.mjs';
-import { dayKey } from '../public/modules/core.js';
+import { dayKey, CHARACTERS } from '../public/modules/core.js';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 const fails = (fn, word) => { try { fn(); return false; } catch (err) { return !word || String(err.message).includes(word); } };
@@ -163,6 +165,112 @@ export async function liveMatch({ seed = 12345, lag = { a: 40, b: 130 }, jitter 
     out.emoSent = emoSent;
     out.room = room.room; out.line = room.line; out.phones = phones; out.startAt = startAt; out.endClock = clock; out.roomStats = room.stats; out.writes = ctx.writes;
     out.alarm = ctx.alarm;
+    return out;
+  } finally {
+    Date.now = realNow; globalThis.Response = RealResponse; globalThis.WebSocketPair = realPair;
+  }
+}
+
+// V13.232 방 하나 + 폰 3 · 4대로 여러 명 판 한 판(1:1:1 난투 · 2:2 팀전). opts: 사람(지연 ms) · 팀전 자리 · 컴퓨터 채우기 · 끊김 · 방 재시작.
+//   people: [{ id, lag, tm? }] 첫 사람이 방장. fill: 빈자리를 컴퓨터로.
+export async function liveMatchN({ mode = 'ffa', seed = 2468, people, jitter = 30, drop = null, idle = null, restartAt = null, fill = false, shuffle = false } = {}) {
+  const realNow = Date.now, RealResponse = globalThis.Response, realPair = globalThis.WebSocketPair;
+  let clock = 60_000_000;
+  Date.now = () => clock;
+  globalThis.WebSocketPair = function () { return { 0: fakeSocket(), 1: fakeSocket() }; };
+  globalThis.Response = class extends RealResponse { constructor(body, init = {}) { if (init.status === 101) { super(null, { status: 200 }); this.upgraded = init.webSocket; return; } super(body, init); } };
+  const reports = [];
+  const env = { VOCA_STATE_SECRET: 'test-secret', VOCA_STATE: { idFromName: n => n, get: () => ({ fetch: async (url, init) => { reports.push({ url, key: init.headers['X-Arena-Key'], body: JSON.parse(init.body) }); return new RealResponse('{}', { status: 200 }); } }) } };
+  let ctx = fakeCtx(), room = new ArenaRoom(ctx, env, { timers: false });
+  room.seed = () => seed;
+  await room.ready;
+  const PETS = [['dragon', 'dog', 'bear'], ['turtle', 'fox', 'tiger'], ['cat', 'owl', 'penguin'], ['panda', 'rabbit', 'snake']];
+  const out = { reports, ctx };
+  try {
+    const admin = msg => room.admin({ id: 'room-n', ...msg }).then(res => res.json().then(body => ({ status: res.status, ...body })));
+    const [host, ...guests] = people;
+    out.init = (await admin({ action: 'init', code: '0777', mode, ticket: 't-' + host.id, host: { id: host.id, name: host.id.toUpperCase(), pets: pets(PETS[0]) } })).ok;
+    for (const [i, g] of guests.entries()) out['join_' + g.id] = (await admin({ action: 'join', ticket: 't-' + g.id, player: { id: g.id, name: g.id.toUpperCase(), pets: pets(PETS[i + 1]) } })).status || 200;
+    if (people.length >= LIVE.MODES[mode].seats) out.full = (await admin({ action: 'join', ticket: 'tz', player: { id: 'z', name: 'Z', pets: pets(['dog']) } })).status;
+    const phones = {}, inbox = [], lastAt = {};
+    const deliver = (to, text, at) => inbox.push({ to, text, at });
+    const late = who => { const base = phones[who].lag + Math.floor(phones[who].rnd() * jitter); lastAt[who] = Math.max(lastAt[who] || 0, clock + base); return lastAt[who]; };
+    async function connect(who) {
+      await room.accept(new URL(`https://arena/ws?ticket=t-${who}`));
+      const ws = ctx.getWebSockets(who).at(-1);
+      phones[who].ws = ws;
+      for (const text of ws.sent.splice(0)) deliver(who, text, late(who));
+      ws.hook = text => { ws.sent.length = 0; deliver(who, text, late(who)); };
+    }
+    for (const [i, p] of people.entries()) { phones[p.id] = { who: p.id, lag: p.lag, rnd: lcg(17 + i * 31), got: [], lobby: null, sim: null, msgs: 0, bytes: 0 }; await connect(p.id); }
+    const toRoom = (who, msg) => { const text = JSON.stringify(msg); phones[who].msgs++; phones[who].bytes += text.length; inbox.push({ to: 'room', who, text, at: late(who) }); };
+    const flushInbox = async () => {
+      inbox.sort((x, y) => x.at - y.at);
+      while (inbox.length && inbox[0].at <= clock) {
+        const m = inbox.shift();
+        if (m.to === 'room') { const ws = phones[m.who].ws; if (ws.readyState === 1) await room.webSocketMessage(ws, m.text); continue; }
+        const p = phones[m.to], msg = JSON.parse(m.text);
+        if (p.offline) continue;
+        p.got.push(msg.type);
+        if (msg.type === 'lobby') p.lobby = msg;
+        if (msg.type === 'error') p.error = msg.error;
+        if (msg.type === 'start' && !p.sim) {
+          p.start = msg;
+          p.sim = createLiveSimN({ seed: msg.seed, mode: msg.mode, sides: msg.sides, side: msg.side, send: l => toRoom(m.to, { type: 'in', l }), onDesync: () => { p.desync = (p.desync || 0) + 1; toRoom(m.to, { type: 'sync' }); } });
+        }
+        if (!p.sim) continue;
+        if (msg.type === 'b') p.sim.onBatch(msg);
+        if (msg.type === 'all') p.sim.rebuild(msg.inputs, msg.c);
+        if (msg.type === 'ai') (p.ai ||= []).push(msg);
+        if (msg.type === 'over') { p.over = msg; p.sim.end({ winner: msg.winner, ticks: msg.ticks, all: msg.all }); }
+      }
+    };
+    const run = async ms => { const end = clock + ms; while (clock < end) { clock += 10; await flushInbox(); } };
+    await run(300);
+    out.lobby = phones[host.id].lobby;
+    // 대기실: 팀전 자리 고르기 · 섞기 · 컴퓨터 채우기 · 준비 · 시작.
+    for (const p of people) if (p.tm != null) toRoom(p.id, { type: 'seat', tm: p.tm });
+    await run(200);
+    out.seatsAfterPick = room.room.seats.map(x => [x.id, x.tm]);
+    if (shuffle) { toRoom(guests[0].id, { type: 'shuffle' }); await run(200); out.guestShuffle = room.room.seats.map(x => x.tm).join(); toRoom(host.id, { type: 'shuffle' }); await run(200); out.shuffled = room.room.seats.map(x => x.tm); }
+    for (const g of guests) toRoom(g.id, { type: 'ready', on: true });
+    await run(500);
+    toRoom(host.id, { type: 'start' });
+    await run(300);
+    out.startNoFill = room.room.phase;
+    out.noFillError = phones[host.id].error || '';
+    if (fill) { toRoom(guests[0].id, { type: 'fill', on: true }); await run(100); out.guestFill = room.room.fill; toRoom(host.id, { type: 'fill', on: true }); await run(100); toRoom(host.id, { type: 'start' }); await run(400); }
+    out.started = room.room.phase === 'play';
+    const startAt = room.room.start_at, ticks = LIVE.MODES[mode].ticks;
+    let lastPulse = clock, lastFlush = clock, lastPing = clock;
+    while (room.room?.phase === 'play' && clock < startAt + 240_000) {
+      clock += 10;
+      await flushInbox();
+      for (const p of Object.values(phones)) {
+        if (!p.sim || p.offline) continue;
+        const want = Math.floor((clock - startAt) / ARENA.TICK_MS);
+        while (p.sim.S.t < want && p.sim.S.t < ticks + 5 && !p.sim.P.S.over) {
+          if (idle !== p.who) for (const x of botInputs(p.sim, p.rnd)) p.sim.push(x);
+          p.sim.step();
+        }
+        if (p.sim.P.S.over && !p.over) p.earlyOver = Math.max(p.earlyOver || 0, want - p.sim.P.S.t); // 판정 전에 내 화면만 끝난 틱 수
+      }
+      if (clock - lastFlush >= LIVE.BATCH_MS) { lastFlush = clock; for (const p of Object.values(phones)) if (!p.offline) p.sim?.flush(); }
+      if (clock - lastPing >= 1000) { lastPing = clock; for (const p of Object.values(phones)) if (!p.offline) toRoom(p.who, { type: 'ping', t: 1 }); }
+      if (clock - lastPulse >= LIVE.BATCH_MS) { lastPulse = clock; await room.pulse(clock); }
+      const tick = Math.floor((clock - startAt) / ARENA.TICK_MS);
+      if (drop && tick === drop.from && !phones[drop.who].offline && !phones[drop.who].dropped) { const p = phones[drop.who]; p.offline = true; p.dropped = true; p.ws.close(1006); await room.webSocketClose(p.ws); }
+      if (drop && tick >= drop.to && phones[drop.who].offline) { phones[drop.who].offline = false; await connect(drop.who); }
+      if (restartAt && tick === restartAt && !out.restarted) {
+        out.restarted = true;
+        await room.save();
+        const ctx2 = fakeCtx(); for (const [k, v] of ctx.store) ctx2.store.set(k, v);
+        ctx = ctx2; room = new ArenaRoom(ctx, env, { timers: false }); await room.ready;
+        for (const p of Object.values(phones)) await connect(p.who);
+      }
+    }
+    await run(1000);
+    Object.assign(out, { room: room.room, line: room.line, phones, startAt, roomStats: room.stats, writes: ctx.writes, alarm: ctx.alarm });
     return out;
   } finally {
     Date.now = realNow; globalThis.Response = RealResponse; globalThis.WebSocketPair = realPair;
@@ -352,6 +460,125 @@ export async function runArenaRoomChecks() {
     const v = createArena({ seed: 5, me: teams.me, foe: teams.foe, foeHuman: true }).view();
     assert(JSON.stringify(mirrorView(mirrorView(v, true), true)) === JSON.stringify(v) && mirrorInput([3, 1], true)[1] === 5 && mirrorInput([3, 10, 0], true)[2] === 8 && mirrorInput([3, 10], true)[1] === 10 && mirrorEvent({ e: 'dmg', who: 'me', x: 30, y: 70 }, true).who === 'foe' && mirrorEvent({ e: 'dmg', who: 'me', x: 30, y: 70 }, true).y === 30,
       'V13.230 손님 화면 돌리기(위 ↔ 아래 · 방향 · 조준 · 사건)');
+  }
+
+  // 7) V13.232 (④단계) 1:1:1 난투 · 2:2 팀전.
+  {
+    // 7-1) 난투: 폰 3대(지연 40 · 130 · 220ms) — 롤백 결과 = 방 판정, 위쪽 자리 폰은 180° 돌려 내 펫이 아래.
+    const f = await liveMatchN({ mode: 'ffa', seed: 2468, people: [{ id: 'a', lag: 40 }, { id: 'b', lag: 130 }, { id: 'c', lag: 220 }] });
+    assert(f.full === 409 && f.lobby?.seats === 3 && f.lobby.pets_n === 2 && f.lobby.pets.length === 3, 'V13.232 난투 방: 자리 3칸(넷째는 409) · 펫 2마리 고르기');
+    assert(f.started && f.room.phase === 'over' && f.reports.length === 1 && f.room.result.same && f.room.sides.every(x => x.team.length === 2), 'V13.232 난투: 시작 → 끝 → 메인에 한 번 보고 · 방이 돌리던 전투 = 처음부터 다시 돌린 판정');
+    const vf = liveVerdictN({ seed: f.room.seed, mode: 'ffa', sides: f.room.sides, inputs: f.line.T.inputs, aiTicks: f.line.T.aiTicks, human: f.line.T.human });
+    assert(vf.winner === f.room.result.winner && vf.ticks === f.room.result.ticks && vf.rank.length === 3 && vf.rank[0] === (vf.winner === 'draw' ? vf.rank[0] : vf.winner), 'V13.232 난투 판정(runArenaN): 1등 = 이긴 사람 · 등수 3칸');
+    for (const who of ['a', 'b', 'c']) {
+      const p = f.phones[who], mine = f.room.sides.find(x => x.id === who);
+      assert(p.over && p.sim.P.hash() === f.line.E.hash() && !p.desync && p.sim.S.winner === (vf.winner === 'draw' ? 'draw' : vf.winner === mine.side ? 'me' : 'foe'),
+        `V13.232 난투 폰 ${who}: 롤백으로 돌린 끝 상태 = 방 판정(되감기 ${p.sim.stats.rollbacks}번, 어긋남 0)`);
+      const v = p.sim.view(), E = f.line.E.view()[mine.side];
+      assert(mine.y < 50 ? Math.abs(v.me.x - (100 - E.x)) < 1e-9 && Math.abs(v.me.y - (100 - E.y)) < 1e-9 : v.me.x === E.x && v.me.y === E.y, `V13.232 난투 폰 ${who}: 위쪽 자리면 경기장을 180° 돌려 본다`);
+    }
+    // 7-2) 팀전: 사람 3명 + 빈자리 컴퓨터, 자리 고르기 · 섞기(방장만) · 끊김 3초 → 컴퓨터 · 방 재시작.
+    const t = await liveMatchN({ mode: '2v2', seed: 1357, fill: true, shuffle: true, people: [{ id: 'a', lag: 40 }, { id: 'b', lag: 130, tm: 1 }, { id: 'c', lag: 90 }], drop: { who: 'c', from: 400, to: 560 }, restartAt: 900 });
+    assert(JSON.stringify(t.seatsAfterPick) === JSON.stringify([['a', 0], ['b', 1], ['c', 0]]) && t.guestShuffle === '0,1,0' && t.shuffled.filter(x => x === 0).length <= 2 && t.shuffled.filter(x => x === 1).length <= 2,
+      'V13.232 팀전 자리: 사람이 적은 팀으로 들어오고 · 빈자리를 눌러 팀 고르기(팀마다 2자리) · 섞기는 방장만');
+    assert(t.startNoFill === 'lobby' && t.noFillError.includes('컴퓨터로 채우기') && t.guestFill === false && t.started, 'V13.232 빈자리가 있으면 시작 못 함 → 방장이 컴퓨터로 채우기를 켜면 시작(손님은 못 켠다)');
+    const bots = t.room.sides.filter(x => x.bot);
+    assert(t.room.sides.length === 4 && bots.length === 1 && [0, 1].every(tm => t.room.sides.filter(x => x.tm === tm).length === 2) && t.room.sides.slice(0, 2).every(x => x.tm === 0) && bots[0].team.length === 2,
+      'V13.232 팀전: 빈자리 컴퓨터 1명 · 파랑 2 · 빨강 2(자리 p0 · p1 파랑)');
+    assert(t.room.result.same && t.restarted && ['a', 'b', 'c'].every(w => t.phones[w].sim.P.hash() === t.line.E.hash() && !t.phones[w].desync), 'V13.232 팀전 폰 3대: 끊겼다 돌아오고 방이 다시 켜져도 끝 상태 = 방 판정');
+    const cSide = t.room.sides.find(x => x.id === 'c').side, cIn = t.line.T.inputs[cSide];
+    assert(cIn.some(x => x[1] === INPUT.AI_ON) && cIn.some(x => x[1] === INPUT.AI_OFF) && t.line.T.inputs[bots[0].side].length === 0 && t.line.T.aiTicks[bots[0].side] === 0,
+      'V13.232 팀전 끊김 3초면 컴퓨터가 대신 조종 · 컴퓨터 자리는 처음부터 컴퓨터(조작 0, 대신 조종 시간에도 안 센다)');
+    const rep = t.reports[0].body.result;
+    assert(rep.mode === '2v2' && rep.seats.length === 4 && rep.seats.filter(x => x.bot).length === 1 && rep.seats.every(x => typeof x.win === 'boolean' && x.place >= 1),
+      'V13.232 팀전 보고: 자리 4개(컴퓨터 표시) · 사람마다 이겼나 · 등수');
+    // 7-3) 엔진 규칙(같은 판을 직접): 팀원 공격 안 됨 · 팀원 회복 · 보호막 · 막타 점수 · 번개 연쇄 · 시간 끝 판정.
+    const F = (key, hp = null) => { const x = fighter({ key, form: 2, level: 12 }); if (hp) x.hp = hp; return x; };
+    const P4 = (keys, extra = {}) => keys.map((k, i) => ({ who: `p${i}`, tm: i < 2 ? 0 : 1, team: [F(k), F(k)], x: [40, 46, 40, 46][i], y: [60, 60, 40, 40][i], ...extra[i] }));
+    const A = createArena({ seed: 9, players: P4(['dog', 'bear', 'cat', 'fox']), maxTicks: 3000 });
+    for (let i = 0; i < 30; i++) A.step();
+    // p0이 팀원 p1 쪽으로 자동 조준 · 공격 · 스킬 · 필살기: 팀원은 다치지 않는다(다른 팀만).
+    const before = A.S.p1.team[0].cur;
+    A.S.p0.gauge = ARENA.GAUGE_MAX;
+    A.pushAs('p0', [A.S.t, INPUT.AIM_AUTO]); A.pushAs('p0', [A.S.t, INPUT.ATK, 6]); A.pushAs('p0', [A.S.t + 15, INPUT.SKILL, 6]); A.pushAs('p0', [A.S.t + 40, INPUT.ULT, 4]);
+    for (let i = 0; i < 120; i++) A.step();
+    assert(A.S.p1.team[0].cur === before || A.S.p1.lastBy !== 'p0', 'V13.232 팀전: 팀원은 공격 · 스킬 · 필살기에 맞지 않는다');
+    const dmgs = []; const B = createArena({ seed: 11, players: P4(['dog', 'bear', 'cat', 'fox'], { 0: { ai: 1 }, 1: { ai: 1 }, 2: { ai: 1 }, 3: { ai: 1 } }), maxTicks: 3000 });
+    while (!B.S.over) for (const e of B.step()) if (e.e === 'dmg' && e.by) dmgs.push([e.by, e.who]);
+    assert(dmgs.length > 50 && dmgs.every(([by, who]) => B.S[by].tm !== B.S[who].tm), `V13.232 팀전 한 판(컴퓨터 4명): 피해 ${dmgs.length}번 모두 다른 팀끼리 · 팀원끼리 0번`);
+    // 팀원 회복 · 보호막: 회복 스킬 펫(penguin 계열이 아니어도 guard 펫을 찾는다)이 쓰면 가까운 팀원도.
+    const ALL = Object.keys(CHARACTERS);
+    const guardKey = ALL.find(k => { const x = fighter({ key: k }).skill; return x.kind === 'guard' && x.heal > 0; });
+    assert(guardKey, 'V13.232 회복 스킬 펫이 있다');
+    {
+      const G = createArena({ seed: 3, players: P4([guardKey, 'dog', 'cat', 'fox']), maxTicks: 3000 });
+      for (let i = 0; i < 30; i++) G.step();
+      G.S.p1.team[0].cur = 50; G.S.p1.x = G.S.p0.x + 6; G.S.p1.y = G.S.p0.y;
+      G.S.p0.skill = 0; G.pushAs('p0', [G.S.t, INPUT.SKILL]);
+      const ev = []; for (let i = 0; i < 3; i++) ev.push(...G.step());
+      assert(ev.some(e => e.e === 'buff' && e.who === 'p1' && e.mate === 'p0') && (G.S.p1.team[0].cur > 50 || G.S.p1.shield > 0), `V13.232 팀전: 팀원 회복 · 보호막 스킬(${guardKey})은 가까운 팀원(${ARENA_N.MATE_RANGE}% 안)에게도`);
+    }
+    // 막타 점수: p1이 거의 다 깎아 놓은 펫을 p0이 마지막에 쓰러뜨리면 점수는 p0만.
+    const L3 = [0, 1, 2].map(i => ({ who: `p${i}`, tm: i, team: [F('dog'), F('dog')], x: [50, 30, 70][i], y: [60, 40, 40][i] }));
+    const K = createArena({ seed: 5, players: L3, maxTicks: 2400, ffa: true });
+    for (let i = 0; i < 30; i++) K.step();
+    K.S.dealt.p1 = 999; K.S.p2.lastBy = 'p1'; K.S.p2.team[0].cur = 1; K.S.p2.x = K.S.p0.x; K.S.p2.y = K.S.p0.y - 8; K.S.p1.x = 15; K.S.p1.y = 20;
+    K.pushAs('p0', [K.S.t, INPUT.ATK, 0]);
+    const kev = []; for (let i = 0; i < 4; i++) kev.push(...K.step());
+    assert(kev.some(e => e.e === 'faint' && e.who === 'p2' && e.by === 'p0') && K.S.ko.p0 === 1 && K.S.ko.p1 === 0, 'V13.232 난투 막타 점수: 쓰러뜨린 점수는 마지막에 때린 사람에게만(먼저 많이 깎은 사람이 아니라)');
+    // 번개 연쇄: 맞은 상대 옆(24% 안)의 다른 상대에게 한 번 튄다.
+    const chainKey = ALL.find(k => fighter({ key: k, s2: 0 }).skill2.id === 'chain');
+    const Cn = createArena({ seed: 7, players: [0, 1, 2].map(i => ({ who: `p${i}`, tm: i, team: [i ? F('dog') : fighter({ key: chainKey, form: 2, level: 12, s2: 0 }), F('dog')], x: [50, 50, 58][i], y: [70, 45, 45][i] })), maxTicks: 2400, ffa: true });
+    for (let i = 0; i < 30; i++) Cn.step();
+    Cn.S.p1.x = 50; Cn.S.p1.y = 45; Cn.S.p2.x = 60; Cn.S.p2.y = 45; Cn.S.p0.skill2 = 0;
+    Cn.pushAs('p0', [Cn.S.t, INPUT.SKILL2, 0]);
+    const cev = []; for (let i = 0; i < 12; i++) { Cn.S.p1.x = 50; Cn.S.p1.y = 45; Cn.S.p2.x = 60; Cn.S.p2.y = 45; cev.push(...Cn.step()); }
+    assert(cev.some(e => e.e === 'chainjump' && e.who === 'p0') && cev.filter(e => e.e === 'dmg' && e.by === 'p0').map(e => e.who).sort().join() === 'p1,p2', `V13.232 번개 연쇄(${chainKey}): 맞은 상대 옆의 다른 상대에게 튄다(1:1에는 옆 상대가 없다)`);
+    // 시간 끝: 난투는 쓰러뜨린 수 → 남은 체력, 팀전은 남은 체력. 같은 조작이면 늘 같은 결과.
+    const T3 = [0, 1, 2].map(i => ({ who: `p${i}`, tm: i, team: [F('dog'), F('dog')], x: [50, 18, 82][i], y: [78, 24, 24][i] }));
+    const idleRun = runArenaN({ seed: 1, players: T3, maxTicks: 60, ffa: true });
+    assert(idleRun.winner === 'draw' && idleRun.ticks === 60, 'V13.232 난투 시간 끝: 쓰러뜨린 수 · 남은 체력이 모두 같으면 무승부');
+    const T3b = T3.map((p, i) => i === 1 ? { ...p, team: [F('dog'), { ...F('dog'), hp: F('dog').hp }] } : p);
+    const one = createArena({ seed: 1, players: T3b, maxTicks: 60, ffa: true }); one.S.p1.team[1].cur = 1; one.S.ko.p2 = 1;
+    while (!one.S.over) one.step();
+    assert(one.S.winner === 'p2' && one.S.rank[0] === 'p2' && one.S.rank.at(-1) === 'p1', 'V13.232 난투 시간 끝: 쓰러뜨린 수가 많은 사람 1등, 같으면 남은 체력(남은 체력 적은 사람이 꼴등)');
+    const two = createArena({ seed: 1, players: P4(['dog', 'dog', 'dog', 'dog']).map((p, i) => ({ ...p, x: [32, 68, 32, 68][i], y: [76, 76, 24, 24][i] })), maxTicks: 60 }); two.S.p2.team[0].cur = 10;
+    while (!two.S.over) two.step();
+    assert(two.S.winner === 't0' && JSON.stringify(runArenaN({ seed: 4, players: P4(['dog', 'bear', 'cat', 'fox'], { 0: { ai: 1 }, 1: { ai: 1 }, 2: { ai: 1 }, 3: { ai: 1 } }), maxTicks: 3000 })) === JSON.stringify(runArenaN({ seed: 4, players: P4(['dog', 'bear', 'cat', 'fox'], { 0: { ai: 1 }, 1: { ai: 1 }, 2: { ai: 1 }, 3: { ai: 1 } }), maxTicks: 3000 })),
+      'V13.232 팀전 시간 끝: 남은 체력이 많은 팀 · 같은 씨앗과 조작이면 늘 같은 결과');
+    // 7-4) 같은 학년 · 보상 · 농사 막기.
+    const now = 9_300_000_000;
+    const a = stu('a', '고1A'), b = stu('b', '고1B'), c = stu('c', '고1C'), d = stu('d', '고1D'), g2 = stu('g', '고2A');
+    const state = { profiles: [a, b, c, d, g2] };
+    const opened = liveOpen(state, a, school, pets(['dog', 'cat']), { id: '22222222-2222-4222-8222-222222222222', now, mode: '2v2' });
+    assert(opened._arenas.at(-1).mode === '2v2' && fails(() => liveOpen(state, b, school, pets(['dog']), { id: 'y', now, mode: '3v3' }), '골라'), 'V13.232 방 만들기: 1:1 · 난투 · 팀전만');
+    for (const x of [b, c, d]) liveJoin(state, x, school, pets(['fox']), { code: opened.room.code, now: now + 1000 });
+    assert(state.arenaInvites[0].m.length === 4 && fails(() => liveJoin(state, g2, school, pets(['fox']), { code: opened.room.code, now: now + 2000 }), '같은 학년'), 'V13.232 팀전 · 난투도 같은 학년만 들어온다(4명 모두 서버가 확인)');
+    const seat = (id, side, tm, extra = {}) => ({ id, side, tm, win: tm === 0, place: tm === 0 ? 1 : 3, ko: 1, dealt: 300, ults: 0, inputs: 200, ai_ticks: 0, ai_half: false, bot: false, idle: false, ...extra });
+    const body = { id: opened.room.id, result: { mode: '2v2', winner: 't0', ticks: 2000, idle: false, seats: [seat('a', 'p0', 0), seat('b', 'p1', 0, { idle: true, inputs: 3 }), seat('c', 'p2', 1), seat('bot:1', 'p3', 1, { bot: true })] } };
+    const logs = [];
+    assert(settleArenaLive(state, body, { profileOf: id => state.profiles.find(x => x.id === id), schoolOf: () => school, log: (p, line) => logs.push(line), now }), 'V13.232 팀전 정산');
+    const ra = a.games.done.find(x => x.id === `live:${opened.room.id}`).r, rb = b.games.done.find(x => x.id === `live:${opened.room.id}`).r, rc = c.games.done.find(x => x.id === `live:${opened.room.id}`).r;
+    assert(ra.paid && ra.win && ra.coins === ARENA.COINS.win && ra.mode === '2v2' && !rb.paid && rb.reason === 'idle' && rc.paid && !rc.win && rc.coins === ARENA.COINS.lose && !d.games?.done && logs.length === 3,
+      'V13.232 팀전 보상: 이긴 팀 12 · 진 팀(쓰러뜨림 있으면) 4 · 거의 안 한 사람만 보상 없음 · 컴퓨터 자리는 정산에서 뺀다 · 판에 없는 학생은 안 고친다');
+    assert(a.games.arena.pairs.m['b+c'] === 1, 'V13.232 같은 친구 코인 판 하루 2판: 팀전은 같은 사람 조합(나 빼고 사람만, 컴퓨터 제외)으로 센다');
+    const solo = liveVerdictN({ seed: t.room.seed, mode: '2v2', sides: t.room.sides.map(x => (x.id === 'b' || x.id === 'c' ? { ...x, bot: true } : x)), inputs: t.line.T.inputs, aiTicks: t.line.T.aiTicks, human: t.line.T.human });
+    assert(solo.idle, 'V13.232 제대로 한 사람이 2명 미만이면(혼자 + 컴퓨터) 그 판은 모두 보상 없음(농사 막기)');
+    assert(seatSides('2v2', shuffleTeams([{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }], 99)).map(x => x.tm).join() === '0,0,1,1' && multiMode('ffa') && multiMode('2v2') && !multiMode('1v1') && slotsFor(t.room.sides, 'p2').flip,
+      'V13.232 섞기 뒤에도 파랑 2 · 빨강 2 · 빨강 팀 폰은 경기장을 돌려 본다');
+    // 7-5) 다시 보기(여러 명): 씨앗 + 모든 쪽 조작으로 같은 판.
+    const recN = { mode: 'ffa', side: f.room.sides[1].side, seed: f.room.seed, sides: f.room.sides, inputs: f.room.result.all, at: 1 };
+    const RN = createReplaySimN(cleanReplays([recN])[0]);
+    while (!RN.S.over) RN.step();
+    assert(RN.S.t === f.room.result.ticks && cleanReplays([recN, { ...recN, sides: [] }]).length === 1, 'V13.232 다시 보기(난투): 같은 판 재생 · 망가진 기록은 버린다');
+    // 7-6) 예산: 사람 수에 맞춘 메시지 · Durable Object 요청(웹소켓 메시지 20개 = 요청 1건).
+    const budget = (x, n) => ({ in_msgs: x.roomStats.in_msgs, out_msgs: x.roomStats.out_msgs, requests: Math.ceil(x.roomStats.in_msgs / 20) + 4 + n * 2, writes: x.writes, secs: Math.round(x.room.result.ticks * ARENA.TICK_MS / 1000) });
+    // 팀전 예산은 끊김 · 재시작 없는 사람 4명 판으로 잰다.
+    const t4 = await liveMatchN({ mode: '2v2', seed: 8642, people: [{ id: 'a', lag: 40 }, { id: 'b', lag: 130 }, { id: 'c', lag: 90 }, { id: 'd', lag: 200 }] });
+    assert(t4.full === 409 && t4.room.result.same && ['a', 'b', 'c', 'd'].every(w => t4.phones[w].sim.P.hash() === t4.line.E.hash() && !t4.phones[w].desync), 'V13.232 팀전 사람 4명(지연 40 · 90 · 130 · 200ms): 다섯째는 409 · 폰 4대 끝 상태 = 방 판정');
+    out.ffa = budget(f, 3); out.team = budget(t4, 4);
+    assert(out.ffa.requests <= 3 * 130 && out.team.requests <= 4 * 130 && out.ffa.writes <= 50 && out.team.writes <= 60, `V13.232 한 판 요청 예산: 난투 ${out.ffa.requests}건 · 팀전 ${out.team.requests}건 · 저장 ${out.ffa.writes} · ${out.team.writes}번`);
+    console.log('[arena-room] 난투', JSON.stringify(out.ffa), '팀전', JSON.stringify(out.team));
   }
 
   // 6) 연결 · 렉 방지(코드).
