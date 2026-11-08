@@ -205,7 +205,9 @@ function lobbyView() {
   const locked = !!me?.ready && !host;
   const all = v.players.length >= n && v.players.every(p => p.host || p.ready);
   const friends = host ? (L.home?.friends || []) : [];
-  arenaUi.main(`<section class="ar-live ar-lv-lobby${lobbyArt()}">
+  const keep = L.drawn ? ' keep' : '';
+  L.drawn = true;
+  arenaUi.main(`<section class="ar-live ar-lv-lobby${keep}${lobbyArt()}">
     <div class="ar-title"><small>친구 대전 대기실 · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} 뒤 닫혀요</small><h1>방 <b class="ar-lv-codebig">${esc(v.code)}</b></h1></div>
     <div class="ar-lv-seats">${Array.from({ length: n }, (_, i) => seat(i)).join('<span class="ar-lv-vs">VS</span>')}</div>
     <div class="ar-card">
