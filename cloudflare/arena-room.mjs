@@ -9,6 +9,7 @@
 //   대기실: 팀전은 자리를 눌러 팀 고르기(seat) · 방장 섞기(shuffle) · 빈자리 컴퓨터로 채우기(fill). 컴퓨터 자리는 보상 계산에서 뺀다.
 import { LIVE, LIVE_EMOTES, SIDES, liveTeam, liveFighters, createTimeline, liveVerdict, multiMode, seatSides, createTimelineN, liveVerdictN, teamFull, shuffleTeams, BOT_NAME } from '../public/modules/arena-live-rules.js';
 import { ARENA } from '../public/modules/arena-rules.js';
+import { cleanDeco } from '../public/modules/arena-deco-rules.js';
 import { reportRetryMs } from './battle-room.mjs';
 
 const MESSAGE_TYPES = new Set(['sync', 'ping', 'team', 'ready', 'start', 'leave', 'in', 'emo', 'seat', 'shuffle', 'fill']);
@@ -28,6 +29,8 @@ export async function arenaReportKey(env) {
 }
 const randomSeed = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return (a[0] % 2147483646) + 1; };
 
+// V13.235 방에 남기는 꾸미기(이름만, 약 40바이트). 메인이 열린 것만 보낸다.
+const roomDeco = dc => { const c = cleanDeco(dc); return { bg: c.bg || 'auto', rg: c.rg || 'basic', en: c.en || 'basic' }; };
 export class ArenaRoom {
   constructor(ctx, env, { timers = true } = {}) {
     this.ctx = ctx;
@@ -101,8 +104,13 @@ export class ArenaRoom {
   pushLobby() { for (const ws of this.ctx.getWebSockets()) this.send(ws, this.lobbyView(this.ctx.getTags(ws)[0])); }
   startView(id) {
     const r = this.room, s = this.seatOf(id);
-    if (multiMode(r.mode)) return { type: 'start', mode: r.mode, seed: r.seed, start_at: r.start_at, side: s?.side || null, sides: r.sides.map(x => ({ side: x.side, tm: x.tm, team: x.team, x: x.x, y: x.y, bot: !!x.bot, name: x.name })), over: r.phase === 'over', now: Date.now() };
-    return { type: 'start', seed: r.seed, start_at: r.start_at, side: s?.side || null, teams: r.teams, names: r.names, over: r.phase === 'over', now: Date.now() };
+    if (multiMode(r.mode)) return { type: 'start', mode: r.mode, seed: r.seed, start_at: r.start_at, side: s?.side || null, sides: r.sides.map(x => ({ side: x.side, tm: x.tm, team: x.team, x: x.x, y: x.y, bot: !!x.bot, name: x.name })), deco: this.decoView(), over: r.phase === 'over', now: Date.now() };
+    return { type: 'start', seed: r.seed, start_at: r.start_at, side: s?.side || null, teams: r.teams, names: r.names, deco: this.decoView(), over: r.phase === 'over', now: Date.now() };
+  }
+  // V13.235 경기장 꾸미기: 경기장 · 링은 방장 것, 입장 효과는 사람마다(자리 이름 → 효과). 메인이 열린 것만 보낸다(server/arena-deco.mjs decoOf).
+  decoView() {
+    const r = this.room, host = r.seats.find(x => x.id === r.host)?.dc || {};
+    return { bg: host.bg || 'auto', rg: host.rg || 'basic', en: Object.fromEntries(r.seats.filter(x => x.side).map(x => [x.side, x.dc?.en || 'basic'])) };
   }
   allView() { const T = this.line.T; return { type: 'all', c: T.confirmed, inputs: T.inputs, now: Date.now() }; }
 
@@ -123,7 +131,7 @@ export class ArenaRoom {
       const host = msg.host;
       const mode = LIVE.MODES[msg.mode] ? msg.mode : '1v1';
       this.room = { id: msg.id, code: msg.code, mode, host: host.id, created_at: now, phase: 'lobby', fill: false,
-        tickets: { [host.id]: msg.ticket }, seats: [{ id: host.id, name: host.name, pets: host.pets, team: liveTeam(host.pets, [], LIVE.MODES[mode].team), tm: 0, ready: false }], emotes: {}, reported: false };
+        tickets: { [host.id]: msg.ticket }, seats: [{ id: host.id, name: host.name, pets: host.pets, team: liveTeam(host.pets, [], LIVE.MODES[mode].team), tm: 0, ready: false, dc: roomDeco(host.dc) }], emotes: {}, reported: false };
     } else {
       const r = this.room;
       if (!r || r.phase !== 'lobby') return json({ error: r ? '이미 시작한 방이에요.' : '방이 닫혔어요.' }, r ? 409 : 404);
@@ -133,7 +141,7 @@ export class ArenaRoom {
           if (r.seats.length >= LIVE.MODES[r.mode].seats) return json({ error: '방이 꽉 찼어요.' }, 409);
           // 팀전: 사람이 적은 팀(같으면 파랑)으로 들어간다. 대기실에서 자리를 눌러 바꿀 수 있다.
           const tm = r.mode === '2v2' && teamFull(r.seats, 0) ? 1 : r.mode === '2v2' && r.seats.filter(x => x.tm === 1).length < r.seats.filter(x => (x.tm || 0) === 0).length ? 1 : 0;
-          r.seats.push({ id: p.id, name: p.name, pets: p.pets, team: liveTeam(p.pets, [], LIVE.MODES[r.mode].team), tm, ready: false });
+          r.seats.push({ id: p.id, name: p.name, pets: p.pets, team: liveTeam(p.pets, [], LIVE.MODES[r.mode].team), tm, ready: false, dc: roomDeco(p.dc) });
         }
         r.tickets[p.id] = msg.ticket;
       } else if (msg.action === 'close') {

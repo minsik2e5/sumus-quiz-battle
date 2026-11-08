@@ -11,6 +11,7 @@ import { ARENA, baseS2, cleanTree } from '../public/modules/arena-rules.js';
 import { LIVE, cleanCode } from '../public/modules/arena-live-rules.js';
 import { gradeOf } from './competition.mjs';
 import { addBonus, findReceipt, keepReceipt } from './rewards.mjs';
+import { bumpCoinWin, decoOf } from './arena-deco.mjs';
 
 export const ARENA_INVITES = { MAX: 120, STARTED_KEEP_MS: 30 * 60000 };
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -54,7 +55,7 @@ function newCode(state, now) {
 export function livePlayer(p, pets) {
   const s2 = p.games?.arena?.s2 || {}, tr = p.games?.arena?.tr || {};
   const ready = (pets || []).filter(x => Number(x.form) >= 1).sort((a, b) => b.level - a.level).slice(0, 40);
-  return { id: p.id, name: String(p.display_name || '친구').slice(0, 20), cls: String(p.class_name || '').slice(0, 20), pets: ready.map(x => ({ key: x.key, form: Number(x.form), level: Number(x.level), s2: baseS2(x.key, s2[x.key]), tr: cleanTree(tr[x.key]) })) };
+  return { id: p.id, name: String(p.display_name || '친구').slice(0, 20), cls: String(p.class_name || '').slice(0, 20), pets: ready.map(x => ({ key: x.key, form: Number(x.form), level: Number(x.level), s2: baseS2(x.key, s2[x.key]), tr: cleanTree(tr[x.key]) })), dc: decoOf(p.games?.arena) }; // V13.235 꾸미기(방장 경기장 · 링, 사람마다 입장 효과)
 }
 const roomView = (x, p) => ({ id: x.id, code: x.code, mode: x.mode, host: x.hn, ticket: x.t[p.id], is_host: x.h === p.id });
 
@@ -186,6 +187,7 @@ export function liveSettleOne(p, { id, seat, others, winner, idle, peers = true,
     const coins = win ? ARENA.COINS.win : base.ko >= 1 ? ARENA.COINS.lose : 0;
     a.plays = Number(a.plays || 0) + 1;
     a.tk = Number(a.tk || 0) - 1;
+    if (win) bumpCoinWin(a); // V13.235 꾸미기 열림: 코인 판 승리만 센다
     a.pairs.m = Object.fromEntries([...Object.entries(a.pairs.m), [pairKey, Number(a.pairs.m[pairKey] || 0) + 1]].slice(-10));
     addBonus(p, { xp: ARENA.XP, coins, pet, now });
     out = { ...base, paid: true, coins, xp: ARENA.XP };

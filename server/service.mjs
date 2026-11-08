@@ -56,6 +56,7 @@ import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './ga
 import { wallStart, wallFinish, wallView, wallLine } from './wall.mjs';
 import { ARENA } from '../public/modules/arena-rules.js';
 import { arenaStart, arenaFinish, arenaView, arenaLine, arenaPoolFor, arenaPoolPut, grantArenaTicket } from './arena.mjs';
+import { setDeco } from './arena-deco.mjs';
 import { arenaPeers, arenaInviteFor, myLiveRoom, liveOpen, liveInvite, liveJoin, liveDecline, liveResult, pairLeft, tidyArenaInvites, settleArenaLive, arenaReportPending, undoLiveJoin } from './arena-live.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
 import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, partyPlaysLeft, settleParty, partyReportPending, undoParty } from './party.mjs';
@@ -857,6 +858,8 @@ export function settleArenaReport(state, body) {
   return settleArenaLive(state, body, { profileOf: pid => state.profiles.find(x => x.id === pid), schoolOf: x => schoolForProfile(state, x), activePet: pid => activePetKey(state, pid), log: (x, line, at) => logActivity(x, 'arena', line, at) });
 }
 export { arenaReportPending, undoLiveJoin };
+// V13.235 친구 방 열기 · 들어가기에 실어 온 꾸미기: 안 열린 것은 거부(혼자 판 시작과 같은 규칙).
+const liveDeco = (p, body) => { if (body?.deco && typeof body.deco === 'object' && !Array.isArray(body.deco)) setDeco((p.games ||= {}).arena ||= {}, body.deco); };
 function activePetKey(state, studentId) {
   const p = state.profiles.find(x => x.id === studentId);
   return p?.pets?.some(x => x.key === p.avatar_key) ? p.avatar_key : undefined;
@@ -1988,7 +1991,9 @@ export async function service(state, method, path, body, token, options = {}) {
     const picks = body.picks && typeof body.picks === 'object' && !Array.isArray(body.picks) ? body.picks : null;
     // V13.231 스킬트리 가지({ 펫 키: '011' }): 규칙 파일 cleanTrees가 알려진 펫 · 0/1 세 글자만 남긴다.
     const tree = body.tree && typeof body.tree === 'object' && !Array.isArray(body.tree) ? body.tree : null;
-    const r = arenaStart(p, { id: id(), team, picks, tree, friends, pets: petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), now });
+    // V13.235 경기장 꾸미기({ bg, rg, en, ps }): 안 열린 것은 거부(server/arena-deco.mjs).
+    const deco = body.deco && typeof body.deco === 'object' && !Array.isArray(body.deco) ? body.deco : null;
+    const r = arenaStart(p, { id: id(), team, picks, tree, friends, deco, pets: petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), now });
     if (!p.preview_owner_id) arenaPoolPut(state, p, school.id, r.team, now);
     delete r.team;
     return r;
@@ -2022,6 +2027,7 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     if (p.preview_owner_id) fail('미리 보기에서는 친구 대전을 할 수 없어요.', 409);
     const now = Date.now();
+    liveDeco(p, body); // V13.235 방장 꾸미기(경기장 · 링 · 입장 효과)
     return liveOpen(state, p, schoolForProfile(state, p), petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), { id: id(), now, mode: ['1v1', 'ffa', '2v2'].includes(body.mode) ? body.mode : '1v1' }); // V13.232 1:1:1 · 2:2
   }
   if (path === '/games/arena/live/invite' && method === 'POST') {
@@ -2034,6 +2040,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (p.preview_owner_id) fail('미리 보기에서는 친구 대전을 할 수 없어요.', 409);
     const now = Date.now();
     tidyArenaInvites(state, now);
+    liveDeco(p, body); // V13.235 내 입장 효과
     return liveJoin(state, p, schoolForProfile(state, p), petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), { code: str(body.code, 8), id: str(body.id, 64), now });
   }
   if (path === '/games/arena/live/decline' && method === 'POST') {

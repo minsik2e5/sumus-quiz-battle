@@ -8,6 +8,9 @@ import { ELEMENTS, fxImpact, fxPunch, fxSpeedLines, fxRecoil, fxLite } from './b
 import { ARENA, BEATS, INPUT, ROLE, DIR16, SK2, ZONES_MAX, TREE, createArena, fighter, dirCode, aimCode, petTree, cleanTree } from './arena-rules.js';
 import { ARENA_ART } from './arena-art.js';
 import { openLive, liveClick, closeLive, keepReplay } from './arena-live.js';
+// V13.235 연습장(arena-practice.js) · 경기장 꾸미기(arena-deco.js). 화면만 붙이는 곳은 decoStage · decoMount · decoWin 세 군데.
+import { practiceClick, closePractice } from './arena-practice.js';
+import { decoClick, closeDeco, decoStage, decoMount, decoWin, decoWant, decoBgOf, soloDeco } from './arena-deco.js';
 
 // V13.225 펫 아레나 2(놀이터): 전체 화면. 위에서 비스듬히 내려다보는 경기장에서 내 펫을 직접 조종해 상대 펫과 싸운다.
 //   왼쪽 아래 조이스틱으로 움직이고, 오른쪽 버튼: 공격(누르고 있으면 계속) · 스킬 1 · 스킬 2(펫마다 다르다) · 필살기(게이지) · 회피 · 교체.
@@ -76,7 +79,12 @@ const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } cat
 const readyPets = A => (A.data.stats?.pets || []).filter(x => Number(x.form) >= 1).sort((a, b) => b.level - a.level || (b.active ? 1 : 0) - (a.active ? 1 : 0));
 
 // V13.230 실시간 친구 대전(arena-live.js)이 쓰는 화면 조각. 전투 화면은 그대로, 전투(R.sim)만 롤백 전투로 바뀐다.
-export const arenaUi = { main: html => main(html), pop: (...a) => pop(...a), sfx: (...a) => sfx(...a), petImg: (k, f) => petImg(k, f), cur: () => (R?.playing ? R.cur : null), lobby: () => { if (R) { R.live = null; lobby(); } } };
+export const arenaUi = { main: html => main(html), pop: (...a) => pop(...a), sfx: (...a) => sfx(...a), petImg: (k, f) => petImg(k, f), cur: () => (R?.playing ? R.cur : null), lobby: () => { if (R) { R.live = null; lobby(); } },
+  // V13.235 연습장 · 꾸미기: 지금 아레나 상태 · 판 멈추기 · 내 펫 칸 다시 그리기 · 스킬트리 가지 / 스킬 ② 저장(대기실과 같은 규칙).
+  R: () => R, stop: () => { if (R) { R.playing = false; R.live = null; cancelAnimationFrame(R.raf); app()?.classList.remove('playing'); } },
+  bg: name => setBg(name),
+  redrawMe: () => { if (R?.cur) { drawMon('me'); drawPad(); } },
+  keep: (key, { tr, s2 }) => { if (!R) return; if (tr) { R.trees[key] = cleanTree(tr); save(TREE_KEY(), R.trees); } if (s2 === 0 || s2 === 1) { R.picks[key] = s2; save(PICK_KEY(), R.picks); } } };
 // live: { sim, want(now) 지금 틱(소수), late, mounted(), finish(), why(res), buttons(), quitText, quit(), replay }.
 export async function arenaMatch(r, live) {
   if (!R) return;
@@ -115,6 +123,7 @@ export function openArena(A, exit, opts = {}) {
 }
 function setBg(name) {
   const el = $('ar-bg'); if (!el) return;
+  if (decoStage($('ar-stage'), el, name)) return; // V13.235 꾸미기 경기장(그림 68이 없으면 CSS 장면)
   const [want, backup] = BG[name] || BG.plaza;
   const stage = $('ar-stage');
   el.onload = () => stage?.classList.toggle('art', el.src.includes('/assets/arena/'));
@@ -152,6 +161,10 @@ function onClick(event) {
   const act = b.dataset.ar;
   // V13.230 친구 대전(arena-live.js) 버튼.
   if (act === 'live') { sfx('tap'); return openLive(R.A); }
+  // V13.235 연습장(pr-) · 꾸미기(dc-) 버튼. 연습 판 중 나가기는 대기실로.
+  if (act.startsWith('pr-')) return void practiceClick(act, b);
+  if (act.startsWith('dc-')) return void decoClick(act, b);
+  if (act === 'exit' && R.playing && R.live?.practice) { R.live.quit(); arenaUi.stop(); return lobby(); }
   if (act.startsWith('lv-')) { if (R.playing && act !== 'lv-emo') return; return void liveClick(act, b); }
   if (act === 'exit') return R.playing ? confirmQuit() : leave();
   if (act === 'pet') return togglePet(b.dataset.key);
@@ -266,6 +279,7 @@ function treePanel(pets) {
 }
 function lobby(again = false, keep = false) {
   R.playing = false;
+  closePractice(); closeDeco();
   cancelAnimationFrame(R.raf);
   app()?.classList.remove('playing');
   setBg('plaza');
@@ -291,6 +305,7 @@ function lobby(again = false, keep = false) {
       <p class="ar-words">${paid ? `코인 판 · 이기면 ${coin()}${ARENA.COINS.win} · 오늘 ${num(left)}판 남음 · 입장권 1장을 써요` : left <= 0 ? `오늘 코인 판(${ARENA.DAILY}판)을 다 썼어요. 연습 판은 계속 할 수 있어요` : `입장권이 없어서 연습 판이에요(코인 없음). <b>단어 연습을 끝까지 풀면 입장권</b>을 받아요`}</p>
       <button type="button" class="yl-cta ar-go" data-ar="start" ${pets.length ? '' : 'disabled'}>${!pets.length ? '펫을 먼저 키워 주세요' : paid ? '대전 시작!' : '연습 판 시작'}</button>
       <button type="button" class="btn full ar-live-go" data-ar="live" ${pets.length ? '' : 'disabled'}>👥 친구와 실시간 대전 <small>같은 학년 · 방 코드</small></button>
+      <div class="ar-extra"><button type="button" class="ar-extra-btn prac" data-ar="pr-open" ${pets.length ? '' : 'disabled'}><b>🎯</b><span>연습장<small>허수아비로 스킬 시험 · 보상 없음</small></span></button><button type="button" class="ar-extra-btn deco" data-ar="dc-open"><b>🎨</b><span>경기장 꾸미기<small>🏆 ${num(v.deco?.wins || 0)}승 · 이기면 열려요</small></span></button></div>
     </div>
   </section>`);
 }
@@ -302,17 +317,18 @@ async function start(button) {
   const picks = Object.fromEntries(R.team.filter(k => R.picks[k] != null).map(k => [k, R.picks[k]]));
   // V13.231 스킬트리 가지도 내 팀 펫 것만(서버가 기억하고 판 기록에 싣는다).
   const tree = Object.fromEntries(R.team.filter(k => R.trees[k] != null).map(k => [k, cleanTree(R.trees[k])]));
-  try { r = await api('/games/arena/start', { team: R.team, picks, tree }); }
+  try { r = await api('/games/arena/start', { team: R.team, picks, tree, deco: decoWant() }); }
   catch (err) { if (!R) return; buttonBusy(button, false); return toast(err.message || '대전을 시작하지 못했어요.'); }
   if (!R) return;
-  R.view = { ...R.view, left: r.left, tickets: r.tickets, wins: r.wins, streak: r.streak, best_streak: r.best_streak, s2: r.s2 || R.view?.s2, tr: r.tr || R.view?.tr };
+  R.view = { ...R.view, left: r.left, tickets: r.tickets, wins: r.wins, streak: r.streak, best_streak: r.best_streak, s2: r.s2 || R.view?.s2, tr: r.tr || R.view?.tr, deco: r.deco || R.view?.deco };
+  r.deco = soloDeco(r); // V13.235 내 경기장 · 링 · 입장 효과 · 승리 포즈(+ 친구 팀 주인의 입장 효과)
   await vs(r);
   if (R) play(r);
 }
 
 /* ---------- VS ---------- */
 async function vs(r) {
-  setBg(['plaza', 'forest', 'night'][r.seed % 3]);
+  setBg(decoBgOf(r)); // V13.235 고른 경기장(무작위면 예전처럼 seed % 3)
   if (r.multi) return vsMulti(r);
   const side = (who, name, team) => `<div class="ar-vs-side ${who}"><b>${esc(name)}</b><div>${team.map((f, n) => `<span style="--i:${n}">${petImg(f.key, f.form)}<small>Lv.${f.level}</small>${elTag(f.el)}</span>`).join('')}</div></div>`;
   main(`<section class="ar-vs" id="ar-vs"><div class="ar-vs-bg"></div><div class="ar-vs-art"></div>
@@ -400,6 +416,7 @@ function play(r) {
   Object.assign(R, { inputs: [], queue: [], dir: 0, sentDir: 0, holdAtk: false, keyDown: new Set(), playing: true, paused: false, pausedMs: 0, started: false });
   app()?.classList.add('playing');
   main(field()); artGuard();
+  decoMount(R); // V13.235 링 모양 · 입장 효과
   R.slots = null; R.skillsOn = true;
   preloadPoses();
   applyLite();
@@ -1147,9 +1164,11 @@ async function end() {
   R.playing = false; R.holdAtk = false; R.drag = null; hideAim();
   cancelAnimationFrame(R.raf);
   place(1);
+  if (R.live?.practice) return R.live.done(); // V13.235 연습장: 승패 · 기록 없이 연습 결과만
   const local = R.sim.S.winner;
   // 마지막 한 방이면 0.6초 느리게 보여 준 뒤 배너.
   if (R.finale && !reduced()) { await wait(650); if (!R) return; }
+  if (local === 'me') decoWin(R); // V13.235 승리 포즈
   banner(local === 'me' ? (R.multi ? (R.r.mode === '2v2' ? '팀 승리!' : '1등!') : '승리!') : local === 'draw' ? '무승부' : '패배…', local === 'me' ? 'me win' : 'foe');
   sfx(local === 'me' ? 'fanfare-epic' : 'fail');
   await wait(1400);
@@ -1163,7 +1182,7 @@ async function end() {
   if (!R.live) keepReplay(R.A, { solo: true, side: 'me', seed: R.r.seed, foeLevel: R.r.foe_level, teams: { me: R.r.me.map(f => ({ key: f.key, form: f.form, level: f.level, s2: f.s2 ? 1 : 0 })), foe: R.r.foe.team.map(f => ({ key: f.key, form: f.form, level: f.level, s2: f.s2 ? 1 : 0 })) }, names: { me: '나', foe: R.r.foe.name }, inputs: { me: R.inputs, foe: [] }, result: local === 'me' ? 'win' : local === 'draw' ? 'draw' : 'lose' });
   if (res?.stats) Object.assign(R.A.data.stats, res.stats);
   if (typeof res?.points_balance === 'number') R.A.data.stats.points_balance = res.points_balance;
-  R.view = { ...R.view, left: res?.left ?? R.view?.left, tickets: res?.tickets ?? R.view?.tickets, wins: res?.wins ?? R.view?.wins, streak: res?.streak ?? R.view?.streak, best_streak: res?.best_streak ?? R.view?.best_streak };
+  R.view = { ...R.view, left: res?.left ?? R.view?.left, tickets: res?.tickets ?? R.view?.tickets, wins: res?.wins ?? R.view?.wins, streak: res?.streak ?? R.view?.streak, best_streak: res?.best_streak ?? R.view?.best_streak, deco: res?.deco ?? R.view?.deco };
   R.A.data.rewards ||= {}; R.A.data.rewards.arena = R.view;
   result(local, res);
 }
