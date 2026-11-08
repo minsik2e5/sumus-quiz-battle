@@ -55,7 +55,7 @@ import { TIMING } from '../public/modules/timing-rules.js';
 import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './games.mjs';
 import { wallStart, wallFinish, wallView, wallLine } from './wall.mjs';
 import { ARENA } from '../public/modules/arena-rules.js';
-import { arenaStart, arenaFinish, arenaView, arenaLine, arenaPoolFor, arenaPoolPut, grantArenaTicket } from './arena.mjs';
+import { arenaStart, arenaFinish, arenaView, arenaLine, arenaPoolFor, arenaPoolPut, grantArenaTicket, arenaLiveFriends, arenaLiveCreate, arenaLiveJoin, arenaLiveInviteFor, arenaLiveDecline, arenaLiveCurrent, newArenaCode, settleArenaLive, arenaLivePending, undoArenaLive, arenaLiveLine, arenaLiveReceipts } from './arena.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
 import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, partyPlaysLeft, settleParty, partyReportPending, undoParty } from './party.mjs';
 import { PARTY } from './party-engine.mjs';
@@ -848,6 +848,16 @@ function hatchEgg(state, p, { epic, season, missing, price }) {
 }
 // 선생님 TV가 쓰는 것(입장표 포함: 선생님만 받는다).
 const partyHostView = x => ({ id: x.id, code: x.code, kind: x.kind, minutes: x.minutes, steal: x.steal, teams: !!x.teams, class_name: x.class_name, label: x.label || x.class_name, tv_ticket: x.tv_ticket, created_at: x.created_at });
+// V13.230 펫 아레나 친구 대전: 방이 보낸 끝 보고(cloudflare/worker.mjs /api/internal/arena-result). 같은 판은 한 번만 정산.
+const arenaWho = state => x => ({ school_id: schoolForProfile(state, x)?.id || '', grade: gradeOf(x.class_name) });
+export function settleArenaReport(state, body) {
+  const out = settleArenaLive(state, body, { profileOf: pid => state.profiles.find(x => x.id === pid), who: arenaWho(state), petKey: pid => activePetKey(state, pid),
+    log: (p, res) => logActivity(p, 'arena', arenaLiveLine(res, res.foe_name), Date.now()) });
+  if (!out?.results) return out;
+  for (const [pid, res] of Object.entries(out.results)) { const p = state.profiles.find(x => x.id === pid); if (p) res.points_balance = coinBalance(state, p); }
+  return out;
+}
+export { arenaLivePending, undoArenaLive, arenaLiveReceipts };
 // 방이 보낸 결과(cloudflare/worker.mjs /api/internal/party-result).
 export function settlePartyReport(state, body) { return settleParty(state, body, { petKey: pid => activePetKey(state, pid) }); }
 export { partyReportPending, undoParty };
@@ -1360,7 +1370,7 @@ export async function service(state, method, path, body, token, options = {}) {
       assignment_id: activePractice.assignment_id || null,
       daily_quest: !!activePractice.daily_quest
     } : null;
-    return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes, ...dailyQuestProgress(sessions, activePractice, dailyQuest.target) } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
+    return { profile, divisions: teacher ? ['middle','high'] : [selectedDivision], schools, books, stats: stats(state, p, sessions), mastery: state.mastery[p.id] || {}, word_mastery: wordMastery, daily_quest: dailyQuest ? { target: dailyQuest.target, mix: dailyQuest.mix, range_codes: dailyQuest.range_codes, ...dailyQuestProgress(sessions, activePractice, dailyQuest.target) } : null, battle_invite: p.role === 'student' ? battleInviteFor(state, p, Date.now()) : null, arena_invite: p.role === 'student' ? arenaLiveInviteFor(state, p, Date.now()) : null, grammar_progress: grammarProgress, meaning_aliases: teacher ? state.meaningAliases : {}, meaning_alias_meta: teacher ? state.meaningAliasMeta : {}, meaning_disputes: meaningDisputes,
       // V13.215 선생님: 학생 목록은 화면이 쓰는 칸만, 연습 기록은 오늘 것 + 최근 실전시험 6개만(server/teacher-home.mjs).
       // 학생별 이번 주 · 지난주 · 마지막 학습은 session_digest, 전체 기록은 결과 분석 탭의 GET /teacher/records.
       profiles: teacher ? studentProfiles.map(s => ({ ...teacherStudentRow(s, stats(state, s, sessionsByStudent.get(s.id) || [], battlesByStudent)), active_at: lastActiveAt(s) })) : [],
@@ -1992,6 +2002,37 @@ export async function service(state, method, path, body, token, options = {}) {
     if (!result.again && result.reason !== 'short') logActivity(p, 'arena', arenaLine(result), now);
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
+  // V13.230 펫 아레나 실시간 1:1(server/arena.mjs · cloudflare/arena-room.mjs). 같은 학교 · 같은 학년 친구끼리.
+  //   렉 방지: 판 도중 조작은 방 객체만 오간다. 메인은 방 만들기 · 들어가기 · 끝 보고(내부)만. 친구 목록은 GET.
+  if (path === '/games/arena/live/friends' && method === 'GET') {
+    requireRole(p, 'student');
+    return { friends: arenaLiveFriends(state, p, arenaWho(state), Date.now()), current: arenaLiveCurrent(state, p) };
+  }
+  if (path === '/games/arena/live/current' && method === 'GET') {
+    requireRole(p, 'student');
+    return { room: arenaLiveCurrent(state, p) };
+  }
+  if (path === '/games/arena/live/create' && method === 'POST') {
+    requireRole(p, 'student');
+    if (p.preview_owner_id) fail('미리보기 계정은 친구 대전을 할 수 없어요.', 409);
+    if (!schoolForProfile(state, p)) fail('학생 학교 설정을 확인해주세요.', 409);
+    const now = Date.now(), friendId = str(body.friend_id, 64);
+    const friend = friendId ? state.profiles.find(x => x.id === friendId && x.role === 'student' && x.active !== false && !x.preview_owner_id) : null;
+    if (friendId && !friend) fail('초대할 친구를 찾지 못했어요.', 404);
+    const out = arenaLiveCreate(state, p, { who: arenaWho(state), pets: petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), friend, roomId: id(), code: newArenaCode(state), now });
+    return { room: out.room, _arena: [...out.closing, out.message] };
+  }
+  if (path === '/games/arena/live/join' && method === 'POST') {
+    requireRole(p, 'student');
+    if (p.preview_owner_id) fail('미리보기 계정은 친구 대전을 할 수 없어요.', 409);
+    const out = arenaLiveJoin(state, p, { who: arenaWho(state), pets: petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), code: str(body.code, 8).replace(/\D/g, ''), id: str(body.id, 64), now: Date.now() });
+    return { room: out.room, _arena: [out.message] };
+  }
+  if (path === '/games/arena/live/decline' && method === 'POST') {
+    requireRole(p, 'student');
+    arenaLiveDecline(state, p, str(body.id, 64));
+    return { ok: true };
+  }
   if (path === '/games/match/board' && method === 'GET') {
     requireRole(p, 'student');
     // V13.152 범위(all · school · class)와 기간(week · all). 처음은 전체 학생 · 이번 주.
@@ -2471,7 +2512,8 @@ export async function service(state, method, path, body, token, options = {}) {
   }
   if (path === '/battle/invite' && method === 'GET') {
     requireRole(p, 'student');
-    return { invite: battleInviteFor(state, p, Date.now()) };
+    // V13.230 친구 대전(펫 아레나) 초대도 같은 20초 확인에 싣는다(새 자동 새로고침을 만들지 않는다).
+    return { invite: battleInviteFor(state, p, Date.now()), arena_invite: arenaLiveInviteFor(state, p, Date.now()) };
   }
   if (path === '/battle/invite/decline' && method === 'POST') {
     requireRole(p, 'student');

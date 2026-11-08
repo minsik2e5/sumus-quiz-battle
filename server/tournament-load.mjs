@@ -8,7 +8,9 @@
 // 여기 숫자는 이 컴퓨터의 Node 값이라 Cloudflare와 같지 않다. 바꾸기 전과 후를 같은 조건에서 비교하는 데 쓴다.
 import { performance } from 'node:perf_hooks';
 import { hashToken } from './auth.mjs';
-import { service, settleBattle } from './service.mjs';
+import { service, settleBattle, settleArenaReport } from './service.mjs';
+import { liveMatch } from './arena-live-sim.mjs';
+import { liveReport } from './arena-live.mjs';
 import * as coord from './mutation-coordinator.mjs';
 import { createLocalRepository } from '../cloudflare/local-first.mjs';
 import { createStorageMock } from './storage-mock.mjs';
@@ -112,6 +114,19 @@ export async function runTournamentLoad({ level = 'ok', seconds = 20, others = 8
       v = res?.prefetched_next || null;
     }
   };
+  // V13.230 펫 아레나 친구 대전(실시간 1:1): 메인에는 방 만들기 · 들어가기 · 끝 보고만 온다(판 도중 조작은 방 객체).
+  //   친구 4쌍이 대회 중에 한 판씩. 끝 보고는 두 조작 기록으로 runArena를 다시 돌린다(메인에서 가장 무거운 부분).
+  const report = liveReport(liveMatch({ seed: 5 }).r);
+  const friendMatch = async (a, b) => {
+    await sleep(Math.random() * 4000);
+    const made = await timed('친구 대전 방 만들기', () => call(a, 'POST', '/games/arena/live/create', { friend_id: b }));
+    if (!made?.room) return;
+    await sleep(800 + Math.random() * 1500);
+    const joined = await timed('친구 대전 들어가기', () => call(b, 'POST', '/games/arena/live/join', { id: made.room.id }));
+    if (!joined?.room) return;
+    await sleep(seconds * 400 + Math.random() * seconds * 200);
+    await timed('친구 대전 끝 보고', () => c.durable(s => settleArenaReport(s, { ...report, id: made.room.id, players: [a, b] }) || coordinator.NO_MUTATION));
+  };
   const teacher = async () => { while (live()) { await sleep(8000); await timed('선생님 대진표(GET)', () => call('tl-teacher', 'GET', `/teacher/tournaments/${tid}`)); } };
   const t = c.current().state.tournaments.find(x => x.id === tid);
   const t0 = performance.now();
@@ -120,6 +135,7 @@ export async function runTournamentLoad({ level = 'ok', seconds = 20, others = 8
     ...players.map(gamer), ...players.map(inviter),
     ...Array.from({ length: extraGamers }, (_, i) => gamer(`sl-${40 + i}`)),
     ...Array.from({ length: others }, (_, i) => practice(`sl-${32 + i}`)),
+    ...Array.from({ length: 4 }, (_, i) => friendMatch(`sl-${32 + i * 2}`, `sl-${33 + i * 2}`)),
     teacher()
   ]);
   await c.flush();

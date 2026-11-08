@@ -11,7 +11,7 @@ export const STATE_BUDGET_KB = {
   // 않게 10MB. 요약은 계속 쌓이므로(하루 약 70KB) 넘으면 요약 보관도 검토한다. 얼려 같이 쓴다(복사 안 함).
   sessions: 10000,
   mastery: 6000,            // 학생별 숙련도: 학생 묶음째 얼려 같이 쓴다(요청한 학생 것만 복사).
-  profiles: 1500,           // 학생 프로필(펫 · 칭호 · 놀이터 기록): 활동 기록 · 본 칭호 등은 개수 상한을 둔다. V13.229 아레나 스킬 ② 고르기(games.arena.s2): 내 펫만 · 40개 상한(약 0.6KB).
+  profiles: 1500,           // 학생 프로필(펫 · 칭호 · 놀이터 기록): 활동 기록 · 본 칭호 등은 개수 상한을 둔다. V13.229 아레나 스킬 ② 고르기(games.arena.s2): 내 펫만 · 40개 상한(약 0.6KB). V13.230 친구 대전 games.arena.live_room(1개 · 15분) · pairs(오늘 것만 · 10줄 · 약 0.4KB).
   meaningDisputes: 800,     // 이의 신청: 처리 끝난 것은 정리 대상.
   practices: 600,           // 진행 중 연습(끝난 것은 10분 뒤 지움).
   battles: 500,             // 야차전 방 기록(정리: 취소 1주).
@@ -34,6 +34,7 @@ export const STATE_BUDGET_KB = {
   clawNews: 30,             // 인형뽑기 반 소식: 개수 상한.
   timingDaily: 30,          // 10초 맞추기 오늘의 챌린지.
   arenaTeams: 120,          // V13.225 펫 아레나 친구 팀: 반마다 최근 20팀 · 전체 600팀 · 30일 지나면 뺀다(한 팀 약 0.12KB).
+  arenaInvites: 20,         // V13.230 펫 아레나 친구 대전 열린 방(방 번호 → 방 · 입장표): 15분 지나면 지우고 최대 200개(한 방 약 0.25KB). 판 도중 조작은 방 객체(ArenaRoom)에만 있다.
   signupCodes: 20,
   storageAutoTrim: 10,
   sessionArchive: 2,        // V13.216 옮기기 기록(마지막 차례 · 합계만).

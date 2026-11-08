@@ -33,6 +33,10 @@
       {
         "name": "PARTY_ROOM",
         "class_name": "PartyRoom"
+      },
+      {
+        "name": "ARENA_ROOM",
+        "class_name": "ArenaRoom"
       }
     ]
   },
@@ -59,6 +63,12 @@
       "tag": "v4",
       "new_sqlite_classes": [
         "PartyRoom"
+      ]
+    },
+    {
+      "tag": "v5",
+      "new_sqlite_classes": [
+        "ArenaRoom"
       ]
     }
   ],
@@ -93,7 +103,8 @@
           { "name": "VOCA_STATE", "class_name": "VocaStateObject" },
           { "name": "BATTLE_ROOM", "class_name": "BattleRoom" },
           { "name": "DUNGEON_ROOM", "class_name": "DungeonRoom" },
-          { "name": "PARTY_ROOM", "class_name": "PartyRoom" }
+          { "name": "PARTY_ROOM", "class_name": "PartyRoom" },
+          { "name": "ARENA_ROOM", "class_name": "ArenaRoom" }
         ]
       }
     }

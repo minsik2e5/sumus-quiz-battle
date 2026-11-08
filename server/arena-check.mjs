@@ -10,6 +10,7 @@ import { PET_SKILLS } from '../public/modules/battle-engine.js';
 import { arenaStart, arenaFinish, arenaView, pickTeam, pickFoe, foeLevelOf, arenaLine, grantArenaTicket, arenaPoolFor, arenaPoolPut, ARENA_POOL, S2_MAX } from './arena.mjs';
 import { ACTIVITY_MODES } from './activity.mjs';
 import { STATE_BUDGET_KB } from './perf-budget.mjs';
+import { runArenaLiveChecks } from './arena-live-check.mjs';
 
 const source = path => readFileSync(fileURLToPath(new URL(path, import.meta.url)), 'utf8');
 const fails = (fn, word) => { try { fn(); return false; } catch (err) { return !word || String(err.message).includes(word); } };
@@ -398,4 +399,6 @@ export async function runArenaChecks(assert) {
       && codex.includes('SUMUS 펫 아레나 66 (Runner용)') && codex.includes('REFERENCE IMAGES ARE ATTACHED') && codex.includes('PR까지만') && codex.includes('arena/bg-plaza.webp') && source(`${dir}README.md`).includes('펫 아레나 스킬 연출(66)'),
       'V13.229 그림 66 주문서: 시트 7장 · 그림 19장, 시트마다 Drive 65번 아레나 그림을 열어 그림체를 맞추고 "SUMUS 펫 아레나 66 (Runner용)"에 정확한 이름으로 저장, Codex 지시문은 저장소 그림 참고');
   }
+  // 13) V13.230 실시간 1:1 친구 대전(③단계): 두 학생 조작 기록으로 서버가 다시 돌린 결과 = 두 화면 · 끊김 · 시간 초과 · 같은 학년만 · 농사 막기.
+  await runArenaLiveChecks(assert);
 }

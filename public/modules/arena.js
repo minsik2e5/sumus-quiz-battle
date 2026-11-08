@@ -7,6 +7,7 @@ import { coinShower, countUp } from './celebrate.js';
 import { ELEMENTS, fxImpact, fxPunch, fxSpeedLines, fxRecoil, fxLite } from './battle-fx.js';
 import { ARENA, BEATS, INPUT, ROLE, DIR16, SK2, ZONES_MAX, createArena, fighter, dirCode, aimCode, skill2Picks } from './arena-rules.js';
 import { ARENA_ART } from './arena-art.js';
+import { LIVE, LiveSim, replaySim } from './arena-live.js';
 
 // V13.225 펫 아레나 2(놀이터): 전체 화면. 위에서 비스듬히 내려다보는 경기장에서 내 펫을 직접 조종해 상대 펫과 싸운다.
 //   왼쪽 아래 조이스틱으로 움직이고, 오른쪽 버튼: 공격(누르고 있으면 계속) · 스킬 1 · 스킬 2(펫마다 다르다) · 필살기(게이지) · 회피 · 교체.
@@ -26,6 +27,9 @@ import { ARENA_ART } from './arena-art.js';
 //   렉 예산(구성안 4장): 효과 조각 한 번에 40개(저사양 20) · 스킬 하나 8개(저사양 4) · 장판 칸 4개 · 줄기 칸 2개 · 부채꼴 칸 2개 ·
 //   분신 칸 2개를 미리 만들어 다시 쓴다. 줄기 · 부채꼴 · 장판은 transform(scale)만, 움직임은 transform · opacity만, 빛 번짐 필터는
 //   스킬 · 필살기 칸만(저사양 끔). 그림 66(public/assets/arena/fx-*.webp)이 오면 ARENA_ART로 같은 칸이 그림으로 바뀐다.
+// V13.230 (2탄 ③단계) 실시간 1:1 친구 대전(arena-live.js · cloudflare/arena-room.mjs): 같은 학년 친구 초대 · 방 번호 4자리 · 대기실(팀 · 스킬 ② ·
+//   조준 · 준비) · 입력만 주고받고 각 폰이 같은 전투를 돌린다(롤백). 친구 화면은 위아래를 뒤집어 늘 내 펫이 아래. 끊기면 3초 뒤 컴퓨터가 대신 조종하고
+//   다시 들어오면 이어서. 이모트 8개(1.5초에 1번) · 신호 막대 · 다시 보기(혼자 판도). 판 도중 조작은 메인 서버를 거치지 않는다(렉 방지 규칙 6).
 // 그림: 주문서 65(public/assets/arena/) 경기장 · VS · 승패 배너 · 필살기 아이콘 · 쓰러짐 별. 경기장 그림이 없으면 지금 있는 전투 광장(battle/bg-arena), 작은 그림이 없으면 그 자리를 비운다.
 
 const BG = { plaza: ['arena/bg-plaza', 'battle/bg-arena'], forest: ['arena/bg-forest', 'battle/bg-forest'], night: ['arena/bg-night', 'battle/bg-boss'] };
@@ -67,7 +71,7 @@ const save = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } cat
 // 싸울 수 있는 내 펫(알이 아닌 펫): 레벨 순.
 const readyPets = A => (A.data.stats?.pets || []).filter(x => Number(x.form) >= 1).sort((a, b) => b.level - a.level || (b.active ? 1 : 0) - (a.active ? 1 : 0));
 
-export function openArena(A, exit) {
+export function openArena(A, exit, opts = {}) {
   closeAll();
   R = { A, exit, timers: [], view: A.data.rewards?.arena || null };
   A.screen = 'arena';
@@ -90,6 +94,8 @@ export function openArena(A, exit) {
   document.addEventListener('visibilitychange', R.vis);
   window.scrollTo(0, 0);
   preloadSound(['tm-count', 'tm-go', 'hit', 'hit-star', 'hit-leaf', 'hit-wind', 'atk-star', 'atk-leaf', 'atk-wind', 'skill', 'ult-riser', 'ult-impact', 'faint', 'combo', 'crit', 'fanfare-epic', 'fail', 'coins', 'smash', 'swoosh', 'tap']);
+  // 홈 화면 초대에서 '받기'를 누르고 왔으면 바로 친구 방으로.
+  if (opts.join) return liveJoin({ id: opts.join.id });
   lobby();
 }
 function setBg(name) {
@@ -111,6 +117,7 @@ function closeAll() {
   if (R.keysUp) document.removeEventListener('keyup', R.keysUp);
   if (R.vis) document.removeEventListener('visibilitychange', R.vis);
   if (R.resize) window.removeEventListener('resize', R.resize);
+  liveClose();
 }
 async function leave() {
   const exit = R?.exit;
@@ -128,13 +135,27 @@ function onClick(event) {
   if (!b || b.disabled || !R) return;
   unlockSound();
   const act = b.dataset.ar;
-  if (act === 'exit') return R.playing ? confirmQuit() : leave();
-  if (act === 'pet') return togglePet(b.dataset.key);
-  if (act === 'pick2') { R.picks[b.dataset.key] = Number(b.dataset.i) === 1 ? 1 : 0; save(PICK_KEY(), R.picks); sfx('tap'); return lobby(false, true); }
-  if (act === 'aim') { R.aim = b.dataset.aim; save(AIM_KEY, R.aim); sfx('tap'); return lobby(false, true); }
+  if (act === 'exit') return R.playing && !R.replay ? confirmQuit() : R.replay ? stopReplay() : inLiveLobby() ? liveLeave() : leave();
+  const live = inLiveLobby();
+  if (act === 'pet') return live ? liveTogglePet(b.dataset.key) : togglePet(b.dataset.key);
+  if (act === 'pick2') { const v = Number(b.dataset.i) === 1 ? 1 : 0; sfx('tap'); if (live) return liveSet({ s2: { [b.dataset.key]: v } }); R.picks[b.dataset.key] = v; save(PICK_KEY(), R.picks); return lobby(false, true); }
+  if (act === 'aim') { R.aim = b.dataset.aim; save(AIM_KEY, R.aim); sfx('tap'); return live ? liveSet({ aim: R.aim }) : lobby(false, true); }
   if (act === 'start') return start(b);
-  if (act === 'again') return lobby(true);
-  if (act === 'quit-yes') return leave();
+  if (act === 'again') { if (!R.live?.done) return lobby(true); const id = R.live.go?.ids?.[1 - R.live.side]; buttonBusy(b); return id ? liveCreate(id, b) : liveMenu(); }
+  if (act === 'live') { sfx('tap'); return liveMenu(); }
+  if (act === 'live-room') { buttonBusy(b); return liveCreate(null, b); }
+  if (act === 'live-invite') { buttonBusy(b); return liveCreate(b.dataset.id, b); }
+  if (act === 'live-code') { const v = ($('ar-code')?.value || '').replace(/\D/g, ''); if (v.length !== 4) return toast('방 번호 4자리를 넣어 주세요.'); buttonBusy(b); return liveJoin({ code: v }, b); }
+  if (act === 'live-rejoin') { buttonBusy(b); return liveRejoin(b); }
+  if (act === 'live-accept') { buttonBusy(b); return liveJoin({ id: b.dataset.id }, b); }
+  if (act === 'live-ready') { sfx('tap'); return liveSet({ ready: b.dataset.on !== '1' }); }
+  if (act === 'live-start') { sfx('tap'); return liveSend({ type: 'start' }); }
+  if (act === 'back-lobby') { liveClose(); return lobby(false, true); }
+  if (act === 'emote') { $('ar-emo-tray')?.classList.toggle('on'); return; }
+  if (act === 'emote-i') { $('ar-emo-tray')?.classList.remove('on'); return sendEmote(Number(b.dataset.i)); }
+  if (act === 'replay') return startReplay();
+  if (act === 'replay-speed') { if (R.replay) { R.replay.speed = R.replay.speed === 1 ? 2 : 1; b.textContent = `${R.replay.speed}배`; } return; }
+  if (act === 'quit-yes') { if (R.live) R.live.quit = true; return leave(); }
   if (act === 'quit-no') { document.querySelector('.ar-quit')?.remove(); resume(); return; }
 }
 const KEY_DIR = { ArrowUp: [0, -1], KeyW: [0, -1], ArrowDown: [0, 1], KeyS: [0, 1], ArrowLeft: [-1, 0], KeyA: [-1, 0], ArrowRight: [1, 0], KeyD: [1, 0] };
@@ -172,7 +193,7 @@ function confirmQuit() {
   pause();
   const box = document.createElement('div');
   box.className = 'ar-quit';
-  box.innerHTML = '<div><b>그만할까요?</b><p>이번 대전은 기록되지 않아요.</p><button type="button" class="btn" data-ar="quit-no">계속하기</button><button type="button" class="btn primary" data-ar="quit-yes">그만하기</button></div>';
+  box.innerHTML = `<div><b>그만할까요?</b><p>${R.live ? '나가면 남은 시간은 컴퓨터가 대신 싸워요. 절반 넘게 대신 싸우면 보상이 없어요.' : '이번 대전은 기록되지 않아요.'}</p><button type="button" class="btn" data-ar="quit-no">계속하기</button><button type="button" class="btn primary" data-ar="quit-yes">그만하기</button></div>`;
   app()?.appendChild(box);
 }
 
@@ -202,6 +223,7 @@ function lobby(again = false, keep = false) {
   const slot = n => { const key = R.team[n], p = pets.find(x => x.key === key); return p ? `<span class="ar-slot on"><b>${n + 1}</b>${petImg(p.key, p.form)}<div><small>${esc(p.name || petName(p.key))} · Lv.${p.level}</small>${skillLine(p.key, p.form, p.level)}</div></span>` : `<span class="ar-slot"><b>${n + 1}</b><i>?</i><div><small>비어 있음</small></div></span>`; };
   main(`<section class="ar-lobby${again ? ' again' : ''}${keep ? ' keep' : ''}">
     <div class="ar-title"><small>3 대 3 펫 대전</small><h1>펫 아레나</h1></div>
+    ${liveEntry()}
     <div class="ar-card">
       <ul class="ar-rules">
         <li><b>🕹️</b><span>왼쪽 <em>조이스틱</em>으로 움직이면 그쪽을 바라봐요. <em>공격</em>은 바라보는 쪽으로!</span></li>
@@ -234,18 +256,250 @@ async function start(button) {
   if (R) play(r);
 }
 
+/* ---------- V13.230 친구 대전(실시간 1:1) ---------- */
+// 혼자 대전 대기실 위의 입구: 진행 중인 방 · 온 초대 · 친구 대전 열기.
+function liveEntry() {
+  const inv = R.A.data.arena_invite && R.A.data.arena_invite.expires_at > Date.now() ? R.A.data.arena_invite : null;
+  return `<div class="ar-live-entry">
+    ${R.view?.live_room ? '<button type="button" class="yl-cta ar-go live" data-ar="live-rejoin">진행 중인 친구 대전으로 돌아가기</button>' : ''}
+    ${inv ? `<div class="ar-invite"><b>⚔️ ${esc(inv.host)}의 친구 대전 초대!</b><button type="button" class="btn primary" data-ar="live-accept" data-id="${esc(inv.id)}">받기</button></div>` : ''}
+    <button type="button" class="ar-live-btn" data-ar="live"><i aria-hidden="true">⚔️</i><span><b>친구와 실시간 대전</b><small>같은 학년 친구 · 1 대 1 · 방 번호로도 들어가요</small></span><em>${num(R.view?.live_wins || 0)}승</em></button>
+  </div>`;
+}
+const inLiveLobby = () => !!R?.live && !R.playing && !R.live.go && R.live.view?.phase === 'lobby';
+async function liveMenu() {
+  liveClose();
+  R.playing = false; R.replay = null;
+  app()?.classList.remove('playing', 'ar-replaying');
+  setBg('night');
+  const pairs = R.view?.pairs || {};
+  main(`<section class="ar-lobby ar-live-menu keep">
+    <div class="ar-title"><small>같은 학년 친구와 1 대 1</small><h1>친구 대전</h1></div>
+    <div class="ar-card">
+      <ul class="ar-rules">
+        <li><b>📱</b><span>친구 폰과 <em>실시간</em>으로 싸워요. 내 펫은 늘 아래, 친구 펫은 위!</span></li>
+        <li><b>🏫</b><span><em>같은 학교 · 같은 학년</em> 친구만 초대하고 들어올 수 있어요(반은 달라도 돼요)</span></li>
+        <li><b>🪙</b><span>코인은 혼자 대전과 같아요(하루 ${ARENA.DAILY}판 · 입장권). <em>같은 친구와는 하루 2판</em>까지 코인, 그다음은 연습 판</span></li>
+      </ul>
+      <h3 class="ar-sub">방 번호로 들어가기</h3>
+      <div class="ar-code-row"><input id="ar-code" class="ar-code-in" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off" placeholder="0000" aria-label="방 번호 4자리"><button type="button" class="btn primary" data-ar="live-code">들어가기</button></div>
+      <button type="button" class="yl-cta ar-go" data-ar="live-room">방 만들고 번호 알려 주기</button>
+      <h3 class="ar-sub">친구 초대 <small>같은 학교 · 같은 학년</small></h3>
+      <div class="ar-friends" id="ar-friends"><p class="ar-why">친구 목록을 불러오는 중…</p></div>
+      <button type="button" class="btn full" data-ar="back-lobby">혼자 대전으로</button>
+    </div>
+  </section>`);
+  let out;
+  try { out = await api('/games/arena/live/friends'); } catch (err) { const el = $('ar-friends'); if (el) el.innerHTML = `<p class="ar-why">${esc(err.message || '친구 목록을 불러오지 못했어요.')}</p>`; return; }
+  const el = $('ar-friends'); if (!el || !R) return;
+  if (out.current) el.insertAdjacentHTML('beforebegin', '<button type="button" class="yl-cta ar-go live" data-ar="live-rejoin">진행 중인 친구 대전으로 돌아가기</button>');
+  el.innerHTML = out.friends.length ? out.friends.map(f => `<button type="button" class="ar-friend" data-ar="live-invite" data-id="${esc(f.id)}" ${f.busy ? 'disabled' : ''}><b>${esc(f.name)}</b><small>${esc(f.class_name)}${pairs[f.id] ? ` · 오늘 코인 판 ${Math.min(2, pairs[f.id])}/2` : ''}</small><em>${f.busy ? '대전 중' : '초대'}</em></button>`).join('')
+    : '<p class="ar-why">초대할 수 있는 같은 학년 친구가 아직 없어요. 방 번호로 불러 보세요!</p>';
+}
+async function liveCreate(friendId, button) {
+  let out;
+  try { out = await api('/games/arena/live/create', friendId ? { friend_id: friendId } : {}); }
+  catch (err) { if (R) { buttonBusy(button, false); toast(err.message || '방을 만들지 못했어요.'); } return; }
+  if (R) liveConnect(out.room);
+}
+async function liveJoin(q, button) {
+  let out;
+  try { out = await api('/games/arena/live/join', q); }
+  catch (err) { if (!R) return; if (button) buttonBusy(button, false); toast(err.message || '방에 들어가지 못했어요.'); if (!button) lobby(); return; }
+  if (R) { R.A.data.arena_invite = null; liveConnect(out.room); }
+}
+async function liveRejoin(button) {
+  let out;
+  try { out = await api('/games/arena/live/current'); } catch (err) { buttonBusy(button, false); return toast(err.message || '다시 들어가지 못했어요.'); }
+  if (!R) return;
+  if (!out.room) { if (R.view) R.view.live_room = null; toast('친구 대전이 끝났어요.'); return lobby(false, true); }
+  liveConnect(out.room);
+}
+// 방 소켓: 끊기면 0.5 · 1 · 2 · 4초 뒤 다시(8번까지). 다시 들어오면 방이 씨앗 + 확정 조작을 다시 준다.
+function liveConnect(room) {
+  liveClose();
+  R.live = { room, side: room.host ? 0 : 1, offset: 0, rtt: 0, ai: [false, false], res: null, alive: true, tries: 0, next: 1, emoteAt: 0 };
+  main('<div class="ar-saving">친구 대전 방에 들어가는 중…</div>');
+  openSocket();
+  const L = R.live;
+  L.timer = setInterval(() => liveTick(L), LIVE.SEND_MS);
+}
+function openSocket() {
+  const L = R?.live; if (!L?.alive) return;
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  let ws;
+  try { ws = new WebSocket(`${proto}://${location.host}/api/arena/ws/${encodeURIComponent(L.room.id)}?ticket=${encodeURIComponent(L.room.ticket)}`); } catch { return; }
+  L.ws = ws;
+  ws.onopen = () => { L.tries = 0; L.next = L.sim?.pending[0]?.[0] || (L.sim ? L.sim.seq + 1 : 1); L.lastMsg = Date.now(); drawNet(); };
+  ws.onmessage = ev => { if (R?.live !== L) return; let m; try { m = JSON.parse(ev.data); } catch { return; } L.lastMsg = Date.now(); onLive(L, m); };
+  ws.onclose = ev => {
+    if (R?.live !== L || !L.alive || L.ws !== ws) return;
+    L.ws = null; drawNet();
+    if (ev.code === 1000 || ev.code === 4000) return;
+    if (L.tries >= 8) { if (!L.go) liveGone('친구 대전 방에 들어가지 못했어요. 방이 닫혔을 수 있어요.'); return; }
+    const t = setTimeout(openSocket, Math.min(4000, 500 * 2 ** L.tries++)); R.timers.push(t);
+  };
+}
+function liveClose() {
+  const L = R?.live; if (!L) return;
+  L.alive = false;
+  clearInterval(L.timer); clearInterval(L.invitePoll);
+  try { L.ws?.close(1000, 'bye'); } catch {}
+  R.live = null;
+}
+const liveSend = msg => { const ws = R?.live?.ws; if (ws?.readyState === 1) { try { ws.send(JSON.stringify(msg)); } catch {} return true; } return false; };
+function liveSet(patch) {
+  const L = R.live, me = L?.view?.seats?.[L.side]; if (!me) return;
+  // 바로 보이게 내 자리를 먼저 고치고(준비는 풀린다), 방이 확인해 다시 보낸다.
+  if (patch.team) { me.team = patch.team.map(k => { const p = me.pets.find(x => x[0] === k); return [k, p[1], p[2], me.s2[k] === 1 ? 1 : 0]; }); me.ready = false; }
+  if (patch.s2) { me.s2 = { ...me.s2, ...patch.s2 }; me.team = me.team.map(x => [x[0], x[1], x[2], me.s2[x[0]] === 1 ? 1 : 0]); me.ready = false; }
+  if (patch.aim) me.aim = patch.aim;
+  if (typeof patch.ready === 'boolean') me.ready = patch.ready;
+  liveSend({ type: 'set', ...patch });
+  liveLobby(true);
+}
+function liveTogglePet(key) {
+  const me = R.live.view.seats[R.live.side], team = me.team.map(x => x[0]), i = team.indexOf(key);
+  if (i >= 0) { if (team.length > 1) team.splice(i, 1); }
+  else if (team.length < ARENA.TEAM) team.push(key);
+  else { team.shift(); team.push(key); }
+  sfx('tap');
+  liveSet({ team });
+}
+function liveLeave() { liveSend({ type: 'leave' }); liveClose(); toast('친구 대전 방에서 나왔어요.'); liveMenu(); }
+function liveGone(text) { liveClose(); main(`<section class="ar-lobby keep"><div class="ar-card"><p class="ar-why">${esc(text)}</p><button type="button" class="yl-cta ar-go" data-ar="live">친구 대전으로</button><button type="button" class="btn full" data-ar="back-lobby">혼자 대전으로</button></div></section>`); }
+
+// 방이 보낸 것.
+function onLive(L, m) {
+  if (typeof m.now === 'number' && !L.rtt) L.offset = m.now - Date.now();
+  if (m.type === 'pong') { const rtt = Math.max(1, Date.now() - m.c); L.rtt = L.rtt ? Math.round(L.rtt * 0.7 + rtt * 0.3) : rtt; L.offset = m.now + rtt / 2 - Date.now(); return drawNet(); }
+  if (m.type === 'lobby') { L.view = m.view; if (m.view.phase === 'closed' && !L.go) return liveGone(m.view.reason === 'timeout' ? '5분 동안 시작하지 않아서 방이 닫혔어요.' : m.view.reason === 'replaced' ? '새 방을 만들어서 이 방은 닫혔어요.' : '방장이 방을 닫았어요.'); if (!L.go && m.view.phase === 'lobby') { liveLobby(!!L.shown); L.shown = true; } return; }
+  if (m.type === 'go') { if (!L.go) { L.go = m; liveStart(L); } return; }
+  if (m.type === 'full') { L.ai = m.ai || L.ai; if (L.sim) L.sim.full(m); else L.full = m; drawNet(); return; }
+  if (m.type === 'b') { if (!L.sim) return; L.sim.confirm(m); if (L.sim.bad) { L.sim.bad = false; liveSend({ type: 'sync' }); } return; }
+  if (m.type === 'net') { L.ai = m.ai; drawNet(); if (R.playing && m.ai[1 - L.side]) toastOnce('친구 연결이 끊겨서 컴퓨터가 대신 싸워요'); return; }
+  if (m.type === 'emote') return showEmote(m.side === L.side ? 'me' : 'foe', m.i);
+  if (m.type === 'end') { L.ended = m.result; if ('res' in m) L.res = m.res; if (L.sim && !L.sim.S.over) liveSend({ type: 'sync' }); return; }
+  if (m.type === 'done') { L.res = m.res; return; }
+  if (m.type === 'error') toast(m.error || '잠시 후 다시 해 주세요.');
+}
+// 0.1초마다: 확정 안 된 내 조작을 묶어 보내고, 1초마다 신호(왕복 시간 · 시계 맞추기).
+function liveTick(L) {
+  if (!L.alive) return;
+  const now = Date.now();
+  if (L.ws?.readyState === 1) {
+    if (L.sim) {
+      const list = L.sim.pending.filter(([seq]) => seq >= L.next).slice(0, LIVE.BATCH_MAX);
+      if (list.length) { liveSend({ type: 'in', s: list[0][0], l: list.map(([, x]) => x) }); L.next = list.at(-1)[0] + 1; }
+    }
+    if (now - (L.pingAt || 0) >= LIVE.PING_MS && !document.hidden) { L.pingAt = now; liveSend({ type: 'ping', c: now }); }
+  }
+  // 소식이 4초 넘게 없으면 연결을 새로 연다(폰이 잠깐 잠들었다 깬 경우).
+  if (L.go && L.ws && now - (L.lastMsg || now) > 4000) { try { L.ws.close(4001, 'stale'); } catch {} L.ws = null; openSocket(); }
+}
+function drawNet() {
+  const L = R?.live, el = $('ar-net'); if (!L || !el) return;
+  const cls = !L.ws || L.ws.readyState !== 1 ? 'off' : L.rtt > 400 ? 'bad' : L.rtt > 200 ? 'mid' : 'good';
+  if (el._c !== cls) { el._c = cls; el.className = `ar-net ${cls}`; el.title = cls === 'off' ? '연결 중…' : `신호 ${L.rtt}ms`; }
+  const note = $('ar-ai-note'), ai = L.ai[1 - L.side], mine = L.ai[L.side];
+  if (note) { const t = mine ? '연결이 끊겨 컴퓨터가 대신 싸우는 중… 다시 연결하고 있어요' : ai ? '친구 연결이 끊겨 컴퓨터가 대신 싸우는 중' : ''; if (note._t !== t) { note._t = t; note.textContent = t; note.classList.toggle('on', !!t); } }
+}
+// 대기실(방 안): 방 번호 · 두 자리 · 내 팀 고르기 · 스킬 ② · 조준 · 준비 · 시작.
+function liveLobby(keep = false) {
+  const L = R.live, v = L?.view; if (!v || R.playing) return;
+  const me = v.seats[v.side], fr = v.seats[1 - v.side];
+  const pets = (me.pets || []).map(([key, form, level]) => ({ key, form, level }));
+  R.team = me.team.map(x => x[0]); R.picks = { ...me.s2 }; R.aim = me.aim;
+  const left = Math.max(0, Math.ceil((v.expires_at - (Date.now() + L.offset)) / 60000));
+  const seat = (p, mine) => p ? `<div class="ar-seat${mine ? ' me' : ''}${p.ready ? ' ready' : ''}"><b>${esc(mine ? '나' : p.name)}${p.host ? ' <i>방장</i>' : ''}</b><span>${p.team.map(([key, form]) => petImg(key, form)).join('')}</span><em>${p.ready ? '준비 완료!' : '고르는 중…'}</em></div>`
+    : `<div class="ar-seat empty"><b>친구를 기다려요</b><span><i>?</i></span><em>방 번호 <strong>${esc(v.code)}</strong>를 알려 주세요</em></div>`;
+  const slot = n => { const key = R.team[n], p = pets.find(x => x.key === key); return p ? `<span class="ar-slot on"><b>${n + 1}</b>${petImg(p.key, p.form)}<div><small>${esc(petName(p.key))} · Lv.${p.level}</small>${skillLine(p.key, p.form, p.level)}</div></span>` : `<span class="ar-slot"><b>${n + 1}</b><i>?</i><div><small>비어 있음</small></div></span>`; };
+  const both = !!fr && me.ready && fr.ready;
+  main(`<section class="ar-lobby ar-live-lobby${keep ? ' keep' : ''}">
+    <div class="ar-title"><small>친구 대전 · 1 대 1 · ${left}분 안에 시작</small><h1>방 ${esc(v.code)}</h1></div>
+    <div class="ar-card">
+      <div class="ar-seats">${seat(me, true)}<i class="ar-seat-vs">VS</i>${seat(fr, false)}</div>
+      <div class="ar-emo-row" role="group" aria-label="이모트">${LIVE.EMOTES.map((e, i) => `<button type="button" data-ar="emote-i" data-i="${i}" aria-label="이모트 ${esc(e)}">${esc(e)}</button>`).join('')}</div>
+      <div class="ar-aimset" role="group" aria-label="조준 방식">${AIM_MODES.map(([k, n, d]) => `<button type="button" class="ar-aimopt${R.aim === k ? ' on' : ''}" data-ar="aim" data-aim="${k}" aria-pressed="${R.aim === k}"><b>${n}</b><small>${d}</small></button>`).join('')}</div>
+      <h3 class="ar-sub">내 팀 <small>순서대로 나가요 · 스킬 ②를 골라요</small></h3>
+      <div class="ar-slots">${[0, 1, 2].map(slot).join('')}</div>
+      <div class="ar-pets">${pets.map(p => `<button type="button" class="ar-pet-pick${R.team.includes(p.key) ? ' on' : ''}" data-ar="pet" data-key="${esc(p.key)}" aria-pressed="${R.team.includes(p.key)}">${petImg(p.key, p.form)}<small>Lv.${p.level}</small>${R.team.includes(p.key) ? `<b>${R.team.indexOf(p.key) + 1}</b>` : ''}</button>`).join('')}</div>
+      <button type="button" class="yl-cta ar-go${me.ready ? ' on' : ''}" data-ar="live-ready" data-on="${me.ready ? 1 : 0}">${me.ready ? '준비 완료! (누르면 취소)' : '준비'}</button>
+      ${me.host ? `<button type="button" class="yl-cta ar-go start" data-ar="live-start" ${both ? '' : 'disabled'}>${!fr ? '친구가 들어오면 시작할 수 있어요' : both ? '대전 시작!' : '둘 다 준비하면 시작'}</button>` : `<p class="ar-words">${both ? '방장이 곧 시작해요!' : '준비를 누르고 방장이 시작하길 기다려요'}</p>`}
+      <button type="button" class="btn full" data-ar="exit">방에서 나가기</button>
+    </div>
+  </section>`);
+}
+// 시작: 같은 전투(방장 = me 쪽)를 만들고, VS → 방 시계에 맞춘 카운트다운 → 판.
+async function liveStart(L) {
+  const g = L.go, fs = list => list.map(([key, form, level, s2]) => fighter({ key, form, level, s2 }));
+  L.side = g.side;
+  L.sim = new LiveSim({ seed: g.seed, a: fs(g.teams[0]), b: fs(g.teams[1]), side: g.side });
+  if (L.full) { L.sim.full(L.full); L.full = null; }
+  const mine = g.teams[g.side], theirs = g.teams[1 - g.side];
+  const brief = list => list.map(([key, form, level, s2]) => { const f = fighter({ key, form, level, s2 }); return { key, form, level, s2, el: f.el }; });
+  const r = { id: L.room.id, seed: g.seed, live: true, me: brief(mine), foe: { name: g.names[1 - g.side], bot: false, team: brief(theirs) }, foe_level: 1, coin_play: true };
+  const lead = g.start_at - (Date.now() + L.offset);
+  if (lead > 3400) await vs(r, lead - 3200);
+  if (!R || R.live !== L) return;
+  play(r, L);
+}
+
+/* ---------- 이모트 ---------- */
+function sendEmote(i) {
+  const L = R?.live; if (!L) return;
+  const now = Date.now();
+  if (now - L.emoteAt < LIVE.EMOTE_GAP_MS) return toastOnce('이모트는 잠깐 뒤에 다시');
+  L.emoteAt = now;
+  liveSend({ type: 'emote', i });
+}
+function showEmote(who, i) {
+  const text = LIVE.EMOTES[i]; if (!text) return;
+  sfx('tap', { rate: who === 'me' ? 1.3 : 1.6 });
+  const el = $(`ar-emo-${who}`) || document.querySelector(`.ar-seat${who === 'me' ? '.me' : ':not(.me)'} em`);
+  if (!el) return;
+  if (el.id) {
+    // 애니메이션 다시 시작: 두 이름을 번갈아 쓴다(배치를 억지로 다시 하지 않는다).
+    el.textContent = text;
+    el.className = `ar-emo on ${el.classList.contains('a') ? 'b' : 'a'}`;
+    clearTimeout(el._t); el._t = setTimeout(() => { el.className = 'ar-emo'; }, 2200);
+  } else pop(text, who === 'me' ? 30 : 70, 40, 'emote');
+}
+
+/* ---------- 다시 보기 ---------- */
+// 씨앗 + 두 쪽 조작 기록으로 처음부터 다시 돈다(혼자 판은 상대 컴퓨터도 같은 씨앗대로 똑같이 움직인다).
+function keepReplay() {
+  const L = R.live;
+  R.replayData = L ? { seed: L.go.seed, a: L.sim.a, b: L.sim.b, ia: L.sim.all[0], ib: L.sim.all[1], side: L.side }
+    : { seed: R.r.seed, a: R.teams.me, b: R.teams.foe, ia: R.inputs.slice(), ib: null, side: 0, foeLevel: R.r.foe_level };
+  R.replayData.r = R.r;
+}
+function startReplay() {
+  const d = R?.replayData; if (!d) return;
+  sfx('tap');
+  R.replay = { speed: 1, ms: 0, last: 0 };
+  play(d.r, null, replaySim(d));
+}
+function stopReplay() {
+  if (!R?.replay) return;
+  R.playing = false; R.replay = null;
+  cancelAnimationFrame(R.raf);
+  app()?.classList.remove('playing', 'ar-replaying');
+  if (R.lastResult) result(...R.lastResult);
+}
+
 /* ---------- VS ---------- */
-async function vs(r) {
+async function vs(r, ms = 2300) {
   setBg(['plaza', 'forest', 'night'][r.seed % 3]);
   const side = (who, name, team) => `<div class="ar-vs-side ${who}"><b>${esc(name)}</b><div>${team.map((f, n) => `<span style="--i:${n}">${petImg(f.key, f.form)}<small>Lv.${f.level}</small>${elTag(f.el)}</span>`).join('')}</div></div>`;
   main(`<section class="ar-vs" id="ar-vs"><div class="ar-vs-bg"></div><div class="ar-vs-art"></div>
     ${side('foe', r.foe.name + (r.foe.bot ? '' : '의 팀'), r.foe.team)}
     <div class="ar-vs-mark">VS</div>
     ${side('me', '내 팀', r.me)}
-    <p class="ar-vs-lv">${['쉬움', '보통', '어려움'][r.foe_level] || '보통'} 상대${r.coin_play ? '' : ' · 연습 판'}</p>
+    <p class="ar-vs-lv">${r.live ? '친구 대전 · 실시간' : `${['쉬움', '보통', '어려움'][r.foe_level] || '보통'} 상대${r.coin_play ? '' : ' · 연습 판'}`}</p>
   </section>`);
   sfx('swoosh'); later(() => { sfx('smash'); buzz(30); }, 450);
-  await wait(2300);
+  await wait(ms);
 }
 
 /* ---------- 전투 화면 ---------- */
@@ -265,12 +519,16 @@ function field() {
       <div class="ar-bar foe" id="ar-hud-foe"></div>
       <div class="ar-bar me" id="ar-hud-me"></div>
       <span class="ar-clock" id="ar-clock">2:00</span>
+      ${R.live ? `<span class="ar-net off" id="ar-net" aria-label="신호"><i></i><i></i><i></i></span><button type="button" class="ar-emo-btn" data-ar="emote" aria-label="이모트">😀</button>
+      <div class="ar-emo-tray" id="ar-emo-tray" role="group" aria-label="이모트">${LIVE.EMOTES.map((e, i) => `<button type="button" data-ar="emote-i" data-i="${i}">${esc(e)}</button>`).join('')}</div>` : ''}
     </div>
+    ${R.live ? '<p class="ar-ai-note" id="ar-ai-note" aria-live="polite"></p>' : ''}
+    ${R.replay ? '<div class="ar-replay-bar"><b>🎬 다시 보기</b><button type="button" class="btn" data-ar="replay-speed">1배</button><button type="button" class="btn primary" data-ar="exit">끝내기</button></div>' : ''}
     <div class="ar-field yb-arena" id="ar-field">
       <div class="ar-ring" aria-hidden="true"></div>
       ${zones}${warns}${lines}<div class="ar-aim" id="ar-aim" aria-hidden="true"><i></i></div><div class="ar-aim-spot" id="ar-aim-spot" aria-hidden="true"></div>${cones}${clones}${shots}${nums}${cut}
-      <div class="ar-mon foe" id="ar-foe"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-foe-body"></span><span class="ar-status" aria-hidden="true"><i class="bub"></i><i class="vines"></i><i class="burnf"></i></span><span class="ar-hp"><i id="ar-foe-hp"></i><b id="ar-foe-sh"></b></span></div>
-      <div class="ar-mon me" id="ar-me"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-me-body"></span><span class="ar-status" aria-hidden="true"><i class="bub"></i><i class="vines"></i><i class="burnf"></i></span><span class="ar-hp"><i id="ar-me-hp"></i><b id="ar-me-sh"></b></span><span class="ar-face" id="ar-face"><i></i></span></div>
+      <div class="ar-mon foe" id="ar-foe"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-foe-body"></span><span class="ar-status" aria-hidden="true"><i class="bub"></i><i class="vines"></i><i class="burnf"></i></span><span class="ar-hp"><i id="ar-foe-hp"></i><b id="ar-foe-sh"></b></span><span class="ar-emo" id="ar-emo-foe" aria-hidden="true"></span></div>
+      <div class="ar-mon me" id="ar-me"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-me-body"></span><span class="ar-status" aria-hidden="true"><i class="bub"></i><i class="vines"></i><i class="burnf"></i></span><span class="ar-hp"><i id="ar-me-hp"></i><b id="ar-me-sh"></b></span><span class="ar-face" id="ar-face"><i></i></span><span class="ar-emo" id="ar-emo-me" aria-hidden="true"></span></div>
     </div>
     <div class="ar-combo" id="ar-combo" aria-hidden="true"><b id="ar-combo-n"></b><small>콤보!</small></div>
     <div class="ar-pad" id="ar-pad">
@@ -290,15 +548,19 @@ function field() {
 function hudHtml(who, name, team) {
   return `<b>${esc(name)}</b><span class="ar-dots">${team.map((f, n) => `<i id="ar-dot-${who}-${n}">${petImg(f.key, R.forms[who][n])}</i>`).join('')}</span>`;
 }
-function play(r) {
+// live: 친구 대전(R.live, 전투는 LiveSim) · rep: 다시 보기(replaySim, 조작 없음).
+function play(r, live = null, rep = null) {
   // 서버와 똑같이 key · form · level로 능력치를 다시 만든다(server/arena.mjs unpack과 같다).
   const fighters = list => list.map(f => fighter({ key: f.key, form: f.form, level: f.level, s2: f.s2 }));
   R.r = r;
   R.forms = { me: r.me.map(f => f.form), foe: r.foe.team.map(f => f.form) };
   R.teams = { me: fighters(r.me), foe: fighters(r.foe.team) };
-  R.sim = createArena({ seed: r.seed, me: R.teams.me, foe: R.teams.foe, foeLevel: r.foe_level });
-  Object.assign(R, { inputs: [], queue: [], dir: 0, sentDir: 0, holdAtk: false, keyDown: new Set(), playing: true, paused: false, pausedMs: 0, started: false });
+  R.sim = rep || (live ? live.sim : createArena({ seed: r.seed, me: R.teams.me, foe: R.teams.foe, foeLevel: r.foe_level }));
+  Object.assign(R, { queue: [], dir: 0, sentDir: 0, holdAtk: false, keyDown: new Set(), playing: true, paused: false, pausedMs: 0, started: false });
+  if (!rep) R.inputs = [];
   app()?.classList.add('playing');
+  app()?.classList.toggle('ar-replaying', !!rep);
+  app()?.classList.toggle('ar-living', !!live);
   main(field()); artGuard();
   R.slots = null; R.skillsOn = true;
   preloadPoses();
@@ -309,13 +571,14 @@ function play(r) {
   window.addEventListener('resize', R.resize);
   bindPad();
   R.prev = R.sim.view(); R.cur = R.prev;
-  // 조준 방식(대기실에서 고른 것)은 첫 틱 조작으로 넣는다: 서버도 같은 조작 기록으로 다시 돌린다.
+  // 조준 방식(대기실에서 고른 것)은 첫 틱 조작으로 넣는다: 서버도 같은 조작 기록으로 다시 돌린다(친구 대전은 방이 넣는다).
   const mode = { easy: INPUT.AIM_EASY, auto: INPUT.AIM_AUTO }[R.aim];
-  if (mode) { const x = [0, mode]; R.inputs.push(x); R.sim.push(x); }
+  if (mode && !live && !rep) { const x = [0, mode]; R.inputs.push(x); R.sim.push(x); }
   Object.assign(R, { stopUntil: 0, z: '', faceCode: -9, drag: null, numN: 0, finale: false });
   const a = $('ar-hud-foe'), b = $('ar-hud-me');
   if (a) a.innerHTML = hudHtml('foe', R.r.foe.name, R.cur.foe.team);
   if (b) b.innerHTML = hudHtml('me', '나', R.cur.me.team);
+  if (live) drawNet();
   // 쓰러짐 별 그림도 미리 받아 둔다.
   const star = new Image(); star.decoding = 'async'; star.src = '/assets/arena/fx-faint.webp';
   drawMon('me'); drawMon('foe'); drawHud(); drawPad();
@@ -323,8 +586,17 @@ function play(r) {
   countIn();
 }
 async function countIn() {
-  for (const n of ['3', '2', '1']) { pop(n, 50, 45, 'count'); sfx('tm-count'); await wait(1000); if (!R?.playing) return; }
-  pop('FIGHT!', 50, 45, 'count go'); sfx('tm-go'); buzz(40);
+  if (R.replay) { pop('다시 보기', 50, 45, 'count go'); R.t0 = performance.now(); R.started = true; R.raf = requestAnimationFrame(loop); return; }
+  // 친구 대전: 두 폰이 방 시계에 맞춰 같이 센다(늦게 들어왔으면 바로 시작).
+  const L = R.live, left = () => L ? L.go.start_at - (Date.now() + L.offset) : 0;
+  for (const n of ['3', '2', '1']) {
+    if (L && left() < (Number(n) - 1) * 1000) continue;
+    if (L) { await wait(Math.max(0, left() - Number(n) * 1000)); if (!R?.playing) return; }
+    pop(n, 50, 45, 'count'); sfx('tm-count');
+    await wait(L ? Math.max(0, left() - (Number(n) - 1) * 1000) : 1000);
+    if (!R?.playing) return;
+  }
+  if (!L || left() > -1500) { pop('FIGHT!', 50, 45, 'count go'); sfx('tm-go'); buzz(40); }
   R.t0 = performance.now(); R.started = true;
   R.raf = requestAnimationFrame(loop);
 }
@@ -599,14 +871,20 @@ function loop(now) {
   lagWatch(now);
   if (R.paused) { R.raf = requestAnimationFrame(loop); return; }
   // 히트스톱: 화면만 잠깐 멈춘다(전투 시계를 그만큼 늦출 뿐, 전투 계산은 같다).
+  // 다시 보기: 화면 시간 × 빠르기. 히트스톱 동안은 멈춘다.
+  if (R.replay) { const r = R.replay; if (now >= R.stopUntil && r.last) r.ms += Math.min(100, now - r.last) * r.speed; r.last = now; }
   if (now < R.stopUntil) { R.raf = requestAnimationFrame(loop); return; }
-  const want = Math.floor((now - R.t0 - R.pausedMs) / ARENA.TICK_MS);
+  // 전투 시계: 친구 대전은 방 시계(두 폰이 같다), 다시 보기는 위, 혼자 판은 이 폰 시계(멈춤 · 히트스톱만큼 늦춘다).
+  const ms = R.replay ? R.replay.ms : R.live ? Date.now() + R.live.offset - R.live.go.start_at : now - R.t0 - R.pausedMs;
+  const want = Math.floor(ms / ARENA.TICK_MS);
   let n = 0;
   const behind = want - R.sim.S.t > 12; // 많이 밀렸으면(다른 탭) 효과 없이 따라잡는다
-  while (R.sim.S.t < want && !R.sim.S.over && n++ < 60 && !(now < R.stopUntil)) tickOnce(!behind);
+  const can = () => !R.sim.canStep || R.sim.canStep();
+  while (R.sim.S.t < want && !R.sim.S.over && can() && n++ < 60 && !(now < R.stopUntil)) tickOnce(!behind);
   if (R.sim.S.over) return end();
   if (now < R.stopUntil) { R.raf = requestAnimationFrame(loop); return; }
-  const frac = Math.max(0, Math.min(1, (now - R.t0 - R.pausedMs) / ARENA.TICK_MS - R.sim.S.t + 1));
+  if (R.live && !R.replay) drawNet();
+  const frac = Math.max(0, Math.min(1, ms / ARENA.TICK_MS - R.sim.S.t + 1));
   place(frac);
   drawPad();
   clock();
@@ -618,11 +896,14 @@ function clock() {
 }
 // 한 틱: 이번 틱의 조작을 기록 · 전투에 넣고 → 한 걸음 → 사건 그리기.
 function tickOnce(show) {
-  const t = R.sim.S.t, add = c => { const x = Array.isArray(c) ? [t, ...c] : [t, c]; R.inputs.push(x); R.sim.push(x); };
-  if (R.dir !== R.sentDir) { R.sentDir = R.dir; add(R.dir); }
-  const q = R.queue.splice(0);
-  if (R.holdAtk && R.cur.me.cd <= 1 && !q.includes(INPUT.ATK)) q.push(INPUT.ATK);
-  for (const c of q) if (R.inputs.length < ARENA.INPUT_MAX - 2) add(c);
+  // 친구 대전: 내 조작은 LiveSim이 받아 바로 돌리고(방에는 0.1초마다 묶어서), 다시 보기는 조작이 없다.
+  const t = R.sim.S.t, add = c => { const x = Array.isArray(c) ? [t, ...c] : [t, c]; R.inputs.push(x); if (R.sim.local) R.sim.local(x); else R.sim.push(x); };
+  if (!R.replay) {
+    if (R.dir !== R.sentDir) { R.sentDir = R.dir; add(R.dir); }
+    const q = R.queue.splice(0);
+    if (R.holdAtk && R.cur.me.cd <= 1 && !q.includes(INPUT.ATK)) q.push(INPUT.ATK);
+    for (const c of q) if (R.inputs.length < ARENA.INPUT_MAX - 2) add(c);
+  }
   R.prev = R.cur;
   const ev = R.sim.step();
   R.cur = R.sim.view();
@@ -673,7 +954,8 @@ function hitStop(ms) {
   if (!ms || reduced() || !R?.playing) return;
   const now = R.frameNow || performance.now(), until = now + ms;
   if (until <= R.stopUntil) return;
-  R.pausedMs += until - Math.max(now, R.stopUntil);
+  // 친구 대전은 방 시계를 늦출 수 없다: 화면만 멈췄다가 다음 프레임들에 따라잡는다(멈춤이 짧아 2~3틱).
+  if (!R.live && !R.replay) R.pausedMs += until - Math.max(now, R.stopUntil);
   R.stopUntil = until;
 }
 // 경기장만 흔들린다(앱 전체에 클래스를 붙이면 화면 전체 스타일을 다시 계산해서 무겁다). translate 속성이라 줌(scale)과 겹쳐도 된다.
@@ -971,7 +1253,7 @@ function banner(text, who) {
 }
 
 /* ---------- 잠깐 멈춤 ---------- */
-function pause() { if (!R?.playing || R.paused) return; R.paused = true; R.pauseAt = performance.now(); R.holdAtk = false; R.dir = 0; R.drag = null; hideAim(); drawStick(0, 0); }
+function pause() { if (!R?.playing || R.paused || R.live || R.replay) return; R.paused = true; R.pauseAt = performance.now(); R.holdAtk = false; R.dir = 0; R.drag = null; hideAim(); drawStick(0, 0); }
 function resume() { if (!R?.paused) return; R.pausedMs += performance.now() - R.pauseAt; R.paused = false; }
 function onVisibility() { if (document.hidden) pause(); else if (!document.querySelector('.ar-quit')) resume(); }
 
@@ -981,6 +1263,12 @@ async function end() {
   cancelAnimationFrame(R.raf);
   place(1);
   const local = R.sim.S.winner;
+  if (R.replay) {
+    banner(local === 'me' ? '승리!' : local === 'draw' ? '무승부' : '패배…', local === 'me' ? 'me win' : 'foe');
+    await wait(1400);
+    return stopReplay();
+  }
+  if (R.live) return liveEnd(local);
   // 마지막 한 방이면 0.6초 느리게 보여 준 뒤 배너.
   if (R.finale && !reduced()) { await wait(650); if (!R) return; }
   banner(local === 'me' ? '승리!' : local === 'draw' ? '무승부' : '패배…', local === 'me' ? 'me win' : 'foe');
@@ -996,12 +1284,46 @@ async function end() {
   if (typeof res?.points_balance === 'number') R.A.data.stats.points_balance = res.points_balance;
   R.view = { ...R.view, left: res?.left ?? R.view?.left, tickets: res?.tickets ?? R.view?.tickets, wins: res?.wins ?? R.view?.wins, streak: res?.streak ?? R.view?.streak, best_streak: res?.best_streak ?? R.view?.best_streak };
   R.A.data.rewards ||= {}; R.A.data.rewards.arena = R.view;
+  keepReplay();
   result(local, res);
 }
+// 친구 대전 끝: 배너 → 방이 메인에서 받아 온 정산(두 조작 기록으로 서버가 다시 돌린 결과)을 기다린다(최대 12초).
+async function liveEnd(local) {
+  const L = R.live;
+  if (R.finale && !reduced()) { await wait(650); if (!R) return; }
+  banner(local === 'me' ? '승리!' : local === 'draw' ? '무승부' : '패배…', local === 'me' ? 'me win' : 'foe');
+  sfx(local === 'me' ? 'fanfare-epic' : 'fail');
+  await wait(1400);
+  if (!R || R.live !== L) return;
+  main('<div class="ar-saving">서버가 두 친구의 조작 기록으로 결과를 확인하는 중…</div>');
+  for (let i = 0; i < 48 && R?.live === L && !L.res; i++) await wait(250);
+  if (!R || R.live !== L) return;
+  const res = L.res || { paid: false, reason: 'pending' };
+  L.done = true;
+  if (typeof res.points_balance === 'number') R.A.data.stats.points_balance = res.points_balance;
+  R.view = { ...R.view, left: res.left ?? R.view?.left, tickets: res.tickets ?? R.view?.tickets, live_wins: res.lw ?? R.view?.live_wins, pairs: res.pairs ?? R.view?.pairs, live_room: null };
+  R.A.data.rewards ||= {}; R.A.data.rewards.arena = R.view;
+  keepReplay();
+  result(local, res);
+  // 결과 화면에서 친구의 '한 판 더' 초대를 20초마다 확인한다(3분까지 · 화면이 보일 때만, 기존 홈 확인과 같은 GET).
+  let n = 0;
+  L.invitePoll = setInterval(async () => {
+    if (R?.live !== L || ++n > 9) return clearInterval(L.invitePoll);
+    if (document.hidden || R.playing) return;
+    try { const { arena_invite: inv } = await api('/battle/invite'); if (inv && R?.live === L && !R.playing) { R.A.data.arena_invite = inv; const box = $('ar-res-invite'); if (box) { box.innerHTML = `<b>⚔️ ${esc(inv.host)}의 한 판 더!</b><button type="button" class="btn primary" data-ar="live-accept" data-id="${esc(inv.id)}">받기</button>`; box.classList.add('on'); sfx('tap'); buzz(60); } } } catch {}
+  }, 20000);
+}
 function result(local, res) {
+  R.lastResult = [local, res];
   const winner = res?.winner || local, win = winner === 'me', coins = Number(res?.coins || 0), xp = Number(res?.xp || 0);
-  const ko = res?.ko ?? R.sim.S.ko.me, dealt = res?.dealt ?? R.sim.S.dealt.me;
+  const mine = R.sim.mine ? R.sim.mine() : { ko: R.cur.ko.me, dealt: R.cur.dealt.me, ults: R.cur.ults.me, team: R.cur.me.team.map(f => f.cur) };
+  const ko = res?.ko ?? mine.ko, dealt = res?.dealt ?? mine.dealt, live = !!R.live;
   const why = res?.reason === 'daily' ? `오늘 코인 판(${ARENA.DAILY}판)을 다 썼어요. 기록은 남아요!`
+    : res?.reason === 'pair' ? '같은 친구와는 하루 2판까지 코인을 받아요. 다른 친구와도 겨뤄 봐요!'
+    : res?.reason === 'idle' ? '한쪽이 거의 움직이지 않은 판이라 둘 다 보상이 없어요.'
+    : res?.reason === 'away' ? '연결이 끊겨 컴퓨터가 절반 넘게 대신 싸워서 보상이 없어요.'
+    : res?.reason === 'grade' ? '같은 학년 친구끼리만 보상을 받아요.'
+    : res?.reason === 'pending' ? '결과를 확인하고 있어요. 잠시 뒤 놀이터에서 코인을 확인해 주세요.'
     : res?.reason === 'ticket' ? '입장권이 없어서 연습 판이었어요. 단어 연습을 끝까지 풀면 입장권을 받아요!'
     : res?.reason === 'error' ? esc(res.error || '저장하지 못했어요.')
     : res?.reason === 'short' || res?.reason === 'stale' ? '이번 대전은 기록되지 않았어요.'
@@ -1009,13 +1331,14 @@ function result(local, res) {
   const team = R.r.me;
   main(`<section class="ar-result ${win ? 'win' : 'lose'}">
     <div class="ar-res-card">
-      <div class="ar-res-head">${winner === 'draw' ? '' : artImg(win ? 'banner-win' : 'banner-lose', 'ar-res-banner')}<h2>${win ? '승리!' : winner === 'draw' ? '무승부' : '아쉬운 패배'}</h2><p>vs ${esc(R.r.foe.name)}${res?.streak >= 2 && win ? ` · <b>${res.streak}연승!</b>` : ''}</p></div>
-      <div class="ar-res-team">${team.map((f, n) => `<span style="--i:${n}" class="${R.sim.S.me.team[n].cur <= 0 ? 'down' : ''}">${petImg(f.key, f.form)}</span>`).join('')}</div>
-      <div class="ar-res-rows"><span><small>쓰러뜨림</small><b>${num(ko)}</b></span><span><small>준 피해</small><b>${num(dealt)}</b></span><span><small>필살기</small><b>${res?.ults ?? R.sim.S.ults.me}</b></span></div>
+      <div class="ar-res-head">${winner === 'draw' ? '' : artImg(win ? 'banner-win' : 'banner-lose', 'ar-res-banner')}<h2>${win ? '승리!' : winner === 'draw' ? '무승부' : '아쉬운 패배'}</h2><p>${live ? '친구 대전 · ' : ''}vs ${esc(R.r.foe.name)}${res?.streak >= 2 && win && !live ? ` · <b>${res.streak}연승!</b>` : ''}</p></div>
+      <div class="ar-res-team">${team.map((f, n) => `<span style="--i:${n}" class="${mine.team[n] <= 0 ? 'down' : ''}">${petImg(f.key, f.form)}</span>`).join('')}</div>
+      <div class="ar-res-rows"><span><small>쓰러뜨림</small><b>${num(ko)}</b></span><span><small>준 피해</small><b>${num(dealt)}</b></span><span><small>필살기</small><b>${res?.ults ?? mine.ults}</b></span></div>
       ${coins || xp ? `<div class="ar-res-gain">${coins ? `<span class="r coin">${coin()}<b>+${num(coins)}</b>${res?.streak_coins ? `<small>3연승 +${res.streak_coins} 포함</small>` : ''}</span>` : ''}${xp ? `<span class="r xp"><b>+${xp}</b><small>경험치</small></span>` : ''}</div>` : ''}
       ${why ? `<p class="ar-why">${why}</p>` : ''}
-      <p class="ar-tip">${win ? '다음 판은 상대가 더 똑똑해질 수 있어요!' : '팁: 빨간 표시가 뜨면 회피! 상성이 좋은 펫으로 교체해 보세요.'}</p>
-      <div class="ar-res-btns"><button type="button" class="yl-cta" data-ar="again">한 판 더</button><button type="button" class="btn full" data-ar="exit">놀이터로</button></div>
+      <p class="ar-tip">${live ? (win ? `친구 대전 ${num(res?.lw || 0)}승! 이모트로 인사해요 👋` : '다시 보기로 친구가 어떻게 싸웠는지 살펴봐요!') : win ? '다음 판은 상대가 더 똑똑해질 수 있어요!' : '팁: 빨간 표시가 뜨면 회피! 상성이 좋은 펫으로 교체해 보세요.'}</p>
+      ${live ? `<div class="ar-emo-row" role="group" aria-label="이모트">${LIVE.EMOTES.map((e, i) => `<button type="button" data-ar="emote-i" data-i="${i}">${esc(e)}</button>`).join('')}</div><div class="ar-invite" id="ar-res-invite"></div>` : ''}
+      <div class="ar-res-btns">${R.replayData ? '<button type="button" class="btn full" data-ar="replay">🎬 다시 보기</button>' : ''}<button type="button" class="yl-cta" data-ar="again">${live ? '친구 대전 한 판 더' : '한 판 더'}</button><button type="button" class="btn full" data-ar="exit">놀이터로</button></div>
     </div>
   </section>`);
   artGuard();

@@ -638,7 +638,14 @@ function startInvitePolling() {
   invitePoll = setInterval(async () => {
     if (!A.data || A.screen || A.tab !== 'home' || document.visibilityState !== 'visible' || $('#modal-root').children.length) return;
     try {
-      const { invite } = await api('/battle/invite');
+      const { invite, arena_invite: arenaInvite } = await api('/battle/invite');
+      // V13.230 펫 아레나 친구 대전 초대도 같은 확인으로(새 자동 새로고침 없음).
+      const arenaBefore = A.data.arena_invite;
+      if ((arenaInvite?.id || null) !== (arenaBefore?.id || null)) {
+        A.data.arena_invite = arenaInvite || null;
+        if (arenaInvite) { toast(`${arenaInvite.host}의 펫 아레나 친구 대전 초대가 왔어요!`); navigator.vibrate?.(80); }
+        if (!invite && !A.data.battle_invite) { renderKeepScroll(); return; }
+      }
       const before = A.data.battle_invite;
       if ((invite?.id || null) === (before?.id || null) && !invite) return;
       A.data.battle_invite = invite;
@@ -1028,6 +1035,9 @@ $('#app').addEventListener('click', async event => {
       return openWallGame(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }, { words: w.list, codes: w.picked, label: wordsLabel(A, w.picked) });
     }
     // V13.225 놀이터 펫 아레나 2: 직접 조종하는 펫 대전(단어 없음, 코인 판 입장권은 단어 연습으로).
+    // V13.230 펫 아레나 친구 대전 초대: 받기 → 아레나 화면에서 바로 그 방으로, 거절 → 초대를 숨긴다.
+    if (d.action === 'arena-live-accept' && A.data.arena_invite) { const invite = A.data.arena_invite; A.data.arena_invite = null; window.scrollTo(0, 0); return openArena(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }, { join: invite }); }
+    if (d.action === 'arena-live-decline') { buttonBusy(b); try { await api('/games/arena/live/decline', { id: d.id }); } catch {} A.data.arena_invite = null; renderKeepScroll(); toast('친구 대전 초대를 거절했어요.'); return; }
     if (d.action === 'arena-open') { window.scrollTo(0, 0); return openArena(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     // V13.162 놀이터 몬스터 사냥.
     if (d.action === 'claw-open') { window.scrollTo(0, 0); return openClaw(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
