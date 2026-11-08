@@ -1,4 +1,4 @@
-import { service, sweep, examAttemptExpired, preauthenticateLogin, settleBattle, battleReportPending, undoDungeon, runEveningReminders, settlePartyReport, partyReportPending, undoParty } from '../server/service.mjs';
+import { service, sweep, examAttemptExpired, preauthenticateLogin, settleBattle, battleReportPending, undoDungeon, runEveningReminders, settlePartyReport, partyReportPending, undoParty, settleArenaReport, arenaReportPending, undoLiveJoin } from '../server/service.mjs';
 import { createDungeonReporter } from '../server/dungeon-reports.mjs';
 import { sendPush } from '../server/push.mjs';
 import { dropEndpoints } from '../server/notify.mjs';
@@ -10,6 +10,9 @@ export { DungeonRoom };
 // V13.149 교실 게임 방(보물 사냥 · 반 전체 낚시): 판 하나에 방 하나.
 import { PartyRoom, partyReportKey } from './party-room.mjs';
 export { PartyRoom };
+// V13.230 펫 아레나 실시간 친구 대전 방.
+import { ArenaRoom, arenaReportKey } from './arena-room.mjs';
+export { ArenaRoom };
 import { selfSignup, checkSignupCode, signupCodeGuard } from '../server/signup.mjs';
 import { examAdmin } from '../server/exam-admin.mjs';
 import { migrateState, stateSizeReport } from '../server/state.mjs';
@@ -468,6 +471,13 @@ export class VocaStateObject {
         await this.mutations.durable(state => settlePartyReport(state, body) ? { ok: true } : NO_MUTATION);
         return json({ ok: true });
       }
+      // V13.230: 펫 아레나 친구 대전 방이 끝난 판을 한 번 보고한다(같은 방은 한 번만 정산).
+      if (url.pathname === '/api/internal/arena-result') {
+        if (request.headers.get('X-Arena-Key') !== await arenaReportKey(this.env)) throw Object.assign(Error('허용되지 않은 요청입니다.'), { status: 403 });
+        if (!arenaReportPending(this.mutations.current().state, body)) return json({ ok: true });
+        await this.mutations.durable(state => settleArenaReport(state, body) ? { ok: true } : NO_MUTATION);
+        return json({ ok: true });
+      }
       const address = request.headers.get('CF-Connecting-IP') || 'unknown';
       const cookie = request.headers.get('cookie') || '';
       const token = cookie.split(';').map(value => value.trim()).find(value => value.startsWith('sumus_session='))?.slice(14) || '';
@@ -564,7 +574,9 @@ export class VocaStateObject {
       const dungeonMessages = result?._dungeon ? [result._dungeon] : [];
       // V13.149 교실 게임 방 준비(문제와 입장표는 방에만 간다).
       const partyMessages = Array.isArray(result?._parties) ? result._parties : [];
-      if (result && typeof result === 'object') { delete result._battle; delete result._battles; delete result._push; delete result._dungeon; delete result._parties; }
+      // V13.230 펫 아레나 친구 대전 방 준비(입장표 · 펫 목록은 방에만 간다).
+      const arenaMessages = Array.isArray(result?._arenas) ? result._arenas : [];
+      if (result && typeof result === 'object') { delete result._battle; delete result._battles; delete result._push; delete result._dungeon; delete result._parties; delete result._arenas; }
       for (const message of roomMessages) {
         const room = this.env.BATTLE_ROOM.get(this.env.BATTLE_ROOM.idFromName(message.id));
         const reply = await room.fetch('https://battle/admin', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(message) }).catch(() => null);
@@ -590,6 +602,15 @@ export class VocaStateObject {
           const why = await reply?.json().catch(() => null);
           await this.mutations.durable(state => undoParty(state, message) ? true : NO_MUTATION);
           throw Object.assign(Error(why?.error || '교실 게임 방을 준비하지 못했어요. 잠시 후 다시 시도해주세요.'), { status: reply && reply.status < 500 ? 409 : 503 });
+        }
+      }
+      for (const message of arenaMessages) {
+        const room = this.env.ARENA_ROOM.get(this.env.ARENA_ROOM.idFromName(message.id));
+        const reply = await room.fetch('https://arena/admin', { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(message) }).catch(() => null);
+        if (!reply?.ok && message.action !== 'close') {
+          const why = await reply?.json().catch(() => null);
+          await this.mutations.durable(state => undoLiveJoin(state, message) ? true : NO_MUTATION);
+          throw Object.assign(Error(why?.error || '아레나 방을 준비하지 못했어요. 잠시 후 다시 시도해주세요.'), { status: reply && reply.status < 500 ? 409 : 503 });
         }
       }
       // After the rooms are ready: a 도전장 for a room that failed to open is never sent.
@@ -697,6 +718,14 @@ export default {
       const origin = request.headers.get('origin');
       if (origin && new URL(origin).host !== url.host) return securityHeaders(json({ error: '허용되지 않은 요청입니다.' }, 403), url.pathname);
       return env.PARTY_ROOM.get(env.PARTY_ROOM.idFromName(partySocket[1])).fetch(request);
+    }
+    // V13.230 펫 아레나 친구 대전 방 소켓도 방으로 바로 간다.
+    const arenaSocket = url.pathname.match(/^\/api\/arena\/ws\/([0-9a-f-]{36})$/);
+    if (arenaSocket) {
+      if (request.headers.get('Upgrade') !== 'websocket') return securityHeaders(json({ error: 'WebSocket 연결이 필요해요.' }, 426), url.pathname);
+      const origin = request.headers.get('origin');
+      if (origin && new URL(origin).host !== url.host) return securityHeaders(json({ error: '허용되지 않은 요청입니다.' }, 403), url.pathname);
+      return env.ARENA_ROOM.get(env.ARENA_ROOM.idFromName(arenaSocket[1])).fetch(request);
     }
     if (url.pathname.startsWith('/api/')) {
       const id = env.VOCA_STATE.idFromName('main');

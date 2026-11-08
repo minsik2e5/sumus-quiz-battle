@@ -10,6 +10,7 @@ import { assembleState } from '../cloudflare/state-parts.mjs';
 import { runBattleRoomChecks } from './battle-room-check.mjs';
 import { runDungeonRoomChecks } from './dungeon-room-check.mjs';
 import { runPartyRoomChecks } from './party-room-check.mjs';
+import { runArenaRoomChecks } from './arena-room-check.mjs';
 import { runWriteBudgetChecks } from './write-budget-check.mjs';
 import { runTestAppChecks } from './test-app-check.mjs';
 
@@ -360,7 +361,7 @@ export async function runCloudflareCheck() {
 
 // pathToFileURL: a hand-built `file://${path}` never matches on Windows, which made this check exit 0 without running.
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  runCloudflareCheck().then(runWriteBudgetChecks).then(runBattleRoomChecks).then(runDungeonRoomChecks).then(runPartyRoomChecks).then(runTestAppChecks).catch(error => {
+  runCloudflareCheck().then(runWriteBudgetChecks).then(runBattleRoomChecks).then(runDungeonRoomChecks).then(runPartyRoomChecks).then(runArenaRoomChecks).then(runTestAppChecks).catch(error => {
     console.error('[cloudflare-check] FAIL', error);
     process.exitCode = 1;
   });
