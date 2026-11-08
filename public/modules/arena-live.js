@@ -329,7 +329,7 @@ async function finish(m) {
     if (i > 0 || !m.reported) await new Promise(res => setTimeout(res, i === 0 ? 600 : 1200));
     try {
       const d = await api(`/games/arena/live/result?id=${encodeURIComponent(L.room.id)}`);
-      if (d.result) { if (typeof d.points_balance === 'number') A.data.stats.points_balance = d.points_balance; return { ...d.result, left: d.left, tickets: d.tickets, wins: d.wins }; }
+      if (d.result) { if (typeof d.points_balance === 'number') A.data.stats.points_balance = d.points_balance; return { ...d.result, left: d.left, tickets: d.tickets, wins: d.wins, rank: d.rank }; }
     } catch {}
   }
   const s = o.sides?.[m.side] || {};

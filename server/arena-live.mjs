@@ -11,6 +11,7 @@ import { ARENA, baseS2, cleanTree } from '../public/modules/arena-rules.js';
 import { LIVE, cleanCode } from '../public/modules/arena-live-rules.js';
 import { gradeOf } from './competition.mjs';
 import { addBonus, findReceipt, keepReceipt } from './rewards.mjs';
+import { applyRank, liveRatio } from './arena-rank.mjs';
 
 export const ARENA_INVITES = { MAX: 120, STARTED_KEEP_MS: 30 * 60000 };
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -154,19 +155,21 @@ export function settleArenaLive(state, body, { profileOf, schoolOf, activePet = 
   const res = body.result || {}, seats = (Array.isArray(res.seats) ? res.seats.slice(0, LIVE.MODES[x.mode]?.seats || 2) : []).filter(s => !s.bot).map(s => ({ ...s, mode: x.mode }));
   // 자리는 방이 보낸 것(방 열쇠로만 오는 보고)을 믿는다.
   const people = seats.map(s => ({ s, p: typeof s.id === 'string' ? profileOf(s.id) : null }));
+  // V13.234 랭크: 컴퓨터 빈자리가 있던 판은 RP를 주고받지 않는다.
+  const bots = (Array.isArray(res.seats) ? res.seats : []).some(s => s?.bot);
   for (const { s, p } of people) {
     if (!p || p.role !== 'student') continue;
     const others = people.filter(o => o.p && o.p !== p);
     // 끝 보고 때도 같은 학년인지 다시 본다(그 사이 반이 바뀌었으면 기록만).
     const peers = others.every(o => arenaPeers(p, schoolOf(p), o.p, schoolOf(o.p)));
-    const out = liveSettleOne(p, { id: x.id, seat: s, others: others.map(o => o.p), winner: res.winner, idle: !!res.idle, peers, pet: activePet(p.id), now });
+    const out = liveSettleOne(p, { id: x.id, seat: s, others: others.map(o => o.p), winner: res.winner, idle: !!res.idle, peers, bots, pet: activePet(p.id), now });
     log(p, `펫 아레나 ${x.mode === 'ffa' ? '난투' : x.mode === '2v2' ? '팀전' : '친구 대전'} ${out.win ? '승리' : res.winner === 'draw' ? '무승부' : '패배'}${others[0] ? ` · ${String(others[0].p.display_name || '').slice(0, 10)}` : ''}${out.paid && out.coins ? ` · ${out.coins}코인` : ''}`, now);
   }
   return true;
 }
 
 // 한 사람 정산: 보상은 혼자 판과 같은 크기 · 하루 5판 합산 · 입장권도 같이. 같은 친구 코인 판 하루 2판.
-export function liveSettleOne(p, { id, seat, others, winner, idle, peers = true, pet = null, now = Date.now() }) {
+export function liveSettleOne(p, { id, seat, others, winner, idle, peers = true, bots = false, pet = null, now = Date.now() }) {
   const g = games(p), a = g.arena ||= {}, rid = `live:${id}`;
   const seen = findReceipt(g, 'arena', rid);
   if (seen) return seen.r;
@@ -189,6 +192,8 @@ export function liveSettleOne(p, { id, seat, others, winner, idle, peers = true,
     a.pairs.m = Object.fromEntries([...Object.entries(a.pairs.m), [pairKey, Number(a.pairs.m[pairKey] || 0) + 1]].slice(-10));
     addBonus(p, { xp: ARENA.XP, coins, pet, now });
     out = { ...base, paid: true, coins, xp: ARENA.XP };
+    // V13.234 랭크: 코인 판만(같은 친구 하루 2판 · 컴퓨터 대신 조종 · 자리 비움은 위에서 이미 빠진다). 상대 힘은 상대들 RP로.
+    if (!bots) out.rp = applyRank(p, { win, draw: winner === 'draw', ratio: liveRatio(p, others, now), place: base.mode === 'ffa' ? base.place : 0, now });
   }
   return keepReceipt(g, 'arena', rid, out, now);
 }

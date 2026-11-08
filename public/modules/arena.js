@@ -8,6 +8,7 @@ import { ELEMENTS, fxImpact, fxPunch, fxSpeedLines, fxRecoil, fxLite } from './b
 import { ARENA, BEATS, INPUT, ROLE, DIR16, SK2, ZONES_MAX, TREE, createArena, fighter, dirCode, aimCode, petTree, cleanTree } from './arena-rules.js';
 import { ARENA_ART } from './arena-art.js';
 import { openLive, liveClick, closeLive, keepReplay } from './arena-live.js';
+import { rankCard, rankGain, playRankGain, rankBoardHtml, rankClaimHtml } from './arena-rank-ui.js';
 
 // V13.225 펫 아레나 2(놀이터): 전체 화면. 위에서 비스듬히 내려다보는 경기장에서 내 펫을 직접 조종해 상대 펫과 싸운다.
 //   왼쪽 아래 조이스틱으로 움직이고, 오른쪽 버튼: 공격(누르고 있으면 계속) · 스킬 1 · 스킬 2(펫마다 다르다) · 필살기(게이지) · 회피 · 교체.
@@ -160,6 +161,11 @@ function onClick(event) {
   if (act === 'pick2') { R.picks[b.dataset.key] = Number(b.dataset.i) === 1 ? 1 : 0; save(PICK_KEY(), R.picks); sfx('tap'); return lobby(false, true); }
   if (act === 'aim') { R.aim = b.dataset.aim; save(AIM_KEY, R.aim); sfx('tap'); return lobby(false, true); }
   if (act === 'start') return start(b);
+  // V13.234 랭크 시즌(arena-rank-ui.js): 랭킹 탭 · 시즌 보상 받기.
+  if (act === 'rank') { sfx('tap'); return rankBoard(); }
+  if (act === 'rank-back') { sfx('tap'); return lobby(false, true); }
+  if (act === 'rank-claim') return rankClaim(b);
+  if (act === 'rank-claim-ok') { document.querySelector('.ark-claim-pop')?.remove(); return lobby(false, true); }
   if (act === 'again') return lobby(true);
   if (act === 'quit-yes') { R.live?.quit?.(); return leave(); }
   if (act === 'quit-no') { document.querySelector('.ar-quit')?.remove(); resume(); return; }
@@ -274,6 +280,7 @@ function lobby(again = false, keep = false) {
   const slot = n => { const key = R.team[n], p = pets.find(x => x.key === key); return p ? `<span class="ar-slot on${key === R.focus ? ' focus' : ''}" data-ar="focus" data-key="${esc(key)}"><b>${n + 1}</b>${petImg(p.key, p.form)}<div><small>${esc(p.name || petName(p.key))} · Lv.${p.level}</small>${skillLine(p.key, p.form, p.level)}</div></span>` : `<span class="ar-slot"><b>${n + 1}</b><i>?</i><div><small>비어 있음</small></div></span>`; };
   main(`<section class="ar-lobby${again ? ' again' : ''}${keep ? ' keep' : ''}">
     <div class="ar-title"><small>3 대 3 펫 대전</small><h1>펫 아레나</h1></div>
+    ${rankCard(v.rank)}
     <div class="ar-card">
       <ul class="ar-rules">
         <li><b>🕹️</b><span>왼쪽 <em>조이스틱</em>으로 움직이면 그쪽을 바라봐요. <em>공격</em>은 바라보는 쪽으로!</span></li>
@@ -308,6 +315,36 @@ async function start(button) {
   R.view = { ...R.view, left: r.left, tickets: r.tickets, wins: r.wins, streak: r.streak, best_streak: r.best_streak, s2: r.s2 || R.view?.s2, tr: r.tr || R.view?.tr };
   await vs(r);
   if (R) play(r);
+}
+
+// V13.234 랭킹 탭: GET 한 번(1분 안에 다시 열면 받아 둔 것). 시즌 보상 받기: POST 한 번 → 겹쳐 띄우는 연출.
+async function rankBoard() {
+  const cached = R.rankBoard && Date.now() - R.rankBoard.at < 60000 ? R.rankBoard.d : null;
+  if (!cached) main('<div class="ar-saving">랭킹을 불러오는 중…</div>');
+  let d = cached;
+  if (!d) {
+    try { d = await api('/games/arena/rank'); } catch (err) { if (!R) return; toast(err.message || '랭킹을 불러오지 못했어요.'); return lobby(false, true); }
+    if (!R) return;
+    R.rankBoard = { at: Date.now(), d };
+    if (d.me) R.view = { ...R.view, rank: d.me };
+  }
+  main(rankBoardHtml(d));
+  artGuard();
+}
+async function rankClaim(button) {
+  buttonBusy(button);
+  let r;
+  try { r = await api('/games/arena/rank/claim', {}); }
+  catch (err) { if (!R) return; buttonBusy(button, false); return toast(err.message || '보상을 받지 못했어요.'); }
+  if (!R) return;
+  if (r.stats) Object.assign(R.A.data.stats, r.stats);
+  if (typeof r.points_balance === 'number') R.A.data.stats.points_balance = r.points_balance;
+  R.view = { ...R.view, rank: r.rank || R.view?.rank };
+  R.A.data.rewards ||= {}; R.A.data.rewards.arena = R.view;
+  R.rankBoard = null;
+  app()?.insertAdjacentHTML('beforeend', rankClaimHtml(r));
+  sfx('fanfare-epic');
+  if (r.coins) later(() => { sfx('coins'); coinShower(app(), 18); const b = $('ar-coins'); if (b) countUp(b, Number(R.A.data.stats?.points_balance || 0), 900); }, 700);
 }
 
 /* ---------- VS ---------- */
@@ -1163,7 +1200,7 @@ async function end() {
   if (!R.live) keepReplay(R.A, { solo: true, side: 'me', seed: R.r.seed, foeLevel: R.r.foe_level, teams: { me: R.r.me.map(f => ({ key: f.key, form: f.form, level: f.level, s2: f.s2 ? 1 : 0 })), foe: R.r.foe.team.map(f => ({ key: f.key, form: f.form, level: f.level, s2: f.s2 ? 1 : 0 })) }, names: { me: '나', foe: R.r.foe.name }, inputs: { me: R.inputs, foe: [] }, result: local === 'me' ? 'win' : local === 'draw' ? 'draw' : 'lose' });
   if (res?.stats) Object.assign(R.A.data.stats, res.stats);
   if (typeof res?.points_balance === 'number') R.A.data.stats.points_balance = res.points_balance;
-  R.view = { ...R.view, left: res?.left ?? R.view?.left, tickets: res?.tickets ?? R.view?.tickets, wins: res?.wins ?? R.view?.wins, streak: res?.streak ?? R.view?.streak, best_streak: res?.best_streak ?? R.view?.best_streak };
+  R.view = { ...R.view, left: res?.left ?? R.view?.left, tickets: res?.tickets ?? R.view?.tickets, wins: res?.wins ?? R.view?.wins, streak: res?.streak ?? R.view?.streak, best_streak: res?.best_streak ?? R.view?.best_streak, rank: res?.rank ?? R.view?.rank };
   R.A.data.rewards ||= {}; R.A.data.rewards.arena = R.view;
   result(local, res);
 }
@@ -1182,6 +1219,7 @@ function result(local, res) {
       ${R.multi ? rankRows() : ''}
       <div class="ar-res-team">${team.map((f, n) => `<span style="--i:${n}" class="${R.sim.S.me.team[n].cur <= 0 ? 'down' : ''}">${petImg(f.key, f.form)}</span>`).join('')}</div>
       <div class="ar-res-rows"><span><small>쓰러뜨림</small><b>${num(ko)}</b></span><span><small>준 피해</small><b>${num(dealt)}</b></span><span><small>필살기</small><b>${res?.ults ?? R.sim.S.ults.me}</b></span></div>
+      ${rankGain(res?.rp)}
       ${coins || xp ? `<div class="ar-res-gain">${coins ? `<span class="r coin">${coin()}<b>+${num(coins)}</b>${res?.streak_coins ? `<small>3연승 +${res.streak_coins} 포함</small>` : ''}</span>` : ''}${xp ? `<span class="r xp"><b>+${xp}</b><small>경험치</small></span>` : ''}</div>` : ''}
       ${why ? `<p class="ar-why">${why}</p>` : ''}
       <p class="ar-tip">${win ? '다음 판은 상대가 더 똑똑해질 수 있어요!' : '팁: 빨간 표시가 뜨면 회피! 상성이 좋은 펫으로 교체해 보세요.'}</p>
@@ -1189,6 +1227,7 @@ function result(local, res) {
     </div>
   </section>`);
   artGuard();
+  if (res?.rp) playRankGain(res.rp, { later, sfx, reduced: reduced() });
   if (coins) { later(() => { sfx('coins'); coinShower(app(), 22); const b = $('ar-coins'); if (b) countUp(b, Number(R.A.data.stats?.points_balance || 0), 900); }, 500); }
 }
 
