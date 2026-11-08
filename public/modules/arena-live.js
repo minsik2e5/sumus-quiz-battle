@@ -15,6 +15,7 @@ import { LIVE, LIVE_EMOTES, cleanCode, createLiveSim, createReplaySim, cleanRepl
 //   판 화면은 같은 전투 화면(arena.js)에 펫 칸만 늘린다(createLiveSimN: 내 펫 'me', 다른 사람 'foe' · 'o2' · 'o3').
 import { arenaMatch, arenaUi } from './arena.js';
 import { ARENA_ART } from './arena-art.js';
+import { decoWant, liveDecoOf } from './arena-deco.js';
 
 // 그림 66(PR #287: 대기실 배경 lobby-bg · 팀 깃발 team-blue/red)이 들어오면 그림, 없으면 CSS(v13230.css).
 const artOn = name => ARENA_ART.has(name);
@@ -109,12 +110,12 @@ export function liveClick(act, b) {
 }
 async function open(b) {
   buttonBusy(b);
-  try { const d = await api('/games/arena/live/open', { mode: b?.dataset?.mode || '1v1' }); if (L) enter(d.room); }
+  try { const d = await api('/games/arena/live/open', { mode: b?.dataset?.mode || '1v1', deco: decoWant() }); if (L) enter(d.room); }
   catch (err) { if (L) { buttonBusy(b, false); toast(err.message || '방을 만들지 못했어요.'); } }
 }
 async function join(body, b) {
   if (b) buttonBusy(b);
-  try { const d = await api('/games/arena/live/join', body); if (L) enter(d.room); }
+  try { const d = await api('/games/arena/live/join', { ...body, deco: decoWant() }); if (L) enter(d.room); }
   catch (err) { if (!L) return; if (b) buttonBusy(b, false); toast(err.message || '들어가지 못했어요.'); if (!L.home) home(); }
 }
 async function invite(b) {
@@ -301,6 +302,7 @@ function begin(msg) {
   L.timers.push(setInterval(() => { if (L?.match === m && !m.done) sim.flush(); }, LIVE.BATCH_MS));
   L.timers.push(setInterval(() => { if (L?.match === m && !m.done) ping(); }, 1000));
   const r = multi ? multiR(msg.mode, msg.sides, sim, { id: L.room.id, seed: msg.seed }) : { id: L.room.id, seed: msg.seed, live: true, me: brief(msg.teams[side]), foe: { name: msg.names[foe] || '친구', bot: false, team: brief(msg.teams[foe]) }, foe_level: 1 };
+  r.deco = liveDecoOf(msg.deco, side, slot => multi ? sim.map?.[slot] : slot === foe ? 'foe' : null); // V13.236 방장 경기장 · 링, 사람마다 입장 효과
   arenaMatch(r, {
     sim, live: true,
     // 지금 틱 = (서버 시계 − 시작 시각) ÷ 50ms. 히트스톱으로 화면이 잠깐 멈춰도 다음 프레임에 따라잡는다.
@@ -348,6 +350,7 @@ function replay(i) {
     : { id: 'replay', seed: rec.seed, live: true, replay: true, me: brief(rec.teams[side]), foe: { name: `${rec.names?.[foe] || '상대'} · 다시 보기`, bot: !!rec.solo, team: brief(rec.teams[foe]) }, foe_level: rec.foeLevel ?? 1 };
   if (L.match) L.match.done = true;
   L.match = null;
+  r.deco = liveDecoOf(msg.deco, side, slot => multi ? sim.map?.[slot] : slot === foe ? 'foe' : null); // V13.236 방장 경기장 · 링, 사람마다 입장 효과
   arenaMatch(r, {
     sim, live: true, replay: true,
     want: now => { t0 ||= now; return (now - t0) / ARENA.TICK_MS; },
