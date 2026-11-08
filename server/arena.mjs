@@ -260,7 +260,7 @@ const humanInputs = list => list.filter(([, c]) => c !== INPUT.AI_ON && c !== IN
 //   profileOf(id) · who(p) · petKey(id)는 service.mjs가 준다. 돌려주는 값: { results: { 학생 id: 결과 } }.
 export function settleArenaLive(state, body, { profileOf, who, petKey = () => null, log = () => {}, now = Date.now() }) {
   const list = liveList(state), room = list.find(x => x.id === body?.id);
-  if (body?.kind === 'left') { if (room && room.guest_id) { room.guest_id = null; } return { ok: true }; }
+  if (body?.kind === 'left') { if (room?.guest_id) { const g = profileOf(room.guest_id)?.games?.arena; if (g?.live_room?.id === room.id) delete g.live_room; room.guest_id = null; } return { ok: true }; }
   if (!room) return null;
   state.arenaInvites = list.filter(x => x !== room);
   const ids = [room.host_id, room.guest_id].filter(Boolean);

@@ -36,7 +36,7 @@
 /* 방 대기실 */
 .ar-live-lobby .ar-title h1{font-variant-numeric:tabular-nums;letter-spacing:.04em}
 .ar-seats{display:grid;grid-template-columns:1fr auto 1fr;align-items:stretch;gap:6px}
-.ar-seat{display:grid;justify-items:center;align-content:start;gap:4px;padding:10px 6px;border-radius:18px;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.12);transition:border-color .2s,background .2s}
+.ar-seat{position:relative;display:grid;justify-items:center;align-content:start;gap:4px;padding:10px 6px;border-radius:18px;background:rgba(255,255,255,.07);border:2px solid rgba(255,255,255,.12);transition:border-color .2s,background .2s}
 .ar-seat.me{border-color:rgba(96,165,250,.6)}
 .ar-seat.ready{border-color:#4ade80;background:radial-gradient(circle at 50% 20%,rgba(74,222,128,.25),rgba(255,255,255,.06) 70%)}
 .ar-seat.empty{border-style:dashed;opacity:.85}
@@ -54,6 +54,13 @@
 .ar-emo-row{display:flex;gap:4px;justify-content:center;flex-wrap:nowrap}
 .ar-emo-row button,.ar-emo-tray button{min-width:34px;height:34px;padding:0 4px;border:0;border-radius:12px;background:rgba(255,255,255,.12);color:#fff;font-size:18px;font-weight:950;cursor:pointer}
 .ar-emo-row button:active,.ar-emo-tray button:active{transform:scale(.9)}
+
+/* 대기실 · 결과 화면 이모트 자리 */
+.ar-seat>.ar-emo{left:50%;bottom:calc(100% - 14px)}
+.ar-res-emo{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+.ar-res-emo>span{position:relative;display:grid;justify-items:center;padding-top:2px}
+.ar-res-emo small{font-size:11px;font-weight:800;opacity:.7}
+.ar-res-emo .ar-emo{bottom:100%}
 
 /* 판: 신호 막대 · 이모트 · 컴퓨터가 대신 조종 안내 */
 .ar-hud{position:relative}
@@ -73,7 +80,7 @@
 .ar-emo.on.b{animation:ar-emo-b 2.1s cubic-bezier(.3,1.5,.5,1) forwards}
 @keyframes ar-emo-a{12%{opacity:1;transform:translate(-20%,-8px) scale(1.1)}22%,80%{opacity:1;transform:translate(-20%,-6px) scale(1)}100%{opacity:0;transform:translate(-20%,-18px) scale(.9)}}
 @keyframes ar-emo-b{12%{opacity:1;transform:translate(-20%,-8px) scale(1.1)}22%,80%{opacity:1;transform:translate(-20%,-6px) scale(1)}100%{opacity:0;transform:translate(-20%,-18px) scale(.9)}}
-.ar-ai-note{position:absolute;z-index:16;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 112px);margin:0;padding:5px 12px;border-radius:99px;background:rgba(225,29,72,.85);font-size:12.5px;font-weight:900;white-space:nowrap;opacity:0;transform:translate(-50%,-6px);transition:opacity .2s,transform .2s;pointer-events:none}
+.ar-ai-note{position:absolute;z-index:16;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 158px);margin:0;padding:5px 12px;border-radius:99px;background:rgba(225,29,72,.85);font-size:12.5px;font-weight:900;white-space:nowrap;opacity:0;transform:translate(-50%,-6px);transition:opacity .2s,transform .2s;pointer-events:none}
 .ar-ai-note.on{opacity:1;transform:translate(-50%,0)}
 .ar-fx.pop.emote{font-size:30px}
 

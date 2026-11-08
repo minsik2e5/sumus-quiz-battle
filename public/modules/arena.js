@@ -390,12 +390,12 @@ function liveTick(L) {
   if (L.ws?.readyState === 1) {
     if (L.sim) {
       const list = L.sim.pending.filter(([seq]) => seq >= L.next).slice(0, LIVE.BATCH_MAX);
-      if (list.length) { liveSend({ type: 'in', s: list[0][0], l: list.map(([, x]) => x) }); L.next = list.at(-1)[0] + 1; }
+      if (list.length) { liveSend({ type: 'in', s: list[0][0], l: list.map(([, x]) => x) }); L.next = list[list.length - 1][0] + 1; }
     }
     if (now - (L.pingAt || 0) >= LIVE.PING_MS && !document.hidden) { L.pingAt = now; liveSend({ type: 'ping', c: now }); }
   }
   // 소식이 4초 넘게 없으면 연결을 새로 연다(폰이 잠깐 잠들었다 깬 경우).
-  if (L.go && L.ws && now - (L.lastMsg || now) > 4000) { try { L.ws.close(4001, 'stale'); } catch {} L.ws = null; openSocket(); }
+  if (L.go && L.ws && !L.ended && !L.done && now - (L.lastMsg || now) > 4000) { try { L.ws.close(4001, 'stale'); } catch {} L.ws = null; openSocket(); }
 }
 function drawNet() {
   const L = R?.live, el = $('ar-net'); if (!L || !el) return;
@@ -411,7 +411,7 @@ function liveLobby(keep = false) {
   const pets = (me.pets || []).map(([key, form, level]) => ({ key, form, level }));
   R.team = me.team.map(x => x[0]); R.picks = { ...me.s2 }; R.aim = me.aim;
   const left = Math.max(0, Math.ceil((v.expires_at - (Date.now() + L.offset)) / 60000));
-  const seat = (p, mine) => p ? `<div class="ar-seat${mine ? ' me' : ''}${p.ready ? ' ready' : ''}"><b>${esc(mine ? '나' : p.name)}${p.host ? ' <i>방장</i>' : ''}</b><span>${p.team.map(([key, form]) => petImg(key, form)).join('')}</span><em>${p.ready ? '준비 완료!' : '고르는 중…'}</em></div>`
+  const seat = (p, mine) => p ? `<div class="ar-seat${mine ? ' me' : ''}${p.ready ? ' ready' : ''}"><span class="ar-emo" id="ar-emo-seat-${mine ? 'me' : 'foe'}" aria-hidden="true"></span><b>${esc(mine ? '나' : p.name)}${p.host ? ' <i>방장</i>' : ''}</b><span>${p.team.map(([key, form]) => petImg(key, form)).join('')}</span><em>${p.ready ? '준비 완료!' : '고르는 중…'}</em></div>`
     : `<div class="ar-seat empty"><b>친구를 기다려요</b><span><i>?</i></span><em>방 번호 <strong>${esc(v.code)}</strong>를 알려 주세요</em></div>`;
   const slot = n => { const key = R.team[n], p = pets.find(x => x.key === key); return p ? `<span class="ar-slot on"><b>${n + 1}</b>${petImg(p.key, p.form)}<div><small>${esc(petName(p.key))} · Lv.${p.level}</small>${skillLine(p.key, p.form, p.level)}</div></span>` : `<span class="ar-slot"><b>${n + 1}</b><i>?</i><div><small>비어 있음</small></div></span>`; };
   const both = !!fr && me.ready && fr.ready;
@@ -456,14 +456,13 @@ function sendEmote(i) {
 function showEmote(who, i) {
   const text = LIVE.EMOTES[i]; if (!text) return;
   sfx('tap', { rate: who === 'me' ? 1.3 : 1.6 });
-  const el = $(`ar-emo-${who}`) || document.querySelector(`.ar-seat${who === 'me' ? '.me' : ':not(.me)'} em`);
+  // 판: 펫 머리 위 · 대기실: 자리 위 · 결과 화면: 이모트 줄 위(칸 하나씩 다시 쓴다).
+  const el = $(`ar-emo-${who}`) || $(`ar-emo-seat-${who}`);
   if (!el) return;
-  if (el.id) {
-    // 애니메이션 다시 시작: 두 이름을 번갈아 쓴다(배치를 억지로 다시 하지 않는다).
-    el.textContent = text;
-    el.className = `ar-emo on ${el.classList.contains('a') ? 'b' : 'a'}`;
-    clearTimeout(el._t); el._t = setTimeout(() => { el.className = 'ar-emo'; }, 2200);
-  } else pop(text, who === 'me' ? 30 : 70, 40, 'emote');
+  // 애니메이션 다시 시작: 두 이름을 번갈아 쓴다(배치를 억지로 다시 하지 않는다).
+  el.textContent = text;
+  el.className = `ar-emo on ${el.classList.contains('a') ? 'b' : 'a'}`;
+  clearTimeout(el._t); el._t = setTimeout(() => { el.className = 'ar-emo'; }, 2200);
 }
 
 /* ---------- 다시 보기 ---------- */
@@ -1337,7 +1336,7 @@ function result(local, res) {
       ${coins || xp ? `<div class="ar-res-gain">${coins ? `<span class="r coin">${coin()}<b>+${num(coins)}</b>${res?.streak_coins ? `<small>3연승 +${res.streak_coins} 포함</small>` : ''}</span>` : ''}${xp ? `<span class="r xp"><b>+${xp}</b><small>경험치</small></span>` : ''}</div>` : ''}
       ${why ? `<p class="ar-why">${why}</p>` : ''}
       <p class="ar-tip">${live ? (win ? `친구 대전 ${num(res?.lw || 0)}승! 이모트로 인사해요 👋` : '다시 보기로 친구가 어떻게 싸웠는지 살펴봐요!') : win ? '다음 판은 상대가 더 똑똑해질 수 있어요!' : '팁: 빨간 표시가 뜨면 회피! 상성이 좋은 펫으로 교체해 보세요.'}</p>
-      ${live ? `<div class="ar-emo-row" role="group" aria-label="이모트">${LIVE.EMOTES.map((e, i) => `<button type="button" data-ar="emote-i" data-i="${i}">${esc(e)}</button>`).join('')}</div><div class="ar-invite" id="ar-res-invite"></div>` : ''}
+      ${live ? `<div class="ar-res-emo" aria-hidden="true"><span><span class="ar-emo" id="ar-emo-seat-me"></span><small>나</small></span><span><span class="ar-emo" id="ar-emo-seat-foe"></span><small>${esc(R.r.foe.name)}</small></span></div><div class="ar-emo-row" role="group" aria-label="이모트">${LIVE.EMOTES.map((e, i) => `<button type="button" data-ar="emote-i" data-i="${i}">${esc(e)}</button>`).join('')}</div><div class="ar-invite" id="ar-res-invite"></div>` : ''}
       <div class="ar-res-btns">${R.replayData ? '<button type="button" class="btn full" data-ar="replay">🎬 다시 보기</button>' : ''}<button type="button" class="yl-cta" data-ar="again">${live ? '친구 대전 한 판 더' : '한 판 더'}</button><button type="button" class="btn full" data-ar="exit">놀이터로</button></div>
     </div>
   </section>`);
