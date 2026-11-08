@@ -189,8 +189,8 @@ function togglePet(key) {
 // V13.229 스킬 ②: 속성 스킬 2개 중 하나를 고른다(톡 누르면 바뀐다, 무료).
 function skillLine(key, form, level) {
   const pick = R.picks?.[key] === 1 ? 1 : 0, f = fighter({ key, form, level, s2: pick }), k = f.skill, r = ROLE[f.role];
-  const opts = skill2Picks(key).map((k2, i) => `<button type="button" class="ar-pick2${i === pick ? ' on' : ''}" data-ar="pick2" data-key="${esc(key)}" data-i="${i}" aria-pressed="${i === pick}"><b>${k2.icon} ${esc(k2.name)}</b><small>${esc(k2.desc)}</small></button>`).join('');
-  return `<span class="ar-skill" style="--c1:${pal(f.el).c1};--c2:${pal(f.el).c2}"><i class="ar-role">${esc(r.name)} · ${f.melee ? '근접' : '원거리'}<small>${esc(r.desc)}</small></i><b>① ${esc(k.name)}</b><small>${esc(KIND_KO[k.kind])} · ${esc(k.desc)}</small><b>② 고르기 <small>톡 눌러 바꾸기 · 무료</small></b><span class="ar-picks" role="group" aria-label="스킬 2 고르기">${opts}</span><em>필살기 ${esc(f.ult)}</em></span>`;
+  const opts = skill2Picks(key).map((k2, i) => `<button type="button" class="ar-pick2${i === pick ? ' on' : ''}" data-ar="pick2" data-key="${esc(key)}" data-i="${i}" aria-pressed="${i === pick}" title="${esc(k2.desc)}"><i>${k2.icon}</i><b>${esc(k2.name)}</b></button>`).join('');
+  return `<span class="ar-skill" style="--c1:${pal(f.el).c1};--c2:${pal(f.el).c2}"><i class="ar-role">${esc(r.name)} · ${f.melee ? '근접' : '원거리'}<small>${esc(r.desc)}</small></i><b>① ${esc(k.name)}</b><small>${esc(KIND_KO[k.kind])} · ${esc(k.desc)}</small><b class="ar-pick-h">② 고르기</b><span class="ar-picks" role="group" aria-label="스킬 2 고르기">${opts}</span><small class="ar-pick-desc">${esc(f.skill2.desc)}</small><em>필살기 ${esc(f.ult)}</em></span>`;
 }
 function lobby(again = false, keep = false) {
   R.playing = false;
@@ -300,6 +300,7 @@ function play(r) {
   Object.assign(R, { inputs: [], queue: [], dir: 0, sentDir: 0, holdAtk: false, keyDown: new Set(), playing: true, paused: false, pausedMs: 0, started: false });
   app()?.classList.add('playing');
   main(field()); artGuard();
+  R.slots = null; R.skillsOn = true;
   preloadPoses();
   applyLite();
   R.fxN = 0; R.lag = { last: 0, longs: [] };
@@ -468,14 +469,14 @@ function drawHp() {
 }
 // 버튼 쿨타임 · 필살기 링(바뀔 때만 쓴다).
 function drawPad() {
-  const m = R.cur.me, set = (id, frac) => { const el = $(id); if (!el) return; const v = Math.round(frac * 100); if (el._v !== v) { el._v = v; el.style.transform = `scaleY(${frac})`; el.parentElement?.classList.toggle('wait', frac > 0); } };
+  const m = R.cur.me, set = (id, frac) => { const el = slot(id); if (!el) return; const v = Math.round(frac * 100); if (el._v !== v) { el._v = v; el.style.transform = `scaleY(${frac})`; el.parentElement?.classList.toggle('wait', frac > 0); } };
   const f = R.teams.me[m.idx];
   set('ar-cd-skill', Math.max(0, m.skill) / (f.skillCd || ARENA.SKILL_TICKS));
   set('ar-cd-skill2', Math.max(0, m.skill2) / (f.skill2Cd || ARENA.SKILL2_TICKS));
   set('ar-cd-dodge', Math.max(0, m.dodgeCd) / (f.dodgeCd || ARENA.DODGE_CD));
   const alive = m.team.filter((f, i) => f.cur > 0 && i !== m.idx).length;
   set('ar-cd-swap', alive ? Math.max(0, m.swapCd) / ARENA.SWAP_CD : 1);
-  const g = Math.floor(m.gauge), ring = $('ar-ult-ring');
+  const g = Math.floor(m.gauge), ring = slot('ar-ult-ring');
   if (ring && ring._g !== g) { ring._g = g; ring.style.strokeDashoffset = String(100 - g); $('ar-ult')?.classList.toggle('full', g >= ARENA.GAUGE_MAX); }
 }
 // 경기장 좌표(%) → 픽셀(화면 크기가 바뀔 때만 다시 잰다).
@@ -484,7 +485,7 @@ const px = (x, y) => { const g = geo(); return { x: x / 100 * g.w, y: y / 100 * 
 function place(frac) {
   const at = {};
   for (const who of ['me', 'foe']) {
-    const a = R.prev[who], b = R.cur[who], el = $(`ar-${who}`); if (!el) continue;
+    const a = R.prev[who], b = R.cur[who], el = slot(`ar-${who}`); if (!el) continue;
     const jump = a.idx !== b.idx || Math.abs(b.x - a.x) > 12; // 교체 · 밀쳐내기는 한 번에
     const x = jump ? b.x : a.x + (b.x - a.x) * frac, y = jump ? b.y : a.y + (b.y - a.y) * frac;
     const p = px(x, y);
@@ -502,15 +503,15 @@ function place(frac) {
   }
   // 겹침 순서: 아래쪽(앞) 펫이 위로. 순서가 바뀔 때만 쓴다(매 프레임 zIndex를 쓰지 않는다).
   const z = at.me && at.foe && at.me.y >= at.foe.y ? 'me' : 'foe';
-  if (R.z !== z) { R.z = z; const m = $('ar-me'), f = $('ar-foe'); if (m) m.style.zIndex = z === 'me' ? '12' : '11'; if (f) f.style.zIndex = z === 'me' ? '11' : '12'; }
+  if (R.z !== z) { R.z = z; const m = slot('ar-me'), f = slot('ar-foe'); if (m) m.style.zIndex = z === 'me' ? '12' : '11'; if (f) f.style.zIndex = z === 'me' ? '11' : '12'; }
   // 내 펫이 바라보는 쪽 화살표(16방향 칸이 바뀔 때만 돌린다).
   const fc = aimCode(R.cur.me.fx, R.cur.me.fy);
-  if (fc !== R.faceCode) { R.faceCode = fc; const f = $('ar-face'), g = geo(); if (f) f.style.transform = `rotate(${(Math.atan2(R.cur.me.fy * g.h, R.cur.me.fx * g.w) * 180 / Math.PI + 90).toFixed(1)}deg)`; }
+  if (fc !== R.faceCode) { R.faceCode = fc; const f = slot('ar-face'), g = geo(); if (f) f.style.transform = `rotate(${(Math.atan2(R.cur.me.fy * g.h, R.cur.me.fx * g.w) * 180 / Math.PI + 90).toFixed(1)}deg)`; }
   if (R.drag?.on) drawAim();
   // 날아가는 공격 · 지진 표시(정해진 개수의 칸을 다시 쓴다).
   const shots = R.cur.shots;
   for (let i = 0; i < SHOTS_MAX; i++) {
-    const el = $(`ar-shot-${i}`), s = shots[i]; if (!el) continue;
+    const el = slot(`ar-shot-${i}`), s = shots[i]; if (!el) continue;
     if (!s) { if (el._on) { el._on = false; el.style.opacity = '0'; } continue; }
     // V13.229 새 스킬 탄(바위 · 얼음 창 · 독침 · 분신 별): 종류 · 방향이 바뀔 때만 클래스 · 각도를 다시 쓴다.
     const p = px(s.x, s.y), P = pal(s.el), ang = s.id ? Math.round(angOf(s.vx, s.vy) / 5) * 5 : 0, key = `${s.el}${s.kind}${s.r}${s.id}${ang}`;
@@ -520,7 +521,7 @@ function place(frac) {
   }
   const qs = R.cur.quakes;
   for (let i = 0; i < WARN_MAX; i++) {
-    const el = $(`ar-warn-${i}`), q = qs[i]; if (!el) continue;
+    const el = slot(`ar-warn-${i}`), q = qs[i]; if (!el) continue;
     if (!q) { if (el._on) { el._on = false; el.style.opacity = '0'; el.className = 'ar-warn'; el._from = null; } continue; }
     // 크기는 transform scale로만(너비 · 높이를 바꾸면 배치를 다시 한다). 기본 칸은 WARN_BASE px 원.
     const p = px(q.x, q.y), k = q.r * 2 / 100 * geo().w / WARN_BASE * (1.15 - Math.max(0, q.left) / (q.warn || 14) * 0.3);
@@ -530,7 +531,7 @@ function place(frac) {
   }
   const ms = R.cur.mines || [];
   for (let i = 0; i < MINE_MAX; i++) {
-    const el = $(`ar-mine-${i}`), m = ms[i]; if (!el) continue;
+    const el = slot(`ar-mine-${i}`), m = ms[i]; if (!el) continue;
     if (!m) { if (el._on) { el._on = false; el.style.opacity = '0'; el.className = 'ar-mine'; } continue; }
     const p = px(m.x, m.y);
     if (!el._on) { el._on = true; el.style.opacity = '1'; el.className = `ar-mine on ${m.from}`; el.style.setProperty('--c1', pal(m.el).c1); }
@@ -545,23 +546,29 @@ function slotClass(el, cls, art) {
   el._cls = cls; el.className = cls;
   if (el._art !== art) { el._art = art; el.style.setProperty('--art', art || 'none'); }
 }
+// 칸 찾기는 판마다 한 번(매 프레임 getElementById를 하지 않는다).
+const slot = id => (R.slots ||= new Map()).get(id) || (() => { const el = $(id); if (el) R.slots.set(id, el); return el; })();
 function drawSkills(at) {
   const v = R.cur, g = geo();
+  // 새 스킬 칸이 하나도 없고 지난 프레임에도 없었으면 바로 끝(대부분의 프레임).
+  const busy = (v.zones?.length || 0) + (v.lines?.length || 0) + (v.minions?.length || 0) + (v.me.chan > 0) + (v.foe.chan > 0);
+  if (!busy && !R.skillsOn) return;
+  R.skillsOn = busy > 0;
   // 장판: 장판 번호(n) % 4 칸. 한 판에 4개까지라 늘 다른 칸이다.
   const used = new Set();
   for (const z of v.zones || []) {
-    const i = z.n % ZONES_MAX, el = $(`ar-zone-${i}`); if (!el) continue;
+    const i = z.n % ZONES_MAX, el = slot(`ar-zone-${i}`); if (!el) continue;
     used.add(i);
     const p = px(z.x, z.y), k = z.r * 2 / 100 * g.w / ZONE_BASE, fade = z.left < 10 ? ' fading' : '', P = pal(z.el);
     if (el._n !== z.n) { el._n = z.n; el.style.setProperty('--c1', P.c1); el.style.setProperty('--c2', P.c2); try { el.animate([{ opacity: 0, scale: '.3' }, { opacity: 1, scale: '1.08', offset: .6 }, { opacity: 1, scale: '1' }], { duration: 320, easing: 'ease-out' }); } catch {} }
     slotClass(el, `ar-zone on ${z.id} ${z.from}${fade}${artOf(z.id) ? ' art' : ''}`, artOf(z.id));
     el.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) translate(-50%, -50%) scale(${k.toFixed(3)})`;
   }
-  for (let i = 0; i < ZONES_MAX; i++) if (!used.has(i)) { const el = $(`ar-zone-${i}`); if (el && el._cls !== 'ar-zone') { el._n = -1; slotClass(el, 'ar-zone', ''); } }
+  for (let i = 0; i < ZONES_MAX; i++) if (!used.has(i)) { const el = slot(`ar-zone-${i}`); if (el && el._cls !== 'ar-zone') { el._n = -1; slotClass(el, 'ar-zone', ''); } }
   // 줄기 표시(모으는 동안): 쏜 펫 자리에서 조준 방향으로 가는 얇은 띠(길이 · 굵기는 scale).
   const ls = v.lines || [];
   for (let i = 0; i < LINE_MAX; i++) {
-    const el = $(`ar-line-${i}`), L = ls[i]; if (!el) continue;
+    const el = slot(`ar-line-${i}`), L = ls[i]; if (!el) continue;
     if (!L) { if (el._on) { el._on = false; el.className = 'ar-line'; } continue; }
     const p = px(L.x, L.y), len = L.len / 100 * g.w, wide = Math.max(0.4, L.w * 2 / 100 * g.w / 10);
     if (!el._on || el._id !== L.id + L.from) { el._on = true; el._id = L.id + L.from; el.className = `ar-line on ${L.id} ${L.from}`; el.style.setProperty('--c1', pal(L.el).c1); }
@@ -569,7 +576,7 @@ function drawSkills(at) {
   }
   // 부채꼴 지속(불 뿜기): 쪽마다 칸 하나. 펫 입에서 조준 방향으로.
   for (const who of ['me', 'foe']) {
-    const el = $(`ar-cone-${who}`), s = v[who]; if (!el) continue;
+    const el = slot(`ar-cone-${who}`), s = v[who]; if (!el) continue;
     if (!(s.chan > 0)) { if (el._on) { el._on = false; el.className = `ar-cone ${who}`; } continue; }
     const p = at[who] ? px(at[who].x, at[who].y) : px(s.x, s.y), len = (SK2.breath.range + ARENA.BODY) / 100 * g.w;
     if (!el._on) { el._on = true; const art = artOf('breath'); el.style.setProperty('--art', art || 'none'); el.className = `ar-cone ${who} on${art ? ' art' : ''}`; }
@@ -578,7 +585,7 @@ function drawSkills(at) {
   // 분신: 쪽마다 칸 하나(반투명 펫 그림 + 별가루 테두리).
   const ms = v.minions || [];
   for (const who of ['me', 'foe']) {
-    const el = $(`ar-clone-${who}`), m = ms.find(q => q.from === who); if (!el) continue;
+    const el = slot(`ar-clone-${who}`), m = ms.find(q => q.from === who); if (!el) continue;
     if (!m) { if (el._on) { el._on = false; el.className = `ar-clone ${who}`; } continue; }
     if (el._key !== m.key) { el._key = m.key; const b = el.querySelector('.ar-clone-body'); if (b) b.innerHTML = petImg(m.key, R.forms[who][R.cur[who].idx] || 2, 'ar-pet-img'); }
     if (!el._on) { el._on = true; const art = artOf('clone'); el.style.setProperty('--art', art || 'none'); el.style.setProperty('--c1', pal(m.el).c1); el.className = `ar-clone ${who} on${art ? ' art' : ''}`; }
@@ -606,7 +613,7 @@ function loop(now) {
   R.raf = requestAnimationFrame(loop);
 }
 function clock() {
-  const s = Math.max(0, Math.ceil((ARENA.MAX_TICKS - R.sim.S.t) * ARENA.TICK_MS / 1000)), el = $('ar-clock');
+  const s = Math.max(0, Math.ceil((ARENA.MAX_TICKS - R.sim.S.t) * ARENA.TICK_MS / 1000)), el = slot('ar-clock');
   if (el && el._s !== s) { el._s = s; el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; el.classList.toggle('low', s <= 15); }
 }
 // 한 틱: 이번 틱의 조작을 기록 · 전투에 넣고 → 한 걸음 → 사건 그리기.

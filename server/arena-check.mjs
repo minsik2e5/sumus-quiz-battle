@@ -177,9 +177,16 @@ export async function runArenaChecks(assert) {
       'V13.229 스킬 ②는 펫 속성의 새 스킬 2개 중 하나(근접 · 원거리 모두 같은 두 개에서 고른다)');
     // 근접(돌진 · 지진)과 원거리(빔 · 구슬)가 서로 이길 수 있다.
     const melee = keys.filter(k => ['dash', 'quake'].includes(SHAPE[elementOf(k)])), ranged = keys.filter(k => !melee.includes(k));
-    const win = (A, B) => { let w = 0; for (let n = 1; n <= 36; n++) { const me = [0, 1, 2].map(i => fighter({ key: A[(n * 3 + i) % A.length], form: 2, level: 10 })), foe = [0, 1, 2].map(i => fighter({ key: B[(n * 5 + i * 7) % B.length], form: 2, level: 10 })); const X = createArena({ seed: n * 31, me, foe, foeLevel: 1 }); playArena(X, 1, n); if (X.S.winner === 'me') w++; } return w / 36; };
-    const mr = win(melee, ranged), rm = win(ranged, melee);
-    assert(mr > 0.35 && mr < 0.85 && rm > 0.35 && rm < 0.85 && Math.abs(mr - rm) < 0.3, `V13.226 근접 펫도 원거리 펫을 이길 수 있다(근접 → 원거리 ${Math.round(mr * 100)}% · 원거리 → 근접 ${Math.round(rm * 100)}%)`);
+    // V13.229: 근접 팀 대 원거리 팀을 직접 붙인다(양쪽 보통 컴퓨터, 절반은 자리를 바꾸고 스킬 ②도 섞는다). 전: 400판 55.0% → 후 55.2%.
+    //   (예전에는 검사용 학생 대 컴퓨터로 쟀지만, 그 값은 학생 · 컴퓨터 솜씨 차이가 섞여 근접 · 원거리 차이를 보기 어렵다.)
+    let mw = 0;
+    for (let n = 1; n <= 400; n++) {
+      const flip = n % 2, me = [0, 1, 2].map(i => fighter({ key: melee[(n * 3 + i) % melee.length], form: 2, level: 10, s2: (n + i) & 1 })), foe = [0, 1, 2].map(i => fighter({ key: ranged[(n * 5 + i * 7) % ranged.length], form: 2, level: 10, s2: (n >> 1) + i & 1 }));
+      const X = createArena({ seed: n * 31, me: flip ? foe : me, foe: flip ? me : foe, foeLevel: 1, meAi: 1 });
+      let g = 0; while (!X.S.over && g++ < ARENA.MAX_TICKS + 50) X.step();
+      mw += X.S.winner === (flip ? 'foe' : 'me') ? 1 : X.S.winner === 'draw' ? 0.5 : 0;
+    }
+    assert(mw / 400 > 0.38 && mw / 400 < 0.62, `V13.226 근접 펫도 원거리 펫을 이길 수 있다(근접 팀 대 원거리 팀 ${Math.round(mw / 4)}%, 400판)`);
     // 스킬 2 버튼: 쿨타임이 있다(V13.229 방울 보호막: 누르면 방울 2개).
     const me = [fighter({ key: 'dog', form: 2, level: 5 })];
     const A = createArena({ seed: 3, me: [fighter({ key: 'turtle', form: 2, level: 5, s2: 1 })], foe: me, foeLevel: 0 });
@@ -256,7 +263,7 @@ export async function runArenaChecks(assert) {
   {
     assert(petTier('dog') === 'normal' && petTier('penguin') === 'epic' && petTier('phoenix') === 'legend' && petTier('tyranno') === 'legend' && petTier('ladybug') === 'legend' && petTier('pumpkincat') === 'limited' && petTier('gumiho') === 'mythic',
       'V13.228 아레나 등급: 일반 · 영웅 · 전설(시리즈 포함) · 한정 · 신화');
-    assert(TIER_MUL.normal === 1 && Math.abs(TIER_MUL.epic - 1) <= 0.01 && Math.abs(TIER_MUL.limited - 1) <= 0.025 && TIER_MUL.legend > TIER_MUL.epic && TIER_MUL.mythic > TIER_MUL.legend && TIER_MUL.mythic <= 1.12,
+    assert(TIER_MUL.normal === 1 && Math.abs(TIER_MUL.epic - 1) <= 0.02 && Math.abs(TIER_MUL.limited - 1) <= 0.025 && TIER_MUL.legend > TIER_MUL.epic && TIER_MUL.mythic > TIER_MUL.legend && TIER_MUL.mythic <= 1.12,
       `V13.228 등급 배수: 일반 ${TIER_MUL.normal} · 영웅 ${TIER_MUL.epic} · 전설 ${TIER_MUL.legend} · 한정 ${TIER_MUL.limited} · 신화 ${TIER_MUL.mythic}`);
     const got = TIER_PAIRS.map(([a, b, goal, tol]) => ({ a, b, goal, tol, r: tierRate(a, b, 800) }));
     assert(got.every(x => Math.abs(x.r - x.goal) <= x.tol), `V13.228 등급 승률(800판씩, 양쪽 같은 솜씨): ${got.map(x => `${x.a} 대 ${x.b} ${Math.round(x.r * 1000) / 10}%(목표 ${Math.round(x.goal * 100)} ± ${Math.round(x.tol * 100)})`).join(' · ')}`);
@@ -369,8 +376,8 @@ export async function runArenaChecks(assert) {
       assert(Object.keys(q.games.arena.s2).length <= S2_MAX, `V13.229 스킬 ② 기억은 ${S2_MAX}개까지(프로필 크기 상한)`);
     }
     // 밸런스: 같은 펫이 두 스킬 중 무엇을 골라도 섞인 상대 팀 승률 차이 ±3% 안(node server/arena-sim.mjs picks 1000).
-    const gaps = Object.keys(EL_SKILLS).map(el => ({ el, ...pickGap(el, 600) }));
-    assert(gaps.every(g => Math.abs(g.gap) <= 0.03), `V13.229 스킬 ② 고르기 승률 차이(600판씩): ${gaps.map(g => `${EL_SKILLS[g.el][0].name} ${Math.round(g.a * 1000) / 10} · ${EL_SKILLS[g.el][1].name} ${Math.round(g.b * 1000) / 10}`).join(' / ')}`);
+    const gaps = Object.keys(EL_SKILLS).map(el => ({ el, ...pickGap(el, 1000) }));
+    assert(gaps.every(g => Math.abs(g.gap) <= 0.03), `V13.229 스킬 ② 고르기 승률 차이(1000판씩): ${gaps.map(g => `${EL_SKILLS[g.el][0].name} ${Math.round(g.a * 1000) / 10} · ${EL_SKILLS[g.el][1].name} ${Math.round(g.b * 1000) / 10}`).join(' / ')}`);
     // 화면: 스킬 ② 고르기 칸 · 새 칸(장판 4 · 줄기 · 부채꼴 · 분신) · 조각 상한 · 그림 게이트.
     const ui = source('../public/modules/arena.js'), css = source('../public/v13229.css'), build = source('./build-assets.mjs');
     assert(['data-ar="pick2"', 'skill2Picks(key)', "api('/games/arena/start', { team: R.team, picks })", 'R.view?.s2', 's2: f.s2', 'id="ar-zone-${i}"', 'id="ar-line-${i}"', 'id="ar-stream-${i}"', 'id="ar-cone-${w}"', 'id="ar-clone-${w}"', 'function drawSkills(', 'function streamFx(', 'function ultExtra(', 'function meteorBoom(', "import { ARENA_ART } from './arena-art.js'"].every(x => ui.includes(x)) && build.includes('"v13229.css"') && build.includes("public/modules/arena-art.js") && source('../public/modules/arena-art.js').includes('export const ARENA_ART'),

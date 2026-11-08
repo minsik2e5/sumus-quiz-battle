@@ -151,10 +151,10 @@ export const EL_SKILLS = {
   ],
   water: [
     { id: 'jet', name: '물대포', shape: 'stream', icon: '🌊', desc: '굵은 물줄기 · 맞으면 크게 밀려남' },
-    { id: 'bubble', name: '방울 보호막', shape: 'guard', icon: '🫧', desc: '피해 2번 막고 깨질 때 밀쳐냄' }
+    { id: 'bubble', name: '방울 보호막', shape: 'guard', icon: '🫧', desc: '잠깐 피해 2번 막고 깨질 때 밀쳐냄' }
   ],
   leaf: [
-    { id: 'vine', name: '덩굴 묶기', shape: 'stream', icon: '🌱', desc: '땅에서 덩굴이 솟아 1초 묶음' },
+    { id: 'vine', name: '덩굴 묶기', shape: 'stream', icon: '🌱', desc: '땅에서 덩굴이 솟아 1.5초 묶음' },
     { id: 'petal', name: '꽃잎 회복장', shape: 'field', icon: '🌸', desc: '4초 동안 안에 있으면 회복' }
   ],
   earth: [
@@ -180,22 +180,22 @@ export const EL_SKILLS = {
 };
 // 스킬마다 세기 · 길이(밸런스는 server/arena-sim.mjs picks로 맞춘다: 같은 펫이 두 스킬 중 무엇을 골라도 승률 차이 ±3% 안).
 export const SK2 = {
-  breath: { ticks: 24, every: 4, range: 27, cos: 0.866, power: 1.18, burn: 40, burnPow: 0.1 },
-  meteor: { r: 14, warn: 16, power: 3.15 },
+  breath: { ticks: 24, every: 4, range: 27, cos: 0.866, power: 0.85, burn: 40, burnPow: 0.1 },
+  meteor: { r: 14, warn: 16, power: 4.7 },
   jet: { len: 54, w: 6, warn: 5, power: 2.4, knock: 13 },
-  bubble: { hits: 2, ticks: 36, pop: 0.4, push: 10, popR: 17 },
-  vine: { len: 48, w: 4, warn: 6, power: 4.0, root: 30 },
-  petal: { r: 14, ticks: 80, every: 10, heal: 0.012 },
-  boulder: { v: 2.3, r: 4.5, life: 30, power: 2.0, stun: 5 },
-  crack: { r: 13, ticks: 60, every: 10, power: 0.8, slow: 14 },
-  tornado: { r: 10, ticks: 60, every: 8, power: 1.2, v: 0.8, pull: 1.1 },
-  gale: { n: 3, ticks: 5, gap: 3, v: 3.6, power: 1.4 },
-  icefield: { r: 14, ticks: 70, every: 10, power: 0.4, slow: 14, slide: 0.4 },
-  spear: { n: 3, spread: 0.2, v: 3.8, r: 2.6, life: 14, power: 0.75, freeze: 6 },
-  cloud: { r: 17, ticks: 80, every: 10, poison: 30, dot: 0.25 },
-  darts: { n: 5, every: 2, v: 4.4, r: 2, life: 14, power: 0.65, venom: 22, venomMax: 110 },
-  chain: { len: 56, w: 3.5, warn: 4, power: 1.6, zap: 7 },
-  clone: { ticks: 60, every: 9, power: 0.5, v: 3.4, r: 2.4, life: 16, hitR: 4 }
+  bubble: { hits: 2, ticks: 36, pop: 0.32, push: 10, popR: 17 },
+  vine: { len: 50, w: 6.5, warn: 5, power: 4.7, root: 30 },
+  petal: { r: 14, ticks: 80, every: 10, heal: 0.023 },
+  boulder: { v: 2.3, r: 4.5, life: 30, power: 1.75, stun: 5 },
+  crack: { r: 13, ticks: 60, every: 10, power: 0.64, slow: 14 },
+  tornado: { r: 12, ticks: 60, every: 8, power: 1.8, v: 0.8, pull: 1.4 },
+  gale: { n: 3, ticks: 5, gap: 3, v: 3.6, power: 1.22 },
+  icefield: { r: 12, ticks: 70, every: 10, power: 0.35, slow: 14, slide: 0.4 },
+  spear: { n: 3, spread: 0.2, v: 3.8, r: 2.6, life: 14, power: 0.35, freeze: 4 },
+  cloud: { r: 17, ticks: 80, every: 10, poison: 30, dot: 0.29 },
+  darts: { n: 5, every: 2, v: 4.4, r: 2, life: 14, power: 0.69, venom: 22, venomMax: 110 },
+  chain: { len: 56, w: 3.5, warn: 4, power: 1.1, zap: 7 },
+  clone: { ticks: 60, every: 9, power: 0.58, v: 3.4, r: 2.4, life: 16, hitR: 4 }
 };
 export const ZONES_MAX = 4;   // 장판은 한 판에 4개까지(넘으면 오래된 것부터 사라진다 · 화면도 칸 4개를 다시 쓴다)
 export const MINIONS_MAX = 2; // 분신은 쪽마다 1마리(두 쪽 합쳐 2)
@@ -224,7 +224,8 @@ export function petTier(key) {
 }
 // 시작 값(일반 1 · 영웅 1 · 전설 · 시리즈 1.06 · 한정 1 · 신화 1.12)에서 승률을 보고 고친 값: 펫 무리마다 속성 · 근접/원거리 섞임이 달라서
 //   같은 배수여도 승률이 다르다(예: 한정 펫은 원거리가 많아 1.00이면 약 45%). 4000판씩: 영웅 49.7 · 전설 54.3 · 신화 대 전설 54.8 · 한정 49.4%. 목표: 일반 대 영웅 50 ± 3 · 전설 대 일반 ≈ 55 · 신화 대 전설 ≈ 55 · 한정 대 일반 50 ± 3.
-export const TIER_MUL = { normal: 1, epic: 1.005, legend: 1.035, limited: 1.02, mythic: 1.105 };
+// V13.229 새 스킬 16개를 넣고 다시 맞춤(1500판씩): 영웅 49.5 · 전설 53.8 · 신화 대 전설 55.8 · 한정 49.7%.
+export const TIER_MUL = { normal: 1, epic: 1.015, legend: 1.035, limited: 1.02, mythic: 1.095 };
 const FORM_HP = [0, 300, 420, 560], FORM_ATK = [0, 12, 16, 20];
 // 펫 이름에서 고정으로 정한 작은 차이(같은 펫은 늘 같다): 빠르기 0.9~1.1.
 const keyHash = key => [...String(key)].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) % 9973, 7);
@@ -279,12 +280,13 @@ export function cleanInputs(raw, maxTick = ARENA.MAX_TICKS + 400) {
   return out;
 }
 
+// V13.229 새 스킬을 넣고 쉬움 · 어려움의 공격 간격(slow)을 다시 맞췄다(보통 학생: 쉬움 ≈ 90 · 보통 ≈ 50 · 어려움 ≈ 35).
 // 컴퓨터 상대의 솜씨(쉬움 · 보통 · 어려움): 날아오는 공격을 피할 확률 · 공격 간격 배수 · 스킬 쓰는 정도 · 공격 누르는 정도 ·
 //   V13.228 조준 정확도(acc: 정확히 상대 쪽으로 끌 확률, 아니면 16방향 한두 칸 빗나감). 컴퓨터도 사람과 같은 조준 규칙을 따른다.
 export const AI = [
-  { dodge: 0.1, slow: 1.56, skill: 0.05, aim: 0.6, acc: 0.4 },
+  { dodge: 0.1, slow: 1.66, skill: 0.05, aim: 0.6, acc: 0.4 },
   { dodge: 0.25, slow: 1.36, skill: 0.08, aim: 0.85, acc: 0.5 },
-  { dodge: 0.36, slow: 1.27, skill: 0.1, aim: 0.9, acc: 0.57 }
+  { dodge: 0.36, slow: 1.25, skill: 0.1, aim: 0.9, acc: 0.57 }
 ];
 const wantNone = () => ({ atk: false, skill: false, skill2: false, ult: false, dodge: false, swap: false, atkA: -1, skillA: -1, skill2A: -1, ultA: -1 });
 
