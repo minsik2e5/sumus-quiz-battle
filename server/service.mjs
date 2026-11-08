@@ -56,6 +56,7 @@ import { matchStart, matchFinish, matchView, matchBoard, matchGhost } from './ga
 import { wallStart, wallFinish, wallView, wallLine } from './wall.mjs';
 import { ARENA } from '../public/modules/arena-rules.js';
 import { arenaStart, arenaFinish, arenaView, arenaLine, arenaPoolFor, arenaPoolPut, grantArenaTicket } from './arena.mjs';
+import { rankBoardView, claimRank } from './arena-rank.mjs';
 import { arenaPeers, arenaInviteFor, myLiveRoom, liveOpen, liveInvite, liveJoin, liveDecline, liveResult, pairLeft, tidyArenaInvites, settleArenaLive, arenaReportPending, undoLiveJoin } from './arena-live.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
 import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, partyPlaysLeft, settleParty, partyReportPending, undoParty } from './party.mjs';
@@ -1999,6 +2000,19 @@ export async function service(state, method, path, body, token, options = {}) {
     const result = arenaFinish(p, { id: str(body.id, 80), inputs: Array.isArray(body.inputs) ? body.inputs.slice(0, 4000) : [], pet: activePetKey(state, p.id), now });
     if (!result.again && result.reason !== 'short') logActivity(p, 'arena', arenaLine(result), now);
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
+  }
+  // V13.234 랭크 시즌(server/arena-rank.mjs): 랭킹 탭은 GET + 1분 캐시(같은 학교 · 같은 학년 상위 20명 + 내 순위).
+  //   학생 목록을 훑는 일은 이 GET에서 1분에 한 번(학년 묶음마다)만. 쓰기 요청(판 끝)은 그 학생 랭크만 고친다.
+  if (path === '/games/arena/rank' && method === 'GET') {
+    requireRole(p, 'student');
+    return rankBoardView(p.preview_owner_id ? [] : state.profiles, p, x => schoolForProfile(state, x), Date.now());
+  }
+  // 시즌 보상 받기: 보상 안 받은 지난 시즌마다 한 번(코인 조금 + 칭호). 그 학생 것만.
+  if (path === '/games/arena/rank/claim' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now(), r = claimRank(p, { pet: activePetKey(state, p.id), now });
+    if (r.coins) logActivity(p, 'arena', `펫 아레나 시즌 보상 · ${r.got.map(x => `시즌 ${x.s} ${x.label}`).join(', ')} · ${r.coins}코인`, now);
+    return { ...r, ...arenaView(p, now), points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
   // V13.230 펫 아레나 실시간 친구 대전(server/arena-live.mjs · 방 cloudflare/arena-room.mjs). 같은 학년끼리만(선생님 결정).
   //   보기(친구 목록 · 내 방 · 결과)는 GET. 판은 방 객체가 돌리고, 메인은 방 열기 · 들어가기 · 결과 한 번만.

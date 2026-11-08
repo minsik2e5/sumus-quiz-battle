@@ -4,7 +4,7 @@
 //   (build-runner.mjs는 26번 이후를 모르므로 돌리지 않는다: slice-map.csv 뒤쪽이 지워진다.)
 // 앱은 그림이 없어도 CSS 버튼(금속 테두리 · 보석 바탕 · 원형 쿨타임)으로 완성되어 보인다. 그림(public/assets/arena/<이름>.webp)이 들어오면
 //   npm run build:assets가 public/modules/arena-art.js(ARENA_ART)에 이름을 적고, 같은 자리(버튼 바탕 · 아이콘 · 조이스틱 · 이모트)가 그 그림으로 바뀐다.
-//   (public/modules/arena.js uiArt · setIco, public/v13233.css .art-bg · .art-ico. 코드 등록 필요 없음.)
+//   (public/modules/arena.js uiArt · setIco, public/v13235.css .art-bg · .art-ico. 코드 등록 필요 없음.)
 // 글자 · 숫자는 그리지 않는다(버튼 이름 · 쿨타임은 앱이 쓴다).
 // CLAUDE.md 그림 주문서 규칙 두 가지를 시트마다 넣는다:
 //   ① Drive의 기존 아레나 그림(65번 · 66번)을 열어 그림체를 맞추라 ② 정해진 Drive 폴더에 정확한 파일 이름으로 저장하라.
@@ -113,13 +113,13 @@ const CODEX = () => `# Codex 작업 지시: 그림 67 (펫 아레나 경기 버�
 
 ## 목표
 선생님 주문: "옆에 버튼들 퀄이 너무 떨어져. **에셋으로 만들자.**" 경기장 오른쪽 버튼(공격 · 스킬 ① · 스킬 ② · 필살기 · 회피 · 교체), 왼쪽 조이스틱 바닥 · 손잡이, 이모트 버튼을 게임다운 그림 버튼으로 바꾼다.
-v13.233에서 CSS 버튼(금속 테두리 · 보석 바탕 · 원형 쿨타임 · 준비됨 빛)과 그림 자리를 먼저 만들어 두었다. **그림 파일만 넣으면 된다.**
+v13.235에서 CSS 버튼(금속 테두리 · 보석 바탕 · 원형 쿨타임 · 준비됨 빛)과 그림 자리를 먼저 만들어 두었다. **그림 파일만 넣으면 된다.**
 
 | 시트 | 내용 | 넣는 곳(\`public/assets/arena/\`) | 자르기 |
 |---|---|---|---|
 ${SHEETS.map(s => `| ${s.no} | ${s.ko} | ${s.cells.filter(c => c[1] !== '-').map(c => `\`${c[1]}\``).join(' · ')} | \`${s.cut}\` |`).join('\n')}
 
-\`npm run build:assets\`가 \`public/modules/arena-art.js\`(\`ARENA_ART\`)에 이름을 적고, 경기 화면의 같은 자리(버튼 바탕 · 아이콘 · 조이스틱 · 이모트)가 알아서 그림으로 바뀐다(\`arena.js\` uiArt · setIco, \`v13233.css\` .art-bg · .art-ico). 앱 코드는 고치지 않는다.
+\`npm run build:assets\`가 \`public/modules/arena-art.js\`(\`ARENA_ART\`)에 이름을 적고, 경기 화면의 같은 자리(버튼 바탕 · 아이콘 · 조이스틱 · 이모트)가 알아서 그림으로 바뀐다(\`arena.js\` uiArt · setIco, \`v13235.css\` .art-bg · .art-ico). 앱 코드는 고치지 않는다.
 스킬 ① 아이콘은 스킬 종류(공격 burst · 강화 boost · 중독 poison · 지키기 guard), 스킬 ② 아이콘은 스킬 id(\`EL_SKILLS\`의 16개)로 고른다.
 
 ## 꼭 지킬 것

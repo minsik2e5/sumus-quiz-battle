@@ -8,6 +8,7 @@ import { ELEMENTS, fxImpact, fxPunch, fxSpeedLines, fxRecoil, fxLite } from './b
 import { ARENA, BEATS, INPUT, ROLE, DIR16, SK2, ZONES_MAX, TREE, createArena, fighter, dirCode, aimCode, petTree, cleanTree } from './arena-rules.js';
 import { ARENA_ART } from './arena-art.js';
 import { openLive, liveClick, closeLive, keepReplay } from './arena-live.js';
+import { rankCard, rankGain, playRankGain, rankBoardHtml, rankClaimHtml } from './arena-rank-ui.js';
 
 // V13.225 펫 아레나 2(놀이터): 전체 화면. 위에서 비스듬히 내려다보는 경기장에서 내 펫을 직접 조종해 상대 펫과 싸운다.
 //   왼쪽 아래 조이스틱으로 움직이고, 오른쪽 버튼: 공격(누르고 있으면 계속) · 스킬 1 · 스킬 2(펫마다 다르다) · 필살기(게이지) · 회피 · 교체.
@@ -121,10 +122,10 @@ function setBg(name) {
   el.onerror = () => { el.onerror = null; stage?.classList.remove('art'); el.src = `/assets/${backup}.webp`; };
   el.src = `/assets/${want}.webp`;
 }
-// V13.233 쿨타임 원형 게이지: 반쪽 원판 두 개(돌리기만) + 준비됨 반짝 링.
+// V13.235 쿨타임 원형 게이지: 반쪽 원판 두 개(돌리기만) + 준비됨 반짝 링.
 const CD = id => `<i class="cd" id="ar-cd-${id}"><i><b></b></i><i><b></b></i></i><i class="rdy"></i>`;
 const artImg = (name, cls) => `<img class="${cls}" data-ar-art src="/assets/arena/${name}.webp" alt="" draggable="false" decoding="async">`;
-// V13.233 그림 67(버튼 · 조이스틱 · 이모트 · 아이콘): 그림이 있으면 같은 자리를 그림으로(없으면 CSS 버튼 그대로).
+// V13.235 그림 67(버튼 · 조이스틱 · 이모트 · 아이콘): 그림이 있으면 같은 자리를 그림으로(없으면 CSS 버튼 그대로).
 const UI = name => ARENA_ART.has(name) ? `url(/assets/arena/${name}.webp)` : '';
 const UI_BTNS = [['atk', 'ui-btn-atk', 'ui-ico-atk'], ['skill', 'ui-btn-skill', ''], ['skill2', 'ui-btn-skill', ''], ['ult', 'ui-btn-ult', 'ui-ico-ult'], ['dodge', 'ui-btn-dodge', 'ui-ico-dodge'], ['swap', 'ui-btn-swap', 'ui-ico-swap']];
 function setIco(btn, url) {
@@ -186,6 +187,11 @@ function onClick(event) {
   if (act === 'pick2') { R.picks[b.dataset.key] = Number(b.dataset.i) === 1 ? 1 : 0; save(PICK_KEY(), R.picks); sfx('tap'); return lobby(false, true); }
   if (act === 'aim') { R.aim = b.dataset.aim; save(AIM_KEY, R.aim); sfx('tap'); return lobby(false, true); }
   if (act === 'start') return start(b);
+  // V13.234 랭크 시즌(arena-rank-ui.js): 랭킹 탭 · 시즌 보상 받기.
+  if (act === 'rank') { sfx('tap'); return rankBoard(); }
+  if (act === 'rank-back') { sfx('tap'); return lobby(false, true); }
+  if (act === 'rank-claim') return rankClaim(b);
+  if (act === 'rank-claim-ok') { document.querySelector('.ark-claim-pop')?.remove(); return lobby(false, true); }
   if (act === 'again') return lobby(true);
   if (act === 'quit-yes') { R.live?.quit?.(); return leave(); }
   if (act === 'quit-no') { document.querySelector('.ar-quit')?.remove(); resume(); return; }
@@ -300,6 +306,7 @@ function lobby(again = false, keep = false) {
   const slot = n => { const key = R.team[n], p = pets.find(x => x.key === key); return p ? `<span class="ar-slot on${key === R.focus ? ' focus' : ''}" data-ar="focus" data-key="${esc(key)}"><b>${n + 1}</b>${petImg(p.key, p.form)}<div><small>${esc(p.name || petName(p.key))} · Lv.${p.level}</small>${skillLine(p.key, p.form, p.level)}</div></span>` : `<span class="ar-slot"><b>${n + 1}</b><i>?</i><div><small>비어 있음</small></div></span>`; };
   main(`<section class="ar-lobby${again ? ' again' : ''}${keep ? ' keep' : ''}">
     <div class="ar-title"><small>3 대 3 펫 대전</small><h1>펫 아레나</h1></div>
+    ${rankCard(v.rank)}
     <div class="ar-card">
       <ul class="ar-rules">
         <li><b>🕹️</b><span>왼쪽 <em>조이스틱</em>으로 움직이면 그쪽을 바라봐요. <em>공격</em>은 바라보는 쪽으로!</span></li>
@@ -334,6 +341,36 @@ async function start(button) {
   R.view = { ...R.view, left: r.left, tickets: r.tickets, wins: r.wins, streak: r.streak, best_streak: r.best_streak, s2: r.s2 || R.view?.s2, tr: r.tr || R.view?.tr };
   await vs(r);
   if (R) play(r);
+}
+
+// V13.234 랭킹 탭: GET 한 번(1분 안에 다시 열면 받아 둔 것). 시즌 보상 받기: POST 한 번 → 겹쳐 띄우는 연출.
+async function rankBoard() {
+  const cached = R.rankBoard && Date.now() - R.rankBoard.at < 60000 ? R.rankBoard.d : null;
+  if (!cached) main('<div class="ar-saving">랭킹을 불러오는 중…</div>');
+  let d = cached;
+  if (!d) {
+    try { d = await api('/games/arena/rank'); } catch (err) { if (!R) return; toast(err.message || '랭킹을 불러오지 못했어요.'); return lobby(false, true); }
+    if (!R) return;
+    R.rankBoard = { at: Date.now(), d };
+    if (d.me) R.view = { ...R.view, rank: d.me };
+  }
+  main(rankBoardHtml(d));
+  artGuard();
+}
+async function rankClaim(button) {
+  buttonBusy(button);
+  let r;
+  try { r = await api('/games/arena/rank/claim', {}); }
+  catch (err) { if (!R) return; buttonBusy(button, false); return toast(err.message || '보상을 받지 못했어요.'); }
+  if (!R) return;
+  if (r.stats) Object.assign(R.A.data.stats, r.stats);
+  if (typeof r.points_balance === 'number') R.A.data.stats.points_balance = r.points_balance;
+  R.view = { ...R.view, rank: r.rank || R.view?.rank };
+  R.A.data.rewards ||= {}; R.A.data.rewards.arena = R.view;
+  R.rankBoard = null;
+  app()?.insertAdjacentHTML('beforeend', rankClaimHtml(r));
+  sfx('fanfare-epic');
+  if (r.coins) later(() => { sfx('coins'); coinShower(app(), 18); const b = $('ar-coins'); if (b) countUp(b, Number(R.A.data.stats?.points_balance || 0), 900); }, 700);
 }
 
 /* ---------- VS ---------- */
@@ -376,7 +413,7 @@ function field() {
   const clones = SLOTS().map(w => `<span class="ar-clone ${w}" id="ar-clone-${w}"><span class="ar-clone-body"></span></span>`).join('');
   // 펫 칸: 1:1은 상대 · 나, 여러 명은 다른 사람들 · 나(내 펫이 맨 위). 여러 명이면 머리 위 이름표(팀 색).
   const mon = who => `<div class="ar-mon ${who}${R.multi ? (isAlly(who) ? ' ally' : ' enemy') : ''}" id="ar-${who}"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-${who}-body"></span><span class="ar-status" aria-hidden="true"><i class="bub"></i><i class="vines"></i><i class="burnf"></i></span><span class="ar-hp"><i id="ar-${who}-hp"></i><b id="ar-${who}-sh"></b></span>${who === 'me' ? '<span class="ar-face" id="ar-face"><i></i></span>' : ''}${R.multi ? `<span class="ar-tag">${esc(who === 'me' ? '나' : R.names?.[who] || '')}</span>` : ''}</div>`;
-  // V13.233 잔상 칸(쪽마다 하나, 다시 쓴다).
+  // V13.235 잔상 칸(쪽마다 하나, 다시 쓴다).
   const mons = SLOTS().map(w => `<div class="ar-mon ${w} ghost ar-ghost-slot" id="ar-ghost-${w}" aria-hidden="true"></div>`).join('') + [...SLOTS().filter(w => w !== 'me'), 'me'].map(mon).join('');
   const bars = R.multi ? [...SLOTS().filter(w => w !== 'me'), 'me'].map(w => `<div class="ar-bar ${w} ${isAlly(w) ? 'ally' : 'enemy'}" id="ar-hud-${w}"></div>`).join('') : '<div class="ar-bar foe" id="ar-hud-foe"></div><div class="ar-bar me" id="ar-hud-me"></div>';
   // 필살기 컷인 · 물들이기 · 반짝이는 미리 만들어 두고 다시 쓴다(필살기 순간에 조각을 새로 만들지 않는다).
@@ -441,7 +478,7 @@ function play(r) {
   if (mode) { const x = [0, mode]; R.inputs.push(x); R.sim.push(x); }
   Object.assign(R, { stopUntil: 0, z: '', faceCode: -9, drag: null, numN: 0, finale: false });
   for (const who of SLOTS()) { const el = $(`ar-hud-${who}`); if (el) el.innerHTML = hudHtml(who, who === 'me' ? '나' : R.names[who], R.cur[who].team); }
-  // 쓰러짐 별 그림도 미리 받아 둔다. V13.233 효과 그림(그림 66) · 컷인 펫 그림도 판 시작 전에 디코드해 둔다.
+  // 쓰러짐 별 그림도 미리 받아 둔다. V13.235 효과 그림(그림 66) · 컷인 펫 그림도 판 시작 전에 디코드해 둔다.
   warmArt();
   for (const who of SLOTS()) drawMon(who);
   drawHud(); drawPad();
@@ -468,7 +505,7 @@ function preloadPoses() {
     }
   });
 }
-// V13.233 렉 방지: 처음 쓰는 순간 디코드하느라 멈추지 않게, 카운트다운 동안 그림을 미리 디코드한다(img.decode()).
+// V13.235 렉 방지: 처음 쓰는 순간 디코드하느라 멈추지 않게, 카운트다운 동안 그림을 미리 디코드한다(img.decode()).
 //   효과 그림(256~512px, 모두 합쳐 약 4MB) · 쓰러짐 별 · 컷인 펫 그림. 디코드한 Image는 판이 끝날 때까지 쥐고 있는다.
 function warmArt() {
   const keep = R.keep = [], jobs = [];
@@ -484,7 +521,7 @@ function warmArt() {
   // 한 프레임에 몰리지 않게 카운트다운(3초) 동안 120ms마다 하나씩.
   jobs.forEach((job, i) => later(job, 250 + i * 120));
 }
-// V13.233 글자 미리 배치: 판에서 처음 뜨는 글자(한글 · 이모지 · 숫자)는 글꼴 모양 만들기(셰이핑)가 무거워 첫 타격 프레임이 길었다.
+// V13.235 글자 미리 배치: 판에서 처음 뜨는 글자(한글 · 이모지 · 숫자)는 글꼴 모양 만들기(셰이핑)가 무거워 첫 타격 프레임이 길었다.
 //   같은 클래스(같은 글꼴 · 크기)로 보이지 않는 칸에 한 번 배치해 두면 그 뒤로는 캐시를 쓴다. 칸은 contain:strict라 다른 것에 영향이 없다.
 const WARM_WORDS = ['FIGHT!', '0123456789', '💥', '막음!', '치명타!', '효과가 굉장해!', '효과가 별로…', '교체!', '등장!', '+회복', '감전!', '기절!', '끌려옴!', '느려짐', '묶임!', '밀려남!', '얼어붙음!', '중독!', '화상!', '콤보!', '쓰러뜨렸다!', '쓰러짐…', '방울이 사라졌어요', '막음! (1)'];
 const WARM_POPS = ['', 'crit', 'eff', 'eff weak', 'enter', 'heal', 'stun', 'skill me', 'skill foe', 'count'], WARM_KINDS = WARM_POPS.length + 2;
@@ -599,7 +636,7 @@ function drawStick(x, y) {
 function drawMon(who) {
   const s = R.cur[who], f = s.team[s.idx], el = $(`ar-${who}-body`);
   // 피격 섬광: 같은 그림을 하얗게 한 장 더 겹쳐 두고 opacity만 바꾼다.
-  // V13.233 공격 · 맞는 자세 그림도 미리 겹쳐 두고 opacity만 바꾼다(그림 주소를 바꾸면 그때 디코드 · 그림자 필터를 다시 그려 렉).
+  // V13.235 공격 · 맞는 자세 그림도 미리 겹쳐 두고 opacity만 바꾼다(그림 주소를 바꾸면 그때 디코드 · 그림자 필터를 다시 그려 렉).
   const poses = ['attack', 'hurt'].map(pose => expressionSrc(f.key, R.forms[who][s.idx], pose)).filter(Boolean)
     .map(src => `<img class="ar-pet-img ar-pose" data-pose="${src}" src="${src}" alt="" draggable="false" decoding="async">`).join('');
   if (el) {
@@ -646,7 +683,7 @@ function drawHp() {
 }
 // 버튼 쿨타임 · 필살기 링(바뀔 때만 쓴다).
 function drawPad() {
-  // V13.233 원형 게이지: 남은 몫(0~1)만큼 12시부터 시계 방향으로 어둡다. 오른쪽 반 · 왼쪽 반 원판을 rotate만 한다(값이 바뀔 때만).
+  // V13.235 원형 게이지: 남은 몫(0~1)만큼 12시부터 시계 방향으로 어둡다. 오른쪽 반 · 왼쪽 반 원판을 rotate만 한다(값이 바뀔 때만).
   const m = R.cur.me, set = (id, frac) => {
     const el = slot(id); if (!el) return; const v = Math.round(frac * 100); if (el._v === v) return;
     const was = el._v > 0; el._v = v;
@@ -668,7 +705,7 @@ function drawPad() {
 // 경기장 좌표(%) → 픽셀(화면 크기가 바뀔 때만 다시 잰다).
 const geo = () => R.geo ||= (() => { const el = $('ar-field'); return el ? { w: el.clientWidth, h: el.clientHeight } : { w: 360, h: 400 }; })();
 const px = (x, y) => { const g = geo(); return { x: x / 100 * g.w, y: y / 100 * g.h }; };
-// V13.233 같은 값이면 쓰지 않는다(서 있는 펫 · 멈춘 칸이 매 프레임 스타일을 다시 계산하지 않게).
+// V13.235 같은 값이면 쓰지 않는다(서 있는 펫 · 멈춘 칸이 매 프레임 스타일을 다시 계산하지 않게).
 const setTf = (el, tf) => { if (el._tf !== tf) { el._tf = tf; el.style.transform = tf; } };
 function place(frac) {
   const at = {};
@@ -705,7 +742,7 @@ function place(frac) {
   const shots = R.cur.shots;
   for (let i = 0; i < SHOTS_MAX; i++) {
     const el = slot(`ar-shot-${i}`), s = shots[i]; if (!el) continue;
-    // V13.233 쉬는 칸은 .idle(레이어에서 내려 매 프레임 레이어 정리 비용을 줄인다), 날아갈 때만 레이어.
+    // V13.235 쉬는 칸은 .idle(레이어에서 내려 매 프레임 레이어 정리 비용을 줄인다), 날아갈 때만 레이어.
     if (!s) { if (el._on) { el._on = false; el.style.opacity = '0'; el.classList.add('idle'); } continue; }
     // V13.229 새 스킬 탄(바위 · 얼음 창 · 독침 · 분신 별): 종류 · 방향이 바뀔 때만 클래스 · 각도를 다시 쓴다.
     const p = px(s.x, s.y), P = pal(s.el), ang = s.id ? Math.round(angOf(s.vx, s.vy) / 5) * 5 : 0, key = `${s.el}${s.kind}${s.r}${s.id}${ang}`;
@@ -896,7 +933,7 @@ function cutin(e) {
   for (const [k, v] of [['--c1', P.c1], ['--c2', P.c2], ['--c3', P.c3]]) box.style.setProperty(k, v);
   box.className = `fx2 fx2-cut ar-cut on ${e.who} t${e.rank || 0}`;
   const pet = $('ar-cut-pet'), want = `${e.key}-${e.form}`;
-  // V13.233 판 시작 때 만들어 디코드해 둔 그림 중 하나만 켠다(처음 필살기 때 새 그림을 디코드하느라 멈추지 않게).
+  // V13.235 판 시작 때 만들어 디코드해 둔 그림 중 하나만 켠다(처음 필살기 때 새 그림을 디코드하느라 멈추지 않게).
   if (pet && pet._k !== want) {
     pet._k = want;
     let on = null; for (const img of pet.children) { const hit = img.dataset.k === want; img.classList.toggle('on', hit); if (hit) on = img; }
@@ -1057,7 +1094,7 @@ function spark(at, el) {
 }
 function swapPose(body, src, ms) {
   if (!body || !src) return;
-  // V13.233 미리 겹쳐 둔 자세 그림을 켠다(opacity · 제 레이어라 다시 그리지 않는다).
+  // V13.235 미리 겹쳐 둔 자세 그림을 켠다(opacity · 제 레이어라 다시 그리지 않는다).
   const layer = [...body.querySelectorAll('img.ar-pose')].find(x => x.dataset.pose === src);
   if (layer) {
     for (const x of body.querySelectorAll('img.ar-pose.on')) if (x !== layer) x.classList.remove('on');
@@ -1186,7 +1223,7 @@ function ultExtra(e, from, to) {
   if (el === 'toxic') { big('miasma'); bits('puff', to, 8, 60, 900, 'toxic'); return; }
   big('starfall'); bits('star', to, 8, 80, 800, 'star'); washFlash('star', .7, 200);
 }
-// V13.233 잔상: 쪽마다 미리 만든 칸 하나를 다시 쓴다(예전: 펫 칸 통째 복제 + blur 필터 → 복제 · 그리기가 무거웠다).
+// V13.235 잔상: 쪽마다 미리 만든 칸 하나를 다시 쓴다(예전: 펫 칸 통째 복제 + blur 필터 → 복제 · 그리기가 무거웠다).
 //   모습은 같다: 지금 자리 · 방향의 펫 그림이 반투명 · 흐림 · 밝게 0.32초 남는다.
 function afterimage(who) {
   const mon = slot(`ar-${who}`), ghost = slot(`ar-ghost-${who}`); if (!mon || !ghost) return;
@@ -1262,7 +1299,7 @@ async function end() {
   if (!R.live) keepReplay(R.A, { solo: true, side: 'me', seed: R.r.seed, foeLevel: R.r.foe_level, teams: { me: R.r.me.map(f => ({ key: f.key, form: f.form, level: f.level, s2: f.s2 ? 1 : 0 })), foe: R.r.foe.team.map(f => ({ key: f.key, form: f.form, level: f.level, s2: f.s2 ? 1 : 0 })) }, names: { me: '나', foe: R.r.foe.name }, inputs: { me: R.inputs, foe: [] }, result: local === 'me' ? 'win' : local === 'draw' ? 'draw' : 'lose' });
   if (res?.stats) Object.assign(R.A.data.stats, res.stats);
   if (typeof res?.points_balance === 'number') R.A.data.stats.points_balance = res.points_balance;
-  R.view = { ...R.view, left: res?.left ?? R.view?.left, tickets: res?.tickets ?? R.view?.tickets, wins: res?.wins ?? R.view?.wins, streak: res?.streak ?? R.view?.streak, best_streak: res?.best_streak ?? R.view?.best_streak };
+  R.view = { ...R.view, left: res?.left ?? R.view?.left, tickets: res?.tickets ?? R.view?.tickets, wins: res?.wins ?? R.view?.wins, streak: res?.streak ?? R.view?.streak, best_streak: res?.best_streak ?? R.view?.best_streak, rank: res?.rank ?? R.view?.rank };
   R.A.data.rewards ||= {}; R.A.data.rewards.arena = R.view;
   result(local, res);
 }
@@ -1281,6 +1318,7 @@ function result(local, res) {
       ${R.multi ? rankRows() : ''}
       <div class="ar-res-team">${team.map((f, n) => `<span style="--i:${n}" class="${R.sim.S.me.team[n].cur <= 0 ? 'down' : ''}">${petImg(f.key, f.form)}</span>`).join('')}</div>
       <div class="ar-res-rows"><span><small>쓰러뜨림</small><b>${num(ko)}</b></span><span><small>준 피해</small><b>${num(dealt)}</b></span><span><small>필살기</small><b>${res?.ults ?? R.sim.S.ults.me}</b></span></div>
+      ${rankGain(res?.rp)}
       ${coins || xp ? `<div class="ar-res-gain">${coins ? `<span class="r coin">${coin()}<b>+${num(coins)}</b>${res?.streak_coins ? `<small>3연승 +${res.streak_coins} 포함</small>` : ''}</span>` : ''}${xp ? `<span class="r xp"><b>+${xp}</b><small>경험치</small></span>` : ''}</div>` : ''}
       ${why ? `<p class="ar-why">${why}</p>` : ''}
       <p class="ar-tip">${win ? '다음 판은 상대가 더 똑똑해질 수 있어요!' : '팁: 빨간 표시가 뜨면 회피! 상성이 좋은 펫으로 교체해 보세요.'}</p>
@@ -1288,6 +1326,7 @@ function result(local, res) {
     </div>
   </section>`);
   artGuard();
+  if (res?.rp) playRankGain(res.rp, { later, sfx, reduced: reduced() });
   if (coins) { later(() => { sfx('coins'); coinShower(app(), 22); const b = $('ar-coins'); if (b) countUp(b, Number(R.A.data.stats?.points_balance || 0), 900); }, 500); }
 }
 

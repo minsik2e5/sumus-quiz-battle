@@ -10,6 +10,7 @@
 import { dayKey, STANDARD_PET_KEYS } from '../public/modules/core.js';
 import { ARENA, TREE, fighter, teamPower, cleanInputs, cleanPicks, cleanTrees, runArena } from '../public/modules/arena-rules.js';
 import { addBonus, findReceipt, keepReceipt, secureRandom } from './rewards.mjs';
+import { applyRank, rankView } from './arena-rank.mjs';
 
 export const ARENA_POOL = { PER_CLASS: 20, MAX: 600, KEEP_MS: 30 * 86400000 };
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -25,7 +26,7 @@ const playsToday = (a, now) => a.day === dayKey(now) ? Number(a.plays || 0) : 0;
 export function arenaView(p, now = Date.now()) {
   const a = p.games?.arena || {}; // 읽기만
   const left = Math.max(0, ARENA.DAILY - playsToday(a, now)), tickets = Math.min(ARENA.TICKETS_MAX, Number(a.tk || 0));
-  return { left, tickets, coin_play: left > 0 && tickets > 0, daily: ARENA.DAILY, s2: cleanPicks(a.s2, S2_MAX), tr: cleanTrees(a.tr, TR_MAX), games: Number(a.games || 0), wins: Number(a.wins || 0), streak: Number(a.streak || 0), best_streak: Number(a.best_streak || 0) };
+  return { left, tickets, coin_play: left > 0 && tickets > 0, daily: ARENA.DAILY, s2: cleanPicks(a.s2, S2_MAX), tr: cleanTrees(a.tr, TR_MAX), games: Number(a.games || 0), wins: Number(a.wins || 0), streak: Number(a.streak || 0), best_streak: Number(a.best_streak || 0), rank: rankView(p, now) };
 }
 
 // 코인 판 입장권: 끝까지 푼 연습(ARENA.TICKET_PRACTICE문제 이상)마다 1장(하루 3장), 출석 1장. 보관 TICKETS_MAX장.
@@ -140,7 +141,9 @@ function arenaSettle(p, a, live, { inputs, pet, now }) {
   a.plays = Number(a.plays || 0) + 1;
   a.tk = Number(a.tk || 0) - 1;
   addBonus(p, { xp: ARENA.XP, coins, pet, now });
-  return { ...out, paid: true, coins, streak_coins: streakCoins, xp: ARENA.XP };
+  // V13.234 랭크: 코인 판만, 연습 상대(컴퓨터 팀, bot)는 빼고. 상대 힘 = 상대 팀 힘 ÷ 내 팀 힘.
+  const rp = live.bot ? null : applyRank(p, { win: base.win, draw: r.winner === 'draw', ratio: teamPower(unpack(live.foe)) / Math.max(1, teamPower(unpack(live.me))), now });
+  return { ...out, paid: true, coins, streak_coins: streakCoins, xp: ARENA.XP, ...(rp ? { rp } : {}) };
 }
 
 export const arenaLine = res => `펫 아레나 ${res.win ? '승리' : res.winner === 'draw' ? '무승부' : '패배'} · 쓰러뜨림 ${res.ko || 0}${res.paid && res.coins ? ` · ${res.coins}코인` : ''}`;

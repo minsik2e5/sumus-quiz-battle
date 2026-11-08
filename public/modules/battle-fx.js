@@ -67,7 +67,7 @@ let lite = false;
 export const fxLite = on => { lite = !!on; };
 export const fxIsLite = () => lite;
 export const fxCap = rank => { capNow = lite ? FX2_LITE_CAP : FX2_CAP[Math.max(0, Math.min(3, rank | 0))]; };
-// V13.233 렉 방지: 조각 수는 경기장마다 센다(조각마다 querySelectorAll로 경기장 전체를 훑지 않는다).
+// V13.235 렉 방지: 조각 수는 경기장마다 센다(조각마다 querySelectorAll로 경기장 전체를 훑지 않는다).
 //   같은 그림(SVG 글)은 한 번만 읽어 두고 복사한다(조각마다 innerHTML로 SVG를 새로 읽지 않는다). 보이는 모습은 같다.
 const counts = new WeakMap(), TEMPLATES = new Map();
 const live = arena => counts.get(arena) || 0;

@@ -107,7 +107,7 @@ const AUTOPLAY = () => {
   const key = (type, code) => document.dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
   const DIRS = [['KeyW'], ['KeyS'], ['KeyA'], ['KeyD'], ['KeyW', 'KeyA'], ['KeyW', 'KeyD'], ['KeyS', 'KeyA'], ['KeyS', 'KeyD'], []];
   let held = [], atk = false, n = 0;
-  // V13.233 누르는 순서를 매번 같게(씨앗 고정 난수) → 고치기 전 · 후를 같은 조작으로 비교한다.
+  // V13.235 누르는 순서를 매번 같게(씨앗 고정 난수) → 고치기 전 · 후를 같은 조작으로 비교한다.
   let seed = 7; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
   setInterval(() => {
     if (!document.getElementById('ar-pad')) { held = []; atk = false; return; }
@@ -173,7 +173,7 @@ async function main() {
   const cdp = await ctx.newCDPSession(me);
   await cdp.send('Performance.enable');
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU });
-  // V13.233 --layers: 합성 레이어 수(가장 많았던 때)와 큰 레이어. 레이어가 많으면 Layerize · Commit이 프레임마다 무겁다.
+  // V13.235 --layers: 합성 레이어 수(가장 많았던 때)와 큰 레이어. 레이어가 많으면 Layerize · Commit이 프레임마다 무겁다.
   const LAYERS = { max: 0, area: 0, top: '' };
   if (process.argv.includes('--layers')) {
     await cdp.send('LayerTree.enable');
@@ -217,7 +217,7 @@ async function main() {
     console.log([...self].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, v]) => `${Math.round(v)}ms ${k}`).join('\n'));
   }
   // --tags: 긴 프레임에 함께 있던 것(그 프레임에 생긴 효과 · 바뀐 그림). '긴/전체'가 높을수록 그것이 무겁다.
-  // V13.233 --slow: 33ms 넘은 프레임마다 언제 · 얼마나 · 그 프레임에 생긴 것.
+  // V13.235 --slow: 33ms 넘은 프레임마다 언제 · 얼마나 · 그 프레임에 생긴 것.
   if (process.argv.includes('--slow')) console.log((P.slow || []).join('\n'));
   if (process.argv.includes('--tags')) console.log(Object.entries(P.tagLong).sort((a, b) => b[1] - a[1]).slice(0, 16).map(([k, v]) => `${v}/${P.tagAll[k] ?? '-'} ${k}`).join('\n'));
   const secs = P.frames.reduce((a, b) => a + b, 0) / 1000;

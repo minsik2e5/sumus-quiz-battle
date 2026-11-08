@@ -8,6 +8,7 @@ import { bonusRecords, epicCount } from './rewards.mjs';
 import { guardDayNums } from '../public/modules/streak-guard.js';
 import { dungeonTitleStats, dungeonKings } from './dungeon-records.mjs';
 import { clawTitleStats } from './claw.mjs';
+import { rankTitleStats } from './arena-rank.mjs';
 import { blankTitleStats, gramTitleStats } from './titles-3.mjs';
 import { fishTitleStats, huntTitleStats, petTitleStats, rangeTitleStats, coinEarned, coinSpent, timingWeekKings } from './titles-4.mjs';
 
@@ -214,6 +215,9 @@ export function createCompetition(state, now = Date.now()) {
     claw_dolls: p => clawTitleStats(p).claw_dolls,
     claw_kinds: p => clawTitleStats(p).claw_kinds,
     claw_gold: p => clawTitleStats(p).claw_gold,
+    // V13.234 펫 아레나 랭크 시즌: 보상을 받은 시즌 최고 티어(1 브론즈 … 5 다이아) · 다이아 시즌 수(server/arena-rank.mjs).
+    arena_season_best: p => rankTitleStats(p).arena_season_best,
+    arena_diamond_seasons: p => rankTitleStats(p).arena_diamond_seasons,
     // V13.195 곤충 · 공룡 시리즈(시리즈 알): 만난 곤충 · 공룡 수.
     series_bug: p => seriesGroupKeys('bug').filter(key => (Array.isArray(p?.pets) ? p.pets : []).some(pet => pet?.key === key)).length,
     series_dino: p => seriesGroupKeys('dino').filter(key => (Array.isArray(p?.pets) ? p.pets : []).some(pet => pet?.key === key)).length,

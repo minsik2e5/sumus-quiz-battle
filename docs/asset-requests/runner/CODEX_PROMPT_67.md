@@ -2,7 +2,7 @@
 
 ## 목표
 선생님 주문: "옆에 버튼들 퀄이 너무 떨어져. **에셋으로 만들자.**" 경기장 오른쪽 버튼(공격 · 스킬 ① · 스킬 ② · 필살기 · 회피 · 교체), 왼쪽 조이스틱 바닥 · 손잡이, 이모트 버튼을 게임다운 그림 버튼으로 바꾼다.
-v13.233에서 CSS 버튼(금속 테두리 · 보석 바탕 · 원형 쿨타임 · 준비됨 빛)과 그림 자리를 먼저 만들어 두었다. **그림 파일만 넣으면 된다.**
+v13.235에서 CSS 버튼(금속 테두리 · 보석 바탕 · 원형 쿨타임 · 준비됨 빛)과 그림 자리를 먼저 만들어 두었다. **그림 파일만 넣으면 된다.**
 
 | 시트 | 내용 | 넣는 곳(`public/assets/arena/`) | 자르기 |
 |---|---|---|---|
@@ -16,7 +16,7 @@ v13.233에서 CSS 버튼(금속 테두리 · 보석 바탕 · 원형 쿨타임 �
 | 67-8 | 스킬 ② 아이콘 바람 · 얼음(회오리 · 질풍 베기 · 얼음 장판 · 얼음 창) | `ui-s2-tornado` · `ui-s2-gale` · `ui-s2-icefield` · `ui-s2-spear` | `--fit-each --size 256` |
 | 67-9 | 스킬 ② 아이콘 독 · 별(독구름 · 독침 · 번개 · 분신) | `ui-s2-cloud` · `ui-s2-darts` · `ui-s2-chain` · `ui-s2-clone` | `--fit-each --size 256` |
 
-`npm run build:assets`가 `public/modules/arena-art.js`(`ARENA_ART`)에 이름을 적고, 경기 화면의 같은 자리(버튼 바탕 · 아이콘 · 조이스틱 · 이모트)가 알아서 그림으로 바뀐다(`arena.js` uiArt · setIco, `v13233.css` .art-bg · .art-ico). 앱 코드는 고치지 않는다.
+`npm run build:assets`가 `public/modules/arena-art.js`(`ARENA_ART`)에 이름을 적고, 경기 화면의 같은 자리(버튼 바탕 · 아이콘 · 조이스틱 · 이모트)가 알아서 그림으로 바뀐다(`arena.js` uiArt · setIco, `v13235.css` .art-bg · .art-ico). 앱 코드는 고치지 않는다.
 스킬 ① 아이콘은 스킬 종류(공격 burst · 강화 boost · 중독 poison · 지키기 guard), 스킬 ② 아이콘은 스킬 id(`EL_SKILLS`의 16개)로 고른다.
 
 ## 꼭 지킬 것
