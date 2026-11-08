@@ -138,6 +138,8 @@ const server = http.createServer(async (req, res) => {
       // V13.128 · V13.149 던전 · 교실 게임 방(문제와 입장표)도 Cloudflare에만 있다.
       delete result._dungeon;
       delete result._parties;
+      // V13.230 펫 아레나 친구 대전 방(입장표 · 펫 목록)도 Cloudflare에만 있다.
+      delete result._arenas;
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(result)); return;
     }
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405); res.end(); return; }
