@@ -1,0 +1,60 @@
+/* V13.228 펫 아레나 2탄 ①단계(public/modules/arena.js): 렉 고치기 · 조준 직접 조작 · 타격감. 클래스 ar-. */
+
+/* 렉: 경기장은 안쪽 배치만 따로(contain). 흔들림 · 필살기 멈춤은 앱 전체가 아니라 경기장에만 붙인다. */
+.ar-field.yb-arena{contain:layout style}
+.ar-app.shake{animation:none}
+.ar-field.ult .ar-mon:not(.hidden) .ar-body{animation-play-state:paused}
+/* 지진 경고: 기본 칸 100px 원, 크기는 transform scale로. 깜빡임 · 돌기는 보일 때(.on)만(숨은 칸은 애니메이션 없음). */
+.ar-warn{width:100px;height:100px;border-width:4px}
+.ar-warn::after,.ar-mine::after{animation:none}
+.ar-warn.on::after{animation:ar-warnblink .25s ease-in-out infinite alternate}
+.ar-mine.on::after{animation:ar-auraspin 2.5s linear infinite}
+.ar-lite .ar-warn.on::after,.ar-lite .ar-mine.on::after{animation:none}
+@media (prefers-reduced-motion:reduce){.ar-warn.on::after,.ar-mine.on::after{animation:none}}
+/* 글자 팝업은 translate로 자리 잡는다(left/top은 0). */
+.ar-fx.pop,.ar-fx.pop.eff{left:0;top:0}
+/* 필살기 컷인 · 물들이기: 미리 만든 칸을 다시 쓴다. 쉴 때는 그리지 않는다. */
+.ar-cut,.ar-wash{will-change:auto}
+.ar-cut{visibility:hidden}
+.ar-cut.on{visibility:visible}
+.ar-cut-star{position:absolute;z-index:2;font-style:normal;font-size:18px;line-height:1;color:#ffe38a;text-shadow:0 0 6px #ffd23f;opacity:0}
+.ar-wash{opacity:0}
+
+/* 조준: 내 펫이 바라보는 쪽 화살표(발밑 둘레) */
+.ar-face{position:absolute;left:50%;top:80%;width:0;height:0;pointer-events:none;transition:transform .08s linear}
+.ar-face i{position:absolute;left:-8px;top:-50px;width:0;height:0;border:8px solid transparent;border-top:0;border-bottom:12px solid #60a5fa;filter:drop-shadow(0 0 3px #60a5fa)}
+.ar-lite .ar-face i{filter:none}
+/* 끌어서 조준: 화살표(직선) · 부채꼴(필살기 · 세 갈래 · 연발) · 원(지진 · 소나기) */
+.ar-aim{position:absolute;left:0;top:0;width:0;height:0;z-index:9;pointer-events:none;opacity:0}
+.ar-aim.on{opacity:1}
+.ar-aim i{position:absolute;bottom:0;left:0;transform:translateX(-50%)}
+.ar-aim.arrow i{width:26px;height:200px;background:linear-gradient(0deg,rgba(147,197,253,.1),rgba(147,197,253,.7));clip-path:polygon(32% 100%,32% 13%,0 13%,50% 0,100% 13%,68% 13%,68% 100%)}
+.ar-aim.fan i{width:340px;height:170px;border-radius:170px 170px 0 0;background:conic-gradient(from -35deg at 50% 100%,rgba(147,197,253,.5) 0 70deg,transparent 70deg);-webkit-mask:radial-gradient(circle at 50% 100%,#000 60%,rgba(0,0,0,.35) 70%);mask:radial-gradient(circle at 50% 100%,#000 60%,rgba(0,0,0,.35) 70%)}
+.ar-aim.circle i{display:none}
+.ar-aim-spot{position:absolute;left:0;top:0;width:96px;height:96px;border-radius:50%;z-index:9;pointer-events:none;opacity:0;border:3px dashed rgba(147,197,253,.95);background:radial-gradient(circle,rgba(96,165,250,.38),rgba(96,165,250,.08) 70%)}
+.ar-aim-spot.on{opacity:1}
+/* 대기실: 조준 방식 고르기 */
+.ar-aimset{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:8px 0 2px}
+.ar-aimopt{display:grid;gap:1px;padding:7px 4px;border:0;border-radius:12px;background:rgba(255,255,255,.1);color:#fff;box-shadow:inset 0 0 0 2px rgba(255,255,255,.18);font:inherit;cursor:pointer}
+.ar-aimopt b{font-size:13px;font-weight:950}
+.ar-aimopt small{font-size:10.5px;opacity:.8}
+.ar-aimopt.on{background:linear-gradient(180deg,rgba(96,165,250,.45),rgba(37,99,235,.35));box-shadow:inset 0 0 0 2px #93c5fd}
+
+/* 타격감: 피격 섬광(같은 그림을 하얗게 겹쳐 opacity만). 저사양은 필터 없이 밝게 더하기. */
+.ar-flash{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;opacity:0;pointer-events:none;filter:brightness(0) invert(1)}
+.ar-lite .ar-flash{filter:none;mix-blend-mode:plus-lighter}
+/* 큰 데미지 숫자(칸 8개를 다시 쓴다). 스킬은 속성 색, 치명타는 노랑 + 💥, 필살기는 가장 크게. */
+.ar-num{position:absolute;left:0;top:0;z-index:165;pointer-events:none;opacity:0;font-weight:950;font-style:normal;white-space:nowrap;font-size:22px;line-height:1;color:#fff;-webkit-text-stroke:1.2px rgba(0,0,0,.6);paint-order:stroke fill;text-shadow:0 2px 0 rgba(0,0,0,.5)}
+.ar-num.me{color:#fecaca}
+.ar-num.skill{font-size:28px;color:color-mix(in srgb,var(--c1,#fde047) 55%,#fff)}
+.ar-num.crit{font-size:32px;color:#fde047;-webkit-text-stroke:1.6px #b45309}
+.ar-num.ult{font-size:42px;color:#fde047;-webkit-text-stroke:1.8px #b45309}
+.ar-num.ult.crit{font-size:48px}
+.ar-num.poison{font-size:16px;color:#d8b4fe}
+.ar-fx.pop.crit{font-size:14px;font-weight:950;color:#fde047;-webkit-text-stroke:1px #7c2d12;paint-order:stroke fill;z-index:166}
+/* 콤보 */
+.ar-combo{position:absolute;z-index:40;right:14px;top:calc(max(10px,env(safe-area-inset-top)) + 108px);display:flex;align-items:baseline;gap:3px;opacity:0;pointer-events:none;transform-origin:100% 50%;font-weight:950}
+.ar-combo b{font-size:34px;font-style:italic;line-height:1;color:#fff;-webkit-text-stroke:1.5px #1e3a8a;paint-order:stroke fill}
+.ar-combo small{font-size:15px;font-style:italic;color:#bfdbfe;text-shadow:0 1px 0 rgba(0,0,0,.6)}
+.ar-combo.hot b{color:#fde047;-webkit-text-stroke-color:#b45309}
+@media (max-height:700px){.ar-combo{top:calc(max(8px,env(safe-area-inset-top)) + 96px)}}

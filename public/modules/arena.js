@@ -4,8 +4,8 @@ import { petKey, expressionSrc } from './character.js';
 import { coin } from './emblems.js';
 import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
 import { coinShower, countUp } from './celebrate.js';
-import { ELEMENTS, fxImpact, fxSkillCutIn, fxPunch, fxSpeedLines, fxRecoil, fxLite } from './battle-fx.js';
-import { ARENA, BEATS, INPUT, ROLE, createArena, fighter, dirCode } from './arena-rules.js';
+import { ELEMENTS, fxImpact, fxPunch, fxSpeedLines, fxRecoil, fxLite } from './battle-fx.js';
+import { ARENA, BEATS, INPUT, ROLE, DIR16, createArena, fighter, dirCode, aimCode } from './arena-rules.js';
 
 // V13.225 펫 아레나 2(놀이터): 전체 화면. 위에서 비스듬히 내려다보는 경기장에서 내 펫을 직접 조종해 상대 펫과 싸운다.
 //   왼쪽 아래 조이스틱으로 움직이고, 오른쪽 버튼: 공격(누르고 있으면 계속) · 스킬 1 · 스킬 2(펫마다 다르다) · 필살기(게이지) · 회피 · 교체.
@@ -13,6 +13,13 @@ import { ARENA, BEATS, INPUT, ROLE, createArena, fighter, dirCode } from './aren
 // V13.226 렉 방지: 기본 공격 맞힘은 가벼운 불꽃 하나(스킬 · 필살기만 큰 효과), 자세 그림은 미리 받아 두고, 긴 프레임이 이어지는 폰은
 //   자동으로 가벼운 연출(.ar-lite, 7일 기억)로 간다. 펫 · 효과는 바뀔 때만 다시 쓴다.
 // 전투 계산은 arena-rules.js(서버와 같은 함수), 판 · 확인 · 보상은 서버(server/arena.mjs). 화면은 조작 기록 [틱, 코드]만 보낸다. 클래스는 ar-.
+// V13.228 (2탄 ①단계) 조준 직접 조작: 움직이는 쪽을 바라보고, 공격은 그쪽으로(±25° 보정). 스킬 · 필살기 버튼을 끌면 경기장에
+//   화살표 · 부채꼴 · 원이 보이고 놓으면 그 방향(16방향)으로, 톡 누르면 바라보는 방향. 대기실에서 쉬운 조준(±40°) · 자동 조준(예전 방식)을 고른다.
+//   타격감: 히트스톱(화면만 잠깐 멈춤) · 넉백 · 피격 섬광 · 큰 데미지 숫자(칸 8개 다시 쓰기) · 크리티컬 · 경기장만 흔들림 · 카메라 줌 ·
+//   마지막 한 방 슬로 · 소리 겹치기(같은 소리 0.05초에 1번) · 진동 · 콤보.
+//   렉 방지: 필살기 컷인 · 물들이기는 미리 만든 칸을 다시 쓰고 흔들림 · 멈춤 표시는 경기장(#ar-field)에만 붙인다. 필살기 조각은 3프레임에 나눠 만든다.
+//   지진 표시는 transform scale로, 펫 겹침 순서(zIndex)는 바뀔 때만, 숨은 칸은 애니메이션을 멈추고, 글자 · 숫자는 translate로 자리 잡는다.
+//   위 막대(HUD) 펫 점은 한 번만 만들고 클래스만 바꾼다.
 // 그림: 주문서 65(public/assets/arena/) 경기장 · VS · 승패 배너 · 필살기 아이콘 · 쓰러짐 별. 경기장 그림이 없으면 지금 있는 전투 광장(battle/bg-arena), 작은 그림이 없으면 그 자리를 비운다.
 
 const BG = { plaza: ['arena/bg-plaza', 'battle/bg-arena'], forest: ['arena/bg-forest', 'battle/bg-forest'], night: ['arena/bg-night', 'battle/bg-boss'] };
@@ -20,12 +27,19 @@ const KIND_KO = { burst: '공격', boost: '강화', poison: '중독', guard: '�
 const SHOTS_MAX = 14, WARN_MAX = 6, MINE_MAX = 2, FX_MAX = 40;
 const S2_ICON = { blink: '🌀', nova: '💥', barrage: '🎯', trap: '🪤', rain: '☄️', rush: '🐾', pull: '🪝', heal: '💚' };
 const LITE_KEY = 'sumus-arena-lite', LITE_LONG_MS = 50, LITE_WINDOW_MS = 3000, LITE_LONG_COUNT = 8, LITE_DAYS = 7;
+const DMG_MAX = 8, WARN_BASE = 100;
+const HITSTOP = { atk: 40, skill: 70, skill2: 70, ult: 120 };
+const AIM_KEY = 'sumus-arena-aim';
+const AIM_MODES = [['free', '직접 조준', '움직이는 쪽 · 버튼 끌기'], ['easy', '쉬운 조준', '보정이 넓어요'], ['auto', '자동 조준', '늘 상대 쪽']];
+const DRAG_PX = 16;
 let R = null;
 const root = () => document.getElementById('app');
 const $ = id => document.getElementById(id);
 let REDUCED = null;
 const reduced = () => (REDUCED ||= matchMedia('(prefers-reduced-motion: reduce)')).matches;
-const sfx = (key, opts) => { if (soundOn()) playSound(key, opts); };
+// 같은 소리는 0.05초에 1번까지(겹쳐 울리면 시끄럽고 무겁다).
+const sfxAt = new Map();
+const sfx = (key, opts) => { if (!soundOn()) return; const now = performance.now(); if (now - (sfxAt.get(key) || -1e9) < 50) return; sfxAt.set(key, now); playSound(key, opts); };
 const buzz = p => { try { if (soundOn()) navigator.vibrate?.(p); } catch {} };
 function later(fn, ms) { const cur = R; const t = setTimeout(() => { if (R === cur && !cur.closing) fn(); }, ms); cur.timers.push(t); }
 const wait = ms => new Promise(res => later(res, reduced() ? Math.min(ms, 250) : ms));
@@ -49,6 +63,7 @@ export function openArena(A, exit) {
   const ready = readyPets(A).map(x => x.key);
   const saved = load(TEAM_KEY(), []).filter(k => ready.includes(k));
   R.team = (saved.length ? saved : ready).slice(0, ARENA.TEAM);
+  R.aim = AIM_MODES.some(m => m[0] === load(AIM_KEY, 'free')) ? load(AIM_KEY, 'free') : 'free';
   root().innerHTML = `<div class="session-app ar-app" id="ar-app">
     <div class="ar-stage" id="ar-stage"><img class="ar-bg" id="ar-bg" alt="" draggable="false"><div class="ar-shade"></div></div>
     <header class="ar-top"><button type="button" class="yb-back" data-ar="exit" aria-label="나가기">${icon('back')}</button><strong>펫 아레나</strong><span class="ar-wallet">${coin()}<b id="ar-coins">${num(A.data.stats?.points_balance || 0)}</b></span></header>
@@ -102,6 +117,7 @@ function onClick(event) {
   const act = b.dataset.ar;
   if (act === 'exit') return R.playing ? confirmQuit() : leave();
   if (act === 'pet') return togglePet(b.dataset.key);
+  if (act === 'aim') { R.aim = b.dataset.aim; save(AIM_KEY, R.aim); sfx('tap'); return lobby(false, true); }
   if (act === 'start') return start(b);
   if (act === 'again') return lobby(true);
   if (act === 'quit-yes') return leave();
@@ -126,11 +142,13 @@ function keyDir() {
   drawStick(x * 0.7, y * 0.7);
 }
 // 버튼 누르기: 다음 틱에 조작 기록으로 들어간다. 공격은 누르고 있는 동안 쿨타임마다 계속.
-function press(btn, down = true) {
+// V13.228 code: 끌어서 조준한 16방향(0~15), 없으면 -1(바라보는 방향).
+function press(btn, down = true, code = -1) {
   if (!R?.playing || R.paused) return;
   if (btn === 'atk') { R.holdAtk = down; if (down) R.queue.push(INPUT.ATK); return; }
   if (!down) return;
-  R.queue.push({ skill: INPUT.SKILL, skill2: INPUT.SKILL2, ult: INPUT.ULT, dodge: INPUT.DODGE, swap: INPUT.SWAP }[btn]);
+  const c = { skill: INPUT.SKILL, skill2: INPUT.SKILL2, ult: INPUT.ULT, dodge: INPUT.DODGE, swap: INPUT.SWAP }[btn];
+  R.queue.push(code >= 0 && c !== INPUT.DODGE && c !== INPUT.SWAP ? [c, code] : c);
   if (btn === 'ult' && R.cur.me.gauge < ARENA.GAUGE_MAX) toastOnce('필살기 게이지가 아직 다 안 찼어요');
   buzz(8);
 }
@@ -170,10 +188,12 @@ function lobby(again = false, keep = false) {
     <div class="ar-title"><small>3 대 3 펫 대전</small><h1>펫 아레나</h1></div>
     <div class="ar-card">
       <ul class="ar-rules">
-        <li><b>🕹️</b><span>왼쪽 <em>조이스틱</em>으로 움직이고, 오른쪽 버튼으로 <em>공격 · 스킬 ① ②</em></span></li>
+        <li><b>🕹️</b><span>왼쪽 <em>조이스틱</em>으로 움직이면 그쪽을 바라봐요. <em>공격</em>은 바라보는 쪽으로!</span></li>
+        <li><b>🎯</b><span><em>스킬 · 필살기 버튼을 끌면</em> 원하는 쪽으로 조준, 톡 누르면 바라보는 쪽. 등 뒤 · 기절한 상대는 <em>치명타</em></span></li>
         <li><b>💨</b><span>날아오는 공격은 <em>회피</em>로 피해요(잠깐 무적). 바닥에 빨간 표시가 뜨면 피하기!</span></li>
         <li><b>🔥</b><span>때리고 맞으면 <em>필살기 게이지</em>가 차요. 꽉 차면 필살기! 위험하면 <em>교체</em></span></li>
       </ul>
+      <div class="ar-aimset" role="group" aria-label="조준 방식">${AIM_MODES.map(([k, n, d]) => `<button type="button" class="ar-aimopt${R.aim === k ? ' on' : ''}" data-ar="aim" data-aim="${k}" aria-pressed="${R.aim === k}"><b>${n}</b><small>${d}</small></button>`).join('')}</div>
       <h3 class="ar-sub">내 팀 <small>순서대로 나가요 · 펫마다 특징 · 스킬 2개가 달라요</small></h3>
       <div class="ar-slots">${[0, 1, 2].map(slot).join('')}</div>
       ${pets.length ? `<div class="ar-pets">${pets.map(p => `<button type="button" class="ar-pet-pick${R.team.includes(p.key) ? ' on' : ''}" data-ar="pet" data-key="${esc(p.key)}" aria-pressed="${R.team.includes(p.key)}">${petImg(p.key, p.form)}<small>Lv.${p.level}</small>${R.team.includes(p.key) ? `<b>${R.team.indexOf(p.key) + 1}</b>` : ''}</button>`).join('')}</div>`
@@ -214,6 +234,9 @@ async function vs(r) {
 function field() {
   const shots = Array.from({ length: SHOTS_MAX }, (_, i) => `<i class="ar-shot" id="ar-shot-${i}"></i>`).join('');
   const warns = Array.from({ length: WARN_MAX }, (_, i) => `<i class="ar-warn" id="ar-warn-${i}"></i>`).join('') + Array.from({ length: MINE_MAX }, (_, i) => `<i class="ar-mine" id="ar-mine-${i}"></i>`).join('');
+  const nums = Array.from({ length: DMG_MAX }, (_, i) => `<b class="ar-num" id="ar-num-${i}"></b>`).join('');
+  // 필살기 컷인 · 물들이기 · 반짝이는 미리 만들어 두고 다시 쓴다(필살기 순간에 조각을 새로 만들지 않는다).
+  const cut = `<div class="fx2 fx2-cut ar-cut" id="ar-cut" aria-hidden="true"><div class="fx2-cut-dim"></div><div class="fx2-cut-band"><div class="fx2-cut-lines"></div><div class="fx2-cut-pet" id="ar-cut-pet"></div><div class="fx2-cut-text"><small id="ar-cut-who"></small><b id="ar-cut-name"></b><em></em></div></div>${Array.from({ length: 7 }, (_, i) => `<i class="ar-cut-star" style="left:${12 + i * 12}%;top:${26 + (i * 37) % 44}%">✦</i>`).join('')}</div><div class="fx2 fx2-wash ar-wash" id="ar-wash" aria-hidden="true"></div>`;
   return `<section class="ar-play" id="ar-play">
     <div class="ar-hud">
       <div class="ar-bar foe" id="ar-hud-foe"></div>
@@ -222,10 +245,11 @@ function field() {
     </div>
     <div class="ar-field yb-arena" id="ar-field">
       <div class="ar-ring" aria-hidden="true"></div>
-      ${warns}${shots}
+      ${warns}<div class="ar-aim" id="ar-aim" aria-hidden="true"><i></i></div><div class="ar-aim-spot" id="ar-aim-spot" aria-hidden="true"></div>${shots}${nums}${cut}
       <div class="ar-mon foe" id="ar-foe"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-foe-body"></span><span class="ar-hp"><i id="ar-foe-hp"></i><b id="ar-foe-sh"></b></span></div>
-      <div class="ar-mon me" id="ar-me"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-me-body"></span><span class="ar-hp"><i id="ar-me-hp"></i><b id="ar-me-sh"></b></span><span class="ar-arrow"></span></div>
+      <div class="ar-mon me" id="ar-me"><span class="ar-shadow"></span><span class="ar-aura"></span><span class="ar-body" id="ar-me-body"></span><span class="ar-hp"><i id="ar-me-hp"></i><b id="ar-me-sh"></b></span><span class="ar-face" id="ar-face"><i></i></span></div>
     </div>
+    <div class="ar-combo" id="ar-combo" aria-hidden="true"><b id="ar-combo-n"></b><small>콤보!</small></div>
     <div class="ar-pad" id="ar-pad">
       <div class="ar-stick" id="ar-stick" aria-label="움직이기"><i id="ar-knob"></i></div>
       <div class="ar-btns">
@@ -239,8 +263,9 @@ function field() {
     </div>
   </section>`;
 }
-function hudHtml(who, name, team, idx) {
-  return `<b>${esc(name)}</b><span class="ar-dots">${team.map((f, n) => `<i class="${f.cur <= 0 ? 'down' : n === idx ? 'now' : ''}">${petImg(f.key, R.forms[who][n])}</i>`).join('')}</span>`;
+// 위 막대: 이름 · 펫 점(그림)은 판 시작에 한 번만 만든다. 그 뒤로는 drawHud가 점의 클래스만 바꾼다.
+function hudHtml(who, name, team) {
+  return `<b>${esc(name)}</b><span class="ar-dots">${team.map((f, n) => `<i id="ar-dot-${who}-${n}">${petImg(f.key, R.forms[who][n])}</i>`).join('')}</span>`;
 }
 function play(r) {
   // 서버와 똑같이 key · form · level로 능력치를 다시 만든다(server/arena.mjs unpack과 같다).
@@ -260,6 +285,15 @@ function play(r) {
   window.addEventListener('resize', R.resize);
   bindPad();
   R.prev = R.sim.view(); R.cur = R.prev;
+  // 조준 방식(대기실에서 고른 것)은 첫 틱 조작으로 넣는다: 서버도 같은 조작 기록으로 다시 돌린다.
+  const mode = { easy: INPUT.AIM_EASY, auto: INPUT.AIM_AUTO }[R.aim];
+  if (mode) { const x = [0, mode]; R.inputs.push(x); R.sim.push(x); }
+  Object.assign(R, { stopUntil: 0, z: '', faceCode: -9, drag: null, numN: 0, finale: false });
+  const a = $('ar-hud-foe'), b = $('ar-hud-me');
+  if (a) a.innerHTML = hudHtml('foe', R.r.foe.name, R.cur.foe.team);
+  if (b) b.innerHTML = hudHtml('me', '나', R.cur.me.team);
+  // 쓰러짐 별 그림도 미리 받아 둔다.
+  const star = new Image(); star.decoding = 'async'; star.src = '/assets/arena/fx-faint.webp';
   drawMon('me'); drawMon('foe'); drawHud(); drawPad();
   place(0);
   countIn();
@@ -320,24 +354,68 @@ function bindPad() {
   stick.addEventListener('pointermove', e => { if (e.pointerId === id) move(e); });
   const up = e => { if (e.pointerId !== id) return; id = null; R.dir = 0; drawStick(0, 0); };
   stick.addEventListener('pointerup', up); stick.addEventListener('pointercancel', up);
+  // 스킬 · 필살기: 누른 채 끌면 조준(경기장에 화살표 · 부채꼴 · 원), 놓으면 나간다. 톡 누르면 바라보는 방향.
+  //   조준이 필요 없는 스킬(순간이동 · 폭발 · 함정 · 치유 · 지키기 · 강화)과 자동 조준은 누르는 순간 나간다.
   pad.addEventListener('pointerdown', e => {
     const b = e.target.closest('[data-btn]'); if (!b) return;
     e.preventDefault(); unlockSound();
     b.classList.add('down');
     try { b.setPointerCapture(e.pointerId); } catch {}
-    press(b.dataset.btn, true);
+    const btn = b.dataset.btn;
+    if (R?.playing && R.aim !== 'auto' && aimShape(btn)) { const r = b.getBoundingClientRect(); R.drag = { id: e.pointerId, btn, x: r.left + r.width / 2, y: r.top + r.height / 2, code: -1, on: false }; return; }
+    press(btn, true);
   });
-  const release = e => { const b = e.target.closest('[data-btn]'); if (!b) return; b.classList.remove('down'); if (b.dataset.btn === 'atk') press('atk', false); };
+  pad.addEventListener('pointermove', e => {
+    const d = R?.drag; if (!d || d.id !== e.pointerId) return;
+    const dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (Math.sqrt(dx * dx + dy * dy) < DRAG_PX) { if (d.on) { d.on = false; d.code = -1; hideAim(); } return; }
+    // 화면 방향 → 경기장 % 방향(가로 · 세로 크기가 달라서 나눠 준다).
+    const g = geo(), code = aimCode(dx / g.w, dy / g.h);
+    if (!d.on) buzz(6);
+    d.on = true; if (d.code !== code) { d.code = code; drawAim(); }
+  });
+  const release = e => {
+    const b = e.target.closest('[data-btn]'); if (!b) return;
+    b.classList.remove('down');
+    if (b.dataset.btn === 'atk') press('atk', false);
+    const d = R?.drag;
+    if (d && d.id === e.pointerId) { R.drag = null; hideAim(); if (e.type === 'pointerup') press(d.btn, true, d.on ? d.code : -1); }
+  };
   pad.addEventListener('pointerup', release); pad.addEventListener('pointercancel', release);
   pad.addEventListener('contextmenu', e => e.preventDefault());
 }
+// 이 버튼은 조준할 수 있나: 'arrow' 화살표 · 'fan' 부채꼴 · 'circle' 원, 조준이 필요 없으면 null.
+function aimShape(btn) {
+  const f = R?.teams?.me?.[R.cur?.me?.idx]; if (!f) return null;
+  if (btn === 'ult') return 'fan';
+  if (btn === 'skill') return ['guard', 'boost'].includes(f.skill.kind) ? null : f.shape === 'quake' ? 'circle' : f.shape === 'orb' ? 'fan' : 'arrow';
+  if (btn === 'skill2') return { barrage: 'fan', rain: 'circle', pull: 'arrow', rush: 'arrow' }[f.skill2.kind] || null;
+  return null;
+}
+// 조준 표시: 내 펫 발밑에서 끈 방향으로. 원은 놓일 자리(상대 쪽이면 상대 발밑, 아니면 그 방향으로 상대 거리만큼 12~40).
+function drawAim() {
+  const d = R?.drag, box = $('ar-aim'), spot = $('ar-aim-spot'); if (!d || !box || !spot) return;
+  const shape = aimShape(d.btn); if (!shape || d.code < 0) return hideAim();
+  const m = R.cur.me, o = R.cur.foe, [ax, ay] = DIR16[d.code], g = geo(), p = px(m.x, m.y);
+  const ang = Math.atan2(ay * g.h, ax * g.w) * 180 / Math.PI + 90;
+  if (box._shape !== shape) { box._shape = shape; box.className = `ar-aim on ${shape}`; }
+  box.style.transform = `translate(${Math.round(p.x)}px, ${Math.round(p.y)}px) rotate(${ang.toFixed(1)}deg)`;
+  if (shape === 'circle') {
+    const dx = o.x - m.x, dy = o.y - m.y, dist = Math.sqrt(dx * dx + dy * dy) || 1, on = (ax * dx + ay * dy) / dist >= ARENA.AIM_DRAG;
+    const r = Math.max(12, Math.min(ARENA.QUAKE_RANGE, dist)), q = on ? { x: o.x, y: o.y } : { x: Math.max(8, Math.min(92, m.x + ax * r)), y: Math.max(14, Math.min(86, m.y + ay * r)) }, sp = px(q.x, q.y);
+    spot.className = 'ar-aim-spot on'; spot.style.transform = `translate(${Math.round(sp.x)}px, ${Math.round(sp.y)}px) translate(-50%, -50%) scale(1, .55)`;
+  } else if (spot._on !== false) { spot._on = false; spot.className = 'ar-aim-spot'; }
+  spot._on = shape === 'circle';
+}
+function hideAim() { const box = $('ar-aim'), spot = $('ar-aim-spot'); if (box) { box.className = 'ar-aim'; box._shape = ''; } if (spot) { spot.className = 'ar-aim-spot'; spot._on = false; } }
 function drawStick(x, y) {
   const k = $('ar-knob'); if (k) k.style.transform = `translate(${x * 34}px, ${y * 34}px)`;
 }
 
 function drawMon(who) {
   const s = R.cur[who], f = s.team[s.idx], el = $(`ar-${who}-body`);
-  if (el) el.innerHTML = petImg(f.key, R.forms[who][s.idx], 'ar-pet-img');
+  // 피격 섬광: 같은 그림을 하얗게 한 장 더 겹쳐 두고 opacity만 바꾼다.
+  if (el) el.innerHTML = petImg(f.key, R.forms[who][s.idx], 'ar-pet-img') + `<img class="ar-flash" src="${petSrc(f.key, R.forms[who][s.idx])}" alt="" draggable="false" decoding="async">`;
   $(`ar-${who}`)?.classList.remove('down');
   if (who === 'me') {
     const k = R.teams.me[s.idx].skill, n = $('ar-skill-name'), ico = $('ar-skill-ico');
@@ -352,9 +430,10 @@ function drawMon(who) {
 }
 function drawHud() {
   const v = R.cur;
-  const a = $('ar-hud-foe'), b = $('ar-hud-me');
-  if (a) a.innerHTML = hudHtml('foe', R.r.foe.name, v.foe.team, v.foe.idx);
-  if (b) b.innerHTML = hudHtml('me', '나', v.me.team, v.me.idx);
+  for (const who of ['me', 'foe']) v[who].team.forEach((f, n) => {
+    const el = $(`ar-dot-${who}-${n}`), cls = f.cur <= 0 ? 'down' : n === v[who].idx ? 'now' : '';
+    if (el && el.className !== cls) el.className = cls;
+  });
   drawHp();
 }
 function drawHp() {
@@ -380,13 +459,14 @@ function drawPad() {
 const geo = () => R.geo ||= (() => { const el = $('ar-field'); return el ? { w: el.clientWidth, h: el.clientHeight } : { w: 360, h: 400 }; })();
 const px = (x, y) => { const g = geo(); return { x: x / 100 * g.w, y: y / 100 * g.h }; };
 function place(frac) {
+  const at = {};
   for (const who of ['me', 'foe']) {
     const a = R.prev[who], b = R.cur[who], el = $(`ar-${who}`); if (!el) continue;
     const jump = a.idx !== b.idx || Math.abs(b.x - a.x) > 12; // 교체 · 밀쳐내기는 한 번에
     const x = jump ? b.x : a.x + (b.x - a.x) * frac, y = jump ? b.y : a.y + (b.y - a.y) * frac;
     const p = px(x, y);
     el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -80%)`;
-    el.style.zIndex = String(10 + Math.round(y));
+    at[who] = { x, y };
     const flags = [b.fx < -0.1 || (Math.abs(b.fx) <= 0.1 && R.cur[who === 'me' ? 'foe' : 'me'].x < x) ? 'flip' : '', b.enter > 0 ? 'hidden' : '', b.stun > 0 ? 'stun' : '', b.slow > 0 ? 'slow' : '',
       b.boost > 0 ? 'boost' : '', b.shield > 0 ? 'shield' : '', b.poison > 0 ? 'poison' : '', b.inv > 0 && b.dash > 0 ? 'inv' : '', b.power2 > 0 ? 'charged' : ''].join(' ');
     if (el._flags !== flags) {
@@ -395,6 +475,13 @@ function place(frac) {
       for (const [k, on] of [['flip', flags.includes('flip')], ['hidden', b.enter > 0], ['stun', b.stun > 0], ['slow', b.slow > 0], ['boost', b.boost > 0], ['shield', b.shield > 0], ['poison', b.poison > 0], ['inv', b.inv > 0 && b.dash > 0], ['charged', b.power2 > 0]]) cls.toggle(k, on);
     }
   }
+  // 겹침 순서: 아래쪽(앞) 펫이 위로. 순서가 바뀔 때만 쓴다(매 프레임 zIndex를 쓰지 않는다).
+  const z = at.me && at.foe && at.me.y >= at.foe.y ? 'me' : 'foe';
+  if (R.z !== z) { R.z = z; const m = $('ar-me'), f = $('ar-foe'); if (m) m.style.zIndex = z === 'me' ? '12' : '11'; if (f) f.style.zIndex = z === 'me' ? '11' : '12'; }
+  // 내 펫이 바라보는 쪽 화살표(16방향 칸이 바뀔 때만 돌린다).
+  const fc = aimCode(R.cur.me.fx, R.cur.me.fy);
+  if (fc !== R.faceCode) { R.faceCode = fc; const f = $('ar-face'), g = geo(); if (f) f.style.transform = `rotate(${(Math.atan2(R.cur.me.fy * g.h, R.cur.me.fx * g.w) * 180 / Math.PI + 90).toFixed(1)}deg)`; }
+  if (R.drag?.on) drawAim();
   // 날아가는 공격 · 지진 표시(정해진 개수의 칸을 다시 쓴다).
   const shots = R.cur.shots;
   for (let i = 0; i < SHOTS_MAX; i++) {
@@ -408,31 +495,35 @@ function place(frac) {
   const qs = R.cur.quakes;
   for (let i = 0; i < WARN_MAX; i++) {
     const el = $(`ar-warn-${i}`), q = qs[i]; if (!el) continue;
-    if (!q) { if (el._on) { el._on = false; el.style.opacity = '0'; } continue; }
-    const p = px(q.x, q.y), w = q.r * 2 / 100 * geo().w;
-    el._on = true; el.style.opacity = '1';
-    if (el._from !== q.from) { el._from = q.from; el.className = `ar-warn ${q.from}`; }
-    el.style.width = `${w}px`; el.style.height = `${w * 0.55}px`;
-    el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%) scale(${(1.15 - Math.max(0, q.left) / 14 * 0.3).toFixed(3)})`;
+    if (!q) { if (el._on) { el._on = false; el.style.opacity = '0'; el.className = 'ar-warn'; el._from = null; } continue; }
+    // 크기는 transform scale로만(너비 · 높이를 바꾸면 배치를 다시 한다). 기본 칸은 WARN_BASE px 원.
+    const p = px(q.x, q.y), k = q.r * 2 / 100 * geo().w / WARN_BASE * (1.15 - Math.max(0, q.left) / 14 * 0.3);
+    if (!el._on) { el._on = true; el.style.opacity = '1'; el._from = null; }
+    if (el._from !== q.from) { el._from = q.from; el.className = `ar-warn on ${q.from}`; }
+    el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%) scale(${k.toFixed(3)}, ${(k * 0.55).toFixed(3)})`;
   }
   const ms = R.cur.mines || [];
   for (let i = 0; i < MINE_MAX; i++) {
     const el = $(`ar-mine-${i}`), m = ms[i]; if (!el) continue;
-    if (!m) { if (el._on) { el._on = false; el.style.opacity = '0'; } continue; }
+    if (!m) { if (el._on) { el._on = false; el.style.opacity = '0'; el.className = 'ar-mine'; } continue; }
     const p = px(m.x, m.y);
-    if (!el._on) { el._on = true; el.style.opacity = '1'; el.className = `ar-mine ${m.from}`; el.style.setProperty('--c1', pal(m.el).c1); }
+    if (!el._on) { el._on = true; el.style.opacity = '1'; el.className = `ar-mine on ${m.from}`; el.style.setProperty('--c1', pal(m.el).c1); }
     el.style.transform = `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)`;
   }
 }
 function loop(now) {
   if (!R?.playing) return;
+  R.frameNow = now;
   lagWatch(now);
   if (R.paused) { R.raf = requestAnimationFrame(loop); return; }
+  // 히트스톱: 화면만 잠깐 멈춘다(전투 시계를 그만큼 늦출 뿐, 전투 계산은 같다).
+  if (now < R.stopUntil) { R.raf = requestAnimationFrame(loop); return; }
   const want = Math.floor((now - R.t0 - R.pausedMs) / ARENA.TICK_MS);
   let n = 0;
   const behind = want - R.sim.S.t > 12; // 많이 밀렸으면(다른 탭) 효과 없이 따라잡는다
-  while (R.sim.S.t < want && !R.sim.S.over && n++ < 60) tickOnce(!behind);
+  while (R.sim.S.t < want && !R.sim.S.over && n++ < 60 && !(now < R.stopUntil)) tickOnce(!behind);
   if (R.sim.S.over) return end();
+  if (now < R.stopUntil) { R.raf = requestAnimationFrame(loop); return; }
   const frac = Math.max(0, Math.min(1, (now - R.t0 - R.pausedMs) / ARENA.TICK_MS - R.sim.S.t + 1));
   place(frac);
   drawPad();
@@ -445,7 +536,7 @@ function clock() {
 }
 // 한 틱: 이번 틱의 조작을 기록 · 전투에 넣고 → 한 걸음 → 사건 그리기.
 function tickOnce(show) {
-  const t = R.sim.S.t, add = c => { const x = [t, c]; R.inputs.push(x); R.sim.push(x); };
+  const t = R.sim.S.t, add = c => { const x = Array.isArray(c) ? [t, ...c] : [t, c]; R.inputs.push(x); R.sim.push(x); };
   if (R.dir !== R.sentDir) { R.sentDir = R.dir; add(R.dir); }
   const q = R.queue.splice(0);
   if (R.holdAtk && R.cur.me.cd <= 1 && !q.includes(INPUT.ATK)) q.push(INPUT.ATK);
@@ -458,9 +549,10 @@ function tickOnce(show) {
 function onEvent(e, show) {
   if (e.e === 'enter') { if (show) { const s = R.cur[e.who]; pop(`${petName(e.key)} 등장!`, s.x, s.y - 12, 'enter'); sfx('swoosh'); } return; }
   if (e.e === 'swap') { R.prev = R.cur; drawMon(e.who); drawHud(); if (show && !R.fainted?.[e.who]) { pop('교체!', 50, e.who === 'me' ? 80 : 20, 'enter'); sfx('swoosh'); } if (R.fainted) R.fainted[e.who] = false; return; }
-  if (e.e === 'faint') { const el = $(`ar-${e.who}`); (R.fainted ||= {})[e.who] = true; drawHud(); if (show) { faintFx(e); banner(e.who === 'me' ? `${petName(e.key)} 쓰러짐…` : `${petName(e.key)} 쓰러뜨렸다!`, e.who); sfx('faint'); buzz([40, 30, 40]); } el?.classList.remove('down'); return; }
+  // 쓰러짐: 유령 · 별은 이번 프레임, 배너는 다음 프레임(한 프레임에 몰리지 않게).
+  if (e.e === 'faint') { const el = $(`ar-${e.who}`); (R.fainted ||= {})[e.who] = true; drawHud(); if (show) { faintFx(e); nextFrame(() => banner(e.who === 'me' ? `${petName(e.key)} 쓰러짐…` : `${petName(e.key)} 쓰러뜨렸다!`, e.who)); sfx('faint'); buzz([40, 30, 40]); } el?.classList.remove('down'); return; }
   if (e.e === 'over') return;
-  if (e.e === 'dmg') { drawHp(); if (show) hurt(e); return; }
+  if (e.e === 'dmg') { drawHp(); if (show) hurt(e); else if (e.last) R.finale = true; return; }
   if (e.e === 'buff') { drawHp(); if (show) { pop(e.name, R.cur[e.who].x, R.cur[e.who].y - 20, `skill ${e.who}`); sfx('skill'); aura(e.who, e.el); } return; }
   if (!show) return;
   if (e.e === 'cutin') return cutin(e);
@@ -478,21 +570,71 @@ function onEvent(e, show) {
   if (e.e === 'poison') return void pop('중독!', R.cur[e.who].x, R.cur[e.who].y - 22, 'stun');
   if (e.e === 'knock') return void pop('밀려남!', R.cur[e.who].x, R.cur[e.who].y - 22, 'stun');
 }
+// 다음 프레임에(한 프레임에 조각을 몰아 만들지 않게). 판이 끝났으면 하지 않는다.
+function nextFrame(fn, n = 1) { const cur = R; requestAnimationFrame(() => { if (R !== cur || cur.closing) return; n > 1 ? nextFrame(fn, n - 1) : fn(); }); }
+const arenaEl = () => $('ar-field');
+// 히트스톱: 화면만 ms 동안 멈춘다. 전투 시계(pausedMs)를 같은 만큼 늦추므로 전투 계산(틱 · 조작 기록)은 그대로다.
+function hitStop(ms) {
+  if (!ms || reduced() || !R?.playing) return;
+  const now = R.frameNow || performance.now(), until = now + ms;
+  if (until <= R.stopUntil) return;
+  R.pausedMs += until - Math.max(now, R.stopUntil);
+  R.stopUntil = until;
+}
+// 경기장만 흔들린다(앱 전체에 클래스를 붙이면 화면 전체 스타일을 다시 계산해서 무겁다). translate 속성이라 줌(scale)과 겹쳐도 된다.
+function shakeField(big) {
+  const f = arenaEl(); if (!f || reduced()) return;
+  if (!big && app()?.classList.contains('ar-lite')) return; // 저사양: 필살기 흔들림만
+  const a = big ? 6 : 3;
+  try { f.animate([{ translate: '0 0' }, { translate: `${-a}px ${a * 0.6}px` }, { translate: `${a}px ${-a * 0.7}px` }, { translate: `${-a * 0.7}px ${a * 0.4}px` }, { translate: `${a * 0.5}px ${-a * 0.3}px` }, { translate: '0 0' }], { duration: big ? 420 : 220, easing: 'linear' }); } catch {}
+}
+// 카메라 줌: 경기장이 맞은 자리 쪽으로 살짝 당겨졌다 돌아온다(scale 속성).
+function zoomAt(at, amount = 0.08, ms = 520) {
+  const f = arenaEl(); if (!f || reduced()) return;
+  f.style.transformOrigin = `${Math.round(at.x)}px ${Math.round(at.y)}px`;
+  try { f.animate([{ scale: 1 }, { scale: 1 + amount, offset: 0.3 }, { scale: 1 + amount * 0.8, offset: 0.7 }, { scale: 1 }], { duration: ms, easing: 'cubic-bezier(.2,.8,.3,1)' }); } catch {}
+}
 function cutin(e) {
-  const fieldEl = $('ar-field');
-  fxSkillCutIn(fieldEl, { side: e.who, portrait: petImg(e.key, e.form), name: e.name, petName: petName(e.key), el: e.el, rank: e.rank });
+  const box = $('ar-cut'), wash = $('ar-wash'); if (!box) return;
+  const P = pal(e.el);
+  for (const [k, v] of [['--c1', P.c1], ['--c2', P.c2], ['--c3', P.c3]]) box.style.setProperty(k, v);
+  box.className = `fx2 fx2-cut ar-cut on ${e.who} t${e.rank || 0}`;
+  const pet = $('ar-cut-pet'), want = `${e.key}-${e.form}`;
+  if (pet && pet._k !== want) { pet._k = want; pet.innerHTML = petImg(e.key, e.form, 'avatar-art'); }
+  const who = $('ar-cut-who'), name = $('ar-cut-name');
+  if (who) who.textContent = petName(e.key);
+  if (name) name.textContent = e.name;
+  const run = (el, frames, opts) => { try { el?.animate(frames, { fill: 'forwards', ...opts }); } catch {} };
+  const from = e.who === 'me' ? '-110%' : '110%', to = e.who === 'me' ? '110%' : '-110%';
+  run(box.querySelector('.fx2-cut-band'), [
+    { transform: `translateX(${from}) skewY(-5deg)`, opacity: 0, easing: 'cubic-bezier(.15,.85,.25,1)' },
+    { transform: 'translateX(0) skewY(-5deg)', opacity: 1, offset: .2 },
+    { transform: 'translateX(0) skewY(-5deg) scale(1.03)', opacity: 1, offset: .78, easing: 'cubic-bezier(.6,0,.9,.35)' },
+    { transform: `translateX(${to}) skewY(-5deg)`, opacity: 0 }
+  ], { duration: 950, easing: 'linear' });
+  run(box.querySelector('.fx2-cut-dim'), [{ opacity: 0 }, { opacity: 1, offset: .2 }, { opacity: 1, offset: .78 }, { opacity: 0 }], { duration: 950 });
+  run(pet, [{ transform: 'translateX(-30px) scale(.8)' }, { transform: 'translateX(0) scale(1.08)', offset: .25 }, { transform: 'translateX(8px) scale(1.12)' }], { duration: 950, easing: 'ease-out' });
+  // 영웅 이상: 반짝이(미리 만든 7개 중 저사양은 2개) · 전설 이상: 경기장이 속성 색으로 물든다.
+  const lite = app()?.classList.contains('ar-lite');
+  box.querySelectorAll('.ar-cut-star').forEach((st, i) => { if ((e.rank || 0) >= 1 && i < (lite ? 2 : 3 + e.rank * 2)) run(st, [{ transform: 'scale(.1)', opacity: 0 }, { transform: 'translateY(-8px) scale(1) rotate(60deg)', opacity: 1, offset: .4 }, { transform: 'translateY(-22px) scale(.2) rotate(120deg)', opacity: 0 }], { duration: 760, delay: 120 + i * 70 }); });
+  if ((e.rank || 0) >= 2 && wash) { wash.style.setProperty('--c1', P.c1); wash.style.setProperty('--c2', P.c2); run(wash, [{ opacity: 0 }, { opacity: 1, offset: .25 }, { opacity: .8, offset: .7 }, { opacity: 0 }], { duration: 920 }); }
+  later(() => box.classList.remove('on'), 1000);
   sfx('ult-riser'); buzz(60);
-  app()?.classList.add('ult');
-  later(() => app()?.classList.remove('ult'), ARENA.ULT_FREEZE_TICKS * ARENA.TICK_MS);
+  // 멈춤 표시는 경기장에만(앱 전체 X).
+  arenaEl()?.classList.add('ult');
+  later(() => arenaEl()?.classList.remove('ult'), ARENA.ULT_FREEZE_TICKS * ARENA.TICK_MS);
   if (e.who === 'foe') later(() => pop('회피하면 피할 수 있어요!', 50, 92, 'hint'), 200);
 }
+// 필살기가 터질 때: 큰 빔 → (다음 프레임) 터짐 조각 → (그다음) 지진 · 금. 흔들림 · 줌은 경기장만.
 function ultFx(e) {
-  const fieldEl = $('ar-field'), to = px(e.tx, e.ty), from = px(e.x, e.y);
+  const fieldEl = arenaEl(), to = px(e.tx, e.ty), from = px(e.x, e.y);
   beam(from, to, e.el, true);
-  quake(to, e.el, true);
-  fxImpact(fieldEl, to, e.el, 3);
-  fxPunch(app(), .06); app()?.classList.add('shake'); later(() => app()?.classList.remove('shake'), 420);
+  shakeField(true);
+  if (e.hit) zoomAt(to, 0.08, 560); else fxPunch(fieldEl, .04);
   sfx('ult-impact');
+  if (e.who === 'me' && e.hit) buzz([30, 20, 60]);
+  nextFrame(() => fxImpact(arenaEl(), to, e.el, 3));
+  nextFrame(() => quake(to, e.el, true), 2);
 }
 function attack(e) {
   const fieldEl = $('ar-field'), from = px(e.x, e.y);
@@ -507,17 +649,65 @@ function attack(e) {
   sfx(atkSfx(e.el), { rate: e.e === 'skill' ? .85 : 1.1 });
 }
 const atkSfx = el => el === 'leaf' ? 'atk-leaf' : el === 'wind' ? 'atk-wind' : 'atk-star';
+// 맞는 순간: 히트스톱 → 섬광 · 큰 숫자 · 치명타 · 콤보 · 흔들림 · 소리 겹치기 · 진동.
+const HIT_SFX = { leaf: 'hit-leaf', wind: 'hit-wind', star: 'hit-star', ice: 'hit-star', flame: 'hit-star' };
 function hurt(e) {
-  if (e.kind !== 'poison') {
-    fxRecoil($(`ar-${e.who}-body`), e.who === 'me' ? 1 : -1);
+  const poison = e.kind === 'poison', body = $(`ar-${e.who}-body`), stop = poison ? 0 : HITSTOP[e.kind] || 40;
+  if (!poison) {
+    hitStop(stop);
+    flash(body);
+    const dir = e.who === 'me' ? 1 : -1;
+    // 움찔은 멈춤이 끝난 뒤에(멈춤 동안은 섬광만).
+    later(() => fxRecoil($(`ar-${e.who}-body`), dir), stop);
     const s = R.cur[e.who], f = s.team[s.idx];
-    if (f) { const src = expressionSrc(f.key, R.forms[e.who][s.idx], 'hurt'); if (poseReady(src)) swapPose($(`ar-${e.who}-body`), src, 300); }
+    if (f) { const src = expressionSrc(f.key, R.forms[e.who][s.idx], 'hurt'); if (poseReady(src)) swapPose(body, src, 300); }
   }
-  pop(e.blocked && !e.dmg ? '막음!' : String(e.dmg), e.x + (Math.random() * 8 - 4), e.y - 16, `dmg ${e.kind}${e.who === 'me' ? ' me' : ''}`);
-  if (e.m > 1 && e.kind !== 'atk' && e.kind !== 'poison') pop('효과가 굉장해!', e.x, e.y - 27, 'eff');
-  else if (e.m < 1 && e.kind !== 'atk' && e.kind !== 'poison') pop('효과가 별로…', e.x, e.y - 27, 'eff weak');
-  if (e.kind !== 'poison') sfx(e.kind === 'ult' ? 'crit' : 'hit', { rate: e.kind === 'atk' ? 1.1 : .9 });
-  if (e.who === 'me' && e.kind !== 'atk' && e.kind !== 'poison') buzz(30);
+  dmgNum(e);
+  if (e.m > 1 && e.kind !== 'atk' && !poison) pop('효과가 굉장해!', e.x, e.y - 27, 'eff');
+  else if (e.m < 1 && e.kind !== 'atk' && !poison) pop('효과가 별로…', e.x, e.y - 27, 'eff weak');
+  if (!poison) {
+    // 소리 겹치기: 때림 + 속성 + (내가 맞으면) 아픔, 높이를 조금씩 다르게.
+    sfx(e.kind === 'ult' ? 'crit' : 'hit', { rate: e.kind === 'atk' ? 1.1 : .9 });
+    sfx(HIT_SFX[e.el] || 'hit-star', { rate: e.kind === 'atk' ? 1.2 : 1 });
+    if (e.who === 'me') sfx('hurt', { rate: 1.05 });
+    if (e.crit) sfx('crit', { rate: 1.15 });
+    if (e.kind === 'skill' || e.kind === 'skill2') shakeField(false);
+  }
+  if (e.who === 'me' && e.kind !== 'atk' && !poison) buzz(30);
+  if (e.who === 'foe' && e.combo >= 2) combo(e.combo);
+  if (e.last) finale(e);
+}
+function flash(body) {
+  const img = body?.querySelector('.ar-flash'); if (!img) return;
+  try { img.animate([{ opacity: .95 }, { opacity: .95, offset: .5 }, { opacity: 0 }], { duration: 110, easing: 'ease-out' }); } catch {}
+}
+// 큰 데미지 숫자: 미리 만든 칸 8개를 돌려 쓴다(새 조각을 만들지 않는다). 스킬은 속성 색, 치명타는 노랑 + 💥.
+function dmgNum(e) {
+  const i = R.numN++ % DMG_MAX, el = $(`ar-num-${i}`); if (!el) return;
+  const p = px(e.x + (((R.numN * 37) % 9) - 4), e.y - 16), P = pal(e.el);
+  const big = e.kind === 'ult' ? 'ult' : e.kind === 'atk' ? 'atk' : e.kind === 'poison' ? 'poison' : 'skill';
+  el.className = `ar-num ${big}${e.crit ? ' crit' : ''}${e.who === 'me' ? ' me' : ''}`;
+  el.style.setProperty('--c1', P.c1);
+  el.textContent = e.blocked && !e.dmg ? '막음!' : `${e.crit ? '💥' : ''}${e.dmg}`;
+  el.style.translate = `${Math.round(p.x)}px ${Math.round(p.y)}px`;
+  const k = big === 'ult' ? 1.7 : e.crit ? 1.6 : big === 'skill' ? 1.45 : 1.3;
+  try { el.animate([{ transform: 'translate(-50%,-30%) scale(.4)', opacity: 0 }, { transform: `translate(-50%,-70%) scale(${k})`, opacity: 1, offset: .14 }, { transform: 'translate(-50%,-80%) scale(1)', opacity: 1, offset: .32 }, { transform: 'translate(-50%,-80%) scale(1)', opacity: 1, offset: .7 }, { transform: 'translate(-50%,-170%) scale(.9)', opacity: 0 }], { duration: big === 'ult' ? 1150 : 900, easing: 'ease-out', fill: 'forwards' }); } catch {}
+  if (e.crit) pop('치명타!', e.x, e.y - 30, 'crit');
+}
+function combo(n) {
+  const el = $('ar-combo'), b = $('ar-combo-n'); if (!el || !b) return;
+  b.textContent = String(n);
+  el.classList.toggle('hot', n >= 5);
+  try { el.animate([{ transform: 'scale(1.5)', opacity: 1 }, { transform: 'scale(1)', opacity: 1, offset: .15 }, { transform: 'scale(1)', opacity: 1, offset: .8 }, { transform: 'scale(.9)', opacity: 0 }], { duration: 2000, easing: 'ease-out', fill: 'forwards' }); } catch {}
+  if (n >= 3) sfx('combo', { rate: Math.min(1.5, 0.9 + n * 0.05) });
+}
+// 판을 끝내는 한 방: 0.6초 느리게 + 줌.
+function finale(e) {
+  if (R.finale) return;
+  R.finale = true;
+  const at = px(e.x, e.y), f = arenaEl();
+  zoomAt(at, 0.1, 900);
+  later(() => { try { f?.getAnimations({ subtree: true }).forEach(a => { a.playbackRate = 0.35; }); } catch {} }, 30);
 }
 function spark(at, el) {
   const P = pal(el);
@@ -570,8 +760,10 @@ function aura(who, el) {
   mon.style.setProperty('--c1', pal(el).c1);
   mon.classList.remove('buffing'); requestAnimationFrame(() => mon.classList.add('buffing'));
 }
+// 글자: left/top 대신 translate로 자리 잡는다(배치를 다시 하지 않게).
 function pop(text, x, y, cls = '') {
-  return fxEl(`pop ${cls}`, { left: `${x}%`, top: `${y}%` }, cls.includes('count') ? 950 : cls.includes('hint') ? 1800 : 1000, esc(text));
+  const p = px(x, y);
+  return fxEl(`pop ${cls}`, { translate: `${Math.round(p.x)}px ${Math.round(p.y)}px` }, cls.includes('count') ? 950 : cls.includes('hint') ? 1800 : 1000, esc(text));
 }
 function faintFx(e) {
   const fieldEl = $('ar-field'); if (!fieldEl) return;
@@ -594,16 +786,18 @@ function banner(text, who) {
 }
 
 /* ---------- 잠깐 멈춤 ---------- */
-function pause() { if (!R?.playing || R.paused) return; R.paused = true; R.pauseAt = performance.now(); R.holdAtk = false; R.dir = 0; drawStick(0, 0); }
+function pause() { if (!R?.playing || R.paused) return; R.paused = true; R.pauseAt = performance.now(); R.holdAtk = false; R.dir = 0; R.drag = null; hideAim(); drawStick(0, 0); }
 function resume() { if (!R?.paused) return; R.pausedMs += performance.now() - R.pauseAt; R.paused = false; }
 function onVisibility() { if (document.hidden) pause(); else if (!document.querySelector('.ar-quit')) resume(); }
 
 /* ---------- 끝 ---------- */
 async function end() {
-  R.playing = false; R.holdAtk = false;
+  R.playing = false; R.holdAtk = false; R.drag = null; hideAim();
   cancelAnimationFrame(R.raf);
   place(1);
   const local = R.sim.S.winner;
+  // 마지막 한 방이면 0.6초 느리게 보여 준 뒤 배너.
+  if (R.finale && !reduced()) { await wait(650); if (!R) return; }
   banner(local === 'me' ? '승리!' : local === 'draw' ? '무승부' : '패배…', local === 'me' ? 'me win' : 'foe');
   sfx(local === 'me' ? 'fanfare-epic' : 'fail');
   await wait(1400);
