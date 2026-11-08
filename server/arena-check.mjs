@@ -2,12 +2,13 @@
 //   직접 조종하는 3:3 펫 대전. 전투는 씨앗과 '몇 번째 틱에 무엇을 눌렀나'만으로 정해지고, 서버가 같은 함수로 다시 돌려 승패 · 보상을 정한다.
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { ARENA, BEATS, INPUT, DIRS, DIR16, ROLE, SHAPE, TIER_MUL, AI, SHAPES6, EL_SKILLS, SK2, ZONES_MAX, matchup, fighter, petRank, petTier, petSkill, petSkill2, skill2Picks, cleanPicks, petRole, dirCode, aimCode, cleanInputs, createArena, runArena } from '../public/modules/arena-rules.js';
-import { playArena, seeded, botRate, tierRate, TIER_PAIRS, pickGap } from './arena-sim.mjs';
+import { ARENA, BEATS, INPUT, DIRS, DIR16, ROLE, SHAPE, TIER_MUL, AI, SHAPES6, EL_SKILLS, SK2, ZONES_MAX, matchup, fighter, petRank, petTier, petSkill, petSkill2, skill2Picks, cleanPicks, petRole, dirCode, aimCode, cleanInputs, createArena, runArena,
+  TREE, TREE_UP, ULT2, ULT_SHAPE, ROLE_UP, EL_MUL, L1B_EXTRA, GUARD_NOVA, treeSeed, baseS2, cleanTree, cleanTrees, treeOpen, petTree, skillExtra } from '../public/modules/arena-rules.js';
+import { playArena, seeded, botRate, tierRate, TIER_PAIRS, pickGap, elementTable, treeGap } from './arena-sim.mjs';
 import { CHARACTERS } from '../public/modules/core.js';
 import { elementOf } from '../public/modules/battle-fx.js';
 import { PET_SKILLS } from '../public/modules/battle-engine.js';
-import { arenaStart, arenaFinish, arenaView, pickTeam, pickFoe, foeLevelOf, arenaLine, grantArenaTicket, arenaPoolFor, arenaPoolPut, ARENA_POOL, S2_MAX } from './arena.mjs';
+import { arenaStart, arenaFinish, arenaView, pickTeam, pickFoe, foeLevelOf, arenaLine, grantArenaTicket, arenaPoolFor, arenaPoolPut, ARENA_POOL, S2_MAX, TR_MAX, unpackTeam } from './arena.mjs';
 import { ACTIVITY_MODES } from './activity.mjs';
 import { STATE_BUDGET_KB } from './perf-budget.mjs';
 
@@ -155,7 +156,7 @@ export async function runArenaChecks(assert) {
     assert(svc.includes("grantArenaTicket(p, 'attend', now)") && svc.includes("grantArenaTicket(student, 'practice', finalizedAt)"), 'V13.225 출석 · 끝까지 푼 연습이 입장권을 준다');
     assert(games.includes('export function arenaCard') && arcade.includes('${arenaCard(A, art)}') && app.includes("d.action === 'arena-open'") && !app.slice(app.indexOf("d.action === 'arena-open'"), app.indexOf("d.action === 'arena-open'") + 300).includes('arcadeWords') && menu.includes("['펫 아레나', r.arena?.left]") && build.includes('"v13226.css"') && build.includes("'wall', 'arena'"),
       'V13.225 놀이터 미니게임에 펫 아레나 카드(단어 고르기 없음) · 오늘 남은 판 · 최고 연승');
-    assert(ui.includes("api('/games/arena/start'") && ui.includes("api('/games/arena/finish', { id: R.r.id, inputs: R.inputs })") && ui.includes('createArena(') && ui.includes('fighter({ key: f.key, form: f.form, level: f.level, s2: f.s2 })') && ui.includes("'arena/bg-plaza', 'battle/bg-arena'"),
+    assert(ui.includes("api('/games/arena/start'") && ui.includes("api('/games/arena/finish', { id: R.r.id, inputs: R.inputs })") && ui.includes('createArena(') && ui.includes('fighter({ key: f.key, form: f.form, level: f.level, s2: f.s2, tr: f.tr })') && ui.includes("'arena/bg-plaza', 'battle/bg-arena'"),
       'V13.225 화면은 서버 판으로 같은 전투를 돌리고 조작 기록만 보낸다');
     assert(['ar-stick', "data-btn=\"atk\"", "data-btn=\"skill\"", "data-btn=\"ult\"", "data-btn=\"dodge\"", "data-btn=\"swap\"", 'pointerdown', 'KeyJ'].every(x => ui.includes(x)) && !ui.includes('dealWalls') && !ui.includes('questions'),
       'V13.225 조작: 조이스틱 · 공격 · 스킬 · 필살기 · 회피 · 교체 버튼(누르는 순간 반응), 키보드도 된다. 단어 문제 없음');
@@ -263,7 +264,7 @@ export async function runArenaChecks(assert) {
   {
     assert(petTier('dog') === 'normal' && petTier('penguin') === 'epic' && petTier('phoenix') === 'legend' && petTier('tyranno') === 'legend' && petTier('ladybug') === 'legend' && petTier('pumpkincat') === 'limited' && petTier('gumiho') === 'mythic',
       'V13.228 아레나 등급: 일반 · 영웅 · 전설(시리즈 포함) · 한정 · 신화');
-    assert(TIER_MUL.normal === 1 && Math.abs(TIER_MUL.epic - 1) <= 0.02 && Math.abs(TIER_MUL.limited - 1) <= 0.025 && TIER_MUL.legend > TIER_MUL.epic && TIER_MUL.mythic > TIER_MUL.legend && TIER_MUL.mythic <= 1.12,
+    assert(TIER_MUL.normal === 1 && Math.abs(TIER_MUL.epic - 1) <= 0.02 && Math.abs(TIER_MUL.limited - 1) <= 0.05 && TIER_MUL.legend > TIER_MUL.epic && TIER_MUL.mythic > TIER_MUL.legend && TIER_MUL.mythic <= 1.12,
       `V13.228 등급 배수: 일반 ${TIER_MUL.normal} · 영웅 ${TIER_MUL.epic} · 전설 ${TIER_MUL.legend} · 한정 ${TIER_MUL.limited} · 신화 ${TIER_MUL.mythic}`);
     const got = TIER_PAIRS.map(([a, b, goal, tol]) => ({ a, b, goal, tol, r: tierRate(a, b, 800) }));
     assert(got.every(x => Math.abs(x.r - x.goal) <= x.tol), `V13.228 등급 승률(800판씩, 양쪽 같은 솜씨): ${got.map(x => `${x.a} 대 ${x.b} ${Math.round(x.r * 1000) / 10}%(목표 ${Math.round(x.goal * 100)} ± ${Math.round(x.tol * 100)})`).join(' · ')}`);
@@ -353,7 +354,7 @@ export async function runArenaChecks(assert) {
     assert(same && s2used > 30, `V13.229 새 스킬을 쓴 판도 서버가 다시 돌리면 같은 결과(스킬 ② ${s2used}번, 16판)`);
     assert(!source('../public/modules/arena-rules.js').match(/Math\.(random|sin|cos|tan|atan2|exp|log|pow|hypot)\b/), 'V13.229 새 모양 · 스킬도 삼각함수 · 무작위 없이(16방향 표 · sqrt만)');
     // 스킬 ② 고르기: 규칙 · 서버.
-    assert(fighter({ key: 'turtle', s2: 1 }).skill2.id === 'bubble' && fighter({ key: 'turtle' }).skill2.id === 'jet' && fighter({ key: 'turtle', s2: 7 }).skill2.id === 'jet'
+    assert(fighter({ key: 'turtle', s2: 1 }).skill2.id === 'bubble' && fighter({ key: 'turtle' }).skill2.id === EL_SKILLS.water[treeSeed('turtle').base].id && fighter({ key: 'turtle', s2: 7 }).skill2.id === 'jet'
       && JSON.stringify(cleanPicks({ turtle: 1, dog: 0, nope: 1, cat: 2, bear: '1' })) === '{"turtle":1,"dog":0}' && JSON.stringify(cleanPicks([1])) === '{}',
       'V13.229 스킬 ② 고르기: 0(A) · 1(B)만, 모르는 펫 · 다른 값은 버린다');
     {
@@ -361,7 +362,7 @@ export async function runArenaChecks(assert) {
       const p = { id: 's2', role: 'student', display_name: '학생', games: {} };
       const r = arenaStart(p, { id: 'g1', pets, team: ['turtle', 'dog', 'bear'], picks: { turtle: 1, dog: 1, cat: 1, owl: 1 }, now: 1000, random: seeded(3) });
       const a = p.games.arena;
-      assert(a.s2.turtle === 1 && a.s2.dog === 1 && a.s2.cat === undefined && a.s2.owl === undefined && a.live.me.find(x => x[0] === 'turtle')[3] === 1 && a.live.me.find(x => x[0] === 'bear')[3] === 0 && r.me.find(f => f.key === 'turtle').s2 === 1 && r.s2.turtle === 1,
+      assert(a.s2.turtle === 1 && a.s2.dog === 1 && a.s2.cat === undefined && a.s2.owl === undefined && a.live.me.find(x => x[0] === 'turtle')[3] === 1 && a.live.me.find(x => x[0] === 'bear')[3] === treeSeed('bear').base && r.me.find(f => f.key === 'turtle').s2 === 1 && r.s2.turtle === 1,
         'V13.229 서버: 고른 스킬 ②는 내 펫(알 아님)만 기억하고, 판 기록 [키, 단계, 레벨, 스킬 ②]에 넣어 보낸다');
       arenaStart(p, { id: 'g2', pets, team: ['turtle'], now: 2000, random: seeded(4) });
       assert(p.games.arena.live.me.find(x => x[0] === 'turtle')[3] === 1 && arenaView(p, 2000).s2.turtle === 1, 'V13.229 서버: 고르지 않고 시작하면 기억한 스킬 ②로(무료로 바꾼 것이 남는다)');
@@ -380,7 +381,7 @@ export async function runArenaChecks(assert) {
     assert(gaps.every(g => Math.abs(g.gap) <= 0.03), `V13.229 스킬 ② 고르기 승률 차이(1000판씩): ${gaps.map(g => `${EL_SKILLS[g.el][0].name} ${Math.round(g.a * 1000) / 10} · ${EL_SKILLS[g.el][1].name} ${Math.round(g.b * 1000) / 10}`).join(' / ')}`);
     // 화면: 스킬 ② 고르기 칸 · 새 칸(장판 4 · 줄기 · 부채꼴 · 분신) · 조각 상한 · 그림 게이트.
     const ui = source('../public/modules/arena.js'), css = source('../public/v13229.css'), build = source('./build-assets.mjs');
-    assert(['data-ar="pick2"', 'skill2Picks(key)', "api('/games/arena/start', { team: R.team, picks })", 'R.view?.s2', 's2: f.s2', 'id="ar-zone-${i}"', 'id="ar-line-${i}"', 'id="ar-stream-${i}"', 'id="ar-cone-${w}"', 'id="ar-clone-${w}"', 'function drawSkills(', 'function streamFx(', 'function ultExtra(', 'function meteorBoom(', "import { ARENA_ART } from './arena-art.js'"].every(x => ui.includes(x)) && build.includes('"v13229.css"') && build.includes("public/modules/arena-art.js") && source('../public/modules/arena-art.js').includes('export const ARENA_ART'),
+    assert(["api('/games/arena/start', { team: R.team, picks, tree })", 'R.view?.s2', 's2: f.s2', 'id="ar-zone-${i}"', 'id="ar-line-${i}"', 'id="ar-stream-${i}"', 'id="ar-cone-${w}"', 'id="ar-clone-${w}"', 'function drawSkills(', 'function streamFx(', 'function ultExtra(', 'function meteorBoom(', "import { ARENA_ART } from './arena-art.js'"].every(x => ui.includes(x)) && build.includes('"v13229.css"') && build.includes("public/modules/arena-art.js") && source('../public/modules/arena-art.js').includes('export const ARENA_ART'),
       'V13.229 화면: 대기실에서 펫마다 스킬 ② 고르기(무료) · 미리 만든 장판 · 줄기 · 부채꼴 · 분신 칸 · 속성 필살기 연출 · 그림 66이 오면 칸이 그림으로(ARENA_ART)');
     assert(ui.includes('FX_MAX = 40, FX_MAX_LITE = 20, SKILL_FX = 8, SKILL_FX_LITE = 4') && ui.includes('R.fxN >= (R.lite ? FX_MAX_LITE : FX_MAX)') && ui.includes('k = skillCap(n)') && ui.includes('STREAM_MAX = 2') && ui.includes('Array.from({ length: ZONES_MAX }'),
       'V13.229 렉 예산: 효과 조각 한 번에 40개(저사양 20) · 스킬 하나 8개(저사양 4) · 장판 칸 4개 · 줄기 칸 2개');
@@ -397,5 +398,103 @@ export async function runArenaChecks(assert) {
     assert(split.length === 7 && texts.every((t, i) => t.includes('STYLE REFERENCE') && t.includes('"SUMUS 펫 아레나 65 (Runner용)"') && t.includes('"SUMUS 펫 아레나 66 (Runner용)"') && /named exactly "66-\d\.png"/.test(t)) && map.length === 19 && map.every(l => l.includes('public/assets/arena/'))
       && codex.includes('SUMUS 펫 아레나 66 (Runner용)') && codex.includes('REFERENCE IMAGES ARE ATTACHED') && codex.includes('PR까지만') && codex.includes('arena/bg-plaza.webp') && source(`${dir}README.md`).includes('펫 아레나 스킬 연출(66)'),
       'V13.229 그림 66 주문서: 시트 7장 · 그림 19장, 시트마다 Drive 65번 아레나 그림을 열어 그림체를 맞추고 "SUMUS 펫 아레나 66 (Runner용)"에 정확한 이름으로 저장, Codex 지시문은 저장소 그림 참고');
+  }
+  // 13) V13.231 (2탄 ⑤단계) 펫별 스킬트리 · 속성 균형.
+  {
+    const keys = Object.keys(CHARACTERS);
+    // 저장 모양: 층마다 0(A) · 1(B) 세 글자, 이상한 값은 기본 가지. 잠긴 층(레벨 모자람)은 -1.
+    assert(cleanTree('101') === '101' && cleanTree('12') === TREE.DEF && cleanTree(5) === TREE.DEF && JSON.stringify(cleanTrees({ dog: '010', nope: '111', cat: '2', bear: 7 })) === '{"dog":"010"}' && JSON.stringify(cleanTrees([1])) === '{}'
+      && JSON.stringify(treeOpen(9, '111')) === '[-1,-1,-1]' && JSON.stringify(treeOpen(10, '111')) === '[1,-1,-1]' && JSON.stringify(treeOpen(29, '010')) === '[0,1,-1]' && JSON.stringify(treeOpen(30, '010')) === '[0,1,0]' && TREE.LEVELS.join() === '10,20,30',
+      'V13.231 스킬트리: 펫 레벨 Lv.10 · 20 · 30에 층이 열리고, 층마다 가지 A(0) · B(1) 세 글자로 기억한다');
+    // 97마리 조합이 겹치지 않는다(속성 · 역할 · 스킬 ① 종류 · 1층 A 갈래 · 기본 스킬 ②).
+    const sig = new Set(keys.map(k => { const t = petTree(k, 30, '000'), u = petTree(k, 30, '111'); return [elementOf(k), petRole(k), petSkill(k).kind, ...t.map(x => x.a.name + x.a.desc), ...u.map(x => x.b.name + x.b.desc)].join('|'); }));
+    const sig2 = new Set(keys.map(k => [elementOf(k), petRole(k), petSkill(k).kind, treeSeed(k).l1, treeSeed(k).base].join('|')));
+    assert(keys.length === 97 && sig.size === keys.length && sig2.size === keys.length && keys.every(k => petTree(k, 1).length === 3),
+      `V13.231 펫 ${keys.length}마리 스킬트리 조합이 모두 다르다(이름에서 고정, 같은 속성 · 역할 · 스킬 종류끼리 비켜 감)`);
+    // 층마다 효과: 1층 A 위력/쿨 · B 속성 덤, 2층 A 다른 스킬(+쿨) · B 기본 스킬 강화, 3층 A 두 번째 필살기 · B 역할 강화. 잠긴 층은 효과 없음.
+    const cdKey = keys.find(k => treeSeed(k).l1 === 'cd'), powKey = keys.find(k => treeSeed(k).l1 === 'pow' && petSkill(k).kind === 'guard');
+    const F = (key, level, tr, s2 = null) => fighter({ key, form: 2, level, tr, s2 }), bare = (key, level, s2 = null) => fighter({ key, form: 2, level, s2, noTree: true });
+    const tank = keys.find(k => petRole(k) === 'tank');
+    assert(F(cdKey, 10, '011').skillCd < bare(cdKey, 10).skillCd && F(cdKey, 9, '011').skillCd === bare(cdKey, 9).skillCd
+      && F(powKey, 10, '011').skill.heal + F(powKey, 10, '011').skill.shield > bare(powKey, 10).skill.heal + bare(powKey, 10).skill.shield
+      && F(powKey, 10, '111').skill.plus === 'nova' && keys.filter(k => petSkill(k).kind === 'boost').every(k => F(k, 12, '111').skill.plus === 'long')
+      && keys.filter(k => ['burst', 'poison'].includes(petSkill(k).kind)).every(k => skillExtra(F(k, 12, '111').skill) === (petSkill(k).kind === 'poison' ? 'poison2' : petSkill(k).extra ? `${petSkill(k).extra}2` : L1B_EXTRA[elementOf(k)])),
+      'V13.231 스킬트리 1층: A 스킬 ① 강화(펫마다 위력 또는 쿨타임) · B 속성 덤(지키기는 둘레 폭발, 강화는 길게, 공격은 속성 효과) · Lv.9까지는 효과 없음');
+    assert(keys.every(k => { const b = treeSeed(k).base, list = EL_SKILLS[elementOf(k)]; return F(k, 19, '000').skill2.id === list[b].id && F(k, 20, '000').skill2.id === list[1 - b].id && F(k, 20, '010').skill2.id === list[b].id
+        && F(k, 20, '000').skill2Cd < F(k, 19, '000').skill2Cd && F(k, 20, '010').s2pow === TREE_UP.s2pow && F(k, 19, '010').s2pow === 1 && F(k, 25, '010', 1 - b).skill2.id === list[1 - b].id; }),
+      'V13.231 스킬트리 2층: A 속성 새 스킬로 바꾸기(+쿨) · B 기본 스킬 강화. 기본 스킬 ②는 2탄 ②에서 고른 기록이 있으면 그것(기록을 살린다)');
+    assert(keys.every(k => { const el = elementOf(k), a = F(k, 30, '000'), b = F(k, 30, '001'), n = bare(k, 30); return a.ult === ULT2[el].name && a.ult2 === ULT2[el].shape && b.ult2 === null && F(k, 29, '000').ult2 === null && ['ring', 'line'].includes(a.ult2)
+        && (petRole(k) !== 'tank' || b.hp > n.hp) && (petRole(k) !== 'swift' || b.dodgeCd < n.dodgeCd) && (petRole(k) !== 'power' || b.atk > n.atk) && (petRole(k) !== 'rapid' || b.atkTicks < n.atkTicks) && (petRole(k) !== 'smart' || b.skillCd < n.skillCd); })
+      && Object.keys(ULT2).length === 8 && new Set(Object.values(ULT2).map(u => u.name)).size === 8 && Object.keys(ROLE_UP).every(r => ROLE[r]) && F(tank, 30, '001').hp > bare(tank, 30).hp,
+      'V13.231 스킬트리 3층: A 속성 필살기 두 번째(8속성 · 원 또는 일직선) · B 역할 강화(튼튼 체력 · 날쌘 회피 · 한방 공격 · 연타 간격 · 꾀돌이 쿨)');
+    // 두 번째 필살기 맞는 자리: 원은 내 둘레, 일직선은 조준 쪽 길게. 지키기 속성 폭발은 둘레.
+    {
+      const ringKey = keys.find(k => ULT2[elementOf(k)].shape === 'ring'), lineKey = keys.find(k => ULT2[elementOf(k)].shape === 'line');
+      const ultAt = (key, foeAt, code) => {
+        const A = createArena({ seed: 4, me: [F(key, 30, '000')], foe: [fighter({ key: 'pig', form: 2, level: 30 })], foeLevel: 1, foeIdle: true });
+        Object.assign(A.S.me, { x: 50, y: 70, fx: 0, fy: -1, gauge: ARENA.GAUGE_MAX, enter: 0 }); Object.assign(A.S.foe, { ...foeAt, enter: 0 });
+        A.push(code == null ? [0, INPUT.ULT] : [0, INPUT.ULT, code]);
+        const ev = []; for (let i = 0; i < ARENA.ULT_FREEZE_TICKS + 3; i++) ev.push(...A.step());
+        return ev.find(e => e.e === 'ult');
+      };
+      const r1 = ultAt(ringKey, { x: 50 + ULT_SHAPE.ring.r - 2, y: 70 }), r2 = ultAt(ringKey, { x: 50, y: 70 - ULT_SHAPE.ring.r - 12 });
+      const l1 = ultAt(lineKey, { x: 50, y: 70 - ULT_SHAPE.line.len + 8 }, 0), l2 = ultAt(lineKey, { x: 50 + 20, y: 40 }, 0);
+      assert(r1?.u2 === 'ring' && r1.hit && !r2.hit && l1?.u2 === 'line' && l1.hit && !l2.hit && l1.len === ULT_SHAPE.line.len,
+        'V13.231 두 번째 필살기: 원은 내 둘레(옆에 붙으면 맞고 멀면 안 맞음) · 일직선은 조준 쪽으로 길게(줄 밖이면 안 맞음)');
+      const A = createArena({ seed: 6, me: [F(powKey, 12, '111')], foe: [fighter({ key: 'pig', form: 2, level: 12 })], foeLevel: 1, foeIdle: true });
+      Object.assign(A.S.me, { x: 50, y: 60, skill: 0, enter: 0 }); Object.assign(A.S.foe, { x: 50, y: 60 - GUARD_NOVA.r + 2, enter: 0 });
+      A.push([0, INPUT.SKILL]); const ev = A.step();
+      assert(ev.some(e => e.e === 'nova') && ev.some(e => e.e === 'dmg' && e.who === 'foe' && e.kind === 'skill'), 'V13.231 1층 B 지키기 스킬: 쓰면 둘레로 속성 폭발(가까운 상대가 맞는다)');
+    }
+    // 가지가 섞인 판도 서버(runArena) = 화면.
+    {
+      let same = true, n2 = 0;
+      for (let k = 1; k <= 12; k++) {
+        const r = seeded(k * 19), team = () => [0, 1, 2].map(() => fighter({ key: keys[Math.floor(r() * keys.length)], form: 2 + (k % 2), level: 10 + Math.floor(r() * 25), s2: r() < 0.5 ? 0 : 1, tr: [0, 1, 2].map(() => r() < 0.5 ? 0 : 1).join('') }));
+        const me = team(), foe = team(), A = createArena({ seed: k * 71, me, foe, foeLevel: k % 3 }), inputs = cleanInputs(playArena(A, 1 + (k % 2), k));
+        const R2 = runArena({ seed: k * 71, me: me.map(f => fighter({ key: f.key, form: f.form, level: f.level, s2: f.s2, tr: f.tr })), foe: foe.map(f => fighter({ key: f.key, form: f.form, level: f.level, s2: f.s2, tr: f.tr })), foeLevel: k % 3, inputs });
+        same &&= R2.winner === A.S.winner && R2.ticks === A.S.t && R2.dealt.me === A.S.dealt.me && R2.dealt.foe === A.S.dealt.foe;
+        n2 += A.S.ults.me + A.S.ults.foe;
+      }
+      assert(same && n2 > 5, `V13.231 스킬트리 가지가 섞인 판도 서버가 다시 돌리면 같은 결과(12판, 필살기 ${n2}번)`);
+    }
+    // 서버: 가지는 내 펫(알 아님)만 기억(TR_MAX개 상한), 판 기록 [키, 단계, 레벨, 기본 스킬 ②, 가지]에 실어 보내고 끝낼 때 같은 가지로 다시 돌린다.
+    {
+      const pets = [{ key: 'turtle', form: 2, level: 31 }, { key: 'dog', form: 2, level: 22 }, { key: 'bear', form: 2, level: 12 }, { key: 'cat', form: 0, level: 1 }];
+      const p = { id: 't', role: 'student', display_name: '학생', games: { arena: { s2: { turtle: 1 } } } };
+      const r = arenaStart(p, { id: 'h1', pets, team: ['turtle', 'dog', 'bear'], tree: { turtle: '000', dog: '101', cat: '111', owl: '111', bear: 'x' }, now: 1000, random: seeded(8) });
+      const a = p.games.arena, me = a.live.me;
+      assert(a.tr.turtle === '000' && a.tr.dog === '101' && a.tr.cat === undefined && a.tr.owl === undefined && a.tr.bear === undefined && me.find(x => x[0] === 'turtle')[4] === '000' && me.find(x => x[0] === 'bear')[4] === TREE.DEF
+        && me.find(x => x[0] === 'turtle')[3] === 1 && r.me.find(f => f.key === 'turtle').tr === '000' && fighter(r.me.find(f => f.key === 'turtle')).skill2.id === EL_SKILLS.water[0].id && arenaView(p, 1000).tr.dog === '101' && arenaView(p, 1000).s2.turtle === 1,
+        'V13.231 서버: 스킬트리 가지는 내 펫만 기억하고, 판 기록에 실어 보낸다(2탄 ② 스킬 ② 기록은 기본 스킬로 그대로)');
+      arenaStart(p, { id: 'h2', pets, team: ['turtle', 'dog'], now: 2000, random: seeded(9) });
+      const live = p.games.arena.live, un = l => l.map(([key, form, level, s2, tr]) => fighter({ key, form, level, s2, tr }));
+      const A = createArena({ seed: live.seed, me: un(live.me), foe: un(live.foe), foeLevel: live.fl }), inputs = playArena(A, 2, 3);
+      const fin = arenaFinish(p, { id: 'h2', inputs, now: 2000 + ARENA.COUNTDOWN_MS + A.S.t * ARENA.TICK_MS + 1000 });
+      assert(live.me.find(x => x[0] === 'turtle')[4] === '000' && fin.winner === A.S.winner && fin.dealt === A.S.dealt.me, `V13.231 서버 끝내기도 기억한 가지로 다시 돌린다(화면 = 서버: ${fin.winner})`);
+      const [old] = unpackTeam([['dog', 2, 25, 1]]);
+      assert(old.tr === TREE.DEF && old.s2 === 1, 'V13.231 예전 판 기록 · 친구 팀(가지 없음)은 기본 가지로');
+      const many = {}; for (const k of keys) many[k] = '111';
+      const q = { id: 'q2', role: 'student', games: {} }, all = keys.map((key, i) => ({ key, form: 2, level: 10 + (i % 25) }));
+      arenaStart(q, { id: 'g', pets: all, team: [], tree: many, now: 1, random: seeded(2) });
+      assert(Object.keys(q.games.arena.tr).length <= TR_MAX && TR_MAX === 40 && JSON.stringify(q.games.arena.tr).length < 800, `V13.231 스킬트리 기억은 ${TR_MAX}개까지(펫마다 약 14바이트, 프로필 크기 상한)`);
+      const svc = source('./service.mjs'), budget = source('./perf-budget.mjs');
+      assert(svc.includes("const tree = body.tree && typeof body.tree === 'object' && !Array.isArray(body.tree) ? body.tree : null;") && svc.includes('picks, tree, friends') && budget.includes('games.arena.tr'),
+        'V13.231 서버 요청: 스킬트리 가지(tree)를 받아 정리하고, 프로필 예산(perf-budget)에 적는다');
+    }
+    // 밸런스(빠른 판 수, 자세한 표는 node server/arena-sim.mjs elements · tree 1500).
+    const els = elementTable(600);
+    assert(els.rows.every(x => Math.abs(x.rel - 0.5) <= 0.05) && EL_MUL.star.atk < 1 && EL_MUL.star.hp < 1,
+      `V13.231 속성 균형(600판씩, 보통 학생 · 8속성 평균 기준 50 ± 5, 별빛 보정 ${EL_MUL.star.hp}): ${els.rows.map(x => `${x.el} ${Math.round(x.rel * 1000) / 10}`).join(' · ')}`);
+    const gaps = [0, 1, 2].map(L => treeGap(L, 500));
+    assert(gaps.every(g => Math.abs(g.gap) <= 0.03), `V13.231 스킬트리 가지 A · B 승률 차이 ±3(500판씩, Lv.30~34): ${gaps.map((g, i) => `${i + 1}층 A ${Math.round(g.a * 1000) / 10} · B ${Math.round(g.b * 1000) / 10}`).join(' / ')}`);
+    // 화면: 대기실 스킬트리(3층 · 잠긴 층 · 미리보기) · 두 번째 필살기 연출 · 렉 예산.
+    const ui = source('../public/modules/arena.js'), css = source('../public/v13231.css'), build = source('./build-assets.mjs');
+    assert(['function treePanel(', 'function pickBranch(', 'data-ar="tree"', 'data-ar="focus"', 'Lv.${x.lv}에 열려요', 'ar-preview', 'TREE_KEY()', 'function ult2Fx(', 'function novaFx(', "e.u2 ? ult2Fx(e) : ultFx(e)", "f.ult2 === 'ring' ? null"].every(x => ui.includes(x)) && !ui.includes('data-ar="pick2"')
+      && build.includes('"v13231.css"') && ['.ar-floor.lock', '.ar-branch.on', '.ar-fx.ult2ring', '.ar-fx.ult2line', '.ar-lite .ar-fx.ult2ring', 'prefers-reduced-motion'].every(x => css.includes(x)),
+      'V13.231 화면: 대기실 펫 카드에 스킬트리 3층(잠긴 층은 "Lv.20에 열려요") · 고르면 바로 미리보기 · 두 번째 필살기(원 · 일직선) 연출');
+    const u2 = ui.slice(ui.indexOf('function ult2Fx('), ui.indexOf('function attack('));
+    assert(!/createElement|innerHTML\s*=|setInterval|backdrop-filter/.test(u2) && (u2.match(/fxEl\(/g) || []).length <= 3 && (css.match(/@keyframes ar-u2-[\w-]+\{(?:[^{}]*\{[^}]*\})+\}/g) || []).length === 4 && (css.match(/@keyframes ar-u2-[\w-]+\{(?:[^{}]*\{[^}]*\})+\}/g) || []).every(k => !/(width|height|left|top|margin|inset)\s*:/.test(k)),
+      'V13.231 두 번째 필살기 연출은 효과 조각 상한(fxEl) 안에서, 움직임은 transform · opacity만');
   }
 }

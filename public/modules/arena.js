@@ -5,7 +5,7 @@ import { coin } from './emblems.js';
 import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
 import { coinShower, countUp } from './celebrate.js';
 import { ELEMENTS, fxImpact, fxPunch, fxSpeedLines, fxRecoil, fxLite } from './battle-fx.js';
-import { ARENA, BEATS, INPUT, ROLE, DIR16, SK2, ZONES_MAX, createArena, fighter, dirCode, aimCode, skill2Picks } from './arena-rules.js';
+import { ARENA, BEATS, INPUT, ROLE, DIR16, SK2, ZONES_MAX, TREE, createArena, fighter, dirCode, aimCode, petTree, cleanTree } from './arena-rules.js';
 import { ARENA_ART } from './arena-art.js';
 
 // V13.225 펫 아레나 2(놀이터): 전체 화면. 위에서 비스듬히 내려다보는 경기장에서 내 펫을 직접 조종해 상대 펫과 싸운다.
@@ -33,6 +33,9 @@ const KIND_KO = { burst: '공격', boost: '강화', poison: '중독', guard: '�
 const SHOTS_MAX = 14, WARN_MAX = 6, MINE_MAX = 2, FX_MAX = 40, FX_MAX_LITE = 20, SKILL_FX = 8, SKILL_FX_LITE = 4;
 const LINE_MAX = 3, STREAM_MAX = 2, LINE_BASE = 100, CONE_BASE = 200, ZONE_BASE = 100;
 const PICK_KEY = () => `sumus-arena-s2:${R?.A?.data?.profile?.id || ''}`;
+// V13.231 스킬트리: 펫마다 가지 '011'(층마다 0 A · 1 B). 서버에 기억(R.view.tr) 위에 이 폰에서 방금 고른 것.
+const TREE_KEY = () => `sumus-arena-tree:${R?.A?.data?.profile?.id || ''}`;
+const FLOOR_KO = ['1층', '2층', '3층'], FLOOR_ROLE = ['스킬 ①', '스킬 ②', '필살기 · 역할'];
 // 그림 66 이름(있으면 칸에 그림을 깐다). 없으면 CSS 연출 그대로.
 const ART = { breath: 'fx-flame-breath', meteor: 'fx-meteor', jet: 'fx-water-jet', bubble: 'fx-bubble', vine: 'fx-vine', petal: 'fx-petal-field', boulder: 'fx-boulder', crack: 'fx-crack-field',
   tornado: 'fx-tornado', icefield: 'fx-ice-field', spear: 'fx-ice-spear', cloud: 'fx-poison-cloud', chain: 'fx-lightning', clone: 'fx-clone', crit: 'fx-crit' };
@@ -77,6 +80,8 @@ export function openArena(A, exit) {
   R.aim = AIM_MODES.some(m => m[0] === load(AIM_KEY, 'free')) ? load(AIM_KEY, 'free') : 'free';
   // 스킬 ② 고르기: 서버에 기억한 것(R.view.s2) 위에 이 폰에서 방금 고른 것.
   R.picks = { ...(R.view?.s2 || {}), ...load(PICK_KEY(), {}) };
+  R.trees = { ...(R.view?.tr || {}), ...load(TREE_KEY(), {}) };
+  R.focus = R.team[0] || null;
   root().innerHTML = `<div class="session-app ar-app" id="ar-app">
     <div class="ar-stage" id="ar-stage"><img class="ar-bg" id="ar-bg" alt="" draggable="false"><div class="ar-shade"></div></div>
     <header class="ar-top"><button type="button" class="yb-back" data-ar="exit" aria-label="나가기">${icon('back')}</button><strong>펫 아레나</strong><span class="ar-wallet">${coin()}<b id="ar-coins">${num(A.data.stats?.points_balance || 0)}</b></span></header>
@@ -130,6 +135,8 @@ function onClick(event) {
   const act = b.dataset.ar;
   if (act === 'exit') return R.playing ? confirmQuit() : leave();
   if (act === 'pet') return togglePet(b.dataset.key);
+  if (act === 'tree') return pickBranch(b.dataset.key, Number(b.dataset.l), Number(b.dataset.b));
+  if (act === 'focus') { R.focus = b.dataset.key; sfx('tap'); return lobby(false, true); }
   if (act === 'pick2') { R.picks[b.dataset.key] = Number(b.dataset.i) === 1 ? 1 : 0; save(PICK_KEY(), R.picks); sfx('tap'); return lobby(false, true); }
   if (act === 'aim') { R.aim = b.dataset.aim; save(AIM_KEY, R.aim); sfx('tap'); return lobby(false, true); }
   if (act === 'start') return start(b);
@@ -186,11 +193,54 @@ function togglePet(key) {
   sfx('tap');
   lobby(false, true);
 }
-// V13.229 스킬 ②: 속성 스킬 2개 중 하나를 고른다(톡 누르면 바뀐다, 무료).
+// V13.231 팀 칸: 역할 · 스킬 ① ② · 필살기를 짧게, 스킬트리는 가지 점 3개(A · B · 자물쇠). 톡 누르면 아래 스킬트리가 이 펫으로.
+const lobbyFighter = (key, form, level) => fighter({ key, form, level, s2: R.picks?.[key] ?? null, tr: R.trees?.[key] });
 function skillLine(key, form, level) {
-  const pick = R.picks?.[key] === 1 ? 1 : 0, f = fighter({ key, form, level, s2: pick }), k = f.skill, r = ROLE[f.role];
-  const opts = skill2Picks(key).map((k2, i) => `<button type="button" class="ar-pick2${i === pick ? ' on' : ''}" data-ar="pick2" data-key="${esc(key)}" data-i="${i}" aria-pressed="${i === pick}" title="${esc(k2.desc)}"><i>${k2.icon}</i><b>${esc(k2.name)}</b></button>`).join('');
-  return `<span class="ar-skill" style="--c1:${pal(f.el).c1};--c2:${pal(f.el).c2}"><i class="ar-role">${esc(r.name)} · ${f.melee ? '근접' : '원거리'}<small>${esc(r.desc)}</small></i><b>① ${esc(k.name)}</b><small>${esc(KIND_KO[k.kind])} · ${esc(k.desc)}</small><b class="ar-pick-h">② 고르기</b><span class="ar-picks" role="group" aria-label="스킬 2 고르기">${opts}</span><small class="ar-pick-desc">${esc(f.skill2.desc)}</small><em>필살기 ${esc(f.ult)}</em></span>`;
+  const f = lobbyFighter(key, form, level), k = f.skill, r = ROLE[f.role], t = treeOf(key, level);
+  const dots = t.map((x, i) => `<i class="ar-tdot${x.open ? ` on b${x.pick}` : ''}" title="${esc(`${FLOOR_KO[i]} Lv.${x.lv}`)}">${x.open ? (x.pick ? 'B' : 'A') : '🔒'}</i>`).join('');
+  return `<span class="ar-skill" style="--c1:${pal(f.el).c1};--c2:${pal(f.el).c2}"><i class="ar-role">${esc(r.name)} · ${f.melee ? '근접' : '원거리'}<small>${esc(r.desc)}</small></i><b>① ${esc(k.name)}</b><b>② ${esc(f.skill2.icon)} ${esc(f.skill2.name)}</b><em>필살기 ${esc(f.ult)}</em><span class="ar-tdots" aria-label="스킬트리">${dots}</span></span>`;
+}
+const treeOf = (key, level) => petTree(key, level, R.trees?.[key], R.picks?.[key] ?? null);
+// 가지 고르기(무료 · 언제든): 열린 층만. 고르면 바로 미리보기가 바뀐다.
+function pickBranch(key, layer, branch) {
+  const p = readyPets(R.A).find(x => x.key === key);
+  if (!p || !(layer >= 0 && layer <= 2) || Number(p.level) < TREE.LEVELS[layer]) return;
+  const t = cleanTree(R.trees[key]).split('');
+  if (Number(t[layer]) === branch) return;
+  t[layer] = String(branch ? 1 : 0);
+  R.trees[key] = t.join('');
+  save(TREE_KEY(), R.trees);
+  R.flash = { key, layer };
+  sfx('skill', { rate: 1.3, volume: .6 }); buzz(12);
+  lobby(false, true);
+}
+// 스킬트리 판: 아래(1층)에서 위(3층)로 자라는 나무. 잠긴 층은 "Lv.20에 열려요" + 남은 레벨 막대. 고른 가지는 빛나고 줄기로 이어진다.
+function treePanel(pets) {
+  const p = pets.find(x => x.key === R.focus) || pets.find(x => x.key === R.team[0]);
+  if (!p) return '';
+  const key = p.key, lv = Number(p.level), t = treeOf(key, lv), now = lobbyFighter(key, p.form, lv), bare = fighter({ key, form: p.form, level: lv, s2: now.s2, noTree: true });
+  const P = pal(now.el), sec = n => (n * ARENA.TICK_MS / 1000).toFixed(1);
+  const pct = (a, b) => { const d = Math.round((a / b - 1) * 100); return d ? `<i class="${d > 0 ? 'up' : 'dn'}">${d > 0 ? '+' : ''}${d}%</i>` : ''; };
+  const pctLow = (a, b) => { const d = Math.round((1 - a / b) * 100); return d ? `<i class="up">−${d}%</i>` : ''; };
+  const floor = (x, i) => {
+    const lock = !x.open, flash = R.flash?.key === key && R.flash?.layer === i;
+    const branch = (k, n) => `<button type="button" class="ar-branch b${n}${x.pick === n ? ' on' : ''}${flash && x.pick === n ? ' grow' : ''}" data-ar="tree" data-key="${esc(key)}" data-l="${i}" data-b="${n}" aria-pressed="${x.pick === n}" ${lock ? 'disabled' : ''}><i>${esc(k.icon)}</i><span><b><u>${n ? 'B' : 'A'}</u>${esc(k.name)}</b><small>${esc(k.desc)}</small></span></button>`;
+    const need = x.lv - lv, prog = Math.max(0, Math.min(100, Math.round(lv / x.lv * 100)));
+    return `<li class="ar-floor${lock ? ' lock' : ''}" style="--i:${i}"><div class="ar-floor-h"><b>${FLOOR_KO[i]}</b><small>Lv.${x.lv} · ${FLOOR_ROLE[i]}</small>${lock ? `<em>🔒 Lv.${x.lv}에 열려요</em>` : '<em class="open">열림 · 무료로 바꿔요</em>'}</div>
+      <div class="ar-branches">${branch(x.a, 0)}<span class="ar-fork" aria-hidden="true"></span>${branch(x.b, 1)}</div>
+      ${lock ? `<div class="ar-floor-lock"><span><i style="width:${prog}%"></i></span><small>Lv.${lv} → Lv.${x.lv} · ${need}레벨 남음 · 단어 공부로 펫이 자라요</small></div>` : ''}</li>`;
+  };
+  R.flash = null;
+  return `<div class="ar-tree" style="--c1:${P.c1};--c2:${P.c2};--c3:${P.c3}">
+    <div class="ar-tree-h">${petImg(key, p.form, 'ar-tree-pet')}<div><small>스킬트리 · ${esc(ELEMENTS[now.el]?.name || '')} · ${esc(ROLE[now.role].name)}</small><b>${esc(p.name || petName(key))} <em>Lv.${lv}</em></b></div>
+      <span class="ar-tree-tabs" role="group" aria-label="스킬트리 볼 펫">${R.team.map(k => { const q = pets.find(x => x.key === k); return q ? `<button type="button" class="ar-ttab${k === key ? ' on' : ''}" data-ar="focus" data-key="${esc(k)}" aria-pressed="${k === key}">${petImg(k, q.form)}</button>` : ''; }).join('')}</span></div>
+    <ol class="ar-floors">${[2, 1, 0].map(i => floor(t[i], i)).join('')}</ol>
+    <div class="ar-preview" aria-live="polite"><b>미리보기</b>
+      <span><small>체력</small>${num(now.hp)}${pct(now.hp, bare.hp)}</span><span><small>공격</small>${num(now.atk)}${pct(now.atk, bare.atk)}</span>
+      <span><small>① ${esc(now.skill.name)}</small>${sec(now.skillCd)}초${pctLow(now.skillCd, bare.skillCd)}</span>
+      <span><small>② ${esc(now.skill2.icon)} ${esc(now.skill2.name)}</small>${sec(now.skill2Cd)}초${pctLow(now.skill2Cd, bare.skill2Cd)}${now.s2pow > 1 ? `<i class="up">위력 +${Math.round((now.s2pow - 1) * 100)}%</i>` : ''}</span>
+      <span class="ult"><small>필살기</small>${esc(now.ult)}${now.ult2 ? `<i class="up">${now.ult2 === 'ring' ? '둘레 큰 원' : '긴 일직선'}</i>` : ''}</span></div>
+  </div>`;
 }
 function lobby(again = false, keep = false) {
   R.playing = false;
@@ -199,7 +249,7 @@ function lobby(again = false, keep = false) {
   setBg('plaza');
   const v = R.view || {}, pets = readyPets(R.A);
   const tickets = Number(v.tickets || 0), left = Number(v.left ?? ARENA.DAILY), paid = tickets > 0 && left > 0;
-  const slot = n => { const key = R.team[n], p = pets.find(x => x.key === key); return p ? `<span class="ar-slot on"><b>${n + 1}</b>${petImg(p.key, p.form)}<div><small>${esc(p.name || petName(p.key))} · Lv.${p.level}</small>${skillLine(p.key, p.form, p.level)}</div></span>` : `<span class="ar-slot"><b>${n + 1}</b><i>?</i><div><small>비어 있음</small></div></span>`; };
+  const slot = n => { const key = R.team[n], p = pets.find(x => x.key === key); return p ? `<span class="ar-slot on${key === R.focus ? ' focus' : ''}" data-ar="focus" data-key="${esc(key)}"><b>${n + 1}</b>${petImg(p.key, p.form)}<div><small>${esc(p.name || petName(p.key))} · Lv.${p.level}</small>${skillLine(p.key, p.form, p.level)}</div></span>` : `<span class="ar-slot"><b>${n + 1}</b><i>?</i><div><small>비어 있음</small></div></span>`; };
   main(`<section class="ar-lobby${again ? ' again' : ''}${keep ? ' keep' : ''}">
     <div class="ar-title"><small>3 대 3 펫 대전</small><h1>펫 아레나</h1></div>
     <div class="ar-card">
@@ -212,6 +262,7 @@ function lobby(again = false, keep = false) {
       <div class="ar-aimset" role="group" aria-label="조준 방식">${AIM_MODES.map(([k, n, d]) => `<button type="button" class="ar-aimopt${R.aim === k ? ' on' : ''}" data-ar="aim" data-aim="${k}" aria-pressed="${R.aim === k}"><b>${n}</b><small>${d}</small></button>`).join('')}</div>
       <h3 class="ar-sub">내 팀 <small>순서대로 나가요 · 펫마다 특징 · 스킬 2개가 달라요</small></h3>
       <div class="ar-slots">${[0, 1, 2].map(slot).join('')}</div>
+      ${treePanel(pets)}
       ${pets.length ? `<div class="ar-pets">${pets.map(p => `<button type="button" class="ar-pet-pick${R.team.includes(p.key) ? ' on' : ''}" data-ar="pet" data-key="${esc(p.key)}" aria-pressed="${R.team.includes(p.key)}">${petImg(p.key, p.form)}<small>Lv.${p.level}</small>${R.team.includes(p.key) ? `<b>${R.team.indexOf(p.key) + 1}</b>` : ''}</button>`).join('')}</div>`
         : '<p class="ar-why">알에서 깬 펫이 없어요. 공부해서 펫을 키우면 싸울 수 있어요!</p>'}
       <div class="ar-recs"><div><small>승리</small><b>${num(v.wins || 0)}</b></div><div><small>연승</small><b>${num(v.streak || 0)}<small> / 최고 ${num(v.best_streak || 0)}</small></b></div><div><small>입장권</small><b>🎟️ ${num(tickets)}<small> / ${num(ARENA.TICKETS_MAX)}</small></b></div></div>
@@ -226,10 +277,12 @@ async function start(button) {
   let r;
   // 스킬 ② 고르기는 내 팀 펫 것만 보낸다(서버가 기억한다).
   const picks = Object.fromEntries(R.team.filter(k => R.picks[k] != null).map(k => [k, R.picks[k]]));
-  try { r = await api('/games/arena/start', { team: R.team, picks }); }
+  // V13.231 스킬트리 가지도 내 팀 펫 것만(서버가 기억하고 판 기록에 싣는다).
+  const tree = Object.fromEntries(R.team.filter(k => R.trees[k] != null).map(k => [k, cleanTree(R.trees[k])]));
+  try { r = await api('/games/arena/start', { team: R.team, picks, tree }); }
   catch (err) { if (!R) return; buttonBusy(button, false); return toast(err.message || '대전을 시작하지 못했어요.'); }
   if (!R) return;
-  R.view = { ...R.view, left: r.left, tickets: r.tickets, wins: r.wins, streak: r.streak, best_streak: r.best_streak, s2: r.s2 || R.view?.s2 };
+  R.view = { ...R.view, left: r.left, tickets: r.tickets, wins: r.wins, streak: r.streak, best_streak: r.best_streak, s2: r.s2 || R.view?.s2, tr: r.tr || R.view?.tr };
   await vs(r);
   if (R) play(r);
 }
@@ -292,7 +345,7 @@ function hudHtml(who, name, team) {
 }
 function play(r) {
   // 서버와 똑같이 key · form · level로 능력치를 다시 만든다(server/arena.mjs unpack과 같다).
-  const fighters = list => list.map(f => fighter({ key: f.key, form: f.form, level: f.level, s2: f.s2 }));
+  const fighters = list => list.map(f => fighter({ key: f.key, form: f.form, level: f.level, s2: f.s2, tr: f.tr }));
   R.r = r;
   R.forms = { me: r.me.map(f => f.form), foe: r.foe.team.map(f => f.form) };
   R.teams = { me: fighters(r.me), foe: fighters(r.foe.team) };
@@ -411,7 +464,7 @@ function bindPad() {
 // 이 버튼은 조준할 수 있나: 'arrow' 화살표 · 'fan' 부채꼴 · 'circle' 원, 조준이 필요 없으면 null.
 function aimShape(btn) {
   const f = R?.teams?.me?.[R.cur?.me?.idx]; if (!f) return null;
-  if (btn === 'ult') return 'fan';
+  if (btn === 'ult') return f.ult2 === 'ring' ? null : f.ult2 === 'line' ? 'arrow' : 'fan';
   if (btn === 'skill') return ['guard', 'boost'].includes(f.skill.kind) ? null : f.shape === 'quake' ? 'circle' : f.shape === 'orb' ? 'fan' : 'arrow';
   if (btn === 'skill2') return { breath: 'fan', spear: 'fan', meteor: 'circle', crack: 'circle', icefield: 'circle', cloud: 'circle', jet: 'arrow', vine: 'arrow', chain: 'arrow', tornado: 'arrow', boulder: 'arrow', gale: 'arrow', darts: 'arrow' }[f.skill2.id] || null;
   return null;
@@ -639,7 +692,8 @@ function onEvent(e, show) {
   if (e.e === 'heal') { drawHp(); if (show) healFx(e); return; }
   if (!show) return;
   if (e.e === 'cutin') return cutin(e);
-  if (e.e === 'ult') return ultFx(e);
+  if (e.e === 'ult') return e.u2 ? ult2Fx(e) : ultFx(e);
+  if (e.e === 'nova') return novaFx(e);
   if (e.e === 'skillname') { pop(e.name, R.cur[e.who].x, R.cur[e.who].y - 20, `skill ${e.who}`); sfx('skill'); return; }
   if (e.e === 'skill2' && e.id) return skill2Fx(e);
   if (e.e === 'atk' || e.e === 'skill' || e.e === 'skill2') return attack(e);
@@ -731,6 +785,37 @@ function ultFx(e) {
   nextFrame(() => fxImpact(arenaEl(), to, e.el, 3));
   nextFrame(() => quake(to, e.el, true), 2);
   nextFrame(() => ultExtra(e, from, to), 3);
+}
+// V13.231 스킬트리 3층 A 두 번째 필살기: 원(내 둘레로 퍼지는 충격파 두 겹 + 속성 조각) · 일직선(경기장을 가로지르는 굵은 광선 + 끝 폭발).
+function ult2Fx(e) {
+  const from = px(e.x, e.y), P = pal(e.el), g = geo();
+  shakeField(true); sfx('ult-impact'); washFlash(e.el, .6, 640);
+  if (e.who === 'me' && e.hit) buzz([30, 20, 60]);
+  if (e.u2 === 'ring') {
+    const k = (e.r * 2 / 100 * g.w / ZONE_BASE).toFixed(2);
+    fxEl('ult2ring', { left: `${Math.round(from.x)}px`, top: `${Math.round(from.y)}px`, '--c1': P.c1, '--c2': P.c2, '--c3': P.c3, '--k': k }, 900, '<b></b><b></b><em></em>');
+    nextFrame(() => quake(from, e.el, true));
+    nextFrame(() => bits(ULT2_BIT[e.el] || 'star', from, 8, e.r / 100 * g.w * 0.9, 820, e.el), 2);
+    if (e.hit) nextFrame(() => fxImpact(arenaEl(), px(e.tx, e.ty), e.el, 3), 2);
+    zoomAt(from, 0.07, 520);
+    return;
+  }
+  const end = px(e.x + e.nx * e.len, e.y + e.ny * e.len), dx = end.x - from.x, dy = end.y - from.y, len = Math.sqrt(dx * dx + dy * dy), ang = Math.atan2(dy, dx) * 180 / Math.PI;
+  const w = Math.max(18, e.w * 2 / 100 * g.w);
+  fxEl('ult2line', { left: `${Math.round(from.x)}px`, top: `${Math.round(from.y)}px`, width: `${Math.round(len)}px`, height: `${Math.round(w)}px`, transform: `translateY(-50%) rotate(${ang.toFixed(1)}deg)`, '--c1': P.c1, '--c2': P.c2, '--c3': P.c3 }, 900, '<b></b><em></em>');
+  beam(from, end, e.el, true);
+  const at = e.hit ? px(e.tx, e.ty) : end;
+  nextFrame(() => fxImpact(arenaEl(), at, e.el, 3));
+  nextFrame(() => bits(ULT2_BIT[e.el] || 'star', at, 8, 60, 760, e.el), 2);
+  if (e.hit) zoomAt(at, 0.07, 520);
+}
+const ULT2_BIT = { flame: 'ember', water: 'drop', leaf: 'petalbit', earth: 'rock', wind: 'leafbit', ice: 'frost', toxic: 'puff', star: 'star' };
+// V13.231 스킬트리 1층 B: 지키기 스킬을 쓰면 둘레로 속성 폭발.
+function novaFx(e) {
+  const at = px(e.x, e.y);
+  ring(at, e.el, e.r);
+  bits(ULT2_BIT[e.el] || 'star', at, 5, e.r / 100 * geo().w * 0.8, 560, e.el);
+  sfx('smash', { rate: 1.4, volume: .7 });
 }
 function attack(e) {
   const fieldEl = $('ar-field'), from = px(e.x, e.y);
