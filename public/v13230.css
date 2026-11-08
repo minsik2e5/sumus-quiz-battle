@@ -1,0 +1,70 @@
+/* V13.230 펫 아레나 실시간 친구 대전: 친구 대전 첫 화면 · 대기실(자리 · 펫 고르기 · 초대) · 판 중 이모트 · 연결 신호 막대 · 다시 보기.
+   렉 방지: 판 중에 붙는 것은 이모트 줄(버튼 4개)과 신호 막대(칸 3개)뿐이고, 바뀔 때만 클래스를 바꾼다. 움직임은 transform · opacity만.
+   그림 66(lobby-bg · team-blue · team-red)이 있으면(ARENA_ART) 그림을, 없으면 CSS 그라데이션으로. */
+
+.ar-live-go{margin-top:-2px;display:flex;align-items:center;justify-content:center;gap:8px;border-radius:18px;font-weight:900;background:linear-gradient(135deg,rgba(56,189,248,.22),rgba(167,139,250,.22));color:#fff;box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.28)}
+.ar-live-go small{font-weight:700;opacity:.8;font-size:11.5px}
+
+.ar-live{display:grid;gap:14px;padding:6px 16px 28px;max-width:520px;margin:0 auto;color:#fff}
+.ar-live.art{background:var(--lv-bg) center top/cover no-repeat}
+.ar-live .ar-title small{background:linear-gradient(90deg,#0ea5e9,#8b5cf6)}
+.ar-lv-code{display:grid;grid-template-columns:auto 1fr auto;gap:8px;align-items:center}
+.ar-lv-code label{font-weight:900;font-size:13px}
+.ar-lv-code input{min-width:0;font:inherit;font-size:24px;font-weight:950;letter-spacing:.35em;text-align:center;padding:8px 6px;border-radius:14px;border:2px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff}
+.ar-lv-code input:focus{outline:none;border-color:#fde047}
+.ar-lv-invite{border:2px solid rgba(253,224,71,.6)}
+.ar-lv-invite small{opacity:.85}
+.ar-lv-row{display:flex;gap:8px;justify-content:flex-end}
+.ar-lv-replays{display:grid;gap:6px}
+.ar-lv-rp{display:grid;text-align:left;gap:2px;padding:9px 12px;border-radius:14px;border:0;background:rgba(255,255,255,.08);color:#fff;font:inherit;cursor:pointer}
+.ar-lv-rp b{font-size:14px}
+.ar-lv-rp small{font-size:12px;opacity:.75}
+
+/* 대기실 */
+.ar-lv-codebig{display:inline-block;letter-spacing:.12em;color:#fde047;-webkit-text-fill-color:#fde047}
+.ar-lv-seats{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
+.ar-lv-vs{font-size:22px;font-weight:950;color:#fde047;text-shadow:0 2px 0 #b45309}
+.ar-lv-seat{position:relative;display:grid;gap:4px;justify-items:center;text-align:center;min-height:118px;padding:10px 6px;border-radius:18px;background:linear-gradient(160deg,rgba(37,99,235,.42),rgba(12,18,48,.82));box-shadow:inset 0 0 0 2px rgba(147,197,253,.35);overflow:hidden}
+.ar-lv-seat:nth-child(3){background:linear-gradient(160deg,rgba(225,29,72,.42),rgba(12,18,48,.82));box-shadow:inset 0 0 0 2px rgba(253,164,175,.35)}
+.ar-lv-seat.flag::before{content:"";position:absolute;right:-10px;top:-10px;width:54px;height:54px;background:var(--flag) center/contain no-repeat;opacity:.9}
+.ar-lv-seat.empty{opacity:.7;background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 2px dashed rgba(255,255,255,.3);animation:ar-lv-wait 1.6s ease-in-out infinite}
+.ar-lv-seat.ready{box-shadow:inset 0 0 0 2.5px #4ade80,0 0 18px rgba(74,222,128,.35)}
+.ar-lv-seat.mine b{color:#fde047}
+.ar-lv-seat > small{font-size:11.5px;opacity:.85}
+.ar-lv-team{display:flex;gap:2px}
+.ar-lv-team i{display:grid;justify-items:center;font-style:normal}
+.ar-lv-team img{width:36px;height:36px;object-fit:contain}
+.ar-lv-team small{font-size:10px;opacity:.8}
+@keyframes ar-lv-wait{50%{opacity:.45}}
+.ar-lv-picks{display:grid;gap:6px}
+.ar-lv-pick{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.ar-lv-pick > b{font-size:12.5px;min-width:58px}
+.ar-lv-friends{list-style:none;margin:0;padding:0;display:grid;gap:6px;max-height:240px;overflow:auto}
+.ar-lv-friends li{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:12px;background:rgba(255,255,255,.07)}
+.ar-lv-friends li span{display:grid}
+.ar-lv-friends li small{font-size:11.5px;opacity:.75}
+.ar-saving .btn{display:block;margin:14px auto 0}
+
+/* 이모트(야차전 이모트) */
+.ar-emotes{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+.ar-play-emo{position:absolute;right:8px;top:54px;z-index:40;flex-direction:column;gap:4px}
+.ar-play-emo .yb-emote{padding:5px 9px;font-size:12px;opacity:.82;background:rgba(255,255,255,.88)}
+.ar-play-emo .yb-emote:active{transform:scale(.92)}
+.ar-fx.pop.emote{font-size:17px;padding:5px 11px;border-radius:14px;background:#fff;color:#17242f;text-shadow:none;box-shadow:0 4px 14px rgba(0,0,0,.35);animation:ar-emo 1.8s cubic-bezier(.3,1.4,.5,1) forwards;z-index:170}
+.ar-fx.pop.emote.foe{background:#ffe4e6}
+@keyframes ar-emo{0%{opacity:0;transform:translate(-50%,-30%) scale(.6)}12%{opacity:1;transform:translate(-50%,-55%) scale(1.08)}20%{transform:translate(-50%,-55%) scale(1)}80%{opacity:1}100%{opacity:0;transform:translate(-50%,-80%) scale(1)}}
+
+/* 연결 신호 막대(왕복 시간: 150ms 아래 초록 · 400ms 아래 노랑 · 넘으면 빨강) */
+.ar-net{position:absolute;left:10px;top:56px;z-index:40;display:flex;align-items:flex-end;gap:2px;height:14px;padding:3px 5px;border-radius:8px;background:rgba(0,0,0,.35)}
+.ar-net i{display:block;width:4px;border-radius:2px;background:rgba(255,255,255,.35)}
+.ar-net i:nth-child(1){height:5px}.ar-net i:nth-child(2){height:9px}.ar-net i:nth-child(3){height:13px}
+.ar-net.good i{background:#4ade80}
+.ar-net.ok i:nth-child(-n+2){background:#facc15}
+.ar-net.bad i:nth-child(1){background:#f87171}
+
+/* 다시 보기: 버튼은 숨기고 경기장만 */
+.ar-replay .ar-pad{visibility:hidden}
+.ar-replay .ar-play-emo,.ar-replay .ar-net{display:none}
+.ar-replay #ar-play::after{content:"다시 보기";position:absolute;left:50%;top:58px;transform:translateX(-50%);padding:3px 12px;border-radius:99px;background:rgba(0,0,0,.45);font-size:12px;font-weight:900;color:#fff;z-index:40}
+
+@media (prefers-reduced-motion:reduce){.ar-lv-seat.empty{animation:none}.ar-fx.pop.emote{animation-duration:.01s}}

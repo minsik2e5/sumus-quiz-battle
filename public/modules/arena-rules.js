@@ -60,7 +60,9 @@ export const ARENA = {
 // 조작 기록 [틱, 코드]: 0 멈춤 · 1~8 방향(위부터 시계 방향) · 10 공격 · 11 스킬 1 · 12 필살기 · 13 회피 · 14 교체 · 15 스킬 2.
 // V13.228 [틱, 코드, 조준]: 공격 · 스킬 · 필살기에 조준 방향(0~15, 위부터 시계 방향 16방향)을 붙일 수 있다(버튼을 끌어서 조준).
 //   조준이 없으면 바라보는 방향(+ 보정). 16 쉬운 조준(보정 ±40°) · 17 자동 조준(늘 상대 쪽, 예전 방식) · 18 직접 조준(±25°, 처음 값).
-export const INPUT = { STOP: 0, ATK: 10, SKILL: 11, ULT: 12, DODGE: 13, SWAP: 14, SKILL2: 15, AIM_EASY: 16, AIM_AUTO: 17, AIM_FREE: 18 };
+export const INPUT = { STOP: 0, ATK: 10, SKILL: 11, ULT: 12, DODGE: 13, SWAP: 14, SKILL2: 15, AIM_EASY: 16, AIM_AUTO: 17, AIM_FREE: 18, AI_ON: 19, AI_OFF: 20 };
+// V13.230 실시간 친구 대전: 19 컴퓨터가 대신 조종(끊김 3초) · 20 다시 사람이 조종. 방(cloudflare/arena-room.mjs)만 넣는다(폰이 보낸 것은 cleanInputs가 18까지만 받는다).
+export const PLAYER_CODE_MAX = 18;
 export const AIMABLE = [10, 11, 12, 15];
 // 16방향 단위 벡터(0 = 위, 시계 방향 22.5°마다). sin 값을 미리 적은 표라 브라우저마다 같다.
 const S16 = [0, 0.3827, 0.7071, 0.9239, 1, 0.9239, 0.7071, 0.3827, 0, -0.3827, -0.7071, -0.9239, -1, -0.9239, -0.7071, -0.3827];
@@ -263,13 +265,13 @@ export function rng(seed) {
 }
 
 // 조작 기록 정리: [[틱, 코드], …] → 틱이 0 이상 · 한도 안 · 앞뒤 순서대로 · 알려진 코드만. 어긋나면 거기서 멈춘다.
-export function cleanInputs(raw, maxTick = ARENA.MAX_TICKS + 400) {
+export function cleanInputs(raw, maxTick = ARENA.MAX_TICKS + 400, maxCode = PLAYER_CODE_MAX) {
   const out = [];
   let last = 0;
   for (const x of Array.isArray(raw) ? raw.slice(0, ARENA.INPUT_MAX) : []) {
     const t = Math.round(Number(x?.[0])), c = Math.round(Number(x?.[1]));
     if (!Number.isFinite(t) || t < last || t > maxTick) break;
-    if (!((c >= 0 && c <= 8) || (c >= 10 && c <= 18))) break;
+    if (!((c >= 0 && c <= 8) || (c >= 10 && c <= Math.min(maxCode, INPUT.AI_OFF)))) break;
     if (x.length > 2 && x[2] != null) {
       const a = Math.round(Number(x[2]));
       if (!AIMABLE.includes(c) || !(a >= 0 && a <= 15)) break;
@@ -294,8 +296,20 @@ const wantNone = () => ({ atk: false, skill: false, skill2: false, ult: false, d
 // 화면은 step()이 돌려주는 사건(ev)으로 그리고, 서버는 끝까지 돌려 결과만 본다.
 //   meAi: 검사 · 미리 보기용으로 내 쪽도 컴퓨터가 조종(0~2). 실제 판에서는 쓰지 않는다.
 //   foeIdle: 검사용으로 상대가 가만히 서 있다(조준 · 넉백 · 크리티컬 규칙 확인).
-export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle = false }) {
-  const random = rng(seed), brain = { foe: foeIdle ? null : AI[Math.max(0, Math.min(2, foeLevel))], me: meAi == null ? null : AI[Math.max(0, Math.min(2, meAi))] };
+//   V13.230 foeHuman: 실시간 친구 대전. 상대 쪽도 사람이 조종한다(pushFoe로 조작, 컴퓨터는 19 · 20 조작으로 켜고 끈다).
+//   rollback용 snapshot() · restore() · setQueues(), 상태 요약 hash().
+export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle = false, foeHuman = false }) {
+  const lvl = n => Math.max(0, Math.min(2, Math.round(Number(n) || 0)));
+  // 씨앗 수(mulberry32, rng()와 같은 수열). 되감기 때 저장 · 되돌리기를 하려고 상태(rs)를 여기 둔다.
+  let rs = seed >>> 0;
+  const random = () => {
+    rs = (rs + 0x6D2B79F5) >>> 0;
+    let t = rs;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const brain = { get me() { return S.ai.me == null ? null : AI[S.ai.me]; }, get foe() { return S.ai.foe == null ? null : AI[S.ai.foe]; } };
   const side = (team, who) => ({
     who, team: team.map(f => ({ ...f, cur: f.hp })), idx: 0, gauge: 0,
     x: 50, y: who === 'me' ? 72 : 28, fx: 0, fy: who === 'me' ? -1 : 1, dir: 0,
@@ -304,7 +318,8 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     chan: 0, cnx: 0, cny: 0, volley: 0, vnx: 0, vny: 0, gale: 0, galeGap: 0, bubble: 0, bubbleT: 0, burn: 0, burnDmg: 0, root: 0, slide: 0, sx: 0, sy: 0,
     want: wantNone(), strafe: random() < 0.5 ? 1 : -1, think: 0
   });
-  const S = { t: 0, freeze: 0, over: false, winner: null, me: side(me, 'me'), foe: side(foe, 'foe'), shots: [], quakes: [], mines: [], zones: [], lines: [], minions: [], zoneN: 0, inputs: [], ip: 0, ults: { me: 0, foe: 0 }, pendingUlt: null, ultAim: null, dealt: { me: 0, foe: 0 }, ko: { me: 0, foe: 0 } };
+  const S = { t: 0, freeze: 0, over: false, winner: null, me: side(me, 'me'), foe: side(foe, 'foe'), shots: [], quakes: [], mines: [], zones: [], lines: [], minions: [], zoneN: 0, inputs: [], ip: 0, ults: { me: 0, foe: 0 }, pendingUlt: null, ultAim: null, dealt: { me: 0, foe: 0 }, ko: { me: 0, foe: 0 },
+    inputs2: [], ip2: 0, ai: { me: meAi == null ? null : lvl(meAi), foe: foeIdle || foeHuman ? null : lvl(foeLevel) } };
   const active = s => s.team[s.idx];
   const other = s => s === S.me ? S.foe : S.me;
   const alive = s => s.team.some(f => f.cur > 0);
@@ -652,18 +667,24 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
   }
 
   function input() {
-    while (S.ip < S.inputs.length && S.inputs[S.ip][0] <= S.t) {
-      const [, c, a] = S.inputs[S.ip++], w = S.me.want, code = a == null ? -1 : a;
-      if (c <= 8) S.me.dir = c;
+    while (S.ip < S.inputs.length && S.inputs[S.ip][0] <= S.t) apply(S.me, S.inputs[S.ip++]);
+    while (S.ip2 < S.inputs2.length && S.inputs2[S.ip2][0] <= S.t) apply(S.foe, S.inputs2[S.ip2++]);
+  }
+  function apply(side, x) {
+    {
+      const [, c, a] = x, w = side.want, code = a == null ? -1 : a;
+      if (c === INPUT.AI_ON) { S.ai[side.who] = 1; return; }
+      if (c === INPUT.AI_OFF) { S.ai[side.who] = null; side.want = wantNone(); side.dir = 0; return; }
+      if (c <= 8) side.dir = c;
       else if (c === INPUT.ATK) { w.atk = true; w.atkA = code; }
       else if (c === INPUT.SKILL) { w.skill = true; w.skillA = code; }
       else if (c === INPUT.ULT) { w.ult = true; w.ultA = code; }
       else if (c === INPUT.DODGE) w.dodge = true;
       else if (c === INPUT.SWAP) w.swap = true;
       else if (c === INPUT.SKILL2) { w.skill2 = true; w.skill2A = code; }
-      else if (c === INPUT.AIM_EASY) S.me.aimMode = 1;
-      else if (c === INPUT.AIM_AUTO) S.me.aimMode = 2;
-      else if (c === INPUT.AIM_FREE) S.me.aimMode = 0;
+      else if (c === INPUT.AIM_EASY) side.aimMode = 1;
+      else if (c === INPUT.AIM_AUTO) side.aimMode = 2;
+      else if (c === INPUT.AIM_FREE) side.aimMode = 0;
     }
   }
   // 날아가는 공격 · 지진.
@@ -775,6 +796,12 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
   return {
     S, step,
     push: x => { S.inputs.push(x); },
+    // V13.230 실시간: 상대 쪽 조작 · 되감기(조작 목록은 저장하지 않는다: 확정된 판이 들고 있다) · 상태 요약.
+    pushFoe: x => { S.inputs2.push(x); },
+    snapshot: () => { const { inputs, inputs2, ...rest } = S; return { s: structuredClone(rest), rs }; },
+    restore: snap => { const keep = { inputs: S.inputs, inputs2: S.inputs2 }; for (const k of Object.keys(S)) delete S[k]; Object.assign(S, structuredClone(snap.s), keep); rs = snap.rs; },
+    setQueues: (mine = [], theirs = []) => { S.inputs = mine; S.ip = 0; S.inputs2 = theirs; S.ip2 = 0; },
+    hash: () => arenaHash(S),
     view: () => ({ t: S.t, freeze: S.freeze, me: sideView(S.me), foe: sideView(S.foe), shots: S.shots.map(x => ({ x: x.x, y: x.y, r: x.r, el: x.el, kind: x.kind, from: x.from, id: x.id || '', vx: x.vx, vy: x.vy })), quakes: S.quakes.map(q => ({ x: q.self ? S[q.from].x : q.x, y: q.self ? S[q.from].y : q.y, r: q.r, left: q.at - S.t, warn: q.warn || 14, id: q.id || '', from: q.from })),
       zones: S.zones.map(z => ({ n: z.n, id: z.id, x: z.x, y: z.y, r: z.r, left: z.until - S.t, el: z.el, from: z.from })), lines: S.lines.map(L => ({ id: L.id, x: L.x, y: L.y, nx: L.nx, ny: L.ny, len: L.len, w: L.w, left: L.at - S.t, el: L.el, from: L.from })),
       minions: S.minions.map(m => ({ x: m.x, y: m.y, key: m.key, el: m.el, from: m.from, left: m.until - S.t })), mines: S.mines.map(m => ({ x: m.x, y: m.y, from: m.from, el: m.el })), over: S.over, winner: S.winner })
@@ -782,11 +809,23 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
 }
 
 // 끝까지 한 번에(서버 · 검사): 결과 { winner, ticks, ults, left, ko, dealt }.
-export function runArena({ seed, me, foe, foeLevel, inputs, meAi = null }) {
-  const A = createArena({ seed, me, foe, foeLevel, meAi });
+// V13.230 foeInputs: 실시간 친구 대전(상대 쪽도 사람 조작). 방이 끝에 이것으로 다시 돌려 승패를 정한다.
+export function runArena({ seed, me, foe, foeLevel, inputs, meAi = null, foeInputs = null }) {
+  const A = createArena({ seed, me, foe, foeLevel, meAi, foeHuman: !!foeInputs });
   for (const x of inputs || []) A.push(x);
+  for (const x of foeInputs || []) A.pushFoe(x);
   let guard = 0;
   while (!A.S.over && guard++ < ARENA.MAX_TICKS + 2000) A.step();
   const left = s => s.team.filter(f => f.cur > 0).length;
   return { winner: A.S.winner || 'draw', ticks: A.S.t, ults: { ...A.S.ults }, left: { me: left(A.S.me), foe: left(A.S.foe) }, ko: { ...A.S.ko }, dealt: { ...A.S.dealt } };
+}
+
+// V13.230 상태 요약(1초마다 방과 폰이 비교): 틱 · 두 쪽 자리(0.1 단위) · 체력 · 지금 펫 · 게이지 · 날아가는 공격 수. 같은 조작이면 어디서나 같다.
+export function arenaHash(S) {
+  let h = 2166136261 >>> 0;
+  const add = n => { h = Math.imul(h ^ (Math.round(n) | 0), 16777619) >>> 0; };
+  add(S.t);
+  for (const s of [S.me, S.foe]) { add(s.x * 10); add(s.y * 10); add(s.idx); add(s.gauge * 10); for (const f of s.team) add(f.cur); }
+  add(S.shots.length); add(S.zones.length);
+  return h;
 }

@@ -372,6 +372,16 @@ function petCareBar(A, hatched) {
 // Challenges and tournament matches waiting on the student (the everyday way in is the 야차전 tab).
 function yachaAlerts(A) {
   const invite = A.data.battle_invite;
+  // V13.230 펫 아레나 친구 대전 초대(야차전 도전장이 먼저).
+  const ar = A.data.arena_invite;
+  if (ar && !(invite && invite.expires_at > Date.now()) && ar.expires_at > Date.now()) {
+    const left = Math.max(1, Math.ceil((ar.expires_at - Date.now()) / 60000));
+    return `<section class="home-yacha-v1360 invite arena-invite-v13230" aria-label="펫 아레나 초대">
+      <span class="hy-mark" aria-hidden="true">🐾</span>
+      <span class="hy-text"><small>펫 아레나 친구 대전 초대!</small><strong>${esc(ar.host)}의 방 ${esc(ar.code)}</strong><em>실시간 1 대 1 · ${left}분 안에 들어가요</em></span>
+      <span class="hy-actions"><button type="button" class="hy-no" data-action="arena-decline" data-id="${esc(ar.id)}">거절</button><button type="button" class="hy-go" data-action="arena-accept">들어가기 ${icon('arrow')}</button></span>
+    </section>`;
+  }
   // V13.61: a challenge from a friend replaces the banner until it is answered or expires.
   if (invite && invite.expires_at > Date.now()) {
     const left = Math.max(1, Math.ceil((invite.expires_at - Date.now()) / 60000));

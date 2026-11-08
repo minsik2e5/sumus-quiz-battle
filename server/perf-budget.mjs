@@ -34,6 +34,7 @@ export const STATE_BUDGET_KB = {
   clawNews: 30,             // 인형뽑기 반 소식: 개수 상한.
   timingDaily: 30,          // 10초 맞추기 오늘의 챌린지.
   arenaTeams: 120,          // V13.225 펫 아레나 친구 팀: 반마다 최근 20팀 · 전체 600팀 · 30일 지나면 뺀다(한 팀 약 0.12KB).
+  arenaInvites: 20,         // V13.230 펫 아레나 친구 대전 방(방 코드 · 초대): 대기 5분 · 사람이 찬 방 30분 지나면 지움 · 최대 120개(한 줄 약 0.15KB).
   signupCodes: 20,
   storageAutoTrim: 10,
   sessionArchive: 2,        // V13.216 옮기기 기록(마지막 차례 · 합계만).

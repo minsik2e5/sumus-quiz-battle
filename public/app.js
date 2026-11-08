@@ -638,7 +638,14 @@ function startInvitePolling() {
   invitePoll = setInterval(async () => {
     if (!A.data || A.screen || A.tab !== 'home' || document.visibilityState !== 'visible' || $('#modal-root').children.length) return;
     try {
-      const { invite } = await api('/battle/invite');
+      const { invite, arena_invite: arena } = await api('/battle/invite');
+      // V13.230 펫 아레나 친구 대전 초대도 같은 확인에 실려 온다(새 자동 새로고침 없음).
+      const arenaBefore = A.data.arena_invite;
+      if ((arena?.id || null) !== (arenaBefore?.id || null)) {
+        A.data.arena_invite = arena;
+        if (arena && !invite) { toast(`${arena.host}이(가) 펫 아레나 친구 대전에 초대했어요!`); navigator.vibrate?.(80); }
+        if (!invite && !A.data.battle_invite) { renderKeepScroll(); return; }
+      }
       const before = A.data.battle_invite;
       if ((invite?.id || null) === (before?.id || null) && !invite) return;
       A.data.battle_invite = invite;
@@ -1029,6 +1036,9 @@ $('#app').addEventListener('click', async event => {
     }
     // V13.225 놀이터 펫 아레나 2: 직접 조종하는 펫 대전(단어 없음, 코인 판 입장권은 단어 연습으로).
     if (d.action === 'arena-open') { window.scrollTo(0, 0); return openArena(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
+    // V13.230 첫 화면의 펫 아레나 친구 대전 초대.
+    if (d.action === 'arena-accept' && A.data.arena_invite) { const inv = A.data.arena_invite; A.data.arena_invite = null; window.scrollTo(0, 0); return openArena(A, async () => { A.screen = null; A.tab = 'home'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }, { join: inv.id }); }
+    if (d.action === 'arena-decline') { buttonBusy(b); await api('/games/arena/live/decline', { id: d.id }).catch(() => {}); A.data.arena_invite = null; renderKeepScroll(); toast('초대를 거절했어요.'); return; }
     // V13.162 놀이터 몬스터 사냥.
     if (d.action === 'claw-open') { window.scrollTo(0, 0); return openClaw(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     if (d.action === 'hunt-open') { window.scrollTo(0, 0); return openHunt(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
