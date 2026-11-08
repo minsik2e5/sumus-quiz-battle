@@ -497,4 +497,52 @@ export async function runArenaChecks(assert) {
     assert(!/createElement|innerHTML\s*=|setInterval|backdrop-filter/.test(u2) && (u2.match(/fxEl\(/g) || []).length <= 3 && (css.match(/@keyframes ar-u2-[\w-]+\{(?:[^{}]*\{[^}]*\})+\}/g) || []).length === 4 && (css.match(/@keyframes ar-u2-[\w-]+\{(?:[^{}]*\{[^}]*\})+\}/g) || []).every(k => !/(width|height|left|top|margin|inset)\s*:/.test(k)),
       'V13.231 두 번째 필살기 연출은 효과 조각 상한(fxEl) 안에서, 움직임은 transform · opacity만');
   }
+  // V13.233 혼자 판 렉 대책 · 버튼(그림 67 자리). 찾은 원인이 다시 들어오지 않게 금지 패턴을 검사한다.
+  {
+    const ui = source('../public/modules/arena.js'), fx = source('../public/modules/battle-fx.js'), build = source('./build-assets.mjs');
+    const cssOf = n => source(`../public/v${n}.css`), FIGHT_CSS = ['13226', '13228', '13229', '13231', '13233'];
+    const fn = (name, next) => { const a = ui.indexOf(`function ${name}(`); return a < 0 ? '' : ui.slice(a, ui.indexOf('\nfunction ', a + 10)); };
+    // 1) 경기 화면 CSS 애니메이션은 transform · opacity(scale · translate · rotate)만. box-shadow · filter · clip-path · 크기 · 자리 · 배경을 애니메이션하면 매 프레임 다시 그린다.
+    const badKeys = [];
+    for (const n of [...FIGHT_CSS, '13230', '13232']) for (const m of cssOf(n).matchAll(/@keyframes ([\w-]+)\{((?:[^{}]*\{[^}]*\})+)\}/g)) {
+      const props = [...m[2].matchAll(/(?:^|[{;])\s*([\w-]+)\s*:/g)].map(x => x[1]).filter(p => !['transform', 'opacity', 'scale', 'translate', 'rotate', 'offset'].includes(p));
+      if (props.length && m[1] !== 'ar-lv-pick') badKeys.push(`${n}:${m[1]}(${props.join(',')})`);
+    }
+    assert(!badKeys.length, `V13.233 경기 화면 애니메이션은 transform · opacity만(대기실 ar-lv-pick 빼고)${badKeys.length ? ': ' + badKeys.join(' · ') : ''}`);
+    const c33 = cssOf('13233');
+    assert(build.includes('"v13233.css"') && /@keyframes ar-ultready\{from\{opacity:[\d.]+;transform:scale/.test(cssOf('13226')) && c33.includes('.ar-btn.ult.full::before{animation:ar-ultready') && !/\.ar-btn\.ult\.full\{[^}]*animation:ar-ultready/.test(cssOf('13226')),
+      'V13.233 필살기 준비 빛: box-shadow 무한 애니메이션 → ::before opacity · scale');
+    // 2) 쉬는(투명) 칸은 레이어로 올리지 않는다(35칸이 늘 레이어라 매 프레임 레이어 정리 · 커밋이 무거웠다).
+    assert(c33.includes('.ar-shot.idle,.ar-warn:not(.on),.ar-mine:not(.on),.ar-zone:not(.on),.ar-line:not(.on),.ar-cone:not(.on),.ar-clone:not(.on),.ar-stream{will-change:auto}') && ui.includes('<i class="ar-shot idle"') && ui.includes("el.classList.add('idle')") && ui.includes("el.classList.remove('idle')"),
+      'V13.233 쉬는 칸(탄 · 경고 · 장판 · 줄기 · 부채꼴 · 분신)은 will-change 없음, 켜질 때만 레이어');
+    // 3) 자세 그림: 그림 주소를 바꾸지 않고 미리 겹친 칸을 opacity로(바꿀 때마다 디코드 · 그림자 필터를 다시 그렸다).
+    const sw = fn('swapPose');
+    assert(fn('drawMon').includes('ar-pet-img ar-pose') && sw.includes("body.querySelectorAll('img.ar-pose')") && sw.indexOf("classList.add('on')") < sw.indexOf("setAttribute('src'") && c33.includes('.ar-pose{position:absolute;left:0;top:0;opacity:0;will-change:opacity}') && c33.includes('.ar-body.posing>.ar-pet-img:not(.ar-pose){opacity:0}'),
+      'V13.233 공격 · 맞는 자세: 미리 겹친 그림을 opacity로 켠다(src 바꾸기는 그림이 없을 때만)');
+    // 4) 잔상 · 컷인: 판마다 만든 칸을 다시 쓴다(펫 칸 통째 복제 · 첫 필살기 때 새 그림 디코드 금지).
+    assert(!fn('afterimage').includes('cloneNode') && ui.includes('id="ar-ghost-${w}"') && !/pet\.innerHTML\s*=/.test(fn('cutin')) && c33.includes('.ar-ghost-slot .ar-body{animation:none;will-change:auto}') && c33.includes('.ar-cut .fx2-cut-pet .avatar-art:not(.on){display:none}'),
+      'V13.233 잔상은 쪽마다 칸 하나를 다시 쓰고(복제 · blur 필터 새로 그리기 없음), 컷인 펫 그림은 판 시작 때 만들어 둔다');
+    // 5) 처음 쓰는 그림은 카운트다운 동안 나눠서 미리 디코드(img.decode()) · 글자도 미리 배치.
+    const warm = fn('warmArt');
+    assert(warm.includes('.decode?.()') && warm.includes('Object.values(ART)') && /later\(job, 250 \+ i \* 120\)/.test(warm) && warm.includes('warmText(i)') && ui.includes('  warmArt();') && c33.includes('.ar-warm{') && c33.includes('contain:strict'),
+      'V13.233 효과 그림(그림 66) · 컷인 펫 그림 · 판 글자를 카운트다운 동안 120ms마다 하나씩 미리 디코드 · 배치');
+    // 6) 효과 조각: 조각마다 경기장 전체를 querySelectorAll로 세지 않고, SVG 글은 한 번 읽어 복사한다.
+    const piece = fx.slice(fx.indexOf('function piece('), fx.indexOf('const run ='));
+    assert((piece.match(/querySelectorAll/g) || []).length === 1 && piece.includes('if (live(arena) >= capNow) { const n = arena.querySelectorAll') && !/innerHTML\s*=\s*html/.test(piece) && fx.includes('t.content.cloneNode(true)') && fx.includes('counts.set(arena, live(arena) + 1)') && fx.includes('width="${Math.round(size)}"'),
+      'V13.233 효과 조각(battle-fx piece): 개수는 세어 두고(상한에 닿을 때만 다시 셈) SVG는 템플릿 복사(조각마다 경기장 훑기 · SVG 다시 읽기 없음)');
+    // 7) 매 프레임 같은 transform을 다시 쓰지 않는다 · 쿨타임 원형 게이지는 rotate만.
+    const pl = fn('place');
+    assert(ui.includes('const setTf = (el, tf) => { if (el._tf !== tf)') && !/el\.style\.transform = `translate\(\$\{p\.x/.test(ui) && (pl.match(/setTf\(el, /g) || []).length >= 4 && fn('drawPad').includes('rotate(${Math.min(180, deg)') && !fn('drawPad').includes('scaleY'),
+      'V13.233 펫 · 칸 자리는 바뀔 때만 쓰고(setTf), 쿨타임 게이지는 반쪽 원판 rotate만');
+    // 8) 버튼 그림(그림 67): 그림이 있으면 같은 자리를 그림으로, 없으면 CSS 버튼. 이름은 주문서(build-67.mjs)와 같다.
+    const b67 = source('../docs/asset-requests/runner/build-67.mjs');
+    const names = [...b67.matchAll(/'(ui-[a-z0-9-]+)'/g)].map(m => m[1]);
+    const used = ['ui-btn-atk', 'ui-btn-skill', 'ui-btn-ult', 'ui-btn-dodge', 'ui-btn-swap', 'ui-btn-press', 'ui-btn-cd', 'ui-btn-ready', 'ui-btn-emote', 'ui-stick-base', 'ui-stick-knob', 'ui-ico-atk', 'ui-ico-ult', 'ui-ico-dodge', 'ui-ico-swap'];
+    const s2 = Object.values(EL_SKILLS).flat().map(k => `ui-s2-${k.id}`), s1 = ['burst', 'boost', 'poison', 'guard'].map(k => `ui-ico-${k}`);
+    assert([...used, ...s2, ...s1].every(n => names.includes(n)) && s2.length === 16 && used.slice(0, 11).every(n => ui.includes(`'${n}'`)) && ui.includes('UI(`ui-ico-${k.kind}`)') && ui.includes('UI(`ui-s2-${k2.id}`)') && ui.includes('  main(field()); artGuard(); uiArt();')
+      && ['.ar-btn.art-bg{', '.ar-btn.art-ico>b{display:none}', '.ar-stick.art-bg{', '.ar-stick.art-knob i{', '.ar-pad.art-ready', '.ar-pad.art-press', '.ar-pad.art-cd'].every(x => c33.includes(x)),
+      `V13.233 버튼 · 조이스틱 · 이모트 · 아이콘 그림 자리(그림 67, ${names.length}장): 그림이 들어오면 같은 자리가 그림으로(ARENA_ART), 없으면 CSS 버튼`);
+    assert(/\.ar-btn\{[^}]*border:3px solid transparent;[^}]*padding-box,var\(--rim\) border-box/.test(c33) && c33.includes('.ar-btn.down{transform:translateY(3px) scale(.93)}') && ui.includes('<i class="rdy"></i>') && ui.includes("querySelector('.rdy')?.animate("),
+      'V13.233 버튼: 금속 테두리 · 보석 바탕 · 누름(transform) · 쿨타임 원형 게이지 · 준비됨 반짝(opacity · scale)');
+  }
 }

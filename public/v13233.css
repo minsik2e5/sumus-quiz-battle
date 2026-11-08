@@ -1,0 +1,120 @@
+/* V13.233 펫 아레나: 오른쪽 버튼 · 조이스틱 · 이모트를 게임다운 버튼으로 + 혼자 판 렉 줄이기.
+   버튼: 금속 테두리(padding-box · border-box 두 겹 그라디언트) · 보석 바탕 · 윗면 반짝임(::after) · 아래 두께(그림자, 정적) ·
+   누름(transform만) · 쿨타임 원형 게이지(반쪽 원판 두 개를 rotate만) · 준비됨 빛(::before, opacity · scale만).
+   그림 67이 오면(ARENA_ART: ui-btn-* · ui-ico-* · ui-s2-* · ui-stick-*) 같은 자리가 그림으로 바뀐다(.art-bg · .art-ico).
+   렉 방지: 움직이는 것은 모두 transform · opacity. 그라디언트 · 그림자는 정적(애니메이션하지 않는다). 글자 · 숫자는 앱이 쓴다. */
+
+/* ---------- 버튼 바탕 ---------- */
+.ar-btn{--rim:linear-gradient(160deg,#fff7cf 0%,#f4c74f 22%,#9a6412 48%,#f8dc7a 72%,#7a4a0b 100%);--gem1:#e2e8f0;--gem2:#475569;--gem3:#0f172a;--lip:#0b1220;--glow:#fde047;
+  overflow:visible;border:3px solid transparent;
+  background:radial-gradient(circle at 50% 30%,var(--gem1) 0%,var(--gem2) 52%,var(--gem3) 100%) padding-box,var(--rim) border-box;
+  box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.28),inset 0 -7px 12px rgba(0,0,0,.42),inset 0 5px 9px rgba(255,255,255,.22),0 4px 0 var(--lip),0 9px 14px rgba(0,0,0,.45);
+  transition:transform .07s ease-out;-webkit-tap-highlight-color:transparent}
+.ar-btn::after{content:"";position:absolute;left:16%;right:16%;top:7%;height:36%;border-radius:50%;pointer-events:none;background:linear-gradient(180deg,rgba(255,255,255,.62),rgba(255,255,255,0));transition:opacity .07s}
+.ar-btn::before{content:"";position:absolute;inset:-9px;border-radius:50%;pointer-events:none;opacity:0;background:radial-gradient(circle,transparent 52%,color-mix(in srgb,var(--glow) 85%,transparent) 62%,transparent 72%)}
+.ar-btn.down{transform:translateY(3px) scale(.93)}
+.ar-btn.down::after{opacity:.35}
+.ar-btn b{position:relative;z-index:1;text-shadow:0 2px 0 rgba(0,0,0,.35),0 0 8px rgba(255,255,255,.35)}
+/* 이름표: 버튼 아래 테두리에 걸친 작은 리본 */
+.ar-btn small{position:absolute;z-index:3;left:50%;bottom:-7px;transform:translateX(-50%);max-width:74px;padding:1px 7px 2px;border-radius:8px;font-size:9.5px;line-height:1.25;letter-spacing:-.02em;color:#fff;
+  background:linear-gradient(180deg,#334155,#0b1220);box-shadow:0 0 0 1.5px #e9c160,0 2px 3px rgba(0,0,0,.4);text-shadow:none}
+.ar-btn.wait small{opacity:1}
+.ar-btn.wait b{opacity:.6}
+
+/* 버튼마다 보석 색 */
+.ar-btn.atk{--gem1:#fecaca;--gem2:#ef4444;--gem3:#7f1d1d;--lip:#450a0a;--glow:#fca5a5;background:radial-gradient(circle at 50% 30%,var(--gem1) 0%,var(--gem2) 50%,var(--gem3) 100%) padding-box,var(--rim) border-box}
+.ar-btn.atk b{font-size:32px}
+.ar-btn.skill{--gem1:#fff;--gem2:var(--c1,#a855f7);--gem3:#1e1b4b;--lip:#140f33;--glow:var(--c1,#a855f7);background:radial-gradient(circle at 50% 30%,var(--gem1) 0%,var(--gem2) 50%,var(--gem3) 100%) padding-box,var(--rim) border-box}
+.ar-btn.skill2{--gem1:#fff;--gem2:var(--c1,#22d3ee);--gem3:#0f172a;--lip:#06101f;--glow:var(--c1,#22d3ee);background:radial-gradient(circle at 50% 30%,var(--gem1) 0%,var(--gem2) 50%,var(--gem3) 100%) padding-box,var(--rim) border-box}
+.ar-btn.dodge{--gem1:#e0f2fe;--gem2:#38bdf8;--gem3:#0c4a6e;--lip:#082f49;--glow:#7dd3fc;--rim:linear-gradient(160deg,#ffffff 0%,#cbd5e1 25%,#64748b 50%,#e2e8f0 75%,#475569 100%);background:radial-gradient(circle at 50% 30%,var(--gem1) 0%,var(--gem2) 50%,var(--gem3) 100%) padding-box,var(--rim) border-box}
+.ar-btn.swap{--gem1:#ddd6fe;--gem2:#6d28d9;--gem3:#1e1b4b;--lip:#140f33;--glow:#c4b5fd;--rim:linear-gradient(160deg,#ffffff 0%,#cbd5e1 25%,#64748b 50%,#e2e8f0 75%,#475569 100%);background:radial-gradient(circle at 50% 30%,var(--gem1) 0%,var(--gem2) 50%,var(--gem3) 100%) padding-box,var(--rim) border-box}
+.ar-btn.ult{--gem1:#fef9c3;--gem2:#f59e0b;--gem3:#7c2d12;--lip:#431407;--glow:#fde047;background:radial-gradient(circle at 50% 30%,var(--gem1) 0%,var(--gem2) 50%,var(--gem3) 100%) padding-box,var(--rim) border-box}
+
+/* ---------- 쿨타임: 원형으로 줄어드는 어둠(반쪽 원판 두 개를 돌린다 · transform만) ---------- */
+.ar-btn:not(.wait) .cd{visibility:hidden}
+.ar-btn .cd{position:absolute;inset:0;z-index:2;border-radius:50%;overflow:hidden;pointer-events:none;background:none;transform:none}
+.ar-btn .cd>i{position:absolute;top:0;bottom:0;width:50%;overflow:hidden}
+.ar-btn .cd>i:first-child{left:50%}
+.ar-btn .cd>i:last-child{left:0}
+.ar-btn .cd>i>b{position:absolute;top:0;bottom:0;width:100%;background:rgba(3,7,18,.66);transform:rotate(0deg)}
+.ar-btn .cd>i:first-child>b{left:-100%;transform-origin:100% 50%;border-radius:999px 0 0 999px}
+.ar-btn .cd>i:last-child>b{left:100%;transform-origin:0 50%;border-radius:0 999px 999px 0}
+/* 쿨타임 동안 테두리 위 은은한 띠(정적) */
+.ar-btn.wait::after{opacity:.4}
+/* 준비됨: 한 번 반짝(앱이 .rdy를 WAAPI로 opacity · scale만 움직인다) */
+.ar-btn .rdy{position:absolute;inset:-6px;z-index:2;border-radius:50%;pointer-events:none;opacity:0;border:3px solid #fff;box-shadow:0 0 12px var(--glow),inset 0 0 10px var(--glow)}
+
+/* ---------- 필살기: 게이지 링 + 준비됨 빛(예전 box-shadow 무한 애니메이션 → ::before opacity · scale) ---------- */
+.ar-btn.ult{filter:none}
+.ar-btn.ult:not(.full) .ar-ult-ico,.ar-btn.ult:not(.full) .ar-ult-txt{opacity:.55}
+.ar-btn.ult:not(.full){--rim:linear-gradient(160deg,#e5e7eb 0%,#9ca3af 30%,#4b5563 55%,#d1d5db 80%,#374151 100%)}
+.ar-btn.ult:not(.full)::after{opacity:.45}
+.ar-btn.ult svg{z-index:2}
+.ar-btn.ult circle{stroke:#fde047;stroke-width:3.6;stroke-linecap:round}
+/* (v13226 ar-ultready: box-shadow 무한 → ::before opacity · scale) */
+.ar-btn.ult.full::before{animation:ar-ultready .55s ease-in-out infinite alternate}
+.ar-btn.ult .ar-ult-ico{z-index:1}
+
+/* ---------- 조이스틱 ---------- */
+.ar-stick{border:3px solid transparent;
+  background:radial-gradient(circle,rgba(15,23,42,.55) 0 46%,rgba(30,41,59,.72) 47% 62%,rgba(15,23,42,.6) 63%) padding-box,linear-gradient(160deg,#fff7cf,#d6a73a 30%,#6b4508 55%,#f3d47a 78%,#5c3a07) border-box;
+  box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.22),inset 0 8px 16px rgba(0,0,0,.45),0 4px 0 #0b1220,0 9px 16px rgba(0,0,0,.4)}
+.ar-stick::before{content:"";position:absolute;inset:10px;border-radius:50%;pointer-events:none;
+  background:conic-gradient(from -8deg,rgba(255,255,255,.55) 0 16deg,transparent 16deg 90deg,rgba(255,255,255,.55) 90deg 106deg,transparent 106deg 180deg,rgba(255,255,255,.55) 180deg 196deg,transparent 196deg 270deg,rgba(255,255,255,.55) 270deg 286deg,transparent 286deg);
+  -webkit-mask:radial-gradient(circle,transparent 78%,#000 80%);mask:radial-gradient(circle,transparent 78%,#000 80%);opacity:.7}
+.ar-stick i{border:3px solid transparent;
+  background:radial-gradient(circle at 42% 32%,#ffffff 0%,#dbeafe 22%,#60a5fa 58%,#1e3a8a 100%) padding-box,linear-gradient(160deg,#fff7cf,#e2b84b 35%,#7a4b06 65%,#f8dc7a) border-box;
+  box-shadow:inset 0 -6px 9px rgba(0,0,0,.35),inset 0 4px 6px rgba(255,255,255,.5),0 6px 10px rgba(0,0,0,.45);will-change:transform}
+.ar-stick i::after{content:"";position:absolute;left:20%;right:20%;top:10%;height:32%;border-radius:50%;background:linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,0))}
+
+/* ---------- 이모트(경기 중 오른쪽 위) ---------- */
+.ar-play-emo .yb-emote{position:relative;border:2px solid transparent;border-radius:14px;color:#17242f;font-weight:900;opacity:.92;
+  background:linear-gradient(180deg,#ffffff,#e2e8f0) padding-box,linear-gradient(160deg,#fff7cf,#d6a73a 45%,#8a5a10) border-box;
+  box-shadow:0 3px 0 rgba(15,23,42,.55),0 5px 10px rgba(0,0,0,.3);transition:transform .07s}
+.ar-play-emo .yb-emote:active{transform:translateY(2px) scale(.92)}
+
+/* ---------- 그림 67이 오면: 같은 자리를 그림으로(바탕 · 아이콘) ---------- */
+.ar-btn.art-bg{border-color:transparent;background:var(--bg) center/100% 100% no-repeat;box-shadow:0 7px 12px rgba(0,0,0,.4)}
+.ar-btn.art-bg::after{display:none}
+.ar-btn .ico{position:relative;z-index:1;display:block;width:62%;height:62%;background:var(--ico) center/contain no-repeat}
+.ar-btn.art-ico>b{display:none}
+.ar-btn.ult.art-ico .ar-ult-ico,.ar-btn.ult.art-ico .ar-ult-txt{display:none}
+.ar-btn.wait .ico{opacity:.6}
+.ar-stick.art-bg{border-color:transparent;background:var(--bg) center/100% 100% no-repeat;box-shadow:0 8px 14px rgba(0,0,0,.35)}
+.ar-stick.art-bg::before{display:none}
+.ar-stick.art-knob i{border-color:transparent;background:var(--knob) center/100% 100% no-repeat;box-shadow:none}
+.ar-stick.art-knob i::after{display:none}
+.ar-play.art-emo .ar-play-emo .yb-emote{border-color:transparent;background:var(--emo) center/100% 100% no-repeat}
+.ar-pad.art-ready .ar-btn::before{inset:-12px;background:var(--ready) center/100% 100% no-repeat}
+.ar-pad.art-press .ar-btn.art-bg.down::after{display:block;inset:0;left:0;right:0;top:0;height:auto;border-radius:50%;background:var(--press) center/100% 100% no-repeat;opacity:1}
+.ar-pad.art-cd .ar-btn .cd>i>b{background:var(--cdimg) 0 50%/200% 100% no-repeat}
+.ar-pad.art-cd .ar-btn .cd>i:last-child>b{background-position:100% 50%}
+
+/* 저사양(.ar-lite): 바깥 그림자만 줄인다(모양 · 테두리 · 게이지는 그대로) */
+.ar-lite .ar-btn{box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.28),0 4px 0 var(--lip)}
+.ar-lite .ar-btn.ult.full::before{animation:none;opacity:.8}
+@media (prefers-reduced-motion:reduce){.ar-btn.ult.full::before{animation:none;opacity:.85}}
+
+/* ---------- 렉 방지(연출 모습은 같게, 더 싸게) ---------- */
+/* 공격 · 맞는 자세 그림: 미리 겹쳐 두고 opacity만(제 레이어라 바꿀 때 다시 그리지 않는다) */
+.ar-pose{position:absolute;left:0;top:0;opacity:0;will-change:opacity}
+.ar-body.posing>.ar-pet-img:not(.ar-pose){opacity:0}
+.ar-body>.ar-pose.on{opacity:1}
+/* 잔상 칸(쪽마다 하나, 평소엔 투명) */
+.ar-mon.ghost.ar-ghost-slot{opacity:0;transition:none;z-index:9;will-change:auto}
+.ar-ghost-slot .ar-body{animation:none;will-change:auto}
+/* 컷인 펫 그림: 판 시작 때 모두 만들어 디코드해 두고 하나만 보인다 */
+.ar-cut .fx2-cut-pet .avatar-art:not(.on){display:none}
+/* 빔: clip-path · filter 애니메이션(v13226 ar-beam) → scale(가로로 뻗기) · opacity. 끝의 밝아짐은 흰 덧칠(::after opacity) */
+.ar-fx.beam::after{content:"";position:absolute;inset:0;border-radius:inherit;background:#fff;opacity:0;animation:ar-beamhot .38s ease-out forwards}
+@keyframes ar-beamhot{0%,30%{opacity:0}100%{opacity:.45}}
+/* 버프 빛: box-shadow 애니메이션(v13226 ar-buff) → 정적 빛(::before)을 opacity로 */
+.ar-mon.buffing .ar-aura::before{content:"";position:absolute;inset:0;border-radius:50%;box-shadow:0 0 30px var(--c1,#fde047);animation:ar-buffglow .6s ease-out forwards}
+@keyframes ar-buffglow{from{opacity:1}to{opacity:0}}
+@media (prefers-reduced-motion:reduce){.ar-fx.beam,.ar-fx.beam::after,.ar-mon.buffing .ar-aura,.ar-mon.buffing .ar-aura::before{animation:none}}
+.ar-fx.beam.big::after{animation-duration:.7s}
+/* 글자 미리 배치 칸(보이지 않음 · 영향 없음) */
+.ar-warm{position:absolute;left:0;top:0;width:1px;height:1px;overflow:hidden;visibility:hidden;pointer-events:none;contain:strict;z-index:-1}
+.ar-warm *{position:static!important;animation:none!important;transform:none!important;translate:none!important;opacity:1!important}
+/* 쉬는(투명) 칸은 레이어로 올리지 않는다: 켜질 때(.on · 날아가는 탄)만 will-change. 35칸이 늘 레이어라 매 프레임 레이어 정리 · 커밋이 무거웠다 */
+.ar-shot.idle,.ar-warn:not(.on),.ar-mine:not(.on),.ar-zone:not(.on),.ar-line:not(.on),.ar-cone:not(.on),.ar-clone:not(.on),.ar-stream{will-change:auto}

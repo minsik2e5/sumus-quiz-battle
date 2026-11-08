@@ -5,7 +5,7 @@
 // 서버는 가짜(/api/games/arena/start · finish만 흉내). 전투 계산은 진짜 arena-rules.js다.
 // 탭이 스스로 조종한다: 120ms마다 방향을 바꾸고, 공격은 계속 누르고, 스킬 1 · 2 · 필살기 · 회피를 틈틈이 누른다(키보드 이벤트).
 //
-// 잰 것: 프레임 간격(평균 · 95%), 33ms · 50ms 넘은 프레임(분당), 50ms 넘는 긴 작업, 입력 지연(누른 시각 → 다음 프레임이 그려진 직후),
+// 잰 것: 프레임 간격(평균 · 95% · 가장 긴 것 frame_max · FIGHT! 뒤 가장 긴 것 fight_max), 33ms · 50ms 넘은 프레임(분당), 50ms 넘는 긴 작업, 입력 지연(누른 시각 → 다음 프레임이 그려진 직후),
 //   스타일 재계산 · 배치 시간, 효과 조각이 떠 있는 프레임만 따로.
 //
 // 사용: node docs/arena-perf.mjs [--cpu 4] [--seconds 70] [--lite auto|off] [--profile] [--trace] [--css '실험 CSS'] [--shot 파일.png] [--mode ffa|2v2]
@@ -107,12 +107,14 @@ const AUTOPLAY = () => {
   const key = (type, code) => document.dispatchEvent(new KeyboardEvent(type, { code, bubbles: true }));
   const DIRS = [['KeyW'], ['KeyS'], ['KeyA'], ['KeyD'], ['KeyW', 'KeyA'], ['KeyW', 'KeyD'], ['KeyS', 'KeyA'], ['KeyS', 'KeyD'], []];
   let held = [], atk = false, n = 0;
+  // V13.233 누르는 순서를 매번 같게(씨앗 고정 난수) → 고치기 전 · 후를 같은 조작으로 비교한다.
+  let seed = 7; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
   setInterval(() => {
     if (!document.getElementById('ar-pad')) { held = []; atk = false; return; }
     n++;
-    if (n % 6 === 0) { for (const c of held) key('keyup', c); held = DIRS[Math.floor(Math.random() * DIRS.length)]; for (const c of held) key('keydown', c); }
+    if (n % 6 === 0) { for (const c of held) key('keyup', c); held = DIRS[Math.floor(rnd() * DIRS.length)]; for (const c of held) key('keydown', c); }
     if (!atk) { key('keydown', 'KeyJ'); atk = true; }
-    const r = Math.random();
+    const r = rnd();
     if (r < .04) key('keydown', 'KeyK'); else if (r < .07) key('keydown', 'KeyI'); else if (r < .10) key('keydown', 'KeyL'); else if (r < .14) key('keydown', 'Space');
   }, 120);
 };
@@ -121,7 +123,7 @@ const PROBE = () => {
   let last = 0, tags = new Set();
   // 프레임마다 무엇이 생겼나(효과 조각 · 배너 · 컷인 · 그림 바꾸기)를 적어 두고, 긴 프레임(50ms+)에 무엇이 있었나 센다.
   const mo = new MutationObserver(list => { for (const m of list) {
-    if (m.type === 'childList') for (const n of m.addedNodes) { if (n.nodeType === 1) tags.add((n.className?.baseVal ?? n.className ?? n.nodeName).toString().split(' ').filter(c => c && c !== 'ar-fx').slice(0, 2).join('.') || n.nodeName); }
+    if (m.type === 'childList') for (const n of m.addedNodes) { if (n.nodeType === 1 && !P.fight && n.classList?.contains('count') && n.classList.contains('go')) P.fight = performance.now(); if (n.nodeType === 1) tags.add((n.className?.baseVal ?? n.className ?? n.nodeName).toString().split(' ').filter(c => c && c !== 'ar-fx').slice(0, 2).join('.') || n.nodeName); }
     else if (m.attributeName === 'src') tags.add('img-src');
     else if (m.attributeName === 'class' && /ar-app/.test(m.target.className)) tags.add('app:' + m.target.className.replace(/session-app|ar-app|playing/g, '').trim());
   } });
@@ -130,9 +132,10 @@ const PROBE = () => {
     const playing = !!document.getElementById('ar-pad');
     if (playing && !P.on) { P.on = true; P.t0 = t; }
     if (P.on && playing && last) {
-      const d = t - last; P.frames.push(d);
+      const d = t - last; P.frames.push(d); if (P.fight && t > P.fight) (P.play ||= []).push(d);
       for (const k of tags) { P.tagAll[k] = (P.tagAll[k] || 0) + 1; if (d > 50) P.tagLong[k] = (P.tagLong[k] || 0) + 1; }
       if (d > 50) P.tagLong['(모든 긴 프레임)'] = (P.tagLong['(모든 긴 프레임)'] || 0) + 1;
+      if (d > 33.4) (P.slow ||= []).push(`${((t - P.t0) / 1000).toFixed(1)}s ${Math.round(d)}ms ${[...tags].slice(0, 6).join(' ')}`);
       const fx = document.querySelectorAll('#ar-field .ar-fx').length; if (fx) P.fxFrames.push(d); if (fx > P.fxMax) P.fxMax = fx;
     }
     if (P.on && !playing && !P.t1) P.t1 = t;
@@ -170,18 +173,24 @@ async function main() {
   const cdp = await ctx.newCDPSession(me);
   await cdp.send('Performance.enable');
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU });
+  // V13.233 --layers: 합성 레이어 수(가장 많았던 때)와 큰 레이어. 레이어가 많으면 Layerize · Commit이 프레임마다 무겁다.
+  const LAYERS = { max: 0, area: 0, top: '' };
+  if (process.argv.includes('--layers')) {
+    await cdp.send('LayerTree.enable');
+    cdp.on('LayerTree.layerTreeDidChange', ({ layers }) => { if (!layers || layers.length <= LAYERS.max) return; LAYERS.max = layers.length; LAYERS.area = Math.round(layers.filter(l => l.drawsContent).reduce((a, l) => a + l.width * l.height, 0) / 1000); LAYERS.draws = layers.filter(l => l.drawsContent).length; });
+  }
   const PROFILE = process.argv.includes('--profile'), TRACE = process.argv.includes('--trace');
   await me.goto(`${base}/arena.html`);
   // --vs-shot 파일.png: VS 화면(판 시작 전)을 찍는다.
   if (arg('vs-shot', '')) { await me.waitForSelector('#ar-vs', { timeout: 30000 }); await new Promise(r => setTimeout(r, 1300)); await me.screenshot({ path: arg('vs-shot', ''), scale: 'css' }); }
   await me.waitForSelector('#ar-pad', { timeout: 30000 });
-  if (TRACE) await browser.startTracing(me, { categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline'] });
+  if (TRACE) await browser.startTracing(me, { categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', ...(process.argv.includes('--samples') ? ['disabled-by-default-v8.cpu_profiler'] : [])] });
   if (PROFILE) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); }
   const m0 = Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(m => [m.name, m.value]));
   const started = Date.now(); let shot = false;
   while (Date.now() - started < SECONDS * 1000) {
     await new Promise(r => setTimeout(r, 1000));
-    if (SHOT && !shot && Date.now() - started > Number(arg('shot-at', 12000))) { await me.screenshot({ path: SHOT, scale: 'css' }); shot = true; }
+    if (SHOT && !shot && Date.now() - started > Number(arg('shot-at', 12000))) { await me.screenshot({ path: SHOT, scale: process.argv.includes('--shot-device') ? 'device' : 'css' }); shot = true; }
     if (await me.evaluate(() => !!window.__perf.t1)) break;
   }
   // --probe '식': 끝에 페이지에서 식을 돌려 값을 찍는다(화면 확인용).
@@ -191,7 +200,9 @@ async function main() {
   const m1 = Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(m => [m.name, m.value]));
   const P = await me.evaluate(() => window.__perf);
   if (TRACE) {
-    const trace = JSON.parse((await browser.stopTracing()).toString());
+    const raw = (await browser.stopTracing()).toString();
+    if (arg('trace-out', '')) await import('node:fs').then(fs => fs.writeFileSync(arg('trace-out', ''), raw));
+    const trace = JSON.parse(raw);
     const ev = trace.traceEvents.filter(e => e.ph === 'X' && e.dur);
     const sum = {}; for (const e of ev) if (['UpdateLayoutTree', 'Layout', 'Paint', 'PrePaint', 'Layerize', 'Commit', 'FunctionCall', 'FireAnimationFrame', 'TimerFire', 'EventDispatch', 'Decode Image', 'ImageDecodeTask', 'ParseHTML', 'MajorGC', 'MinorGC', 'HitTest'].includes(e.name)) sum[e.name] = (sum[e.name] || 0) + e.dur / 1000;
     console.log('trace(ms):', Object.entries(sum).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${Math.round(v)}`).join(' · '));
@@ -206,12 +217,14 @@ async function main() {
     console.log([...self].sort((a, b) => b[1] - a[1]).slice(0, 15).map(([k, v]) => `${Math.round(v)}ms ${k}`).join('\n'));
   }
   // --tags: 긴 프레임에 함께 있던 것(그 프레임에 생긴 효과 · 바뀐 그림). '긴/전체'가 높을수록 그것이 무겁다.
+  // V13.233 --slow: 33ms 넘은 프레임마다 언제 · 얼마나 · 그 프레임에 생긴 것.
+  if (process.argv.includes('--slow')) console.log((P.slow || []).join('\n'));
   if (process.argv.includes('--tags')) console.log(Object.entries(P.tagLong).sort((a, b) => b[1] - a[1]).slice(0, 16).map(([k, v]) => `${v}/${P.tagAll[k] ?? '-'} ${k}`).join('\n'));
   const secs = P.frames.reduce((a, b) => a + b, 0) / 1000;
   const mins = secs / 60;
   const out = {
-    mode: MODE || '1v1', pets_max: await me.evaluate(() => document.querySelectorAll('.ar-mon').length), cpu: CPU, lite: LITE, seconds: r1(secs), frames: P.frames.length, fps: r1(P.frames.length / secs),
-    frame_avg: r1(avg(P.frames)), frame_p95: r1(pct(P.frames, .95)), over33_per_min: r1(P.frames.filter(d => d > 33.4).length / mins), over50_per_min: r1(P.frames.filter(d => d > 50).length / mins),
+    mode: MODE || '1v1', pets_max: await me.evaluate(() => document.querySelectorAll('.ar-mon:not(.ar-ghost-slot)').length), cpu: CPU, lite: LITE, seconds: r1(secs), frames: P.frames.length, fps: r1(P.frames.length / secs),
+    frame_avg: r1(avg(P.frames)), frame_p95: r1(pct(P.frames, .95)), frame_max: r1(Math.max(0, ...P.frames)), fight_max: r1(Math.max(0, ...(P.play || []))), fight_over33_per_min: r1((P.play || []).filter(d => d > 33.4).length / ((P.play || []).reduce((a, b) => a + b, 0) / 60000 || 1)), fight_over50_per_min: r1((P.play || []).filter(d => d > 50).length / ((P.play || []).reduce((a, b) => a + b, 0) / 60000 || 1)), start_max: r1(Math.max(0, ...P.frames.slice(0, 30))), over33_per_min: r1(P.frames.filter(d => d > 33.4).length / mins), over50_per_min: r1(P.frames.filter(d => d > 50).length / mins),
     fx_frame_avg: r1(avg(P.fxFrames)), fx_frame_p95: r1(pct(P.fxFrames, .95)), fx_max: P.fxMax,
     long_tasks: P.long.length, long_max: Math.max(0, ...P.long),
     taps: P.input.length, input_avg: r1(avg(P.input)), input_p95: r1(pct(P.input, .95)), input_max: r1(Math.max(0, ...P.input)),
@@ -220,6 +233,7 @@ async function main() {
     script_ms: Math.round((m1.ScriptDuration - m0.ScriptDuration) * 1000), task_ms: Math.round((m1.TaskDuration - m0.TaskDuration) * 1000),
     nodes: m1.Nodes, lite_class: await me.evaluate(() => !!document.querySelector('.ar-app.ar-lite'))
   };
+  if (process.argv.includes('--layers')) console.log('layers:', JSON.stringify(LAYERS));
   console.log(JSON.stringify(out));
   await browser.close(); server.close();
   process.exit(0);
