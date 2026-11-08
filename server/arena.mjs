@@ -5,13 +5,14 @@
 //                   s2{ 펫 키: 0 | 1 } V13.229 스킬 ② 고르기(속성 스킬 2개 중 하나, 무료로 바꿈. 내 펫만 · S2_MAX개 상한)
 //                     V13.231부터는 '기본 스킬 ②'(스킬트리 2층 B '그대로')로 그대로 쓴다. 새로 쓰지는 않고 읽기만.
 //                   tr{ 펫 키: '011' } V13.231 스킬트리 가지(층마다 0 A · 1 B, 무료로 바꿈. 내 펫만 · TR_MAX개 상한, 펫마다 약 14바이트),
-//                   cw V13.235 코인 판 승리 누적 · dc{ bg, rg, en, ps } 고른 경기장 꾸미기(server/arena-deco.mjs, 약 60바이트) }
+//                   cw V13.236 코인 판 승리 누적 · dc{ bg, rg, en, ps } 고른 경기장 꾸미기(server/arena-deco.mjs, 약 60바이트) }
 //   state.arenaTeams: 친구들이 상대로 만나는 팀 목록(학교 · 반마다 최근 PER_CLASS개, 전체 MAX개, 30일 지나면 뺀다).
 //                   렉 방지: 시작 요청이 전체 학생을 훑지 않고 이 작은 목록만 본다.
 import { dayKey, STANDARD_PET_KEYS } from '../public/modules/core.js';
 import { ARENA, TREE, fighter, teamPower, cleanInputs, cleanPicks, cleanTrees, runArena } from '../public/modules/arena-rules.js';
 import { addBonus, findReceipt, keepReceipt, secureRandom } from './rewards.mjs';
 import { decoView, setDeco, bumpCoinWin, decoOf } from './arena-deco.mjs';
+import { applyRank, rankView } from './arena-rank.mjs';
 
 export const ARENA_POOL = { PER_CLASS: 20, MAX: 600, KEEP_MS: 30 * 86400000 };
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -27,7 +28,7 @@ const playsToday = (a, now) => a.day === dayKey(now) ? Number(a.plays || 0) : 0;
 export function arenaView(p, now = Date.now()) {
   const a = p.games?.arena || {}; // 읽기만
   const left = Math.max(0, ARENA.DAILY - playsToday(a, now)), tickets = Math.min(ARENA.TICKETS_MAX, Number(a.tk || 0));
-  return { left, tickets, coin_play: left > 0 && tickets > 0, daily: ARENA.DAILY, s2: cleanPicks(a.s2, S2_MAX), tr: cleanTrees(a.tr, TR_MAX), games: Number(a.games || 0), wins: Number(a.wins || 0), streak: Number(a.streak || 0), best_streak: Number(a.best_streak || 0), deco: decoView(a) };
+  return { left, tickets, coin_play: left > 0 && tickets > 0, daily: ARENA.DAILY, s2: cleanPicks(a.s2, S2_MAX), tr: cleanTrees(a.tr, TR_MAX), games: Number(a.games || 0), wins: Number(a.wins || 0), streak: Number(a.streak || 0), best_streak: Number(a.best_streak || 0), rank: rankView(p, now), deco: decoView(a) };
 }
 
 // 코인 판 입장권: 끝까지 푼 연습(ARENA.TICKET_PRACTICE문제 이상)마다 1장(하루 3장), 출석 1장. 보관 TICKETS_MAX장.
@@ -64,7 +65,7 @@ export function arenaPoolFor(state, p, schoolId, now = Date.now()) {
     .filter(x => x.k === k && x.p !== p.id && now - x.at < ARENA_POOL.KEEP_MS)
     .map(x => ({ name: x.n, team: x.t, en: x.e || '' }));
 }
-// V13.235 e: 내 입장 효과(친구가 내 팀을 만나면 보인다, 기본이면 적지 않음).
+// V13.236 e: 내 입장 효과(친구가 내 팀을 만나면 보인다, 기본이면 적지 않음).
 export function arenaPoolPut(state, p, schoolId, team, now = Date.now()) {
   const k = poolKey(schoolId, p.class_name), all = Array.isArray(state.arenaTeams) ? state.arenaTeams : [];
   const keep = all.filter(x => x.p !== p.id && now - x.at < ARENA_POOL.KEEP_MS);
@@ -92,7 +93,7 @@ export const foeLevelOf = a => Number(a?.streak || 0) >= 3 ? 2 : Number(a?.games
 // 판 받기. 하던 판이 있으면 버리고 새로(코인 · 입장권은 끝낼 때만 오가므로 잃을 것이 없다).
 // V13.229 picks: 대기실에서 고른 스킬 ②({ 키: 0 | 1 }). 내 펫(알이 아닌 것)만 남겨 a.s2에 합친다(새로 고른 것이 이긴다, S2_MAX개 상한).
 // V13.231 tree: 스킬트리 가지({ 키: '011' }). 스킬 ② 고르기와 같은 방식으로 a.tr에 합친다(TR_MAX개 상한).
-// V13.235 deco: 고른 경기장 꾸미기({ bg, rg, en, ps }). 안 열린 것이면 판을 만들지 않고 거부한다(server/arena-deco.mjs setDeco).
+// V13.236 deco: 고른 경기장 꾸미기({ bg, rg, en, ps }). 안 열린 것이면 판을 만들지 않고 거부한다(server/arena-deco.mjs setDeco).
 export function arenaStart(p, { id, pets, team: keys, picks = null, tree = null, deco = null, friends = [], now = Date.now(), random = secureRandom }) {
   const a = games(p).arena ||= {};
   setDeco(a, deco);
@@ -144,9 +145,11 @@ function arenaSettle(p, a, live, { inputs, pet, now }) {
   const coins = base.win ? ARENA.COINS.win + streakCoins : base.ko >= 1 ? ARENA.COINS.lose : 0;
   a.plays = Number(a.plays || 0) + 1;
   a.tk = Number(a.tk || 0) - 1;
-  if (base.win) bumpCoinWin(a); // V13.235 꾸미기 열림: 코인 판 승리만 센다
+  if (base.win) bumpCoinWin(a); // V13.236 꾸미기 열림: 코인 판 승리만 센다
   addBonus(p, { xp: ARENA.XP, coins, pet, now });
-  return { ...out, paid: true, coins, streak_coins: streakCoins, xp: ARENA.XP };
+  // V13.234 랭크: 코인 판만, 연습 상대(컴퓨터 팀, bot)는 빼고. 상대 힘 = 상대 팀 힘 ÷ 내 팀 힘.
+  const rp = live.bot ? null : applyRank(p, { win: base.win, draw: r.winner === 'draw', ratio: teamPower(unpack(live.foe)) / Math.max(1, teamPower(unpack(live.me))), now });
+  return { ...out, paid: true, coins, streak_coins: streakCoins, xp: ARENA.XP, ...(rp ? { rp } : {}) };
 }
 
 export const arenaLine = res => `펫 아레나 ${res.win ? '승리' : res.winner === 'draw' ? '무승부' : '패배'} · 쓰러뜨림 ${res.ko || 0}${res.paid && res.coins ? ` · ${res.coins}코인` : ''}`;

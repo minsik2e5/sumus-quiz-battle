@@ -57,6 +57,7 @@ import { wallStart, wallFinish, wallView, wallLine } from './wall.mjs';
 import { ARENA } from '../public/modules/arena-rules.js';
 import { arenaStart, arenaFinish, arenaView, arenaLine, arenaPoolFor, arenaPoolPut, grantArenaTicket } from './arena.mjs';
 import { setDeco } from './arena-deco.mjs';
+import { rankBoardView, claimRank } from './arena-rank.mjs';
 import { arenaPeers, arenaInviteFor, myLiveRoom, liveOpen, liveInvite, liveJoin, liveDecline, liveResult, pairLeft, tidyArenaInvites, settleArenaLive, arenaReportPending, undoLiveJoin } from './arena-live.mjs';
 import { elementOf } from '../public/modules/battle-fx.js';
 import { openParties, newPartyCode, partyTicket, tidyParties, partyPlayer, partyPlaysLeft, settleParty, partyReportPending, undoParty } from './party.mjs';
@@ -858,7 +859,7 @@ export function settleArenaReport(state, body) {
   return settleArenaLive(state, body, { profileOf: pid => state.profiles.find(x => x.id === pid), schoolOf: x => schoolForProfile(state, x), activePet: pid => activePetKey(state, pid), log: (x, line, at) => logActivity(x, 'arena', line, at) });
 }
 export { arenaReportPending, undoLiveJoin };
-// V13.235 친구 방 열기 · 들어가기에 실어 온 꾸미기: 안 열린 것은 거부(혼자 판 시작과 같은 규칙).
+// V13.236 친구 방 열기 · 들어가기에 실어 온 꾸미기: 안 열린 것은 거부(혼자 판 시작과 같은 규칙).
 const liveDeco = (p, body) => { if (body?.deco && typeof body.deco === 'object' && !Array.isArray(body.deco)) setDeco((p.games ||= {}).arena ||= {}, body.deco); };
 function activePetKey(state, studentId) {
   const p = state.profiles.find(x => x.id === studentId);
@@ -1991,7 +1992,7 @@ export async function service(state, method, path, body, token, options = {}) {
     const picks = body.picks && typeof body.picks === 'object' && !Array.isArray(body.picks) ? body.picks : null;
     // V13.231 스킬트리 가지({ 펫 키: '011' }): 규칙 파일 cleanTrees가 알려진 펫 · 0/1 세 글자만 남긴다.
     const tree = body.tree && typeof body.tree === 'object' && !Array.isArray(body.tree) ? body.tree : null;
-    // V13.235 경기장 꾸미기({ bg, rg, en, ps }): 안 열린 것은 거부(server/arena-deco.mjs).
+    // V13.236 경기장 꾸미기({ bg, rg, en, ps }): 안 열린 것은 거부(server/arena-deco.mjs).
     const deco = body.deco && typeof body.deco === 'object' && !Array.isArray(body.deco) ? body.deco : null;
     const r = arenaStart(p, { id: id(), team, picks, tree, friends, deco, pets: petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), now });
     if (!p.preview_owner_id) arenaPoolPut(state, p, school.id, r.team, now);
@@ -2004,6 +2005,19 @@ export async function service(state, method, path, body, token, options = {}) {
     const result = arenaFinish(p, { id: str(body.id, 80), inputs: Array.isArray(body.inputs) ? body.inputs.slice(0, 4000) : [], pet: activePetKey(state, p.id), now });
     if (!result.again && result.reason !== 'short') logActivity(p, 'arena', arenaLine(result), now);
     return { ...result, points_balance: coinBalance(state, p), stats: stats(state, p) };
+  }
+  // V13.234 랭크 시즌(server/arena-rank.mjs): 랭킹 탭은 GET + 1분 캐시(같은 학교 · 같은 학년 상위 20명 + 내 순위).
+  //   학생 목록을 훑는 일은 이 GET에서 1분에 한 번(학년 묶음마다)만. 쓰기 요청(판 끝)은 그 학생 랭크만 고친다.
+  if (path === '/games/arena/rank' && method === 'GET') {
+    requireRole(p, 'student');
+    return rankBoardView(p.preview_owner_id ? [] : state.profiles, p, x => schoolForProfile(state, x), Date.now());
+  }
+  // 시즌 보상 받기: 보상 안 받은 지난 시즌마다 한 번(코인 조금 + 칭호). 그 학생 것만.
+  if (path === '/games/arena/rank/claim' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now(), r = claimRank(p, { pet: activePetKey(state, p.id), now });
+    if (r.coins) logActivity(p, 'arena', `펫 아레나 시즌 보상 · ${r.got.map(x => `시즌 ${x.s} ${x.label}`).join(', ')} · ${r.coins}코인`, now);
+    return { ...r, ...arenaView(p, now), points_balance: coinBalance(state, p), stats: stats(state, p) };
   }
   // V13.230 펫 아레나 실시간 친구 대전(server/arena-live.mjs · 방 cloudflare/arena-room.mjs). 같은 학년끼리만(선생님 결정).
   //   보기(친구 목록 · 내 방 · 결과)는 GET. 판은 방 객체가 돌리고, 메인은 방 열기 · 들어가기 · 결과 한 번만.
@@ -2027,7 +2041,7 @@ export async function service(state, method, path, body, token, options = {}) {
     requireRole(p, 'student');
     if (p.preview_owner_id) fail('미리 보기에서는 친구 대전을 할 수 없어요.', 409);
     const now = Date.now();
-    liveDeco(p, body); // V13.235 방장 꾸미기(경기장 · 링 · 입장 효과)
+    liveDeco(p, body); // V13.236 방장 꾸미기(경기장 · 링 · 입장 효과)
     return liveOpen(state, p, schoolForProfile(state, p), petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), { id: id(), now, mode: ['1v1', 'ffa', '2v2'].includes(body.mode) ? body.mode : '1v1' }); // V13.232 1:1:1 · 2:2
   }
   if (path === '/games/arena/live/invite' && method === 'POST') {
@@ -2040,7 +2054,7 @@ export async function service(state, method, path, body, token, options = {}) {
     if (p.preview_owner_id) fail('미리 보기에서는 친구 대전을 할 수 없어요.', 409);
     const now = Date.now();
     tidyArenaInvites(state, now);
-    liveDeco(p, body); // V13.235 내 입장 효과
+    liveDeco(p, body); // V13.236 내 입장 효과
     return liveJoin(state, p, schoolForProfile(state, p), petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), { code: str(body.code, 8), id: str(body.id, 64), now });
   }
   if (path === '/games/arena/live/decline' && method === 'POST') {

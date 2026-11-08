@@ -318,6 +318,16 @@ Object.assign(TITLES, {
   bugall: { name: '곤충 채집왕', tier: 'epic', group: 'collect', stat: 'series_bug', goal: seriesGroupKeys('bug').length || 6, icon: 'paw', how: '곤충 · 공룡 알에서 곤충 6종 다 모으기(점순이 · 붕붕이 · 영차 · 반짝이 · 장수 · 나풀)', desc: '곤충채 안이 반짝반짝, 숲속 친구들이 다 모였어요.' },
   dinoall: { name: '쥬라기 반장', tier: 'epic', group: 'collect', stat: 'series_dino', goal: seriesGroupKeys('dino').length || 6, icon: 'crown', how: '곤충 · 공룡 알에서 공룡 6종 다 모으기(뿔뿔이 · 삐죽이 · 롱롱이 · 휘익 · 단단이 · 렉스)', desc: '반장 완장을 찬 공룡 알, 쥬라기 친구들이 줄을 서요.' }
 });
+// V13.234 펫 아레나 랭크 시즌 칭호(server/arena-rank.mjs): 시즌 끝 보상을 받을 때 그 시즌 최고 티어로 열린다(한 번 열리면 계속).
+//   arena_season_best 1 브론즈 … 5 다이아, arena_diamond_seasons 다이아로 끝낸 시즌 수. 메달 그림은 주문서 69가 오면 TITLE_ART에 키만 넣는다.
+export const TITLES_ARENA_RANK = ['arena-silver', 'arena-gold', 'arena-plat', 'arena-diamond', 'arena-diamond2'];
+Object.assign(TITLES, {
+  'arena-silver': { name: '아레나 실버 투사', tier: 'rare', group: 'arcade', stat: 'arena_season_best', goal: 2, icon: 'shield', how: '펫 아레나 랭크 시즌을 실버 이상으로 끝내기', desc: '아레나 모래 위에 첫 이름을 새겼어요.' },
+  'arena-gold': { name: '골드 글래디에이터', tier: 'epic', group: 'arcade', stat: 'arena_season_best', goal: 3, icon: 'sword', how: '펫 아레나 랭크 시즌을 골드 이상으로 끝내기', desc: '관중석이 내 펫 이름을 외쳐요.' },
+  'arena-plat': { name: '플래티넘 챔피언', tier: 'epic', group: 'arcade', stat: 'arena_season_best', goal: 4, icon: 'trophy', how: '펫 아레나 랭크 시즌을 플래티넘 이상으로 끝내기', desc: '반짝이는 플래티넘 벨트의 주인.' },
+  'arena-diamond': { name: '다이아 아레나 마스터', tier: 'legendary', group: 'arcade', stat: 'arena_season_best', goal: 5, icon: 'gem', how: '펫 아레나 랭크 시즌을 다이아로 끝내기(다이아 전용)', desc: '아레나 꼭대기, 다이아 티어!' },
+  'arena-diamond2': { name: '아레나의 전설', tier: 'limited', once: true, group: 'arcade', stat: 'arena_diamond_seasons', goal: 2, icon: 'crown', coins: 100, how: '펫 아레나 랭크 시즌을 다이아로 두 번 끝내기', desc: '두 시즌 연속 정상, 살아 있는 전설.' }
+});
 // V13.67: titles that came out of the capsule machine. V13.68 retired the machine: they stay
 // with the students who have them and are not shown to anyone else (`retired`).
 Object.assign(TITLES, {

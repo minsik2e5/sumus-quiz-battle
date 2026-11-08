@@ -302,7 +302,7 @@ function begin(msg) {
   L.timers.push(setInterval(() => { if (L?.match === m && !m.done) sim.flush(); }, LIVE.BATCH_MS));
   L.timers.push(setInterval(() => { if (L?.match === m && !m.done) ping(); }, 1000));
   const r = multi ? multiR(msg.mode, msg.sides, sim, { id: L.room.id, seed: msg.seed }) : { id: L.room.id, seed: msg.seed, live: true, me: brief(msg.teams[side]), foe: { name: msg.names[foe] || '친구', bot: false, team: brief(msg.teams[foe]) }, foe_level: 1 };
-  r.deco = liveDecoOf(msg.deco, side, slot => multi ? sim.map?.[slot] : slot === foe ? 'foe' : null); // V13.235 방장 경기장 · 링, 사람마다 입장 효과
+  r.deco = liveDecoOf(msg.deco, side, slot => multi ? sim.map?.[slot] : slot === foe ? 'foe' : null); // V13.236 방장 경기장 · 링, 사람마다 입장 효과
   arenaMatch(r, {
     sim, live: true,
     // 지금 틱 = (서버 시계 − 시작 시각) ÷ 50ms. 히트스톱으로 화면이 잠깐 멈춰도 다음 프레임에 따라잡는다.
@@ -331,7 +331,7 @@ async function finish(m) {
     if (i > 0 || !m.reported) await new Promise(res => setTimeout(res, i === 0 ? 600 : 1200));
     try {
       const d = await api(`/games/arena/live/result?id=${encodeURIComponent(L.room.id)}`);
-      if (d.result) { if (typeof d.points_balance === 'number') A.data.stats.points_balance = d.points_balance; return { ...d.result, left: d.left, tickets: d.tickets, wins: d.wins }; }
+      if (d.result) { if (typeof d.points_balance === 'number') A.data.stats.points_balance = d.points_balance; return { ...d.result, left: d.left, tickets: d.tickets, wins: d.wins, rank: d.rank }; }
     } catch {}
   }
   const s = o.sides?.[m.side] || {};
@@ -350,7 +350,7 @@ function replay(i) {
     : { id: 'replay', seed: rec.seed, live: true, replay: true, me: brief(rec.teams[side]), foe: { name: `${rec.names?.[foe] || '상대'} · 다시 보기`, bot: !!rec.solo, team: brief(rec.teams[foe]) }, foe_level: rec.foeLevel ?? 1 };
   if (L.match) L.match.done = true;
   L.match = null;
-  r.deco = liveDecoOf(msg.deco, side, slot => multi ? sim.map?.[slot] : slot === foe ? 'foe' : null); // V13.235 방장 경기장 · 링, 사람마다 입장 효과
+  r.deco = liveDecoOf(msg.deco, side, slot => multi ? sim.map?.[slot] : slot === foe ? 'foe' : null); // V13.236 방장 경기장 · 링, 사람마다 입장 효과
   arenaMatch(r, {
     sim, live: true, replay: true,
     want: now => { t0 ||= now; return (now - t0) / ARENA.TICK_MS; },

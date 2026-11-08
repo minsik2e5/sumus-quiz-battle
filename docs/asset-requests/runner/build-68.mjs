@@ -1,4 +1,4 @@
-// 그림 주문서 68: 펫 아레나 경기장 꾸미기 · 연습장 그림(구성안 docs/pet-arena-v2-plan.md 6장 7 · 8번, V13.235).
+// 그림 주문서 68: 펫 아레나 경기장 꾸미기 · 연습장 그림(구성안 docs/pet-arena-v2-plan.md 6장 7 · 8번, V13.236).
 //   node docs/asset-requests/runner/build-68.mjs
 // 만드는 것: 68-pet-arena-deco.txt, split/ 시트별 파일, slice-map.csv의 68 줄(있으면 바꿔 쓴다). CODEX_PROMPT_68.md는 손으로 쓴다.
 //   (build-runner.mjs는 26번 이후를 모르므로 돌리지 않는다: slice-map.csv 뒤쪽이 지워진다.)

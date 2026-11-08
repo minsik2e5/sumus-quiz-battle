@@ -2,7 +2,7 @@
 
 ## 목표
 펫 아레나 **경기장 꾸미기**(이긴 횟수로 열리는 경기장 · 링 · 입장 효과 · 승리 포즈, 새 재화 없음)와 **연습장**(허수아비) 그림을 만들어 넣고 PR을 만든다.
-구성안은 `docs/pet-arena-v2-plan.md` 6장 7 · 8번, 앱 쪽은 V13.235(`public/modules/arena-deco.js` · `arena-practice.js`).
+구성안은 `docs/pet-arena-v2-plan.md` 6장 7 · 8번, 앱 쪽은 V13.236(`public/modules/arena-deco.js` · `arena-practice.js`).
 
 | 시트 | 내용 | 넣는 곳(`public/assets/arena/`) | 자르기 |
 |---|---|---|---|

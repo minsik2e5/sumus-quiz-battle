@@ -29,7 +29,7 @@ export async function arenaReportKey(env) {
 }
 const randomSeed = () => { const a = new Uint32Array(1); crypto.getRandomValues(a); return (a[0] % 2147483646) + 1; };
 
-// V13.235 방에 남기는 꾸미기(이름만, 약 40바이트). 메인이 열린 것만 보낸다.
+// V13.236 방에 남기는 꾸미기(이름만, 약 40바이트). 메인이 열린 것만 보낸다.
 const roomDeco = dc => { const c = cleanDeco(dc); return { bg: c.bg || 'auto', rg: c.rg || 'basic', en: c.en || 'basic' }; };
 export class ArenaRoom {
   constructor(ctx, env, { timers = true } = {}) {
@@ -107,7 +107,7 @@ export class ArenaRoom {
     if (multiMode(r.mode)) return { type: 'start', mode: r.mode, seed: r.seed, start_at: r.start_at, side: s?.side || null, sides: r.sides.map(x => ({ side: x.side, tm: x.tm, team: x.team, x: x.x, y: x.y, bot: !!x.bot, name: x.name })), deco: this.decoView(), over: r.phase === 'over', now: Date.now() };
     return { type: 'start', seed: r.seed, start_at: r.start_at, side: s?.side || null, teams: r.teams, names: r.names, deco: this.decoView(), over: r.phase === 'over', now: Date.now() };
   }
-  // V13.235 경기장 꾸미기: 경기장 · 링은 방장 것, 입장 효과는 사람마다(자리 이름 → 효과). 메인이 열린 것만 보낸다(server/arena-deco.mjs decoOf).
+  // V13.236 경기장 꾸미기: 경기장 · 링은 방장 것, 입장 효과는 사람마다(자리 이름 → 효과). 메인이 열린 것만 보낸다(server/arena-deco.mjs decoOf).
   decoView() {
     const r = this.room, host = r.seats.find(x => x.id === r.host)?.dc || {};
     return { bg: host.bg || 'auto', rg: host.rg || 'basic', en: Object.fromEntries(r.seats.filter(x => x.side).map(x => [x.side, x.dc?.en || 'basic'])) };

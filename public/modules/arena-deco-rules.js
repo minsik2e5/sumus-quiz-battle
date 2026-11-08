@@ -1,4 +1,4 @@
-// V13.235 펫 아레나 경기장 꾸미기(구성안 docs/pet-arena-v2-plan.md 6장 7번). 새 재화 없음: 이긴 횟수(코인 판 승리 누적)로 열린다.
+// V13.236 펫 아레나 경기장 꾸미기(구성안 docs/pet-arena-v2-plan.md 6장 7번). 새 재화 없음: 이긴 횟수(코인 판 승리 누적)로 열린다.
 //   화면(arena-deco.js) · 서버(server/arena-deco.mjs) · 방(cloudflare/arena-room.mjs)이 같이 쓰는 목록.
 //   칸 4가지: bg 경기장 배경 · rg 링(바닥 원) · en 입장 효과(상대에게도 보인다) · ps 승리 포즈.
 //   고른 것은 프로필 games.arena.dc { bg, rg, en, ps }(약 60바이트)에 남고, 판 시작 요청에 실어 보내면 서버가 열렸는지 본다(안 열린 것은 거부).
