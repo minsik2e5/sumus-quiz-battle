@@ -1,11 +1,13 @@
 // V13.228 펫 아레나 시뮬레이터(검사 · 밸런스 맞추기용, 앱에는 들어가지 않는다).
 //   node server/arena-sim.mjs tiers 300   등급끼리 승률(같은 단계 · 같은 레벨, 양쪽 모두 같은 솜씨의 컴퓨터가 조종)
 //   node server/arena-sim.mjs bots 120    검사용 학생(대충 · 보통 · 잘함) 대 컴퓨터(쉬움 · 보통 · 어려움) 승률
+//   node server/arena-sim.mjs elements 1000  V13.231 속성마다 승률(8속성 평균 기준, 목표 50 ± 5)
+//   node server/arena-sim.mjs tree 1000 [속성]  V13.231 스킬트리 층마다 가지 A · B 승률(목표 차이 ±3)
 //   node server/arena-sim.mjs picks 1000  V13.229 속성마다 스킬 ② 두 개: 검사용 학생이 A · B를 골라 같은 상대들을 이긴 비율(목표 차이 ±3)
 // 목표(docs/pet-arena-v2-plan.md 2장 · 5장): 일반 대 영웅 50% ± 3, 전설 대 일반 ≈ 55%, 신화 대 전설 ≈ 55%, 한정 대 일반 50% ± 3.
 //   보통 학생 대 컴퓨터: 쉬움 ≈ 90% · 보통 ≈ 50% · 어려움 ≈ 35%.
 import { fileURLToPath } from 'node:url';
-import { ARENA, INPUT, EL_SKILLS, createArena, fighter, petTier, dirCode, aimCode } from '../public/modules/arena-rules.js';
+import { ARENA, INPUT, EL_SKILLS, createArena, fighter, petTier, dirCode, aimCode, ultReach } from '../public/modules/arena-rules.js';
 import { elementOf } from '../public/modules/battle-fx.js';
 import { CHARACTERS } from '../public/modules/core.js';
 
@@ -18,7 +20,7 @@ export function playArena(A, skill = 1, seed = 1) {
   const P = [{ dodge: 0.05, atk: 0.5, keep: 0.3, acc: 0.55 }, { dodge: 0.2, atk: 0.75, keep: 0.6, acc: 0.8 }, { dodge: 0.45, atk: 0.95, keep: 0.9, acc: 0.95 }][skill];
   const rnd = seeded(seed * 13 + 1), inputs = [];
   let dir = -1, guard = 0, aiming = 0, off = 0;
-  const aim = (dx, dy) => { const c = aimCode(dx, dy); return rnd() < P.acc ? c : (c + (rnd() < 0.5 ? 15 : 1)) % 16; };
+  const aim = (dx, dy) => { const c = Math.max(0, aimCode(dx, dy)); return rnd() < P.acc ? c : (c + (rnd() < 0.5 ? 15 : 1)) % 16; };
   while (!A.S.over && guard++ < ARENA.MAX_TICKS + 50) {
     const v = A.view(), m = v.me, f = v.foe, t = v.t, out = [];
     const dx = f.x - m.x, dy = f.y - m.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -39,7 +41,7 @@ export function playArena(A, skill = 1, seed = 1) {
       || (v.lines || []).some(L => L.from === 'foe' && L.left <= 3 && onLine(L));
     const c = dirCode(mx, my, 0.2); if (c !== dir) { dir = c; out.push([t, c]); }
     if (danger && m.dodgeCd <= 0 && rnd() < P.dodge) out.push([t, INPUT.DODGE]);
-    if (m.gauge >= ARENA.GAUGE_MAX && f.enter <= 0) out.push([t, INPUT.ULT, aim(dx, dy)]);
+    if (m.gauge >= ARENA.GAUGE_MAX && f.enter <= 0 && ultReach(A.S.me.team[m.idx], d)) out.push([t, INPUT.ULT, aim(dx, dy)]);
     if (m.skill <= 0 && d < want + 14 && f.enter <= 0) out.push([t, INPUT.SKILL, aim(dx, dy)]);
     else if (m.skill2 <= 0 && d < want + 18 && f.enter <= 0) out.push([t, INPUT.SKILL2, aim(dx, dy)]);
     for (const x of out) { inputs.push(x); A.push(x); }
@@ -114,6 +116,44 @@ export function aiPickRate(el, pick, n = 1000) {
   return w / n;
 }
 export const pickGap = (el, n = 800) => { const a = pickRate(el, 0, n), b = pickRate(el, 1, n); return { a, b, gap: a - b }; };
+// V13.231 속성 균형: 보통 솜씨 검사용 학생이 속성 el 펫 셋(아무 등급)으로 섞인 상대 팀(보통 컴퓨터)과 싸운 승률.
+//   레벨은 8~34(스킬트리 층이 골고루 열림), 가지는 판마다 무작위. 목표: 속성마다 50 ± 5.
+const randTree = rnd => [0, 1, 2].map(() => rnd() < 0.5 ? '0' : '1').join('');
+const mixTeam = (keys, form, level, rnd) => [0, 1, 2].map(() => fighter({ key: keys[Math.floor(rnd() * keys.length)], form, level, s2: rnd() < 0.5 ? 0 : 1, tr: randTree(rnd) }));
+const gameLv = i => ({ form: 2 + ((i >> 1) % 2), level: 8 + ((i >> 2) % 27) });
+export function elementRate(el, n = 1000, { skill = 1, seed = 1 } = {}) {
+  const rnd = seeded(n * 5 + seed * 7919 + (el ? el.charCodeAt(0) * 31 + el.length : 3));
+  let w = 0;
+  for (let i = 0; i < n; i++) {
+    const { form, level } = gameLv(i), mine = mixTeam(el ? EL_KEYS[el] : ALL_KEYS, form, level, rnd), foe = mixTeam(ALL_KEYS, form, level, rnd);
+    const A = createArena({ seed: 3000 + i * 29 + seed, me: mine, foe, foeLevel: 1 });
+    playArena(A, skill, i + seed);
+    w += A.S.winner === 'me' ? 1 : A.S.winner === 'draw' ? 0.5 : 0;
+  }
+  return w / n;
+}
+// 속성마다 { raw, rel }: 한 속성만으로 짠 팀은 상성에 걸리면 셋 다 약해서 그대로 승률은 섞인 팀보다 낮다(모든 속성이 같이 낮다).
+//   그래서 속성 사이 차이를 본다: rel = 50 + raw − (8속성 평균). mix: true면 참고로 섞인 내 팀 승률도.
+export function elementTable(n = 1000, { mix = false } = {}) {
+  const rows = Object.keys(EL_KEYS).map(el => ({ el, raw: elementRate(el, n) })), mean = rows.reduce((a, r) => a + r.raw, 0) / rows.length;
+  return { mean, base: mix ? elementRate(null, n * 2) : null, rows: rows.map(r => ({ ...r, rel: 0.5 + r.raw - mean })) };
+}
+// V13.231 스킬트리 가지 A · B: 층 layer만 A(0) 또는 B(1)로 두고(다른 층은 무작위) 같은 판을 돌려 비교한다(짝지은 비교).
+//   내 펫은 el 속성(없으면 전체)에서, 레벨 30~34(세 층 모두 열림). 검사용 학생 보통 솜씨 대 보통 컴퓨터, 상대는 섞인 팀.
+export function treeRate(layer, branch, n = 1000, el = null) {
+  const rnd = seeded(n * 3 + layer * 101 + (el ? el.charCodeAt(0) * 7 + el.length : 1));
+  let w = 0;
+  for (let i = 0; i < n; i++) {
+    const form = 2 + ((i >> 1) % 2), level = 30 + ((i >> 2) % 5), keys = el ? EL_KEYS[el] : ALL_KEYS;
+    const mine = [0, 1, 2].map(() => { const t = randTree(rnd).split(''); t[layer] = String(branch); return fighter({ key: keys[Math.floor(rnd() * keys.length)], form, level, s2: rnd() < 0.5 ? 0 : 1, tr: t.join('') }); });
+    const foe = mixTeam(ALL_KEYS, form, level, rnd);
+    const A = createArena({ seed: 5000 + i * 31, me: mine, foe, foeLevel: 1 });
+    playArena(A, 1, i + 7);
+    w += A.S.winner === 'me' ? 1 : A.S.winner === 'draw' ? 0.5 : 0;
+  }
+  return w / n;
+}
+export const treeGap = (layer, n = 1000, el = null) => { const a = treeRate(layer, 0, n, el), b = treeRate(layer, 1, n, el); return { a, b, gap: a - b }; };
 export const TIER_PAIRS = [['epic', 'normal', 0.5, 0.03], ['legend', 'normal', 0.55, 0.04], ['mythic', 'legend', 0.55, 0.04], ['limited', 'normal', 0.5, 0.03]];
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
@@ -126,6 +166,14 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   } else if (mode === 'picks') {
     console.log(`스킬 ② 고르기(${n}판씩, 보통 솜씨 검사용 학생이 A · B를 골라 같은 판을 돌린 승률, 목표 차이 ±3)`);
     for (const el of Object.keys(EL_SKILLS)) { const r = pickGap(el, n), [a, b] = EL_SKILLS[el], c = aiPickRate(el, 0, n), d = aiPickRate(el, 1, n); console.log(`${el} ${a.name} ${pc(r.a)} · ${b.name} ${pc(r.b)} → 차이 ${(r.gap * 100).toFixed(1)} ${Math.abs(r.gap) <= 0.03 ? 'OK' : '벗어남'}  (참고: 컴퓨터끼리 ${pc(c)} · ${pc(d)})`); }
+  } else if (mode === 'elements') {
+    const t = elementTable(n, { mix: true });
+    console.log(`속성 승률(${n}판씩, 보통 학생이 한 속성 펫 셋 대 보통 컴퓨터 · 섞인 상대, Lv.8~34 · 가지 무작위). 8속성 평균 ${pc(t.mean)} · (참고) 섞인 내 팀 ${pc(t.base)}`);
+    for (const r of t.rows) console.log(`${r.el}: 그대로 ${pc(r.raw)} → 평균 기준 ${pc(r.rel)} ${Math.abs(r.rel - 0.5) <= 0.05 ? 'OK' : '벗어남'}`);
+  } else if (mode === 'tree') {
+    const el = process.argv[4] || null;
+    console.log(`스킬트리 가지 A · B(${n}판씩, Lv.30~34, 보통 학생${el ? ` · ${el} 펫` : ''}, 목표 차이 ±3)`);
+    for (const L of [0, 1, 2]) { const r = treeGap(L, n, el); console.log(`${L + 1}층: A ${pc(r.a)} · B ${pc(r.b)} → 차이 ${(r.gap * 100).toFixed(1)} ${Math.abs(r.gap) <= 0.03 ? 'OK' : '벗어남'}`); }
   } else if (mode === 'bots') {
     console.log(`검사용 학생 대 컴퓨터(${n}판씩)`);
     for (const [skill, name] of [[0, '대충'], [1, '보통'], [2, '잘함']]) console.log(`${name}: ` + [0, 1, 2].map(fl => { const r = botRate(fl, skill, n); return `${['쉬움', '보통', '어려움'][fl]} ${pc(r.w)}(${Math.round(r.sec)}초)`; }).join(' · '));

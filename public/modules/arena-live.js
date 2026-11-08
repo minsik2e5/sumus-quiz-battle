@@ -8,7 +8,7 @@
 //   다시 보기: 씨앗 + 두 쪽 조작을 이 폰(localStorage)에 최근 5판만. 서버 저장 0.
 import { api, esc, num, toast, buttonBusy } from './ui.js';
 import { CHARACTERS } from './core.js';
-import { ARENA, fighter, skill2Picks } from './arena-rules.js';
+import { ARENA, fighter, treeOpen } from './arena-rules.js';
 import { LIVE, LIVE_EMOTES, cleanCode, createLiveSim, createReplaySim, cleanReplays, liveFighters, otherSide } from './arena-live-rules.js';
 import { arenaMatch, arenaUi } from './arena.js';
 import { ARENA_ART } from './arena-art.js';
@@ -193,6 +193,12 @@ function sendTeam() {
   arenaUi.sfx('tap');
 }
 const petImg = (key, form) => arenaUi.petImg(key, form);
+// V13.231 스킬트리: 실시간 방에서는 펫 아레나 대기실에서 고른 가지 그대로(보기만). 스킬 ② · 필살기 이름과 가지 점 3개.
+function liveTreeLine(p) {
+  const f = fighter({ key: p.key, form: p.form, level: p.level, s2: p.s2, tr: p.tr }), open = treeOpen(p.level, p.tr);
+  const dots = open.map(x => `<i class="ar-tdot${x >= 0 ? ` on b${x}` : ''}">${x >= 0 ? (x ? 'B' : 'A') : '🔒'}</i>`).join('');
+  return `<div class="ar-lv-pick"><b>${esc(petName(p.key))}</b><small>② ${esc(f.skill2.icon)} ${esc(f.skill2.name)} · 필살기 ${esc(f.ult)}</small><span class="ar-tdots" aria-label="스킬트리">${dots}</span></div>`;
+}
 function lobbyView() {
   const v = L.view, me = v.players.find(p => p.id === v.you), host = me?.host, n = v.seats;
   const left = Math.max(0, Math.ceil((v.closes_at - serverNow()) / 1000));
@@ -211,9 +217,9 @@ function lobbyView() {
     <div class="ar-title"><small>친구 대전 대기실 · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} 뒤 닫혀요</small><h1>방 <b class="ar-lv-codebig">${esc(v.code)}</b></h1></div>
     <div class="ar-lv-seats">${Array.from({ length: n }, (_, i) => seat(i)).join('<span class="ar-lv-vs">VS</span>')}</div>
     <div class="ar-card">
-      <h3 class="ar-sub">내 팀 <small>3마리 · 순서대로 나가요 · 펫마다 스킬 ②를 골라요</small></h3>
+      <h3 class="ar-sub">내 팀 <small>3마리 · 순서대로 나가요 · 스킬트리는 펫 아레나 대기실에서 바꿔요</small></h3>
       <div class="ar-pets">${pets.map(p => `<button type="button" class="ar-pet-pick${mine.includes(p.key) ? ' on' : ''}" data-ar="lv-pet" data-key="${esc(p.key)}" ${locked ? 'disabled' : ''} aria-pressed="${mine.includes(p.key)}">${petImg(p.key, p.form)}<small>Lv.${p.level}</small>${mine.includes(p.key) ? `<b>${mine.indexOf(p.key) + 1}</b>` : ''}</button>`).join('')}</div>
-      <div class="ar-lv-picks">${mine.map(k => pets.find(p => p.key === k)).filter(Boolean).map(p => `<div class="ar-lv-pick"><b>${esc(petName(p.key))}</b>${skill2Picks(p.key).map((k2, i) => `<button type="button" class="ar-pick2${(p.s2 === 1 ? 1 : 0) === i ? ' on' : ''}" data-ar="lv-pick2" data-key="${esc(p.key)}" data-i="${i}" ${locked ? 'disabled' : ''}><i>${k2.icon}</i><b>${esc(k2.name)}</b></button>`).join('')}</div>`).join('')}</div>
+      <div class="ar-lv-picks">${mine.map(k => pets.find(p => p.key === k)).filter(Boolean).map(p => liveTreeLine(p)).join('')}</div>
       ${host ? `<button type="button" class="yl-cta ar-go" data-ar="lv-start" ${all ? '' : 'disabled'}>${all ? '대전 시작!' : v.players.length < n ? '친구를 기다려요' : '친구가 준비하면 시작'}</button>`
         : `<button type="button" class="yl-cta ar-go" data-ar="lv-ready" data-on="${me?.ready ? 0 : 1}">${me?.ready ? '준비 취소' : '준비!'}</button>`}
       <div class="ar-emotes ar-lv-emo">${Object.entries(LIVE_EMOTES).map(([k, t]) => `<button type="button" class="yb-emote" data-ar="lv-emo" data-k="${k}">${esc(t)}</button>`).join('')}</div>
@@ -241,7 +247,7 @@ function showEmote(who, k) {
 }
 
 /* ---------- 판 ---------- */
-const brief = list => list.map(f => { const x = fighter({ key: f.key, form: f.form, level: f.level, s2: f.s2 }); return { key: f.key, form: f.form, level: f.level, s2: f.s2, el: x.el }; });
+const brief = list => list.map(f => { const x = fighter({ key: f.key, form: f.form, level: f.level, s2: f.s2, tr: f.tr }); return { key: f.key, form: f.form, level: f.level, s2: f.s2, tr: x.tr, el: x.el }; });
 function begin(msg) {
   const side = msg.side, foe = otherSide(side);
   if (!side) return;

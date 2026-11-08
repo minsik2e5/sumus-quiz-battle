@@ -7,7 +7,7 @@
 //   결과 영수증은 혼자 판과 같은 g.done(kind 'arena', id 'live:<방>')에 남는다(같은 보고를 두 번 받아도 한 번만 준다).
 import { randomBytes } from 'node:crypto';
 import { dayKey } from '../public/modules/core.js';
-import { ARENA } from '../public/modules/arena-rules.js';
+import { ARENA, baseS2, cleanTree } from '../public/modules/arena-rules.js';
 import { LIVE, cleanCode } from '../public/modules/arena-live-rules.js';
 import { gradeOf } from './competition.mjs';
 import { addBonus, findReceipt, keepReceipt } from './rewards.mjs';
@@ -50,11 +50,11 @@ function newCode(state, now) {
   fail('방이 너무 많아요. 잠시 뒤에 다시 만들어 주세요.', 409);
 }
 
-// 방에 보내는 학생 정보: 싸울 수 있는 펫(알이 아닌 것, 레벨 순 40마리까지)과 기억한 스킬 ② 고르기.
+// 방에 보내는 학생 정보: 싸울 수 있는 펫(알이 아닌 것, 레벨 순 40마리까지)과 기본 스킬 ②(고른 기록, 없으면 이름에서) · V13.231 스킬트리 가지.
 export function livePlayer(p, pets) {
-  const s2 = p.games?.arena?.s2 || {};
+  const s2 = p.games?.arena?.s2 || {}, tr = p.games?.arena?.tr || {};
   const ready = (pets || []).filter(x => Number(x.form) >= 1).sort((a, b) => b.level - a.level).slice(0, 40);
-  return { id: p.id, name: String(p.display_name || '친구').slice(0, 20), cls: String(p.class_name || '').slice(0, 20), pets: ready.map(x => ({ key: x.key, form: Number(x.form), level: Number(x.level), s2: s2[x.key] === 1 ? 1 : 0 })) };
+  return { id: p.id, name: String(p.display_name || '친구').slice(0, 20), cls: String(p.class_name || '').slice(0, 20), pets: ready.map(x => ({ key: x.key, form: Number(x.form), level: Number(x.level), s2: baseS2(x.key, s2[x.key]), tr: cleanTree(tr[x.key]) })) };
 }
 const roomView = (x, p) => ({ id: x.id, code: x.code, mode: x.mode, host: x.hn, ticket: x.t[p.id], is_host: x.h === p.id });
 

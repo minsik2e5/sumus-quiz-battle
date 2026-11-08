@@ -4,7 +4,7 @@
 //   방은 조작 순서(몇 번째 틱)를 정해 0.1초마다 "이 틱까지 확정"을 보낸다. 늦게 온 친구 조작이면 폰이 그 틱으로 되감아 다시 계산한다.
 //   끝 판정은 늘 방: 확정된 모든 조작으로 runArena를 다시 돌린 결과.
 // 엔진 쪽 이름: 방장 = 'me' 쪽(아래), 손님 = 'foe' 쪽(위). 손님 화면은 경기장을 180° 돌려 보여 준다(mirror*). 경기장이 위아래 · 좌우 대칭이라 같다.
-import { ARENA, INPUT, PLAYER_CODE_MAX, cleanInputs, createArena, runArena, fighter } from './arena-rules.js';
+import { ARENA, INPUT, PLAYER_CODE_MAX, cleanInputs, createArena, runArena, fighter, cleanTree } from './arena-rules.js';
 
 export const LIVE = {
   MODES: { '1v1': { seats: 2, team: 3, ms: ARENA.MAX_TICKS * ARENA.TICK_MS } }, // ④단계(1:1:1 · 2:2)는 여기에 자리 수 · 펫 수를 더한다
@@ -39,16 +39,17 @@ export const otherSide = who => who === 'me' ? 'foe' : 'me';
 // 방 코드: 숫자 4자리(0으로 시작해도 된다).
 export const cleanCode = raw => { const s = String(raw ?? '').replace(/\D/g, ''); return s.length === LIVE.CODE_LEN ? s : ''; };
 
-// 대기실에서 고른 펫 3마리: 내 펫 목록(pets: [{key, form, level, s2}])에서만, 겹치지 않게. 모자라면 레벨 높은 펫으로 채운다.
+// 대기실에서 고른 펫 3마리: 내 펫 목록(pets: [{key, form, level, s2, tr}])에서만, 겹치지 않게. 모자라면 레벨 높은 펫으로 채운다.
 export function liveTeam(pets, keys, n = LIVE.MODES['1v1'].team) {
   const list = (Array.isArray(pets) ? pets : []).filter(p => p && Number(p.form) >= 1);
   const by = new Map(list.map(p => [String(p.key), p]));
   const out = [];
   for (const k of (Array.isArray(keys) ? keys : []).map(String)) if (by.has(k) && !out.includes(by.get(k)) && out.length < n) out.push(by.get(k));
   for (const p of [...list].sort((a, b) => Number(b.level) - Number(a.level))) if (out.length < n && !out.includes(p)) out.push(p);
-  return out.map(p => ({ key: String(p.key), form: Math.max(1, Math.min(3, Number(p.form) || 1)), level: Math.max(1, Math.min(99, Number(p.level) || 1)), s2: p.s2 === 1 ? 1 : 0 }));
+  return out.map(p => ({ key: String(p.key), form: Math.max(1, Math.min(3, Number(p.form) || 1)), level: Math.max(1, Math.min(99, Number(p.level) || 1)), s2: p.s2 === 1 ? 1 : 0, tr: cleanTree(p.tr) }));
 }
-export const liveFighters = team => team.map(f => fighter({ key: f.key, form: f.form, level: f.level, s2: f.s2 }));
+// V13.231 스킬트리 가지(tr)도 실어 방 판정 · 서버 롤백 · 다시 보기가 같은 결과(가지 없는 예전 기록은 기본 가지).
+export const liveFighters = team => team.map(f => fighter({ key: f.key, form: f.form, level: f.level, s2: f.s2, tr: f.tr }));
 
 /* ---------- 손님 화면: 경기장을 180° 돌려 본다 ---------- */
 const flipDir = c => c >= 1 && c <= 8 ? ((c - 1 + 4) % 8) + 1 : c;
