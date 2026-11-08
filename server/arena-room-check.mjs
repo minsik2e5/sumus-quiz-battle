@@ -36,7 +36,8 @@ function fakeCtx() {
   };
   return ctx;
 }
-const pets = (keys, level = 12) => keys.map((key, i) => ({ key, form: 2, level: level - i, s2: 0 }));
+// V13.231 tr: 스킬트리 가지 { 펫 키: '011' }(없으면 가지 없이 = 예전 기록).
+const pets = (keys, level = 12, tr = null) => keys.map((key, i) => ({ key, form: 2, level: level - i, s2: 0, ...(tr?.[key] ? { tr: tr[key] } : {}) }));
 const lcg = seed => { let s = seed >>> 0; return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; }; };
 
 // 조작하는 검사용 폰: 틱마다 가끔 방향을 바꾸고 공격 · 스킬 · 회피 · 필살기를 누른다(화면 좌표, 손님은 엔진이 돌린다).
@@ -53,7 +54,7 @@ function botInputs(sim, rnd) {
 }
 
 // 방 하나 + 폰 두 대로 한 판. opts: 지연(ms) · 끊김(틱 구간) · 조작 안 하는 폰 · 방 재시작 시각.
-export async function liveMatch({ seed = 12345, lag = { a: 40, b: 130 }, jitter = 30, drop = null, idle = null, restartAt = null, emoteSpam = false } = {}) {
+export async function liveMatch({ seed = 12345, lag = { a: 40, b: 130 }, jitter = 30, drop = null, idle = null, restartAt = null, emoteSpam = false, level = 12, tr = null } = {}) {
   const realNow = Date.now, RealResponse = globalThis.Response, realPair = globalThis.WebSocketPair;
   let clock = 50_000_000;
   Date.now = () => clock;
@@ -67,8 +68,8 @@ export async function liveMatch({ seed = 12345, lag = { a: 40, b: 130 }, jitter 
   const out = { reports, ctx };
   try {
     const admin = msg => room.admin({ id: 'room-1', ...msg }).then(res => res.json().then(body => ({ status: res.status, ...body })));
-    assert.equal((await admin({ action: 'init', code: '0420', mode: '1v1', ticket: 'ta', host: { id: 'a', name: '가온', pets: pets(['dragon', 'dog', 'bear', 'cat']) } })).ok, true, '방 만들기');
-    assert.equal((await admin({ action: 'join', ticket: 'tb', player: { id: 'b', name: '나래', pets: pets(['turtle', 'fox', 'tiger']) } })).ok, true, '들어가기');
+    assert.equal((await admin({ action: 'init', code: '0420', mode: '1v1', ticket: 'ta', host: { id: 'a', name: '가온', pets: pets(['dragon', 'dog', 'bear', 'cat'], level, tr) } })).ok, true, '방 만들기');
+    assert.equal((await admin({ action: 'join', ticket: 'tb', player: { id: 'b', name: '나래', pets: pets(['turtle', 'fox', 'tiger'], level, tr) } })).ok, true, '들어가기');
     out.full = (await admin({ action: 'join', ticket: 'tc', player: { id: 'c', name: '다솜', pets: pets(['dog']) } })).status;
     out.badTicket = (await room.accept(new URL('https://arena/ws?ticket=nope'))).status;
     // 폰: 받은 메시지는 지연만큼 늦게 도착(순서는 지킨다).
@@ -363,6 +364,26 @@ export async function runArenaRoomChecks() {
     console.log('[arena-room] 1:1 한 판', JSON.stringify(out.budget));
   }
 
+  // 2-1) V13.231 스킬트리 가지가 있는 펫(Lv.32~34, 세 층 모두 열림): 방 판 기록에 가지가 실리고, 롤백으로 돌린 끝 = 방 판정 = 서버 다시 돌리기.
+  {
+    const tr = { dragon: '000', dog: '101', bear: '010', turtle: '110', fox: '001', tiger: '111' };
+    const t = await liveMatch({ seed: 4242, level: 34, tr });
+    const teams = t.room.teams, all = [...teams.me, ...teams.foe];
+    assert(all.length === 6 && all.every(f => f.tr === tr[f.key]) && liveFighters(teams.me).some(f => f.ult2) && liveFighters(teams.foe).some(f => f.tree[2] === 1),
+      'V13.231 실시간 방: 펫마다 스킬트리 가지(tr)가 방 판 기록에 실린다(두 번째 필살기 · 역할 강화가 실제로 적용)');
+    const v = liveVerdict({ seed: t.room.seed, teams: { me: liveFighters(teams.me), foe: liveFighters(teams.foe) }, inputs: t.line.T.inputs, aiTicks: t.line.T.aiTicks, human: t.line.T.human });
+    const bare = liveVerdict({ seed: t.room.seed, teams: { me: liveFighters(teams.me.map(f => ({ ...f, tr: undefined }))), foe: liveFighters(teams.foe.map(f => ({ ...f, tr: undefined }))) }, inputs: t.line.T.inputs, aiTicks: t.line.T.aiTicks, human: t.line.T.human });
+    assert(t.room.result.same && v.winner === t.room.result.winner && v.ticks === t.room.result.ticks, `V13.231 가지 있는 펫으로 한 판: 방 판정 = 확정 조작으로 다시 돌린 서버 판정(${v.winner}, ${v.ticks}틱)`);
+    for (const who of ['a', 'b']) {
+      const p = t.phones[who], E = t.line.E;
+      assert(p.over && !p.desync && p.sim.P.S.t === E.S.t && p.sim.P.hash() === E.hash(), `V13.231 가지 있는 펫: 폰 ${who} 롤백 끝 상태 = 방 판정(한 글자까지)`);
+    }
+    assert(bare.ticks !== v.ticks || bare.winner !== v.winner || JSON.stringify(bare) !== JSON.stringify(v), 'V13.231 가지를 빼고 돌리면 다른 판이 된다(가지가 판정에 실제로 쓰인다)');
+    const { livePlayer } = await import('./arena-live.mjs');
+    const lp = livePlayer({ id: 'x', display_name: '학생', games: { arena: { s2: { turtle: 1 }, tr: { turtle: '000', fox: 'bad' } } } }, [{ key: 'turtle', form: 2, level: 31 }, { key: 'fox', form: 2, level: 12 }, { key: 'cat', form: 0, level: 1 }]);
+    assert(lp.pets.length === 2 && lp.pets[0].tr === '000' && lp.pets[0].s2 === 1 && lp.pets[1].tr === '011' && liveTeam(lp.pets, ['turtle'])[0].tr === '000',
+      'V13.231 방에 보내는 학생 정보: 기억한 가지(이상한 값은 기본 가지)와 기본 스킬 ②');
+  }
   // 3) 끊김 3초면 컴퓨터가 대신 조종 → 다시 들어오면 확정 조작 전부를 받아 이어서. 방이 다시 켜져도 같은 판정.
   {
     const d = await liveMatch({ seed: 777, drop: { who: 'b', from: 400, to: 560 }, restartAt: 900 });

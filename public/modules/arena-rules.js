@@ -194,15 +194,15 @@ export const SK2 = {
   jet: { len: 54, w: 6, warn: 5, power: 2.4, knock: 13 },
   bubble: { hits: 2, ticks: 36, pop: 0.32, push: 10, popR: 17 },
   vine: { len: 50, w: 6.5, warn: 5, power: 4.7, root: 30 },
-  petal: { r: 14, ticks: 80, every: 10, heal: 0.023 },
+  petal: { r: 14, ticks: 80, every: 10, heal: 0.026 },
   boulder: { v: 2.3, r: 4.5, life: 30, power: 1.75, stun: 5 },
   crack: { r: 13, ticks: 60, every: 10, power: 0.64, slow: 14 },
   tornado: { r: 12, ticks: 60, every: 8, power: 1.8, v: 0.8, pull: 1.4 },
   gale: { n: 3, ticks: 5, gap: 3, v: 3.6, power: 1.22 },
   icefield: { r: 12, ticks: 70, every: 10, power: 0.35, slow: 14, slide: 0.4 },
-  spear: { n: 3, spread: 0.2, v: 3.8, r: 2.6, life: 14, power: 0.35, freeze: 4 },
+  spear: { n: 3, spread: 0.2, v: 3.8, r: 2.6, life: 14, power: 0.46, freeze: 4 },
   cloud: { r: 17, ticks: 80, every: 10, poison: 30, dot: 0.29 },
-  darts: { n: 5, every: 2, v: 4.4, r: 2, life: 14, power: 0.69, venom: 22, venomMax: 110 },
+  darts: { n: 5, every: 2, v: 4.4, r: 2, life: 14, power: 0.72, venom: 22, venomMax: 110 },
   chain: { len: 56, w: 3.5, warn: 4, power: 1.1, zap: 7 },
   clone: { ticks: 60, every: 9, power: 0.58, v: 3.4, r: 2.4, life: 16, hitR: 4 }
 };
@@ -221,6 +221,94 @@ export function cleanPicks(raw, max = 80) {
   return out;
 }
 
+// V13.231 (2탄 ⑤단계) 펫별 스킬트리: 펫 레벨 Lv.10 · 20 · 30에 층이 하나씩 열리고, 층마다 가지 A · B 중 하나를 고른다
+//   (무료 · 언제든 대기실에서, 새 재화 없음). 기억: games.arena.tr { 펫 키: '011' } 층마다 0(A) · 1(B), 없으면 TREE.DEF.
+//   레벨이 모자란 층은 효과가 없다. 판 기록 · 친구 팀에는 [key, form, level, s2, tr]로 실어 서버가 같은 결과로 다시 돌린다.
+//   1층 Lv.10: A 스킬 ① 강화(펫마다 위력 +15% 또는 쿨타임 −15%) · B 스킬 ① 속성 덤(속성 효과를 붙이거나 길게).
+//   2층 Lv.20: A 스킬 ②를 속성 새 스킬로 바꾸기(+ 쿨타임 −12%) · B 그대로 두고 강화(위력 +15%).
+//     '그대로'인 스킬 ②(기본)는 2탄 ②에서 고른 기록(games.arena.s2)이 있으면 그것, 없으면 이름에서 고정.
+//   3층 Lv.30: A 필살기 바꾸기(속성 필살기 두 번째) · B 역할 강화(튼튼 체력 · 날쌘 회피 · 한방 공격 · 연타 간격 · 꾀돌이 쿨).
+export const TREE = { LEVELS: [10, 20, 30], DEF: '011', MAX: 40 };
+export const TREE_UP = { pow: 1.15, cd: 0.85, s2cd: 0.88, s2pow: 1.15, boostLong: 1.4 };
+// 1층 B 속성 덤: 스킬 ①이 맞으면 붙는 효과(이미 있으면 길게) · 지키기 스킬은 쓸 때 둘레로 터진다 · 강화 스킬은 길게.
+export const L1B_EXTRA = { flame: 'burn', water: 'knock', leaf: 'root1', earth: 'stun', wind: 'knock', ice: 'slow', toxic: 'poison', star: 'zap' };
+export const GUARD_NOVA = { r: 16, power: 0.9, melee: 0.55 }; // 근접 펫은 늘 붙어 있어 더 자주 맞힌다(가지 A · B 승률을 맞춘 값)
+// 지키기 둘레 폭발의 덤: 근접 펫(바위 · 풀)은 늘 붙어 있어 기절 · 묶임이 너무 세서 짧게(stun1 · root1).
+export const NOVA_EXTRA = { ...L1B_EXTRA, earth: 'stun1' };
+const EXTRA_KO2 = { ...EXTRA_KO, burn: '화상', root1: '묶임', zap: '감전', freeze: '얼어붙음', stun1: '짧은 기절' };
+// 3층 A 속성 필살기 두 번째: ring 내 둘레 큰 원(가까이 붙어서) · line 긴 일직선(멀리서 조준). pow: 속성마다 위력 보정(가지 A · B 승률을 맞춘 값).
+export const ULT2 = {
+  flame: { name: '불사조 강림', shape: 'ring', icon: '🐦', extra: 'burn' },
+  water: { name: '해일 창', shape: 'line', icon: '🔱', extra: 'knock' },
+  leaf: { name: '천년 가시덩굴', shape: 'line', icon: '🌿', extra: 'root1', pow: 0.92 },
+  earth: { name: '운석 충돌', shape: 'ring', icon: '🌋', extra: 'stun', pow: 0.85 },
+  wind: { name: '진공 칼날', shape: 'line', icon: '🌬️', extra: 'knock' },
+  ice: { name: '빙하 감옥', shape: 'ring', icon: '🧊', extra: 'freeze', pow: 1.1 },
+  toxic: { name: '독룡의 숨결', shape: 'line', icon: '🐉', extra: 'poison', pow: 1.02 },
+  star: { name: '은하 폭발', shape: 'ring', icon: '🌌', extra: 'zap', pow: 0.82 }
+};
+export const ULT_SHAPE = { ring: { r: 26, power: 5.6 }, line: { len: 80, w: 9, power: 5.8 } };
+export const ROLE_UP = {
+  tank: { name: '더 튼튼', desc: '체력 +8%', hp: 1.08 },
+  swift: { name: '더 날쌘', desc: '회피 쿨타임 −25%', dodge: 0.75 },
+  power: { name: '더 한방', desc: '공격 +6%', atk: 1.06 },
+  rapid: { name: '더 연타', desc: '공격 간격 −14%', atkTicks: 0.86 },
+  smart: { name: '더 꾀돌이', desc: '스킬 쿨타임 −10%', skill: 0.9 }
+};
+// 펫마다 이름에서 고정한 두 갈래(1층 A가 위력/쿨타임 중 무엇인가 · 기본 스킬 ②): 속성 · 역할 · 스킬 ① 종류가 같은 펫끼리
+//   스킬트리가 겹치지 않게, 이름 순서대로 정하며 겹치면 다음 조합으로 비킨다(97마리 모두 다른 조합, 검사가 본다).
+let TREE_SEEDS = null;
+export function treeSeed(key) {
+  if (!TREE_SEEDS) {
+    TREE_SEEDS = {};
+    const used = new Set();
+    for (const k of Object.keys(CHARACTERS)) {
+      const h = keyHash(k), g = `${elementOf(k)}|${petRole(k)}|${petSkill(k).kind}`;
+      const start = ((h >> 4) & 1) | (((h >> 6) & 1) << 1);
+      let pick = start;
+      for (let i = 0; i < 4; i++) { const c = (start + i) % 4; if (!used.has(`${g}|${c}`)) { pick = c; break; } }
+      used.add(`${g}|${pick}`);
+      TREE_SEEDS[k] = { l1: pick & 1 ? 'cd' : 'pow', base: pick >> 1 };
+    }
+  }
+  return TREE_SEEDS[key] || { l1: 'pow', base: 0 };
+}
+// 기본 스킬 ②: 고른 기록(0 · 1)이 있으면 그것, 없으면 이름에서 고정.
+export const baseS2 = (key, rec) => rec === 0 || rec === 1 ? rec : treeSeed(key).base;
+// 스킬 ①이 맞으면 붙는 덤(1층 B면 속성 덤 · 이미 있으면 길게).
+export function skillExtra(k) {
+  const base = k.kind === 'poison' ? 'poison' : k.extra;
+  if (!k.plus || k.plus === 'nova' || k.plus === 'long') return base;
+  return base ? `${base}2` : k.plus;
+}
+// 필살기가 닿는 거리인가(컴퓨터 · 검사용 학생이 누를 때 본다): 두 번째 필살기 원은 가까이, 일직선은 길이 안.
+export const ultReach = (f, d) => f?.ult2 === 'ring' ? d <= ULT_SHAPE.ring.r + ARENA.BODY - 2 : f?.ult2 === 'line' ? d <= ULT_SHAPE.line.len : true;
+export const cleanTree = v => typeof v === 'string' && /^[01]{3}$/.test(v) ? v : TREE.DEF;
+// 스킬트리 기억 정리: { 펫 키: '011' } → 알려진 펫 · 0/1 세 글자만, 많아야 max개.
+export function cleanTrees(raw, max = TREE.MAX) {
+  const out = {};
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  for (const [k, v] of Object.entries(raw).slice(0, max)) if (CHARACTERS[k] && typeof v === 'string' && /^[01]{3}$/.test(v)) out[k] = v;
+  return out;
+}
+// 층마다 열렸나 · 고른 가지(잠긴 층은 -1).
+export const treeOpen = (level, tr) => { const t = cleanTree(tr); return TREE.LEVELS.map((lv, i) => Number(level) >= lv ? Number(t[i]) : -1); };
+// 화면용: 펫 하나의 스킬트리 3층(가지 A · B 이름 · 설명 · 열렸나 · 고른 것).
+export function petTree(key, level = 1, tr = TREE.DEF, s2rec = null) {
+  const el = elementOf(key), seed = treeSeed(key), sk = petSkill(key), base = baseS2(key, s2rec), list = EL_SKILLS[el] || EL_SKILLS.star;
+  const role = petRole(key), up = ROLE_UP[role], u2 = ULT2[el] || ULT2.star, open = treeOpen(level, tr), keep = list[base], swap = list[1 - base];
+  const l1b = sk.kind === 'guard' ? `쓸 때 둘레로 ${EXTRA_KO2[NOVA_EXTRA[el]]} 폭발` : sk.kind === 'boost' ? `강화 시간 +${Math.round((TREE_UP.boostLong - 1) * 100)}%` : sk.kind === 'poison' ? '맞으면 중독 길게' : sk.extra ? `맞으면 ${EXTRA_KO2[sk.extra]} 길게` : `맞으면 ${EXTRA_KO2[L1B_EXTRA[el]]}`;
+  const layers = [
+    { lv: TREE.LEVELS[0], a: { icon: '⚡', name: `${sk.name} 강화`, desc: seed.l1 === 'cd' ? `쿨타임 −${Math.round((1 - TREE_UP.cd) * 100)}%` : `${sk.kind === 'guard' ? '회복 · 보호막' : sk.kind === 'boost' ? '강화 효과' : '위력'} +${Math.round((TREE_UP.pow - 1) * 100)}%` },
+      b: { icon: '🌈', name: `${sk.name} 속성 덤`, desc: l1b } },
+    { lv: TREE.LEVELS[1], a: { icon: swap.icon, name: `${swap.name}로 바꾸기`, desc: `${swap.desc} · 쿨타임 −${Math.round((1 - TREE_UP.s2cd) * 100)}%` },
+      b: { icon: keep.icon, name: `${keep.name} 강화`, desc: `${keep.desc} · 위력 +${Math.round((TREE_UP.s2pow - 1) * 100)}%` } },
+    { lv: TREE.LEVELS[2], a: { icon: u2.icon, name: `필살기 ${u2.name}`, desc: `${u2.shape === 'ring' ? '내 둘레 큰 원' : '멀리 긴 일직선'} · 맞으면 ${EXTRA_KO2[u2.extra]}` },
+      b: { icon: '💪', name: `역할 강화 · ${up.name}`, desc: up.desc } }
+  ];
+  return layers.map((x, i) => ({ ...x, pick: open[i], open: open[i] >= 0, want: Number(cleanTree(tr)[i]) }));
+}
+
 // 등급: 일반 0 · 영웅 1 · 전설 · 한정 · 시리즈 2 · 신화 3.
 export function petRank(key) {
   const c = CHARACTERS[key] || {};
@@ -234,27 +322,41 @@ export function petTier(key) {
 // 시작 값(일반 1 · 영웅 1 · 전설 · 시리즈 1.06 · 한정 1 · 신화 1.12)에서 승률을 보고 고친 값: 펫 무리마다 속성 · 근접/원거리 섞임이 달라서
 //   같은 배수여도 승률이 다르다(예: 한정 펫은 원거리가 많아 1.00이면 약 45%). 4000판씩: 영웅 49.7 · 전설 54.3 · 신화 대 전설 54.8 · 한정 49.4%. 목표: 일반 대 영웅 50 ± 3 · 전설 대 일반 ≈ 55 · 신화 대 전설 ≈ 55 · 한정 대 일반 50 ± 3.
 // V13.229 새 스킬 16개를 넣고 다시 맞춤(1500판씩): 영웅 49.5 · 전설 53.8 · 신화 대 전설 55.8 · 한정 49.7%.
-export const TIER_MUL = { normal: 1, epic: 1.015, legend: 1.035, limited: 1.02, mythic: 1.095 };
+export const TIER_MUL = { normal: 1, epic: 1.01, legend: 1.05, limited: 1.04, mythic: 1.1 };
 const FORM_HP = [0, 300, 420, 560], FORM_ATK = [0, 12, 16, 20];
 // 펫 이름에서 고정으로 정한 작은 차이(같은 펫은 늘 같다): 빠르기 0.9~1.1.
 const keyHash = key => [...String(key)].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) % 9973, 7);
 // 근접 · 원거리 보정(서로 이길 수 있게 맞춘 값, 검사가 본다).
 export const REACH_MUL = { melee: { hp: 1.07, atk: 1.08, spd: 1.05 }, ranged: { hp: 1, atk: 0.96, spd: 1 } };
 // 싸우는 펫 하나: { key, form(1~3), level, s2(스킬 ② 고르기 0 · 1) } → 능력치. 알(form 0)은 싸우지 않는다.
+// V13.231 속성 보정(속성 균형): 속성마다 공격 모양 · 스킬이 달라 같은 등급이어도 승률이 달랐다(별빛 ≈ 57 · 물 · 바위 ≈ 36).
+//   체력 · 공격 배수로 맞춘다(server/arena-sim.mjs elements, 목표 속성마다 50 ± 5).
+export const EL_MUL = { flame: { hp: 1.02, atk: 1.02 }, water: { hp: 1.025, atk: 1.015 }, leaf: { hp: 1.0, atk: 1.0 }, earth: { hp: 1.025, atk: 1.02 }, wind: { hp: 1.035, atk: 1.03 }, ice: { hp: 1, atk: 0.995 }, toxic: { hp: 1.01, atk: 1.005 }, star: { hp: 0.96, atk: 0.96 } };
+// 싸우는 펫 하나: { key, form(1~3), level, s2(기본 스킬 ② 0 · 1, 없으면 이름에서), tr(스킬트리 '011'), noTree(미리보기 비교용: 스킬트리 없이) } → 능력치. 알(form 0)은 싸우지 않는다.
 export function fighter(pet) {
   const key = String(pet?.key || 'dog'), form = Math.max(1, Math.min(3, Math.round(Number(pet?.form) || 1)));
-  const level = Math.max(1, Math.min(60, Math.round(Number(pet?.level) || 1))), rank = petRank(key), el = elementOf(key), s2 = Number(pet?.s2) === 1 ? 1 : 0;
-  const tier = petTier(key), mul = TIER_MUL[tier] * (1 + Math.min(30, level) * 0.01);
+  const level = Math.max(1, Math.min(60, Math.round(Number(pet?.level) || 1))), rank = petRank(key), el = elementOf(key);
+  const s2 = baseS2(key, pet?.s2 === 0 || pet?.s2 === 1 ? pet.s2 : pet?.s2 == null ? null : 0), tr = cleanTree(pet?.tr), [t1, t2, t3] = pet?.noTree ? [-1, -1, -1] : treeOpen(level, tr);
+  const tier = petTier(key), mul = TIER_MUL[tier] * (1 + Math.min(30, level) * 0.01), E = EL_MUL[el] || EL_MUL.star;
   const role = petRole(key), R = ROLE[role], shape = SHAPE[el] || 'beam', melee = !!SHOT[shape].melee;
+  const U = t3 === 1 ? ROLE_UP[role] : {}, seed = treeSeed(key);
   const spd = (0.9 + (keyHash(key) % 21) / 100) * R.spd;
   // 근접 펫은 다가가야 하니 더 튼튼하고 세고 조금 빠르다(원거리와 승률을 맞춘 값, 검사가 본다).
   const M = melee ? REACH_MUL.melee : REACH_MUL.ranged;
+  // 스킬트리 1층: A 위력/쿨타임 · B 속성 덤. 2층: A 다른 속성 스킬(+쿨) · B 기본 스킬 강화. 3층: A 두 번째 필살기 · B 역할 강화.
+  const skill = { ...petSkill(key) };
+  let skillCdMul = R.skill || 1;
+  if (t1 === 0 && seed.l1 === 'cd') skillCdMul *= TREE_UP.cd;
+  if (t1 === 0 && seed.l1 === 'pow') { skill.power *= TREE_UP.pow; skill.heal *= TREE_UP.pow; skill.shield *= TREE_UP.pow; skill.boost *= TREE_UP.pow; skill.dot *= TREE_UP.pow; }
+  if (t1 === 1) skill.plus = skill.kind === 'guard' ? 'nova' : skill.kind === 'boost' ? 'long' : L1B_EXTRA[el];
+  const pick2 = t2 === 0 ? 1 - s2 : s2, u2 = t3 === 0 ? ULT2[el] || ULT2.star : null;
   return {
-    key, form, level, s2, rank, tier, el, shape, role, melee,
-    hp: Math.round(FORM_HP[form] * mul * R.hp * M.hp), atk: Math.round(FORM_ATK[form] * mul * R.atk * M.atk),
-    spd, atkTicks: Math.round(ARENA.ATK_TICKS / spd * (R.atkTicks || 1)), move: ARENA.SPEED * spd * M.spd,
-    dodgeCd: Math.round(ARENA.DODGE_CD * (R.dodge || 1)), skillCd: Math.round(ARENA.SKILL_TICKS * (R.skill || 1)), skill2Cd: Math.round(ARENA.SKILL2_TICKS * (R.skill || 1)),
-    skill: petSkill(key), skill2: petSkill2(key, s2), ult: ULT_NAME[el] || '필살기'
+    key, form, level, s2, tr, tree: [t1, t2, t3], rank, tier, el, shape, role, melee,
+    hp: Math.round(FORM_HP[form] * mul * R.hp * M.hp * E.hp * (U.hp || 1)), atk: Math.round(FORM_ATK[form] * mul * R.atk * M.atk * E.atk * (U.atk || 1)),
+    spd, atkTicks: Math.round(ARENA.ATK_TICKS / spd * (R.atkTicks || 1) * (U.atkTicks || 1)), move: ARENA.SPEED * spd * M.spd,
+    dodgeCd: Math.round(ARENA.DODGE_CD * (R.dodge || 1) * (U.dodge || 1)), skillCd: Math.round(ARENA.SKILL_TICKS * skillCdMul * (U.skill || 1)),
+    skill2Cd: Math.round(ARENA.SKILL2_TICKS * (R.skill || 1) * (U.skill || 1) * (t2 === 0 ? TREE_UP.s2cd : 1)), s2pow: t2 === 1 ? TREE_UP.s2pow : 1,
+    skill, skill2: petSkill2(key, pick2), ult: u2 ? u2.name : ULT_NAME[el] || '필살기', ult2: u2 ? u2.shape : null, ultExtra: u2 ? u2.extra : null, ultPow: u2?.pow || 1
   };
 }
 export const teamPower = team => (team || []).reduce((n, f) => n + f.hp / 10 + f.atk * 3, 0);
@@ -294,8 +396,8 @@ export function cleanInputs(raw, maxTick = ARENA.MAX_TICKS + 400, maxCode = PLAY
 //   V13.228 조준 정확도(acc: 정확히 상대 쪽으로 끌 확률, 아니면 16방향 한두 칸 빗나감). 컴퓨터도 사람과 같은 조준 규칙을 따른다.
 export const AI = [
   { dodge: 0.1, slow: 1.66, skill: 0.05, aim: 0.6, acc: 0.4 },
-  { dodge: 0.25, slow: 1.36, skill: 0.08, aim: 0.85, acc: 0.5 },
-  { dodge: 0.36, slow: 1.25, skill: 0.1, aim: 0.9, acc: 0.57 }
+  { dodge: 0.25, slow: 1.3, skill: 0.08, aim: 0.85, acc: 0.5 },
+  { dodge: 0.36, slow: 1.23, skill: 0.1, aim: 0.9, acc: 0.57 }
 ];
 const wantNone = () => ({ atk: false, skill: false, skill2: false, ult: false, dodge: false, swap: false, atkA: -1, skillA: -1, skill2A: -1, ultA: -1 });
 
@@ -413,7 +515,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     const twice = kind === 'atk' && from.power2 > 0 ? (from.power2 = 0, 2) : 1;
     // 크리티컬: 상대 등 뒤에서(상대가 바라보는 쪽과 내 쪽이 135° 넘게 벌어짐) 또는 기절한 상대.
     const [bx, by] = aimAt(to, from), crit = to.stun > 0 || to.fx * bx + to.fy * by <= ARENA.BACK;
-    let dmg = Math.max(1, Math.round(a.atk * power * m * spread * twice * (crit ? ARENA.CRIT : 1) * (kind === 'atk' && from.boost > 0 ? 1 + a.skill.boost : 1)));
+    let dmg = Math.max(1, Math.round(a.atk * power * m * spread * twice * (crit ? ARENA.CRIT : 1) * (kind === 'atk' && from.boost > 0 ? 1 + a.skill.boost : 1) * (kind === 'skill2' ? a.s2pow || 1 : 1)));
     let blocked = 0;
     if (to.shield > 0) { blocked = Math.min(to.shield, dmg); to.shield -= blocked; dmg -= blocked; }
     d.cur = Math.max(0, d.cur - dmg);
@@ -430,6 +532,13 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     if (extra === 'slow') { to.slow = ARENA.SLOW_TICKS; ev.push({ e: 'slow', who: to.who }); }
     if (extra === 'stun') { to.stun = Math.max(to.stun, ARENA.STUN_TICKS); ev.push({ e: 'stun', who: to.who }); }
     if (extra === 'knock') { const [nx, ny] = aimAt(from, to); to.x = clampX(to.x + nx * 9); to.y = clampY(to.y + ny * 9); ev.push({ e: 'knock', who: to.who }); }
+    // V13.231 스킬트리 1층 B 속성 덤: 길게(…2) · 짧은 묶임(root1).
+    if (extra === 'slow2') { to.slow = Math.round(ARENA.SLOW_TICKS * 1.6); ev.push({ e: 'slow', who: to.who }); }
+    if (extra === 'stun2') { to.stun = Math.max(to.stun, Math.round(ARENA.STUN_TICKS * 1.5)); ev.push({ e: 'stun', who: to.who }); }
+    if (extra === 'knock2') { const [nx, ny] = aimAt(from, to); to.x = clampX(to.x + nx * 14); to.y = clampY(to.y + ny * 14); ev.push({ e: 'knock', who: to.who }); }
+    if (extra === 'poison2') { to.poison = 120; to.poisonDmg = a.atk * (a.skill.dot || 1.2) / 8; ev.push({ e: 'poison', who: to.who }); }
+    if (extra === 'root1') { to.root = Math.max(to.root, 10); ev.push({ e: 'root', who: to.who }); }
+    if (extra === 'stun1') { to.stun = Math.max(to.stun, 6); ev.push({ e: 'stun', who: to.who }); }
     if (extra === 'pull') { const [nx, ny] = aimAt(to, from); to.x = clampX(to.x + nx * 14); to.y = clampY(to.y + ny * 14); to.slow = ARENA.SLOW_TICKS; ev.push({ e: 'pull', who: to.who }); }
     if (extra === 'poison') { to.poison = 80; to.poisonDmg = a.atk * (a.skill.dot || 1.2) / 8; ev.push({ e: 'poison', who: to.who }); }
     // V13.229 새 스킬 덤: 화상(불) · 묶임(덩굴) · 얼어붙음(얼음 창) · 독침(맞을수록 중독 길게) · 감전(번개) · 기절(바위).
@@ -529,11 +638,13 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
         if (k.shield) m.shield = Math.max(m.shield, Math.round(a.atk * k.shield * 2.5));
         ev.push({ e: 'buff', who: m.who, kind: 'guard', name: k.name, el: a.el, heal: !!k.heal, shield: m.shield, hp: f.cur, max: f.hp, mate: s.who });
       }
+      // V13.231 스킬트리 1층 B: 지키면서 둘레로 속성 폭발(V13.232 여러 명이면 둘레의 다른 팀 모두).
+      if (k.plus === 'nova') { ev.push({ e: 'nova', who: s.who, el: a.el, x: s.x, y: s.y, r: GUARD_NOVA.r }); for (const e of foes(s)) if (gap(s, e) <= GUARD_NOVA.r + ARENA.BODY) damage(s, e, a.melee ? GUARD_NOVA.melee : GUARD_NOVA.power, 'skill', ev, NOVA_EXTRA[a.el]); }
       return ev.push({ e: 'buff', who: s.who, kind: 'guard', name: k.name, el: a.el, heal: !!k.heal, shield: s.shield, hp: a.cur, max: a.hp });
     }
-    if (k.kind === 'boost') { s.boost = 120; s.cd = 0; return ev.push({ e: 'buff', who: s.who, kind: 'boost', name: k.name, el: a.el }); }
+    if (k.kind === 'boost') { s.boost = k.plus === 'long' ? Math.round(120 * TREE_UP.boostLong) : 120; s.cd = 0; return ev.push({ e: 'buff', who: s.who, kind: 'boost', name: k.name, el: a.el }); }
     ev.push({ e: 'skillname', who: s.who, name: k.name, el: a.el });
-    const extra = k.kind === 'poison' ? 'poison' : k.extra;
+    const extra = skillExtra(k);
     if (a.shape === 'beam') return shoot(s, k.power, 'skill', ev, { v: 5.2, r: 5, life: 14, extra }, code);
     if (a.shape === 'orb') return shoot(s, k.power / 1.6, 'skill', ev, { v: 2.8, r: 3.6, life: 22, extra, spread: 0.32 }, code);
     if (a.shape === 'quake') return quakeAt(s, k.power, 'skill', ev, extra, spot(s, code));
@@ -545,7 +656,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     s.skill2 = a.skill2Cd || ARENA.SKILL2_TICKS;
     ev.push({ e: 'skillname', who: s.who, name: k.name, el: a.el, two: true, id: k.id });
     const base = { e: 'skill2', who: s.who, id: k.id, shape: k.shape, el: a.el, x: s.x, y: s.y };
-    if (k.id === 'bubble') { s.bubble = K.hits; s.bubbleT = K.ticks; return ev.push({ ...base, hits: K.hits }); }
+    if (k.id === 'bubble') { s.bubble = K.hits; s.bubbleT = Math.round(K.ticks * (a.s2pow || 1)); return ev.push({ ...base, hits: K.hits }); }
     if (k.id === 'petal') { addZone(s, k.id, s.x, s.y, K); return ev.push({ ...base, r: K.r, ticks: K.ticks }); }
     const [nx, ny, locked, o] = aimVec(s, code);
     face(s, nx, ny);
@@ -594,17 +705,27 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     face(s, nx, ny);
     S.freeze = ARENA.ULT_FREEZE_TICKS;
     S.pendingUlt = s.who; S.ultAim = [nx, ny];
-    ev.push({ e: 'cutin', who: s.who, key: a.key, form: a.form, el: a.el, name: a.ult, rank: a.rank, tx: o.x, ty: o.y, nx, ny });
+    ev.push({ e: 'cutin', who: s.who, key: a.key, form: a.form, el: a.el, name: a.ult, rank: a.rank, tx: o.x, ty: o.y, nx, ny, u2: a.ult2 || '' });
   }
   // 컷인이 끝나면 터진다: 조준한 쪽 부채꼴(±35°) 안에 있고, 그 순간 회피 중(무적)이 아니면 맞는다.
   function ultLand(ev) {
     const s = S[S.pendingUlt], [nx, ny] = S.ultAim || [0, 0]; S.pendingUlt = null; S.ultAim = null;
     if (!s) return;
+    if (active(s)?.ult2) return ult2Land(s, nx, ny, ev);
     // 여러 명이면 부채꼴 안의 다른 팀 모두(맨 앞 펫 쪽으로 연출).
     const inside = o => { const [tx, ty, d] = aimAt(s, o); return d <= ARENA.BODY * 2 || tx * nx + ty * ny >= ARENA.ULT_ARC; };
     const all = foes(s), hits = all.filter(inside), o = hits[0] || foeOf(s), far = Math.max(30, Math.min(60, gap(s, o)));
     ev.push({ e: 'ult', who: s.who, el: active(s).el, x: s.x, y: s.y, tx: hits.length ? o.x : clampX(s.x + nx * far), ty: hits.length ? o.y : clampY(s.y + ny * far), hit: hits.length > 0, nx, ny, n: hits.length });
     for (const h of hits) damage(s, h, ARENA.ULT_POWER, 'ult', ev, active(s).skill.extra === 'knock' ? 'knock' : null);
+  }
+  // V13.231 스킬트리 3층 A 두 번째 필살기: ring 내 둘레 큰 원 · line 조준 쪽 긴 일직선.
+  function ult2Land(s, nx, ny, ev) {
+    const a = active(s), K = ULT_SHAPE[a.ult2];
+    // V13.232 여러 명이면 고리 · 줄 안의 다른 팀 모두.
+    const on = o => { if (a.ult2 === 'ring') return gap(s, o) <= K.r + ARENA.BODY; const rx = o.x - s.x, ry = o.y - s.y, along = rx * nx + ry * ny; return along >= -ARENA.BODY && along <= K.len + ARENA.BODY && Math.abs(rx * ny - ry * nx) <= K.w + ARENA.BODY; };
+    const hits = foes(s).filter(on), o = hits[0] || foeOf(s), hit = hits.length > 0;
+    ev.push({ e: 'ult', who: s.who, el: a.el, u2: a.ult2, x: s.x, y: s.y, nx, ny, r: K.r || 0, len: K.len || 0, w: K.w || 0, tx: hit ? o.x : a.ult2 === 'ring' ? s.x : clampX(s.x + nx * 50), ty: hit ? o.y : a.ult2 === 'ring' ? s.y : clampY(s.y + ny * 50), hit, n: hits.length });
+    for (const h of hits) damage(s, h, K.power * (a.ultPow || 1), 'ult', ev, a.ultExtra);
   }
   function dodge(s, ev) {
     let [dx, dy] = DIRS[s.dir] || [0, 0];
@@ -731,7 +852,7 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
     s.dir = dirCode(mx + cx, my + cy, 0.2);
     // 컴퓨터도 버튼을 끌어서 조준한다: 솜씨(acc)만큼 정확히, 아니면 16방향 한두 칸 빗나간다.
     const aim = () => { const c = aimCode(nx, ny), r = random(); return r < b.acc ? c : (c + 16 + (r < (1 + b.acc) / 2 ? 1 : -1) * (random() < 0.7 ? 1 : 2)) % 16; };
-    if (s.gauge >= ARENA.GAUGE_MAX && o.enter <= 0 && o.inv <= 0 && !w.ult) { w.ult = true; w.ultA = aim(); }
+    if (s.gauge >= ARENA.GAUGE_MAX && o.enter <= 0 && o.inv <= 0 && !w.ult && ultReach(a, d)) { w.ult = true; w.ultA = aim(); }
     if (s.skill <= 0 && d < want + 14 && !w.skill && random() < b.skill) { w.skill = true; w.skillA = aim(); }
     if (s.skill2 <= 0 && d < want + 18 && !w.skill2 && random() < b.skill * 0.8) { w.skill2 = true; w.skill2A = aim(); }
     if (s.cd <= 0 && d < (melee ? 15 : 44) && random() < b.aim) { w.atk = true; w.atkA = aim(); }
@@ -816,13 +937,13 @@ export function createArena({ seed, me, foe, foeLevel = 1, meAi = null, foeIdle 
         // 꽃잎 회복장: 내 펫(2:2면 팀원도).
         for (const m of [s, ...mates(s)]) {
           const f = active(m);
-          if (pulse && f?.cur > 0 && m.enter <= 0 && gap(z, m) <= z.r + ARENA.BODY * 0.5 && f.cur < f.hp) { f.cur = Math.min(f.hp, f.cur + Math.round(f.hp * K.heal)); ev.push({ e: 'heal', who: m.who, hp: f.cur, max: f.hp, x: m.x, y: m.y }); }
+          if (pulse && f?.cur > 0 && m.enter <= 0 && gap(z, m) <= z.r + ARENA.BODY * 0.5 && f.cur < f.hp) { f.cur = Math.min(f.hp, f.cur + Math.round(f.hp * K.heal * (active(s)?.s2pow || 1))); ev.push({ e: 'heal', who: m.who, hp: f.cur, max: f.hp, x: m.x, y: m.y }); }
         }
         continue;
       }
       for (const o of foes(s)) {
         if (!hittable(o) || gap(z, o) > z.r + ARENA.BODY * 0.5) continue;
-        if (z.id === 'cloud') { if (pulse) { o.poison = Math.max(o.poison, K.poison + 1); o.poisonDmg = Math.max(o.poisonDmg || 0, active(s).atk * K.dot); o.lastBy = s.who; } continue; }
+        if (z.id === 'cloud') { if (pulse) { o.poison = Math.max(o.poison, K.poison + 1); o.poisonDmg = Math.max(o.poisonDmg || 0, active(s).atk * K.dot * (active(s).s2pow || 1)); o.lastBy = s.who; } continue; }
         if (z.id === 'tornado') { const dx = z.x - o.x, dy = z.y - o.y, d = Math.sqrt(dx * dx + dy * dy); if (d > 0.5) { const k = Math.min(K.pull, d) / d; o.x = clampX(o.x + dx * k); o.y = clampY(o.y + dy * k); } }
         else { o.slow = Math.max(o.slow, K.slow); if (z.id === 'icefield') o.slide = 6; }
         if (pulse) damage(s, o, K.power, 'skill2', ev, null, 0, true);

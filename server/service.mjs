@@ -1986,7 +1986,9 @@ export async function service(state, method, path, body, token, options = {}) {
     const friends = p.preview_owner_id ? [] : arenaPoolFor(state, p, school.id, now);
     // V13.229 스킬 ② 고르기({ 펫 키: 0 | 1 }): 규칙 파일 cleanPicks가 알려진 펫 · 0/1만 남긴다.
     const picks = body.picks && typeof body.picks === 'object' && !Array.isArray(body.picks) ? body.picks : null;
-    const r = arenaStart(p, { id: id(), team, picks, friends, pets: petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), now });
+    // V13.231 스킬트리 가지({ 펫 키: '011' }): 규칙 파일 cleanTrees가 알려진 펫 · 0/1 세 글자만 남긴다.
+    const tree = body.tree && typeof body.tree === 'object' && !Array.isArray(body.tree) ? body.tree : null;
+    const r = arenaStart(p, { id: id(), team, picks, tree, friends, pets: petProgress(p.pets, xpSessions(state, p.id, p), p.avatar_key), now });
     if (!p.preview_owner_id) arenaPoolPut(state, p, school.id, r.team, now);
     delete r.team;
     return r;
