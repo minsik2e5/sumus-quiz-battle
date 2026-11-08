@@ -41,10 +41,10 @@
 .ar-aimopt.on{background:linear-gradient(180deg,rgba(96,165,250,.45),rgba(37,99,235,.35));box-shadow:inset 0 0 0 2px #93c5fd}
 
 /* 타격감: 피격 섬광(같은 그림을 하얗게 겹쳐 opacity만). 저사양은 필터 없이 밝게 더하기. */
-.ar-flash{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;opacity:0;pointer-events:none;filter:brightness(0) invert(1);will-change:opacity}
+.ar-flash{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;opacity:0;pointer-events:none;filter:brightness(0) invert(1)}
 .ar-lite .ar-flash{filter:none;mix-blend-mode:plus-lighter}
 /* 큰 데미지 숫자(칸 8개를 다시 쓴다). 스킬은 속성 색, 치명타는 노랑 + 💥, 필살기는 가장 크게. */
-.ar-num{position:absolute;left:0;top:0;z-index:165;pointer-events:none;opacity:0;font-weight:950;font-style:normal;white-space:nowrap;font-size:22px;line-height:1;color:#fff;-webkit-text-stroke:1.2px rgba(0,0,0,.6);paint-order:stroke fill;text-shadow:0 2px 0 rgba(0,0,0,.5);will-change:transform,opacity}
+.ar-num{position:absolute;left:0;top:0;z-index:165;pointer-events:none;opacity:0;font-weight:950;font-style:normal;white-space:nowrap;font-size:22px;line-height:1;color:#fff;-webkit-text-stroke:1.2px rgba(0,0,0,.6);paint-order:stroke fill;text-shadow:0 2px 0 rgba(0,0,0,.5)}
 .ar-num.me{color:#fecaca}
 .ar-num.skill{font-size:28px;color:color-mix(in srgb,var(--c1,#fde047) 55%,#fff)}
 .ar-num.crit{font-size:32px;color:#fde047;-webkit-text-stroke:1.6px #b45309}
