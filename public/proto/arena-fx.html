@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="robots" content="noindex">
-<title>펫 아레나 캔버스 연출 시험</title>
+<title>펫 아레나 캔버스 연출 시험 2판</title>
 <!-- 측정용 시험 페이지: 앱과 연결하지 않는다(미리 받기 제외 · 메뉴 링크 없음). docs/arena-battle-reboot-plan.md 참고. -->
 <style>
 @font-face { font-family: 'Jua'; font-display: block; src: url('/assets/fonts/jua-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+2000-206F; }
@@ -29,17 +29,25 @@ html, body { margin: 0; height: 100%; background: #0b1020; color: var(--ink); ov
 #bar button.on { border-color: var(--gold); color: var(--gold); }
 #note { position: fixed; right: 8px; top: calc(env(safe-area-inset-top) + 74px); font-size: 11px; opacity: .7; text-align: right; pointer-events: none; }
 body.clean #bar, body.clean #dbg, body.clean #note { display: none; }
+/* 2판: 캔버스 위 DOM 막(합성기가 처리 → 캔버스 칠하기 0). 가장자리 어둡게 · 속성 색 · 흰 번쩍 · 반전 섬광 */
+.veil { position: fixed; inset: 0; pointer-events: none; }
+#vig { background: radial-gradient(ellipse 75% 62% at 50% 50%, rgba(0, 0, 0, 0) 55%, rgba(4, 6, 18, .55) 100%); transition: opacity .4s; opacity: .85; }
+#vig.ult { opacity: 1; background: radial-gradient(ellipse 70% 55% at 50% 48%, rgba(0, 0, 0, 0) 35%, rgba(4, 2, 18, .82) 100%); }
+#tint { opacity: 0; mix-blend-mode: normal; }
+#flash { background: #fffaf0; opacity: 0; }
+#stage.inv { filter: invert(1) hue-rotate(180deg); }
 </style>
 </head>
 <body>
 <canvas id="stage"></canvas>
+<div class="veil" id="tint"></div><div class="veil" id="vig"></div><div class="veil" id="flash"></div>
 <div id="hud"><div class="team a" id="team-a"></div><div class="timer" id="timer">2:00</div><div class="team b" id="team-b"></div></div>
 <div id="dbg"></div>
 <div id="note">시험 페이지 · 앱과 연결 안 됨</div>
 <div id="bar">
   <button data-q="auto">자동</button><button data-q="3">높음</button><button data-q="2">중간</button><button data-q="1">낮음</button><button data-q="0">최저</button>
   <button data-pets="2">펫 2</button><button data-pets="4">펫 4</button>
-  <button data-act="pause">멈춤</button><button data-act="clean">깨끗한 화면</button>
+  <button data-act="pause">멈춤</button><button data-act="mute">소리 끄기</button><button data-act="clean">깨끗한 화면</button>
 </div>
 <script src="/proto/arena-fx.js" type="module"></script>
 </body>

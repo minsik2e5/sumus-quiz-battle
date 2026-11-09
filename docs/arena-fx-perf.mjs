@@ -58,6 +58,8 @@ async function measure(browser, base, { cpu, seconds, q, pets, fx = '1', shot, s
   await cdp.send('Performance.enable');
   await page.goto(`${base}/proto/arena-fx.html?q=${q}&pets=${pets}&fx=${fx}&decal=${arg('decal', '1')}&clean=1`);
   await page.waitForFunction(() => window.__fx && window.__fx.frames > 10, null, { timeout: 30000 });
+  // --sound: 화면을 한 번 톡 → 소리가 켜진 채로 잰다(오디오 합성 비용 포함)
+  if (process.argv.includes('--sound')) await page.touchscreen.tap(195, 420);
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: cpu });
   // 처음 2초(그림 디코드 · 글꼴)는 버리고 잰다. --gpu는 SwiftShader 셰이더 준비가 길어 6초
   await page.waitForTimeout(Number(arg('warm', GPU ? 6 : 2)) * 1000);
@@ -70,14 +72,14 @@ async function measure(browser, base, { cpu, seconds, q, pets, fx = '1', shot, s
     while (shotList.length && Date.now() - t0 > shotList[0][1]) { const [path] = shotList.shift(); await page.screenshot(path.endsWith('.png') ? { path, scale: 'css' } : { path, type: 'jpeg', quality: 72, scale: 'css' }); }
   }
   const P = await page.evaluate(() => window.__perf);
-  const F = await page.evaluate(() => ({ ...window.__fx, canvasMB: window.__fx.canvasMB(), accel: (() => { try { const c = document.createElement('canvas'); c.width = c.height = 300; const g = c.getContext('2d'); return typeof g.isContextLost === 'function' ? 'ok' : '-'; } catch { return '-'; } })() }));
+  const F = await page.evaluate(() => ({ ...window.__fx, glowsMax: window.__fx.glowsMax, canvasMB: window.__fx.canvasMB(), accel: (() => { try { const c = document.createElement('canvas'); c.width = c.height = 300; const g = c.getContext('2d'); return typeof g.isContextLost === 'function' ? 'ok' : '-'; } catch { return '-'; } })() }));
   await ctx.close();
   const secs = P.frames.reduce((a, b) => a + b, 0) / 1000, mins = secs / 60;
   return {
     cpu, q, pets, fx, gpu: GPU, seconds: r1(secs), fps: r1(P.frames.length / secs), frame_p95: r1(pct(P.frames, .95)), frame_p99: r1(pct(P.frames, .99)), frame_max: r1(Math.max(0, ...P.frames)),
     over33_per_min: r1(P.frames.filter(d => d > 33.4).length / mins), over50_per_min: r1(P.frames.filter(d => d > 50).length / mins),
     long_tasks: P.long.length, long_max: Math.max(0, ...P.long), heap_mb: r1(heapMax / 1048576), canvas_mb: F.canvasMB,
-    debris_max: F.debrisMax, smoke_max: F.smokeMax, sparks_max: F.sparksMax, fx_max: F.fxMax, tier_end: F.tier, tier_drops: F.tierDrops, stalls: (F.stalls || []).slice(-8), heals: F.heals, cycles: F.cycles, errors: errors.slice(0, 3)
+    debris_max: F.debrisMax, glows_max: F.glowsMax, cutins: F.cutins, mat_art: F.matArt, smoke_max: F.smokeMax, sparks_max: F.sparksMax, fx_max: F.fxMax, tier_end: F.tier, tier_drops: F.tierDrops, stalls: (F.stalls || []).slice(-8), heals: F.heals, cycles: F.cycles, errors: errors.slice(0, 3)
   };
 }
 
