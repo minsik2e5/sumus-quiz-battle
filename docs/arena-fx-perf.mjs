@@ -67,7 +67,7 @@ async function measure(browser, base, { cpu, seconds, q, pets, fx = '1', shot, s
     await page.waitForTimeout(500);
     const m = Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(x => [x.name, x.value]));
     heapMax = Math.max(heapMax, m.JSHeapUsedSize || 0);
-    while (shotList.length && Date.now() - t0 > shotList[0][1]) { const [path] = shotList.shift(); await page.screenshot({ path, type: path.endsWith('.png') ? 'png' : 'jpeg', quality: 72, scale: 'css' }); }
+    while (shotList.length && Date.now() - t0 > shotList[0][1]) { const [path] = shotList.shift(); await page.screenshot(path.endsWith('.png') ? { path, scale: 'css' } : { path, type: 'jpeg', quality: 72, scale: 'css' }); }
   }
   const P = await page.evaluate(() => window.__perf);
   const F = await page.evaluate(() => ({ ...window.__fx, canvasMB: window.__fx.canvasMB(), accel: (() => { try { const c = document.createElement('canvas'); c.width = c.height = 300; const g = c.getContext('2d'); return typeof g.isContextLost === 'function' ? 'ok' : '-'; } catch { return '-'; } })() }));
