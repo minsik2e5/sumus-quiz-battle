@@ -7,7 +7,7 @@
 //   - 바닥 자국은 그때그때 그리지 않고 "경기장 그림 한 장"에 구워 넣는다 → 자국이 몇 개가 쌓여도 매 프레임 비용은 그림 1장.
 //   - 큰 그림(펫 · 연기 · 빛 · 돌 · 숫자 · 글자)은 처음에 작은 캔버스로 한 번 만들어 두고 drawImage만 한다(매 프레임 그라디언트 · 글자 만들기 없음).
 //   - 저사양 단계 3개(해상도 · 파편 수 · 빛 겹 수)를 프레임 시간을 보고 자동으로 내린다.
-// 주소 옵션: ?q=auto|2|1|0(품질) &pets=2|4 &clean=1(버튼 · 측정 글자 숨김) &seed=숫자
+// 주소 옵션: ?q=auto|3|2|1|0(품질: 높음 · 중간 · 낮음 · 최저) &pets=2|4 &clean=1(버튼 · 측정 글자 숨김) &seed=숫자
 
 const P = new URLSearchParams(location.search);
 const $ = s => document.querySelector(s);
@@ -16,13 +16,15 @@ const ctx = cvs.getContext('2d', { alpha: false, desynchronized: true });
 
 /* ---------- 품질 단계 ---------- */
 const TIERS = [
+  // 최저: CSS 픽셀보다 낮은 해상도로 그리고 화면에 늘려 보인다(조금 흐리지만 칠하는 넓이가 절반) — GPU 캔버스가 없는 느린 폰용
+  { name: '최저', scale: .75, debris: 70, smoke: 20, sparks: 70, mult: .35, glow: false, fieldPx: 3 },
   { name: '낮음', scale: 1, debris: 90, smoke: 28, sparks: 90, mult: 0.4, glow: false, fieldPx: 4 },
   { name: '중간', scale: 1.5, debris: 200, smoke: 56, sparks: 180, mult: 0.7, glow: true, fieldPx: 6 },
   { name: '높음', scale: 2, debris: 400, smoke: 96, sparks: 320, mult: 1, glow: true, fieldPx: 8 }
 ];
 const qArg = P.get('q') || 'auto';
 let auto = qArg === 'auto';
-let tier = auto ? 2 : Math.max(0, Math.min(2, Number(qArg) | 0));
+let tier = auto ? 3 : Math.max(0, Math.min(3, Number(qArg) | 0));
 let T = TIERS[tier];
 let PETS_N = P.get('pets') === '2' ? 2 : 4;
 if (P.get('clean') === '1') document.body.classList.add('clean');
@@ -48,7 +50,7 @@ const cam = { x: WW / 2, y: WH / 2, z: 1, tz: 1, punch: 0, trauma: 0 };
 
 function resize() {
   cssW = innerWidth; cssH = innerHeight;
-  S = Math.min(devicePixelRatio || 1, T.scale);
+  S = T.scale < 1 ? T.scale : Math.min(devicePixelRatio || 1, T.scale);
   cvs.width = Math.round(cssW * S); cvs.height = Math.round(cssH * S);
   ppu = cssW / VIEW_W;
   buildSprites();
@@ -88,7 +90,7 @@ function buildGround() {
   resetField();
 }
 function edgePoint(t) { const per = 2 * (WW - 8) + 2 * (WH - 8); let d = t * per; if (d < WW - 8) return [4 + d, 4]; d -= WW - 8; if (d < WH - 8) return [WW - 4, 4 + d]; d -= WH - 8; if (d < WW - 8) return [WW - 4 - d, WH - 4]; d -= WW - 8; return [4, WH - 4 - d]; }
-function resetField() { field = mk(ground.width, ground.height); fctx = field.getContext('2d'); fctx.drawImage(ground, 0, 0); fctx.setTransform(FPX, 0, 0, FPX, 0, 0); scars = 0; }
+function resetField() { field = mk(ground.width, ground.height); fctx = field.getContext('2d'); fctx.drawImage(ground, 0, 0); fctx.setTransform(FPX, 0, 0, FPX, 0, 0); scars = 0; if (P.get('decal') === '0') { fctx = mk(8, 8).getContext('2d'); fctx.setTransform(FPX, 0, 0, FPX, 0, 0); } } // ?decal=0: 자국 굽기 끄기(측정용)
 function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 function scar(n = 1) { scars += n; if (scars > SCAR_CAP) healField(); }
 // 자국 상한: 땅 그림을 25% 덮어 오래된 자국부터 옅어진다(개별 자국 목록을 들고 있지 않음 → 메모리 일정)
@@ -611,7 +613,7 @@ function drawDebris(k, ox, oy, dt) {
   }
   if (!D.n) return;
   // 그림자(높을 때만, 높음 단계)
-  if (tier === 2) { ctx.globalAlpha = .35; for (let j = 0; j < D.n; j++) if (D.z[j] > 1.5) { const s = D.size[j] * 1.6; ctx.drawImage(SPR.shadow, D.x[j] - s / 2, D.y[j] - s * .2, s, s * .4); } ctx.globalAlpha = 1; }
+  if (tier === 3) { ctx.globalAlpha = .35; for (let j = 0; j < D.n; j++) if (D.z[j] > 1.5) { const s = D.size[j] * 1.6; ctx.drawImage(SPR.shadow, D.x[j] - s / 2, D.y[j] - s * .2, s, s * .4); } ctx.globalAlpha = 1; }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   for (let j = 0; j < D.n; j++) {
     const set = SPR[ROCK_KIND[D.kind[j]]], img = set[j % set.length], s = D.size[j] * 2.2 * k, c = Math.cos(D.rot[j]), sn = Math.sin(D.rot[j]);
@@ -716,6 +718,7 @@ function frame(now) {
   let dt = (now - last) / 1000; last = now;
   if (paused) return;
   frameLog.push(dt * 1000);
+  if (dt > .2) (stats.stalls ||= []).push(`${(clock - cycleStart).toFixed(1)}s/${Math.round(dt * 1000)}ms/fx${fx.length}/d${D.n}/t${texts.length}/b${banner ? 1 : 0}`);
   dt = Math.min(dt, .1);
   acc += dt * 1000;
   let steps = 0; while (acc >= TICK && steps < 5) { tickSim(); acc -= TICK; steps++; }
@@ -748,7 +751,7 @@ function showDbg() {
 function markButtons() { for (const b of document.querySelectorAll('#bar button')) b.classList.toggle('on', b.dataset.q === (auto ? 'auto' : String(tier)) || b.dataset.pets === String(PETS_N) || (b.dataset.act === 'pause' && paused)); }
 $('#bar').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
-  if (b.dataset.q) { auto = b.dataset.q === 'auto'; setTier(auto ? 2 : Number(b.dataset.q)); }
+  if (b.dataset.q) { auto = b.dataset.q === 'auto'; setTier(auto ? 3 : Number(b.dataset.q)); }
   if (b.dataset.pets) { PETS_N = Number(b.dataset.pets); makePets(); resetField(); }
   if (b.dataset.act === 'pause') paused = !paused;
   if (b.dataset.act === 'clean') document.body.classList.add('clean');
