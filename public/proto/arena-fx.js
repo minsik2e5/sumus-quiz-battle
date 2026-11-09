@@ -843,7 +843,7 @@ function frame(now) {
   let steps = 0; while (acc >= TICK && steps < 5) { tickSim(); acc -= TICK; steps++; }
   if (steps === 5) acc = 0;
   const fdt = hitstop > 0 ? 0 : slowmo > 0 ? dt * .35 : dt;
-  clock += fdt;
+  clock += fdt; stats.t = clock;
   for (let i = timers.length - 1; i >= 0; i--) if (clock >= timers[i].at) { const f = timers[i].fn; timers.splice(i, 1); f(); }
   if (FX_ON) runScript();
   render(dt, acc / TICK);

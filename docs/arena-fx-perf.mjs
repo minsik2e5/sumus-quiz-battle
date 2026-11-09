@@ -66,10 +66,12 @@ async function measure(browser, base, { cpu, seconds, q, pets, fx = '1', shot, s
   await page.evaluate(() => { window.__perf.frames = []; window.__perf.long = []; });
   const t0 = Date.now(); let heapMax = 0; const shotList = shots ? [...shots] : shot ? [[shot, shotAt]] : [];
   while (Date.now() - t0 < seconds * 1000) {
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(shotList.some(x => x[2]) ? 40 : 500);
     const m = Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(x => [x.name, x.value]));
     heapMax = Math.max(heapMax, m.JSHeapUsedSize || 0);
-    while (shotList.length && Date.now() - t0 > shotList[0][1]) { const [path] = shotList.shift(); await page.screenshot(path.endsWith('.png') ? { path, scale: 'css' } : { path, type: 'jpeg', quality: 72, scale: 'css' }); }
+    // 'c' 붙은 시각(예: 파일.png@c10.9)은 페이지의 연출 시계(초) 기준 → 매번 같은 장면을 찍는다
+    if (shotList.length && shotList[0][2]) { const t = await page.evaluate(() => window.__fx.t || 0); if (t >= shotList[0][1]) { const [path] = shotList.shift(); await page.screenshot(path.endsWith('.png') ? { path, scale: 'css' } : { path, type: 'jpeg', quality: 72, scale: 'css' }); } }
+    while (shotList.length && !shotList[0][2] && Date.now() - t0 > shotList[0][1]) { const [path] = shotList.shift(); await page.screenshot(path.endsWith('.png') ? { path, scale: 'css' } : { path, type: 'jpeg', quality: 72, scale: 'css' }); }
   }
   const P = await page.evaluate(() => window.__perf);
   const F = await page.evaluate(() => ({ ...window.__fx, glowsMax: window.__fx.glowsMax, canvasMB: window.__fx.canvasMB(), accel: (() => { try { const c = document.createElement('canvas'); c.width = c.height = 300; const g = c.getContext('2d'); return typeof g.isContextLost === 'function' ? 'ok' : '-'; } catch { return '-'; } })() }));
@@ -92,7 +94,7 @@ const browser = await pw.chromium.launch({ args: GPU ? ['--enable-gpu', '--use-a
 const SECONDS = Number(arg('seconds', 40));
 const runs = process.argv.includes('--table')
   ? [[1, '3'], [4, '3'], [4, '2'], [4, 'auto'], [6, '3'], [6, 'auto'], [6, '1'], [6, '0']].map(([cpu, q]) => ({ cpu, q, pets: 4, seconds: SECONDS }))
-  : [{ cpu: Number(arg('cpu', 4)), q: arg('q', 'auto'), pets: Number(arg('pets', 4)), fx: arg('fx', '1'), seconds: SECONDS, shot: arg('shot', ''), shotAt: Number(arg('shot-at', 8300)), shots: arg('shots', '') ? arg('shots', '').split(',').map(s => s.split('@')).map(([p, t]) => [p, Number(t)]) : null }];
+  : [{ cpu: Number(arg('cpu', 4)), q: arg('q', 'auto'), pets: Number(arg('pets', 4)), fx: arg('fx', '1'), seconds: SECONDS, shot: arg('shot', ''), shotAt: Number(arg('shot-at', 8300)), shots: arg('shots', '') ? arg('shots', '').split(',').map(s => s.split('@')).map(([p, t]) => [p, Number(String(t).replace('c', '')), String(t).startsWith('c')]) : null }];
 const rows = [];
 for (const r of runs) { const out = await measure(browser, base, r); rows.push(out); console.log(JSON.stringify(out)); }
 if (rows.length > 1 || !process.argv.includes('--json')) {

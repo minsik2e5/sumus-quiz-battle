@@ -1,9 +1,9 @@
 // 펫 아레나 연출 시험 페이지 소리(2판): 파일 없이 WebAudio로 그 자리에서 합성한다.
 //   - 첫 터치(pointerdown · keydown) 뒤에만 켜진다(브라우저 자동 재생 규칙). 음소거는 setMuted.
-//   - 소리 하나 = 노드 몇 개(잡음 + 필터 + 사인/톱니 + 음량 곡선). 동시에 10개까지만(넘으면 버림) → 큰 장면에서도 오디오 스레드가 가볍다.
-//   - 같은 소리가 너무 촘촘하면(타격 60ms 안) 한 번만 낸다.
+//   - 소리 하나 = 노드 몇 개(잡음 + 필터 + 사인/톱니 + 음량 곡선). 동시에 8개까지만(넘으면 버림) → 큰 장면에서도 오디오 스레드가 가볍다.
+//   - 같은 소리가 너무 촘촘하면(타격 90ms 안) 한 번만 낸다. 큰 소리(폭발 · 번개 · 필살)가 울리는 0.15초 동안 타격음은 쉰다.
 let AC = null, out = null, noise = null, muted = false, live = 0;
-const MAX_VOICES = 10, last = {};
+const MAX_VOICES = 8, last = {};
 export const soundState = () => ({ on: !!AC && AC.state === 'running', muted, live });
 export function setMuted(m) { muted = m; if (out) out.gain.setTargetAtTime(m ? 0 : .55, AC.currentTime, .02); }
 export function unlockSound() {
@@ -47,6 +47,8 @@ const VOICES = {
   faint(v = 1) { const t = voice(.7); if (t == null) return; const g = AC.createGain(); env(g, t, .01, .3 * v, .6); chain(osc('triangle', t, 520, 90, .6), g); }
 };
 export function sfx(name, v = 1) {
-  const now = performance.now(); if (now - (last[name] || 0) < (name === 'hit' ? 60 : 30)) return; last[name] = now;
+  const now = performance.now(); if (now - (last[name] || 0) < (name === 'hit' ? 90 : 30)) return;
+  if (name === 'hit' && now - Math.max(last.boom || 0, last.thunder || 0, last.ult || 0) < 150) return;
+  last[name] = now;
   try { VOICES[name]?.(v); } catch {}
 }

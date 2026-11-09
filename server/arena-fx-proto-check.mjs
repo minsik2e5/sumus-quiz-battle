@@ -27,6 +27,6 @@ export async function runArenaFxProtoChecks(assert) {
   // 빛 번짐은 미리 번지게 그린 그림으로(프레임마다 blur 필터 없음, 사파리), 소리는 파일 없이 합성 · 첫 터치 뒤에만
   assert(!/ctx\.filter\s*=/.test(js) && !/\.filter\s*=\s*['`"]blur/.test(js), '캔버스 ctx.filter(blur)를 쓰지 않는다');
   const snd = source('../public/proto/arena-fx-sound.js');
-  assert(!/new Audio\(|\.mp3|\.ogg|fetch\(/.test(snd) && snd.includes('const MAX_VOICES = 10') && js.includes("addEventListener('pointerdown', unlockSound"), '소리는 WebAudio 합성(파일 없음) · 동시 10개 상한 · 첫 터치 뒤에만 켜짐');
+  assert(!/new Audio\(|\.mp3|\.ogg|fetch\(/.test(snd) && /const MAX_VOICES = ([1-9]|10),/.test(snd) && js.includes("addEventListener('pointerdown', unlockSound"), '소리는 WebAudio 합성(파일 없음) · 동시 10개 이하 상한 · 첫 터치 뒤에만 켜짐');
   assert(html.includes('data-act="mute"'), '시험 페이지에 음소거 버튼이 있다');
 }
