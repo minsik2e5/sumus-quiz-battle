@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="robots" content="noindex">
+<title>펫 아레나 캔버스 연출 시험</title>
+<!-- 측정용 시험 페이지: 앱과 연결하지 않는다(미리 받기 제외 · 메뉴 링크 없음). docs/arena-battle-reboot-plan.md 참고. -->
+<style>
+@font-face { font-family: 'Jua'; font-display: block; src: url('/assets/fonts/jua-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+2000-206F; }
+@font-face { font-family: 'Jua'; font-display: block; src: url('/assets/fonts/jua-korean.woff2') format('woff2'); unicode-range: U+1100-11FF, U+3000-303F, U+3130-318F, U+AC00-D7AF; }
+:root { --ink: #fff; --panel: rgba(14, 20, 38, .78); --line: rgba(255, 255, 255, .16); --a: #4aa8ff; --b: #ff5a5a; --gold: #ffd257; }
+html, body { margin: 0; height: 100%; background: #0b1020; color: var(--ink); overflow: hidden; font-family: 'Jua', system-ui, sans-serif; -webkit-user-select: none; user-select: none; touch-action: none; }
+#stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#hud { position: fixed; left: 0; right: 0; top: 0; padding: calc(env(safe-area-inset-top) + 8px) 10px 10px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 8px; background: linear-gradient(rgba(8, 12, 26, .72), rgba(8, 12, 26, 0)); pointer-events: none; }
+.team { display: flex; gap: 6px; }
+.team.b { justify-content: flex-end; }
+.mon { width: 54px; }
+.face { width: 40px; height: 40px; border-radius: 12px; background: var(--panel) center / 120% no-repeat; border: 2px solid var(--a); display: block; margin: 0 auto 3px; }
+.b .face { border-color: var(--b); }
+.mon.out .face { filter: grayscale(1) brightness(.55); }
+.bar { height: 6px; border-radius: 4px; background: rgba(0, 0, 0, .45); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 100%; background: #6dea7a; transform-origin: 0 50%; transition: transform .18s ease-out; }
+.bar i.mid { background: #ffd257; } .bar i.low { background: #ff6262; }
+.timer { min-width: 64px; text-align: center; font-size: 26px; line-height: 40px; text-shadow: 0 2px 0 rgba(0, 0, 0, .5); }
+#dbg { position: fixed; left: 8px; top: calc(env(safe-area-inset-top) + 74px); font: 11px/1.35 ui-monospace, monospace; background: rgba(0, 0, 0, .5); padding: 4px 6px; border-radius: 6px; pointer-events: none; white-space: pre; }
+#bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 10px calc(env(safe-area-inset-bottom) + 10px); display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; background: linear-gradient(rgba(8, 12, 26, 0), rgba(8, 12, 26, .8)); }
+#bar button { font: inherit; font-size: 14px; color: #fff; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; }
+#bar button.on { border-color: var(--gold); color: var(--gold); }
+#note { position: fixed; right: 8px; top: calc(env(safe-area-inset-top) + 74px); font-size: 11px; opacity: .7; text-align: right; pointer-events: none; }
+body.clean #bar, body.clean #dbg, body.clean #note { display: none; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div id="hud"><div class="team a" id="team-a"></div><div class="timer" id="timer">2:00</div><div class="team b" id="team-b"></div></div>
+<div id="dbg"></div>
+<div id="note">시험 페이지 · 앱과 연결 안 됨</div>
+<div id="bar">
+  <button data-q="auto">자동</button><button data-q="2">높음</button><button data-q="1">중간</button><button data-q="0">낮음</button>
+  <button data-pets="2">펫 2</button><button data-pets="4">펫 4</button>
+  <button data-act="pause">멈춤</button><button data-act="clean">깨끗한 화면</button>
+</div>
+<script src="/proto/arena-fx.js" type="module"></script>
+</body>
+</html>
