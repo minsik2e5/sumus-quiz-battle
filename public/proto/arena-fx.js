@@ -12,8 +12,8 @@
 //   - 품질 4단계(해상도 · 파편 수 · 빛 겹 · 잔상 · 컷인 속도선 수)를 프레임 시간을 보고 자동으로 내린다.
 // 주소 옵션: ?q=auto|3|2|1|0(높음 · 중간 · 낮음 · 최저) &pets=2|4 &clean=1 &seed=숫자 &fx=0(효과 끄기) &decal=0(자국 굽기 끄기)
 import { ARENA_ART } from '/modules/arena-art.js';
-import { sfx, unlockSound, setMuted, soundState } from '/proto/arena-fx-sound.js?v=2.1';
-const PROTO_V = '2.1';
+import { sfx, unlockSound, setMuted, soundState } from '/proto/arena-fx-sound.js?v=2.2';
+const PROTO_V = '2.2';
 // 옛 서비스 워커가 이 페이지를 캐시에서 주던 폰: 기다리는 새 워커가 있으면 바로 넘어가게 하고(SKIP_WAITING), 넘어가면 한 번만 새로 고친다.
 //   새 sw.js는 /proto/를 거치지 않으므로 그다음부터는 늘 서버의 새 파일이다. 앱의 pwa.js는 이 페이지에 없어서 직접 한다.
 try {
