@@ -13,9 +13,14 @@ export async function runArenaFxProtoChecks(assert) {
   const html = source('../public/proto/arena-fx.html'), js = source('../public/proto/arena-fx.js'), sw = source('../public/sw.js');
   const precache = JSON.parse(sw.match(/const PRECACHE = (\[.*\]);/)[1]);
   assert(!precache.some(u => u.startsWith('/proto/')), '아레나 연출 시험 페이지는 미리 받기에 넣지 않는다');
+  // 서비스 워커는 /proto/를 거치지 않는다(fetch 핸들러에서 navigate 처리 · 캐시보다 먼저 돌아감) → 폰에 옛 시험 페이지가 남지 않는다
+  const handler = sw.slice(sw.indexOf("addEventListener('fetch'"));
+  const skip = handler.indexOf("if (url.pathname.startsWith('/proto/')) return;");
+  assert(skip > 0 && skip < handler.indexOf("req.mode === 'navigate'") && skip < handler.indexOf('caches.match(req'), '서비스 워커 fetch 핸들러는 /proto/ 요청을 navigate · 캐시 처리보다 먼저 그냥 보낸다');
+  assert(js.includes("w.postMessage({ type: 'SKIP_WAITING' })") && js.includes("from '/proto/arena-fx-sound.js?v="), '시험 페이지는 기다리는 새 서비스 워커를 넘기고, 스크립트를 ?v=로 불러 옛 캐시를 넘긴다');
   const appFiles = ['../public/app.js', '../public/index.html', ...readdirSync(path('../public/modules')).filter(n => n.endsWith('.js')).map(n => '../public/modules/' + n)];
   assert(appFiles.every(f => !source(f).includes('/proto/')), '앱 화면 코드는 시험 페이지(/proto/)를 부르지 않는다');
-  assert(!/<script(?![^>]*\bsrc=)[^>]*>/.test(html) && !/\son[a-z]+=/.test(html) && html.includes('src="/proto/arena-fx.js"'), '시험 페이지는 인라인 스크립트 없이(CSP script-src self) 별도 파일로 돈다');
+  assert(!/<script(?![^>]*\bsrc=)[^>]*>/.test(html) && !/\son[a-z]+=/.test(html) && /src="\/proto\/arena-fx\.js\?v=[\w.]+"/.test(html), '시험 페이지는 인라인 스크립트 없이(CSP script-src self) 별도 파일로 돈다');
   assert(/const DMAX = \d+, SMAX = \d+, KMAX = \d+, GMAX = \d+;/.test(js) && ['if (D.n >= T.debris) return;', 'if (M.n >= T.smoke) return;', 'if (K.n >= T.sparks) return;', 'if (G.n >= T.glows) return;'].every(x => js.includes(x)), '파편 · 연기 · 불꽃 · 빛 알갱이는 정해진 크기의 풀(상한)에서만 쓴다');
   assert(/const SCAR_CAP = \d+;/.test(js) && js.includes('if (scars > SCAR_CAP) healField();'), '바닥 자국은 경기장 그림 한 장에 구워 넣고, 상한이 넘으면 아물게 한다(목록이 끝없이 쌓이지 않음)');
   assert(js.includes('const TICK = 50;') && js.includes('render(dt, acc / TICK)'), '고정 틱(50ms, 규칙과 같은 간격) + 그리기 보간');
