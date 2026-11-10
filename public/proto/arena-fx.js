@@ -140,9 +140,13 @@ function tint(k, rgb) {
   const src = mat[k]; c = mk(src.width, src.height); const g = c.getContext('2d');
   g.drawImage(src, 0, 0);
   if (MATS[k][0] === 'luma') { g.globalCompositeOperation = 'source-in'; g.fillStyle = `rgb(${rgb})`; g.fillRect(0, 0, c.width, c.height); }
-  else { g.globalCompositeOperation = 'multiply'; g.fillStyle = `rgb(${rgb})`; g.fillRect(0, 0, c.width, c.height); g.globalCompositeOperation = 'destination-in'; g.drawImage(src, 0, 0); }
+  // add 재료: 먼저 색을 빼(채도 0, 밝기만 남김) 흰 빛으로 만든 뒤 곱하기로 색을 입힌다 → 그림 71의 빛이 주황 · 파랑으로 그려져 있어도 어떤 속성 색이든 맑게 나온다
+  else { g.globalCompositeOperation = 'saturation'; g.fillStyle = '#808080'; g.fillRect(0, 0, c.width, c.height); if (rgb !== '255,255,255') { g.globalCompositeOperation = 'multiply'; g.fillStyle = `rgb(${rgb})`; g.fillRect(0, 0, c.width, c.height); } g.globalCompositeOperation = 'destination-in'; g.drawImage(src, 0, 0); }
   tintCache.set(key, c); return c;
 }
+// 그림 71이 들어온 재료만 세기 · 크기를 맞춘다(그린 빛은 코드 빛보다 진하고, 불티 점은 칸에 비해 작다). [투명도 배율, 크기 배율]
+const ART_ADJ = { glow: [.55, .8], burst: [.8, .9], ring: [.85, 1], ember: [1, 3.2], stardust: [.9, 1.3], frost: [.8, 1], star: [.85, 1], scorch: [.55, .9], crater: [.75, 1], 'crack-star': [.85, 1], 'crack-line': [.8, 1] };
+const adj = k => matFromArt.has(k) ? ART_ADJ[k] || [1, 1] : [1, 1];
 const EL_RGB = { star: '255,226,90', flame: '255,130,50', earth: '214,170,110', ice: '140,215,255', toxic: '200,110,255', water: '80,180,255', wind: '170,255,220', leaf: '140,230,90' };
 
 /* ---------- 바닥: 처음 한 번 그린 땅(ground) + 자국이 구워지는 경기장(field) ---------- */
@@ -178,7 +182,8 @@ function scar(n = 1) { scars += n; if (scars > SCAR_CAP) healField(); }
 function healField() { fctx.save(); fctx.setTransform(1, 0, 0, 1, 0, 0); fctx.globalAlpha = .25; fctx.drawImage(ground, 0, 0); fctx.restore(); scars = Math.round(scars * .75); stats.heals++; }
 // 자국 도장: 재료(mul)를 곱하기로 바닥에 굽는다. 그림 71-7이 오면 그 그림, 없으면 코드 그림.
 function stamp(k, x, y, w, h = w, rot = 0, alpha = 1, n = 1) {
-  const g = fctx; g.save(); g.translate(x, y); if (rot) g.rotate(rot); g.globalAlpha = alpha; g.globalCompositeOperation = 'multiply';
+  const [ga, gs] = adj(k); w *= gs; h *= gs;
+  const g = fctx; g.save(); g.translate(x, y); if (rot) g.rotate(rot); g.globalAlpha = alpha * ga; g.globalCompositeOperation = 'multiply';
   g.drawImage(mat[k], -w / 2, -h / 2, w, h); g.restore(); scar(n);
 }
 
@@ -332,7 +337,7 @@ const MAX_FX = 16, MAX_RINGS = 18, MAX_NUMS = 24, MAX_TEXTS = 10;
 function pushFx(f) { if (fx.length >= MAX_FX) { fx[0].end?.(); fx.shift(); } fx.push(f); }
 function ring(x, y, r1, dur, rgb, w = 1.6, delay = 0) { if (rings.length < MAX_RINGS) rings.push({ x, y, r1, dur, rgb, w, t: -delay }); }
 // 빛 번짐: glow 재료(미리 번지게 그린 그림)에 색을 입혀 더하기로 — blur 없음
-function flash(x, y, r, dur, rgb = '255,255,255', delay = 0, k = 'glow') { if (flashes.length < 24) flashes.push({ x, y, r, dur, img: rgb === '255,255,255' ? mat[k] : tint(k, rgb), t: -delay, k }); }
+function flash(x, y, r, dur, rgb = '255,255,255', delay = 0, k = 'glow') { if (flashes.length < 24) flashes.push({ x, y, r, dur, img: rgb === '255,255,255' && k !== 'glow' ? mat[k] : tint(k, rgb), t: -delay, k }); }
 function shake(v) { cam.trauma = Math.min(1, cam.trauma + v); }
 function stop(ms) { hitstop = Math.max(hitstop, ms / 1000); }
 // DOM 막: 속성 색(잠깐 화면에 색) · 반전 섬광 · 가장자리 어둡게(필살 때 진하게)
@@ -552,7 +557,7 @@ function ultimate(from) {
       radial2(x, y, 18, 8, 52, '255,240,190', .4);
       addDebris(x, y, 160, 0, 1.4, 1.2); addDebris(x, y, 40, 2, 1.1);
       addSmoke(x, y, 26, 0, 7, 18); addSmoke(x, y, 10, 1, 6, 10); addSparks(x, y, 60, 1, 110, 2.6); addGlow(x, y, 40, 2, 40, 3, 1.1, null, TAU, -4); addGlow(x, y, 6, 4, 30, 4, .5);
-      stamp('scorch', x, y, 34, 34, rnd() * TAU, 1); stamp('crater', x, y, 26, 24, 0, .9); stamp('crack-star', x, y, 52, 52, rnd() * TAU, 1, 3);
+      stamp('scorch', x, y, 34, 34, rnd() * TAU, 1); stamp('crater', x, y, 26, 24, 0, .9); stamp('crack-star', x, y, 42, 42, rnd() * TAU, 1, 3);
       for (const p of enemies) if (Math.hypot(p.x - x, p.y - y) < 32) hit(p, 34 + (rnd() * 10 | 0), 'crit', from);
       setTimeout(() => vigEl.classList.remove('ult'), 500);
     });
@@ -736,9 +741,9 @@ function drawGlows(k, ox, oy, dt) {
   if (!G.n) return;
   ctx.globalCompositeOperation = 'lighter'; ctx.setTransform(1, 0, 0, 1, 0, 0);
   for (let j = 0; j < G.n; j++) {
-    const [mk2, rgb] = GLOW_MAT[G.kind[j]], img = rgb === '255,255,255' ? mat[mk2] : tint(mk2, rgb), p = G.life[j] / G.max[j];
-    const s = G.size[j] * k * (G.kind[j] === 1 ? .6 + p * .6 : 1), iw = s / img.width, c = Math.cos(G.rot[j]), sn = Math.sin(G.rot[j]);
-    ctx.globalAlpha = Math.min(1, p * 2);
+    const [mk2, rgb] = GLOW_MAT[G.kind[j]], img = rgb === '255,255,255' ? mat[mk2] : tint(mk2, rgb), p = G.life[j] / G.max[j], [ga, gs] = adj(mk2);
+    const s = G.size[j] * gs * k * (G.kind[j] === 1 ? .6 + p * .6 : 1), iw = s / img.width, c = Math.cos(G.rot[j]), sn = Math.sin(G.rot[j]);
+    ctx.globalAlpha = Math.min(1, p * 2) * ga;
     ctx.setTransform(c * iw, sn * iw, -sn * iw, c * iw, ox + G.x[j] * k, oy + G.y[j] * k);
     ctx.drawImage(img, -img.width / 2, -img.height / 2);
   }
@@ -764,7 +769,7 @@ function drawRings(dt) {
   for (let i = rings.length - 1; i >= 0; i--) {
     const r = rings[i]; r.t += dt; if (r.t >= r.dur) { rings.splice(i, 1); continue; } if (r.t < 0) continue;
     const p = r.t / r.dur, a = (1 - p) * (1 - p), R = r.r1 * easeOut(p);
-    if (T.glow) { ctx.globalAlpha = a; const img = tint('ring', r.rgb), s = R * 2 * (256 / 208); ctx.drawImage(img, r.x - s / 2, r.y - s * .44, s, s * .88); ctx.globalAlpha = 1; }
+    if (T.glow) { const [ga] = adj('ring'); ctx.globalAlpha = a * ga; const img = tint('ring', r.rgb), s = R * 2 * (256 / 208); ctx.drawImage(img, r.x - s / 2, r.y - s * .44, s, s * .88); ctx.globalAlpha = 1; }
     else { ctx.strokeStyle = `rgba(${r.rgb},${a})`; ctx.lineWidth = r.w * (1 - p * .6); ctx.beginPath(); ctx.ellipse(r.x, r.y, R, R * .88, 0, 0, TAU); ctx.stroke(); }
   }
   ctx.globalCompositeOperation = 'source-over';
@@ -773,7 +778,7 @@ function drawFlashes(dt) {
   ctx.globalCompositeOperation = 'lighter';
   for (let i = flashes.length - 1; i >= 0; i--) {
     const f = flashes[i]; f.t += dt; if (f.t >= f.dur) { flashes.splice(i, 1); continue; } if (f.t < 0) continue;
-    const p = f.t / f.dur, a = p < .1 ? 1 : 1 - (p - .1) / .9, r = f.r * (.6 + .4 * easeOut(p));
+    const [ga, gs] = adj(f.k), p = f.t / f.dur, a = (p < .1 ? 1 : 1 - (p - .1) / .9) * ga, r = f.r * gs * (.6 + .4 * easeOut(p));
     ctx.globalAlpha = a; ctx.drawImage(f.img, f.x - r, f.y - r, r * 2, r * 2);
   }
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
