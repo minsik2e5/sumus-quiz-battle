@@ -9,6 +9,8 @@
 //   스타일 재계산 · 배치 시간, 효과 조각이 떠 있는 프레임만 따로.
 //
 // 사용: node docs/arena-perf.mjs [--cpu 4] [--seconds 70] [--lite auto|off] [--profile] [--trace] [--css '실험 CSS'] [--shot 파일.png] [--mode ffa|2v2]
+// V13.238 캔버스 무대: 효과 수는 무대 풀 · 목록(window.__arenaStage.count()), FIGHT!는 무대가 적은 시각(fightAt).
+//   --tier auto|0|1|2|3: 품질 자동(기본, 처음엔 높음에서 내려감) · 고정(최저 0 ~ 높음 3). 끝에 tier(끝 단계) · tier_log(내려간 때) · 풀 최대치를 찍는다.
 // V13.232 --mode ffa | 2v2: 1:1:1 난투(펫 3마리) · 2:2 팀전(펫 4마리)을 잰다. 방은 페이지 안에서 흉내 낸다(0.1초마다 내 조작을 확정해 돌려줌),
 //   다른 자리는 컴퓨터(보통)가 조종하므로 경기장에 펫이 3 · 4마리 동시에 싸운다. 화면 · 전투는 진짜(arena.js · createLiveSimN).
 // playwright가 필요하다(이 저장소 의존성이 아니다). 먼저 npm run build:assets(public/app.bundle.css).
@@ -45,6 +47,8 @@ const PETS = ME.map((key, i) => ({ key, form: 3, level: 20 - i, active: i === 0 
 
 const MIME = { '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.webp': 'image/webp', '.png': 'image/png', '.svg': 'image/svg+xml', '.mp3': 'audio/mpeg', '.json': 'application/json', '.html': 'text/html' };
 const MODE = arg('mode', '');
+// V13.238 --practice: 연습장(허수아비 '반격')을 잰다 · 본다.
+const PRACTICE = process.argv.includes('--practice');
 const MULTI_PETS = [['gumiho', 'bear'], ['dragon', 'turtle'], ['phoenix', 'dog'], ['tiger', 'penguin']];
 const sideOf = (i, tm, x, y) => ({ side: `p${i}`, tm, x, y, bot: i > 0, name: i === 0 ? '나' : `친구 ${i}`, team: MULTI_PETS[i].map((key, j) => ({ key, form: 3, level: 20, s2: (i + j) & 1 })) });
 const MULTI_SIDES = MODE === 'ffa' ? [sideOf(0, 0, 50, 78), sideOf(1, 1, 18, 24), sideOf(2, 2, 82, 24)]
@@ -79,7 +83,8 @@ const PAGE = `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta n
 const { openArena } = await import('/modules/arena.js');
 const A = { data: { profile: { id: 'me', display_name: '나', role: 'student' }, stats: { pets: ${JSON.stringify(PETS)}, points_balance: 100 }, rewards: {} }, screen: 'arena' };
 openArena(A, () => {});
-setTimeout(() => document.querySelector('[data-ar="start"]')?.click(), 600);
+setTimeout(() => document.querySelector(${PRACTICE ? `'[data-ar="pr-open"]'` : `'[data-ar="start"]'`})?.click(), 600);
+${PRACTICE ? `setTimeout(() => document.querySelector('[data-ar="pr-dummy"][data-k="fight"]')?.click(), 1000); setTimeout(() => document.querySelector('[data-ar="pr-go"]')?.click(), 1300);` : ''}
 </script></body></html>`;
 
 async function startServer() {
@@ -136,7 +141,9 @@ const PROBE = () => {
       for (const k of tags) { P.tagAll[k] = (P.tagAll[k] || 0) + 1; if (d > 50) P.tagLong[k] = (P.tagLong[k] || 0) + 1; }
       if (d > 50) P.tagLong['(모든 긴 프레임)'] = (P.tagLong['(모든 긴 프레임)'] || 0) + 1;
       if (d > 33.4) (P.slow ||= []).push(`${((t - P.t0) / 1000).toFixed(1)}s ${Math.round(d)}ms ${[...tags].slice(0, 6).join(' ')}`);
-      const fx = document.querySelectorAll('#ar-field .ar-fx').length; if (fx) P.fxFrames.push(d); if (fx > P.fxMax) P.fxMax = fx;
+      const st = window.__arenaStage, c = st?.count?.(), fx = c ? c.fx + c.bits + c.sparks + c.glows + c.smoke + c.debris + c.rings + c.nums + c.texts + c.ghosts : document.querySelectorAll('#ar-field .ar-fx').length;
+      if (!P.fight && st?.fightAt) P.fight = st.fightAt;
+      if (fx) P.fxFrames.push(d); if (fx > P.fxMax) P.fxMax = fx;
     }
     if (P.on && !playing && !P.t1) P.t1 = t;
     last = t; tags = new Set(); requestAnimationFrame(loop);
@@ -158,7 +165,8 @@ async function main() {
   const pw = loadPlaywright();
   const server = await startServer();
   const base = `http://127.0.0.1:${server.address().port}`;
-  const browser = await pw.chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'] });
+  // PW_EXEC: playwright와 받은 브라우저 판이 다를 때 그 브라우저 실행 파일 경로.
+  const browser = await pw.chromium.launch({ args: ['--autoplay-policy=no-user-gesture-required'], ...(process.env.PW_EXEC ? { executablePath: process.env.PW_EXEC } : {}) });
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });
   const me = await ctx.newPage();
   me.on('pageerror', e => console.error('[pageerror]', e.message));
@@ -168,6 +176,8 @@ async function main() {
   await me.addInitScript(mode => { try { if (mode === 'off') localStorage.removeItem('sumus-arena-lite'); else if (mode === 'on') localStorage.setItem('sumus-arena-lite', String(Date.now())); } catch {} }, LITE);
   // --lite off: 자동 단계도 못 켜게 막는다(보통 연출 그대로 잰다).
   if (LITE === 'off') await me.addInitScript(() => { const s = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (k === 'sumus-arena-lite') return; return s.call(this, k, v); }; });
+  const TIER = arg('tier', 'auto');
+  await me.addInitScript(t => { try { localStorage.removeItem('sumus-arena-tier'); } catch {} if (t !== 'auto') window.__arenaTierFix = Number(t); }, TIER);
   const EXTRA = arg('css', '');
   if (EXTRA) await me.addInitScript(css => document.addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); }), EXTRA);
   const cdp = await ctx.newCDPSession(me);
@@ -231,7 +241,9 @@ async function main() {
     style_ms: Math.round((m1.RecalcStyleDuration - m0.RecalcStyleDuration) * 1000), style_count: m1.RecalcStyleCount - m0.RecalcStyleCount,
     layout_ms: Math.round((m1.LayoutDuration - m0.LayoutDuration) * 1000), layout_count: m1.LayoutCount - m0.LayoutCount,
     script_ms: Math.round((m1.ScriptDuration - m0.ScriptDuration) * 1000), task_ms: Math.round((m1.TaskDuration - m0.TaskDuration) * 1000),
-    nodes: m1.Nodes, lite_class: await me.evaluate(() => !!document.querySelector('.ar-app.ar-lite'))
+    nodes: m1.Nodes, lite_class: await me.evaluate(() => !!document.querySelector('.ar-app.ar-lite')),
+    heap_mb: r1((await cdp.send('Runtime.getHeapUsage').catch(() => ({ usedSize: 0 }))).usedSize / 1048576),
+    ...(await me.evaluate(() => { const s = window.__arenaStage; return s ? { tier_mode: window.__arenaTierFix ?? 'auto', tier: ['최저', '낮음', '중간', '높음'][s.tier], tier_log: s.tierLog.join(' '), pool_max: `fx${s.fxMax} 조각${s.bitsMax} 불꽃${s.sparksMax} 빛${s.glowsMax} 연기${s.smokeMax} 파편${s.debrisMax} 고리${s.ringsMax} 숫자${s.numsMax} 글자${s.textsMax}`, scars: s.scars, heals: s.heals } : {}; }))
   };
   if (process.argv.includes('--layers')) console.log('layers:', JSON.stringify(LAYERS));
   console.log(JSON.stringify(out));

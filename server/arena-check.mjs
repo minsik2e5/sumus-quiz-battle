@@ -160,12 +160,13 @@ export async function runArenaChecks(assert) {
       'V13.225 화면은 서버 판으로 같은 전투를 돌리고 조작 기록만 보낸다');
     assert(['ar-stick', "data-btn=\"atk\"", "data-btn=\"skill\"", "data-btn=\"ult\"", "data-btn=\"dodge\"", "data-btn=\"swap\"", 'pointerdown', 'KeyJ'].every(x => ui.includes(x)) && !ui.includes('dealWalls') && !ui.includes('questions'),
       'V13.225 조작: 조이스틱 · 공격 · 스킬 · 필살기 · 회피 · 교체 버튼(누르는 순간 반응), 키보드도 된다. 단어 문제 없음');
-    const css = source('../public/v13226.css');
+    const css = source('../public/v13226.css'), stage = source('../public/modules/arena-stage.js');
     const art = ['entry', 'bg-plaza', 'bg-forest', 'bg-night', 'vs', 'banner-win', 'banner-lose', 'ult-icon', 'fx-faint'];
-    assert(art.every(n => existsSync(new URL(`../public/assets/arena/${n}.webp`, import.meta.url))) && ui.includes("artImg('ult-icon'") && ui.includes("'banner-win' : 'banner-lose'") && ui.includes('/assets/arena/fx-faint.webp') && css.includes('url(/assets/arena/vs.webp)') && css.includes('.ar-stage.art~.ar-main .ar-ring{display:none}'),
+    assert(art.every(n => existsSync(new URL(`../public/assets/arena/${n}.webp`, import.meta.url))) && ui.includes("artImg('ult-icon'") && ui.includes("'banner-win' : 'banner-lose'") && stage.includes("artReady('fx-faint')") && css.includes('url(/assets/arena/vs.webp)') && css.includes('.ar-stage.art~.ar-main .ar-ring{display:none}'),
       'V13.225 주문서 65 그림 9개: 경기장 · VS · 승패 배너 · 필살기 아이콘 · 쓰러짐 별');
-    assert(ui.includes('R.fxN >= (R.lite ? FX_MAX_LITE : FX_MAX)') && ui.includes('SHOTS_MAX') && css.includes('.ar-shot{') && css.includes('will-change:transform') && !/\.ar-shot[^{]*\{[^}]*transition:[^}]*(left|top)/.test(css),
-      'V13.225 렉 방지: 효과 조각 상한, 날아가는 공격은 정해진 칸을 다시 쓰고 transform으로만 움직인다');
+    // V13.238 효과는 캔버스 무대(arena-stage.js)의 상한 있는 목록 · 풀, 날아가는 공격은 매 프레임 상태(cur.shots)를 그대로 그린다(DOM 칸 없음).
+    assert(stage.includes('if (fx.length >= Math.min(LIST_MAX.fx, T.fx)) return null;') && stage.includes('for (const s of sc.cur.shots || [])') && !ui.includes('ar-shot-') && css.includes('.ar-shot{') && css.includes('will-change:transform') && !/\.ar-shot[^{]*\{[^}]*transition:[^}]*(left|top)/.test(css),
+      'V13.225 렉 방지: 효과 상한, 날아가는 공격은 캔버스에 그린다(V13.238 전까지는 정해진 칸을 transform으로)');
   }
   // 8) V13.226 펫마다 역할 · 스킬 2개 · 근접 보강 · 렉 방지.
   {
@@ -193,11 +194,13 @@ export async function runArenaChecks(assert) {
     const A = createArena({ seed: 3, me: [fighter({ key: 'turtle', form: 2, level: 5, s2: 1 })], foe: me, foeLevel: 0 });
     A.S.me.skill2 = 0; A.push([0, INPUT.SKILL2]); A.step();
     assert(A.S.me.skill2 > 0 && A.S.me.bubble === SK2.bubble.hits && cleanInputs([[0, INPUT.SKILL2]]).length === 1, 'V13.226 스킬 2: 누르면 쿨타임(방울 보호막은 방울 2개), 서버도 스킬 2 조작을 받는다');
-    const ui = source('../public/modules/arena.js'), css = source('../public/v13226.css');
-    assert(ui.includes('data-btn="skill2"') && ui.includes("KeyI: 'skill2'") && ui.includes('ar-role') && ui.includes('ar-mine-'), 'V13.226 화면: 스킬 2 버튼(키보드 I) · 대기실에 역할 · 스킬 ① ② · 함정 표시');
-    assert(ui.includes('function lagWatch') && ui.includes("classList.toggle('ar-lite', on)") && ui.includes('fxLite(on)') && css.includes('.ar-lite .ar-pet-img') && ui.includes('preloadPoses()') && ui.includes('poseReady(src)') && ui.includes("if (e.kind === 'atk') spark("),
+    const ui = source('../public/modules/arena.js'), css = source('../public/v13226.css'), stage = source('../public/modules/arena-stage.js');
+    assert(ui.includes('data-btn="skill2"') && ui.includes("KeyI: 'skill2'") && ui.includes('ar-role') && stage.includes('for (const m of v.mines || [])'), 'V13.226 화면: 스킬 2 버튼(키보드 I) · 대기실에 역할 · 스킬 ① ② · 함정 표시');
+    // V13.238 느린 폰 자동 단계는 무대 품질 4단계(autoTier, 7일 기억)로, 자세 그림은 무대가 미리 받아 둔 것만 켠다.
+    assert(stage.includes('function autoTier()') && ui.includes("classList.toggle('ar-lite', on)") && ui.includes('fxLite(on)') && css.includes('.ar-lite .ar-pet-img') && stage.includes("pose(who, kind, ms) { const p = pets.get(who); if (p?.poses[kind])") && ui.includes("if (e.kind === 'atk') spark("),
       'V13.226 렉 방지: 기본 공격은 가벼운 불꽃, 자세 그림은 미리 받아 두고, 느린 폰은 자동으로 가벼운 연출');
-    assert(!/@keyframes ar-warnblink\{[^}]*filter/.test(css) && ui.includes('el._flags !== flags'), 'V13.226 렉 방지: 깜빡임은 opacity로, 펫 상태 클래스는 바뀔 때만 쓴다');
+    const placeFn = ui.slice(ui.indexOf('function place(frac)'), ui.indexOf('function loop(now)'));
+    assert(!/@keyframes ar-warnblink\{[^}]*filter/.test(css) && !/classList|style\./.test(placeFn) && placeFn.includes('R.stage?.render('), 'V13.226 렉 방지: 깜빡임은 opacity로, 펫 상태는 매 프레임 DOM에 쓰지 않는다(V13.238부터 캔버스)');
   }
 
   // 9) V13.228 (2탄 ①단계) 조준 직접 조작 · 넉백 · 크리티컬 · 등급 배수 · 렉 방지.
@@ -272,13 +275,14 @@ export async function runArenaChecks(assert) {
   // 11) V13.228 화면: 끌어서 조준 · 타격감 · 렉 방지 금지 패턴.
   {
     const ui = source('../public/modules/arena.js'), css = source('../public/v13228.css'), build = source('./build-assets.mjs');
-    assert(build.includes('"v13228.css"') && ['function aimShape(', "addEventListener('pointermove'", 'press(d.btn, true, d.on ? d.code : -1)', 'aimCode(dx / g.w, dy / g.h)', 'id="ar-aim"', 'id="ar-aim-spot"', 'data-ar="aim"', 'INPUT.AIM_EASY', 'INPUT.AIM_AUTO', 'id="ar-face"'].every(x => ui.includes(x)),
+    assert(build.includes('"v13228.css"') && ['function aimShape(', "addEventListener('pointermove'", 'press(d.btn, true, d.on ? d.code : -1)', 'aimCode(dx / g.w, dy / g.h)', 'id="ar-aim"', 'id="ar-aim-spot"', 'data-ar="aim"', 'INPUT.AIM_EASY', 'INPUT.AIM_AUTO'].every(x => ui.includes(x)) && source('../public/modules/arena-stage.js').includes('function drawFace('),
       'V13.228 화면: 스킬 · 필살기 버튼을 끌면 화살표 · 부채꼴 · 원으로 조준하고 놓으면 그 방향, 바라보는 쪽 화살표, 대기실에서 조준 방식(직접 · 쉬움 · 자동)');
-    assert(['function hitStop(', 'R.pausedMs += until', 'function flash(', 'DMG_MAX', 'function dmgNum(', "pop('치명타!'", 'function combo(', 'function finale(', 'function shakeField(', 'function zoomAt(', 'now - (sfxAt.get(key)', "e.who === 'me' && e.hit) buzz"].every(x => ui.includes(x)) && css.includes('.ar-lite .ar-flash{filter:none') && ui.includes("if (!big && app()?.classList.contains('ar-lite')) return"),
-      'V13.228 타격감: 히트스톱(화면만) · 피격 섬광 · 큰 숫자(칸 다시 쓰기) · 치명타 · 콤보 · 마지막 한 방 슬로 · 경기장 흔들림 · 줌 · 소리 겹치기(0.05초) · 진동. 저사양은 조각만 줄이고 느낌은 그대로');
-    const drawHud = ui.slice(ui.indexOf('function drawHud()'), ui.indexOf('function drawHp()')), placeFn = ui.slice(ui.indexOf('function place(frac)'), ui.indexOf('function loop(now)'));
+    const stage = source('../public/modules/arena-stage.js');
+    assert(['function hitStop(', 'stage()?.hitStop(ms)', 'function flash(', 'function dmgNum(', "pop('치명타!'", 'function combo(', 'function finale(', 'function shakeField(', 'function zoomAt(', 'now - (sfxAt.get(key)', "e.who === 'me' && e.hit) buzz"].every(x => ui.includes(x)) && css.includes('.ar-lite .ar-flash{filter:none') && stage.includes('if (!big && lite()) return;') && stage.includes('if (nums.length >= LIST_MAX.nums) nums.shift();'),
+      'V13.228 타격감: 히트스톱(V13.238부터 연출 시간만) · 피격 섬광 · 큰 숫자(상한) · 치명타 · 콤보 · 마지막 한 방 슬로 · 경기장 흔들림 · 줌 · 소리 겹치기(0.05초) · 진동. 저사양은 조각만 줄이고 느낌은 그대로');
+    const drawHud = ui.slice(ui.indexOf('function drawHud()'), ui.indexOf('function drawPad()')), placeFn = ui.slice(ui.indexOf('function place(frac)'), ui.indexOf('function loop(now)'));
     const banned = ["app()?.classList.add('ult')", "classList.add('shake')", 'fxPunch(app()', 'fxSkillCutIn(', 'style.zIndex = String(10 + Math.round(y))', "left: `${x}%`"];
-    assert(banned.every(x => !ui.includes(x)) && !drawHud.includes('innerHTML') && !placeFn.includes('style.width') && !placeFn.includes('style.height') && placeFn.includes('if (R.z !== z)') && ui.includes("nextFrame(() => fxImpact(") && ui.includes('id="ar-cut"') && ui.includes("nextFrame(() => banner("),
+    assert(banned.every(x => !ui.includes(x)) && !drawHud.includes('innerHTML') && !placeFn.includes('style.width') && !placeFn.includes('style.height') && stage.includes('list.sort((a, b) => a.y - b.y') && ui.includes("nextFrame(() => stage()?.impact(") && ui.includes('id="ar-cut"') && ui.includes("nextFrame(() => banner("),
       'V13.228 렉 방지: 필살기 컷인은 미리 만든 칸 · 흔들림/멈춤은 경기장만 · 조각은 프레임을 나눠 · 겹침 순서는 바뀔 때만 · 지진 표시는 scale · 글자는 translate · HUD는 클래스만');
     assert(css.includes('.ar-field.yb-arena{contain:layout style}') && css.includes('.ar-warn::after,.ar-mine::after{animation:none}') && css.includes('.ar-warn.on::after{animation:') && css.includes('.ar-fx.pop,.ar-fx.pop.eff{left:0;top:0}'),
       'V13.228 렉 방지(CSS): 경기장 contain · 숨은 경고 · 함정 칸은 애니메이션 멈춤');
@@ -380,12 +384,13 @@ export async function runArenaChecks(assert) {
     const gaps = Object.keys(EL_SKILLS).map(el => ({ el, ...pickGap(el, 1000) }));
     assert(gaps.every(g => Math.abs(g.gap) <= 0.03), `V13.229 스킬 ② 고르기 승률 차이(1000판씩): ${gaps.map(g => `${EL_SKILLS[g.el][0].name} ${Math.round(g.a * 1000) / 10} · ${EL_SKILLS[g.el][1].name} ${Math.round(g.b * 1000) / 10}`).join(' / ')}`);
     // 화면: 스킬 ② 고르기 칸 · 새 칸(장판 4 · 줄기 · 부채꼴 · 분신) · 조각 상한 · 그림 게이트.
-    const ui = source('../public/modules/arena.js'), css = source('../public/v13229.css'), build = source('./build-assets.mjs');
-    assert(["api('/games/arena/start', { team: R.team, picks, tree, deco: decoWant() })", 'R.view?.s2', 's2: f.s2', 'id="ar-zone-${i}"', 'id="ar-line-${i}"', 'id="ar-stream-${i}"', 'id="ar-cone-${w}"', 'id="ar-clone-${w}"', 'function drawSkills(', 'function streamFx(', 'function ultExtra(', 'function meteorBoom(', "import { ARENA_ART } from './arena-art.js'"].every(x => ui.includes(x)) && build.includes('"v13229.css"') && build.includes("public/modules/arena-art.js") && source('../public/modules/arena-art.js').includes('export const ARENA_ART'),
-      'V13.229 화면: 대기실에서 펫마다 스킬 ② 고르기(무료) · 미리 만든 장판 · 줄기 · 부채꼴 · 분신 칸 · 속성 필살기 연출 · 그림 66이 오면 칸이 그림으로(ARENA_ART)');
-    assert(ui.includes('FX_MAX = 40, FX_MAX_LITE = 20, SKILL_FX = 8, SKILL_FX_LITE = 4') && ui.includes('R.fxN >= (R.lite ? FX_MAX_LITE : FX_MAX)') && ui.includes('k = skillCap(n)') && ui.includes('STREAM_MAX = 2') && ui.includes('Array.from({ length: ZONES_MAX }'),
-      'V13.229 렉 예산: 효과 조각 한 번에 40개(저사양 20) · 스킬 하나 8개(저사양 4) · 장판 칸 4개 · 줄기 칸 2개');
-    const drawFn = ui.slice(ui.indexOf('function drawSkills('), ui.indexOf('function loop(now)')), fxFns = ui.slice(ui.indexOf('/* ---------- V13.229 새 스킬 연출'), ui.indexOf('function afterimage('));
+    const ui = source('../public/modules/arena.js'), css = source('../public/v13229.css'), build = source('./build-assets.mjs'), stage = source('../public/modules/arena-stage.js');
+    assert(["api('/games/arena/start', { team: R.team, picks, tree, deco: decoWant() })", 'R.view?.s2', 's2: f.s2', 'function streamFx(', 'function ultExtra(', 'function meteorBoom(', "import { ARENA_ART } from './arena-art.js'"].every(x => ui.includes(x))
+      && ['for (const z of v.zones || [])', 'for (const L of v.lines || [])', 'function drawCone(', 'function drawClone(', 'stream(from, len, thick, ang, el, id, artName)', "import { ARENA_ART } from './arena-art.js'"].every(x => stage.includes(x)) && build.includes('"v13229.css"') && build.includes("public/modules/arena-art.js") && source('../public/modules/arena-art.js').includes('export const ARENA_ART'),
+      'V13.229 화면: 대기실에서 펫마다 스킬 ② 고르기(무료) · 장판 · 줄기 · 부채꼴 · 분신(V13.238부터 캔버스) · 속성 필살기 연출 · 그림 66이 오면 그림으로(ARENA_ART)');
+    assert(/export const LIST_MAX = \{ fx: 24,/.test(stage) && stage.includes('const kind = BIT[cls] ?? 0, k = Math.min(n, T.per)') && /\{ name: '낮음'[^}]*per: 4,/.test(stage) && /\{ name: '높음'[^}]*per: 8,/.test(stage) && stage.includes('if (B.n >= T.bits) return;'),
+      'V13.229 렉 예산(V13.238 캔버스): 큰 효과 24개 · 스킬 하나 조각 8개(저사양 4) · 조각은 정해진 크기의 풀');
+    const drawFn = ui.slice(ui.indexOf('function place(frac)'), ui.indexOf('function loop(now)')), fxFns = ui.slice(ui.indexOf('/* ---------- V13.229 새 스킬 연출'), ui.indexOf('function afterimage('));
     const keyframes = [...css.matchAll(/@keyframes [\w-]+\{([^{}]*\{[^}]*\})+\}/g)].map(m => m[0]);
     assert(!/style\.(width|height|left|top)\b/.test(drawFn) && !ui.includes('offsetWidth') && !/style\.(width|height)\b/.test(fxFns) && keyframes.length > 10 && keyframes.every(k => !/(width|height|left|top|filter|margin)\s*:/.test(k.replace(/^@keyframes [\w-]+\{/, ''))),
       'V13.229 렉 방지: 새 칸은 transform(scale) · opacity로만 움직이고(너비 · 높이 · 위치 · 필터 애니메이션 없음), 강제 배치(offsetWidth) 없음');
@@ -513,18 +518,18 @@ export async function runArenaChecks(assert) {
     assert(build.includes('"v13235.css"') && /@keyframes ar-ultready\{from\{opacity:[\d.]+;transform:scale/.test(cssOf('13226')) && c33.includes('.ar-btn.ult.full::before{animation:ar-ultready') && !/\.ar-btn\.ult\.full\{[^}]*animation:ar-ultready/.test(cssOf('13226')),
       'V13.235 필살기 준비 빛: box-shadow 무한 애니메이션 → ::before opacity · scale');
     // 2) 쉬는(투명) 칸은 레이어로 올리지 않는다(35칸이 늘 레이어라 매 프레임 레이어 정리 · 커밋이 무거웠다).
-    assert(c33.includes('.ar-shot.idle,.ar-warn:not(.on),.ar-mine:not(.on),.ar-zone:not(.on),.ar-line:not(.on),.ar-cone:not(.on),.ar-clone:not(.on),.ar-stream{will-change:auto}') && ui.includes('<i class="ar-shot idle"') && ui.includes("el.classList.add('idle')") && ui.includes("el.classList.remove('idle')"),
-      'V13.235 쉬는 칸(탄 · 경고 · 장판 · 줄기 · 부채꼴 · 분신)은 will-change 없음, 켜질 때만 레이어');
+    const stage = source('../public/modules/arena-stage.js');
+    assert(c33.includes('.ar-shot.idle,.ar-warn:not(.on),.ar-mine:not(.on),.ar-zone:not(.on),.ar-line:not(.on),.ar-cone:not(.on),.ar-clone:not(.on),.ar-stream{will-change:auto}') && !/class="ar-(shot|warn|zone|line|stream|cone|clone)/.test(ui) && ui.includes('<canvas class="ar-cv"'),
+      'V13.235 쉬는 칸은 레이어로 올리지 않는다 → V13.238부터 칸 자체가 없고 캔버스 한 장(레이어 하나)');
     // 3) 자세 그림: 그림 주소를 바꾸지 않고 미리 겹친 칸을 opacity로(바꿀 때마다 디코드 · 그림자 필터를 다시 그렸다).
-    const sw = fn('swapPose');
-    assert(fn('drawMon').includes('ar-pet-img ar-pose') && sw.includes("body.querySelectorAll('img.ar-pose')") && sw.indexOf("classList.add('on')") < sw.indexOf("setAttribute('src'") && c33.includes('.ar-pose{position:absolute;left:0;top:0;opacity:0;will-change:opacity}') && c33.includes('.ar-body.posing>.ar-pet-img:not(.ar-pose){opacity:0}'),
-      'V13.235 공격 · 맞는 자세: 미리 겹친 그림을 opacity로 켠다(src 바꾸기는 그림이 없을 때만)');
+    assert(fn('drawMon').includes("poses: { attack: expressionSrc(f.key, form, 'attack'), hurt: expressionSrc(f.key, form, 'hurt') }") && stage.includes('p.poses[k] = sprites(im, Math.round(p.sz * S)') && !ui.includes('function swapPose('),
+      'V13.235 공격 · 맞는 자세: 미리 받아 둔 그림만 켠다(V13.238 무대가 보일 크기로 한 번 줄여 둔 그림, 주소 바꾸기 · 다시 디코드 없음)');
     // 4) 잔상 · 컷인: 판마다 만든 칸을 다시 쓴다(펫 칸 통째 복제 · 첫 필살기 때 새 그림 디코드 금지).
-    assert(!fn('afterimage').includes('cloneNode') && ui.includes('id="ar-ghost-${w}"') && !/pet\.innerHTML\s*=/.test(fn('cutin')) && c33.includes('.ar-ghost-slot .ar-body{animation:none;will-change:auto}') && c33.includes('.ar-cut .fx2-cut-pet .avatar-art:not(.on){display:none}'),
-      'V13.235 잔상은 쪽마다 칸 하나를 다시 쓰고(복제 · blur 필터 새로 그리기 없음), 컷인 펫 그림은 판 시작 때 만들어 둔다');
+    assert(!fn('afterimage').includes('cloneNode') && stage.includes('if (ghosts.length >= LIST_MAX.ghosts) ghosts.shift();') && !/pet\.innerHTML\s*=/.test(fn('cutin')) && c33.includes('.ar-ghost-slot .ar-body{animation:none;will-change:auto}') && c33.includes('.ar-cut .fx2-cut-pet .avatar-art:not(.on){display:none}'),
+      'V13.235 잔상은 상한 있는 목록(복제 · blur 필터 없음, V13.238 캔버스), 컷인 펫 그림은 판 시작 때 만들어 둔다');
     // 5) 처음 쓰는 그림은 카운트다운 동안 나눠서 미리 디코드(img.decode()) · 글자도 미리 배치.
     const warm = fn('warmArt');
-    assert(warm.includes('.decode?.()') && warm.includes('Object.values(ART)') && /later\(job, 250 \+ i \* 120\)/.test(warm) && warm.includes('warmText(i)') && ui.includes('  warmArt();') && c33.includes('.ar-warm{') && c33.includes('contain:strict'),
+    assert(warm.includes('.decode?.()') && warm.includes('Object.values(ART)') && /later\(job, 250 \+ i \* 120\)/.test(warm) && warm.includes('R.stage?.warm(warmList())') && stage.includes('function warmStep()') && ui.includes('  warmArt();') && c33.includes('.ar-warm{') && c33.includes('contain:strict'),
       'V13.235 효과 그림(그림 66) · 컷인 펫 그림 · 판 글자를 카운트다운 동안 120ms마다 하나씩 미리 디코드 · 배치');
     // 6) 효과 조각: 조각마다 경기장 전체를 querySelectorAll로 세지 않고, SVG 글은 한 번 읽어 복사한다.
     const piece = fx.slice(fx.indexOf('function piece('), fx.indexOf('const run ='));
@@ -532,8 +537,8 @@ export async function runArenaChecks(assert) {
       'V13.235 효과 조각(battle-fx piece): 개수는 세어 두고(상한에 닿을 때만 다시 셈) SVG는 템플릿 복사(조각마다 경기장 훑기 · SVG 다시 읽기 없음)');
     // 7) 매 프레임 같은 transform을 다시 쓰지 않는다 · 쿨타임 원형 게이지는 rotate만.
     const pl = fn('place');
-    assert(ui.includes('const setTf = (el, tf) => { if (el._tf !== tf)') && !/el\.style\.transform = `translate\(\$\{p\.x/.test(ui) && (pl.match(/setTf\(el, /g) || []).length >= 4 && fn('drawPad').includes('rotate(${Math.min(180, deg)') && !fn('drawPad').includes('scaleY'),
-      'V13.235 펫 · 칸 자리는 바뀔 때만 쓰고(setTf), 쿨타임 게이지는 반쪽 원판 rotate만');
+    assert(!/style|classList/.test(pl) && !/el\.style\.transform = `translate\(\$\{p\.x/.test(ui) && fn('drawPad').includes('rotate(${Math.min(180, deg)') && !fn('drawPad').includes('scaleY'),
+      'V13.235 펫 · 칸 자리를 매 프레임 DOM에 쓰지 않고(V13.238 캔버스), 쿨타임 게이지는 반쪽 원판 rotate만');
     // 8) 버튼 그림(그림 67): 그림이 있으면 같은 자리를 그림으로, 없으면 CSS 버튼. 이름은 주문서(build-67.mjs)와 같다.
     const b67 = source('../docs/asset-requests/runner/build-67.mjs');
     const names = [...b67.matchAll(/'(ui-[a-z0-9-]+)'/g)].map(m => m[1]);
@@ -544,7 +549,7 @@ export async function runArenaChecks(assert) {
       `V13.235 버튼 · 조이스틱 · 이모트 · 아이콘 그림 자리(그림 67, ${names.length}장): 그림이 들어오면 같은 자리가 그림으로(ARENA_ART), 없으면 CSS 버튼`);
     assert(/\.ar-btn\{[^}]*border:3px solid transparent;[^}]*padding-box,var\(--rim\) border-box/.test(c33) && c33.includes('.ar-btn.down{transform:translateY(3px) scale(.93)}') && ui.includes('<i class="rdy"></i>') && ui.includes("querySelector('.rdy')?.animate("),
       'V13.235 버튼: 금속 테두리 · 보석 바탕 · 누름(transform) · 쿨타임 원형 게이지 · 준비됨 반짝(opacity · scale)');
-    assert(c33.includes('.ar-field.yb-arena::before{content:none;display:none}') && ui.includes('class="ar-field yb-arena"'),
+    assert(c33.includes('.ar-field.yb-arena::before{content:none;display:none}') && ui.includes('class="ar-field yb-arena'),
       'V13.235 판 화면 가운데 옅은 가로 띠(야차전 가운데 선 .yb-arena:before)를 아레나에서는 그리지 않는다');
   }
 }
