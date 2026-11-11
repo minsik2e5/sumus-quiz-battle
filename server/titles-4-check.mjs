@@ -208,7 +208,7 @@ export async function runTitles4Checks(assert) {
     assert(/repairStreak\(state, student, endedAt\);\n[^\n]*\n\s*if \(student\?\.role === 'student' && answerRecords\.length\) rememberRangeBest\(student, studentRangeCounts\(state, student\)\);/.test(svc) && svc.includes('setRangeCounter(studentRangeCounts);'),
       'V13.191 최고값은 연습이 끝날 때(finishPractice) 서버가 채점한 단어 기록으로만 센다');
     const mocks = allBooks({ extraBooks: [] }).filter(b => b.mock).map(b => b.id).sort();
-    assert(mocks.join() === 'gangseo:final:mock-sep-2026,seonbu-external-44-corrected-202603,seonbu:final:external-45-60-2026', 'V13.191 모의고사 책 표시(mock: true)는 강서고 9월 · 선부고 외부지문 44 · 45~60 셋');
+    assert(mocks.join() === 'danwon:final:mock-sep-2026,gangseo:final:mock-sep-2026,seonbu-external-44-corrected-202603,seonbu:final:external-45-60-2026', 'V13.191 모의고사 책 표시(mock: true)는 단원고 9월(V13.237) · 강서고 9월 · 선부고 외부지문 44 · 45~60 넷');
   }
 
   // ---- 보이는 범위: 모의고사 칭호는 모의고사 책이 있는 학교만, 심해 칭호는 심해 그림이 다 있을 때만
@@ -269,7 +269,7 @@ export async function runTitles4Checks(assert) {
     const t2 = (await call(tok, 'GET', '/bootstrap')).titles, seen2 = await call(tok, 'POST', '/titles/seen', { keys: t.batch });
     assert(!t2.batch.length && want.every(key => !t2.fresh.includes(key)) && seen2.paid_coins === 0 && me.title_reward.total === coins, 'V13.191 소급 지급은 한 번만(다시 보내도 코인 0, 다시 묶이지 않는다)');
     const d1 = (await call(tokD, 'GET', '/bootstrap')).titles;
-    assert(d1.batch_wave === 3 && d1.batch.join() === 'mlv10,mday3' && d1.stats.mock_books === 0 && !visibleTitleKeys(d1.unlocked, { middle: false, mock: false }).includes('mockcover'), 'V13.191 3탄도 아직 안 본 학생은 3탄 묶음부터, 단원고는 모의고사 책이 없어 모의고사 칭호가 숨는다');
+    assert(d1.batch_wave === 3 && d1.batch.join() === 'mlv10,mday3' && d1.stats.mock_books === 1 && visibleTitleKeys(d1.unlocked, { middle: false, mock: true }).includes('mockcover') && !visibleTitleKeys(d1.unlocked, { middle: false, mock: false }).includes('mockcover'), 'V13.191 3탄도 아직 안 본 학생은 3탄 묶음부터 · V13.237 단원고도 9월 모의고사 책(1권)이 생겨 모의고사 칭호가 보인다(책이 없는 학교면 숨는다)');
     await call(tokD, 'POST', '/titles/seen', { keys: d1.batch });
     const d2 = (await call(tokD, 'GET', '/bootstrap')).titles;
     assert(d2.batch_wave === 4 && d2.batch.join() === 'gift20,petname', 'V13.191 3탄 묶음을 본 뒤 다음 열기에 4탄 묶음');
