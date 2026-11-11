@@ -71,7 +71,7 @@ async function home() {
   const list = replays(L.A).slice().reverse();
   arenaUi.main(`<section class="ar-live${lobbyArt()}">
     <div class="ar-title"><small>같은 학년 친구와 1:1 · 1:1:1 · 2:2</small><h1>친구 대전</h1></div>
-    ${d.invite ? `<div class="ar-card ar-lv-invite"><b>📨 ${esc(d.invite.host)}의 ${esc(MODE_KO[d.invite.mode] || '1:1')} 초대</b><small>방 ${esc(d.invite.code)} · 5분 안에 들어가요</small><div class="ar-lv-row"><button type="button" class="btn" data-ar="lv-decline" data-id="${esc(d.invite.id)}">거절</button><button type="button" class="yl-cta" data-ar="lv-accept" data-id="${esc(d.invite.id)}">들어가기</button></div></div>` : ''}
+    ${d.invite ? `<div class="ar-card ar-lv-invite"><b>${esc(d.invite.host)}의 ${esc(MODE_KO[d.invite.mode] || '1:1')} 초대</b><small>방 ${esc(d.invite.code)} · 5분 안에 들어가요</small><div class="ar-lv-row"><button type="button" class="btn" data-ar="lv-decline" data-id="${esc(d.invite.id)}">거절</button><button type="button" class="yl-cta" data-ar="lv-accept" data-id="${esc(d.invite.id)}">들어가기</button></div></div>` : ''}
     <div class="ar-card">
       <div class="ar-lv-modes" role="group" aria-label="방 만들기">
         <button type="button" class="yl-cta ar-lv-mode m1" data-ar="lv-open" data-mode="1v1"><b>1:1</b><small>펫 3마리 · 2분</small></button>
@@ -208,8 +208,8 @@ const petImg = (key, form) => arenaUi.petImg(key, form);
 // V13.231 스킬트리: 실시간 방에서는 펫 아레나 대기실에서 고른 가지 그대로(보기만). 스킬 ② · 필살기 이름과 가지 점 3개.
 function liveTreeLine(p) {
   const f = fighter({ key: p.key, form: p.form, level: p.level, s2: p.s2, tr: p.tr }), open = treeOpen(p.level, p.tr);
-  const dots = open.map(x => `<i class="ar-tdot${x >= 0 ? ` on b${x}` : ''}">${x >= 0 ? (x ? 'B' : 'A') : '🔒'}</i>`).join('');
-  return `<div class="ar-lv-pick"><b>${esc(petName(p.key))}</b><small>② ${esc(f.skill2.icon)} ${esc(f.skill2.name)} · 필살기 ${esc(f.ult)}</small><span class="ar-tdots" aria-label="스킬트리">${dots}</span></div>`;
+  const dots = open.map(x => `<i class="ar-tdot${x >= 0 ? ` on b${x}` : ''}">${x >= 0 ? (x ? 'B' : 'A') : '<b class="ar-lock" aria-label="잠김"></b>'}</i>`).join('');
+  return `<div class="ar-lv-pick"><b>${esc(petName(p.key))}</b><small>② ${esc(f.skill2.name)} · 필살기 ${esc(f.ult)}</small><span class="ar-tdots" aria-label="스킬트리">${dots}</span></div>`;
 }
 function lobbyView() {
   const v = L.view, me = v.players.find(p => p.id === v.you), host = me?.host, n = v.seats;
@@ -217,7 +217,7 @@ function lobbyView() {
   const seat = i => {
     const p = v.players[i];
     if (!p) return `<div class="ar-lv-seat empty"><b>${i === 0 ? '방장' : '빈자리'}</b><small>친구를 기다려요…</small></div>`;
-    return `<div class="ar-lv-seat ${p.id === v.you ? 'mine' : ''} ${p.ready || p.host ? 'ready' : ''}${flag(i)}"><b>${esc(p.name)}${p.host ? ' 👑' : ''}</b><span class="ar-lv-team">${p.team.map(f => `<i>${petImg(f.key, f.form)}<small>Lv.${f.level}</small></i>`).join('')}</span><small>${p.host ? '방장' : p.ready ? '준비 완료!' : '고르는 중'}${p.online ? '' : ' · 연결 끊김'}</small></div>`;
+    return `<div class="ar-lv-seat ${p.id === v.you ? 'mine' : ''} ${p.ready || p.host ? 'ready' : ''}${flag(i)}"><b>${esc(p.name)}${p.host ? ' <em class="ar-host">방장</em>' : ''}</b><span class="ar-lv-team">${p.team.map(f => `<i>${petImg(f.key, f.form)}<small>Lv.${f.level}</small></i>`).join('')}</span><small>${p.host ? '방장' : p.ready ? '준비 완료!' : '고르는 중'}${p.online ? '' : ' · 연결 끊김'}</small></div>`;
   };
   const pets = myPets(), mine = L.keys || [];
   const locked = !!me?.ready && !host;
@@ -231,7 +231,7 @@ function lobbyView() {
   arenaUi.main(`<section class="ar-live ar-lv-lobby${keep}${lobbyArt()}">
     <div class="ar-title"><small>친구 대전 대기실 · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')} 뒤 닫혀요</small><h1>방 <b class="ar-lv-codebig">${esc(v.code)}</b></h1></div>
     ${multi ? seatsN(v, me, locked) : `<div class="ar-lv-seats">${Array.from({ length: n }, (_, i) => seat(i)).join('<span class="ar-lv-vs">VS</span>')}</div>`}
-    ${multi && host ? `<div class="ar-lv-host">${v.mode === '2v2' ? '<button type="button" class="btn" data-ar="lv-shuffle">🔀 팀 섞기</button>' : ''}<button type="button" class="btn ar-lv-fill${v.fill ? ' on' : ''}" data-ar="lv-fill" data-on="${v.fill ? 0 : 1}" aria-pressed="${!!v.fill}">🤖 빈자리 컴퓨터 ${v.fill ? '켬' : '끔'}</button><small>컴퓨터 자리는 보상 계산에서 빠져요</small></div>` : ''}
+    ${multi && host ? `<div class="ar-lv-host">${v.mode === '2v2' ? '<button type="button" class="btn" data-ar="lv-shuffle">팀 섞기</button>' : ''}<button type="button" class="btn ar-lv-fill${v.fill ? ' on' : ''}" data-ar="lv-fill" data-on="${v.fill ? 0 : 1}" aria-pressed="${!!v.fill}">빈자리 컴퓨터 ${v.fill ? '켬' : '끔'}</button><small>컴퓨터 자리는 보상 계산에서 빠져요</small></div>` : ''}
     <div class="ar-card">
       <h3 class="ar-sub">내 팀 <small>${need}마리 · 순서대로 나가요 · 스킬트리는 펫 아레나 대기실에서 바꿔요</small></h3>
       <div class="ar-pets">${pets.map(p => `<button type="button" class="ar-pet-pick${mine.includes(p.key) ? ' on' : ''}" data-ar="lv-pet" data-key="${esc(p.key)}" ${locked ? 'disabled' : ''} aria-pressed="${mine.includes(p.key)}">${petImg(p.key, p.form)}<small>Lv.${p.level}</small>${mine.includes(p.key) ? `<b>${mine.indexOf(p.key) + 1}</b>` : ''}</button>`).join('')}</div>
@@ -251,10 +251,10 @@ function lobbyView() {
 }
 // V13.232 여러 명 대기실 자리: 난투 3칸, 팀전 파랑 2 · 빨강 2(빈자리를 누르면 그 팀으로).
 function seatsN(v, me, locked) {
-  const card = (p, i) => `<div class="ar-lv-seat ${p.id === v.you ? 'mine' : ''} ${p.ready || p.host ? 'ready' : ''}${v.mode === '2v2' ? flag(p.tm) : ''}" style="--i:${i}"><b>${esc(p.name)}${p.host ? ' 👑' : ''}</b><span class="ar-lv-team">${p.team.map(f => `<i>${petImg(f.key, f.form)}<small>Lv.${f.level}</small></i>`).join('')}</span><small>${p.host ? '방장' : p.ready ? '준비 완료!' : '고르는 중'}${p.online ? '' : ' · 연결 끊김'}</small></div>`;
+  const card = (p, i) => `<div class="ar-lv-seat ${p.id === v.you ? 'mine' : ''} ${p.ready || p.host ? 'ready' : ''}${v.mode === '2v2' ? flag(p.tm) : ''}" style="--i:${i}"><b>${esc(p.name)}${p.host ? ' <em class="ar-host">방장</em>' : ''}</b><span class="ar-lv-team">${p.team.map(f => `<i>${petImg(f.key, f.form)}<small>Lv.${f.level}</small></i>`).join('')}</span><small>${p.host ? '방장' : p.ready ? '준비 완료!' : '고르는 중'}${p.online ? '' : ' · 연결 끊김'}</small></div>`;
   const empty = (tm, i) => {
     const can = v.mode === '2v2' && me && !locked && (me.tm || 0) !== tm;
-    return `<${can ? 'button type="button" data-ar="lv-seat" data-tm="' + tm + '"' : 'div'} class="ar-lv-seat empty${can ? ' pick' : ''}" style="--i:${i}"><b>${v.fill ? '🤖 컴퓨터' : '빈자리'}</b><small>${can ? '눌러서 이 팀으로' : v.fill ? '시작하면 컴퓨터가 앉아요' : '친구를 기다려요…'}</small></${can ? 'button' : 'div'}>`;
+    return `<${can ? 'button type="button" data-ar="lv-seat" data-tm="' + tm + '"' : 'div'} class="ar-lv-seat empty${can ? ' pick' : ''}" style="--i:${i}"><b>${v.fill ? '컴퓨터' : '빈자리'}</b><small>${can ? '눌러서 이 팀으로' : v.fill ? '시작하면 컴퓨터가 앉아요' : '친구를 기다려요…'}</small></${can ? 'button' : 'div'}>`;
   };
   if (v.mode !== '2v2') {
     const cells = Array.from({ length: v.seats }, (_, i) => v.players[i] ? card(v.players[i], i) : empty(0, i));

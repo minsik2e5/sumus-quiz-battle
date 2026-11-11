@@ -87,7 +87,7 @@ export function arenaCard(A, art) {
   const v = A.data.rewards?.arena || {};
   const ready = (A.data.stats?.pets || []).filter(x => Number(x.form) >= 1).length;
   const pic = art?.entry?.has('arena') ? '<img class="ag-big-bg" src="/assets/arena/entry.webp" alt="" draggable="false" decoding="async">'
-    : '<span class="ag-big-bg ag-arena-bg"><i class="ag-arena-face">⚔️</i></span>';
+    : '<span class="ag-big-bg ag-arena-bg"><i class="ag-arena-face">VS</i></span>';
   return `<article class="ag-big ag-arena">
     <div class="ag-big-art" aria-hidden="true">${pic}<span class="ag-big-title"><small>3 대 3 · 펫 대전</small><strong>펫 아레나</strong><em>내 펫을 직접 조종! 스킬 · 회피 · 필살기</em></span></div>
     <div class="ag-big-body">

@@ -5,71 +5,60 @@
 /* 팀 칸: 톡 누르면 아래 스킬트리가 이 펫으로. 가지 점 3개(A · B · 자물쇠). */
 .ar-slot.on{cursor:pointer;transition:transform .15s,box-shadow .2s}
 .ar-slot.on:active{transform:scale(.97)}
-.ar-slot.focus{box-shadow:0 0 0 3px rgba(253,224,71,.85),0 8px 22px rgba(253,224,71,.28)}
 .ar-tdots{display:flex;gap:3px;margin-top:3px}
-.ar-tdot{display:grid;place-items:center;width:19px;height:19px;border-radius:7px;font-style:normal;font-size:10px;font-weight:950;background:rgba(15,23,42,.6);color:rgba(226,232,240,.55);border:1.5px solid rgba(255,255,255,.12)}
-.ar-tdot.on{color:#0f172a;border-color:transparent;background:linear-gradient(160deg,#fde68a,#f59e0b)}
-.ar-tdot.on.b1{background:linear-gradient(160deg,#a5f3fc,#38bdf8)}
+.ar-tdot{display:grid;place-items:center;width:19px;height:19px;border-radius:8px;font-style:normal;font-size:12px;font-weight:950;border:1.5px solid var(--a-line)}
+.ar-tdot.on{border-color:transparent}
 
 /* 스킬트리 판 */
-.ar-tree{position:relative;display:grid;gap:10px;padding:12px 12px 14px;border-radius:20px;overflow:hidden;
-  background:radial-gradient(120% 70% at 50% 100%,color-mix(in srgb,var(--c1) 38%,transparent),transparent 70%),linear-gradient(180deg,rgba(15,23,42,.72),rgba(8,12,32,.9));
-  border:1.5px solid color-mix(in srgb,var(--c1) 55%,rgba(255,255,255,.1));box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 10px 28px rgba(0,0,0,.35)}
-.ar-tree::before{content:"";position:absolute;inset:-40% -20% auto;height:70%;background:radial-gradient(closest-side,color-mix(in srgb,var(--c2) 22%,transparent),transparent);pointer-events:none;opacity:.7}
+.ar-tree{position:relative;display:grid;gap:10px;padding:12px 12px 14px;border-radius:16px;overflow:hidden;
+  border:1.5px solid color-mix(in srgb,var(--c1) 55%,var(--a-line))}
+.ar-tree::before{content:"";position:absolute;inset:-40% -20% auto;height:70%;pointer-events:none;opacity:.7}
 .ar-tree-h{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px}
-.ar-tree-pet{width:48px;height:48px;object-fit:contain;filter:drop-shadow(0 4px 8px color-mix(in srgb,var(--c1) 70%,transparent));animation:ar-tree-bob 2.6s ease-in-out infinite}
-.ar-tree-h small{display:block;font-size:11px;font-weight:800;color:color-mix(in srgb,var(--c2) 80%,#fff)}
-.ar-tree-h b{font-size:16px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
-.ar-tree-h b em{font-style:normal;font-size:12px;color:#fde047}
+.ar-tree-pet{width:48px;height:48px;object-fit:contain;filter:);animation:ar-tree-bob 2.6s ease-in-out infinite}
+.ar-tree-h small{display:block;font-size:12px;font-weight:800}
+.ar-tree-h b{font-size:17px;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}
+.ar-tree-h b em{font-style:normal;font-size:12px}
 .ar-tree-tabs{display:flex;gap:4px}
-.ar-ttab{width:36px;height:36px;padding:2px;border-radius:11px;border:2px solid rgba(255,255,255,.15);background:rgba(15,23,42,.55);cursor:pointer}
+.ar-ttab{width:36px;height:36px;padding:2px;border-radius:8px;border:2px solid var(--a-line);cursor:pointer}
 .ar-ttab img{width:100%;height:100%;object-fit:contain}
-.ar-ttab.on{border-color:#fde047;background:color-mix(in srgb,var(--c1) 40%,rgba(15,23,42,.6))}
+.ar-ttab.on{border-color:var(--a-line)}
 
 /* 층: 위(3층)에서 아래(1층)로 쌓고, 가운데 줄기가 이어진다. 열린 층의 줄기는 속성 색으로 빛난다. */
 .ar-floors{position:relative;display:grid;gap:10px;margin:0;padding:0;list-style:none}
-.ar-floors::before{content:"";position:absolute;left:50%;top:14px;bottom:14px;width:6px;margin-left:-3px;border-radius:3px;background:linear-gradient(0deg,color-mix(in srgb,var(--c1) 85%,#fff),color-mix(in srgb,var(--c1) 30%,transparent));opacity:.55}
-.ar-floor{position:relative;display:grid;gap:5px;padding:8px;border-radius:16px;background:rgba(15,23,42,.62);border:1.5px solid rgba(255,255,255,.1);animation:ar-floor-in .45s cubic-bezier(.3,1.3,.5,1) both;animation-delay:calc((2 - var(--i)) * 70ms)}
+.ar-floors::before{content:"";position:absolute;left:50%;top:14px;bottom:14px;width:6px;margin-left:-3px;border-radius:8px;opacity:.55}
+.ar-floor{position:relative;display:grid;gap:5px;padding:8px;border-radius:16px;border:1.5px solid var(--a-line);animation:ar-floor-in .45s cubic-bezier(.3,1.3,.5,1) both;animation-delay:calc((2 - var(--i)) * 70ms)}
 .ar-lobby.keep .ar-floor{animation:none}
 .ar-floor-h{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
-.ar-floor-h b{font-size:13px;font-weight:950;color:#fde68a}
-.ar-floor-h small{font-size:11px;font-weight:800;opacity:.85}
-.ar-floor-h em{margin-left:auto;font-style:normal;font-size:10.5px;font-weight:900;color:#fca5a5}
-.ar-floor-h em.open{color:#86efac}
+.ar-floor-h b{font-size:12px;font-weight:950}
+.ar-floor-h small{font-size:12px;font-weight:800;opacity:.85}
+.ar-floor-h em{margin-left:auto;font-style:normal;font-size:12px;font-weight:900}
 .ar-branches{display:grid;grid-template-columns:minmax(0,1fr) 14px minmax(0,1fr);align-items:stretch}
 .ar-fork{position:relative}
-.ar-fork::before{content:"";position:absolute;left:0;right:0;top:50%;height:3px;margin-top:-1.5px;background:color-mix(in srgb,var(--c1) 60%,rgba(255,255,255,.2));border-radius:2px}
-.ar-branch{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:6px;min-width:0;padding:7px 7px 7px 6px;border-radius:13px;border:2px solid rgba(255,255,255,.14);
-  background:linear-gradient(160deg,rgba(30,41,59,.85),rgba(15,23,42,.9));color:#e2e8f0;font:inherit;text-align:left;cursor:pointer;transition:border-color .15s,transform .12s,box-shadow .2s,background .2s}
-.ar-branch>i{display:grid;place-items:center;width:30px;height:30px;border-radius:10px;font-style:normal;font-size:17px;background:rgba(255,255,255,.08)}
+.ar-fork::before{content:"";position:absolute;left:0;right:0;top:50%;height:3px;margin-top:-1.5px;border-radius:8px}
+.ar-branch{position:relative;display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:6px;min-width:0;padding:7px 7px 7px 6px;border-radius:16px;border:2px solid var(--a-line);font:inherit;text-align:left;cursor:pointer;transition:border-color .15s,transform .12s,box-shadow .2s,background .2s}
+.ar-branch>i{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;font-style:normal;font-size:17px}
 .ar-branch span{display:grid;min-width:0}
 .ar-branch b{font-size:12px;line-height:1.2;font-weight:900;word-break:keep-all}
-.ar-branch b u{text-decoration:none;display:inline-grid;place-items:center;width:15px;height:15px;margin-right:4px;border-radius:5px;font-size:10px;background:rgba(255,255,255,.14);vertical-align:1px}
-.ar-branch small{font-size:10.5px;line-height:1.3;opacity:.8;word-break:keep-all}
+.ar-branch b u{text-decoration:none;display:inline-grid;place-items:center;width:15px;height:15px;margin-right:4px;border-radius:8px;font-size:12px;vertical-align:1px}
+.ar-branch small{font-size:12px;line-height:1.3;opacity:.8;word-break:keep-all}
 .ar-branch:active:not(:disabled){transform:scale(.96)}
-.ar-branch.on{border-color:color-mix(in srgb,var(--c1) 80%,#fde047);background:linear-gradient(160deg,color-mix(in srgb,var(--c1) 55%,rgba(15,23,42,.5)),rgba(15,23,42,.75));box-shadow:0 0 0 1px rgba(253,224,71,.35),0 6px 18px color-mix(in srgb,var(--c1) 45%,transparent)}
-.ar-branch.on>i{background:radial-gradient(circle,color-mix(in srgb,var(--c2) 70%,transparent),transparent 75%);filter:drop-shadow(0 0 6px var(--c1))}
-.ar-branch.on b u{background:#fde047;color:#0f172a}
-.ar-branch.b1.on b u{background:#7dd3fc}
-.ar-branch.on::after{content:"✓";position:absolute;top:-7px;right:-5px;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;font-size:11px;font-weight:950;color:#0f172a;background:#fde047;box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.ar-branch.on{border-color:color-mix(in srgb,var(--c1) 80%,var(--a-line))}
+.ar-branch.on::after{content:"✓";position:absolute;top:-7px;right:-5px;display:grid;place-items:center;width:18px;height:18px;border-radius:50%;font-size:12px;font-weight:950}
 .ar-branch.grow{animation:ar-branch-grow .5s cubic-bezier(.3,1.6,.5,1)}
-.ar-branch.grow::before{content:"";position:absolute;inset:-3px;border-radius:15px;border:2px solid var(--c2);animation:ar-branch-ring .6s ease-out forwards;pointer-events:none}
+.ar-branch.grow::before{content:"";position:absolute;inset:-3px;border-radius:16px;border:2px solid var(--c2);animation:ar-branch-ring .6s ease-out forwards;pointer-events:none}
 .ar-floor.lock .ar-branch{cursor:default;filter:grayscale(.85);opacity:.5}
-.ar-floor.lock{background:rgba(15,23,42,.45);border-style:dashed}
+.ar-floor.lock{border-style:dashed}
 .ar-floor-lock{display:grid;gap:3px}
-.ar-floor-lock span{height:6px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}
-.ar-floor-lock span i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#fde047,var(--c1))}
-.ar-floor-lock small{font-size:10.5px;font-weight:800;opacity:.8}
+.ar-floor-lock span{height:6px;border-radius:8px;overflow:hidden}
+.ar-floor-lock span i{display:block;height:100%;border-radius:8px}
+.ar-floor-lock small{font-size:12px;font-weight:800;opacity:.8}
 
 /* 미리보기: 고르면 바로 바뀐다(스킬트리 없을 때와 비교한 % 표시) */
 .ar-preview{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
-.ar-preview>b{font-size:12px;font-weight:950;color:#fde68a;margin-right:2px}
-.ar-preview span{display:inline-flex;align-items:baseline;gap:4px;padding:4px 7px;border-radius:9px;background:rgba(255,255,255,.08);font-size:12px;font-weight:900}
-.ar-preview small{font-size:10.5px;font-weight:800;opacity:.75}
-.ar-preview i{font-style:normal;font-size:10.5px;font-weight:950;padding:0 4px;border-radius:5px}
-.ar-preview i.up{color:#bbf7d0;background:rgba(34,197,94,.25)}
-.ar-preview i.dn{color:#fecaca;background:rgba(239,68,68,.25)}
-.ar-preview span.ult{background:linear-gradient(90deg,color-mix(in srgb,var(--c1) 45%,transparent),rgba(255,255,255,.06))}
+.ar-preview>b{font-size:12px;font-weight:950;margin-right:2px}
+.ar-preview span{display:inline-flex;align-items:baseline;gap:4px;padding:4px 7px;border-radius:8px;font-size:12px;font-weight:900}
+.ar-preview small{font-size:12px;font-weight:800;opacity:.75}
+.ar-preview i{font-style:normal;font-size:12px;font-weight:950;padding:0 4px;border-radius:8px}
 
 @keyframes ar-tree-bob{50%{transform:translateY(-3px)}}
 @keyframes ar-floor-in{from{opacity:0;transform:translateY(10px) scale(.97)}}

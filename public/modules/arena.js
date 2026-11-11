@@ -264,8 +264,8 @@ function togglePet(key) {
 const lobbyFighter = (key, form, level) => fighter({ key, form, level, s2: R.picks?.[key] ?? null, tr: R.trees?.[key] });
 function skillLine(key, form, level) {
   const f = lobbyFighter(key, form, level), k = f.skill, r = ROLE[f.role], t = treeOf(key, level);
-  const dots = t.map((x, i) => `<i class="ar-tdot${x.open ? ` on b${x.pick}` : ''}" title="${esc(`${FLOOR_KO[i]} Lv.${x.lv}`)}">${x.open ? (x.pick ? 'B' : 'A') : '🔒'}</i>`).join('');
-  return `<span class="ar-skill" style="--c1:${pal(f.el).c1};--c2:${pal(f.el).c2}"><i class="ar-role">${esc(r.name)} · ${f.melee ? '근접' : '원거리'}<small>${esc(r.desc)}</small></i><b>① ${esc(k.name)}</b><b>② ${esc(f.skill2.icon)} ${esc(f.skill2.name)}</b><em>필살기 ${esc(f.ult)}</em><span class="ar-tdots" aria-label="스킬트리">${dots}</span></span>`;
+  const dots = t.map((x, i) => `<i class="ar-tdot${x.open ? ` on b${x.pick}` : ''}" title="${esc(`${FLOOR_KO[i]} Lv.${x.lv}`)}">${x.open ? (x.pick ? 'B' : 'A') : '<b class="ar-lock" aria-label="잠김"></b>'}</i>`).join('');
+  return `<span class="ar-skill" style="--c1:${pal(f.el).c1};--c2:${pal(f.el).c2}"><i class="ar-role">${esc(r.name)} · ${f.melee ? '근접' : '원거리'}<small>${esc(r.desc)}</small></i><b>① ${esc(k.name)}</b><b>② ${esc(f.skill2.name)}</b><em>필살기 ${esc(f.ult)}</em><span class="ar-tdots" aria-label="스킬트리">${dots}</span></span>`;
 }
 const treeOf = (key, level) => petTree(key, level, R.trees?.[key], R.picks?.[key] ?? null);
 // 가지 고르기(무료 · 언제든): 열린 층만. 고르면 바로 미리보기가 바뀐다.
@@ -291,9 +291,9 @@ function treePanel(pets) {
   const pctLow = (a, b) => { const d = Math.round((1 - a / b) * 100); return d ? `<i class="up">−${d}%</i>` : ''; };
   const floor = (x, i) => {
     const lock = !x.open, flash = R.flash?.key === key && R.flash?.layer === i;
-    const branch = (k, n) => `<button type="button" class="ar-branch b${n}${x.pick === n ? ' on' : ''}${flash && x.pick === n ? ' grow' : ''}" data-ar="tree" data-key="${esc(key)}" data-l="${i}" data-b="${n}" aria-pressed="${x.pick === n}" ${lock ? 'disabled' : ''}><i>${esc(k.icon)}</i><span><b><u>${n ? 'B' : 'A'}</u>${esc(k.name)}</b><small>${esc(k.desc)}</small></span></button>`;
+    const branch = (k, n) => `<button type="button" class="ar-branch b${n}${x.pick === n ? ' on' : ''}${flash && x.pick === n ? ' grow' : ''}" data-ar="tree" data-key="${esc(key)}" data-l="${i}" data-b="${n}" aria-pressed="${x.pick === n}" ${lock ? 'disabled' : ''}><i>${n ? 'B' : 'A'}</i><span><b>${esc(k.name)}</b><small>${esc(k.desc)}</small></span></button>`;
     const need = x.lv - lv, prog = Math.max(0, Math.min(100, Math.round(lv / x.lv * 100)));
-    return `<li class="ar-floor${lock ? ' lock' : ''}" style="--i:${i}"><div class="ar-floor-h"><b>${FLOOR_KO[i]}</b><small>Lv.${x.lv} · ${FLOOR_ROLE[i]}</small>${lock ? `<em>🔒 Lv.${x.lv}에 열려요</em>` : '<em class="open">열림 · 무료로 바꿔요</em>'}</div>
+    return `<li class="ar-floor${lock ? ' lock' : ''}" style="--i:${i}"><div class="ar-floor-h"><b>${FLOOR_KO[i]}</b><small>Lv.${x.lv} · ${FLOOR_ROLE[i]}</small>${lock ? `<em><b class="ar-lock" aria-hidden="true"></b>Lv.${x.lv}에 열려요</em>` : '<em class="open">열림 · 무료로 바꿔요</em>'}</div>
       <div class="ar-branches">${branch(x.a, 0)}<span class="ar-fork" aria-hidden="true"></span>${branch(x.b, 1)}</div>
       ${lock ? `<div class="ar-floor-lock"><span><i style="width:${prog}%"></i></span><small>Lv.${lv} → Lv.${x.lv} · ${need}레벨 남음 · 단어 공부로 펫이 자라요</small></div>` : ''}</li>`;
   };
@@ -305,7 +305,7 @@ function treePanel(pets) {
     <div class="ar-preview" aria-live="polite"><b>미리보기</b>
       <span><small>체력</small>${num(now.hp)}${pct(now.hp, bare.hp)}</span><span><small>공격</small>${num(now.atk)}${pct(now.atk, bare.atk)}</span>
       <span><small>① ${esc(now.skill.name)}</small>${sec(now.skillCd)}초${pctLow(now.skillCd, bare.skillCd)}</span>
-      <span><small>② ${esc(now.skill2.icon)} ${esc(now.skill2.name)}</small>${sec(now.skill2Cd)}초${pctLow(now.skill2Cd, bare.skill2Cd)}${now.s2pow > 1 ? `<i class="up">위력 +${Math.round((now.s2pow - 1) * 100)}%</i>` : ''}</span>
+      <span><small>② ${esc(now.skill2.name)}</small>${sec(now.skill2Cd)}초${pctLow(now.skill2Cd, bare.skill2Cd)}${now.s2pow > 1 ? `<i class="up">위력 +${Math.round((now.s2pow - 1) * 100)}%</i>` : ''}</span>
       <span class="ult"><small>필살기</small>${esc(now.ult)}${now.ult2 ? `<i class="up">${now.ult2 === 'ring' ? '둘레 큰 원' : '긴 일직선'}</i>` : ''}</span></div>
   </div>`;
 }
@@ -318,27 +318,38 @@ function lobby(again = false, keep = false) {
   const v = R.view || {}, pets = readyPets(R.A);
   const tickets = Number(v.tickets || 0), left = Number(v.left ?? ARENA.DAILY), paid = tickets > 0 && left > 0;
   const slot = n => { const key = R.team[n], p = pets.find(x => x.key === key); return p ? `<span class="ar-slot on${key === R.focus ? ' focus' : ''}" data-ar="focus" data-key="${esc(key)}"><b>${n + 1}</b>${petImg(p.key, p.form)}<div><small>${esc(p.name || petName(p.key))} · Lv.${p.level}</small>${skillLine(p.key, p.form, p.level)}</div></span>` : `<span class="ar-slot"><b>${n + 1}</b><i>?</i><div><small>비어 있음</small></div></span>`; };
+  const off = pets.length ? '' : 'disabled', help = document.querySelector('.ar-help');
+  if (help) R.helpOpen = help.open; // 다시 그려도 방법 칸은 펼친 그대로
   main(`<section class="ar-lobby${again ? ' again' : ''}${keep ? ' keep' : ''}">
     <div class="ar-title"><small>3 대 3 펫 대전</small><h1>펫 아레나</h1></div>
     ${rankCard(v.rank)}
-    <div class="ar-card">
-      <ul class="ar-rules">
-        <li><b>🕹️</b><span>왼쪽 <em>조이스틱</em>으로 움직이면 그쪽을 바라봐요. <em>공격</em>은 바라보는 쪽으로!</span></li>
-        <li><b>🎯</b><span><em>스킬 · 필살기 버튼을 끌면</em> 원하는 쪽으로 조준, 톡 누르면 바라보는 쪽. 등 뒤 · 기절한 상대는 <em>치명타</em></span></li>
-        <li><b>💨</b><span>날아오는 공격은 <em>회피</em>로 피해요(잠깐 무적). 바닥에 빨간 표시가 뜨면 피하기!</span></li>
-        <li><b>🔥</b><span>때리고 맞으면 <em>필살기 게이지</em>가 차요. 꽉 차면 필살기! 위험하면 <em>교체</em></span></li>
-      </ul>
-      <div class="ar-aimset" role="group" aria-label="조준 방식">${AIM_MODES.map(([k, n, d]) => `<button type="button" class="ar-aimopt${R.aim === k ? ' on' : ''}" data-ar="aim" data-aim="${k}" aria-pressed="${R.aim === k}"><b>${n}</b><small>${d}</small></button>`).join('')}</div>
-      <h3 class="ar-sub">내 팀 <small>순서대로 나가요 · 펫마다 특징 · 스킬 2개가 달라요</small></h3>
+    <div class="ar-card ar-entry">
+      <h3 class="ar-sub">내 팀 <small>순서대로 나가요 · 눌러서 스킬트리</small></h3>
       <div class="ar-slots">${[0, 1, 2].map(slot).join('')}</div>
-      ${treePanel(pets)}
+      <button type="button" class="yl-cta ar-go" data-ar="start" ${off}>${!pets.length ? '펫을 먼저 키워 주세요' : paid ? '대전 시작!' : '연습 판 시작'}${pets.length && paid ? `<small>입장권 ${num(tickets)}</small>` : ''}</button>
+      <p class="ar-words">${paid ? `코인 판 · 이기면 ${coin()}${ARENA.COINS.win} · 오늘 ${num(left)}판 남음` : left <= 0 ? `오늘 코인 판(${ARENA.DAILY}판)을 다 썼어요. 연습 판은 계속 돼요` : `입장권이 없어서 연습 판이에요. <b>단어 연습을 끝까지 풀면 입장권</b>을 받아요`}</p>
+    </div>
+    <div class="ar-extra">
+      <button type="button" class="ar-extra-btn live" data-ar="live" ${off}><b>친구 대전</b><small>같은 학년 · 방 코드</small></button>
+      <button type="button" class="ar-extra-btn prac" data-ar="pr-open" ${off}><b>연습장</b><small>허수아비 · 보상 없음</small></button>
+      <button type="button" class="ar-extra-btn deco" data-ar="dc-open"><b>꾸미기</b><small>${num(v.deco?.wins || 0)}승 · 이기면 열려요</small></button>
+    </div>
+    <div class="ar-recs"><div><small>승리</small><b>${num(v.wins || 0)}</b></div><div><small>연승</small><b>${num(v.streak || 0)}<small> / 최고 ${num(v.best_streak || 0)}</small></b></div><div><small>입장권</small><b>${num(tickets)}<small> / ${num(ARENA.TICKETS_MAX)}</small></b></div></div>
+    <details class="ar-card ar-help"${R.helpOpen ? ' open' : ''}>
+      <summary><i aria-hidden="true">i</i>싸우는 방법 · 조준 방식<small>${esc(AIM_MODES.find(m => m[0] === R.aim)?.[1] || '')}</small></summary>
+      <ol class="ar-rules">
+        <li><span>왼쪽 <em>조이스틱</em>으로 움직이면 그쪽을 바라봐요. <em>공격</em>은 바라보는 쪽으로!</span></li>
+        <li><span><em>스킬 · 필살기 버튼을 끌면</em> 원하는 쪽으로 조준, 톡 누르면 바라보는 쪽. 등 뒤 · 기절한 상대는 <em>치명타</em></span></li>
+        <li><span>날아오는 공격은 <em>회피</em>로 피해요(잠깐 무적). 바닥에 빨간 표시가 뜨면 피하기!</span></li>
+        <li><span>때리고 맞으면 <em>필살기 게이지</em>가 차요. 꽉 차면 필살기! 위험하면 <em>교체</em></span></li>
+      </ol>
+      <div class="ar-aimset" role="group" aria-label="조준 방식">${AIM_MODES.map(([k, n, d]) => `<button type="button" class="ar-aimopt${R.aim === k ? ' on' : ''}" data-ar="aim" data-aim="${k}" aria-pressed="${R.aim === k}"><b>${n}</b><small>${d}</small></button>`).join('')}</div>
+    </details>
+    <div class="ar-card ar-build">
+      <h3 class="ar-sub">팀 바꾸기 <small>펫마다 특징 · 스킬 2개가 달라요</small></h3>
       ${pets.length ? `<div class="ar-pets">${pets.map(p => `<button type="button" class="ar-pet-pick${R.team.includes(p.key) ? ' on' : ''}" data-ar="pet" data-key="${esc(p.key)}" aria-pressed="${R.team.includes(p.key)}">${petImg(p.key, p.form)}<small>Lv.${p.level}</small>${R.team.includes(p.key) ? `<b>${R.team.indexOf(p.key) + 1}</b>` : ''}</button>`).join('')}</div>`
         : '<p class="ar-why">알에서 깬 펫이 없어요. 공부해서 펫을 키우면 싸울 수 있어요!</p>'}
-      <div class="ar-recs"><div><small>승리</small><b>${num(v.wins || 0)}</b></div><div><small>연승</small><b>${num(v.streak || 0)}<small> / 최고 ${num(v.best_streak || 0)}</small></b></div><div><small>입장권</small><b>🎟️ ${num(tickets)}<small> / ${num(ARENA.TICKETS_MAX)}</small></b></div></div>
-      <p class="ar-words">${paid ? `코인 판 · 이기면 ${coin()}${ARENA.COINS.win} · 오늘 ${num(left)}판 남음 · 입장권 1장을 써요` : left <= 0 ? `오늘 코인 판(${ARENA.DAILY}판)을 다 썼어요. 연습 판은 계속 할 수 있어요` : `입장권이 없어서 연습 판이에요(코인 없음). <b>단어 연습을 끝까지 풀면 입장권</b>을 받아요`}</p>
-      <button type="button" class="yl-cta ar-go" data-ar="start" ${pets.length ? '' : 'disabled'}>${!pets.length ? '펫을 먼저 키워 주세요' : paid ? '대전 시작!' : '연습 판 시작'}</button>
-      <button type="button" class="btn full ar-live-go" data-ar="live" ${pets.length ? '' : 'disabled'}>👥 친구와 실시간 대전 <small>같은 학년 · 방 코드</small></button>
-      <div class="ar-extra"><button type="button" class="ar-extra-btn prac" data-ar="pr-open" ${pets.length ? '' : 'disabled'}><b>🎯</b><span>연습장<small>허수아비로 스킬 시험 · 보상 없음</small></span></button><button type="button" class="ar-extra-btn deco" data-ar="dc-open"><b>🎨</b><span>경기장 꾸미기<small>🏆 ${num(v.deco?.wins || 0)}승 · 이기면 열려요</small></span></button></div>
+      ${treePanel(pets)}
     </div>
   </section>`);
 }
@@ -1340,7 +1351,7 @@ function result(local, res) {
       ${rankGain(res?.rp)}
       ${coins || xp ? `<div class="ar-res-gain">${coins ? `<span class="r coin">${coin()}<b>+${num(coins)}</b>${res?.streak_coins ? `<small>3연승 +${res.streak_coins} 포함</small>` : ''}</span>` : ''}${xp ? `<span class="r xp"><b>+${xp}</b><small>경험치</small></span>` : ''}</div>` : ''}
       ${why ? `<p class="ar-why">${why}</p>` : ''}
-      <p class="ar-tip">${win ? '다음 판은 상대가 더 똑똑해질 수 있어요!' : '팁: 빨간 표시가 뜨면 회피! 상성이 좋은 펫으로 교체해 보세요.'}</p>
+      ${win ? '' : '<p class="ar-tip">빨간 표시가 뜨면 회피! 상성이 좋은 펫으로 교체해 보세요.</p>'}
       <div class="ar-res-btns">${R.live ? R.live.buttons() : '<button type="button" class="yl-cta" data-ar="again">한 판 더</button><button type="button" class="btn full" data-ar="exit">놀이터로</button>'}</div>
     </div>
   </section>`);
@@ -1358,7 +1369,7 @@ function multiTitle(win, winner) {
 }
 function rankRows() {
   const order = R.cur.rank || SLOTS();
-  return `<ol class="ar-res-rank ${R.r.mode}">${order.map((w, i) => `<li class="${w === 'me' ? 'mine' : ''} ${isAlly(w) ? 'ally' : 'enemy'}"><i>${R.r.mode === '2v2' ? (isAlly(w) ? '🔵' : '🔴') : `${i + 1}등`}</i><b>${esc(w === 'me' ? '나' : R.names[w] || '')}</b><small>쓰러뜨림 ${num(R.cur.ko?.[w] || 0)}</small></li>`).join('')}</ol>`;
+  return `<ol class="ar-res-rank ${R.r.mode}">${order.map((w, i) => `<li class="${w === 'me' ? 'mine' : ''} ${isAlly(w) ? 'ally' : 'enemy'}"><i>${R.r.mode === '2v2' ? `<b class="ar-tm ${isAlly(w) ? 'ally' : 'enemy'}" aria-label="${isAlly(w) ? '우리 팀' : '상대 팀'}"></b>` : `${i + 1}등`}</i><b>${esc(w === 'me' ? '나' : R.names[w] || '')}</b><small>쓰러뜨림 ${num(R.cur.ko?.[w] || 0)}</small></li>`).join('')}</ol>`;
 }
 
 // 상성표(도움말 · 검사용): '불꽃 → 풀 · 얼음'.
