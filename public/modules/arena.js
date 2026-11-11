@@ -3,6 +3,8 @@ import { CHARACTERS } from './core.js';
 import { petKey, expressionSrc } from './character.js';
 import { coin } from './emblems.js';
 import { playSound, unlockSound, soundOn, preloadSound } from './sound.js';
+// V13.237 새 소리(ar-*.mp3)는 사건 이름으로 부른다(사건 → 소리 표: arena-sfx.js). 캔버스 쪽(arena-stage.js)도 같은 이름으로 부르면 된다.
+import { arenaSound, arenaHitSound, ARENA_SFX_KEYS, METEOR_HIT } from './arena-sfx.js';
 import { coinShower, countUp } from './celebrate.js';
 import { ELEMENTS, fxImpact, fxPunch, fxSpeedLines, fxRecoil, fxLite } from './battle-fx.js';
 import { ARENA, BEATS, INPUT, ROLE, DIR16, SK2, ZONES_MAX, TREE, createArena, fighter, dirCode, aimCode, petTree, cleanTree } from './arena-rules.js';
@@ -117,7 +119,7 @@ export function openArena(A, exit, opts = {}) {
   document.addEventListener('keyup', R.keysUp);
   document.addEventListener('visibilitychange', R.vis);
   window.scrollTo(0, 0);
-  preloadSound(['tm-count', 'tm-go', 'hit', 'hit-star', 'hit-leaf', 'hit-wind', 'atk-star', 'atk-leaf', 'atk-wind', 'skill', 'ult-riser', 'ult-impact', 'faint', 'combo', 'crit', 'fanfare-epic', 'fail', 'coins', 'smash', 'swoosh', 'tap']);
+  preloadSound(['tm-count', 'tm-go', 'hit', 'hit-star', 'hit-leaf', 'hit-wind', 'atk-star', 'atk-leaf', 'atk-wind', 'skill', 'ult-riser', 'ult-impact', 'faint', 'combo', 'crit', 'fanfare-epic', 'fail', 'coins', 'smash', 'swoosh', 'tap', ...ARENA_SFX_KEYS]);
   lobby();
   // V13.230 첫 화면 초대에서 들어오면 바로 친구 대전 방으로.
   if (opts.join) openLive(A, { join: opts.join });
@@ -899,7 +901,7 @@ function onEvent(e, show) {
   if (e.e === 'stream') return streamFx(e);
   if (e.e === 'gale') { afterimage(e.who); slash(px(e.x, e.y), e.nx, e.ny, e.el); sfx('swoosh', { rate: 1.2 + e.n * 0.1 }); return; }
   if (e.e === 'bubble') { if (e.gone) return void pop('방울이 사라졌어요', e.x, e.y - 22, 'stun'); bits('drop', px(e.x, e.y - 8), 3, 26, 420, 'water'); pop(e.left ? `막음! (${e.left})` : '막음!', e.x, e.y - 24, `skill ${e.who}`); sfx('tap', { rate: 1.6 }); return; }
-  if (e.e === 'bubblepop') { ring(px(e.x, e.y), 'water', e.r); bits('drop', px(e.x, e.y - 8), 6, 60, 560, 'water'); sfx('smash', { rate: 1.5 }); buzz(20); return; }
+  if (e.e === 'bubblepop') { ring(px(e.x, e.y), 'water', e.r); bits('drop', px(e.x, e.y - 8), 6, 60, 560, 'water'); arenaSound('bubblepop'); buzz(20); return; }
   if (e.e === 'cloneshot') { sfx('atk-star', { rate: 1.5, volume: .5 }); return; }
   if (e.e === 'cloneend') { bits('star', px(e.x, e.y - 10), 4, 30, 520, 'star'); return; }
   // V13.232 여러 명: 상태 글자(화상 · 기절 …)는 나와 관련된 것만(다른 사람끼리는 펫 위 표시 · 색으로 보인다).
@@ -974,7 +976,7 @@ function cutin(e) {
   box.querySelectorAll('.ar-cut-star').forEach((st, i) => { if ((e.rank || 0) >= 1 && i < (lite ? 2 : 3 + e.rank * 2)) run(st, [{ transform: 'scale(.1)', opacity: 0 }, { transform: 'translateY(-8px) scale(1) rotate(60deg)', opacity: 1, offset: .4 }, { transform: 'translateY(-22px) scale(.2) rotate(120deg)', opacity: 0 }], { duration: 760, delay: 120 + i * 70 }); });
   if ((e.rank || 0) >= 2 && wash) { wash.style.setProperty('--c1', P.c1); wash.style.setProperty('--c2', P.c2); run(wash, [{ opacity: 0 }, { opacity: 1, offset: .25 }, { opacity: .8, offset: .7 }, { opacity: 0 }], { duration: 920 }); }
   later(() => box.classList.remove('on'), 1000);
-  sfx('ult-riser'); buzz(60);
+  arenaSound('ult-rise'); buzz(60);
   // 멈춤 표시는 경기장에만(앱 전체 X).
   arenaEl()?.classList.add('ult');
   later(() => arenaEl()?.classList.remove('ult'), ARENA.ULT_FREEZE_TICKS * ARENA.TICK_MS);
@@ -988,7 +990,7 @@ function ultFx(e) {
   beam(from, to, e.el, true);
   shakeField(true);
   if (e.hit && !far) zoomAt(to, 0.08, 560); else fxPunch(fieldEl, .04);
-  sfx('ult-impact');
+  arenaSound('ult-blast');
   if (e.who === 'me' && e.hit) buzz([30, 20, 60]);
   nextFrame(() => fxImpact(arenaEl(), to, e.el, 3));
   nextFrame(() => quake(to, e.el, true), 2);
@@ -997,7 +999,7 @@ function ultFx(e) {
 // V13.231 스킬트리 3층 A 두 번째 필살기: 원(내 둘레로 퍼지는 충격파 두 겹 + 속성 조각) · 일직선(경기장을 가로지르는 굵은 광선 + 끝 폭발).
 function ult2Fx(e) {
   const from = px(e.x, e.y), P = pal(e.el), g = geo();
-  shakeField(true); sfx('ult-impact'); washFlash(e.el, .6, 640);
+  shakeField(true); arenaSound('ult-blast'); washFlash(e.el, .6, 640);
   if (e.who === 'me' && e.hit) buzz([30, 20, 60]);
   if (e.u2 === 'ring') {
     const k = (e.r * 2 / 100 * g.w / ZONE_BASE).toFixed(2);
@@ -1011,7 +1013,7 @@ function ult2Fx(e) {
   const end = px(e.x + e.nx * e.len, e.y + e.ny * e.len), dx = end.x - from.x, dy = end.y - from.y, len = Math.sqrt(dx * dx + dy * dy), ang = Math.atan2(dy, dx) * 180 / Math.PI;
   const w = Math.max(18, e.w * 2 / 100 * g.w);
   fxEl('ult2line', { left: `${Math.round(from.x)}px`, top: `${Math.round(from.y)}px`, width: `${Math.round(len)}px`, height: `${Math.round(w)}px`, transform: `translateY(-50%) rotate(${ang.toFixed(1)}deg)`, '--c1': P.c1, '--c2': P.c2, '--c3': P.c3 }, 900, '<b></b><em></em>');
-  beam(from, end, e.el, true);
+  beam(from, end, e.el, true); arenaSound('beam');
   const at = e.hit ? px(e.tx, e.ty) : end;
   nextFrame(() => fxImpact(arenaEl(), at, e.el, 3));
   nextFrame(() => bits(ULT2_BIT[e.el] || 'star', at, 8, 60, 760, e.el), 2);
@@ -1057,15 +1059,14 @@ function hurt(e) {
     if (f && near) { const src = expressionSrc(f.key, R.forms[e.who][s.idx], 'hurt'); if (poseReady(src)) swapPose(body, src, 300); }
   }
   dmgNum(e);
-  if (!near) { if (!poison && !e.tick) sfx('hit', { rate: 1.1, volume: .55 }); if (e.last) finale(e); return; }
+  if (!near) { if (!poison && !e.tick) arenaHitSound(e, false); if (e.last) finale(e); return; }
   if (e.m > 1 && e.kind !== 'atk' && !poison) pop('효과가 굉장해!', e.x, e.y - 27, 'eff');
   else if (e.m < 1 && e.kind !== 'atk' && !poison) pop('효과가 별로…', e.x, e.y - 27, 'eff weak');
   if (!poison) {
-    // 소리 겹치기: 때림 + 속성 + (내가 맞으면) 아픔, 높이를 조금씩 다르게.
-    sfx(e.kind === 'ult' ? 'crit' : 'hit', { rate: e.kind === 'atk' ? 1.1 : .9 });
+    // 소리 겹치기: 등급 소리(타격 · 속성 · 짧은 저음, 강타면 히트스톱 퍽 · 치명타) + 펫 속성 + (내가 맞으면) 아픔.
+    arenaHitSound(e);
     sfx(HIT_SFX[e.el] || 'hit-star', { rate: e.kind === 'atk' ? 1.2 : 1 });
     if (e.who === 'me') sfx('hurt', { rate: 1.05 });
-    if (e.crit) sfx('crit', { rate: 1.15 });
     if ((e.kind === 'skill' || e.kind === 'skill2') && !e.tick) shakeField(false);
   }
   if (e.who === 'me' && e.kind !== 'atk' && !poison && !e.tick) buzz(30);
@@ -1190,16 +1191,16 @@ function skill2Fx(e) {
   const src = f && expressionSrc(f.key, R.forms[e.who][s.idx], 'attack');
   if (poseReady(src)) swapPose($(`ar-${e.who}-body`), src, 400);
   const id = e.id;
-  if (id === 'breath') { sfx('ult-riser', { rate: 1.6, volume: .7 }); sfx('atk-star', { rate: .6 }); later(() => { const t = px(e.x + e.nx * 16, e.y + e.ny * 16); fxEl('scorch', { left: `${Math.round(t.x)}px`, top: `${Math.round(t.y)}px` }, 1600); }, 300); return; }
-  if (id === 'meteor') { const t = px(e.tx, e.ty), art = artOf('meteor'); fxEl(`meteorfall${art ? ' art' : ''}`, { left: `${Math.round(t.x)}px`, top: `${Math.round(t.y)}px`, '--art': art || 'none', '--fall': `${e.warn * ARENA.TICK_MS}ms` }, e.warn * ARENA.TICK_MS + 60); sfx('swoosh', { rate: .6 }); return; }
+  if (id === 'breath') { arenaSound('breath'); later(() => { const t = px(e.x + e.nx * 16, e.y + e.ny * 16); fxEl('scorch', { left: `${Math.round(t.x)}px`, top: `${Math.round(t.y)}px` }, 1600); }, 300); return; }
+  if (id === 'meteor') { const t = px(e.tx, e.ty), art = artOf('meteor'); fxEl(`meteorfall${art ? ' art' : ''}`, { left: `${Math.round(t.x)}px`, top: `${Math.round(t.y)}px`, '--art': art || 'none', '--fall': `${e.warn * ARENA.TICK_MS}ms` }, e.warn * ARENA.TICK_MS + 60); arenaSound('meteor', { at: Math.max(0, e.warn * ARENA.TICK_MS / 1000 - METEOR_HIT) }); return; }
   if (id === 'jet' || id === 'vine' || id === 'chain') { bits('charge', at, 4, 14, 260, e.el); sfx(id === 'chain' ? 'hit-star' : 'swoosh', { rate: id === 'jet' ? .7 : 1.3 }); return; }
   if (id === 'bubble') { aura(e.who, e.el); bits('drop', px(e.x, e.y - 10), 5, 26, 520, 'water'); sfx('skill', { rate: 1.3 }); return; }
   if (id === 'petal') { bits('petalbit', px(e.x, e.y), 6, 40, 900, 'leaf'); sfx('skill', { rate: 1.1 }); return; }
-  if (id === 'crack' || id === 'icefield' || id === 'cloud') { const t = px(e.tx, e.ty); bits(id === 'crack' ? 'rock' : id === 'icefield' ? 'frost' : 'puff', t, 5, 34, 600, e.el); if (id === 'crack') { shakeField(false); sfx('smash', { rate: .8 }); } else sfx('swoosh', { rate: .9 }); return; }
-  if (id === 'tornado') { bits('leafbit', at, 4, 20, 500, 'wind'); sfx('swoosh', { rate: .55 }); return; }
-  if (id === 'boulder') { sfx('smash', { rate: .6 }); bits('dust', at, 4, 18, 420, 'earth'); return; }
+  if (id === 'crack' || id === 'icefield' || id === 'cloud') { const t = px(e.tx, e.ty); bits(id === 'crack' ? 'rock' : id === 'icefield' ? 'frost' : 'puff', t, 5, 34, 600, e.el); if (id === 'crack') { shakeField(false); arenaSound('quake'); } else arenaSound(id === 'icefield' ? 'ice' : 'poison'); return; }
+  if (id === 'tornado') { bits('leafbit', at, 4, 20, 500, 'wind'); arenaSound('tornado'); return; }
+  if (id === 'boulder') { arenaSound('boulder'); bits('dust', at, 4, 18, 420, 'earth'); return; }
   if (id === 'gale') { afterimage(e.who); slash(at, e.nx, e.ny, e.el); sfx('swoosh', { rate: 1.2 }); return; }
-  if (id === 'spear' || id === 'darts') { bits('charge', at, 3, 12, 220, e.el); sfx(id === 'spear' ? 'hit-star' : 'swoosh', { rate: 1.5 }); return; }
+  if (id === 'spear' || id === 'darts') { bits('charge', at, 3, 12, 220, e.el); if (id === 'spear') arenaSound('ice', { rate: 1.3, gain: .7 }); else sfx('swoosh', { rate: 1.5 }); return; }
   if (id === 'clone') { bits('star', px(e.x - e.ny * 9, e.y + e.nx * 9), 6, 26, 640, 'star'); sfx('skill', { rate: 1.4 }); return; }
 }
 // 굵은 줄기(물대포 · 덩굴 · 번개): 미리 만든 칸 2개를 번갈아 쓴다. 자리 · 방향은 translate · rotate, 길이는 scale.
@@ -1213,9 +1214,9 @@ function streamFx(e) {
   el.style.transform = `scale(${(len / LINE_BASE).toFixed(3)}, ${wide.toFixed(2)})`;
   try { el.animate([{ opacity: 0, scale: '.1 1' }, { opacity: 1, scale: '1 1.2', offset: .18 }, { opacity: 1, scale: '1 1', offset: .65 }, { opacity: 0, scale: '1 .4' }], { duration: e.id === 'chain' ? 300 : 460, easing: 'ease-out' }); } catch {}
   const end = e.hit ? px(e.tx, e.ty) : px(e.x + e.nx * e.len, e.y + e.ny * e.len);
-  if (e.id === 'jet') { bits('drop', end, 6, 40, 520, 'water'); if (e.hit) fxImpact(arenaEl(), end, 'water', 2); sfx('smash', { rate: 1.2 }); }
-  else if (e.id === 'vine') { bits('leafbit', end, 5, 26, 600, 'leaf'); sfx('atk-leaf', { rate: .8 }); }
-  else { washFlash('star', .35, 140); bits('spark', end, 4, 24, 320, 'star'); sfx('hit-star', { rate: .7 }); }
+  if (e.id === 'jet') { bits('drop', end, 6, 40, 520, 'water'); if (e.hit) fxImpact(arenaEl(), end, 'water', 2); arenaSound('jet'); }
+  else if (e.id === 'vine') { bits('leafbit', end, 5, 26, 600, 'leaf'); arenaSound('vine'); }
+  else { washFlash('star', .35, 140); bits('spark', end, 4, 24, 320, 'star'); arenaSound('thunder'); }
   if (e.hit && e.who === 'foe') buzz(25);
 }
 function meteorBoom(e) {
@@ -1223,7 +1224,7 @@ function meteorBoom(e) {
   quake(at, 'flame', true);
   ring(at, 'flame', e.r);
   nextFrame(() => bits('ember', at, 8, 60, 640, 'flame'));
-  shakeField(true); zoomAt(at, 0.06, 480); sfx('ult-impact', { rate: 1.2 }); sfx('smash');
+  shakeField(true); zoomAt(at, 0.06, 480); sfx('smash'); // 쾅은 떨어지기 시작할 때 낸 ar-meteor 안에 있다(때를 맞춤).
   if (R.cur.me && Math.abs(R.cur.me.x - e.x) < e.r + 5 && Math.abs(R.cur.me.y - e.y) < e.r + 5) buzz([30, 20, 40]);
 }
 // 필살기 속성 연출(컷인 뒤 터질 때 덧붙인다, 조각은 8개 · 저사양 4개까지). 예: 화염 폭풍 = 불 뿜기 큰 버전 + 운석 3개.
