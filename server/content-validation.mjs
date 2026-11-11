@@ -1,6 +1,7 @@
 import builtinBooksData from '../data/vocabulary.json' with { type: 'json' };
 import { seonbu44Correction } from './seonbu44-correction.mjs';
 import { gangseoSepMockBook } from './gangseo-sep-mock.mjs';
+import { danwonSepMockBook } from './danwon-sep-mock.mjs';
 import { seonbuExternalFinalBook } from './seonbu-external-final.mjs';
 import { DANWONGO_PASSAGES } from '../public/danwongo-grammar-data.js';
 import { DANWONGO_TEXTBOOK_PASSAGES } from '../public/danwongo-textbook-grammar-data.js';
@@ -17,7 +18,7 @@ const runtimeBooks = () => {
     if (!isSeonbu || !Array.isArray(book.words)) return book;
     return { ...book, words: book.words.filter(word => String(word.range_code) !== '44') };
   });
-  return [...books, seonbu44Correction, seonbuExternalFinalBook, gangseoSepMockBook];
+  return [...books, seonbu44Correction, seonbuExternalFinalBook, gangseoSepMockBook, danwonSepMockBook];
 };
 const assert = (condition, message) => { if (!condition) fail(message); };
 
