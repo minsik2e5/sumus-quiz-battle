@@ -14,6 +14,7 @@ import { LIVE, LIVE_EMOTES, cleanCode, createLiveSim, createReplaySim, cleanRepl
 //   팀전은 빈자리를 눌러 팀 고르기 · 방장 섞기, 여러 명 판은 방장이 빈자리를 컴퓨터로 채울 수 있다(보상 계산에서 빠진다).
 //   판 화면은 같은 전투 화면(arena.js)에 펫 칸만 늘린다(createLiveSimN: 내 펫 'me', 다른 사람 'foe' · 'o2' · 'o3').
 import { arenaMatch, arenaUi } from './arena.js';
+import { arenaSound } from './arena-sfx.js';
 import { ARENA_ART } from './arena-art.js';
 import { decoWant, liveDecoOf } from './arena-deco.js';
 
@@ -67,6 +68,8 @@ async function home() {
   try { d = await api('/games/arena/live'); } catch (err) { if (!L) return; return arenaUi.main(`<div class="ar-saving">${esc(err.message || '불러오지 못했어요.')}<button type="button" class="btn" data-ar="lv-back">돌아가기</button></div>`); }
   if (!L) return;
   L.home = d;
+  // V13.237 받은 초대가 새로 보이면 딩-동-딩(같은 초대는 한 번만).
+  if (d.invite && d.invite.id !== L.heardInvite) { L.heardInvite = d.invite.id; arenaSound('invite'); }
   if (d.room && d.room.id !== L.skip) return enter(d.room);
   const list = replays(L.A).slice().reverse();
   arenaUi.main(`<section class="ar-live${lobbyArt()}">
@@ -225,6 +228,9 @@ function lobbyView() {
   // 여러 명 판: 사람이 2명 이상이고 빈자리를 컴퓨터로 채우면 시작할 수 있다.
   const enough = v.players.length >= n || (multi && v.fill && v.players.length >= 2);
   const all = enough && v.players.every(p => p.host || p.ready);
+  // V13.237 모두 준비가 된 순간 한 번(풀렸다 다시 되면 또).
+  if (all && !L.allReady) arenaSound('ready');
+  L.allReady = all;
   const friends = host ? (L.home?.friends || []) : [];
   const keep = L.drawn ? ' keep' : '';
   L.drawn = true;
