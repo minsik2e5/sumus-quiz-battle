@@ -31,7 +31,13 @@ export const SOUND_GAIN = {
   'rod-tick': .4, 'rod-ratchet': .45, 'rod-drag': .55, 'rod-shimmer': .45, 'rod-snap-heavy': .9,
   'trophy-boom': .9, 'deep-hum': .35, 'deep-bubble': .4, 'deep-pass': .6,
   // V13.191 인형뽑기 놓침 연출(docs/sound/claw-synth.mjs): 집게 버팀 · 인형 툭 · 아깝다.
-  'claw-strain': .55, 'claw-slip': .75, 'claw-aww': .6
+  'claw-strain': .55, 'claw-slip': .75, 'claw-aww': .6,
+  // V13.237 펫 아레나(docs/sound/arena-synth.mjs, 사건 → 소리 표는 arena-sfx.js): 맞힘 등급 5종(타격 · 속성 · 짧은 저음) · 치명타 · 히트스톱 퍽 ·
+  // 필살 3단(올라감 → 정적 → 폭발) · 광선 웅 · 지진 쿵-우르르 · 번개 찌직-쾅 · 스킬 ②(불 뿜기 · 운석 · 물대포 · 방울 깨짐 · 덩굴 · 바위 · 회오리 · 얼음 · 독) · 초대 · 모두 준비.
+  'ar-hit-1': .45, 'ar-hit-2': .6, 'ar-hit-3': .7, 'ar-hit-4': .8, 'ar-hit-5': .9, 'ar-crit': .8, 'ar-hitstop': .75,
+  'ar-ult-rise': .8, 'ar-ult-blast': .95, 'ar-beam': .6, 'ar-quake': .85, 'ar-thunder': .85,
+  'ar-flame-breath': .65, 'ar-meteor': .85, 'ar-water-jet': .65, 'ar-bubble-pop': .7, 'ar-vine': .65, 'ar-rock-roll': .7,
+  'ar-tornado': .6, 'ar-ice': .7, 'ar-poison': .6, 'ar-invite': .75, 'ar-ready': .75
 };
 // 이어지는 소리: key -> 한 주기(초). 파일은 같은 주기가 세 번 이어져 있고, 가운데 주기만 되풀이한다(reel-synth.mjs의 LOOP).
 export const SOUND_LOOP = { 'reel-strain': .8, 'deep-hum': 1.2 };
