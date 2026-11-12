@@ -137,22 +137,22 @@ function preview() {
   const p = pets.find(x => x.key === R.team?.[0]) || pets[0];
   const L = D.look, bgName = decoBg(L.bg, 0), base = BASE_BG.includes(bgName);
   const src = base ? (ARENA_ART.has(BASE_ART[bgName]) ? `/assets/arena/${BASE_ART[bgName]}.webp` : `/assets/${BASE_BACKUP[bgName]}.webp`) : ARENA_ART.has(`bg-${bgName}`) ? `/assets/arena/bg-${bgName}.webp` : '';
-  const pet = p ? `<img src="/assets/pets/${esc(p.key)}-${Math.max(1, Math.min(3, Number(p.form)))}.webp" alt="${esc(CHARACTERS[p.key]?.ko || p.key)}" draggable="false" decoding="async">` : '<b class="dc-pv-egg">🥚</b>';
+  const pet = p ? `<img src="/assets/pets/${esc(p.key)}-${Math.max(1, Math.min(3, Number(p.form)))}.webp" alt="${esc(CHARACTERS[p.key]?.ko || p.key)}" draggable="false" decoding="async">` : '<b class="dc-pv-egg">알</b>';
   return `<div class="dc-pv${src ? ' has-img' : ''} dc-${bgName}" id="dc-pv">
     ${src ? `<img class="dc-pv-bg" src="${src}" alt="" draggable="false" decoding="async">` : ''}${base ? '' : sceneHtml(bgName)}
     <div class="dc-pv-field" id="dc-pv-field"><div class="ar-ring" id="dc-pv-ring"></div><span class="dc-pv-pet ar-mon me">${pet}</span></div>
-    <div class="dc-pv-tags">${DECO_SLOTS.map(s => `<span><small>${DECO_KO[s]}</small>${esc(decoItem(s, L[s])?.icon || '')} ${esc(decoItem(s, L[s])?.n || '')}</span>`).join('')}</div>
-    <div class="dc-pv-btns"><button type="button" class="dc-pv-play" data-ar="dc-play" data-what="en">▶ 입장</button><button type="button" class="dc-pv-play" data-ar="dc-play" data-what="ps">▶ 승리 포즈</button></div>
+    <div class="dc-pv-tags">${DECO_SLOTS.map(s => `<span><small>${DECO_KO[s]}</small>${esc(decoItem(s, L[s])?.n || '')}</span>`).join('')}</div>
+    <div class="dc-pv-btns"><button type="button" class="dc-pv-play" data-ar="dc-play" data-what="en"><i class="dc-tri" aria-hidden="true"></i>입장</button><button type="button" class="dc-pv-play" data-ar="dc-play" data-what="ps"><i class="dc-tri" aria-hidden="true"></i>승리 포즈</button></div>
   </div>`;
 }
 function card(slot, x, wins, mine) {
   const lock = x.w > wins, on = mine[slot] === x.k, look = D.look[slot] === x.k;
   const thumb = slot === 'bg' ? `<i class="dc-thumb bg ${x.k === 'auto' ? 'auto' : `dc-${x.k}`}${x.k !== 'auto' && (ARENA_ART.has(`bg-${x.k}`) || BASE_ART[x.k] && ARENA_ART.has(BASE_ART[x.k])) ? ' art' : ''}" style="${x.k !== 'auto' && ARENA_ART.has(`bg-${x.k}`) ? `--art:url(/assets/arena/bg-${x.k}.webp)` : BASE_ART[x.k] && ARENA_ART.has(BASE_ART[x.k]) ? `--art:url(/assets/arena/${BASE_ART[x.k]}.webp)` : ''}"></i>`
     : slot === 'rg' ? `<i class="dc-thumb rg"><b class="ar-ring rg-${x.k}${x.k !== 'basic' ? ' rg-on' : ''}${ARENA_ART.has(`ring-${x.k}`) ? ' art' : ''}" style="--art:${ARENA_ART.has(`ring-${x.k}`) ? `url(/assets/arena/ring-${x.k}.webp)` : 'none'}">${x.k !== 'basic' ? '<i></i><i></i><i></i>' : ''}</b></i>`
-    : `<i class="dc-thumb ${slot} t-${x.k}">${esc(x.icon)}</i>`;
+    : `<i class="dc-thumb ${slot} t-${x.k}"><b>${esc(String(x.n).slice(0, 1))}</b></i>`;
   return `<button type="button" class="dc-item${lock ? ' lock' : ''}${on ? ' on' : ''}${look ? ' look' : ''}" data-ar="dc-pick" data-slot="${slot}" data-k="${esc(x.k)}" aria-pressed="${on}">
     ${thumb}<span class="dc-item-t"><b>${esc(x.n)}</b><small>${esc(x.d)}</small></span>
-    ${lock ? `<span class="dc-lock"><em>🔒 ${num(x.w - wins)}승 더</em><span class="dc-bar"><i style="width:${pctOf(x.w, wins)}%"></i></span><small>${num(wins)} / ${num(x.w)}승</small></span>` : on ? '<span class="dc-on">✓ 사용 중</span>' : x.w ? `<span class="dc-open">${num(x.w)}승 달성</span>` : '<span class="dc-open">기본</span>'}
+    ${lock ? `<span class="dc-lock"><em><b class="ar-lock" aria-hidden="true"></b>${num(x.w - wins)}승 더</em><span class="dc-bar"><i style="width:${pctOf(x.w, wins)}%"></i></span><small>${num(wins)} / ${num(x.w)}승</small></span>` : on ? '<span class="dc-on">사용 중</span>' : x.w ? `<span class="dc-open">${num(x.w)}승 달성</span>` : '<span class="dc-open">기본</span>'}
   </button>`;
 }
 function draw(first = false) {
@@ -161,10 +161,10 @@ function draw(first = false) {
   const total = DECO_SLOTS.reduce((n, s) => n + DECO[s].length, 0), open = DECO_SLOTS.reduce((n, s) => n + DECO[s].filter(x => x.w <= wins).length, 0);
   arenaUi.main(`<section class="ar-deco${first ? ' first' : ''}">
     <div class="ar-title"><small>이긴 횟수로 열려요 · 코인 · 재화 없음</small><h1>경기장 꾸미기</h1></div>
-    <div class="dc-wins"><span class="dc-trophy">🏆</span><div><b>${num(wins)}<small>승</small></b><small>코인 판 승리 누적 · 열림 ${open} / ${total}</small></div>
-      ${next ? `<div class="dc-next"><small>다음: ${esc(DECO_KO[next.slot])} <b>${esc(decoItem(next.slot, next.k)?.icon || '')} ${esc(next.n)}</b></small><span class="dc-bar big"><i style="width:${pctOf(next.w, wins)}%"></i></span><em>${num(next.left)}승 더!</em></div>` : '<div class="dc-next all"><b>모두 열었어요! 👑</b></div>'}</div>
+    <div class="dc-wins"><div><b>${num(wins)}<small>승</small></b><small>코인 판 승리 누적 · 열림 ${open} / ${total}</small></div>
+      ${next ? `<div class="dc-next"><small>다음: ${esc(DECO_KO[next.slot])} <b>${esc(next.n)}</b></small><span class="dc-bar big"><i style="width:${pctOf(next.w, wins)}%"></i></span><em>${num(next.left)}승 더!</em></div>` : '<div class="dc-next all"><b>모두 열었어요!</b></div>'}</div>
     ${preview()}
-    <div class="dc-tabs" role="tablist">${DECO_SLOTS.map(s => `<button type="button" role="tab" class="dc-tab${D.tab === s ? ' on' : ''}" data-ar="dc-tab" data-slot="${s}" aria-selected="${D.tab === s}">${esc(DECO[s][1]?.icon || DECO[s][0].icon)} ${DECO_KO[s]}<small>${DECO[s].filter(x => x.w <= wins).length}/${DECO[s].length}</small></button>`).join('')}</div>
+    <div class="dc-tabs" role="tablist">${DECO_SLOTS.map(s => `<button type="button" role="tab" class="dc-tab${D.tab === s ? ' on' : ''}" data-ar="dc-tab" data-slot="${s}" aria-selected="${D.tab === s}">${DECO_KO[s]}<small>${DECO[s].filter(x => x.w <= wins).length}/${DECO[s].length}</small></button>`).join('')}</div>
     <div class="dc-grid">${DECO[D.tab].map(x => card(D.tab, x, wins, mine)).join('')}</div>
     <p class="dc-note">${D.tab === 'en' ? '입장 효과는 <b>친구에게도 보여요</b>(친구 대전 · 내 팀을 만난 친구 화면).' : D.tab === 'bg' || D.tab === 'rg' ? '혼자 판과 <b>내가 방장인 친구 대전</b>에 적용돼요.' : '이기면 내 펫이 이 포즈를 해요.'} 잠긴 것도 눌러서 미리 볼 수 있어요.</p>
     <button type="button" class="yl-cta" data-ar="dc-back">대기실로</button>

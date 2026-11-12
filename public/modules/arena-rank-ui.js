@@ -33,7 +33,7 @@ export function rankCard(v) {
       <span class="ark-info"><small>시즌 ${num(v.season)} · ${v.days_left <= 1 ? '<em>오늘 끝나요!</em>' : `${num(v.days_left)}일 남음`}</small><b>${esc(t.label)}</b>
         ${bar(t.pct)}<small class="ark-rp"><b>${num(v.rp)}</b> RP${t.next ? ` · 다음 단계까지 ${num(t.next - v.rp)}` : ' · 최고 단계!'}</small></span>
       <span class="ark-go">랭킹 ›</span></button>
-    ${pend.length ? `<button type="button" class="yl-cta ark-claim" data-ar="rank-claim">🎁 시즌 ${pend.map(x => num(x.s)).join(' · ')} 보상 받기 <small>${esc(pend[pend.length - 1].best)}</small></button>` : ''}
+    ${pend.length ? `<button type="button" class="yl-cta ark-claim" data-ar="rank-claim">시즌 ${pend.map(x => num(x.s)).join(' · ')} 보상 받기 <small>${esc(pend[pend.length - 1].best)}</small></button>` : ''}
     <p class="ark-note">코인 판 승패로 RP가 오르내려요 · 연습 판 · 연습 상대 · 컴퓨터 빈자리 판은 빼요</p>
   </div>`;
 }
@@ -86,7 +86,7 @@ export function playRankGain(rp, { later, sfx, reduced = false } = {}) {
 // 랭킹 탭(GET /games/arena/rank). d: { top, place, total, me }.
 export function rankBoardHtml(d) {
   const me = d?.me, t = tierOf(me?.rp || 0), top = Array.isArray(d?.top) ? d.top : [];
-  const row = x => `<li class="${x.mine ? 'mine' : ''}${x.place <= 3 ? ` top${x.place}` : ''}"><i class="ark-place">${x.place <= 3 ? ['🥇', '🥈', '🥉'][x.place - 1] : num(x.place)}</i>${rankBadge(x.tier, tierOf(x.rp).step, 'sm')}<span class="ark-who"><b>${esc(x.name)}</b><small>${esc(x.cls)} · ${esc(x.label)}</small></span><b class="ark-pts">${num(x.rp)}<small>RP</small></b></li>`;
+  const row = x => `<li class="${x.mine ? 'mine' : ''}${x.place <= 3 ? ` top${x.place}` : ''}"><i class="ark-place">${num(x.place)}</i>${rankBadge(x.tier, tierOf(x.rp).step, 'sm')}<span class="ark-who"><b>${esc(x.name)}</b><small>${esc(x.cls)} · ${esc(x.label)}</small></span><b class="ark-pts">${num(x.rp)}<small>RP</small></b></li>`;
   const mine = top.some(x => x.mine);
   return `<section class="ark-board">
     <div class="ar-title"><small>시즌 ${num(me?.season || 1)} · ${num(me?.days_left || 0)}일 남음</small><h1>아레나 랭킹</h1></div>
