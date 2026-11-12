@@ -96,11 +96,36 @@
 | `claw-slip` | 인형뽑기: 인형이 발톱에서 툭 빠짐(스륵 + 폭신한 쿵) | 우리가 합성(`docs/sound/claw-synth.mjs`의 `claw-slip`) | 0.70초 · 6KB |
 | `claw-aww` | 인형뽑기: 한 박자 늦은 "아깝다!"(반음씩 내려가는 말렛) | 우리가 합성(`docs/sound/claw-synth.mjs`의 `claw-aww`) | 1.29초 · 10KB |
 
+| `ar-hit-1` | 펫 아레나: 맞힘 1등급(스침 · 여러 번 맞는 스킬의 한 번 · 남끼리 친 것) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-hit-1`) | 10KB |
+| `ar-hit-2` | 펫 아레나: 맞힘 2등급(평타) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-hit-2`) | 11KB |
+| `ar-hit-3` | 펫 아레나: 맞힘 3등급(스킬) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-hit-3`) | 13KB |
+| `ar-hit-4` | 펫 아레나: 맞힘 4등급(효과 굉장 · 치명 스킬) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-hit-4`) | 14KB |
+| `ar-hit-5` | 펫 아레나: 맞힘 5등급(필살기). 등급마다 타격 · 속성 · 짧은 저음 3층 | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-hit-5`) | 17KB |
+| `ar-crit` | 펫 아레나: 치명타(째짐 + 금속 쨍 + 저음) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-crit`) | 13KB |
+| `ar-hitstop` | 펫 아레나: 히트스톱 무거운 퍽(강타 · 필살) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-hitstop`) | 5KB |
+| `ar-ult-rise` | 펫 아레나 필살 1단: 올라가는 소리(1.1초, 끝을 끊어 0.1초 정적) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-ult-rise`) | 13KB |
+| `ar-ult-blast` | 펫 아레나 필살 3단: 폭발 | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-ult-blast`) | 48KB |
+| `ar-beam` | 펫 아레나: 광선 "웅-" 지속음(일직선 필살기) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-beam`) | 22KB |
+| `ar-quake` | 펫 아레나: 지진 "쿵-우르르"(갈라진 땅) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-quake`) | 35KB |
+| `ar-thunder` | 펫 아레나: 번개 "찌직-쾅"(번개 연쇄) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-thunder`) | 34KB |
+| `ar-flame-breath` | 펫 아레나: 불 뿜기(이어지는 화르륵) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-flame-breath`) | 24KB |
+| `ar-meteor` | 펫 아레나: 운석 휘익 + 쾅(쾅은 0.55초 지점) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-meteor`) | 38KB |
+| `ar-water-jet` | 펫 아레나: 물대포 쏴아 | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-water-jet`) | 16KB |
+| `ar-bubble-pop` | 펫 아레나: 방울 깨짐 | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-bubble-pop`) | 13KB |
+| `ar-vine` | 펫 아레나: 덩굴 감김 | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-vine`) | 18KB |
+| `ar-rock-roll` | 펫 아레나: 바위 구름 | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-rock-roll`) | 23KB |
+| `ar-tornado` | 펫 아레나: 회오리 | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-tornado`) | 24KB |
+| `ar-ice` | 펫 아레나: 얼어붙음 · 쨍(얼음 장판 · 얼음 창) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-ice`) | 26KB |
+| `ar-poison` | 펫 아레나: 독구름 보글 | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-poison`) | 22KB |
+| `ar-invite` | 친구 대전: 초대 받음(딩-동-딩) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-invite`) | 17KB |
+| `ar-ready` | 친구 대전: 모두 준비 | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-ready`) | 21KB |
+
 ## 출처와 라이선스
 - **우리가 합성한 소리**: `docs/sound/synth.mjs`로 만든다(종소리 배음 · 마림바 · 쓸어올리는 바람 소리 · 저음 울림 · 반짝이 · 리버브를 겹침). 다시 만들 때: `npm i --no-save @breezystack/lamejs` 후 `node docs/sound/synth.mjs <출력 폴더>` → 원하는 파일을 `public/assets/sfx/<key>.mp3`로 복사. 우리가 만든 것이라 제약이 없다.
 - **낚시 소리(V13.164)**: `docs/sound/reel-synth.mjs`. 물소리는 크고 작은 물방울(민나르트 공명: 울리며 높아지는 사인)을 촘촘히 흩뿌리고, 끼익은 마찰이 붙었다 미끄러지는 톡을 낚싯대 · 줄 공명으로 거른다. `reel-strain`은 같은 0.8초를 세 번 이어 붙인 파일이고, 앱은 가운데 0.8초만 되풀이한다(`sound.js`의 `SOUND_LOOP`와 주기를 같게 둔다).
 - **10초 맞추기 소리(V13.180)**: `docs/sound/timing-synth.mjs`. 전자 시계 삑(사인 + 약한 홀수 배음) · 째깍(좁은 대역 잡음 톡) · 플라스틱 버튼 딸깍(쿵 + 스위치 똑)에 종 · 마림바 · 금관 · 반짝이를 겹쳤다. 모두 2초 이하 · 64~96kbps로 작게(11개 합 약 120KB).
 - **인형뽑기 놓침 소리(V13.191)**: `docs/sound/claw-synth.mjs`. 낚시 손맛 소리(`feel-synth.mjs`)의 마찰(끼익) · 줄 울림 · 바람 · 쿵 · 말렛 · 종 재료를 그대로 옮겨 짧게 만들었다(64kbps, 합계 21KB).
+- **펫 아레나 소리(V13.237)**: `docs/sound/arena-synth.mjs`. 던전 전투 소리(`battle-synth.mjs`)의 악기를 그대로 쓰고 겹쳤다. 맞힘은 등급 5종이 모두 타격(퍽) · 속성(밝은 기운) · 짧은 저음(높이가 훅 떨어지는 사인) 3층. 필살 1단은 1.1초에서 딱 끊어 경기장이 멈춘 1.2초의 마지막 0.1초가 정적이 된다. 96kbps, 23개 합 약 480KB(펫 아레나에 들어갈 때만 받는다). 어느 사건에 어느 소리를 내는지는 `public/modules/arena-sfx.js`의 표 하나에 있다.
 - **Kenney**(kenney.nl, CC0): 출처 표기 없이 써도 된다.
 - **Mixkit**(mixkit.co): 시청 페이지에 후보로 들어 있다. 앱·게임·교육·상업용은 무료이고 출처 표기도 필요 없지만, **파일 자체를 따로 재배포하면 안 된다.** 이 저장소는 공개(PUBLIC)라서 Mixkit 원본 파일은 저장소에 넣지 않는다. 쓰려면 저장소를 비공개로 바꾸거나, 배포 단계에서만 넣는 방법을 먼저 정한다.
 

@@ -1,0 +1,21 @@
+Create ONE square image, 1024×1024 pixels, laid out as a 4×4 icon sheet: sixteen separate icons, one centered in each cell (each cell is 256×256), every icon about 190 pixels wide with empty space around it so nothing touches the cell edges. Use a real transparent background (PNG alpha). Do NOT paint a checkerboard, grid lines, frames, cell borders or labels. No text, no letters, no numbers, no watermark. Do not ask me any questions; just generate the image.
+Style: premium 3D-painted mobile game UI for a cute pet battle game, matching the glossy painted pets and arenas. ONE shared material language for everything: (1) dark NAVY GLASS panels (deep navy with a soft inner gradient and a thin bright top edge), (2) a GOLD metal trim in exactly three thicknesses (thick for the main button, medium for frames, thin for chips), (3) element GEMS only where told. Light always comes from the upper-left. Clean crisp edges, readable at small size, not noisy, not over-glowing: glow ONLY where the prompt says.
+STYLE REFERENCE — before drawing, open these existing pictures already in Google Drive and match their art style, rendering quality, color clarity, lighting direction (light from the upper-left) and finish exactly: the folder "SUMUS 펫 아레나 70 (Runner용)" ("70-1.png" the style guide you must follow first of all), the folder "SUMUS 펫 아레나 65 (Runner용)" ("65-2.png" the arena floor, "65-6.png" the banner and icon sheet), the folder "SUMUS 펫 아레나 69 (Runner용)" ("69-1.png" the rank badges), the folder "SUMUS 전설 펫 07 (Runner용)" ("07a-1.png" a pet). If a folder is not there, search Google Drive for those exact file names. Original designs only: do NOT copy or resemble any character, creature, logo, icon or screen layout from any other game, anime, cartoon or movie.
+All sixteen icons share ONE style: a glossy white-and-gold silhouette with a thin dark navy outline and a tiny soft shadow below, no background plate, no circle behind them. Rows are listed left to right.
+ROW 1, COLUMN 1: a short broad SWORD pointing up-right
+ROW 1, COLUMN 2: a four-pointed STAR burst with a small flame tail
+ROW 1, COLUMN 3: a curved double SWOOSH arrow (a roll)
+ROW 1, COLUMN 4: two curved ARROWS making a circle
+ROW 2, COLUMN 1: a straw TRAINING DUMMY with a round target on its chest
+ROW 2, COLUMN 2: a small PAINT BRUSH crossed with a flag pennant
+ROW 2, COLUMN 3: a three-step PODIUM
+ROW 2, COLUMN 4: a TICKET stub with a notched edge and a star
+ROW 3, COLUMN 1: a gold COIN seen slightly from the side with a star stamp
+ROW 3, COLUMN 2: a chunky PADLOCK
+ROW 3, COLUMN 3: a round information BADGE with a small dot-and-bar mark (not a letter)
+ROW 3, COLUMN 4: a DOOR with an arrow pointing out
+ROW 4, COLUMN 1: a GOLD MEDAL on a short red ribbon with one star on it
+ROW 4, COLUMN 2: a SILVER MEDAL on a short blue ribbon with two small stars
+ROW 4, COLUMN 3: a BRONZE MEDAL on a short green ribbon with three tiny stars
+ROW 4, COLUMN 4: a round SPEECH BUBBLE with a small heart inside
+WHEN DONE — upload the finished PNG to Google Drive, into the folder "SUMUS 펫 아레나 70 (Runner용)", named exactly "70-2.png" (if a file with that name is already there, replace it; if the folder does not exist, create it). Actually save the file to Google Drive; showing the picture in the chat is not enough.

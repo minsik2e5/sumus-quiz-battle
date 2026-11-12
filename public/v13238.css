@@ -1,0 +1,5 @@
+/* V13.238 펫 아레나 캔버스 무대(①단계): 경기장 장면은 캔버스 한 장(#ar-cv, public/modules/arena-stage.js).
+   캔버스는 경기장보다 위 110px · 옆 40px · 아래 30px 크게(위쪽 펫 머리 · 체력 막대 · 숫자가 잘리지 않게, 예전 DOM도 넘쳐 보였다).
+   z-index 11: 물들이기(10) 위, 필살기 컷인(12) 아래 — 예전 펫 칸(11~12)과 같은 자리. 펫 칸(.ar-mon)은 꾸미기 · HUD가 클래스만 붙이는 빈 자리표. */
+.ar-field.cv .ar-cv{position:absolute;left:-40px;top:-110px;width:calc(100% + 80px);height:calc(100% + 140px);z-index:11;display:block;pointer-events:none}
+.ar-field.cv .ar-mon{display:none}

@@ -68,7 +68,10 @@ import { runWallChecks } from './wall-check.mjs';
 import { runArenaChecks } from './arena-check.mjs';
 import { runArenaDecoChecks } from './arena-deco-check.mjs';
 import { runArenaScreensChecks } from './arena-screens-check.mjs';
+import { runArenaFxProtoChecks } from './arena-fx-proto-check.mjs';
+import { runArenaSoundChecks } from './arena-sound-check.mjs';
 import { runArenaRankChecks } from './arena-rank-check.mjs';
+import { runArenaStageChecks } from './arena-stage-check.mjs';
 import { runPlaygroundMenuChecks } from './playground-menu-check.mjs';
 import { runTitles4Checks } from './titles-4-check.mjs';
 import { runGuard167Checks } from './guard-167-check.mjs';
@@ -211,12 +214,12 @@ export async function runReleaseCheck() {
       assert(sep && sep.school_id === 'gangseo-high' && sep.school === '강서고' && sep.division === 'high' && sep.exam_period === 'final' && sep.words.length === 329, 'V13.172 강서고 9월 모의고사 단어장: 강서고 기말고사 329단어');
       assert(Object.entries(expected).every(([q, n]) => sep.words.filter(word => word.range_code === `9월 ${q}`).length === n) && new Set(sep.words.map(word => word.range_code)).size === 9, 'V13.172 강서고 9월 모의고사 9지문(29·30·31·32·33·34·37·38·40번) 단어 수가 PDF와 같다');
       assert(sep.words.every(word => word.word && word.meaning && word.source && word.source_question && word.id.startsWith('gs_sep_')) && sep.words.some(word => word.word === "by the skin of one's teeth" && word.meaning === '간신히, 가까스로'), 'V13.172 9월 단어는 모두 단어 · 뜻 · 출처 · 문항 번호를 가진다');
-      // V13.237 단원고 9월 모의고사 단어장: 단원고 기말고사 13지문 463단어(2026년 9월 인천 학평), 범위 '9월 <문항>'
+      // V13.238 단원고 9월 모의고사 단어장: 단원고 기말고사 13지문 463단어(2026년 9월 인천 학평), 범위 '9월 <문항>'
       const dwSep = runtimeBooks.find(book => book.id === 'danwon:final:mock-sep-2026');
       const dwExpected = { 21: 29, 22: 36, 23: 30, 24: 29, 29: 36, 32: 34, 33: 44, 34: 37, 36: 36, 38: 37, 39: 29, 40: 44, '41~42': 42 };
-      assert(dwSep && dwSep.school_id === 'danwon-high' && dwSep.school === '단원고' && dwSep.division === 'high' && dwSep.exam_period === 'final' && dwSep.mock === true && dwSep.words.length === 463, 'V13.237 단원고 9월 모의고사 단어장: 단원고 기말고사 463단어');
-      assert(Object.entries(dwExpected).every(([q, n]) => dwSep.words.filter(word => word.range_code === `9월 ${q}`).length === n) && new Set(dwSep.words.map(word => word.range_code)).size === 13, 'V13.237 단원고 9월 모의고사 13지문(21~24 · 29 · 32~34 · 36 · 38~40 · 41~42번) 단어 수가 교재 어휘표와 같다');
-      assert(dwSep.words.every(word => word.word && word.meaning && word.source && word.source_question && word.id.startsWith('dw_sep_') && word.book_id === dwSep.id), 'V13.237 단원고 9월 단어는 모두 단어 · 뜻 · 출처(문항)가 있고 id가 dw_sep_로 시작한다');
+      assert(dwSep && dwSep.school_id === 'danwon-high' && dwSep.school === '단원고' && dwSep.division === 'high' && dwSep.exam_period === 'final' && dwSep.mock === true && dwSep.words.length === 463, 'V13.238 단원고 9월 모의고사 단어장: 단원고 기말고사 463단어');
+      assert(Object.entries(dwExpected).every(([q, n]) => dwSep.words.filter(word => word.range_code === `9월 ${q}`).length === n) && new Set(dwSep.words.map(word => word.range_code)).size === 13, 'V13.238 단원고 9월 모의고사 13지문(21~24 · 29 · 32~34 · 36 · 38~40 · 41~42번) 단어 수가 교재 어휘표와 같다');
+      assert(dwSep.words.every(word => word.word && word.meaning && word.source && word.source_question && word.id.startsWith('dw_sep_') && word.book_id === dwSep.id), 'V13.238 단원고 9월 단어는 모두 단어 · 뜻 · 출처(문항)가 있고 id가 dw_sep_로 시작한다');
       // V13.171 선부고 기말고사 외부지문 45 ~ 60(16지문 461단어, 2026년 3월 서울 · 6월 부산 학평): 기말고사 묶음, 범위마다 단어 수, 중간고사 35~44와 id가 겹치지 않음
       const finalSb = runtimeBooks.find(book => book.id === 'seonbu:final:external-45-60-2026');
       const counts = { 45: 28, 46: 33, 47: 41, 48: 31, 49: 21, 50: 22, 51: 41, 52: 31, 53: 26, 54: 22, 55: 27, 56: 22, 57: 25, 58: 19, 59: 37, 60: 35 };
@@ -1610,7 +1613,10 @@ await runWallChecks(assert);
 await runArenaChecks(assert);
 await runArenaDecoChecks(assert);
 await runArenaScreensChecks(assert);
+await runArenaFxProtoChecks(assert);
+await runArenaSoundChecks(assert);
 await runArenaRankChecks(assert);
+await runArenaStageChecks(assert);
 await runPlaygroundMenuChecks(assert);
     await runTitles4Checks(assert);
     await runActivityChecks(assert);
