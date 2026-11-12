@@ -143,6 +143,7 @@ const cssSources = [
   "v13234.css",
   "v13235.css",
   "v13236.css",
+  "v13238.css",
   "v13185.css",
   "v13184.css",
   "v13178.css"
@@ -298,7 +299,8 @@ export const ARENA_ART = new Set(${JSON.stringify(art)});
   // Loaded on every start; teacher tools, grammar data and pet images are cached on first
   // use. Images still count toward ASSET_HASH, so a redrawn pet reaches installed apps.
   // V13.77: the install guide, its QR code and the PNG icons are also only fetched when used.
-  const onDemand = /^\/(?:(?:teacher-enhancements|exam-ops|grammar-choice-sample|blank-writing|[a-z-]+-grammar-data|[a-z-]+-blank-data|install)\.js|install\.html|vendor\/.+|icons\/.+\.png|assets\/.+\.(?:webp|mp3))$/;
+  // 펫 아레나 캔버스 시험 페이지(public/proto/)는 측정용이라 미리 받지 않는다(앱과 연결 안 함).
+  const onDemand = /^\/(?:(?:teacher-enhancements|exam-ops|grammar-choice-sample|blank-writing|[a-z-]+-grammar-data|[a-z-]+-blank-data|install)\.js|install\.html|vendor\/.+|icons\/.+\.png|proto\/.+|assets\/.+\.(?:webp|mp3))$/;
   // The page is cached as "/": Cloudflare answers /index.html with a 307 to /,
   // and a redirected response cannot be used to answer a navigation.
   const precache = served.map(({ url }) => url === '/index.html' ? '/' : url).filter(url => !onDemand.test(url));

@@ -87,10 +87,11 @@ function mounted(run, me, foe) {
   // 화면 칸도 연습용 능력치로(쿨타임 막대 · 스킬 이름).
   R.teams = { me: [me], foe: [foe] };
   arenaUi.redrawMe?.();
-  const play = $('ar-play'), mon = $('ar-foe'), body = $('ar-foe-body');
+  const play = $('ar-play'), mon = $('ar-foe');
   play?.classList.add('practice');
   if (mon) mon.classList.add('ar-dummy', `d-${P.dummy}`);
-  if (body) body.innerHTML = `<span class="pr-scare">${dummyArt('pr-dummy-img')}</span>`;
+  // V13.238 허수아비는 캔버스 무대가 그린다(그림 'dummy'가 없으면 코드 그림: 기둥 · 가로대 · 과녁 머리).
+  arenaUi.dummy?.('foe', P.dummy);
   const dot = $('ar-dot-foe-0'); if (dot) dot.innerHTML = '<b class="pr-dot">🎯</b>';
   play?.insertAdjacentHTML('beforeend', `<div class="pr-panel" id="pr-panel" aria-live="off">
       <div class="pr-big"><span><small>DPS</small><b id="pr-dps">0</b><em id="pr-dps-all">평균 0</em></span><span><small>준 피해</small><b id="pr-total">0</b><em id="pr-hits">0번 맞힘</em></span><span><small>가장 센 한 방</small><b id="pr-best">0</b><em id="pr-combo">최고 콤보 0</em></span></div>
