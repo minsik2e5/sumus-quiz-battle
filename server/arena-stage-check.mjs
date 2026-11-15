@@ -55,8 +55,8 @@ export async function runArenaStageChecks(assert) {
   const caps = ['if (B.n >= T.bits) return;', 'if (K.n >= T.sparks) return;', 'if (G.n >= T.glows) return;', 'if (M.n >= T.smoke) return;', 'if (D.n >= T.debris) return;', 'if (fx.length >= Math.min(LIST_MAX.fx, T.fx)) return null;', 'if (rings.length < LIST_MAX.rings)', 'if (nums.length >= LIST_MAX.nums) nums.shift();', 'if (pops.length >= LIST_MAX.texts) pops.shift();', 'if (ghosts.length >= LIST_MAX.ghosts) ghosts.shift();'];
   assert(stage.includes('const F = n => new Float32Array(n)') && pools.every(x => stage.includes(x)) && caps.every(x => stage.includes(x)) && stage.includes('const swapOut = '),
     'V13.238 효과 저장소는 미리 만든 Float32Array 풀 · 상한 목록(지우기는 맨 끝과 바꾸기) → 판이 길어져도 메모리가 늘지 않는다');
-  assert(/export const SCAR_CAP = 36;/.test(stage) && stage.includes('if (scars > SCAR_CAP) heal();') && stage.includes("fctx.globalCompositeOperation = 'destination-out'") && stage.includes('if (floor && scars) ctx.drawImage(floor, 0, 0, W, H);'),
-    'V13.238 바닥 자국은 바닥 캔버스 한 장에 굽고(매 프레임 그림 1장), 36이 넘으면 오래된 자국부터 아문다(끝없이 쌓이는 목록 없음)');
+  assert(/export const SCAR_CAP = 36;/.test(stage) && stage.includes('if (scars > SCAR_CAP) heal();') && stage.includes("fctx.globalCompositeOperation = 'destination-out'") && stage.includes('if (scars) gctx.drawImage(floor, 0, 0);'),
+    'V13.238 바닥 자국은 바닥 캔버스 한 장에 굽고(V13.240부터 바닥 층에 합쳐 매 프레임 비용 0), 36이 넘으면 오래된 자국부터 아문다(끝없이 쌓이는 목록 없음)');
   assert(stage.includes('if (texts.size > 160) texts.clear();') && stage.includes('if (tintCache.size > 60) tintCache.clear();'), 'V13.238 글자 그림 · 색 입힌 재료 캐시도 상한(160 · 60)이 있다');
 
   // 4) 품질 자동 4단계 · 칠하기 비용
@@ -70,13 +70,13 @@ export async function runArenaStageChecks(assert) {
 
   // 5) 경기장 DOM: 효과 조각 없음 · 버튼 · HUD는 DOM 그대로 · 무대 모듈은 아레나를 열 때만
   const fieldFn = ui.slice(ui.indexOf('function field() {'), ui.indexOf('// 위 막대: 이름')), fxPart = ui.slice(ui.indexOf('// 다음 프레임에(한 프레임에'), ui.indexOf('// 쓰러짐 배너 글:'));
-  assert(!ui.includes('ar-fx') && (fxPart.match(/createElement\(/g) || []).length === 1 && fxPart.includes('el.className = `ar-banner ${who}`') && fieldFn.includes('<canvas class="ar-cv" id="ar-cv" aria-hidden="true"></canvas>') && ['data-btn="atk"', 'id="ar-hud-me"', 'id="ar-clock"', 'id="ar-aim"', 'id="ar-cut"', 'id="ar-wash"'].every(x => fieldFn.includes(x)),
-    'V13.238 경기장은 캔버스 한 장(효과 DOM 조각 없음, 배너만 DOM), 버튼 · 위 막대 · 조준 표시 · 컷인 · 물들이기는 DOM 그대로');
+  assert(!ui.includes('ar-fx') && (fxPart.match(/createElement\(/g) || []).length === 1 && fxPart.includes('el.className = `ar-banner ${who}`') && fieldFn.includes('<canvas class="ar-cv" id="ar-cv" aria-hidden="true"></canvas>') && ['data-btn="atk"', 'id="ar-hud-${w}"', 'id="ar-clock"', 'id="ar-cut"', 'id="ar-wash"'].every(x => fieldFn.includes(x)),
+    'V13.238 경기장은 캔버스 한 장(효과 DOM 조각 없음, 배너만 DOM), 버튼 · 위 막대 · 컷인 · 물들이기는 DOM 그대로(V13.240 조준 표시는 무대가 바닥에)');
   assert(!app.includes('arena-stage') && ui.includes("import('./arena-stage.js')") && !/^import .*arena-stage/m.test(ui) && ui.includes('R.stageMod = await mod.catch(() => null);'),
     'V13.238 무대 모듈은 앱 첫 화면에서 읽지 않고 아레나 판을 시작할 때(VS 화면 동안) 불러온다');
-  const css = source('../public/v13238.css'), build = source('./build-assets.mjs');
-  assert(build.includes('"v13238.css"') && css.includes('.ar-field.cv .ar-cv{position:absolute;left:-40px;top:-110px;width:calc(100% + 80px);height:calc(100% + 140px);z-index:11') && stage.includes('const PAD = { l: 40, t: 110, r: 40, b: 30 };'),
-    'V13.238 캔버스 크기 · 자리(CSS)와 무대의 여백(PAD)이 같다, 물들이기(10) 위 · 컷인(12) 아래');
+  const css = source('../public/v13238.css'), css2 = source('../public/v13240.css'), build = source('./build-assets.mjs');
+  assert(build.includes('"v13238.css"') && css.includes('z-index:11') && css2.includes('.ar-field.cv.cam .ar-cv{left:0;top:0;width:100%;height:100%}') && stage.includes('const PAD = { l: 0, t: 0, r: 0, b: 0 };'),
+    'V13.238 캔버스 크기 · 자리(CSS)와 무대의 여백(PAD)이 같다(V13.240부터 경기장 = 화면 전체, 여백 0), 물들이기(10) 위 · 컷인(12) 아래');
   // 6) 모든 판이 같은 무대: 혼자 판 · 친구 대전(되감기) · 다시 보기 · 연습장 · 2:2 · 난투는 모두 play()로 들어온다
   assert((ui.match(/(?<!function )\bplay\(r\)/g) || []).length === 2 && ui.includes('R.stage = R.stageMod?.createStage($(\'ar-field\'), stageHost()) || null;') && source('../public/modules/arena-practice.js').includes("arenaUi.dummy?.('foe', P.dummy);") && stage.includes('function dummySprite('),
     'V13.238 혼자 판 · 친구 대전 · 다시 보기 · 연습장(허수아비) · 2:2 · 난투가 모두 같은 캔버스 무대로 그린다');

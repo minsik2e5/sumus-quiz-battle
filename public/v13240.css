@@ -1,0 +1,64 @@
+/* V13.240 펫 아레나 캔버스 전환 ②단계: 위에서 비스듬히 내려다보는 경기장 · 카메라 · 위쪽 한 줄 HUD · 부채꼴 버튼(docs/arena-battle-reboot-plan.md 3장).
+   경기장(#ar-field)이 화면 전체. 바닥 층(.ar-world: 바닥 캔버스 + 꾸미기 링)은 카메라를 따라 transform만 바뀌고(다시 칠하지 않음),
+   펫 · 효과 캔버스(#ar-cv)는 경기장과 같은 크기로 그 위에 겹친다. HUD는 위, 버튼은 아래에 경기장 위로 겹친다(반투명). backdrop blur 없음. */
+.ar-play.cam{display:block}
+.ar-play.cam .ar-field.cam{position:absolute;inset:0;margin:0;flex:none;overflow:hidden;z-index:1}
+.ar-field.cv.cam .ar-cv{left:0;top:0;width:100%;height:100%}
+.ar-field.cam .ar-world{position:absolute;left:0;top:0;z-index:1;transform-origin:0 0;pointer-events:none;will-change:transform}
+.ar-field.cam .ar-ground{position:absolute;left:0;top:0;display:block}
+.ar-stage~.ar-main .ar-field.cam .ar-world .ar-ring{position:absolute;display:block;box-sizing:border-box}
+
+/* 위쪽 한 줄 HUD: [내 얼굴 · 체력 · 필살 게이지 · 남은 펫] 시간 [상대 …]. 뒤로 가기 버튼(왼쪽 위 38px) 옆에서 시작. */
+.ar-play.cam .ar-hud.row{position:absolute;left:0;right:0;top:0;z-index:15;display:flex;align-items:flex-start;gap:6px;padding:max(10px,env(safe-area-inset-top)) 8px 10px 56px;background:linear-gradient(180deg,rgba(6,10,28,.7),rgba(6,10,28,.34) 72%,rgba(6,10,28,0));pointer-events:none}
+.ar-hud.row .ar-side{flex:1;min-width:0;display:grid;gap:3px;align-content:start}
+.ar-hud.row .ar-bar{display:flex;align-items:center;gap:6px;min-width:0;padding:3px 6px 3px 3px;border:0;border-radius:24px;background:rgba(8,12,32,.55);font-size:12px;font-weight:900}
+.ar-hud.row .ar-side.r .ar-bar{flex-direction:row-reverse;padding:3px 3px 3px 6px;text-align:right}
+.ar-hud.row .ah-face{flex:none;display:grid;place-items:center;width:38px;height:38px;border-radius:50%;overflow:hidden;background:rgba(255,255,255,.12);box-shadow:0 0 0 2px #fb7185}
+.ar-hud.row .ar-bar.me .ah-face,.ar-hud.row .ar-bar.ally .ah-face{box-shadow:0 0 0 2px #60a5fa}
+.ar-hud.row .ar-bar.me .ah-face{width:44px;height:44px;box-shadow:0 0 0 2.5px #fde047}
+.ar-hud.row .ah-face img{width:120%;height:120%;object-fit:contain}
+.ar-hud.row .ah-info{flex:1;min-width:0;display:grid;gap:3px}
+.ar-hud.row .ah-top{display:flex;align-items:center;gap:4px;min-width:0}
+.ar-hud.row .ar-side.r .ah-top{flex-direction:row-reverse}
+.ar-hud.row .ah-top>b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11.5px;line-height:1.1}
+.ar-hud.row .ah-hp{display:block;height:7px;border-radius:4px;overflow:hidden;background:rgba(0,0,0,.55);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)}
+.ar-hud.row .ah-hp>i{display:block;height:100%;transform-origin:0 50%;background:linear-gradient(90deg,#16a34a,#86efac);transition:transform .16s ease-out}
+.ar-hud.row .ar-side.r .ah-hp>i{transform-origin:100% 50%;background:linear-gradient(270deg,#e11d48,#fda4af)}
+.ar-hud.row .ar-bar.ally:not(.me) .ah-hp>i{background:linear-gradient(90deg,#2563eb,#93c5fd)}
+.ar-hud.row .ah-hp>i.low,.ar-hud.row .ar-side.r .ah-hp>i.low{background:linear-gradient(90deg,#f59e0b,#fde047)}
+.ar-hud.row .ah-gauge{display:block;height:4px;border-radius:3px;overflow:hidden;background:rgba(0,0,0,.5)}
+.ar-hud.row .ah-gauge>i{display:block;height:100%;transform-origin:0 50%;transform:scaleX(0);background:linear-gradient(90deg,#f59e0b,#fde047);transition:transform .2s ease-out}
+.ar-hud.row .ah-gauge>i.full{background:#fde047;box-shadow:0 0 6px #fde047}
+.ar-hud.row .ar-dots{display:flex;gap:2px;flex:none;margin:0}
+.ar-hud.row .ar-dots i{width:15px;height:15px;border-radius:50%;overflow:hidden;opacity:.55;background:rgba(255,255,255,.1)}
+.ar-hud.row .ar-dots i.now{opacity:1;box-shadow:0 0 0 1.5px #fff}
+.ar-hud.row .ar-dots i.down{opacity:.25;filter:grayscale(1)}
+.ar-hud.row .ar-dots img{width:100%;height:100%;object-fit:contain}
+.ar-hud.row .ar-clock{flex:none;align-self:flex-start;min-width:56px;margin-top:6px;padding:3px 9px;border-radius:99px;background:rgba(8,12,32,.7);font-size:19px;font-weight:950;text-align:center;font-variant-numeric:tabular-nums}
+/* 2:2 · 난투: 칸이 둘씩 쌓이니 작게 */
+.ar-hud.row.multi .ar-bar{padding:2px 5px 2px 2px;font-size:11px}
+.ar-hud.row.multi .ah-face{width:28px;height:28px}
+.ar-hud.row.multi .ar-bar.me .ah-face{width:34px;height:34px}
+.ar-hud.row.multi .ah-hp{height:5px}
+.ar-hud.row.multi .ar-dots i{width:12px;height:12px}
+.ar-hud.row.multi .ar-clock{font-size:16px;min-width:48px}
+.ar-hud.row.multi .ar-ko{flex:none}
+/* 꼭 알려야 하는 말(친구 연결)만: HUD 아래 작은 한 줄 */
+.ar-play.cam .ar-note{position:absolute;left:50%;top:calc(max(10px,env(safe-area-inset-top)) + 64px);z-index:16;max-width:86%;margin:0;padding:4px 12px;border-radius:99px;background:rgba(8,12,32,.78);font-size:12px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transform:translateX(-50%);transition:opacity .2s;pointer-events:none}
+.ar-play.cam .ar-note.on{opacity:1}
+.ar-play.cam .ar-combo{top:calc(max(10px,env(safe-area-inset-top)) + 72px)}
+
+/* 아래 버튼: 공격(88)이 가운데, 둘레에 부채꼴로 필살(72) · 스킬(60) · 회피(52) · 교체(44). 반투명이라 경기장이 비쳐 보인다. */
+.ar-play.cam .ar-pad{position:absolute;left:0;right:0;bottom:0;padding:0 10px calc(10px + env(safe-area-inset-bottom));pointer-events:none}
+.ar-play.cam .ar-pad>*{pointer-events:auto}
+.ar-pad.fan .ar-btns{width:240px;height:230px;pointer-events:none}
+.ar-pad.fan .ar-btn{right:auto;bottom:auto;pointer-events:auto;opacity:.9}
+.ar-pad.fan .ar-btn.atk{left:136px;top:132px;width:88px;height:88px;opacity:.96}
+.ar-pad.fan .ar-btn.ult{left:152px;top:50px;width:72px;height:72px;opacity:.95}
+.ar-pad.fan .ar-btn.skill{left:80px;top:97px;width:60px;height:60px}
+.ar-pad.fan .ar-btn.skill2{left:83px;top:14px;width:60px;height:60px}
+.ar-pad.fan .ar-btn.dodge{left:74px;top:164px;width:52px;height:52px}
+.ar-pad.fan .ar-btn.swap{left:28px;top:58px;width:44px;height:44px}
+.ar-pad.fan .ar-btn.swap small{font-size:9px}
+.ar-pad.fan .ar-stick{opacity:.9}
+@media (max-height:700px){.ar-pad.fan .ar-btns{margin-top:-32px}}
