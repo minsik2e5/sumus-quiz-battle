@@ -40,6 +40,8 @@ export async function runArenaViewChecks(assert) {
   assert(['plaza', 'forest', 'night', 'sky', 'glacier', 'volcano', 'galaxy'].every(k => F[k]?.top?.length === 2 && F[k].rim?.length === 2) && stage.includes("ARENA_ART.has(`floor-${floorKey}`) ? image(`/assets/arena/floor-${floorKey}.webp`)")
     && Math.abs(A.x + .06 * A.w - 8) < 1e-9 && Math.abs(A.x + .94 * A.w - 92) < 1e-9 && Math.abs(A.y + .25 * A.h - 14) < 1e-9 && Math.abs(A.y + .75 * A.h - 86) < 1e-9 && ui.includes('floor: () => curBg'),
     'V13.240 바닥: 꾸미기 경기장 7곳마다 코드 바닥, 그림 72(floor-<이름>.webp)가 ARENA_ART에 들어오면 그림만 바뀐다(판 = 그림 가로 6~94% · 세로 25~75%, 주문서 72)');
+  assert(stage.includes('host.backdrop?.(false);') && stage.includes('dead = true; host.backdrop?.(true);') && ui.includes("backdrop: on => $('ar-stage')?.classList.toggle('ar-hidebg', !on),") && css.includes('.ar-stage.ar-hidebg>*{display:none}') && stage.includes('field.style.backgroundColor = F.out[0];'),
+    'V13.240 렉 방지: 판 동안 뒤 배경 그림 층(꾸미기 장면 애니메이션 포함)을 숨기고 바닥 층이 덮는다(합성할 화면 넓이가 ①과 같다), 판이 끝나면 되돌린다');
   assert(stage.includes("fs = clamp(S, .75, 1.25);") && /export const FLOOR_PAD = \{ l: (\d+), r: (\d+), t: (\d+), b: (\d+) \};/.test(stage),
     'V13.240 바닥 캔버스 해상도는 1.25배까지(메모리), 크기는 경기장 + 여백(FLOOR_PAD) 한 장');
 

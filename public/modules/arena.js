@@ -546,6 +546,8 @@ function stageHost() {
     scene: () => { if (!R?.cur || !R.prev) return null; scene.slots = SLOTS(); scene.prev = R.prev; scene.cur = R.cur; scene.practice = !!R.live?.practice; scene.aim = R.drag?.on ? R.aimView : null; return scene; },
     // V13.240 바닥(꾸미기 경기장 이름 → 코드 바닥 색 · 그림 72 floor-<이름>)
     floor: () => curBg,
+    // V13.240 렉 방지: 판 동안 뒤 배경 그림 층을 숨기고(바닥 층이 덮음), 판이 끝나 무대가 멈추면 되돌린다.
+    backdrop: on => $('ar-stage')?.classList.toggle('ar-hidebg', !on),
     reduced, lite: liteOn, onTier: t => applyLite(t)
   };
 }

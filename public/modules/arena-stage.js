@@ -270,10 +270,8 @@ export function createStage(field, host) {
     g.strokeStyle = F.rim[0]; g.lineWidth = u * 1.6; g.stroke();
     g.strokeStyle = 'rgba(255,255,255,.45)'; g.lineWidth = u * .3; rr2(px0 - u * .35, py0 - u * .35, px1 - px0 + u * .7, py1 - py0 + u * .7, rad + u * .35); g.stroke();
     g.strokeStyle = F.rim[1]; g.lineWidth = u * .35; rr2(px0 + u * 1.3, py0 + u * 1.3 * ty, px1 - px0 - u * 2.6, py1 - py0 - u * 2.6 * ty, rad - u); g.stroke();
-    // 3) 맨 위(먼 쪽 끝)는 투명하게 흐려 뒤 경기장 그림(지금 배경 · 꾸미기 장면)이 지평선처럼 보이게
-    g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'destination-out';
-    gr = g.createLinearGradient(0, 0, 0, baseC.height * .09); gr.addColorStop(0, 'rgba(0,0,0,1)'); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, baseC.width, baseC.height * .09);
-    g.globalCompositeOperation = 'source-over';
+    // 3) 바닥 캔버스 밖(카메라가 빼면 보이는 곳)은 경기장 칸 바탕색을 둘레 색으로(렉 방지: 전투 중에는 뒤 배경 그림 층을 숨겨 합성할 층이 ①과 같다)
+    field.style.backgroundColor = F.out[0];
     groundDirty = 1;
   }
   // 바닥 그림 + 자국을 바닥 층 캔버스에 합친다(자국이 바뀐 때 · 그림이 온 때만).
@@ -1211,8 +1209,9 @@ export function createStage(field, host) {
     raf = requestAnimationFrame(idle);
     if (now - drawnAt > 40) render(now);
   }
-  function destroy() { if (dead) return; dead = true; cancelAnimationFrame(raf); removeEventListener('resize', onResize); pets.clear(); imgs.clear(); }
+  function destroy() { if (dead) return; dead = true; host.backdrop?.(true); cancelAnimationFrame(raf); removeEventListener('resize', onResize); pets.clear(); imgs.clear(); }
   const onResize = () => resize();
+  host.backdrop?.(false); // 전투 중에는 뒤 배경 그림(#ar-bg · 꾸미기 장면 애니메이션)을 숨긴다 — 바닥 층이 화면을 덮으니 합성할 층을 하나 줄인다
   addEventListener('resize', onResize);
   resize();
   host.onTier?.(tier);

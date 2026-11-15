@@ -62,3 +62,4 @@
 .ar-pad.fan .ar-btn.swap small{font-size:9px}
 .ar-pad.fan .ar-stick{opacity:.9}
 @media (max-height:700px){.ar-pad.fan .ar-btns{margin-top:-32px}}
+.ar-stage.ar-hidebg>*{display:none}
