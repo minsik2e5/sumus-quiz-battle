@@ -281,7 +281,7 @@ export const ARENA_ART = new Set(${JSON.stringify(art)});
   console.log(`[arena-art] ${art.length} pictures`);
 }
 
-// V13.241 펫 대행진 그림 게이트(그림 74): public/assets/runner/<이름>.webp가 들어오면 public/modules/runner-art.js의 RUNNER_ART에
+// V13.241 펫 대행진 그림 게이트(그림 74, 주문서 docs/asset-requests/runner/build-74.mjs): public/assets/runner/<이름>.webp가 들어오면 public/modules/runner-art.js의 RUNNER_ART에
 // 이름이 적히고 게임이 같은 자리의 코드 그림 대신 그 그림을 쓴다(없는 그림은 요청하지 않음). RUNNER_SFX: 소리 묶음
 // public/modules/runner-sfx.js가 있을 때만 true(없으면 불러오지 않아 404가 없다).
 {
