@@ -47,6 +47,7 @@ import { rangeCounts, rememberRangeBest, keepTimingLastWeek } from './titles-4.m
 import { grantTimingPlay, timingView, timingPing, timingStart, timingFinish, timingBoard, timingLine, dailyConfig, dailyTeacherView, setDaily, timingDailyBoard } from './timing.mjs';
 import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow, huntSell, huntCoins, huntSpend, huntBerryQuiz, huntBerryAnswer } from './hunt.mjs';
 import { grantClaw, clawView, clawStart, clawDrop, clawGuideSeen, clawPreviewFill, clawActivityText } from './claw.mjs';
+import { runnerView, runnerStart, runnerFinish, runnerBoard, runnerLine } from './runner.mjs';
 import { HUNT, HUNT_MONSTERS } from '../public/modules/hunt-rules.js';
 import { CLAW } from '../public/modules/claw-rules.js';
 import { postClawNews, clawNewsFor } from './claw-news.mjs';
@@ -1395,7 +1396,7 @@ export async function service(state, method, path, body, token, options = {}) {
       school_league: leagueFor(state, competition, p, now),
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), yabawi: yabawiView(p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), wall: wallView(p, now), arena: arenaView(p, now), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), timing: timingView(p, now, dailyConfig(state, now)), blank: p.role === 'student' ? blankView(p, now) : null },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), yabawi: yabawiView(p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), wall: wallView(p, now), arena: arenaView(p, now), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), runner: runnerView(p, now), timing: timingView(p, now, dailyConfig(state, now)), blank: p.role === 'student' ? blankView(p, now) : null },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -2276,6 +2277,28 @@ export async function service(state, method, path, body, token, options = {}) {
     if (res.new_pet) grantLegendEgg(p);
     if (!res.again && (res.caught || res.fled)) logActivity(p, 'hunt', `몬스터 사냥 ${(res.kind === 'pet' ? CHARACTERS[res.key]?.ko : HUNT_MONSTERS[res.key]?.ko) || '몬스터'} ${res.caught ? '잡음' : '도망'}`, now);
     return { ...res, hunt: huntView(p, now), ...(res.new_pet ? { profile: publicProfile(p), stats: stats(state, p) } : {}) };
+  }
+  // V13.241 펫 대행진(server/runner.mjs): 판 시작 · 끝 두 번만 쓴다. 지도 · 반 순위는 GET(반 순위는 1분 캐시).
+  if (path === '/runner/home' && method === 'GET') {
+    requireRole(p, 'student');
+    return { runner: runnerView(p, Date.now()) };
+  }
+  if (path === '/runner/start' && method === 'POST') {
+    requireRole(p, 'student');
+    if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
+    const now = Date.now(), res = runnerStart(p, { id: str(body.id, 40), stage: body.stage, now });
+    return { ...res, runner: runnerView(p, now) };
+  }
+  if (path === '/runner/finish' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now(), res = runnerFinish(p, { id: str(body.id, 40), input: body.input, now });
+    if (!res.again && res.valid) logActivity(p, 'runner', runnerLine(res), now);
+    return { ...res, runner: runnerView(p, now), ...(res.coins || res.box ? { points_balance: coinBalance(state, p) } : {}) };
+  }
+  if (path === '/runner/board' && method === 'GET') {
+    requireRole(p, 'student');
+    const group = x => `${schoolForProfile(state, x)?.id || ''}|${x.division || ''}|${gradeOf(x.class_name)}`;
+    return runnerBoard(state.profiles, p, { group, ranked: x => isRankedStudent(x) || x.id === p.id, hidden: isPrivate, now: Date.now() });
   }
   // V13.180 인형뽑기(놀이터): 집게권 넣기 · 집게(server/claw.mjs). 판 배치 · 잡힘은 서버가 정한다.
   if (path === '/claw/home' && method === 'POST') {

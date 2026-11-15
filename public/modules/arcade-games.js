@@ -153,6 +153,21 @@ export function timingCard(A, art) {
     </div>
   </article>`;
 }
+// V13.241 펫 대행진: 코드로 그린 카드(하늘 다리 · 정령 무리). 그림 74(runner/entry)가 들어오면 그 그림.
+export function runnerCard(A, art) {
+  const v = A.data.rewards?.runner || {}, has = art?.runner?.has?.('entry');
+  return `<article class="ag-big ag-runner">
+    <div class="ag-big-art" aria-hidden="true">${has ? '<img class="ag-big-bg" src="/assets/runner/entry.webp" alt="" draggable="false" decoding="async">' : '<span class="ag-big-bg ag-rn-bg"><i class="ag-rn-road"></i><i class="ag-rn-gate g"><b>×2</b></i><i class="ag-rn-gate b"><b>−5</b></i><i class="ag-rn-crowd"></i><i class="ag-rn-castle"></i></span>'}<span class="ag-big-title"><small>혼자 · 액션 게임</small><strong>펫 대행진</strong><em>정령 무리를 불려 바위를 깨고, 갇힌 내 펫을 구해 성을 무너뜨려요</em></span></div>
+    <div class="ag-big-body">
+      <ul class="ag-stats" aria-label="내 펫 대행진">
+        <li><i class="ag-ico">⭐</i><b>${num(v.total || 0)}</b><small>별</small></li>
+        <li><i class="ag-ico">🏰</i><b>${num(v.st || 0)}/${num(v.stages || 25)}</b><small>스테이지</small></li>
+        <li>${coin()}<b>${num(v.coin_today || 0)}/${num(v.coin_daily || 40)}</b><small>오늘 코인</small></li>
+      </ul>
+      <button type="button" class="yl-cta ag-go" data-action="runner-open" aria-label="펫 대행진 들어가기">들어가기</button>
+    </div>
+  </article>`;
+}
 export function gamesSection(A, art) {
   return `<section class="ag-group" aria-label="게임"><h2 class="ag-head">게임</h2>
     ${reelCard(A, art)}
@@ -162,6 +177,7 @@ export function gamesSection(A, art) {
     ${huntCard(A, art)}
     ${clawCard(A, art)}
     ${timingCard(A, art)}
+    ${runnerCard(A, art)}
   </section>
   <h2 class="ag-head">상점 · 뽑기</h2>`;
 }

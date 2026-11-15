@@ -1,7 +1,7 @@
 // V13.212 야차 대회 렉 시험(check:load): 운영 크기(약 9MB) 상태를 실제 로컬 저장소(cloudflare/local-first.mjs, SQLite 모의 객체)에
 // 두고, 대회 날처럼 한꺼번에 일어나는 일을 메인 상태 객체 하나에서 돌려 경로별 걸린 시간(p50 · p95 · max)을 잰다.
 //   - 대회 학생 32명: 16판을 열고(주인 · 손님 /tournament/play) 판이 끝나면 방이 결과를 보고한다(settleBattle).
-//     경기를 기다리는 동안은 놀이터를 한다(10초 맞추기 ping, 인형뽑기 · 사냥 · 낚시 첫 화면 = '보기'인 POST).
+//     경기를 기다리는 동안은 놀이터를 한다(10초 맞추기 ping, 인형뽑기 · 사냥 · 낚시 첫 화면 = '보기'인 POST, V13.241 펫 대행진 시작 · 끝 20%).
 //   - 다른 학생 8명: 연습 답(빠른 길).
 //   - 학생 홈 초대 확인(GET /battle/invite) · 선생님 대진표(8초) · TV(5초).
 // 쓰기 단계(오늘 쓴 줄 %)마다 저장 모으기 값이 다르다(cloudflare/worker.mjs commitPacing): ok 0.25초 · warn 1.5초 · defer 6초.
@@ -16,6 +16,8 @@ import { loadState } from './save-load.mjs';
 import { allBooks } from './service.mjs';
 import { createSessionArchive } from '../cloudflare/session-archive-store.mjs';
 import { planArchive, applyArchive } from './session-archive.mjs';
+import { makeMap } from '../public/modules/runner-rules.js';
+import { botRun } from './runner-sim.mjs';
 
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 export const loadStats = list => { const s = list.slice().sort((a, b) => a - b); const at = q => Math.round(s[Math.min(s.length - 1, Math.floor(q * s.length))] || 0); return { p50: at(.5), p95: at(.95), max: Math.round(s.at(-1) || 0), n: s.length }; };
@@ -95,9 +97,21 @@ export async function runTournamentLoad({ level = 'ok', seconds = 20, others = 8
   };
   // 놀이터: 10초 맞추기 ping, 인형뽑기 · 사냥 첫 화면, 낚시 안내(모두 '보기'인 POST).
   const GAMES = [['POST /timing/ping', '/timing/ping'], ['POST /claw/home', '/claw/home'], ['POST /hunt/home', '/hunt/home'], ['POST /reel/guide', '/reel/guide']];
+  // V13.241 펫 대행진: 판 시작 → 조종 기록(봇)으로 끝. 끝은 서버가 판 전체(약 1,500틱)를 다시 돌린다. 부하 시험은 실제 판 길이를
+  // 기다리지 않아 '너무 빠른 판'으로 무효가 되지만, 다시 돌리기는 먼저 끝까지 하므로 걸리는 시간은 그대로 잰다.
+  const MAP1 = makeMap(1);
+  const runner = async id => {
+    const n = (runnerN[id] = (runnerN[id] || 0) + 1), rid = `rn-${id}-${n}`.padEnd(8, '0');
+    const st = await timed('POST /runner/start', () => call(id, 'POST', '/runner/start', { id: rid, stage: 1 }));
+    if (!st?.pet) return;
+    const { input } = botRun(MAP1, { start: st.start, pet: { el: st.pet.el, mul: st.pet.mul } }, { skill: 0.8, seed: n });
+    await timed('POST /runner/finish', () => call(id, 'POST', '/runner/finish', { id: rid, input }));
+  };
+  const runnerN = {};
   const gamer = async id => {
     while (live()) {
       await sleep(gameEvery * (0.5 + Math.random()));
+      if (Math.random() < 0.2) { await runner(id); continue; }
       const [key, path] = GAMES[Math.floor(Math.random() * GAMES.length)];
       await timed(key, () => call(id, 'POST', path, {}));
     }

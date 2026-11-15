@@ -144,6 +144,7 @@ const cssSources = [
   "v13235.css",
   "v13236.css",
   "v13239.css",
+  "v13241.css",
   "v13238.css",
   "v13185.css",
   "v13184.css",
@@ -278,6 +279,22 @@ export const ARENA_ART = new Set(${JSON.stringify(art)});
 `;
   if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
   console.log(`[arena-art] ${art.length} pictures`);
+}
+
+// V13.241 펫 대행진 그림 게이트(그림 74): public/assets/runner/<이름>.webp가 들어오면 public/modules/runner-art.js의 RUNNER_ART에
+// 이름이 적히고 게임이 같은 자리의 코드 그림 대신 그 그림을 쓴다(없는 그림은 요청하지 않음). RUNNER_SFX: 소리 묶음
+// public/modules/runner-sfx.js가 있을 때만 true(없으면 불러오지 않아 404가 없다).
+{
+  const dir = resolve(root, 'public/assets/runner');
+  const art = existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.webp')).map(f => f.slice(0, -5)).sort() : [];
+  const sfx = existsSync(resolve(root, 'public/modules/runner-sfx.js'));
+  const out = resolve(root, 'public/modules/runner-art.js');
+  const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/runner)에 있는 펫 대행진 그림 · 소리 묶음이 있는지.
+export const RUNNER_ART = new Set(${JSON.stringify(art)});
+export const RUNNER_SFX = ${sfx};
+`;
+  if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
+  console.log(`[runner-art] ${art.length} pictures · sfx ${sfx}`);
 }
 
 // Service worker: precache list + a hash of every served file. Any change to
