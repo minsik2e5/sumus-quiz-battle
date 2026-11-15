@@ -36,7 +36,7 @@
 - **PR까지만 만든다. 머지하지 않는다.** `sumus-voca-prod-deploy`에 머지하면 운영에 바로 배포된다. **운영 Supabase에 연결하지 않는다.**
 - **그림은 Codex에 내장된 그림 생성 기능으로 만든다.** OpenAI API 키(`OPENAI_API_KEY`)나 유료 API를 쓰지 않는다. 키가 없다고 멈추지 않는다.
 - **Google Drive는 쓰지 않는다. 멈추지 않는다.** 아래 "프롬프트 손보기"대로 Drive 문구를 지우고 저장소 안의 기존 그림을 참고 그림으로 붙인다.
-- 브랜치는 `sumus-voca-prod-deploy`에서 새로 만든다(예: `codex/art-74-pet-runner`).
+- 브랜치는 `claude/runner-art-74`에서 새로 만든다(예: `codex/art-74-pet-runner`). 자르기 스크립트(`slice-74.mjs`) · `build-74.mjs` · `runner-art.js` 목록이 아직 이 브랜치에만 있다. 그 브랜치가 이미 `sumus-voca-prod-deploy`에 머지됐으면 `sumus-voca-prod-deploy`에서 만든다. PR의 받는 쪽도 같은 브랜치로 한다.
 - 고치는 파일: 위 표의 그림 44장, `docs/asset-requests/runner/DONE_74.md`, 빌드가 바꾸는 `public/sw.js` · `public/modules/runner-art.js`. 그 밖의 앱 코드, 게임 규칙, 코인, 서버 로직, 점검 파일은 건드리지 않는다. 버전은 올리지 않는다.
 - 원본 PNG는 커밋하지 않는다(`/tmp/art/`). 기존 그림 파일은 지우거나 덮어쓰지 않는다. **새 파일만 추가**한다.
 - 그림에 **글자 · 숫자 · 로고가 없다**(숫자는 게임이 바위 · 문 · 지도 칸 위에 찍는다).
