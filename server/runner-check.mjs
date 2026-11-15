@@ -91,8 +91,8 @@ export async function runRunnerChecks(assert) {
     assert(!/setInterval/.test(ui) && (ui.match(/api\('/g) || []).length === 4 && ui.includes("api('/runner/finish', { id: g.id, input: g.rec.out() })"), '게임 화면은 서버에 자동으로 묻지 않는다(지도 · 순위 GET, 시작 · 끝 POST뿐)');
     const ev = ui.match(/const SND_EVENTS = (\[.*?\]);/)?.[1];
     assert(ev && JSON.parse(ev.replace(/'/g, '"')).join() === 'gate-good,gate-bad,multiply,shoot,rock-hit,rock-break,saw,hammer,rescue,card,cannon,castle-hit,castle-fall,star,fail,start'
-      && ui.includes("if (!RUNNER_SFX || soundFn) return; import('./runner-sfx.js')") && build.includes("existsSync(resolve(root, 'public/modules/runner-sfx.js'))"),
-      '소리: runner-sfx.js가 있을 때만 불러 runnerSound(사건 이름 16개)를 부른다(없으면 조용히, 404 없음)');
+      && ui.includes("if (!RUNNER_SFX || soundFn) return; import('./runner-sfx.js')") && ui.includes('m.preloadRunnerSound?.()') && ui.includes("snd('shoot', { crowd: S.n })") && ui.includes("snd('star', { i })") && ui.includes("snd('card', { pick: true })") && build.includes("existsSync(resolve(root, 'public/modules/runner-sfx.js'))"),
+      '소리: runner-sfx.js가 있을 때만 불러 들어갈 때 preloadRunnerSound(), runnerSound(사건 이름 16개 · 사격 crowd · 별 i · 카드 pick)를 부른다');
     assert(build.includes("resolve(root, 'public/assets/runner')") && ui.includes("RUNNER_ART.has(k) ? `/assets/runner/${k}.webp` : null") && existsSync(fileURLToPath(new URL('../public/modules/runner-art.js', import.meta.url))), '그림 74: build:assets가 적은 그림(RUNNER_ART)만 쓰고 없으면 코드 그림');
     assert(!/ctx\.filter\s*=/.test(ui) && /draw: 150,/.test(ui) && ui.includes('const DRAW_MAX = 150;') && ui.includes("const TIER_KEY = 'sumus-runner-tier', TIER_DAYS = 7;"), '연출: 정령은 최대 150마리만 그림 · blur 필터 없음 · 내려간 품질은 7일 기억');
     const card = source('../public/modules/arcade-games.js'), app = source('../public/app.js');

@@ -19,8 +19,10 @@ import { ARENA_ART } from './arena-art.js';
 
 const SND_EVENTS = ['gate-good', 'gate-bad', 'multiply', 'shoot', 'rock-hit', 'rock-break', 'saw', 'hammer', 'rescue', 'card', 'cannon', 'castle-hit', 'castle-fall', 'star', 'fail', 'start'];
 let soundFn = null;
-function loadSound() { if (!RUNNER_SFX || soundFn) return; import('./runner-sfx.js').then(m => { soundFn = m.runnerSound || null; }).catch(() => {}); }
-const snd = (name, opts) => { try { soundFn?.(name, opts); } catch {} };
+// 펫 대행진에 들어갈 때 한 번: 소리 표를 불러 preloadRunnerSound()로 rn-*.mp3를 미리 받는다(첫 화면 로딩 · 서비스 워커 미리 받기에는 없음).
+function loadSound() { if (!RUNNER_SFX || soundFn) return; import('./runner-sfx.js').then(m => { soundFn = m.runnerSound || null; try { m.preloadRunnerSound?.(); } catch {} }).catch(() => {}); }
+// 화면 시험(docs/runner-play-shot.mjs)만 window.__rnSndLog로 사건 · 낸 소리 수를 받는다(앱은 이 값을 만들지 않는다).
+const snd = (name, opts) => { try { const n = soundFn?.(name, opts); window.__rnSndLog?.(name, n || 0); } catch {} };
 const readPref = (k, f) => { try { return localStorage.getItem(k) ?? f; } catch { return f; } };
 const writePref = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
 const root = () => document.getElementById('app');
@@ -364,7 +366,7 @@ function whiteFlash(a) { const f = $('rn-flash'); if (!f) return; f.style.transi
 /* ---------- 규칙 사건 → 연출 · 소리 ---------- */
 function onEvent(type, a, b, c, d) {
   const g = G; if (!g) return; const S = g.S, sl = g.slot;
-  if (type === 'shoot') { const v = vw(g, a); v.hitT = .08; if ((g.shotT -= 1) > 0) return; g.shotT = 2; const n = Math.min(3, 1 + (S.n / 80 | 0)); for (let i = 0; i < n; i++) { const k = (rnd() * Math.max(1, g.shown)) | 0; shoot(g, S.cx + sl.ox[k], S.z + sl.oz[k] + .4, a.x + rr(-.4, .4), .9, a.z - .6); } snd('shoot'); return; }
+  if (type === 'shoot') { const v = vw(g, a); v.hitT = .08; if ((g.shotT -= 1) > 0) return; g.shotT = 2; const n = Math.min(3, 1 + (S.n / 80 | 0)); for (let i = 0; i < n; i++) { const k = (rnd() * Math.max(1, g.shown)) | 0; shoot(g, S.cx + sl.ox[k], S.z + sl.oz[k] + .4, a.x + rr(-.4, .4), .9, a.z - .6); } snd('shoot', { crowd: S.n }); return; }
   if (type === 'break') { snd('rock-break'); shake(g, .18); addDebris(g, a.x, .5, a.z, 22, 0, 1.1); addSmoke(g, a.x, .2, a.z, 5, 0, .9, .8); addSparks(g, a.x, .8, a.z, 14, 1, 13); addGlow(g, a.x, .8, a.z, 6, 0, 4, .5, .5, 2); flash(g, a.x, .8, a.z, 2.2, .3); flash(g, a.x, .8, a.z, 1.6, .25, '255,255,255', 'burst'); ring(g, a.x, .2, a.z, 2.6, .4, '255,240,200'); return; }
   if (type === 'crash') { snd('rock-hit'); if (!b) return; shake(g, .45); whiteFlash(.25); addDebris(g, a.x, .5, a.z, 26, a.type === 'crystal' ? 1 : 0, 1.2); addSmoke(g, a.x, .2, a.z, 8, 2, 1, 1); lose(g, b, S.cx); return; }
   if (type === 'saw' || type === 'hammer') { snd(type); if (!b) return; shake(g, type === 'saw' ? .15 : .4); addSparks(g, a.x, .6, a.z, type === 'saw' ? 12 : 8, 1, 14); if (type === 'hammer') { addSmoke(g, a.x, 0, a.z, 6, 0, 1, 1.2); ring(g, a.x, .1, a.z, 2.4, .35, '255,240,210'); } lose(g, b, a.x); return; }
@@ -422,7 +424,7 @@ function showCards(o) {
 function pickCard(i) {
   const g = G; if (!g || g.S.phase !== 'card') return;
   const el = $('rn-cards'); el.querySelectorAll('.rn-card')[i]?.classList.add('picked');
-  g.lastN = g.S.n; g.rec.pick(i); runPick(g.S, i, onEvent); snd('star');
+  g.lastN = g.S.n; g.rec.pick(i); runPick(g.S, i, onEvent); snd('card', { pick: true });
   setTimeout(() => { el.classList.remove('on'); $('rn-vig')?.classList.remove('ult'); }, 260);
 }
 
@@ -449,7 +451,7 @@ function showResult(g, res, err) {
     ${reason ? `<p class="rn-res-note warn">${esc(reason)}</p>` : ''}
     <div class="rn-res-btns"><button type="button" class="yl-cta" data-g="${canNext ? 'next' : 'again'}">${canNext ? '다음 스테이지' : '다시 도전'}</button>${canNext ? '<button type="button" class="rn-ghost" data-g="again">다시</button>' : ''}<button type="button" class="rn-ghost" data-g="map">지도</button></div></div>`;
   el.hidden = false;
-  if (clear) for (let i = 0; i < stars; i++) setTimeout(() => snd('star'), 250 + i * 300);
+  if (clear) for (let i = 0; i < stars; i++) setTimeout(() => snd('star', { i }), 250 + i * 300);
 }
 
 /* ---------- 고리: 고정 틱 + 보간 · 자동 품질 ---------- */

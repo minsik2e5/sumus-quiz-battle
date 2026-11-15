@@ -12,8 +12,11 @@
 //   - 품질 4단계(해상도 · 그리는 정령 수 · 파편 수 · 빛 겹 · 컷인 속도선)를 프레임 시간을 보고 자동으로 내린다(올리지 않음).
 // 주소 옵션: ?q=auto|3|2|1|0(높음 · 중간 · 낮음 · 최저) &clean=1 &seed=숫자 &fx=0(바탕만) &auto=0(자동 조종 끄기)
 import { ARENA_ART } from '/modules/arena-art.js';
-import { sfx, unlockSound, setMuted, soundState } from '/proto/runner-fx-sound.js?v=1.0';
-const PROTO_V = '1.0';
+import { sfx, unlockSound, setMuted, soundState } from '/proto/runner-fx-sound.js?v=1.1';
+// 러너 사건 소리는 앱과 같은 소리 표(runner-sfx.js · rn-*.mp3)로 낸다. 나머지(기 모으기 · 불길 · 퐁 · 얼음)는 시험 페이지 합성 그대로.
+import { runnerSound, preloadRunnerSound } from '/modules/runner-sfx.js?v=1.1';
+const rs = (ev, o) => { if (!soundState().muted) runnerSound(ev, o); };
+const PROTO_V = '1.1';
 // 옛 서비스 워커가 남은 폰: 기다리는 새 워커를 바로 넘기고(SKIP_WAITING), 넘어가면 한 번만 새로 고친다(arena-fx.js와 같은 방법).
 try {
   const sw = navigator.serviceWorker;
@@ -431,16 +434,16 @@ function onShoot(tgt) {
   if ((shotT -= DT) > 0) return; shotT = .05;
   const n = Math.min(3, 1 + (S0.n / 80 | 0));
   for (let i = 0; i < n; i++) { const k = (rnd() * Math.max(1, shown)) | 0; shoot(S0.cx + SOX[k], S0.z + SOZ[k] + .4, tgt.x + rr(-.4, .4), .9, tgt.z - .6); }
-  sfx('shot', .7);
+  rs('shoot', { crowd: S0.n });
 }
 function onRockBreak(o) {
-  sfx('boom', .55); shake(.18);
+  rs('rock-break'); shake(.18);
   addDebris(o.x, .5, o.z, 22, 0, 1.1); addSmoke(o.x, .2, o.z, 5, 0, .9, .8); addSparks(o.x, .8, o.z, 14, 1, 13); addGlow(o.x, .8, o.z, 6, 0, 4, .5, .5, 2);
   flash(o.x, .8, o.z, 2.2, .3); flash(o.x, .8, o.z, 1.6, .25, '255,255,255', 'burst'); ring(o.x, .2, o.z, 2.6, .4, '255,240,200');
 }
 function onRockCrash(o, loss) {
   log(`충돌 ${o.type} −${loss}`);
-  sfx('boom', .8); sfx('down', .6); shake(.45); whiteFlash(.25);
+  rs('rock-hit', { gain: 1.4 }); rs('gate-bad', { gain: .8 }); shake(.45); whiteFlash(.25);
   addDebris(o.x, .5, o.z, 26, o.type === 'crystal' ? 1 : 0, 1.2); addSmoke(o.x, .2, o.z, 8, 2, 1, 1);
   popNum('minus', '−' + loss, S0.cx, 2.4, S0.z + 1);
   for (let i = 0; i < Math.min(14, loss); i++) { const k = (rnd() * Math.max(1, shown)) | 0; flyer(S0.cx + SOX[k], .4, S0.z + SOZ[k], 0); }
@@ -448,7 +451,7 @@ function onRockCrash(o, loss) {
 }
 function onHazard(x, z, loss, kind) {
   log(`${kind} −${loss}`);
-  sfx(kind === 'saw' ? 'saw' : 'boom', kind === 'saw' ? 1 : .6); shake(kind === 'saw' ? .15 : .4);
+  rs(kind === 'saw' ? 'saw' : 'hammer'); shake(kind === 'saw' ? .15 : .4);
   addSparks(x, .6, z, kind === 'saw' ? 12 : 8, 1, 14); if (kind === 'hammer') { addSmoke(x, 0, z, 6, 0, 1, 1.2); ring(x, .1, z, 2.4, .35, '255,240,210'); }
   popNum('minus', '−' + loss, x, 1.8, z);
   for (let i = 0; i < Math.min(10, loss); i++) { let best = 0, bd = 1e9; for (let t = 0; t < 4; t++) { const k = (rnd() * Math.max(1, shown)) | 0, d = Math.abs(S0.cx + SOX[k] - x); if (d < bd) { bd = d; best = k; } } flyer(S0.cx + SOX[best], .4, S0.z + SOZ[best], 0); }
@@ -458,7 +461,7 @@ function onGate(o, side, op, before, after) {
   log(`문 ${op[0]}${op[1]} ${before}→${after}`);
   const gx = side * ROAD / 2, ok = good(op[0]);
   o.passed = side; o.passT = 0;
-  sfx(ok ? 'up' : 'down'); if (ok) screenTint('spirit', .12); else shake(.25);
+  rs(!ok ? 'gate-bad' : op[0] === '×' ? 'multiply' : 'gate-good'); if (ok) screenTint('spirit', .12); else shake(.25);
   flash(gx, 1.2, o.z, 3.4, .35, ok ? '140,210,255' : '255,120,120'); ring(gx, .3, o.z, 3.2, .45, ok ? '170,230,255' : '255,150,150');
   addGlow(gx, 1.2, o.z, 14, ok ? 4 : 0, 4, .6, .7, 1.5);
   if (after > before) onGain(before, after, gx - S0.cx, 1); else { popNum('minus', '−' + (before - after), S0.cx, 2.4, S0.z + 1); for (let i = 0; i < Math.min(16, before - after); i++) { const k = (rnd() * Math.max(1, shown)) | 0; flyer(S0.cx + SOX[k], .4, S0.z + SOZ[k], 0); } syncCrowd(0, 0); }
@@ -471,14 +474,14 @@ function onGain(before, after, fromX, fromZ) {
 }
 const cardsEl = $('#cards');
 function onCard(o) {
-  vigEl.classList.add('ult'); sfx('charge', .5);
+  vigEl.classList.add('ult'); rs('card');
   cardsEl.innerHTML = o.cards.map(([t], i) => `<button class="card" data-i="${i}"><b>${t}</b><small>${['정령', '강화', '보호', '대포'][['add', 'fire', 'shield', 'power'].indexOf(o.cards[i][1])] || ''}</small></button>`).join('');
   cardsEl.classList.add('on');
   if (autoSteer) later(1.3, () => pickCard(o.pick));
 }
 function pickCard(i) {
   if (S0.phase !== 'card') return;
-  const b = cardsEl.querySelectorAll('.card')[i]; b?.classList.add('picked'); sfx('star', .7);
+  const b = cardsEl.querySelectorAll('.card')[i]; b?.classList.add('picked'); rs('card', { pick: true });
   setTimeout(() => { cardsEl.classList.remove('on'); vigEl.classList.remove('ult'); }, 260);
   applyCard(S0.card, i); pill(S0.card.cards[i][0] + '!', 'star', 1.2);
 }
@@ -487,10 +490,10 @@ let rescueT = 0;
 function onRescue(o) {
   log('구출');
   // 수정이 깨짐 → 컷인(규칙 시간 멈춤 1초) → 펫이 무리 앞에 합류 → 아레나 속성 필살기(화염 돌파: 앞 바위를 불길이 쓸어 감)
-  sfx('ice', 1.2); sfx('boom', .7); shake(.6); whiteFlash(.5);
+  sfx('ice', 1.2); rs('rock-break'); shake(.6); whiteFlash(.5);
   addDebris(o.x, 1.2, o.z, 40, 1, 1.4); addGlow(o.x, 1.4, o.z, 16, 3, 5, .9, .7, 2); flash(o.x, 1.4, o.z, 4, .5, '160,230,255'); ring(o.x, .3, o.z, 4, .5, '200,240,255');
   S0.phase = 'rescue'; rescueT = 1.1;
-  cutin = { t: 0, dur: 1.05, name: PET.name + ' 구출!', sub: PET.skill, el: PET.el }; sfx('ult'); vigEl.classList.add('ult');
+  cutin = { t: 0, dur: 1.05, name: PET.name + ' 구출!', sub: PET.skill, el: PET.el }; rs('rescue'); vigEl.classList.add('ult');
   later(1.1, () => { vigEl.classList.remove('ult'); S0.pet = true; petSkill(); });
 }
 function petSkill() {
@@ -512,7 +515,7 @@ function onSiege() {
 }
 let castleCracks = 0, castleHitT = 0;
 function onPour(k) {
-  const c = S0.castle; sfx('cannon', .5); sfx('pop', .5);
+  const c = S0.castle; rs('cannon'); sfx('pop', .5);
   const vis = Math.min(3, k);
   for (let i = 0; i < vis; i++) flyer(S0.cx + rr(-.3, .3), 2, S0.z + crowdR(S0.n) + 1.2, 1, rr(-2.5, 2.5), rr(1.5, 5), c.z - 1, rr(.55, .75));
   cam.punch += .006;
@@ -520,12 +523,12 @@ function onPour(k) {
 }
 function onCastleHit(dmg, big) {
   const c = S0.castle; castleHitT = .08;
-  const level = c.hp / c.max < .33 ? 2 : c.hp / c.max < .66 ? 1 : 0; if (level > castleCracks) { castleCracks = level; crackCastle(level); addDebris(rr(-3, 3), 6, c.z, 12, 0, .8); sfx('boom', .6); shake(.3); }
+  const level = c.hp / c.max < .33 ? 2 : c.hp / c.max < .66 ? 1 : 0; if (level > castleCracks) { castleCracks = level; crackCastle(level); addDebris(rr(-3, 3), 6, c.z, 12, 0, .8); rs('castle-hit', { gain: 1.4 }); shake(.3); }
   if (big) { flash(0, 4, c.z - 1, 7, .5, '255,180,90'); addDebris(0, 4, c.z - 1, 20, 0, 1); popNum('pop', '−' + Math.round(dmg), 0, 9, c.z); }
 }
 function onCastleDown() {
   const c = S0.castle;
-  sfx('boom', 1.3); later(.18, () => sfx('boom', 1)); invertFlash(); whiteFlash(.8); shake(1); hitstop = .12; cam.punch += .08;
+  rs('castle-fall'); invertFlash(); whiteFlash(.8); shake(1); hitstop = .12; cam.punch += .08;
   flash(0, 4, c.z, 10, .7); flash(0, 4, c.z, 14, 1, '255,214,140');
   for (let i = 0; i < 3; i++) ring(0, .2, c.z, 7 + i * 3, .6 + i * .15, i ? '255,230,180' : '255,255,255', i * .08);
   addDebris(0, 3, c.z, 120, 0, 1.6); addSmoke(0, .5, c.z, 26, 0, 2.2, 5); addSmoke(0, 3, c.z, 10, 2, 2, 3); addSparks(0, 4, c.z, 40, 1, 18, .8); addGlow(0, 4, c.z, 30, 2, 8, 1, 1.2, 1);
@@ -541,13 +544,14 @@ function onResult() {
   S0.phase = 'result'; resultT = 0; const n = S0.stars;
   banner = { text: n ? '성 함락!' : '정령이 모두 쓰러졌어요', t: 0, dur: 3.2 };
   stars = { n, t: 0, left: S0.n };
-  for (let i = 0; i < n; i++) later(.35 + i * .3, () => { sfx('star'); whiteFlash(.12); });
+  for (let i = 0; i < n; i++) later(.35 + i * .3, () => { rs('star', { i }); whiteFlash(.12); });
+  if (!n) later(.35, () => rs('fail'));
   later(3.6, restart);
 }
 function restart() {
   stats.cycles++; banner = null; stars = null; cutin = null; pieces = []; timers = []; fx = []; rings = []; flashes = []; pops = []; texts = [];
   D.n = M.n = K.n = G.n = FL.n = B.n = 0; castleCracks = 0; { const g = SPR.castle.getContext('2d'); g.clearRect(0, 0, SPR.castle.width, SPR.castle.height); g.drawImage(castleBase, 0, 0); }
-  resetSim(); cam.back = 8.5; cam.z = S0.z - cam.back; cam.h = 8; cam.zoom = 1; resultT = -1; siegeT = 0;
+  rs('start'); resetSim(); cam.back = 8.5; cam.z = S0.z - cam.back; cam.h = 8; cam.zoom = 1; resultT = -1; siegeT = 0;
 }
 
 /* ---------- 조종: 좌우로 끌기(자동 조종은 시연 · 측정용) ---------- */
@@ -755,7 +759,7 @@ function drawFlyers(dt) {
   const c = S0.castle;
   for (let j = FL.n - 1; j >= 0; j--) { FL.life[j] -= dt;
     if (FL.life[j] <= 0) { if (FL.kind[j] && !c.down) { // 성에 도착: 작은 불꽃 · 먼지 · 맞음 번쩍
-        castleHitT = .06; if (rnd() < .5) addSparks(FL.x[j], FL.y[j], FL.z[j], 3, 3, 8, .4); if (rnd() < .25) addSmoke(FL.x[j], FL.y[j], FL.z[j], 1, 1, .6, .3); if (rnd() < .3) sfx('hit', .5); onCastleHit(0, false); }
+        castleHitT = .06; if (rnd() < .5) addSparks(FL.x[j], FL.y[j], FL.z[j], 3, 3, 8, .4); if (rnd() < .25) addSmoke(FL.x[j], FL.y[j], FL.z[j], 1, 1, .6, .3); rs('castle-hit'); onCastleHit(0, false); }
       swapOut(FL, j, --FL.n, FKEYS); continue; }
     if (dt) { FL.vy[j] -= (FL.kind[j] ? 15.7 : 18) * dt; FL.x[j] += FL.vx[j] * dt; FL.y[j] += FL.vy[j] * dt; FL.z[j] += FL.vz[j] * dt; FL.rot[j] += FL.vr[j] * dt; } }
   const spr = SPR.spirit;
@@ -764,7 +768,7 @@ function drawFlyers(dt) {
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
 }
 function drawBullets(dt) {
-  for (let j = B.n - 1; j >= 0; j--) { B.life[j] -= dt; if (B.life[j] <= 0) { addSparks(B.x[j], B.y[j], B.z[j], 2, 1, 7, .3); if (rnd() < .3) sfx('hit', .35); swapOut(B, j, --B.n, BKEYS); continue; }
+  for (let j = B.n - 1; j >= 0; j--) { B.life[j] -= dt; if (B.life[j] <= 0) { addSparks(B.x[j], B.y[j], B.z[j], 2, 1, 7, .3); rs('rock-hit', { gain: .6 }); swapOut(B, j, --B.n, BKEYS); continue; }
     B.x[j] += B.vx[j] * dt; B.y[j] += B.vy[j] * dt; B.z[j] += B.vz[j] * dt; }
   if (!B.n) return;
   ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round'; ctx.strokeStyle = '#bff0ff'; ctx.lineWidth = 2.2 * S; ctx.beginPath();
@@ -907,6 +911,7 @@ $('#bar').addEventListener('click', e => {
   markButtons(); showDbg();
 });
 addEventListener('pointerdown', unlockSound, { passive: true });
+preloadRunnerSound(); addEventListener('pointerdown', preloadRunnerSound, { once: true, passive: true }); // 펫 대행진에 들어올 때만 받는다
 addEventListener('keydown', unlockSound);
 addEventListener('resize', () => { resize(); crackCastleRedo(); });
 

@@ -18,13 +18,18 @@ await mkdir(OUT, { recursive: true });
 const browser = await pw.chromium.launch({ args: ['--mute-audio'] });
 const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
 const page = await ctx.newPage();
-const errors = [];
+const errors = [], reqs = [];
+page.on('request', r => reqs.push(r.url()));
 page.on('pageerror', e => errors.push(e.message));
 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 await page.addInitScript(() => {
+  // 사건별 낸 소리 수(runner.js snd → window.__rnSndLog)
+  window.__rnSnd = {}; window.__rnSndLog = (name, n) => { const o = window.__rnSnd[name] ||= { calls: 0, played: 0 }; o.calls++; o.played += n; };
+  window.__rnBad = new URLSearchParams(location.search).has('bad');
   // 간단한 자동 조종: 20단위 안 첫 물체를 보고 좋은 문 쪽 · 바위(깰 수 있으면) · 수정으로, 톱날 · 망치는 반대쪽. 공성전은 계속 누름.
   const apply = (n, g) => g[0] === '+' ? n + g[1] : g[0] === '×' ? n * g[1] : Math.max(0, n - g[1]);
   window.__rnAutopilot = S => {
+    if (window.__rnBad) return { tx: 0, hold: false };
     if (S.phase === 'siege') return { tx: 0, hold: S.siegeT > 10 };
     for (const o of S.items) {
       if (o.done || o.z < S.z - 1 || o.z > S.z + 20 || o.type === 'card' || o.type === 'end') continue;
@@ -36,7 +41,7 @@ await page.addInitScript(() => {
     return { tx: S.cx };
   };
 });
-await page.goto(BASE + '/');
+await page.goto(BASE + (process.argv.includes('--bad') ? '/?bad=1' : '/'));
 await page.fill('input[autocomplete="username"], input[name="username"]', 'ts1').catch(() => {});
 await page.fill('input[type="password"]', 'test1234').catch(() => {});
 await page.keyboard.press('Enter');
@@ -75,5 +80,9 @@ while (Date.now() - t0 < 150000) {
 await page.waitForTimeout(1800);
 await page.screenshot({ path: resolve(OUT, 'runner-play-result.jpg'), type: 'jpeg', quality: 70 });
 const result = await page.textContent('#rn-result').catch(() => '');
-console.log(JSON.stringify({ seconds: Math.round((Date.now() - t0) / 1000), cards, result: (result || '').replace(/\s+/g, ' ').trim().slice(0, 160), errors: errors.slice(0, 5) }));
+const sounds = await page.evaluate(() => window.__rnSnd).catch(() => null);
+// 16개 사건 소리를 직접 한 번씩(이 판에 안 나온 사건 포함): 낸 소리 수가 1 이상이어야 한다
+const direct = await page.evaluate(async () => { const m = await import('/modules/runner-sfx.js'), out = {}; for (const e of Object.keys(m.RUNNER_SFX)) { out[e] = m.runnerSound(e, e === 'star' ? { i: 2 } : {}); await new Promise(r => setTimeout(r, 200)); } return out; }).catch(e => String(e));
+const mp3 = reqs.filter(u => /\/assets\/sfx\/rn-/.test(u)).length;
+console.log(JSON.stringify({ sounds, direct, mp3_loaded: mp3, seconds: Math.round((Date.now() - t0) / 1000), cards, result: (result || '').replace(/\s+/g, ' ').trim().slice(0, 160), errors: errors.slice(0, 5) }));
 await browser.close();
