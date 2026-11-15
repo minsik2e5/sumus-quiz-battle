@@ -32,7 +32,7 @@ export async function runArenaViewChecks(assert) {
 
   // 2) 바닥 층: transform만 · 자국 굽기 · 그림 72 자리
   const render = stage.slice(stage.indexOf('function render(now, f)'), stage.indexOf('/* ---------- 품질 자동'));
-  assert(render.includes('if (css !== view.css) { view.css = css; world.style.transform = css;') && render.includes('Math.round(view.ox + view.sx - PX * view.k)') && stage.includes('view.gx = wx - bx') && render.includes('if (groundDirty && now - groundAt > 100) composeGround(now);') && !render.includes('paintBase(') && !render.includes('ctx.drawImage(floor, 0, 0'),
+  assert(render.includes('if (css !== view.css) { view.css = css; world.style.transform = css;') && render.includes('Math.round(view.ox + bsx - PX * view.k)') && stage.includes('view.gx = wx - bx') && render.includes('if (groundDirty && now - groundAt > 100) composeGround(now);') && !render.includes('paintBase(') && !render.includes('ctx.drawImage(floor, 0, 0'),
     'V13.240 바닥 층은 카메라 값이 바뀐 때만(1px 단위 · 데드존) transform 한 번(다시 칠하지 않음), 자국이 바뀐 때만 0.1초에 한 번까지 바닥 그림 + 자국을 합친다(매 프레임 바닥 그리기 없음)');
   assert(ui.includes('<div class="ar-world" id="ar-world" aria-hidden="true"><canvas class="ar-ground" id="ar-ground"></canvas><div class="ar-ring" aria-hidden="true"></div></div>') && css.includes('.ar-field.cam .ar-world{position:absolute;left:0;top:0;z-index:1;transform-origin:0 0;pointer-events:none;will-change:transform}'),
     'V13.240 바닥 층(.ar-world)에 바닥 캔버스 · 꾸미기 링이 함께 있어 카메라와 같이 움직인다(링 해금 그대로)');

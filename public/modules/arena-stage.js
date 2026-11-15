@@ -841,7 +841,9 @@ export function createStage(field, host) {
     // 바닥 층: transform만(값이 바뀐 때만 쓴다) · 자국이 바뀌었으면 0.1초에 한 번까지 다시 합친다.
     if (world) {
       // 렉 방지: 1px · 0.004배 단위로 반올림해 같은 값이면 쓰지 않는다(쓸 때마다 스타일 계산 · 합성). 캔버스와 어긋남은 0.5px 안.
-      const css = `translate3d(${Math.round(view.ox + view.sx - PX * view.k)}px,${Math.round(view.oy + view.sy - PY * view.k)}px,0) scale(${(Math.round(view.k * 250) / 250).toFixed(3)})`;
+      // 작은 흔들림(3px 미만)은 펫 · 효과 캔버스만 흔든다(바닥 층 쓰기를 줄임). 큰 흔들림은 바닥도 같이.
+      const bsx = amp >= 3 ? view.sx : 0, bsy = amp >= 3 ? view.sy : 0;
+      const css = `translate3d(${Math.round(view.ox + bsx - PX * view.k)}px,${Math.round(view.oy + bsy - PY * view.k)}px,0) scale(${(Math.round(view.k * 250) / 250).toFixed(3)})`;
       if (css !== view.css) { view.css = css; world.style.transform = css; stats.floorWrites = (stats.floorWrites || 0) + 1; }
     }
     if (groundDirty && now - groundAt > 100) composeGround(now);
