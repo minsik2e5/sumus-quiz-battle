@@ -280,6 +280,19 @@ export const ARENA_ART = new Set(${JSON.stringify(art)});
   console.log(`[arena-art] ${art.length} pictures`);
 }
 
+// 펫 대행진 그림 게이트(그림 74): public/assets/runner/<이름>.webp가 들어오면 public/modules/runner-art.js의 RUNNER_ART에 이름이 적히고,
+// 게임은 이 목록에 있는 그림만 불러온다. 없는 이름은 지금의 코드 그림 그대로(404 없음). 주문서 docs/asset-requests/runner/build-74.mjs.
+{
+  const dir = resolve(root, 'public/assets/runner');
+  const art = existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.webp')).map(f => f.slice(0, -5)).sort() : [];
+  const out = resolve(root, 'public/modules/runner-art.js');
+  const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/runner)에 있는 펫 대행진 그림.
+export const RUNNER_ART = new Set(${JSON.stringify(art)});
+`;
+  if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
+  console.log(`[runner-art] ${art.length} pictures`);
+}
+
 // Service worker: precache list + a hash of every served file. Any change to
 // the app changes sw.js, so installed apps pick up each deploy even when no
 // version string was bumped by hand.
