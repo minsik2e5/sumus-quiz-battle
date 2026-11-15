@@ -175,7 +175,8 @@ export function createStage(field, host) {
   // 바닥 층(.ar-world)은 캔버스 밖 DOM: 코드로 그린 바닥(그림 72가 오면 그림) + 자국을 한 장(.ar-ground)에 합쳐 두고,
   //   카메라가 움직이면 그 층의 transform만 바꾼다(다시 칠하지 않음 · 합성만). 펫 · 효과 캔버스는 예전처럼 투명하게 그 위에 겹친다.
   //   자국(금 · 그을음)은 자국 캔버스(floor)에 굽고, 바뀐 때만(0.1초에 한 번까지) 바닥 그림 + 자국을 다시 합친다.
-  const world = field.querySelector('.ar-world'), ground = world?.querySelector('canvas.ar-ground'), gctx = ground?.getContext('2d');
+  // 측정 도구만(docs/arena-perf.mjs --init 'window.__arenaFloorCanvas = 1'): 바닥을 캔버스에 매 프레임 그리는 방식과 비교(V13.240에서 재 보니 더 느려 DOM 층을 씀).
+  const world = window.__arenaFloorCanvas ? null : field.querySelector('.ar-world'), ground = world?.querySelector('canvas.ar-ground'), gctx = ground?.getContext('2d');
   let floor = null, fctx = null, scars = 0, baseC = null, fs = 1, U = 6, GW = 600, GH = 468, PX = 0, PY = 0, groundDirty = 0, floorKey = '';
   const inset = { top: 0, bot: 0 };
   function resize() {
@@ -746,13 +747,23 @@ export function createStage(field, host) {
     const zt = (multi ? VIEW.zMulti : 1) * clamp(lerp(VIEW.zMax, VIEW.zMin, (d - 12) / 28), VIEW.zMin, VIEW.zMax);
     // 몸 가운데(발보다 조금 위)를 본다
     const wx = tx / 100 * GW, wy = ty / 100 * GH - VIEW.petUnits * U * .3;
-    if (view.snap) { view.x = wx; view.y = wy; view.z = zt; view.snap = false; }
-    else { const a = 1 - Math.exp(-dt / VIEW.follow), az = 1 - Math.exp(-dt / (VIEW.follow * 2.2)); view.x += (wx - view.x) * a; view.y += (wy - view.y) * a; view.z += (zt - view.z) * az; }
+    if (view.snap) { view.x = wx; view.y = wy; view.z = zt; view.snap = false; view.gx = wx; view.gy = wy; }
+    else {
+      // 데드존(렉 방지): 보는 곳은 목표가 가운데 상자(가로 ±5 · 세로 ±3.5단위) 밖으로 나간 만큼만 따라간다 → 펫이 조금 움직일 때 카메라 · 바닥 층이 멈춰 있다.
+      const bx = 5 * U, by = 3.5 * U * VIEW.tilt;
+      if (wx > view.gx + bx) view.gx = wx - bx; else if (wx < view.gx - bx) view.gx = wx + bx;
+      if (wy > view.gy + by) view.gy = wy - by; else if (wy < view.gy - by) view.gy = wy + by;
+      const a = 1 - Math.exp(-dt / VIEW.follow), az = 1 - Math.exp(-dt / (VIEW.follow * 2.2));
+      view.x += (view.gx - view.x) * a; view.y += (view.gy - view.y) * a;
+      if (Math.abs(view.gx - view.x) < .3) view.x = view.gx; if (Math.abs(view.gy - view.y) < .3) view.y = view.gy;
+      const zq = Math.round(zt * 25) / 25; view.z += (zq - view.z) * az; if (Math.abs(zq - view.z) < .003) view.z = zq;
+    }
     // 가두기: 보이는 경기장이 판(규칙 -3~103 × -6~104)보다 크면 가운데, 아니면 판 밖이 거의 안 보이게
     const z = view.z, hw = W / 2 / z, up = ((inset.top + H - inset.bot) / 2 - inset.top) / z, down = up;
     const lo = -3 / 100 * GW, hi = 103 / 100 * GW, top = -6 / 100 * GH, bot = 104 / 100 * GH;
     view.x = hi - lo <= hw * 2 ? (lo + hi) / 2 : clamp(view.x, lo + hw, hi - hw);
     view.y = bot - top <= up + down ? (top + bot) / 2 : clamp(view.y, top + up, bot - down);
+    view.gx = clamp(view.gx, Math.min(view.x, lo + hw), Math.max(view.x, hi - hw)); view.gy = clamp(view.gy, Math.min(view.y, top + up), Math.max(view.y, bot - down));
   }
   // V13.240 조준 표시(예전 DOM .ar-aim): 바닥에 눕혀 그린다 — 화살표 · 부채꼴 · 원(놓일 자리). 방향은 규칙 방향 그대로.
   function drawAim(sc) {
@@ -829,8 +840,9 @@ export function createStage(field, host) {
     const base = () => ctx.setTransform(S * view.k, 0, 0, S * view.k, S * (PAD.l + view.ox + view.sx), S * (PAD.t + view.oy + view.sy));
     // 바닥 층: transform만(값이 바뀐 때만 쓴다) · 자국이 바뀌었으면 0.1초에 한 번까지 다시 합친다.
     if (world) {
-      const css = `translate3d(${(view.ox + view.sx - PX * view.k).toFixed(1)}px,${(view.oy + view.sy - PY * view.k).toFixed(1)}px,0) scale(${view.k.toFixed(4)})`;
-      if (css !== view.css) { view.css = css; world.style.transform = css; }
+      // 렉 방지: 1px · 0.004배 단위로 반올림해 같은 값이면 쓰지 않는다(쓸 때마다 스타일 계산 · 합성). 캔버스와 어긋남은 0.5px 안.
+      const css = `translate3d(${Math.round(view.ox + view.sx - PX * view.k)}px,${Math.round(view.oy + view.sy - PY * view.k)}px,0) scale(${(Math.round(view.k * 250) / 250).toFixed(3)})`;
+      if (css !== view.css) { view.css = css; world.style.transform = css; stats.floorWrites = (stats.floorWrites || 0) + 1; }
     }
     if (groundDirty && now - groundAt > 100) composeGround(now);
     ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
