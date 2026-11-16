@@ -88,3 +88,7 @@
 @keyframes rnm-in{0%{transform:translateY(10px) scale(.92);opacity:0}100%{transform:none;opacity:1}}
 @media (max-width:370px){.rnm-cards{grid-template-columns:1fr}.rnm-today ul{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){.rnm-card::after,.rnm-boss,.rnm-hp i::after,.rnm-gift,.rnm-today li.hot i{animation:none}}
+
+/* 첫 화면 왼쪽 위 나가기 버튼: 흰 바탕에 흰 화살표라 빈 네모로 보이던 것 → 유리판 + 흰 화살표 */
+.rn-top .yb-back{flex:none;width:40px;height:40px;border-radius:var(--a-r-1,12px);background:var(--rn-glass);color:var(--rn-cloud);box-shadow:inset 0 0 0 1px var(--rn-white-line)}
+.rn-top .yb-back .icon{width:22px;height:22px;stroke:currentColor;stroke-width:2.6}

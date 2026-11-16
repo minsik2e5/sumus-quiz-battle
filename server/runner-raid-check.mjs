@@ -140,6 +140,7 @@ export async function runRunnerRaidChecks(assert) {
     const css = source('../public/v13243.css'), build = source('./build-assets.mjs');
     assert(build.includes('"v13243.css"') && !/blur\(|transition:[^;}]*(width|height|left|top|box-shadow)|@keyframes[^{]*\{[^}]*(width|height|left|top):/.test(css) && /var\(--a-gold\)/.test(css),
       '③ 화면 CSS: 아레나 디자인 토큰, 움직임은 transform · opacity만, blur 없음');
+    assert(css.includes('.rn-top .yb-back{') && /\.rn-top \.yb-back\{[^}]*background:var\(--rn-glass\)[^}]*color:var\(--rn-cloud\)/.test(css) && ui.includes('data-rn="exit"'), '첫 화면 나가기 버튼: 유리판 위 흰 화살표(흰 바탕 빈 네모로 보이지 않게)');
     const load = source('./tournament-load.mjs'), stress = source('./stress-check.mjs');
     assert(load.includes("'GET /runner/daily'") && load.includes("'GET /runner/raid'") && stress.includes("p95('GET /runner/raid')"), '부하 시험(check:load)에 도전 순위 GET · 보스 GET · 판 끝이 들어 있다');
     assert(STATE_BUDGET_KB.runnerRaid > 0 && STATE_BUDGET_KB.runnerRaid <= 20, '반 보스 묶음 runnerRaid 예산(perf-budget.mjs)');
