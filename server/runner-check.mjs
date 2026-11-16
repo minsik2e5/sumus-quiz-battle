@@ -207,6 +207,12 @@ export async function runRunnerChecks(assert) {
     assert(ui.includes('if (!g.sprS2 || g.S2 > g.sprS2 * 1.01) { g.sprS2 = g.logS2 = g.S2; buildSprites(g); }') && ui.includes('function rescaleLogical(g, r)') && ui.includes('const MIPS = new Map();') && ui.includes("textSprite(g, '피버 타임!', 'cut', 'star');") && ui.includes('const EMERG_CD = 12;') && !/rn-streak[^{]*\{[^}]*animation/.test(css) && !/\.rn-streak i\{[^}]*transition/.test(css),
       '판 중 다시 굽기 없음: 해상도가 내려가도 그림은 그대로(크기만), 알림 글자 미리 굽기, 카운트다운 예상 12ms, 피버 점은 끝없는 애니메이션 없음');
   }
+  // V13.243 놀이터 큰 카드: 입구 그림은 다른 게임처럼 ENTRY_ART(public/assets/runner/entry.webp, 임시는 그림 74 합성), 숫자 줄은 남색 바탕 위 흰 글씨(아레나와 같은 토큰)
+  {
+    const card = source('../public/modules/arcade-games.js'), build = source('./build-assets.mjs'), css = source('../public/v13241.css');
+    assert(card.includes("has = art?.entry?.has?.('runner')") && build.includes("'arena', 'runner'].filter(") && existsSync(fileURLToPath(new URL('../public/assets/runner/entry.webp', import.meta.url))) && existsSync(fileURLToPath(new URL('../docs/asset-requests/runner/make-entry.mjs', import.meta.url))) && css.includes('.ag-runner{background:var(--a-bg)}'),
+      '펫 대행진 놀이터 카드: 입구 그림 ENTRY_ART(임시 그림은 그림 74 합성) · 숫자 줄이 잘 보이는 남색 바탕');
+  }
   // V13.243 테스트 앱 띠 빌드 표시: deploy-test만 /test-build.json을 만들고(저장소 · 운영에는 없음), 앱은 테스트 앱 주소에서만 부른다
   {
     const wf = source('../.github/workflows/deploy-test.yml'), prod = source('../.github/workflows/deploy-cloudflare.yml'), app = source('../public/app.js'), ign = source('../.gitignore');

@@ -196,3 +196,7 @@
 .rn-game.fever .rn-vig{opacity:1;background:radial-gradient(ellipse at center,transparent 58%,rgba(255,190,40,.42) 100%)}
 .rn-game.fever .rn-count{outline:2px solid #ffd24a}
 .rn-res-list li.fever b{color:#ffb020}
+/* v13.243 놀이터 큰 카드: 아레나처럼 남색 바탕(--a-bg) 위 흰 숫자 → 밝은 바탕에 흰 글씨가 안 보이던 것 고침. 그림 아래는 바탕색으로 흐려짐 */
+.ag-runner{background:var(--a-bg)}
+.ag-runner .ag-big-art::after{background:linear-gradient(180deg,transparent 40%,var(--a-bg) 100%)}
+.ag-runner .ag-stats li{background:var(--a-surface);color:var(--a-ink)}

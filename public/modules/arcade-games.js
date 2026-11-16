@@ -162,7 +162,7 @@ function runnerMetaChips(v) {
   return `<ul class="ag-rn-meta" aria-label="오늘 할 것">${chips.join('')}</ul>`;
 }
 export function runnerCard(A, art) {
-  const v = A.data.rewards?.runner || {}, has = art?.runner?.has?.('entry');
+  const v = A.data.rewards?.runner || {}, has = art?.entry?.has?.('runner');   // v13.243 입구 그림(public/assets/runner/entry.webp)은 ENTRY_ART로(다른 게임과 같게)
   return `<article class="ag-big ag-runner">
     <div class="ag-big-art" aria-hidden="true">${has ? '<img class="ag-big-bg" src="/assets/runner/entry.webp" alt="" draggable="false" decoding="async">' : '<span class="ag-big-bg ag-rn-bg"><i class="ag-rn-road"></i><i class="ag-rn-gate g"><b>×2</b></i><i class="ag-rn-gate b"><b>−5</b></i><i class="ag-rn-crowd"></i><i class="ag-rn-castle"></i></span>'}<span class="ag-big-title"><small>혼자 · 액션 게임</small><strong>펫 대행진</strong><em>정령 무리를 불려 바위를 깨고, 갇힌 내 펫을 구해 성을 무너뜨려요</em></span></div>
     <div class="ag-big-body">
