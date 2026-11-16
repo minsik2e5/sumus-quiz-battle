@@ -200,3 +200,5 @@
 .ag-runner{background:var(--a-bg)}
 .ag-runner .ag-big-art::after{background:linear-gradient(180deg,transparent 40%,var(--a-bg) 100%)}
 .ag-runner .ag-stats li{background:var(--a-surface);color:var(--a-ink)}
+.ag-runner .ag-rn-meta li{background:var(--a-surface);color:var(--a-ink);box-shadow:inset 0 0 0 1px var(--a-line)}
+.ag-runner .ag-rn-meta li.hot{background:var(--a-gold);color:var(--a-gold-ink)}

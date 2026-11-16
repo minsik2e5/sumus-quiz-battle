@@ -168,7 +168,7 @@ export function runnerCard(A, art) {
     <div class="ag-big-body">
       <ul class="ag-stats" aria-label="내 펫 대행진">
         <li><i class="ag-ico">⭐</i><b>${num(v.total || 0)}</b><small>별</small></li>
-        <li><i class="ag-ico">🏰</i><b>${num(v.st || 0)}/${num(v.stages || 25)}</b><small>스테이지</small></li>
+        <li><i class="ag-ico">🏰</i><b>${num(v.st || 0)}</b><small>스테이지</small></li>
         <li>${coin()}<b>${num(v.coin_today || 0)}/${num(v.coin_daily || 40)}</b><small>오늘 코인</small></li>
       </ul>
       ${runnerMetaChips(v)}
