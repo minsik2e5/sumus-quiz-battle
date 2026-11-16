@@ -81,9 +81,9 @@ const dmgPerTick = (n, fire) => (1 + Math.min(n, 400) * 0.028) * fire;
 
 /* ---------- 맵 생성기(스테이지 번호 → 같은 맵) ---------- */
 // 물체: gate{z,l,r} · rock{z,x,hp} · saw{z,x0,amp,per} · hammer{z,x,per,ph} · card{z,cards} · crystal{z,x,hp} · end{z}
-// over.hz: 위험 세기 덮어쓰기(난도 맞출 때만). 보통은 스테이지 표의 값.
+// over.hz: 위험 세기 덮어쓰기(난도 맞출 때만). 보통은 스테이지 표의 값. over.seed: 맵 씨앗(오늘의 도전만, 없으면 스테이지 씨앗).
 export function makeMap(stage, over = null) {
-  const s = Math.max(1, Math.min(RUNNER.MAX_STAGE, stage | 0)), R = mulberry(stageSeed(s)), d = s / 100;
+  const s = Math.max(1, Math.min(RUNNER.MAX_STAGE, stage | 0)), R = mulberry(over?.seed ?? stageSeed(s)), d = s / 100;   // over.seed: 모드 자리(오늘의 도전, runner-modes.js)
   const row = STAGE_TABLE[s - 1], hz = over?.hz ?? (row ? row[2] / 100 : 1);
   const u = (a, b) => a + R() * (b - a), pick = arr => arr[Math.floor(R() * arr.length)];
   const items = [];

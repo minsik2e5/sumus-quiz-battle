@@ -6,6 +6,8 @@ import { CHARACTERS } from './core.js';
 import { RUNNER, PET_SKILL, cardName, CARDS, theme, makeMap, runInit, runTick, runPick, recorder, quantTx, crowdR, tri, goodGate, isBoss, stageTarget } from './runner-rules.js';
 import { RUNNER_ART, RUNNER_SFX } from './runner-art.js';
 import { ARENA_ART } from './arena-art.js';
+import { modeMap } from './runner-modes.js';
+import { metaCards, openDailySheet, openRaidSheet, resultMeta, fillDailyRank, elKo } from './runner-meta.js';
 
 // V13.241 펫 대행진(크라우드 러너, 놀이터). 구성안 docs/pet-runner-plan.md · 펫 대행진 연출 시험 페이지의 엔진을 옮겨 씀.
 // 화면 흐름: 지도(스테이지 1~25, 별 3개) → [출발] → 한 판(달리기 · 카드 2번 · 수정 구출 · 공성전) → 결과 → [다시] 한 번에 바로.
@@ -59,6 +61,7 @@ function lobby() {
       <section class="rn-hero"><div class="rn-hero-sky" aria-hidden="true"><i></i><i></i><i></i></div>
         <h1>하늘 다리</h1><p>좌우로 끌어 숫자 문을 고르고, 바위를 쏴 깨고, 갇힌 내 펫을 구한 뒤 대포로 성을 무너뜨려요!</p>
         <div class="rn-total"><span>${starRow(3, 'big')}<b>${num(v.total)}</b><small>/ ${v.stages * 3}</small></span>${v.box ? `<span class="rn-box">${art('daily-chest') ? `<img src="${art('daily-chest')}" alt="" draggable="false">` : ''}오늘 첫 판 상자 +${v.box_coins}</span>` : ''}</div></section>
+      ${metaCards(v)}
       <section class="rn-map" aria-label="스테이지 지도">${nodes.join('')}</section>
       <section class="rn-go-panel">
         <div><strong>${s}스테이지${isBoss(s) ? ' · 보스 성' : ''}</strong><small>${starAt(v, s) ? `내 최고 ${starRow(starAt(v, s))}` : '처음 도전'}${cheer ? ` · 응원 정령 +${Math.round(cheer * 100)}%` : ''}</small></div>
@@ -77,21 +80,24 @@ async function onLobbyClick(e) {
   if (act === 'pick') { R.sel = Number(b.dataset.s); return lobby(); }
   if (act === 'board') return showBoard();
   if (act === 'go') return startGame(R.sel);
+  // V13.243 오늘의 도전 · 주간 반 보스(runner-meta.js): 누를 때만 GET 한 번
+  if (act === 'daily') return openDailySheet(() => R && startGame(0, 'daily'));
+  if (act === 'raid') return openRaidSheet(out => { if (!R) return; if (out?.coins && R.A?.data?.stats) R.A.data.stats.points_balance = Number(R.A.data.stats.points_balance || 0) + out.coins; api('/runner/home').then(res => { if (R && res?.runner) { R.v = res.runner; if (!R.game) lobby(); } }).catch(() => {}); });
 }
 async function showBoard() {
   let res; try { res = await api('/runner/board'); } catch (err) { return toast(err.message || '반 순위를 불러오지 못했어요.'); }
-  const row = r => `<li class="${r.me ? 'me' : ''}"><b>${r.rank}</b>${avatar(r.pet, { small: true })}<span>${esc(r.name)}</span><em>${starRow(1)}${num(r.total)}</em><small>${r.st}스테이지</small></li>`;
+  const row = r => `<li class="${r.me ? 'me' : ''}"><b>${r.rank}</b>${avatar(r.pet, { size: 'mini' })}<span>${esc(r.name)}</span><em>${starRow(1)}${num(r.total)}</em><small>${r.st}스테이지</small></li>`;
   openSheet(`<div class="rn-board-sheet"><h2>펫 대행진 반 순위</h2><p>같은 학교 · 같은 학년 친구들의 별 합계예요(1분마다 새로).</p>
     <ol>${(res.top || []).map(row).join('') || '<li class="empty">아직 아무도 안 했어요. 첫 주인공이 되어 봐요!</li>'}</ol>${res.me && !res.top.some(r => r.me) ? `<ol class="mine">${row(res.me)}</ol>` : ''}</div>`, '펫 대행진 반 순위', { className: 'rn-sheet' });
 }
 
 /* ---------- 한 판 ---------- */
-async function startGame(stage) {
+async function startGame(stage, mode = 'stage') {
   if (R.busy) return;
   R.busy = true;
   const id = `rn-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   let res;
-  try { res = await api('/runner/start', { id, stage }); }
+  try { res = await api('/runner/start', { id, stage, mode }); }
   catch (err) { R.busy = false; toast(err.message || '시작하지 못했어요.'); return lobby(); }
   if (res.runner) R.v = res.runner;
   // 판에 쓸 그림(구출 펫 · 그림 74 · 재료)을 디코드까지 기다린다(최대 1.8초): 판 첫 몇 초에 처음 그리기 비용이 몰리지 않게
@@ -147,10 +153,11 @@ function closeGame() {
 }
 function playGame(start) {
   closeGame();
-  const map = makeMap(start.stage), pet = start.pet || {};
+  // V13.243 모드 자리: 오늘의 도전은 서버가 준 맵 씨앗으로(runner-modes.js modeMap, 서버와 같은 맵)
+  const daily = start.mode === 'daily', map = daily ? modeMap({ mode: 'daily', stage: start.stage, seed: start.map_seed, el: start.el }) : makeMap(start.stage), pet = start.pet || {};
   root().innerHTML = `<div class="rn-back" id="rn-back" aria-hidden="true"></div><div class="rn-game" id="rn-game"${art('card-frame') ? ` style="--rn-card:url(${art('card-frame')})"` : ''}><canvas id="rn-cvs"></canvas>
     <div class="rn-veil" id="rn-tint"></div><div class="rn-veil rn-vig" id="rn-vig"></div><div class="rn-veil" id="rn-flash"></div>
-    <header class="rn-hud"><button type="button" class="rn-x" data-g="quit" aria-label="그만하기">${icon('close')}</button><div class="rn-hud-mid"><b>${start.stage}스테이지${isBoss(start.stage) ? ' · 보스 성' : ''}</b><div class="rn-prog"><i id="rn-prog"></i><em class="rn-prog-castle${isBoss(start.stage) ? ' boss' : ''}" aria-hidden="true"></em></div></div><div class="rn-hud-r"><span class="rn-count" id="rn-count" aria-label="정령 수"><i aria-hidden="true"></i><b id="rn-count-n">${num(start.start)}</b></span><small id="rn-hint">끌어서 조종</small></div></header>
+    <header class="rn-hud"><button type="button" class="rn-x" data-g="quit" aria-label="그만하기">${icon('close')}</button><div class="rn-hud-mid"><b>${daily ? `오늘의 도전 · ${elKo(start.el)} 속성` : `${start.stage}스테이지${isBoss(start.stage) ? ' · 보스 성' : ''}`}</b><div class="rn-prog"><i id="rn-prog"></i><em class="rn-prog-castle${isBoss(start.stage) ? ' boss' : ''}" aria-hidden="true"></em></div></div><div class="rn-hud-r"><span class="rn-count" id="rn-count" aria-label="정령 수"><i aria-hidden="true"></i><b id="rn-count-n">${num(start.start)}</b></span><small id="rn-hint">끌어서 조종</small></div></header>
     <div class="rn-cards" id="rn-cards" aria-live="polite"></div>
     <div class="rn-result" id="rn-result" hidden></div></div>`;
   const cvs = $('rn-cvs');
@@ -187,7 +194,7 @@ function onGameClick(b) {
   const g = b.dataset.g;
   if (g === 'quit') { if (G.S.phase === 'done' || confirm('이 판을 그만할까요? 이 판의 기록은 남지 않아요.')) { const r = R; closeGame(); if (r) lobby(); } return; }
   if (g === 'card') return pickCard(Number(b.dataset.i));
-  if (g === 'again') { const s = G.start.stage; closeGame(); return startGame(s); }
+  if (g === 'again') { const s = G.start.stage, m = G.start.mode === 'daily' ? 'daily' : 'stage'; closeGame(); return startGame(s, m); }
   if (g === 'next') { const s = Math.min(view().stages, G.start.stage + 1); closeGame(); return startGame(s); }
   if (g === 'map') { closeGame(); return lobby(); }
 }
@@ -552,16 +559,17 @@ async function sendFinish(g) {
 }
 function showResult(g, res, err) {
   const el = $('rn-result'); if (!el) return;
-  const stars = res?.valid ? res.stars : g.S.stars, clear = stars > 0, v = view(), last = g.start.stage >= v.stages, canNext = clear && !last, S = g.S, c = S.castle;
+  const stars = res?.valid ? res.stars : g.S.stars, clear = stars > 0, v = view(), daily = g.start.mode === 'daily', last = g.start.stage >= v.stages, canNext = clear && !last && !daily, S = g.S, c = S.castle;
   const reason = err ? (err.message || '결과를 보내지 못했어요.') : res && !res.valid ? ({ fast: '너무 빨리 끝난 판이라 기록되지 않았어요.', expired: '판이 너무 오래 열려 있어서 기록되지 않았어요.', input: '조종 기록을 읽지 못했어요.' }[res.reason] || '기록되지 않았어요.') : '';
   // 아깝게 졌을 때: 성 HP가 얼마 남았는지(공성전까지 갔으면) · 성까지 얼마 남았는지(달리다 졌으면)를 크게
   const hpLeft = Math.max(1, Math.ceil(c.hp / c.max * 100)), runLeft = Math.max(1, Math.round((1 - clamp(S.z / g.map.len, 0, 1)) * 100));
   const near = clear ? '' : S.siegeT > 0 ? `<p class="rn-near${hpLeft <= 30 ? ' hot' : ''}">성 HP <b>${hpLeft}%</b> 남았어${hpLeft <= 30 ? '!' : '요'}</p>` : `<p class="rn-near${runLeft <= 30 ? ' hot' : ''}">성까지 <b>${runLeft}%</b> 남았어${runLeft <= 30 ? '!' : '요'}</p>`;
   const coins = res?.valid ? Number(res.coins || 0) : 0, box = res?.valid ? Number(res.box || 0) : 0;
   const face = art(clear ? 'spirit-cheer' : 'spirit-hurt');
-  el.innerHTML = `<div class="rn-res-card${clear ? ' win' : ''}" id="rn-res-card">${face ? `<img class="rn-res-face" src="${face}" alt="" draggable="false">` : ''}<h2>${clear ? (g.map.boss ? '보스 성 함락!' : '성 함락!') : '아쉬워요!'}</h2>
+  el.innerHTML = `<div class="rn-res-card${clear ? ' win' : ''}" id="rn-res-card">${face ? `<img class="rn-res-face" src="${face}" alt="" draggable="false">` : ''}<h2>${clear ? (daily ? '오늘의 도전 성공!' : g.map.boss ? '보스 성 함락!' : '성 함락!') : '아쉬워요!'}</h2>
     <div class="rn-res-stars">${[0, 1, 2].map(i => `<i class="${i < stars ? 'on' : ''}" style="--d:${.25 + i * .3}s"></i>`).join('')}</div>
     ${near}
+    ${resultMeta(res)}
     <ul class="rn-res-list"><li><span>남은 정령</span><b>${num(S.left)}</b></li><li><span>깬 바위</span><b>${num(S.broke)}</b></li>
       ${res?.valid ? `<li class="coin"><span>코인</span><b>${coin()}+<em id="rn-coin-n">0</em></b></li>${box ? `<li class="box"><span>오늘 첫 판 상자</span><b>${coin()}+${num(box)}</b></li>` : ''}` : ''}</ul>
     ${res?.valid && !coins && res.stars && v.coin_today >= v.coin_daily ? `<p class="rn-res-note">오늘 코인은 다 받았어요. 별과 기록은 그대로 쌓여요!</p>` : ''}
@@ -570,6 +578,7 @@ function showResult(g, res, err) {
     <div class="rn-res-btns"><button type="button" class="rn-big gold" data-g="again">한 판 더</button>${canNext ? '<button type="button" class="rn-big blue" data-g="next">다음 스테이지 →</button>' : ''}<button type="button" class="rn-ghost" data-g="map">지도</button></div></div>
     <div class="rn-coinrain" id="rn-coinrain" aria-hidden="true"></div>`;
   el.hidden = false;
+  if (daily && res?.valid) fillDailyRank();
   const card = $('rn-res-card');
   // 별이 하나씩 쾅: CSS 별 애니메이션(--d)과 같은 때 소리 · 카드 흔들림
   for (let i = 0; i < stars; i++) setTimeout(() => { snd('star', { i }); try { card?.animate([{ transform: 'translateY(0)' }, { transform: 'translateY(6px)' }, { transform: 'translateY(0)' }], { duration: 180, easing: 'ease-out' }); } catch {} }, 250 + i * 300);

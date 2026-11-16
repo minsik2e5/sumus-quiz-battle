@@ -47,7 +47,7 @@ import { rangeCounts, rememberRangeBest, keepTimingLastWeek } from './titles-4.m
 import { grantTimingPlay, timingView, timingPing, timingStart, timingFinish, timingBoard, timingLine, dailyConfig, dailyTeacherView, setDaily, timingDailyBoard } from './timing.mjs';
 import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow, huntSell, huntCoins, huntSpend, huntBerryQuiz, huntBerryAnswer } from './hunt.mjs';
 import { grantClaw, clawView, clawStart, clawDrop, clawGuideSeen, clawPreviewFill, clawActivityText } from './claw.mjs';
-import { runnerView, runnerStart, runnerFinish, runnerBoard, runnerLine } from './runner.mjs';
+import { runnerView, runnerStart, runnerFinish, runnerBoard, runnerLine, runnerDaily, runnerRaid, runnerRaidClaim, runnerRaidTeacher } from './runner.mjs';
 import { HUNT, HUNT_MONSTERS } from '../public/modules/hunt-rules.js';
 import { CLAW } from '../public/modules/claw-rules.js';
 import { postClawNews, clawNewsFor } from './claw-news.mjs';
@@ -171,6 +171,9 @@ const schoolByRef = (state, value) => {
   ));
 };
 const schoolForProfile = (state, profile) => state.schools.find(s => s.id === profile.school_id) || schoolByRef(state, profile.school);
+// V13.243 펫 대행진 "반" = 같은 학교 · 같은 학년대 묶음(반 순위 · 오늘의 도전 · 주간 반 보스가 같이 쓴다).
+const runnerGroupOf = state => x => `${schoolForProfile(state, x)?.id || ''}|${x.division || ''}|${gradeOf(x.class_name)}`;
+const runnerCtx = (state, p) => ({ group: runnerGroupOf(state)(p), bucket: state.runnerRaid || {} });
 const activeTeacherDivision = profile => DIVISIONS.includes(profile.active_division) ? profile.active_division : 'high';
 const teacherSchools = (state, profile, division = activeTeacherDivision(profile)) => state.schools.filter(s => s.active !== false && s.division === division && profile.school_ids?.includes(s.id));
 const activeTeacherSchool = (state, profile) => teacherSchools(state, profile).find(s => s.id === profile.active_school_id) || teacherSchools(state, profile)[0];
@@ -1396,7 +1399,7 @@ export async function service(state, method, path, body, token, options = {}) {
       school_league: leagueFor(state, competition, p, now),
       idle_students: teacher && selectedSchool ? idleStudents(state, competition, selectedSchool, now) : null,
       league: teacher ? null : leagueView(competition, p),
-      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), yabawi: yabawiView(p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), wall: wallView(p, now), arena: arenaView(p, now), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), runner: runnerView(p, now), timing: timingView(p, now, dailyConfig(state, now)), blank: p.role === 'student' ? blankView(p, now) : null },
+      rewards: teacher ? null : { attendance: attendanceView(p, now), gacha: gachaView(p), lucky: luckyView(p, now), rps: rpsFor(state, p, now), yabawi: yabawiView(p, now), market_open: marketOpen(state), bot: botView(p, now), monster: monsterView(p, now, monsterContext(state, p)), match: matchView(p, now, gameWeekKey(now)), wall: wallView(p, now), arena: arenaView(p, now), reel: reelView(p, now), hunt: huntView(p, now), claw: clawView(p, now), runner: runnerView(p, now, runnerCtx(state, p)), timing: timingView(p, now, dailyConfig(state, now)), blank: p.role === 'student' ? blankView(p, now) : null },
       care: teacher ? null : careView(p, lastActiveBefore(state, p, now), now, activePetKey(state, p.id)),
       push: teacher ? null : pushView(state, p),
       notice: teacher ? null : noticeFor(state, p, studentSchool, now),
@@ -1423,7 +1426,8 @@ export async function service(state, method, path, body, token, options = {}) {
     const school = activeTeacherSchool(state, p);
     if (!school) fail('학교 설정을 확인해주세요.', 409);
     const mine = state.profiles.filter(x => x.role === 'student' && x.division === school.division && sameSchool(x, school) && !x.preview_owner_id);
-    if (path === '/teacher/activity') return { overview: activityOverview(mine, Date.now()) };
+    // V13.243 펫 대행진 반 보스 한 줄(묶음 표만 본다).
+    if (path === '/teacher/activity') return { overview: { ...activityOverview(mine, Date.now()), runner_raids: runnerRaidTeacher(state.runnerRaid || {}, school.id, Date.now()) } };
     const student = mine.find(x => x.id === decodeURIComponent(path.slice('/teacher/activity/'.length)));
     if (!student) fail('학생을 찾을 수 없어요.', 404);
     return { student_id: student.id, activity: activityOf(student), server_time: Date.now() };
@@ -2281,24 +2285,39 @@ export async function service(state, method, path, body, token, options = {}) {
   // V13.241 펫 대행진(server/runner.mjs): 판 시작 · 끝 두 번만 쓴다. 지도 · 반 순위는 GET(반 순위는 1분 캐시).
   if (path === '/runner/home' && method === 'GET') {
     requireRole(p, 'student');
-    return { runner: runnerView(p, Date.now()) };
+    return { runner: runnerView(p, Date.now(), runnerCtx(state, p)) };
   }
   if (path === '/runner/start' && method === 'POST') {
     requireRole(p, 'student');
     if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
-    const now = Date.now(), res = runnerStart(p, { id: str(body.id, 40), stage: body.stage, now });
-    return { ...res, runner: runnerView(p, now) };
+    const now = Date.now(), res = runnerStart(p, { id: str(body.id, 40), stage: body.stage, mode: body.mode === 'daily' ? 'daily' : 'stage', group: runnerGroupOf(state)(p), now });
+    return { ...res, runner: runnerView(p, now, runnerCtx(state, p)) };
   }
   if (path === '/runner/finish' && method === 'POST') {
     requireRole(p, 'student');
-    const now = Date.now(), res = runnerFinish(p, { id: str(body.id, 40), input: body.input, now });
+    // 반 보스 피해: 묶음 숫자 하나에 더하기만(O(1)). 같은 판을 다시 보내면 영수증 그대로(두 번 더하지 않음).
+    const now = Date.now(), res = runnerFinish(p, { id: str(body.id, 40), input: body.input, now, raid: { bucket: (state.runnerRaid ||= {}), group: runnerGroupOf(state)(p) } });
     if (!res.again && res.valid) logActivity(p, 'runner', runnerLine(res), now);
-    return { ...res, runner: runnerView(p, now), ...(res.coins || res.box ? { points_balance: coinBalance(state, p) } : {}) };
+    return { ...res, runner: runnerView(p, now, runnerCtx(state, p)), ...(res.coins || res.box ? { points_balance: coinBalance(state, p) } : {}) };
+  }
+  // V13.243 오늘의 도전 순위 · 반 보스 화면은 GET(묶음 학생을 훑는 계산은 1분 캐시). 보상 받기만 POST(그 학생 것만, 한 번).
+  if (path === '/runner/daily' && method === 'GET') {
+    requireRole(p, 'student');
+    return runnerDaily(state.profiles, p, { group: runnerGroupOf(state), ranked: x => isRankedStudent(x) || x.id === p.id, hidden: isPrivate, now: Date.now() });
+  }
+  if (path === '/runner/raid' && method === 'GET') {
+    requireRole(p, 'student');
+    return runnerRaid(state.profiles, p, { group: runnerGroupOf(state), ranked: x => isRankedStudent(x) || x.id === p.id, hidden: isPrivate, bucket: state.runnerRaid || {}, now: Date.now() });
+  }
+  if (path === '/runner/raid/claim' && method === 'POST') {
+    requireRole(p, 'student');
+    const now = Date.now(), res = runnerRaidClaim(p, { bucket: state.runnerRaid || {}, group: runnerGroupOf(state)(p), now });
+    logActivity(p, 'runner', `펫 대행진 반 보스 보상 ${res.coins}코인`, now);
+    return { ...res, runner: runnerView(p, now, runnerCtx(state, p)), points_balance: coinBalance(state, p) };
   }
   if (path === '/runner/board' && method === 'GET') {
     requireRole(p, 'student');
-    const group = x => `${schoolForProfile(state, x)?.id || ''}|${x.division || ''}|${gradeOf(x.class_name)}`;
-    return runnerBoard(state.profiles, p, { group, ranked: x => isRankedStudent(x) || x.id === p.id, hidden: isPrivate, now: Date.now() });
+    return runnerBoard(state.profiles, p, { group: runnerGroupOf(state), ranked: x => isRankedStudent(x) || x.id === p.id, hidden: isPrivate, now: Date.now() });
   }
   // V13.180 인형뽑기(놀이터): 집게권 넣기 · 집게(server/claw.mjs). 판 배치 · 잡힘은 서버가 정한다.
   if (path === '/claw/home' && method === 'POST') {

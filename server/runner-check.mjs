@@ -88,7 +88,7 @@ export async function runRunnerChecks(assert) {
     assert(svc.includes("path === '/runner/home' && method === 'GET'") && svc.includes("path === '/runner/board' && method === 'GET'") && svc.includes("path === '/runner/start' && method === 'POST'") && svc.includes("path === '/runner/finish' && method === 'POST'"),
       '서버 요청: 지도 · 반 순위는 GET, 판마다 start · finish 두 POST');
     assert(STATE_BUDGET_KB.runnerRaid > 0 && STATE_BUDGET_KB.runnerRaid <= 20, '새 데이터 묶음(주간 반 보스 runnerRaid)에 예산이 있다(perf-budget.mjs)');
-    assert(!/setInterval/.test(ui) && (ui.match(/api\('/g) || []).length === 4 && ui.includes("api('/runner/finish', { id: g.id, input: g.rec.out() })"), '게임 화면은 서버에 자동으로 묻지 않는다(지도 · 순위 GET, 시작 · 끝 POST뿐)');
+    assert(!/setInterval/.test(ui) && (ui.match(/api\('/g) || []).length === 5 && ui.includes("api('/runner/finish', { id: g.id, input: g.rec.out() })"), '게임 화면은 서버에 자동으로 묻지 않는다(지도 · 순위 GET, 시작 · 끝 POST뿐, V13.243 보상 받은 뒤 지도 GET 한 번)');
     const ev = ui.match(/const SND_EVENTS = (\[.*?\]);/)?.[1];
     assert(ev && JSON.parse(ev.replace(/'/g, '"')).join() === 'gate-good,gate-bad,multiply,shoot,rock-hit,rock-break,saw,hammer,rescue,card,cannon,castle-hit,castle-fall,star,fail,start'
       && ui.includes("if (!RUNNER_SFX || soundFn) return; import('./runner-sfx.js')") && ui.includes('m.preloadRunnerSound?.()') && ui.includes("g.shootOpt.crowd = S.n; snd('shoot', g.shootOpt);") && ui.includes("snd('star', { i })") && ui.includes("snd('card', { pick: true })") && build.includes("existsSync(resolve(root, 'public/modules/runner-sfx.js'))"),

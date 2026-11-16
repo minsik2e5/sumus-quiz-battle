@@ -68,6 +68,13 @@ function hoursHtml(o) {
   return `<div class="act-hours" role="img" aria-label="접속 시간대">${o.hours.map((c, h) => `<div title="${h}시 ${c}번"><i style="height:${c ? Math.max(5, Math.round(c / max * 100)) : 0}%"></i>${h % 6 === 0 ? `<span>${h}</span>` : ''}</div>`).join('')}</div>
     <p class="act-note">기록에 남은 활동의 시각으로 센 거예요(학생당 최근 30개) · ${ACT_NOTE}</p>`;
 }
+// V13.243 펫 대행진 주간 반 보스: 묶음(학년대)마다 이번 주 진행 · 참여 수 한 줄(같은 GET 응답, 묶음 표만 읽음)
+function raidsHtml(o) {
+  const rows = o.runner_raids || [];
+  if (!rows.length) return '';
+  const line = r => `<li><b>${esc(r.grade)}</b> ${esc(r.boss)} ${r.killed ? '<em>격파!</em>' : `${num(r.pct)}%`} · 참여 ${num(r.players)}명${r.last ? ` <small>(지난주 ${r.last.killed ? '격파' : '못 잡음'} · ${num(r.last.players)}명)</small>` : ''}</li>`;
+  return `<section class="act-card act-wide"><h3>펫 대행진 반 보스<small>이번 주 진행 · 참여 학생 수</small></h3><ul class="act-raids">${rows.map(line).join('')}</ul></section>`;
+}
 function bodyHtml() {
   if (!cache) return '<p class="act-empty">불러오는 중…</p>';
   const o = cache;
@@ -76,6 +83,7 @@ function bodyHtml() {
     <section class="act-card"><h3>학생 레벨 분포<small>레벨 구간별 학생 수</small></h3>${levelsHtml()}</section>
     <section class="act-card"><h3>몬스터전 레벨 분포<small>지금 도전 중인 레벨</small></h3>${monstersHtml(o)}</section>
     <section class="act-card act-wide"><h3>접속 시간대<small>몇 시에 많이 하나(한국 시간)</small></h3>${hoursHtml(o)}</section>
+    ${raidsHtml(o)}
   </div>`;
 }
 const paint = () => { const el = document.querySelector('.act-fold-v13173 .act-body'); if (el) el.innerHTML = bodyHtml(); };

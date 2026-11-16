@@ -106,6 +106,9 @@ export async function runTournamentLoad({ level = 'ok', seconds = 20, others = 8
     if (!st?.pet) return;
     const { input } = botRun(MAP1, { start: st.start, pet: { el: st.pet.el, mul: st.pet.mul } }, { skill: 0.8, seed: n });
     await timed('POST /runner/finish', () => call(id, 'POST', '/runner/finish', { id: rid, input }));
+    // V13.243 판 끝 뒤 결과 · 지도 카드에서 오늘의 도전 순위 · 반 보스를 여는 학생(묶음 학생을 훑는 계산은 1분 캐시)
+    if (n % 2) await timed('GET /runner/daily', () => call(id, 'GET', '/runner/daily'));
+    else await timed('GET /runner/raid', () => call(id, 'GET', '/runner/raid'));
   };
   const runnerN = {};
   const gamer = async id => {
