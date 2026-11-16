@@ -154,6 +154,13 @@ export function timingCard(A, art) {
   </article>`;
 }
 // V13.241 펫 대행진: 코드로 그린 카드(하늘 다리 · 정령 무리). 그림 74(runner/entry)가 들어오면 그 그림.
+// V13.243 놀이터 카드 칩: 오늘의 도전 · 반 보스 HP · 받을 보상(첫 화면 요약 숫자만, 요청 없음)
+function runnerMetaChips(v) {
+  const r = v.raid, d = v.daily;
+  if (!r || !d) return '';
+  const chips = [r.claim ? `<li class="hot">반 보스 보상 +${num(r.claim)}</li>` : '', d.best ? '' : '<li>오늘의 도전 아직!</li>', `<li>반 보스 ${r.killed ? '격파!' : `HP ${100 - Math.min(100, r.pct | 0)}%`}</li>`].filter(Boolean);
+  return `<ul class="ag-rn-meta" aria-label="오늘 할 것">${chips.join('')}</ul>`;
+}
 export function runnerCard(A, art) {
   const v = A.data.rewards?.runner || {}, has = art?.runner?.has?.('entry');
   return `<article class="ag-big ag-runner">
@@ -164,6 +171,7 @@ export function runnerCard(A, art) {
         <li><i class="ag-ico">🏰</i><b>${num(v.st || 0)}/${num(v.stages || 25)}</b><small>스테이지</small></li>
         <li>${coin()}<b>${num(v.coin_today || 0)}/${num(v.coin_daily || 40)}</b><small>오늘 코인</small></li>
       </ul>
+      ${runnerMetaChips(v)}
       <button type="button" class="yl-cta ag-go" data-action="runner-open" aria-label="펫 대행진 들어가기">들어가기</button>
     </div>
   </article>`;

@@ -1,7 +1,7 @@
 // V13.241 펫 대행진 실제 화면 한 판 시험 + 스크린샷(검사에는 넣지 않는다). 운영 · 테스트 서버에 연결하지 않는다.
 // 미리: 로컬 서버를 테스트 앱 처음 데이터로 켠다(학생 ts1 / test1234). 예:
 //   node -e "..." 로 server/test-seed.mjs testSeedState()를 DATA_PATH sqlite에 넣고 DATA_PATH=… PORT=8787 node server/index.mjs
-// 사용: node docs/runner-play-shot.mjs [--base http://localhost:8787] [--stage 1] [--out 폴더] [--bad]
+// 사용: node docs/runner-play-shot.mjs [--base http://localhost:8787] [--stage 1] [--out 폴더] [--bad] [--daily(V13.243 반 보스 · 오늘의 도전 창 + 도전 판)]
 //   측정: --perf --cpu 4 --q auto|3|2|1|0 → 폰처럼(390×844 · 배율 3 · 터치, CPU N배) 한 판 동안 프레임을 잰다(docs/arena-fx-perf.mjs와 같은 숫자).
 // 하는 일: 로그인 → 놀이터 → 펫 대행진 카드 → 지도 스크린샷 → 출발 → 간단한 자동 조종(window.__rnAutopilot: 좋은 문 · 바위 · 수정 노리기,
 //   공성전 누르기)으로 끝까지 → 결과 스크린샷. 카드는 첫 장을 누른다. 중간 장면도 몇 장 찍는다.
@@ -91,7 +91,15 @@ if (PERF) { cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setCP
 // 출발 누름 → 판 시작(그림 받기 · 디코드 · 재료 굽기 · 카운트다운 포함)까지 걸린 시간과 그동안 가장 긴 멈춤도 잰다(새 브라우저라 첫 판 디코드 포함).
 if (PERF) await page.evaluate(() => { window.__perf.frames = []; window.__perf.long = []; window.__perf.on = true; window.__perf.t0 = performance.now(); });
 if (PERF && arg('profile-start')) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
-await page.click('[data-rn="go"]');
+// V13.243 --daily: 반 보스 창 · 오늘의 도전 창을 찍고 오늘의 도전 판으로 출발
+if (process.argv.includes('--daily')) {
+  await page.click('[data-rn="raid"]'); await page.waitForTimeout(1200);
+  await page.screenshot({ path: resolve(OUT, 'runner-raid.jpg'), type: 'jpeg', quality: 70 });
+  await page.keyboard.press('Escape'); await page.waitForTimeout(500);
+  await page.click('[data-rn="daily"]'); await page.waitForTimeout(1200);
+  await page.screenshot({ path: resolve(OUT, 'runner-daily.jpg'), type: 'jpeg', quality: 70 });
+  await page.click('[data-rnm="daily-go"]');
+} else await page.click('[data-rn="go"]');
 // 측정: 규칙이 돌기 시작한 순간(카운트다운 뒤)부터 WINDOW초. CPU N배는 출발 전에 걸어 둔다(판 첫 몇 초도 같은 조건).
 const WINDOW = Number(arg('window', 40));
 if (PERF) {

@@ -122,9 +122,9 @@ const dmgPerTick = (n, fire) => (1 + Math.min(n, 400) * 0.028) * fire;
 // 물체: gate{z,l,r,mv?,sw?} · rock{z,x,hp} · wall{z,hp,gap?{x,w}} · foe{z,x,hp,boss?} · saw{z,x0,amp,per} · hammer{z,x,per,ph}
 //       whirl{z,x}(사막) · slide{z,len}(얼음) · pillar{z,x,per,ph}(화산) · card{z,cards} · crystal{z,x,hp} · end{z}
 // 리듬(쉼 → 긴장 → 폭발): 쉼 = 고르는 재미(좋음/좋음 · 약한 바위), 긴장 = 벽 · 적 무리 · 위험한 짝 · 움직이는/바뀌는 문 · 테마 장애물,
-//   폭발 = × 문 · 깨는 맛 바위 줄(피버를 노릴 수 있는 곳). over.hz: 위험 세기 덮어쓰기(난도 맞출 때만).
+//   폭발 = × 문 · 깨는 맛 바위 줄(피버를 노릴 수 있는 곳). over.hz: 위험 세기 덮어쓰기(난도 맞출 때만). over.seed: 맵 씨앗(오늘의 도전만, runner-modes.js).
 export function makeMap(stage, over = null) {
-  const s = Math.max(1, Math.min(RUNNER.MAX_STAGE, stage | 0)), R = mulberry(stageSeed(s)), d = s / 100, th = theme(s);
+  const s = Math.max(1, Math.min(RUNNER.MAX_STAGE, stage | 0)), R = mulberry(over?.seed ?? stageSeed(s)), d = s / 100, th = theme(s);
   const row = STAGE_TABLE[s - 1], hz = over?.hz ?? (row ? row[2] / 100 : 1);
   const u = (a, b) => a + R() * (b - a), pick = arr => arr[Math.floor(R() * arr.length)];
   const items = [];

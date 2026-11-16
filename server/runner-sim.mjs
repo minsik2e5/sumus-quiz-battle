@@ -96,11 +96,12 @@ export function population(stage, M = 300, seed = 7, over = null) {
 }
 // 위험 세기: 100%부터 낮춰 가며 달리기 중 전멸이 (1 − 깰 확률)의 60% 아래가 되는 첫 값(예: 85% 목표면 전멸 9% 아래).
 export const HZ_STEPS = [100, 85, 70, 55, 42, 32, 24];
-export function tuneStage(stage, M = 400) {
-  const { clear, three } = stageTarget(stage);
+// mapSeed · target: 오늘의 도전 맵 표(DAILY_TABLE)를 맞출 때만(씨앗을 바꾼 맵 · 목표 깸 65%)
+export function tuneStage(stage, M = 400, mapSeed = null, target = null) {
+  const { clear, three } = target || stageTarget(stage), ms = mapSeed == null ? {} : { seed: mapSeed };
   let hz = HZ_STEPS.at(-1);
-  for (const h of HZ_STEPS) { const { out } = population(stage, Math.round(M / 2), 5, { hz: h / 100 }); if (out.filter(o => !o.n).length / out.length <= (1 - clear) * 0.6) { hz = h; break; } }
-  const { out } = population(stage, M, 7, { hz: hz / 100 });
+  for (const h of HZ_STEPS) { const { out } = population(stage, Math.round(M / 2), 5, { hz: h / 100, ...ms }); if (out.filter(o => !o.n).length / out.length <= (1 - clear) * 0.6) { hz = h; break; } }
+  const { out } = population(stage, M, 7, { hz: hz / 100, ...ms });
   const A = out.map(o => o.n * o.power / (1 - o.f)).sort((a, b) => a - b);
   // 하한: 가운데 봇 값의 35%(전멸한 봇이 분위수에 걸려 성이 너무 약해지지 않게)
   const H = Math.max(10, Math.round(A[A.length >> 1] * 0.35), Math.round(A[Math.min(A.length - 1, Math.floor((1 - clear) * A.length))]));
@@ -108,7 +109,7 @@ export function tuneStage(stage, M = 400) {
   let r3 = Math.max(5, Math.min(90, Math.round(100 * ratio[Math.min(ratio.length - 1, Math.floor((1 - three) * ratio.length))])));
   // 강화 없이 별 3이 늘 가능하게: 가장 잘하는 봇(솜씨 1 · 카드 9가지 중 최고)이 남기는 비율의 97%를 넘지 않게
   //   가장 잘하는 봇도 못 깨는 성이면 성 HP를 그 봇이 별 3을 받을 만큼으로 낮춘다(드문 경우).
-  const map = makeMap(stage, { hz: hz / 100 }), tops = [];
+  const map = makeMap(stage, { hz: hz / 100, ...ms }), tops = [];
   for (const [el, seed] of BEST_TRY) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) { const { S } = botRun(map, { start: map.start, pet: { el, mul: 1 } }, { skill: 1, seed, cards: [a, b] }); tops.push({ n: S.start, power: S.power, f: S.petOn ? (RUNNER.PET_SIEGE + (el === 'star' ? 0.2 : 0)) * S.petup : 0 }); }
   const topAt = h => Math.max(-1, ...tops.map(o => { const need = Math.ceil(Math.max(1, h - Math.round(h * o.f)) / o.power); return o.n >= need ? (o.n - need) / o.n : -1; }));
   let HH = H, top = topAt(HH);
@@ -136,7 +137,14 @@ export function rates(stage, M = 300, seed = 11) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const cmd = process.argv[2] || 'rates', M = Number(process.argv[3]) || (cmd === 'tune' ? 400 : 300);
-  if (cmd === 'tune') {
+  if (cmd === 'daily') {
+    // 오늘의 도전 맵 표: 도전 스테이지마다 씨앗 8개를 봇 M명으로 맞춰 runner-modes.js의 DAILY_TABLE 줄을 다시 쓴다(목표 깸 65% · 별 3 30%)
+    const { DAILY, DAILY_SEED } = await import('../public/modules/runner-modes.js'), table = {};
+    for (const st of DAILY.STAGES) table[st] = Array.from({ length: 8 }, (_, i) => { const sd = DAILY_SEED(st, i); return [sd, ...tuneStage(st, M, sd, { clear: 0.65, three: 0.3 })]; });
+    const file = fileURLToPath(new URL('../public/modules/runner-modes.js', import.meta.url)), src = readFileSync(file, 'utf8');
+    writeFileSync(file, src.replace(/export const DAILY_TABLE = \{.*\};/, `export const DAILY_TABLE = ${JSON.stringify(table)};`));
+    console.log('daily table', Object.keys(table).length);
+  } else if (cmd === 'tune') {
     const rows = [];
     for (let s = 1; s <= RUNNER.MAX_STAGE; s++) rows.push(tuneStage(s, M));
     const file = fileURLToPath(new URL('../public/modules/runner-rules.js', import.meta.url)), src = readFileSync(file, 'utf8');
