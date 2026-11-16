@@ -12,6 +12,7 @@
 //   - 품질 4단계(해상도 · 그리는 정령 수 · 파편 수 · 빛 겹 · 컷인 속도선)를 프레임 시간을 보고 자동으로 내린다(올리지 않음).
 // 주소 옵션: ?q=auto|3|2|1|0(높음 · 중간 · 낮음 · 최저) &clean=1 &seed=숫자 &fx=0(바탕만) &auto=0(자동 조종 끄기)
 import { ARENA_ART } from '/modules/arena-art.js';
+import { RUNNER_ART } from '/modules/runner-art.js';
 import { sfx, unlockSound, setMuted, soundState } from '/proto/runner-fx-sound.js?v=1.1';
 // 러너 사건 소리는 앱과 같은 소리 표(runner-sfx.js · rn-*.mp3)로 낸다. 나머지(기 모으기 · 불길 · 퐁 · 얼음)는 시험 페이지 합성 그대로.
 import { runnerSound, preloadRunnerSound } from '/modules/runner-sfx.js?v=1.1';
@@ -129,6 +130,7 @@ const EL_RGB = { star: '255,226,90', flame: '255,130,50', ice: '140,215,255', to
 let sky;
 const THEME = { skyTop: '#3f7fe0', skyMid: '#8cc3ff', horizon: '#e9f3ff', sea: '#f4f0ff', seaDeep: '#b9b4ef', roadA: [236, 205, 150], roadB: [222, 186, 124], rail: '#f6d36a', railDark: '#b8862d', fog: [226, 238, 255] };
 function buildSky() {
+  if (RA['bg-sky']) { sky = mk(cvs.width, cvs.height); const x = sky.getContext('2d'), im = RA['bg-sky'], sc = Math.max(cvs.width / im.width, cvs.height / im.height); x.drawImage(im, (cvs.width - im.width * sc) / 2, (cvs.height - im.height * sc) / 2, im.width * sc, im.height * sc); return; }
   sky = mk(cvs.width, cvs.height); const g = sky.getContext('2d'), W = sky.width, H = sky.height;
   let lg = g.createLinearGradient(0, 0, 0, HZ); lg.addColorStop(0, THEME.skyTop); lg.addColorStop(.7, THEME.skyMid); lg.addColorStop(1, THEME.horizon); g.fillStyle = lg; g.fillRect(0, 0, W, HZ + 1);
   radial(g, 0, [[0, 'rgba(255,252,230,1)'], [.15, 'rgba(255,240,190,.7)'], [1, 'rgba(255,240,190,0)']], W * .45, W * .72, HZ * .5);
@@ -160,6 +162,21 @@ function spiritSprite(px, body = ['#e8fbff', '#7fd8ff', '#2f86d8'], flame = '#bf
   g.fillStyle = 'rgba(255,120,160,.5)'; for (const x of [19, 45]) { g.beginPath(); g.ellipse(x, 47, 3.6, 2, 0, 0, TAU); g.fill(); }
   return c;
 }
+// 그림 74(public/assets/runner): build:assets가 RUNNER_ART에 적은 그림만 불러와 같은 자리의 코드 그림을 바꾼다(앱 runner.js와 같은 규칙).
+const RA = {}, RA_KEYS = ['spirit-run', 'spirit-fly', 'gate-good', 'gate-bad', 'gate-frame', 'rock-num', 'saw', 'hammer', 'crystal', 'cannon', 'castle-sky', 'post-sky', 'cloud-isle', 'bg-sky', 'road-sky'];
+function loadRunnerArt() { return Promise.all(RA_KEYS.filter(k => RUNNER_ART.has(k)).map(k => new Promise(res => { const im = new Image(); im.decoding = 'async'; im.onload = () => { RA[k] = im; res(); }; im.onerror = res; im.src = `/assets/runner/${k}.webp`; }))); }
+const fromRA = (k, w, h) => { const im = RA[k]; if (!im) return null; const c = mk(w, h); c.getContext('2d').drawImage(im, 0, 0, w, h); return c; };
+function outlinedRA(k, px) { const im = RA[k]; if (!im) return null; const c = mk(px, px), x = c.getContext('2d'), sil = mk(px, px), sx = sil.getContext('2d'), pad = Math.max(1, px * .045), inner = px - pad * 2; sx.drawImage(im, pad, pad, inner, inner); sx.globalCompositeOperation = 'source-in'; sx.fillStyle = '#123a6b'; sx.fillRect(0, 0, px, px); for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; x.drawImage(sil, Math.cos(a) * pad, Math.sin(a) * pad); } x.drawImage(im, pad, pad, inner, inner); return c; }
+let gateAdd = false, hammerArt = false, spiritU = .52;
+function applyRunnerArt() {
+  if (RA['spirit-run']) { const sp = Math.round(30 * S); SPR.spirit = outlinedRA('spirit-run', sp); SPR.spiritW = whiteOf(SPR.spirit); spiritU = .66; }
+  if (RA['gate-good']) { SPR.gateGood = fromRA('gate-good', 212, 150); SPR.gateBad = fromRA('gate-bad', 212, 150) || SPR.gateBad; gateAdd = true; }
+  SPR.gateFrame = fromRA('gate-frame', 96, 192);
+  if (RA['rock-num']) { SPR.rock = fromRA('rock-num', 160 * S, 150 * S); SPR.rockW = whiteOf(SPR.rock); }
+  SPR.saw = fromRA('saw', 128, 128) || SPR.saw;
+  if (RA.hammer) { SPR.hammer = fromRA('hammer', 128, 192); hammerArt = true; }
+  SPR.post = fromRA('post-sky', 48, 128) || SPR.post; SPR.cloud = fromRA('cloud-isle', 288, 192) || SPR.cloud; SPR.cannon = fromRA('cannon', 140 * S, 140 * S) || SPR.cannon;
+}
 function buildSprites() {
   // 정령 그림은 화면에 보일 크기(가까운 줄 ≈ 30 CSS px)로 한 번 만들어 둔다: 큰 그림을 매번 줄여 찍으면 CPU 캔버스에서 무겁다.
   const sp = Math.round(30 * S);
@@ -187,7 +204,7 @@ function buildSprites() {
   SPR.post = mk(40, 120); { const g = SPR.post.getContext('2d'); const lg = g.createLinearGradient(0, 0, 40, 0); lg.addColorStop(0, '#fff3c2'); lg.addColorStop(.5, THEME.rail); lg.addColorStop(1, THEME.railDark); g.fillStyle = lg; g.fillRect(10, 20, 20, 100); g.beginPath(); g.arc(20, 18, 15, 0, TAU); g.fill(); g.fillStyle = 'rgba(255,255,255,.8)'; g.beginPath(); g.arc(15, 13, 5, 0, TAU); g.fill(); }
   // 떠 있는 구름 섬(길 양옆을 지나감)
   SPR.cloud = mk(256, 140); { const g = SPR.cloud.getContext('2d'); for (const [x, y, r] of [[70, 80, 50], [120, 62, 62], [180, 82, 48], [140, 96, 52], [92, 100, 44]]) radial(g, 0, [[0, '#ffffff'], [.75, 'rgba(250,248,255,.95)'], [1, 'rgba(235,232,255,0)']], r, x, y); }
-  buildCrystal(); buildCastle(); buildCannon(); buildDigits();
+  buildCrystal(); buildCastle(); buildCannon(); buildDigits(); applyRunnerArt();
   SPR.text = new Map();
 }
 function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
@@ -199,6 +216,7 @@ function buildCrystal() {
   const path = () => { g.beginPath(); shape.forEach(([x, y], i) => i ? g.lineTo(x, y) : g.moveTo(x, y)); g.closePath(); };
   path(); g.fillStyle = 'rgba(120,210,255,.35)'; g.fill();
   if (img.pet) g.drawImage(img.pet, 40, 70, 120, 120 * img.pet.height / img.pet.width);
+  if (RA.crystal) { g.drawImage(RA.crystal, 0, 0, 200, 240); SPR.crystal = c; SPR.crystalW = whiteOf(c); return; }
   path(); const lg = g.createLinearGradient(24, 0, 176, 240); lg.addColorStop(0, 'rgba(230,250,255,.55)'); lg.addColorStop(.5, 'rgba(120,200,255,.25)'); lg.addColorStop(1, 'rgba(60,120,220,.5)'); g.fillStyle = lg; g.fill();
   g.lineWidth = 5; g.strokeStyle = '#e8fbff'; g.stroke(); g.lineWidth = 2; g.strokeStyle = 'rgba(40,110,200,.8)';
   g.beginPath(); g.moveTo(100, 6); g.lineTo(100, 234); g.moveTo(24, 70); g.lineTo(100, 110); g.lineTo(176, 70); g.moveTo(40, 200); g.lineTo(100, 110); g.lineTo(160, 200); g.stroke();
@@ -209,7 +227,9 @@ function buildCrystal() {
 const CASTLE_PX = { w: 300, h: 300 };
 let castleBase;
 function buildCastle() {
-  const W = CASTLE_PX.w * S, H = CASTLE_PX.h * S, c = mk(W, H), g = c.getContext('2d'); g.scale(S, S);
+  const W = CASTLE_PX.w * S, H = CASTLE_PX.h * S, c = mk(W, H), g = c.getContext('2d');
+  if (RA['castle-sky']) { g.drawImage(RA['castle-sky'], 0, 0, W, H); castleBase = c; SPR.castle = mk(W, H); SPR.castle.getContext('2d').drawImage(c, 0, 0); SPR.castleW = whiteOf(c); return; }
+  g.scale(S, S);
   const stone = (x, y, w, h, top) => { const lg = g.createLinearGradient(x, 0, x + w, 0); lg.addColorStop(0, '#d9d1c4'); lg.addColorStop(.5, '#bdb2a1'); lg.addColorStop(1, '#8f8474'); g.fillStyle = lg; g.fillRect(x, y, w, h); g.strokeStyle = '#4c4236'; g.lineWidth = 3; g.strokeRect(x, y, w, h); g.strokeStyle = 'rgba(76,66,54,.45)'; g.lineWidth = 1.5; for (let yy = y + 14; yy < y + h; yy += 14) { g.beginPath(); g.moveTo(x, yy); g.lineTo(x + w, yy); g.stroke(); for (let xx = x + ((yy / 14) % 2 ? 10 : 22); xx < x + w; xx += 24) { g.beginPath(); g.moveTo(xx, yy - 14); g.lineTo(xx, yy); g.stroke(); } } if (top) for (let xx = x; xx < x + w - 4; xx += 16) { g.fillStyle = '#c9bfae'; g.fillRect(xx, y - 12, 10, 12); g.strokeStyle = '#4c4236'; g.lineWidth = 2.5; g.strokeRect(xx, y - 12, 10, 12); } };
   stone(50, 110, 200, 180, true);
   stone(10, 60, 70, 230, true); stone(220, 60, 70, 230, true); stone(115, 30, 70, 120, true);
@@ -637,15 +657,28 @@ function drawRoad() {
     const col = `rgb(${lerp(base[0], THEME.fog[0], fog) | 0},${lerp(base[1], THEME.fog[1], fog) | 0},${lerp(base[2], THEME.fog[2], fog) | 0})`;
     // 난간(금색 띠) → 길
     ctx.fillStyle = fog > .6 ? '#e8e2d0' : THEME.rail; ctx.beginPath(); ctx.moveTo(lxB, yB); ctx.lineTo(rxB, yB); ctx.lineTo(rxA, yA); ctx.lineTo(lxA, yA); ctx.fill();
+    if (RA['road-sky']) continue;   // 그림 74 길 타일: 아래에서 띠로 깐다
     const iB = rail * sB, iA = rail * sA;
     ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(lxB + iB, yB); ctx.lineTo(rxB - iB, yB); ctx.lineTo(rxA - iA, yA); ctx.lineTo(lxA + iA, yA); ctx.fill();
     // 판자 이음새 한 줄
     ctx.fillStyle = `rgba(120,80,40,${.25 * (1 - fog)})`; ctx.fillRect(lxB + iB, yB, rxB - lxB - iB * 2, Math.max(1, .05 * sB));
   }
-  // 다리 밑면(두께): 가장 가까운 줄 아래 짙은 띠
+  if (RA['road-sky']) roadTiled(RA['road-sky']);
   // 난간 기둥(6단위마다, 품질별 개수)
   const p0 = Math.ceil((cam.z + 1.5) / 6) * 6;
   for (let i = T.posts - 1; i >= 0; i--) { const zz = p0 + i * 6; for (const sd of [-1, 1]) if (proj(sd * (ROAD + .18), 0, zz)) { const w = .45 * PS, h = 1.3 * PS; ctx.drawImage(SPR.post, PX - w / 2, PY - h, w, h); } }
+}
+// 길 타일: 화면을 가로 띠로 나눠 띠마다 그 깊이의 길 폭 · 타일 줄을 잘라 찍는다(앱 runner.js drawRoadTiled와 같은 방식)
+function roadTiled(im) {
+  const K = F * (cam.zoom + cam.punch), iw = im.width, ih = im.height, TZ = 4, fr = v => v - Math.floor(v), yTop = HZ + cam.h * K / 90, yBot = Math.min(cvs.height, HZ + cam.h * K / .8), band = [12, 9, 7, 5][tier] * S;
+  for (let y = yTop; y < yBot; y += band) {
+    const y2 = Math.min(yBot, y + band), dzm = cam.h * K / ((y + y2) * .5 - HZ), half = ROAD * K / dzm, x0 = CX - cam.x * K / dzm - half, w = half * 2;
+    const za = cam.z + cam.h * K / (y - HZ), zb = cam.z + cam.h * K / (y2 - HZ);
+    if (za - zb >= TZ) { ctx.drawImage(im, 0, 0, iw, ih, x0, y, w, y2 - y + 1); continue; }
+    const ra = (1 - fr(za / TZ)) * ih, rb = (1 - fr(zb / TZ)) * ih;
+    if (rb > ra) ctx.drawImage(im, 0, ra, iw, Math.max(.5, rb - ra), x0, y, w, y2 - y + 1);
+    else { const t = (ih - ra) / (ih - ra + rb), ys = y + (y2 - y) * t; if (ih - ra > .5) ctx.drawImage(im, 0, ra, iw, ih - ra, x0, y, w, ys - y + 1); if (rb > .5) ctx.drawImage(im, 0, 0, iw, rb, x0, ys, w, y2 - ys + 1); }
+  }
 }
 function drawObj(o, dt, cx, z) {
   if (o.type === 'gate') return drawGate(o, dt);
@@ -653,7 +686,8 @@ function drawObj(o, dt, cx, z) {
   if (o.type === 'saw') { if (!proj(o.x, .75, o.z)) return; const r = o.r * PS; // 레일 + 톱날
     const y0 = PY; proj(-ROAD, .05, o.z); const lx = PX, ly = PY; proj(ROAD, .05, o.z); ctx.fillStyle = 'rgba(60,60,80,.55)'; ctx.fillRect(lx, ly - .06 * PS, PX - lx, .12 * PS); proj(o.x, .75, o.z);
     ctx.save(); ctx.translate(PX, y0); ctx.rotate(clock * 14); ctx.drawImage(SPR.saw, -r, -r, r * 2, r * 2); ctx.restore(); return; }
-  if (o.type === 'hammer') { const L = 3, ang = lerp(o.prevA, o.a, .5); if (!proj(o.x, 4.2, o.z)) return; const px = PX, py = PY; proj(o.x + Math.sin(ang) * L, 4.2 - Math.cos(ang) * L, o.z); const hx = PX, hy = PY, s2 = PS;
+  if (o.type === 'hammer') { const L = 3, ang = lerp(o.prevA, o.a, .5); if (!proj(o.x, 4.2, o.z)) return; const px = PX, py = PY;
+    if (hammerArt) { const hh = (L + .9) * PS, hw = hh * 192 / 288; ctx.save(); ctx.translate(px, py); ctx.rotate(ang); ctx.drawImage(SPR.hammer, -hw / 2, -hh * .1, hw, hh); ctx.restore(); return; } proj(o.x + Math.sin(ang) * L, 4.2 - Math.cos(ang) * L, o.z); const hx = PX, hy = PY, s2 = PS;
     ctx.strokeStyle = '#6b4520'; ctx.lineWidth = .22 * s2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(hx, hy); ctx.stroke();
     ctx.fillStyle = '#4a3a2a'; ctx.beginPath(); ctx.arc(px, py, .25 * s2, 0, TAU); ctx.fill();
     ctx.save(); ctx.translate(hx, hy); ctx.rotate(ang); const w = 1.8 * s2, h = 1.2 * s2; ctx.drawImage(SPR.hammer, -w / 2, -h / 2, w, h); ctx.restore(); return; }
@@ -674,7 +708,7 @@ function drawGate(o, dt) {
     proj(x0, 2.6, o.z); const ax = PX, ay = PY; proj(x1, 0, o.z); const bx = PX, by = PY, sc = PS;
     const chosen = o.passed === side, a = (o.passed ? (chosen ? fade : fade * .4) : 1);
     const grow = chosen ? 1 + o.passT * .6 : 1, cxm = (ax + bx) / 2, cym = (ay + by) / 2, w = (bx - ax) * grow, h = (by - ay) * grow;
-    ctx.globalAlpha = a; ctx.drawImage(good(val[0]) ? SPR.gateGood : SPR.gateBad, cxm - w / 2, cym - h / 2, w, h);
+    ctx.globalAlpha = a; if (gateAdd) ctx.globalCompositeOperation = 'lighter'; ctx.drawImage(good(val[0]) ? SPR.gateGood : SPR.gateBad, cxm - w / 2, cym - h / 2, w, h); ctx.globalCompositeOperation = 'source-over';
     drawNum(good(val[0]) ? 'good' : 'bad', val[0] + val[1], cxm, cym, Math.min(1.8, sc / 34) * grow, a);
     ctx.globalAlpha = 1;
   }
@@ -722,7 +756,7 @@ function drawCrowd(dt, cx, z) {
   // 그림자(높음만, 정령 수만큼 그리지 않고 무리 전체 한 장)
   const R = crowdR(s.n);
   if (proj(cx, 0, z)) { const w = (R * 2 + .8) * PS; ctx.globalAlpha = .55; ctx.drawImage(SPR.shadow, PX - w / 2, PY - w * .14, w, w * .32); ctx.globalAlpha = 1; }
-  const spr = SPR.spirit, scale = .52;
+  const spr = SPR.spirit, scale = spiritU;
   for (let oi = 0; oi < DRAW_MAX; oi++) {
     const i = ORDER[oi]; if (i >= shown) continue;
     SOX[i] += (TOX[i] - SOX[i]) * spring; SOZ[i] += (TOZ[i] - SOZ[i]) * spring; if (POP[i] < 1) POP[i] = Math.min(1, POP[i] + dt * 3.5);
@@ -763,7 +797,7 @@ function drawFlyers(dt) {
       swapOut(FL, j, --FL.n, FKEYS); continue; }
     if (dt) { FL.vy[j] -= (FL.kind[j] ? 15.7 : 18) * dt; FL.x[j] += FL.vx[j] * dt; FL.y[j] += FL.vy[j] * dt; FL.z[j] += FL.vz[j] * dt; FL.rot[j] += FL.vr[j] * dt; } }
   const spr = SPR.spirit;
-  for (let j = 0; j < FL.n; j++) { if (!proj(FL.x[j], FL.y[j], FL.z[j])) continue; const sz = .52 * PS, a = FL.kind[j] ? 1 : Math.min(1, FL.life[j] / FL.max[j] * 1.5), c2 = Math.cos(FL.rot[j]), sn = Math.sin(FL.rot[j]), iw = sz / spr.width;
+  for (let j = 0; j < FL.n; j++) { if (!proj(FL.x[j], FL.y[j], FL.z[j])) continue; const sz = spiritU * PS, a = FL.kind[j] ? 1 : Math.min(1, FL.life[j] / FL.max[j] * 1.5), c2 = Math.cos(FL.rot[j]), sn = Math.sin(FL.rot[j]), iw = sz / spr.width;
     ctx.globalAlpha = a; ctx.setTransform(c2 * iw, sn * iw, -sn * iw, c2 * iw, PX, PY); ctx.drawImage(FL.kind[j] ? spr : SPR.spiritW, -spr.width / 2, -spr.height / 2); }
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
 }
@@ -915,7 +949,7 @@ preloadRunnerSound(); addEventListener('pointerdown', preloadRunnerSound, { once
 addEventListener('keydown', unlockSound);
 addEventListener('resize', () => { resize(); crackCastleRedo(); });
 
-await Promise.all([loadImg('pet', `/assets/pets/${PET.key}-3.webp`), loadImg('mon', '/assets/monsters/alarmwolf.webp'), loadMatArt(), document.fonts.load('20px Jua', '0123 구출공성전'), document.fonts.load('20px Jua', '0123+×−')]).catch(() => {});
+await Promise.all([loadRunnerArt(), loadImg('pet', `/assets/pets/${PET.key}-3.webp`), loadImg('mon', '/assets/monsters/alarmwolf.webp'), loadMatArt(), document.fonts.load('20px Jua', '0123 구출공성전'), document.fonts.load('20px Jua', '0123+×−')]).catch(() => {});
 buildMats(); stats.matArt = matFromArt.size;
 resetSim(); resize(); cam.z = S0.z - cam.back; markButtons(); stats.tier = tier;
 stats.canvasMB = () => Math.round([cvs, sky, SPR.castle, castleBase, SPR.crystal].reduce((a, c) => a + c.width * c.height * 4, 0) / 1048576 * 10) / 10;

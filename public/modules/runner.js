@@ -3,7 +3,7 @@ import { coin } from './emblems.js';
 import { avatar } from './character.js';
 import { openSheet } from './sheet.js';
 import { CHARACTERS } from './core.js';
-import { RUNNER, PET_SKILL, cardName, CARDS, makeMap, runInit, runTick, runPick, recorder, quantTx, crowdR, tri, goodGate, isBoss, stageTarget } from './runner-rules.js';
+import { RUNNER, PET_SKILL, cardName, CARDS, theme, makeMap, runInit, runTick, runPick, recorder, quantTx, crowdR, tri, goodGate, isBoss, stageTarget } from './runner-rules.js';
 import { RUNNER_ART, RUNNER_SFX } from './runner-art.js';
 import { ARENA_ART } from './arena-art.js';
 
@@ -49,16 +49,16 @@ function lobby() {
   const nodes = [];
   for (let s = 1; s <= v.stages; s++) {
     const n = starAt(v, s), lock = s > open, boss = isBoss(s);
-    nodes.push(`<button type="button" class="rn-node${lock ? ' lock' : ''}${boss ? ' boss' : ''}${s === R.sel ? ' sel' : ''}${n ? ' done' : ''}" data-rn="pick" data-s="${s}" ${lock ? 'disabled' : ''} aria-label="${s}스테이지${lock ? ' 잠김' : ` 별 ${n}개`}">
+    nodes.push(`<button type="button" class="rn-node${art('map-node') ? ' art' : ''}${lock ? ' lock' : ''}${boss ? ' boss' : ''}${s === R.sel ? ' sel' : ''}${n ? ' done' : ''}" data-rn="pick" data-s="${s}" ${lock ? 'disabled' : ''} aria-label="${s}스테이지${lock ? ' 잠김' : ` 별 ${n}개`}">
       <b>${s}</b>${lock ? '<i class="rn-lock" aria-hidden="true"></i>' : starRow(n)}</button>`);
   }
   const s = R.sel, cheer = v.cheer?.stage === s ? v.cheer.bonus : 0, tg = stageTarget(s);
-  root().innerHTML = `<div class="session-app rn-app" id="rn-app"><header class="rn-top"><button type="button" class="yb-back" data-rn="exit" aria-label="나가기">${icon('back')}</button><strong>펫 대행진</strong>
+  root().innerHTML = `<div class="session-app rn-app" id="rn-app"${art('map-node') ? ` style="--rn-node:url(${art('map-node')})"` : ''}><header class="rn-top"><button type="button" class="yb-back" data-rn="exit" aria-label="나가기">${icon('back')}</button><strong>펫 대행진</strong>
       <span class="rn-chip" title="오늘 받은 코인">${coin()}<b>${num(v.coin_today)}/${num(v.coin_daily)}</b></span><button type="button" class="rn-chip rn-board" data-rn="board">반 순위</button></header>
     <main class="rn-main">
       <section class="rn-hero"><div class="rn-hero-sky" aria-hidden="true"><i></i><i></i><i></i></div>
         <h1>하늘 다리</h1><p>좌우로 끌어 숫자 문을 고르고, 바위를 쏴 깨고, 갇힌 내 펫을 구한 뒤 대포로 성을 무너뜨려요!</p>
-        <div class="rn-total"><span>${starRow(3, 'big')}<b>${num(v.total)}</b><small>/ ${v.stages * 3}</small></span>${v.box ? `<span class="rn-box">오늘 첫 판 상자 +${v.box_coins}</span>` : ''}</div></section>
+        <div class="rn-total"><span>${starRow(3, 'big')}<b>${num(v.total)}</b><small>/ ${v.stages * 3}</small></span>${v.box ? `<span class="rn-box">${art('daily-chest') ? `<img src="${art('daily-chest')}" alt="" draggable="false">` : ''}오늘 첫 판 상자 +${v.box_coins}</span>` : ''}</div></section>
       <section class="rn-map" aria-label="스테이지 지도">${nodes.join('')}</section>
       <section class="rn-go-panel">
         <div><strong>${s}스테이지${isBoss(s) ? ' · 보스 성' : ''}</strong><small>${starAt(v, s) ? `내 최고 ${starRow(starAt(v, s))}` : '처음 도전'}${cheer ? ` · 응원 정령 +${Math.round(cheer * 100)}%` : ''}</small></div>
@@ -95,7 +95,7 @@ async function startGame(stage) {
   catch (err) { R.busy = false; toast(err.message || '시작하지 못했어요.'); return lobby(); }
   if (res.runner) R.v = res.runner;
   // 판에 쓸 그림(구출 펫 · 그림 74 · 재료)을 디코드까지 기다린다(최대 1.8초): 판 첫 몇 초에 처음 그리기 비용이 몰리지 않게
-  await Promise.race([warmArt(res.pet?.key, res.pet?.form).catch(() => {}), new Promise(r => setTimeout(r, 1800))]);
+  await Promise.race([warmArt(res.pet?.key, res.pet?.form, theme(res.stage)).catch(() => {}), new Promise(r => setTimeout(r, 1800))]);
   R.busy = false;
   if (!R) return;
   playGame(res);
@@ -129,10 +129,14 @@ function getImg(src) {
   p = new Promise(res => { const im = new Image(); im.decoding = 'async'; im.onload = () => (im.decode ? im.decode().catch(() => {}) : Promise.resolve()).then(() => { READY.set(src, im); res(im); }); im.onerror = () => res(null); im.src = src; });
   IMGS.set(src, p); return p;
 }
-const ART_KEYS = ['spirit-run', 'gate-good', 'gate-bad', 'rock-num', 'saw', 'hammer', 'crystal', 'cannon', 'bg-sky', 'post-sky', 'cloud-isle', 'castle-sky'];
+// 그림 74: 공통 그림 + 테마 그림(bg · road · post · castle-<테마>). 스테이지 1~25는 하늘 다리(sky).
+const ART_KEYS = ['spirit-run', 'spirit-fly', 'spirit-hurt', 'spirit-cheer', 'gate-good', 'gate-bad', 'gate-burst', 'gate-frame', 'rock-num', 'saw', 'hammer', 'crystal', 'cannon', 'cannon-fire', 'castle-chunk-a', 'castle-chunk-b', 'cloud-isle'];
+// 그림을 효과 재료 칸으로도 쓰는 것: 문 통과 빛 · 대포 불꽃(검은 배경 → 더하기), 성 조각(파편)
+const ART_MAT = { 'gate-burst': 'gate-burst', 'cannon-fire': 'cannon-fire', 'castle-chunk-a': 'chunk-a', 'castle-chunk-b': 'chunk-b' };
+const themeKeys = th => ['bg', 'road', 'post', 'castle'].map(k => `${k}-${th}`);
 const MAT_KEYS = ['glow', 'ring', 'burst', 'flame', 'ember', 'star', 'stardust', 'speed', 'rock-a', 'rock-b', 'shard', 'smoke', 'dust'];
-const artSrcs = () => [...ART_KEYS.filter(k => art(k)).map(art), ...MAT_KEYS.filter(k => ARENA_ART.has('mat-' + k)).map(k => `/assets/arena/mat-${k}.webp`)];
-function warmArt(petKey = null, form = 3) { return Promise.all([...artSrcs(), ...(petKey ? [petSrc(petKey, form)] : [])].map(getImg)); }
+const artSrcs = (th = 'sky') => [...ART_KEYS.concat(themeKeys(th)).filter(k => art(k)).map(art), ...MAT_KEYS.filter(k => ARENA_ART.has('mat-' + k)).map(k => `/assets/arena/mat-${k}.webp`)];
+function warmArt(petKey = null, form = 3, th = 'sky') { return Promise.all([...artSrcs(th), ...(petKey ? [petSrc(petKey, form)] : [])].map(getImg)); }
 let G = null;   // 게임 상태
 function closeGame() {
   if (!G) return;
@@ -144,7 +148,7 @@ function closeGame() {
 function playGame(start) {
   closeGame();
   const map = makeMap(start.stage), pet = start.pet || {};
-  root().innerHTML = `<div class="rn-game" id="rn-game"><canvas id="rn-cvs"></canvas>
+  root().innerHTML = `<div class="rn-game" id="rn-game"${art('card-frame') ? ` style="--rn-card:url(${art('card-frame')})"` : ''}><canvas id="rn-cvs"></canvas>
     <div class="rn-veil" id="rn-tint"></div><div class="rn-veil rn-vig" id="rn-vig"></div><div class="rn-veil" id="rn-flash"></div>
     <header class="rn-hud"><button type="button" class="rn-x" data-g="quit" aria-label="그만하기">${icon('close')}</button><div class="rn-hud-mid"><b>${start.stage}스테이지${isBoss(start.stage) ? ' · 보스 성' : ''}</b><div class="rn-prog"><i id="rn-prog"></i><em class="rn-prog-castle${isBoss(start.stage) ? ' boss' : ''}" aria-hidden="true"></em></div></div><div class="rn-hud-r"><span class="rn-count" id="rn-count" aria-label="정령 수"><i aria-hidden="true"></i><b id="rn-count-n">${num(start.start)}</b></span><small id="rn-hint">끌어서 조종</small></div></header>
     <div class="rn-cards" id="rn-cards" aria-live="polite"></div>
@@ -184,6 +188,7 @@ function onGameClick(b) {
 
 /* ---------- 엔진: 카메라 · 그림 · 풀 (연출 시험 페이지와 같은 방식) ---------- */
 function initEngine(g) {
+  g.th = g.map.theme;
   g.cam = { z: -8.5, x: 0, h: 8, zoom: 1, back: 8.5, trauma: 0, punch: 0 };
   g.img = {}; g.mat = {}; g.tintCache = new Map(); g.SPR = {};
   g.pools = {
@@ -199,8 +204,8 @@ function initEngine(g) {
   g.slot = { ox: new Float32Array(DRAW_MAX), oz: new Float32Array(DRAW_MAX), pop: new Float32Array(DRAW_MAX) }; g.shown = 0;
   buildMats(g);
   resize(g);
-  const want = [['pet', petSrc(g.pet.key, g.pet.form)], ...ART_KEYS.filter(k => art(k)).map(k => [k, art(k)]), ...MAT_KEYS.filter(k => ARENA_ART.has('mat-' + k)).map(k => ['mat:' + k, `/assets/arena/mat-${k}.webp`])];
-  const use = (k, im) => { if (!im) return; if (k.startsWith('mat:')) { const c = mk(im.width, im.height); c.getContext('2d').drawImage(im, 0, 0); g.mat[k.slice(4)] = c; g.matArt.add(k.slice(4)); g.tintCache.clear(); } else g.img[k] = im; };
+  const want = [['pet', petSrc(g.pet.key, g.pet.form)], ...ART_KEYS.concat(themeKeys(g.th)).filter(k => art(k)).map(k => [k, art(k)]), ...MAT_KEYS.filter(k => ARENA_ART.has('mat-' + k)).map(k => ['mat:' + k, `/assets/arena/mat-${k}.webp`])];
+  const use = (k, im) => { if (!im) return; if (k.startsWith('mat:')) { const c = mk(im.width, im.height); c.getContext('2d').drawImage(im, 0, 0); g.mat[k.slice(4)] = c; g.matArt.add(k.slice(4)); g.tintCache.clear(); } else { g.img[k] = im; if (ART_MAT[k]) { const c = mk(im.width, im.height); c.getContext('2d').drawImage(im, 0, 0); g.mat[ART_MAT[k]] = c; } } };
   let late = false;
   for (const [k, src] of want) { const im = READY.get(src); if (im) use(k, im); else { late = true; getImg(src).then(im2 => { if (G !== g || !im2) return; use(k, im2); buildSprites(g); buildSky(g); prebake(g); }); } }
   if (!late || g.img.pet || g.matArt.size) { buildSprites(g); buildSky(g); }
@@ -257,7 +262,7 @@ const MATS = {
   smoke: ['luma', 256, c => puff(c, 256, 7)],
   dust: ['luma', 256, c => { c.setTransform(1, 0, 0, .58, 0, 54); puff(c, 256, 9); }]
 };
-function buildMats(g) { g.matArt = new Set(); for (const [k, [, size, draw, h]] of Object.entries(MATS)) { const c = mk(size, h || size); draw(c.getContext('2d')); g.mat[k] = c; } }
+function buildMats(g) { g.matArt = new Set(); for (const [k, [, size, draw, h]] of Object.entries(MATS)) { const c = mk(size, h || size); draw(c.getContext('2d')); g.mat[k] = c; } g.mat['gate-burst'] = g.mat.burst; g.mat['cannon-fire'] = g.mat.burst; g.mat['chunk-a'] = g.mat['rock-a']; g.mat['chunk-b'] = g.mat['rock-b']; }
 function tint(g, k, rgb) {
   // 이름 → 색 → 그림 두 단 캐시(프레임마다 키 문자열을 만들지 않는다)
   let m = g.tintCache.get(k); if (!m) g.tintCache.set(k, m = new Map()); let c = m.get(rgb); if (c) return c;
@@ -268,13 +273,22 @@ function tint(g, k, rgb) {
 }
 function buildSky(g) {
   const W = g.cvs.width, H = g.cvs.height, HZ = g.HZ, c = mk(W, H), x = c.getContext('2d');
-  if (g.img['bg-sky']) { const im = g.img['bg-sky'], sc = Math.max(W / im.width, H / im.height); x.drawImage(im, (W - im.width * sc) / 2, (H - im.height * sc) / 2, im.width * sc, im.height * sc); g.sky = c; return; }
+  g.fogGrad = g.ctx.createLinearGradient(0, HZ, 0, HZ + H * .2); g.fogGrad.addColorStop(0, 'rgba(226,238,255,.85)'); g.fogGrad.addColorStop(1, 'rgba(226,238,255,0)');
+  if (g.img['bg-' + g.th]) { const im = g.img['bg-' + g.th], sc = Math.max(W / im.width, H / im.height); x.drawImage(im, (W - im.width * sc) / 2, (H - im.height * sc) / 2, im.width * sc, im.height * sc); g.sky = c; return; }
   let lg = x.createLinearGradient(0, 0, 0, HZ); lg.addColorStop(0, THEME.skyTop); lg.addColorStop(.7, THEME.skyMid); lg.addColorStop(1, THEME.horizon); x.fillStyle = lg; x.fillRect(0, 0, W, HZ + 1);
   radial(x, 0, [[0, 'rgba(255,252,230,1)'], [.15, 'rgba(255,240,190,.7)'], [1, 'rgba(255,240,190,0)']], W * .45, W * .72, HZ * .5);
   lg = x.createLinearGradient(0, HZ, 0, H); lg.addColorStop(0, THEME.horizon); lg.addColorStop(.25, THEME.sea); lg.addColorStop(1, THEME.seaDeep); x.fillStyle = lg; x.fillRect(0, HZ, W, H - HZ);
   for (let i = 0; i < 26; i++) radial(x, 0, [[0, 'rgba(255,255,255,.85)'], [1, 'rgba(255,255,255,0)']], (.04 + (i * 7 % 6) / 100) * W, ((i * 0.618) % 1.2 - .1) * W, HZ - (i * 13 % 10) / 30 * HZ);
   for (let i = 0; i < 46; i++) { const t = (i * 0.382) % 1, y = HZ + t * t * (H - HZ), r = (.03 + t * .16) * W; radial(x, 0, [[0, 'rgba(255,255,255,.7)'], [.6, 'rgba(248,246,255,.35)'], [1, 'rgba(240,238,255,0)']], r, ((i * 0.737) % 1.2 - .1) * W, y); }
   g.sky = c;
+}
+// 정령 그림 + 남색 테두리(8방향으로 실루엣을 찍고 그 위에 그림): 나무 길 · 구름 위에서도 32px 정령이 또렷하게
+function outlined(g, k, px) {
+  const im = g.img[k]; if (!im) return null;
+  const c = mk(px, px), x = c.getContext('2d'), sil = mk(px, px), sx = sil.getContext('2d'), pad = Math.max(1, px * .045), inner = px - pad * 2;
+  sx.drawImage(im, pad, pad, inner, inner); sx.globalCompositeOperation = 'source-in'; sx.fillStyle = '#123a6b'; sx.fillRect(0, 0, px, px);
+  for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; x.drawImage(sil, Math.cos(a) * pad, Math.sin(a) * pad); }
+  x.drawImage(im, pad, pad, inner, inner); return c;
 }
 function fromImg(g, k, w, h) { const im = g.img[k]; if (!im) return null; const c = mk(w, h); c.getContext('2d').drawImage(im, 0, 0, w, h); return c; }
 function whiteOf(c) { const w = mk(c.width, c.height), x = w.getContext('2d'); x.drawImage(c, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#fff'; x.fillRect(0, 0, w.width, w.height); return w; }
@@ -292,20 +306,25 @@ function spiritSprite(px, body = ['#e8fbff', '#7fd8ff', '#2f86d8'], flame = '#bf
 }
 function buildSprites(g) {
   const S = g.S2, P = g.SPR, sp = Math.round(30 * S);
-  P.spirit = fromImg(g, 'spirit-run', sp, sp) || spiritSprite(sp); P.spiritW = whiteOf(P.spirit);
+  P.spirit = outlined(g, 'spirit-run', sp) || spiritSprite(sp); P.spiritW = whiteOf(P.spirit);
+  P.spiritFly = outlined(g, 'spirit-fly', sp) || P.spirit; P.spiritHurt = outlined(g, 'spirit-hurt', sp) || P.spiritW;
+  g.spiritU = g.img['spirit-run'] ? .66 : .52;   // 그림 정령은 조금 크게(그림 안 여백 · 32px에서 읽히게)
+  // 그림 74 문 판(gate-good · bad)은 검은 배경 빛 그림 → 더하기 섞기로 그린다(gateAdd). 가운데 기둥은 gate-frame.
+  g.gateAdd = !!g.img['gate-good']; P.gateFrame = g.img['gate-frame'] ? fromImg(g, 'gate-frame', 96, 192) : null;
   const sh = mk(64, 32), sx = sh.getContext('2d'), gr = sx.createRadialGradient(32, 16, 0, 32, 16, 32); gr.addColorStop(0, 'rgba(40,40,80,.4)'); gr.addColorStop(1, 'rgba(40,40,80,0)'); sx.setTransform(1, 0, 0, .5, 0, 8); sx.fillStyle = gr; sx.fillRect(0, -16, 64, 64); P.shadow = sh;
   P.pet = g.img.pet ? shrink(g.img.pet, Math.round(96 * S)) : null;
   P.petBig = g.img.pet ? shrink(g.img.pet, Math.round(Math.min(g.cssW * .8, 300) * S)) : null;
   P.rock = fromImg(g, 'rock-num', 160 * S, 150 * S); if (!P.rock) { P.rock = mk(160 * S, 150 * S); const x = P.rock.getContext('2d'); x.scale(S * 160 / 128, S * 150 / 128); rock(x, 128, '#9b8b78', .92); }
   P.rockW = whiteOf(P.rock);
   for (const [k, c1, c2, edge] of [['gate-good', 'rgba(70,170,255,.62)', 'rgba(40,120,240,.35)', '#bfe6ff'], ['gate-bad', 'rgba(255,90,100,.62)', 'rgba(220,40,70,.35)', '#ffc4c4']]) {
-    P[k] = fromImg(g, k, 200, 150); if (P[k]) continue;
+    P[k] = fromImg(g, k, 212, 150); if (P[k]) continue;
     const c = mk(200, 150), x = c.getContext('2d'), lg = x.createLinearGradient(0, 0, 0, 150); lg.addColorStop(0, c1); lg.addColorStop(1, c2); x.fillStyle = lg; roundRect(x, 4, 4, 192, 142, 14); x.fill(); x.lineWidth = 6; x.strokeStyle = edge; x.stroke(); x.fillStyle = 'rgba(255,255,255,.28)'; roundRect(x, 14, 12, 172, 22, 10); x.fill(); P[k] = c;
   }
   P.saw = fromImg(g, 'saw', 128, 128); if (!P.saw) { P.saw = mk(128, 128); const x = P.saw.getContext('2d'); x.translate(64, 64); x.fillStyle = '#d7dde6'; x.strokeStyle = '#3b4250'; x.lineWidth = 3; x.beginPath(); for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; x.lineTo(Math.cos(a) * 60, Math.sin(a) * 60); x.lineTo(Math.cos(a + .2) * 46, Math.sin(a + .2) * 46); } x.closePath(); x.fill(); x.stroke(); const r2 = x.createRadialGradient(-10, -10, 4, 0, 0, 44); r2.addColorStop(0, '#fff'); r2.addColorStop(1, '#8b96a8'); x.fillStyle = r2; x.beginPath(); x.arc(0, 0, 40, 0, TAU); x.fill(); x.fillStyle = '#e04848'; x.beginPath(); x.arc(0, 0, 12, 0, TAU); x.fill(); x.stroke(); }
-  P.hammer = fromImg(g, 'hammer', 160, 110); if (!P.hammer) { P.hammer = mk(160, 110); const x = P.hammer.getContext('2d'), lg = x.createLinearGradient(0, 0, 0, 110); lg.addColorStop(0, '#ffcf6b'); lg.addColorStop(1, '#a8621a'); x.fillStyle = lg; x.strokeStyle = '#4a2a08'; x.lineWidth = 5; roundRect(x, 6, 8, 148, 94, 18); x.fill(); x.stroke(); x.fillStyle = 'rgba(255,255,255,.35)'; roundRect(x, 18, 16, 124, 18, 9); x.fill(); }
-  P.post = fromImg(g, 'post-sky', 40, 120); if (!P.post) { P.post = mk(40, 120); const x = P.post.getContext('2d'), lg = x.createLinearGradient(0, 0, 40, 0); lg.addColorStop(0, '#fff3c2'); lg.addColorStop(.5, THEME.rail); lg.addColorStop(1, THEME.railDark); x.fillStyle = lg; x.fillRect(10, 20, 20, 100); x.beginPath(); x.arc(20, 18, 15, 0, TAU); x.fill(); }
-  P.cloud = fromImg(g, 'cloud-isle', 256, 140); if (!P.cloud) { P.cloud = mk(256, 140); const x = P.cloud.getContext('2d'); for (const [cx, cy, r] of [[70, 80, 50], [120, 62, 62], [180, 82, 48], [140, 96, 52], [92, 100, 44]]) radial(x, 0, [[0, '#fff'], [.75, 'rgba(250,248,255,.95)'], [1, 'rgba(235,232,255,0)']], r, cx, cy); }
+  // 망치 그림(손잡이 위 · 머리 아래 한 장)이 오면 통째로 돌린다(hammerArt)
+  g.hammerArt = !!g.img.hammer; P.hammer = g.hammerArt ? fromImg(g, 'hammer', 128, 192) : null; if (!P.hammer) { P.hammer = mk(160, 110); const x = P.hammer.getContext('2d'), lg = x.createLinearGradient(0, 0, 0, 110); lg.addColorStop(0, '#ffcf6b'); lg.addColorStop(1, '#a8621a'); x.fillStyle = lg; x.strokeStyle = '#4a2a08'; x.lineWidth = 5; roundRect(x, 6, 8, 148, 94, 18); x.fill(); x.stroke(); x.fillStyle = 'rgba(255,255,255,.35)'; roundRect(x, 18, 16, 124, 18, 9); x.fill(); }
+  P.post = fromImg(g, 'post-' + g.th, 48, 128); if (!P.post) { P.post = mk(40, 120); const x = P.post.getContext('2d'), lg = x.createLinearGradient(0, 0, 40, 0); lg.addColorStop(0, '#fff3c2'); lg.addColorStop(.5, THEME.rail); lg.addColorStop(1, THEME.railDark); x.fillStyle = lg; x.fillRect(10, 20, 20, 100); x.beginPath(); x.arc(20, 18, 15, 0, TAU); x.fill(); }
+  P.cloud = fromImg(g, 'cloud-isle', 288, 192); if (!P.cloud) { P.cloud = mk(256, 140); const x = P.cloud.getContext('2d'); for (const [cx, cy, r] of [[70, 80, 50], [120, 62, 62], [180, 82, 48], [140, 96, 52], [92, 100, 44]]) radial(x, 0, [[0, '#fff'], [.75, 'rgba(250,248,255,.95)'], [1, 'rgba(235,232,255,0)']], r, cx, cy); }
   // 수정 감옥(안에 구출할 내 펫)
   { const W = 200 * S, H = 240 * S, c = mk(W, H), x = c.getContext('2d'); x.scale(S, S);
     const shape = [[100, 6], [176, 70], [160, 200], [100, 234], [40, 200], [24, 70]], path = () => { x.beginPath(); shape.forEach(([a, b], i) => i ? x.lineTo(a, b) : x.moveTo(a, b)); x.closePath(); };
@@ -324,7 +343,7 @@ function buildSprites(g) {
 }
 function buildCastle(g) {
   const S = g.S2, W = 300 * S, H = 300 * S, c = mk(W, H), x = c.getContext('2d');
-  if (g.img['castle-sky']) x.drawImage(g.img['castle-sky'], 0, 0, W, H);
+  if (g.img['castle-' + g.th]) x.drawImage(g.img['castle-' + g.th], 0, 0, W, H);
   else {
     x.scale(S, S);
     const stone = (sx, sy, w, h) => { const lg = x.createLinearGradient(sx, 0, sx + w, 0); lg.addColorStop(0, '#d9d1c4'); lg.addColorStop(.5, '#bdb2a1'); lg.addColorStop(1, '#8f8474'); x.fillStyle = lg; x.fillRect(sx, sy, w, h); x.strokeStyle = '#4c4236'; x.lineWidth = 3; x.strokeRect(sx, sy, w, h); x.strokeStyle = 'rgba(76,66,54,.45)'; x.lineWidth = 1.5; for (let yy = sy + 14; yy < sy + h; yy += 14) { x.beginPath(); x.moveTo(sx, yy); x.lineTo(sx + w, yy); x.stroke(); } for (let xx = sx; xx < sx + w - 4; xx += 16) { x.fillStyle = '#c9bfae'; x.fillRect(xx, sy - 12, 10, 12); x.strokeStyle = '#4c4236'; x.lineWidth = 2.5; x.strokeRect(xx, sy - 12, 10, 12); } };
@@ -397,7 +416,7 @@ function syncCrowd(g, fromX, fromZ) {
 }
 
 /* ---------- 풀에 넣기 ---------- */
-function addDebris(g, x, y, z, n, kind = 0, power = 1) { const D = g.pools.D; n = Math.round(n * g.T.mult); for (let i = 0; i < n; i++) { if (D.n >= g.T.debris * g.capK) return; const j = D.n++, a = rnd() * TAU, sp = rr(.2, 1) * 7 * power; D.x[j] = x + rr(-.3, .3); D.y[j] = y + rr(0, .4); D.z[j] = z + rr(-.3, .3); D.vx[j] = Math.cos(a) * sp; D.vz[j] = Math.sin(a) * sp * .8 - rr(0, 4) * power; D.vy[j] = rr(4, 11) * power; D.rot[j] = rnd() * TAU; D.vr[j] = rr(-12, 12); D.max[j] = D.life[j] = rr(1, 1.8); D.size[j] = rr(.18, .5); D.kind[j] = kind; } }
+function addDebris(g, x, y, z, n, kind = 0, power = 1) { const D = g.pools.D; n = Math.round(n * g.T.mult); for (let i = 0; i < n; i++) { if (D.n >= g.T.debris * g.capK) return; const j = D.n++, a = rnd() * TAU, sp = rr(.2, 1) * 7 * power; D.x[j] = x + rr(-.3, .3); D.y[j] = y + rr(0, .4); D.z[j] = z + rr(-.3, .3); D.vx[j] = Math.cos(a) * sp; D.vz[j] = Math.sin(a) * sp * .8 - rr(0, 4) * power; D.vy[j] = rr(4, 11) * power; D.rot[j] = rnd() * TAU; D.vr[j] = rr(-12, 12); D.max[j] = D.life[j] = rr(1, 1.8); D.size[j] = rr(.18, .5) * (kind === 2 ? 2.6 : 1); D.kind[j] = kind; } }
 function addSmoke(g, x, y, z, n, kind = 0, r = .8, spread = 1) { const M = g.pools.M; n = Math.max(1, Math.round(n * g.T.mult)); for (let i = 0; i < n; i++) { if (M.n >= g.T.smoke * g.capK) return; const j = M.n++, a = rnd() * TAU, d = rr(0, spread); M.x[j] = x + Math.cos(a) * d; M.y[j] = y + rr(0, .5); M.z[j] = z + Math.sin(a) * d; M.r[j] = r * rr(.6, 1.2); M.vr[j] = r * rr(.8, 1.6); M.vx[j] = Math.cos(a) * rr(.5, 2); M.vy[j] = rr(.3, 1.4); M.vz[j] = Math.sin(a) * rr(.5, 2); M.max[j] = M.life[j] = rr(.9, 1.8); M.a[j] = rr(.5, .85); M.kind[j] = kind; } }
 function addSparks(g, x, y, z, n, col = 0, speed = 12, len = .5) { const K = g.pools.K; n = Math.round(n * g.T.mult); for (let i = 0; i < n; i++) { if (K.n >= g.T.sparks * g.capK) return; const j = K.n++, a = rnd() * TAU, b = rr(-.3, 1.2), sp = speed * rr(.35, 1); K.x[j] = x; K.y[j] = y; K.z[j] = z; K.vx[j] = Math.cos(a) * Math.cos(b) * sp; K.vz[j] = Math.sin(a) * Math.cos(b) * sp; K.vy[j] = Math.sin(b) * sp; K.max[j] = K.life[j] = rr(.2, .45); K.len[j] = len * rr(.6, 1.3); K.col[j] = col; } }
 function addGlow(g, x, y, z, n, kind, speed = 3, size = .6, life = .6, up = 0) { const Q = g.pools.Gl; n = Math.max(1, Math.round(n * g.T.mult)); for (let i = 0; i < n; i++) { if (Q.n >= g.T.glows * g.capK) return; const j = Q.n++, a = rnd() * TAU, sp = speed * rr(.3, 1); Q.x[j] = x + rr(-.2, .2); Q.y[j] = y + rr(-.2, .2); Q.z[j] = z; Q.vx[j] = Math.cos(a) * sp; Q.vz[j] = Math.sin(a) * sp; Q.vy[j] = rr(-.5, 1) * sp * .5; Q.max[j] = Q.life[j] = life * rr(.6, 1.2); Q.size[j] = size * rr(.6, 1.3); Q.kind[j] = kind; Q.up[j] = up; } }
@@ -426,7 +445,8 @@ function onEvent(type, a, b, c, d) {
     const mul = c[0] === '×';
     snd(ok ? (mul ? 'multiply' : 'gate-good') : 'gate-bad'); if (ok) screenTint('spirit', mul ? .2 : .12); else { shake(g, .3); screenTint('star', 0); whiteFlash(.12); }
     flash(g, gx, 1.2, a.z, mul ? 5 : 3.4, .4, ok ? '140,210,255' : '255,120,120'); ring(g, gx, .3, a.z, mul ? 4.6 : 3.2, .45, ok ? '170,230,255' : '255,150,150'); addGlow(g, gx, 1.2, a.z, mul ? 22 : 14, ok ? 4 : 0, 4, .6, .7, 1.5);
-    burst(g, c[0] + c[1], ok ? 'good' : 'bad', mul);   // 통과한 숫자가 화면 쪽으로 튀어나온다
+    burst(g, c[0] + c[1], ok ? 'good' : 'bad', mul);
+    if (ok) flash(g, gx, 1.4, a.z, mul ? 3.6 : 2.6, .35, '255,255,255', 'gate-burst');   // 그림 74 gate-burst(더하기)   // 통과한 숫자가 화면 쪽으로 튀어나온다
     if (ok) { addGlow(g, gx, 1.6, a.z, mul ? 16 : 10, 3, 6, .7, .7, 2); addGlow(g, gx, 1.4, a.z, mul ? 14 : 8, 2, 5, .6, .8, 1); if (mul) { g.hitstop = .06; g.cam.punch += .05; shake(g, .3); flash(g, gx, 1.4, a.z, 2.6, .3, '255,255,255', 'burst'); } }
     if (S.n > d) {
       popNum(g, 'pop', '+' + (S.n - d), S.cx, 2.6, S.z + 1.5); syncCrowd(g, gx - S.cx, 1); addGlow(g, S.cx, 1, S.z, 10, 2, 3, .5, .6, 1);
@@ -456,7 +476,7 @@ function onEvent(type, a, b, c, d) {
   }
   if (type === 'siege') { snd('card'); pill(g, '공성전! 화면을 누르고 있으면 발사', 'star', 2.4); $('rn-hint').textContent = '누르고 있으면 발사'; syncCrowd(g, 0, 0); return; }
   if (type === 'petSiege') { snd('castle-hit'); screenTint(g.pet.el, .22); shake(g, .6); whiteFlash(.35); const cz = S.castle.z; flash(g, 0, 4, cz - 1, 7, .5, EL_RGB[g.pet.el] || '255,180,90'); addDebris(g, 0, 4, cz - 1, 20, 0, 1); popNum(g, 'minus', '−' + a, 0, 9, cz); castleHit(g); return; }
-  if (type === 'pour') { snd('cannon'); const vis = Math.min(3, a); for (let i = 0; i < vis; i++) flyer(g, S.cx + rr(-.3, .3), 2, S.z + crowdR(S.n) + 1.2, 1, rr(-2.5, 2.5), rr(1.5, 5), S.castle.z - 1, rr(.55, .75)); g.cam.punch += .006; syncCrowd(g, 0, 0); return; }
+  if (type === 'pour') { snd('cannon'); if ((g.fireFx = (g.fireFx || 0) + 1) % 3 === 1) flash(g, S.cx, 2.6, S.z + crowdR(S.n) + 1.6, 1.4, .16, '255,255,255', 'cannon-fire'); const vis = Math.min(3, a); for (let i = 0; i < vis; i++) flyer(g, S.cx + rr(-.3, .3), 2, S.z + crowdR(S.n) + 1.2, 1, rr(-2.5, 2.5), rr(1.5, 5), S.castle.z - 1, rr(.55, .75)); g.cam.punch += .006; syncCrowd(g, 0, 0); return; }
   if (type === 'fall') { g.slow = .75; invertFlash(); castleDown(g); return; }   // 마지막 일격: 느린 동작 + 반전 섬광 + 붕괴
   if (type === 'done') { later(g, S.castle.down ? 1.4 : .6, () => sendFinish(g)); if (!a) snd('fail'); return; }
 }
@@ -479,14 +499,14 @@ function castleDown(g) {
   const c = g.S.castle; snd('castle-fall'); whiteFlash(.8); shake(g, 1); g.hitstop = .12; g.cam.punch += .08;
   flash(g, 0, 4, c.z, 10, .7); flash(g, 0, 4, c.z, 14, 1, '255,214,140');
   for (let i = 0; i < 3; i++) ring(g, 0, .2, c.z, 7 + i * 3, .6 + i * .15, i ? '255,230,180' : '255,255,255', i * .08);
-  addDebris(g, 0, 3, c.z, 120, 0, 1.6); addSmoke(g, 0, .5, c.z, 26, 0, 2.2, 5); addSmoke(g, 0, 3, c.z, 10, 2, 2, 3); addSparks(g, 0, 4, c.z, 40, 1, 18, .8); addGlow(g, 0, 4, c.z, 30, 2, 8, 1, 1.2, 1);
+  addDebris(g, 0, 3, c.z, 80, 0, 1.6); addDebris(g, 0, 4, c.z, 40, 2, 1.4); addSmoke(g, 0, .5, c.z, 26, 0, 2.2, 5); addSmoke(g, 0, 3, c.z, 10, 2, 2, 3); addSparks(g, 0, 4, c.z, 40, 1, 18, .8); addGlow(g, 0, 4, c.z, 30, 2, 8, 1, 1.2, 1);   // 40개는 성 조각 그림(castle-chunk-a · b)
   g.pieces = [];
   for (let r = 0; r < 5; r++) for (let q = 0; q < 6; q++) g.pieces.push({ sx: q / 6, sy: r / 5, x: (q + .5) / 6 * 10 - 5, y: 10 - (r + .5) / 5 * 10, z: c.z, vx: rr(-2, 2) + ((q + .5) / 6 - .5) * 4, vy: rr(1, 5) + (5 - r) * .4, vz: rr(-3, 1), rot: 0, vr: rr(-2, 2), t: 0 });
 }
 function showCards(o) {
   const el = $('rn-cards'); if (!el) return;
   $('rn-vig')?.classList.add('ult'); G.lastN = G.S.n;
-  el.innerHTML = `<p class="rn-cards-h">카드 한 장을 골라요</p><div class="rn-card-row">${o.cards.map((c, i) => `<button type="button" class="rn-card" data-g="card" data-i="${i}"><b>${esc(cardName(c))}</b><small>${esc(CARDS[c[0]]?.tag || '')}</small></button>`).join('')}</div>`;
+  el.innerHTML = `<p class="rn-cards-h">카드 한 장을 골라요</p><div class="rn-card-row">${o.cards.map((c, i) => `<button type="button" class="rn-card${art('card-frame') ? ' art' : ''}" data-g="card" data-i="${i}"><b>${esc(cardName(c))}</b><small>${esc(CARDS[c[0]]?.tag || '')}</small></button>`).join('')}</div>`;
   el.classList.add('on');
 }
 function pickCard(i) {
@@ -514,7 +534,8 @@ function showResult(g, res, err) {
   const hpLeft = Math.max(1, Math.ceil(c.hp / c.max * 100)), runLeft = Math.max(1, Math.round((1 - clamp(S.z / g.map.len, 0, 1)) * 100));
   const near = clear ? '' : S.siegeT > 0 ? `<p class="rn-near${hpLeft <= 30 ? ' hot' : ''}">성 HP <b>${hpLeft}%</b> 남았어${hpLeft <= 30 ? '!' : '요'}</p>` : `<p class="rn-near${runLeft <= 30 ? ' hot' : ''}">성까지 <b>${runLeft}%</b> 남았어${runLeft <= 30 ? '!' : '요'}</p>`;
   const coins = res?.valid ? Number(res.coins || 0) : 0, box = res?.valid ? Number(res.box || 0) : 0;
-  el.innerHTML = `<div class="rn-res-card${clear ? ' win' : ''}" id="rn-res-card"><h2>${clear ? (g.map.boss ? '보스 성 함락!' : '성 함락!') : '아쉬워요!'}</h2>
+  const face = art(clear ? 'spirit-cheer' : 'spirit-hurt');
+  el.innerHTML = `<div class="rn-res-card${clear ? ' win' : ''}" id="rn-res-card">${face ? `<img class="rn-res-face" src="${face}" alt="" draggable="false">` : ''}<h2>${clear ? (g.map.boss ? '보스 성 함락!' : '성 함락!') : '아쉬워요!'}</h2>
     <div class="rn-res-stars">${[0, 1, 2].map(i => `<i class="${i < stars ? 'on' : ''}" style="--d:${.25 + i * .3}s"></i>`).join('')}</div>
     ${near}
     <ul class="rn-res-list"><li><span>남은 정령</span><b>${num(S.left)}</b></li><li><span>깬 바위</span><b>${num(S.broke)}</b></li>
@@ -660,7 +681,7 @@ function castleStage(g, dt) {
   const S = g.S, c = S.castle; if (!dt || c.down || !(S.phase === 'siege' || S.siegeT > 0)) return;
   const p = c.hp / c.max;
   if (p < .5 && g.T.fire && (g.fireT -= dt) <= 0) { g.fireT = .12 + p * .3; const x = rr(-3.8, 3.8), y = rr(3, 9); addGlow(g, x, y, c.z - .6, 1, 1, .6, rr(1.2, 2.2), .55, 2.5); if (rnd() < .35) addSmoke(g, x, y + .5, c.z - .4, 1, 3, 1.2, .3); }
-  if (p < .25 && (g.chunkT -= dt) <= 0) { g.chunkT = .28; addDebris(g, rr(-4, 4), rr(8, 10), c.z - .3, 3, 0, .5); }
+  if (p < .25 && (g.chunkT -= dt) <= 0) { g.chunkT = .28; addDebris(g, rr(-4, 4), rr(8, 10), c.z - .3, 3, 2, .5); }
 }
 function drawClouds(g) {
   const ctx = g.ctx, k0 = Math.floor((g.cam.z + 4) / 15), img = g.SPR.cloud;
@@ -672,7 +693,7 @@ function drawClouds(g) {
   ctx.globalAlpha = 1;
 }
 function drawRoad(g) {
-  const ctx = g.ctx, cam = g.cam, ROAD = RUNNER.ROAD, z0 = Math.floor((cam.z + 1) / 3) * 3, far = 90, rail = .35, endZ = g.S.castle.z + 6;
+  const ctx = g.ctx, cam = g.cam, ROAD = RUNNER.ROAD, z0 = Math.floor((cam.z + 1) / 3) * 3, far = 90, rail = .35, endZ = g.S.castle.z + 6, tile = g.img['road-' + g.th];
   for (let zz = z0 + far; zz >= z0; zz -= 3) {
     if (zz > endZ) continue;
     const za = Math.max(zz, cam.z + .8), zb = zz + 3; if (zb <= za) continue;
@@ -680,18 +701,37 @@ function drawRoad(g) {
     proj(g, -ROAD - rail, 0, za); const lxA = PX, yA = PY, sA = PS; proj(g, ROAD + rail, 0, za); const rxA = PX;
     const fog = clamp((zz - cam.z) / far, 0, 1) * .85, odd = Math.floor(zz / 3) & 1, fi = Math.min(31, Math.round(fog * 31)), PAL = g.pal;
     ctx.fillStyle = fog > .6 ? '#e8e2d0' : THEME.rail; ctx.beginPath(); ctx.moveTo(lxB, yB); ctx.lineTo(rxB, yB); ctx.lineTo(rxA, yA); ctx.lineTo(lxA, yA); ctx.fill();
+    if (tile) continue;   // 그림 74 길 타일이 있으면 금빛 난간 띠만 그리고, 길은 아래 drawRoadTiled가 깐다
     const iB = rail * sB, iA = rail * sA;
     ctx.fillStyle = (odd ? PAL.roadA : PAL.roadB)[fi]; ctx.beginPath(); ctx.moveTo(lxB + iB, yB); ctx.lineTo(rxB - iB, yB); ctx.lineTo(rxA - iA, yA); ctx.lineTo(lxA + iA, yA); ctx.fill();
     ctx.fillStyle = PAL.seam[fi]; ctx.fillRect(lxB + iB, yB, rxB - lxB - iB * 2, Math.max(1, .05 * sB));
     // 가운데 빛 줄무늬(한 칸 걸러): 바닥이 흘러가는 속도감
     if (odd && fog < .7) { const mB = (lxB + rxB) / 2, mA = (lxA + rxA) / 2, wB = .09 * sB, wA = .09 * sA; ctx.fillStyle = PAL.stripe[fi]; ctx.beginPath(); ctx.moveTo(mB - wB, yB); ctx.lineTo(mB + wB, yB); ctx.lineTo(mA + wA, yA); ctx.lineTo(mA - wA, yA); ctx.fill(); }
   }
+  if (tile) drawRoadTiled(g, tile, endZ);
   // 난간 윗줄(기둥을 잇는 금빛 막대): 가까운 끝 ~ 먼 끝 직선 두 줄 → 기둥과 함께 지나가며 깊이가 보인다
   const zn = cam.z + 1.6, zf = Math.min(endZ, cam.z + 80);
   ctx.fillStyle = THEME.rail;
   for (const sd of [-1, 1]) { if (!proj(g, sd * (ROAD + .18), 1.15, zn)) continue; const x0 = PX, y0 = PY, w0 = .07 * PS; proj(g, sd * (ROAD + .18), 1.15, zf); const w1 = Math.max(.6, .07 * PS); ctx.beginPath(); ctx.moveTo(x0, y0 - w0); ctx.lineTo(PX, PY - w1); ctx.lineTo(PX, PY + w1); ctx.lineTo(x0, y0 + w0); ctx.fill(); }
   const p0 = Math.ceil((cam.z + 1.5) / 6) * 6;
   for (let i = g.T.posts - 1; i >= 0; i--) { const zz = p0 + i * 6; if (zz > endZ) continue; for (const sd of [-1, 1]) if (proj(g, sd * (ROAD + .18), 0, zz)) { const w = .45 * PS, h = 1.3 * PS; ctx.drawImage(g.SPR.post, PX - w / 2, PY - h, w, h); } }
+}
+// 길 타일(그림 74 road-<테마>, 세로로 이어지는 256px): 화면을 가로 띠(품질별 5~12px)로 나눠 띠마다 그 깊이의 길 폭 · 타일 줄을 잘라 찍는다.
+//   타일 한 장 = 길 4단위. 띠 위아래 깊이로 타일 줄을 고르고, 타일 경계를 넘으면 두 번에 나눠 찍어 이음매가 없다. 멀리는 안개 그라디언트 한 장.
+const frac = v => v - Math.floor(v), TILE_Z = 4;
+function drawRoadTiled(g, img, endZ) {
+  const ctx = g.ctx, cam = g.cam, K = g.F * (cam.zoom + cam.punch), HZ = g.HZ, ROAD = RUNNER.ROAD, iw = img.width, ih = img.height;
+  const zFar = Math.min(cam.z + 90, endZ), yTop = HZ + cam.h * K / (zFar - cam.z), yBot = Math.min(g.cvs.height, HZ + cam.h * K / .8), band = [12, 9, 7, 5][g.tier] * g.S2;
+  for (let y = yTop; y < yBot; y += band) {
+    const y2 = Math.min(yBot, y + band), dzm = cam.h * K / ((y + y2) * .5 - HZ), half = ROAD * K / dzm, x0 = g.CX - cam.x * K / dzm - half, w = half * 2;
+    const za = cam.z + cam.h * K / (y - HZ), zb = cam.z + cam.h * K / (y2 - HZ);
+    if (za - zb >= TILE_Z) { ctx.drawImage(img, 0, 0, iw, ih, x0, y, w, y2 - y + 1); continue; }
+    const ra = (1 - frac(za / TILE_Z)) * ih, rb = (1 - frac(zb / TILE_Z)) * ih;
+    if (rb > ra) ctx.drawImage(img, 0, ra, iw, Math.max(.5, rb - ra), x0, y, w, y2 - y + 1);
+    else { const t = (ih - ra) / (ih - ra + rb), ys = y + (y2 - y) * t; if (ih - ra > .5) ctx.drawImage(img, 0, ra, iw, ih - ra, x0, y, w, ys - y + 1); if (rb > .5) ctx.drawImage(img, 0, 0, iw, rb, x0, ys, w, y2 - ys + 1); }
+  }
+  // 멀리 안개(화면 크기마다 한 번 만든 그라디언트): 먼 길이 하늘색으로 흐려진다
+  if (proj(g, -ROAD, 0, zFar)) { const ax = PX, ay = PY; proj(g, ROAD, 0, zFar); const bx = PX; const zm = cam.z + 26; proj(g, ROAD, 0, zm); const cxp = PX, cy = PY; proj(g, -ROAD, 0, zm); ctx.fillStyle = g.fogGrad; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, ay); ctx.lineTo(cxp, cy); ctx.lineTo(PX, cy); ctx.fill(); }
 }
 function drawObj(g, o, dt, cx, z, alpha) {
   const ctx = g.ctx, P = g.SPR, S = g.S, t = S.tick - 1 + alpha;
@@ -708,10 +748,12 @@ function drawObj(g, o, dt, cx, z, alpha) {
       // 테두리 빛(속성 없이 파랑 · 빨강, 숨 쉬듯) → 판 → 박동하는 숫자(×문은 더 크게)
       const ok = goodGate(val), puls = 1 + Math.sin(g.clock * 6 + side) * .07 * (val[0] === '×' ? 1.6 : 1);
       if (g.T.glow) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a * (.45 + .2 * Math.sin(g.clock * 5 + side)); const gw = w * 1.5; ctx.drawImage(ok ? g.tg.gateGood : g.tg.gateBad, cxm - gw / 2, cym - gw * .55, gw, gw * 1.1); ctx.globalCompositeOperation = 'source-over'; }
-      ctx.globalAlpha = a; ctx.drawImage(ok ? P['gate-good'] : P['gate-bad'], cxm - w / 2, cym - h / 2, w, h);
+      ctx.globalAlpha = a; if (g.gateAdd) ctx.globalCompositeOperation = 'lighter';
+      ctx.drawImage(ok ? P['gate-good'] : P['gate-bad'], cxm - w / 2, cym - h / 2, w, h); ctx.globalCompositeOperation = 'source-over';
       drawNum(g, ok ? 'good' : 'bad', lab, cxm, cym, Math.min(1.8, sc / 34) * grow * puls * (val[0] === '×' ? 1.15 : 1), a); ctx.globalAlpha = 1;
     }
-    proj(g, 0, 2.8, o.z); const tx = PX, ty = PY; proj(g, 0, 0, o.z); ctx.fillStyle = '#f2f6ff'; ctx.fillRect(tx - .1 * PS, ty, .2 * PS, PY - ty);
+    if (P.gateFrame) { proj(g, 0, 0, o.z); const fh = 3.4 * PS, fw = fh * .5; ctx.drawImage(P.gateFrame, PX - fw / 2, PY - fh, fw, fh); }   // 가운데 기둥(그림 74 gate-frame)
+    else { proj(g, 0, 2.8, o.z); const tx = PX, ty = PY; proj(g, 0, 0, o.z); ctx.fillStyle = '#f2f6ff'; ctx.fillRect(tx - .1 * PS, ty, .2 * PS, PY - ty); }
     return;
   }
   if (o.type === 'rock') {
@@ -721,7 +763,7 @@ function drawObj(g, o, dt, cx, z, alpha) {
     ctx.drawImage(P.rock, PX - w / 2 + wob, PY - h * .9, w, h);
     if (v.hitT > 0) { v.hitT -= dt; ctx.globalAlpha = .45; ctx.drawImage(P.rockW, PX - w / 2 + wob, PY - h * .9, w, h); ctx.globalAlpha = 1; }
     const hit = v.hitT > 0, jx = hit ? rr(-.08, .08) * PS : 0;   // 맞는 동안 숫자가 흔들리며 커졌다 줄어든다
-    drawNum(g, 'rock', ns(Math.ceil(o.hp)), PX + jx, PY - h * .45, Math.min(1.5, PS / 34) * (hit ? 1.14 : 1)); return;
+    drawNum(g, 'rock', ns(Math.ceil(o.hp)), PX + jx, PY - h * (g.img['rock-num'] ? .36 : .45), Math.min(1.5, PS / 34) * (hit ? 1.14 : 1)); return;
   }
   if (o.type === 'saw') {
     const x = o.stop ? o.x : o.x0 + o.amp * tri(t / o.per);
@@ -734,6 +776,7 @@ function drawObj(g, o, dt, cx, z, alpha) {
     const L = 3, ang = o.stop ? 0 : Math.sin(tri(t / o.per + o.ph) * Math.PI / 2) * 1.25;
     if (!o.stop && o.z - S.z < 30) warn(g, o.x, o.z, 1.2, .35 + .65 * (1 - Math.min(1, Math.abs(ang) / 1.25)));   // 내려칠 자리: 머리가 내려올수록 진하게
     if (!proj(g, o.x, 4.2, o.z)) return; const px = PX, py = PY;
+    if (g.hammerArt) { const hh = (L + .9) * PS, hw = hh * 192 / 288; ctx.save(); ctx.translate(px, py); ctx.rotate(ang); ctx.drawImage(P.hammer, -hw / 2, -hh * .1, hw, hh); ctx.restore(); return; }   // 손잡이 위 끝이 축
     proj(g, o.x + Math.sin(ang) * L, 4.2 - Math.cos(ang) * L, o.z); const hx = PX, hy = PY, s2 = PS;
     ctx.strokeStyle = '#6b4520'; ctx.lineWidth = .22 * s2; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(hx, hy); ctx.stroke();
     ctx.fillStyle = '#4a3a2a'; ctx.beginPath(); ctx.arc(px, py, .25 * s2, 0, TAU); ctx.fill();
@@ -781,9 +824,9 @@ function drawCrowd(g, dt, cx, z) {
     const back = 1.4 - TOZ[i] / 3;
     sl.ox[i] += (TOX[i] * breath + lag * back - sl.ox[i]) * spring; sl.oz[i] += (TOZ[i] * breath - sl.oz[i]) * spring; if (sl.pop[i] < 1) sl.pop[i] = Math.min(1, sl.pop[i] + dt * 3.5);
     const hop = run ? Math.abs(Math.sin(t * HF[i] + PH[i])) * HA[i] : Math.abs(Math.sin(t * 4 + PH[i])) * .1;
-    if (g.T.shadows && proj(g, cx + sl.ox[i], 0, z + sl.oz[i])) { const sw = .5 * PS * (1 - hop * .9); ctx.globalAlpha = .45; ctx.drawImage(P.shadow, PX - sw / 2, PY - sw * .16, sw, sw * .32); ctx.globalAlpha = 1; }
+    if (g.T.shadows && proj(g, cx + sl.ox[i], 0, z + sl.oz[i])) { const sw = g.spiritU * .95 * PS * (1 - hop * .9); ctx.globalAlpha = .45; ctx.drawImage(P.shadow, PX - sw / 2, PY - sw * .16, sw, sw * .32); ctx.globalAlpha = 1; }
     if (!proj(g, cx + sl.ox[i], hop, z + sl.oz[i])) continue;
-    const lead = TOZ[i] > front, pp = sl.pop[i], sz = .52 * PS * (pp < 1 ? easeOut(pp) * 1.15 : 1) * (lead ? 1.1 : 1), sq = run ? 1 + Math.sin(t * HF[i] * 2 + PH[i]) * .07 : 1;
+    const lead = TOZ[i] > front, pp = sl.pop[i], sz = g.spiritU * PS * (pp < 1 ? easeOut(pp) * 1.15 : 1) * (lead ? 1.1 : 1), sq = run ? 1 + Math.sin(t * HF[i] * 2 + PH[i]) * .07 : 1;
     ctx.drawImage(spr, PX - sz / 2, PY - sz * sq, sz, sz * sq);
     if (lead && g.T.rim) { ctx.globalAlpha = .16 + .08 * Math.sin(t * 6 + PH[i]); ctx.drawImage(P.spiritW, PX - sz / 2, PY - sz * sq, sz, sz * sq); ctx.globalAlpha = 1; }
   }
@@ -797,7 +840,7 @@ function drawCrowd(g, dt, cx, z) {
     ctx.drawImage(spr, PX - w / 2 + 4 * g.S2 * sc, PY - h * .42, h * .84, h * .84); drawNum(g, 'count', str, PX + 10 * g.S2 * sc, PY, sc);
   }
 }
-const DEB = [['rock-a', 'rock-b'], ['shard']], PUFF = [['dust', '235,225,205'], ['smoke', '255,255,255'], ['dust', '200,185,160'], ['smoke', '120,110,130']], SPARK = ['#ffffff', '#ffe066', '#ff8a3a', '#8fe0ff'];
+const DEB = [['rock-a', 'rock-b'], ['shard'], ['chunk-a', 'chunk-b']], PUFF = [['dust', '235,225,205'], ['smoke', '255,255,255'], ['dust', '200,185,160'], ['smoke', '120,110,130']], SPARK = ['#ffffff', '#ffe066', '#ff8a3a', '#8fe0ff'];
 const GLOW = [['ember', '255,190,90'], ['flame', '255,255,255'], ['stardust', '255,255,255'], ['star', '255,255,255'], ['ember', '120,220,255']];
 const ADJ = { glow: [.55, .8], burst: [.8, .9], ring: [.85, 1], ember: [1, 3.2], stardust: [.9, 1.3], star: [.85, 1] };
 const ONE = [1, 1], adj = (g, k) => g.matArt.has(k) ? ADJ[k] || ONE : ONE;
@@ -819,7 +862,7 @@ function drawFlyers(g, dt) {
   const spr = g.SPR.spirit;
   // 빛 꼬리(대포 정령 · 합류 정령): 진행 반대쪽에 흐린 빛 두 점(품질 중간 이상)
   if (g.T.trail) { ctx.globalCompositeOperation = 'lighter'; const gl = g.tg.trail; for (let j = 0; j < F.n; j++) { if (!F.kind[j]) continue; for (let k = 1; k <= 2; k++) { if (!proj(g, F.x[j] - F.vx[j] * .03 * k, F.y[j] - F.vy[j] * .03 * k, F.z[j] - F.vz[j] * .03 * k)) continue; const s = (.9 - k * .2) * PS; ctx.globalAlpha = .5 / k; ctx.drawImage(gl, PX - s / 2, PY - s / 2, s, s); } } ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
-  for (let j = 0; j < F.n; j++) { if (!proj(g, F.x[j], F.y[j], F.z[j])) continue; const sz = .52 * PS, a = F.kind[j] ? 1 : Math.min(1, F.life[j] / F.max[j] * 1.5), cc = Math.cos(F.rot[j]), sn = Math.sin(F.rot[j]), iw = sz / spr.width; ctx.globalAlpha = a; ctx.setTransform(cc * iw, sn * iw, -sn * iw, cc * iw, PX, PY); ctx.drawImage(F.kind[j] ? spr : g.SPR.spiritW, -spr.width / 2, -spr.height / 2); }
+  for (let j = 0; j < F.n; j++) { if (!proj(g, F.x[j], F.y[j], F.z[j])) continue; const sz = g.spiritU * PS, a = F.kind[j] ? 1 : Math.min(1, F.life[j] / F.max[j] * 1.5), cc = Math.cos(F.rot[j]), sn = Math.sin(F.rot[j]), iw = sz / spr.width; ctx.globalAlpha = a; ctx.setTransform(cc * iw, sn * iw, -sn * iw, cc * iw, PX, PY); ctx.drawImage(F.kind[j] ? g.SPR.spiritFly : g.SPR.spiritHurt, -spr.width / 2, -spr.height / 2); }
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
 }
 function drawBullets(g, dt) {

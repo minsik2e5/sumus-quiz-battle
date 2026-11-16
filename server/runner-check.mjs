@@ -104,8 +104,11 @@ export async function runRunnerChecks(assert) {
       '마지막 일격은 연출 시간만 느리게(규칙 틱은 그대로) + 반전 섬광, 결과는 큰 "한 판 더" · 아깝게 지면 남은 성 HP · 코인 비는 품질 상한');
     // 렉 방지(선생님: "렉은 절대 안 걸리게"): 판 전에 그림 디코드 · 재료 굽기 · 카운트다운 동안 품질 결정, blur · shadowBlur 없음,
     //   프레임마다 색 문자열 · 숫자 문자열 · 물체 목록을 새로 만들지 않음, 정령이 많으면 효과 상한을 줄임
-    assert(!/shadowBlur|ctx\.filter\s*=/.test(ui) && ui.includes('await Promise.race([warmArt(res.pet?.key, res.pet?.form)') && ui.includes('function prebake(g)') && ui.includes('autoTier(g, true)') && ui.includes('const COUNTDOWN = 1.5;'),
+    assert(!/shadowBlur|ctx\.filter\s*=/.test(ui) && ui.includes('await Promise.race([warmArt(res.pet?.key, res.pet?.form, theme(res.stage))') && ui.includes('function prebake(g)') && ui.includes('autoTier(g, true)') && ui.includes('const COUNTDOWN = 1.5;'),
       '판 시작 전: 그림 디코드(최대 1.8초) · 색 입힌 재료 · 길 색 표 미리 굽기 · 카운트다운 동안 품질 결정, blur · shadowBlur 없음');
+    // 그림 74: 검은 배경 문 판은 더하기 섞기, 길 타일은 띠로 원근, 성 붕괴는 castle-chunk-a · b 조각, 정령은 테두리
+    assert(ui.includes("g.gateAdd = !!g.img['gate-good']") && ui.includes('if (g.gateAdd) ctx.globalCompositeOperation = \'lighter\'') && ui.includes('function drawRoadTiled(g, img, endZ)') && ui.includes("['chunk-a', 'chunk-b']") && ui.includes('addDebris(g, 0, 4, c.z, 40, 2, 1.4); addSmoke(') && ui.includes("outlined(g, 'spirit-run'"),
+      '그림 74: 문 판 더하기 섞기 · 길 타일 원근 · 성 조각 그림 · 정령 테두리');
     const drawCode = ui.slice(ui.indexOf('/* ---------- 그리기 ---------- */'));
     assert(!/String\(Math\.ceil|\.splice\(|objs = \[\]|for \(const \[side, val\]|\$\{lerp\(base/.test(drawCode) && ui.includes('const objs = g.objs; objs.length = 0;') && ui.includes("let m = g.tintCache.get(k);") && ui.includes('g.capK = 1 - .35 * want / DRAW_MAX;'),
       '그리기: 프레임마다 숫자 · 색 문자열, 물체 배열, splice를 만들지 않고(캐시 · 재사용), 정령이 많을수록 파편 · 빛 상한을 줄인다');

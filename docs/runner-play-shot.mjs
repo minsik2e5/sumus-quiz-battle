@@ -77,11 +77,14 @@ await page.screenshot({ path: resolve(OUT, 'runner-map.jpg'), type: 'jpeg', qual
 if (STAGE > 1) await page.click(`[data-rn="pick"][data-s="${STAGE}"]`).catch(() => {});
 let cdp = null;
 if (PERF) { cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU }); }
+// 출발 누름 → 판 시작(그림 받기 · 디코드 · 재료 굽기 · 카운트다운 포함)까지 걸린 시간과 그동안 가장 긴 멈춤도 잰다(새 브라우저라 첫 판 디코드 포함).
+if (PERF) await page.evaluate(() => { window.__perf.frames = []; window.__perf.long = []; window.__perf.on = true; window.__perf.t0 = performance.now(); });
 await page.click('[data-rn="go"]');
 // 측정: 규칙이 돌기 시작한 순간(카운트다운 뒤)부터 WINDOW초. CPU N배는 출발 전에 걸어 둔다(판 첫 몇 초도 같은 조건).
 const WINDOW = Number(arg('window', 40));
 if (PERF) {
   await page.waitForFunction(() => window.__rnPhase, null, { timeout: 30000 });
+  var pre = await page.evaluate(() => ({ ms: Math.round(performance.now() - window.__perf.t0), frame: Math.round(Math.max(0, ...window.__perf.frames)), long: Math.max(0, ...window.__perf.long) }));
   await page.evaluate(() => { window.__perf.frames = []; window.__perf.long = []; window.__perf.lat = []; window.__perf.on = true; });
   const tEnd = Date.now() + WINDOW * 1000, box = { x: 195, y: 600 };
   while (Date.now() < tEnd) { box.x = 150 + Math.random() * 90; await page.mouse.move(box.x, box.y); await page.waitForTimeout(250); if (await page.$('#rn-cards.on')) { await page.click('#rn-cards.on .rn-card', { timeout: 1500 }).catch(() => {}); await page.waitForTimeout(400); } if (await page.$('#rn-result:not([hidden])')) break; }
@@ -108,7 +111,7 @@ if (PERF) {
   const fr = P.frames.filter(d => d < 5000), secs = fr.reduce((a, b) => a + b, 0) / 1000, mins = secs / 60, pct = q => { const x = [...fr].sort((a, b) => a - b); return x[Math.min(x.length - 1, Math.floor(x.length * q))] || 0; };
   const r1 = x => Math.round(x * 10) / 10;
   const lat = [...P.lat].sort((a, b) => a - b), lp = q => r1(lat[Math.min(lat.length - 1, Math.floor(lat.length * q))] || 0);
-  perf = { cpu: CPU, q: Q, seconds: r1(secs), fps: r1(fr.length / secs), p95: r1(pct(.95)), p99: r1(pct(.99)), max: r1(Math.max(...fr)), over33_min: r1(fr.filter(d => d > 33.4).length / mins), over50_min: r1(fr.filter(d => d > 50).length / mins), long_tasks: P.long.length, input_p50: lp(.5), input_p95: lp(.95), input_n: lat.length, first5s_over50: (() => { let t = 0, n = 0; for (const d of fr) { t += d; if (t > 5000) break; if (d > 50) n++; } return n; })(), tier_end: ['최저', '낮음', '중간', '높음'][tierEnd] };
+  perf = { cpu: CPU, q: Q, seconds: r1(secs), fps: r1(fr.length / secs), p95: r1(pct(.95)), p99: r1(pct(.99)), max: r1(Math.max(...fr)), over33_min: r1(fr.filter(d => d > 33.4).length / mins), over50_min: r1(fr.filter(d => d > 50).length / mins), long_tasks: P.long.length, input_p50: lp(.5), input_p95: lp(.95), input_n: lat.length, first5s_over50: (() => { let t = 0, n = 0; for (const d of fr) { t += d; if (t > 5000) break; if (d > 50) n++; } return n; })(), tier_end: ['최저', '낮음', '중간', '높음'][tierEnd], start_ms: pre.ms, start_frame_max: pre.frame, start_long_max: pre.long };
   console.log(JSON.stringify(perf)); await browser.close(); process.exit(0);
 }
 const sounds = await page.evaluate(() => window.__rnSnd).catch(() => null);
