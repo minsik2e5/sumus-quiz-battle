@@ -230,9 +230,12 @@ function prebake(g) {
 }
 const pool = (n, keys) => { const o = { n: 0, keys, cap: n }; for (const k of keys) o[k] = new Float32Array(n); return o; };
 function swapOut(A, j) { const l = --A.n; for (const k of A.keys) A[k][j] = A[k][l]; }
+// 단계마다 캔버스 배율. 낮음 · 최저(배율 1 이하)는 칸 넓이를 폰(390×844)만큼으로 맞춘다: 아이패드 · PC 큰 칸에서 느린 기기가 폰보다 많이 칠하지 않게.
+const PHONE_AREA = 390 * 844;
+function s2Of(g, t) { const sc = TIERS[t].scale; return sc <= 1 ? sc * Math.min(1, Math.sqrt(PHONE_AREA / (g.cssW * g.cssH))) : Math.min(devicePixelRatio || 1, sc); }
 function resize(g) {
   const box = g.cvs.parentElement; g.cssW = box?.clientWidth || innerWidth; g.cssH = box?.clientHeight || innerHeight;   // 가운데 세로 칸 크기 기준
-  g.S2 = g.T.scale < 1 ? g.T.scale : Math.min(devicePixelRatio || 1, g.T.scale);
+  g.S2 = s2Of(g, g.tier);
   g.cvs.width = Math.round(g.cssW * g.S2); g.cvs.height = Math.round(g.cssH * g.S2);
   g.F = Math.min(g.cssW * 1.05, g.cssH * .62) * g.S2; g.CX = g.cvs.width / 2; g.HZ = g.cvs.height * .25;
   buildSky(g); buildSprites(g);
@@ -627,9 +630,9 @@ function hud(g, now) {
 function autoTier(g, warm = false) {
   const log = g.frameLog; g.frameLog = []; if (!log.length || g.tier === 0 || (!warm && g.frames < 90) || (warm && log.length < 20)) return;
   if (warm) {
-    // 카운트다운(효과 없는 장면) 평균 프레임으로 고른다: 칠하는 넓이 ∝ 해상도² → 단계마다 예상 시간을 계산해 10ms 안(효과 몫을 넉넉히 남김: 난도 조정 뒤 무리가 커짐)인 가장 높은 단계
-    const sorted = [...log].sort((a, b) => a - b), mid = sorted[sorted.length >> 1], sc = g.T.scale; let t = g.tier;
-    while (t > 0 && mid * (TIERS[t].scale / sc) ** 2 > 10) t--;
+    // 카운트다운(효과 없는 장면) 평균 프레임으로 고른다: 칠하는 넓이 ∝ 실제 캔버스 배율² → 단계마다 예상 시간을 계산해 10ms 안(효과 몫을 넉넉히 남김: 난도 조정 뒤 무리가 커짐)인 가장 높은 단계
+    const sorted = [...log].sort((a, b) => a - b), mid = sorted[sorted.length >> 1], sc = g.S2; let t = g.tier;
+    while (t > 0 && mid * (s2Of(g, t) / sc) ** 2 > 10) t--;   // 실제 캔버스 배율로 예상(배율 1 화면은 높음 · 중간 · 낮음이 같은 크기)
     if (t < g.tier) setTier(g, t);
     return;
   }

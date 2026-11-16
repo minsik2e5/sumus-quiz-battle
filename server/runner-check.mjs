@@ -112,6 +112,9 @@ export async function runRunnerChecks(assert) {
     // 그림 74 렉 방지: 길 타일 · 하늘은 불투명 캔버스로 미리 굽고(축소본 4장), 최저 단계는 길을 가까운 점으로, 판 준비는 두 번에 나눈다
     assert(ui.includes('function roadMip(img)') && ui.includes("x = c.getContext('2d', { alpha: false });   // 불투명 캔버스") && ui.includes('if (!g.tier) ctx.imageSmoothingEnabled = false;') && ui.includes('requestAnimationFrame(() => setTimeout(() => {') && !ui.includes('buildSprites(g); buildSky(g); }\n  prebake(g);'),
       '그림 74 렉 방지: 길 타일 축소본 · 불투명 하늘 · 최저 단계 가까운 점 · 판 준비 두 번에 나눔');
+    // 넓은 화면: 게임은 가운데 세로 칸, 낮음 · 최저는 칸 넓이를 폰만큼으로, 카운트다운 품질 예상은 실제 캔버스 배율로. 양옆 장식은 CSS 배경 한 장(프레임마다 안 그림)
+    assert(ui.includes('function s2Of(g, t)') && ui.includes('Math.sqrt(PHONE_AREA / (g.cssW * g.cssH))') && ui.includes('mid * (s2Of(g, t) / sc) ** 2 > 10') && ui.includes("g.cssW = box?.clientWidth") && source('../public/v13241.css').includes('.rn-back{') && source('../public/v13241.css').includes('width:min(100vw,520px,') && !/rn-back/.test(ui.slice(ui.indexOf('/* ---------- 그리기 ---------- */'))),
+      '넓은 화면: 세로 칸 · 낮은 단계 캔버스 넓이 폰만큼 · 품질 예상은 실제 배율 · 양옆 장식은 정적 CSS 배경');
     const drawCode = ui.slice(ui.indexOf('/* ---------- 그리기 ---------- */'));
     assert(!/String\(Math\.ceil|\.splice\(|objs = \[\]|for \(const \[side, val\]|\$\{lerp\(base/.test(drawCode) && ui.includes('const objs = g.objs; objs.length = 0;') && ui.includes("let m = g.tintCache.get(k);") && ui.includes('g.capK = 1 - .35 * want / DRAW_MAX;'),
       '그리기: 프레임마다 숫자 · 색 문자열, 물체 배열, splice를 만들지 않고(캐시 · 재사용), 정령이 많을수록 파편 · 빛 상한을 줄인다');
