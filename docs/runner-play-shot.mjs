@@ -86,6 +86,7 @@ if (PERF) {
   await page.waitForFunction(() => window.__rnPhase, null, { timeout: 30000 });
   var pre = await page.evaluate(() => ({ ms: Math.round(performance.now() - window.__perf.t0), frame: Math.round(Math.max(0, ...window.__perf.frames)), long: Math.max(0, ...window.__perf.long) }));
   await page.evaluate(() => { window.__perf.frames = []; window.__perf.long = []; window.__perf.lat = []; window.__perf.on = true; });
+  if (arg('profile')) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
   const tEnd = Date.now() + WINDOW * 1000, box = { x: 195, y: 600 };
   while (Date.now() < tEnd) { box.x = 150 + Math.random() * 90; await page.mouse.move(box.x, box.y); await page.waitForTimeout(250); if (await page.$('#rn-cards.on')) { await page.click('#rn-cards.on .rn-card', { timeout: 1500 }).catch(() => {}); await page.waitForTimeout(400); } if (await page.$('#rn-result:not([hidden])')) break; }
   await page.evaluate(() => { window.__perf.on = false; });
@@ -107,6 +108,7 @@ const result = await page.textContent('#rn-result').catch(() => '');
 let perf = null;
 if (PERF) {
   const P = await page.evaluate(() => { window.__perf.on = false; return window.__perf; }) /* 결과 화면이 뜨기 전까지(달리기 · 카드 · 구출 · 공성전) */, tierEnd = await page.evaluate(() => { try { return JSON.parse(localStorage.getItem('sumus-runner-tier'))?.t ?? 3; } catch { return 3; } });
+  if (arg('profile')) { const { profile } = await cdp.send('Profiler.stop'); (await import('node:fs')).writeFileSync(arg('profile'), JSON.stringify(profile)); }
   await cdp.send('Emulation.setCPUThrottlingRate', { rate: 1 });
   const fr = P.frames.filter(d => d < 5000), secs = fr.reduce((a, b) => a + b, 0) / 1000, mins = secs / 60, pct = q => { const x = [...fr].sort((a, b) => a - b); return x[Math.min(x.length - 1, Math.floor(x.length * q))] || 0; };
   const r1 = x => Math.round(x * 10) / 10;
