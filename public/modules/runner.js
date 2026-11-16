@@ -533,7 +533,7 @@ function whiteFlash(a) { const f = $('rn-flash'); if (!f) return; f.style.transi
 /* ---------- 규칙 사건 → 연출 · 소리 ---------- */
 function onEvent(type, a, b, c, d) {
   const g = G; if (!g) return; const S = g.S, sl = g.slot;
-  if (type === 'shoot') { const v = vw(g, a); v.hitT = .08; if ((g.shotT -= 1) > 0) return; g.shotT = g.feverOn ? 1 : 2; const n = Math.min(g.feverOn ? 5 : 3, 1 + (S.n / 80 | 0)), az = a.type === 'foe' ? a.pz : a.z; for (let i = 0; i < n; i++) { const k = (rnd() * Math.max(1, g.shown)) | 0, tx = a.type === 'wall' ? S.cx + rr(-1.5, 1.5) : a.x + rr(-.4, .4); shoot(g, S.cx + sl.ox[k], S.z + sl.oz[k] + .4, tx, a.type === 'wall' ? rr(.6, 1.8) : .9, az - .6); } if (a.type === 'wall' && (g.wallSnd = (g.wallSnd || 0) + 1) % 4 === 0) snd('wall-hit'); g.shootOpt.crowd = S.n; snd('shoot', g.shootOpt); return; }
+  if (type === 'shoot') { const v = vw(g, a); v.hitT = .08; if ((g.shotT -= 1) > 0) return; g.shotT = g.feverOn && g.tier ? 1 : 2; const n = Math.min(g.feverOn && g.tier ? 5 : 3, 1 + (S.n / 80 | 0)), az = a.type === 'foe' ? a.pz : a.z; for (let i = 0; i < n; i++) { const k = (rnd() * Math.max(1, g.shown)) | 0, tx = a.type === 'wall' ? S.cx + rr(-1.5, 1.5) : a.x + rr(-.4, .4); shoot(g, S.cx + sl.ox[k], S.z + sl.oz[k] + .4, tx, a.type === 'wall' ? rr(.6, 1.8) : .9, az - .6); } if (a.type === 'wall' && (g.wallSnd = (g.wallSnd || 0) + 1) % 4 === 0) snd('wall-hit'); g.shootOpt.crowd = S.n; snd('shoot', g.shootOpt); return; }
   if (type === 'break') { snd('rock-break'); shake(g, .26); g.hitstop = Math.max(g.hitstop, .03); addDebris(g, a.x, .5, a.z, 22, 0, 1.1); addSmoke(g, a.x, .2, a.z, 5, 0, .9, .8); addSparks(g, a.x, .8, a.z, 14, 1, 13); addGlow(g, a.x, .8, a.z, 6, 0, 4, .5, .5, 2); flash(g, a.x, .8, a.z, 2.2, .3); flash(g, a.x, .8, a.z, 1.6, .25, '255,255,255', 'burst'); ring(g, a.x, .2, a.z, 2.6, .4, '255,240,200'); return; }
   if (type === 'crash') { snd('rock-hit'); if (!b) return; shake(g, .45); whiteFlash(.25); addDebris(g, a.x, .5, a.z, 26, a.type === 'crystal' ? 1 : 0, 1.2); addSmoke(g, a.x, .2, a.z, 8, 2, 1, 1); lose(g, b, S.cx); return; }
   if (type === 'saw' || type === 'hammer') { snd(type); if (!b) return; shake(g, type === 'saw' ? .15 : .4); addSparks(g, a.x, .6, a.z, type === 'saw' ? 12 : 8, 1, 14); if (type === 'hammer') { addSmoke(g, a.x, 0, a.z, 6, 0, 1, 1.2); ring(g, a.x, .1, a.z, 2.4, .35, '255,240,210'); } lose(g, b, a.x); return; }
@@ -562,13 +562,13 @@ function onEvent(type, a, b, c, d) {
   // v13.242 적 무리: 다가오면 붉은 경고, 정면 충돌은 느린 동작 + 충돌 빛 + 양쪽이 우르르 깎임, 이기면 함성
   if (type === 'foeWake') { if (!g.foeWarned) { g.foeWarned = true; pill(g, a.boss ? '적 대장이 달려와요!' : '적 무리가 달려와요!', 'flame', 1.4); } screenTint('flame', .1); return; }
   if (type === 'clash') {
-    const cz = (S.z + a.pz) / 2, cxm = (S.cx + a.x) / 2; snd('clash'); g.slow = .55; g.hitstop = .08; g.cam.punch += .08; shake(g, .75); whiteFlash(.4); g.clashFx = 1;
-    flash(g, cxm, 1.2, cz, 6, .55, '255,255,255', 'clash-burst'); flash(g, cxm, 1.2, cz, 4, .4, '255,90,90'); ring(g, cxm, .2, cz, 5, .5, '255,255,255'); ring(g, cxm, .2, cz, 7, .7, '255,90,90', .08);
+    const cz = (S.z + a.pz) / 2, cxm = (S.cx + a.x) / 2; snd('clash'); g.slow = .55; g.hitstop = .08; g.cam.punch += .08; shake(g, .75); whiteFlash(.2); g.clashFx = 1;
+    flash(g, cxm, 1.6, cz + 1, 3.6, .45, '255,255,255', 'clash-burst'); flash(g, cxm, 1.2, cz + 1, 2.6, .35, '255,90,90'); ring(g, cxm, .2, cz, 5, .5, '255,255,255'); ring(g, cxm, .2, cz, 7, .7, '255,90,90', .08);
     addSparks(g, cxm, 1, cz, 30, 2, 16, .7); addSmoke(g, cxm, .2, cz, 8, 0, 1.2, 2); pill(g, a.boss ? '적 대장과 정면 충돌!' : '정면 충돌!', 'flame', 1.1); return;
   }
   if (type === 'fight') {
     const cz = (S.z + a.pz) / 2, cxm = (S.cx + a.x) / 2; if ((g.fightT = (g.fightT || 0) + 1) % 2) snd('rock-hit'); shake(g, .12);
-    addSparks(g, cxm + rr(-1.5, 1.5), rr(.4, 1.4), cz, 5, rnd() < .5 ? 1 : 2, 12, .5); addGlow(g, cxm, 1, cz, 2, 0, 3, .5, .4, 1);
+    if (g.tier || g.fightT % 2) addSparks(g, cxm + rr(-1.5, 1.5), rr(.4, 1.4), cz, 5, rnd() < .5 ? 1 : 2, 12, .5); addGlow(g, cxm, 1, cz, 2, 0, 3, .5, .4, 1);
     for (let i = 0; i < Math.min(3, b); i++) flyer(g, a.x + rr(-1, 1), .4, a.pz + rr(-.5, .5), 3);
     if (c) { for (let i = 0; i < Math.min(3, c); i++) { const k = (rnd() * Math.max(1, g.shown)) | 0; flyer(g, S.cx + sl.ox[k], .4, S.z + sl.oz[k], 0); } syncCrowd(g, 0, 0); }
     if (g.fightT % 3 === 0) { popNum(g, 'minus', '−' + c, S.cx - .8, 2.2, S.z + 1); popNum(g, 'foe', '−' + b, a.x + .8, 2.4, a.pz); }
@@ -920,7 +920,7 @@ function drawObj(g, o, dt, cx, z, alpha) {
     }
     if (P.gateFrame) { proj(g, sx, 0, o.z); const fh = 3.4 * PS, fw = fh * .5; ctx.drawImage(P.gateFrame, PX - fw / 2, PY - fh, fw, fh); }   // 가운데 기둥(그림 74 gate-frame)
     else { proj(g, sx, 2.8, o.z); const tx = PX, ty = PY; proj(g, sx, 0, o.z); ctx.fillStyle = '#f2f6ff'; ctx.fillRect(tx - .1 * PS, ty, .2 * PS, PY - ty); }
-    if ((o.mv || o.sw) && !passed && o.z - S.z < 60 && proj(g, sx, 3.5, o.z)) { const lb = v.lb ||= textSprite(g, o.mv ? '↔ 움직이는 문' : '⇄ 바뀌는 문', 'pill', o.mv ? 'spirit' : 'star'), k = Math.min(1, PS / 40); ctx.drawImage(lb.c, PX - lb.w * k / 2, PY - lb.h * k, lb.w * k, lb.h * k); }
+    if ((o.mv || o.sw) && !passed && g.tier && o.z - S.z < 60 && proj(g, sx, 3.5, o.z)) { const lb = v.lb ||= textSprite(g, o.mv ? '↔ 움직이는 문' : '⇄ 바뀌는 문', 'pill', o.mv ? 'spirit' : 'star'), k = Math.min(1, PS / 40); ctx.drawImage(lb.c, PX - lb.w * k / 2, PY - lb.h * k, lb.w * k, lb.h * k); }
     return;
   }
   if (o.type === 'wall') return drawWall(g, o, dt);
@@ -969,28 +969,28 @@ function drawWall(g, o, dt) {
   if (o.done || !proj(g, 0, 0, o.z)) return;
   const ctx = g.ctx, P = g.SPR, v = vw(g, o), H = 3.1, ROAD = RUNNER.ROAD + .25, wob = v.hitT > 0 ? rr(-.05, .05) : 0, crack = o.hp < o.max * .33 ? 2 : o.hp < o.max * .66 ? 1 : 0;
   if (v.hitT > 0) v.hitT -= dt;
-  const segs = v.segs ||= o.gap ? [[-ROAD, o.gap.x - o.gap.w / 2], [o.gap.x + o.gap.w / 2, ROAD]] : [[-ROAD, ROAD]], tw = H * 2;   // 토막은 벽마다 한 번만 만든다
+  const segs = v.segs ||= o.gap ? [[-ROAD, o.gap.x - o.gap.w / 2], [o.gap.x + o.gap.w / 2, ROAD]] : [[-ROAD, ROAD]], tw = g.tier ? H * 2 : 99;   // 최저 단계는 토막마다 한 장으로 늘려 그림(그리기 횟수 줄임)   // 토막은 벽마다 한 번만 만든다
   if (o.gap && g.T.glow && proj(g, o.gap.x, .1, o.z)) { const gw = o.gap.w * PS * 1.2; ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .55 + .25 * Math.sin(g.clock * 6); ctx.drawImage(g.tg.gateGood, PX - gw / 2, PY - gw * .8, gw, gw); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
   let big = 0, bx = 0;
   for (const [x0, x1] of segs) {
     if (x1 - x0 < .2) continue;
     if (x1 - x0 > big) { big = x1 - x0; bx = (x0 + x1) / 2; }
     for (let x = x0; x < x1 - .01; x += tw) {
-      const xe = Math.min(x1, x + tw), f = (xe - x) / tw; if (!proj(g, x + wob, H, o.z)) continue; const ax = PX, ay = PY; proj(g, xe + wob, 0, o.z); const w = PX - ax, h = PY - ay, sw = P.wall.width * f;
+      const xe = Math.min(x1, x + tw), f = g.tier ? (xe - x) / tw : 1; if (!proj(g, x + wob, H, o.z)) continue; const ax = PX, ay = PY; proj(g, xe + wob, 0, o.z); const w = PX - ax, h = PY - ay, sw = P.wall.width * f;
       ctx.drawImage(P.wall, 0, 0, sw, P.wall.height, ax, ay, w, h);
-      if (crack) ctx.drawImage(P.wallCrack[crack - 1], 0, 0, sw, P.wall.height, ax, ay, w, h);
-      if (v.hitT > 0) { ctx.globalAlpha = .4; ctx.drawImage(P.wallW, 0, 0, sw, P.wall.height, ax, ay, w, h); ctx.globalAlpha = 1; }
+      if (crack && g.tier) ctx.drawImage(P.wallCrack[crack - 1], 0, 0, sw, P.wall.height, ax, ay, w, h);   // 최저 단계는 금 · 번쩍 없이(넓은 그림을 덜 칠함)
+      if (v.hitT > 0 && g.tier) { ctx.globalAlpha = .4; ctx.drawImage(P.wallW, 0, 0, sw, P.wall.height, ax, ay, w, h); ctx.globalAlpha = 1; }
     }
   }
   if (big && proj(g, bx, H * .5, o.z)) { const hit = v.hitT > 0; drawNum(g, 'wall', ns(Math.ceil(o.hp)), PX + (hit ? rr(-.06, .06) * PS : 0), PY, Math.min(2, PS / 26) * (hit ? 1.1 : 1)); }
 }
 // v13.242 적 무리: 빨간 정령(품질별 최대 14 · 24 · 36 · 50마리) 해바라기 대형 · 통통 뛰며 달려옴 · 머리 위 빨간 숫자 배지. 적 대장은 큰 정령 하나 + 무리.
-const FOE_DRAW = [14, 24, 36, 50];
+const FOE_DRAW = [10, 24, 36, 50];
 function drawFoe(g, o, dt, alpha) {
-  if (o.done) return;
-  const ctx = g.ctx, P = g.SPR, S = g.S, moving = o.on && S.clash !== o, z = o.on ? o.pz + (moving ? RUNNER.FOE_SPEED * RUNNER.DT * (1 - alpha) : 0) : o.z, n = Math.min(Math.ceil(o.hp), FOE_DRAW[g.tier]), t = g.clock, v = vw(g, o);
+  if (o.done) return;   // 싸우는 동안은 1.4단위 앞에 그려 내 무리에 가리지 않게(연출만)
+  const ctx = g.ctx, P = g.SPR, S = g.S, moving = o.on && S.clash !== o, z = o.on ? o.pz + (moving ? RUNNER.FOE_SPEED * RUNNER.DT * (1 - alpha) : 1.4) : o.z, n = Math.min(Math.max(6, Math.ceil(o.hp)), FOE_DRAW[g.tier]), t = g.clock, v = vw(g, o);
   if (v.hitT > 0) v.hitT -= dt;
-  const Rf = foeR(o.hp), spread = Rf / crowdR(Math.min(150, o.hp)) * 1.05, sz0 = g.spiritU * 1.25, fight = S.clash === o;   // 적 정령은 조금 크게(멀리서도 붉은 무리가 읽히게)
+  const Rf = foeR(o.hp), spread = Rf / crowdR(Math.min(150, o.hp)) * 1.15, sz0 = g.spiritU * 1.35, fight = S.clash === o;   // 적 정령은 조금 크게(멀리서도 붉은 무리가 읽히게)
   if (proj(g, o.x, 0, z)) { const w = (Rf * 2 + .6) * PS; ctx.globalAlpha = .5; ctx.drawImage(P.shadow, PX - w / 2, PY - w * .14, w, w * .32); ctx.globalAlpha = 1; }
   if (g.T.glow && o.on && proj(g, o.x, .6, z)) { const w = (Rf * 2.4 + 1) * PS; ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .28 + .1 * Math.sin(t * 7); ctx.drawImage(g.tg.foeGlow, PX - w / 2, PY - w * .5, w, w); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
   for (let oi = DRAW_MAX - 1; oi >= 0; oi--) {
@@ -1063,7 +1063,7 @@ function drawCrowd(g, dt, cx, z) {
   if (siege && proj(g, cx, 0, z + Rr + .8)) { const w = 2.6 * PS, h = w * 120 / 140; ctx.drawImage(P.cannon, PX - w / 2, PY - h * .92, w, h); }
   if (proj(g, cx, 0, z)) { const w = (Rr * 2 + .8) * PS; ctx.globalAlpha = .55; ctx.drawImage(P.shadow, PX - w / 2, PY - w * .14, w, w * .32); ctx.globalAlpha = 1; }
   // 피버: 무리 아래 금빛 숨(더하기). 그림 75 fever-aura가 있으면 그 그림.
-  if (g.feverOn && proj(g, cx, .5, z)) { const w = (Rr * 2.8 + 1.5) * PS * (1 + .08 * Math.sin(t * 9)); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .55; ctx.drawImage(g.tg.aura, PX - w / 2, PY - w * .55, w, w); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
+  if (g.feverOn && g.T.glow && proj(g, cx, .5, z)) { const w = (Rr * 2.8 + 1.5) * PS * (1 + .08 * Math.sin(t * 9)); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .55; ctx.drawImage(g.tg.aura, PX - w / 2, PY - w * .55, w, w); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
   if (g.cheerT > 0) g.cheerT -= dt;
   // 대형: 숨 쉬듯 퍼졌다 모이고(breath), 좌우로 움직이면 뒤쪽이 늦게 따라온다(lag). 맨 앞줄(앞 30%)은 조금 크게 · 테두리 빛.
   const spring = 1 - Math.exp(-dt * 7), spr = P.spirit, breath = 1 + Math.sin(t * 1.7) * .06 + (run ? 0 : -.04), lag = -g.vx * .035, front = Math.sqrt(Math.max(1, g.shown)) * .22 * .85 * .55;
@@ -1076,7 +1076,7 @@ function drawCrowd(g, dt, cx, z) {
     if (!proj(g, cx + sl.ox[i], hop, z + sl.oz[i])) continue;
     const lead = TOZ[i] > front, pp = sl.pop[i], sz = g.spiritU * PS * (pp < 1 ? easeOut(pp) * 1.15 : 1) * (lead ? 1.1 : 1), sq = run ? 1 + Math.sin(t * HF[i] * 2 + PH[i]) * .07 : 1;
     ctx.drawImage(g.cheerT > 0 && P.spiritCheer ? P.spiritCheer : spr, PX - sz / 2, PY - sz * sq, sz, sz * sq);
-    if (g.feverOn && (i & 3) === 0) { ctx.globalAlpha = .22 + .12 * Math.sin(t * 12 + PH[i]); ctx.drawImage(P.spiritW, PX - sz / 2, PY - sz * sq, sz, sz * sq); ctx.globalAlpha = 1; }
+    if (g.feverOn && g.T.rim && (i & 3) === 0) { ctx.globalAlpha = .22 + .12 * Math.sin(t * 12 + PH[i]); ctx.drawImage(P.spiritW, PX - sz / 2, PY - sz * sq, sz, sz * sq); ctx.globalAlpha = 1; }
     else if (lead && g.T.rim) { ctx.globalAlpha = .16 + .08 * Math.sin(t * 6 + PH[i]); ctx.drawImage(P.spiritW, PX - sz / 2, PY - sz * sq, sz, sz * sq); ctx.globalAlpha = 1; }
   }
   // 구한 펫: 하늘에서 무리 앞으로 내려앉는다(0.35초) → 착지 충격파

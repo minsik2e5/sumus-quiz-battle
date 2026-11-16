@@ -194,7 +194,6 @@
 .rn-streak[data-n="1"] i:nth-child(-n+1),.rn-streak[data-n="2"] i:nth-child(-n+2),.rn-streak[data-n="3"] i{background:#ffd24a;transform:scale(1.2)}
 .rn-streak.hot i{animation:rn-hot .4s ease-in-out infinite alternate}
 @keyframes rn-hot{from{opacity:.6}to{opacity:1}}
-.rn-game.fever .rn-vig{opacity:1;background:radial-gradient(ellipse at center,transparent 58%,rgba(255,190,40,.42) 100%);animation:rn-fever-edge .45s ease-in-out infinite alternate}
-@keyframes rn-fever-edge{from{opacity:.55}to{opacity:1}}
+.rn-game.fever .rn-vig{opacity:1;background:radial-gradient(ellipse at center,transparent 58%,rgba(255,190,40,.42) 100%)}
 .rn-game.fever .rn-count{box-shadow:0 0 0 2px #ffd24a}
 .rn-res-list li.fever b{color:#ffb020}
