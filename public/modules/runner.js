@@ -253,17 +253,24 @@ function initEngine(g) {
   buildMats(g);
   const want = [['pet', petSrc(g.pet.key, g.pet.form)], ...ART_KEYS.concat(themeKeys(g.th)).filter(k => art(k)).map(k => [k, art(k)]), ...MAT_KEYS.filter(k => ARENA_ART.has('mat-' + k)).map(k => ['mat:' + k, `/assets/arena/mat-${k}.webp`])];
   const use = (k, im) => { if (!im) return; if (k.startsWith('mat:')) { const c = mk(im.width, im.height); c.getContext('2d').drawImage(im, 0, 0); g.mat[k.slice(4)] = c; g.matArt.add(k.slice(4)); g.tintCache.clear(); } else { g.img[k] = im; if (k.startsWith('wall-chunk-')) { const c = mk(im.width, im.height); c.getContext('2d').drawImage(im, 0, 0); g.mat.wchunk = c; } if (ART_MAT[k]) { const c = mk(im.width, im.height); c.getContext('2d').drawImage(im, 0, 0); g.mat[ART_MAT[k]] = c; } } };
-  for (const [k, src] of want) { const im = READY.get(src); if (im) use(k, im); else { getImg(src).then(im2 => { if (G !== g || !im2) return; use(k, im2); buildSprites(g); buildSky(g); prebake(g); }); } }
+  for (const [k, src] of want) { const im = READY.get(src); if (im) use(k, im); else { getImg(src).then(im2 => { if (G !== g || !im2) return; use(k, im2); g.sprS2 = g.logS2 = g.S2; buildSprites(g); buildSky(g); prebake(g); }); } }
   resize(g);   // 준비된 그림을 먼저 넣고 하늘 · 정령을 한 번만 굽는다(예전에는 두 번)
   g.ctx.drawImage(g.sky, 0, 0);   // 굽기를 둘로 나눈 사이의 한 프레임에도 하늘이 보이게
 }
 // 미리 굽기: 판 중에 쓰는 색 입힌 빛 · 고리 · 연기 그림과 길 색 표를 판 시작 전에 만들어 둔다(카운트다운 동안).
 function prebake(g) {
+  // v13.243 판 중 첫 글자 그림 굽기 없애기: 판에서 뜨는 알림 글자를 카운트다운 동안 미리 굽는다(처음 뜰 때 끊김 방지)
+  if (g.SPR.text) {
+    for (const [t, el] of [['벽 격파!', 'star'], ['틈으로 쏙!', 'spirit'], ['적 무리가 달려와요!', 'flame'], ['적 대장이 달려와요!', 'flame'], ['정면 충돌!', 'flame'], ['적 대장과 정면 충돌!', 'flame'], ['승리!', 'star'], ['적 대장 격파!', 'star'],
+      ['공성전! 화면을 누르고 있으면 발사', 'star'], ['미끄러워요! 조종이 느려져요', 'ice'], ['↔ 움직이는 문', 'spirit'], ['⇄ 바뀌는 문', 'star']]) textSprite(g, t, 'pill', el);
+    textSprite(g, '피버 타임!', 'cut', 'star');
+  }
   const T = (k, rgb) => tint(g, k, rgb);
   g.tg = { gateGood: T('glow', '90,170,255'), gateBad: T('glow', '255,80,90'), crystal: T('glow', '140,220,255'), trail: T('glow', '150,225,255'), speedW: T('speed', '255,255,255'),
     speedF: T('speed', '255,214,90'), aura: g.matArt.has('fever-aura') || g.img['fever-aura'] ? g.mat['fever-aura'] : T('glow', '255,200,70'), foeGlow: T('glow', '255,70,70'), lava: T('glow', '255,120,40'), gold: T('glow', '255,220,120'),
     clash: g.img['clash-burst'] ? g.mat['clash-burst'] : T('burst', '255,230,190') };
-  for (const rgb of ['255,90,90', '255,200,80']) T('ring', rgb);
+  for (const rgb of ['255,90,90', '255,200,80', '255,214,140']) T('ring', rgb);
+  for (const rgb of ['255,90,90', '255,220,120']) T('glow', rgb);   // 충돌 · 승리 · 적 격파 빛(처음 쓸 때 굽지 않게)
   for (const rgb of ['140,210,255', '255,120,120', '160,230,255', '255,214,140', '255,180,90', ...Object.values(EL_RGB)]) T('glow', rgb);
   for (const rgb of ['255,240,200', '170,230,255', '255,150,150', '255,240,210', '200,240,255', '255,255,255', '255,230,180', ...Object.values(EL_RGB)]) T('ring', rgb);
   for (const rgb of Object.values(EL_RGB)) T('speed', rgb);
@@ -283,6 +290,8 @@ function floorS2(g) { const d = Math.min(devicePixelRatio || 1, 2); return Math.
 // 비상 단계(g.emerg, 선생님 확인): 최저(하한)에서도 판 중 4초(2초 창 둘) 평균 프레임이 EMERG_MS(25ms)를 넘고 화면 30Hz 묶임도 아니면(캔버스를 CPU로 그리거나 GPU가 약한 기기)
 //   한 단계씩 내려간다: 하한(세로 폰 538px) → 1 중간(하한 × 0.75, 약 400px) → 2 예전 최저 크기(배율 0.68, 265px). 단계 사이 6초 쉼, 그 판 동안만이고 기억하지 않는다.
 //   20ms 넘는 프레임이 12% 넘어도(60Hz에서 자주 끊김) 내려간다. 카운트다운에서 이미 무거우면(하한 예상 18ms↑) 처음부터 중간으로(중간도 18ms↑면 예전 크기로) 시작한다. 다음 판은 다시 하한부터. RES_EMERGENCY = false면 끈다.
+// v13.243: 카운트다운(효과 없는 장면) 예상 기준 18 → 12ms. 판에서는 효과 · 적 무리 · 벽이 더해져 카운트다운보다 무겁다 → 판 중에 다시 내려가며 캔버스를 다시 만들던 끊김을 없앰(빠른 폰은 카운트다운이 5ms 안팎이라 그대로)
+const EMERG_CD = 12;
 const RES_EMERGENCY = true, EMERG_MS = 25, EMERG_MID = .75, PHONE_AREA = 390 * 844;
 const emergS2 = g => .68 * Math.min(1, Math.sqrt(PHONE_AREA / (g.cssW * g.cssH)));
 function s2Of(g, t) { if (g.emerg && t === 0) return Math.round(Math.min(floorS2(g) * (g.emerg === 1 ? EMERG_MID : 1), g.emerg === 1 ? 9 : emergS2(g)) * 100) / 100; const top = Math.max(floorS2(g), Math.min(devicePixelRatio || 1, 2)), lo = floorS2(g), r = TIERS[t].res; return Math.round((lo + (top - lo) * r / 3) * 100) / 100; }
@@ -291,7 +300,17 @@ function resize(g) {
   g.S2 = s2Of(g, g.tier);
   g.cvs.width = Math.round(g.cssW * g.S2); g.cvs.height = Math.round(g.cssH * g.S2);
   g.F = Math.min(g.cssW * 1.05, g.cssH * .62) * g.S2; g.CX = g.cvs.width / 2; g.HZ = g.cvs.height * .25;
-  buildSky(g); buildSprites(g);
+  buildSky(g);
+  // v13.243 판 중 다시 굽기 0: 그림(정령 · 숫자 아틀라스 · 성 · 벽 …)은 판에서 처음 정한 해상도(또는 더 높을 때만 다시)로 한 번 굽고,
+  //   해상도가 내려가면 다시 굽지 않는다. 화면 픽셀로 크기를 적어 둔 것(숫자 아틀라스 · 글자 그림 · 컷인 펫 · 피버 판)만 비율로 고친다.
+  if (!g.sprS2 || g.S2 > g.sprS2 * 1.01) { g.sprS2 = g.logS2 = g.S2; buildSprites(g); }
+  else if (g.logS2 !== g.S2) { rescaleLogical(g, g.S2 / g.logS2); g.logS2 = g.S2; }
+}
+function rescaleLogical(g, r) {
+  const P = g.SPR;
+  for (const A of Object.values(P.digits)) { A.cw *= r; A.ch *= r; A.adv *= r; }
+  for (const s of P.text.values()) { s.w *= r; s.h *= r; }
+  P.petBigW = (P.petBigW || P.petBig?.width || 0) * r; P.feverW = (P.feverW || P.feverPlate?.width || 0) * r;
 }
 function radial(c, r0, stops, Rr, cx, cy) { const x = cx ?? (r0 || 0), y = cy ?? (r0 || 0), rad = Rr ?? r0; const gr = c.createRadialGradient(x, y, 0, x, y, rad); for (const [o, col] of stops) gr.addColorStop(o, col); c.fillStyle = gr; c.beginPath(); c.arc(x, y, rad, 0, TAU); c.fill(); }
 function roundRect(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
@@ -341,7 +360,7 @@ function backdrop(im) {
 function buildSky(g) {
   const W = g.cvs.width, H = g.cvs.height, HZ = g.HZ, c = mk(W, H), x = c.getContext('2d', { alpha: false });   // 불투명 캔버스: 매 프레임 화면 전체를 섞기 없이 복사
   g.fogGrad = g.ctx.createLinearGradient(0, HZ, 0, HZ + H * .2); const fg = THEME.fog.join(','); g.fogGrad.addColorStop(0, `rgba(${fg},.85)`); g.fogGrad.addColorStop(1, `rgba(${fg},0)`);
-  g.roadMip = roadMip(g.img['road-' + g.th]);
+  g.roadMip = g.img['road-' + g.th] ? (MIPS.get(g.img['road-' + g.th]) || MIPS.set(g.img['road-' + g.th], roadMip(g.img['road-' + g.th])).get(g.img['road-' + g.th])) : null;   // 축소본은 그림마다 한 번(해상도가 바뀌어도 다시 안 만듦)
   if (g.img['bg-' + g.th]) backdrop(g.img['bg-' + g.th]);
   if (g.img['bg-' + g.th]) { const im = g.img['bg-' + g.th], sc = Math.max(W / im.width, H / im.height); x.drawImage(im, (W - im.width * sc) / 2, (H - im.height * sc) / 2, im.width * sc, im.height * sc); g.sky = c; return; }
   let lg = x.createLinearGradient(0, 0, 0, HZ); lg.addColorStop(0, THEME.skyTop); lg.addColorStop(.7, THEME.skyMid); lg.addColorStop(1, THEME.horizon); x.fillStyle = lg; x.fillRect(0, 0, W, HZ + 1);
@@ -391,7 +410,7 @@ function buildSprites(g) {
   P.gateFrame = g.img['gate-frame'] ? fromImg(g, 'gate-frame', 192, 384) : null; P.gateFrameS = P.gateFrame && shrink(P.gateFrame, 96);
   const sh = mk(64, 32), sx = sh.getContext('2d'), gr = sx.createRadialGradient(32, 16, 0, 32, 16, 32); gr.addColorStop(0, 'rgba(40,40,80,.4)'); gr.addColorStop(1, 'rgba(40,40,80,0)'); sx.setTransform(1, 0, 0, .5, 0, 8); sx.fillStyle = gr; sx.fillRect(0, -16, 64, 64); P.shadow = sh;
   P.pet = g.img.pet ? shrink(g.img.pet, Math.round(150 * S)) : null;   // 그리는 폭(2.5 × 거리 배율 ≈ 135 × 배율)보다 크게
-  P.petBig = g.img.pet ? shrink(g.img.pet, Math.round(Math.min(g.cssW * .8, 300) * S)) : null;
+  P.petBig = g.img.pet ? shrink(g.img.pet, Math.round(Math.min(g.cssW * .8, 300) * S)) : null; P.petBigW = P.petBig?.width || 0;
   P.rock = fromImg(g, 'rock-num', 256, 240); if (!P.rock) { P.rock = mk(160 * S, 150 * S); const x = P.rock.getContext('2d'); x.scale(S * 160 / 128, S * 150 / 128); rock(x, 128, '#9b8b78', .92); }
   P.rockW = whiteOf(P.rock);
   for (const [k, c1, c2, edge] of [['gate-good', 'rgba(70,170,255,.62)', 'rgba(40,120,240,.35)', '#bfe6ff'], ['gate-bad', 'rgba(255,90,100,.62)', 'rgba(220,40,70,.35)', '#ffc4c4']]) {
@@ -452,7 +471,7 @@ function buildThemed(g) {
   P.slide = fromImg(g, 'ice-slide', Math.round(200 * S), Math.round(200 * S)); if (!P.slide) { const w = Math.round(200 * S), c = mk(w, w), x = c.getContext('2d'), lg = x.createLinearGradient(0, 0, w, w); lg.addColorStop(0, 'rgba(240,252,255,.9)'); lg.addColorStop(.5, 'rgba(170,225,255,.85)'); lg.addColorStop(1, 'rgba(110,180,235,.9)'); x.fillStyle = lg; x.fillRect(0, 0, w, w); x.strokeStyle = 'rgba(255,255,255,.8)'; x.lineWidth = 3 * S; for (let i = 0; i < 6; i++) { x.beginPath(); x.moveTo(w * (i / 6), 0); x.lineTo(w * (i / 6) + w * .3, w); x.stroke(); } P.slide = c; }
   P.pillar = fromImg(g, 'fire-pillar', Math.round(96 * S), Math.round(256 * S)); if (!P.pillar) { const w = Math.round(96 * S), h = Math.round(256 * S), c = mk(w, h), x = c.getContext('2d'); for (const [k, col] of [[1, 'rgba(200,40,10,.85)'], [.72, 'rgba(255,130,30,.9)'], [.42, 'rgba(255,230,140,.95)']]) { x.fillStyle = col; x.beginPath(); x.moveTo(w / 2 - w * .45 * k, h); x.bezierCurveTo(w / 2 - w * .5 * k, h * .5, w / 2 - w * .2 * k, h * .2, w / 2, 0); x.bezierCurveTo(w / 2 + w * .2 * k, h * .2, w / 2 + w * .5 * k, h * .5, w / 2 + w * .45 * k, h); x.fill(); } P.pillar = c; }
   { const w = Math.round(128 * S), c = mk(w, w / 2), x = c.getContext('2d'); x.translate(w / 2, w / 4); x.scale(1, .45); radial(x, 0, [[0, 'rgba(255,200,90,1)'], [.35, 'rgba(255,90,20,.9)'], [.7, 'rgba(60,20,10,.85)'], [1, 'rgba(30,10,8,0)']], w / 2); P.vent = c; }
-  P.feverPlate = g.img['fever-plate'] ? fromImg(g, 'fever-plate', Math.round(320 * S), Math.round(160 * S)) : null;
+  P.feverPlate = g.img['fever-plate'] ? fromImg(g, 'fever-plate', Math.round(320 * S), Math.round(160 * S)) : null; P.feverW = P.feverPlate?.width || 0;
 }
 function buildCastle(g) {
   const S = g.S2, W = 300 * S, H = 300 * S, c = mk(W, H), x = c.getContext('2d');
@@ -469,7 +488,7 @@ function buildCastle(g) {
   for (let l = 1; l <= (g.cracks || 0); l++) crackCastle(g, l);
 }
 function crackCastle(g, level) {
-  const x = g.SPR.castle.getContext('2d'); x.save(); x.scale(g.S2, g.S2); x.globalCompositeOperation = 'source-atop'; x.strokeStyle = 'rgba(40,28,18,.85)'; x.lineCap = 'round';
+  const x = g.SPR.castle.getContext('2d'); x.save(); x.scale(g.sprS2 || g.S2, g.sprS2 || g.S2); x.globalCompositeOperation = 'source-atop'; x.strokeStyle = 'rgba(40,28,18,.85)'; x.lineCap = 'round';
   for (let i = 0; i < 4 + level * 3; i++) { let cx = 30 + (i * 67 + level * 41) % 240, cy = 60 + (i * 53 + level * 29) % 210; x.lineWidth = 1.5 + (i % 3); x.beginPath(); x.moveTo(cx, cy); for (let k = 0; k < 6; k++) { cx += ((i + k) % 5 - 2) * 6; cy += 6 + (k * 3 % 10); x.lineTo(cx, cy); } x.stroke(); }
   x.restore();
 }
@@ -784,7 +803,7 @@ function autoTier(g, warm = false) {
     while (t > 0 && mid * (s2Of(g, t) / sc) ** 2 * (t > g.tier ? 1.25 : 1) > 10) t--;   // 올라갈 때는 25% 더 여유를 본다
     // 효과 없는 카운트다운 장면도 하한에서 18ms를 넘을 만큼 무거우면 처음부터 비상 중간으로(그 판만)
     //   중간 크기(0.75배)로도 18ms를 넘을 만큼 무거우면 바로 예전 최저 크기로
-    if (RES_EMERGENCY && t === 0 && mid * (floorS2(g) / sc) ** 2 > 18) return setTier(g, 0, mid * (floorS2(g) * EMERG_MID / sc) ** 2 > 18 ? 2 : 1);
+    if (RES_EMERGENCY && t === 0 && mid * (floorS2(g) / sc) ** 2 > EMERG_CD) return setTier(g, 0, mid * (floorS2(g) * EMERG_MID / sc) ** 2 > EMERG_CD ? 2 : 1);
     if (t !== g.tier) setTier(g, t);
     return;
   }
@@ -872,7 +891,7 @@ function drawFever(g, dt) {
     else {
       const p = F.t / 1.3, sc = p < .15 ? .5 + easeOut(p / .15) * .7 : 1.2 - (p - .15) * .2, a = p > .8 ? (1 - p) / .2 : 1, s = F.spr, cy = H * .36;
       ctx.globalAlpha = a;
-      if (g.SPR.feverPlate) { const pw = g.SPR.feverPlate.width * sc, ph = g.SPR.feverPlate.height * sc; ctx.drawImage(g.SPR.feverPlate, W / 2 - pw / 2, cy - ph / 2, pw, ph); }
+      if (g.SPR.feverPlate) { const pw = g.SPR.feverW * sc, ph = pw / 2; ctx.drawImage(g.SPR.feverPlate, W / 2 - pw / 2, cy - ph / 2, pw, ph); }
       ctx.drawImage(s.c, W / 2 - s.w * sc / 2, cy - s.h * sc / 2, s.w * sc, s.h * sc);
       const band = g.img['light-band'] ? g.img['light-band'] : g.tg.speedF; ctx.globalCompositeOperation = 'lighter';
       for (let k = 0; k < 2; k++) { const y = k ? H * (.15 + p * .7) : H * (.85 - p * .7), bw = W * 1.4; ctx.globalAlpha = a * .6; ctx.drawImage(band, W / 2 - bw / 2 + (k ? 1 : -1) * (p - .5) * W * .6, y - 30 * S2, bw, 60 * S2); }
@@ -957,6 +976,7 @@ function drawRoad(g) {
 //   타일 한 장 = 길 4단위. 띠 위아래 깊이로 타일 줄을 고르고, 타일 경계를 넘으면 두 번에 나눠 찍어 이음매가 없다. 멀리는 안개 그라디언트 한 장.
 const frac = v => v - Math.floor(v), TILE_Z = 4;
 // 길 타일 축소본: 불투명 캔버스(섞기 없음) 256 · 128 · 64 · 32px. 먼 줄은 작은 것을 써서 큰 그림을 줄여 그리는 비용을 없앤다(판 전에 한 번).
+const MIPS = new Map();
 function roadMip(img) {
   if (!img) return null; const out = []; let src = img;
   for (let w = 256; w >= 32; w /= 2) { const h = Math.round(w * img.height / img.width), c = mk(w, h), x = c.getContext('2d', { alpha: false }); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, w, h); out.push(c); src = c; }
@@ -1083,7 +1103,7 @@ function drawFoe(g, o, dt, alpha) {
   const ctx = g.ctx, P = g.SPR, S = g.S, moving = o.on && S.clash !== o, z = o.on ? o.pz + (moving ? RUNNER.FOE_SPEED * RUNNER.DT * (1 - alpha) : 1.4) : o.z, n = Math.min(Math.max(6, Math.ceil(o.hp)), FOE_DRAW[g.tier]), t = g.clock, v = vw(g, o);
   if (v.hitT > 0) v.hitT -= dt;
   const Rf = foeR(o.hp), spread = Rf / crowdR(Math.min(150, o.hp)) * 1.35, sz0 = g.spiritU * 1.75, fight = S.clash === o;   // 적 정령은 조금 크게(멀리서도 붉은 무리가 읽히게)
-  if (proj(g, o.x, 0, z)) { const w = (Rf * 2 + .6) * PS; ctx.globalAlpha = .5; ctx.drawImage(P.shadow, PX - w / 2, PY - w * .14, w, w * .32); ctx.globalAlpha = 1; }
+  if (g.tier && proj(g, o.x, 0, z)) { const w = (Rf * 2 + .6) * PS; ctx.globalAlpha = .5; ctx.drawImage(P.shadow, PX - w / 2, PY - w * .14, w, w * .32); ctx.globalAlpha = 1; }
   if (g.T.glow && o.on && proj(g, o.x, .6, z)) { const w = (Rf * 2.4 + 1) * PS; ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .28 + .1 * Math.sin(t * 7); ctx.drawImage(g.tg.foeGlow, PX - w / 2, PY - w * .5, w, w); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
   for (let oi = DRAW_MAX - 1; oi >= 0; oi--) {
     const i = ORDER[oi]; if (i >= n) continue;
@@ -1093,7 +1113,7 @@ function drawFoe(g, o, dt, alpha) {
   }
   if (o.boss && proj(g, o.x, Math.abs(Math.sin(t * 5)) * .3, z - Rf - .3)) { const w = 2.2 * PS; ctx.drawImage(P.foeBoss, PX - w / 2, PY - w, w, w); }
   // 다가오는 동안: 발밑 붉은 고리(숨 쉬듯) + 큰 숫자 배지 → 1~2초 전부터 "빨간 무리가 온다"가 읽힌다
-  if (o.on && !fight && proj(g, o.x, .05, z)) { const w = (Rf * 2.2 + .8) * PS * (1 + .06 * Math.sin(t * 10)); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .8; ctx.drawImage(tint(g, 'ring', '255,90,90'), PX - w / 2, PY - w * .18, w, w * .36); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
+  if (o.on && !fight && g.tier && proj(g, o.x, .05, z)) { const w = (Rf * 2.2 + .8) * PS * (1 + .06 * Math.sin(t * 10)); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .8; ctx.drawImage(tint(g, 'ring', '255,90,90'), PX - w / 2, PY - w * .18, w, w * .36); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
   if (proj(g, o.x, 1.9 + Rf * .35, z)) {
     const str = ns(Math.ceil(o.hp)), sc = Math.min(1.5, PS / ((o.on ? 13 : 17) * g.S2)), A = P.digits.foe, w = A.adv * str.length * sc + 26 * g.S2 * sc, h = A.ch * sc * .9;
     ctx.fillStyle = 'rgba(90,10,20,.82)'; roundRect(ctx, PX - w / 2, PY - h / 2, w, h, h / 2); ctx.fill(); ctx.lineWidth = 2 * g.S2; ctx.strokeStyle = '#ff9a9a'; ctx.stroke();
@@ -1260,7 +1280,7 @@ function drawCutin(g, dt) {
   ctx.globalCompositeOperation = 'lighter'; const sp = c.sp;
   for (let i = 0; i < g.T.cutLines; i++) { const yy = (-.45 + .9 * ((i * .618) % 1)) * bh, len = W * (.5 + ((i * .37) % .5)), xx = W * .9 - ((c.t * 2.6 * W + i * 97 * S) % (W * 2.2)); ctx.globalAlpha = .55; ctx.drawImage(sp, xx, yy - 10 * S, len, 22 * S); }
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
-  const big = g.SPR.petBig; if (big) { const bw = big.width, slide = t < .3 ? 1 - easeOut(t / .3) : t > .7 ? -easeOut((t - .7) / .3) : 0; ctx.drawImage(big, slide * W * .9 + bw * .15 - bw / 2, -bw * .55, bw, bw * big.height / big.width); }
+  const big = g.SPR.petBig; if (big) { const bw = g.SPR.petBigW || big.width, slide = t < .3 ? 1 - easeOut(t / .3) : t > .7 ? -easeOut((t - .7) / .3) : 0; ctx.drawImage(big, slide * W * .9 + bw * .15 - bw / 2, -bw * .55, bw, bw * big.height / big.width); }
   const s1 = c.s1, s2 = c.s2, sc = t < .25 ? 1.6 - t / .25 * .6 : 1;
   ctx.drawImage(s1.c, -W * .2 - s1.w * sc / 2, -bh * .2 - s1.h * sc / 2, s1.w * sc, s1.h * sc); ctx.drawImage(s2.c, -W * .14 - s2.w * sc * .4, bh * .2 - s2.h * sc * .4, s2.w * sc * .8, s2.h * sc * .8);
   ctx.restore();

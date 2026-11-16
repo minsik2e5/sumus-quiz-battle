@@ -185,7 +185,7 @@ export async function runRunnerChecks(assert) {
       '안정화: 길은 사다리꼴 한 장(난간 포함) + 무늬 띠(화면 4~5px) + 가장자리 직선을 화면 픽셀로 덮는 매끈한 테두리 띠(clip 없음), 난간 윗줄 · 기둥 원본 해상도');
     assert(ui.includes('const RES_EMERGENCY = true, EMERG_MS = 25, EMERG_MID = .75, PHONE_AREA = 390 * 844;') && ui.includes('floorS2(g) * (g.emerg === 1 ? EMERG_MID : 1)')
       && ui.includes('if (RES_EMERGENCY && (avg > EMERG_MS || slow > .12) && !(w.capped && prev.capped)) { setTier(g, 0, g.emerg + 1); g.lastWin = null; }') && ui.includes('if (g.emerg >= 2 || !prev || g.clock - (g.tierAt || 0) < 6) return;')
-      && ui.includes('if (RES_EMERGENCY && t === 0 && mid * (floorS2(g) / sc) ** 2 > 18) return setTier(g, 0, mid * (floorS2(g) * EMERG_MID / sc) ** 2 > 18 ? 2 : 1);') && ui.includes('tier: savedTier(), emerg: 0,')
+      && ui.includes('if (RES_EMERGENCY && t === 0 && mid * (floorS2(g) / sc) ** 2 > EMERG_CD) return setTier(g, 0, mid * (floorS2(g) * EMERG_MID / sc) ** 2 > EMERG_CD ? 2 : 1);') && ui.includes('tier: savedTier(), emerg: 0,')
       && /\n  writePref\(TIER_KEY, JSON\.stringify\(\{ t, at: Date\.now\(\) \}\)\);   \/\/ 비상 단계는 기억하지 않는다/.test(ui) && ui.includes('if (g.emerg >= 2) ctx.imageSmoothingEnabled = false;'),
       '안정화 비상 단계(선생님 확인): 하한 → 중간(0.75배) → 예전 최저, 4초 평균 25ms 초과 또는 20ms↑ 프레임 12%↑(30Hz 묶임 아님)일 때 한 단계씩 6초 쉼, 카운트다운이 무거우면 중간부터, 그 판만(기억 안 함, 품질 기억 writePref는 살아 있음)');
     assert(ui.includes('Math.min(1.8, sc / (17 * g.S2), fitN)') && ui.includes('Math.min(1.5, PS / (15 * g.S2) + .4)') && !/PS \/ 34\b/.test(ui), '안정화: 숫자 크기는 화면 배율과 상관없이 같고(PS ÷ 배율), 문 판 · 바위 폭 안에 들어간다');
@@ -199,6 +199,13 @@ export async function runRunnerChecks(assert) {
     assert(card.includes('export function runnerCard') && card.includes('data-action="runner-open"') && source('../public/modules/arcade.js').includes('${runnerCard(A, art)}') && app.includes("d.action === 'runner-open'"), '놀이터 미니게임에 펫 대행진 카드가 있다');
     const load = source('./tournament-load.mjs'), stress = source('./stress-check.mjs');
     assert(load.includes("'POST /runner/finish'") && stress.includes("p95('POST /runner/finish')"), '부하 시험(check:load)에 펫 대행진 끝(다시 돌리기 포함)이 들어 있다');
+  }
+  // V13.243 판 중 다시 굽기 0: 해상도가 내려가도 그림은 다시 굽지 않고(크기만 비율로), 길 축소본은 그림마다 한 번, 알림 글자는 카운트다운에 미리,
+  //   카운트다운 예상 기준 12ms(판 중에 다시 내려가며 캔버스를 다시 만들지 않게), 위쪽 피버 점은 끝없는 CSS 애니메이션 없음
+  {
+    const ui = source('../public/modules/runner.js'), css = source('../public/v13241.css');
+    assert(ui.includes('if (!g.sprS2 || g.S2 > g.sprS2 * 1.01) { g.sprS2 = g.logS2 = g.S2; buildSprites(g); }') && ui.includes('function rescaleLogical(g, r)') && ui.includes('const MIPS = new Map();') && ui.includes("textSprite(g, '피버 타임!', 'cut', 'star');") && ui.includes('const EMERG_CD = 12;') && !/rn-streak[^{]*\{[^}]*animation/.test(css) && !/\.rn-streak i\{[^}]*transition/.test(css),
+      '판 중 다시 굽기 없음: 해상도가 내려가도 그림은 그대로(크기만), 알림 글자 미리 굽기, 카운트다운 예상 12ms, 피버 점은 끝없는 애니메이션 없음');
   }
   // V13.243 테스트 앱 띠 빌드 표시: deploy-test만 /test-build.json을 만들고(저장소 · 운영에는 없음), 앱은 테스트 앱 주소에서만 부른다
   {

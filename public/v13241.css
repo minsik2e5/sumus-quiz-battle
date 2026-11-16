@@ -190,10 +190,9 @@
 .rn-up-buy{border:0;border-radius:12px;padding:9px 12px;min-width:76px;font:inherit;font-weight:700;background:var(--rn-gold);color:#4a2c00;display:inline-flex;align-items:center;justify-content:center;gap:4px;box-shadow:0 3px 0 rgba(0,0,0,.18)}
 .rn-up-buy:disabled{opacity:.45;box-shadow:none}
 .rn-streak{display:inline-flex;gap:3px;align-items:center;margin-left:4px}
-.rn-streak i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.28);transition:background .2s,transform .2s}
+.rn-streak i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.28)}
 .rn-streak[data-n="1"] i:nth-child(-n+1),.rn-streak[data-n="2"] i:nth-child(-n+2),.rn-streak[data-n="3"] i{background:#ffd24a;transform:scale(1.2)}
-.rn-streak.hot i{animation:rn-hot .4s ease-in-out infinite alternate}
-@keyframes rn-hot{from{opacity:.6}to{opacity:1}}
+.rn-streak.hot i{background:#ffb020}
 .rn-game.fever .rn-vig{opacity:1;background:radial-gradient(ellipse at center,transparent 58%,rgba(255,190,40,.42) 100%)}
-.rn-game.fever .rn-count{box-shadow:0 0 0 2px #ffd24a}
+.rn-game.fever .rn-count{outline:2px solid #ffd24a}
 .rn-res-list li.fever b{color:#ffb020}
