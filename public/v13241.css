@@ -202,3 +202,4 @@
 .ag-runner .ag-stats li{background:var(--a-surface);color:var(--a-ink)}
 .ag-runner .ag-rn-meta li{background:var(--a-surface);color:var(--a-ink);box-shadow:inset 0 0 0 1px var(--a-line)}
 .ag-runner .ag-rn-meta li.hot{background:var(--a-gold);color:var(--a-gold-ink)}
+.ag-runner .ag-stats li{min-width:0}.ag-runner .ag-stats b,.ag-runner .ag-stats small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ag-runner .ag-stats small{font-size:10.5px}

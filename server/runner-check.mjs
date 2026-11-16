@@ -213,6 +213,12 @@ export async function runRunnerChecks(assert) {
     assert(card.includes("has = art?.entry?.has?.('runner')") && build.includes("'arena', 'runner'].filter(") && existsSync(fileURLToPath(new URL('../public/assets/runner/entry.webp', import.meta.url))) && existsSync(fileURLToPath(new URL('../docs/asset-requests/runner/make-entry.mjs', import.meta.url))) && css.includes('.ag-runner{background:var(--a-bg)}'),
       '펫 대행진 놀이터 카드: 입구 그림 ENTRY_ART(임시 그림은 그림 74 합성) · 숫자 줄이 잘 보이는 남색 바탕');
   }
+  // V13.243 결과 화면: 판이 끝나면 얼굴 그림 미리 디코드, 글 만들기와 보이기를 다른 프레임으로 · 놀이터 카드 숫자 줄은 줄바꿈 없이
+  {
+    const ui = source('../public/modules/runner.js'), css = source('../public/v13241.css');
+    assert(ui.includes("if (f) getImg(f).catch(() => {});") && ui.includes('requestAnimationFrame(() => { if (el.isConnected) el.hidden = false; });') && css.includes('.ag-runner .ag-stats b,.ag-runner .ag-stats small{white-space:nowrap'),
+      '결과 화면 한 프레임 줄이기(얼굴 그림 미리 · 다음 프레임에 보이기), 놀이터 카드 숫자 줄 줄바꿈 없음');
+  }
   // V13.243 테스트 앱 띠 빌드 표시: deploy-test만 /test-build.json을 만들고(저장소 · 운영에는 없음), 앱은 테스트 앱 주소에서만 부른다
   {
     const wf = source('../.github/workflows/deploy-test.yml'), prod = source('../.github/workflows/deploy-cloudflare.yml'), app = source('../public/app.js'), ign = source('../.gitignore');

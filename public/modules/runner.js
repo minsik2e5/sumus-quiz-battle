@@ -647,7 +647,8 @@ function onEvent(type, a, b, c, d) {
   if (type === 'petSiege') { snd('castle-hit'); screenTint(g.pet.el, .22); shake(g, .6); whiteFlash(.35); const cz = S.castle.z; flash(g, 0, 4, cz - 1, 7, .5, EL_RGB[g.pet.el] || '255,180,90'); addDebris(g, 0, 4, cz - 1, 20, 0, 1); popNum(g, 'minus', '−' + a, 0, 9, cz); castleHit(g); return; }
   if (type === 'pour') { snd('cannon'); if ((g.fireFx = (g.fireFx || 0) + 1) % 3 === 1) flash(g, S.cx, 2.6, S.z + crowdR(S.n) + 1.6, 1.4, .16, '255,255,255', 'cannon-fire'); const vis = Math.min(3, a); for (let i = 0; i < vis; i++) flyer(g, S.cx + rr(-.3, .3), 2, S.z + crowdR(S.n) + 1.2, 1, rr(-2.5, 2.5), rr(1.5, 5), S.castle.z - 1, rr(.55, .75)); g.cam.punch += .006; syncCrowd(g, 0, 0); return; }
   if (type === 'fall') { g.slow = .75; if (g.tier) invertFlash(); castleDown(g); return; }   // 마지막 일격: 느린 동작 + 반전 섬광(최저 단계는 캔버스 전체 반전을 빼서 한 프레임이 길어지지 않게) + 붕괴
-  if (type === 'done') { later(g, S.castle.down ? 1.4 : .6, () => sendFinish(g)); if (!a) snd('fail'); return; }
+  // v13.243 결과 화면 한 프레임 줄이기: 판이 끝나면(결과 요청 전 기다리는 동안) 결과 얼굴 그림을 미리 디코드해 둔다
+  if (type === 'done') { const f = art(a ? 'spirit-cheer' : 'spirit-hurt'); if (f) getImg(f).catch(() => {}); later(g, S.castle.down ? 1.4 : .6, () => sendFinish(g)); if (!a) snd('fail'); return; }
 }
 function warn(g, x, z, r, a) { if (!proj(g, x, 0, z)) return; const w = r * 2 * PS; g.ctx.globalAlpha = clamp(a, 0, 1) * .8; g.ctx.drawImage(g.SPR.warn, PX - w / 2, PY - w * .25, w, w * .5); g.ctx.globalAlpha = 1; }
 function petImpact(g, x, z) {
@@ -728,7 +729,8 @@ function showResult(g, res, err) {
     ${reason ? `<p class="rn-res-note warn">${esc(reason)}</p>` : ''}
     <div class="rn-res-btns"><button type="button" class="rn-big gold" data-g="again">한 판 더</button>${canNext ? '<button type="button" class="rn-big blue" data-g="next">다음 스테이지 →</button>' : ''}<button type="button" class="rn-ghost" data-g="map">지도</button></div></div>
     <div class="rn-coinrain" id="rn-coinrain" aria-hidden="true"></div>`;
-  el.hidden = false;
+  // 글을 만든 프레임과 보이는 프레임을 나눈다(한 프레임에 글 만들기 + 배치 + 칠하기가 몰려 100ms까지 걸리던 것)
+  requestAnimationFrame(() => { if (el.isConnected) el.hidden = false; });
   if (daily && res?.valid) fillDailyRank();
   const card = $('rn-res-card');
   // 별이 하나씩 쾅: CSS 별 애니메이션(--d)과 같은 때 소리 · 카드 흔들림
