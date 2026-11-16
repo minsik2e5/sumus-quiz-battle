@@ -62,7 +62,9 @@
 .rn-board-sheet li.empty{justify-content:center;opacity:.7}
 .rn-board-sheet .rn-stars i{background:var(--rn-gold)}
 /* ---------- 게임 화면(캔버스 위 막) ---------- */
-.rn-game{position:fixed;inset:0;z-index:50;background:var(--rn-sky1);overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
+/* 넓은 화면(PC · 아이패드 · 가로 폰): 게임은 가운데 세로 칸(최대 9:16 · 폭 520px · 높이 1600px), 양옆은 같은 하늘 그림을 아주 작게 줄였다 늘린(부드러운) 어두운 장식 */
+.rn-back{position:fixed;inset:0;z-index:50;background:linear-gradient(rgb(8 14 34 / .55),rgb(8 14 34 / .55)),var(--rn-back,none) center/cover,var(--rn-sky1)}
+.rn-game{position:fixed;z-index:50;left:50%;top:50%;height:min(100vh,1600px);height:min(100dvh,1600px);width:min(100vw,520px,calc(min(100vh,1600px) * .5625));width:min(100vw,520px,calc(min(100dvh,1600px) * .5625));transform:translate(-50%,-50%);background:var(--rn-sky1);overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;box-shadow:0 0 40px rgb(0 0 0 / .35)}
 .rn-game canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .rn-veil{position:absolute;inset:0;pointer-events:none;opacity:0}
 .rn-vig{opacity:.8;background:radial-gradient(ellipse 75% 62% at 50% 50%,transparent 60%,rgb(10 16 40 / .35) 100%);transition:opacity .4s}
@@ -123,6 +125,7 @@
 .rn-prog-castle.boss{background:var(--rn-boss)}
 .rn-hud-r{display:flex;flex-direction:column;align-items:flex-end;gap:4px;padding-top:0;pointer-events:none}
 .rn-hud-r small{font-size:var(--a-fs-1);color:var(--rn-white-dim)}
+.rn-hud-mid{min-width:0}.rn-hud-r{flex:none}   /* 좁은 세로 칸(PC 가로 화면)에서 오른쪽 배지가 잘리지 않게 */
 .rn-count{display:inline-flex;align-items:center;gap:5px;padding:4px 10px 4px 6px;border-radius:var(--a-r-3);background:var(--a-glass);border:1px solid var(--rn-white-line);color:var(--a-ink);font-family:var(--a-num);font-size:var(--a-fs-4);line-height:1;transform-origin:100% 50%}
 .rn-count i{width:20px;height:20px;border-radius:50% 50% 46% 46%;background:radial-gradient(circle at 35% 35%,var(--rn-sky3),var(--rn-sky2) 55%,var(--rn-blue))}
 .rn-count b{font-weight:400;min-width:2ch;text-align:right}

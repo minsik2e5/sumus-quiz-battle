@@ -148,7 +148,7 @@ function closeGame() {
 function playGame(start) {
   closeGame();
   const map = makeMap(start.stage), pet = start.pet || {};
-  root().innerHTML = `<div class="rn-game" id="rn-game"${art('card-frame') ? ` style="--rn-card:url(${art('card-frame')})"` : ''}><canvas id="rn-cvs"></canvas>
+  root().innerHTML = `<div class="rn-back" id="rn-back" aria-hidden="true"></div><div class="rn-game" id="rn-game"${art('card-frame') ? ` style="--rn-card:url(${art('card-frame')})"` : ''}><canvas id="rn-cvs"></canvas>
     <div class="rn-veil" id="rn-tint"></div><div class="rn-veil rn-vig" id="rn-vig"></div><div class="rn-veil" id="rn-flash"></div>
     <header class="rn-hud"><button type="button" class="rn-x" data-g="quit" aria-label="그만하기">${icon('close')}</button><div class="rn-hud-mid"><b>${start.stage}스테이지${isBoss(start.stage) ? ' · 보스 성' : ''}</b><div class="rn-prog"><i id="rn-prog"></i><em class="rn-prog-castle${isBoss(start.stage) ? ' boss' : ''}" aria-hidden="true"></em></div></div><div class="rn-hud-r"><span class="rn-count" id="rn-count" aria-label="정령 수"><i aria-hidden="true"></i><b id="rn-count-n">${num(start.start)}</b></span><small id="rn-hint">끌어서 조종</small></div></header>
     <div class="rn-cards" id="rn-cards" aria-live="polite"></div>
@@ -195,7 +195,7 @@ function onGameClick(b) {
 /* ---------- 엔진: 카메라 · 그림 · 풀 (연출 시험 페이지와 같은 방식) ---------- */
 function initEngine(g) {
   g.th = g.map.theme;
-  g.cam = { z: -8.5, x: 0, h: 8, zoom: 1, back: 8.5, trauma: 0, punch: 0 };
+  g.cam = { z: -7.6, x: 0, h: 8.6, zoom: 1, back: 7.6, trauma: 0, punch: 0 };
   g.img = {}; g.mat = {}; g.tintCache = new Map(); g.SPR = {};
   g.pools = {
     D: pool(300, ['x', 'y', 'z', 'vx', 'vy', 'vz', 'rot', 'vr', 'life', 'max', 'size', 'kind']),
@@ -231,7 +231,7 @@ function prebake(g) {
 const pool = (n, keys) => { const o = { n: 0, keys, cap: n }; for (const k of keys) o[k] = new Float32Array(n); return o; };
 function swapOut(A, j) { const l = --A.n; for (const k of A.keys) A[k][j] = A[k][l]; }
 function resize(g) {
-  g.cssW = innerWidth; g.cssH = innerHeight;
+  const box = g.cvs.parentElement; g.cssW = box?.clientWidth || innerWidth; g.cssH = box?.clientHeight || innerHeight;   // 가운데 세로 칸 크기 기준
   g.S2 = g.T.scale < 1 ? g.T.scale : Math.min(devicePixelRatio || 1, g.T.scale);
   g.cvs.width = Math.round(g.cssW * g.S2); g.cvs.height = Math.round(g.cssH * g.S2);
   g.F = Math.min(g.cssW * 1.05, g.cssH * .62) * g.S2; g.CX = g.cvs.width / 2; g.HZ = g.cvs.height * .25;
@@ -274,10 +274,17 @@ function tint(g, k, rgb) {
   else { x.globalCompositeOperation = 'saturation'; x.fillStyle = '#808080'; x.fillRect(0, 0, c.width, c.height); if (rgb !== '255,255,255') { x.globalCompositeOperation = 'multiply'; x.fillStyle = `rgb(${rgb})`; x.fillRect(0, 0, c.width, c.height); } x.globalCompositeOperation = 'destination-in'; x.drawImage(src, 0, 0); }
   m.set(rgb, c); return c;
 }
+// 양옆 장식: 하늘 그림을 27×40으로 줄여 JPEG 한 장으로(그림마다 한 번). 크게 늘리면 저절로 부드럽게 흐려진다(filter 없음).
+const BACK = new Map();
+function backdrop(im) {
+  let u = BACK.get(im); if (!u) { const c = mk(27, 40); c.getContext('2d').drawImage(im, 0, 0, 27, 40); u = `url(${c.toDataURL('image/jpeg', .8)})`; BACK.set(im, u); }
+  $('rn-back')?.style.setProperty('--rn-back', u);
+}
 function buildSky(g) {
   const W = g.cvs.width, H = g.cvs.height, HZ = g.HZ, c = mk(W, H), x = c.getContext('2d', { alpha: false });   // 불투명 캔버스: 매 프레임 화면 전체를 섞기 없이 복사
   g.fogGrad = g.ctx.createLinearGradient(0, HZ, 0, HZ + H * .2); g.fogGrad.addColorStop(0, 'rgba(226,238,255,.85)'); g.fogGrad.addColorStop(1, 'rgba(226,238,255,0)');
   g.roadMip = roadMip(g.img['road-' + g.th]);
+  if (g.img['bg-' + g.th]) backdrop(g.img['bg-' + g.th]);
   if (g.img['bg-' + g.th]) { const im = g.img['bg-' + g.th], sc = Math.max(W / im.width, H / im.height); x.drawImage(im, (W - im.width * sc) / 2, (H - im.height * sc) / 2, im.width * sc, im.height * sc); g.sky = c; return; }
   let lg = x.createLinearGradient(0, 0, 0, HZ); lg.addColorStop(0, THEME.skyTop); lg.addColorStop(.7, THEME.skyMid); lg.addColorStop(1, THEME.horizon); x.fillStyle = lg; x.fillRect(0, 0, W, HZ + 1);
   radial(x, 0, [[0, 'rgba(255,252,230,1)'], [.15, 'rgba(255,240,190,.7)'], [1, 'rgba(255,240,190,0)']], W * .45, W * .72, HZ * .5);
@@ -293,6 +300,15 @@ function outlined(g, k, px) {
   sx.drawImage(im, pad, pad, inner, inner); sx.globalCompositeOperation = 'source-in'; sx.fillStyle = '#123a6b'; sx.fillRect(0, 0, px, px);
   for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; x.drawImage(sil, Math.cos(a) * pad, Math.sin(a) * pad); }
   x.drawImage(im, pad, pad, inner, inner); return c;
+}
+// 검은 배경 빛 그림 → 진한 색 유리: 밝기를 알파로(검정 = 투명), 색은 알파로 나눠 되살리고 조금 진하게. 그림마다 한 번(모듈 캐시).
+const GLASS = new Map();
+function glassOf(im, w, h) {
+  let c = GLASS.get(im); if (c) return c;
+  c = mk(w, h); const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h), p = d.data;
+  for (let i = 0; i < p.length; i += 4) { const m = Math.max(p[i], p[i + 1], p[i + 2]); if (m < 8) { p[i + 3] = 0; continue; } const k = 255 / m * .8; p[i] = Math.min(255, p[i] * k); p[i + 1] = Math.min(255, p[i + 1] * k); p[i + 2] = Math.min(255, p[i + 2] * k); p[i + 3] = Math.min(255, m * 1.12); }
+  x.putImageData(d, 0, 0); GLASS.set(im, c); return c;
 }
 function fromImg(g, k, w, h) { const im = g.img[k]; if (!im) return null; const c = mk(w, h); c.getContext('2d').drawImage(im, 0, 0, w, h); return c; }
 function whiteOf(c) { const w = mk(c.width, c.height), x = w.getContext('2d'); x.drawImage(c, 0, 0); x.globalCompositeOperation = 'source-in'; x.fillStyle = '#fff'; x.fillRect(0, 0, w.width, w.height); return w; }
@@ -313,15 +329,15 @@ function buildSprites(g) {
   P.spirit = outlined(g, 'spirit-run', sp) || spiritSprite(sp); P.spiritW = whiteOf(P.spirit);
   P.spiritFly = outlined(g, 'spirit-fly', sp) || P.spirit; P.spiritHurt = outlined(g, 'spirit-hurt', sp) || P.spiritW;
   g.spiritU = g.img['spirit-run'] ? .66 : .52;   // 그림 정령은 조금 크게(그림 안 여백 · 32px에서 읽히게)
-  // 그림 74 문 판(gate-good · bad)은 검은 배경 빛 그림 → 더하기 섞기로 그린다(gateAdd). 가운데 기둥은 gate-frame.
-  g.gateAdd = !!g.img['gate-good']; P.gateFrame = g.img['gate-frame'] ? fromImg(g, 'gate-frame', 96, 192) : null;
+  // 그림 74 문 판(gate-good · bad)은 검은 배경 빛 그림 → 판 전에 검정을 투명으로 바꾼 진한 색 유리(glassOf)로 보통 섞기. 빛만 더하기. 가운데 기둥은 gate-frame.
+  P.gateFrame = g.img['gate-frame'] ? fromImg(g, 'gate-frame', 96, 192) : null;
   const sh = mk(64, 32), sx = sh.getContext('2d'), gr = sx.createRadialGradient(32, 16, 0, 32, 16, 32); gr.addColorStop(0, 'rgba(40,40,80,.4)'); gr.addColorStop(1, 'rgba(40,40,80,0)'); sx.setTransform(1, 0, 0, .5, 0, 8); sx.fillStyle = gr; sx.fillRect(0, -16, 64, 64); P.shadow = sh;
   P.pet = g.img.pet ? shrink(g.img.pet, Math.round(96 * S)) : null;
   P.petBig = g.img.pet ? shrink(g.img.pet, Math.round(Math.min(g.cssW * .8, 300) * S)) : null;
   P.rock = fromImg(g, 'rock-num', 160 * S, 150 * S); if (!P.rock) { P.rock = mk(160 * S, 150 * S); const x = P.rock.getContext('2d'); x.scale(S * 160 / 128, S * 150 / 128); rock(x, 128, '#9b8b78', .92); }
   P.rockW = whiteOf(P.rock);
   for (const [k, c1, c2, edge] of [['gate-good', 'rgba(70,170,255,.62)', 'rgba(40,120,240,.35)', '#bfe6ff'], ['gate-bad', 'rgba(255,90,100,.62)', 'rgba(220,40,70,.35)', '#ffc4c4']]) {
-    P[k] = fromImg(g, k, 212, 150); if (P[k]) continue;
+    if (g.img[k]) { P[k] = glassOf(g.img[k], 212, 150); continue; }
     const c = mk(200, 150), x = c.getContext('2d'), lg = x.createLinearGradient(0, 0, 0, 150); lg.addColorStop(0, c1); lg.addColorStop(1, c2); x.fillStyle = lg; roundRect(x, 4, 4, 192, 142, 14); x.fill(); x.lineWidth = 6; x.strokeStyle = edge; x.stroke(); x.fillStyle = 'rgba(255,255,255,.28)'; roundRect(x, 14, 12, 172, 22, 10); x.fill(); P[k] = c;
   }
   P.saw = fromImg(g, 'saw', 128, 128); if (!P.saw) { P.saw = mk(128, 128); const x = P.saw.getContext('2d'); x.translate(64, 64); x.fillStyle = '#d7dde6'; x.strokeStyle = '#3b4250'; x.lineWidth = 3; x.beginPath(); for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; x.lineTo(Math.cos(a) * 60, Math.sin(a) * 60); x.lineTo(Math.cos(a + .2) * 46, Math.sin(a + .2) * 46); } x.closePath(); x.fill(); x.stroke(); const r2 = x.createRadialGradient(-10, -10, 4, 0, 0, 44); r2.addColorStop(0, '#fff'); r2.addColorStop(1, '#8b96a8'); x.fillStyle = r2; x.beginPath(); x.arc(0, 0, 40, 0, TAU); x.fill(); x.fillStyle = '#e04848'; x.beginPath(); x.arc(0, 0, 12, 0, TAU); x.fill(); x.stroke(); }
@@ -371,7 +387,7 @@ function buildCannon(g) {
   for (const wx of [34, 106]) { const r = x.createRadialGradient(wx - 4, 92, 2, wx, 96, 22); r.addColorStop(0, '#e9b56a'); r.addColorStop(1, '#7a4a1a'); x.fillStyle = r; x.strokeStyle = '#3a2208'; x.lineWidth = 3; x.beginPath(); x.arc(wx, 96, 20, 0, TAU); x.fill(); x.stroke(); }
   g.SPR.cannon = d;
 }
-const NUM_STYLES = { count: [30, '#ffffff', '#d8f3ff', '#123a6b', 6], rock: [30, '#ffffff', '#fff1d0', '#3a2614', 6], good: [44, '#ffffff', '#d6f1ff', '#0d3f86', 8], bad: [44, '#ffffff', '#ffe0e0', '#7a1020', 8], pop: [34, '#fff7b0', '#ffc53a', '#5a2c00', 7], minus: [30, '#ffe0e0', '#ff6a6a', '#4a0a10', 6] };
+const NUM_STYLES = { count: [30, '#ffffff', '#d8f3ff', '#123a6b', 6], rock: [30, '#ffffff', '#fff1d0', '#3a2614', 6], good: [48, '#ffffff', '#d6f1ff', '#062a63', 11], bad: [48, '#ffffff', '#ffe0e0', '#55060f', 11], pop: [34, '#fff7b0', '#ffc53a', '#5a2c00', 7], minus: [30, '#ffe0e0', '#ff6a6a', '#4a0a10', 6] };
 const GLYPHS = '0123456789+×−';
 function buildDigits(g) {
   const S = g.S2; g.SPR.digits = {};
@@ -379,7 +395,8 @@ function buildDigits(g) {
     const fs = size * S, cw = Math.ceil(fs * .78), ch = Math.ceil(fs * 1.3), c = mk(cw * GLYPHS.length, ch), x = c.getContext('2d');
     x.font = `${fs}px Jua, system-ui, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
     const gr = x.createLinearGradient(0, ch * .2, 0, ch * .8); gr.addColorStop(0, f0); gr.addColorStop(1, f1);
-    for (let d = 0; d < GLYPHS.length; d++) { x.lineWidth = lw * S; x.strokeStyle = stroke; x.strokeText(GLYPHS[d], d * cw + cw / 2, ch / 2); x.fillStyle = gr; x.fillText(GLYPHS[d], d * cw + cw / 2, ch / 2); }
+    for (let d = 0; d < GLYPHS.length; d++) { x.lineWidth = lw * S; x.strokeStyle = 'rgba(0,0,0,.28)'; x.strokeText(GLYPHS[d], d * cw + cw / 2, ch / 2 + 3 * S); x.strokeStyle = stroke;   // 약한 그림자(아래로 비킨 진한 테두리) → 테두리 → 글자
+       x.strokeText(GLYPHS[d], d * cw + cw / 2, ch / 2); x.fillStyle = gr; x.fillText(GLYPHS[d], d * cw + cw / 2, ch / 2); }
     g.SPR.digits[k] = { c, cw, ch, adv: cw * .74 };
   }
 }
@@ -625,8 +642,8 @@ function setTier(g, t) { g.tier = t; g.T = TIERS[t]; writePref(TIER_KEY, JSON.st
 function render(g, dt, alpha) {
   const ctx = g.ctx, S = g.S, cam = g.cam, fdt = g.hitstop > 0 ? 0 : g.slow > 0 ? dt * .3 : dt;
   const z = lerp(g.pz, S.z, alpha), cx = lerp(g.pcx, S.cx, alpha), siege = S.phase === 'siege' || (S.phase === 'done' && S.castle.down) || S.siegeT > 0;
-  // 무리가 커질수록 카메라가 살짝 물러나 높아진다(정령이 화면 밖으로 넘치지 않게)
-  const Rr = crowdR(S.n), tb = siege ? 11 : 8.5 + Math.min(2.4, Rr * .8), th = siege ? 9 : 8 + Math.min(1.2, Rr * .4), tzm = siege ? 1.3 : 1, k = 1 - Math.exp(-dt * 2.5);
+  // 무리가 커질수록 카메라가 살짝 물러나 높아진다(정령이 화면 밖으로 넘치지 않게). 기본 거리 7.6: 무리가 화면 아래쪽 1/3에 크게
+  const Rr = crowdR(S.n), tb = siege ? 11 : 7.6 + Math.min(2.4, Rr * .8), th = siege ? 9 : 8.6 + Math.min(1.2, Rr * .4), tzm = siege ? 1.3 : 1, k = 1 - Math.exp(-dt * 2.5);
   if (dt) { g.vx = clamp((cx - g.lastCx) / dt, -12, 12); g.lastCx = cx; }
   cam.back += (tb - cam.back) * k; cam.h += (th - cam.h) * k; cam.zoom += (tzm - cam.zoom) * k;
   cam.z = z - cam.back; cam.x += (cx * .35 - cam.x) * (1 - Math.exp(-dt * 4));
@@ -761,8 +778,7 @@ function drawObj(g, o, dt, cx, z, alpha) {
       // 테두리 빛(속성 없이 파랑 · 빨강, 숨 쉬듯) → 판 → 박동하는 숫자(×문은 더 크게)
       const ok = goodGate(val), puls = 1 + Math.sin(g.clock * 6 + side) * .07 * (val[0] === '×' ? 1.6 : 1);
       if (g.T.glow) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a * (.45 + .2 * Math.sin(g.clock * 5 + side)); const gw = w * 1.5; ctx.drawImage(ok ? g.tg.gateGood : g.tg.gateBad, cxm - gw / 2, cym - gw * .55, gw, gw * 1.1); ctx.globalCompositeOperation = 'source-over'; }
-      ctx.globalAlpha = a; if (g.gateAdd) ctx.globalCompositeOperation = 'lighter';
-      ctx.drawImage(ok ? P['gate-good'] : P['gate-bad'], cxm - w / 2, cym - h / 2, w, h); ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = a; ctx.drawImage(ok ? P['gate-good'] : P['gate-bad'], cxm - w / 2, cym - h / 2, w, h);
       drawNum(g, ok ? 'good' : 'bad', lab, cxm, cym, Math.min(1.8, sc / 34) * grow * puls * (val[0] === '×' ? 1.15 : 1), a); ctx.globalAlpha = 1;
     }
     if (P.gateFrame) { proj(g, 0, 0, o.z); const fh = 3.4 * PS, fw = fh * .5; ctx.drawImage(P.gateFrame, PX - fw / 2, PY - fh, fw, fh); }   // 가운데 기둥(그림 74 gate-frame)

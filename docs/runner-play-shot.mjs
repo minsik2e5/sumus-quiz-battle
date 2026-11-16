@@ -18,7 +18,9 @@ const pw = (() => { for (const n of [process.env.PLAYWRIGHT, 'playwright'].filte
 await mkdir(OUT, { recursive: true });
 const browser = await pw.chromium.launch({ args: ['--mute-audio'] });
 const PERF = process.argv.includes('--perf'), CPU = Number(arg('cpu', 1)), Q = arg('q', 'auto');
-const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: PERF ? 3 : 1, isMobile: true, hasTouch: true });
+// --size 1918x628 → PC 가로 화면(마우스), 기본 390×844 폰
+const SIZE = (arg('size', '390x844')).split('x').map(Number), DESK = SIZE[0] > SIZE[1] && SIZE[0] >= 1000;
+const ctx = await browser.newContext({ viewport: { width: SIZE[0], height: SIZE[1] }, deviceScaleFactor: PERF ? 3 : 1, isMobile: !DESK, hasTouch: !DESK });
 const page = await ctx.newPage();
 const errors = [], reqs = [];
 page.on('request', r => reqs.push(r.url()));

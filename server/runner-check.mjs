@@ -45,7 +45,7 @@ export async function runRunnerChecks(assert) {
   {
     const miss = []; for (let s = 1; s <= RUNNER.STAGES; s++) if (bestStars(s) < 3) miss.push(s);
     assert(!miss.length, `강화 없이도 별 3이 가능하다(가장 잘하는 봇, 1~${RUNNER.STAGES}스테이지${miss.length ? ` · 안 되는 곳 ${miss.join(', ')}` : ''})`);
-    assert(stageTarget(10).clear < stageTarget(9).clear && stageTarget(11).clear > stageTarget(12).clear && stageTarget(3).clear >= 0.98 && stageTarget(76).three === 0.08, '목표: 보스 성(10의 배수)은 어렵게, 바로 다음은 쉬어 가기, 1~5 ≈100% · 76~100 별 3 8%');
+    assert(stageTarget(10).clear === 0.5 && stageTarget(20).clear === 0.5 && stageTarget(11).clear > stageTarget(12).clear && stageTarget(1).clear === 0.95 && stageTarget(3).clear === 0.8 && stageTarget(3).three === 0.4 && stageTarget(17).clear >= 0.65 && stageTarget(17).clear <= 0.75 && stageTarget(76).three === 0.08, '목표(선생님): 1 튜토리얼 95% · 2~5 80% · 6~25 65~75% · 보스 성 50%, 별 3은 절반쯤 · 76~100 별 3 8%');
   }
   // 3) 서버: 시작 · 끝
   {
@@ -106,9 +106,9 @@ export async function runRunnerChecks(assert) {
     //   프레임마다 색 문자열 · 숫자 문자열 · 물체 목록을 새로 만들지 않음, 정령이 많으면 효과 상한을 줄임
     assert(!/shadowBlur|ctx\.filter\s*=/.test(ui) && ui.includes('await Promise.race([warmArt(res.pet?.key, res.pet?.form, theme(res.stage))') && ui.includes('function prebake(g)') && ui.includes('autoTier(g, true)') && ui.includes('const COUNTDOWN = 1.5;'),
       '판 시작 전: 그림 디코드(최대 1.8초) · 색 입힌 재료 · 길 색 표 미리 굽기 · 카운트다운 동안 품질 결정, blur · shadowBlur 없음');
-    // 그림 74: 검은 배경 문 판은 더하기 섞기, 길 타일은 띠로 원근, 성 붕괴는 castle-chunk-a · b 조각, 정령은 테두리
-    assert(ui.includes("g.gateAdd = !!g.img['gate-good']") && ui.includes('if (g.gateAdd) ctx.globalCompositeOperation = \'lighter\'') && ui.includes('function drawRoadTiled(g, img, endZ)') && ui.includes("['chunk-a', 'chunk-b']") && ui.includes('addDebris(g, 0, 4, c.z, 40, 2, 1.4); addSmoke(') && ui.includes("outlined(g, 'spirit-run'"),
-      '그림 74: 문 판 더하기 섞기 · 길 타일 원근 · 성 조각 그림 · 정령 테두리');
+    // 그림 74: 검은 배경 문 판은 검정→투명 진한 색 유리(보통 섞기, 빛만 더하기), 길 타일은 띠로 원근, 성 붕괴는 castle-chunk-a · b 조각, 정령은 테두리
+    assert(ui.includes('function glassOf(im, w, h)') && ui.includes('if (g.img[k]) { P[k] = glassOf(g.img[k], 212, 150); continue; }') && !ui.includes('g.gateAdd') && ui.includes('function drawRoadTiled(g, img, endZ)') && ui.includes("['chunk-a', 'chunk-b']") && ui.includes('addDebris(g, 0, 4, c.z, 40, 2, 1.4); addSmoke(') && ui.includes("outlined(g, 'spirit-run'"),
+      '그림 74: 문 판 진한 색 유리(검정→투명, 보통 섞기 · 빛만 더하기) · 길 타일 원근 · 성 조각 그림 · 정령 테두리');
     // 그림 74 렉 방지: 길 타일 · 하늘은 불투명 캔버스로 미리 굽고(축소본 4장), 최저 단계는 길을 가까운 점으로, 판 준비는 두 번에 나눈다
     assert(ui.includes('function roadMip(img)') && ui.includes("x = c.getContext('2d', { alpha: false });   // 불투명 캔버스") && ui.includes('if (!g.tier) ctx.imageSmoothingEnabled = false;') && ui.includes('requestAnimationFrame(() => setTimeout(() => {') && !ui.includes('buildSprites(g); buildSky(g); }\n  prebake(g);'),
       '그림 74 렉 방지: 길 타일 축소본 · 불투명 하늘 · 최저 단계 가까운 점 · 판 준비 두 번에 나눔');
