@@ -118,7 +118,10 @@ if (PERF) {
   const tEnd = Date.now() + WINDOW * 1000, box = { x: SIZE[0] / 2, y: SIZE[1] * .7 };
   // --shot-at 초 --shot 파일: 측정 중 그 순간 화면 한 장(같은 장면 전후 비교용, 측정 숫자에는 넣지 않을 때만 쓴다)
   const shotAt = Number(arg('shot-at', 0)), t1 = Date.now(); let shotDone = !shotAt;
+  // 판 중 캔버스 해상도가 바뀐 횟수(선명도가 판 중에 바뀌는지): 0.25초마다 캔버스 크기를 본다
+  var resLog = [];
   while (Date.now() < tEnd) {
+    { const wh = await page.evaluate(() => { const c = document.getElementById('rn-cvs'); return c && !document.querySelector('#rn-result:not([hidden])') ? c.width + 'x' + c.height : null; }).catch(() => null); if (wh && resLog.at(-1) !== wh) resLog.push(wh); }
     if (!shotDone && Date.now() - t1 > shotAt * 1000) { shotDone = true; await page.screenshot({ path: resolve(OUT, arg('shot', 'runner-perf-shot.png')) }); } box.x = SIZE[0] / 2 - 45 + Math.random() * 90; await page.mouse.move(box.x, box.y); await page.waitForTimeout(250); if (await page.$('#rn-cards.on')) { await page.click('#rn-cards.on .rn-card', { timeout: 1500 }).catch(() => {}); await page.waitForTimeout(400); } if (await page.$('#rn-result:not([hidden])')) break; }
   await page.evaluate(() => { window.__perf.on = false; });
 }
@@ -149,7 +152,7 @@ if (PERF) {
   const fr = P.frames.filter(d => d < 5000), secs = fr.reduce((a, b) => a + b, 0) / 1000, mins = secs / 60, pct = q => { const x = [...fr].sort((a, b) => a - b); return x[Math.min(x.length - 1, Math.floor(x.length * q))] || 0; };
   const r1 = x => Math.round(x * 10) / 10;
   const lat = [...P.lat].sort((a, b) => a - b), lp = q => r1(lat[Math.min(lat.length - 1, Math.floor(lat.length * q))] || 0);
-  perf = { errors: errors.slice(0, 5), emerg_s: emergS, tier_last: await page.evaluate(() => window.__rnTier ?? null), cpu: CPU, q: Q, seconds: r1(secs), fps: r1(fr.length / secs), p95: r1(pct(.95)), p99: r1(pct(.99)), max: r1(Math.max(...fr)), over33_min: r1(fr.filter(d => d > 33.4).length / mins), over50_min: r1(fr.filter(d => d > 50).length / mins), long_tasks: P.long.length, input_p50: lp(.5), input_p95: lp(.95), input_n: lat.length, first5s_over50: (() => { let t = 0, n = 0; for (const d of fr) { t += d; if (t > 5000) break; if (d > 50) n++; } return n; })(), tier_end: ['최저', '낮음', '중간', '높음'][tierEnd], start_ms: pre.ms, siege_max: Math.round(P.siege), crowd_end: await page.evaluate(() => window.__rnN || 0), canvas: await page.evaluate(() => { const c = document.querySelector('#rn-cvs'); return c ? `${c.width}x${c.height}` : ''; }), start_frame_max: pre.frame, start_long_max: pre.long };
+  perf = { res_changes: Math.max(0, (typeof resLog === 'undefined' ? [] : resLog).length - 1), res_log: (typeof resLog === 'undefined' ? [] : resLog).join(' > '), errors: errors.slice(0, 5), emerg_s: emergS, tier_last: await page.evaluate(() => window.__rnTier ?? null), cpu: CPU, q: Q, seconds: r1(secs), fps: r1(fr.length / secs), p95: r1(pct(.95)), p99: r1(pct(.99)), max: r1(Math.max(...fr)), over33_min: r1(fr.filter(d => d > 33.4).length / mins), over50_min: r1(fr.filter(d => d > 50).length / mins), long_tasks: P.long.length, input_p50: lp(.5), input_p95: lp(.95), input_n: lat.length, first5s_over50: (() => { let t = 0, n = 0; for (const d of fr) { t += d; if (t > 5000) break; if (d > 50) n++; } return n; })(), tier_end: ['최저', '낮음', '중간', '높음'][tierEnd], start_ms: pre.ms, siege_max: Math.round(P.siege), crowd_end: await page.evaluate(() => window.__rnN || 0), canvas: await page.evaluate(() => { const c = document.querySelector('#rn-cvs'); return c ? `${c.width}x${c.height}` : ''; }), start_frame_max: pre.frame, start_long_max: pre.long };
   console.log(JSON.stringify(perf)); await browser.close(); process.exit(0);
 }
 const sounds = await page.evaluate(() => window.__rnSnd).catch(() => null);
