@@ -158,7 +158,7 @@ export async function runRunnerChecks(assert) {
     assert(tiers.length === 4 && tiers[0].join() === 'false,false,0,0,false,false,6' && tiers[3][0] === 'true' && tiers.every((t, i) => !i || (Number(t[2]) >= Number(tiers[i - 1][2]) && Number(t[6]) >= Number(tiers[i - 1][6]))),
       '새 연출(발밑 그림자 · 빛 꼬리 · 속도선 · 떠가는 구름 · 성 불 · 앞줄 빛 · 코인 비)은 품질 단계에 묶이고 최저에서는 꺼진다');
     assert(ui.includes('if (S.n === g.hudN || now - g.hudTextAt < 100) return;') && ui.includes("box.animate([") && !/offsetWidth|getBoundingClientRect/.test(ui), '위쪽 정령 수 배지: 바뀔 때만 · 0.1초에 한 번 글자를 쓰고, 튀는 효과는 Web Animations(배치 다시 계산 없음)');
-    assert(ui.includes("g.slow > 0 ? dt * .3 : dt") && ui.includes("if (type === 'fall') { g.slow = .75; invertFlash(); castleDown(g); return; }") && ui.includes('data-g="again">한 판 더</button>') && ui.includes('성 HP <b>${hpLeft}%</b> 남았어') && ui.includes('const n = g.T.coins;'),
+    assert(ui.includes("g.slow > 0 ? dt * .3 : dt") && ui.includes("if (type === 'fall') { g.slow = .75; if (g.tier) invertFlash(); castleDown(g); return; }") && ui.includes('data-g="again">한 판 더</button>') && ui.includes('성 HP <b>${hpLeft}%</b> 남았어') && ui.includes('const n = g.T.coins;'),
       '마지막 일격은 연출 시간만 느리게(규칙 틱은 그대로) + 반전 섬광, 결과는 큰 "한 판 더" · 아깝게 지면 남은 성 HP · 코인 비는 품질 상한');
     // 렉 방지(선생님: "렉은 절대 안 걸리게"): 판 전에 그림 디코드 · 재료 굽기 · 카운트다운 동안 품질 결정, blur · shadowBlur 없음,
     //   프레임마다 색 문자열 · 숫자 문자열 · 물체 목록을 새로 만들지 않음, 정령이 많으면 효과 상한을 줄임

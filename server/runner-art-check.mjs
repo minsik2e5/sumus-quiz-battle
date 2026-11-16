@@ -88,6 +88,6 @@ export async function runRunnerArtChecks(assert) {
   const build = source('build-assets.mjs'), artFile = path('../public/modules/runner-art.js');
   const dir = path('../public/assets/runner'), have = existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.webp')).map(f => f.slice(0, -5)).sort() : [];
   assert(build.includes("'public/assets/runner'") && build.includes('export const RUNNER_ART = new Set(') && existsSync(artFile)
-    && (readFileSync(artFile, 'utf8').match(/RUNNER_ART = new Set\((\[.*\])\)/) || [])[1] === JSON.stringify(have) && have.every(k => keys.includes(k) || keys75.includes(k)),
+    && (readFileSync(artFile, 'utf8').match(/RUNNER_ART = new Set\((\[.*\])\)/) || [])[1] === JSON.stringify(have) && have.every(k => k === 'entry' || keys.includes(k) || keys75.includes(k)),   // entry = 놀이터 입구 그림(ENTRY_ART, v13.243)
     `그림 74: build-assets가 runner 그림 ${have.length}장을 RUNNER_ART에 적고, 주문서에 없는 이름은 없다`);
 }

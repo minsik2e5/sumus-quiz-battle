@@ -642,10 +642,11 @@ function onEvent(type, a, b, c, d) {
     if (S.n !== g.lastN) { popNum(g, 'pop', '+' + (S.n - g.lastN), S.cx, 2.6, S.z + 1.5); syncCrowd(g, 0, 2); }
     return;
   }
-  if (type === 'siege') { snd('card'); pill(g, '공성전! 화면을 누르고 있으면 발사', 'star', 2.4); $('rn-hint').textContent = '누르고 있으면 발사'; syncCrowd(g, 0, 0); return; }
+  if (type === 'siege') { if (g.feverOn) { g.feverOn = false; g.feverBig = null; $('rn-game')?.classList.remove('fever'); streak(g); }   // 규칙이 공성전에서 피버를 끈다(feverEnd 사건 없음) → 연출도 같이 끔
+    snd('card'); pill(g, '공성전! 화면을 누르고 있으면 발사', 'star', 2.4); $('rn-hint').textContent = '누르고 있으면 발사'; syncCrowd(g, 0, 0); return; }
   if (type === 'petSiege') { snd('castle-hit'); screenTint(g.pet.el, .22); shake(g, .6); whiteFlash(.35); const cz = S.castle.z; flash(g, 0, 4, cz - 1, 7, .5, EL_RGB[g.pet.el] || '255,180,90'); addDebris(g, 0, 4, cz - 1, 20, 0, 1); popNum(g, 'minus', '−' + a, 0, 9, cz); castleHit(g); return; }
   if (type === 'pour') { snd('cannon'); if ((g.fireFx = (g.fireFx || 0) + 1) % 3 === 1) flash(g, S.cx, 2.6, S.z + crowdR(S.n) + 1.6, 1.4, .16, '255,255,255', 'cannon-fire'); const vis = Math.min(3, a); for (let i = 0; i < vis; i++) flyer(g, S.cx + rr(-.3, .3), 2, S.z + crowdR(S.n) + 1.2, 1, rr(-2.5, 2.5), rr(1.5, 5), S.castle.z - 1, rr(.55, .75)); g.cam.punch += .006; syncCrowd(g, 0, 0); return; }
-  if (type === 'fall') { g.slow = .75; invertFlash(); castleDown(g); return; }   // 마지막 일격: 느린 동작 + 반전 섬광 + 붕괴
+  if (type === 'fall') { g.slow = .75; if (g.tier) invertFlash(); castleDown(g); return; }   // 마지막 일격: 느린 동작 + 반전 섬광(최저 단계는 캔버스 전체 반전을 빼서 한 프레임이 길어지지 않게) + 붕괴
   if (type === 'done') { later(g, S.castle.down ? 1.4 : .6, () => sendFinish(g)); if (!a) snd('fail'); return; }
 }
 function warn(g, x, z, r, a) { if (!proj(g, x, 0, z)) return; const w = r * 2 * PS; g.ctx.globalAlpha = clamp(a, 0, 1) * .8; g.ctx.drawImage(g.SPR.warn, PX - w / 2, PY - w * .25, w, w * .5); g.ctx.globalAlpha = 1; }
@@ -658,10 +659,12 @@ function petImpact(g, x, z) {
 // 피버까지 남은 칸(위쪽 막대 점 3개): 문을 지날 때만 바뀐다(DOM은 그때만 씀)
 function streak(g) { const n = g.S.fever > 0 ? 3 : g.S.streak; if (n === g.streakShown) return; g.streakShown = n; const el = $('rn-streak'); if (!el) return; el.dataset.n = n; el.classList.toggle('hot', g.S.fever > 0); }
 // 벽 깨짐 · 부딪힘: 길 너비만큼 큰 조각 · 먼지 · 불꽃(조각은 그림 75 wall-chunk-<테마> 또는 테마 색 돌)
+const WALL_XS = [-3, -1, 1, 3], WALL_XS0 = [-2, 2];
 function wallBurst(g, o, power) {
   ring(g, 0, .2, o.z, 7, .5, '255,240,200'); flash(g, 0, 1.4, o.z, 7, .4); flash(g, 0, 1.2, o.z, 4, .3, '255,255,255', 'burst');
-  for (const x of [-3, -1, 1, 3]) { addDebris(g, x, 1.2, o.z, 9, 3, power); addSmoke(g, x, .4, o.z, 3, 0, 1.2, 1); }
-  addSparks(g, 0, 1.4, o.z, 24, 1, 15, .7); addGlow(g, 0, 1.2, o.z, 10, 0, 5, .6, .6, 2);
+  const xs = g.tier ? WALL_XS : WALL_XS0;   // 최저 단계는 두 곳에서만(한 프레임에 조각이 몰려 생기지 않게)
+  for (const x of xs) { addDebris(g, x, 1.2, o.z, 9, 3, power); addSmoke(g, x, .4, o.z, g.tier ? 3 : 1, 0, 1.2, 1); }
+  addSparks(g, 0, 1.4, o.z, g.tier ? 24 : 10, 1, 15, .7); if (g.tier) addGlow(g, 0, 1.2, o.z, 10, 0, 5, .6, .6, 2);
 }
 const vw = (g, o) => { let v = g.view.get(o); if (!v) { v = { hitT: 0, passT: -1, labL: '', labR: '' }; g.view.set(o, v); } return v; };
 function lose(g, loss, x) { const S = g.S, sl = g.slot; popNum(g, 'minus', '−' + loss, x, 2.2, S.z + 1); for (let i = 0; i < Math.min(14, loss); i++) { const k = (rnd() * Math.max(1, g.shown)) | 0; flyer(g, S.cx + sl.ox[k], .4, S.z + sl.oz[k], 0); } syncCrowd(g, 0, 0); }
@@ -675,7 +678,10 @@ function castleDown(g) {
   const c = g.S.castle; snd('castle-fall'); whiteFlash(.8); shake(g, 1); g.hitstop = .12; g.cam.punch += .08;
   flash(g, 0, 4, c.z, 10, .7); flash(g, 0, 4, c.z, 14, 1, '255,214,140');
   for (let i = 0; i < 3; i++) ring(g, 0, .2, c.z, 7 + i * 3, .6 + i * .15, i ? '255,230,180' : '255,255,255', i * .08);
-  addDebris(g, 0, 3, c.z, 80, 0, 1.6); addDebris(g, 0, 4, c.z, 40, 2, 1.4); addSmoke(g, 0, .5, c.z, 26, 0, 2.2, 5); addSmoke(g, 0, 3, c.z, 10, 2, 2, 3); addSparks(g, 0, 4, c.z, 40, 1, 18, .8); addGlow(g, 0, 4, c.z, 30, 2, 8, 1, 1.2, 1);   // 40개는 성 조각 그림(castle-chunk-a · b)
+  addDebris(g, 0, 3, c.z, 80, 0, 1.6); addSparks(g, 0, 4, c.z, 40, 1, 18, .8);
+  // 나머지 조각 · 연기 · 빛은 다음 몇 프레임에 나눠 만든다(한 프레임에 몰리지 않게, 보이는 모습은 같음)
+  later(g, .03, () => { addDebris(g, 0, 4, c.z, 40, 2, 1.4); addSmoke(g, 0, .5, c.z, 26, 0, 2.2, 5); });
+  later(g, .06, () => { addSmoke(g, 0, 3, c.z, 10, 2, 2, 3); addGlow(g, 0, 4, c.z, 30, 2, 8, 1, 1.2, 1); });   // 40개는 성 조각 그림(castle-chunk-a · b)
   g.pieces = [];
   for (let r = 0; r < 5; r++) for (let q = 0; q < 6; q++) g.pieces.push({ sx: q / 6, sy: r / 5, x: (q + .5) / 6 * 10 - 5, y: 10 - (r + .5) / 5 * 10, z: c.z, vx: rr(-2, 2) + ((q + .5) / 6 - .5) * 4, vy: rr(1, 5) + (5 - r) * .4, vz: rr(-3, 1), rot: 0, vr: rr(-2, 2), t: 0 });
 }
