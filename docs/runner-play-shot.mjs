@@ -97,7 +97,7 @@ if (PERF) {
   var emergS = null;
   // --skip 초: 그만큼 지난 뒤부터 잰다(비상 단계 숫자와 같은 구간을 옛 코드로 잴 때)
   if (arg('skip')) await page.waitForTimeout(Number(arg('skip')) * 1000);
-  if (process.argv.includes('--after-emerg')) { const t9 = Date.now(); await page.waitForFunction(() => window.__rnTier === -1, null, { timeout: 25000 }).then(() => { emergS = Math.round((Date.now() - t9) / 100) / 10; }).catch(() => {}); }
+  if (process.argv.includes('--after-emerg')) { const t9 = Date.now(); await page.waitForFunction(() => window.__rnTier < 0, null, { timeout: 25000 }).then(() => { emergS = Math.round((Date.now() - t9) / 100) / 10; }).catch(() => {}); }
   await page.evaluate(() => { window.__perf.frames = []; window.__perf.long = []; window.__perf.lat = []; window.__perf.on = true; });
   if (arg('profile')) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
   const tEnd = Date.now() + WINDOW * 1000, box = { x: SIZE[0] / 2, y: SIZE[1] * .7 };
@@ -129,7 +129,7 @@ if (PERF) {
   const fr = P.frames.filter(d => d < 5000), secs = fr.reduce((a, b) => a + b, 0) / 1000, mins = secs / 60, pct = q => { const x = [...fr].sort((a, b) => a - b); return x[Math.min(x.length - 1, Math.floor(x.length * q))] || 0; };
   const r1 = x => Math.round(x * 10) / 10;
   const lat = [...P.lat].sort((a, b) => a - b), lp = q => r1(lat[Math.min(lat.length - 1, Math.floor(lat.length * q))] || 0);
-  perf = { errors: errors.slice(0, 5), emerg_s: emergS, cpu: CPU, q: Q, seconds: r1(secs), fps: r1(fr.length / secs), p95: r1(pct(.95)), p99: r1(pct(.99)), max: r1(Math.max(...fr)), over33_min: r1(fr.filter(d => d > 33.4).length / mins), over50_min: r1(fr.filter(d => d > 50).length / mins), long_tasks: P.long.length, input_p50: lp(.5), input_p95: lp(.95), input_n: lat.length, first5s_over50: (() => { let t = 0, n = 0; for (const d of fr) { t += d; if (t > 5000) break; if (d > 50) n++; } return n; })(), tier_end: ['최저', '낮음', '중간', '높음'][tierEnd], start_ms: pre.ms, siege_max: Math.round(P.siege), crowd_end: await page.evaluate(() => window.__rnN || 0), canvas: await page.evaluate(() => { const c = document.querySelector('#rn-cvs'); return c ? `${c.width}x${c.height}` : ''; }), start_frame_max: pre.frame, start_long_max: pre.long };
+  perf = { errors: errors.slice(0, 5), emerg_s: emergS, tier_last: await page.evaluate(() => window.__rnTier ?? null), cpu: CPU, q: Q, seconds: r1(secs), fps: r1(fr.length / secs), p95: r1(pct(.95)), p99: r1(pct(.99)), max: r1(Math.max(...fr)), over33_min: r1(fr.filter(d => d > 33.4).length / mins), over50_min: r1(fr.filter(d => d > 50).length / mins), long_tasks: P.long.length, input_p50: lp(.5), input_p95: lp(.95), input_n: lat.length, first5s_over50: (() => { let t = 0, n = 0; for (const d of fr) { t += d; if (t > 5000) break; if (d > 50) n++; } return n; })(), tier_end: ['최저', '낮음', '중간', '높음'][tierEnd], start_ms: pre.ms, siege_max: Math.round(P.siege), crowd_end: await page.evaluate(() => window.__rnN || 0), canvas: await page.evaluate(() => { const c = document.querySelector('#rn-cvs'); return c ? `${c.width}x${c.height}` : ''; }), start_frame_max: pre.frame, start_long_max: pre.long };
   console.log(JSON.stringify(perf)); await browser.close(); process.exit(0);
 }
 const sounds = await page.evaluate(() => window.__rnSnd).catch(() => null);

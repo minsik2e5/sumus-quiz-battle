@@ -160,7 +160,7 @@ function playGame(start) {
     alive: true, map, start, cvs, ctx: cvs.getContext('2d', { alpha: false, desynchronized: true }), id: start.id,
     S: runInit(map, { start: start.start, pet: pet.el ? { el: pet.el, mul: pet.mul } : null }), rec: recorder(),
     pet, tx: 0, hold: false, drag: null, last: 0, acc: 0, clock: 0, timers: [], frameLog: [], jsLog: [], lastCheck: 0, frames: 0,
-    tier: savedTier(), emerg: false, sent: false, pz: 0, pcx: 0, paused: false, shotT: 0, lastN: 0, hitstop: 0, castleHitT: 0, cracks: 0, slow: 0, bursts: [], hudN: -1, hudBumpAt: 0, hudAt: 0, hudTextAt: 0, cd: COUNTDOWN, vx: 0, lastCx: 0, petLand: null, fireT: 0, chunkT: 0
+    tier: savedTier(), emerg: 0, sent: false, pz: 0, pcx: 0, paused: false, shotT: 0, lastN: 0, hitstop: 0, castleHitT: 0, cracks: 0, slow: 0, bursts: [], hudN: -1, hudBumpAt: 0, hudAt: 0, hudTextAt: 0, cd: COUNTDOWN, vx: 0, lastCx: 0, petLand: null, fireT: 0, chunkT: 0
   };
   if (R) R.game = G;
   G.T = TIERS[G.tier];
@@ -237,12 +237,12 @@ function swapOut(A, j) { const l = --A.n; for (const k of A.keys) A[k][j] = A[k]
 //   높음 = min(dpr, 2), 중간 = 높음과 하한 사이 2/3, 낮음 = 1/3, 최저 = 하한. 큰 PC · 아이패드 칸도 하한까지만(폰보다 많이 칠하지 않게 낮은 단계는 하한).
 const RES_MIN_W = 540;
 function floorS2(g) { const d = Math.min(devicePixelRatio || 1, 2); return Math.max(d * .5, RES_MIN_W / Math.max(1, g.cssW)); }
-// 비상 단계(g.emerg, 선생님 확인 ①): 최저(하한)에서 판 중 8초(2초 창 넷) 평균 프레임이 33ms를 넘고 화면 30Hz 묶임도 아닐 때만(캔버스를 CPU로 그리는 아주 느린 기기)
-//   예전 최저 크기(배율 0.68, 폰 넓이까지)로 내려간다. 그 판 동안만이고 기억하지 않는다(다음 판은 하한부터 다시 — 품질 기억 때문에 영구히 흐려지지 않게).
-//   아이폰 · 요즘 안드로이드처럼 GPU로 그리는 폰은 걸리지 않는다. RES_EMERGENCY = false면 끈다.
-const RES_EMERGENCY = true, EMERG_MS = 33, PHONE_AREA = 390 * 844;   // EMERG_MS: 하한에서 8초 평균 프레임이 이보다 길면 비상(선생님 확인 33ms)
+// 비상 단계(g.emerg, 선생님 확인): 최저(하한)에서도 판 중 4초(2초 창 둘) 평균 프레임이 EMERG_MS(25ms)를 넘고 화면 30Hz 묶임도 아니면(캔버스를 CPU로 그리거나 GPU가 약한 기기)
+//   한 단계씩 내려간다: 하한(세로 폰 538px) → 1 중간(하한 × 0.75, 약 400px) → 2 예전 최저 크기(배율 0.68, 265px). 단계 사이 6초 쉼, 그 판 동안만이고 기억하지 않는다.
+//   20ms 넘는 프레임이 12% 넘어도(60Hz에서 자주 끊김) 내려간다. 카운트다운에서 이미 무거우면(하한 예상 18ms↑) 처음부터 중간으로(중간도 18ms↑면 예전 크기로) 시작한다. 다음 판은 다시 하한부터. RES_EMERGENCY = false면 끈다.
+const RES_EMERGENCY = true, EMERG_MS = 25, EMERG_MID = .75, PHONE_AREA = 390 * 844;
 const emergS2 = g => .68 * Math.min(1, Math.sqrt(PHONE_AREA / (g.cssW * g.cssH)));
-function s2Of(g, t) { if (g.emerg && t === 0) return Math.min(floorS2(g), Math.round(emergS2(g) * 100) / 100); const top = Math.max(floorS2(g), Math.min(devicePixelRatio || 1, 2)), lo = floorS2(g), r = TIERS[t].res; return Math.round((lo + (top - lo) * r / 3) * 100) / 100; }
+function s2Of(g, t) { if (g.emerg && t === 0) return Math.round(Math.min(floorS2(g) * (g.emerg === 1 ? EMERG_MID : 1), g.emerg === 1 ? 9 : emergS2(g)) * 100) / 100; const top = Math.max(floorS2(g), Math.min(devicePixelRatio || 1, 2)), lo = floorS2(g), r = TIERS[t].res; return Math.round((lo + (top - lo) * r / 3) * 100) / 100; }
 function resize(g) {
   const box = g.cvs.parentElement; g.cssW = box?.clientWidth || innerWidth; g.cssH = box?.clientHeight || innerHeight;   // 가운데 세로 칸 크기 기준
   g.S2 = s2Of(g, g.tier);
@@ -646,37 +646,44 @@ function hud(g, now) {
 //   카운트다운: 효과 없는 장면 프레임의 중간값으로 단계마다 예상 시간을 계산해 고른다. 저장된 단계보다 한 단계까지는 다시 올라갈 수 있다(한 번 잘못 내려간 폰이 7일 동안 최저에 갇히지 않게).
 //   판 중: 2초 창 두 개(4초)를 보고, 둘 다 느리면(20ms 넘는 프레임 25%↑, 또는 평균 프레임 24ms↑) 한 단계만 내린다. 내린 뒤 6초 동안은 다시 보지 않고, 판 중에는 올리지 않는다.
 //   화면이 30Hz로 묶인 폰(저전력 모드: 프레임이 고르게 33ms)은 그리기 시간(JS)이 짧으면 내리지 않는다 — 내려도 빨라지지 않고 흐려지기만 한다.
+// 30Hz 묶임(저전력 모드): 프레임의 90% 이상이 30~37ms이고 40ms 넘는 프레임이 2% 아래(고르게 33ms). 그리기가 느린 기기는 33 · 50ms가 섞여 여기에 안 걸린다.
+const cappedOf = log => { let c = 0, big = 0; for (const d of log) { if (d > 30 && d < 37) c++; else if (d > 40) big++; } return log.length > 0 && c / log.length >= .9 && big / log.length < .02; };
 function winStats(log, js) {
-  const n = log.length; let sum = 0, slow = 0, cap = 0; for (const d of log) { sum += d; if (d > 20) slow++; if (d > 29 && d < 37.5) cap++; }
+  const n = log.length; let sum = 0, slow = 0; for (const d of log) { sum += d; if (d > 20) slow++; }
   const js2 = [...js].sort((a, b) => a - b);
-  return { n, avg: sum / n, slow: slow / n, capped: cap / n > .75, js: js2[js2.length >> 1] || 0 };
+  return { n, avg: sum / n, slow: slow / n, capped: cappedOf(log), js: js2[js2.length >> 1] || 0 };
 }
 function autoTier(g, warm = false) {
   const log = g.frameLog, js = g.jsLog; g.frameLog = []; g.jsLog = [];
   if (warm) {
     if (log.length < 20) return;
-    const sorted = [...log].sort((a, b) => a - b), mid = sorted[sorted.length >> 1], sc = g.S2, jsMid = [...js].sort((a, b) => a - b)[js.length >> 1] || 0, capped = mid > 29 && mid < 37.5 && jsMid < 8;
+    const sorted = [...log].sort((a, b) => a - b), mid = sorted[sorted.length >> 1], sc = g.S2, jsMid = [...js].sort((a, b) => a - b)[js.length >> 1] || 0, capped = cappedOf(log) && jsMid < 8;
     if (capped) return;
     let t = Math.min(3, g.tier + 1);
     while (t > 0 && mid * (s2Of(g, t) / sc) ** 2 * (t > g.tier ? 1.25 : 1) > 10) t--;   // 올라갈 때는 25% 더 여유를 본다
+    // 효과 없는 카운트다운 장면도 하한에서 18ms를 넘을 만큼 무거우면 처음부터 비상 중간으로(그 판만)
+    //   중간 크기(0.75배)로도 18ms를 넘을 만큼 무거우면 바로 예전 최저 크기로
+    if (RES_EMERGENCY && t === 0 && mid * (floorS2(g) / sc) ** 2 > 18) return setTier(g, 0, mid * (floorS2(g) * EMERG_MID / sc) ** 2 > 18 ? 2 : 1);
     if (t !== g.tier) setTier(g, t);
     return;
   }
   if (!log.length || g.frames < 90) return;
   const w = winStats(log, js), prev = g.lastWin; g.lastWin = w;
-  (g.wins ||= []).push(w); if (g.wins.length > 4) g.wins.shift();
-  if (g.emerg || !prev || g.clock - (g.tierAt || 0) < 6) return;
+  if (g.emerg >= 2 || !prev || g.clock - (g.tierAt || 0) < 6) return;
   if (w.capped && w.js < 10 && prev.capped) return;
   if (g.tier === 0) {
-    // 비상 단계: 하한에서 8초(창 넷) 평균 33ms 초과 · 30Hz 묶임이 아닌 창이 있음
-    const W = g.wins; if (RES_EMERGENCY && W.length === 4 && W.reduce((a, x) => a + x.avg * x.n, 0) / W.reduce((a, x) => a + x.n, 0) > EMERG_MS && !W.every(x => x.capped)) { setTier(g, 0, true); g.lastWin = null; g.wins = []; }
+    // 비상 단계: 하한(또는 중간)에서 4초 평균 EMERG_MS 초과 또는 20ms 넘는 프레임 12%↑ · 30Hz 묶임이 아님 → 한 단계 더(6초 쉼)
+    const avg = (w.avg * w.n + prev.avg * prev.n) / (w.n + prev.n), slow = (w.slow * w.n + prev.slow * prev.n) / (w.n + prev.n);
+    if (RES_EMERGENCY && (avg > EMERG_MS || slow > .12) && !(w.capped && prev.capped)) { setTier(g, 0, g.emerg + 1); g.lastWin = null; }
     return;
   }
   const bad = x => x.slow > .25 || x.avg > 24;
-  if (bad(w) && bad(prev)) { setTier(g, g.tier - 1); g.lastWin = null; g.wins = []; }
+  if (bad(w) && bad(prev)) { setTier(g, g.tier - 1); g.lastWin = null; }
 }
-function setTier(g, t, emerg = false) {
-  g.tier = t; g.T = TIERS[t]; g.tierAt = g.clock; g.emerg = t === 0 && emerg; window.__rnTier = g.emerg ? -1 : t;   // 화면 시험(docs/runner-play-shot.mjs)이 읽는다 writePref(TIER_KEY, JSON.stringify({ t, at: Date.now() }));   // 비상 단계는 기억하지 않는다
+function setTier(g, t, emerg = 0) {
+  g.tier = t; g.T = TIERS[t]; g.tierAt = g.clock; g.emerg = t === 0 ? Math.max(0, Math.min(2, emerg | 0)) : 0;
+  window.__rnTier = g.emerg ? -g.emerg : t;   // 화면 시험(docs/runner-play-shot.mjs)이 읽는다(−1 = 비상 중간, −2 = 비상 끝)
+  writePref(TIER_KEY, JSON.stringify({ t, at: Date.now() }));   // 비상 단계는 기억하지 않는다(다음 판은 하한부터)
   const P = g.pools; for (const [k, cap] of [['D', 'debris'], ['M', 'smoke'], ['K', 'sparks'], ['Gl', 'glows'], ['F', 'fly'], ['B', 'shots']]) P[k].n = Math.min(P[k].n, g.T[cap]);
   if (s2Of(g, t) !== g.S2) resize(g);   // 해상도가 그대로면 다시 굽지 않는다(효과만 줄어 끊김 없음)
   syncCrowd(g, 0, 0);
@@ -819,8 +826,8 @@ function drawRoadTiled(g, img, endZ) {
   const ctx = g.ctx, cam = g.cam, K = g.F * (cam.zoom + cam.punch), HZ = g.HZ, ROAD = RUNNER.ROAD, mip = g.roadMip;
   const zFar = Math.min(cam.z + 90, endZ), yTop = HZ + cam.h * K / (zFar - cam.z), yBot = Math.min(g.cvs.height, HZ + cam.h * K / .8);
   // 띠 높이는 화면 픽셀 4~5px(띠 안 길 폭 차이 1px 안팎): 가장자리는 바깥의 사다리꼴 clip이 매끈하게 자르고, 띠는 아래 끝 폭으로 넉넉히 칠한다.
-  // 비상 단계(CPU로 그리는 아주 느린 기기)만 길 무늬를 가까운 점으로(예전 최저와 같음 — 그 기기에서는 부드럽게 늘리기가 프레임의 큰 몫). 그 밖은 늘 부드럽게.
-  if (g.emerg) ctx.imageSmoothingEnabled = false;
+  // 비상 끝 단계(2, 예전 최저 크기)만 길 무늬를 가까운 점으로(예전 최저와 같음 — 그 기기에서는 부드럽게 늘리기가 프레임의 큰 몫). 그 밖은 늘 부드럽게.
+  if (g.emerg >= 2) ctx.imageSmoothingEnabled = false;
   const band = g.emerg ? 4 : clamp(Math.round(2.2 * g.S2 + 1), 3, 6);
   let padMax = 0;
   for (let y = yTop; y < yBot; y += band) {
