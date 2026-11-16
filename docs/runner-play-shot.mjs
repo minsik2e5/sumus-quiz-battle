@@ -20,7 +20,7 @@ const browser = await pw.chromium.launch({ args: ['--mute-audio'] });
 const PERF = process.argv.includes('--perf'), CPU = Number(arg('cpu', 1)), Q = arg('q', 'auto');
 // --size 1918x628 → PC 가로 화면(마우스), 기본 390×844 폰
 const SIZE = (arg('size', '390x844')).split('x').map(Number), DESK = SIZE[0] > SIZE[1] && SIZE[0] >= 1000;
-const ctx = await browser.newContext({ viewport: { width: SIZE[0], height: SIZE[1] }, deviceScaleFactor: PERF ? 3 : 1, isMobile: !DESK, hasTouch: !DESK });
+const ctx = await browser.newContext({ viewport: { width: SIZE[0], height: SIZE[1] }, deviceScaleFactor: Number(arg('dpr', PERF ? 3 : 1)), isMobile: !DESK, hasTouch: !DESK });
 const page = await ctx.newPage();
 const errors = [], reqs = [];
 page.on('request', r => reqs.push(r.url()));
@@ -29,7 +29,8 @@ page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 await page.addInitScript(q => {
   try { if (q === 'auto') localStorage.removeItem('sumus-runner-tier'); else localStorage.setItem('sumus-runner-tier', JSON.stringify({ t: Number(q), at: Date.now() })); } catch {}
   const P = window.__perf = { frames: [], long: [], on: false }; let last = 0;
-  const loop = t => { if (last && P.on) P.frames.push(t - last); last = t; requestAnimationFrame(loop); }; requestAnimationFrame(loop);
+  P.siege = 0;   // 공성전 ~ 성 붕괴(결과 화면 전)까지 가장 긴 프레임: 가장 무거운 순간
+  const loop = t => { if (last && P.on) { P.frames.push(t - last); if (window.__rnPhase === 'siege' && t - last > P.siege) P.siege = t - last; } last = t; requestAnimationFrame(loop); }; requestAnimationFrame(loop);
   try { new PerformanceObserver(l => { if (P.on) for (const e of l.getEntries()) P.long.push(Math.round(e.duration)); }).observe({ type: 'longtask' }); } catch {}
   // 입력 지연: 손가락(포인터) 움직임이 처리되고 다음 화면 프레임이 시작될 때까지(ms)
   P.lat = []; addEventListener('pointermove', e => { if (!P.on) return; const t0 = e.timeStamp; requestAnimationFrame(t => P.lat.push(t - t0)); }, { capture: true, passive: true });
@@ -42,7 +43,7 @@ await page.addInitScript(() => {
   const apply = (n, g) => g[0] === '+' ? n + g[1] : g[0] === '×' ? n * g[1] : Math.max(0, n - g[1]);
   window.__rnAutopilot = S => {
     if (window.__rnBad) return { tx: 0, hold: false };
-    window.__rnPhase = S.phase; window.__rnSiegeT = S.siegeT;
+    window.__rnPhase = S.phase; window.__rnSiegeT = S.siegeT; if (S.phase === 'siege' && !window.__rnN) window.__rnN = S.n;
     if (S.phase === 'siege') return { tx: 0, hold: S.siegeT > 10 };
     for (const o of S.items) {
       if (o.done || o.z < S.z - 1 || o.z > S.z + 20 || o.type === 'card' || o.type === 'end') continue;
@@ -91,8 +92,8 @@ if (PERF) {
   var pre = await page.evaluate(() => ({ ms: Math.round(performance.now() - window.__perf.t0), frame: Math.round(Math.max(0, ...window.__perf.frames)), long: Math.max(0, ...window.__perf.long) }));
   await page.evaluate(() => { window.__perf.frames = []; window.__perf.long = []; window.__perf.lat = []; window.__perf.on = true; });
   if (arg('profile')) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
-  const tEnd = Date.now() + WINDOW * 1000, box = { x: 195, y: 600 };
-  while (Date.now() < tEnd) { box.x = 150 + Math.random() * 90; await page.mouse.move(box.x, box.y); await page.waitForTimeout(250); if (await page.$('#rn-cards.on')) { await page.click('#rn-cards.on .rn-card', { timeout: 1500 }).catch(() => {}); await page.waitForTimeout(400); } if (await page.$('#rn-result:not([hidden])')) break; }
+  const tEnd = Date.now() + WINDOW * 1000, box = { x: SIZE[0] / 2, y: SIZE[1] * .7 };
+  while (Date.now() < tEnd) { box.x = SIZE[0] / 2 - 45 + Math.random() * 90; await page.mouse.move(box.x, box.y); await page.waitForTimeout(250); if (await page.$('#rn-cards.on')) { await page.click('#rn-cards.on .rn-card', { timeout: 1500 }).catch(() => {}); await page.waitForTimeout(400); } if (await page.$('#rn-result:not([hidden])')) break; }
   await page.evaluate(() => { window.__perf.on = false; });
 }
 const t0 = Date.now(), shots = [[9000, 'runner-play-run.jpg']];
@@ -117,7 +118,7 @@ if (PERF) {
   const fr = P.frames.filter(d => d < 5000), secs = fr.reduce((a, b) => a + b, 0) / 1000, mins = secs / 60, pct = q => { const x = [...fr].sort((a, b) => a - b); return x[Math.min(x.length - 1, Math.floor(x.length * q))] || 0; };
   const r1 = x => Math.round(x * 10) / 10;
   const lat = [...P.lat].sort((a, b) => a - b), lp = q => r1(lat[Math.min(lat.length - 1, Math.floor(lat.length * q))] || 0);
-  perf = { cpu: CPU, q: Q, seconds: r1(secs), fps: r1(fr.length / secs), p95: r1(pct(.95)), p99: r1(pct(.99)), max: r1(Math.max(...fr)), over33_min: r1(fr.filter(d => d > 33.4).length / mins), over50_min: r1(fr.filter(d => d > 50).length / mins), long_tasks: P.long.length, input_p50: lp(.5), input_p95: lp(.95), input_n: lat.length, first5s_over50: (() => { let t = 0, n = 0; for (const d of fr) { t += d; if (t > 5000) break; if (d > 50) n++; } return n; })(), tier_end: ['최저', '낮음', '중간', '높음'][tierEnd], start_ms: pre.ms, start_frame_max: pre.frame, start_long_max: pre.long };
+  perf = { cpu: CPU, q: Q, seconds: r1(secs), fps: r1(fr.length / secs), p95: r1(pct(.95)), p99: r1(pct(.99)), max: r1(Math.max(...fr)), over33_min: r1(fr.filter(d => d > 33.4).length / mins), over50_min: r1(fr.filter(d => d > 50).length / mins), long_tasks: P.long.length, input_p50: lp(.5), input_p95: lp(.95), input_n: lat.length, first5s_over50: (() => { let t = 0, n = 0; for (const d of fr) { t += d; if (t > 5000) break; if (d > 50) n++; } return n; })(), tier_end: ['최저', '낮음', '중간', '높음'][tierEnd], start_ms: pre.ms, siege_max: Math.round(P.siege), crowd_end: await page.evaluate(() => window.__rnN || 0), canvas: await page.evaluate(() => { const c = document.querySelector('#rn-cvs'); return c ? `${c.width}x${c.height}` : ''; }), start_frame_max: pre.frame, start_long_max: pre.long };
   console.log(JSON.stringify(perf)); await browser.close(); process.exit(0);
 }
 const sounds = await page.evaluate(() => window.__rnSnd).catch(() => null);
