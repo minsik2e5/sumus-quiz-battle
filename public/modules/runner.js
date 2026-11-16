@@ -406,7 +406,7 @@ function buildSprites(g) {
 // v13.242 적 정령(그림 75 enemy-*가 없으면 빨간 정령 코드 그림) · 적 대장(왕관)
 function buildFoes(g) {
   const S = g.S2, P = g.SPR, sp = Math.round(30 * S);
-  P.foe = outlined(g, 'enemy-run', sp) || spiritSprite(sp, ['#ffe0dc', '#ff6a5a', '#b3202c'], '#ffb08a'); P.foeW = whiteOf(P.foe);
+  P.foe = outlined(g, 'enemy-run', sp) || spiritSprite(sp, ['#ffb4a8', '#ff3434', '#8a0c18'], '#ff7a3a'); P.foeW = whiteOf(P.foe);
   P.foeHit = outlined(g, 'enemy-hit', sp) || P.foeW;
   P.foeDown = outlined(g, 'enemy-down', sp) || P.foe;
   const bp = Math.round(64 * S); P.foeBoss = g.img['enemy-boss'] ? shrink(g.img['enemy-boss'], bp) : (() => { const c = spiritSprite(bp, ['#ffd6f0', '#c04ad8', '#5a1478'], '#ff9ad8'), x = c.getContext('2d'); x.fillStyle = '#ffd24a'; x.strokeStyle = '#7a4a00'; x.lineWidth = bp / 40; x.beginPath(); const k = bp / 64; x.moveTo(20 * k, 14 * k); x.lineTo(24 * k, 4 * k); x.lineTo(28 * k, 11 * k); x.lineTo(32 * k, 2 * k); x.lineTo(36 * k, 11 * k); x.lineTo(40 * k, 4 * k); x.lineTo(44 * k, 14 * k); x.closePath(); x.fill(); x.stroke(); return c; })();
@@ -562,8 +562,9 @@ function onEvent(type, a, b, c, d) {
   // v13.242 적 무리: 다가오면 붉은 경고, 정면 충돌은 느린 동작 + 충돌 빛 + 양쪽이 우르르 깎임, 이기면 함성
   if (type === 'foeWake') { if (!g.foeWarned) { g.foeWarned = true; pill(g, a.boss ? '적 대장이 달려와요!' : '적 무리가 달려와요!', 'flame', 1.4); } screenTint('flame', .1); return; }
   if (type === 'clash') {
-    const cz = (S.z + a.pz) / 2, cxm = (S.cx + a.x) / 2; snd('clash'); g.slow = .55; g.hitstop = .08; g.cam.punch += .08; shake(g, .75); whiteFlash(.2); g.clashFx = 1;
-    flash(g, cxm, 1.6, cz + 1, 3.6, .45, '255,255,255', 'clash-burst'); flash(g, cxm, 1.2, cz + 1, 2.6, .35, '255,90,90'); ring(g, cxm, .2, cz, 5, .5, '255,255,255'); ring(g, cxm, .2, cz, 7, .7, '255,90,90', .08);
+    // 충돌 빛은 짧고 작게(0.18초 · 반지름 1.8): 부딪치는 두 무리가 가려지지 않게. 대신 불꽃 · 붉은 고리 · 흔들림으로 세게.
+    const cz = (S.z + a.pz) / 2, cxm = (S.cx + a.x) / 2; snd('clash'); g.slow = .5; g.hitstop = .06; g.cam.punch += .06; shake(g, .7); g.clashFx = 1;
+    flash(g, cxm, 1.2, cz + 1.2, 1.8, .18, '255,255,255', 'clash-burst'); ring(g, cxm, .15, cz + .6, 4, .4, '255,90,90'); ring(g, cxm, .15, cz + .6, 6, .55, '255,200,80', .06);
     addSparks(g, cxm, 1, cz, 30, 2, 16, .7); addSmoke(g, cxm, .2, cz, 8, 0, 1.2, 2); pill(g, a.boss ? '적 대장과 정면 충돌!' : '정면 충돌!', 'flame', 1.1); return;
   }
   if (type === 'fight') {
@@ -571,7 +572,7 @@ function onEvent(type, a, b, c, d) {
     if (g.tier || g.fightT % 2) addSparks(g, cxm + rr(-1.5, 1.5), rr(.4, 1.4), cz, 5, rnd() < .5 ? 1 : 2, 12, .5); addGlow(g, cxm, 1, cz, 2, 0, 3, .5, .4, 1);
     for (let i = 0; i < Math.min(3, b); i++) flyer(g, a.x + rr(-1, 1), .4, a.pz + rr(-.5, .5), 3);
     if (c) { for (let i = 0; i < Math.min(3, c); i++) { const k = (rnd() * Math.max(1, g.shown)) | 0; flyer(g, S.cx + sl.ox[k], .4, S.z + sl.oz[k], 0); } syncCrowd(g, 0, 0); }
-    if (g.fightT % 3 === 0) { popNum(g, 'minus', '−' + c, S.cx - .8, 2.2, S.z + 1); popNum(g, 'foe', '−' + b, a.x + .8, 2.4, a.pz); }
+    if (g.fightT % 5 === 1) { popNum(g, 'minus', '−' + c, S.cx - 1.4, 3, S.z + .5); popNum(g, 'foe', '−' + b, a.x + 1.4, 3.6, a.pz + 1.4); }   // 숫자는 드물게 · 높게(두 무리가 가려지지 않게)
     return;
   }
   if (type === 'clashWin') { snd('clash-win'); g.cheerT = 1.1; g.slow = Math.max(g.slow, .25); shake(g, .3); ring(g, S.cx, .2, S.z, 5, .6, '255,214,140'); addGlow(g, S.cx, 1.4, S.z, 18, 3, 5, .7, .8, 2.5); flash(g, S.cx, 1.6, S.z + 1, 4, .4, '255,220,120'); pill(g, a.boss ? '적 대장 격파!' : '승리!', 'star', 1.1); return; }
@@ -769,8 +770,8 @@ function render(g, dt, alpha) {
   drawSkyDrift(g); drawClouds(g); drawRoad(g); drawFloor(g);
   // 그릴 물체 목록(먼 것부터): 판마다 하나의 배열을 다시 쓰고(새 배열 없음), 거의 정렬된 상태라 끼워 넣기 정렬
   const objs = g.objs; objs.length = 0;
-  // 정렬 깊이 dz: 달려오는 적 무리는 지금 자리(pz), 나머지는 z. 바닥 장애물(미끄럼 · 소용돌이)은 drawFloor가 먼저 그렸다.
-  for (let i = S.lo; i < S.items.length; i++) { const o = S.items[i]; if (o.z > cam.z + 95) break; const dz = o.type === 'foe' && o.on ? o.pz : o.z; if (dz > cam.z + 1 && o.type !== 'card' && o.type !== 'end' && o.type !== 'slide' && o.type !== 'whirl') { o.dz = dz; objs.push(o); } }
+  // 정렬 깊이 dz: 달려오는 적 무리는 지금 자리보다 7 앞(앞의 문 판 위에 그려 가리지 않게, 연출만), 나머지는 z. 바닥 장애물(미끄럼 · 소용돌이)은 drawFloor가 먼저 그렸다.
+  for (let i = S.lo; i < S.items.length; i++) { const o = S.items[i]; if (o.z > cam.z + 95) break; const dz = o.type === 'foe' && o.on ? Math.max(o.pz - 7, S.z + .5) : o.z; if (dz > cam.z + 1 && o.type !== 'card' && o.type !== 'end' && o.type !== 'slide' && o.type !== 'whirl') { o.dz = dz; objs.push(o); } }
   if (siege || S.castle.z < cam.z + 95) { g.oCastle.z = g.oCastle.dz = S.castle.z; objs.push(g.oCastle); }
   g.oCrowd.z = g.oCrowd.dz = z + .01; objs.push(g.oCrowd);
   for (let i = 1; i < objs.length; i++) { const o = objs[i]; let j = i - 1; while (j >= 0 && objs[j].dz < o.dz) { objs[j + 1] = objs[j]; j--; } objs[j + 1] = o; }
@@ -985,12 +986,12 @@ function drawWall(g, o, dt) {
   if (big && proj(g, bx, H * .5, o.z)) { const hit = v.hitT > 0; drawNum(g, 'wall', ns(Math.ceil(o.hp)), PX + (hit ? rr(-.06, .06) * PS : 0), PY, Math.min(2, PS / 26) * (hit ? 1.1 : 1)); }
 }
 // v13.242 적 무리: 빨간 정령(품질별 최대 14 · 24 · 36 · 50마리) 해바라기 대형 · 통통 뛰며 달려옴 · 머리 위 빨간 숫자 배지. 적 대장은 큰 정령 하나 + 무리.
-const FOE_DRAW = [10, 24, 36, 50];
+const FOE_DRAW = [12, 28, 40, 56];
 function drawFoe(g, o, dt, alpha) {
   if (o.done) return;   // 싸우는 동안은 1.4단위 앞에 그려 내 무리에 가리지 않게(연출만)
   const ctx = g.ctx, P = g.SPR, S = g.S, moving = o.on && S.clash !== o, z = o.on ? o.pz + (moving ? RUNNER.FOE_SPEED * RUNNER.DT * (1 - alpha) : 1.4) : o.z, n = Math.min(Math.max(6, Math.ceil(o.hp)), FOE_DRAW[g.tier]), t = g.clock, v = vw(g, o);
   if (v.hitT > 0) v.hitT -= dt;
-  const Rf = foeR(o.hp), spread = Rf / crowdR(Math.min(150, o.hp)) * 1.15, sz0 = g.spiritU * 1.35, fight = S.clash === o;   // 적 정령은 조금 크게(멀리서도 붉은 무리가 읽히게)
+  const Rf = foeR(o.hp), spread = Rf / crowdR(Math.min(150, o.hp)) * 1.35, sz0 = g.spiritU * 1.75, fight = S.clash === o;   // 적 정령은 조금 크게(멀리서도 붉은 무리가 읽히게)
   if (proj(g, o.x, 0, z)) { const w = (Rf * 2 + .6) * PS; ctx.globalAlpha = .5; ctx.drawImage(P.shadow, PX - w / 2, PY - w * .14, w, w * .32); ctx.globalAlpha = 1; }
   if (g.T.glow && o.on && proj(g, o.x, .6, z)) { const w = (Rf * 2.4 + 1) * PS; ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .28 + .1 * Math.sin(t * 7); ctx.drawImage(g.tg.foeGlow, PX - w / 2, PY - w * .5, w, w); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
   for (let oi = DRAW_MAX - 1; oi >= 0; oi--) {
@@ -1000,8 +1001,10 @@ function drawFoe(g, o, dt, alpha) {
     const sz = sz0 * PS, im = v.hitT > 0 && i % 3 === 0 ? P.foeHit : P.foe; ctx.drawImage(im, PX - sz / 2, PY - sz, sz, sz);
   }
   if (o.boss && proj(g, o.x, Math.abs(Math.sin(t * 5)) * .3, z - Rf - .3)) { const w = 2.2 * PS; ctx.drawImage(P.foeBoss, PX - w / 2, PY - w, w, w); }
+  // 다가오는 동안: 발밑 붉은 고리(숨 쉬듯) + 큰 숫자 배지 → 1~2초 전부터 "빨간 무리가 온다"가 읽힌다
+  if (o.on && !fight && proj(g, o.x, .05, z)) { const w = (Rf * 2.2 + .8) * PS * (1 + .06 * Math.sin(t * 10)); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .8; ctx.drawImage(tint(g, 'ring', '255,90,90'), PX - w / 2, PY - w * .18, w, w * .36); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
   if (proj(g, o.x, 1.9 + Rf * .35, z)) {
-    const str = ns(Math.ceil(o.hp)), sc = Math.min(1.3, PS / 34), A = P.digits.foe, w = A.adv * str.length * sc + 26 * g.S2 * sc, h = A.ch * sc * .9;
+    const str = ns(Math.ceil(o.hp)), sc = Math.min(1.5, PS / (o.on ? 26 : 34)), A = P.digits.foe, w = A.adv * str.length * sc + 26 * g.S2 * sc, h = A.ch * sc * .9;
     ctx.fillStyle = 'rgba(90,10,20,.82)'; roundRect(ctx, PX - w / 2, PY - h / 2, w, h, h / 2); ctx.fill(); ctx.lineWidth = 2 * g.S2; ctx.strokeStyle = '#ff9a9a'; ctx.stroke();
     ctx.drawImage(P.foe, PX - w / 2 + 4 * g.S2 * sc, PY - h * .42, h * .84, h * .84); drawNum(g, 'foe', str, PX + 10 * g.S2 * sc, PY, sc);
   }
