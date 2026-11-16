@@ -11,7 +11,7 @@ export const TEST_APP = {
   PASSWORD: 'test1234',
   TEACHER: 'tteacher',
   // 판이 바뀔 때마다 SEED를 올린다: 이미 켜진 테스트 앱에도 시작할 때 한 번 덧붙인다(applyTestSeed).
-  SEED: 6,
+  SEED: 7,
   TEACHERS: [['tteacher', '테스트 선생님'], ['tteacher2', '테스트 선생님 2']],
   BAIT: 10,
   // V13.162 판 3 · 4(손맛 고퀄 뒤 다시 채움): 펫 사냥을 바로 해 볼 수 있게 공(기본 · 좋은 · 황금)과 지도에 새 친구 '?' 하나.
@@ -21,6 +21,8 @@ export const TEST_APP = {
   GIFTS: { 'bugdino-ts2': { ts2: ['ladybug', 'bee', 'ant', 'firefly', 'rhinobeetle', 'butterfly', 'tricera', 'stego', 'brachio', 'ptera', 'ankylo', 'tyranno'] }, 'special-ts3': { ts3: ['hachiware', 'usagi', 'chiikawa'] }, 'special5-ts3': { ts3: ['furuhonya', 'kurimanju', 'momonga', 'rakko', 'shisa'] }, 'special6-ts3': { ts3: ['kani', 'siren', 'horned', 'islandman', 'anoko', 'beetle'] } },
   // V13.180 판 6: 인형뽑기를 바로 해 볼 수 있게 집게권(보관 상한까지).
   CLAW: 6,
+  // V13.242 판 7: 펫 대행진 26~100스테이지(사막 · 얼음 협곡 · 화산)를 바로 해 볼 수 있게 나래(ts2)는 99스테이지까지 깬 것으로(별은 없음).
+  RUNNER: { ts2: 99 },
   STUDENTS: [
     ['ts1', '가온', 'dog'], ['ts2', '나래', 'cat'], ['ts3', '다온', 'fox'],
     ['ts4', '라온', 'rabbit'], ['ts5', '마루', 'bear'], ['ts6', '바다', 'penguin']
@@ -77,6 +79,7 @@ export async function applyTestSeed(state, now = Date.now(), hash = null) {
     h.map ||= { slot: null, spots: [] };
     const c = p.claw ||= {};
     c.t = Math.max(Number(c.t || 0), TEST_APP.CLAW);
+    if (TEST_APP.RUNNER[username]) { const r = (p.games ||= {}).runner ||= {}; r.st = Math.max(Number(r.st || 0), TEST_APP.RUNNER[username]); }
     if (fresh && !h.map.spots.some(s => s.kind === 'pet')) h.map.spots.push({ id: `seed-${username}`, kind: 'pet', key: fresh, tier: 'pet', form: 1, x: 50, y: 44, cell: 4 });
   }
   state.test_seed = TEST_APP.SEED;

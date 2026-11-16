@@ -46,9 +46,16 @@ await page.addInitScript(() => {
     if (window.__rnBad) return { tx: 0, hold: false };
     window.__rnPhase = S.phase; window.__rnSiegeT = S.siegeT; if (S.phase === 'siege' && !window.__rnN) window.__rnN = S.n;
     if (S.phase === 'siege') return { tx: 0, hold: S.siegeT > 10 };
+    // v13.242: 장면 표시(스크린샷 때) · 적 무리는 정면으로(쏘며 맞섬) · 벽은 틈(있으면) · 움직이는/바뀌는 문은 지금 칸 · 바닥 장애물은 피함
+    const F = window.__rnSeen ||= {}; if (S.clash) F.clash = (F.clash || 0) + 1; if (S.fever > 0) F.fever = (F.fever || 0) + 1;
+    window.__rnS = S;   // 시험용: 지금 판 상태(--debug로 적 무리 · 충돌을 적는다)
+    if (S.clash) return { tx: S.cx };
+    for (const o of S.foes || []) if (!o.done && o.pz - S.z < 26) { F.foe = (F.foe || 0) + 1; return { tx: o.x }; }
+    const tri = p => { const f = p - Math.floor(p); return f < 0.25 ? f * 4 : f < 0.75 ? 2 - f * 4 : f * 4 - 4; };
     for (const o of S.items) {
-      if (o.done || o.z < S.z - 1 || o.z > S.z + 20 || o.type === 'card' || o.type === 'end') continue;
-      if (o.type === 'gate') return { tx: apply(S.n, o.l) >= apply(S.n, o.r) ? -2.2 : 2.2 };
+      if (o.done || o.z < S.z - 1 || o.z > S.z + 20 || o.type === 'card' || o.type === 'end' || o.type === 'slide' || o.type === 'foe') continue;
+      if (o.type === 'gate') { const sw = o.sw && (Math.floor(S.tick / o.sw) & 1), L = sw ? o.r : o.l, Rv = sw ? o.l : o.r, sx = o.mv ? o.mv.amp * tri(S.tick / o.mv.per + o.mv.ph) : 0; return { tx: apply(S.n, L) >= apply(S.n, Rv) ? sx - 1.6 : sx + 1.6 }; }
+      if (o.type === 'wall') { if (o.z - S.z < 12) F.wall = (F.wall || 0) + 1; return { tx: o.gap ? o.gap.x : S.cx }; }
       if (o.type === 'crystal') return { tx: o.x };
       if (o.type === 'rock') return { tx: o.hp < (1 + Math.min(S.n, 400) * 0.028) * (o.z - S.z) * 1.6 ? o.x : (o.x > 0 ? -3 : 3) };
       return { tx: (o.x ?? o.x0) > 0 ? -2.8 : 2.8 };
@@ -98,13 +105,18 @@ if (PERF) {
   await page.evaluate(() => { window.__perf.on = false; });
 }
 const t0 = Date.now(), shots = [[9000, 'runner-play-run.jpg']];
-let cards = 0, shotRescue = false, shotSiege = false;
+let cards = 0, shotRescue = false, shotSiege = false, burstAt = 0, burstN = 0; const shotSeen = {};
 while (!PERF && Date.now() - t0 < 150000) {
   await page.waitForTimeout(120);
   if (await page.$('#rn-result:not([hidden])')) { if (PERF) await page.evaluate(() => { window.__perf.on = false; }); break; }
   if (await page.$('#rn-cards.on')) { await page.waitForTimeout(500); if (cards === 0) await page.screenshot({ path: resolve(OUT, 'runner-play-card.jpg'), type: 'jpeg', quality: 70 }); await page.click('#rn-cards.on .rn-card', { timeout: 1500 }).catch(() => {}); cards++; await page.waitForTimeout(600); }
   const el = Date.now() - t0;
+  if (process.argv.includes('--debug')) console.log(await page.evaluate(() => { const S = window.__rnS; return S ? JSON.stringify({ t: S.tick, z: Math.round(S.z), n: S.n, ph: S.phase, clash: S.clash ? Math.round(S.clash.hp) : null, foes: S.foes.map(o => [Math.round(o.pz), Math.round(o.x * 10) / 10, Math.round(o.hp), o.done]) }) : ''; }));
+  if (arg('every') && el > (burstAt += Number(arg('every')))) await page.screenshot({ path: resolve(OUT, `runner-burst-${String(burstN++).padStart(3, '0')}.jpg`), type: 'jpeg', quality: 60 });   // --every ms: 장면 고르기용 연속 사진
+  else if (arg('every')) burstAt -= Number(arg('every'));
   while (shots.length && el > shots[0][0]) { const [, f] = shots.shift(); await page.screenshot({ path: resolve(OUT, f), type: 'jpeg', quality: 70 }); }
+  const seen = await page.evaluate(() => window.__rnSeen || {}).catch(() => ({}));
+  for (const k of ['wall', 'clash', 'fever']) if (seen[k] >= (k === 'wall' ? 2 : k === 'clash' ? 1 : 12) && !shotSeen[k]) { shotSeen[k] = true; await page.screenshot({ path: resolve(OUT, `runner-play-${k}.jpg`), type: 'jpeg', quality: 70 }); }
   const siegeT = await page.evaluate(() => window.__rnPhase === 'siege' ? window.__rnSiegeT : 0).catch(() => 0);
   if (!shotSiege && siegeT > 24) { shotSiege = true; await page.screenshot({ path: resolve(OUT, 'runner-play-siege.jpg'), type: 'jpeg', quality: 70 }); }
   void shotRescue;

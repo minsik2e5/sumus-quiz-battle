@@ -47,7 +47,7 @@ import { rangeCounts, rememberRangeBest, keepTimingLastWeek } from './titles-4.m
 import { grantTimingPlay, timingView, timingPing, timingStart, timingFinish, timingBoard, timingLine, dailyConfig, dailyTeacherView, setDaily, timingDailyBoard } from './timing.mjs';
 import { grantBall, huntCard, huntView, huntMap, huntMeet, huntThrow, huntSell, huntCoins, huntSpend, huntBerryQuiz, huntBerryAnswer } from './hunt.mjs';
 import { grantClaw, clawView, clawStart, clawDrop, clawGuideSeen, clawPreviewFill, clawActivityText } from './claw.mjs';
-import { runnerView, runnerStart, runnerFinish, runnerBoard, runnerLine } from './runner.mjs';
+import { runnerView, runnerStart, runnerFinish, runnerBoard, runnerLine, runnerUpgrade } from './runner.mjs';
 import { HUNT, HUNT_MONSTERS } from '../public/modules/hunt-rules.js';
 import { CLAW } from '../public/modules/claw-rules.js';
 import { postClawNews, clawNewsFor } from './claw-news.mjs';
@@ -2286,8 +2286,14 @@ export async function service(state, method, path, body, token, options = {}) {
   if (path === '/runner/start' && method === 'POST') {
     requireRole(p, 'student');
     if (!p.pets?.length) fail('먼저 첫 펫을 골라주세요.', 409);
-    const now = Date.now(), res = runnerStart(p, { id: str(body.id, 40), stage: body.stage, now });
+    const now = Date.now(), res = runnerStart(p, { id: str(body.id, 40), stage: body.stage, rules: body.rules, now });
     return { ...res, runner: runnerView(p, now) };
+  }
+  // v13.242 정령 강화(기존 코인): 그 학생 프로필만 고친다
+  if (path === '/runner/upgrade' && method === 'POST') {
+    requireRole(p, 'student');
+    const res = runnerUpgrade(p, str(body.key, 4), coinBalance(state, p));
+    return { ...res, runner: runnerView(p, Date.now()), points_balance: coinBalance(state, p) };
   }
   if (path === '/runner/finish' && method === 'POST') {
     requireRole(p, 'student');

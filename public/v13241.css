@@ -169,3 +169,32 @@
 .rn-box{display:inline-flex;align-items:center;gap:4px}
 .rn-box img{width:22px;height:22px;margin:-4px 0}
 .rn-res-face{display:block;width:84px;height:84px;margin:-58px auto 0;filter:drop-shadow(0 6px 8px rgb(0 0 0 / .25))}
+/* v13.242 펫 대행진 ②: 테마 지도(26~100) · 정령 강화 · 피버 연속 점 · 피버 화면 가장자리 */
+.rn-map-h{grid-column:1/-1;margin:10px 2px -2px;font-family:'Jua',system-ui,sans-serif;font-weight:400;font-size:18px;display:flex;align-items:baseline;gap:6px;color:var(--rn-ink)}
+.rn-map-h small{font-family:system-ui,sans-serif;font-size:12px;opacity:.6}
+.rn-map-h::before{content:'';width:10px;height:10px;border-radius:3px;background:#7fc4ff;transform:rotate(45deg)}
+.rn-map-h.th-desert::before{background:#f0b05a}.rn-map-h.th-ice::before{background:#bfe8ff}.rn-map-h.th-volcano::before{background:#ff6a3a}
+.rn-hero.th-desert{background:linear-gradient(160deg,#c06a26,#e9a456)}.rn-hero.th-ice{background:linear-gradient(160deg,#25588f,#6fb0e0)}.rn-hero.th-volcano{background:linear-gradient(160deg,#2a0e18,#8a2a1a)}
+.rn-hero p b{color:#ffe27a}
+.rn-up-sheet h2{margin:0 0 4px;font-family:'Jua',system-ui,sans-serif;font-weight:400;font-size:22px}
+.rn-up-sheet p{margin:0 0 12px;font-size:13px;line-height:1.5}
+.rn-up-bal{display:inline-flex;align-items:center;gap:4px;font-weight:700;opacity:1}
+.rn-up-sheet ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.rn-up-sheet li{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--rn-sky3)}
+.rn-up-sheet li>div{flex:1;min-width:0;display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center}
+.rn-up-sheet li b{font-family:'Jua',system-ui,sans-serif;font-weight:400;font-size:17px}
+.rn-up-sheet li small{grid-column:1;font-size:12px;opacity:.7}
+.rn-up-sheet li em{grid-row:1;grid-column:2;font-style:normal;font-weight:700;font-size:13px}
+.rn-up-bar{grid-column:1/-1;height:7px;border-radius:4px;background:rgba(0,0,0,.12);overflow:hidden}
+.rn-up-bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#7fd8ff,#ffd24a);transform-origin:0 50%;transform:scaleX(var(--p))}
+.rn-up-buy{border:0;border-radius:12px;padding:9px 12px;min-width:76px;font:inherit;font-weight:700;background:var(--rn-gold);color:#4a2c00;display:inline-flex;align-items:center;justify-content:center;gap:4px;box-shadow:0 3px 0 rgba(0,0,0,.18)}
+.rn-up-buy:disabled{opacity:.45;box-shadow:none}
+.rn-streak{display:inline-flex;gap:3px;align-items:center;margin-left:4px}
+.rn-streak i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.28);transition:background .2s,transform .2s}
+.rn-streak[data-n="1"] i:nth-child(-n+1),.rn-streak[data-n="2"] i:nth-child(-n+2),.rn-streak[data-n="3"] i{background:#ffd24a;transform:scale(1.2)}
+.rn-streak.hot i{animation:rn-hot .4s ease-in-out infinite alternate}
+@keyframes rn-hot{from{opacity:.6}to{opacity:1}}
+.rn-game.fever .rn-vig{opacity:1;background:radial-gradient(ellipse at center,transparent 58%,rgba(255,190,40,.42) 100%);animation:rn-fever-edge .45s ease-in-out infinite alternate}
+@keyframes rn-fever-edge{from{opacity:.55}to{opacity:1}}
+.rn-game.fever .rn-count{box-shadow:0 0 0 2px #ffd24a}
+.rn-res-list li.fever b{color:#ffb020}

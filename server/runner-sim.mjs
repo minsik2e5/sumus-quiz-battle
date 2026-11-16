@@ -8,50 +8,74 @@
 //       node server/runner-sim.mjs rates [봇 수=300]  (지금 표로 스테이지마다 깬 확률 · 별 3 확률)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { RUNNER, makeMap, runInit, runTick, runPick, recorder, replay, runResult, crowdR, gateApply, mulberry, stageTarget, quantTx } from '../public/modules/runner-rules.js';
+import { RUNNER, makeMap, runInit, runTick, runPick, recorder, replay, runResult, crowdR, gateApply, gateSides, gateSplit, mulberry, stageTarget, quantTx } from '../public/modules/runner-rules.js';
 
 const ELS = ['flame', 'water', 'ice', 'leaf', 'earth', 'wind', 'toxic', 'star'];
 const dmgTick = (n, fire) => (1 + Math.min(n, 400) * 0.028) * fire;
 
 // 봇 한 판: { input, S }. cards: 'random' | [i, j](정한 카드) , skill 1이면 늘 바르게.
+// 규칙 2판: 움직이는 · 바뀌는 문은 닿을 때의 칸을 내다보고, 벽은 틈 · 부딪힘 중 덜 잃는 쪽, 적 무리는 쏴서 이길 만하면 맞서고 아니면 비킨다.
+const ROAD_X = [-3, -1.5, 0, 1.5, 3];
 export function botRun(map, opts, { skill = 0.7, seed = 1, cards = 'random', holdDelay = 8 } = {}) {
   const R = mulberry(seed), S = runInit(map, opts), rec = recorder(), plan = new Map();
   let ci = 0, tx = 0;
   const look = 8 + 16 * skill;
-  while (S.phase !== 'done' && S.tick < 6000) {
+  const roll = o => R() < (o.type === 'gate' ? 0.6 + 0.4 * skill : o.type === 'rock' || o.type === 'crystal' || o.type === 'wall' || o.type === 'foe' ? 0.5 + 0.5 * skill : skill);
+  const stepZ = () => RUNNER.SPEED * RUNNER.DT * (S.fever > 0 ? RUNNER.FEVER_SPEED : 1);
+  const fireNow = () => S.fever > 0 ? S.fire * RUNNER.FEVER_FIRE : S.fire;
+  const away = x => x > 0.3 ? -2.8 : x < -0.3 ? 2.8 : (R() < 0.5 ? -2.8 : 2.8);
+  while (S.phase !== 'done' && S.tick < 7000) {
     if (S.phase === 'card') { const i = Array.isArray(cards) ? cards[ci++] ?? 0 : Math.floor(R() * 3); rec.pick(i); runPick(S, i); continue; }
     let hold = false;
     if (S.phase === 'siege') hold = S.siegeT >= holdDelay;
-    else if (S.phase === 'run') {
-      const R0 = crowdR(S.n);
-      for (const o of S.items) {
-        if (o.done || o.z < S.z - 1 || o.type === 'card' || o.type === 'end') continue;
-        if (o.z > S.z + look) break;
-        if (!plan.has(o)) {
-          // 사람은 문은 잘 본다(0.6 + 0.4k), 바위 판단은 중간(0.5 + 0.5k), 톱날 · 망치 피하기가 솜씨 그대로(k).
-          const good = R() < (o.type === 'gate' ? 0.6 + 0.4 * skill : o.type === 'rock' || o.type === 'crystal' ? 0.5 + 0.5 * skill : skill);
-          if (o.type === 'gate') { const l = gateApply(S.n, o.l), r = gateApply(S.n, o.r), best = l >= r ? -2.2 : 2.2; plan.set(o, good ? best : -best); }
-          else if (o.type === 'rock' || o.type === 'crystal') {
-            const row = S.items.filter(x => (x.type === 'rock' || x.type === 'crystal') && !x.done && Math.abs(x.z - o.z) < 3);
-            const ticks = Math.min(RUNNER.SHOOT_RANGE, o.z - S.z) / (RUNNER.SPEED * RUNNER.DT), can = x => x.hp <= dmgTick(S.n, S.fire) * ticks * 0.85;
-            const target = o.type === 'crystal' ? o : row.filter(can).sort((a, b) => a.hp - b.hp)[0];
-            // 바르게: 깰 수 있는 바위를 노리고, 다 못 깨면 바위가 없는 쪽으로. 틀리면 그냥 지금 자리.
-            const gap = x => Math.min(...row.map(r => Math.abs(r.x - x))), free = [-3, -1.5, 0, 1.5, 3].reduce((m, x) => gap(x) > gap(m) ? x : m, 0);
-            plan.set(o, good ? (target ? target.x : free) : S.cx);
-          } else plan.set(o, good ? (o.type === 'saw' ? (o.x0 > 0 ? -2.8 : o.x0 < 0 ? 2.8 : (R() < 0.5 ? -2.8 : 2.8)) : (o.x > 0 ? -2.8 : o.x < 0 ? 2.8 : 2.8)) : S.cx + (R() - 0.5) * 2);
-        }
-        // 두 번째 기회: 바위가 6단위 안인데 다 못 깰 것 같으면 0.5 + 0.5k 확률로 틈으로 비킨다(한 번만 정함)
-        if ((o.type === 'rock') && o.z - S.z < 6 && !plan.has('late' + S.items.indexOf(o))) {
-          const left = (o.z - S.z) / (RUNNER.SPEED * RUNNER.DT), sure = o.hp <= dmgTick(S.n, S.fire) * left;
-          const row = S.items.filter(x => x.type === 'rock' && !x.done && Math.abs(x.z - o.z) < 3), gap = x => Math.min(...row.map(r => Math.abs(r.x - x)));
-          plan.set('late' + S.items.indexOf(o), true);
-          if (!sure && R() < 0.5 + 0.5 * skill) plan.set(o, [-3, -1.5, 0, 1.5, 3].reduce((m, x) => gap(x) > gap(m) ? x : m, 0));
-        }
-        tx = plan.get(o); break;
+    else if (S.phase === 'run' && !S.clash) {
+      let target = null;
+      // 달려오는 적 무리가 먼저
+      for (const o of S.foes) {
+        if (o.done || o.pz - S.z > look + 6) continue;
+        if (!plan.has(o)) plan.set(o, roll(o));
+        const left = Math.max(1, (o.pz - S.z) / (stepZ() + RUNNER.FOE_SPEED * RUNNER.DT)), rest = o.hp - dmgTick(S.n, fireNow()) * RUNNER.FOE_ARMOR * Math.min(left, 34);
+        // 바르게: 쏴서 많이 남지 않으면 정면으로(쏘며 맞섬), 많이 남으면 반대쪽 끝으로 비킨다. 틀리면 그냥 지금 자리.
+        target = plan.get(o) ? (rest > S.n * 0.6 ? away(o.x) : o.x) : S.cx; break;
       }
-      void R0;
+      if (target === null) for (const o of S.items) {
+        if (o.done || o.z < S.z - 1 || o.type === 'card' || o.type === 'end' || o.type === 'slide' || o.type === 'foe') continue;
+        if (o.z > S.z + look) break;
+        if (!plan.has(o)) plan.set(o, roll(o));
+        const good = plan.get(o), ticks = Math.max(0, (o.z - S.z) / stepZ());
+        if (o.type === 'gate') {
+          // 닿을 때(ticks 뒤)의 칸막이 · 두 칸 값으로 고른다
+          const at = S.tick + ticks, [l, r] = gateSides(o, at), sx = gateSplit(o, at), best = gateApply(S.n, l) >= gateApply(S.n, r) ? -1 : 1, side = good ? best : -best;
+          target = side < 0 ? Math.max(-3.4, Math.min(sx - 1.3, -0.6 + sx)) : Math.min(3.4, Math.max(sx + 1.3, 0.6 + sx));
+        } else if (o.type === 'rock' || o.type === 'crystal') {
+          if (!plan.has('x' + S.items.indexOf(o))) {
+            const row = S.items.filter(x => (x.type === 'rock' || x.type === 'crystal') && !x.done && Math.abs(x.z - o.z) < 3);
+            const tt = Math.min(RUNNER.SHOOT_RANGE, o.z - S.z) / stepZ(), can = x => x.hp <= dmgTick(S.n, fireNow()) * tt * 0.85;
+            const tg = o.type === 'crystal' ? o : row.filter(can).sort((a, b) => a.hp - b.hp)[0];
+            const gap = x => Math.min(...row.map(r => Math.abs(r.x - x))), free = ROAD_X.reduce((m, x) => gap(x) > gap(m) ? x : m, 0);
+            plan.set('x' + S.items.indexOf(o), good ? (tg ? tg.x : free) : S.cx);
+          }
+          target = plan.get('x' + S.items.indexOf(o));
+          // 두 번째 기회: 바위가 6단위 안인데 다 못 깰 것 같으면 0.5 + 0.5k 확률로 틈으로 비킨다(한 번만 정함)
+          if (o.type === 'rock' && o.z - S.z < 6 && !plan.has('late' + S.items.indexOf(o))) {
+            const sure = o.hp <= dmgTick(S.n, fireNow()) * ticks;
+            const row = S.items.filter(x => x.type === 'rock' && !x.done && Math.abs(x.z - o.z) < 3), gap = x => Math.min(...row.map(r => Math.abs(r.x - x)));
+            plan.set('late' + S.items.indexOf(o), true);
+            if (!sure && R() < 0.5 + 0.5 * skill) plan.set('x' + S.items.indexOf(o), ROAD_X.reduce((m, x) => gap(x) > gap(m) ? x : m, 0));
+            target = plan.get('x' + S.items.indexOf(o));
+          }
+        } else if (o.type === 'wall') {
+          // 벽: 닿기 전에 다 깰 수 있으면 그대로, 아니면 틈(있으면)과 부딪힘 중 덜 잃는 쪽
+          const rest = o.hp - dmgTick(S.n, fireNow()) * ticks, Rn = crowdR(S.n);
+          const gapLoss = o.gap ? Math.floor(S.n * Math.max(0, 1 - o.gap.w / 2 / Rn) * RUNNER.GAP_SQUEEZE) : Infinity;
+          target = good && o.gap && rest > 0 && gapLoss < rest ? o.gap.x : (good ? S.cx : (o.gap ? -o.gap.x : S.cx));
+        } else if (o.type === 'saw') target = good ? away(o.x0) : S.cx + (R() - 0.5) * 2;
+        else target = good ? away(o.x) : S.cx + (R() - 0.5) * 2;   // 망치 · 모래 소용돌이 · 불기둥
+        break;
+      }
+      if (target !== null) tx = target;
     }
-    tx = quantTx(tx);
+    tx = quantTx(Math.max(-RUNNER.ROAD, Math.min(RUNNER.ROAD, tx)));
     rec.tick(S.tick, tx, hold);
     runTick(S, tx, hold);
   }
@@ -81,13 +105,22 @@ export function tuneStage(stage, M = 400) {
   // 하한: 가운데 봇 값의 35%(전멸한 봇이 분위수에 걸려 성이 너무 약해지지 않게)
   const H = Math.max(10, Math.round(A[A.length >> 1] * 0.35), Math.round(A[Math.min(A.length - 1, Math.floor((1 - clear) * A.length))]));
   const ratio = out.map(o => { const hp = Math.max(1, H - Math.round(H * o.f)), need = Math.ceil(hp / o.power); return o.n >= need ? (o.n - need) / o.n : -1; }).sort((a, b) => a - b);
-  const r3 = Math.max(5, Math.min(90, Math.round(100 * ratio[Math.min(ratio.length - 1, Math.floor((1 - three) * ratio.length))])));
-  return [H, r3, hz];
+  let r3 = Math.max(5, Math.min(90, Math.round(100 * ratio[Math.min(ratio.length - 1, Math.floor((1 - three) * ratio.length))])));
+  // 강화 없이 별 3이 늘 가능하게: 가장 잘하는 봇(솜씨 1 · 카드 9가지 중 최고)이 남기는 비율의 97%를 넘지 않게
+  //   가장 잘하는 봇도 못 깨는 성이면 성 HP를 그 봇이 별 3을 받을 만큼으로 낮춘다(드문 경우).
+  const map = makeMap(stage, { hz: hz / 100 }), tops = [];
+  for (const [el, seed] of BEST_TRY) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) { const { S } = botRun(map, { start: map.start, pet: { el, mul: 1 } }, { skill: 1, seed, cards: [a, b] }); tops.push({ n: S.start, power: S.power, f: S.petOn ? (RUNNER.PET_SIEGE + (el === 'star' ? 0.2 : 0)) * S.petup : 0 }); }
+  const topAt = h => Math.max(-1, ...tops.map(o => { const need = Math.ceil(Math.max(1, h - Math.round(h * o.f)) / o.power); return o.n >= need ? (o.n - need) / o.n : -1; }));
+  let HH = H, top = topAt(HH);
+  while (top * 97 < 5 && HH > 10) { HH = Math.floor(HH * 0.9); top = topAt(HH); }
+  if (top > 0) r3 = Math.max(5, Math.min(r3, Math.floor(top * 97)));
+  return [HH, r3, hz];
 }
-// 가장 잘하는 봇(솜씨 1, 카드 9가지 중 가장 좋은 것, 강화 없음)의 별
-export function bestStars(stage, pet = { el: 'flame', mul: 1 }) {
+// 가장 잘하는 봇(솜씨 1, 강화 없음)의 별: 펫 2가지 × 조종 씨앗 2가지 × 카드 9가지 중 가장 좋은 것(별 3이 나오면 바로 멈춤)
+const BEST_TRY = [['flame', 3], ['water', 4], ['flame', 5], ['star', 6]];
+export function bestStars(stage) {
   const map = makeMap(stage); let best = 0;
-  for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) best = Math.max(best, botRun(map, { start: map.start, pet }, { skill: 1, seed: 3, cards: [a, b] }).S.stars);
+  for (const [el, seed] of BEST_TRY) for (let a = 0; a < 3; a++) for (let b = 0; b < 3; b++) { best = Math.max(best, botRun(map, { start: map.start, pet: { el, mul: 1 } }, { skill: 1, seed, cards: [a, b] }).S.stars); if (best === 3) return 3; }
   return best;
 }
 export function rates(stage, M = 300, seed = 11) {
@@ -112,4 +145,14 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   } else {
     for (let s = 1; s <= RUNNER.STAGES; s++) { const r = rates(s, M), tg = stageTarget(s); console.log(`스테이지 ${s}: 깸 ${(r.clear * 100).toFixed(0)}%(목표 ${(tg.clear * 100).toFixed(0)}) · 별3 ${(r.three * 100).toFixed(0)}%(목표 ${(tg.three * 100).toFixed(0)}) · 다시 돌리기 같음 ${(r.replaySame * 100).toFixed(0)}% · 가장 잘하면 별 ${bestStars(s)}`); }
   }
+}
+// v13.242 펫 등급 세기 확인(구성안 2-5): 같은 봇 · 같은 펫 속성으로 등급 배율만 바꿔(기본 1 · 전설 1.06 · 신화 1.12) 깸 · 별 3 확률을 잰다.
+export function tierRates(stage, mul, M = 200, seed = 21) {
+  const map = makeMap(stage), R = mulberry(seed * 131 + stage); let c = 0, t = 0;
+  for (let i = 0; i < M; i++) {
+    const el = ['flame', 'water', 'ice', 'leaf', 'earth', 'wind', 'toxic', 'star'][Math.floor(R() * 8)], skill = 0.35 + R() * 0.6, sd = Math.floor(R() * 1e9);
+    const { S } = botRun(map, { start: map.start, pet: { el, mul } }, { skill, seed: sd });
+    if (S.stars > 0) c++; if (S.stars === 3) t++;
+  }
+  return { clear: c / M, three: t / M };
 }
