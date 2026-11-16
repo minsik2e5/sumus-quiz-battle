@@ -105,10 +105,12 @@ async function startGame(stage) {
 const TIERS = [
   // v13.241 퀄리티 업: shadows = 정령마다 발밑 그림자, trail = 탄 · 대포 정령 빛 꼬리, speed = 가장자리 속도선 수, sky = 떠가는 구름 수,
   //   fire = 성이 약해지면 불 · 연기, rim = 맨 앞줄 테두리 빛, coins = 결과 화면 코인 비 수. 모두 품질 단계와 함께 내려간다.
-  { name: '최저', scale: .68, draw: 40, debris: 70, smoke: 18, sparks: 70, glows: 60, fly: 30, shots: 20, mult: .35, glow: false, cutLines: 4, posts: 6, shadows: false, trail: false, speed: 0, sky: 0, fire: false, rim: false, coins: 6 },
-  { name: '낮음', scale: 1, draw: 70, debris: 90, smoke: 26, sparks: 90, glows: 90, fly: 40, shots: 28, mult: .45, glow: false, cutLines: 6, posts: 8, shadows: false, trail: false, speed: 4, sky: 1, fire: true, rim: false, coins: 10 },
-  { name: '중간', scale: 1.5, draw: 110, debris: 200, smoke: 48, sparks: 180, glows: 160, fly: 70, shots: 44, mult: .7, glow: true, cutLines: 10, posts: 12, shadows: true, trail: true, speed: 6, sky: 3, fire: true, rim: true, coins: 14 },
-  { name: '높음', scale: 2, draw: 150, debris: 300, smoke: 72, sparks: 260, glows: 240, fly: 100, shots: 60, mult: 1, glow: true, cutLines: 14, posts: 16, shadows: true, trail: true, speed: 8, sky: 4, fire: true, rim: true, coins: 18 }
+  // v13.241 그래픽 안정화: 단계를 내릴 때 효과(정령 수 · 파편 · 빛 · 그림자)부터 줄이고 해상도는 마지막에 줄인다(res: 3 = 원래 배율, 0 = 하한).
+  //   해상도 하한 = CSS 픽셀 × min(dpr, 2) × 0.5, 폭 540px 이상(s2Of). 낮은 단계도 선명하게.
+  { name: '최저', scale: .68, res: 0, draw: 40, debris: 70, smoke: 18, sparks: 70, glows: 60, fly: 30, shots: 20, mult: .35, glow: false, cutLines: 4, posts: 6, shadows: false, trail: false, speed: 0, sky: 0, fire: false, rim: false, coins: 6 },
+  { name: '낮음', scale: 1, res: 1, draw: 70, debris: 90, smoke: 26, sparks: 90, glows: 90, fly: 40, shots: 28, mult: .45, glow: false, cutLines: 6, posts: 8, shadows: false, trail: false, speed: 4, sky: 1, fire: true, rim: false, coins: 10 },
+  { name: '중간', scale: 1.5, res: 2, draw: 110, debris: 200, smoke: 48, sparks: 180, glows: 160, fly: 70, shots: 44, mult: .7, glow: true, cutLines: 10, posts: 12, shadows: true, trail: true, speed: 6, sky: 3, fire: true, rim: true, coins: 14 },
+  { name: '높음', scale: 2, res: 3, draw: 150, debris: 300, smoke: 72, sparks: 260, glows: 240, fly: 100, shots: 60, mult: 1, glow: true, cutLines: 14, posts: 16, shadows: true, trail: true, speed: 8, sky: 4, fire: true, rim: true, coins: 18 }
 ];
 const DRAW_MAX = 150;
 const COUNTDOWN = 1.5;   // 판 시작 전 3 · 2 · 1(효과음 START_GO와 같은 길이): 이 동안 장면을 그려 캐시 · 그림을 데우고 규칙은 멈춰 둔다
@@ -157,8 +159,8 @@ function playGame(start) {
   G = {
     alive: true, map, start, cvs, ctx: cvs.getContext('2d', { alpha: false, desynchronized: true }), id: start.id,
     S: runInit(map, { start: start.start, pet: pet.el ? { el: pet.el, mul: pet.mul } : null }), rec: recorder(),
-    pet, tx: 0, hold: false, drag: null, last: 0, acc: 0, clock: 0, timers: [], frameLog: [], lastCheck: 0, frames: 0,
-    tier: savedTier(), sent: false, pz: 0, pcx: 0, paused: false, shotT: 0, lastN: 0, hitstop: 0, castleHitT: 0, cracks: 0, slow: 0, bursts: [], hudN: -1, hudBumpAt: 0, hudAt: 0, hudTextAt: 0, cd: COUNTDOWN, vx: 0, lastCx: 0, petLand: null, fireT: 0, chunkT: 0
+    pet, tx: 0, hold: false, drag: null, last: 0, acc: 0, clock: 0, timers: [], frameLog: [], jsLog: [], lastCheck: 0, frames: 0,
+    tier: savedTier(), emerg: false, sent: false, pz: 0, pcx: 0, paused: false, shotT: 0, lastN: 0, hitstop: 0, castleHitT: 0, cracks: 0, slow: 0, bursts: [], hudN: -1, hudBumpAt: 0, hudAt: 0, hudTextAt: 0, cd: COUNTDOWN, vx: 0, lastCx: 0, petLand: null, fireT: 0, chunkT: 0
   };
   if (R) R.game = G;
   G.T = TIERS[G.tier];
@@ -231,8 +233,16 @@ function prebake(g) {
 const pool = (n, keys) => { const o = { n: 0, keys, cap: n }; for (const k of keys) o[k] = new Float32Array(n); return o; };
 function swapOut(A, j) { const l = --A.n; for (const k of A.keys) A[k][j] = A[k][l]; }
 // 단계마다 캔버스 배율. 낮음 · 최저(배율 1 이하)는 칸 넓이를 폰(390×844)만큼으로 맞춘다: 아이패드 · PC 큰 칸에서 느린 기기가 폰보다 많이 칠하지 않게.
-const PHONE_AREA = 390 * 844;
-function s2Of(g, t) { const sc = TIERS[t].scale; return sc <= 1 ? sc * Math.min(1, Math.sqrt(PHONE_AREA / (g.cssW * g.cssH))) : Math.min(devicePixelRatio || 1, sc); }
+//   v13.241 그래픽 안정화: 어떤 단계도 하한(CSS × min(dpr, 2) × 0.5, 폭 540 이상) 아래로 내려가지 않는다 — 예전 최저(폭 약 265px)를 4배 넘게 늘려 길 · 숫자가 흐리고 계단처럼 깨졌다.
+//   높음 = min(dpr, 2), 중간 = 높음과 하한 사이 2/3, 낮음 = 1/3, 최저 = 하한. 큰 PC · 아이패드 칸도 하한까지만(폰보다 많이 칠하지 않게 낮은 단계는 하한).
+const RES_MIN_W = 540;
+function floorS2(g) { const d = Math.min(devicePixelRatio || 1, 2); return Math.max(d * .5, RES_MIN_W / Math.max(1, g.cssW)); }
+// 비상 단계(g.emerg, 선생님 확인 ①): 최저(하한)에서 판 중 8초(2초 창 넷) 평균 프레임이 33ms를 넘고 화면 30Hz 묶임도 아닐 때만(캔버스를 CPU로 그리는 아주 느린 기기)
+//   예전 최저 크기(배율 0.68, 폰 넓이까지)로 내려간다. 그 판 동안만이고 기억하지 않는다(다음 판은 하한부터 다시 — 품질 기억 때문에 영구히 흐려지지 않게).
+//   아이폰 · 요즘 안드로이드처럼 GPU로 그리는 폰은 걸리지 않는다. RES_EMERGENCY = false면 끈다.
+const RES_EMERGENCY = true, EMERG_MS = 33, PHONE_AREA = 390 * 844;   // EMERG_MS: 하한에서 8초 평균 프레임이 이보다 길면 비상(선생님 확인 33ms)
+const emergS2 = g => .68 * Math.min(1, Math.sqrt(PHONE_AREA / (g.cssW * g.cssH)));
+function s2Of(g, t) { if (g.emerg && t === 0) return Math.min(floorS2(g), Math.round(emergS2(g) * 100) / 100); const top = Math.max(floorS2(g), Math.min(devicePixelRatio || 1, 2)), lo = floorS2(g), r = TIERS[t].res; return Math.round((lo + (top - lo) * r / 3) * 100) / 100; }
 function resize(g) {
   const box = g.cvs.parentElement; g.cssW = box?.clientWidth || innerWidth; g.cssH = box?.clientHeight || innerHeight;   // 가운데 세로 칸 크기 기준
   g.S2 = s2Of(g, g.tier);
@@ -328,25 +338,25 @@ function spiritSprite(px, body = ['#e8fbff', '#7fd8ff', '#2f86d8'], flame = '#bf
   return c;
 }
 function buildSprites(g) {
-  const S = g.S2, P = g.SPR, sp = Math.round(30 * S);
+  const S = g.S2, P = g.SPR, sp = Math.round(46 * S);   // v13.241 안정화: 그리는 크기(약 35~45 × 배율)보다 크게 구워 늘려 그리지 않는다(예전 30 × 배율은 흐림)
   P.spirit = outlined(g, 'spirit-run', sp) || spiritSprite(sp); P.spiritW = whiteOf(P.spirit);
   P.spiritFly = outlined(g, 'spirit-fly', sp) || P.spirit; P.spiritHurt = outlined(g, 'spirit-hurt', sp) || P.spiritW;
   g.spiritU = g.img['spirit-run'] ? .66 : .52;   // 그림 정령은 조금 크게(그림 안 여백 · 32px에서 읽히게)
   // 그림 74 문 판(gate-good · bad)은 검은 배경 빛 그림 → 판 전에 검정을 투명으로 바꾼 진한 색 유리(glassOf)로 보통 섞기. 빛만 더하기. 가운데 기둥은 gate-frame.
-  P.gateFrame = g.img['gate-frame'] ? fromImg(g, 'gate-frame', 96, 192) : null;
+  P.gateFrame = g.img['gate-frame'] ? fromImg(g, 'gate-frame', 192, 384) : null; P.gateFrameS = P.gateFrame && shrink(P.gateFrame, 96);
   const sh = mk(64, 32), sx = sh.getContext('2d'), gr = sx.createRadialGradient(32, 16, 0, 32, 16, 32); gr.addColorStop(0, 'rgba(40,40,80,.4)'); gr.addColorStop(1, 'rgba(40,40,80,0)'); sx.setTransform(1, 0, 0, .5, 0, 8); sx.fillStyle = gr; sx.fillRect(0, -16, 64, 64); P.shadow = sh;
-  P.pet = g.img.pet ? shrink(g.img.pet, Math.round(96 * S)) : null;
+  P.pet = g.img.pet ? shrink(g.img.pet, Math.round(150 * S)) : null;   // 그리는 폭(2.5 × 거리 배율 ≈ 135 × 배율)보다 크게
   P.petBig = g.img.pet ? shrink(g.img.pet, Math.round(Math.min(g.cssW * .8, 300) * S)) : null;
-  P.rock = fromImg(g, 'rock-num', 160 * S, 150 * S); if (!P.rock) { P.rock = mk(160 * S, 150 * S); const x = P.rock.getContext('2d'); x.scale(S * 160 / 128, S * 150 / 128); rock(x, 128, '#9b8b78', .92); }
+  P.rock = fromImg(g, 'rock-num', 256, 240); if (!P.rock) { P.rock = mk(160 * S, 150 * S); const x = P.rock.getContext('2d'); x.scale(S * 160 / 128, S * 150 / 128); rock(x, 128, '#9b8b78', .92); }
   P.rockW = whiteOf(P.rock);
   for (const [k, c1, c2, edge] of [['gate-good', 'rgba(70,170,255,.62)', 'rgba(40,120,240,.35)', '#bfe6ff'], ['gate-bad', 'rgba(255,90,100,.62)', 'rgba(220,40,70,.35)', '#ffc4c4']]) {
-    if (g.img[k]) { P[k] = glassOf(g.img[k], 212, 150); continue; }
-    const c = mk(200, 150), x = c.getContext('2d'), lg = x.createLinearGradient(0, 0, 0, 150); lg.addColorStop(0, c1); lg.addColorStop(1, c2); x.fillStyle = lg; roundRect(x, 4, 4, 192, 142, 14); x.fill(); x.lineWidth = 6; x.strokeStyle = edge; x.stroke(); x.fillStyle = 'rgba(255,255,255,.28)'; roundRect(x, 14, 12, 172, 22, 10); x.fill(); P[k] = c;
+    if (g.img[k]) { P[k] = glassOf(g.img[k], g.img[k].width, g.img[k].height); P[k + 'S'] = shrink(P[k], 192); continue; }   // 원본 해상도(384×272) + 반 축소본: 가까우면 원본, 멀면 축소본
+    const c = mk(200, 150), x = c.getContext('2d'), lg = x.createLinearGradient(0, 0, 0, 150); lg.addColorStop(0, c1); lg.addColorStop(1, c2); x.fillStyle = lg; roundRect(x, 4, 4, 192, 142, 14); x.fill(); x.lineWidth = 6; x.strokeStyle = edge; x.stroke(); x.fillStyle = 'rgba(255,255,255,.28)'; roundRect(x, 14, 12, 172, 22, 10); x.fill(); P[k] = c; P[k + 'S'] = c;
   }
   P.saw = fromImg(g, 'saw', 128, 128); if (!P.saw) { P.saw = mk(128, 128); const x = P.saw.getContext('2d'); x.translate(64, 64); x.fillStyle = '#d7dde6'; x.strokeStyle = '#3b4250'; x.lineWidth = 3; x.beginPath(); for (let i = 0; i < 16; i++) { const a = i / 16 * TAU; x.lineTo(Math.cos(a) * 60, Math.sin(a) * 60); x.lineTo(Math.cos(a + .2) * 46, Math.sin(a + .2) * 46); } x.closePath(); x.fill(); x.stroke(); const r2 = x.createRadialGradient(-10, -10, 4, 0, 0, 44); r2.addColorStop(0, '#fff'); r2.addColorStop(1, '#8b96a8'); x.fillStyle = r2; x.beginPath(); x.arc(0, 0, 40, 0, TAU); x.fill(); x.fillStyle = '#e04848'; x.beginPath(); x.arc(0, 0, 12, 0, TAU); x.fill(); x.stroke(); }
   // 망치 그림(손잡이 위 · 머리 아래 한 장)이 오면 통째로 돌린다(hammerArt)
   g.hammerArt = !!g.img.hammer; P.hammer = g.hammerArt ? fromImg(g, 'hammer', 128, 192) : null; if (!P.hammer) { P.hammer = mk(160, 110); const x = P.hammer.getContext('2d'), lg = x.createLinearGradient(0, 0, 0, 110); lg.addColorStop(0, '#ffcf6b'); lg.addColorStop(1, '#a8621a'); x.fillStyle = lg; x.strokeStyle = '#4a2a08'; x.lineWidth = 5; roundRect(x, 6, 8, 148, 94, 18); x.fill(); x.stroke(); x.fillStyle = 'rgba(255,255,255,.35)'; roundRect(x, 18, 16, 124, 18, 9); x.fill(); }
-  P.post = fromImg(g, 'post-' + g.th, 48, 128); if (!P.post) { P.post = mk(40, 120); const x = P.post.getContext('2d'), lg = x.createLinearGradient(0, 0, 40, 0); lg.addColorStop(0, '#fff3c2'); lg.addColorStop(.5, THEME.rail); lg.addColorStop(1, THEME.railDark); x.fillStyle = lg; x.fillRect(10, 20, 20, 100); x.beginPath(); x.arc(20, 18, 15, 0, TAU); x.fill(); }
+  P.post = fromImg(g, 'post-' + g.th, 96, 256); P.postS = fromImg(g, 'post-' + g.th, 48, 128); if (!P.post) { P.post = mk(40, 120); const x = P.post.getContext('2d'), lg = x.createLinearGradient(0, 0, 40, 0); lg.addColorStop(0, '#fff3c2'); lg.addColorStop(.5, THEME.rail); lg.addColorStop(1, THEME.railDark); x.fillStyle = lg; x.fillRect(10, 20, 20, 100); x.beginPath(); x.arc(20, 18, 15, 0, TAU); x.fill(); P.postS = P.post; }
   P.cloud = fromImg(g, 'cloud-isle', 288, 192); if (!P.cloud) { P.cloud = mk(256, 140); const x = P.cloud.getContext('2d'); for (const [cx, cy, r] of [[70, 80, 50], [120, 62, 62], [180, 82, 48], [140, 96, 52], [92, 100, 44]]) radial(x, 0, [[0, '#fff'], [.75, 'rgba(250,248,255,.95)'], [1, 'rgba(235,232,255,0)']], r, cx, cy); }
   // 수정 감옥(안에 구출할 내 펫)
   { const W = 200 * S, H = 240 * S, c = mk(W, H), x = c.getContext('2d'); x.scale(S, S);
@@ -390,24 +400,28 @@ function buildCannon(g) {
   for (const wx of [34, 106]) { const r = x.createRadialGradient(wx - 4, 92, 2, wx, 96, 22); r.addColorStop(0, '#e9b56a'); r.addColorStop(1, '#7a4a1a'); x.fillStyle = r; x.strokeStyle = '#3a2208'; x.lineWidth = 3; x.beginPath(); x.arc(wx, 96, 20, 0, TAU); x.fill(); x.stroke(); }
   g.SPR.cannon = d;
 }
+// 숫자 아틀라스(v13.241 안정화): 기본 크기 × 배율 × AT로 크게 구워 두고(문 · 바위는 2배, 튀어나오는 숫자 good · bad는 3배), 그릴 때 1/AT로 줄인다.
+//   튀어나오는 큰 숫자는 아틀라스보다 1.1배 넘게 늘리지 않는다(drawBursts의 상한) → 뿌옇게 번지지 않음.
+const NUM_AT = { count: 2, rock: 2, good: 3, bad: 3, pop: 2, minus: 2 };
 const NUM_STYLES = { count: [30, '#ffffff', '#d8f3ff', '#123a6b', 6], rock: [30, '#ffffff', '#fff1d0', '#3a2614', 6], good: [48, '#ffffff', '#d6f1ff', '#062a63', 11], bad: [48, '#ffffff', '#ffe0e0', '#55060f', 11], pop: [34, '#fff7b0', '#ffc53a', '#5a2c00', 7], minus: [30, '#ffe0e0', '#ff6a6a', '#4a0a10', 6] };
 const GLYPHS = '0123456789+×−';
 function buildDigits(g) {
   const S = g.S2; g.SPR.digits = {};
   for (const [k, [size, f0, f1, stroke, lw]] of Object.entries(NUM_STYLES)) {
-    const fs = size * S, cw = Math.ceil(fs * .78), ch = Math.ceil(fs * 1.3), c = mk(cw * GLYPHS.length, ch), x = c.getContext('2d');
+    const fs = size * S * NUM_AT[k], cw = Math.ceil(fs * .78), ch = Math.ceil(fs * 1.3), c = mk(cw * GLYPHS.length, ch), x = c.getContext('2d');
     x.font = `${fs}px Jua, system-ui, sans-serif`; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineJoin = 'round';
     const gr = x.createLinearGradient(0, ch * .2, 0, ch * .8); gr.addColorStop(0, f0); gr.addColorStop(1, f1);
-    for (let d = 0; d < GLYPHS.length; d++) { x.lineWidth = lw * S; x.strokeStyle = 'rgba(0,0,0,.28)'; x.strokeText(GLYPHS[d], d * cw + cw / 2, ch / 2 + 3 * S); x.strokeStyle = stroke;   // 약한 그림자(아래로 비킨 진한 테두리) → 테두리 → 글자
+    const L = S * NUM_AT[k]; for (let d = 0; d < GLYPHS.length; d++) { x.lineWidth = lw * L; x.strokeStyle = 'rgba(0,0,0,.28)'; x.strokeText(GLYPHS[d], d * cw + cw / 2, ch / 2 + 3 * L); x.strokeStyle = stroke;   // 약한 그림자(아래로 비킨 진한 테두리) → 테두리 → 글자
        x.strokeText(GLYPHS[d], d * cw + cw / 2, ch / 2); x.fillStyle = gr; x.fillText(GLYPHS[d], d * cw + cw / 2, ch / 2); }
-    g.SPR.digits[k] = { c, cw, ch, adv: cw * .74 };
+    const kk = 1 / NUM_AT[k]; g.SPR.digits[k] = { c, cw: cw * kk, ch: ch * kk, adv: cw * .74 * kk, k: NUM_AT[k], scw: cw, sch: ch };
   }
 }
+// 숫자 크기는 화면 배율과 상관없이 같게(PS ÷ 배율, v13.241 안정화 — 예전에는 배율이 낮을수록 숫자가 작아졌다)
 // 숫자 → 글자 캐시(바위 · 성 · 배지 숫자를 프레임마다 String()으로 새로 만들지 않는다)
 const NSTR = []; const ns = n => n >= 0 && n < 20000 ? (NSTR[n] ??= String(n)) : String(n);
 function drawNum(g, style, str, x, y, sc = 1, a = 1) {
   const A = g.SPR.digits[style], w = A.adv * str.length * sc, c = g.ctx; c.globalAlpha = a;
-  for (let d = 0; d < str.length; d++) { const v = GLYPHS.indexOf(str[d]); if (v < 0) continue; c.drawImage(A.c, v * A.cw, 0, A.cw, A.ch, x - w / 2 + d * A.adv * sc - (A.cw - A.adv) * sc / 2, y - A.ch * sc / 2, A.cw * sc, A.ch * sc); }
+  for (let d = 0; d < str.length; d++) { const v = GLYPHS.indexOf(str[d]); if (v < 0) continue; c.drawImage(A.c, v * A.scw, 0, A.scw, A.sch, x - w / 2 + d * A.adv * sc - (A.cw - A.adv) * sc / 2, y - A.ch * sc / 2, A.cw * sc, A.ch * sc); }
   c.globalAlpha = 1;
 }
 function textSprite(g, text, kind, el = 'star') {
@@ -597,7 +611,8 @@ function frame(now) {
   for (let i = g.timers.length - 1; i >= 0; i--) if (g.clock >= g.timers[i].at) { const f = g.timers[i].fn; g.timers.splice(i, 1); f(); }
   const S = g.S;
   // 카운트다운: 장면만 그린다(규칙 멈춤). 끝날 때 이 동안의 프레임으로 품질을 한 번 정해, 다시 굽기가 판 시작 전에 끝나게 한다.
-  if (g.cd > 0) { g.cd -= dt; g.pz = S.z; g.pcx = S.cx; render(g, dt, 0); g.frames++; if (g.cd <= 0) { autoTier(g, true); g.last = 0; g.frameLog.length = 0; } return; }
+  if (g.cd > 0) {
+    g.cd -= dt; g.pz = S.z; g.pcx = S.cx; const j0 = performance.now(); render(g, dt, 0); g.jsLog.push(performance.now() - j0); g.frames++; if (g.cd <= 0) { autoTier(g, true); g.last = 0; g.frameLog.length = 0; g.jsLog.length = 0; } return; }
   if (S.phase !== 'card' && S.phase !== 'done') {
     g.acc += dt * 1000; let steps = 0;
     while (g.acc >= RUNNER.TICK && steps < 5 && S.phase !== 'card' && S.phase !== 'done') {
@@ -609,7 +624,7 @@ function frame(now) {
     }
     if (steps === 5) g.acc = 0;
   } else { g.pz = S.z; g.pcx = S.cx; g.acc = 0; }
-  render(g, dt, Math.min(1, g.acc / RUNNER.TICK));
+  const j0 = performance.now(); render(g, dt, Math.min(1, g.acc / RUNNER.TICK)); g.jsLog.push(performance.now() - j0);
   g.frames++;
   hud(g, now);
   if (now - g.lastCheck > 2000) { g.lastCheck = now; autoTier(g); }
@@ -627,19 +642,45 @@ function hud(g, now) {
   box.dataset.dir = up ? 'up' : 'down';
   try { box.animate([{ transform: 'scale(1.32)' }, { transform: 'scale(.94)' }, { transform: 'scale(1)' }], { duration: 280, easing: 'ease-out' }); } catch {}
 }
+// 품질 자동(v13.241 그래픽 안정화 — 히스테리시스):
+//   카운트다운: 효과 없는 장면 프레임의 중간값으로 단계마다 예상 시간을 계산해 고른다. 저장된 단계보다 한 단계까지는 다시 올라갈 수 있다(한 번 잘못 내려간 폰이 7일 동안 최저에 갇히지 않게).
+//   판 중: 2초 창 두 개(4초)를 보고, 둘 다 느리면(20ms 넘는 프레임 25%↑, 또는 평균 프레임 24ms↑) 한 단계만 내린다. 내린 뒤 6초 동안은 다시 보지 않고, 판 중에는 올리지 않는다.
+//   화면이 30Hz로 묶인 폰(저전력 모드: 프레임이 고르게 33ms)은 그리기 시간(JS)이 짧으면 내리지 않는다 — 내려도 빨라지지 않고 흐려지기만 한다.
+function winStats(log, js) {
+  const n = log.length; let sum = 0, slow = 0, cap = 0; for (const d of log) { sum += d; if (d > 20) slow++; if (d > 29 && d < 37.5) cap++; }
+  const js2 = [...js].sort((a, b) => a - b);
+  return { n, avg: sum / n, slow: slow / n, capped: cap / n > .75, js: js2[js2.length >> 1] || 0 };
+}
 function autoTier(g, warm = false) {
-  const log = g.frameLog; g.frameLog = []; if (!log.length || g.tier === 0 || (!warm && g.frames < 90) || (warm && log.length < 20)) return;
+  const log = g.frameLog, js = g.jsLog; g.frameLog = []; g.jsLog = [];
   if (warm) {
-    // 카운트다운(효과 없는 장면) 평균 프레임으로 고른다: 칠하는 넓이 ∝ 실제 캔버스 배율² → 단계마다 예상 시간을 계산해 10ms 안(효과 몫을 넉넉히 남김: 난도 조정 뒤 무리가 커짐)인 가장 높은 단계
-    const sorted = [...log].sort((a, b) => a - b), mid = sorted[sorted.length >> 1], sc = g.S2; let t = g.tier;
-    while (t > 0 && mid * (s2Of(g, t) / sc) ** 2 > 10) t--;   // 실제 캔버스 배율로 예상(배율 1 화면은 높음 · 중간 · 낮음이 같은 크기)
-    if (t < g.tier) setTier(g, t);
+    if (log.length < 20) return;
+    const sorted = [...log].sort((a, b) => a - b), mid = sorted[sorted.length >> 1], sc = g.S2, jsMid = [...js].sort((a, b) => a - b)[js.length >> 1] || 0, capped = mid > 29 && mid < 37.5 && jsMid < 8;
+    if (capped) return;
+    let t = Math.min(3, g.tier + 1);
+    while (t > 0 && mid * (s2Of(g, t) / sc) ** 2 * (t > g.tier ? 1.25 : 1) > 10) t--;   // 올라갈 때는 25% 더 여유를 본다
+    if (t !== g.tier) setTier(g, t);
     return;
   }
-  const slow = log.filter(d => d > 20).length / log.length;
-  if (slow > .15) setTier(g, Math.max(0, g.tier - (slow > .5 ? 2 : 1)));
+  if (!log.length || g.frames < 90) return;
+  const w = winStats(log, js), prev = g.lastWin; g.lastWin = w;
+  (g.wins ||= []).push(w); if (g.wins.length > 4) g.wins.shift();
+  if (g.emerg || !prev || g.clock - (g.tierAt || 0) < 6) return;
+  if (w.capped && w.js < 10 && prev.capped) return;
+  if (g.tier === 0) {
+    // 비상 단계: 하한에서 8초(창 넷) 평균 33ms 초과 · 30Hz 묶임이 아닌 창이 있음
+    const W = g.wins; if (RES_EMERGENCY && W.length === 4 && W.reduce((a, x) => a + x.avg * x.n, 0) / W.reduce((a, x) => a + x.n, 0) > EMERG_MS && !W.every(x => x.capped)) { setTier(g, 0, true); g.lastWin = null; g.wins = []; }
+    return;
+  }
+  const bad = x => x.slow > .25 || x.avg > 24;
+  if (bad(w) && bad(prev)) { setTier(g, g.tier - 1); g.lastWin = null; g.wins = []; }
 }
-function setTier(g, t) { g.tier = t; g.T = TIERS[t]; writePref(TIER_KEY, JSON.stringify({ t, at: Date.now() })); const P = g.pools; for (const [k, cap] of [['D', 'debris'], ['M', 'smoke'], ['K', 'sparks'], ['Gl', 'glows'], ['F', 'fly'], ['B', 'shots']]) P[k].n = Math.min(P[k].n, g.T[cap]); resize(g); syncCrowd(g, 0, 0); }
+function setTier(g, t, emerg = false) {
+  g.tier = t; g.T = TIERS[t]; g.tierAt = g.clock; g.emerg = t === 0 && emerg; window.__rnTier = g.emerg ? -1 : t;   // 화면 시험(docs/runner-play-shot.mjs)이 읽는다 writePref(TIER_KEY, JSON.stringify({ t, at: Date.now() }));   // 비상 단계는 기억하지 않는다
+  const P = g.pools; for (const [k, cap] of [['D', 'debris'], ['M', 'smoke'], ['K', 'sparks'], ['Gl', 'glows'], ['F', 'fly'], ['B', 'shots']]) P[k].n = Math.min(P[k].n, g.T[cap]);
+  if (s2Of(g, t) !== g.S2) resize(g);   // 해상도가 그대로면 다시 굽지 않는다(효과만 줄어 끊김 없음)
+  syncCrowd(g, 0, 0);
+}
 
 /* ---------- 그리기 ---------- */
 function render(g, dt, alpha) {
@@ -650,9 +691,10 @@ function render(g, dt, alpha) {
   if (dt) { g.vx = clamp((cx - g.lastCx) / dt, -12, 12); g.lastCx = cx; }
   cam.back += (tb - cam.back) * k; cam.h += (th - cam.h) * k; cam.zoom += (tzm - cam.zoom) * k;
   cam.z = z - cam.back; cam.x += (cx * .35 - cam.x) * (1 - Math.exp(-dt * 4));
-  cam.punch = Math.min(cam.punch, .15) * Math.exp(-dt * 7); cam.trauma = Math.max(0, cam.trauma - dt * 1.6);
-  const shk = cam.trauma * cam.trauma * .35, tt = performance.now() / 1000, sx = cam.x, sh = cam.h;
-  cam.x += shk * Math.sin(tt * 71); cam.h += shk * Math.sin(tt * 89 + 1) * .6;
+  // 흔들림 · 줌(v13.241 안정화): 줌 펀치 상한 0.15 → 0.08, 흔들림 폭 0.35 → 0.2 · 떨림 71Hz → 두 사인(23 · 31)을 섞은 느린 흔들림 → 화면이 덜 어지럽고 글자가 덜 번진다
+  cam.punch = Math.min(cam.punch, .08) * Math.exp(-dt * 6); cam.trauma = Math.max(0, cam.trauma - dt * 1.8);
+  const shk = cam.trauma * cam.trauma * .2, tt = performance.now() / 1000, sx = cam.x, sh = cam.h;
+  cam.x += shk * (Math.sin(tt * 23) * .7 + Math.sin(tt * 31 + 2) * .3); cam.h += shk * Math.sin(tt * 27 + 1) * .5;
   ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   ctx.drawImage(g.sky, 0, 0);
   drawSkyDrift(g); drawClouds(g); drawRoad(g);
@@ -696,7 +738,7 @@ function burst(g, str, style, big = false) { if (g.bursts.length >= 4) g.bursts.
 function drawBursts(g, dt) {
   for (let i = g.bursts.length - 1; i >= 0; i--) {
     const b = g.bursts[i]; b.t += dt; const d = b.big ? .7 : .55; if (b.t > d) { cut(g.bursts, i); continue; }
-    const p = b.t / d, sc = (b.big ? 1.6 : 1.2) + easeOut(p) * (b.big ? 3.2 : 2.2), a = p < .15 ? p / .15 : 1 - (p - .15) / .85;
+    const A = g.SPR.digits[b.style], cap = A.k * 1.1, p = b.t / d, sc = Math.min(cap, (b.big ? 1.4 : 1.1) + easeOut(p) * (b.big ? 2 : 1.5)), a = p < .15 ? p / .15 : 1 - (p - .15) / .85;   // 아틀라스 1.1배까지만
     drawNum(g, b.style, b.str, g.cvs.width / 2, g.cvs.height * (.46 - p * .06), sc, a * .95);
   }
 }
@@ -716,29 +758,53 @@ function drawClouds(g) {
   }
   ctx.globalAlpha = 1;
 }
+// 길(v13.241 그래픽 안정화): 띠마다 따로 칠하던 판(이음매 · 계단)을 **사다리꼴 한 장**으로 바꿨다.
+//   ① 난간까지 포함한 사다리꼴 한 장(가까이 난간 색 → 멀리 안개 색 그라디언트) ② 안을 길 무늬 띠로 채움(띠는 길 가장자리보다 pad만큼 넓게)
+//   ③ 길 가장자리 테두리 띠: 진짜 가장자리 선(직선)에서 화면 픽셀로 ±(pad + 0.5)인 매끈한 사다리꼴 한 장씩 → 띠 끝의 계단을 덮는다
+//     (clip은 CPU로 그리는 느린 기기에서 비싸서 쓰지 않는다) ④ 난간 윗줄 · 기둥. 모두 부드러운(안티앨리어스) 다각형이고 imageSmoothing은 늘 켠다.
+function roadQuad(g, half, zNear, zFar) {
+  if (!proj(g, -half, 0, zFar)) return null; const lf = PX, yf = PY; proj(g, half, 0, zFar); const rf = PX;
+  proj(g, -half, 0, zNear); const ln = PX, yn = PY; proj(g, half, 0, zNear); return [lf, yf, rf, PX, yn, ln];
+}
+function quadPath(ctx, q) { ctx.beginPath(); ctx.moveTo(q[0], q[1]); ctx.lineTo(q[2], q[1]); ctx.lineTo(q[3], q[4]); ctx.lineTo(q[5], q[4]); ctx.closePath(); }
 function drawRoad(g) {
-  const ctx = g.ctx, cam = g.cam, ROAD = RUNNER.ROAD, z0 = Math.floor((cam.z + 1) / 3) * 3, far = 90, rail = .35, endZ = g.S.castle.z + 6, tile = g.img['road-' + g.th];
-  for (let zz = z0 + far; zz >= z0; zz -= 3) {
-    if (zz > endZ) continue;
-    const za = Math.max(zz, cam.z + .8), zb = zz + 3; if (zb <= za) continue;
-    if (!proj(g, -ROAD - rail, 0, zb)) continue; const lxB = PX, yB = PY, sB = PS; proj(g, ROAD + rail, 0, zb); const rxB = PX;
-    proj(g, -ROAD - rail, 0, za); const lxA = PX, yA = PY, sA = PS; proj(g, ROAD + rail, 0, za); const rxA = PX;
-    const fog = clamp((zz - cam.z) / far, 0, 1) * .85, odd = Math.floor(zz / 3) & 1, fi = Math.min(31, Math.round(fog * 31)), PAL = g.pal;
-    ctx.fillStyle = fog > .6 ? '#e8e2d0' : THEME.rail; ctx.beginPath(); ctx.moveTo(lxB, yB); ctx.lineTo(rxB, yB); ctx.lineTo(rxA, yA); ctx.lineTo(lxA, yA); ctx.fill();
-    if (tile) continue;   // 그림 74 길 타일이 있으면 금빛 난간 띠만 그리고, 길은 아래 drawRoadTiled가 깐다
-    const iB = rail * sB, iA = rail * sA;
-    ctx.fillStyle = (odd ? PAL.roadA : PAL.roadB)[fi]; ctx.beginPath(); ctx.moveTo(lxB + iB, yB); ctx.lineTo(rxB - iB, yB); ctx.lineTo(rxA - iA, yA); ctx.lineTo(lxA + iA, yA); ctx.fill();
-    ctx.fillStyle = PAL.seam[fi]; ctx.fillRect(lxB + iB, yB, rxB - lxB - iB * 2, Math.max(1, .05 * sB));
-    // 가운데 빛 줄무늬(한 칸 걸러): 바닥이 흘러가는 속도감
-    if (odd && fog < .7) { const mB = (lxB + rxB) / 2, mA = (lxA + rxA) / 2, wB = .09 * sB, wA = .09 * sA; ctx.fillStyle = PAL.stripe[fi]; ctx.beginPath(); ctx.moveTo(mB - wB, yB); ctx.lineTo(mB + wB, yB); ctx.lineTo(mA + wA, yA); ctx.lineTo(mA - wA, yA); ctx.fill(); }
+  const ctx = g.ctx, cam = g.cam, ROAD = RUNNER.ROAD, rail = .35, endZ = g.S.castle.z + 6, tile = g.img['road-' + g.th], PAL = g.pal;
+  const zNear = cam.z + .8, zFar = Math.min(endZ, cam.z + 90); if (zFar <= zNear) return;
+  ctx.imageSmoothingEnabled = true;
+  const outer = roadQuad(g, ROAD + rail, zNear, zFar); if (!outer) return;
+  // ① 난간 띠까지 한 장: 단색(그라디언트는 카메라가 움직일 때마다 다시 만들어야 하고 CPU로 그리는 기기에서 비싸다). 먼 곳(안개)만 밝은 색 사다리꼴 한 장 더.
+  const zMid = Math.min(zFar, cam.z + 64), farQ = zMid < zFar ? roadQuad(g, ROAD + rail, zMid, zFar) : null;
+  ctx.fillStyle = THEME.rail; quadPath(ctx, outer); ctx.fill();
+  if (farQ) { ctx.fillStyle = '#e8e2d0'; quadPath(ctx, farQ); ctx.fill(); }
+  const inner = roadQuad(g, ROAD, zNear, zFar);
+  if (tile) {
+    const pad = drawRoadTiled(g, tile, endZ) + .5;
+    // ③ 테두리 띠(진한 갈색 단색): 가장자리 직선을 화면에서 ±pad 픽셀 옮긴 사다리꼴(먼 쪽은 0.6배로 가늘게)
+    ctx.fillStyle = 'rgba(96,60,24,.92)';
+    for (const sd of [-1, 1]) { const xf = sd < 0 ? inner[0] : inner[2], xn = sd < 0 ? inner[5] : inner[3]; ctx.beginPath(); ctx.moveTo(xf - pad * .6, inner[1]); ctx.lineTo(xf + pad * .6, inner[1]); ctx.lineTo(xn + pad, inner[4]); ctx.lineTo(xn - pad, inner[4]); ctx.closePath(); ctx.fill(); }
   }
-  if (tile) drawRoadTiled(g, tile, endZ);
-  // 난간 윗줄(기둥을 잇는 금빛 막대): 가까운 끝 ~ 먼 끝 직선 두 줄 → 기둥과 함께 지나가며 깊이가 보인다
+  else {
+    // 코드 그림 길: 바탕 사다리꼴 한 장 + 3단위 줄무늬(가로 띠는 길 사다리꼴 안에서만, 잘라서 가장자리가 매끈)
+    ctx.fillStyle = PAL.roadB[8]; quadPath(ctx, inner); ctx.fill();
+    ctx.save(); quadPath(ctx, inner); ctx.clip();
+    const z0 = Math.floor((cam.z + 1) / 3) * 3;
+    for (let zz = z0 + 90; zz >= z0; zz -= 3) {
+      if (zz > endZ) continue; const za = Math.max(zz, zNear), zb = zz + 3; if (zb <= za) continue;
+      const q = roadQuad(g, ROAD + .2, za, zb); if (!q) continue;
+      const fog = clamp((zz - cam.z) / 90, 0, 1) * .85, odd = Math.floor(zz / 3) & 1, fi = Math.min(31, Math.round(fog * 31));
+      ctx.fillStyle = (odd ? PAL.roadA : PAL.roadB)[fi]; quadPath(ctx, q); ctx.fill();
+      if (odd && fog < .7) { const m = roadQuad(g, .09, za, zb); if (m) { ctx.fillStyle = PAL.stripe[fi]; quadPath(ctx, m); ctx.fill(); } }
+    }
+    ctx.restore();
+  }
+  // 난간 윗줄(기둥을 잇는 금빛 막대) · 아래 그늘 줄: 가까운 끝 ~ 먼 끝 사다리꼴 한 장씩
   const zn = cam.z + 1.6, zf = Math.min(endZ, cam.z + 80);
-  ctx.fillStyle = THEME.rail;
-  for (const sd of [-1, 1]) { if (!proj(g, sd * (ROAD + .18), 1.15, zn)) continue; const x0 = PX, y0 = PY, w0 = .07 * PS; proj(g, sd * (ROAD + .18), 1.15, zf); const w1 = Math.max(.6, .07 * PS); ctx.beginPath(); ctx.moveTo(x0, y0 - w0); ctx.lineTo(PX, PY - w1); ctx.lineTo(PX, PY + w1); ctx.lineTo(x0, y0 + w0); ctx.fill(); }
+  for (const [yy, col, wd] of [[1.12, 'rgba(90,60,20,.35)', .05], [1.15, THEME.rail, .07]]) {
+    ctx.fillStyle = col;
+    for (const sd of [-1, 1]) { if (!proj(g, sd * (ROAD + .18), yy, zn)) continue; const x0 = PX, y0 = PY, w0 = wd * PS; proj(g, sd * (ROAD + .18), yy, zf); const w1 = Math.max(.6, wd * PS); ctx.beginPath(); ctx.moveTo(x0, y0 - w0); ctx.lineTo(PX, PY - w1); ctx.lineTo(PX, PY + w1); ctx.lineTo(x0, y0 + w0); ctx.fill(); }
+  }
   const p0 = Math.ceil((cam.z + 1.5) / 6) * 6;
-  for (let i = g.T.posts - 1; i >= 0; i--) { const zz = p0 + i * 6; if (zz > endZ) continue; for (const sd of [-1, 1]) if (proj(g, sd * (ROAD + .18), 0, zz)) { const w = .45 * PS, h = 1.3 * PS; ctx.drawImage(g.SPR.post, PX - w / 2, PY - h, w, h); } }
+  for (let i = g.T.posts - 1; i >= 0; i--) { const zz = p0 + i * 6; if (zz > endZ) continue; for (const sd of [-1, 1]) if (proj(g, sd * (ROAD + .18), 0, zz)) { const w = .45 * PS, h = 1.3 * PS; ctx.drawImage(h > g.SPR.post.height * .6 ? g.SPR.post : g.SPR.postS, PX - w / 2, PY - h, w, h); } }
 }
 // 길 타일(그림 74 road-<테마>, 세로로 이어지는 256px): 화면을 가로 띠(품질별 5~12px)로 나눠 띠마다 그 깊이의 길 폭 · 타일 줄을 잘라 찍는다.
 //   타일 한 장 = 길 4단위. 띠 위아래 깊이로 타일 줄을 고르고, 타일 경계를 넘으면 두 번에 나눠 찍어 이음매가 없다. 멀리는 안개 그라디언트 한 장.
@@ -751,20 +817,27 @@ function roadMip(img) {
 }
 function drawRoadTiled(g, img, endZ) {
   const ctx = g.ctx, cam = g.cam, K = g.F * (cam.zoom + cam.punch), HZ = g.HZ, ROAD = RUNNER.ROAD, mip = g.roadMip;
-  const zFar = Math.min(cam.z + 90, endZ), yTop = HZ + cam.h * K / (zFar - cam.z), yBot = Math.min(g.cvs.height, HZ + cam.h * K / .8), band = [12, 9, 7, 5][g.tier] * g.S2;
-  if (!g.tier) ctx.imageSmoothingEnabled = false;   // 최저 단계: 길 타일은 가장 가까운 점으로(느린 폰에서 길 그리기 비용을 크게 줄임)
+  const zFar = Math.min(cam.z + 90, endZ), yTop = HZ + cam.h * K / (zFar - cam.z), yBot = Math.min(g.cvs.height, HZ + cam.h * K / .8);
+  // 띠 높이는 화면 픽셀 4~5px(띠 안 길 폭 차이 1px 안팎): 가장자리는 바깥의 사다리꼴 clip이 매끈하게 자르고, 띠는 아래 끝 폭으로 넉넉히 칠한다.
+  // 비상 단계(CPU로 그리는 아주 느린 기기)만 길 무늬를 가까운 점으로(예전 최저와 같음 — 그 기기에서는 부드럽게 늘리기가 프레임의 큰 몫). 그 밖은 늘 부드럽게.
+  if (g.emerg) ctx.imageSmoothingEnabled = false;
+  const band = g.emerg ? 4 : clamp(Math.round(2.2 * g.S2 + 1), 3, 6);
+  let padMax = 0;
   for (let y = yTop; y < yBot; y += band) {
-    const y2 = Math.min(yBot, y + band), dzm = cam.h * K / ((y + y2) * .5 - HZ), half = ROAD * K / dzm, x0 = g.CX - cam.x * K / dzm - half, w = half * 2;
+    const y2 = Math.min(yBot, y + band), dzm = cam.h * K / ((y + y2) * .5 - HZ), dzb = cam.h * K / (y2 - HZ), half = ROAD * K / dzm, x0 = g.CX - cam.x * K / dzm - half, w = half * 2, pad = (ROAD * K / dzb - half) + 1; if (pad > padMax) padMax = pad;
     if (mip) img = mip[w > 192 ? 0 : w > 96 ? 1 : w > 48 ? 2 : 3]; const iw = img.width, ih = img.height;
     const za = cam.z + cam.h * K / (y - HZ), zb = cam.z + cam.h * K / (y2 - HZ);
-    if (za - zb >= TILE_Z) { ctx.drawImage(img, 0, 0, iw, ih, x0, y, w, y2 - y + 1); continue; }
+    // 타일 가로는 길 폭에 맞추고 양옆 pad만큼 늘려(타일 가장자리 줄은 1px 안팎으로만 흔들림) clip 밖까지 덮는다
+    const X = x0 - pad, Wd = w + pad * 2;
+    if (za - zb >= TILE_Z) { ctx.drawImage(img, 0, 0, iw, ih, X, y, Wd, y2 - y + 1); continue; }
     const ra = (1 - frac(za / TILE_Z)) * ih, rb = (1 - frac(zb / TILE_Z)) * ih;
-    if (rb > ra) ctx.drawImage(img, 0, ra, iw, Math.max(.5, rb - ra), x0, y, w, y2 - y + 1);
-    else { const t = (ih - ra) / (ih - ra + rb), ys = y + (y2 - y) * t; if (ih - ra > .5) ctx.drawImage(img, 0, ra, iw, ih - ra, x0, y, w, ys - y + 1); if (rb > .5) ctx.drawImage(img, 0, 0, iw, rb, x0, ys, w, y2 - ys + 1); }
+    if (rb > ra) ctx.drawImage(img, 0, ra, iw, Math.max(.5, rb - ra), X, y, Wd, y2 - y + 1);
+    else { const t = (ih - ra) / (ih - ra + rb), ys = y + (y2 - y) * t; if (ih - ra > .5) ctx.drawImage(img, 0, ra, iw, ih - ra, X, y, Wd, ys - y + 1); if (rb > .5) ctx.drawImage(img, 0, 0, iw, rb, X, ys, Wd, y2 - ys + 1); }
   }
   ctx.imageSmoothingEnabled = true;
   // 멀리 안개(화면 크기마다 한 번 만든 그라디언트): 먼 길이 하늘색으로 흐려진다
   if (proj(g, -ROAD, 0, zFar)) { const ax = PX, ay = PY; proj(g, ROAD, 0, zFar); const bx = PX; const zm = cam.z + 26; proj(g, ROAD, 0, zm); const cxp = PX, cy = PY; proj(g, -ROAD, 0, zm); ctx.fillStyle = g.fogGrad; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, ay); ctx.lineTo(cxp, cy); ctx.lineTo(PX, cy); ctx.fill(); }
+  return padMax;   // 띠가 길 가장자리 밖으로 나간 최대 픽셀(테두리 띠 폭)
 }
 function drawObj(g, o, dt, cx, z, alpha) {
   const ctx = g.ctx, P = g.SPR, S = g.S, t = S.tick - 1 + alpha;
@@ -781,10 +854,12 @@ function drawObj(g, o, dt, cx, z, alpha) {
       // 테두리 빛(속성 없이 파랑 · 빨강, 숨 쉬듯) → 판 → 박동하는 숫자(×문은 더 크게)
       const ok = goodGate(val), puls = 1 + Math.sin(g.clock * 6 + side) * .07 * (val[0] === '×' ? 1.6 : 1);
       if (g.T.glow) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = a * (.45 + .2 * Math.sin(g.clock * 5 + side)); const gw = w * 1.5; ctx.drawImage(ok ? g.tg.gateGood : g.tg.gateBad, cxm - gw / 2, cym - gw * .55, gw, gw * 1.1); ctx.globalCompositeOperation = 'source-over'; }
-      ctx.globalAlpha = a; ctx.drawImage(ok ? P['gate-good'] : P['gate-bad'], cxm - w / 2, cym - h / 2, w, h);
-      drawNum(g, ok ? 'good' : 'bad', lab, cxm, cym, Math.min(1.8, sc / 34) * grow * puls * (val[0] === '×' ? 1.15 : 1), a); ctx.globalAlpha = 1;
+      const gp = ok ? (w > 260 ? P['gate-good'] : P['gate-goodS']) : (w > 260 ? P['gate-bad'] : P['gate-badS']);
+      ctx.globalAlpha = a; ctx.drawImage(gp, cxm - w / 2, cym - h / 2, w, h);
+      const fitN = w * .5 / (P.digits[ok ? 'good' : 'bad'].adv * lab.length);   // 숫자는 문 판 폭의 절반까지(멀리서 판을 가리지 않게, 가까우면 1.8배 상한)
+      drawNum(g, ok ? 'good' : 'bad', lab, cxm, cym, Math.min(1.8, sc / (17 * g.S2), fitN) * grow * puls * (val[0] === '×' ? 1.15 : 1), a); ctx.globalAlpha = 1;
     }
-    if (P.gateFrame) { proj(g, 0, 0, o.z); const fh = 3.4 * PS, fw = fh * .5; ctx.drawImage(P.gateFrame, PX - fw / 2, PY - fh, fw, fh); }   // 가운데 기둥(그림 74 gate-frame)
+    if (P.gateFrame) { proj(g, 0, 0, o.z); const fh = 3.4 * PS, fw = fh * .5; ctx.drawImage(fh > 260 ? P.gateFrame : P.gateFrameS, PX - fw / 2, PY - fh, fw, fh); }   // 가운데 기둥(그림 74 gate-frame)
     else { proj(g, 0, 2.8, o.z); const tx = PX, ty = PY; proj(g, 0, 0, o.z); ctx.fillStyle = '#f2f6ff'; ctx.fillRect(tx - .1 * PS, ty, .2 * PS, PY - ty); }
     return;
   }
@@ -795,7 +870,7 @@ function drawObj(g, o, dt, cx, z, alpha) {
     ctx.drawImage(P.rock, PX - w / 2 + wob, PY - h * .9, w, h);
     if (v.hitT > 0) { v.hitT -= dt; ctx.globalAlpha = .45; ctx.drawImage(P.rockW, PX - w / 2 + wob, PY - h * .9, w, h); ctx.globalAlpha = 1; }
     const hit = v.hitT > 0, jx = hit ? rr(-.08, .08) * PS : 0;   // 맞는 동안 숫자가 흔들리며 커졌다 줄어든다
-    drawNum(g, 'rock', ns(Math.ceil(o.hp)), PX + jx, PY - h * (g.img['rock-num'] ? .36 : .45), Math.min(1.5, PS / 34) * (hit ? 1.14 : 1)); return;
+    const hs = ns(Math.ceil(o.hp)); drawNum(g, 'rock', hs, PX + jx, PY - h * (g.img['rock-num'] ? .36 : .45), Math.min(1.5, PS / (17 * g.S2), w * .7 / (P.digits.rock.adv * hs.length)) * (hit ? 1.14 : 1)); return;
   }
   if (o.type === 'saw') {
     const x = o.stop ? o.x : o.x0 + o.amp * tri(t / o.per);
@@ -821,7 +896,7 @@ function drawObj(g, o, dt, cx, z, alpha) {
     const crack = o.hp < o.max * .25 ? 3 : o.hp < o.max * .5 ? 2 : o.hp < o.max * .8 ? 1 : 0;   // 수정 금: 깎일수록 세 단계
     if (crack) ctx.drawImage(P.crystalCrack[crack - 1], PX - w / 2 + wob, PY - h + bob, w, h);
     if (v.hitT > 0) { v.hitT -= dt; ctx.globalAlpha = .5; ctx.drawImage(P.crystalW, PX - w / 2 + wob, PY - h + bob, w, h); ctx.globalAlpha = 1; }
-    drawNum(g, 'rock', ns(Math.ceil(o.hp)), PX, PY - h - .3 * PS, Math.min(1.4, PS / 40)); return;
+    const hs = ns(Math.ceil(o.hp)); drawNum(g, 'rock', hs, PX, PY - h - .3 * PS, Math.min(1.4, PS / (20 * g.S2), w * .8 / (P.digits.rock.adv * hs.length))); return;
   }
   if (o.type === 'castle') return drawCastle(g, dt);
   if (o.type === 'crowd') return drawCrowd(g, dt, cx, z);
@@ -834,7 +909,7 @@ function drawCastle(g, dt) {
   proj(g, 0, 11.4, c.z); const bw = 6 * PS, bh = .55 * PS, p = c.hp / c.max;
   ctx.fillStyle = 'rgba(16,20,40,.8)'; roundRect(ctx, PX - bw / 2 - 3, PY - 3, bw + 6, bh + 6, bh / 2 + 3); ctx.fill();
   ctx.fillStyle = p > .5 ? '#6dea7a' : p > .25 ? '#ffd257' : '#ff6262'; roundRect(ctx, PX - bw / 2, PY, Math.max(bh, bw * p), bh, bh / 2); ctx.fill();
-  drawNum(g, 'count', ns(Math.ceil(c.hp)), PX, PY + bh / 2, Math.min(1.1, PS / 30));
+  drawNum(g, 'count', ns(Math.ceil(c.hp)), PX, PY + bh / 2, Math.min(1.1, PS / (15 * g.S2)));
 }
 function drawPieces(g, dt) {
   const ctx = g.ctx, src = g.SPR.castle, cw = src.width / 6, ch = src.height / 5;
@@ -867,7 +942,7 @@ function drawCrowd(g, dt, cx, z) {
   if (L) { L.t += dt; const p = Math.min(1, L.t / .35); drop = (1 - p * p) * 7; if (p >= 1 && !L.hit) { L.hit = true; petImpact(g, cx + (siege ? -1.9 : Rr * .55), z + Rr * .5 + .6); } if (L.t > 1) g.petLand = null; }
   if (S.petOn && P.pet && (!L || L.t > 0) && proj(g, cx + (siege ? -1.9 : Rr * .55), drop + Math.abs(Math.sin(t * 8)) * .25, z + Rr * .5 + .6)) { const w = 2.5 * PS, h = w * P.pet.height / P.pet.width; ctx.drawImage(P.pet, PX - w / 2, PY - h, w, h); }
   if (proj(g, cx, 1.9 + Rr * .35, z + Rr * .3)) {
-    const str = ns(S.n), sc = Math.min(1.3, PS / 34), A = P.digits.count, w = A.adv * str.length * sc + 26 * g.S2 * sc, h = A.ch * sc * .9;
+    const str = ns(S.n), sc = Math.min(1.3, PS / (17 * g.S2)), A = P.digits.count, w = A.adv * str.length * sc + 26 * g.S2 * sc, h = A.ch * sc * .9;
     ctx.fillStyle = 'rgba(16,40,90,.78)'; roundRect(ctx, PX - w / 2, PY - h / 2, w, h, h / 2); ctx.fill(); ctx.lineWidth = 2 * g.S2; ctx.strokeStyle = '#9fe1ff'; ctx.stroke();
     ctx.drawImage(spr, PX - w / 2 + 4 * g.S2 * sc, PY - h * .42, h * .84, h * .84); drawNum(g, 'count', str, PX + 10 * g.S2 * sc, PY, sc);
   }
@@ -935,7 +1010,7 @@ function drawFlashes(g, dt) {
   for (let i = g.flashes.length - 1; i >= 0; i--) { const f = g.flashes[i]; f.t += dt; if (f.t >= f.dur) { cut(g.flashes, i); continue; } if (!proj(g, f.x, f.y, f.z)) continue; const AJ = adj(g, f.k), ga = AJ[0], gs = AJ[1], p = f.t / f.dur, a = (p < .1 ? 1 : 1 - (p - .1) / .9) * ga, r = f.r * gs * (.6 + .4 * easeOut(p)) * PS, im = f.img; ctx.globalAlpha = a; ctx.drawImage(im, PX - r, PY - r, r * 2, r * 2); }
   ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
 }
-function drawPops(g, dt) { for (let i = g.pops.length - 1; i >= 0; i--) { const n = g.pops[i]; n.t += dt; if (n.t > 1.1) { cut(g.pops, i); continue; } if (!proj(g, n.x, n.y + easeOut(Math.min(1, n.t / .6)) * 1.2, n.z)) continue; const pop = n.t < .1 ? 1.8 - 8 * n.t : 1, a = n.t > .8 ? (1.1 - n.t) / .3 : 1; drawNum(g, n.style, n.str, PX, PY, pop * Math.min(1.5, PS / 30 + .4), a); } }
+function drawPops(g, dt) { for (let i = g.pops.length - 1; i >= 0; i--) { const n = g.pops[i]; n.t += dt; if (n.t > 1.1) { cut(g.pops, i); continue; } if (!proj(g, n.x, n.y + easeOut(Math.min(1, n.t / .6)) * 1.2, n.z)) continue; const pop = n.t < .1 ? 1.8 - 8 * n.t : 1, a = n.t > .8 ? (1.1 - n.t) / .3 : 1; drawNum(g, n.style, n.str, PX, PY, pop * Math.min(1.5, PS / (15 * g.S2) + .4), a); } }
 function drawBanner(g, dt) {
   const b = g.banner; if (!b) return; b.t += dt; if (b.t > b.dur) { g.banner = null; return; }
   const s = b.spr, a = b.t > b.dur - .2 ? (b.dur - b.t) / .2 : 1, sc = b.t < .12 ? .6 + b.t / .12 * .4 : 1;

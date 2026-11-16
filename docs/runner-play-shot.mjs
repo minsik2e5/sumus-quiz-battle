@@ -16,7 +16,9 @@ const arg = (n, f) => { const i = process.argv.indexOf(`--${n}`); return i > 0 ?
 const BASE = arg('base', 'http://localhost:8787'), OUT = resolve(arg('out', resolve(here, 'docs/screenshots'))), STAGE = Number(arg('stage', 1));
 const pw = (() => { for (const n of [process.env.PLAYWRIGHT, 'playwright'].filter(Boolean)) { try { return require(n); } catch {} } throw Error('playwright가 필요해요'); })();
 await mkdir(OUT, { recursive: true });
-const browser = await pw.chromium.launch({ args: ['--mute-audio'] });
+// --gpu: 캔버스를 GPU 쪽(SwiftShader)에서 그린다 → 진짜 폰처럼 그리기가 메인 스레드 밖으로 빠진다(CPU N배는 스크립트에만 걸림). 없으면 CPU로 그려 진짜 폰보다 불리.
+const GPU = process.argv.includes('--gpu');
+const browser = await pw.chromium.launch({ args: ['--mute-audio', ...(GPU ? ['--enable-gpu', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-accelerated-2d-canvas'] : [])] });
 const PERF = process.argv.includes('--perf'), CPU = Number(arg('cpu', 1)), Q = arg('q', 'auto');
 // --size 1918x628 → PC 가로 화면(마우스), 기본 390×844 폰
 const SIZE = (arg('size', '390x844')).split('x').map(Number), DESK = SIZE[0] > SIZE[1] && SIZE[0] >= 1000;
@@ -91,10 +93,18 @@ if (PERF) {
   await page.waitForFunction(() => window.__rnPhase, null, { timeout: 30000 });
   if (arg('profile-start')) { const { profile } = await cdp.send('Profiler.stop'); (await import('node:fs')).writeFileSync(arg('profile-start'), JSON.stringify(profile)); }
   var pre = await page.evaluate(() => ({ ms: Math.round(performance.now() - window.__perf.t0), frame: Math.round(Math.max(0, ...window.__perf.frames)), long: Math.max(0, ...window.__perf.long) }));
+  // --after-emerg: 비상 단계로 내려간 뒤부터 잰다(내려간 때까지 걸린 초를 emerg_s로 적음, 25초 안에 안 내려가면 그대로 잰다)
+  var emergS = null;
+  // --skip 초: 그만큼 지난 뒤부터 잰다(비상 단계 숫자와 같은 구간을 옛 코드로 잴 때)
+  if (arg('skip')) await page.waitForTimeout(Number(arg('skip')) * 1000);
+  if (process.argv.includes('--after-emerg')) { const t9 = Date.now(); await page.waitForFunction(() => window.__rnTier === -1, null, { timeout: 25000 }).then(() => { emergS = Math.round((Date.now() - t9) / 100) / 10; }).catch(() => {}); }
   await page.evaluate(() => { window.__perf.frames = []; window.__perf.long = []; window.__perf.lat = []; window.__perf.on = true; });
   if (arg('profile')) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
   const tEnd = Date.now() + WINDOW * 1000, box = { x: SIZE[0] / 2, y: SIZE[1] * .7 };
-  while (Date.now() < tEnd) { box.x = SIZE[0] / 2 - 45 + Math.random() * 90; await page.mouse.move(box.x, box.y); await page.waitForTimeout(250); if (await page.$('#rn-cards.on')) { await page.click('#rn-cards.on .rn-card', { timeout: 1500 }).catch(() => {}); await page.waitForTimeout(400); } if (await page.$('#rn-result:not([hidden])')) break; }
+  // --shot-at 초 --shot 파일: 측정 중 그 순간 화면 한 장(같은 장면 전후 비교용, 측정 숫자에는 넣지 않을 때만 쓴다)
+  const shotAt = Number(arg('shot-at', 0)), t1 = Date.now(); let shotDone = !shotAt;
+  while (Date.now() < tEnd) {
+    if (!shotDone && Date.now() - t1 > shotAt * 1000) { shotDone = true; await page.screenshot({ path: resolve(OUT, arg('shot', 'runner-perf-shot.png')) }); } box.x = SIZE[0] / 2 - 45 + Math.random() * 90; await page.mouse.move(box.x, box.y); await page.waitForTimeout(250); if (await page.$('#rn-cards.on')) { await page.click('#rn-cards.on .rn-card', { timeout: 1500 }).catch(() => {}); await page.waitForTimeout(400); } if (await page.$('#rn-result:not([hidden])')) break; }
   await page.evaluate(() => { window.__perf.on = false; });
 }
 const t0 = Date.now(), shots = [[9000, 'runner-play-run.jpg']];
@@ -119,7 +129,7 @@ if (PERF) {
   const fr = P.frames.filter(d => d < 5000), secs = fr.reduce((a, b) => a + b, 0) / 1000, mins = secs / 60, pct = q => { const x = [...fr].sort((a, b) => a - b); return x[Math.min(x.length - 1, Math.floor(x.length * q))] || 0; };
   const r1 = x => Math.round(x * 10) / 10;
   const lat = [...P.lat].sort((a, b) => a - b), lp = q => r1(lat[Math.min(lat.length - 1, Math.floor(lat.length * q))] || 0);
-  perf = { cpu: CPU, q: Q, seconds: r1(secs), fps: r1(fr.length / secs), p95: r1(pct(.95)), p99: r1(pct(.99)), max: r1(Math.max(...fr)), over33_min: r1(fr.filter(d => d > 33.4).length / mins), over50_min: r1(fr.filter(d => d > 50).length / mins), long_tasks: P.long.length, input_p50: lp(.5), input_p95: lp(.95), input_n: lat.length, first5s_over50: (() => { let t = 0, n = 0; for (const d of fr) { t += d; if (t > 5000) break; if (d > 50) n++; } return n; })(), tier_end: ['최저', '낮음', '중간', '높음'][tierEnd], start_ms: pre.ms, siege_max: Math.round(P.siege), crowd_end: await page.evaluate(() => window.__rnN || 0), canvas: await page.evaluate(() => { const c = document.querySelector('#rn-cvs'); return c ? `${c.width}x${c.height}` : ''; }), start_frame_max: pre.frame, start_long_max: pre.long };
+  perf = { errors: errors.slice(0, 5), emerg_s: emergS, cpu: CPU, q: Q, seconds: r1(secs), fps: r1(fr.length / secs), p95: r1(pct(.95)), p99: r1(pct(.99)), max: r1(Math.max(...fr)), over33_min: r1(fr.filter(d => d > 33.4).length / mins), over50_min: r1(fr.filter(d => d > 50).length / mins), long_tasks: P.long.length, input_p50: lp(.5), input_p95: lp(.95), input_n: lat.length, first5s_over50: (() => { let t = 0, n = 0; for (const d of fr) { t += d; if (t > 5000) break; if (d > 50) n++; } return n; })(), tier_end: ['최저', '낮음', '중간', '높음'][tierEnd], start_ms: pre.ms, siege_max: Math.round(P.siege), crowd_end: await page.evaluate(() => window.__rnN || 0), canvas: await page.evaluate(() => { const c = document.querySelector('#rn-cvs'); return c ? `${c.width}x${c.height}` : ''; }), start_frame_max: pre.frame, start_long_max: pre.long };
   console.log(JSON.stringify(perf)); await browser.close(); process.exit(0);
 }
 const sounds = await page.evaluate(() => window.__rnSnd).catch(() => null);
