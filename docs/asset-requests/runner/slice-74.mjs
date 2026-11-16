@@ -16,19 +16,23 @@ import sharp from 'sharp';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { basename } from 'node:path';
-import { SHEETS, isBg } from './build-74.mjs';
+import { SHEETS as S74 } from './build-74.mjs';
+import { SHEETS as S75 } from './build-75.mjs';
+// 75(②단계 그림)도 같은 칸 처리라서 이 파일 하나로 자른다: node slice-74.mjs /tmp/art/75-2.png
+const SHEETS = [...S74, ...S75];
+const isBg = s => s.cells[0][3] === 'bg';
 
 const ASSETS = fileURLToPath(new URL('../../../public/assets/runner/', import.meta.url));
 const args = process.argv.slice(2);
 const pi = args.indexOf('--preview'), preview = pi >= 0 ? args.splice(pi, 2)[1] : '';
 const qi = args.indexOf('--quality'), quality = qi >= 0 ? Number(args.splice(qi, 2)[1]) : 82;
 const file = args[0];
-const no = basename(file || '').match(/74-\d+/)?.[0];
+const no = basename(file || '').match(/7[45]-\d+/)?.[0];
 const sheet = SHEETS.find(s => s.no === no);
-if (!sheet) { console.error('사용법: node slice-74.mjs <74-N.png> [--preview out.png] [--quality 82]'); process.exit(1); }
+if (!sheet) { console.error('사용법: node slice-74.mjs <74-N.png | 75-N.png> [--preview out.png] [--quality 82]'); process.exit(1); }
 mkdirSync(ASSETS, { recursive: true });
 const CELL_XY = { 'TOP-LEFT': [0, 0], 'TOP-RIGHT': [1, 0], 'BOTTOM-LEFT': [0, 1], 'BOTTOM-RIGHT': [1, 1] };
-const LIMIT = key => key.startsWith('bg-') ? 150 : key.startsWith('castle-') && !key.includes('chunk') ? 80 : 40;
+const LIMIT = key => key.startsWith('bg-') ? 150 : key.startsWith('castle-') && !key.includes('chunk') && key !== 'castle-flag' ? 80 : 40;
 const outs = [];
 let bad = false;
 const save = async (img, key, kind, w, h) => {
