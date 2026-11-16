@@ -165,14 +165,33 @@ export async function runRunnerChecks(assert) {
     assert(!/shadowBlur|ctx\.filter\s*=/.test(ui) && ui.includes('await Promise.race([warmArt(res.pet?.key, res.pet?.form, theme(res.stage))') && ui.includes('function prebake(g)') && ui.includes('autoTier(g, true)') && ui.includes('const COUNTDOWN = 1.5;'),
       '판 시작 전: 그림 디코드(최대 1.8초) · 색 입힌 재료 · 길 색 표 미리 굽기 · 카운트다운 동안 품질 결정, blur · shadowBlur 없음');
     // 그림 74: 검은 배경 문 판은 검정→투명 진한 색 유리(보통 섞기, 빛만 더하기), 길 타일은 띠로 원근, 성 붕괴는 castle-chunk-a · b 조각, 정령은 테두리
-    assert(ui.includes('function glassOf(im, w, h)') && ui.includes('if (g.img[k]) { P[k] = glassOf(g.img[k], 212, 150); continue; }') && !ui.includes('g.gateAdd') && ui.includes('function drawRoadTiled(g, img, endZ)') && ui.includes("['chunk-a', 'chunk-b']") && ui.includes('addDebris(g, 0, 4, c.z, 40, 2, 1.4); addSmoke(') && ui.includes("outlined(g, 'spirit-run'"),
+    assert(ui.includes('function glassOf(im, w, h)') && ui.includes('if (g.img[k]) { P[k] = glassOf(g.img[k], g.img[k].width, g.img[k].height); P[k + \'S\'] = shrink(P[k], 192); continue; }') && !ui.includes('g.gateAdd') && ui.includes('function drawRoadTiled(g, img, endZ)') && ui.includes("['chunk-a', 'chunk-b']") && ui.includes('addDebris(g, 0, 4, c.z, 40, 2, 1.4); addSmoke(') && ui.includes("outlined(g, 'spirit-run'"),
       '그림 74: 문 판 진한 색 유리(검정→투명, 보통 섞기 · 빛만 더하기) · 길 타일 원근 · 성 조각 그림 · 정령 테두리');
     // 그림 74 렉 방지: 길 타일 · 하늘은 불투명 캔버스로 미리 굽고(축소본 4장), 최저 단계는 길을 가까운 점으로, 판 준비는 두 번에 나눈다
-    assert(ui.includes('function roadMip(img)') && ui.includes("x = c.getContext('2d', { alpha: false });   // 불투명 캔버스") && ui.includes('if (!g.tier) ctx.imageSmoothingEnabled = false;') && ui.includes('requestAnimationFrame(() => setTimeout(() => {') && !ui.includes('buildSprites(g); buildSky(g); }\n  prebake(g);'),
-      '그림 74 렉 방지: 길 타일 축소본 · 불투명 하늘 · 최저 단계 가까운 점 · 판 준비 두 번에 나눔');
+    assert(ui.includes('function roadMip(img)') && ui.includes("x = c.getContext('2d', { alpha: false });   // 불투명 캔버스") && (ui.match(/imageSmoothingEnabled = false/g) || []).length === 1 && ui.includes('if (g.emerg >= 2) ctx.imageSmoothingEnabled = false;') && ui.includes('requestAnimationFrame(() => setTimeout(() => {') && !ui.includes('buildSprites(g); buildSky(g); }\n  prebake(g);'),
+      '그림 74 렉 방지: 길 타일 축소본 · 불투명 하늘 · 판 준비 두 번에 나눔(v13.241 안정화: 가까운 점 그리기는 비상 끝 단계의 길 무늬만)');
     // 넓은 화면: 게임은 가운데 세로 칸, 낮음 · 최저는 칸 넓이를 폰만큼으로, 카운트다운 품질 예상은 실제 캔버스 배율로. 양옆 장식은 CSS 배경 한 장(프레임마다 안 그림)
-    assert(ui.includes('function s2Of(g, t)') && ui.includes('Math.sqrt(PHONE_AREA / (g.cssW * g.cssH))') && ui.includes('mid * (s2Of(g, t) / sc) ** 2 > 10') && ui.includes("g.cssW = box?.clientWidth") && source('../public/v13241.css').includes('.rn-back{') && source('../public/v13241.css').includes('width:min(100vw,520px,') && !/rn-back/.test(ui.slice(ui.indexOf('/* ---------- 그리기 ---------- */'))),
-      '넓은 화면: 세로 칸 · 낮은 단계 캔버스 넓이 폰만큼 · 품질 예상은 실제 배율 · 양옆 장식은 정적 CSS 배경');
+    assert(ui.includes('function s2Of(g, t)') && ui.includes('const RES_MIN_W = 540;') && ui.includes("function floorS2(g) { const d = Math.min(devicePixelRatio || 1, 2); return Math.max(d * .5, RES_MIN_W / Math.max(1, g.cssW)); }") && ui.includes('mid * (s2Of(g, t) / sc) ** 2 * (t > g.tier ? 1.25 : 1) > 10') && ui.includes("g.cssW = box?.clientWidth") && source('../public/v13241.css').includes('.rn-back{') && source('../public/v13241.css').includes('width:min(100vw,520px,') && !/rn-back/.test(ui.slice(ui.indexOf('/* ---------- 그리기 ---------- */'))),
+      '넓은 화면: 세로 칸 · 품질 예상은 실제 배율 · 양옆 장식은 정적 CSS 배경');
+    // v13.241 그래픽 안정화(선생님 아이폰 녹화: 길 가장자리 계단 · 흐린 정령 · 숫자): 해상도 하한 · 효과부터 줄이기 · 히스테리시스 · 사다리꼴 길 · 큰 숫자 아틀라스 · 흔들림 줄임
+    {
+      const fake = { cssW: 390 }, s2 = t => { globalThis.devicePixelRatio = 3; const TI = [0, 1, 2, 3]; const lo = Math.max(1, 540 / fake.cssW), top = Math.max(lo, 2); return lo + (top - lo) * TI[t] / 3; };
+      assert(s2(0) * 390 >= 540 && s2(3) === 2 && ui.includes("{ name: '최저', scale: .68, res: 0,") && ui.includes("{ name: '높음', scale: 2, res: 3,"),
+        '안정화: 어떤 품질 단계도 캔버스가 CSS × min(dpr, 2) × 0.5 · 폭 540px 아래로 내려가지 않는다(세로 폰 390px 최저 = 540px, 예전 265px)');
+    }
+    assert(ui.includes('if (s2Of(g, t) !== g.S2) resize(g);') && ui.includes('c / log.length >= .9 && big / log.length < .02') && ui.includes("const bad = x => x.slow > .25 || x.avg > 24;") && ui.includes('if (bad(w) && bad(prev)) { setTier(g, g.tier - 1); g.lastWin = null; }') && ui.includes('g.clock - (g.tierAt || 0) < 6') && ui.includes('if (w.capped && w.js < 10 && prev.capped) return;') && !ui.includes('g.tier - (slow > .5 ? 2 : 1)'),
+      '안정화: 품질은 4초(2초 창 둘) 평균으로(30Hz 묶임 = 33ms 근처 90%↑ · 40ms↑ 2% 아래) 한 단계씩만 내리고, 내린 뒤 6초 쉬며 판 중에는 올리지 않는다 · 30Hz로 묶인 폰은 내리지 않음 · 해상도가 같으면 다시 굽지 않음');
+    assert(ui.includes('function roadQuad(g, half, zNear, zFar)') && ui.includes('const pad = drawRoadTiled(g, tile, endZ) + .5;') && ui.includes('const band = g.emerg ? 4 : clamp(Math.round(2.2 * g.S2 + 1), 3, 6);') && ui.includes('return padMax;') && !/ctx\.clip\(\); drawRoadTiled/.test(ui) && ui.includes('g.SPR.post : g.SPR.postS'),
+      '안정화: 길은 사다리꼴 한 장(난간 포함) + 무늬 띠(화면 4~5px) + 가장자리 직선을 화면 픽셀로 덮는 매끈한 테두리 띠(clip 없음), 난간 윗줄 · 기둥 원본 해상도');
+    assert(ui.includes('const RES_EMERGENCY = true, EMERG_MS = 25, EMERG_MID = .75, PHONE_AREA = 390 * 844;') && ui.includes('floorS2(g) * (g.emerg === 1 ? EMERG_MID : 1)')
+      && ui.includes('if (RES_EMERGENCY && (avg > EMERG_MS || slow > .12) && !(w.capped && prev.capped)) { setTier(g, 0, g.emerg + 1); g.lastWin = null; }') && ui.includes('if (g.emerg >= 2 || !prev || g.clock - (g.tierAt || 0) < 6) return;')
+      && ui.includes('if (RES_EMERGENCY && t === 0 && mid * (floorS2(g) / sc) ** 2 > 18) return setTier(g, 0, mid * (floorS2(g) * EMERG_MID / sc) ** 2 > 18 ? 2 : 1);') && ui.includes('tier: savedTier(), emerg: 0,')
+      && /\n  writePref\(TIER_KEY, JSON\.stringify\(\{ t, at: Date\.now\(\) \}\)\);   \/\/ 비상 단계는 기억하지 않는다/.test(ui) && ui.includes('if (g.emerg >= 2) ctx.imageSmoothingEnabled = false;'),
+      '안정화 비상 단계(선생님 확인): 하한 → 중간(0.75배) → 예전 최저, 4초 평균 25ms 초과 또는 20ms↑ 프레임 12%↑(30Hz 묶임 아님)일 때 한 단계씩 6초 쉼, 카운트다운이 무거우면 중간부터, 그 판만(기억 안 함, 품질 기억 writePref는 살아 있음)');
+    assert(ui.includes('Math.min(1.8, sc / (17 * g.S2), fitN)') && ui.includes('Math.min(1.5, PS / (15 * g.S2) + .4)') && !/PS \/ 34\b/.test(ui), '안정화: 숫자 크기는 화면 배율과 상관없이 같고(PS ÷ 배율), 문 판 · 바위 폭 안에 들어간다');
+    assert(ui.includes('const NUM_AT = { foe: 2, wall: 2, count: 2, rock: 2, good: 3, bad: 3, pop: 2, minus: 2 };') && ui.includes('cap = A.k * 1.1') && ui.includes("w > 260 ? P['gate-good'] : P['gate-goodS']") && ui.includes('sp = Math.round(46 * S)'),
+      '안정화: 숫자는 2~3배 큰 아틀라스로 굽고 튀어나오는 숫자는 1.1배까지만 늘림 · 문 판은 원본/축소본 중 고름 · 정령은 그리는 크기보다 크게 구움');
+    assert(ui.includes('cam.punch = Math.min(cam.punch, .08)') && ui.includes('const shk = cam.trauma * cam.trauma * .2,') && !ui.includes('Math.sin(tt * 71)'), '안정화: 줌 펀치 상한 0.08 · 흔들림 폭 0.2 · 빠른 떨림(71) 없음');
     const drawCode = ui.slice(ui.indexOf('/* ---------- 그리기 ---------- */'));
     assert(!/String\(Math\.ceil|\.splice\(|objs = \[\]|for \(const \[side, val\]|\$\{lerp\(base/.test(drawCode) && ui.includes('const objs = g.objs; objs.length = 0;') && ui.includes("let m = g.tintCache.get(k);") && ui.includes('g.capK = 1 - .35 * want / DRAW_MAX;'),
       '그리기: 프레임마다 숫자 · 색 문자열, 물체 배열, splice를 만들지 않고(캐시 · 재사용), 정령이 많을수록 파편 · 빛 상한을 줄인다');
