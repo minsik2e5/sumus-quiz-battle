@@ -627,9 +627,9 @@ function hud(g, now) {
 function autoTier(g, warm = false) {
   const log = g.frameLog; g.frameLog = []; if (!log.length || g.tier === 0 || (!warm && g.frames < 90) || (warm && log.length < 20)) return;
   if (warm) {
-    // 카운트다운(효과 없는 장면) 평균 프레임으로 고른다: 칠하는 넓이 ∝ 해상도² → 단계마다 예상 시간을 계산해 12ms 안(효과 몫을 남김)인 가장 높은 단계
+    // 카운트다운(효과 없는 장면) 평균 프레임으로 고른다: 칠하는 넓이 ∝ 해상도² → 단계마다 예상 시간을 계산해 10ms 안(효과 몫을 넉넉히 남김: 난도 조정 뒤 무리가 커짐)인 가장 높은 단계
     const sorted = [...log].sort((a, b) => a - b), mid = sorted[sorted.length >> 1], sc = g.T.scale; let t = g.tier;
-    while (t > 0 && mid * (TIERS[t].scale / sc) ** 2 > 12) t--;
+    while (t > 0 && mid * (TIERS[t].scale / sc) ** 2 > 10) t--;
     if (t < g.tier) setTier(g, t);
     return;
   }
