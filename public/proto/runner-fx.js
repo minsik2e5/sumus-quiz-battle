@@ -35,7 +35,7 @@ const ctx = cvs.getContext('2d', { alpha: false, desynchronized: true });
 /* ---------- 품질 단계 ---------- */
 // draw: 그리는 정령 수 상한(나머지는 숫자). 정령 그림 1장 = drawImage 1번이라 150마리도 가볍지만, CPU로 그리는 폰은 칠하는 넓이가 문제라 줄인다.
 const TIERS = [
-  { name: '최저', scale: .75, draw: 40, debris: 70, smoke: 18, sparks: 70, glows: 60, fly: 30, shots: 20, mult: .35, glow: false, shadow: false, cutLines: 4, posts: 6 },
+  { name: '최저', scale: .68, draw: 40, debris: 70, smoke: 18, sparks: 70, glows: 60, fly: 30, shots: 20, mult: .35, glow: false, shadow: false, cutLines: 4, posts: 6 },
   { name: '낮음', scale: 1, draw: 70, debris: 90, smoke: 26, sparks: 90, glows: 90, fly: 40, shots: 28, mult: .45, glow: false, shadow: false, cutLines: 6, posts: 8 },
   { name: '중간', scale: 1.5, draw: 110, debris: 200, smoke: 48, sparks: 180, glows: 160, fly: 70, shots: 44, mult: .7, glow: true, shadow: false, cutLines: 10, posts: 12 },
   { name: '높음', scale: 2, draw: 150, debris: 300, smoke: 72, sparks: 260, glows: 240, fly: 100, shots: 60, mult: 1, glow: true, shadow: true, cutLines: 14, posts: 16 }

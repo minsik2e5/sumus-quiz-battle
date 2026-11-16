@@ -105,7 +105,7 @@ async function startGame(stage) {
 const TIERS = [
   // v13.241 퀄리티 업: shadows = 정령마다 발밑 그림자, trail = 탄 · 대포 정령 빛 꼬리, speed = 가장자리 속도선 수, sky = 떠가는 구름 수,
   //   fire = 성이 약해지면 불 · 연기, rim = 맨 앞줄 테두리 빛, coins = 결과 화면 코인 비 수. 모두 품질 단계와 함께 내려간다.
-  { name: '최저', scale: .75, draw: 40, debris: 70, smoke: 18, sparks: 70, glows: 60, fly: 30, shots: 20, mult: .35, glow: false, cutLines: 4, posts: 6, shadows: false, trail: false, speed: 0, sky: 0, fire: false, rim: false, coins: 6 },
+  { name: '최저', scale: .68, draw: 40, debris: 70, smoke: 18, sparks: 70, glows: 60, fly: 30, shots: 20, mult: .35, glow: false, cutLines: 4, posts: 6, shadows: false, trail: false, speed: 0, sky: 0, fire: false, rim: false, coins: 6 },
   { name: '낮음', scale: 1, draw: 70, debris: 90, smoke: 26, sparks: 90, glows: 90, fly: 40, shots: 28, mult: .45, glow: false, cutLines: 6, posts: 8, shadows: false, trail: false, speed: 4, sky: 1, fire: true, rim: false, coins: 10 },
   { name: '중간', scale: 1.5, draw: 110, debris: 200, smoke: 48, sparks: 180, glows: 160, fly: 70, shots: 44, mult: .7, glow: true, cutLines: 10, posts: 12, shadows: true, trail: true, speed: 6, sky: 3, fire: true, rim: true, coins: 14 },
   { name: '높음', scale: 2, draw: 150, debris: 300, smoke: 72, sparks: 260, glows: 240, fly: 100, shots: 60, mult: 1, glow: true, cutLines: 14, posts: 16, shadows: true, trail: true, speed: 8, sky: 4, fire: true, rim: true, coins: 18 }
@@ -692,7 +692,7 @@ function drawClouds(g) {
   ctx.globalAlpha = .95;
   for (let k = k0 + 7; k >= k0; k--) for (let sd = -1; sd <= 1; sd += 2) {
     const h = Math.sin(k * 12.9898 + sd * 78.233) * 43758.5453, f = h - Math.floor(h);
-    if (proj(g, sd * (7 + f * 9), -2.5 - f * 2.5, k * 15 + f * 6)) { const ww = (3 + f * 3) * PS; ctx.drawImage(img, PX - ww / 2, PY - ww * .3, ww, ww * .55); }
+    if (proj(g, sd * (7 + f * 9), -2.5 - f * 2.5, k * 15 + f * 6)) { const ww = (3 + f * 3) * PS, hh = ww * img.height / img.width; ctx.drawImage(img, PX - ww / 2, PY - hh * .55, ww, hh); }   // 그림 비율 그대로(구름 섬 288×192)
   }
   ctx.globalAlpha = 1;
 }
