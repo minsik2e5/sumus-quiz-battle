@@ -25,6 +25,7 @@ const page = await ctx.newPage();
 const errors = [], reqs = [];
 page.on('request', r => reqs.push(r.url()));
 page.on('pageerror', e => errors.push(e.message));
+if (arg('css')) await page.addInitScript(css => addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = css; document.head.append(st); }), arg('css'));   // 시험용: 스타일 덮어쓰기(원인 찾기)
 page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
 await page.addInitScript(q => {
   try { if (q === 'auto') localStorage.removeItem('sumus-runner-tier'); else localStorage.setItem('sumus-runner-tier', JSON.stringify({ t: Number(q), at: Date.now() })); } catch {}
