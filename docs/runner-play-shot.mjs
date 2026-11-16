@@ -79,11 +79,13 @@ let cdp = null;
 if (PERF) { cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU }); }
 // 출발 누름 → 판 시작(그림 받기 · 디코드 · 재료 굽기 · 카운트다운 포함)까지 걸린 시간과 그동안 가장 긴 멈춤도 잰다(새 브라우저라 첫 판 디코드 포함).
 if (PERF) await page.evaluate(() => { window.__perf.frames = []; window.__perf.long = []; window.__perf.on = true; window.__perf.t0 = performance.now(); });
+if (PERF && arg('profile-start')) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }
 await page.click('[data-rn="go"]');
 // 측정: 규칙이 돌기 시작한 순간(카운트다운 뒤)부터 WINDOW초. CPU N배는 출발 전에 걸어 둔다(판 첫 몇 초도 같은 조건).
 const WINDOW = Number(arg('window', 40));
 if (PERF) {
   await page.waitForFunction(() => window.__rnPhase, null, { timeout: 30000 });
+  if (arg('profile-start')) { const { profile } = await cdp.send('Profiler.stop'); (await import('node:fs')).writeFileSync(arg('profile-start'), JSON.stringify(profile)); }
   var pre = await page.evaluate(() => ({ ms: Math.round(performance.now() - window.__perf.t0), frame: Math.round(Math.max(0, ...window.__perf.frames)), long: Math.max(0, ...window.__perf.long) }));
   await page.evaluate(() => { window.__perf.frames = []; window.__perf.long = []; window.__perf.lat = []; window.__perf.on = true; });
   if (arg('profile')) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.start'); }

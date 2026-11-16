@@ -152,7 +152,6 @@ function playGame(start) {
     <div class="rn-veil" id="rn-tint"></div><div class="rn-veil rn-vig" id="rn-vig"></div><div class="rn-veil" id="rn-flash"></div>
     <header class="rn-hud"><button type="button" class="rn-x" data-g="quit" aria-label="그만하기">${icon('close')}</button><div class="rn-hud-mid"><b>${start.stage}스테이지${isBoss(start.stage) ? ' · 보스 성' : ''}</b><div class="rn-prog"><i id="rn-prog"></i><em class="rn-prog-castle${isBoss(start.stage) ? ' boss' : ''}" aria-hidden="true"></em></div></div><div class="rn-hud-r"><span class="rn-count" id="rn-count" aria-label="정령 수"><i aria-hidden="true"></i><b id="rn-count-n">${num(start.start)}</b></span><small id="rn-hint">끌어서 조종</small></div></header>
     <div class="rn-cards" id="rn-cards" aria-live="polite"></div>
-    <div class="rn-cd" aria-hidden="true"><b>3</b><b>2</b><b>1</b><b class="go">출발!</b></div>
     <div class="rn-result" id="rn-result" hidden></div></div>`;
   const cvs = $('rn-cvs');
   G = {
@@ -174,8 +173,15 @@ function playGame(start) {
   G.onResize = () => G && resize(G);
   addEventListener('pointermove', G.onMove); addEventListener('pointerup', G.onUp); addEventListener('pointercancel', G.onUp);
   document.addEventListener('visibilitychange', G.onVis); addEventListener('resize', G.onResize);
-  snd('start');   // 효과음 rn-start: 삑 · 삑 · 삑 → 1.5초에 "출발!"(카운트다운과 같은 때)
-  G.raf = requestAnimationFrame(frame);
+  // 판 시작 준비를 두 번에 나눈다(한 번에 길게 멈추지 않게): ① 정령 · 하늘 굽기(위) → 한 프레임 그리기 → ② 색 입힌 재료 굽기 · 카운트다운 시작
+  const g = G;
+  requestAnimationFrame(() => setTimeout(() => {
+    if (G !== g) return;
+    prebake(g); syncCrowd(g, 0, 0);
+    app.insertAdjacentHTML('beforeend', '<div class="rn-cd" aria-hidden="true"><b>3</b><b>2</b><b>1</b><b class="go">출발!</b></div>');
+    snd('start');   // 효과음 rn-start: 삑 · 삑 · 삑 → 1.5초에 "출발!"(카운트다운과 같은 때)
+    g.raf = requestAnimationFrame(frame);
+  }, 0));
 }
 function onGameClick(b) {
   const g = b.dataset.g;
@@ -203,14 +209,11 @@ function initEngine(g) {
   g.objs = []; g.oCastle = { type: 'castle', z: 0 }; g.oCrowd = { type: 'crowd', z: 0 }; g.shootOpt = { crowd: 0 }; g.progPct = -1;
   g.slot = { ox: new Float32Array(DRAW_MAX), oz: new Float32Array(DRAW_MAX), pop: new Float32Array(DRAW_MAX) }; g.shown = 0;
   buildMats(g);
-  resize(g);
   const want = [['pet', petSrc(g.pet.key, g.pet.form)], ...ART_KEYS.concat(themeKeys(g.th)).filter(k => art(k)).map(k => [k, art(k)]), ...MAT_KEYS.filter(k => ARENA_ART.has('mat-' + k)).map(k => ['mat:' + k, `/assets/arena/mat-${k}.webp`])];
   const use = (k, im) => { if (!im) return; if (k.startsWith('mat:')) { const c = mk(im.width, im.height); c.getContext('2d').drawImage(im, 0, 0); g.mat[k.slice(4)] = c; g.matArt.add(k.slice(4)); g.tintCache.clear(); } else { g.img[k] = im; if (ART_MAT[k]) { const c = mk(im.width, im.height); c.getContext('2d').drawImage(im, 0, 0); g.mat[ART_MAT[k]] = c; } } };
-  let late = false;
-  for (const [k, src] of want) { const im = READY.get(src); if (im) use(k, im); else { late = true; getImg(src).then(im2 => { if (G !== g || !im2) return; use(k, im2); buildSprites(g); buildSky(g); prebake(g); }); } }
-  if (!late || g.img.pet || g.matArt.size) { buildSprites(g); buildSky(g); }
-  prebake(g);
-  syncCrowd(g, 0, 0);
+  for (const [k, src] of want) { const im = READY.get(src); if (im) use(k, im); else { getImg(src).then(im2 => { if (G !== g || !im2) return; use(k, im2); buildSprites(g); buildSky(g); prebake(g); }); } }
+  resize(g);   // 준비된 그림을 먼저 넣고 하늘 · 정령을 한 번만 굽는다(예전에는 두 번)
+  g.ctx.drawImage(g.sky, 0, 0);   // 굽기를 둘로 나눈 사이의 한 프레임에도 하늘이 보이게
 }
 // 미리 굽기: 판 중에 쓰는 색 입힌 빛 · 고리 · 연기 그림과 길 색 표를 판 시작 전에 만들어 둔다(카운트다운 동안).
 function prebake(g) {
@@ -272,8 +275,9 @@ function tint(g, k, rgb) {
   m.set(rgb, c); return c;
 }
 function buildSky(g) {
-  const W = g.cvs.width, H = g.cvs.height, HZ = g.HZ, c = mk(W, H), x = c.getContext('2d');
+  const W = g.cvs.width, H = g.cvs.height, HZ = g.HZ, c = mk(W, H), x = c.getContext('2d', { alpha: false });   // 불투명 캔버스: 매 프레임 화면 전체를 섞기 없이 복사
   g.fogGrad = g.ctx.createLinearGradient(0, HZ, 0, HZ + H * .2); g.fogGrad.addColorStop(0, 'rgba(226,238,255,.85)'); g.fogGrad.addColorStop(1, 'rgba(226,238,255,0)');
+  g.roadMip = roadMip(g.img['road-' + g.th]);
   if (g.img['bg-' + g.th]) { const im = g.img['bg-' + g.th], sc = Math.max(W / im.width, H / im.height); x.drawImage(im, (W - im.width * sc) / 2, (H - im.height * sc) / 2, im.width * sc, im.height * sc); g.sky = c; return; }
   let lg = x.createLinearGradient(0, 0, 0, HZ); lg.addColorStop(0, THEME.skyTop); lg.addColorStop(.7, THEME.skyMid); lg.addColorStop(1, THEME.horizon); x.fillStyle = lg; x.fillRect(0, 0, W, HZ + 1);
   radial(x, 0, [[0, 'rgba(255,252,230,1)'], [.15, 'rgba(255,240,190,.7)'], [1, 'rgba(255,240,190,0)']], W * .45, W * .72, HZ * .5);
@@ -719,17 +723,26 @@ function drawRoad(g) {
 // 길 타일(그림 74 road-<테마>, 세로로 이어지는 256px): 화면을 가로 띠(품질별 5~12px)로 나눠 띠마다 그 깊이의 길 폭 · 타일 줄을 잘라 찍는다.
 //   타일 한 장 = 길 4단위. 띠 위아래 깊이로 타일 줄을 고르고, 타일 경계를 넘으면 두 번에 나눠 찍어 이음매가 없다. 멀리는 안개 그라디언트 한 장.
 const frac = v => v - Math.floor(v), TILE_Z = 4;
+// 길 타일 축소본: 불투명 캔버스(섞기 없음) 256 · 128 · 64 · 32px. 먼 줄은 작은 것을 써서 큰 그림을 줄여 그리는 비용을 없앤다(판 전에 한 번).
+function roadMip(img) {
+  if (!img) return null; const out = []; let src = img;
+  for (let w = 256; w >= 32; w /= 2) { const h = Math.round(w * img.height / img.width), c = mk(w, h), x = c.getContext('2d', { alpha: false }); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, w, h); out.push(c); src = c; }
+  return out;
+}
 function drawRoadTiled(g, img, endZ) {
-  const ctx = g.ctx, cam = g.cam, K = g.F * (cam.zoom + cam.punch), HZ = g.HZ, ROAD = RUNNER.ROAD, iw = img.width, ih = img.height;
+  const ctx = g.ctx, cam = g.cam, K = g.F * (cam.zoom + cam.punch), HZ = g.HZ, ROAD = RUNNER.ROAD, mip = g.roadMip;
   const zFar = Math.min(cam.z + 90, endZ), yTop = HZ + cam.h * K / (zFar - cam.z), yBot = Math.min(g.cvs.height, HZ + cam.h * K / .8), band = [12, 9, 7, 5][g.tier] * g.S2;
+  if (!g.tier) ctx.imageSmoothingEnabled = false;   // 최저 단계: 길 타일은 가장 가까운 점으로(느린 폰에서 길 그리기 비용을 크게 줄임)
   for (let y = yTop; y < yBot; y += band) {
     const y2 = Math.min(yBot, y + band), dzm = cam.h * K / ((y + y2) * .5 - HZ), half = ROAD * K / dzm, x0 = g.CX - cam.x * K / dzm - half, w = half * 2;
+    if (mip) img = mip[w > 192 ? 0 : w > 96 ? 1 : w > 48 ? 2 : 3]; const iw = img.width, ih = img.height;
     const za = cam.z + cam.h * K / (y - HZ), zb = cam.z + cam.h * K / (y2 - HZ);
     if (za - zb >= TILE_Z) { ctx.drawImage(img, 0, 0, iw, ih, x0, y, w, y2 - y + 1); continue; }
     const ra = (1 - frac(za / TILE_Z)) * ih, rb = (1 - frac(zb / TILE_Z)) * ih;
     if (rb > ra) ctx.drawImage(img, 0, ra, iw, Math.max(.5, rb - ra), x0, y, w, y2 - y + 1);
     else { const t = (ih - ra) / (ih - ra + rb), ys = y + (y2 - y) * t; if (ih - ra > .5) ctx.drawImage(img, 0, ra, iw, ih - ra, x0, y, w, ys - y + 1); if (rb > .5) ctx.drawImage(img, 0, 0, iw, rb, x0, ys, w, y2 - ys + 1); }
   }
+  ctx.imageSmoothingEnabled = true;
   // 멀리 안개(화면 크기마다 한 번 만든 그라디언트): 먼 길이 하늘색으로 흐려진다
   if (proj(g, -ROAD, 0, zFar)) { const ax = PX, ay = PY; proj(g, ROAD, 0, zFar); const bx = PX; const zm = cam.z + 26; proj(g, ROAD, 0, zm); const cxp = PX, cy = PY; proj(g, -ROAD, 0, zm); ctx.fillStyle = g.fogGrad; ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, ay); ctx.lineTo(cxp, cy); ctx.lineTo(PX, cy); ctx.fill(); }
 }
