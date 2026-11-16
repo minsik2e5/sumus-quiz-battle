@@ -181,5 +181,12 @@ export async function runRunnerChecks(assert) {
     const load = source('./tournament-load.mjs'), stress = source('./stress-check.mjs');
     assert(load.includes("'POST /runner/finish'") && stress.includes("p95('POST /runner/finish')"), '부하 시험(check:load)에 펫 대행진 끝(다시 돌리기 포함)이 들어 있다');
   }
+  // V13.243 테스트 앱 띠 빌드 표시: deploy-test만 /test-build.json을 만들고(저장소 · 운영에는 없음), 앱은 테스트 앱 주소에서만 부른다
+  {
+    const wf = source('../.github/workflows/deploy-test.yml'), prod = source('../.github/workflows/deploy-cloudflare.yml'), app = source('../public/app.js'), ign = source('../.gitignore');
+    const i = app.indexOf("fetch('/test-build.json'"), guard = app.lastIndexOf("if (/^sumus-voca-test\\./.test(location.hostname)) {", i);
+    assert(wf.includes('> public/test-build.json') && !prod.includes('test-build') && i > 0 && guard > 0 && i - guard < 200 && ign.includes('public/test-build.json') && !existsSync(fileURLToPath(new URL('../public/test-build.json', import.meta.url))) && source('../public/v13149.css').includes("var(--test-build,'')"),
+      '테스트 앱 띠에 빌드 표시(브랜치 끝 · 커밋 7자리): 테스트 배포만 만들고, 앱은 테스트 앱에서만 읽는다(운영에는 없음)');
+  }
   void dayKey; void recorder;
 }
