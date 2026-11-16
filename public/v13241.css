@@ -6,7 +6,7 @@
   --rn-gold:#f6c445;--rn-gold2:#ffe9a6;--rn-gold-ink:#2a1d00;--rn-blue:#3b82f6;--rn-red:#ef4444;--rn-boss:#8b5cf6;
   --rn-panel:#ffffff;--rn-line:#d6e2f7;--rn-dark:#0b1233;--rn-star-off:#c9d3e8;--rn-shade:rgb(10 20 60 / .18);
   --rn-glass:rgb(14 20 46 / .72);--rn-white-dim:rgb(255 255 255 / .75);--rn-white-line:rgb(255 255 255 / .35);
-  --rn-road1:#eccd96;--rn-road2:#d9b276;
+  --rn-road1:#eccd96;--rn-road2:#d9b276;--rn-gold-dark:#b8862d;
 }
 /* ---------- 지도 ---------- */
 .rn-app{min-height:100vh;background:linear-gradient(180deg,var(--rn-sky1),var(--rn-sky2) 34%,var(--rn-sky3) 70%);color:var(--rn-ink);padding-bottom:calc(env(safe-area-inset-bottom) + 24px)}
@@ -114,3 +114,45 @@
 .ag-rn-gate b{font-weight:400}
 .ag-rn-crowd{position:absolute;left:50%;bottom:8%;width:34%;height:24%;transform:translateX(-50%);border-radius:50%;background:radial-gradient(circle at 30% 40%,var(--rn-sky3) 0 8%,transparent 9%),radial-gradient(circle at 55% 35%,var(--rn-sky3) 0 8%,transparent 9%),radial-gradient(circle at 75% 55%,var(--rn-sky3) 0 8%,transparent 9%),radial-gradient(circle at 40% 70%,var(--rn-sky3) 0 8%,transparent 9%),radial-gradient(ellipse,var(--rn-sky2),var(--rn-blue))}
 .ag-rn-castle{position:absolute;left:50%;top:6%;width:16%;height:20%;transform:translateX(-50%);background:linear-gradient(var(--rn-star-off),var(--rn-ink2));clip-path:polygon(0 25%,15% 25%,15% 10%,30% 10%,30% 25%,42% 25%,42% 0,58% 0,58% 25%,70% 25%,70% 10%,85% 10%,85% 25%,100% 25%,100% 100%,0 100%)}
+/* ---------- v13.241 퀄리티 업: 위쪽 막대 · 반전 섬광 · 결과(아레나 #298 디자인 토큰 --a-*) ---------- */
+.rn-game canvas.inv{filter:invert(1) hue-rotate(180deg)}
+.rn-hud-mid b{font-family:var(--a-num);font-size:var(--a-fs-3)}
+.rn-prog{position:relative;overflow:visible;border-color:var(--rn-white-dim);background:var(--a-glass)}
+.rn-prog i{border-radius:6px;transition:transform .3s linear}
+.rn-prog-castle{position:absolute;right:-12px;top:50%;width:20px;height:20px;transform:translateY(-50%);background:var(--a-gold);clip-path:polygon(0 30%,20% 30%,20% 10%,40% 10%,40% 30%,60% 30%,60% 10%,80% 10%,80% 30%,100% 30%,100% 100%,0 100%);filter:drop-shadow(0 1px 0 var(--a-shade))}
+.rn-prog-castle.boss{background:var(--rn-boss)}
+.rn-hud-r{display:flex;flex-direction:column;align-items:flex-end;gap:4px;padding-top:0;pointer-events:none}
+.rn-hud-r small{font-size:var(--a-fs-1);color:var(--rn-white-dim)}
+.rn-count{display:inline-flex;align-items:center;gap:5px;padding:4px 10px 4px 6px;border-radius:var(--a-r-3);background:var(--a-glass);border:1px solid var(--rn-white-line);color:var(--a-ink);font-family:var(--a-num);font-size:var(--a-fs-4);line-height:1;transform-origin:100% 50%}
+.rn-count i{width:20px;height:20px;border-radius:50% 50% 46% 46%;background:radial-gradient(circle at 35% 35%,var(--rn-sky3),var(--rn-sky2) 55%,var(--rn-blue))}
+.rn-count b{font-weight:400;min-width:2ch;text-align:right}
+.rn-count[data-dir=up]{border-color:var(--a-gold);box-shadow:0 0 0 2px var(--a-gold-soft)}
+.rn-count[data-dir=down]{border-color:var(--a-foe);box-shadow:0 0 0 2px var(--a-foe-soft)}
+.rn-cards-h,.rn-card b{font-family:var(--a-num)}
+.rn-res-card{position:relative;z-index:1}
+.rn-res-card h2{font-family:var(--a-num)}
+.rn-res-stars i{position:relative}
+.rn-res-stars i.on{animation:rn-slam .5s var(--d) cubic-bezier(.2,1.7,.35,1) both}
+.rn-near{margin:2px 0 10px;font-family:var(--a-num);font-size:var(--a-fs-4);color:var(--rn-ink2)}
+.rn-near b{font-weight:400;font-size:var(--a-fs-5);color:var(--a-foe)}
+.rn-near.hot{animation:rn-pop .4s .5s cubic-bezier(.2,1.6,.4,1) both}
+.rn-res-list li.coin b em{font-style:normal;min-width:2ch;display:inline-block;text-align:left}
+.rn-res-btns{flex-direction:column;align-items:stretch}
+.rn-big{font-family:var(--a-num);font-size:var(--a-fs-4);height:60px;border:0;border-radius:var(--a-r-2);cursor:pointer;color:var(--a-gold-ink);background:var(--a-gold);box-shadow:0 5px 0 var(--rn-gold-dark),0 10px 20px var(--rn-shade);transition:transform .12s}
+.rn-big.blue{color:var(--a-ink);background:var(--a-me);box-shadow:0 5px 0 var(--rn-dark),0 10px 20px var(--rn-shade)}
+.rn-big:active{transform:translateY(3px)}
+.rn-res-btns .rn-ghost{flex:none}
+.rn-coinrain{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+.rn-coinrain span{position:absolute;left:var(--x);top:-40px;width:28px;height:28px;animation:rn-coin 1.3s var(--d) cubic-bezier(.4,.1,.6,1) both}
+.rn-coinrain span>*{width:100%;height:100%}
+@keyframes rn-slam{0%{opacity:0;transform:scale(2.8) rotate(-25deg)}55%{opacity:1;transform:scale(.86) rotate(4deg)}75%{transform:scale(1.08)}100%{opacity:1;transform:none}}
+@keyframes rn-coin{0%{opacity:0;transform:translateY(0) rotate(0)}10%{opacity:1}100%{opacity:0;transform:translateY(105vh) rotate(var(--r))}}
+@media (prefers-reduced-motion:reduce){.rn-res-stars i.on,.rn-near.hot{animation:none}.rn-coinrain{display:none}}
+/* 판 시작 전 3 · 2 · 1 · 출발!(DOM은 판 전에 한 번 넣고 CSS로만 움직임, 1.5초) */
+.rn-cd{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.rn-cd b{grid-area:1/1;font-family:var(--a-num);font-weight:400;font-size:96px;color:var(--a-ink);-webkit-text-stroke:6px var(--rn-dark);paint-order:stroke;opacity:0;animation:rn-cd .375s linear both}
+.rn-cd b:nth-child(2){animation-delay:.375s}.rn-cd b:nth-child(3){animation-delay:.75s}
+.rn-cd b.go{font-size:64px;color:var(--a-gold);animation:rn-cd-go .6s 1.125s ease-out both}
+@keyframes rn-cd{0%{opacity:0;transform:scale(1.8)}25%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(.8)}}
+@keyframes rn-cd-go{0%{opacity:0;transform:scale(2)}30%{opacity:1;transform:scale(1)}75%{opacity:1}100%{opacity:0;transform:scale(1.15)}}
+@media (prefers-reduced-motion:reduce){.rn-cd b{animation-duration:.01s}}

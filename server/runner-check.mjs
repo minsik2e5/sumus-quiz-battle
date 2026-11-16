@@ -91,10 +91,24 @@ export async function runRunnerChecks(assert) {
     assert(!/setInterval/.test(ui) && (ui.match(/api\('/g) || []).length === 4 && ui.includes("api('/runner/finish', { id: g.id, input: g.rec.out() })"), '게임 화면은 서버에 자동으로 묻지 않는다(지도 · 순위 GET, 시작 · 끝 POST뿐)');
     const ev = ui.match(/const SND_EVENTS = (\[.*?\]);/)?.[1];
     assert(ev && JSON.parse(ev.replace(/'/g, '"')).join() === 'gate-good,gate-bad,multiply,shoot,rock-hit,rock-break,saw,hammer,rescue,card,cannon,castle-hit,castle-fall,star,fail,start'
-      && ui.includes("if (!RUNNER_SFX || soundFn) return; import('./runner-sfx.js')") && ui.includes('m.preloadRunnerSound?.()') && ui.includes("snd('shoot', { crowd: S.n })") && ui.includes("snd('star', { i })") && ui.includes("snd('card', { pick: true })") && build.includes("existsSync(resolve(root, 'public/modules/runner-sfx.js'))"),
+      && ui.includes("if (!RUNNER_SFX || soundFn) return; import('./runner-sfx.js')") && ui.includes('m.preloadRunnerSound?.()') && ui.includes("g.shootOpt.crowd = S.n; snd('shoot', g.shootOpt);") && ui.includes("snd('star', { i })") && ui.includes("snd('card', { pick: true })") && build.includes("existsSync(resolve(root, 'public/modules/runner-sfx.js'))"),
       '소리: runner-sfx.js가 있을 때만 불러 들어갈 때 preloadRunnerSound(), runnerSound(사건 이름 16개 · 사격 crowd · 별 i · 카드 pick)를 부른다');
     assert(build.includes("resolve(root, 'public/assets/runner')") && ui.includes("RUNNER_ART.has(k) ? `/assets/runner/${k}.webp` : null") && existsSync(fileURLToPath(new URL('../public/modules/runner-art.js', import.meta.url))), '그림 74: build:assets가 적은 그림(RUNNER_ART)만 쓰고 없으면 코드 그림');
     assert(!/ctx\.filter\s*=/.test(ui) && /draw: 150,/.test(ui) && ui.includes('const DRAW_MAX = 150;') && ui.includes("const TIER_KEY = 'sumus-runner-tier', TIER_DAYS = 7;"), '연출: 정령은 최대 150마리만 그림 · blur 필터 없음 · 내려간 품질은 7일 기억');
+    // v13.241 퀄리티 업: 새 연출도 품질 4단계에 묶인다(낮은 단계는 끄거나 줄임), 위쪽 배지는 바뀔 때만 · 0.1초에 한 번까지, 결과 화면
+    const tiers = [...ui.matchAll(/\{ name: '[^']+', scale: [^}]*?shadows: (true|false), trail: (true|false), speed: (\d+), sky: (\d+), fire: (true|false), rim: (true|false), coins: (\d+) \}/g)].map(m => m.slice(1));
+    assert(tiers.length === 4 && tiers[0].join() === 'false,false,0,0,false,false,6' && tiers[3][0] === 'true' && tiers.every((t, i) => !i || (Number(t[2]) >= Number(tiers[i - 1][2]) && Number(t[6]) >= Number(tiers[i - 1][6]))),
+      '새 연출(발밑 그림자 · 빛 꼬리 · 속도선 · 떠가는 구름 · 성 불 · 앞줄 빛 · 코인 비)은 품질 단계에 묶이고 최저에서는 꺼진다');
+    assert(ui.includes('if (S.n === g.hudN || now - g.hudTextAt < 100) return;') && ui.includes("box.animate([") && !/offsetWidth|getBoundingClientRect/.test(ui), '위쪽 정령 수 배지: 바뀔 때만 · 0.1초에 한 번 글자를 쓰고, 튀는 효과는 Web Animations(배치 다시 계산 없음)');
+    assert(ui.includes("g.slow > 0 ? dt * .3 : dt") && ui.includes("if (type === 'fall') { g.slow = .75; invertFlash(); castleDown(g); return; }") && ui.includes('data-g="again">한 판 더</button>') && ui.includes('성 HP <b>${hpLeft}%</b> 남았어') && ui.includes('const n = g.T.coins;'),
+      '마지막 일격은 연출 시간만 느리게(규칙 틱은 그대로) + 반전 섬광, 결과는 큰 "한 판 더" · 아깝게 지면 남은 성 HP · 코인 비는 품질 상한');
+    // 렉 방지(선생님: "렉은 절대 안 걸리게"): 판 전에 그림 디코드 · 재료 굽기 · 카운트다운 동안 품질 결정, blur · shadowBlur 없음,
+    //   프레임마다 색 문자열 · 숫자 문자열 · 물체 목록을 새로 만들지 않음, 정령이 많으면 효과 상한을 줄임
+    assert(!/shadowBlur|ctx\.filter\s*=/.test(ui) && ui.includes('await Promise.race([warmArt(res.pet?.key, res.pet?.form)') && ui.includes('function prebake(g)') && ui.includes('autoTier(g, true)') && ui.includes('const COUNTDOWN = 1.5;'),
+      '판 시작 전: 그림 디코드(최대 1.8초) · 색 입힌 재료 · 길 색 표 미리 굽기 · 카운트다운 동안 품질 결정, blur · shadowBlur 없음');
+    const drawCode = ui.slice(ui.indexOf('/* ---------- 그리기 ---------- */'));
+    assert(!/String\(Math\.ceil|\.splice\(|objs = \[\]|for \(const \[side, val\]|\$\{lerp\(base/.test(drawCode) && ui.includes('const objs = g.objs; objs.length = 0;') && ui.includes("let m = g.tintCache.get(k);") && ui.includes('g.capK = 1 - .35 * want / DRAW_MAX;'),
+      '그리기: 프레임마다 숫자 · 색 문자열, 물체 배열, splice를 만들지 않고(캐시 · 재사용), 정령이 많을수록 파편 · 빛 상한을 줄인다');
     const card = source('../public/modules/arcade-games.js'), app = source('../public/app.js');
     assert(card.includes('export function runnerCard') && card.includes('data-action="runner-open"') && source('../public/modules/arcade.js').includes('${runnerCard(A, art)}') && app.includes("d.action === 'runner-open'"), '놀이터 미니게임에 펫 대행진 카드가 있다');
     const load = source('./tournament-load.mjs'), stress = source('./stress-check.mjs');
