@@ -620,7 +620,7 @@ function render(g, dt, alpha) {
   for (let i = 0; i < objs.length; i++) drawObj(g, objs[i], fdt, cx, z, alpha);
   drawSmoke(g, fdt); drawDebris(g, fdt); drawFlyers(g, fdt); drawBullets(g, fdt);
   drawRings(g, fdt); drawFlashes(g, fdt); drawGlows(g, fdt); drawSparks(g, fdt);
-  for (let i = g.fx.length - 1; i >= 0; i--) { const f = g.fx[i]; f.draw(fdt); f.t += fdt; if (f.t >= f.dur) g.fx.splice(i, 1); }
+  for (let i = g.fx.length - 1; i >= 0; i--) { const f = g.fx[i]; f.draw(fdt); f.t += fdt; if (f.t >= f.dur) cut(g.fx, i); }
   castleStage(g, fdt);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   if (S.phase === 'run') drawSpeedLines(g, dt);
