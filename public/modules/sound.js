@@ -37,7 +37,10 @@ export const SOUND_GAIN = {
   'ar-hit-1': .45, 'ar-hit-2': .6, 'ar-hit-3': .7, 'ar-hit-4': .8, 'ar-hit-5': .9, 'ar-crit': .8, 'ar-hitstop': .75,
   'ar-ult-rise': .8, 'ar-ult-blast': .95, 'ar-beam': .6, 'ar-quake': .85, 'ar-thunder': .85,
   'ar-flame-breath': .65, 'ar-meteor': .85, 'ar-water-jet': .65, 'ar-bubble-pop': .7, 'ar-vine': .65, 'ar-rock-roll': .7,
-  'ar-tornado': .6, 'ar-ice': .7, 'ar-poison': .6, 'ar-invite': .75, 'ar-ready': .75
+  'ar-tornado': .6, 'ar-ice': .7, 'ar-poison': .6, 'ar-invite': .75, 'ar-ready': .75,
+  // 펫 대행진(크라우드 러너) 16개(docs/sound/runner-synth.mjs, 표 runner-sfx.js). 펫 대행진에 들어갈 때만 받는다.
+  'rn-gate-good': .7, 'rn-gate-bad': .5, 'rn-multiply': .65, 'rn-shoot': .3, 'rn-rock-hit': .45, 'rn-rock-break': .75, 'rn-saw': .55, 'rn-hammer': .7,
+  'rn-rescue': .8, 'rn-card': .65, 'rn-cannon': .5, 'rn-castle-hit': .5, 'rn-castle-fall': .95, 'rn-star': .75, 'rn-fail': .65, 'rn-start': .7
 };
 // 이어지는 소리: key -> 한 주기(초). 파일은 같은 주기가 세 번 이어져 있고, 가운데 주기만 되풀이한다(reel-synth.mjs의 LOOP).
 export const SOUND_LOOP = { 'reel-strain': .8, 'deep-hum': 1.2 };

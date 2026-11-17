@@ -12,3 +12,6 @@ public/app.bundle.css
 
 # V13.144 server/write-sim.mjs가 잠깐 꺼내 두는 옛 코드
 cloudflare-v13143/
+
+# V13.243 테스트 앱 빌드 표시(deploy-test가 배포 때만 만듦)
+public/test-build.json

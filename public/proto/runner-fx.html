@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="robots" content="noindex">
+<title>펫 대행진 연출 시험 1판</title>
+<!-- 측정용 시험 페이지: 앱과 연결하지 않는다(미리 받기 제외 · 메뉴 링크 없음). docs/pet-runner-plan.md 참고. -->
+<style>
+@font-face { font-family: 'Jua'; font-display: block; src: url('/assets/fonts/jua-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+2000-206F, U+2212; }
+@font-face { font-family: 'Jua'; font-display: block; src: url('/assets/fonts/jua-korean.woff2') format('woff2'); unicode-range: U+1100-11FF, U+3000-303F, U+3130-318F, U+AC00-D7AF; }
+:root { --ink: #fff; --panel: rgba(14, 20, 38, .78); --line: rgba(255, 255, 255, .16); --gold: #ffd257; --sky: #7fd8ff; }
+html, body { margin: 0; height: 100%; background: #3f7fe0; color: var(--ink); overflow: hidden; font-family: 'Jua', system-ui, sans-serif; -webkit-user-select: none; user-select: none; touch-action: none; }
+#stage { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#hud { position: fixed; left: 0; right: 0; top: 0; padding: calc(env(safe-area-inset-top) + 10px) 14px 14px; display: flex; flex-direction: column; align-items: center; gap: 6px; pointer-events: none; background: linear-gradient(rgba(10, 30, 70, .45), rgba(10, 30, 70, 0)); }
+#hud .stage { font-size: 16px; text-shadow: 0 2px 0 rgba(0, 0, 0, .35); }
+#prog { width: min(70vw, 300px); height: 10px; border-radius: 6px; background: rgba(10, 20, 50, .45); overflow: hidden; border: 2px solid rgba(255, 255, 255, .6); }
+#prog i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #7fd8ff, #ffd257); transform-origin: 0 50%; transform: scaleX(0); transition: transform 1.8s linear; }
+#dbg { position: fixed; left: 8px; top: calc(env(safe-area-inset-top) + 64px); font: 11px/1.35 ui-monospace, monospace; background: rgba(0, 0, 0, .5); padding: 4px 6px; border-radius: 6px; pointer-events: none; white-space: pre; }
+#note { position: fixed; right: 8px; top: calc(env(safe-area-inset-top) + 64px); font-size: 11px; opacity: .75; text-align: right; pointer-events: none; }
+#bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 8px 10px calc(env(safe-area-inset-bottom) + 10px); display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; background: linear-gradient(rgba(8, 12, 26, 0), rgba(8, 12, 26, .7)); }
+#bar button { font: inherit; font-size: 14px; color: #fff; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; }
+#bar button.on { border-color: var(--gold); color: var(--gold); }
+body.clean #bar, body.clean #dbg, body.clean #note { display: none; }
+/* 카드 3장 중 1장(판 중간 2번): DOM 막 — 캔버스는 그대로 돌고, 규칙 시간만 멈춘다 */
+#cards { position: fixed; left: 0; right: 0; top: 34%; display: flex; justify-content: center; gap: 10px; padding: 0 12px; opacity: 0; transform: translateY(18px) scale(.94); transition: opacity .2s, transform .2s; pointer-events: none; }
+#cards.on { opacity: 1; transform: none; pointer-events: auto; }
+.card { font: inherit; color: #fff; flex: 0 1 112px; height: 150px; border-radius: 16px; border: 3px solid #ffe7a0; background: linear-gradient(160deg, #3a63c9, #1e2f73 70%); box-shadow: 0 6px 0 #0d1640, 0 10px 24px rgba(0, 0, 0, .35); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 8px; }
+.card b { font-size: 19px; line-height: 1.2; text-align: center; font-weight: normal; }
+.card small { font-size: 12px; color: #ffe7a0; padding: 2px 8px; border-radius: 8px; background: rgba(0, 0, 0, .25); }
+.card.picked { transform: translateY(-10px) scale(1.08); border-color: #fff; background: linear-gradient(160deg, #ffcf4a, #d7861a 70%); transition: transform .18s; }
+.veil { position: fixed; inset: 0; pointer-events: none; }
+#vig { background: radial-gradient(ellipse 75% 62% at 50% 50%, rgba(0, 0, 0, 0) 60%, rgba(10, 16, 40, .35) 100%); transition: opacity .4s; opacity: .8; }
+#vig.ult { opacity: 1; background: radial-gradient(ellipse 70% 55% at 50% 48%, rgba(0, 0, 0, 0) 30%, rgba(6, 4, 22, .75) 100%); }
+#tint { opacity: 0; }
+#flash { background: #fffaf0; opacity: 0; }
+#stage.inv { filter: invert(1) hue-rotate(180deg); }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div class="veil" id="tint"></div><div class="veil" id="vig"></div><div class="veil" id="flash"></div>
+<div id="hud"><div class="stage">스테이지 12 · 하늘 다리</div><div id="prog"><i></i></div></div>
+<div id="cards"></div>
+<div id="dbg"></div>
+<div id="note">시험 페이지 · 앱과 연결 안 됨<br>끌어서 조종 · 공성전은 누르고 있기</div>
+<div id="bar">
+  <button data-q="auto">자동</button><button data-q="3">높음</button><button data-q="2">중간</button><button data-q="1">낮음</button><button data-q="0">최저</button>
+  <button data-act="auto">자동 조종</button><button data-act="restart">다시</button><button data-act="pause">멈춤</button><button data-act="mute">소리 끄기</button><button data-act="clean">깨끗한 화면</button>
+</div>
+<!-- ?v=: 브라우저 캐시에 남은 옛 판을 넘긴다(판을 바꾸면 runner-fx.js의 PROTO_V와 같이 올린다) -->
+<script src="/proto/runner-fx.js?v=1.1" type="module"></script>
+</body>
+</html>

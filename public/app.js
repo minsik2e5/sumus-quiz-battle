@@ -27,13 +27,18 @@ import { openReel } from './modules/reel.js';
 import { openHunt } from './modules/hunt.js';
 import { openClaw } from './modules/claw.js';
 import { openTiming } from './modules/timing.js';
+import { openRunner } from './modules/runner.js';
 import { arcadeWords, wordsLabel, openWordsSheet, partyCode } from './modules/arcade-games.js';
 import { openMatchGame } from './modules/match-game.js';
 import { openWallGame } from './modules/wall.js';
 import { openArena } from './modules/arena.js';
 import { openPartyJoin } from './modules/party.js';
 // V13.149 테스트 앱(sumus-voca-test)에서는 화면 위에 '테스트 앱' 표시를 띄워 운영과 헷갈리지 않게 한다.
-if (/^sumus-voca-test\./.test(location.hostname)) document.documentElement.classList.add('is-test-app');
+// V13.243 테스트 앱 띠에 빌드 표시(브랜치 끝부분 · 커밋 7자리): deploy-test가 배포 때만 만드는 /test-build.json(저장소에는 없음, 운영은 부르지 않음)
+if (/^sumus-voca-test\./.test(location.hostname)) {
+  document.documentElement.classList.add('is-test-app');
+  fetch('/test-build.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(b => { if (b?.b) document.documentElement.style.setProperty('--test-build', JSON.stringify(` · ${String(b.b).slice(0, 40)}`)); }).catch(() => {});
+}
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -1042,6 +1047,7 @@ $('#app').addEventListener('click', async event => {
     // V13.162 놀이터 몬스터 사냥.
     if (d.action === 'claw-open') { window.scrollTo(0, 0); return openClaw(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     if (d.action === 'hunt-open') { window.scrollTo(0, 0); return openHunt(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
+    if (d.action === 'runner-open') { window.scrollTo(0, 0); return openRunner(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     if (d.action === 'timing-open') { window.scrollTo(0, 0); return openTiming(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     if (d.action === 'reel-open') { window.scrollTo(0, 0); return openReel(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     // V13.91 나 메뉴판: 어려운 단어 opens 단어 학습 on the ★ words; 알림 scrolls to its settings.
