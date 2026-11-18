@@ -66,6 +66,7 @@ import { runTimingDailyChecks } from './timing-daily-check.mjs';
 import { runYabawiChecks } from './yabawi-check.mjs';
 import { runWallChecks } from './wall-check.mjs';
 import { runArenaChecks } from './arena-check.mjs';
+import { runMockBookCleanChecks } from './mock-book-clean-check.mjs';
 import { runArenaDecoChecks } from './arena-deco-check.mjs';
 import { runArenaScreensChecks } from './arena-screens-check.mjs';
 import { runArenaFxProtoChecks } from './arena-fx-proto-check.mjs';
@@ -1617,6 +1618,7 @@ export async function runReleaseCheck() {
 await runYabawiChecks(assert);
 await runWallChecks(assert);
 await runArenaChecks(assert);
+runMockBookCleanChecks(assert);
 await runArenaDecoChecks(assert);
 await runArenaScreensChecks(assert);
 await runArenaFxProtoChecks(assert);
