@@ -7,6 +7,8 @@ export const CF_FREE_PLAN = {
   rowsWrittenPerDay: 100_000,
   // 하루에 읽을 수 있는 줄 수.
   rowsReadPerDay: 5_000_000,
+  // V13.244 하루 Durable Objects 요청 수(계정 전체: 메인 객체 + 방 객체, 방의 WebSocket 메시지는 20개가 1건).
+  requestsPerDay: 100_000,
   // SQLite 행 하나의 최대 크기(바이트). 이보다 큰 조각은 여러 행으로 나눈다.
   maxRowBytes: 2_000_000
 };

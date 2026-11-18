@@ -41,6 +41,7 @@ export const STATE_BUDGET_KB = {
   signupCodes: 20,
   storageAutoTrim: 10,
   sessionArchive: 2,        // V13.216 옮기기 기록(마지막 차례 · 합계만).
+  autoclean: 5,             // V13.244 자동 정리 내역(server/autoclean.mjs): 최근 20줄 { at, d: [{ k, n, kb, t }] } + 합계(한 줄 약 0.1~0.2KB, 20줄 고정).
   storageTrims: 30,
   battleSettings: 5,
   schools: 30,
