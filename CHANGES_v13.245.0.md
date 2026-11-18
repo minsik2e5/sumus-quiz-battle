@@ -1,4 +1,4 @@
-# v13.240.0 — 펫 아레나: 위에서 내려다보는 경기장 · 카메라 · 한 줄 HUD (캔버스 전환 ②단계)
+# v13.245.0 — 펫 아레나: 위에서 내려다보는 경기장 · 카메라 · 한 줄 HUD (캔버스 전환 ②단계)
 
 계획: `docs/arena-battle-reboot-plan.md` 3장(화면) · 7장 ②행 · 7-1 렉 예산. ①단계(v13.238.0, 캔버스 무대) 위에 시점 · 카메라 · 화면 배치를 바꿨다.
 **그리기만 바꿨다.** 전투 규칙(`arena-rules.js` · `arena-live-rules.js` · `arena-practice-rules.js`) · 서버 판정(`server/arena.mjs`) · 되감기(`arena-live.js`)는 그대로다(`server/arena-stage-check.mjs`가 내용 해시로 확인).

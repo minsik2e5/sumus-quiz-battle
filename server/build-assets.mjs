@@ -144,6 +144,8 @@ const cssSources = [
   "v13235.css",
   "v13236.css",
   "v13239.css",
+  "v13241.css",
+  "v13243.css",
   "v13238.css",
   "v13240.css",
   "v13185.css",
@@ -259,7 +261,7 @@ export const YABAWI_ART = new Set(${JSON.stringify(art)});
 // V13.210 놀이터 입구 그림 게이트(그림 63): 10초 맞추기 · 가위바위보 · 야바위 큰 카드 그림(public/assets/<게임>/entry.webp)이
 // 들어오면 public/modules/entry-art.js에 이름이 적히고 카드가 그 그림으로 바뀐다. 없으면 지금 그림(코드로 그린 그림 · 로봇 · 곽 사장 카드 그림).
 {
-  const games = ['timing', 'rps', 'yabawi', 'wall', 'arena'].filter(g => existsSync(resolve(root, `public/assets/${g}/entry.webp`)));
+  const games = ['timing', 'rps', 'yabawi', 'wall', 'arena', 'runner'].filter(g => existsSync(resolve(root, `public/assets/${g}/entry.webp`)));
   const out = resolve(root, 'public/modules/entry-art.js');
   const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 입구 그림(public/assets/<게임>/entry.webp)이 있는 놀이터 게임.
 export const ENTRY_ART = new Set(${JSON.stringify(games)});
@@ -279,6 +281,22 @@ export const ARENA_ART = new Set(${JSON.stringify(art)});
 `;
   if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
   console.log(`[arena-art] ${art.length} pictures`);
+}
+
+// V13.241 펫 대행진 그림 게이트(그림 74, 주문서 docs/asset-requests/runner/build-74.mjs): public/assets/runner/<이름>.webp가 들어오면 public/modules/runner-art.js의 RUNNER_ART에
+// 이름이 적히고 게임이 같은 자리의 코드 그림 대신 그 그림을 쓴다(없는 그림은 요청하지 않음). RUNNER_SFX: 소리 묶음
+// public/modules/runner-sfx.js가 있을 때만 true(없으면 불러오지 않아 404가 없다).
+{
+  const dir = resolve(root, 'public/assets/runner');
+  const art = existsSync(dir) ? readdirSync(dir).filter(f => f.endsWith('.webp')).map(f => f.slice(0, -5)).sort() : [];
+  const sfx = existsSync(resolve(root, 'public/modules/runner-sfx.js'));
+  const out = resolve(root, 'public/modules/runner-art.js');
+  const text = `// 만든 곳: server/build-assets.mjs (손으로 고치지 않는다). 그림 폴더(public/assets/runner)에 있는 펫 대행진 그림 · 소리 묶음이 있는지.
+export const RUNNER_ART = new Set(${JSON.stringify(art)});
+export const RUNNER_SFX = ${sfx};
+`;
+  if (!existsSync(out) || readFileSync(out, 'utf8') !== text) writeFileSync(out, text);
+  console.log(`[runner-art] ${art.length} pictures · sfx ${sfx}`);
 }
 
 // Service worker: precache list + a hash of every served file. Any change to

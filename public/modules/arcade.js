@@ -11,7 +11,7 @@ import { yabawiCard, yabawiGame, yabawiOn } from './yabawi.js';
 import { YABAWI } from './yabawi-rules.js';
 import { stocksCard, loadMarket, openStock, startStockClock } from './stocks.js';
 import { RPS_BETS } from './rewards.js';
-import { gamesSection, partyRow, reelCard, matchCard, wallCard, arenaCard, huntCard, clawCard, timingCard } from './arcade-games.js';
+import { gamesSection, partyRow, reelCard, matchCard, wallCard, arenaCard, huntCard, clawCard, timingCard, runnerCard } from './arcade-games.js';
 import { ENTRY_ART } from './entry-art.js';
 import { pgMenuOn, pgRead, pgWrite, playgroundHtml } from './playground-menu.js';
 import { YABAWI_ART } from './yabawi-art.js';
@@ -20,6 +20,7 @@ import { FISHING_ART } from './reel.js';
 import { MATCH_ART } from './match-game.js';
 import { HUNT_ART } from './hunt.js';
 import { CLAW_ART } from './claw-art.js';
+import { RUNNER_ART } from './runner-art.js';
 
 // 놀이터: the coin capsule (코인 뽑기, V13.68) and the egg shop, plus the decorations kept from the retired V13.67 capsule machine (모은 꾸미기, under 나). The server
 // decides everything (server/rewards.mjs); this module draws `[data-arcade]` and keeps it up to
@@ -257,10 +258,10 @@ async function playYabawi(A, resume) {
 }
 let pg = pgRead();
 function menuHtml(A) {
-  const balance = Number(A.data.stats?.points_balance || 0), r = rewards(A), art = { fishing: FISHING_ART, match: MATCH_ART, hunt: HUNT_ART, claw: CLAW_ART, entry: ENTRY_ART };
+  const balance = Number(A.data.stats?.points_balance || 0), r = rewards(A), art = { fishing: FISHING_ART, match: MATCH_ART, hunt: HUNT_ART, runner: RUNNER_ART, claw: CLAW_ART, entry: ENTRY_ART };
   return playgroundHtml(A, pg, {
     balance, yabawi: yabawiOn(), art: YABAWI_ART,
-    games: () => `${reelCard(A, art)}${matchCard(A, art)}${wallCard(A, art)}${arenaCard(A, art)}${huntCard(A, art)}${clawCard(A, art)}${timingCard(A, art)}`,
+    games: () => `${reelCard(A, art)}${matchCard(A, art)}${wallCard(A, art)}${arenaCard(A, art)}${huntCard(A, art)}${clawCard(A, art)}${timingCard(A, art)}${runnerCard(A, art)}`,
     party: partyRow,
     rps: () => rpsCard(r.rps, rpsBet, balance),
     yabawiGame: () => yabawiCard(r.yabawi, ybBet, balance),

@@ -27,13 +27,18 @@ import { openReel } from './modules/reel.js';
 import { openHunt } from './modules/hunt.js';
 import { openClaw } from './modules/claw.js';
 import { openTiming } from './modules/timing.js';
+import { openRunner } from './modules/runner.js';
 import { arcadeWords, wordsLabel, openWordsSheet, partyCode } from './modules/arcade-games.js';
 import { openMatchGame } from './modules/match-game.js';
 import { openWallGame } from './modules/wall.js';
 import { openArena } from './modules/arena.js';
 import { openPartyJoin } from './modules/party.js';
 // V13.149 테스트 앱(sumus-voca-test)에서는 화면 위에 '테스트 앱' 표시를 띄워 운영과 헷갈리지 않게 한다.
-if (/^sumus-voca-test\./.test(location.hostname)) document.documentElement.classList.add('is-test-app');
+// V13.243 테스트 앱 띠에 빌드 표시(브랜치 끝부분 · 커밋 7자리): deploy-test가 배포 때만 만드는 /test-build.json(저장소에는 없음, 운영은 부르지 않음)
+if (/^sumus-voca-test\./.test(location.hostname)) {
+  document.documentElement.classList.add('is-test-app');
+  fetch('/test-build.json', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(b => { if (b?.b) document.documentElement.style.setProperty('--test-build', JSON.stringify(` · ${String(b.b).slice(0, 40)}`)); }).catch(() => {});
+}
 const A = { data: null, tab: 'home', screen: null, school: '단원고', ranges: {}, mode: 'write_meaning', practiceRunMode: 'practice', target: 30, sound: false, role: 'student', division: 'high', studyView: 'hub', examKind: null, memorizeFilter: 'all', memorizeShowAll: false, memorizeRange: '', memStars: [], memRevealed: [], middleWordsOpen: false, middleGrammarLesson: 6 };
 const ALL_CLASSES = '__ALL__';
 const examTargetLabel = value => value === ALL_CLASSES ? '학교 전체' : value;
@@ -256,6 +261,8 @@ onTeacherRecordsLoaded(() => {
   if (typing) { const next = $('#results-search'); if (next) { next.focus(); next.setSelectionRange(at, at); } }
 });
 onTeacherGrammarLoaded(() => { if (A.data?.profile?.role === 'teacher' && !A.screen && !document.querySelector('#modal-root .modal') && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) renderKeepScroll(); });
+// V13.243.2 놀이터 교실 게임 방 번호 칸: Enter는 '들어가기'와 같다. 전에는 인라인 onsubmit이 보안 정책(CSP)에 막혀 콘솔 오류가 나고 Enter에 화면이 새로고침됐다.
+document.addEventListener('submit', event => { const form = event.target.closest?.('.ag-join'); if (!form) return; event.preventDefault(); form.querySelector('[data-action="arcade-party"]')?.click(); });
 function render() {
   if (!A.data || A.screen) return;
   // Every student picks a first pet (once) before using the app.
@@ -631,14 +638,19 @@ function maybeMissedYou() {
 async function leaveBattle() { A.screen = null; await petChanged(); window.scrollTo(0, 0); }
 // V13.61: a student on the home screen checks for a friend's challenge every 20 seconds
 // (a small request; the full refresh stays every 2 minutes).
+// V13.244 요청 수 자동 조절: 서버가 내려 주는 배수(poll_scale 1 · 2 · 4)만큼 자동 새로고침을 건너뛴다. 간격을 줄이는 길은 없다(1 미만은 1로 본다).
+const pollTicks = {};
+const pollSlow = key => { const scale = Math.max(1, Math.min(4, Math.floor(Number(A.data?.poll_scale) || 1))); pollTicks[key] = (pollTicks[key] || 0) + 1; return scale > 1 && pollTicks[key] % scale !== 0; };
 let invitePoll;
 function startInvitePolling() {
   clearInterval(invitePoll);
   if (A.data?.profile?.role !== 'student') return;
   invitePoll = setInterval(async () => {
     if (!A.data || A.screen || A.tab !== 'home' || document.visibilityState !== 'visible' || $('#modal-root').children.length) return;
+    if (pollSlow('invite')) return;
     try {
-      const { invite, arena_invite: arena } = await api('/battle/invite');
+      const { invite, arena_invite: arena, poll_scale: scale } = await api('/battle/invite');
+      A.data.poll_scale = scale || 1;
       // V13.230 펫 아레나 친구 대전 초대도 같은 확인에 실려 온다(새 자동 새로고침 없음).
       const arenaBefore = A.data.arena_invite;
       if ((arena?.id || null) !== (arenaBefore?.id || null)) {
@@ -663,7 +675,7 @@ function startTournamentPolling() {
     if (!A.data || A.screen || A.tab !== 'tournaments' || document.visibilityState !== 'visible' || $('#modal-root').children.length) return;
     if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
     const active = (A.data.tournaments || []).filter(t => t.status === 'active');
-    if (!active.length) return;
+    if (!active.length || pollSlow('tournament')) return;
     // V13.71: fetch only the live tournaments and redraw only a bracket that changed (the whole
     // teacher bootstrap and page were reloaded every 8 seconds before).
     try {
@@ -707,7 +719,7 @@ function startPolling() {
     const liveTabs = A.data.profile.role === 'teacher'
       ? ['dashboard', 'exams', 'results', 'tournaments']
       : ['home', 'ranking'];
-    if (!liveTabs.includes(A.tab)) return;
+    if (!liveTabs.includes(A.tab) || pollSlow('refresh')) return;
     try { await refresh(); renderKeepScroll(); }
     catch (err) { if (err.status === 401) { clearInterval(poll); A.data = null; loginView(); } }
   }, interval);
@@ -1042,6 +1054,7 @@ $('#app').addEventListener('click', async event => {
     // V13.162 놀이터 몬스터 사냥.
     if (d.action === 'claw-open') { window.scrollTo(0, 0); return openClaw(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     if (d.action === 'hunt-open') { window.scrollTo(0, 0); return openHunt(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
+    if (d.action === 'runner-open') { window.scrollTo(0, 0); return openRunner(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     if (d.action === 'timing-open') { window.scrollTo(0, 0); return openTiming(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     if (d.action === 'reel-open') { window.scrollTo(0, 0); return openReel(A, async () => { A.screen = null; A.tab = 'arcade'; try { await refresh(); } catch {} render(); window.scrollTo(0, 0); }); }
     // V13.91 나 메뉴판: 어려운 단어 opens 단어 학습 on the ★ words; 알림 scrolls to its settings.

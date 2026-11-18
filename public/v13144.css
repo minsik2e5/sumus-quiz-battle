@@ -3,3 +3,6 @@
 .server-write-warning-v13144 b { font-size: 15px; }
 .server-write-warning-v13144 small { font-size: 13px; opacity: .85; }
 .server-write-warning-v13144.defer { border-color: #f2b1a8; background: #fff0ee; color: #a3321f; }
+/* V13.244 자동 정리 내역 한 줄 */
+.server-autoclean-v13244 { margin: 0 0 16px; padding: 8px 14px; border: 1px solid #d5e6da; border-radius: 12px; background: #f3faf5; color: #2f6b45; }
+.server-autoclean-v13244 small { font-size: 13px; }

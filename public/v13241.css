@@ -1,0 +1,205 @@
+/* V13.241 펫 대행진(크라우드 러너): 지도(로비) · 게임 화면 위 DOM(위 막대 · 카드 3장 · 결과) · 놀이터 카드.
+   색은 :root 토큰 칸에만 쓴다. 게임 장면은 캔버스(public/modules/runner.js)가 그리고, 여기는 그 위 막만 꾸민다.
+   움직임은 transform · opacity만(렉 방지 규칙 8). */
+:root{
+  --rn-sky1:#3f7fe0;--rn-sky2:#8cc3ff;--rn-sky3:#eaf4ff;--rn-cloud:#ffffff;--rn-ink:#14244d;--rn-ink2:#4b5d8a;
+  --rn-gold:#f6c445;--rn-gold2:#ffe9a6;--rn-gold-ink:#2a1d00;--rn-blue:#3b82f6;--rn-red:#ef4444;--rn-boss:#8b5cf6;
+  --rn-panel:#ffffff;--rn-line:#d6e2f7;--rn-dark:#0b1233;--rn-star-off:#c9d3e8;--rn-shade:rgb(10 20 60 / .18);
+  --rn-glass:rgb(14 20 46 / .72);--rn-white-dim:rgb(255 255 255 / .75);--rn-white-line:rgb(255 255 255 / .35);
+  --rn-road1:#eccd96;--rn-road2:#d9b276;--rn-gold-dark:#b8862d;
+}
+/* ---------- 지도 ---------- */
+.rn-app{min-height:100vh;background:linear-gradient(180deg,var(--rn-sky1),var(--rn-sky2) 34%,var(--rn-sky3) 70%);color:var(--rn-ink);padding-bottom:calc(env(safe-area-inset-bottom) + 24px)}
+.rn-top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;color:var(--rn-cloud)}
+.rn-top strong{flex:1;font-family:'Jua',system-ui,sans-serif;font-size:22px;font-weight:400}
+.rn-chip{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:999px;background:var(--rn-glass);color:var(--rn-cloud);font-size:14px;border:1px solid var(--rn-white-line)}
+.rn-chip b{font-weight:700}
+.rn-board{font:inherit;font-size:14px;cursor:pointer}
+.rn-main{max-width:560px;margin:0 auto;padding:0 16px}
+.rn-hero{position:relative;overflow:hidden;border-radius:16px;padding:18px 16px;background:var(--rn-glass);color:var(--rn-cloud);box-shadow:0 10px 26px var(--rn-shade)}
+.rn-hero h1{margin:0 0 6px;font-family:'Jua',system-ui,sans-serif;font-weight:400;font-size:32px}
+.rn-hero p{margin:0 0 12px;font-size:14px;color:var(--rn-white-dim);line-height:1.5}
+.rn-hero-sky i{position:absolute;border-radius:50%;background:var(--rn-cloud);opacity:.12}
+.rn-hero-sky i:nth-child(1){width:140px;height:60px;right:-30px;top:10px}
+.rn-hero-sky i:nth-child(2){width:90px;height:40px;right:60px;top:52px}
+.rn-hero-sky i:nth-child(3){width:180px;height:70px;left:-60px;bottom:-30px}
+.rn-total{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.rn-total>span:first-child{display:flex;align-items:center;gap:6px;font-family:'Jua',system-ui,sans-serif;font-size:22px}
+.rn-total small{font-size:14px;color:var(--rn-white-dim)}
+.rn-box{padding:5px 10px;border-radius:999px;background:var(--rn-gold);color:var(--rn-gold-ink);font-size:13px}
+.rn-stars{display:inline-flex;gap:2px}
+.rn-stars i{width:12px;height:12px;background:var(--rn-star-off);clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.rn-stars i.on{background:var(--rn-gold)}
+.rn-stars.big i{width:18px;height:18px;background:var(--rn-gold)}
+.rn-map{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin:16px 0}
+.rn-node{position:relative;aspect-ratio:1;border:0;border-radius:16px;background:var(--rn-panel);color:var(--rn-ink);font:inherit;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;box-shadow:0 4px 0 var(--rn-line),0 8px 16px var(--rn-shade);cursor:pointer;transition:transform .15s}
+.rn-node b{font-family:'Jua',system-ui,sans-serif;font-size:22px;font-weight:400}
+.rn-node .rn-stars i{width:10px;height:10px}
+.rn-node.boss{background:linear-gradient(160deg,var(--rn-panel),var(--rn-gold2))}
+.rn-node.boss::after{content:'';position:absolute;top:-6px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--rn-boss);box-shadow:0 0 0 2px var(--rn-panel)}
+.rn-node.sel{transform:translateY(-3px) scale(1.06);box-shadow:0 0 0 3px var(--rn-gold),0 8px 16px var(--rn-shade)}
+.rn-node.lock{opacity:.55;cursor:default;box-shadow:none}
+.rn-lock{width:14px;height:14px;border-radius:4px;background:var(--rn-ink2)}
+.rn-go-panel{display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;background:var(--rn-panel);box-shadow:0 8px 20px var(--rn-shade)}
+.rn-go-panel>div{flex:1;display:flex;flex-direction:column;gap:4px}
+.rn-go-panel strong{font-family:'Jua',system-ui,sans-serif;font-weight:400;font-size:22px}
+.rn-go-panel small{font-size:13px;color:var(--rn-ink2);display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.rn-go-panel .rn-go{flex:0 0 auto;width:auto;min-width:120px;margin:0;font-size:20px}
+.rn-go-panel>div{min-width:0}
+.rn-note{margin:12px 2px 0;font-size:13px;color:var(--rn-ink2);line-height:1.5}
+.rn-note.sub{margin-top:4px;font-size:12px}
+/* 반 순위 */
+.rn-board-sheet h2{margin:0 0 4px;font-family:'Jua',system-ui,sans-serif;font-weight:400;font-size:22px}
+.rn-board-sheet p{margin:0 0 12px;font-size:13px;opacity:.75}
+.rn-board-sheet ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.rn-board-sheet ol.mine{margin-top:10px;padding-top:10px;border-top:1px dashed var(--rn-line)}
+.rn-board-sheet li{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:12px;background:var(--rn-sky3)}
+.rn-board-sheet li.me{box-shadow:inset 0 0 0 2px var(--rn-gold)}
+.rn-board-sheet li>b{width:24px;text-align:center;font-family:'Jua',system-ui,sans-serif;font-weight:400}
+.rn-board-sheet li>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rn-board-sheet li em{font-style:normal;display:flex;align-items:center;gap:4px;font-weight:700}
+.rn-board-sheet li small{font-size:12px;opacity:.7}
+.rn-board-sheet li.empty{justify-content:center;opacity:.7}
+.rn-board-sheet .rn-stars i{background:var(--rn-gold)}
+/* ---------- 게임 화면(캔버스 위 막) ---------- */
+/* 넓은 화면(PC · 아이패드 · 가로 폰): 게임은 가운데 세로 칸(최대 9:16 · 폭 520px · 높이 1600px), 양옆은 같은 하늘 그림을 아주 작게 줄였다 늘린(부드러운) 어두운 장식 */
+.rn-back{position:fixed;inset:0;z-index:50;background:linear-gradient(rgb(8 14 34 / .55),rgb(8 14 34 / .55)),var(--rn-back,none) center/cover,var(--rn-sky1)}
+.rn-game{position:fixed;z-index:50;left:50%;top:50%;height:min(100vh,1600px);height:min(100dvh,1600px);width:min(100vw,520px,calc(min(100vh,1600px) * .5625));width:min(100vw,520px,calc(min(100dvh,1600px) * .5625));transform:translate(-50%,-50%);background:var(--rn-sky1);overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none;box-shadow:0 0 40px rgb(0 0 0 / .35)}
+.rn-game canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.rn-veil{position:absolute;inset:0;pointer-events:none;opacity:0}
+.rn-vig{opacity:.8;background:radial-gradient(ellipse 75% 62% at 50% 50%,transparent 60%,rgb(10 16 40 / .35) 100%);transition:opacity .4s}
+.rn-vig.ult{opacity:1;background:radial-gradient(ellipse 70% 55% at 50% 48%,transparent 30%,rgb(6 4 22 / .75) 100%)}
+#rn-flash{background:var(--rn-cloud)}
+.rn-hud{position:absolute;left:0;right:0;top:0;display:flex;align-items:flex-start;gap:10px;padding:calc(env(safe-area-inset-top) + 10px) 12px 14px;background:linear-gradient(rgb(10 30 70 / .45),transparent);color:var(--rn-cloud);pointer-events:none}
+.rn-hud>*{pointer-events:auto}
+.rn-x{width:38px;height:38px;border-radius:12px;border:1px solid var(--rn-white-line);background:var(--rn-glass);color:var(--rn-cloud);display:grid;place-items:center;cursor:pointer}
+.rn-hud-mid{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none}
+.rn-hud-mid b{font-family:'Jua',system-ui,sans-serif;font-weight:400;font-size:17px;text-shadow:0 2px 0 rgb(0 0 0 / .35)}
+.rn-prog{width:min(60vw,280px);height:10px;border-radius:6px;background:rgb(10 20 50 / .45);border:2px solid var(--rn-white-dim);overflow:hidden}
+.rn-prog i{display:block;height:100%;background:linear-gradient(90deg,var(--rn-sky2),var(--rn-gold));transform-origin:0 50%;transform:scaleX(0);transition:transform 1.8s linear}
+.rn-hud-r{min-width:38px;font-size:12px;text-align:right;color:var(--rn-white-dim);pointer-events:none;padding-top:10px}
+.rn-cards{position:absolute;left:0;right:0;top:30%;display:flex;flex-direction:column;align-items:center;gap:10px;padding:0 12px;opacity:0;transform:translateY(18px) scale(.94);transition:opacity .2s,transform .2s;pointer-events:none}
+.rn-cards.on{opacity:1;transform:none;pointer-events:auto}
+.rn-cards-h{margin:0;color:var(--rn-cloud);font-family:'Jua',system-ui,sans-serif;font-size:22px;text-shadow:0 2px 0 rgb(0 0 0 / .45)}
+.rn-card-row{display:flex;justify-content:center;gap:10px;width:100%}
+.rn-card{font:inherit;color:var(--rn-cloud);flex:0 1 112px;height:150px;border-radius:16px;border:3px solid var(--rn-gold2);background:linear-gradient(160deg,var(--rn-blue),var(--rn-dark) 80%);box-shadow:0 6px 0 var(--rn-dark),0 10px 24px rgb(0 0 0 / .35);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:8px;cursor:pointer;transition:transform .18s}
+.rn-card b{font-family:'Jua',system-ui,sans-serif;font-weight:400;font-size:19px;line-height:1.2;text-align:center}
+.rn-card small{font-size:12px;color:var(--rn-gold2);padding:2px 8px;border-radius:8px;background:rgb(0 0 0 / .25)}
+.rn-card.picked{transform:translateY(-10px) scale(1.08);border-color:var(--rn-cloud);background:linear-gradient(160deg,var(--rn-gold),var(--rn-gold-ink) 140%)}
+.rn-result{position:absolute;inset:0;display:grid;place-items:center;padding:16px;background:rgb(6 10 30 / .45)}
+.rn-result[hidden]{display:none}
+.rn-res-card{width:min(100%,360px);padding:22px 18px 18px;border-radius:20px;background:var(--rn-panel);color:var(--rn-ink);text-align:center;box-shadow:0 18px 40px rgb(0 0 0 / .35);animation:rn-pop .35s cubic-bezier(.2,1.4,.4,1) both}
+.rn-res-card h2{margin:0;font-family:'Jua',system-ui,sans-serif;font-weight:400;font-size:32px}
+.rn-res-card.win h2{color:var(--rn-blue)}
+.rn-res-stars{display:flex;justify-content:center;gap:8px;margin:12px 0}
+.rn-res-stars i{width:54px;height:54px;background:var(--rn-star-off);clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+.rn-res-stars i:nth-child(2){transform:translateY(-10px)}
+.rn-res-stars i.on{background:var(--rn-gold);animation:rn-star .45s var(--d) cubic-bezier(.2,1.6,.4,1) both}
+.rn-res-list{list-style:none;margin:0 0 10px;padding:0;display:flex;flex-direction:column;gap:6px}
+.rn-res-list li{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:12px;background:var(--rn-sky3);font-size:15px}
+.rn-res-list li b{display:inline-flex;align-items:center;gap:4px}
+.rn-res-list li.box{background:var(--rn-gold2)}
+.rn-res-note{margin:6px 0;font-size:13px;color:var(--rn-ink2)}
+.rn-res-note.warn{color:var(--rn-red)}
+.rn-res-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+.rn-res-btns .yl-cta{flex:1 1 100%}
+.rn-ghost{flex:1;font:inherit;font-size:15px;padding:10px;border-radius:12px;border:1px solid var(--rn-line);background:var(--rn-panel);color:var(--rn-ink);cursor:pointer}
+@keyframes rn-pop{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
+@keyframes rn-star{from{opacity:0;transform:scale(2.2) rotate(-20deg)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.rn-res-card,.rn-res-stars i.on{animation:none}}
+/* ---------- 놀이터 카드(그림 74가 오기 전 코드 그림) ---------- */
+.ag-rn-bg{background:linear-gradient(180deg,var(--rn-sky1),var(--rn-sky2) 55%,var(--rn-sky3));overflow:hidden}
+.ag-rn-road{position:absolute;left:50%;bottom:-10%;width:70%;height:90%;transform:translateX(-50%) perspective(160px) rotateX(48deg);transform-origin:50% 100%;background:repeating-linear-gradient(180deg,var(--rn-road1) 0 14px,var(--rn-road2) 14px 28px);border-left:6px solid var(--rn-gold);border-right:6px solid var(--rn-gold)}
+.ag-rn-gate{position:absolute;top:30%;width:22%;height:22%;border-radius:8px;display:grid;place-items:center;font-family:'Jua',system-ui,sans-serif;font-style:normal;font-size:20px;color:var(--rn-cloud);border:3px solid var(--rn-white-dim)}
+.ag-rn-gate.g{left:28%;background:rgb(59 130 246 / .7)}
+.ag-rn-gate.b{right:28%;background:rgb(239 68 68 / .7)}
+.ag-rn-gate b{font-weight:400}
+.ag-rn-crowd{position:absolute;left:50%;bottom:8%;width:34%;height:24%;transform:translateX(-50%);border-radius:50%;background:radial-gradient(circle at 30% 40%,var(--rn-sky3) 0 8%,transparent 9%),radial-gradient(circle at 55% 35%,var(--rn-sky3) 0 8%,transparent 9%),radial-gradient(circle at 75% 55%,var(--rn-sky3) 0 8%,transparent 9%),radial-gradient(circle at 40% 70%,var(--rn-sky3) 0 8%,transparent 9%),radial-gradient(ellipse,var(--rn-sky2),var(--rn-blue))}
+.ag-rn-castle{position:absolute;left:50%;top:6%;width:16%;height:20%;transform:translateX(-50%);background:linear-gradient(var(--rn-star-off),var(--rn-ink2));clip-path:polygon(0 25%,15% 25%,15% 10%,30% 10%,30% 25%,42% 25%,42% 0,58% 0,58% 25%,70% 25%,70% 10%,85% 10%,85% 25%,100% 25%,100% 100%,0 100%)}
+/* ---------- v13.241 퀄리티 업: 위쪽 막대 · 반전 섬광 · 결과(아레나 #298 디자인 토큰 --a-*) ---------- */
+.rn-game canvas.inv{filter:invert(1) hue-rotate(180deg)}
+.rn-hud-mid b{font-family:var(--a-num);font-size:var(--a-fs-3)}
+.rn-prog{position:relative;overflow:visible;border-color:var(--rn-white-dim);background:var(--a-glass)}
+.rn-prog i{border-radius:6px;transition:transform .3s linear}
+.rn-prog-castle{position:absolute;right:-12px;top:50%;width:20px;height:20px;transform:translateY(-50%);background:var(--a-gold);clip-path:polygon(0 30%,20% 30%,20% 10%,40% 10%,40% 30%,60% 30%,60% 10%,80% 10%,80% 30%,100% 30%,100% 100%,0 100%);filter:drop-shadow(0 1px 0 var(--a-shade))}
+.rn-prog-castle.boss{background:var(--rn-boss)}
+.rn-hud-r{display:flex;flex-direction:column;align-items:flex-end;gap:4px;padding-top:0;pointer-events:none}
+.rn-hud-r small{font-size:var(--a-fs-1);color:var(--rn-white-dim)}
+.rn-hud-mid{min-width:0}.rn-hud-r{flex:none}   /* 좁은 세로 칸(PC 가로 화면)에서 오른쪽 배지가 잘리지 않게 */
+.rn-count{display:inline-flex;align-items:center;gap:5px;padding:4px 10px 4px 6px;border-radius:var(--a-r-3);background:var(--a-glass);border:1px solid var(--rn-white-line);color:var(--a-ink);font-family:var(--a-num);font-size:var(--a-fs-4);line-height:1;transform-origin:100% 50%}
+.rn-count i{width:20px;height:20px;border-radius:50% 50% 46% 46%;background:radial-gradient(circle at 35% 35%,var(--rn-sky3),var(--rn-sky2) 55%,var(--rn-blue))}
+.rn-count b{font-weight:400;min-width:2ch;text-align:right}
+.rn-count[data-dir=up]{border-color:var(--a-gold);box-shadow:0 0 0 2px var(--a-gold-soft)}
+.rn-count[data-dir=down]{border-color:var(--a-foe);box-shadow:0 0 0 2px var(--a-foe-soft)}
+.rn-cards-h,.rn-card b{font-family:var(--a-num)}
+.rn-res-card{position:relative;z-index:1}
+.rn-res-card h2{font-family:var(--a-num)}
+.rn-res-stars i{position:relative}
+.rn-res-stars i.on{animation:rn-slam .5s var(--d) cubic-bezier(.2,1.7,.35,1) both}
+.rn-near{margin:2px 0 10px;font-family:var(--a-num);font-size:var(--a-fs-4);color:var(--rn-ink2)}
+.rn-near b{font-weight:400;font-size:var(--a-fs-5);color:var(--a-foe)}
+.rn-near.hot{animation:rn-pop .4s .5s cubic-bezier(.2,1.6,.4,1) both}
+.rn-res-list li.coin b em{font-style:normal;min-width:2ch;display:inline-block;text-align:left}
+.rn-res-btns{flex-direction:column;align-items:stretch}
+.rn-big{font-family:var(--a-num);font-size:var(--a-fs-4);height:60px;border:0;border-radius:var(--a-r-2);cursor:pointer;color:var(--a-gold-ink);background:var(--a-gold);box-shadow:0 5px 0 var(--rn-gold-dark),0 10px 20px var(--rn-shade);transition:transform .12s}
+.rn-big.blue{color:var(--a-ink);background:var(--a-me);box-shadow:0 5px 0 var(--rn-dark),0 10px 20px var(--rn-shade)}
+.rn-big:active{transform:translateY(3px)}
+.rn-res-btns .rn-ghost{flex:none}
+.rn-coinrain{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:2}
+.rn-coinrain span{position:absolute;left:var(--x);top:-40px;width:28px;height:28px;animation:rn-coin 1.3s var(--d) cubic-bezier(.4,.1,.6,1) both}
+.rn-coinrain span>*{width:100%;height:100%}
+@keyframes rn-slam{0%{opacity:0;transform:scale(2.8) rotate(-25deg)}55%{opacity:1;transform:scale(.86) rotate(4deg)}75%{transform:scale(1.08)}100%{opacity:1;transform:none}}
+@keyframes rn-coin{0%{opacity:0;transform:translateY(0) rotate(0)}10%{opacity:1}100%{opacity:0;transform:translateY(105vh) rotate(var(--r))}}
+@media (prefers-reduced-motion:reduce){.rn-res-stars i.on,.rn-near.hot{animation:none}.rn-coinrain{display:none}}
+/* 판 시작 전 3 · 2 · 1 · 출발!(DOM은 판 전에 한 번 넣고 CSS로만 움직임, 1.5초) */
+.rn-cd{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.rn-cd b{grid-area:1/1;font-family:var(--a-num);font-weight:400;font-size:96px;color:var(--a-ink);-webkit-text-stroke:6px var(--rn-dark);paint-order:stroke;opacity:0;animation:rn-cd .375s linear both}
+.rn-cd b:nth-child(2){animation-delay:.375s}.rn-cd b:nth-child(3){animation-delay:.75s}
+.rn-cd b.go{font-size:64px;color:var(--a-gold);animation:rn-cd-go .6s 1.125s ease-out both}
+@keyframes rn-cd{0%{opacity:0;transform:scale(1.8)}25%{opacity:1;transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:scale(.8)}}
+@keyframes rn-cd-go{0%{opacity:0;transform:scale(2)}30%{opacity:1;transform:scale(1)}75%{opacity:1}100%{opacity:0;transform:scale(1.15)}}
+@media (prefers-reduced-motion:reduce){.rn-cd b{animation-duration:.01s}}
+/* 그림 74가 들어온 칸: 카드 테두리 · 지도 칸 · 첫 판 상자 · 결과 정령 */
+.rn-card.art{background:var(--rn-card) center/100% 100% no-repeat;border:0;box-shadow:0 8px 18px rgb(0 0 0 / .35);color:var(--rn-ink)}
+.rn-card.art small{color:var(--rn-ink2);background:rgb(255 255 255 / .6)}
+.rn-card.art.picked{background:var(--rn-card) center/100% 100% no-repeat;filter:brightness(1.12)}
+.rn-node.art{background:var(--rn-node) center/100% 100% no-repeat;box-shadow:none;color:var(--rn-ink)}
+.rn-node.art.sel{box-shadow:0 0 0 3px var(--rn-gold)}
+.rn-node.art b{text-shadow:0 1px 0 var(--rn-panel)}
+.rn-box{display:inline-flex;align-items:center;gap:4px}
+.rn-box img{width:22px;height:22px;margin:-4px 0}
+.rn-res-face{display:block;width:84px;height:84px;margin:-58px auto 0;filter:drop-shadow(0 6px 8px rgb(0 0 0 / .25))}
+/* v13.242 펫 대행진 ②: 테마 지도(26~100) · 정령 강화 · 피버 연속 점 · 피버 화면 가장자리 */
+.rn-map-h{grid-column:1/-1;margin:10px 2px -2px;font-family:'Jua',system-ui,sans-serif;font-weight:400;font-size:18px;display:flex;align-items:baseline;gap:6px;color:var(--rn-ink)}
+.rn-map-h small{font-family:system-ui,sans-serif;font-size:12px;opacity:.6}
+.rn-map-h::before{content:'';width:10px;height:10px;border-radius:3px;background:#7fc4ff;transform:rotate(45deg)}
+.rn-map-h.th-desert::before{background:#f0b05a}.rn-map-h.th-ice::before{background:#bfe8ff}.rn-map-h.th-volcano::before{background:#ff6a3a}
+.rn-hero.th-desert{background:linear-gradient(160deg,#c06a26,#e9a456)}.rn-hero.th-ice{background:linear-gradient(160deg,#25588f,#6fb0e0)}.rn-hero.th-volcano{background:linear-gradient(160deg,#2a0e18,#8a2a1a)}
+.rn-hero p b{color:#ffe27a}
+.rn-up-sheet h2{margin:0 0 4px;font-family:'Jua',system-ui,sans-serif;font-weight:400;font-size:22px}
+.rn-up-sheet p{margin:0 0 12px;font-size:13px;line-height:1.5}
+.rn-up-bal{display:inline-flex;align-items:center;gap:4px;font-weight:700;opacity:1}
+.rn-up-sheet ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.rn-up-sheet li{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--rn-sky3)}
+.rn-up-sheet li>div{flex:1;min-width:0;display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center}
+.rn-up-sheet li b{font-family:'Jua',system-ui,sans-serif;font-weight:400;font-size:17px}
+.rn-up-sheet li small{grid-column:1;font-size:12px;opacity:.7}
+.rn-up-sheet li em{grid-row:1;grid-column:2;font-style:normal;font-weight:700;font-size:13px}
+.rn-up-bar{grid-column:1/-1;height:7px;border-radius:4px;background:rgba(0,0,0,.12);overflow:hidden}
+.rn-up-bar i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#7fd8ff,#ffd24a);transform-origin:0 50%;transform:scaleX(var(--p))}
+.rn-up-buy{border:0;border-radius:12px;padding:9px 12px;min-width:76px;font:inherit;font-weight:700;background:var(--rn-gold);color:#4a2c00;display:inline-flex;align-items:center;justify-content:center;gap:4px;box-shadow:0 3px 0 rgba(0,0,0,.18)}
+.rn-up-buy:disabled{opacity:.45;box-shadow:none}
+.rn-streak{display:inline-flex;gap:3px;align-items:center;margin-left:4px}
+.rn-streak i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.28)}
+.rn-streak[data-n="1"] i:nth-child(-n+1),.rn-streak[data-n="2"] i:nth-child(-n+2),.rn-streak[data-n="3"] i{background:#ffd24a;transform:scale(1.2)}
+.rn-streak.hot i{background:#ffb020}
+.rn-game.fever .rn-vig{opacity:1;background:radial-gradient(ellipse at center,transparent 58%,rgba(255,190,40,.42) 100%)}
+.rn-game.fever .rn-count{outline:2px solid #ffd24a}
+.rn-res-list li.fever b{color:#ffb020}
+/* v13.243 놀이터 큰 카드: 아레나처럼 남색 바탕(--a-bg) 위 흰 숫자 → 밝은 바탕에 흰 글씨가 안 보이던 것 고침. 그림 아래는 바탕색으로 흐려짐 */
+.ag-runner{background:var(--a-bg)}
+.ag-runner .ag-big-art::after{background:linear-gradient(180deg,transparent 40%,var(--a-bg) 100%)}
+.ag-runner .ag-stats li{background:var(--a-surface);color:var(--a-ink)}
+.ag-runner .ag-rn-meta li{background:var(--a-surface);color:var(--a-ink);box-shadow:inset 0 0 0 1px var(--a-line)}
+.ag-runner .ag-rn-meta li.hot{background:var(--a-gold);color:var(--a-gold-ink)}
+.ag-runner .ag-stats li{min-width:0}.ag-runner .ag-stats b,.ag-runner .ag-stats small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ag-runner .ag-stats small{font-size:10.5px}

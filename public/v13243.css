@@ -1,0 +1,148 @@
+/* V13.243 펫 대행진 ③단계: 오늘 할 것 · 오늘의 도전 카드 · 주간 반 보스 카드 · 도전 순위 / 보스 창 · 결과 화면 한 줄.
+   아레나 디자인 토큰(--a-*, v13239.css)을 쓴다: 남색 유리판 + 금 하나, 속성 색은 --a-el-*. 움직임은 transform · opacity만(렉 방지),
+   blur · 그림자 번짐 애니메이션 없음. 그림은 보스 한 장(기존 던전 몬스터)뿐. */
+.rnm-today{margin:14px 0 0;padding:12px 14px;border-radius:var(--a-r-2);background:var(--a-glass);color:var(--a-ink);border:1px solid color-mix(in srgb,var(--a-ink) 14%,transparent);box-shadow:0 10px 24px var(--a-shade)}
+.rnm-today h2{margin:0 0 8px;font:400 var(--a-fs-2)/1 var(--a-num);color:var(--a-gold);letter-spacing:.02em}
+.rnm-today ul{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0;padding:0;list-style:none}
+.rnm-today li{display:flex;align-items:center;gap:6px;min-height:40px;padding:6px 8px;border-radius:var(--a-r-1);background:var(--a-fill);font-size:var(--a-fs-1);line-height:1.25;color:var(--a-ink)}
+.rnm-today li i{flex:none;width:16px;height:16px;border-radius:50%;border:2px solid color-mix(in srgb,var(--a-ink) 45%,transparent)}
+.rnm-today li.done{color:var(--a-dim)}
+.rnm-today li.done i{border-color:var(--a-gold);background:var(--a-gold) radial-gradient(circle at 50% 55%,var(--a-gold-ink) 0 2px,transparent 3px)}
+.rnm-today li.hot{background:var(--a-gold-soft);box-shadow:inset 0 0 0 1px var(--a-gold)}
+.rnm-today li.hot i{border-color:var(--a-gold);animation:rnm-pulse 1.4s ease-in-out infinite}
+.rnm-today .coin,.rnm-card .coin{width:14px;height:14px;vertical-align:-2px}
+
+.rnm-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0 0}
+.rnm-card{position:relative;overflow:hidden;display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-height:186px;padding:12px;border:0;border-radius:var(--a-r-2);text-align:left;color:var(--a-ink);
+  background:linear-gradient(160deg,color-mix(in srgb,var(--rnm-c,var(--a-gold)) 40%,var(--a-surface)) 0%,var(--a-bg) 78%);box-shadow:0 12px 26px var(--a-shade),inset 0 0 0 1px color-mix(in srgb,var(--rnm-c,var(--a-gold)) 45%,transparent);
+  cursor:pointer;transition:transform .15s ease;-webkit-tap-highlight-color:transparent}
+.rnm-card:active{transform:scale(.97)}
+.rnm-card::before{content:"";position:absolute;inset:-40% -60% auto auto;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,color-mix(in srgb,var(--rnm-c,var(--a-gold)) 55%,transparent),transparent 68%);opacity:.55;pointer-events:none}
+.rnm-card::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,color-mix(in srgb,var(--a-ink) 22%,transparent),transparent);transform:skewX(-18deg);animation:rnm-shine 4.2s ease-in-out infinite;pointer-events:none}
+.rnm-card>*{position:relative;z-index:1}
+.rnm-tag{padding:3px 8px;border-radius:var(--a-r-3);background:color-mix(in srgb,var(--a-bg) 60%,transparent);font:400 var(--a-fs-1)/1.2 var(--a-num);color:var(--a-gold)}
+.rnm-time{font-size:11px;color:var(--a-dim);margin:-2px 0 2px}
+.rnm-card strong{font:400 var(--a-fs-3)/1.2 var(--a-num);text-shadow:0 2px 0 var(--a-shade)}
+.rnm-el{display:flex;align-items:center;gap:6px;line-height:1.3;font-size:var(--a-fs-1);color:var(--a-dim)}
+.rnm-el b{color:var(--a-ink)}
+.rnm-el>i,.rnm-spec>i{flex:none;width:12px;height:12px;border-radius:50%;background:var(--rnm-c);box-shadow:0 0 0 3px color-mix(in srgb,var(--rnm-c) 30%,transparent)}
+.rnm-best{font-size:var(--a-fs-1);color:var(--a-dim);line-height:1.35}
+.rnm-best b{color:var(--a-ink);font-family:var(--a-num);font-weight:400;font-size:var(--a-fs-2)}
+.rnm-cta{margin-top:auto;padding:7px 12px;border-radius:var(--a-r-3);background:var(--a-gold);color:var(--a-gold-ink);font:400 var(--a-fs-2)/1 var(--a-num);box-shadow:0 3px 0 color-mix(in srgb,var(--a-gold) 55%,var(--a-gold-ink))}
+.rnm-daily{--rnm-c:var(--a-el-star)}
+.el-flame{--rnm-c:var(--a-el-flame)}.el-water{--rnm-c:var(--a-el-water)}.el-ice{--rnm-c:var(--a-el-ice)}.el-leaf{--rnm-c:var(--a-el-leaf)}
+.el-earth{--rnm-c:var(--a-el-earth)}.el-wind{--rnm-c:var(--a-el-wind)}.el-toxic{--rnm-c:var(--a-el-toxic)}.el-star{--rnm-c:var(--a-el-star)}
+.rnm-raid{--rnm-c:var(--rnm-boss,var(--a-foe))}
+.rnm-raid strong{max-width:calc(100% - 58px)}
+.rnm-boss{position:absolute;right:-12px;top:6px;width:84px;height:84px;object-fit:contain;filter:drop-shadow(0 6px 0 var(--a-shade));animation:rnm-bob 2.6s ease-in-out infinite;z-index:1}
+.rnm-raid.down .rnm-boss{opacity:.55;transform:rotate(-12deg);animation:none}
+.rnm-raid .rnm-best,.rnm-raid .rnm-cta,.rnm-raid .rnm-hp{position:relative;z-index:2}
+.rnm-hp{position:relative;display:block;width:100%;height:18px;border-radius:var(--a-r-3);overflow:hidden;background:color-mix(in srgb,var(--a-bg) 75%,transparent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a-ink) 20%,transparent)}
+.rnm-hp i{position:absolute;inset:0;transform-origin:left center;background:linear-gradient(180deg,color-mix(in srgb,var(--a-foe) 70%,var(--a-ink)),var(--a-foe));transition:transform .6s cubic-bezier(.2,.8,.2,1)}
+.rnm-hp i::after{content:"";position:absolute;inset:0 0 0 -14px;background:repeating-linear-gradient(115deg,transparent 0 10px,color-mix(in srgb,var(--a-ink) 16%,transparent) 10px 14px);animation:rnm-stripe 1.2s linear infinite}
+.rnm-hp em{position:relative;display:block;text-align:center;font:400 var(--a-fs-1)/18px var(--a-num);font-style:normal;color:var(--a-ink);text-shadow:0 1px 0 var(--a-shade)}
+.rnm-raid.down .rnm-hp em,.rnm-hp.big em{color:var(--a-ink)}
+.rnm-raid.claim{box-shadow:0 12px 26px var(--a-shade),inset 0 0 0 2px var(--a-gold)}
+.rnm-gift{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:var(--a-r-3);background:var(--a-gold-soft);color:var(--a-gold)!important;animation:rnm-pulse 1.4s ease-in-out infinite}
+
+/* 창: 오늘의 도전 · 반 보스 */
+.rn-board-sheet li .avatar-art{flex:none;width:36px;height:36px}
+.rn-board-sheet li .avatar-art img{width:100%;height:100%;object-fit:contain}
+.rnm-card .rnm-mine b{color:var(--a-gold)}
+.rnm-claim{display:flex;align-items:center;justify-content:center;gap:6px;min-height:52px;border:0;border-radius:var(--a-r-3);background:linear-gradient(180deg,color-mix(in srgb,var(--a-gold) 70%,var(--a-ink)),var(--a-gold));color:var(--a-gold-ink);font:400 var(--a-fs-4)/1 var(--a-num);box-shadow:0 4px 0 color-mix(in srgb,var(--a-gold) 55%,var(--a-gold-ink));animation:rnm-pulse 1.4s ease-in-out infinite;cursor:pointer}
+.rnm-claim .coin{width:22px;height:22px}
+.rnm-sheet h3{margin:14px 0 6px;font:400 var(--a-fs-2)/1.2 var(--a-num)}
+.rnm-spec{display:flex;align-items:center;gap:6px;font-weight:600}
+.rnm-sheet ol li small{margin-left:6px;opacity:.7}
+.rnm-go{width:100%;margin-top:12px}
+.rnm-boss-hero{position:relative;display:grid;place-items:center;height:150px;margin:-4px -4px 6px;border-radius:var(--a-r-2);background:radial-gradient(circle at 50% 62%,color-mix(in srgb,var(--rnm-boss) 55%,transparent),transparent 65%),linear-gradient(180deg,var(--a-surface),var(--a-bg))}
+.rnm-boss-hero img{width:140px;height:140px;object-fit:contain;animation:rnm-bob 2.6s ease-in-out infinite}
+.rnm-raid-sheet.down .rnm-boss-hero img{animation:none;transform:rotate(-14deg) translateY(10px);opacity:.75}
+.rnm-stamp{position:absolute;right:14px;top:14px;padding:6px 14px;border:3px solid var(--a-gold);border-radius:var(--a-r-1);color:var(--a-gold);font:400 var(--a-fs-4)/1 var(--a-num);transform:rotate(-12deg);animation:rnm-stamp .5s cubic-bezier(.2,1.6,.4,1) both}
+.rnm-hp.big{width:100%;height:24px;margin:6px 0 8px}
+.rnm-hp.big em{line-height:24px;font-size:var(--a-fs-2)}
+.rnm-mine{margin:8px 0 0;font-weight:600}
+.rnm-last{margin:8px 0 0;padding:8px 10px;border-radius:var(--a-r-1);background:color-mix(in srgb,var(--a-surface) 10%,transparent);font-size:var(--a-fs-1)}
+
+/* 결과 화면 한 줄 */
+.rnm-res{display:grid;gap:6px;margin:10px 0 4px;padding:0;list-style:none}
+.rnm-res li{display:flex;align-items:baseline;gap:8px;padding:8px 12px;border-radius:12px;background:var(--a-surface);color:var(--a-ink);animation:rnm-in .45s cubic-bezier(.2,1.4,.4,1) .9s both}
+.rnm-res li span{font-size:var(--a-fs-1);color:var(--a-dim)}
+.rnm-res li b{font:400 var(--a-fs-3)/1.1 var(--a-num);color:var(--a-gold)}
+.rnm-res li small{margin-left:auto;font-size:11px;color:var(--a-dim)}
+.rnm-res li.down{background:linear-gradient(90deg,color-mix(in srgb,var(--a-foe) 55%,var(--a-surface)),var(--a-surface));box-shadow:inset 0 0 0 2px var(--a-gold)}
+.rnm-res li.pop b{animation:rnm-pop .45s cubic-bezier(.2,1.6,.4,1) both}
+.rnm-res-daily{animation-delay:1.05s!important}
+
+/* 놀이터 카드 칩 */
+.ag-rn-meta{display:flex;flex-wrap:wrap;gap:5px;margin:0 0 8px;padding:0;list-style:none}
+.ag-rn-meta li{padding:3px 8px;border-radius:999px;background:var(--a-gold-soft);color:var(--a-gold-ink);font-size:var(--a-fs-1);font-weight:700;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--a-gold) 60%,transparent)}
+.ag-rn-meta li.hot{background:var(--a-gold);animation:rnm-pulse 1.4s ease-in-out infinite}
+
+@keyframes rnm-shine{0%,62%{transform:translateX(0) skewX(-18deg)}100%{transform:translateX(420%) skewX(-18deg)}}
+@keyframes rnm-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes rnm-stripe{to{transform:translateX(14px)}}
+@keyframes rnm-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.06)}}
+@keyframes rnm-stamp{0%{transform:rotate(-12deg) scale(2.2);opacity:0}100%{transform:rotate(-12deg) scale(1);opacity:1}}
+@keyframes rnm-pop{0%{transform:scale(1.8);opacity:0}100%{transform:none;opacity:1}}
+@keyframes rnm-in{0%{transform:translateY(10px) scale(.92);opacity:0}100%{transform:none;opacity:1}}
+@media (max-width:370px){.rnm-cards{grid-template-columns:1fr}.rnm-today ul{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.rnm-card::after,.rnm-boss,.rnm-hp i::after,.rnm-gift,.rnm-today li.hot i{animation:none}}
+
+/* 첫 화면 왼쪽 위 나가기 버튼: 흰 바탕에 흰 화살표라 빈 네모로 보이던 것 → 유리판 + 흰 화살표 */
+.rn-top .yb-back{flex:none;width:40px;height:40px;border-radius:var(--a-r-1,12px);background:var(--rn-glass);color:var(--rn-cloud);box-shadow:inset 0 0 0 1px var(--rn-white-line)}
+.rn-top .yb-back .icon{width:22px;height:22px;stroke:currentColor;stroke-width:2.6}
+
+/* V13.243.2 앱 전체 점검에서 나온 분명한 버그만 고친다(디자인 방향은 그대로). 검사: server/app-audit-fix-check.mjs. 묶음 목록 규칙(v13 + 숫자 3개) 때문에 새 파일 대신 여기에 덧붙인다.
+   ① 야차전 → 대결: 범위 이름이 길면("외부 45 · 외부 46") 칩이 카드 밖으로 나가 옆 카드와 겹치던 것. 칩 줄은 카드 너비 안에서 줄을 바꾸고,
+      칩 하나가 카드보다 길면 말줄임표로 줄인다. */
+.yl-rm>button:first-child{min-width:0}
+.yl-chips{max-width:100%;min-width:0;flex-wrap:wrap;justify-content:center}
+.yl-chips i{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+/* ② 야차전 → 몬스터: 몬스터 레벨 카드의 숫자 칸 3개. 결과 화면용 .mh-stats(v13107, 흰 알약 + 남색 숫자)가 같은 이름이라
+      어두운 카드 위 숫자 칸까지 덮어써서 라벨 · 숫자가 안 보이던 것. 카드 안에서는 원래 모양(어두운 유리 칸 + 밝은 글자)으로 되돌린다. */
+.ms-hero .mh-stats{display:flex;gap:6px}
+.ms-hero .mh-stats b{font-size:19px;color:#fff}
+.ms-hero .mh-stats .hard b{color:var(--mh-ember)}
+.ms-hero .mh-stats span{display:block;padding:0;border-radius:0;background:none;font-size:11px;font-weight:700;color:#efe8fa;text-align:center}
+/* ③ 선생님 화면(폰): 머리줄에 버튼이 많으면(대시보드: 새로고침 · 공지 · 코인 선물 · 계정 · 나가기) 학교 이름이 한 글자씩 세로로 꺾이던 것.
+      제목은 줄이지 않고, 버튼 줄이 안 들어가면 아래 줄로 내려간다. 학교 · 반 고르는 띠는 숨은 가로 스크롤 대신 줄을 바꿔서 '미리보기'가 보인다.
+      아래 메뉴 7칸은 "단어 데…" · "뜻 이의…"처럼 잘리지 않게 두 줄까지 쓴다. */
+@media (max-width:760px){
+  .teacher-app.tv2 .tv2-top{flex-wrap:wrap;row-gap:8px}
+  .teacher-app.tv2 .tv2-title{flex:1 0 auto}
+  .teacher-app.tv2 .tv2-title .eyebrow{white-space:nowrap}
+  .teacher-app.tv2 .tv2-top-actions{flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
+  .teacher-app.tv2 .tv2-context{flex-wrap:wrap;overflow-x:visible;row-gap:6px}
+  .teacher-app.tv2 .tv2-tab{justify-content:flex-start}
+  .teacher-app.tv2 .tv2-tab span{white-space:normal;overflow:visible;text-overflow:clip;word-break:keep-all;line-height:1.15;text-align:center}
+}
+/* ④ 펫 도감: 번호 · 종류 · 레벨 글자가 펫 색 그대로라 연한 바탕 위에서 흐리던 것(대비 2:1 안팎). 같은 색에 먹색을 섞어 진하게.
+      아직 못 만난 모습 아래 "알 · Lv.3"도 한 단계 진하게. */
+.pb-no,.pb-type,.pb-lv{color:color-mix(in srgb,var(--pc) 42%,#16221e)}
+.pb-form figcaption{color:#66756f}
+/* ⑤ 홈 랭킹 메달: 금 · 은 · 동 위 흰 숫자가 흐리던 것. 메달 색에 맞는 진한 글자로. */
+.hr-medal.m1{color:#4d3300}
+.hr-medal.m2{color:#27323d}
+.hr-medal.m3{color:#2b1202}
+/* ⑥ 펫 대행진 지도: 아래로 내리면 밝은 하늘 위에서 흰 제목 "펫 대행진"이 안 보이던 것. 글자에 남색 테두리 그림자를 준다. */
+.rn-top strong{text-shadow:0 0 2px var(--rn-ink),0 1px 0 var(--rn-ink),0 0 10px rgba(20,36,77,.55)}
+/* ⑦ 누름 영역: 야차전 도움말 "?"(20px) · "← 학습 / ← 놀이터 / ← 나"(22~26px)는 모양은 그대로 두고 누르는 자리만 44px로 넓힌다. */
+.yl-q::after{content:"";position:absolute;inset:-12px}
+.study-back,.page-back-v1368{position:relative}
+.study-back::after,.page-back-v1368::after{content:"";position:absolute;inset:-11px -8px}
+/* ⑧ 펫 도감: 한정 펫 카드 머리줄("No.xx 이름 … 🎃 가을 이벤트 한정")이 줄을 못 바꿔서 카드가 격자 칸보다 넓어지고 화면이 가로로 밀리던 것
+      (폭 320px 폰 31px · 아이패드 2칸 33px). 카드는 칸 너비를 넘지 않고, 머리줄은 줄을 바꾼다. */
+.pb-grid>.pb-card{min-width:0}
+.pb-card header{flex-wrap:wrap;row-gap:4px}
+/* ⑨ 야차전 → 대결(폭 360px 아래 작은 폰): "가진 코인 … 이기면 +10, 지면 −10 ?" 줄이 한 줄 고정이라 화면이 가로로 27px 밀리던 것. 줄을 바꾼다. */
+@media (max-width:360px){
+  .yl-hint{margin-left:0;white-space:normal;flex-wrap:wrap}
+}
+/* ⑩ 선생님 화면(폰) 단어 데이터 등 넓은 표: 폰에서 카드로 바뀌는 표(학생 관리 · 결과 분석)를 위해 가로 스크롤을 꺼 둔 규칙(v1364)이
+      카드로 안 바뀌는 표까지 막아서 '허용 뜻 · 관리' 칸이 잘려 누를 수 없던 것. 카드형이 아닌 표는 옆으로 밀어 볼 수 있게 한다. */
+@media (max-width:760px){
+  .teacher-app.tv2 .table-scroll:not(:has(.student-ops-table,.tv2-results-table)){overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+/* ⑥-2 펫 대행진 지도 머리줄: 내려가도 제목 뒤가 하늘색이게(맨 위에서는 바탕과 같은 색이라 티가 나지 않는다). */
+.rn-app>.rn-top{background:linear-gradient(180deg,var(--rn-sky1) 60%,transparent)}

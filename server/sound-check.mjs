@@ -12,10 +12,10 @@ export function runSoundChecks(assert) {
   const dir = '../public/assets/sfx/';
   const files = readdirSync(here(dir)).filter(name => name.endsWith('.mp3'));
   const sizes = Object.fromEntries(files.map(name => [name.slice(0, -4), statSync(here(dir + name)).size]));
-  assert(SOUND_KEYS.length === 116 && SOUND_KEYS.every(key => sizes[key] > 0) && files.length === SOUND_KEYS.length, 'V13.116 효과음(V13.130: 던전 전투 23개를 더해 49개, V13.149 짝 맞추기 3개를 더해 52개, V13.164 낚시 13개를 더해 65개, V13.180 10초 맞추기 11개를 더해 76개, V13.190 낚시 손맛 14개를 더해 90개, V13.191 인형뽑기 놓침 3개를 더해 93개, V13.237 펫 아레나 23개를 더해 116개, key마다 public/assets/sfx/<key>.mp3 하나)이 있고 남는 파일이 없다');
+  assert(SOUND_KEYS.length === 132 && SOUND_KEYS.every(key => sizes[key] > 0) && files.length === SOUND_KEYS.length, 'V13.116 효과음(V13.130: 던전 전투 23개를 더해 49개, V13.149 짝 맞추기 3개를 더해 52개, V13.164 낚시 13개를 더해 65개, V13.180 10초 맞추기 11개를 더해 76개, V13.190 낚시 손맛 14개를 더해 90개, V13.191 인형뽑기 놓침 3개를 더해 93개, V13.237 펫 아레나 23개를 더해 116개, 펫 대행진 16개를 더해 132개, key마다 public/assets/sfx/<key>.mp3 하나)이 있고 남는 파일이 없다');
   const mp3 = name => { const b = readFileSync(here(dir + name + '.mp3')); return (b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) || (b[0] === 0xff && (b[1] & 0xe0) === 0xe0); };
   const total = Object.values(sizes).reduce((a, b) => a + b, 0);
-  assert(SOUND_KEYS.every(mp3) && SOUND_KEYS.every(key => sizes[key] <= 200 * 1024) && total <= 2.7 * 1024 * 1024, `V13.116 효과음은 모두 mp3이고 하나에 200KB, 합쳐서 2.2MB 이하다(V13.130: 1.2MB → 2MB, V13.180: 10초 맞추기 120KB를 더해 2.2MB, V13.237: 펫 아레나 약 480KB를 더해 2.7MB, 처음 쓸 때만 받는다) (지금 ${Math.round(total / 1024)}KB)`);
+  assert(SOUND_KEYS.every(mp3) && SOUND_KEYS.every(key => sizes[key] <= 200 * 1024) && total <= 2.7 * 1024 * 1024, `V13.116 효과음은 모두 mp3이고 하나에 200KB, 합쳐서 2.2MB 이하다(V13.130: 1.2MB → 2MB, V13.180: 10초 맞추기 120KB를 더해 2.2MB, V13.237: 펫 아레나 약 480KB를 더해 2.7MB, 펫 대행진 약 90KB는 그 안에서, 처음 쓸 때만 받는다) (지금 ${Math.round(total / 1024)}KB)`);
   assert(SOUND_KEYS.every(key => SOUND_GAIN[key] > 0 && SOUND_GAIN[key] <= 1), 'V13.116 효과음마다 기본 음량(0~1)이 있다');
 
   const sound = read('../public/modules/sound.js');

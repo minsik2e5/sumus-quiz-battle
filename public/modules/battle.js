@@ -720,7 +720,6 @@ function monsterTab() {
   const past = Array.from({ length: shown }, (_, i) => st.stage - 1 - i);
   return `<section class="mh-hero ms-hero ms-region-hero" style="--rg:${cur.region.bg}" aria-label="몬스터 레벨">
       <div class="mh-hero-art" aria-hidden="true">${monsterPic(cur)}</div>
-      <span class="mh-kicker">MONSTER LEVEL</span>
       <span class="ms-region-chip" aria-label="지역 ${esc(cur.region.name)}">${cur.region.icon} ${esc(cur.region.name)}<small>${cur.region.slot + 1}/${cur.region.size}</small></span>
       <h2>몬스터 레벨 <b class="ms-now">${num(st.stage)}</b></h2>
       <p>레벨마다 <b>이지 → 노말 → 하드</b>를 깨면 다음 레벨이 열려요. 레벨이 오를수록 몬스터가 세지고 <b>처음 잡을 때 보상</b>도 커져요.</p>

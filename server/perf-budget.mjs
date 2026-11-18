@@ -34,10 +34,14 @@ export const STATE_BUDGET_KB = {
   clawNews: 30,             // 인형뽑기 반 소식: 개수 상한.
   timingDaily: 30,          // 10초 맞추기 오늘의 챌린지.
   arenaTeams: 120,          // V13.225 펫 아레나 친구 팀: 반마다 최근 20팀 · 전체 600팀 · 30일 지나면 뺀다(한 팀 약 0.12KB). V13.236 팀 주인의 입장 효과 e(기본이면 안 적음, 약 14바이트 더).
+  runnerRaid: 16,           // V13.243 펫 대행진 주간 반 보스: 반 묶음(같은 학교 · 학년대)마다 { w: 주, hp, d: 피해 합계, n: 참여 수, k: 격파 때, b: 보스, p: 지난주 한 줄 }(한 줄 약 0.22KB).
+                            //   판 끝은 d에 숫자 하나 더하기(O(1)). 주가 바뀌면 지난주 한 줄(p)만 남기고, 2주 넘게 안 쓴 묶음은 지우고, 묶음은 60개까지(runner-modes.js RAID.GROUPS_MAX).
+                            //   학생별 진행(별 · 오늘 코인 · 열린 판 · 오늘의 도전 최고 · 이번/지난주 내 피해 · 받은 보상 주)은 프로필 games.runner 안(약 0.35KB, 쌓이는 목록 없음).
   arenaInvites: 20,         // V13.230 펫 아레나 친구 대전 방(방 코드 · 초대): 대기 5분 · 사람이 찬 방 30분 지나면 지움 · 최대 120개(한 줄 약 0.15KB).
   signupCodes: 20,
   storageAutoTrim: 10,
   sessionArchive: 2,        // V13.216 옮기기 기록(마지막 차례 · 합계만).
+  autoclean: 5,             // V13.244 자동 정리 내역(server/autoclean.mjs): 최근 20줄 { at, d: [{ k, n, kb, t }] } + 합계(한 줄 약 0.1~0.2KB, 20줄 고정).
   storageTrims: 30,
   battleSettings: 5,
   schools: 30,

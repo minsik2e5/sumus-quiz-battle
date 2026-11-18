@@ -119,6 +119,22 @@
 | `ar-poison` | 펫 아레나: 독구름 보글 | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-poison`) | 22KB |
 | `ar-invite` | 친구 대전: 초대 받음(딩-동-딩) | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-invite`) | 17KB |
 | `ar-ready` | 친구 대전: 모두 준비 | 우리가 합성(`docs/sound/arena-synth.mjs`의 `ar-ready`) | 21KB |
+| `rn-gate-good` | 펫 대행진: 좋은 문(+): 위로 튀는 네 음 + 반짝 | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-gate-good`) | 7KB |
+| `rn-gate-bad` | 펫 대행진: 나쁜 문(−): 뿅 하고 미끄러져 내려감(무섭지 않게) | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-gate-bad`) | 3KB |
+| `rn-multiply` | 펫 대행진: ×문: 작은 퐁 18개가 와르르 높아지며 불어남 | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-multiply`) | 8KB |
+| `rn-shoot` | 펫 대행진: 정령 연사 "퓻"(무리가 클수록 드물게 · 작게) | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-shoot`) | 1KB |
+| `rn-rock-hit` | 펫 대행진: 바위 · 표적 맞음 딱 | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-rock-hit`) | 1KB |
+| `rn-rock-break` | 펫 대행진: 바위 깨짐 쩍 + 쿵 + 파편 | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-rock-break`) | 7KB |
+| `rn-saw` | 펫 대행진: 톱날 위이잉 | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-saw`) | 4KB |
+| `rn-hammer` | 펫 대행진: 망치 쿵 | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-hammer`) | 3KB |
+| `rn-rescue` | 펫 대행진: 펫 구출 팡파르(금관 + 종) | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-rescue`) | 9KB |
+| `rn-card` | 펫 대행진: 카드 등장 휙 + 딩(고를 때는 높여 냄) | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-card`) | 6KB |
+| `rn-cannon` | 펫 대행진: 공성 대포 둥(연사) | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-cannon`) | 2KB |
+| `rn-castle-hit` | 펫 대행진: 성벽 맞음 퍽 + 부스러기 | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-castle-hit`) | 2KB |
+| `rn-castle-fall` | 펫 대행진: 성 무너짐 쾅-우르르 + 승리 화음 살짝 | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-castle-fall`) | 11KB |
+| `rn-star` | 펫 대행진: 별 띵(1 · 2 · 3번째는 한 음씩 높게) | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-star`) | 7KB |
+| `rn-fail` | 펫 대행진: 아깝게 짐(내려가다 끝음이 올라감) | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-fail`) | 9KB |
+| `rn-start` | 펫 대행진: 출발 카운트 삑 · 삑 · 삑 → 1.5초에 출발! | 우리가 합성(`docs/sound/runner-synth.mjs`의 `rn-start`) | 13KB |
 
 ## 출처와 라이선스
 - **우리가 합성한 소리**: `docs/sound/synth.mjs`로 만든다(종소리 배음 · 마림바 · 쓸어올리는 바람 소리 · 저음 울림 · 반짝이 · 리버브를 겹침). 다시 만들 때: `npm i --no-save @breezystack/lamejs` 후 `node docs/sound/synth.mjs <출력 폴더>` → 원하는 파일을 `public/assets/sfx/<key>.mp3`로 복사. 우리가 만든 것이라 제약이 없다.
