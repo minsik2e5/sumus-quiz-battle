@@ -1,0 +1,31 @@
+/* V13.245 게임 렉 점검: 화면 전체를 매 프레임 다시 칠하던 끝없는 애니메이션을 투명도 · 이동만 바꾸는 방식으로(모습은 그대로).
+   box-shadow · background-position을 움직이면 그 넓이를 프레임마다 다시 칠한다. opacity · transform은 다시 칠하지 않고 합성만 한다. */
+
+/* 벽 통과 피버 테두리: 두 그림자(시작 색 · 끝 색)를 미리 칠해 두고 서로 투명도만 바꾼다 */
+.wl-edge{box-shadow:none}
+.wl-edge::before,.wl-edge::after{content:"";position:absolute;inset:0;pointer-events:none}
+.wl-edge::before{box-shadow:inset 0 0 0 4px #ffd43b,inset 0 0 50px rgba(255,140,0,.7)}
+.wl-edge::after{box-shadow:inset 0 0 0 5px #ff6b6b,inset 0 0 70px rgba(255,80,160,.75);opacity:0}
+.wl-app.fever .wl-edge{animation:none}
+.wl-app.fever .wl-edge::before{animation:wl-fever-a .6s ease-in-out infinite alternate}
+.wl-app.fever .wl-edge::after{animation:wl-fever-b .6s ease-in-out infinite alternate}
+@keyframes wl-fever-a{to{opacity:0}}
+@keyframes wl-fever-b{to{opacity:1}}
+
+/* 가위바위보 긴장 테두리: 옅은 그림자는 그대로 두고, 짙은 그림자를 위에 겹쳐 투명도만 뛴다 */
+.rps-show.tense .rps-vignette{animation:none;box-shadow:inset 0 0 40px rgba(255,40,70,.25)}
+.rps-show.tense .rps-vignette::after{content:"";position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 110px rgba(255,40,70,.6);opacity:0;animation:rps-vig-o .95s ease-in-out infinite}
+.rps-show.final .rps-vignette::after{animation-duration:.7s}
+@keyframes rps-vig-o{0%,100%{opacity:0}18%{opacity:1}}
+
+/* 인형뽑기 반짝이: 배경 위치 대신 무늬 두 장을 통째로 위로 민다(무늬 두 칸 = 220px · 240px씩 → 이음매 없이 되풀이) */
+.cw-glitter{background-image:none;animation:none;overflow:hidden}
+.cw-glitter::before,.cw-glitter::after{content:"";position:absolute;left:0;right:0;top:0;pointer-events:none;will-change:transform}
+.cw-glitter::before{bottom:-220px;background-image:radial-gradient(circle,rgba(255,255,255,.9) 0 1px,transparent 2px);background-size:90px 110px;animation:cw-glit-a 9s linear infinite}
+.cw-glitter::after{bottom:-240px;background-image:radial-gradient(circle,rgba(255,240,250,.8) 0 1px,transparent 2px);background-size:140px 120px;background-position:40px 60px;animation:cw-glit-b 9s linear infinite}
+@keyframes cw-glit-a{to{transform:translate3d(0,-220px,0)}}
+@keyframes cw-glit-b{to{transform:translate3d(0,-240px,0)}}
+
+@media (prefers-reduced-motion:reduce){
+  .wl-app.fever .wl-edge::before,.wl-app.fever .wl-edge::after,.rps-show.tense .rps-vignette::after,.cw-glitter::before,.cw-glitter::after{animation:none!important}
+}
