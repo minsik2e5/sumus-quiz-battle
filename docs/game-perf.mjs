@@ -60,7 +60,7 @@ const PROBE = () => {
 const DRIVERS = {};
 export const driver = (name, d) => { DRIVERS[name] = d; };
 const vis = async (page, sel) => !!(await page.$(sel).then(async el => el && await el.isVisible()).catch(() => false));
-const tapIf = async (page, sel) => { const el = await page.$(sel); if (el && await el.isVisible().catch(() => false)) { await el.click({ timeout: 1500 }).catch(() => {}); return true; } return false; };
+const tapIf = async (page, sel) => { const el = await page.$(sel); if (el && await el.isVisible().catch(() => false)) { await el.click({ timeout: 1500, force: true }).catch(() => {}); return true; } return false; };
 
 await import('./game-perf-drivers.mjs').then(m => m.register(driver, { vis, tapIf, sleep }));
 
@@ -84,6 +84,8 @@ for (let i = 0; i < 6; i++) {
   if (auto) { await auto.click().catch(() => {}); await sleep(1500); continue; }
   await page.keyboard.press('Escape'); await sleep(300);
 }
+await page.evaluate(() => document.querySelector('.pwa-install-close, #pwa-install-close, [class*="pwa-install-close"]')?.click());   // 설치 안내 배너가 카드를 가린다
+await sleep(900);
 const cdp = await ctx.newCDPSession(page);
 await cdp.send('Performance.enable');
 const metrics = async () => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(m => [m.name, m.value]));
