@@ -71,6 +71,8 @@ const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, de
 const page = await ctx.newPage(), errors = [];
 page.on('pageerror', e => errors.push(e.message));
 await page.addInitScript(PROBE);
+// --css '실험 CSS': 스타일을 덮어써서 원인을 찾는다(예: 필터를 끄면 얼마나 빨라지나)
+if (arg('css')) await page.addInitScript(css => addEventListener('DOMContentLoaded', () => { const st = document.createElement('style'); st.textContent = css; document.head.append(st); }), arg('css'));
 if (D.init) await page.addInitScript(D.init);
 await page.goto(BASE + '/');
 await page.fill('input[autocomplete="username"], input[name="username"]', USER).catch(() => {});
