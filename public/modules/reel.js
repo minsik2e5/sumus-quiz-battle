@@ -405,26 +405,35 @@ export function rodSvg(g, L, now = 0) {
   }
   return out.join('');
 }
+// V13.245 같은 값이면 속성을 다시 쓰지 않는다(매 프레임 SVG 다시 그리기를 줄임). 요소가 새로 그려지면 기억도 같이 사라진다.
+function setA(el, name, value) { const m = el.__a ||= {}; if (m[name] === value) return; m[name] = value; el.setAttribute(name, value); }
 function drawRig(target) {
   if (!R.W) return;
   const g = rodGeom(), s = g.s;
-  $('rl-rodv').innerHTML = rodSvg(g, R.look || rodLook(1), reduced() ? 0 : performance.now());
+  // V13.245 렉 방지: 낚싯대 SVG(요소 40~50개)는 모양이 바뀐 프레임에만 다시 쓴다(가만히 있을 때는 같은 문자열이라 파싱 · 배치 · 칠하기를 건너뜀).
+  //   반짝이(전설 낚싯대)는 1/30초 단위로만 바뀌게 한다(2초 주기로 천천히 숨 쉬는 빛이라 눈에는 같다).
+  const L = R.look || rodLook(1), rv = $('rl-rodv'), html = rodSvg(g, L, reduced() ? 0 : L.sparkle ? Math.floor(performance.now() / 33) * 33 : 0);
+  if (rv.__html !== html) { rv.__html = html; rv.innerHTML = html; }
   // 릴: 손잡이 위, 낚싯대 오른쪽 아래에 붙는다.
   const [rx, ry] = g.at(.2), [tx, ty] = g.tan(.2), cx = rx - ty * -30 * s, cy = ry + tx * -30 * s;
   const reel = $('rl-reelg');
-  reel.setAttribute('transform', `translate(${cx.toFixed(1)},${cy.toFixed(1)})`);
-  reel.querySelector('.spool').setAttribute('r', 27 * s);
-  if (R.reelArt) { const img = $('rl-reelimg'), z = 92 * s; img.setAttribute('x', -z / 2); img.setAttribute('y', -z / 2); img.setAttribute('width', z); img.setAttribute('height', z); }
-  reel.querySelector('.cap').setAttribute('r', 9 * s);
-  const arm = reel.querySelector('.arm'); arm.setAttribute('x', 0); const thin = R.reelArt ? .7 : 1; arm.setAttribute('y', -4 * s * thin); arm.setAttribute('width', 34 * s * thin); arm.setAttribute('height', 8 * s * thin); arm.setAttribute('rx', 4 * s * thin);
-  const knob = reel.querySelector('.knob'); knob.setAttribute('cx', 34 * s * thin); knob.setAttribute('r', 8.5 * s * thin);
-  $('rl-crank').setAttribute('transform', `rotate(${(R.rig.crank % 360).toFixed(1)})`);
+  setA(reel, 'transform', `translate(${cx.toFixed(1)},${cy.toFixed(1)})`);
+  // 릴 크기는 화면 크기(s)가 바뀔 때만 다시 쓴다
+  if (reel.__s !== s || reel.__art !== R.reelArt) {
+    reel.__s = s; reel.__art = R.reelArt;
+    reel.querySelector('.spool').setAttribute('r', 27 * s);
+    if (R.reelArt) { const img = $('rl-reelimg'), z = 92 * s; img.setAttribute('x', -z / 2); img.setAttribute('y', -z / 2); img.setAttribute('width', z); img.setAttribute('height', z); }
+    reel.querySelector('.cap').setAttribute('r', 9 * s);
+    const arm = reel.querySelector('.arm'); arm.setAttribute('x', 0); const thin = R.reelArt ? .7 : 1; arm.setAttribute('y', -4 * s * thin); arm.setAttribute('width', 34 * s * thin); arm.setAttribute('height', 8 * s * thin); arm.setAttribute('rx', 4 * s * thin);
+    const knob = reel.querySelector('.knob'); knob.setAttribute('cx', 34 * s * thin); knob.setAttribute('r', 8.5 * s * thin);
+  }
+  setA($('rl-crank'), 'transform', `rotate(${(R.rig.crank % 360).toFixed(1)})`);
   // 줄: 낚싯대 끝 → 찌 또는 물고기. 팽팽할수록 덜 처진다.
   const line = $('rl-line2');
-  if (!target) { line.setAttribute('d', `M${g.tip[0]},${g.tip[1]} l0,${46 * s}`); return; }
+  if (!target) { setA(line, 'd', `M${g.tip[0]},${g.tip[1]} l0,${46 * s}`); return; }
   const [ex, ey] = target.p, sag = target.sag ?? 40;
-  line.setAttribute('d', `M${g.tip[0].toFixed(1)},${g.tip[1].toFixed(1)} Q${((g.tip[0] + ex) / 2).toFixed(1)},${(Math.max(g.tip[1], ey) + sag).toFixed(1)} ${ex.toFixed(1)},${ey.toFixed(1)}`);
-  line.setAttribute('class', `rl-line2 ${target.zone || ''}`);
+  setA(line, 'd', `M${g.tip[0].toFixed(1)},${g.tip[1].toFixed(1)} Q${((g.tip[0] + ex) / 2).toFixed(1)},${(Math.max(g.tip[1], ey) + sag).toFixed(1)} ${ex.toFixed(1)},${ey.toFixed(1)}`);
+  setA(line, 'class', `rl-line2 ${target.zone || ''}`);
 }
 // 찌 위치(px). 날아가는 동안은 포물선.
 function bobPos(t) {
@@ -915,7 +924,7 @@ function fightStep(t, dt) {
   if (m?.kind === 'rhythm') {
     // 지나간 노트는 놓침
     for (const [k, x] of m.notes.entries()) if (!x.done && t - x.at > 190) { x.done = 'miss'; m.combo = 0; f.dist = Math.min(f.max * 1.2, f.dist + .8); f.tension = Math.min(100, f.tension + 5); judge('MISS', 'miss', x.side); document.querySelector(`.rl-note[data-k="${k}"]`)?.classList.add('gone'); sfx('wrong', { gain: .25 }); }
-    const lane = $('rl-notes'), H = lane?.clientHeight || 220;
+    const lane = $('rl-notes'), H = lane ? (lane.__h ||= lane.clientHeight || 220) : 220;   // V13.245 높이는 한 번만 잰다(매 프레임 배치 강제 없음)
     if (lane) for (const el of lane.children) { const at = Number(el.dataset.at), k = 1 - (at - t) / 1100; el.style.transform = `translateY(${(clamp(k, -.1, 1.2) * H).toFixed(1)}px)`; el.style.opacity = k < -.05 ? 0 : 1; }
     if (m.notes.every(x => x.done)) { endMove(m.hit / m.notes.length >= .6); }
   }
@@ -955,7 +964,7 @@ function fightStep(t, dt) {
   R.rig.tDir = clamp((f.x - R.W * .62) / (R.W * .45), -1, 1);
   R.rig.spin = f.holding ? 520 + f.tension * 4 : 0;
   // HUD
-  $('rl-dist-n').textContent = `${Math.max(0, Math.ceil(f.dist))}m`;
+  { const dn = $('rl-dist-n'), m10 = Math.max(0, Math.ceil(f.dist)); if (dn.__m !== m10) { dn.__m = m10; dn.textContent = `${m10}m`; } }   // V13.245 글자는 바뀔 때만
   $('rl-dist-fill').style.transform = `scaleY(${clamp(f.dist / f.max, 0, 1).toFixed(3)})`;
   const ring = $('rl-tring'); ring.style.strokeDashoffset = `${(390 * (1 - f.tension / 100)).toFixed(1)}`;
   $('rl-pov').dataset.zone = zone;
