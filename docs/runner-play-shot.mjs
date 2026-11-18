@@ -87,7 +87,7 @@ await page.screenshot({ path: resolve(OUT, 'runner-card.jpg'), type: 'jpeg', qua
 await page.click('[data-action="runner-open"]');
 await page.waitForTimeout(1500);
 await page.screenshot({ path: resolve(OUT, 'runner-map.jpg'), type: 'jpeg', quality: 70 });
-if (STAGE > 1) await page.click(`[data-rn="pick"][data-s="${STAGE}"]`).catch(() => {});
+if (STAGE > 1 || arg('user')) await page.click(`[data-rn="pick"][data-s="${STAGE}"]`).catch(() => {});   // 다른 계정(ts2 = 99스테이지까지 열림)은 1스테이지도 눌러서 고른다
 let cdp = null;
 if (PERF) { cdp = await ctx.newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: CPU }); }
 // 출발 누름 → 판 시작(그림 받기 · 디코드 · 재료 굽기 · 카운트다운 포함)까지 걸린 시간과 그동안 가장 긴 멈춤도 잰다(새 브라우저라 첫 판 디코드 포함).
