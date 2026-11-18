@@ -103,6 +103,7 @@ for (let r = 0; r < ROUNDS; r++) {
   const m0 = await metrics();
   await page.evaluate(() => { const P = window.__gp; P.frames = []; P.long = []; P.lat = []; P.net = []; P.img = []; P.on = true; });
   if (arg('profile') && r === 0) { await cdp.send('Profiler.enable'); await cdp.send('Profiler.setSamplingInterval', { interval: 200 }); await cdp.send('Profiler.start'); }
+  if (has('trace') && r === 0) await browser.startTracing(page, { categories: ['devtools.timeline', 'disabled-by-default-devtools.timeline', 'disabled-by-default-devtools.timeline.stack'] });
   const tEnd = Date.now() + SECONDS * 1000; let anims = {}, n = 0;
   while (Date.now() < tEnd) {
     if (await page.evaluate(D.done).catch(() => false)) break;
@@ -121,6 +122,17 @@ for (let r = 0; r < ROUNDS; r++) {
   }
   const P = await page.evaluate(() => { const P = window.__gp; P.on = false; return { frames: P.frames, long: P.long, lat: P.lat, net: P.net, img: P.img }; });
   if (arg('profile') && r === 0) { const { profile } = await cdp.send('Profiler.stop'); writeFileSync(arg('profile'), JSON.stringify(profile)); }
+  // --trace: 판 중 브라우저 일(종류별 ms) · 40ms 넘는 작업마다 안에서 한 일 · 스타일/배치를 다시 하게 만든 코드 줄(많은 순)
+  if (has('trace') && r === 0) {
+    const tr = JSON.parse((await browser.stopTracing()).toString()).traceEvents, ev = tr.filter(e => e.ph === 'X' && e.dur), sum = {};
+    for (const e of ev) if (['UpdateLayoutTree', 'Layout', 'Paint', 'PrePaint', 'Layerize', 'Commit', 'FunctionCall', 'FireAnimationFrame', 'TimerFire', 'EventDispatch', 'Decode Image', 'ImageDecodeTask', 'ParseHTML', 'MajorGC', 'MinorGC', 'HitTest', 'RasterTask', 'XHRReadyStateChange'].includes(e.name)) sum[e.name] = (sum[e.name] || 0) + e.dur / 1000;
+    console.error('trace(ms): ' + Object.entries(sum).sort((a, b) => b[1] - a[1]).map(([k, v]) => `${k} ${Math.round(v)}`).join(' · '));
+    const t00 = Math.min(...ev.map(e => e.ts));
+    for (const t of ev.filter(e => e.name === 'RunTask' && e.dur > 40000).slice(0, 25)) { const kids = {}; for (const e of ev) if (e.tid === t.tid && e.pid === t.pid && e.ts >= t.ts && e.ts + e.dur <= t.ts + t.dur && e !== t && e.name !== 'RunTask') kids[e.name] = Math.max(kids[e.name] || 0, e.dur / 1000); console.error(`long ${((t.ts - t00) / 1e6).toFixed(1)}s ${Math.round(t.dur / 1000)}ms: ` + Object.entries(kids).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => `${k} ${Math.round(v)}`).join(' · ')); }
+    const why = {};
+    for (const e of tr) if (e.name === 'ScheduleStyleRecalculation' || e.name === 'InvalidateLayout') { const st = e.args?.data?.stackTrace?.[0]; const k = `${e.name}: ${st ? `${st.functionName || '(anon)'} ${String(st.url).split('/').pop().split('?')[0]}:${st.lineNumber + 1}` : '(js 아님: CSS 애니메이션 등)'}`; why[k] = (why[k] || 0) + 1; }
+    console.error(Object.entries(why).sort((a, b) => b[1] - a[1]).slice(0, 12).map(([k, v]) => `${v} ${k}`).join('\n'));
+  }
   const m1 = await metrics();
   const fr = P.frames.filter(d => d < 5000), secs = fr.reduce((a, b) => a + b, 0) / 1000, mins = secs / 60 || 1, sorted = [...fr].sort((a, b) => a - b), lat = [...P.lat].sort((a, b) => a - b);
   let acc = 0, f5 = 0; for (const d of fr) { acc += d; if (acc > 5000) break; if (d > 50) f5++; }
