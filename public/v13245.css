@@ -26,6 +26,9 @@
 @keyframes cw-glit-a{to{transform:translate3d(0,-220px,0)}}
 @keyframes cw-glit-b{to{transform:translate3d(0,-240px,0)}}
 
+/* 짝 맞추기 시계: 0.01초마다 바뀌는 글자 칸의 크기를 고정해, 글자가 바뀌어도 배치 다시 계산이 이 칸 밖으로 번지지 않게(모습은 같다) */
+#mt-clock b{display:block;width:100%;height:1em;text-align:center;contain:size layout style}
+
 @media (prefers-reduced-motion:reduce){
   .wl-app.fever .wl-edge::before,.wl-app.fever .wl-edge::after,.rps-show.tense .rps-vignette::after,.cw-glitter::before,.cw-glitter::after{animation:none!important}
 }

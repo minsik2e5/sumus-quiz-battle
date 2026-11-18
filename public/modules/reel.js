@@ -407,13 +407,33 @@ export function rodSvg(g, L, now = 0) {
 }
 // V13.245 같은 값이면 속성을 다시 쓰지 않는다(매 프레임 SVG 다시 그리기를 줄임). 요소가 새로 그려지면 기억도 같이 사라진다.
 function setA(el, name, value) { const m = el.__a ||= {}; if (m[name] === value) return; m[name] = value; el.setAttribute(name, value); }
+// V13.245 낚싯대 SVG를 통째로 새로 만들지 않고(매 프레임 파싱 + 요소 40~50개 새로 만들기 + 스타일 처음부터), 있는 요소의 바뀐 속성만 고친다.
+//   요소 종류 · 개수가 달라지면(낚싯대를 바꿨을 때 등) 그때만 통째로 다시 쓴다. 그려지는 모습은 같다.
+const SVG_EL = /<(\w+)((?:\s+[\w-]+="[^"]*")*)\s*\/>/g, SVG_AT = /([\w-]+)="([^"]*)"/g;
+function patchSvg(root, html) {
+  const kids = root.children, sig = root.__sig;
+  let i = 0, ok = !!sig, m, a; SVG_EL.lastIndex = 0;
+  while (ok && (m = SVG_EL.exec(html))) {
+    const el = kids[i], was = sig[i];
+    if (!el || !was || was.tag !== m[1]) { ok = false; break; }
+    let n = 0; SVG_AT.lastIndex = 0;
+    while ((a = SVG_AT.exec(m[2]))) { n++; if (was.at[a[1]] !== a[2]) { if (!(a[1] in was.at)) { ok = false; break; } was.at[a[1]] = a[2]; el.setAttribute(a[1], a[2]); } }
+    if (n !== was.n) ok = false;
+    i++;
+  }
+  if (ok && i === kids.length) return;
+  root.innerHTML = html;
+  const list = []; SVG_EL.lastIndex = 0;
+  while ((m = SVG_EL.exec(html))) { const at = {}; let n = 0; SVG_AT.lastIndex = 0; while ((a = SVG_AT.exec(m[2]))) { at[a[1]] = a[2]; n++; } list.push({ tag: m[1], at, n }); }
+  root.__sig = list.length === root.children.length ? list : null;   // 형식이 예상과 다르면 계속 통째로 쓴다(안전한 쪽)
+}
 function drawRig(target) {
   if (!R.W) return;
   const g = rodGeom(), s = g.s;
   // V13.245 렉 방지: 낚싯대 SVG(요소 40~50개)는 모양이 바뀐 프레임에만 다시 쓴다(가만히 있을 때는 같은 문자열이라 파싱 · 배치 · 칠하기를 건너뜀).
   //   반짝이(전설 낚싯대)는 1/30초 단위로만 바뀌게 한다(2초 주기로 천천히 숨 쉬는 빛이라 눈에는 같다).
   const L = R.look || rodLook(1), rv = $('rl-rodv'), html = rodSvg(g, L, reduced() ? 0 : L.sparkle ? Math.floor(performance.now() / 33) * 33 : 0);
-  if (rv.__html !== html) { rv.__html = html; rv.innerHTML = html; }
+  if (rv.__html !== html) { rv.__html = html; patchSvg(rv, html); }
   // 릴: 손잡이 위, 낚싯대 오른쪽 아래에 붙는다.
   const [rx, ry] = g.at(.2), [tx, ty] = g.tan(.2), cx = rx - ty * -30 * s, cy = ry + tx * -30 * s;
   const reel = $('rl-reelg');
