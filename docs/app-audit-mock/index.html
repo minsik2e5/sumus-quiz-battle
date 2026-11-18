@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SUMUS VOCA 디자인 정리 시안 (2026-11)</title>
+<!-- 정적 시안이다. 앱 코드와 이어져 있지 않고, 그림만 ../../public/assets 에서 가져온다(저장소 폴더에서 바로 열면 보인다).
+     같은 화면 뼈대에 방향(A · B · C)별 토큰만 바꿔 끼운다. 스크린샷: node docs/app-audit-mock/shot.mjs -->
+<style>
+*{box-sizing:border-box;margin:0}
+body{font-family:Pretendard,"Apple SD Gothic Neo","Noto Sans KR",system-ui,sans-serif;background:#d9dedb;padding:24px;color:#16221e}
+h1{font-size:22px;margin-bottom:6px}
+.lead{font-size:14px;color:#44524d;margin-bottom:20px;max-width:900px;line-height:1.6}
+.row{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:36px;align-items:flex-start}
+.col>h2{font-size:15px;margin-bottom:8px}
+.col>h2 small{font-weight:500;color:#44524d}
+.col>p{width:390px;font-size:12.5px;color:#44524d;line-height:1.55;margin-top:8px}
+
+/* ---------- 공통 토큰(세 방향이 같은 이름을 쓴다) ---------- */
+.phone{width:390px;height:780px;overflow:hidden;position:relative;border-radius:28px;background:var(--bg);color:var(--ink);box-shadow:0 12px 32px rgba(0,0,0,.18);
+  --fs-1:12px;--fs-2:14px;--fs-3:16px;--fs-4:20px;--fs-5:26px; /* 글자 크기 5단계 */
+  --r-1:10px;--r-2:16px;--r-pill:999px;                         /* 둥근 정도 3가지 */
+  --gap:12px;--pad:16px}
+/* A안: 밝고 차분하게 — 초록 하나 + 회색, 그라디언트 없음, 그림자 한 단계 */
+.dA{--bg:#f5f7f6;--surface:#fff;--line:#e2e8e5;--ink:#16221e;--sub:#57655f;--brand:#0b7a54;--on-brand:#fff;--soft:#e7f4ee;--on-soft:#0a5c40;--coin:#8a5a00;--coin-bg:#fff4d6;--shadow:0 1px 2px rgba(16,34,30,.06);--tile:#f1f5f3}
+/* B안: 게임 톤 — 아레나(#298) 토큰을 놀이터 · 야차전으로 넓힘: 남색 유리판 + 금 하나 */
+.dB{--bg:#0f1830;--surface:#1a2548;--line:#2c3a66;--ink:#f3f6ff;--sub:#aab5d8;--brand:#f6c445;--on-brand:#2a1c00;--soft:#263465;--on-soft:#f6c445;--coin:#f6c445;--coin-bg:#263465;--shadow:none;--tile:#22305c}
+/* C안: 납작 · 글자 중심 — 카드와 3D 그림을 줄이고 줄 목록으로 */
+.dC{--bg:#fff;--surface:#fff;--line:#e6e9e8;--ink:#111a17;--sub:#5a6661;--brand:#0b7a54;--on-brand:#fff;--soft:#eef5f2;--on-soft:#0a5c40;--coin:#111a17;--coin-bg:#f2f4f3;--shadow:none;--tile:transparent;--r-2:0px}
+
+.top{display:flex;align-items:center;gap:8px;padding:14px var(--pad) 6px}
+.top b{font-size:var(--fs-2);letter-spacing:.02em}
+.top .coin{margin-left:auto;display:flex;align-items:center;gap:4px;padding:6px 12px;border-radius:var(--r-pill);background:var(--coin-bg);color:var(--coin);font-size:var(--fs-2);font-weight:800}
+.top .coin img{width:18px;height:18px}
+.main{padding:8px var(--pad) 90px;display:flex;flex-direction:column;gap:var(--gap)}
+h3.page{font-size:var(--fs-5);font-weight:800;letter-spacing:-.02em;margin:6px 0 2px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-2);box-shadow:var(--shadow);padding:14px}
+.dC .card{border-width:0 0 1px;padding:14px 0}
+.sub{color:var(--sub);font-size:var(--fs-1);line-height:1.45}
+.pillc{display:inline-block;padding:3px 9px;border-radius:var(--r-pill);background:var(--soft);color:var(--on-soft);font-size:var(--fs-1);font-weight:700}
+.btn{display:flex;align-items:center;justify-content:center;min-height:48px;border-radius:var(--r-1);background:var(--brand);color:var(--on-brand);font-size:var(--fs-3);font-weight:800;border:0}
+.btn.ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+.nav{position:absolute;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(5,1fr);padding:8px 8px 14px;background:var(--surface);border-top:1px solid var(--line)}
+.nav span{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:var(--fs-1);font-weight:700;color:var(--sub);padding:4px 0;border-radius:var(--r-1)}
+.nav span.on{color:var(--on-soft);background:var(--soft)}
+.nav img{width:26px;height:26px}
+.dC .nav img{display:none}.dC .nav span{padding:12px 0}
+
+/* 놀이터 첫 화면 */
+.today{display:flex;align-items:center;gap:12px}
+.today strong{font-size:var(--fs-3)}
+.hub{display:flex;align-items:center;gap:12px}
+.hub .ico{flex:none;width:56px;height:56px;border-radius:var(--r-1);background:var(--tile);display:grid;place-items:center}
+.hub .ico img{width:48px;height:48px}
+.dC .hub .ico{display:none}
+.hub h4{font-size:var(--fs-4);font-weight:800}
+.hub .go{margin-left:auto;color:var(--sub);font-size:20px}
+.hub .left{margin-top:6px}
+
+/* 야차전 대결 */
+.hero{display:flex;align-items:center;gap:12px}
+.hero img{width:56px;height:56px}
+.hero h4{font-size:var(--fs-3)}
+.seg{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:4px;border-radius:var(--r-1);background:var(--tile);border:1px solid var(--line)}
+.seg span{text-align:center;padding:9px 0;border-radius:8px;font-size:var(--fs-2);font-weight:700;color:var(--sub)}
+.seg span.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.dB .seg span.on{background:var(--brand);color:var(--on-brand)}
+.dC .seg{background:none;border-width:0 0 1px;border-radius:0;padding:0}.dC .seg span.on{border-bottom:3px solid var(--brand);border-radius:0}
+.line{display:flex;align-items:center;gap:10px;font-size:var(--fs-2)}
+.line>b:first-child{flex:none;width:44px;color:var(--sub);font-weight:700}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px;flex:1}
+.opt{min-height:44px;display:grid;place-items:center;border-radius:var(--r-1);border:1px solid var(--line);font-size:var(--fs-2);font-weight:700;background:var(--surface)}
+.opt.on{background:var(--soft);color:var(--on-soft);border-color:var(--on-soft)}
+.range{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.range .opt{display:block;padding:10px;text-align:left;min-width:0}
+.range .opt b{display:block;font-size:var(--fs-2)}
+.range .opt i{display:block;font-style:normal;font-size:var(--fs-1);color:var(--sub);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;flex:1}
+hr{border:0;border-top:1px solid var(--line)}
+
+/* 홈 */
+.pet{display:flex;align-items:center;gap:14px}
+.pet img{width:96px;height:96px}
+.pet h4{font-size:var(--fs-4)}
+.bar{height:8px;border-radius:var(--r-pill);background:var(--tile);overflow:hidden;margin-top:8px;border:1px solid var(--line)}
+.bar i{display:block;height:100%;width:62%;background:var(--brand)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stats div b{display:block;font-size:var(--fs-4)}
+.rank{display:flex;align-items:center;gap:10px;font-size:var(--fs-2)}
+.rank em{font-style:normal;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--soft);color:var(--on-soft);font-size:var(--fs-1);font-weight:800}
+.rank b{margin-left:auto}
+</style>
+</head>
+<body>
+<h1>SUMUS VOCA 디자인 정리 시안</h1>
+<p class="lead">같은 화면 3개(놀이터 첫 화면 · 야차전 대결 · 홈)를 세 방향으로 그렸습니다. 세 방향 모두 <b>글자 크기 5단계 · 둥근 정도 3가지 · 색 이름 13개</b>만 씁니다(지금 앱: 글자 크기 값 189개 · 둥근 정도 값 150개 · 색 2,388가지). 영어 꼬리표는 모두 뺐고, 같은 정보는 한 번만 나옵니다. 자세한 설명은 <code>docs/app-audit-2026-11.md</code> 3부.</p>
+
+<script>
+// 화면 뼈대는 한 번만 쓰고 방향별로 찍어 낸다.
+const A = '../../public/assets';
+const nav = on => `<div class="nav">${[['홈', 'nav-home'], ['학습', 'nav-study'], ['야차전', 'nav-yacha'], ['놀이터', 'nav-arcade'], ['나', 'nav-me']].map(([t, i]) => `<span class="${t === on ? 'on' : ''}"><img src="${A}/ui/${i}.webp" alt="">${t}</span>`).join('')}</div>`;
+const head = `<div class="top"><b>SUMUS VOCA</b><span class="coin"><img src="${A}/ui/coin.webp" alt="">950</span></div>`;
+const hubCard = (ico, title, line, left) => `<div class="card hub"><span class="ico"><img src="${A}/${ico}.webp" alt=""></span><div><h4>${title}</h4><p class="sub">${line}</p>${left ? `<p class="left"><span class="pillc">오늘 ${left}판 남음</span></p>` : ''}</div><span class="go">›</span></div>`;
+const screens = {
+  '놀이터 첫 화면': `${head}<div class="main"><h3 class="page">놀이터</h3>
+    <div class="card today"><div><strong>오늘 남은 판 33판</strong><p class="sub">미니게임 18 · 코인 승부 10 · 상점 5</p></div></div>
+    ${hubCard('yabawi/menu-arcade', '미니게임', '낚시 · 짝 맞추기 · 펫 아레나 · 펫 대행진 외 4개', 18)}
+    ${hubCard('yabawi/menu-tajja', '코인 승부', '가위바위보 · 야바위', 10)}
+    ${hubCard('yabawi/menu-shop', '상점', '코인 뽑기 · 알 상점', 5)}
+    ${hubCard('ui/me-records', '기록', '게임별 최고 기록 · 도감', 0)}
+  </div>${nav('놀이터')}`,
+  '야차전 대결': `${head}<div class="main"><h3 class="page">야차전</h3>
+    <div class="card hero"><img src="${A}/pets/cat-1-happy.webp" alt=""><div><h4>나비와 출전 준비</h4><p class="sub">0승 0패 · 브론즈 리그</p></div></div>
+    <div class="seg"><span class="on">대결</span><span>몬스터</span><span>던전</span><span>기록</span></div>
+    <div class="card" style="display:flex;flex-direction:column;gap:12px">
+      <div class="line"><b>방식</b><div class="two"><span class="opt on">스피드</span><span class="opt">실력</span></div></div>
+      <hr>
+      <div class="line"><b>단어</b><span style="font-weight:700">외부 45 · 외부 46</span><span class="sub" style="margin-left:auto">71단어 ›</span></div>
+      <div class="range"><div class="opt on"><b>각자 내 범위 <span class="pillc">추천</span></b><i>나 외부 45 · 46 / 친구는 친구 번호</i></div><div class="opt"><b>같은 범위로</b><i>둘 다 외부 45 · 46</i></div></div>
+      <hr>
+      <div class="line"><b>판돈</b><div class="three"><span class="opt on">10</span><span class="opt">30</span><span class="opt">50</span></div></div>
+    </div>
+    <div class="btn">친구에게 도전장</div>
+    <div class="two"><div class="btn ghost">방 만들기</div><div class="btn ghost">코드로 참가</div></div>
+  </div>${nav('야차전')}`,
+  '홈': `${head}<div class="main">
+    <div class="card pet"><img src="${A}/pets/cat-1-happy.webp" alt=""><div style="flex:1"><h4>나비 <span class="pillc">Lv.3</span></h4><p class="sub">다음 진화 Lv.10 · 경험치 150 남음</p><div class="bar"><i></i></div></div></div>
+    <div class="card"><strong style="font-size:var(--fs-3)">오늘은 20개만 끝내요</strong><p class="sub" style="margin:4px 0 12px">오답 0 · 복습 0 · 새 단어 20</p><div class="btn">오늘 학습 시작</div></div>
+    <div class="card stats"><div><p class="sub">이번 주 맞힌 단어</p><b>36개</b></div><div><p class="sub">연속 학습</p><b>0일</b></div></div>
+    <div class="card" style="display:flex;flex-direction:column;gap:10px"><div class="line"><strong>이번 주 랭킹 · 고1</strong><span class="sub" style="margin-left:auto">전체 보기 ›</span></div>
+      <div class="rank"><em>1</em>나래<b>360</b></div><div class="rank"><em>2</em>가온<b>240</b></div><div class="rank"><em>3</em>다온<b>180</b></div></div>
+  </div>${nav('홈')}`,
+};
+const names = { dA: ['A안 · 밝고 차분하게', '초록 하나 + 회색. 그라디언트 · 색 꼬리표 없음. 3D 그림은 같은 크기 타일 위에.'], dB: ['B안 · 게임 톤(남색 + 금)', '아레나(#298) 토큰을 놀이터 · 야차전으로 넓힘. 3D 그림이 가장 잘 어울림.'], dC: ['C안 · 납작 · 글자 중심', '카드와 3D 그림을 줄이고 줄 목록으로. 가장 가볍지만 재미가 줄어듦.'] };
+for (const [title, html] of Object.entries(screens)) {
+  document.write(`<div class="row" data-screen="${title}">${Object.entries(names).map(([d, [name, note]]) => `<div class="col"><h2>${title} <small>— ${name}</small></h2><div class="phone ${d}">${html}</div><p>${note}</p></div>`).join('')}</div>`);
+}
+</script>
+</body>
+</html>
