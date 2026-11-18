@@ -92,3 +92,57 @@
 /* 첫 화면 왼쪽 위 나가기 버튼: 흰 바탕에 흰 화살표라 빈 네모로 보이던 것 → 유리판 + 흰 화살표 */
 .rn-top .yb-back{flex:none;width:40px;height:40px;border-radius:var(--a-r-1,12px);background:var(--rn-glass);color:var(--rn-cloud);box-shadow:inset 0 0 0 1px var(--rn-white-line)}
 .rn-top .yb-back .icon{width:22px;height:22px;stroke:currentColor;stroke-width:2.6}
+
+/* V13.243.2 앱 전체 점검에서 나온 분명한 버그만 고친다(디자인 방향은 그대로). 검사: server/app-audit-fix-check.mjs. 묶음 목록 규칙(v13 + 숫자 3개) 때문에 새 파일 대신 여기에 덧붙인다.
+   ① 야차전 → 대결: 범위 이름이 길면("외부 45 · 외부 46") 칩이 카드 밖으로 나가 옆 카드와 겹치던 것. 칩 줄은 카드 너비 안에서 줄을 바꾸고,
+      칩 하나가 카드보다 길면 말줄임표로 줄인다. */
+.yl-rm>button:first-child{min-width:0}
+.yl-chips{max-width:100%;min-width:0;flex-wrap:wrap;justify-content:center}
+.yl-chips i{min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+/* ② 야차전 → 몬스터: 몬스터 레벨 카드의 숫자 칸 3개. 결과 화면용 .mh-stats(v13107, 흰 알약 + 남색 숫자)가 같은 이름이라
+      어두운 카드 위 숫자 칸까지 덮어써서 라벨 · 숫자가 안 보이던 것. 카드 안에서는 원래 모양(어두운 유리 칸 + 밝은 글자)으로 되돌린다. */
+.ms-hero .mh-stats{display:flex;gap:6px}
+.ms-hero .mh-stats b{font-size:19px;color:#fff}
+.ms-hero .mh-stats .hard b{color:var(--mh-ember)}
+.ms-hero .mh-stats span{display:block;padding:0;border-radius:0;background:none;font-size:11px;font-weight:700;color:#efe8fa;text-align:center}
+/* ③ 선생님 화면(폰): 머리줄에 버튼이 많으면(대시보드: 새로고침 · 공지 · 코인 선물 · 계정 · 나가기) 학교 이름이 한 글자씩 세로로 꺾이던 것.
+      제목은 줄이지 않고, 버튼 줄이 안 들어가면 아래 줄로 내려간다. 학교 · 반 고르는 띠는 숨은 가로 스크롤 대신 줄을 바꿔서 '미리보기'가 보인다.
+      아래 메뉴 7칸은 "단어 데…" · "뜻 이의…"처럼 잘리지 않게 두 줄까지 쓴다. */
+@media (max-width:760px){
+  .teacher-app.tv2 .tv2-top{flex-wrap:wrap;row-gap:8px}
+  .teacher-app.tv2 .tv2-title{flex:1 0 auto}
+  .teacher-app.tv2 .tv2-title .eyebrow{white-space:nowrap}
+  .teacher-app.tv2 .tv2-top-actions{flex:0 1 auto;flex-wrap:wrap;justify-content:flex-end;margin-left:auto}
+  .teacher-app.tv2 .tv2-context{flex-wrap:wrap;overflow-x:visible;row-gap:6px}
+  .teacher-app.tv2 .tv2-tab{justify-content:flex-start}
+  .teacher-app.tv2 .tv2-tab span{white-space:normal;overflow:visible;text-overflow:clip;word-break:keep-all;line-height:1.15;text-align:center}
+}
+/* ④ 펫 도감: 번호 · 종류 · 레벨 글자가 펫 색 그대로라 연한 바탕 위에서 흐리던 것(대비 2:1 안팎). 같은 색에 먹색을 섞어 진하게.
+      아직 못 만난 모습 아래 "알 · Lv.3"도 한 단계 진하게. */
+.pb-no,.pb-type,.pb-lv{color:color-mix(in srgb,var(--pc) 42%,#16221e)}
+.pb-form figcaption{color:#66756f}
+/* ⑤ 홈 랭킹 메달: 금 · 은 · 동 위 흰 숫자가 흐리던 것. 메달 색에 맞는 진한 글자로. */
+.hr-medal.m1{color:#4d3300}
+.hr-medal.m2{color:#27323d}
+.hr-medal.m3{color:#2b1202}
+/* ⑥ 펫 대행진 지도: 아래로 내리면 밝은 하늘 위에서 흰 제목 "펫 대행진"이 안 보이던 것. 글자에 남색 테두리 그림자를 준다. */
+.rn-top strong{text-shadow:0 0 2px var(--rn-ink),0 1px 0 var(--rn-ink),0 0 10px rgba(20,36,77,.55)}
+/* ⑦ 누름 영역: 야차전 도움말 "?"(20px) · "← 학습 / ← 놀이터 / ← 나"(22~26px)는 모양은 그대로 두고 누르는 자리만 44px로 넓힌다. */
+.yl-q::after{content:"";position:absolute;inset:-12px}
+.study-back,.page-back-v1368{position:relative}
+.study-back::after,.page-back-v1368::after{content:"";position:absolute;inset:-11px -8px}
+/* ⑧ 펫 도감: 한정 펫 카드 머리줄("No.xx 이름 … 🎃 가을 이벤트 한정")이 줄을 못 바꿔서 카드가 격자 칸보다 넓어지고 화면이 가로로 밀리던 것
+      (폭 320px 폰 31px · 아이패드 2칸 33px). 카드는 칸 너비를 넘지 않고, 머리줄은 줄을 바꾼다. */
+.pb-grid>.pb-card{min-width:0}
+.pb-card header{flex-wrap:wrap;row-gap:4px}
+/* ⑨ 야차전 → 대결(폭 360px 아래 작은 폰): "가진 코인 … 이기면 +10, 지면 −10 ?" 줄이 한 줄 고정이라 화면이 가로로 27px 밀리던 것. 줄을 바꾼다. */
+@media (max-width:360px){
+  .yl-hint{margin-left:0;white-space:normal;flex-wrap:wrap}
+}
+/* ⑩ 선생님 화면(폰) 단어 데이터 등 넓은 표: 폰에서 카드로 바뀌는 표(학생 관리 · 결과 분석)를 위해 가로 스크롤을 꺼 둔 규칙(v1364)이
+      카드로 안 바뀌는 표까지 막아서 '허용 뜻 · 관리' 칸이 잘려 누를 수 없던 것. 카드형이 아닌 표는 옆으로 밀어 볼 수 있게 한다. */
+@media (max-width:760px){
+  .teacher-app.tv2 .table-scroll:not(:has(.student-ops-table,.tv2-results-table)){overflow-x:auto;-webkit-overflow-scrolling:touch}
+}
+/* ⑥-2 펫 대행진 지도 머리줄: 내려가도 제목 뒤가 하늘색이게(맨 위에서는 바탕과 같은 색이라 티가 나지 않는다). */
+.rn-app>.rn-top{background:linear-gradient(180deg,var(--rn-sky1) 60%,transparent)}

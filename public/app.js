@@ -261,6 +261,8 @@ onTeacherRecordsLoaded(() => {
   if (typing) { const next = $('#results-search'); if (next) { next.focus(); next.setSelectionRange(at, at); } }
 });
 onTeacherGrammarLoaded(() => { if (A.data?.profile?.role === 'teacher' && !A.screen && !document.querySelector('#modal-root .modal') && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) renderKeepScroll(); });
+// V13.243.2 놀이터 교실 게임 방 번호 칸: Enter는 '들어가기'와 같다. 전에는 인라인 onsubmit이 보안 정책(CSP)에 막혀 콘솔 오류가 나고 Enter에 화면이 새로고침됐다.
+document.addEventListener('submit', event => { const form = event.target.closest?.('.ag-join'); if (!form) return; event.preventDefault(); form.querySelector('[data-action="arcade-party"]')?.click(); });
 function render() {
   if (!A.data || A.screen) return;
   // Every student picks a first pet (once) before using the app.
