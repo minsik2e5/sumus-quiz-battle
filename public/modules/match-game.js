@@ -304,11 +304,10 @@ function hit(a, b) {
     if (fever) sfx('combo', { gain: .45, rate: 1.1 });
     a.classList.add('gone'); b.classList.add('gone');
   }, crash);
-  // V13.246 렉 방지: 맞힌 순간 한 프레임에 몰리던 일을 둘로 나눈다. 카드가 날아가 부딪히는 것(위)은 바로,
-  //   콤보 글자 · 펫 말풍선 · 달리기 표시는 바로 다음 프레임에(1/60초 뒤라 눈에는 같다). 피버 켜기는 규칙에 닿으므로 그대로 바로 한다.
-  const m = M, feverNow = M.combo === FEVER_AT && !last, cheer = !feverNow && M.combo >= 2 ? [M.fever ? 'happy' : 'cheer', CHEERS[Math.min(M.combo, CHEERS.length - 1)]] : null;
-  if (feverNow) feverOn();
-  requestAnimationFrame(() => { if (M !== m || M.closing) return; comboText(); if (cheer) petSay(cheer[0], cheer[1]); meRun(); ghostGap(split); });
+  comboText();
+  if (M.combo === FEVER_AT && !last) feverOn();
+  else if (M.combo >= 2) petSay(M.fever ? 'happy' : 'cheer', CHEERS[Math.min(M.combo, CHEERS.length - 1)]);
+  meRun(); ghostGap(split);
   if (last) finale(mx, my, split);
   else if (roundEnd) nextRound();
 }

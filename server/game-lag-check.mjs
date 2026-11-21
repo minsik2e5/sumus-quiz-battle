@@ -33,11 +33,6 @@ export async function runGameLagChecks(assert) {
     assert(tick.includes('M.clockEl?.isConnected') && tick.includes('txt !== M.clockTxt') && hud.includes('off !== M.ringOff') && hud.includes('M.ringFill?.isConnected'), '짝 맞추기 tick · hud: 요소를 프레임마다 찾지 않고 값이 바뀔 때만 쓴다');
     assert(/#mt-clock b\{[^}]*contain:size layout style/.test(css), '짝 맞추기 시계 칸: 크기 고정 + contain(글자가 바뀌어도 배치가 칸 밖으로 번지지 않음)');
   }
-  // 2-2) 짝 맞추기: 맞힌 순간의 일을 두 프레임으로 나눈다(콤보 글자 · 펫 말풍선 · 달리기 표시는 다음 프레임), 피버 켜기는 바로
-  {
-    const js = source('../public/modules/match-game.js'), hit = fnBody(js, 'hit');
-    assert(hit && /if \(feverNow\) feverOn\(\);\s*requestAnimationFrame\(\(\) => \{ if \(M !== m \|\| M\.closing\) return; comboText\(\); if \(cheer\) petSay\(cheer\[0\], cheer\[1\]\); meRun\(\); ghostGap\(split\); \}\);/.test(hit), '짝 맞추기 hit: 콤보 글자 · 말풍선 · 달리기 표시는 다음 프레임에, 판이 바뀌었으면 하지 않는다');
-  }
   // 3) 새 CSS가 묶음에 들어 있고, 움직임을 새로 만들지 않는다
   {
     const css = source('../public/v13246.css'), build = source('./build-assets.mjs');
