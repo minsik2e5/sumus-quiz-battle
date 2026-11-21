@@ -179,4 +179,15 @@ export function register(driver, { vis, tapIf, sleep }) {
     act: yachaAct, again: async () => { await sleep(1500); },
     exit: async page => { await tapIf(page, '.mh-result .btn, .mh-result button'); await sleep(500); await page.click('nav.bottom-nav [data-go="home"]', { force: true, timeout: 8000 }).catch(() => {}); }
   });
+  /* V13.246 펫 대행진(5판 연속 메모리 확인용): 출발 → 좌우로 움직이고 카드가 뜨면 고른다 → 결과에서 한 판 더. 나가기는 지도 → 나가기 */
+  driver('runner', {
+    open: open('[data-action="runner-open"]'),
+    start: async page => { if (!(await tapIf(page, '#rn-result:not([hidden]) [data-g="again"]'))) await page.click('[data-rn="go"]', { timeout: 8000 }); },
+    playing: () => !!document.getElementById('rn-cvs') && !!document.getElementById('rn-result')?.hidden,
+    done: () => !!document.querySelector('#rn-result:not([hidden])'),
+    every: 300,
+    act: async (page, n) => { if (await tapIf(page, '#rn-cards.on .rn-card')) return; await page.mouse.move(150 + (n * 37) % 90, 600); },
+    again: async () => { await sleep(1800); },
+    exit: async page => { await tapIf(page, '#rn-result:not([hidden]) [data-g="map"]'); await sleep(1200); await tapIf(page, '[data-rn="exit"]'); }
+  });
 }
