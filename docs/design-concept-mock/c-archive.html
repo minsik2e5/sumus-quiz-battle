@@ -30,7 +30,7 @@
 .C .tabs a.on { color: var(--ink); }
 .C .tabs a.on::before { content: ""; position: absolute; left: 50%; top: 0; width: 9px; height: 9px; margin-left: -4.5px; background: var(--holo); transform: rotate(45deg); box-shadow: 0 0 0 1.5px var(--ink); }
 .C .btn { display: flex; align-items: center; justify-content: center; gap: 10px; height: 58px; border-radius: 14px; background: var(--ink); color: var(--pearl); font-size: 17px; font-weight: 800; text-decoration: none; transition: transform 120ms; }
-.C .btn:active { transform: translateY(2px); }
+.C .btn:active, .C .btn.press { transform: translateY(2px); }
 .C .btn small { font-weight: 600; opacity: .72; font-size: 14px; }
 
 /* 카드 공통 */
@@ -165,6 +165,11 @@
     <div class="h-cta"><a class="btn" href="#">오늘 단어 20장 <small>12일 연속</small></a><p>다 풀면 피닉스 경험치 <b>+200</b></p></div>
     <nav class="tabs"><a class="on">홈</a><a>학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
   </div></figure>
+  <aside class="spec"><div class="no">03</div><h2>홀로 도감</h2><p class="one">펫과 단어를 수집 카드로. 진주빛 바탕, 홀로 빛은 보상에만, 세리프 제목.</p>
+    <h3>색</h3><div class="sws"><i style="background:#eeedf3" data-c="#eeedf3"></i><i style="background:#1c1a27" data-c="#1c1a27"></i><i style="background:#fbfaf7" data-c="#fbfaf7"></i><i style="background:#b8892a" data-c="#b8892a"></i><i style="background:#d9434b" data-c="#d9434b"></i></div>
+    <h3 style="margin-top:24px">제목 글꼴 · 함렛(Hahmlet) 800 OFL</h3><div class="fs" style="font-family:'Hahmlet';font-weight:800;">오늘 20단어</div><div class="fn">본문 Pretendard · 함렛 700 하나 177KB</div>
+    <h3>버튼</h3><div class="bt C" style="background:none;padding:0;position:relative"><a class="btn" href="#">오늘 단어 20장</a></div>
+    <p class="ref">참고: 포켓몬 TCG 포켓 · 마블 스냅 · 토스 "키워봐요"</p></aside>
 
   <figure class="shot"><figcaption>단어 공부 (정답 직후, 카드 뒤집힘)</figcaption>
   <div class="phone C" data-screen="study">
@@ -233,6 +238,6 @@
   </ul></section>
 </div>
 <p class="note">숫자 · 이름은 예시입니다. 펫 등급 이름(전설 · 영웅 · 희귀)은 앱의 실제 등급표에 맞춰 바꿉니다. 그림은 모두 저장소의 것입니다(public/assets).</p>
-<script>if (location.search.includes('still')) document.body.classList.add('still');</script>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo');</script>
 </body>
 </html>

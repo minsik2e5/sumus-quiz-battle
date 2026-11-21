@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 H · 픽셀 아케이드</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+/* ===== H · 픽셀 아케이드 — 점수 칸이 큰 레트로 카드 게임 ===== */
+.H { --void: #141a33; --felt: #1f6f5c; --chalk: #f4f1e8; --red: #ff4d4d; --blue: #3b8cff; --gold: #ffcf4a; background: var(--void); color: var(--chalk); font-family: "Galmuri11", "Pretendard", monospace; image-rendering: pixelated; }
+.H .scan { position: absolute; inset: 0; background: repeating-linear-gradient(0deg, rgba(0,0,0,.18) 0 1px, transparent 1px 3px); pointer-events: none; z-index: 9; }
+.H .box { position: absolute; background: #222a4d; box-shadow: 0 0 0 3px #0a0e1f, inset 0 0 0 3px #3a4479; }
+.H .top { left: 12px; right: 12px; top: 14px; height: 44px; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; font-size: 13px; }
+.H .top b { color: var(--gold); font-weight: 700; }
+.H .stage { left: 12px; right: 12px; top: 72px; height: 300px; background: var(--felt); box-shadow: 0 0 0 3px #0a0e1f, inset 0 0 0 3px #2f9a80; overflow: hidden; }
+.H .stage .pet { position: absolute; left: 50%; bottom: 8px; width: 270px; margin-left: -135px; animation: h-step 600ms steps(4) both; }
+.H .stage .lv { position: absolute; left: 12px; top: 12px; padding: 4px 8px; background: #0a0e1f; font-size: 12px; }
+.H .stage .nm { position: absolute; right: 12px; top: 12px; padding: 4px 8px; background: #0a0e1f; font-size: 14px; font-weight: 700; color: var(--gold); }
+.H .score { left: 12px; right: 12px; top: 388px; height: 96px; display: grid; grid-template-columns: 1fr 34px 1fr; align-items: center; padding: 0 12px; }
+.H .chip { height: 60px; display: grid; place-items: center; font-size: 30px; font-weight: 700; color: #fff; box-shadow: inset 0 -5px 0 rgba(0,0,0,.25); animation: h-pop 300ms steps(3) both; }
+.H .chip small { display: block; font-size: 11px; font-weight: 400; opacity: .9; text-align: center; }
+.H .chip.b { background: var(--blue); } .H .chip.r { background: var(--red); animation-delay: 150ms; }
+.H .x { text-align: center; font-size: 28px; color: var(--gold); }
+.H .menu { left: 12px; right: 12px; top: 500px; height: 132px; padding: 8px 12px; }
+.H .menu a { position: relative; display: flex; justify-content: space-between; padding: 9px 4px 9px 22px; font-size: 15px; border-bottom: 2px dashed #3a4479; }
+.H .menu a:last-child { border-bottom: 0; }
+.H .menu a::before { content: "▶"; position: absolute; left: 2px; color: transparent; }
+.H .menu a.sel::before { color: var(--gold); }
+.H .menu a span { color: var(--gold); }
+.h-go { position: absolute; left: 12px; right: 12px; bottom: 96px; height: 60px; display: grid; place-items: center; background: #ff4d4d; color: #fff; font-family: "Galmuri11", monospace; font-weight: 700; font-size: 20px; text-decoration: none; box-shadow: 0 0 0 3px #0a0e1f, inset 0 -6px 0 #b8262f, inset 0 3px 0 #ff8a8a; transition: transform 60ms steps(1); }
+.h-go:active, .h-go.press { transform: translateY(4px); box-shadow: 0 0 0 3px #0a0e1f, inset 0 -2px 0 #b8262f; }
+.spec .h-go { position: static; }
+.H .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 78px; padding: 0 14px 18px; display: flex; justify-content: space-between; align-items: center; background: #0a0e1f; }
+.H .tabs a { font-size: 13px; color: #8a93c4; }
+.H .tabs a.on { color: var(--gold); }
+.H .tabs a.on::before { content: "▶"; margin-right: 2px; }
+@keyframes h-step { from { transform: translateY(60px); } }
+@keyframes h-pop { from { transform: scale(.5); } }
+</style>
+</head>
+<body class="board">
+<header><h1>시안 H · 픽셀 아케이드</h1><p>레트로 카드 게임처럼 점수를 큰 색 칸("단어 × 콤보")으로 보여 줌. 도트 글꼴, 각진 픽셀 테두리, 브라운관 줄무늬. 움직임도 계단처럼 딱딱 끊김. <a href="index.html">← 시안 목록</a></p></header>
+<div class="phones">
+  <figure class="shot"><figcaption>홈</figcaption>
+  <div class="phone H" data-screen="home">
+    <div class="box top"><span>단원고 1-A</span><span>코인 <b>890</b></span></div>
+    <div class="box stage"><span class="lv">레벨 3 · 진화까지 150</span><span class="nm">티라노 쿵</span><img class="pet" src="../../public/assets/pets/tyranno-3.webp" alt=""></div>
+    <div class="box score"><div class="chip b"><span>90<small>이번 주 단어</small></span></div><div class="x">×</div><div class="chip r"><span>12<small>연속 일</small></span></div></div>
+    <nav class="box menu"><a class="sel">야차전 <span>3명 대기</span></a><a>놀이터 <span>33판</span></a><a>도감 <span>22/94</span></a></nav>
+    <a class="h-go" href="#">오늘 단어 20 시작</a>
+    <nav class="tabs"><a class="on">홈</a><a>학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
+    <div class="scan"></div>
+  </div></figure>
+  <aside class="spec"><div class="no">08</div><h2>픽셀 아케이드</h2><p class="one">도트 글꼴 + 큰 점수 칸 "90 × 12". 각진 픽셀 테두리, 계단식 움직임.</p>
+    <h3>색</h3><div class="sws"><i style="background:#141a33" data-c="#141a33"></i><i style="background:#1f6f5c" data-c="#1f6f5c"></i><i style="background:#3b8cff" data-c="#3b8cff"></i><i style="background:#ff4d4d" data-c="#ff4d4d"></i><i style="background:#ffcf4a" data-c="#ffcf4a"></i></div>
+    <h3 style="margin-top:24px">글꼴 · 갈무리11(Galmuri11) OFL</h3><div class="fs" style="font-family:'Galmuri11'">오늘 20단어</div><div class="fn">제목 · 본문 모두 갈무리 하나 · 보통+굵게 약 600KB(완성형 전체) → 서브셋 필수</div>
+    <h3>버튼</h3><div class="bt"><a class="h-go" href="#">오늘 단어 20 시작</a></div>
+    <p class="ref">참고: 발라트로의 "점수 × 배수" 칸, 레트로 RPG 창</p></aside>
+</div>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo');</script>
+</body>
+</html>

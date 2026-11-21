@@ -40,9 +40,9 @@
 .A .go { position: relative; display: flex; align-items: center; justify-content: space-between; height: 66px; padding: 0 26px; background: var(--red); color: var(--ink); border: 0; transform: skewX(var(--skew)); font-family: "Black Han Sans", sans-serif; font-size: 24px; text-decoration: none; transition: transform var(--t-snap) var(--e-snap); }
 .A .go > * { transform: skewX(12deg); }
 .A .go small { font-family: "Pretendard", sans-serif; font-weight: 800; font-size: 15px; }
-.A .go:active { transform: skewX(var(--skew)) translate(2px, 2px); }
+.A .go:active, .A .go.press { transform: skewX(var(--skew)) translate(2px, 2px); }
 .A .go::before { content: ""; position: absolute; inset: 0; background: #fff; opacity: 0; transition: opacity 80ms; }
-.A .go:active::before { opacity: .5; }
+.A .go:active::before, .A .go.press::before { opacity: .5; }
 
 .A .tag { display: inline-block; padding: 4px 10px; font-size: 12px; font-weight: 800; transform: skewX(var(--skew)); }
 .A .tag > span { display: inline-block; transform: skewX(12deg); }
@@ -187,6 +187,11 @@
     </nav>
     <nav class="tabs"><a class="on">홈</a><a>학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
   </div></figure>
+  <aside class="spec"><div class="no">01</div><h2>스트릿 HUD</h2><p class="one">검정 + 빨강 한 색, −12° 기울어진 굵은 글자. 대전 게임처럼 "지금 할 것 하나"만 크게.</p>
+    <h3>색</h3><div class="sws"><i style="background:#0e0e11" data-c="#0e0e11"></i><i style="background:#1b1b20" data-c="#1b1b20"></i><i style="background:#f2f0ea" data-c="#f2f0ea"></i><i style="background:#ff4655" data-c="#ff4655"></i><i style="background:#f5e663" data-c="#f5e663"></i></div>
+    <h3 style="margin-top:24px">제목 글꼴 · 검은고딕(Black Han Sans) OFL</h3><div class="fs" style="font-family:'Black Han Sans';">오늘 20단어</div><div class="fn">본문 Pretendard · 검은고딕 한글 2,350자 167KB</div>
+    <h3>버튼</h3><div class="bt A" style="background:none;padding:0;position:relative"><a class="go" href="#"><span>오늘 단어 시작</span><small>20개 ▶</small></a></div>
+    <p class="ref">참고: 젠레스 존 제로 · 발로란트 · 포켓몬 챔피언스</p></aside>
 
   <!-- 공부 -->
   <figure class="shot"><figcaption>단어 공부 (정답 직후)</figcaption>
@@ -259,6 +264,6 @@
   </ul></section>
 </div>
 <p class="note">숫자 · 이름(구미호 루나, 12일, 4승 2패 등)은 예시입니다. 그림은 모두 저장소의 것입니다(public/assets).</p>
-<script>if (location.search.includes('still')) document.body.classList.add('still');</script>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo');</script>
 </body>
 </html>

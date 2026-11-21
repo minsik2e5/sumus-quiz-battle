@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 E · 월광 RPG</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+/* ===== E · 월광 RPG — 어두운 남색 + 금빛 가는 선, 서사 RPG 로비 ===== */
+.E { --night: #0b1020; --deep: #151c33; --gold: #d9b56a; --moon: #eef1ff; --teal: #5fe3d0; background: radial-gradient(120% 70% at 50% 28%, #24305a 0%, var(--night) 62%); color: var(--moon); font-family: "Pretendard", sans-serif; }
+.E .moon { position: absolute; left: 50%; top: 116px; width: 300px; height: 300px; margin-left: -150px; border-radius: 50%; border: 1px solid rgba(217,181,106,.5); }
+.E .moon::before { content: ""; position: absolute; inset: 18px; border-radius: 50%; border: 1px dashed rgba(217,181,106,.28); animation: e-turn 1200ms cubic-bezier(.03,.4,.1,1) both; }
+.E .pet { position: absolute; left: 50%; top: 104px; width: 330px; margin-left: -165px; animation: e-rise 700ms cubic-bezier(.03,.4,.1,1) both; }
+.E .top { position: absolute; left: 18px; right: 18px; top: 18px; display: flex; justify-content: space-between; font-size: 13px; color: rgba(238,241,255,.7); }
+.E .top b { color: var(--gold); font-weight: 700; }
+.E .title { position: absolute; left: 0; right: 0; top: 430px; text-align: center; }
+.E .title small { font-size: 12px; letter-spacing: .3em; color: var(--gold); }
+.E .title h1 { margin-top: 4px; font-family: "Song Myung"; font-weight: 400; font-size: 40px; letter-spacing: .02em; }
+.E .title p { margin-top: 2px; font-size: 13px; color: rgba(238,241,255,.66); }
+.E .gauge { position: absolute; left: 60px; right: 60px; top: 528px; height: 6px; background: rgba(238,241,255,.12); }
+.E .gauge i { position: absolute; inset: 0; background: linear-gradient(90deg, var(--gold), #fff2c9); transform-origin: left; transform: scaleX(.6); animation: e-fill 900ms 300ms cubic-bezier(.03,.4,.1,1) both; }
+.E .gauge::before, .E .gauge::after { content: ""; position: absolute; top: -4px; width: 10px; height: 10px; border: 1px solid var(--gold); transform: rotate(45deg); background: var(--night); }
+.E .gauge::before { left: -16px; } .E .gauge::after { right: -16px; }
+.E .side { position: absolute; top: 92px; display: grid; gap: 12px; }
+.E .side.l { left: 14px; } .E .side.r { right: 14px; }
+.E .side a { width: 56px; height: 56px; display: grid; place-items: center; text-align: center; font-size: 11px; font-weight: 700; color: var(--moon); border: 1px solid rgba(217,181,106,.45); transform: rotate(45deg) scale(.82); background: rgba(21,28,51,.85); }
+.E .side a span { transform: rotate(-45deg); line-height: 1.15; }
+.E .side a b { display: block; font-size: 15px; color: var(--gold); }
+.E .stats { position: absolute; left: 22px; right: 22px; top: 556px; display: flex; justify-content: space-between; text-align: center; }
+.E .stats div { flex: 1; font-size: 12px; color: rgba(238,241,255,.6); }
+.E .stats b { display: block; font-family: "Song Myung"; font-weight: 400; font-size: 24px; color: var(--moon); }
+.E .stats div + div { border-left: 1px solid rgba(217,181,106,.3); }
+.e-go { position: absolute; left: 40px; right: 40px; bottom: 112px; height: 58px; display: grid; place-items: center; color: #0b1020; background: linear-gradient(180deg, #f3dea6, #d9b56a); font-family: "Song Myung"; font-size: 21px; text-decoration: none; clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 14px 100%, 0 50%); transition: transform 140ms cubic-bezier(0,0,.15,1), filter 140ms; }
+.e-go:active, .e-go.press { transform: scale(.96); }
+.spec .e-go { position: static; }
+.E .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 80px; padding: 0 18px 20px; display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(217,181,106,.3); background: rgba(11,16,32,.92); }
+.E .tabs a { font-size: 13px; color: rgba(238,241,255,.5); font-weight: 600; }
+.E .tabs a.on { color: var(--gold); }
+@keyframes e-rise { from { transform: translateY(26px); opacity: 0; } }
+@keyframes e-turn { from { transform: rotate(-90deg); opacity: 0; } }
+@keyframes e-fill { from { transform: scaleX(0); } }
+</style>
+</head>
+<body class="board">
+<header><h1>시안 E · 월광 RPG</h1><p>어두운 남색 밤하늘 + 금빛 가는 선. 펫이 달 앞에 서 있는 서사 RPG 로비. 메뉴는 양옆 마름모로. <a href="index.html">← 시안 목록</a></p></header>
+<div class="phones">
+  <figure class="shot"><figcaption>홈</figcaption>
+  <div class="phone E" data-screen="home">
+    <div class="top"><span>단원고 1-A</span><span><b>890</b> 코인</span></div>
+    <div class="moon"></div>
+    <img class="pet" src="../../public/assets/pets/baekho-3.webp" alt="">
+    <nav class="side l"><a><span>야차전<b>3</b></span></a><a><span>놀이터<b>33</b></span></a></nav>
+    <nav class="side r"><a><span>도감<b>22</b></span></a><a><span>칭호<b>11</b></span></a></nav>
+    <div class="title"><small>전설 · 3단계</small><h1>백호 하랑</h1><p>다음 진화까지 경험치 150</p></div>
+    <div class="gauge"><i></i></div>
+    <div class="stats"><div><b>90</b>이번 주 단어</div><div><b>12</b>연속 일</div><div><b>3위</b>고1</div></div>
+    <a class="e-go" href="#">오늘의 수련 · 20단어</a>
+    <nav class="tabs"><a class="on">홈</a><a>학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+  <aside class="spec"><div class="no">05</div><h2>월광 RPG</h2><p class="one">밤하늘 남색 + 금빛 선. 펫이 달 앞 주인공, 메뉴는 양옆 마름모.</p>
+    <h3>색</h3><div class="sws"><i style="background:#0b1020" data-c="#0b1020"></i><i style="background:#151c33" data-c="#151c33"></i><i style="background:#d9b56a" data-c="#d9b56a"></i><i style="background:#eef1ff" data-c="#eef1ff"></i><i style="background:#5fe3d0" data-c="#5fe3d0"></i></div>
+    <h3 style="margin-top:24px">제목 글꼴 · 송명(Song Myung) OFL</h3><div class="fs" style="font-family:'Song Myung'">오늘 20단어</div><div class="fn">본문 Pretendard · 송명 한글 2,350자 약 400KB → 제목 글자만 서브셋 권장</div>
+    <h3>버튼</h3><div class="bt"><a class="e-go" href="#">오늘의 수련 · 20단어</a></div>
+    <p class="ref">참고: 붕괴: 스타레일 · 원신 메뉴의 금빛 가는 선, 블루 아카이브 로비</p></aside>
+</div>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo');</script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>시안 J · 다꾸 노트</title>
+<link rel="stylesheet" href="mock.css">
+<style>
+/* ===== J · 다꾸 노트 — 다이어리 꾸미기 감성, 줄 노트 + 폴라로이드 ===== */
+.J { --paper: #fbf8f1; --line: #dfe6f2; --ink: #2b2a33; --tape: #ffd9a8; --rose: #ff7a8a; --sky: #8fc3ff; background: var(--paper); background-image: linear-gradient(transparent 31px, var(--line) 31px, var(--line) 32px); background-size: 100% 32px; color: var(--ink); font-family: "Pretendard", sans-serif; }
+.J .hand { font-family: "Gaegu", cursive; font-weight: 700; }
+.J .margin { position: absolute; left: 34px; top: 0; bottom: 0; width: 1.5px; background: rgba(255,122,138,.5); }
+.J .top { position: absolute; left: 48px; right: 18px; top: 18px; display: flex; justify-content: space-between; font-size: 13px; color: #6a6874; }
+.J .date { position: absolute; left: 48px; top: 50px; font-size: 26px; }
+.J .polar { position: absolute; left: 58px; top: 104px; width: 236px; padding: 12px 12px 46px; background: #fff; box-shadow: 0 6px 18px rgba(43,42,51,.15); transform: rotate(-4deg); animation: j-drop 520ms cubic-bezier(.03,.4,.1,1) both; }
+.J .polar .ph { height: 210px; background: #e8f1ff; overflow: hidden; }
+.J .polar img { width: 100%; margin-top: -6px; }
+.J .polar p { position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; font-size: 24px; }
+.J .tape { position: absolute; width: 90px; height: 26px; background: var(--tape); opacity: .9; }
+.J .t1 { left: 128px; top: 92px; transform: rotate(-8deg); }
+.J .t2 { right: 40px; top: 120px; width: 70px; background: var(--sky); transform: rotate(78deg); }
+.J .memo { position: absolute; right: 14px; top: 290px; width: 116px; padding: 12px 10px; background: #fff7a8; transform: rotate(5deg); box-shadow: 0 4px 10px rgba(43,42,51,.12); font-size: 20px; line-height: 1.15; animation: j-stick 380ms 300ms cubic-bezier(.3,1.6,.5,1) both; }
+.J .memo b { color: var(--rose); }
+.J .todo { position: absolute; left: 48px; right: 18px; top: 416px; }
+.J .todo h2 { font-size: 26px; line-height: 32px; }
+.J .todo li { list-style: none; display: flex; align-items: center; gap: 10px; height: 32px; font-size: 21px; }
+.J .todo li i { width: 20px; height: 20px; border: 2px solid var(--ink); border-radius: 4px; flex: none; position: relative; }
+.J .todo li.done i::after { content: "✓"; position: absolute; left: 1px; top: -9px; font-size: 24px; color: var(--rose); font-style: normal; }
+.J .todo li.done span { text-decoration: line-through 2px var(--rose); color: #8d8b96; }
+.J .todo li small { margin-left: auto; font-size: 17px; color: #6a6874; }
+.J .hl { background: linear-gradient(transparent 50%, rgba(143,195,255,.6) 50%); }
+.j-go { position: absolute; left: 48px; right: 18px; bottom: 98px; height: 58px; display: grid; place-items: center; border-radius: 14px; background: #2b2a33; color: #fbf8f1; font-family: "Gaegu", cursive; font-weight: 700; font-size: 25px; text-decoration: none; transform: rotate(-1deg); transition: transform 140ms cubic-bezier(.3,1.6,.5,1); }
+.j-go:active, .j-go.press { transform: rotate(1deg) scale(.96); }
+.spec .j-go { position: static; }
+.J .tabs { position: absolute; left: 0; right: 0; bottom: 0; height: 80px; padding: 0 16px 20px; display: flex; justify-content: space-between; align-items: center; background: var(--paper); border-top: 1.5px dashed #c9c4d6; }
+.J .tabs a { font-family: "Gaegu", cursive; font-weight: 700; font-size: 20px; color: #9a97a6; }
+.J .tabs a.on { color: var(--ink); background: linear-gradient(transparent 55%, var(--tape) 55%); }
+@keyframes j-drop { from { transform: rotate(-12deg) translateY(-30px); opacity: 0; } }
+@keyframes j-stick { from { transform: rotate(-10deg) scale(1.4); opacity: 0; } }
+</style>
+</head>
+<body class="board">
+<header><h1>시안 J · 다꾸 노트</h1><p>다이어리 꾸미기 감성. 줄 노트 위에 펫 폴라로이드, 마스킹 테이프, 포스트잇, 손글씨 할 일 목록. 오늘 할 일을 지워 가는 맛. <a href="index.html">← 시안 목록</a></p></header>
+<div class="phones">
+  <figure class="shot"><figcaption>홈</figcaption>
+  <div class="phone J" data-screen="home">
+    <div class="margin"></div>
+    <div class="top"><span>단원고 1-A</span><span>890 코인</span></div>
+    <div class="date hand">11월 21일 토요일 · 맑음</div>
+    <div class="polar"><div class="ph"><img src="../../public/assets/pets/penguin-3.webp" alt=""></div><p class="hand">우리 펭이, 레벨 3</p></div>
+    <i class="tape t1"></i><i class="tape t2"></i>
+    <div class="memo hand">진화까지<br><b>150</b> 남음!<br>연속 12일 ♡</div>
+    <div class="todo hand"><h2><span class="hl">오늘 할 일</span></h2>
+      <ul>
+        <li class="done"><i></i><span>펭이 밥 주기</span></li>
+        <li><i></i><span>단어 20개</span><small>7/20</small></li>
+        <li><i></i><span>야차전 1판</span><small>3명 대기</small></li>
+        <li><i></i><span>놀이터</span><small>33판 남음</small></li>
+      </ul></div>
+    <a class="j-go" href="#">단어 20개 하러 가기</a>
+    <nav class="tabs"><a class="on">홈</a><a>학습</a><a>야차전</a><a>놀이터</a><a>나</a></nav>
+  </div></figure>
+  <aside class="spec"><div class="no">10</div><h2>다꾸 노트</h2><p class="one">줄 노트 + 폴라로이드 + 테이프 + 포스트잇. 손글씨 할 일 목록을 지워 감.</p>
+    <h3>색</h3><div class="sws"><i style="background:#fbf8f1" data-c="#fbf8f1"></i><i style="background:#2b2a33" data-c="#2b2a33"></i><i style="background:#ff7a8a" data-c="#ff7a8a"></i><i style="background:#8fc3ff" data-c="#8fc3ff"></i><i style="background:#ffd9a8" data-c="#ffd9a8"></i></div>
+    <h3 style="margin-top:24px">제목 글꼴 · 개구(Gaegu) Bold OFL</h3><div class="fs" style="font-family:'Gaegu';font-weight:700">오늘 20단어</div><div class="fn">본문 Pretendard · 개구 한글 2,350자 약 500KB → 손글씨는 제목 · 목록에만</div>
+    <h3>버튼</h3><div class="bt"><a class="j-go" href="#">단어 20개 하러 가기</a></div>
+    <p class="ref">참고: 다이어리 꾸미기(다꾸) · 스터디 플래너 인증샷, Finch의 할 일 목록</p></aside>
+</div>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo');</script>
+</body>
+</html>

@@ -31,7 +31,7 @@
 .B .tabs a.on { color: var(--cobalt); }
 .B .tabs a.on svg { fill: var(--ice); }
 .B .pill { display: flex; align-items: center; justify-content: center; gap: 8px; height: 60px; border-radius: 99px; font-size: 18px; font-weight: 800; text-decoration: none; transition: transform 120ms var(--e-enter); }
-.B .pill:active { transform: scale(.97); }
+.B .pill:active, .B .pill.press { transform: scale(.97); }
 .B .pill.w { background: var(--white); color: var(--cobalt); }
 .B .pill.c { background: var(--cobalt); color: var(--white); }
 
@@ -171,6 +171,11 @@
       <a><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 4.5-5 8-5s6.5 1 8 5"/></svg>나</a>
     </nav>
   </div></figure>
+  <aside class="spec"><div class="no">02</div><h2>코발트 포커스</h2><p class="one">진한 파랑 면 + 흰 큰 글자 한 문장. 공부 화면은 흰 바탕에 문제만.</p>
+    <h3>색</h3><div class="sws"><i style="background:#2f45ff" data-c="#2f45ff"></i><i style="background:#0d1240" data-c="#0d1240"></i><i style="background:#ffffff" data-c="#ffffff"></i><i style="background:#e4e8ff" data-c="#e4e8ff"></i><i style="background:#ffe14d" data-c="#ffe14d"></i></div>
+    <h3 style="margin-top:24px">제목 글꼴 · Pretendard 900 OFL</h3><div class="fs" style="font-family:'Pretendard';font-weight:900;">오늘 20단어</div><div class="fn">글꼴 하나(가변 432KB / 1굵기 170KB)</div>
+    <h3>버튼</h3><div class="bt B" style="background:none;padding:0;position:relative"><a class="pill c" href="#">20단어 시작</a></div>
+    <p class="ref">참고: 스픽 · 말해보카 · 콴다 · 토스</p></aside>
 
   <figure class="shot"><figcaption>단어 공부 (정답 직후)</figcaption>
   <div class="phone B" data-screen="study">
@@ -251,6 +256,6 @@
   </ul></section>
 </div>
 <p class="note">숫자 · 이름은 예시입니다. 그림은 모두 저장소의 것입니다(public/assets).</p>
-<script>if (location.search.includes('still')) document.body.classList.add('still');</script>
+<script>if (location.search.includes('still')) document.body.classList.add('still'); if (location.search.includes('solo')) document.body.classList.add('solo');</script>
 </body>
 </html>
