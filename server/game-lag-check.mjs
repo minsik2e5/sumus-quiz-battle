@@ -33,6 +33,18 @@ export async function runGameLagChecks(assert) {
     assert(tick.includes('M.clockEl?.isConnected') && tick.includes('txt !== M.clockTxt') && hud.includes('off !== M.ringOff') && hud.includes('M.ringFill?.isConnected'), '짝 맞추기 tick · hud: 요소를 프레임마다 찾지 않고 값이 바뀔 때만 쓴다');
     assert(/#mt-clock b\{[^}]*contain:size layout style/.test(css), '짝 맞추기 시계 칸: 크기 고정 + contain(글자가 바뀌어도 배치가 칸 밖으로 번지지 않음)');
   }
+  // 2-2) 짝 맞추기: 맞힌 순간의 일을 두 프레임으로 나눈다(콤보 글자 · 펫 말풍선 · 달리기 표시는 다음 프레임), 피버 켜기는 바로
+  {
+    const js = source('../public/modules/match-game.js'), hit = fnBody(js, 'hit');
+    assert(hit && /if \(feverNow\) feverOn\(\);\s*requestAnimationFrame\(\(\) => \{ if \(M !== m \|\| M\.closing\) return; comboText\(\); if \(cheer\) petSay\(cheer\[0\], cheer\[1\]\); meRun\(\); ghostGap\(split\); \}\);/.test(hit), '짝 맞추기 hit: 콤보 글자 · 말풍선 · 달리기 표시는 다음 프레임에, 판이 바뀌었으면 하지 않는다');
+  }
+  // 2-3) 펫 아레나: 스프라이트 묶음은 그림 · 크기 · 팀 색마다 한 번만 굽고, 대기 펫은 카운트다운 동안 한 프레임에 하나씩 미리 굽는다
+  {
+    const st = source('../public/modules/arena-stage.js'), ui = source('../public/modules/arena.js'), spr = fnBody(st, 'sprites'), warm = fnBody(st, 'warmStep'), rs = fnBody(st, 'resize');
+    assert(spr.includes('sprC.get(key)') && spr.includes('`${im.src}|${px}|${color || \'\'}`') && spr.includes('if (sprC.size > 40) sprC.clear();'), '아레나 sprites: 같은 그림 · 크기 · 색은 캐시에서(상한 40)');
+    assert(warm.includes("if (kind === 'spr') {") && warm.includes('break;') && rs.includes('sprC.clear();') && rs.includes('for (const w of sprWant) if (!warmQ.includes(w)) warmQ.push(w);'), '아레나: 스프라이트 미리 굽기는 한 프레임에 하나, 크기가 바뀌면 비우고 다시 굽는다');
+    assert(/if \(i === R\.cur\?\.\[who\]\?\.idx\) return;[^\n]*jobs\.push\(\(\) => R\.stage\?\.warm\(\[\['spr', src, team\]\]\)\)/.test(ui), '아레나 warmArt: 대기 펫의 기본 · 공격 · 맞는 자세 그림을 카운트다운 동안 미리 굽게 맡긴다');
+  }
   // 3) 새 CSS가 묶음에 들어 있고, 움직임을 새로 만들지 않는다
   {
     const css = source('../public/v13246.css'), build = source('./build-assets.mjs');

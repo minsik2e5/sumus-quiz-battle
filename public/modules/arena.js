@@ -568,6 +568,8 @@ function warmArt() {
     jobs.push(() => { if (pet.querySelector(`[data-k="${k}"]`)) return; pet.insertAdjacentHTML('beforeend', petImg(f.key, R.forms[who][i], 'avatar-art').replace('<img ', `<img data-k="${k}" `)); pet.lastElementChild?.decode?.().catch(() => {}); });
   });
   jobs.push(() => R.stage?.warm(warmList()));
+  // V13.246 교체로 나올 펫(대기 펫)의 무대 스프라이트를 미리 굽는다 → 교체하는 프레임에 본체 · 실루엣 · 테두리 굽기가 몰리지 않게. 그림 하나씩.
+  for (const who of SLOTS()) { const team = who === 'me' ? 'me' : R.multi ? (isAlly(who) ? 'ally' : 'enemy') : 'foe'; R.teams[who].forEach((f, i) => { if (i === R.cur?.[who]?.idx) return; const form = R.forms[who][i]; for (const src of [petSrc(f.key, form), expressionSrc(f.key, form, 'attack'), expressionSrc(f.key, form, 'hurt')]) if (src) jobs.push(() => R.stage?.warm([['spr', src, team]])); }); }
   // 한 프레임에 몰리지 않게 카운트다운(3초) 동안 120ms마다 하나씩.
   jobs.forEach((job, i) => later(job, 250 + i * 120));
 }
