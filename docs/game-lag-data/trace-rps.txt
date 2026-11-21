@@ -1,0 +1,16 @@
+trace(ms): RasterTask 426 · UpdateLayoutTree 393 · Paint 321 · Layerize 181 · FunctionCall 169 · PrePaint 167 · Commit 157 · Layout 129 · TimerFire 116 · FireAnimationFrame 114 · EventDispatch 78 · ImageDecodeTask 56 · Decode Image 47 · MajorGC 19 · HitTest 14 · ParseHTML 4
+long 1.0s 52ms: EventDispatch 37 · FunctionCall 36 · Layout 11 · PrePaint 3 · UpdateLayoutTree 2
+long 2.8s 64ms: TimerFire 63 · UpdateLayoutTree 10 · Layout 7 · ParseHTML 0 · EventDispatch 0
+207 ScheduleStyleRecalculation: (js 아님: CSS 애니메이션 등)
+30 InvalidateLayout: step rps.js:163
+18 InvalidateLayout: (js 아님: CSS 애니메이션 등)
+8 ScheduleStyleRecalculation: banner rps.js:146
+4 InvalidateLayout: banner rps.js:146
+3 InvalidateLayout: talk rps.js:151
+3 ScheduleStyleRecalculation: talk rps.js:151
+3 ScheduleStyleRecalculation: controls rps.js:186
+3 InvalidateLayout: throwHand rps.js:228
+3 ScheduleStyleRecalculation: throwHand rps.js:228
+2 InvalidateLayout: controls rps.js:186
+2 InvalidateLayout: (anon) arcade.js:41
+{"game":"rps","cpu":4,"rounds":1,"start_ms":516,"seconds":3.7,"fps":53.3,"p95":33.3,"max":100,"over33_min":80,"over50_min":48,"first5s_over50":3,"long_tasks":2,"input_p95":27.3,"style_ms":460,"layout_ms":134,"layout_count":67,"script_ms":124,"task_ms":2193,"net":{"/api/rps/play":1,"/api/rps/cash":1},"img":["arm-robot-paper.webp","arm-me-scissors.webp","robot-lose.webp","arm-me-thumb.webp","robot-think.webp"],"anims_inf":{},"hidden":null,"heap_mb":[4.2,4.4],"nodes":[649,922],"listeners":[67,69],"after_exit":{"raf_per_s":0,"intervals":[{"ms":20000,"at":"startInvitePolling (/app.js?v=13.243.0:643:16) < startPolling (/app.js?v=13.243.0:705:3)"},{"ms":120000,"at":"startPolling (/app.js?v=13.243.0:709:10) < $.onsubmit (/app.js?v=13.243.0:386:346)"}],"audio":0,"ctx_running":2,"anims_inf":{"rps-rays":1,"rps-bob":3},"heap_mb":4.4,"nodes":950,"listeners":69},"errors":[]}

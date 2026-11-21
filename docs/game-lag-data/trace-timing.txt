@@ -1,0 +1,15 @@
+trace(ms): RasterTask 768 · UpdateLayoutTree 620 · FireAnimationFrame 598 · FunctionCall 506 · Paint 362 · Commit 285 · PrePaint 193 · Layerize 170 · Layout 49 · EventDispatch 24 · TimerFire 14 · MajorGC 12 · ParseHTML 6 · HitTest 4 · ImageDecodeTask 0 · Decode Image 0
+long 11.4s 115ms: Layout 43 · UpdateLayoutTree 30 · FireAnimationFrame 23 · Paint 4 · PrePaint 3
+685 ScheduleStyleRecalculation: (js 아님: CSS 애니메이션 등)
+7 ScheduleStyleRecalculation: setLed timing.js:66
+4 InvalidateLayout: (js 아님: CSS 애니메이션 등)
+2 InvalidateLayout: stateText timing.js:161
+2 ScheduleStyleRecalculation: release timing.js:324
+1 ScheduleStyleRecalculation: (anon) timing.js:288
+1 ScheduleStyleRecalculation: down timing.js:316
+1 InvalidateLayout: press timing.js:339
+1 ScheduleStyleRecalculation: press timing.js:339
+1 InvalidateLayout: release timing.js:324
+1 ScheduleStyleRecalculation: (anon) timing.js:387
+1 ScheduleStyleRecalculation: (anon) timing.js:326
+{"game":"timing","cpu":4,"rounds":1,"start_ms":3089,"seconds":11.5,"fps":59.5,"p95":16.7,"max":100.1,"over33_min":5.2,"over50_min":5.2,"first5s_over50":0,"long_tasks":1,"input_p95":23.1,"style_ms":828,"layout_ms":84,"layout_count":47,"script_ms":482,"task_ms":4003,"net":{"/api/timing/finish":1},"img":["dog-1-s.webp"],"anims_inf":{"tmFlicker":1,"tmBreath":1},"hidden":null,"heap_mb":[4.3,4.5],"nodes":[1100,1147],"listeners":[77,78],"after_exit":{"raf_per_s":0,"intervals":[{"ms":20000,"at":"startInvitePolling (/app.js?v=13.243.0:643:16) < startPolling (/app.js?v=13.243.0:705:3)"},{"ms":120000,"at":"startPolling (/app.js?v=13.243.0:709:10) < $.onsubmit (/app.js?v=13.243.0:386:346)"}],"audio":0,"ctx_running":1,"anims_inf":{"tmFlicker":1,"tmBreath":1,"tmShine":1,"tmHop":1},"heap_mb":4.5,"nodes":1114,"listeners":77},"errors":[]}

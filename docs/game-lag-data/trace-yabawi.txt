@@ -1,0 +1,15 @@
+trace(ms): RasterTask 1693 · Paint 403 · UpdateLayoutTree 292 · Layerize 240 · Layout 205 · Commit 205 · PrePaint 180 · FunctionCall 175 · FireAnimationFrame 138 · TimerFire 71 · EventDispatch 70 · ImageDecodeTask 22 · HitTest 16 · MajorGC 15 · Decode Image 14 · ParseHTML 5
+long 6.1s 47ms: TimerFire 47 · Layout 18 · UpdateLayoutTree 5 · ParseHTML 1 · EventDispatch 0
+378 ScheduleStyleRecalculation: (js 아님: CSS 애니메이션 등)
+214 InvalidateLayout: (js 아님: CSS 애니메이션 등)
+4 ScheduleStyleRecalculation: banner yabawi.js:205
+3 ScheduleStyleRecalculation: controls yabawi.js:458
+3 InvalidateLayout: talk yabawi.js:202
+3 ScheduleStyleRecalculation: talk yabawi.js:202
+2 InvalidateLayout: controls yabawi.js:458
+2 InvalidateLayout: (anon) arcade.js:41
+2 ScheduleStyleRecalculation: (anon) arcade.js:41
+2 ScheduleStyleRecalculation: lift yabawi.js:248
+2 InvalidateLayout: banner yabawi.js:205
+2 ScheduleStyleRecalculation: stamp yabawi.js:206
+{"game":"yabawi","cpu":4,"rounds":1,"start_ms":527,"seconds":6.2,"fps":58.7,"p95":16.8,"max":50,"over33_min":19.3,"over50_min":0,"first5s_over50":0,"long_tasks":0,"input_p95":28.1,"style_ms":337,"layout_ms":248,"layout_count":263,"script_ms":154,"task_ms":2664,"net":{"/api/yabawi/deal":1,"/api/yabawi/pick":1},"img":["dealer-sweep.webp"],"anims_inf":{"yw-flicker":1,"yw-smoke":2,"yw-breathe":1},"hidden":null,"heap_mb":[4.3,4.5],"nodes":[649,881],"listeners":[67,69],"after_exit":{"raf_per_s":0,"intervals":[{"ms":20000,"at":"startInvitePolling (/app.js?v=13.243.0:643:16) < startPolling (/app.js?v=13.243.0:705:3)"},{"ms":120000,"at":"startPolling (/app.js?v=13.243.0:709:10) < $.onsubmit (/app.js?v=13.243.0:386:346)"}],"audio":0,"ctx_running":2,"anims_inf":{},"heap_mb":4.5,"nodes":901,"listeners":69},"errors":[]}
