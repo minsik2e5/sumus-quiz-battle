@@ -201,9 +201,7 @@ export function createStage(field, host) {
     const ring = world?.querySelector('.ar-ring');
     if (ring) Object.assign(ring.style, { left: `${PX + 6 * U}px`, top: `${PY + 10 * U * VIEW.tilt}px`, width: `${88 * U}px`, height: `${82 * U * VIEW.tilt}px`, right: 'auto', bottom: 'auto' });
     paintBase();
-    sprC.clear();
     for (const p of pets.values()) { p.sz = petSize(); build(p); }
-    for (const w of sprWant) if (!warmQ.includes(w)) warmQ.push(w);   // 크기가 바뀌었으니(품질 단계 · 화면 돌림) 대기 펫 스프라이트를 프레임마다 하나씩 다시 굽는다
     digits.clear(); texts.clear(); bitSpr.clear(); orbSpr.clear();
     void oldPX;
   }
@@ -302,14 +300,7 @@ export function createStage(field, host) {
     for (let i = 0; i < 8; i++) { const a = i / 8 * TAU; g.globalAlpha = .55; g.drawImage(sil, r + Math.cos(a) * r, r + Math.sin(a) * r); }
     return { c, r };
   }
-  // V13.246 렉 방지: 같은 그림 · 크기 · 팀 색의 스프라이트 묶음(본체 · 흰 실루엣 · 테두리)은 한 번만 굽는다.
-  //   교체로 나올 펫은 카운트다운 동안 미리 구워 두어(warm의 'spr'), 교체하는 프레임에 굽기가 몰리지 않는다. 크기가 바뀌면(resize) 비운다.
-  const sprC = new Map(), teamColor = team => team === 'enemy' || team === 'foe' ? 'rgba(251,113,133,1)' : 'rgba(96,165,250,1)';
-  function sprites(im, px, color) {
-    const key = `${im.src}|${px}|${color || ''}`; let s = sprC.get(key);
-    if (!s) { const body = shrink(im, px); s = { body, white: silhouette(body, '#fff'), glow: color ? outline(body, color) : null, tints: {} }; if (sprC.size > 40) sprC.clear(); sprC.set(key, s); }
-    return s;
-  }
+  function sprites(im, px, color) { const body = shrink(im, px); return { body, white: silhouette(body, '#fff'), glow: color ? outline(body, color) : null, tints: {} }; }
   function build(p) {
     const px = Math.round(p.sz * S * SPR_K), color = p.team === 'enemy' || p.team === 'foe' ? 'rgba(251,113,133,1)' : 'rgba(96,165,250,1)';
     p.spr = p.img ? sprites(p.img, px, color) : null;
@@ -396,13 +387,9 @@ export function createStage(field, host) {
     texts.set(key, s); return s;
   }
   // 카운트다운 동안 쓸 글자를 몇 개씩 미리 그림으로(첫 타격 프레임이 글꼴 그리기로 길어지지 않게).
-  const warmQ = [], sprWant = [];
+  const warmQ = [];
   function warmStep() {
-    for (let n = 0; n < 3 && warmQ.length; n++) {
-      const [kind, a, b] = warmQ.shift();
-      if (kind === 'spr') { whenImg(a, im => sprites(im, Math.round(petSize() * S * SPR_K), teamColor(b))); break; }   // 스프라이트 굽기는 한 프레임에 하나만
-      if (kind === 'num') atlas(a, b); else textSprite(a, b);
-    }
+    for (let n = 0; n < 3 && warmQ.length; n++) { const [kind, a, b] = warmQ.shift(); if (kind === 'num') atlas(a, b); else textSprite(a, b); }
   }
 
   /* ---------- 조각 모양(작은 그림 한 번 만들기) ---------- */
@@ -526,7 +513,7 @@ export function createStage(field, host) {
       whenImg(src, im => { if (p.src === want) { p.img = im; build(p); } });
       for (const [k, s] of Object.entries(poses)) if (s) whenImg(s, im => { if (p.src === want) { p.poseImg[k] = im; p.poses[k] = sprites(im, Math.round(p.sz * S * SPR_K), p.team === 'enemy' || p.team === 'foe' ? 'rgba(251,113,133,1)' : 'rgba(96,165,250,1)'); } });
     },
-    resize, warm(list) { for (const w of list) { if (w[0] === 'spr') sprWant.push(w); warmQ.push(w); } },
+    resize, warm(list) { warmQ.push(...list); },
     // 그림 66 · 쓰러짐 별 · 허수아비를 카운트다운 동안 미리 받아 디코드(ARENA_ART에 있는 이름만)
     preload(names) { for (const n of names) if (ARENA_ART.has(n)) image(`/assets/arena/${n}.webp`); },
     // 공격 · 맞는 자세 그림을 ms 동안(미리 받아 둔 것만)
